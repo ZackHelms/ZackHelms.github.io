@@ -47,6 +47,15 @@ header {
 header h1 { font-size: 1.4rem; color: var(--gold); letter-spacing: 0.05em; }
 header .subtitle { color: var(--text-dim); font-size: 0.9rem; font-style: italic; }
 header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.compat-logo { height: 40px; width: auto; cursor: pointer; opacity: 0.85; transition: opacity 0.15s; border-radius: 3px; }
+.compat-logo:hover { opacity: 1; }
+.attr-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
+.attr-overlay.open { display: flex; }
+.attr-box { background: var(--surface); border: 2px solid var(--gold); border-radius: 8px; padding: 28px 32px; max-width: 480px; width: 90%; position: relative; font-family: var(--font-body); color: var(--text); line-height: 1.7; }
+.attr-box h2 { color: var(--gold); font-size: 1.1rem; margin-bottom: 16px; }
+.attr-box a { color: var(--gold); }
+.attr-close { position: absolute; top: 10px; right: 14px; background: none; border: none; color: var(--text-dim); font-size: 1.3rem; cursor: pointer; line-height: 1; }
+.attr-close:hover { color: var(--text); }
 
 .main-layout {
   display: flex;
@@ -674,6 +683,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     <h1>Character Creator</h1>
     <span class="subtitle">Player's Handbook — August 2024</span>
   </div>
+  <img src="Dolmenwood-Compatibility-Logo-White-On-Black.png" alt="Dolmenwood Compatibility Logo" class="compat-logo" onclick="document.getElementById('attrOverlay').classList.add('open')" title="Attributions">
   <div class="save-controls">
     <button class="btn btn-secondary btn-sm" onclick="saveCharacter()">Save</button>
     <button class="btn btn-secondary btn-sm" onclick="loadCharacter()">Load</button>
@@ -683,6 +693,17 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     <button class="btn btn-secondary btn-sm" onclick="printSheet()">Print Sheet</button>
   </div>
 </header>
+<div id="attrOverlay" class="attr-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="attr-box">
+    <button class="attr-close" onclick="document.getElementById('attrOverlay').classList.remove('open')">&times;</button>
+    <h2>Attributions</h2>
+    <p>This is an independent product published under the Dolmenwood Third-Party Licence and is not affiliated with or approved by Necrotic Gnome.</p>
+    <br>
+    <p><a href="https://necroticgnome.com/pages/about-dolmenwood" target="_blank">Dolmenwood&reg;</a> and all related characters and elements are &copy; <a href="https://necroticgnome.com" target="_blank">Necrotic Gnome</a> and used with permission under licence.</p>
+    <br>
+    <p style="font-size:0.8rem;color:var(--text-dim)">Logo and licence from the <a href="https://necroticgnome.com/products/dolmenwood-creator-kit" target="_blank">Dolmenwood Creator Kit</a> via <a href="https://necroticgnome.com/3pp" target="_blank">necroticgnome.com/3pp</a>.</p>
+  </div>
+</div>
 <!--
 <img 
   src="your-image.jpg" 
