@@ -639,7 +639,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 #modal-box h4 { color:var(--gold); margin-bottom:12px; font-size:1rem; }
 #modal-box p { color:var(--text); font-family:var(--font-ui); font-size:0.9rem; line-height:1.6; }
 #modal-buttons { display:flex; gap:8px; margin-top:16px; justify-content:flex-end; flex-wrap:wrap; }
-.load-item { padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; font-family:var(--font-ui); font-size:0.85rem; color:var(--text); margin-bottom:6px; transition:all 0.15s; display:block; width:100%; text-align:left; }
+.load-item { padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; font-family:var(--font-ui); font-size:0.85rem; color:var(--text); margin-bottom:6px; transition:all 0.15s; display:block; width:100%; text-align:left; background:var(--surface); }
 .load-item:hover { border-color:var(--gold-dim); color:var(--gold-dim); background:var(--surface2); }
 /* Adjust step controls */
 .adj-control { display:flex; align-items:center; gap:6px; }
@@ -1759,6 +1759,24 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const roll = rollD100();
     const idx = Math.min(Math.floor((roll - 1) / (100 / n)), n - 1);
     char.background = kd.backgrounds[idx];
+    render();
+  }
+
+  function rollFirstName() {
+    const kd = getKindredData();
+    if (!kd) return;
+    const list = getNameSuggestions(kd, char.gender || 'any');
+    if (!list.length) return;
+    char.name = list[Math.floor(Math.random() * list.length)];
+    render();
+  }
+
+  function rollSurname() {
+    const kd = getKindredData();
+    if (!kd) return;
+    const surnames = kd.names.surname || [];
+    if (!surnames.length) return;
+    char.surname = surnames[Math.floor(Math.random() * surnames.length)];
     render();
   }
 
@@ -2888,13 +2906,19 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       <div class="two-col">
         <div>
           <div class="form-row">
-            <label>First Name *</label>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <label style="margin:0">First Name *</label>
+              ${firstNames.length ? `<div class="dice-btn" onclick="rollFirstName()" title="Roll random first name"><img src="${DICE_IMGS.D20}" alt="d20" style="width:18px;height:18px;object-fit:contain"></div>` : ''}
+            </div>
             <input type="text" ${firstNames.length?`list="${firstListId}"`:''}
               value="${char.name}" oninput="char.name=this.value" placeholder="Type or choose from list">
             ${firstNames.length ? `<div class="hint">${firstNames.length} suggestions available — type to filter or choose from list</div>` : ''}
           </div>
           <div class="form-row">
-            <label>Surname</label>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <label style="margin:0">Surname</label>
+              ${surnames.length ? `<div class="dice-btn" onclick="rollSurname()" title="Roll random surname"><img src="${DICE_IMGS.D20}" alt="d20" style="width:18px;height:18px;object-fit:contain"></div>` : ''}
+            </div>
             <input type="text" ${surnames.length?`list="${surnameListId}"`:''}
               value="${char.surname}" oninput="char.surname=this.value" placeholder="Type or choose from list">
             ${surnames.length ? `<div class="hint">${surnames.length} suggestions available</div>` : ''}
