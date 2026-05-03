@@ -639,8 +639,12 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 #modal-box h4 { color:var(--gold); margin-bottom:12px; font-size:1rem; }
 #modal-box p { color:var(--text); font-family:var(--font-ui); font-size:0.9rem; line-height:1.6; }
 #modal-buttons { display:flex; gap:8px; margin-top:16px; justify-content:flex-end; flex-wrap:wrap; }
+.load-row { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.load-row .load-item { margin-bottom:0; flex:1; }
 .load-item { padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; font-family:var(--font-ui); font-size:0.85rem; color:var(--text); margin-bottom:6px; transition:all 0.15s; display:block; width:100%; text-align:left; background:var(--surface); }
 .load-item:hover { border-color:var(--gold-dim); color:var(--gold-dim); background:var(--surface2); }
+.load-delete { flex-shrink:0; width:28px; height:28px; border:1px solid var(--red); border-radius:var(--radius); background:transparent; color:var(--red-bright); cursor:pointer; font-size:0.9rem; display:flex; align-items:center; justify-content:center; transition:all 0.15s; padding:0; font-family:var(--font-ui); }
+.load-delete:hover { background:var(--red); color:var(--text); }
 /* Adjust step controls */
 .adj-control { display:flex; align-items:center; gap:6px; }
 .adj-btn { width:28px; height:28px; border-radius:4px; border:none; cursor:pointer; font-size:1rem; line-height:1; display:flex; align-items:center; justify-content:center; transition:all 0.15s; font-family:var(--font-ui); }
@@ -3461,20 +3465,10 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     }
   }
 
-  function loadCharacter() {
-    if (!storageAvailable()) {
-      showModal(
-        `<h4>Browser Storage Unavailable</h4><p>Your browser is blocking local storage. Use <strong>Import JSON</strong> to load a previously exported character file instead.</p>`,
-        [{ label: 'OK', onClick: () => {} }]
-      );
-      return;
-    }
+  function showLoadDialog() {
     let saved = [];
     try { saved = Object.keys(localStorage).filter(k => k.startsWith('dolmenwood_char_')); }
-    catch(e) {
-      showModal('<h4>Load Failed</h4><p>Storage unavailable: ' + (e.message||'') + '</p>', [{label:'OK',onClick:()=>{}}]);
-      return;
-    }
+    catch(e) { return; }
     if (!saved.length) {
       showModal('<h4>Load Character</h4><p>No saved characters found. Use <strong>Import JSON</strong> to load from a file.</p>',
         [{ label: 'OK', onClick: () => {} }]);
@@ -3482,7 +3476,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     }
     const listHTML = saved.map(k => {
       const label = k.replace('dolmenwood_char_', '');
-      return `<button class="load-item" data-key="${k}">${label}</button>`;
+      return `<div class="load-row"><button class="load-delete" data-key="${k}" title="Delete character">✕</button><button class="load-item" data-key="${k}">${label}</button></div>`;
     }).join('');
     showModal(
       `<h4>Load Character</h4><p>Select a character to load:</p>${listHTML}`,
@@ -3499,6 +3493,35 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         render();
       });
     });
+    document.querySelectorAll('#modal-content .load-delete').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.key;
+        const label = key.replace('dolmenwood_char_', '');
+        showModal(
+          `<h4>Delete Character</h4><p>Are you sure you want to delete <strong>${label}</strong>? This cannot be undone.</p>`,
+          [
+            { label: 'Delete', style: 'danger', onClick: () => { localStorage.removeItem(key); showLoadDialog(); } },
+            { label: 'Cancel', onClick: () => showLoadDialog() }
+          ]
+        );
+      });
+    });
+  }
+
+  function loadCharacter() {
+    if (!storageAvailable()) {
+      showModal(
+        `<h4>Browser Storage Unavailable</h4><p>Your browser is blocking local storage. Use <strong>Import JSON</strong> to load a previously exported character file instead.</p>`,
+        [{ label: 'OK', onClick: () => {} }]
+      );
+      return;
+    }
+    try { Object.keys(localStorage); }
+    catch(e) {
+      showModal('<h4>Load Failed</h4><p>Storage unavailable: ' + (e.message||'') + '</p>', [{label:'OK',onClick:()=>{}}]);
+      return;
+    }
+    showLoadDialog();
   }
 
   function exportJSON() {
