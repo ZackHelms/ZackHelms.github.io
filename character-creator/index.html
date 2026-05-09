@@ -3305,9 +3305,9 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           <input type="number" min="1" max="${cd.hitDie}" value="${hpRolled !== undefined ? hpRolled : ''}" placeholder="?"
             oninput="setLuHPManual(${lvl}, parseInt(this.value))"
             style="width:58px;background:var(--bg);border:2px solid var(--border);color:var(--text);font-size:1.3rem;text-align:center;padding:5px;border-radius:var(--radius);font-family:var(--font-body)">
-          <div class="lu-stat ${maxHP !== null ? 'improved' : ''}" style="flex:none">
+          <div id="lu-hp-stat-${lvl}" class="lu-stat ${maxHP !== null ? 'improved' : ''}" style="flex:none">
             <div class="ls-label">HP Gained</div>
-            <div class="ls-value">${maxHP !== null ? (maxHP > 0 ? '+' : '') + maxHP : '?'}</div>
+            <div id="lu-hp-value-${lvl}" class="ls-value">${maxHP !== null ? (maxHP > 0 ? '+' : '') + maxHP : '?'}</div>
             <div class="ls-sub">roll + CON ${modStr(conMod)}</div>
           </div>
         </div>`;
@@ -3509,8 +3509,15 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   function setLuHPManual(lvl, val) {
     if (!char.luHP) char.luHP = {};
     const n = parseInt(val);
-    if (!isNaN(n) && n >= 1) char.luHP[lvl] = n;
-    render();
+    if (!isNaN(n) && n >= 1) {
+      char.luHP[lvl] = n;
+      const conMod = abilityMod(char.con) ?? 0;
+      const gained = Math.max(1, n + conMod);
+      const statEl = document.getElementById('lu-hp-stat-' + lvl);
+      const valEl  = document.getElementById('lu-hp-value-' + lvl);
+      if (statEl) statEl.classList.add('improved');
+      if (valEl)  valEl.textContent = (gained > 0 ? '+' : '') + gained;
+    }
   }
 
   function rollLuHP(lvl) {
