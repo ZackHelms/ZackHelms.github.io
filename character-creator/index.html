@@ -1635,6 +1635,50 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     { name:"Purify Food and Drink", prayer:"St Gretchen's Sublimation", desc:"Permanently purify up to 12 portions of poisoned, rotten, spoiled, or contaminated food or drink." },
     { name:"Rally", prayer:"St Jorrael's Counsel", desc:"Purge fear from caster or touched creature for 2 Turns. +1 bonus per Level to saves vs magical fear effects." }
   ];
+  const HOLY_SPELLS_RANK2 = [
+    { name:"Bless", prayer:"Righteousness of St Gondyw", desc:"All allies in a 20′×20′ area gain +1 Attack and Damage Rolls (and +1 Loyalty for retainers) for 6 Turns." },
+    { name:"Charm Serpents", prayer:"St Dank's Plea", desc:"Hypnotise snakes whose levels total up to twice yours; charmed snakes sway and never attack. 1d4 Rounds (if attacking) or 1d4 Turns." },
+    { name:"Find Traps", prayer:"Path of St Gripe", desc:"All traps within 30′ glow with faint flickering flames for 2 Turns. Both magical and mechanical traps revealed." },
+    { name:"Flame Ward", prayer:"Boldness of St Hollyhock", desc:"+2 saves vs fire effects; reduce fire damage by 1 per die; single creature unharmed by non-magical heat/fire for 2 Turns." },
+    { name:"Hold Person", prayer:"St Waylaine's Reproof", desc:"Mortals, fairies, or demi-fey within 180′ must Save vs Hold (–2 for single target) or be frozen for 9 Turns. 1d4 targets in a group." },
+    { name:"Reveal Alignment", prayer:"St Willofrith's Warning", desc:"An angelic voice whispers the Alignment of one target within 30′. Instant." },
+    { name:"Silence", prayer:"Abjuration of St Signis", desc:"No sound within a 15′ radius area for 12 Turns; conversation and spellcasting impossible. May be cast on a creature (Save vs Spell)." },
+    { name:"Speak With Animals", prayer:"Speech of St Hamfast", desc:"Speak with all animals of one species for 6 Turns. Friendly animals may perform simple services." }
+  ];
+  const HOLY_SPELLS_RANK3 = [
+    { name:"Animal Growth", prayer:"Mercy of St Vinicus", desc:"One normal or giant animal doubles in size for 12 Turns: melee damage doubled, carry weight doubled." },
+    { name:"Bless Weapon", prayer:"Courage of St Sedge", desc:"Silver light enchants one weapon for 1 Turn: +1d6 damage and the weapon can harm monsters requiring magic to hit." },
+    { name:"Cure Affliction", prayer:"St Pastery's Blessing", desc:"Cure one disease, or restore sight or hearing (removing the cause), for a creature within 30′. Instant." },
+    { name:"Holy Light", prayer:"Devotion of St Eggort", desc:"Eternal 30′ daylight at a fixed location (permanent), or a 15′ beacon imposing –2 attacks/saves on undead (6 Turns), or cancel magical darkness." },
+    { name:"Locate Object", prayer:"St Keye's Revelation", desc:"A cherub-apparition points toward the nearest object of a chosen class, or a specific visualised object, within 120′ for 6 Turns." },
+    { name:"Remove Curse", prayer:"St Primula's Grace", desc:"Permanently cure one curse on the caster or a touched creature, allowing a cursed item to be discarded. Instant." }
+  ];
+  const HOLY_SPELLS_RANK4 = [
+    { name:"Circle of Protection", prayer:"St Faxis' Abjuration", desc:"10′ radius moving circle grants Mantle of Protection to all allies within: +1 AC and saves vs Chaotic/summoned creatures for 12 Turns." },
+    { name:"Create Water", prayer:"St Quister's Defence", desc:"A fount of sweet-tasting pure water springs up, sustaining 12 people and 12 mounts for one day (~50 gallons). Permanent." },
+    { name:"Greater Healing", prayer:"Steadfastness of St Wick", desc:"Restore 2d6+2 HP to caster or touched creature (cannot exceed maximum). Instant." },
+    { name:"Remove Poison", prayer:"St Torphia's Respite", desc:"Neutralise poison in a creature or object. A poisoning victim may be revived to 1 HP if cast within 10 Rounds of death. Instant." },
+    { name:"Speak With Plants", prayer:"Salvation of St Wort", desc:"Communicate with plants for 3 Turns. Normal flora reports recent passings; monstrous plants can converse." },
+    { name:"Serpent Transformation", prayer:"St Horace's Requital", desc:"Transform 2d8 sticks into adders that obey your orders for 6 Turns. Each reverts to a stick when killed or when the spell ends." }
+  ];
+  const HOLY_SPELLS_RANK5 = [
+    { name:"Communion", prayer:"St Elsa's Visitation", desc:"Enter a trance and ask 3 yes/no questions of an ascended saint; all answers are guaranteed true. Once per week (or month)." },
+    { name:"Create Food", prayer:"St Ponch's Feast", desc:"Food for 12 people and 12 mounts for one day appears near the caster. Permanent." },
+    { name:"Holy Fire", prayer:"St Goodenough's Rebuke", desc:"Column of holy fire: destroy/banish undead and summoned creatures in 30′ area (Save vs Spell), target one creature (–2 save), or remove a curse/disease by touch." },
+    { name:"Holy Quest", prayer:"Righteousness of St Galaunt", desc:"Command one creature within 30′ to perform a quest (not suicidal). Failure to comply: –2 Attack and Saving Throws until completed." },
+    { name:"Insect Plague", prayer:"Amity of St Cornice", desc:"60′ diameter swarm of biting insects; 1 damage/Round to all inside; vision limited to 30′; Levels 1–2 creatures flee in horror. Lasts 1 Turn/Level." },
+    { name:"Raise Dead", prayer:"Mercy of St Clewyd", desc:"Return a deceased mortal to life (dead ≤ 2 days/Level). Requires a cathedral, a dozen priests, and 2,000gp of incense. Weakness lasts 2 weeks." }
+  ];
+  const HOLY_SPELLS_BY_RANK = [HOLY_SPELLS_RANK1, HOLY_SPELLS_RANK2, HOLY_SPELLS_RANK3, HOLY_SPELLS_RANK4, HOLY_SPELLS_RANK5];
+
+  const ARCANE_SPELLS_BY_RANK = [
+    ["Crystal Resonance","Decipher","Fairy Servant","Firelight","Floating Disc","Glyph of Sealing","Ignite / Extinguish","Ingratiate","Ioun Shard","Shield of Force","Vapours of Dream","Ventriloquism"],
+    ["Arcane Cypher","Dweomerlight","Flaming Spirit","Glyph of Locking","Invisibility","Knock","Levitate","Mind Crystal","Mirror Image","Perceive the Invisible","Phantasm","Web"],
+    ["Circle of Invisibility","Crystal Vision","Dark Sight","Dispel Magic","Fireball","Fly","Haste","Lightning Bolt","Missile Ward","Paralysation","Serpent Glyph","Water Breathing"],
+    ["Acid Globe","Arcane Eye","Confusion","Dimension Door","Dominate","Hallucinatory Terrain","Hex Weaving","Plant Growth","Polymorph","Wall of Fire","Wall of Ice","Woodland Veil"],
+    ["Air Sphere","Animate Dead","Cloudkill","Conjure Elemental","Fabricate","Feeblemind","Mire","Passwall","Sending","Telekinesis","Teleport","Wall of Stone"],
+    ["Anti-Magic Ward","Control Weather","Disintegrate","Dweomerfire","Geas","Invisible Stalker","Move Terrain","Oracle","Petrification","Project Image","Wave of Force","Word of Doom"]
+  ];
 
   const ARCANE_RANK1_DESCS = {
     "Crystal Resonance": "Attune a gem (50gp+) to absorb and reproduce environmental energy (light, images, sound, or temperature).",
@@ -2018,7 +2062,42 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       case 'hp': return !!char.hpRoll && calcMaxHP() !== null;
       case 'equipment': return !!char.armorResult || char.cls === 'friar' || char.cls === 'magician';
       case 'alignment': return !!char.alignment;
-      case 'level-up': return !!(char.cls && char.kindred && char.luTarget && char.luTarget > 1);
+      case 'level-up': {
+        if (!char.cls || !char.kindred || !char.luTarget || char.luTarget <= 1) return false;
+        const _cd = CLASS_ADVANCEMENT[char.cls];
+        if (!_cd) return false;
+        for (let _lvl = 2; _lvl <= char.luTarget; _lvl++) {
+          // HP roll required for levels 1–10
+          if (_lvl <= 10 && (char.luHP || {})[_lvl] === undefined) return false;
+          // Combat talent required when talent count increases
+          if (_cd.combatTalentsPerLevel) {
+            const prevT = _cd.combatTalentsPerLevel[_lvl - 2] || 0;
+            const newT  = _cd.combatTalentsPerLevel[_lvl - 1] || 0;
+            if (newT > prevT) {
+              const tid = (char.luCombatTalent || {})[_lvl];
+              if (!tid) return false;
+              if (tid === 'weapon_specialist' || tid === 'slayer') {
+                if (!(char.luCombatTalentDetail || {})[_lvl]) return false;
+              }
+            }
+          }
+          // Glamour slots required when count increases
+          if (_cd.glamoursPerLevel) {
+            const prevG = _cd.glamoursPerLevel[_lvl - 2] || 0;
+            const newG  = _cd.glamoursPerLevel[_lvl - 1] || 0;
+            const numNew = newG - prevG;
+            if (numNew > 0) {
+              const slots = (char.luGlamour || {})[_lvl] || [];
+              for (let _gi = 0; _gi < numNew; _gi++) {
+                if (slots[_gi] === undefined || slots[_gi] < 0) return false;
+              }
+            }
+          }
+          // Symbiotic flesh required for mossling_class
+          if (char.cls === 'mossling_class' && (char.luSymbiotic || {})[_lvl] === undefined) return false;
+        }
+        return true;
+      }
       case 'sheet': return false;
       default: return false;
     }
@@ -3366,6 +3445,27 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           }).join('');
           const spellPage = CLASS_PAGES[char.cls] ? `p. ${CLASS_PAGES[char.cls]}` : '';
           spellsHTML = `<div class="lu-sub-label">Spells Per Day ${spellPage ? `<span class="ref-note">${spellPage}</span>` : ''}</div><div class="lu-stat-grid">${cells}</div>`;
+
+          // Show newly unlocked rank spell lists
+          const isHoly = (char.cls === 'cleric' || char.cls === 'friar');
+          const isArcane = (char.cls === 'magician' || char.cls === 'breggle_class');
+          const newRankListsHTML = newSlots.map((n, i) => {
+            const prev = prevSlots?.[i] || 0;
+            if (n > 0 && prev === 0) {
+              // This rank unlocks at this level
+              if (isHoly && HOLY_SPELLS_BY_RANK[i]) {
+                const spellItems = HOLY_SPELLS_BY_RANK[i].map(s =>
+                  `<div class="sheet-spell"><span class="spell-name">${s.name} <span class="spell-prayer">(${s.prayer})</span></span><span class="spell-desc">${s.desc}</span></div>`
+                ).join('');
+                return `<div class="lu-sub-label" style="margin-top:8px">Rank ${i+1} Holy Spells Unlocked <span class="ref-note">p. 100</span></div><div style="margin-top:4px">${spellItems}</div>`;
+              } else if (isArcane && ARCANE_SPELLS_BY_RANK[i]) {
+                const spellNames = ARCANE_SPELLS_BY_RANK[i].join(', ');
+                return `<div class="lu-sub-label" style="margin-top:8px">Rank ${i+1} Arcane Spells Unlocked <span class="ref-note">p. 78</span></div><div class="lu-unlock" style="margin-top:4px;font-size:0.82rem">${spellNames}</div>`;
+              }
+            }
+            return '';
+          }).join('');
+          if (newRankListsHTML) spellsHTML += newRankListsHTML;
         }
       }
     }
@@ -3432,10 +3532,12 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
                 <div class="dice-btn" onclick="rollLuGlamour(${lvl}, ${gi})" title="Roll d20 for random glamour">
                   <img src="${DICE_IMGS.D20}" alt="d20" style="width:30px;height:30px;object-fit:contain">
                 </div>
-                <select onchange="setLuGlamour(${lvl}, ${gi}, parseInt(this.value))" style="flex:1">
-                  <option value="-1">— Choose or roll for a glamour —</option>
-                  ${glamOpts}
-                </select>
+                <div class="form-row" style="flex:1;margin-bottom:0">
+                  <select onchange="setLuGlamour(${lvl}, ${gi}, parseInt(this.value))">
+                    <option value="-1">— Choose or roll for a glamour —</option>
+                    ${glamOpts}
+                  </select>
+                </div>
               </div>
               ${chosen !== null && chosen >= 0 ? `<div class="tip-box" style="margin-top:4px"><strong>${GLAMOURS[chosen].name}:</strong> ${GLAMOURS[chosen].desc}</div>` : ''}
             </div>`;
@@ -3685,18 +3787,19 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
             spellListHTML = `<div style="margin-top:8px"><div style="color:var(--gold-dim);font-size:0.78rem;font-family:var(--font-ui);margin-bottom:6px"><strong>Spell Book:</strong> ${book.name}</div>${spells}</div>`;
           }
         }
-      } else if (char.cls === 'friar') {
-        magicHow = 'Pray for 1 hour after rest to prepare any Rank 1 holy spell. Cast by speaking the Liturgic prayer aloud — you must be able to speak. Any of the spells below may be chosen each day.';
-        const spells = HOLY_SPELLS_RANK1.map(s =>
-          `<div class="sheet-spell"><span class="spell-name">${s.name} <span class="spell-prayer">(${s.prayer})</span></span><span class="spell-desc">${s.desc}</span></div>`
-        ).join('');
-        spellListHTML = `<div style="margin-top:8px">${spells}</div>`;
-      } else if (char.cls === 'cleric') {
-        magicHow = 'From Level 2: Pray for 1 hour after rest to prepare any Rank 1 holy spell. Cast by speaking the Liturgic prayer aloud — you must be able to speak. Any of the spells below may be chosen each day.';
-        const spells = HOLY_SPELLS_RANK1.map(s =>
-          `<div class="sheet-spell"><span class="spell-name">${s.name} <span class="spell-prayer">(${s.prayer})</span></span><span class="spell-desc">${s.desc}</span></div>`
-        ).join('');
-        spellListHTML = `<div style="margin-top:8px">${spells}</div>`;
+      } else if (char.cls === 'friar' || char.cls === 'cleric') {
+        const isCleric = char.cls === 'cleric';
+        magicHow = (isCleric ? 'From Level 2: Pray' : 'Pray') + ' for 1 hour after rest to prepare holy spells. Cast by speaking the Liturgic prayer aloud — you must be able to speak. Any spell of the appropriate rank may be chosen each day.';
+        const dayRow = cd.spellsPerDay[displayLevel - 1] || cd.spellsPerDay[0];
+        const slots = dayRow[1];
+        const rankSections = slots.map((n, i) => {
+          if (n === 0 || !HOLY_SPELLS_BY_RANK[i]) return '';
+          const rankSpells = HOLY_SPELLS_BY_RANK[i].map(s =>
+            `<div class="sheet-spell"><span class="spell-name">${s.name} <span class="spell-prayer">(${s.prayer})</span></span><span class="spell-desc">${s.desc}</span></div>`
+          ).join('');
+          return `<div style="margin-top:10px;margin-bottom:2px"><strong style="color:var(--gold-dim);font-size:0.78rem;font-family:var(--font-ui)">Rank ${i+1} (${n}/day)</strong></div>${rankSpells}`;
+        }).join('');
+        spellListHTML = `<div style="margin-top:8px">${rankSections}</div>`;
       }
 
       const magicHowHTML = magicHow
@@ -3724,30 +3827,56 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     if (char.liegeHouse !== null) traits.push(`Liege: ${cd.liegeHouses?.[char.liegeHouse]?.name}`);
     if (char.cls === 'friar') traits.push(`Armour of Faith: +${cd.armorOfFaithBonus[0]} AC`);
     // Level-up choices
+    const UNSPEC = `<span style="color:var(--red-bright)">Unspecified</span>`;
     if (displayLevel > 1) {
-      const luCT = char.luCombatTalent || {};
+      const luCT  = char.luCombatTalent || {};
       const luCTD = char.luCombatTalentDetail || {};
-      Object.entries(luCT).forEach(([lvl, tid]) => {
-        const t = COMBAT_TALENTS.find(x => x.id === tid);
-        if (t) {
-          const detail = luCTD[lvl] ? ` [${luCTD[lvl]}]` : '';
-          traits.push(`Combat Talent (Lv${lvl}): ${t.name}${detail} — ${t.desc}`);
+      const luGl  = char.luGlamour || {};
+      const luSy  = char.luSymbiotic || {};
+      for (let _lvl = 2; _lvl <= displayLevel; _lvl++) {
+        // Combat talents
+        if (cd.combatTalentsPerLevel) {
+          const prevT = cd.combatTalentsPerLevel[_lvl - 2] || 0;
+          const newT  = cd.combatTalentsPerLevel[_lvl - 1] || 0;
+          if (newT > prevT) {
+            const tid = luCT[_lvl];
+            const t = tid ? COMBAT_TALENTS.find(x => x.id === tid) : null;
+            if (t) {
+              const needDetail = (tid === 'weapon_specialist' || tid === 'slayer');
+              const detail = luCTD[_lvl] ? ` [${luCTD[_lvl]}]` : (needDetail ? ` [${UNSPEC}]` : '');
+              traits.push(`Combat Talent (Lv${_lvl}): ${t.name}${detail} — ${t.desc}`);
+            } else {
+              traits.push(`Combat Talent (Lv${_lvl}): ${UNSPEC}`);
+            }
+          }
         }
-      });
-      const luGl = char.luGlamour || {};
-      Object.entries(luGl).forEach(([lvl, slots]) => {
-        if (slots && typeof slots === 'object') {
-          Object.values(slots).forEach(gi => {
-            const g = GLAMOURS[gi];
-            if (g) traits.push(`Glamour (Lv${lvl}): ${g.name}`);
-          });
+        // Glamours
+        if (cd.glamoursPerLevel) {
+          const prevG = cd.glamoursPerLevel[_lvl - 2] || 0;
+          const newG  = cd.glamoursPerLevel[_lvl - 1] || 0;
+          const numNew = newG - prevG;
+          const slots = luGl[_lvl] || [];
+          for (let _gi = 0; _gi < numNew; _gi++) {
+            const gi = slots[_gi];
+            const g = gi !== undefined && gi >= 0 ? GLAMOURS[gi] : null;
+            if (g) {
+              traits.push(`Glamour (Lv${_lvl}): ${g.name}`);
+            } else {
+              traits.push(`Glamour (Lv${_lvl}): ${UNSPEC}`);
+            }
+          }
         }
-      });
-      const luSy = char.luSymbiotic || {};
-      Object.entries(luSy).forEach(([lvl, si]) => {
-        const flesh = SYMBIOTIC_FLESH[si];
-        if (flesh) traits.push(`Symbiotic Flesh (Lv${lvl}): ${flesh}`);
-      });
+        // Symbiotic flesh (mossling_class)
+        if (char.cls === 'mossling_class') {
+          const si = luSy[_lvl];
+          const flesh = si !== undefined ? SYMBIOTIC_FLESH[si] : null;
+          if (flesh) {
+            traits.push(`Symbiotic Flesh (Lv${_lvl}): ${flesh}`);
+          } else {
+            traits.push(`Symbiotic Flesh (Lv${_lvl}): ${UNSPEC}`);
+          }
+        }
+      }
     }
 
     const fullName = [char.name, char.surname].filter(Boolean).join(' ');
