@@ -203,7 +203,9 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 .kindred-card .k-traits li::before { content: "• "; color: var(--gold-dim); }
 .kindred-card .k-langs { margin-top: 6px; font-size: 0.75rem; color: var(--text-dim); font-family: var(--font-ui); }
 .kindred-card .k-classes { margin-top: 4px; font-size: 0.75rem; font-family: var(--font-ui); }
-.kindred-card .k-restrict { margin-top: 4px; font-size: 0.75rem; color: var(--red-bright); font-family: var(--font-ui); }
+.kindred-card .k-restrict { margin-top: 4px; font-size: 0.75rem; color: var(--text-dim); font-family: var(--font-ui); }
+.kindred-card .k-restrict.not-avail { color: var(--red-bright); }
+.kindred-card .k-fit-badge { position: absolute; top: 8px; right: 8px; font-size: 0.65rem; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 3px; font-weight: 600; }
 
 /* Kindred Detail Panel */
 .kindred-detail-panel {
@@ -695,6 +697,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 .lu-dice-row { display: flex; align-items: center; gap: 12px; margin: 6px 0; flex-wrap: wrap; }
 .lu-unlock { background: #1e2e1e; border: 1px solid var(--green); border-radius: 4px; padding: 8px 12px; font-family: var(--font-ui); font-size: 0.82rem; color: var(--green-bright); margin: 5px 0; }
 .lu-sub-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); font-family: var(--font-ui); margin-bottom: 6px; margin-top: 12px; }
+.ref-note { font-family: var(--font-ui); font-size: 0.7rem; color: var(--gold-dim); background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; display: inline-block; vertical-align: middle; margin-left: 8px; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -1588,6 +1591,16 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     "Edible mushrooms growing in hair","Semi-sentient mushroom growing from top of head"
   ];
 
+  const CLASS_PAGES = {
+    bard:'58', cleric:'60', enchanter:'62', fighter:'64', friar:'66',
+    hunter:'68', knight:'70', magician:'72', thief:'74',
+    breggle_class:'180', elf_class:'182', grimalkin_class:'184',
+    mossling_class:'186', woodgrue_class:'188'
+  };
+  const KINDRED_PAGES = {
+    breggle:'32', elf:'36', grimalkin:'40', human:'44', mossling:'48', woodgrue:'52'
+  };
+
   const COMBAT_TALENTS = [
     { id: 'battle_rage',       name: 'Battle Rage',       desc: 'Enter a rage: +2 Attack and Damage, −2 AC, for 2d4 Rounds. Can only attack; no fleeing or deliberate actions. Once/day.' },
     { id: 'cleave',            name: 'Cleave',            desc: 'After killing a foe in melee, immediately make another melee attack against an adjacent enemy.' },
@@ -1790,6 +1803,18 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     render();
   }
 
+  function rollSpellBook() {
+    const cd = getClassData();
+    if (!cd?.startingSpellBooks?.length) return;
+    char.spellBook = rollDie(6); // 1-indexed to match book.id (1–6)
+    render();
+  }
+
+  function rollEnchanterGlamour() {
+    char.enchanterGlamour = rollDie(20) - 1;
+    render();
+  }
+
   function rollBackground() {
     const kd = getKindredData();
     if (!kd?.backgrounds?.length) return;
@@ -1979,7 +2004,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       case 'hp': return !!char.hpRoll && calcMaxHP() !== null;
       case 'equipment': return !!char.armorResult || char.cls === 'friar' || char.cls === 'magician';
       case 'alignment': return !!char.alignment;
-      case 'level-up': return true;
+      case 'level-up': return !!(char.cls && char.kindred && char.luTarget && char.luTarget > 1);
       case 'sheet': return false;
       default: return false;
     }
@@ -2074,7 +2099,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return `
       <div class="step-header">
         <div class="step-num">Step 1</div>
-        <h2>Roll Ability Scores</h2>
+        <h2>Roll Ability Scores <span class="ref-note">p. 22</span></h2>
         <p>Roll 3d6 for each Ability Score in order and enter the results below.</p>
       </div>
       <div class="tip-box" style="display:flex;align-items:center;gap:10px">
@@ -2086,11 +2111,11 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         <span>Click the dice to roll 3d6 for all scores at once, or click the dice on each box to roll individually.</span>
       </div>
       <div class="info-box">
-        <p class="rule"><strong>Optional – Sub-Par Characters:</strong> If every score is 8 or less, or more than one score is 6 or lower, you may discard and re-roll.</p>
+        <p class="rule"><strong>Optional – Sub-Par Characters:</strong> If every score is 8 or less, or more than one score is 6 or lower, you may discard and re-roll. <span class="ref-note">p. 22</span></p>
       </div>
       <div class="ability-grid">${boxes}</div>
       <div class="info-box" style="margin-top:12px">
-        <h4>Ability Modifiers Reference</h4>
+        <h4>Ability Modifiers Reference <span class="ref-note">p. 22</span></h4>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim)">
           <div>3 → <strong style="color:var(--red-bright)">−3</strong></div>
           <div>4–5 → <strong style="color:var(--red-bright)">−2</strong></div>
@@ -2111,19 +2136,47 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const cards = Object.entries(KINDREDS).map(([key, kd]) => {
       const sel = char.kindred === key;
       const isForbidden = selectedCls ? kd.forbiddenClasses.includes(selectedCls) : false;
+      const isCommon   = selectedCls ? kd.recommendedClasses.includes(selectedCls) : false;
+      const isUncommon = selectedCls ? kd.uncommonClasses.includes(selectedCls)    : false;
+
+      // Fit badge (top-right corner, only when a class is selected)
+      let fitBadge = '';
+      if (selectedCls) {
+        if (isForbidden) {
+          fitBadge = `<span class="k-fit-badge badge-forbidden">Not Available</span>`;
+        } else if (isCommon) {
+          fitBadge = `<span class="k-fit-badge badge-good">Common</span>`;
+        } else if (isUncommon) {
+          fitBadge = `<span class="k-fit-badge badge-ok">Uncommon</span>`;
+        }
+      }
+
       const traits = kd.traits.slice(0,3).map(t => `<li>${t.name}</li>`).join('');
-      const rec = kd.recommendedClasses.map(c => CLASS_ADVANCEMENT[c]?.name || c).join(', ');
-      const unc = kd.uncommonClasses.length ? kd.uncommonClasses.map(c => CLASS_ADVANCEMENT[c]?.name || c).join(', ') : '';
-      const forb = kd.forbiddenClasses.length ? kd.forbiddenClasses.map(c => CLASS_ADVANCEMENT[c]?.name || c).join(', ') : '';
+      const rec  = kd.recommendedClasses.map(c => CLASS_ADVANCEMENT[c]?.name || c).join(', ');
+      const unc  = kd.uncommonClasses.length ? kd.uncommonClasses.map(c => CLASS_ADVANCEMENT[c]?.name || c).join(', ') : '';
+
+      // "Cannot be:" list — gray text, selected class highlighted red
+      let restrictLine = '';
+      if (isForbidden) {
+        restrictLine = `<div class="k-restrict not-avail">Not available for ${CLASS_ADVANCEMENT[selectedCls]?.name || selectedCls}</div>`;
+      } else if (kd.forbiddenClasses.length) {
+        const forbHtml = kd.forbiddenClasses.map(c => {
+          const name = CLASS_ADVANCEMENT[c]?.name || c;
+          return (c === selectedCls) ? `<strong style="color:var(--red-bright)">${name}</strong>` : name;
+        }).join(', ');
+        restrictLine = `<div class="k-restrict">Cannot be: ${forbHtml}</div>`;
+      }
+
       const classLines = [
         rec ? `<div class="k-classes"><strong>Common:</strong> ${rec}</div>` : '',
         unc ? `<div class="k-classes" style="color:var(--text-dim)"><em>Uncommon:</em> ${unc}</div>` : '',
-        isForbidden ? `<div class="k-restrict">Not available for ${CLASS_ADVANCEMENT[selectedCls]?.name || selectedCls}</div>`
-          : forb ? `<div class="k-restrict">Cannot be: ${forb}</div>` : ''
+        restrictLine
       ].join('');
+
       const onclick = isForbidden ? '' : `onclick="selectKindred('${key}')"`;
       return `
         <div class="kindred-card ${sel ? 'selected' : ''} ${isForbidden ? 'forbidden' : ''}" ${onclick}>
+          ${fitBadge}
           <h3>${kd.name}</h3>
           <div class="k-type">${kd.type.charAt(0).toUpperCase() + kd.type.slice(1)} · ${kd.size}</div>
           <div class="k-subtitle">${kd.subtitle}</div>
@@ -2181,7 +2234,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
       detailPanel = `
         <div class="kindred-detail-panel">
-          <h3>${kd.name} Traits</h3>
+          <h3>${kd.name} Traits <span class="ref-note">p. ${KINDRED_PAGES[char.kindred] || '30'}</span></h3>
           <div class="kindred-traits-grid">${traitTiles}</div>
           ${xpSection}
         </div>`;
@@ -2190,7 +2243,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return `
       <div class="step-header">
         <div class="step-num">Step 4</div>
-        <h2>Choose a Kindred</h2>
+        <h2>Choose a Kindred <span class="ref-note">p. 30</span></h2>
         <p>Select the type of creature your character is. New players: Human is recommended.</p>
       </div>
       ${tipBox}
@@ -2266,7 +2319,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return `
       <div class="step-header">
         <div class="step-num">Step 2</div>
-        <h2>Choose a Class</h2>
+        <h2>Choose a Class <span class="ref-note">p. 57</span></h2>
         <p>Select your character's adventuring profession. Cards are colour-coded based on your ability scores. New players: Fighter is recommended.</p>
       </div>
       ${kd ? `<div class="tip-box">${kd.name}: not available for ${forbidden.join(', ') || 'all classes'}.</div>` : ''}
@@ -2281,7 +2334,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const abilities = cd.abilities.map(a => `<li>${a}</li>`).join('');
     return `
       <div class="info-box" style="margin-top:12px">
-        <h4>${cd.name} — Abilities</h4>
+        <h4>${cd.name} — Abilities <span class="ref-note">p. ${CLASS_PAGES[key] || '57'}</span></h4>
         <ul>${abilities}</ul>
       </div>`;
   }
@@ -2429,11 +2482,11 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return `
       <div class="step-header">
         <div class="step-num">Step 6</div>
-        <h2>Adjust Ability Scores</h2>
+        <h2>Adjust Ability Scores <span class="ref-note">p. 19</span></h2>
         <p>Optional: Raise your Prime Abilities by lowering non-prime scores.</p>
       </div>
       <div class="info-box">
-        <h4>Rules for ${cd.name}</h4>
+        <h4>Rules for ${cd.name} <span class="ref-note">p. 19</span></h4>
         <ul>
           <li>Prime abilities: <strong style="color:var(--gold)">${cd.primeAbilities.join(' and ')}</strong></li>
           <li>Decrease a <strong>non-prime</strong> score to earn points for prime scores</li>
@@ -2477,7 +2530,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return `
       <div class="step-header">
         <div class="step-num">Step 7</div>
-        <h2>Roll Hit Points</h2>
+        <h2>Roll Hit Points <span class="ref-note">p. 16</span></h2>
         <p>Roll your class's Hit Die and add your Constitution modifier. Minimum 1 HP.</p>
       </div>
       ${classSpecial}
@@ -2498,7 +2551,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         ${maxHP !== null ? `<div style="font-size:0.75rem;color:var(--text-dim);font-family:var(--font-ui)">(roll ${char.hpRoll} + CON ${modStr(conMod)}${conMod < 0 && (parseInt(char.hpRoll)+conMod) < 1 ? ' → minimum 1' : ''})</div>` : ''}
       </div>
       <div class="info-box">
-        <p class="rule"><strong>Optional Re-roll:</strong> If you roll 1 or 2 (before Constitution modifier), the Referee may allow you to re-roll.</p>
+        <p class="rule"><strong>Optional Re-roll:</strong> If you roll 1 or 2 (before Constitution modifier), the Referee may allow you to re-roll. <span class="ref-note">p. 16</span></p>
       </div>
       ${navButtons(true, true)}`;
   }
@@ -2523,7 +2576,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     } else {
       const armorTable = buildArmorTable(cd);
       armorSection = `
-        <h3 style="color:var(--gold-dim);font-size:0.85rem;margin-bottom:8px">Armour (roll 1d6)</h3>
+        <h3 style="color:var(--gold-dim);font-size:0.85rem;margin-bottom:8px">Armour (roll 1d6) <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></h3>
         <table class="roll-table">
           <thead><tr><th>Roll</th><th>Result</th></tr></thead>
           <tbody>${armorTable}</tbody>
@@ -2543,7 +2596,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const weapTable = buildWeaponTable(cd);
     const oneWeaponRoll = char.cls === 'friar';
     const weapSection = `
-      <h3 style="color:var(--gold-dim);font-size:0.85rem;margin:16px 0 8px">Weapons (roll 1d6${oneWeaponRoll ? '' : ' twice'})</h3>
+      <h3 style="color:var(--gold-dim);font-size:0.85rem;margin:16px 0 8px">Weapons (roll 1d6${oneWeaponRoll ? '' : ' twice'}) <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></h3>
       <table class="roll-table">
         <thead><tr><th>Roll</th><th>Result</th></tr></thead>
         <tbody>${weapTable}</tbody>
@@ -2619,7 +2672,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return `
       <div class="step-header">
         <div class="step-num">Step 8</div>
-        <h2>Starting Equipment</h2>
+        <h2>Starting Equipment <span class="ref-note">p. 18, p. ${CLASS_PAGES[char.cls] || '57'}</span></h2>
         <p>Roll for your starting armour and weapons as determined by your class. Enter dice results below.</p>
       </div>
       ${isSmall ? '<div class="warn-box">Small kindred: armour must be custom-made; cannot use Large weapons.</div>' : ''}
@@ -2727,7 +2780,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return `
       <div class="step-header">
         <div class="step-num">Step 9</div>
-        <h2>Choose Alignment</h2>
+        <h2>Choose Alignment <span class="ref-note">p. 24</span></h2>
         <p>Alignment guides your character's behaviour. Clerics and Friars cannot be Chaotic.</p>
       </div>
       <div class="alignment-row">${cards}</div>
@@ -2933,7 +2986,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return `
       <div class="step-header">
         <div class="step-num">Step 5</div>
-        <h2>Kindred Details</h2>
+        <h2>Kindred Details <span class="ref-note">p. ${KINDRED_PAGES[char.kindred] || '30'}</span></h2>
         <p>Name your character and fill in kindred-specific choices and personal details.</p>
       </div>
       ${firstDatalist}${surnameDatalist}
@@ -2987,7 +3040,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         <textarea oninput="char.notes=this.value">${char.notes}</textarea>
       </div>
       <div class="info-box">
-        <h4>Native Languages</h4>
+        <h4>Native Languages <span class="ref-note">p. 26</span></h4>
         <ul class="equip-list">${langDisplay}</ul>
       </div>
       ${extraLangSection}
@@ -3025,7 +3078,10 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       }).join('');
       content = `
         <div class="info-box">
-          <h4>Starting Glamour (roll d20 or choose)</h4>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <h4 style="margin:0">Starting Glamour (roll d20 or choose)</h4>
+            <div class="dice-btn" onclick="rollEnchanterGlamour()" title="Roll d20 for glamour"><img src="${DICE_IMGS.D20}" alt="d20" style="width:32px;height:32px;object-fit:contain"></div>
+          </div>
           ${note}
           <div class="pick-grid">${glamItems}</div>
           ${char.enchanterGlamour !== null ? `<div class="tip-box" style="margin-top:8px"><strong>${GLAMOURS[char.enchanterGlamour].name}:</strong> ${GLAMOURS[char.enchanterGlamour].desc}</div>` : ''}
@@ -3082,7 +3138,10 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           </ul>
         </div>
         <div class="info-box">
-          <h4>Starting Spell Book (roll d6 or choose)</h4>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <h4 style="margin:0">Starting Spell Book (roll d6 or choose)</h4>
+            <div class="dice-btn" onclick="rollSpellBook()" title="Roll d6 for spell book"><img src="${DICE_IMGS.D6}" alt="d6" style="width:32px;height:32px;object-fit:contain"></div>
+          </div>
           <div class="pick-grid" style="grid-template-columns:1fr">${books}</div>
         </div>`;
     }
@@ -3141,7 +3200,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return `
       <div class="step-header">
         <div class="step-num">Step 3</div>
-        <h2>Class Specifics</h2>
+        <h2>Class Specifics <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></h2>
         <p>Class-specific choices and starting options for your ${cd.name}.</p>
       </div>
       ${content}
@@ -3185,7 +3244,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return `
       <div class="step-header">
         <div class="step-num">Optional Step</div>
-        <h2>Level Up Assistant</h2>
+        <h2>Level Up Assistant <span class="ref-note">p. 25</span></h2>
         <p>Plan your character's advancement. Choose a target level to see what you gain at each step. Rolls and choices made here are for reference only — record them on your character sheet.</p>
       </div>
       <div class="form-row">
@@ -3194,6 +3253,16 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           <option value="1" ${target === 1 ? 'selected' : ''}>— Stay at Level 1 (skip)</option>
           ${opts}
         </select>
+      </div>
+      <div class="info-box">
+        <h4>Levelling Up Rules <span class="ref-note">p. 25</span></h4>
+        <ul>
+          <li>Roll your class hit die and add CON modifier to find HP gained. Minimum <strong>1 HP</strong> per level. <span class="ref-note">p. 25</span></li>
+          <li><strong>Optional (Referee's discretion):</strong> If the HP roll is 1 or 2 (before CON modifier), the Referee may allow a re-roll. <span class="ref-note">p. 16</span></li>
+          <li>CON modifier applies to HP at each level <strong>up to Level 10 only</strong>. Levels 11+ use the flat value with no CON modifier. <span class="ref-note">p. 25</span></li>
+          <li>Update your Attack bonus and all five Saving Throws from your class advancement table. <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></li>
+          <li>XP required for the next level is listed in your class advancement table. <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></li>
+        </ul>
       </div>
       ${sections}
       ${navButtons(true, true)}`;
@@ -3217,15 +3286,14 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const hpRolled = (char.luHP || {})[lvl];
     let hpHTML;
     if (isAfter10) {
-      const gain = cd.hitDieAfter10 + conMod;
       hpHTML = `
         <div class="lu-dice-row">
           <div class="lu-stat improved" style="flex:none">
             <div class="ls-label">HP Gained</div>
-            <div class="ls-value">${gain >= 0 ? '+' : ''}${gain}</div>
-            <div class="ls-sub">+${cd.hitDieAfter10} flat + CON ${modStr(conMod)}</div>
+            <div class="ls-value">+${cd.hitDieAfter10}</div>
+            <div class="ls-sub">flat (no roll, no CON mod)</div>
           </div>
-          <span style="font-family:var(--font-ui);font-size:0.82rem;color:var(--text-dim)">Levels 11+: fixed +${cd.hitDieAfter10} HP per level (no roll required).</span>
+          <span style="font-family:var(--font-ui);font-size:0.82rem;color:var(--text-dim)">Levels 11+: gain +${cd.hitDieAfter10} HP flat per level. CON modifier does not apply. <span class="ref-note">p. 25</span></span>
         </div>`;
     } else {
       const maxHP = hpRolled !== undefined ? Math.max(1, hpRolled + conMod) : null;
@@ -3234,11 +3302,9 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           <div class="dice-btn" onclick="rollLuHP(${lvl})" title="Roll 1d${cd.hitDie} for HP">
             <img src="${DICE_IMGS['D'+cd.hitDie]}" alt="d${cd.hitDie}" style="width:40px;height:40px;object-fit:contain">
           </div>
-          <div class="lu-stat" style="flex:none">
-            <div class="ls-label">Roll</div>
-            <div class="ls-value">${hpRolled !== undefined ? hpRolled : '?'}</div>
-            <div class="ls-sub">1d${cd.hitDie}</div>
-          </div>
+          <input type="number" min="1" max="${cd.hitDie}" value="${hpRolled !== undefined ? hpRolled : ''}" placeholder="?"
+            oninput="setLuHPManual(${lvl}, parseInt(this.value))"
+            style="width:58px;background:var(--bg);border:2px solid var(--border);color:var(--text);font-size:1.3rem;text-align:center;padding:5px;border-radius:var(--radius);font-family:var(--font-body)">
           <div class="lu-stat ${maxHP !== null ? 'improved' : ''}" style="flex:none">
             <div class="ls-label">HP Gained</div>
             <div class="ls-value">${maxHP !== null ? (maxHP > 0 ? '+' : '') + maxHP : '?'}</div>
@@ -3284,7 +3350,8 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
                 <div class="ls-sub">${imp ? 'was ' + (prev || '—') : 'per day'}</div>
               </div>` : '';
           }).join('');
-          spellsHTML = `<div class="lu-sub-label">Spells Per Day</div><div class="lu-stat-grid">${cells}</div>`;
+          const spellPage = CLASS_PAGES[char.cls] ? `p. ${CLASS_PAGES[char.cls]}` : '';
+          spellsHTML = `<div class="lu-sub-label">Spells Per Day ${spellPage ? `<span class="ref-note">${spellPage}</span>` : ''}</div><div class="lu-stat-grid">${cells}</div>`;
         }
       }
     }
@@ -3299,7 +3366,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         const talentOpts = COMBAT_TALENTS.map(t => `<option value="${t.id}" ${chosen === t.id ? 'selected' : ''}>${t.name}</option>`).join('');
         const chosenData = chosen ? COMBAT_TALENTS.find(t => t.id === chosen) : null;
         talentHTML = `
-          <div class="lu-sub-label">Combat Talent (choose one)</div>
+          <div class="lu-sub-label">Combat Talent (choose one) <span class="ref-note">p. 64</span></div>
           <div class="form-row" style="margin-bottom:6px">
             <select onchange="setLuCombatTalent(${lvl}, this.value)">
               <option value="">— Choose a combat talent —</option>
@@ -3337,7 +3404,8 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
               ${chosen !== null && chosen >= 0 ? `<div class="tip-box" style="margin-top:4px"><strong>${GLAMOURS[chosen].name}:</strong> ${GLAMOURS[chosen].desc}</div>` : ''}
             </div>`;
         }
-        glamoursHTML = `<div class="lu-sub-label">New Glamour${numNew > 1 ? 's' : ''} (+${numNew})</div>${picks}`;
+        const glamPage = CLASS_PAGES[char.cls] ? `p. ${CLASS_PAGES[char.cls]}` : '';
+        glamoursHTML = `<div class="lu-sub-label">New Glamour${numNew > 1 ? 's' : ''} (+${numNew}) ${glamPage ? `<span class="ref-note">${glamPage}</span>` : ''}</div>${picks}`;
       }
     }
 
@@ -3347,7 +3415,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       const roll = (char.luSymbiotic || {})[lvl];
       const flesh = roll !== undefined ? SYMBIOTIC_FLESH[roll] : null;
       symbioticHTML = `
-        <div class="lu-sub-label">Symbiotic Flesh (new trait)</div>
+        <div class="lu-sub-label">Symbiotic Flesh (new trait) <span class="ref-note">p. 186</span></div>
         <div class="lu-dice-row">
           <div class="dice-btn" onclick="rollLuSymbiotic(${lvl})" title="Roll d20 for symbiotic flesh trait">
             <img src="${DICE_IMGS.D20}" alt="d20" style="width:30px;height:30px;object-fit:contain">
@@ -3359,7 +3427,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     // Class-specific unlocks
     const unlocks = getLevelUnlocks(cd, kd, lvl);
     const unlocksHTML = unlocks.length > 0 ? `
-      <div class="lu-sub-label">New Abilities</div>
+      <div class="lu-sub-label">New Abilities <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></div>
       ${unlocks.map(u => `<div class="lu-unlock">✦ ${u}</div>`).join('')}` : '';
 
     return `
@@ -3369,10 +3437,10 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           <span class="lu-xp-badge">${xp} XP required</span>
         </div>
         <div class="lu-body">
-          <div class="lu-sub-label" style="margin-top:0">Hit Points</div>
+          <div class="lu-sub-label" style="margin-top:0">Hit Points <span class="ref-note">p. 25</span></div>
           ${hpHTML}
           <hr class="section-divider">
-          <div class="lu-sub-label" style="margin-top:0">Combat Stats</div>
+          <div class="lu-sub-label" style="margin-top:0">Combat Stats <span class="ref-note">p. 25, ${CLASS_PAGES[char.cls] ? 'p. ' + CLASS_PAGES[char.cls] : ''}</span></div>
           ${savesHTML}
           ${spellsHTML}
           ${talentHTML}
@@ -3437,6 +3505,13 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   }
 
   function setLuTarget(lvl) { char.luTarget = lvl; render(); }
+
+  function setLuHPManual(lvl, val) {
+    if (!char.luHP) char.luHP = {};
+    const n = parseInt(val);
+    if (!isNaN(n) && n >= 1) char.luHP[lvl] = n;
+    render();
+  }
 
   function rollLuHP(lvl) {
     const cd = getClassData();
@@ -3560,7 +3635,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
       spellsSection = `
         <div class="sheet-section">
-          <h3>Spells (Level 1)</h3>
+          <h3>Spells (Level 1) <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></h3>
           <div class="sheet-grid">${spellCells}</div>
           ${magicHowHTML}
           ${spellListHTML}
@@ -3584,7 +3659,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return `
       <div class="step-header">
         <div class="step-num">Step 10</div>
-        <h2>Character Sheet</h2>
+        <h2>Character Sheet <span class="ref-note">p. 16</span></h2>
         <p>Your complete Level 1 character. Use the Print button to get a printable version.</p>
       </div>
       <div id="sheet-container">
@@ -3595,12 +3670,12 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         </div>
 
         <div class="sheet-section">
-          <h3>Ability Scores</h3>
+          <h3>Ability Scores <span class="ref-note">p. 22</span></h3>
           <div class="sheet-abilities">${abilityCells}</div>
         </div>
 
         <div class="sheet-section">
-          <h3>Core Statistics</h3>
+          <h3>Core Statistics <span class="ref-note">p. 16</span></h3>
           <div class="sheet-grid">
             <div class="sheet-stat">
               <div class="s-label">Max Hit Points</div>
@@ -3636,7 +3711,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         </div>
 
         <div class="sheet-section">
-          <h3>Saving Throws (Level 1)</h3>
+          <h3>Saving Throws (Level 1) <span class="ref-note">p. 145</span></h3>
           <div class="sheet-saves">
             ${['Doom','Ray','Hold','Blast','Spell'].map((s, i) => `
               <div class="sheet-stat">
@@ -3651,22 +3726,22 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         ${spellsSection}
 
         <div class="sheet-section">
-          <h3>Skills (Level 1)</h3>
+          <h3>Skills (Level 1) <span class="ref-note">p. 144</span></h3>
           ${renderSkillsForSheet()}
         </div>
 
         <div class="sheet-section">
-          <h3>Languages</h3>
+          <h3>Languages <span class="ref-note">p. 26</span></h3>
           <div class="sheet-traits">${langs.join(' · ')}</div>
         </div>
 
         <div class="sheet-section">
-          <h3>Equipment</h3>
+          <h3>Equipment <span class="ref-note">p. 18</span></h3>
           <ul class="sheet-equip equip-list">${equip.map(e => `<li>${e}</li>`).join('')}</ul>
         </div>
 
         <div class="sheet-section">
-          <h3>Traits &amp; Abilities</h3>
+          <h3>Traits &amp; Abilities <span class="ref-note">p. ${KINDRED_PAGES[char.kindred] || '30'}, p. ${CLASS_PAGES[char.cls] || '57'}</span></h3>
           <div class="sheet-traits">
             ${traits.map(t => `<div style="margin-bottom:4px">• ${t}</div>`).join('')}
           </div>
@@ -3696,6 +3771,130 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
             ${char.gender && char.gender !== 'any' ? ` · Gender: ${char.gender.charAt(0).toUpperCase()+char.gender.slice(1)}` : ''}
           </div>
         </div>
+
+        ${(() => {
+          if (!char.luTarget || char.luTarget <= 1) return '';
+          const tgt = char.luTarget;
+          const tgtRow = cd.table[tgt - 1];
+          if (!tgtRow) return '';
+          const conMod = abilityMod(char.con) ?? 0;
+          const luHP = char.luHP || {};
+
+          // Accumulate total HP from level 1 up through luTarget
+          let totalHP = maxHP ?? 0;
+          let allRolled = !!maxHP;
+          for (let lvl = 2; lvl <= tgt; lvl++) {
+            if (lvl <= 10) {
+              const rolled = luHP[lvl];
+              if (rolled !== undefined) {
+                totalHP += Math.max(1, rolled + conMod);
+              } else {
+                allRolled = false;
+              }
+            } else {
+              totalHP += cd.hitDieAfter10 ?? 1;
+            }
+          }
+
+          const saveNames = ['Doom','Ray','Hold','Blast','Spell'];
+          const saveCells = saveNames.map((s, i) => `
+            <div class="sheet-stat">
+              <div class="s-label">${s}</div>
+              <div class="s-value">${tgtRow[3+i]}</div>
+              <div class="s-sub">target</div>
+            </div>`).join('');
+
+          // Talents section (fighter)
+          let talentsHTML = '';
+          const luCombatTalent = char.luCombatTalent || {};
+          const talentEntries = Object.entries(luCombatTalent).filter(([,v]) => v);
+          if (talentEntries.length) {
+            const talentNames = talentEntries.map(([lvl, tid]) => {
+              const t = COMBAT_TALENTS.find(x => x.id === tid);
+              return t ? `<div style="margin-bottom:2px">• Level ${lvl}: <strong style="color:var(--gold)">${t.name}</strong> — <span style="font-size:0.78rem;color:var(--text-dim)">${t.desc}</span></div>` : '';
+            }).join('');
+            talentsHTML = `<div class="sheet-section"><h3>Combat Talents (Fighter) <span class="ref-note">p. 64</span></h3><div class="sheet-traits">${talentNames}</div></div>`;
+          }
+
+          // Glamours gained during level-up (enchanter)
+          let luGlamoursHTML = '';
+          const luGlamour = char.luGlamour || {};
+          const glamourEntries = Object.entries(luGlamour);
+          if (cd.glamoursPerLevel && glamourEntries.length) {
+            const rows = glamourEntries.map(([lvlKey, slots]) => {
+              if (!slots || typeof slots !== 'object') return '';
+              return Object.entries(slots).map(([idx, gi]) => {
+                const g = GLAMOURS[gi];
+                return g ? `<div style="margin-bottom:2px">• Level ${lvlKey}: <strong style="color:var(--gold)">${g.name}</strong> — <span style="font-size:0.78rem;color:var(--text-dim)">${g.desc}</span></div>` : '';
+              }).join('');
+            }).join('');
+            if (rows) luGlamoursHTML = `<div class="sheet-section"><h3>Glamours Gained (Level Up) <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></h3><div class="sheet-traits">${rows}</div></div>`;
+          }
+
+          // Symbiotic flesh (mossling)
+          let luSyHTML = '';
+          const luSymbiotic = char.luSymbiotic || {};
+          const syEntries = Object.entries(luSymbiotic).filter(([,v]) => v !== undefined);
+          if (syEntries.length) {
+            const rows = syEntries.map(([lvl, si]) => {
+              const flesh = SYMBIOTIC_FLESH[si];
+              return flesh ? `<div style="margin-bottom:2px">• Level ${lvl}: <span style="color:var(--text-dim)">${flesh}</span></div>` : '';
+            }).join('');
+            if (rows) luSyHTML = `<div class="sheet-section"><h3>Symbiotic Flesh Gained (Level Up) <span class="ref-note">p. 186</span></h3><div class="sheet-traits">${rows}</div></div>`;
+          }
+
+          // Spells per day at target level
+          let luSpellsHTML = '';
+          if (cd.spellsPerDay) {
+            const dayRow = cd.spellsPerDay[tgt - 1];
+            if (dayRow) {
+              const rankNames = ['Rank 1','Rank 2','Rank 3','Rank 4','Rank 5','Rank 6'];
+              const cells = dayRow[1].map((n, i) => `
+                <div class="sheet-stat">
+                  <div class="s-label">${rankNames[i]}</div>
+                  <div class="s-value">${n || '—'}</div>
+                  <div class="s-sub">per day</div>
+                </div>`).join('');
+              luSpellsHTML = `<div class="sheet-section"><h3>Spells Per Day (Level ${tgt}) <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></h3><div class="sheet-grid">${cells}</div></div>`;
+            }
+          }
+
+          return `
+            <div style="border-top:2px solid var(--gold-dim);margin-top:20px;padding-top:16px">
+              <h3 style="color:var(--gold);font-family:var(--font-ui);margin-bottom:12px">Level Up Summary — Target Level ${tgt} <span class="ref-note">p. 25</span></h3>
+
+              <div class="sheet-section">
+                <h3>Hit Points at Level ${tgt}</h3>
+                <div class="sheet-grid">
+                  <div class="sheet-stat">
+                    <div class="s-label">Total HP</div>
+                    <div class="s-value" style="color:var(--green-bright)">${allRolled ? totalHP : totalHP + '+'}</div>
+                    <div class="s-sub">${allRolled ? 'all levels rolled' : 'some rolls pending'}</div>
+                  </div>
+                  <div class="sheet-stat">
+                    <div class="s-label">XP Needed</div>
+                    <div class="s-value">${tgtRow[1].toLocaleString()}</div>
+                    <div class="s-sub">to reach Level ${tgt}</div>
+                  </div>
+                  <div class="sheet-stat">
+                    <div class="s-label">Attack Bonus</div>
+                    <div class="s-value">${modStr(tgtRow[2])}</div>
+                    <div class="s-sub">at Level ${tgt}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="sheet-section">
+                <h3>Saving Throws (Level ${tgt}) <span class="ref-note">p. 145</span></h3>
+                <div class="sheet-saves">${saveCells}</div>
+              </div>
+
+              ${luSpellsHTML}
+              ${talentsHTML}
+              ${luGlamoursHTML}
+              ${luSyHTML}
+            </div>`;
+        })()}
       </div>
       ${navButtons(true, false)}`;
   }
