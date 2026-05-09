@@ -3259,7 +3259,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         <ul>
           <li>Roll your class hit die and add CON modifier to find HP gained. Minimum <strong>1 HP</strong> per level. <span class="ref-note">p. 25</span></li>
           <li><strong>Optional (Referee's discretion):</strong> If the HP roll is 1 or 2 (before CON modifier), the Referee may allow a re-roll. <span class="ref-note">p. 16</span></li>
-          <li>CON modifier applies to HP at each level <strong>up to Level 10 only</strong>. Levels 11+ use the flat value with no CON modifier. <span class="ref-note">p. 25</span></li>
+          <li>CON modifier applies to HP at each level <strong>up to Level 10 only</strong>. Levels 11+ use the flat value with no CON modifier. <span class="ref-note">p. 23</span></li>
           <li>Update your Attack bonus and all five Saving Throws from your class advancement table. <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></li>
           <li>XP required for the next level is listed in your class advancement table. <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></li>
         </ul>
@@ -3293,7 +3293,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
             <div class="ls-value">+${cd.hitDieAfter10}</div>
             <div class="ls-sub">flat (no roll, no CON mod)</div>
           </div>
-          <span style="font-family:var(--font-ui);font-size:0.82rem;color:var(--text-dim)">Levels 11+: gain +${cd.hitDieAfter10} HP flat per level. CON modifier does not apply. <span class="ref-note">p. 25</span></span>
+          <span style="font-family:var(--font-ui);font-size:0.82rem;color:var(--text-dim)">Levels 11+: gain +${cd.hitDieAfter10} HP flat per level. CON modifier does not apply. <span class="ref-note">p. 23</span></span>
         </div>`;
     } else {
       const maxHP = hpRolled !== undefined ? Math.max(1, hpRolled + conMod) : null;
@@ -3437,7 +3437,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           <span class="lu-xp-badge">${xp} XP required</span>
         </div>
         <div class="lu-body">
-          <div class="lu-sub-label" style="margin-top:0">Hit Points <span class="ref-note">p. 25</span></div>
+          <div class="lu-sub-label" style="margin-top:0">Hit Points <span class="ref-note">p. 25, p. 23</span></div>
           ${hpHTML}
           <hr class="section-divider">
           <div class="lu-sub-label" style="margin-top:0">Combat Stats <span class="ref-note">p. 25, ${CLASS_PAGES[char.cls] ? 'p. ' + CLASS_PAGES[char.cls] : ''}</span></div>
