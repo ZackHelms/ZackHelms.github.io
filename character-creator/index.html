@@ -3562,6 +3562,24 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const langs = [...getLanguages(), ...char.extraLangs];
     const speed = getSpeed();
 
+    // Target-level computed values (respects Level Up step choices)
+    const displayLevel = (char.luTarget && char.luTarget > 1) ? char.luTarget : 1;
+    const displayRow = cd.table[displayLevel - 1] || l1;
+    const conMod = abilityMod(char.con) ?? 0;
+    let displayHP = maxHP ?? 0;
+    let displayHPComplete = !!maxHP;
+    if (displayLevel > 1) {
+      for (let lvl = 2; lvl <= displayLevel; lvl++) {
+        const roll = (char.luHP || {})[lvl];
+        if (lvl <= 10) {
+          if (roll !== undefined) { displayHP += Math.max(1, roll + conMod); }
+          else { displayHPComplete = false; }
+        } else {
+          displayHP += cd.hitDieAfter10 ?? 1;
+        }
+      }
+    }
+
     // Ability scores
     const abilityOrder = ['str','int','wis','dex','con','cha'];
     const primes = new Set(cd.primeAbilities.map(a => a.substring(0,3)));
@@ -3589,12 +3607,13 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     char.advItems.forEach(i => equip.push(ADVENTURING_ITEMS[i]));
     if (char.spellBook !== null) equip.push(`Spell book: ${cd.startingSpellBooks[char.spellBook-1]?.name}`);
 
-    // Spells
+    // Spells — use target level's slots
     let spellsSection = '';
     if (cd.spellsPerDay && l1) {
       const rankNames = ['Rank 1','Rank 2','Rank 3','Rank 4','Rank 5','Rank 6'];
-      const day1 = cd.spellsPerDay[0][1];
-      const spellCells = day1.map((n, i) => `
+      const dayRow = cd.spellsPerDay[displayLevel - 1] || cd.spellsPerDay[0];
+      const spellSlots = dayRow[1];
+      const spellCells = spellSlots.map((n, i) => `
         <div class="sheet-stat">
           <div class="s-label">${rankNames[i]}</div>
           <div class="s-value">${n || '—'}</div>
@@ -3635,7 +3654,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
       spellsSection = `
         <div class="sheet-section">
-          <h3>Spells (Level 1) <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></h3>
+          <h3>Spells (Level ${displayLevel}) <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></h3>
           <div class="sheet-grid">${spellCells}</div>
           ${magicHowHTML}
           ${spellListHTML}
@@ -3653,6 +3672,28 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     if (char.holyOrder !== null) traits.push(`Holy Order preference: ${CLERIC_ORDERS[char.holyOrder]?.name} (chosen at Level 2)`);
     if (char.liegeHouse !== null) traits.push(`Liege: ${cd.liegeHouses?.[char.liegeHouse]?.name}`);
     if (char.cls === 'friar') traits.push(`Armour of Faith: +${cd.armorOfFaithBonus[0]} AC`);
+    // Level-up choices
+    if (displayLevel > 1) {
+      const luCT = char.luCombatTalent || {};
+      Object.entries(luCT).forEach(([lvl, tid]) => {
+        const t = COMBAT_TALENTS.find(x => x.id === tid);
+        if (t) traits.push(`Combat Talent (Lv${lvl}): ${t.name} — ${t.desc}`);
+      });
+      const luGl = char.luGlamour || {};
+      Object.entries(luGl).forEach(([lvl, slots]) => {
+        if (slots && typeof slots === 'object') {
+          Object.values(slots).forEach(gi => {
+            const g = GLAMOURS[gi];
+            if (g) traits.push(`Glamour (Lv${lvl}): ${g.name}`);
+          });
+        }
+      });
+      const luSy = char.luSymbiotic || {};
+      Object.entries(luSy).forEach(([lvl, si]) => {
+        const flesh = SYMBIOTIC_FLESH[si];
+        if (flesh) traits.push(`Symbiotic Flesh (Lv${lvl}): ${flesh}`);
+      });
+    }
 
     const fullName = [char.name, char.surname].filter(Boolean).join(' ');
 
@@ -3660,12 +3701,12 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       <div class="step-header">
         <div class="step-num">Step 10</div>
         <h2>Character Sheet <span class="ref-note">p. 16</span></h2>
-        <p>Your complete Level 1 character. Use the Print button to get a printable version.</p>
+        <p>Your complete Level ${displayLevel} character. Use the Print button to get a printable version.</p>
       </div>
       <div id="sheet-container">
         <div class="sheet-header">
           <h2>${fullName || '(Unnamed)'}</h2>
-          <p>${kd.name} ${cd.name} · Level 1 · ${char.alignment ? char.alignment.charAt(0).toUpperCase()+char.alignment.slice(1) : '—'}</p>
+          <p>${kd.name} ${cd.name} · Level ${displayLevel} · ${char.alignment ? char.alignment.charAt(0).toUpperCase()+char.alignment.slice(1) : '—'}</p>
           ${char.background ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.85rem">${char.background}</p>` : ''}
         </div>
 
@@ -3675,12 +3716,12 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         </div>
 
         <div class="sheet-section">
-          <h3>Core Statistics <span class="ref-note">p. 16</span></h3>
+          <h3>Core Statistics (Level ${displayLevel}) <span class="ref-note">p. 16</span></h3>
           <div class="sheet-grid">
             <div class="sheet-stat">
               <div class="s-label">Max Hit Points</div>
-              <div class="s-value">${maxHP ?? '—'}</div>
-              <div class="s-sub">1d${cd.hitDie} + CON ${modStr(abilityMod(char.con))}</div>
+              <div class="s-value">${displayHP > 0 ? (displayHPComplete ? displayHP : displayHP + '+') : (maxHP ?? '—')}</div>
+              <div class="s-sub">${displayLevel > 1 ? (displayHPComplete ? 'accumulated Lv1–'+displayLevel : 'some rolls pending') : '1d'+cd.hitDie+' + CON '+modStr(conMod)}</div>
             </div>
             <div class="sheet-stat">
               <div class="s-label">Armour Class</div>
@@ -3689,7 +3730,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
             </div>
             <div class="sheet-stat">
               <div class="s-label">Attack Bonus</div>
-              <div class="s-value">${l1 ? modStr(l1[2]) : '—'}</div>
+              <div class="s-value">${displayRow ? modStr(displayRow[2]) : '—'}</div>
               <div class="s-sub">${cd.combatAptitude}</div>
             </div>
             <div class="sheet-stat">
@@ -3702,21 +3743,27 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
               <div class="s-value">${mr >= 0 ? '+' : ''}${mr}</div>
               <div class="s-sub">WIS ${modStr(abilityMod(char.wis))} + kindred</div>
             </div>
+            ${displayLevel > 1 ? `
+            <div class="sheet-stat">
+              <div class="s-label">XP to Reach Lv${displayLevel}</div>
+              <div class="s-value">${displayRow ? displayRow[1].toLocaleString() : '—'}</div>
+              <div class="s-sub">total XP needed</div>
+            </div>` : `
             <div class="sheet-stat">
               <div class="s-label">XP Modifier</div>
               <div class="s-value">${xpMod >= 0 ? '+' : ''}${xpMod}%</div>
               <div class="s-sub">prime ability</div>
-            </div>
+            </div>`}
           </div>
         </div>
 
         <div class="sheet-section">
-          <h3>Saving Throws (Level 1) <span class="ref-note">p. 145</span></h3>
+          <h3>Saving Throws (Level ${displayLevel}) <span class="ref-note">p. 145</span></h3>
           <div class="sheet-saves">
             ${['Doom','Ray','Hold','Blast','Spell'].map((s, i) => `
               <div class="sheet-stat">
                 <div class="s-label">${s}</div>
-                <div class="s-value">${l1 ? l1[3+i] : '—'}</div>
+                <div class="s-value">${displayRow ? displayRow[3+i] : '—'}</div>
                 <div class="s-sub">target</div>
               </div>`).join('')}
           </div>
@@ -3726,7 +3773,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         ${spellsSection}
 
         <div class="sheet-section">
-          <h3>Skills (Level 1) <span class="ref-note">p. 144</span></h3>
+          <h3>Skills (Level ${displayLevel}) <span class="ref-note">p. 144</span></h3>
           ${renderSkillsForSheet()}
         </div>
 
@@ -3764,7 +3811,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         <div class="sheet-section" style="margin-top:16px">
           <h3>Character Info</h3>
           <div class="sheet-traits" style="font-family:var(--font-ui);font-size:0.8rem;color:var(--text-dim)">
-            Kindred: ${kd.name} (${kd.type}, ${kd.size}) · Class: ${cd.name} · Level: 1 · XP: 0
+            Kindred: ${kd.name} (${kd.type}, ${kd.size}) · Class: ${cd.name} · Level: ${displayLevel} · XP: ${displayLevel > 1 && displayRow ? displayRow[1].toLocaleString() : '0'}
             ${kd.age ? ` · Starting Age: ${kd.age} years` : ''}
             ${kd.height ? ` · Height: ${kd.height}` : ''}
             ${char.elfType ? ` · Elf type: ${char.elfType.charAt(0).toUpperCase()+char.elfType.slice(1)}` : ''}
@@ -3772,129 +3819,6 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           </div>
         </div>
 
-        ${(() => {
-          if (!char.luTarget || char.luTarget <= 1) return '';
-          const tgt = char.luTarget;
-          const tgtRow = cd.table[tgt - 1];
-          if (!tgtRow) return '';
-          const conMod = abilityMod(char.con) ?? 0;
-          const luHP = char.luHP || {};
-
-          // Accumulate total HP from level 1 up through luTarget
-          let totalHP = maxHP ?? 0;
-          let allRolled = !!maxHP;
-          for (let lvl = 2; lvl <= tgt; lvl++) {
-            if (lvl <= 10) {
-              const rolled = luHP[lvl];
-              if (rolled !== undefined) {
-                totalHP += Math.max(1, rolled + conMod);
-              } else {
-                allRolled = false;
-              }
-            } else {
-              totalHP += cd.hitDieAfter10 ?? 1;
-            }
-          }
-
-          const saveNames = ['Doom','Ray','Hold','Blast','Spell'];
-          const saveCells = saveNames.map((s, i) => `
-            <div class="sheet-stat">
-              <div class="s-label">${s}</div>
-              <div class="s-value">${tgtRow[3+i]}</div>
-              <div class="s-sub">target</div>
-            </div>`).join('');
-
-          // Talents section (fighter)
-          let talentsHTML = '';
-          const luCombatTalent = char.luCombatTalent || {};
-          const talentEntries = Object.entries(luCombatTalent).filter(([,v]) => v);
-          if (talentEntries.length) {
-            const talentNames = talentEntries.map(([lvl, tid]) => {
-              const t = COMBAT_TALENTS.find(x => x.id === tid);
-              return t ? `<div style="margin-bottom:2px">• Level ${lvl}: <strong style="color:var(--gold)">${t.name}</strong> — <span style="font-size:0.78rem;color:var(--text-dim)">${t.desc}</span></div>` : '';
-            }).join('');
-            talentsHTML = `<div class="sheet-section"><h3>Combat Talents (Fighter) <span class="ref-note">p. 64</span></h3><div class="sheet-traits">${talentNames}</div></div>`;
-          }
-
-          // Glamours gained during level-up (enchanter)
-          let luGlamoursHTML = '';
-          const luGlamour = char.luGlamour || {};
-          const glamourEntries = Object.entries(luGlamour);
-          if (cd.glamoursPerLevel && glamourEntries.length) {
-            const rows = glamourEntries.map(([lvlKey, slots]) => {
-              if (!slots || typeof slots !== 'object') return '';
-              return Object.entries(slots).map(([idx, gi]) => {
-                const g = GLAMOURS[gi];
-                return g ? `<div style="margin-bottom:2px">• Level ${lvlKey}: <strong style="color:var(--gold)">${g.name}</strong> — <span style="font-size:0.78rem;color:var(--text-dim)">${g.desc}</span></div>` : '';
-              }).join('');
-            }).join('');
-            if (rows) luGlamoursHTML = `<div class="sheet-section"><h3>Glamours Gained (Level Up) <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></h3><div class="sheet-traits">${rows}</div></div>`;
-          }
-
-          // Symbiotic flesh (mossling)
-          let luSyHTML = '';
-          const luSymbiotic = char.luSymbiotic || {};
-          const syEntries = Object.entries(luSymbiotic).filter(([,v]) => v !== undefined);
-          if (syEntries.length) {
-            const rows = syEntries.map(([lvl, si]) => {
-              const flesh = SYMBIOTIC_FLESH[si];
-              return flesh ? `<div style="margin-bottom:2px">• Level ${lvl}: <span style="color:var(--text-dim)">${flesh}</span></div>` : '';
-            }).join('');
-            if (rows) luSyHTML = `<div class="sheet-section"><h3>Symbiotic Flesh Gained (Level Up) <span class="ref-note">p. 186</span></h3><div class="sheet-traits">${rows}</div></div>`;
-          }
-
-          // Spells per day at target level
-          let luSpellsHTML = '';
-          if (cd.spellsPerDay) {
-            const dayRow = cd.spellsPerDay[tgt - 1];
-            if (dayRow) {
-              const rankNames = ['Rank 1','Rank 2','Rank 3','Rank 4','Rank 5','Rank 6'];
-              const cells = dayRow[1].map((n, i) => `
-                <div class="sheet-stat">
-                  <div class="s-label">${rankNames[i]}</div>
-                  <div class="s-value">${n || '—'}</div>
-                  <div class="s-sub">per day</div>
-                </div>`).join('');
-              luSpellsHTML = `<div class="sheet-section"><h3>Spells Per Day (Level ${tgt}) <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></h3><div class="sheet-grid">${cells}</div></div>`;
-            }
-          }
-
-          return `
-            <div style="border-top:2px solid var(--gold-dim);margin-top:20px;padding-top:16px">
-              <h3 style="color:var(--gold);font-family:var(--font-ui);margin-bottom:12px">Level Up Summary — Target Level ${tgt} <span class="ref-note">p. 25</span></h3>
-
-              <div class="sheet-section">
-                <h3>Hit Points at Level ${tgt}</h3>
-                <div class="sheet-grid">
-                  <div class="sheet-stat">
-                    <div class="s-label">Total HP</div>
-                    <div class="s-value" style="color:var(--green-bright)">${allRolled ? totalHP : totalHP + '+'}</div>
-                    <div class="s-sub">${allRolled ? 'all levels rolled' : 'some rolls pending'}</div>
-                  </div>
-                  <div class="sheet-stat">
-                    <div class="s-label">XP Needed</div>
-                    <div class="s-value">${tgtRow[1].toLocaleString()}</div>
-                    <div class="s-sub">to reach Level ${tgt}</div>
-                  </div>
-                  <div class="sheet-stat">
-                    <div class="s-label">Attack Bonus</div>
-                    <div class="s-value">${modStr(tgtRow[2])}</div>
-                    <div class="s-sub">at Level ${tgt}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="sheet-section">
-                <h3>Saving Throws (Level ${tgt}) <span class="ref-note">p. 145</span></h3>
-                <div class="sheet-saves">${saveCells}</div>
-              </div>
-
-              ${luSpellsHTML}
-              ${talentsHTML}
-              ${luGlamoursHTML}
-              ${luSyHTML}
-            </div>`;
-        })()}
       </div>
       ${navButtons(true, false)}`;
   }
@@ -3995,7 +3919,9 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     try {
       const name = char.name || 'unnamed';
       const cls = char.cls || 'unknown';
-      const key = `dolmenwood_char_${name}_${cls}`.toLowerCase().replace(/\s+/g,'-');
+      const lvl = (char.luTarget && char.luTarget > 1) ? char.luTarget : 1;
+      const lvlStr = 'lv' + String(lvl).padStart(2, '0');
+      const key = `dolmenwood_char_${name}_${cls}_${lvlStr}`.toLowerCase().replace(/\s+/g,'-');
       localStorage.setItem(key, JSON.stringify({ char, currentStep }));
       localStorage.setItem('dolmenwood_last', key);
       showModal(
@@ -4076,8 +4002,11 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       const name = (char.name || 'character').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const lvl = (char.luTarget && char.luTarget > 1) ? char.luTarget : 1;
+      const lvlStr = 'lv' + String(lvl).padStart(2, '0');
+      const cls = (char.cls || 'character').toLowerCase();
       a.href = url;
-      a.download = `dolmenwood-${name}.json`;
+      a.download = `dolmenwood-${name}-${cls}-${lvlStr}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
