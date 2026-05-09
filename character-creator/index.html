@@ -1672,12 +1672,90 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   const HOLY_SPELLS_BY_RANK = [HOLY_SPELLS_RANK1, HOLY_SPELLS_RANK2, HOLY_SPELLS_RANK3, HOLY_SPELLS_RANK4, HOLY_SPELLS_RANK5];
 
   const ARCANE_SPELLS_BY_RANK = [
-    ["Crystal Resonance","Decipher","Fairy Servant","Firelight","Floating Disc","Glyph of Sealing","Ignite / Extinguish","Ingratiate","Ioun Shard","Shield of Force","Vapours of Dream","Ventriloquism"],
-    ["Arcane Cypher","Dweomerlight","Flaming Spirit","Glyph of Locking","Invisibility","Knock","Levitate","Mind Crystal","Mirror Image","Perceive the Invisible","Phantasm","Web"],
-    ["Circle of Invisibility","Crystal Vision","Dark Sight","Dispel Magic","Fireball","Fly","Haste","Lightning Bolt","Missile Ward","Paralysation","Serpent Glyph","Water Breathing"],
-    ["Acid Globe","Arcane Eye","Confusion","Dimension Door","Dominate","Hallucinatory Terrain","Hex Weaving","Plant Growth","Polymorph","Wall of Fire","Wall of Ice","Woodland Veil"],
-    ["Air Sphere","Animate Dead","Cloudkill","Conjure Elemental","Fabricate","Feeblemind","Mire","Passwall","Sending","Telekinesis","Teleport","Wall of Stone"],
-    ["Anti-Magic Ward","Control Weather","Disintegrate","Dweomerfire","Geas","Invisible Stalker","Move Terrain","Oracle","Petrification","Project Image","Wave of Force","Word of Doom"]
+    [
+      {name:"Crystal Resonance", desc:"Attune a gem (50gp+) to absorb and reproduce environmental energy (light, images, sound, or temperature)."},
+      {name:"Decipher", desc:"Script your hand passes over transforms into readable Woldish for 2 Turns. Deciphers any language or cipher."},
+      {name:"Fairy Servant", desc:"Summon an invisible sprite for 6 Turns to manipulate small objects and carry up to 80 coins. Cannot fight."},
+      {name:"Firelight", desc:"Heatless ball of flame sheds light 15′ for 6+ Turns. Can flare to force –2 Attack Rolls on nearby creatures."},
+      {name:"Floating Disc", desc:"Invisible 3′ disc floats at waist height and follows you, holding up to 5,000 coins, for 6 Turns."},
+      {name:"Glyph of Sealing", desc:"Glowing rune prevents a door or portal from being opened for 2d6 Turns."},
+      {name:"Ignite / Extinguish", desc:"Launch 1 spark stream per Level (1 damage each, save negates), or snuff up to 1 flame per Level."},
+      {name:"Ingratiate", desc:"Enchant a small gift. Recipient who accepts must save or be indefinitely charmed to view you as a close friend."},
+      {name:"Ioun Shard", desc:"Glowing crystal orbits your head for 2 Turns. Fire at any visible target: hits without fail for 1d6+1 damage."},
+      {name:"Shield of Force", desc:"Invisible barrier deflects Ioun Shards; grants AC 17 vs missiles and AC 15 vs other attacks for 2 Turns."},
+      {name:"Vapours of Dream", desc:"Purple vapour fills a 10′ cube per Round; creatures Level 4 or lower inside must save or sleep 4d4 Turns."},
+      {name:"Ventriloquism", desc:"Your voice emanates from any chosen point within 60′ for 2 Turns."}
+    ],
+    [
+      {name:"Arcane Cypher", desc:"Transform text into sigils only you can read. Encodes 1 page/Level of normal text or 1 spell in a book. Decoded only by Decipher."},
+      {name:"Dweomerlight", desc:"Magical auras glow in scintillating colours for 6 Turns, revealing magic items, active enchantments, and spell effects."},
+      {name:"Flaming Spirit", desc:"Whirling white flame you direct each Round (up to 30′ from current position); target saves vs Ray or takes 1d6 damage. Lasts 1 Round/Level."},
+      {name:"Glyph of Locking", desc:"Invisible permanent rune locks a portal. You and casters 3+ Levels higher can bypass; Knock disables for 1 Turn."},
+      {name:"Invisibility", desc:"Target disappears for 1 hour/Level. Broken if the subject attacks or casts. Gear invisible; carried light invisible but emitted light is not."},
+      {name:"Knock", desc:"Magically open any closed portal, unlock bars, or reveal known secret doors. Dispels Glyph of Sealing; disables Glyph of Locking for 1 Turn. Instant."},
+      {name:"Levitate", desc:"Float vertically at 20′/Round for 6+ Turns, moving laterally by pushing off surfaces. Normal load capacity maintained."},
+      {name:"Mind Crystal", desc:"A gem (250gp+) reads thoughts of living minds within range for 12 Turns. Concentrate 1 Turn per direction; isolate one mind with an extra Turn."},
+      {name:"Mirror Image", desc:"1d4 illusory duplicates absorb attacks (even misses) for 6 Turns. Voice and spells appear to come from random images."},
+      {name:"Perceive the Invisible", desc:"See all invisible creatures and objects within 10′/Level outlined in gold for 6 Turns."},
+      {name:"Phantasm", desc:"Silent translucent illusion in a 20′ cube — a scene, an illusory attack, or a monster (Level ≤ yours, AC 10). Viewers save or believe it real. Requires concentration."},
+      {name:"Web", desc:"10′ cube of sticky webbing traps creatures for 2 Turns/Level. Str 13+ breaks free in 1d4 Turns; large in 1d4 Rounds. Burns in 2 Rounds for 1d6 fire damage inside."}
+    ],
+    [
+      {name:"Circle of Invisibility", desc:"All within 10′ of a chosen creature become invisible for 1 hour/Level; area moves with them. Broken individually if any member attacks or casts."},
+      {name:"Crystal Vision", desc:"A gem (500gp+) lets you see through other creatures' eyes for 12 Turns. Switch subjects by concentrating. Blocked by 2′ rock or lead."},
+      {name:"Dark Sight", desc:"Subject sees in darkness up to 60′ for 1 day."},
+      {name:"Dispel Magic", desc:"Unravel all spell effects in a 20′ cube. Lower-Level caster effects dispelled automatically; 5% per Level difference chance higher-Level magic resists. Magic items unaffected."},
+      {name:"Fireball", desc:"20′ radius sphere of fire at up to 240′ range. Damage: 1d6/Level (save vs Blast = half)."},
+      {name:"Fly", desc:"Subject flies in any direction (including hover) at Speed 120 for 1d6+1 Turns per Level."},
+      {name:"Haste", desc:"Up to 24 creatures in a 30′ radius move and act twice as fast (double Speed and attacks) for 3 Turns. Spells and wands not doubled."},
+      {name:"Lightning Bolt", desc:"60′×5′ bolt of lightning; 1d6/Level damage (save vs Ray = half). Bounces off solid barriers back toward caster."},
+      {name:"Missile Ward", desc:"Complete protection from normal-sized, non-magical missiles for 12 Turns."},
+      {name:"Paralysation", desc:"Creatures in a 20′ cube totalling twice your Level (lowest first) are paralysed for 6 Turns (save vs Hold). Caster can cancel at will. Mindless creatures unaffected."},
+      {name:"Serpent Glyph", desc:"Hidden glyph (with 100gp powdered amber) on text or surface. Triggered by reading or touching: a glowing serpent attacks; hit = temporal stasis for 1d4 days."},
+      {name:"Water Breathing", desc:"Single subject breathes water for 1 day. Does not affect air breathing or swimming speed."}
+    ],
+    [
+      {name:"Acid Globe", desc:"1′ globe of acid; 1d4/Level damage (save vs Blast = half). Failed save: same damage again next Round. Splash: all within 5′ save or take 2d4."},
+      {name:"Arcane Eye", desc:"Invisible floating eye moves at 120′/Turn and sees 60′ in total darkness for 6 Turns. Cannot pass through solid barriers."},
+      {name:"Confusion", desc:"3d6 creatures in a 30′ radius act randomly for 12 Rounds. Level 3+: save vs Spell each Round to resist. Roll 2d6 for action each Round."},
+      {name:"Dimension Door", desc:"Two door-shaped rifts (one within 10′ of you, one up to 360′ away). One creature steps through; unwilling targets within 10′ save vs Hold or be pulled through."},
+      {name:"Dominate", desc:"Charm 3d6 creatures Level 3 or lower, or 1 higher-Level creature (each saves vs Spell). Daily save to break. Subject obeys commands not contrary to alignment."},
+      {name:"Hallucinatory Terrain", desc:"Illusory terrain feature at up to 240′ range. Permanent until touched by an intelligent being."},
+      {name:"Hex Weaving", desc:"Remove a curse permanently (allows discarding a cursed item), or place a curse (–2 saves, –4 attack, or halved Ability Score). Multiple unique curses may stack."},
+      {name:"Plant Growth", desc:"Dense thorny thicket fills up to 3,000 sq. ft. of woodland permanently. Large creatures at half Speed; smaller hack through at 10′/Turn."},
+      {name:"Polymorph", desc:"Transform a living creature into another type. Self: gains physical traits (1d6+1 Turns/Level); cannot cast spells. Other: permanent, fully becomes new form."},
+      {name:"Wall of Fire", desc:"Opaque curtain of flame (60′×20′ line or 20′ ring). Level 4+ creatures suffer 3d6 to pass (doubled for cold/undead); Level 3 or lower cannot pass."},
+      {name:"Wall of Ice", desc:"Semi-transparent ice wall. Level 4+ with tools: 1d6 Turns to breach a 5′ hole for 2d6 damage (doubled for fire). Level 3 or lower cannot break it. Lasts 12 Turns."},
+      {name:"Woodland Veil", desc:"Up to 100 Small/Medium creatures appear as a copse of trees to all observers. Permanent until caster dismisses."}
+    ],
+    [
+      {name:"Air Sphere", desc:"Breathable air in 10′ radius around caster while underwater, moving with you. Lasts 1 Turn/Level."},
+      {name:"Animate Dead", desc:"Raise 1 Medium humanoid corpse or skeleton per Level as an undead servant permanently (until slain). Cannot use special powers."},
+      {name:"Cloudkill", desc:"30′ diameter poisonous fog moves at Speed 10 for 6 Turns. All inside take 1 damage/Round; Level 4 or lower save vs Doom or die instantly."},
+      {name:"Conjure Elemental", desc:"Summon a giant elemental (air, earth, fire, or water) from a large mass of its element. Must concentrate; unchained elemental attacks you."},
+      {name:"Fabricate", desc:"Disassemble raw inanimate materials and weave them into finished objects. Up to 1 cubic yard/Level (1 cubic foot/Level for minerals). Permanent."},
+      {name:"Feeblemind", desc:"Arcane caster target saves vs Spell (–4 penalty) or Intelligence drops to 3; cannot think clearly or cast spells. Permanent."},
+      {name:"Mire", desc:"Up to 3,000 sq. ft. of earth/sand/rock becomes 10′-deep mud for 3d6 days. Movement at 10% Speed; heavy creatures sink at 1′/Round."},
+      {name:"Passwall", desc:"Open a 5′ diameter hole in solid rock up to 10′ deep for 3 Turns."},
+      {name:"Sending", desc:"Deliver a mental message of up to 25 words to any familiar creature at unlimited range. Instant; understood regardless of language."},
+      {name:"Telekinesis", desc:"Move an object or creature by thought (up to 200 coins/Level) at 20′/Round for up to 6 Rounds. Creatures save vs Hold to resist."},
+      {name:"Teleport", desc:"Instantly teleport caster or chosen creature to a known destination. Risk of landing off-target increases with unfamiliarity; arriving in solid matter = instant death."},
+      {name:"Wall of Stone", desc:"Solid rock wall of any shape, up to 1,000 cubic feet. Must be supported. Permanent."}
+    ],
+    [
+      {name:"Anti-Magic Ward", desc:"Shimmering violet shell blocks all incoming Rank 1–3 spells (including from magic items) for 1 Round/Level. Can be ended by Dispel Magic."},
+      {name:"Control Weather", desc:"Manifest chosen weather (calm, extreme heat, fog, high winds, rain, or snow) outdoors within 720′ while concentrating."},
+      {name:"Disintegrate", desc:"A beam reduces a creature or non-living target to a pile of dust. Creature saves vs Doom or dies; unattended objects destroyed automatically."},
+      {name:"Dweomerfire", desc:"Flame of pure arcane energy burns away enchantments and magical protections in a targeted area, disrupting magic items and dispelling active spells."},
+      {name:"Geas", desc:"Compel one creature to carry out a specific quest. Failing to comply: –2 Attack and Saving Throws until completed. Indefinite duration."},
+      {name:"Invisible Stalker", desc:"Summon an invisible air elemental to carry out one assigned task until complete. Reports back if the task proves impossible."},
+      {name:"Move Terrain", desc:"Permanently reshape natural terrain (hills, valleys, rivers) within 480′. Up to a 300′×300′ area may be reshaped over 1 Turn."},
+      {name:"Oracle", desc:"Ask one question about any topic; receive a cryptic but truthful vision of the answer — past, present, or future."},
+      {name:"Petrification", desc:"Target saves vs Spell or is permanently turned to stone. Magical means can reverse the effect."},
+      {name:"Project Image", desc:"Create an illusory double of yourself at up to 240′; you see through it and can cast spells as if you were there. Lasts 6 Turns."},
+      {name:"Wave of Force", desc:"Massive invisible force wave hurls all creatures in a 120′×20′ path back 3d6×10′; creatures impacting solid surfaces take 1d6 per 10′ thrown."},
+      {name:"Word of Doom", desc:"A single syllable kills all creatures of Level 8 or below within 30′ that fail their save vs Doom. Deafened creatures, undead, and constructs are immune."}
+    ]
   ];
 
   const ARCANE_RANK1_DESCS = {
@@ -3459,8 +3537,10 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
                 ).join('');
                 return `<div class="lu-sub-label" style="margin-top:8px">Rank ${i+1} Holy Spells Unlocked <span class="ref-note">p. 100</span></div><div style="margin-top:4px">${spellItems}</div>`;
               } else if (isArcane && ARCANE_SPELLS_BY_RANK[i]) {
-                const spellNames = ARCANE_SPELLS_BY_RANK[i].join(', ');
-                return `<div class="lu-sub-label" style="margin-top:8px">Rank ${i+1} Arcane Spells Unlocked <span class="ref-note">p. 78</span></div><div class="lu-unlock" style="margin-top:4px;font-size:0.82rem">${spellNames}</div>`;
+                const spellItems = ARCANE_SPELLS_BY_RANK[i].map(s =>
+                  `<div class="sheet-spell"><span class="spell-name">${s.name}</span><span class="spell-desc">${s.desc}</span></div>`
+                ).join('');
+                return `<div class="lu-sub-label" style="margin-top:8px">Rank ${i+1} Arcane Spells Available to Learn <span class="ref-note">p. 78</span></div><div class="lu-unlock" style="margin-top:4px;font-size:0.8rem;color:var(--gold-dim);font-family:var(--font-ui)">These spells are not automatically learned — seek spell books, mentors (3+ Levels above you), or research (2 wks + 1,000gp/Rank). Each spell book holds 3 spells.</div><div style="margin-top:4px">${spellItems}</div>`;
               }
             }
             return '';
@@ -3776,15 +3856,32 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       let magicHow = '';
       let spellListHTML = '';
 
-      if (char.cls === 'magician') {
+      if (char.cls === 'magician' || char.cls === 'breggle_class') {
         magicHow = 'Memorize spells from your spell book after 8 hours of rest (1 hour of study). Casting a spell forgets it — re-read your book to re-memorize. Requires verbal and somatic components.';
-        if (char.spellBook !== null && cd.startingSpellBooks) {
+        // Starting spell book (rank 1 spells)
+        if (char.cls === 'magician' && char.spellBook !== null && cd.startingSpellBooks) {
           const book = cd.startingSpellBooks[char.spellBook - 1];
           if (book) {
             const spells = book.spells.map(sp =>
               `<div class="sheet-spell"><span class="spell-name">${sp}</span><span class="spell-desc">${ARCANE_RANK1_DESCS[sp] || ''}</span></div>`
             ).join('');
-            spellListHTML = `<div style="margin-top:8px"><div style="color:var(--gold-dim);font-size:0.78rem;font-family:var(--font-ui);margin-bottom:6px"><strong>Spell Book:</strong> ${book.name}</div>${spells}</div>`;
+            spellListHTML += `<div style="margin-top:8px"><div style="color:var(--gold-dim);font-size:0.78rem;font-family:var(--font-ui);margin-bottom:6px"><strong>Spell Book:</strong> ${book.name}</div>${spells}</div>`;
+          }
+        }
+        // Show all spell ranks available at displayLevel (as "available to learn" reference)
+        const dayRow = cd.spellsPerDay[displayLevel - 1] || cd.spellsPerDay[0];
+        const slots = dayRow[1];
+        const highestRank = slots.reduce((max, n, i) => n > 0 ? i : max, -1);
+        if (highestRank > 0) {
+          const rankSections = slots.map((n, i) => {
+            if (n === 0 || i === 0 || !ARCANE_SPELLS_BY_RANK[i]) return ''; // rank 1 already in spell book
+            const rankSpells = ARCANE_SPELLS_BY_RANK[i].map(s =>
+              `<div class="sheet-spell"><span class="spell-name">${s.name}</span><span class="spell-desc">${s.desc}</span></div>`
+            ).join('');
+            return `<div style="margin-top:12px;margin-bottom:2px"><strong style="color:var(--gold-dim);font-size:0.78rem;font-family:var(--font-ui)">Rank ${i+1} — available to learn (${n}/day slots)</strong></div>${rankSpells}`;
+          }).join('');
+          if (rankSections) {
+            spellListHTML += `<div style="margin-top:10px;padding:8px 10px;background:var(--bg-card);border-radius:var(--radius);border:1px solid var(--border)"><div style="font-size:0.78rem;color:var(--gold-dim);font-family:var(--font-ui);margin-bottom:4px"><strong>Higher-rank spells (not yet learned)</strong></div><div style="font-size:0.78rem;color:var(--text-dim);font-family:var(--font-ui);margin-bottom:8px">These spells are <em>not</em> automatically learned — you must seek them out. Study a spell book (1 week/Rank + INT check), find a mentor (3+ Levels above you), or research (2 weeks + 1,000gp/Rank). Each spell book holds 3 spells (or more with the optional Simple Spell Books rule). <span class="ref-note">p. 78</span></div>${rankSections}</div>`;
           }
         }
       } else if (char.cls === 'friar' || char.cls === 'cleric') {
