@@ -1612,6 +1612,19 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     { id: 'weapon_specialist', name: 'Weapon Specialist', desc: 'Choose one weapon type. +1 Attack and Damage with that weapon. May choose a different type each time this talent is taken.' }
   ];
 
+  const WEAPON_TYPES = [
+    'Battle axe','Club','Crossbow','Dagger','Flail','Great axe','Halberd','Hand axe',
+    'Lance','Longbow','Longsword','Mace','Military pick','Pike','Shortbow','Shortsword',
+    'Sling','Spear','Staff','Two-handed sword','Warhammer','War pick'
+  ];
+
+  const CREATURE_TYPES = [
+    'Animals (beasts)','Constructs (golems, automatons)','Demons / chaotic spirits',
+    'Dragons','Demi-fey (Breggle, Grimalkin, Mossling, Woodgrue)','Fairies (elves, fairy nobles)',
+    'Fungi creatures','Giants','Goblinoids','Humans (mortals)','Lycanthropes',
+    'Spiders & arachnids','Undead (skeletons, zombies, wights, etc.)','Aquatic creatures'
+  ];
+
   const HOLY_SPELLS_RANK1 = [
     { name:"Detect Evil", prayer:"St Whittery's Vision", desc:"Perceive evil enchantments and evil intentions on creatures/objects within 120′ for 6 Turns. Cannot read thoughts." },
     { name:"Detect Magic", prayer:"Wisdom of St Thorm", desc:"Enchanted objects, areas, or creatures within 60′ glow in shimmering gold for 2 Turns." },
@@ -1725,6 +1738,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       luHP: {},
       luGlamour: {},
       luCombatTalent: {},
+      luCombatTalentDetail: {},
       luSymbiotic: {}
     };
   }
@@ -3363,8 +3377,29 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       const newTalents  = cd.combatTalentsPerLevel[lvl - 1] || 0;
       if (newTalents > prevTalents) {
         const chosen = (char.luCombatTalent || {})[lvl];
+        const detail = (char.luCombatTalentDetail || {})[lvl] || '';
         const talentOpts = COMBAT_TALENTS.map(t => `<option value="${t.id}" ${chosen === t.id ? 'selected' : ''}>${t.name}</option>`).join('');
         const chosenData = chosen ? COMBAT_TALENTS.find(t => t.id === chosen) : null;
+        let subPickHTML = '';
+        if (chosen === 'weapon_specialist') {
+          const wOpts = WEAPON_TYPES.map(w => `<option value="${w}" ${detail === w ? 'selected' : ''}>${w}</option>`).join('');
+          subPickHTML = `<div class="form-row" style="margin-bottom:6px">
+            <label style="font-size:0.82rem">Weapon type:</label>
+            <select onchange="setLuCombatTalentDetail(${lvl}, this.value)">
+              <option value="">— Choose weapon —</option>
+              ${wOpts}
+            </select>
+          </div>`;
+        } else if (chosen === 'slayer') {
+          const cOpts = CREATURE_TYPES.map(c => `<option value="${c}" ${detail === c ? 'selected' : ''}>${c}</option>`).join('');
+          subPickHTML = `<div class="form-row" style="margin-bottom:6px">
+            <label style="font-size:0.82rem">Creature type:</label>
+            <select onchange="setLuCombatTalentDetail(${lvl}, this.value)">
+              <option value="">— Choose creature type —</option>
+              ${cOpts}
+            </select>
+          </div>`;
+        }
         talentHTML = `
           <div class="lu-sub-label">Combat Talent (choose one) <span class="ref-note">p. 64</span></div>
           <div class="form-row" style="margin-bottom:6px">
@@ -3373,7 +3408,8 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
               ${talentOpts}
             </select>
           </div>
-          ${chosenData ? `<div class="lu-unlock"><strong>${chosenData.name}:</strong> ${chosenData.desc}</div>` : ''}`;
+          ${subPickHTML}
+          ${chosenData ? `<div class="lu-unlock"><strong>${chosenData.name}:</strong> ${chosenData.desc}${detail ? ` <em style="color:var(--gold)">[${detail}]</em>` : ''}</div>` : ''}`;
       }
     }
 
@@ -3551,6 +3587,14 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   function setLuCombatTalent(lvl, talent) {
     if (!char.luCombatTalent) char.luCombatTalent = {};
     char.luCombatTalent[lvl] = talent;
+    if (!char.luCombatTalentDetail) char.luCombatTalentDetail = {};
+    char.luCombatTalentDetail[lvl] = ''; // clear sub-pick when talent changes
+    render();
+  }
+
+  function setLuCombatTalentDetail(lvl, value) {
+    if (!char.luCombatTalentDetail) char.luCombatTalentDetail = {};
+    char.luCombatTalentDetail[lvl] = value;
     render();
   }
 
@@ -3682,9 +3726,13 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     // Level-up choices
     if (displayLevel > 1) {
       const luCT = char.luCombatTalent || {};
+      const luCTD = char.luCombatTalentDetail || {};
       Object.entries(luCT).forEach(([lvl, tid]) => {
         const t = COMBAT_TALENTS.find(x => x.id === tid);
-        if (t) traits.push(`Combat Talent (Lv${lvl}): ${t.name} — ${t.desc}`);
+        if (t) {
+          const detail = luCTD[lvl] ? ` [${luCTD[lvl]}]` : '';
+          traits.push(`Combat Talent (Lv${lvl}): ${t.name}${detail} — ${t.desc}`);
+        }
       });
       const luGl = char.luGlamour || {};
       Object.entries(luGl).forEach(([lvl, slots]) => {
@@ -3703,6 +3751,61 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     }
 
     const fullName = [char.name, char.surname].filter(Boolean).join(' ');
+
+    // Magic detail section for spellcasters
+    let magicDetailSection = '';
+    if (char.cls === 'magician') {
+      magicDetailSection = `
+        <div class="sheet-section">
+          <h3>Arcane Magic — How It Works <span class="ref-note">p. 78</span></h3>
+          <div class="sheet-traits" style="font-size:0.85rem;line-height:1.7">
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Memorisation:</strong> After a night's rest, study your spell books for 1 hour to memorise spells. Casting a spell erases it from memory — re-study to re-memorise. Duplicate spells allowed if you have the slots.</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Casting:</strong> Must be able to speak with one hand free. In combat: counts as your action, cannot move that Round, declare before initiative, disrupted if harmed first.</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Frequency:</strong> You get a limited number of spell slots per day (see Spells above). Plan carefully — a Rank 1 caster may have only one shot per day. Higher levels open more slots and higher Rank spells.</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">What you can do:</strong> Battlefield control (Web, Fireball, Wall of Ice), direct damage (Lightning Bolt, Ioun Shard), invisibility and scouting (Invisibility, Arcane Eye), utility (Knock, Fly, Floating Disc), divination (Crystal Vision, Oracle), and powerful late-game effects (Teleport, Word of Doom).</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Learning new spells:</strong> Study a spell book (1 week/Rank + Intelligence Check; failure = retry at next Level gained). Learn from a mentor 3+ Levels higher (1 week; mentor expects a service). Research a new spell (2 weeks + 1,000gp/Rank; 1-in-6 minimum failure chance). Rewrite a lost book from memory (1 week + 1,000gp/Rank). <span class="ref-note">p. 78</span></div>
+            <div><strong style="color:var(--gold)">Sharing spells:</strong> You can let another Magician copy spells from your books, or teach them directly if you act as mentor (3+ Levels above them).</div>
+          </div>
+        </div>`;
+    } else if (char.cls === 'enchanter') {
+      magicDetailSection = `
+        <div class="sheet-section">
+          <h3>Fairy Magic — How It Works <span class="ref-note">p. 92</span></h3>
+          <div class="sheet-traits" style="font-size:0.85rem;line-height:1.7">
+            <div style="margin-bottom:8px"><strong style="color:var(--gold)">Glamours (innate, unlimited):</strong> Activated by thought alone — no gesture, no incantation. No daily limit unless noted. In combat: counts as action but you <em>can</em> move the same Round and need not declare before initiative; glamours cannot be disrupted. Your most flexible and reliable magic.</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">What glamours do:</strong> Social manipulation (Beguilement, Silver Tongue, Mirth and Malice), stealth (Cloak of Darkness, Vanishing, Walk in Shadows), sensory tricks (Moon Sight, Subtle Sight, Fairy Dust), minor conjuration (Conjure Treats, Fool's Gold), and battlefield disruption (Awe). You gain more glamours as you level.</div>
+            <div style="margin-bottom:8px"><strong style="color:var(--gold)">Runes (granted by fairy nobles, limited use):</strong> More powerful than glamours. Gained by petitioning fairy nobles (roll 2d6 on the Rune Granted table; level bonus applies). Thought-activated but with combat restrictions like arcane spells. Usage frequency: Lesser runes once/day (or more at high level); Greater runes once/week early on; Mighty runes once ever. <span class="ref-note">p. 92</span></div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Gaining more runes:</strong> Seek out fairy nobles and earn their favour. A quest or service is typically required. A poor relationship with fairies (or a bad roll) can result in no rune being granted.</div>
+            <div><strong style="color:var(--gold)">Resistance to divine aid:</strong> 2-in-6 chance beneficial holy spells have no effect on you.</div>
+          </div>
+        </div>`;
+    } else if (char.cls === 'cleric') {
+      magicDetailSection = `
+        <div class="sheet-section">
+          <h3>Holy Magic — How It Works <span class="ref-note">p. 100</span></h3>
+          <div class="sheet-traits" style="font-size:0.85rem;line-height:1.7">
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Available from Level 2.</strong> At Level 1 you fight and Turn Undead; holy magic unlocks at Level 2.</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Daily prayer:</strong> After a night's rest, pray for 1 hour to prepare your spells. You may choose <em>any</em> holy spell of the appropriate Rank each day — you are not locked to specific spells. Duplicates allowed.</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Casting:</strong> Recite the prayer in the Liturgic tongue. Must be able to speak; cannot cast gagged or in magical silence. In combat: counts as action, cannot move that Round, declare before initiative, disrupted if harmed first.</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">What you can do:</strong> Healing (Lesser/Greater Healing), protection (Mantle of Protection, Frost/Flame Ward, Circle of Protection), combat support (Bless, Bless Weapon, Rally), Turn Undead, detection (Detect Evil, Find Traps), and high-level miracles (Raise Dead, Holy Fire, Communion).</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Frequency:</strong> Limited slots per day but flexible — pick the right spell for the situation each morning. Healing is available every day; at higher levels you can cast powerful area spells.</div>
+            <div><strong style="color:var(--gold)">Shrine bonus:</strong> Praying 1 hour at a dedicated saint's shrine grants one additional spell (that saint's spell) for the day. <span class="ref-note">p. 100</span></div>
+          </div>
+        </div>`;
+    } else if (char.cls === 'friar') {
+      magicDetailSection = `
+        <div class="sheet-section">
+          <h3>Holy Magic — How It Works <span class="ref-note">p. 100</span></h3>
+          <div class="sheet-traits" style="font-size:0.85rem;line-height:1.7">
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Daily prayer:</strong> After a night's rest, pray for 1 hour to prepare your spells. Choose any holy spell of the appropriate Rank each day — fully flexible, not locked to a list.</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Casting:</strong> Recite the prayer in the Liturgic tongue; must be able to speak. In combat: counts as action, cannot move that Round, declare before initiative, disrupted if harmed first.</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">What you can do:</strong> Healing (Lesser Healing from Level 1), protection and warding, support (Rally, Bless), detection, and powerful miracles at high levels. As a wandering mendicant you lean toward healing, travel, and aiding the common folk.</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Frequency:</strong> Limited slots per day. At Level 1 you cast 1 Rank 1 spell. Your Armour of Faith already gives a permanent AC bonus without spending any spell slots.</div>
+            <div style="margin-bottom:6px"><strong style="color:var(--gold)">Shrine bonus:</strong> Praying 1 hour at a dedicated saint's shrine grants one extra spell for the day. <span class="ref-note">p. 100</span></div>
+            <div><strong style="color:var(--gold)">vs Cleric:</strong> Friars are lighter-armoured wanderers; Clerics are armoured warriors with Turn Undead. Both draw from the same holy spell list and gain magic at the same levels.</div>
+          </div>
+        </div>`;
+    }
 
     return `
       <div class="step-header">
@@ -3778,6 +3881,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         </div>
 
         ${spellsSection}
+        ${magicDetailSection}
 
         <div class="sheet-section">
           <h3>Skills (Level ${displayLevel}) <span class="ref-note">p. 144${CLASS_PAGES[char.cls] ? ', p. ' + CLASS_PAGES[char.cls] : ''}</span></h3>
