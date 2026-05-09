@@ -3716,7 +3716,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         </div>
 
         <div class="sheet-section">
-          <h3>Core Statistics (Level ${displayLevel}) <span class="ref-note">p. 16</span></h3>
+          <h3>Core Statistics (Level ${displayLevel}) <span class="ref-note">p. 16${CLASS_PAGES[char.cls] ? ', p. ' + CLASS_PAGES[char.cls] : ''}</span></h3>
           <div class="sheet-grid">
             <div class="sheet-stat">
               <div class="s-label">Max Hit Points</div>
@@ -3758,7 +3758,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         </div>
 
         <div class="sheet-section">
-          <h3>Saving Throws (Level ${displayLevel}) <span class="ref-note">p. 145</span></h3>
+          <h3>Saving Throws (Level ${displayLevel}) <span class="ref-note">p. 145${CLASS_PAGES[char.cls] ? ', p. ' + CLASS_PAGES[char.cls] : ''}</span></h3>
           <div class="sheet-saves">
             ${['Doom','Ray','Hold','Blast','Spell'].map((s, i) => `
               <div class="sheet-stat">
@@ -3773,7 +3773,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         ${spellsSection}
 
         <div class="sheet-section">
-          <h3>Skills (Level ${displayLevel}) <span class="ref-note">p. 144</span></h3>
+          <h3>Skills (Level ${displayLevel}) <span class="ref-note">p. 144${CLASS_PAGES[char.cls] ? ', p. ' + CLASS_PAGES[char.cls] : ''}</span></h3>
           ${renderSkillsForSheet()}
         </div>
 
