@@ -3293,7 +3293,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
             <div class="ls-value">+${cd.hitDieAfter10}</div>
             <div class="ls-sub">flat (no roll, no CON mod)</div>
           </div>
-          <span style="font-family:var(--font-ui);font-size:0.82rem;color:var(--text-dim)">Levels 11+: gain +${cd.hitDieAfter10} HP flat per level. CON modifier does not apply. <span class="ref-note">p. 23${cd.hitDieAfter10 > 1 && CLASS_PAGES[char.cls] ? ', p. ' + CLASS_PAGES[char.cls] : ''}</span></span>
+          <span style="font-family:var(--font-ui);font-size:0.82rem;color:var(--text-dim)">Levels 11+: gain +${cd.hitDieAfter10} HP flat per level. CON modifier does not apply.${cd.hitDieAfter10 > 1 && CLASS_PAGES[char.cls] ? ' <span class="ref-note">p. ' + CLASS_PAGES[char.cls] + '</span>' : ''}</span>
         </div>`;
     } else {
       const maxHP = hpRolled !== undefined ? Math.max(1, hpRolled + conMod) : null;
