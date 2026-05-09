@@ -678,6 +678,23 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 }
 .xp-bar .xp-label { color: var(--text-dim); font-size: 0.75rem; margin-bottom: 4px; }
 .xp-bar .xp-value { color: var(--gold); font-size: 1.1rem; }
+
+/* Level Up Assistant */
+.lu-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin: 12px 0; overflow: hidden; }
+.lu-section-header { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lu-section-header h3 { color: var(--gold); font-size: 0.95rem; font-family: var(--font-ui); margin: 0; }
+.lu-body { padding: 14px; }
+.lu-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin: 8px 0; }
+.lu-stat { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 7px 10px; text-align: center; }
+.lu-stat .ls-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); font-family: var(--font-ui); }
+.lu-stat .ls-value { font-size: 1.05rem; color: var(--text); }
+.lu-stat .ls-sub { font-size: 0.62rem; color: var(--text-dim); font-family: var(--font-ui); }
+.lu-stat.improved { border-color: var(--green); }
+.lu-stat.improved .ls-value { color: var(--green-bright); }
+.lu-xp-badge { background: var(--surface); border: 1px solid var(--gold-dim); border-radius: 3px; padding: 2px 8px; font-family: var(--font-ui); font-size: 0.8rem; color: var(--gold); white-space: nowrap; }
+.lu-dice-row { display: flex; align-items: center; gap: 12px; margin: 6px 0; flex-wrap: wrap; }
+.lu-unlock { background: #1e2e1e; border: 1px solid var(--green); border-radius: 4px; padding: 8px 12px; font-family: var(--font-ui); font-size: 0.82rem; color: var(--green-bright); margin: 5px 0; }
+.lu-sub-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); font-family: var(--font-ui); margin-bottom: 6px; margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -1571,6 +1588,17 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     "Edible mushrooms growing in hair","Semi-sentient mushroom growing from top of head"
   ];
 
+  const COMBAT_TALENTS = [
+    { id: 'battle_rage',       name: 'Battle Rage',       desc: 'Enter a rage: +2 Attack and Damage, −2 AC, for 2d4 Rounds. Can only attack; no fleeing or deliberate actions. Once/day.' },
+    { id: 'cleave',            name: 'Cleave',            desc: 'After killing a foe in melee, immediately make another melee attack against an adjacent enemy.' },
+    { id: 'defender',         name: 'Defender',         desc: 'Sacrifice attacks to protect an ally: each Attack sacrificed gives the ally +2 AC for that Round.' },
+    { id: 'last_stand',       name: 'Last Stand',       desc: 'At 0 HP or below, keep fighting for 1d4 Rounds before dying. Actions continue at normal capacity.' },
+    { id: 'leader',           name: 'Leader',           desc: 'All allies within 30′ gain +1 Attack on your initiative count. Once/day per ally.' },
+    { id: 'main_gauche',      name: 'Main Gauche',      desc: 'When wielding a dagger in your off hand, gain +1 AC. On a natural 19–20 Attack roll, disarm the foe.' },
+    { id: 'slayer',           name: 'Slayer',           desc: 'Choose a creature type. +2 Attack and Damage vs that type. May choose a different type each time this talent is taken.' },
+    { id: 'weapon_specialist', name: 'Weapon Specialist', desc: 'Choose one weapon type. +1 Attack and Damage with that weapon. May choose a different type each time this talent is taken.' }
+  ];
+
   const HOLY_SPELLS_RANK1 = [
     { name:"Detect Evil", prayer:"St Whittery's Vision", desc:"Perceive evil enchantments and evil intentions on creatures/objects within 120′ for 6 Turns. Cannot read thoughts." },
     { name:"Detect Magic", prayer:"Wisdom of St Thorm", desc:"Enchanted objects, areas, or creatures within 60′ glow in shimmering gold for 2 Turns." },
@@ -1646,6 +1674,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     { id: 'hp',               label: 'Roll Hit Points' },
     { id: 'equipment',        label: 'Starting Equipment' },
     { id: 'alignment',        label: 'Choose Alignment' },
+    { id: 'level-up',         label: 'Level Up' },
     { id: 'sheet',            label: 'Character Sheet' }
   ];
 
@@ -1678,7 +1707,12 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       name: '', surname: '', background: '', notes: '',
       gender: 'any',
       languages: [],
-      extraLangs: []
+      extraLangs: [],
+      luTarget: 1,
+      luHP: {},
+      luGlamour: {},
+      luCombatTalent: {},
+      luSymbiotic: {}
     };
   }
 
@@ -1945,6 +1979,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       case 'hp': return !!char.hpRoll && calcMaxHP() !== null;
       case 'equipment': return !!char.armorResult || char.cls === 'friar' || char.cls === 'magician';
       case 'alignment': return !!char.alignment;
+      case 'level-up': return true;
       case 'sheet': return false;
       default: return false;
     }
@@ -1973,6 +2008,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       hp: renderHP,
       equipment: renderEquipment,
       alignment: renderAlignment,
+      'level-up': renderLevelUp,
       sheet: renderSheet
     };
 
@@ -3126,7 +3162,317 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     render();
   }
 
-  // ── Step 9: Character Sheet ───────────────────────────────────────────────────
+  // ── Level Up Assistant ────────────────────────────────────────────────────────
+
+  function renderLevelUp() {
+    const cd = getClassData();
+    const kd = getKindredData();
+    if (!cd || !kd) return `<div class="warn-box">Complete all character steps first.</div>${navButtons(true, true)}`;
+
+    const target = char.luTarget || 1;
+    const opts = Array.from({length: 14}, (_, i) => {
+      const lvl = i + 2;
+      const row = cd.table[lvl - 1];
+      const xp = row ? row[1].toLocaleString() : '?';
+      return `<option value="${lvl}" ${target === lvl ? 'selected' : ''}>Level ${lvl} (${xp} XP)</option>`;
+    }).join('');
+
+    let sections = '';
+    for (let lvl = 2; lvl <= target; lvl++) {
+      sections += buildLevelSection(cd, kd, lvl);
+    }
+
+    return `
+      <div class="step-header">
+        <div class="step-num">Optional Step</div>
+        <h2>Level Up Assistant</h2>
+        <p>Plan your character's advancement. Choose a target level to see what you gain at each step. Rolls and choices made here are for reference only — record them on your character sheet.</p>
+      </div>
+      <div class="form-row">
+        <label>Level up to:</label>
+        <select onchange="setLuTarget(parseInt(this.value))">
+          <option value="1" ${target === 1 ? 'selected' : ''}>— Stay at Level 1 (skip)</option>
+          ${opts}
+        </select>
+      </div>
+      ${sections}
+      ${navButtons(true, true)}`;
+  }
+
+  function buildLevelSection(cd, kd, lvl) {
+    const prevRow = cd.table[lvl - 2];
+    const newRow  = cd.table[lvl - 1];
+    if (!prevRow || !newRow) return '';
+
+    const xp = newRow[1].toLocaleString();
+    const prevAtk = prevRow[2], newAtk = newRow[2];
+    const atkChanged = newAtk !== prevAtk;
+    const saveNames = ['Doom', 'Ray', 'Hold', 'Blast', 'Spell'];
+    const prevSaves = prevRow.slice(3);
+    const newSaves  = newRow.slice(3);
+
+    // HP section
+    const conMod = abilityMod(char.con) ?? 0;
+    const isAfter10 = lvl > 10;
+    const hpRolled = (char.luHP || {})[lvl];
+    let hpHTML;
+    if (isAfter10) {
+      const gain = cd.hitDieAfter10 + conMod;
+      hpHTML = `
+        <div class="lu-dice-row">
+          <div class="lu-stat improved" style="flex:none">
+            <div class="ls-label">HP Gained</div>
+            <div class="ls-value">${gain >= 0 ? '+' : ''}${gain}</div>
+            <div class="ls-sub">+${cd.hitDieAfter10} flat + CON ${modStr(conMod)}</div>
+          </div>
+          <span style="font-family:var(--font-ui);font-size:0.82rem;color:var(--text-dim)">Levels 11+: fixed +${cd.hitDieAfter10} HP per level (no roll required).</span>
+        </div>`;
+    } else {
+      const maxHP = hpRolled !== undefined ? Math.max(1, hpRolled + conMod) : null;
+      hpHTML = `
+        <div class="lu-dice-row">
+          <div class="dice-btn" onclick="rollLuHP(${lvl})" title="Roll 1d${cd.hitDie} for HP">
+            <img src="${DICE_IMGS['D'+cd.hitDie]}" alt="d${cd.hitDie}" style="width:40px;height:40px;object-fit:contain">
+          </div>
+          <div class="lu-stat" style="flex:none">
+            <div class="ls-label">Roll</div>
+            <div class="ls-value">${hpRolled !== undefined ? hpRolled : '?'}</div>
+            <div class="ls-sub">1d${cd.hitDie}</div>
+          </div>
+          <div class="lu-stat ${maxHP !== null ? 'improved' : ''}" style="flex:none">
+            <div class="ls-label">HP Gained</div>
+            <div class="ls-value">${maxHP !== null ? (maxHP > 0 ? '+' : '') + maxHP : '?'}</div>
+            <div class="ls-sub">roll + CON ${modStr(conMod)}</div>
+          </div>
+        </div>`;
+    }
+
+    // Combat stats grid
+    const savesHTML = `
+      <div class="lu-stat-grid">
+        ${saveNames.map((name, i) => {
+          const imp = newSaves[i] < prevSaves[i];
+          return `<div class="lu-stat ${imp ? 'improved' : ''}">
+            <div class="ls-label">${name}</div>
+            <div class="ls-value">${newSaves[i]}</div>
+            <div class="ls-sub">${imp ? 'was ' + prevSaves[i] : 'unchanged'}</div>
+          </div>`;
+        }).join('')}
+        <div class="lu-stat ${atkChanged ? 'improved' : ''}">
+          <div class="ls-label">Attack</div>
+          <div class="ls-value">${modStr(newAtk)}</div>
+          <div class="ls-sub">${atkChanged ? 'was ' + modStr(prevAtk) : 'unchanged'}</div>
+        </div>
+      </div>`;
+
+    // Spells per day
+    let spellsHTML = '';
+    if (cd.spellsPerDay) {
+      const prevSlots = cd.spellsPerDay[lvl - 2]?.[1];
+      const newSlots  = cd.spellsPerDay[lvl - 1]?.[1];
+      if (newSlots) {
+        const rankNames = ['Rank 1','Rank 2','Rank 3','Rank 4','Rank 5','Rank 6'];
+        const changed = newSlots.some((n, i) => n !== (prevSlots?.[i] || 0));
+        if (changed) {
+          const cells = newSlots.map((n, i) => {
+            const prev = prevSlots?.[i] || 0;
+            const imp = n > prev;
+            return (n > 0 || prev > 0) ? `
+              <div class="lu-stat ${imp ? 'improved' : ''}">
+                <div class="ls-label">${rankNames[i]}</div>
+                <div class="ls-value">${n || '—'}</div>
+                <div class="ls-sub">${imp ? 'was ' + (prev || '—') : 'per day'}</div>
+              </div>` : '';
+          }).join('');
+          spellsHTML = `<div class="lu-sub-label">Spells Per Day</div><div class="lu-stat-grid">${cells}</div>`;
+        }
+      }
+    }
+
+    // Fighter combat talents
+    let talentHTML = '';
+    if (cd.combatTalentsPerLevel) {
+      const prevTalents = cd.combatTalentsPerLevel[lvl - 2] || 0;
+      const newTalents  = cd.combatTalentsPerLevel[lvl - 1] || 0;
+      if (newTalents > prevTalents) {
+        const chosen = (char.luCombatTalent || {})[lvl];
+        const talentOpts = COMBAT_TALENTS.map(t => `<option value="${t.id}" ${chosen === t.id ? 'selected' : ''}>${t.name}</option>`).join('');
+        const chosenData = chosen ? COMBAT_TALENTS.find(t => t.id === chosen) : null;
+        talentHTML = `
+          <div class="lu-sub-label">Combat Talent (choose one)</div>
+          <div class="form-row" style="margin-bottom:6px">
+            <select onchange="setLuCombatTalent(${lvl}, this.value)">
+              <option value="">— Choose a combat talent —</option>
+              ${talentOpts}
+            </select>
+          </div>
+          ${chosenData ? `<div class="lu-unlock"><strong>${chosenData.name}:</strong> ${chosenData.desc}</div>` : ''}`;
+      }
+    }
+
+    // Glamours
+    let glamoursHTML = '';
+    if (cd.glamoursPerLevel) {
+      const prevGlam = cd.glamoursPerLevel[lvl - 2] || 0;
+      const newGlam  = cd.glamoursPerLevel[lvl - 1] || 0;
+      const numNew = newGlam - prevGlam;
+      if (numNew > 0) {
+        const existing = (char.luGlamour || {})[lvl] || [];
+        let picks = '';
+        for (let gi = 0; gi < numNew; gi++) {
+          const chosen = existing[gi] ?? null;
+          const glamOpts = GLAMOURS.map((g, idx) => `<option value="${idx}" ${chosen === idx ? 'selected' : ''}>${g.name}</option>`).join('');
+          picks += `
+            <div style="margin-bottom:10px">
+              <div style="font-size:0.75rem;color:var(--text-dim);font-family:var(--font-ui);margin-bottom:4px">New Glamour ${gi + 1}</div>
+              <div class="lu-dice-row">
+                <div class="dice-btn" onclick="rollLuGlamour(${lvl}, ${gi})" title="Roll d20 for random glamour">
+                  <img src="${DICE_IMGS.D20}" alt="d20" style="width:30px;height:30px;object-fit:contain">
+                </div>
+                <select onchange="setLuGlamour(${lvl}, ${gi}, parseInt(this.value))" style="flex:1">
+                  <option value="-1">— Choose or roll for a glamour —</option>
+                  ${glamOpts}
+                </select>
+              </div>
+              ${chosen !== null && chosen >= 0 ? `<div class="tip-box" style="margin-top:4px"><strong>${GLAMOURS[chosen].name}:</strong> ${GLAMOURS[chosen].desc}</div>` : ''}
+            </div>`;
+        }
+        glamoursHTML = `<div class="lu-sub-label">New Glamour${numNew > 1 ? 's' : ''} (+${numNew})</div>${picks}`;
+      }
+    }
+
+    // Mossling symbiotic flesh
+    let symbioticHTML = '';
+    if (char.cls === 'mossling_class') {
+      const roll = (char.luSymbiotic || {})[lvl];
+      const flesh = roll !== undefined ? SYMBIOTIC_FLESH[roll] : null;
+      symbioticHTML = `
+        <div class="lu-sub-label">Symbiotic Flesh (new trait)</div>
+        <div class="lu-dice-row">
+          <div class="dice-btn" onclick="rollLuSymbiotic(${lvl})" title="Roll d20 for symbiotic flesh trait">
+            <img src="${DICE_IMGS.D20}" alt="d20" style="width:30px;height:30px;object-fit:contain">
+          </div>
+          ${flesh ? `<div class="lu-unlock" style="flex:1">✦ ${flesh}</div>` : `<span style="font-family:var(--font-ui);font-size:0.85rem;color:var(--text-dim)">Click the d20 to roll your new symbiotic trait.</span>`}
+        </div>`;
+    }
+
+    // Class-specific unlocks
+    const unlocks = getLevelUnlocks(cd, kd, lvl);
+    const unlocksHTML = unlocks.length > 0 ? `
+      <div class="lu-sub-label">New Abilities</div>
+      ${unlocks.map(u => `<div class="lu-unlock">✦ ${u}</div>`).join('')}` : '';
+
+    return `
+      <div class="lu-section">
+        <div class="lu-section-header">
+          <h3>Level ${lvl - 1} → Level ${lvl}</h3>
+          <span class="lu-xp-badge">${xp} XP required</span>
+        </div>
+        <div class="lu-body">
+          <div class="lu-sub-label" style="margin-top:0">Hit Points</div>
+          ${hpHTML}
+          <hr class="section-divider">
+          <div class="lu-sub-label" style="margin-top:0">Combat Stats</div>
+          ${savesHTML}
+          ${spellsHTML}
+          ${talentHTML}
+          ${glamoursHTML}
+          ${symbioticHTML}
+          ${unlocksHTML}
+        </div>
+      </div>`;
+  }
+
+  function getLevelUnlocks(cd, kd, lvl) {
+    const notes = [];
+    const cls = char.cls;
+
+    if (cls === 'cleric' && lvl === 2) {
+      notes.push('Holy magic unlocked: pray for spells each day. Join a holy order (Order of St Faxis, St Sedge, or St Signis).');
+    }
+    if (cls === 'friar' && cd.armorOfFaithBonus) {
+      const prev = cd.armorOfFaithBonus[lvl - 2];
+      const next = cd.armorOfFaithBonus[lvl - 1];
+      if (next !== prev) notes.push(`Armour of Faith increases to +${next} AC (was +${prev}).`);
+    }
+    if (cls === 'breggle_class') {
+      if (lvl === 4) notes.push('Longhorn status reached: Gaze ability unlocked (charm human/shorthorn, Save vs Spell) and arcane spellcasting begins.');
+      const hornDmg = lvl >= 10 ? '1d6+2' : lvl >= 9 ? '1d6+1' : lvl >= 6 ? '1d6' : '1d4';
+      const prevHornDmg = (lvl-1) >= 10 ? '1d6+2' : (lvl-1) >= 9 ? '1d6+1' : (lvl-1) >= 6 ? '1d6' : '1d4';
+      if (hornDmg !== prevHornDmg) notes.push(`Horn attack damage increases to ${hornDmg}.`);
+      if (lvl >= 4) {
+        const gazeTable = [0,0,0,1,2,2,3,3,4,4,5];
+        const gazeUses = gazeTable[Math.min(lvl, gazeTable.length-1)];
+        const prevGazeUses = gazeTable[Math.min(lvl-1, gazeTable.length-1)];
+        if (gazeUses !== prevGazeUses) notes.push(`Gaze uses per day increases to ${gazeUses}.`);
+      }
+    }
+    if (cls === 'knight') {
+      if (lvl === 3) notes.push('Knighthood granted: rights of hospitality from nobles of same alignment.');
+      if (lvl === 5) notes.push('Monster Slayer: +2 Attack and Damage vs Large creatures. Horsemanship special: urge steed to +10 Speed once/day.');
+    }
+    if (cls === 'grimalkin_class') {
+      const lockTable = [[1,6],[3,5],[5,4],[7,3],[10,2]];
+      const prev = lockTable.reduce((t, [l, v]) => lvl-1 >= l ? v : t, 6);
+      const next = lockTable.reduce((t, [l, v]) => lvl   >= l ? v : t, 6);
+      if (next !== prev) notes.push(`Pick Lock skill improves to Target ${next}.`);
+    }
+    if (cls === 'woodgrue_class') {
+      const stealthTable = [[1,6],[3,5],[5,4],[7,3],[10,2]];
+      const prev = stealthTable.reduce((t, [l, v]) => lvl-1 >= l ? v : t, 6);
+      const next = stealthTable.reduce((t, [l, v]) => lvl   >= l ? v : t, 6);
+      if (next !== prev) notes.push(`Stealth skill improves to Target ${next}.`);
+      notes.push(`Mad Revelry: now ${lvl} use${lvl !== 1 ? 's' : ''}/day (once per level).`);
+    }
+    if (cls === 'mossling_class' && lvl === 4) {
+      notes.push('Fungal Symbiosis unlocked: attempt a symbiotic pact with a non-hostile monstrous fungus (Save vs Spell). Gain its powers 1× per 2 levels per day.');
+    }
+    if ((cls === 'enchanter' || cls === 'elf_class') && lvl === 5) {
+      notes.push('Detect Magic skill improves to Target 4 (was Target 5).');
+    }
+    if ((cls === 'enchanter' || cls === 'elf_class') && lvl === 9) {
+      notes.push('Detect Magic skill improves to Target 3 (was Target 4).');
+    }
+    return notes;
+  }
+
+  function setLuTarget(lvl) { char.luTarget = lvl; render(); }
+
+  function rollLuHP(lvl) {
+    const cd = getClassData();
+    if (!cd) return;
+    if (!char.luHP) char.luHP = {};
+    char.luHP[lvl] = rollDie(cd.hitDie);
+    render();
+  }
+
+  function rollLuGlamour(lvl, idx) {
+    if (!char.luGlamour) char.luGlamour = {};
+    if (!char.luGlamour[lvl]) char.luGlamour[lvl] = [];
+    char.luGlamour[lvl][idx] = rollDie(20) - 1;
+    render();
+  }
+
+  function setLuGlamour(lvl, idx, glamourIdx) {
+    if (!char.luGlamour) char.luGlamour = {};
+    if (!char.luGlamour[lvl]) char.luGlamour[lvl] = [];
+    char.luGlamour[lvl][idx] = glamourIdx;
+    render();
+  }
+
+  function rollLuSymbiotic(lvl) {
+    if (!char.luSymbiotic) char.luSymbiotic = {};
+    char.luSymbiotic[lvl] = rollDie(20) - 1;
+    render();
+  }
+
+  function setLuCombatTalent(lvl, talent) {
+    if (!char.luCombatTalent) char.luCombatTalent = {};
+    char.luCombatTalent[lvl] = talent;
+    render();
+  }
+
+  // ── Step 10: Character Sheet ───────────────────────────────────────────────────
 
   function renderSheet() {
     const kd = getKindredData();
