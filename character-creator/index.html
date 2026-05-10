@@ -4479,7 +4479,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
           <div class="sheet-header">
             <h2>${fullName || '(Unnamed)'}</h2>
-            <p>${kd.name} ${cd.name} · Level ${displayLevel} · ${char.alignment ? char.alignment.charAt(0).toUpperCase()+char.alignment.slice(1) : '—'}</p>
+            <p>${cd.name.startsWith(kd.name) ? cd.name : kd.name + ' ' + cd.name} · Level ${displayLevel} · ${char.alignment ? char.alignment.charAt(0).toUpperCase()+char.alignment.slice(1) : '—'}</p>
             ${char.background ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.85rem">${char.background}</p>` : ''}
             ${moonSignDisplay() || affiliationDisplay() ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.8rem">${[moonSignDisplay() ? `Moon: ${moonSignDisplay()}` : '', affiliationDisplay() ? `Affiliation: ${affiliationDisplay()}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
           </div>
@@ -5041,7 +5041,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 </style></head><body>
 <div class="header">
   <h1>${fullName}</h1>
-  <h2>${kd.name} ${cd.name} · Level ${displayLevel} · ${char.alignment ? char.alignment.charAt(0).toUpperCase()+char.alignment.slice(1) : '—'}</h2>
+  <h2>${cd.name.startsWith(kd.name) ? cd.name : kd.name + ' ' + cd.name} · Level ${displayLevel} · ${char.alignment ? char.alignment.charAt(0).toUpperCase()+char.alignment.slice(1) : '—'}</h2>
   ${char.background ? `<p><strong>Background:</strong> ${char.background}</p>` : ''}
   ${char.gender && char.gender !== 'any' ? `<p style="color:#666;font-size:9pt"><strong>Gender:</strong> ${char.gender.charAt(0).toUpperCase()+char.gender.slice(1)}</p>` : ''}
   ${char.elfType ? `<p style="color:#666;font-size:9pt"><strong>Elf Heritage:</strong> ${char.elfType.charAt(0).toUpperCase()+char.elfType.slice(1)}</p>` : ''}
@@ -5323,7 +5323,7 @@ ${inner}
 
       // Page 1 — Identity
       set('Name', fullName);
-      set('Kindred & Class', `${kd.name} ${cd.name}`);
+      set('Kindred & Class', cd.name.startsWith(kd.name) ? cd.name : `${kd.name} ${cd.name}`);
       set('Background', char.background || '');
       set('Alignment', char.alignment ? char.alignment.charAt(0).toUpperCase() + char.alignment.slice(1) : '');
       set('Moon Sign',   char.moonSign || '');
