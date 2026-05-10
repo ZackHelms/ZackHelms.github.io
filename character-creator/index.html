@@ -4270,7 +4270,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           </div>
 
           <div class="sheet-section">
-            <h3>Movement <span class="ref-note">p. 16</span></h3>
+            <h3>Movement <span class="ref-note">p. 16, 146</span></h3>
             <div class="sheet-grid">
               <div class="sheet-stat">
                 <div class="s-label">Speed</div>
@@ -4281,6 +4281,11 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
                 <div class="s-label">Exploring</div>
                 <div class="s-value">${speed * 3}</div>
                 <div class="s-sub">ft / turn</div>
+              </div>
+              <div class="sheet-stat">
+                <div class="s-label">Overland</div>
+                <div class="s-value">${Math.floor(getSpeed() / 5)}</div>
+                <div class="s-sub">TP / day</div>
               </div>
             </div>
           </div>
@@ -4819,6 +4824,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   <div class="p-grid">
     <div class="p-stat"><div class="label">Speed</div><div class="val">${speed}</div><div class="sub">ft / round</div></div>
     <div class="p-stat"><div class="label">Exploring</div><div class="val">${speed*3}</div><div class="sub">ft / turn</div></div>
+    <div class="p-stat"><div class="label">Overland</div><div class="val">${Math.floor(speed/5)}</div><div class="sub">TP / day</div></div>
   </div>
 </div>
 
@@ -5114,6 +5120,7 @@ ${inner}
       // Movement
       set('Speed',     speed);
       set('Exploring', speed * 3);
+      set('Overland',  Math.floor(speed / 5));
 
       // Combat
       set('Armour Class', acData?.ac ?? '');
