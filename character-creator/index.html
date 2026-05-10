@@ -2030,6 +2030,40 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const wrapped = lines.flatMap(line => wordWrap(line, maxCharsPerLine));
     return { fit: wrapped.slice(0, maxLines), overflow: wrapped.slice(maxLines) };
   }
+  // Fills up to maxLines from originals; returns wrapped lines that fit + overflow original strings.
+  // Overflow originals are returned unwrapped so they can be re-wrapped at a different width later.
+  function fitTraitOriginals(originals, maxCharsPerLine, maxLines) {
+    let lineCount = 0;
+    const fitWrapped = [];
+    const overflowOriginals = [];
+    for (const orig of originals) {
+      const wrapped = wordWrap(orig, maxCharsPerLine);
+      if (lineCount + wrapped.length <= maxLines) {
+        fitWrapped.push(...wrapped);
+        lineCount += wrapped.length;
+      } else {
+        overflowOriginals.push(orig);
+      }
+    }
+    return { fitWrapped, overflowOriginals };
+  }
+  function abbrevTrait(s) {
+    return s
+      .replace(/\+(\d+) Attack Rolls? and Damage Rolls?/gi, '+$1 atk/dmg')
+      .replace(/Attack Rolls? and Damage Rolls?/gi, 'atk/dmg rolls')
+      .replace(/\+(\d+) Attack Rolls?/gi, '+$1 atk')
+      .replace(/\+(\d+) Damage Rolls?/gi, '+$1 dmg')
+      .replace(/\+(\d+) damage\b/gi, '+$1 dmg')
+      .replace(/\+(\d+) Saving Throws?/gi, '+$1 ST')
+      .replace(/\+(\d+) Charisma\b/gi, '+$1 Cha')
+      .replace(/\+(\d+) Strength\b/gi, '+$1 Str')
+      .replace(/\+(\d+) Intelligence\b/gi, '+$1 Int')
+      .replace(/\+(\d+) Wisdom\b/gi, '+$1 Wis')
+      .replace(/\+(\d+) Dexterity\b/gi, '+$1 Dex')
+      .replace(/\+(\d+) Constitution\b/gi, '+$1 Con')
+      .replace(/\+(\d+) attack\b/gi, '+$1 atk')
+      .replace(/\b(\d+) damage\b/gi, '$1 dmg');
+  }
 
   function moonSignDisplay() {
     if (!char.moonSign) return '';
@@ -5192,21 +5226,32 @@ ${inner}
       }
       const hpVal = displayHP > 0 ? (displayHPComplete ? String(displayHP) : displayHP + '+') : (maxHP ?? '—');
 
-      // Traits — split kindred vs class
+      // Traits — kindred first, then class; deduplicated by normalized name
+      const _seenTraitKeys = new Set();
+      function _traitKey(s) {
+        const colonIdx = s.indexOf(':');
+        return (colonIdx > 0 ? s.substring(0, colonIdx) : s).toLowerCase().replace(/[^\w]/g, '').trim();
+      }
+      function _addTrait(arr, raw) {
+        const line = abbrevTrait(raw);
+        const k = _traitKey(line);
+        if (!_seenTraitKeys.has(k)) { _seenTraitKeys.add(k); arr.push(line); }
+      }
+
       const kindredTraitLines = [];
-      kd.traits.forEach(t => kindredTraitLines.push(`${t.name}: ${t.desc}`));
-      if (char.glamour !== null) kindredTraitLines.push(`Kindred Glamour: ${GLAMOURS[char.glamour]?.name} — ${GLAMOURS[char.glamour]?.desc}`);
+      kd.traits.forEach(t => _addTrait(kindredTraitLines, `${t.name}: ${t.desc}`));
+      if (char.glamour !== null) _addTrait(kindredTraitLines, `Kindred Glamour: ${GLAMOURS[char.glamour]?.name} — ${GLAMOURS[char.glamour]?.desc}`);
       const _moonEntry = moonSignEntry();
-      if (_moonEntry) kindredTraitLines.push(`Moon Sign — ${moonSignDisplay()}: ${_moonEntry.effect}`);
+      if (_moonEntry) _addTrait(kindredTraitLines, `Moon Sign — ${moonSignDisplay()}: ${_moonEntry.effect}`);
 
       const classTraitLines = [];
-      cd.abilities.forEach(a => { classTraitLines.push(a.replace(/<[^>]+>/g, '')); });
-      if (char.enchanterGlamour !== null) classTraitLines.push(`Enchanter Glamour: ${GLAMOURS[char.enchanterGlamour]?.name} — ${GLAMOURS[char.enchanterGlamour]?.desc}`);
-      if (char.knack !== null) classTraitLines.push(`Knack: ${MOSSLING_KNACKS[char.knack]?.name} — ${MOSSLING_KNACKS[char.knack]?.desc}`);
-      if (char.symbioticFlesh !== null) classTraitLines.push(`Symbiotic Flesh: ${SYMBIOTIC_FLESH[char.symbioticFlesh]}`);
-      if (char.holyOrder !== null) classTraitLines.push(`Holy Order: ${CLERIC_ORDERS[char.holyOrder]?.name} — ${CLERIC_ORDERS[char.holyOrder]?.power}`);
-      if (char.liegeHouse !== null) classTraitLines.push(`Liege House: ${cd.liegeHouses?.[char.liegeHouse]?.name} (${cd.liegeHouses?.[char.liegeHouse]?.alignment})`);
-      if (char.cls === 'friar') classTraitLines.push(`Armour of Faith: +${cd.armorOfFaithBonus[0]} AC`);
+      cd.abilities.forEach(a => _addTrait(classTraitLines, a.replace(/<[^>]+>/g, '')));
+      if (char.enchanterGlamour !== null) _addTrait(classTraitLines, `Enchanter Glamour: ${GLAMOURS[char.enchanterGlamour]?.name} — ${GLAMOURS[char.enchanterGlamour]?.desc}`);
+      if (char.knack !== null) _addTrait(classTraitLines, `Knack: ${MOSSLING_KNACKS[char.knack]?.name} — ${MOSSLING_KNACKS[char.knack]?.desc}`);
+      if (char.symbioticFlesh !== null) _addTrait(classTraitLines, `Symbiotic Flesh: ${SYMBIOTIC_FLESH[char.symbioticFlesh]}`);
+      if (char.holyOrder !== null) _addTrait(classTraitLines, `Holy Order: ${CLERIC_ORDERS[char.holyOrder]?.name} — ${CLERIC_ORDERS[char.holyOrder]?.power}`);
+      if (char.liegeHouse !== null) _addTrait(classTraitLines, `Liege House: ${cd.liegeHouses?.[char.liegeHouse]?.name} (${cd.liegeHouses?.[char.liegeHouse]?.alignment})`);
+      if (char.cls === 'friar') _addTrait(classTraitLines, `Armour of Faith: +${cd.armorOfFaithBonus[0]} AC`);
       // Level-up traits (Lv2+) always go to Reference Notes — not in PDF boxes
 
       // Skills
@@ -5326,11 +5371,12 @@ ${inner}
       set('Survival', survivalTarget + '+');
       extraSkills.forEach((s, i) => { if (i < 6) set(`Extra Skill ${i + 1}`, s); });
 
-      // Stage 1 & 2: boxes (34 chars; box1=9 lines, box2=1 line) — level-1 traits only
-      const kRes = fitTraitLines(kindredTraitLines, 34, 9);
-      const cRes = fitTraitLines(classTraitLines,   34, 1);
-      set('Kindred & Class Traits 1', kRes.fit.join('\r'));
-      set('Kindred & Class Traits 2', cRes.fit.join('\r'));
+      // Stage 1 & 2: boxes (34 chars; box1=9 lines, box2=9 lines) — level-1 traits only
+      // Both boxes have ~9 lines capacity (confirmed from PDF field heights: box1=157pt, box2=175pt)
+      const allTraitOriginals = [...kindredTraitLines, ...classTraitLines];
+      const boxResult = fitTraitOriginals(allTraitOriginals, 34, 18); // 9+9=18 total lines
+      set('Kindred & Class Traits 1', boxResult.fitWrapped.slice(0, 9).join('\r'));
+      set('Kindred & Class Traits 2', boxResult.fitWrapped.slice(9, 18).join('\r'));
 
       // Languages
       set('Languages 1', langs1);
@@ -5353,13 +5399,13 @@ ${inner}
       });
       set('Gold Pieces', char.gold || '');
       // Stage 3: Other Notes (46 chars, 15 lines) — overflow from boxes + existing notes
-      // Sentinel only added when trait overflow itself exceeds Other Notes capacity
-      const traitOverflow = [...kRes.overflow, ...cRes.overflow];
-      const traitOFWrapped = traitOverflow.flatMap(l => wordWrap(l, 46));
+      // Overflow originals are re-wrapped at 46 chars (wider than box width of 34)
+      const traitOverflowOriginals = boxResult.overflowOriginals;
+      const traitOFWrapped = traitOverflowOriginals.flatMap(orig => wordWrap(orig, 46));
       const traitExceedsNotes = traitOFWrapped.length > 15;
       const existingNoteLines = char.notes ? char.notes.split('\n') : [];
-      const sep = traitOverflow.length && existingNoteLines.length ? [''] : [];
-      const otherNotesInput = [...traitOverflow, ...sep, ...existingNoteLines];
+      const sep = traitOverflowOriginals.length && existingNoteLines.length ? [''] : [];
+      const otherNotesInput = [...traitOFWrapped, ...sep, ...existingNoteLines];
       const notesRes = fitTraitLines(otherNotesInput, 46, 15);
       let noteFitLines = notesRes.fit;
       if (traitExceedsNotes) {
