@@ -1801,6 +1801,75 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     { name:"Order of St Signis", symbol:"Human skull crowned with ivy", power:"Undead slayer: +1 Attack vs undead; your attacks harm undead that need silver/magic to hit." }
   ];
 
+  const MOON_SIGNS_DATA = [
+    { range:'01–03', moon:'Grinning Moon', phase:'Waxing', effect:"50% chance of guardian undead ignoring the character's presence. (Though they act normally if provoked.)" },
+    { range:'04',    moon:'Grinning Moon', phase:'Full',   effect:'+1 bonus to Saving Throws against the powers of undead monsters.' },
+    { range:'05–07', moon:'Grinning Moon', phase:'Waning', effect:'+1 Attack bonus against undead monsters.' },
+    { range:'08–10', moon:'Dead Moon',     phase:'Waxing', effect:'+1 bonus to Attack and Damage Rolls the Round after killing a foe.' },
+    { range:'11',    moon:'Dead Moon',     phase:'Full',   effect:'If killed by non-magical means, returns to life after 1 Turn with 1 HP. Constitution and Wisdom permanently halved (min 3). Once ever.' },
+    { range:'12–14', moon:'Dead Moon',     phase:'Waning', effect:'Undead monsters attack all others in the party before attacking the character.' },
+    { range:'15–17', moon:'Beast Moon',    phase:'Waxing', effect:'+2 bonus to Charisma (max 18) when interacting with dogs and horses.' },
+    { range:'18',    moon:'Beast Moon',    phase:'Full',   effect:'Wild animals attack all others in the party before attacking the character.' },
+    { range:'19–21', moon:'Beast Moon',    phase:'Waning', effect:'+1 Attack bonus against wolves and bears.' },
+    { range:'22–24', moon:'Squamous Moon', phase:'Waxing', effect:'Effects of poison are delayed by 1 Turn.' },
+    { range:'25',    moon:'Squamous Moon', phase:'Full',   effect:'+2 bonus to Saving Throws against breath attacks and magical powers of wyrms and dragons.' },
+    { range:'26–29', moon:'Squamous Moon', phase:'Waning', effect:'+1 Attack bonus against serpents and wyrms.' },
+    { range:'30–33', moon:"Knight's Moon", phase:'Waxing', effect:'+2 bonus to Charisma (max 18) when interacting with nobles.' },
+    { range:'34',    moon:"Knight's Moon", phase:'Full',   effect:'+1 AC bonus against attacks with metal weapons.' },
+    { range:'35–38', moon:"Knight's Moon", phase:'Waning', effect:'On a tied Initiative roll in melee with knights or soldiers, the character acts first.' },
+    { range:'39–42', moon:'Rotting Moon',  phase:'Waxing', effect:'+2 bonus to Charisma (max 18) when interacting with sentient fungi.' },
+    { range:'43',    moon:'Rotting Moon',  phase:'Full',   effect:'+2 AC bonus against attacks by fungal monsters.' },
+    { range:'44–47', moon:'Rotting Moon',  phase:'Waning', effect:'Fungal monsters in the character\'s presence suffer −1 to Attack and Damage Rolls.' },
+    { range:'48–51', moon:"Maiden's Moon", phase:'Waxing', effect:'+2 bonus to Charisma (max 18) when interacting with demi-fey.' },
+    { range:'52',    moon:"Maiden's Moon", phase:'Full',   effect:'+2 bonus to Saving Throws against charms and glamours.' },
+    { range:'53–56', moon:"Maiden's Moon", phase:'Waning', effect:'+1 bonus to Attack and Damage Rolls against shape-changers and those cloaked with illusions.' },
+    { range:'57–60', moon:"Witch's Moon",  phase:'Waxing', effect:'When receiving magical healing, gain 1 additional HP. Applies at most once per day to each type of magical healing.' },
+    { range:'61',    moon:"Witch's Moon",  phase:'Full',   effect:'+1 bonus to Saving Throws against holy magic.' },
+    { range:'62–65', moon:"Witch's Moon",  phase:'Waning', effect:'+1 bonus to Attack Rolls against witches and holy spell casters.' },
+    { range:'66–69', moon:"Robber's Moon", phase:'Waxing', effect:'+2 bonus to Charisma (max 18) when interacting with Chaotic mortals.' },
+    { range:'70',    moon:"Robber's Moon", phase:'Full',   effect:'+1 AC bonus against attacks by Chaotic mortals, fairies, or demi-fey.' },
+    { range:'71–74', moon:"Robber's Moon", phase:'Waning', effect:'+1 Attack bonus against Chaotic mortals, fairies, and demi-fey.' },
+    { range:'75–78', moon:'Goat Moon',     phase:'Waxing', effect:'+2 bonus to Charisma (max 18) when interacting with breggles (including crookhorns).' },
+    { range:'79',    moon:'Goat Moon',     phase:'Full',   effect:'Breggles (including crookhorns) attack all others in the party before attacking the character.' },
+    { range:'80–83', moon:'Goat Moon',     phase:'Waning', effect:'+1 Attack bonus against breggles (including crookhorns).' },
+    { range:'84–87', moon:'Narrow Moon',   phase:'Waxing', effect:'+2 bonus to Charisma (max 18) when interacting with fairies, but −1 penalty to all Saving Throws against fairy magic.' },
+    { range:'88',    moon:'Narrow Moon',   phase:'Full',   effect:'If afflicted by a curse or Geas spell, 1-in-4 chance the caster is also affected by their own magic.' },
+    { range:'89–92', moon:'Narrow Moon',   phase:'Waning', effect:'+1 Attack bonus against fairies and demi-fey.' },
+    { range:'93–96', moon:'Black Moon',    phase:'Waxing', effect:'+1 bonus to Search Checks to find secret doors.' },
+    { range:'97',    moon:'Black Moon',    phase:'Full',   effect:'+2 bonus to AC and Saving Throws when surprised.' },
+    { range:'98–00', moon:'Black Moon',    phase:'Waning', effect:'+2 bonus to Saving Throws versus illusions and glamours.' },
+  ];
+
+  const AFFILIATIONS = {
+    House: [
+      { name:'Brackenwold', alignment:'Lawful',  desc:'The overarching Duchy encompassing all other noble domains. Seat: Castle Brackenwold (SE). Head: Duke Thespian III, who prefers hunting and fears the Nag-Lord.' },
+      { name:'Guillefer',   alignment:'Neutral', desc:'Forest domain along the Lochsbreth Road, NE Dolmenwood. Seat: The Hall of Sleep. Head: Edwin Guillefer, poet and harpist, friend of the sorceress Ygraine.' },
+      { name:'Harrowmoor',  alignment:'Lawful',  desc:'Heart of Dolmenwood, Prigwort to Lake Longmere. Seat: Harrowmoor Keep. Head: Lady Theatrice Harrowmoor, expert historian, bolstering the Prigwort guard.' },
+      { name:'Hogwarsh',    alignment:'Neutral', desc:'Barony of the High Wold (Malbleat, Murkin, Nodlock, Ramius within). Seat: High-Hankle. Head: Baron Sagewine Hogwarsh, lax in law, prefers wine.' },
+      { name:'Malbleat',    alignment:'Chaotic', desc:'E. High Wold; encompasses Lankshorn and Dreg. Seat: Redwraith Manor. Head: Lord Gryphius Malbleat (longhorn breggle), refined aesthete, cruel, feuds with Ramius.' },
+      { name:'Mulbreck',    alignment:'Lawful',  desc:'S. Dolmenwood east of River Hameth. Seat: Bogwitt Manor. Head: Lady Pulsephine Mulbreck, reclusive, in mourning.' },
+      { name:'Murkin',      alignment:'Chaotic', desc:'Rugged W. Dolmenwood within Hogwarsh Barony. Seat: Kolstoke Keep. Head: Lord Simeone Murkin (mixed breggle/human), boorish, obsessed with conquest.' },
+      { name:'Nodlock',     alignment:'Neutral', desc:'Far SW tip of Dolmenwood. Seat: Nodding Castle. Head: Lord Harald Nodlock, slovenly, wine-loving, lackey of Ramius.' },
+      { name:'Ramius',      alignment:'Neutral', desc:'W. deeps and SW grasslands (within Hogwarsh Barony). Seat: Castle Everdusk. Head: Lord Shadgore Ramius (longhorn breggle), brilliant strategist, resents Malbleat.' },
+    ],
+    Cult: [
+      { name:'The Drune',             alignment:'Chaotic', desc:'Secretive cabal of sorcerers who roam Dolmenwood cloaked in black. Known as "the Hooded Men" by common folk who dare not speak the word "Drune." They maintain hidden standing stones and vaults throughout the wood.' },
+      { name:'Gwyrae',                alignment:'Neutral', desc:'The ancient religion of Dolmenwood humans, suppressed by the Pluritine Church ~1,200 years ago. Worshippers of the Wood Gods; the Green Man (feast, ale, hunting) survives in folklore. Witches may still practise it in secret.' },
+      { name:'Mogba',                 alignment:'Neutral', desc:'Mossling religion venerating deep forest and underworld deities: Mbombre the clay god, Blosquom the fungal god, Splobgra the worm god. Mould oracles serve as hermit-priests. Virtually unknown to other kindreds.' },
+      { name:'Aud frengd Hlerr',      alignment:'Neutral', desc:'Breggle ancestor worship venerating family ancestors up to the semi-mythical Hraigl. No formal clergy; most breggles practise it. Holy symbol: a ring of horns. Compatible with Pluritine cosmology.' },
+      { name:'Cults of the Nag-Lord', alignment:'Chaotic', desc:'Rumoured cults venerating the Nag-Lord, the "King of the Wood." Said to be springing up in wild places. Crookhorns, monsters, and corrupted humans gather to worship him.' },
+    ],
+    Faction: [
+      { name:'Pluritine Church', alignment:'Lawful',  desc:'Dominant religion and political power of the Duchy. Worships a nameless male god through saints. Holy symbol: the Chapes (circle with five rays). Hierarchy: Archbishop → Bishop → Commander → Abbot → Vicar → Curate. Holy text: The Pragmaphon.' },
+      { name:'The Witches',      alignment:'Neutral', desc:'Mortal women who gather beneath the moon to work magic, practising the old Gwyrae faith in secret. No formal structure; a loose network of covens scattered through Dolmenwood.' },
+    ],
+    Organization: [
+      { name:'Order of St Faxis',              alignment:'Lawful', desc:'Edict: Root out practitioners of dark magic — those who deal with devils or necromancy. Power: +2 Saving Throws vs. arcane magic; arcane casters suffer −2 vs. the cleric\'s spells. Symbol: Three crossed swords.' },
+      { name:'Order of St Sedge',              alignment:'Lawful', desc:'Edict: Defend Church lands from invaders. Power: Lay on hands — heal up to 1 HP per Level per day. Symbol: A hand with two fingers raised.' },
+      { name:'Order of St Signis (Lichwards)', alignment:'Lawful', desc:'Edict: Watch over the dead and hunt undead. Power: +1 Attack vs. undead; attacks harm undead that normally require silver or magic weapons. Symbol: A human skull crowned with ivy.' },
+    ],
+  };
+
   const ADVENTURING_ITEMS = [
     "Bedroll","Chalk (10 sticks)","Chisel","Cooking pots","Crowbar",
     "Firewood (bundle)","Grappling hook","Ink, quill, 5 sheets paper","Iron spikes (12)","Lantern (hooded)",
@@ -1904,7 +1973,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       elfType: null,          // 'rustic' or 'courtly' for elf
       detailRolls: {},        // { head, face, body, demeanour, dress, speech, desires, beliefs }
       name: '', surname: '', background: '', notes: '',
-      affiliation: '', moonSign: '',
+      affiliation: '', affiliationCategory: '', moonSign: '',
       gender: 'any',
       languages: [],
       extraLangs: [],
@@ -1920,9 +1989,31 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
   // ── Dice rolling utilities ────────────────────────────────────────────────
 
+  let _moonOpen = false;
+
   function rollDie(sides) { return Math.floor(Math.random() * sides) + 1; }
   function rollDice(n, sides) { let t = 0; for (let i = 0; i < n; i++) t += rollDie(sides); return t; }
   function rollD100() { return Math.floor(Math.random() * 100) + 1; }
+
+  function moonSignLabel(entry) {
+    return entry.range + ' — ' + entry.moon + ' (' + entry.phase + ')';
+  }
+  function rollMoonSign() {
+    const n = Math.floor(Math.random() * 100) + 1;
+    const entry = MOON_SIGNS_DATA.find(m => {
+      const parts = m.range.split('–');
+      const lo = parseInt(parts[0]);
+      const hi = parts[1] ? (parts[1] === '00' ? 100 : parseInt(parts[1])) : lo;
+      return n >= lo && n <= hi;
+    });
+    if (entry) char.moonSign = moonSignLabel(entry);
+    _moonOpen = false;
+    render();
+  }
+  function affiliationDisplay() {
+    if (!char.affiliation) return '';
+    return char.affiliationCategory === 'House' ? 'House ' + char.affiliation : char.affiliation;
+  }
 
   function rollAllAbilities() {
     ['str','int','wis','dex','con','cha'].forEach(a => {
@@ -3012,16 +3103,10 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         <div style="font-size:0.75rem;color:var(--text-dim);font-family:var(--font-ui);margin-top:6px">Note: Holy Order is chosen at Level 2, not at character creation. Mark your preference now.</div>
       </div>` : '';
 
-    const MOON_SIGNS = [
-      'Grinning Moon','Dead Moon','Beast Moon','Squamous Moon',
-      'Knight\'s Moon','Rotting Moon','Maiden\'s Moon','Witch\'s Moon',
-      'Robber\'s Moon','Goat Moon','Narrow Moon','Black Moon'
-    ];
-    const moonIsCustom = char.moonSign && !MOON_SIGNS.includes(char.moonSign);
-    const moonOpts = `<option value="">Skip (optional rule)</option>` +
-      MOON_SIGNS.map(m => `<option value="${m}"${char.moonSign===m?' selected':''}>${m}</option>`).join('') +
-      `<option value="__custom__"${moonIsCustom?' selected':''}>Custom (enter below)</option>`;
-    const moonCustomShown = moonIsCustom || char.moonSign === '__custom__';
+    const moonLabel = char.moonSign || 'Skip (optional rule)';
+    const affCats = ['House','Cult','Faction','Organization'];
+    const affOptions = char.affiliationCategory ? AFFILIATIONS[char.affiliationCategory] : [];
+    const selAffilEntry = affOptions.find(a => a.name === char.affiliation);
 
     return `
       <div class="step-header">
@@ -3034,27 +3119,62 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
       <div class="info-box" style="margin-top:16px">
         <h4>Moon Sign <span class="ref-note">p. 175</span> <span style="font-size:0.7rem;color:var(--text-dim);font-weight:normal">(optional rule — mortals &amp; demi-fey only)</span></h4>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:8px">Roll d100 at character creation for a permanent moon sign that grants a minor ability. Check with your Referee before using this rule.</p>
-        <select style="width:100%;max-width:320px;padding:6px 8px;background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:4px;font-size:0.9rem"
-          onchange="char.moonSign=this.value;render()">
-          ${moonOpts}
-        </select>
-        ${moonCustomShown ? `
-        <div style="margin-top:8px">
-          <input type="text" placeholder="e.g. Dead Moon — Waning"
-            value="${char.moonSign !== '__custom__' ? char.moonSign : ''}"
-            style="width:100%;max-width:320px;padding:6px 8px;background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:4px;font-size:0.9rem"
-            oninput="char.moonSign=this.value||'__custom__'">
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:8px">Roll d100 at character creation for a permanent moon sign granting a minor ability. Check with your Referee before using this rule.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+          <button class="btn btn-sm" onclick="rollMoonSign()">🎲 Roll d100</button>
+          <button class="btn btn-sm" onclick="_moonOpen=!_moonOpen;render()" style="flex:1;max-width:420px;display:flex;justify-content:space-between;align-items:center;text-align:left;padding:6px 10px">
+            <span style="color:${char.moonSign?'var(--text-main)':'var(--text-dim)'}">${moonLabel}</span>
+            <span style="margin-left:8px">${_moonOpen?'▲':'▼'}</span>
+          </button>
+        </div>
+        ${_moonOpen ? `
+        <div style="border:1px solid var(--border);border-radius:4px;max-height:320px;overflow-y:auto;margin-bottom:8px">
+          <div onclick="char.moonSign='';_moonOpen=false;render()"
+            style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);background:${!char.moonSign?'rgba(180,150,80,0.15)':'transparent'};font-style:italic;color:var(--text-dim)">
+            Skip (optional rule)
+          </div>
+          ${MOON_SIGNS_DATA.map((m,i) => {
+            const lbl = moonSignLabel(m);
+            const sel = char.moonSign === lbl;
+            return `<div onclick="char.moonSign=moonSignLabel(MOON_SIGNS_DATA[${i}]);_moonOpen=false;render()"
+              style="padding:8px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.04);background:${sel?'rgba(180,150,80,0.15)':'transparent'}">
+              <div style="font-weight:bold;color:var(--text-main);font-size:0.9rem">${m.range} — ${m.moon} (${m.phase})</div>
+              <div style="font-size:0.78rem;color:var(--text-dim);margin-top:2px">${m.effect}</div>
+            </div>`;
+          }).join('')}
         </div>` : ''}
+        <input type="text" placeholder="Manual entry (e.g. 01–03 — Grinning Moon (Waxing))"
+          value="${char.moonSign}"
+          style="width:100%;max-width:440px;padding:6px 8px;background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:4px;font-size:0.85rem"
+          oninput="char.moonSign=this.value;_moonOpen=false">
       </div>
 
       <div class="info-box" style="margin-top:12px">
-        <h4>Affiliation <span style="font-size:0.7rem;color:var(--text-dim);font-weight:normal">(optional)</span></h4>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:8px">Noble house, cult, faction, or organisation. Knights serve one of the eight noble houses (p. 176–177). Leave blank if none.</p>
-        <input type="text" placeholder="e.g. House Malbleat, Drune Initiate, None"
-          value="${char.affiliation || ''}"
-          style="width:100%;max-width:380px;padding:6px 8px;background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:4px;font-size:0.9rem"
-          oninput="char.affiliation=this.value">
+        <h4>Affiliation <span class="ref-note">p. 176</span> <span style="font-size:0.7rem;color:var(--text-dim);font-weight:normal">(optional)</span></h4>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:8px">Noble house, cult, faction, or organisation. Knights serve one of the nine noble houses (p. 176–177).</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+          ${affCats.map(cat => `
+          <button class="btn btn-sm${char.affiliationCategory===cat?' btn-primary':''}"
+            onclick="char.affiliationCategory='${cat}';char.affiliation='';render()">${cat}</button>`).join('')}
+          ${char.affiliationCategory ? `<button class="btn btn-sm" onclick="char.affiliationCategory='';char.affiliation='';render()" style="opacity:0.6">✕ Clear</button>` : ''}
+        </div>
+        ${char.affiliationCategory ? `
+        <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px">
+          ${affOptions.map(a => `
+          <div onclick="char.affiliation='${a.name}';render()"
+            style="padding:7px 12px;cursor:pointer;border-radius:4px;border:1px solid ${char.affiliation===a.name?'var(--gold)':'var(--border)'};background:${char.affiliation===a.name?'rgba(180,150,80,0.12)':'var(--bg-card)'};display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:${char.affiliation===a.name?'bold':'normal'};color:var(--text-main)">${a.name}</span>
+            <span style="font-size:0.75rem;color:var(--text-dim)">${a.alignment}</span>
+          </div>`).join('')}
+        </div>` : ''}
+        ${selAffilEntry ? `
+        <div style="background:rgba(180,150,80,0.08);border:1px solid rgba(180,150,80,0.25);border-radius:4px;padding:10px 12px">
+          <div style="margin-bottom:4px">
+            <strong style="color:var(--gold)">${affiliationDisplay()}</strong>
+            <span style="font-size:0.78rem;color:var(--text-dim);margin-left:8px">${char.affiliationCategory} · ${selAffilEntry.alignment}</span>
+          </div>
+          <p style="margin:0;font-size:0.82rem;color:var(--text-dim)">${selAffilEntry.desc}</p>
+        </div>` : ''}
       </div>
 
       ${navButtons(true, true)}`;
@@ -4283,7 +4403,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
             <h2>${fullName || '(Unnamed)'}</h2>
             <p>${kd.name} ${cd.name} · Level ${displayLevel} · ${char.alignment ? char.alignment.charAt(0).toUpperCase()+char.alignment.slice(1) : '—'}</p>
             ${char.background ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.85rem">${char.background}</p>` : ''}
-            ${(char.moonSign && char.moonSign !== '__custom__') || char.affiliation ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.8rem">${[char.moonSign && char.moonSign !== '__custom__' ? `Moon: ${char.moonSign}` : '', char.affiliation ? `Affiliation: ${char.affiliation}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
+            ${char.moonSign || char.affiliation ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.8rem">${[char.moonSign ? `Moon: ${char.moonSign}` : '', affiliationDisplay() ? `Affiliation: ${affiliationDisplay()}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
           </div>
 
           <div class="sheet-section">
@@ -5135,8 +5255,8 @@ ${inner}
       set('Kindred & Class', `${kd.name} ${cd.name}`);
       set('Background', char.background || '');
       set('Alignment', char.alignment ? char.alignment.charAt(0).toUpperCase() + char.alignment.slice(1) : '');
-      set('Moon Sign',   (char.moonSign && char.moonSign !== '__custom__') ? char.moonSign : '');
-      set('Affiliation', char.affiliation || '');
+      set('Moon Sign',   char.moonSign || '');
+      set('Affiliation', affiliationDisplay() || '');
 
       // Ability scores
       const abilities = ['Strength','Intelligence','Wisdom','Dexterity','Constitution','Charisma'];
