@@ -4932,8 +4932,16 @@ ${spellsGrid}
       const pdfDoc = await PDFDocument.load(templateBytes);
       const form = pdfDoc.getForm();
 
+      const toWinAnsi = s => String(s ?? '')
+        .replace(/[′ʹ]/g, "'")   // prime/foot marks → apostrophe
+        .replace(/[‘’‚‛]/g, "'")  // curly single quotes
+        .replace(/[“”„‟]/g, '"')  // curly double quotes
+        .replace(/[–—]/g, '-')              // en/em dash
+        .replace(/…/g, '...')                    // ellipsis
+        .replace(/[^\x00-\xFF]/g, '?');               // anything else outside latin-1
+
       const set = (name, val) => {
-        try { form.getTextField(name).setText(String(val ?? '')); } catch(e) {}
+        try { form.getTextField(name).setText(toWinAnsi(val)); } catch(e) {}
       };
 
       // Page 1 — Identity
