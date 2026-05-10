@@ -2040,6 +2040,71 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return MOON_SIGNS_DATA.find(m => moonSignLabel(m) === char.moonSign) || null;
   }
 
+  function buildLevelUpRefLines() {
+    const cd = getClassData();
+    if (!cd || !char.luTarget || char.luTarget <= 1) return [];
+    const displayLevel = char.luTarget;
+    const luCT  = char.luCombatTalent  || {};
+    const luCTD = char.luCombatTalentDetail || {};
+    const luGl  = char.luGlamour       || {};
+    const luSy  = char.luSymbiotic     || {};
+    const lines = [];
+
+    // Collapse glamours into one line
+    const glamourParts = [];
+    if (cd.glamoursPerLevel) {
+      for (let lvl = 2; lvl <= displayLevel; lvl++) {
+        const prevG = cd.glamoursPerLevel[lvl - 2] || 0;
+        const newG  = cd.glamoursPerLevel[lvl - 1] || 0;
+        const slots = luGl[lvl] || [];
+        for (let gi = 0; gi < (newG - prevG); gi++) {
+          const idx = slots[gi];
+          const g = idx !== undefined && idx >= 0 ? GLAMOURS[idx] : null;
+          glamourParts.push({ lvl, name: g ? g.name : 'Unspecified' });
+        }
+      }
+    }
+    if (glamourParts.length) {
+      const lvls = [...new Set(glamourParts.map(e => e.lvl))].join(',');
+      lines.push(`Glamours (Lv${lvls}): ${glamourParts.map(e => e.name).join(', ')}`);
+    }
+
+    // Collapse combat talents into one line
+    const talentParts = [];
+    if (cd.combatTalentsPerLevel) {
+      for (let lvl = 2; lvl <= displayLevel; lvl++) {
+        const prevT = cd.combatTalentsPerLevel[lvl - 2] || 0;
+        const newT  = cd.combatTalentsPerLevel[lvl - 1] || 0;
+        if (newT > prevT) {
+          const tid = luCT[lvl];
+          const t = tid ? COMBAT_TALENTS.find(x => x.id === tid) : null;
+          const detail = t && luCTD[lvl] ? ` [${luCTD[lvl]}]` : '';
+          talentParts.push({ lvl, name: t ? t.name + detail : 'Unspecified' });
+        }
+      }
+    }
+    if (talentParts.length) {
+      const lvls = talentParts.map(e => e.lvl).join(',');
+      lines.push(`Combat Talents (Lv${lvls}): ${talentParts.map(e => e.name).join(', ')}`);
+    }
+
+    // Collapse symbiotic flesh into one line
+    const symParts = [];
+    if (char.cls === 'mossling_class') {
+      for (let lvl = 2; lvl <= displayLevel; lvl++) {
+        const si = luSy[lvl];
+        const flesh = si !== undefined ? SYMBIOTIC_FLESH[si] : null;
+        symParts.push({ lvl, name: flesh || 'Unspecified' });
+      }
+    }
+    if (symParts.length) {
+      const lvls = symParts.map(e => e.lvl).join(',');
+      lines.push(`Symbiotic Flesh (Lv${lvls}): ${symParts.map(e => e.name).join(', ')}`);
+    }
+
+    return lines;
+  }
+
   function rollAllAbilities() {
     ['str','int','wis','dex','con','cha'].forEach(a => {
       const v = rollDice(3, 6);
@@ -4248,59 +4313,6 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     if (char.cls === 'friar') traits.push(`Armour of Faith: +${cd.armorOfFaithBonus[0]} AC`);
     const _mse = moonSignEntry();
     if (_mse) traits.push(`Moon Sign — ${moonSignDisplay()}: ${_mse.effect}`);
-    // Level-up choices
-    const UNSPEC = `<span style="color:var(--red-bright)">Unspecified</span>`;
-    if (displayLevel > 1) {
-      const luCT  = char.luCombatTalent || {};
-      const luCTD = char.luCombatTalentDetail || {};
-      const luGl  = char.luGlamour || {};
-      const luSy  = char.luSymbiotic || {};
-      for (let _lvl = 2; _lvl <= displayLevel; _lvl++) {
-        // Combat talents
-        if (cd.combatTalentsPerLevel) {
-          const prevT = cd.combatTalentsPerLevel[_lvl - 2] || 0;
-          const newT  = cd.combatTalentsPerLevel[_lvl - 1] || 0;
-          if (newT > prevT) {
-            const tid = luCT[_lvl];
-            const t = tid ? COMBAT_TALENTS.find(x => x.id === tid) : null;
-            if (t) {
-              const needDetail = (tid === 'weapon_specialist' || tid === 'slayer');
-              const detail = luCTD[_lvl] ? ` [${luCTD[_lvl]}]` : (needDetail ? ` [${UNSPEC}]` : '');
-              traits.push(`Combat Talent (Lv${_lvl}): ${t.name}${detail} — ${t.desc}`);
-            } else {
-              traits.push(`Combat Talent (Lv${_lvl}): ${UNSPEC}`);
-            }
-          }
-        }
-        // Glamours
-        if (cd.glamoursPerLevel) {
-          const prevG = cd.glamoursPerLevel[_lvl - 2] || 0;
-          const newG  = cd.glamoursPerLevel[_lvl - 1] || 0;
-          const numNew = newG - prevG;
-          const slots = luGl[_lvl] || [];
-          for (let _gi = 0; _gi < numNew; _gi++) {
-            const gi = slots[_gi];
-            const g = gi !== undefined && gi >= 0 ? GLAMOURS[gi] : null;
-            if (g) {
-              traits.push(`Glamour (Lv${_lvl}): ${g.name}`);
-            } else {
-              traits.push(`Glamour (Lv${_lvl}): ${UNSPEC}`);
-            }
-          }
-        }
-        // Symbiotic flesh (mossling_class)
-        if (char.cls === 'mossling_class') {
-          const si = luSy[_lvl];
-          const flesh = si !== undefined ? SYMBIOTIC_FLESH[si] : null;
-          if (flesh) {
-            traits.push(`Symbiotic Flesh (Lv${_lvl}): ${flesh}`);
-          } else {
-            traits.push(`Symbiotic Flesh (Lv${_lvl}): ${UNSPEC}`);
-          }
-        }
-      }
-    }
-
     const fullName = [char.name, char.surname].filter(Boolean).join(' ');
 
     // Magic detail section for spellcasters
@@ -4561,20 +4573,31 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         </div><!-- end sheet-panel-primary -->
 
         <!-- ═══ SECONDARY INFO — reference notes ═══ -->
-        ${(spellsRefSection || magicDetailSection || thiefSkillsRefHTML || charDetailsHTML || charInfoHTML) ? `
-        <div class="sheet-panel sheet-panel-secondary" id="sheet-secondary-panel">
-          <div class="sheet-panel-label">
-            <span class="sheet-panel-label-text">Reference Notes for Your Character</span>
-            <button class="btn btn-primary btn-sm" onclick="printNotes()">Print Notes</button>
-          </div>
-          <div class="sheet-secondary">
-            ${spellsRefSection}
-            ${magicDetailSection}
-            ${thiefSkillsRefHTML}
-            ${charDetailsHTML}
-            ${charInfoHTML}
-          </div>
-        </div>` : ''}
+        ${(() => {
+          const luLines = buildLevelUpRefLines();
+          const levelUpRefHTML = luLines.length ? `
+            <div class="sheet-section">
+              <h3>Level-Up Abilities (Lv2+)</h3>
+              <div class="sheet-traits">
+                ${luLines.map(l => `<div style="margin-bottom:4px">• ${l}</div>`).join('')}
+              </div>
+            </div>` : '';
+          return (spellsRefSection || magicDetailSection || thiefSkillsRefHTML || charDetailsHTML || charInfoHTML || levelUpRefHTML) ? `
+          <div class="sheet-panel sheet-panel-secondary" id="sheet-secondary-panel">
+            <div class="sheet-panel-label">
+              <span class="sheet-panel-label-text">Reference Notes for Your Character</span>
+              <button class="btn btn-primary btn-sm" onclick="printNotes()">Print Notes</button>
+            </div>
+            <div class="sheet-secondary">
+              ${spellsRefSection}
+              ${magicDetailSection}
+              ${thiefSkillsRefHTML}
+              ${charDetailsHTML}
+              ${charInfoHTML}
+              ${levelUpRefHTML}
+            </div>
+          </div>` : '';
+        })()}
 
       </div>
       ${navButtons(true, false)}`;
@@ -5184,38 +5207,7 @@ ${inner}
       if (char.holyOrder !== null) classTraitLines.push(`Holy Order: ${CLERIC_ORDERS[char.holyOrder]?.name} — ${CLERIC_ORDERS[char.holyOrder]?.power}`);
       if (char.liegeHouse !== null) classTraitLines.push(`Liege House: ${cd.liegeHouses?.[char.liegeHouse]?.name} (${cd.liegeHouses?.[char.liegeHouse]?.alignment})`);
       if (char.cls === 'friar') classTraitLines.push(`Armour of Faith: +${cd.armorOfFaithBonus[0]} AC`);
-      if (displayLevel > 1) {
-        const luCT = char.luCombatTalent || {};
-        const luCTD = char.luCombatTalentDetail || {};
-        const luGl = char.luGlamour || {};
-        const luSy = char.luSymbiotic || {};
-        for (let _lvl = 2; _lvl <= displayLevel; _lvl++) {
-          if (cd.combatTalentsPerLevel) {
-            const prevT = cd.combatTalentsPerLevel[_lvl - 2] || 0;
-            const newT  = cd.combatTalentsPerLevel[_lvl - 1] || 0;
-            if (newT > prevT) {
-              const tid = luCT[_lvl];
-              const t = tid ? COMBAT_TALENTS.find(x => x.id === tid) : null;
-              const detail = t && luCTD[_lvl] ? ` [${luCTD[_lvl]}]` : '';
-              classTraitLines.push(t ? `Combat Talent (Lv${_lvl}): ${t.name}${detail} — ${t.desc}` : `Combat Talent (Lv${_lvl}): Unspecified`);
-            }
-          }
-          if (cd.glamoursPerLevel) {
-            const prevG = cd.glamoursPerLevel[_lvl - 2] || 0;
-            const newG  = cd.glamoursPerLevel[_lvl - 1] || 0;
-            for (let _gi = 0; _gi < (newG - prevG); _gi++) {
-              const gi = (luGl[_lvl] || [])[_gi];
-              const g = gi !== undefined && gi >= 0 ? GLAMOURS[gi] : null;
-              kindredTraitLines.push(g ? `Glamour (Lv${_lvl}): ${g.name} — ${g.desc}` : `Glamour (Lv${_lvl}): Unspecified`);
-            }
-          }
-          if (char.cls === 'mossling_class') {
-            const si = luSy[_lvl];
-            const flesh = si !== undefined ? SYMBIOTIC_FLESH[si] : null;
-            classTraitLines.push(flesh ? `Symbiotic Flesh (Lv${_lvl}): ${flesh}` : `Symbiotic Flesh (Lv${_lvl}): Unspecified`);
-          }
-        }
-      }
+      // Level-up traits (Lv2+) always go to Reference Notes — not in PDF boxes
 
       // Skills
       const listenTarget = kd.skillBonuses?.listen || 6;
@@ -5334,7 +5326,7 @@ ${inner}
       set('Survival', survivalTarget + '+');
       extraSkills.forEach((s, i) => { if (i < 6) set(`Extra Skill ${i + 1}`, s); });
 
-      // Traits — word-wrap and overflow into Other Notes (34 chars/line, box1=9 lines, box2=1 line)
+      // Stage 1 & 2: boxes (34 chars; box1=9 lines, box2=1 line) — level-1 traits only
       const kRes = fitTraitLines(kindredTraitLines, 34, 9);
       const cRes = fitTraitLines(classTraitLines,   34, 1);
       set('Kindred & Class Traits 1', kRes.fit.join('\r'));
@@ -5360,10 +5352,20 @@ ${inner}
         }
       });
       set('Gold Pieces', char.gold || '');
+      // Stage 3: Other Notes (46 chars, 15 lines) — overflow from boxes + existing notes
+      // Sentinel only added when trait overflow itself exceeds Other Notes capacity
       const traitOverflow = [...kRes.overflow, ...cRes.overflow];
-      const existingNotes = char.notes || '';
-      const sep = existingNotes && traitOverflow.length ? '\n\n' : '';
-      set('Other Notes', existingNotes + sep + traitOverflow.join('\n'));
+      const traitOFWrapped = traitOverflow.flatMap(l => wordWrap(l, 46));
+      const traitExceedsNotes = traitOFWrapped.length > 15;
+      const existingNoteLines = char.notes ? char.notes.split('\n') : [];
+      const sep = traitOverflow.length && existingNoteLines.length ? [''] : [];
+      const otherNotesInput = [...traitOverflow, ...sep, ...existingNoteLines];
+      const notesRes = fitTraitLines(otherNotesInput, 46, 15);
+      let noteFitLines = notesRes.fit;
+      if (traitExceedsNotes) {
+        noteFitLines = [...noteFitLines.slice(0, 14), 'Continued in Reference Notes...'];
+      }
+      set('Other Notes', noteFitLines.join('\r'));
 
       // Total weight
       const allItemsForWeight = [...equippedItems.slice(0, 10), ...stowedItems.slice(0, 16)];
