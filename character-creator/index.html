@@ -2014,6 +2014,14 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     if (!char.affiliation) return '';
     return char.affiliationCategory === 'House' ? 'House ' + char.affiliation : char.affiliation;
   }
+  function moonSignDisplay() {
+    if (!char.moonSign) return '';
+    const entry = MOON_SIGNS_DATA.find(m => moonSignLabel(m) === char.moonSign);
+    return entry ? entry.moon + ' (' + entry.phase + ')' : char.moonSign;
+  }
+  function moonSignEntry() {
+    return MOON_SIGNS_DATA.find(m => moonSignLabel(m) === char.moonSign) || null;
+  }
 
   function rollAllAbilities() {
     ['str','int','wis','dex','con','cha'].forEach(a => {
@@ -3147,6 +3155,11 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           value="${char.moonSign}"
           style="width:100%;max-width:440px;padding:6px 8px;background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:4px;font-size:0.85rem"
           oninput="char.moonSign=this.value;_moonOpen=false">
+        ${moonSignEntry() ? `
+        <div style="margin-top:10px;background:rgba(180,150,80,0.08);border:1px solid rgba(180,150,80,0.25);border-radius:4px;padding:10px 12px">
+          <strong style="color:var(--gold)">${moonSignDisplay()}</strong>
+          <p style="margin:6px 0 0;font-size:0.82rem;color:var(--text-dim)">${moonSignEntry().effect}</p>
+        </div>` : ''}
       </div>
 
       <div class="info-box" style="margin-top:12px">
@@ -4216,6 +4229,8 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     if (char.holyOrder !== null) traits.push(`Holy Order preference: ${CLERIC_ORDERS[char.holyOrder]?.name} (chosen at Level 2)`);
     if (char.liegeHouse !== null) traits.push(`Liege: ${cd.liegeHouses?.[char.liegeHouse]?.name}`);
     if (char.cls === 'friar') traits.push(`Armour of Faith: +${cd.armorOfFaithBonus[0]} AC`);
+    const _mse = moonSignEntry();
+    if (_mse) traits.push(`Moon Sign — ${moonSignDisplay()}: ${_mse.effect}`);
     // Level-up choices
     const UNSPEC = `<span style="color:var(--red-bright)">Unspecified</span>`;
     if (displayLevel > 1) {
@@ -4403,7 +4418,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
             <h2>${fullName || '(Unnamed)'}</h2>
             <p>${kd.name} ${cd.name} · Level ${displayLevel} · ${char.alignment ? char.alignment.charAt(0).toUpperCase()+char.alignment.slice(1) : '—'}</p>
             ${char.background ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.85rem">${char.background}</p>` : ''}
-            ${char.moonSign || char.affiliation ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.8rem">${[char.moonSign ? `Moon: ${char.moonSign}` : '', affiliationDisplay() ? `Affiliation: ${affiliationDisplay()}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
+            ${moonSignDisplay() || affiliationDisplay() ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.8rem">${[moonSignDisplay() ? `Moon: ${moonSignDisplay()}` : '', affiliationDisplay() ? `Affiliation: ${affiliationDisplay()}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
           </div>
 
           <div class="sheet-section">
@@ -5141,6 +5156,8 @@ ${inner}
       const kindredTraitLines = [];
       kd.traits.forEach(t => kindredTraitLines.push(`${t.name}: ${t.desc}`));
       if (char.glamour !== null) kindredTraitLines.push(`Kindred Glamour: ${GLAMOURS[char.glamour]?.name} — ${GLAMOURS[char.glamour]?.desc}`);
+      const _moonEntry = moonSignEntry();
+      if (_moonEntry) kindredTraitLines.push(`Moon Sign — ${moonSignDisplay()}: ${_moonEntry.effect}`);
 
       const classTraitLines = [];
       cd.abilities.forEach(a => { classTraitLines.push(a.replace(/<[^>]+>/g, '')); });
