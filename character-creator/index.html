@@ -3424,6 +3424,16 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
     else if (char.cls === 'thief') {
       const THIEF_SKILLS = ['Climb Wall','Decipher Document','Disarm Mechanism','Legerdemain','Listen','Pick Lock','Search','Stealth'];
+      const THIEF_SKILL_DESCS = {
+        'Climb Wall':         'Climb sheer or steep surfaces with minimal handholds, no equipment needed.',
+        'Decipher Document':  'Understand a text in an unknown language, unravel a cipher, or read a cryptic map.',
+        'Disarm Mechanism':   'Disable clockwork trap mechanisms hidden in a lock, lid, or door handle. Requires thieves\' tools.',
+        'Legerdemain':        'Pilfer a small item from another creature or perform sleight of hand (palm object, slip poison, etc.).',
+        'Listen':             'Detect creatures through a closed door. Referee rolls secretly — silence could mean failure or nothing to hear.',
+        'Pick Lock':          'Open a lock without a key. Requires thieves\' tools.',
+        'Search':             'Find hidden features (traps, secret doors, hidden compartments) in a 10×10 area. Referee rolls secretly.',
+        'Stealth':            'Hide in shadows or move silently when a Surprise Roll shows the party has been spotted.',
+      };
       const exp = char.thiefExpertise || {};
       const totalUsed = THIEF_SKILLS.reduce((s, k) => s + (exp[k] || 0), 0);
       const remaining = 4 - totalUsed;
@@ -3432,14 +3442,17 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         const target = 6 - pts;
         const canAdd = remaining > 0 && target > 2;
         const canSub = pts > 0;
-        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
-          <div style="flex:1;font-size:0.88rem">${skill}</div>
-          <div style="display:flex;align-items:center;gap:6px">
+        return `<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:0.88rem;font-weight:600">${skill}</div>
+            <div style="font-size:0.72rem;color:var(--text-dim);line-height:1.4;margin-top:2px">${THIEF_SKILL_DESCS[skill]}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;padding-top:2px">
             <button class="btn btn-secondary" style="width:28px;height:28px;padding:0;font-size:1rem;line-height:1" onclick="setThiefExpertise('${skill}',-1)" ${canSub?'':'disabled'}>−</button>
             <div style="width:20px;text-align:center;font-weight:600;font-size:0.85rem;color:var(--gold)">${pts > 0 ? '+'+pts : '—'}</div>
             <button class="btn btn-secondary" style="width:28px;height:28px;padding:0;font-size:1rem;line-height:1" onclick="setThiefExpertise('${skill}',1)" ${canAdd?'':'disabled'}>+</button>
           </div>
-          <div style="width:60px;text-align:right;font-size:0.82rem;color:var(--text-dim)">Target: <strong style="color:var(--text)">${target}</strong></div>
+          <div style="width:60px;text-align:right;font-size:0.82rem;color:var(--text-dim);flex-shrink:0;padding-top:2px">Target: <strong style="color:var(--text)">${target}</strong></div>
         </div>`;
       }).join('');
       content = `
@@ -4168,6 +4181,34 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       return `<div class="sheet-section"><h3>Character Details</h3><div class="sheet-traits">${rows}</div></div>`;
     })();
 
+    const thiefSkillsRefHTML = (() => {
+      if (char.cls !== 'thief') return '';
+      const exp = char.thiefExpertise || {};
+      const THIEF_SKILL_DESCS = {
+        'Climb Wall':         'Climb sheer or steep surfaces with minimal handholds, no equipment needed.',
+        'Decipher Document':  'Understand a text in an unknown language, unravel a cipher, or read a cryptic map.',
+        'Disarm Mechanism':   'Disable clockwork trap mechanisms in a lock, lid, or door handle. Requires thieves\' tools.',
+        'Legerdemain':        'Pilfer a small item from another creature or perform sleight of hand (palm object, slip poison, etc.).',
+        'Listen':             'Detect creatures through a closed door. Referee rolls secretly — silence could mean failure or nothing to hear.',
+        'Pick Lock':          'Open a lock without a key. Requires thieves\' tools.',
+        'Search':             'Find hidden features (traps, secret doors, hidden compartments) in a 10×10 area. Referee rolls secretly.',
+        'Stealth':            'Hide in shadows or move silently when a Surprise Roll shows the party has been spotted.',
+      };
+      const THIEF_SKILLS = ['Climb Wall','Decipher Document','Disarm Mechanism','Legerdemain','Listen','Pick Lock','Search','Stealth'];
+      const rows = THIEF_SKILLS.map(skill => {
+        const target = Math.max(2, 6 - (exp[skill] || 0));
+        return `<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:0.78rem">
+          <div style="width:130px;flex-shrink:0"><strong style="color:var(--text)">${skill}</strong> <span style="color:var(--gold-dim)">${target}+</span></div>
+          <div style="color:var(--text-dim);line-height:1.4">${THIEF_SKILL_DESCS[skill]}</div>
+        </div>`;
+      }).join('');
+      return `<div class="sheet-section">
+        <h3>Thief Skills <span class="ref-note">p. 75</span></h3>
+        <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:6px">Roll 1d6 — succeed if result ≥ target. Natural 1 always fails; natural 6 always succeeds.</div>
+        ${rows}
+      </div>`;
+    })();
+
     const charInfoHTML = `
       <div class="sheet-section">
         <h3>Character Info</h3>
@@ -4324,15 +4365,16 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         </div><!-- end sheet-panel-primary -->
 
         <!-- ═══ SECONDARY INFO — reference notes ═══ -->
-        ${(spellsRefSection || magicDetailSection || charDetailsHTML || charInfoHTML) ? `
+        ${(spellsRefSection || magicDetailSection || thiefSkillsRefHTML || charDetailsHTML || charInfoHTML) ? `
         <div class="sheet-panel sheet-panel-secondary" id="sheet-secondary-panel">
           <div class="sheet-panel-label">
             <span class="sheet-panel-label-text">Reference Notes for Your Character</span>
-            <button class="btn btn-secondary btn-sm" onclick="printNotes()">Print Notes</button>
+            <button class="btn btn-primary btn-sm" onclick="printNotes()">Print Notes</button>
           </div>
           <div class="sheet-secondary">
             ${spellsRefSection}
             ${magicDetailSection}
+            ${thiefSkillsRefHTML}
             ${charDetailsHTML}
             ${charInfoHTML}
           </div>
