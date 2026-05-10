@@ -1866,7 +1866,8 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       luGlamour: {},
       luCombatTalent: {},
       luCombatTalentDetail: {},
-      luSymbiotic: {}
+      luSymbiotic: {},
+      thiefExpertise: {}
     };
   }
 
@@ -2140,7 +2141,16 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       case 'kindred': return !!char.kindred;
       case 'kindred-details': return !!char.name;
       case 'class': return !!char.cls;
-      case 'class-specifics': return !!char.cls;
+      case 'class-specifics': {
+        if (!char.cls) return false;
+        if (char.cls === 'thief') {
+          const _exp = char.thiefExpertise || {};
+          const _TSKILLS = ['Climb Wall','Decipher Document','Disarm Mechanism','Legerdemain','Listen','Pick Lock','Search','Stealth'];
+          const _used = _TSKILLS.reduce((s, k) => s + (_exp[k] || 0), 0);
+          return _used === 4;
+        }
+        return true;
+      }
       case 'adjust': return !!char.cls;
       case 'hp': return !!char.hpRoll && calcMaxHP() !== null;
       case 'equipment': return !!char.armorResult || char.cls === 'friar' || char.cls === 'magician';
@@ -3366,6 +3376,42 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         </div>`;
     }
 
+    else if (char.cls === 'thief') {
+      const THIEF_SKILLS = ['Climb Wall','Decipher Document','Disarm Mechanism','Legerdemain','Listen','Pick Lock','Search','Stealth'];
+      const exp = char.thiefExpertise || {};
+      const totalUsed = THIEF_SKILLS.reduce((s, k) => s + (exp[k] || 0), 0);
+      const remaining = 4 - totalUsed;
+      const rows = THIEF_SKILLS.map(skill => {
+        const pts = exp[skill] || 0;
+        const target = 6 - pts;
+        const canAdd = remaining > 0 && target > 2;
+        const canSub = pts > 0;
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+          <div style="flex:1;font-size:0.88rem">${skill}</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <button class="btn btn-secondary" style="width:28px;height:28px;padding:0;font-size:1rem;line-height:1" onclick="setThiefExpertise('${skill}',-1)" ${canSub?'':'disabled'}>−</button>
+            <div style="width:20px;text-align:center;font-weight:600;font-size:0.85rem;color:var(--gold)">${pts > 0 ? '+'+pts : '—'}</div>
+            <button class="btn btn-secondary" style="width:28px;height:28px;padding:0;font-size:1rem;line-height:1" onclick="setThiefExpertise('${skill}',1)" ${canAdd?'':'disabled'}>+</button>
+          </div>
+          <div style="width:60px;text-align:right;font-size:0.82rem;color:var(--text-dim)">Target: <strong style="color:var(--text)">${target}</strong></div>
+        </div>`;
+      }).join('');
+      content = `
+        <div class="info-box" style="margin-bottom:12px">
+          <h4>Thief Expertise Points <span class="ref-note">p. 75</span></h4>
+          <p style="font-size:0.85rem;margin-bottom:6px">Allocate <strong>4 expertise points</strong> across your 8 thief skills. Each point lowers a skill's Target by 1 (base 6, minimum 2). A lower Target is easier to roll — you succeed by rolling equal to or above the Target on 1d6.</p>
+          <p style="font-size:0.82rem;color:var(--text-dim);margin:0">Optional rule: gain 2 more points per level gained (track in Level Up assistant).</p>
+        </div>
+        <div class="info-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <h4 style="margin:0">Skill Targets</h4>
+            <span style="font-size:0.85rem;color:${remaining>0?'var(--gold)':'var(--text-dim)'}"><strong>${remaining}</strong> point${remaining!==1?'s':''} remaining</span>
+          </div>
+          <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:8px">Roll 1d6 — succeed if result ≥ Target. Natural 1 always fails; natural 6 always succeeds.</div>
+          ${rows}
+        </div>`;
+    }
+
     else {
       content = `
         <div class="info-box">
@@ -3383,6 +3429,21 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       </div>
       ${content}
       ${navButtons(true, true)}`;
+  }
+
+  function setThiefExpertise(skill, delta) {
+    const THIEF_SKILLS = ['Climb Wall','Decipher Document','Disarm Mechanism','Legerdemain','Listen','Pick Lock','Search','Stealth'];
+    const exp = char.thiefExpertise || {};
+    const totalUsed = THIEF_SKILLS.reduce((s, k) => s + (exp[k] || 0), 0);
+    const current = exp[skill] || 0;
+    const newVal = current + delta;
+    if (newVal < 0) return;
+    if (delta > 0 && totalUsed >= 4) return;
+    const base = 6;
+    if (base - newVal < 2) return; // min target 2
+    exp[skill] = newVal;
+    char.thiefExpertise = exp;
+    render();
   }
 
   function setGender(g) {
@@ -4216,8 +4277,16 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       enchanter: [{ name:'Detect Magic',target:5}],
       hunter: [{ name:'Alertness',target:6},{ name:'Stalking',target:6},{ name:'Survival',target:5},{ name:'Tracking',target:5}],
       magician: [{ name:'Detect Magic',target:6}],
-      thief: [{ name:'Climb Wall',target:4},{ name:'Decipher Document',target:6},{ name:'Disarm Mechanism',target:6},
-              { name:'Legerdemain',target:6},{ name:'Pick Lock',target:5},{ name:'Search',target:6},{ name:'Stealth',target:5}]
+      thief: (() => {
+        const exp = char.thiefExpertise || {};
+        const hasAny = Object.values(exp).some(v => v > 0);
+        if (hasAny) {
+          return ['Climb Wall','Decipher Document','Disarm Mechanism','Legerdemain','Listen','Pick Lock','Search','Stealth']
+            .map(n => ({ name: n, target: Math.max(2, 6 - (exp[n] || 0)) }));
+        }
+        return [{ name:'Climb Wall',target:4},{ name:'Decipher Document',target:6},{ name:'Disarm Mechanism',target:6},
+                { name:'Legerdemain',target:6},{ name:'Pick Lock',target:5},{ name:'Search',target:6},{ name:'Stealth',target:5}];
+      })()
     };
 
     const classSpecific = classSkills[char.cls] || [];
@@ -4536,7 +4605,15 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         enchanter: [['Detect Magic',5]],
         hunter: [['Alertness',6],['Stalking',6],['Survival',5],['Tracking',5]],
         magician: [['Detect Magic',6]],
-        thief: [['Climb Wall',4],['Decipher Document',6],['Disarm Mechanism',6],['Legerdemain',6],['Pick Lock',5],['Search',6],['Stealth',5]]
+        thief: (() => {
+          const exp = char.thiefExpertise || {};
+          const hasAny = Object.values(exp).some(v => v > 0);
+          if (hasAny) {
+            return ['Climb Wall','Decipher Document','Disarm Mechanism','Legerdemain','Listen','Pick Lock','Search','Stealth']
+              .map(n => [n, Math.max(2, 6 - (exp[n] || 0))]);
+          }
+          return [['Climb Wall',4],['Decipher Document',6],['Disarm Mechanism',6],['Legerdemain',6],['Pick Lock',5],['Search',6],['Stealth',5]];
+        })()
       };
       const base = [['Listen', kd.skillBonuses?.listen||6],['Search', kd.skillBonuses?.search||6],['Survival', kd.skillBonuses?.survivalForaging||6]];
       return [...base, ...(classSkills[char.cls]||[])].map(([n,t]) => `<tr><td>${n}</td><td>${t}+</td></tr>`).join('');
