@@ -2014,6 +2014,23 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     if (!char.affiliation) return '';
     return char.affiliationCategory === 'House' ? 'House ' + char.affiliation : char.affiliation;
   }
+  function wordWrap(line, maxChars) {
+    const words = line.split(' ');
+    const wrapped = [];
+    let current = '';
+    for (const word of words) {
+      if (!current) { current = word; continue; }
+      if ((current + ' ' + word).length <= maxChars) { current += ' ' + word; }
+      else { wrapped.push(current); current = word; }
+    }
+    if (current) wrapped.push(current);
+    return wrapped.length ? wrapped : [''];
+  }
+  function fitTraitLines(lines, maxCharsPerLine, maxLines) {
+    const wrapped = lines.flatMap(line => wordWrap(line, maxCharsPerLine));
+    return { fit: wrapped.slice(0, maxLines), overflow: wrapped.slice(maxLines) };
+  }
+
   function moonSignDisplay() {
     if (!char.moonSign) return '';
     const entry = MOON_SIGNS_DATA.find(m => moonSignLabel(m) === char.moonSign);
@@ -5317,9 +5334,11 @@ ${inner}
       set('Survival', survivalTarget + '+');
       extraSkills.forEach((s, i) => { if (i < 6) set(`Extra Skill ${i + 1}`, s); });
 
-      // Traits
-      set('Kindred & Class Traits 1', kindredTraitLines.join('\r'));
-      set('Kindred & Class Traits 2', classTraitLines.join('\r'));
+      // Traits — word-wrap and overflow into Other Notes (34 chars/line, box1=9 lines, box2=1 line)
+      const kRes = fitTraitLines(kindredTraitLines, 34, 9);
+      const cRes = fitTraitLines(classTraitLines,   34, 1);
+      set('Kindred & Class Traits 1', kRes.fit.join('\r'));
+      set('Kindred & Class Traits 2', cRes.fit.join('\r'));
 
       // Languages
       set('Languages 1', langs1);
@@ -5341,7 +5360,10 @@ ${inner}
         }
       });
       set('Gold Pieces', char.gold || '');
-      set('Other Notes', char.notes || '');
+      const traitOverflow = [...kRes.overflow, ...cRes.overflow];
+      const existingNotes = char.notes || '';
+      const sep = existingNotes && traitOverflow.length ? '\n\n' : '';
+      set('Other Notes', existingNotes + sep + traitOverflow.join('\n'));
 
       // Total weight
       const allItemsForWeight = [...equippedItems.slice(0, 10), ...stowedItems.slice(0, 16)];
