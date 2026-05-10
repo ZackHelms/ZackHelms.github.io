@@ -563,6 +563,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 .sheet-traits { font-family: var(--font-ui); font-size: 0.8rem; color: var(--text-dim); line-height: 1.8; }
 .sheet-equip { font-family: var(--font-ui); font-size: 0.8rem; color: var(--text-dim); }
 .sheet-equip li { padding: 2px 0; }
+.item-weight { font-size: 0.72rem; color: var(--text-muted, var(--text-dim)); opacity: 0.7; margin-left: 4px; }
 .sheet-spell { display: flex; flex-direction: column; margin-bottom: 7px; font-family: var(--font-ui); }
 .sheet-spell .spell-name { color: var(--gold); font-size: 0.82rem; font-weight: bold; }
 .sheet-spell .spell-prayer { color: var(--text-dim); font-size: 0.73rem; font-style: italic; }
@@ -1806,6 +1807,46 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     "Marbles (bag of 20)","Oil flask","Rope (50′)","Sack","Shovel",
     "Sledgehammer","Small hammer","Tent","Torches (3)","Twine (100′ ball)"
   ];
+
+  // Equipment weights in coins (from Players Book pp. 116-121)
+  const ITEM_WEIGHTS = {
+    // Armor (as it appears in armorResult)
+    'leather': 200, 'leather+shield': 300, 'bark': 300, 'bark+shield': 400,
+    'chainmail': 400, 'chainmail+shield': 500, 'pinecone': 400, 'pinecone+shield': 500,
+    'plate': 500, 'plate+shield': 600, 'full plate': 700, 'full plate+shield': 800,
+    'shield': 100,
+    // Weapons (as they appear in startingWeapons results, lowercase)
+    'battle axe': 100, 'club': 20, 'crossbow': 50, 'dagger': 10, '3 daggers': 30,
+    'hand axe': 20, 'longbow': 40, 'longsword': 30, 'mace': 40, 'shortbow': 20,
+    'shortsword': 20, 'sling': 10, 'spear': 30, 'lance (spear for small)': 30,
+    'staff': 40, 'two-handed sword': 140, 'warhammer': 40,
+    'shortbow + 20 arrows': 40, 'longbow + 20 arrows': 60,
+    'crossbow + 20 quarrels': 70, 'sling + 20 stones': 10,
+    // Starting class items
+    'wooden holy symbol': 10, "thieves' tools": 10,
+    "friar's habit": 30, 'ritual robes': 30,
+    'musical instrument (stringed or wind)': 50,
+    // Fixed items
+    'common clothes': 30, 'backpack': 50,
+    'backpack (2 rations, waterskin, tinder box)': 130,
+    // Backpack contents (individual, in stowed list)
+    '2 rations': 40, 'waterskin': 50, 'tinder box': 10,
+    // Adventuring items (exact strings from ADVENTURING_ITEMS)
+    'bedroll': 70, 'chalk (10 sticks)': 10, 'chisel': 20, 'cooking pots': 100,
+    'crowbar': 50, 'firewood (bundle)': 200, 'grappling hook': 40,
+    'iron spikes (12)': 60, 'lantern (hooded)': 20, 'marbles (bag of 20)': 20,
+    'oil flask': 10, 'rope (50′)': 100, 'sack': 5, 'shovel': 50,
+    'sledgehammer': 100, 'small hammer': 30, 'tent': 20, 'torches (3)': 30,
+    'twine (100′ ball)': 10,
+  };
+
+  function getItemWeight(item) {
+    if (!item) return null;
+    const key = String(item).toLowerCase().trim();
+    if (key in ITEM_WEIGHTS) return ITEM_WEIGHTS[key];
+    // Spell book — no weight entry needed (negligible / not in standard slots)
+    return null;
+  }
 
   const LANGUAGES = [
     { name:"Caprice", desc:"Breggle noble tongue" },
@@ -4271,7 +4312,10 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
           <div class="sheet-section">
             <h3>Equipment <span class="ref-note">p. 18</span></h3>
-            <ul class="sheet-equip equip-list">${equip.map(e => `<li>${e}</li>`).join('')}</ul>
+            <ul class="sheet-equip equip-list">${equip.map(e => {
+              const w = getItemWeight(e);
+              return `<li>${e}${w ? `<span class="item-weight">(${w}cn)</span>` : ''}</li>`;
+            }).join('')}</ul>
           </div>
 
           ${char.notes ? `<div class="sheet-section"><h3>Notes</h3><div class="sheet-traits">${char.notes}</div></div>` : ''}
@@ -5055,10 +5099,27 @@ ${inner}
       set('Languages 2', langs2);
 
       // Page 2 — Equipment
-      equippedItems.forEach((item, i) => { if (i < 10) set(`Equipped Item ${i + 1}`, item); });
-      stowedItems.forEach((item, i)   => { if (i < 16) set(`Stowed Item ${i + 1}`, item); });
+      equippedItems.forEach((item, i) => {
+        if (i < 10) {
+          set(`Equipped Item ${i + 1}`, item);
+          const w = getItemWeight(item);
+          if (w) set(`Equipped Item Weight ${i + 1}`, String(w));
+        }
+      });
+      stowedItems.forEach((item, i) => {
+        if (i < 16) {
+          set(`Stowed Item ${i + 1}`, item);
+          const w = getItemWeight(item);
+          if (w) set(`Stowed Item Weight ${i + 1}`, String(w));
+        }
+      });
       set('Gold Pieces', char.gold || '');
       set('Other Notes', char.notes || '');
+
+      // Total weight
+      const allItemsForWeight = [...equippedItems.slice(0, 10), ...stowedItems.slice(0, 16)];
+      const totalWeight = allItemsForWeight.reduce((sum, item) => sum + (getItemWeight(item) || 0), 0);
+      if (totalWeight > 0) set('Total Weight', String(totalWeight));
 
       // Save and download
       const pdfBytes = await pdfDoc.save();
