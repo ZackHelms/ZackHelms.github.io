@@ -614,8 +614,12 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
 /* Sheet primary/secondary split */
-.sheet-secondary { margin-top: 28px; padding-top: 20px; border-top: 2px solid var(--border); }
-.sheet-secondary-title { font-size: 0.78rem; color: var(--text-dim); font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; }
+.sheet-panel { border-radius: var(--radius); border: 1px solid var(--border); padding: 20px; margin-bottom: 20px; }
+.sheet-panel-primary { background: var(--surface); border-color: var(--gold-dim); }
+.sheet-panel-secondary { background: var(--surface2); border-color: var(--border); }
+.sheet-panel-label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.sheet-panel-label-text { font-size: 0.72rem; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-dim); }
+.sheet-secondary { margin-top: 0; padding-top: 0; border-top: none; }
 
 /* Print styles */
 @media print {
@@ -4143,11 +4147,16 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       <div class="step-header">
         <div class="step-num">Step 10</div>
         <h2>Character Sheet <span class="ref-note">p. 16</span></h2>
-        <p>Your complete Level ${displayLevel} character. The Print button prints the primary character sheet (top section).</p>
+        <p>Your complete Level ${displayLevel} character. Download the filled official PDF, or print just the reference notes.</p>
       </div>
       <div id="sheet-container">
 
         <!-- ═══ PRIMARY INFO — matches official character sheet ═══ -->
+        <div class="sheet-panel sheet-panel-primary">
+          <div class="sheet-panel-label">
+            <span class="sheet-panel-label-text">Official Character Sheet</span>
+            <button class="btn btn-primary btn-sm" id="dl-sheet-btn-inline" onclick="downloadSheetPDF()">⬇ Download Sheet (PDF)</button>
+          </div>
         <div id="sheet-primary">
 
           <div class="sheet-header">
@@ -4268,15 +4277,21 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           ${char.notes ? `<div class="sheet-section"><h3>Notes</h3><div class="sheet-traits">${char.notes}</div></div>` : ''}
 
         </div><!-- end #sheet-primary -->
+        </div><!-- end sheet-panel-primary -->
 
         <!-- ═══ SECONDARY INFO — reference notes ═══ -->
         ${(spellsRefSection || magicDetailSection || charDetailsHTML || charInfoHTML) ? `
-        <div class="sheet-secondary">
-          <div class="sheet-secondary-title">Reference Notes for Your Character</div>
-          ${spellsRefSection}
-          ${magicDetailSection}
-          ${charDetailsHTML}
-          ${charInfoHTML}
+        <div class="sheet-panel sheet-panel-secondary" id="sheet-secondary-panel">
+          <div class="sheet-panel-label">
+            <span class="sheet-panel-label-text">Reference Notes for Your Character</span>
+            <button class="btn btn-secondary btn-sm" onclick="printNotes()">Print Notes</button>
+          </div>
+          <div class="sheet-secondary">
+            ${spellsRefSection}
+            ${magicDetailSection}
+            ${charDetailsHTML}
+            ${charInfoHTML}
+          </div>
         </div>` : ''}
 
       </div>
@@ -4787,6 +4802,44 @@ ${spellsGrid}
   }
 
 
+  // ── Print Reference Notes ────────────────────────────────────────────────────
+
+  function printNotes() {
+    const panel = document.getElementById('sheet-secondary-panel');
+    if (!panel) { showModal('<h4>Nothing to Print</h4><p>No reference notes are available for this character.</p>', [{label:'OK',onClick:()=>{}}]); return; }
+    const fullName = [char.name, char.surname].filter(Boolean).join(' ') || '(Unnamed)';
+    const inner = panel.querySelector('.sheet-secondary')?.innerHTML || panel.innerHTML;
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<title>${fullName} — Reference Notes</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, serif; font-size: 10pt; color: #1a1a1a; background: #fff; padding: 24px; }
+  h1 { font-size: 14pt; margin-bottom: 4px; }
+  h2 { font-size: 10pt; color: #555; margin-bottom: 12px; font-weight: normal; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  h3 { font-size: 9pt; border-bottom: 1px solid #ddd; margin: 10px 0 5px; padding-bottom: 2px; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+  p, li, div { font-size: 9pt; line-height: 1.45; }
+  ul { padding-left: 1.2em; margin: 4px 0; }
+  .sheet-spell { margin: 4px 0 6px; }
+  .spell-name { font-weight: bold; font-size: 9pt; margin-right: 6px; }
+  .spell-desc { font-size: 8.5pt; color: #444; }
+  .lu-sub-label { font-size: 7pt; text-transform: uppercase; letter-spacing: 0.08em; color: #777; margin: 8px 0 3px; }
+  .lu-unlock { font-size: 8pt; color: #666; font-style: italic; margin-bottom: 4px; }
+  .sheet-section { margin-bottom: 10px; }
+  @media print { body { padding: 12px; } }
+</style>
+</head><body>
+<h1>${fullName}</h1>
+<h2>Reference Notes</h2>
+${inner}
+</body></html>`;
+    const win = window.open('', '_blank', 'width=800,height=900');
+    if (!win) { showModal('<h4>Pop-up Blocked</h4><p>Allow pop-ups for this page, then click Print Notes again.</p>', [{label:'OK',onClick:()=>{}}]); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
+  }
+
   // ── Download official PDF sheet (AcroForm fill via pdf-lib) ─────────────────
 
   async function downloadSheetPDF() {
@@ -4802,7 +4855,9 @@ ${spellsGrid}
     }
 
     const btn = document.getElementById('dl-sheet-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+    const btn2 = document.getElementById('dl-sheet-btn-inline');
+    if (btn)  { btn.disabled = true;  btn.textContent = 'Generating…'; }
+    if (btn2) { btn2.disabled = true; btn2.textContent = 'Generating…'; }
 
     try {
       const { PDFDocument } = PDFLib;
@@ -5019,7 +5074,8 @@ ${spellsGrid}
     } catch(err) {
       showModal(`<h4>Download Failed</h4><p>${err.message}</p>`, [{label:'OK',onClick:()=>{}}]);
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Download Sheet'; }
+      if (btn)  { btn.disabled = false;  btn.textContent = 'Download Sheet'; }
+      if (btn2) { btn2.disabled = false; btn2.textContent = '⬇ Download Sheet (PDF)'; }
     }
   }
 
