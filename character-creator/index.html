@@ -1872,7 +1872,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     { id: 'adjust',           label: 'Adjust Abilities' },
     { id: 'hp',               label: 'Roll Hit Points' },
     { id: 'equipment',        label: 'Starting Equipment' },
-    { id: 'alignment',        label: 'Choose Alignment' },
+    { id: 'alignment',        label: 'Alignment & Identity' },
     { id: 'level-up',         label: 'Level Up' },
     { id: 'sheet',            label: 'Character Sheet' }
   ];
@@ -1904,6 +1904,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       elfType: null,          // 'rustic' or 'courtly' for elf
       detailRolls: {},        // { head, face, body, demeanour, dress, speech, desires, beliefs }
       name: '', surname: '', background: '', notes: '',
+      affiliation: '', moonSign: '',
       gender: 'any',
       languages: [],
       extraLangs: [],
@@ -3011,14 +3012,51 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         <div style="font-size:0.75rem;color:var(--text-dim);font-family:var(--font-ui);margin-top:6px">Note: Holy Order is chosen at Level 2, not at character creation. Mark your preference now.</div>
       </div>` : '';
 
+    const MOON_SIGNS = [
+      'Grinning Moon','Dead Moon','Beast Moon','Squamous Moon',
+      'Knight\'s Moon','Rotting Moon','Maiden\'s Moon','Witch\'s Moon',
+      'Robber\'s Moon','Goat Moon','Narrow Moon','Black Moon'
+    ];
+    const moonIsCustom = char.moonSign && !MOON_SIGNS.includes(char.moonSign);
+    const moonOpts = `<option value="">Skip (optional rule)</option>` +
+      MOON_SIGNS.map(m => `<option value="${m}"${char.moonSign===m?' selected':''}>${m}</option>`).join('') +
+      `<option value="__custom__"${moonIsCustom?' selected':''}>Custom (enter below)</option>`;
+    const moonCustomShown = moonIsCustom || char.moonSign === '__custom__';
+
     return `
       <div class="step-header">
         <div class="step-num">Step 9</div>
-        <h2>Choose Alignment <span class="ref-note">p. 24</span></h2>
+        <h2>Alignment &amp; Identity <span class="ref-note">p. 24, 175, 176</span></h2>
         <p>Alignment guides your character's behaviour. Clerics and Friars cannot be Chaotic.</p>
       </div>
       <div class="alignment-row">${cards}</div>
       ${holyOrderSection}
+
+      <div class="info-box" style="margin-top:16px">
+        <h4>Moon Sign <span class="ref-note">p. 175</span> <span style="font-size:0.7rem;color:var(--text-dim);font-weight:normal">(optional rule — mortals &amp; demi-fey only)</span></h4>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:8px">Roll d100 at character creation for a permanent moon sign that grants a minor ability. Check with your Referee before using this rule.</p>
+        <select style="width:100%;max-width:320px;padding:6px 8px;background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:4px;font-size:0.9rem"
+          onchange="char.moonSign=this.value;render()">
+          ${moonOpts}
+        </select>
+        ${moonCustomShown ? `
+        <div style="margin-top:8px">
+          <input type="text" placeholder="e.g. Dead Moon — Waning"
+            value="${char.moonSign !== '__custom__' ? char.moonSign : ''}"
+            style="width:100%;max-width:320px;padding:6px 8px;background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:4px;font-size:0.9rem"
+            oninput="char.moonSign=this.value||'__custom__'">
+        </div>` : ''}
+      </div>
+
+      <div class="info-box" style="margin-top:12px">
+        <h4>Affiliation <span style="font-size:0.7rem;color:var(--text-dim);font-weight:normal">(optional)</span></h4>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:8px">Noble house, cult, faction, or organisation. Knights serve one of the eight noble houses (p. 176–177). Leave blank if none.</p>
+        <input type="text" placeholder="e.g. House Malbleat, Drune Initiate, None"
+          value="${char.affiliation || ''}"
+          style="width:100%;max-width:380px;padding:6px 8px;background:var(--bg-card);color:var(--text-main);border:1px solid var(--border);border-radius:4px;font-size:0.9rem"
+          oninput="char.affiliation=this.value">
+      </div>
+
       ${navButtons(true, true)}`;
   }
 
@@ -4245,6 +4283,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
             <h2>${fullName || '(Unnamed)'}</h2>
             <p>${kd.name} ${cd.name} · Level ${displayLevel} · ${char.alignment ? char.alignment.charAt(0).toUpperCase()+char.alignment.slice(1) : '—'}</p>
             ${char.background ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.85rem">${char.background}</p>` : ''}
+            ${(char.moonSign && char.moonSign !== '__custom__') || char.affiliation ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.8rem">${[char.moonSign && char.moonSign !== '__custom__' ? `Moon: ${char.moonSign}` : '', char.affiliation ? `Affiliation: ${char.affiliation}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
           </div>
 
           <div class="sheet-section">
@@ -5096,6 +5135,8 @@ ${inner}
       set('Kindred & Class', `${kd.name} ${cd.name}`);
       set('Background', char.background || '');
       set('Alignment', char.alignment ? char.alignment.charAt(0).toUpperCase() + char.alignment.slice(1) : '');
+      set('Moon Sign',   (char.moonSign && char.moonSign !== '__custom__') ? char.moonSign : '');
+      set('Affiliation', char.affiliation || '');
 
       // Ability scores
       const abilities = ['Strength','Intelligence','Wisdom','Dexterity','Constitution','Charisma'];
