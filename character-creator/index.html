@@ -4178,13 +4178,24 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           </div>
 
           <div class="sheet-section">
-            <h3>Core Statistics (Level ${displayLevel}) <span class="ref-note">p. 16${CLASS_PAGES[char.cls] ? ', p. ' + CLASS_PAGES[char.cls] : ''}</span></h3>
+            <h3>Movement <span class="ref-note">p. 16</span></h3>
             <div class="sheet-grid">
               <div class="sheet-stat">
-                <div class="s-label">Max Hit Points</div>
-                <div class="s-value">${displayHP > 0 ? (displayHPComplete ? displayHP : displayHP + '+') : (maxHP ?? '—')}</div>
-                <div class="s-sub">${displayLevel > 1 ? (displayHPComplete ? 'Lv1–'+displayLevel+' accumulated' : 'some rolls pending') : '1d'+cd.hitDie+' + CON '+modStr(conMod)}</div>
+                <div class="s-label">Speed</div>
+                <div class="s-value">${speed}</div>
+                <div class="s-sub">ft / round</div>
               </div>
+              <div class="sheet-stat">
+                <div class="s-label">Exploring</div>
+                <div class="s-value">${speed * 3}</div>
+                <div class="s-sub">ft / turn</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sheet-section">
+            <h3>Combat <span class="ref-note">p. ${CLASS_PAGES[char.cls] || '57'}</span></h3>
+            <div class="sheet-grid">
               <div class="sheet-stat">
                 <div class="s-label">Armour Class</div>
                 <div class="s-value">${acData?.ac ?? '—'}</div>
@@ -4196,19 +4207,30 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
                 <div class="s-sub">${cd.combatAptitude}</div>
               </div>
               <div class="sheet-stat">
-                <div class="s-label">Speed</div>
-                <div class="s-value">${speed}</div>
-                <div class="s-sub">ft / round</div>
+                <div class="s-label">Magic Res.</div>
+                <div class="s-value">${mr >= 0 ? '+' : ''}${mr}</div>
+                <div class="s-sub">vs magic</div>
               </div>
+            </div>
+          </div>
+
+          <div class="sheet-section">
+            <h3>Health &amp; Experience <span class="ref-note">p. 16, p. 25</span></h3>
+            <div class="sheet-grid">
               <div class="sheet-stat">
-                <div class="s-label">Exploring</div>
-                <div class="s-value">${speed * 3}</div>
-                <div class="s-sub">ft / turn</div>
+                <div class="s-label">Max Hit Points</div>
+                <div class="s-value">${displayHP > 0 ? (displayHPComplete ? displayHP : displayHP + '+') : (maxHP ?? '—')}</div>
+                <div class="s-sub">${displayLevel > 1 ? (displayHPComplete ? 'Lv1–'+displayLevel+' accumulated' : 'some rolls pending') : '1d'+cd.hitDie+' + CON '+modStr(conMod)}</div>
               </div>
               <div class="sheet-stat">
                 <div class="s-label">Level</div>
                 <div class="s-value">${displayLevel}</div>
-                <div class="s-sub">XP: ${displayRow ? displayRow[1].toLocaleString() : '0'}</div>
+                <div class="s-sub">current</div>
+              </div>
+              <div class="sheet-stat">
+                <div class="s-label">Next Level</div>
+                <div class="s-value">${cd.table[displayLevel] ? cd.table[displayLevel][1].toLocaleString() : '—'}</div>
+                <div class="s-sub">XP needed</div>
               </div>
               <div class="sheet-stat">
                 <div class="s-label">XP Modifier</div>
@@ -4691,14 +4713,28 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 </div>
 
 <div class="p-section">
-  <h3>Core Statistics (Level ${displayLevel})</h3>
+  <h3>Movement</h3>
   <div class="p-grid">
-    <div class="p-stat"><div class="label">Max HP</div><div class="val">${hpDisplay}</div><div class="sub">${hpSub}</div></div>
-    <div class="p-stat"><div class="label">Armour Class</div><div class="val">${acData?.ac??'—'}</div><div class="sub">${acData?.armorKey??''}</div></div>
-    <div class="p-stat"><div class="label">Attack Bonus</div><div class="val">${displayRow?modStr(displayRow[2]):'—'}</div><div class="sub">${cd.combatAptitude}</div></div>
     <div class="p-stat"><div class="label">Speed</div><div class="val">${speed}</div><div class="sub">ft / round</div></div>
     <div class="p-stat"><div class="label">Exploring</div><div class="val">${speed*3}</div><div class="sub">ft / turn</div></div>
-    <div class="p-stat"><div class="label">Level</div><div class="val">${displayLevel}</div><div class="sub">XP: ${displayRow?displayRow[1].toLocaleString():'0'}</div></div>
+  </div>
+</div>
+
+<div class="p-section">
+  <h3>Combat (Level ${displayLevel})</h3>
+  <div class="p-grid">
+    <div class="p-stat"><div class="label">Armour Class</div><div class="val">${acData?.ac??'—'}</div><div class="sub">${acData?.armorKey??''}</div></div>
+    <div class="p-stat"><div class="label">Attack Bonus</div><div class="val">${displayRow?modStr(displayRow[2]):'—'}</div><div class="sub">${cd.combatAptitude}</div></div>
+    <div class="p-stat"><div class="label">Magic Res.</div><div class="val">${mr>=0?'+':''}${mr}</div><div class="sub">vs magic</div></div>
+  </div>
+</div>
+
+<div class="p-section">
+  <h3>Health &amp; Experience</h3>
+  <div class="p-grid">
+    <div class="p-stat"><div class="label">Max HP</div><div class="val">${hpDisplay}</div><div class="sub">${hpSub}</div></div>
+    <div class="p-stat"><div class="label">Level</div><div class="val">${displayLevel}</div><div class="sub">current</div></div>
+    <div class="p-stat"><div class="label">Next Level</div><div class="val">${cd.table[displayLevel]?cd.table[displayLevel][1].toLocaleString():'—'}</div><div class="sub">XP needed</div></div>
     <div class="p-stat"><div class="label">XP Modifier</div><div class="val">${xpMod>=0?'+':''}${xpMod}%</div><div class="sub">prime ability</div></div>
   </div>
 </div>
