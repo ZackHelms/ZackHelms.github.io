@@ -1938,7 +1938,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     { id: 'class-specifics',  label: 'Class Specifics' },
     { id: 'kindred',          label: 'Choose Kindred' },
     { id: 'kindred-details',  label: 'Kindred Details' },
-    { id: 'character-image',  label: 'Character Image' },
+    { id: 'character-image',  label: 'Portrait' },
     { id: 'adjust',           label: 'Adjust Abilities' },
     { id: 'hp',               label: 'Roll Hit Points' },
     { id: 'equipment',        label: 'Starting Equipment' },
@@ -2496,8 +2496,9 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   }
 
   function attachHandlers(stepId) {
-    if (stepId === 'character-image' && _portraitGenerating) {
-      _startPortraitDotsAnimation();
+    if (stepId === 'character-image') {
+      if (_portraitGenerating) _startPortraitDotsAnimation();
+      else _refreshPortraitPreview();
     }
     if (stepId === 'abilities') {
       ['str','int','wis','dex','con','cha'].forEach(a => {
@@ -3587,48 +3588,94 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     render();
   }
 
-  // ── Step 6: Character Image ───────────────────────────────────────────────────
+  // ── Step 6: Portrait ─────────────────────────────────────────────────────────
 
+  // Rich kindred descriptions for the image prompt — static, set once
   const KINDRED_FLAVOR = {
-    breggle:   'goat-headed humanoid, cloven hooves, curling horns',
-    elf:       'ageless fairy, otherworldly beauty, pointed ears',
-    grimalkin: 'anthropomorphic cat fairy, feline face and tail',
-    human:     'mortal human, medieval fantasy',
-    mossling:  'gnarled woody humanoid, bark-like skin, forest creature',
-    woodgrue:  'wild fey creature, long pointed features, woodland dweller'
+    breggle:
+      'A stocky goat-headed humanoid with great curling horns, cloven hooves, coarse brindled fur, and a broad-shouldered earthy build; one of the common mortal folk of Dolmenwood',
+    elf:
+      'A willowy ageless fairy of haunting otherworldly beauty, with fine pointed ears, luminous unsettling eyes, and the eerie timeless grace of one who has crossed from the fairy realm into the mortal world of Dolmenwood',
+    grimalkin:
+      'An elegant anthropomorphic cat-fairy in humanoid form, with expressive feline facial features, long sensitive whiskers, a sinuous tail, and a coat of distinctively coloured fur; a mercurial shape-shifting fairy creature',
+    human:
+      'A mortal human dwelling in the grim moss-draped world of Dolmenwood, a figure of the common folk navigating a land where ancient fairy enchantment and folk horror lurk behind every forest tree',
+    mossling:
+      'A gnarled short woody humanoid with bark-textured skin, patches of living moss on knotted limbs, and deep forest-dark eyes; a creature whose body resembles twisted living roots and ancient gnarled branches',
+    woodgrue:
+      'A lean wild fey humanoid with elongated spindly limbs, an oversized angular head, large unblinking eyes, and the primal unsettling presence of a creature barely emerged from Dolmenwood\'s deep tangled heart'
   };
+
+  // Default style string — user can edit transiently in-page
+  const _PORTRAIT_STYLE_DEFAULT =
+    'Artistic style beautifully blends whimsical storybook charm with eerie folk horror. ' +
+    'Evokes the flavor of traditional British Isles folklore, balancing whimsical, quirky anthropomorphism ' +
+    'with a grimy, unsettling undercurrent of magical decay. ' +
+    'Full body portrait from head to feet, standing pose, full length figure.';
+
+  // Transient portrait params — not saved, reset on page load
+  let _pStyle  = _PORTRAIT_STYLE_DEFAULT;
+  let _pWidth  = 512;
+  let _pHeight = 512;
+  let _pModel  = 'flux';
+  let _pNologo = true;
 
   // Mutable generation state (not persisted)
   let _portraitGenerating = false;
   let _portraitError = null;
   let _portraitLastUrl = null;
-  let _portraitLastPrompt = null;
 
   function canGeneratePortrait() {
     const dr = char.detailRolls || {};
     return !!char.name && ['head','face','body','demeanour','dress'].some(k => dr[k] != null);
   }
 
-  function buildPortraitPrompt() {
+  function buildPortraitCharacterPart() {
     const kd = getKindredData();
     const dr = char.detailRolls || {};
-    const flavor = KINDRED_FLAVOR[char.kindred] || 'fantasy humanoid';
-    const detailKeys = ['head','face','body','demeanour','dress'];
-    const details = detailKeys
+    const flavor = KINDRED_FLAVOR[char.kindred] || 'a fantasy humanoid creature';
+    const details = ['head','face','body','demeanour','dress']
       .map(k => {
         if (dr[k] == null) return null;
         const table = kd && kd.details && kd.details[k];
         return table ? table[dr[k]] : null;
       })
       .filter(Boolean);
-    const detailStr = details.length ? details.join(', ') : '';
-    return `${flavor}${detailStr ? ', ' + detailStr : ''}; dark whimsical fairy-tale folklore illustration, Brian Froud style, painterly, muted earth tones, square portrait composition`;
+    return flavor + (details.length ? ', ' + details.join(', ') : '');
+  }
+
+  function buildPortraitPrompt() {
+    return buildPortraitCharacterPart() + '; ' + _pStyle;
+  }
+
+  function buildPortraitUrl(seed) {
+    const encoded = encodeURIComponent(buildPortraitPrompt());
+    const nologoQ = _pNologo ? '&nologo=true' : '';
+    return `https://image.pollinations.ai/prompt/${encoded}?width=${_pWidth}&height=${_pHeight}&model=${encodeURIComponent(_pModel)}${nologoQ}&seed=${seed}`;
   }
 
   function nameToSeed(name) {
     let h = 0;
     for (let i = 0; i < name.length; i++) h = (Math.imul(31, h) + name.charCodeAt(i)) | 0;
     return Math.abs(h);
+  }
+
+  function setPortraitParam(param, value) {
+    if      (param === 'style')  _pStyle  = value;
+    else if (param === 'width')  _pWidth  = parseInt(value)  || 512;
+    else if (param === 'height') _pHeight = parseInt(value)  || 512;
+    else if (param === 'model')  _pModel  = value;
+    else if (param === 'nologo') _pNologo = value;
+    else if (param === 'seed')   char.portraitSeed = parseInt(value) || 0;
+    _refreshPortraitPreview();
+  }
+
+  function _refreshPortraitPreview() {
+    const seed = char.portraitSeed || 0;
+    const promptEl = document.getElementById('portrait-prompt-preview');
+    if (promptEl) promptEl.textContent = buildPortraitPrompt();
+    const urlEl = document.getElementById('portrait-url-preview');
+    if (urlEl) urlEl.textContent = buildPortraitUrl(seed);
   }
 
   let _dotsInterval = null;
@@ -3644,28 +3691,23 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     }, 500);
   }
 
-  // Called by inline onload on the hidden img during loading phase
   function portraitImgReady() {
     _portraitGenerating = false;
     render();
   }
 
-  // Called by inline onerror on the hidden img during loading phase
   function portraitImgFailed() {
-    _portraitError = 'Image failed to render after download. The Pollinations URL may have returned a non-image response or timed out.';
+    _portraitError = 'Image failed to render after download — the URL may have expired or returned non-image data.';
     _portraitGenerating = false;
     render();
   }
 
   async function _doGeneratePortrait(seed) {
-    const prompt = buildPortraitPrompt();
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&model=flux&nologo=true&seed=${seed}`;
+    const url = buildPortraitUrl(seed);
     _portraitLastUrl = url;
-    _portraitLastPrompt = prompt;
     _portraitGenerating = true;
     _portraitError = null;
     char.portraitSeed = seed;
-    // Clear old portrait so the hidden img won't fire onload for the previous image
     char.portrait = null;
     render();
     try {
@@ -3687,8 +3729,6 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         render();
         return;
       }
-      // Fetch OK — set portrait URL and keep _portraitGenerating = true.
-      // The hidden <img> in the loading state will trigger portraitImgReady() on load.
       char.portrait = url;
       render();
     } catch(e) {
@@ -3713,7 +3753,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const kd = getKindredData();
     const dr = char.detailRolls || {};
 
-    // Build detail rows for display — all 8 fields, visual ones marked for prompt inclusion
+    // ── Character details table ──────────────────────────────────────────────
     const VISUAL_KEYS = ['head','face','body','demeanour','dress'];
     const ALL_DETAIL_KEYS = ['head','face','body','demeanour','dress','speech','desires','beliefs'];
     const bodyLabel = char.kindred === 'grimalkin' ? 'Fur' : 'Body';
@@ -3737,18 +3777,73 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const detailsPanel = `
       <div class="info-box" style="margin-bottom:12px">
         <h4 style="margin:0 0 8px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">
-          Character Details <span style="font-size:0.7rem;color:var(--gold-dim);font-weight:normal">(★ = used in prompt)</span>
+          Character Details <span style="font-size:0.7rem;color:var(--gold-dim);font-weight:normal">(★ = included in prompt · go back to change)</span>
         </h4>
+        <div style="font-size:0.78rem;color:var(--text-dim);font-style:italic;margin-bottom:8px;line-height:1.4">
+          Kindred: ${KINDRED_FLAVOR[char.kindred] ? KINDRED_FLAVOR[char.kindred].slice(0,80) + '…' : '—'}
+        </div>
         <table style="width:100%;border-collapse:collapse">${detailRows}</table>
       </div>`;
 
-    // Image panel
+    // ── Editable params panel ────────────────────────────────────────────────
+    const currentSeed = char.portraitSeed || 0;
+    const currentPrompt = enabled ? buildPortraitPrompt() : '';
+    const currentUrl = enabled ? buildPortraitUrl(currentSeed) : '';
+    const styleEscaped = _pStyle.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    const paramsPanel = `
+      <div class="info-box" style="margin-bottom:12px">
+        <h4 style="margin:0 0 12px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">Prompt Parameters</h4>
+
+        <label style="display:block;font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim);margin-bottom:4px">Style &amp; Composition</label>
+        <textarea rows="5" style="width:100%;box-sizing:border-box;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:0.8rem;resize:vertical;font-family:inherit"
+          oninput="setPortraitParam('style',this.value)">${styleEscaped}</textarea>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;align-items:center">
+          <label style="font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim)">Width
+            <input type="number" min="64" max="2048" step="64" value="${_pWidth}"
+              style="width:70px;margin-left:6px;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.82rem"
+              oninput="setPortraitParam('width',this.value)">
+          </label>
+          <label style="font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim)">Height
+            <input type="number" min="64" max="2048" step="64" value="${_pHeight}"
+              style="width:70px;margin-left:6px;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.82rem"
+              oninput="setPortraitParam('height',this.value)">
+          </label>
+          <label style="font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim)">Model
+            <input type="text" value="${_pModel}"
+              style="width:100px;margin-left:6px;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.82rem"
+              oninput="setPortraitParam('model',this.value)" placeholder="flux">
+          </label>
+          <label style="font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim);display:flex;align-items:center;gap:5px">
+            <input type="checkbox" ${_pNologo ? 'checked' : ''}
+              onchange="setPortraitParam('nologo',this.checked)">
+            No Logo
+          </label>
+          <label style="font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim)">Seed
+            <input type="number" value="${currentSeed}"
+              style="width:90px;margin-left:6px;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.82rem"
+              oninput="setPortraitParam('seed',this.value)">
+          </label>
+        </div>
+
+        <div style="margin-top:12px">
+          <div style="font-family:var(--font-ui);font-size:0.72rem;color:var(--text-dim);margin-bottom:3px">Full prompt</div>
+          <div id="portrait-prompt-preview" style="font-size:0.75rem;color:var(--text);background:var(--bg-deep,#111);border:1px solid var(--border);border-radius:4px;padding:6px 8px;line-height:1.5;word-break:break-word">${currentPrompt}</div>
+        </div>
+        <div style="margin-top:8px">
+          <div style="font-family:var(--font-ui);font-size:0.72rem;color:var(--text-dim);margin-bottom:3px">URL</div>
+          <div id="portrait-url-preview" style="font-size:0.72rem;color:var(--gold-dim);background:var(--bg-deep,#111);border:1px solid var(--border);border-radius:4px;padding:6px 8px;word-break:break-all;line-height:1.5">${currentUrl}</div>
+        </div>
+      </div>`;
+
+    // ── Image panel ──────────────────────────────────────────────────────────
     let imagePanel = '';
     if (!enabled) {
       imagePanel = `
         <div class="info-box" style="text-align:center;padding:24px 16px">
-          <p style="color:var(--text-dim);margin:0 0 16px">Select at least one visual detail (head, face, body, demeanour, or dress) in the previous step to enable portrait generation.</p>
-          <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Create Character Image</button>
+          <p style="color:var(--text-dim);margin:0 0 16px">Select at least one visual detail (head, face, body, demeanour, or dress) in the Kindred Details step to enable portrait generation.</p>
+          <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Generate Portrait</button>
         </div>`;
     } else if (_portraitGenerating) {
       imagePanel = `
@@ -3758,17 +3853,17 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           ${char.portrait ? `<img src="${char.portrait}" style="display:none" onload="portraitImgReady()" onerror="portraitImgFailed()">` : ''}
           <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
             <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Regenerate</button>
-            <button class="btn btn-primary" disabled style="opacity:0.4;cursor:not-allowed">New Portrait</button>
+            <button class="btn btn-primary" disabled style="opacity:0.4;cursor:not-allowed">Generate</button>
           </div>
         </div>`;
     } else if (char.portrait) {
       imagePanel = `
         <div class="info-box" style="text-align:center;padding:16px">
           <img src="${char.portrait}" alt="Character portrait"
-            style="width:300px;height:300px;object-fit:cover;border-radius:8px;display:block;margin:0 auto 16px;border:2px solid var(--border)">
+            style="max-width:100%;width:${_pWidth}px;max-height:520px;object-fit:contain;border-radius:8px;display:block;margin:0 auto 16px;border:2px solid var(--border)">
           <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-            <button class="btn btn-secondary" onclick="regeneratePortrait()">Regenerate</button>
-            <button class="btn btn-primary" onclick="generatePortrait()">New Portrait</button>
+            <button class="btn btn-secondary" onclick="regeneratePortrait()">Regenerate (new seed)</button>
+            <button class="btn btn-primary" onclick="generatePortrait()">Generate (current seed)</button>
           </div>
           <p style="font-size:0.72rem;color:var(--text-dim);margin-top:12px;font-family:var(--font-ui)">Powered by Pollinations.ai · FLUX</p>
         </div>`;
@@ -3776,35 +3871,28 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       imagePanel = `
         <div class="info-box" style="text-align:center;padding:24px 16px">
           <p style="color:var(--text-dim);margin:0 0 16px">Generate an AI portrait based on your character's appearance details.</p>
-          <button class="btn btn-primary" onclick="generatePortrait()">Create Character Image</button>
+          <button class="btn btn-primary" onclick="generatePortrait()">Generate Portrait</button>
           <p style="font-size:0.72rem;color:var(--text-dim);margin-top:12px;font-family:var(--font-ui)">Powered by Pollinations.ai · FLUX · ~5–20 seconds</p>
         </div>`;
     }
 
-    // Debug / info panel — always shown when there's something to show
-    const currentPrompt = enabled ? buildPortraitPrompt() : null;
-    const debugLines = [];
-    if (char.name) debugLines.push(`<strong>Character:</strong> ${char.name}${char.surname ? ' ' + char.surname : ''} (${char.kindred || '?'})`);
-    if (currentPrompt) debugLines.push(`<strong>Prompt:</strong> ${currentPrompt}`);
-    if (_portraitLastUrl || char.portrait) debugLines.push(`<strong>URL:</strong> <a href="${_portraitLastUrl || char.portrait}" target="_blank" style="color:var(--gold-dim);word-break:break-all">${_portraitLastUrl || char.portrait}</a>`);
-    if (char.portraitSeed) debugLines.push(`<strong>Seed:</strong> ${char.portraitSeed}`);
-    if (_portraitError) debugLines.push(`<strong style="color:#e55">Error:</strong> <pre style="white-space:pre-wrap;margin:4px 0 0;font-size:0.75rem;color:#e55">${_portraitError}</pre>`);
-
-    const debugPanel = debugLines.length ? `
-      <div class="info-box" style="margin-top:12px;font-size:0.78rem;line-height:1.6;font-family:var(--font-ui)">
-        <h4 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">Debug Info</h4>
-        ${debugLines.map(l => `<div style="margin-bottom:4px">${l}</div>`).join('')}
+    // ── Error panel ──────────────────────────────────────────────────────────
+    const errorPanel = _portraitError ? `
+      <div class="info-box" style="margin-top:12px;border-color:#e55">
+        <h4 style="margin:0 0 6px;font-size:0.78rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:#e55">Generation Error</h4>
+        <pre style="white-space:pre-wrap;margin:0;font-size:0.76rem;color:#e55;line-height:1.5">${_portraitError}</pre>
       </div>` : '';
 
     return `
       <div class="step-header">
         <div class="step-num">Step 6</div>
-        <h2>Character Image</h2>
-        <p>Generate an AI portrait of your character based on their appearance details.</p>
+        <h2>Portrait</h2>
+        <p>Generate an AI portrait of your character. Edit the parameters below to fine-tune the result.</p>
       </div>
       ${detailsPanel}
+      ${paramsPanel}
       ${imagePanel}
-      ${debugPanel}
+      ${errorPanel}
       ${navButtons(true, true)}`;
   }
 
