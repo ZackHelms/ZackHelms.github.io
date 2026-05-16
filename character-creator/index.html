@@ -2496,6 +2496,9 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   }
 
   function attachHandlers(stepId) {
+    if (stepId === 'character-image' && _portraitGenerating) {
+      _startPortraitDotsAnimation();
+    }
     if (stepId === 'abilities') {
       ['str','int','wis','dex','con','cha'].forEach(a => {
         const el = document.getElementById(`ab-${a}`);
@@ -3595,6 +3598,12 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     woodgrue:  'wild fey creature, long pointed features, woodland dweller'
   };
 
+  // Mutable generation state (not persisted)
+  let _portraitGenerating = false;
+  let _portraitError = null;
+  let _portraitLastUrl = null;
+  let _portraitLastPrompt = null;
+
   function canGeneratePortrait() {
     const dr = char.detailRolls || {};
     return !!char.name && ['head','face','body','demeanour','dress'].some(k => dr[k] != null);
@@ -3622,51 +3631,170 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return Math.abs(h);
   }
 
-  function generatePortrait() {
-    if (!canGeneratePortrait()) return;
-    if (!char.portraitSeed) char.portraitSeed = nameToSeed(char.name || 'character');
-    const prompt = buildPortraitPrompt();
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&model=flux&nologo=true&seed=${char.portraitSeed}`;
-    char.portrait = url;
+  let _dotsInterval = null;
+
+  function _startPortraitDotsAnimation() {
+    clearInterval(_dotsInterval);
+    let count = 1;
+    _dotsInterval = setInterval(() => {
+      const el = document.getElementById('portrait-loading-dots');
+      if (!el) { clearInterval(_dotsInterval); _dotsInterval = null; return; }
+      el.textContent = '.'.repeat(count);
+      count = count % 3 + 1;
+    }, 500);
+  }
+
+  // Called by inline onload on the hidden img during loading phase
+  function portraitImgReady() {
+    _portraitGenerating = false;
     render();
   }
 
-  function regeneratePortrait() {
-    char.portraitSeed = (char.portraitSeed || 0) + 1;
-    const prompt = buildPortraitPrompt();
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&model=flux&nologo=true&seed=${char.portraitSeed}`;
-    char.portrait = url;
+  // Called by inline onerror on the hidden img during loading phase
+  function portraitImgFailed() {
+    _portraitError = 'Image failed to render after download. The Pollinations URL may have returned a non-image response or timed out.';
+    _portraitGenerating = false;
     render();
+  }
+
+  async function _doGeneratePortrait(seed) {
+    const prompt = buildPortraitPrompt();
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&model=flux&nologo=true&seed=${seed}`;
+    _portraitLastUrl = url;
+    _portraitLastPrompt = prompt;
+    _portraitGenerating = true;
+    _portraitError = null;
+    char.portraitSeed = seed;
+    // Clear old portrait so the hidden img won't fire onload for the previous image
+    char.portrait = null;
+    render();
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        let body = '';
+        try { body = await resp.text(); } catch(_) {}
+        _portraitError = `HTTP ${resp.status} ${resp.statusText}${body ? '\n' + body.slice(0, 400) : ''}`;
+        _portraitGenerating = false;
+        render();
+        return;
+      }
+      const ct = resp.headers.get('content-type') || '';
+      if (!ct.startsWith('image/')) {
+        let body = '';
+        try { body = await resp.text(); } catch(_) {}
+        _portraitError = `Unexpected content-type: ${ct}${body ? '\n' + body.slice(0, 400) : ''}`;
+        _portraitGenerating = false;
+        render();
+        return;
+      }
+      // Fetch OK — set portrait URL and keep _portraitGenerating = true.
+      // The hidden <img> in the loading state will trigger portraitImgReady() on load.
+      char.portrait = url;
+      render();
+    } catch(e) {
+      _portraitError = `Network error: ${e.message}`;
+      _portraitGenerating = false;
+      render();
+    }
+  }
+
+  function generatePortrait() {
+    if (!canGeneratePortrait()) return;
+    const seed = char.portraitSeed || nameToSeed(char.name || 'character');
+    _doGeneratePortrait(seed);
+  }
+
+  function regeneratePortrait() {
+    _doGeneratePortrait((char.portraitSeed || 0) + 1);
   }
 
   function renderCharacterImage() {
     const enabled = canGeneratePortrait();
-    const portrait = char.portrait;
+    const kd = getKindredData();
+    const dr = char.detailRolls || {};
 
-    const disabledState = `
-      <div class="info-box" style="text-align:center;padding:24px 16px">
-        <p style="color:var(--text-dim);margin:0 0 16px">Complete the character detail fields in the Kindred Details step
-        (head, face, body, demeanour, or dress) to enable portrait generation.</p>
-        <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Create Character Image</button>
+    // Build detail rows for display — all 8 fields, visual ones marked for prompt inclusion
+    const VISUAL_KEYS = ['head','face','body','demeanour','dress'];
+    const ALL_DETAIL_KEYS = ['head','face','body','demeanour','dress','speech','desires','beliefs'];
+    const bodyLabel = char.kindred === 'grimalkin' ? 'Fur' : 'Body';
+    const DETAIL_LABELS = { head:'Head', face:'Face', body:bodyLabel, demeanour:'Demeanour', dress:'Dress', speech:'Speech', desires:'Desires', beliefs:'Beliefs' };
+
+    const detailRows = ALL_DETAIL_KEYS.map(k => {
+      const idx = dr[k];
+      const table = kd && kd.details && kd.details[k];
+      const value = (idx != null && table) ? table[idx] : null;
+      const inPrompt = VISUAL_KEYS.includes(k);
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:4px 10px 4px 0;font-family:var(--font-ui);font-size:0.78rem;color:var(--text-dim);white-space:nowrap">
+          ${DETAIL_LABELS[k]}${inPrompt ? ' <span style="color:var(--gold-dim);font-size:0.68rem" title="Used in image prompt">★</span>' : ''}
+        </td>
+        <td style="padding:4px 0;font-size:0.85rem;color:${value ? 'var(--text)' : 'var(--text-dim)'}">
+          ${value ? value : '<em>— not selected</em>'}
+        </td>
+      </tr>`;
+    }).join('');
+
+    const detailsPanel = `
+      <div class="info-box" style="margin-bottom:12px">
+        <h4 style="margin:0 0 8px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">
+          Character Details <span style="font-size:0.7rem;color:var(--gold-dim);font-weight:normal">(★ = used in prompt)</span>
+        </h4>
+        <table style="width:100%;border-collapse:collapse">${detailRows}</table>
       </div>`;
 
-    const enabledState = `
-      <div class="info-box" style="text-align:center;padding:24px 16px">
-        ${portrait ? `
-          <img src="${portrait}" alt="Character portrait"
-            style="width:300px;height:300px;object-fit:cover;border-radius:8px;display:block;margin:0 auto 16px;border:2px solid var(--border)"
-            onerror="this.style.display='none';document.getElementById('portrait-err').style.display='block'">
-          <p id="portrait-err" style="color:var(--text-dim);display:none">Image generation failed — try regenerating.</p>
-          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:8px">
+    // Image panel
+    let imagePanel = '';
+    if (!enabled) {
+      imagePanel = `
+        <div class="info-box" style="text-align:center;padding:24px 16px">
+          <p style="color:var(--text-dim);margin:0 0 16px">Select at least one visual detail (head, face, body, demeanour, or dress) in the previous step to enable portrait generation.</p>
+          <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Create Character Image</button>
+        </div>`;
+    } else if (_portraitGenerating) {
+      imagePanel = `
+        <div class="info-box" style="text-align:center;padding:24px 16px">
+          <p style="margin:0 0 4px;font-size:1rem">Loading<span id="portrait-loading-dots">.</span></p>
+          <p style="font-size:0.75rem;color:var(--text-dim);font-family:var(--font-ui);margin:0 0 16px">This may take 5–20 seconds</p>
+          ${char.portrait ? `<img src="${char.portrait}" style="display:none" onload="portraitImgReady()" onerror="portraitImgFailed()">` : ''}
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Regenerate</button>
+            <button class="btn btn-primary" disabled style="opacity:0.4;cursor:not-allowed">New Portrait</button>
+          </div>
+        </div>`;
+    } else if (char.portrait) {
+      imagePanel = `
+        <div class="info-box" style="text-align:center;padding:16px">
+          <img src="${char.portrait}" alt="Character portrait"
+            style="width:300px;height:300px;object-fit:cover;border-radius:8px;display:block;margin:0 auto 16px;border:2px solid var(--border)">
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
             <button class="btn btn-secondary" onclick="regeneratePortrait()">Regenerate</button>
             <button class="btn btn-primary" onclick="generatePortrait()">New Portrait</button>
           </div>
-        ` : `
-          <p style="color:var(--text-dim);margin:0 0 16px">Generate an AI portrait based on your character's details.</p>
+          <p style="font-size:0.72rem;color:var(--text-dim);margin-top:12px;font-family:var(--font-ui)">Powered by Pollinations.ai · FLUX</p>
+        </div>`;
+    } else {
+      imagePanel = `
+        <div class="info-box" style="text-align:center;padding:24px 16px">
+          <p style="color:var(--text-dim);margin:0 0 16px">Generate an AI portrait based on your character's appearance details.</p>
           <button class="btn btn-primary" onclick="generatePortrait()">Create Character Image</button>
-        `}
-        <p style="font-size:0.72rem;color:var(--text-dim);margin-top:14px;font-family:var(--font-ui)">Powered by Pollinations.ai · FLUX · Images load in ~5–10 seconds</p>
-      </div>`;
+          <p style="font-size:0.72rem;color:var(--text-dim);margin-top:12px;font-family:var(--font-ui)">Powered by Pollinations.ai · FLUX · ~5–20 seconds</p>
+        </div>`;
+    }
+
+    // Debug / info panel — always shown when there's something to show
+    const currentPrompt = enabled ? buildPortraitPrompt() : null;
+    const debugLines = [];
+    if (char.name) debugLines.push(`<strong>Character:</strong> ${char.name}${char.surname ? ' ' + char.surname : ''} (${char.kindred || '?'})`);
+    if (currentPrompt) debugLines.push(`<strong>Prompt:</strong> ${currentPrompt}`);
+    if (_portraitLastUrl || char.portrait) debugLines.push(`<strong>URL:</strong> <a href="${_portraitLastUrl || char.portrait}" target="_blank" style="color:var(--gold-dim);word-break:break-all">${_portraitLastUrl || char.portrait}</a>`);
+    if (char.portraitSeed) debugLines.push(`<strong>Seed:</strong> ${char.portraitSeed}`);
+    if (_portraitError) debugLines.push(`<strong style="color:#e55">Error:</strong> <pre style="white-space:pre-wrap;margin:4px 0 0;font-size:0.75rem;color:#e55">${_portraitError}</pre>`);
+
+    const debugPanel = debugLines.length ? `
+      <div class="info-box" style="margin-top:12px;font-size:0.78rem;line-height:1.6;font-family:var(--font-ui)">
+        <h4 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">Debug Info</h4>
+        ${debugLines.map(l => `<div style="margin-bottom:4px">${l}</div>`).join('')}
+      </div>` : '';
 
     return `
       <div class="step-header">
@@ -3674,7 +3802,9 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         <h2>Character Image</h2>
         <p>Generate an AI portrait of your character based on their appearance details.</p>
       </div>
-      ${enabled ? enabledState : disabledState}
+      ${detailsPanel}
+      ${imagePanel}
+      ${debugPanel}
       ${navButtons(true, true)}`;
   }
 
