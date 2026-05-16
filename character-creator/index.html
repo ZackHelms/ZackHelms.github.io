@@ -3614,6 +3614,8 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     'Full body portrait from head to feet, standing pose, full length figure.';
 
   // Transient portrait params — not saved, reset on page load
+  let _pKindredFlavor    = null; // null = use KINDRED_FLAVOR default
+  let _pKindredForFlavor = null; // tracks which kindred _pKindredFlavor was last set for
   let _pStyle  = _PORTRAIT_STYLE_DEFAULT;
   let _pWidth  = 512;
   let _pHeight = 512;
@@ -3633,7 +3635,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   function buildPortraitCharacterPart() {
     const kd = getKindredData();
     const dr = char.detailRolls || {};
-    const flavor = KINDRED_FLAVOR[char.kindred] || 'a fantasy humanoid creature';
+    const flavor = _pKindredFlavor || KINDRED_FLAVOR[char.kindred] || 'a fantasy humanoid creature';
     const details = ['head','face','body','demeanour','dress']
       .map(k => {
         if (dr[k] == null) return null;
@@ -3661,12 +3663,13 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   }
 
   function setPortraitParam(param, value) {
-    if      (param === 'style')  _pStyle  = value;
-    else if (param === 'width')  _pWidth  = parseInt(value)  || 512;
-    else if (param === 'height') _pHeight = parseInt(value)  || 512;
-    else if (param === 'model')  _pModel  = value;
-    else if (param === 'nologo') _pNologo = value;
-    else if (param === 'seed')   char.portraitSeed = parseInt(value) || 0;
+    if      (param === 'kindred') _pKindredFlavor = value;
+    else if (param === 'style')   _pStyle  = value;
+    else if (param === 'width')   _pWidth  = parseInt(value)  || 512;
+    else if (param === 'height')  _pHeight = parseInt(value)  || 512;
+    else if (param === 'model')   _pModel  = value;
+    else if (param === 'nologo')  _pNologo = value;
+    else if (param === 'seed')    char.portraitSeed = parseInt(value) || 0;
     _refreshPortraitPreview();
   }
 
@@ -3785,15 +3788,26 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         <table style="width:100%;border-collapse:collapse">${detailRows}</table>
       </div>`;
 
+    // Reset kindred flavor if the kindred has changed since it was last edited
+    if (_pKindredForFlavor !== char.kindred) {
+      _pKindredFlavor = KINDRED_FLAVOR[char.kindred] || '';
+      _pKindredForFlavor = char.kindred;
+    }
+
     // ── Editable params panel ────────────────────────────────────────────────
     const currentSeed = char.portraitSeed || 0;
     const currentPrompt = enabled ? buildPortraitPrompt() : '';
     const currentUrl = enabled ? buildPortraitUrl(currentSeed) : '';
+    const kindredEscaped = (_pKindredFlavor || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const styleEscaped = _pStyle.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
     const paramsPanel = `
       <div class="info-box" style="margin-bottom:12px">
         <h4 style="margin:0 0 12px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">Prompt Parameters</h4>
+
+        <label style="display:block;font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim);margin-bottom:4px">Kindred Description</label>
+        <textarea rows="3" style="width:100%;box-sizing:border-box;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:0.8rem;resize:vertical;font-family:inherit;margin-bottom:10px"
+          oninput="setPortraitParam('kindred',this.value)">${kindredEscaped}</textarea>
 
         <label style="display:block;font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim);margin-bottom:4px">Style &amp; Composition</label>
         <textarea rows="5" style="width:100%;box-sizing:border-box;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:0.8rem;resize:vertical;font-family:inherit"
