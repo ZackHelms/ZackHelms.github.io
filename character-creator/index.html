@@ -3616,6 +3616,8 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   // Transient portrait params — not saved, reset on page load
   let _pKindredFlavor    = null; // null = use KINDRED_FLAVOR default
   let _pKindredForFlavor = null; // tracks which kindred _pKindredFlavor was last set for
+  let _pDetails        = {};    // { head, face, body, demeanour, dress } — editable prompt text
+  let _pDetailsFromIdx = {};    // tracks which dr[k] index each _pDetails[k] was populated from
   let _pStyle  = _PORTRAIT_STYLE_DEFAULT;
   let _pWidth  = 512;
   let _pHeight = 512;
@@ -3629,21 +3631,22 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
   function canGeneratePortrait() {
     const dr = char.detailRolls || {};
-    return !!char.name && ['head','face','body','demeanour','dress'].some(k => dr[k] != null);
+    const hasRoll = ['head','face','body','demeanour','dress'].some(k => dr[k] != null);
+    const hasTyped = ['head','face','body','demeanour','dress'].some(k => (_pDetails[k] || '').trim());
+    return !!char.name && (hasRoll || hasTyped);
   }
 
   function buildPortraitCharacterPart() {
-    const kd = getKindredData();
-    const dr = char.detailRolls || {};
     const flavor = _pKindredFlavor || KINDRED_FLAVOR[char.kindred] || 'a fantasy humanoid creature';
     const details = ['head','face','body','demeanour','dress']
-      .map(k => {
-        if (dr[k] == null) return null;
-        const table = kd && kd.details && kd.details[k];
-        return table ? table[dr[k]] : null;
-      })
+      .map(k => (_pDetails[k] || '').trim())
       .filter(Boolean);
     return flavor + (details.length ? ', ' + details.join(', ') : '');
+  }
+
+  function setPortraitDetail(key, value) {
+    _pDetails[key] = value;
+    _refreshPortraitPreview();
   }
 
   function buildPortraitPrompt() {
@@ -3756,37 +3759,16 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const kd = getKindredData();
     const dr = char.detailRolls || {};
 
-    // ── Character details table ──────────────────────────────────────────────
+    // Sync editable detail text from detailRolls whenever a roll selection changes
     const VISUAL_KEYS = ['head','face','body','demeanour','dress'];
-    const ALL_DETAIL_KEYS = ['head','face','body','demeanour','dress','speech','desires','beliefs'];
-    const bodyLabel = char.kindred === 'grimalkin' ? 'Fur' : 'Body';
-    const DETAIL_LABELS = { head:'Head', face:'Face', body:bodyLabel, demeanour:'Demeanour', dress:'Dress', speech:'Speech', desires:'Desires', beliefs:'Beliefs' };
-
-    const detailRows = ALL_DETAIL_KEYS.map(k => {
+    VISUAL_KEYS.forEach(k => {
       const idx = dr[k];
-      const table = kd && kd.details && kd.details[k];
-      const value = (idx != null && table) ? table[idx] : null;
-      const inPrompt = VISUAL_KEYS.includes(k);
-      return `<tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:4px 10px 4px 0;font-family:var(--font-ui);font-size:0.78rem;color:var(--text-dim);white-space:nowrap">
-          ${DETAIL_LABELS[k]}${inPrompt ? ' <span style="color:var(--gold-dim);font-size:0.68rem" title="Used in image prompt">★</span>' : ''}
-        </td>
-        <td style="padding:4px 0;font-size:0.85rem;color:${value ? 'var(--text)' : 'var(--text-dim)'}">
-          ${value ? value : '<em>— not selected</em>'}
-        </td>
-      </tr>`;
-    }).join('');
-
-    const detailsPanel = `
-      <div class="info-box" style="margin-bottom:12px">
-        <h4 style="margin:0 0 8px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">
-          Character Details <span style="font-size:0.7rem;color:var(--gold-dim);font-weight:normal">(★ = included in prompt · go back to change)</span>
-        </h4>
-        <div style="font-size:0.78rem;color:var(--text-dim);font-style:italic;margin-bottom:8px;line-height:1.4">
-          Kindred: ${KINDRED_FLAVOR[char.kindred] ? KINDRED_FLAVOR[char.kindred].slice(0,80) + '…' : '—'}
-        </div>
-        <table style="width:100%;border-collapse:collapse">${detailRows}</table>
-      </div>`;
+      if (_pDetailsFromIdx[k] !== idx) {
+        const table = kd && kd.details && kd.details[k];
+        _pDetails[k] = (idx != null && table) ? table[idx] : '';
+        _pDetailsFromIdx[k] = idx;
+      }
+    });
 
     // Reset kindred flavor if the kindred has changed since it was last edited
     if (_pKindredForFlavor !== char.kindred) {
@@ -3794,12 +3776,34 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       _pKindredForFlavor = char.kindred;
     }
 
+    // ── Editable character detail textboxes ──────────────────────────────────
+    const bodyLabel = char.kindred === 'grimalkin' ? 'Fur' : 'Body';
+    const DETAIL_LABELS = { head:'Head', face:'Face', body:bodyLabel, demeanour:'Demeanour', dress:'Dress' };
+    const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    const detailInputs = VISUAL_KEYS.map(k => `
+      <div style="margin-bottom:8px">
+        <label style="display:block;font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim);margin-bottom:3px">${DETAIL_LABELS[k]}</label>
+        <input type="text" value="${esc(_pDetails[k])}"
+          placeholder="— not selected (go back to pick one)"
+          style="width:100%;box-sizing:border-box;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:0.82rem"
+          oninput="setPortraitDetail('${k}',this.value)">
+      </div>`).join('');
+
+    const detailsPanel = `
+      <div class="info-box" style="margin-bottom:12px">
+        <h4 style="margin:0 0 10px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">
+          Character Details <span style="font-size:0.7rem;color:var(--gold-dim);font-weight:normal">(pre-filled from selections · edit freely)</span>
+        </h4>
+        ${detailInputs}
+      </div>`;
+
     // ── Editable params panel ────────────────────────────────────────────────
     const currentSeed = char.portraitSeed || 0;
     const currentPrompt = enabled ? buildPortraitPrompt() : '';
     const currentUrl = enabled ? buildPortraitUrl(currentSeed) : '';
-    const kindredEscaped = (_pKindredFlavor || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const styleEscaped = _pStyle.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const kindredEscaped = esc(_pKindredFlavor);
+    const styleEscaped = esc(_pStyle);
 
     const paramsPanel = `
       <div class="info-box" style="margin-bottom:12px">
