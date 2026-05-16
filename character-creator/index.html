@@ -1938,6 +1938,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     { id: 'class-specifics',  label: 'Class Specifics' },
     { id: 'kindred',          label: 'Choose Kindred' },
     { id: 'kindred-details',  label: 'Kindred Details' },
+    { id: 'character-image',  label: 'Character Image' },
     { id: 'adjust',           label: 'Adjust Abilities' },
     { id: 'hp',               label: 'Roll Hit Points' },
     { id: 'equipment',        label: 'Starting Equipment' },
@@ -1963,6 +1964,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       advItems: [],
       extraItems: [],
       goldRoll: '', gold: 0,
+      portrait: null, portraitSeed: 0,
       glamour: null,         // kindred glamour (elf/grimalkin)
       enchanterGlamour: null, // enchanter class glamour
       knack: null,
@@ -2402,6 +2404,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       case 'abilities': return ['str','int','wis','dex','con','cha'].every(a => char[a] >= 3 && char[a] <= 18);
       case 'kindred': return !!char.kindred;
       case 'kindred-details': return !!char.name;
+      case 'character-image': return !!char.portrait;
       case 'class': return !!char.cls;
       case 'class-specifics': {
         if (!char.cls) return false;
@@ -2475,6 +2478,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       abilities: renderAbilities,
       kindred: renderKindred,
       'kindred-details': renderKindredDetails,
+      'character-image': renderCharacterImage,
       class: renderClass,
       'class-specifics': renderClassSpecifics,
       adjust: renderAdjust,
@@ -2931,7 +2935,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
     return `
       <div class="step-header">
-        <div class="step-num">Step 6</div>
+        <div class="step-num">Step 7</div>
         <h2>Adjust Ability Scores <span class="ref-note">p. 19</span></h2>
         <p>Optional: Raise your Prime Abilities by lowering non-prime scores.</p>
       </div>
@@ -2979,7 +2983,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
     return `
       <div class="step-header">
-        <div class="step-num">Step 7</div>
+        <div class="step-num">Step 8</div>
         <h2>Roll Hit Points <span class="ref-note">p. 16</span></h2>
         <p>Roll your class's Hit Die and add your Constitution modifier. Minimum 1 HP.</p>
       </div>
@@ -3121,7 +3125,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
     return `
       <div class="step-header">
-        <div class="step-num">Step 8</div>
+        <div class="step-num">Step 9</div>
         <h2>Starting Equipment <span class="ref-note">p. 18, p. ${CLASS_PAGES[char.cls] || '57'}</span></h2>
         <p>Roll for your starting armour and weapons as determined by your class. Enter dice results below.</p>
       </div>
@@ -3234,7 +3238,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
     return `
       <div class="step-header">
-        <div class="step-num">Step 9</div>
+        <div class="step-num">Step 10</div>
         <h2>Alignment &amp; Identity <span class="ref-note">p. 24, 175, 176</span></h2>
         <p>Alignment guides your character's behaviour. Clerics and Friars cannot be Chaotic.</p>
       </div>
@@ -3578,6 +3582,100 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     if (!char.detailRolls) char.detailRolls = {};
     char.detailRolls[key] = char.detailRolls[key] === idx ? undefined : idx;
     render();
+  }
+
+  // ── Step 6: Character Image ───────────────────────────────────────────────────
+
+  const KINDRED_FLAVOR = {
+    breggle:   'goat-headed humanoid, cloven hooves, curling horns',
+    elf:       'ageless fairy, otherworldly beauty, pointed ears',
+    grimalkin: 'anthropomorphic cat fairy, feline face and tail',
+    human:     'mortal human, medieval fantasy',
+    mossling:  'gnarled woody humanoid, bark-like skin, forest creature',
+    woodgrue:  'wild fey creature, long pointed features, woodland dweller'
+  };
+
+  function canGeneratePortrait() {
+    const dr = char.detailRolls || {};
+    return !!char.name && ['head','face','body','demeanour','dress'].some(k => dr[k] != null);
+  }
+
+  function buildPortraitPrompt() {
+    const kd = getKindredData();
+    const dr = char.detailRolls || {};
+    const flavor = KINDRED_FLAVOR[char.kindred] || 'fantasy humanoid';
+    const detailKeys = ['head','face','body','demeanour','dress'];
+    const details = detailKeys
+      .map(k => {
+        if (dr[k] == null) return null;
+        const table = kd && kd.details && kd.details[k];
+        return table ? table[dr[k]] : null;
+      })
+      .filter(Boolean);
+    const detailStr = details.length ? details.join(', ') : '';
+    return `${flavor}${detailStr ? ', ' + detailStr : ''}; dark whimsical fairy-tale folklore illustration, Brian Froud style, painterly, muted earth tones, square portrait composition`;
+  }
+
+  function nameToSeed(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (Math.imul(31, h) + name.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  }
+
+  function generatePortrait() {
+    if (!canGeneratePortrait()) return;
+    if (!char.portraitSeed) char.portraitSeed = nameToSeed(char.name || 'character');
+    const prompt = buildPortraitPrompt();
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&model=flux&nologo=true&seed=${char.portraitSeed}`;
+    char.portrait = url;
+    render();
+  }
+
+  function regeneratePortrait() {
+    char.portraitSeed = (char.portraitSeed || 0) + 1;
+    const prompt = buildPortraitPrompt();
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&model=flux&nologo=true&seed=${char.portraitSeed}`;
+    char.portrait = url;
+    render();
+  }
+
+  function renderCharacterImage() {
+    const enabled = canGeneratePortrait();
+    const portrait = char.portrait;
+
+    const disabledState = `
+      <div class="info-box" style="text-align:center;padding:24px 16px">
+        <p style="color:var(--text-dim);margin:0 0 16px">Complete the character detail fields in the Kindred Details step
+        (head, face, body, demeanour, or dress) to enable portrait generation.</p>
+        <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Create Character Image</button>
+      </div>`;
+
+    const enabledState = `
+      <div class="info-box" style="text-align:center;padding:24px 16px">
+        ${portrait ? `
+          <img src="${portrait}" alt="Character portrait"
+            style="width:300px;height:300px;object-fit:cover;border-radius:8px;display:block;margin:0 auto 16px;border:2px solid var(--border)"
+            onerror="this.style.display='none';document.getElementById('portrait-err').style.display='block'">
+          <p id="portrait-err" style="color:var(--text-dim);display:none">Image generation failed — try regenerating.</p>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:8px">
+            <button class="btn btn-secondary" onclick="regeneratePortrait()">Regenerate</button>
+            <button class="btn btn-primary" onclick="generatePortrait()">New Portrait</button>
+          </div>
+        ` : `
+          <p style="color:var(--text-dim);margin:0 0 16px">Generate an AI portrait based on your character's details.</p>
+          <button class="btn btn-primary" onclick="generatePortrait()">Create Character Image</button>
+        `}
+        <p style="font-size:0.72rem;color:var(--text-dim);margin-top:14px;font-family:var(--font-ui)">Powered by Pollinations.ai · FLUX · Images load in ~5–10 seconds</p>
+      </div>`;
+
+    return `
+      <div class="step-header">
+        <div class="step-num">Step 6</div>
+        <h2>Character Image</h2>
+        <p>Generate an AI portrait of your character based on their appearance details.</p>
+      </div>
+      ${enabled ? enabledState : disabledState}
+      ${navButtons(true, true)}`;
   }
 
   // ── Step 5: Class Specifics ───────────────────────────────────────────────────
@@ -4194,7 +4292,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     render();
   }
 
-  // ── Step 10: Character Sheet ───────────────────────────────────────────────────
+  // ── Step 11: Character Sheet ───────────────────────────────────────────────────
 
   function renderSheet() {
     const kd = getKindredData();
@@ -4463,7 +4561,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
     return `
       <div class="step-header">
-        <div class="step-num">Step 10</div>
+        <div class="step-num">Step 11</div>
         <h2>Character Sheet <span class="ref-note">p. 16</span></h2>
         <p>Your complete Level ${displayLevel} character. Download the filled official PDF, or print just the reference notes.</p>
       </div>
@@ -4477,11 +4575,14 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           </div>
         <div id="sheet-primary">
 
-          <div class="sheet-header">
-            <h2>${fullName || '(Unnamed)'}</h2>
-            <p>${cd.name.startsWith(kd.name) ? cd.name : kd.name + ' ' + cd.name} · Level ${displayLevel} · ${char.alignment ? char.alignment.charAt(0).toUpperCase()+char.alignment.slice(1) : '—'}</p>
-            ${char.background ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.85rem">${char.background}</p>` : ''}
-            ${moonSignDisplay() || affiliationDisplay() ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.8rem">${[moonSignDisplay() ? `Moon: ${moonSignDisplay()}` : '', affiliationDisplay() ? `Affiliation: ${affiliationDisplay()}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
+          <div class="sheet-header" style="${char.portrait ? 'display:flex;gap:14px;align-items:flex-start' : ''}">
+            ${char.portrait ? `<img src="${char.portrait}" alt="Character portrait" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:2px solid var(--border);flex-shrink:0">` : ''}
+            <div>
+              <h2>${fullName || '(Unnamed)'}</h2>
+              <p>${cd.name.startsWith(kd.name) ? cd.name : kd.name + ' ' + cd.name} · Level ${displayLevel} · ${char.alignment ? char.alignment.charAt(0).toUpperCase()+char.alignment.slice(1) : '—'}</p>
+              ${char.background ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.85rem">${char.background}</p>` : ''}
+              ${moonSignDisplay() || affiliationDisplay() ? `<p style="font-style:italic;color:var(--text-dim);font-size:0.8rem">${[moonSignDisplay() ? `Moon: ${moonSignDisplay()}` : '', affiliationDisplay() ? `Affiliation: ${affiliationDisplay()}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
+            </div>
           </div>
 
           <div class="sheet-section">
