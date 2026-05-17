@@ -1938,12 +1938,12 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     { id: 'class-specifics',  label: 'Class Specifics' },
     { id: 'kindred',          label: 'Choose Kindred' },
     { id: 'kindred-details',  label: 'Kindred Details' },
-    { id: 'character-image',  label: 'Portrait' },
     { id: 'adjust',           label: 'Adjust Abilities' },
     { id: 'hp',               label: 'Roll Hit Points' },
     { id: 'equipment',        label: 'Starting Equipment' },
     { id: 'alignment',        label: 'Alignment & Identity' },
     { id: 'level-up',         label: 'Level Up' },
+    { id: 'character-image',  label: 'Portrait' },
     { id: 'sheet',            label: 'Character Sheet' }
   ];
 
@@ -2942,7 +2942,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
     return `
       <div class="step-header">
-        <div class="step-num">Step 7</div>
+        <div class="step-num">Step 6</div>
         <h2>Adjust Ability Scores <span class="ref-note">p. 19</span></h2>
         <p>Optional: Raise your Prime Abilities by lowering non-prime scores.</p>
       </div>
@@ -2990,7 +2990,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
     return `
       <div class="step-header">
-        <div class="step-num">Step 8</div>
+        <div class="step-num">Step 7</div>
         <h2>Roll Hit Points <span class="ref-note">p. 16</span></h2>
         <p>Roll your class's Hit Die and add your Constitution modifier. Minimum 1 HP.</p>
       </div>
@@ -3132,7 +3132,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
     return `
       <div class="step-header">
-        <div class="step-num">Step 9</div>
+        <div class="step-num">Step 8</div>
         <h2>Starting Equipment <span class="ref-note">p. 18, p. ${CLASS_PAGES[char.cls] || '57'}</span></h2>
         <p>Roll for your starting armour and weapons as determined by your class. Enter dice results below.</p>
       </div>
@@ -3245,7 +3245,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
     return `
       <div class="step-header">
-        <div class="step-num">Step 10</div>
+        <div class="step-num">Step 9</div>
         <h2>Alignment &amp; Identity <span class="ref-note">p. 24, 175, 176</span></h2>
         <p>Alignment guides your character's behaviour. Clerics and Friars cannot be Chaotic.</p>
       </div>
@@ -3632,6 +3632,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   let _portraitError = null;
   let _portraitLastUrl = null;
   let _portraitUploadInfo = null; // { origKB, compKB, format } shown after upload
+  let _portraitSource = null;     // 'pollinations' | 'pasted' | 'browse' | 'dropped'
 
   function canGeneratePortrait() {
     const dr = char.detailRolls || {};
@@ -3666,13 +3667,16 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   function buildGeminiPrompt() {
     const kd = getKindredData();
     const kindredName = kd ? kd.name : (char.kindred || 'character');
-    const kindredId   = char.kindred || 'character';
     const g = (char.gender && char.gender !== 'any') ? char.gender + ' ' : '';
     const details = ['head','face','body','demeanour','dress']
       .map(k => (_pDetails[k] || '').trim()).filter(Boolean);
     const csv = details.join(', ');
     return `Generate an image of a ${g}${kindredName} in Dolmenwood, 1:1 aspect ratio, ` +
-      `use portrait-gen/${kindredId}*.png as reference images, and modify this image by giving them: ${csv}`;
+      `use any attachments as reference images, and modify this image by giving them: ${csv}. ` +
+      `Artistic style beautifully blends whimsical storybook charm with eerie folk horror. ` +
+      `Evokes the flavor of traditional British Isles folklore, balancing whimsical, quirky anthropomorphism ` +
+      `with a grimy, unsettling undercurrent of magical decay. ` +
+      `Full body portrait from head to feet, standing pose, full length figure. 1:1 aspect ratio, square image.`;
   }
 
   async function compressPortraitImage(dataUrl) {
@@ -3693,7 +3697,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     });
   }
 
-  async function handlePortraitUpload(file) {
+  async function handlePortraitUpload(file, source) {
     if (!file || !file.type.startsWith('image/')) return;
     const origKB = Math.round(file.size / 1024);
     const reader = new FileReader();
@@ -3703,6 +3707,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       const format = compressed.startsWith('data:image/webp') ? 'WebP' : 'JPEG';
       char.portrait = compressed;
       _portraitUploadInfo = { origKB, compKB, format };
+      _portraitSource = source || 'browse';
       _portraitError = null;
       render();
     };
@@ -3716,7 +3721,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     for (const item of items) {
       if (item.type.startsWith('image/')) {
         e.preventDefault();
-        handlePortraitUpload(item.getAsFile());
+        handlePortraitUpload(item.getAsFile(), 'pasted');
         break;
       }
     }
@@ -3754,7 +3759,32 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const promptEl = document.getElementById('portrait-prompt-preview');
     if (promptEl) promptEl.textContent = buildPortraitPrompt();
     const urlEl = document.getElementById('portrait-url-preview');
-    if (urlEl) urlEl.textContent = buildPortraitUrl(seed);
+    if (urlEl) {
+      const url = buildPortraitUrl(seed);
+      if ('href' in urlEl) urlEl.href = url;
+      else urlEl.textContent = url;
+    }
+  }
+
+  async function copyRefImage(src, btn) {
+    const origText = btn ? btn.textContent : '';
+    try {
+      const img = new Image();
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = src; });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      canvas.toBlob(async blob => {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+          if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = origText; }, 1500); }
+        } catch(e) {
+          if (btn) { btn.textContent = 'Error'; setTimeout(() => { btn.textContent = origText; }, 1500); }
+        }
+      }, 'image/png');
+    } catch(e) {
+      if (btn) { btn.textContent = 'Error'; setTimeout(() => { btn.textContent = origText; }, 1500); }
+    }
   }
 
   let _dotsInterval = null;
@@ -3809,6 +3839,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         return;
       }
       char.portrait = url;
+      _portraitSource = 'pollinations';
       render();
     } catch(e) {
       _portraitError = `Network error: ${e.message}`;
@@ -3871,23 +3902,108 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         ${detailInputs}
       </div>`;
 
-    // ── Editable params panel ────────────────────────────────────────────────
+    // ── Gemini Option 1 panel ────────────────────────────────────────────────
     const currentSeed = char.portraitSeed || 0;
     const currentPrompt = enabled ? buildPortraitPrompt() : '';
-    const currentUrl = enabled ? buildPortraitUrl(currentSeed) : '';
     const kindredEscaped = esc(_pKindredFlavor);
     const styleEscaped = esc(_pStyle);
 
-    const paramsPanel = `
+    const geminiPrompt = canGeneratePortrait() ? buildGeminiPrompt() : '';
+    const geminiEsc = geminiPrompt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    const KINDRED_REF_IMAGES = {
+      woodgrue: [
+        { src: 'portrait-gen/PHB/woodgrue-00-phb.png',           label: 'Woodgrue 1' },
+        { src: 'portrait-gen/PHB/woodgrue-01-phb-flute-dance.png', label: 'Woodgrue 2' }
+      ],
+      mossling: [
+        { src: 'portrait-gen/PHB/mossling-01-phb.png',            label: 'Mossling 1' },
+        { src: 'portrait-gen/PHB/mossling-02-in-a-tree.png',      label: 'Mossling 2' },
+        { src: 'portrait-gen/PHB/mossling-03-beer.png',           label: 'Mossling 3' },
+        { src: 'portrait-gen/PHB/mossling-04-club.png',           label: 'Mossling 4' },
+        { src: 'portrait-gen/PHB/mossling-05-turnip.png',         label: 'Mossling 5' },
+        { src: 'portrait-gen/PHB/mossling-06-knife-mushrooms.png', label: 'Mossling 6' }
+      ]
+    };
+    const refImgs = KINDRED_REF_IMAGES[char.kindred];
+    const refImagesHtml = refImgs ? `
+      <div style="margin:12px 0 0">
+        <p style="font-size:0.75rem;color:var(--text-dim);font-family:var(--font-ui);margin:0 0 6px">
+          Reference images — attach these in AI Studio when generating a ${kd ? kd.name : char.kindred}:
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${refImgs.map(ri => `
+            <div style="text-align:center">
+              <img src="${ri.src}" alt="${ri.label}"
+                style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:1px solid var(--border);display:block;cursor:pointer"
+                title="Click to copy image" onclick="copyRefImage('${ri.src}',this.nextElementSibling)">
+              <button class="btn btn-secondary" onclick="copyRefImage('${ri.src}',this)"
+                style="margin-top:4px;font-size:0.65rem;padding:2px 8px;width:80px">Copy</button>
+            </div>`).join('')}
+        </div>
+        <p style="font-size:0.7rem;color:var(--text-dim);margin:6px 0 0;font-style:italic">
+          Right-click an image to save, or click Copy to copy to clipboard, then attach in AI Studio.
+        </p>
+      </div>` : '';
+
+    const geminiPanel = `
       <div class="info-box" style="margin-bottom:12px">
-        <h4 style="margin:0 0 12px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">Prompt Parameters</h4>
+        <h4 style="margin:0 0 10px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">Option 1: Gemini (better)</h4>
+
+        <p style="font-size:0.78rem;color:var(--text-dim);margin:0 0 8px;line-height:1.5">
+          <strong style="color:var(--text)">1.</strong> Copy the prompt below, then open AI Studio and paste it.
+          Attach reference images there if you have them.
+        </p>
+        <textarea readonly rows="5" onclick="this.select()"
+          style="width:100%;box-sizing:border-box;background:var(--bg-deep,#111);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:0.78rem;font-family:monospace;resize:vertical;cursor:text"
+          >${geminiEsc}</textarea>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn btn-secondary" onclick="copyGeminiPrompt()" ${!geminiPrompt ? 'disabled style="opacity:0.4"' : ''}>Copy Prompt</button>
+          <a class="btn btn-secondary" href="https://aistudio.google.com/prompts/new_chat" target="_blank" rel="noopener"
+            style="text-decoration:none">Open AI Studio ↗</a>
+        </div>
+
+        ${refImagesHtml}
+
+        <p style="font-size:0.78rem;color:var(--text-dim);margin:14px 0 0;line-height:1.5">
+          <strong style="color:var(--text)">2.</strong> Generate in AI Studio, then upload or paste the result in the "Your Character Portrait" panel below (Ctrl+V works anywhere on this page).
+        </p>
+      </div>`;
+
+    // ── Option 2: Pollinations.ai panel (params + generate) ─────────────────
+    const currentUrl = enabled ? buildPortraitUrl(currentSeed) : '';
+    const currentUrlEsc = currentUrl.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    let pollinationsButtons = '';
+    if (!enabled) {
+      pollinationsButtons = `
+        <p style="font-size:0.78rem;color:var(--text-dim);margin:0 0 8px">Select at least one visual detail to enable generation.</p>
+        <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Generate Portrait</button>`;
+    } else if (_portraitGenerating) {
+      pollinationsButtons = `
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Regenerate (new seed)</button>
+          <button class="btn btn-primary" disabled style="opacity:0.4;cursor:not-allowed">Generate (current seed)</button>
+        </div>`;
+    } else {
+      pollinationsButtons = `
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          ${char.portrait && _portraitSource === 'pollinations' ? `<button class="btn btn-secondary" onclick="regeneratePortrait()">Regenerate (new seed)</button>` : ''}
+          <button class="btn btn-primary" onclick="generatePortrait()">Generate Portrait</button>
+        </div>
+        ${char.portrait && _portraitSource !== 'pollinations' ? '<p style="font-size:0.72rem;color:#c87;font-family:var(--font-ui);margin:8px 0 0">⚠ Clicking Generate will replace the current portrait</p>' : ''}`;
+    }
+
+    const pollinationsPanel = `
+      <div class="info-box" style="margin-bottom:12px">
+        <h4 style="margin:0 0 12px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">Option 2: Pollinations.ai (creepier)</h4>
 
         <label style="display:block;font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim);margin-bottom:4px">Kindred Description</label>
         <textarea rows="3" style="width:100%;box-sizing:border-box;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:0.8rem;resize:vertical;font-family:inherit;margin-bottom:10px"
           oninput="setPortraitParam('kindred',this.value)">${kindredEscaped}</textarea>
 
         <label style="display:block;font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim);margin-bottom:4px">Style &amp; Composition</label>
-        <textarea rows="5" style="width:100%;box-sizing:border-box;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:0.8rem;resize:vertical;font-family:inherit"
+        <textarea rows="4" style="width:100%;box-sizing:border-box;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:0.8rem;resize:vertical;font-family:inherit"
           oninput="setPortraitParam('style',this.value)">${styleEscaped}</textarea>
 
         <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;align-items:center">
@@ -3922,98 +4038,47 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           <div style="font-family:var(--font-ui);font-size:0.72rem;color:var(--text-dim);margin-bottom:3px">Full prompt</div>
           <div id="portrait-prompt-preview" style="font-size:0.75rem;color:var(--text);background:var(--bg-deep,#111);border:1px solid var(--border);border-radius:4px;padding:6px 8px;line-height:1.5;word-break:break-word">${currentPrompt}</div>
         </div>
-        <div style="margin-top:8px">
+        <div style="margin-top:8px;margin-bottom:12px">
           <div style="font-family:var(--font-ui);font-size:0.72rem;color:var(--text-dim);margin-bottom:3px">URL</div>
-          <div id="portrait-url-preview" style="font-size:0.72rem;color:var(--gold-dim);background:var(--bg-deep,#111);border:1px solid var(--border);border-radius:4px;padding:6px 8px;word-break:break-all;line-height:1.5">${currentUrl}</div>
+          <a href="${currentUrlEsc}" target="_blank" rel="noopener" id="portrait-url-preview"
+            style="font-size:0.72rem;color:var(--gold-dim);background:var(--bg-deep,#111);border:1px solid var(--border);border-radius:4px;padding:6px 8px;word-break:break-all;line-height:1.5;display:block;text-decoration:none"
+            title="Open Pollinations.ai image in a new browser tab">Open Pollinations.ai image in a new browser tab ↗</a>
         </div>
+
+        ${pollinationsButtons}
       </div>`;
 
-    // ── Gemini Option D panel ────────────────────────────────────────────────
-    const geminiPrompt = canGeneratePortrait() ? buildGeminiPrompt() : '';
-    const geminiEsc = geminiPrompt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    // ── Your Character Portrait panel ────────────────────────────────────────
     const uploadSizeInfo = _portraitUploadInfo
-      ? `<p style="font-size:0.73rem;color:var(--text-dim);margin:8px 0 0;font-family:var(--font-ui)">
+      ? `<p style="font-size:0.73rem;color:var(--text-dim);margin:6px 0 0;font-family:var(--font-ui);text-align:center">
            Compressed: ${_portraitUploadInfo.origKB} KB → ${_portraitUploadInfo.compKB} KB ${_portraitUploadInfo.format}
            (${Math.round((1 - _portraitUploadInfo.compKB / _portraitUploadInfo.origKB) * 100)}% smaller) · 512 px max
          </p>` : '';
 
-    const geminiPanel = `
-      <div class="info-box" style="margin-bottom:12px">
-        <h4 style="margin:0 0 10px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">
-          Option 1: Gemini (better)
-        </h4>
+    const sourceLabels = {
+      pollinations: 'Generated by Pollinations.ai',
+      pasted: 'Pasted in from clipboard (Ctrl+V)',
+      browse: 'Uploaded from filesystem',
+      dropped: 'Dropped from filesystem'
+    };
+    const sourceText = char.portrait && _portraitSource ? (sourceLabels[_portraitSource] || '') : '';
 
-        <p style="font-size:0.78rem;color:var(--text-dim);margin:0 0 8px;line-height:1.5">
-          <strong style="color:var(--text)">1.</strong> Copy the prompt below, then open AI Studio and paste it.
-          Upload your kindred reference images there if you have them.
-        </p>
-        <textarea readonly rows="4" onclick="this.select()"
-          style="width:100%;box-sizing:border-box;background:var(--bg-deep,#111);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:0.78rem;font-family:monospace;resize:vertical;cursor:text"
-          >${geminiEsc}</textarea>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
-          <button class="btn btn-secondary" onclick="copyGeminiPrompt()" ${!geminiPrompt ? 'disabled style="opacity:0.4"' : ''}>Copy Prompt</button>
-          <a class="btn btn-secondary" href="https://aistudio.google.com/prompts/new_chat" target="_blank" rel="noopener"
-            style="text-decoration:none">Open AI Studio ↗</a>
-        </div>
-
-        <p style="font-size:0.78rem;color:var(--text-dim);margin:14px 0 8px;line-height:1.5">
-          <strong style="color:var(--text)">2.</strong> Generate, then upload or paste the result here (Ctrl+V anywhere on this page).
-        </p>
-        <input type="file" id="portrait-file-input" accept="image/*" style="display:none"
-          onchange="handlePortraitUpload(this.files[0])">
-        <div onclick="triggerPortraitFileInput()"
-          ondragover="event.preventDefault()"
-          ondrop="event.preventDefault();handlePortraitUpload(event.dataTransfer.files[0])"
-          style="border:2px dashed var(--border);border-radius:6px;padding:20px;text-align:center;cursor:pointer;color:var(--text-dim);font-size:0.82rem;transition:border-color 0.15s"
-          onmouseenter="this.style.borderColor='var(--gold-dim)'" onmouseleave="this.style.borderColor='var(--border)'">
-          Drop image here · Ctrl+V to paste · Click to browse
-        </div>
-        ${uploadSizeInfo}
-      </div>`;
-
-    // ── Image panel ──────────────────────────────────────────────────────────
-    let imagePanel = '';
-    if (!enabled) {
-      imagePanel = `
-        <div class="info-box" style="text-align:center;padding:24px 16px">
-          <p style="color:var(--text-dim);margin:0 0 16px">Select at least one visual detail (head, face, body, demeanour, or dress) in the Kindred Details step to enable portrait generation.</p>
-          <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Generate Portrait</button>
-        </div>`;
-    } else if (_portraitGenerating) {
-      imagePanel = `
-        <div class="info-box" style="text-align:center;padding:24px 16px">
-          <p style="margin:0 0 4px;font-size:1rem">Loading<span id="portrait-loading-dots">.</span></p>
-          <p style="font-size:0.75rem;color:var(--text-dim);font-family:var(--font-ui);margin:0 0 16px">This may take 5–20 seconds</p>
-          ${char.portrait ? `<img src="${char.portrait}" style="display:none" onload="portraitImgReady()" onerror="portraitImgFailed()">` : ''}
-          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-            <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Regenerate</button>
-            <button class="btn btn-primary" disabled style="opacity:0.4;cursor:not-allowed">Generate</button>
-          </div>
-        </div>`;
+    let portraitContent = '';
+    if (_portraitGenerating) {
+      portraitContent = `
+        <p style="margin:0 0 4px;font-size:1rem;text-align:center">Loading<span id="portrait-loading-dots">.</span></p>
+        <p style="font-size:0.75rem;color:var(--text-dim);font-family:var(--font-ui);margin:0 0 16px;text-align:center">This may take 5–20 seconds</p>
+        ${char.portrait ? `<img src="${char.portrait}" style="display:none" onload="portraitImgReady()" onerror="portraitImgFailed()">` : ''}`;
     } else if (char.portrait) {
-      const isUpload = char.portrait.startsWith('data:');
-      imagePanel = `
-        <div class="info-box" style="text-align:center;padding:16px">
-          <h4 style="margin:0 0 10px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">
-            Option 2: Pollinator.ai (creepier)
-          </h4>
-          <img src="${char.portrait}" alt="Character portrait"
-            style="max-width:100%;width:${_pWidth}px;max-height:520px;object-fit:contain;border-radius:8px;display:block;margin:0 auto 16px;border:2px solid var(--border)">
-          ${isUpload ? '<p style="font-size:0.72rem;color:var(--text-dim);margin:0 0 10px;font-family:var(--font-ui)">Uploaded portrait</p>' : ''}
-          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-            <button class="btn btn-secondary" onclick="regeneratePortrait()">Regenerate (new seed)</button>
-            <button class="btn btn-primary" onclick="generatePortrait()">Generate (current seed)</button>
-          </div>
-          <p style="font-size:0.72rem;color:var(--text-dim);margin-top:10px;font-family:var(--font-ui)">
-            Powered by Pollinations.ai · FLUX${isUpload ? ' · ⚠ Clicking Generate will replace the uploaded portrait' : ''}
-          </p>
-        </div>`;
+      portraitContent = `
+        <img src="${char.portrait}" alt="Character portrait"
+          style="max-width:100%;width:${_pWidth}px;max-height:520px;object-fit:contain;border-radius:8px;display:block;margin:0 auto 8px;border:2px solid var(--border)">
+        ${sourceText ? `<p style="font-size:0.72rem;color:var(--text-dim);font-family:var(--font-ui);margin:4px 0;text-align:center">${sourceText}</p>` : ''}
+        ${uploadSizeInfo}`;
     } else {
-      imagePanel = `
-        <div class="info-box" style="text-align:center;padding:24px 16px">
-          <p style="color:var(--text-dim);margin:0 0 16px">Generate an AI portrait based on your character's appearance details.</p>
-          <button class="btn btn-primary" onclick="generatePortrait()">Generate Portrait</button>
-          <p style="font-size:0.72rem;color:var(--text-dim);margin-top:12px;font-family:var(--font-ui)">Powered by Pollinations.ai · FLUX · ~5–20 seconds</p>
+      portraitContent = `
+        <div style="width:100%;max-width:512px;height:180px;margin:0 auto;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:0.85rem;text-align:center;padding:16px;box-sizing:border-box">
+          Portrait will appear here after generation or upload
         </div>`;
     }
 
@@ -4024,17 +4089,35 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         <pre style="white-space:pre-wrap;margin:0;font-size:0.76rem;color:#e55;line-height:1.5">${_portraitError}</pre>
       </div>` : '';
 
+    const portraitPanel = `
+      <div class="info-box" style="margin-bottom:12px">
+        <h4 style="margin:0 0 12px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">Your Character Portrait</h4>
+        <input type="file" id="portrait-file-input" accept="image/*" style="display:none"
+          onchange="handlePortraitUpload(this.files[0],'browse')">
+        <div onclick="triggerPortraitFileInput()"
+          ondragover="event.preventDefault()"
+          ondrop="event.preventDefault();handlePortraitUpload(event.dataTransfer.files[0],'dropped')"
+          style="border:2px dashed var(--border);border-radius:6px;padding:12px;text-align:center;cursor:pointer;color:var(--text-dim);font-size:0.82rem;transition:border-color 0.15s;margin-bottom:12px"
+          onmouseenter="this.style.borderColor='var(--gold-dim)'" onmouseleave="this.style.borderColor='var(--border)'">
+          Drop image here · Ctrl+V to paste · Click to browse
+        </div>
+        ${portraitContent}
+        ${errorPanel}
+        <p style="font-size:0.72rem;color:var(--gold-dim);font-family:var(--font-ui);margin:10px 0 0;text-align:center">
+          Click the Save button to save this portrait with your character.
+        </p>
+      </div>`;
+
     return `
       <div class="step-header">
-        <div class="step-num">Step 6</div>
+        <div class="step-num">Step 11</div>
         <h2>Portrait</h2>
         <p>Generate a portrait of your character based on chosen kindred and character details.</p>
       </div>
       ${detailsPanel}
-      ${paramsPanel}
       ${geminiPanel}
-      ${imagePanel}
-      ${errorPanel}
+      ${pollinationsPanel}
+      ${portraitPanel}
       ${navButtons(true, true)}`;
   }
 
@@ -4921,7 +5004,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
     return `
       <div class="step-header">
-        <div class="step-num">Step 11</div>
+        <div class="step-num">Step 12</div>
         <h2>Character Sheet <span class="ref-note">p. 16</span></h2>
         <p>Your complete Level ${displayLevel} character. Download the filled official PDF, or print just the reference notes.</p>
       </div>
