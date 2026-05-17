@@ -3940,7 +3940,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const geminiPanel = `
       <div class="info-box" style="margin-bottom:12px">
         <h4 style="margin:0 0 10px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">
-          Generate via Gemini (Option D)
+          Option 1: Gemini (better)
         </h4>
 
         <p style="font-size:0.78rem;color:var(--text-dim);margin:0 0 8px;line-height:1.5">
@@ -3994,6 +3994,9 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       const isUpload = char.portrait.startsWith('data:');
       imagePanel = `
         <div class="info-box" style="text-align:center;padding:16px">
+          <h4 style="margin:0 0 10px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">
+            Option 2: Pollinator.ai (creepier)
+          </h4>
           <img src="${char.portrait}" alt="Character portrait"
             style="max-width:100%;width:${_pWidth}px;max-height:520px;object-fit:contain;border-radius:8px;display:block;margin:0 auto 16px;border:2px solid var(--border)">
           ${isUpload ? '<p style="font-size:0.72rem;color:var(--text-dim);margin:0 0 10px;font-family:var(--font-ui)">Uploaded portrait</p>' : ''}
