@@ -3655,6 +3655,9 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       char.advItems.forEach(i => { const it = ADVENTURING_ITEMS[i]; if (it) gear.push(it); });
     }
     if (gear.length) parts.push(`Equipment: ${gear.join(', ')}`);
+    if (char.symbioticFlesh !== null && char.symbioticFlesh !== undefined) {
+      parts.push(`Symbiotic flesh: ${SYMBIOTIC_FLESH[char.symbioticFlesh]}`);
+    }
     return parts.join('. ');
   }
 
@@ -3759,6 +3762,16 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   function copyGeminiPrompt() {
     const txt = buildGeminiPrompt();
     navigator.clipboard.writeText(txt).catch(() => {});
+  }
+
+  function copyEl(id, btn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent).then(() => {
+      if (btn) { const t = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = t, 1500); }
+    }).catch(() => {
+      if (btn) { const t = btn.textContent; btn.textContent = 'Error'; setTimeout(() => btn.textContent = t, 1500); }
+    });
   }
 
   function triggerPortraitFileInput() {
@@ -3948,6 +3961,9 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         char.advItems.forEach(i => { const it = ADVENTURING_ITEMS[i]; if (it) gear.push(it); });
       }
       if (gear.length) rows.push({ label: 'Equipment', value: gear.join(', ') });
+      if (char.symbioticFlesh !== null && char.symbioticFlesh !== undefined) {
+        rows.push({ label: 'Symbiotic flesh', value: SYMBIOTIC_FLESH[char.symbioticFlesh] });
+      }
       return rows;
     })() : [];
 
@@ -3976,8 +3992,43 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const kindredEscaped = esc(_pKindredFlavor);
     const styleEscaped = esc(_pStyle);
 
-    const geminiPrompt = canGeneratePortrait() ? buildGeminiPrompt() : '';
-    const geminiEsc = geminiPrompt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    // Build Gemini sub-prompts
+    const _gGender = (char.gender && char.gender !== 'any') ? char.gender + ' ' : '';
+    const _gKindredName = kd ? kd.name : (char.kindred || 'character');
+    const _gInitial = `Generate an image of a ${_gGender}${_gKindredName} in Dolmenwood`;
+
+    const _gLabeledDetails = buildLabeledDetails();
+    const _gFlesh = (char.symbioticFlesh !== null && char.symbioticFlesh !== undefined)
+      ? `symbiotic flesh: ${SYMBIOTIC_FLESH[char.symbioticFlesh]}` : '';
+    const _gDetailParts = _gFlesh ? [..._gLabeledDetails, _gFlesh] : _gLabeledDetails;
+    const _gDetails = _gDetailParts.length ? `Modify this image by giving them: ${_gDetailParts.join(', ')}.` : '';
+
+    const _gcd = getClassData();
+    const _gGear = [];
+    if (char.armorResult && char.armorResult !== 'none') _gGear.push(char.armorResult);
+    if (char.weapon1Result) _gGear.push(char.weapon1Result);
+    if (char.weapon2Result && char.weapon2Result !== char.weapon1Result) _gGear.push(char.weapon2Result);
+    if (_gcd) _gcd.startingItems.forEach(i => _gGear.push(i));
+    _gGear.push('common clothes');
+    if (char.advItems && char.advItems.length) {
+      char.advItems.forEach(i => { const it = ADVENTURING_ITEMS[i]; if (it) _gGear.push(it); });
+    }
+    const _gEquip = _gGear.length ? `Modify this image to show them with equipment: ${_gGear.join(', ')}.` : '';
+
+    const _KINDRED_CLASSES = ['breggle_class','elf_class','grimalkin_class','mossling_class','woodgrue_class'];
+    const _gClassPrompt = (char.cls && !_KINDRED_CLASSES.includes(char.cls) && _gcd)
+      ? `Modify this image to show them as a member of the ${_gcd.name} class.` : '';
+
+    const _gStyle = 'Artistic style: Beautiful blend of whimsical storybook charm with eerie folk horror. Dimensions: 1 to 1 aspect ratio, square.';
+
+    const _gRow = (id, label, text) => text ? `
+      <div style="margin-bottom:8px">
+        <div style="font-family:var(--font-ui);font-size:0.7rem;color:var(--text-dim);margin-bottom:3px">${label}</div>
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <pre id="${id}" style="flex:1;font-size:0.76rem;color:var(--text);background:var(--bg-deep,#111);border:1px solid var(--border);border-radius:4px;padding:6px 8px;line-height:1.5;font-family:monospace;white-space:pre-wrap;word-break:break-word;margin:0">${esc(text)}</pre>
+          <button class="btn btn-secondary" onclick="copyEl('${id}',this)" style="flex-shrink:0;font-size:0.72rem;padding:4px 10px;align-self:flex-start">Copy</button>
+        </div>
+      </div>` : '';
 
     const KINDRED_REF_IMAGES = {
       breggle: [
@@ -4029,23 +4080,34 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       <div class="info-box" style="margin-bottom:12px">
         <h4 style="margin:0 0 10px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">Option 1: Gemini (better)</h4>
 
-        <p style="font-size:0.78rem;color:var(--text-dim);margin:0 0 8px;line-height:1.5">
-          <strong style="color:var(--text)">1.</strong> Copy the prompt below, then open AI Studio and paste it.
-          Attach reference images there if you have them.
+        <p style="font-size:0.78rem;color:var(--text);font-weight:600;margin:0 0 4px">
+          1. Open Google AI Studio and select "Image Generation"
         </p>
-        <textarea readonly rows="5" onclick="this.select()"
-          style="width:100%;box-sizing:border-box;background:var(--bg-deep,#111);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:0.78rem;font-family:monospace;resize:vertical;cursor:text"
-          >${geminiEsc}</textarea>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
-          <button class="btn btn-secondary" onclick="copyGeminiPrompt()" ${!geminiPrompt ? 'disabled style="opacity:0.4"' : ''}>Copy Prompt</button>
+        <div style="margin-bottom:10px">
           <a class="btn btn-secondary" href="https://aistudio.google.com/prompts/new_chat" target="_blank" rel="noopener"
-            style="text-decoration:none">Open AI Studio ↗</a>
+            style="text-decoration:none;font-size:0.8rem">Open AI Studio ↗</a>
         </div>
 
-        ${refImagesHtml}
+        <p style="font-size:0.78rem;color:var(--text);font-weight:600;margin:0 0 4px">
+          2. ${refImgs ? `Copy/paste the ${_gKindredName} reference images below into the prompt in AI Studio — they will be used automatically` : 'Optionally attach any reference images in AI Studio'}
+        </p>
+        ${refImagesHtml || '<p style="font-size:0.75rem;color:var(--text-dim);margin:0 0 10px;font-style:italic">No reference images available for this kindred</p>'}
 
-        <p style="font-size:0.78rem;color:var(--text-dim);margin:14px 0 0;line-height:1.5">
-          <strong style="color:var(--text)">2.</strong> Generate in AI Studio, then upload or paste the result in the "Your Character Portrait" panel below (Ctrl+V works anywhere on this page).
+        <p style="font-size:0.78rem;color:var(--text);font-weight:600;margin:8px 0 4px">
+          3. Run a simple initial prompt to get a solid base image you like:
+        </p>
+        ${_gRow('gp-initial', 'Initial prompt', _gInitial)}
+
+        <p style="font-size:0.78rem;color:var(--text);font-weight:600;margin:8px 0 4px">
+          4. Run follow-up prompts to refine (copy and send each separately, or combine into one):
+        </p>
+        ${_gRow('gp-details', 'Appearance details', _gDetails)}
+        ${_gRow('gp-equip',   'Equipment', _gEquip)}
+        ${_gRow('gp-class',   'Class', _gClassPrompt)}
+        ${_gRow('gp-style',   'Artistic style', _gStyle)}
+
+        <p style="font-size:0.78rem;color:var(--text);font-weight:600;margin:8px 0 4px">
+          5. Copy the image from AI Studio, then paste it into the "Your Character Portrait" panel below (Ctrl+V anywhere on this page)
         </p>
       </div>`;
 
