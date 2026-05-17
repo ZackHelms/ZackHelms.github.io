@@ -3658,11 +3658,20 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return parts.join('. ');
   }
 
+  function buildLabeledDetails() {
+    const bodyLabel = char.kindred === 'grimalkin' ? 'fur' : 'body';
+    const fieldLabels = { head: 'head', face: 'face', body: bodyLabel, demeanour: 'demeanour', dress: 'dress' };
+    return ['head','face','body','demeanour','dress'].map(k => {
+      const val = (_pDetails[k] || '').trim();
+      if (!val) return '';
+      const label = fieldLabels[k];
+      return val.toLowerCase().includes(label) ? val : val + ' ' + label;
+    }).filter(Boolean);
+  }
+
   function buildPortraitCharacterPart() {
     const flavor = _pKindredFlavor || KINDRED_FLAVOR[char.kindred] || 'a fantasy humanoid creature';
-    const details = ['head','face','body','demeanour','dress']
-      .map(k => (_pDetails[k] || '').trim())
-      .filter(Boolean);
+    const details = buildLabeledDetails();
     const clsEquip = buildClassEquipmentSummary();
     return flavor + (details.length ? ', ' + details.join(', ') : '') + (clsEquip ? '; ' + clsEquip : '');
   }
@@ -3686,8 +3695,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const kd = getKindredData();
     const kindredName = kd ? kd.name : (char.kindred || 'character');
     const g = (char.gender && char.gender !== 'any') ? char.gender + ' ' : '';
-    const details = ['head','face','body','demeanour','dress']
-      .map(k => (_pDetails[k] || '').trim()).filter(Boolean);
+    const details = buildLabeledDetails();
     const csv = details.join(', ');
     const clsEquip = buildClassEquipmentSummary();
     return `Generate an image of a ${g}${kindredName} in Dolmenwood, 1:1 aspect ratio, ` +
