@@ -2614,16 +2614,9 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       const rec  = kd.recommendedClasses.map(c => CLASS_ADVANCEMENT[c]?.name || c).join(', ');
       const unc  = kd.uncommonClasses.length ? kd.uncommonClasses.map(c => CLASS_ADVANCEMENT[c]?.name || c).join(', ') : '';
 
-      // "Cannot be:" list — gray text, selected class highlighted red
       let restrictLine = '';
       if (isForbidden) {
         restrictLine = `<div class="k-restrict not-avail">Not available for ${CLASS_ADVANCEMENT[selectedCls]?.name || selectedCls}</div>`;
-      } else if (kd.forbiddenClasses.length) {
-        const forbHtml = kd.forbiddenClasses.map(c => {
-          const name = CLASS_ADVANCEMENT[c]?.name || c;
-          return (c === selectedCls) ? `<strong style="color:var(--red-bright)">${name}</strong>` : name;
-        }).join(', ');
-        restrictLine = `<div class="k-restrict">Cannot be: ${forbHtml}</div>`;
       }
 
       const classLines = [
