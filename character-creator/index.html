@@ -2499,6 +2499,9 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     if (stepId === 'character-image') {
       if (_portraitGenerating) _startPortraitDotsAnimation();
       else _refreshPortraitPreview();
+      document.addEventListener('paste', pastePortrait);
+    } else {
+      document.removeEventListener('paste', pastePortrait);
     }
     if (stepId === 'abilities') {
       ['str','int','wis','dex','con','cha'].forEach(a => {
@@ -3628,6 +3631,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   let _portraitGenerating = false;
   let _portraitError = null;
   let _portraitLastUrl = null;
+  let _portraitUploadInfo = null; // { origKB, compKB, format } shown after upload
 
   function canGeneratePortrait() {
     const dr = char.detailRolls || {};
@@ -3657,6 +3661,75 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const encoded = encodeURIComponent(buildPortraitPrompt());
     const nologoQ = _pNologo ? '&nologo=true' : '';
     return `https://image.pollinations.ai/prompt/${encoded}?width=${_pWidth}&height=${_pHeight}&model=${encodeURIComponent(_pModel)}${nologoQ}&seed=${seed}`;
+  }
+
+  function buildGeminiPrompt() {
+    const kd = getKindredData();
+    const kindredName = kd ? kd.name : (char.kindred || 'character');
+    const kindredId   = char.kindred || 'character';
+    const g = (char.gender && char.gender !== 'any') ? char.gender + ' ' : '';
+    const details = ['head','face','body','demeanour','dress']
+      .map(k => (_pDetails[k] || '').trim()).filter(Boolean);
+    const csv = details.join(', ');
+    return `Generate an image of a ${g}${kindredName} in Dolmenwood, 1:1 aspect ratio, ` +
+      `use portrait-gen/${kindredId}*.png as reference images, and modify this image by giving them: ${csv}`;
+  }
+
+  async function compressPortraitImage(dataUrl) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 512;
+        const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.round(img.width  * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        let out = canvas.toDataURL('image/webp', 0.92);
+        if (!out.startsWith('data:image/webp')) out = canvas.toDataURL('image/jpeg', 0.92);
+        resolve(out);
+      };
+      img.src = dataUrl;
+    });
+  }
+
+  async function handlePortraitUpload(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const origKB = Math.round(file.size / 1024);
+    const reader = new FileReader();
+    reader.onload = async e => {
+      const compressed = await compressPortraitImage(e.target.result);
+      const compKB = Math.round((compressed.length * 0.75) / 1024); // base64 → bytes estimate
+      const format = compressed.startsWith('data:image/webp') ? 'WebP' : 'JPEG';
+      char.portrait = compressed;
+      _portraitUploadInfo = { origKB, compKB, format };
+      _portraitError = null;
+      render();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function pastePortrait(e) {
+    if (STEPS[currentStep].id !== 'character-image') return;
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        handlePortraitUpload(item.getAsFile());
+        break;
+      }
+    }
+  }
+
+  function copyGeminiPrompt() {
+    const txt = buildGeminiPrompt();
+    navigator.clipboard.writeText(txt).catch(() => {});
+  }
+
+  function triggerPortraitFileInput() {
+    const el = document.getElementById('portrait-file-input');
+    if (el) el.click();
   }
 
   function nameToSeed(name) {
@@ -3855,6 +3928,49 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
         </div>
       </div>`;
 
+    // ── Gemini Option D panel ────────────────────────────────────────────────
+    const geminiPrompt = canGeneratePortrait() ? buildGeminiPrompt() : '';
+    const geminiEsc = geminiPrompt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const uploadSizeInfo = _portraitUploadInfo
+      ? `<p style="font-size:0.73rem;color:var(--text-dim);margin:8px 0 0;font-family:var(--font-ui)">
+           Compressed: ${_portraitUploadInfo.origKB} KB → ${_portraitUploadInfo.compKB} KB ${_portraitUploadInfo.format}
+           (${Math.round((1 - _portraitUploadInfo.compKB / _portraitUploadInfo.origKB) * 100)}% smaller) · 512 px max
+         </p>` : '';
+
+    const geminiPanel = `
+      <div class="info-box" style="margin-bottom:12px">
+        <h4 style="margin:0 0 10px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">
+          Generate via Gemini (Option D)
+        </h4>
+
+        <p style="font-size:0.78rem;color:var(--text-dim);margin:0 0 8px;line-height:1.5">
+          <strong style="color:var(--text)">1.</strong> Copy the prompt below, then open AI Studio and paste it.
+          Upload your kindred reference images there if you have them.
+        </p>
+        <textarea readonly rows="4" onclick="this.select()"
+          style="width:100%;box-sizing:border-box;background:var(--bg-deep,#111);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:0.78rem;font-family:monospace;resize:vertical;cursor:text"
+          >${geminiEsc}</textarea>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn btn-secondary" onclick="copyGeminiPrompt()" ${!geminiPrompt ? 'disabled style="opacity:0.4"' : ''}>Copy Prompt</button>
+          <a class="btn btn-secondary" href="https://aistudio.google.com/prompts/new_chat" target="_blank" rel="noopener"
+            style="text-decoration:none">Open AI Studio ↗</a>
+        </div>
+
+        <p style="font-size:0.78rem;color:var(--text-dim);margin:14px 0 8px;line-height:1.5">
+          <strong style="color:var(--text)">2.</strong> Generate, then upload or paste the result here (Ctrl+V anywhere on this page).
+        </p>
+        <input type="file" id="portrait-file-input" accept="image/*" style="display:none"
+          onchange="handlePortraitUpload(this.files[0])">
+        <div onclick="triggerPortraitFileInput()"
+          ondragover="event.preventDefault()"
+          ondrop="event.preventDefault();handlePortraitUpload(event.dataTransfer.files[0])"
+          style="border:2px dashed var(--border);border-radius:6px;padding:20px;text-align:center;cursor:pointer;color:var(--text-dim);font-size:0.82rem;transition:border-color 0.15s"
+          onmouseenter="this.style.borderColor='var(--gold-dim)'" onmouseleave="this.style.borderColor='var(--border)'">
+          Drop image here · Ctrl+V to paste · Click to browse
+        </div>
+        ${uploadSizeInfo}
+      </div>`;
+
     // ── Image panel ──────────────────────────────────────────────────────────
     let imagePanel = '';
     if (!enabled) {
@@ -3875,15 +3991,19 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           </div>
         </div>`;
     } else if (char.portrait) {
+      const isUpload = char.portrait.startsWith('data:');
       imagePanel = `
         <div class="info-box" style="text-align:center;padding:16px">
           <img src="${char.portrait}" alt="Character portrait"
             style="max-width:100%;width:${_pWidth}px;max-height:520px;object-fit:contain;border-radius:8px;display:block;margin:0 auto 16px;border:2px solid var(--border)">
+          ${isUpload ? '<p style="font-size:0.72rem;color:var(--text-dim);margin:0 0 10px;font-family:var(--font-ui)">Uploaded portrait</p>' : ''}
           <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
             <button class="btn btn-secondary" onclick="regeneratePortrait()">Regenerate (new seed)</button>
             <button class="btn btn-primary" onclick="generatePortrait()">Generate (current seed)</button>
           </div>
-          <p style="font-size:0.72rem;color:var(--text-dim);margin-top:12px;font-family:var(--font-ui)">Powered by Pollinations.ai · FLUX</p>
+          <p style="font-size:0.72rem;color:var(--text-dim);margin-top:10px;font-family:var(--font-ui)">
+            Powered by Pollinations.ai · FLUX${isUpload ? ' · ⚠ Clicking Generate will replace the uploaded portrait' : ''}
+          </p>
         </div>`;
     } else {
       imagePanel = `
@@ -3909,6 +4029,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       </div>
       ${detailsPanel}
       ${paramsPanel}
+      ${geminiPanel}
       ${imagePanel}
       ${errorPanel}
       ${navButtons(true, true)}`;
