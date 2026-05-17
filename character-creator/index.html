@@ -3641,12 +3641,30 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     return !!char.name && (hasRoll || hasTyped);
   }
 
+  function buildClassEquipmentSummary() {
+    const cd = getClassData();
+    const parts = [];
+    if (cd) parts.push(`Class: ${cd.name}`);
+    const gear = [];
+    if (char.armorResult && char.armorResult !== 'none') gear.push(char.armorResult);
+    if (char.weapon1Result) gear.push(char.weapon1Result);
+    if (char.weapon2Result && char.weapon2Result !== char.weapon1Result) gear.push(char.weapon2Result);
+    if (cd) cd.startingItems.forEach(i => gear.push(i));
+    gear.push('common clothes');
+    if (char.advItems && char.advItems.length) {
+      char.advItems.forEach(i => { const it = ADVENTURING_ITEMS[i]; if (it) gear.push(it); });
+    }
+    if (gear.length) parts.push(`Equipment: ${gear.join(', ')}`);
+    return parts.join('. ');
+  }
+
   function buildPortraitCharacterPart() {
     const flavor = _pKindredFlavor || KINDRED_FLAVOR[char.kindred] || 'a fantasy humanoid creature';
     const details = ['head','face','body','demeanour','dress']
       .map(k => (_pDetails[k] || '').trim())
       .filter(Boolean);
-    return flavor + (details.length ? ', ' + details.join(', ') : '');
+    const clsEquip = buildClassEquipmentSummary();
+    return flavor + (details.length ? ', ' + details.join(', ') : '') + (clsEquip ? '; ' + clsEquip : '');
   }
 
   function setPortraitDetail(key, value) {
@@ -3671,8 +3689,10 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const details = ['head','face','body','demeanour','dress']
       .map(k => (_pDetails[k] || '').trim()).filter(Boolean);
     const csv = details.join(', ');
+    const clsEquip = buildClassEquipmentSummary();
     return `Generate an image of a ${g}${kindredName} in Dolmenwood, 1:1 aspect ratio, ` +
-      `use any attachments as reference images, and modify this image by giving them: ${csv}. ` +
+      `use any attachments as reference images, and modify this image by giving them: ${csv}` +
+      (clsEquip ? `. ${clsEquip}` : '') + `. ` +
       `Artistic style beautifully blends whimsical storybook charm with eerie folk horror. ` +
       `Evokes the flavor of traditional British Isles folklore, balancing whimsical, quirky anthropomorphism ` +
       `with a grimy, unsettling undercurrent of magical decay. ` +
@@ -3894,12 +3914,41 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           oninput="setPortraitDetail('${k}',this.value)">
       </div>`).join('');
 
+    const clsEqSummary = buildClassEquipmentSummary();
+    const clsEqRows = clsEqSummary ? (() => {
+      const cd = getClassData();
+      const rows = [];
+      if (cd) rows.push({ label: 'Class', value: cd.name });
+      const gear = [];
+      if (char.armorResult && char.armorResult !== 'none') gear.push(char.armorResult);
+      if (char.weapon1Result) gear.push(char.weapon1Result);
+      if (char.weapon2Result && char.weapon2Result !== char.weapon1Result) gear.push(char.weapon2Result);
+      if (cd) cd.startingItems.forEach(i => gear.push(i));
+      gear.push('Common clothes');
+      if (char.advItems && char.advItems.length) {
+        char.advItems.forEach(i => { const it = ADVENTURING_ITEMS[i]; if (it) gear.push(it); });
+      }
+      if (gear.length) rows.push({ label: 'Equipment', value: gear.join(', ') });
+      return rows;
+    })() : [];
+
+    const clsEqHtml = clsEqRows.length ? `
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        ${clsEqRows.map(r => `
+          <div style="margin-bottom:6px">
+            <span style="font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim)">${r.label}: </span>
+            <span style="font-size:0.82rem;color:var(--text)">${esc(r.value)}</span>
+          </div>`).join('')}
+        <p style="font-size:0.7rem;color:var(--gold-dim);margin:4px 0 0;font-style:italic">Included in portrait prompt automatically</p>
+      </div>` : '';
+
     const detailsPanel = `
       <div class="info-box" style="margin-bottom:12px">
         <h4 style="margin:0 0 10px;font-size:0.85rem;font-family:var(--font-ui);text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim)">
-          Character Details <span style="font-size:0.7rem;color:var(--gold-dim);font-weight:normal">(pre-filled from selections · edit freely)</span>
+          Character Details, Class &amp; Equipment <span style="font-size:0.7rem;color:var(--gold-dim);font-weight:normal">(pre-filled from selections · edit freely)</span>
         </h4>
         ${detailInputs}
+        ${clsEqHtml}
       </div>`;
 
     // ── Gemini Option 1 panel ────────────────────────────────────────────────
