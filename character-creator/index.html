@@ -3633,6 +3633,13 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
   let _portraitLastUrl = null;
   let _portraitUploadInfo = null; // { origKB, compKB, format } shown after upload
   let _portraitSource = null;     // 'pollinations' | 'pasted' | 'browse' | 'dropped'
+  let _portraitParamsDirty = true; // true = button enabled; false = params unchanged since last Pollinations gen
+  let _portraitCharSnapshot = '';  // snapshot of char fields that affect the prompt
+
+  function _buildCharSnapshot() {
+    return [char.cls, char.kindred, char.armorResult, char.weapon1Result, char.weapon2Result,
+            (char.advItems || []).join(','), char.gender].join('|');
+  }
 
   function canGeneratePortrait() {
     const dr = char.detailRolls || {};
@@ -3678,6 +3685,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
 
   function setPortraitDetail(key, value) {
     _pDetails[key] = value;
+    _portraitParamsDirty = true;
     _refreshPortraitPreview();
   }
 
@@ -3779,6 +3787,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     else if (param === 'model')   _pModel  = value;
     else if (param === 'nologo')  _pNologo = value;
     else if (param === 'seed')    char.portraitSeed = parseInt(value) || 0;
+    _portraitParamsDirty = true;
     _refreshPortraitPreview();
   }
 
@@ -3868,6 +3877,8 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
       }
       char.portrait = url;
       _portraitSource = 'pollinations';
+      _portraitParamsDirty = false;
+      _portraitCharSnapshot = _buildCharSnapshot();
       render();
     } catch(e) {
       _portraitError = `Network error: ${e.message}`;
@@ -3906,6 +3917,13 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     if (_pKindredForFlavor !== char.kindred) {
       _pKindredFlavor = KINDRED_FLAVOR[char.kindred] || '';
       _pKindredForFlavor = char.kindred;
+    }
+
+    // Mark dirty if char fields that affect the prompt changed since last Pollinations gen
+    const currentCharSnapshot = _buildCharSnapshot();
+    if (_portraitCharSnapshot && currentCharSnapshot !== _portraitCharSnapshot) {
+      _portraitParamsDirty = true;
+      _portraitCharSnapshot = currentCharSnapshot;
     }
 
     // ── Editable character detail textboxes ──────────────────────────────────
@@ -4042,23 +4060,22 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
     const currentUrl = enabled ? buildPortraitUrl(currentSeed) : '';
     const currentUrlEsc = currentUrl.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
+    const genBtnDisabled = !enabled || (!_portraitParamsDirty && _portraitSource === 'pollinations');
+    const genBtnStyle = genBtnDisabled ? ' disabled style="opacity:0.4;cursor:not-allowed"' : '';
+    const genBtnClick = genBtnDisabled ? '' : ' onclick="generatePortrait()"';
+
     let pollinationsButtons = '';
     if (!enabled) {
       pollinationsButtons = `
         <p style="font-size:0.78rem;color:var(--text-dim);margin:0 0 8px">Select at least one visual detail to enable generation.</p>
-        <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Generate Portrait</button>`;
+        <button class="btn btn-primary" disabled style="opacity:0.4;cursor:not-allowed">Generate with Pollinations.ai</button>`;
     } else if (_portraitGenerating) {
       pollinationsButtons = `
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-secondary" disabled style="opacity:0.4;cursor:not-allowed">Regenerate (new seed)</button>
-          <button class="btn btn-primary" disabled style="opacity:0.4;cursor:not-allowed">Generate (current seed)</button>
-        </div>`;
+        <button class="btn btn-primary" disabled style="opacity:0.4;cursor:not-allowed">Generate with Pollinations.ai</button>`;
     } else {
       pollinationsButtons = `
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          ${char.portrait && _portraitSource === 'pollinations' ? `<button class="btn btn-secondary" onclick="regeneratePortrait()">Regenerate (new seed)</button>` : ''}
-          <button class="btn btn-primary" onclick="generatePortrait()">Generate Portrait</button>
-        </div>
+        <button class="btn btn-primary"${genBtnClick}${genBtnStyle}>Generate with Pollinations.ai</button>
+        ${genBtnDisabled && _portraitSource === 'pollinations' ? '<p style="font-size:0.72rem;color:var(--text-dim);font-family:var(--font-ui);margin:6px 0 0">Change a parameter above to re-enable generation</p>' : ''}
         ${char.portrait && _portraitSource !== 'pollinations' ? '<p style="font-size:0.72rem;color:#c87;font-family:var(--font-ui);margin:8px 0 0">⚠ Clicking Generate will replace the current portrait</p>' : ''}`;
     }
 
@@ -4097,7 +4114,7 @@ header .save-controls { margin-left: auto; display: flex; gap: 8px; flex-wrap: w
           </label>
           <label style="font-family:var(--font-ui);font-size:0.75rem;color:var(--text-dim)">Seed
             <input type="number" value="${currentSeed}"
-              style="width:90px;margin-left:6px;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.82rem"
+              style="width:117px;margin-left:6px;background:var(--bg-input,#1a1a1a);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.82rem"
               oninput="setPortraitParam('seed',this.value)">
           </label>
         </div>
