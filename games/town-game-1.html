@@ -519,7 +519,7 @@ function TownGame() {
             const tile = tls[ty*MAP_W+tx];
             if(tile && tile.type!=="water"){
               const capturedHandler = handleTileClickRef.current;
-              const delay = tapDelayRef.current;
+              const delay = debugEnabledRef.current ? tapDelayRef.current : 0;
               setTimeout(()=>{
                 if(capturedHandler) capturedHandler(tile);
                 if(debugEnabledRef.current && setTapDebugRef.current) setTapDebugRef.current(null);
@@ -755,9 +755,10 @@ function TownGame() {
         }}>
           {visibleTiles.sort((a,b)=>(a.x+a.y)-(b.x+b.y)).map(tile=>{
             const bld=buildings.find(b=>b.x===tile.x&&b.y===tile.y)||null;
-            const isStanding =
-              Math.round(renderPos.x)===tile.x && Math.round(renderPos.y)===tile.y;
-            return <IsoTile key={`${tile.x}-${tile.y}`} tile={tile} season={SEASONS[season]} building={bld} isTarget={isStanding}/>;
+            const isTarget =
+              (target && target.x===tile.x && target.y===tile.y) ||
+              (!target && Math.round(renderPos.x)===tile.x && Math.round(renderPos.y)===tile.y);
+            return <IsoTile key={`${tile.x}-${tile.y}`} tile={tile} season={SEASONS[season]} building={bld} isTarget={isTarget}/>;
           })}
 
           <div style={{
