@@ -624,7 +624,7 @@ function gameLoop(ts) {
     h.decayTimer = (h.decayTimer || 0) + elapsed;
     if (h.decayTimer >= 100) {
       h.decayTimer -= 100;
-      h.speed = Math.max(2.0, h.speed - 0.1);
+      h.speed = Math.max(2.0, h.speed - (h.speed - 2.0) * 0.00765);
     }
     scoreEls[h.def.id].speedEl.textContent = 'spd ' + h.speed.toFixed(1);
   });
