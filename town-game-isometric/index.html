@@ -1,5 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Town Game</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1208; overflow: hidden; }
+        #root { width: 100vw; height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel">
 // Town Game v2.1.0
-import { useState, useCallback, useEffect, useRef } from "react";
+const { useState, useCallback, useEffect, useRef } = React;
 
 const MAP_W = 20, MAP_H = 20, TILE_W = 64, TILE_H = 32;
 const MOVE_SPEED = 6;
@@ -61,7 +79,6 @@ function generateMap() {
 
 function toIso(x,y) { return { sx:(x-y)*(TILE_W/2), sy:(x+y)*(TILE_H/2) }; }
 
-// Darken a hex color slightly
 function darken(hex, pct=0.18) {
   const n=parseInt(hex.slice(1),16);
   const r=Math.max(0,Math.round((n>>16)*(1-pct)));
@@ -70,7 +87,6 @@ function darken(hex, pct=0.18) {
   return `#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}`;
 }
 
-// ---- ISO TILE ----
 function IsoTile({ tile, season, building, isTarget }) {
   const { sx, sy } = toIso(tile.x, tile.y);
   const sc = SEASON_COLORS[season];
@@ -93,17 +109,14 @@ function IsoTile({ tile, season, building, isTarget }) {
       }}
     >
       <svg width={TILE_W} height={TILE_H+12} style={{position:"absolute",top:0,left:0}} overflow="visible">
-        {/* Left side face */}
         <polygon
           points={`0,${TILE_H/2} ${TILE_W/2},${TILE_H} ${TILE_W/2},${TILE_H+10} 0,${TILE_H/2+10}`}
           fill={side} opacity="0.9"
         />
-        {/* Right side face */}
         <polygon
           points={`${TILE_W/2},${TILE_H} ${TILE_W},${TILE_H/2} ${TILE_W},${TILE_H/2+10} ${TILE_W/2},${TILE_H+10}`}
           fill={side} opacity="0.75"
         />
-        {/* Top face with border */}
         <polygon
           points={`${TILE_W/2},0 ${TILE_W},${TILE_H/2} ${TILE_W/2},${TILE_H} 0,${TILE_H/2}`}
           fill={gc}
@@ -124,8 +137,7 @@ function IsoTile({ tile, season, building, isTarget }) {
   );
 }
 
-// ---- MAIN ----
-export default function TownGame() {
+function TownGame() {
   const [tiles,setTiles]                    = useState(()=>generateMap());
   const [player,setPlayer]                  = useState({x:10,y:10});
   const [renderPos,setRenderPos]            = useState({x:10,y:10});
@@ -134,7 +146,7 @@ export default function TownGame() {
   const [totalGathered,setTotalGathered]    = useState({wood:0,stone:0,food:0,hide:0});
   const [buildings,setBuildings]            = useState([]);
   const [villagers,setVillagers]            = useState([]);
-  const [tapDebug,setTapDebug]              = useState(null); // {ex,ey,tx,ty,lx,ly,ctx,cty}
+  const [tapDebug,setTapDebug]              = useState(null);
   const [skillXP,setSkillXP]               = useState({Gathering:0,Building:0,Hunting:0,Leadership:0});
   const [season,setSeason]                  = useState(0);
   const [day,setDay]                        = useState(1);
@@ -146,14 +158,12 @@ export default function TownGame() {
   const [happiness,setHappiness]            = useState(100);
   const [hunger,setHunger]                  = useState(100);
 
-  // Movement refs
   const renderPosRef     = useRef({x:10,y:10});
   const targetRef        = useRef(null);
   const rafRef           = useRef(null);
   const lastTimeRef      = useRef(null);
   const pendingActionRef = useRef(null);
 
-  // Stale-closure prevention refs
   const tilesRef      = useRef(tiles);
   const inventoryRef  = useRef(inventory);
   const reputationRef = useRef(reputation);
@@ -165,21 +175,15 @@ export default function TownGame() {
   useEffect(()=>{ skillXPRef.current=skillXP; },[skillXP]);
   useEffect(()=>{ buildModeRef.current=buildMode; },[buildMode]);
 
-  // ---- PAN/ZOOM STATE (refs only, applied via transform to avoid re-render) ----
-  // panOffset = extra offset in screen pixels (user drag), scale = zoom level
   const panRef        = useRef({x:0,y:0});
   const scaleRef      = useRef(1);
   const [viewTransform, setViewTransform] = useState({px:0,py:0,scale:1});
 
-  // Touch gesture refs
   const touchStateRef      = useRef(null);
   const TAP_THRESHOLD      = 8;
   const mapRef             = useRef(null);
-  // Ref to handleTileClick so the imperative touchend can call it without stale closure
   const handleTileClickRef = useRef(null);
-  // Ref to current camera base offsets so hit-test can invert the transform
   const baseOffRef         = useRef({x:0,y:0,headerH:44});
-  // Ref to setTapDebug so imperative handler can update debug overlay
   const setTapDebugRef     = useRef(null);
 
   const addLog = useCallback((msg)=>{ setLog(p=>[msg,...p].slice(0,60)); },[]);
@@ -190,7 +194,6 @@ export default function TownGame() {
     return 0;
   },[]);
 
-  // ---- MOVEMENT LOOP ----
   useEffect(()=>{
     const step=(now)=>{
       if(!lastTimeRef.current) lastTimeRef.current=now;
@@ -221,9 +224,6 @@ export default function TownGame() {
     return ()=>{ if(rafRef.current) cancelAnimationFrame(rafRef.current); };
   },[]);
 
-  // ---- TOUCH GESTURE HANDLER ----
-  // All tap detection happens here in the imperative handler.
-  // Tiles have pointerEvents:none so they never fire their own touch events.
   useEffect(()=>{
     const el=mapRef.current;
     if(!el) return;
@@ -234,11 +234,6 @@ export default function TownGame() {
     };
     const midpoint=(t1,t2)=>({ x:(t1.clientX+t2.clientX)/2, y:(t1.clientY+t2.clientY)/2 });
 
-    // Convert element-space tap to tile grid coords.
-    // The player's iso position always maps to screen (VIEW_CX + pan.x, VIEW_CY+HEADER_H + pan.y).
-    // So: screenPt - playerScreenPt = (tileLocal - playerLocal) * scale
-    // => tileLocal = playerLocal + (screenPt - playerScreenPt) / scale
-    // Then invert iso from tileLocal.
     const screenToTile=(ex,ey,snapshot)=>{
       const { rsx, rsy, scale, pan, elW, elH } = snapshot;
       const HEADER_H_VAL = 44;
@@ -309,7 +304,6 @@ export default function TownGame() {
       if(e.touches.length===0){
         const wasTap = ts.type==="drag" && !ts.moved && !ts.wasPinch;
         if(wasTap){
-          // Snapshot player iso position and view state at exact tap moment
           const rp = renderPosRef.current;
           const isoP = toIso(rp.x, rp.y);
           const snapshot = {
@@ -366,7 +360,6 @@ export default function TownGame() {
     };
   },[]);
 
-  // ---- TILE ACTION ----
   const fireTileAction = useCallback((tile)=>{
     const idx=tile.y*MAP_W+tile.x;
     const tls=tilesRef.current;
@@ -391,7 +384,6 @@ export default function TownGame() {
     }
   },[addLog,skillLevel]);
 
-  // ---- TILE TAP ----
   const handleTileClick = useCallback((tile)=>{
     const idx=tile.y*MAP_W+tile.x;
     const bm=buildModeRef.current;
@@ -494,7 +486,6 @@ export default function TownGame() {
   const handleTabTap = useCallback((t)=>{ setTab(prev=>prev===t?null:t); },[]);
   const cancelBuild  = useCallback(()=>{ setBuildMode(null); addLog("Build mode cancelled."); },[addLog]);
 
-  // Quest check
   const gameState={buildings,villagers,totalGathered,inventory,reputation};
   useEffect(()=>{
     QUESTS.forEach(q=>{
@@ -508,14 +499,12 @@ export default function TownGame() {
     });
   },[buildings,villagers,totalGathered]);
 
-  // ---- LAYOUT ----
   const HEADER_H    = 44;
   const TAB_BAR_H   = 56;
   const LOG_STRIP_H = 28;
   const PANEL_H     = 320;
   const panelOpen   = tab!==null;
 
-  // Camera center — dynamic based on actual element size
   const [mapSize, setMapSize] = useState({w:390, h:700});
   useEffect(()=>{
     if(!mapRef.current) return;
@@ -531,20 +520,12 @@ export default function TownGame() {
   const VIEW_CY = (mapSize.h - HEADER_H) / 2;
   const { sx:rsx, sy:rsy } = toIso(renderPos.x, renderPos.y);
 
-  // We want tile at player's iso position to appear at (VIEW_CX, VIEW_CY+HEADER_H).
-  // With scale s and transform-origin 0,0:
-  //   screen = containerLocal * s + [tx, ty]
-  // So the tile container's local origin (0,0) maps to screen (tx, ty).
-  // Player tile is at local (rsx + TW/2, rsy + TH/2), we want that at screen (VIEW_CX, VIEW_CY+HEADER_H).
-  // => tx = VIEW_CX - (rsx + TW/2)*s + px
-  //    ty = VIEW_CY+HEADER_H - (rsy + TH/2)*s + py
   const { px, py, scale } = viewTransform;
   const tx = VIEW_CX - (rsx + TILE_W/2)*scale + px;
   const ty = VIEW_CY + HEADER_H - (rsy + TILE_H/2)*scale + py;
   const tileTransform       = `translate(${tx}px,${ty}px) scale(${scale})`;
   const tileTransformOrigin = `0 0`;
 
-  // Keep refs current every render
   handleTileClickRef.current = handleTileClick;
   setTapDebugRef.current     = setTapDebug;
   baseOffRef.current = { tx, ty, scale };
@@ -563,7 +544,6 @@ export default function TownGame() {
   return (
     <div style={{ position:"fixed", inset:0, background:"#1a1208", fontFamily:"'Courier New',monospace", color:"#e8d5a3", overflow:"hidden" }}>
 
-      {/* ==== MAP LAYER z=1 ==== */}
       <div
         ref={mapRef}
         style={{
@@ -572,7 +552,6 @@ export default function TownGame() {
           overflow:"hidden", touchAction:"none",
         }}
       >
-        {/* Tile container + avatar: single transform(translate+scale) with origin 0,0 */}
         <div style={{
           position:"absolute",
           left:0, top:0,
@@ -582,13 +561,11 @@ export default function TownGame() {
         }}>
           {visibleTiles.sort((a,b)=>(a.x+a.y)-(b.x+b.y)).map(tile=>{
             const bld=buildings.find(b=>b.x===tile.x&&b.y===tile.y)||null;
-            // Highlight the tile the avatar is currently standing on (snapped)
             const isStanding =
               Math.round(renderPos.x)===tile.x && Math.round(renderPos.y)===tile.y;
             return <IsoTile key={`${tile.x}-${tile.y}`} tile={tile} season={SEASONS[season]} building={bld} isTarget={isStanding}/>;
           })}
 
-          {/* Avatar inside same container — inherits zoom+pan automatically */}
           <div style={{
             position:"absolute",
             left: avatarIsoX,
@@ -600,7 +577,6 @@ export default function TownGame() {
           }}>🧑‍🌾</div>
         </div>
 
-        {/* DEBUG: red dot — raw tap position in screen space */}
         {tapDebug && (
           <div style={{
             position:"absolute", left:tapDebug.ex, top:tapDebug.ey,
@@ -611,7 +587,6 @@ export default function TownGame() {
           }}/>
         )}
 
-        {/* DEBUG: yellow dot — resolved tile back to screen space via player-relative transform */}
         {tapDebug && tapDebug.tx>=0 && tapDebug.tx<MAP_W && tapDebug.ty>=0 && tapDebug.ty<MAP_H && (()=>{
           const {sx: tsx, sy: tsy} = toIso(tapDebug.tx, tapDebug.ty);
           const tileCX = tsx + TILE_W/2, tileCY = tsy + TILE_H/2;
@@ -631,7 +606,6 @@ export default function TownGame() {
           }}/>;
         })()}
 
-        {/* DEBUG: label */}
         {tapDebug && (
           <div style={{
             position:"absolute", top:HEADER_H+8, left:8, zIndex:99999,
@@ -648,7 +622,6 @@ export default function TownGame() {
         )}
       </div>
 
-      {/* ==== BUILD BANNER z=50 ==== */}
       {buildMode&&(
         <div style={{ position:"absolute", top:HEADER_H+8, left:0, right:0, zIndex:50, display:"flex", justifyContent:"center", pointerEvents:"none" }}>
           <div style={{ background:"#1a1008ee", border:"1px solid #f0a030", padding:"7px 14px", borderRadius:"6px", fontSize:"12px", color:"#f0c060", display:"flex", alignItems:"center", gap:"10px", pointerEvents:"auto" }}>
@@ -658,7 +631,6 @@ export default function TownGame() {
         </div>
       )}
 
-      {/* ==== HEADER z=50 ==== */}
       <div style={{ position:"absolute", top:0, left:0, right:0, height:HEADER_H, zIndex:50, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 10px", background:"linear-gradient(90deg,#2a1a08,#3a2510)", borderBottom:"2px solid #6a4a20" }}>
         <div style={{fontWeight:"bold",fontSize:"13px",color:"#f0c060",letterSpacing:"1px"}}>⚔ TOWN GAME</div>
         <div style={{display:"flex",gap:"7px",fontSize:"11px",flexWrap:"nowrap"}}>
@@ -671,7 +643,6 @@ export default function TownGame() {
         <button onTouchEnd={(e)=>{e.stopPropagation();advanceDay();}} style={{background:"linear-gradient(180deg,#6a4a20,#4a2e10)",border:"1px solid #8a6a30",color:"#f0d080",padding:"0 12px",height:"34px",cursor:"pointer",fontFamily:"inherit",fontSize:"11px",borderRadius:"3px",minWidth:"60px"}}>▶ Day</button>
       </div>
 
-      {/* ==== PANEL z=40 ==== */}
       <div style={{ position:"absolute", left:0, right:0, zIndex:40, bottom:TAB_BAR_H+LOG_STRIP_H, height:panelOpen?PANEL_H:0, background:"#1a1008f4", borderTop:panelOpen?"2px solid #6a4a20":"none", transition:"height 0.22s ease", overflow:"hidden", display:"flex", flexDirection:"column" }}>
         <div style={{flex:1,overflowY:"auto",padding:"12px",WebkitOverflowScrolling:"touch"}}>
 
@@ -783,7 +754,6 @@ export default function TownGame() {
         </div>
       </div>
 
-      {/* ==== LOG STRIP z=50 — always visible ==== */}
       <div
         onTouchEnd={(e)=>{e.stopPropagation();setTab(prev=>prev==="log"?null:"log");}}
         style={{ position:"absolute", left:0, right:0, zIndex:50, bottom:TAB_BAR_H, height:LOG_STRIP_H, background:"#0d0904f8", borderTop:"1px solid #3a2810", display:"flex", alignItems:"center", padding:"0 10px", gap:"8px", cursor:"pointer" }}
@@ -792,7 +762,6 @@ export default function TownGame() {
         <span style={{fontSize:"11px",color:"#b08030",flex:1,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{latestLog}</span>
       </div>
 
-      {/* ==== TAB BAR z=50 ==== */}
       <div style={{ position:"absolute", bottom:0, left:0, right:0, height:TAB_BAR_H, zIndex:50, background:"linear-gradient(0deg,#1a1008,#251408)", borderTop:"2px solid #4a3010", display:"flex" }}>
         {TABS.map(t=>(
           <button key={t} onTouchEnd={(e)=>{e.stopPropagation();handleTabTap(t);}} style={{ flex:1, border:"none", borderTop:tab===t?"2px solid #f0a030":"2px solid transparent", background:tab===t?"#2a1808":"transparent", color:tab===t?"#f0c060":"#806040", cursor:"pointer", fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"2px", minHeight:"44px", padding:"2px 0" }}>
@@ -805,3 +774,8 @@ export default function TownGame() {
     </div>
   );
 }
+
+ReactDOM.createRoot(document.getElementById('root')).render(<TownGame />);
+    </script>
+</body>
+</html>
