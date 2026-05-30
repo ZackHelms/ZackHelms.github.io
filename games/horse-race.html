@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Horse Race</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rye&family=Josefin+Sans:wght@400;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #1a3a0a;
+    font-family: 'Josefin Sans', sans-serif;
+    overflow: hidden;
+    width: 100vw; height: 100vh;
+    cursor: crosshair;
+    user-select: none;
+    touch-action: none;
+  }
+  canvas#bg { position:fixed; inset:0; z-index:0; }
+  canvas#game { position:fixed; inset:0; z-index:1; }
+
+  #scoreboard {
+    position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 4px; padding: 7px 14px;
+    background: rgba(10,20,5,0.82);
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+    z-index: 100; align-items: center;
+    border: 1px solid rgba(180,220,80,0.2); border-top: none;
+    backdrop-filter: blur(4px);
+  }
+  .score-entry {
+    display: flex; flex-direction: column; align-items: center;
+    min-width: 62px; padding: 4px 8px; border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    transition: background 0.4s, box-shadow 0.4s;
+  }
+  .score-swatch { width: 18px; height: 10px; border-radius: 3px; margin-bottom: 2px; }
+  .score-name {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: #cde;
+  }
+  .score-wins {
+    font-family: 'Rye', serif; font-size: 16px; color: #f5e6a3; line-height: 1; margin-top: 1px;
+  }
+  .score-entry.leader {
+    background: rgba(245,220,80,0.16);
+    box-shadow: 0 0 10px rgba(245,220,80,0.35);
+  }
+  .score-speed {
+    font-size: 10px; color: rgba(180,230,255,0.75); letter-spacing: 0.3px; margin-top: 1px;
+  }
+
+  #hint {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    color: rgba(200,240,120,0.65); font-size: 13px; letter-spacing: 1px;
+    pointer-events: none; z-index: 100; white-space: nowrap;
+    font-weight: 700;
+  }
+
+  #winner-banner {
+    position: fixed; bottom: 48px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10,20,5,0.82);
+    border: 2px solid rgba(245,210,80,0.5); border-radius: 20px;
+    padding: 7px 18px; text-align: center; z-index: 200;
+    pointer-events: none;
+    display: flex; align-items: center; gap: 8px;
+    opacity: 0; transition: opacity 0.25s ease;
+    backdrop-filter: blur(4px);
+    white-space: nowrap;
+  }
+  #winner-banner.show { opacity: 1; }
+  #winner-banner.fade { opacity: 0; transition: opacity 0.6s ease; }
+  #winner-banner .trophy { font-size: 20px; line-height: 1; }
+  #winner-banner .name {
+    font-family: 'Rye', serif; font-size: 14px; color: #f5e6a3;
+  }
+  #winner-banner .sub { font-size: 11px; color: rgba(200,220,160,0.8); letter-spacing: 0.5px; }
+
+  #back-link {
+    position: fixed; top: 8px; left: 12px; z-index: 200;
+    color: rgba(200,240,120,0.55); font-size: 11px; font-weight: 700;
+    text-decoration: none; letter-spacing: 1px;
+  }
+  #back-link:hover { color: rgba(200,240,120,0.9); }
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<canvas id="game"></canvas>
+<a id="back-link" href="index.html">← GAMES</a>
+<div id="scoreboard"></div>
+<div id="hint">TAP TO PLACE CARROTS - HORSES RACE TO THE NEAREST ONE</div>
+<div id="winner-banner">
+  <div class="trophy">🏆</div>
+  <div class="name" id="winner-name"></div>
+  <div class="sub">WINS THE CARROT!</div>
+</div>
+<script>
+// ── Canvas setup ──────────────────────────────────────────────
+const bgCanvas  = document.getElementById('bg');
+const gameCanvas = document.getElementById('game');
+const bgCtx  = bgCanvas.getContext('2d');
+const ctx    = gameCanvas.getContext('2d');
+
+function resize() {
+  bgCanvas.width = gameCanvas.width = window.innerWidth;
+  bgCanvas.height = gameCanvas.height = window.innerHeight;
+  drawBackground();
+}
+window.addEventListener('resize', resize);
+
+// ── Background ────────────────────────────────────────────────
+const GRASS_BLADES = [];
+function initGrass() {
+  GRASS_BLADES.length = 0;
+  const count = Math.floor((bgCanvas.width * bgCanvas.height) / 1800);
+  for (let i = 0; i < count; i++) {
+    GRASS_BLADES.push({
+      x: Math.random() * bgCanvas.width,
+      y: Math.random() * bgCanvas.height,
+      h: 6 + Math.random() * 10,
+      angle: (Math.random() - 0.5) * 0.6,
+      shade: Math.random(),
+    });
+  }
+}
+
+function drawBackground() {
+  const W = bgCanvas.width, H = bgCanvas.height;
+  const grad = bgCtx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,   '#3a7a1a');
+  grad.addColorStop(0.5, '#2d6015');
+  grad.addColorStop(1,   '#1e4a0e');
+  bgCtx.fillStyle = grad;
+  bgCtx.fillRect(0,0,W,H);
+
+  for (let i = 0; i < 12; i++) {
+    const px = (i / 12) * W + Math.sin(i * 137) * 60;
+    const py = H * 0.2 + Math.cos(i * 97) * H * 0.35;
+    const r = 30 + Math.sin(i * 53) * 20;
+    const dg = bgCtx.createRadialGradient(px,py,0,px,py,r);
+    dg.addColorStop(0, 'rgba(120,80,30,0.18)');
+    dg.addColorStop(1, 'rgba(120,80,30,0)');
+    bgCtx.fillStyle = dg;
+    bgCtx.beginPath();
+    bgCtx.ellipse(px, py, r * 1.6, r, 0, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+
+  initGrass();
+  GRASS_BLADES.forEach(b => {
+    const g = 100 + Math.floor(b.shade * 60);
+    bgCtx.strokeStyle = `rgba(30,${g},15,0.55)`;
+    bgCtx.lineWidth = 1;
+    bgCtx.beginPath();
+    bgCtx.moveTo(b.x, b.y);
+    bgCtx.lineTo(b.x + Math.sin(b.angle) * b.h, b.y - b.h);
+    bgCtx.stroke();
+  });
+}
+
+// ── Horse definitions ─────────────────────────────────────────
+const HORSE_DEFS = [
+  { id:0, name:'Thunder', bodyColor:'#8B4513', maneColor:'#3d1a05', saddleColor:'#c0392b', markings:'blaze'  },
+  { id:1, name:'Blaze',   bodyColor:'#c8a060', maneColor:'#7a5020', saddleColor:'#2980b9', markings:'sock'   },
+  { id:2, name:'Shadow',  bodyColor:'#2c2c2c', maneColor:'#111',    saddleColor:'#8e44ad', markings:'none'   },
+  { id:3, name:'Daisy',   bodyColor:'#d4a96a', maneColor:'#f5deb3', saddleColor:'#27ae60', markings:'blaze'  },
+];
+
+const GALLOP_FRAMES = [
+  { bodyY:0,  headA:-0.15, legs:[[-0.4,0.9],[0.3,0.5],[-0.5,0.8],[0.5,0.6]] },
+  { bodyY:-4, headA:-0.2,  legs:[[-0.6,0.7],[0.5,0.8],[-0.3,0.5],[0.3,0.9]] },
+  { bodyY:-7, headA:-0.25, legs:[[-0.3,0.5],[0.6,0.9],[ 0.2,0.4],[0.6,0.7]] },
+  { bodyY:-3, headA:-0.1,  legs:[[ 0.4,0.9],[0.2,0.5],[ 0.5,0.8],[-0.4,0.5]] },
+  { bodyY:0,  headA: 0.0,  legs:[[ 0.6,0.6],[-0.2,0.4],[ 0.3,0.9],[-0.5,0.8]] },
+  { bodyY:2,  headA: 0.05, legs:[[ 0.3,0.8],[-0.5,0.7],[ 0.1,0.7],[-0.4,0.9]] },
+  { bodyY:0,  headA:-0.05, legs:[[ 0.0,0.5],[-0.3,0.9],[-0.3,0.5],[-0.2,0.7]] },
+  { bodyY:1,  headA:-0.1,  legs:[[-0.2,0.6],[-0.1,0.7],[-0.5,0.7],[ 0.1,0.5]] },
+];
+
+const WALK_FRAMES = [
+  { bodyY:0,  headA: 0.0,  legs:[[-0.2,0.7],[0.1,0.5],[ 0.2,0.7],[-0.2,0.6]] },
+  { bodyY:1,  headA: 0.02, legs:[[ 0.0,0.8],[0.2,0.7],[ 0.0,0.5],[-0.1,0.8]] },
+  { bodyY:1,  headA: 0.02, legs:[[ 0.2,0.7],[0.0,0.8],[-0.1,0.8],[ 0.1,0.5]] },
+  { bodyY:0,  headA: 0.0,  legs:[[ 0.1,0.5],[-0.2,0.7],[-0.2,0.6],[ 0.2,0.7]] },
+];
+
+function drawHorse(ctx, h, ts) {
+  const racing = h.racing;
+  const frames = racing ? GALLOP_FRAMES : WALK_FRAMES;
+  const fps    = racing ? 14 : 6;
+  const fi     = Math.floor((ts / (1000 / fps)) + h.frameOffset) % frames.length;
+  const frame  = frames[fi];
+
+  ctx.save();
+  ctx.translate(h.x, h.y + frame.bodyY * (racing ? 1 : 0.5));
+  if (!h.facingLeft) ctx.scale(-1, 1);
+
+  const W  = 52;
+  const H  = 22;
+  const bc = h.def.bodyColor;
+  const mc = h.def.maneColor;
+  const sc = h.def.saddleColor;
+
+  // Shadow
+  ctx.save();
+  ctx.translate(0, H + 6);
+  const shg = ctx.createRadialGradient(0,0,2, 0,0,W*0.8);
+  shg.addColorStop(0, 'rgba(0,0,0,0.35)');
+  shg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = shg;
+  ctx.scale(1, 0.3);
+  ctx.beginPath(); ctx.arc(0,0,W*0.8,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  drawLeg(ctx, -10, H-2, frame.legs[1], W*0.7, bc, true);
+  drawLeg(ctx,  8,  H-2, frame.legs[3], W*0.7, bc, true);
+
+  // Body
+  ctx.beginPath();
+  ctx.ellipse(0, 0, W, H, 0, 0, Math.PI*2);
+  ctx.fillStyle = bc;
+  ctx.fill();
+  const bodyGrad = ctx.createRadialGradient(-W*0.3, -H*0.5, 2, 0, 0, W);
+  bodyGrad.addColorStop(0, 'rgba(255,255,255,0.12)');
+  bodyGrad.addColorStop(1, 'rgba(0,0,0,0.25)');
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath(); ctx.ellipse(0, 0, W, H, 0, 0, Math.PI*2); ctx.fill();
+
+  // Saddle
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(-4, -H*0.2, W*0.32, H*0.6, 0, 0, Math.PI*2);
+  ctx.fillStyle = sc;
+  ctx.globalAlpha = 0.75;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  drawLeg(ctx, -10, H-2, frame.legs[0], W*0.7, bc, false);
+  drawLeg(ctx,  8,  H-2, frame.legs[2], W*0.7, bc, false);
+
+  // Neck
+  const neckX = -W + 8;
+  const neckBaseY = -H * 0.3;
+  ctx.save();
+  ctx.translate(neckX, neckBaseY);
+  ctx.rotate(-0.5 + frame.headA * 0.4);
+  ctx.beginPath();
+  ctx.moveTo(-7, 0); ctx.lineTo(7, 0);
+  ctx.lineTo(5, -24); ctx.lineTo(-5, -24);
+  ctx.closePath();
+  ctx.fillStyle = bc;
+  ctx.fill();
+  const ng = ctx.createLinearGradient(-7,0,7,0);
+  ng.addColorStop(0,'rgba(0,0,0,0.2)'); ng.addColorStop(1,'rgba(255,255,255,0.1)');
+  ctx.fillStyle=ng; ctx.fill();
+
+  ctx.fillStyle = mc;
+  for (let m = 0; m < 5; m++) {
+    ctx.beginPath();
+    const my = -5 - m * 4;
+    ctx.ellipse(-2, my, 4, 2.5, -0.4, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // Head
+  ctx.translate(-2, -24);
+  ctx.rotate(frame.headA * 0.5);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 13, 9, -0.3, 0, Math.PI*2);
+  ctx.fillStyle = bc;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(-9, 3, 7, 5, -0.5, 0, Math.PI*2);
+  ctx.fillStyle = bc;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(-13, 5, 4, 3, -0.3, 0, Math.PI*2);
+  ctx.fillStyle = shadeColor(bc, -20);
+  ctx.fill();
+
+  if (h.def.markings === 'blaze') {
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath();
+    ctx.ellipse(-5, -1, 3, 6, -0.1, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  ctx.arc(2, -2, 2.2, 0, Math.PI*2);
+  ctx.fillStyle = '#111';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(3, -2.5, 0.8, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(6, -7); ctx.lineTo(10, -14); ctx.lineTo(13, -8);
+  ctx.closePath();
+  ctx.fillStyle = bc;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(7, -8); ctx.lineTo(10, -13); ctx.lineTo(12, -9);
+  ctx.closePath();
+  ctx.fillStyle = mc;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(-14, 6, 1.5, 1, 0, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fill();
+
+  ctx.restore();
+
+  // Tail
+  ctx.save();
+  ctx.translate(W - 4, -H * 0.1);
+  const tailSwing = Math.sin(ts * 0.003 + h.def.id) * 0.2 + (racing ? Math.sin(ts * 0.015 + h.def.id) * 0.25 : 0);
+  ctx.rotate(0.3 + tailSwing);
+  ctx.fillStyle = mc;
+  for (let t = 0; t < 5; t++) {
+    ctx.beginPath();
+    ctx.moveTo(0, t * 5);
+    ctx.quadraticCurveTo(8 + t * 2, t * 5 + 6, 4 + Math.sin(t) * 3, t * 5 + 12);
+    ctx.lineWidth = 3 - t * 0.4;
+    ctx.strokeStyle = mc;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  if (h.def.markings === 'sock') {
+    ctx.save();
+    ctx.globalAlpha = 0.65;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(-10, H+6, 4, 5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( 9,  H+6, 4, 5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function drawLeg(ctx, baseX, baseY, legData, bodyW, color, far) {
+  const [angle, ext] = legData;
+  const legLen = 28 * (0.7 + ext * 0.3);
+  const kneeX = baseX + Math.sin(angle) * legLen * 0.5;
+  const kneeY = baseY + Math.cos(angle) * legLen * 0.5;
+  const hoofX = kneeX + Math.sin(angle * 0.5) * legLen * 0.55;
+  const hoofY = kneeY + legLen * 0.45;
+
+  ctx.save();
+  if (far) ctx.globalAlpha = 0.7;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = far ? 5 : 6;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(baseX, baseY);
+  ctx.quadraticCurveTo(kneeX, kneeY, hoofX, hoofY);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(hoofX, hoofY + 2, far ? 4 : 5, 3, 0.1, 0, Math.PI*2);
+  ctx.fillStyle = '#1a1008';
+  ctx.fill();
+  ctx.restore();
+}
+
+function shadeColor(hex, amount) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.max(0, Math.min(255, (n >> 16) + amount));
+  const g = Math.max(0, Math.min(255, ((n >> 8) & 0xff) + amount));
+  const b = Math.max(0, Math.min(255, (n & 0xff) + amount));
+  return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+}
+
+// ── Carrot drawing ────────────────────────────────────────────
+function drawCarrot(ctx, x, y, ts) {
+  const pulse = 1 + Math.sin(ts * 0.006) * 0.08;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(pulse, pulse);
+
+  const glow = ctx.createRadialGradient(0,0,4,0,0,30);
+  glow.addColorStop(0, 'rgba(255,140,0,0.45)');
+  glow.addColorStop(1, 'rgba(255,140,0,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(0,0,30,0,Math.PI*2); ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(-8, -14); ctx.lineTo(8, -14);
+  ctx.lineTo(2, 14); ctx.lineTo(-2, 14);
+  ctx.closePath();
+  const cg = ctx.createLinearGradient(-8,0,8,0);
+  cg.addColorStop(0, '#ff8c00');
+  cg.addColorStop(0.5, '#ff6600');
+  cg.addColorStop(1, '#cc4400');
+  ctx.fillStyle = cg;
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(200,80,0,0.4)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const ry = -10 + i * 6;
+    const rw = 7 - i * 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-rw, ry); ctx.lineTo(rw, ry);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#3a8a1a';
+  const leafAngles = [-0.5, 0, 0.5, -0.9, 0.9];
+  leafAngles.forEach(la => {
+    ctx.save();
+    ctx.translate(0, -14);
+    ctx.rotate(la);
+    ctx.beginPath();
+    ctx.moveTo(0,0); ctx.quadraticCurveTo(6, -8, 0, -16); ctx.quadraticCurveTo(-4,-8,0,0);
+    ctx.fillStyle = la % 2 === 0 ? '#3a8a1a' : '#2d6a14';
+    ctx.fill();
+    ctx.restore();
+  });
+
+  ctx.restore();
+}
+
+// ── Dust particles ────────────────────────────────────────────
+const dustParticles = [];
+function spawnDust(x, y, count, racing) {
+  for (let i = 0; i < count; i++) {
+    dustParticles.push({
+      x, y: y + 20,
+      vx: (Math.random()-0.5) * (racing ? 3 : 1.5),
+      vy: -Math.random() * (racing ? 2 : 1),
+      life: 1, maxLife: 0.6 + Math.random() * 0.5,
+      r: racing ? (4 + Math.random()*5) : (2+Math.random()*3),
+    });
+  }
+}
+function updateDrawDust(ctx, elapsed) {
+  for (let i = dustParticles.length - 1; i >= 0; i--) {
+    const d = dustParticles[i];
+    d.life -= elapsed / (d.maxLife * 1000);
+    if (d.life <= 0) { dustParticles.splice(i, 1); continue; }
+    d.x += d.vx; d.y += d.vy; d.vy += 0.04;
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, d.r * d.life, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(180,145,80,${d.life * 0.45})`;
+    ctx.fill();
+  }
+}
+
+// ── Speed lines ───────────────────────────────────────────────
+const TRAIL_COLORS = [
+  '255,255,255',
+  '255,60,60',
+  '255,140,0',
+  '255,230,0',
+  '60,220,60',
+  '0,220,220',
+  '60,100,255',
+  '180,0,255',
+];
+
+function trailColor(speed) {
+  if (speed < 5.0) return null;
+  const idx = Math.min(Math.floor((speed - 5.0) / 2), TRAIL_COLORS.length - 1);
+  return TRAIL_COLORS[idx];
+}
+
+function drawSpeedLines(ctx, h) {
+  const col = trailColor(h.speed);
+  if (!col || !h.racing) return;
+  const trail = h.trail;
+  if (!trail || trail.length < 2) return;
+  const offsets = [-10, -4, 4, 10];
+  offsets.forEach((oy) => {
+    const alpha = 0.55;
+    ctx.save();
+    ctx.strokeStyle = `rgba(${col},${alpha})`;
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < trail.length; i++) {
+      const t = trail[i];
+      if (i === 0) ctx.moveTo(t.x, t.y + oy);
+      else ctx.lineTo(t.x, t.y + oy);
+    }
+    ctx.globalAlpha = alpha * (trail.length / 12);
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+// ── Scoreboard ────────────────────────────────────────────────
+const scoreboard = document.getElementById('scoreboard');
+const scores = {};
+const scoreEls = {};
+HORSE_DEFS.forEach(h => {
+  scores[h.id] = 0;
+  const entry = document.createElement('div');
+  entry.className = 'score-entry';
+  const swatch = document.createElement('div');
+  swatch.className = 'score-swatch';
+  swatch.style.background = h.bodyColor;
+  swatch.style.border = '1px solid ' + shadeColor(h.bodyColor, -30);
+  const nameEl = document.createElement('div');
+  nameEl.className = 'score-name';
+  nameEl.textContent = h.name;
+  const winsEl = document.createElement('div');
+  winsEl.className = 'score-wins';
+  winsEl.textContent = '0';
+  const speedEl = document.createElement('div');
+  speedEl.className = 'score-speed';
+  speedEl.textContent = 'spd 3.0';
+  entry.appendChild(swatch); entry.appendChild(nameEl); entry.appendChild(winsEl); entry.appendChild(speedEl);
+  scoreboard.appendChild(entry);
+  scoreEls[h.id] = { entry, winsEl, speedEl };
+});
+
+function updateScoreboard() {
+  const max = Math.max(...Object.values(scores));
+  HORSE_DEFS.forEach(h => {
+    const horse = horses.find(hh => hh.def.id === h.id);
+    scoreEls[h.id].winsEl.textContent = scores[h.id];
+    scoreEls[h.id].entry.classList.toggle('leader', scores[h.id] === max && max > 0);
+    if (horse) scoreEls[h.id].speedEl.textContent = 'spd ' + horse.speed.toFixed(1);
+  });
+}
+
+// ── Horses state ──────────────────────────────────────────────
+const MARGIN = 70;
+const ARRIVE_DIST = 55;
+
+function clamp(v,lo,hi) { return Math.max(lo,Math.min(hi,v)); }
+
+const horses = HORSE_DEFS.map((h, i) => {
+  const angle = (i / HORSE_DEFS.length) * Math.PI * 2;
+  const r = Math.min(window.innerWidth, window.innerHeight) * 0.28;
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  return {
+    def: h,
+    x: clamp(cx + Math.cos(angle)*r, MARGIN, window.innerWidth-MARGIN),
+    y: clamp(cy + Math.sin(angle)*r, MARGIN, window.innerHeight-MARGIN),
+    vx: 0, vy: 0,
+    speed: 3.0 + Math.random() * 1.2,
+    arrived: false,
+    racing: false,
+    facingLeft: false,
+    frameOffset: Math.random() * 8,
+    dustTimer: 0,
+    wanderAngle: Math.random() * Math.PI * 2,
+    wanderChangeTimer: Math.random() * 2000,
+    wanderPauseTimer: 0,
+    paused: false,
+    stamina: 1.0,
+    hasEaten: false,
+    trail: [],
+  };
+});
+
+const carrots = [];
+let carrotIdSeq = 0;
+let winner = null;
+
+const banner  = document.getElementById('winner-banner');
+const winName = document.getElementById('winner-name');
+let bannerTimeout = null;
+
+function nearestCarrot(h) {
+  let best = null, bestD = Infinity;
+  carrots.forEach(c => {
+    const dx = c.x - h.x, dy = c.y - h.y;
+    const d = dx*dx + dy*dy;
+    if (d < bestD) { bestD = d; best = c; }
+  });
+  return best;
+}
+
+// ── Input ─────────────────────────────────────────────────────
+function placeCarrot(x, y) {
+  if (banner.contains(document.elementFromPoint(x,y))) return;
+  carrots.push({ x, y, id: carrotIdSeq++ });
+  horses.forEach(h => {
+    if (!h.speedInitialized) {
+      h.speedInitialized = true;
+      h.speed = 2.8 + Math.random() * 1.4;
+    }
+    h.racing = true;
+    h.stamina = 0.85 + Math.random() * 0.3;
+    h.arrived = false;
+  });
+  winner = null;
+  banner.classList.remove('show');
+  document.getElementById('hint').style.display = 'none';
+}
+
+gameCanvas.addEventListener('click', e => placeCarrot(e.clientX, e.clientY));
+gameCanvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  placeCarrot(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+
+// ── Game loop ─────────────────────────────────────────────────
+let lastTime = null;
+
+function gameLoop(ts) {
+  requestAnimationFrame(gameLoop);
+  if (!lastTime) lastTime = ts;
+  const elapsed = Math.min(ts - lastTime, 50);
+  lastTime = ts;
+
+  const W = gameCanvas.width, H = gameCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  updateDrawDust(ctx, elapsed);
+  carrots.forEach(c => drawCarrot(ctx, c.x, c.y, ts));
+
+  const sorted = [...horses].sort((a,b) => a.y - b.y);
+
+  horses.forEach(h => {
+    h.decayTimer = (h.decayTimer || 0) + elapsed;
+    if (h.decayTimer >= 100) {
+      h.decayTimer -= 100;
+      h.speed = Math.max(2.0, h.speed - 0.1);
+    }
+    scoreEls[h.def.id].speedEl.textContent = 'spd ' + h.speed.toFixed(1);
+  });
+
+  sorted.forEach(h => {
+    const target = nearestCarrot(h);
+
+    if (h.racing && target) {
+      const dx = target.x - h.x;
+      const dy = target.y - h.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+
+      if (dist < ARRIVE_DIST) {
+        const idx = carrots.indexOf(target);
+        if (idx !== -1) carrots.splice(idx, 1);
+        spawnDust(h.x, h.y, 10, true);
+        h.speed += 1.0;
+        scores[h.def.id]++;
+        updateScoreboard();
+        winName.textContent = h.def.name.toUpperCase();
+        banner.classList.remove('fade');
+        banner.classList.add('show');
+        if (bannerTimeout) clearTimeout(bannerTimeout);
+        bannerTimeout = setTimeout(() => {
+          banner.classList.add('fade');
+          setTimeout(() => { banner.classList.remove('show'); banner.classList.remove('fade'); }, 600);
+        }, 1400);
+
+        if (carrots.length === 0) {
+          horses.forEach(hh => { hh.racing = false; hh.arrived = false; });
+        }
+      } else {
+        const wobble = Math.sin(ts * 0.003 + h.def.id * 1.7) * 0.12;
+        const nx = dx/dist + wobble;
+        const ny = dy/dist + wobble;
+        const fatigue = 1 - (1 - h.stamina) * Math.min(1, (ts % 20000) / 20000);
+        const spd = h.speed * fatigue * (elapsed / 16);
+        h.x += nx * spd;
+        h.y += ny * spd;
+        h.facingLeft = dx < 0;
+
+        if (h.speed >= 5.0) {
+          h.trail.push({ x: h.x, y: h.y });
+          if (h.trail.length > 12) h.trail.shift();
+        } else {
+          h.trail = [];
+        }
+
+        h.dustTimer -= elapsed;
+        if (h.dustTimer <= 0) {
+          spawnDust(h.x, h.y, 2, true);
+          h.dustTimer = 90 + Math.random() * 60;
+        }
+      }
+    } else if (!h.racing || !target) {
+      if (h.paused) {
+        h.wanderPauseTimer -= elapsed;
+        if (h.wanderPauseTimer <= 0) h.paused = false;
+      } else {
+        h.wanderChangeTimer -= elapsed;
+        if (h.wanderChangeTimer <= 0) {
+          h.wanderAngle = Math.random() * Math.PI * 2;
+          h.wanderChangeTimer = 800 + Math.random() * 1200;
+        }
+        const em = 90;
+        if (h.x < em) h.wanderAngle = 0;
+        if (h.x > W-em) h.wanderAngle = Math.PI;
+        if (h.y < em) h.wanderAngle = Math.PI/2;
+        if (h.y > H-em) h.wanderAngle = -Math.PI/2;
+
+        const spd = 0.85 * (elapsed / 16);
+        h.x += Math.cos(h.wanderAngle) * spd;
+        h.y += Math.sin(h.wanderAngle) * spd;
+        h.x = clamp(h.x, MARGIN, W-MARGIN);
+        h.y = clamp(h.y, MARGIN, H-MARGIN);
+        h.facingLeft = Math.cos(h.wanderAngle) < 0;
+        h.trail = [];
+
+        h.dustTimer -= elapsed;
+        if (h.dustTimer <= 0) {
+          if (Math.random() < 0.3) spawnDust(h.x, h.y, 1, false);
+          h.dustTimer = 400 + Math.random() * 600;
+        }
+      }
+    }
+
+    ctx.save();
+    ctx.font = 'bold 11px Josefin Sans';
+    ctx.textAlign = 'center';
+    const lw = ctx.measureText(h.def.name).width + 10;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath();
+    ctx.roundRect(h.x - lw/2, h.y - 52, lw, 16, 3);
+    ctx.fill();
+    ctx.fillStyle = h.def.saddleColor;
+    ctx.fillText(h.def.name, h.x, h.y - 40);
+    ctx.restore();
+
+    drawSpeedLines(ctx, h);
+    drawHorse(ctx, h, ts);
+  });
+}
+
+resize();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
