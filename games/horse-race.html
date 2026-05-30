@@ -622,8 +622,8 @@ function gameLoop(ts) {
 
   horses.forEach(h => {
     h.decayTimer = (h.decayTimer || 0) + elapsed;
-    if (h.decayTimer >= 100) {
-      h.decayTimer -= 100;
+    if (h.decayTimer >= 300) {
+      h.decayTimer -= 300;
       h.speed = Math.max(2.0, h.speed - 0.1);
     }
     scoreEls[h.def.id].speedEl.textContent = 'spd ' + h.speed.toFixed(1);
