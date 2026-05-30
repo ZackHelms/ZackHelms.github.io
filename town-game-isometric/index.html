@@ -16,7 +16,7 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script type="text/babel">
-// Town Game v2.1.0
+// Town Game v2.2.0
 const { useState, useCallback, useEffect, useRef } = React;
 
 const MAP_W = 20, MAP_H = 20, TILE_W = 64, TILE_H = 32;
@@ -30,6 +30,7 @@ const SEASON_COLORS = {
 };
 const WATER_BORDER = "#1e5480";
 const DIRT_BORDER  = "#8a6830";
+const SAVE_INDEX_KEY = "town_saves";
 
 const RESOURCE_TYPES = {
   TREE: { emoji:"🌲", label:"Tree",       yields:{ wood:3 },         hp:3 },
@@ -87,6 +88,7 @@ function darken(hex, pct=0.18) {
   return `#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}`;
 }
 
+// ---- ISO TILE ----
 function IsoTile({ tile, season, building, isTarget }) {
   const { sx, sy } = toIso(tile.x, tile.y);
   const sc = SEASON_COLORS[season];
@@ -137,6 +139,114 @@ function IsoTile({ tile, season, building, isTarget }) {
   );
 }
 
+// ---- SETTINGS MODAL ----
+function SettingsModal({ onClose, onSave, onOpenLoad, onOpenOptions, settingsView, setSettingsView, savedGames, onLoad, onDelete, debugEnabled, setDebugEnabled, tapDelay, setTapDelay }) {
+  const btnStyle = { width:"100%", padding:"13px", background:"#251808", border:"1px solid #3a2510", borderRadius:"6px", color:"#d0a050", cursor:"pointer", fontFamily:"'Courier New',monospace", fontSize:"14px", textAlign:"left", display:"flex", alignItems:"center", gap:"10px" };
+  const TAP_DELAYS = [0, 300, 500, 1000, 2000];
+
+  return (
+    <div
+      onTouchEnd={(e)=>e.stopPropagation()}
+      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.82)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center" }}
+    >
+      <div style={{ background:"#1a1008", border:"2px solid #6a4a20", borderRadius:"8px", padding:"16px", width:"min(300px,88vw)", maxHeight:"80vh", display:"flex", flexDirection:"column" }}>
+
+        {/* Header */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"14px" }}>
+          <span style={{ color:"#f0c060", fontWeight:"bold", fontSize:"14px" }}>
+            {settingsView==="load" ? "📂 Load Game" : settingsView==="options" ? "⚙ Options" : "⚙ Settings"}
+          </span>
+          <button
+            onTouchEnd={(e)=>{ e.stopPropagation(); settingsView ? setSettingsView(null) : onClose(); }}
+            style={{ background:"none", border:"1px solid #4a3010", borderRadius:"4px", color:"#a08040", padding:"4px 10px", cursor:"pointer", fontFamily:"inherit", fontSize:"12px" }}
+          >
+            {settingsView ? "◀ Back" : "✕"}
+          </button>
+        </div>
+
+        {/* Root menu */}
+        {!settingsView && (
+          <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+            <button onTouchEnd={(e)=>{ e.stopPropagation(); onSave(); }} style={btnStyle}>
+              <span style={{fontSize:"18px"}}>💾</span> Save Game
+            </button>
+            <button onTouchEnd={(e)=>{ e.stopPropagation(); onOpenLoad(); }} style={btnStyle}>
+              <span style={{fontSize:"18px"}}>📂</span> Load Game
+            </button>
+            <button onTouchEnd={(e)=>{ e.stopPropagation(); onOpenOptions(); }} style={btnStyle}>
+              <span style={{fontSize:"18px"}}>⚙</span> Options
+            </button>
+          </div>
+        )}
+
+        {/* Load submenu */}
+        {settingsView==="load" && (
+          <div style={{ overflowY:"auto", flex:1 }}>
+            {savedGames.length===0 && (
+              <div style={{ color:"#504030", fontSize:"12px", textAlign:"center", padding:"20px" }}>No saved games yet.</div>
+            )}
+            {savedGames.map(s=>(
+              <div key={s.key} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px", padding:"10px", background:"#251808", border:"1px solid #3a2510", borderRadius:"6px" }}>
+                <div
+                  onTouchEnd={(e)=>{ e.stopPropagation(); onLoad(s.key); }}
+                  style={{ flex:1, cursor:"pointer" }}
+                >
+                  <div style={{ fontSize:"12px", color:"#d0a050" }}>{s.label}</div>
+                  <div style={{ fontSize:"10px", color:"#504030", marginTop:"2px" }}>{s.date}</div>
+                </div>
+                <button
+                  onTouchEnd={(e)=>{ e.stopPropagation(); onDelete(s.key); }}
+                  style={{ background:"#4a0808", border:"1px solid #6a1010", borderRadius:"4px", color:"#f06060", padding:"8px 10px", cursor:"pointer", fontSize:"16px", lineHeight:1, flexShrink:0 }}
+                >
+                  🗑
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Options submenu */}
+        {settingsView==="options" && (
+          <div>
+            {/* Debug toggle */}
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"18px", padding:"10px", background:"#251808", border:"1px solid #3a2510", borderRadius:"6px" }}>
+              <div>
+                <div style={{ fontSize:"13px", color:"#d0a050" }}>Debug overlay</div>
+                <div style={{ fontSize:"10px", color:"#504030", marginTop:"2px" }}>Shows tap coordinates</div>
+              </div>
+              <div
+                onTouchEnd={(e)=>{ e.stopPropagation(); setDebugEnabled(v=>!v); }}
+                style={{ width:46, height:26, borderRadius:13, background:debugEnabled?"#4a7820":"#3a2510", position:"relative", cursor:"pointer", flexShrink:0, transition:"background 0.15s" }}
+              >
+                <div style={{ position:"absolute", top:3, left:debugEnabled?21:3, width:20, height:20, borderRadius:"50%", background:debugEnabled?"#a0e060":"#605040", transition:"left 0.15s" }}/>
+              </div>
+            </div>
+
+            {/* Tap delay */}
+            <div style={{ padding:"10px", background:"#251808", border:"1px solid #3a2510", borderRadius:"6px" }}>
+              <div style={{ fontSize:"13px", color:"#d0a050", marginBottom:"4px" }}>Tap-to-move delay</div>
+              <div style={{ fontSize:"10px", color:"#504030", marginBottom:"10px" }}>Time before action fires after tapping a tile</div>
+              <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
+                {TAP_DELAYS.map(d=>(
+                  <button
+                    key={d}
+                    onTouchEnd={(e)=>{ e.stopPropagation(); setTapDelay(d); }}
+                    style={{ padding:"7px 10px", background:tapDelay===d?"#3a2010":"#1a1008", border:`1px solid ${tapDelay===d?"#f0a030":"#3a2510"}`, color:tapDelay===d?"#f0c060":"#806040", borderRadius:"4px", cursor:"pointer", fontSize:"11px", fontFamily:"inherit" }}
+                  >
+                    {d===0?"instant":d<1000?`${d}ms`:`${d/1000}s`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// ---- MAIN ----
 function TownGame() {
   const [tiles,setTiles]                    = useState(()=>generateMap());
   const [player,setPlayer]                  = useState({x:10,y:10});
@@ -158,27 +268,46 @@ function TownGame() {
   const [happiness,setHappiness]            = useState(100);
   const [hunger,setHunger]                  = useState(100);
 
+  // Settings state
+  const [settingsOpen,setSettingsOpen]      = useState(false);
+  const [settingsView,setSettingsView]      = useState(null); // null | 'load' | 'options'
+  const [savedGames,setSavedGames]          = useState([]);
+  const [debugEnabled,setDebugEnabled]      = useState(false);
+  const [tapDelay,setTapDelay]              = useState(1000);
+
+  // Movement refs
   const renderPosRef     = useRef({x:10,y:10});
   const targetRef        = useRef(null);
   const rafRef           = useRef(null);
   const lastTimeRef      = useRef(null);
   const pendingActionRef = useRef(null);
 
+  // Stale-closure prevention refs
   const tilesRef      = useRef(tiles);
   const inventoryRef  = useRef(inventory);
   const reputationRef = useRef(reputation);
   const skillXPRef    = useRef(skillXP);
   const buildModeRef  = useRef(buildMode);
+  const tapDelayRef   = useRef(tapDelay);
+  const debugEnabledRef = useRef(debugEnabled);
   useEffect(()=>{ tilesRef.current=tiles; },[tiles]);
   useEffect(()=>{ inventoryRef.current=inventory; },[inventory]);
   useEffect(()=>{ reputationRef.current=reputation; },[reputation]);
   useEffect(()=>{ skillXPRef.current=skillXP; },[skillXP]);
   useEffect(()=>{ buildModeRef.current=buildMode; },[buildMode]);
+  useEffect(()=>{ tapDelayRef.current=tapDelay; },[tapDelay]);
+  useEffect(()=>{ debugEnabledRef.current=debugEnabled; },[debugEnabled]);
 
+  // Snapshot of all saveable state, updated every render
+  const saveableRef = useRef({});
+  saveableRef.current = { tiles, player, inventory, totalGathered, buildings, villagers, skillXP, season, day, reputation, completedQuests, log, happiness, hunger };
+
+  // ---- PAN/ZOOM STATE ----
   const panRef        = useRef({x:0,y:0});
   const scaleRef      = useRef(1);
   const [viewTransform, setViewTransform] = useState({px:0,py:0,scale:1});
 
+  // Touch gesture refs
   const touchStateRef      = useRef(null);
   const TAP_THRESHOLD      = 8;
   const mapRef             = useRef(null);
@@ -194,6 +323,64 @@ function TownGame() {
     return 0;
   },[]);
 
+  // ---- SAVE / LOAD ----
+  const saveGame = useCallback(()=>{
+    const s = saveableRef.current;
+    const ts = Date.now();
+    const key = `town_save_${ts}`;
+    const label = `Day ${s.day} · ${SEASONS[s.season]}`;
+    const date = new Date(ts).toLocaleString();
+    localStorage.setItem(key, JSON.stringify(s));
+    const index = JSON.parse(localStorage.getItem(SAVE_INDEX_KEY)||"[]");
+    index.unshift({ key, label, date });
+    localStorage.setItem(SAVE_INDEX_KEY, JSON.stringify(index));
+    addLog(`Saved: ${label}`);
+    setSettingsOpen(false);
+    setSettingsView(null);
+  },[addLog]);
+
+  const openLoad = useCallback(()=>{
+    const index = JSON.parse(localStorage.getItem(SAVE_INDEX_KEY)||"[]");
+    setSavedGames(index);
+    setSettingsView("load");
+  },[]);
+
+  const loadGame = useCallback((key)=>{
+    const raw = localStorage.getItem(key);
+    if(!raw){ addLog("Save not found."); return; }
+    const s = JSON.parse(raw);
+    setTiles(s.tiles);
+    setPlayer(s.player);
+    renderPosRef.current = s.player;
+    setRenderPos(s.player);
+    targetRef.current = null;
+    setTarget(null);
+    setInventory(s.inventory);
+    setTotalGathered(s.totalGathered);
+    setBuildings(s.buildings);
+    setVillagers(s.villagers);
+    setSkillXP(s.skillXP);
+    setSeason(s.season);
+    setDay(s.day);
+    setReputation(s.reputation);
+    setCompletedQuests(s.completedQuests);
+    setLog(s.log);
+    setHappiness(s.happiness);
+    setHunger(s.hunger);
+    addLog(`Loaded: Day ${s.day} · ${SEASONS[s.season]}`);
+    setSettingsOpen(false);
+    setSettingsView(null);
+  },[addLog]);
+
+  const deleteSave = useCallback((key)=>{
+    localStorage.removeItem(key);
+    const index = JSON.parse(localStorage.getItem(SAVE_INDEX_KEY)||"[]");
+    const updated = index.filter(s=>s.key!==key);
+    localStorage.setItem(SAVE_INDEX_KEY, JSON.stringify(updated));
+    setSavedGames(updated);
+  },[]);
+
+  // ---- MOVEMENT LOOP ----
   useEffect(()=>{
     const step=(now)=>{
       if(!lastTimeRef.current) lastTimeRef.current=now;
@@ -224,6 +411,7 @@ function TownGame() {
     return ()=>{ if(rafRef.current) cancelAnimationFrame(rafRef.current); };
   },[]);
 
+  // ---- TOUCH GESTURE HANDLER ----
   useEffect(()=>{
     const el=mapRef.current;
     if(!el) return;
@@ -319,7 +507,7 @@ function TownGame() {
           const { tx:rawTx, ty:rawTy } = screenToTile(ex, ey, snapshot);
           const tx = rawTx - 1;
           const ty = rawTy;
-          if(setTapDebugRef.current) setTapDebugRef.current({
+          if(debugEnabledRef.current && setTapDebugRef.current) setTapDebugRef.current({
             ex, ey, tx, ty,
             ctx: snapshot.rsx, cty: snapshot.rsy,
             scale: snapshot.scale,
@@ -331,10 +519,11 @@ function TownGame() {
             const tile = tls[ty*MAP_W+tx];
             if(tile && tile.type!=="water"){
               const capturedHandler = handleTileClickRef.current;
+              const delay = tapDelayRef.current;
               setTimeout(()=>{
                 if(capturedHandler) capturedHandler(tile);
-                if(setTapDebugRef.current) setTapDebugRef.current(null);
-              }, 1000);
+                if(debugEnabledRef.current && setTapDebugRef.current) setTapDebugRef.current(null);
+              }, delay);
             }
           }
         }
@@ -360,6 +549,7 @@ function TownGame() {
     };
   },[]);
 
+  // ---- TILE ACTION ----
   const fireTileAction = useCallback((tile)=>{
     const idx=tile.y*MAP_W+tile.x;
     const tls=tilesRef.current;
@@ -384,6 +574,7 @@ function TownGame() {
     }
   },[addLog,skillLevel]);
 
+  // ---- TILE TAP ----
   const handleTileClick = useCallback((tile)=>{
     const idx=tile.y*MAP_W+tile.x;
     const bm=buildModeRef.current;
@@ -486,6 +677,7 @@ function TownGame() {
   const handleTabTap = useCallback((t)=>{ setTab(prev=>prev===t?null:t); },[]);
   const cancelBuild  = useCallback(()=>{ setBuildMode(null); addLog("Build mode cancelled."); },[addLog]);
 
+  // Quest check
   const gameState={buildings,villagers,totalGathered,inventory,reputation};
   useEffect(()=>{
     QUESTS.forEach(q=>{
@@ -499,6 +691,7 @@ function TownGame() {
     });
   },[buildings,villagers,totalGathered]);
 
+  // ---- LAYOUT ----
   const HEADER_H    = 44;
   const TAB_BAR_H   = 56;
   const LOG_STRIP_H = 28;
@@ -544,6 +737,7 @@ function TownGame() {
   return (
     <div style={{ position:"fixed", inset:0, background:"#1a1208", fontFamily:"'Courier New',monospace", color:"#e8d5a3", overflow:"hidden" }}>
 
+      {/* ==== MAP LAYER z=1 ==== */}
       <div
         ref={mapRef}
         style={{
@@ -577,7 +771,8 @@ function TownGame() {
           }}>🧑‍🌾</div>
         </div>
 
-        {tapDebug && (
+        {/* Debug overlays — only when debugEnabled */}
+        {debugEnabled && tapDebug && (
           <div style={{
             position:"absolute", left:tapDebug.ex, top:tapDebug.ey,
             transform:"translate(-50%,-50%)",
@@ -587,7 +782,7 @@ function TownGame() {
           }}/>
         )}
 
-        {tapDebug && tapDebug.tx>=0 && tapDebug.tx<MAP_W && tapDebug.ty>=0 && tapDebug.ty<MAP_H && (()=>{
+        {debugEnabled && tapDebug && tapDebug.tx>=0 && tapDebug.tx<MAP_W && tapDebug.ty>=0 && tapDebug.ty<MAP_H && (()=>{
           const {sx: tsx, sy: tsy} = toIso(tapDebug.tx, tapDebug.ty);
           const tileCX = tsx + TILE_W/2, tileCY = tsy + TILE_H/2;
           const playerCX = tapDebug.ctx + TILE_W/2, playerCY = tapDebug.cty + TILE_H/2;
@@ -606,7 +801,7 @@ function TownGame() {
           }}/>;
         })()}
 
-        {tapDebug && (
+        {debugEnabled && tapDebug && (
           <div style={{
             position:"absolute", top:HEADER_H+8, left:8, zIndex:99999,
             background:"#000000dd", color:"#ffffff",
@@ -622,6 +817,7 @@ function TownGame() {
         )}
       </div>
 
+      {/* ==== BUILD BANNER z=50 ==== */}
       {buildMode&&(
         <div style={{ position:"absolute", top:HEADER_H+8, left:0, right:0, zIndex:50, display:"flex", justifyContent:"center", pointerEvents:"none" }}>
           <div style={{ background:"#1a1008ee", border:"1px solid #f0a030", padding:"7px 14px", borderRadius:"6px", fontSize:"12px", color:"#f0c060", display:"flex", alignItems:"center", gap:"10px", pointerEvents:"auto" }}>
@@ -631,8 +827,15 @@ function TownGame() {
         </div>
       )}
 
+      {/* ==== HEADER z=50 ==== */}
       <div style={{ position:"absolute", top:0, left:0, right:0, height:HEADER_H, zIndex:50, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 10px", background:"linear-gradient(90deg,#2a1a08,#3a2510)", borderBottom:"2px solid #6a4a20" }}>
-        <div style={{fontWeight:"bold",fontSize:"13px",color:"#f0c060",letterSpacing:"1px"}}>⚔ TOWN GAME</div>
+        <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+          <button
+            onTouchEnd={(e)=>{e.stopPropagation();setSettingsOpen(true);setSettingsView(null);}}
+            style={{background:"none",border:"1px solid #4a3010",borderRadius:"5px",color:"#c0a060",fontSize:"18px",width:"32px",height:"32px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0}}
+          >⚙</button>
+          <span style={{fontWeight:"bold",fontSize:"13px",color:"#f0c060",letterSpacing:"1px"}}>TOWN GAME</span>
+        </div>
         <div style={{display:"flex",gap:"7px",fontSize:"11px",flexWrap:"nowrap"}}>
           <span>📅{day}</span>
           <span style={{color:{Spring:"#80e080",Summer:"#f0e040",Autumn:"#e08040",Winter:"#80c0e0"}[SEASONS[season]]}}>{SEASONS[season]}</span>
@@ -643,6 +846,7 @@ function TownGame() {
         <button onTouchEnd={(e)=>{e.stopPropagation();advanceDay();}} style={{background:"linear-gradient(180deg,#6a4a20,#4a2e10)",border:"1px solid #8a6a30",color:"#f0d080",padding:"0 12px",height:"34px",cursor:"pointer",fontFamily:"inherit",fontSize:"11px",borderRadius:"3px",minWidth:"60px"}}>▶ Day</button>
       </div>
 
+      {/* ==== PANEL z=40 ==== */}
       <div style={{ position:"absolute", left:0, right:0, zIndex:40, bottom:TAB_BAR_H+LOG_STRIP_H, height:panelOpen?PANEL_H:0, background:"#1a1008f4", borderTop:panelOpen?"2px solid #6a4a20":"none", transition:"height 0.22s ease", overflow:"hidden", display:"flex", flexDirection:"column" }}>
         <div style={{flex:1,overflowY:"auto",padding:"12px",WebkitOverflowScrolling:"touch"}}>
 
@@ -754,6 +958,7 @@ function TownGame() {
         </div>
       </div>
 
+      {/* ==== LOG STRIP z=50 ==== */}
       <div
         onTouchEnd={(e)=>{e.stopPropagation();setTab(prev=>prev==="log"?null:"log");}}
         style={{ position:"absolute", left:0, right:0, zIndex:50, bottom:TAB_BAR_H, height:LOG_STRIP_H, background:"#0d0904f8", borderTop:"1px solid #3a2810", display:"flex", alignItems:"center", padding:"0 10px", gap:"8px", cursor:"pointer" }}
@@ -762,6 +967,7 @@ function TownGame() {
         <span style={{fontSize:"11px",color:"#b08030",flex:1,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{latestLog}</span>
       </div>
 
+      {/* ==== TAB BAR z=50 ==== */}
       <div style={{ position:"absolute", bottom:0, left:0, right:0, height:TAB_BAR_H, zIndex:50, background:"linear-gradient(0deg,#1a1008,#251408)", borderTop:"2px solid #4a3010", display:"flex" }}>
         {TABS.map(t=>(
           <button key={t} onTouchEnd={(e)=>{e.stopPropagation();handleTabTap(t);}} style={{ flex:1, border:"none", borderTop:tab===t?"2px solid #f0a030":"2px solid transparent", background:tab===t?"#2a1808":"transparent", color:tab===t?"#f0c060":"#806040", cursor:"pointer", fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"2px", minHeight:"44px", padding:"2px 0" }}>
@@ -770,6 +976,25 @@ function TownGame() {
           </button>
         ))}
       </div>
+
+      {/* ==== SETTINGS MODAL z=200 ==== */}
+      {settingsOpen && (
+        <SettingsModal
+          onClose={()=>setSettingsOpen(false)}
+          onSave={saveGame}
+          onOpenLoad={openLoad}
+          onOpenOptions={()=>setSettingsView("options")}
+          settingsView={settingsView}
+          setSettingsView={setSettingsView}
+          savedGames={savedGames}
+          onLoad={loadGame}
+          onDelete={deleteSave}
+          debugEnabled={debugEnabled}
+          setDebugEnabled={setDebugEnabled}
+          tapDelay={tapDelay}
+          setTapDelay={setTapDelay}
+        />
+      )}
 
     </div>
   );
