@@ -27,6 +27,7 @@ body {
   min-height: 100vh;
   display: flex; flex-direction: column; align-items: center;
   user-select: none;
+  touch-action: manipulation;
 }
 header {
   width: 100%; padding: 10px 20px 4px;
@@ -116,17 +117,18 @@ canvas { width:100%; height:auto; display:block; }
 .ab-btn {
   background:var(--panel); border:1px solid var(--border);
   color:var(--white); font-family:'Share Tech Mono',monospace;
-  font-size:0.56rem; padding:6px 9px; border-radius:3px; cursor:pointer;
+  font-size:0.65rem; padding:10px 14px; border-radius:4px; cursor:pointer;
   transition:all 0.15s; display:flex; flex-direction:column;
-  align-items:center; gap:2px; min-width:55px;
+  align-items:center; gap:3px; min-width:72px;
   position:relative; overflow:hidden;
+  touch-action: manipulation;
 }
 .ab-btn:hover:not(:disabled) { border-color:var(--player); box-shadow:0 0 8px #39ff1433; transform:translateY(-1px); }
 .ab-btn:disabled { opacity:0.28; cursor:not-allowed; }
-.ab-btn .ab-icon { font-size:1.05rem; }
-.ab-btn .ab-key { color:var(--gold); font-size:0.62rem; }
-.ab-btn .ab-cost { color:var(--mp); font-size:0.5rem; }
-.ab-btn .ab-name { font-size:0.5rem; color:var(--dim); }
+.ab-btn .ab-icon { font-size:1.5rem; }
+.ab-btn .ab-key { color:var(--gold); font-size:0.72rem; }
+.ab-btn .ab-cost { color:var(--mp); font-size:0.6rem; }
+.ab-btn .ab-name { font-size:0.58rem; color:var(--dim); }
 .cd-overlay { position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.62); transition:height 0.08s linear; pointer-events:none; }
 
 /* STAT ROW */
@@ -264,6 +266,7 @@ canvas { width:100%; height:auto; display:block; }
 <div class="ctrl-row">
   <button class="ctrl-btn prime" id="startBtn" onclick="startWave()">START WAVE</button>
   <button class="ctrl-btn" onclick="restartRun()">RESTART</button>
+  <button class="ctrl-btn" onclick="newGameFresh()" style="border-color:#ff4444;color:#ff4444">NEW GAME</button>
 </div>
 
 <!-- UPGRADE SCREEN -->
@@ -386,6 +389,46 @@ let selectedStartLevel=0;
 let animFrame=null, lastTs=0;
 let keys={};
 let pendingUpgrades=null;
+let persistedBoosts=null;
+
+function saveBoosts() {
+  const base = defPlayer();
+  persistedBoosts = {
+    dmgMult:      player.dmgMult,
+    cdMult:       player.cdMult,
+    critChance:   player.critChance,
+    critMult:     player.critMult,
+    aoeMult:      player.aoeMult,
+    hpPerKill:    player.hpPerKill,
+    walkSpeed:    player.walkSpeed,
+    chainBolt:    player.chainBolt,
+    multiShot:    player.multiShot,
+    hasNuke:      player.hasNuke,
+    maxHpBonus:   player.maxHp  - base.maxHp,
+    maxMpBonus:   player.maxMp  - base.maxMp,
+    mpRegenBonus: player.mpRegen - base.mpRegen,
+  };
+}
+
+function applyPersistedBoosts(p) {
+  if (!persistedBoosts) return;
+  const b = persistedBoosts;
+  p.dmgMult    = b.dmgMult;
+  p.cdMult     = b.cdMult;
+  p.critChance = b.critChance;
+  p.critMult   = b.critMult;
+  p.aoeMult    = b.aoeMult;
+  p.hpPerKill  = b.hpPerKill;
+  p.walkSpeed  = b.walkSpeed;
+  p.chainBolt  = b.chainBolt;
+  p.multiShot  = b.multiShot;
+  p.hasNuke    = b.hasNuke;
+  p.maxHp     += b.maxHpBonus;
+  p.hp         = p.maxHp;
+  p.maxMp     += b.maxMpBonus;
+  p.mp         = p.maxMp;
+  p.mpRegen   += b.mpRegenBonus;
+}
 
 function defPlayer() {
   return {
@@ -1110,6 +1153,7 @@ function endBattle(won) {
     },1500);
   } else {
     player.alive=false;
+    saveBoosts();
     log('ec','YOU HAVE FALLEN...');
     setTimeout(()=>showOverlay('YOU FELL','#ff2244',`SCORE: ${score}  |  LV ${player.level}  |  WAVE ${waveIdx+1}`,true),1000);
   }
@@ -1226,6 +1270,7 @@ function beginRun(startWave) {
   document.getElementById('overlay').classList.add('hidden');
   waveIdx=startWave||0; score=0;
   player=defPlayer();
+  applyPersistedBoosts(player);
   enemies=[]; particles=[]; projectiles=[]; floatTexts=[]; groundFX=[]; coins=[];
   gameRunning=true; waveActive=false;
   pendingUpgrades=null;
@@ -1237,6 +1282,7 @@ function beginRun(startWave) {
   document.getElementById('playerNameHud').textContent='CHAMPION';
   document.getElementById('playerNameHud').style.color='#39ff14';
   buildLevelStrip(); buildAbilityRow(); updateHUD(); updateStatRow();
+  if (persistedBoosts) log('sc','Previous boosts carried over!');
   log('sc',`Run started at Wave ${waveIdx+1}. Collect coins to power up!`);
 }
 
@@ -1245,6 +1291,11 @@ function restartRun() {
   document.getElementById('upgradeScreen').classList.add('hidden');
   selectedStartLevel=0; buildStartLevels();
   showOverlay('STICK WARS','#39ff14','CHOOSE YOUR STARTING WAVE',false);
+}
+
+function newGameFresh() {
+  persistedBoosts=null;
+  restartRun();
 }
 
 // =============================================================
