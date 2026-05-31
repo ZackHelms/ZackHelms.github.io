@@ -1036,21 +1036,22 @@ function drawTile(t) {
     ctx.stroke();
   }
 
-  if (debugMode && !t.hit && !t.missed) {
+  if (!t.hit && !t.missed) {
     const segH = t.h / 10;
     ctx.shadowBlur = 0;
+    const bright = debugMode;
     for (let i = 0; i < 10; i++) {
       const sy = t.y + i * segH;
-      ctx.fillStyle = SEG_COLORS[i];
+      ctx.fillStyle = bright ? SEG_COLORS[i].replace(/[\d.]+\)$/, v => String(parseFloat(v)*2.5)+')') : SEG_COLORS[i];
       ctx.fillRect(t.x + 1, sy, t.w - 2, segH - 0.5);
-      ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      ctx.font = `700 ${Math.floor(segH * 0.55)}px monospace`;
-      ctx.textAlign = 'center';
+      ctx.fillStyle = bright ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.22)';
+      ctx.font = `700 ${Math.floor(segH * 0.52)}px monospace`;
+      ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(HIT_MULTIPLIERS[i] + 'x', t.x + t.w / 2, sy + segH / 2);
+      ctx.fillText(HIT_MULTIPLIERS[i] + 'x', t.x + 4, sy + segH / 2);
     }
     // divider lines between segments
-    ctx.strokeStyle = 'rgba(0,245,255,0.18)';
+    ctx.strokeStyle = bright ? 'rgba(0,245,255,0.25)' : 'rgba(0,245,255,0.10)';
     ctx.lineWidth = 0.5;
     for (let i = 1; i < 10; i++) {
       const ly = t.y + i * segH;
@@ -1140,9 +1141,17 @@ function onLanePress(lane) {
   if (anyHit) {
     document.getElementById('score-display').textContent = score;
     document.getElementById('hits-display').textContent = hits;
-    const btn = document.querySelector(`.lane-btn[data-lane="${lane}"]`);
-    if (btn) { btn.classList.add('pressed'); setTimeout(() => btn.classList.remove('pressed'), 100); }
+  } else {
+    misses++;
+    combo = 0;
+    score = hitScore - misses;
+    document.getElementById('score-display').textContent = score;
+    document.getElementById('misses-display').textContent = misses;
+    hitFlash();
+    playMissSound();
   }
+  const btn = document.querySelector(`.lane-btn[data-lane="${lane}"]`);
+  if (btn) { btn.classList.add('pressed'); setTimeout(() => btn.classList.remove('pressed'), 100); }
 }
 
 document.querySelectorAll('.lane-btn').forEach(btn => {
