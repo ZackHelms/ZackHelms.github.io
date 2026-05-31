@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Games</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg: #06060e;
+  --panel: #0b0b16;
+  --border: #1a1a30;
+  --green: #39ff14;
+  --gold: #ffc300;
+  --white: #dde3ff;
+  --dim: #353555;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--white);
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 40px 20px;
+}
+h1 {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: clamp(1.6rem, 5vw, 2.8rem);
+  color: var(--green);
+  text-shadow: 0 0 20px #39ff1466;
+  letter-spacing: 6px;
+  margin-bottom: 6px;
+}
+.sub { font-size: 0.62rem; color: var(--dim); letter-spacing: 4px; margin-bottom: 20px; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  max-width: 800px;
+  width: 100%;
+}
+.game-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  text-decoration: none;
+  color: var(--white);
+  display: flex; flex-direction: row; align-items: center; gap: 12px; text-align: left;
+  transition: all 0.2s;
+}
+.game-card:hover {
+  border-color: var(--green);
+  box-shadow: 0 0 20px #39ff1422;
+  transform: translateY(-2px);
+}
+.game-icon { font-size: 1.8rem; flex-shrink: 0; }
+.game-info { display: flex; flex-direction: column; gap: 3px; }
+.game-name {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 0.82rem;
+  letter-spacing: 2px;
+  color: var(--green);
+}
+.game-desc { font-size: 0.55rem; color: var(--dim); line-height: 1.5; }
+</style>
+</head>
+<body>
+  <h1>GAMES</h1>
+  <div class="sub">-- PICK YOUR BATTLE --</div>
+
+  <div class="grid">
+    <a class="game-card" href="stick-wars.html">
+      <div class="game-icon">⚔️</div>
+      <div class="game-info">
+        <div class="game-name">STICK WARS</div>
+        <div class="game-desc">Wave-based brawler. Fight 10 waves of enemies, collect coins, unlock upgrades, and ascend to power.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="town-game-1.html">
+      <div class="game-icon">🏘️</div>
+      <div class="game-info">
+        <div class="game-name">TOWN BUILDER</div>
+        <div class="game-desc">Isometric town-building sim. Place buildings, grow your settlement, and manage resources.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="horse-race.html">
+      <div class="game-icon">🐎</div>
+      <div class="game-info">
+        <div class="game-name">HORSE RACE</div>
+        <div class="game-desc">Tap to drop carrots and watch four horses gallop to claim them. Speed up your favorite!</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="piano-tiles.html">
+      <div class="game-icon">🎹</div>
+      <div class="game-info">
+        <div class="game-name">PIANO TILES</div>
+        <div class="game-desc">Hit the falling tiles in time with chiptune beats. Two songs, three difficulties.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="stick-commander-3d.html">
+      <div class="game-icon">👑</div>
+      <div class="game-info">
+        <div class="game-name">STICK COMMANDER 3D</div>
+        <div class="game-desc">Command a stick-figure army across 50 waves. Recruit troops, unleash abilities, defeat bosses, slay the Final Overlord.</div>
+      </div>
+    </a>
+  </div>
+</body>
+</html>
