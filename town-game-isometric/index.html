@@ -1,5 +1,23 @@
-// Town Game v2.1.0
-import { useState, useCallback, useEffect, useRef } from "react";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Town Game</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1208; overflow: hidden; }
+        #root { width: 100vw; height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel">
+// Town Game v2.2.0
+const { useState, useCallback, useEffect, useRef } = React;
 
 const MAP_W = 20, MAP_H = 20, TILE_W = 64, TILE_H = 32;
 const MOVE_SPEED = 6;
@@ -12,6 +30,7 @@ const SEASON_COLORS = {
 };
 const WATER_BORDER = "#1e5480";
 const DIRT_BORDER  = "#8a6830";
+const SAVE_INDEX_KEY = "town_saves";
 
 const RESOURCE_TYPES = {
   TREE: { emoji:"🌲", label:"Tree",       yields:{ wood:3 },         hp:3 },
@@ -61,7 +80,6 @@ function generateMap() {
 
 function toIso(x,y) { return { sx:(x-y)*(TILE_W/2), sy:(x+y)*(TILE_H/2) }; }
 
-// Darken a hex color slightly
 function darken(hex, pct=0.18) {
   const n=parseInt(hex.slice(1),16);
   const r=Math.max(0,Math.round((n>>16)*(1-pct)));
@@ -93,17 +111,14 @@ function IsoTile({ tile, season, building, isTarget }) {
       }}
     >
       <svg width={TILE_W} height={TILE_H+12} style={{position:"absolute",top:0,left:0}} overflow="visible">
-        {/* Left side face */}
         <polygon
           points={`0,${TILE_H/2} ${TILE_W/2},${TILE_H} ${TILE_W/2},${TILE_H+10} 0,${TILE_H/2+10}`}
           fill={side} opacity="0.9"
         />
-        {/* Right side face */}
         <polygon
           points={`${TILE_W/2},${TILE_H} ${TILE_W},${TILE_H/2} ${TILE_W},${TILE_H/2+10} ${TILE_W/2},${TILE_H+10}`}
           fill={side} opacity="0.75"
         />
-        {/* Top face with border */}
         <polygon
           points={`${TILE_W/2},0 ${TILE_W},${TILE_H/2} ${TILE_W/2},${TILE_H} 0,${TILE_H/2}`}
           fill={gc}
@@ -124,8 +139,115 @@ function IsoTile({ tile, season, building, isTarget }) {
   );
 }
 
+// ---- SETTINGS MODAL ----
+function SettingsModal({ onClose, onSave, onOpenLoad, onOpenOptions, settingsView, setSettingsView, savedGames, onLoad, onDelete, debugEnabled, setDebugEnabled, tapDelay, setTapDelay }) {
+  const btnStyle = { width:"100%", padding:"13px", background:"#251808", border:"1px solid #3a2510", borderRadius:"6px", color:"#d0a050", cursor:"pointer", fontFamily:"'Courier New',monospace", fontSize:"14px", textAlign:"left", display:"flex", alignItems:"center", gap:"10px" };
+  const TAP_DELAYS = [0, 300, 500, 1000, 2000];
+
+  return (
+    <div
+      onTouchEnd={(e)=>e.stopPropagation()}
+      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.82)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center" }}
+    >
+      <div style={{ background:"#1a1008", border:"2px solid #6a4a20", borderRadius:"8px", padding:"16px", width:"min(300px,88vw)", maxHeight:"80vh", display:"flex", flexDirection:"column" }}>
+
+        {/* Header */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"14px" }}>
+          <span style={{ color:"#f0c060", fontWeight:"bold", fontSize:"14px" }}>
+            {settingsView==="load" ? "📂 Load Game" : settingsView==="options" ? "⚙ Options" : "⚙ Settings"}
+          </span>
+          <button
+            onTouchEnd={(e)=>{ e.stopPropagation(); settingsView ? setSettingsView(null) : onClose(); }}
+            style={{ background:"none", border:"1px solid #4a3010", borderRadius:"4px", color:"#a08040", padding:"4px 10px", cursor:"pointer", fontFamily:"inherit", fontSize:"12px" }}
+          >
+            {settingsView ? "◀ Back" : "✕"}
+          </button>
+        </div>
+
+        {/* Root menu */}
+        {!settingsView && (
+          <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+            <button onTouchEnd={(e)=>{ e.stopPropagation(); onSave(); }} style={btnStyle}>
+              <span style={{fontSize:"18px"}}>💾</span> Save Game
+            </button>
+            <button onTouchEnd={(e)=>{ e.stopPropagation(); onOpenLoad(); }} style={btnStyle}>
+              <span style={{fontSize:"18px"}}>📂</span> Load Game
+            </button>
+            <button onTouchEnd={(e)=>{ e.stopPropagation(); onOpenOptions(); }} style={btnStyle}>
+              <span style={{fontSize:"18px"}}>⚙</span> Options
+            </button>
+          </div>
+        )}
+
+        {/* Load submenu */}
+        {settingsView==="load" && (
+          <div style={{ overflowY:"auto", flex:1 }}>
+            {savedGames.length===0 && (
+              <div style={{ color:"#504030", fontSize:"12px", textAlign:"center", padding:"20px" }}>No saved games yet.</div>
+            )}
+            {savedGames.map(s=>(
+              <div key={s.key} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px", padding:"10px", background:"#251808", border:"1px solid #3a2510", borderRadius:"6px" }}>
+                <div
+                  onTouchEnd={(e)=>{ e.stopPropagation(); onLoad(s.key); }}
+                  style={{ flex:1, cursor:"pointer" }}
+                >
+                  <div style={{ fontSize:"12px", color:"#d0a050" }}>{s.label}</div>
+                  <div style={{ fontSize:"10px", color:"#504030", marginTop:"2px" }}>{s.date}</div>
+                </div>
+                <button
+                  onTouchEnd={(e)=>{ e.stopPropagation(); onDelete(s.key); }}
+                  style={{ background:"#4a0808", border:"1px solid #6a1010", borderRadius:"4px", color:"#f06060", padding:"8px 10px", cursor:"pointer", fontSize:"16px", lineHeight:1, flexShrink:0 }}
+                >
+                  🗑
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Options submenu */}
+        {settingsView==="options" && (
+          <div>
+            {/* Debug toggle */}
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"18px", padding:"10px", background:"#251808", border:"1px solid #3a2510", borderRadius:"6px" }}>
+              <div>
+                <div style={{ fontSize:"13px", color:"#d0a050" }}>Debug overlay</div>
+                <div style={{ fontSize:"10px", color:"#504030", marginTop:"2px" }}>Shows tap coordinates</div>
+              </div>
+              <div
+                onTouchEnd={(e)=>{ e.stopPropagation(); setDebugEnabled(v=>!v); }}
+                style={{ width:46, height:26, borderRadius:13, background:debugEnabled?"#4a7820":"#3a2510", position:"relative", cursor:"pointer", flexShrink:0, transition:"background 0.15s" }}
+              >
+                <div style={{ position:"absolute", top:3, left:debugEnabled?21:3, width:20, height:20, borderRadius:"50%", background:debugEnabled?"#a0e060":"#605040", transition:"left 0.15s" }}/>
+              </div>
+            </div>
+
+            {/* Tap delay */}
+            <div style={{ padding:"10px", background:"#251808", border:"1px solid #3a2510", borderRadius:"6px" }}>
+              <div style={{ fontSize:"13px", color:"#d0a050", marginBottom:"4px" }}>Tap-to-move delay</div>
+              <div style={{ fontSize:"10px", color:"#504030", marginBottom:"10px" }}>Time before action fires after tapping a tile</div>
+              <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
+                {TAP_DELAYS.map(d=>(
+                  <button
+                    key={d}
+                    onTouchEnd={(e)=>{ e.stopPropagation(); setTapDelay(d); }}
+                    style={{ padding:"7px 10px", background:tapDelay===d?"#3a2010":"#1a1008", border:`1px solid ${tapDelay===d?"#f0a030":"#3a2510"}`, color:tapDelay===d?"#f0c060":"#806040", borderRadius:"4px", cursor:"pointer", fontSize:"11px", fontFamily:"inherit" }}
+                  >
+                    {d===0?"instant":d<1000?`${d}ms`:`${d/1000}s`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
 // ---- MAIN ----
-export default function TownGame() {
+function TownGame() {
   const [tiles,setTiles]                    = useState(()=>generateMap());
   const [player,setPlayer]                  = useState({x:10,y:10});
   const [renderPos,setRenderPos]            = useState({x:10,y:10});
@@ -134,7 +256,7 @@ export default function TownGame() {
   const [totalGathered,setTotalGathered]    = useState({wood:0,stone:0,food:0,hide:0});
   const [buildings,setBuildings]            = useState([]);
   const [villagers,setVillagers]            = useState([]);
-  const [tapDebug,setTapDebug]              = useState(null); // {ex,ey,tx,ty,lx,ly,ctx,cty}
+  const [tapDebug,setTapDebug]              = useState(null);
   const [skillXP,setSkillXP]               = useState({Gathering:0,Building:0,Hunting:0,Leadership:0});
   const [season,setSeason]                  = useState(0);
   const [day,setDay]                        = useState(1);
@@ -145,6 +267,13 @@ export default function TownGame() {
   const [buildMode,setBuildMode]            = useState(null);
   const [happiness,setHappiness]            = useState(100);
   const [hunger,setHunger]                  = useState(100);
+
+  // Settings state
+  const [settingsOpen,setSettingsOpen]      = useState(false);
+  const [settingsView,setSettingsView]      = useState(null); // null | 'load' | 'options'
+  const [savedGames,setSavedGames]          = useState([]);
+  const [debugEnabled,setDebugEnabled]      = useState(false);
+  const [tapDelay,setTapDelay]              = useState(1000);
 
   // Movement refs
   const renderPosRef     = useRef({x:10,y:10});
@@ -159,14 +288,21 @@ export default function TownGame() {
   const reputationRef = useRef(reputation);
   const skillXPRef    = useRef(skillXP);
   const buildModeRef  = useRef(buildMode);
+  const tapDelayRef   = useRef(tapDelay);
+  const debugEnabledRef = useRef(debugEnabled);
   useEffect(()=>{ tilesRef.current=tiles; },[tiles]);
   useEffect(()=>{ inventoryRef.current=inventory; },[inventory]);
   useEffect(()=>{ reputationRef.current=reputation; },[reputation]);
   useEffect(()=>{ skillXPRef.current=skillXP; },[skillXP]);
   useEffect(()=>{ buildModeRef.current=buildMode; },[buildMode]);
+  useEffect(()=>{ tapDelayRef.current=tapDelay; },[tapDelay]);
+  useEffect(()=>{ debugEnabledRef.current=debugEnabled; },[debugEnabled]);
 
-  // ---- PAN/ZOOM STATE (refs only, applied via transform to avoid re-render) ----
-  // panOffset = extra offset in screen pixels (user drag), scale = zoom level
+  // Snapshot of all saveable state, updated every render
+  const saveableRef = useRef({});
+  saveableRef.current = { tiles, player, inventory, totalGathered, buildings, villagers, skillXP, season, day, reputation, completedQuests, log, happiness, hunger };
+
+  // ---- PAN/ZOOM STATE ----
   const panRef        = useRef({x:0,y:0});
   const scaleRef      = useRef(1);
   const [viewTransform, setViewTransform] = useState({px:0,py:0,scale:1});
@@ -175,11 +311,8 @@ export default function TownGame() {
   const touchStateRef      = useRef(null);
   const TAP_THRESHOLD      = 8;
   const mapRef             = useRef(null);
-  // Ref to handleTileClick so the imperative touchend can call it without stale closure
   const handleTileClickRef = useRef(null);
-  // Ref to current camera base offsets so hit-test can invert the transform
   const baseOffRef         = useRef({x:0,y:0,headerH:44});
-  // Ref to setTapDebug so imperative handler can update debug overlay
   const setTapDebugRef     = useRef(null);
 
   const addLog = useCallback((msg)=>{ setLog(p=>[msg,...p].slice(0,60)); },[]);
@@ -188,6 +321,63 @@ export default function TownGame() {
     const xp=skillXPRef.current[sk], lvls=SKILLS[sk].levels;
     for(let i=lvls.length-1;i>=0;i--) if(xp>=lvls[i]) return i;
     return 0;
+  },[]);
+
+  // ---- SAVE / LOAD ----
+  const saveGame = useCallback(()=>{
+    const s = saveableRef.current;
+    const ts = Date.now();
+    const key = `town_save_${ts}`;
+    const label = `Day ${s.day} · ${SEASONS[s.season]}`;
+    const date = new Date(ts).toLocaleString();
+    localStorage.setItem(key, JSON.stringify(s));
+    const index = JSON.parse(localStorage.getItem(SAVE_INDEX_KEY)||"[]");
+    index.unshift({ key, label, date });
+    localStorage.setItem(SAVE_INDEX_KEY, JSON.stringify(index));
+    addLog(`Saved: ${label}`);
+    setSettingsOpen(false);
+    setSettingsView(null);
+  },[addLog]);
+
+  const openLoad = useCallback(()=>{
+    const index = JSON.parse(localStorage.getItem(SAVE_INDEX_KEY)||"[]");
+    setSavedGames(index);
+    setSettingsView("load");
+  },[]);
+
+  const loadGame = useCallback((key)=>{
+    const raw = localStorage.getItem(key);
+    if(!raw){ addLog("Save not found."); return; }
+    const s = JSON.parse(raw);
+    setTiles(s.tiles);
+    setPlayer(s.player);
+    renderPosRef.current = s.player;
+    setRenderPos(s.player);
+    targetRef.current = null;
+    setTarget(null);
+    setInventory(s.inventory);
+    setTotalGathered(s.totalGathered);
+    setBuildings(s.buildings);
+    setVillagers(s.villagers);
+    setSkillXP(s.skillXP);
+    setSeason(s.season);
+    setDay(s.day);
+    setReputation(s.reputation);
+    setCompletedQuests(s.completedQuests);
+    setLog(s.log);
+    setHappiness(s.happiness);
+    setHunger(s.hunger);
+    addLog(`Loaded: Day ${s.day} · ${SEASONS[s.season]}`);
+    setSettingsOpen(false);
+    setSettingsView(null);
+  },[addLog]);
+
+  const deleteSave = useCallback((key)=>{
+    localStorage.removeItem(key);
+    const index = JSON.parse(localStorage.getItem(SAVE_INDEX_KEY)||"[]");
+    const updated = index.filter(s=>s.key!==key);
+    localStorage.setItem(SAVE_INDEX_KEY, JSON.stringify(updated));
+    setSavedGames(updated);
   },[]);
 
   // ---- MOVEMENT LOOP ----
@@ -222,8 +412,6 @@ export default function TownGame() {
   },[]);
 
   // ---- TOUCH GESTURE HANDLER ----
-  // All tap detection happens here in the imperative handler.
-  // Tiles have pointerEvents:none so they never fire their own touch events.
   useEffect(()=>{
     const el=mapRef.current;
     if(!el) return;
@@ -234,11 +422,6 @@ export default function TownGame() {
     };
     const midpoint=(t1,t2)=>({ x:(t1.clientX+t2.clientX)/2, y:(t1.clientY+t2.clientY)/2 });
 
-    // Convert element-space tap to tile grid coords.
-    // The player's iso position always maps to screen (VIEW_CX + pan.x, VIEW_CY+HEADER_H + pan.y).
-    // So: screenPt - playerScreenPt = (tileLocal - playerLocal) * scale
-    // => tileLocal = playerLocal + (screenPt - playerScreenPt) / scale
-    // Then invert iso from tileLocal.
     const screenToTile=(ex,ey,snapshot)=>{
       const { rsx, rsy, scale, pan, elW, elH } = snapshot;
       const HEADER_H_VAL = 44;
@@ -309,7 +492,6 @@ export default function TownGame() {
       if(e.touches.length===0){
         const wasTap = ts.type==="drag" && !ts.moved && !ts.wasPinch;
         if(wasTap){
-          // Snapshot player iso position and view state at exact tap moment
           const rp = renderPosRef.current;
           const isoP = toIso(rp.x, rp.y);
           const snapshot = {
@@ -325,7 +507,7 @@ export default function TownGame() {
           const { tx:rawTx, ty:rawTy } = screenToTile(ex, ey, snapshot);
           const tx = rawTx - 1;
           const ty = rawTy;
-          if(setTapDebugRef.current) setTapDebugRef.current({
+          if(debugEnabledRef.current && setTapDebugRef.current) setTapDebugRef.current({
             ex, ey, tx, ty,
             ctx: snapshot.rsx, cty: snapshot.rsy,
             scale: snapshot.scale,
@@ -337,10 +519,11 @@ export default function TownGame() {
             const tile = tls[ty*MAP_W+tx];
             if(tile && tile.type!=="water"){
               const capturedHandler = handleTileClickRef.current;
+              const delay = tapDelayRef.current;
               setTimeout(()=>{
                 if(capturedHandler) capturedHandler(tile);
-                if(setTapDebugRef.current) setTapDebugRef.current(null);
-              }, 1000);
+                if(debugEnabledRef.current && setTapDebugRef.current) setTapDebugRef.current(null);
+              }, delay);
             }
           }
         }
@@ -515,7 +698,6 @@ export default function TownGame() {
   const PANEL_H     = 320;
   const panelOpen   = tab!==null;
 
-  // Camera center — dynamic based on actual element size
   const [mapSize, setMapSize] = useState({w:390, h:700});
   useEffect(()=>{
     if(!mapRef.current) return;
@@ -531,20 +713,12 @@ export default function TownGame() {
   const VIEW_CY = (mapSize.h - HEADER_H) / 2;
   const { sx:rsx, sy:rsy } = toIso(renderPos.x, renderPos.y);
 
-  // We want tile at player's iso position to appear at (VIEW_CX, VIEW_CY+HEADER_H).
-  // With scale s and transform-origin 0,0:
-  //   screen = containerLocal * s + [tx, ty]
-  // So the tile container's local origin (0,0) maps to screen (tx, ty).
-  // Player tile is at local (rsx + TW/2, rsy + TH/2), we want that at screen (VIEW_CX, VIEW_CY+HEADER_H).
-  // => tx = VIEW_CX - (rsx + TW/2)*s + px
-  //    ty = VIEW_CY+HEADER_H - (rsy + TH/2)*s + py
   const { px, py, scale } = viewTransform;
   const tx = VIEW_CX - (rsx + TILE_W/2)*scale + px;
   const ty = VIEW_CY + HEADER_H - (rsy + TILE_H/2)*scale + py;
   const tileTransform       = `translate(${tx}px,${ty}px) scale(${scale})`;
   const tileTransformOrigin = `0 0`;
 
-  // Keep refs current every render
   handleTileClickRef.current = handleTileClick;
   setTapDebugRef.current     = setTapDebug;
   baseOffRef.current = { tx, ty, scale };
@@ -572,7 +746,6 @@ export default function TownGame() {
           overflow:"hidden", touchAction:"none",
         }}
       >
-        {/* Tile container + avatar: single transform(translate+scale) with origin 0,0 */}
         <div style={{
           position:"absolute",
           left:0, top:0,
@@ -582,13 +755,11 @@ export default function TownGame() {
         }}>
           {visibleTiles.sort((a,b)=>(a.x+a.y)-(b.x+b.y)).map(tile=>{
             const bld=buildings.find(b=>b.x===tile.x&&b.y===tile.y)||null;
-            // Highlight the tile the avatar is currently standing on (snapped)
             const isStanding =
               Math.round(renderPos.x)===tile.x && Math.round(renderPos.y)===tile.y;
             return <IsoTile key={`${tile.x}-${tile.y}`} tile={tile} season={SEASONS[season]} building={bld} isTarget={isStanding}/>;
           })}
 
-          {/* Avatar inside same container — inherits zoom+pan automatically */}
           <div style={{
             position:"absolute",
             left: avatarIsoX,
@@ -600,8 +771,8 @@ export default function TownGame() {
           }}>🧑‍🌾</div>
         </div>
 
-        {/* DEBUG: red dot — raw tap position in screen space */}
-        {tapDebug && (
+        {/* Debug overlays — only when debugEnabled */}
+        {debugEnabled && tapDebug && (
           <div style={{
             position:"absolute", left:tapDebug.ex, top:tapDebug.ey,
             transform:"translate(-50%,-50%)",
@@ -611,8 +782,7 @@ export default function TownGame() {
           }}/>
         )}
 
-        {/* DEBUG: yellow dot — resolved tile back to screen space via player-relative transform */}
-        {tapDebug && tapDebug.tx>=0 && tapDebug.tx<MAP_W && tapDebug.ty>=0 && tapDebug.ty<MAP_H && (()=>{
+        {debugEnabled && tapDebug && tapDebug.tx>=0 && tapDebug.tx<MAP_W && tapDebug.ty>=0 && tapDebug.ty<MAP_H && (()=>{
           const {sx: tsx, sy: tsy} = toIso(tapDebug.tx, tapDebug.ty);
           const tileCX = tsx + TILE_W/2, tileCY = tsy + TILE_H/2;
           const playerCX = tapDebug.ctx + TILE_W/2, playerCY = tapDebug.cty + TILE_H/2;
@@ -631,8 +801,7 @@ export default function TownGame() {
           }}/>;
         })()}
 
-        {/* DEBUG: label */}
-        {tapDebug && (
+        {debugEnabled && tapDebug && (
           <div style={{
             position:"absolute", top:HEADER_H+8, left:8, zIndex:99999,
             background:"#000000dd", color:"#ffffff",
@@ -660,7 +829,13 @@ export default function TownGame() {
 
       {/* ==== HEADER z=50 ==== */}
       <div style={{ position:"absolute", top:0, left:0, right:0, height:HEADER_H, zIndex:50, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 10px", background:"linear-gradient(90deg,#2a1a08,#3a2510)", borderBottom:"2px solid #6a4a20" }}>
-        <div style={{fontWeight:"bold",fontSize:"13px",color:"#f0c060",letterSpacing:"1px"}}>⚔ TOWN GAME</div>
+        <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+          <button
+            onTouchEnd={(e)=>{e.stopPropagation();setSettingsOpen(true);setSettingsView(null);}}
+            style={{background:"none",border:"1px solid #4a3010",borderRadius:"5px",color:"#c0a060",fontSize:"18px",width:"32px",height:"32px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0}}
+          >⚙</button>
+          <span style={{fontWeight:"bold",fontSize:"13px",color:"#f0c060",letterSpacing:"1px"}}>TOWN GAME</span>
+        </div>
         <div style={{display:"flex",gap:"7px",fontSize:"11px",flexWrap:"nowrap"}}>
           <span>📅{day}</span>
           <span style={{color:{Spring:"#80e080",Summer:"#f0e040",Autumn:"#e08040",Winter:"#80c0e0"}[SEASONS[season]]}}>{SEASONS[season]}</span>
@@ -783,7 +958,7 @@ export default function TownGame() {
         </div>
       </div>
 
-      {/* ==== LOG STRIP z=50 — always visible ==== */}
+      {/* ==== LOG STRIP z=50 ==== */}
       <div
         onTouchEnd={(e)=>{e.stopPropagation();setTab(prev=>prev==="log"?null:"log");}}
         style={{ position:"absolute", left:0, right:0, zIndex:50, bottom:TAB_BAR_H, height:LOG_STRIP_H, background:"#0d0904f8", borderTop:"1px solid #3a2810", display:"flex", alignItems:"center", padding:"0 10px", gap:"8px", cursor:"pointer" }}
@@ -802,6 +977,30 @@ export default function TownGame() {
         ))}
       </div>
 
+      {/* ==== SETTINGS MODAL z=200 ==== */}
+      {settingsOpen && (
+        <SettingsModal
+          onClose={()=>setSettingsOpen(false)}
+          onSave={saveGame}
+          onOpenLoad={openLoad}
+          onOpenOptions={()=>setSettingsView("options")}
+          settingsView={settingsView}
+          setSettingsView={setSettingsView}
+          savedGames={savedGames}
+          onLoad={loadGame}
+          onDelete={deleteSave}
+          debugEnabled={debugEnabled}
+          setDebugEnabled={setDebugEnabled}
+          tapDelay={tapDelay}
+          setTapDelay={setTapDelay}
+        />
+      )}
+
     </div>
   );
 }
+
+ReactDOM.createRoot(document.getElementById('root')).render(<TownGame />);
+    </script>
+</body>
+</html>
