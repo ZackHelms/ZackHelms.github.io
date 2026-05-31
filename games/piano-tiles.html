@@ -384,7 +384,7 @@
       <div class="title-tile"></div>
     </div>
     <h1>PIANO<br>TILES</h1>
-    <p>TAP THE BLACK TILES<br>DON'T MISS</p>
+    <p>TAP THE FALLING TILES<br>BEAT YOUR BEST SCORE</p>
     <div id="song-select">
       <button class="song-btn active" data-song="takedown">"TAKEDOWN" - K-Pop Demon Hunters</button>
       <button class="song-btn" data-song="dance_monkey">"DANCE MONKEY" - Tones and I</button>
@@ -399,11 +399,12 @@
 
   <!-- GAME OVER SCREEN -->
   <div class="screen hidden" id="gameover-screen">
-    <h1 style="color:var(--glow-pink);text-shadow:0 0 30px var(--glow-pink)">MISS!</h1>
+    <h1 id="gameover-title" style="color:var(--glow-cyan);text-shadow:0 0 30px var(--glow-cyan)">COMPLETE</h1>
     <div class="stat">SCORE <span id="final-score">0</span></div>
     <div class="stat">BEST <span id="best-score">0</span></div>
-    <div class="stat">COMBO <span id="final-combo">0</span></div>
-    <button class="btn" id="restart-btn">RETRY</button>
+    <div class="stat">MAX COMBO <span id="final-combo">0</span></div>
+    <div class="stat">MISSES <span id="final-misses">0</span></div>
+    <button class="btn" id="restart-btn">PLAY AGAIN</button>
   </div>
 </div>
 
@@ -623,6 +624,8 @@ let particles = [];
 let score = 0;
 let combo = 0;
 let maxCombo = 0;
+let misses = 0;
+let songEndTime = 0;
 let speed = 0;
 let animId;
 let lastTime = 0;
@@ -634,64 +637,53 @@ const PINK = '#ff006e';
 const GOLD = '#ffd700';
 
 // ---- BEAT MAPS ----
+// Entry format: [step, lane_or_lanes]
+//   lane_or_lanes: number (single tap) or [l1,l2] (simultaneous taps)
+// Steps are 16th notes. 98 BPM → step = 0.153s; 130 BPM → step = 0.115s
+// Easy:   half notes (8 steps) and quarter notes (4 steps), single taps only
+// Medium: quarter (4) and eighth (2) notes, rare 2-lane simultaneous
+// Hard:   16th (1), eighth (2), quarter notes, frequent 2-lane
 const BEAT_MAPS = {
   dance_monkey: {
     easy: [
-      [0,1],[4,2],[8,0],[12,3],
-      [16,2],[20,1],[24,3],[28,0],
-      [32,1],[36,2],[40,0],[44,3],
-      [48,2],[52,1],[56,3],[60,0],
+      [0,1],[8,2],[20,0],[28,3],
+      [36,1],[44,2],[52,0],[60,3],
     ],
     medium: [
-      [0,1],[2,3],[4,2],[6,0],
-      [8,1],[10,2],[12,3],[14,1],
-      [16,2],[18,0],[20,1],[22,3],
-      [24,0],[26,2],[28,3],[30,1],
-      [32,2],[34,0],[36,1],[38,3],
-      [40,2],[42,1],[44,0],[46,2],
-      [48,1],[50,3],[52,2],[54,0],
-      [56,3],[58,1],[60,0],[62,2],
+      [0,1],[4,3],[8,2],[12,0],
+      [16,1],[20,3],[24,2],[28,0],
+      [32,3],[36,1],[40,2],[44,0],
+      [48,[1,3]],[52,2],[56,0],[60,3],
     ],
     hard: [
-      [0,1],[1,2],[2,3],[4,2],[5,1],[6,0],
-      [8,1],[9,3],[10,2],[11,0],[12,3],[14,1],
-      [16,2],[17,1],[18,0],[20,1],[21,2],[22,3],
-      [24,0],[25,2],[26,1],[28,3],[30,2],
-      [32,1],[33,0],[34,2],[36,3],[37,1],[38,0],
-      [40,2],[41,3],[42,1],[44,0],[45,2],[46,3],
-      [48,1],[49,0],[50,2],[52,3],[53,1],[54,2],
-      [56,0],[57,3],[58,1],[60,2],[61,0],[62,3],
+      [0,1],[2,3],[4,2],[6,0],[8,1],[10,2],
+      [12,3],[14,1],[16,2],[17,0],[18,3],
+      [20,1],[22,2],[24,[0,3]],[26,1],[28,2],
+      [30,0],[32,3],[33,1],[34,2],[36,0],
+      [38,3],[40,1],[42,2],[44,[1,3]],
+      [46,0],[48,2],[50,3],[52,1],[54,0],
+      [56,[2,3]],[58,1],[60,2],[62,0],
     ],
   },
   takedown: {
     easy: [
-      [0,0],[4,2],[8,1],[12,3],
-      [16,2],[20,0],[24,3],[28,1],
-      [32,0],[36,3],[40,2],[44,1],
-      [48,3],[52,0],[56,1],[60,2],
+      [0,0],[8,1],[20,3],[28,2],
+      [36,0],[44,3],[52,1],[60,2],
     ],
     medium: [
-      [0,0],[2,2],[4,1],[6,3],
-      [8,2],[10,0],[12,3],[14,1],
-      [16,0],[18,3],[20,2],[22,0],
-      [24,1],[26,3],[28,0],[30,2],
-      [32,1],[34,0],[36,3],[38,1],
-      [40,2],[42,1],[44,0],[46,3],
-      [48,2],[50,0],[52,1],[54,3],
-      [56,0],[58,2],[60,3],[62,1],
+      [0,0],[4,2],[8,1],[12,3],
+      [16,2],[20,0],[24,1],[28,3],
+      [32,2],[36,0],[40,3],[44,1],
+      [48,[0,2]],[52,3],[56,1],[60,2],
     ],
     hard: [
-      [0,0],[1,1],[2,2],[3,3],[4,2],[5,1],
-      [6,3],[7,0],[8,1],[9,2],[10,0],[11,3],
-      [12,2],[13,1],[14,0],[16,3],[17,2],[18,1],
-      [19,0],[20,3],[21,1],[22,2],[23,0],
-      [24,1],[25,3],[26,0],[27,2],[28,1],[29,3],
-      [30,0],[32,2],[33,0],[34,3],[35,1],
-      [36,2],[37,0],[38,3],[39,1],[40,0],[41,2],
-      [42,3],[43,1],[44,2],[45,0],[46,1],[47,3],
-      [48,0],[49,2],[50,1],[51,3],[52,0],[53,2],
-      [54,1],[55,3],[56,2],[57,0],[58,3],[59,1],
-      [60,0],[61,2],[62,3],[63,1],
+      [0,0],[2,2],[4,1],[6,3],[8,0],[10,1],
+      [12,2],[14,3],[16,0],[17,2],[18,1],
+      [20,3],[22,0],[24,[1,3]],[26,2],[28,0],
+      [30,3],[32,1],[33,0],[34,3],[36,2],
+      [38,1],[40,3],[42,0],[44,[0,2]],
+      [46,3],[48,1],[50,2],[52,0],[54,3],
+      [56,[1,3]],[58,0],[60,2],[62,1],
     ],
   },
 };
@@ -711,8 +703,12 @@ function buildTileQueue(song, difficulty) {
   const loopDur = song.melody.length * stepDur;
   const queue = [];
   for (let loop = 0; loop < 8; loop++) {
-    for (const [step, lane] of map) {
-      queue.push({ lane, audioTime: loop * loopDur + step * stepDur, spawned: false, hit: false, missed: false, alpha: 1, glow: 0 });
+    for (const [step, laneOrLanes] of map) {
+      const lanes = Array.isArray(laneOrLanes) ? laneOrLanes : [laneOrLanes];
+      const audioTime = loop * loopDur + step * stepDur;
+      for (const lane of lanes) {
+        queue.push({ lane, audioTime, spawned: false, hit: false, missed: false, alpha: 1, glow: 0 });
+      }
     }
   }
   return queue;
@@ -723,11 +719,13 @@ let tileQueueBase = 0;
 
 function initGame() {
   tiles = []; particles = []; hitTexts = [];
-  score = 0; combo = 0; maxCombo = 0;
+  score = 0; combo = 0; maxCombo = 0; misses = 0; songEndTime = 0;
   const LOOKAHEAD = 1.8;
   speed = (H - HIT_ZONE_H) / LOOKAHEAD;
   tileQueue = buildTileQueue(SONGS[selectedSong], selectedDifficulty);
   tileQueueBase = audioCtx ? audioCtx.currentTime : 0;
+  const lastTile = tileQueue[tileQueue.length - 1];
+  songEndTime = lastTile ? lastTile.audioTime + 2.5 : 0;
   document.getElementById('score-display').textContent = '0';
   document.getElementById('combo-display').textContent = '';
   document.getElementById('speed-bar').style.width = '0%';
@@ -796,10 +794,22 @@ function gameOver() {
   state = 'over';
   cancelAnimationFrame(animId);
   stopMusic();
-  if (score > bestScore) bestScore = score;
+  const isNewBest = score > bestScore;
+  if (isNewBest) bestScore = score;
+  const title = document.getElementById('gameover-title');
+  if (isNewBest && score > 0) {
+    title.textContent = 'NEW BEST!';
+    title.style.color = 'var(--glow-gold)';
+    title.style.textShadow = '0 0 30px var(--glow-gold)';
+  } else {
+    title.textContent = 'COMPLETE';
+    title.style.color = 'var(--glow-cyan)';
+    title.style.textShadow = '0 0 30px var(--glow-cyan)';
+  }
   document.getElementById('final-score').textContent = score;
   document.getElementById('best-score').textContent = bestScore;
   document.getElementById('final-combo').textContent = maxCombo;
+  document.getElementById('final-misses').textContent = misses;
   document.getElementById('gameover-screen').classList.remove('hidden');
   document.getElementById('ui').classList.add('hidden');
   document.getElementById('hit-zone').classList.add('hidden');
@@ -873,11 +883,26 @@ function loop(ts) {
 
   const LOOKAHEAD = 1.8;
   const nowAudio = audioCtx ? (audioCtx.currentTime - tileQueueBase) : 0;
+
+  // End game when all tiles have had time to be played
+  if (songEndTime > 0 && nowAudio > songEndTime) {
+    gameOver();
+    return;
+  }
+
   for (const qt of tileQueue) {
     if (!qt.spawned && qt.audioTime <= nowAudio + LOOKAHEAD) {
       qt.spawned = true;
-      tiles.push({ lane: qt.lane, x: qt.lane*LANE_W+4, y: -TILE_H, w: LANE_W-8, h: TILE_H, hit: false, missed: false, alpha: 1, glow: 0, beatTime: qt.audioTime });
+      // Place tile at correct y based on how far ahead its beat time is
+      const timeAhead = qt.audioTime - nowAudio;
+      const yInit = -TILE_H + Math.max(0, LOOKAHEAD - timeAhead) * speed;
+      tiles.push({ lane: qt.lane, x: qt.lane*LANE_W+4, y: yInit, w: LANE_W-8, h: TILE_H, hit: false, missed: false, alpha: 1, glow: 0, beatTime: qt.audioTime });
     }
+  }
+
+  // Progress bar shows song completion
+  if (songEndTime > 0) {
+    document.getElementById('speed-bar').style.width = Math.min(nowAudio / songEndTime * 100, 100) + '%';
   }
 
   const pxPerFrame = speed * (16.67/1000) * dt;
@@ -887,12 +912,11 @@ function loop(ts) {
       t.y += pxPerFrame;
       if (t.y > H - HIT_ZONE_H + 60 && !t.missed && !t.hit) {
         t.missed = true;
+        misses++;
         combo = 0;
         document.getElementById('combo-display').textContent = '';
         hitFlash();
         playMissSound();
-        gameOver();
-        return;
       }
     } else {
       t.glow  -= 0.08 * dt;
@@ -900,7 +924,7 @@ function loop(ts) {
     }
     drawTile(t);
   }
-  tiles = tiles.filter(t => !t.hit || t.alpha > 0);
+  tiles = tiles.filter(t => (!t.hit || t.alpha > 0) && (!t.missed || t.y < H + 20));
 
   for (let i = particles.length-1; i >= 0; i--) {
     const p = particles[i];
