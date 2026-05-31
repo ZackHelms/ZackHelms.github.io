@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STICK COMMANDER 3D</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+:root {
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --red:#ff2244; --white:#dde3ff;
+  --dim:#353555; --blue:#4499ff; --purple:#b44fff; --orange:#ff8800;
+  --crystal:#44ddff; --teal:#00ffcc;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:var(--bg); font-family:'Share Tech Mono',monospace; color:var(--white);
+  min-height:100vh; display:flex; flex-direction:column; align-items:center;
+  user-select:none; touch-action:manipulation;
+}
+header{
+  width:100%; max-width:960px; padding:8px 16px 4px;
+  display:flex; justify-content:space-between; align-items:center;
+  border-bottom:1px solid var(--border);
+}
+.back-link{font-size:0.58rem; color:var(--dim); text-decoration:none; letter-spacing:2px;}
+.back-link:hover{color:var(--white);}
+h1{font-family:'Black Ops One',sans-serif; font-size:clamp(1rem,3.5vw,1.7rem); color:var(--crystal); text-shadow:0 0 20px #44ddff66; letter-spacing:4px;}
+.tagline{font-size:0.52rem; color:var(--dim); letter-spacing:3px;}
+
+/* RESOURCE HUD */
+.res-bar{
+  display:flex; gap:6px; width:min(960px,98vw); padding:5px 10px;
+  flex-wrap:wrap; border-bottom:1px solid var(--border); background:var(--panel); align-items:center;
+}
+.res-chip{display:flex; align-items:center; gap:3px; font-size:0.6rem; background:var(--bg); border:1px solid var(--border); border-radius:3px; padding:2px 7px;}
+.res-chip .ri{font-size:0.85rem;}
+.res-chip .rl{color:var(--dim);}
+.res-chip .rv{color:var(--white); min-width:22px;}
+.wave-label{margin-left:auto; font-family:'Black Ops One',sans-serif; font-size:0.68rem; color:var(--gold);}
+.crystal-wrap{display:flex; align-items:center; gap:5px; flex:1; min-width:100px; max-width:200px;}
+.crystal-label{font-size:0.55rem; color:var(--crystal); white-space:nowrap;}
+.crystal-bar-outer{flex:1; height:7px; background:#111120; border:1px solid var(--crystal); border-radius:1px; overflow:hidden;}
+.crystal-bar-inner{height:100%; background:linear-gradient(90deg,#226699,var(--crystal)); transition:width 0.2s;}
+.cmd-wrap{display:flex; align-items:center; gap:5px; flex:1; min-width:100px; max-width:200px;}
+.cmd-label{font-size:0.55rem; color:var(--green); white-space:nowrap;}
+.cmd-bar-outer{flex:1; height:7px; background:#111120; border:1px solid var(--green); border-radius:1px; overflow:hidden;}
+.cmd-bar-inner{height:100%; background:linear-gradient(90deg,#1a5500,var(--green)); transition:width 0.2s;}
+
+/* CANVAS */
+.canvas-wrap{width:min(960px,98vw); position:relative; border:1px solid var(--border); overflow:hidden;}
+canvas{width:100%; height:auto; display:block;}
+
+/* WAVE ANNOUNCE */
+.wave-announce{
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(0,0,0,0.82); z-index:10; gap:8px; pointer-events:none;
+}
+.wave-announce.hidden{display:none;}
+.wa-title{font-family:'Black Ops One',sans-serif; font-size:clamp(1.5rem,5vw,2.8rem); letter-spacing:6px;}
+.wa-sub{font-size:0.64rem; color:var(--dim); letter-spacing:4px;}
+.wa-info{display:flex; gap:6px; margin-top:4px; flex-wrap:wrap; justify-content:center; max-width:90%;}
+.wa-card{background:#0c0c18; border:1px solid #222; border-radius:3px; padding:5px 8px; font-size:0.54rem; text-align:center; min-width:56px;}
+.wc-icon{font-size:0.9rem;}
+.wc-name{color:var(--white); margin-top:1px;}
+.wc-count{color:var(--gold);}
+.wa-countdown{font-family:'Black Ops One',sans-serif; font-size:clamp(2.5rem,8vw,4.5rem); color:var(--gold); text-shadow:0 0 30px #ffc30099; animation:cntPop 0.5s ease-out;}
+@keyframes cntPop{from{transform:scale(1.8);opacity:0;}to{transform:scale(1);opacity:1;}}
+
+/* BOSS ANNOUNCE */
+.boss-announce{
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(20,0,0,0.88); z-index:11; gap:8px; pointer-events:none;
+}
+.boss-announce.hidden{display:none;}
+.ba-warning{font-family:'Black Ops One',sans-serif; font-size:0.72rem; color:#aa2222; letter-spacing:6px; animation:bFlash 0.6s infinite alternate;}
+@keyframes bFlash{from{opacity:0.5;}to{opacity:1;}}
+.ba-title{font-family:'Black Ops One',sans-serif; font-size:clamp(1.8rem,5.5vw,3.2rem); color:var(--red); letter-spacing:5px; text-shadow:0 0 30px #ff224466;}
+.ba-name{font-family:'Black Ops One',sans-serif; font-size:clamp(0.9rem,2.5vw,1.5rem); color:var(--orange); letter-spacing:3px;}
+.ba-desc{font-size:0.6rem; color:#aa6666; letter-spacing:2px; text-align:center; max-width:360px;}
+.ba-reward{font-size:0.62rem; color:var(--gold);}
+.ba-countdown{font-family:'Black Ops One',sans-serif; font-size:clamp(2rem,6vw,3.5rem); color:var(--red); text-shadow:0 0 20px #ff224499; animation:cntPop 0.5s ease-out;}
+
+/* BOSS HP */
+.boss-hpbar-wrap{
+  width:min(960px,98vw); background:var(--panel); border:1px solid #440000;
+  padding:5px 10px; display:none; align-items:center; gap:8px;
+}
+.boss-hpbar-wrap.visible{display:flex;}
+.boss-hpbar-label{font-family:'Black Ops One',sans-serif; font-size:0.62rem; color:var(--red); letter-spacing:2px; min-width:140px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.boss-hpbar-outer{flex:1; height:12px; background:#110000; border:1px solid var(--red); border-radius:2px; overflow:hidden;}
+.boss-hpbar-inner{height:100%; background:linear-gradient(90deg,#660000,var(--red)); transition:width 0.2s;}
+.boss-hp-text{font-size:0.56rem; color:var(--red); min-width:55px; text-align:right;}
+.boss-phase{font-size:0.54rem; color:var(--orange); padding:1px 5px; border:1px solid var(--orange); border-radius:2px; white-space:nowrap;}
+
+/* ABILITIES */
+.ability-row{
+  display:flex; gap:5px; width:min(960px,98vw); padding:7px 10px;
+  background:var(--panel); border-bottom:1px solid var(--border); flex-wrap:wrap; align-items:center;
+}
+.ab-section-label{font-size:0.52rem; color:var(--dim); letter-spacing:2px; margin-right:4px; white-space:nowrap;}
+.ab-btn{
+  background:var(--bg); border:1px solid var(--border); color:var(--white);
+  font-family:'Share Tech Mono',monospace; font-size:0.58rem;
+  padding:7px 8px; border-radius:4px; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:2px; min-width:68px;
+  position:relative; overflow:hidden; transition:all 0.15s;
+}
+.ab-btn:hover:not(:disabled){border-color:var(--crystal); box-shadow:0 0 8px #44ddff33;}
+.ab-btn:disabled{opacity:0.3; cursor:not-allowed;}
+.ab-btn .ab-icon{font-size:1.2rem;}
+.ab-btn .ab-key{color:var(--gold); font-size:0.65rem;}
+.ab-btn .ab-name{font-size:0.5rem; color:var(--dim); text-align:center; line-height:1.2;}
+.ab-btn .ab-cd{font-size:0.48rem; color:var(--orange);}
+.cd-fill{position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.65); pointer-events:none; transition:height 0.08s linear;}
+.ab-btn.ab-locked{display:none;}
+
+/* SHOP */
+.shop-panel{
+  width:min(960px,98vw); background:var(--panel); border-bottom:1px solid var(--border); padding:7px 10px;
+}
+.shop-header{display:flex; align-items:center; gap:10px; margin-bottom:5px;}
+.shop-title{font-family:'Black Ops One',sans-serif; font-size:0.6rem; color:var(--gold); letter-spacing:3px;}
+.shop-units{display:flex; gap:5px; flex-wrap:wrap;}
+.ub-btn{
+  background:var(--bg); border:1px solid var(--border); color:var(--white);
+  font-family:'Share Tech Mono',monospace; font-size:0.52rem;
+  padding:5px 7px; border-radius:3px; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:1px; min-width:60px;
+  transition:all 0.15s;
+}
+.ub-btn:hover:not(:disabled){border-color:var(--green);}
+.ub-btn:disabled{opacity:0.35; cursor:not-allowed;}
+.ub-btn .ub-icon{font-size:1rem;}
+.ub-btn .ub-name{color:var(--green); font-size:0.5rem; letter-spacing:1px;}
+.ub-btn .ub-cost{color:var(--gold);}
+.ub-btn .ub-stat{color:var(--dim); font-size:0.46rem; text-align:center;}
+.ub-btn.ub-locked{display:none;}
+
+/* MAIN OVERLAY */
+#overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,0.93);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  z-index:50; gap:12px;
+}
+#overlay.hidden{display:none;}
+.ov-title{font-family:'Black Ops One',sans-serif; font-size:clamp(1.8rem,5.5vw,3rem); letter-spacing:5px;}
+.ov-sub{font-size:0.63rem; color:var(--dim); letter-spacing:3px; max-width:420px; text-align:center; line-height:1.9;}
+.ov-box{
+  background:var(--panel); border:1px solid var(--border); border-radius:4px;
+  padding:12px 18px; font-size:0.57rem; color:#667; line-height:2.1; text-align:center; max-width:500px;
+}
+.ov-box .hl{color:var(--white);}
+.ov-box .gld{color:var(--gold);}
+.ov-box .cry{color:var(--crystal);}
+.ov-box .grn{color:var(--green);}
+.start-btn{
+  background:var(--panel); border:2px solid var(--crystal); color:var(--crystal);
+  font-family:'Black Ops One',sans-serif; font-size:0.88rem; letter-spacing:4px;
+  padding:11px 28px; border-radius:4px; cursor:pointer;
+  text-shadow:0 0 10px var(--crystal); box-shadow:0 0 20px #44ddff22; transition:all 0.2s;
+}
+.start-btn:hover{background:#071218; box-shadow:0 0 30px #44ddff44;}
+.ov-score-val{font-family:'Black Ops One',sans-serif; font-size:1.1rem; color:var(--gold);}
+.ov-reason{font-size:0.7rem; color:var(--red); letter-spacing:2px;}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back-link" href="index.html">← GAMES</a>
+  <div style="display:flex;flex-direction:column;align-items:center;">
+    <h1>STICK COMMANDER 3D</h1>
+    <div class="tagline">-- COMMAND YOUR ARMY --</div>
+  </div>
+  <div style="width:80px;"></div>
+</header>
+
+<div class="res-bar">
+  <div class="res-chip"><span class="ri">🪙</span><span class="rl">GOLD</span><span class="rv" id="resGold">100</span></div>
+  <div class="res-chip"><span class="ri">💎</span><span class="rl">GEMS</span><span class="rv" id="resGems">0</span></div>
+  <div class="res-chip"><span class="ri">⭐</span><span class="rl">REP</span><span class="rv" id="resRep">0</span></div>
+  <div class="res-chip"><span class="ri">🏆</span><span class="rl">SCORE</span><span class="rv" id="resScore">0</span></div>
+  <div class="crystal-wrap">
+    <span class="crystal-label">💎 CRYSTAL</span>
+    <div class="crystal-bar-outer"><div class="crystal-bar-inner" id="crystalBar" style="width:100%"></div></div>
+  </div>
+  <div class="cmd-wrap">
+    <span class="cmd-label">⚔ CMD</span>
+    <div class="cmd-bar-outer"><div class="cmd-bar-inner" id="cmdBar" style="width:100%"></div></div>
+  </div>
+  <div class="wave-label" id="waveLbl">WAVE 1/50</div>
+</div>
+
+<div class="boss-hpbar-wrap" id="bossHpWrap">
+  <div class="boss-hpbar-label" id="bossHpLabel">BOSS</div>
+  <div class="boss-hpbar-outer"><div class="boss-hpbar-inner" id="bossHpBar" style="width:100%"></div></div>
+  <div class="boss-hp-text" id="bossHpText">0</div>
+  <div class="boss-phase" id="bossPhaseLabel" style="display:none">PHASE 1</div>
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="arena" width="960" height="320"></canvas>
+  <div class="wave-announce hidden" id="waveAnnounce">
+    <div class="wa-title" id="waTitle">WAVE 1</div>
+    <div class="wa-sub" id="waSub">GET READY</div>
+    <div class="wa-info" id="waInfo"></div>
+    <div class="wa-countdown" id="waCountdown"></div>
+  </div>
+  <div class="boss-announce hidden" id="bossAnnounce">
+    <div class="ba-warning">⚠ BOSS APPROACHING ⚠</div>
+    <div class="ba-title" id="baTitleEl">MINI BOSS</div>
+    <div class="ba-name" id="baNameEl">SKULL CAPTAIN</div>
+    <div class="ba-desc" id="baDescEl">A fearsome warrior approaches!</div>
+    <div class="ba-reward" id="baRewardEl">🏆 Defeat to earn reward</div>
+    <div class="ba-countdown" id="baCountdown"></div>
+  </div>
+</div>
+
+<div class="ability-row" id="abilityRow">
+  <span class="ab-section-label">ABILITIES:</span>
+</div>
+
+<div class="shop-panel">
+  <div class="shop-header">
+    <div class="shop-title">RECRUIT TROOPS</div>
+    <span style="font-size:0.54rem; color:var(--dim);">Click to deploy — costs gold</span>
+  </div>
+  <div class="shop-units" id="shopUnits"></div>
+</div>
+
+<div id="overlay">
+  <div class="ov-title" id="ovTitle" style="color:var(--crystal);">STICK COMMANDER 3D</div>
+  <div class="ov-sub" id="ovSub">Lead your army across 50 waves. Defend the base crystal. Defeat the Final Overlord.</div>
+  <div class="ov-box">
+    <span class="cry">💎 Crystal</span> destroyed = <hl>defeat</hl> &nbsp;|&nbsp; <hl>Wave 50</hl> = <span class="gld">victory</span><br>
+    Recruit troops below · Use <span class="hl">Q W E R T Y</span> for abilities<br>
+    Kill enemies to earn <span class="gld">gold</span> · Defeat bosses for <span class="cry">gems</span>
+  </div>
+  <div class="ov-reason hidden" id="ovReason"></div>
+  <div class="ov-score-val hidden" id="ovScore"></div>
+  <button class="start-btn" id="startBtn">▶ BEGIN CAMPAIGN</button>
+</div>
+
+<script>
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const CANVAS_W = 960, CANVAS_H = 320;
+const GROUND_Y = 278;
+const CRYSTAL_X = 48, CRYSTAL_Y = 220;
+const PLAYER_SPAWN_X = 110;
+const ENEMY_SPAWN_X = 910;
+const MAX_FIELD_UNITS = 60; // per side visible limit
+
+// ─── UNIT DEFINITIONS ────────────────────────────────────────────────────────
+const UNIT_DEFS = {
+  swordsman:   { name:'SWORDSMAN',   icon:'⚔',  cost:30,  hp:80,  dmg:12, speed:65, range:28, rate:1.2, color:'#39ff14', desc:'Basic melee',       size:1.0 },
+  shield_guard:{ name:'SHIELD GUARD',icon:'🛡',  cost:55,  hp:220, dmg:8,  speed:40, range:28, rate:0.9, color:'#4499ff', desc:'High HP tank',       size:1.1 },
+  archer:      { name:'ARCHER',      icon:'🏹',  cost:50,  hp:60,  dmg:20, speed:58, range:200,rate:0.8, color:'#ccff44', desc:'Ranged attacker',    size:1.0, ranged:true },
+  spearman:    { name:'SPEARMAN',    icon:'🗡',  cost:45,  hp:100, dmg:16, speed:60, range:50, rate:1.0, color:'#00ffcc', desc:'+dmg vs giants',     size:1.0 },
+  mage:        { name:'MAGE',        icon:'🔮',  cost:80,  hp:65,  dmg:30, speed:50, range:220,rate:0.5, color:'#b44fff', desc:'Area spell damage',  size:1.0, ranged:true, aoe:true },
+  healer:      { name:'HEALER',      icon:'💚',  cost:70,  hp:70,  dmg:5,  speed:52, range:130,rate:0.5, color:'#ff99cc', desc:'Heals nearby allies', size:1.0, ranged:true, healer:true },
+  elite_knight:{ name:'ELITE KNIGHT',icon:'🏇',  cost:160, hp:320, dmg:38, speed:68, range:38, rate:1.5, color:'#ffc300', desc:'Powerful melee',     size:1.15 },
+  dragon_rider:{ name:'DRAGON RIDER',icon:'🐉',  cost:320, hp:260, dmg:65, speed:105,range:260,rate:0.6, color:'#ff6600', desc:'Flying, massive dmg', size:1.2, ranged:true, flying:true },
+};
+
+// ─── ENEMY DEFINITIONS ───────────────────────────────────────────────────────
+const ENEMY_DEFS = {
+  raider:      { name:'RAIDER',     icon:'💀',  hp:55,   dmg:10, speed:68, range:28, rate:1.0, color:'#ff5555', reward:8  },
+  e_archer:    { name:'ARCHER',     icon:'🏹',  hp:45,   dmg:15, speed:55, range:180,rate:0.7, color:'#ff8844', reward:10, ranged:true },
+  berserker:   { name:'BERSERKER',  icon:'😡',  hp:90,   dmg:20, speed:105,range:28, rate:1.8, color:'#ff2222', reward:14 },
+  assassin:    { name:'ASSASSIN',   icon:'🗡',  hp:65,   dmg:28, speed:125,range:28, rate:1.5, color:'#aa44ff', reward:18 },
+  shaman:      { name:'SHAMAN',     icon:'🔱',  hp:75,   dmg:9,  speed:48, range:110,rate:0.5, color:'#44ffcc', reward:20, ranged:true },
+  warlock:     { name:'WARLOCK',    icon:'☠',  hp:85,   dmg:22, speed:44, range:190,rate:0.4, color:'#8844ff', reward:22, ranged:true, summons:'skeleton' },
+  giant:       { name:'GIANT',      icon:'🗿',  hp:700,  dmg:45, speed:30, range:55, rate:0.5, color:'#aa5533', reward:50, size:1.8 },
+  fire_mage:   { name:'FIRE MAGE',  icon:'🔥',  hp:95,   dmg:32, speed:44, range:185,rate:0.4, color:'#ff6600', reward:28, ranged:true, aoe:true },
+  flying_beast:{ name:'FLYING',     icon:'🦅',  hp:130,  dmg:24, speed:95, range:55, rate:1.0, color:'#cc8833', reward:25, flying:true },
+  necromancer: { name:'NECROMANCER',icon:'💀',  hp:110,  dmg:16, speed:40, range:200,rate:0.3, color:'#55aa55', reward:35, ranged:true, summons:'skeleton_e' },
+  skeleton:    { name:'SKELETON',   icon:'💀',  hp:30,   dmg:8,  speed:72, range:28, rate:1.1, color:'#aaaaaa', reward:3  },
+};
+
+// ─── ABILITY DEFINITIONS ─────────────────────────────────────────────────────
+const ABILITY_DEFS = [
+  { id:'rally',      name:'RALLY',        icon:'⚡', key:'Q', cd:25, desc:'+30% dmg 10s',     color:'#ffc300' },
+  { id:'defense',    name:'DEFENSE',      icon:'🛡', key:'W', cd:30, desc:'+50% armor 10s',   color:'#4499ff' },
+  { id:'meteor',     name:'METEOR',       icon:'☄', key:'E', cd:45, desc:'Area damage',       color:'#ff6600' },
+  { id:'banner',     name:'HEAL BANNER',  icon:'💚', key:'R', cd:35, desc:'Heal all troops',  color:'#ff99cc' },
+  { id:'freeze',     name:'FREEZE',       icon:'❄', key:'T', cd:40, desc:'Slow enemies 75%',  color:'#44ddff' },
+  { id:'resurrect',  name:'RESURRECT',    icon:'✨', key:'Y', cd:60, desc:'Revive fallen',    color:'#ffff55' },
+];
+
+// ─── WAVE DATA ────────────────────────────────────────────────────────────────
+function makeWave(n) {
+  // Returns {enemies:[{type,count}], isBoss:bool, bossData?, reward?}
+  const bossWaves = {
+    5:  { type:'mini', bossType:'skull_captain',  name:'SKULL CAPTAIN',    desc:'Huge sword · Summons Raiders',           reward:{ability:'rally',   units:[], gems:5,  gold:150} },
+    10: { type:'mini', bossType:'iron_crusher',   name:'IRON CRUSHER',     desc:'Heavy armor · Ground slam attack',       reward:{unit:'shield_guard',         gems:8,  gold:200} },
+    15: { type:'mini', bossType:'shadow_assassin',name:'SHADOW ASSASSIN',  desc:'Teleports · High critical damage',       reward:{ability:'defense',  gems:10, gold:250} },
+    20: { type:'mini', bossType:'bone_giant',     name:'BONE GIANT',       desc:'Giant enemy · Summons skeletons',        reward:{unit:'spearman',             gems:12, gold:300} },
+    25: { type:'major',bossType:'warlord_king',   name:'THE WARLORD KING', desc:'Earthquake · Battle Cry · Reinforcements',reward:{unit:'mage', ability:'meteor', gems:20, gold:500} },
+    30: { type:'mini', bossType:'inferno_mage',   name:'INFERNO MAGE',     desc:'Firestorm · Lava Pools',                 reward:{unit:'healer',               gems:15, gold:350} },
+    35: { type:'mini', bossType:'necrolord',      name:'NECROLORD',        desc:'Raise Dead · Dark Explosion',            reward:{ability:'banner',   gems:18, gold:400} },
+    40: { type:'mini', bossType:'sky_terror',     name:'SKY TERROR',       desc:'Flying dragon beast · Dive attacks',     reward:{unit:'dragon_rider',          gems:25, gold:500} },
+    45: { type:'mini', bossType:'titan_destroyer',name:'TITAN DESTROYER',  desc:'Massive giant · Shockwave attacks',      reward:{ability:'resurrect',gems:30, gold:600} },
+    50: { type:'final',bossType:'overlord',       name:'THE OVERLORD',     desc:'4-phase boss · Constant reinforcements', reward:{gold:9999, gems:100, title:'CROWN OF THE COMMANDER'} },
+  };
+  if (bossWaves[n]) return { ...buildBossWave(n, bossWaves[n]), ...bossWaves[n], isBoss:true };
+
+  // Regular wave: scale enemies by wave number
+  const pool = [];
+  const wn = n;
+  if (wn >= 1)  pool.push('raider');
+  if (wn >= 3)  pool.push('e_archer');
+  if (wn >= 4)  pool.push('berserker');
+  if (wn >= 13) pool.push('assassin');
+  if (wn >= 17) pool.push('warlock');
+  if (wn >= 21) pool.push('shaman');
+  if (wn >= 26) pool.push('fire_mage');
+  if (wn >= 28) pool.push('flying_beast');
+  if (wn >= 31) pool.push('giant');
+  if (wn >= 37) pool.push('necromancer');
+
+  const base = 8 + wn * 2.2;
+  const total = Math.floor(base * (1 + (wn - 1) * 0.06));
+  const enemies = [];
+  const perType = Math.ceil(total / pool.length);
+  pool.forEach(t => enemies.push({ type:t, count:Math.min(perType, Math.ceil(total * 0.4 + Math.random()*total*0.3)) }));
+  return { enemies, isBoss:false };
+}
+
+const BOSS_STATS = {
+  skull_captain:   { hp:600,  dmg:30, speed:55, range:50, color:'#cc2222', size:1.6, reward_gold:150, phases:1 },
+  iron_crusher:    { hp:1200, dmg:40, speed:35, range:60, color:'#886644', size:1.7, reward_gold:200, phases:1 },
+  shadow_assassin: { hp:800,  dmg:45, speed:110,range:40, color:'#882299', size:1.4, reward_gold:250, phases:1 },
+  bone_giant:      { hp:1800, dmg:50, speed:28, range:65, color:'#ddddaa', size:2.0, reward_gold:300, phases:1 },
+  warlord_king:    { hp:3500, dmg:55, speed:50, range:55, color:'#cc6600', size:1.8, reward_gold:500, phases:2 },
+  inferno_mage:    { hp:1400, dmg:48, speed:42, range:200,color:'#ff4400', size:1.5, reward_gold:350, phases:1, ranged:true, aoe:true },
+  necrolord:       { hp:1600, dmg:40, speed:38, range:200,color:'#44aa44', size:1.5, reward_gold:400, phases:1, ranged:true },
+  sky_terror:      { hp:2000, dmg:52, speed:90, range:80, color:'#886600', size:1.8, reward_gold:500, phases:2, flying:true },
+  titan_destroyer: { hp:4000, dmg:65, speed:25, range:70, color:'#664422', size:2.2, reward_gold:600, phases:2 },
+  overlord:        { hp:8000, dmg:70, speed:45, range:60, color:'#aa0000', size:2.0, reward_gold:1000, phases:4, ranged:true, aoe:true },
+};
+
+function buildBossWave(n, bossInfo) {
+  const escorts = [];
+  if (n === 5)  escorts.push({type:'raider',count:8});
+  if (n === 10) escorts.push({type:'raider',count:10},{type:'berserker',count:5});
+  if (n === 15) escorts.push({type:'assassin',count:6},{type:'raider',count:8});
+  if (n === 20) escorts.push({type:'skeleton',count:15},{type:'raider',count:10});
+  if (n === 25) escorts.push({type:'raider',count:15},{type:'e_archer',count:10},{type:'berserker',count:8});
+  if (n === 30) escorts.push({type:'fire_mage',count:5},{type:'raider',count:12});
+  if (n === 35) escorts.push({type:'necromancer',count:4},{type:'warlock',count:6});
+  if (n === 40) escorts.push({type:'flying_beast',count:8},{type:'raider',count:10});
+  if (n === 45) escorts.push({type:'giant',count:3},{type:'berserker',count:12});
+  if (n === 50) escorts.push({type:'raider',count:20},{type:'e_archer',count:15},{type:'berserker',count:12},{type:'assassin',count:8},{type:'warlock',count:6},{type:'fire_mage',count:6},{type:'giant',count:4},{type:'necromancer',count:4},{type:'flying_beast',count:4});
+  return { enemies: escorts };
+}
+
+// ─── GAME STATE ───────────────────────────────────────────────────────────────
+let GS = {};
+function resetGS() {
+  GS = {
+    state: 'title',
+    wave: 0,
+    gold: 100, gems: 0, rep: 0, score: 0,
+    crystalHp: 1000, crystalMaxHp: 1000,
+    commanderHp: 200, commanderMaxHp: 200,
+    troops: [], enemies: [], projectiles: [], particles: [], floatTexts: [],
+    abilityCds: { rally:0, defense:0, meteor:0, banner:0, freeze:0, resurrect:0 },
+    activeBuffs: [],
+    unlockedUnits: new Set(['swordsman', 'archer']),
+    unlockedAbilities: new Set(['rally']),
+    waveQueue: [],
+    spawnTimer: 0, spawnInterval: 0.6,
+    bossUnit: null,
+    announceTimer: 0, countdownVal: 3,
+    waveWon: false, gameOver: false,
+    defenseActive: false, defenseTimer: 0,
+    rallyActive: false, rallyTimer: 0,
+    freezeActive: false, freezeTimer: 0,
+    bannerActive: false, bannerTimer: 0,
+    infiniteMode: false,
+    repTimer: 0,
+    damageFlash: 0,
+    uid: 1,
+    lastBossPhase: 0,
+  };
+}
+
+// ─── UID ───────────────────────────────────────────────────────────────────────
+function nextId() { return GS.uid++; }
+
+// ─── SPAWN UNIT ───────────────────────────────────────────────────────────────
+function spawnUnit(type, team, x, y) {
+  const def = team === 'player' ? UNIT_DEFS[type] : ENEMY_DEFS[type];
+  if (!def) return null;
+  const sz = def.size || 1.0;
+  let dmg = def.dmg;
+  if (team === 'player' && GS.rallyActive) dmg = Math.floor(dmg * 1.3);
+  const u = {
+    id: nextId(), type, team, x, y,
+    hp: def.hp, maxHp: def.hp, dmg, defDmg: def.dmg,
+    speed: def.speed, range: def.range, rate: def.rate, atkTimer: Math.random() * (1/def.rate),
+    color: def.color, size: sz,
+    ranged: !!def.ranged, flying: !!def.flying, aoe: !!def.aoe,
+    healer: !!def.healer, summons: def.summons || null,
+    state: 'march', target: null,
+    isBoss: false, phase: 0,
+    anim: Math.random() * Math.PI * 2,
+    hitFlash: 0,
+    slowTimer: 0,
+    spearBonus: type === 'spearman',
+  };
+  return u;
+}
+
+function spawnBoss(bossType, wave) {
+  const bs = BOSS_STATS[bossType];
+  if (!bs) return null;
+  const u = {
+    id: nextId(), type: bossType, team: 'enemy',
+    x: ENEMY_SPAWN_X, y: GROUND_Y,
+    hp: bs.hp, maxHp: bs.hp, dmg: bs.dmg, defDmg: bs.dmg,
+    speed: bs.speed, range: bs.range, rate: 0.6, atkTimer: 0,
+    color: bs.color, size: bs.size || 1.5,
+    ranged: !!bs.ranged, flying: !!bs.flying, aoe: !!bs.aoe,
+    state: 'march', target: null, isBoss: true,
+    phase: 1, maxPhases: bs.phases || 1,
+    anim: 0, hitFlash: 0, slowTimer: 0,
+    summons: bossType === 'skull_captain' ? 'raider' : (bossType === 'bone_giant' || bossType === 'necrolord' ? 'skeleton' : null),
+    summonTimer: 0, summonInterval: 8,
+    spearBonus: false,
+  };
+  return u;
+}
+
+// ─── RENDERING ────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('arena');
+const ctx = canvas.getContext('2d');
+
+function drawBackground() {
+  // Sky gradient
+  const grad = ctx.createLinearGradient(0,0,0,GROUND_Y);
+  grad.addColorStop(0,'#060610');
+  grad.addColorStop(1,'#0a0a1e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,CANVAS_W,GROUND_Y);
+
+  // Stars
+  ctx.fillStyle = '#ffffff22';
+  for (let i=0; i<40; i++) {
+    const sx = (i*137.5)%CANVAS_W;
+    const sy = (i*53.1)%(GROUND_Y-20);
+    ctx.fillRect(sx,sy,1,1);
+  }
+
+  // Ground
+  const ggrad = ctx.createLinearGradient(0,GROUND_Y,0,CANVAS_H);
+  ggrad.addColorStop(0,'#0d1a0d');
+  ggrad.addColorStop(1,'#050d05');
+  ctx.fillStyle = ggrad;
+  ctx.fillRect(0,GROUND_Y,CANVAS_W,CANVAS_H-GROUND_Y);
+  ctx.strokeStyle = '#1a3a1a';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0,GROUND_Y); ctx.lineTo(CANVAS_W,GROUND_Y); ctx.stroke();
+
+  // Crystal base
+  drawCrystal(CRYSTAL_X, CRYSTAL_Y);
+
+  // Enemy side darkness
+  const eGrad = ctx.createLinearGradient(CANVAS_W-80,0,CANVAS_W,0);
+  eGrad.addColorStop(0,'transparent');
+  eGrad.addColorStop(1,'#1a000088');
+  ctx.fillStyle = eGrad;
+  ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+
+  // Damage flash
+  if (GS.damageFlash > 0) {
+    ctx.fillStyle = `rgba(255,0,0,${GS.damageFlash * 0.3})`;
+    ctx.fillRect(0,0,CANVAS_W,CANVAS_H);
+  }
+}
+
+function drawCrystal(x, y) {
+  const t = Date.now()/1000;
+  const pulse = 0.5 + 0.5 * Math.sin(t*2);
+  // Glow
+  ctx.save();
+  ctx.shadowColor = '#44ddff';
+  ctx.shadowBlur = 20 + pulse*10;
+  // Crystal shape
+  ctx.beginPath();
+  ctx.moveTo(x, y-22);
+  ctx.lineTo(x+12, y-8);
+  ctx.lineTo(x+8, y+10);
+  ctx.lineTo(x, y+14);
+  ctx.lineTo(x-8, y+10);
+  ctx.lineTo(x-12, y-8);
+  ctx.closePath();
+  const cpct = GS.crystalHp / GS.crystalMaxHp;
+  const cg = ctx.createLinearGradient(x-12,y-22,x+12,y+14);
+  cg.addColorStop(0, cpct > 0.5 ? '#88eeff' : cpct > 0.2 ? '#ffcc44' : '#ff4444');
+  cg.addColorStop(1, cpct > 0.5 ? '#226699' : cpct > 0.2 ? '#cc6600' : '#880000');
+  ctx.fillStyle = cg;
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff44';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+  // Label
+  ctx.fillStyle = '#44ddffaa';
+  ctx.font = '8px Share Tech Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('BASE', x, y+26);
+}
+
+function drawStick(x, y, color, size, facing, anim, hitFlash, isBoss) {
+  const s = 12 * size;
+  const walkOff = Math.sin(anim*4) * 3 * size;
+  ctx.save();
+  if (hitFlash > 0) {
+    ctx.globalAlpha = 0.3 + 0.7*(1-hitFlash);
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = 8;
+  }
+  if (isBoss) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 12;
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, 1.5 * size);
+  ctx.lineCap = 'round';
+  // Head
+  ctx.beginPath();
+  ctx.arc(x, y - s*2.3, s*0.55, 0, Math.PI*2);
+  ctx.stroke();
+  // Body
+  ctx.beginPath();
+  ctx.moveTo(x, y - s*1.75);
+  ctx.lineTo(x, y - s*0.65);
+  ctx.stroke();
+  // Arms
+  ctx.beginPath();
+  ctx.moveTo(x - s*0.9*facing, y - s*1.5 + walkOff*0.3);
+  ctx.lineTo(x, y - s*1.3);
+  ctx.lineTo(x + s*0.9*facing, y - s*1.5 - walkOff*0.3);
+  ctx.stroke();
+  // Legs
+  ctx.beginPath();
+  ctx.moveTo(x, y - s*0.65);
+  ctx.lineTo(x - s*0.55, y + walkOff);
+  ctx.moveTo(x, y - s*0.65);
+  ctx.lineTo(x + s*0.55, y - walkOff);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawWeapon(x, y, type, color, size, facing) {
+  const s = 12 * size;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, 1.5 * size);
+  ctx.lineCap = 'round';
+  if (type === 'swordsman' || type === 'elite_knight' || type === 'skull_captain' || type === 'warlord_king') {
+    // Sword
+    ctx.beginPath();
+    ctx.moveTo(x + s*0.9*facing, y - s*1.5);
+    ctx.lineTo(x + s*2.1*facing, y - s*1.0);
+    ctx.stroke();
+  } else if (type === 'shield_guard' || type === 'iron_crusher') {
+    // Shield
+    ctx.fillStyle = color + '88';
+    ctx.beginPath();
+    ctx.rect(x - s*1.5*facing, y - s*1.8, s*0.8, s*1.4);
+    ctx.fill(); ctx.stroke();
+  } else if (type === 'spearman') {
+    ctx.beginPath();
+    ctx.moveTo(x - s*0.9*facing, y - s*1.5);
+    ctx.lineTo(x - s*2.8*facing, y - s*1.9);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawUnit(u) {
+  const facing = u.team === 'player' ? 1 : -1;
+  u.anim += 0.016 * (u.state === 'march' ? u.speed / 60 : 0.2);
+  drawStick(u.x, u.y, u.color, u.size, facing, u.anim, u.hitFlash, u.isBoss);
+  drawWeapon(u.x, u.y, u.type, u.color, u.size, facing);
+  // HP bar
+  const barW = 18 * u.size, barH = 3;
+  const bx = u.x - barW/2, by = u.y - 12*u.size*2.3 - 10*u.size;
+  ctx.fillStyle = '#111';
+  ctx.fillRect(bx, by, barW, barH);
+  const pct = u.hp / u.maxHp;
+  ctx.fillStyle = pct > 0.5 ? '#33cc11' : pct > 0.25 ? '#cc8800' : '#cc2222';
+  ctx.fillRect(bx, by, barW * pct, barH);
+  // Boss crown
+  if (u.isBoss) {
+    ctx.fillStyle = '#ffc300';
+    ctx.font = `${Math.floor(10*u.size)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('👑', u.x, u.y - 12*u.size*2.3 - 14*u.size);
+  }
+  // Flying indicator
+  if (u.flying) {
+    u.y = GROUND_Y - 30 - Math.sin(u.anim*2)*8;
+  }
+  if (u.hitFlash > 0) u.hitFlash = Math.max(0, u.hitFlash - 0.05);
+}
+
+function drawProjectile(p) {
+  ctx.save();
+  ctx.fillStyle = p.color;
+  if (p.type === 'fireball' || p.type === 'meteor_chunk') {
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.type === 'meteor_chunk' ? 5 : 4, 0, Math.PI*2);
+    ctx.fill();
+  } else if (p.type === 'arrow') {
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const dx = p.tx - p.x, dy = p.ty - p.y;
+    const len = Math.sqrt(dx*dx+dy*dy)||1;
+    ctx.moveTo(p.x - dx/len*5, p.y - dy/len*5);
+    ctx.lineTo(p.x + dx/len*5, p.y + dy/len*5);
+    ctx.stroke();
+  } else if (p.type === 'heal') {
+    ctx.fillStyle = '#ff99cc';
+    ctx.font = '12px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('💚', p.x, p.y);
+  } else {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawParticle(p) {
+  const alpha = p.life / p.maxLife;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = p.color;
+  if (p.type === 'smoke') {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size*(1-alpha*0.5), 0, Math.PI*2);
+    ctx.fill();
+  } else {
+    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+  }
+  ctx.restore();
+}
+
+function drawFloatText(ft) {
+  const alpha = ft.life / ft.maxLife;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = `bold ${ft.size}px Share Tech Mono`;
+  ctx.fillStyle = ft.color;
+  ctx.textAlign = 'center';
+  ctx.fillText(ft.text, ft.x, ft.y);
+  ctx.restore();
+}
+
+function spawnParticles(x, y, color, count, type='spark') {
+  for (let i=0; i<count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 30 + Math.random() * 80;
+    GS.particles.push({
+      x, y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed - 20,
+      color, size: 2+Math.random()*3, life: 0.4+Math.random()*0.5, maxLife: 0.9, type,
+    });
+  }
+}
+
+function addFloat(x, y, text, color, size=11) {
+  GS.floatTexts.push({ x, y, vy:-28, text, color, size, life:1.0, maxLife:1.0 });
+}
+
+// ─── COMBAT HELPERS ───────────────────────────────────────────────────────────
+function dist(a, b) {
+  const dx = a.x-b.x, dy = a.y-b.y;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+function findTarget(unit, opponents) {
+  let best = null, bestDist = Infinity;
+  for (const o of opponents) {
+    if (o.hp <= 0) continue;
+    const d = dist(unit, o);
+    if (d < bestDist) { bestDist = d; best = o; }
+  }
+  return { target: best, d: bestDist };
+}
+
+function findHealTarget(healer, allies) {
+  let best = null, bestMissing = 0;
+  for (const a of allies) {
+    if (a.hp <= 0) continue;
+    const missing = a.maxHp - a.hp;
+    if (missing > bestMissing && dist(healer, a) <= healer.range) {
+      bestMissing = missing; best = a;
+    }
+  }
+  return best;
+}
+
+function dealDamage(attacker, target, dmgOverride) {
+  let dmg = dmgOverride !== undefined ? dmgOverride : attacker.dmg;
+  if (attacker.spearBonus && (target.type === 'giant' || target.type === 'bone_giant' || target.type === 'titan_destroyer')) dmg *= 1.5;
+  if (GS.defenseActive && target.team === 'player') dmg = Math.floor(dmg * 0.5);
+  if (GS.freezeActive && attacker.team === 'enemy') dmg = Math.floor(dmg * 0.6);
+  dmg = Math.max(1, Math.floor(dmg));
+  target.hp -= dmg;
+  target.hitFlash = 1;
+  spawnParticles(target.x, target.y, attacker.team === 'player' ? '#ff5555' : '#55ff55', 3);
+  addFloat(target.x, target.y - 12*target.size*2 - 8, `-${dmg}`, attacker.team === 'player' ? '#ff4444' : '#44ff44', 10);
+  return dmg;
+}
+
+function fireProjectile(attacker, target, type) {
+  const col = type === 'arrow' ? attacker.color : type === 'fireball' ? '#ff6600' : type === 'heal' ? '#ff99cc' : '#cc44ff';
+  GS.projectiles.push({
+    x: attacker.x, y: attacker.y - 15*attacker.size,
+    tx: target.x, ty: target.y - 15*(target.size||1),
+    speed: type === 'arrow' ? 350 : 280,
+    dmg: attacker.dmg, color: col, type,
+    team: attacker.team, targetId: target.id,
+    aoe: attacker.aoe, aoeRadius: 40,
+    healer: attacker.healer,
+  });
+}
+
+// ─── ABILITY EFFECTS ──────────────────────────────────────────────────────────
+function useAbility(id) {
+  if (!GS.unlockedAbilities.has(id)) return;
+  if (GS.abilityCds[id] > 0) return;
+  if (GS.state !== 'playing') return;
+  const def = ABILITY_DEFS.find(a => a.id === id);
+  const cd = def ? def.cd : 30;
+  GS.abilityCds[id] = cd;
+  switch (id) {
+    case 'rally':
+      GS.rallyActive = true; GS.rallyTimer = 10;
+      GS.troops.forEach(t => t.dmg = Math.floor(t.defDmg * 1.3));
+      spawnParticles(480, GROUND_Y-40, '#ffc300', 20);
+      addFloat(480, GROUND_Y-60, 'RALLY!', '#ffc300', 14);
+      break;
+    case 'defense':
+      GS.defenseActive = true; GS.defenseTimer = 10;
+      GS.troops.forEach(t => { t._defColor = t.color; t.color = '#4499ff'; });
+      addFloat(480, GROUND_Y-60, 'SHIELD FORMATION!', '#4499ff', 13);
+      break;
+    case 'meteor':
+      // Spawn meteor chunks targeting enemy cluster
+      const targets = GS.enemies.filter(e => e.hp > 0).slice(0,12);
+      const cx = targets.length ? targets.reduce((s,e)=>s+e.x,0)/targets.length : 600;
+      for (let i=0; i<8; i++) {
+        setTimeout(() => {
+          const tx2 = cx + (Math.random()-0.5)*120;
+          GS.projectiles.push({ x:tx2+(-50+Math.random()*100), y:-20, tx:tx2, ty:GROUND_Y-10, speed:500, dmg:80, color:'#ff6600', type:'meteor_chunk', team:'player', targetId:null, aoe:true, aoeRadius:55 });
+        }, i*120);
+      }
+      addFloat(cx, GROUND_Y-80, '☄ METEOR!', '#ff6600', 16);
+      break;
+    case 'banner':
+      GS.bannerActive = true; GS.bannerTimer = 0.1;
+      const healAmt = 40;
+      GS.troops.forEach(t => {
+        t.hp = Math.min(t.maxHp, t.hp + healAmt);
+        spawnParticles(t.x, t.y-20, '#ff99cc', 4, 'smoke');
+      });
+      GS.commanderHp = Math.min(GS.commanderMaxHp, GS.commanderHp + 50);
+      addFloat(480, GROUND_Y-60, '💚 HEAL BANNER!', '#ff99cc', 13);
+      break;
+    case 'freeze':
+      GS.freezeActive = true; GS.freezeTimer = 8;
+      GS.enemies.forEach(e => { e._origSpeed = e.speed; e.speed = Math.floor(e.speed * 0.25); e.slowTimer = 8; e.color = '#88ccff'; });
+      addFloat(480, GROUND_Y-60, '❄ TIME FREEZE!', '#44ddff', 14);
+      break;
+    case 'resurrect':
+      // Revive a few dead (remove recently killed — simulate by healing low-HP units)
+      let revived = 0;
+      GS.troops.forEach(t => { if (t.hp < t.maxHp * 0.15 && revived < 5) { t.hp = Math.floor(t.maxHp * 0.5); revived++; spawnParticles(t.x,t.y-20,'#ffff55',6,'smoke'); } });
+      addFloat(480, GROUND_Y-60, '✨ RESURRECTION!', '#ffff55', 14);
+      break;
+  }
+}
+
+// ─── WAVE MANAGEMENT ─────────────────────────────────────────────────────────
+function startWave(n) {
+  GS.wave = n;
+  GS.waveWon = false;
+  GS.bossUnit = null;
+  GS.spawnTimer = 0;
+  const wdata = makeWave(n);
+  // Build flat queue
+  GS.waveQueue = [];
+  wdata.enemies.forEach(e => {
+    for (let i=0; i<e.count; i++) GS.waveQueue.push(e.type);
+  });
+  // Shuffle queue
+  for (let i=GS.waveQueue.length-1; i>0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [GS.waveQueue[i],GS.waveQueue[j]] = [GS.waveQueue[j],GS.waveQueue[i]];
+  }
+  if (wdata.isBoss) {
+    GS.waveData = wdata;
+    GS.pendingBoss = wdata.bossType;
+    GS.bossSpawned = false;
+    GS.bossSpawnDelay = 3; // seconds after escorts
+  } else {
+    GS.waveData = wdata;
+    GS.pendingBoss = null;
+    GS.bossSpawnDelay = 0;
+  }
+  GS.spawnInterval = Math.max(0.25, 0.7 - n * 0.008);
+  GS.state = 'playing';
+  updateWaveLbl();
+}
+
+function showWaveAnnounce(n) {
+  const wdata = makeWave(n);
+  const el = document.getElementById('waveAnnounce');
+  const isBoss = wdata.isBoss;
+  document.getElementById('waTitle').textContent = isBoss ? `⚔ BOSS WAVE ${n}` : `WAVE ${n}`;
+  document.getElementById('waTitle').style.color = isBoss ? '#ff2244' : '#44ddff';
+  document.getElementById('waSub').textContent = isBoss ? `BOSS APPROACHING!` : `GET READY`;
+  const infoEl = document.getElementById('waInfo');
+  infoEl.innerHTML = '';
+  if (!isBoss) {
+    const counts = {};
+    wdata.enemies.forEach(e => counts[e.type] = (counts[e.type]||0)+e.count);
+    Object.entries(counts).forEach(([type, cnt]) => {
+      const def = ENEMY_DEFS[type];
+      if (!def) return;
+      const d = document.createElement('div'); d.className = 'wa-card';
+      d.innerHTML = `<div class="wc-icon">${def.icon}</div><div class="wc-name">${def.name}</div><div class="wc-count">×${cnt}</div>`;
+      infoEl.appendChild(d);
+    });
+  }
+  el.classList.remove('hidden');
+  GS.announceTimer = 3;
+  GS.countdownVal = 3;
+  document.getElementById('waCountdown').textContent = '3';
+}
+
+function showBossAnnounce(bossType, wdata) {
+  const el = document.getElementById('bossAnnounce');
+  el.classList.remove('hidden');
+  document.getElementById('baTitleEl').textContent = wdata.type === 'final' ? 'FINAL BOSS' : wdata.type === 'major' ? 'MAJOR BOSS' : 'MINI BOSS';
+  document.getElementById('baNameEl').textContent = wdata.name;
+  document.getElementById('baDescEl').textContent = wdata.desc;
+  const r = wdata.reward;
+  let rtext = '🏆 REWARD: ';
+  if (r.unit) rtext += `${UNIT_DEFS[r.unit]?.name || r.unit} unlocked · `;
+  if (r.ability) rtext += `${ABILITY_DEFS.find(a=>a.id===r.ability)?.name || r.ability} ability · `;
+  if (r.gems) rtext += `+${r.gems} gems · `;
+  if (r.gold) rtext += `+${r.gold} gold`;
+  document.getElementById('baRewardEl').textContent = rtext;
+  document.getElementById('baCountdown').textContent = '5';
+  GS.bossAnnounceTimer = 5;
+  GS.state = 'boss_announce';
+}
+
+// ─── BOSS PHASE TRANSITIONS ──────────────────────────────────────────────────
+function checkBossPhase(boss) {
+  if (!boss || !boss.isBoss) return;
+  const pct = boss.hp / boss.maxHp;
+  let newPhase = 1;
+  if (boss.maxPhases >= 4) {
+    if (pct <= 0.25) newPhase = 4;
+    else if (pct <= 0.5) newPhase = 3;
+    else if (pct <= 0.75) newPhase = 2;
+  } else if (boss.maxPhases >= 2) {
+    if (pct <= 0.5) newPhase = 2;
+  }
+  if (newPhase > boss.phase) {
+    boss.phase = newPhase;
+    boss.speed = Math.floor(boss.speed * 1.15);
+    boss.dmg = Math.floor(boss.dmg * 1.2);
+    spawnParticles(boss.x, boss.y-20, boss.color, 20);
+    addFloat(boss.x, boss.y-60, `PHASE ${newPhase}!`, '#ff2244', 14);
+    document.getElementById('bossPhaseLabel').textContent = `PHASE ${newPhase}`;
+    // Spawn reinforcements on major phases
+    if (newPhase === 2 || newPhase === 3) {
+      for (let i=0; i<6; i++) {
+        GS.waveQueue.push('raider');
+      }
+    }
+    if (newPhase === 4) {
+      for (let i=0; i<10; i++) GS.waveQueue.push('berserker');
+      addFloat(boss.x, boss.y-80, '☠ DEMON FORM!', '#aa0000', 16);
+      boss.color = '#660000';
+    }
+  }
+}
+
+// ─── GRANT BOSS REWARD ───────────────────────────────────────────────────────
+function grantBossReward(wdata) {
+  const r = wdata.reward;
+  if (r.unit) GS.unlockedUnits.add(r.unit);
+  if (r.ability) GS.unlockedAbilities.add(r.ability);
+  if (r.gems) { GS.gems += r.gems; addFloat(480, GROUND_Y-100, `+${r.gems} 💎`, '#44ddff', 14); }
+  if (r.gold) { GS.gold += r.gold; addFloat(480, GROUND_Y-80, `+${r.gold} 🪙`, '#ffc300', 14); }
+  if (r.title) {
+    addFloat(480, GROUND_Y-120, `👑 ${r.title}`, '#ffc300', 16);
+    GS.infiniteMode = true;
+  }
+  GS.rep += 10;
+  buildShop(); buildAbilityBar();
+}
+
+// ─── UPDATE LOOP ─────────────────────────────────────────────────────────────
+function update(dt) {
+  if (GS.state === 'announce') {
+    GS.announceTimer -= dt;
+    const cnt = Math.ceil(GS.announceTimer);
+    if (cnt !== GS.countdownVal) {
+      GS.countdownVal = cnt;
+      document.getElementById('waCountdown').textContent = cnt > 0 ? cnt : '';
+    }
+    if (GS.announceTimer <= 0) {
+      document.getElementById('waveAnnounce').classList.add('hidden');
+      startWave(GS.wave);
+    }
+    updateParticles(dt); updateFloatTexts(dt);
+    return;
+  }
+  if (GS.state === 'boss_announce') {
+    GS.bossAnnounceTimer -= dt;
+    const cnt2 = Math.ceil(GS.bossAnnounceTimer);
+    if (cnt2 !== GS.countdownVal) {
+      GS.countdownVal = cnt2;
+      document.getElementById('baCountdown').textContent = cnt2 > 0 ? cnt2 : '';
+    }
+    if (GS.bossAnnounceTimer <= 0) {
+      document.getElementById('bossAnnounce').classList.add('hidden');
+      startWave(GS.wave);
+    }
+    updateParticles(dt); updateFloatTexts(dt);
+    return;
+  }
+  if (GS.state !== 'playing') return;
+
+  // Timers
+  GS.repTimer += dt;
+  if (GS.repTimer >= 10) { GS.rep++; GS.repTimer = 0; }
+  GS.damageFlash = Math.max(0, GS.damageFlash - dt*3);
+
+  if (GS.rallyActive) { GS.rallyTimer -= dt; if (GS.rallyTimer <= 0) { GS.rallyActive=false; GS.troops.forEach(t=>t.dmg=t.defDmg); } }
+  if (GS.defenseActive) { GS.defenseTimer -= dt; if (GS.defenseTimer <= 0) { GS.defenseActive=false; GS.troops.forEach(t=>{if(t._defColor)t.color=t._defColor;}); } }
+  if (GS.freezeActive) { GS.freezeTimer -= dt; if (GS.freezeTimer <= 0) { GS.freezeActive=false; GS.enemies.forEach(e=>{if(e._origSpeed)e.speed=e._origSpeed; e.color=(ENEMY_DEFS[e.type]||BOSS_STATS[e.type])?.color||e.color;}); } }
+
+  for (const id in GS.abilityCds) { if (GS.abilityCds[id] > 0) GS.abilityCds[id] = Math.max(0, GS.abilityCds[id]-dt); }
+
+  // Spawn enemies
+  if (GS.waveQueue.length > 0) {
+    GS.spawnTimer -= dt;
+    if (GS.spawnTimer <= 0) {
+      GS.spawnTimer = GS.spawnInterval;
+      if (GS.enemies.filter(e=>e.hp>0).length < MAX_FIELD_UNITS) {
+        const type = GS.waveQueue.shift();
+        const u = spawnUnit(type, 'enemy', ENEMY_SPAWN_X + Math.random()*20, GROUND_Y);
+        if (u) GS.enemies.push(u);
+      } else {
+        GS.waveQueue.unshift(GS.waveQueue[0]); // hold
+      }
+    }
+  }
+
+  // Spawn boss when escorts depleted
+  if (GS.pendingBoss && !GS.bossSpawned && GS.waveQueue.length === 0) {
+    GS.bossSpawnDelay -= dt;
+    if (GS.bossSpawnDelay <= 0) {
+      const boss = spawnBoss(GS.pendingBoss, GS.wave);
+      if (boss) {
+        GS.enemies.push(boss);
+        GS.bossUnit = boss;
+        GS.bossSpawned = true;
+        document.getElementById('bossHpWrap').classList.add('visible');
+        document.getElementById('bossPhaseLabel').style.display = boss.maxPhases > 1 ? 'block' : 'none';
+        addFloat(boss.x, boss.y-80, `☠ ${GS.waveData.name} ARRIVES!`, '#ff2244', 15);
+      }
+    }
+  }
+
+  // Update units
+  updateUnits(GS.troops, GS.enemies, dt, 'player');
+  updateUnits(GS.enemies, GS.troops, dt, 'enemy');
+
+  // Boss phase & summons
+  if (GS.bossUnit && GS.bossUnit.hp > 0) {
+    checkBossPhase(GS.bossUnit);
+    GS.bossUnit.summonTimer = (GS.bossUnit.summonTimer||0) + dt;
+    if (GS.bossUnit.summons && GS.bossUnit.summonTimer >= GS.bossUnit.summonInterval) {
+      GS.bossUnit.summonTimer = 0;
+      for (let i=0; i<3; i++) {
+        const su = spawnUnit(GS.bossUnit.summons, 'enemy', ENEMY_SPAWN_X - 20 + Math.random()*30, GROUND_Y);
+        if (su) GS.enemies.push(su);
+      }
+      addFloat(GS.bossUnit.x, GS.bossUnit.y-50, 'SUMMONS!', '#cc4444', 11);
+    }
+    // Update boss HP bar
+    document.getElementById('bossHpBar').style.width = Math.max(0, GS.bossUnit.hp/GS.bossUnit.maxHp*100)+'%';
+    document.getElementById('bossHpText').textContent = Math.max(0,GS.bossUnit.hp);
+  }
+
+  // Projectiles
+  updateProjectiles(dt);
+
+  // Particles & float texts
+  updateParticles(dt);
+  updateFloatTexts(dt);
+
+  // Crystal damage from enemies that reach left edge
+  for (const e of GS.enemies) {
+    if (e.hp > 0 && e.x <= CRYSTAL_X + 30 && !e.attackingBase) {
+      e.attackingBase = true;
+      e.atkTimer = 0;
+    }
+    if (e.attackingBase && e.hp > 0) {
+      e.atkTimer -= dt;
+      if (e.atkTimer <= 0) {
+        e.atkTimer = 1/e.rate;
+        const dmgToCrystal = Math.floor(e.dmg * 0.5);
+        const dmgToCmd = Math.floor(e.dmg * 0.3);
+        GS.crystalHp -= dmgToCrystal;
+        GS.commanderHp -= dmgToCmd;
+        GS.damageFlash = 0.8;
+        spawnParticles(CRYSTAL_X, CRYSTAL_Y, '#44ddff', 5);
+        if (GS.crystalHp <= 0) { GS.crystalHp = 0; endGame(false, 'base crystal destroyed'); return; }
+        if (GS.commanderHp <= 0) { GS.commanderHp = 0; endGame(false, 'commander fallen'); return; }
+      }
+    }
+  }
+
+  // Clean dead
+  GS.troops = GS.troops.filter(t => t.hp > 0);
+  GS.enemies = GS.enemies.filter(e => e.hp > 0);
+  GS.projectiles = GS.projectiles.filter(p => !p.done);
+
+  // Check wave won
+  const enemiesGone = GS.enemies.every(e => e.hp <= 0) && GS.waveQueue.length === 0 && (!GS.pendingBoss || GS.bossSpawned);
+  if (enemiesGone && !GS.waveWon) {
+    GS.waveWon = true;
+    if (GS.waveData && GS.waveData.isBoss) grantBossReward(GS.waveData);
+    GS.gold += 20 + GS.wave * 5;
+    GS.score += 100 * GS.wave;
+    GS.rep += 2;
+    if (GS.bossUnit) { document.getElementById('bossHpWrap').classList.remove('visible'); GS.bossUnit = null; }
+    if (GS.wave >= 50) { endGame(true); return; }
+    setTimeout(() => {
+      const nextWave = GS.wave + 1;
+      GS.state = 'announce';
+      const nextData = makeWave(nextWave);
+      if (nextData.isBoss) {
+        showBossAnnounce(nextData.bossType, nextData);
+        GS.wave = nextWave;
+      } else {
+        GS.wave = nextWave;
+        showWaveAnnounce(nextWave);
+      }
+    }, 1200);
+  }
+
+  updateHUD();
+}
+
+function updateUnits(units, opponents, dt, team) {
+  for (const u of units) {
+    if (u.hp <= 0) continue;
+    if (u.slowTimer > 0) u.slowTimer = Math.max(0, u.slowTimer-dt);
+
+    if (u.attackingBase) continue; // handled separately
+
+    const dir = team === 'player' ? 1 : -1;
+
+    if (u.healer) {
+      const healTarget = findHealTarget(u, units);
+      if (healTarget) {
+        u.state = 'attack'; u.target = healTarget;
+        u.atkTimer -= dt;
+        if (u.atkTimer <= 0) {
+          u.atkTimer = 1/u.rate;
+          fireProjectile(u, healTarget, 'heal');
+        }
+        continue;
+      }
+    }
+
+    const { target, d } = findTarget(u, opponents);
+    u.target = target;
+
+    if (target && d <= u.range) {
+      u.state = 'attack';
+      u.atkTimer -= dt;
+      if (u.atkTimer <= 0) {
+        u.atkTimer = 1/u.rate;
+        if (u.ranged) {
+          const projType = u.type === 'mage' || u.aoe ? 'fireball' : u.healer ? 'heal' : 'arrow';
+          fireProjectile(u, target, projType);
+        } else {
+          dealDamage(u, target);
+          if (target.hp <= 0) {
+            onUnitDeath(target, team);
+          }
+        }
+      }
+    } else if (target) {
+      u.state = 'march';
+      const spd = u.speed * (u.slowTimer > 0 ? 0.3 : 1.0);
+      u.x += dir * spd * dt;
+    } else {
+      // No enemies — march toward base
+      u.state = 'march';
+      const spd = u.speed * (u.slowTimer > 0 ? 0.3 : 1.0);
+      u.x += dir * spd * dt;
+    }
+    // Clamp to field
+    if (team === 'player') u.x = Math.max(CRYSTAL_X + 20, Math.min(ENEMY_SPAWN_X + 50, u.x));
+    else u.x = Math.max(CRYSTAL_X - 20, Math.min(ENEMY_SPAWN_X + 20, u.x));
+  }
+}
+
+function onUnitDeath(unit, killerTeam) {
+  spawnParticles(unit.x, unit.y-10, unit.color, 8);
+  if (killerTeam === 'player' && unit.team === 'enemy') {
+    const def = ENEMY_DEFS[unit.type] || BOSS_STATS[unit.type];
+    const reward = def?.reward || 5;
+    GS.gold += reward;
+    GS.score += reward * 2;
+    addFloat(unit.x, unit.y-30, `+${reward}🪙`, '#ffc300', 10);
+    if (unit.isBoss) GS.gems += 5;
+  }
+}
+
+function updateProjectiles(dt) {
+  for (const p of GS.projectiles) {
+    if (p.done) continue;
+    const dx = p.tx-p.x, dy = p.ty-p.y;
+    const d = Math.sqrt(dx*dx+dy*dy);
+    if (d < 8) {
+      p.done = true;
+      if (p.healer) {
+        // Find ally to heal
+        const ally = GS.troops.find(t => t.id === p.targetId);
+        if (ally && ally.hp > 0) {
+          const heal = 25;
+          ally.hp = Math.min(ally.maxHp, ally.hp + heal);
+          addFloat(ally.x, ally.y-25, `+${heal}💚`, '#ff99cc', 10);
+        }
+      } else {
+        // Deal damage
+        const victims = p.aoe
+          ? [...GS.troops, ...GS.enemies].filter(u => u.team !== p.team && u.hp > 0 && Math.abs(u.x-p.tx) < p.aoeRadius)
+          : (p.team === 'player' ? GS.enemies : GS.troops).filter(u => u.id === p.targetId && u.hp > 0);
+        victims.forEach(v => {
+          dealDamage({dmg:p.dmg, spearBonus:false, team:p.team}, v);
+          if (v.hp <= 0) onUnitDeath(v, p.team === 'player' ? 'player' : 'enemy');
+        });
+        if (p.aoe) spawnParticles(p.tx, p.ty, p.color, 12);
+      }
+    } else {
+      const spd = p.speed * dt / d;
+      p.x += dx*spd; p.y += dy*spd;
+      // If tracking target moved, update tx/ty
+      const tgt = [...GS.troops, ...GS.enemies].find(u => u.id === p.targetId);
+      if (tgt && tgt.hp > 0) { p.tx = tgt.x; p.ty = tgt.y - 15*(tgt.size||1); }
+    }
+  }
+}
+
+function updateParticles(dt) {
+  for (const p of GS.particles) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 60*dt; p.life -= dt;
+  }
+  GS.particles = GS.particles.filter(p => p.life > 0);
+}
+
+function updateFloatTexts(dt) {
+  for (const f of GS.floatTexts) { f.y += f.vy * dt; f.life -= dt; }
+  GS.floatTexts = GS.floatTexts.filter(f => f.life > 0);
+}
+
+// ─── DRAW LOOP ────────────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0,0,CANVAS_W,CANVAS_H);
+  drawBackground();
+  // Draw troops
+  for (const t of GS.troops) drawUnit(t);
+  // Draw enemies
+  for (const e of GS.enemies) drawUnit(e);
+  // Draw projectiles
+  for (const p of GS.projectiles) drawProjectile(p);
+  // Draw particles
+  for (const p of GS.particles) drawParticle(p);
+  // Draw float texts
+  for (const f of GS.floatTexts) drawFloatText(f);
+  // Commander stick figure
+  drawCommander();
+  // Active buff indicators
+  drawBuffs();
+}
+
+function drawCommander() {
+  const cx = 85, cy = GROUND_Y;
+  const pulse = 0.5 + 0.5*Math.sin(Date.now()/400);
+  ctx.save();
+  ctx.shadowColor = '#39ff14';
+  ctx.shadowBlur = 8 + pulse*6;
+  drawStick(cx, cy, '#39ff14', 1.2, 1, Date.now()/800, 0, false);
+  // Crown
+  ctx.fillStyle = '#ffc300';
+  ctx.font = '13px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('👑', cx, cy - 38);
+  // Label
+  ctx.fillStyle = '#39ff14aa';
+  ctx.font = '7px Share Tech Mono';
+  ctx.fillText('CMD', cx, cy+10);
+  ctx.restore();
+}
+
+function drawBuffs() {
+  let bx = 200, by = 25;
+  if (GS.rallyActive) drawBuffTag(bx, by, '⚡ RALLY', '#ffc300'); bx += 80;
+  if (GS.defenseActive) drawBuffTag(bx, by, '🛡 DEFENSE', '#4499ff'); bx += 90;
+  if (GS.freezeActive) drawBuffTag(bx, by, '❄ FREEZE', '#44ddff'); bx += 90;
+}
+
+function drawBuffTag(x, y, text, color) {
+  ctx.save();
+  ctx.fillStyle = color+'33';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  const w = 75, h = 16;
+  ctx.beginPath(); ctx.roundRect(x-w/2,y-h/2,w,h,3); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.font = '8px Share Tech Mono';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+// ─── MAIN LOOP ────────────────────────────────────────────────────────────────
+let lastTime = 0;
+function loop(ts) {
+  const dt = Math.min((ts - lastTime)/1000, 0.05);
+  lastTime = ts;
+  update(dt);
+  draw();
+  updateAbilityBar();
+  requestAnimationFrame(loop);
+}
+
+// ─── HUD UPDATES ──────────────────────────────────────────────────────────────
+function updateHUD() {
+  document.getElementById('resGold').textContent = GS.gold;
+  document.getElementById('resGems').textContent = GS.gems;
+  document.getElementById('resRep').textContent = GS.rep;
+  document.getElementById('resScore').textContent = GS.score;
+  document.getElementById('crystalBar').style.width = Math.max(0, GS.crystalHp/GS.crystalMaxHp*100)+'%';
+  document.getElementById('cmdBar').style.width = Math.max(0, GS.commanderHp/GS.commanderMaxHp*100)+'%';
+  updateShopButtons();
+}
+
+function updateWaveLbl() {
+  document.getElementById('waveLbl').textContent = `WAVE ${GS.wave}/50`;
+}
+
+function updateAbilityBar() {
+  ABILITY_DEFS.forEach(a => {
+    const btn = document.getElementById('ab_'+a.id);
+    if (!btn) return;
+    const cd = GS.abilityCds[a.id] || 0;
+    const fill = btn.querySelector('.cd-fill');
+    const cdEl = btn.querySelector('.ab-cd');
+    const pct = cd / a.cd;
+    if (fill) fill.style.height = (pct*100)+'%';
+    if (cdEl) cdEl.textContent = cd > 0 ? cd.toFixed(1)+'s' : 'READY';
+    btn.disabled = cd > 0 || GS.state !== 'playing';
+  });
+}
+
+function updateShopButtons() {
+  ABILITY_DEFS.forEach(a => {
+    const btn = document.getElementById('ab_'+a.id);
+    if (btn) btn.classList.toggle('ab-locked', !GS.unlockedAbilities.has(a.id));
+  });
+  Object.keys(UNIT_DEFS).forEach(type => {
+    const btn = document.getElementById('ub_'+type);
+    if (!btn) return;
+    btn.classList.toggle('ub-locked', !GS.unlockedUnits.has(type));
+    const def = UNIT_DEFS[type];
+    btn.disabled = GS.gold < def.cost || GS.state !== 'playing';
+  });
+}
+
+// ─── BUILD UI ────────────────────────────────────────────────────────────────
+function buildAbilityBar() {
+  const row = document.getElementById('abilityRow');
+  row.innerHTML = '<span class="ab-section-label">ABILITIES:</span>';
+  ABILITY_DEFS.forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = 'ab-btn' + (GS.unlockedAbilities.has(a.id) ? '' : ' ab-locked');
+    btn.id = 'ab_'+a.id;
+    btn.innerHTML = `<span class="ab-icon">${a.icon}</span><span class="ab-key">[${a.key}]</span><span class="ab-name">${a.name}</span><span class="ab-cd">READY</span><div class="cd-fill" style="height:0%"></div>`;
+    btn.style.borderColor = a.color+'66';
+    btn.onclick = () => useAbility(a.id);
+    row.appendChild(btn);
+  });
+}
+
+function buildShop() {
+  const units = document.getElementById('shopUnits');
+  units.innerHTML = '';
+  Object.entries(UNIT_DEFS).forEach(([type, def]) => {
+    const btn = document.createElement('button');
+    btn.className = 'ub-btn' + (GS.unlockedUnits.has(type) ? '' : ' ub-locked');
+    btn.id = 'ub_'+type;
+    btn.innerHTML = `<span class="ub-icon">${def.icon}</span><span class="ub-name">${def.name}</span><span class="ub-cost">🪙${def.cost}</span><span class="ub-stat">HP:${def.hp} DMG:${def.dmg}</span>`;
+    btn.disabled = GS.gold < def.cost;
+    btn.onclick = () => recruitUnit(type);
+    units.appendChild(btn);
+  });
+}
+
+function recruitUnit(type) {
+  if (GS.state !== 'playing') return;
+  const def = UNIT_DEFS[type];
+  if (!def || GS.gold < def.cost || !GS.unlockedUnits.has(type)) return;
+  GS.gold -= def.cost;
+  const x = PLAYER_SPAWN_X + Math.random()*20 - 10;
+  const u = spawnUnit(type, 'player', x, GROUND_Y);
+  if (u) GS.troops.push(u);
+  addFloat(x, GROUND_Y-30, `+${def.name}`, def.color, 10);
+  updateHUD();
+}
+
+// ─── GAME OVER / VICTORY ─────────────────────────────────────────────────────
+function endGame(victory, reason) {
+  GS.state = 'gameover';
+  document.getElementById('bossHpWrap').classList.remove('visible');
+  const ov = document.getElementById('overlay');
+  ov.classList.remove('hidden');
+  const title = document.getElementById('ovTitle');
+  const sub = document.getElementById('ovSub');
+  const scoreEl = document.getElementById('ovScore');
+  const reasonEl = document.getElementById('ovReason');
+  const btn = document.getElementById('startBtn');
+  if (victory) {
+    title.textContent = 'VICTORY!'; title.style.color = '#ffc300';
+    sub.textContent = GS.infiniteMode ? 'INFINITE MODE UNLOCKED — The battle never ends!' : 'You defeated all 50 waves and slew the Final Overlord!';
+    reasonEl.classList.add('hidden');
+    btn.textContent = GS.infiniteMode ? '▶ PLAY INFINITE MODE' : '▶ PLAY AGAIN';
+  } else {
+    title.textContent = 'DEFEATED'; title.style.color = '#ff2244';
+    sub.textContent = `Wave ${GS.wave} — Your campaign ends here.`;
+    reasonEl.textContent = reason ? reason.toUpperCase() : 'ARMY DESTROYED';
+    reasonEl.classList.remove('hidden');
+    btn.textContent = '▶ TRY AGAIN';
+  }
+  scoreEl.textContent = `SCORE: ${GS.score}`;
+  scoreEl.classList.remove('hidden');
+}
+
+// ─── INPUT ────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const map = { q:'rally', w:'defense', e:'meteor', r:'banner', t:'freeze', y:'resurrect' };
+  const id = map[e.key.toLowerCase()];
+  if (id) useAbility(id);
+});
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('ovScore').classList.add('hidden');
+  document.getElementById('ovReason').classList.add('hidden');
+  resetGS();
+  buildAbilityBar();
+  buildShop();
+  GS.wave = 1;
+  GS.state = 'announce';
+  showWaveAnnounce(1);
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+resetGS();
+buildAbilityBar();
+buildShop();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
