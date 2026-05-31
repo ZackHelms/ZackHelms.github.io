@@ -215,8 +215,8 @@ body {
 }
 @media (orientation: portrait) { .ub-btn { min-width: 62px; } }
 @media (orientation: landscape) { .ub-btn { width: 100%; } }
-.ub-btn:active:not(:disabled), .ub-btn:hover:not(:disabled) { border-color: var(--green); }
-.ub-btn.selected { border-color: var(--green); box-shadow: 0 0 10px #39ff1455; background: rgba(12,28,12,0.95); }
+.ub-btn:active:not(:disabled):not(.selected), .ub-btn:hover:not(:disabled):not(.selected) { border-color: var(--green); }
+.ub-btn.selected { border: 2px solid var(--green); box-shadow: 0 0 14px #39ff1466, inset 0 0 8px #39ff1411; background: rgba(12,28,12,0.95); }
 .ub-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .ub-btn .ub-icon { font-size: 0.95rem; }
 .ub-btn .ub-name { color: var(--green); font-size: 0.47rem; letter-spacing: 0.5px; }
@@ -1610,6 +1610,11 @@ function buildShop() {
     if (!locked) btn.addEventListener('click', e => { e.stopPropagation(); selectTroop(GS.selectedTroop === type ? null : type); });
     container.appendChild(btn);
   }
+  // Re-apply selection after DOM rebuild (e.g. after unlock)
+  if (GS && GS.selectedTroop) {
+    const sel = document.getElementById('ub_' + GS.selectedTroop);
+    if (sel) sel.classList.add('selected');
+  }
 }
 
 function buildAbilityBar() {
@@ -1640,7 +1645,8 @@ function updateHUD() {
     const type = btn.id.replace('ub_', '');
     const def  = TROOP_DEFS[type];
     if (!def || !GS.unlockedTroops.has(type)) return;
-    btn.disabled = GS.gold < def.cost;
+    // Never disable the currently selected button — it must stay clickable to deselect
+    btn.disabled = GS.gold < def.cost && type !== GS.selectedTroop;
   });
 
   // Ability cooldown overlays
