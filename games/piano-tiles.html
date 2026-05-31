@@ -350,6 +350,112 @@
     z-index: 200;
   }
   #back-link:hover { color: rgba(0,245,255,0.9); }
+
+  /* recording overlay — sits above canvas, leaves hit-zone visible */
+  #recording-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    bottom: var(--hit-zone-h);
+    z-index: 50;
+    background: rgba(8,8,16,0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  #rec-indicator {
+    color: var(--glow-pink);
+    text-shadow: 0 0 15px var(--glow-pink);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    animation: rec-blink 1s ease-in-out infinite;
+  }
+  @keyframes rec-blink {
+    0%,100% { opacity: 1; } 50% { opacity: 0.25; }
+  }
+  #rec-timer {
+    font-size: 36px;
+    font-weight: 900;
+    color: var(--glow-cyan);
+    text-shadow: 0 0 20px var(--glow-cyan);
+    letter-spacing: 4px;
+  }
+  #rec-song-name {
+    font-size: 11px;
+    color: rgba(255,255,255,0.55);
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+  }
+  #rec-tap-count {
+    font-size: 10px;
+    color: rgba(255,255,255,0.35);
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* tracks manager screen */
+  #tracks-screen { padding: 16px; gap: 10px; }
+  #tracks-screen h1 { font-size: 24px; margin-bottom: 4px; }
+  #tracks-list {
+    width: 100%;
+    max-height: 360px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .track-item {
+    background: rgba(0,245,255,0.04);
+    border: 1px solid rgba(0,245,255,0.14);
+    padding: 9px 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .track-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: rgba(255,255,255,0.8);
+    letter-spacing: 0.5px;
+    word-break: break-all;
+  }
+  .track-meta {
+    font-family: 'Space Mono', monospace;
+    font-size: 8px;
+    color: rgba(255,255,255,0.35);
+  }
+  .track-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+  .track-btn {
+    padding: 5px 10px;
+    background: transparent;
+    border: 1px solid rgba(0,245,255,0.35);
+    color: rgba(0,245,255,0.75);
+    font-family: 'Orbitron', monospace;
+    font-size: 8px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: all 0.15s;
+  }
+  .track-btn:hover { background: rgba(0,245,255,0.1); }
+  .track-btn-del { border-color: rgba(255,0,110,0.35); color: rgba(255,0,110,0.75); }
+  .track-btn-del:hover { background: rgba(255,0,110,0.1); }
+  .tracks-empty {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,0.35);
+    text-align: center;
+    padding: 24px 8px;
+    line-height: 2;
+  }
+  #tracks-link {
+    font-size: 9px;
+    padding: 6px 18px;
+    border-color: rgba(0,245,255,0.28);
+    color: rgba(0,245,255,0.45);
+    letter-spacing: 2px;
+  }
 </style>
 </head>
 <body>
@@ -393,8 +499,26 @@
       <button class="diff-btn active" data-diff="easy">EASY</button>
       <button class="diff-btn" data-diff="medium">NORMAL</button>
       <button class="diff-btn" data-diff="hard">HARD</button>
+      <button class="diff-btn" data-diff="custom">CUSTOM</button>
     </div>
     <button class="btn" id="start-btn">PLAY</button>
+    <button class="btn" id="tracks-link">SAVED TRACKS</button>
+  </div>
+
+  <!-- RECORDING OVERLAY (leaves hit-zone visible) -->
+  <div id="recording-overlay" class="hidden">
+    <div id="rec-indicator">● REC</div>
+    <div id="rec-timer">0:00</div>
+    <div id="rec-song-name"></div>
+    <div id="rec-tap-count">0 taps recorded</div>
+    <button class="btn" id="stop-rec-btn" style="font-size:11px;padding:10px 28px;">STOP &amp; SAVE</button>
+  </div>
+
+  <!-- TRACKS MANAGER SCREEN -->
+  <div class="screen hidden" id="tracks-screen">
+    <h1>SAVED<br>TRACKS</h1>
+    <div id="tracks-list"></div>
+    <button class="btn" id="close-tracks-btn">CLOSE</button>
   </div>
 
   <!-- GAME OVER SCREEN -->
@@ -694,57 +818,6 @@ const CYAN = '#00f5ff';
 const PINK = '#ff006e';
 const GOLD = '#ffd700';
 
-// ---- BEAT MAPS ----
-// Entry format: [step, lane_or_lanes]
-//   lane_or_lanes: number (single tap) or [l1,l2] (simultaneous taps)
-// Steps are 16th notes. 98 BPM → step = 0.153s; 130 BPM → step = 0.115s
-// Easy:   half notes (8 steps) and quarter notes (4 steps), single taps only
-// Medium: quarter (4) and eighth (2) notes, rare 2-lane simultaneous
-// Hard:   16th (1), eighth (2), quarter notes, frequent 2-lane
-const BEAT_MAPS = {
-  dance_monkey: {
-    easy: [
-      [0,1],[8,2],[20,0],[28,3],
-      [36,1],[44,2],[52,0],[60,3],
-    ],
-    medium: [
-      [0,1],[4,3],[8,2],[12,0],
-      [16,1],[20,3],[24,2],[28,0],
-      [32,3],[36,1],[40,2],[44,0],
-      [48,[1,3]],[52,2],[56,0],[60,3],
-    ],
-    hard: [
-      [0,1],[2,3],[4,2],[6,0],[8,1],[10,2],
-      [12,3],[14,1],[16,2],[17,0],[18,3],
-      [20,1],[22,2],[24,[0,3]],[26,1],[28,2],
-      [30,0],[32,3],[33,1],[34,2],[36,0],
-      [38,3],[40,1],[42,2],[44,[1,3]],
-      [46,0],[48,2],[50,3],[52,1],[54,0],
-      [56,[2,3]],[58,1],[60,2],[62,0],
-    ],
-  },
-  takedown: {
-    easy: [
-      [0,0],[8,1],[20,3],[28,2],
-      [36,0],[44,3],[52,1],[60,2],
-    ],
-    medium: [
-      [0,0],[4,2],[8,1],[12,3],
-      [16,2],[20,0],[24,1],[28,3],
-      [32,2],[36,0],[40,3],[44,1],
-      [48,[0,2]],[52,3],[56,1],[60,2],
-    ],
-    hard: [
-      [0,0],[2,2],[4,1],[6,3],[8,0],[10,1],
-      [12,2],[14,3],[16,0],[17,2],[18,1],
-      [20,3],[22,0],[24,[1,3]],[26,2],[28,0],
-      [30,3],[32,1],[33,0],[34,3],[36,2],
-      [38,1],[40,3],[42,0],[44,[0,2]],
-      [46,3],[48,1],[50,2],[52,0],[54,3],
-      [56,[1,3]],[58,0],[60,2],[62,1],
-    ],
-  },
-};
 
 let selectedDifficulty = 'easy';
 document.querySelectorAll('.diff-btn').forEach(b => {
@@ -756,7 +829,13 @@ document.querySelectorAll('.diff-btn').forEach(b => {
 });
 
 function buildTileQueue(difficulty) {
-  const map = SONGS[selectedSong][difficulty];
+  let map;
+  if (difficulty === 'custom') {
+    const stored = localStorage.getItem(`piano_tiles_custom_${selectedSong}`);
+    map = stored ? JSON.parse(stored) : [];
+  } else {
+    map = SONGS[selectedSong][difficulty];
+  }
   const queue = [];
   for (const [t, laneOrLanes] of map) {
     const lanes = Array.isArray(laneOrLanes) ? laneOrLanes : [laneOrLanes];
@@ -776,7 +855,7 @@ function initGame() {
   speed = (H - HIT_ZONE_H) / LOOKAHEAD;
   tileQueue = buildTileQueue(selectedDifficulty);
   const lastTile = tileQueue[tileQueue.length - 1];
-  songEndTime = lastTile ? lastTile.audioTime + 2.5 : 0;
+  songEndTime = lastTile ? lastTile.audioTime + 2.5 : 60;
   document.getElementById('score-display').textContent = '0';
   document.getElementById('combo-display').textContent = '';
   document.getElementById('speed-bar').style.width = '0%';
@@ -867,6 +946,7 @@ function gameOver() {
 }
 
 function onLanePress(lane) {
+  if (state === 'recording') { recordTap(lane); return; }
   if (state !== 'playing') return;
   let hit = null;
   for (let i = tiles.length - 1; i >= 0; i--) {
@@ -1026,6 +1106,178 @@ document.getElementById('restart-btn').addEventListener('click', () => {
 
 ctx.fillStyle = '#080810';
 ctx.fillRect(0, 0, W, H);
+
+// ---- CUSTOM TRACKS — STORAGE ----
+const CUSTOM_ACTIVE_KEY = (song) => `piano_tiles_custom_${song}`;
+const RECORDINGS_KEY = 'piano_tiles_recordings';
+
+function getSavedRecordings() {
+  try { return JSON.parse(localStorage.getItem(RECORDINGS_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function saveRecording(songId, taps) {
+  const recs = getSavedRecordings();
+  const d = new Date();
+  const id = Date.now().toString();
+  const name = `${SONGS[songId].title} — ${d.toLocaleDateString()} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`;
+  recs.push({ id, song: songId, name, taps, savedAt: Date.now() });
+  localStorage.setItem(RECORDINGS_KEY, JSON.stringify(recs));
+  localStorage.setItem(CUSTOM_ACTIVE_KEY(songId), JSON.stringify(taps));
+}
+
+function loadRecording(id) {
+  const recs = getSavedRecordings();
+  const rec = recs.find(r => r.id === id);
+  if (!rec) return;
+  localStorage.setItem(CUSTOM_ACTIVE_KEY(rec.song), JSON.stringify(rec.taps));
+  selectedSong = rec.song;
+  selectedDifficulty = 'custom';
+  document.querySelectorAll('.song-btn').forEach(b => b.classList.toggle('active', b.dataset.song === selectedSong));
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.toggle('active', b.dataset.diff === 'custom'));
+  closeTracksManager();
+}
+
+function deleteRecording(id) {
+  const recs = getSavedRecordings().filter(r => r.id !== id);
+  localStorage.setItem(RECORDINGS_KEY, JSON.stringify(recs));
+  renderTracksList();
+}
+
+function exportRecording(id) {
+  const recs = getSavedRecordings();
+  const rec = recs.find(r => r.id === id);
+  if (!rec) return;
+  const out = { format: 'Piano Tiles Tap Track v1', song: rec.song, name: rec.name, exportedAt: new Date().toISOString(), taps: rec.taps };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${rec.song}_tap_track.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function renderTracksList() {
+  const list = document.getElementById('tracks-list');
+  const recs = getSavedRecordings();
+  if (!recs.length) {
+    list.innerHTML = '<p class="tracks-empty">No saved tracks.<br>Long-press CUSTOM (2 sec) to record.</p>';
+    return;
+  }
+  list.innerHTML = recs.map(r => `
+    <div class="track-item">
+      <div class="track-name">${r.name}</div>
+      <div class="track-meta">${r.taps.length} taps</div>
+      <div class="track-actions">
+        <button class="track-btn" onclick="loadRecording('${r.id}')">LOAD</button>
+        <button class="track-btn" onclick="exportRecording('${r.id}')">EXPORT</button>
+        <button class="track-btn track-btn-del" onclick="deleteRecording('${r.id}')">DEL</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openTracksManager() { renderTracksList(); document.getElementById('tracks-screen').classList.remove('hidden'); }
+function closeTracksManager() { document.getElementById('tracks-screen').classList.add('hidden'); }
+
+document.getElementById('tracks-link').addEventListener('click', openTracksManager);
+document.getElementById('close-tracks-btn').addEventListener('click', closeTracksManager);
+
+// ---- CUSTOM RECORDING MODE ----
+let isRecording = false;
+let recordingTaps = [];
+let recTimerInterval = null;
+const lastTapPerLane = [0, 0, 0, 0];
+
+function recordTap(lane) {
+  if (!isRecording || !bgMusic) return;
+  const now = parseFloat(bgMusic.currentTime.toFixed(2));
+  if (now - lastTapPerLane[lane] < 0.05) return; // 50ms debounce per lane
+  lastTapPerLane[lane] = now;
+  recordingTaps.push([now, lane]);
+  document.getElementById('rec-tap-count').textContent = `${recordingTaps.length} taps recorded`;
+  const btn = document.querySelector(`.lane-btn[data-lane="${lane}"]`);
+  if (btn) { btn.classList.add('pressed'); setTimeout(() => btn.classList.remove('pressed'), 100); }
+  playNote(lane, false);
+}
+
+function startRecording() {
+  if (state !== 'start') return;
+  initAudio();
+  stopMusic();
+  isRecording = true;
+  recordingTaps = [];
+  state = 'recording';
+  lastTapPerLane.fill(0);
+  document.getElementById('rec-song-name').textContent = SONGS[selectedSong].title;
+  document.getElementById('rec-timer').textContent = '0:00';
+  document.getElementById('rec-tap-count').textContent = '0 taps recorded';
+  document.getElementById('recording-overlay').classList.remove('hidden');
+  document.getElementById('start-screen').classList.add('hidden');
+  document.getElementById('hit-zone').classList.remove('hidden');
+  recTimerInterval = setInterval(() => {
+    if (!bgMusic) return;
+    const t = bgMusic.currentTime;
+    document.getElementById('rec-timer').textContent = `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
+  }, 100);
+  startMusic();
+  bgMusic.addEventListener('ended', finishRecording, { once: true });
+}
+
+function finishRecording() {
+  clearInterval(recTimerInterval);
+  if (bgMusic) bgMusic.removeEventListener('ended', finishRecording);
+  isRecording = false;
+  state = 'start';
+  stopMusic();
+  document.getElementById('recording-overlay').classList.add('hidden');
+  document.getElementById('start-screen').classList.remove('hidden');
+  document.getElementById('hit-zone').classList.add('hidden');
+  if (recordingTaps.length > 0) {
+    saveRecording(selectedSong, recordingTaps);
+    selectedDifficulty = 'custom';
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.toggle('active', b.dataset.diff === 'custom'));
+    // Cyan confirmation flash
+    const f = document.getElementById('miss-flash');
+    f.style.background = 'rgba(0,245,255,0.18)';
+    f.style.opacity = '1';
+    setTimeout(() => { f.style.opacity = '0'; f.style.background = 'rgba(255,0,110,0.15)'; }, 500);
+  }
+}
+
+document.getElementById('stop-rec-btn').addEventListener('click', finishRecording);
+
+// Long-press CUSTOM button (2 sec) → recording mode
+const customDiffBtn = document.querySelector('.diff-btn[data-diff="custom"]');
+let longPressTimer = null;
+
+function beginLongPress() {
+  cancelLongPress();
+  customDiffBtn.style.transition = 'box-shadow 2s linear, border-color 2s linear, color 2s linear';
+  customDiffBtn.style.boxShadow = '0 0 18px rgba(255,0,110,0.7)';
+  customDiffBtn.style.borderColor = 'var(--glow-pink)';
+  customDiffBtn.style.color = 'var(--glow-pink)';
+  longPressTimer = setTimeout(() => { cancelLongPress(); startRecording(); }, 2000);
+}
+
+function cancelLongPress() {
+  clearTimeout(longPressTimer);
+  longPressTimer = null;
+  customDiffBtn.style.transition = 'all 0.2s';
+  customDiffBtn.style.boxShadow = '';
+  customDiffBtn.style.borderColor = '';
+  customDiffBtn.style.color = '';
+}
+
+customDiffBtn.addEventListener('mousedown', beginLongPress);
+customDiffBtn.addEventListener('touchstart', (e) => { e.preventDefault(); beginLongPress(); }, { passive: false });
+customDiffBtn.addEventListener('mouseup', cancelLongPress);
+customDiffBtn.addEventListener('mouseleave', cancelLongPress);
+customDiffBtn.addEventListener('touchend', cancelLongPress);
+customDiffBtn.addEventListener('touchcancel', cancelLongPress);
 </script>
 </body>
 </html>
