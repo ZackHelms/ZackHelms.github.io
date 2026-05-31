@@ -38,6 +38,16 @@ body {
   #hud { left: var(--side-w); right: var(--side-w); }
 }
 
+/* Portrait: two explicit flex rows */
+@media (orientation: portrait) {
+  .hud-row { display: flex; align-items: center; gap: 5px; width: 100%; }
+  .hud-r2 .bar-chip { flex: 1; max-width: none; }
+}
+/* Landscape: dissolve row wrappers so chips join the single HUD flex row */
+@media (orientation: landscape) {
+  .hud-row { display: contents; }
+}
+
 .hud-chip {
   display: flex; align-items: center; gap: 3px;
   background: rgba(11,11,22,0.88); border: 1px solid var(--border);
@@ -94,26 +104,25 @@ body {
 
 /* ── ABILITY BAR ─────────────────────────────── */
 #abilityBar {
-  position: fixed; z-index: 10;
-  background: rgba(6,6,14,0.93);
+  background: rgba(6,6,14,0.93); z-index: 10;
   display: flex; align-items: center; gap: 4px;
   overflow: auto; scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
 #abilityBar::-webkit-scrollbar { display: none; }
 
-/* Portrait: horizontal strip above shop */
+/* Portrait: horizontal strip inside #uiBottom (in flow, no position:fixed) */
 @media (orientation: portrait) {
   #abilityBar {
-    bottom: var(--shop-h); left: 0; right: 0;
     flex-direction: row; padding: 4px 6px;
     border-top: 1px solid var(--border);
     overflow-x: auto; overflow-y: hidden;
   }
 }
-/* Landscape: left vertical panel */
+/* Landscape: left vertical panel (position:fixed) */
 @media (orientation: landscape) {
   #abilityBar {
+    position: fixed;
     left: 0; top: var(--hud-h); bottom: 0;
     width: var(--side-w); flex-direction: column;
     padding: 6px 4px; border-right: 1px solid var(--border);
@@ -137,17 +146,28 @@ body {
 .ab-btn .ab-cost { font-size: 0.47rem; color: var(--purple); }
 .ab-cd-overlay   { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.65); pointer-events: none; transition: height 0.08s; }
 
+/* ── BOTTOM UI WRAPPER ────────────────────────── */
+/* Portrait: fixed at bottom, stacked column so abilityBar sits above shop */
+@media (orientation: portrait) {
+  #uiBottom {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; flex-direction: column; z-index: 10;
+  }
+}
+/* Landscape: dissolve the wrapper; children use their own position:fixed */
+@media (orientation: landscape) {
+  #uiBottom { display: contents; }
+}
+
 /* ── SHOP ─────────────────────────────────────── */
 #shop {
-  position: fixed; z-index: 10;
-  background: rgba(6,6,14,0.95);
+  background: rgba(6,6,14,0.95); z-index: 10;
   display: flex; flex-direction: column;
 }
 
-/* Portrait: single horizontal scrollable row at bottom */
+/* Portrait: in flow within #uiBottom */
 @media (orientation: portrait) {
   #shop {
-    bottom: 0; left: 0; right: 0;
     border-top: 1px solid var(--border);
     padding: 5px 6px 7px;
   }
@@ -164,9 +184,10 @@ body {
   #shopUnits::-webkit-scrollbar { display: none; }
 }
 
-/* Landscape: vertical column on right */
+/* Landscape: vertical column on right (position:fixed) */
 @media (orientation: landscape) {
   #shop {
+    position: fixed;
     right: 0; top: var(--hud-h); bottom: 0;
     width: var(--side-w); border-left: 1px solid var(--border);
     padding: 5px 3px; overflow: hidden;
@@ -279,31 +300,34 @@ body {
 </head>
 <body>
 
-<!-- ── TOP HUD (compact, 1-2 rows) ──────────────── -->
+<!-- ── TOP HUD (compact, 2 rows portrait / 1 row landscape) ──────────────── -->
 <div id="hud">
-  <div class="hud-chip wave-chip">
-    <span class="lbl">WAVE</span>
-    <span class="val" id="hudWave">1 / 30</span>
+  <div class="hud-row hud-r1">
+    <div class="hud-chip wave-chip">
+      <span class="lbl">WAVE</span>
+      <span class="val" id="hudWave">1 / 30</span>
+    </div>
+    <div class="hud-chip gold-chip">
+      <span>🪙</span><span class="val" id="hudGold">800</span>
+    </div>
+    <div class="hud-chip">
+      <span>🏆</span><span class="val" id="hudScore">0</span>
+    </div>
+    <button class="icon-btn" id="pauseBtn" title="Pause">⏸</button>
+    <button class="icon-btn" id="viewTogBtn" title="Toggle 2D/3D view">2D</button>
   </div>
-  <div class="hud-chip gold-chip">
-    <span>🪙</span><span class="val" id="hudGold">800</span>
+  <div class="hud-row hud-r2">
+    <div class="bar-chip">
+      <span class="bl" style="color:var(--crystal);">💎</span>
+      <div class="bar-outer crystal-outer"><div class="bar-inner crystal-fill" id="crystalFill" style="width:100%"></div></div>
+      <span class="bar-val" id="hudCrystalHp">1000</span>
+    </div>
+    <div class="bar-chip">
+      <span class="bl" style="color:var(--purple);">⚡</span>
+      <div class="bar-outer mana-outer"><div class="bar-inner mana-fill" id="manaFill" style="width:100%"></div></div>
+      <span class="bar-val" id="hudMana">100</span>
+    </div>
   </div>
-  <div class="hud-chip">
-    <span>🏆</span><span class="val" id="hudScore">0</span>
-  </div>
-  <div class="bar-chip">
-    <span class="bl" style="color:var(--crystal);">💎</span>
-    <div class="bar-outer crystal-outer"><div class="bar-inner crystal-fill" id="crystalFill" style="width:100%"></div></div>
-    <span class="bar-val" id="hudCrystalHp">1000</span>
-  </div>
-  <div class="bar-chip">
-    <span class="bl" style="color:var(--purple);">⚡</span>
-    <div class="bar-outer mana-outer"><div class="bar-inner mana-fill" id="manaFill" style="width:100%"></div></div>
-    <span class="bar-val" id="hudMana">100</span>
-  </div>
-  <!-- Pause & view-toggle icon buttons -->
-  <button class="icon-btn" id="pauseBtn" title="Pause">⏸</button>
-  <button class="icon-btn" id="viewTogBtn" title="Toggle 2D/3D view">2D</button>
 </div>
 
 <!-- ── BOSS HP BAR ──────────────────────────────── -->
@@ -313,13 +337,16 @@ body {
   <span class="boss-hp-txt" id="bossHpTxt">0</span>
 </div>
 
-<!-- ── ABILITY BAR ────────────────────────────── -->
-<div id="abilityBar"></div>
+<!-- ── BOTTOM UI: portrait=stacked column, landscape=display:contents ──── -->
+<div id="uiBottom">
+  <!-- ── ABILITY BAR ──────────────────────────── -->
+  <div id="abilityBar"></div>
 
-<!-- ── SHOP ──────────────────────────────────── -->
-<div id="shop">
-  <div class="shop-label">TROOPS</div>
-  <div id="shopUnits"></div>
+  <!-- ── SHOP ────────────────────────────────── -->
+  <div id="shop">
+    <div class="shop-label">TROOPS</div>
+    <div id="shopUnits"></div>
+  </div>
 </div>
 
 <!-- Three.js canvas -->
@@ -608,6 +635,7 @@ const cam3DSave = { phi: 1.1, radius: 34 };
 let dragging    = false;
 let mouseStart  = { x: 0, y: 0 };
 let dragDist    = 0;
+let dragStartY  = 0;
 let pinchDist   = 0;
 
 function applyCameraOrbit() {
@@ -633,6 +661,7 @@ function toggleView() {
 canvas.addEventListener('mousedown', e => {
   dragging = true; dragDist = 0;
   mouseStart = { x: e.clientX, y: e.clientY };
+  dragStartY = e.clientY;
 });
 canvas.addEventListener('mouseup', () => { dragging = false; });
 canvas.addEventListener('mousemove', e => {
@@ -641,8 +670,9 @@ canvas.addEventListener('mousemove', e => {
   const dy = e.clientY - mouseStart.y;
   dragDist += Math.abs(dx) + Math.abs(dy);
   if (!view2D) {
-    camTheta -= dx * 0.008;
-    camPhi = Math.max(0.25, Math.min(Math.PI / 2 - 0.05, camPhi + dy * 0.008));
+    const hSign = dragStartY > window.innerHeight / 2 ? 1 : -1;
+    camTheta += hSign * dx * 0.008;
+    camPhi = Math.max(0.25, Math.min(Math.PI / 2 - 0.05, camPhi - dy * 0.008));
     applyCameraOrbit();
   }
   mouseStart = { x: e.clientX, y: e.clientY };
@@ -657,6 +687,7 @@ canvas.addEventListener('touchstart', e => {
   dragDist = 0; dragging = false;
   if (e.touches.length === 1) {
     mouseStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    dragStartY = e.touches[0].clientY;
   } else if (e.touches.length === 2) {
     pinchDist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
@@ -684,8 +715,9 @@ canvas.addEventListener('touchmove', e => {
     dragDist += Math.abs(dx) + Math.abs(dy);
     dragging = dragDist > 6;
     if (!view2D) {
-      camTheta -= dx * 0.008;
-      camPhi = Math.max(0.25, Math.min(Math.PI / 2 - 0.05, camPhi + dy * 0.008));
+      const hSign = dragStartY > window.innerHeight / 2 ? 1 : -1;
+      camTheta += hSign * dx * 0.008;
+      camPhi = Math.max(0.25, Math.min(Math.PI / 2 - 0.05, camPhi - dy * 0.008));
       applyCameraOrbit();
     }
     mouseStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
