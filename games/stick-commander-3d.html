@@ -245,20 +245,44 @@ body {
 #unlockToast.show { display: block; animation: toastPop 0.25s ease; }
 @keyframes toastPop { from{transform:translateX(-50%) scale(0.8);opacity:0;} to{transform:translateX(-50%) scale(1);opacity:1;} }
 
-/* ── WAVE DONE TOAST (slim one-liner) ────────── */
-#waveDone {
-  position: fixed; top: var(--hud-h); left: 50%; transform: translateX(-50%);
-  background: rgba(6,6,14,0.94); border: 1px solid var(--gold);
-  border-top: none; border-bottom-left-radius: 5px; border-bottom-right-radius: 5px;
-  padding: 5px 18px; z-index: 24; display: none;
-  align-items: center; gap: 10px; white-space: nowrap; font-size: 0.62rem;
+/* ── WAVE INTERLUDE OVERLAY (faint gray tint) ── */
+#waveInterludeOverlay {
+  position: fixed; inset: 0; z-index: 22;
+  background: rgba(20,20,40,0.52);
+  pointer-events: none; display: none;
 }
-#waveDone.visible { display: flex; animation: slideDown 0.2s ease; }
-@keyframes slideDown { from{opacity:0;transform:translateX(-50%) translateY(-8px);} to{opacity:1;transform:translateX(-50%) translateY(0);} }
-#wdTitle    { font-family:'Black Ops One',sans-serif; color:var(--gold); font-size:0.7rem; }
-#wdBonus    { color: var(--gold); }
-#wdNext     { color: var(--dim); }
-#wdCountdown{ font-family:'Black Ops One',sans-serif; color:var(--crystal); font-size:0.78rem; min-width:14px; }
+#waveInterludeOverlay.visible { display: block; }
+
+/* ── WAVE DONE PANEL ─────────────────────────── */
+#waveDone {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(6,6,14,0.97); border: 1px solid var(--gold);
+  border-radius: 8px; padding: 18px 24px;
+  z-index: 24; display: none; flex-direction: column;
+  align-items: center; gap: 10px;
+  min-width: min(320px, 88vw); max-width: min(420px, 92vw);
+  pointer-events: none;
+}
+#waveDone.visible { display: flex; animation: wdPop 0.25s ease; }
+@keyframes wdPop { from{opacity:0;transform:translate(-50%,-50%) scale(0.88);} to{opacity:1;transform:translate(-50%,-50%) scale(1);} }
+#wdTitle { font-family:'Black Ops One',sans-serif; color:var(--gold); font-size:1.05rem; letter-spacing:3px; text-align:center; }
+.wd-stats-row { display:flex; gap:16px; align-items:center; }
+.wd-gold { color:var(--gold); font-family:'Black Ops One',sans-serif; font-size:0.85rem; }
+.wd-crystal { font-size:0.66rem; }
+#wdTroopTable {
+  width:100%; display:flex; flex-direction:column; gap:3px;
+  border-top:1px solid var(--border); padding-top:8px;
+}
+.wd-troop-row { display:flex; justify-content:space-between; align-items:center; font-size:0.62rem; }
+.wd-troop-name { color:var(--white); }
+.wd-troop-math { color:var(--dim); letter-spacing:0.5px; }
+.wd-troop-math b { color:var(--green); }
+.wd-next-row {
+  display:flex; gap:6px; align-items:center; font-size:0.6rem; color:var(--dim);
+  border-top:1px solid var(--border); padding-top:8px; width:100%; justify-content:center;
+}
+#wdCountdown { font-family:'Black Ops One',sans-serif; color:var(--crystal); font-size:0.9rem; min-width:12px; text-align:center; }
 
 /* ── PAUSE OVERLAY ───────────────────────────── */
 #pauseOverlay {
@@ -358,12 +382,21 @@ body {
 <!-- Unlock notification -->
 <div id="unlockToast"><div id="unlockToastText">🔓 ARCHER UNLOCKED!</div></div>
 
-<!-- Wave-done slim banner -->
+<!-- Wave interlude dim overlay -->
+<div id="waveInterludeOverlay"></div>
+
+<!-- Wave-done summary panel -->
 <div id="waveDone">
-  <span id="wdTitle">WAVE 1 ✓</span>
-  <span id="wdBonus">+200🪙</span>
-  <span id="wdNext" style="color:var(--dim);">next in</span>
-  <span id="wdCountdown">3</span>
+  <div id="wdTitle">WAVE 1 COMPLETE</div>
+  <div class="wd-stats-row">
+    <span id="wdGoldEarned" class="wd-gold">+200🪙</span>
+    <span id="wdCrystalDelta" class="wd-crystal">💎 No damage</span>
+  </div>
+  <div id="wdTroopTable"></div>
+  <div class="wd-next-row">
+    <span id="wdNext">next wave in</span>
+    <span id="wdCountdown">3</span>
+  </div>
 </div>
 
 <!-- Pause overlay -->
@@ -670,7 +703,7 @@ canvas.addEventListener('mousemove', e => {
   const dy = e.clientY - mouseStart.y;
   dragDist += Math.abs(dx) + Math.abs(dy);
   if (!view2D) {
-    const hSign = dragStartY > window.innerHeight / 2 ? 1 : -1;
+    const hSign = dragStartY > window.innerHeight / 2 ? -1 : 1;
     camTheta += hSign * dx * 0.008;
     camPhi = Math.max(0.25, Math.min(Math.PI / 2 - 0.05, camPhi - dy * 0.008));
     applyCameraOrbit();
@@ -715,7 +748,7 @@ canvas.addEventListener('touchmove', e => {
     dragDist += Math.abs(dx) + Math.abs(dy);
     dragging = dragDist > 6;
     if (!view2D) {
-      const hSign = dragStartY > window.innerHeight / 2 ? 1 : -1;
+      const hSign = dragStartY > window.innerHeight / 2 ? -1 : 1;
       camTheta += hSign * dx * 0.008;
       camPhi = Math.max(0.25, Math.min(Math.PI / 2 - 0.05, camPhi - dy * 0.008));
       applyCameraOrbit();
@@ -770,6 +803,9 @@ function resetGame() {
     waveWon:        false,
     betweenTimer:   0,
     unlockedTroops: new Set(['soldier']),
+    waveStartGold: START_GOLD, waveStartCrystalHp: CRYSTAL_MAX_HP,
+    waveStartTroopCounts: {}, waveGoldEarned: 0,
+    waveTroopsAdded: {}, waveTroopsLost: {},
     uid: 1,
     lastTime: performance.now(),
   };
@@ -1030,15 +1066,19 @@ function handleDeath(unit) {
   if (unit.team === 'enemy') {
     GS.gold  += unit.reward;
     GS.score += unit.reward * 3;
+    GS.waveGoldEarned += unit.reward;
     addFloat3D(unit.group.position.clone().add(new THREE.Vector3(0, 2.5, 0)),
       `+${unit.reward}🪙`, '#ffc300');
     rollUnlocks(unit);
     if (unit.isBoss) {
       GS.gold  += unit.reward; // double gold for boss kill
+      GS.waveGoldEarned += unit.reward;
       GS.score += 5000;
       document.getElementById('bossBar').classList.remove('visible');
       GS.bossUnit = null;
     }
+  } else if (unit.team === 'player') {
+    GS.waveTroopsLost[unit.type] = (GS.waveTroopsLost[unit.type] || 0) + 1;
   }
   scene.remove(unit.group);
 }
@@ -1312,6 +1352,17 @@ function startWave(n) {
   GS.bossUnit = null;
   document.getElementById('bossBar').classList.remove('visible');
 
+  // Snapshot state at wave start for interlude summary
+  GS.waveStartGold = GS.gold;
+  GS.waveStartCrystalHp = GS.crystalHp;
+  GS.waveStartTroopCounts = {};
+  for (const type of Object.keys(TROOP_DEFS)) {
+    GS.waveStartTroopCounts[type] = GS.troops.filter(t => t.type === type && t.hp > 0).length;
+  }
+  GS.waveGoldEarned = 0;
+  GS.waveTroopsAdded = {};
+  GS.waveTroopsLost = {};
+
   // Clean out dead enemies from previous wave
   GS.enemies = GS.enemies.filter(e => e.hp > 0);
 
@@ -1360,15 +1411,56 @@ function checkWaveWin() {
 function showWaveComplete(goldBonus) {
   GS.phase = 'between';
   const n = GS.wave;
-  document.getElementById('wdTitle').textContent    = n >= MAX_WAVES ? '⚔ SURVIVED!' : `WAVE ${n} ✓`;
-  document.getElementById('wdBonus').textContent    = `+${goldBonus}🪙`;
-  document.getElementById('wdNext').style.display   = n >= MAX_WAVES ? 'none' : '';
+
+  // Title
+  document.getElementById('wdTitle').textContent = n >= MAX_WAVES ? '⚔ SURVIVED ALL WAVES!' : `WAVE ${n} COMPLETE`;
+
+  // Gold earned this wave (kills + wave bonus)
+  const totalGold = GS.waveGoldEarned + goldBonus;
+  document.getElementById('wdGoldEarned').textContent = `+${totalGold}🪙`;
+
+  // Crystal HP delta
+  const dmgTaken = GS.waveStartCrystalHp - GS.crystalHp;
+  const crystalEl = document.getElementById('wdCrystalDelta');
+  if (dmgTaken === 0) {
+    crystalEl.textContent = '💎 No damage taken!';
+    crystalEl.style.color = 'var(--green)';
+  } else {
+    crystalEl.textContent = `💎 −${dmgTaken} HP`;
+    crystalEl.style.color = 'var(--red)';
+  }
+
+  // Troop table: types that had any presence (start or deployed)
+  const tableEl = document.getElementById('wdTroopTable');
+  tableEl.innerHTML = '';
+  for (const [type, def] of Object.entries(TROOP_DEFS)) {
+    const start = GS.waveStartTroopCounts[type] || 0;
+    const added = GS.waveTroopsAdded[type] || 0;
+    if (start === 0 && added === 0) continue;
+    const lost = GS.waveTroopsLost[type] || 0;
+    const end  = start + added - lost;
+    const row  = document.createElement('div');
+    row.className = 'wd-troop-row';
+    row.innerHTML =
+      `<span class="wd-troop-name">${def.icon} ${def.name}</span>` +
+      `<span class="wd-troop-math">${start} + ${added} − ${lost} = <b>${end}</b></span>`;
+    tableEl.appendChild(row);
+  }
+
+  // Countdown
+  document.getElementById('wdNext').style.display = n >= MAX_WAVES ? 'none' : '';
   GS.betweenTimer = n >= MAX_WAVES ? 3 : WAVE_BREAK;
   document.getElementById('wdCountdown').textContent = GS.betweenTimer;
+
   document.getElementById('waveDone').classList.add('visible');
+  document.getElementById('waveInterludeOverlay').classList.add('visible');
   updateCountdown();
   if (n >= MAX_WAVES) {
-    setTimeout(() => { document.getElementById('waveDone').classList.remove('visible'); endGame(true); }, 3500);
+    setTimeout(() => {
+      document.getElementById('waveDone').classList.remove('visible');
+      document.getElementById('waveInterludeOverlay').classList.remove('visible');
+      endGame(true);
+    }, 3500);
   }
 }
 
@@ -1381,6 +1473,7 @@ function updateCountdown() {
     if (GS.betweenTimer <= 0) {
       clearInterval(_cdInterval);
       document.getElementById('waveDone').classList.remove('visible');
+      document.getElementById('waveInterludeOverlay').classList.remove('visible');
       GS.wave++;
       GS.phase = 'playing';
       GS.enemies = [];   // clear any lingering corpses
@@ -1457,6 +1550,7 @@ function handleFieldTap(clientX, clientY) {
   GS.gold -= def.cost;
   const troop = spawnTroop(GS.selectedTroop, pt.x, pt.z);
   GS.troops.push(troop);
+  GS.waveTroopsAdded[GS.selectedTroop] = (GS.waveTroopsAdded[GS.selectedTroop] || 0) + 1;
   const hex = '#' + def.color.toString(16).padStart(6, '0');
   addFloat3D(new THREE.Vector3(pt.x, 1.5, pt.z), `+${def.name}`, hex);
   updateHUD();
@@ -1553,6 +1647,7 @@ function endGame(victory) {
   GS.phase = victory ? 'victory' : 'gameover';
   clearInterval(_cdInterval);
   document.getElementById('waveDone').classList.remove('visible');
+  document.getElementById('waveInterludeOverlay').classList.remove('visible');
   if (victory) {
     document.getElementById('victoryScreen').classList.remove('hidden');
     document.getElementById('vicScore').textContent = 'SCORE: ' + GS.score;
