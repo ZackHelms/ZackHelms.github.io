@@ -450,6 +450,7 @@ const FIELD_RADIUS    = 20;   // play area radius (units)
 const SPAWN_RADIUS    = 25;   // enemy spawn distance from center
 const MIN_PLACE_DIST  = 2.5;  // can't place troops right at crystal
 const WAVE_BREAK      = 3;    // seconds between waves
+const IDLE_RADIUS     = 7;    // troops drift back within this radius when idle
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TROOP DEFINITIONS
@@ -967,6 +968,18 @@ function moveTo(unit, tx, tz, dt) {
   animateLimbs(unit.limbs, unit.walkPhase, true);
 }
 
+function returnToRing(t, dt, idleSwaySpeed) {
+  const di = distToOrigin(t);
+  if (di > IDLE_RADIUS + 0.5) {
+    // Walk back toward the ring at IDLE_RADIUS, keeping the same angle from center
+    const p = t.group.position;
+    const ang = Math.atan2(p.x, p.z);
+    moveTo(t, Math.sin(ang) * IDLE_RADIUS, Math.cos(ang) * IDLE_RADIUS, dt);
+  } else {
+    animateLimbs(t.limbs, t.walkPhase += dt * idleSwaySpeed, false);
+  }
+}
+
 function updateUnits(dt) {
   // ── PLAYER TROOPS ─────────────────────────────────────────────────────────
   for (const t of GS.troops) {
@@ -989,7 +1002,7 @@ function updateUnits(dt) {
         }
       } else {
         t.state = 'idle';
-        animateLimbs(t.limbs, t.walkPhase += dt * 0.5, false);
+        returnToRing(t, dt, 0.5);
       }
       continue;
     }
@@ -1014,7 +1027,8 @@ function updateUnits(dt) {
       t.state = 'march';
       moveTo(t, target.group.position.x, target.group.position.z, dt);
     } else {
-      animateLimbs(t.limbs, t.walkPhase += dt * 0.3, false);
+      t.state = 'idle';
+      returnToRing(t, dt, 0.3);
     }
   }
 
