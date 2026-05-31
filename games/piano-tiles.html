@@ -119,24 +119,55 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 16px;
+    padding: 0 12px;
     background: linear-gradient(to bottom, rgba(8,8,16,0.9), transparent);
   }
 
-  #score-display {
-    font-size: 28px;
-    font-weight: 900;
-    color: var(--glow-cyan);
-    text-shadow: 0 0 20px var(--glow-cyan);
-    letter-spacing: 2px;
+  .stat-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 64px;
   }
-
-  #combo-display {
-    font-size: 11px;
-    color: var(--glow-gold);
-    text-shadow: 0 0 10px var(--glow-gold);
+  .stat-label {
+    font-size: 8px;
+    letter-spacing: 2px;
     font-family: 'Space Mono', monospace;
-    text-align: right;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 1px;
+  }
+  .stat-value {
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  #hits-display   { color: var(--glow-cyan);  text-shadow: 0 0 14px var(--glow-cyan); }
+  #score-display  { color: var(--glow-gold);  text-shadow: 0 0 18px var(--glow-gold); font-size: 26px; }
+  #misses-display { color: var(--glow-pink);  text-shadow: 0 0 14px var(--glow-pink); }
+
+  /* debug toggle */
+  #debug-toggle {
+    position: absolute;
+    top: 8px; right: 8px;
+    z-index: 35;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(0,245,255,0.3);
+    border-radius: 4px;
+    color: rgba(0,245,255,0.5);
+    font-family: 'Space Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 1px;
+    padding: 3px 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    touch-action: manipulation;
+  }
+  #debug-toggle.on {
+    border-color: var(--glow-cyan);
+    color: var(--glow-cyan);
+    box-shadow: 0 0 8px rgba(0,245,255,0.4);
+    background: rgba(0,245,255,0.08);
   }
 
   /* screens */
@@ -523,9 +554,20 @@
   <div id="miss-flash"></div>
 
   <div id="ui" class="hidden">
-    <div id="score-display">0</div>
-    <div id="combo-display"></div>
+    <div class="stat-box">
+      <div class="stat-label">HITS</div>
+      <div class="stat-value" id="hits-display">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">SCORE</div>
+      <div class="stat-value" id="score-display">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">MISS</div>
+      <div class="stat-value" id="misses-display">0</div>
+    </div>
   </div>
+  <button id="debug-toggle">DBG</button>
 
   <div id="hit-zone" class="hidden">
     <button class="lane-btn" data-lane="0"></button>
@@ -600,7 +642,7 @@
     <h1 id="gameover-title" style="color:var(--glow-cyan);text-shadow:0 0 30px var(--glow-cyan)">COMPLETE</h1>
     <div class="stat">SCORE <span id="final-score">0</span></div>
     <div class="stat">BEST <span id="best-score">0</span></div>
-    <div class="stat">MAX COMBO <span id="final-combo">0</span></div>
+    <div class="stat">HITS <span id="final-hits">0</span></div>
     <div class="stat">MISSES <span id="final-misses">0</span></div>
     <button class="btn" id="restart-btn">PLAY AGAIN</button>
   </div>
@@ -878,6 +920,8 @@ let state = 'start';
 let tiles = [];
 let particles = [];
 let score = 0;
+let hitScore = 0;
+let hits = 0;
 let combo = 0;
 let maxCombo = 0;
 let misses = 0;
@@ -887,6 +931,9 @@ let animId;
 let lastTime = 0;
 let bestScore = 0;
 let hitTexts = [];
+let debugMode = false;
+
+const HIT_MULTIPLIERS = [1, 2, 3, 4, 5, 5, 4, 3, 2, 1];
 
 const CYAN = '#00f5ff';
 const PINK = '#ff006e';
@@ -924,16 +971,31 @@ let tileQueue = [];
 
 function initGame() {
   tiles = []; particles = []; hitTexts = [];
-  score = 0; combo = 0; maxCombo = 0; misses = 0; songEndTime = 0;
+  score = 0; hitScore = 0; hits = 0; combo = 0; maxCombo = 0; misses = 0; songEndTime = 0;
   const LOOKAHEAD = 1.8;
   speed = (H - HIT_ZONE_H) / LOOKAHEAD;
   tileQueue = buildTileQueue(selectedDifficulty);
   const lastTile = tileQueue[tileQueue.length - 1];
   songEndTime = lastTile ? lastTile.audioTime + 2.5 : 60;
   document.getElementById('score-display').textContent = '0';
-  document.getElementById('combo-display').textContent = '';
+  document.getElementById('hits-display').textContent = '0';
+  document.getElementById('misses-display').textContent = '0';
   document.getElementById('speed-bar').style.width = '0%';
 }
+
+// Segment colors: dim for low multiplier, bright for high
+const SEG_COLORS = [
+  'rgba(0,245,255,0.06)',  // 1x
+  'rgba(0,245,255,0.10)',  // 2x
+  'rgba(0,245,255,0.16)',  // 3x
+  'rgba(0,245,255,0.24)',  // 4x
+  'rgba(0,245,255,0.34)',  // 5x
+  'rgba(0,245,255,0.34)',  // 5x
+  'rgba(0,245,255,0.24)',  // 4x
+  'rgba(0,245,255,0.16)',  // 3x
+  'rgba(0,245,255,0.10)',  // 2x
+  'rgba(0,245,255,0.06)',  // 1x
+];
 
 function drawTile(t) {
   if (t.hit && t.alpha <= 0) return;
@@ -973,6 +1035,29 @@ function drawTile(t) {
     ctx.lineTo(t.x + t.w - r, t.y + 1);
     ctx.stroke();
   }
+
+  if (debugMode && !t.hit && !t.missed) {
+    const segH = t.h / 10;
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < 10; i++) {
+      const sy = t.y + i * segH;
+      ctx.fillStyle = SEG_COLORS[i];
+      ctx.fillRect(t.x + 1, sy, t.w - 2, segH - 0.5);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.font = `700 ${Math.floor(segH * 0.55)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(HIT_MULTIPLIERS[i] + 'x', t.x + t.w / 2, sy + segH / 2);
+    }
+    // divider lines between segments
+    ctx.strokeStyle = 'rgba(0,245,255,0.18)';
+    ctx.lineWidth = 0.5;
+    for (let i = 1; i < 10; i++) {
+      const ly = t.y + i * segH;
+      ctx.beginPath(); ctx.moveTo(t.x + 1, ly); ctx.lineTo(t.x + t.w - 1, ly); ctx.stroke();
+    }
+  }
+
   ctx.restore();
 }
 
@@ -1012,11 +1097,17 @@ function gameOver() {
   }
   document.getElementById('final-score').textContent = score;
   document.getElementById('best-score').textContent = bestScore;
-  document.getElementById('final-combo').textContent = maxCombo;
+  document.getElementById('final-hits').textContent = hits;
   document.getElementById('final-misses').textContent = misses;
   document.getElementById('gameover-screen').classList.remove('hidden');
   document.getElementById('ui').classList.add('hidden');
   document.getElementById('hit-zone').classList.add('hidden');
+}
+
+function getHitMultiplier(tile) {
+  const hitLineY = H - HIT_ZONE_H;
+  const rel = Math.max(0, Math.min(0.9999, (hitLineY - tile.y) / tile.h));
+  return HIT_MULTIPLIERS[Math.floor(rel * 10)];
 }
 
 function onLanePress(lane) {
@@ -1029,19 +1120,21 @@ function onLanePress(lane) {
     if (t.y + t.h >= H * 0.3) { hit = t; break; }
   }
   if (hit) {
+    const mult = getHitMultiplier(hit);
     hit.hit = true; hit.glow = 1;
+    hits++;
     combo++;
     if (combo > maxCombo) maxCombo = combo;
-    score += combo >= 10 ? 20 : combo >= 5 ? 15 : 10;
-    playNote(lane, combo >= 10);
+    hitScore += mult;
+    score = hitScore - misses;
+    playNote(lane, mult >= 5);
     const cx = hit.lane * LANE_W + LANE_W/2;
     const cy = H - HIT_ZONE_H - 20;
-    const color = combo >= 10 ? GOLD : combo >= 5 ? PINK : CYAN;
+    const color = mult >= 5 ? GOLD : mult >= 3 ? PINK : CYAN;
     spawnParticles(cx, cy, color);
-    const label = combo >= 20 ? 'INSANE!' : combo >= 10 ? 'PERFECT' : combo >= 5 ? 'GREAT' : '';
-    if (label) spawnHitText(hit.lane, label, color);
+    if (mult >= 4) spawnHitText(hit.lane, mult + 'x', color);
     document.getElementById('score-display').textContent = score;
-    if (combo >= 5) document.getElementById('combo-display').textContent = 'x' + combo + ' COMBO';
+    document.getElementById('hits-display').textContent = hits;
     const btn = document.querySelector(`.lane-btn[data-lane="${lane}"]`);
     if (btn) { btn.classList.add('pressed'); setTimeout(() => btn.classList.remove('pressed'), 100); }
   }
@@ -1119,7 +1212,9 @@ function loop(ts) {
         t.missed = true;
         misses++;
         combo = 0;
-        document.getElementById('combo-display').textContent = '';
+        score = hitScore - misses;
+        document.getElementById('score-display').textContent = score;
+        document.getElementById('misses-display').textContent = misses;
         hitFlash();
         playMissSound();
       }
@@ -1176,6 +1271,11 @@ document.getElementById('start-btn').addEventListener('click', startGame);
 document.getElementById('restart-btn').addEventListener('click', () => {
   document.getElementById('gameover-screen').classList.add('hidden');
   startGame();
+});
+
+document.getElementById('debug-toggle').addEventListener('click', () => {
+  debugMode = !debugMode;
+  document.getElementById('debug-toggle').classList.toggle('on', debugMode);
 });
 
 ctx.fillStyle = '#080810';
