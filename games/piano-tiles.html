@@ -1100,7 +1100,7 @@ function loop(ts) {
       qt.spawned = true;
       // Place tile at correct y based on how far ahead its beat time is
       const timeAhead = qt.audioTime - nowAudio;
-      const yInit = -TILE_H + Math.max(0, LOOKAHEAD - timeAhead) * speed;
+      const yInit = -TILE_H/2 + Math.max(0, LOOKAHEAD - timeAhead) * speed;
       tiles.push({ lane: qt.lane, x: qt.lane*LANE_W+4, y: yInit, w: LANE_W-8, h: TILE_H, hit: false, missed: false, alpha: 1, glow: 0, beatTime: qt.audioTime });
     }
   }
