@@ -386,8 +386,7 @@
     <h1>PIANO<br>TILES</h1>
     <p>TAP THE FALLING TILES<br>BEAT YOUR BEST SCORE</p>
     <div id="song-select">
-      <button class="song-btn active" data-song="takedown">"TAKEDOWN" - K-Pop Demon Hunters</button>
-      <button class="song-btn" data-song="dance_monkey">"DANCE MONKEY" - Tones and I</button>
+      <button class="song-btn active" data-song="kpopsong1">KPOP SONG 1</button>
     </div>
     <div id="difficulty-select">
       <button class="diff-btn active" data-diff="easy">EASY</button>
@@ -409,11 +408,11 @@
 </div>
 
 <script>
-// ---- CHIPTUNE ENGINE ----
+// ---- AUDIO ENGINE ----
 let audioCtx = null;
 let masterGain = null;
-let seqTimeout = null;
-let selectedSong = 'takedown';
+let bgMusic = null;
+let selectedSong = 'kpopsong1';
 
 function n(name) {
   const notes = { C:0,D:2,E:4,F:5,G:7,A:9,B:11 };
@@ -423,53 +422,92 @@ function n(name) {
   const semi = notes[letter] + acc + (oct + 1) * 12;
   return 440 * Math.pow(2, (semi - 69) / 12);
 }
-const R = null;
 
-const DANCE_MONKEY = {
-  bpm: 98,
-  melody: [
-    'F#5','E5','D5','C#5', 'B4','A4','B4','C#5', 'D5','C#5','B4','A4', 'F#4',R,R,R,
-    'F#5','E5','D5','C#5', 'B4','C#5','D5',R, 'A4','B4','C#5','D5', 'E5',R,R,R,
-    'F#5','E5','D5','C#5', 'B4','A4','B4','C#5', 'D5','E5','F#5','E5', 'D5',R,R,R,
-    'A5','G#5','F#5','E5', 'D5','C#5','B4',R, 'F#4',R,R,R, R,R,R,R,
+// ---- SONG DATA ----
+// Tap Template — KPOP SONG 1 (150 BPM, 4/4)
+// All times in seconds from song start.
+// Sections:
+//   Intro     0.0 – 3.2s  (2 bars):  Industrial bass riff + group shout on bar downbeats
+//   Verse     3.2 – 12.8s (6 bars):  Rapid 16th hi-hats, punchy kick, syncopated vocals
+//   Pre-Cho  12.8 – 16.0s (2 bars):  Drums drop; synth swell + sharp vocal ad-libs (sparse)
+//   Chorus   16.0 – 25.6s (6 bars):  Wall of sound, supersaw chords, heavy downbeats, group harmonies
+// Main downbeats: 0.0, 1.6, 3.2, 4.8, 6.4, 8.0, 9.6, 11.2, 12.8, 14.4, 16.0, 17.6, 19.2, 20.8, 22.4, 24.0
+// Quarter note = 0.4s  |  8th note = 0.2s  |  16th note = 0.1s
+const KPOPSONG1 = {
+  title: 'KPOP SONG 1',
+  bpm: 150,
+  src: 'kpopsong1.mp3',
+
+  // Easy: half notes (0.8s) in intro/verse, quarter notes (0.4s) in chorus; single taps only
+  easy: [
+    // Intro — bar downbeats
+    [0.0,1],[0.8,3],[1.6,2],[2.4,0],
+    // Verse — half notes
+    [3.2,1],[4.0,3],[4.8,0],[5.6,2],[6.4,3],[7.2,1],[8.0,0],[8.8,2],[9.6,3],[10.4,1],[11.2,0],[12.0,2],
+    // Pre-Chorus — very sparse (2 hits)
+    [12.8,3],[14.4,1],
+    // Chorus — quarter notes
+    [16.0,1],[16.4,3],[16.8,0],[17.2,2],
+    [17.6,3],[18.0,1],[18.4,0],[18.8,2],
+    [19.2,3],[19.6,1],[20.0,2],[20.4,0],
+    [20.8,1],[21.2,3],[21.6,2],[22.0,0],
+    [22.4,3],[22.8,1],[23.2,0],[23.6,2],
+    [24.0,1],[24.4,3],[24.8,0],[25.2,2],
   ],
-  bass: [
-    'F#2',R,'F#2',R, 'D2',R,'D2',R, 'E2',R,'E2',R, 'C#2',R,'C#2',R,
-    'F#2',R,'F#2',R, 'D2',R,'D2',R, 'A2',R,'A2',R, 'E2',R,'E2',R,
-    'F#2',R,'F#2',R, 'D2',R,'D2',R, 'E2',R,'E2',R, 'C#2',R,'C#2',R,
-    'F#2',R,'F#2',R, 'A2',R,'A2',R, 'E2',R,'E2',R, 'B1',R,'B1',R,
+
+  // Medium: quarter notes + syncopated 8ths in verse; 8th notes + rare 2-lane in chorus
+  medium: [
+    // Intro — quarter notes
+    [0.0,2],[0.4,0],[0.8,1],[1.2,3],[1.6,2],[2.0,0],[2.4,3],[2.8,1],
+    // Verse — quarter notes with one 8th-note syncopation per half-bar
+    [3.2,1],[3.4,3],[4.0,0],[4.2,2],[4.8,1],[5.0,3],[5.6,0],[5.8,2],
+    [6.4,1],[6.6,3],[7.2,0],[7.4,2],[8.0,1],[8.2,3],[8.8,0],[9.0,2],
+    [9.6,1],[9.8,3],[10.4,0],[10.6,2],[11.2,1],[11.4,3],[12.0,0],[12.2,2],
+    // Pre-Chorus — quarter notes building tension
+    [12.8,3],[13.2,1],[13.6,2],[14.0,0],[14.4,3],[14.8,1],[15.2,2],[15.6,0],
+    // Chorus — 8th notes with 2-lane on each bar downbeat
+    [16.0,[1,3]],[16.2,0],[16.4,2],[16.6,3],[16.8,0],[17.0,2],[17.2,3],[17.4,0],
+    [17.6,[0,2]],[17.8,3],[18.0,1],[18.2,3],[18.4,0],[18.6,2],[18.8,1],[19.0,3],
+    [19.2,[1,3]],[19.4,0],[19.6,2],[19.8,3],[20.0,0],[20.2,1],[20.4,2],[20.6,0],
+    [20.8,[0,2]],[21.0,3],[21.2,1],[21.4,0],[21.6,2],[21.8,3],[22.0,1],[22.2,0],
+    [22.4,[1,3]],[22.6,2],[22.8,0],[23.0,3],[23.2,1],[23.4,2],[23.6,0],[23.8,3],
+    [24.0,[0,2]],[24.2,1],[24.4,3],[24.6,0],[24.8,2],[25.0,3],[25.2,1],[25.4,0],
   ],
-  kick:  [1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0,
-          1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0],
-  snare: [0,0,0,0,1,0,0,0, 0,0,0,0,1,0,0,0, 0,0,0,0,1,0,0,0, 0,0,0,0,1,0,0,0,
-          0,0,0,0,1,0,0,0, 0,0,0,0,1,0,0,0, 0,0,0,0,1,0,0,0, 0,0,0,0,1,0,0,0],
-  hat:   [1,0,1,0,1,0,1,0, 1,0,1,0,1,0,1,0, 1,0,1,0,1,0,1,0, 1,0,1,0,1,0,1,0,
-          1,0,1,0,1,0,1,0, 1,0,1,0,1,0,1,0, 1,0,1,0,1,0,1,0, 1,0,1,0,1,0,1,0],
+
+  // Hard: 8th-note base + 16th-note bursts in verse; dense 8ths + frequent 2-lane in chorus
+  hard: [
+    // Intro — 8th notes
+    [0.0,2],[0.2,0],[0.4,1],[0.6,3],[0.8,2],[1.0,0],[1.2,3],[1.4,1],
+    [1.6,2],[1.8,0],[2.0,3],[2.2,1],[2.4,0],[2.6,2],[2.8,1],[3.0,3],
+    // Verse — 16th-note burst (4 notes) at half-bar, 8th notes otherwise
+    // Bar 3
+    [3.2,0],[3.3,1],[3.4,2],[3.5,3],[3.6,0],[3.8,2],[4.0,1],[4.1,3],[4.2,0],[4.3,2],[4.4,1],[4.6,3],
+    // Bar 4
+    [4.8,0],[4.9,2],[5.0,1],[5.1,3],[5.2,0],[5.4,2],[5.6,1],[5.7,3],[5.8,0],[5.9,2],[6.0,1],[6.2,3],
+    // Bar 5
+    [6.4,0],[6.5,1],[6.6,2],[6.7,3],[6.8,0],[7.0,2],[7.2,1],[7.3,3],[7.4,0],[7.5,2],[7.6,1],[7.8,3],
+    // Bar 6
+    [8.0,0],[8.1,2],[8.2,1],[8.3,3],[8.4,0],[8.6,2],[8.8,1],[8.9,3],[9.0,0],[9.1,2],[9.2,1],[9.4,3],
+    // Bar 7
+    [9.6,0],[9.7,1],[9.8,2],[9.9,3],[10.0,0],[10.2,2],[10.4,1],[10.5,3],[10.6,0],[10.7,2],[10.8,1],[11.0,3],
+    // Bar 8
+    [11.2,0],[11.3,2],[11.4,1],[11.5,3],[11.6,0],[11.8,2],[12.0,1],[12.1,3],[12.2,0],[12.3,2],[12.4,1],[12.6,3],
+    // Pre-Chorus — 8th notes
+    [12.8,3],[13.0,1],[13.2,2],[13.4,0],[13.6,3],[13.8,1],[14.0,2],[14.2,0],
+    [14.4,3],[14.6,1],[14.8,2],[15.0,0],[15.2,3],[15.4,1],[15.6,2],[15.8,0],
+    // Chorus — 8th notes + 16th pairs + 2-lane on downbeats
+    [16.0,[1,3]],[16.1,0],[16.2,2],[16.3,3],[16.4,[0,2]],[16.6,3],[16.8,1],[17.0,0],
+    [17.2,[1,3]],[17.3,0],[17.4,2],[17.5,3],[17.6,[0,2]],[17.8,1],[18.0,3],[18.2,0],
+    [18.4,[1,3]],[18.5,2],[18.6,0],[18.7,3],[18.8,[0,2]],[19.0,1],[19.2,3],[19.4,0],
+    [19.6,[1,3]],[19.7,2],[19.8,0],[19.9,3],[20.0,[0,2]],[20.2,1],[20.4,3],[20.6,0],
+    [20.8,[1,3]],[20.9,0],[21.0,2],[21.1,3],[21.2,[0,2]],[21.4,1],[21.6,3],[21.8,0],
+    [22.0,[1,3]],[22.1,2],[22.2,0],[22.3,3],[22.4,[0,2]],[22.6,1],[22.8,3],[23.0,0],
+    [23.2,[1,3]],[23.3,0],[23.4,2],[23.5,3],[23.6,[0,2]],[23.8,1],[24.0,3],[24.2,0],
+    [24.4,[1,3]],[24.5,2],[24.6,0],[24.7,3],[24.8,[0,2]],[25.0,1],[25.2,3],[25.4,0],
+  ],
 };
 
-const TAKEDOWN = {
-  bpm: 130,
-  melody: [
-    'A5','A5','G5','E5', 'F#5',R,'E5','D5', 'A5','A5','G5','E5', 'F#5',R,R,R,
-    'B5','A5','G5','F#5', 'E5','D5','E5','F#5', 'G5','F#5','E5','D5', 'A4',R,R,R,
-    'A5','A5','G5','E5', 'F#5','G5','A5','B5', 'C#6','B5','A5','G5', 'F#5',R,R,R,
-    'D5','E5','F#5','G5', 'A5','B5','A5','G5', 'F#5','E5','D5','E5', 'F#5',R,R,R,
-  ],
-  bass: [
-    'A2',R,'A2',R, 'D2',R,'D2',R, 'E2',R,'E2',R, 'F#2',R,'F#2',R,
-    'B2',R,'B2',R, 'G2',R,'G2',R, 'A2',R,'A2',R, 'E2',R,'E2',R,
-    'A2',R,'A2',R, 'D2',R,'D2',R, 'E2',R,'E2',R, 'F#2',R,'F#2',R,
-    'D2',R,'D2',R, 'A2',R,'A2',R, 'F#2',R,'F#2',R, 'E2',R,'E2',R,
-  ],
-  kick:  [1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0,
-          1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0],
-  snare: [0,0,1,0,0,0,1,0, 0,0,1,0,0,0,1,0, 0,0,1,0,0,0,1,0, 0,0,1,0,0,0,1,0,
-          0,0,1,0,0,0,1,0, 0,0,1,0,0,0,1,0, 0,0,1,0,0,0,1,0, 0,0,1,0,0,0,1,0],
-  hat:   [1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
-          1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1],
-};
-
-const SONGS = { dance_monkey: DANCE_MONKEY, takedown: TAKEDOWN };
+const SONGS = { kpopsong1: KPOPSONG1 };
 
 function initAudio() {
   if (audioCtx) return;
@@ -477,6 +515,8 @@ function initAudio() {
   masterGain = audioCtx.createGain();
   masterGain.gain.value = 0.55;
   masterGain.connect(audioCtx.destination);
+  bgMusic = new Audio('kpopsong1.mp3');
+  bgMusic.volume = 0.85;
 }
 
 function chipNote(freq, time, dur, type, vol, detune) {
@@ -495,82 +535,16 @@ function chipNote(freq, time, dur, type, vol, detune) {
   osc.stop(time + dur);
 }
 
-function kickDrum(time) {
-  const osc = audioCtx.createOscillator();
-  const env = audioCtx.createGain();
-  osc.frequency.setValueAtTime(200, time);
-  osc.frequency.exponentialRampToValueAtTime(40, time + 0.12);
-  env.gain.setValueAtTime(0.8, time);
-  env.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
-  osc.connect(env); env.connect(masterGain);
-  osc.start(time); osc.stop(time + 0.2);
-}
-
-function snareDrum(time) {
-  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.15, audioCtx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
-  const src = audioCtx.createBufferSource();
-  const env = audioCtx.createGain();
-  const filt = audioCtx.createBiquadFilter();
-  filt.type = 'bandpass'; filt.frequency.value = 2500; filt.Q.value = 0.7;
-  src.buffer = buf;
-  env.gain.setValueAtTime(0.35, time);
-  env.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
-  src.connect(filt); filt.connect(env); env.connect(masterGain);
-  src.start(time); src.stop(time + 0.15);
-}
-
-function hihat(time, open) {
-  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * (open ? 0.1 : 0.04), audioCtx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
-  const src = audioCtx.createBufferSource();
-  const env = audioCtx.createGain();
-  const filt = audioCtx.createBiquadFilter();
-  filt.type = 'highpass'; filt.frequency.value = 8000;
-  src.buffer = buf;
-  env.gain.setValueAtTime(0.15, time);
-  env.gain.exponentialRampToValueAtTime(0.001, time + (open ? 0.09 : 0.03));
-  src.connect(filt); filt.connect(env); env.connect(masterGain);
-  src.start(time);
-}
-
-let seqStep = 0;
-let seqNextTime = 0;
-
-function scheduleSequencer() {
-  if (!audioCtx || state !== 'playing') return;
-  const song = SONGS[selectedSong];
-  const stepDur = (60 / song.bpm) / 4;
-  const totalSteps = song.melody.length;
-  const lookahead = 0.1;
-
-  while (seqNextTime < audioCtx.currentTime + lookahead) {
-    const i = seqStep % totalSteps;
-    const t = seqNextTime;
-    if (song.melody[i]) chipNote(n(song.melody[i]), t, stepDur * 0.85, 'square', 0.18);
-    if (song.bass[i])   chipNote(n(song.bass[i]),   t, stepDur * 0.9,  'triangle', 0.28);
-    if (song.kick[i])   kickDrum(t);
-    if (song.snare[i])  snareDrum(t);
-    if (song.hat[i])    hihat(t, false);
-    seqStep++;
-    seqNextTime += stepDur;
-  }
-
-  seqTimeout = setTimeout(scheduleSequencer, 40);
-}
-
 function startMusic() {
-  if (!audioCtx) return;
-  seqStep = 0;
-  seqNextTime = audioCtx.currentTime + 0.05;
-  scheduleSequencer();
+  if (!bgMusic) return;
+  bgMusic.currentTime = 0;
+  bgMusic.play().catch(() => {});
 }
 
 function stopMusic() {
-  clearTimeout(seqTimeout);
-  seqTimeout = null;
+  if (!bgMusic) return;
+  bgMusic.pause();
+  bgMusic.currentTime = 0;
 }
 
 document.querySelectorAll('.song-btn').forEach(b => {
@@ -697,33 +671,26 @@ document.querySelectorAll('.diff-btn').forEach(b => {
   });
 });
 
-function buildTileQueue(song, difficulty) {
-  const map = BEAT_MAPS[selectedSong][difficulty];
-  const stepDur = (60 / song.bpm) / 4;
-  const loopDur = song.melody.length * stepDur;
+function buildTileQueue(difficulty) {
+  const map = SONGS[selectedSong][difficulty];
   const queue = [];
-  for (let loop = 0; loop < 8; loop++) {
-    for (const [step, laneOrLanes] of map) {
-      const lanes = Array.isArray(laneOrLanes) ? laneOrLanes : [laneOrLanes];
-      const audioTime = loop * loopDur + step * stepDur;
-      for (const lane of lanes) {
-        queue.push({ lane, audioTime, spawned: false, hit: false, missed: false, alpha: 1, glow: 0 });
-      }
+  for (const [t, laneOrLanes] of map) {
+    const lanes = Array.isArray(laneOrLanes) ? laneOrLanes : [laneOrLanes];
+    for (const lane of lanes) {
+      queue.push({ lane, audioTime: t, spawned: false, hit: false, missed: false, alpha: 1, glow: 0 });
     }
   }
-  return queue;
+  return queue.sort((a, b) => a.audioTime - b.audioTime);
 }
 
 let tileQueue = [];
-let tileQueueBase = 0;
 
 function initGame() {
   tiles = []; particles = []; hitTexts = [];
   score = 0; combo = 0; maxCombo = 0; misses = 0; songEndTime = 0;
   const LOOKAHEAD = 1.8;
   speed = (H - HIT_ZONE_H) / LOOKAHEAD;
-  tileQueue = buildTileQueue(SONGS[selectedSong], selectedDifficulty);
-  tileQueueBase = audioCtx ? audioCtx.currentTime : 0;
+  tileQueue = buildTileQueue(selectedDifficulty);
   const lastTile = tileQueue[tileQueue.length - 1];
   songEndTime = lastTile ? lastTile.audioTime + 2.5 : 0;
   document.getElementById('score-display').textContent = '0';
@@ -882,7 +849,7 @@ function loop(ts) {
   });
 
   const LOOKAHEAD = 1.8;
-  const nowAudio = audioCtx ? (audioCtx.currentTime - tileQueueBase) : 0;
+  const nowAudio = bgMusic ? bgMusic.currentTime : 0;
 
   // End game when all tiles have had time to be played
   if (songEndTime > 0 && nowAudio > songEndTime) {
