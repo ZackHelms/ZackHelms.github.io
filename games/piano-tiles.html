@@ -1114,7 +1114,7 @@ function onLanePress(lane) {
   if (state === 'recording') { recordTap(lane); return; }
   if (state !== 'playing') return;
   let hit = null;
-  for (let i = tiles.length - 1; i >= 0; i--) {
+  for (let i = 0; i < tiles.length; i++) {
     const t = tiles[i];
     if (t.hit || t.missed || t.lane !== lane) continue;
     if (t.y + t.h >= H * 0.3) { hit = t; break; }
