@@ -456,6 +456,59 @@
     color: rgba(0,245,255,0.45);
     letter-spacing: 2px;
   }
+  /* recording overlay panels */
+  #rec-ready-panel, #rec-active-panel { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+  #rec-ready-instruction {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,0.45);
+    text-align: center;
+    line-height: 1.8;
+    letter-spacing: 0.5px;
+  }
+  /* save/discard modal — covers full container */
+  #rec-done-modal {
+    position: absolute;
+    inset: 0;
+    z-index: 70;
+    background: rgba(8,8,16,0.93);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #rec-done-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 30px 24px;
+    border: 1px solid rgba(0,245,255,0.28);
+    background: rgba(6,6,18,0.99);
+    box-shadow: 0 0 50px rgba(0,245,255,0.12);
+    width: 270px;
+  }
+  #rec-done-title {
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    color: var(--glow-cyan);
+    text-shadow: 0 0 20px var(--glow-cyan);
+  }
+  #rec-done-stats {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.55);
+    text-align: center;
+    line-height: 1.8;
+  }
+  #rec-done-actions { display: flex; gap: 12px; }
+  #discard-rec-btn {
+    border-color: rgba(255,0,110,0.45);
+    color: rgba(255,0,110,0.8);
+    text-shadow: none;
+    box-shadow: none;
+  }
+  #discard-rec-btn:hover { background: rgba(255,0,110,0.1); box-shadow: 0 0 20px rgba(255,0,110,0.2); }
 </style>
 </head>
 <body>
@@ -505,13 +558,34 @@
     <button class="btn" id="tracks-link">SAVED TRACKS</button>
   </div>
 
-  <!-- RECORDING OVERLAY (leaves hit-zone visible) -->
+  <!-- RECORDING OVERLAY (leaves hit-zone visible for tapping) -->
   <div id="recording-overlay" class="hidden">
-    <div id="rec-indicator">● REC</div>
-    <div id="rec-timer">0:00</div>
-    <div id="rec-song-name"></div>
-    <div id="rec-tap-count">0 taps recorded</div>
-    <button class="btn" id="stop-rec-btn" style="font-size:11px;padding:10px 28px;">STOP &amp; SAVE</button>
+    <!-- Panel 1: Ready — shown before audio starts -->
+    <div id="rec-ready-panel">
+      <div id="rec-song-name" style="font-size:12px;font-family:'Space Mono',monospace;color:rgba(255,255,255,0.7);letter-spacing:1px;"></div>
+      <div id="rec-ready-instruction">TAP THE LANE BUTTONS BELOW<br>IN RHYTHM WITH THE SONG<br>TO CREATE YOUR TAP TRACK</div>
+      <button class="btn" id="start-rec-btn" style="font-size:11px;padding:10px 28px;">START RECORDING</button>
+      <button class="btn" id="cancel-rec-btn" style="font-size:9px;padding:7px 20px;border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.35);box-shadow:none;text-shadow:none;">CANCEL</button>
+    </div>
+    <!-- Panel 2: Active — shown while audio plays -->
+    <div id="rec-active-panel" class="hidden">
+      <div id="rec-indicator">● REC</div>
+      <div id="rec-timer">0:00</div>
+      <div id="rec-tap-count">0 taps recorded</div>
+      <button class="btn" id="stop-rec-btn" style="font-size:10px;padding:8px 24px;">STOP</button>
+    </div>
+  </div>
+
+  <!-- SAVE / DISCARD MODAL (full-screen, z-index 70) -->
+  <div id="rec-done-modal" class="hidden">
+    <div id="rec-done-box">
+      <div id="rec-done-title">RECORDING<br>COMPLETE</div>
+      <div id="rec-done-stats"></div>
+      <div id="rec-done-actions">
+        <button class="btn" id="save-rec-btn" style="font-size:11px;padding:10px 24px;">SAVE</button>
+        <button class="btn" id="discard-rec-btn" style="font-size:11px;padding:10px 24px;">DISCARD</button>
+      </div>
+    </div>
   </div>
 
   <!-- TRACKS MANAGER SCREEN -->
@@ -1187,6 +1261,9 @@ document.getElementById('tracks-link').addEventListener('click', openTracksManag
 document.getElementById('close-tracks-btn').addEventListener('click', closeTracksManager);
 
 // ---- CUSTOM RECORDING MODE ----
+// Phase 1 — "ready":  overlay visible, audio NOT started yet (user sees START RECORDING btn)
+// Phase 2 — "active": audio plays, taps recorded (user sees REC indicator + STOP btn)
+// Phase 3 — "done":   audio stopped, save/discard modal shown over everything
 let isRecording = false;
 let recordingTaps = [];
 let recTimerInterval = null;
@@ -1204,53 +1281,94 @@ function recordTap(lane) {
   playNote(lane, false);
 }
 
+// Called from long-press — just opens the overlay in "ready" phase (no audio yet)
 function startRecording() {
   if (state !== 'start') return;
   initAudio();
   stopMusic();
-  isRecording = true;
-  recordingTaps = [];
   state = 'recording';
-  lastTapPerLane.fill(0);
+  isRecording = false;
+  recordingTaps = [];
   document.getElementById('rec-song-name').textContent = SONGS[selectedSong].title;
-  document.getElementById('rec-timer').textContent = '0:00';
-  document.getElementById('rec-tap-count').textContent = '0 taps recorded';
+  document.getElementById('rec-ready-panel').classList.remove('hidden');
+  document.getElementById('rec-active-panel').classList.add('hidden');
   document.getElementById('recording-overlay').classList.remove('hidden');
   document.getElementById('start-screen').classList.add('hidden');
   document.getElementById('hit-zone').classList.remove('hidden');
+}
+
+// Called when user taps START RECORDING — direct user gesture so audio plays reliably
+function beginRecording() {
+  if (state !== 'recording') return;
+  isRecording = true;
+  lastTapPerLane.fill(0);
+  recordingTaps = [];
+  document.getElementById('rec-ready-panel').classList.add('hidden');
+  document.getElementById('rec-active-panel').classList.remove('hidden');
+  document.getElementById('rec-timer').textContent = '0:00';
+  document.getElementById('rec-tap-count').textContent = '0 taps recorded';
   recTimerInterval = setInterval(() => {
     if (!bgMusic) return;
     const t = bgMusic.currentTime;
     document.getElementById('rec-timer').textContent = `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
   }, 100);
-  startMusic();
-  bgMusic.addEventListener('ended', finishRecording, { once: true });
+  startMusic(); // direct user-gesture context → audio plays
+  bgMusic.addEventListener('ended', onSongEnded, { once: true });
 }
 
-function finishRecording() {
+function onSongEnded() { showDoneModal(true); }
+
+// Stop button — user chose to stop early
+document.getElementById('stop-rec-btn').addEventListener('click', () => {
+  if (bgMusic) bgMusic.removeEventListener('ended', onSongEnded);
+  showDoneModal(false);
+});
+
+function showDoneModal(songFinished) {
   clearInterval(recTimerInterval);
-  if (bgMusic) bgMusic.removeEventListener('ended', finishRecording);
   isRecording = false;
-  state = 'start';
   stopMusic();
+  document.getElementById('rec-active-panel').classList.add('hidden');
+  const tapCount = recordingTaps.length;
+  const songTitle = SONGS[selectedSong].title;
+  document.getElementById('rec-done-stats').innerHTML =
+    `${songTitle}<br>${tapCount} tap${tapCount !== 1 ? 's' : ''} recorded` +
+    (songFinished ? '' : '<br><span style="color:rgba(255,255,255,0.35);font-size:9px;">stopped early</span>');
+  document.getElementById('hit-zone').classList.add('hidden'); // no accidental taps during modal
+  document.getElementById('rec-done-modal').classList.remove('hidden');
+}
+
+document.getElementById('save-rec-btn').addEventListener('click', () => {
+  document.getElementById('rec-done-modal').classList.add('hidden');
   document.getElementById('recording-overlay').classList.add('hidden');
   document.getElementById('start-screen').classList.remove('hidden');
-  document.getElementById('hit-zone').classList.add('hidden');
+  state = 'start';
   if (recordingTaps.length > 0) {
     saveRecording(selectedSong, recordingTaps);
     selectedDifficulty = 'custom';
     document.querySelectorAll('.diff-btn').forEach(b => b.classList.toggle('active', b.dataset.diff === 'custom'));
-    // Cyan confirmation flash
-    const f = document.getElementById('miss-flash');
-    f.style.background = 'rgba(0,245,255,0.18)';
-    f.style.opacity = '1';
-    setTimeout(() => { f.style.opacity = '0'; f.style.background = 'rgba(255,0,110,0.15)'; }, 500);
   }
-}
+});
 
-document.getElementById('stop-rec-btn').addEventListener('click', finishRecording);
+document.getElementById('discard-rec-btn').addEventListener('click', () => {
+  document.getElementById('rec-done-modal').classList.add('hidden');
+  document.getElementById('recording-overlay').classList.add('hidden');
+  document.getElementById('start-screen').classList.remove('hidden');
+  state = 'start';
+  recordingTaps = [];
+});
 
-// Long-press CUSTOM button (2 sec) → recording mode
+document.getElementById('cancel-rec-btn').addEventListener('click', () => {
+  document.getElementById('recording-overlay').classList.add('hidden');
+  document.getElementById('start-screen').classList.remove('hidden');
+  document.getElementById('hit-zone').classList.add('hidden');
+  state = 'start';
+  stopMusic();
+});
+
+document.getElementById('start-rec-btn').addEventListener('click', beginRecording);
+
+// Long-press CUSTOM button (2 sec) → opens recording overlay in ready phase
 const customDiffBtn = document.querySelector('.diff-btn[data-diff="custom"]');
 let longPressTimer = null;
 
