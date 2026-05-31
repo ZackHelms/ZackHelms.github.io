@@ -1113,26 +1113,31 @@ function getHitMultiplier(tile) {
 function onLanePress(lane) {
   if (state === 'recording') { recordTap(lane); return; }
   if (state !== 'playing') return;
-  let hit = null;
+
+  const hitLineY = H - HIT_ZONE_H;
+  let anyHit = false;
+
   for (let i = 0; i < tiles.length; i++) {
     const t = tiles[i];
     if (t.hit || t.missed || t.lane !== lane) continue;
-    if (t.y + t.h >= H * 0.3) { hit = t; break; }
-  }
-  if (hit) {
-    const mult = getHitMultiplier(hit);
-    hit.hit = true; hit.glow = 1;
+    // Hit line must intersect this tile's vertical extent
+    if (hitLineY < t.y || hitLineY > t.y + t.h) continue;
+
+    const mult = getHitMultiplier(t);
+    t.hit = true; t.glow = 1;
     hits++;
     combo++;
     if (combo > maxCombo) maxCombo = combo;
     hitScore += mult;
     score = hitScore - misses;
     playNote(lane, mult >= 5);
-    const cx = hit.lane * LANE_W + LANE_W/2;
-    const cy = H - HIT_ZONE_H - 20;
     const color = mult >= 5 ? GOLD : mult >= 3 ? PINK : CYAN;
-    spawnParticles(cx, cy, color);
-    if (mult >= 4) spawnHitText(hit.lane, mult + 'x', color);
+    spawnParticles(t.lane * LANE_W + LANE_W/2, hitLineY - 20, color);
+    if (mult >= 4) spawnHitText(t.lane, mult + 'x', color);
+    anyHit = true;
+  }
+
+  if (anyHit) {
     document.getElementById('score-display').textContent = score;
     document.getElementById('hits-display').textContent = hits;
     const btn = document.querySelector(`.lane-btn[data-lane="${lane}"]`);
@@ -1208,7 +1213,7 @@ function loop(ts) {
     const t = tiles[i];
     if (!t.hit) {
       t.y += pxPerFrame;
-      if (t.y > H - HIT_ZONE_H + 60 && !t.missed && !t.hit) {
+      if (t.y > H - HIT_ZONE_H && !t.missed && !t.hit) {
         t.missed = true;
         misses++;
         combo = 0;
