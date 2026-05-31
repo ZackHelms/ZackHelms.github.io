@@ -12,295 +12,337 @@
   --green: #39ff14; --gold: #ffc300; --red: #ff2244;
   --white: #dde3ff; --dim: #353555; --crystal: #44ddff;
   --orange: #ff8800; --purple: #b44fff;
+  /* Heights/widths updated via JS after first render */
+  --hud-h: 58px;
+  --shop-h: 82px;   /* portrait: shop height */
+  --ab-h:   68px;   /* portrait: ability bar height */
+  --side-w: 80px;   /* landscape: side panel width */
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
-
 body {
-  background: var(--bg);
-  font-family: 'Share Tech Mono', monospace;
-  color: var(--white);
-  overflow: hidden;
-  width: 100vw; height: 100vh;
+  background: var(--bg); font-family: 'Share Tech Mono', monospace;
+  color: var(--white); overflow: hidden; width: 100vw; height: 100vh;
 }
+#gameCanvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
 
-/* Three.js canvas sits behind everything */
-#gameCanvas {
-  position: fixed; top: 0; left: 0;
-  width: 100vw; height: 100vh;
-  z-index: 0;
-}
-
-/* ── TOP HUD ─────────────────────────────────── */
+/* ── TOP HUD (compact, 1-2 rows) ────────────── */
 #hud {
-  position: fixed; top: 0; left: 0; right: 0;
-  background: linear-gradient(180deg, rgba(6,6,14,0.95) 0%, transparent 100%);
-  padding: 8px 14px 18px;
-  display: flex; align-items: center; gap: 12px;
-  flex-wrap: wrap;
-  z-index: 10; pointer-events: none;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+  background: rgba(6,6,14,0.94); border-bottom: 1px solid var(--border);
+  padding: 5px 8px; display: flex; align-items: center;
+  gap: 5px; flex-wrap: wrap; pointer-events: none;
+}
+/* keep side panels clear in landscape */
+@media (orientation: landscape) {
+  #hud { left: var(--side-w); right: var(--side-w); }
 }
 
 .hud-chip {
-  display: flex; align-items: center; gap: 5px;
-  background: rgba(11,11,22,0.85); border: 1px solid var(--border);
-  border-radius: 4px; padding: 4px 10px; font-size: 0.62rem;
-  pointer-events: auto;
+  display: flex; align-items: center; gap: 3px;
+  background: rgba(11,11,22,0.88); border: 1px solid var(--border);
+  border-radius: 4px; padding: 3px 7px; font-size: 0.6rem;
+  pointer-events: auto; white-space: nowrap;
 }
-.hud-chip .lbl { color: var(--dim); margin-right: 2px; }
+.hud-chip .lbl { color: var(--dim); }
 .hud-chip .val { color: var(--white); }
 .hud-chip.gold-chip { border-color: var(--gold); }
-.hud-chip.gold-chip .val { color: var(--gold); font-family: 'Black Ops One', sans-serif; font-size: 0.78rem; }
+.hud-chip.gold-chip .val { color: var(--gold); font-family: 'Black Ops One', sans-serif; font-size: 0.76rem; }
 .hud-chip.wave-chip { border-color: var(--crystal); }
 .hud-chip.wave-chip .val { color: var(--crystal); font-family: 'Black Ops One', sans-serif; }
 
-.bar-wrap { display: flex; align-items: center; gap: 5px; }
-.bar-label { font-size: 0.58rem; white-space: nowrap; }
-.bar-outer {
-  height: 8px; background: #111120;
-  border-radius: 2px; overflow: hidden;
-  border: 1px solid var(--border);
+/* crystal & mana take remaining width */
+.bar-chip {
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(11,11,22,0.88); border: 1px solid var(--border);
+  border-radius: 4px; padding: 3px 7px; font-size: 0.56rem;
+  flex: 1; min-width: 90px; max-width: 180px;
 }
-.crystal-bar-outer { width: 120px; border-color: var(--crystal); }
-.mana-bar-outer    { width: 90px;  border-color: var(--purple); }
+.bar-chip .bl { white-space: nowrap; }
+.bar-outer { flex: 1; height: 7px; background: #111120; border-radius: 2px; overflow: hidden; border: 1px solid var(--border); }
 .bar-inner { height: 100%; border-radius: 2px; transition: width 0.2s; }
 .crystal-fill { background: linear-gradient(90deg, #226699, var(--crystal)); }
 .mana-fill    { background: linear-gradient(90deg, #660099, var(--purple)); }
+.crystal-outer { border-color: var(--crystal); }
+.mana-outer    { border-color: var(--purple); }
+.bar-val { font-size: 0.52rem; color: var(--dim); white-space: nowrap; min-width: 30px; text-align: right; }
 
-.place-indicator {
-  margin-left: auto; font-size: 0.6rem; color: var(--green);
-  background: rgba(11,11,22,0.85); border: 1px solid var(--green);
-  border-radius: 4px; padding: 4px 10px;
-  display: none; pointer-events: auto;
+/* Icon buttons (pause, view toggle) */
+.icon-btn {
+  background: rgba(11,11,22,0.88); border: 1px solid var(--border);
+  border-radius: 5px; width: 34px; height: 34px; min-width: 34px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 0.95rem; color: var(--white);
+  pointer-events: auto; transition: border-color 0.15s;
 }
-.place-indicator.visible { display: block; animation: pulseBorder 1s infinite alternate; }
-@keyframes pulseBorder { from{box-shadow:0 0 4px var(--green)33;} to{box-shadow:0 0 12px var(--green)88;} }
+.icon-btn:active, .icon-btn:hover { border-color: var(--crystal); }
+#pauseBtn   { border-color: var(--dim); }
+#viewTogBtn { border-color: var(--dim); font-size: 0.62rem; font-family: 'Black Ops One', sans-serif; }
 
-/* ── BOSS HP BAR ─────────────────────────────── */
+/* ── BOSS HP BAR ──────────────────────────────── */
 #bossBar {
-  position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
-  width: min(500px, 90vw); background: rgba(11,11,22,0.92);
-  border: 1px solid var(--red); border-radius: 4px;
-  padding: 6px 12px; z-index: 10; display: none; align-items: center; gap: 8px;
+  position: fixed; top: var(--hud-h); left: 50%; transform: translateX(-50%);
+  width: min(480px, 88vw); background: rgba(11,11,22,0.94);
+  border: 1px solid var(--red); border-bottom-left-radius: 4px; border-bottom-right-radius: 4px;
+  padding: 4px 10px; z-index: 10; display: none; align-items: center; gap: 6px;
 }
 #bossBar.visible { display: flex; }
-.boss-name-lbl { font-family: 'Black Ops One', sans-serif; font-size: 0.65rem; color: var(--red); min-width: 130px; }
-.boss-bar-outer { flex: 1; height: 10px; background: #110000; border: 1px solid var(--red); border-radius: 2px; overflow: hidden; }
+.boss-name-lbl { font-family: 'Black Ops One', sans-serif; font-size: 0.6rem; color: var(--red); min-width: 110px; }
+.boss-bar-outer { flex: 1; height: 8px; background: #110000; border: 1px solid var(--red); border-radius: 2px; overflow: hidden; }
 .boss-bar-fill  { height: 100%; background: linear-gradient(90deg, #660000, var(--red)); transition: width 0.2s; }
-.boss-hp-txt    { font-size: 0.56rem; color: var(--red); min-width: 50px; text-align: right; }
+.boss-hp-txt    { font-size: 0.52rem; color: var(--red); min-width: 44px; text-align: right; }
 
-/* ── ABILITIES BAR ───────────────────────────── */
+/* ── ABILITY BAR ─────────────────────────────── */
 #abilityBar {
-  position: fixed; bottom: 130px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 6px; align-items: center;
-  z-index: 10;
+  position: fixed; z-index: 10;
+  background: rgba(6,6,14,0.93);
+  display: flex; align-items: center; gap: 4px;
+  overflow: auto; scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
-.ab-section-lbl {
-  font-size: 0.52rem; color: var(--dim); letter-spacing: 2px;
-  writing-mode: horizontal-tb; margin-right: 2px;
+#abilityBar::-webkit-scrollbar { display: none; }
+
+/* Portrait: horizontal strip above shop */
+@media (orientation: portrait) {
+  #abilityBar {
+    bottom: var(--shop-h); left: 0; right: 0;
+    flex-direction: row; padding: 4px 6px;
+    border-top: 1px solid var(--border);
+    overflow-x: auto; overflow-y: hidden;
+  }
 }
+/* Landscape: left vertical panel */
+@media (orientation: landscape) {
+  #abilityBar {
+    left: 0; top: var(--hud-h); bottom: 0;
+    width: var(--side-w); flex-direction: column;
+    padding: 6px 4px; border-right: 1px solid var(--border);
+    overflow-y: auto; overflow-x: hidden; align-items: stretch;
+  }
+}
+
 .ab-btn {
-  background: rgba(11,11,22,0.9); border: 1px solid var(--border);
+  background: rgba(11,11,22,0.92); border: 1px solid var(--border);
   color: var(--white); font-family: 'Share Tech Mono', monospace;
-  font-size: 0.57rem; padding: 7px 9px; border-radius: 5px;
-  cursor: pointer; display: flex; flex-direction: column;
-  align-items: center; gap: 2px; min-width: 72px;
-  position: relative; overflow: hidden; transition: all 0.15s;
+  font-size: 0.54rem; border-radius: 5px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 2px; position: relative; overflow: hidden; transition: border-color 0.15s;
+  flex-shrink: 0; padding: 6px 5px; min-width: 68px;
 }
-.ab-btn:hover:not(:disabled) { border-color: var(--crystal); box-shadow: 0 0 8px #44ddff44; }
+.ab-btn:active:not(:disabled), .ab-btn:hover:not(:disabled) { border-color: var(--crystal); }
 .ab-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .ab-btn .ab-icon { font-size: 1.3rem; }
-.ab-btn .ab-key  { color: var(--gold); font-size: 0.66rem; }
-.ab-btn .ab-name { font-size: 0.5rem; color: var(--dim); text-align: center; }
-.ab-btn .ab-cost { font-size: 0.5rem; color: var(--purple); }
+.ab-btn .ab-key  { color: var(--gold); font-size: 0.62rem; }
+.ab-btn .ab-name { font-size: 0.48rem; color: var(--dim); text-align: center; line-height: 1.1; }
+.ab-btn .ab-cost { font-size: 0.47rem; color: var(--purple); }
 .ab-cd-overlay   { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.65); pointer-events: none; transition: height 0.08s; }
 
-/* ── SHOP BAR ────────────────────────────────── */
+/* ── SHOP ─────────────────────────────────────── */
 #shop {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: linear-gradient(0deg, rgba(6,6,14,0.97) 0%, rgba(11,11,22,0.92) 100%);
-  border-top: 1px solid var(--border);
-  padding: 8px 12px 10px;
-  z-index: 10;
+  position: fixed; z-index: 10;
+  background: rgba(6,6,14,0.95);
+  display: flex; flex-direction: column;
 }
-.shop-header {
-  font-size: 0.54rem; color: var(--dim); letter-spacing: 3px;
-  margin-bottom: 5px; display: flex; align-items: center; gap: 8px;
+
+/* Portrait: single horizontal scrollable row at bottom */
+@media (orientation: portrait) {
+  #shop {
+    bottom: 0; left: 0; right: 0;
+    border-top: 1px solid var(--border);
+    padding: 5px 6px 7px;
+  }
+  .shop-label {
+    font-size: 0.48rem; color: var(--dim); letter-spacing: 3px;
+    font-family: 'Black Ops One', sans-serif; color: var(--gold);
+    margin-bottom: 4px;
+  }
+  #shopUnits {
+    display: flex; flex-direction: row; gap: 5px;
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch; flex-wrap: nowrap;
+  }
+  #shopUnits::-webkit-scrollbar { display: none; }
 }
-.shop-title { font-family: 'Black Ops One', sans-serif; color: var(--gold); font-size: 0.62rem; }
-#shopUnits { display: flex; gap: 5px; flex-wrap: wrap; }
+
+/* Landscape: vertical column on right */
+@media (orientation: landscape) {
+  #shop {
+    right: 0; top: var(--hud-h); bottom: 0;
+    width: var(--side-w); border-left: 1px solid var(--border);
+    padding: 5px 3px; overflow: hidden;
+  }
+  .shop-label {
+    font-size: 0.42rem; color: var(--gold); letter-spacing: 1px;
+    text-align: center; margin-bottom: 4px;
+    font-family: 'Black Ops One', sans-serif;
+  }
+  #shopUnits {
+    display: flex; flex-direction: column; gap: 4px;
+    overflow-y: auto; overflow-x: hidden; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch; flex: 1;
+  }
+  #shopUnits::-webkit-scrollbar { display: none; }
+}
 
 .ub-btn {
-  background: rgba(11,11,22,0.9); border: 1px solid var(--border);
+  background: rgba(11,11,22,0.92); border: 1px solid var(--border);
   color: var(--white); font-family: 'Share Tech Mono', monospace;
-  font-size: 0.52rem; padding: 5px 8px; border-radius: 4px;
+  font-size: 0.5rem; padding: 5px 5px; border-radius: 4px;
   cursor: pointer; display: flex; flex-direction: column;
-  align-items: center; gap: 1px; min-width: 64px;
-  transition: all 0.15s;
+  align-items: center; gap: 1px; flex-shrink: 0;
+  transition: border-color 0.15s;
 }
-.ub-btn:hover:not(:disabled) { border-color: var(--green); }
-.ub-btn.selected { border-color: var(--green); box-shadow: 0 0 10px #39ff1455; background: rgba(15,30,15,0.9); }
+@media (orientation: portrait) { .ub-btn { min-width: 62px; } }
+@media (orientation: landscape) { .ub-btn { width: 100%; } }
+.ub-btn:active:not(:disabled), .ub-btn:hover:not(:disabled) { border-color: var(--green); }
+.ub-btn.selected { border-color: var(--green); box-shadow: 0 0 10px #39ff1455; background: rgba(12,28,12,0.95); }
 .ub-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.ub-btn .ub-icon { font-size: 1rem; }
-.ub-btn .ub-name { color: var(--green); font-size: 0.5rem; letter-spacing: 1px; }
-.ub-btn .ub-cost { color: var(--gold); }
-.ub-btn .ub-stat { color: var(--dim); font-size: 0.44rem; text-align: center; }
-.ub-btn.locked { opacity: 0.2; cursor: not-allowed; border-style: dashed; }
+.ub-btn .ub-icon { font-size: 0.95rem; }
+.ub-btn .ub-name { color: var(--green); font-size: 0.47rem; letter-spacing: 0.5px; }
+.ub-btn .ub-cost { color: var(--gold); font-size: 0.48rem; }
+.ub-btn .ub-stat { color: var(--dim); font-size: 0.41rem; text-align: center; line-height: 1.2; }
+.ub-btn.locked   { opacity: 0.18; cursor: not-allowed; border-style: dashed; }
 
-/* ── FLOATING TEXTS ──────────────────────────── */
-#floatContainer {
-  position: fixed; inset: 0; pointer-events: none; z-index: 15;
-}
+/* ── FLOAT TEXTS ─────────────────────────────── */
+#floatContainer { position: fixed; inset: 0; pointer-events: none; z-index: 15; }
 .float-txt {
   position: absolute; font-family: 'Share Tech Mono', monospace;
-  font-weight: bold; font-size: 0.78rem;
+  font-weight: bold; font-size: 0.75rem;
   text-shadow: 0 0 6px currentColor;
-  transform: translateX(-50%);
-  pointer-events: none; white-space: nowrap;
+  transform: translateX(-50%); pointer-events: none; white-space: nowrap;
 }
 
 /* ── UNLOCK TOAST ────────────────────────────── */
 #unlockToast {
-  position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
-  background: rgba(11,11,22,0.95); border: 2px solid var(--green);
-  border-radius: 6px; padding: 10px 24px;
-  font-family: 'Black Ops One', sans-serif; font-size: 0.82rem;
+  position: fixed; top: calc(var(--hud-h) + 6px); left: 50%; transform: translateX(-50%);
+  background: rgba(11,11,22,0.96); border: 2px solid var(--green);
+  border-radius: 5px; padding: 7px 18px;
+  font-family: 'Black Ops One', sans-serif; font-size: 0.76rem;
   color: var(--green); text-shadow: 0 0 10px var(--green);
-  box-shadow: 0 0 25px #39ff1444;
-  z-index: 20; display: none; text-align: center;
+  box-shadow: 0 0 22px #39ff1444; z-index: 20; display: none; text-align: center;
 }
-#unlockToast.show { display: block; animation: toastPop 0.3s ease; }
+#unlockToast.show { display: block; animation: toastPop 0.25s ease; }
 @keyframes toastPop { from{transform:translateX(-50%) scale(0.8);opacity:0;} to{transform:translateX(-50%) scale(1);opacity:1;} }
 
-/* ── OVERLAYS ────────────────────────────────── */
-.overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.92);
+/* ── WAVE DONE TOAST (slim one-liner) ────────── */
+#waveDone {
+  position: fixed; top: var(--hud-h); left: 50%; transform: translateX(-50%);
+  background: rgba(6,6,14,0.94); border: 1px solid var(--gold);
+  border-top: none; border-bottom-left-radius: 5px; border-bottom-right-radius: 5px;
+  padding: 5px 18px; z-index: 24; display: none;
+  align-items: center; gap: 10px; white-space: nowrap; font-size: 0.62rem;
+}
+#waveDone.visible { display: flex; animation: slideDown 0.2s ease; }
+@keyframes slideDown { from{opacity:0;transform:translateX(-50%) translateY(-8px);} to{opacity:1;transform:translateX(-50%) translateY(0);} }
+#wdTitle    { font-family:'Black Ops One',sans-serif; color:var(--gold); font-size:0.7rem; }
+#wdBonus    { color: var(--gold); }
+#wdNext     { color: var(--dim); }
+#wdCountdown{ font-family:'Black Ops One',sans-serif; color:var(--crystal); font-size:0.78rem; min-width:14px; }
+
+/* ── PAUSE OVERLAY ───────────────────────────── */
+#pauseOverlay {
+  position: fixed; inset: 0; z-index: 35;
+  background: rgba(20,20,40,0.74);
   display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  z-index: 30; gap: 14px;
+  align-items: center; justify-content: center; gap: 10px;
+  cursor: pointer;
+}
+#pauseOverlay.hidden { display: none; }
+.pause-title { font-family:'Black Ops One',sans-serif; font-size:clamp(1.8rem,6vw,2.8rem); letter-spacing:6px; color:var(--white); }
+.pause-sub   { font-size:0.65rem; color:var(--dim); letter-spacing:3px; }
+
+/* ── OVERLAYS (title, gameover, victory) ─────── */
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 30; gap: 12px;
 }
 .overlay.hidden { display: none; }
-
-.ov-title {
-  font-family: 'Black Ops One', sans-serif;
-  font-size: clamp(1.8rem, 5vw, 3rem);
-  letter-spacing: 5px;
-}
-.ov-sub { font-size: 0.65rem; color: var(--dim); letter-spacing: 3px; max-width: 480px; text-align: center; line-height: 2; }
-.ov-box {
-  background: var(--panel); border: 1px solid var(--border); border-radius: 5px;
-  padding: 14px 20px; font-size: 0.58rem; color: #556; line-height: 2.2;
-  text-align: center; max-width: 520px;
-}
-.ov-box .hl  { color: var(--white); }
-.ov-box .gld { color: var(--gold); }
-.ov-box .cry { color: var(--crystal); }
-.ov-box .grn { color: var(--green); }
-.ov-score    { font-family: 'Black Ops One', sans-serif; font-size: 1.1rem; color: var(--gold); }
-
+.ov-title { font-family:'Black Ops One',sans-serif; font-size:clamp(1.6rem,5vw,2.8rem); letter-spacing:5px; }
+.ov-sub   { font-size:0.63rem; color:var(--dim); letter-spacing:3px; max-width:480px; text-align:center; line-height:2; }
+.ov-box   { background:var(--panel); border:1px solid var(--border); border-radius:5px; padding:12px 18px; font-size:0.57rem; color:#556; line-height:2.1; text-align:center; max-width:500px; }
+.ov-box .hl  { color:var(--white); }
+.ov-box .gld { color:var(--gold); }
+.ov-box .cry { color:var(--crystal); }
+.ov-box .grn { color:var(--green); }
+.ov-score { font-family:'Black Ops One',sans-serif; font-size:1.1rem; color:var(--gold); }
 .big-btn {
-  background: var(--panel); border: 2px solid var(--crystal); color: var(--crystal);
-  font-family: 'Black Ops One', sans-serif; font-size: 0.9rem; letter-spacing: 4px;
-  padding: 12px 30px; border-radius: 5px; cursor: pointer;
-  text-shadow: 0 0 10px var(--crystal); transition: all 0.2s;
+  background:var(--panel); border:2px solid var(--crystal); color:var(--crystal);
+  font-family:'Black Ops One',sans-serif; font-size:0.88rem; letter-spacing:4px;
+  padding:11px 28px; border-radius:5px; cursor:pointer;
+  text-shadow:0 0 10px var(--crystal); transition:all 0.2s;
 }
-.big-btn:hover { background: #071218; box-shadow: 0 0 30px #44ddff44; }
-.big-btn.red { border-color: var(--red); color: var(--red); text-shadow: 0 0 10px var(--red); }
-.big-btn.red:hover { box-shadow: 0 0 30px #ff224444; }
-
-/* Wave-between screen */
-#waveDone {
-  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
-  background: rgba(6,6,14,0.92); border: 1px solid var(--gold);
-  border-radius: 8px; padding: 20px 36px; z-index: 25;
-  text-align: center; display: none; min-width: 300px;
-}
-#waveDone.visible { display: block; animation: fadeIn 0.3s ease; }
-@keyframes fadeIn { from{opacity:0;transform:translate(-50%,-50%) scale(0.95);} to{opacity:1;transform:translate(-50%,-50%) scale(1);} }
-#waveDone h2 { font-family:'Black Ops One',sans-serif; color:var(--gold); font-size:1.2rem; letter-spacing:3px; }
-#waveDone .wd-info { font-size:0.6rem; color:var(--dim); margin:6px 0 4px; line-height:1.9; }
-#waveDone .wd-countdown { font-family:'Black Ops One',sans-serif; font-size:1.8rem; color:var(--crystal); }
-
+.big-btn:hover { background:#071218; box-shadow:0 0 28px #44ddff44; }
+.big-btn.red { border-color:var(--red); color:var(--red); text-shadow:0 0 10px var(--red); }
+.big-btn.red:hover { box-shadow:0 0 28px #ff224444; }
 </style>
 </head>
 <body>
 
-<!-- ── TOP HUD ─────────────────────────────────── -->
+<!-- ── TOP HUD (compact, 1-2 rows) ──────────────── -->
 <div id="hud">
   <div class="hud-chip wave-chip">
     <span class="lbl">WAVE</span>
     <span class="val" id="hudWave">1 / 30</span>
   </div>
-
   <div class="hud-chip gold-chip">
-    <span>🪙</span>
-    <span class="lbl">GOLD</span>
-    <span class="val" id="hudGold">800</span>
+    <span>🪙</span><span class="val" id="hudGold">800</span>
   </div>
-
   <div class="hud-chip">
-    <span>🏆</span>
-    <span class="lbl">SCORE</span>
-    <span class="val" id="hudScore">0</span>
+    <span>🏆</span><span class="val" id="hudScore">0</span>
   </div>
-
-  <div class="bar-wrap hud-chip">
-    <span class="bar-label" style="color:var(--crystal);">💎 CRYSTAL</span>
-    <div class="bar-outer crystal-bar-outer">
-      <div class="bar-inner crystal-fill" id="crystalFill" style="width:100%"></div>
-    </div>
-    <span class="val" id="hudCrystalHp" style="font-size:0.56rem;">1000</span>
+  <div class="bar-chip">
+    <span class="bl" style="color:var(--crystal);">💎</span>
+    <div class="bar-outer crystal-outer"><div class="bar-inner crystal-fill" id="crystalFill" style="width:100%"></div></div>
+    <span class="bar-val" id="hudCrystalHp">1000</span>
   </div>
-
-  <div class="bar-wrap hud-chip">
-    <span class="bar-label" style="color:var(--purple);">⚡ MANA</span>
-    <div class="bar-outer mana-bar-outer">
-      <div class="bar-inner mana-fill" id="manaFill" style="width:100%"></div>
-    </div>
-    <span class="val" id="hudMana" style="font-size:0.56rem;">100</span>
+  <div class="bar-chip">
+    <span class="bl" style="color:var(--purple);">⚡</span>
+    <div class="bar-outer mana-outer"><div class="bar-inner mana-fill" id="manaFill" style="width:100%"></div></div>
+    <span class="bar-val" id="hudMana">100</span>
   </div>
-
-  <div class="place-indicator" id="placeIndicator">📍 PLACING: <span id="placingName">SOLDIER</span> — click field · ESC cancel</div>
+  <!-- Pause & view-toggle icon buttons -->
+  <button class="icon-btn" id="pauseBtn" title="Pause">⏸</button>
+  <button class="icon-btn" id="viewTogBtn" title="Toggle 2D/3D view">2D</button>
 </div>
 
-<!-- ── BOSS HP BAR ─────────────────────────────── -->
+<!-- ── BOSS HP BAR ──────────────────────────────── -->
 <div id="bossBar">
   <span class="boss-name-lbl" id="bossNameLbl">BOSS</span>
   <div class="boss-bar-outer"><div class="boss-bar-fill" id="bossBarFill" style="width:100%"></div></div>
   <span class="boss-hp-txt" id="bossHpTxt">0</span>
 </div>
 
-<!-- ── ABILITIES BAR ───────────────────────────── -->
-<div id="abilityBar">
-  <span class="ab-section-lbl">ABILITIES</span>
-</div>
+<!-- ── ABILITY BAR ────────────────────────────── -->
+<div id="abilityBar"></div>
 
-<!-- ── SHOP BAR ────────────────────────────────── -->
+<!-- ── SHOP ──────────────────────────────────── -->
 <div id="shop">
-  <div class="shop-header">
-    <span class="shop-title">DEPLOY TROOPS</span>
-    <span>— click troop then click the field to place</span>
-  </div>
+  <div class="shop-label">TROOPS</div>
   <div id="shopUnits"></div>
 </div>
 
 <!-- Three.js canvas -->
 <canvas id="gameCanvas"></canvas>
 
-<!-- Floating damage/gold texts -->
+<!-- Float text layer -->
 <div id="floatContainer"></div>
 
-<!-- Unlock toast -->
-<div id="unlockToast" id="unlockToast">
-  <div id="unlockToastText">🔓 ARCHER UNLOCKED!</div>
+<!-- Unlock notification -->
+<div id="unlockToast"><div id="unlockToastText">🔓 ARCHER UNLOCKED!</div></div>
+
+<!-- Wave-done slim banner -->
+<div id="waveDone">
+  <span id="wdTitle">WAVE 1 ✓</span>
+  <span id="wdBonus">+200🪙</span>
+  <span id="wdNext" style="color:var(--dim);">next in</span>
+  <span id="wdCountdown">3</span>
 </div>
 
-<!-- Wave-complete popup -->
-<div id="waveDone">
-  <h2 id="wdTitle">WAVE 1 COMPLETE!</h2>
-  <div class="wd-info" id="wdInfo"></div>
-  <div class="wd-countdown" id="wdCountdown">5</div>
+<!-- Pause overlay -->
+<div id="pauseOverlay" class="hidden">
+  <div class="pause-title">⏸ PAUSED</div>
+  <div class="pause-sub">Tap anywhere to continue</div>
 </div>
 
 <!-- Title Screen -->
@@ -308,10 +350,10 @@ body {
   <div class="ov-title" style="color:var(--crystal);">STICK COMMANDER 3D</div>
   <div class="ov-sub">Lead your stick-figure army. Defend the crystal. Survive 30 waves.</div>
   <div class="ov-box">
-    <span class="grn">Click a troop</span> in the shop, then <span class="grn">click the battlefield</span> to deploy<br>
-    <span class="cry">Q W E R</span> — Commander abilities &nbsp;|&nbsp; <span class="gld">ESC</span> — cancel placement<br>
+    <span class="grn">Tap a troop</span> in the panel, then <span class="grn">tap the field</span> to deploy<br>
+    <span class="cry">Q W E R</span> — abilities · <span class="cry">Swipe</span> to rotate · <span class="cry">Pinch</span> to zoom<br>
     Kill enemies to earn <span class="gld">gold</span> &amp; <span class="grn">unlock new troop types</span><br>
-    <span class="cry">Crystal</span> destroyed = <hl>defeat</hl> &nbsp;|&nbsp; Survive wave 30 = <span class="gld">victory!</span>
+    <span class="cry">Crystal</span> destroyed = defeat &nbsp;|&nbsp; Survive wave 30 = <span class="gld">victory!</span>
   </div>
   <button class="big-btn" id="startBtn">▶ BEGIN CAMPAIGN</button>
 </div>
@@ -347,7 +389,7 @@ const MANA_REGEN      = 15;   // per second
 const FIELD_RADIUS    = 20;   // play area radius (units)
 const SPAWN_RADIUS    = 25;   // enemy spawn distance from center
 const MIN_PLACE_DIST  = 2.5;  // can't place troops right at crystal
-const WAVE_BREAK      = 6;    // seconds between waves
+const WAVE_BREAK      = 3;    // seconds between waves
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TROOP DEFINITIONS
@@ -555,14 +597,18 @@ function makeCrystal() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CAMERA ORBIT CONTROLS
+// CAMERA ORBIT CONTROLS  (mouse + touch + pinch)
 // ═══════════════════════════════════════════════════════════════════════════════
-let camTheta  = Math.PI / 5;   // horizontal angle
-let camPhi    = 1.1;            // vertical angle (radians)
-let camRadius = 34;             // distance from origin
-let dragging  = false;
-let mouseStart = { x: 0, y: 0 };
-let dragDist   = 0;
+let camTheta  = Math.PI / 5;
+let camPhi    = 1.1;
+let camRadius = 34;
+let view2D    = false;          // true = top-down orthographic-like view
+const cam3DSave = { phi: 1.1, radius: 34 };
+
+let dragging    = false;
+let mouseStart  = { x: 0, y: 0 };
+let dragDist    = 0;
+let pinchDist   = 0;
 
 function applyCameraOrbit() {
   camera.position.x = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
@@ -571,9 +617,21 @@ function applyCameraOrbit() {
   camera.lookAt(0, 0, 0);
 }
 
+function toggleView() {
+  view2D = !view2D;
+  document.getElementById('viewTogBtn').textContent = view2D ? '3D' : '2D';
+  if (view2D) {
+    cam3DSave.phi = camPhi; cam3DSave.radius = camRadius;
+    camPhi = 0.02; camRadius = 46;
+  } else {
+    camPhi = cam3DSave.phi; camRadius = cam3DSave.radius;
+  }
+  applyCameraOrbit();
+}
+
+// ── Mouse ─────────────────────────────────────────────────────────────────────
 canvas.addEventListener('mousedown', e => {
-  dragging = true;
-  dragDist = 0;
+  dragging = true; dragDist = 0;
   mouseStart = { x: e.clientX, y: e.clientY };
 });
 canvas.addEventListener('mouseup', () => { dragging = false; });
@@ -582,15 +640,66 @@ canvas.addEventListener('mousemove', e => {
   const dx = e.clientX - mouseStart.x;
   const dy = e.clientY - mouseStart.y;
   dragDist += Math.abs(dx) + Math.abs(dy);
-  camTheta -= dx * 0.008;
-  camPhi    = Math.max(0.25, Math.min(Math.PI / 2 - 0.05, camPhi + dy * 0.008));
+  if (!view2D) {
+    camTheta -= dx * 0.008;
+    camPhi = Math.max(0.25, Math.min(Math.PI / 2 - 0.05, camPhi + dy * 0.008));
+    applyCameraOrbit();
+  }
   mouseStart = { x: e.clientX, y: e.clientY };
-  applyCameraOrbit();
 });
 canvas.addEventListener('wheel', e => {
-  camRadius = Math.max(10, Math.min(55, camRadius + e.deltaY * 0.025));
+  camRadius = Math.max(10, Math.min(58, camRadius + e.deltaY * 0.025));
   applyCameraOrbit();
 }, { passive: true });
+
+// ── Touch: single-finger swipe = rotate, two-finger pinch = zoom ──────────────
+canvas.addEventListener('touchstart', e => {
+  dragDist = 0; dragging = false;
+  if (e.touches.length === 1) {
+    mouseStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  } else if (e.touches.length === 2) {
+    pinchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  }
+}, { passive: true });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 2) {
+    // Pinch zoom — keep centred on crystal
+    const d = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    const delta = pinchDist - d;
+    camRadius = Math.max(10, Math.min(58, camRadius + delta * 0.07));
+    pinchDist = d;
+    dragDist += Math.abs(delta); // suppress tap
+    applyCameraOrbit();
+  } else if (e.touches.length === 1) {
+    const dx = e.touches[0].clientX - mouseStart.x;
+    const dy = e.touches[0].clientY - mouseStart.y;
+    dragDist += Math.abs(dx) + Math.abs(dy);
+    dragging = dragDist > 6;
+    if (!view2D) {
+      camTheta -= dx * 0.008;
+      camPhi = Math.max(0.25, Math.min(Math.PI / 2 - 0.05, camPhi + dy * 0.008));
+      applyCameraOrbit();
+    }
+    mouseStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  if (dragDist < 8) {
+    // Treat as a tap → try to place troop
+    const touch = e.changedTouches[0];
+    handleFieldTap(touch.clientX, touch.clientY);
+  }
+  dragging = false;
+});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GAME STATE
@@ -1218,16 +1327,16 @@ function checkWaveWin() {
 
 function showWaveComplete(goldBonus) {
   GS.phase = 'between';
-  const n   = GS.wave;
-  const panel = document.getElementById('waveDone');
-  document.getElementById('wdTitle').textContent = n >= MAX_WAVES ? '⚔ FINAL WAVE SURVIVED!' : `WAVE ${n} COMPLETE!`;
-  document.getElementById('wdInfo').innerHTML    = `Wave bonus: <span style="color:var(--gold)">+${goldBonus}🪙</span><br>Mana fully restored<br>${n >= MAX_WAVES ? '' : 'Next wave in:'}`;
-  GS.betweenTimer = WAVE_BREAK;
-  panel.classList.add('visible');
+  const n = GS.wave;
+  document.getElementById('wdTitle').textContent    = n >= MAX_WAVES ? '⚔ SURVIVED!' : `WAVE ${n} ✓`;
+  document.getElementById('wdBonus').textContent    = `+${goldBonus}🪙`;
+  document.getElementById('wdNext').style.display   = n >= MAX_WAVES ? 'none' : '';
+  GS.betweenTimer = n >= MAX_WAVES ? 3 : WAVE_BREAK;
+  document.getElementById('wdCountdown').textContent = GS.betweenTimer;
+  document.getElementById('waveDone').classList.add('visible');
   updateCountdown();
-
   if (n >= MAX_WAVES) {
-    setTimeout(() => { panel.classList.remove('visible'); endGame(true); }, 4000);
+    setTimeout(() => { document.getElementById('waveDone').classList.remove('visible'); endGame(true); }, 3500);
   }
 }
 
@@ -1249,59 +1358,92 @@ function updateCountdown() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PAUSE SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════════
+let paused = false;
+
+function pauseGame() {
+  if (GS.phase !== 'playing' && GS.phase !== 'between') return;
+  if (paused) return;
+  paused = true;
+  document.getElementById('pauseOverlay').classList.remove('hidden');
+  document.getElementById('pauseBtn').textContent = '▶';
+}
+
+function resumeGame() {
+  if (!paused) return;
+  paused = false;
+  GS.lastTime = performance.now(); // prevent dt spike on resume
+  document.getElementById('pauseOverlay').classList.add('hidden');
+  document.getElementById('pauseBtn').textContent = '⏸';
+}
+
+document.getElementById('pauseBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  paused ? resumeGame() : pauseGame();
+});
+document.getElementById('pauseOverlay').addEventListener('click', resumeGame);
+document.getElementById('viewTogBtn').addEventListener('click', e => {
+  e.stopPropagation(); toggleView();
+});
+
+// Auto-pause when app is backgrounded
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+window.addEventListener('pagehide', pauseGame);
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // INPUT — keyboard abilities + troop placement
 // ═══════════════════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { selectTroop(null); return; }
+  if (e.key === ' ' || e.key === 'p' || e.key === 'P') { paused ? resumeGame() : pauseGame(); return; }
   const map = { q:'freeze', w:'inspire', e:'lightning', r:'healcrys' };
   const id  = map[e.key.toLowerCase()];
-  if (id) { useAbility(id); return; }
-  if (e.key === 'Escape') selectTroop(null);
+  if (id) useAbility(id);
 });
 
 const raycaster = new THREE.Raycaster();
 const mouseNDC  = new THREE.Vector2();
 
-canvas.addEventListener('click', e => {
-  // If drag occurred, don't place
-  if (dragDist > 6) return;
-
-  const rect  = canvas.getBoundingClientRect();
-  mouseNDC.x  = ((e.clientX - rect.left) / rect.width)  *  2 - 1;
-  mouseNDC.y  = ((e.clientY - rect.top)  / rect.height) * -2 + 1;
+// Shared placement logic for both click and touch-tap
+function handleFieldTap(clientX, clientY) {
+  if (!GS.selectedTroop || GS.phase !== 'playing') return;
+  const rect = canvas.getBoundingClientRect();
+  mouseNDC.x = ((clientX - rect.left) / rect.width)  *  2 - 1;
+  mouseNDC.y = ((clientY - rect.top)  / rect.height) * -2 + 1;
   raycaster.setFromCamera(mouseNDC, camera);
   const hits = raycaster.intersectObject(clickPlane);
   if (!hits.length) return;
 
   const pt = hits[0].point;
   const distFromCenter = Math.sqrt(pt.x * pt.x + pt.z * pt.z);
+  const def = TROOP_DEFS[GS.selectedTroop];
+  if (distFromCenter < MIN_PLACE_DIST)   { addFloat3D(new THREE.Vector3(pt.x, 1, pt.z), 'TOO CLOSE!', '#ff4444'); return; }
+  if (distFromCenter > FIELD_RADIUS + 3) { addFloat3D(new THREE.Vector3(pt.x, 1, pt.z), 'OUT OF RANGE!', '#ff4444'); return; }
+  if (GS.gold < def.cost)                { addFloat3D(new THREE.Vector3(pt.x, 1, pt.z), 'NOT ENOUGH GOLD', '#ff4444'); return; }
 
-  // Troop placement
-  if (GS.selectedTroop && GS.phase === 'playing') {
-    const def = TROOP_DEFS[GS.selectedTroop];
-    if (distFromCenter < MIN_PLACE_DIST) { addFloat3D(new THREE.Vector3(pt.x, 1, pt.z), 'TOO CLOSE!', '#ff4444'); return; }
-    if (distFromCenter > FIELD_RADIUS + 3) { addFloat3D(new THREE.Vector3(pt.x, 1, pt.z), 'OUT OF RANGE!', '#ff4444'); return; }
-    if (GS.gold < def.cost) { addFloat3D(new THREE.Vector3(pt.x, 1, pt.z), 'NOT ENOUGH GOLD!', '#ff4444'); return; }
+  GS.gold -= def.cost;
+  const troop = spawnTroop(GS.selectedTroop, pt.x, pt.z);
+  GS.troops.push(troop);
+  const hex = '#' + def.color.toString(16).padStart(6, '0');
+  addFloat3D(new THREE.Vector3(pt.x, 1.5, pt.z), `+${def.name}`, hex);
+  updateHUD();
+}
 
-    GS.gold -= def.cost;
-    const troop = spawnTroop(GS.selectedTroop, pt.x, pt.z);
-    GS.troops.push(troop);
-    addFloat3D(new THREE.Vector3(pt.x, 1.5, pt.z), `+${def.name}`, TROOP_DEFS[GS.selectedTroop].color > 0 ? '#' + TROOP_DEFS[GS.selectedTroop].color.toString(16).padStart(6,'0') : '#39ff14');
-    updateHUD();
-  }
+canvas.addEventListener('click', e => {
+  if (dragDist > 6) return; // was a drag, not a click
+  handleFieldTap(e.clientX, e.clientY);
 });
 
+// Toggle: tap button again to deselect
 function selectTroop(type) {
   GS.selectedTroop = type;
-  // Update button selected states
   document.querySelectorAll('.ub-btn').forEach(btn => btn.classList.remove('selected'));
   if (type) {
     const btn = document.getElementById('ub_' + type);
     if (btn) btn.classList.add('selected');
-    document.getElementById('placeIndicator').classList.add('visible');
-    document.getElementById('placingName').textContent = TROOP_DEFS[type].name;
     canvas.style.cursor = 'crosshair';
   } else {
-    document.getElementById('placeIndicator').classList.remove('visible');
     canvas.style.cursor = 'default';
   }
 }
@@ -1320,7 +1462,7 @@ function buildShop() {
     btn.disabled = locked || GS.gold < def.cost;
     btn.innerHTML = `<span class="ub-icon">${def.icon}</span><span class="ub-name">${def.name}</span><span class="ub-cost">🪙${def.cost}</span><span class="ub-stat">${def.desc}</span>`;
     btn.title = locked ? 'Kill enemies to unlock!' : def.desc;
-    if (!locked) btn.addEventListener('click', e => { e.stopPropagation(); selectTroop(type); });
+    if (!locked) btn.addEventListener('click', e => { e.stopPropagation(); selectTroop(GS.selectedTroop === type ? null : type); });
     container.appendChild(btn);
   }
 }
@@ -1346,7 +1488,7 @@ function updateHUD() {
   document.getElementById('hudCrystalHp').textContent = Math.max(0, GS.crystalHp);
   document.getElementById('crystalFill').style.width = Math.max(0, GS.crystalHp / CRYSTAL_MAX_HP * 100) + '%';
   document.getElementById('manaFill').style.width   = (GS.mana / MANA_MAX * 100) + '%';
-  document.getElementById('hudMana').textContent    = Math.floor(GS.mana) + '/' + MANA_MAX;
+  document.getElementById('hudMana').textContent    = Math.floor(GS.mana);
 
   // Shop button enable/disable
   document.querySelectorAll('.ub-btn').forEach(btn => {
@@ -1390,6 +1532,9 @@ function endGame(victory) {
 }
 
 function startGame() {
+  paused = false;
+  document.getElementById('pauseOverlay').classList.add('hidden');
+  document.getElementById('pauseBtn').textContent = '⏸';
   document.getElementById('titleScreen').classList.add('hidden');
   document.getElementById('gameOverScreen').classList.add('hidden');
   document.getElementById('victoryScreen').classList.add('hidden');
@@ -1398,6 +1543,18 @@ function startGame() {
   GS.phase = 'playing';
   startWave(1);
 }
+
+// Keep --hud-h CSS variable in sync so panels position correctly
+function syncHudHeight() {
+  const h = document.getElementById('hud').offsetHeight;
+  document.documentElement.style.setProperty('--hud-h', h + 'px');
+  // Also measure shop height (portrait) to anchor ability bar above it
+  const sh = document.getElementById('shop').offsetHeight;
+  document.documentElement.style.setProperty('--shop-h', sh + 'px');
+}
+window.addEventListener('resize', syncHudHeight);
+// Run after first render
+requestAnimationFrame(() => requestAnimationFrame(syncHudHeight));
 
 document.getElementById('startBtn').addEventListener('click',     startGame);
 document.getElementById('retryBtn').addEventListener('click',     startGame);
@@ -1408,6 +1565,9 @@ document.getElementById('playAgainBtn').addEventListener('click', startGame);
 // ═══════════════════════════════════════════════════════════════════════════════
 function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
+
+  // Always render even while paused so the scene stays visible
+  if (paused) { renderer.render(scene, camera); return; }
 
   const dt = Math.min((timestamp - GS.lastTime) / 1000, 0.05);
   GS.lastTime = timestamp;
