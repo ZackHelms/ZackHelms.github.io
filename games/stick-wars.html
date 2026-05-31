@@ -108,6 +108,18 @@ canvas { width:100%; height:auto; display:block; }
 .enemy-card .ec-icon { font-size:1.1rem; }
 .enemy-card .ec-name { color:var(--white); margin-top:2px; }
 .enemy-card .ec-stat { color:var(--dim); margin-top:1px; }
+.wa-countdown {
+  font-family:'Black Ops One',sans-serif;
+  font-size:clamp(2.4rem,8vw,4.5rem);
+  color:var(--gold);
+  text-shadow:0 0 30px #ffc30099, 0 0 60px #ffc30044;
+  margin-top:8px;
+  animation:countPop 0.5s ease-out;
+}
+@keyframes countPop {
+  from { transform:scale(1.8); opacity:0; }
+  to { transform:scale(1); opacity:1; }
+}
 
 /* ABILITIES */
 .ability-row {
@@ -202,25 +214,6 @@ canvas { width:100%; height:auto; display:block; }
   transform: none !important;
 }
 
-/* ---- COUNTDOWN ---- */
-.countdown-overlay {
-  position:absolute; inset:0;
-  display:flex; align-items:center; justify-content:center;
-  pointer-events:none; z-index:11;
-}
-.countdown-overlay.hidden { display:none; }
-.countdown-num {
-  font-family:'Black Ops One',sans-serif;
-  font-size:clamp(3rem,12vw,6rem);
-  color:var(--gold);
-  text-shadow:0 0 40px #ffc30099, 0 0 80px #ffc30044;
-  animation:countPop 0.5s ease-out;
-}
-@keyframes countPop {
-  from { transform:scale(1.8); opacity:0; }
-  to { transform:scale(1); opacity:1; }
-}
-
 /* ---- PAUSE OVERLAY ---- */
 #pauseOverlay {
   position:fixed; inset:0; background:rgba(0,0,0,0.82);
@@ -292,13 +285,11 @@ canvas { width:100%; height:auto; display:block; }
 
 <div class="canvas-wrap">
   <canvas id="arena" width="900" height="310"></canvas>
-  <div class="countdown-overlay hidden" id="countdownOverlay">
-    <div class="countdown-num" id="countdownNum">3</div>
-  </div>
   <div class="wave-announce hidden" id="waveAnnounce">
     <div class="wa-title" id="waTitle">WAVE 1</div>
     <div class="wa-sub" id="waSub">GET READY...</div>
     <div class="wa-enemies" id="waEnemies"></div>
+    <div class="wa-countdown" id="waCountdown"></div>
   </div>
 </div>
 
@@ -444,6 +435,7 @@ let upgradesLocked=false;
 let persistedBoosts=null;
 let paused=false;
 let countdownTimer=null;
+let waveAnnounced=false;
 
 function saveBoosts() {
   const base = defPlayer();
@@ -1212,21 +1204,30 @@ function showWaveAnnounce(cfg, cb) {
   setTimeout(()=>{ el.classList.add('hidden'); cb(); }, 2600);
 }
 
+function spawnWaveEnemies(cfg) {
+  enemies=[];
+  cfg.enemies.forEach((eid,i)=>{
+    const e=spawnEnemy(eid,W-70-i*85); if(e) enemies.push(e);
+  });
+  updateEnemyHUD();
+  waveActive=true;
+  log('sc',`=== ${cfg.label}: ${cfg.intro} ===`);
+}
+
 function startWave() {
   if (!gameRunning||waveActive||pendingUpgrades) return;
   if (waveIdx>=WAVE_CONFIGS.length) { endRun(); return; }
   const cfg=WAVE_CONFIGS[waveIdx];
   document.getElementById('waveBadge').textContent=cfg.label;
   document.getElementById('startBtn').disabled=true;
-  showWaveAnnounce(cfg,()=>{
-    enemies=[];
-    cfg.enemies.forEach((eid,i)=>{
-      const e=spawnEnemy(eid,W-70-i*85); if(e) enemies.push(e);
-    });
-    updateEnemyHUD();
-    waveActive=true;
-    log('sc',`=== ${cfg.label}: ${cfg.intro} ===`);
-  });
+  document.getElementById('waveAnnounce').classList.add('hidden');
+  if (waveAnnounced) {
+    // Countdown already showed the wave info — spawn immediately
+    waveAnnounced=false;
+    spawnWaveEnemies(cfg);
+  } else {
+    showWaveAnnounce(cfg, ()=>spawnWaveEnemies(cfg));
+  }
 }
 
 function endBattle(won) {
@@ -1356,6 +1357,7 @@ function buildStartLevels() {
 
 function showOverlay(title,color,sub,showRetry) {
   cancelCountdown();
+  waveAnnounced=false;
   gameRunning=false;
   document.getElementById('ovTitle').textContent=title;
   document.getElementById('ovTitle').style.color=color;
@@ -1389,6 +1391,7 @@ function beginRun(startWave) {
 
 function restartRun() {
   cancelCountdown();
+  waveAnnounced=false;
   gameRunning=false; waveActive=false;
   document.getElementById('upgradeScreen').classList.add('hidden');
   selectedStartLevel=0; buildStartLevels();
@@ -1429,24 +1432,42 @@ document.addEventListener('keyup',e=>keys[e.key]=false);
 // =============================================================
 function startCountdown() {
   cancelCountdown();
+  if (waveIdx >= WAVE_CONFIGS.length) return;
+  const cfg = WAVE_CONFIGS[waveIdx];
+
+  // Pre-populate wave announce with next wave info
+  document.getElementById('waTitle').textContent = cfg.label;
+  document.getElementById('waTitle').style.color = cfg.color;
+  document.getElementById('waSub').textContent = cfg.intro;
+  const ec = document.getElementById('waEnemies');
+  ec.innerHTML = '';
+  for (const eid of cfg.enemies) {
+    const def = ENEMY_DEFS.find(d=>d.id===eid); if (!def) continue;
+    const scale = 1 + waveIdx * 0.15;
+    const card = document.createElement('div'); card.className = 'enemy-card';
+    card.innerHTML = `<div class="ec-icon">${def.icon}</div><div class="ec-name">${def.name}</div><div class="ec-stat">${Math.round(def.hp*scale)} HP</div>`;
+    ec.appendChild(card);
+  }
+  waveAnnounced = true;
+
+  const el = document.getElementById('waveAnnounce');
+  const numEl = document.getElementById('waCountdown');
   let count = 3;
-  const overlay = document.getElementById('countdownOverlay');
-  const numEl = document.getElementById('countdownNum');
 
   function tick() {
-    if (!gameRunning) { overlay.classList.add('hidden'); return; }
+    if (!gameRunning) { el.classList.add('hidden'); waveAnnounced = false; return; }
     if (pendingUpgrades || paused) {
-      overlay.classList.add('hidden');
+      el.classList.add('hidden');
       countdownTimer = setTimeout(tick, 200);
       return;
     }
     if (count <= 0) {
-      overlay.classList.add('hidden');
+      el.classList.add('hidden');
       countdownTimer = null;
       startWave();
       return;
     }
-    overlay.classList.remove('hidden');
+    el.classList.remove('hidden');
     numEl.textContent = count--;
     numEl.style.animation = 'none';
     void numEl.offsetWidth;
@@ -1459,7 +1480,7 @@ function startCountdown() {
 
 function cancelCountdown() {
   if (countdownTimer) { clearTimeout(countdownTimer); countdownTimer = null; }
-  document.getElementById('countdownOverlay').classList.add('hidden');
+  document.getElementById('waveAnnounce').classList.add('hidden');
 }
 
 function pauseGame() {
