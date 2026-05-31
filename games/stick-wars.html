@@ -1504,8 +1504,7 @@ document.addEventListener('visibilitychange', ()=>{
   if (document.hidden) pauseGame();
 });
 
-document.addEventListener('pointerup', e=>{
-  if (paused && !document.getElementById('overlay').classList.contains('hidden') === false) return;
+document.addEventListener('pointerup', ()=>{
   if (paused) resumeGame();
 });
 
