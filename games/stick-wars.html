@@ -195,6 +195,19 @@ canvas { width:100%; height:auto; display:block; }
 .tier-epic { background:#2a1a3a; color:#cc66ff; border:1px solid #993399; }
 .tier-legendary { background:#3a2800; color:var(--gold); border:1px solid #996600; }
 .upg-coins { font-size:0.72rem; color:var(--coin); }
+.upg-card.locked {
+  border-color: #151520 !important;
+  opacity: 0.35;
+  pointer-events: none;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: opacity 0.3s, border-color 0.3s;
+}
+.upg-card.unlocking {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 20px #ffc30066 !important;
+  transition: border-color 0.35s ease, box-shadow 0.35s ease;
+}
 
 /* ---- MAIN OVERLAY ---- */
 #overlay {
@@ -389,6 +402,7 @@ let selectedStartLevel=0;
 let animFrame=null, lastTs=0;
 let keys={};
 let pendingUpgrades=null;
+let upgradesLocked=false;
 let persistedBoosts=null;
 
 function saveBoosts() {
@@ -501,8 +515,45 @@ function dropCoins(x, y, count) {
   }
 }
 
+function sweepCoinsToHUD() {
+  const canvasRect = CVS.getBoundingClientRect();
+  const badge = document.getElementById('coinsBadge');
+  const badgeRect = badge.getBoundingClientRect();
+  const scaleX = W / canvasRect.width;
+  const scaleY = H / canvasRect.height;
+  const tx = (badgeRect.left + badgeRect.width/2 - canvasRect.left) * scaleX;
+  const ty = (badgeRect.top  + badgeRect.height/2 - canvasRect.top)  * scaleY;
+  let delay = 0;
+  for (const c of coins) {
+    if (!c.collected) {
+      c.flyToHUD = true;
+      c.flyDelay = delay;
+      c.flyTx = tx; c.flyTy = ty;
+      delay += 0.06; // stagger each coin by 60ms
+    }
+  }
+}
+
 function updateCoins(dt) {
   for (const c of coins) {
+    if (c.flyToHUD) {
+      if (c.flyDelay > 0) { c.flyDelay -= dt; continue; }
+      const dx = c.flyTx - c.x, dy = c.flyTy - c.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const spd = 700 * dt;
+      if (dist < spd + 4) {
+        collectCoin(c);
+        // Flash the badge
+        const badge = document.getElementById('coinsBadge');
+        badge.style.color = '#fff';
+        setTimeout(()=>badge.style.color='', 120);
+      } else {
+        c.x += dx/dist * spd;
+        c.y += dy/dist * spd;
+        c.size = Math.max(3, c.size * 0.97);
+      }
+      continue;
+    }
     if (!c.landed) {
       c.vy += 300*dt;
       c.y += c.vy*dt;
@@ -588,15 +639,17 @@ function updateXPBar() {
 
 function showUpgradeScreen() {
   waveActive = false;
+  upgradesLocked = true;
   pendingUpgrades = pickUpgrades(3);
   const screen = document.getElementById('upgradeScreen');
-  document.getElementById('upgSub').textContent = `LEVEL ${player.level} - CHOOSE A POWER`;
+  const subEl = document.getElementById('upgSub');
+  subEl.textContent = `LEVEL ${player.level} — CHOOSING IN 2...`;
   document.getElementById('upgCoins').textContent = `🪙 ${player.totalCoins} coins collected`;
   const cards = document.getElementById('upgCards');
   cards.innerHTML = '';
   pendingUpgrades.forEach((u, i)=>{
     const card = document.createElement('div');
-    card.className = 'upg-card';
+    card.className = 'upg-card locked';
     card.innerHTML = `
       <div class="uc-icon">${u.icon}</div>
       <div class="uc-name">${u.name}</div>
@@ -607,10 +660,20 @@ function showUpgradeScreen() {
     cards.appendChild(card);
   });
   screen.classList.remove('hidden');
+  setTimeout(()=>{ subEl.textContent = `LEVEL ${player.level} — CHOOSING IN 1...`; }, 1000);
+  setTimeout(()=>{
+    upgradesLocked = false;
+    subEl.textContent = `LEVEL ${player.level} — CHOOSE A POWER`;
+    cards.querySelectorAll('.upg-card').forEach(c=>{
+      c.classList.remove('locked');
+      c.classList.add('unlocking');
+      setTimeout(()=>c.classList.remove('unlocking'), 500);
+    });
+  }, 2000);
 }
 
 function applyUpgrade(idx) {
-  if (!pendingUpgrades || idx >= pendingUpgrades.length) return;
+  if (!pendingUpgrades || idx >= pendingUpgrades.length || upgradesLocked) return;
   const u = pendingUpgrades[idx];
   u.apply(player);
   log('sc', `Upgrade: ${u.name} - ${u.desc}`);
@@ -994,6 +1057,7 @@ function fireEnemyAbility(e) {
 // UPDATE
 // =============================================================
 function update(dt) {
+  updateCoins(dt); // always run so fly-to-HUD works between waves
   if (!waveActive) return;
 
   player.mp=Math.min(player.maxMp,player.mp+player.mpRegen*dt);
@@ -1061,8 +1125,6 @@ function update(dt) {
     if(g.tickTimer<=0){if(player.alive&&Math.abs(player.x-g.x)<g.w/2)dealDmg(player,g.dmg,false,null);g.tickTimer=g.tickInterval;}
     if(g.life<=0)groundFX.splice(i,1);
   }
-
-  updateCoins(dt);
 
   for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=120*dt;p.life-=dt;if(p.life<=0)particles.splice(i,1);}
   for(let i=floatTexts.length-1;i>=0;i--){const t=floatTexts[i];t.y+=t.vy*dt;t.life-=dt;if(t.life<=0)floatTexts.splice(i,1);}
@@ -1143,6 +1205,7 @@ function endBattle(won) {
     dropCoins(W/2, GROUND-30, bonusCoins);
     floatTxt(W/2,H/2-60,`WAVE CLEAR! +${bonusCoins} COINS`,'#ffe033',18);
     log('cc',`Wave bonus: ${bonusCoins} coins dropped!`);
+    setTimeout(sweepCoinsToHUD, 1000);
     player.hp=player.maxHp; player.mp=player.maxMp;
     markLevelDone(waveIdx);
     waveIdx++;
@@ -1314,7 +1377,7 @@ document.addEventListener('keydown',e=>{
   keys[e.key]=true;
   const map={'q':0,'Q':0,'w':1,'W':1,'e':2,'E':2,'r':3,'R':3};
   if(e.key in map){e.preventDefault();usePlayerAbility(map[e.key]);}
-  if(pendingUpgrades){
+  if(pendingUpgrades&&!upgradesLocked){
     if(e.key==='1')applyUpgrade(0);
     else if(e.key==='2')applyUpgrade(1);
     else if(e.key==='3')applyUpgrade(2);
