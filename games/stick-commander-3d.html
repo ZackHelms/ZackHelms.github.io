@@ -1696,6 +1696,13 @@ function pauseGame() {
   document.getElementById('pauseBtn').textContent = '▶';
 }
 
+// Pause without showing the overlay — used when opening Shop/Gear tabs
+function pauseSilent() {
+  if (GS.phase !== 'playing' && GS.phase !== 'between') return;
+  if (paused) return;
+  paused = true;
+}
+
 function resumeGame() {
   if (!paused) return;
   paused = false;
@@ -1981,6 +1988,9 @@ let currentTab = 'fight';
 let tabPausedGame = false;
 
 function switchTab(tab) {
+  // Tapping the already-active Shop/Gear tab toggles back to Fight
+  if (tab !== 'fight' && currentTab === tab) { switchTab('fight'); return; }
+
   currentTab = tab;
   ['fight','shop','gear'].forEach(t => {
     const b = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
@@ -1988,9 +1998,12 @@ function switchTab(tab) {
   });
   document.getElementById('tabShopPanel').classList.toggle('visible', tab === 'shop');
   document.getElementById('tabGearPanel').classList.toggle('visible', tab === 'gear');
+
   if (tab !== 'fight') {
-    if (!paused) { pauseGame(); tabPausedGame = true; }
+    // Pause silently (no overlay) when opening a tab
+    if (!paused) { pauseSilent(); tabPausedGame = true; }
   } else {
+    // Returning to Fight: resume only if we were the ones who paused
     if (tabPausedGame) { resumeGame(); tabPausedGame = false; }
   }
   if (tab === 'shop') buildTabShop();
