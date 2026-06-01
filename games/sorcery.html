@@ -12,6 +12,7 @@
   --red: #ff2244; --white: #dde3ff; --dim: #8899bb; --purple: #b44fff;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
+html { height:100%; }
 body {
   background:var(--bg); font-family:'Share Tech Mono',monospace;
   color:var(--white); display:flex; flex-direction:column;
@@ -51,10 +52,15 @@ body {
 
 /* ── CANVAS WRAP (portrait: fills remaining space) ── */
 #canvas-wrap {
-  width:100%; max-width:600px; flex:1;
-  position:relative; overflow:hidden; min-height:0;
+  width:100%; max-width:600px; flex:1; min-height:0; min-width:0;
+  position:relative; overflow:hidden;
 }
-canvas { width:100%; height:100%; display:block; cursor:crosshair; }
+/* absolute fill so the canvas always covers its container exactly,
+   regardless of intrinsic canvas pixel dimensions */
+canvas {
+  position:absolute; top:0; left:0;
+  width:100%; height:100%; cursor:crosshair;
+}
 
 /* ── SPELL BAR (portrait: bottom) ── */
 #spell-bar {
@@ -85,33 +91,33 @@ canvas { width:100%; height:100%; display:block; cursor:crosshair; }
 
 /* ── LANDSCAPE LAYOUT ── */
 @media (orientation:landscape) {
-  body { flex-direction:row; align-items:stretch; max-width:none; }
+  body { flex-direction:row; align-items:stretch; max-width:none; height:100dvh; }
 
   /* Left panel: HUD */
   #hud {
     flex-direction:column; align-items:stretch;
-    width:140px; max-width:none; flex-shrink:0;
-    height:100dvh; border-bottom:none; border-right:1px solid var(--border);
-    padding:10px 10px; gap:10px; justify-content:flex-start;
+    width:120px; max-width:none; flex-shrink:0;
+    height:100%; border-bottom:none; border-right:1px solid var(--border);
+    padding:8px; gap:8px; justify-content:flex-start; overflow:hidden;
   }
   #hud .hud-col { flex:0 0 auto; align-items:flex-start; width:100%; }
   #hud .hud-col.center {
     order:-1; align-items:flex-start; padding:0;
-    border-bottom:1px solid var(--border); padding-bottom:8px;
+    border-bottom:1px solid var(--border); padding-bottom:7px;
   }
   #hud .hud-col.right { align-items:flex-start; }
   #hud .bar-outer { width:100%; }
-  #pause-btn { margin-top:auto; width:100%; border-radius:4px; }
+  #pause-btn { margin-top:auto; width:100%; }
 
-  /* Center: canvas */
-  #canvas-wrap { flex:1; max-width:none; height:100dvh; }
+  /* Center: canvas — fill all remaining space */
+  #canvas-wrap { flex:1; max-width:none; height:100%; min-height:0; min-width:0; }
 
   /* Right panel: spell slots */
   #spell-bar {
     flex-direction:column; align-items:stretch;
-    width:140px; max-width:none; flex-shrink:0;
-    height:100dvh; border-top:none; border-left:1px solid var(--border);
-    padding:10px 10px; gap:10px; justify-content:flex-start;
+    width:120px; max-width:none; flex-shrink:0;
+    height:100%; border-top:none; border-left:1px solid var(--border);
+    padding:8px; gap:8px; justify-content:flex-start; overflow:hidden;
   }
   .spell-slot { flex:1; min-height:0; }
 }
@@ -305,7 +311,7 @@ canvas.width = CW; canvas.height = CH;
 const ctx = canvas.getContext('2d');
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
-const BASE_Y = CH - 55;
+const BASE_Y = CH - 90;
 const BASE_H = 14;
 const BASE_MAX_HP = 500;
 function xpNeeded(lvl) { return 10 + (lvl - 1) * 8; }
@@ -1041,6 +1047,16 @@ function gameOver() {
   wrap.addEventListener('touchend',   e=>{e.preventDefault();onUp(e.changedTouches[0].clientX,e.changedTouches[0].clientY);},{passive:false});
   wrap.addEventListener('contextmenu',e=>e.preventDefault());
 })();
+
+// ── CANVAS RESIZE SAFETY NET ─────────────────────────────────────────────────
+// Keeps canvas CSS size matching its container when orientation changes.
+// The game's logical pixel dimensions (CW × CH) stay fixed; only the CSS
+// display size changes, and pos() already handles coordinate mapping.
+new ResizeObserver(() => {
+  const wrap = document.getElementById('canvas-wrap');
+  canvas.style.width  = wrap.clientWidth  + 'px';
+  canvas.style.height = wrap.clientHeight + 'px';
+}).observe(document.getElementById('canvas-wrap'));
 
 // ── START ─────────────────────────────────────────────────────────────────────
 startGame();
