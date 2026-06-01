@@ -13,85 +13,182 @@
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 body {
-  background: var(--bg); font-family: 'Share Tech Mono', monospace;
-  color: var(--white); display: flex; flex-direction: column;
-  align-items: center; height: 100dvh; overflow: hidden;
-  user-select: none; touch-action: manipulation;
+  background:var(--bg); font-family:'Share Tech Mono',monospace;
+  color:var(--white); display:flex; flex-direction:column;
+  align-items:center; height:100dvh; overflow:hidden;
+  user-select:none; touch-action:manipulation;
 }
+
+/* ── HUD ── */
 #hud {
-  width: 100%; max-width: 600px;
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 6px 12px; background: var(--panel);
-  border-bottom: 1px solid var(--border); flex-shrink: 0;
+  width:100%; max-width:600px;
+  display:flex; align-items:center; gap:8px;
+  padding:5px 10px; background:var(--panel);
+  border-bottom:1px solid var(--border); flex-shrink:0;
 }
-.hud-col { display: flex; flex-direction: column; gap: 2px; }
-.hud-col.center { align-items: center; }
-.hud-col.right { align-items: flex-end; }
-.hud-label { font-size: 0.48rem; color: var(--dim); letter-spacing: 2px; }
-.bar-outer { width: 110px; height: 7px; background: #111120; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
-.bar-inner { height: 100%; border-radius: 2px; transition: width 0.12s; }
-.hp-bar { background: linear-gradient(90deg,#880000,#ff2244); }
-.xp-bar { background: linear-gradient(90deg,#2244cc,#b44fff); }
-.hud-val { font-size: 0.5rem; color: var(--dim); }
-#canvas-wrap { width: 100%; max-width: 600px; aspect-ratio: 6/7; position: relative; flex-shrink: 0; }
-canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+.hud-col { display:flex; flex-direction:column; gap:2px; flex:1; }
+.hud-col.right { align-items:flex-end; }
+.hud-col.center { align-items:center; flex:0 0 auto; padding:0 6px; }
+.hud-label { font-size:0.46rem; color:var(--dim); letter-spacing:2px; }
+.bar-outer { width:100px; height:7px; background:#111120; border:1px solid var(--border); border-radius:2px; overflow:hidden; }
+.bar-inner { height:100%; border-radius:2px; transition:width 0.12s; }
+.hp-bar { background:linear-gradient(90deg,#880000,#ff2244); }
+.xp-bar { background:linear-gradient(90deg,#2244cc,#b44fff); }
+.hud-val { font-size:0.48rem; color:var(--dim); }
+#pause-btn {
+  flex-shrink:0; width:34px; height:34px;
+  background:var(--bg); border:1px solid var(--border); border-radius:4px;
+  color:var(--white); font-size:1rem; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  line-height:1;
+}
+#pause-btn:active { border-color:var(--blue); }
+
+/* ── CANVAS ── */
+#canvas-wrap { width:100%; max-width:600px; aspect-ratio:6/7; position:relative; flex-shrink:0; }
+canvas { width:100%; height:100%; display:block; cursor:crosshair; }
+
+/* ── SPELL BAR ── */
 #spell-bar {
-  width: 100%; max-width: 600px; display: flex; gap: 6px;
-  padding: 5px 10px; background: var(--panel);
-  border-top: 1px solid var(--border); flex-shrink: 0;
+  width:100%; max-width:600px; display:flex; gap:6px;
+  padding:5px 10px; background:var(--panel);
+  border-top:1px solid var(--border); flex-shrink:0;
 }
 .spell-slot {
-  flex: 1; border: 1px solid var(--border); border-radius: 4px;
-  padding: 4px 8px; font-size: 0.58rem; background: var(--bg);
-  display: flex; flex-direction: column; gap: 1px; min-height: 46px;
+  flex:1; border:1px solid var(--border); border-radius:4px;
+  padding:4px 8px; background:var(--bg); cursor:pointer;
+  display:flex; flex-direction:column; gap:1px; min-height:46px;
+  transition:border-color 0.15s;
 }
-.slot-lbl { color: var(--dim); font-size: 0.46rem; letter-spacing: 2px; }
-.slot-name { font-family: 'Black Ops One',sans-serif; font-size: 0.62rem; color: var(--blue); letter-spacing: 1px; }
-.slot-hint { color: var(--dim); font-size: 0.44rem; }
-#slot-ray { border-color: #2244aa; }
-/* Level-up overlay */
+.spell-slot:active { border-color:var(--blue) !important; }
+#slot-ray { border-color:#2244aa; }
+.slot-lbl { color:var(--dim); font-size:0.44rem; letter-spacing:2px; }
+.slot-name { font-family:'Black Ops One',sans-serif; font-size:0.62rem; color:var(--blue); letter-spacing:1px; }
+.slot-hint { color:var(--dim); font-size:0.42rem; display:flex; justify-content:space-between; }
+.slot-arrow { color:var(--dim); font-size:0.6rem; }
+
+/* ── SPELL PICKER ── */
+#sp-overlay {
+  display:none; position:fixed; inset:0; z-index:60;
+}
+#sp-overlay.show { display:block; }
+#sp-backdrop {
+  position:absolute; inset:0; background:rgba(0,0,0,0.55);
+}
+#sp-panel {
+  position:absolute; bottom:0; left:50%; transform:translateX(-50%);
+  width:min(600px,100%);
+  background:var(--panel); border-top:2px solid var(--border);
+  border-radius:12px 12px 0 0; padding:14px 14px 20px;
+  max-height:55vh; overflow-y:auto;
+}
+#sp-title {
+  font-family:'Black Ops One',sans-serif; font-size:0.75rem;
+  color:var(--dim); letter-spacing:4px; margin-bottom:10px;
+  padding-bottom:8px; border-bottom:1px solid var(--border);
+}
+.sp-item {
+  display:flex; flex-direction:column; gap:3px;
+  padding:10px 12px; border-radius:6px; cursor:pointer;
+  border:1px solid transparent; margin-bottom:6px;
+  transition:all 0.15s;
+}
+.sp-item:last-child { margin-bottom:0; }
+.sp-item:hover, .sp-item:active { border-color:var(--blue); background:#111120; }
+.sp-item.equipped { border-color:#2244aa; background:#0a0a18; }
+.sp-item .sp-name { font-family:'Black Ops One',sans-serif; font-size:0.78rem; color:var(--blue); letter-spacing:1px; }
+.sp-item.equipped .sp-name::after { content:' ✓'; color:var(--green); font-family:'Share Tech Mono',monospace; font-size:0.6rem; }
+.sp-item .sp-desc { font-size:0.5rem; color:var(--dim); line-height:1.5; }
+.sp-empty { color:var(--dim); font-size:0.55rem; padding:10px; text-align:center; }
+
+/* ── LEVEL UP OVERLAY ── */
 #lu-overlay {
-  display: none; position: fixed; inset: 0;
-  background: rgba(6,6,14,0.88); z-index: 100;
-  flex-direction: column; justify-content: center; align-items: center; gap: 14px;
+  display:none; position:fixed; inset:0;
+  background:rgba(6,6,14,0.88); z-index:100;
+  flex-direction:column; justify-content:center; align-items:center;
+  gap:12px; padding:16px;
 }
-#lu-overlay.show { display: flex; }
+#lu-overlay.show { display:flex; }
 #lu-title {
-  font-family: 'Black Ops One',sans-serif; font-size: clamp(1.4rem,5vw,2rem);
-  color: var(--gold); text-shadow: 0 0 24px #ffc30077; letter-spacing: 6px;
+  font-family:'Black Ops One',sans-serif;
+  font-size:clamp(1.6rem,6vw,2.4rem);
+  color:var(--gold); text-shadow:0 0 24px #ffc30077; letter-spacing:6px;
 }
-#lu-sub { font-size: 0.55rem; color: var(--dim); letter-spacing: 4px; margin-top: -8px; }
-#lu-cards { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; padding: 0 14px; }
+#lu-sub {
+  font-size:clamp(0.5rem,2vw,0.65rem); color:var(--dim); letter-spacing:4px;
+  margin-top:-6px;
+}
+#lu-cards {
+  display:flex; flex-direction:column; gap:10px;
+  align-items:center; width:100%;
+  max-height:65vh; overflow-y:auto;
+}
 .lu-card {
-  background: var(--panel); border: 2px solid var(--border); border-radius: 8px;
-  padding: 12px 14px; width: 155px; cursor: pointer; transition: all 0.18s;
-  display: flex; flex-direction: column; gap: 5px;
+  background:var(--panel); border:2px solid var(--border); border-radius:10px;
+  padding:14px 18px; width:min(90vw,420px);
+  cursor:pointer; transition:all 0.18s;
+  display:flex; flex-direction:column; gap:6px;
 }
-.lu-card:hover, .lu-card:active { border-color: var(--gold); box-shadow: 0 0 18px #ffc30044; transform: translateY(-2px); }
-.lu-card .c-type { font-size: 0.44rem; letter-spacing: 3px; color: var(--dim); }
-.lu-card .c-name { font-family: 'Black Ops One',sans-serif; font-size: 0.75rem; color: var(--gold); }
-.lu-card .c-desc { font-size: 0.5rem; color: var(--white); line-height: 1.5; }
-/* Game over */
+.lu-card:hover, .lu-card:active { border-color:var(--gold); box-shadow:0 0 20px #ffc30044; transform:translateY(-2px); }
+.lu-card .c-type {
+  font-size:0.5rem; letter-spacing:3px; color:var(--dim);
+  background:#111120; display:inline-block; padding:2px 6px; border-radius:3px;
+}
+.lu-card .c-name { font-family:'Black Ops One',sans-serif; font-size:clamp(0.9rem,3vw,1.1rem); color:var(--gold); letter-spacing:1px; }
+.lu-card .c-desc { font-size:clamp(0.52rem,1.8vw,0.65rem); color:var(--white); line-height:1.6; }
+/* Blocked state — cards visible but unclickable */
+#lu-overlay.blocked .lu-card { pointer-events:none; filter:brightness(0.55); }
+
+/* Landscape: side-by-side cards */
+@media (orientation:landscape) {
+  #lu-cards { flex-direction:row; align-items:stretch; overflow-x:auto; overflow-y:hidden; padding-bottom:4px; }
+  .lu-card { width:min(32vw,260px); flex-shrink:0; }
+}
+
+/* ── PAUSE OVERLAY ── */
+#pause-overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(6,6,14,0.82); z-index:90;
+  flex-direction:column; justify-content:center; align-items:center; gap:14px;
+  cursor:pointer;
+}
+#pause-overlay.show { display:flex; }
+#pause-overlay h2 {
+  font-family:'Black Ops One',sans-serif; font-size:clamp(2rem,8vw,3.5rem);
+  color:var(--white); letter-spacing:8px;
+  text-shadow:0 0 30px rgba(221,227,255,0.3);
+}
+#pause-overlay .p-sub { font-size:clamp(0.55rem,2vw,0.72rem); color:var(--dim); letter-spacing:4px; }
+#resume-btn {
+  padding:12px 32px; background:var(--panel);
+  border:2px solid var(--blue); border-radius:4px; color:var(--blue);
+  font-family:'Black Ops One',sans-serif; font-size:0.9rem; letter-spacing:3px; cursor:pointer;
+  margin-top:4px;
+}
+#resume-btn:hover { box-shadow:0 0 16px #4488ff66; }
+
+/* ── GAME OVER ── */
 #gameover {
-  display: none; position: fixed; inset: 0;
-  background: rgba(6,6,14,0.93); z-index: 200;
-  flex-direction: column; justify-content: center; align-items: center; gap: 12px;
+  display:none; position:fixed; inset:0;
+  background:rgba(6,6,14,0.93); z-index:200;
+  flex-direction:column; justify-content:center; align-items:center; gap:12px;
 }
-#gameover.show { display: flex; }
+#gameover.show { display:flex; }
 #gameover h2 {
-  font-family: 'Black Ops One',sans-serif; font-size: clamp(1.6rem,6vw,2.8rem);
-  color: var(--red); text-shadow: 0 0 28px #ff224466; letter-spacing: 6px;
+  font-family:'Black Ops One',sans-serif; font-size:clamp(1.6rem,6vw,2.8rem);
+  color:var(--red); text-shadow:0 0 28px #ff224466; letter-spacing:6px;
 }
-#go-stats { font-size: 0.62rem; color: var(--dim); text-align: center; line-height: 2.2; }
+#go-stats { font-size:clamp(0.58rem,2vw,0.72rem); color:var(--dim); text-align:center; line-height:2.4; }
 #restart-btn {
-  margin-top: 6px; padding: 10px 28px; background: var(--panel);
-  border: 2px solid var(--red); border-radius: 4px; color: var(--red);
-  font-family: 'Black Ops One',sans-serif; font-size: 0.8rem; letter-spacing: 3px; cursor: pointer;
+  margin-top:6px; padding:10px 28px; background:var(--panel);
+  border:2px solid var(--red); border-radius:4px; color:var(--red);
+  font-family:'Black Ops One',sans-serif; font-size:0.85rem; letter-spacing:3px; cursor:pointer;
 }
-#restart-btn:hover { box-shadow: 0 0 16px #ff224466; }
+#restart-btn:hover { box-shadow:0 0 16px #ff224466; }
 </style>
 </head>
 <body>
+
 <div id="hud">
   <div class="hud-col">
     <div class="hud-label">BASE HP</div>
@@ -100,37 +197,56 @@ canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
   </div>
   <div class="hud-col center">
     <div style="font-family:'Black Ops One',sans-serif;color:var(--gold);font-size:0.95rem;letter-spacing:2px" id="lv-txt">LVL 1</div>
-    <div style="font-size:0.52rem;color:var(--gold)" id="gold-txt">&#x1F4B0; 0</div>
-    <div style="font-size:0.44rem;color:var(--dim)" id="wave-txt">WAVE 1</div>
+    <div style="font-size:0.5rem;color:var(--gold)" id="gold-txt">&#x1F4B0; 0</div>
+    <div style="font-size:0.42rem;color:var(--dim)" id="wave-txt">WAVE 1</div>
   </div>
   <div class="hud-col right">
     <div class="hud-label">XP</div>
     <div class="bar-outer"><div class="bar-inner xp-bar" id="xp-bar" style="width:0%"></div></div>
     <div class="hud-val" id="xp-val">0 / 10</div>
   </div>
+  <button id="pause-btn" onclick="togglePause()" title="Pause">&#9646;&#9646;</button>
 </div>
 
 <div id="canvas-wrap"><canvas id="gc"></canvas></div>
 
 <div id="spell-bar">
-  <div class="spell-slot" id="slot-ray">
+  <div class="spell-slot" id="slot-ray" onclick="openSpellPicker('ray')">
     <div class="slot-lbl">RAY SPELL</div>
     <div class="slot-name" id="ray-name">MAGIC MISSILE</div>
-    <div class="slot-hint">TAP TO FIRE</div>
+    <div class="slot-hint"><span>TAP TO FIRE</span><span class="slot-arrow">&#9660;</span></div>
   </div>
-  <div class="spell-slot" id="slot-wall">
+  <div class="spell-slot" id="slot-wall" onclick="openSpellPicker('wall')">
     <div class="slot-lbl">WALL SPELL</div>
     <div class="slot-name" id="wall-name">&#x2014; EMPTY &#x2014;</div>
-    <div class="slot-hint">HOLD 1s TO CAST</div>
+    <div class="slot-hint"><span>HOLD 1s TO CAST</span><span class="slot-arrow">&#9660;</span></div>
   </div>
 </div>
 
+<!-- Spell Picker -->
+<div id="sp-overlay">
+  <div id="sp-backdrop"></div>
+  <div id="sp-panel">
+    <div id="sp-title">SELECT SPELL</div>
+    <div id="sp-list"></div>
+  </div>
+</div>
+
+<!-- Level Up -->
 <div id="lu-overlay">
   <div id="lu-title">LEVEL UP!</div>
-  <div id="lu-sub">&#x2014; CHOOSE ONE &#x2014;</div>
+  <div id="lu-sub" style="text-align:center">&#x2014; CHOOSE ONE &#x2014;</div>
   <div id="lu-cards"></div>
 </div>
 
+<!-- Pause -->
+<div id="pause-overlay">
+  <h2>PAUSED</h2>
+  <div class="p-sub">TAP TO RESUME</div>
+  <button id="resume-btn">RESUME</button>
+</div>
+
+<!-- Game Over -->
 <div id="gameover">
   <h2>BASE DESTROYED</h2>
   <div id="go-stats"></div>
@@ -138,27 +254,27 @@ canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
 </div>
 
 <script>
-// ── CANVAS SETUP ─────────────────────────────────────────────────────────────
+// ── CANVAS ───────────────────────────────────────────────────────────────────
 const CW = 600, CH = 700;
 const canvas = document.getElementById('gc');
 canvas.width = CW; canvas.height = CH;
 const ctx = canvas.getContext('2d');
 
-// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+// ── CONSTANTS ────────────────────────────────────────────────────────────────
 const BASE_Y = CH - 55;
 const BASE_H = 14;
 const BASE_MAX_HP = 500;
 function xpNeeded(lvl) { return 10 + (lvl - 1) * 8; }
 function diffScale(wave) { return 1 + wave * 0.14; }
 
-// ── SPELL DATA ────────────────────────────────────────────────────────────────
+// ── SPELL DEFS ───────────────────────────────────────────────────────────────
 const RAY_DEFS = {
   magic_missile: {
     id:'magic_missile', name:'MAGIC MISSILE', desc:'Fast blue bolt. Single target.',
     color:'#4488ff', glow:'#2255cc', speed:900, dmg:25, aoe:0, dot:0, dotDur:0, instant:false,
   },
   fireball: {
-    id:'fireball', name:'FIREBALL', desc:'AOE explosion + 5s burn on impact.',
+    id:'fireball', name:'FIREBALL', desc:'AOE explosion on impact + 5s burn.',
     color:'#ff8800', glow:'#ff4400', speed:420, dmg:15, aoe:55, dot:3, dotDur:5, instant:false,
   },
   laserbeam: {
@@ -169,7 +285,7 @@ const RAY_DEFS = {
 
 const WALL_DEFS = {
   force_field: {
-    id:'force_field', name:'FORCE FIELD', desc:'100 HP barrier that stops enemies.',
+    id:'force_field', name:'FORCE FIELD', desc:'100 HP barrier. Stops enemies.',
     color:'#00ccff', glow:'#0088cc', baseHp:100, duration:Infinity, slow:0, dotDmg:0, blocks:true,
   },
   fire_wall: {
@@ -177,49 +293,38 @@ const WALL_DEFS = {
     color:'#ff6600', glow:'#ff3300', baseHp:Infinity, duration:20, slow:0, dotDmg:5, blocks:false,
   },
   slow_wall: {
-    id:'slow_wall', name:'SLOW WALL', desc:'Slows enemies 80%. 20s.',
+    id:'slow_wall', name:'SLOW WALL', desc:'Slows enemies 80% movement. 20s.',
     color:'#aabbff', glow:'#6677cc', baseHp:Infinity, duration:20, slow:0.8, dotDmg:0, blocks:false,
   },
 };
 
-// Upgrades: targetType 'ray'|'wall', maxTimes, available(spellObj), apply(G,spellObj)
 const UPGRADE_DEFS = [
-  {
-    id:'split', name:'SPLIT', targetType:'ray', maxTimes:5,
+  { id:'split',   name:'SPLIT',     targetType:'ray',  maxTimes:5,
     desc:'Fire one additional ray per cast.',
-    apply(G,s){ s._split = (s._split||1)+1; },
-  },
-  {
-    id:'speed', name:'SPEED', targetType:'ray', maxTimes:1,
+    apply(G,s){ s._split = (s._split||1)+1; } },
+  { id:'speed',   name:'SPEED',     targetType:'ray',  maxTimes:1,
     desc:'Projectile speed +50%.',
     avail(s){ return s.speed !== Infinity; },
-    apply(G,s){ s.speed = Math.min(s.speed*1.5, 1800); },
-  },
-  {
-    id:'damage', name:'POWER', targetType:'ray', maxTimes:5,
+    apply(G,s){ s.speed = Math.min(s.speed*1.5, 1800); } },
+  { id:'damage',  name:'POWER',     targetType:'ray',  maxTimes:5,
     desc:'+20% impact damage.',
-    apply(G,s){ s.dmg = Math.round(s.dmg*1.2); },
-  },
-  {
-    id:'dot', name:'IGNITE', targetType:'ray', maxTimes:5,
+    apply(G,s){ s.dmg = Math.round(s.dmg*1.2); } },
+  { id:'dot',     name:'IGNITE',    targetType:'ray',  maxTimes:5,
     desc:'Add or strengthen burning DOT.',
-    apply(G,s){ s.dot = s.dot ? Math.round(s.dot*1.33) : 2; s.dotDur = s.dotDur||5; },
-  },
-  {
-    id:'wall_hp', name:'REINFORCE', targetType:'wall', maxTimes:5,
+    apply(G,s){ s.dot = s.dot ? Math.round(s.dot*1.33) : 2; s.dotDur = s.dotDur||5; } },
+  { id:'wall_hp', name:'REINFORCE', targetType:'wall', maxTimes:5,
     desc:'+50% wall HP.',
     avail(s){ return s.baseHp !== Infinity; },
-    apply(G,s){ s.baseHp = Math.round(s.baseHp*1.5); },
-  },
+    apply(G,s){ s.baseHp = Math.round(s.baseHp*1.5); } },
 ];
 
 // ── ENEMY TYPES ──────────────────────────────────────────────────────────────
 const ENEMY_TYPES = [
-  { id:'imp',   name:'IMP',   col:'#ff4455', r:11, hp:30,  spd:60, range:40, dmg:8,  rate:1.5, xp:1, gold:0, wave:0  },
-  { id:'orc',   name:'ORC',   col:'#77cc44', r:15, hp:80,  spd:40, range:45, dmg:18, rate:1.0, xp:2, gold:0, wave:3  },
-  { id:'troll', name:'TROLL', col:'#559933', r:20, hp:200, spd:28, range:50, dmg:30, rate:0.7, xp:5, gold:0, wave:6  },
-  { id:'ghost', name:'GHOST', col:'#aabbff', r:13, hp:50,  spd:75, range:45, dmg:12, rate:2.0, xp:3, gold:0, wave:4  },
-  { id:'golem', name:'GOLEM', col:'#cc8833', r:28, hp:600, spd:22, range:55, dmg:50, rate:0.5, xp:20,gold:15,wave:10,boss:true },
+  { id:'imp',   name:'IMP',   col:'#ff4455', r:11, hp:30,  spd:60, range:40, dmg:8,  rate:1.5, xp:1,  gold:0,  wave:0  },
+  { id:'orc',   name:'ORC',   col:'#77cc44', r:15, hp:80,  spd:40, range:45, dmg:18, rate:1.0, xp:2,  gold:0,  wave:3  },
+  { id:'troll', name:'TROLL', col:'#559933', r:20, hp:200, spd:28, range:50, dmg:30, rate:0.7, xp:5,  gold:0,  wave:6  },
+  { id:'ghost', name:'GHOST', col:'#aabbff', r:13, hp:50,  spd:75, range:45, dmg:12, rate:2.0, xp:3,  gold:0,  wave:4  },
+  { id:'golem', name:'GOLEM', col:'#cc8833', r:28, hp:600, spd:22, range:55, dmg:50, rate:0.5, xp:20, gold:15, wave:10, boss:true },
 ];
 
 // ── GAME STATE ───────────────────────────────────────────────────────────────
@@ -228,42 +333,159 @@ let G;
 function startGame() {
   document.getElementById('gameover').classList.remove('show');
   document.getElementById('lu-overlay').classList.remove('show');
+  hidePauseOverlay();
+  closeSpellPicker();
 
+  const mm = cloneDef(RAY_DEFS.magic_missile, { _split:1 });
   G = {
-    running: true, paused: false,
-    wave: 1, spawnTimer: 1.5, spawnInterval: 2.2,
-    waveKilled: 0, waveTarget: 6,
+    running:true,
+    // pause depth — each reason pushes/pops; tick only runs when depth=0
+    _pd: 0,
+    paused: false,
+    manualPaused: false,
+    levelingUp: false,
+    pickerOpen: false,
+
+    wave:1, spawnTimer:1.5, spawnInterval:2.2,
+    waveKilled:0, waveTarget:6,
 
     baseHp: BASE_MAX_HP,
+    level:1, xp:0, xpNext:xpNeeded(1),
+    gold:0, totalKills:0,
 
-    level: 1, xp: 0, xpNext: xpNeeded(1),
-    gold: 0, totalKills: 0,
+    // Spell instances: id → live object (upgrades applied in-place)
+    raySpells: { magic_missile: mm },
+    wallSpells: {},
+    ray: mm,   // reference into raySpells
+    wall: null, // reference into wallSpells or null
 
-    luPending: false, luBuffer: 0,
+    upgTaken: {}, // key: upgId+'_'+spellId → count
 
-    // Equipped spells (live clones of defs)
-    ray: clone(RAY_DEFS.magic_missile, { _split:1 }),
-    wall: null,
+    enemies:[], projectiles:[], walls:[],
+    particles:[], floats:[],
 
-    // Known spell ids
-    knownRay: ['magic_missile'],
-    knownWall: [],
-    // upgradeTaken[upgId+'_'+spellId] = count
-    upgTaken: {},
-
-    enemies: [], projectiles: [], walls: [],
-    particles: [], floats: [],
-
-    holdStart: null, holdX: 0, holdY: 0,
-    lastTs: null,
+    holdStart:null, holdX:0, holdY:0,
+    lastTs:null,
   };
   requestAnimationFrame(loop);
   updateHUD(); updateSpellBar();
 }
 
-function clone(def, extra) { return Object.assign({}, def, extra||{}); }
+function cloneDef(def, extra) { return Object.assign({}, def, extra||{}); }
 
-// ── MAIN LOOP ─────────────────────────────────────────────────────────────────
+// ── PAUSE HELPERS ────────────────────────────────────────────────────────────
+function pushPause() { G._pd++; G.paused = true; }
+function popPause()  { G._pd = Math.max(0, G._pd-1); if (G._pd===0) G.paused = false; }
+
+function togglePause() {
+  if (!G || !G.running || G.levelingUp || G.pickerOpen) return;
+  if (G.manualPaused) {
+    G.manualPaused = false;
+    popPause();
+    hidePauseOverlay();
+  } else {
+    G.manualPaused = true;
+    pushPause();
+    showPauseOverlay();
+  }
+}
+
+function showPauseOverlay() {
+  document.getElementById('pause-overlay').classList.add('show');
+  document.getElementById('pause-btn').textContent = '▶';
+}
+function hidePauseOverlay() {
+  document.getElementById('pause-overlay').classList.remove('show');
+  if (document.getElementById('pause-btn')) document.getElementById('pause-btn').innerHTML = '&#9646;&#9646;';
+}
+
+document.getElementById('pause-overlay').addEventListener('click', function(e) {
+  if (!G || !G.running || !G.manualPaused) return;
+  G.manualPaused = false;
+  popPause();
+  hidePauseOverlay();
+});
+document.getElementById('resume-btn').addEventListener('click', function(e) {
+  e.stopPropagation();
+  if (!G || !G.running || !G.manualPaused) return;
+  G.manualPaused = false;
+  popPause();
+  hidePauseOverlay();
+});
+
+// Auto-pause when app is backgrounded
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && G && G.running && !G.manualPaused && !G.levelingUp) {
+    G.manualPaused = true;
+    pushPause();
+    showPauseOverlay();
+  }
+});
+window.addEventListener('blur', () => {
+  if (G && G.running && !G.manualPaused && !G.levelingUp) {
+    G.manualPaused = true;
+    pushPause();
+    showPauseOverlay();
+  }
+});
+
+// ── SPELL PICKER ─────────────────────────────────────────────────────────────
+let _pickerType = null;
+
+function openSpellPicker(slotType) {
+  if (!G || !G.running || G.levelingUp) return;
+  // Close if same picker is already open
+  if (G.pickerOpen) { closeSpellPicker(); return; }
+
+  _pickerType = slotType;
+  G.pickerOpen = true;
+  pushPause();
+
+  const isRay = slotType === 'ray';
+  const defs = isRay ? RAY_DEFS : WALL_DEFS;
+  const known = isRay ? G.raySpells : G.wallSpells;
+  const equipped = isRay ? G.ray : G.wall;
+
+  document.getElementById('sp-title').textContent = isRay ? 'SELECT RAY SPELL' : 'SELECT WALL SPELL';
+
+  const list = document.getElementById('sp-list');
+  list.innerHTML = '';
+
+  const knownIds = Object.keys(known);
+  if (knownIds.length === 0) {
+    list.innerHTML = '<div class="sp-empty">No spells known yet.<br>Level up to unlock wall spells.</div>';
+  } else {
+    for (const id of knownIds) {
+      const def = defs[id];
+      const isEquipped = equipped && equipped.id === id;
+      const item = document.createElement('div');
+      item.className = 'sp-item' + (isEquipped ? ' equipped' : '');
+      item.innerHTML = `<div class="sp-name">${def.name}</div><div class="sp-desc">${def.desc}</div>`;
+      item.addEventListener('click', () => {
+        if (isRay) G.ray = G.raySpells[id];
+        else G.wall = G.wallSpells[id];
+        updateSpellBar();
+        closeSpellPicker();
+      });
+      list.appendChild(item);
+    }
+  }
+
+  document.getElementById('sp-overlay').classList.add('show');
+}
+
+function closeSpellPicker() {
+  if (!G || !G.pickerOpen) return;
+  G.pickerOpen = false;
+  popPause();
+  document.getElementById('sp-overlay').classList.remove('show');
+  _pickerType = null;
+}
+
+document.getElementById('sp-backdrop').addEventListener('click', closeSpellPicker);
+document.getElementById('sp-backdrop').addEventListener('touchend', e => { e.preventDefault(); closeSpellPicker(); });
+
+// ── MAIN LOOP ────────────────────────────────────────────────────────────────
 function loop(ts) {
   if (!G.running) return;
   const dt = G.lastTs ? Math.min((ts - G.lastTs)/1000, 0.1) : 0.016;
@@ -274,20 +496,12 @@ function loop(ts) {
 }
 
 function tick(dt) {
-  // level-up buffer
-  if (G.luPending) {
-    G.luBuffer -= dt;
-    if (G.luBuffer <= 0) { G.luPending = false; G.paused = true; showLevelUp(); }
-    return;
-  }
-
   spawnTick(dt);
   tickProjectiles(dt);
   tickEnemies(dt);
   tickWalls(dt);
   tickParticles(dt);
   tickFloats(dt);
-
   if (G.baseHp <= 0) { G.baseHp = 0; gameOver(); }
   updateHUD();
 }
@@ -295,14 +509,11 @@ function tick(dt) {
 // ── SPAWNING ──────────────────────────────────────────────────────────────────
 function spawnTick(dt) {
   G.spawnTimer -= dt;
-  if (G.spawnTimer <= 0) {
-    if (G.waveKilled < G.waveTarget) {
-      spawnEnemy();
-      G.waveKilled++;
-      G.spawnTimer = G.spawnInterval * (0.7 + Math.random()*0.6);
-    }
+  if (G.spawnTimer <= 0 && G.waveKilled < G.waveTarget) {
+    spawnEnemy();
+    G.waveKilled++;
+    G.spawnTimer = G.spawnInterval * (0.7 + Math.random()*0.6);
   }
-  // Advance wave when all this wave's enemies are dead
   if (G.waveKilled >= G.waveTarget && G.enemies.length === 0) {
     G.wave++;
     G.waveKilled = 0;
@@ -315,20 +526,18 @@ function spawnTick(dt) {
 function spawnEnemy() {
   const sc = diffScale(G.wave);
   let pool = ENEMY_TYPES.filter(e => e.wave <= G.wave);
-  // Boss: 5% chance when wave >= 10
   if (G.wave >= 10 && Math.random() < 0.05) pool = [ENEMY_TYPES[4]];
   const def = pool[Math.floor(Math.random()*pool.length)];
   const x = def.r + Math.random()*(CW - def.r*2);
   G.enemies.push({
-    id: Math.random(), def,
-    col: def.col, r: def.r, name: def.name,
+    id: Math.random(), col:def.col, r:def.r, name:def.name,
     x, y: -def.r - 4,
     hp: Math.round(def.hp*sc), maxHp: Math.round(def.hp*sc),
-    spd: def.spd, range: def.range,
-    dmg: Math.round(def.dmg*sc), rate: def.rate,
-    atkTimer: 0, xp: def.xp + Math.floor(G.wave*0.25),
-    gold: def.gold, boss: !!def.boss,
-    fx: {}, dead: false, // fx: { burning:{dps,dur,tick}, slowed:{fac,dur} }
+    spd:def.spd, range:def.range,
+    dmg: Math.round(def.dmg*sc), rate:def.rate,
+    atkTimer:0, xp: def.xp + Math.floor(G.wave*0.25),
+    gold:def.gold, boss:!!def.boss,
+    fx:{}, dead:false,
   });
 }
 
@@ -338,40 +547,35 @@ function fireRay(tx, ty) {
   const s = G.ray;
   const ox = CW/2, oy = BASE_Y;
   const splits = s._split || 1;
-
-  for (let i = 0; i < splits; i++) {
-    let fx = tx, fy = ty;
+  for (let i=0; i<splits; i++) {
+    let fx=tx, fy=ty;
     if (splits > 1) {
       const spread = (i - (splits-1)/2) * 20;
-      const dx = tx-ox, dy = ty-oy;
-      const len = Math.hypot(dx,dy)||1;
+      const dx=tx-ox, dy=ty-oy, len=Math.hypot(dx,dy)||1;
       fx = tx + (-dy/len)*spread;
       fy = ty + (dx/len)*spread;
     }
-    if (s.instant) {
-      fireLaser(s, ox, oy, fx, fy);
-    } else {
-      const dx = fx-ox, dy = fy-oy, len = Math.hypot(dx,dy)||1;
+    if (s.instant) fireLaser(s, ox, oy, fx, fy);
+    else {
+      const dx=fx-ox, dy=fy-oy, len=Math.hypot(dx,dy)||1;
       G.projectiles.push({
-        col: s.color, glow: s.glow,
-        x: ox, y: oy,
-        vx: (dx/len)*s.speed, vy: (dy/len)*s.speed,
-        dmg: s.dmg, aoe: s.aoe||0, dot: s.dot||0, dotDur: s.dotDur||0,
+        col:s.color, glow:s.glow,
+        x:ox, y:oy,
+        vx:(dx/len)*s.speed, vy:(dy/len)*s.speed,
+        dmg:s.dmg, aoe:s.aoe||0, dot:s.dot||0, dotDur:s.dotDur||0,
         r: s.id==='fireball' ? 9 : 5,
-        trail: [], alive: true,
+        trail:[], alive:true,
       });
     }
   }
 }
 
 function fireLaser(s, ox, oy, tx, ty) {
-  const dx = tx-ox, dy = ty-oy, len = Math.hypot(dx,dy)||1;
-  const ex = ox + (dx/len)*2000, ey = oy + (dy/len)*2000;
+  const dx=tx-ox, dy=ty-oy, len=Math.hypot(dx,dy)||1;
+  const ex=ox+(dx/len)*2000, ey=oy+(dy/len)*2000;
   G.particles.push({ type:'laser', x1:ox,y1:oy,x2:ex,y2:ey, col:s.color, a:1, life:0.18, max:0.18 });
   for (const e of G.enemies) {
-    if (!e.dead && ptSegDist(e.x,e.y,ox,oy,ex,ey) < e.r+4) {
-      hitEnemy(e, s.dmg, s.dot, s.dotDur);
-    }
+    if (!e.dead && ptSegDist(e.x,e.y,ox,oy,ex,ey) < e.r+4) hitEnemy(e, s.dmg, s.dot, s.dotDur);
   }
 }
 
@@ -411,31 +615,24 @@ function explode(cx,cy,rad,dmg,dot,dotDur,col) {
 // ── ENEMIES ──────────────────────────────────────────────────────────────────
 function tickEnemies(dt) {
   const blockers = G.walls.filter(w=>w.spellId==='force_field'&&w.hp>0);
-
   for (const e of G.enemies) {
     if (e.dead) continue;
     tickFx(e, dt);
     if (e.dead) continue;
-
     const moveSpd = e.spd * (e.fx.slowed ? 1-e.fx.slowed.fac : 1);
-
-    // Check force field blocking
     let blocked = null;
     for (const w of blockers) {
       if (e.y < w.y && Math.abs(e.y - w.y) < e.r + 12) { blocked = w; break; }
     }
-
     if (blocked) {
-      // Attack the wall
       e.atkTimer -= dt;
       if (e.atkTimer <= 0) {
         e.atkTimer = 1/e.rate;
         blocked.hp -= e.dmg;
         spark(e.x, e.y, '#ffffff');
-        floatText(`-${e.dmg}`, e.x, e.y - e.r, '#ffaaaa');
+        floatText(`-${e.dmg}`, e.x, e.y-e.r, '#ffaaaa');
       }
     } else if (BASE_Y - e.y <= e.range) {
-      // Attack base
       e.atkTimer -= dt;
       if (e.atkTimer <= 0) {
         e.atkTimer = 1/e.rate;
@@ -455,17 +652,13 @@ function tickFx(e, dt) {
     const b = e.fx.burning;
     b.dur -= dt; b.tick -= dt;
     if (b.tick <= 0) {
-      b.tick = 1;
-      e.hp -= b.dps;
+      b.tick = 1; e.hp -= b.dps;
       spark(e.x, e.y, '#ff8800');
       if (e.hp <= 0) { killEnemy(e); return; }
     }
     if (b.dur <= 0) delete e.fx.burning;
   }
-  if (e.fx.slowed) {
-    e.fx.slowed.dur -= dt;
-    if (e.fx.slowed.dur <= 0) delete e.fx.slowed;
-  }
+  if (e.fx.slowed) { e.fx.slowed.dur -= dt; if (e.fx.slowed.dur<=0) delete e.fx.slowed; }
 }
 
 function hitEnemy(e, dmg, dot, dotDur) {
@@ -473,7 +666,7 @@ function hitEnemy(e, dmg, dot, dotDur) {
   e.hp -= dmg;
   spark(e.x, e.y, '#ffffff');
   floatText(`-${dmg}`, e.x, e.y-e.r, '#ffddaa');
-  if (dot > 0) e.fx.burning = { dps:dot, dur:dotDur, tick: e.fx.burning?.tick || 1 };
+  if (dot > 0) e.fx.burning = { dps:dot, dur:dotDur, tick: e.fx.burning?.tick||1 };
   if (e.hp <= 0) killEnemy(e);
 }
 
@@ -483,9 +676,9 @@ function killEnemy(e) {
   G.totalKills++;
   G.xp += e.xp;
   floatText(`+${e.xp} XP`, e.x, e.y-e.r-10, '#b44fff');
-  if (e.gold > 0) { G.gold += e.gold; floatText(`+${e.gold} 💰`, e.x, e.y-e.r-22, '#ffc300'); }
+  if (e.gold > 0) { G.gold += e.gold; floatText(`+${e.gold} \u{1F4B0}`, e.x, e.y-e.r-22, '#ffc300'); }
   for (let i=0;i<8;i++) G.particles.push({
-    type:'spark', x:e.x,y:e.y,
+    type:'spark', x:e.x, y:e.y,
     vx:(Math.random()-.5)*130, vy:(Math.random()-.5)*130-40,
     col:e.col, a:1, life:0.5+Math.random()*0.4, max:0.9, r:2+Math.random()*3,
   });
@@ -493,12 +686,13 @@ function killEnemy(e) {
 }
 
 function checkLevelUp() {
-  while (G.xp >= G.xpNext) {
+  if (G.xp >= G.xpNext) {
     G.xp -= G.xpNext;
     G.level++;
     G.xpNext = xpNeeded(G.level);
-    G.luPending = true;
-    G.luBuffer = 1.0;
+    G.levelingUp = true;
+    pushPause();
+    showLevelUp();
   }
 }
 
@@ -506,37 +700,34 @@ function checkLevelUp() {
 function castWall(tapX, tapY) {
   if (!G.wall) return;
   const def = G.wall;
-  // Remove existing non-permanent walls of same type
   if (def.duration !== Infinity) G.walls = G.walls.filter(w=>w.spellId!==def.id);
   const wy = Math.min(Math.max(tapY, 80), BASE_Y - 80);
   G.walls.push({
-    spellId: def.id, col: def.color, glow: def.glow,
-    x: CW/2, y: wy, w: CW-40, h: 12,
-    hp: def.baseHp, maxHp: def.baseHp,
-    duration: def.duration, timer: def.duration,
-    slow: def.slow, dotDmg: def.dotDmg, blocks: def.blocks,
-    dotTick: {}, dead: false,
+    spellId:def.id, col:def.color, glow:def.glow,
+    x:CW/2, y:wy, w:CW-40, h:12,
+    hp:def.baseHp, maxHp:def.baseHp,
+    duration:def.duration, timer:def.duration,
+    slow:def.slow, dotDmg:def.dotDmg, blocks:def.blocks,
+    dotTick:{}, dead:false,
   });
 }
 
 function tickWalls(dt) {
-  const wx1 = w => w.x - w.w/2, wx2 = w => w.x + w.w/2;
-  const wy1 = w => w.y - w.h/2, wy2 = w => w.y + w.h/2;
-
+  const wx1=w=>w.x-w.w/2, wx2=w=>w.x+w.w/2;
+  const wy1=w=>w.y-w.h/2, wy2=w=>w.y+w.h/2;
   for (const w of G.walls) {
-    if (w.timer !== Infinity) { w.timer -= dt; if (w.timer<=0) { w.dead=true; continue; } }
-    if (w.hp !== Infinity && w.hp <= 0) { w.dead=true; continue; }
+    if (w.timer!==Infinity) { w.timer-=dt; if(w.timer<=0){w.dead=true;continue;} }
+    if (w.hp!==Infinity && w.hp<=0) { w.dead=true; continue; }
     for (const e of G.enemies) {
       if (e.dead) continue;
       if (e.x>=wx1(w)&&e.x<=wx2(w)&&e.y>=wy1(w)&&e.y<=wy2(w)) {
-        if (w.slow > 0) e.fx.slowed = {fac:w.slow, dur:1.5};
-        if (w.dotDmg > 0) {
-          if (!w.dotTick[e.id]) w.dotTick[e.id] = 1;
-          w.dotTick[e.id] -= dt;
-          if (w.dotTick[e.id] <= 0) {
-            w.dotTick[e.id] = 1;
-            e.hp -= w.dotDmg;
-            spark(e.x, e.y, w.col);
+        if (w.slow>0) e.fx.slowed={fac:w.slow,dur:1.5};
+        if (w.dotDmg>0) {
+          if (!w.dotTick[e.id]) w.dotTick[e.id]=1;
+          w.dotTick[e.id]-=dt;
+          if (w.dotTick[e.id]<=0) {
+            w.dotTick[e.id]=1; e.hp-=w.dotDmg;
+            spark(e.x,e.y,w.col);
             if (e.hp<=0) killEnemy(e);
           }
         }
@@ -546,16 +737,14 @@ function tickWalls(dt) {
   G.walls = G.walls.filter(w=>!w.dead);
 }
 
-// ── PARTICLES + FLOATS ───────────────────────────────────────────────────────
+// ── PARTICLES ────────────────────────────────────────────────────────────────
 function spark(x,y,col) {
   G.particles.push({ type:'hit', x,y, vx:(Math.random()-.5)*55, vy:-28-Math.random()*28, col, a:0.9, life:0.25, max:0.25, r:3 });
 }
-function floatText(txt,x,y,col) {
-  G.floats.push({ txt, x, y, col, a:1, life:1.2, vy:-28 });
-}
+function floatText(txt,x,y,col) { G.floats.push({txt,x,y,col,a:1,life:1.2,vy:-28}); }
 function tickParticles(dt) {
   for (const p of G.particles) {
-    p.life -= dt; p.a = Math.max(0, p.life/p.max);
+    p.life-=dt; p.a=Math.max(0,p.life/p.max);
     if (p.vx!==undefined) { p.x+=p.vx*dt; p.y+=p.vy*dt; }
   }
   G.particles = G.particles.filter(p=>p.life>0);
@@ -565,52 +754,37 @@ function tickFloats(dt) {
   G.floats = G.floats.filter(f=>f.life>0);
 }
 
-// ── DRAW ──────────────────────────────────────────────────────────────────────
+// ── DRAW ─────────────────────────────────────────────────────────────────────
 function draw() {
   ctx.clearRect(0,0,CW,CH);
-
-  // Background + grid
-  ctx.fillStyle = '#06060e';
-  ctx.fillRect(0,0,CW,CH);
-  ctx.strokeStyle = '#0d0d1e'; ctx.lineWidth = 1;
+  ctx.fillStyle='#06060e'; ctx.fillRect(0,0,CW,CH);
+  ctx.strokeStyle='#0d0d1e'; ctx.lineWidth=1;
   for (let x=0;x<CW;x+=40){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,CH);ctx.stroke(); }
   for (let y=0;y<CH;y+=40){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(CW,y);ctx.stroke(); }
-
-  drawWalls();
-  drawLaserParticles();
-  drawEnemies();
-  drawProjectiles();
-  drawBoomParticles();
-  drawSparkParticles();
-  drawFloats();
-  drawBase();
-  drawHoldRing();
+  drawWalls(); drawLaserPtcl(); drawEnemies(); drawProjectiles();
+  drawBoomPtcl(); drawSparkPtcl(); drawFloats(); drawBase(); drawHoldRing();
 }
 
 function drawBase() {
-  const frac = G.baseHp/BASE_MAX_HP;
-  const col = frac>.5 ? '#2244aa' : frac>.25 ? '#aa6600' : '#aa1133';
-  ctx.shadowColor = col; ctx.shadowBlur = 22;
-  ctx.fillStyle = col; ctx.fillRect(0, BASE_Y, CW, BASE_H);
-  // hp fill overlay
-  ctx.fillStyle = 'rgba(255,255,255,0.07)';
-  ctx.fillRect(0, BASE_Y, CW*frac, BASE_H);
-  ctx.shadowBlur = 0;
-  ctx.font = '10px "Share Tech Mono"';
-  ctx.fillStyle = '#dde3ff66'; ctx.textAlign = 'center';
-  ctx.fillText('BASE', CW/2, BASE_Y+10);
+  const frac=G.baseHp/BASE_MAX_HP;
+  const col=frac>.5?'#2244aa':frac>.25?'#aa6600':'#aa1133';
+  ctx.shadowColor=col; ctx.shadowBlur=22;
+  ctx.fillStyle=col; ctx.fillRect(0,BASE_Y,CW,BASE_H);
+  ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.fillRect(0,BASE_Y,CW*frac,BASE_H);
+  ctx.shadowBlur=0;
+  ctx.font='10px "Share Tech Mono"'; ctx.fillStyle='#dde3ff66'; ctx.textAlign='center';
+  ctx.fillText('BASE',CW/2,BASE_Y+10);
 }
 
 function drawWalls() {
   for (const w of G.walls) {
     const x1=w.x-w.w/2, y1=w.y-w.h/2;
-    let alpha = 1;
-    if (w.timer!==Infinity) alpha = Math.min(1, w.timer/4)*0.85 + 0.15;
-    ctx.globalAlpha = alpha;
-    ctx.shadowColor = w.glow; ctx.shadowBlur = 20;
-    ctx.fillStyle = w.col; ctx.fillRect(x1,y1,w.w,w.h);
+    let alpha=1;
+    if (w.timer!==Infinity) alpha=Math.min(1,w.timer/4)*0.85+0.15;
+    ctx.globalAlpha=alpha; ctx.shadowColor=w.glow; ctx.shadowBlur=20;
+    ctx.fillStyle=w.col; ctx.fillRect(x1,y1,w.w,w.h);
     if (w.hp!==Infinity) {
-      const frac = Math.max(0,w.hp/w.maxHp);
+      const frac=Math.max(0,w.hp/w.maxHp);
       ctx.shadowBlur=0;
       ctx.fillStyle='#111120'; ctx.fillRect(x1,y1-7,w.w,4);
       ctx.fillStyle=w.col; ctx.fillRect(x1,y1-7,w.w*frac,4);
@@ -622,33 +796,27 @@ function drawWalls() {
 function drawEnemies() {
   for (const e of G.enemies) {
     if (e.dead) continue;
-    ctx.shadowColor = e.col; ctx.shadowBlur = e.boss ? 28 : 14;
-    ctx.fillStyle = e.col;
+    ctx.shadowColor=e.col; ctx.shadowBlur=e.boss?28:14;
+    ctx.fillStyle=e.col;
     ctx.beginPath(); ctx.arc(e.x,e.y,e.r,0,Math.PI*2); ctx.fill();
-    ctx.shadowBlur = 0;
-
+    ctx.shadowBlur=0;
     if (e.fx.burning) {
       ctx.strokeStyle='#ff8800'; ctx.lineWidth=2;
       ctx.beginPath(); ctx.arc(e.x,e.y,e.r+3,0,Math.PI*2); ctx.stroke();
     }
     if (e.fx.slowed) {
-      ctx.strokeStyle='#aabbff'; ctx.lineWidth=2;
-      ctx.setLineDash([3,3]);
+      ctx.strokeStyle='#aabbff'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
       ctx.beginPath(); ctx.arc(e.x,e.y,e.r+3,0,Math.PI*2); ctx.stroke();
       ctx.setLineDash([]);
     }
-
-    // HP bar
     const bw=e.r*2.6, bx=e.x-bw/2, by=e.y-e.r-10;
     ctx.fillStyle='#111120'; ctx.fillRect(bx,by,bw,4);
     const f=Math.max(0,e.hp/e.maxHp);
-    ctx.fillStyle = f>.5?'#33cc44':f>.25?'#ffaa00':'#ff2244';
+    ctx.fillStyle=f>.5?'#33cc44':f>.25?'#ffaa00':'#ff2244';
     ctx.fillRect(bx,by,bw*f,4);
-
     if (e.boss) {
-      ctx.font='bold 10px "Share Tech Mono"';
-      ctx.fillStyle='#ffc300'; ctx.textAlign='center';
-      ctx.fillText(e.name, e.x, e.y-e.r-14);
+      ctx.font='bold 10px "Share Tech Mono"'; ctx.fillStyle='#ffc300'; ctx.textAlign='center';
+      ctx.fillText(e.name,e.x,e.y-e.r-14);
     }
   }
 }
@@ -657,19 +825,17 @@ function drawProjectiles() {
   for (const p of G.projectiles) {
     for (let i=0;i<p.trail.length;i++) {
       const t=p.trail[i];
-      ctx.globalAlpha = (i/p.trail.length)*0.45;
-      ctx.fillStyle=p.col;
+      ctx.globalAlpha=(i/p.trail.length)*0.45; ctx.fillStyle=p.col;
       ctx.beginPath(); ctx.arc(t.x,t.y,p.r*0.65,0,Math.PI*2); ctx.fill();
     }
-    ctx.globalAlpha=1;
-    ctx.shadowColor=p.glow; ctx.shadowBlur=22;
+    ctx.globalAlpha=1; ctx.shadowColor=p.glow; ctx.shadowBlur=22;
     ctx.fillStyle=p.col;
     ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
     ctx.shadowBlur=0;
   }
 }
 
-function drawLaserParticles() {
+function drawLaserPtcl() {
   for (const p of G.particles) {
     if (p.type!=='laser') continue;
     ctx.globalAlpha=p.a; ctx.shadowColor=p.col; ctx.shadowBlur=18;
@@ -679,18 +845,18 @@ function drawLaserParticles() {
   }
 }
 
-function drawBoomParticles() {
+function drawBoomPtcl() {
   for (const p of G.particles) {
     if (p.type!=='boom') continue;
-    const prog = 1 - p.life/p.max;
+    const prog=1-p.life/p.max;
     ctx.globalAlpha=p.a*0.65; ctx.shadowColor=p.col; ctx.shadowBlur=30;
     ctx.fillStyle=p.col;
-    ctx.beginPath(); ctx.arc(p.x,p.y, p.rad*prog*1.2+8, 0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.rad*prog*1.2+8,0,Math.PI*2); ctx.fill();
     ctx.globalAlpha=1; ctx.shadowBlur=0;
   }
 }
 
-function drawSparkParticles() {
+function drawSparkPtcl() {
   for (const p of G.particles) {
     if (p.type!=='spark'&&p.type!=='hit') continue;
     ctx.globalAlpha=p.a; ctx.shadowColor=p.col; ctx.shadowBlur=10;
@@ -702,35 +868,31 @@ function drawSparkParticles() {
 
 function drawFloats() {
   ctx.font='11px "Share Tech Mono"'; ctx.textAlign='center';
-  for (const f of G.floats) {
-    ctx.globalAlpha=f.a; ctx.fillStyle=f.col;
-    ctx.fillText(f.txt, f.x, f.y);
-  }
+  for (const f of G.floats) { ctx.globalAlpha=f.a; ctx.fillStyle=f.col; ctx.fillText(f.txt,f.x,f.y); }
   ctx.globalAlpha=1;
 }
 
 function drawHoldRing() {
   if (G.holdStart===null) return;
-  const prog = Math.min((performance.now()-G.holdStart)/1000, 1);
+  const prog=Math.min((performance.now()-G.holdStart)/1000,1);
   ctx.strokeStyle='#00ccff'; ctx.lineWidth=3;
   ctx.shadowColor='#00ccff'; ctx.shadowBlur=14;
   ctx.beginPath();
-  ctx.arc(G.holdX, G.holdY, 22, -Math.PI/2, -Math.PI/2 + Math.PI*2*prog);
-  ctx.stroke();
-  ctx.shadowBlur=0;
+  ctx.arc(G.holdX,G.holdY,22,-Math.PI/2,-Math.PI/2+Math.PI*2*prog);
+  ctx.stroke(); ctx.shadowBlur=0;
 }
 
 // ── HUD ───────────────────────────────────────────────────────────────────────
 function updateHUD() {
-  const hf = G.baseHp/BASE_MAX_HP;
-  document.getElementById('hp-bar').style.width = (hf*100)+'%';
-  document.getElementById('hp-val').textContent = `${Math.ceil(G.baseHp)} / ${BASE_MAX_HP}`;
-  const xf = G.xp/G.xpNext;
-  document.getElementById('xp-bar').style.width = (xf*100)+'%';
-  document.getElementById('xp-val').textContent = `${G.xp} / ${G.xpNext}`;
-  document.getElementById('lv-txt').textContent = `LVL ${G.level}`;
-  document.getElementById('gold-txt').textContent = `💰 ${G.gold}`;
-  document.getElementById('wave-txt').textContent = `WAVE ${G.wave}`;
+  const hf=G.baseHp/BASE_MAX_HP;
+  document.getElementById('hp-bar').style.width=(hf*100)+'%';
+  document.getElementById('hp-val').textContent=`${Math.ceil(G.baseHp)} / ${BASE_MAX_HP}`;
+  const xf=G.xp/G.xpNext;
+  document.getElementById('xp-bar').style.width=(xf*100)+'%';
+  document.getElementById('xp-val').textContent=`${G.xp} / ${G.xpNext}`;
+  document.getElementById('lv-txt').textContent=`LVL ${G.level}`;
+  document.getElementById('gold-txt').textContent=`\u{1F4B0} ${G.gold}`;
+  document.getElementById('wave-txt').textContent=`WAVE ${G.wave}`;
 }
 
 function updateSpellBar() {
@@ -738,24 +900,40 @@ function updateSpellBar() {
   document.getElementById('wall-name').textContent = G.wall ? G.wall.name : '— EMPTY —';
 }
 
-// ── LEVEL UP ──────────────────────────────────────────────────────────────────
+// ── LEVEL UP ─────────────────────────────────────────────────────────────────
 function showLevelUp() {
   const opts = buildOptions();
   const container = document.getElementById('lu-cards');
   container.innerHTML = '';
+
   for (const opt of opts) {
     const card = document.createElement('div');
     card.className = 'lu-card';
     card.innerHTML = `<div class="c-type">${opt.cat}</div><div class="c-name">${opt.name}</div><div class="c-desc">${opt.desc}</div>`;
     card.addEventListener('click', () => {
+      if (document.getElementById('lu-overlay').classList.contains('blocked')) return;
       opt.apply();
       document.getElementById('lu-overlay').classList.remove('show');
-      G.paused = false;
+      G.levelingUp = false;
+      popPause();
       updateSpellBar();
+      // Check for another pending level-up
+      if (G.xp >= G.xpNext) checkLevelUp();
     });
     container.appendChild(card);
   }
-  document.getElementById('lu-overlay').classList.add('show');
+
+  const overlay = document.getElementById('lu-overlay');
+  const sub = document.getElementById('lu-sub');
+
+  overlay.classList.add('show', 'blocked');
+  sub.textContent = '— WAIT… —';
+
+  // Unblock after 1 second
+  setTimeout(() => {
+    overlay.classList.remove('blocked');
+    sub.textContent = '— CHOOSE ONE —';
+  }, 1000);
 }
 
 function buildOptions() {
@@ -769,7 +947,6 @@ function buildOptions() {
     if (!rand) break;
     out.push(rand);
   }
-  // shuffle
   for (let i=out.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [out[i],out[j]]=[out[j],out[i]]; }
   return out.slice(0,3);
 }
@@ -777,17 +954,17 @@ function buildOptions() {
 function pickNewSpell() {
   const cands = [];
   for (const id of Object.keys(RAY_DEFS)) {
-    if (!G.knownRay.includes(id)) {
+    if (!G.raySpells[id]) {
       const d = RAY_DEFS[id];
       cands.push({ cat:'NEW RAY SPELL', name:d.name, desc:d.desc,
-        apply() { G.knownRay.push(id); G.ray = clone(d,{_split:1}); } });
+        apply() { const s=cloneDef(d,{_split:1}); G.raySpells[id]=s; G.ray=s; } });
     }
   }
   for (const id of Object.keys(WALL_DEFS)) {
-    if (!G.knownWall.includes(id)) {
+    if (!G.wallSpells[id]) {
       const d = WALL_DEFS[id];
       cands.push({ cat:'NEW WALL SPELL', name:d.name, desc:d.desc,
-        apply() { G.knownWall.push(id); G.wall = clone(d); } });
+        apply() { const s=cloneDef(d); G.wallSpells[id]=s; G.wall=s; } });
     }
   }
   if (!cands.length) return null;
@@ -796,8 +973,8 @@ function pickNewSpell() {
 
 function pickEquippedUpgrade(existing) {
   const cands = [];
-  if (G.ray) collectUpgrades(G.ray, 'ray', 'RAY UPGRADE', cands);
-  if (G.wall) collectUpgrades(G.wall, 'wall', 'WALL UPGRADE', cands);
+  if (G.ray) collectUpgrades(G.ray,'ray','RAY UPGRADE',cands);
+  if (G.wall) collectUpgrades(G.wall,'wall','WALL UPGRADE',cands);
   const valid = cands.filter(c=>!existing.some(e=>e._key===c._key));
   if (!valid.length) return null;
   return valid[Math.floor(Math.random()*valid.length)];
@@ -820,8 +997,8 @@ function collectUpgrades(spellObj, type, cat, out) {
     const taken = G.upgTaken[key]||0;
     if (taken >= u.maxTimes) continue;
     out.push({
-      _key: key, cat, name: u.name,
-      desc: `[${spellObj.name}] ${u.desc}`,
+      _key:key, cat, name:u.name,
+      desc:`[${spellObj.name}] ${u.desc}`,
       apply() { G.upgTaken[key]=(G.upgTaken[key]||0)+1; u.apply(G,spellObj); },
     });
   }
@@ -831,7 +1008,7 @@ function collectUpgrades(spellObj, type, cat, out) {
 function gameOver() {
   G.running = false;
   document.getElementById('go-stats').innerHTML =
-    `WAVE ${G.wave} &nbsp;|&nbsp; KILLS: ${G.totalKills} &nbsp;|&nbsp; LVL: ${G.level} &nbsp;|&nbsp; 💰 ${G.gold}`;
+    `WAVE ${G.wave} &nbsp;|&nbsp; KILLS: ${G.totalKills} &nbsp;|&nbsp; LVL: ${G.level} &nbsp;|&nbsp; \u{1F4B0} ${G.gold}`;
   document.getElementById('gameover').classList.add('show');
 }
 
