@@ -320,87 +320,6 @@ body {
 .big-btn:hover { background:#071218; box-shadow:0 0 28px #44ddff44; }
 .big-btn.red { border-color:var(--red); color:var(--red); text-shadow:0 0 10px var(--red); }
 .big-btn.red:hover { box-shadow:0 0 28px #ff224444; }
-
-/* ── TAB BAR ─────────────────────────────────── */
-#tabBar { display:flex; gap:4px; align-items:center; }
-.tab-btn {
-  background:rgba(11,11,22,0.92); border:1px solid var(--border);
-  color:var(--dim); font-family:'Black Ops One',sans-serif;
-  font-size:0.5rem; padding:3px 8px; border-radius:4px;
-  cursor:pointer; letter-spacing:0.5px; white-space:nowrap;
-  pointer-events:auto; transition:all 0.15s;
-}
-.tab-btn:hover { border-color:var(--crystal); color:var(--white); }
-.tab-btn.active { border-color:var(--crystal); color:var(--crystal); background:rgba(8,20,28,0.95); }
-.up-chip {
-  font-size:0.52rem; color:var(--purple); font-family:'Black Ops One',sans-serif;
-  background:rgba(11,11,22,0.88); border:1px solid #440088;
-  border-radius:4px; padding:3px 7px; white-space:nowrap; pointer-events:none;
-}
-/* ── TAB PANELS ──────────────────────────────── */
-#tabShopPanel, #tabGearPanel {
-  position:fixed; left:0; right:0; bottom:0; top:var(--hud-h);
-  z-index:19; background:rgba(6,6,14,0.97);
-  display:none; flex-direction:column;
-  overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px 10px; gap:10px;
-}
-#tabShopPanel.visible, #tabGearPanel.visible { display:flex; }
-.tab-panel-title {
-  font-family:'Black Ops One',sans-serif; font-size:0.85rem;
-  color:var(--gold); letter-spacing:3px; text-align:center; flex-shrink:0;
-}
-.tp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; }
-.tp-card {
-  background:var(--panel); border:1px solid var(--border); border-radius:6px;
-  padding:10px 8px; display:flex; flex-direction:column; align-items:center; gap:4px;
-}
-.tp-card.locked{opacity:0.42;} .tp-card .tp-icon{font-size:1.7rem;}
-.tp-card .tp-name{font-family:'Black Ops One',sans-serif;font-size:0.62rem;color:var(--green);}
-.tp-card .tp-cost{font-size:0.54rem;color:var(--gold);}
-.tp-card .tp-stat{font-size:0.48rem;color:var(--dim);text-align:center;line-height:1.4;}
-.tp-card .tp-hint{font-size:0.46rem;color:var(--orange);font-style:italic;text-align:center;}
-.tp-card .tp-count{font-size:0.44rem;color:var(--crystal);border:1px solid var(--crystal);border-radius:2px;padding:1px 4px;}
-.gear-section-title {
-  font-family:'Black Ops One',sans-serif; font-size:0.7rem; color:var(--gold);
-  letter-spacing:2px; border-bottom:1px solid var(--border); padding-bottom:4px; flex-shrink:0;
-}
-.up-display-bar {
-  display:flex; align-items:center; gap:8px; font-size:0.6rem;
-  padding:6px 10px; background:rgba(40,8,60,0.5); border-radius:5px;
-  border:1px solid #440088; flex-shrink:0;
-}
-.up-val{font-family:'Black Ops One',sans-serif;font-size:1rem;color:var(--purple);}
-.gear-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;}
-.gear-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:3px;}
-.gc-head{display:flex;align-items:center;gap:6px;} .gc-icon{font-size:1.1rem;}
-.gc-name{font-family:'Black Ops One',sans-serif;font-size:0.54rem;color:var(--crystal);}
-.gc-desc{font-size:0.48rem;color:var(--white);line-height:1.3;} .gc-cost{font-size:0.46rem;color:var(--purple);}
-.gear-btn {
-  background:rgba(20,20,40,0.9); border:1px solid var(--crystal); color:var(--crystal);
-  font-family:'Share Tech Mono',monospace; font-size:0.48rem; padding:4px 6px;
-  border-radius:3px; cursor:pointer; margin-top:2px; transition:all 0.15s;
-}
-.gear-btn:hover:not(:disabled){background:rgba(8,25,35,0.9);box-shadow:0 0 8px #44ddff44;}
-.gear-btn:disabled{opacity:0.38;cursor:not-allowed;border-color:var(--dim);color:var(--dim);}
-.gear-btn.owned{border-color:var(--green);color:var(--green);background:rgba(5,18,5,0.9);}
-.gear-btn.equipped-btn{border-color:var(--gold);color:var(--gold);background:rgba(20,14,0,0.9);}
-.tg-row{display:flex;flex-direction:column;gap:5px;}
-.tg-type-block{background:rgba(11,11,22,0.7);border:1px solid var(--border);border-radius:5px;padding:8px;}
-.tg-type-head{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:0.58rem;}
-.tg-type-head .tg-icon{font-size:1rem;} .tg-type-head .tg-name{font-family:'Black Ops One',sans-serif;color:var(--green);}
-.tg-gear-row{display:flex;flex-wrap:wrap;gap:5px;}
-.tg-gear-btn {
-  background:rgba(20,20,40,0.9); border:1px solid var(--border); color:var(--dim);
-  font-family:'Share Tech Mono',monospace; font-size:0.46rem; padding:4px 7px;
-  border-radius:3px; cursor:pointer; transition:all 0.15s;
-  display:flex; flex-direction:column; align-items:center; gap:1px;
-}
-.tg-gear-btn:hover:not(:disabled){border-color:var(--crystal);color:var(--white);}
-.tg-gear-btn:disabled{opacity:0.38;cursor:not-allowed;}
-.tg-gear-btn.owned{border-color:var(--green);color:var(--green);background:rgba(5,18,5,0.9);}
-.tgb-icon{font-size:0.9rem;} .tgb-name{font-size:0.42rem;} .tgb-cost{font-size:0.4rem;color:var(--purple);}
-.tg-gear-btn.owned .tgb-cost{color:var(--green);}
-.wd-up-earn{font-size:0.62rem;color:var(--purple);font-family:'Black Ops One',sans-serif;}
 </style>
 </head>
 <body>
@@ -433,14 +352,6 @@ body {
       <span class="bar-val" id="hudMana">100</span>
     </div>
   </div>
-  <div class="hud-row hud-r3">
-    <div id="tabBar">
-      <button class="tab-btn active" id="tabFightBtn">⚔ FIGHT</button>
-      <button class="tab-btn" id="tabShopBtn">🏪 SHOP</button>
-      <button class="tab-btn" id="tabGearBtn">⚙ GEAR</button>
-    </div>
-    <span class="up-chip" id="upChip">⬡ 0 UP</span>
-  </div>
 </div>
 
 <!-- ── BOSS HP BAR ──────────────────────────────── -->
@@ -462,16 +373,6 @@ body {
   </div>
 </div>
 
-<!-- Tab: Shop panel -->
-<div id="tabShopPanel">
-  <div class="tab-panel-title">TROOP ROSTER</div>
-  <div class="tp-grid" id="tpGrid"></div>
-</div>
-<!-- Tab: Gear panel -->
-<div id="tabGearPanel">
-  <div class="tab-panel-title">GEAR</div>
-  <div id="gearContent"></div>
-</div>
 <!-- Three.js canvas -->
 <canvas id="gameCanvas"></canvas>
 
@@ -490,7 +391,6 @@ body {
   <div class="wd-stats-row">
     <span id="wdGoldEarned" class="wd-gold">+200🪙</span>
     <span id="wdCrystalDelta" class="wd-crystal">💎 No damage</span>
-    <span id="wdUpEarned" class="wd-up-earn"></span>
   </div>
   <div id="wdTroopTable"></div>
   <div class="wd-next-row">
@@ -586,14 +486,6 @@ const ENEMY_DEFS = {
                unlocks:{ knight:0.5, bomber:0.3 } },
   fire_mage: { name:'FIRE MAGE', color:0xff5500, hp:100,  dmg:35, speed:1.8, range:9.0, rate:0.4, reward:44, scale:1.1, ranged:true, aoe:true,
                unlocks:{ bomber:0.15, wizard:0.08 } },
-  e_bomber:     { name:'BOMBER',       color:0xff6600, hp:55,  dmg:40, speed:2.2, range:7.0, rate:0.5, reward:28, scale:1.0, ranged:true, aoe:true,
-                  unlocks:{ bomber:0.12 } },
-  shieldbearer: { name:'SHIELDBEARER', color:0x8888ff, hp:160, dmg:14, speed:1.8, range:1.8, rate:0.8, reward:35, scale:1.2, shield:3,
-                  unlocks:{ knight:0.15 } },
-  speedster:    { name:'SPEEDSTER',    color:0xffff22, hp:50,  dmg:18, speed:7.0, range:1.5, rate:1.6, reward:30, scale:0.85,
-                  unlocks:{ spearman:0.10 } },
-  necromancer:  { name:'NECROMANCER',  color:0xaa00cc, hp:85,  dmg:28, speed:1.6, range:11.0,rate:0.4, reward:48, scale:1.0, ranged:true,
-                  unlocks:{ wizard:0.08, healer:0.06 } },
 };
 
 // Boss definitions keyed by wave number
@@ -621,28 +513,6 @@ const ABILITY_DEFS = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GEAR SYSTEM  (persists across game restarts)
-// ═══════════════════════════════════════════════════════════════════════════════
-const GEAR = { up:0, cmdOwned:new Set(), cmdEquipped:[], troopGear:{} };
-
-const COMMANDER_GEAR = [
-  { id:'mana_lens',     name:'MANA LENS',      icon:'🔭', cost:3, desc:'+30% mana regen'    },
-  { id:'gold_cache',    name:'GOLD CACHE',      icon:'💰', cost:3, desc:'+50% wave bonuses'  },
-  { id:'cryo_core',     name:'CRYO CORE',       icon:'🧊', cost:4, desc:'Freeze +4 seconds'  },
-  { id:'quickcast_orb', name:'QUICKCAST ORB',   icon:'🔮', cost:4, desc:'-25% ability CDs'   },
-  { id:'fortress_shard',name:'FORTRESS SHARD',  icon:'🏰', cost:5, desc:'Crystal max HP +200' },
-];
-
-const TROOP_GEAR = [
-  { id:'edge_rune',  name:'EDGE RUNE',  icon:'⚔', cost:2, desc:'+25% damage' },
-  { id:'iron_rune',  name:'IRON RUNE',  icon:'🛡', cost:2, desc:'+30% max HP'  },
-  { id:'swift_rune', name:'SWIFT RUNE', icon:'💨', cost:2, desc:'+20% speed'  },
-  { id:'eagle_rune', name:'EAGLE RUNE', icon:'🦅', cost:3, desc:'+30% range'  },
-];
-
-function hasCmdGear(id) { return GEAR.cmdEquipped.includes(id); }
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // THREE.JS SCENE SETUP
 // ═══════════════════════════════════════════════════════════════════════════════
 const canvas = document.getElementById('gameCanvas');
@@ -667,23 +537,16 @@ window.addEventListener('resize', () => {
 });
 
 // ── Lighting ─────────────────────────────────────────────────────────────────
-const hemiLight = new THREE.HemisphereLight(0x334466, 0x112211, 0.8);
-scene.add(hemiLight);
-
-const ambient = new THREE.AmbientLight(0x445566, 1.2);
+const ambient = new THREE.AmbientLight(0x334455, 0.9);
 scene.add(ambient);
 
-const sun = new THREE.DirectionalLight(0xffeedd, 1.6);
+const sun = new THREE.DirectionalLight(0xffeedd, 1.1);
 sun.position.set(12, 25, 12);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
 scene.add(sun);
 
-const fillLight = new THREE.DirectionalLight(0x334466, 0.5);
-fillLight.position.set(-10, 15, -10);
-scene.add(fillLight);
-
-const crystalGlow = new THREE.PointLight(0x44ddff, 4, 20);
+const crystalGlow = new THREE.PointLight(0x44ddff, 3, 18);
 crystalGlow.position.set(0, 2, 0);
 scene.add(crystalGlow);
 
@@ -937,14 +800,13 @@ function resetGame() {
   floatTexts.length = 0;
   document.getElementById('floatContainer').innerHTML = '';
 
-  const crystalMax = CRYSTAL_MAX_HP + (hasCmdGear('fortress_shard') ? 200 : 0);
   GS = {
     phase: 'playing',      // playing | between | gameover | victory
     wave:  1,
     gold:  START_GOLD,
     score: 0,
     mana:  MANA_MAX,
-    crystalHp: crystalMax, crystalMaxHp: crystalMax,
+    crystalHp: CRYSTAL_MAX_HP,
     troops:      [],
     enemies:     [],
     projectiles: [],
@@ -959,7 +821,7 @@ function resetGame() {
     waveWon:        false,
     betweenTimer:   0,
     unlockedTroops: new Set(['soldier']),
-    waveStartGold: START_GOLD, waveStartCrystalHp: crystalMax,
+    waveStartGold: START_GOLD, waveStartCrystalHp: CRYSTAL_MAX_HP,
     waveStartTroopCounts: {}, waveGoldEarned: 0,
     waveTroopsAdded: {}, waveTroopsLost: {},
     uid: 1,
@@ -983,18 +845,14 @@ function buildWaveQueue(waveNum) {
 
   // Available enemy pool grows with wave
   const pool = [];
-  if (n >= 1)  pool.push({ type: 'raider',       w: 3   });
-  if (n >= 3)  pool.push({ type: 'e_archer',     w: 2   });
-  if (n >= 4)  pool.push({ type: 'berserker',    w: 2   });
-  if (n >= 6)  pool.push({ type: 'e_bomber',     w: 1.5 });
-  if (n >= 7)  pool.push({ type: 'shieldbearer', w: 1.5 });
-  if (n >= 8)  pool.push({ type: 'shaman',       w: 1.5 });
-  if (n >= 9)  pool.push({ type: 'speedster',    w: 1.5 });
-  if (n >= 11) pool.push({ type: 'assassin',     w: 1.5 });
-  if (n >= 14) pool.push({ type: 'warlock',      w: 1.5 });
-  if (n >= 16) pool.push({ type: 'necromancer',  w: 1.0 });
-  if (n >= 18) pool.push({ type: 'fire_mage',    w: 1   });
-  if (n >= 22) pool.push({ type: 'giant',        w: 0.5 });
+  if (n >= 1)  pool.push({ type: 'raider',    w: 3   });
+  if (n >= 3)  pool.push({ type: 'e_archer',  w: 2   });
+  if (n >= 4)  pool.push({ type: 'berserker', w: 2   });
+  if (n >= 8)  pool.push({ type: 'shaman',    w: 1.5 });
+  if (n >= 11) pool.push({ type: 'assassin',  w: 1.5 });
+  if (n >= 14) pool.push({ type: 'warlock',   w: 1.5 });
+  if (n >= 18) pool.push({ type: 'fire_mage', w: 1   });
+  if (n >= 22) pool.push({ type: 'giant',     w: 0.5 });
 
   const totalEnemies = Math.floor(8 + n * 3.5);
   const totalW = pool.reduce((s, e) => s + e.w, 0);
@@ -1016,39 +874,29 @@ function buildWaveQueue(waveNum) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function spawnTroop(type, x, z) {
   const def = TROOP_DEFS[type];
-  const tgSet = GEAR.troopGear[type] || new Set();
-  let hp  = def.hp,  dmg = def.dmg, spd = def.speed, rng = def.range;
-  if (tgSet.has('iron_rune'))  hp  = Math.round(hp  * 1.30);
-  if (tgSet.has('edge_rune'))  dmg = Math.round(dmg * 1.25);
-  if (tgSet.has('swift_rune')) spd = spd * 1.20;
-  if (tgSet.has('eagle_rune')) rng = rng * 1.30;
-
   const { group, mat, limbs } = makeStickman(def.color, 1.0);
   group.position.set(x, 0, z);
   scene.add(group);
 
   return {
     id: nextUid(), type, team: 'player', group, mat, limbs,
-    hp, maxHp: hp, dmg, speed: spd,
-    range: rng, rate: def.rate, atkTimer: Math.random() * (1 / def.rate),
+    hp: def.hp, maxHp: def.hp, dmg: def.dmg, speed: def.speed,
+    range: def.range, rate: def.rate, atkTimer: Math.random() * (1 / def.rate),
     ranged: !!def.ranged, aoe: !!def.aoe, healer: !!def.healer,
     state: 'idle', target: null,
     walkPhase: Math.random() * Math.PI * 2, isBoss: false,
     frozen: false, frozenTimer: 0,
     inspired: false, inspiredTimer: 0,
-    defDmg: dmg, defSpeed: spd,
+    defDmg: def.dmg, defSpeed: def.speed,
   };
 }
 
 function spawnEnemy(type, isBoss = false, bossData = null) {
   const def = isBoss ? bossData : ENEMY_DEFS[type];
   const scale = def.scale || 1.0;
-  // HP scales +38% per wave after wave 5 (capped at 18 stacks)
-  let hp = def.hp;
-  if (!isBoss && GS && GS.wave > 5) {
-    hp = Math.round(def.hp * Math.pow(1.38, Math.min(GS.wave - 5, 18)));
-  }
   const { group, mat, limbs } = makeStickman(def.color, scale);
+
+  // Spawn at random point on perimeter
   const angle = Math.random() * Math.PI * 2;
   const r = SPAWN_RADIUS + Math.random() * 2;
   group.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
@@ -1056,7 +904,7 @@ function spawnEnemy(type, isBoss = false, bossData = null) {
 
   return {
     id: nextUid(), type, team: 'enemy', group, mat, limbs,
-    hp, maxHp: hp, dmg: def.dmg, speed: def.speed,
+    hp: def.hp, maxHp: def.hp, dmg: def.dmg, speed: def.speed,
     range: def.range || 1.5, rate: def.rate || 1.0,
     atkTimer: Math.random() * (1 / (def.rate || 1)),
     ranged: !!def.ranged, aoe: !!def.aoe,
@@ -1064,7 +912,6 @@ function spawnEnemy(type, isBoss = false, bossData = null) {
     walkPhase: Math.random() * Math.PI * 2, isBoss,
     reward: def.reward || 15, unlocks: def.unlocks || {},
     frozen: false, frozenTimer: 0,
-    shield: def.shield || 0,
     scale,
   };
 }
@@ -1236,13 +1083,6 @@ function updateUnits(dt) {
 // COMBAT
 // ═══════════════════════════════════════════════════════════════════════════════
 function dealDamage(attacker, target) {
-  if (target.team === 'enemy' && target.shield > 0) {
-    target.shield--;
-    target.mat.emissive && target.mat.emissive.setHex(0x8888ff);
-    setTimeout(() => target.mat.emissive && target.mat.emissive.setHex(0x000000), 80);
-    addFloat3D(target.group.position.clone().add(new THREE.Vector3(0, 1.5, 0)), 'BLOCKED!', '#8888ff');
-    return;
-  }
   const dmg = Math.max(1, Math.floor(attacker.dmg));
   target.hp -= dmg;
   target.mat.emissive && target.mat.emissive.setHex(0xffffff);
@@ -1367,22 +1207,19 @@ function useAbility(id) {
   if (GS.mana < def.mana) { addFloat3D(new THREE.Vector3(0, 3, 0), 'NOT ENOUGH MANA', '#ff4444'); return; }
 
   GS.mana -= def.mana;
-  const cdMult = hasCmdGear('quickcast_orb') ? 0.75 : 1.0;
-  GS.abilityCds[id] = def.cd * cdMult;
+  GS.abilityCds[id] = def.cd;
 
   switch (id) {
-    case 'freeze': {
-      const freezeDur = hasCmdGear('cryo_core') ? 11 : 7;
-      GS.freezeActive = true; GS.freezeTimer = freezeDur;
+    case 'freeze':
+      GS.freezeActive = true; GS.freezeTimer = 7;
       GS.enemies.forEach(e => {
         if (e.hp <= 0) return;
-        e.frozen = true; e.frozenTimer = freezeDur;
+        e.frozen = true; e.frozenTimer = 7;
         e.mat.color.setHex(0x88ccff);
       });
       addFloat3D(new THREE.Vector3(0, 4, 0), '❄ FREEZE!', '#44ddff');
       spawnAbilityRing(0x44ddff, 15);
       break;
-    }
 
     case 'inspire':
       GS.inspireActive = true; GS.inspireTimer = 10;
@@ -1419,9 +1256,8 @@ function useAbility(id) {
     }
 
     case 'healcrys': {
-      const cMaxHp = GS.crystalMaxHp || CRYSTAL_MAX_HP;
-      const healed = Math.min(200, cMaxHp - GS.crystalHp);
-      GS.crystalHp = Math.min(cMaxHp, GS.crystalHp + 200);
+      const healed = Math.min(200, CRYSTAL_MAX_HP - GS.crystalHp);
+      GS.crystalHp = Math.min(CRYSTAL_MAX_HP, GS.crystalHp + 200);
       addFloat3D(new THREE.Vector3(0, 2.5, 0), `+${healed} 💎 HEALED`, '#44ddff');
       flashCrystal(true);
       spawnDeathParticles(new THREE.Vector3(0, 1, 0), 0x44ddff, 15);
@@ -1595,30 +1431,24 @@ function checkWaveWin() {
   const bossHandled = !GS.bossWaveData || GS.bossSpawned;
   if (allDead && noQueue && bossHandled && !GS.waveWon) {
     GS.waveWon = true;
-    let bonus = 60 + GS.wave * 20;
-    if (hasCmdGear('gold_cache')) bonus = Math.round(bonus * 1.5);
+    const bonus = 60 + GS.wave * 20;
     GS.gold  += bonus;
     GS.score += 200 * GS.wave;
-    GS.mana   = MANA_MAX;
-    const noDmg = GS.crystalHp >= GS.waveStartCrystalHp;
-    const upEarned = 2 + (noDmg ? 1 : 0);
-    GEAR.up += upEarned;
-    document.getElementById('upChip').textContent = `⬡ ${GEAR.up} UP`;
-    showWaveComplete(bonus, upEarned);
+    GS.mana   = MANA_MAX;  // reset mana between waves
+    showWaveComplete(bonus);
   }
 }
 
-function showWaveComplete(goldBonus, upEarned = 0) {
+function showWaveComplete(goldBonus) {
   GS.phase = 'between';
   const n = GS.wave;
 
   // Title
   document.getElementById('wdTitle').textContent = n >= MAX_WAVES ? '⚔ SURVIVED ALL WAVES!' : `WAVE ${n} COMPLETE`;
 
+  // Gold earned this wave (kills + wave bonus)
   const totalGold = GS.waveGoldEarned + goldBonus;
   document.getElementById('wdGoldEarned').textContent = `+${totalGold}🪙`;
-  const upEl = document.getElementById('wdUpEarned');
-  if (upEl) upEl.textContent = upEarned > 0 ? `+${upEarned}⬡ UP` : '';
 
   // Crystal HP delta
   const dmgTaken = GS.waveStartCrystalHp - GS.crystalHp;
@@ -1819,9 +1649,8 @@ function updateHUD() {
   document.getElementById('hudWave').textContent    = `${GS.wave} / ${MAX_WAVES}`;
   document.getElementById('hudGold').textContent    = GS.gold;
   document.getElementById('hudScore').textContent   = GS.score;
-  const cMax = GS.crystalMaxHp || CRYSTAL_MAX_HP;
   document.getElementById('hudCrystalHp').textContent = Math.max(0, GS.crystalHp);
-  document.getElementById('crystalFill').style.width = Math.max(0, GS.crystalHp / cMax * 100) + '%';
+  document.getElementById('crystalFill').style.width = Math.max(0, GS.crystalHp / CRYSTAL_MAX_HP * 100) + '%';
   document.getElementById('manaFill').style.width   = (GS.mana / MANA_MAX * 100) + '%';
   document.getElementById('hudMana').textContent    = Math.floor(GS.mana);
 
@@ -1913,9 +1742,8 @@ function gameLoop(timestamp) {
   if (crystalMesh) crystalMesh.rotation.y += dt * 0.8;
 
   if (GS.phase === 'playing') {
-    // Mana regeneration (mana_lens commander gear +30%)
-    const manaRate = MANA_REGEN * (hasCmdGear('mana_lens') ? 1.3 : 1.0);
-    GS.mana = Math.min(MANA_MAX, GS.mana + manaRate * dt);
+    // Mana regeneration
+    GS.mana = Math.min(MANA_MAX, GS.mana + MANA_REGEN * dt);
 
     // Cooldown ticks
     for (const id in GS.abilityCds) {
@@ -1972,178 +1800,6 @@ function gameLoop(timestamp) {
 
   updateFloatTexts(dt);
   renderer.render(scene, camera);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TAB SYSTEM
-// ═══════════════════════════════════════════════════════════════════════════════
-let currentTab = 'fight';
-let tabPausedGame = false;
-
-function switchTab(tab) {
-  currentTab = tab;
-  ['fight','shop','gear'].forEach(t => {
-    const b = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
-    if (b) b.classList.toggle('active', t === tab);
-  });
-  document.getElementById('tabShopPanel').classList.toggle('visible', tab === 'shop');
-  document.getElementById('tabGearPanel').classList.toggle('visible', tab === 'gear');
-  if (tab !== 'fight') {
-    if (!paused) { pauseGame(); tabPausedGame = true; }
-  } else {
-    if (tabPausedGame) { resumeGame(); tabPausedGame = false; }
-  }
-  if (tab === 'shop') buildTabShop();
-  if (tab === 'gear') buildTabGear();
-}
-
-document.getElementById('tabFightBtn').addEventListener('click', e => { e.stopPropagation(); switchTab('fight'); });
-document.getElementById('tabShopBtn').addEventListener('click',  e => { e.stopPropagation(); switchTab('shop');  });
-document.getElementById('tabGearBtn').addEventListener('click',  e => { e.stopPropagation(); switchTab('gear');  });
-
-// ── SHOP PANEL ────────────────────────────────────────────────────────────────
-const UNLOCK_HINTS = {
-  archer:   'Kill Raiders or Enemy Archers',
-  knight:   'Kill Berserkers or Shieldbearers',
-  wizard:   'Kill Shamans',
-  spearman: 'Kill Berserkers or Assassins',
-  bomber:   'Kill Warlocks or Giants',
-  healer:   'Kill Shamans or Warlocks',
-};
-
-function buildTabShop() {
-  const grid = document.getElementById('tpGrid');
-  grid.innerHTML = '';
-  for (const [type, def] of Object.entries(TROOP_DEFS)) {
-    const unlocked = GS && GS.unlockedTroops && GS.unlockedTroops.has(type);
-    const card = document.createElement('div');
-    card.className = 'tp-card' + (unlocked ? '' : ' locked');
-    if (unlocked) {
-      const count = GS ? GS.troops.filter(t => t.type === type && t.hp > 0).length : 0;
-      const tgSet = GEAR.troopGear[type] || new Set();
-      const gearIcons = [...tgSet].map(gid => TROOP_GEAR.find(g => g.id === gid)?.icon || '').join('');
-      card.innerHTML =
-        `<span class="tp-icon">${def.icon}</span>` +
-        `<span class="tp-name">${def.name}</span>` +
-        `<span class="tp-cost">🪙 ${def.cost}</span>` +
-        `<span class="tp-stat">${def.desc}</span>` +
-        (gearIcons ? `<span class="tp-stat" style="color:var(--green)">${gearIcons} gear</span>` : '') +
-        (count > 0 ? `<span class="tp-count">×${count} deployed</span>` : '');
-    } else {
-      card.innerHTML =
-        `<span class="tp-icon" style="font-size:1.4rem;filter:grayscale(1)">❓</span>` +
-        `<span class="tp-name">???</span>` +
-        `<span class="tp-cost">???</span>` +
-        `<span class="tp-hint">${UNLOCK_HINTS[type] || 'Kill more enemies'}</span>`;
-    }
-    grid.appendChild(card);
-  }
-}
-
-// ── GEAR PANEL ────────────────────────────────────────────────────────────────
-function buildTabGear() {
-  const content = document.getElementById('gearContent');
-  content.innerHTML = '';
-
-  const upBar = document.createElement('div');
-  upBar.className = 'up-display-bar';
-  upBar.innerHTML = `<span class="up-val">⬡ ${GEAR.up}</span><span style="color:var(--dim)">Upgrade Points — earned 2/wave (+1 bonus for no crystal damage)</span>`;
-  content.appendChild(upBar);
-
-  // Commander Gear
-  const cmdTitle = document.createElement('div');
-  cmdTitle.className = 'gear-section-title';
-  cmdTitle.textContent = `⚔ COMMANDER GEAR  (equip up to 3 — ${GEAR.cmdEquipped.length}/3 equipped)`;
-  content.appendChild(cmdTitle);
-
-  const cmdGrid = document.createElement('div');
-  cmdGrid.className = 'gear-grid';
-  for (const g of COMMANDER_GEAR) {
-    const owned    = GEAR.cmdOwned.has(g.id);
-    const equipped = GEAR.cmdEquipped.includes(g.id);
-    const card = document.createElement('div');
-    card.className = 'gear-card';
-    card.innerHTML =
-      `<div class="gc-head"><span class="gc-icon">${g.icon}</span><span class="gc-name">${g.name}</span></div>` +
-      `<div class="gc-desc">${g.desc}</div>` +
-      `<div class="gc-cost">${owned ? '✓ Owned' : `⬡ ${g.cost} UP`}</div>`;
-
-    if (!owned) {
-      const btn = document.createElement('button');
-      btn.className = 'gear-btn'; btn.textContent = `Buy (${g.cost} UP)`;
-      btn.disabled = GEAR.up < g.cost;
-      btn.addEventListener('click', () => {
-        if (GEAR.up >= g.cost && !GEAR.cmdOwned.has(g.id)) {
-          GEAR.up -= g.cost; GEAR.cmdOwned.add(g.id);
-          document.getElementById('upChip').textContent = `⬡ ${GEAR.up} UP`;
-          buildTabGear();
-        }
-      });
-      card.appendChild(btn);
-    } else if (equipped) {
-      const btn = document.createElement('button');
-      btn.className = 'gear-btn equipped-btn'; btn.textContent = '✓ EQUIPPED — Unequip';
-      btn.addEventListener('click', () => { GEAR.cmdEquipped = GEAR.cmdEquipped.filter(id => id !== g.id); buildTabGear(); });
-      card.appendChild(btn);
-    } else {
-      const btn = document.createElement('button');
-      btn.className = 'gear-btn owned';
-      btn.textContent = GEAR.cmdEquipped.length >= 3 ? 'Slots full' : 'Equip';
-      btn.disabled = GEAR.cmdEquipped.length >= 3;
-      btn.addEventListener('click', () => {
-        if (GEAR.cmdEquipped.length < 3) { GEAR.cmdEquipped.push(g.id); buildTabGear(); }
-      });
-      card.appendChild(btn);
-    }
-    cmdGrid.appendChild(card);
-  }
-  content.appendChild(cmdGrid);
-
-  // Troop Gear
-  const tgTitle = document.createElement('div');
-  tgTitle.className = 'gear-section-title'; tgTitle.style.marginTop = '14px';
-  tgTitle.textContent = '⚔ TROOP GEAR  (permanent per-type stat upgrades)';
-  content.appendChild(tgTitle);
-
-  const tgRow = document.createElement('div');
-  tgRow.className = 'tg-row';
-  const unlocked = GS && GS.unlockedTroops ? [...GS.unlockedTroops] : ['soldier'];
-  for (const type of unlocked) {
-    const def = TROOP_DEFS[type];
-    if (!def) continue;
-    const tgSet = GEAR.troopGear[type] || new Set();
-    const block = document.createElement('div');
-    block.className = 'tg-type-block';
-    block.innerHTML = `<div class="tg-type-head"><span class="tg-icon">${def.icon}</span><span class="tg-name">${def.name}</span></div>`;
-    const gearRow = document.createElement('div');
-    gearRow.className = 'tg-gear-row';
-    for (const tg of TROOP_GEAR) {
-      const ownedTg = tgSet.has(tg.id);
-      const btn = document.createElement('button');
-      btn.className = 'tg-gear-btn' + (ownedTg ? ' owned' : '');
-      btn.disabled = ownedTg || GEAR.up < tg.cost;
-      btn.title = tg.desc;
-      btn.innerHTML =
-        `<span class="tgb-icon">${tg.icon}</span>` +
-        `<span class="tgb-name">${tg.name}</span>` +
-        `<span class="tgb-cost">${ownedTg ? '✓' : `⬡${tg.cost}`}</span>`;
-      if (!ownedTg) {
-        btn.addEventListener('click', () => {
-          if (GEAR.up >= tg.cost) {
-            GEAR.up -= tg.cost;
-            if (!GEAR.troopGear[type]) GEAR.troopGear[type] = new Set();
-            GEAR.troopGear[type].add(tg.id);
-            document.getElementById('upChip').textContent = `⬡ ${GEAR.up} UP`;
-            buildTabGear();
-          }
-        });
-      }
-      gearRow.appendChild(btn);
-    }
-    block.appendChild(gearRow);
-    tgRow.appendChild(block);
-  }
-  content.appendChild(tgRow);
 }
 
 // ── Start loop ────────────────────────────────────────────────────────────────
