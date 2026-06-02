@@ -107,7 +107,9 @@ canvas {
   }
   #hud .hud-col.right { align-items:flex-start; }
   #hud .bar-outer { width:100%; }
-  #pause-btn { margin-top:auto; width:100%; }
+  #dbg-btn { width:100%; }
+  #pause-btn { margin-top:4px; width:100%; }
+  #hud-actions { margin-top:auto; }
 
   /* Center: canvas — fill all remaining space */
   #canvas-wrap { flex:1; max-width:none; height:100%; min-height:0; min-width:0; }
@@ -200,18 +202,39 @@ canvas {
 /* ── PAUSE OVERLAY ── */
 #pause-overlay {
   display:none; position:fixed; inset:0;
-  background:rgba(6,6,14,0.93); z-index:90;
-  flex-direction:column; align-items:stretch;
+  background:rgba(6,6,14,0.82); z-index:90;
+  flex-direction:column; justify-content:center; align-items:center;
+  gap:14px; cursor:pointer;
 }
 #pause-overlay.show { display:flex; }
-#pause-label {
-  position:absolute; top:12px; right:16px;
-  font-family:'Black Ops One',sans-serif; font-size:clamp(0.9rem,3.5vw,1.4rem);
-  color:var(--white); letter-spacing:6px; text-shadow:0 0 20px rgba(221,227,255,0.3);
-  pointer-events:none; z-index:1;
+#pause-overlay h2 {
+  font-family:'Black Ops One',sans-serif; font-size:clamp(2rem,8vw,3.5rem);
+  color:var(--white); letter-spacing:8px; text-shadow:0 0 30px rgba(221,227,255,0.3);
 }
-#pause-debug {
-  flex:1; overflow-y:auto; padding:14px 16px 8px;
+.p-sub { font-size:clamp(0.6rem,2.2vw,0.75rem); color:var(--dim); letter-spacing:4px; }
+#resume-btn {
+  padding:12px 32px; background:var(--panel); border:2px solid var(--blue);
+  border-radius:4px; color:var(--blue); font-family:'Black Ops One',sans-serif;
+  font-size:0.9rem; letter-spacing:3px; cursor:pointer; margin-top:4px;
+}
+#resume-btn:hover { box-shadow:0 0 16px #4488ff66; }
+
+/* ── DEBUG OVERLAY ── */
+#dbg-overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(6,6,14,0.93); z-index:95;
+  flex-direction:column; align-items:stretch;
+}
+#dbg-overlay.show { display:flex; }
+#dbg-close {
+  position:absolute; top:10px; right:14px;
+  background:none; border:none; color:var(--dim);
+  font-size:1.1rem; cursor:pointer; z-index:1;
+  padding:4px 8px; line-height:1;
+}
+#dbg-close:hover { color:var(--white); }
+#dbg-content {
+  flex:1; overflow-y:auto; padding:14px 16px 16px;
   display:flex; flex-direction:column; gap:16px;
 }
 .debug-header {
@@ -234,18 +257,14 @@ canvas {
   font-family:'Black Ops One',sans-serif; color:var(--white);
   font-size:0.62rem; min-width:55px;
 }
-#pause-bottom {
-  flex-shrink:0; display:flex; flex-direction:column; align-items:center;
-  gap:8px; padding:12px 16px; border-top:1px solid var(--border);
-  background:var(--panel); cursor:pointer;
+#dbg-btn {
+  flex-shrink:0; width:36px; height:36px;
+  background:var(--bg); border:1px solid var(--border); border-radius:4px;
+  color:var(--dim); font-family:'Share Tech Mono',monospace;
+  font-size:0.52rem; letter-spacing:1px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
 }
-.p-sub { font-size:clamp(0.6rem,2.2vw,0.75rem); color:var(--dim); letter-spacing:4px; }
-#resume-btn {
-  padding:10px 28px; background:var(--bg); border:2px solid var(--blue);
-  border-radius:4px; color:var(--blue); font-family:'Black Ops One',sans-serif;
-  font-size:0.9rem; letter-spacing:3px; cursor:pointer;
-}
-#resume-btn:hover { box-shadow:0 0 16px #4488ff66; }
+#dbg-btn:active { border-color:var(--gold); color:var(--gold); }
 
 /* ── GAME OVER ── */
 #gameover {
@@ -285,7 +304,10 @@ canvas {
     <div class="bar-outer"><div class="bar-inner xp-bar" id="xp-bar" style="width:0%"></div></div>
     <div class="hud-val" id="xp-val">0 / 10</div>
   </div>
-  <button id="pause-btn" onclick="togglePause()" title="Pause">&#9646;&#9646;</button>
+  <div id="hud-actions" style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+    <button id="dbg-btn" onclick="toggleDebug()" title="Debug">DBG</button>
+    <button id="pause-btn" onclick="togglePause()" title="Pause">&#9646;&#9646;</button>
+  </div>
 </div>
 
 <div id="canvas-wrap"><canvas id="gc"></canvas></div>
@@ -321,14 +343,17 @@ canvas {
 
 <!-- Pause -->
 <div id="pause-overlay">
-  <div id="pause-label">PAUSED</div>
-  <div id="pause-debug">
-    <div class="debug-section" id="debug-spells"></div>
-    <div class="debug-section" id="debug-enemies"></div>
-  </div>
-  <div id="pause-bottom">
-    <div class="p-sub">TAP TO RESUME</div>
-    <button id="resume-btn">RESUME</button>
+  <h2>PAUSED</h2>
+  <div class="p-sub">TAP TO RESUME</div>
+  <button id="resume-btn">RESUME</button>
+</div>
+
+<!-- Debug -->
+<div id="dbg-overlay">
+  <button id="dbg-close" onclick="closeDebug()">&#x2715;</button>
+  <div id="dbg-content">
+    <div id="debug-spells"></div>
+    <div id="debug-enemies"></div>
   </div>
 </div>
 
@@ -429,6 +454,7 @@ function startGame() {
   document.getElementById('lu-overlay').classList.remove('show');
   hidePauseOverlay();
   closeSpellPicker();
+  closeDebug();
 
   const mm = cloneDef(RAY_DEFS.magic_missile, { _split:1 });
   G = {
@@ -447,6 +473,7 @@ function startGame() {
     ray:mm, wall:null,
     upgTaken:{},
     enemySeen:{},
+    enemySeenOrder:[],
 
     enemies:[], projectiles:[], walls:[],
     particles:[], floats:[],
@@ -474,7 +501,6 @@ function togglePause() {
 }
 
 function showPauseOverlay() {
-  buildPauseDebug();
   document.getElementById('pause-overlay').classList.add('show');
   document.getElementById('pause-btn').textContent='▶';
 }
@@ -521,20 +547,41 @@ function buildSpellDebug() {
 function buildEnemyDebug() {
   const el=document.getElementById('debug-enemies');
   let html='<div class="debug-header">ENEMIES ENCOUNTERED</div>';
-  const seenIds=Object.keys(G.enemySeen||{});
+  const seenIds=G.enemySeenOrder||[];
   if (!seenIds.length) { html+='<div class="debug-upg">None yet.</div>'; el.innerHTML=html; return; }
   const sc=diffScale(G.wave);
   for (const id of seenIds) {
     const def=ENEMY_TYPES.find(e=>e.id===id);
     if (!def) continue;
-    const count=G.enemySeen[id];
+    const info=G.enemySeen[id];
     const curHp=Math.round(def.hp*sc);
     const curDmg=Math.round(def.dmg*sc);
     html+=`<div class="debug-enemy-row"><div class="debug-enemy-name">${def.name}</div>`;
-    html+=`<span>seen:${count}</span><span>HP:${curHp}</span><span>DMG:${curDmg}</span>`;
+    html+=`<span>lv:${info.firstWave}</span><span>seen:${info.count}</span>`;
+    html+=`<span>HP:${curHp}</span><span>DMG:${curDmg}</span>`;
     html+=`<span>RNG:${def.range}</span><span>SPD:${def.spd}</span></div>`;
   }
   el.innerHTML=html;
+}
+
+let _dbgOpen=false;
+
+function toggleDebug() {
+  if (!G||!G.running) return;
+  _dbgOpen?closeDebug():openDebug();
+}
+
+function openDebug() {
+  if (_dbgOpen) return;
+  _dbgOpen=true; pushPause();
+  buildPauseDebug();
+  document.getElementById('dbg-overlay').classList.add('show');
+}
+
+function closeDebug() {
+  if (!_dbgOpen) return;
+  _dbgOpen=false; popPause();
+  document.getElementById('dbg-overlay').classList.remove('show');
 }
 
 function hidePauseOverlay() {
@@ -652,7 +699,11 @@ function spawnEnemy() {
   let pool=ENEMY_TYPES.filter(e=>e.wave<=G.wave);
   if (G.wave>=10&&Math.random()<0.05) pool=[ENEMY_TYPES[4]];
   const def=pool[Math.floor(Math.random()*pool.length)];
-  G.enemySeen[def.id]=(G.enemySeen[def.id]||0)+1;
+  if (!G.enemySeen[def.id]) {
+    G.enemySeen[def.id]={count:0,firstWave:G.wave};
+    G.enemySeenOrder.unshift(def.id);
+  }
+  G.enemySeen[def.id].count++;
   const x=def.r+Math.random()*(CW-def.r*2);
   G.enemies.push({
     id:Math.random(), col:def.col, r:def.r, name:def.name,
