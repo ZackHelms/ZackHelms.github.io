@@ -409,11 +409,11 @@ const WALL_DEFS = {
   },
   fire_wall: {
     id:'fire_wall', name:'FIRE WALL', desc:'Burns enemies passing through. 20s.',
-    color:'#ff6600', glow:'#ff3300', baseHp:Infinity, baseW:CW-40, duration:20, slow:0, dotDmg:5, blocks:false,
+    color:'#ff6600', glow:'#ff3300', baseHp:Infinity, duration:20, slow:0, dotDmg:5, blocks:false,
   },
   slow_wall: {
     id:'slow_wall', name:'SLOW WALL', desc:'Slows enemies 80% movement. 20s.',
-    color:'#aabbff', glow:'#6677cc', baseHp:Infinity, baseW:CW-40, duration:20, slow:0.8, dotDmg:0, blocks:false,
+    color:'#aabbff', glow:'#6677cc', baseHp:Infinity, duration:20, slow:0.8, dotDmg:0, blocks:false,
   },
 };
 
@@ -449,9 +449,9 @@ const UPGRADE_DEFS = [
     avail(s){ return s.id==='fire_wall'; },
     apply(G,s){ s.dotDmg=Math.round(s.dotDmg*1.5); } },
   { id:'expand',  name:'EXPAND',    targetType:'wall',
-    desc:'+33% wall width.',
+    desc:'+33% wall thickness.',
     avail(s){ return s.id==='fire_wall'||s.id==='slow_wall'; },
-    apply(G,s){ s.baseW=Math.round((s.baseW||CW-40)*1.33); } },
+    apply(G,s){ s.baseH=Math.round((s.baseH||12)*1.33); } },
   { id:'weaken',  name:'WEAKEN',    targetType:'wall',
     desc:'Slowed enemies take 20% more damage.',
     avail(s){ return s.id==='slow_wall'; },
@@ -558,7 +558,7 @@ function buildSpellDebug() {
     } else {
       if (def.baseHp!==Infinity) lines.push(`WALL HP: ${def.baseHp} &rarr; ${s.baseHp}`);
       if (def.dotDmg>0||s.dotDmg>0) lines.push(`FIRE DMG: ${def.dotDmg} &rarr; ${s.dotDmg}/tick`);
-      if (def.baseW) lines.push(`WIDTH: ${def.baseW} &rarr; ${Math.min(s.baseW||def.baseW,CW)}px`);
+      if (s.baseH>12) lines.push(`THICKNESS: 12 &rarr; ${s.baseH}px`);
       if (s._debuff>0) lines.push(`WEAKEN: +${Math.round(s._debuff*100)}% dmg`);
       if (s._gravity>0) lines.push(`GRAVITY: ${s._gravity} px/s`);
     }
@@ -916,10 +916,9 @@ function castWall(tapX, tapY) {
   const def=G.wall;
   if (def.duration!==Infinity) G.walls=G.walls.filter(w=>w.spellId!==def.id);
   const wy=Math.min(Math.max(tapY,80),BASE_Y-80);
-  const wallW=Math.min(def.baseW||CW-40, CW);
   G.walls.push({
     spellId:def.id, col:def.color, glow:def.glow,
-    x:CW/2, y:wy, w:wallW, h:12,
+    x:CW/2, y:wy, w:CW-40, h:def.baseH||12,
     hp:def.baseHp, maxHp:def.baseHp,
     duration:def.duration, timer:def.duration,
     slow:def.slow, dotDmg:def.dotDmg, blocks:def.blocks,
