@@ -418,23 +418,28 @@ const WALL_DEFS = {
 };
 
 const UPGRADE_DEFS = [
+  // ── magic missile ──
   { id:'split',   name:'SPLIT',     targetType:'ray',
     desc:'Fire one additional ray per cast.',
+    avail(s){ return s.id==='magic_missile'; },
     apply(G,s){ s._split=(s._split||1)+1; } },
-  { id:'speed',   name:'SPEED',     targetType:'ray',
-    desc:'Projectile speed +33%.',
-    avail(s){ return s.speed!==Infinity; },
-    apply(G,s){ s.speed=s.speed*1.33; } },
   { id:'damage',  name:'POWER',     targetType:'ray',
     desc:'+20% impact damage.',
     apply(G,s){ s.dmg=Math.round(s.dmg*1.2); } },
-  { id:'dot',     name:'IGNITE',    targetType:'ray',
-    desc:'Add or strengthen burning DOT (+66%).',
-    apply(G,s){ s.dot=s.dot?Math.round(s.dot*1.66):2; s.dotDur=s.dotDur||5; } },
   { id:'bounce',  name:'BOUNCE',    targetType:'ray',
     desc:'+1 bounce to nearest enemy on hit.',
     avail(s){ return s.id==='magic_missile'; },
     apply(G,s){ s._bounce=(s._bounce||0)+1; } },
+  // ── fireball ──
+  { id:'blast',   name:'BLAST',     targetType:'ray',
+    desc:'+33% explosion radius.',
+    avail(s){ return s.id==='fireball'; },
+    apply(G,s){ s.aoe=Math.round(s.aoe*1.33); } },
+  { id:'dot',     name:'IGNITE',    targetType:'ray',
+    desc:'Strengthen burning DOT (+66% dmg/s).',
+    avail(s){ return s.id==='fireball'||s.id==='laserbeam'; },
+    apply(G,s){ s.dot=s.dot?Math.round(s.dot*1.66):2; s.dotDur=s.dotDur||5; } },
+  // ── walls ──
   { id:'wall_hp', name:'REINFORCE', targetType:'wall',
     desc:'+50% wall HP.',
     avail(s){ return s.baseHp!==Infinity; },
@@ -545,8 +550,8 @@ function buildSpellDebug() {
     const lines=[];
     if (isRay) {
       lines.push(`DMG: ${def.dmg} &rarr; ${s.dmg}`);
-      if (def.speed!==Infinity) lines.push(`SPD: ${Math.round(def.speed)} &rarr; ${Math.round(s.speed)}`);
-      lines.push(`RAYS: 1 &rarr; ${s._split||1}`);
+      if (s.id==='magic_missile') lines.push(`RAYS: 1 &rarr; ${s._split||1}`);
+      if (def.aoe>0) lines.push(`AOE RADIUS: ${def.aoe} &rarr; ${s.aoe}`);
       const baseDot=def.dot||0;
       if (baseDot>0||s.dot>0) lines.push(`DOT: ${baseDot}/s &rarr; ${s.dot||0}/s`);
       if (s._bounce>0) lines.push(`BOUNCE: ${s._bounce}`);
