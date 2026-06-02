@@ -390,7 +390,7 @@ function baseColor(frac) {
 const RAY_DEFS = {
   magic_missile: {
     id:'magic_missile', name:'MAGIC MISSILE', desc:'Fast blue bolt. Single target.',
-    color:'#4488ff', glow:'#2255cc', speed:900, dmg:25, aoe:0, dot:0, dotDur:0, instant:false,
+    color:'#4488ff', glow:'#2255cc', speed:900, dmg:50, aoe:0, dot:0, dotDur:0, instant:false,
   },
   fireball: {
     id:'fireball', name:'FIREBALL', desc:'AOE explosion on impact + 5s burn.',
@@ -404,23 +404,23 @@ const RAY_DEFS = {
 
 const WALL_DEFS = {
   force_field: {
-    id:'force_field', name:'FORCE FIELD', desc:'100 HP barrier. Stops enemies.',
-    color:'#00ccff', glow:'#0088cc', baseHp:100, duration:Infinity, slow:0, dotDmg:0, blocks:true,
+    id:'force_field', name:'FORCE FIELD', desc:'200 HP barrier. Stops enemies.',
+    color:'#00ccff', glow:'#0088cc', baseHp:200, duration:Infinity, slow:0, dotDmg:0, blocks:true,
   },
   fire_wall: {
     id:'fire_wall', name:'FIRE WALL', desc:'Burns enemies passing through. 20s.',
-    color:'#ff6600', glow:'#ff3300', baseHp:Infinity, duration:20, slow:0, dotDmg:5, blocks:false,
+    color:'#ff6600', glow:'#ff3300', baseHp:Infinity, baseW:CW-40, duration:20, slow:0, dotDmg:5, blocks:false,
   },
   slow_wall: {
     id:'slow_wall', name:'SLOW WALL', desc:'Slows enemies 80% movement. 20s.',
-    color:'#aabbff', glow:'#6677cc', baseHp:Infinity, duration:20, slow:0.8, dotDmg:0, blocks:false,
+    color:'#aabbff', glow:'#6677cc', baseHp:Infinity, baseW:CW-40, duration:20, slow:0.8, dotDmg:0, blocks:false,
   },
 };
 
 const UPGRADE_DEFS = [
   { id:'split',   name:'SPLIT',     targetType:'ray',
-    desc:'×1.5 rays per cast (rounds up).',
-    apply(G,s){ s._split=Math.round((s._split||1)*1.5); if(s._split<2)s._split=2; } },
+    desc:'Fire one additional ray per cast.',
+    apply(G,s){ s._split=(s._split||1)+1; } },
   { id:'speed',   name:'SPEED',     targetType:'ray',
     desc:'Projectile speed +33%.',
     avail(s){ return s.speed!==Infinity; },
@@ -431,10 +431,30 @@ const UPGRADE_DEFS = [
   { id:'dot',     name:'IGNITE',    targetType:'ray',
     desc:'Add or strengthen burning DOT (+66%).',
     apply(G,s){ s.dot=s.dot?Math.round(s.dot*1.66):2; s.dotDur=s.dotDur||5; } },
+  { id:'bounce',  name:'BOUNCE',    targetType:'ray',
+    desc:'+1 bounce to nearest enemy on hit.',
+    avail(s){ return s.id==='magic_missile'; },
+    apply(G,s){ s._bounce=(s._bounce||0)+1; } },
   { id:'wall_hp', name:'REINFORCE', targetType:'wall',
     desc:'+50% wall HP.',
     avail(s){ return s.baseHp!==Infinity; },
     apply(G,s){ s.baseHp=Math.round(s.baseHp*1.5); } },
+  { id:'fw_dot',  name:'INFERNO',   targetType:'wall',
+    desc:'+50% fire damage per tick.',
+    avail(s){ return s.id==='fire_wall'; },
+    apply(G,s){ s.dotDmg=Math.round(s.dotDmg*1.5); } },
+  { id:'expand',  name:'EXPAND',    targetType:'wall',
+    desc:'+33% wall width.',
+    avail(s){ return s.id==='fire_wall'||s.id==='slow_wall'; },
+    apply(G,s){ s.baseW=Math.round((s.baseW||CW-40)*1.33); } },
+  { id:'weaken',  name:'WEAKEN',    targetType:'wall',
+    desc:'Slowed enemies take 20% more damage.',
+    avail(s){ return s.id==='slow_wall'; },
+    apply(G,s){ s._debuff=(s._debuff||0)+0.2; } },
+  { id:'gravity', name:'GRAVITY',   targetType:'wall',
+    desc:'Pull blocked enemies toward center (+10 px/s).',
+    avail(s){ return s.id==='force_field'; },
+    apply(G,s){ s._gravity=(s._gravity||0)+10; } },
 ];
 
 // ── ENEMY TYPES ──────────────────────────────────────────────────────────────
@@ -442,8 +462,9 @@ const ENEMY_TYPES = [
   { id:'imp',   name:'IMP',   col:'#ff4455', r:11, hp:30,  spd:60, range:40, dmg:8,  rate:1.5, xp:1,  gold:0,  wave:0  },
   { id:'orc',   name:'ORC',   col:'#77cc44', r:15, hp:80,  spd:40, range:45, dmg:18, rate:1.0, xp:2,  gold:0,  wave:3  },
   { id:'troll', name:'TROLL', col:'#559933', r:20, hp:200, spd:28, range:50, dmg:30, rate:0.7, xp:5,  gold:0,  wave:6  },
-  { id:'ghost', name:'GHOST', col:'#aabbff', r:13, hp:50,  spd:75, range:45, dmg:12, rate:2.0, xp:3,  gold:0,  wave:4  },
-  { id:'golem', name:'GOLEM', col:'#cc8833', r:28, hp:600, spd:22, range:55, dmg:50, rate:0.5, xp:20, gold:15, wave:10, boss:true },
+  { id:'ghost', name:'GHOST', col:'#aabbff', r:13, hp:50,  spd:75,  range:45, dmg:12, rate:2.0, xp:3,  gold:0,  wave:4  },
+  { id:'ninja', name:'NINJA', col:'#cc44ff', r:7,  hp:50,  spd:225, range:22, dmg:6,  rate:2.0, xp:4,  gold:0,  wave:8  },
+  { id:'golem', name:'GOLEM', col:'#cc8833', r:28, hp:600, spd:22,  range:55, dmg:50, rate:0.5, xp:20, gold:15, wave:10, boss:true },
 ];
 
 // ── GAME STATE ───────────────────────────────────────────────────────────────
@@ -528,8 +549,13 @@ function buildSpellDebug() {
       lines.push(`RAYS: 1 &rarr; ${s._split||1}`);
       const baseDot=def.dot||0;
       if (baseDot>0||s.dot>0) lines.push(`DOT: ${baseDot}/s &rarr; ${s.dot||0}/s`);
+      if (s._bounce>0) lines.push(`BOUNCE: ${s._bounce}`);
     } else {
       if (def.baseHp!==Infinity) lines.push(`WALL HP: ${def.baseHp} &rarr; ${s.baseHp}`);
+      if (def.dotDmg>0||s.dotDmg>0) lines.push(`FIRE DMG: ${def.dotDmg} &rarr; ${s.dotDmg}/tick`);
+      if (def.baseW) lines.push(`WIDTH: ${def.baseW} &rarr; ${Math.min(s.baseW||def.baseW,CW)}px`);
+      if (s._debuff>0) lines.push(`WEAKEN: +${Math.round(s._debuff*100)}% dmg`);
+      if (s._gravity>0) lines.push(`GRAVITY: ${s._gravity} px/s`);
     }
     const upgLines=[];
     for (const u of UPGRADE_DEFS) {
@@ -732,8 +758,9 @@ function fireRay(tx, ty) {
       const dx=fx-ox, dy=fy-oy, len=Math.hypot(dx,dy)||1;
       G.projectiles.push({
         col:s.color, glow:s.glow, x:ox, y:oy,
-        vx:(dx/len)*s.speed, vy:(dy/len)*s.speed,
+        vx:(dx/len)*s.speed, vy:(dy/len)*s.speed, speed:s.speed,
         dmg:s.dmg, aoe:s.aoe||0, dot:s.dot||0, dotDur:s.dotDur||0,
+        bounces:s._bounce||0, hitIds:new Set(),
         r:s.id==='fireball'?9:5, trail:[], alive:true,
       });
     }
@@ -766,8 +793,31 @@ function tickProjectiles(dt) {
     for (const e of G.enemies) {
       if (e.dead) continue;
       if (Math.hypot(p.x-e.x,p.y-e.y)<e.r+p.r) {
-        if (p.aoe>0) explode(p.x,p.y,p.aoe,p.dmg,p.dot,p.dotDur,p.col);
-        else hitEnemy(e,p.dmg,p.dot,p.dotDur);
+        if (p.aoe>0) {
+          explode(p.x,p.y,p.aoe,p.dmg,p.dot,p.dotDur,p.col);
+        } else {
+          hitEnemy(e,p.dmg,p.dot,p.dotDur);
+          if (p.bounces>0) {
+            p.hitIds.add(e.id);
+            let best=null, bestD=Infinity;
+            for (const c of G.enemies) {
+              if (c.dead||p.hitIds.has(c.id)) continue;
+              const d=Math.hypot(c.x-p.x,c.y-p.y);
+              if (d<bestD) { bestD=d; best=c; }
+            }
+            if (best) {
+              const bx=best.x-p.x, by=best.y-p.y, bl=Math.hypot(bx,by)||1;
+              const spd=p.speed||900;
+              G.projectiles.push({
+                col:p.col, glow:p.glow, x:p.x, y:p.y,
+                vx:(bx/bl)*spd, vy:(by/bl)*spd, speed:spd,
+                dmg:p.dmg, aoe:0, dot:p.dot, dotDur:p.dotDur,
+                bounces:p.bounces-1, hitIds:new Set(p.hitIds),
+                r:p.r, trail:[], alive:true,
+              });
+            }
+          }
+        }
         p.alive=false; break;
       }
     }
@@ -794,6 +844,10 @@ function tickEnemies(dt) {
       if (e.y<w.y&&Math.abs(e.y-w.y)<e.r+12) { blocked=w; break; }
     }
     if (blocked) {
+      if (blocked.gravity>0) {
+        const pull=blocked.gravity, dx=CW/2-e.x;
+        if (Math.abs(dx)>0.5) e.x+=Math.sign(dx)*Math.min(Math.abs(dx),pull*dt);
+      }
       e.atkTimer-=dt;
       if (e.atkTimer<=0) {
         e.atkTimer=1/e.rate; blocked.hp-=e.dmg;
@@ -825,6 +879,7 @@ function tickFx(e, dt) {
 
 function hitEnemy(e, dmg, dot, dotDur) {
   if (e.dead) return;
+  if (e.fx.slowed?.debuff>0) dmg=Math.round(dmg*(1+e.fx.slowed.debuff));
   e.hp-=dmg; spark(e.x,e.y,'#ffffff'); floatText(`-${dmg}`,e.x,e.y-e.r,'#ffddaa');
   if (dot>0) e.fx.burning={dps:dot,dur:dotDur,tick:e.fx.burning?.tick||1};
   if (e.hp<=0) killEnemy(e);
@@ -856,12 +911,14 @@ function castWall(tapX, tapY) {
   const def=G.wall;
   if (def.duration!==Infinity) G.walls=G.walls.filter(w=>w.spellId!==def.id);
   const wy=Math.min(Math.max(tapY,80),BASE_Y-80);
+  const wallW=Math.min(def.baseW||CW-40, CW);
   G.walls.push({
     spellId:def.id, col:def.color, glow:def.glow,
-    x:CW/2, y:wy, w:CW-40, h:12,
+    x:CW/2, y:wy, w:wallW, h:12,
     hp:def.baseHp, maxHp:def.baseHp,
     duration:def.duration, timer:def.duration,
     slow:def.slow, dotDmg:def.dotDmg, blocks:def.blocks,
+    debuff:def._debuff||0, gravity:def._gravity||0,
     dotTick:{}, dead:false,
   });
 }
@@ -875,7 +932,7 @@ function tickWalls(dt) {
     for (const e of G.enemies) {
       if (e.dead) continue;
       if (e.x>=wx1(w)&&e.x<=wx2(w)&&e.y>=wy1(w)&&e.y<=wy2(w)) {
-        if (w.slow>0) e.fx.slowed={fac:w.slow,dur:1.5};
+        if (w.slow>0) e.fx.slowed={fac:w.slow,dur:1.5,debuff:w.debuff||0};
         if (w.dotDmg>0) {
           // Timer starts at 0 so the first hit lands immediately on contact
           if (w.dotTick[e.id]===undefined) w.dotTick[e.id]=0;
