@@ -218,6 +218,18 @@ canvas {
   font-size:0.9rem; letter-spacing:3px; cursor:pointer; margin-top:4px;
 }
 #resume-btn:hover { box-shadow:0 0 16px #4488ff66; }
+#pause-tips {
+  max-height:35vh; overflow-y:auto; text-align:left;
+  width:min(88vw,420px); background:var(--panel);
+  border:1px solid var(--border); border-radius:6px;
+  padding:10px 14px; margin:2px 0;
+}
+.tip-head {
+  font-family:'Black Ops One',sans-serif; font-size:0.62rem;
+  color:var(--gold); letter-spacing:3px; margin-bottom:2px;
+}
+.tip-body { font-size:0.52rem; color:var(--dim); line-height:1.75; margin-bottom:8px; }
+.tip-body:last-child { margin-bottom:0; }
 
 /* ── DEBUG OVERLAY ── */
 #dbg-overlay {
@@ -257,6 +269,10 @@ canvas {
   font-family:'Black Ops One',sans-serif; color:var(--white);
   font-size:0.62rem; min-width:55px;
 }
+.debug-dim { opacity:0.35; }
+.debug-upg-row { display:flex; gap:8px; flex-wrap:wrap; }
+.debug-upg-row span { font-size:0.52rem; color:var(--dim); }
+.debug-upg-row span.taken { color:var(--gold); }
 #dbg-btn {
   flex-shrink:0; width:36px; height:36px;
   background:var(--bg); border:1px solid var(--border); border-radius:4px;
@@ -344,6 +360,12 @@ canvas {
 <!-- Pause -->
 <div id="pause-overlay">
   <h2>PAUSED</h2>
+  <div id="pause-tips">
+    <div class="tip-head">BUILD IDEAS</div>
+    <div class="tip-body"><b style="color:var(--blue)">MAGIC MISSILE + SLOW WALL</b><br>High single-target DPS. POWER and SPLIT increase raw output. BOUNCE handles multi-target cleanup. SLOW WALL lets you land hits on fast enemies that require precise aim. WEAKEN debuff amplifies all missile damage.</div>
+    <div class="tip-body"><b style="color:var(--blue)">FIREBALL + FORCE FIELD</b><br>Stack BLAST RADIUS for wide sweeps. GRAVITY funnels enemies to the center of each Force Field so every fireball hits multiple targets. REINFORCE extends the wall against heavy waves.</div>
+    <div class="tip-body"><b style="color:var(--blue)">LASER + FIRE WALL (DOT BUILD)</b><br>Both Laser Beam and Fire Wall apply burning. PYROMANIAC stacks increase max burn stacks — each stack ticks 1 dmg/s independently. IGNITE on Laser for active pressure; INFERNO on Fire Wall for passive killing. Caution: un-upgraded Fire Wall adds weak stacks that block stronger ones.</div>
+  </div>
   <div class="p-sub">TAP TO RESUME</div>
   <button id="resume-btn">RESUME</button>
 </div>
@@ -394,11 +416,11 @@ const RAY_DEFS = {
   },
   fireball: {
     id:'fireball', name:'FIREBALL', desc:'AOE explosion on impact + 5s burn.',
-    color:'#ff8800', glow:'#ff4400', speed:420, dmg:15, aoe:55, dot:3, dotDur:5, instant:false,
+    color:'#ff8800', glow:'#ff4400', speed:420, dmg:35, aoe:55, dot:5, dotDur:5, instant:false,
   },
   laserbeam: {
     id:'laserbeam', name:'LASER BEAM', desc:'Instant line through tap. Burns all hit.',
-    color:'#ff2244', glow:'#ff0011', speed:Infinity, dmg:20, aoe:0, dot:2, dotDur:5, instant:true,
+    color:'#ff2244', glow:'#ff0011', speed:Infinity, dmg:20, aoe:0, dot:10, dotDur:5, instant:true,
   },
 };
 
@@ -409,7 +431,7 @@ const WALL_DEFS = {
   },
   fire_wall: {
     id:'fire_wall', name:'FIRE WALL', desc:'Burns enemies passing through. 20s.',
-    color:'#ff6600', glow:'#ff3300', baseHp:Infinity, duration:20, slow:0, dotDmg:10, blocks:false,
+    color:'#ff6600', glow:'#ff3300', baseHp:Infinity, duration:20, slow:0, dotDmg:20, blocks:false,
   },
   slow_wall: {
     id:'slow_wall', name:'SLOW WALL', desc:'Slows enemies 80% movement. 20s.',
@@ -439,6 +461,10 @@ const UPGRADE_DEFS = [
     desc:'Strengthen burning DOT (+66% dmg/s).',
     avail(s){ return s.id==='fireball'||s.id==='laserbeam'; },
     apply(G,s){ s.dot=s.dot?Math.round(s.dot*1.66):2; s.dotDur=s.dotDur||5; } },
+  { id:'burnstacks', name:'PYROMANIAC', targetType:'ray', globalKey:'burnstacks',
+    desc:'+1 max burn stacks (all sources). Base: 3.',
+    avail(s){ return (G.ray?.dot>0)||(G.wall?.dotDmg>0); },
+    apply(G,s){ G.maxBurnStacks=(G.maxBurnStacks||3)+1; } },
   // ── walls ──
   { id:'wall_hp', name:'REINFORCE', targetType:'wall',
     desc:'+50% wall HP.',
@@ -498,6 +524,7 @@ function startGame() {
     wallSpells:{},
     ray:mm, wall:null,
     upgTaken:{},
+    maxBurnStacks:3,
     enemySeen:{},
     enemySeenOrder:[],
 
@@ -539,39 +566,65 @@ function buildPauseDebug() {
 
 function buildSpellDebug() {
   const el=document.getElementById('debug-spells');
-  let html='<div class="debug-header">SPELLS &amp; UPGRADES</div>';
-  const allSpells=[...Object.values(G.raySpells),...Object.values(G.wallSpells)];
-  if (!allSpells.length) { html+='<div class="debug-upg">No spells.</div>'; el.innerHTML=html; return; }
-  for (const s of allSpells) {
-    const def=RAY_DEFS[s.id]||WALL_DEFS[s.id];
-    if (!def) continue;
-    const isRay=!!RAY_DEFS[s.id];
-    html+=`<div class="debug-spell"><div class="debug-spell-name">${s.name}</div>`;
-    const lines=[];
-    if (isRay) {
-      lines.push(`DMG: ${def.dmg} &rarr; ${s.dmg}`);
-      if (s.id==='magic_missile'||s.id==='laserbeam') lines.push(`RAYS: 1 &rarr; ${s._split||1}`);
-      if (def.aoe>0) lines.push(`AOE RADIUS: ${def.aoe} &rarr; ${s.aoe}`);
-      const baseDot=def.dot||0;
-      if (baseDot>0||s.dot>0) lines.push(`DOT: ${baseDot}/s &rarr; ${s.dot||0}/s`);
-      if (s._bounce>0) lines.push(`BOUNCE: ${s._bounce}`);
-    } else {
-      if (def.baseHp!==Infinity) lines.push(`WALL HP: ${def.baseHp} &rarr; ${s.baseHp}`);
-      if (def.dotDmg>0||s.dotDmg>0) lines.push(`FIRE DMG: ${def.dotDmg} &rarr; ${s.dotDmg}/tick`);
-      if (s.baseH>12) lines.push(`THICKNESS: 12 &rarr; ${s.baseH}px`);
-      if (s._debuff>0) lines.push(`WEAKEN: +${Math.round(s._debuff*100)}% dmg`);
-      if (s._gravity>0) lines.push(`GRAVITY: ${s._gravity} px/s`);
+  let html='';
+
+  // helper: render one spell block (owned or locked)
+  function spellBlock(def, s, isRay) {
+    const owned=!!s;
+    html+=`<div class="debug-spell${owned?'':' debug-dim'}">`;
+    html+=`<div class="debug-spell-name">${def.name}${owned?'':' <span style="font-size:0.5rem;letter-spacing:1px;color:var(--dim)">[locked]</span>'}</div>`;
+    if (owned) {
+      const lines=[];
+      if (isRay) {
+        lines.push(`DMG:${def.dmg}&rarr;${s.dmg}`);
+        if (def.id==='magic_missile'||def.id==='laserbeam') lines.push(`RAYS:1&rarr;${s._split||1}`);
+        if (def.aoe>0) lines.push(`AOE:${def.aoe}&rarr;${s.aoe}`);
+        if (def.dot>0||s.dot>0) lines.push(`DOT:${def.dot||0}&rarr;${s.dot||0}/s`);
+        if (s._bounce>0) lines.push(`BOUNCE:${s._bounce}`);
+      } else {
+        if (def.baseHp!==Infinity) lines.push(`HP:${def.baseHp}&rarr;${s.baseHp}`);
+        if (def.dotDmg>0||s.dotDmg>0) lines.push(`FIRE:${def.dotDmg}&rarr;${s.dotDmg}/tick`);
+        if (s.baseH>12) lines.push(`THICK:${s.baseH}px`);
+        if (s._debuff>0) lines.push(`WEAKEN:+${Math.round(s._debuff*100)}%`);
+        if (s._gravity>0) lines.push(`GRAV:${s._gravity}px/s`);
+      }
+      if (lines.length) html+=`<div class="debug-upg">${lines.join(' &nbsp;')}</div>`;
     }
-    const upgLines=[];
+    // show all applicable upgrades (dim if not taken)
+    const upgSpans=[];
     for (const u of UPGRADE_DEFS) {
-      if (u.targetType!==(isRay?'ray':'wall')) continue;
-      const key=u.id+'_'+s.id;
+      if (u.targetType!==(isRay?'ray':'wall')||u.globalKey) continue;
+      if (u.avail&&!u.avail(s||def)) continue;
+      const key=u.id+'_'+def.id;
       const taken=G.upgTaken[key]||0;
-      if (taken>0) upgLines.push(`${u.name}&times;${taken}`);
+      upgSpans.push(`<span class="${taken?'taken':''}" style="${taken?'':'opacity:0.35'}">${u.name}${taken?'&times;'+taken:''}</span>`);
     }
-    lines.push(upgLines.length?('UPG: '+upgLines.join(', ')):'No upgrades.');
-    html+=`<div class="debug-upg">${lines.join('<br>')}</div></div>`;
+    if (upgSpans.length) html+=`<div class="debug-upg-row">${upgSpans.join('')}</div>`;
+    html+='</div>';
   }
+
+  // Ray spells
+  html+='<div class="debug-header">RAY SPELLS</div>';
+  for (const [id,def] of Object.entries(RAY_DEFS)) spellBlock(def,G.raySpells[id],true);
+
+  // Wall spells
+  html+='<div class="debug-header" style="margin-top:10px">WALL SPELLS</div>';
+  for (const [id,def] of Object.entries(WALL_DEFS)) spellBlock(def,G.wallSpells[id],false);
+
+  // General upgrades
+  const generals=UPGRADE_DEFS.filter(u=>u.globalKey);
+  if (generals.length) {
+    html+='<div class="debug-header" style="margin-top:10px">GENERAL</div>';
+    for (const u of generals) {
+      const taken=G.upgTaken[u.globalKey]||0;
+      html+=`<div class="debug-spell${taken?'':' debug-dim'}">`;
+      html+=`<div class="debug-spell-name" style="${taken?'':'opacity:0.35'}">${u.name}${taken?' &times;'+taken:''}</div>`;
+      html+=`<div class="debug-upg" style="${taken?'':'opacity:0.35'}">${u.desc}</div>`;
+      html+=`<div class="debug-upg">MAX BURN STACKS NOW: ${G.maxBurnStacks||3}</div>`;
+      html+='</div>';
+    }
+  }
+
   el.innerHTML=html;
 }
 
@@ -870,14 +923,22 @@ function tickEnemies(dt) {
   G.enemies=G.enemies.filter(e=>!e.dead);
 }
 
+function applyBurn(e, dps, dur) {
+  if (!e.fx.burns) e.fx.burns=[];
+  if (e.fx.burns.length<(G.maxBurnStacks||3))
+    e.fx.burns.push({dps, dur, tick:1});
+}
+
 function tickFx(e, dt) {
-  if (e.fx.burning) {
-    const b=e.fx.burning; b.dur-=dt; b.tick-=dt;
-    if (b.tick<=0) {
-      b.tick=1; e.hp-=b.dps; spark(e.x,e.y,'#ff8800');
-      if (e.hp<=0) { killEnemy(e); return; }
+  if (e.fx.burns?.length) {
+    for (let i=e.fx.burns.length-1;i>=0;i--) {
+      const b=e.fx.burns[i]; b.dur-=dt; b.tick-=dt;
+      if (b.tick<=0) {
+        b.tick=1; e.hp-=b.dps; spark(e.x,e.y,'#ff8800');
+        if (e.hp<=0) { killEnemy(e); return; }
+      }
+      if (b.dur<=0) e.fx.burns.splice(i,1);
     }
-    if (b.dur<=0) delete e.fx.burning;
   }
   if (e.fx.slowed) { e.fx.slowed.dur-=dt; if(e.fx.slowed.dur<=0) delete e.fx.slowed; }
 }
@@ -886,7 +947,7 @@ function hitEnemy(e, dmg, dot, dotDur) {
   if (e.dead) return;
   if (e.fx.slowed?.debuff>0) dmg=Math.round(dmg*(1+e.fx.slowed.debuff));
   e.hp-=dmg; spark(e.x,e.y,'#ffffff'); floatText(`-${dmg}`,e.x,e.y-e.r,'#ffddaa');
-  if (dot>0) e.fx.burning={dps:dot,dur:dotDur,tick:e.fx.burning?.tick||1};
+  if (dot>0) applyBurn(e, dot, dotDur);
   if (e.hp<=0) killEnemy(e);
 }
 
@@ -943,11 +1004,8 @@ function tickWalls(dt) {
           w.dotTick[e.id]-=dt;
           if (w.dotTick[e.id]<=0) {
             w.dotTick[e.id]=0.333;
-            e.hp-=w.dotDmg;
             spark(e.x,e.y,w.col);
-            // Apply/refresh 5s burning DOT (no stack — overwrite)
-            e.fx.burning={dps:w.dotDmg, dur:5, tick:e.fx.burning?.tick??1};
-            if (e.hp<=0) killEnemy(e);
+            applyBurn(e, w.dotDmg, 5);
           }
         }
       }
@@ -1024,9 +1082,12 @@ function drawEnemies() {
     ctx.fillStyle=e.col;
     ctx.beginPath(); ctx.arc(e.x,e.y,e.r,0,Math.PI*2); ctx.fill();
     ctx.shadowBlur=0;
-    if (e.fx.burning) {
-      ctx.strokeStyle='#ff8800'; ctx.lineWidth=2;
+    if (e.fx.burns?.length) {
+      const stacks=e.fx.burns.length;
+      ctx.strokeStyle=stacks>=3?'#ffff00':stacks>=2?'#ffcc00':'#ff8800';
+      ctx.lineWidth=stacks; ctx.shadowColor='#ff8800'; ctx.shadowBlur=8;
       ctx.beginPath(); ctx.arc(e.x,e.y,e.r+3,0,Math.PI*2); ctx.stroke();
+      ctx.shadowBlur=0;
     }
     if (e.fx.slowed) {
       ctx.strokeStyle='#aabbff'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
@@ -1204,10 +1265,12 @@ function collectUpgrades(spellObj, type, cat, out) {
   for (const u of UPGRADE_DEFS) {
     if (u.targetType!==type) continue;
     if (u.avail&&!u.avail(spellObj)) continue;
-    const key=u.id+'_'+spellObj.id;
+    const key=u.globalKey||u.id+'_'+spellObj.id;
+    const label=u.globalKey?u.name:`[${spellObj.name}] ${u.name}`;
+    const desc=u.globalKey?u.desc:`[${spellObj.name}] ${u.desc}`;
     out.push({
-      _key:key, cat, name:u.name,
-      desc:`[${spellObj.name}] ${u.desc}`,
+      _key:key, cat:u.cat||cat, name:label,
+      desc,
       apply(){ G.upgTaken[key]=(G.upgTaken[key]||0)+1; u.apply(G,spellObj); },
     });
   }
