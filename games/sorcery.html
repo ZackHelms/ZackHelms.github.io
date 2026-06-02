@@ -1005,7 +1005,9 @@ function tickWalls(dt) {
           if (w.dotTick[e.id]<=0) {
             w.dotTick[e.id]=0.333;
             spark(e.x,e.y,w.col);
-            applyBurn(e, w.dotDmg, 5);
+            if (!e.fx.burns) e.fx.burns=[];
+            const max=G.maxBurnStacks||3;
+            while (e.fx.burns.length<max) e.fx.burns.push({dps:w.dotDmg,dur:5,tick:1});
           }
         }
       }
