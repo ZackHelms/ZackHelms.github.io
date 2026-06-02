@@ -728,11 +728,15 @@ function tickWalls(dt) {
       if (e.x>=wx1(w)&&e.x<=wx2(w)&&e.y>=wy1(w)&&e.y<=wy2(w)) {
         if (w.slow>0) e.fx.slowed={fac:w.slow,dur:1.5};
         if (w.dotDmg>0) {
-          if (!w.dotTick[e.id]) w.dotTick[e.id]=1;
+          // Timer starts at 0 so the first hit lands immediately on contact
+          if (w.dotTick[e.id]===undefined) w.dotTick[e.id]=0;
           w.dotTick[e.id]-=dt;
           if (w.dotTick[e.id]<=0) {
-            w.dotTick[e.id]=1; e.hp-=w.dotDmg;
+            w.dotTick[e.id]=0.333;
+            e.hp-=w.dotDmg;
             spark(e.x,e.y,w.col);
+            // Apply/refresh 5s burning DOT (no stack — overwrite)
+            e.fx.burning={dps:w.dotDmg, dur:5, tick:e.fx.burning?.tick??1};
             if (e.hp<=0) killEnemy(e);
           }
         }
