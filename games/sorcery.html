@@ -421,7 +421,7 @@ const UPGRADE_DEFS = [
   // ── magic missile ──
   { id:'split',   name:'SPLIT',     targetType:'ray',
     desc:'Fire one additional ray per cast.',
-    avail(s){ return s.id==='magic_missile'; },
+    avail(s){ return s.id==='magic_missile'||s.id==='laserbeam'; },
     apply(G,s){ s._split=(s._split||1)+1; } },
   { id:'damage',  name:'POWER',     targetType:'ray',
     desc:'+20% impact damage.',
@@ -550,7 +550,7 @@ function buildSpellDebug() {
     const lines=[];
     if (isRay) {
       lines.push(`DMG: ${def.dmg} &rarr; ${s.dmg}`);
-      if (s.id==='magic_missile') lines.push(`RAYS: 1 &rarr; ${s._split||1}`);
+      if (s.id==='magic_missile'||s.id==='laserbeam') lines.push(`RAYS: 1 &rarr; ${s._split||1}`);
       if (def.aoe>0) lines.push(`AOE RADIUS: ${def.aoe} &rarr; ${s.aoe}`);
       const baseDot=def.dot||0;
       if (baseDot>0||s.dot>0) lines.push(`DOT: ${baseDot}/s &rarr; ${s.dot||0}/s`);
