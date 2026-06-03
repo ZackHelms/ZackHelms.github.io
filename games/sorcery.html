@@ -300,6 +300,12 @@ canvas {
   font-family:'Black Ops One',sans-serif; font-size:0.85rem; letter-spacing:3px; cursor:pointer;
 }
 #restart-btn:hover { box-shadow:0 0 16px #ff224466; }
+#save-log-btn {
+  margin-top:6px; padding:7px 20px; background:none;
+  border:1px solid var(--dim); border-radius:4px; color:var(--dim);
+  font-family:'Share Tech Mono',monospace; font-size:0.7rem; letter-spacing:2px; cursor:pointer;
+}
+#save-log-btn:hover { color:var(--white); border-color:var(--white); }
 </style>
 </head>
 <body>
@@ -384,6 +390,7 @@ canvas {
   <h2>BASE DESTROYED</h2>
   <div id="go-stats"></div>
   <button id="restart-btn" onclick="startGame()">PLAY AGAIN</button>
+  <button id="save-log-btn" onclick="GameLog.download()">&#x1F4BE; SAVE LOG</button>
 </div>
 
 <script>
@@ -399,6 +406,56 @@ const BASE_H = 14;
 const BASE_MAX_HP = 500;
 function xpNeeded(lvl) { return 10 + (lvl - 1) * 8; }
 function diffScale(wave) { return 1 + wave * 0.14; }
+
+// ── SESSION LOGGER ─────────────────────────────────────────────────────────────
+// Events are buffered in memory; download via SAVE LOG on game-over screen.
+// Files go in games/LOGS/ — named sorcery_YYYYMMDDHHMMSS.jsonl
+const GameLog = (() => {
+  let startTs=0, entries=[], _lastLevelTs=0, _waveStartTs=0, _waveXp=0, _waveKills=0;
+  const elapsed = () => +((Date.now()-startTs)/1000).toFixed(2);
+  const snap = s => {
+    if (!s) return null;
+    if ('baseHp' in s)
+      return {id:s.id, hp:s.baseHp===Infinity?'inf':s.baseHp, dotDmg:s.dotDmg||0,
+              h:s.baseH||12, slow:s.slow||0, debuff:s._debuff||0, gravity:s._gravity||0};
+    return {id:s.id, dmg:s.dmg, dot:s.dot||0, dotDur:s.dotDur||0,
+            aoe:s.aoe||0, split:s._split||1, bounce:s._bounce||0};
+  };
+  const filename = () => {
+    const d=new Date(startTs), p=n=>String(n).padStart(2,'0');
+    return `sorcery_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.jsonl`;
+  };
+  return {
+    init() { startTs=Date.now(); entries=[]; _lastLevelTs=0; _waveStartTs=0; _waveXp=0; _waveKills=0; },
+    rec(ev,data={}) { entries.push({t:elapsed(),ev,...data}); },
+    snap,
+    waveTick(xp) { _waveXp+=xp; _waveKills++; },
+    waveClear(wave) {
+      this.rec('WAVE_CLEAR',{wave,kills:_waveKills,xpEarned:_waveXp,
+        duration:+(elapsed()-_waveStartTs).toFixed(1)});
+      _waveXp=0; _waveKills=0;
+    },
+    waveStart(wave,target,interval,sc) {
+      _waveStartTs=elapsed();
+      this.rec('WAVE_START',{wave,waveTarget:target,
+        spawnInterval:+interval.toFixed(2),diffScale:+sc.toFixed(3)});
+    },
+    levelUp(data) {
+      const now=elapsed();
+      this.rec('SORCERER_LEVEL_UP',{...data,timeSinceLast:+(now-_lastLevelTs).toFixed(1)});
+      _lastLevelTs=now;
+    },
+    download() {
+      if (!entries.length) return;
+      const text=entries.map(e=>JSON.stringify(e)).join('\n');
+      const blob=new Blob([text],{type:'application/x-ndjson'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download=filename(); a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),2000);
+    },
+  };
+})();
 
 // Base color: lerp gray → red as HP decreases
 function baseColor(frac) {
@@ -534,6 +591,10 @@ function startGame() {
     holdStart:null, holdX:0, holdY:0,
     lastTs:null,
   };
+  GameLog.init();
+  GameLog.rec('SESSION_START',{level:G.level,xpNext:G.xpNext,
+    ray:GameLog.snap(G.ray),wall:null,maxBurnStacks:G.maxBurnStacks});
+  GameLog.waveStart(G.wave,G.waveTarget,G.spawnInterval,diffScale(G.wave));
   requestAnimationFrame(loop);
   updateHUD(); updateSpellBar();
 }
@@ -771,9 +832,11 @@ function spawnTick(dt) {
     G.spawnTimer=G.spawnInterval*(0.7+Math.random()*0.6);
   }
   if (G.waveKilled>=G.waveTarget&&G.enemies.length===0) {
+    GameLog.waveClear(G.wave);
     G.wave++; G.waveKilled=0;
     G.waveTarget=Math.floor(6+G.wave*1.6);
     G.spawnInterval=Math.max(0.75,2.2-G.wave*0.07);
+    GameLog.waveStart(G.wave,G.waveTarget,G.spawnInterval,diffScale(G.wave));
     G.spawnTimer=2.0;
   }
 }
@@ -916,6 +979,7 @@ function tickEnemies(dt) {
       if (e.atkTimer<=0) {
         e.atkTimer=1/e.rate;
         G.baseHp=Math.max(0,G.baseHp-e.dmg);
+        GameLog.rec('BASE_HIT',{enemy:e.id,dmg:e.dmg,baseHp:+G.baseHp.toFixed(1),wave:G.wave});
         spark(e.x,BASE_Y,'#ff4455'); floatText(`-${e.dmg}`,e.x,BASE_Y-18,'#ff2244');
       }
     } else { e.y+=ms*dt; }
@@ -955,6 +1019,7 @@ function killEnemy(e) {
   if (e.dead) return;
   e.dead=true; e.hp=0; G.totalKills++;
   G.xp+=e.xp; floatText(`+${e.xp} XP`,e.x,e.y-e.r-10,'#b44fff');
+  GameLog.waveTick(e.xp);
   if (e.gold>0) { G.gold+=e.gold; floatText(`+${e.gold} \u{1F4B0}`,e.x,e.y-e.r-22,'#ffc300'); }
   for (let i=0;i<8;i++) G.particles.push({
     type:'spark',x:e.x,y:e.y,
@@ -966,7 +1031,10 @@ function killEnemy(e) {
 
 function checkLevelUp() {
   if (G.xp>=G.xpNext) {
+    const prevXpNeeded=G.xpNext;
     G.xp-=G.xpNext; G.level++; G.xpNext=xpNeeded(G.level);
+    GameLog.levelUp({level:G.level,wave:G.wave,kills:G.totalKills,
+      xpThreshold:prevXpNeeded,nextThreshold:G.xpNext});
     G.levelingUp=true; pushPause(); showLevelUp();
   }
 }
@@ -1199,7 +1267,11 @@ function showLevelUp() {
     card.innerHTML=`<div class="c-type">${opt.cat}</div><div class="c-name">${opt.name}</div><div class="c-desc">${opt.desc}</div>`;
     card.addEventListener('click', ()=>{
       if (document.getElementById('lu-overlay').classList.contains('blocked')) return;
+      const before={ray:GameLog.snap(G.ray),wall:GameLog.snap(G.wall)};
       opt.apply();
+      const after={ray:GameLog.snap(G.ray),wall:GameLog.snap(G.wall)};
+      GameLog.rec(opt.cat.startsWith('NEW')?'SPELL_UNLOCKED':'UPGRADE_PICKED',
+        {name:opt.name,cat:opt.cat,level:G.level,wave:G.wave,before,after});
       document.getElementById('lu-overlay').classList.remove('show');
       G.levelingUp=false; popPause(); updateSpellBar();
       if (G.xp>=G.xpNext) checkLevelUp();
@@ -1281,6 +1353,10 @@ function collectUpgrades(spellObj, type, cat, out) {
 // ── GAME OVER ─────────────────────────────────────────────────────────────────
 function gameOver() {
   G.running=false;
+  GameLog.waveClear(G.wave);
+  GameLog.rec('GAME_OVER',{wave:G.wave,kills:G.totalKills,level:G.level,gold:G.gold,
+    maxBurnStacks:G.maxBurnStacks,baseHp:+G.baseHp.toFixed(1),
+    ray:GameLog.snap(G.ray),wall:GameLog.snap(G.wall)});
   document.getElementById('go-stats').innerHTML=
     `WAVE ${G.wave} &nbsp;|&nbsp; KILLS: ${G.totalKills} &nbsp;|&nbsp; LVL: ${G.level} &nbsp;|&nbsp; \u{1F4B0} ${G.gold}`;
   document.getElementById('gameover').classList.add('show');
