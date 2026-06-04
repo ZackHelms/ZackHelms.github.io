@@ -306,6 +306,34 @@ canvas {
   font-family:'Share Tech Mono',monospace; font-size:0.7rem; letter-spacing:2px; cursor:pointer;
 }
 #save-log-btn:hover { color:var(--white); border-color:var(--white); }
+#resume-overlay {
+  position:absolute; inset:0; background:rgba(6,6,14,0.93);
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  gap:10px; z-index:40;
+}
+#resume-overlay.show { display:flex; }
+#resume-overlay h2 { color:var(--green); font-family:'Black Ops One',sans-serif;
+  font-size:clamp(1.4rem,5vw,1.8rem); letter-spacing:4px; margin:0 0 4px; }
+#resume-stats { font-size:clamp(0.62rem,2vw,0.78rem); color:var(--dim);
+  text-align:center; line-height:2.4; }
+#resume-btn {
+  margin-top:6px; padding:10px 28px; background:var(--panel);
+  border:2px solid var(--green); border-radius:4px; color:var(--green);
+  font-family:'Black Ops One',sans-serif; font-size:0.85rem; letter-spacing:3px; cursor:pointer;
+}
+#resume-btn:hover { box-shadow:0 0 16px #39ff1466; }
+#newgame-btn {
+  padding:7px 20px; background:none;
+  border:1px solid var(--dim); border-radius:4px; color:var(--dim);
+  font-family:'Share Tech Mono',monospace; font-size:0.7rem; letter-spacing:2px; cursor:pointer;
+}
+#newgame-btn:hover { color:var(--white); border-color:var(--white); }
+#autosave-flash {
+  position:absolute; bottom:6px; right:8px;
+  font-family:'Share Tech Mono',monospace; font-size:0.6rem; color:var(--green);
+  opacity:0; transition:opacity 0.3s; pointer-events:none; z-index:10;
+}
+#autosave-flash.show { opacity:1; }
 </style>
 </head>
 <body>
@@ -332,7 +360,7 @@ canvas {
   </div>
 </div>
 
-<div id="canvas-wrap"><canvas id="gc"></canvas></div>
+<div id="canvas-wrap"><canvas id="gc"></canvas><span id="autosave-flash">SAVED</span></div>
 
 <div id="spell-bar">
   <div class="spell-slot" id="slot-ray" onclick="openSpellPicker('ray')">
@@ -391,6 +419,13 @@ canvas {
   <div id="go-stats"></div>
   <button id="restart-btn" onclick="startGame()">PLAY AGAIN</button>
   <button id="save-log-btn" onclick="GameLog.download()">&#x1F4BE; SAVE LOG</button>
+</div>
+
+<div id="resume-overlay">
+  <h2>CONTINUE?</h2>
+  <div id="resume-stats"></div>
+  <button id="resume-btn" onclick="doResume()">RESUME</button>
+  <button id="newgame-btn" onclick="startGame()">NEW GAME</button>
 </div>
 
 <script>
@@ -456,6 +491,135 @@ const GameLog = (() => {
     },
   };
 })();
+
+// ── AUTO-SAVE / RESTORE ────────────────────────────────────────────────────────
+const SAVE_KEY='sorcery_v1';
+
+function _serializeSpell(s) {
+  const o={};
+  for (const k of Object.keys(s)) if (typeof s[k]!=='function') o[k]=s[k];
+  return o;
+}
+function _serializeEnemy(e) {
+  return {
+    id:e.id, col:e.col, r:e.r, name:e.name, boss:e.boss,
+    x:e.x, y:e.y, hp:e.hp, maxHp:e.maxHp,
+    spd:e.spd, range:e.range, dmg:e.dmg, rate:e.rate,
+    atkTimer:e.atkTimer, xp:e.xp, gold:e.gold,
+    fx:{
+      burns:(e.fx.burns||[]).map(b=>({...b})),
+      slowed:e.fx.slowed?{...e.fx.slowed}:null,
+    },
+  };
+}
+function _serializeWall(w) {
+  return {
+    spellId:w.spellId, x:w.x, y:w.y, w:w.w, h:w.h,
+    hp:w.hp, timer:w.timer, col:w.col, glow:w.glow,
+    slow:w.slow, dotDmg:w.dotDmg, blocks:w.blocks,
+    debuff:w.debuff||0, gravity:w.gravity||0,
+  };
+}
+
+function saveState() {
+  if (!G||!G.running) return;
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      wave:G.wave, spawnTimer:G.spawnTimer, spawnInterval:G.spawnInterval,
+      waveKilled:G.waveKilled, waveTarget:G.waveTarget,
+      baseHp:G.baseHp, level:G.level, xp:G.xp, xpNext:G.xpNext,
+      gold:G.gold, totalKills:G.totalKills, maxBurnStacks:G.maxBurnStacks,
+      upgTaken:{...G.upgTaken},
+      enemySeen:JSON.parse(JSON.stringify(G.enemySeen)),
+      enemySeenOrder:[...G.enemySeenOrder],
+      raySpellIds:Object.keys(G.raySpells),
+      raySpells:Object.fromEntries(Object.entries(G.raySpells).map(([k,s])=>[k,_serializeSpell(s)])),
+      wallSpellIds:Object.keys(G.wallSpells),
+      wallSpells:Object.fromEntries(Object.entries(G.wallSpells).map(([k,s])=>[k,_serializeSpell(s)])),
+      activeRayId:G.ray?.id||null, activeWallId:G.wall?.id||null,
+      enemies:G.enemies.filter(e=>!e.dead).map(_serializeEnemy),
+      walls:G.walls.filter(w=>!w.dead).map(_serializeWall),
+    }));
+    _flashSaved();
+  } catch(err) { console.warn('autosave failed',err); }
+}
+
+function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch {} }
+
+function hasSave() {
+  try { const r=localStorage.getItem(SAVE_KEY); return r?JSON.parse(r):null; }
+  catch { return null; }
+}
+
+let _flashTimer=null;
+function _flashSaved() {
+  const el=document.getElementById('autosave-flash');
+  if (!el) return;
+  el.classList.add('show');
+  clearTimeout(_flashTimer);
+  _flashTimer=setTimeout(()=>el.classList.remove('show'),1200);
+}
+
+function showResume(snap) {
+  document.getElementById('resume-stats').innerHTML=
+    `WAVE ${snap.wave} &nbsp;|&nbsp; LVL ${snap.level} &nbsp;|&nbsp; KILLS: ${snap.totalKills} &nbsp;|&nbsp; &#x1F4B0; ${snap.gold}`;
+  document.getElementById('resume-overlay').classList.add('show');
+}
+function hideResume() { document.getElementById('resume-overlay').classList.remove('show'); }
+
+function doResume() {
+  const snap=hasSave();
+  if (!snap) { startGame(); return; }
+  hideResume();
+  document.getElementById('gameover').classList.remove('show');
+  document.getElementById('lu-overlay').classList.remove('show');
+  hidePauseOverlay(); closeSpellPicker(); closeDebug();
+
+  const raySpells={};
+  for (const id of snap.raySpellIds) raySpells[id]={...snap.raySpells[id]};
+  const wallSpells={};
+  for (const id of snap.wallSpellIds) wallSpells[id]={...snap.wallSpells[id]};
+
+  G = {
+    running:true, _pd:0, paused:false,
+    manualPaused:false, levelingUp:false, pickerOpen:false,
+
+    wave:snap.wave, spawnTimer:snap.spawnTimer, spawnInterval:snap.spawnInterval,
+    waveKilled:snap.waveKilled, waveTarget:snap.waveTarget,
+
+    baseHp:snap.baseHp,
+    level:snap.level, xp:snap.xp, xpNext:snap.xpNext,
+    gold:snap.gold, totalKills:snap.totalKills,
+
+    raySpells, wallSpells,
+    ray:snap.activeRayId?raySpells[snap.activeRayId]:null,
+    wall:snap.activeWallId?wallSpells[snap.activeWallId]:null,
+    upgTaken:{...snap.upgTaken},
+    maxBurnStacks:snap.maxBurnStacks,
+    enemySeen:JSON.parse(JSON.stringify(snap.enemySeen)),
+    enemySeenOrder:[...snap.enemySeenOrder],
+
+    enemies:snap.enemies.map(e=>({
+      ...e, dead:false,
+      fx:{
+        burns:(e.fx.burns||[]).map(b=>({...b})),
+        slowed:e.fx.slowed?{...e.fx.slowed}:undefined,
+      },
+    })),
+    walls:snap.walls.map(w=>({...w,dead:false,dotTick:{}})),
+    projectiles:[], particles:[], floats:[],
+
+    holdStart:null, holdX:0, holdY:0, lastTs:null,
+    saveTimer:10,
+  };
+
+  GameLog.init();
+  GameLog.rec('SESSION_RESUMED',{wave:G.wave,level:G.level,kills:G.totalKills});
+  GameLog.waveStart(G.wave,G.waveTarget,G.spawnInterval,diffScale(G.wave));
+
+  requestAnimationFrame(loop);
+  updateHUD(); updateSpellBar();
+}
 
 // Base color: lerp gray → red as HP decreases
 function baseColor(frac) {
@@ -561,9 +725,8 @@ let G;
 function startGame() {
   document.getElementById('gameover').classList.remove('show');
   document.getElementById('lu-overlay').classList.remove('show');
-  hidePauseOverlay();
-  closeSpellPicker();
-  closeDebug();
+  hidePauseOverlay(); closeSpellPicker(); closeDebug(); hideResume();
+  clearSave();
 
   const mm = cloneDef(RAY_DEFS.magic_missile, { _split:1 });
   G = {
@@ -588,8 +751,8 @@ function startGame() {
     enemies:[], projectiles:[], walls:[],
     particles:[], floats:[],
 
-    holdStart:null, holdX:0, holdY:0,
-    lastTs:null,
+    holdStart:null, holdX:0, holdY:0, lastTs:null,
+    saveTimer:10,
   };
   GameLog.init();
   GameLog.rec('SESSION_START',{level:G.level,xpNext:G.xpNext,
@@ -746,13 +909,15 @@ document.getElementById('resume-btn').addEventListener('click', function(e) {
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden&&G&&G.running&&!G.manualPaused&&!G.levelingUp) {
-    G.manualPaused=true; pushPause(); showPauseOverlay();
+  if (document.hidden&&G&&G.running) {
+    saveState();
+    if (!G.manualPaused&&!G.levelingUp) { G.manualPaused=true; pushPause(); showPauseOverlay(); }
   }
 });
 window.addEventListener('blur', () => {
-  if (G&&G.running&&!G.manualPaused&&!G.levelingUp) {
-    G.manualPaused=true; pushPause(); showPauseOverlay();
+  if (G&&G.running) {
+    saveState();
+    if (!G.manualPaused&&!G.levelingUp) { G.manualPaused=true; pushPause(); showPauseOverlay(); }
   }
 });
 
@@ -820,7 +985,9 @@ function tick(dt) {
   tickWalls(dt);
   tickParticles(dt);
   tickFloats(dt);
-  if (G.baseHp<=0) { G.baseHp=0; gameOver(); }
+  if (G.baseHp<=0) { G.baseHp=0; gameOver(); return; }
+  G.saveTimer-=dt;
+  if (G.saveTimer<=0) { G.saveTimer=10; saveState(); }
   updateHUD();
 }
 
@@ -837,6 +1004,7 @@ function spawnTick(dt) {
     G.waveTarget=Math.floor(6+G.wave*1.6);
     G.spawnInterval=Math.max(0.75,2.2-G.wave*0.07);
     GameLog.waveStart(G.wave,G.waveTarget,G.spawnInterval,diffScale(G.wave));
+    saveState();
     G.spawnTimer=2.0;
   }
 }
@@ -1353,6 +1521,7 @@ function collectUpgrades(spellObj, type, cat, out) {
 // ── GAME OVER ─────────────────────────────────────────────────────────────────
 function gameOver() {
   G.running=false;
+  clearSave();
   GameLog.waveClear(G.wave);
   GameLog.rec('GAME_OVER',{wave:G.wave,kills:G.totalKills,level:G.level,gold:G.gold,
     maxBurnStacks:G.maxBurnStacks,baseHp:+G.baseHp.toFixed(1),
@@ -1412,7 +1581,11 @@ new ResizeObserver(() => {
 }).observe(document.getElementById('canvas-wrap'));
 
 // ── START ─────────────────────────────────────────────────────────────────────
-startGame();
+(function() {
+  const snap=hasSave();
+  if (snap) showResume(snap);
+  else startGame();
+})();
 </script>
 </body>
 </html>
