@@ -334,6 +334,19 @@ canvas {
   opacity:0; transition:opacity 0.3s; pointer-events:none; z-index:10;
 }
 #autosave-flash.show { opacity:1; }
+#update-btn {
+  position:absolute; top:0; left:50%; transform:translateX(-50%);
+  background:var(--gold); color:#06060e;
+  font-family:'Black Ops One',sans-serif; font-size:0.65rem; letter-spacing:2px;
+  padding:5px 16px; border-radius:0 0 8px 8px; cursor:pointer;
+  display:none; z-index:50; white-space:nowrap;
+  animation:pulse-update 1.8s ease-in-out infinite;
+}
+#update-btn.show { display:block; }
+@keyframes pulse-update {
+  0%,100% { box-shadow:0 0 6px #ffc300aa; }
+  50%      { box-shadow:0 0 18px #ffc300; }
+}
 </style>
 </head>
 <body>
@@ -360,7 +373,7 @@ canvas {
   </div>
 </div>
 
-<div id="canvas-wrap"><canvas id="gc"></canvas><span id="autosave-flash">SAVED</span></div>
+<div id="canvas-wrap"><canvas id="gc"></canvas><span id="autosave-flash">SAVED</span><div id="update-btn" onclick="applyUpdate()">&#x1F504; NEW VERSION — TAP TO RELOAD</div></div>
 
 <div id="spell-bar">
   <div class="spell-slot" id="slot-ray" onclick="openSpellPicker('ray')">
@@ -493,13 +506,24 @@ const GameLog = (() => {
 })();
 
 // ── AUTO-SAVE / RESTORE ────────────────────────────────────────────────────────
-const SAVE_KEY='sorcery_v1';
+const SAVE_KEY='sorcery_v2';
 
-function _serializeSpell(s) {
-  const o={};
-  for (const k of Object.keys(s)) if (typeof s[k]!=='function') o[k]=s[k];
-  return o;
+// Reconstruct a spell from current defs + upgrade history so saves always
+// reflect the latest balance values rather than baked-in old numbers.
+function rebuildSpell(spellId, type, upgTaken) {
+  const def = type==='ray' ? RAY_DEFS[spellId] : WALL_DEFS[spellId];
+  if (!def) return null;
+  const s = cloneDef(def, type==='ray' ? {_split:1} : {});
+  for (const upg of UPGRADE_DEFS) {
+    if (upg.targetType!==type) continue;
+    if (upg.globalKey) continue; // global upgrades handled separately
+    if (upg.avail&&!upg.avail(s)) continue;
+    const count = upgTaken[upg.id+'_'+spellId]||0;
+    for (let i=0;i<count;i++) upg.apply({maxBurnStacks:99},s);
+  }
+  return s;
 }
+
 function _serializeEnemy(e) {
   return {
     id:e.id, col:e.col, r:e.r, name:e.name, boss:e.boss,
@@ -528,14 +552,12 @@ function saveState() {
       wave:G.wave, spawnTimer:G.spawnTimer, spawnInterval:G.spawnInterval,
       waveKilled:G.waveKilled, waveTarget:G.waveTarget,
       baseHp:G.baseHp, level:G.level, xp:G.xp, xpNext:G.xpNext,
-      gold:G.gold, totalKills:G.totalKills, maxBurnStacks:G.maxBurnStacks,
+      gold:G.gold, totalKills:G.totalKills,
       upgTaken:{...G.upgTaken},
       enemySeen:JSON.parse(JSON.stringify(G.enemySeen)),
       enemySeenOrder:[...G.enemySeenOrder],
       raySpellIds:Object.keys(G.raySpells),
-      raySpells:Object.fromEntries(Object.entries(G.raySpells).map(([k,s])=>[k,_serializeSpell(s)])),
       wallSpellIds:Object.keys(G.wallSpells),
-      wallSpells:Object.fromEntries(Object.entries(G.wallSpells).map(([k,s])=>[k,_serializeSpell(s)])),
       activeRayId:G.ray?.id||null, activeWallId:G.wall?.id||null,
       enemies:G.enemies.filter(e=>!e.dead).map(_serializeEnemy),
       walls:G.walls.filter(w=>!w.dead).map(_serializeWall),
@@ -575,10 +597,20 @@ function doResume() {
   document.getElementById('lu-overlay').classList.remove('show');
   hidePauseOverlay(); closeSpellPicker(); closeDebug();
 
+  // Rebuild spell objects from current defs + upgrade history so any balance
+  // changes in the source code are automatically applied on resume.
   const raySpells={};
-  for (const id of snap.raySpellIds) raySpells[id]={...snap.raySpells[id]};
+  for (const id of snap.raySpellIds) {
+    const s=rebuildSpell(id,'ray',snap.upgTaken);
+    if (s) raySpells[id]=s;
+  }
   const wallSpells={};
-  for (const id of snap.wallSpellIds) wallSpells[id]={...snap.wallSpells[id]};
+  for (const id of snap.wallSpellIds) {
+    const s=rebuildSpell(id,'wall',snap.upgTaken);
+    if (s) wallSpells[id]=s;
+  }
+  // Global upgrades: recalculate from upgTaken history
+  const maxBurnStacks = 3 + (snap.upgTaken['burnstacks']||0);
 
   G = {
     running:true, _pd:0, paused:false,
@@ -595,7 +627,7 @@ function doResume() {
     ray:snap.activeRayId?raySpells[snap.activeRayId]:null,
     wall:snap.activeWallId?wallSpells[snap.activeWallId]:null,
     upgTaken:{...snap.upgTaken},
-    maxBurnStacks:snap.maxBurnStacks,
+    maxBurnStacks,
     enemySeen:JSON.parse(JSON.stringify(snap.enemySeen)),
     enemySeenOrder:[...snap.enemySeenOrder],
 
@@ -606,7 +638,15 @@ function doResume() {
         slowed:e.fx.slowed?{...e.fx.slowed}:undefined,
       },
     })),
-    walls:snap.walls.map(w=>({...w,dead:false,dotTick:{}})),
+    // Patch live walls with rebuilt spell properties so balance changes apply
+    walls:snap.walls.map(w=>{
+      const rs=wallSpells[w.spellId];
+      return {...w, dead:false, dotTick:{},
+        dotDmg:rs?rs.dotDmg:w.dotDmg, slow:rs?rs.slow:w.slow,
+        debuff:rs?(rs._debuff||0):w.debuff, gravity:rs?(rs._gravity||0):w.gravity,
+        h:rs?(rs.baseH||12):w.h,
+      };
+    }),
     projectiles:[], particles:[], floats:[],
 
     holdStart:null, holdX:0, holdY:0, lastTs:null,
@@ -620,6 +660,24 @@ function doResume() {
   requestAnimationFrame(loop);
   updateHUD(); updateSpellBar();
 }
+
+// ── VERSION CHECK ─────────────────────────────────────────────────────────────
+let _knownEtag=null;
+async function checkForUpdate() {
+  try {
+    const res=await fetch(location.pathname+'?_='+Date.now(),{method:'HEAD'});
+    const tag=res.headers.get('etag')||res.headers.get('last-modified')||'';
+    if (!tag) return;
+    if (_knownEtag===null) { _knownEtag=tag; return; }
+    if (tag!==_knownEtag) document.getElementById('update-btn').classList.add('show');
+  } catch {}
+}
+function applyUpdate() {
+  saveState();
+  location.reload(true);
+}
+// First check after 5 s (let the page settle), then every 5 min
+setTimeout(()=>{ checkForUpdate(); setInterval(checkForUpdate,5*60*1000); },5000);
 
 // Base color: lerp gray → red as HP decreases
 function baseColor(frac) {
