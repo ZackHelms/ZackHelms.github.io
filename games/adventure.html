@@ -1,0 +1,2040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Adventure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff;
+  --red:#ff2244; --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none;touch-action:manipulation;}
+.screen{display:none;width:100%;height:100%;position:absolute;top:0;left:0;flex-direction:column;align-items:center;overflow:hidden;}
+.screen.active{display:flex;}
+
+/* ── MAIN MENU ── */
+#s-main{justify-content:center;gap:20px;padding:40px 20px;}
+.title-glow{font-family:'Black Ops One',sans-serif;font-size:clamp(2.4rem,10vw,4rem);color:var(--green);text-shadow:0 0 30px #39ff1488,0 0 60px #39ff1444;letter-spacing:8px;text-align:center;}
+.subtitle{font-size:0.65rem;color:var(--dim);letter-spacing:4px;margin-top:-12px;}
+.menu-btns{display:flex;flex-direction:column;gap:12px;width:100%;max-width:300px;}
+.btn{font-family:'Share Tech Mono',monospace;font-size:0.85rem;letter-spacing:2px;padding:14px 20px;background:var(--panel);border:1px solid var(--border);color:var(--white);cursor:pointer;border-radius:4px;transition:all 0.2s;text-transform:uppercase;}
+.btn:hover,.btn:active{border-color:var(--green);color:var(--green);box-shadow:0 0 15px #39ff1433;background:#0d0d1a;}
+.btn.gold{border-color:var(--gold);color:var(--gold);}
+.btn.gold:hover{box-shadow:0 0 15px #ffc30033;}
+.btn.red{border-color:var(--red);color:var(--red);}
+.btn.red:hover{box-shadow:0 0 15px #ff224433;}
+.btn.blue{border-color:var(--blue);color:var(--blue);}
+.btn.blue:hover{box-shadow:0 0 15px #4488ff33;}
+.btn.dim{border-color:#333;color:#555;cursor:not-allowed;}
+.btn.dim:hover{border-color:#333;color:#555;box-shadow:none;background:var(--panel);}
+.btn.purple{border-color:var(--purple);color:var(--purple);}
+.btn.purple:hover{box-shadow:0 0 15px #b44fff33;}
+
+/* ── LOAD GAME ── */
+#s-load{padding:20px;}
+.screen-header{display:flex;align-items:center;gap:12px;width:100%;max-width:480px;margin-bottom:16px;}
+.screen-title{font-family:'Black Ops One',sans-serif;font-size:1.2rem;color:var(--green);letter-spacing:4px;}
+.saves-list{width:100%;max-width:480px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px;padding-bottom:20px;}
+.save-row{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all 0.2s;}
+.save-row:hover{border-color:var(--blue);}
+.save-info{flex:1;}
+.save-name{font-size:0.85rem;color:var(--white);}
+.save-meta{font-size:0.62rem;color:var(--dim);margin-top:3px;}
+.save-icons{font-size:1rem;letter-spacing:2px;}
+.trash-btn{background:none;border:1px solid var(--border);color:var(--red);padding:6px 10px;border-radius:4px;cursor:pointer;font-size:0.8rem;transition:all 0.2s;font-family:'Share Tech Mono',monospace;}
+.trash-btn:hover{border-color:var(--red);box-shadow:0 0 10px #ff224433;}
+.empty-saves{color:var(--dim);font-size:0.8rem;text-align:center;margin-top:40px;}
+
+/* ── CHAR CREATE ── */
+#s-create{padding:20px;gap:16px;overflow-y:auto;}
+.progress-bar{display:flex;gap:6px;width:100%;max-width:480px;}
+.prog-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);background:var(--panel);}
+.prog-dot.done{background:var(--green);border-color:var(--green);}
+.prog-dot.active{border-color:var(--gold);box-shadow:0 0 8px var(--gold);}
+.create-section{width:100%;max-width:480px;}
+.create-label{font-size:0.65rem;color:var(--dim);letter-spacing:3px;margin-bottom:10px;text-transform:uppercase;}
+.type-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.type-card{background:var(--panel);border:2px solid var(--border);border-radius:6px;padding:14px 10px;cursor:pointer;transition:all 0.2s;text-align:center;}
+.type-card:hover,.type-card.selected{border-color:var(--green);box-shadow:0 0 12px #39ff1433;}
+.type-card.selected{background:#0d160d;}
+.type-icon{font-size:1.8rem;margin-bottom:6px;}
+.type-name{font-family:'Black Ops One',sans-serif;font-size:0.75rem;color:var(--green);letter-spacing:2px;}
+.type-desc{font-size:0.58rem;color:var(--dim);margin-top:4px;line-height:1.5;}
+.gender-btns{display:flex;gap:10px;}
+.gender-btn{flex:1;padding:12px;background:var(--panel);border:2px solid var(--border);border-radius:4px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:0.85rem;color:var(--dim);transition:all 0.2s;}
+.gender-btn.selected{border-color:var(--blue);color:var(--blue);box-shadow:0 0 10px #4488ff33;}
+.name-row{display:flex;gap:8px;align-items:center;}
+.name-input{flex:1;background:var(--panel);border:1px solid var(--border);color:var(--white);font-family:'Share Tech Mono',monospace;font-size:0.9rem;padding:10px 12px;border-radius:4px;outline:none;}
+.name-input:focus{border-color:var(--blue);}
+.rand-btn{background:var(--panel);border:1px solid var(--border);color:var(--dim);padding:10px 12px;border-radius:4px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:0.75rem;transition:all 0.2s;white-space:nowrap;}
+.rand-btn:hover{border-color:var(--purple);color:var(--purple);}
+
+/* ── ADVENTURE FLOW ── */
+#s-adventure{position:relative;}
+.adv-topbar{width:100%;background:var(--panel);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:10px;z-index:10;flex-shrink:0;}
+.adv-party-name{font-family:'Black Ops One',sans-serif;font-size:0.85rem;color:var(--green);letter-spacing:2px;flex:1;}
+.adv-gold{font-size:0.75rem;color:var(--gold);}
+.adv-party-btn{background:none;border:1px solid var(--border);padding:6px 10px;border-radius:4px;cursor:pointer;font-size:0.9rem;transition:all 0.2s;}
+.adv-party-btn:hover{border-color:var(--green);}
+.adv-flow{flex:1;overflow-y:auto;padding:20px 20px 80px;display:flex;flex-direction:column;align-items:center;gap:0;}
+.flow-node{display:flex;align-items:flex-start;gap:12px;width:100%;max-width:400px;margin-bottom:0;}
+.flow-line-col{display:flex;flex-direction:column;align-items:center;width:30px;flex-shrink:0;}
+.flow-vert-line{width:2px;background:var(--border);flex:1;min-height:20px;}
+.flow-vert-line.active-line{background:var(--green);}
+.flow-dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);background:var(--panel);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.7rem;cursor:pointer;transition:all 0.2s;}
+.flow-dot.completed{border-color:var(--dim);background:var(--dim);}
+.flow-dot.current{border-color:var(--green);background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 1.5s infinite;}
+.flow-dot.future{border-color:var(--border);opacity:0.4;}
+@keyframes pulse{0%,100%{box-shadow:0 0 10px var(--green);}50%{box-shadow:0 0 20px var(--green),0 0 40px #39ff1444;}}
+.flow-content{flex:1;padding:8px 0 20px;}
+.flow-node-title{font-family:'Black Ops One',sans-serif;font-size:0.8rem;color:var(--white);letter-spacing:2px;}
+.flow-node-desc{font-size:0.65rem;color:var(--dim);margin-top:3px;line-height:1.5;}
+.flow-node-action{margin-top:8px;}
+.flow-choices{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.flow-choice-btn{background:var(--panel);border:1px solid var(--border);color:var(--white);padding:10px 14px;border-radius:4px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:0.72rem;text-align:left;transition:all 0.2s;line-height:1.4;}
+.flow-choice-btn:hover{border-color:var(--blue);color:var(--blue);}
+.flow-choice-label{font-size:0.8rem;color:var(--blue);}
+.flow-choice-desc{font-size:0.62rem;color:var(--dim);margin-top:2px;}
+.party-walker{font-size:1rem;margin-right:2px;}
+
+/* ── COMBAT ── */
+#s-combat{padding:0;gap:0;}
+.combat-enemies{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:12px;background:linear-gradient(180deg,#08081a 0%,var(--bg) 100%);border-bottom:2px solid var(--border);}
+.combat-divider{font-size:0.6rem;color:var(--dim);letter-spacing:4px;padding:4px 0;background:var(--bg);width:100%;text-align:center;flex-shrink:0;}
+.combat-party{flex:1;display:flex;flex-direction:column;padding:8px 12px;gap:6px;overflow-y:auto;}
+.combat-actions{padding:8px 12px;border-top:1px solid var(--border);background:var(--panel);flex-shrink:0;}
+.action-row{display:flex;gap:6px;flex-wrap:wrap;}
+.action-btn{flex:1;min-width:80px;padding:10px 8px;background:var(--panel);border:1px solid var(--border);color:var(--white);cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:0.72rem;border-radius:4px;transition:all 0.2s;text-align:center;}
+.action-btn:hover:not(:disabled){border-color:var(--green);color:var(--green);}
+.action-btn:disabled{opacity:0.3;cursor:not-allowed;}
+.action-btn.active{border-color:var(--gold);color:var(--gold);}
+.action-label{font-size:0.6rem;color:var(--dim);letter-spacing:2px;margin-bottom:4px;text-transform:uppercase;}
+.enemy-card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:10px 14px;width:100%;max-width:380px;display:flex;align-items:center;gap:10px;transition:all 0.2s;cursor:pointer;}
+.enemy-card.targetable:hover{border-color:var(--red);}
+.enemy-card.selected-target{border-color:var(--red);box-shadow:0 0 12px #ff224433;}
+.enemy-card.dead{opacity:0.3;cursor:default;}
+.enemy-icon{font-size:1.5rem;flex-shrink:0;}
+.enemy-name{font-size:0.8rem;color:var(--white);flex:1;}
+.enemy-hp-bar{height:6px;background:#1a0a0a;border-radius:3px;margin-top:4px;overflow:hidden;}
+.enemy-hp-fill{height:100%;background:var(--red);border-radius:3px;transition:width 0.3s;}
+.party-member-row{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:8px 12px;display:flex;align-items:center;gap:8px;transition:all 0.2s;}
+.party-member-row.active{border-color:var(--gold);box-shadow:0 0 10px #ffc30022;}
+.party-member-row.ko{opacity:0.4;}
+.pm-icon{font-size:1.2rem;flex-shrink:0;}
+.pm-info{flex:1;}
+.pm-name{font-size:0.75rem;color:var(--white);}
+.pm-hp-bar{height:5px;background:#1a0a0a;border-radius:3px;margin-top:3px;overflow:hidden;}
+.pm-hp-fill{height:100%;background:var(--green);border-radius:3px;transition:width 0.3s;}
+.pm-hp-fill.low{background:var(--gold);}
+.pm-hp-fill.crit{background:var(--red);}
+.pm-hp-text{font-size:0.6rem;color:var(--dim);margin-top:2px;}
+.pm-status{font-size:0.65rem;color:var(--dim);}
+.combat-log{height:60px;overflow-y:auto;padding:6px 12px;background:#050510;border-top:1px solid var(--border);flex-shrink:0;}
+.log-line{font-size:0.65rem;color:var(--dim);line-height:1.6;}
+.log-line.hit{color:var(--white);}
+.log-line.dmg{color:var(--red);}
+.log-line.good{color:var(--green);}
+.log-line.info{color:var(--blue);}
+
+/* ── RP ENCOUNTER ── */
+#s-rp{justify-content:flex-end;padding:0;}
+.rp-bg{position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(180deg,#04040c 0%,#0a0a18 100%);display:flex;align-items:center;justify-content:center;}
+.rp-portrait-area{position:absolute;top:20%;left:50%;transform:translateX(-50%);font-size:5rem;text-align:center;}
+.rp-dialog{width:100%;background:var(--panel);border-top:2px solid var(--border);padding:16px;z-index:5;flex-shrink:0;}
+.rp-speaker{font-family:'Black Ops One',sans-serif;font-size:0.75rem;color:var(--gold);letter-spacing:2px;margin-bottom:6px;}
+.rp-text{font-size:0.78rem;color:var(--white);line-height:1.6;margin-bottom:14px;min-height:40px;}
+.rp-choices{display:flex;flex-direction:column;gap:6px;}
+.rp-choice-btn{background:var(--bg);border:1px solid var(--border);color:var(--dim);padding:10px 14px;border-radius:4px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:0.72rem;text-align:left;transition:all 0.2s;}
+.rp-choice-btn:hover{border-color:var(--blue);color:var(--blue);}
+
+/* ── PARTY STATUS ── */
+#s-party{padding:0;}
+.party-header{width:100%;background:var(--panel);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.party-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;width:100%;}
+.char-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:14px;width:100%;max-width:480px;margin:0 auto;}
+.char-card-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.char-type-icon{font-size:2rem;}
+.char-name-area{flex:1;}
+.char-name{font-family:'Black Ops One',sans-serif;font-size:0.9rem;color:var(--white);letter-spacing:2px;}
+.char-meta{font-size:0.62rem;color:var(--dim);margin-top:2px;}
+.char-level{font-family:'Black Ops One',sans-serif;font-size:1rem;color:var(--gold);}
+.xp-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:3px;}
+.xp-fill{height:100%;background:var(--gold);border-radius:2px;transition:width 0.3s;}
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:8px 0;}
+.stat-item{font-size:0.65rem;color:var(--dim);}
+.stat-item span{color:var(--white);}
+.equip-section{margin-top:8px;border-top:1px solid var(--border);padding-top:8px;}
+.equip-label{font-size:0.6rem;color:var(--dim);letter-spacing:2px;margin-bottom:4px;}
+.equip-name{font-size:0.75rem;color:var(--blue);}
+.ability-slots{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;}
+.ability-slot{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:6px 8px;font-size:0.62rem;}
+.ability-slot.filled{border-color:var(--purple);color:var(--purple);}
+.ability-slot.empty{color:#333;}
+.monster-form{font-size:0.8rem;color:var(--green);margin-top:6px;}
+.transform-hint{font-size:0.62rem;color:var(--dim);margin-top:3px;}
+
+/* ── COMBAT RESULTS ── */
+#s-results{justify-content:center;padding:20px;gap:16px;}
+.results-title{font-family:'Black Ops One',sans-serif;font-size:1.4rem;color:var(--gold);letter-spacing:4px;text-shadow:0 0 20px #ffc30066;}
+.results-content{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:8px;}
+.result-line{font-size:0.78rem;color:var(--white);padding:4px 0;border-bottom:1px solid var(--border);}
+.result-line:last-child{border-bottom:none;}
+.result-line.good{color:var(--green);}
+.result-line.xp{color:var(--gold);}
+.result-line.loot{color:var(--blue);}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#000000cc;z-index:100;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.active{display:flex;}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:20px;width:100%;max-width:380px;}
+.modal-title{font-family:'Black Ops One',sans-serif;font-size:1rem;color:var(--gold);letter-spacing:3px;margin-bottom:10px;}
+.modal-text{font-size:0.78rem;color:var(--dim);line-height:1.6;margin-bottom:16px;}
+.modal-btns{display:flex;gap:8px;flex-wrap:wrap;}
+.modal-btn{flex:1;min-width:100px;padding:10px;background:var(--bg);border:1px solid var(--border);color:var(--white);cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:0.75rem;border-radius:4px;transition:all 0.2s;text-align:center;}
+.modal-btn:hover{border-color:var(--green);color:var(--green);}
+.modal-btn.danger{border-color:var(--red);color:var(--red);}
+.modal-btn.danger:hover{box-shadow:0 0 10px #ff224433;}
+
+/* ── LEVELUP BANNER ── */
+#levelup-banner{position:fixed;top:0;left:0;width:100%;height:100%;z-index:200;display:none;align-items:center;justify-content:center;pointer-events:none;}
+#levelup-banner.show{display:flex;animation:lvlflash 2s forwards;}
+@keyframes lvlflash{0%{background:#00000000;}10%{background:#ffc30044;}90%{background:#ffc30000;}100%{background:#00000000;display:none;}}
+.levelup-text{font-family:'Black Ops One',sans-serif;font-size:clamp(1.4rem,6vw,2.2rem);color:var(--gold);text-shadow:0 0 30px var(--gold);letter-spacing:4px;text-align:center;animation:lvltxt 2s forwards;}
+@keyframes lvltxt{0%{opacity:0;transform:scale(0.5);}20%{opacity:1;transform:scale(1.1);}80%{opacity:1;transform:scale(1);}100%{opacity:0;transform:scale(0.9);}}
+
+/* ── ITEM PICKER ── */
+.item-picker{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;margin-bottom:10px;}
+.item-pick-btn{background:var(--bg);border:1px solid var(--border);color:var(--white);padding:8px 12px;border-radius:4px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:0.72rem;text-align:left;transition:all 0.2s;display:flex;justify-content:space-between;}
+.item-pick-btn:hover{border-color:var(--green);color:var(--green);}
+
+/* ── MUTATION MODAL ── */
+.mutation-slots{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
+.mut-slot-btn{background:var(--bg);border:1px solid var(--border);color:var(--dim);padding:8px 12px;border-radius:4px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:0.72rem;text-align:left;transition:all 0.2s;}
+.mut-slot-btn:hover{border-color:var(--purple);color:var(--purple);}
+.mut-slot-btn.filled{border-color:#333;color:#555;}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<!-- SCREENS -->
+<div id="s-main" class="screen active">
+  <div class="title-glow">ADVENTURE</div>
+  <div class="subtitle">-- PATH TO THE UNKNOWN --</div>
+  <div class="menu-btns">
+    <button class="btn gold" onclick="startNewGame()">NEW GAME</button>
+    <button class="btn blue" onclick="showLoad()">LOAD GAME</button>
+    <button class="btn dim">SETTINGS &nbsp;— COMING SOON</button>
+  </div>
+</div>
+
+<div id="s-load" class="screen">
+  <div class="screen-header">
+    <button class="btn" style="padding:8px 14px;" onclick="showScreen('s-main')">← BACK</button>
+    <div class="screen-title">LOAD GAME</div>
+  </div>
+  <div id="saves-list" class="saves-list"></div>
+</div>
+
+<div id="s-create" class="screen">
+  <div class="progress-bar" id="prog-bar"></div>
+  <div class="create-section">
+    <div class="create-label" id="create-step-label">STEP</div>
+    <div id="create-content"></div>
+  </div>
+  <div style="width:100%;max-width:480px;margin-top:10px;">
+    <button class="btn gold" id="create-confirm-btn" onclick="confirmCreateStep()">CONFIRM</button>
+  </div>
+</div>
+
+<div id="s-adventure" class="screen">
+  <div class="adv-topbar">
+    <div class="adv-party-name" id="adv-party-name">Party</div>
+    <div class="adv-gold" id="adv-gold">💰 0</div>
+    <button class="adv-party-btn" onclick="showPartyStatus()">👥</button>
+    <button class="adv-party-btn" onclick="saveGame()">💾</button>
+  </div>
+  <div class="adv-flow" id="adv-flow"></div>
+</div>
+
+<div id="s-combat" class="screen">
+  <div class="combat-enemies" id="combat-enemies"></div>
+  <div class="combat-divider">── VS ──</div>
+  <div class="combat-party" id="combat-party"></div>
+  <div class="combat-log" id="combat-log"></div>
+  <div class="combat-actions" id="combat-actions">
+    <div class="action-label" id="action-label">YOUR TURN</div>
+    <div class="action-row" id="action-row"></div>
+  </div>
+</div>
+
+<div id="s-rp" class="screen">
+  <div class="rp-bg">
+    <div class="rp-portrait-area" id="rp-portrait"></div>
+  </div>
+  <div class="rp-dialog">
+    <div class="rp-speaker" id="rp-speaker"></div>
+    <div class="rp-text" id="rp-text"></div>
+    <div class="rp-choices" id="rp-choices"></div>
+  </div>
+</div>
+
+<div id="s-party" class="screen">
+  <div class="party-header">
+    <button class="btn" style="padding:8px 14px;" onclick="showScreen('s-adventure')">← BACK</button>
+    <div class="screen-title">PARTY STATUS</div>
+    <div style="flex:1"></div>
+    <div class="adv-gold" id="party-gold">💰 0</div>
+  </div>
+  <div class="party-scroll" id="party-scroll"></div>
+</div>
+
+<div id="s-results" class="screen">
+  <div class="results-title" id="results-title">VICTORY</div>
+  <div class="results-content" id="results-content"></div>
+  <button class="btn gold" style="width:100%;max-width:400px;" onclick="endCombat()">CONTINUE</button>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal-box">
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-text" id="modal-text"></div>
+    <div class="modal-btns" id="modal-btns"></div>
+  </div>
+</div>
+
+<div id="levelup-banner">
+  <div class="levelup-text" id="levelup-text"></div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════
+
+const TYPE_ICONS = {human:'⚔️', mutant:'🧬', monster:'🐺', robot:'🤖'};
+const GENDER_ICONS = {male:'♂', female:'♀'};
+
+const CHAR_TYPES = {
+  human: {
+    name:'Human', icon:'⚔️',
+    desc:'Balanced fighter. Grows steadily, equips melee or ranged weapons.',
+    startHP:30, startSTR:5, startDEX:5, startDEF:3,
+    hpPerLv:5, strPerLv:1, dexPerLv:1, defPerLv:0.5,
+    startWeapon:'wooden_sword'
+  },
+  mutant: {
+    name:'Mutant', icon:'🧬',
+    desc:'Unpredictable. Weaker base stats but gains powerful random mutations.',
+    startHP:25, startSTR:4, startDEX:6, startDEF:2,
+    hpPerLv:4, strPerLv:0.8, dexPerLv:0.8, defPerLv:0.4,
+    startWeapon:'wooden_sword'
+  },
+  monster: {
+    name:'Monster', icon:'🐺',
+    desc:'Transforms by eating enemy meat. Raw power that evolves.',
+    startForm:'dog',
+    startWeapon:null
+  },
+  robot: {
+    name:'Robot', icon:'🤖',
+    desc:'Durable machine. High DEF, steady growth. Parts system coming.',
+    startHP:35, startSTR:6, startDEX:4, startDEF:5,
+    hpPerLv:4, strPerLv:1, dexPerLv:0.5, defPerLv:0.8,
+    startWeapon:'iron_fist'
+  }
+};
+
+const ABILITIES = [
+  {id:'regen',name:'Regen',type:'passive',desc:'Heal 3 HP at start of each turn'},
+  {id:'iron_skin',name:'Iron Skin',type:'passive',desc:'+3 DEF permanently while equipped'},
+  {id:'eagle_eye',name:'Eagle Eye',type:'passive',desc:'+15% hit chance'},
+  {id:'fire_blast',name:'Fire Blast',type:'active',desc:'Deal 8+lvl fire damage to one enemy',target:'enemy'},
+  {id:'ice_shard',name:'Ice Shard',type:'active',desc:'Deal 6+lvl ice damage and slow enemy (-10% hit next turn)',target:'enemy'},
+  {id:'thunder',name:'Thunder',type:'active',desc:'Deal 5+lvl lightning to all enemies',target:'all_enemies'},
+  {id:'poison',name:'Poison Sting',type:'active',desc:'Poison one enemy (3 dmg/turn, 3 turns)',target:'enemy'},
+  {id:'drain',name:'Drain',type:'active',desc:'Steal 6+lvl HP from one enemy',target:'enemy'},
+  {id:'heal',name:'Mend',type:'active',desc:'Restore 12+lvl HP to one ally',target:'ally'},
+  {id:'berserk',name:'Berserk',type:'passive',desc:'+5 STR, -3 DEF'},
+  {id:'camouflage',name:'Camouflage',type:'passive',desc:'+20% flee success chance'},
+  {id:'counter',name:'Counter',type:'passive',desc:'30% chance to counter-attack after being hit'},
+];
+
+const MONSTER_FORMS = {
+  dog:     {name:'Dog',     hp:28, atk:4,  def:1, natural:'Bite',    special:null,         icon:'🐕'},
+  wolf:    {name:'Wolf',    hp:38, atk:7,  def:2, natural:'Claw',    special:null,         icon:'🐺'},
+  cat:     {name:'Cat',     hp:30, atk:5,  def:3, natural:'Scratch', special:'dodge10',    icon:'🐈'},
+  boar:    {name:'Boar',    hp:42, atk:8,  def:4, natural:'Gore',    special:null,         icon:'🐗'},
+  bear:    {name:'Bear',    hp:55, atk:10, def:5, natural:'Maul',    special:null,         icon:'🐻'},
+  panther: {name:'Panther', hp:45, atk:9,  def:5, natural:'Pounce',  special:'crit15',     icon:'🐆'},
+  troll:   {name:'Troll',   hp:60, atk:12, def:6, natural:'Slam',    special:null,         icon:'👹'},
+};
+
+const MONSTER_TREE = {
+  dog:  [{meat:'wolf_meat',  form:'wolf'}, {meat:'cat_meat',  form:'cat'}, {meat:'boar_meat', form:'boar'}],
+  wolf: [{meat:'bear_meat',  form:'bear'}],
+  cat:  [{meat:'panther_meat',form:'panther'}],
+  boar: [{meat:'troll_meat', form:'troll'}],
+};
+
+const WEAPONS = {
+  wooden_sword:{id:'wooden_sword',name:'Wooden Sword',type:'melee', dmgMin:2,dmgMax:5, stat:'str'},
+  wooden_bow:  {id:'wooden_bow',  name:'Wooden Bow',  type:'ranged',dmgMin:2,dmgMax:4, stat:'dex'},
+  iron_sword:  {id:'iron_sword',  name:'Iron Sword',  type:'melee', dmgMin:5,dmgMax:9, stat:'str'},
+  iron_bow:    {id:'iron_bow',    name:'Iron Bow',    type:'ranged',dmgMin:4,dmgMax:8, stat:'dex'},
+  iron_fist:   {id:'iron_fist',   name:'Iron Fist',   type:'melee', dmgMin:3,dmgMax:6, stat:'str',robotOnly:true},
+  steel_sword: {id:'steel_sword', name:'Steel Sword', type:'melee', dmgMin:8,dmgMax:14,stat:'str'},
+  bite:        {id:'bite',        name:'Bite',        type:'melee', dmgMin:3,dmgMax:5, stat:'str',monsterOnly:true},
+};
+
+const ARMORS = {
+  cloth:   {id:'cloth',   name:'Cloth Armor',   def:1},
+  leather: {id:'leather', name:'Leather Armor',  def:3},
+  chain:   {id:'chain',   name:'Chain Mail',     def:5},
+  plate:   {id:'plate',   name:'Plate Armor',    def:8},
+};
+
+const CONSUMABLES = {
+  potion:      {id:'potion',     name:'Potion',       effect:'heal',   value:30, desc:'Restore 30 HP'},
+  hi_potion:   {id:'hi_potion',  name:'Hi-Potion',    effect:'heal',   value:60, desc:'Restore 60 HP'},
+  revive:      {id:'revive',     name:'Revive',       effect:'revive', value:1,  desc:"Wake a KO'd ally with 1 HP"},
+  wolf_meat:   {id:'wolf_meat',  name:'Wolf Meat',    effect:'meat',   form:'wolf',    desc:'Monster: become Wolf'},
+  cat_meat:    {id:'cat_meat',   name:'Cat Meat',     effect:'meat',   form:'cat',     desc:'Monster: become Cat'},
+  boar_meat:   {id:'boar_meat',  name:'Boar Meat',    effect:'meat',   form:'boar',    desc:'Monster: become Boar'},
+  bear_meat:   {id:'bear_meat',  name:'Bear Meat',    effect:'meat',   form:'bear',    desc:'Monster: become Bear'},
+  panther_meat:{id:'panther_meat',name:'Panther Meat',effect:'meat',   form:'panther', desc:'Monster: become Panther'},
+  troll_meat:  {id:'troll_meat', name:'Troll Meat',   effect:'meat',   form:'troll',   desc:'Monster: become Troll'},
+};
+
+const ALL_ITEMS = {...WEAPONS, ...ARMORS, ...CONSUMABLES};
+
+const ENEMIES = {
+  stray_dog:    {name:'Stray Dog',    hp:12, atk:3, def:1, xp:8,  gold:[1,4], icon:'🐕', loot:[{id:'wolf_meat',chance:0.2}]},
+  wild_wolf:    {name:'Wild Wolf',    hp:20, atk:5, def:2, xp:14, gold:[2,6], icon:'🐺', loot:[{id:'wolf_meat',chance:0.4},{id:'potion',chance:0.1}]},
+  forest_cat:   {name:'Forest Cat',  hp:15, atk:4, def:2, xp:11, gold:[1,5], icon:'🐈', loot:[{id:'cat_meat',chance:0.35}]},
+  boar:         {name:'Wild Boar',    hp:28, atk:7, def:3, xp:18, gold:[2,7], icon:'🐗', loot:[{id:'boar_meat',chance:0.3}]},
+  bandit:       {name:'Bandit',       hp:25, atk:6, def:3, xp:20, gold:[3,8], icon:'🗡️', loot:[{id:'potion',chance:0.25},{id:'wooden_sword',chance:0.1}]},
+  forest_troll: {name:'Forest Troll', hp:50, atk:10,def:5, xp:40, gold:[5,12],icon:'👹', loot:[{id:'troll_meat',chance:0.25},{id:'hi_potion',chance:0.2}]},
+  dark_knight:  {name:'Dark Knight',  hp:40, atk:9, def:6, xp:35, gold:[4,10],icon:'🛡️', loot:[{id:'iron_sword',chance:0.15},{id:'chain',chance:0.1}]},
+};
+
+const RANDOM_NAMES = {
+  human:{
+    male:['Aldric','Bram','Cael','Dorin','Erwan','Finn','Garen','Holt','Ivan','Jaryn'],
+    female:['Aela','Brynn','Cira','Dela','Erin','Fyra','Gwynn','Hara','Isla','Jara']
+  },
+  mutant:{
+    male:['Vex','Zorn','Flux','Grix','Nyx','Ort','Plex','Quill','Rox','Syx'],
+    female:['Vaxa','Zara','Fela','Gryx','Nyra','Orla','Plexa','Quill','Roxa','Syxa']
+  },
+  monster:{
+    male:['Fang','Claw','Rend','Snarl','Growl','Crunch','Gnash','Maul','Rip','Tear'],
+    female:['Luna','Shadow','Swift','Silent','Dark','Storm','Night','Wild','Fierce','Keen']
+  },
+  robot:{
+    male:['R-7','X-14','Unit-3','Bolt','Hex','Dex','Mek','Rig','Zip','Core'],
+    female:['R-9','X-22','Unit-7','Nova','Hexa','Dexa','Meka','Riga','Zipa','Cora']
+  }
+};
+
+const ENEMY_POOLS = {
+  forest: [
+    [{id:'wild_wolf',count:2}],
+    [{id:'forest_cat',count:2}],
+    [{id:'wild_wolf',count:1},{id:'forest_cat',count:1}],
+    [{id:'boar',count:1}],
+    [{id:'wild_wolf',count:1},{id:'stray_dog',count:2}],
+  ],
+  road: [
+    [{id:'bandit',count:2}],
+    [{id:'bandit',count:1},{id:'stray_dog',count:1}],
+    [{id:'bandit',count:3}],
+  ],
+  town: [
+    [{id:'bandit',count:1}],
+    [{id:'stray_dog',count:3}],
+  ],
+  boss_forest: [
+    [{id:'forest_troll',count:1}],
+    [{id:'dark_knight',count:1}],
+    [{id:'forest_troll',count:1},{id:'wild_wolf',count:1}],
+  ]
+};
+
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+
+let G = {
+  party: [],
+  nodes: [],
+  currentNodeId: 0,
+  completedNodes: [],
+  inventory: [],
+  gold: 0,
+  location: 'road',
+  day: 1,
+  saveId: null,
+};
+
+let createState = {
+  charIndex: 0,
+  chars: [],
+  current: {type:null, gender:null, name:''},
+};
+
+let combatState = null;
+let rpState = null;
+let currentNodeForCombat = null;
+let pendingMutation = null;
+let pendingMutationChar = null;
+
+// ═══════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════
+
+function rand(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function chance(p){ return Math.random()<p; }
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showModal(title, text, buttons){
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-text').textContent = text;
+  const bb = document.getElementById('modal-btns');
+  bb.innerHTML = '';
+  buttons.forEach(b=>{
+    const btn = document.createElement('button');
+    btn.className = 'modal-btn'+(b.cls?' '+b.cls:'');
+    btn.textContent = b.label;
+    btn.onclick = ()=>{ closeModal(); b.action && b.action(); };
+    bb.appendChild(btn);
+  });
+  document.getElementById('modal-overlay').classList.add('active');
+}
+
+function closeModal(){ document.getElementById('modal-overlay').classList.remove('active'); }
+
+function showLevelUp(name, level){
+  const banner = document.getElementById('levelup-banner');
+  document.getElementById('levelup-text').textContent = `LEVEL UP!\n${name} — Lv.${level}`;
+  banner.classList.add('show');
+  setTimeout(()=>banner.classList.remove('show'), 2000);
+}
+
+function formatTS(ts){
+  const d = new Date(ts);
+  return d.toLocaleDateString()+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+// ═══════════════════════════════════════════════════
+// CHARACTER CREATION
+// ═══════════════════════════════════════════════════
+
+function buildChar(type, gender, name){
+  const t = CHAR_TYPES[type];
+  const ch = {type, gender, name, level:1, xp:0};
+  if(type === 'monster'){
+    ch.form = 'dog';
+    const fd = MONSTER_FORMS.dog;
+    ch.maxHp = fd.hp; ch.hp = fd.hp;
+    ch.str = 0; ch.dex = 0; ch.def = fd.def;
+    ch.weapon = null; ch.armor = null;
+  } else {
+    ch.maxHp = t.startHP; ch.hp = t.startHP;
+    ch.str = t.startSTR; ch.dex = t.startDEX; ch.def = t.startDEF;
+    ch.weapon = t.startWeapon;
+    ch.armor = null;
+  }
+  if(type === 'mutant'){
+    const pool = [...ABILITIES].sort(()=>Math.random()-0.5);
+    ch.abilities = [pool[0].id, pool[1].id, null, null];
+  } else {
+    ch.abilities = null;
+  }
+  ch.statusEffects = [];
+  ch.ko = false;
+  return ch;
+}
+
+function startNewGame(){
+  createState = {charIndex:0, chars:[], current:{type:null,gender:null,name:''}};
+  renderCreateScreen();
+  showScreen('s-create');
+}
+
+function renderCreateScreen(){
+  const {charIndex, current} = createState;
+  // progress dots
+  const pb = document.getElementById('prog-bar');
+  pb.innerHTML = '';
+  for(let i=0;i<4;i++){
+    const d = document.createElement('div');
+    d.className = 'prog-dot'+(i<charIndex?' done':i===charIndex?' active':'');
+    pb.appendChild(d);
+  }
+  document.getElementById('create-step-label').textContent = `CHARACTER ${charIndex+1} OF 4`;
+
+  const cont = document.getElementById('create-content');
+  cont.innerHTML = '';
+
+  // type selector
+  const typeSection = document.createElement('div');
+  typeSection.innerHTML = `<div class="create-label">CHOOSE TYPE</div>`;
+  const cards = document.createElement('div');
+  cards.className = 'type-cards';
+  Object.entries(CHAR_TYPES).forEach(([key,t])=>{
+    const card = document.createElement('div');
+    card.className = 'type-card'+(current.type===key?' selected':'');
+    card.innerHTML = `<div class="type-icon">${t.icon}</div><div class="type-name">${t.name.toUpperCase()}</div><div class="type-desc">${t.desc}</div>`;
+    card.onclick = ()=>{ createState.current.type=key; renderCreateScreen(); };
+    cards.appendChild(card);
+  });
+  typeSection.appendChild(cards);
+  cont.appendChild(typeSection);
+
+  // gender
+  const genSection = document.createElement('div');
+  genSection.style.marginTop='14px';
+  genSection.innerHTML = `<div class="create-label">GENDER</div><div class="gender-btns">
+    <button class="gender-btn${current.gender==='male'?' selected':''}" onclick="createState.current.gender='male';renderCreateScreen()">♂ MALE</button>
+    <button class="gender-btn${current.gender==='female'?' selected':''}" onclick="createState.current.gender='female';renderCreateScreen()">♀ FEMALE</button>
+  </div>`;
+  cont.appendChild(genSection);
+
+  // name
+  const nameSection = document.createElement('div');
+  nameSection.style.marginTop='14px';
+  nameSection.innerHTML = `<div class="create-label">NAME</div><div class="name-row">
+    <input class="name-input" id="name-input" maxlength="12" placeholder="Enter name..." value="${current.name||''}">
+    <button class="rand-btn" onclick="randomizeName()">RANDOM</button>
+  </div>`;
+  cont.appendChild(nameSection);
+  const ni = document.getElementById('name-input');
+  if(ni) ni.oninput = ()=>{ createState.current.name = ni.value; };
+}
+
+function randomizeName(){
+  const {type, gender} = createState.current;
+  if(!type||!gender){ return; }
+  const list = RANDOM_NAMES[type][gender];
+  createState.current.name = pick(list);
+  renderCreateScreen();
+}
+
+function confirmCreateStep(){
+  const {current} = createState;
+  if(!current.type){ showModal('Missing Info','Please choose a type.',[{label:'OK'}]); return; }
+  if(!current.gender){ showModal('Missing Info','Please choose a gender.',[{label:'OK'}]); return; }
+  const name = (document.getElementById('name-input')?.value||'').trim();
+  if(!name){ showModal('Missing Info','Please enter a name.',[{label:'OK'}]); return; }
+  current.name = name;
+  createState.chars.push(buildChar(current.type, current.gender, current.name));
+  createState.charIndex++;
+  if(createState.charIndex >= 4){
+    beginAdventure(createState.chars);
+  } else {
+    createState.current = {type:null, gender:null, name:''};
+    renderCreateScreen();
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// SAVE / LOAD
+// ═══════════════════════════════════════════════════
+
+const SAVE_KEY = 'adventure_saves';
+
+function getSaves(){ try{ return JSON.parse(localStorage.getItem(SAVE_KEY)||'[]'); }catch(e){ return []; } }
+function putSaves(arr){ localStorage.setItem(SAVE_KEY, JSON.stringify(arr)); }
+
+function saveGame(){
+  const saves = getSaves();
+  const leader = G.party[0];
+  const saveName = `${leader.name} & Party — Day ${G.day}`;
+  const obj = {
+    id: G.saveId || Date.now().toString(),
+    name: saveName,
+    timestamp: Date.now(),
+    party: G.party,
+    nodes: G.nodes,
+    currentNodeId: G.currentNodeId,
+    completedNodes: G.completedNodes,
+    inventory: G.inventory,
+    gold: G.gold,
+    location: G.location,
+    day: G.day,
+  };
+  G.saveId = obj.id;
+  const idx = saves.findIndex(s=>s.id===obj.id);
+  if(idx>=0) saves[idx]=obj; else {
+    if(saves.length>=10){ showModal('Save Limit','Max 10 saves. Delete one first.',[{label:'OK'}]); return; }
+    saves.push(obj);
+  }
+  putSaves(saves);
+  showModal('Saved!',`Game saved: ${saveName}`,[{label:'OK'}]);
+}
+
+function loadSave(id){
+  const saves = getSaves();
+  const sv = saves.find(s=>s.id===id);
+  if(!sv) return;
+  G = {
+    party: sv.party,
+    nodes: sv.nodes,
+    currentNodeId: sv.currentNodeId,
+    completedNodes: sv.completedNodes,
+    inventory: sv.inventory,
+    gold: sv.gold,
+    location: sv.location,
+    day: sv.day || 1,
+    saveId: sv.id,
+  };
+  // re-init statusEffects if missing
+  G.party.forEach(c=>{ if(!c.statusEffects) c.statusEffects=[];  if(typeof c.ko==='undefined') c.ko=false; });
+  showScreen('s-adventure');
+  renderAdventureFlow();
+}
+
+function deleteSave(id){
+  showModal('Delete Save?','This cannot be undone.',[
+    {label:'Cancel'},
+    {label:'DELETE', cls:'danger', action:()=>{
+      const saves = getSaves().filter(s=>s.id!==id);
+      putSaves(saves);
+      showLoad();
+    }}
+  ]);
+}
+
+function showLoad(){
+  const saves = getSaves();
+  const list = document.getElementById('saves-list');
+  list.innerHTML = '';
+  if(!saves.length){
+    list.innerHTML = '<div class="empty-saves">No saved games found.</div>';
+  } else {
+    saves.sort((a,b)=>b.timestamp-a.timestamp).forEach(sv=>{
+      const row = document.createElement('div');
+      row.className = 'save-row';
+      const icons = sv.party.map(c=>TYPE_ICONS[c.type]||'?').join('');
+      row.innerHTML = `
+        <div class="save-info" style="cursor:pointer" onclick="loadSave('${sv.id}')">
+          <div class="save-name">${sv.name}</div>
+          <div class="save-meta">${formatTS(sv.timestamp)}</div>
+          <div class="save-icons">${icons}</div>
+        </div>
+        <button class="trash-btn" onclick="deleteSave('${sv.id}')">🗑️</button>
+      `;
+      list.appendChild(row);
+    });
+  }
+  showScreen('s-load');
+}
+
+// ═══════════════════════════════════════════════════
+// ADVENTURE / NODE SYSTEM
+// ═══════════════════════════════════════════════════
+
+const FATHER_WARNING = {
+  start:'start',
+  nodes:{
+    start:{speaker:'Father',portrait:'👴',text:"You look shaken. What happened out there?",
+      choices:[
+        {text:'We were attacked by stray dogs.',next:'concerned'},
+        {text:'Nothing serious. Just some dogs.',next:'dismissive'},
+        {text:'[Say nothing]',next:'silence'}
+      ]},
+    concerned:{speaker:'Father',portrait:'👴',text:"Dogs near the gate? That's unusual. Here, take this — don't go out unprepared.",choices:[{text:'Thank you.',next:'end_good'}]},
+    dismissive:{speaker:'Father',portrait:'👴',text:"Hmph. Your confidence will either save you or kill you. Be careful.",choices:[{text:'I will.',next:'end_neutral'}]},
+    silence:{speaker:'Father',portrait:'👴',text:"..You've always been the quiet type. Just be safe out there.",choices:[{text:'(nod)',next:'end_neutral'}]},
+    end_good:{speaker:null,text:'[Father handed you a Potion]',effect:{addItem:'potion'},choices:[{text:'Continue',next:null}]},
+    end_neutral:{speaker:null,text:'[You head back to town square]',choices:[{text:'Continue',next:null}]}
+  }
+};
+
+const WOUNDED_TRAVELER = {
+  start:'start',
+  nodes:{
+    start:{speaker:'Traveler',portrait:'🧍',text:'Please... help me. Bandits... on the north road...',
+      choices:[
+        {text:"I'll help. What happened?",next:'explain'},
+        {text:"I can't help you right now.",next:'refuse'},
+        {text:'[Tend to their wounds]',next:'heal_them'}
+      ]},
+    explain:{speaker:'Traveler',portrait:'🧍',text:"They took my pack. Had supplies for the village further north. If you defeat them, keep whatever they have.",choices:[{text:"We'll look into it.",next:'end_quest'}]},
+    refuse:{speaker:'Traveler',portrait:'🧍',text:'...I understand. May fortune find you.',choices:[{text:'Continue',next:'end_neutral'}]},
+    heal_them:{speaker:'Traveler',portrait:'🧍',text:'Thank you... bless you. If you find the bandits, they camp near the old oak.',choices:[{text:"We'll handle it.",next:'end_quest_healed'}]},
+    end_quest:{speaker:null,text:'[+5 XP each.]',effect:{xpAll:5},choices:[{text:'Continue',next:null}]},
+    end_quest_healed:{speaker:null,text:"[+5 XP each. Traveler's Gratitude noted.]",effect:{xpAll:5},choices:[{text:'Continue',next:null}]},
+    end_neutral:{speaker:null,text:'[You continue on your way]',choices:[{text:'Continue',next:null}]}
+  }
+};
+
+const INN_REST = {
+  start:'start',
+  nodes:{
+    start:{speaker:'Innkeeper',portrait:'🏨',text:"Welcome! A night's rest is 10 gold. Restores full HP for your party.",
+      choices:[
+        {text:'Rest for 10 gold',next:'rest',cost:10},
+        {text:'Just looking around',next:'rumors'}
+      ]},
+    rest:{speaker:null,text:'[Party rested. Full HP restored.]',effect:{restParty:true,cost:10},choices:[{text:'Continue',next:null}]},
+    rumors:{speaker:'Innkeeper',portrait:'🏨',text:"Word is there's something stirring deep in Holt Forest. Travelers have gone missing.",choices:[{text:'Noted.',next:'end'}]},
+    end:{speaker:null,text:'[You leave the inn]',choices:[{text:'Continue',next:null}]}
+  }
+};
+
+const MERCHANT_SCRIPT = {
+  start:'start',
+  nodes:{
+    start:{speaker:'Merchant',portrait:'🛒',text:"Passing through? I've got supplies — potions and the like.",
+      choices:[
+        {text:'Buy Potion (15g)',next:'buy_potion',cost:15,item:'potion'},
+        {text:'Buy Hi-Potion (30g)',next:'buy_hipotion',cost:30,item:'hi_potion'},
+        {text:'Nothing, thanks.',next:'end'}
+      ]},
+    buy_potion:{speaker:null,text:'[Purchased Potion for 15 gold.]',effect:{addItem:'potion',cost:15},choices:[{text:'Continue',next:null}]},
+    buy_hipotion:{speaker:null,text:'[Purchased Hi-Potion for 30 gold.]',effect:{addItem:'hi_potion',cost:30},choices:[{text:'Continue',next:null}]},
+    end:{speaker:null,text:'[The merchant waves farewell.]',choices:[{text:'Continue',next:null}]}
+  }
+};
+
+const MYSTIC_SCRIPT = {
+  start:'start',
+  nodes:{
+    start:{speaker:'Mystic',portrait:'🔮',text:"I sense great power within your party. The forest holds secrets... and danger.",
+      choices:[
+        {text:'Tell me more.',next:'more'},
+        {text:'We are ready.',next:'ready'}
+      ]},
+    more:{speaker:'Mystic',portrait:'🔮',text:"A dark knight patrols the deep woods. Defeat him and glory awaits.",choices:[{text:'Understood.',next:'end_xp'}]},
+    ready:{speaker:'Mystic',portrait:'🔮',text:"Then go. And return victorious.",choices:[{text:'We will.',next:'end_xp'}]},
+    end_xp:{speaker:null,text:'[+10 XP each for the wisdom gained.]',effect:{xpAll:10},choices:[{text:'Continue',next:null}]}
+  }
+};
+
+const TUTORIAL_NODES = [
+  {id:0, type:'combat', title:'Ambushed!',
+   desc:'Stray dogs rush you near the town gates.',
+   enemies:[{id:'stray_dog',count:2}], next:null, choices:null},
+  {id:1, type:'decision', title:'What Now?',
+   desc:'You stand outside town, catching your breath. The sun is low.',
+   choices:[
+     {label:'Head to Town', desc:'Find your father and tell him what happened.', next:2},
+     {label:'Head into the Wilds', desc:'Something felt off. Investigate.', next:3}
+   ]},
+  {id:2, type:'rp', title:"Father's Warning", script:'father_warning', next:4},
+  {id:3, type:'rp', title:'Wounded Traveler', script:'wounded_traveler', next:4},
+  {id:4, type:'decision', title:'The Road Ahead',
+   desc:'The town of Holt is behind you. Adventure lies ahead.',
+   choices:[
+     {label:'Visit the Inn', desc:'Rest, heal, and hear rumors.', next:5},
+     {label:'Enter Holt Forest', desc:'Hunt and explore.', next:6}
+   ]},
+  {id:5, type:'rp', title:'Inn Rest', script:'inn_rest', next:7},
+  {id:6, type:'combat', title:'Forest Patrol',
+   enemies:[{id:'wild_wolf',count:1},{id:'forest_cat',count:1}], next:7},
+  {id:7, type:'_generate'},
+];
+
+function getScript(name){
+  if(name==='father_warning') return FATHER_WARNING;
+  if(name==='wounded_traveler') return WOUNDED_TRAVELER;
+  if(name==='inn_rest') return INN_REST;
+  if(name==='merchant') return MERCHANT_SCRIPT;
+  if(name==='mystic') return MYSTIC_SCRIPT;
+  return null;
+}
+
+function generateNode(id){
+  const loc = G.location;
+  const pool = loc==='forest' ? 'forest' : loc==='town' ? 'town' : 'road';
+  const highLevel = G.party.reduce((a,c)=>a+c.level,0)/G.party.length >= 3;
+  const r = Math.random();
+  let node;
+  if(r < 0.55){
+    // combat
+    let enemies;
+    if(highLevel && loc==='forest' && chance(0.3)){
+      enemies = pick(ENEMY_POOLS.boss_forest);
+    } else {
+      enemies = pick(ENEMY_POOLS[pool] || ENEMY_POOLS.road);
+    }
+    node = {id, type:'combat', title:pick(['Ambush!','Patrol Encounter','Hostile Ground','Surprise Attack','Road Danger']),
+      desc:pick(['Enemies block your path.','They come out of nowhere.','Your party is surrounded.','A fight breaks out.']),
+      enemies, next:null};
+  } else if(r < 0.85){
+    // rp
+    const scripts = loc==='town' ? ['inn_rest','mystic'] : ['merchant','mystic','wounded_traveler'];
+    const script = pick(scripts);
+    const titles = {inn_rest:'Inn Rest',merchant:'Traveling Merchant',mystic:'Mysterious Figure',wounded_traveler:'Wounded Traveler'};
+    node = {id, type:'rp', title:titles[script]||'Encounter', script, next:null};
+  } else {
+    // decision
+    node = {id, type:'decision', title:'At the Crossroads',
+      desc:'Your party pauses. Where to next?',
+      choices:[
+        {label:'Explore the Forest', desc:'Hunt for monsters and treasure.', locChange:'forest', next:id+1},
+        {label:'Return toward Town', desc:'Rest and resupply.', locChange:'town', next:id+1},
+        {label:'Follow the Road', desc:'See what lies ahead.', locChange:'road', next:id+1},
+      ]};
+  }
+  return node;
+}
+
+function getNode(id){
+  if(id < TUTORIAL_NODES.length) return TUTORIAL_NODES[id];
+  const existing = G.nodes.find(n=>n.id===id);
+  if(existing) return existing;
+  const node = generateNode(id);
+  G.nodes.push(node);
+  return node;
+}
+
+function beginAdventure(party){
+  G = {
+    party,
+    nodes: [],
+    currentNodeId: 0,
+    completedNodes: [],
+    inventory: [{id:'potion',qty:2}],
+    gold: 0,
+    location: 'road',
+    day: 1,
+    saveId: null,
+  };
+  showScreen('s-adventure');
+  renderAdventureFlow();
+  // auto-trigger node 0
+  setTimeout(()=>triggerNode(0), 400);
+}
+
+function renderAdventureFlow(){
+  const flow = document.getElementById('adv-flow');
+  flow.innerHTML = '';
+  const leader = G.party[0];
+  document.getElementById('adv-party-name').textContent = `${leader.name} & Party`;
+  document.getElementById('adv-gold').textContent = `💰 ${G.gold}`;
+
+  const maxNode = Math.max(G.currentNodeId+2, ...G.completedNodes, 0);
+  for(let i=0;i<=maxNode;i++){
+    const node = getNode(i);
+    if(!node || node.type==='_generate') break;
+    const isCompleted = G.completedNodes.includes(i);
+    const isCurrent = i===G.currentNodeId;
+    const isFuture = !isCompleted && !isCurrent;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flow-node';
+
+    const lineCol = document.createElement('div');
+    lineCol.className = 'flow-line-col';
+
+    if(i>0){
+      const topLine = document.createElement('div');
+      topLine.className = 'flow-vert-line'+(isCompleted?' active-line':'');
+      topLine.style.minHeight='20px';
+      lineCol.appendChild(topLine);
+    }
+
+    const dot = document.createElement('div');
+    dot.className = 'flow-dot'+(isCompleted?' completed':isCurrent?' current':' future');
+    const dotIcons = {combat:'⚔️',rp:'💬',decision:'🔀'};
+    dot.textContent = isCompleted?'✓':(dotIcons[node.type]||'•');
+    if(isCurrent){ dot.title='Tap to begin'; dot.onclick=()=>triggerNode(i); }
+    if(isCompleted){ dot.onclick=()=>showNodeSummary(i); }
+    lineCol.appendChild(dot);
+
+    const botLine = document.createElement('div');
+    botLine.className = 'flow-vert-line'+(isCompleted?' active-line':'');
+    botLine.style.minHeight='20px';
+    lineCol.appendChild(botLine);
+
+    wrapper.appendChild(lineCol);
+
+    const content = document.createElement('div');
+    content.className = 'flow-content';
+    content.innerHTML = `<div class="flow-node-title">${node.title||''}</div>`;
+    if(node.desc) content.innerHTML += `<div class="flow-node-desc">${node.desc}</div>`;
+
+    if(isCurrent){
+      if(node.type==='decision'){
+        const cf = document.createElement('div');
+        cf.className = 'flow-choices';
+        (node.choices||[]).forEach(ch=>{
+          const btn = document.createElement('button');
+          btn.className = 'flow-choice-btn';
+          btn.innerHTML = `<div class="flow-choice-label">${ch.label}</div><div class="flow-choice-desc">${ch.desc||''}</div>`;
+          btn.onclick=()=>chooseDecision(ch);
+          cf.appendChild(btn);
+        });
+        content.appendChild(cf);
+      } else {
+        const ab = document.createElement('div');
+        ab.className = 'flow-node-action';
+        const tb = document.createElement('button');
+        tb.className = 'btn gold';
+        tb.style.fontSize='0.75rem';
+        tb.style.padding='10px 16px';
+        tb.textContent = node.type==='combat'?'⚔️ ENGAGE':'💬 BEGIN';
+        tb.onclick=()=>triggerNode(i);
+        ab.appendChild(tb);
+        content.appendChild(ab);
+      }
+      // walker icon
+      const walker = document.createElement('div');
+      walker.style.fontSize='0.85rem';
+      walker.style.marginTop='4px';
+      walker.textContent = G.party.map(c=>TYPE_ICONS[c.type]).join('');
+      content.appendChild(walker);
+    }
+
+    wrapper.appendChild(content);
+    flow.appendChild(wrapper);
+  }
+  // scroll to current
+  setTimeout(()=>{
+    const dots = flow.querySelectorAll('.flow-dot.current');
+    if(dots.length) dots[0].scrollIntoView({behavior:'smooth',block:'center'});
+  },100);
+}
+
+function chooseDecision(choice){
+  if(choice.locChange) G.location = choice.locChange;
+  G.completedNodes.push(G.currentNodeId);
+  G.currentNodeId = choice.next;
+  G.day++;
+  renderAdventureFlow();
+}
+
+function triggerNode(id){
+  const node = getNode(id);
+  if(!node) return;
+  if(node.type==='combat'){
+    startCombat(node);
+  } else if(node.type==='rp'){
+    startRP(node);
+  } else if(node.type==='decision'){
+    // decisions are handled inline
+  }
+}
+
+function showNodeSummary(id){
+  const node = getNode(id);
+  if(!node) return;
+  showModal(node.title||'Past Event', node.desc||'You recall this event.',[{label:'OK'}]);
+}
+
+function advanceFromNode(nodeId){
+  G.completedNodes.push(nodeId);
+  const node = getNode(nodeId);
+  let next = node?.next;
+  if(typeof next === 'number'){
+    G.currentNodeId = next;
+  } else {
+    G.currentNodeId = nodeId+1;
+  }
+  G.day++;
+  // check for monster transform
+  checkMonsterTransform(()=>{
+    showScreen('s-adventure');
+    renderAdventureFlow();
+  });
+}
+
+function checkMonsterTransform(cb){
+  const monster = G.party.find(c=>c.type==='monster');
+  if(!monster){ cb(); return; }
+  const tree = MONSTER_TREE[monster.form]||[];
+  const available = tree.filter(t=>G.inventory.find(i=>i.id===t.meat&&i.qty>0));
+  if(!available.length){ cb(); return; }
+  const opts = available.map(a=>{
+    const fd = MONSTER_FORMS[a.form];
+    return {label:`Eat ${ALL_ITEMS[a.meat]?.name||a.meat} → ${fd.name} (HP:${fd.hp} ATK:${fd.atk})`, action:()=>{
+      removeItem(a.meat,1);
+      transformMonster(monster, a.form);
+      showModal('Transformed!',`${monster.name} becomes ${MONSTER_FORMS[a.form].name}!`,[{label:'OK',action:cb}]);
+    }};
+  });
+  opts.push({label:'Not now', action:cb});
+  showModal(`${monster.name} can transform!`,'Eligible meat in inventory. Transform now?', opts);
+}
+
+function transformMonster(ch, form){
+  ch.form = form;
+  const fd = MONSTER_FORMS[form];
+  const oldMaxHp = ch.maxHp;
+  ch.maxHp = fd.hp + (ch.level-1)*4;
+  ch.hp = Math.min(ch.hp + (ch.maxHp - oldMaxHp), ch.maxHp);
+  ch.def = fd.def;
+}
+
+// ═══════════════════════════════════════════════════
+// COMBAT ENGINE
+// ═══════════════════════════════════════════════════
+
+function buildEnemyGroup(enemyDefs){
+  const group = [];
+  enemyDefs.forEach(def=>{
+    const tmpl = ENEMIES[def.id];
+    if(!tmpl) return;
+    for(let i=0;i<def.count;i++){
+      group.push({
+        ...tmpl,
+        maxHp: tmpl.hp,
+        hp: tmpl.hp,
+        id: def.id,
+        uid: Math.random().toString(36).slice(2),
+        statusEffects: [],
+        dead: false,
+      });
+    }
+  });
+  return group;
+}
+
+function getAttackerStat(ch){
+  if(ch.type==='monster'){
+    return MONSTER_FORMS[ch.form]?.atk || 4;
+  }
+  const w = ch.weapon ? WEAPONS[ch.weapon] : null;
+  if(!w) return ch.str||0;
+  return w.stat==='dex' ? (ch.dex||0) : (ch.str||0);
+}
+
+function getWeaponDmg(ch){
+  if(ch.type==='monster'){
+    const fd = MONSTER_FORMS[ch.form];
+    return {min:fd.atk-2, max:fd.atk+2};
+  }
+  const w = ch.weapon ? WEAPONS[ch.weapon] : null;
+  if(!w) return {min:1,max:3};
+  return {min:w.dmgMin, max:w.dmgMax};
+}
+
+function calcHit(attackerStat, defDEF, bonuses=0){
+  return clamp(0.75 + (attackerStat - defDEF)*0.02 + bonuses, 0.15, 0.95);
+}
+
+function calcDmg(ch){
+  const d = getWeaponDmg(ch);
+  const stat = getAttackerStat(ch);
+  return rand(d.min, d.max) + Math.floor(stat/3);
+}
+
+function getCharDef(ch){
+  let def = ch.def||0;
+  const armor = ch.armor ? ARMORS[ch.armor] : null;
+  if(armor) def += armor.def;
+  if(ch.abilities && ch.abilities.includes('iron_skin')) def+=3;
+  if(ch.abilities && ch.abilities.includes('berserk')) def-=3;
+  return Math.max(0,def);
+}
+
+function getCharStr(ch){
+  let s = ch.str||0;
+  if(ch.abilities && ch.abilities.includes('berserk')) s+=5;
+  return s;
+}
+
+function startCombat(node){
+  currentNodeForCombat = node;
+  const enemies = buildEnemyGroup(node.enemies||[]);
+  combatState = {
+    node,
+    enemies,
+    party: G.party.map(c=>({...c})),
+    turn: 'player',
+    activeCharIdx: 0,
+    log:[],
+    loot:[],
+    xpGained:0,
+    goldGained:0,
+    phase:'select', // select, target_enemy, target_ally, ability_select, item_select
+    pendingAction: null,
+    pendingAbility: null,
+    roundNum: 1,
+  };
+  // find first living char
+  combatState.activeCharIdx = firstLiving(combatState.party);
+  showScreen('s-combat');
+  renderCombat();
+}
+
+function firstLiving(party){
+  for(let i=0;i<party.length;i++) if(!party[i].ko) return i;
+  return 0;
+}
+
+function nextLivingChar(party, after){
+  for(let i=after+1;i<party.length;i++) if(!party[i].ko) return i;
+  return -1;
+}
+
+function addLog(msg, cls=''){
+  combatState.log.push({msg,cls});
+  renderCombatLog();
+}
+
+function renderCombatLog(){
+  const el = document.getElementById('combat-log');
+  el.innerHTML = combatState.log.slice(-6).map(l=>`<div class="log-line ${l.cls}">${l.msg}</div>`).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderCombat(){
+  renderEnemies();
+  renderCombatParty();
+  renderActions();
+}
+
+function renderEnemies(){
+  const el = document.getElementById('combat-enemies');
+  el.innerHTML = '';
+  combatState.enemies.forEach((e,i)=>{
+    const card = document.createElement('div');
+    card.className = 'enemy-card'+(e.dead?' dead':'');
+    const pct = Math.max(0,e.hp/e.maxHp*100);
+    const targetable = !e.dead && (combatState.phase==='target_enemy'||combatState.phase==='ability_target_enemy');
+    if(targetable) card.classList.add('targetable');
+    card.innerHTML = `
+      <div class="enemy-icon">${e.icon||'👾'}</div>
+      <div style="flex:1">
+        <div class="enemy-name">${e.name}${e.dead?' (Dead)':''}</div>
+        <div style="font-size:0.6rem;color:var(--dim)">${e.dead?'--':e.hp+'/'+e.maxHp+' HP'}</div>
+        <div class="enemy-hp-bar"><div class="enemy-hp-fill" style="width:${pct}%"></div></div>
+        ${e.statusEffects?.length?`<div style="font-size:0.6rem;color:var(--purple)">${e.statusEffects.map(s=>s.name).join(', ')}</div>`:''}
+      </div>`;
+    if(targetable) card.onclick=()=>selectEnemyTarget(i);
+    el.appendChild(card);
+  });
+}
+
+function renderCombatParty(){
+  const el = document.getElementById('combat-party');
+  el.innerHTML = '';
+  combatState.party.forEach((ch,i)=>{
+    const isActive = i===combatState.activeCharIdx && combatState.turn==='player';
+    const row = document.createElement('div');
+    row.className = 'party-member-row'+(isActive?' active':'')+(ch.ko?' ko':'');
+    const pct = Math.max(0,ch.hp/ch.maxHp*100);
+    const hpClass = pct>50?'':pct>25?'low':'crit';
+    const hpFillClass = pct>50?'':pct>25?'low':'crit';
+    const actualHpClass = pct>50?'':pct>25?'low':'crit';
+    const icon = ch.ko?'😵':(ch.type==='monster'?MONSTER_FORMS[ch.form]?.icon||'🐺':TYPE_ICONS[ch.type]);
+    const statusStr = ch.statusEffects?.length ? ch.statusEffects.map(s=>s.name).join(', ') : (isActive?'► ACTIVE':'');
+    row.innerHTML = `
+      <div class="pm-icon">${icon}</div>
+      <div class="pm-info">
+        <div class="pm-name">${ch.name} ${ch.ko?'(KO)':''}</div>
+        <div class="pm-hp-bar"><div class="pm-hp-fill ${actualHpClass}" style="width:${pct}%"></div></div>
+        <div class="pm-hp-text">${ch.hp}/${ch.maxHp} HP</div>
+      </div>
+      <div class="pm-status">${statusStr}</div>`;
+    el.appendChild(row);
+  });
+}
+
+function renderActions(){
+  const al = document.getElementById('action-label');
+  const ar = document.getElementById('action-row');
+  ar.innerHTML = '';
+  const ch = combatState.party[combatState.activeCharIdx];
+
+  if(combatState.turn!=='player'||!ch||ch.ko){
+    al.textContent = 'ENEMY TURN...';
+    return;
+  }
+
+  if(combatState.phase==='target_enemy'||combatState.phase==='ability_target_enemy'){
+    al.textContent = 'SELECT TARGET';
+    const back = document.createElement('button');
+    back.className='action-btn';
+    back.textContent='← BACK';
+    back.onclick=()=>{ combatState.phase='select'; combatState.pendingAction=null; combatState.pendingAbility=null; renderCombat(); };
+    ar.appendChild(back);
+    return;
+  }
+  if(combatState.phase==='ability_target_ally'||combatState.phase==='target_ally'){
+    al.textContent = 'SELECT ALLY';
+    const back = document.createElement('button');
+    back.className='action-btn';
+    back.textContent='← BACK';
+    back.onclick=()=>{ combatState.phase='select'; combatState.pendingAction=null; combatState.pendingAbility=null; renderCombat(); };
+    ar.appendChild(back);
+    renderAllyTargets();
+    return;
+  }
+  if(combatState.phase==='item_select'){
+    al.textContent = 'USE ITEM';
+    renderItemPicker();
+    return;
+  }
+  if(combatState.phase==='ability_select'){
+    al.textContent = 'USE ABILITY';
+    renderAbilityPicker(ch);
+    return;
+  }
+
+  al.textContent = `${ch.name}'s TURN`;
+
+  // Attack / Ability
+  if(ch.type==='mutant' && ch.abilities){
+    const activeAbs = ch.abilities.filter(a=>a && ABILITIES.find(x=>x.id===a&&x.type==='active'));
+    if(activeAbs.length){
+      const ab = document.createElement('button');
+      ab.className='action-btn active';
+      ab.textContent='⚡ ABILITY';
+      ab.onclick=()=>{ combatState.phase='ability_select'; renderCombat(); };
+      ar.appendChild(ab);
+    } else {
+      addAttackBtn(ar,ch);
+    }
+    // Also show attack
+    addAttackBtn(ar,ch);
+  } else {
+    addAttackBtn(ar,ch);
+  }
+
+  // Item
+  const itemBtn = document.createElement('button');
+  itemBtn.className='action-btn';
+  itemBtn.textContent='🎒 ITEM';
+  const hasItems = G.inventory.some(i=>CONSUMABLES[i.id]&&i.qty>0);
+  if(!hasItems) itemBtn.disabled=true;
+  itemBtn.onclick=()=>{ combatState.phase='item_select'; renderCombat(); };
+  ar.appendChild(itemBtn);
+
+  // Flee
+  const fleeBtn = document.createElement('button');
+  fleeBtn.className='action-btn red';
+  fleeBtn.textContent='🏃 FLEE';
+  fleeBtn.onclick=()=>attemptFlee();
+  ar.appendChild(fleeBtn);
+}
+
+function addAttackBtn(ar, ch){
+  const w = ch.weapon ? WEAPONS[ch.weapon] : null;
+  const atkBtn = document.createElement('button');
+  atkBtn.className='action-btn';
+  const wname = ch.type==='monster'?MONSTER_FORMS[ch.form]?.natural||'Attack':(w?w.name:'Punch');
+  atkBtn.textContent=`⚔️ ${wname}`;
+  atkBtn.onclick=()=>{ combatState.phase='target_enemy'; combatState.pendingAction='attack'; renderCombat(); };
+  ar.appendChild(atkBtn);
+}
+
+function renderItemPicker(){
+  const ar = document.getElementById('action-row');
+  ar.innerHTML = '';
+  const back = document.createElement('button');
+  back.className='action-btn';
+  back.textContent='← BACK';
+  back.onclick=()=>{ combatState.phase='select'; renderCombat(); };
+  ar.appendChild(back);
+
+  const al = document.getElementById('action-label');
+  al.textContent = 'CHOOSE ITEM';
+
+  // item list below action row
+  let picker = document.getElementById('item-picker-inline');
+  if(!picker){
+    picker = document.createElement('div');
+    picker.id = 'item-picker-inline';
+    picker.className = 'item-picker';
+    document.getElementById('combat-actions').appendChild(picker);
+  }
+  picker.innerHTML='';
+
+  G.inventory.forEach(invItem=>{
+    const itemDef = CONSUMABLES[invItem.id];
+    if(!itemDef||invItem.qty<=0) return;
+    const btn = document.createElement('button');
+    btn.className='item-pick-btn';
+    btn.innerHTML=`<span>${itemDef.name} x${invItem.qty}</span><span style="color:var(--dim);font-size:0.62rem">${itemDef.desc}</span>`;
+    btn.onclick=()=>{
+      picker.remove();
+      useItemInCombat(invItem.id, itemDef);
+    };
+    picker.appendChild(btn);
+  });
+}
+
+function removeItemPickerInline(){
+  const p = document.getElementById('item-picker-inline');
+  if(p) p.remove();
+}
+
+function useItemInCombat(itemId, itemDef){
+  if(itemDef.effect==='heal'){
+    if(itemDef.target==='all'){
+      combatState.party.forEach(c=>{ if(!c.ko) c.hp=Math.min(c.maxHp,c.hp+itemDef.value); });
+      addLog(`${itemDef.name} heals the party!`,'good');
+    } else {
+      // need to pick ally
+      combatState.pendingAction='item';
+      combatState.pendingItem=itemId;
+      combatState.phase='target_ally';
+      renderCombat();
+      return;
+    }
+  } else if(itemDef.effect==='revive'){
+    combatState.pendingAction='item';
+    combatState.pendingItem=itemId;
+    combatState.phase='target_ally';
+    renderCombat();
+    return;
+  }
+  removeItem(itemId,1);
+  combatState.phase='select';
+  endPlayerAction();
+}
+
+function renderAllyTargets(){
+  let picker = document.getElementById('item-picker-inline');
+  if(!picker){
+    picker = document.createElement('div');
+    picker.id = 'item-picker-inline';
+    picker.className = 'item-picker';
+    document.getElementById('combat-actions').appendChild(picker);
+  }
+  picker.innerHTML='';
+  combatState.party.forEach((ch,i)=>{
+    const btn = document.createElement('button');
+    btn.className='item-pick-btn';
+    const isKo = ch.ko;
+    btn.innerHTML=`<span>${isKo?'😵':''} ${ch.name}</span><span style="color:var(--dim);font-size:0.62rem">${ch.hp}/${ch.maxHp} HP</span>`;
+    btn.onclick=()=>{
+      picker.remove();
+      applyAllyTarget(i);
+    };
+    picker.appendChild(btn);
+  });
+}
+
+function applyAllyTarget(idx){
+  const ch = combatState.party[idx];
+  if(combatState.pendingAction==='item'){
+    const itemId = combatState.pendingItem;
+    const itemDef = CONSUMABLES[itemId];
+    if(itemDef.effect==='heal'){
+      ch.hp = Math.min(ch.maxHp, ch.hp+(itemDef.value||30));
+      addLog(`${ch.name} healed for ${itemDef.value||30} HP!`,'good');
+    } else if(itemDef.effect==='revive'){
+      if(ch.ko){
+        ch.ko=false;
+        ch.hp=1;
+        addLog(`${ch.name} revived!`,'good');
+      }
+    }
+    removeItem(itemId,1);
+  } else if(combatState.phase==='ability_target_ally'){
+    applyAbilityToAlly(idx);
+    return;
+  }
+  combatState.phase='select';
+  endPlayerAction();
+}
+
+function renderAbilityPicker(ch){
+  const ar = document.getElementById('action-row');
+  ar.innerHTML='';
+  const back = document.createElement('button');
+  back.className='action-btn';
+  back.textContent='← BACK';
+  back.onclick=()=>{ combatState.phase='select'; renderCombat(); };
+  ar.appendChild(back);
+
+  let picker = document.getElementById('item-picker-inline');
+  if(!picker){
+    picker = document.createElement('div');
+    picker.id='item-picker-inline';
+    picker.className='item-picker';
+    document.getElementById('combat-actions').appendChild(picker);
+  }
+  picker.innerHTML='';
+  (ch.abilities||[]).forEach(aId=>{
+    if(!aId) return;
+    const ab = ABILITIES.find(x=>x.id===aId);
+    if(!ab||ab.type!=='active') return;
+    const btn = document.createElement('button');
+    btn.className='item-pick-btn';
+    btn.innerHTML=`<span>${ab.name}</span><span style="color:var(--dim);font-size:0.62rem">${ab.desc}</span>`;
+    btn.onclick=()=>{
+      picker.remove();
+      combatState.pendingAbility = ab;
+      if(ab.target==='all_enemies'){
+        applyAbilityAllEnemies(ab);
+      } else if(ab.target==='ally'){
+        combatState.phase='ability_target_ally';
+        renderCombat();
+      } else {
+        combatState.phase='ability_target_enemy';
+        renderCombat();
+      }
+    };
+    picker.appendChild(btn);
+  });
+}
+
+function selectEnemyTarget(idx){
+  const e = combatState.enemies[idx];
+  if(!e||e.dead) return;
+  if(combatState.phase==='target_enemy'){
+    doPlayerAttack(idx);
+  } else if(combatState.phase==='ability_target_enemy'){
+    applyAbilityToEnemy(idx);
+  }
+}
+
+function doPlayerAttack(enemyIdx){
+  const ch = combatState.party[combatState.activeCharIdx];
+  const e = combatState.enemies[enemyIdx];
+  const stat = getAttackerStat(ch);
+  // check eagle eye
+  const hitBonus = (ch.abilities&&ch.abilities.includes('eagle_eye'))?0.15:0;
+  const hitChance = calcHit(stat, e.def||0, hitBonus);
+  if(Math.random()<hitChance){
+    const dmg = calcDmg(ch);
+    e.hp = Math.max(0, e.hp-dmg);
+    addLog(`${ch.name} attacks ${e.name} for ${dmg} damage!`,'hit');
+    if(e.hp<=0){ e.dead=true; addLog(`${e.name} defeated!`,'good'); rollLoot(e); }
+  } else {
+    addLog(`${ch.name} attacks ${e.name}... MISS!`,'');
+  }
+  combatState.phase='select';
+  endPlayerAction();
+}
+
+function applyAbilityToEnemy(idx){
+  const ch = combatState.party[combatState.activeCharIdx];
+  const e = combatState.enemies[idx];
+  const ab = combatState.pendingAbility;
+  if(!ab||e.dead) return;
+  applyActiveAbility(ab, ch, e, null);
+  combatState.phase='select';
+  combatState.pendingAbility=null;
+  endPlayerAction();
+}
+
+function applyAbilityToAlly(idx){
+  const ch = combatState.party[combatState.activeCharIdx];
+  const target = combatState.party[idx];
+  const ab = combatState.pendingAbility;
+  if(!ab) return;
+  applyActiveAbility(ab, ch, null, target);
+  combatState.phase='select';
+  combatState.pendingAbility=null;
+  endPlayerAction();
+}
+
+function applyAbilityAllEnemies(ab){
+  const ch = combatState.party[combatState.activeCharIdx];
+  combatState.enemies.forEach(e=>{ if(!e.dead) applyActiveAbility(ab,ch,e,null); });
+  combatState.phase='select';
+  combatState.pendingAbility=null;
+  endPlayerAction();
+}
+
+function applyActiveAbility(ab, caster, enemy, ally){
+  const lv = caster.level||1;
+  switch(ab.id){
+    case 'fire_blast':
+      if(enemy){ const d=rand(8+lv,12+lv); enemy.hp=Math.max(0,enemy.hp-d); addLog(`${caster.name} blasts ${enemy.name} with fire for ${d}!`,'dmg'); if(enemy.hp<=0){enemy.dead=true;addLog(`${enemy.name} defeated!`,'good');rollLoot(enemy);}}
+      break;
+    case 'ice_shard':
+      if(enemy){ const d=rand(6+lv,10+lv); enemy.hp=Math.max(0,enemy.hp-d); enemy.statusEffects=enemy.statusEffects||[]; enemy.statusEffects.push({id:'slow',name:'Slowed',turns:1,hitMod:-0.1}); addLog(`${caster.name} shatters ${enemy.name} with ice for ${d}!`,'dmg'); if(enemy.hp<=0){enemy.dead=true;addLog(`${enemy.name} defeated!`,'good');rollLoot(enemy);}}
+      break;
+    case 'thunder':
+      if(enemy){ const d=rand(5+lv,9+lv); enemy.hp=Math.max(0,enemy.hp-d); addLog(`Thunder strikes ${enemy.name} for ${d}!`,'dmg'); if(enemy.hp<=0){enemy.dead=true;addLog(`${enemy.name} defeated!`,'good');rollLoot(enemy);}}
+      break;
+    case 'poison':
+      if(enemy){ enemy.statusEffects=enemy.statusEffects||[]; enemy.statusEffects.push({id:'poison',name:'Poisoned',turns:3,dmgPerTurn:3}); addLog(`${enemy.name} is poisoned!`,'info'); }
+      break;
+    case 'drain':
+      if(enemy){ const d=rand(6+lv,10+lv); enemy.hp=Math.max(0,enemy.hp-d); caster.hp=Math.min(caster.maxHp,caster.hp+d); addLog(`${caster.name} drains ${d} HP from ${enemy.name}!`,'good'); if(enemy.hp<=0){enemy.dead=true;addLog(`${enemy.name} defeated!`,'good');rollLoot(enemy);}}
+      break;
+    case 'heal':
+      if(ally){ const h=12+lv; ally.hp=Math.min(ally.maxHp,ally.hp+h); addLog(`${caster.name} mends ${ally.name} for ${h} HP!`,'good'); }
+      break;
+  }
+  renderCombat();
+}
+
+function rollLoot(enemy){
+  const g = rand(enemy.gold[0], enemy.gold[1]);
+  combatState.goldGained += g;
+  combatState.xpGained += enemy.xp||0;
+  (enemy.loot||[]).forEach(l=>{
+    if(chance(l.chance)){
+      combatState.loot.push(l.id);
+      addLog(`Found: ${ALL_ITEMS[l.id]?.name||l.id}!`,'loot');
+    }
+  });
+}
+
+function endPlayerAction(){
+  removeItemPickerInline();
+  renderCombat();
+  // check win
+  if(combatState.enemies.every(e=>e.dead)){
+    setTimeout(showCombatResults, 600);
+    return;
+  }
+  // next living char
+  const next = nextLivingChar(combatState.party, combatState.activeCharIdx);
+  if(next>=0){
+    combatState.activeCharIdx = next;
+    // apply regen
+    const ch = combatState.party[next];
+    if(ch.abilities && ch.abilities.includes('regen')){
+      ch.hp = Math.min(ch.maxHp, ch.hp+3);
+      addLog(`${ch.name} regenerates 3 HP.`,'good');
+    }
+    renderCombat();
+  } else {
+    // all player chars acted — enemy turn
+    setTimeout(doEnemyTurn, 500);
+  }
+}
+
+function doEnemyTurn(){
+  combatState.turn='enemy';
+  renderActions();
+  const livingEnemies = combatState.enemies.filter(e=>!e.dead);
+  livingEnemies.forEach(e=>{
+    // tick status effects on enemy
+    (e.statusEffects||[]).forEach(se=>{
+      if(se.id==='poison'){ e.hp=Math.max(0,e.hp-se.dmgPerTurn); addLog(`${e.name} takes ${se.dmgPerTurn} poison damage!`,'dmg'); if(e.hp<=0){e.dead=true;addLog(`${e.name} defeated!`,'good');rollLoot(e);} }
+      se.turns--;
+    });
+    e.statusEffects = (e.statusEffects||[]).filter(se=>se.turns>0);
+    if(e.dead) return;
+    // attack random living party member
+    const targets = combatState.party.filter(c=>!c.ko);
+    if(!targets.length) return;
+    const target = pick(targets);
+    const def = getCharDef(target);
+    const slowMod = (e.statusEffects||[]).find(s=>s.id==='slow')?.hitMod||0;
+    const hitChance = clamp(0.75+(e.atk-def)*0.02+slowMod, 0.15, 0.95);
+    if(Math.random()<hitChance){
+      let dmg = rand(Math.max(1,e.atk-2), e.atk+2) + Math.floor(e.atk/3);
+      // check counter
+      if(target.abilities&&target.abilities.includes('counter')&&chance(0.3)){
+        const counterDmg = calcDmg(target);
+        e.hp=Math.max(0,e.hp-counterDmg);
+        addLog(`${target.name} counters for ${counterDmg}!`,'good');
+        if(e.hp<=0){e.dead=true;addLog(`${e.name} defeated!`,'good');rollLoot(e);}
+      }
+      target.hp=Math.max(0,target.hp-dmg);
+      addLog(`${e.name} attacks ${target.name} for ${dmg}!`,'dmg');
+      if(target.hp<=0){ target.ko=true; target.hp=0; addLog(`${target.name} is knocked out!`,''); }
+    } else {
+      addLog(`${e.name} attacks ${target.name}... MISS!`,'');
+    }
+  });
+
+  // apply party regen at start of their new turn
+  combatState.party.forEach(ch=>{
+    if(!ch.ko&&ch.abilities&&ch.abilities.includes('regen')){
+      ch.hp=Math.min(ch.maxHp,ch.hp+3);
+    }
+  });
+
+  renderCombat();
+
+  // check if all party KO
+  if(combatState.party.every(c=>c.ko)){
+    setTimeout(partyWipe, 600);
+    return;
+  }
+
+  // start new player round
+  combatState.turn='player';
+  combatState.roundNum++;
+  combatState.activeCharIdx = firstLiving(combatState.party);
+  combatState.phase='select';
+  renderCombat();
+}
+
+function attemptFlee(){
+  const fleeChance = 0.5 + (G.party.some(c=>c.abilities&&c.abilities.includes('camouflage'))?0.2:0);
+  if(chance(fleeChance)){
+    addLog('Your party fled successfully!','info');
+    setTimeout(()=>{
+      combatState=null;
+      showScreen('s-adventure');
+      renderAdventureFlow();
+    },800);
+  } else {
+    addLog('Failed to flee! Enemies get a free attack!','dmg');
+    combatState.phase='select';
+    combatState.turn='enemy';
+    renderActions();
+    setTimeout(doEnemyTurn,500);
+  }
+}
+
+function partyWipe(){
+  // restore everyone to 1 HP
+  G.party.forEach(c=>{ c.hp=Math.max(1,Math.floor(c.maxHp*0.3)); c.ko=false; c.statusEffects=[]; });
+  showModal('Party Defeated','Your party retreats to the inn. Everyone recovers enough to continue.',[
+    {label:'Continue', action:()=>{
+      combatState=null;
+      showScreen('s-adventure');
+      renderAdventureFlow();
+    }}
+  ]);
+}
+
+function showCombatResults(){
+  // apply XP, gold, loot to main party
+  const xp = combatState.xpGained;
+  const gold = combatState.goldGained;
+  G.gold += gold;
+  combatState.loot.forEach(id=>{
+    if(CONSUMABLES[id]||ARMORS[id]||WEAPONS[id]) addItem(id,1);
+  });
+
+  // copy HP changes back to main party
+  combatState.party.forEach((cc,i)=>{ G.party[i].hp=cc.hp; G.party[i].ko=cc.ko; G.party[i].statusEffects=[]; });
+
+  const levelUps = [];
+  G.party.forEach(c=>{
+    if(c.ko){ c.hp=1; c.ko=false; }
+    c.xp = (c.xp||0)+xp;
+    while(c.xp >= xpThreshold(c.level)){
+      c.xp -= xpThreshold(c.level);
+      c.level++;
+      applyLevelUp(c);
+      levelUps.push({name:c.name, level:c.level});
+    }
+  });
+
+  // build results screen
+  const title = document.getElementById('results-title');
+  title.textContent = 'VICTORY!';
+  const content = document.getElementById('results-content');
+  content.innerHTML = '';
+  addResult(content,`XP Gained: ${xp}`, 'xp');
+  addResult(content,`Gold Gained: ${gold}`, 'good');
+  if(combatState.loot.length){
+    combatState.loot.forEach(id=>addResult(content,`Loot: ${ALL_ITEMS[id]?.name||id}`,'loot'));
+  }
+  levelUps.forEach(lu=>addResult(content,`★ ${lu.name} reached Lv.${lu.level}!`,'good'));
+
+  showScreen('s-results');
+
+  // show level up banners
+  levelUps.forEach((lu,i)=>{
+    setTimeout(()=>showLevelUp(lu.name, lu.level), i*2100);
+  });
+
+  // check mutation after fight
+  setTimeout(()=>{
+    checkMutationOffer(()=>{});
+  }, levelUps.length*2100+500);
+}
+
+function addResult(cont, text, cls=''){
+  const d = document.createElement('div');
+  d.className='result-line '+cls;
+  d.textContent=text;
+  cont.appendChild(d);
+}
+
+function endCombat(){
+  const node = currentNodeForCombat;
+  combatState=null;
+  if(node) advanceFromNode(node.id);
+  else { showScreen('s-adventure'); renderAdventureFlow(); }
+}
+
+function xpThreshold(level){ return level*20; }
+
+function applyLevelUp(c){
+  const t = CHAR_TYPES[c.type];
+  if(c.type==='monster'){
+    c.maxHp = (MONSTER_FORMS[c.form]?.hp||28) + c.level*4;
+    c.hp = c.maxHp; // heal on level up
+    return;
+  }
+  c.maxHp += t.hpPerLv;
+  c.hp = Math.min(c.hp+t.hpPerLv, c.maxHp);
+  c.str = (c.str||0) + t.strPerLv;
+  c.dex = (c.dex||0) + t.dexPerLv;
+  c.def += t.defPerLv;
+  // round non-integer stats
+  c.str = Math.round(c.str*10)/10;
+  c.dex = Math.round(c.dex*10)/10;
+  c.def = Math.round(c.def*10)/10;
+}
+
+// ═══════════════════════════════════════════════════
+// MUTATION SYSTEM
+// ═══════════════════════════════════════════════════
+
+function checkMutationOffer(cb){
+  const mutants = G.party.filter(c=>c.type==='mutant');
+  if(!mutants.length){ cb(); return; }
+  const mutant = mutants[0];
+  if(!chance(0.2)){ cb(); return; }
+  const newAb = pick(ABILITIES);
+  offerMutation(mutant, newAb, cb);
+}
+
+function offerMutation(ch, ab, cb){
+  pendingMutation = ab;
+  pendingMutationChar = ch;
+
+  const slotLabels = (ch.abilities||[]).map((id,i)=>{
+    const existing = id ? ABILITIES.find(x=>x.id===id) : null;
+    return `Slot ${i+1}: ${existing?existing.name:'(Empty)'}`;
+  });
+
+  const buttons = (ch.abilities||[]).map((id,i)=>({
+    label: `Replace ${slotLabels[i]}`,
+    action: ()=>{
+      ch.abilities[i] = ab.id;
+      addLog && addLog(`${ch.name} learned ${ab.name}!`,'good');
+      cb();
+    }
+  }));
+  buttons.push({label:'Decline', action:cb});
+
+  showModal(`New Mutation: ${ab.name}`, `${ab.desc}\n\nChoose a slot to replace:`, buttons);
+}
+
+// ═══════════════════════════════════════════════════
+// RP ENGINE
+// ═══════════════════════════════════════════════════
+
+function startRP(node){
+  const script = getScript(node.script);
+  if(!script){ advanceFromNode(node.id); return; }
+  rpState = {
+    node,
+    script,
+    currentNode: script.start,
+  };
+  showScreen('s-rp');
+  renderRP();
+}
+
+function renderRP(){
+  const {script, currentNode} = rpState;
+  const snode = script.nodes[currentNode];
+  if(!snode) return;
+
+  document.getElementById('rp-portrait').textContent = snode.portrait||'';
+  const spEl = document.getElementById('rp-speaker');
+  if(snode.speaker){ spEl.textContent=snode.speaker.toUpperCase(); spEl.style.display='block'; }
+  else { spEl.style.display='none'; }
+  document.getElementById('rp-text').textContent = snode.text||'';
+
+  // apply effects
+  if(snode.effect) applyRPEffect(snode.effect);
+
+  const choicesEl = document.getElementById('rp-choices');
+  choicesEl.innerHTML='';
+  (snode.choices||[]).forEach(ch=>{
+    const btn = document.createElement('button');
+    btn.className='rp-choice-btn';
+    btn.textContent=ch.text;
+    btn.onclick=()=>handleRPChoice(ch);
+    choicesEl.appendChild(btn);
+  });
+}
+
+function applyRPEffect(effect){
+  if(effect.addItem) addItem(effect.addItem,1);
+  if(effect.xpAll){
+    G.party.forEach(c=>{
+      c.xp=(c.xp||0)+effect.xpAll;
+      while(c.xp>=xpThreshold(c.level)){
+        c.xp-=xpThreshold(c.level);
+        c.level++;
+        applyLevelUp(c);
+        showLevelUp(c.name,c.level);
+      }
+    });
+  }
+  if(effect.restParty){
+    if(effect.cost && G.gold>=effect.cost){
+      G.gold-=effect.cost;
+      G.party.forEach(c=>{ c.hp=c.maxHp; c.ko=false; c.statusEffects=[]; });
+    } else if(effect.cost && G.gold<effect.cost){
+      // can't afford — skip rest
+    } else {
+      G.party.forEach(c=>{ c.hp=c.maxHp; });
+    }
+  }
+  if(effect.cost && !effect.restParty && !effect.addItem){
+    G.gold=Math.max(0,G.gold-effect.cost);
+  }
+}
+
+function handleRPChoice(choice){
+  if(choice.cost && G.gold<choice.cost){
+    showModal("Can't afford","Not enough gold!",[{label:'OK',action:()=>{
+      // go back to rp without advancing
+      renderRP._skipEffect=true;
+      rpState.currentNode=rpState.script.start;
+      renderRP();
+    }}]);
+    return;
+  }
+  if(choice.next===null||choice.next===undefined){
+    // end of script
+    const node = rpState.node;
+    rpState=null;
+    advanceFromNode(node.id);
+    return;
+  }
+  rpState.currentNode=choice.next;
+  renderRP();
+}
+
+// ═══════════════════════════════════════════════════
+// INVENTORY
+// ═══════════════════════════════════════════════════
+
+function addItem(id, qty){
+  const existing = G.inventory.find(i=>i.id===id);
+  if(existing) existing.qty+=qty;
+  else G.inventory.push({id,qty});
+}
+
+function removeItem(id, qty){
+  const existing = G.inventory.find(i=>i.id===id);
+  if(existing){ existing.qty=Math.max(0,existing.qty-qty); if(existing.qty<=0) G.inventory=G.inventory.filter(i=>i.id!==id||i.qty>0); }
+}
+
+// ═══════════════════════════════════════════════════
+// PARTY STATUS
+// ═══════════════════════════════════════════════════
+
+function showPartyStatus(){
+  const scroll = document.getElementById('party-scroll');
+  scroll.innerHTML='';
+  document.getElementById('party-gold').textContent=`💰 ${G.gold}`;
+  G.party.forEach(ch=>scroll.appendChild(buildCharCard(ch)));
+  showScreen('s-party');
+}
+
+function buildCharCard(ch){
+  const card = document.createElement('div');
+  card.className='char-card';
+
+  const icon = ch.type==='monster'?MONSTER_FORMS[ch.form]?.icon||'🐺':TYPE_ICONS[ch.type];
+  const typeName = ch.type==='monster'?MONSTER_FORMS[ch.form]?.name||'Monster':CHAR_TYPES[ch.type]?.name||ch.type;
+  const xpPct = Math.round((ch.xp||0)/xpThreshold(ch.level)*100);
+  const hpPct = Math.round(ch.hp/ch.maxHp*100);
+
+  let statsHTML='';
+  if(ch.type!=='monster'){
+    statsHTML=`<div class="stat-row">
+      <div class="stat-item">STR: <span>${Math.floor(ch.str||0)}</span></div>
+      <div class="stat-item">DEX: <span>${Math.floor(ch.dex||0)}</span></div>
+      <div class="stat-item">DEF: <span>${Math.floor(ch.def||0)}</span></div>
+      <div class="stat-item">HP: <span>${ch.hp}/${ch.maxHp}</span></div>
+    </div>`;
+  } else {
+    const fd=MONSTER_FORMS[ch.form];
+    statsHTML=`<div class="stat-row">
+      <div class="stat-item">ATK: <span>${fd.atk}</span></div>
+      <div class="stat-item">DEF: <span>${fd.def}</span></div>
+      <div class="stat-item">HP: <span>${ch.hp}/${ch.maxHp}</span></div>
+      <div class="stat-item">Form: <span>${fd.name}</span></div>
+    </div>`;
+  }
+
+  let equipHTML='';
+  if(ch.type!=='monster'&&ch.type!=='robot'){
+    const w=ch.weapon?WEAPONS[ch.weapon]:null;
+    const a=ch.armor?ARMORS[ch.armor]:null;
+    equipHTML=`<div class="equip-section">
+      <div class="equip-label">EQUIPMENT</div>
+      <div class="equip-name">${w?'⚔️ '+w.name:'No weapon'}</div>
+      <div class="equip-name">${a?'🛡️ '+a.name:'No armor'}</div>
+    </div>`;
+  } else if(ch.type==='robot'){
+    const w=ch.weapon?WEAPONS[ch.weapon]:null;
+    equipHTML=`<div class="equip-section">
+      <div class="equip-label">EQUIPMENT</div>
+      <div class="equip-name">${w?'⚔️ '+w.name:'No weapon'}</div>
+      <div style="font-size:0.62rem;color:var(--dim);margin-top:4px">Parts slots: coming soon</div>
+    </div>`;
+  }
+
+  let abilitiesHTML='';
+  if(ch.type==='mutant'&&ch.abilities){
+    abilitiesHTML=`<div class="equip-section">
+      <div class="equip-label">ABILITIES</div>
+      <div class="ability-slots">${(ch.abilities).map((id,i)=>{
+        const ab=id?ABILITIES.find(x=>x.id===id):null;
+        return `<div class="ability-slot ${ab?'filled':'empty'}">${ab?`${ab.name}<br><span style="font-size:0.55rem;color:var(--dim)">${ab.type}</span>`:`Slot ${i+1}: Empty`}</div>`;
+      }).join('')}</div>
+    </div>`;
+  }
+
+  let monsterHTML='';
+  if(ch.type==='monster'){
+    const tree=MONSTER_TREE[ch.form]||[];
+    const hints=tree.map(t=>{
+      const hasItem=G.inventory.find(i=>i.id===t.meat&&i.qty>0);
+      const fd=MONSTER_FORMS[t.form];
+      return `${hasItem?'✓':'○'} ${ALL_ITEMS[t.meat]?.name||t.meat} → ${fd.name}`;
+    }).join('\n');
+    monsterHTML=`<div class="equip-section">
+      <div class="equip-label">TRANSFORMATIONS</div>
+      <div class="monster-form">Current: ${MONSTER_FORMS[ch.form]?.name}</div>
+      ${hints?`<div class="transform-hint" style="white-space:pre-line">${hints}</div>`:'<div class="transform-hint">No further transformations from current form.</div>'}
+    </div>`;
+  }
+
+  card.innerHTML=`
+    <div class="char-card-header">
+      <div class="char-type-icon">${icon}</div>
+      <div class="char-name-area">
+        <div class="char-name">${ch.name}</div>
+        <div class="char-meta">${ch.gender?.toUpperCase()||''} ${typeName.toUpperCase()}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="char-level">Lv.${ch.level}</div>
+        <div style="font-size:0.6rem;color:var(--dim)">XP: ${ch.xp||0}/${xpThreshold(ch.level)}</div>
+        <div class="xp-bar" style="width:60px"><div class="xp-fill" style="width:${xpPct}%"></div></div>
+      </div>
+    </div>
+    <div class="pm-hp-bar"><div class="pm-hp-fill" style="width:${hpPct}%"></div></div>
+    <div style="font-size:0.62rem;color:var(--dim);margin-bottom:6px">${ch.hp}/${ch.maxHp} HP</div>
+    ${statsHTML}${equipHTML}${abilitiesHTML}${monsterHTML}
+  `;
+  return card;
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+
+showScreen('s-main');
+</script>
+</body>
+</html>
