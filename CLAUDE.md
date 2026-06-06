@@ -22,3 +22,18 @@ It is fine to push directly to the `main` branch for this repository. No pull re
 - Color palette via `:root` CSS vars; dark background (`#06060e`), neon accents
 - Canvas 2D for all game rendering; `requestAnimationFrame` game loop
 - No external JS libraries
+
+## Game-specific context files
+
+Each game with significant design complexity has a dedicated context file in `.claude/`:
+
+| Game | Context file | When to use |
+|---|---|---|
+| Adventure (`games/adventure.html`) | `.claude/adventure.md` | Any work on the adventure RPG — character systems, combat, RP encounters, save system, progression |
+| Sorcery (`games/sorcery.html`) | `.claude/sorcery.md` | Any work on the sorcery tower-defense game |
+
+**Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
+
+## Shared game conventions
+
+See `games/CLAUDE.md` for the full shared conventions table (fonts, palette, input, etc.).
