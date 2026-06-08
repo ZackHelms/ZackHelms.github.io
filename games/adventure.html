@@ -52,10 +52,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 
 /* ── CHAR CREATE ── */
 #s-create{padding:20px;gap:16px;overflow-y:auto;}
-.progress-bar{display:flex;gap:6px;width:100%;max-width:480px;}
-.prog-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);background:var(--panel);}
-.prog-dot.done{background:var(--green);border-color:var(--green);}
-.prog-dot.active{border-color:var(--gold);box-shadow:0 0 8px var(--gold);}
+.progress-bar{display:flex;gap:8px;padding:0 0 4px;}
+.prog-slot{width:52px;height:52px;border:2px solid var(--gold);border-radius:6px;background:var(--panel);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0;overflow:hidden;}
+.prog-slot.active{border-color:var(--gold);box-shadow:0 0 10px var(--gold);animation:pulse-gold 1.5s infinite;}
+.prog-slot.filled{border-color:var(--dim);}
+.prog-slot.filled:hover{border-color:var(--blue);box-shadow:0 0 8px #4488ff55;}
+.prog-slot img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated;display:block;}
+@keyframes pulse-gold{0%,100%{box-shadow:0 0 8px var(--gold);}50%{box-shadow:0 0 18px var(--gold),0 0 30px #ffc30044;}}
 .create-section{width:100%;max-width:480px;}
 .create-label{font-size:0.65rem;color:var(--dim);letter-spacing:3px;margin-bottom:10px;text-transform:uppercase;}
 .type-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
@@ -354,6 +357,8 @@ const CHAR_ICONS = {
   },
 };
 
+CHAR_ICONS.monster = CHAR_ICONS.dog; // animal icons for monster type
+
 const CHAR_TYPES = {
   human: {
     name:'Human', icon:'⚔️',
@@ -606,7 +611,7 @@ function buildChar(type, gender, name){
 }
 
 function startNewGame(){
-  createState = {charIndex:0, chars:[], current:{type:null,gender:null,name:''}};
+  createState = {charIndex:0, chars:[null,null,null,null], current:{type:null,gender:null,name:''}};
   renderCreateScreen();
   showScreen('s-create');
 }
@@ -617,11 +622,26 @@ function renderCreateScreen(){
   const pb = document.getElementById('prog-bar');
   pb.innerHTML = '';
   for(let i=0;i<4;i++){
-    const d = document.createElement('div');
-    d.className = 'prog-dot'+(i<charIndex?' done':i===charIndex?' active':'');
-    pb.appendChild(d);
+    const ch = createState.chars[i];
+    const slot = document.createElement('div');
+    if(ch){
+      slot.className = 'prog-slot filled'+(i===charIndex?' active':'');
+      const iconKey = ch.type==='monster'?'dog':ch.type;
+      const imgSrc = CHAR_ICONS[iconKey]?.[ch.gender]||'';
+      if(imgSrc) slot.innerHTML = `<img src="${imgSrc}" alt="${ch.name}">`;
+      slot.title = `${ch.name} (tap to edit)`;
+      slot.onclick = ()=>editChar(i);
+    } else {
+      slot.className = 'prog-slot'+(i===charIndex?' active':'');
+      slot.title = `Character slot ${i+1}`;
+      slot.onclick = ()=>jumpToSlot(i);
+    }
+    pb.appendChild(slot);
   }
-  document.getElementById('create-step-label').textContent = `CHARACTER ${charIndex+1} OF 4`;
+  const allFilled = createState.chars.every(c=>c!==null);
+  document.getElementById('create-step-label').textContent = allFilled?'PARTY READY — CONFIRM TO BEGIN':`CHARACTER ${charIndex+1} OF 4`;
+  const confirmBtn = document.getElementById('create-confirm-btn');
+  if(confirmBtn) confirmBtn.textContent = allFilled?'BEGIN ADVENTURE':'CONFIRM';
 
   const cont = document.getElementById('create-content');
   cont.innerHTML = '';
@@ -635,7 +655,15 @@ function renderCreateScreen(){
     const card = document.createElement('div');
     card.className = 'type-card'+(current.type===key?' selected':'');
     card.innerHTML = `<div class="type-icon">${t.icon}</div><div class="type-name">${t.name.toUpperCase()}</div><div class="type-desc">${t.desc}</div>`;
-    card.onclick = ()=>{ createState.current.type=key; renderCreateScreen(); };
+    card.onclick = ()=>{
+      const prev = createState.current.type;
+      createState.current.type = key;
+      if(prev !== key && createState.current.gender){
+        const list = RANDOM_NAMES[key]?.[createState.current.gender]||[];
+        if(list.length) createState.current.name = pick(list);
+      }
+      renderCreateScreen();
+    };
     cards.appendChild(card);
   });
   typeSection.appendChild(cards);
@@ -684,6 +712,21 @@ function randomizeName(){
   renderCreateScreen();
 }
 
+function editChar(i){
+  const ch = createState.chars[i];
+  if(!ch) return;
+  createState.charIndex = i;
+  createState.current = {type:ch.type, gender:ch.gender, name:ch.name};
+  renderCreateScreen();
+}
+
+function jumpToSlot(i){
+  if(createState.chars[i]!==null) return; // filled — use editChar
+  createState.charIndex = i;
+  createState.current = {type:null, gender:null, name:''};
+  renderCreateScreen();
+}
+
 function confirmCreateStep(){
   const {current} = createState;
   if(!current.type){ showModal('Missing Info','Please choose a type.',[{label:'OK'}]); return; }
@@ -691,14 +734,15 @@ function confirmCreateStep(){
   const name = (document.getElementById('name-input')?.value||'').trim();
   if(!name){ showModal('Missing Info','Please enter a name.',[{label:'OK'}]); return; }
   current.name = name;
-  createState.chars.push(buildChar(current.type, current.gender, current.name));
-  createState.charIndex++;
-  if(createState.charIndex >= 4){
+  createState.chars[createState.charIndex] = buildChar(current.type, current.gender, current.name);
+  if(createState.chars.every(c=>c!==null)){
     beginAdventure(createState.chars);
-  } else {
-    createState.current = {type:null, gender:null, name:''};
-    renderCreateScreen();
+    return;
   }
+  const nextEmpty = createState.chars.findIndex((c,i)=>c===null);
+  createState.charIndex = nextEmpty;
+  createState.current = {type:null, gender:null, name:''};
+  renderCreateScreen();
 }
 
 // ═══════════════════════════════════════════════════
