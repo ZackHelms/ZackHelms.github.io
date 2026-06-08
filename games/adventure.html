@@ -114,17 +114,18 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 .combat-enemies{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:12px;background:linear-gradient(180deg,#08081a 0%,var(--bg) 100%);border-bottom:2px solid var(--border);}
 .combat-divider{font-size:0.6rem;color:var(--dim);letter-spacing:4px;padding:4px 0;background:var(--bg);width:100%;text-align:center;flex-shrink:0;}
 .combat-party{flex:1;display:flex;flex-direction:column;padding:8px 12px;gap:6px;overflow-y:auto;}
-.combat-actions{padding:8px 12px;border-top:1px solid var(--border);background:var(--panel);flex-shrink:0;}
-.action-row{display:flex;gap:6px;flex-wrap:wrap;}
-.action-btn{flex:1;min-width:80px;padding:10px 8px;background:var(--panel);border:1px solid var(--border);color:var(--white);cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:0.72rem;border-radius:4px;transition:all 0.2s;text-align:center;}
-.action-btn:hover:not(:disabled){border-color:var(--green);color:var(--green);}
-.action-btn:disabled{opacity:0.3;cursor:not-allowed;}
-.action-btn.active{border-color:var(--gold);color:var(--gold);}
-.action-label{font-size:0.6rem;color:var(--dim);letter-spacing:2px;margin-bottom:4px;text-transform:uppercase;}
+.pm-actions{display:flex;flex-direction:column;gap:3px;flex-shrink:0;align-self:stretch;justify-content:center;}
+.pm-action-btn{padding:5px 8px;background:var(--bg);border:1px solid var(--border);color:var(--dim);cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:0.6rem;border-radius:3px;transition:all 0.15s;min-width:88px;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;}
+.pm-action-btn:hover:not(:disabled){border-color:var(--green);color:var(--green);}
+.pm-action-btn:disabled{opacity:0.3;cursor:not-allowed;}
+.pm-action-btn.default{border-color:var(--gold);color:var(--gold);}
+.pm-action-btn.selected{border-color:var(--gold);color:var(--gold);background:#1a1200;box-shadow:0 0 6px #ffc30044;}
+.party-member-row.ally-targeted{border-color:var(--gold);box-shadow:0 0 10px #ffc30022;}
 .enemy-card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:10px 14px;width:100%;max-width:380px;display:flex;align-items:center;gap:10px;transition:all 0.2s;cursor:pointer;}
-.enemy-card.targetable:hover{border-color:var(--red);}
-.enemy-card.selected-target{border-color:var(--red);box-shadow:0 0 12px #ff224433;}
+.enemy-card.selected-target{border-color:var(--gold);box-shadow:0 0 12px #ffc30044;}
 .enemy-card.dead{opacity:0.3;cursor:default;}
+@keyframes invalid-flash{0%{border-color:var(--border);}40%{border-color:var(--red);box-shadow:0 0 8px #ff224455;}100%{border-color:var(--border);}}
+.enemy-card.invalid-flash{animation:invalid-flash 0.35s ease-out;}
 .enemy-icon{font-size:1.5rem;flex-shrink:0;}
 .enemy-name{font-size:0.8rem;color:var(--white);flex:1;}
 .enemy-hp-bar{height:6px;background:#1a0a0a;border-radius:3px;margin-top:4px;overflow:hidden;}
@@ -278,10 +279,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
   <div class="combat-divider">── VS ──</div>
   <div class="combat-party" id="combat-party"></div>
   <div class="combat-log" id="combat-log"></div>
-  <div class="combat-actions" id="combat-actions">
-    <div class="action-label" id="action-label">YOUR TURN</div>
-    <div class="action-row" id="action-row"></div>
-  </div>
 </div>
 
 <div id="s-rp" class="screen">
@@ -1031,7 +1028,7 @@ function renderAdventureFlow(){
   document.getElementById('adv-party-name').textContent = `${leader.name} & Party`;
   document.getElementById('adv-gold').textContent = `💰 ${G.gold}`;
 
-  const maxNode = Math.max(G.currentNodeId+2, ...G.completedNodes, 0);
+  const maxNode = Math.max(G.currentNodeId, ...G.completedNodes, 0);
   for(let i=0;i<=maxNode;i++){
     const node = getNode(i);
     if(!node || node.type==='_generate') break;
@@ -1234,7 +1231,10 @@ function calcHit(attackerStat, defDEF, bonuses=0){
 function calcDmg(ch){
   const d = getWeaponDmg(ch);
   const stat = getAttackerStat(ch);
-  return rand(d.min, d.max) + Math.floor(stat/3);
+  let dmg = rand(d.min, d.max) + Math.floor(stat/3);
+  const oc = (ch.statusEffects||[]).find(s=>s.id==='overclock');
+  if(oc){ dmg = Math.round(dmg*oc.dmgMult); ch.statusEffects=ch.statusEffects.filter(s=>s!==oc); }
+  return dmg;
 }
 
 function getCharDef(ch){
@@ -1265,9 +1265,12 @@ function startCombat(node){
     loot:[],
     xpGained:0,
     goldGained:0,
-    phase:'select', // select, target_enemy, target_ally, ability_select, item_select
+    phase:'select',
+    pendingSlot: null,
     pendingAction: null,
     pendingAbility: null,
+    selectedEnemyIdx: null,
+    selectedAllyIdx: null,
     roundNum: 1,
   };
   // find first living char
@@ -1300,18 +1303,199 @@ function renderCombatLog(){
 function renderCombat(){
   renderEnemies();
   renderCombatParty();
-  renderActions();
+}
+
+
+// ── COMBAT ACTION HELPERS ──────────────────────────────────────────
+
+function getWeaponTargetType(ch){
+  if(ch.type==='monster') return 'enemy_front';
+  const w = ch.weapon?WEAPONS[ch.weapon]:null;
+  return (w&&w.type==='ranged')?'enemy_any':'enemy_front';
+}
+
+function getFirstActiveAbility(ch){
+  if(!ch.abilities) return null;
+  for(const id of ch.abilities){
+    if(!id) continue;
+    const ab = ABILITIES.find(a=>a.id===id&&a.type==='active');
+    if(ab) return ab;
+  }
+  return null;
+}
+
+function getAbilityTargetType(ab){
+  if(!ab) return 'enemy_any';
+  if(ab.id==='thunder') return 'enemy_all';
+  if(ab.id==='heal') return 'ally';
+  return 'enemy_any';
+}
+
+function getCharActionSlots(ch){
+  const w = ch.weapon?WEAPONS[ch.weapon]:null;
+  const atkName = ch.type==='monster'?(MONSTER_FORMS[ch.form]?.natural||'Bite'):(w?w.name:'Punch');
+  const slot0 = {label:`⚔️ ${atkName}`, id:'attack', targetType:getWeaponTargetType(ch)};
+  let slot1;
+  switch(ch.type){
+    case 'human':{
+      const hasPot = G.inventory.some(i=>(i.id==='potion'||i.id==='hi_potion')&&i.qty>0);
+      slot1 = {label:'💊 Potion', id:'heal_ally', targetType:'ally', disabled:!hasPot};
+      break;
+    }
+    case 'mutant':{
+      const ab = getFirstActiveAbility(ch);
+      slot1 = ab?{label:`⚡ ${ab.name}`, id:'ability', abilityId:ab.id, targetType:getAbilityTargetType(ab)}:{label:'⚡ No Ability', id:'no_ability', disabled:true};
+      break;
+    }
+    case 'monster':
+      slot1 = {label:'😤 Growl', id:'growl', targetType:'enemy_front'};
+      break;
+    case 'robot':
+      slot1 = {label:'⚙️ Overclock', id:'overclock', targetType:'self'};
+      break;
+    default:
+      slot1 = {label:'—', id:'none', disabled:true};
+  }
+  return [slot0, slot1, {label:'🏃 Flee', id:'flee', targetType:'all_allies'}];
+}
+
+function setDefaultTarget(targetType){
+  if(targetType==='enemy_front'||targetType==='enemy_any'){
+    const fi = combatState.enemies.findIndex(e=>!e.dead);
+    combatState.selectedEnemyIdx = fi>=0?fi:null;
+    combatState.selectedAllyIdx = null;
+  } else if(targetType==='enemy_all'){
+    combatState.selectedEnemyIdx = -1;
+    combatState.selectedAllyIdx = null;
+  } else if(targetType==='ally'){
+    combatState.selectedEnemyIdx = null;
+    combatState.selectedAllyIdx = combatState.activeCharIdx;
+  } else if(targetType==='self'){
+    combatState.selectedEnemyIdx = null;
+    combatState.selectedAllyIdx = combatState.activeCharIdx;
+  } else if(targetType==='all_allies'){
+    combatState.selectedEnemyIdx = null;
+    combatState.selectedAllyIdx = -1;
+  }
+}
+
+function tapActionSlot(si){
+  const ch = combatState.party[combatState.activeCharIdx];
+  const slot = getCharActionSlots(ch)[si];
+  if(!slot||slot.disabled) return;
+  if(combatState.phase==='pending'&&combatState.pendingSlot===si){
+    executeSlot(si);
+  } else {
+    combatState.phase='pending';
+    combatState.pendingSlot=si;
+    combatState.pendingAbility = slot.abilityId?ABILITIES.find(a=>a.id===slot.abilityId):null;
+    setDefaultTarget(slot.targetType);
+    renderCombat();
+  }
+}
+
+function executeSlot(si){
+  const ch = combatState.party[combatState.activeCharIdx];
+  const slot = getCharActionSlots(ch)[si];
+  if(!slot) return;
+  ch.lastCombatSlot = si;
+  combatState.phase='select';
+  combatState.pendingSlot = null;
+  const ei = combatState.selectedEnemyIdx;
+  const ai = combatState.selectedAllyIdx;
+  combatState.selectedEnemyIdx = null;
+  combatState.selectedAllyIdx = null;
+  switch(slot.id){
+    case 'attack':
+      if(ei!=null&&ei>=0) doPlayerAttack(ei); else endPlayerAction(); break;
+    case 'ability':
+      if(ei===-1) applyAbilityAllEnemies(combatState.pendingAbility);
+      else if(ai!=null&&ai>=0) applyAbilityToAlly(ai);
+      else if(ei!=null&&ei>=0) applyAbilityToEnemy(ei);
+      else endPlayerAction();
+      break;
+    case 'heal_ally': useHealOnAlly(ai!=null&&ai>=0?ai:combatState.activeCharIdx); break;
+    case 'growl': doGrowl(ei!=null&&ei>=0?ei:combatState.enemies.findIndex(e=>!e.dead)); break;
+    case 'overclock': doOverclock(); break;
+    case 'flee': attemptFlee(); break;
+    default: endPlayerAction();
+  }
+  combatState.pendingAbility = null;
+}
+
+function handleEnemyCardClick(idx){
+  if(combatState.phase!=='pending'||combatState.pendingSlot===null) return;
+  const e = combatState.enemies[idx];
+  if(!e||e.dead) return;
+  const ch = combatState.party[combatState.activeCharIdx];
+  const slot = getCharActionSlots(ch)[combatState.pendingSlot];
+  if(!slot) return;
+  const tt = slot.targetType;
+  if(tt==='enemy_front'){
+    const front = combatState.enemies.findIndex(e=>!e.dead);
+    if(idx===front){ combatState.selectedEnemyIdx=idx; renderCombat(); } else flashInvalidTarget(idx);
+  } else if(tt==='enemy_any'){
+    combatState.selectedEnemyIdx=idx; renderCombat();
+  } else { flashInvalidTarget(idx); }
+}
+
+function handleAllyClick(idx){
+  if(combatState.phase!=='pending') return;
+  const ch = combatState.party[combatState.activeCharIdx];
+  const slot = getCharActionSlots(ch)[combatState.pendingSlot];
+  if(!slot||slot.targetType!=='ally') return;
+  combatState.selectedAllyIdx=idx;
+  renderCombat();
+}
+
+function flashInvalidTarget(idx){
+  const cards = document.querySelectorAll('.enemy-card');
+  const card = cards[idx];
+  if(card){ card.classList.add('invalid-flash'); setTimeout(()=>card.classList.remove('invalid-flash'),380); }
+}
+
+function doGrowl(enemyIdx){
+  const ch = combatState.party[combatState.activeCharIdx];
+  const e = combatState.enemies[enemyIdx];
+  if(!e||e.dead){ endPlayerAction(); return; }
+  e.statusEffects = e.statusEffects||[];
+  e.statusEffects.push({id:'growl',name:'Weakened',turns:2,atkMod:-2});
+  addLog(`${ch.name} growls fiercely! ${e.name}'s attack weakened!`,'info');
+  endPlayerAction();
+}
+
+function doOverclock(){
+  const ch = combatState.party[combatState.activeCharIdx];
+  ch.statusEffects = ch.statusEffects||[];
+  ch.statusEffects.push({id:'overclock',name:'Overclocked',turns:1,dmgMult:1.5});
+  addLog(`${ch.name} overclocks! Next attack +50% damage!`,'good');
+  endPlayerAction();
+}
+
+function useHealOnAlly(allyIdx){
+  const target = combatState.party[allyIdx];
+  if(!target){ endPlayerAction(); return; }
+  const hiPot = G.inventory.find(i=>i.id==='hi_potion'&&i.qty>0);
+  const pot = G.inventory.find(i=>i.id==='potion'&&i.qty>0);
+  const item = hiPot||pot;
+  if(!item){ addLog('No potions!',''); endPlayerAction(); return; }
+  const def = CONSUMABLES[item.id];
+  target.hp = Math.min(target.maxHp, target.hp+def.value);
+  removeItem(item.id,1);
+  addLog(`${target.name} drinks ${def.name} and recovers ${def.value} HP!`,'good');
+  endPlayerAction();
 }
 
 function renderEnemies(){
   const el = document.getElementById('combat-enemies');
   el.innerHTML = '';
+  const sIdx = combatState.selectedEnemyIdx;
+  const inPending = combatState.phase==='pending';
   combatState.enemies.forEach((e,i)=>{
     const card = document.createElement('div');
     card.className = 'enemy-card'+(e.dead?' dead':'');
     const pct = Math.max(0,e.hp/e.maxHp*100);
-    const targetable = !e.dead && (combatState.phase==='target_enemy'||combatState.phase==='ability_target_enemy');
-    if(targetable) card.classList.add('targetable');
+    if(inPending && !e.dead && (sIdx===i||sIdx===-1)) card.classList.add('selected-target');
     card.innerHTML = `
       <div class="enemy-icon">${e.icon||'👾'}</div>
       <div style="flex:1">
@@ -1320,7 +1504,7 @@ function renderEnemies(){
         <div class="enemy-hp-bar"><div class="enemy-hp-fill" style="width:${pct}%"></div></div>
         ${e.statusEffects?.length?`<div style="font-size:0.6rem;color:var(--purple)">${e.statusEffects.map(s=>s.name).join(', ')}</div>`:''}
       </div>`;
-    if(targetable) card.onclick=()=>selectEnemyTarget(i);
+    if(!e.dead) card.onclick=()=>handleEnemyCardClick(i);
     el.appendChild(card);
   });
 }
@@ -1328,23 +1512,45 @@ function renderEnemies(){
 function renderCombatParty(){
   const el = document.getElementById('combat-party');
   el.innerHTML = '';
+  const isPlayerTurn = combatState.turn==='player';
+  const selAlly = combatState.selectedAllyIdx;
+  const inPending = combatState.phase==='pending';
   combatState.party.forEach((ch,i)=>{
-    const isActive = i===combatState.activeCharIdx && combatState.turn==='player';
+    const isActive = i===combatState.activeCharIdx && isPlayerTurn;
+    const isAllyTargeted = inPending && !ch.ko && (selAlly===i||selAlly===-1);
     const row = document.createElement('div');
-    row.className = 'party-member-row'+(isActive?' active':'')+(ch.ko?' ko':'');
+    row.className = 'party-member-row'+(isActive?' active':'')+(ch.ko?' ko':'')+(isAllyTargeted?' ally-targeted':'');
     const pct = Math.max(0,ch.hp/ch.maxHp*100);
     const hpClass = pct>50?'':pct>25?'low':'crit';
-    const hpFillClass = pct>50?'':pct>25?'low':'crit';
-    const actualHpClass = pct>50?'':pct>25?'low':'crit';
-    const statusStr = ch.statusEffects?.length ? ch.statusEffects.map(s=>s.name).join(', ') : (isActive?'► ACTIVE':'');
+    const statusStr = ch.statusEffects?.length?ch.statusEffects.map(s=>s.name).join(', '):'';
     row.innerHTML = `
       <div class="pm-icon${ch.ko?' ko':''}">${charPortrait(ch,44)}</div>
       <div class="pm-info">
-        <div class="pm-name">${ch.name} ${ch.ko?'(KO)':''}</div>
-        <div class="pm-hp-bar"><div class="pm-hp-fill ${actualHpClass}" style="width:${pct}%"></div></div>
-        <div class="pm-hp-text">${ch.hp}/${ch.maxHp} HP</div>
-      </div>
-      <div class="pm-status">${statusStr}</div>`;
+        <div class="pm-name">${ch.name}${ch.ko?' (KO)':''}</div>
+        <div class="pm-hp-bar"><div class="pm-hp-fill ${hpClass}" style="width:${pct}%"></div></div>
+        <div class="pm-hp-text">${ch.hp}/${ch.maxHp} HP${statusStr?' · '+statusStr:''}</div>
+      </div>`;
+    if(isActive && !ch.ko && isPlayerTurn){
+      const actDiv = document.createElement('div');
+      actDiv.className = 'pm-actions';
+      getCharActionSlots(ch).forEach((slot,si)=>{
+        if(!slot) return;
+        const btn = document.createElement('button');
+        const isPending = inPending && combatState.pendingSlot===si;
+        const isDefault = !inPending && (ch.lastCombatSlot??0)===si;
+        btn.className = 'pm-action-btn'+(isPending?' selected':isDefault?' default':'');
+        btn.disabled = !!slot.disabled;
+        btn.textContent = slot.label;
+        btn.onclick = ev=>{ ev.stopPropagation(); tapActionSlot(si); };
+        actDiv.appendChild(btn);
+      });
+      row.appendChild(actDiv);
+    }
+    if(inPending && !ch.ko){
+      const activeSlots = getCharActionSlots(combatState.party[combatState.activeCharIdx]);
+      const slot = activeSlots[combatState.pendingSlot];
+      if(slot && slot.targetType==='ally'){ row.style.cursor='pointer'; row.onclick=()=>handleAllyClick(i); }
+    }
     el.appendChild(row);
   });
 }
@@ -1687,7 +1893,11 @@ function rollLoot(enemy){
 }
 
 function endPlayerAction(){
-  removeItemPickerInline();
+  combatState.phase='select';
+  combatState.pendingSlot=null;
+  combatState.selectedEnemyIdx=null;
+  combatState.selectedAllyIdx=null;
+  combatState.pendingAbility=null;
   renderCombat();
   // check win
   if(combatState.enemies.every(e=>e.dead)){
@@ -1713,7 +1923,7 @@ function endPlayerAction(){
 
 function doEnemyTurn(){
   combatState.turn='enemy';
-  renderActions();
+  addLog('Enemy turn...','info');
   const livingEnemies = combatState.enemies.filter(e=>!e.dead);
   livingEnemies.forEach(e=>{
     // tick status effects on enemy
@@ -1729,9 +1939,11 @@ function doEnemyTurn(){
     const target = pick(targets);
     const def = getCharDef(target);
     const slowMod = (e.statusEffects||[]).find(s=>s.id==='slow')?.hitMod||0;
-    const hitChance = clamp(0.75+(e.atk-def)*0.02+slowMod, 0.15, 0.95);
+    const growlMod = (e.statusEffects||[]).find(s=>s.id==='growl');
+    const effAtk = e.atk + (growlMod?growlMod.atkMod:0);
+    const hitChance = clamp(0.75+(effAtk-def)*0.02+slowMod, 0.15, 0.95);
     if(Math.random()<hitChance){
-      let dmg = rand(Math.max(1,e.atk-2), e.atk+2) + Math.floor(e.atk/3);
+      let dmg = rand(Math.max(1,effAtk-2), effAtk+2) + Math.floor(effAtk/3);
       // check counter
       if(target.abilities&&target.abilities.includes('counter')&&chance(0.3)){
         const counterDmg = calcDmg(target);
