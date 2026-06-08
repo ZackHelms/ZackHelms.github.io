@@ -6,6 +6,19 @@ Single-file RPG at `games/adventure.html`. Inspired by Final Fantasy Legend (198
 
 ---
 
+## Combat border color language
+
+| Color | Meaning | Applied to |
+|---|---|---|
+| **Green** (`--green` `#39ff14`) | Tap again to confirm | Action button — both the default slot on a fresh turn AND a selected (pending) slot |
+| **Gold/Yellow** (`--gold` `#ffc300`) | Current target of the action | Enemy card or ally row that is targeted |
+| **Cyan** (`--cyan` `#00e5ff`) | Whose turn it is right now | Active party member's row |
+
+**Rule:** green = "needs another tap", gold = "you will hit this", cyan = "this entity acts now".  
+Never use gold for action buttons; never use green for targets.
+
+---
+
 ## Design decisions (locked)
 
 | Topic | Decision |
