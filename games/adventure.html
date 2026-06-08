@@ -132,7 +132,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 .party-member-row{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:8px 12px;display:flex;align-items:center;gap:8px;transition:all 0.2s;}
 .party-member-row.active{border-color:var(--gold);box-shadow:0 0 10px #ffc30022;}
 .party-member-row.ko{opacity:0.4;}
-.pm-icon{font-size:1.2rem;flex-shrink:0;}
+.pm-icon{width:44px;height:44px;flex-shrink:0;position:relative;display:flex;align-items:center;justify-content:center;}.pm-icon img{width:44px;height:44px;object-fit:cover;image-rendering:pixelated;border-radius:4px;}.pm-icon.ko img{filter:grayscale(1) opacity(0.45);}.pm-icon.ko::after{content:'😵';position:absolute;font-size:1.1rem;}
 .pm-info{flex:1;}
 .pm-name{font-size:0.75rem;color:var(--white);}
 .pm-hp-bar{height:5px;background:#1a0a0a;border-radius:3px;margin-top:3px;overflow:hidden;}
@@ -165,7 +165,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 .party-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;width:100%;}
 .char-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:14px;width:100%;max-width:480px;margin:0 auto;}
 .char-card-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
-.char-type-icon{font-size:2rem;}
+.char-type-icon{width:56px;height:56px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}.char-type-icon img{width:56px;height:56px;object-fit:cover;image-rendering:pixelated;border-radius:5px;}
 .char-name-area{flex:1;}
 .char-name{font-family:'Black Ops One',sans-serif;font-size:0.9rem;color:var(--white);letter-spacing:2px;}
 .char-meta{font-size:0.62rem;color:var(--dim);margin-top:2px;}
@@ -332,6 +332,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 // ═══════════════════════════════════════════════════
 
 const TYPE_ICONS = {human:'⚔️', mutant:'🧬', monster:'🐺', robot:'🤖'};
+
+function charPortrait(ch, size){
+  const s = size||44;
+  const iconKey = ch.type==='monster'?'dog':ch.type;
+  const src = CHAR_ICONS?.[iconKey]?.[ch.gender];
+  if(src) return `<img src="${src}" style="width:${s}px;height:${s}px;object-fit:cover;image-rendering:pixelated;border-radius:4px;" alt="${ch.name||''}">`;
+  return TYPE_ICONS[ch.type]||'?';
+}
 const GENDER_ICONS = {male:'♂', female:'♀', androgynous:'⚧'};
 
 const CHAR_ICONS = {
@@ -823,7 +831,7 @@ function showLoad(){
     saves.sort((a,b)=>b.timestamp-a.timestamp).forEach(sv=>{
       const row = document.createElement('div');
       row.className = 'save-row';
-      const icons = sv.party.map(c=>TYPE_ICONS[c.type]||'?').join('');
+      const icons = sv.party.map(c=>charPortrait(c,22)).join('');
       row.innerHTML = `
         <div class="save-info" style="cursor:pointer" onclick="loadSave('${sv.id}')">
           <div class="save-name">${sv.name}</div>
@@ -1092,7 +1100,7 @@ function renderAdventureFlow(){
       const walker = document.createElement('div');
       walker.style.fontSize='0.85rem';
       walker.style.marginTop='4px';
-      walker.textContent = G.party.map(c=>TYPE_ICONS[c.type]).join('');
+      walker.style.display='flex'; walker.style.gap='3px'; walker.innerHTML = G.party.map(c=>charPortrait(c,20)).join('');
       content.appendChild(walker);
     }
 
@@ -1328,10 +1336,9 @@ function renderCombatParty(){
     const hpClass = pct>50?'':pct>25?'low':'crit';
     const hpFillClass = pct>50?'':pct>25?'low':'crit';
     const actualHpClass = pct>50?'':pct>25?'low':'crit';
-    const icon = ch.ko?'😵':(ch.type==='monster'?MONSTER_FORMS[ch.form]?.icon||'🐺':TYPE_ICONS[ch.type]);
     const statusStr = ch.statusEffects?.length ? ch.statusEffects.map(s=>s.name).join(', ') : (isActive?'► ACTIVE':'');
     row.innerHTML = `
-      <div class="pm-icon">${icon}</div>
+      <div class="pm-icon${ch.ko?' ko':''}">${charPortrait(ch,44)}</div>
       <div class="pm-info">
         <div class="pm-name">${ch.name} ${ch.ko?'(KO)':''}</div>
         <div class="pm-hp-bar"><div class="pm-hp-fill ${actualHpClass}" style="width:${pct}%"></div></div>
@@ -2032,7 +2039,6 @@ function buildCharCard(ch){
   const card = document.createElement('div');
   card.className='char-card';
 
-  const icon = ch.type==='monster'?MONSTER_FORMS[ch.form]?.icon||'🐺':TYPE_ICONS[ch.type];
   const typeName = ch.type==='monster'?MONSTER_FORMS[ch.form]?.name||'Monster':CHAR_TYPES[ch.type]?.name||ch.type;
   const xpPct = Math.round((ch.xp||0)/xpThreshold(ch.level)*100);
   const hpPct = Math.round(ch.hp/ch.maxHp*100);
@@ -2101,7 +2107,7 @@ function buildCharCard(ch){
 
   card.innerHTML=`
     <div class="char-card-header">
-      <div class="char-type-icon">${icon}</div>
+      <div class="char-type-icon">${charPortrait(ch,56)}</div>
       <div class="char-name-area">
         <div class="char-name">${ch.name}</div>
         <div class="char-meta">${ch.gender?.toUpperCase()||''} ${typeName.toUpperCase()}</div>
