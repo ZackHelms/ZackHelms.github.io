@@ -1673,7 +1673,11 @@ function getCharActionSlots(ch){
 }
 
 function setDefaultTarget(targetType){
-  if(targetType==='enemy_front'||targetType==='enemy_any'){
+  if(targetType==='enemy_front'){
+    const fi = combatState.enemies.slice(0,3).findIndex(e=>!e.dead);
+    combatState.selectedEnemyIdx = fi>=0?fi:null;
+    combatState.selectedAllyIdx = null;
+  } else if(targetType==='enemy_any'){
     const fi = combatState.enemies.findIndex(e=>!e.dead);
     combatState.selectedEnemyIdx = fi>=0?fi:null;
     combatState.selectedAllyIdx = null;
@@ -1745,8 +1749,7 @@ function handleEnemyCardClick(idx){
   if(!slot) return;
   const tt = slot.targetType;
   if(tt==='enemy_front'){
-    const front = combatState.enemies.findIndex(e=>!e.dead);
-    if(idx===front){ combatState.selectedEnemyIdx=idx; renderCombat(); } else flashInvalidTarget(idx);
+    if(idx<=2){ combatState.selectedEnemyIdx=idx; renderCombat(); } else flashInvalidTarget(idx);
   } else if(tt==='enemy_any'){
     combatState.selectedEnemyIdx=idx; renderCombat();
   } else { flashInvalidTarget(idx); }
