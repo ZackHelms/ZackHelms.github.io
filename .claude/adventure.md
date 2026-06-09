@@ -103,6 +103,60 @@ Single-file RPG at `games/adventure.html`. Inspired by Final Fantasy Legend (198
 
 ---
 
+## Green Eyes quest (nodes 7–20)
+
+Scripted story arc running after the tutorial. New mechanics:
+
+- **`G.flags`** — persistent quest state object (`clueAfflicted`, `clueAnimalTracks`, `clueRobot`, `clueJournal`, `puzzle1done`…)
+- **Conditional choices** — `condition: ()=>bool` on RP choices; `renderRP` filters them before render
+- **`setFlag` effect** — sets `G.flags[key] = true`
+- **`failCombat` effect** — marks a puzzle failure; triggers insect-swarm combat returning to the puzzle node (no day advance)
+- **`startFailCombat(nodeId)`** — creates a transient combat node with `_failReturn`; `endCombat` detects this and returns without advancing
+
+### Quest flow
+
+```
+7  RP  green_eyes_morning   (story bridge; +5 XP)
+8  RP  green_eyes_hub       (4 optional SQs; "Head North" gated until ≥1 clue found)
+9  RP  road_north
+10 Combat  2× infected_wolf + 1× green_dog
+11 RP  deep_forest
+12 Combat  2× infected_boar
+13 RP  lab_entrance
+14 RP  lab_interior
+15-19  Puzzles 1–5 (wrong → insect swarm → retry same puzzle)
+20 RP  green_eyes_ending (+50 XP; ambiguous ending)
+21+  Procedural generation
+```
+
+### Side quests (inside green_eyes_hub)
+
+| SQ | Clue | Flag |
+|---|---|---|
+| A — Town medic (afflicted man) | ISOLATION + location | `clueAfflicted` |
+| B — Animal tracks at north gate | RESONANCE + bearing | `clueAnimalTracks` |
+| C — Robot traveler on north road | ORGANIC + 528 Hz + bearing | `clueRobot` |
+| D — Ruined camp east of town | INVERT + journal page item | `clueJournal` |
+
+### Puzzle answers
+
+| # | Answer |
+|---|---|
+| 1 | B — same type |
+| 2 | C — 528 Hz |
+| 3 | B — Neural Amplifier |
+| 4 | B — lack organic neural pathways |
+| 5 | ISOLATION — RESONANCE — ORGANIC — INVERT |
+
+### New enemies
+
+| ID | HP/ATK/DEF | XP |
+|---|---|---|
+| `green_dog` | 18/5/2 | 12 |
+| `infected_wolf` | 28/8/2 | 18 |
+| `infected_boar` | 38/10/4 | 24 |
+| `insect_swarm` | 12/3/0 | 8 |
+
 ## TODO
 
 - [ ] Shop RP encounter (buy weapons, armor, potions)
@@ -137,3 +191,4 @@ Single-file RPG at `games/adventure.html`. Inspired by Final Fantasy Legend (198
 - [x] Gold system
 - [x] Inn rest mechanic
 - [x] Level-up system with stat scaling
+- [x] Green Eyes quest — full scripted arc (nodes 7–20) with 4 side quests, 5 puzzles, insect-swarm fail-combat, conditional hub gating, ambiguous ending (2026-06-09)
