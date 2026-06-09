@@ -30,6 +30,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 .btn.red:hover{box-shadow:0 0 15px #ff224433;}
 .btn.blue{border-color:var(--blue);color:var(--blue);}
 .btn.blue:hover{box-shadow:0 0 15px #4488ff33;}
+.btn.green{border-color:var(--green);color:var(--green);}
+.btn.green:hover{box-shadow:0 0 15px #39ff1433;}
 .btn.dim{border-color:#333;color:#555;cursor:not-allowed;}
 .btn.dim:hover{border-color:#333;color:#555;box-shadow:none;background:var(--panel);}
 .btn.purple{border-color:var(--purple);color:var(--purple);}
@@ -247,6 +249,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
   <div class="title-glow">ADVENTURE</div>
   <div class="subtitle">-- PATH TO THE UNKNOWN --</div>
   <div class="menu-btns">
+    <button id="continue-btn" class="btn green" onclick="loadAutosave()" style="display:none">CONTINUE</button>
     <button class="btn gold" onclick="startNewGame()">NEW GAME</button>
     <button class="btn blue" onclick="showLoad()">LOAD GAME</button>
     <button class="btn dim">SETTINGS &nbsp;— COMING SOON</button>
@@ -577,6 +580,7 @@ function showScreen(id){
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     const el = document.getElementById(id);
     if(el) el.classList.add('active');
+    if(id==='s-main') refreshMainMenu();
     overlay.style.opacity = '0';
     overlay.style.pointerEvents = 'none';
     _screenTimer = null;
@@ -795,9 +799,56 @@ function confirmCreateStep(){
 // ═══════════════════════════════════════════════════
 
 const SAVE_KEY = 'adventure_saves';
+const AUTOSAVE_KEY = 'adventure_autosave';
 
 function getSaves(){ try{ return JSON.parse(localStorage.getItem(SAVE_KEY)||'[]'); }catch(e){ return []; } }
 function putSaves(arr){ localStorage.setItem(SAVE_KEY, JSON.stringify(arr)); }
+
+function autoSave(){
+  if(!G||!G.party||!G.party.length) return;
+  const obj = {
+    saveId: G.saveId||null,
+    timestamp: Date.now(),
+    party: G.party,
+    nodes: G.nodes,
+    currentNodeId: G.currentNodeId,
+    completedNodes: G.completedNodes,
+    inventory: G.inventory,
+    gold: G.gold,
+    location: G.location,
+    day: G.day,
+    flags: G.flags,
+  };
+  try{ localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(obj)); }catch(e){}
+}
+
+function loadAutosave(){
+  try{
+    const sv = JSON.parse(localStorage.getItem(AUTOSAVE_KEY));
+    if(!sv) return;
+    G = {
+      party: sv.party,
+      nodes: sv.nodes,
+      currentNodeId: sv.currentNodeId,
+      completedNodes: sv.completedNodes,
+      inventory: sv.inventory,
+      gold: sv.gold,
+      location: sv.location,
+      day: sv.day||1,
+      saveId: sv.saveId||null,
+      flags: sv.flags||{},
+    };
+    G.party.forEach(c=>{ if(!c.statusEffects) c.statusEffects=[]; if(typeof c.ko==='undefined') c.ko=false; });
+    showScreen('s-adventure');
+    renderAdventureFlow();
+  }catch(e){}
+}
+
+function refreshMainMenu(){
+  const has = !!localStorage.getItem(AUTOSAVE_KEY);
+  const btn = document.getElementById('continue-btn');
+  if(btn) btn.style.display = has ? '' : 'none';
+}
 
 function saveGame(){
   const saves = getSaves();
@@ -1316,6 +1367,7 @@ function beginAdventure(party){
 }
 
 function renderAdventureFlow(){
+  autoSave();
   const flow = document.getElementById('adv-flow');
   flow.innerHTML = '';
   const leader = G.party[0];
@@ -2660,6 +2712,7 @@ function buildCharCard(ch){
 // ═══════════════════════════════════════════════════
 
 showScreen('s-main');
+refreshMainMenu();
 </script>
 </body>
 </html>
