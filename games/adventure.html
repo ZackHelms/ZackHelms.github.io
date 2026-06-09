@@ -111,43 +111,51 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 
 /* ── COMBAT ── */
 #s-combat{padding:0;gap:0;}
-.combat-enemies{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:12px;background:linear-gradient(180deg,#08081a 0%,var(--bg) 100%);border-bottom:2px solid var(--border);}
+.combat-enemies{flex:1;display:flex;align-items:center;justify-content:center;padding:12px;background:linear-gradient(180deg,#08081a 0%,var(--bg) 100%);border-bottom:2px solid var(--border);min-height:0;}
+.enemy-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:100%;max-width:300px;}
+.enemy-tile{aspect-ratio:1;background:var(--panel);border:1px solid var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;cursor:default;transition:border-color 0.2s,box-shadow 0.2s;overflow:hidden;}
+.enemy-tile.targetable{cursor:pointer;}
+.enemy-tile.targetable:hover{border-color:var(--gold);}
+.enemy-tile.is-selected{border-color:var(--gold);box-shadow:0 0 10px #ffc30044;}
+.enemy-tile.dead{opacity:0.25;cursor:default;}
+.enemy-tile.empty-slot{border-color:transparent;background:transparent;pointer-events:none;}
 .combat-divider{font-size:0.6rem;color:var(--dim);letter-spacing:4px;padding:4px 0;background:var(--bg);width:100%;text-align:center;flex-shrink:0;}
 .combat-party{flex:1;display:flex;flex-direction:column;padding:8px 12px;gap:6px;overflow-y:auto;}
-.pm-actions{display:flex;flex-direction:column;gap:3px;flex-shrink:0;align-self:stretch;justify-content:center;}
-.pm-action-btn{padding:5px 8px;background:var(--bg);border:1px solid var(--border);color:var(--dim);cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:0.6rem;border-radius:3px;transition:all 0.15s;min-width:88px;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;}
-.pm-action-btn:hover:not(:disabled){border-color:var(--green);color:var(--green);}
-.pm-action-btn:disabled{opacity:0.3;cursor:not-allowed;}
-.pm-action-btn.default{border-color:var(--green);color:var(--green);}
-.pm-action-btn.selected{border-color:var(--green);color:var(--green);background:#001800;box-shadow:0 0 8px #39ff1444;}
 .party-member-row.ally-targeted{border-color:var(--gold);box-shadow:0 0 10px #ffc30022;}
-.enemy-card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:10px 14px;width:100%;max-width:380px;display:flex;align-items:center;gap:10px;transition:all 0.2s;cursor:pointer;}
-.enemy-card.selected-target{border-color:var(--gold);box-shadow:0 0 12px #ffc30044;}
-.enemy-card.dead{opacity:0.3;cursor:default;}
 @keyframes invalid-flash{0%{border-color:var(--border);}40%{border-color:var(--red);box-shadow:0 0 8px #ff224455;}100%{border-color:var(--border);}}
-.enemy-card.invalid-flash{animation:invalid-flash 0.35s ease-out;}
-.enemy-icon{font-size:1.5rem;flex-shrink:0;}
-.enemy-name{font-size:0.8rem;color:var(--white);flex:1;}
-.enemy-hp-bar{height:6px;background:#1a0a0a;border-radius:3px;margin-top:4px;overflow:hidden;}
-.enemy-hp-fill{height:100%;background:var(--red);border-radius:3px;transition:width 0.3s;}
+.enemy-tile.invalid-flash{animation:invalid-flash 0.35s ease-out;}
+.combat-actions{padding:6px 12px;border-top:1px solid var(--border);background:var(--panel);flex-shrink:0;}
+.action-row{display:flex;gap:6px;flex-wrap:wrap;}
+.action-btn{flex:1;min-width:80px;padding:10px 8px;background:var(--panel);border:1px solid var(--border);color:var(--white);cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:0.72rem;border-radius:4px;transition:all 0.2s;text-align:center;}
+.action-btn:hover:not(:disabled){border-color:var(--green);color:var(--green);}
+.action-btn:disabled{opacity:0.3;cursor:not-allowed;}
+.action-label{font-size:0.6rem;color:var(--dim);letter-spacing:2px;margin-bottom:4px;text-transform:uppercase;}
 .party-member-row{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:8px 12px;display:flex;align-items:center;gap:8px;transition:all 0.2s;}
 .party-member-row.active{border-color:var(--cyan);box-shadow:0 0 10px #00e5ff22;}
 .party-member-row.ko{opacity:0.4;}
 .pm-icon{width:44px;height:44px;flex-shrink:0;position:relative;display:flex;align-items:center;justify-content:center;}.pm-icon img{width:44px;height:44px;object-fit:cover;image-rendering:pixelated;border-radius:4px;}.pm-icon.ko img{filter:grayscale(1) opacity(0.45);}.pm-icon.ko::after{content:'😵';position:absolute;font-size:1.1rem;}
-.pm-info{flex:1;}
-.pm-name{font-size:0.75rem;color:var(--white);}
+.pm-info{flex:1;min-width:0;}
+.pm-name{font-size:0.75rem;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pm-hp-bar{height:5px;background:#1a0a0a;border-radius:3px;margin-top:3px;overflow:hidden;}
 .pm-hp-fill{height:100%;background:var(--green);border-radius:3px;transition:width 0.3s;}
 .pm-hp-fill.low{background:var(--gold);}
 .pm-hp-fill.crit{background:var(--red);}
 .pm-hp-text{font-size:0.6rem;color:var(--dim);margin-top:2px;}
-.pm-status{font-size:0.65rem;color:var(--dim);}
+.pm-status{font-size:0.65rem;color:var(--dim);flex-shrink:0;}
+.pm-action-btns{display:flex;gap:4px;flex-shrink:0;}
+.pm-action-btn{width:36px;height:36px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--white);cursor:pointer;font-size:0.95rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s;padding:0;}
+.pm-action-btn:hover:not(:disabled){border-color:var(--green);}
+.pm-action-btn.ready{border-color:var(--green);color:var(--green);background:#001800;box-shadow:0 0 8px #39ff1444;}
+.pm-action-btn:disabled{opacity:0.3;cursor:not-allowed;}
 .combat-log{height:60px;overflow-y:auto;padding:6px 12px;background:#050510;border-top:1px solid var(--border);flex-shrink:0;}
 .log-line{font-size:0.65rem;color:var(--dim);line-height:1.6;}
 .log-line.hit{color:var(--white);}
 .log-line.dmg{color:var(--red);}
 .log-line.good{color:var(--green);}
 .log-line.info{color:var(--blue);}
+
+/* ── TRANSITION ── */
+#transition-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;opacity:0;pointer-events:none;z-index:999;transition:opacity 0.5s;}
 
 /* ── RP ENCOUNTER ── */
 #s-rp{justify-content:flex-end;padding:0;}
@@ -259,8 +267,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
     <div class="create-label" id="create-step-label">STEP</div>
     <div id="create-content"></div>
   </div>
-  <div style="width:100%;max-width:480px;margin-top:10px;">
-    <button class="btn gold" id="create-confirm-btn" onclick="confirmCreateStep()">CONFIRM</button>
+  <div style="width:100%;max-width:480px;margin-top:10px;display:flex;gap:8px;">
+    <button class="btn gold" id="create-confirm-btn" onclick="confirmCreateStep()" style="flex:1">CONFIRM</button>
+    <button class="btn purple" id="create-allrandom-btn" onclick="randomizeAllChars()">ALL RANDOM</button>
   </div>
 </div>
 
@@ -320,6 +329,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 <div id="levelup-banner">
   <div class="levelup-text" id="levelup-text"></div>
 </div>
+
+<div id="transition-overlay"></div>
 
 <script>
 'use strict';
@@ -465,6 +476,10 @@ const ENEMIES = {
   bandit:       {name:'Bandit',       hp:25, atk:6, def:3, xp:20, gold:[3,8], icon:'🗡️', loot:[{id:'potion',chance:0.25},{id:'wooden_sword',chance:0.1}]},
   forest_troll: {name:'Forest Troll', hp:50, atk:10,def:5, xp:40, gold:[5,12],icon:'👹', loot:[{id:'troll_meat',chance:0.25},{id:'hi_potion',chance:0.2}]},
   dark_knight:  {name:'Dark Knight',  hp:40, atk:9, def:6, xp:35, gold:[4,10],icon:'🛡️', loot:[{id:'iron_sword',chance:0.15},{id:'chain',chance:0.1}]},
+  green_dog:    {name:'Green-Eyed Dog',   hp:18, atk:5,  def:2, xp:12, gold:[1,5], icon:'🐕', loot:[]},
+  infected_wolf:{name:'Infected Wolf',    hp:28, atk:8,  def:2, xp:18, gold:[2,7], icon:'🐺', loot:[{id:'wolf_meat',chance:0.3}]},
+  infected_boar:{name:'Infected Boar',    hp:38, atk:10, def:4, xp:24, gold:[2,8], icon:'🐗', loot:[{id:'boar_meat',chance:0.25}]},
+  insect_swarm: {name:'Insect Swarm',     hp:12, atk:3,  def:0, xp:8,  gold:[0,2], icon:'🐝', loot:[]},
 };
 
 const RANDOM_NAMES = {
@@ -528,6 +543,7 @@ let G = {
   location: 'road',
   day: 1,
   saveId: null,
+  flags: {},
 };
 
 let createState = {
@@ -551,9 +567,20 @@ function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
 function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function chance(p){ return Math.random()<p; }
 
+let _screenTimer = null;
 function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+  if(_screenTimer){ clearTimeout(_screenTimer); _screenTimer=null; }
+  const overlay = document.getElementById('transition-overlay');
+  overlay.style.opacity = '1';
+  overlay.style.pointerEvents = 'all';
+  _screenTimer = setTimeout(()=>{
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    const el = document.getElementById(id);
+    if(el) el.classList.add('active');
+    overlay.style.opacity = '0';
+    overlay.style.pointerEvents = 'none';
+    _screenTimer = null;
+  }, 500);
 }
 
 function showModal(title, text, buttons){
@@ -726,10 +753,23 @@ function editChar(i){
 }
 
 function jumpToSlot(i){
-  if(createState.chars[i]!==null) return; // filled — use editChar
+  if(createState.chars[i]!==null) return;
   createState.charIndex = i;
   createState.current = {type:null, gender:null, name:''};
   renderCreateScreen();
+}
+
+function randomizeAllChars(){
+  const types = Object.keys(CHAR_TYPES);
+  const genders = ['male','female'];
+  const chars = [];
+  for(let i=0;i<4;i++){
+    const type = pick(types);
+    const gender = pick(genders);
+    const name = pick(RANDOM_NAMES[type][gender]);
+    chars.push(buildChar(type, gender, name));
+  }
+  beginAdventure(chars);
 }
 
 function confirmCreateStep(){
@@ -775,6 +815,7 @@ function saveGame(){
     gold: G.gold,
     location: G.location,
     day: G.day,
+    flags: G.flags,
   };
   G.saveId = obj.id;
   const idx = saves.findIndex(s=>s.id===obj.id);
@@ -800,6 +841,7 @@ function loadSave(id){
     location: sv.location,
     day: sv.day || 1,
     saveId: sv.id,
+    flags: sv.flags || {},
   };
   // re-init statusEffects if missing
   G.party.forEach(c=>{ if(!c.statusEffects) c.statusEffects=[];  if(typeof c.ko==='undefined') c.ko=false; });
@@ -925,6 +967,229 @@ const MYSTIC_SCRIPT = {
   }
 };
 
+// ── GREEN EYES QUEST ─────────────────────────────────────────────────────────
+
+const GREEN_EYES_MORNING = {
+  start:'start',
+  nodes:{
+    start:{speaker:null,portrait:'',text:'Two days since the dogs. The north end of town is tense — arguments at the market, animals clustering in packs, a stillness in the air that does not belong.',
+      choices:[{text:'What is happening?',next:'spreading'}]},
+    spreading:{speaker:null,portrait:'',text:'Merchants who traded peaceably for years nearly came to blows. A robot courier watched it all, unaffected. Something is turning living things against anything different from themselves.',
+      choices:[
+        {text:'The dogs came from the north.',next:'north_hint'},
+        {text:'Where is it coming from?',next:'north_hint'}
+      ]},
+    north_hint:{speaker:'Townswoman',portrait:'👩',text:'Old Lena at the clinic has a man in there — crawled in from the north road last night, eyes half-lit green. She says he keeps repeating something about the north woods.',
+      choices:[{text:'We need to find the source.',next:'closing'}]},
+    closing:{speaker:null,portrait:'',text:'Four leads. Four possible clues. The town is counting on you.',
+      choices:[{text:'We investigate.',next:'end'}]},
+    end:{speaker:null,portrait:'',text:'[Investigation phase begins. +5 XP each.]',effect:{xpAll:5},choices:[{text:'Let\'s move.',next:null}]}
+  }
+};
+
+const GREEN_EYES_HUB = {
+  start:'hub_main',
+  nodes:{
+    hub_main:{speaker:null,portrait:'',text:'Four leads. The clock is ticking.',
+      choices:[
+        {text:'Visit the town medic — Old Lena\'s clinic',next:'sq_a_intro',condition:()=>!G.flags.clueAfflicted},
+        {text:'Follow the animal tracks from the north gate',next:'sq_b_intro',condition:()=>!G.flags.clueAnimalTracks},
+        {text:'Check the north road — talk to travelers',next:'sq_c_intro',condition:()=>!G.flags.clueRobot},
+        {text:'Search the old ruined camp east of town',next:'sq_d_intro',condition:()=>!G.flags.clueJournal},
+        {text:'We have enough. Head North.',next:null,condition:()=>!!(G.flags.clueAfflicted||G.flags.clueAnimalTracks||G.flags.clueRobot||G.flags.clueJournal)}
+      ]},
+    sq_a_intro:{speaker:'Old Lena',portrait:'👩‍⚕️',text:'Come in. Quietly. He\'s in one of his bad hours — eyes flickering green. Whatever this is, it is inside his mind, not just on the surface.',
+      choices:[{text:'Can he talk at all?',next:'sq_a_man'},{text:'We will come back.',next:'hub_main'}]},
+    sq_a_man:{speaker:'Old Lena',portrait:'👩‍⚕️',text:'In bursts. He surfaces for a minute, then goes under again. He grabbed at me when I got close an hour ago — be careful.',
+      choices:[{text:'[Approach gently]',next:'sq_a_approach'},{text:'[Step back]',next:'sq_a_back'}]},
+    sq_a_back:{speaker:'Old Lena',portrait:'👩‍⚕️',text:'Probably wise.',choices:[{text:'We will come back.',next:'hub_main'}]},
+    sq_a_approach:{speaker:null,portrait:'',text:'You approach the cot. The man\'s eyes open halfway — pale green at the iris edge, like a lit screen behind his eyes.',
+      choices:[{text:'[Speak quietly]',next:'sq_a_lucid'}]},
+    sq_a_lucid:{speaker:'Afflicted Man',portrait:'😵',text:'...stone building... I went there three days ago... where the creek runs dry... north woods... forty-three paces north from where the creek bed ends...',
+      choices:[{text:'What is inside it?',next:'sq_a_lucid_2'}]},
+    sq_a_lucid_2:{speaker:'Afflicted Man',portrait:'😵',text:'...a machine... humming... I just wanted to look... then everything felt wrong... ISOLATION... the field... it makes you see only your own kind...',
+      choices:[{text:'[Note: ISOLATION]',next:'sq_a_done'}]},
+    sq_a_done:{speaker:null,portrait:'',text:'[Clue: ISOLATION. Location: stone building, north woods, 43 paces from the dry creek bed. +10 XP each.]',effect:{setFlag:'clueAfflicted',xpAll:10},
+      choices:[{text:'Back to the investigation.',next:'hub_main'}]},
+    sq_b_intro:{speaker:null,portrait:'',text:'Outside the north gate, the ground is churned — prints from dozens of animals, all leading from the tree line and retreating again.',
+      choices:[{text:'Follow them into the forest edge.',next:'sq_b_track'},{text:'Study them from here.',next:'sq_b_study'}]},
+    sq_b_study:{speaker:null,portrait:'',text:'The prints are sorted. Wolf tracks with wolf tracks. Boar with boar. They do not cross. Something is pulling each kind together — a RESONANCE drawing things toward their own.',
+      choices:[{text:'[Note: RESONANCE]',next:'sq_b_done'}]},
+    sq_b_track:{speaker:null,portrait:'',text:'A dozen squirrels line a low branch inside the tree line. Below, a lone cat paces. The squirrels watch the cat — not each other. Every eye on the wrong species. None attack their own kind.',
+      choices:[{text:'Something is sorting them. A RESONANCE between kinds.',next:'sq_b_done'}]},
+    sq_b_done:{speaker:null,portrait:'',text:'[Clue: RESONANCE. Direction: all tracks converge due north. +10 XP each.]',effect:{setFlag:'clueAnimalTracks',xpAll:10},
+      choices:[{text:'Back to town.',next:'hub_main'}]},
+    sq_c_intro:{speaker:null,portrait:'',text:'On the north road — a robot courier unit, dented casing, amber lenses. The only person in town who does not look shaken.',
+      choices:[{text:'Did you come from the north?',next:'sq_c_confirm'},{text:'[Walk away]',next:'hub_main'}]},
+    sq_c_confirm:{speaker:'Robot Courier',portrait:'🤖',text:'Confirmed. Approximately two kilometers north, I passed a stone structure — overgrown, transmitting a signal at 528 Hz.',
+      choices:[{text:'Why were you not affected?',next:'sq_c_immune'},{text:'What was it transmitting?',next:'sq_c_what'}]},
+    sq_c_what:{speaker:'Robot Courier',portrait:'🤖',text:'A signal in the organic neural resonance band. All biological entities within range showed aggression and type-clustering. I was unaffected.',
+      choices:[{text:'Why?',next:'sq_c_immune'}]},
+    sq_c_immune:{speaker:'Robot Courier',portrait:'🤖',text:'I have no ORGANIC neural pathways. The field has nothing to interact with. Human, mutant, monster, animal — biological nervous systems respond to it. Synthetic minds do not.',
+      choices:[{text:'[Note: ORGANIC]',next:'sq_c_location'}]},
+    sq_c_location:{speaker:'Robot Courier',portrait:'🤖',text:'Due north on the forest trail. Take the left branch at the split. The dry creek bed will be on your right. The structure is set back from the path.',
+      choices:[{text:'Thank you.',next:'sq_c_done'}]},
+    sq_c_done:{speaker:null,portrait:'',text:'[Clue: ORGANIC. Frequency: 528 Hz confirmed. Bearing confirmed. +10 XP each.]',effect:{setFlag:'clueRobot',xpAll:10},
+      choices:[{text:'Back to the road.',next:'hub_main'}]},
+    sq_d_intro:{speaker:null,portrait:'',text:'The old camp east of town. Rotted canvas, cold fire ring. But someone was here recently — a bedroll, a coffee-stained tin, and a canvas satchel with the clasp torn open.',
+      choices:[{text:'Search the satchel.',next:'sq_d_search'},{text:'Check the perimeter first.',next:'sq_d_perimeter'}]},
+    sq_d_perimeter:{speaker:null,portrait:'',text:'Boot prints in the mud — heading northeast into the trees. They do not come back. Whoever was here left in a hurry, or did not leave under their own power.',
+      choices:[{text:'Check the satchel.',next:'sq_d_search'}]},
+    sq_d_search:{speaker:null,portrait:'',text:'Inside: field notes, mostly ash. One page survived — edges burned, ink smeared, but legible.',
+      choices:[{text:'Read it.',next:'sq_d_journal'}]},
+    sq_d_journal:{speaker:'Journal Page',portrait:'📄',text:'"Day 12. Device calibrated to 528 Hz. NEURAL AMPLIFIER orientation is critical — INVERTED = field reversal, disabling isolation effect. Current: ALIGNED. Emergency deactivation word: INVERT."',
+      choices:[{text:'[Note: INVERT]',next:'sq_d_done'}]},
+    sq_d_done:{speaker:null,portrait:'',text:'[Clue: INVERT. Neural Amplifier inversion = shutdown. Journal page taken. +10 XP each.]',effect:{setFlag:'clueJournal',xpAll:10,addItem:'journal_page'},
+      choices:[{text:'Back to camp edge.',next:'hub_main'}]}
+  }
+};
+
+const ROAD_NORTH = {
+  start:'start',
+  nodes:{
+    start:{speaker:null,portrait:'',text:'You leave before dawn. The north road is empty. A mile out, the first sign: a cluster of rabbits at the roadside, all facing south, perfectly still. Eyes faintly green.',
+      choices:[{text:'Keep moving.',next:'forest_edge'}]},
+    forest_edge:{speaker:null,portrait:'',text:'The forest closes around the path. Above, three birds follow a single squirrel through the canopy without attacking each other. They track it. Only it. The effect is stronger here.',
+      choices:[{text:'How much further?',next:'creek'}]},
+    creek:{speaker:null,portrait:'',text:'The dry creek bed appears on your right — cracked mud, long empty. Forty-three paces north from here.',
+      choices:[{text:'Start counting.',next:null}]}
+  }
+};
+
+const DEEP_FOREST = {
+  start:'start',
+  nodes:{
+    start:{speaker:null,portrait:'',text:'Past the wolfpack. The forest has gone quiet — wrong kind of quiet. Deer stand in a cluster of six. Three foxes form a triangle. A family of boars, shoulder to shoulder. None mixing. All watching.',
+      choices:[{text:'The field is sorting them.',next:'isolation_note'}]},
+    isolation_note:{speaker:null,portrait:'',text:'They do not attack you. They do not attack each other. Only across types does the aggression kick in — the field highlights the unfamiliar and erases the familiar.',
+      choices:[{text:'Focus. The building is close.',next:'count'}]},
+    count:{speaker:null,portrait:'',text:'Thirty-seven paces. Forty. Forty-three. You stop.',
+      choices:[{text:'Look up.',next:null}]}
+  }
+};
+
+const LAB_ENTRANCE = {
+  start:'start',
+  nodes:{
+    start:{speaker:null,portrait:'',text:'There. Moss-covered stone, half-sunk into the earth. No path, no signage, no door handle on the south face. Built to be missed.',
+      choices:[{text:'Circle it.',next:'north_face'}]},
+    north_face:{speaker:null,portrait:'',text:'North face: a steel door, ajar. Through the gap — a low hum. The air smells of ozone and heated metal. 528 Hz. You can feel it in your back teeth.',
+      choices:[{text:'Listen first.',next:'listen'},{text:'Push the door.',next:'enter'}]},
+    listen:{speaker:null,portrait:'',text:'Movement inside — unsteady, pacing. Then silence. Then pacing again. Whoever is in there is not moving normally.',
+      choices:[{text:'Push the door.',next:'enter'}]},
+    enter:{speaker:null,portrait:'',text:'The room is lit by instrument glow. Green LEDs, oscilloscope lines, a central machine the size of a wardrobe. Four labeled panels. The humming is in your chest now.',
+      choices:[{text:'Find the scientist.',next:null}]}
+  }
+};
+
+const LAB_INTERIOR = {
+  start:'start',
+  nodes:{
+    start:{speaker:null,portrait:'',text:'At the far end of the room, the scientist paces. The green in their eyes catches the LED light and throws it back. They have not noticed you yet.',
+      choices:[{text:'Approach carefully.',next:'approach'},{text:'Go straight to the controls.',next:'controls_first'}]},
+    approach:{speaker:null,portrait:'',text:'One step. The scientist spins — too fast — and slams into a workbench. Equipment crashes. They are not attacking. They are reacting. The field has them.',
+      choices:[{text:'Move to the controls.',next:'controls_first'}]},
+    controls_first:{speaker:null,portrait:'',text:'The central machine: four labeled sections — RESONATOR CORE, NEURAL AMPLIFIER, PHASE CONVERTER, SIGNAL EMITTER. A burned note on the housing reads: "NEURAL AMPLIFIER orientation is critical."',
+      choices:[{text:'How do we shut it down?',next:'panel_explain'}]},
+    panel_explain:{speaker:null,portrait:'',text:'A safety panel requires four diagnostic answers in sequence. A fifth dial takes an emergency keyword. The manual is half-burned. You will have to work from memory.',
+      choices:[{text:'We are ready.',next:null}]}
+  }
+};
+
+const PUZZLE_1 = {
+  start:'start',
+  nodes:{
+    start:{speaker:'Device Panel',portrait:'🖥️',text:'DIAGNOSTIC 1 OF 4 — Under what condition do the afflicted refrain from attacking?',
+      choices:[
+        {text:'A) When in complete darkness.',next:'wrong'},
+        {text:'B) When facing entities of the same type.',next:'correct'},
+        {text:'C) When injured and retreating.',next:'wrong'},
+        {text:'D) Only at night.',next:'wrong'}
+      ]},
+    correct:{speaker:null,portrait:'',text:'[CORRECT. Dial 1 set. ✓]',effect:{setFlag:'puzzle1done'},choices:[{text:'Next.',next:null}]},
+    wrong:{speaker:null,portrait:'',text:'[WRONG INPUT. Internal containment breached.]',effect:{failCombat:15},choices:[{text:'Brace yourselves.',next:null}]}
+  }
+};
+
+const PUZZLE_2 = {
+  start:'start',
+  nodes:{
+    start:{speaker:'Device Panel',portrait:'🖥️',text:'DIAGNOSTIC 2 OF 4 — The resonance field operates at what frequency?',
+      choices:[
+        {text:'A) 440 Hz',next:'wrong'},
+        {text:'B) 396 Hz',next:'wrong'},
+        {text:'C) 528 Hz',next:'correct'},
+        {text:'D) 174 Hz',next:'wrong'}
+      ]},
+    correct:{speaker:null,portrait:'',text:'[CORRECT. Dial 2 set. ✓]',effect:{setFlag:'puzzle2done'},choices:[{text:'Next.',next:null}]},
+    wrong:{speaker:null,portrait:'',text:'[WRONG INPUT. Internal containment breached.]',effect:{failCombat:16},choices:[{text:'Brace yourselves.',next:null}]}
+  }
+};
+
+const PUZZLE_3 = {
+  start:'start',
+  nodes:{
+    start:{speaker:'Device Panel',portrait:'🖥️',text:'DIAGNOSTIC 3 OF 4 — Which component must be inverted to reverse the field polarity?',
+      choices:[
+        {text:'A) Resonator Core',next:'wrong'},
+        {text:'B) Neural Amplifier',next:'correct'},
+        {text:'C) Phase Converter',next:'wrong'},
+        {text:'D) Signal Emitter',next:'wrong'}
+      ]},
+    correct:{speaker:null,portrait:'',text:'[CORRECT. Dial 3 set. ✓]',effect:{setFlag:'puzzle3done'},choices:[{text:'Next.',next:null}]},
+    wrong:{speaker:null,portrait:'',text:'[WRONG INPUT. Internal containment breached.]',effect:{failCombat:17},choices:[{text:'Brace yourselves.',next:null}]}
+  }
+};
+
+const PUZZLE_4 = {
+  start:'start',
+  nodes:{
+    start:{speaker:'Device Panel',portrait:'🖥️',text:'DIAGNOSTIC 4 OF 4 — Why are synthetic beings unaffected by the isolation field?',
+      choices:[
+        {text:'A) They move too quickly for the signal.',next:'wrong'},
+        {text:'B) They lack organic neural pathways.',next:'correct'},
+        {text:'C) Metal casing blocks the frequency.',next:'wrong'},
+        {text:'D) They are too large for the signal to affect.',next:'wrong'}
+      ]},
+    correct:{speaker:null,portrait:'',text:'[CORRECT. Dial 4 set. ✓]',effect:{setFlag:'puzzle4done'},choices:[{text:'Almost there.',next:null}]},
+    wrong:{speaker:null,portrait:'',text:'[WRONG INPUT. Internal containment breached.]',effect:{failCombat:18},choices:[{text:'Brace yourselves.',next:null}]}
+  }
+};
+
+const PUZZLE_5_FINAL = {
+  start:'start',
+  nodes:{
+    start:{speaker:'Device Panel',portrait:'🖥️',text:'EMERGENCY DEACTIVATION — Enter the four-word shutdown phrase in the correct order.',
+      choices:[
+        {text:'ISOLATION — RESONANCE — ORGANIC — INVERT',next:'correct'},
+        {text:'RESONANCE — ISOLATION — INVERT — ORGANIC',next:'wrong'},
+        {text:'ORGANIC — INVERT — ISOLATION — RESONANCE',next:'wrong'},
+        {text:'INVERT — ORGANIC — RESONANCE — ISOLATION',next:'wrong'}
+      ]},
+    correct:{speaker:null,portrait:'',text:'[ACCEPTED. SHUTTING DOWN.]',choices:[{text:'...',next:'final_moment'}]},
+    final_moment:{speaker:null,portrait:'',text:'The humming dies. The green LEDs go dark one by one. From across the room — the sound of the scientist crumpling to the floor.',
+      choices:[{text:'Go to them.',next:null}]},
+    wrong:{speaker:null,portrait:'',text:'[WRONG SEQUENCE. Internal containment breached.]',effect:{failCombat:19},choices:[{text:'Brace yourselves.',next:null}]}
+  }
+};
+
+const GREEN_EYES_ENDING = {
+  start:'start',
+  nodes:{
+    start:{speaker:null,portrait:'',text:'The scientist is breathing. The green is gone from their eyes — replaced by ordinary, exhausted brown. They do not look like a monster. They look like someone who made a terrible mistake.',
+      choices:[{text:'What happened to you?',next:'scientist_talks'},{text:'[Stay quiet. Watch them breathe.]',next:'quiet_watch'}]},
+    scientist_talks:{speaker:'Scientist',portrait:'👨‍🔬',text:'...I was studying isolation behavior in colony creatures... how species cluster under stress... the device was supposed to be an observation tool...',
+      choices:[{text:'It affected the whole town.',next:'scientist_2'},{text:'[Say nothing]',next:'ambiguous_end'}]},
+    scientist_2:{speaker:'Scientist',portrait:'👨‍🔬',text:'I know. I think I was inside it too long. I could not think clearly anymore. I kept it running without understanding what I was doing.',
+      choices:[{text:'Will you be alright?',next:'scientist_3'}]},
+    scientist_3:{speaker:'Scientist',portrait:'👨‍🔬',text:'I don\'t know. I hope so.',choices:[{text:'...',next:'ambiguous_end'}]},
+    quiet_watch:{speaker:null,portrait:'',text:'Their breathing steadies. They do not open their eyes. The hum is gone. The lab is just a room now.',choices:[{text:'...',next:'ambiguous_end'}]},
+    ambiguous_end:{speaker:null,portrait:'',text:'Outside, an animal call — normal, unthreatened. Then another. Different species, same direction. Moving together.',choices:[{text:'...',next:'walk_out'}]},
+    walk_out:{speaker:null,portrait:'',text:'You leave the lab. The forest is different on the way back. You are not sure what happens to the scientist. You are not sure what happens to the town. The green is gone from every eye you pass.',choices:[{text:'...',next:'final_xp'}]},
+    final_xp:{speaker:null,portrait:'',text:'[Green Eyes complete. +50 XP each.]',effect:{xpAll:50},choices:[{text:'The road continues.',next:null}]}
+  }
+};
+
 const TUTORIAL_NODES = [
   {id:0, type:'combat', title:'Ambushed!',
    desc:'Stray dogs rush you near the town gates.',
@@ -946,7 +1211,24 @@ const TUTORIAL_NODES = [
   {id:5, type:'rp', title:'Inn Rest', script:'inn_rest', next:7},
   {id:6, type:'combat', title:'Forest Patrol',
    enemies:[{id:'wild_wolf',count:1},{id:'forest_cat',count:1}], next:7},
-  {id:7, type:'_generate'},
+  {id:7,  type:'rp', title:'Two Days Later',   script:'green_eyes_morning', next:8},
+  {id:8,  type:'rp', title:'Investigation',    script:'green_eyes_hub',     next:9},
+  {id:9,  type:'rp', title:'Into the North',   script:'road_north',         next:10},
+  {id:10, type:'combat', title:'Ambush in the Trees',
+   desc:'Green-eyed wolves burst from the undergrowth.',
+   enemies:[{id:'infected_wolf',count:2},{id:'green_dog',count:1}], next:11},
+  {id:11, type:'rp', title:'The Deep Forest',  script:'deep_forest',        next:12},
+  {id:12, type:'combat', title:'The Path is Blocked',
+   desc:'Infected boars charge from the tree line.',
+   enemies:[{id:'infected_boar',count:2}], next:13},
+  {id:13, type:'rp', title:'Found',             script:'lab_entrance',       next:14},
+  {id:14, type:'rp', title:'The Lab',           script:'lab_interior',       next:15},
+  {id:15, type:'rp', title:'Dial 1 of 4',       script:'puzzle_1',           next:16},
+  {id:16, type:'rp', title:'Dial 2 of 4',       script:'puzzle_2',           next:17},
+  {id:17, type:'rp', title:'Dial 3 of 4',       script:'puzzle_3',           next:18},
+  {id:18, type:'rp', title:'Dial 4 of 4',       script:'puzzle_4',           next:19},
+  {id:19, type:'rp', title:'Final Sequence',    script:'puzzle_5_final',     next:20},
+  {id:20, type:'rp', title:'Silence',           script:'green_eyes_ending',  next:null},
 ];
 
 function getScript(name){
@@ -955,6 +1237,18 @@ function getScript(name){
   if(name==='inn_rest') return INN_REST;
   if(name==='merchant') return MERCHANT_SCRIPT;
   if(name==='mystic') return MYSTIC_SCRIPT;
+  if(name==='green_eyes_morning') return GREEN_EYES_MORNING;
+  if(name==='green_eyes_hub') return GREEN_EYES_HUB;
+  if(name==='road_north') return ROAD_NORTH;
+  if(name==='deep_forest') return DEEP_FOREST;
+  if(name==='lab_entrance') return LAB_ENTRANCE;
+  if(name==='lab_interior') return LAB_INTERIOR;
+  if(name==='puzzle_1') return PUZZLE_1;
+  if(name==='puzzle_2') return PUZZLE_2;
+  if(name==='puzzle_3') return PUZZLE_3;
+  if(name==='puzzle_4') return PUZZLE_4;
+  if(name==='puzzle_5_final') return PUZZLE_5_FINAL;
+  if(name==='green_eyes_ending') return GREEN_EYES_ENDING;
   return null;
 }
 
@@ -1014,11 +1308,11 @@ function beginAdventure(party){
     location: 'road',
     day: 1,
     saveId: null,
+    flags: {},
   };
   showScreen('s-adventure');
   renderAdventureFlow();
-  // auto-trigger node 0
-  setTimeout(()=>triggerNode(0), 400);
+  setTimeout(()=>triggerNode(0), 1400);
 }
 
 function renderAdventureFlow(){
@@ -1116,7 +1410,12 @@ function chooseDecision(choice){
   G.completedNodes.push(G.currentNodeId);
   G.currentNodeId = choice.next;
   G.day++;
-  renderAdventureFlow();
+  const nextNode = getNode(choice.next);
+  if(nextNode && nextNode.type !== 'decision'){
+    triggerNode(choice.next);
+  } else {
+    renderAdventureFlow();
+  }
 }
 
 function triggerNode(id){
@@ -1252,6 +1551,21 @@ function getCharStr(ch){
   return s;
 }
 
+function autoArm(){
+  const ch = combatState.party[combatState.activeCharIdx];
+  if(!ch||ch.ko) return;
+  const slots = getCharActionSlots(ch);
+  const si = ch.lastCombatSlot ?? 0;
+  const slot = slots[si] && !slots[si].disabled ? slots[si] : slots[0];
+  const realSi = (slot===slots[si]&&!slots[si]?.disabled) ? si : 0;
+  if(slot && !slot.disabled){
+    combatState.phase='pending';
+    combatState.pendingSlot=realSi;
+    combatState.pendingAbility=slot.abilityId?ABILITIES.find(a=>a.id===slot.abilityId):null;
+    setDefaultTarget(slot.targetType);
+  }
+}
+
 function startCombat(node){
   currentNodeForCombat = node;
   const enemies = buildEnemyGroup(node.enemies||[]);
@@ -1267,14 +1581,13 @@ function startCombat(node){
     goldGained:0,
     phase:'select',
     pendingSlot: null,
-    pendingAction: null,
     pendingAbility: null,
     selectedEnemyIdx: null,
     selectedAllyIdx: null,
     roundNum: 1,
   };
-  // find first living char
   combatState.activeCharIdx = firstLiving(combatState.party);
+  autoArm();
   showScreen('s-combat');
   renderCombat();
 }
@@ -1449,9 +1762,12 @@ function handleAllyClick(idx){
 }
 
 function flashInvalidTarget(idx){
-  const cards = document.querySelectorAll('.enemy-card');
-  const card = cards[idx];
-  if(card){ card.classList.add('invalid-flash'); setTimeout(()=>card.classList.remove('invalid-flash'),380); }
+  const displayOrder = [6,7,8,3,4,5,0,1,2];
+  const domPos = displayOrder.indexOf(idx);
+  if(domPos<0) return;
+  const cells = document.querySelectorAll('.enemy-tile');
+  const cell = cells[domPos];
+  if(cell){ cell.classList.add('invalid-flash'); setTimeout(()=>cell.classList.remove('invalid-flash'),380); }
 }
 
 function doGrowl(enemyIdx){
@@ -1489,24 +1805,38 @@ function useHealOnAlly(allyIdx){
 function renderEnemies(){
   const el = document.getElementById('combat-enemies');
   el.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'enemy-grid';
+
+  // 0-2 = frontline (bottom row in DOM), 3-5 = midline, 6-8 = backline (top row)
+  const displayOrder = [6,7,8,3,4,5,0,1,2];
   const sIdx = combatState.selectedEnemyIdx;
   const inPending = combatState.phase==='pending';
-  combatState.enemies.forEach((e,i)=>{
-    const card = document.createElement('div');
-    card.className = 'enemy-card'+(e.dead?' dead':'');
-    const pct = Math.max(0,e.hp/e.maxHp*100);
-    if(inPending && !e.dead && (sIdx===i||sIdx===-1)) card.classList.add('selected-target');
-    card.innerHTML = `
-      <div class="enemy-icon">${e.icon||'👾'}</div>
-      <div style="flex:1">
-        <div class="enemy-name">${e.name}${e.dead?' (Dead)':''}</div>
-        <div style="font-size:0.6rem;color:var(--dim)">${e.dead?'--':e.hp+'/'+e.maxHp+' HP'}</div>
-        <div class="enemy-hp-bar"><div class="enemy-hp-fill" style="width:${pct}%"></div></div>
-        ${e.statusEffects?.length?`<div style="font-size:0.6rem;color:var(--purple)">${e.statusEffects.map(s=>s.name).join(', ')}</div>`:''}
-      </div>`;
-    if(!e.dead) card.onclick=()=>handleEnemyCardClick(i);
-    el.appendChild(card);
+
+  displayOrder.forEach(slotIdx=>{
+    const e = combatState.enemies[slotIdx];
+    const cell = document.createElement('div');
+    if(!e){
+      cell.className='enemy-tile empty-slot';
+      grid.appendChild(cell);
+      return;
+    }
+    cell.className='enemy-tile'+(e.dead?' dead':'');
+    const pct=Math.max(0,e.hp/e.maxHp*100);
+    if(inPending && !e.dead && (sIdx===slotIdx||sIdx===-1)) cell.classList.add('is-selected');
+    if(!e.dead) cell.classList.add('targetable');
+    cell.innerHTML=`
+      <div style="font-size:1.3rem;line-height:1">${e.icon||'👾'}</div>
+      <div style="font-size:0.48rem;color:var(--white);text-align:center;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%">${e.name}</div>
+      <div style="width:88%;height:3px;background:#1a0a0a;border-radius:2px;margin-top:3px;overflow:hidden">
+        <div style="height:100%;background:var(--red);border-radius:2px;width:${pct}%"></div>
+      </div>
+      <div style="font-size:0.45rem;color:var(--dim);margin-top:1px">${e.dead?'✗':e.hp+'/'+e.maxHp}</div>
+      ${e.statusEffects?.length?`<div style="font-size:0.42rem;color:var(--purple)">${e.statusEffects.map(s=>s.name[0]).join(',')}</div>`:''}`;
+    if(!e.dead) cell.onclick=()=>handleEnemyCardClick(slotIdx);
+    grid.appendChild(cell);
   });
+  el.appendChild(grid);
 }
 
 function renderCombatParty(){
@@ -1521,36 +1851,38 @@ function renderCombatParty(){
     const row = document.createElement('div');
     row.className = 'party-member-row'+(isActive?' active':'')+(ch.ko?' ko':'')+(isAllyTargeted?' ally-targeted':'');
     const pct = Math.max(0,ch.hp/ch.maxHp*100);
-    const hpClass = pct>50?'':pct>25?'low':'crit';
+    const hpCls = pct>50?'':pct>25?'low':'crit';
     const statusStr = ch.statusEffects?.length?ch.statusEffects.map(s=>s.name).join(', '):'';
-    row.innerHTML = `
+    row.innerHTML=`
       <div class="pm-icon${ch.ko?' ko':''}">${charPortrait(ch,44)}</div>
       <div class="pm-info">
         <div class="pm-name">${ch.name}${ch.ko?' (KO)':''}</div>
-        <div class="pm-hp-bar"><div class="pm-hp-fill ${hpClass}" style="width:${pct}%"></div></div>
+        <div class="pm-hp-bar"><div class="pm-hp-fill ${hpCls}" style="width:${pct}%"></div></div>
         <div class="pm-hp-text">${ch.hp}/${ch.maxHp} HP${statusStr?' · '+statusStr:''}</div>
       </div>`;
     if(isActive && !ch.ko && isPlayerTurn){
-      const actDiv = document.createElement('div');
-      actDiv.className = 'pm-actions';
+      const btns = document.createElement('div');
+      btns.className='pm-action-btns';
       getCharActionSlots(ch).forEach((slot,si)=>{
         if(!slot) return;
-        const btn = document.createElement('button');
-        const isPending = inPending && combatState.pendingSlot===si;
-        const isDefault = !inPending && (ch.lastCombatSlot??0)===si;
-        btn.className = 'pm-action-btn'+(isPending?' selected':isDefault?' default':'');
-        btn.disabled = !!slot.disabled;
-        btn.textContent = slot.label;
-        btn.onclick = ev=>{ ev.stopPropagation(); tapActionSlot(si); };
-        actDiv.appendChild(btn);
+        const btn=document.createElement('button');
+        const isPending=inPending && combatState.pendingSlot===si;
+        btn.className='pm-action-btn'+(isPending?' ready':'');
+        btn.disabled=!!slot.disabled;
+        btn.title=slot.label;
+        // Extract leading emoji as icon
+        btn.textContent=(slot.label.match(/^\S+/)||['?'])[0];
+        btn.onclick=ev=>{ ev.stopPropagation(); tapActionSlot(si); };
+        btns.appendChild(btn);
       });
-      row.appendChild(actDiv);
+      row.appendChild(btns);
     }
     if(inPending && !ch.ko){
-      const activeSlots = getCharActionSlots(combatState.party[combatState.activeCharIdx]);
-      const slot = activeSlots[combatState.pendingSlot];
+      const activeSlots=getCharActionSlots(combatState.party[combatState.activeCharIdx]);
+      const slot=activeSlots[combatState.pendingSlot];
       if(slot && slot.targetType==='ally'){ row.style.cursor='pointer'; row.onclick=()=>handleAllyClick(i); }
     }
+
     el.appendChild(row);
   });
 }
@@ -1562,75 +1894,45 @@ function renderActions(){
   const ch = combatState.party[combatState.activeCharIdx];
 
   if(combatState.turn!=='player'||!ch||ch.ko){
-    al.textContent = 'ENEMY TURN...';
+    al.textContent='ENEMY TURN...';
+    return;
+  }
+
+  if(combatState.phase==='select'){
+    al.textContent=`${ch.name}'s TURN`;
+    // Actions are rendered inline in the party member row
     return;
   }
 
   if(combatState.phase==='target_enemy'||combatState.phase==='ability_target_enemy'){
-    al.textContent = 'SELECT TARGET';
-    const back = document.createElement('button');
+    al.textContent='SELECT TARGET';
+    const back=document.createElement('button');
     back.className='action-btn';
     back.textContent='← BACK';
-    back.onclick=()=>{ combatState.phase='select'; combatState.pendingAction=null; combatState.pendingAbility=null; renderCombat(); };
+    back.onclick=()=>{combatState.phase='select';combatState.pendingAction=null;combatState.pendingAbility=null;renderCombat();};
     ar.appendChild(back);
     return;
   }
   if(combatState.phase==='ability_target_ally'||combatState.phase==='target_ally'){
-    al.textContent = 'SELECT ALLY';
-    const back = document.createElement('button');
+    al.textContent='SELECT ALLY';
+    const back=document.createElement('button');
     back.className='action-btn';
     back.textContent='← BACK';
-    back.onclick=()=>{ combatState.phase='select'; combatState.pendingAction=null; combatState.pendingAbility=null; renderCombat(); };
+    back.onclick=()=>{combatState.phase='select';combatState.pendingAction=null;combatState.pendingAbility=null;renderCombat();};
     ar.appendChild(back);
     renderAllyTargets();
     return;
   }
   if(combatState.phase==='item_select'){
-    al.textContent = 'USE ITEM';
+    al.textContent='USE ITEM';
     renderItemPicker();
     return;
   }
   if(combatState.phase==='ability_select'){
-    al.textContent = 'USE ABILITY';
+    al.textContent='USE ABILITY';
     renderAbilityPicker(ch);
     return;
   }
-
-  al.textContent = `${ch.name}'s TURN`;
-
-  // Attack / Ability
-  if(ch.type==='mutant' && ch.abilities){
-    const activeAbs = ch.abilities.filter(a=>a && ABILITIES.find(x=>x.id===a&&x.type==='active'));
-    if(activeAbs.length){
-      const ab = document.createElement('button');
-      ab.className='action-btn active';
-      ab.textContent='⚡ ABILITY';
-      ab.onclick=()=>{ combatState.phase='ability_select'; renderCombat(); };
-      ar.appendChild(ab);
-    } else {
-      addAttackBtn(ar,ch);
-    }
-    // Also show attack
-    addAttackBtn(ar,ch);
-  } else {
-    addAttackBtn(ar,ch);
-  }
-
-  // Item
-  const itemBtn = document.createElement('button');
-  itemBtn.className='action-btn';
-  itemBtn.textContent='🎒 ITEM';
-  const hasItems = G.inventory.some(i=>CONSUMABLES[i.id]&&i.qty>0);
-  if(!hasItems) itemBtn.disabled=true;
-  itemBtn.onclick=()=>{ combatState.phase='item_select'; renderCombat(); };
-  ar.appendChild(itemBtn);
-
-  // Flee
-  const fleeBtn = document.createElement('button');
-  fleeBtn.className='action-btn red';
-  fleeBtn.textContent='🏃 FLEE';
-  fleeBtn.onclick=()=>attemptFlee();
-  ar.appendChild(fleeBtn);
 }
 
 function addAttackBtn(ar, ch){
@@ -1899,16 +2201,15 @@ function endPlayerAction(){
   combatState.selectedAllyIdx=null;
   combatState.pendingAbility=null;
   renderCombat();
-  // check win
   if(combatState.enemies.every(e=>e.dead)){
     setTimeout(showCombatResults, 600);
     return;
   }
-  // next living char
   const next = nextLivingChar(combatState.party, combatState.activeCharIdx);
   if(next>=0){
     combatState.activeCharIdx = next;
-    // apply regen
+    combatState.phase = 'select';
+    autoArm();
     const ch = combatState.party[next];
     if(ch.abilities && ch.abilities.includes('regen')){
       ch.hp = Math.min(ch.maxHp, ch.hp+3);
@@ -1916,7 +2217,6 @@ function endPlayerAction(){
     }
     renderCombat();
   } else {
-    // all player chars acted — enemy turn
     setTimeout(doEnemyTurn, 500);
   }
 }
@@ -1979,6 +2279,7 @@ function doEnemyTurn(){
   combatState.roundNum++;
   combatState.activeCharIdx = firstLiving(combatState.party);
   combatState.phase='select';
+  autoArm();
   renderCombat();
 }
 
@@ -2071,8 +2372,18 @@ function addResult(cont, text, cls=''){
 function endCombat(){
   const node = currentNodeForCombat;
   combatState=null;
-  if(node) advanceFromNode(node.id);
-  else { showScreen('s-adventure'); renderAdventureFlow(); }
+  if(!node){ showScreen('s-adventure'); renderAdventureFlow(); return; }
+  if(node._failReturn!==undefined){
+    G.currentNodeId=node._failReturn;
+    checkMonsterTransform(()=>{ showScreen('s-adventure'); renderAdventureFlow(); });
+    return;
+  }
+  advanceFromNode(node.id);
+}
+
+function startFailCombat(returnNodeId){
+  G.currentNodeId=returnNodeId;
+  startCombat({type:'combat',title:'Insect Swarm!',desc:'The wrong setting releases an angry swarm.',enemies:[{id:'insect_swarm',count:2}],_failReturn:returnNodeId});
 }
 
 function xpThreshold(level){ return level*20; }
@@ -2162,7 +2473,8 @@ function renderRP(){
 
   const choicesEl = document.getElementById('rp-choices');
   choicesEl.innerHTML='';
-  (snode.choices||[]).forEach(ch=>{
+  const visibleChoices=(snode.choices||[]).filter(ch=>!ch.condition||ch.condition());
+  visibleChoices.forEach(ch=>{
     const btn = document.createElement('button');
     btn.className='rp-choice-btn';
     btn.textContent=ch.text;
@@ -2173,6 +2485,8 @@ function renderRP(){
 
 function applyRPEffect(effect){
   if(effect.addItem) addItem(effect.addItem,1);
+  if(effect.setFlag) G.flags[effect.setFlag]=true;
+  if(effect.failCombat!==undefined && rpState) rpState._pendingFailCombat=effect.failCombat;
   if(effect.xpAll){
     G.party.forEach(c=>{
       c.xp=(c.xp||0)+effect.xpAll;
@@ -2210,9 +2524,10 @@ function handleRPChoice(choice){
     return;
   }
   if(choice.next===null||choice.next===undefined){
-    // end of script
     const node = rpState.node;
+    const failNode = rpState._pendingFailCombat;
     rpState=null;
+    if(failNode!==undefined){ startFailCombat(failNode); return; }
     advanceFromNode(node.id);
     return;
   }
