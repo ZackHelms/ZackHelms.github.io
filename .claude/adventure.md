@@ -159,6 +159,7 @@ Scripted story arc running after the tutorial. New mechanics:
 
 ## TODO
 
+- [ ] Story review pass — revisit Green Eyes narrative text for tone, pacing, and continuity; incorporate any feedback from playtesting
 - [ ] Shop RP encounter (buy weapons, armor, potions)
 - [ ] Quest system (tracked quests, bonus XP from quest completion)
 - [ ] Road zone encounters (bandits, merchant)
