@@ -55,6 +55,61 @@
 - **Format**: 200 entries × 2 bytes, little-endian unsigned 16-bit
 - **Range**: 20–9999 for standard monsters; bosses have 5000–25690
 
+## Graphics & Tile Data
+
+### DMG Color Palette
+| Index | GB color | Hex (RGB) | Name |
+|---|---|---|---|
+| 0 | lightest | #9BBC0F | Off-white/green |
+| 1 | light | #8BAC0F | Light green |
+| 2 | dark | #306230 | Dark green |
+| 3 | darkest | #0F380F | Near-black green |
+
+### Font / Text Tiles (1bpp)
+- **File offset**: `0x0F100` — `0x0F4B7` (Bank 3, CPU address 0x7100 when bank 3 selected)
+- **Count**: 119 tiles × 8 bytes = 0x3B8 bytes
+- **Format**: 1 byte per row (8 rows), bit 7 = leftmost pixel; 1=dark (color 3), 0=light (color 0)
+- **VRAM destination**: 0x9000 (tile area 2, signed-index mode)
+- **Startup copy**: Bank0+0x0305 — `LD A,3; RST 28h; LD DE,0x7100; LD HL,0x9000; LD BC,0x03B8; CALL 0x043D`
+  - Copy routine doubles each byte to both VRAM bitplanes (1bpp → 2bpp), yielding color 0 or color 3 only
+- **Tile index → character mapping**:
+  - `0–9` = digits 0–9
+  - `10–35` = letters A–Z (A=10, B=11, … Z=35)
+  - `36–63` = lowercase a–z
+  - `64–103` = blank/space tiles
+  - `104–118` = special characters (punctuation, symbols)
+- **Reference image**: `FFL1/img/tile_sheet_1bpp_large.png` — 119 tiles at 6× scale with index labels
+
+### Bank 2 Graphics Tiles (2bpp)
+- **File offset**: `0x08000` — `0x0BFFF`
+- **Format**: Standard GB 2bpp tiles, 16 bytes each (2 bytes/row: lo bitplane, hi bitplane)
+- **Count**: 1024 tiles
+- **Content**: World map tiles, sprites, UI graphics, dungeon tiles
+- **Reference image**: `FFL1/img/bank2_tile_grid.png` — all 1024 tiles, 32 per row
+
+### Bank Switch Mechanism
+- **Instruction**: `RST 0x28` (not a standard MBC register write)
+- **Usage**: Load bank number into A, then `RST 0x28`
+- **Example**: Bank 3 → `LD A, 3; RST 0x28`
+
+### Title Screen
+- **BG tilemap**: **Dynamically built at runtime** — no static tilemap stored in ROM.
+  Text positions are written to VRAM by the text renderer; searching ROM for static BG maps
+  for the title screen is a dead end.
+- **Authoritative pixel source**: `FFL1/img/title_screen.png`
+  - 160×144 lossless PNG cropped from emulator screenshot (nearest-neighbor resize)
+  - Edit individual pixels directly in this file
+- **5× upscale**: `FFL1/img/title_screen_5x.png` (800×720, nearest-neighbor, for reference)
+
+### img/ Directory Contents
+| File | Source | Size | Notes |
+|---|---|---|---|
+| `title_screen.png` | Emulator screenshot → nearest-neighbor resize | 160×144 | Editable pixel-by-pixel |
+| `title_screen_5x.png` | `title_screen.png` upscaled | 800×720 | Reference only |
+| `tile_sheet_1bpp_large.png` | ROM 0x0F100, 119 tiles | varies | 6× scale, indexed labels |
+| `bank2_tile_grid.png` | ROM 0x08000–0x0BFFF, 1024 tiles | varies | 32 tiles/row, 2bpp |
+| `gameboy.png` | Hand-authored asset | — | Shell background image |
+
 ## Character Encoding Table
 ```
 0x8A=a  0x8B=b  0x8C=c  0x8D=d  0x8E=e  0x8F=f

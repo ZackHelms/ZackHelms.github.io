@@ -7,37 +7,40 @@ A web port and mechanics wiki for **Final Fantasy Legend 1** (Game Boy, 1989), a
 ```
 FFL1/
   .claude/          ← Context files for Claude (you are here)
+  img/              ← ROM-extracted and authored graphics
+    title_screen.png        ← 160×144 lossless PNG; editable pixel-by-pixel
+    title_screen_5x.png     ← 800×720 nearest-neighbor upscale (reference)
+    tile_sheet_1bpp_large.png ← 119 font tiles from ROM 0x0F100, indexed
+    bank2_tile_grid.png     ← 1024 2bpp graphics tiles from Bank 2
+    gameboy.png             ← Shell background image
+  rom/              ← ROM binary (gitignored — place ffl1.gb here for emulator)
   data/             ← Game data files
     monsters.json   ← 200 monsters: name, HP, STR, DEF, AGI, MANA — FROM ROM
     abilities.json  ← 252 abilities/items/weapons: name + type — FROM ROM
-    items.json      ← Weapons, armor, spells, usable items (categorized from abilities.json)
-                       NOTE: stat_bonus, base_power, uses, stat_used, element fields are
-                       INFERRED, not extracted from ROM. Do not use as a mechanics reference.
-    transformation.json ← Monster family system — family names from ROM index analysis;
-                          transformation rules (eat count, trigger) NOT from ROM
-    world.json      ← World structure — NOT from ROM; designed for game engine use
-    shops.json      ← Shop inventories — NOT from ROM
-    encounters.json ← Random encounter tables — NOT from ROM
-    dialogue.json   ← Story text and NPC dialogue — NOT from ROM
-  js/               ← Game engine JavaScript modules
-  css/              ← Shared styles
+  v001/             ← Archived first-pass JS game engine (not actively developed)
+    game.html, js/, css/, data/
   index.html        ← Hub page (tythos.com/FFL1/)
   general.html      ← Mechanics wiki (ROM data only)
   monsters.html     ← Monster database (ROM data)
   mutants.html      ← Ability database (ROM data)
   humans.html       ← Armor and usable item name list (ROM data)
   items.html        ← Full item name/type database (ROM data)
-  game.html         ← Playable JS port
+  game.html         ← v002: Game Boy shell + 160×144 canvas; shows title_screen.png
+  emulator.html     ← EmulatorJS wrapper (requires ffl1.gb in rom/)
 ```
 
 ## ROM-Extracted Data
-Only two data files are directly sourced from the ROM binary:
+Data files directly sourced from the ROM binary:
 - `monsters.json` — names from 0x14000, HP from 0x1B254, stats from 0x1AAE8
 - `abilities.json` — names and type bytes from 0x14640
+- `img/title_screen.png` — 160×144 pixel-accurate title screen (nearest-neighbor from emulator screenshot)
+- `img/tile_sheet_1bpp_large.png` — 119 font tiles from ROM offset 0x0F100
+- `img/bank2_tile_grid.png` — 1024 graphics tiles from ROM offset 0x08000
 
-Everything else in `data/` was generated to support the JS game engine and
+Everything else in `data/` (v001 data files) was generated to support the JS game engine and
 should not be treated as authoritative for the original game's mechanics.
 See `mechanics.md` for the full list of what has and has not been extracted.
+See `rom-data.md` for tile/graphics offsets and the img/ directory inventory.
 
 ## Key Design Decisions
 - **Data-first**: All game data lives in `data/*.json` — edit those to mod the game
@@ -47,7 +50,8 @@ See `mechanics.md` for the full list of what has and has not been extracted.
 
 ## Working on This
 - Read the relevant context file before editing game systems
-- `monsters.json` and `abilities.json` are ROM-extracted; all other data files are not
-- For game engine changes, see `engine.md`
-- For ROM data reference (offsets, encoding, byte layouts), see `rom-data.md`
-- For mechanics reference (what is and isn't extracted), see `mechanics.md`
+- `monsters.json` and `abilities.json` are ROM-extracted; v001 data files are not
+- For ROM data reference (offsets, encoding, byte layouts, tile/graphics data), see `rom-data.md`
+- For mechanics reference (what is and isn't extracted from ROM), see `mechanics.md`
+- For v001 engine architecture reference (archived), see `engine.md`
+- **SOP**: See `FFL1/CLAUDE.md` for the standing procedure after any ROM exploration work
