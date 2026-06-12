@@ -75,6 +75,7 @@ top = 29% − element_height% / 2  = 29% − (W% × 0.2085)
 | 85%    | 35.4%          | 11.3% |
 | 88%    | 36.7%          | 10.65% |
 | 90%    | 37.5%          | 10.25% |
+| 91%    | 37.95%         | 10.03% |
 | 95%    | 39.6%          | 9.2%  |
 
 **Why `height: XX%` doesn't work for resizing:** the gameboy.png "screen hole" is a dark teal body color, not transparent/black. The `background: #000` on the container made size changes invisible. Using `aspect-ratio` and a smaller `width` lets the gameboy bezel show around the game canvas, making size changes visible.
@@ -85,7 +86,7 @@ top = 29% − element_height% / 2  = 29% − (W% × 0.2085)
 
 - 160×144 canvas, CSS `transform:scale()` to fit shell screen area
 - Renders `img/title_screen.png` on load; fallback is solid DMG color #9BBC0F
-- Game screen: `#screen-area` at `top:10.65%; left:50%; width:88%; aspect-ratio:160/144; transform:translateX(-50%)`
+- Game screen: `#screen-area` at `top:9.9%; left:50%; width:91%; aspect-ratio:160/144; transform:translateX(-50%)`
 - Touch zones for all 8 buttons; debug mode via `?debug` param or DBG button
 - Off button (⏻, top-left): shows power-off confirm overlay; navigates to `index.html` on confirm
 - Reset button (↺, top-right): redraws title screen; A+B+Select+Start combo also triggers reset
