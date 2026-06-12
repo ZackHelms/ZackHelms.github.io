@@ -163,7 +163,7 @@
     }
 
     /* ── OFF / RESET BUTTONS ───────────────────────────────────────────────── */
-    #off-btn, #rst-btn {
+    #off-btn, #rst-btn, #rld-btn {
       position: absolute;
       top: 1.5%;
       background: rgba(6, 6, 14, 0.65);
@@ -182,6 +182,7 @@
     }
     #off-btn { left: 2%; }
     #rst-btn { right: 2%; }
+    #rld-btn { left: 50%; transform: translateX(-50%); }
 
     /* ── POWER OFF OVERLAY ─────────────────────────────────────────────────── */
     #poweroff-overlay {
@@ -246,6 +247,7 @@
 
       <button id="dbg-btn" aria-label="Toggle debug mode">DBG</button>
       <button id="off-btn" aria-label="Power off">⏻</button>
+      <button id="rld-btn" aria-label="Reload">↻</button>
       <button id="rst-btn" aria-label="Reset">↺</button>
 
       <div class="touch-zone" id="dpad-up"    data-key="ArrowUp"    aria-label="Up"></div>
@@ -395,6 +397,17 @@
     bindBtn(offBtn, () => poOvl.classList.add('active'));
     bindBtn(rstBtn, resetGame);
     bindBtn(poYes,  () => { window.location.href = 'index.html'; });
+
+    const rldBtn = document.getElementById('rld-btn');
+    bindBtn(rldBtn, function hardReload() {
+      if ('caches' in window) {
+        caches.keys()
+          .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+          .finally(() => location.reload(true));
+      } else {
+        location.reload(true);
+      }
+    });
 
     poOvl.addEventListener('touchstart', e => { e.stopPropagation(); e.preventDefault(); }, { passive: false });
     poOvl.addEventListener('touchend',   e => { e.stopPropagation(); e.preventDefault(); if (e.target === poOvl) poOvl.classList.remove('active'); }, { passive: false });
