@@ -132,8 +132,8 @@
     }
 
     /* D-pad arms */
-    #dpad-up    { top: 68%;   left: 15%;   width: 8.65%; height: 5.52%; }
-    #dpad-down  { top: 77.7%; left: 15%;   width: 8.65%; height: 5.52%; }
+    #dpad-up    { top: 68%;   left: 15.5%; width: 8.65%; height: 5.52%; }
+    #dpad-down  { top: 77.5%; left: 15.5%; width: 8.65%; height: 5.52%; }
     #dpad-left  { top: 72.6%; left:  5.5%; width: 12%;   height: 4%;    }
     #dpad-right { top: 72.6%; left: 25.75%;width: 12%;   height: 4%;    }
 
@@ -169,16 +169,39 @@
     #btn-select.pressed { background: rgba(255, 127,  39, 0.65); box-shadow: 0 0 10px rgba(255,127, 39,0.7); }
     #btn-start.pressed  { background: rgba(130,  65,  20, 0.65); box-shadow: 0 0 10px rgba(200,100, 40,0.7); }
 
-    /* ── DEBUG MODE (add ?debug to URL) ─────────────────────────────────────── */
-    body.debug-mode #dpad-up    { outline: 2px solid rgba(  0,150,  0,0.8); background: rgba(  0,150,  0,0.15); }
-    body.debug-mode #dpad-down  { outline: 2px solid rgba(  0, 75,  0,0.8); background: rgba(  0, 75,  0,0.15); }
-    body.debug-mode #dpad-left  { outline: 2px solid rgba(  0,255,  0,0.8); background: rgba(  0,255,  0,0.15); }
-    body.debug-mode #dpad-right { outline: 2px solid rgba(  0,100,  0,0.8); background: rgba(  0,100,  0,0.15); }
-    body.debug-mode #btn-a      { outline: 2px solid rgba(  0,107,153,0.8); background: rgba(  0,107,153,0.15); }
-    body.debug-mode #btn-b      { outline: 2px solid rgba(  0,162,232,0.8); background: rgba(  0,162,232,0.15); }
-    body.debug-mode #btn-select { outline: 2px solid rgba(255,127, 39,0.8); background: rgba(255,127, 39,0.15); }
-    body.debug-mode #btn-start  { outline: 2px solid rgba(130, 65, 20,0.8); background: rgba(130, 65, 20,0.15); }
-    body.debug-mode #emulator-container { outline: 2px solid rgba(255,0,0,0.6); }
+    /* ── DEBUG MODE ──────────────────────────────────────────────────────────
+     * Lower specificity (0,0,2,0) than #id.pressed (0,1,1,0) — pressing shows through.
+     */
+    .debug-mode .touch-zone {
+      background: rgba(255, 255, 255, 0.10);
+      outline: 1px solid rgba(255, 255, 255, 0.25);
+    }
+    .debug-mode #emulator-container { outline: 2px solid rgba(255, 0, 0, 0.6); }
+
+    /* ── DBG TOGGLE BUTTON ─────────────────────────────────────────────────── */
+    #dbg-btn {
+      position: absolute;
+      top: 56%; left: 88%;
+      transform: translateX(-50%);
+      background: rgba(6, 6, 14, 0.65);
+      color: rgba(57, 255, 20, 0.6);
+      border: 1px solid rgba(57, 255, 20, 0.25);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(0.3rem, 1.1vw, 0.5rem);
+      letter-spacing: 0.08em;
+      padding: 3px 7px;
+      border-radius: 3px;
+      cursor: pointer;
+      z-index: 20;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .debug-mode #dbg-btn {
+      background: rgba(57, 255, 20, 0.15);
+      color: #39ff14;
+      border-color: rgba(57, 255, 20, 0.6);
+    }
   </style>
 </head>
 <body>
@@ -198,6 +221,9 @@
 
       <!-- EmulatorJS mounts here -->
       <div id="emulator-container"></div>
+
+      <!-- Debug toggle -->
+      <button id="dbg-btn" aria-label="Toggle debug mode">DBG</button>
 
       <!-- Touch zones -->
       <div class="touch-zone" id="dpad-up"    data-key="ArrowUp"    aria-label="Up"></div>
@@ -219,6 +245,11 @@
     if (new URLSearchParams(location.search).has('debug')) {
       document.body.classList.add('debug-mode');
     }
+
+    const dbgBtn = document.getElementById('dbg-btn');
+    dbgBtn.addEventListener('touchstart',  e => { e.stopPropagation(); e.preventDefault(); }, { passive: false });
+    dbgBtn.addEventListener('touchend',    e => { e.stopPropagation(); e.preventDefault(); document.body.classList.toggle('debug-mode'); }, { passive: false });
+    dbgBtn.addEventListener('click',       ()  => document.body.classList.toggle('debug-mode'));
 
     // ── IMAGE → CONTROLS LAYER SIZING ─────────────────────────────────────────
     const img   = document.getElementById('gameboy-bg');
