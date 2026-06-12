@@ -68,6 +68,47 @@
 0xFF = string terminator
 ```
 
+## DTE (Double Tile Encoding) Text Compression
+
+FFL1 uses DTE compression for UI and story text. Two lookup tables map single bytes to character pairs:
+
+- **DTE1**: bytes `$50`–`$8F` → 64 pairs (128 bytes) — most frequent bigrams
+- **DTE2**: bytes `$C0`–`$F6` → 55 pairs (110 bytes) — secondary bigrams
+
+### DTE Table Location
+- **ROM offset**: `0x14E40` (bank 5, CPU address `0x4E40`) — loaded into RAM at startup
+- **Load destination**: RAM `$C800` (DTE1, 128 bytes) and `$C860` (DTE2, 110 bytes)
+- **Load code**: bank 0 at `0x02DD`; copies 256 bytes from ROM bank 5 `$4E40` → RAM `$C800`
+
+### Text Decoder Routines (Bank 0)
+| Address | Purpose |
+|---|---|
+| `0x0918` | Main text decoder (menu/stat display); uses DTE tables |
+| `0x0F36` | Secondary text decoder (story/UI text) |
+| `0x0000` | RST $00 helper: adds A to HL (indexed table lookup) |
+
+### DTE Encoding Note
+The DTE tables at `0x14E40` encode number/stat display characters, NOT story text letters directly. Story text uses the same tables but encodes all letter bigrams — even 4-letter sequences like "been", "said", "tower" have every bigram DTE-compressed, making raw-byte searching for English words impossible without decoding.
+
+### Starting Character Table
+- **Offset**: `0x17F90` (bank 5)
+- **Format**: 8 bytes — monster/class indices for initial character creation screen
+- **Values**: `B1 B2 B3 B4 12 24 48 78` → decimal `[177, 178, 179, 180, 18, 36, 72, 120]`
+- **Meaning**: human-m, human-f, mutant-m, mutant-f, CLIPPER(18), REDBULL(36), WERERAT(72), ZOMBIE(120)
+- **Confidence**: HIGH (directly read from ROM)
+
+### Player Class Stubs (Bank 5)
+- **Offset**: `0x14568` (bank 5)
+- **Format**: same as monster name table (8 bytes per entry)
+- **Indices 173–188**: All labeled "human" or "mutant" with gender byte at position 7
+  - `0x96` ('m') = male, `0x8F` ('f') = female
+- 16 total entries for human/mutant variants (guild NPC characters)
+
+### Bank 3 UI Text (confirmed)
+- **Offset**: `0x0ECC8` (bank 3)
+- **Strings found**: `start`, `continue`, `fight`, `run`, `item` (using normalbase encoding)
+- These are dynamically rendered to VRAM by the text engine at runtime
+
 ## Monster Index Ranges
 | Range | Family/Type |
 |---|---|
