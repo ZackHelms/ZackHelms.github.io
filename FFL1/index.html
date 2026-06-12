@@ -23,19 +23,29 @@
 .hero .sub { font-size: 0.7rem; color: var(--dim2); letter-spacing: 5px; margin-bottom: 24px; }
 .hero p { font-size: 0.85rem; color: var(--white); max-width: 60ch; margin: 0 auto 24px; }
 .play-btn {
-  display: inline-block;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
   background: linear-gradient(135deg, #ffc300, #ff8c00);
   color: #06060e;
   font-family: 'Black Ops One', sans-serif;
-  font-size: 1rem;
   letter-spacing: 3px;
-  padding: 12px 32px;
+  padding: 10px 28px 8px;
   border-radius: 4px;
   text-decoration: none;
   transition: all 0.2s;
   box-shadow: 0 0 24px #ffc30055;
+  min-width: 120px;
 }
 .play-btn:hover { box-shadow: 0 0 40px #ffc30099; transform: translateY(-2px); color: #06060e; }
+.play-btn .btn-label { font-size: 1rem; line-height: 1; }
+.play-btn .btn-mode  { font-size: 0.55rem; letter-spacing: 2px; opacity: 0.75; margin-top: 3px; font-family: 'Share Tech Mono', monospace; }
+.play-btn-emu {
+  background: linear-gradient(135deg, #00c8ff, #007baa);
+  box-shadow: 0 0 24px #00f5ff44;
+}
+.play-btn-emu:hover { box-shadow: 0 0 40px #00f5ff99; color: #06060e; }
+.play-btns { display: inline-flex; gap: 14px; align-items: stretch; flex-wrap: wrap; justify-content: center; margin-bottom: 8px; }
 .wiki-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -93,8 +103,16 @@
     <div class="sub">MAKAI TOUSHI SA·GA · GAME BOY · 1989</div>
     <p>The original SaGa game. A tower-climbing RPG featuring Humans, Mutants, and Monsters with
     radically different progression systems. This site is a mechanics wiki and playable JavaScript port.</p>
-    <a href="game.html" class="play-btn">▶ PLAY NOW</a>
-    <br>
+    <div class="play-btns">
+      <a href="game.html" class="play-btn">
+        <span class="btn-label">▶ PLAY</span>
+        <span class="btn-mode">webapp</span>
+      </a>
+      <a href="emulator.html" class="play-btn play-btn-emu">
+        <span class="btn-label">▶ PLAY</span>
+        <span class="btn-mode">emulator</span>
+      </a>
+    </div>
     <div class="rom-badge">ROM-extracted data · <span>200 monsters</span> · <span>252 abilities</span> · <span>8 spells</span></div>
   </div>
 
