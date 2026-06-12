@@ -19,6 +19,7 @@ export class Engine {
     this.party = null;
     this.keys = {};
     this.prevKeys = {};
+    this._holdTimers = {};
     this._raf = null;
 
     // World state
@@ -91,6 +92,14 @@ export class Engine {
     return this.keys[code] && !this.prevKeys[code];
   }
 
+  // True on first frame AND after initial 250 ms delay every ~83 ms (for held movement)
+  _held(code) {
+    if (!this.keys[code]) return false;
+    if (!this.prevKeys[code]) return true;
+    const t = this._holdTimers[code] || 0;
+    return t >= 15 && (t - 15) % 5 === 0;
+  }
+
   async start() {
     await loadAllData();
     this.state = STATES.TITLE;
@@ -101,6 +110,17 @@ export class Engine {
     this._raf = requestAnimationFrame(() => {
       this._update();
       this._render();
+      // Track how many consecutive frames each key has been held
+      for (const code of Object.keys(this.keys)) {
+        if (this.prevKeys[code]) this._holdTimers[code] = (this._holdTimers[code] || 0) + 1;
+        else this._holdTimers[code] = 0;
+      }
+      for (const code of Object.keys(this._holdTimers)) {
+        if (!this.keys[code]) delete this._holdTimers[code];
+      }
+      for (const code of Object.keys(this.prevKeys)) {
+        if (!this.keys[code]) delete this.prevKeys[code];
+      }
       Object.assign(this.prevKeys, this.keys);
       this._loop();
     });
@@ -215,10 +235,10 @@ export class Engine {
     }
 
     let dx = 0, dy = 0;
-    if (this._pressed('ArrowUp'))    { dy = -1; this.party.playerFacing = 'up'; }
-    if (this._pressed('ArrowDown'))  { dy =  1; this.party.playerFacing = 'down'; }
-    if (this._pressed('ArrowLeft'))  { dx = -1; this.party.playerFacing = 'left'; }
-    if (this._pressed('ArrowRight')) { dx =  1; this.party.playerFacing = 'right'; }
+    if (this._held('ArrowUp'))    { dy = -1; this.party.playerFacing = 'up'; }
+    if (this._held('ArrowDown'))  { dy =  1; this.party.playerFacing = 'down'; }
+    if (this._held('ArrowLeft'))  { dx = -1; this.party.playerFacing = 'left'; }
+    if (this._held('ArrowRight')) { dx =  1; this.party.playerFacing = 'right'; }
 
     if (dx === 0 && dy === 0) return;
 
