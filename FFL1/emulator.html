@@ -133,18 +133,18 @@
 
     /* D-pad arms */
     #dpad-up    { top: 68%;   left: 15%;  width: 12%; height: 4%;  }
-    #dpad-down  { top: 78%;   left: 16%;  width: 12%; height: 4%;  }
+    #dpad-down  { top: 77.9%; left: 15.5%;  width: 12%; height: 4%;  }
     #dpad-left  { top: 72.5%; left:  6%;  width: 12%; height: 4%;  }
     #dpad-right { top: 72.5%; left: 26%;  width: 12%; height: 4%;  }
 
     /* A button */
     #btn-a {
-      top: 69.5%; left: 80%; width: 14%;
+      top: 69.5%; left: 79.5%; width: 14%;
       aspect-ratio: 1; border-radius: 50%;
     }
     /* B button */
     #btn-b {
-      top: 73%; left: 64%; width: 14%;
+      top: 73%; left: 63.5%; width: 14%;
       aspect-ratio: 1; border-radius: 50%;
     }
     /* SELECT */
@@ -258,40 +258,51 @@
       return map[code] || code;
     }
 
-    document.querySelectorAll('.touch-zone[data-key]').forEach(el => {
-      const code = el.dataset.key;
+    const touchZones = Array.from(document.querySelectorAll('.touch-zone[data-key]'));
+    const touchState = new Map(); // touchId → Set<element> pressed by that finger
 
-      el.addEventListener('touchstart', e => {
-        e.preventDefault();
-        el.classList.add('pressed');
-        keyDown(code);
-      }, { passive: false });
+    function zonesAt(x, y) {
+      return touchZones.filter(el => {
+        const r = el.getBoundingClientRect();
+        return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+      });
+    }
 
-      const release = e => {
-        e.preventDefault();
-        el.classList.remove('pressed');
-        keyUp(code);
-      };
-      el.addEventListener('touchend',    release, { passive: false });
-      el.addEventListener('touchcancel', release, { passive: false });
+    function pressedByOther(zone, excludeId) {
+      for (const [id, set] of touchState) {
+        if (id !== excludeId && set.has(zone)) return true;
+      }
+      return false;
+    }
 
-      el.addEventListener('touchmove', e => {
-        e.preventDefault();
-        const t = e.touches[0];
-        const rect = el.getBoundingClientRect();
-        const inside = t.clientX >= rect.left && t.clientX <= rect.right &&
-                       t.clientY >= rect.top  && t.clientY <= rect.bottom;
-        if (!inside) {
-          el.classList.remove('pressed');
-          keyUp(code);
+    function applyTouch(id, x, y) {
+      const next = new Set(zonesAt(x, y));
+      const prev = touchState.get(id) ?? new Set();
+      for (const zone of next) {
+        if (!prev.has(zone)) { zone.classList.add('pressed'); keyDown(zone.dataset.key); }
+      }
+      for (const zone of prev) {
+        if (!next.has(zone) && !pressedByOther(zone, id)) {
+          zone.classList.remove('pressed'); keyUp(zone.dataset.key);
         }
-      }, { passive: false });
-    });
+      }
+      touchState.set(id, next);
+    }
 
-    document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
-    document.addEventListener('touchstart', e => {
-      if (e.touches.length > 1) e.preventDefault();
-    }, { passive: false });
+    function releaseTouch(id) {
+      const zones = touchState.get(id) ?? new Set();
+      touchState.delete(id);
+      for (const zone of zones) {
+        if (!pressedByOther(zone, id)) {
+          zone.classList.remove('pressed'); keyUp(zone.dataset.key);
+        }
+      }
+    }
+
+    document.addEventListener('touchstart',  e => { e.preventDefault(); for (const t of e.changedTouches) applyTouch(t.identifier, t.clientX, t.clientY); }, { passive: false });
+    document.addEventListener('touchmove',   e => { e.preventDefault(); for (const t of e.changedTouches) applyTouch(t.identifier, t.clientX, t.clientY); }, { passive: false });
+    document.addEventListener('touchend',    e => { e.preventDefault(); for (const t of e.changedTouches) releaseTouch(t.identifier); }, { passive: false });
+    document.addEventListener('touchcancel', e => {                      for (const t of e.changedTouches) releaseTouch(t.identifier); }, { passive: false });
 
     // ── ROM CHECK + EMULATORJS BOOTSTRAP ─────────────────────────────────────
     // EmulatorJS config must be set before loader.js is appended.
