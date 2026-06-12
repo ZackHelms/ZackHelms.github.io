@@ -31,6 +31,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 |---|---|---|
 | Adventure (`games/adventure.html`) | `.claude/adventure.md` | Any work on the adventure RPG — character systems, combat, RP encounters, save system, progression |
 | Sorcery (`games/sorcery.html`) | `.claude/sorcery.md` | Any work on the sorcery tower-defense game |
+| FFL1 (`FFL1/`) | `FFL1/.claude/` (4 files) | Any work on the Final Fantasy Legend JS recreation — ROM data reference, mechanics, engine architecture, overview |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 

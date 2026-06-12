@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Items &amp; Gear — FFL1</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.tab-bar { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:20px; }
+.tab-btn {
+  padding:8px 18px; font-size:0.72rem; letter-spacing:1px;
+  color:var(--dim2); cursor:pointer; border:none; background:none;
+  font-family:'Share Tech Mono',monospace;
+  border-bottom:2px solid transparent; transition:all 0.15s;
+}
+.tab-btn.active { color:var(--gold); border-bottom-color:var(--gold); }
+.tab-pane { display:none; }
+.tab-pane.active { display:block; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FFL1</h1>
+  <div class="breadcrumb">
+    <a href="/">tythos.com</a><span>/</span>
+    <a href="index.html">FFL1</a><span>/</span>
+    <span>Items</span>
+  </div>
+</header>
+<nav>
+  <a href="index.html">HOME</a>
+  <a href="general.html">GENERAL</a>
+  <a href="monsters.html">MONSTERS</a>
+  <a href="mutants.html">MUTANTS</a>
+  <a href="humans.html">HUMANS</a>
+  <a href="items.html" class="active">ITEMS</a>
+  <a href="game.html">▶ PLAY</a>
+</nav>
+
+<main>
+  <div class="page-title">ITEMS &amp; GEAR</div>
+  <div class="page-sub">WEAPONS · ARMOR · SPELLS · USABLE ITEMS</div>
+
+  <section>
+    <h2>QUICK REFERENCE</h2>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-title">WEAPON USES</div>
+        <p>Most weapons have limited uses (typically 20–40 uses). When uses reach 0 the weapon breaks and disappears. Always carry backups.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">GUNS VS SWORDS</div>
+        <p>Guns deal fixed damage ignoring DEF. Swords use STR − DEF formula.
+        In World 3+ where enemies have very high DEF, guns dominate.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">EQUIP RESTRICTIONS</div>
+        <p>Humans: all weapons + armor (8 slots).<br>
+        Mutants: weapons only (4 slots).<br>
+        Monsters: nothing — meat only.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">SPECIAL WEAPONS</div>
+        <p>Glass Sword: 1 use, destroys any enemy instantly.<br>
+        Excalibur: hits all enemies for massive damage.<br>
+        Masamune: high damage + special crit rate.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="weapons">WEAPONS</button>
+    <button class="tab-btn" data-tab="armor">ARMOR</button>
+    <button class="tab-btn" data-tab="spells">SPELLS</button>
+    <button class="tab-btn" data-tab="usable">USABLE ITEMS</button>
+  </div>
+
+  <div id="tab-weapons" class="tab-pane active">
+    <div class="filter-bar">
+      <input type="text" id="weapon-search" placeholder="Search…">
+      <select id="weapon-type-filter">
+        <option value="">All types</option>
+        <option value="sword">Sword</option>
+        <option value="gun">Gun</option>
+        <option value="melee">Melee / Other</option>
+      </select>
+      <select id="weapon-stat-filter">
+        <option value="">All stats</option>
+        <option value="str">STR</option>
+        <option value="agi">AGI</option>
+        <option value="mana">MANA</option>
+        <option value="Fixed">Fixed (gun)</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table id="weapon-table">
+        <thead>
+          <tr>
+            <th>NAME</th><th>TYPE</th><th>STAT</th>
+            <th class="num">BASE PWR</th><th class="num">USES</th>
+            <th>ELEMENT</th><th>SPECIAL</th>
+          </tr>
+        </thead>
+        <tbody id="weapon-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-armor" class="tab-pane">
+    <div class="table-wrap">
+      <table id="armor-table">
+        <thead>
+          <tr><th>NAME</th><th>SLOT</th><th>DEF BONUS</th><th>OTHER</th></tr>
+        </thead>
+        <tbody id="armor-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-spells" class="tab-pane">
+    <p style="font-size:0.82rem;margin-bottom:16px;">Spells are cast by Mutants (via ability slots) or by using spell book weapons.
+    Spell damage scales with the caster's MANA stat.</p>
+    <div class="formula">Spell damage = rand(MANA × 2, MANA × 3)</div>
+    <div class="table-wrap">
+      <table id="spell-table">
+        <thead>
+          <tr><th>NAME</th><th>ELEMENT</th><th>TARGET</th><th class="num">BASE PWR</th><th>STATUS</th><th>USES</th></tr>
+        </thead>
+        <tbody id="spell-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-usable" class="tab-pane">
+    <p style="font-size:0.82rem;margin-bottom:16px;">Usable items can be used in battle or on the field map. Most are consumable (one use).</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>NAME</th><th>EFFECT</th><th>USABLE BY</th></tr>
+        </thead>
+        <tbody id="usable-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+async function init() {
+  const data = await fetch('data/items.json').then(r => r.json());
+
+  // WEAPONS
+  const wTbody = document.getElementById('weapon-tbody');
+  const wRows = [];
+  [...data.weapons].sort((a,b) => b.base_power - a.base_power).forEach(w => {
+    const tr = document.createElement('tr');
+    tr.dataset.name = w.name.toLowerCase();
+    tr.dataset.type = w.weapon_type;
+    tr.dataset.stat = w.stat_used;
+    const statTag = {str:'tag-gold', agi:'tag-cyan', mana:'tag-purple', Fixed:'tag-red'}[w.stat_used] || '';
+    tr.innerHTML = `
+      <td><strong>${w.name}</strong></td>
+      <td><span class="tag tag-green">${w.weapon_type}</span></td>
+      <td><span class="tag ${statTag}">${w.stat_used}</span></td>
+      <td class="num">${w.base_power}</td>
+      <td class="num">${w.uses}</td>
+      <td>${w.element ? `<span class="tag tag-cyan" style="font-size:0.58rem">${w.element}</span>` : '—'}</td>
+      <td style="font-size:0.7rem;color:var(--dim2)">${w.special||'—'}</td>`;
+    wTbody.appendChild(tr);
+    wRows.push(tr);
+  });
+
+  function filterWeapons() {
+    const q = document.getElementById('weapon-search').value.toLowerCase();
+    const t = document.getElementById('weapon-type-filter').value;
+    const s = document.getElementById('weapon-stat-filter').value;
+    wRows.forEach(r => {
+      const ok = (!q || r.dataset.name.includes(q)) &&
+                 (!t || r.dataset.type === t) &&
+                 (!s || r.dataset.stat === s);
+      r.classList.toggle('hidden', !ok);
+    });
+  }
+  document.getElementById('weapon-search').addEventListener('input', filterWeapons);
+  document.getElementById('weapon-type-filter').addEventListener('change', filterWeapons);
+  document.getElementById('weapon-stat-filter').addEventListener('change', filterWeapons);
+
+  // ARMOR
+  const aTbody = document.getElementById('armor-tbody');
+  data.armor.forEach(a => {
+    const tr = document.createElement('tr');
+    const bonus = a.stat_bonus || {};
+    const defB = bonus.def !== undefined ? `+${bonus.def}` : '—';
+    const other = Object.entries(bonus)
+      .filter(([k]) => k !== 'def' && k !== 'element_resist')
+      .map(([k,v]) => `+${v} ${k.toUpperCase()}`).join(', ')
+      || (bonus.element_resist ? `Resist ${bonus.element_resist}` : '—');
+    tr.innerHTML = `<td><strong>${a.name}</strong></td>
+      <td><span class="tag tag-cyan">${a.armor_type}</span></td>
+      <td class="num">${defB}</td><td>${other}</td>`;
+    aTbody.appendChild(tr);
+  });
+
+  // SPELLS
+  const spTbody = document.getElementById('spell-tbody');
+  data.spells.forEach(s => {
+    const tr = document.createElement('tr');
+    const elemColor = {fire:'tag-red', ice:'tag-cyan', elec:'tag-gold', poison:'tag-purple',
+      none:'', earth:'tag-green'}[s.element] || '';
+    tr.innerHTML = `<td><strong>${s.name}</strong></td>
+      <td><span class="tag ${elemColor}">${s.element}</span></td>
+      <td>${s.target.replace(/_/g,' ')}</td>
+      <td class="num">${s.base_power || '—'}</td>
+      <td>${s.status ? `<span class="tag tag-red">${s.status}</span>` : '—'}</td>
+      <td class="num">${s.uses}</td>`;
+    spTbody.appendChild(tr);
+  });
+
+  // USABLE
+  const uTbody = document.getElementById('usable-tbody');
+  data.usable.forEach(u => {
+    const tr = document.createElement('tr');
+    let eff = u.effect || '—';
+    if (u.heal_amount) eff += ` (${u.heal_amount} HP)`;
+    if (u.stat_boost) eff += ` (+1 ${u.stat_boost.toUpperCase()})`;
+    tr.innerHTML = `<td><strong>${u.name}</strong></td><td>${eff}</td>
+      <td style="font-size:0.7rem">${(u.usable_by||[]).join(', ')}</td>`;
+    uTbody.appendChild(tr);
+  });
+
+  // TABS
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+}
+init();
+</script>
+</body>
+</html>

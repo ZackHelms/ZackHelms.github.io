@@ -1,0 +1,99 @@
+{
+  "_notes": "Random encounter tables by world/area. monster_id references monsters.json. Rates are weights (sum to ~100).",
+  "encounter_tables": [
+    {
+      "area": "w1_overworld",
+      "world": 1,
+      "step_rate": 0.12,
+      "group_size": {"min": 1, "max": 3},
+      "monsters": [
+        {"monster_id": 0, "weight": 20, "name": "fly"},
+        {"monster_id": 1, "weight": 15, "name": "drgonfly"},
+        {"monster_id": 2, "weight": 15, "name": "hornet"},
+        {"monster_id": 78, "weight": 20, "name": "goblin"},
+        {"monster_id": 79, "weight": 15, "name": "oni"},
+        {"monster_id": 102, "weight": 10, "name": "slime"},
+        {"monster_id": 72, "weight": 5, "name": "wererat"}
+      ]
+    },
+    {
+      "area": "w1_castle",
+      "world": 1,
+      "step_rate": 0.18,
+      "group_size": {"min": 1, "max": 2},
+      "monsters": [
+        {"monster_id": 158, "weight": 40, "name": "soldier"},
+        {"monster_id": 167, "weight": 30, "name": "guard"},
+        {"monster_id": 168, "weight": 20, "name": "hunter"},
+        {"monster_id": 72, "weight": 10, "name": "wererat"}
+      ]
+    },
+    {
+      "area": "w1_cave",
+      "world": 1,
+      "step_rate": 0.15,
+      "group_size": {"min": 1, "max": 3},
+      "monsters": [
+        {"monster_id": 60, "weight": 25, "name": "worm"},
+        {"monster_id": 61, "weight": 20, "name": "p-worm"},
+        {"monster_id": 12, "weight": 20, "name": "cactus"},
+        {"monster_id": 120, "weight": 20, "name": "zombie"},
+        {"monster_id": 121, "weight": 15, "name": "ghoul"}
+      ]
+    },
+    {
+      "area": "w2_overworld",
+      "world": 2,
+      "step_rate": 0.14,
+      "group_size": {"min": 1, "max": 3},
+      "monsters": [
+        {"monster_id": 42, "weight": 20, "name": "condor"},
+        {"monster_id": 43, "weight": 15, "name": "raven"},
+        {"monster_id": 48, "weight": 20, "name": "snake"},
+        {"monster_id": 73, "weight": 15, "name": "werewolf"},
+        {"monster_id": 108, "weight": 15, "name": "gargoyle"},
+        {"monster_id": 114, "weight": 15, "name": "medusa"}
+      ]
+    },
+    {
+      "area": "w3_overworld",
+      "world": 3,
+      "step_rate": 0.14,
+      "group_size": {"min": 1, "max": 2},
+      "monsters": [
+        {"monster_id": 169, "weight": 25, "name": "robot"},
+        {"monster_id": 170, "weight": 20, "name": "trooper"},
+        {"monster_id": 171, "weight": 20, "name": "armor"},
+        {"monster_id": 172, "weight": 20, "name": "machine"},
+        {"monster_id": 84, "weight": 15, "name": "griffin"}
+      ]
+    },
+    {
+      "area": "w4_overworld",
+      "world": 4,
+      "step_rate": 0.14,
+      "group_size": {"min": 1, "max": 2},
+      "monsters": [
+        {"monster_id": 110, "weight": 20, "name": "demon"},
+        {"monster_id": 111, "weight": 20, "name": "demolord"},
+        {"monster_id": 112, "weight": 15, "name": "demoking"},
+        {"monster_id": 113, "weight": 15, "name": "athtalot"},
+        {"monster_id": 149, "weight": 15, "name": "tiamat"},
+        {"monster_id": 129, "weight": 15, "name": "wraith"}
+      ]
+    },
+    {
+      "area": "tower",
+      "world": 5,
+      "step_rate": 0.16,
+      "group_size": {"min": 1, "max": 2},
+      "monsters": [
+        {"monster_id": 143, "weight": 20, "name": "phoenix"},
+        {"monster_id": 149, "weight": 20, "name": "tiamat"},
+        {"monster_id": 112, "weight": 20, "name": "demoking"},
+        {"monster_id": 95, "weight": 20, "name": "beholder"},
+        {"monster_id": 101, "weight": 20, "name": "lich"}
+      ]
+    }
+  ]
+}

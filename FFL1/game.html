@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Final Fantasy Legend — Play</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #06060e;
+      --panel:   #0b0b16;
+      --border:  #1a1a30;
+      --green:   #39ff14;
+      --gold:    #ffc300;
+      --cyan:    #00f5ff;
+      --red:     #ff4455;
+      --white:   #dde3ff;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'Share Tech Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── NAV ── */
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      height: 52px;
+      flex-shrink: 0;
+    }
+    header .logo {
+      font-family: 'Black Ops One', sans-serif;
+      color: var(--green);
+      font-size: 1.1rem;
+      text-decoration: none;
+      text-shadow: 0 0 12px var(--green);
+      white-space: nowrap;
+    }
+    nav { display: flex; gap: 0; }
+    nav a {
+      color: var(--white);
+      text-decoration: none;
+      font-size: 0.8rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+    }
+    nav a:hover { color: var(--cyan); background: rgba(0,245,255,0.06); }
+    nav a.active { color: var(--green); }
+
+    /* ── LAYOUT ── */
+    .game-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem 1rem 2rem;
+      gap: 1rem;
+    }
+
+    /* ── CANVAS ── */
+    #gameCanvas {
+      display: block;
+      border: 1px solid var(--border);
+      box-shadow: 0 0 30px rgba(57,255,20,0.08);
+      image-rendering: pixelated;
+      max-width: 100%;
+    }
+
+    /* ── CONTROLS LEGEND ── */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1.5rem;
+      justify-content: center;
+      font-size: 0.75rem;
+      color: #555577;
+      max-width: 640px;
+    }
+    .controls span { white-space: nowrap; }
+    .controls kbd {
+      display: inline-block;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0 5px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--gold);
+    }
+
+    /* ── STATUS BAR ── */
+    #statusBar {
+      font-size: 0.75rem;
+      color: #555577;
+      text-align: center;
+    }
+    #statusBar.error { color: var(--red); }
+
+    /* ── LOADING OVERLAY ── */
+    #loadOverlay {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      z-index: 100;
+    }
+    #loadOverlay .title {
+      font-family: 'Black Ops One', sans-serif;
+      font-size: 2rem;
+      color: var(--green);
+      text-shadow: 0 0 20px var(--green);
+    }
+    #loadOverlay .subtitle {
+      font-size: 0.85rem;
+      color: var(--gold);
+      letter-spacing: 0.15em;
+    }
+    #loadBar {
+      width: 260px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #loadBarInner {
+      height: 100%;
+      width: 0%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      transition: width 0.3s ease;
+    }
+    #loadMsg {
+      font-size: 0.7rem;
+      color: #555577;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading overlay (hidden after data loads) -->
+  <div id="loadOverlay">
+    <div class="title">FINAL FANTASY LEGEND</div>
+    <div class="subtitle">LOADING</div>
+    <div id="loadBar"><div id="loadBarInner"></div></div>
+    <div id="loadMsg">Initializing…</div>
+  </div>
+
+  <header>
+    <a class="logo" href="index.html">FFL</a>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="general.html">Mechanics</a>
+      <a href="monsters.html">Monsters</a>
+      <a href="mutants.html">Mutants</a>
+      <a href="humans.html">Humans</a>
+      <a href="items.html">Items</a>
+      <a href="game.html" class="active">▶ Play</a>
+    </nav>
+  </header>
+
+  <main class="game-wrap">
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+
+    <div class="controls">
+      <span><kbd>↑↓←→</kbd> Move / Navigate</span>
+      <span><kbd>Z</kbd> Confirm / Interact</span>
+      <span><kbd>X</kbd> Cancel / Back</span>
+      <span><kbd>Enter</kbd> Open menu</span>
+      <span><kbd>Esc</kbd> Open menu</span>
+    </div>
+
+    <div id="statusBar">Loading game data…</div>
+  </main>
+
+  <script type="module">
+    import { Engine } from './js/engine.js';
+
+    const canvas  = document.getElementById('gameCanvas');
+    const overlay = document.getElementById('loadOverlay');
+    const loadBar = document.getElementById('loadBarInner');
+    const loadMsg = document.getElementById('loadMsg');
+    const statusBar = document.getElementById('statusBar');
+
+    // Animate the load bar while data fetches
+    let fakeProgress = 0;
+    const tickId = setInterval(() => {
+      fakeProgress = Math.min(fakeProgress + (90 - fakeProgress) * 0.07, 88);
+      loadBar.style.width = fakeProgress + '%';
+    }, 80);
+
+    function setMsg(msg) { loadMsg.textContent = msg; }
+
+    try {
+      setMsg('Loading data files…');
+      const engine = new Engine(canvas);
+
+      // Hook into data loading progress if available
+      engine.onLoadProgress = (msg, pct) => {
+        setMsg(msg);
+        if (pct !== undefined) loadBar.style.width = pct + '%';
+      };
+
+      await engine.start();
+
+      clearInterval(tickId);
+      loadBar.style.width = '100%';
+
+      // Short pause so user sees 100% before fade
+      await new Promise(r => setTimeout(r, 250));
+      overlay.style.transition = 'opacity 0.4s';
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 420);
+
+      statusBar.textContent = 'Use arrow keys to move  ·  Z to confirm  ·  X to cancel  ·  Enter for menu';
+
+      // Focus canvas so keyboard events land immediately
+      canvas.setAttribute('tabindex', '0');
+      canvas.focus();
+
+    } catch (err) {
+      clearInterval(tickId);
+      loadBar.style.background = '#ff4455';
+      loadBar.style.width = '100%';
+      setMsg('Error: ' + err.message);
+      statusBar.textContent = err.message;
+      statusBar.classList.add('error');
+      console.error(err);
+    }
+  </script>
+</body>
+</html>
