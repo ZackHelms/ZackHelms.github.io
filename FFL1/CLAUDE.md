@@ -47,17 +47,55 @@ Commit the context file updates and any new deliverable assets together in one c
 
 ---
 
+## SOP: Resizing UI elements
+
+**Always maintain aspect ratio** when resizing any visual element (game screen, canvas, containers) unless the user explicitly says otherwise.
+
+### Resizing the game screen
+
+The game screen (`#screen-area` in game.html, `#emulator-container` in emulator.html) uses:
+- `width: W%` — controls game size; this is the only value to change for resizing
+- `aspect-ratio: 160 / 144` — enforces Game Boy pixel ratio automatically
+- `left: 50%; transform: translateX(-50%)` — centers horizontally always
+- `top: T%` — must be recalculated when width changes to keep vertical center fixed
+
+**Why `top` must change with `width`:** the container height is derived from width × (144/160). To keep the vertical center at the same point, recalculate `top` each time:
+
+```
+image aspect ratio:  682/316 = 2.158  (gameboy.png height/width)
+screen hole center:  29% of layer height  (empirically calibrated)
+
+element_height% = W% × (316/682) × (144/160) = W% × 0.417
+top = 29% − element_height% / 2  = 29% − (W% × 0.2085)
+```
+
+| width% | element height% | top% |
+|--------|----------------|------|
+| 80%    | 33.4%          | 12.3% |
+| 85%    | 35.4%          | 11.3% |
+| 88%    | 36.7%          | 10.65% |
+| 90%    | 37.5%          | 10.25% |
+| 95%    | 39.6%          | 9.2%  |
+
+**Why `height: XX%` doesn't work for resizing:** the gameboy.png "screen hole" is a dark teal body color, not transparent/black. The `background: #000` on the container made size changes invisible. Using `aspect-ratio` and a smaller `width` lets the gameboy bezel show around the game canvas, making size changes visible.
+
+---
+
 ## game.html current state (v002)
 
 - 160×144 canvas, CSS `transform:scale()` to fit shell screen area
 - Renders `img/title_screen.png` on load; fallback is solid DMG color #9BBC0F
-- Game Boy shell layout: `#screen-area` at `top:7.5%; left:1.5%; width:97%; height:43%`
+- Game screen: `#screen-area` at `top:10.65%; left:50%; width:88%; aspect-ratio:160/144; transform:translateX(-50%)`
 - Touch zones for all 8 buttons; debug mode via `?debug` param or DBG button
+- Off button (⏻, top-left): shows power-off confirm overlay; navigates to `index.html` on confirm
+- Reset button (↺, top-right): redraws title screen; A+B+Select+Start combo also triggers reset
 - No game logic yet — title screen display only
 
 ## emulator.html
 
 - EmulatorJS wrapper using gambatte core
 - Requires ROM at `rom/ffl1.gb` (gitignored); shows a notice if absent
-- Same shell layout and touch zones as game.html
+- Same shell layout, touch zones, off/reset buttons as game.html
 - Select button: `data-key="ShiftLeft"` (gambatte binding, differs from game.html's `Escape`)
+- Screen: `#emulator-container` at same position/size as `#screen-area` in game.html
+- Reset fires A+B+Select+Start key combo to EmulatorJS (100ms hold)
