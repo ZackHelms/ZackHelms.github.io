@@ -1,5 +1,13 @@
 # FFL1 Webapp — TODO
 
+## ROM Research
+
+- **Full ROM map** — find, create, and verify a complete ROM map for the US release of FFL1.
+  Sources to check: Data Crystal wiki (datacrystal.tcrf.net/wiki/The_Final_Fantasy_Legend/ROM_map),
+  TASVideos (tasvideos.org/GameResources/GB/FinalFantasyLegend), existing disassembly projects
+  (gameboycolorizations/ffl1-color on GitHub). Verified entries go in `FFL1/.claude/rom-map.md`.
+  Goal: know exactly which ROM addresses handle each screen, sprite table, data table, and mechanic.
+
 ## Stubs (no-ops in current build)
 
 - **CONTINUE** — selecting "CONTINUE" on the title screen and pressing A does nothing.
