@@ -303,20 +303,287 @@
       canvas.style.transform = `scale(${scale})`;
     }
 
-    // ── TITLE SCREEN RENDER ───────────────────────────────────────────────────
+    // ── CANVAS CONTEXT ───────────────────────────────────────────────────────
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
 
+    // ── FONT SYSTEM ───────────────────────────────────────────────────────────
+    // 119 1bpp tiles from ROM 0x0F100 (bank 3)
+    // Tile→char: 0-9=digits, 10-35=A-Z, 36-61=a-z, 62+=blank/special
+    const FONT_B64 = 'AD5jY2NjYz4AGDgYGBgYPAA+Y2MGGDB/AD5jYw5jYz4ADh42JmZ/BgB/YH4DA2M+AD5jYH5jYz4Af2NjBgwYGAA+Y2M+Y2M+AD5jYz8DYz4AHBwUNj5jYwB+Y2N+Y2N+AD5jY2BjYz4AfGZjY2NmfAB/YGJ+YmB/AH9gYn5iYGAAPmNgZ2FjPgBjY2N/Y2NjAB4MDAwMDB4ABwMDA2NjPgBjZmx4bGZjAGBgYGBgYX8AY2N3f2tjYwBjY3N7b2djAD5jY2NjYz4AfmNjY35gYAA+Y2NjbWY7AH5jY35sZmMAPmNgPgNjPgD/mRgYGBg8AGNjY2NjYz4AY2MiNjYcHABjY2trf3ciAEFjNhwcNmMAw2Y8GBgYPAB/QwYMGDF/AAAAHAYeNh8AMDA8NjY2PAAAABw2MDYcAAYGHjY2Nh8AAAAcMj4wHgAMGhg8GBgYAAAeFBw2NhwAMDAwPDY2NgAADAAMDAwMAAwADAwMLBgAMDAzNjw2MwAYGBgYGBgYAAAAfm1tbW0AAAA8NjY2NgAAABw2NjYcAAAAPDY8MDAAAAAfNh4GBgAAADYZGRgYAAAAHzgeAz4AABg+GBgYDAAAADY2NjYcAAAAYmI0NBgAAABtbW1tNgAAADMeDB4zAAAAMx4MGDAAAAB+DBgwfgBgYCBAAAAAAAAAABgYCBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOeZmVokWqXbf0FJXUlJIhwcYp/xkfGRfgAADxFni/oA4JCJRSIWDTNBSTZdVX9BfwB5h59osKDg/4G9gYH/gf8AAAAAAABgYAAAAABmZgAAAAAAAD4AAAAICAgICAgACBwiIgQICAAIAGBgAABgYAAAACAAAAAAAA==';
+    let fontBytes = null;
+
+    function initFont() {
+      const bin = atob(FONT_B64);
+      fontBytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) fontBytes[i] = bin.charCodeAt(i);
+    }
+
+    // DMG palette [R,G,B]
+    const C0=[0x9B,0xBC,0x0F], C1=[0x8B,0xAC,0x0F], C2=[0x30,0x62,0x30], C3=[0x0F,0x38,0x0F];
+
+    function tileAt(ch) {
+      if (ch>='A'&&ch<='Z') return 10+ch.charCodeAt(0)-65;
+      if (ch>='a'&&ch<='z') return 36+ch.charCodeAt(0)-97;
+      if (ch>='0'&&ch<='9') return ch.charCodeAt(0)-48;
+      return 64;
+    }
+
+    function drawTile(tIdx, px, py, fg, bg) {
+      const imgData = ctx.createImageData(8,8);
+      const d = imgData.data;
+      const valid = fontBytes && tIdx>=0 && tIdx<119;
+      const off = valid ? tIdx*8 : 0;
+      for (let r=0; r<8; r++) {
+        const byte = valid ? fontBytes[off+r] : 0;
+        for (let c=0; c<8; c++) {
+          const bit = valid ? (byte>>(7-c))&1 : 0;
+          const col = bit ? fg : bg;
+          const i = (r*8+c)*4;
+          d[i]=col[0]; d[i+1]=col[1]; d[i+2]=col[2]; d[i+3]=255;
+        }
+      }
+      ctx.putImageData(imgData, px, py);
+    }
+
+    function drawStr(text, px, py, fg, bg) {
+      const s = text.toUpperCase();
+      for (let i=0; i<s.length; i++) drawTile(tileAt(s[i]), px+i*8, py, fg, bg);
+    }
+
+    function fillDMG(px, py, w, h, col) {
+      ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+      ctx.fillRect(px, py, w, h);
+    }
+
+    // ── GAME DATA ─────────────────────────────────────────────────────────────
+    // Starting classes from ROM 0x17F94 — HIGH confidence (directly from ROM)
+    // Indices: [177,178,179,180,18,36,72,120] = human-m/f, mutant-m/f, clipper, redbull, wererat, zombie
+    const CLASSES = [
+      {name:'HUMAN',   gender:'M'}, {name:'HUMAN',   gender:'F'},
+      {name:'MUTANT',  gender:'M'}, {name:'MUTANT',  gender:'F'},
+      {name:'CLIPPER', gender:'' }, {name:'REDBULL', gender:'' },
+      {name:'WERERAT', gender:'' }, {name:'ZOMBIE',  gender:'' },
+    ];
+
+    // Story text — MEDIUM confidence (web-sourced; needs ROM DTE decode for verification)
+    const STORY = [
+      'IT HAS BEEN SAID','THAT THE TOWER IN','THE CENTER OF THE',
+      'WORLD IS CONNECTED','TO PARADISE.','',
+      'DREAMING OF A LIFE','IN PARADISE, MANY','HAVE CHALLENGED',
+      'THE SECRET OF THE','TOWER, BUT NO ONE','KNOWS WHAT BECAME',
+      'OF THEM.','',
+      'NOW THERE IS','ANOTHER WHO WILL','BRAVE THE ADVENTURE','...',
+    ];
+    const LINES_PER_PAGE = 7;
+
+    // Name-entry character grid (uppercase only, 3 rows × 9 cols)
+    const NGRID = [
+      ['A','B','C','D','E','F','G','H','I'],
+      ['J','K','L','M','N','O','P','Q','R'],
+      ['S','T','U','V','W','X','Y','Z',' '],
+    ];
+    const MAX_NAME = 8;
+
+    // ── GAME STATE ────────────────────────────────────────────────────────────
+    const ST = {TITLE:0, CLASS:1, NAME:2, STORY:3, WORLD:4};
+    let state = ST.TITLE;
+    let titleSel = 0;          // 0=START 1=CONTINUE
+    let classSel = 0;          // 0-7
+    let nameGx = 0, nameGy = 0;
+    let playerName = '';
+    let storyTop = 0;          // first visible story line index
+    let blinkOn = true, blinkMs = 0;
+
+    // ── TITLE IMAGE ───────────────────────────────────────────────────────────
     const titleImg = new Image();
     titleImg.src = 'img/title_screen.png';
-    titleImg.onload = () => {
-      ctx.drawImage(titleImg, 0, 0, 160, 144);
-    };
-    titleImg.onerror = () => {
-      // Fallback: plain DMG background
-      ctx.fillStyle = '#9BBC0F';
-      ctx.fillRect(0, 0, 160, 144);
-    };
+    let titleLoaded = false;
+    titleImg.onload  = () => { titleLoaded = true; if (state===ST.TITLE) renderTitle(); };
+    titleImg.onerror = () => { titleLoaded = false; };
+
+    // ── INPUT ─────────────────────────────────────────────────────────────────
+    const PRESSED = new Set();
+    window.addEventListener('keydown', e => {
+      if (PRESSED.has(e.code)) return;
+      PRESSED.add(e.code);
+      handleKey(e.code);
+    });
+    window.addEventListener('keyup', e => PRESSED.delete(e.code));
+
+    function handleKey(code) {
+      if (state===ST.TITLE) return handleTitle(code);
+      if (state===ST.CLASS) return handleClass(code);
+      if (state===ST.NAME)  return handleName(code);
+      if (state===ST.STORY) return handleStory(code);
+    }
+
+    function handleTitle(code) {
+      if (code==='ArrowLeft')  { titleSel=0; render(); }
+      if (code==='ArrowRight') { titleSel=1; render(); }
+      if ((code==='KeyZ'||code==='Enter') && titleSel===0) {
+        state=ST.CLASS; classSel=0; render();
+      }
+      // CONTINUE: stub no-op (see TODO.md)
+    }
+
+    function handleClass(code) {
+      if (code==='ArrowUp')   { classSel=(classSel+7)%8; render(); }
+      if (code==='ArrowDown') { classSel=(classSel+1)%8; render(); }
+      if (code==='KeyZ'||code==='Enter') {
+        playerName=''; nameGx=0; nameGy=0; state=ST.NAME; render();
+      }
+      if (code==='KeyX') { state=ST.TITLE; render(); }
+    }
+
+    function handleName(code) {
+      const rows = NGRID.length, cols = 9;
+      if (code==='ArrowUp')    { nameGy=Math.max(0,nameGy-1); render(); }
+      if (code==='ArrowDown')  { nameGy=Math.min(rows,nameGy+1); render(); }
+      if (code==='ArrowLeft')  { nameGx=Math.max(0,nameGx-1); render(); }
+      if (code==='ArrowRight') { nameGx=Math.min(cols-1,nameGx+1); render(); }
+      if (code==='KeyX') {
+        if (playerName.length>0) { playerName=playerName.slice(0,-1); render(); }
+        return;
+      }
+      if (code==='KeyZ') {
+        if (nameGy < rows) {
+          const ch = NGRID[nameGy][nameGx];
+          if (ch && ch!==' ' && playerName.length<MAX_NAME) { playerName+=ch; render(); }
+        } else {
+          if (nameGx<=3) confirmName(); else if (playerName.length>0) { playerName=playerName.slice(0,-1); render(); }
+        }
+      }
+      if (code==='Enter') confirmName();
+    }
+
+    function confirmName() {
+      if (!playerName) playerName = CLASSES[classSel].name.substring(0,6);
+      storyTop=0; state=ST.STORY; render();
+    }
+
+    function handleStory(code) {
+      if (code==='KeyZ'||code==='Enter') {
+        storyTop += LINES_PER_PAGE;
+        if (storyTop >= STORY.length) { state=ST.WORLD; }
+        render();
+      }
+    }
+
+    // ── RENDER ────────────────────────────────────────────────────────────────
+    function render() {
+      if      (state===ST.TITLE) renderTitle();
+      else if (state===ST.CLASS) renderClass();
+      else if (state===ST.NAME)  renderName();
+      else if (state===ST.STORY) renderStory();
+      else if (state===ST.WORLD) renderWorld();
+    }
+
+    function renderTitle() {
+      if (titleLoaded) {
+        ctx.drawImage(titleImg, 0, 0, 160, 144);
+      } else {
+        fillDMG(0,0,160,144,C0);
+        drawStr('START',    32, 104, C3, C0);
+        drawStr('CONTINUE', 88, 104, C3, C0);
+      }
+      if (blinkOn) {
+        // ► before selected option; START at x≈18, CONTINUE at x≈93 (pixel analysis)
+        const cx = titleSel===0 ? 8 : 83;
+        ctx.fillStyle = `rgb(${C3[0]},${C3[1]},${C3[2]})`;
+        ctx.beginPath();
+        ctx.moveTo(cx, 105); ctx.lineTo(cx+5, 108); ctx.lineTo(cx, 111);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+
+    function renderClass() {
+      fillDMG(0,0,160,144,C0);
+      drawStr('WHO ARE YOU?', 4, 4, C3, C0);
+      fillDMG(0,14,160,1,C3);
+      for (let i=0; i<CLASSES.length; i++) {
+        const cl = CLASSES[i];
+        const py = 20 + i*14;
+        const sel = i===classSel;
+        fillDMG(0, py-1, 160, 12, sel?C3:C0);
+        const label = cl.name+(cl.gender?' '+cl.gender:'');
+        drawStr(label, 20, py, sel?C0:C3, sel?C3:C0);
+        if (sel && blinkOn) {
+          ctx.fillStyle = `rgb(${C0[0]},${C0[1]},${C0[2]})`;
+          ctx.beginPath();
+          ctx.moveTo(10,py+1); ctx.lineTo(16,py+4); ctx.lineTo(10,py+7);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+    }
+
+    function renderName() {
+      fillDMG(0,0,160,144,C0);
+      drawStr('YOUR NAME', 4, 4, C3, C0);
+      fillDMG(0,14,160,1,C3);
+
+      // Name display with blinking underline cursor
+      drawStr(playerName||' ', 8, 20, C3, C0);
+      if (blinkOn && playerName.length<MAX_NAME) fillDMG(8+playerName.length*8, 27, 8, 2, C3);
+
+      // Character grid (3 rows × 9 cols, 16px per cell)
+      const GX0=8, GY0=42, CW=16, CH=14;
+      for (let gy=0; gy<NGRID.length; gy++) {
+        for (let gx=0; gx<9; gx++) {
+          const ch = NGRID[gy][gx];
+          if (!ch||ch===' ') continue;
+          const px=GX0+gx*CW, py=GY0+gy*CH;
+          const sel = gx===nameGx && gy===nameGy;
+          fillDMG(px-1,py-1,10,10,sel?C3:C0);
+          drawTile(tileAt(ch), px, py, sel?C0:C3, sel?C3:C0);
+        }
+      }
+
+      // Special row: END | DEL
+      const spY = GY0+NGRID.length*CH+2;
+      const endSel = nameGy===NGRID.length && nameGx<=3;
+      const delSel = nameGy===NGRID.length && nameGx>=5;
+      fillDMG(8, spY-2, 32, 12, endSel?C3:C0);
+      drawStr('END', 12, spY, endSel?C0:C3, endSel?C3:C0);
+      fillDMG(88, spY-2, 32, 12, delSel?C3:C0);
+      drawStr('DEL', 92, spY, delSel?C0:C3, delSel?C3:C0);
+    }
+
+    function renderStory() {
+      fillDMG(0,0,160,144,C3);
+      const end = Math.min(storyTop+LINES_PER_PAGE, STORY.length);
+      for (let i=storyTop; i<end; i++) {
+        const line = STORY[i];
+        if (line) drawStr(line, 4, 16+(i-storyTop)*14, C0, C3);
+      }
+      if (blinkOn) drawStr('PRESS A', 52, 130, C0, C3);
+    }
+
+    function renderWorld() {
+      fillDMG(0,0,160,144,C1);
+      fillDMG(0,0,160,12,C3);
+      const cl = CLASSES[classSel];
+      drawStr((playerName||'????').substring(0,8), 4, 2, C0, C3);
+      drawStr(cl.name+(cl.gender?' '+cl.gender:''), 88, 2, C1, C3);
+      // Tower placeholder
+      fillDMG(72,16,16,88,C3);
+      fillDMG(64,12,32,8,C3);
+      // Character figure placeholder
+      fillDMG(76,104,8,12,C3);
+      drawStr('TOWER BASE', 44, 132, C3, C1);
+    }
+
+    // ── BLINK LOOP ────────────────────────────────────────────────────────────
+    let lastTs = 0;
+    function tick(ts) {
+      const dt = ts-lastTs; lastTs=ts;
+      blinkMs += dt;
+      if (blinkMs>=500) {
+        blinkMs-=500; blinkOn=!blinkOn;
+        if (state!==ST.WORLD) render();
+      }
+      requestAnimationFrame(tick);
+    }
 
     // ── TOUCH INPUT ───────────────────────────────────────────────────────────
     const heldKeys = new Set();
@@ -378,7 +645,10 @@
 
     // ── RESET ─────────────────────────────────────────────────────────────────
     function resetGame() {
-      if (titleImg.complete && titleImg.naturalWidth > 0) ctx.drawImage(titleImg, 0, 0, 160, 144);
+      state=ST.TITLE; titleSel=0; classSel=0;
+      playerName=''; nameGx=0; nameGy=0;
+      storyTop=0; blinkOn=true; blinkMs=0;
+      render();
     }
 
     // ── OFF / RESET BUTTONS ───────────────────────────────────────────────────
@@ -415,6 +685,11 @@
     poPopup.addEventListener('touchstart', e => e.stopPropagation(), { passive: false });
     poPopup.addEventListener('touchend',   e => e.stopPropagation(), { passive: false });
     poPopup.addEventListener('click',      e => e.stopPropagation());
+
+    // ── INIT ──────────────────────────────────────────────────────────────────
+    initFont();
+    render();
+    requestAnimationFrame(tick);
   </script>
 </body>
 </html>

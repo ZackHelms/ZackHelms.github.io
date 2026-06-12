@@ -10,6 +10,11 @@
 - Ability names — ability table at 0x14640 (252 × 8 bytes)
 - Ability type classification — type byte (byte 7) and prefix byte (byte 0) of each ability record
 - Character encoding — 0x8A='a'…0xA3='z', 0x40='A'…0x59='Z', 0xA4='0'…0xAD='9'
+- Starting character table — ROM 0x17F94 (8 bytes): [177,178,179,180,18,36,72,120] = human-m/f, mutant-m/f, clipper, redbull, wererat, zombie
+- Player class stubs — ROM 0x14568 (bank 5); indices 173–188; human/mutant variants with gender byte at position 7
+- Bank 3 UI text — ROM 0x0ECC8: "start", "continue", "fight", "run", "item" (normalbase encoding, runtime-rendered to VRAM)
+- Font tiles — 1bpp, 119 tiles × 8 bytes at ROM 0x0F100; tile 0–9=digits, 10–35=A–Z, 36–61=a–z
+- DTE table location — ROM 0x14E40 (bank 5) → loaded to RAM $C800 at startup; encodes digit/stat bigrams
 
 ### Not Yet Extracted
 The following mechanics have NOT been extracted from the ROM binary. Do not present
@@ -29,6 +34,9 @@ these as facts in wiki pages or context files:
 - Stat item effect amounts
 - Armor stat bonus values
 - World structure (which bosses appear where, crystal ball requirements)
+- Story / intro text — DTE-compressed in ROM; no raw bytes searchable without full DTE decode; web-sourced version stored in data/dialog.md (MEDIUM confidence)
+- Name-entry UI layout — row/column counts, cell sizes, END/DEL positions not confirmed from ROM
+- CONTINUE save-file format — not yet extracted
 
 ---
 

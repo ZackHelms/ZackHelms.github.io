@@ -47,6 +47,31 @@ Commit the context file updates and any new deliverable assets together in one c
 
 ---
 
+## SOP: ROM → Webapp Feature Implementation
+
+When implementing a new feature in the webapp that mimics ROM behavior:
+
+1. **ROM first** — extract the mechanic, asset, or text from the binary before writing any game code. Never invent or guess values.
+2. **Screenshots as reference** — user-supplied screenshots show what the game looks like; ROM binary determines how it works. When they conflict, the ROM is authoritative.
+3. **Ask before forging ahead** — if mechanics are unclear or underspecified after ROM analysis, ask clarifying questions.
+4. **Document ROM structure as you go** — update `.claude/rom-data.md`, `.claude/mechanics.md`, `.claude/overview.md` with every new offset, encoding, or layout discovered.
+5. **Confidence levels** — when implementing a feature, state confidence:
+   - HIGH: value/behavior directly extracted from ROM binary
+   - MEDIUM: inferred from ROM structure + reliable web reference
+   - LOW: web-sourced only; needs ROM verification
+6. **Reliable reference resources** (confirm with user before promoting):
+   - Data Crystal wiki: `https://datacrystal.tcrf.net/wiki/The_Final_Fantasy_Legend/ROM_map` — 403 on direct fetch but web-search-accessible; character encoding confirmed accurate
+   - `gameboycolorizations/ffl1-color` on GitHub — GBC colorization patch (assembly); useful for code structure but not original game logic
+7. **Story/dialog text** — store in `FFL1/data/dialog.md`; mark sections as ROM-extracted vs web-sourced.
+8. **Sprites and graphics** — extract from ROM via Python+Pillow scripts saved to `/tmp/`; commit final PNGs to `img/`.
+
+### Reliable Reference Resources
+| Resource | URL | What it's good for | Confirmed reliable? |
+|---|---|---|---|
+| Data Crystal FFL1 | `datacrystal.tcrf.net/wiki/The_Final_Fantasy_Legend/ROM_map` | Character encoding, bank layout, DTE encoding scheme | YES (encoding confirmed against ROM) |
+
+---
+
 ## SOP: Resizing UI elements
 
 **Always maintain aspect ratio** when resizing any visual element (game screen, canvas, containers) unless the user explicitly says otherwise.
