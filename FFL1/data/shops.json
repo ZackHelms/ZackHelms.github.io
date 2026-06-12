@@ -1,0 +1,77 @@
+{
+  "_notes": "Shop inventories per world/location. Prices are approximate from FAQ sources.",
+  "shops": [
+    {
+      "id": "w1_base_item",
+      "name": "Item Shop",
+      "location": "w1_base",
+      "world": 1,
+      "inventory": [
+        {"name": "potion", "ability_id": 0, "price": 50},
+        {"name": "antdote", "ability_id": 122, "price": 80},
+        {"name": "eyedrop", "ability_id": 6, "price": 100},
+        {"name": "revive", "ability_id": 7, "price": 300}
+      ]
+    },
+    {
+      "id": "w1_base_weapon",
+      "name": "Weapon Shop",
+      "location": "w1_base",
+      "world": 1,
+      "inventory": [
+        {"name": "hammer", "ability_id": 32, "price": 300},
+        {"name": "bow", "ability_id": 58, "price": 250},
+        {"name": "rapier", "ability_id": 45, "price": 200},
+        {"name": "wand", "ability_id": 103, "price": 150}
+      ]
+    },
+    {
+      "id": "w1_base_armor",
+      "name": "Armor Shop",
+      "location": "w1_base",
+      "world": 1,
+      "inventory": [
+        {"name": "bronze helmet", "ability_id": 75, "price": 200},
+        {"name": "bronze chest", "ability_id": 82, "price": 350},
+        {"name": "bronze gloves", "ability_id": 88, "price": 180},
+        {"name": "bronze shoes", "ability_id": 94, "price": 160}
+      ]
+    },
+    {
+      "id": "w2_town_weapon",
+      "name": "Weapon Shop",
+      "location": "w2_town",
+      "world": 2,
+      "inventory": [
+        {"name": "'katana", "ability_id": 36, "price": 2000},
+        {"name": "'battle", "ability_id": 35, "price": 1500},
+        {"name": "musket", "ability_id": 62, "price": 3000},
+        {"name": "staff", "ability_id": 104, "price": 1800}
+      ]
+    },
+    {
+      "id": "w3_town_weapon",
+      "name": "Weapon Shop",
+      "location": "w3_town",
+      "world": 3,
+      "inventory": [
+        {"name": "smg", "ability_id": 67, "price": 8000},
+        {"name": "magnum", "ability_id": 63, "price": 6000},
+        {"name": "'dragon", "ability_id": 40, "price": 10000},
+        {"name": "'elec", "ability_id": 44, "price": 9000}
+      ]
+    },
+    {
+      "id": "w4_town_weapon",
+      "name": "Final Weapon Shop",
+      "location": "w4_town",
+      "world": 4,
+      "inventory": [
+        {"name": "'sun", "ability_id": 41, "price": 25000},
+        {"name": "balkan", "ability_id": 70, "price": 20000},
+        {"name": "masmune", "ability_id": 57, "price": 50000},
+        {"name": "'rune", "ability_id": 54, "price": 30000}
+      ]
+    }
+  ]
+}

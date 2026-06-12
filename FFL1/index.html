@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FFL1 — Final Fantasy Legend</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.hero {
+  text-align: center;
+  padding: 48px 24px 32px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 40px;
+}
+.hero h1 {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: clamp(2rem, 7vw, 3.8rem);
+  color: var(--gold);
+  text-shadow: 0 0 40px #ffc30066;
+  letter-spacing: 6px;
+  margin-bottom: 6px;
+}
+.hero .sub { font-size: 0.7rem; color: var(--dim2); letter-spacing: 5px; margin-bottom: 24px; }
+.hero p { font-size: 0.85rem; color: var(--white); max-width: 60ch; margin: 0 auto 24px; }
+.play-btn {
+  display: inline-block;
+  background: linear-gradient(135deg, #ffc300, #ff8c00);
+  color: #06060e;
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 3px;
+  padding: 12px 32px;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: all 0.2s;
+  box-shadow: 0 0 24px #ffc30055;
+}
+.play-btn:hover { box-shadow: 0 0 40px #ffc30099; transform: translateY(-2px); color: #06060e; }
+.wiki-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 40px;
+}
+.wiki-card {
+  display: block;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 18px 20px;
+  text-decoration: none;
+  color: var(--white);
+  transition: all 0.2s;
+}
+.wiki-card:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 16px #00f5ff22;
+  transform: translateY(-2px);
+  color: var(--white);
+}
+.wiki-card .icon { font-size: 1.8rem; margin-bottom: 10px; }
+.wiki-card .title {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 0.85rem;
+  color: var(--gold);
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+.wiki-card .desc { font-size: 0.72rem; color: var(--dim2); line-height: 1.5; }
+.rom-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--panel); border: 1px solid var(--border2);
+  border-radius: 20px; padding: 4px 12px; font-size: 0.65rem;
+  color: var(--dim2); margin-top: 8px;
+}
+.rom-badge span { color: var(--green); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FFL1</h1>
+  <div class="breadcrumb">
+    <a href="/">tythos.com</a>
+    <span>/</span>
+    <span>Final Fantasy Legend</span>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>FINAL FANTASY LEGEND</h1>
+    <div class="sub">MAKAI TOUSHI SA·GA · GAME BOY · 1989</div>
+    <p>The original SaGa game. A tower-climbing RPG featuring Humans, Mutants, and Monsters with
+    radically different progression systems. This site is a mechanics wiki and playable JavaScript port.</p>
+    <a href="game.html" class="play-btn">▶ PLAY NOW</a>
+    <br>
+    <div class="rom-badge">ROM-extracted data · <span>200 monsters</span> · <span>252 abilities</span> · <span>8 spells</span></div>
+  </div>
+
+  <section>
+    <h2>MECHANICS WIKI</h2>
+    <div class="wiki-grid">
+      <a href="general.html" class="wiki-card">
+        <div class="icon">📖</div>
+        <div class="title">GENERAL</div>
+        <div class="desc">Overview of all game systems — worlds, battle, progression, tips.</div>
+      </a>
+      <a href="monsters.html" class="wiki-card">
+        <div class="icon">🐉</div>
+        <div class="title">MONSTERS</div>
+        <div class="desc">Monster class mechanics. The meat eating system, family transformations, all 200 monster stats.</div>
+      </a>
+      <a href="mutants.html" class="wiki-card">
+        <div class="icon">🧬</div>
+        <div class="title">MUTANTS</div>
+        <div class="desc">Mutant stat growth formula, ability system, max values, optimal strategies.</div>
+      </a>
+      <a href="humans.html" class="wiki-card">
+        <div class="icon">⚔️</div>
+        <div class="title">HUMANS</div>
+        <div class="desc">Human equipment system, stat items, max stats, gear optimization.</div>
+      </a>
+      <a href="items.html" class="wiki-card">
+        <div class="icon">🗡️</div>
+        <div class="title">ITEMS &amp; GEAR</div>
+        <div class="desc">Complete database of weapons, armor, spells, and usable items with stats.</div>
+      </a>
+    </div>
+  </section>
+
+  <section>
+    <h2>QUICK REFERENCE</h2>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-title">THREE CLASSES</div>
+        <p><strong style="color:var(--cyan)">Human</strong> — Equipment-based stats. 8 item slots. Grows via stat-boosting items.</p>
+        <p><strong style="color:var(--green)">Mutant</strong> — Random stat gains after battle. 4 item + 4 ability slots. High magic potential.</p>
+        <p><strong style="color:var(--gold)">Monster</strong> — No equipment. Transforms by eating meat. 4 meat slots. Most powerful end-game.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">STAT CAPS</div>
+        <p>All stats display a maximum of <strong style="color:var(--gold)">99</strong> on screen.</p>
+        <p>Internal maximum is <strong style="color:var(--gold)">255</strong> for STR/DEF/AGI/MANA.</p>
+        <p>HP maximum is <strong style="color:var(--gold)">999</strong>.</p>
+        <p>Mutant MANA can grow beyond 99 (displayed as 99 but keeps scaling spells).</p>
+      </div>
+      <div class="card">
+        <div class="card-title">FIVE WORLDS</div>
+        <p>World 1 → World 2 → World 3 → World 4 → Tower of God</p>
+        <p>Collect 4 Crystal Balls per world to open the gate to the next.</p>
+        <p>The Tower of God has 20 floors leading to the final bosses: <strong style="color:var(--red)">Ashura</strong> and <strong style="color:var(--red)">Creator</strong>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>ABOUT THIS PORT</h2>
+    <div class="panel">
+      <p>This is a <strong>from-scratch JavaScript recreation</strong> of FFL1 built on ROM-extracted game data.
+      Monster names, HP values, stats, and ability names were extracted directly from the original ROM binary.
+      Game mechanics and world structure are reconstructed from community documentation.</p>
+      <p>All game data lives in <code>data/*.json</code> — edit those files to modify monster stats, weapons,
+      shops, encounter tables, maps, or story text. The JS engine reads the data at runtime so you never
+      need to touch the engine code for content changes.</p>
+      <p style="color:var(--dim2); font-size:0.7rem; margin-top:10px;">
+        ROM data extracted from: <em>Final Fantasy Legend, The (USA).gb</em> (128 KB) ·
+        Character encoding confirmed via pattern analysis ·
+        Monster names verified against community documentation
+      </p>
+    </div>
+  </section>
+</main>
+
+</body>
+</html>

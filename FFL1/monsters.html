@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monsters — FFL1</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+#monster-table td:nth-child(3),
+#monster-table td:nth-child(4),
+#monster-table td:nth-child(5),
+#monster-table td:nth-child(6),
+#monster-table td:nth-child(7) { font-variant-numeric: tabular-nums; text-align:right; }
+.family-header td {
+  background: var(--panel2);
+  color: var(--gold);
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+  padding: 8px 10px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FFL1</h1>
+  <div class="breadcrumb">
+    <a href="/">tythos.com</a><span>/</span>
+    <a href="index.html">FFL1</a><span>/</span>
+    <span>Monsters</span>
+  </div>
+</header>
+<nav>
+  <a href="index.html">HOME</a>
+  <a href="general.html">GENERAL</a>
+  <a href="monsters.html" class="active">MONSTERS</a>
+  <a href="mutants.html">MUTANTS</a>
+  <a href="humans.html">HUMANS</a>
+  <a href="items.html">ITEMS</a>
+  <a href="game.html">▶ PLAY</a>
+</nav>
+
+<main>
+  <div class="page-title">MONSTER CLASS</div>
+  <div class="page-sub">MEAT SYSTEM · FAMILIES · ALL 150 WILD MONSTERS</div>
+
+  <section>
+    <h2>HOW THE MONSTER CLASS WORKS</h2>
+    <p>A Monster character cannot equip weapons or armor. Instead, it holds up to <strong>4 meat slots</strong>.
+    When you defeat an enemy, it may drop a meat item. Eating meats is how your monster character
+    grows stronger — by transforming into different monster forms.</p>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-title">MEAT SLOTS</div>
+        <p>Your monster can hold up to 4 meat items at once. Meat is obtained by defeating wild
+        monsters. The meat matches the family of the monster you defeated.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">TRANSFORMATION</div>
+        <p>Eat all 4 meats of the same family to transform into that family. The tier of your
+        new form depends on the <strong>meat level</strong> (hidden value, 1–20).</p>
+      </div>
+      <div class="card">
+        <div class="card-title">STATS ON TRANSFORM</div>
+        <p>When you transform, you inherit the base stats of your new monster form at the
+        given tier. Your old form and all its stats are lost permanently.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">MEAT LEVEL</div>
+        <p>Each meat has a hidden level (1–20). Higher-level monsters drop higher-level
+        meat. High-level meat transforms you into a stronger tier of the target family.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>TRANSFORMATION TABLE</h2>
+    <p>FFL1 has <strong>26 monster families</strong>. When you eat 4 meats of the same family,
+    you become the form in that family at the meat's level. The 6 tiers per family range from weakest (tier 1) to strongest (tier 6).</p>
+
+    <div class="callout tip">
+      <strong>Strategy:</strong> Always aim to eat the highest-level meat possible.
+      Late-game monsters drop level 15–20 meat, transforming you into the max-tier form
+      with stats exceeding 99 for STR/DEF/AGI.
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>FAMILY</th><th>TIER 1</th><th>TIER 2</th><th>TIER 3</th>
+            <th>TIER 4</th><th>TIER 5</th><th>TIER 6</th>
+          </tr>
+        </thead>
+        <tbody id="family-table"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>MEAT SYSTEM RULES</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>RULE</th><th>DETAIL</th></tr></thead>
+        <tbody>
+          <tr><td>Meat slots</td><td>Max 4 at once. New meat replaces old if slots full.</td></tr>
+          <tr><td>Trigger transform</td><td>Eat (use) a 4th meat that matches 3 already in slots → instant transform.</td></tr>
+          <tr><td>Meat level</td><td>Hidden 1–20. Determined by the monster that dropped it. Higher tier monsters → higher level meat.</td></tr>
+          <tr><td>Mixed meats</td><td>4 meats of different families do not trigger transformation.</td></tr>
+          <tr><td>Stat inheritance</td><td>Transform gives you the new form's base stats at that tier. Previous stats lost.</td></tr>
+          <tr><td>Loss of form</td><td>Transformation is permanent. Plan transformations carefully.</td></tr>
+          <tr><td>Boss meat</td><td>Bosses generally do not drop meat.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>ALL MONSTERS (ROM DATA)</h2>
+    <p>Stats extracted directly from the ROM. Internal values may exceed 99 (the screen display cap).
+    HP values are exact. STR/DEF/AGI/MANA are raw internal values.</p>
+
+    <div class="filter-bar">
+      <input type="text" id="search" placeholder="Search by name…">
+      <select id="family-filter">
+        <option value="">All families</option>
+        <option value="insect">Insect</option>
+        <option value="aquatic">Aquatic/Fish</option>
+        <option value="plant">Plant</option>
+        <option value="beast">Beast</option>
+        <option value="bird">Bird</option>
+        <option value="reptile">Reptile</option>
+        <option value="werecreature">Werecreature</option>
+        <option value="giant">Giant/Goblinoid</option>
+        <option value="mythical">Mythical</option>
+        <option value="eyecreature">Eye Creature</option>
+        <option value="undead">Undead/Spirit</option>
+        <option value="slime">Slime</option>
+        <option value="demon">Demon</option>
+        <option value="snakedemon">Snake/Demon</option>
+        <option value="elemental">Elemental</option>
+        <option value="dragon">Dragon</option>
+        <option value="boss">Boss</option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table id="monster-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>NAME</th>
+            <th>HP</th>
+            <th>STR</th>
+            <th>DEF</th>
+            <th>AGI</th>
+            <th>MANA</th>
+            <th>FAMILY</th>
+            <th>MEAT</th>
+          </tr>
+        </thead>
+        <tbody id="monster-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+async function init() {
+  const [monstersData, transformData] = await Promise.all([
+    fetch('data/monsters.json').then(r => r.json()),
+    fetch('data/transformation.json').then(r => r.json())
+  ]);
+
+  // Build family table
+  const famTbody = document.getElementById('family-table');
+  transformData.families.forEach(fam => {
+    const tiers = fam.examples || [];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${fam.id}</td><td><span class="tag tag-gold">${fam.name}</span></td>
+      ${Array.from({length:6}, (_,i) => `<td style="font-size:0.7rem;color:var(--dim2)">${tiers[i]||'—'}</td>`).join('')}`;
+    famTbody.appendChild(tr);
+  });
+
+  // Build monster table
+  const tbody = document.getElementById('monster-tbody');
+  const rows = [];
+
+  monstersData.forEach(m => {
+    const tr = document.createElement('tr');
+    tr.dataset.name = m.name.toLowerCase();
+    tr.dataset.family = m.family;
+    const strVal = Math.min(m.str, 255);
+    const defVal = Math.min(m.def, 255);
+    const agiVal = Math.min(m.agi, 255);
+    const manaVal = Math.min(m.mana, 255);
+    const strDisp = strVal > 99 ? `<span style="color:var(--gold)">${strVal}*</span>` : strVal;
+    const defDisp = defVal > 99 ? `<span style="color:var(--gold)">${defVal}*</span>` : defVal;
+    const agiDisp = agiVal > 99 ? `<span style="color:var(--gold)">${agiVal}*</span>` : agiVal;
+    const manaDisp = manaVal > 99 ? `<span style="color:var(--gold)">${manaVal}*</span>` : manaVal;
+    const meatTag = m.can_drop_meat
+      ? `<span class="tag tag-green">lv ${m.meat_level}</span>`
+      : `<span class="tag" style="color:var(--dim)">—</span>`;
+    tr.innerHTML = `
+      <td style="color:var(--dim2)">${m.id}</td>
+      <td>${m.name}</td>
+      <td>${m.hp}</td>
+      <td>${strDisp}</td>
+      <td>${defDisp}</td>
+      <td>${agiDisp}</td>
+      <td>${manaDisp}</td>
+      <td><span class="tag tag-cyan" style="font-size:0.58rem">${m.family}</span></td>
+      <td>${meatTag}</td>`;
+    tbody.appendChild(tr);
+    rows.push(tr);
+  });
+
+  // Filter logic
+  function applyFilters() {
+    const q = document.getElementById('search').value.toLowerCase();
+    const fam = document.getElementById('family-filter').value;
+    rows.forEach(r => {
+      const matchName = !q || r.dataset.name.includes(q);
+      const matchFam = !fam || r.dataset.family === fam;
+      r.classList.toggle('hidden', !(matchName && matchFam));
+    });
+  }
+  document.getElementById('search').addEventListener('input', applyFilters);
+  document.getElementById('family-filter').addEventListener('change', applyFilters);
+}
+init();
+</script>
+</body>
+</html>

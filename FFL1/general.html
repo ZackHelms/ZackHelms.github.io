@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>General Mechanics — FFL1</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <h1>FFL1</h1>
+  <div class="breadcrumb">
+    <a href="/">tythos.com</a><span>/</span>
+    <a href="index.html">FFL1</a><span>/</span>
+    <span>General</span>
+  </div>
+</header>
+<nav>
+  <a href="index.html">HOME</a>
+  <a href="general.html" class="active">GENERAL</a>
+  <a href="monsters.html">MONSTERS</a>
+  <a href="mutants.html">MUTANTS</a>
+  <a href="humans.html">HUMANS</a>
+  <a href="items.html">ITEMS</a>
+  <a href="game.html">▶ PLAY</a>
+</nav>
+
+<main>
+  <div class="page-title">GENERAL MECHANICS</div>
+  <div class="page-sub">SYSTEM OVERVIEW · BATTLE · WORLD STRUCTURE</div>
+
+  <section>
+    <h2>OVERVIEW</h2>
+    <p>Final Fantasy Legend (SaGa 1) is a non-linear RPG where you assemble a party of 4 characters
+    and climb through 4 worlds to reach the Tower of God. What makes it unique is that each character
+    class grows in a fundamentally different way — there is no shared "level up" system.</p>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-title">HUMAN</div>
+        <p>Stats only increase by consuming stat-boosting items (Strong, Agility, etc.).
+        Can equip 8 items/weapons at once. Very predictable, powerful with good gear.</p>
+        <a href="humans.html" style="font-size:0.72rem; color:var(--cyan);">→ Full guide</a>
+      </div>
+      <div class="card">
+        <div class="card-title">MUTANT</div>
+        <p>Gains random stat increases and random abilities after each battle.
+        Only 4 equipment slots. High MANA potential makes them the best spellcasters.</p>
+        <a href="mutants.html" style="font-size:0.72rem; color:var(--cyan);">→ Full guide</a>
+      </div>
+      <div class="card">
+        <div class="card-title">MONSTER</div>
+        <p>Cannot equip items. Carries 4 meat slots. Eating 4 meats of the same type
+        transforms you into that monster family, giving you their stats.</p>
+        <a href="monsters.html" style="font-size:0.72rem; color:var(--cyan);">→ Full guide</a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>WORLD STRUCTURE</h2>
+    <p>The game consists of 4 overworlds plus the final Tower of God dungeon.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>WORLD</th>
+            <th>THEME</th>
+            <th>GOAL</th>
+            <th>BOSS</th>
+            <th>ENCOUNTER RANGE</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td><td>World 1</td><td>Medieval</td>
+            <td>Collect 4 Crystal Balls</td><td>—</td><td>HP 20–795</td>
+          </tr>
+          <tr>
+            <td>2</td><td>World 2</td><td>Mystical</td>
+            <td>Collect 4 Crystal Balls</td><td>Byak-Ko</td><td>HP 250–2000</td>
+          </tr>
+          <tr>
+            <td>3</td><td>World 3</td><td>High-tech</td>
+            <td>Collect 4 Crystal Balls</td><td>Sei-Ryu</td><td>HP 1000–5000</td>
+          </tr>
+          <tr>
+            <td>4</td><td>World 4</td><td>Dark / Hell</td>
+            <td>Enter Tower of God</td><td>Gen-Bu + Su-Zaku</td><td>HP 3000–9000</td>
+          </tr>
+          <tr>
+            <td>5</td><td>Tower of God</td><td>Divine</td>
+            <td>Reach top (20 floors)</td><td>Divine Beasts +2, Ashura, Creator</td><td>HP 5000–25690</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Each world gate requires 4 Crystal Balls (World 1–3). Crystal Balls are guarded in
+    dungeons and fortresses throughout each world.</p>
+  </section>
+
+  <section>
+    <h2>BATTLE SYSTEM</h2>
+    <p>Combat is turn-based. All party members and all enemies act each round. Turn order is
+    determined by the AGI stat — higher AGI acts first.</p>
+
+    <h3>Actions per character</h3>
+    <ul style="font-size:0.82rem; padding-left:20px; margin-bottom:10px;">
+      <li><strong>Attack</strong> — use equipped weapon; damage based on weapon's stat (STR/AGI/MANA)</li>
+      <li><strong>Use Item</strong> — consume a potion, use an ability/spell, eat meat (monsters)</li>
+      <li><strong>Flee</strong> — attempt to escape; success based on party vs. enemy AGI</li>
+    </ul>
+
+    <h3>Damage formulas</h3>
+    <div class="formula">Physical:  damage = rand(str × 2, str × 3) − target.def  (min 1)</div>
+    <div class="formula">Magic:     damage = rand(mana × 2, mana × 3)  (ignores DEF)</div>
+    <div class="formula">Gun:       damage = weapon.base_power × rand(0.8, 1.2)  (largely ignores DEF)</div>
+    <div class="formula">Elemental: effective damage ×1.5 if enemy has weakness</div>
+
+    <div class="callout tip">
+      <strong>Tip:</strong> Guns deal consistent damage regardless of the enemy's DEF stat.
+      They are very effective against high-DEF enemies in the later game.
+    </div>
+
+    <h3>Status effects</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>STATUS</th><th>EFFECT</th><th>CURE ITEM</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Poison</td><td>Lose HP each turn outside battle</td><td>Antdote</td></tr>
+          <tr><td>Sleep</td><td>Skip turns; cleared by taking damage</td><td>Bell / Pan</td></tr>
+          <tr><td>Stone</td><td>Cannot act; treated as dead if all petrified</td><td>Needle</td></tr>
+          <tr><td>Blind</td><td>Physical attacks frequently miss</td><td>Eyedrop</td></tr>
+          <tr><td>Death</td><td>KO'd</td><td>Revive (item)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>EQUIPMENT &amp; ITEMS</h2>
+    <p>Most weapons have a limited number of <strong>uses</strong> before they break.
+    Always carry backup weapons, especially for Humans who depend entirely on gear.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>TYPE</th><th>STAT USED</th><th>NOTES</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Sword (<code>'sword</code>)</td><td>STR</td><td>Most common; balanced power/uses</td></tr>
+          <tr><td>Axe / Hammer</td><td>STR</td><td>High power, fewer uses</td></tr>
+          <tr><td>Whip</td><td>STR</td><td>Hits all enemies at once</td></tr>
+          <tr><td>Rapier / Claw</td><td>AGI</td><td>Weaker base but scales with Agility</td></tr>
+          <tr><td>Gun (pistol/SMG/etc.)</td><td>Fixed</td><td>Bypasses DEF; consistent damage</td></tr>
+          <tr><td>Spell Book</td><td>MANA</td><td>Elemental spells; limited uses</td></tr>
+          <tr><td>Rod / Wand / Staff</td><td>MANA</td><td>Magic melee</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <a href="items.html" style="font-size:0.8rem; color:var(--cyan);">→ Complete item database</a>
+  </section>
+
+  <section>
+    <h2>STAT SYSTEM</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>STAT</th><th>EFFECT</th><th>DISPLAY MAX</th><th>INTERNAL MAX</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>HP</td><td>Hit points; reach 0 = KO</td><td class="num">999</td><td class="num">999</td></tr>
+          <tr><td>STR</td><td>Physical attack power</td><td class="num">99</td><td class="num">255</td></tr>
+          <tr><td>DEF</td><td>Physical damage reduction</td><td class="num">99</td><td class="num">255</td></tr>
+          <tr><td>AGI</td><td>Turn order; flee chance; AGI-weapon damage</td><td class="num">99</td><td class="num">255</td></tr>
+          <tr><td>MANA</td><td>Magic spell power; mutant ability use</td><td class="num">99</td><td class="num">255+</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <strong>Note:</strong> The display cap of 99 is a screen limitation only. Stats internally continue
+      to grow beyond 99 up to 255. Mutant MANA in particular can grow well past the display cap and
+      continues to improve spell damage even when showing 99.
+    </div>
+  </section>
+
+  <section>
+    <h2>TIPS &amp; STRATEGY</h2>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-title">SAVE OFTEN</div>
+        <p>Mutants can randomly lose good abilities. Save after every battle that gives
+        you a useful ability, and before any fight that might do so.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">MEAT STRATEGY</div>
+        <p>For monsters: plan your transformation chain. High-level meat from strong
+        enemies gives you stronger forms. Don't waste high-tier meat on weak forms.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">GUNS LATE GAME</div>
+        <p>Gun damage ignores DEF. As enemies gain hundreds of DEF in World 4 and the Tower,
+        guns become dramatically more effective than STR-based swords.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">CRYSTAL BALLS</div>
+        <p>Don't sell Crystal Balls — they open the world gates. Some appear in dungeons,
+        some are guarded by bosses. Explore thoroughly before moving on.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+</body>
+</html>

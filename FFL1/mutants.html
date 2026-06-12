@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mutants — FFL1</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.ability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.ability-item {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 0.72rem;
+}
+.ability-item .a-name { color: var(--cyan); margin-bottom: 2px; }
+.ability-item .a-type { color: var(--dim2); font-size: 0.62rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FFL1</h1>
+  <div class="breadcrumb">
+    <a href="/">tythos.com</a><span>/</span>
+    <a href="index.html">FFL1</a><span>/</span>
+    <span>Mutants</span>
+  </div>
+</header>
+<nav>
+  <a href="index.html">HOME</a>
+  <a href="general.html">GENERAL</a>
+  <a href="monsters.html">MONSTERS</a>
+  <a href="mutants.html" class="active">MUTANTS</a>
+  <a href="humans.html">HUMANS</a>
+  <a href="items.html">ITEMS</a>
+  <a href="game.html">▶ PLAY</a>
+</nav>
+
+<main>
+  <div class="page-title">MUTANT CLASS</div>
+  <div class="page-sub">STAT GROWTH · ABILITIES · MAX VALUES · STRATEGY</div>
+
+  <section>
+    <h2>CLASS OVERVIEW</h2>
+    <p>Mutants occupy a middle ground between Humans and Monsters. They grow naturally
+    through battle but with an element of randomness. Their greatest strength is
+    <strong>MANA growth</strong> — a Mutant can become an extraordinarily powerful spellcaster
+    by the end of the game.</p>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-title">EQUIPMENT</div>
+        <p>4 equipment slots for weapons/items (no armor slots).</p>
+        <p>Cannot equip helmets, chest armor, gloves, or shoes.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">ABILITIES</div>
+        <p>4 separate ability slots (powers like Fire, Punch, Heal).</p>
+        <p>Acquired randomly after battle. Overflow silently deletes one random existing ability.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">STAT GROWTH</div>
+        <p>After each battle victory, each stat has a chance to increase by 1–2.</p>
+        <p>The chance is influenced by your actions during the battle.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>STAT GAIN SYSTEM</h2>
+    <p>After each victorious battle, the game checks each of a Mutant's stats and may increase them.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>STAT</th><th>TRIGGER</th><th>NOTES</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>HP</td>
+            <td>Killing enemies</td>
+            <td>Increases most reliably. Will steadily grow toward 999.</td>
+          </tr>
+          <tr>
+            <td>STR</td>
+            <td>Using STR-based weapons (swords, hammers)</td>
+            <td>Grows slowly. Rarely exceeds ~50 without deliberate grinding.</td>
+          </tr>
+          <tr>
+            <td>AGI</td>
+            <td>Using AGI-based weapons (rapier, guns)</td>
+            <td>Grows with rapier use. Useful for turn-order advantage.</td>
+          </tr>
+          <tr>
+            <td>MANA</td>
+            <td>Using spells or MANA-based abilities</td>
+            <td><strong style="color:var(--gold)">Highest growth rate.</strong> Can reach 99+ (internal) easily.</td>
+          </tr>
+          <tr>
+            <td>DEF</td>
+            <td>Surviving hits</td>
+            <td>Grows passively. Moderate growth.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="formula">
+      Chance of +1 to a stat per battle ≈ 15–40% depending on actions taken
+    </div>
+
+    <div class="callout tip">
+      <strong>Optimize MANA:</strong> Use spells every battle to maximize MANA growth.
+      A late-game Mutant with MANA 99+ (internal ~150–200) casts spells that deal
+      300–600 damage — far exceeding what weapons can do.
+    </div>
+  </section>
+
+  <section>
+    <h2>STAT CAPS</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>STAT</th><th>DISPLAY MAX</th><th>INTERNAL MAX</th><th>PRACTICAL MAX</th></tr></thead>
+        <tbody>
+          <tr><td>HP</td><td class="num">999</td><td class="num">999</td><td class="num">~600–800 normal playthrough</td></tr>
+          <tr><td>STR</td><td class="num">99</td><td class="num">255</td><td class="num">~40–80 (low priority)</td></tr>
+          <tr><td>DEF</td><td class="num">99</td><td class="num">255</td><td class="num">~50–120</td></tr>
+          <tr><td>AGI</td><td class="num">99</td><td class="num">255</td><td class="num">~30–70</td></tr>
+          <tr><td>MANA</td><td class="num">99 (shown)</td><td class="num">255+</td><td class="num">~100–180 end-game</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The display cap of 99 for STR/DEF/AGI/MANA is visual only. Internal values continue
+    to increase past 99 and continue to affect combat calculations. MANA past 99 still
+    increases spell damage significantly.</p>
+  </section>
+
+  <section>
+    <h2>ABILITY SYSTEM</h2>
+    <p>Mutants have <strong>4 ability slots</strong> that are separate from equipment.
+    Abilities are learned randomly after battles — you have no control over which ability
+    you receive. When a 5th ability would be acquired, one of the 4 existing abilities
+    is deleted at random <em>without any warning</em>.</p>
+
+    <div class="callout warn">
+      <strong>Warning:</strong> The game gives NO notification when an ability is lost.
+      After every battle where you might gain an ability, immediately check your party's
+      ability list. Save often to avoid losing rare abilities.
+    </div>
+
+    <h3>Ability Categories (from ROM)</h3>
+    <div class="filter-bar">
+      <input type="text" id="ability-search" placeholder="Search abilities…">
+      <select id="ability-type-filter">
+        <option value="">All types</option>
+        <option value="spell">Spell</option>
+        <option value="ability">Ability</option>
+        <option value="usable_item">Usable Item</option>
+        <option value="sword">Sword</option>
+        <option value="weapon">Weapon</option>
+        <option value="armor">Armor</option>
+        <option value="quest_item">Quest Item</option>
+      </select>
+    </div>
+    <div class="ability-grid" id="ability-grid"></div>
+
+    <h3>Rarest &amp; Most Valuable Abilities</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ABILITY</th><th>TYPE</th><th>WHY IT MATTERS</th></tr></thead>
+        <tbody>
+          <tr><td>flare</td><td>Spell</td><td>Massive fire damage to one enemy. Best single-target nuke.</td></tr>
+          <tr><td>quake</td><td>Spell</td><td>Earth damage to all enemies. Rare and powerful.</td></tr>
+          <tr><td>p-blast</td><td>Ability</td><td>Strong status-inducing attack.</td></tr>
+          <tr><td>heal</td><td>Ability</td><td>Restores HP. Invaluable — don't lose this one.</td></tr>
+          <tr><td>death</td><td>Spell</td><td>Instant death on one enemy. Works on some bosses.</td></tr>
+          <tr><td>barrier</td><td>Ability</td><td>Reduces all damage taken. Strong defensive buff.</td></tr>
+          <tr><td>power</td><td>Ability</td><td>Increases attack power temporarily.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>OPTIMAL MUTANT STRATEGY</h2>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-title">EARLY GAME</div>
+        <p>Equip a rapier or bow to build AGI. Use any spell abilities to build MANA.
+        Buy Cure/Heal items to compensate for lack of armor.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">MID GAME</div>
+        <p>Prioritize MANA growth. Cast spells every turn even when not necessary.
+        Keep Heal ability at all costs — save/reload to protect it.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">LATE GAME</div>
+        <p>With MANA &gt;99 internally, Flare deals 400–700 damage. This exceeds
+        most weapons. Keep 3–4 offensive spells and Heal for sustainability.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">ABILITY MANAGEMENT</div>
+        <p>After gaining a useful ability, save immediately. If the next battle
+        randomly drops a junk ability and deletes your Heal, you can reload.
+        This is not cheating — it's intended (use the in-game save rooms).</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+async function init() {
+  const abilities = await fetch('data/abilities.json').then(r => r.json());
+  const grid = document.getElementById('ability-grid');
+  const items = [];
+
+  abilities.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'ability-item';
+    el.dataset.name = a.name.toLowerCase();
+    el.dataset.type = a.type;
+    const typeColor = {
+      spell: 'tag-purple', ability: 'tag-cyan', usable_item: 'tag-green',
+      sword: 'tag-gold', weapon: 'tag-gold', armor: 'tag-cyan', quest_item: 'tag-red'
+    }[a.type] || '';
+    el.innerHTML = `<div class="a-name">${a.name || '—'}</div>
+      <div class="a-type"><span class="tag ${typeColor}">${a.type}</span></div>`;
+    grid.appendChild(el);
+    items.push(el);
+  });
+
+  function filter() {
+    const q = document.getElementById('ability-search').value.toLowerCase();
+    const t = document.getElementById('ability-type-filter').value;
+    items.forEach(el => {
+      el.classList.toggle('hidden', (q && !el.dataset.name.includes(q)) || (t && el.dataset.type !== t));
+    });
+  }
+  document.getElementById('ability-search').addEventListener('input', filter);
+  document.getElementById('ability-type-filter').addEventListener('change', filter);
+}
+init();
+</script>
+</body>
+</html>

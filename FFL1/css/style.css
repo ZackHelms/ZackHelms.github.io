@@ -1,0 +1,284 @@
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg: #06060e;
+  --panel: #0b0b16;
+  --panel2: #0f0f1e;
+  --border: #1a1a30;
+  --border2: #252545;
+  --green: #39ff14;
+  --gold: #ffc300;
+  --cyan: #00f5ff;
+  --red: #ff4455;
+  --purple: #c77dff;
+  --white: #dde3ff;
+  --dim: #353555;
+  --dim2: #4a4a70;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--white);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+a { color: var(--cyan); text-decoration: none; }
+a:hover { color: var(--green); }
+
+/* ── HEADER ── */
+header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+header h1 {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 1.5rem;
+  color: var(--gold);
+  text-shadow: 0 0 16px #ffc30066;
+  letter-spacing: 4px;
+}
+.breadcrumb {
+  font-size: 0.7rem;
+  color: var(--dim2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.breadcrumb a { color: var(--dim2); }
+.breadcrumb a:hover { color: var(--cyan); }
+.breadcrumb span { color: var(--dim); }
+
+nav {
+  display: flex;
+  gap: 0;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+nav a {
+  padding: 8px 16px;
+  font-size: 0.72rem;
+  letter-spacing: 1px;
+  color: var(--dim2);
+  border-right: 1px solid var(--border);
+  transition: all 0.15s;
+}
+nav a:hover, nav a.active {
+  color: var(--green);
+  background: var(--panel2);
+}
+
+/* ── MAIN CONTENT ── */
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.page-title {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: clamp(1.4rem, 4vw, 2.2rem);
+  color: var(--green);
+  text-shadow: 0 0 18px #39ff1444;
+  letter-spacing: 4px;
+  margin-bottom: 4px;
+}
+.page-sub {
+  font-size: 0.68rem;
+  color: var(--dim2);
+  letter-spacing: 3px;
+  margin-bottom: 32px;
+}
+
+/* ── SECTIONS ── */
+section { margin-bottom: 40px; }
+
+h2 {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 1.1rem;
+  color: var(--gold);
+  letter-spacing: 2px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  margin-bottom: 16px;
+}
+
+h3 {
+  font-size: 0.9rem;
+  color: var(--cyan);
+  letter-spacing: 1px;
+  margin: 16px 0 8px;
+}
+
+p {
+  font-size: 0.82rem;
+  color: var(--white);
+  margin-bottom: 10px;
+  max-width: 72ch;
+}
+
+/* ── TABLES ── */
+.table-wrap { overflow-x: auto; margin-bottom: 20px; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+th {
+  background: var(--panel2);
+  color: var(--gold);
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 1px;
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border2);
+  white-space: nowrap;
+}
+td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+tr:nth-child(even) td { background: var(--panel); }
+tr:hover td { background: var(--panel2); }
+
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tag {
+  display: inline-block;
+  font-size: 0.6rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.tag-green { background: #39ff1422; color: var(--green); border: 1px solid #39ff1444; }
+.tag-gold  { background: #ffc30022; color: var(--gold);  border: 1px solid #ffc30044; }
+.tag-cyan  { background: #00f5ff22; color: var(--cyan);  border: 1px solid #00f5ff44; }
+.tag-red   { background: #ff445522; color: var(--red);   border: 1px solid #ff445544; }
+.tag-purple{ background: #c77dff22; color: var(--purple);border: 1px solid #c77dff44; }
+
+/* ── CARDS / PANELS ── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.panel h3 { margin-top: 0; }
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.card:hover {
+  border-color: var(--border2);
+  box-shadow: 0 0 12px #39ff1411;
+}
+.card-title {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 0.9rem;
+  color: var(--gold);
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+.card p { margin-bottom: 0; }
+
+/* ── STAT BARS ── */
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+}
+.stat-label { width: 48px; color: var(--dim2); letter-spacing: 1px; }
+.stat-bar-wrap { flex: 1; height: 6px; background: var(--border); border-radius: 3px; }
+.stat-bar { height: 100%; border-radius: 3px; }
+.stat-val { width: 32px; text-align: right; color: var(--white); }
+
+/* ── FORMULA BLOCKS ── */
+.formula {
+  background: var(--panel2);
+  border-left: 3px solid var(--cyan);
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  color: var(--cyan);
+  margin: 10px 0;
+  border-radius: 0 4px 4px 0;
+}
+
+/* ── CALLOUT BOX ── */
+.callout {
+  background: var(--panel2);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--gold);
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-size: 0.78rem;
+}
+.callout.warn { border-left-color: var(--red); }
+.callout.tip  { border-left-color: var(--green); }
+.callout strong { color: var(--gold); }
+.callout.warn strong { color: var(--red); }
+.callout.tip  strong { color: var(--green); }
+
+/* ── SEARCH / FILTER ── */
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  align-items: center;
+}
+.filter-bar input {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  color: var(--white);
+  padding: 6px 12px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  width: 220px;
+}
+.filter-bar input:focus { outline: none; border-color: var(--cyan); }
+.filter-bar select {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  color: var(--white);
+  padding: 6px 10px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  border-radius: 4px;
+}
+.filter-bar select:focus { outline: none; border-color: var(--cyan); }
+
+/* ── HIDDEN ── */
+.hidden { display: none !important; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  main { padding: 20px 14px 48px; }
+  header { padding: 10px 14px; }
+  .card-grid { grid-template-columns: 1fr; }
+}
