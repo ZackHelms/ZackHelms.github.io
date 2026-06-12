@@ -131,10 +131,18 @@
     #btn-select.pressed { background: rgba(255, 127,  39, 0.65); box-shadow: 0 0 10px rgba(255,127, 39,0.7); }
     #btn-start.pressed  { background: rgba(130,  65,  20, 0.65); box-shadow: 0 0 10px rgba(200,100, 40,0.7); }
 
+    /* ── POWER OFF CONFIRM ZONE ────────────────────────────────────────────── */
+    #poweroff-yes-zone {
+      display: block;
+      /* height extended ~3x via padding-bottom; button stays at top */
+      padding-bottom: calc(2 * (6px + 1.4 * clamp(0.3rem, 1.1vw, 0.5rem)));
+    }
+
     /* ── DEBUG MODE ─────────────────────────────────────────────────────────── */
     .debug-mode .touch-zone,
     .debug-mode #off-zone,
-    .debug-mode #rst-zone {
+    .debug-mode #rst-zone,
+    .debug-mode #poweroff-yes-zone {
       background: rgba(255, 0, 0, 0.05);
       outline: 1px solid rgba(255, 0, 0, 0.7);
     }
@@ -175,7 +183,7 @@
       user-select: none;
     }
     #off-zone { left: 2%; }
-    #rst-zone { right: 2%; }
+    #rst-zone { right: 2%; display: flex; justify-content: flex-end; }
 
     /* ── OFF / RESET BUTTONS ───────────────────────────────────────────────── */
     #off-btn, #rst-btn, #rld-btn {
@@ -274,7 +282,7 @@
     <div id="poweroff-overlay">
       <div id="poweroff-popup">
         <div class="popup-label">POWER OFF?</div>
-        <button id="poweroff-yes">POWER OFF</button>
+        <div id="poweroff-yes-zone"><button id="poweroff-yes">POWER OFF</button></div>
       </div>
     </div>
   </div>
@@ -298,10 +306,13 @@
     function updateZoneHeights() {
       const btn = document.getElementById('off-btn');
       if (!btn) return;
-      const h = btn.getBoundingClientRect().height;
-      if (h > 0) {
-        document.getElementById('off-zone').style.height = (h * 3) + 'px';
-        document.getElementById('rst-zone').style.height = (h * 3) + 'px';
+      const rect = btn.getBoundingClientRect();
+      const h = rect.height, w = rect.width;
+      if (h > 0 && w > 0) {
+        const offZ = document.getElementById('off-zone');
+        const rstZ = document.getElementById('rst-zone');
+        if (offZ) { offZ.style.height = (h * 3) + 'px'; offZ.style.width = (w * 3) + 'px'; }
+        if (rstZ) { rstZ.style.height = (h * 3) + 'px'; rstZ.style.width = (w * 3) + 'px'; }
       }
     }
 
@@ -681,15 +692,16 @@
 
     const offBtn  = document.getElementById('off-btn');
     const rstBtn  = document.getElementById('rst-btn');
-    const offZone = document.getElementById('off-zone');
-    const rstZone = document.getElementById('rst-zone');
-    const poOvl   = document.getElementById('poweroff-overlay');
-    const poPopup = document.getElementById('poweroff-popup');
-    const poYes   = document.getElementById('poweroff-yes');
+    const offZone    = document.getElementById('off-zone');
+    const rstZone    = document.getElementById('rst-zone');
+    const poOvl      = document.getElementById('poweroff-overlay');
+    const poPopup    = document.getElementById('poweroff-popup');
+    const poYes      = document.getElementById('poweroff-yes');
+    const poYesZone  = document.getElementById('poweroff-yes-zone');
 
-    bindBtn(offZone, () => poOvl.classList.add('active'));
-    bindBtn(rstZone, resetGame);
-    bindBtn(poYes,  () => { window.location.href = 'index.html'; });
+    bindBtn(offZone,   () => poOvl.classList.add('active'));
+    bindBtn(rstZone,   resetGame);
+    bindBtn(poYesZone, () => { window.location.href = 'index.html'; });
 
     const rldBtn = document.getElementById('rld-btn');
     bindBtn(rldBtn, function hardReload() {
