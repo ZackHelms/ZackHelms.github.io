@@ -40,67 +40,39 @@
 
 <main>
   <div class="page-title">ITEMS &amp; GEAR</div>
-  <div class="page-sub">WEAPONS · ARMOR · SPELLS · USABLE ITEMS</div>
+  <div class="page-sub">ROM-EXTRACTED DATA ONLY</div>
 
-  <section>
-    <h2>QUICK REFERENCE</h2>
-    <div class="card-grid">
-      <div class="card">
-        <div class="card-title">WEAPON USES</div>
-        <p>Most weapons have limited uses (typically 20–40 uses). When uses reach 0 the weapon breaks and disappears. Always carry backups.</p>
-      </div>
-      <div class="card">
-        <div class="card-title">GUNS VS SWORDS</div>
-        <p>Guns deal fixed damage ignoring DEF. Swords use STR − DEF formula.
-        In World 3+ where enemies have very high DEF, guns dominate.</p>
-      </div>
-      <div class="card">
-        <div class="card-title">EQUIP RESTRICTIONS</div>
-        <p>Humans: all weapons + armor (8 slots).<br>
-        Mutants: weapons only (4 slots).<br>
-        Monsters: nothing — meat only.</p>
-      </div>
-      <div class="card">
-        <div class="card-title">SPECIAL WEAPONS</div>
-        <p>Glass Sword: 1 use, destroys any enemy instantly.<br>
-        Excalibur: hits all enemies for massive damage.<br>
-        Masamune: high damage + special crit rate.</p>
-      </div>
-    </div>
-  </section>
+  <div class="callout warn">
+    <strong>Data source notice:</strong> Item names and type classifications are extracted directly
+    from the ROM ability table at <code>0x14640</code>. Numeric values such as base power, use
+    counts, elemental affinity, and stat bonuses are <strong>not</strong> encoded in the name
+    records and have not been extracted from the ROM. Those columns are omitted here.
+  </div>
 
   <div class="tab-bar">
-    <button class="tab-btn active" data-tab="weapons">WEAPONS</button>
+    <button class="tab-btn active" data-tab="weapons">WEAPONS / SWORDS</button>
     <button class="tab-btn" data-tab="armor">ARMOR</button>
-    <button class="tab-btn" data-tab="spells">SPELLS</button>
+    <button class="tab-btn" data-tab="spells">SPELLS / ABILITIES</button>
     <button class="tab-btn" data-tab="usable">USABLE ITEMS</button>
   </div>
 
   <div id="tab-weapons" class="tab-pane active">
+    <p style="font-size:0.82rem;margin-bottom:16px;">
+      Weapons are classified by type byte: <code>0x32</code> = sword/blade (prefix <code>0xEC</code>
+      renders as <code>'</code> in-game), <code>0x14</code>/<code>0x1E</code> = other weapon (gun/ranged).
+    </p>
     <div class="filter-bar">
       <input type="text" id="weapon-search" placeholder="Search…">
       <select id="weapon-type-filter">
         <option value="">All types</option>
-        <option value="sword">Sword</option>
-        <option value="gun">Gun</option>
-        <option value="melee">Melee / Other</option>
-      </select>
-      <select id="weapon-stat-filter">
-        <option value="">All stats</option>
-        <option value="str">STR</option>
-        <option value="agi">AGI</option>
-        <option value="mana">MANA</option>
-        <option value="Fixed">Fixed (gun)</option>
+        <option value="sword">Sword (0x32)</option>
+        <option value="weapon">Weapon (0x14/0x1E)</option>
       </select>
     </div>
     <div class="table-wrap">
       <table id="weapon-table">
         <thead>
-          <tr>
-            <th>NAME</th><th>TYPE</th><th>STAT</th>
-            <th class="num">BASE PWR</th><th class="num">USES</th>
-            <th>ELEMENT</th><th>SPECIAL</th>
-          </tr>
+          <tr><th>NAME</th><th>ROM TYPE</th></tr>
         </thead>
         <tbody id="weapon-tbody"></tbody>
       </table>
@@ -108,10 +80,14 @@
   </div>
 
   <div id="tab-armor" class="tab-pane">
+    <p style="font-size:0.82rem;margin-bottom:16px;">
+      Armor entries have type byte <code>0xFE</code> or <code>0xFD</code>. Slot (helmet/chest/gloves/shoes)
+      is determined by prefix byte. Stat bonuses are not in the name record and have not been extracted.
+    </p>
     <div class="table-wrap">
-      <table id="armor-table">
+      <table>
         <thead>
-          <tr><th>NAME</th><th>SLOT</th><th>DEF BONUS</th><th>OTHER</th></tr>
+          <tr><th>NAME</th><th>SLOT (prefix byte)</th></tr>
         </thead>
         <tbody id="armor-tbody"></tbody>
       </table>
@@ -119,13 +95,23 @@
   </div>
 
   <div id="tab-spells" class="tab-pane">
-    <p style="font-size:0.82rem;margin-bottom:16px;">Spells are cast by Mutants (via ability slots) or by using spell book weapons.
-    Spell damage scales with the caster's MANA stat.</p>
-    <div class="formula">Spell damage = rand(MANA × 2, MANA × 3)</div>
+    <p style="font-size:0.82rem;margin-bottom:16px;">
+      Spells and abilities have prefix byte <code>0xEF</code> (elemental spell) or type bytes
+      <code>0x05</code>, <code>0x0A</code>, <code>0x0B</code>, <code>0x0F</code> (ability).
+      Power, target, element, and status effects have not been extracted from the ROM.
+    </p>
+    <div class="filter-bar">
+      <input type="text" id="spell-search" placeholder="Search…">
+      <select id="spell-type-filter">
+        <option value="">All types</option>
+        <option value="spell">Spell</option>
+        <option value="ability">Ability</option>
+      </select>
+    </div>
     <div class="table-wrap">
-      <table id="spell-table">
+      <table>
         <thead>
-          <tr><th>NAME</th><th>ELEMENT</th><th>TARGET</th><th class="num">BASE PWR</th><th>STATUS</th><th>USES</th></tr>
+          <tr><th>NAME</th><th>ROM TYPE</th></tr>
         </thead>
         <tbody id="spell-tbody"></tbody>
       </table>
@@ -133,11 +119,14 @@
   </div>
 
   <div id="tab-usable" class="tab-pane">
-    <p style="font-size:0.82rem;margin-bottom:16px;">Usable items can be used in battle or on the field map. Most are consumable (one use).</p>
+    <p style="font-size:0.82rem;margin-bottom:16px;">
+      Usable items have type byte <code>0x01</code> or <code>0x03</code>. Effects (heal amount,
+      stat boost, status cure) have not been extracted from the ROM.
+    </p>
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>NAME</th><th>EFFECT</th><th>USABLE BY</th></tr>
+          <tr><th>NAME</th><th>ROM TYPE</th></tr>
         </thead>
         <tbody id="usable-tbody"></tbody>
       </table>
@@ -152,20 +141,13 @@ async function init() {
   // WEAPONS
   const wTbody = document.getElementById('weapon-tbody');
   const wRows = [];
-  [...data.weapons].sort((a,b) => b.base_power - a.base_power).forEach(w => {
+  [...data.weapons].forEach(w => {
     const tr = document.createElement('tr');
     tr.dataset.name = w.name.toLowerCase();
-    tr.dataset.type = w.weapon_type;
-    tr.dataset.stat = w.stat_used;
-    const statTag = {str:'tag-gold', agi:'tag-cyan', mana:'tag-purple', Fixed:'tag-red'}[w.stat_used] || '';
+    tr.dataset.type = w.weapon_type || 'weapon';
     tr.innerHTML = `
       <td><strong>${w.name}</strong></td>
-      <td><span class="tag tag-green">${w.weapon_type}</span></td>
-      <td><span class="tag ${statTag}">${w.stat_used}</span></td>
-      <td class="num">${w.base_power}</td>
-      <td class="num">${w.uses}</td>
-      <td>${w.element ? `<span class="tag tag-cyan" style="font-size:0.58rem">${w.element}</span>` : '—'}</td>
-      <td style="font-size:0.7rem;color:var(--dim2)">${w.special||'—'}</td>`;
+      <td><span class="tag tag-gold">${w.weapon_type || 'weapon'}</span></td>`;
     wTbody.appendChild(tr);
     wRows.push(tr);
   });
@@ -173,58 +155,54 @@ async function init() {
   function filterWeapons() {
     const q = document.getElementById('weapon-search').value.toLowerCase();
     const t = document.getElementById('weapon-type-filter').value;
-    const s = document.getElementById('weapon-stat-filter').value;
     wRows.forEach(r => {
-      const ok = (!q || r.dataset.name.includes(q)) &&
-                 (!t || r.dataset.type === t) &&
-                 (!s || r.dataset.stat === s);
-      r.classList.toggle('hidden', !ok);
+      r.classList.toggle('hidden', (q && !r.dataset.name.includes(q)) || (t && r.dataset.type !== t));
     });
   }
   document.getElementById('weapon-search').addEventListener('input', filterWeapons);
   document.getElementById('weapon-type-filter').addEventListener('change', filterWeapons);
-  document.getElementById('weapon-stat-filter').addEventListener('change', filterWeapons);
 
   // ARMOR
   const aTbody = document.getElementById('armor-tbody');
   data.armor.forEach(a => {
     const tr = document.createElement('tr');
-    const bonus = a.stat_bonus || {};
-    const defB = bonus.def !== undefined ? `+${bonus.def}` : '—';
-    const other = Object.entries(bonus)
-      .filter(([k]) => k !== 'def' && k !== 'element_resist')
-      .map(([k,v]) => `+${v} ${k.toUpperCase()}`).join(', ')
-      || (bonus.element_resist ? `Resist ${bonus.element_resist}` : '—');
-    tr.innerHTML = `<td><strong>${a.name}</strong></td>
-      <td><span class="tag tag-cyan">${a.armor_type}</span></td>
-      <td class="num">${defB}</td><td>${other}</td>`;
+    tr.innerHTML = `
+      <td><strong>${a.name}</strong></td>
+      <td><span class="tag tag-cyan">${a.armor_type || '—'}</span></td>`;
     aTbody.appendChild(tr);
   });
 
-  // SPELLS
+  // SPELLS / ABILITIES
   const spTbody = document.getElementById('spell-tbody');
-  data.spells.forEach(s => {
+  const spRows = [];
+  [...data.spells, ...(data.abilities || [])].forEach(s => {
     const tr = document.createElement('tr');
-    const elemColor = {fire:'tag-red', ice:'tag-cyan', elec:'tag-gold', poison:'tag-purple',
-      none:'', earth:'tag-green'}[s.element] || '';
-    tr.innerHTML = `<td><strong>${s.name}</strong></td>
-      <td><span class="tag ${elemColor}">${s.element}</span></td>
-      <td>${s.target.replace(/_/g,' ')}</td>
-      <td class="num">${s.base_power || '—'}</td>
-      <td>${s.status ? `<span class="tag tag-red">${s.status}</span>` : '—'}</td>
-      <td class="num">${s.uses}</td>`;
+    tr.dataset.name = s.name.toLowerCase();
+    tr.dataset.type = s.type || 'spell';
+    tr.innerHTML = `
+      <td><strong>${s.name}</strong></td>
+      <td><span class="tag tag-purple">${s.type || 'spell'}</span></td>`;
     spTbody.appendChild(tr);
+    spRows.push(tr);
   });
+
+  function filterSpells() {
+    const q = document.getElementById('spell-search').value.toLowerCase();
+    const t = document.getElementById('spell-type-filter').value;
+    spRows.forEach(r => {
+      r.classList.toggle('hidden', (q && !r.dataset.name.includes(q)) || (t && r.dataset.type !== t));
+    });
+  }
+  document.getElementById('spell-search').addEventListener('input', filterSpells);
+  document.getElementById('spell-type-filter').addEventListener('change', filterSpells);
 
   // USABLE
   const uTbody = document.getElementById('usable-tbody');
   data.usable.forEach(u => {
     const tr = document.createElement('tr');
-    let eff = u.effect || '—';
-    if (u.heal_amount) eff += ` (${u.heal_amount} HP)`;
-    if (u.stat_boost) eff += ` (+1 ${u.stat_boost.toUpperCase()})`;
-    tr.innerHTML = `<td><strong>${u.name}</strong></td><td>${eff}</td>
-      <td style="font-size:0.7rem">${(u.usable_by||[]).join(', ')}</td>`;
+    tr.innerHTML = `
+      <td><strong>${u.name}</strong></td>
+      <td style="color:var(--dim2);font-size:0.72rem">usable_item</td>`;
     uTbody.appendChild(tr);
   });
 

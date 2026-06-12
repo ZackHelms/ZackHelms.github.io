@@ -28,191 +28,162 @@
 
 <main>
   <div class="page-title">GENERAL MECHANICS</div>
-  <div class="page-sub">SYSTEM OVERVIEW · BATTLE · WORLD STRUCTURE</div>
+  <div class="page-sub">ROM-EXTRACTED DATA ONLY</div>
+
+  <div class="callout warn">
+    <strong>Data source notice:</strong> This wiki is built from data tables extracted directly from the
+    ROM binary (<code>Final Fantasy Legend, The (USA).gb</code>). Only information derived from the
+    extracted data files is presented here. Mechanics that have not yet been extracted from the ROM —
+    including damage formulas, turn order logic, status effect rules, flee calculations, equipment slot
+    counts, and elemental interactions — are omitted rather than inferred.
+  </div>
 
   <section>
-    <h2>OVERVIEW</h2>
-    <p>Final Fantasy Legend (SaGa 1) is a non-linear RPG where you assemble a party of 4 characters
-    and climb through 4 worlds to reach the Tower of God. What makes it unique is that each character
-    class grows in a fundamentally different way — there is no shared "level up" system.</p>
+    <h2>CHARACTER CLASSES</h2>
+    <p>The ROM contains three character class identifiers. Player-class entries appear at monster
+    indices 173–188 in the creature table. The three classes are distinct enough to occupy separate
+    index blocks:</p>
+
     <div class="card-grid">
       <div class="card">
         <div class="card-title">HUMAN</div>
-        <p>Stats only increase by consuming stat-boosting items (Strong, Agility, etc.).
-        Can equip 8 items/weapons at once. Very predictable, powerful with good gear.</p>
-        <a href="humans.html" style="font-size:0.72rem; color:var(--cyan);">→ Full guide</a>
+        <p>Equipment-focused class. Stats and mechanics not fully extracted from ROM.</p>
+        <a href="humans.html" style="font-size:0.72rem; color:var(--cyan);">→ Humans page</a>
       </div>
       <div class="card">
         <div class="card-title">MUTANT</div>
-        <p>Gains random stat increases and random abilities after each battle.
-        Only 4 equipment slots. High MANA potential makes them the best spellcasters.</p>
-        <a href="mutants.html" style="font-size:0.72rem; color:var(--cyan);">→ Full guide</a>
+        <p>Random-growth class. Stats and mechanics not fully extracted from ROM.</p>
+        <a href="mutants.html" style="font-size:0.72rem; color:var(--cyan);">→ Mutants page</a>
       </div>
       <div class="card">
         <div class="card-title">MONSTER</div>
-        <p>Cannot equip items. Carries 4 meat slots. Eating 4 meats of the same type
-        transforms you into that monster family, giving you their stats.</p>
-        <a href="monsters.html" style="font-size:0.72rem; color:var(--cyan);">→ Full guide</a>
+        <p>Transformation class. Drop data (can_drop_meat, meat_level) extracted from ROM.
+        Transformation mechanics not yet extracted.</p>
+        <a href="monsters.html" style="font-size:0.72rem; color:var(--cyan);">→ Monsters page</a>
       </div>
     </div>
   </section>
 
   <section>
-    <h2>WORLD STRUCTURE</h2>
-    <p>The game consists of 4 overworlds plus the final Tower of God dungeon.</p>
+    <h2>BOSS ROSTER (ROM DATA)</h2>
+    <p>Final bosses are the last entries in the 200-monster table. Stats extracted directly from
+    <code>0x1AAE8</code> (STR/DEF/AGI/MANA) and <code>0x1B254</code> (HP). Values that exceed 99
+    are shown as-is — the display cap of 99 observed in-game is a rendering limit, not the stored value.</p>
+
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>#</th>
-            <th>WORLD</th>
-            <th>THEME</th>
-            <th>GOAL</th>
-            <th>BOSS</th>
-            <th>ENCOUNTER RANGE</th>
+            <th>ROM ID</th><th>NAME</th><th>HP</th><th>STR</th><th>DEF</th><th>AGI</th><th>MANA</th>
           </tr>
         </thead>
-        <tbody>
-          <tr>
-            <td>1</td><td>World 1</td><td>Medieval</td>
-            <td>Collect 4 Crystal Balls</td><td>—</td><td>HP 20–795</td>
-          </tr>
-          <tr>
-            <td>2</td><td>World 2</td><td>Mystical</td>
-            <td>Collect 4 Crystal Balls</td><td>Byak-Ko</td><td>HP 250–2000</td>
-          </tr>
-          <tr>
-            <td>3</td><td>World 3</td><td>High-tech</td>
-            <td>Collect 4 Crystal Balls</td><td>Sei-Ryu</td><td>HP 1000–5000</td>
-          </tr>
-          <tr>
-            <td>4</td><td>World 4</td><td>Dark / Hell</td>
-            <td>Enter Tower of God</td><td>Gen-Bu + Su-Zaku</td><td>HP 3000–9000</td>
-          </tr>
-          <tr>
-            <td>5</td><td>Tower of God</td><td>Divine</td>
-            <td>Reach top (20 floors)</td><td>Divine Beasts +2, Ashura, Creator</td><td>HP 5000–25690</td>
-          </tr>
-        </tbody>
+        <tbody id="boss-tbody"></tbody>
       </table>
     </div>
-    <p>Each world gate requires 4 Crystal Balls (World 1–3). Crystal Balls are guarded in
-    dungeons and fortresses throughout each world.</p>
+    <p style="font-size:0.72rem;color:var(--dim2);margin-top:8px;">
+      Indices 189–199. Note: boss HP values from 0x1B254 may be stored as 2-byte little-endian;
+      values shown are the raw decoded integers.
+    </p>
   </section>
 
   <section>
-    <h2>BATTLE SYSTEM</h2>
-    <p>Combat is turn-based. All party members and all enemies act each round. Turn order is
-    determined by the AGI stat — higher AGI acts first.</p>
+    <h2>MONSTER FAMILIES (ROM INDEX RANGES)</h2>
+    <p>Monsters are grouped into families by contiguous index blocks in the ROM name table at
+    <code>0x14000</code>. Family boundaries are inferred from monster names and index positions.</p>
 
-    <h3>Actions per character</h3>
-    <ul style="font-size:0.82rem; padding-left:20px; margin-bottom:10px;">
-      <li><strong>Attack</strong> — use equipped weapon; damage based on weapon's stat (STR/AGI/MANA)</li>
-      <li><strong>Use Item</strong> — consume a potion, use an ability/spell, eat meat (monsters)</li>
-      <li><strong>Flee</strong> — attempt to escape; success based on party vs. enemy AGI</li>
-    </ul>
-
-    <h3>Damage formulas</h3>
-    <div class="formula">Physical:  damage = rand(str × 2, str × 3) − target.def  (min 1)</div>
-    <div class="formula">Magic:     damage = rand(mana × 2, mana × 3)  (ignores DEF)</div>
-    <div class="formula">Gun:       damage = weapon.base_power × rand(0.8, 1.2)  (largely ignores DEF)</div>
-    <div class="formula">Elemental: effective damage ×1.5 if enemy has weakness</div>
-
-    <div class="callout tip">
-      <strong>Tip:</strong> Guns deal consistent damage regardless of the enemy's DEF stat.
-      They are very effective against high-DEF enemies in the later game.
-    </div>
-
-    <h3>Status effects</h3>
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>STATUS</th><th>EFFECT</th><th>CURE ITEM</th></tr>
+          <tr><th>INDICES</th><th>FAMILY</th><th>FIRST NAME</th><th>LAST NAME</th><th>COUNT</th></tr>
         </thead>
         <tbody>
-          <tr><td>Poison</td><td>Lose HP each turn outside battle</td><td>Antdote</td></tr>
-          <tr><td>Sleep</td><td>Skip turns; cleared by taking damage</td><td>Bell / Pan</td></tr>
-          <tr><td>Stone</td><td>Cannot act; treated as dead if all petrified</td><td>Needle</td></tr>
-          <tr><td>Blind</td><td>Physical attacks frequently miss</td><td>Eyedrop</td></tr>
-          <tr><td>Death</td><td>KO'd</td><td>Revive (item)</td></tr>
+          <tr><td>0–5</td><td>Insect</td><td>fly</td><td>mantis</td><td>6</td></tr>
+          <tr><td>6–11</td><td>Fish / Aquatic</td><td>barracud</td><td>leviatan</td><td>6</td></tr>
+          <tr><td>12–17</td><td>Plant</td><td>cactus</td><td>darkrose</td><td>6</td></tr>
+          <tr><td>18–23</td><td>Crustacean</td><td>clipper</td><td>scarab</td><td>6</td></tr>
+          <tr><td>24–29</td><td>Shellfish</td><td>shrimp</td><td>dagon</td><td>6</td></tr>
+          <tr><td>30–35</td><td>Canine</td><td>wolf</td><td>fenswolf</td><td>6</td></tr>
+          <tr><td>36–39</td><td>Bovine</td><td>redbull</td><td>behemoth</td><td>4</td></tr>
+          <tr><td>40–41</td><td>Pachyderm</td><td>baku</td><td>ganesha</td><td>2</td></tr>
+          <tr><td>42–47</td><td>Bird</td><td>condor</td><td>nike</td><td>6</td></tr>
+          <tr><td>48–53</td><td>Snake</td><td>snake</td><td>jorgandr</td><td>6</td></tr>
+          <tr><td>54–59</td><td>Mollusk</td><td>octopus</td><td>kraken</td><td>6</td></tr>
+          <tr><td>60–65</td><td>Worm</td><td>worm</td><td>gigaworm</td><td>6</td></tr>
+          <tr><td>66–71</td><td>Lizard</td><td>lizard</td><td>basilisk</td><td>6</td></tr>
+          <tr><td>72–77</td><td>Werebeast</td><td>wererat</td><td>anubis</td><td>6</td></tr>
+          <tr><td>78–83</td><td>Goblinoid</td><td>goblin</td><td>susano-o</td><td>6</td></tr>
+          <tr><td>84–89</td><td>Mythical</td><td>griffin</td><td>ki-rin</td><td>6</td></tr>
+          <tr><td>90–95</td><td>Eye</td><td>big eye</td><td>beholder</td><td>6</td></tr>
+          <tr><td>96–101</td><td>Skeleton</td><td>skeleton</td><td>lich</td><td>6</td></tr>
+          <tr><td>102–107</td><td>Slime</td><td>slime</td><td>hi-slime</td><td>6</td></tr>
+          <tr><td>108–113</td><td>Demon</td><td>gargoyle</td><td>athtalot</td><td>6</td></tr>
+          <tr><td>114–119</td><td>Siren</td><td>medusa</td><td>lilith</td><td>6</td></tr>
+          <tr><td>120–131</td><td>Undead / Spirit</td><td>zombie</td><td>ghost</td><td>12</td></tr>
+          <tr><td>132–137</td><td>Elemental</td><td>woodman</td><td>mazin</td><td>6</td></tr>
+          <tr><td>138–143</td><td>Bird 2</td><td>albatros</td><td>phoenix</td><td>6</td></tr>
+          <tr><td>144–149</td><td>Dragon</td><td>dragon</td><td>tiamat</td><td>6</td></tr>
+          <tr><td>150–164</td><td>Human warriors</td><td>karateka</td><td>wizard</td><td>15</td></tr>
+          <tr><td>165–172</td><td>Vampire / Machine</td><td>vampire</td><td>machine</td><td>8</td></tr>
+          <tr><td>173–188</td><td>Player class stubs</td><td colspan="2">(human/mutant variants)</td><td>16</td></tr>
+          <tr><td>189–199</td><td>Bosses</td><td>gen-bu</td><td>creator</td><td>11</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
   <section>
-    <h2>EQUIPMENT &amp; ITEMS</h2>
-    <p>Most weapons have a limited number of <strong>uses</strong> before they break.
-    Always carry backup weapons, especially for Humans who depend entirely on gear.</p>
+    <h2>ABILITY TYPE CODES (ROM DATA)</h2>
+    <p>Each entry in the ability table at <code>0x14640</code> (252 entries × 8 bytes) encodes a
+    type byte at position 7 and a prefix byte at position 0. These are the observed values and
+    their classifications:</p>
 
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>TYPE</th><th>STAT USED</th><th>NOTES</th></tr>
+          <tr><th>BYTE VALUE</th><th>POSITION</th><th>CLASSIFICATION</th></tr>
         </thead>
         <tbody>
-          <tr><td>Sword (<code>'sword</code>)</td><td>STR</td><td>Most common; balanced power/uses</td></tr>
-          <tr><td>Axe / Hammer</td><td>STR</td><td>High power, fewer uses</td></tr>
-          <tr><td>Whip</td><td>STR</td><td>Hits all enemies at once</td></tr>
-          <tr><td>Rapier / Claw</td><td>AGI</td><td>Weaker base but scales with Agility</td></tr>
-          <tr><td>Gun (pistol/SMG/etc.)</td><td>Fixed</td><td>Bypasses DEF; consistent damage</td></tr>
-          <tr><td>Spell Book</td><td>MANA</td><td>Elemental spells; limited uses</td></tr>
-          <tr><td>Rod / Wand / Staff</td><td>MANA</td><td>Magic melee</td></tr>
+          <tr><td><code>0x01</code>, <code>0x03</code></td><td>Type (byte 7)</td><td>Usable item</td></tr>
+          <tr><td><code>0x05</code>, <code>0x0A</code>, <code>0x0B</code>, <code>0x0F</code></td><td>Type (byte 7)</td><td>Ability (mutant / monster use)</td></tr>
+          <tr><td><code>0x14</code>, <code>0x1E</code></td><td>Type (byte 7)</td><td>Weapon (gun / ranged)</td></tr>
+          <tr><td><code>0x32</code></td><td>Type (byte 7)</td><td>Sword / blade</td></tr>
+          <tr><td><code>0xFE</code>, <code>0xFD</code></td><td>Type (byte 7)</td><td>Armor</td></tr>
+          <tr><td><code>0xEC</code></td><td>Prefix (byte 0)</td><td>Sword (renders as <code>'</code> prefix in-game)</td></tr>
+          <tr><td><code>0xEF</code></td><td>Prefix (byte 0)</td><td>Elemental spell</td></tr>
+          <tr><td><code>0xE9</code></td><td>Prefix (byte 0)</td><td>Helmet</td></tr>
+          <tr><td><code>0xED</code></td><td>Prefix (byte 0)</td><td>Chest armor</td></tr>
+          <tr><td><code>0xE8</code></td><td>Prefix (byte 0)</td><td>Gloves</td></tr>
+          <tr><td><code>0xEA</code>, <code>0xEB</code></td><td>Prefix (byte 0)</td><td>Shoes</td></tr>
         </tbody>
       </table>
     </div>
-    <a href="items.html" style="font-size:0.8rem; color:var(--cyan);">→ Complete item database</a>
   </section>
 
-  <section>
-    <h2>STAT SYSTEM</h2>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>STAT</th><th>EFFECT</th><th>DISPLAY MAX</th><th>INTERNAL MAX</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>HP</td><td>Hit points; reach 0 = KO</td><td class="num">999</td><td class="num">999</td></tr>
-          <tr><td>STR</td><td>Physical attack power</td><td class="num">99</td><td class="num">255</td></tr>
-          <tr><td>DEF</td><td>Physical damage reduction</td><td class="num">99</td><td class="num">255</td></tr>
-          <tr><td>AGI</td><td>Turn order; flee chance; AGI-weapon damage</td><td class="num">99</td><td class="num">255</td></tr>
-          <tr><td>MANA</td><td>Magic spell power; mutant ability use</td><td class="num">99</td><td class="num">255+</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="callout">
-      <strong>Note:</strong> The display cap of 99 is a screen limitation only. Stats internally continue
-      to grow beyond 99 up to 255. Mutant MANA in particular can grow well past the display cap and
-      continues to improve spell damage even when showing 99.
-    </div>
-  </section>
-
-  <section>
-    <h2>TIPS &amp; STRATEGY</h2>
-    <div class="card-grid">
-      <div class="card">
-        <div class="card-title">SAVE OFTEN</div>
-        <p>Mutants can randomly lose good abilities. Save after every battle that gives
-        you a useful ability, and before any fight that might do so.</p>
-      </div>
-      <div class="card">
-        <div class="card-title">MEAT STRATEGY</div>
-        <p>For monsters: plan your transformation chain. High-level meat from strong
-        enemies gives you stronger forms. Don't waste high-tier meat on weak forms.</p>
-      </div>
-      <div class="card">
-        <div class="card-title">GUNS LATE GAME</div>
-        <p>Gun damage ignores DEF. As enemies gain hundreds of DEF in World 4 and the Tower,
-        guns become dramatically more effective than STR-based swords.</p>
-      </div>
-      <div class="card">
-        <div class="card-title">CRYSTAL BALLS</div>
-        <p>Don't sell Crystal Balls — they open the world gates. Some appear in dungeons,
-        some are guarded by bosses. Explore thoroughly before moving on.</p>
-      </div>
-    </div>
-  </section>
 </main>
+
+<script>
+async function loadBosses() {
+  const monsters = await fetch('data/monsters.json').then(r => r.json());
+  const bosses = monsters.filter(m => m.id >= 189);
+  const tbody = document.getElementById('boss-tbody');
+  bosses.forEach(m => {
+    const tr = document.createElement('tr');
+    const fmt = v => v > 99
+      ? `<span style="color:var(--gold)">${v}*</span>`
+      : v;
+    tr.innerHTML = `
+      <td style="color:var(--dim2)">${m.id}</td>
+      <td><strong>${m.name}</strong></td>
+      <td class="num">${m.hp}</td>
+      <td class="num">${fmt(m.str)}</td>
+      <td class="num">${fmt(m.def)}</td>
+      <td class="num">${fmt(m.agi)}</td>
+      <td class="num">${fmt(m.mana)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+loadBosses();
+</script>
 
 </body>
 </html>

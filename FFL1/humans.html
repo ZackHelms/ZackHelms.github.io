@@ -28,107 +28,26 @@
 
 <main>
   <div class="page-title">HUMAN CLASS</div>
-  <div class="page-sub">EQUIPMENT · STAT ITEMS · MAX VALUES · OPTIMIZATION</div>
+  <div class="page-sub">ROM-EXTRACTED DATA ONLY</div>
+
+  <div class="callout warn">
+    <strong>Data source notice:</strong> Human class mechanics — equipment slot counts, stat item
+    amounts, stat caps, and armor bonus values — have not been extracted from the ROM binary.
+    Only the armor name and slot-type data from the ROM ability table is shown below.
+  </div>
 
   <section>
-    <h2>CLASS OVERVIEW</h2>
-    <p>Humans are entirely equipment-dependent. They gain no stats from winning battles —
-    growth comes exclusively from <strong>consumable stat items</strong> found in shops and dungeons.
-    What they lack in natural growth they compensate for with <strong>8 equipment slots</strong>
-    — the most of any class — allowing significant weapon and armor stacking.</p>
-
-    <div class="card-grid">
-      <div class="card">
-        <div class="card-title">EQUIPMENT SLOTS: 8</div>
-        <p>Can carry 8 weapons/items simultaneously. Equipping all 5 armor pieces
-        (helmet, chest, gloves, shoes, shield-equivalent) still leaves 3 weapon slots.</p>
-      </div>
-      <div class="card">
-        <div class="card-title">ARMOR USE</div>
-        <p>Humans are the only class (with Mutants) that can equip armor.
-        Full armor set stacks significant DEF bonuses on top of base stats.</p>
-      </div>
-      <div class="card">
-        <div class="card-title">NO NATURAL GROWTH</div>
-        <p>Winning battles does nothing for a Human's stats. Only consumable stat items
-        (Strong, Agility, etc.) permanently raise base stats.</p>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <h2>STAT ITEMS</h2>
-    <p>Permanent stat increases come from consuming specific items. These are one-use
-    items found in shops (at high prices) and occasionally in dungeons.</p>
+    <h2>ARMOR ENTRIES (ROM DATA)</h2>
+    <p>Armor items are identified in the ability table at <code>0x14640</code> by type byte
+    <code>0xFE</code> or <code>0xFD</code>. Slot type (helmet, chest, gloves, shoes) is
+    determined by the prefix byte at position 0. Names are decoded using the FFL character
+    encoding. Stat bonuses are <strong>not</strong> encoded in the ability name record and
+    have not been extracted.</p>
 
     <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>ITEM</th><th>STAT RAISED</th><th>AMOUNT</th><th>FOUND IN</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Strong</td><td>STR</td><td>+1</td><td>Item shops (World 1+)</td></tr>
-          <tr><td>Agility</td><td>AGI</td><td>+1</td><td>Item shops (World 2+)</td></tr>
-          <tr><td>(HP items)</td><td>HP</td><td>+50–100</td><td>Various dungeons</td></tr>
-          <tr><td>Potion</td><td>HP (heal)</td><td>Recovers ~100</td><td>All item shops</td></tr>
-          <tr><td>XPotion</td><td>HP (heal)</td><td>Recovers ~200</td><td>World 2+ shops</td></tr>
-          <tr><td>Elixir</td><td>HP (heal full)</td><td>Full restore</td><td>World 3+ / rare</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="callout warn">
-      <strong>Warning:</strong> If a Human changes class or switches to another class,
-      all stat gains from items are permanently lost. Do not change a Human's class
-      mid-game unless you are prepared to restart their stat progression.
-    </div>
-  </section>
-
-  <section>
-    <h2>STAT CAPS</h2>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>STAT</th><th>BASE START</th><th>DISPLAY MAX</th><th>INTERNAL MAX</th><th>WITH GEAR</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>HP</td><td class="num">~100–200</td><td class="num">999</td>
-            <td class="num">999</td><td class="num">—</td>
-          </tr>
-          <tr>
-            <td>STR</td><td class="num">~10–20</td><td class="num">99</td>
-            <td class="num">255</td><td class="num">+10–20 from weapons</td>
-          </tr>
-          <tr>
-            <td>DEF</td><td class="num">~5–15</td><td class="num">99</td>
-            <td class="num">255</td><td class="num"><strong style="color:var(--gold)">+30–50 from full armor</strong></td>
-          </tr>
-          <tr>
-            <td>AGI</td><td class="num">~10–20</td><td class="num">99</td>
-            <td class="num">255</td><td class="num">+5–15 from shoes</td>
-          </tr>
-          <tr>
-            <td>MANA</td><td class="num">~5–10</td><td class="num">99</td>
-            <td class="num">255</td><td class="num">+5–10 from magic items</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <p>A Human's greatest defensive advantage comes from stacking all 5 armor pieces.
-    A full Dragon-tier armor set can add <strong>45+ DEF</strong>, making the Human
-    extremely tanky against physical attacks.</p>
-  </section>
-
-  <section>
-    <h2>ARMOR SYSTEM</h2>
-    <p>Armor has 5 piece types. Each type provides a different bonus. Humans (and Mutants)
-    can equip one of each type. Armor takes up equipment slots.</p>
-
-    <div class="table-wrap" id="armor-table-wrap">
       <table id="armor-table">
         <thead>
-          <tr><th>SLOT</th><th>NAME</th><th>DEF BONUS</th><th>OTHER BONUS</th></tr>
+          <tr><th>NAME</th><th>SLOT (from prefix byte)</th></tr>
         </thead>
         <tbody id="armor-tbody"></tbody>
       </table>
@@ -136,80 +55,46 @@
   </section>
 
   <section>
-    <h2>WEAPON STRATEGY</h2>
-    <p>Humans should carry at least 2–3 weapons at all times. Weapons have limited uses
-    and will break mid-dungeon. The safest loadout for a Human:</p>
+    <h2>STAT ITEM ENTRIES (ROM DATA)</h2>
+    <p>Items that affect character stats are classified as <code>usable_item</code> type
+    (type byte <code>0x01</code> or <code>0x03</code>) in the ability table. The names
+    below are ROM-decoded. What each item does numerically has not been extracted from
+    the ROM code.</p>
 
-    <div class="card-grid">
-      <div class="card">
-        <div class="card-title">SLOT ALLOCATION</div>
-        <p>5 armor pieces + 3 weapons is a typical distribution.</p>
-        <p>Or: skip some armor and carry more weapons for longer dungeon runs.</p>
-      </div>
-      <div class="card">
-        <div class="card-title">MAIN WEAPON</div>
-        <p>Use the strongest sword available for your world tier.
-        Dragon/Sun swords are best before the Tower; Masamune is end-game best.</p>
-      </div>
-      <div class="card">
-        <div class="card-title">BACKUP</div>
-        <p>Always carry a gun as backup. Guns bypass DEF and don't run out of uses
-        as quickly as swords. Essential for Tower of God enemies with very high DEF.</p>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <h2>BEST GEAR BY WORLD</h2>
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>WORLD</th><th>WEAPON</th><th>ARMOR TARGET</th><th>NOTES</th></tr>
+          <tr><th>NAME</th><th>TYPE CODE</th></tr>
         </thead>
-        <tbody>
-          <tr>
-            <td>1</td><td>'katana / 'battle sword</td><td>Bronze set</td>
-            <td>Buy from Base shop; steal from Castle of Sword guards</td>
-          </tr>
-          <tr>
-            <td>2</td><td>'dragon / 'flame sword</td><td>Gold / Silver set</td>
-            <td>World 2 drops and shops. Dragon sword shreds reptiles.</td>
-          </tr>
-          <tr>
-            <td>3</td><td>SMG / Balkan</td><td>Dragon armor</td>
-            <td>Robots have very high DEF. Guns become essential here.</td>
-          </tr>
-          <tr>
-            <td>4+Tower</td><td>Masamune, Balkan, 'sun</td><td>Arthur's armor (best)</td>
-            <td>Masamune has special crit properties. Keep gun for backup.</td>
-          </tr>
-        </tbody>
+        <tbody id="usable-tbody"></tbody>
       </table>
     </div>
   </section>
+
 </main>
 
 <script>
 async function init() {
   const itemsData = await fetch('data/items.json').then(r => r.json());
-  const tbody = document.getElementById('armor-tbody');
 
-  const slotNames = {helmet:'Helmet', chest:'Chest', gloves:'Gloves', shoes:'Shoes', power:'Power'};
-
+  // Armor table
+  const aTbody = document.getElementById('armor-tbody');
   itemsData.armor.forEach(a => {
     const tr = document.createElement('tr');
-    const bonus = a.stat_bonus || {};
-    const defB = bonus.def ? `+${bonus.def} DEF` : '—';
-    const otherB = Object.entries(bonus)
-      .filter(([k]) => k !== 'def' && k !== 'element_resist')
-      .map(([k,v]) => `+${v} ${k.toUpperCase()}`).join(', ')
-      || (bonus.element_resist ? `Resist ${bonus.element_resist}` : '—');
     tr.innerHTML = `
-      <td><span class="tag tag-cyan">${slotNames[a.armor_type] || a.armor_type}</span></td>
-      <td>${a.name}</td>
-      <td class="num">${defB}</td>
-      <td>${otherB}</td>`;
-    tbody.appendChild(tr);
+      <td><strong>${a.name}</strong></td>
+      <td><span class="tag tag-cyan">${a.armor_type || '—'}</span></td>`;
+    aTbody.appendChild(tr);
+  });
+
+  // Usable items table
+  const uTbody = document.getElementById('usable-tbody');
+  itemsData.usable.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${u.name}</strong></td>
+      <td style="color:var(--dim2);font-size:0.72rem">usable_item</td>`;
+    uTbody.appendChild(tr);
   });
 }
 init();
