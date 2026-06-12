@@ -68,11 +68,23 @@ export class Engine {
   }
 
   _setupInput() {
+    // Remap WASD + action keys to canonical codes the engine polls
+    const REMAP = {
+      KeyW: 'ArrowUp',  KeyS: 'ArrowDown',
+      KeyA: 'ArrowLeft', KeyD: 'ArrowRight',
+      KeyK: 'KeyZ',    // A button  → confirm
+      KeyJ: 'KeyX',    // B button  → cancel
+      KeyH: 'Enter',   // Start
+      KeyF: 'Escape',  // Select
+    };
     window.addEventListener('keydown', e => {
-      this.keys[e.code] = true;
-      this._handleKey(e.code, e);
+      const code = REMAP[e.code] ?? e.code;
+      this.keys[code] = true;
     });
-    window.addEventListener('keyup', e => { delete this.keys[e.code]; });
+    window.addEventListener('keyup', e => {
+      const code = REMAP[e.code] ?? e.code;
+      delete this.keys[code];
+    });
   }
 
   _pressed(code) {
