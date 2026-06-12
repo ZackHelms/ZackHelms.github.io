@@ -1,0 +1,340 @@
+# FFL1 ROM Map
+
+Verified entries for `The Final Fantasy Legend (USA).gb` — 128 KB, MBC2.
+
+Confidence levels:
+- **HIGH** — verified by direct byte read from this ROM binary
+- **MEDIUM** — strongly inferred from ROM structure / consistent web sources; needs deeper verification
+- **LOW** — web-sourced only; not yet verified against ROM binary
+
+Sources: [DC] Data Crystal wiki, [RANDO] eclipseyy/FFLRandomizer source (directly fetched), [GS] GameShark codes, [GF] GameFAQs save-state guide, [TAS] TASVideos game resources.
+
+---
+
+## Memory Banking
+
+**Confidence: HIGH** — confirmed from standard MBC2 cartridge spec + bank switch RST verified in previous sessions.
+
+| Bank | File offset range | CPU address (when active) | Notes |
+|---|---|---|---|
+| 0 | `0x00000`–`0x03FFF` | `0x0000`–`0x3FFF` | Fixed (always mapped) |
+| 1 | `0x04000`–`0x07FFF` | `0x4000`–`0x7FFF` | Switchable |
+| 2 | `0x08000`–`0x0BFFF` | `0x4000`–`0x7FFF` | Tile/graphics data |
+| 3 | `0x0C000`–`0x0FFFF` | `0x4000`–`0x7FFF` | Font tiles, UI strings |
+| 4 | `0x10000`–`0x13FFF` | `0x4000`–`0x7FFF` | |
+| 5 | `0x14000`–`0x17FFF` | `0x4000`–`0x7FFF` | Name/ability tables, guild data, DTE tables |
+| 6 | `0x18000`–`0x1BFFF` | `0x4000`–`0x7FFF` | Stat tables, HP table, item data |
+| 7 | `0x1C000`–`0x1FFFF` | `0x4000`–`0x7FFF` | |
+
+**Bank switch mechanism:** `RST 0x28` with A = bank number (not a standard MBC register write).
+File offset formula: bank N starts at `N × 0x4000`.
+CPU address when switched: `file_offset_within_bank + 0x4000`.
+
+---
+
+## Data Tables
+
+### Monster / Character Name Table
+**Confidence: HIGH** — verified by reading all 200 entries and decoding; match expected names.
+
+| Field | Value |
+|---|---|
+| File offset | `0x14000` |
+| Entry count | 200 |
+| Entry size | 8 bytes |
+| Format | Text bytes, `0xFF`-terminated |
+| Encoding | See Character Encoding section below |
+| Source | [DC], verified |
+
+### Monster Stat Table
+**Confidence: MEDIUM** — 9-byte stride confirmed by boss HP sequence (see notes); field layout partially inferred.
+
+| Field | Value |
+|---|---|
+| File offset | `0x1AAE8` |
+| Entry count | 200 |
+| Entry size | **9 bytes** (not 8 — see verification note below) |
+| Source | [RANDO], stride verified |
+
+**Field layout per entry (9 bytes):**
+| Byte | Field | Notes |
+|---|---|---|
+| 0 | Race / type flags | Includes monster family, meat drop flags |
+| 1 | HP table index | Index into HP table at `0x1B254` (see HP Table below) |
+| 2 | STR | Raw stat; display capped at 99, internal max 255 |
+| 3 | DEF | |
+| 4 | AGI | |
+| 5 | MANA | |
+| 6 | Gold table index | Index into gold reward table at `0x1B2A4` |
+| 7 | Ability offset lo | |
+| 8 | Ability offset hi | |
+
+**Stride verification:** With 9-byte stride, boss entries 189–199 yield byte-1 values 22, 23, 24, 25, 26, 27, 28, 29, 31, 30, 31 — a clean sequential walk through the boss HP sub-table (HP: 250, 600, 1000, 1500, 1500, 1750, 2000, 2500, 2000, 5000, 5000). With 8-byte stride, the same byte-1 values decode to incoherent HP values (295, 36, 36312, 514, 20…). 9-byte stride is correct.
+
+**NOTE:** Our `monsters.json` and `mechanics.md` were extracted using an assumed 8-byte stride and may have incorrect stat values for entries above index ~20. HP values are correct (separate table, directly indexed by monster ID). Stats need re-extraction with 9-byte stride.
+
+### Monster HP Table
+**Confidence: HIGH** — verified; values match expected game HP for all tested indices.
+
+| Field | Value |
+|---|---|
+| File offset | `0x1B254` |
+| Entry count | 200+ (two-section structure) |
+| Entry size | 2 bytes, little-endian unsigned 16-bit |
+| Indexing | Via HP table index byte in stat entry (byte 1), NOT directly by monster ID |
+| Source | [DC], verified |
+
+**HP table structure:**
+| Index range | Contents |
+|---|---|
+| 0–21 | Monotonically increasing regular monster HP curve: 20, 40, 60, 82, 103, 126, 150, 175, 202, 231, 262, 295, 330, 368, 409, 454, 501, 551, 606, 666, 729, 795 |
+| 22+ | Explicit HP values for bosses and strong monsters (250, 600, 1000, 1500, 1500, 1750, 2000, 2500, 2000, 5000, 5000 for boss indices 189–199) |
+
+### Monster Type Table
+**Confidence: MEDIUM** — address from [RANDO]; byte read confirms plausible values (0x00 and 0x11 pattern matches insect/fish family groupings).
+
+| Field | Value |
+|---|---|
+| File offset | `0x1B1F0` |
+| Format | 2 types packed per byte (lo nibble = even index, hi nibble = odd index) |
+| Source | [RANDO] |
+
+### Gold Reward Table
+**Confidence: MEDIUM** — address from [RANDO/DC]; byte read shows small values at start (consistent with low-level monster gold drops).
+
+| Field | Value |
+|---|---|
+| File offset | `0x1B2A4` |
+| Entry size | 2 bytes, little-endian |
+| Source | [RANDO] |
+
+### Ability / Item Name Table
+**Confidence: HIGH** — verified; matches ability names decoded from ROM in previous sessions.
+
+| Field | Value |
+|---|---|
+| File offset | `0x14640` |
+| Entry count | 252 |
+| Entry size | 8 bytes |
+| Byte 0 | Prefix code (`0xEC`=sword, `0xEF`=elemental spell, `0xE9`=helmet, `0xED`=chest, `0xE8`=gloves, `0xEA`/`0xEB`=shoes) |
+| Bytes 1–6 | Name text, `0xFF`-padded |
+| Byte 7 | Type code (`0x01`,`0x03`=usable item; `0x05`,`0x0A`,`0x0B`,`0x0F`=ability; `0x14`,`0x1E`=gun; `0x32`=sword; `0xFE`,`0xFD`=armor) |
+| Source | [DC], verified |
+
+### Item GP Cost Table
+**Confidence: LOW** — address from [RANDO]; byte read gives incoherent values with 3-byte LE interpretation. Format or address needs verification.
+
+| Field | Value |
+|---|---|
+| File offset | `0x17E10` |
+| Claimed format | 3 bytes per item |
+| Status | UNVERIFIED — values don't decode cleanly as LE prices |
+
+### Item Full Stat Table
+**Confidence: LOW** — address from [RANDO]; not yet byte-verified.
+
+| Offset | Field |
+|---|---|
+| `0x1B700` | Item flags A |
+| `0x1B701` | Item flags B |
+| `0x1B702` | Item type |
+| `0x1B703` | Alt uses |
+| `0x1B704` | X value |
+| `0x1B705` | Y value |
+| `0x1B706` | GFX index |
+| `0x1B707` | Group / SFX byte |
+
+### Starting Character / Guild Table
+**Confidence: HIGH** — verified by direct byte read.
+
+| Field | Value |
+|---|---|
+| File offset | `0x17F90` |
+| Format | 8 bytes per guild slot |
+| Source | [RANDO], verified |
+
+**Verified bytes at `0x17F90`:**
+```
+B1 B2 B3 B4 12 24 48 78  ← starting character options (slot 1)
+AD AE AF B0 42 60 8A 4E  ← guild templates or slot 2 options
+B1 B2 B3 B4 06 30 3C 1E  ← additional entries...
+```
+
+Decoded starting characters (indices `[177, 178, 179, 180, 18, 36, 72, 120]`):
+HUMAN(M), HUMAN(F), MUTANT(M), MUTANT(F), CLIPPER, REDBULL, WERERAT, ZOMBIE
+
+### Mutant Growth Rate Table
+**Confidence: MEDIUM** — address from [RANDO]; byte read shows plausible graduated values; field labels from [RANDO].
+
+| File offset | Field |
+|---|---|
+| `0x1BF00` | Learn ability rate threshold |
+| `0x1BF01` | Gain HP rate threshold |
+| `0x1BF02` | Gain MANA rate threshold |
+| `0x1BF03` | Gain AGI rate threshold |
+| `0x1BF04` | Gain STR rate threshold |
+| `0x1BF05` | Gain DEF rate threshold |
+| `0x1BF06` | Alter uses rate threshold |
+| `0x1BF0A` | HP gain amount |
+| `0x1BF0B` | STR gain amount |
+| `0x1BF0C` | DEF gain amount |
+| `0x1BF0D` | AGI gain amount |
+| `0x1BF0E` | MANA gain amount |
+
+**Verified raw bytes at `0x1BF00`:** `23 45 63 75 87 8F 93 FF FF FF AF 15 13 15 15 F0`
+
+### Meat Transformation Table
+**Confidence: MEDIUM** — address from [RANDO]; byte read shows `0xFF` sentinel + item indices.
+
+| Field | Value |
+|---|---|
+| File offset | `0x0AFD3` (Bank 2, CPU `0x6FD3`) |
+| Format | 29 bytes per row, 25 rows (25 monster families × 25 result slots) |
+| Source | [RANDO] |
+
+### Equipment Shop Addresses
+**Confidence: LOW** — addresses from [RANDO]; not yet byte-verified.
+
+14 shops at (file offsets): `0x17D38`, `0x17D4C`, `0x17D60`, `0x17D74`, `0x17D88`, `0x17D9C`, `0x17DB0`, `0x17DC4`, `0x17DD8`, `0x17DEC`, `0x17E00`, `0x17D7E`, `0x17DBA`, `0x17DE2`
+
+### Chest Contents Addresses
+**Confidence: LOW** — addresses from [RANDO]; not yet byte-verified. Note: addresses like `0x0A404` are file offsets (Bank 2), not CPU SRAM addresses.
+
+45 chests across all worlds. See source for full list.
+
+---
+
+## Graphics and Tile Data
+
+### Font / Text Tiles (1bpp)
+**Confidence: HIGH** — verified; tiles extracted and rendered in `img/tile_sheet_1bpp_large.png`.
+
+| Field | Value |
+|---|---|
+| File offset | `0x0F100`–`0x0F4B7` (Bank 3, CPU `0x7100` when Bank 3 active) |
+| Count | 119 tiles × 8 bytes = `0x3B8` bytes |
+| Format | 1 byte per row, bit 7 = leftmost pixel; 1=dark (color 3), 0=light (color 0) |
+| VRAM dest | `0x9000` (tile area 2, signed-index mode) |
+| Startup copy | Bank 0 at `0x0305`: doubles each byte to both bitplanes (1bpp → 2bpp) |
+
+**Tile index mapping:**
+| Range | Characters |
+|---|---|
+| 0–9 | Digits 0–9 |
+| 10–35 | Letters A–Z |
+| 36–61 | Letters a–z |
+| 62–103 | Blank / space tiles |
+| 104–118 | Special characters |
+
+### Bank 2 Graphics Tiles (2bpp)
+**Confidence: HIGH** — verified; all 1024 tiles exported to `img/bank2_tile_grid.png`.
+
+| Field | Value |
+|---|---|
+| File offset | `0x08000`–`0x0BFFF` |
+| Format | Standard GB 2bpp, 16 bytes/tile (2 bytes/row: lo bitplane, hi bitplane) |
+| Count | 1024 tiles |
+| Content | World map tiles, character sprites, UI graphics, dungeon tiles |
+
+---
+
+## Text Encoding
+
+### Character Encoding Table
+**Confidence: HIGH** — verified against name table and ability table byte reads.
+
+```
+0x8A=a  0x8B=b  0x8C=c  0x8D=d  0x8E=e  0x8F=f
+0x90=g  0x91=h  0x92=i  0x93=j  0x94=k  0x95=l
+0x96=m  0x97=n  0x98=o  0x99=p  0x9A=q  0x9B=r
+0x9C=s  0x9D=t  0x9E=u  0x9F=v  0xA0=w  0xA1=x
+0xA2=y  0xA3=z
+0x40=A  0x41=B  …  0x59=Z
+0xA4=0  0xA5=1  …  0xAD=9
+0x32=' '  0xF2='-'  0x82='+'  0xEC="'"  0xFF=terminator
+```
+
+### DTE (Double Tile Encoding) Compression
+**Confidence: HIGH** — table location verified by direct byte read in previous sessions.
+
+| Field | Value |
+|---|---|
+| DTE1 table | Bytes `0x50`–`0x8F` → 64 bigram pairs (128 bytes) |
+| DTE2 table | Bytes `0xC0`–`0xF6` → 55 bigram pairs (110 bytes) |
+| ROM location | `0x14E40` (Bank 5) |
+| RAM load dest | `0xC800` (DTE1) and `0xC860` (DTE2) |
+| Load code | Bank 0 at `0x02DD` |
+| Note | DTE is recursive; ALL story text is DTE-compressed; raw byte search for English words is impossible |
+
+### Bank 3 UI Strings (confirmed)
+**Confidence: HIGH** — verified by byte read at `0x0ECC8`.
+
+Strings found at `0x0ECC8`: `start`, `continue`, `fight`, `run`, `item` (normalbase encoding, written to VRAM at runtime).
+
+---
+
+## Code / Engine Addresses
+
+**Confidence: MEDIUM** — from [DC]; not yet independently verified by tracing execution.
+
+| File offset | CPU addr (Bank 6) | Description |
+|---|---|---|
+| `0x1A008` | `0x6008` | Text copy: `0xDE00` → `0xC600` |
+| `0x1A3DE` | `0x63DE` | Text tile routine: `0xC600` → VRAM `0x9900` |
+| `0x193BF` | `0x79BF` | Post-battle mutation dispatch loop |
+
+---
+
+## WRAM (RAM) Addresses
+
+**Confidence: LOW** — from [GS] GameShark codes and [TAS]; not verified against this ROM binary.
+
+### RNG Table
+| Address | Description |
+|---|---|
+| `0xC300`–`0xC37F` | 128-byte RNG seed table; each byte dedicated to one event type |
+| `0xC30B` | Mutant growth RNG (increments by 1 each use) |
+
+### Gold
+| Address | Description |
+|---|---|
+| `0xCC8D`–`0xCC8F` | Gold, 3 bytes (exact encoding unverified) |
+
+### Character Block (25-byte stride)
+Each character occupies 25 (`0x19`) bytes starting at:
+| Character | Base WRAM |
+|---|---|
+| 1 | `0xCC06` |
+| 2 | `0xCC1F` |
+| 3 | `0xCC38` |
+| 4 | `0xCC51` |
+
+### Race / Sex Byte (WRAM encoding)
+| Byte | Meaning |
+|---|---|
+| `0xAD` | Human Male |
+| `0xAE` | Human Female |
+| `0xB3` | Mutant Male |
+| `0xB4` | Mutant Female |
+| (other) | Monster (family-specific) |
+
+---
+
+## SRAM Save Structure
+
+**Confidence: LOW** — MBC2 hardware standard for window address; internal layout not publicly documented.
+
+| Field | Value |
+|---|---|
+| SRAM window | CPU `0xA000`–`0xBFFF` (MBC2 battery-backed) |
+| Internal layout | NOT yet extracted from this ROM binary |
+
+---
+
+## Known Discrepancies and TODOs
+
+1. **monsters.json stat values** — extracted assuming 8-byte stride; must be re-extracted with 9-byte stride. HP values are unaffected (HP table is separate).
+2. **Item GP cost table** — address `0x17E10` from [RANDO] but 3-byte LE interpretation gives incoherent values. Needs format verification.
+3. **Character select screen rendering** — screen is dynamically rendered at runtime; exact routine address not yet found.
+4. **Class select sprite tile indices** — which Bank 2 tiles form the 8 character portraits is not yet identified.
+5. **Full ROM disassembly** — no complete disassembly of this US ROM is publicly available; see TODO.md.

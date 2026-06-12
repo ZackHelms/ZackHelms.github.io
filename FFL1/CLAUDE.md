@@ -7,7 +7,8 @@ Before working on any FFL1 task, read the relevant `.claude/` file:
 | File | When to read |
 |---|---|
 | `.claude/overview.md` | Project structure, current state, what's ROM-extracted vs. invented |
-| `.claude/rom-data.md` | ROM offsets, banking, tile/graphics data, img/ directory inventory |
+| `.claude/rom-map.md` | **Primary ROM reference** — verified offsets, data tables, stride/layout, confidence levels |
+| `.claude/rom-data.md` | Legacy ROM notes (superseded by rom-map.md for verified data; keep for context) |
 | `.claude/mechanics.md` | What game mechanics have and have not been extracted from ROM |
 | `.claude/engine.md` | v001 JS engine architecture (archived reference) |
 
