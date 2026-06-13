@@ -6,7 +6,7 @@
 - Monster names — name table at 0x14000 (200 × 8 bytes) — HIGH confidence
 - Monster HP — HP table at 0x1B254; indexed via byte 1 of stat entry (NOT directly by monster ID); indices 0–21 = regular HP curve, 22+ = boss HP values — HIGH confidence
 - Monster gold — gold table at 0x1B2A4 (4-digit packed BCD, 16 entries); index = lower nibble of stat byte 6; verified against FFLRandomizer source — HIGH confidence
-- Monster ability list pointer — stat bytes 7–8 = little-endian bank-6 CPU address to each monster's action list (e.g., fly → 0x7321 → file 0x1B321); confirmed from FFLRandomizer — MEDIUM confidence (pointer confirmed; list format not yet verified)
+- Monster ability lists — **fully decoded** (HIGH confidence). Stat bytes 7–8 = little-endian bank-6 CPU address to packed sequential list of ability IDs. Length = next monster's pointer − this pointer (no terminator). Each byte = direct ability table ID. Lists include active abilities (attack/spell) and passive D/E-item defenses. All 200 monsters decoded; stored in `data/monsters.json` as `ability_ids` field. Example: fly [149,216,225] = nail·Dquake·Eice; wolf [140] = bite.
 - Character portrait index tables — SPic (small) at 0x0B438 (upper nibble = portrait group, lower = meat level); LPic (large) at 0x0B900; from FFLRandomizer — MEDIUM confidence
 - Encounter table location — 0x1A868, 5 bytes per entry, 128 entries; from FFLRandomizer — MEDIUM confidence (address confirmed; entry format not yet decoded)
 - Shop inventory tables — 14 shops at 0x17D38–0x17E00 range; from FFLRandomizer — MEDIUM confidence
@@ -24,7 +24,7 @@
 - Mutant growth rate thresholds — ROM 0x1BF00 (8 threshold bytes + 5 amount bytes) — MEDIUM confidence
 - Item GP cost table — ROM 0x17E10, 3 bytes per item, **6-digit packed BCD** (each nibble = one decimal digit); confirmed from FFLRandomizer `ReadGPCost` — HIGH confidence. All 252 prices extracted to `data/abilities.json` (gp field) and `data/item_prices.json`.
 - Item stat table — ROM 0x1B700, 8 bytes per item: FlagsA, FlagsB, Type, AltUses, X, Y, GFX, (GroupFlag bit7 + SFX bits6-0) — MEDIUM confidence. X=weapon power for swords/weapons; X=armor defense for equippable armor; X=heal amount for potions (potion=30HP, xpotion=90HP confirmed). Y=element for weapons/armor (1=fire, 2=ice, 4=elec, 8=poison, 15/255=all). FlagsA bits: 0x01=weapon, 0x02=consumable, 0x04=helm, 0x08=body, 0x10=gloves, 0x20=shoes, 0x40=elemental defense passive. Equip restrictions (human/mutant/monster) are a class-level engine rule, NOT stored per-item in the ROM. All 22 equippable armor items decoded with defense+slot; 60 weapons with power; 2 potions with heal. Data added to abilities.json.
-- Item uses count — stored as byte 7 of the ability name table entry (ROM 0x14647 + item_id×8), NOT in the stat table — HIGH confidence (from RANDO `ReadItemUses`)
+- Item uses count — AltUses (byte +3 at 0x1B700) = true per-item uses count; stored in `abilities.json` `uses` field. For most items matches type_byte (the name table byte 7), but notable exceptions: glass sword=1 (one-hit break), masamune=254 (unlimited), xclbr=254, vampic=30, rune=30, SMG=25 — HIGH confidence
 - Shop inventories — 14 shops at ROM 0x17D38–0x17E0F; 10 item IDs per shop; extracted to `data/shops.json` — HIGH confidence for item IDs and prices; UNVERIFIED for world/location assignments
 - Character name encoding — corrected: 0x80–0x89='0'–'9', 0x8A–0xA3='A'–'Z', 0xA4–0xBD='a'–'z', 0xFF=' ', 0xF2='-'. Previous table (Data Crystal) had wrong ranges — HIGH confidence (RANDO source + full 200-name decode verified)
 - Meat transformation — 25 monster classes (class = monster_id // 6 for IDs 0–149); eat table at 0x0AFD3 (29 entries × 25 eater classes); class member lists at 0x0B2A8 (16 entries × 25 classes). All values are class indices, not monster IDs. Extracted to data/transformation.json — HIGH confidence
@@ -36,7 +36,7 @@
 
 ### UNVERIFIED (still needs checking)
 - **Stat byte 6 upper nibble** — contains some per-monster data (varies); lower nibble is gold index. Upper nibble purpose not yet identified.
-- **Stat bytes 7–8** — unknown; many regular monsters share constant values (e.g., byte8=0x73). Not yet identified. Possibly ability list pointer or encounter data.
+- **Stat bytes 7–8** — RESOLVED. These are the monster ability list pointer (little-endian bank-6 CPU address). Fully decoded — see "Monster ability lists" in Extracted section above.
 - **Monster drop byte** — original "byte 6 of 8-byte entry" note was wrong stride era; current byte 6 = gold+unknown packed field. Actual item-drop mechanic not yet located in ROM.
 
 ### Not Yet Extracted

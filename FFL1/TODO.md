@@ -43,8 +43,10 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 
 ---
 
-### ✅ Mystery 2 — RESOLVED: Stat table bytes 7–8 = monster ability list pointer
-**Confirmed from [RANDO]:** FFLRandomizer names these fields "ability offset low byte" (+7) and "ability offset high byte" (+8). Combined as little-endian 16-bit, it is a bank-6 CPU address (0x4000–0x7FFF) pointing to that monster's ability/action list. Fly: bytes [0x21, 0x73] → CPU 0x7321 → file 0x1B321. The constant byte8=0x73 for regular monsters means all regular monster action lists cluster around file 0x1B321–0x1B3FF. Documented in rom-map.md under "Monster Ability List Table".
+### ✅ Mystery 2 — RESOLVED: Stat table bytes 7–8 = monster ability list pointer + lists fully decoded
+**Confirmed from [RANDO]:** FFLRandomizer names these fields "ability offset low byte" (+7) and "ability offset high byte" (+8). Combined as little-endian 16-bit, it is a bank-6 CPU address (0x4000–0x7FFF) pointing to that monster's ability/action list. Fly: bytes [0x21, 0x73] → CPU 0x7321 → file 0x1B321.
+
+**List format decoded:** Packed sequential lists with no terminator. Length = next monster's pointer − this pointer. Each byte = direct ability table ID. Lists include both attack abilities and passive D/E-item defenses. All 200 monsters decoded; stored in `data/monsters.json` as `ability_ids`. Displayed on monsters.html (cyan=active, dim=passive). *(decoded this session)*
 
 ---
 
@@ -74,7 +76,8 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
     - ✅ Armor slot (FlagsA bits) — extracted (`slot` field: helm/body/gloves/shoes/all). HIGH confidence.
     - ✅ Heal amount for potions (X=30 for potion, X=90 for xpotion) — added `heal` field. HIGH confidence.
     - ✅ Equip restrictions — confirmed NOT stored per-item in ROM. Class-level rule: humans=8 items, mutants=4, monsters=0. No per-item flags exist.
-    - Usable item effect amounts (needle, bell, hyper, etc.) → stat table X/Y meaning unclear; not extracted yet *(remainder)*
+    - ✅ Item true uses count (AltUses field, byte +3 at 0x1B700) — added `uses` field to abilities.json. Notable: glass sword=1 (breaks), masamune=254 (unlimited), vampic/rune=30, SMG=25. Wiki updated to show ∞ for 254, highlighted 1.
+    - Usable item effect amounts (needle, bell, hyper, etc.) → X field for status-cure items is a **bitmask** (not a number): needle=0xFD clears bit 1, antdote=0xEF clears bit 4, etc. Status bit meanings not yet confirmed from BGB. Not added to wiki. *(remainder)*
     - Armor FlagsA bit 6 (D-items: Dfire/Dice/etc.) effect/mechanics → not yet confirmed from BGB *(remainder)*
   - `data/encounters.json` — encounter rates/tables fabricated.
     *(discovered during: wiki audit)* Extract from ROM when encounter zone data is found.

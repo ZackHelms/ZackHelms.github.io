@@ -1,1 +1,4849 @@
-[{"id":0,"name":"potion","type":"usable_item","type_byte":3,"prefix":"","raw":[153,152,157,146,152,151,255,3],"gp":50,"heal":30},{"id":1,"name":"xpotion","type":"usable_item","type_byte":3,"prefix":"","raw":[161,153,152,157,146,152,151,3],"gp":200,"heal":90},{"id":2,"name":"cure","type":"spell","type_byte":30,"prefix":"magic","raw":[239,140,158,155,142,255,255,30],"gp":1000},{"id":3,"name":"rod","type":"weapon","type_byte":30,"prefix":"","raw":[155,152,141,255,255,255,255,30],"gp":1000,"power":5,"element":"elec"},{"id":4,"name":"needle","type":"usable_item","type_byte":3,"prefix":"","raw":[151,142,142,141,149,142,255,3],"gp":500},{"id":5,"name":"symbol","type":"usable_item","type_byte":3,"prefix":"","raw":[156,162,150,139,152,149,255,3],"gp":500},{"id":6,"name":"eyedrop","type":"usable_item","type_byte":3,"prefix":"","raw":[142,162,142,141,155,152,153,3],"gp":500},{"id":7,"name":"revive","type":"quest_item","type_byte":1,"prefix":"","raw":[155,142,159,146,159,142,255,1],"gp":15000},{"id":8,"name":"elixir","type":"usable_item","type_byte":3,"prefix":"","raw":[142,149,146,161,146,155,255,3],"gp":10000},{"id":9,"name":"C","type":"quest_item","type_byte":1,"prefix":"","raw":[66,255,255,255,255,255,255,1],"gp":10000},{"id":10,"name":"arcane","type":"quest_item","type_byte":1,"prefix":"","raw":[138,155,140,138,151,142,255,1],"gp":10000},{"id":11,"name":"door","type":"usable_item","type_byte":3,"prefix":"","raw":[141,152,152,155,255,255,255,3],"gp":5000},{"id":12,"name":"strong","type":"quest_item","type_byte":1,"prefix":"","raw":[156,157,155,152,151,144,255,1],"gp":300},{"id":13,"name":"agility","type":"quest_item","type_byte":1,"prefix":"","raw":[138,144,146,149,146,157,162,1],"gp":300},{"id":14,"name":"AB+","type":"quest_item","type_byte":1,"prefix":"","raw":[64,65,130,128,128,255,255,1],"gp":100},{"id":15,"name":"AB","type":"quest_item","type_byte":1,"prefix":"","raw":[64,65,132,128,128,255,255,1],"gp":1000},{"id":16,"name":"AB","type":"quest_item","type_byte":1,"prefix":"","raw":[64,65,134,128,128,255,255,1],"gp":5000},{"id":17,"name":"'king","type":"armor","type_byte":254,"prefix":"sword","raw":[236,148,146,151,144,255,255,254],"gp":0},{"id":18,"name":"king","type":"armor","type_byte":254,"prefix":"body","raw":[232,148,146,151,144,255,255,254],"gp":0,"defense":20,"slot":"body","element":"all"},{"id":19,"name":"king","type":"armor","type_byte":254,"prefix":"shield","raw":[233,148,146,151,144,255,255,254],"gp":0},{"id":20,"name":"airseed","type":"armor","type_byte":254,"prefix":"","raw":[138,146,155,156,142,142,141,254],"gp":0},{"id":21,"name":"red","type":"armor","type_byte":254,"prefix":"","raw":[155,142,141,255,152,155,139,254],"gp":0},{"id":22,"name":"blueorb","type":"armor","type_byte":254,"prefix":"","raw":[139,149,158,142,152,155,139,254],"gp":0},{"id":23,"name":"erase","type":"armor","type_byte":254,"prefix":"","raw":[142,155,138,156,142,137,137,254],"gp":0},{"id":24,"name":"bluekey","type":"armor","type_byte":254,"prefix":"","raw":[139,149,158,142,148,142,162,254],"gp":0},{"id":25,"name":"jailkey","type":"armor","type_byte":254,"prefix":"","raw":[147,138,146,149,148,142,162,254],"gp":0},{"id":26,"name":"whitkey","type":"armor","type_byte":254,"prefix":"","raw":[160,145,146,157,148,142,162,254],"gp":0},{"id":27,"name":"rock","type":"ability","type_byte":16,"prefix":"","raw":[155,152,140,148,255,255,255,16],"gp":100},{"id":28,"name":"light","type":"armor","type_byte":254,"prefix":"","raw":[149,146,144,145,157,255,255,254],"gp":0},{"id":29,"name":"repent","type":"armor","type_byte":254,"prefix":"","raw":[155,142,153,142,151,157,255,254],"gp":0},{"id":30,"name":"rom","type":"armor","type_byte":254,"prefix":"","raw":[155,152,150,255,255,255,255,254],"gp":0},{"id":31,"name":"board","type":"armor","type_byte":254,"prefix":"","raw":[139,152,138,155,141,255,255,254],"gp":0},{"id":32,"name":"hammer","type":"sword","type_byte":50,"prefix":"","raw":[145,138,150,150,142,155,255,50],"gp":25,"power":2},{"id":33,"name":"'long","type":"sword","type_byte":50,"prefix":"sword","raw":[236,149,152,151,144,255,255,50],"gp":132,"power":3},{"id":34,"name":"axe","type":"sword","type_byte":50,"prefix":"","raw":[138,161,142,255,255,255,255,50],"gp":412,"power":4},{"id":35,"name":"'battle","type":"sword","type_byte":50,"prefix":"sword","raw":[236,139,138,157,157,149,142,50],"gp":989,"power":5},{"id":36,"name":"'katana","type":"sword","type_byte":50,"prefix":"sword","raw":[236,148,138,157,138,151,138,50],"gp":2060,"power":6},{"id":37,"name":"'silver","type":"sword","type_byte":50,"prefix":"sword","raw":[236,156,146,149,159,142,155,50],"gp":10712,"power":9},{"id":38,"name":"'coral","type":"sword","type_byte":50,"prefix":"sword","raw":[236,140,152,155,138,149,255,50],"gp":9880,"power":8,"element":"fire"},{"id":39,"name":"'ogre","type":"sword","type_byte":50,"prefix":"sword","raw":[236,152,144,155,142,255,255,50],"gp":9880,"power":8,"element":"ice"},{"id":40,"name":"'dragon","type":"sword","type_byte":50,"prefix":"sword","raw":[236,141,155,138,144,152,151,50],"gp":34600,"power":11,"element":"elec"},{"id":41,"name":"'sun","type":"sword","type_byte":50,"prefix":"sword","raw":[236,156,158,151,255,255,255,50],"gp":67980,"power":13,"element":"poison"},{"id":42,"name":"'flame","type":"sword","type_byte":50,"prefix":"sword","raw":[236,143,149,138,150,142,255,50],"gp":24000,"power":10,"element":"fire"},{"id":43,"name":"'ice","type":"sword","type_byte":50,"prefix":"sword","raw":[236,146,140,142,255,255,255,50],"gp":23880,"power":10,"element":"ice"},{"id":44,"name":"'elec","type":"sword","type_byte":50,"prefix":"sword","raw":[236,142,149,142,140,255,255,50],"gp":24700,"power":10,"element":"elec"},{"id":45,"name":"rapier","type":"sword","type_byte":50,"prefix":"","raw":[155,138,153,146,142,155,255,50],"gp":24,"power":2},{"id":46,"name":"saber","type":"sword","type_byte":50,"prefix":"","raw":[156,138,139,142,155,255,255,50],"gp":2060,"power":6},{"id":47,"name":"l-saber","type":"sword","type_byte":50,"prefix":"","raw":[149,242,156,138,139,142,155,50],"gp":10480,"power":9},{"id":48,"name":"catcraw","type":"sword","type_byte":50,"prefix":"","raw":[140,138,157,140,155,138,160,50],"gp":23200,"power":11},{"id":49,"name":"p-knife","type":"sword","type_byte":50,"prefix":"","raw":[153,242,148,151,146,143,142,50],"gp":3800,"power":7},{"id":50,"name":"p-sword","type":"sword","type_byte":50,"prefix":"","raw":[153,242,156,160,152,155,141,50],"gp":32000,"power":12},{"id":51,"name":"revenge","type":"sword","type_byte":50,"prefix":"","raw":[155,142,159,142,151,144,142,50],"gp":20000},{"id":52,"name":"'vampic","type":"sword","type_byte":50,"prefix":"sword","raw":[236,159,138,150,153,146,140,50],"gp":10000,"power":4,"element":"poison"},{"id":53,"name":"'defend","type":"sword","type_byte":50,"prefix":"sword","raw":[236,141,142,143,142,151,141,50],"gp":48000,"power":12},{"id":54,"name":"'rune","type":"sword","type_byte":50,"prefix":"sword","raw":[236,155,158,151,142,255,255,50],"gp":9800,"power":7},{"id":55,"name":"'xclbr","type":"sword","type_byte":50,"prefix":"sword","raw":[236,161,140,149,139,155,255,50],"gp":100000,"power":200},{"id":56,"name":"'glass","type":"sword","type_byte":50,"prefix":"sword","raw":[236,144,149,138,156,156,255,50],"gp":50000,"power":255},{"id":57,"name":"masmune","type":"sword","type_byte":50,"prefix":"","raw":[150,138,156,150,158,151,142,50],"gp":200000,"power":150},{"id":58,"name":"bow","type":"sword","type_byte":50,"prefix":"","raw":[139,152,160,255,255,255,255,50],"gp":50,"power":20},{"id":59,"name":"longbow","type":"sword","type_byte":50,"prefix":"","raw":[149,152,151,144,139,152,160,50],"gp":8000,"power":120},{"id":60,"name":"g","type":"sword","type_byte":50,"prefix":"","raw":[144,181,240,255,139,152,160,50],"gp":32000,"power":250},{"id":61,"name":"colt","type":"weapon","type_byte":30,"prefix":"","raw":[140,152,149,157,255,255,255,30],"gp":80,"power":40},{"id":62,"name":"musket","type":"weapon","type_byte":30,"prefix":"","raw":[150,158,156,148,142,157,255,30],"gp":800,"power":130},{"id":63,"name":"magnum","type":"weapon","type_byte":30,"prefix":"","raw":[150,138,144,151,158,150,255,30],"gp":8000,"power":250},{"id":64,"name":"whip","type":"sword","type_byte":50,"prefix":"","raw":[160,145,146,153,255,255,255,50],"gp":80,"power":15},{"id":65,"name":"e-whip","type":"sword","type_byte":50,"prefix":"","raw":[142,242,160,145,146,153,255,50],"gp":800,"power":70},{"id":66,"name":"saw","type":"weapon","type_byte":30,"prefix":"","raw":[156,138,160,255,255,255,255,30],"gp":4000,"power":60},{"id":67,"name":"smg","type":"weapon","type_byte":20,"prefix":"","raw":[156,150,144,255,255,255,255,20],"gp":400,"power":50},{"id":68,"name":"grenade","type":"weapon","type_byte":20,"prefix":"","raw":[144,155,142,151,138,141,142,20],"gp":800,"power":100},{"id":69,"name":"bazooka","type":"weapon","type_byte":20,"prefix":"","raw":[139,138,163,152,152,148,138,20],"gp":4000,"power":150},{"id":70,"name":"balkan","type":"weapon","type_byte":20,"prefix":"","raw":[139,138,149,148,138,151,255,20],"gp":8000,"power":200},{"id":71,"name":"missile","type":"ability","type_byte":5,"prefix":"","raw":[150,146,156,156,146,149,142,5],"gp":40000},{"id":72,"name":"nbomb","type":"quest_item","type_byte":1,"prefix":"","raw":[151,240,139,152,150,139,255,1],"gp":100000},{"id":73,"name":"laser","type":"weapon","type_byte":30,"prefix":"","raw":[149,138,156,142,155,255,255,30],"gp":10000,"power":100},{"id":74,"name":"hyper","type":"usable_item","type_byte":3,"prefix":"","raw":[145,162,153,142,155,255,255,3],"gp":100000},{"id":75,"name":"bronze","type":"sword","type_byte":50,"prefix":"shield","raw":[233,139,155,152,151,163,142,50],"gp":40},{"id":76,"name":"gold","type":"sword","type_byte":50,"prefix":"shield","raw":[233,144,152,149,141,255,255,50],"gp":400},{"id":77,"name":"silver","type":"sword","type_byte":50,"prefix":"shield","raw":[233,156,146,149,159,142,155,50],"gp":4000},{"id":78,"name":"flame","type":"sword","type_byte":50,"prefix":"shield","raw":[233,143,149,138,150,142,255,50],"gp":5500,"power":1},{"id":79,"name":"ice","type":"sword","type_byte":50,"prefix":"shield","raw":[233,146,140,142,255,255,255,50],"gp":6000,"power":2},{"id":80,"name":"dragon","type":"sword","type_byte":50,"prefix":"shield","raw":[233,141,155,138,144,152,151,50],"gp":8000,"power":15},{"id":81,"name":"aezis","type":"sword","type_byte":50,"prefix":"shield","raw":[233,138,142,163,146,156,255,50],"gp":8000,"power":240},{"id":82,"name":"bronze","type":"armor","type_byte":254,"prefix":"helm","raw":[237,139,155,152,151,163,142,254],"gp":40,"defense":3,"slot":"helm"},{"id":83,"name":"gold","type":"armor","type_byte":254,"prefix":"helm","raw":[237,144,152,149,141,255,255,254],"gp":175,"defense":5,"slot":"helm"},{"id":84,"name":"silver","type":"armor","type_byte":254,"prefix":"helm","raw":[237,156,146,149,159,142,155,254],"gp":600,"defense":8,"slot":"helm"},{"id":85,"name":"army","type":"armor","type_byte":254,"prefix":"helm","raw":[237,138,155,150,162,255,255,254],"gp":6000,"defense":17,"slot":"helm"},{"id":86,"name":"band","type":"armor","type_byte":254,"prefix":"helm","raw":[237,139,138,151,141,255,255,254],"gp":2000,"defense":25,"slot":"helm","element":"all"},{"id":87,"name":"dragon","type":"armor","type_byte":254,"prefix":"helm","raw":[237,141,155,138,144,152,151,254],"gp":20000,"defense":22,"slot":"helm"},{"id":88,"name":"bronze","type":"armor","type_byte":254,"prefix":"body","raw":[232,139,155,152,151,163,142,254],"gp":80,"defense":4,"slot":"body"},{"id":89,"name":"gold","type":"armor","type_byte":254,"prefix":"body","raw":[232,144,152,149,141,255,255,254],"gp":300,"defense":8,"slot":"body"},{"id":90,"name":"silver","type":"armor","type_byte":254,"prefix":"body","raw":[232,156,146,149,159,142,155,254],"gp":2500,"defense":13,"slot":"body"},{"id":91,"name":"dragon","type":"armor","type_byte":254,"prefix":"body","raw":[232,141,155,138,144,152,151,254],"gp":8500,"defense":19,"slot":"body","element":"all"},{"id":92,"name":"suit","type":"armor","type_byte":254,"prefix":"body","raw":[232,156,158,146,157,255,255,254],"gp":18000,"defense":25,"slot":"body"},{"id":93,"name":"arthur","type":"armor","type_byte":254,"prefix":"body","raw":[232,138,155,157,145,158,155,254],"gp":30000,"defense":38,"slot":"body"},{"id":94,"name":"bronze","type":"armor","type_byte":254,"prefix":"gloves","raw":[234,139,155,152,151,163,142,254],"gp":12,"defense":1,"slot":"gloves"},{"id":95,"name":"gold","type":"armor","type_byte":254,"prefix":"gloves","raw":[234,144,152,149,141,255,255,254],"gp":150,"defense":3,"slot":"gloves"},{"id":96,"name":"silver","type":"armor","type_byte":254,"prefix":"gloves","raw":[234,156,146,149,159,142,155,254],"gp":500,"defense":4,"slot":"gloves"},{"id":97,"name":"giant","type":"armor","type_byte":254,"prefix":"gloves","raw":[234,144,146,138,151,157,255,254],"gp":5000,"defense":6,"slot":"gloves","element":"fire"},{"id":98,"name":"ninja","type":"armor","type_byte":254,"prefix":"gloves","raw":[234,151,146,151,147,138,255,254],"gp":10000,"defense":15,"slot":"gloves","element":"ice"},{"id":99,"name":"hermes","type":"armor","type_byte":254,"prefix":"shoes","raw":[235,145,142,155,150,142,156,254],"gp":8500,"defense":7,"slot":"shoes","element":"ice"},{"id":100,"name":"geta","type":"armor","type_byte":254,"prefix":"shoes","raw":[235,144,142,157,138,255,255,254],"gp":5000,"defense":7,"slot":"shoes","element":"fire"},{"id":101,"name":"","type":"armor","type_byte":254,"prefix":"shoes","raw":[235,255,255,255,255,255,255,254],"gp":10000,"defense":10,"slot":"shoes"},{"id":102,"name":"power","type":"armor","type_byte":254,"prefix":"body","raw":[232,153,152,160,142,155,255,254],"gp":100000,"defense":70,"slot":"all","element":"elec"},{"id":103,"name":"wand","type":"weapon","type_byte":30,"prefix":"","raw":[160,138,151,141,255,255,255,30],"gp":750,"power":7,"element":"fire"},{"id":104,"name":"staff","type":"weapon","type_byte":20,"prefix":"","raw":[156,157,138,143,143,255,255,20],"gp":5000,"power":32},{"id":105,"name":"book","type":"weapon","type_byte":20,"prefix":"","raw":[139,152,152,148,255,255,255,20],"gp":500,"power":10,"element":"poison"},{"id":106,"name":"fire","type":"spell","type_byte":20,"prefix":"magic","raw":[239,143,146,155,142,255,255,20],"gp":500},{"id":107,"name":"ice","type":"spell","type_byte":20,"prefix":"magic","raw":[239,146,140,142,255,255,255,20],"gp":500},{"id":108,"name":"elec","type":"spell","type_byte":20,"prefix":"magic","raw":[239,142,149,142,140,255,255,20],"gp":500},{"id":109,"name":"fog","type":"spell","type_byte":20,"prefix":"magic","raw":[239,143,152,144,255,255,255,20],"gp":500},{"id":110,"name":"flare","type":"spell","type_byte":20,"prefix":"magic","raw":[239,143,149,138,155,142,255,20],"gp":50000},{"id":111,"name":"sleep","type":"spell","type_byte":20,"prefix":"magic","raw":[239,156,149,142,142,153,255,20],"gp":500},{"id":112,"name":"stone","type":"spell","type_byte":20,"prefix":"magic","raw":[239,156,157,152,151,142,255,20],"gp":5000},{"id":113,"name":"death","type":"spell","type_byte":20,"prefix":"magic","raw":[239,141,142,138,157,145,255,20],"gp":5000},{"id":114,"name":"punch","type":"ability","type_byte":99,"prefix":"","raw":[153,158,151,140,145,255,255,99],"gp":500},{"id":115,"name":"kick","type":"ability","type_byte":88,"prefix":"","raw":[148,146,140,148,255,255,255,88],"gp":1100},{"id":116,"name":"butt","type":"ability","type_byte":66,"prefix":"","raw":[139,158,157,157,255,255,255,66],"gp":2100},{"id":117,"name":"x-kick","type":"ability","type_byte":44,"prefix":"","raw":[161,242,148,146,140,148,255,44],"gp":4100},{"id":118,"name":"judo","type":"ability","type_byte":22,"prefix":"","raw":[147,158,141,152,255,255,255,22],"gp":8100},{"id":119,"name":"karate","type":"ability","type_byte":11,"prefix":"","raw":[148,138,155,138,157,142,255,11],"gp":15100},{"id":120,"name":"tempter","type":"weapon","type_byte":30,"prefix":"","raw":[157,142,150,153,157,142,155,30],"gp":5100,"power":32},{"id":121,"name":"counter","type":"weapon","type_byte":20,"prefix":"","raw":[140,152,158,151,157,142,155,20],"gp":5100},{"id":122,"name":"antdote","type":"usable_item","type_byte":3,"prefix":"","raw":[138,151,157,141,152,157,142,3],"gp":100},{"id":123,"name":"bell","type":"usable_item","type_byte":3,"prefix":"","raw":[139,142,149,149,255,255,255,3],"gp":100},{"id":124,"name":"pan","type":"usable_item","type_byte":3,"prefix":"","raw":[153,138,151,255,255,255,255,3],"gp":100},{"id":125,"name":"shocker","type":"usable_item","type_byte":3,"prefix":"","raw":[156,145,152,140,148,142,155,3],"gp":100},{"id":126,"name":"left","type":"armor","type_byte":254,"prefix":"","raw":[149,142,143,157,255,255,255,254],"gp":0},{"id":127,"name":"right","type":"armor","type_byte":254,"prefix":"","raw":[155,146,144,145,157,255,255,254],"gp":0},{"id":128,"name":"honey","type":"ability","type_byte":10,"prefix":"","raw":[145,152,151,142,162,255,255,10],"gp":1121313},{"id":129,"name":"cure","type":"ability","type_byte":10,"prefix":"","raw":[140,158,155,142,255,255,255,10],"gp":1141224},{"id":130,"name":"heal","type":"ability","type_byte":10,"prefix":"","raw":[145,142,138,149,255,255,255,10],"gp":487913},{"id":131,"name":"revive","type":"usable_item","type_byte":3,"prefix":"","raw":[155,142,159,146,159,142,255,3],"gp":1151610},{"id":132,"name":"care","type":"ability","type_byte":5,"prefix":"","raw":[140,138,155,142,255,255,255,5],"gp":426090},{"id":133,"name":"raise","type":"usable_item","type_byte":3,"prefix":"","raw":[155,138,146,156,142,255,255,3],"gp":551212},{"id":134,"name":"telepor","type":"ability","type_byte":5,"prefix":"","raw":[157,142,149,142,153,152,155,5],"gp":1141406},{"id":135,"name":"head","type":"ability","type_byte":5,"prefix":"","raw":[145,142,138,141,255,255,255,5],"gp":304224},{"id":136,"name":"nose","type":"ability","type_byte":15,"prefix":"","raw":[151,152,156,142,255,255,255,15],"gp":1161717},{"id":137,"name":"pincer","type":"weapon","type_byte":20,"prefix":"","raw":[153,146,151,140,142,155,255,20],"gp":1186714,"power":5},{"id":138,"name":"beak","type":"ability","type_byte":25,"prefix":"","raw":[139,142,138,148,255,255,255,25],"gp":382719},{"id":139,"name":"punch","type":"ability","type_byte":25,"prefix":"","raw":[153,158,151,140,145,255,255,25],"gp":1212222},{"id":140,"name":"bite","type":"weapon","type_byte":20,"prefix":"","raw":[139,146,157,142,255,255,255,20],"gp":216286,"power":4},{"id":141,"name":"fin","type":"weapon","type_byte":30,"prefix":"","raw":[143,146,151,255,255,255,255,30],"gp":572020,"power":2},{"id":142,"name":"bone","type":"ability","type_byte":25,"prefix":"","raw":[139,152,151,142,255,255,255,25],"gp":1222293},{"id":143,"name":"sword","type":"ability","type_byte":15,"prefix":"","raw":[156,160,152,155,141,255,255,15],"gp":757569},{"id":144,"name":"hari-te","type":"ability","type_byte":5,"prefix":"","raw":[145,138,155,146,242,157,142,5],"gp":1031608},{"id":145,"name":"bash","type":"usable_item","type_byte":3,"prefix":"","raw":[139,138,156,145,255,255,255,3],"gp":1146665},{"id":146,"name":"saw","type":"weapon","type_byte":20,"prefix":"","raw":[156,138,160,255,255,255,255,20],"gp":1666599,"power":30},{"id":147,"name":"+pincer","type":"ability","type_byte":10,"prefix":"","raw":[130,153,146,151,140,142,155,10],"gp":1051604},{"id":148,"name":"heads","type":"ability","type_byte":5,"prefix":"","raw":[132,145,142,138,141,156,255,5],"gp":1666665},{"id":149,"name":"nail","type":"weapon","type_byte":30,"prefix":"","raw":[151,138,146,149,255,255,255,30],"gp":1659312,"power":2},{"id":150,"name":"legs","type":"ability","type_byte":5,"prefix":"","raw":[136,149,142,144,156,255,255,5],"gp":1121065},{"id":151,"name":"+tusks","type":"ability","type_byte":10,"prefix":"","raw":[130,157,158,156,148,156,255,10],"gp":1666665},{"id":152,"name":"horns","type":"ability","type_byte":10,"prefix":"","raw":[132,145,152,155,151,156,255,10],"gp":1001312},{"id":153,"name":"+swords","type":"ability","type_byte":10,"prefix":"","raw":[130,156,160,152,155,141,156,10],"gp":1176665},{"id":154,"name":"arms","type":"ability","type_byte":5,"prefix":"","raw":[134,138,155,150,156,255,255,5],"gp":1666591},{"id":155,"name":"poison","type":"ability","type_byte":25,"prefix":"","raw":[153,152,146,156,152,151,255,25],"gp":1161311},{"id":156,"name":"poison","type":"ability","type_byte":25,"prefix":"","raw":[153,152,146,156,152,151,255,25],"gp":1666665},{"id":157,"name":"tusk","type":"ability","type_byte":10,"prefix":"","raw":[157,158,156,148,255,255,255,10],"gp":1659318},{"id":158,"name":"p-fangs","type":"weapon","type_byte":20,"prefix":"","raw":[153,242,143,138,151,144,156,20],"gp":1161765,"power":64},{"id":159,"name":"strict","type":"weapon","type_byte":20,"prefix":"","raw":[156,157,155,146,140,157,255,20],"gp":1666665,"power":64},{"id":160,"name":"petrify","type":"ability","type_byte":5,"prefix":"","raw":[153,142,157,155,146,143,162,5],"gp":1031812},{"id":161,"name":"d-fangs","type":"ability","type_byte":5,"prefix":"","raw":[141,242,143,138,151,144,156,5],"gp":1126665},{"id":162,"name":"sl-gaze","type":"weapon","type_byte":20,"prefix":"","raw":[156,149,242,144,138,163,142,20],"gp":1666593,"power":128},{"id":163,"name":"sleep","type":"weapon","type_byte":20,"prefix":"","raw":[156,149,142,142,153,255,255,20],"gp":1090507,"power":128},{"id":164,"name":"blind","type":"ability","type_byte":10,"prefix":"","raw":[139,149,146,151,141,255,255,10],"gp":1666665},{"id":165,"name":"flash","type":"ability","type_byte":10,"prefix":"","raw":[143,149,138,156,145,255,255,10],"gp":1662306},{"id":166,"name":"ink","type":"ability","type_byte":10,"prefix":"","raw":[146,151,148,255,255,255,255,10],"gp":412452},{"id":167,"name":"horn","type":"ability","type_byte":10,"prefix":"","raw":[145,152,155,151,255,255,255,10],"gp":623364},{"id":168,"name":"gaze","type":"ability","type_byte":10,"prefix":"","raw":[144,138,163,142,255,255,255,10],"gp":560911},{"id":169,"name":"gaze","type":"ability","type_byte":5,"prefix":"","raw":[144,138,163,142,255,255,255,5],"gp":1353390},{"id":170,"name":"riddle","type":"usable_item","type_byte":3,"prefix":"","raw":[155,146,141,141,149,142,255,3],"gp":643370},{"id":171,"name":"sing","type":"usable_item","type_byte":3,"prefix":"","raw":[156,146,151,144,255,255,255,3],"gp":563413},{"id":172,"name":"tail","type":"ability","type_byte":10,"prefix":"","raw":[157,138,146,149,255,255,255,10],"gp":573313},{"id":173,"name":"gaze","type":"ability","type_byte":5,"prefix":"","raw":[144,138,163,142,255,255,255,5],"gp":563300},{"id":174,"name":"gaze","type":"ability","type_byte":5,"prefix":"","raw":[144,138,163,142,255,255,255,5],"gp":653313},{"id":175,"name":"drain","type":"ability","type_byte":10,"prefix":"","raw":[141,155,138,146,151,255,255,10],"gp":563340},{"id":176,"name":"stench","type":"ability","type_byte":10,"prefix":"","raw":[156,157,142,151,140,145,255,10],"gp":533434},{"id":177,"name":"sand","type":"ability","type_byte":10,"prefix":"","raw":[156,138,151,141,255,255,255,10],"gp":623459},{"id":178,"name":"tremble","type":"ability","type_byte":10,"prefix":"","raw":[157,155,142,150,139,149,142,10],"gp":633390},{"id":179,"name":"electro","type":"ability","type_byte":10,"prefix":"","raw":[142,149,142,140,157,155,152,10],"gp":613432},{"id":180,"name":"bother","type":"ability","type_byte":10,"prefix":"","raw":[139,152,157,145,142,155,255,10],"gp":603955},{"id":181,"name":"web","type":"ability","type_byte":10,"prefix":"","raw":[160,142,139,255,255,255,255,10],"gp":1333158},{"id":182,"name":"touch","type":"ability","type_byte":5,"prefix":"","raw":[157,152,158,140,145,255,255,5],"gp":1341259},{"id":183,"name":"kiss","type":"ability","type_byte":5,"prefix":"","raw":[148,146,156,156,255,255,255,5],"gp":1340240},{"id":184,"name":"kick","type":"weapon","type_byte":20,"prefix":"","raw":[148,146,140,148,255,255,255,20],"gp":194210,"power":4},{"id":185,"name":"flame","type":"ability","type_byte":10,"prefix":"","raw":[143,149,138,150,142,255,255,10],"gp":452244},{"id":186,"name":"ice","type":"ability","type_byte":10,"prefix":"","raw":[146,140,142,255,255,255,255,10],"gp":1444412},{"id":187,"name":"thunder","type":"ability","type_byte":10,"prefix":"","raw":[157,145,158,151,141,142,155,10],"gp":452145},{"id":188,"name":"gas","type":"ability","type_byte":10,"prefix":"","raw":[144,138,156,255,255,255,255,10],"gp":424570},{"id":189,"name":"acid","type":"ability","type_byte":10,"prefix":"","raw":[138,140,146,141,255,255,255,10],"gp":452547},{"id":190,"name":"squirt","type":"ability","type_byte":10,"prefix":"","raw":[156,154,158,146,155,157,255,10],"gp":714785},{"id":191,"name":"quake","type":"usable_item","type_byte":3,"prefix":"","raw":[154,158,138,148,142,255,255,3],"gp":470648},{"id":192,"name":"tornado","type":"usable_item","type_byte":3,"prefix":"","raw":[157,152,155,151,138,141,152,3],"gp":704933},{"id":193,"name":"acid","type":"usable_item","type_byte":3,"prefix":"","raw":[138,140,146,141,255,255,255,3],"gp":480949},{"id":194,"name":"whirl","type":"usable_item","type_byte":3,"prefix":"","raw":[160,145,146,155,149,255,255,3],"gp":665015},{"id":195,"name":"steal","type":"ability","type_byte":5,"prefix":"","raw":[156,157,142,138,149,255,255,5],"gp":503249},{"id":196,"name":"tentacl","type":"ability","type_byte":25,"prefix":"","raw":[157,142,151,157,138,140,149,25],"gp":535105},{"id":197,"name":"d-beam","type":"ability","type_byte":10,"prefix":"","raw":[141,242,139,142,138,150,255,10],"gp":511150},{"id":198,"name":"fire","type":"ability","type_byte":10,"prefix":"","raw":[143,146,155,142,255,255,255,10],"gp":1625013},{"id":199,"name":"ice","type":"ability","type_byte":10,"prefix":"","raw":[146,140,142,255,255,255,255,10],"gp":512551},{"id":200,"name":"elec","type":"ability","type_byte":10,"prefix":"","raw":[142,149,142,140,255,255,255,10],"gp":435166},{"id":201,"name":"flare","type":"usable_item","type_byte":3,"prefix":"","raw":[143,149,138,155,142,255,255,3],"gp":518451},{"id":202,"name":"stop","type":"ability","type_byte":5,"prefix":"","raw":[156,157,152,153,255,255,255,5],"gp":1405141},{"id":203,"name":"sleep","type":"ability","type_byte":10,"prefix":"","raw":[156,149,142,142,153,255,255,10],"gp":528452},{"id":204,"name":"axe","type":"ability","type_byte":10,"prefix":"","raw":[138,161,142,255,255,255,255,10],"gp":1135221},{"id":205,"name":"s-skin","type":"ability","type_byte":5,"prefix":"","raw":[156,242,156,148,146,151,255,5],"gp":541953},{"id":206,"name":"p-skin","type":"weapon","type_byte":20,"prefix":"","raw":[153,242,156,148,146,151,255,20],"gp":195463,"power":64},{"id":207,"name":"p-skin","type":"ability","type_byte":25,"prefix":"","raw":[153,242,156,148,146,151,255,25],"gp":546954},{"id":208,"name":"burning","type":"ability","type_byte":25,"prefix":"","raw":[139,158,155,151,146,151,144,25],"gp":1105553},{"id":209,"name":"Dfire","type":"armor","type_byte":254,"prefix":"","raw":[67,143,146,155,142,255,255,254],"gp":545555},{"id":210,"name":"Dice","type":"armor","type_byte":254,"prefix":"","raw":[67,146,140,142,255,255,255,254],"gp":695594},{"id":211,"name":"Delec","type":"armor","type_byte":254,"prefix":"","raw":[67,142,149,142,140,255,255,254],"gp":564755},{"id":212,"name":"Dpoison","type":"armor","type_byte":254,"prefix":"","raw":[67,153,152,146,156,152,151,254],"gp":15017},{"id":213,"name":"Dstone","type":"armor","type_byte":254,"prefix":"","raw":[67,156,157,152,151,142,255,254],"gp":503050},{"id":214,"name":"Dpara","type":"armor","type_byte":254,"prefix":"","raw":[67,153,138,155,138,255,255,254],"gp":415070},{"id":215,"name":"Dweapon","type":"armor","type_byte":254,"prefix":"","raw":[67,160,142,138,153,152,151,254],"gp":507750},{"id":216,"name":"Dquake","type":"armor","type_byte":254,"prefix":"","raw":[67,154,158,138,148,142,255,254],"gp":985117},{"id":217,"name":"explode","type":"quest_item","type_byte":1,"prefix":"","raw":[142,161,153,149,152,141,142,1],"gp":502255},{"id":218,"name":"Dchange","type":"armor","type_byte":254,"prefix":"","raw":[67,140,145,138,151,144,142,254],"gp":1331425},{"id":219,"name":"Ddamage","type":"armor","type_byte":254,"prefix":"","raw":[67,141,138,150,138,144,142,254],"gp":1264633},{"id":220,"name":"stone","type":"ability","type_byte":5,"prefix":"","raw":[156,157,152,151,142,255,255,5],"gp":164441},{"id":221,"name":"DiceFwp","type":"armor","type_byte":254,"prefix":"","raw":[67,146,140,142,69,160,153,254],"gp":1211104},{"id":222,"name":"Dall","type":"armor","type_byte":254,"prefix":"","raw":[67,138,149,149,255,255,255,254],"gp":1913},{"id":223,"name":"Efire","type":"armor","type_byte":254,"prefix":"","raw":[68,143,146,155,142,255,255,254],"gp":215323},{"id":224,"name":"Eelec","type":"armor","type_byte":254,"prefix":"","raw":[68,142,149,142,140,255,255,254],"gp":1515044},{"id":225,"name":"Eice","type":"armor","type_byte":254,"prefix":"","raw":[68,146,140,142,255,255,255,254],"gp":163371},{"id":226,"name":"shell","type":"ability","type_byte":25,"prefix":"","raw":[156,145,142,149,149,255,255,25],"gp":604410},{"id":227,"name":"shell","type":"ability","type_byte":25,"prefix":"","raw":[156,145,142,149,149,255,255,25],"gp":1237160},{"id":228,"name":"drink","type":"ability","type_byte":10,"prefix":"","raw":[141,155,146,151,148,255,255,10],"gp":441223},{"id":229,"name":"chill","type":"ability","type_byte":10,"prefix":"","raw":[140,145,146,149,149,255,255,10],"gp":716044},{"id":230,"name":"pollen","type":"weapon","type_byte":20,"prefix":"","raw":[153,152,149,149,142,151,255,20],"gp":132371,"power":16,"element":"poison"},{"id":231,"name":"rocket","type":"ability","type_byte":10,"prefix":"","raw":[155,152,140,148,142,157,255,10],"gp":615111},{"id":232,"name":"beam","type":"ability","type_byte":10,"prefix":"","raw":[139,142,138,150,255,255,255,10],"gp":341265},{"id":233,"name":"melt","type":"ability","type_byte":10,"prefix":"","raw":[150,142,149,157,255,255,255,10],"gp":1305110},{"id":234,"name":"sphere","type":"armor","type_byte":254,"prefix":"","raw":[156,153,145,142,155,142,255,254],"gp":341165},{"id":235,"name":"mirror","type":"ability","type_byte":10,"prefix":"","raw":[150,146,155,155,152,155,255,10],"gp":1305650},{"id":236,"name":"kinesis","type":"ability","type_byte":10,"prefix":"","raw":[148,146,151,142,156,146,156,10],"gp":1115650},{"id":237,"name":"p-blast","type":"ability","type_byte":5,"prefix":"","raw":[153,242,139,149,138,156,157,5],"gp":1124110},{"id":238,"name":"leech","type":"ability","type_byte":5,"prefix":"","raw":[149,142,142,140,145,255,255,5],"gp":1524111},{"id":239,"name":"uncurse","type":"ability","type_byte":10,"prefix":"","raw":[158,151,140,158,155,156,142,10],"gp":1523035},{"id":240,"name":"esp","type":"ability","type_byte":25,"prefix":"","raw":[142,156,153,255,255,255,255,25],"gp":240418},{"id":241,"name":"hypnos","type":"ability","type_byte":21,"prefix":"","raw":[145,162,153,151,152,156,255,21],"gp":43524},{"id":242,"name":"barrier","type":"ability","type_byte":5,"prefix":"","raw":[139,138,155,155,146,142,155,5],"gp":65112},{"id":243,"name":"mirror","type":"usable_item","type_byte":3,"prefix":"","raw":[150,146,155,155,152,155,255,3],"gp":1345261},{"id":244,"name":"power","type":"usable_item","type_byte":3,"prefix":"","raw":[153,152,160,142,155,255,255,3],"gp":1323035},{"id":245,"name":"armor","type":"usable_item","type_byte":3,"prefix":"","raw":[138,155,150,152,155,255,255,3],"gp":240418},{"id":246,"name":"gaze","type":"ability","type_byte":10,"prefix":"","raw":[144,138,163,142,255,255,255,10],"gp":1573524},{"id":247,"name":"heads","type":"ability","type_byte":10,"prefix":"","raw":[131,145,142,138,141,156,255,10],"gp":51951},{"id":248,"name":"DparFwp","type":"armor","type_byte":254,"prefix":"","raw":[67,153,138,155,69,160,153,254],"gp":1511118},{"id":249,"name":"stealth","type":"armor","type_byte":254,"prefix":"","raw":[156,157,142,138,149,157,145,254],"gp":35110},{"id":250,"name":"warning","type":"armor","type_byte":254,"prefix":"","raw":[160,138,155,151,146,151,144,254],"gp":340365},{"id":251,"name":"forseen","type":"armor","type_byte":254,"prefix":"","raw":[143,152,155,156,142,142,151,254],"gp":1305121}]
+[
+  {
+    "id": 0,
+    "name": "potion",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      153,
+      152,
+      157,
+      146,
+      152,
+      151,
+      255,
+      3
+    ],
+    "gp": 50,
+    "heal": 30,
+    "uses": 3
+  },
+  {
+    "id": 1,
+    "name": "xpotion",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      161,
+      153,
+      152,
+      157,
+      146,
+      152,
+      151,
+      3
+    ],
+    "gp": 200,
+    "heal": 90,
+    "uses": 3
+  },
+  {
+    "id": 2,
+    "name": "cure",
+    "type": "spell",
+    "type_byte": 30,
+    "prefix": "magic",
+    "raw": [
+      239,
+      140,
+      158,
+      155,
+      142,
+      255,
+      255,
+      30
+    ],
+    "gp": 1000,
+    "uses": 30
+  },
+  {
+    "id": 3,
+    "name": "rod",
+    "type": "weapon",
+    "type_byte": 30,
+    "prefix": "",
+    "raw": [
+      155,
+      152,
+      141,
+      255,
+      255,
+      255,
+      255,
+      30
+    ],
+    "gp": 1000,
+    "power": 5,
+    "element": "elec",
+    "uses": 30
+  },
+  {
+    "id": 4,
+    "name": "needle",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      151,
+      142,
+      142,
+      141,
+      149,
+      142,
+      255,
+      3
+    ],
+    "gp": 500,
+    "uses": 3
+  },
+  {
+    "id": 5,
+    "name": "symbol",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      156,
+      162,
+      150,
+      139,
+      152,
+      149,
+      255,
+      3
+    ],
+    "gp": 500,
+    "uses": 3
+  },
+  {
+    "id": 6,
+    "name": "eyedrop",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      142,
+      162,
+      142,
+      141,
+      155,
+      152,
+      153,
+      3
+    ],
+    "gp": 500,
+    "uses": 3
+  },
+  {
+    "id": 7,
+    "name": "revive",
+    "type": "quest_item",
+    "type_byte": 1,
+    "prefix": "",
+    "raw": [
+      155,
+      142,
+      159,
+      146,
+      159,
+      142,
+      255,
+      1
+    ],
+    "gp": 15000
+  },
+  {
+    "id": 8,
+    "name": "elixir",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      142,
+      149,
+      146,
+      161,
+      146,
+      155,
+      255,
+      3
+    ],
+    "gp": 10000,
+    "uses": 3
+  },
+  {
+    "id": 9,
+    "name": "C",
+    "type": "quest_item",
+    "type_byte": 1,
+    "prefix": "",
+    "raw": [
+      66,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      1
+    ],
+    "gp": 10000
+  },
+  {
+    "id": 10,
+    "name": "arcane",
+    "type": "quest_item",
+    "type_byte": 1,
+    "prefix": "",
+    "raw": [
+      138,
+      155,
+      140,
+      138,
+      151,
+      142,
+      255,
+      1
+    ],
+    "gp": 10000
+  },
+  {
+    "id": 11,
+    "name": "door",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      141,
+      152,
+      152,
+      155,
+      255,
+      255,
+      255,
+      3
+    ],
+    "gp": 5000,
+    "uses": 3
+  },
+  {
+    "id": 12,
+    "name": "strong",
+    "type": "quest_item",
+    "type_byte": 1,
+    "prefix": "",
+    "raw": [
+      156,
+      157,
+      155,
+      152,
+      151,
+      144,
+      255,
+      1
+    ],
+    "gp": 300
+  },
+  {
+    "id": 13,
+    "name": "agility",
+    "type": "quest_item",
+    "type_byte": 1,
+    "prefix": "",
+    "raw": [
+      138,
+      144,
+      146,
+      149,
+      146,
+      157,
+      162,
+      1
+    ],
+    "gp": 300
+  },
+  {
+    "id": 14,
+    "name": "AB+",
+    "type": "quest_item",
+    "type_byte": 1,
+    "prefix": "",
+    "raw": [
+      64,
+      65,
+      130,
+      128,
+      128,
+      255,
+      255,
+      1
+    ],
+    "gp": 100
+  },
+  {
+    "id": 15,
+    "name": "AB",
+    "type": "quest_item",
+    "type_byte": 1,
+    "prefix": "",
+    "raw": [
+      64,
+      65,
+      132,
+      128,
+      128,
+      255,
+      255,
+      1
+    ],
+    "gp": 1000
+  },
+  {
+    "id": 16,
+    "name": "AB",
+    "type": "quest_item",
+    "type_byte": 1,
+    "prefix": "",
+    "raw": [
+      64,
+      65,
+      134,
+      128,
+      128,
+      255,
+      255,
+      1
+    ],
+    "gp": 5000
+  },
+  {
+    "id": 17,
+    "name": "'king",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "sword",
+    "raw": [
+      236,
+      148,
+      146,
+      151,
+      144,
+      255,
+      255,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 18,
+    "name": "king",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "body",
+    "raw": [
+      232,
+      148,
+      146,
+      151,
+      144,
+      255,
+      255,
+      254
+    ],
+    "gp": 0,
+    "defense": 20,
+    "slot": "body",
+    "element": "all"
+  },
+  {
+    "id": 19,
+    "name": "king",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "shield",
+    "raw": [
+      233,
+      148,
+      146,
+      151,
+      144,
+      255,
+      255,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 20,
+    "name": "airseed",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      138,
+      146,
+      155,
+      156,
+      142,
+      142,
+      141,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 21,
+    "name": "red",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      155,
+      142,
+      141,
+      255,
+      152,
+      155,
+      139,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 22,
+    "name": "blueorb",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      139,
+      149,
+      158,
+      142,
+      152,
+      155,
+      139,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 23,
+    "name": "erase",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      142,
+      155,
+      138,
+      156,
+      142,
+      137,
+      137,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 24,
+    "name": "bluekey",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      139,
+      149,
+      158,
+      142,
+      148,
+      142,
+      162,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 25,
+    "name": "jailkey",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      147,
+      138,
+      146,
+      149,
+      148,
+      142,
+      162,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 26,
+    "name": "whitkey",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      160,
+      145,
+      146,
+      157,
+      148,
+      142,
+      162,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 27,
+    "name": "rock",
+    "type": "ability",
+    "type_byte": 16,
+    "prefix": "",
+    "raw": [
+      155,
+      152,
+      140,
+      148,
+      255,
+      255,
+      255,
+      16
+    ],
+    "gp": 100,
+    "uses": 16
+  },
+  {
+    "id": 28,
+    "name": "light",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      149,
+      146,
+      144,
+      145,
+      157,
+      255,
+      255,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 29,
+    "name": "repent",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      155,
+      142,
+      153,
+      142,
+      151,
+      157,
+      255,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 30,
+    "name": "rom",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      155,
+      152,
+      150,
+      255,
+      255,
+      255,
+      255,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 31,
+    "name": "board",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      139,
+      152,
+      138,
+      155,
+      141,
+      255,
+      255,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 32,
+    "name": "hammer",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      145,
+      138,
+      150,
+      150,
+      142,
+      155,
+      255,
+      50
+    ],
+    "gp": 25,
+    "power": 2,
+    "uses": 50
+  },
+  {
+    "id": 33,
+    "name": "'long",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      149,
+      152,
+      151,
+      144,
+      255,
+      255,
+      50
+    ],
+    "gp": 132,
+    "power": 3,
+    "uses": 50
+  },
+  {
+    "id": 34,
+    "name": "axe",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      138,
+      161,
+      142,
+      255,
+      255,
+      255,
+      255,
+      50
+    ],
+    "gp": 412,
+    "power": 4,
+    "uses": 50
+  },
+  {
+    "id": 35,
+    "name": "'battle",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      139,
+      138,
+      157,
+      157,
+      149,
+      142,
+      50
+    ],
+    "gp": 989,
+    "power": 5,
+    "uses": 50
+  },
+  {
+    "id": 36,
+    "name": "'katana",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      148,
+      138,
+      157,
+      138,
+      151,
+      138,
+      50
+    ],
+    "gp": 2060,
+    "power": 6,
+    "uses": 50
+  },
+  {
+    "id": 37,
+    "name": "'silver",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      156,
+      146,
+      149,
+      159,
+      142,
+      155,
+      50
+    ],
+    "gp": 10712,
+    "power": 9,
+    "uses": 50
+  },
+  {
+    "id": 38,
+    "name": "'coral",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      140,
+      152,
+      155,
+      138,
+      149,
+      255,
+      50
+    ],
+    "gp": 9880,
+    "power": 8,
+    "element": "fire",
+    "uses": 50
+  },
+  {
+    "id": 39,
+    "name": "'ogre",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      152,
+      144,
+      155,
+      142,
+      255,
+      255,
+      50
+    ],
+    "gp": 9880,
+    "power": 8,
+    "element": "ice",
+    "uses": 50
+  },
+  {
+    "id": 40,
+    "name": "'dragon",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      141,
+      155,
+      138,
+      144,
+      152,
+      151,
+      50
+    ],
+    "gp": 34600,
+    "power": 11,
+    "element": "elec",
+    "uses": 50
+  },
+  {
+    "id": 41,
+    "name": "'sun",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      156,
+      158,
+      151,
+      255,
+      255,
+      255,
+      50
+    ],
+    "gp": 67980,
+    "power": 13,
+    "element": "poison",
+    "uses": 50
+  },
+  {
+    "id": 42,
+    "name": "'flame",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      143,
+      149,
+      138,
+      150,
+      142,
+      255,
+      50
+    ],
+    "gp": 24000,
+    "power": 10,
+    "element": "fire",
+    "uses": 50
+  },
+  {
+    "id": 43,
+    "name": "'ice",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      146,
+      140,
+      142,
+      255,
+      255,
+      255,
+      50
+    ],
+    "gp": 23880,
+    "power": 10,
+    "element": "ice",
+    "uses": 50
+  },
+  {
+    "id": 44,
+    "name": "'elec",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      142,
+      149,
+      142,
+      140,
+      255,
+      255,
+      50
+    ],
+    "gp": 24700,
+    "power": 10,
+    "element": "elec",
+    "uses": 50
+  },
+  {
+    "id": 45,
+    "name": "rapier",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      155,
+      138,
+      153,
+      146,
+      142,
+      155,
+      255,
+      50
+    ],
+    "gp": 24,
+    "power": 2,
+    "uses": 50
+  },
+  {
+    "id": 46,
+    "name": "saber",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      156,
+      138,
+      139,
+      142,
+      155,
+      255,
+      255,
+      50
+    ],
+    "gp": 2060,
+    "power": 6,
+    "uses": 50
+  },
+  {
+    "id": 47,
+    "name": "l-saber",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      149,
+      242,
+      156,
+      138,
+      139,
+      142,
+      155,
+      50
+    ],
+    "gp": 10480,
+    "power": 9,
+    "uses": 50
+  },
+  {
+    "id": 48,
+    "name": "catcraw",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      140,
+      138,
+      157,
+      140,
+      155,
+      138,
+      160,
+      50
+    ],
+    "gp": 23200,
+    "power": 11,
+    "uses": 50
+  },
+  {
+    "id": 49,
+    "name": "p-knife",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      153,
+      242,
+      148,
+      151,
+      146,
+      143,
+      142,
+      50
+    ],
+    "gp": 3800,
+    "power": 7,
+    "uses": 50
+  },
+  {
+    "id": 50,
+    "name": "p-sword",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      153,
+      242,
+      156,
+      160,
+      152,
+      155,
+      141,
+      50
+    ],
+    "gp": 32000,
+    "power": 12,
+    "uses": 50
+  },
+  {
+    "id": 51,
+    "name": "revenge",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      155,
+      142,
+      159,
+      142,
+      151,
+      144,
+      142,
+      50
+    ],
+    "gp": 20000,
+    "uses": 50
+  },
+  {
+    "id": 52,
+    "name": "'vampic",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      159,
+      138,
+      150,
+      153,
+      146,
+      140,
+      50
+    ],
+    "gp": 10000,
+    "power": 4,
+    "element": "poison",
+    "uses": 30
+  },
+  {
+    "id": 53,
+    "name": "'defend",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      141,
+      142,
+      143,
+      142,
+      151,
+      141,
+      50
+    ],
+    "gp": 48000,
+    "power": 12,
+    "uses": 50
+  },
+  {
+    "id": 54,
+    "name": "'rune",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      155,
+      158,
+      151,
+      142,
+      255,
+      255,
+      50
+    ],
+    "gp": 9800,
+    "power": 7,
+    "uses": 30
+  },
+  {
+    "id": 55,
+    "name": "'xclbr",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      161,
+      140,
+      149,
+      139,
+      155,
+      255,
+      50
+    ],
+    "gp": 100000,
+    "power": 200,
+    "uses": 254
+  },
+  {
+    "id": 56,
+    "name": "'glass",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "sword",
+    "raw": [
+      236,
+      144,
+      149,
+      138,
+      156,
+      156,
+      255,
+      50
+    ],
+    "gp": 50000,
+    "power": 255,
+    "uses": 1
+  },
+  {
+    "id": 57,
+    "name": "masmune",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      150,
+      138,
+      156,
+      150,
+      158,
+      151,
+      142,
+      50
+    ],
+    "gp": 200000,
+    "power": 150,
+    "uses": 254
+  },
+  {
+    "id": 58,
+    "name": "bow",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      139,
+      152,
+      160,
+      255,
+      255,
+      255,
+      255,
+      50
+    ],
+    "gp": 50,
+    "power": 20,
+    "uses": 50
+  },
+  {
+    "id": 59,
+    "name": "longbow",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      149,
+      152,
+      151,
+      144,
+      139,
+      152,
+      160,
+      50
+    ],
+    "gp": 8000,
+    "power": 120,
+    "uses": 50
+  },
+  {
+    "id": 60,
+    "name": "g",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      144,
+      181,
+      240,
+      255,
+      139,
+      152,
+      160,
+      50
+    ],
+    "gp": 32000,
+    "power": 250,
+    "uses": 50
+  },
+  {
+    "id": 61,
+    "name": "colt",
+    "type": "weapon",
+    "type_byte": 30,
+    "prefix": "",
+    "raw": [
+      140,
+      152,
+      149,
+      157,
+      255,
+      255,
+      255,
+      30
+    ],
+    "gp": 80,
+    "power": 40,
+    "uses": 30
+  },
+  {
+    "id": 62,
+    "name": "musket",
+    "type": "weapon",
+    "type_byte": 30,
+    "prefix": "",
+    "raw": [
+      150,
+      158,
+      156,
+      148,
+      142,
+      157,
+      255,
+      30
+    ],
+    "gp": 800,
+    "power": 130,
+    "uses": 30
+  },
+  {
+    "id": 63,
+    "name": "magnum",
+    "type": "weapon",
+    "type_byte": 30,
+    "prefix": "",
+    "raw": [
+      150,
+      138,
+      144,
+      151,
+      158,
+      150,
+      255,
+      30
+    ],
+    "gp": 8000,
+    "power": 250,
+    "uses": 30
+  },
+  {
+    "id": 64,
+    "name": "whip",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      160,
+      145,
+      146,
+      153,
+      255,
+      255,
+      255,
+      50
+    ],
+    "gp": 80,
+    "power": 15,
+    "uses": 50
+  },
+  {
+    "id": 65,
+    "name": "e-whip",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "",
+    "raw": [
+      142,
+      242,
+      160,
+      145,
+      146,
+      153,
+      255,
+      50
+    ],
+    "gp": 800,
+    "power": 70,
+    "uses": 50
+  },
+  {
+    "id": 66,
+    "name": "saw",
+    "type": "weapon",
+    "type_byte": 30,
+    "prefix": "",
+    "raw": [
+      156,
+      138,
+      160,
+      255,
+      255,
+      255,
+      255,
+      30
+    ],
+    "gp": 4000,
+    "power": 60,
+    "uses": 30
+  },
+  {
+    "id": 67,
+    "name": "smg",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      156,
+      150,
+      144,
+      255,
+      255,
+      255,
+      255,
+      20
+    ],
+    "gp": 400,
+    "power": 50,
+    "uses": 25
+  },
+  {
+    "id": 68,
+    "name": "grenade",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      144,
+      155,
+      142,
+      151,
+      138,
+      141,
+      142,
+      20
+    ],
+    "gp": 800,
+    "power": 100,
+    "uses": 20
+  },
+  {
+    "id": 69,
+    "name": "bazooka",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      139,
+      138,
+      163,
+      152,
+      152,
+      148,
+      138,
+      20
+    ],
+    "gp": 4000,
+    "power": 150,
+    "uses": 20
+  },
+  {
+    "id": 70,
+    "name": "balkan",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      139,
+      138,
+      149,
+      148,
+      138,
+      151,
+      255,
+      20
+    ],
+    "gp": 8000,
+    "power": 200,
+    "uses": 20
+  },
+  {
+    "id": 71,
+    "name": "missile",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      150,
+      146,
+      156,
+      156,
+      146,
+      149,
+      142,
+      5
+    ],
+    "gp": 40000,
+    "uses": 5
+  },
+  {
+    "id": 72,
+    "name": "nbomb",
+    "type": "quest_item",
+    "type_byte": 1,
+    "prefix": "",
+    "raw": [
+      151,
+      240,
+      139,
+      152,
+      150,
+      139,
+      255,
+      1
+    ],
+    "gp": 100000
+  },
+  {
+    "id": 73,
+    "name": "laser",
+    "type": "weapon",
+    "type_byte": 30,
+    "prefix": "",
+    "raw": [
+      149,
+      138,
+      156,
+      142,
+      155,
+      255,
+      255,
+      30
+    ],
+    "gp": 10000,
+    "power": 100,
+    "uses": 30
+  },
+  {
+    "id": 74,
+    "name": "hyper",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      145,
+      162,
+      153,
+      142,
+      155,
+      255,
+      255,
+      3
+    ],
+    "gp": 100000,
+    "uses": 3
+  },
+  {
+    "id": 75,
+    "name": "bronze",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "shield",
+    "raw": [
+      233,
+      139,
+      155,
+      152,
+      151,
+      163,
+      142,
+      50
+    ],
+    "gp": 40,
+    "uses": 50
+  },
+  {
+    "id": 76,
+    "name": "gold",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "shield",
+    "raw": [
+      233,
+      144,
+      152,
+      149,
+      141,
+      255,
+      255,
+      50
+    ],
+    "gp": 400,
+    "uses": 50
+  },
+  {
+    "id": 77,
+    "name": "silver",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "shield",
+    "raw": [
+      233,
+      156,
+      146,
+      149,
+      159,
+      142,
+      155,
+      50
+    ],
+    "gp": 4000,
+    "uses": 50
+  },
+  {
+    "id": 78,
+    "name": "flame",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "shield",
+    "raw": [
+      233,
+      143,
+      149,
+      138,
+      150,
+      142,
+      255,
+      50
+    ],
+    "gp": 5500,
+    "power": 1,
+    "uses": 50
+  },
+  {
+    "id": 79,
+    "name": "ice",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "shield",
+    "raw": [
+      233,
+      146,
+      140,
+      142,
+      255,
+      255,
+      255,
+      50
+    ],
+    "gp": 6000,
+    "power": 2,
+    "uses": 50
+  },
+  {
+    "id": 80,
+    "name": "dragon",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "shield",
+    "raw": [
+      233,
+      141,
+      155,
+      138,
+      144,
+      152,
+      151,
+      50
+    ],
+    "gp": 8000,
+    "power": 15,
+    "uses": 50
+  },
+  {
+    "id": 81,
+    "name": "aezis",
+    "type": "sword",
+    "type_byte": 50,
+    "prefix": "shield",
+    "raw": [
+      233,
+      138,
+      142,
+      163,
+      146,
+      156,
+      255,
+      50
+    ],
+    "gp": 8000,
+    "power": 240,
+    "uses": 50
+  },
+  {
+    "id": 82,
+    "name": "bronze",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "helm",
+    "raw": [
+      237,
+      139,
+      155,
+      152,
+      151,
+      163,
+      142,
+      254
+    ],
+    "gp": 40,
+    "defense": 3,
+    "slot": "helm"
+  },
+  {
+    "id": 83,
+    "name": "gold",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "helm",
+    "raw": [
+      237,
+      144,
+      152,
+      149,
+      141,
+      255,
+      255,
+      254
+    ],
+    "gp": 175,
+    "defense": 5,
+    "slot": "helm"
+  },
+  {
+    "id": 84,
+    "name": "silver",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "helm",
+    "raw": [
+      237,
+      156,
+      146,
+      149,
+      159,
+      142,
+      155,
+      254
+    ],
+    "gp": 600,
+    "defense": 8,
+    "slot": "helm"
+  },
+  {
+    "id": 85,
+    "name": "army",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "helm",
+    "raw": [
+      237,
+      138,
+      155,
+      150,
+      162,
+      255,
+      255,
+      254
+    ],
+    "gp": 6000,
+    "defense": 17,
+    "slot": "helm"
+  },
+  {
+    "id": 86,
+    "name": "band",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "helm",
+    "raw": [
+      237,
+      139,
+      138,
+      151,
+      141,
+      255,
+      255,
+      254
+    ],
+    "gp": 2000,
+    "defense": 25,
+    "slot": "helm",
+    "element": "all"
+  },
+  {
+    "id": 87,
+    "name": "dragon",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "helm",
+    "raw": [
+      237,
+      141,
+      155,
+      138,
+      144,
+      152,
+      151,
+      254
+    ],
+    "gp": 20000,
+    "defense": 22,
+    "slot": "helm"
+  },
+  {
+    "id": 88,
+    "name": "bronze",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "body",
+    "raw": [
+      232,
+      139,
+      155,
+      152,
+      151,
+      163,
+      142,
+      254
+    ],
+    "gp": 80,
+    "defense": 4,
+    "slot": "body"
+  },
+  {
+    "id": 89,
+    "name": "gold",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "body",
+    "raw": [
+      232,
+      144,
+      152,
+      149,
+      141,
+      255,
+      255,
+      254
+    ],
+    "gp": 300,
+    "defense": 8,
+    "slot": "body"
+  },
+  {
+    "id": 90,
+    "name": "silver",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "body",
+    "raw": [
+      232,
+      156,
+      146,
+      149,
+      159,
+      142,
+      155,
+      254
+    ],
+    "gp": 2500,
+    "defense": 13,
+    "slot": "body"
+  },
+  {
+    "id": 91,
+    "name": "dragon",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "body",
+    "raw": [
+      232,
+      141,
+      155,
+      138,
+      144,
+      152,
+      151,
+      254
+    ],
+    "gp": 8500,
+    "defense": 19,
+    "slot": "body",
+    "element": "all"
+  },
+  {
+    "id": 92,
+    "name": "suit",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "body",
+    "raw": [
+      232,
+      156,
+      158,
+      146,
+      157,
+      255,
+      255,
+      254
+    ],
+    "gp": 18000,
+    "defense": 25,
+    "slot": "body"
+  },
+  {
+    "id": 93,
+    "name": "arthur",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "body",
+    "raw": [
+      232,
+      138,
+      155,
+      157,
+      145,
+      158,
+      155,
+      254
+    ],
+    "gp": 30000,
+    "defense": 38,
+    "slot": "body"
+  },
+  {
+    "id": 94,
+    "name": "bronze",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "gloves",
+    "raw": [
+      234,
+      139,
+      155,
+      152,
+      151,
+      163,
+      142,
+      254
+    ],
+    "gp": 12,
+    "defense": 1,
+    "slot": "gloves"
+  },
+  {
+    "id": 95,
+    "name": "gold",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "gloves",
+    "raw": [
+      234,
+      144,
+      152,
+      149,
+      141,
+      255,
+      255,
+      254
+    ],
+    "gp": 150,
+    "defense": 3,
+    "slot": "gloves"
+  },
+  {
+    "id": 96,
+    "name": "silver",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "gloves",
+    "raw": [
+      234,
+      156,
+      146,
+      149,
+      159,
+      142,
+      155,
+      254
+    ],
+    "gp": 500,
+    "defense": 4,
+    "slot": "gloves"
+  },
+  {
+    "id": 97,
+    "name": "giant",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "gloves",
+    "raw": [
+      234,
+      144,
+      146,
+      138,
+      151,
+      157,
+      255,
+      254
+    ],
+    "gp": 5000,
+    "defense": 6,
+    "slot": "gloves",
+    "element": "fire"
+  },
+  {
+    "id": 98,
+    "name": "ninja",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "gloves",
+    "raw": [
+      234,
+      151,
+      146,
+      151,
+      147,
+      138,
+      255,
+      254
+    ],
+    "gp": 10000,
+    "defense": 15,
+    "slot": "gloves",
+    "element": "ice"
+  },
+  {
+    "id": 99,
+    "name": "hermes",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "shoes",
+    "raw": [
+      235,
+      145,
+      142,
+      155,
+      150,
+      142,
+      156,
+      254
+    ],
+    "gp": 8500,
+    "defense": 7,
+    "slot": "shoes",
+    "element": "ice"
+  },
+  {
+    "id": 100,
+    "name": "geta",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "shoes",
+    "raw": [
+      235,
+      144,
+      142,
+      157,
+      138,
+      255,
+      255,
+      254
+    ],
+    "gp": 5000,
+    "defense": 7,
+    "slot": "shoes",
+    "element": "fire"
+  },
+  {
+    "id": 101,
+    "name": "",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "shoes",
+    "raw": [
+      235,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      254
+    ],
+    "gp": 10000,
+    "defense": 10,
+    "slot": "shoes"
+  },
+  {
+    "id": 102,
+    "name": "power",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "body",
+    "raw": [
+      232,
+      153,
+      152,
+      160,
+      142,
+      155,
+      255,
+      254
+    ],
+    "gp": 100000,
+    "defense": 70,
+    "slot": "all",
+    "element": "elec"
+  },
+  {
+    "id": 103,
+    "name": "wand",
+    "type": "weapon",
+    "type_byte": 30,
+    "prefix": "",
+    "raw": [
+      160,
+      138,
+      151,
+      141,
+      255,
+      255,
+      255,
+      30
+    ],
+    "gp": 750,
+    "power": 7,
+    "element": "fire",
+    "uses": 30
+  },
+  {
+    "id": 104,
+    "name": "staff",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      156,
+      157,
+      138,
+      143,
+      143,
+      255,
+      255,
+      20
+    ],
+    "gp": 5000,
+    "power": 32,
+    "uses": 20
+  },
+  {
+    "id": 105,
+    "name": "book",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      139,
+      152,
+      152,
+      148,
+      255,
+      255,
+      255,
+      20
+    ],
+    "gp": 500,
+    "power": 10,
+    "element": "poison",
+    "uses": 20
+  },
+  {
+    "id": 106,
+    "name": "fire",
+    "type": "spell",
+    "type_byte": 20,
+    "prefix": "magic",
+    "raw": [
+      239,
+      143,
+      146,
+      155,
+      142,
+      255,
+      255,
+      20
+    ],
+    "gp": 500,
+    "uses": 20
+  },
+  {
+    "id": 107,
+    "name": "ice",
+    "type": "spell",
+    "type_byte": 20,
+    "prefix": "magic",
+    "raw": [
+      239,
+      146,
+      140,
+      142,
+      255,
+      255,
+      255,
+      20
+    ],
+    "gp": 500,
+    "uses": 20
+  },
+  {
+    "id": 108,
+    "name": "elec",
+    "type": "spell",
+    "type_byte": 20,
+    "prefix": "magic",
+    "raw": [
+      239,
+      142,
+      149,
+      142,
+      140,
+      255,
+      255,
+      20
+    ],
+    "gp": 500,
+    "uses": 20
+  },
+  {
+    "id": 109,
+    "name": "fog",
+    "type": "spell",
+    "type_byte": 20,
+    "prefix": "magic",
+    "raw": [
+      239,
+      143,
+      152,
+      144,
+      255,
+      255,
+      255,
+      20
+    ],
+    "gp": 500,
+    "uses": 20
+  },
+  {
+    "id": 110,
+    "name": "flare",
+    "type": "spell",
+    "type_byte": 20,
+    "prefix": "magic",
+    "raw": [
+      239,
+      143,
+      149,
+      138,
+      155,
+      142,
+      255,
+      20
+    ],
+    "gp": 50000,
+    "uses": 20
+  },
+  {
+    "id": 111,
+    "name": "sleep",
+    "type": "spell",
+    "type_byte": 20,
+    "prefix": "magic",
+    "raw": [
+      239,
+      156,
+      149,
+      142,
+      142,
+      153,
+      255,
+      20
+    ],
+    "gp": 500,
+    "uses": 20
+  },
+  {
+    "id": 112,
+    "name": "stone",
+    "type": "spell",
+    "type_byte": 20,
+    "prefix": "magic",
+    "raw": [
+      239,
+      156,
+      157,
+      152,
+      151,
+      142,
+      255,
+      20
+    ],
+    "gp": 5000,
+    "uses": 20
+  },
+  {
+    "id": 113,
+    "name": "death",
+    "type": "spell",
+    "type_byte": 20,
+    "prefix": "magic",
+    "raw": [
+      239,
+      141,
+      142,
+      138,
+      157,
+      145,
+      255,
+      20
+    ],
+    "gp": 5000,
+    "uses": 20
+  },
+  {
+    "id": 114,
+    "name": "punch",
+    "type": "ability",
+    "type_byte": 99,
+    "prefix": "",
+    "raw": [
+      153,
+      158,
+      151,
+      140,
+      145,
+      255,
+      255,
+      99
+    ],
+    "gp": 500,
+    "uses": 99
+  },
+  {
+    "id": 115,
+    "name": "kick",
+    "type": "ability",
+    "type_byte": 88,
+    "prefix": "",
+    "raw": [
+      148,
+      146,
+      140,
+      148,
+      255,
+      255,
+      255,
+      88
+    ],
+    "gp": 1100,
+    "uses": 88
+  },
+  {
+    "id": 116,
+    "name": "butt",
+    "type": "ability",
+    "type_byte": 66,
+    "prefix": "",
+    "raw": [
+      139,
+      158,
+      157,
+      157,
+      255,
+      255,
+      255,
+      66
+    ],
+    "gp": 2100,
+    "uses": 66
+  },
+  {
+    "id": 117,
+    "name": "x-kick",
+    "type": "ability",
+    "type_byte": 44,
+    "prefix": "",
+    "raw": [
+      161,
+      242,
+      148,
+      146,
+      140,
+      148,
+      255,
+      44
+    ],
+    "gp": 4100,
+    "uses": 44
+  },
+  {
+    "id": 118,
+    "name": "judo",
+    "type": "ability",
+    "type_byte": 22,
+    "prefix": "",
+    "raw": [
+      147,
+      158,
+      141,
+      152,
+      255,
+      255,
+      255,
+      22
+    ],
+    "gp": 8100,
+    "uses": 22
+  },
+  {
+    "id": 119,
+    "name": "karate",
+    "type": "ability",
+    "type_byte": 11,
+    "prefix": "",
+    "raw": [
+      148,
+      138,
+      155,
+      138,
+      157,
+      142,
+      255,
+      11
+    ],
+    "gp": 15100,
+    "uses": 11
+  },
+  {
+    "id": 120,
+    "name": "tempter",
+    "type": "weapon",
+    "type_byte": 30,
+    "prefix": "",
+    "raw": [
+      157,
+      142,
+      150,
+      153,
+      157,
+      142,
+      155,
+      30
+    ],
+    "gp": 5100,
+    "power": 32,
+    "uses": 30
+  },
+  {
+    "id": 121,
+    "name": "counter",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      140,
+      152,
+      158,
+      151,
+      157,
+      142,
+      155,
+      20
+    ],
+    "gp": 5100,
+    "uses": 20
+  },
+  {
+    "id": 122,
+    "name": "antdote",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      138,
+      151,
+      157,
+      141,
+      152,
+      157,
+      142,
+      3
+    ],
+    "gp": 100,
+    "uses": 3
+  },
+  {
+    "id": 123,
+    "name": "bell",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      139,
+      142,
+      149,
+      149,
+      255,
+      255,
+      255,
+      3
+    ],
+    "gp": 100,
+    "uses": 3
+  },
+  {
+    "id": 124,
+    "name": "pan",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      153,
+      138,
+      151,
+      255,
+      255,
+      255,
+      255,
+      3
+    ],
+    "gp": 100,
+    "uses": 3
+  },
+  {
+    "id": 125,
+    "name": "shocker",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      156,
+      145,
+      152,
+      140,
+      148,
+      142,
+      155,
+      3
+    ],
+    "gp": 100,
+    "uses": 3
+  },
+  {
+    "id": 126,
+    "name": "left",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      149,
+      142,
+      143,
+      157,
+      255,
+      255,
+      255,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 127,
+    "name": "right",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      155,
+      146,
+      144,
+      145,
+      157,
+      255,
+      255,
+      254
+    ],
+    "gp": 0
+  },
+  {
+    "id": 128,
+    "name": "honey",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      145,
+      152,
+      151,
+      142,
+      162,
+      255,
+      255,
+      10
+    ],
+    "gp": 1121313,
+    "uses": 10
+  },
+  {
+    "id": 129,
+    "name": "cure",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      140,
+      158,
+      155,
+      142,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 1141224,
+    "uses": 10
+  },
+  {
+    "id": 130,
+    "name": "heal",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      145,
+      142,
+      138,
+      149,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 487913,
+    "uses": 10
+  },
+  {
+    "id": 131,
+    "name": "revive",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      155,
+      142,
+      159,
+      146,
+      159,
+      142,
+      255,
+      3
+    ],
+    "gp": 1151610,
+    "uses": 3
+  },
+  {
+    "id": 132,
+    "name": "care",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      140,
+      138,
+      155,
+      142,
+      255,
+      255,
+      255,
+      5
+    ],
+    "gp": 426090,
+    "uses": 5
+  },
+  {
+    "id": 133,
+    "name": "raise",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      155,
+      138,
+      146,
+      156,
+      142,
+      255,
+      255,
+      3
+    ],
+    "gp": 551212,
+    "uses": 3
+  },
+  {
+    "id": 134,
+    "name": "telepor",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      157,
+      142,
+      149,
+      142,
+      153,
+      152,
+      155,
+      5
+    ],
+    "gp": 1141406,
+    "uses": 5
+  },
+  {
+    "id": 135,
+    "name": "head",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      145,
+      142,
+      138,
+      141,
+      255,
+      255,
+      255,
+      5
+    ],
+    "gp": 304224,
+    "uses": 5
+  },
+  {
+    "id": 136,
+    "name": "nose",
+    "type": "ability",
+    "type_byte": 15,
+    "prefix": "",
+    "raw": [
+      151,
+      152,
+      156,
+      142,
+      255,
+      255,
+      255,
+      15
+    ],
+    "gp": 1161717,
+    "uses": 15
+  },
+  {
+    "id": 137,
+    "name": "pincer",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      153,
+      146,
+      151,
+      140,
+      142,
+      155,
+      255,
+      20
+    ],
+    "gp": 1186714,
+    "power": 5,
+    "uses": 20
+  },
+  {
+    "id": 138,
+    "name": "beak",
+    "type": "ability",
+    "type_byte": 25,
+    "prefix": "",
+    "raw": [
+      139,
+      142,
+      138,
+      148,
+      255,
+      255,
+      255,
+      25
+    ],
+    "gp": 382719,
+    "uses": 25
+  },
+  {
+    "id": 139,
+    "name": "punch",
+    "type": "ability",
+    "type_byte": 25,
+    "prefix": "",
+    "raw": [
+      153,
+      158,
+      151,
+      140,
+      145,
+      255,
+      255,
+      25
+    ],
+    "gp": 1212222,
+    "uses": 25
+  },
+  {
+    "id": 140,
+    "name": "bite",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      139,
+      146,
+      157,
+      142,
+      255,
+      255,
+      255,
+      20
+    ],
+    "gp": 216286,
+    "power": 4,
+    "uses": 20
+  },
+  {
+    "id": 141,
+    "name": "fin",
+    "type": "weapon",
+    "type_byte": 30,
+    "prefix": "",
+    "raw": [
+      143,
+      146,
+      151,
+      255,
+      255,
+      255,
+      255,
+      30
+    ],
+    "gp": 572020,
+    "power": 2,
+    "uses": 30
+  },
+  {
+    "id": 142,
+    "name": "bone",
+    "type": "ability",
+    "type_byte": 25,
+    "prefix": "",
+    "raw": [
+      139,
+      152,
+      151,
+      142,
+      255,
+      255,
+      255,
+      25
+    ],
+    "gp": 1222293,
+    "uses": 25
+  },
+  {
+    "id": 143,
+    "name": "sword",
+    "type": "ability",
+    "type_byte": 15,
+    "prefix": "",
+    "raw": [
+      156,
+      160,
+      152,
+      155,
+      141,
+      255,
+      255,
+      15
+    ],
+    "gp": 757569,
+    "uses": 15
+  },
+  {
+    "id": 144,
+    "name": "hari-te",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      145,
+      138,
+      155,
+      146,
+      242,
+      157,
+      142,
+      5
+    ],
+    "gp": 1031608,
+    "uses": 5
+  },
+  {
+    "id": 145,
+    "name": "bash",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      139,
+      138,
+      156,
+      145,
+      255,
+      255,
+      255,
+      3
+    ],
+    "gp": 1146665,
+    "uses": 3
+  },
+  {
+    "id": 146,
+    "name": "saw",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      156,
+      138,
+      160,
+      255,
+      255,
+      255,
+      255,
+      20
+    ],
+    "gp": 1666599,
+    "power": 30,
+    "uses": 20
+  },
+  {
+    "id": 147,
+    "name": "+pincer",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      130,
+      153,
+      146,
+      151,
+      140,
+      142,
+      155,
+      10
+    ],
+    "gp": 1051604,
+    "uses": 10
+  },
+  {
+    "id": 148,
+    "name": "heads",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      132,
+      145,
+      142,
+      138,
+      141,
+      156,
+      255,
+      5
+    ],
+    "gp": 1666665,
+    "uses": 5
+  },
+  {
+    "id": 149,
+    "name": "nail",
+    "type": "weapon",
+    "type_byte": 30,
+    "prefix": "",
+    "raw": [
+      151,
+      138,
+      146,
+      149,
+      255,
+      255,
+      255,
+      30
+    ],
+    "gp": 1659312,
+    "power": 2,
+    "uses": 30
+  },
+  {
+    "id": 150,
+    "name": "legs",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      136,
+      149,
+      142,
+      144,
+      156,
+      255,
+      255,
+      5
+    ],
+    "gp": 1121065,
+    "uses": 5
+  },
+  {
+    "id": 151,
+    "name": "+tusks",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      130,
+      157,
+      158,
+      156,
+      148,
+      156,
+      255,
+      10
+    ],
+    "gp": 1666665,
+    "uses": 10
+  },
+  {
+    "id": 152,
+    "name": "horns",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      132,
+      145,
+      152,
+      155,
+      151,
+      156,
+      255,
+      10
+    ],
+    "gp": 1001312,
+    "uses": 10
+  },
+  {
+    "id": 153,
+    "name": "+swords",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      130,
+      156,
+      160,
+      152,
+      155,
+      141,
+      156,
+      10
+    ],
+    "gp": 1176665,
+    "uses": 10
+  },
+  {
+    "id": 154,
+    "name": "arms",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      134,
+      138,
+      155,
+      150,
+      156,
+      255,
+      255,
+      5
+    ],
+    "gp": 1666591,
+    "uses": 5
+  },
+  {
+    "id": 155,
+    "name": "poison",
+    "type": "ability",
+    "type_byte": 25,
+    "prefix": "",
+    "raw": [
+      153,
+      152,
+      146,
+      156,
+      152,
+      151,
+      255,
+      25
+    ],
+    "gp": 1161311,
+    "uses": 25
+  },
+  {
+    "id": 156,
+    "name": "poison",
+    "type": "ability",
+    "type_byte": 25,
+    "prefix": "",
+    "raw": [
+      153,
+      152,
+      146,
+      156,
+      152,
+      151,
+      255,
+      25
+    ],
+    "gp": 1666665,
+    "uses": 25
+  },
+  {
+    "id": 157,
+    "name": "tusk",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      157,
+      158,
+      156,
+      148,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 1659318,
+    "uses": 10
+  },
+  {
+    "id": 158,
+    "name": "p-fangs",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      153,
+      242,
+      143,
+      138,
+      151,
+      144,
+      156,
+      20
+    ],
+    "gp": 1161765,
+    "power": 64,
+    "uses": 20
+  },
+  {
+    "id": 159,
+    "name": "strict",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      156,
+      157,
+      155,
+      146,
+      140,
+      157,
+      255,
+      20
+    ],
+    "gp": 1666665,
+    "power": 64,
+    "uses": 20
+  },
+  {
+    "id": 160,
+    "name": "petrify",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      153,
+      142,
+      157,
+      155,
+      146,
+      143,
+      162,
+      5
+    ],
+    "gp": 1031812,
+    "uses": 5
+  },
+  {
+    "id": 161,
+    "name": "d-fangs",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      141,
+      242,
+      143,
+      138,
+      151,
+      144,
+      156,
+      5
+    ],
+    "gp": 1126665,
+    "uses": 5
+  },
+  {
+    "id": 162,
+    "name": "sl-gaze",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      156,
+      149,
+      242,
+      144,
+      138,
+      163,
+      142,
+      20
+    ],
+    "gp": 1666593,
+    "power": 128,
+    "uses": 20
+  },
+  {
+    "id": 163,
+    "name": "sleep",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      156,
+      149,
+      142,
+      142,
+      153,
+      255,
+      255,
+      20
+    ],
+    "gp": 1090507,
+    "power": 128,
+    "uses": 20
+  },
+  {
+    "id": 164,
+    "name": "blind",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      139,
+      149,
+      146,
+      151,
+      141,
+      255,
+      255,
+      10
+    ],
+    "gp": 1666665,
+    "uses": 10
+  },
+  {
+    "id": 165,
+    "name": "flash",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      143,
+      149,
+      138,
+      156,
+      145,
+      255,
+      255,
+      10
+    ],
+    "gp": 1662306,
+    "uses": 10
+  },
+  {
+    "id": 166,
+    "name": "ink",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      146,
+      151,
+      148,
+      255,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 412452,
+    "uses": 10
+  },
+  {
+    "id": 167,
+    "name": "horn",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      145,
+      152,
+      155,
+      151,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 623364,
+    "uses": 10
+  },
+  {
+    "id": 168,
+    "name": "gaze",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      144,
+      138,
+      163,
+      142,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 560911,
+    "uses": 10
+  },
+  {
+    "id": 169,
+    "name": "gaze",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      144,
+      138,
+      163,
+      142,
+      255,
+      255,
+      255,
+      5
+    ],
+    "gp": 1353390,
+    "uses": 5
+  },
+  {
+    "id": 170,
+    "name": "riddle",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      155,
+      146,
+      141,
+      141,
+      149,
+      142,
+      255,
+      3
+    ],
+    "gp": 643370,
+    "uses": 3
+  },
+  {
+    "id": 171,
+    "name": "sing",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      156,
+      146,
+      151,
+      144,
+      255,
+      255,
+      255,
+      3
+    ],
+    "gp": 563413,
+    "uses": 3
+  },
+  {
+    "id": 172,
+    "name": "tail",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      157,
+      138,
+      146,
+      149,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 573313,
+    "uses": 10
+  },
+  {
+    "id": 173,
+    "name": "gaze",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      144,
+      138,
+      163,
+      142,
+      255,
+      255,
+      255,
+      5
+    ],
+    "gp": 563300,
+    "uses": 5
+  },
+  {
+    "id": 174,
+    "name": "gaze",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      144,
+      138,
+      163,
+      142,
+      255,
+      255,
+      255,
+      5
+    ],
+    "gp": 653313,
+    "uses": 5
+  },
+  {
+    "id": 175,
+    "name": "drain",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      141,
+      155,
+      138,
+      146,
+      151,
+      255,
+      255,
+      10
+    ],
+    "gp": 563340,
+    "uses": 10
+  },
+  {
+    "id": 176,
+    "name": "stench",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      156,
+      157,
+      142,
+      151,
+      140,
+      145,
+      255,
+      10
+    ],
+    "gp": 533434,
+    "uses": 10
+  },
+  {
+    "id": 177,
+    "name": "sand",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      156,
+      138,
+      151,
+      141,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 623459,
+    "uses": 10
+  },
+  {
+    "id": 178,
+    "name": "tremble",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      157,
+      155,
+      142,
+      150,
+      139,
+      149,
+      142,
+      10
+    ],
+    "gp": 633390,
+    "uses": 10
+  },
+  {
+    "id": 179,
+    "name": "electro",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      142,
+      149,
+      142,
+      140,
+      157,
+      155,
+      152,
+      10
+    ],
+    "gp": 613432,
+    "uses": 10
+  },
+  {
+    "id": 180,
+    "name": "bother",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      139,
+      152,
+      157,
+      145,
+      142,
+      155,
+      255,
+      10
+    ],
+    "gp": 603955,
+    "uses": 10
+  },
+  {
+    "id": 181,
+    "name": "web",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      160,
+      142,
+      139,
+      255,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 1333158,
+    "uses": 10
+  },
+  {
+    "id": 182,
+    "name": "touch",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      157,
+      152,
+      158,
+      140,
+      145,
+      255,
+      255,
+      5
+    ],
+    "gp": 1341259,
+    "uses": 5
+  },
+  {
+    "id": 183,
+    "name": "kiss",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      148,
+      146,
+      156,
+      156,
+      255,
+      255,
+      255,
+      5
+    ],
+    "gp": 1340240,
+    "uses": 5
+  },
+  {
+    "id": 184,
+    "name": "kick",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      148,
+      146,
+      140,
+      148,
+      255,
+      255,
+      255,
+      20
+    ],
+    "gp": 194210,
+    "power": 4,
+    "uses": 20
+  },
+  {
+    "id": 185,
+    "name": "flame",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      143,
+      149,
+      138,
+      150,
+      142,
+      255,
+      255,
+      10
+    ],
+    "gp": 452244,
+    "uses": 10
+  },
+  {
+    "id": 186,
+    "name": "ice",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      146,
+      140,
+      142,
+      255,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 1444412,
+    "uses": 10
+  },
+  {
+    "id": 187,
+    "name": "thunder",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      157,
+      145,
+      158,
+      151,
+      141,
+      142,
+      155,
+      10
+    ],
+    "gp": 452145,
+    "uses": 10
+  },
+  {
+    "id": 188,
+    "name": "gas",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      144,
+      138,
+      156,
+      255,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 424570,
+    "uses": 10
+  },
+  {
+    "id": 189,
+    "name": "acid",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      138,
+      140,
+      146,
+      141,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 452547,
+    "uses": 10
+  },
+  {
+    "id": 190,
+    "name": "squirt",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      156,
+      154,
+      158,
+      146,
+      155,
+      157,
+      255,
+      10
+    ],
+    "gp": 714785,
+    "uses": 10
+  },
+  {
+    "id": 191,
+    "name": "quake",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      154,
+      158,
+      138,
+      148,
+      142,
+      255,
+      255,
+      3
+    ],
+    "gp": 470648,
+    "uses": 3
+  },
+  {
+    "id": 192,
+    "name": "tornado",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      157,
+      152,
+      155,
+      151,
+      138,
+      141,
+      152,
+      3
+    ],
+    "gp": 704933,
+    "uses": 3
+  },
+  {
+    "id": 193,
+    "name": "acid",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      138,
+      140,
+      146,
+      141,
+      255,
+      255,
+      255,
+      3
+    ],
+    "gp": 480949,
+    "uses": 3
+  },
+  {
+    "id": 194,
+    "name": "whirl",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      160,
+      145,
+      146,
+      155,
+      149,
+      255,
+      255,
+      3
+    ],
+    "gp": 665015,
+    "uses": 3
+  },
+  {
+    "id": 195,
+    "name": "steal",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      156,
+      157,
+      142,
+      138,
+      149,
+      255,
+      255,
+      5
+    ],
+    "gp": 503249,
+    "uses": 5
+  },
+  {
+    "id": 196,
+    "name": "tentacl",
+    "type": "ability",
+    "type_byte": 25,
+    "prefix": "",
+    "raw": [
+      157,
+      142,
+      151,
+      157,
+      138,
+      140,
+      149,
+      25
+    ],
+    "gp": 535105,
+    "uses": 25
+  },
+  {
+    "id": 197,
+    "name": "d-beam",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      141,
+      242,
+      139,
+      142,
+      138,
+      150,
+      255,
+      10
+    ],
+    "gp": 511150,
+    "uses": 10
+  },
+  {
+    "id": 198,
+    "name": "fire",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      143,
+      146,
+      155,
+      142,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 1625013,
+    "uses": 10
+  },
+  {
+    "id": 199,
+    "name": "ice",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      146,
+      140,
+      142,
+      255,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 512551,
+    "uses": 10
+  },
+  {
+    "id": 200,
+    "name": "elec",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      142,
+      149,
+      142,
+      140,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 435166,
+    "uses": 10
+  },
+  {
+    "id": 201,
+    "name": "flare",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      143,
+      149,
+      138,
+      155,
+      142,
+      255,
+      255,
+      3
+    ],
+    "gp": 518451,
+    "uses": 3
+  },
+  {
+    "id": 202,
+    "name": "stop",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      156,
+      157,
+      152,
+      153,
+      255,
+      255,
+      255,
+      5
+    ],
+    "gp": 1405141,
+    "uses": 5
+  },
+  {
+    "id": 203,
+    "name": "sleep",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      156,
+      149,
+      142,
+      142,
+      153,
+      255,
+      255,
+      10
+    ],
+    "gp": 528452,
+    "uses": 10
+  },
+  {
+    "id": 204,
+    "name": "axe",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      138,
+      161,
+      142,
+      255,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 1135221,
+    "uses": 10
+  },
+  {
+    "id": 205,
+    "name": "s-skin",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      156,
+      242,
+      156,
+      148,
+      146,
+      151,
+      255,
+      5
+    ],
+    "gp": 541953,
+    "uses": 5
+  },
+  {
+    "id": 206,
+    "name": "p-skin",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      153,
+      242,
+      156,
+      148,
+      146,
+      151,
+      255,
+      20
+    ],
+    "gp": 195463,
+    "power": 64,
+    "uses": 20
+  },
+  {
+    "id": 207,
+    "name": "p-skin",
+    "type": "ability",
+    "type_byte": 25,
+    "prefix": "",
+    "raw": [
+      153,
+      242,
+      156,
+      148,
+      146,
+      151,
+      255,
+      25
+    ],
+    "gp": 546954,
+    "uses": 25
+  },
+  {
+    "id": 208,
+    "name": "burning",
+    "type": "ability",
+    "type_byte": 25,
+    "prefix": "",
+    "raw": [
+      139,
+      158,
+      155,
+      151,
+      146,
+      151,
+      144,
+      25
+    ],
+    "gp": 1105553,
+    "uses": 25
+  },
+  {
+    "id": 209,
+    "name": "Dfire",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      143,
+      146,
+      155,
+      142,
+      255,
+      255,
+      254
+    ],
+    "gp": 545555
+  },
+  {
+    "id": 210,
+    "name": "Dice",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      146,
+      140,
+      142,
+      255,
+      255,
+      255,
+      254
+    ],
+    "gp": 695594
+  },
+  {
+    "id": 211,
+    "name": "Delec",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      142,
+      149,
+      142,
+      140,
+      255,
+      255,
+      254
+    ],
+    "gp": 564755
+  },
+  {
+    "id": 212,
+    "name": "Dpoison",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      153,
+      152,
+      146,
+      156,
+      152,
+      151,
+      254
+    ],
+    "gp": 15017
+  },
+  {
+    "id": 213,
+    "name": "Dstone",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      156,
+      157,
+      152,
+      151,
+      142,
+      255,
+      254
+    ],
+    "gp": 503050
+  },
+  {
+    "id": 214,
+    "name": "Dpara",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      153,
+      138,
+      155,
+      138,
+      255,
+      255,
+      254
+    ],
+    "gp": 415070
+  },
+  {
+    "id": 215,
+    "name": "Dweapon",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      160,
+      142,
+      138,
+      153,
+      152,
+      151,
+      254
+    ],
+    "gp": 507750
+  },
+  {
+    "id": 216,
+    "name": "Dquake",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      154,
+      158,
+      138,
+      148,
+      142,
+      255,
+      254
+    ],
+    "gp": 985117
+  },
+  {
+    "id": 217,
+    "name": "explode",
+    "type": "quest_item",
+    "type_byte": 1,
+    "prefix": "",
+    "raw": [
+      142,
+      161,
+      153,
+      149,
+      152,
+      141,
+      142,
+      1
+    ],
+    "gp": 502255
+  },
+  {
+    "id": 218,
+    "name": "Dchange",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      140,
+      145,
+      138,
+      151,
+      144,
+      142,
+      254
+    ],
+    "gp": 1331425
+  },
+  {
+    "id": 219,
+    "name": "Ddamage",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      141,
+      138,
+      150,
+      138,
+      144,
+      142,
+      254
+    ],
+    "gp": 1264633
+  },
+  {
+    "id": 220,
+    "name": "stone",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      156,
+      157,
+      152,
+      151,
+      142,
+      255,
+      255,
+      5
+    ],
+    "gp": 164441,
+    "uses": 5
+  },
+  {
+    "id": 221,
+    "name": "DiceFwp",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      146,
+      140,
+      142,
+      69,
+      160,
+      153,
+      254
+    ],
+    "gp": 1211104
+  },
+  {
+    "id": 222,
+    "name": "Dall",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      138,
+      149,
+      149,
+      255,
+      255,
+      255,
+      254
+    ],
+    "gp": 1913
+  },
+  {
+    "id": 223,
+    "name": "Efire",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      68,
+      143,
+      146,
+      155,
+      142,
+      255,
+      255,
+      254
+    ],
+    "gp": 215323
+  },
+  {
+    "id": 224,
+    "name": "Eelec",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      68,
+      142,
+      149,
+      142,
+      140,
+      255,
+      255,
+      254
+    ],
+    "gp": 1515044
+  },
+  {
+    "id": 225,
+    "name": "Eice",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      68,
+      146,
+      140,
+      142,
+      255,
+      255,
+      255,
+      254
+    ],
+    "gp": 163371
+  },
+  {
+    "id": 226,
+    "name": "shell",
+    "type": "ability",
+    "type_byte": 25,
+    "prefix": "",
+    "raw": [
+      156,
+      145,
+      142,
+      149,
+      149,
+      255,
+      255,
+      25
+    ],
+    "gp": 604410,
+    "uses": 25
+  },
+  {
+    "id": 227,
+    "name": "shell",
+    "type": "ability",
+    "type_byte": 25,
+    "prefix": "",
+    "raw": [
+      156,
+      145,
+      142,
+      149,
+      149,
+      255,
+      255,
+      25
+    ],
+    "gp": 1237160,
+    "uses": 25
+  },
+  {
+    "id": 228,
+    "name": "drink",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      141,
+      155,
+      146,
+      151,
+      148,
+      255,
+      255,
+      10
+    ],
+    "gp": 441223,
+    "uses": 10
+  },
+  {
+    "id": 229,
+    "name": "chill",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      140,
+      145,
+      146,
+      149,
+      149,
+      255,
+      255,
+      10
+    ],
+    "gp": 716044,
+    "uses": 10
+  },
+  {
+    "id": 230,
+    "name": "pollen",
+    "type": "weapon",
+    "type_byte": 20,
+    "prefix": "",
+    "raw": [
+      153,
+      152,
+      149,
+      149,
+      142,
+      151,
+      255,
+      20
+    ],
+    "gp": 132371,
+    "power": 16,
+    "element": "poison",
+    "uses": 20
+  },
+  {
+    "id": 231,
+    "name": "rocket",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      155,
+      152,
+      140,
+      148,
+      142,
+      157,
+      255,
+      10
+    ],
+    "gp": 615111,
+    "uses": 10
+  },
+  {
+    "id": 232,
+    "name": "beam",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      139,
+      142,
+      138,
+      150,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 341265,
+    "uses": 10
+  },
+  {
+    "id": 233,
+    "name": "melt",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      150,
+      142,
+      149,
+      157,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 1305110,
+    "uses": 10
+  },
+  {
+    "id": 234,
+    "name": "sphere",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      156,
+      153,
+      145,
+      142,
+      155,
+      142,
+      255,
+      254
+    ],
+    "gp": 341165
+  },
+  {
+    "id": 235,
+    "name": "mirror",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      150,
+      146,
+      155,
+      155,
+      152,
+      155,
+      255,
+      10
+    ],
+    "gp": 1305650,
+    "uses": 10
+  },
+  {
+    "id": 236,
+    "name": "kinesis",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      148,
+      146,
+      151,
+      142,
+      156,
+      146,
+      156,
+      10
+    ],
+    "gp": 1115650,
+    "uses": 10
+  },
+  {
+    "id": 237,
+    "name": "p-blast",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      153,
+      242,
+      139,
+      149,
+      138,
+      156,
+      157,
+      5
+    ],
+    "gp": 1124110,
+    "uses": 5
+  },
+  {
+    "id": 238,
+    "name": "leech",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      149,
+      142,
+      142,
+      140,
+      145,
+      255,
+      255,
+      5
+    ],
+    "gp": 1524111,
+    "uses": 5
+  },
+  {
+    "id": 239,
+    "name": "uncurse",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      158,
+      151,
+      140,
+      158,
+      155,
+      156,
+      142,
+      10
+    ],
+    "gp": 1523035,
+    "uses": 10
+  },
+  {
+    "id": 240,
+    "name": "esp",
+    "type": "ability",
+    "type_byte": 25,
+    "prefix": "",
+    "raw": [
+      142,
+      156,
+      153,
+      255,
+      255,
+      255,
+      255,
+      25
+    ],
+    "gp": 240418,
+    "uses": 25
+  },
+  {
+    "id": 241,
+    "name": "hypnos",
+    "type": "ability",
+    "type_byte": 21,
+    "prefix": "",
+    "raw": [
+      145,
+      162,
+      153,
+      151,
+      152,
+      156,
+      255,
+      21
+    ],
+    "gp": 43524,
+    "uses": 5
+  },
+  {
+    "id": 242,
+    "name": "barrier",
+    "type": "ability",
+    "type_byte": 5,
+    "prefix": "",
+    "raw": [
+      139,
+      138,
+      155,
+      155,
+      146,
+      142,
+      155,
+      5
+    ],
+    "gp": 65112,
+    "uses": 5
+  },
+  {
+    "id": 243,
+    "name": "mirror",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      150,
+      146,
+      155,
+      155,
+      152,
+      155,
+      255,
+      3
+    ],
+    "gp": 1345261,
+    "uses": 3
+  },
+  {
+    "id": 244,
+    "name": "power",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      153,
+      152,
+      160,
+      142,
+      155,
+      255,
+      255,
+      3
+    ],
+    "gp": 1323035,
+    "uses": 3
+  },
+  {
+    "id": 245,
+    "name": "armor",
+    "type": "usable_item",
+    "type_byte": 3,
+    "prefix": "",
+    "raw": [
+      138,
+      155,
+      150,
+      152,
+      155,
+      255,
+      255,
+      3
+    ],
+    "gp": 240418,
+    "uses": 3
+  },
+  {
+    "id": 246,
+    "name": "gaze",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      144,
+      138,
+      163,
+      142,
+      255,
+      255,
+      255,
+      10
+    ],
+    "gp": 1573524,
+    "uses": 10
+  },
+  {
+    "id": 247,
+    "name": "heads",
+    "type": "ability",
+    "type_byte": 10,
+    "prefix": "",
+    "raw": [
+      131,
+      145,
+      142,
+      138,
+      141,
+      156,
+      255,
+      10
+    ],
+    "gp": 51951,
+    "uses": 10
+  },
+  {
+    "id": 248,
+    "name": "DparFwp",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      67,
+      153,
+      138,
+      155,
+      69,
+      160,
+      153,
+      254
+    ],
+    "gp": 1511118
+  },
+  {
+    "id": 249,
+    "name": "stealth",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      156,
+      157,
+      142,
+      138,
+      149,
+      157,
+      145,
+      254
+    ],
+    "gp": 35110
+  },
+  {
+    "id": 250,
+    "name": "warning",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      160,
+      138,
+      155,
+      151,
+      146,
+      151,
+      144,
+      254
+    ],
+    "gp": 340365
+  },
+  {
+    "id": 251,
+    "name": "forseen",
+    "type": "armor",
+    "type_byte": 254,
+    "prefix": "",
+    "raw": [
+      143,
+      152,
+      155,
+      156,
+      142,
+      142,
+      151,
+      254
+    ],
+    "gp": 1305121
+  }
+]

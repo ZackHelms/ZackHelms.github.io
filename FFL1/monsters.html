@@ -80,7 +80,9 @@
     <p>All 200 entries from the ROM monster table. HP from <code>0x1B254</code> (2-byte LE).
     STR/DEF/AGI/MANA from <code>0x1AAE8</code> bytes 2–5 (9-byte stride).
     Gold from BCD table at <code>0x1B2A4</code> via lower nibble of stat byte 6.
-    Values exceeding 99 are highlighted — 99 is a display cap in-game, not the stored value.</p>
+    Values exceeding 99 are highlighted — 99 is a display cap in-game, not the stored value.
+    Ability lists from pointer at stat bytes 7–8 (bank-6 CPU address), decoded from item
+    stat table at <code>0x1B700</code>. Cyan = attack, dim = passive defense (D/E items).</p>
 
     <div class="filter-bar">
       <input type="text" id="search" placeholder="Search by name…">
@@ -101,6 +103,7 @@
             <th>AGI</th>
             <th>MANA</th>
             <th>GOLD</th>
+            <th>ABILITIES</th>
             <th>FAMILY</th>
           </tr>
         </thead>
@@ -127,10 +130,13 @@
 
 <script>
 async function init() {
-  const [monsters, txData] = await Promise.all([
+  const [monsters, txData, abilities] = await Promise.all([
     fetch('data/monsters.json').then(r => r.json()),
-    fetch('data/transformation.json').then(r => r.json())
+    fetch('data/transformation.json').then(r => r.json()),
+    fetch('data/abilities.json').then(r => r.json())
   ]);
+  const abilityById = {};
+  abilities.forEach(a => { abilityById[a.id] = a; });
 
   // Build family filter from actual data
   const families = [...new Set(monsters.map(m => m.family))].sort();
@@ -162,6 +168,13 @@ async function init() {
       <td>${fmt(m.agi)}</td>
       <td>${fmt(m.mana)}</td>
       <td>${m.gold ?? '—'}</td>
+      <td style="font-size:0.62rem;white-space:nowrap">${(m.ability_ids || []).map(id => {
+        if (id === 0xFE || id === 0xFF) return `<span style="color:var(--dim2)">—</span>`;
+        const ab = abilityById[id];
+        if (!ab) return `<span style="color:var(--dim2)">?${id}</span>`;
+        const isPassive = ab.type === 'armor';
+        return `<span style="color:${isPassive ? 'var(--dim2)' : 'var(--cyan)'}">${ab.name}</span>`;
+      }).join('<span style="color:var(--dim2)"> · </span>')}</td>
       <td><span class="tag tag-cyan" style="font-size:0.58rem">${m.family}</span></td>`;
     tbody.appendChild(tr);
     rows.push(tr);

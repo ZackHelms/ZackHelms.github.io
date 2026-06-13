@@ -58,8 +58,8 @@
   <section>
     <h2>USABLE ITEMS (ROM DATA)</h2>
     <p>Classified as <code>usable_item</code> type (type byte <code>0x01</code> or
-    <code>0x03</code>) in the ability table. Uses count from name table byte 7.
-    Heal amount for potions from X field at <code>0x1B700</code> (HIGH confidence).
+    <code>0x03</code>) in the ability table. Uses count from AltUses field (byte +3)
+    at <code>0x1B700</code>. Heal amount for potions from X field (HIGH confidence).
     Effect amounts for other items not yet extracted.</p>
 
     <div class="table-wrap">
@@ -100,7 +100,7 @@ async function init() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${u.name}</strong></td>
-      <td style="color:var(--dim2)">${u.type_byte ?? '—'}</td>
+      <td style="color:var(--dim2)">${u.uses ?? u.type_byte ?? '—'}</td>
       <td style="color:var(--neon-green);text-align:right">${u.heal != null ? u.heal + ' HP' : '—'}</td>
       <td style="color:var(--neon-green)">${u.gp ? u.gp.toLocaleString() + ' GP' : '—'}</td>`;
     uTbody.appendChild(tr);

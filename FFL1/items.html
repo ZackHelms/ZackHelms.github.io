@@ -61,6 +61,7 @@
     <p style="font-size:0.82rem;margin-bottom:16px;">
       Power from X field at <code>0x1B700</code>. Element from Y field (1=fire, 2=ice, 4=elec, 8=poison).
       Swords use prefix byte <code>0xEC</code> (renders <code>'</code> in-game); other weapons are guns/ranged.
+      Uses from AltUses field (byte +3); most swords=50, ∞=unlimited, 1=breaks after one use.
     </p>
     <div class="filter-bar">
       <input type="text" id="weapon-search" placeholder="Search…">
@@ -156,7 +157,7 @@ async function init() {
       <td><span class="tag tag-gold">${w.type}</span></td>
       <td style="color:var(--neon-green);text-align:right">${w.power ?? '—'}</td>
       <td>${elemTag}</td>
-      <td style="color:var(--dim2)">${w.type_byte ?? '—'}</td>
+      <td style="color:var(--dim2)">${w.uses === 254 ? '∞' : w.uses === 1 ? '<span style="color:var(--gold)">1</span>' : (w.uses ?? '—')}</td>
       <td style="color:var(--neon-green)">${w.gp ? w.gp.toLocaleString() + ' GP' : '—'}</td>`;
     wTbody.appendChild(tr);
     wRows.push(tr);
@@ -220,7 +221,7 @@ async function init() {
     tr.innerHTML = `
       <td><strong>${u.name}</strong></td>
       <td style="color:var(--dim2);font-size:0.72rem">usable_item</td>
-      <td style="color:var(--dim2)">${u.type_byte ?? '—'}</td>
+      <td style="color:var(--dim2)">${u.uses ?? u.type_byte ?? '—'}</td>
       <td style="color:var(--neon-green)">${u.heal != null ? u.heal + ' HP' : '—'}</td>
       <td style="color:var(--neon-green)">${u.gp ? u.gp.toLocaleString() + ' GP' : '—'}</td>`;
     uTbody.appendChild(tr);

@@ -175,7 +175,7 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 | +0 | Flags A | Bitmask: 0x01=weapon/attack, 0x02=consumable, 0x04=helm slot, 0x08=body slot, 0x10=gloves slot, 0x20=shoes slot, 0x40=elemental defense passive (D-items) |
 | +1 | Flags B | Combat behavior: 0xA0=strike weapon, 0x80=projectile/gun, 0xC0=area spell, etc. |
 | +2 | Item type code | 0x00=armor, 0x06-0x0C=strike variants, 0x11=gun, 0x12=bow, 0x13=whip, 0x14=ordnance, 0x1A=attack spell, 0x22=area spell, 0x18=healing usable, 0x19=status-cure usable |
-| +3 | Alt uses | |
+| +3 | Alt uses | **True per-item uses count.** For most items matches type_byte from name table, but differs for legendary weapons: glass sword=1 (one-hit breaks), masamune=254 (unlimited), 'xclbr=254, 'vampic=30, 'rune=30. SMG=25 (type_byte=20). Stored in `abilities.json` `uses` field. |
 | +4 | X value | **Weapon power** for swords/weapons; **DEF stat** for equippable armor; **heal amount** for potions (potion=30, xpotion=90 confirmed) |
 | +5 | Y value | **Element**: 1=fire, 2=ice, 4=elec, 8=poison, 15/255=all; bitmask — for D-items (FlagsA=0x40) expands to include 16=stone, 32=para, 64=weapon, 128=quake |
 | +6 | GFX index | Sprite tile used for this item |
@@ -192,16 +192,28 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 - `power`: X value for 60 weapons (type='sword' or 'weapon' in abilities.json)
 - `element`: Y value decoded for weapons/armor where Y in {1,2,4,8,15,255}
 - `heal`: X value for potion (id=0) and xpotion (id=1)
+- `uses`: AltUses (byte +3) for all swords/weapons/spells/abilities/usable items. Equals type_byte for most items; differs for glass sword (1), masamune/xclbr (254=unlimited), vampic/rune (30), SMG (25)
+
+**Status-cure items (X field):** For usable items with Typ=0x19 (status cure), the X field is a bitmask of status bits to CLEAR: needle=0xFD (clears bit 1), symbol=0xFB (bit 2), eyedrop=0xF7 (bit 3), antdote=0xEF (bit 4), shocker=0xBF (bit 6), pan=0xDF (bit 5), bell=0x7F (bit 7). Status bit meanings not yet confirmed from BGB.
 
 ### Monster Ability List Table
-**Confidence: MEDIUM** — pointers from stat table bytes 7–8 (confirmed from [RANDO]); list format not yet verified.
+**Confidence: HIGH** — pointers confirmed from [RANDO]; list format decoded by inter-pointer length analysis.
 
 | Field | Value |
 |---|---|
-| Location | Bank 6 data region, beginning around file `0x1B300` |
+| Location | Bank 6, beginning at file `0x1B321` (fly = first monster) |
 | Pointer | Little-endian 16-bit CPU address in stat entry bytes 7–8; bank 6 CPU `0x4000`–`0x7FFF` → file `0x18000 + (cpu − 0x4000)` |
-| Format | Unknown; likely a terminated list of ability IDs. Fly's list at file `0x1B321`. |
-| Source | [RANDO] |
+| Format | **Packed sequential lists, no terminator.** Each monster's list starts at its pointer; length = next monster's pointer − this monster's pointer. All 200 monsters' lists extracted. |
+| Entry size | 1–8 bytes per monster (1 byte per ability ID) |
+| Encoding | Direct ability table ID (same index space as ability name table at `0x14640`). `0xFE` = placeholder slot (mutant class stubs use these). `0xFF` = special (creator boss). |
+| Source | [RANDO] (pointers), direct decode (list format) |
+
+**List structure:** Each byte is a direct ability ID (0–251). Lists include both active abilities (type=sword/weapon/ability/spell) and passive defenses (type=armor, i.e., D-items and E-items). The passive entries give the monster's inherent resistances when a Monster-class player transforms. Ability IDs stored in `monsters.json` `ability_ids` field.
+
+**Examples:**
+- fly (id=0): [149, 216, 225] = nail · Dquake · Eice
+- wolf (id=30): [140] = bite
+- creator (id=199): [255, 28, 126, 127, 29, 201, 131, 222] = ?FF · light · left · right · repent · flare · revive · Dall
 
 ### Encounter Table
 **Confidence: MEDIUM** — address and stride from [RANDO]; not yet byte-verified for content.
