@@ -12,16 +12,107 @@
   (gameboycolorizations/ffl1-color) as a structural reference. Disassembly addresses go
   in `.claude/rom-map.md` under "Code / Engine Addresses."
 
+## ROM Mysteries (unknown data — investigate when tools are available)
+
+Items in this section have been identified in the ROM but their meaning is not yet understood.
+Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to a one-liner.
+
+---
+
+### Mystery 1: Stat table byte 6 — upper nibble
+**Location:** `0x1AAE8 + idx*9 + 6` — upper nibble only (bits 4–7). Lower nibble is confirmed as gold table index.
+
+**Observed values (upper nibble):**
+| Monster | id | byte6 raw | upper nibble |
+|---------|-----|-----------|--------------|
+| fly | 0 | 0xA1 | 0xA = 10 |
+| drgonfly | 1 | 0x83 | 0x8 = 8 |
+| hornet | 2 | 0x74 | 0x7 = 7 |
+| mosquito | 3 | 0x74 | 0x7 = 7 |
+| cicada | 4 | 0x29 | 0x2 = 2 |
+| mantis | 5 | 0x29 | 0x2 = 2 |
+| barracud | 6 | 0x92 | 0x9 = 9 |
+| gen-bu | 189 | 0x06 | 0x0 = 0 |
+| sei-ryu | 190 | 0x0C | 0x0 = 0 |
+
+**Key observation:** Bosses (189+) all have upper nibble = 0. Regular monsters vary. The FFLRandomizer's `WriteCharacterGoldTableIndex` uses `|=` (not direct assignment), deliberately preserving the upper nibble — so it contains real data the randomizer didn't want to overwrite.
+
+**Hunches:**
+- Meat type / drop category: the FFLRandomizer source says byte 0 contains "Race/Meat/NumAbils" so some meat info may also live in byte 6 upper nibble. Bosses can't be eaten, hence 0.
+- Number of abilities (alternative to byte 0): the upper nibble could be a secondary count or flag for available actions.
+- Encounter tier/rank: could label which dungeon level this monster appears in.
+
+**How to investigate:** Check FFLRandomizer for any function that reads the upper nibble of byte 6. Alternatively, use BGB to set a read breakpoint on `0x1AAEE` (monster 0, byte 6) and watch what code accesses it.
+
+---
+
+### Mystery 2: Stat table bytes 7–8 — unknown fields
+**Location:** `0x1AAE8 + idx*9 + 7` (byte 7) and `0x1AAE8 + idx*9 + 8` (byte 8).
+
+**Observed values:**
+| Monster | id | byte7 | byte8 |
+|---------|-----|-------|-------|
+| fly | 0 | 0x21 (33) | 0x73 (115) |
+| drgonfly | 1 | 0x24 (36) | 0x73 (115) |
+| hornet | 2 | 0x28 (40) | 0x73 (115) |
+| mosquito | 3 | 0x2D (45) | 0x73 (115) |
+| cicada | 4 | 0x33 (51) | 0x73 (115) |
+| mantis | 5 | 0x39 (57) | 0x73 (115) |
+| barracud | 6 | 0x41 (65) | 0x73 (115) |
+| gen-bu | 189 | 0x9F (159) | 0x76 (118) |
+| sei-ryu | 190 | varies | varies |
+
+**Key observations:**
+- Byte 8 = 0x73 is constant for the first ~180 regular monsters; boss entries differ (0x76, etc.)
+- Byte 7 increases roughly monotonically across monster IDs for regular monsters (0x21, 0x24, 0x28, 0x2D…), suggesting sequential index or offset values rather than per-monster stats
+- Bytes 7–8 little-endian → e.g., fly = 0x7321. In bank 6 CPU address space (0x4000–0x7FFF), 0x7321 is a valid address → file offset 0x18000 + (0x7321 − 0x4000) = 0x1B321. This is deep in bank 6 data (HP table is at 0x1B254, gold table at 0x1B2A4). **Strong hunch: bytes 7–8 are a bank-6–relative CPU address pointing to each monster's ability/action list.**
+- Byte 8 = 0x73 → all regular monster ability lists start in the 0x73xx CPU address range (file 0x1B300–0x1B3FF range)
+- The monotonically increasing byte 7 supports this: each monster's action list starts after the previous one in a sequential ability block
+
+**How to investigate:** 
+1. Dump 16–32 bytes starting at file offset 0x1B321 (fly's putative ability pointer) and check if the data there looks like an action list (small integers or name indices).
+2. In FFLRandomizer, search for any function that reads bytes at offset +7 or +8 of the stat entry, or that references addresses in the 0x7300–0x7FFF range in bank 6.
+3. BGB: Set a read breakpoint on 0x7321 in bank 6; the PC at the breakpoint is the code that processes fly's action list.
+
+---
+
+### Mystery 3: Character encoding bytes 0xF2 and 0x82 in monster names
+**Location:** Name table at `0x14000`, 200 × 8 bytes, same encoding as the general character table.
+
+**Observed:**
+- `0xF2` appears in boss names: gen-bu (id 189) = `[gen, 0xF2, bu]`, sei-ryu = `[sei, 0xF2, ryu]`, byak-ko = `[byak, 0xF2, ko]`, su-zaku = `[su, 0xF2, zaku]`, p-flower (id 13) = `[p, 0xF2, flower]`
+- `0x82` appears at the end of strong boss forms: "gen-bu II" form (id 193) name bytes end with `0x82`, "sei-ryu II" (id 194) similarly; likely represents the "2" or "II" suffix used for the powered-up boss variants in the 3rd and 4th worlds
+
+**Current decoder treatment:** `0xF2` mapped to `'-'` (hyphen/dash) based on context. `0x82` mapped to `'2'` tentatively. These are guesses.
+
+**Confirmed encoding range** (from rom-map.md): `0x8A`–`0xA3` = a–z, `0x40`–`0x59` = A–Z, `0xA4`–`0xAD` = 0–9. `0xF2` and `0x82` fall outside the known alphanumeric ranges and may be:
+- Special punctuation (hyphen, period, apostrophe)
+- DTE pair codes that happen to also appear in the name table (unlikely — DTE is for story text only)
+- Extended characters from the full font tile sheet
+
+**How to investigate:** Look at font tile sheet `img/tile_sheet_1bpp_large.png` — tile index encodes the glyph. The character byte value maps to a tile index by some formula; check which tile 0xF2 and 0x82 render in the game's BG tile decoder. Alternatively, look up those tile indices in the BGB VRAM viewer while a boss name is displayed on screen.
+
+---
+
+### Mystery 4: Item GP cost table format (0x17E10)
+**Location:** `0x17E10`, claimed 3-byte-per-item format by FFLRandomizer.
+
+**Problem:** 3-byte little-endian interpretation gives incoherent prices (e.g., multi-million GP for a Potion). The BCD format used by the gold reward table at `0x1B2A4` might also apply here, or the stride may differ.
+
+**Hunch:** The item cost table likely uses the same 4-digit BCD encoding (2 bytes, not 3) as the gold table. Alternatively, if 3 bytes: the first 2 bytes are BCD and the 3rd byte is a shop availability flag or item category byte.
+
+**How to investigate:** 
+1. Try reading 0x17E10 as 2-byte BCD: do the first few items decode to plausible shop prices (Potion ~100–300 GP, etc.)?
+2. Cross-reference with GameFAQs or wiki shop price lists to validate candidate interpretations.
+3. FFLRandomizer: search for `ReadItemCost` or `ReadItemPrice` — the exact decoding function will reveal the format.
+
+---
+
 ## Data Re-Extraction Needed (correctness bugs)
 
-- **Re-extract monsters.json stats** — stat table at `0x1AAE8` uses **9-byte stride**
-  (not 8 as originally assumed). Current STR/DEF/AGI/MANA values in `monsters.json` are
-  wrong. HP values are correct (separate table at `0x1B254`, unaffected).
-  Script: Python, stride=9, layout=[race, hp_idx, STR, DEF, AGI, MANA, gold_idx, ?, ?].
-
 - **Verify item GP cost table** — address `0x17E10` from FFLRandomizer source, but
-  3-byte LE interpretation gives incoherent prices. Verify actual format (may be 2-byte,
-  or BCD, or differently strided). Correct format → `rom-map.md` + update items.html.
+  3-byte LE interpretation gives incoherent prices. See Mystery 4 in ROM Mysteries section for
+  investigation approach. Correct format → `rom-map.md` + update items.html.
 
 ## Missing ROM Data (requires tools or deeper analysis)
 
