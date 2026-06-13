@@ -163,6 +163,10 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 - **DTE decoder implementation** — story/dialog text is DTE-compressed; raw byte search
   is impossible. Need to implement a decoder using the tables at `0x14E40` (loaded to RAM
   `0xC800`) to verify `data/dialog.md` story text and extract NPC dialog.
+  - DTE tables extracted: DTE1 = 64 entries at `0x14E40` (codes `0x50–0x8F`); DTE2 = 55 entries at `0x14EC0` (codes `0xC0–0xF6`)
+  - Dialog encoding differs from name encoding: in dialog mode `0x50–0x8F` are DTE codes (NOT direct letters); direct chars at `0x90–0xBD`
+  - Story text NOT in bank 5 (ability name table occupies `0x14640–0x14E3F`); dialog must be in another bank — location unknown
+  - Blocked on: finding dialog text bank/offset (requires BGB text-display breakpoint or full-ROM DTE sweep)
 
 - **WRAM address verification** — gold, character HP/stats. *(covered by BGB Task 4)*
 
@@ -207,7 +211,7 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 
 - Combat system (damage formulas not yet extracted)
 - Stat gain / mutation trigger (not yet extracted)
-- Meat / transformation system (table at `0x0AFD3` located but not decoded)
+- ✅ Meat / transformation system — ROM extracted to data/transformation.json (HIGH confidence). 25 monster classes × eat table at 0x0AFD3 + class members at 0x0B2A8. Webapp implementation still pending (game logic not yet built).
 - Town interiors and NPC dialog (DTE decoder needed first)
 - Save / load (CONTINUE) functionality
 - SRAM / localStorage persistence
@@ -230,3 +234,7 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
   row numbers 1–8; fixed cursor to circular ring with no row inversion; fixed name/gender to
   fixed columns. Portrait sprites (sub-item 3) remain blocked on BGB session.
   *(was: Near-term Feature Work — class select screen)*
+
+- ✅ **shops.html wiki page** — created from ROM-extracted shops.json (14 shops × 10 items, 6-digit BCD prices). Added to nav on all wiki pages and to index.html wiki grid. Shop location (world/town) assignments remain UNVERIFIED — awaiting user input.
+  **QUESTION FOR USER:** Can you map shop indices 1–14 to their in-game towns/worlds? (From the price ranges, shops 1–2 look like World 1, shops 3–4 World 2, etc. — but ROM confirmation needed.)
+  *(discovered during: shop price extraction)*

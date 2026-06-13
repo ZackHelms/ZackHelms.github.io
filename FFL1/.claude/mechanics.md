@@ -57,7 +57,7 @@ these as facts in wiki pages or context files:
 - Stat item effect amounts
 - Armor stat bonus values
 - World structure (which bosses appear where, crystal ball requirements)
-- Story / intro text — DTE-compressed in ROM; no raw bytes searchable without full DTE decode; web-sourced version stored in data/dialog.md (MEDIUM confidence)
+- Story / intro text — DTE-compressed in ROM; no raw bytes searchable without full DTE decode; web-sourced version stored in data/dialog.md (MEDIUM confidence). DTE tables extracted: DTE1 at 0x14E40 (64 bigrams, codes 0x50–0x8F), DTE2 at 0x14EC0 (55 bigrams, codes 0xC0–0xF6). Dialog encoding ≠ name encoding: 0x50–0x8F are DTE1 codes in dialog (not letters). Story text bank/offset not yet found.
 - Name-entry UI layout — row/column counts, cell sizes, END/DEL positions not confirmed from ROM
 - CONTINUE save-file format — not yet extracted
 
