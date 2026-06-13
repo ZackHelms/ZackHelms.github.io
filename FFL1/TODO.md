@@ -81,7 +81,7 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
   - `data/world.json` — world structure "reconstructed from game knowledge" (LOW confidence).
     *(discovered during: wiki audit)* Extract from ROM when encounter zone / world structure
     is mapped.
-  - `data/items.json` — fabricated stats; wiki pages already use abilities.json instead. Low priority; can delete or keep as deprecated stub.
+  - ✅ `data/items.json` — deleted. Fabricated stats (base_power, stat_bonus, equip restrictions); wiki pages use abilities.json. Removed to avoid misleading future sessions.
 
 ## BGB Session — Breakpoints to Set
 
