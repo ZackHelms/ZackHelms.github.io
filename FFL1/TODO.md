@@ -76,7 +76,8 @@ This pattern holds for insects, canines, fish, and other families checked. Upper
     - ✅ Heal amount for potions (X=30 for potion, X=90 for xpotion) — added `heal` field. HIGH confidence.
     - ✅ Equip restrictions — confirmed NOT stored per-item in ROM. Class-level rule: humans=8 items, mutants=4, monsters=0. No per-item flags exist.
     - ✅ Item true uses count (AltUses field, byte +3 at 0x1B700) — added `uses` field to abilities.json. Notable: glass sword=1 (breaks), masamune=254 (unlimited), vampic/rune=30, SMG=25. Wiki updated to show ∞ for 254, highlighted 1.
-    - Usable item effect amounts (needle, bell, hyper, etc.) → X field for status-cure items is a **bitmask** (not a number): needle=0xFD clears bit 1, antdote=0xEF clears bit 4, etc. Status bit meanings not yet confirmed from BGB. Not added to wiki. *(remainder)*
+    - ✅ Status cure bitmasks — X field for type=0x19 items confirmed as status byte bitmask. All 7 status cure items decoded: needle=bit1(stone), symbol=bit2(banish), eyedrop=bit3(blind), antdote=bit4(poison), pan=bit5(confusion), shocker=bit6(paralysis), bell=bit7(sleep). Added `status_bit` and `status_clears` fields to abilities.json. Wiki updated (items.html, humans.html). Status names are MEDIUM confidence (inferred from item names + RPG conventions; needs BGB to confirm exact meanings).
+    - Stat-boost usable items (hyper, power, armor usable): X field found (hyper=196, power/armor=99) but meaning (boost amount vs stat cap) not confirmed from BGB. Not yet added to wiki. *(remainder)*
     - Armor FlagsA bit 6 (D-items: Dfire/Dice/etc.) effect/mechanics → not yet confirmed from BGB *(remainder)*
   - `data/encounters.json` — encounter rates/tables fabricated.
     *(discovered during: wiki audit)* Extract from ROM when encounter zone data is found.

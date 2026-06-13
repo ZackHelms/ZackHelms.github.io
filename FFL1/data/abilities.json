@@ -96,7 +96,9 @@
       3
     ],
     "gp": 500,
-    "uses": 3
+    "uses": 3,
+    "status_bit": 1,
+    "status_clears": "stone"
   },
   {
     "id": 5,
@@ -115,7 +117,9 @@
       3
     ],
     "gp": 500,
-    "uses": 3
+    "uses": 3,
+    "status_bit": 2,
+    "status_clears": "banish"
   },
   {
     "id": 6,
@@ -134,7 +138,9 @@
       3
     ],
     "gp": 500,
-    "uses": 3
+    "uses": 3,
+    "status_bit": 3,
+    "status_clears": "blind"
   },
   {
     "id": 7,
@@ -2403,7 +2409,9 @@
       3
     ],
     "gp": 100,
-    "uses": 3
+    "uses": 3,
+    "status_bit": 4,
+    "status_clears": "poison"
   },
   {
     "id": 123,
@@ -2422,7 +2430,9 @@
       3
     ],
     "gp": 100,
-    "uses": 3
+    "uses": 3,
+    "status_bit": 7,
+    "status_clears": "sleep"
   },
   {
     "id": 124,
@@ -2441,7 +2451,9 @@
       3
     ],
     "gp": 100,
-    "uses": 3
+    "uses": 3,
+    "status_bit": 5,
+    "status_clears": "confusion"
   },
   {
     "id": 125,
@@ -2460,7 +2472,9 @@
       3
     ],
     "gp": 100,
-    "uses": 3
+    "uses": 3,
+    "status_bit": 6,
+    "status_clears": "paralysis"
   },
   {
     "id": 126,

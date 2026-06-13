@@ -66,7 +66,7 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>NAME</th><th>USES</th><th>HEAL</th><th>GP</th></tr>
+          <tr><th>NAME</th><th>USES</th><th>HEAL / EFFECT</th><th>GP</th></tr>
         </thead>
         <tbody id="usable-tbody"></tbody>
       </table>
@@ -102,7 +102,7 @@ async function init() {
     tr.innerHTML = `
       <td><strong>${u.name}</strong></td>
       <td style="color:var(--dim2)">${u.uses ?? u.type_byte ?? '—'}</td>
-      <td style="color:var(--neon-green);text-align:right">${u.heal != null ? u.heal + ' HP' : '—'}</td>
+      <td style="color:var(--neon-green);text-align:right">${u.heal != null ? u.heal + ' HP' : u.status_clears ? `<span style="color:var(--cyan)">cures ${u.status_clears}</span>` : '—'}</td>
       <td style="color:var(--neon-green)">${u.gp ? u.gp.toLocaleString() + ' GP' : '—'}</td>`;
     uTbody.appendChild(tr);
   });

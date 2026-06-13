@@ -48,7 +48,9 @@
     <strong>Data source:</strong> Names, type, uses from <code>0x14640</code>; GP prices from
     <code>0x17E10</code> (6-digit BCD); weapon power and armor defense from item stat table at
     <code>0x1B700</code>. Element from Y field (HIGH confidence for single-element values).
-    Numeric effect amounts for spells and usable items not yet extracted.
+    Status cure items: X field bitmask confirmed (which status condition each cures) — MEDIUM confidence
+    for status names (inferred from item names; needs BGB to confirm exact bit meanings).
+    Numeric effect amounts for spells and stat-boost usable items not yet extracted.
   </div>
 
   <div class="tab-bar">
@@ -129,7 +131,7 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>NAME</th><th>TYPE</th><th>USES</th><th>HEAL</th><th>GP</th></tr>
+          <tr><th>NAME</th><th>TYPE</th><th>USES</th><th>HEAL / EFFECT</th><th>GP</th></tr>
         </thead>
         <tbody id="usable-tbody"></tbody>
       </table>
@@ -223,7 +225,7 @@ async function init() {
       <td><strong>${u.name}</strong></td>
       <td style="color:var(--dim2);font-size:0.72rem">usable_item</td>
       <td style="color:var(--dim2)">${u.uses ?? u.type_byte ?? '—'}</td>
-      <td style="color:var(--neon-green)">${u.heal != null ? u.heal + ' HP' : '—'}</td>
+      <td style="color:var(--neon-green)">${u.heal != null ? u.heal + ' HP' : u.status_clears ? `<span style="color:var(--cyan)">cures ${u.status_clears}</span>` : '—'}</td>
       <td style="color:var(--neon-green)">${u.gp ? u.gp.toLocaleString() + ' GP' : '—'}</td>`;
     uTbody.appendChild(tr);
   });

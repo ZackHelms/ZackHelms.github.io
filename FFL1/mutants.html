@@ -52,8 +52,11 @@
 
   <div class="callout warn">
     <strong>Data source notice:</strong> Mutant stat-growth rates, ability-gain probabilities,
-    and stat cap values have not been extracted from the ROM binary. Only the ability database
-    (names and type classifications from the ROM) is presented here.
+    and stat cap values have not been fully decoded from ROM.
+    The growth threshold table at <code>0x1BF00</code> has been located (8 threshold values:
+    35, 69, 99, 117, 135, 143, 147, 255), suggesting a diminishing-returns system across
+    the full internal stat range 0–255. Exact growth probabilities and amounts require BGB
+    to trace the growth routine. Only the ability database (ROM-extracted) is presented here.
   </div>
 
   <section>
