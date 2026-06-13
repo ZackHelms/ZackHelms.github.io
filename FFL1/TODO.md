@@ -68,11 +68,14 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
   repo and could mislead future sessions. Extract correct values from ROM and replace each:
   - `data/items.json` — contains `base_power`, `uses`, `stat_bonus`, `heal_amount`, `equip`
     restrictions — all fabricated. *(discovered during: wiki audit)*
-    - Weapon stats (power, uses, element) → needs ROM extraction (ability table bytes + item
-      stat table; address not yet found)
-    - Armor stat bonuses → needs ROM extraction (address not yet found)
-    - Usable item effects (heal amount, stat boost) → needs ROM extraction (not yet found)
-    - Equip restrictions (human/mutant/monster) → needs ROM extraction (not yet found)
+    - ✅ Weapon power (X field at 0x1B700) — extracted and added to abilities.json (`power` field). 60 weapons decoded. HIGH confidence.
+    - ✅ Weapon element (Y field) — extracted for single-element weapons (`element` field). fire/ice/elec/poison.
+    - ✅ Armor defense (X field) — extracted for 22 equippable armor items (`defense` field). HIGH confidence.
+    - ✅ Armor slot (FlagsA bits) — extracted (`slot` field: helm/body/gloves/shoes/all). HIGH confidence.
+    - ✅ Heal amount for potions (X=30 for potion, X=90 for xpotion) — added `heal` field. HIGH confidence.
+    - ✅ Equip restrictions — confirmed NOT stored per-item in ROM. Class-level rule: humans=8 items, mutants=4, monsters=0. No per-item flags exist.
+    - Usable item effect amounts (needle, bell, hyper, etc.) → stat table X/Y meaning unclear; not extracted yet *(remainder)*
+    - Armor FlagsA bit 6 (D-items: Dfire/Dice/etc.) effect/mechanics → not yet confirmed from BGB *(remainder)*
   - `data/encounters.json` — encounter rates/tables fabricated.
     *(discovered during: wiki audit)* Extract from ROM when encounter zone data is found.
   - ✅ `data/shops.json` — replaced with ROM-extracted data (see above).

@@ -172,14 +172,26 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 **Field layout per entry (8 bytes):**
 | Byte offset | Field | Notes |
 |---|---|---|
-| +0 | Flags A | |
-| +1 | Flags B | |
-| +2 | Item type | Not yet decoded |
+| +0 | Flags A | Bitmask: 0x01=weapon/attack, 0x02=consumable, 0x04=helm slot, 0x08=body slot, 0x10=gloves slot, 0x20=shoes slot, 0x40=elemental defense passive (D-items) |
+| +1 | Flags B | Combat behavior: 0xA0=strike weapon, 0x80=projectile/gun, 0xC0=area spell, etc. |
+| +2 | Item type code | 0x00=armor, 0x06-0x0C=strike variants, 0x11=gun, 0x12=bow, 0x13=whip, 0x14=ordnance, 0x1A=attack spell, 0x22=area spell, 0x18=healing usable, 0x19=status-cure usable |
 | +3 | Alt uses | |
-| +4 | X value | |
-| +5 | Y value | |
+| +4 | X value | **Weapon power** for swords/weapons; **DEF stat** for equippable armor; **heal amount** for potions (potion=30, xpotion=90 confirmed) |
+| +5 | Y value | **Element**: 1=fire, 2=ice, 4=elec, 8=poison, 15/255=all; bitmask — for D-items (FlagsA=0x40) expands to include 16=stone, 32=para, 64=weapon, 128=quake |
 | +6 | GFX index | Sprite tile used for this item |
 | +7 | Group flag + SFX | Bit 7 = group flag (`ReadItemGroupFlag`); bits 6–0 = SFX index (`ReadItemSFX`) |
+
+**Per-item equip restrictions (human/mutant/monster):** These are **NOT stored per-item** in the ROM. Equipment capacity is a class-level engine rule: humans can hold 8 items, mutants 4, monsters cannot use items.
+
+**Armor prefix byte** (name table byte 0) correct mapping (confirmed against FlagsA bits):
+- 0xEC = sword, 0xED = helm, 0xE8 = body, 0xEA = gloves, 0xEB = shoes, 0xEF = magic/spell, 0xE9 = shield, 0xEE = gun
+
+**Decoded data in abilities.json:**
+- `defense`: X value for 22 equippable armor items (FlagsA slot bits set, type=0x00)
+- `slot`: "helm"/"body"/"gloves"/"shoes"/"all" from FlagsA bits
+- `power`: X value for 60 weapons (type='sword' or 'weapon' in abilities.json)
+- `element`: Y value decoded for weapons/armor where Y in {1,2,4,8,15,255}
+- `heal`: X value for potion (id=0) and xpotion (id=1)
 
 ### Monster Ability List Table
 **Confidence: MEDIUM** — pointers from stat table bytes 7–8 (confirmed from [RANDO]); list format not yet verified.

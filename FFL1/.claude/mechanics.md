@@ -23,7 +23,7 @@
 - Stat table location — ROM 0x1AAE8, **9-byte stride** (corrected from earlier 8-byte assumption) — HIGH confidence for stride; field layout MEDIUM confidence; byte 0 format partially decoded: `0x7B + (num_abils × 8)` for race=Monster/meat_drop=3
 - Mutant growth rate thresholds — ROM 0x1BF00 (8 threshold bytes + 5 amount bytes) — MEDIUM confidence
 - Item GP cost table — ROM 0x17E10, 3 bytes per item, **6-digit packed BCD** (each nibble = one decimal digit); confirmed from FFLRandomizer `ReadGPCost` — HIGH confidence. All 252 prices extracted to `data/abilities.json` (gp field) and `data/item_prices.json`.
-- Item stat table — ROM 0x1B700, 8 bytes per item: FlagsA, FlagsB, Type, AltUses, X, Y, GFX, (GroupFlag bit7 + SFX bits6-0) — MEDIUM confidence
+- Item stat table — ROM 0x1B700, 8 bytes per item: FlagsA, FlagsB, Type, AltUses, X, Y, GFX, (GroupFlag bit7 + SFX bits6-0) — MEDIUM confidence. X=weapon power for swords/weapons; X=armor defense for equippable armor; X=heal amount for potions (potion=30HP, xpotion=90HP confirmed). Y=element for weapons/armor (1=fire, 2=ice, 4=elec, 8=poison, 15/255=all). FlagsA bits: 0x01=weapon, 0x02=consumable, 0x04=helm, 0x08=body, 0x10=gloves, 0x20=shoes, 0x40=elemental defense passive. Equip restrictions (human/mutant/monster) are a class-level engine rule, NOT stored per-item in the ROM. All 22 equippable armor items decoded with defense+slot; 60 weapons with power; 2 potions with heal. Data added to abilities.json.
 - Item uses count — stored as byte 7 of the ability name table entry (ROM 0x14647 + item_id×8), NOT in the stat table — HIGH confidence (from RANDO `ReadItemUses`)
 - Shop inventories — 14 shops at ROM 0x17D38–0x17E0F; 10 item IDs per shop; extracted to `data/shops.json` — HIGH confidence for item IDs and prices; UNVERIFIED for world/location assignments
 - Character name encoding — corrected: 0x80–0x89='0'–'9', 0x8A–0xA3='A'–'Z', 0xA4–0xBD='a'–'z', 0xFF=' ', 0xF2='-'. Previous table (Data Crystal) had wrong ranges — HIGH confidence (RANDO source + full 200-name decode verified)
@@ -54,8 +54,8 @@ these as facts in wiki pages or context files:
 - Mutant stat gain trigger conditions and probabilities
 - Transformation rules (eat count, trigger conditions, target selection)
 - Meat system rules (slot count, overflow behavior)
-- Stat item effect amounts
-- Armor stat bonus values
+- Stat item effect amounts (items like hyper, needle, bell — effect encoded in stat table but meaning of X/Y not yet confirmed)
+- Armor stat bonus values — NOTE: "bonus values" in old v001 sense (str/def/agi bonus) don't exist per-item; defense value (X field) is the item's DEF stat, now extracted. Class-level equip capacity (humans=8 items, mutants=4, monsters=0) is engine logic.
 - World structure (which bosses appear where, crystal ball requirements)
 - NPC dialog text — FOUND: bank 5 at 0x14F3E–0x17D37 (11,770 bytes). DTE-encoded. DTE tables: DTE1 at 0x14E40 (64 bigrams 0x50–0x8F), DTE2 at 0x14EC0 (55 bigrams 0xC0–0xF6). Dialog encoding uses lowercase-range direct chars (0xA4–0xBD) NOT uppercase (0x8A–0xA3), so ALL of 0x50–0x8F are active DTE codes. 0xBE = apostrophe. 0x0D = newline. 0x00 = string terminator. MEDIUM confidence (text recognized, control code semantics partially decoded). Confirmed samples: "THERE IS A TOWN HIDDEN IN THE CLOUDS" at ~0x173E0; "ANYONE WHO VISITS HIS..." at ~0x16D00.
 - Story / intro text — location not yet found. Web-sourced "IT HAS BEEN SAID THAT THE TOWER..." not located in ROM with DTE compression search. May be in bank 1/3 or use a different encoding. Stored in data/dialog.md (MEDIUM confidence).
