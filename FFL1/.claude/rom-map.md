@@ -283,6 +283,26 @@ Strings found at `0x0ECC8`: `start`, `continue`, `fight`, `run`, `item` (normalb
 | `0x1A3DE` | `0x63DE` | Text tile routine: `0xC600` → VRAM `0x9900` |
 | `0x193BF` | `0x79BF` | Post-battle mutation dispatch loop |
 
+### Placeholder: Routines Not Yet Found
+
+The following rendering/logic routines are needed but not yet located.
+**How to find them**: Load ROM in BGB debugger; set write breakpoint on VRAM `0x9800`–`0x9BFF`
+(BG tilemap) or `0xFF46` (OAM DMA); trigger the relevant screen; PC at the breakpoint is
+in the render routine. See `.claude/sources.md` for the full approach.
+
+| Routine | Status | Notes |
+|---|---|---|
+| Title screen renderer | NOT FOUND | BG tilemap built dynamically; trace from VRAM write breakpoint |
+| Class select renderer | NOT FOUND | Shows 8 character entries + sprites; sets up OAM |
+| Class select OAM setup | NOT FOUND | Positions the 8 character portrait sprites |
+| Name entry renderer | NOT FOUND | Letter grid + name display |
+| Story text renderer | NOT FOUND | Uses DTE decoder at `0x0F36` (bank 0) |
+| Battle initialization | NOT FOUND | Called when encounter triggers |
+| Damage formula | NOT FOUND | Physical, magic, gun damage calculations |
+| Overworld tilemap builder | NOT FOUND | Writes tile indices to BG map at runtime |
+| Save (crystal ball) handler | NOT FOUND | Writes character/world state to SRAM |
+| Load (CONTINUE) handler | NOT FOUND | Reads SRAM and restores state |
+
 ---
 
 ## WRAM (RAM) Addresses
@@ -329,12 +349,46 @@ Each character occupies 25 (`0x19`) bytes starting at:
 | SRAM window | CPU `0xA000`–`0xBFFF` (MBC2 battery-backed) |
 | Internal layout | NOT yet extracted from this ROM binary |
 
+### Placeholder: SRAM Fields Not Yet Mapped
+
+**How to find them**: Make two saves in different states → hex-diff the SRAM bytes →
+differing bytes correspond to the changed value. Repeat for each field (HP, gold, inventory, world flags).
+
+| SRAM field | Status |
+|---|---|
+| Save slot count / layout | NOT FOUND |
+| Character name storage | NOT FOUND |
+| Character class / race byte | NOT FOUND |
+| Current HP per character | NOT FOUND |
+| Max HP per character | NOT FOUND |
+| STR / DEF / AGI / MANA per character | NOT FOUND |
+| Item inventory (4 chars × slots) | NOT FOUND |
+| Mutant ability slots | NOT FOUND |
+| Gold amount | NOT FOUND |
+| Current world / floor | NOT FOUND |
+| Crystal ball save point flags | NOT FOUND |
+| Boss defeated flags | NOT FOUND |
+
 ---
 
-## Known Discrepancies and TODOs
+## Placeholder: Sprite / Asset Data Not Yet Located
 
-1. **monsters.json stat values** — extracted assuming 8-byte stride; must be re-extracted with 9-byte stride. HP values are unaffected (HP table is separate).
-2. **Item GP cost table** — address `0x17E10` from [RANDO] but 3-byte LE interpretation gives incoherent values. Needs format verification.
-3. **Character select screen rendering** — screen is dynamically rendered at runtime; exact routine address not yet found.
-4. **Class select sprite tile indices** — which Bank 2 tiles form the 8 character portraits is not yet identified.
-5. **Full ROM disassembly** — no complete disassembly of this US ROM is publicly available; see TODO.md.
+| Asset | Status | Notes |
+|---|---|---|
+| Class select character portrait tiles | NOT FOUND | 8 portraits; in Bank 2; need OAM trace |
+| Class select cursor sprite tile | NOT FOUND | Circular ring icon; in Bank 2 or Bank 0 |
+| Overworld character walk sprites | NOT FOUND | 2-frame per direction per class; Bank 2 |
+| Town / dungeon tiles | NOT FOUND | Bank 2; tile indices for world map rendering |
+| Battle background tiles | NOT FOUND | Bank 2 |
+| Boss sprites | NOT FOUND | Bank 2; likely large (multi-tile) |
+
+---
+
+## Known Discrepancies and Correction Log
+
+1. **monsters.json stat values** — extracted assuming 8-byte stride; correct stride is 9. HP values are unaffected (HP table is separate). Re-extraction needed.
+2. **Item GP cost table** — address `0x17E10` from [RANDO] but 3-byte LE gives incoherent prices. Format or stride needs verification.
+3. **Class select screen rendering** — dynamically rendered at runtime; exact routine address not yet found. Use BGB VRAM write breakpoint.
+4. **Class select sprite tile indices** — not yet identified. Use BGB OAM viewer while class select is displayed.
+5. **Full ROM disassembly** — no complete US ROM disassembly publicly available. See TODO.md and sources.md.
+6. **REDBULL vs REDHORN** — ROM byte-reads at index 36 decode to `redbull`. Emulator screenshot showed `REDHORN` — likely a different ROM version or patch. Our ROM is authoritative: `redbull`.

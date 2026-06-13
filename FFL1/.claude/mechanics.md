@@ -3,18 +3,22 @@
 ## What Has (and Has Not) Been Extracted from the ROM
 
 ### Extracted
-- Monster names — name table at 0x14000 (200 × 8 bytes)
-- Monster stats — stat table at 0x1AAE8 (200 × 8 bytes, bytes 2–5 = STR/DEF/AGI/MANA)
-- Monster HP — HP table at 0x1B254 (200 × 2 bytes, little-endian)
-- Monster drop byte — byte 6 of each stat record; yields can_drop_meat + meat_level
-- Ability names — ability table at 0x14640 (252 × 8 bytes)
-- Ability type classification — type byte (byte 7) and prefix byte (byte 0) of each ability record
-- Character encoding — 0x8A='a'…0xA3='z', 0x40='A'…0x59='Z', 0xA4='0'…0xAD='9'
-- Starting character table — ROM 0x17F94 (8 bytes): [177,178,179,180,18,36,72,120] = human-m/f, mutant-m/f, clipper, redbull, wererat, zombie
-- Player class stubs — ROM 0x14568 (bank 5); indices 173–188; human/mutant variants with gender byte at position 7
-- Bank 3 UI text — ROM 0x0ECC8: "start", "continue", "fight", "run", "item" (normalbase encoding, runtime-rendered to VRAM)
-- Font tiles — 1bpp, 119 tiles × 8 bytes at ROM 0x0F100; tile 0–9=digits, 10–35=A–Z, 36–61=a–z
-- DTE table location — ROM 0x14E40 (bank 5) → loaded to RAM $C800 at startup; encodes digit/stat bigrams
+- Monster names — name table at 0x14000 (200 × 8 bytes) — HIGH confidence
+- Monster HP — HP table at 0x1B254; indexed via byte 1 of stat entry (NOT directly by monster ID); indices 0–21 = regular HP curve, 22+ = boss HP values — HIGH confidence
+- Ability names — ability table at 0x14640 (252 × 8 bytes) — HIGH confidence
+- Ability type classification — type byte (byte 7) and prefix byte (byte 0) of each ability record — HIGH confidence
+- Character encoding — 0x8A='a'…0xA3='z', 0x40='A'…0x59='Z', 0xA4='0'…0xAD='9' — HIGH confidence
+- Starting character table — ROM 0x17F90 (8 bytes): [177,178,179,180,18,36,72,120] = human-m/f, mutant-m/f, clipper, redbull, wererat, zombie — HIGH confidence
+- Player class stubs — ROM 0x14568 (bank 5); indices 173–188 — MEDIUM confidence
+- Bank 3 UI text — ROM 0x0ECC8: "start", "continue", "fight", "run", "item" — HIGH confidence
+- Font tiles — 1bpp, 119 tiles × 8 bytes at ROM 0x0F100; tile 0–9=digits, 10–35=A–Z, 36–61=a–z — HIGH confidence
+- DTE table location — ROM 0x14E40 (bank 5) → loaded to RAM $C800 at startup — HIGH confidence
+- Stat table location — ROM 0x1AAE8, **9-byte stride** (corrected from earlier 8-byte assumption) — HIGH confidence for stride; field layout MEDIUM confidence
+- Mutant growth rate thresholds — ROM 0x1BF00 (8 threshold bytes + 5 amount bytes) — MEDIUM confidence
+
+### UNVERIFIED (extracted but may be wrong — do not use without re-checking)
+- **monsters.json STR/DEF/AGI/MANA** — extracted with wrong 8-byte stride; values are incorrect. Re-extraction needed with 9-byte stride at 0x1AAE8. HP values are correct.
+- **Monster drop byte** — referenced as "byte 6 of 8-byte entry" in old notes; byte position may shift with 9-byte stride correction.
 
 ### Not Yet Extracted
 The following mechanics have NOT been extracted from the ROM binary. Do not present

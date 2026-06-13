@@ -7,6 +7,12 @@ A web port and mechanics wiki for **Final Fantasy Legend 1** (Game Boy, 1989), a
 ```
 FFL1/
   .claude/          ← Context files for Claude (you are here)
+    overview.md     ← this file
+    rom-map.md      ← PRIMARY verified ROM reference (offsets, strides, confidence levels)
+    rom-data.md     ← legacy ROM notes (superseded by rom-map.md; keep for historical context)
+    sources.md      ← source reliability guide + tool recommendations for ROM research
+    mechanics.md    ← what has and has not been extracted from ROM
+    engine.md       ← v001 JS engine architecture (archived reference)
   img/              ← ROM-extracted and authored graphics
     title_screen.png        ← 160×144 lossless PNG; editable pixel-by-pixel
     title_screen_5x.png     ← 800×720 nearest-neighbor upscale (reference)
@@ -15,8 +21,9 @@ FFL1/
     gameboy.png             ← Shell background image
   rom/              ← ROM binary (gitignored — place ffl1.gb here for emulator)
   data/             ← Game data files
-    monsters.json   ← 200 monsters: name, HP, STR, DEF, AGI, MANA — FROM ROM
+    monsters.json   ← 200 monsters: name, HP — FROM ROM; WARNING: stat columns unverified (see below)
     abilities.json  ← 252 abilities/items/weapons: name + type — FROM ROM
+    dialog.md       ← story/NPC text; marked MEDIUM confidence (web-sourced, not DTE-decoded)
   v001/             ← Archived first-pass JS game engine (not actively developed)
     game.html, js/, css/, data/
   index.html        ← Hub page (tythos.com/FFL1/)
@@ -25,22 +32,24 @@ FFL1/
   mutants.html      ← Ability database (ROM data)
   humans.html       ← Armor and usable item name list (ROM data)
   items.html        ← Full item name/type database (ROM data)
-  game.html         ← v002: Game Boy shell + 160×144 canvas; shows title_screen.png
+  game.html         ← v002: Game Boy shell + 160×144 canvas; state machine title→class→name→story→world
   emulator.html     ← EmulatorJS wrapper (requires ffl1.gb in rom/)
+  TODO.md           ← Pending features, ROM data gaps, correctness bugs
 ```
 
 ## ROM-Extracted Data
 Data files directly sourced from the ROM binary:
-- `monsters.json` — names from 0x14000, HP from 0x1B254, stats from 0x1AAE8
-- `abilities.json` — names and type bytes from 0x14640
+- `monsters.json` — **names (HIGH)** from 0x14000; **HP (HIGH)** from 0x1B254 via HP table index in stat entry; **STR/DEF/AGI/MANA (UNVERIFIED)** — extracted with wrong 8-byte stride, need re-extraction with 9-byte stride
+- `abilities.json` — names and type bytes from 0x14640 (HIGH confidence)
 - `img/title_screen.png` — 160×144 pixel-accurate title screen (nearest-neighbor from emulator screenshot)
 - `img/tile_sheet_1bpp_large.png` — 119 font tiles from ROM offset 0x0F100
 - `img/bank2_tile_grid.png` — 1024 graphics tiles from ROM offset 0x08000
 
 Everything else in `data/` (v001 data files) was generated to support the JS game engine and
 should not be treated as authoritative for the original game's mechanics.
+See `rom-map.md` for the primary verified ROM reference (replaces rom-data.md for new work).
 See `mechanics.md` for the full list of what has and has not been extracted.
-See `rom-data.md` for tile/graphics offsets and the img/ directory inventory.
+See `sources.md` for source reliability rankings and ROM research tool guidance.
 
 ## Key Design Decisions
 - **Data-first**: All game data lives in `data/*.json` — edit those to mod the game
