@@ -46,33 +46,8 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 
 ---
 
-### Mystery 2: Stat table bytes 7–8 — unknown fields
-**Location:** `0x1AAE8 + idx*9 + 7` (byte 7) and `0x1AAE8 + idx*9 + 8` (byte 8).
-
-**Observed values:**
-| Monster | id | byte7 | byte8 |
-|---------|-----|-------|-------|
-| fly | 0 | 0x21 (33) | 0x73 (115) |
-| drgonfly | 1 | 0x24 (36) | 0x73 (115) |
-| hornet | 2 | 0x28 (40) | 0x73 (115) |
-| mosquito | 3 | 0x2D (45) | 0x73 (115) |
-| cicada | 4 | 0x33 (51) | 0x73 (115) |
-| mantis | 5 | 0x39 (57) | 0x73 (115) |
-| barracud | 6 | 0x41 (65) | 0x73 (115) |
-| gen-bu | 189 | 0x9F (159) | 0x76 (118) |
-| sei-ryu | 190 | varies | varies |
-
-**Key observations:**
-- Byte 8 = 0x73 is constant for the first ~180 regular monsters; boss entries differ (0x76, etc.)
-- Byte 7 increases roughly monotonically across monster IDs for regular monsters (0x21, 0x24, 0x28, 0x2D…), suggesting sequential index or offset values rather than per-monster stats
-- Bytes 7–8 little-endian → e.g., fly = 0x7321. In bank 6 CPU address space (0x4000–0x7FFF), 0x7321 is a valid address → file offset 0x18000 + (0x7321 − 0x4000) = 0x1B321. This is deep in bank 6 data (HP table is at 0x1B254, gold table at 0x1B2A4). **Strong hunch: bytes 7–8 are a bank-6–relative CPU address pointing to each monster's ability/action list.**
-- Byte 8 = 0x73 → all regular monster ability lists start in the 0x73xx CPU address range (file 0x1B300–0x1B3FF range)
-- The monotonically increasing byte 7 supports this: each monster's action list starts after the previous one in a sequential ability block
-
-**How to investigate:** 
-1. Dump 16–32 bytes starting at file offset 0x1B321 (fly's putative ability pointer) and check if the data there looks like an action list (small integers or name indices).
-2. In FFLRandomizer, search for any function that reads bytes at offset +7 or +8 of the stat entry, or that references addresses in the 0x7300–0x7FFF range in bank 6.
-3. BGB: Set a read breakpoint on 0x7321 in bank 6; the PC at the breakpoint is the code that processes fly's action list.
+### ✅ Mystery 2 — RESOLVED: Stat table bytes 7–8 = monster ability list pointer
+**Confirmed from [RANDO]:** FFLRandomizer names these fields "ability offset low byte" (+7) and "ability offset high byte" (+8). Combined as little-endian 16-bit, it is a bank-6 CPU address (0x4000–0x7FFF) pointing to that monster's ability/action list. Fly: bytes [0x21, 0x73] → CPU 0x7321 → file 0x1B321. The constant byte8=0x73 for regular monsters means all regular monster action lists cluster around file 0x1B321–0x1B3FF. Documented in rom-map.md under "Monster Ability List Table".
 
 ---
 

@@ -66,12 +66,14 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 | 4 | AGI | |
 | 5 | MANA | |
 | 6 | Gold + unknown | **Lower nibble** = gold table index (0–15) into BCD gold table at `0x1B2A4`; upper nibble = unknown (not gold) |
-| 7 | Unknown | Not yet identified; constant 0x21 for many regular monsters |
-| 8 | Unknown | Not yet identified; constant 0x73 for many regular monsters |
+| 7 | Ability offset lo | Low byte of bank-6 CPU address pointing to monster's ability list |
+| 8 | Ability offset hi | High byte; combined `(byte8 << 8) | byte7` = CPU address (e.g., fly → 0x7321 → file 0x1B321) |
 
 **Stride verification:** With 9-byte stride, boss entries 189–199 yield byte-1 values 22, 23, 24, 25, 26, 27, 28, 29, 31, 30, 31 — a clean sequential walk through the boss HP sub-table (HP: 250, 600, 1000, 1500, 1500, 1750, 2000, 2500, 2000, 5000, 5000). With 8-byte stride, the same byte-1 values decode to incoherent HP values (295, 36, 36312, 514, 20…). 9-byte stride is correct.
 
 **Gold table key verified:** `ReadCharacterGoldTableIndex` in FFLRandomizer source reads `filebytes[0x1AAEE + idx*9] & 0x0F` — confirming lower nibble of byte 6 is the gold index. Gold table uses 4-digit packed BCD encoding (see Gold Reward Table).
+
+**Ability offset confirmed:** FFLRandomizer names bytes +7 and +8 "ability offset low byte" and "ability offset high byte" respectively. Combined as little-endian 16-bit value, this is a bank-6 CPU address (range 0x4000–0x7FFF) pointing to the monster's action/ability list. Bank 6 CPU → file offset: `0x18000 + (cpu_addr − 0x4000)`. Example: fly has bytes [0x21, 0x73] → CPU 0x7321 → file 0x1B321 (within bank 6 data region, past HP and gold tables).
 
 ### Monster HP Table
 **Confidence: HIGH** — verified; values match expected game HP for all tested indices.
@@ -79,10 +81,10 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 | Field | Value |
 |---|---|
 | File offset | `0x1B254` |
-| Entry count | 200+ (two-section structure) |
+| Entry count | **32** (confirmed from [RANDO] source) |
 | Entry size | 2 bytes, little-endian unsigned 16-bit |
 | Indexing | Via HP table index byte in stat entry (byte 1), NOT directly by monster ID |
-| Source | [DC], verified |
+| Source | [DC], [RANDO], verified |
 
 **HP table structure:**
 | Index range | Contents |
@@ -141,8 +143,8 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 | Entry size | 8 bytes |
 | Byte 0 | Prefix code (`0xEC`=sword, `0xEF`=elemental spell, `0xE9`=helmet, `0xED`=chest, `0xE8`=gloves, `0xEA`/`0xEB`=shoes) |
 | Bytes 1–6 | Name text, `0xFF`-padded |
-| Byte 7 | Type code (`0x01`,`0x03`=usable item; `0x05`,`0x0A`,`0x0B`,`0x0F`=ability; `0x14`,`0x1E`=gun; `0x32`=sword; `0xFE`,`0xFD`=armor) |
-| Source | [DC], verified |
+| Byte 7 | **Uses count** — FFLRandomizer calls this field "item uses". The value also serves as a type discriminator by range: `0x01`/`0x03`=usable item; `0x05`,`0x0A`,`0x0B`,`0x0F`=ability (spell); `0x14`/`0x1E`=gun (20/30 shots); `0x32`=sword (50 uses); `0xFE`/`0xFD`=armor (unlimited). |
+| Source | [DC], [RANDO], verified |
 
 ### Item GP Cost Table
 **Confidence: LOW** — address from [RANDO]; byte read gives incoherent values with 3-byte LE interpretation. Format or address needs verification.
@@ -154,18 +156,103 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 | Status | UNVERIFIED — values don't decode cleanly as LE prices |
 
 ### Item Full Stat Table
-**Confidence: LOW** — address from [RANDO]; not yet byte-verified.
+**Confidence: MEDIUM** — address and field names from [RANDO]; stride confirmed (8 bytes/item, same as ability name table).
 
-| Offset | Field |
+| Field | Value |
 |---|---|
-| `0x1B700` | Item flags A |
-| `0x1B701` | Item flags B |
-| `0x1B702` | Item type |
-| `0x1B703` | Alt uses |
-| `0x1B704` | X value |
-| `0x1B705` | Y value |
-| `0x1B706` | GFX index |
-| `0x1B707` | Group / SFX byte |
+| File offset | `0x1B700` |
+| Entry count | 252 (same as ability name table) |
+| Entry size | 8 bytes |
+
+**Field layout per entry (8 bytes):**
+| Byte offset | Field | Notes |
+|---|---|---|
+| +0 | Flags A | |
+| +1 | Flags B | |
+| +2 | Item type | Not yet decoded |
+| +3 | Alt uses | |
+| +4 | X value | |
+| +5 | Y value | |
+| +6 | GFX index | Sprite tile used for this item |
+| +7 | Group / SFX byte | |
+
+### Monster Ability List Table
+**Confidence: MEDIUM** — pointers from stat table bytes 7–8 (confirmed from [RANDO]); list format not yet verified.
+
+| Field | Value |
+|---|---|
+| Location | Bank 6 data region, beginning around file `0x1B300` |
+| Pointer | Little-endian 16-bit CPU address in stat entry bytes 7–8; bank 6 CPU `0x4000`–`0x7FFF` → file `0x18000 + (cpu − 0x4000)` |
+| Format | Unknown; likely a terminated list of ability IDs. Fly's list at file `0x1B321`. |
+| Source | [RANDO] |
+
+### Encounter Table
+**Confidence: MEDIUM** — address and stride from [RANDO]; not yet byte-verified for content.
+
+| Field | Value |
+|---|---|
+| File offset | `0x1A868` |
+| Entry count | 128 |
+| Entry size | 5 bytes |
+| Source | [RANDO] |
+
+Format of each 5-byte encounter entry not yet documented. Contains monster IDs for each encounter slot.
+
+### Equipment Shop Tables
+**Confidence: MEDIUM** — addresses from [RANDO]; not yet byte-verified.
+
+14 shop inventory tables at file offsets (each stores a list of item IDs):
+
+| # | File offset |
+|---|---|
+| 1 | `0x17D38` |
+| 2 | `0x17D4C` |
+| 3 | `0x17D60` |
+| 4 | `0x17D74` |
+| 5 | `0x17D88` |
+| 6 | `0x17D9C` |
+| 7 | `0x17DB0` |
+| 8 | `0x17DC4` |
+| 9 | `0x17DD8` |
+| 10 | `0x17DEC` |
+| 11 | `0x17E00` |
+| 12 | `0x17D7E` |
+| 13 | `0x17DBA` |
+| 14 | `0x17DE2` |
+
+Item GP prices for shop items: see Item GP Cost Table at `0x17E10`.
+
+### Chest Contents Table
+**Confidence: MEDIUM** — addresses from [RANDO]; not yet byte-verified.
+
+44 chest locations; each stores a single item ID byte. Addresses span Bank 2 (`0x0A404`–`0x0AB32`), Bank 5 (`0x16322`–`0x168B6`), and Bank 5 (`0x17710`). Full address list in [RANDO] source.
+
+### Meat Transformation Tables
+**Confidence: MEDIUM** — addresses from [RANDO]; description plausible given known 25-family system.
+
+| Table | File offset | Format |
+|---|---|---|
+| Eat transformation | `0x0AFD3` (Bank 2, CPU `0x6FD3`) | 29 bytes × 25 rows (25 eater families × 29 result slots) |
+| Meat result lists | `0x0B2A8` | 16 bytes × 25 monster classes |
+
+### Character Portrait Tables (SPic / LPic)
+**Confidence: MEDIUM** — addresses from [RANDO]; confirmed as sprite/portrait index storage.
+
+| Field | File offset | Format | Notes |
+|---|---|---|---|
+| SPic + meat level | `0x0B438` | 1 byte per monster (200 entries): upper nibble = small portrait index, lower nibble = meat level | In bank 2, CPU `0x7438` |
+| LPic (large portrait) | `0x0B900` | 1 byte per monster (200 entries): portrait index | In bank 2, CPU `0x7900` |
+
+**Note:** The upper nibble of byte at `0x0B438 + idx` is the small portrait (SPic) tile group index. This table may be the key to resolving the `can_drop_meat` / meat level data that was previously extracted (incorrectly) from the stat table.
+
+### Tower Exit Pairs
+**Confidence: LOW** — address from [RANDO]; format not yet verified.
+
+| Field | Value |
+|---|---|
+| File offset | `0x92D0` (Bank 2, CPU `0x52D0`) |
+| Entry size | 3 bytes per exit pair |
+| Source | [RANDO] |
 
 ### Starting Character / Guild Table
 **Confidence: HIGH** — verified by direct byte read.
@@ -203,6 +290,7 @@ HUMAN(M), HUMAN(F), MUTANT(M), MUTANT(F), CLIPPER, REDBULL, WERERAT, ZOMBIE
 | `0x1BF0C` | DEF gain amount |
 | `0x1BF0D` | AGI gain amount |
 | `0x1BF0E` | MANA gain amount |
+| `0x1BF0F` | Mutant learnable ability list | 2 bytes per ability, 31 abilities (62 bytes total) |
 
 **Verified raw bytes at `0x1BF00`:** `23 45 63 75 87 8F 93 FF FF FF AF 15 13 15 15 F0`
 

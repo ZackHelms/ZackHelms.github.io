@@ -6,6 +6,12 @@
 - Monster names — name table at 0x14000 (200 × 8 bytes) — HIGH confidence
 - Monster HP — HP table at 0x1B254; indexed via byte 1 of stat entry (NOT directly by monster ID); indices 0–21 = regular HP curve, 22+ = boss HP values — HIGH confidence
 - Monster gold — gold table at 0x1B2A4 (4-digit packed BCD, 16 entries); index = lower nibble of stat byte 6; verified against FFLRandomizer source — HIGH confidence
+- Monster ability list pointer — stat bytes 7–8 = little-endian bank-6 CPU address to each monster's action list (e.g., fly → 0x7321 → file 0x1B321); confirmed from FFLRandomizer — MEDIUM confidence (pointer confirmed; list format not yet verified)
+- Character portrait index tables — SPic (small) at 0x0B438 (upper nibble = portrait group, lower = meat level); LPic (large) at 0x0B900; from FFLRandomizer — MEDIUM confidence
+- Encounter table location — 0x1A868, 5 bytes per entry, 128 entries; from FFLRandomizer — MEDIUM confidence (address confirmed; entry format not yet decoded)
+- Shop inventory tables — 14 shops at 0x17D38–0x17E00 range; from FFLRandomizer — MEDIUM confidence
+- Chest contents table — 44 chests at various bank-2 and bank-5 addresses; from FFLRandomizer — MEDIUM confidence
+- Tower exit pairs — 0x92D0 (bank 2, 3 bytes per exit pair); from FFLRandomizer — LOW confidence (not yet verified)
 - Ability names — ability table at 0x14640 (252 × 8 bytes) — HIGH confidence
 - Ability type classification — type byte (byte 7) and prefix byte (byte 0) of each ability record — HIGH confidence
 - Character encoding — 0x8A='a'…0xA3='z', 0x40='A'…0x59='Z', 0xA4='0'…0xAD='9' — HIGH confidence
