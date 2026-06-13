@@ -101,8 +101,15 @@ async function init() {
       spell: 'tag-purple', ability: 'tag-cyan', usable_item: 'tag-green',
       sword: 'tag-gold', weapon: 'tag-gold', armor: 'tag-cyan'
     }[a.type] || '';
+    const ELEM_COLOR = {fire:'tag-red', ice:'tag-cyan', elec:'tag-gold', poison:'tag-purple', all:'tag-green'};
+    const statParts = [];
+    if (a.power != null) statParts.push(`<span style="color:var(--neon-green);font-size:0.6rem">PWR ${a.power}</span>`);
+    if (a.defense != null) statParts.push(`<span style="color:var(--neon-green);font-size:0.6rem">DEF ${a.defense}</span>`);
+    if (a.heal != null) statParts.push(`<span style="color:var(--neon-green);font-size:0.6rem">HEAL ${a.heal}</span>`);
+    if (a.element) statParts.push(`<span class="tag ${ELEM_COLOR[a.element] || ''}" style="font-size:0.55rem;padding:1px 4px">${a.element}</span>`);
     el.innerHTML = `<div class="a-name">${a.name || '—'}${a.gp ? `<span class="a-gp">${a.gp.toLocaleString()}</span>` : ''}</div>
-      <div class="a-type"><span class="tag ${typeColor}">${a.type}</span>${a.uses != null ? `<span style="color:var(--dim2);font-size:0.6rem;margin-left:6px">×${a.uses}</span>` : ''}</div>`;
+      <div class="a-type"><span class="tag ${typeColor}">${a.type}</span>${a.type_byte != null ? `<span style="color:var(--dim2);font-size:0.6rem;margin-left:6px">×${a.type_byte}</span>` : ''}</div>
+      ${statParts.length ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${statParts.join('')}</div>` : ''}`;
     grid.appendChild(el);
     items.push(el);
   });
