@@ -163,6 +163,33 @@
   </section>
 
   <section>
+    <h2>STATUS CONDITIONS (ROM DATA)</h2>
+    <p>Seven status conditions have been identified from the status cure item bitmasks at <code>0x1B700</code>.
+    Each status cure item has an X field that is a bitmask clearing exactly one bit of the status byte.
+    Status names are <strong>MEDIUM confidence</strong> — inferred from item names; needs BGB to confirm exact meanings.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>BIT</th><th>CURE ITEM</th><th>STATUS (INFERRED)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1 (0xFD)</td><td><strong>needle</strong></td><td>Stone / Petrification</td></tr>
+          <tr><td>2 (0xFB)</td><td><strong>symbol</strong></td><td>Banish (unknown condition)</td></tr>
+          <tr><td>3 (0xF7)</td><td><strong>eyedrop</strong></td><td>Blind</td></tr>
+          <tr><td>4 (0xEF)</td><td><strong>antdote</strong></td><td>Poison</td></tr>
+          <tr><td>5 (0xDF)</td><td><strong>pan</strong></td><td>Confusion</td></tr>
+          <tr><td>6 (0xBF)</td><td><strong>shocker</strong></td><td>Paralysis</td></tr>
+          <tr><td>7 (0x7F)</td><td><strong>bell</strong></td><td>Sleep</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.72rem;color:var(--dim2);margin-top:6px;">
+      Source: ROM <code>0x1B700</code> item stat table (type byte 0x19), X field = bitmask (HIGH confidence for values; MEDIUM for status names).
+    </p>
+  </section>
+
+  <section>
     <h2>ABILITY TYPE CODES (ROM DATA)</h2>
     <p>Each entry in the ability table at <code>0x14640</code> (252 entries × 8 bytes) encodes a
     type byte at position 7 and a prefix byte at position 0. These are the observed values and
