@@ -43,10 +43,10 @@
   <div class="page-sub">ROM-EXTRACTED DATA ONLY</div>
 
   <div class="callout warn">
-    <strong>Data source notice:</strong> Item names and type classifications are extracted directly
-    from the ROM ability table at <code>0x14640</code>. Numeric values such as base power, use
-    counts, elemental affinity, and stat bonuses are <strong>not</strong> encoded in the name
-    records and have not been extracted from the ROM. Those columns are omitted here.
+    <strong>Data source notice:</strong> Item names, type classifications, use counts, and GP prices
+    are extracted directly from ROM (<code>0x14640</code> name table, <code>0x17E10</code> price
+    table — 6-digit BCD format). Numeric values such as base power, elemental affinity, and stat
+    bonuses have not yet been extracted from the ROM and are omitted.
   </div>
 
   <div class="tab-bar">
@@ -72,7 +72,7 @@
     <div class="table-wrap">
       <table id="weapon-table">
         <thead>
-          <tr><th>NAME</th><th>ROM TYPE</th></tr>
+          <tr><th>NAME</th><th>ROM TYPE</th><th>USES</th><th>GP</th></tr>
         </thead>
         <tbody id="weapon-tbody"></tbody>
       </table>
@@ -87,7 +87,7 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>NAME</th><th>SLOT (prefix byte)</th></tr>
+          <tr><th>NAME</th><th>SLOT (prefix byte)</th><th>GP</th></tr>
         </thead>
         <tbody id="armor-tbody"></tbody>
       </table>
@@ -111,7 +111,7 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>NAME</th><th>ROM TYPE</th></tr>
+          <tr><th>NAME</th><th>ROM TYPE</th><th>USES</th><th>GP</th></tr>
         </thead>
         <tbody id="spell-tbody"></tbody>
       </table>
@@ -126,7 +126,7 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>NAME</th><th>ROM TYPE</th></tr>
+          <tr><th>NAME</th><th>ROM TYPE</th><th>USES</th><th>GP</th></tr>
         </thead>
         <tbody id="usable-tbody"></tbody>
       </table>
@@ -148,7 +148,9 @@ async function init() {
     tr.dataset.type = w.type;
     tr.innerHTML = `
       <td><strong>${w.name}</strong></td>
-      <td><span class="tag tag-gold">${w.type}</span></td>`;
+      <td><span class="tag tag-gold">${w.type}</span></td>
+      <td style="color:var(--dim2)">${w.uses ?? '—'}</td>
+      <td style="color:var(--neon-green)">${w.gp ? w.gp.toLocaleString() + ' GP' : '—'}</td>`;
     wTbody.appendChild(tr);
     wRows.push(tr);
   });
@@ -170,7 +172,8 @@ async function init() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${a.name}</strong></td>
-      <td><span class="tag tag-cyan">${slotLabel}</span></td>`;
+      <td><span class="tag tag-cyan">${slotLabel}</span></td>
+      <td style="color:var(--neon-green)">${a.gp ? a.gp.toLocaleString() + ' GP' : '—'}</td>`;
     aTbody.appendChild(tr);
   });
 
@@ -183,7 +186,9 @@ async function init() {
     tr.dataset.type = s.type;
     tr.innerHTML = `
       <td><strong>${s.name}</strong></td>
-      <td><span class="tag tag-purple">${s.type}</span></td>`;
+      <td><span class="tag tag-purple">${s.type}</span></td>
+      <td style="color:var(--dim2)">${s.uses ?? '—'}</td>
+      <td style="color:var(--neon-green)">${s.gp ? s.gp.toLocaleString() + ' GP' : '—'}</td>`;
     spTbody.appendChild(tr);
     spRows.push(tr);
   });
@@ -204,7 +209,9 @@ async function init() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${u.name}</strong></td>
-      <td style="color:var(--dim2);font-size:0.72rem">usable_item</td>`;
+      <td style="color:var(--dim2);font-size:0.72rem">usable_item</td>
+      <td style="color:var(--dim2)">${u.uses ?? '—'}</td>
+      <td style="color:var(--neon-green)">${u.gp ? u.gp.toLocaleString() + ' GP' : '—'}</td>`;
     uTbody.appendChild(tr);
   });
 
