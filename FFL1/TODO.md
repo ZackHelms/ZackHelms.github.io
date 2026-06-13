@@ -35,14 +35,11 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 | gen-bu | 189 | 0x06 | 0x0 = 0 |
 | sei-ryu | 190 | 0x0C | 0x0 = 0 |
 
-**Key observation:** Bosses (189+) all have upper nibble = 0. Regular monsters vary. The FFLRandomizer's `WriteCharacterGoldTableIndex` uses `|=` (not direct assignment), deliberately preserving the upper nibble — so it contains real data the randomizer didn't want to overwrite.
+**Key observation:** Bosses (189+) all have upper nibble = 0. Regular monsters vary. The RANDO code (`WriteCharacterGoldTableIndex`) sometimes uses `|=` to preserve the upper nibble, but `WriteMonsterData` zeros the entire byte first — so the RANDO is inconsistent and likely doesn't know what the upper nibble means.
 
-**Hunches:**
-- Meat type / drop category: the FFLRandomizer source says byte 0 contains "Race/Meat/NumAbils" so some meat info may also live in byte 6 upper nibble. Bosses can't be eaten, hence 0.
-- Number of abilities (alternative to byte 0): the upper nibble could be a secondary count or flag for available actions.
-- Encounter tier/rank: could label which dungeon level this monster appears in.
+**RANDO verdict (from source audit):** No `Read*` function ever accesses the upper nibble of byte 6. `AdjustMonsterGoldOffset` accidentally destroys it. Given the RANDO comment "All monsters are Monster race, meat drop 3" and the observation that bosses = 0 (bosses can't be eaten), the upper nibble most likely encodes **meat category / drop tier**.
 
-**How to investigate:** Check FFLRandomizer for any function that reads the upper nibble of byte 6. Alternatively, use BGB to set a read breakpoint on `0x1AAEE` (monster 0, byte 6) and watch what code accesses it.
+**How to investigate:** BGB — set a read breakpoint on CPU address `0x7AEE` in bank 6 (= file `0x1AAEE`, monster 0 byte 6). The PC at the breakpoint is the game code that uses this byte.
 
 ---
 
@@ -69,25 +66,14 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 
 ---
 
-### Mystery 4: Item GP cost table format (0x17E10)
-**Location:** `0x17E10`, claimed 3-byte-per-item format by FFLRandomizer.
-
-**Problem:** 3-byte little-endian interpretation gives incoherent prices (e.g., multi-million GP for a Potion). The BCD format used by the gold reward table at `0x1B2A4` might also apply here, or the stride may differ.
-
-**Hunch:** The item cost table likely uses the same 4-digit BCD encoding (2 bytes, not 3) as the gold table. Alternatively, if 3 bytes: the first 2 bytes are BCD and the 3rd byte is a shop availability flag or item category byte.
-
-**How to investigate:** 
-1. Try reading 0x17E10 as 2-byte BCD: do the first few items decode to plausible shop prices (Potion ~100–300 GP, etc.)?
-2. Cross-reference with GameFAQs or wiki shop price lists to validate candidate interpretations.
-3. FFLRandomizer: search for `ReadItemCost` or `ReadItemPrice` — the exact decoding function will reveal the format.
+### ✅ Mystery 4 — RESOLVED: Item GP cost table = 6-digit packed BCD
+**Confirmed from [RANDO]:** `ReadGPCost` at address `0x17E10 + item_id * 3`. Format: 3 bytes, each nibble = one decimal digit (6 digits total → 000000–999999 GP). Examples: 6789 GP = `[0x00, 0x67, 0x89]`; 10480 GP = `[0x01, 0x04, 0x80]`. Prior "incoherent" readings were 3-byte LE integer misinterpretation. Documented in rom-map.md.
 
 ---
 
 ## Data Re-Extraction Needed (correctness bugs)
 
-- **Verify item GP cost table** — address `0x17E10` from FFLRandomizer source, but
-  3-byte LE interpretation gives incoherent prices. See Mystery 4 in ROM Mysteries section for
-  investigation approach. Correct format → `rom-map.md`.
+- **Extract item GP costs from ROM** — format now confirmed (6-digit packed BCD, `0x17E10 + item_id*3`, Mystery 4 resolved). Re-extract `data/shops.json` prices from ROM binary using this formula.
 
 - **Replace v001 data files with ROM-verified data** — the following files in `FFL1/data/`
   are from the v001 game engine era and contain fabricated or web-sourced values not from

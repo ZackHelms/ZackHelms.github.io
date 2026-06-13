@@ -20,8 +20,11 @@
 - Bank 3 UI text — ROM 0x0ECC8: "start", "continue", "fight", "run", "item" — HIGH confidence
 - Font tiles — 1bpp, 119 tiles × 8 bytes at ROM 0x0F100; tile 0–9=digits, 10–35=A–Z, 36–61=a–z — HIGH confidence
 - DTE table location — ROM 0x14E40 (bank 5) → loaded to RAM $C800 at startup — HIGH confidence
-- Stat table location — ROM 0x1AAE8, **9-byte stride** (corrected from earlier 8-byte assumption) — HIGH confidence for stride; field layout MEDIUM confidence
+- Stat table location — ROM 0x1AAE8, **9-byte stride** (corrected from earlier 8-byte assumption) — HIGH confidence for stride; field layout MEDIUM confidence; byte 0 format partially decoded: `0x7B + (num_abils × 8)` for race=Monster/meat_drop=3
 - Mutant growth rate thresholds — ROM 0x1BF00 (8 threshold bytes + 5 amount bytes) — MEDIUM confidence
+- Item GP cost table — ROM 0x17E10, 3 bytes per item, **6-digit packed BCD** (each nibble = one decimal digit); confirmed from FFLRandomizer `ReadGPCost` — HIGH confidence
+- Item stat table — ROM 0x1B700, 8 bytes per item: FlagsA, FlagsB, Type, AltUses, X, Y, GFX, (GroupFlag bit7 + SFX bits6-0) — MEDIUM confidence
+- Item uses count — stored as byte 7 of the ability name table entry (ROM 0x14647 + item_id×8), NOT in the stat table — HIGH confidence (from RANDO `ReadItemUses`)
 
 ### Previously Unverified — Now Resolved
 - **monsters.json STR/DEF/AGI/MANA** — re-extracted with correct 9-byte stride at 0x1AAE8; values now HIGH confidence. monsters.json updated.

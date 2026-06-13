@@ -59,13 +59,13 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 **Field layout per entry (9 bytes):**
 | Byte | Field | Notes |
 |---|---|---|
-| 0 | Race / type flags | Includes monster family, meat drop flags; exact bit layout not fully mapped |
+| 0 | Race / Meat drop / NumAbils | RANDO formula: `byte = 0x7B + (num_abils × 8)` where `0x7B` = base for race=Monster, meat_drop=3. So `num_abils = (byte − race_meat_base) / 8`. Bits 0–2 likely encode race; bits 3–6 encode num_abils count. Full bit layout not confirmed. |
 | 1 | HP table index | Index into HP table at `0x1B254` (see HP Table below) |
 | 2 | STR | Raw stat; display capped at 99, internal max 255 |
 | 3 | DEF | |
 | 4 | AGI | |
 | 5 | MANA | |
-| 6 | Gold + unknown | **Lower nibble** = gold table index (0–15) into BCD gold table at `0x1B2A4`; upper nibble = unknown (not gold) |
+| 6 | Gold + unknown | **Lower nibble** = gold table index (0–15) into BCD gold table at `0x1B2A4`; **upper nibble = unknown** — RANDO never reads it; `WriteMonsterData` zeroes the entire byte then `|=` the gold index, accidentally destroying the upper nibble. Likely encodes meat category or encounter rank (bosses all have 0). Needs BGB to confirm. |
 | 7 | Ability offset lo | Low byte of bank-6 CPU address pointing to monster's ability list |
 | 8 | Ability offset hi | High byte; combined `(byte8 << 8) | byte7` = CPU address (e.g., fly → 0x7321 → file 0x1B321) |
 
@@ -147,13 +147,18 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 | Source | [DC], [RANDO], verified |
 
 ### Item GP Cost Table
-**Confidence: LOW** — address from [RANDO]; byte read gives incoherent values with 3-byte LE interpretation. Format or address needs verification.
+**Confidence: HIGH** — address and format confirmed from [RANDO] source (`ReadGPCost` / `ReadItemCost`).
 
 | Field | Value |
 |---|---|
 | File offset | `0x17E10` |
-| Claimed format | 3 bytes per item |
-| Status | UNVERIFIED — values don't decode cleanly as LE prices |
+| Entry size | 3 bytes per item |
+| Entry count | 252 (same as ability name table) |
+| Format | **6-digit packed BCD** — each nibble = one decimal digit; supports 0–999,999 GP |
+
+**BCD decode:** `byte0 = (100000s<<4)|10000s`, `byte1 = (1000s<<4)|100s`, `byte2 = (10s<<4)|1s`. Examples: 6,789 GP → `[0x00, 0x67, 0x89]`; 10,480 GP → `[0x01, 0x04, 0x80]`. Prior "incoherent" readings were caused by incorrect 3-byte LE integer interpretation.
+
+`ReadItemCost(filebytes, item_id)` = `ReadGPCost(filebytes, 0x17E10 + 3 * item_id)`
 
 ### Item Full Stat Table
 **Confidence: MEDIUM** — address and field names from [RANDO]; stride confirmed (8 bytes/item, same as ability name table).
@@ -174,7 +179,7 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 | +4 | X value | |
 | +5 | Y value | |
 | +6 | GFX index | Sprite tile used for this item |
-| +7 | Group / SFX byte | |
+| +7 | Group flag + SFX | Bit 7 = group flag (`ReadItemGroupFlag`); bits 6–0 = SFX index (`ReadItemSFX`) |
 
 ### Monster Ability List Table
 **Confidence: MEDIUM** — pointers from stat table bytes 7–8 (confirmed from [RANDO]); list format not yet verified.
