@@ -76,13 +76,12 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
   - `data/encounters.json` — encounter rates/tables fabricated.
     *(discovered during: wiki audit)* Extract from ROM when encounter zone data is found.
   - ✅ `data/shops.json` — replaced with ROM-extracted data (see above).
-  - `data/transformation.json` — transformation table "based on FFLMonsterCalc community
-    documentation" (LOW confidence). *(discovered during: wiki audit)* Eat table at `0x0AFD3`
-    (29 bytes × 25 monster classes); result lists at `0x0B2A8` (16 bytes × 25 classes).
-    Addresses confirmed from RANDO; byte layout not yet decoded. Next step: extract and decode.
+  - ✅ `data/transformation.json` — replaced with ROM data. 25 monster classes × 16 weighted members (0x0B2A8); 25×29 eat transformation table with result class weights (0x0AFD3). Monster class = monster_id // 6 for IDs 0–149; monsters 150+ cannot be eaten. HIGH confidence.
+  - ✅ `data/encounters.json` — replaced with ROM data. 128 encounters × 5 monster slots from 0x1A868. MEDIUM confidence for structure (which slots are active in battle not yet decoded; enc 0-5 appear to be boss encounters). **QUESTION FOR USER:** Which encounters map to which overworld zones/floors?
   - `data/world.json` — world structure "reconstructed from game knowledge" (LOW confidence).
     *(discovered during: wiki audit)* Extract from ROM when encounter zone / world structure
     is mapped.
+  - `data/items.json` — fabricated stats; wiki pages already use abilities.json instead. Low priority; can delete or keep as deprecated stub.
 
 ## BGB Session — Breakpoints to Set
 

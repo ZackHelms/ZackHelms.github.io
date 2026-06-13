@@ -27,6 +27,8 @@
 - Item uses count — stored as byte 7 of the ability name table entry (ROM 0x14647 + item_id×8), NOT in the stat table — HIGH confidence (from RANDO `ReadItemUses`)
 - Shop inventories — 14 shops at ROM 0x17D38–0x17E0F; 10 item IDs per shop; extracted to `data/shops.json` — HIGH confidence for item IDs and prices; UNVERIFIED for world/location assignments
 - Character name encoding — corrected: 0x80–0x89='0'–'9', 0x8A–0xA3='A'–'Z', 0xA4–0xBD='a'–'z', 0xFF=' ', 0xF2='-'. Previous table (Data Crystal) had wrong ranges — HIGH confidence (RANDO source + full 200-name decode verified)
+- Meat transformation — 25 monster classes (class = monster_id // 6 for IDs 0–149); eat table at 0x0AFD3 (29 entries × 25 eater classes); class member lists at 0x0B2A8 (16 entries × 25 classes). All values are class indices, not monster IDs. Extracted to data/transformation.json — HIGH confidence
+- Encounter table — 128 encounters × 5 monster IDs at 0x1A868. Extracted to data/encounters.json. Encounter 0–5 = boss fights. Which 5 slots are active in battle is NOT YET decoded — MEDIUM confidence
 
 ### Previously Unverified — Now Resolved
 - **monsters.json STR/DEF/AGI/MANA** — re-extracted with correct 9-byte stride at 0x1AAE8; values now HIGH confidence. monsters.json updated.
