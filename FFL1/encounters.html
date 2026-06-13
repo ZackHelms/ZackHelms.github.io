@@ -157,15 +157,15 @@ async function init() {
     const badgeClass = etype === 'boss' ? 'badge-boss' : etype === 'scripted' ? 'badge-scripted' : 'badge-random';
     const badgeText = etype === 'boss' ? 'BOSS' : etype === 'scripted' ? 'SCRIPTED' : 'RANDOM';
 
-    // Monster chips
+    // Monster chips — filler styling only in boss/scripted encounters
     const chips = ids.map((mid, i) => {
       const m = byId[mid];
       const name = m?.name ?? `#${mid}`;
       const hp = m?.hp ?? '?';
       const tier = m?.encounter_tier;
       const isBoss = mid >= 189 && mid <= 199;
-      const isNpc = mid >= 150 && mid < 173 && !isBoss;
-      const isFiller = FILLER_IDS.has(mid);
+      const isNpc = mid >= 150 && mid < 173 && !isBoss && (byId[mid]?.encounter_tier === 0);
+      const isFiller = etype !== 'random' && FILLER_IDS.has(mid);
       let cls = 'monster-chip';
       if (isBoss) cls += ' boss-chip';
       else if (isNpc) cls += ' npc-chip';

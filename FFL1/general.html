@@ -136,6 +136,33 @@
   </section>
 
   <section>
+    <h2>MONSTER TYPES (ROM DATA)</h2>
+    <p>Each monster has a type value from the Monster Type Table at <code>0x1B1F0</code> (2 nibbles per byte).
+    Five distinct values: 0=standard (most monsters), and four elemental types whose values match the
+    element bitmask used by weapons and armor (fire=1, ice=2, elec=4, poison=8).
+    Combat significance (e.g., elemental weakness) is not yet confirmed from ROM.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>TYPE</th><th>COUNT</th><th>LABEL</th><th>FAMILY GROUPS</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>0</code></td><td>100</td><td>Standard</td><td>Insect, Plant, Crustacean, Canine, Bovine, Pachyderm, Bird, Worm, Werebeast, Eye, Slime, Elemental, Bird 2, Bosses</td></tr>
+          <tr><td style="color:var(--cyan)"><code>1</code></td><td>18</td><td style="color:var(--cyan)">Aquatic</td><td>Fish/Aquatic (6–11), Shellfish (24–29), Mollusk (54–59)</td></tr>
+          <tr><td style="color:var(--green)"><code>2</code></td><td>22</td><td style="color:var(--green)">Humanoid</td><td>Goblinoid (78–83), Human warriors (150–164), some Vampire/Machine</td></tr>
+          <tr><td style="color:var(--gold)"><code>4</code></td><td>30</td><td style="color:var(--gold)">Reptilian</td><td>Snake (48–53), Lizard (66–71), Mythical (84–89), Siren (114–119), Dragon (144–149)</td></tr>
+          <tr><td style="color:var(--purple,#cc88ff)"><code>8</code></td><td>30</td><td style="color:var(--purple,#cc88ff)">Undead</td><td>Skeleton (96–101), Demon (108–113), Undead/Spirit (120–131)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.72rem;color:var(--dim2);margin-top:6px;">
+      Source: ROM <code>0x1B1F0</code> (HIGH confidence for values; MEDIUM for combat meaning).
+      Filterable in <a href="monsters.html">MONSTERS</a> page.
+    </p>
+  </section>
+
+  <section>
     <h2>ABILITY TYPE CODES (ROM DATA)</h2>
     <p>Each entry in the ability table at <code>0x14640</code> (252 entries × 8 bytes) encodes a
     type byte at position 7 and a prefix byte at position 0. These are the observed values and
