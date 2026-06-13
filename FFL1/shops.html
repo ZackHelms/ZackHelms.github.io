@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shops — FFL1</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.shop-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.shop-card-header {
+  padding: 10px 16px;
+  background: var(--panel2);
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.shop-num {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 0.78rem;
+  color: var(--gold);
+  letter-spacing: 2px;
+}
+.shop-addr {
+  font-size: 0.65rem;
+  color: var(--dim2);
+}
+.shop-range {
+  font-size: 0.68rem;
+  color: var(--dim2);
+}
+.shop-card table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+}
+.shop-card td {
+  padding: 5px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.shop-card tr:last-child td { border-bottom: none; }
+.shop-card td:first-child { color: var(--white); }
+.shop-card td:nth-child(2) { text-align: right; color: var(--neon-green); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.type-sword  { color: var(--gold); }
+.type-weapon { color: var(--cyan); }
+.type-armor  { color: var(--blue, #6699ff); }
+.type-spell  { color: var(--purple, #cc88ff); }
+.type-ability { color: var(--red, #ff5555); }
+.type-usable { color: var(--green); }
+
+.filter-row { display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+.filter-row input { flex:1; min-width:160px; }
+
+.loc-badge {
+  font-size: 0.65rem;
+  color: var(--dim2);
+  font-style: italic;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+.loc-unverified { border-color: var(--dim2); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FFL1</h1>
+  <div class="breadcrumb">
+    <a href="/">tythos.com</a><span>/</span>
+    <a href="index.html">FFL1</a><span>/</span>
+    <span>Shops</span>
+  </div>
+</header>
+<nav>
+  <a href="index.html">HOME</a>
+  <a href="general.html">GENERAL</a>
+  <a href="monsters.html">MONSTERS</a>
+  <a href="mutants.html">MUTANTS</a>
+  <a href="humans.html">HUMANS</a>
+  <a href="items.html">ITEMS</a>
+  <a href="shops.html" class="active">SHOPS</a>
+  <a href="encounters.html">ENCOUNTERS</a>
+  <a href="game.html">▶ PLAY</a>
+</nav>
+
+<main>
+  <div class="page-title">SHOPS</div>
+  <div class="page-sub">ROM-EXTRACTED DATA ONLY</div>
+
+  <div class="callout warn">
+    <strong>Data source notice:</strong> Shop inventories are extracted from ROM
+    (<code>0x17D38</code>–<code>0x17E0F</code>, 14 shops × 10 item IDs each). Item prices use the
+    6-digit BCD table at <code>0x17E10</code>. <strong>Shop locations (world/town) are not yet
+    extracted from the ROM</strong> and are not shown. Shop indices 1–14 correspond to RANDO's
+    <code>equipment_shop_addrs</code> array.
+  </div>
+
+  <div class="filter-row">
+    <input type="text" id="item-search" placeholder="Filter by item name…">
+    <select id="type-filter">
+      <option value="">All item types</option>
+      <option value="sword">Sword</option>
+      <option value="weapon">Weapon</option>
+      <option value="armor">Armor</option>
+      <option value="spell">Spell</option>
+      <option value="ability">Ability</option>
+      <option value="usable_item">Usable item</option>
+    </select>
+  </div>
+
+  <div id="shop-grid" class="shop-grid"></div>
+</main>
+
+<script>
+async function init() {
+  const [shopData, abilities] = await Promise.all([
+    fetch('data/shops.json').then(r => r.json()),
+    fetch('data/abilities.json').then(r => r.json())
+  ]);
+
+  const abilityMap = {};
+  abilities.forEach(a => { abilityMap[a.id] = a; });
+
+  function typeClass(type) {
+    const map = { sword:'type-sword', weapon:'type-weapon', armor:'type-armor',
+                   spell:'type-spell', ability:'type-ability', usable_item:'type-usable' };
+    return map[type] || '';
+  }
+
+  const grid = document.getElementById('shop-grid');
+  const cards = [];
+
+  shopData.shops.forEach(shop => {
+    const card = document.createElement('div');
+    card.className = 'shop-card';
+
+    const minGp = shop.gp_range[0].toLocaleString();
+    const maxGp = shop.gp_range[1].toLocaleString();
+
+    card.innerHTML = `
+      <div class="shop-card-header">
+        <span class="shop-num">SHOP ${shop.shop_index}</span>
+        <span class="shop-addr">${shop.rom_address}</span>
+        <span class="shop-range">${minGp}–${maxGp} GP</span>
+      </div>
+      <table><tbody id="shop-tbody-${shop.shop_index}"></tbody></table>`;
+
+    grid.appendChild(card);
+
+    const tbody = document.getElementById(`shop-tbody-${shop.shop_index}`);
+    const rows = [];
+
+    shop.inventory.forEach(item => {
+      const ab = abilityMap[item.item_id];
+      const type = ab ? ab.type : 'unknown';
+      const tr = document.createElement('tr');
+      tr.dataset.name = item.name.toLowerCase();
+      tr.dataset.type = type;
+      tr.innerHTML = `
+        <td><span class="${typeClass(type)}">${item.name}</span></td>
+        <td>${item.gp.toLocaleString()} GP</td>`;
+      tbody.appendChild(tr);
+      rows.push(tr);
+    });
+
+    cards.push({ card, rows });
+  });
+
+  function applyFilters() {
+    const q = document.getElementById('item-search').value.toLowerCase().trim();
+    const t = document.getElementById('type-filter').value;
+
+    cards.forEach(({ card, rows }) => {
+      let anyVisible = false;
+      rows.forEach(r => {
+        const hide = (q && !r.dataset.name.includes(q)) || (t && r.dataset.type !== t);
+        r.classList.toggle('hidden', hide);
+        if (!hide) anyVisible = true;
+      });
+      card.style.display = anyVisible ? '' : 'none';
+    });
+  }
+
+  document.getElementById('item-search').addEventListener('input', applyFilters);
+  document.getElementById('type-filter').addEventListener('change', applyFilters);
+}
+init();
+</script>
+</body>
+</html>

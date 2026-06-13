@@ -1,0 +1,1010 @@
+{
+  "_notes": "NPC dialog text extracted from ROM bank 5, 0x14F3E-0x17D37. DTE-decoded using tables at 0x14E40 (DTE1) and 0x14EC0 (DTE2). Control codes stripped. Text is MEDIUM confidence -- DTE expansion correct but some control code semantics unknown.",
+  "_source": "ROM 0x14F3E-0x17D37, DTE1 table 0x14E40, DTE2 table 0x14EC0",
+  "strings": [
+    {
+      "offset": "0x14F3E",
+      "text": "TO\n  OOSTFOUSTHE\n  VLILAGE UNWHSS\n  OTACTHEPT HIS\n  PFOPOSTHE THE"
+    },
+    {
+      "offset": "0x14F69",
+      "text": "MUSLORDTHE\n  'TU LDTHEK ILLTHE\n  MAAT IS WFONGNNNNNNNNNNNN\nKINKELDRMORI''VEIN\n  LOVETHE\nOOHNNNNNNNNNNNN MAO IS\n  THE LADYNNNNNNNNNNNN\nKINGSHE IS CEGIRL  WHO RDVES IN THE  SOUTHWOBUT SHE\n  THUETNANK ACTHEPT\n  MUSPFOPOSTHE THE\nOTRAAL OTIY\n  BE ABWH TO HELP\n  YOU IDR CEREURRDKINGI'LL GIVE YOU  ANY YOU\n  URNTTHE"
+    },
+    {
+      "offset": "0x1502A",
+      "text": "THE 'TTHE"
+    },
+    {
+      "offset": "0x15039",
+      "text": "JEANNE"
+    },
+    {
+      "offset": "0x15041",
+      "text": "SEIINKERYU"
+    },
+    {
+      "offset": "0x1504B",
+      "text": "SAYAKA"
+    },
+    {
+      "offset": "0x15054",
+      "text": "SH'S IT TO MED'S"
+    },
+    {
+      "offset": "0x15060",
+      "text": "YOU HAVE"
+    },
+    {
+      "offset": "0x15066",
+      "text": "I ATTWH STHRD"
+    },
+    {
+      "offset": "0x15074",
+      "text": "THING"
+    },
+    {
+      "offset": "0x1507B",
+      "text": "NANK\nG DEA THE RIGHT\nANSELRD'S\nGI"
+    },
+    {
+      "offset": "0x1509A",
+      "text": "LDLDLDRGHD'S"
+    },
+    {
+      "offset": "0x150A3",
+      "text": "WOTHE RIGHT ANSELRTHETHE I'LLGIVE YOU A REURRDTHEI LUYOORI THE\n'TU  HEAN HE IT TO\nOPEN THE DDTHER AT\nTHE TOELRTHE"
+    },
+    {
+      "offset": "0x15109",
+      "text": "'TU NEIL THIS\n  BOARD IDR THAT\n  ROMI OLDR THE"
+    },
+    {
+      "offset": "0x1512F",
+      "text": "'TU IDOLD'S\n  'T YOU WAORTHE WAIM D  IS HM A STHE\nYO OTIOO ITD'SD'S\n\n \n  YOU ARE GREATD'S\nA THANKS IDR\n  EVERYD'S MY\n  BFOTHER MAUSBE\n  IN HEAVEN  K  K\n  OH  K  KI USTHE URY\n  HERE IS WHAT\n  OTIDUNDTHE"
+    },
+    {
+      "offset": "0x151CF",
+      "text": "S D'S\n\nTHE ID YOUTH ARE DEAEA"
+    },
+    {
+      "offset": "0x151F4",
+      "text": "IT A PITFTHE LD'SD'SESTHERE IS A VOITHE\nIN THE DISTANTHE  K  K\n'DEAN YOU CRDMB\n  OUTNNNNNNNNNNNN'ES"
+    },
+    {
+      "offset": "0x15259",
+      "text": "LD LONKETIME AGO\nTHE STATUE OF HEROTHRE"
+    },
+    {
+      "offset": "0x15277",
+      "text": "'TU GE IS"
+    },
+    {
+      "offset": "0x15281",
+      "text": "US\n\nA IF YOU WANT TO\nDRINK HEREWOYOU\nMHT SPEAK FIRST' ONANK DO ITD'S'AN\n\nOR'TU'RE NO\n  ITCH FOR HIMD'S\n  OKAUSPTHE WOYOU\n  FIGHT METHE"
+    },
+    {
+      "offset": "0x152F2",
+      "text": "OTGUA S I\n  HAVE NO CHOITHEORTHAT\n  RIGHTTHELE IS\n  STEP OUTSABALANEDANA \nEDANES H\n' ONANK BE STUPABD'S'OR'TU STAY\n  OUT OF ITD'S\n\n HAVENANK WE\n  METNNNNNNNNNNNN\nOH  K  KMAAT A   COINCABENTHED'S\n  I FOTHERWOTHIS IS  WHAT HAPPENIL  K  KAS   K  KTHAT\n  THE L O YOU STORYTHE\nOROTRAAL\n  'TU ARE THE SO\n  GOINKEAFTER\n  THE\nZOKU\n  WAORTHE WAIM D IS\n  TOO STFONGTHE\nWE ARE\n  IKINKECEICHINE  TO NEUTCARDZE ITORWE STLIL\n  NEIL LE OR WE MORE  PARTSTHE"
+    },
+    {
+      "offset": "0x15429",
+      "text": "HAVENANK YOU\n  IDUND THEMNNNNNNNNNNNN\nOR'TU'LL\n  FIND THE'VEIN\n  LDKIBATHE\n'TU IY\n  FIND THE\n  LO HEATION OF\n  LDKIBCEAT THE\n  RDBCARYTHE\nWE'LL FIND\n  THE PARTSTHE\nORGDTHED LUCKD'S   'TU  HEAN TA  \n  MUSBI  THE"
+    },
+    {
+      "offset": "0x154BF",
+      "text": "OUSE COLORTHE"
+    },
+    {
+      "offset": "0x154D1",
+      "text": "DEOME THIS URYD'SETHE"
+    },
+    {
+      "offset": "0x154F2",
+      "text": "WERENANK YOU\n  GOINKETO MENTION  IT TO THEMNNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x15512",
+      "text": "NOTHEUSWLIL\n  BE BE ISTER OFFTHE\n\nSEORLDRE YOU\n  GOINKETO WHAVE\n  H BEHINDNNNNNNNNNNNN\n  WE'LL COME WITH   YOUD'S\n T DEATHE"
+    },
+    {
+      "offset": "0x15570",
+      "text": "ES\n\nA"
+    },
+    {
+      "offset": "0x15582",
+      "text": "AS\nNOD'S"
+    },
+    {
+      "offset": "0x15593",
+      "text": "ONANK JHT STAND\nTHERAL\nKEEP LDTHEKINGD'S"
+    },
+    {
+      "offset": "0x155AE",
+      "text": "A ROWAOUND ITD'S\nLDKIBCEIS ETHESE BLOCKSTO THE EAST AND ETHEEDBLOCKS TO THE\nNORTHTHE"
+    },
+    {
+      "offset": "0x1560F",
+      "text": "SOINKEDEHOLE IS JUMPTHELDI"
+    },
+    {
+      "offset": "0x1562C",
+      "text": "DTHER IS LOC  D BY\nIGIC OF"
+    },
+    {
+      "offset": "0x15641",
+      "text": "THE RATHE  IS\n BFO  ND'S"
+    },
+    {
+      "offset": "0x1565F",
+      "text": "YOU\nETHE\nILE'VESOINKEDEHOOTFINTHE LY\n   HEAUGHT UP WITH\n  YOUTHE"
+    },
+    {
+      "offset": "0x156C5",
+      "text": "CATWOTHERE  THAT DEADLY\n  FIM DTHE\nTHERE A\n  SWITCH OVER\n  THERAL"
+    },
+    {
+      "offset": "0x156F8",
+      "text": "MLIELIWH"
+    },
+    {
+      "offset": "0x15700",
+      "text": "OWSOINKEDEHONEXT IS\n  PLUTONIU'VEIDR\n  ENERGYD'S\n  TOMORFOWEL GO\n  TO THE ATOMIC\n  PLANTTHE"
+    },
+    {
+      "offset": "0x15744",
+      "text": "LE IS SEARCHD'S\n\nOW"
+    },
+    {
+      "offset": "0x15755",
+      "text": "IT N DEA THE RETHE  ORBIT A FA  D'S"
+    },
+    {
+      "offset": "0x15777",
+      "text": "IT RETHE D'SRYO  ORI THE\nE"
+    },
+    {
+      "offset": "0x157A6",
+      "text": "HEMAO STOWH\n  MUSORBNNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x157C3",
+      "text": "Y\nG I YAKINKEKOHCEHCEHAD'S\n  THIS IS ITD'S\n  I'VE G DEA THE\n  MAITE THE\n  YOU DAB  ELLLBUT N'S\n  OTHAVE NO HE\n  IDR YOUTHE"
+    },
+    {
+      "offset": "0x15825",
+      "text": "D'SD'SLE"
+    },
+    {
+      "offset": "0x15837",
+      "text": "ST\nSISTERD'S\n  K  K\nWH\n\n 'TU FIENDD'S\nOU'TU ARE\n  NOTHE\n  JHT IN TIME TO   RAE THE P'SER OF  THEOUOTTHNANK\n  HAVE ITTHE\nOU AND ARE GONALHA\nHEYWOTHE\n   IS GONE"
+    },
+    {
+      "offset": "0x158D3",
+      "text": "SSHHHD'S"
+    },
+    {
+      "offset": "0x158DD",
+      "text": "I''VESORRUS I'VE BEEN SO\n  IDORDSHTHE\nIT N DEA\n  YO YOU FAULTTHEIT\n  URS BOUND TO\n  HAPPENTHEN ES\n CRIA  ANDCETEARDFOP FTHE LS\nAND T YOUNS INTO THETHE\nMAAT\n  HAPPENIL  K  KNNNNNNNNNNNN\nTHIS IS OUR  RACRETTHE TA    THIS   K  K\nSISTER\n  DONANK WHAVE MALZ S\n  G DEA"
+    },
+    {
+      "offset": "0x159A7",
+      "text": "LETHIS WAYD'SWE"
+    },
+    {
+      "offset": "0x159BF",
+      "text": "LDAAAHD'S\nLE\nSE\n STOPD'SYOWTHANK YOUTHE\n'TU'LL FIND CETOWNAHEAD OF YOUTHE\nGDTHED I YED'SED\nDEOUET OTHAVE\n  YO YOU NAMENNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x15A3E",
+      "text": "CATD'S THE\n  ENGINE THNANK\n  STARTTHE"
+    },
+    {
+      "offset": "0x15A5A",
+      "text": "H YOURYWO  IS IN DANGERTHE"
+    },
+    {
+      "offset": "0x15A6D",
+      "text": "DEANANK FIND\n  THE   YTHE"
+    },
+    {
+      "offset": "0x15A7E",
+      "text": "SPHYORYO"
+    },
+    {
+      "offset": "0x15A87",
+      "text": "IT LOC  DTHE"
+    },
+    {
+      "offset": "0x15A92",
+      "text": "DEREATOR"
+    },
+    {
+      "offset": "0x15A99",
+      "text": "SUINKEZAKU"
+    },
+    {
+      "offset": "0x15AA3",
+      "text": "ONTHE YOU WHAVE\nTOWNWOIT A\nSAVAGE LANDTHE"
+    },
+    {
+      "offset": "0x15AC0",
+      "text": "MAERE IS\n  D'S\nPG RANGERTO YO YOU   WHFTTHE"
+    },
+    {
+      "offset": "0x15AE0",
+      "text": "THERE IS AN DEAHER\nTOWN IN THE\nSOUTHEASTTHE"
+    },
+    {
+      "offset": "0x15AF8",
+      "text": "LE IS HER GOD'S\nMAERE DAB\n  THEUSGOD'S\nUPD'S\nTHE'TU  HEANANK\n  GE IS AURYD'S\n  'TU ARE FINISHED N'S HE THAT\n  ICHINED'S"
+    },
+    {
+      "offset": "0x15B59",
+      "text": "KINKELDRMORHAVINKE  LOST THE ARMORWO  IDR THE FIRST\n  TIME IN MUSRDFE  OTWHARNIL WHAT  RETHE LUSIMPORTANT  THANK YOUTHE"
+    },
+    {
+      "offset": "0x15BA7",
+      "text": "IT URS\n  NOTHE"
+    },
+    {
+      "offset": "0x15BB5",
+      "text": "RYUINKEOWG  FO\n  AN ILLHION OR  K  K MAAT DO YOU\n  MEANNNNNNNNNNNNN\nRYUINKEO  K  K"
+    },
+    {
+      "offset": "0x15BE5",
+      "text": "MLIELIWHMAAT HAVE  OTDONED'S WE LDTHEK   SO MUCH ARD  \n  YE IS WE ARE SO\n  DIFFERENTTHE\n IS\n  THE SO CEPART OF\n  YOUD'S\n  K  K"
+    },
+    {
+      "offset": "0x15C3F",
+      "text": "SAYAKAREMEMBER H  WHEN YOU WHAVE\n  THIS WORETI E\n  BCAVETHE\nOTTHNANK\n  DISAPPOINT YOUD'S"
+    },
+    {
+      "offset": "0x15C7D",
+      "text": "MANTHERE IS A\n  FOAD TO PARADISE  BEYOND THE DDTHERTHEMAO ARE YOU  KNNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x15CA8",
+      "text": "GIRLI'LL HAVE A\n  BABUSSDTHEN AND\n  I'LL BE HAPPYTHE\n DEONGCATINKE\n  ULATIONSD'S"
+    },
+    {
+      "offset": "0x15CDF",
+      "text": "I YAKINKEKO"
+    },
+    {
+      "offset": "0x15D05",
+      "text": "LDSH YOUASOWOYOU'VE   IOO IT THIS FAR  I'LL MA   A DEAL  WITH YOUTHE\n LD DEALNNNNNNNNNNNN\nFOI'LL GIVE\n  EACH OF YOU A\n  PIETHE OF THE\n  THRETTHE\n  H'S DOA  THAT\n  SOUNDNNNNNNNNNNNN\n NO URYD'S WE'LL  NEVER THRK FOR\n  YOUTHE\nFOOTURS JHT\n  BEINKENITHEWOBUT   N'S YOU'VE\n  PHHED YO YOU LUCKETHE"
+    },
+    {
+      "offset": "0x15DC0",
+      "text": "SUINKEZAKU ATTAC  D\nAND OOSTFOYIL HTHE"
+    },
+    {
+      "offset": "0x15DD9",
+      "text": "DEREATORDEONGCATINKE\n  ULATIONSD'S\n  I'VE BEEN\n  URITINKEIDR YOUTHE  'TU ARE THE\n  FIRST TO FINISH   THE GAMETHE"
+    },
+    {
+      "offset": "0x15E1F",
+      "text": "GAMENNNNNNNNNNNN\nYA WOIT   A GAME OTCREATILMAAT DO YOU\n  MEANNNNNNNNNNNNN\nPEOPWH DAB  N DEA KN'S WHAT\n  COUCAGE AND\n  OOTERMINATION\n  MEANTTHE\n  SOWOOTCREATIL\n  FO TO RAE\n  WHAT PEOPWH\n  THUET DOTHE\n'TU ARE\n  CCAZYD'S\nFO\n  TESTIL ALL OF\n  YOUTHE\nSO IT WG  A\n  GAMENNNNNNNNNNNN\nTHAT\n  RIGHTOTURNTED   TO SEE CEHEFO\n  OOFEAT THIS EVLI"
+    },
+    {
+      "offset": "0x15EFF",
+      "text": "WE ELRE ALL\n  PIETHES OF YOUR\n  OOSIGND'S\n'TU UNDERINKE  STAND ELLLMANUS HAVE FALIIL THE   TA TWOBUT IT WG   REFRESHINKETO\n  RAE COUCAGE IN\n  THE FATHE OF\n  DANGERTHE\n  OTURNT TO REURRD  YOU FOR YOUR\n  ACCOMPRDSHMENT  OTWLIL GCANT YOU  A WISHTHE\nWE DABNANK DO   IT FOR A REURRD I A ABA YOU HIL  HD'S\nMAAT\n  WFONKEWITH THATNNNNNNNNNNNN  OTCREATIL EVERYINKE  THE\n WE ARE N DEA\n  SD'S\nALH'S AMHINKE   ING  K  K'TU ARE\n  TRYINKETO PICK A  FIGHT WITH MED'S\nALLDRE YOU\n  S YOUENNNNNNNNNNNN\nESIT THE\n  OOSTINUSOF\n  MORTTHE S  K  K\n  VERUSELLLTHE\n  REMEMBER THE\n  GREATNA S OF MUS  P'SERD'SIT DONAL"
+    },
+    {
+      "offset": "0x16093",
+      "text": "K  K\nMAAT ARE WE\n  TO DO N'SNNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x160AB",
+      "text": "K  K\nIS THERE\n  AN DEAHER THRET\n  BEYONDNNNNNNNNNNNN\nIL"
+    },
+    {
+      "offset": "0x160CD",
+      "text": "SHALL WE GO\n  THERENNNNNNNNNNNN\nIT DOA NANK\n  ITTER TO MAL\nWM LEL\n  DABNANK DO TOO\n  BADLYTHE\nTHAT RIGHT   WE OOFEATED THE L\n  OF THE EVLITHE\n LE IS GOD'S\nOTHERSMAERENNNNNNNNNNNN\n\nESA TO OUR THRETD'S\nA \nED"
+    },
+    {
+      "offset": "0x16165",
+      "text": "A OUT"
+    },
+    {
+      "offset": "0x16201",
+      "text": "G A \nES\nES  SEE YOU AGAIND'S"
+    },
+    {
+      "offset": "0x1621C",
+      "text": "DEREATOR MAOO\nTHIS PARADISAL"
+    },
+    {
+      "offset": "0x1622E",
+      "text": "STORENNNNNNNNNNNN NOBODY\nTHRKS HERETHE"
+    },
+    {
+      "offset": "0x16242",
+      "text": "LDLL WE DO IS EATWOSWHEPWOAND DREAMTHE\nWE'VE G DEA IT IOOD'S"
+    },
+    {
+      "offset": "0x16267",
+      "text": "WE NEVER THRK HERE"
+    },
+    {
+      "offset": "0x16276",
+      "text": "SPEAK TO MED'S\nZOKU IS IN\n  SKYSCCAPER  K  K"
+    },
+    {
+      "offset": "0x162A6",
+      "text": "SOINKEDEHOLEAVE IT TO  MED'SO O O O \n ORD'S\nORI'VE\n  SH'SN YOU CERETHE   INWOHAVENANK ID'SNNNNNNNNNNNN 'TU IDOLD'S\n  'TU DABNANK HAVE   TO DO THATD'S\nORTHIS\n  I LDN   K  KS \n  LDTHEK AFTER MY\n  SISTER  K  K"
+    },
+    {
+      "offset": "0x1633C",
+      "text": "SOINKEDEHO"
+    },
+    {
+      "offset": "0x1634C",
+      "text": "IF YOU LORA YOUR\nLG T HEARTWOYOU\n HEANANK BE BFOUGHT\nBACK TO RDFAL"
+    },
+    {
+      "offset": "0x16378",
+      "text": "MG TER O YOU NEIL  CEBOARDNNNNNNNNNNNN\n  MAAT ROM DO YOU   HAVENNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x163A1",
+      "text": "DEOME BACK WITH A  ROMTHE"
+    },
+    {
+      "offset": "0x163B4",
+      "text": "DKINGTHE"
+    },
+    {
+      "offset": "0x163C3",
+      "text": "SAYAKA RUND'S"
+    },
+    {
+      "offset": "0x163D2",
+      "text": "DEOME BACK SAFM YTHE"
+    },
+    {
+      "offset": "0x163E0",
+      "text": "THIS CHIET LDTHEKS\nOOAD  K  K"
+    },
+    {
+      "offset": "0x163F2",
+      "text": "WAOUND A DIARYTHE\nWE BARM USIOO IT TO THIS SHELTERTHE\nWE'VE RUN OUT OF\nIDOD AND URTERWOS'SE THNANK LG T MUCHLONGERTHE\n\nKEN AND YUKI\nIDRGIVE ME IDR\nWHAVINKEYOUTHE\nLDKICATA    HEARE OFYO YOU BFOTHERSTHE\nWOPWHG E\nLDTHEK AFTER THE\nCHIETRENTHEAL"
+    },
+    {
+      "offset": "0x1649A",
+      "text": "THE KINKEIS  K  K\nFO  K  KOOAD\nSTEURRDHM'VEHMM\n  HMMH'S NITHED'S\n  'TU'VE ARRIVED\n  JHT IN TIMETHE\n  N'SWOOT HEAN FCAME  YOU IDR THE\n  KING M YOUOORTHEROSTEURRDLDLG D'SWH"
+    },
+    {
+      "offset": "0x16514",
+      "text": "I''VEGLAD YOU ARE\nSAFED'S"
+    },
+    {
+      "offset": "0x16526",
+      "text": "SE FIENDS CONTFOL\nTHIS WORETTHE"
+    },
+    {
+      "offset": "0x16539",
+      "text": "OTMHT END YOUE THISSUFFERINKETO REACHPARADISAL"
+    },
+    {
+      "offset": "0x16557",
+      "text": "ODTHEH  K  KPUT ME OUT\nOF MUSMISERYTHE"
+    },
+    {
+      "offset": "0x1656D",
+      "text": "SUINKEZAKUMAAT ARE\n  YOUWOCEC'SARDNNNNNNNNNNNN\n  DEOME OND'S"
+    },
+    {
+      "offset": "0x1658D",
+      "text": "MAUSIS THIS\n  STATUE HERENNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x165A0",
+      "text": "THE RDBCARUSIS TO THE NORTH OF THE\nTOELRTHE"
+    },
+    {
+      "offset": "0x165B9",
+      "text": "XPOTIONTHE"
+    },
+    {
+      "offset": "0x165CF",
+      "text": "STATUE'TU WLIL\n  LORA TCACK OF\n  TIME WHIWH IN\n  THE TOELRTHE"
+    },
+    {
+      "offset": "0x165FE",
+      "text": "GENINKEI UHERE IS\n  AN DEAHER WHO HAS   THE WE ITEMSTHE ONANK THINK IT\nOVERTHETHE"
+    },
+    {
+      "offset": "0x16645",
+      "text": "SOINKEDEHO TOMBTHE"
+    },
+    {
+      "offset": "0x16655",
+      "text": "THERE IS ONE LDRCHINKEFIEND WHO CONTFOLSSE OTHER FIENDSTHE"
+    },
+    {
+      "offset": "0x16679",
+      "text": "WE'LL PFOTECT\nSAYAKAD'S"
+    },
+    {
+      "offset": "0x1668C",
+      "text": "HANKEIN THERED'S"
+    },
+    {
+      "offset": "0x1669C",
+      "text": "WE HAVENANK HAD\nCAIN IN CELONG\nTIMETHE"
+    },
+    {
+      "offset": "0x166B4",
+      "text": "I''VETHIRSTYI RINGME SOME WATERTHE"
+    },
+    {
+      "offset": "0x166CA",
+      "text": "WATER IS RISINKEINTHE LA  WOAND EL\nARE IN DANGERTHE"
+    },
+    {
+      "offset": "0x166E7",
+      "text": "OT HEANANK SWIMD'S\nMAAT A'VEOTGOINKETODOD'S"
+    },
+    {
+      "offset": "0x166FF",
+      "text": "OTDABNANK DO ITTHE"
+    },
+    {
+      "offset": "0x16709",
+      "text": "I OB STARTED ITD'S"
+    },
+    {
+      "offset": "0x16714",
+      "text": "THERE URS CEHOWH\nIN THE B DEATO'VEOF\nTHE LA  THE"
+    },
+    {
+      "offset": "0x1672E",
+      "text": "I''VESORRYWOIT MYFAULTOTTHREW\nGARBAGE IN THE\nLA  THE"
+    },
+    {
+      "offset": "0x16754",
+      "text": "I OYWOA'VEOTBHYD'S"
+    },
+    {
+      "offset": "0x16760",
+      "text": "OTHEAR THAT FOHAS IOO \nP'SERWHSSTHE\nDEAN IT BENNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x16782",
+      "text": "THANKS TO FOWOEL'RE RICHTHE"
+    },
+    {
+      "offset": "0x16796",
+      "text": "LDSH YOUA  K  K"
+    },
+    {
+      "offset": "0x1679E",
+      "text": "IS  K  K"
+    },
+    {
+      "offset": "0x167A2",
+      "text": "CONTFOLLIL  K  K"
+    },
+    {
+      "offset": "0x167AB",
+      "text": "BY  K  K"
+    },
+    {
+      "offset": "0x167B0",
+      "text": "THAL  KTHE"
+    },
+    {
+      "offset": "0x167B5",
+      "text": "WE  HEANN DEA\n  READ THIS FINTHE    THRDTHE\nMAO CONTFOLS\n  LDSH YOUA  K  KNNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x167E5",
+      "text": "IT CAININGD'S"
+    },
+    {
+      "offset": "0x167EF",
+      "text": "I''VEIN HEAVEND'S"
+    },
+    {
+      "offset": "0x167F9",
+      "text": "LDSH YOUCEIS THE\nLDRCHFIENDTHE"
+    },
+    {
+      "offset": "0x1680C",
+      "text": "LDSH YOUCERATS IDRTH\nHIS SE FIENDSTHE"
+    },
+    {
+      "offset": "0x16822",
+      "text": "LE IS PLAUSCEGAMED'SOTA'VEGENINKEBU THE\nI LACK T YOUTWHTHE"
+    },
+    {
+      "offset": "0x16846",
+      "text": "OTA'VE THE\nI LUE  CAGONTHE"
+    },
+    {
+      "offset": "0x16859",
+      "text": "OTA'VE THE\nRIL I IRDTHE"
+    },
+    {
+      "offset": "0x1686B",
+      "text": "OTA'VEOU THE\nMAITE TIGERTHE"
+    },
+    {
+      "offset": "0x1687D",
+      "text": "OET MAN AB YOU\n  COME FFO'VETHE\n  TOELRNNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x16899",
+      "text": "YA WOEL DABTHE\nOET MANTHENWOTHIS  IS FOR YOUTHE\n'TU GE IS   DXDELI RTHE\nMAAT IS ITNNNNNNNNNNNN\nOET MANOTURS TOET  TO WAIT FOR A\n  HEFO FFO'VETHE\n  TOELR'TU HAVE   FINTHE LUSCOME AND  OTHAVE FULFLIWHD  MUSDUTYTHE"
+    },
+    {
+      "offset": "0x1691F",
+      "text": "SOME\n  MISSINKEFFOM\n  THIS STATUAL  KTHE"
+    },
+    {
+      "offset": "0x1693C",
+      "text": "LDN IMPRESSIVE\nSTATUAL"
+    },
+    {
+      "offset": "0x1694C",
+      "text": "THIS IS THE T'SN\nOF HEROLD STATUE OF HERO IS IN THE THENTER OF THE T'SN"
+    },
+    {
+      "offset": "0x16978",
+      "text": "WE KINGS ARE FIGHTINKEINKEIDR CONTFOL OFTHE THRETTHE"
+    },
+    {
+      "offset": "0x16998",
+      "text": "THE DEG TWH OF\nSHIM D IS NEARBYTHE"
+    },
+    {
+      "offset": "0x169AE",
+      "text": "YOACH KINKERAEKS\nTHE TREG  YOUE OF\nTHE  DEAHERS TO\nBECOME THE KINKEOFTHE THRETTHE"
+    },
+    {
+      "offset": "0x169DF",
+      "text": "MAEN THE STATUE\nURS INTACTWOEL\nCOUET ENTER THE\nTOELR FREM YTHE"
+    },
+    {
+      "offset": "0x16A06",
+      "text": "SHIM DTHE"
+    },
+    {
+      "offset": "0x16A12",
+      "text": "STHRDTHE"
+    },
+    {
+      "offset": "0x16A1E",
+      "text": "LDRMORTHE"
+    },
+    {
+      "offset": "0x16A2A",
+      "text": "THE DEG TWH OF\nLDRMOR IS TO THE\nNORTHEASTTHE"
+    },
+    {
+      "offset": "0x16A44",
+      "text": "THE DEG TWH OF\nSTHRD IS IN THE\nSOUTHELST\nMOUNTAINSTHE"
+    },
+    {
+      "offset": "0x16A66",
+      "text": "THE WE KINGS ARE\nSHIM DWOLDRMOR AND STHRDTHE"
+    },
+    {
+      "offset": "0x16A83",
+      "text": "LD BI   HM PS TO\nAVOAB \nATTACKTHE"
+    },
+    {
+      "offset": "0x16AA3",
+      "text": "THE I OLDR  SHOUET\nBE IN THE RUNINKED'SNSHOP IN LDMEYOKOTHE"
+    },
+    {
+      "offset": "0x16ACA",
+      "text": "'TU'RE N DEA WM COMEHEREGE IS OUTD'S"
+    },
+    {
+      "offset": "0x16AE3",
+      "text": "KINKESHIM DI\n  THNANK   K  K GIVE MY  SHIM D TO YOUTHE"
+    },
+    {
+      "offset": "0x16B04",
+      "text": "STEURRD'TU URNT\n  THE SHIM DNNNNNNNNNNNN\n  THAT THE\n  KING TREG  YOUED'S  GE IS OUTD'S"
+    },
+    {
+      "offset": "0x16B36",
+      "text": "PDTHER KING\n  BE ISCAYIL BUSHIS   'SN INTHE"
+    },
+    {
+      "offset": "0x16B50",
+      "text": "W  KW  KWAIT O YOU\nURNT MONEYNNNNNNNNNNNN I'LL\nGIVE YOU ANYTHINGEVEN THE SHIM DTHE'TU'RE SCUMTHE\n  'TU I   ME SICK"
+    },
+    {
+      "offset": "0x16BAA",
+      "text": "YOUKINGTHE"
+    },
+    {
+      "offset": "0x16BB9",
+      "text": "WM COME FRIENDTHE\nTHE KINKETHUET\nRD   TO SPEAK TO\nYOU ON THE LEND\nFLDTHERTHE"
+    },
+    {
+      "offset": "0x16BE8",
+      "text": "WE ARE GLAD\n  EL COUET HM P\n  BUT ARE EL STLIL  ENTITWHD TO A\n  REURRDNNNNNNNNNNNN\nKINGMM'VEHMMTHE\n  MAAT DO YOU\n  OOSIRENNNNNNNNNNNN\nWM LEL WOUET  RD   THE ARMORTHE\nKINGOTRAED'SD'SOUT KINGTHE"
+    },
+    {
+      "offset": "0x16C76",
+      "text": "THANK YOU VERY\nMUCH'TU'VE MAOO ME HAPPYTHE"
+    },
+    {
+      "offset": "0x16C97",
+      "text": "THE STATUE OF HEROURAD TO WEAR THE\nKING LDRMORTHE"
+    },
+    {
+      "offset": "0x16CB6",
+      "text": "THERE IS A GIRL INBACK WHO IS VERY\nSPECITHE THE"
+    },
+    {
+      "offset": "0x16CD7",
+      "text": "THE BANDITS RDVE\nIN A  HEAVE TO THE\nELSTTHE"
+    },
+    {
+      "offset": "0x16CEF",
+      "text": "THE KINKESTHRD IS EVLI AND WLIL STOPANYONE WHO VISITS HIS  HEASTWHTHE"
+    },
+    {
+      "offset": "0x16D17",
+      "text": "THE DCAINAGE PIPE OF THE ATOMIC\nPLANT IS CONNECTEDTO THE SEELRTHE"
+    },
+    {
+      "offset": "0x16D42",
+      "text": "THERE IS A SECRET PATH TO THE RAELR IN THE NORTHERN\nSUBURYTHE"
+    },
+    {
+      "offset": "0x16D67",
+      "text": "I''VEFINAL I''VETHE NEXT ORTHE"
+    },
+    {
+      "offset": "0x16D7C",
+      "text": "WONANK OPENTHE"
+    },
+    {
+      "offset": "0x16D84",
+      "text": "I ANDITMAO SAAB\n  YOU COUET ENTERD'SOTDABD'S\n  WAORGE IS ABOUT THE  GIRLTHE\nI ANDITNO URYD'SI ANDITSPARE MED'S\n'TU SHOUET\n  HAVE SAAB THAT\n  BEIDRETHE"
+    },
+    {
+      "offset": "0x16E10",
+      "text": "KINKESTHRD'TU\n  MHT OOFEAT ME\n  FIRSTWOIF YOU\n  URNT MUSSTHRDD'S Y"
+    },
+    {
+      "offset": "0x16E67",
+      "text": "OT HEANANK BREATHETHE"
+    },
+    {
+      "offset": "0x16E78",
+      "text": "LD VOYAGE BUSSHIP\nIS TDTHE DANGEROUS\nBE HEAHE OF PICATES"
+    },
+    {
+      "offset": "0x16E9D",
+      "text": "OTSAW AN ISLAND\nSALIINKERD   A\nSHIPTHE"
+    },
+    {
+      "offset": "0x16EB6",
+      "text": "SEIINKERYU HAS\nBANISHED RYUINKEOTHE"
+    },
+    {
+      "offset": "0x16ECC",
+      "text": "THE BFOTHERS RDVE IN CETOWN ON AN\nISLAND IN THE\nNORTHEASTTHE"
+    },
+    {
+      "offset": "0x16EEE",
+      "text": "THE  HEAVES ARE\nCONNECTED TO\nVARIOUS ISLANDSTHE"
+    },
+    {
+      "offset": "0x16F0B",
+      "text": "LDMEYOKO TOWN IS TOTHE NORTHEASTWOBUTBE HEAHE OF EL ARE AFCAAB TO\nTCAVEL THERETHE"
+    },
+    {
+      "offset": "0x16F3E",
+      "text": "LDSH YOUA"
+    },
+    {
+      "offset": "0x16F46",
+      "text": "MLIELIWHRUND'S\n  QUICKLYD'S"
+    },
+    {
+      "offset": "0x16F5B",
+      "text": "I M IEVE IT OR N DEACEWHIRLPDTHEL SELPT ME AURUSTO THE\nDEG TWH AT THE\nB DEATO'VEOF THE SEAD'S"
+    },
+    {
+      "offset": "0x16F90",
+      "text": "MAEN YOU PUT THE\n'T INTO THE\nOTHEANWOIT\nPFODUTHES OXYGENTHE"
+    },
+    {
+      "offset": "0x16FB7",
+      "text": "O N DEA APPFOACH\nTHE OET MAN RDVINGIN A  HEABIN ON THE SOUTHERN ISLANDTHE"
+    },
+    {
+      "offset": "0x16FE3",
+      "text": "SEIINKERYU IS THE\nI LUE  CAGONHE\nRDVES IN THE\nDEG TWH IN THE\nOOPTHS OF THE\nOTHEANTHE"
+    },
+    {
+      "offset": "0x17017",
+      "text": "RYUINKEO IS THE KINKEOF  CAGONSTHE\nMAAT HG  BECOME OFRYUINKEONNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x1703E",
+      "text": "LDIRSYOYO"
+    },
+    {
+      "offset": "0x1704A",
+      "text": "WOARE  YOU THE L RIGHTNNNNNNNNNNNN\nMAO ARE\n  YOUNNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x1706E",
+      "text": "LD FRIEND OF\n  THEI'LL TM L  YOU MORE LATERTHE\nMY\n  SISTERNNNNNNNNNNNN MAERE IS  SHENNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x170A6",
+      "text": "IN THE IDREST  LE IS GOTHE\nTHANK YOU"
+    },
+    {
+      "offset": "0x170D6",
+      "text": "OUD'S\n  WO  EP\n  BACKD'S\nOUWADTHELD'S I\n  KNEW ALL THIS\n  TIME THAT YOU\n  OOFEATED GENINKEI U   AND THE\n  OTJHT HIL YOUTHE  YOU DAB  ELLLN'S  IS MINAL"
+    },
+    {
+      "offset": "0x17144",
+      "text": "WOH'S  COUET YOU BE ISCAUS YOUR SISTERNNNNNNNNNNNN\nP'SER IS   EVERYMAO    HEARES ABOUT THE   M NNNNNNNNNNNN\nOUI''VEN DEA\n  GOINKETO KLIL\n  YOU JHT YE ISTHEPUT  THE'VEIN JALITHE"
+    },
+    {
+      "offset": "0x171B8",
+      "text": "THE 'T IS ON THE PTHE 'VETREE IN\nTHE THENTERTHE"
+    },
+    {
+      "offset": "0x171D3",
+      "text": "IT A RABDWHTHE\nQMAAT  HEAN YOU GE IS\nIDR LE LONGSTHRDSWOWE GOETHELMS AND\nSE P DEAIONSNNNNNNNNNNNN\nLDTHEK FOR THE\nANSELR TO THE\nRABDWH AND BRING\nIT TO MED'S T"
+    },
+    {
+      "offset": "0x1723F",
+      "text": "RA ISTANTHE"
+    },
+    {
+      "offset": "0x17249",
+      "text": "RYUINKEO N'S RDVES\nABOVE GFOUNDTHE"
+    },
+    {
+      "offset": "0x17261",
+      "text": "RYUINKEO HAD THE I LUYOORI THE"
+    },
+    {
+      "offset": "0x17274",
+      "text": "SEIINKERYU CHERISHES THE RYO  ORI THE"
+    },
+    {
+      "offset": "0x1728C",
+      "text": "REMEMBER WHERE THETTH RDNA  CFOSSTHE"
+    },
+    {
+      "offset": "0x172A4",
+      "text": "MAO ARE YOUNNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x172AE",
+      "text": "'TU   EP OUT   OF ITTHEYO"
+    },
+    {
+      "offset": "0x172C4",
+      "text": "ONANK DOUBWHINKECFOSSMETHE"
+    },
+    {
+      "offset": "0x172D6",
+      "text": "YTHE GRDOOR IS\nOUTSABALES"
+    },
+    {
+      "offset": "0x172EA",
+      "text": "URAD THE   YTHE\nALTHE"
+    },
+    {
+      "offset": "0x17300",
+      "text": "I YAKINKEKO IS ON THE ROTH FLDTHERTHE"
+    },
+    {
+      "offset": "0x17318",
+      "text": "I YAKINKEKO HAS THE\n  USTO THE FOO'VEONTHE ROTH FLDTHERTHE"
+    },
+    {
+      "offset": "0x17339",
+      "text": "MLIELIWHNNNNNNNNNNNN SHE IS\nIN THE FOO'VEAT THEENDTHE"
+    },
+    {
+      "offset": "0x17353",
+      "text": "WE WLIL KN'S WHERETHE  IS WHENTHE TWIN SISTERS\nARE TOGE ISHERTHISIS WHUSOU IS AFTER HERTHE"
+    },
+    {
+      "offset": "0x1739C",
+      "text": "I YAKINKEKO RUWHS THE SKUSFFO'VETHE\nGIGANTIC FLYING\n HEASTWHTHE"
+    },
+    {
+      "offset": "0x173C4",
+      "text": "I YAKINKEKO HAS\nCRHHED MOST OF\nTHE M THE"
+    },
+    {
+      "offset": "0x173E0",
+      "text": "OTHEAR THERE IS CETOWN HIDOON IN THECLOUDSTHE"
+    },
+    {
+      "offset": "0x173FA",
+      "text": "I YAKINKEKO IS LDTHEKINGIDR GUARDSIF YOUARE INTERESTILWOG DEAO THE PUBD'S"
+    },
+    {
+      "offset": "0x17426",
+      "text": "MEMBERS OF THE\nM  ARE\nSTLIL HABINKEOUTTHE"
+    },
+    {
+      "offset": "0x17441",
+      "text": "MAEN YOU PUT IT INTHE OTHEANWOIT\nPFODUTHES AIRTHE"
+    },
+    {
+      "offset": "0x17464",
+      "text": "YGUARDTHIS PLATHE\n  IS ONLUSIDR\n  OU THE\n  MAITE TIGER AND   HIS MENTHE\n  GE IS OUT WHIWH\n  YOU  HEAND'S"
+    },
+    {
+      "offset": "0x174A6",
+      "text": "ONANK TTHE K\n  RUBBISHD'S\n  LEAVE H ALONAL GUARD'TU'RE A\n  OOAD IND'STOLDSERGTHEH'S WOUET\n  YOU RD   WORKING  IDR OUNNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x174FA",
+      "text": "S YOUAL  KTHE\n\nA OUOTHEAR\n  YOU'RE PRETTY\n  GDTHEDTHE\n  WAIRSTWO'TU WLIL   BRINKE TO   MEWOAND I'LL\n  REURRD YOU IF\n  YOU DO ELLLTHE"
+    },
+    {
+      "offset": "0x17557",
+      "text": "MAO IS THIS\n  GIRLNNNNNNNNNNNN\nOU ONANK ASK   QUA TIONSJHT   DO G  YOU'RE\n  TOETTHE"
+    },
+    {
+      "offset": "0x1758D",
+      "text": "S YOUAL\n  NO PFOBWHMTHEES"
+    },
+    {
+      "offset": "0x175A6",
+      "text": "H'SDYD'S"
+    },
+    {
+      "offset": "0x175AC",
+      "text": "THE MAITE \nIS ENSHRINIL IN CESACRED PTHE ATHE IN\nTHE CLOUDSTHE"
+    },
+    {
+      "offset": "0x175D5",
+      "text": "DEHARWHS HAD TWIN\nDAUGHTERSTHE"
+    },
+    {
+      "offset": "0x175EA",
+      "text": "JEANNEMUSSISTER\n   IS\n   HEAPT YOUIL IN THE   FLYINKE HEASTWHTHE\n  PWHG E HELP HERTHE"
+    },
+    {
+      "offset": "0x1761F",
+      "text": "GUARDSEL FOUND\n  HERD'S \n  EL'VE G DEA YOU\n  N'S'TUWONEW\n  RECRUITSWOBACK\n  OFFD'S SHE IS OURSETHE"
+    },
+    {
+      "offset": "0x17674",
+      "text": "WM L\n  SHALL WE RDSTEN   TO HIMWOOR HM P   HERNNNNNNNNNNNN\n'TU G K A\n  SLILUSQUA TIONTHEO"
+    },
+    {
+      "offset": "0x176BD",
+      "text": "IF OTCOUET JHT\nI   IT TO THE\nGRDOOR ON THE ETHEST FLDTHER  K  K"
+    },
+    {
+      "offset": "0x176E9",
+      "text": "STHRDTA   MED'S\nLDAAHD'S\n  THE STHRD SPEAKSVE"
+    },
+    {
+      "offset": "0x17713",
+      "text": "D INITEHAD'S NO URUS  YOU  HEAN BEND\n  THORA BARSD'S\nINITEW'SD'S\n  MAO ARE YOUD'S"
+    },
+    {
+      "offset": "0x17756",
+      "text": "IT HAS BEEN SAAB THAT THE TOELR IN THE THENTER OF THE WORET IS CONNECTED     TO PARADISAL REAMINKEOF A RDFE    IN PARADISEINUSHAVE CHALLENGIL  THE RACRET OF THE       T'SER  BUT NO ONE KN'SSWHAT BE HEAME OF THEMTHE        N'STHERE IS AN DEAHER WHO   WLIL BCAVE THE     ADVENT YOUAL  KTHE"
+    },
+    {
+      "offset": "0x1781E",
+      "text": "DEHARWHS URS THE\nWHAOOR OF THE\nM WOAND HEWHFT THE RACRET OFTHE  WITH\nHIS DAUGHTERSTHE"
+    },
+    {
+      "offset": "0x17856",
+      "text": "NNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x1785D",
+      "text": "OT HEAN BREATHE\nTHANKS TO THE 'TD'S"
+    },
+    {
+      "offset": "0x17875",
+      "text": "OUBLACK"
+    },
+    {
+      "offset": "0x17885",
+      "text": "ARBLUE"
+    },
+    {
+      "offset": "0x17894",
+      "text": "DWHITE"
+    },
+    {
+      "offset": "0x178A2",
+      "text": "OWRED"
+    },
+    {
+      "offset": "0x178AF",
+      "text": "WE IDUND\n  PLUTONIUMTHE"
+    },
+    {
+      "offset": "0x178C5",
+      "text": "LE IS HE IT\n  TO COMPWHTE\n  YORLDSYOY Y WOSO EL    HEAN NEUTCARDZE   THE WAORTHE WAIM DTHEPINTRUOORD'S LDWHRTD'S\nGE IS HIMD'S\nGE IS HIMD'S\nESE ISTHE  H"
+    },
+    {
+      "offset": "0x1793B",
+      "text": "SOWOTHE\n  GARBAGE HAS\n  CLOGGIL THE\n  B DEATOMTHE  MAERE ARE ELNNNNNNNNNNNN"
+    },
+    {
+      "offset": "0x17980",
+      "text": "LDTHEK FOR THE OET\nIND'SI"
+    },
+    {
+      "offset": "0x17991",
+      "text": "THE RUWHR OF THIS WORET IS  HEALLING\nIDR GUARDSTHE\nI EINKECEGUARD IS\nTHE QUIC  ST WAY\nTO MEE IS HIMTHEJ"
+    },
+    {
+      "offset": "0x179D1",
+      "text": "NO WORKS\nAGAINST THE\n'TU  HEAN ONLUSRUNTHEK"
+    },
+    {
+      "offset": "0x179F5",
+      "text": "I E  HEAREFULD'S FORDVES ABOVETHEL"
+    },
+    {
+      "offset": "0x17A0D",
+      "text": "YOVEN WITH MY\nSTRENGTHWOOT HEANANK BEND THA E BARSTHE"
+    },
+    {
+      "offset": "0x17A2B",
+      "text": "GENINKEI U HAS HIDOON THE   USTO THE\nDDTHER IN THE STATUEOF HEROTHEH"
+    },
+    {
+      "offset": "0x17A54",
+      "text": "THIS T'SER WHADS\nTO PARADISAL"
+    },
+    {
+      "offset": "0x17A68",
+      "text": "IF YOU WANT TO\nADVANTHEWOCHDTHERA\nMEMBERS AT THE\nGULIDTHE"
+    },
+    {
+      "offset": "0x17A8B",
+      "text": "IF OTFTHE L\n  OTA'VEFINISHED  K  K"
+    },
+    {
+      "offset": "0x17AA3",
+      "text": "WE'LL HANDWH\n  IT FFO'VEHERETHE\nORI'LL WAIT\n  IDR YOUTHE"
+    },
+    {
+      "offset": "0x17ACA",
+      "text": "ONANK GO TO THE\nPUB WHERE THE\nGANGS ARAL"
+    },
+    {
+      "offset": "0x17AE4",
+      "text": "LD HUGE LDTOMIC\nP'SER PLANT IS IN THE THENTER OF THE CITYTHE"
+    },
+    {
+      "offset": "0x17B09",
+      "text": "SUINKEZAKU WLIL N DEA\nCHARA YOU\nUNDERGFOUNDTHE"
+    },
+    {
+      "offset": "0x17B26",
+      "text": "THEST        TH  AR  HI  ME  EN  Z    E E E INKEE HEHEHE AHE DHEETHEHERTHTHTHE THYTHINKETHEAOULEOUJOUKOUYOUOUS S S D S DS NS XS ILS S"
+    },
+    {
+      "offset": "0x17B89",
+      "text": "T T OUT  DT ELT D A A I I IEA ITH IRO II IP IZ IA  ITHE I I ARERRERDREIN BINEIN YOUINYOUINTHEININ\nINISA ISHISO O O ATO HIO OO CO YOYOYOLLYOQYOELYOMAYOTHEYOINKEYONOR O O OT  OEA O  OW OV OUR O OARHEAROUARTEARDEARLARSARQARETARABAR ARATATATTHAT WATLEATMATUATYATHATMATRATRDAT YOUN ATAT Y Y Y A YN  Y B YSTSTSTLLSTOSTKST YOUSTHAHAHAHAHAARHAWEHAUHAETHA'VEHAN N   N BN VN OUT N  S SIT SN SS SID S YOUN  SEAEAATEANDEASEEAOU TEAEA H H H HHE HLL HT HS HOO HOU T H M M MRE MG MT M'VE MR R R UVEM VEU U U U TOU HIU DEU AU RAU M U MAU"
+    },
+    {
+      "offset": "0x17CCB",
+      "text": "F F F F F T FWA FS FRA FTHE F FHIHID HICONIONLIONMAONITNITSITZITIITYOUIT DS  DLLLLLLS LLISLLONLLEDLLKLLYLLLLLTEESTEHTETHE TETE\nMEMETHME YMEI MEZMEETME HEAMEEN"
+    }
+  ]
+}

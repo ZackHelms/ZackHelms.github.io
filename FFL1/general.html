@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>General Mechanics — FFL1</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <h1>FFL1</h1>
+  <div class="breadcrumb">
+    <a href="/">tythos.com</a><span>/</span>
+    <a href="index.html">FFL1</a><span>/</span>
+    <span>General</span>
+  </div>
+</header>
+<nav>
+  <a href="index.html">HOME</a>
+  <a href="general.html" class="active">GENERAL</a>
+  <a href="monsters.html">MONSTERS</a>
+  <a href="mutants.html">MUTANTS</a>
+  <a href="humans.html">HUMANS</a>
+  <a href="items.html">ITEMS</a>
+  <a href="shops.html">SHOPS</a>
+  <a href="encounters.html">ENCOUNTERS</a>
+  <a href="game.html">▶ PLAY</a>
+</nav>
+
+<main>
+  <div class="page-title">GENERAL MECHANICS</div>
+  <div class="page-sub">ROM-EXTRACTED DATA ONLY</div>
+
+  <div class="callout warn">
+    <strong>Data source notice:</strong> This wiki is built from data tables extracted directly from the
+    ROM binary (<code>Final Fantasy Legend, The (USA).gb</code>). Only information derived from the
+    extracted data files is presented here. Mechanics that have not yet been extracted from the ROM —
+    including damage formulas, turn order logic, status effect rules, flee calculations, equipment slot
+    counts, and elemental interactions — are omitted rather than inferred.
+  </div>
+
+  <section>
+    <h2>CHARACTER CLASSES</h2>
+    <p>The ROM contains three character class identifiers. Player-class entries appear at monster
+    indices 173–188 in the creature table. The three classes are distinct enough to occupy separate
+    index blocks:</p>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-title">HUMAN</div>
+        <p>Equipment-focused class. Armor defense values and weapon power extracted from ROM.
+        Equip capacity (8 items) is a class-level rule, not per-item data.</p>
+        <a href="humans.html" style="font-size:0.72rem; color:var(--cyan);">→ Humans page</a>
+      </div>
+      <div class="card">
+        <div class="card-title">MUTANT</div>
+        <p>Random-growth class. All 252 abilities listed with GP prices and power values.
+        Stat gain trigger conditions not yet extracted from ROM.</p>
+        <a href="mutants.html" style="font-size:0.72rem; color:var(--cyan);">→ Mutants page</a>
+      </div>
+      <div class="card">
+        <div class="card-title">MONSTER</div>
+        <p>Transformation class. Meat transformation table extracted (25 classes × member weights).
+        Trigger conditions and meat slot count not yet extracted from ROM.</p>
+        <a href="monsters.html" style="font-size:0.72rem; color:var(--cyan);">→ Monsters page</a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>BOSS ROSTER (ROM DATA)</h2>
+    <p>Final bosses are the last entries in the 200-monster table. Stats extracted directly from
+    <code>0x1AAE8</code> (STR/DEF/AGI/MANA) and <code>0x1B254</code> (HP). Values that exceed 99
+    are shown as-is — the display cap of 99 observed in-game is a rendering limit, not the stored value.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ROM ID</th><th>NAME</th><th>ENC</th><th>HP</th><th>STR</th><th>DEF</th><th>AGI</th><th>MANA</th><th>GOLD</th>
+          </tr>
+        </thead>
+        <tbody id="boss-tbody"></tbody>
+      </table>
+    </div>
+    <p style="font-size:0.72rem;color:var(--dim2);margin-top:8px;">
+      Indices 189–199. HP from 0x1B254 (2-byte LE, verified). Gold from BCD table at 0x1B2A4.
+      ENC = encounter table ID from 0x1A868; world labels (W1–W4/Tower/Final) community-sourced.
+      IDs 189–192 = first forms; 193–196 = second forms (same world guardian, harder); 197 = Tower Su-Zaku.
+      Values shown are raw stored integers; in-game display caps stats at 99.
+    </p>
+  </section>
+
+  <section>
+    <h2>MONSTER FAMILIES (ROM INDEX RANGES)</h2>
+    <p>Monsters are grouped into families by contiguous index blocks in the ROM name table at
+    <code>0x14000</code>. Family boundaries are inferred from monster names and index positions.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>INDICES</th><th>FAMILY</th><th>FIRST NAME</th><th>LAST NAME</th><th>COUNT</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>0–5</td><td>Insect</td><td>fly</td><td>mantis</td><td>6</td></tr>
+          <tr><td>6–11</td><td>Fish / Aquatic</td><td>barracud</td><td>leviatan</td><td>6</td></tr>
+          <tr><td>12–17</td><td>Plant</td><td>cactus</td><td>darkrose</td><td>6</td></tr>
+          <tr><td>18–23</td><td>Crustacean</td><td>clipper</td><td>scarab</td><td>6</td></tr>
+          <tr><td>24–29</td><td>Shellfish</td><td>shrimp</td><td>dagon</td><td>6</td></tr>
+          <tr><td>30–35</td><td>Canine</td><td>wolf</td><td>fenswolf</td><td>6</td></tr>
+          <tr><td>36–39</td><td>Bovine</td><td>redbull</td><td>behemoth</td><td>4</td></tr>
+          <tr><td>40–41</td><td>Pachyderm</td><td>baku</td><td>ganesha</td><td>2</td></tr>
+          <tr><td>42–47</td><td>Bird</td><td>condor</td><td>nike</td><td>6</td></tr>
+          <tr><td>48–53</td><td>Snake</td><td>snake</td><td>jorgandr</td><td>6</td></tr>
+          <tr><td>54–59</td><td>Mollusk</td><td>octopus</td><td>kraken</td><td>6</td></tr>
+          <tr><td>60–65</td><td>Worm</td><td>worm</td><td>gigaworm</td><td>6</td></tr>
+          <tr><td>66–71</td><td>Lizard</td><td>lizard</td><td>basilisk</td><td>6</td></tr>
+          <tr><td>72–77</td><td>Werebeast</td><td>wererat</td><td>anubis</td><td>6</td></tr>
+          <tr><td>78–83</td><td>Goblinoid</td><td>goblin</td><td>susano-o</td><td>6</td></tr>
+          <tr><td>84–89</td><td>Mythical</td><td>griffin</td><td>ki-rin</td><td>6</td></tr>
+          <tr><td>90–95</td><td>Eye</td><td>big eye</td><td>beholder</td><td>6</td></tr>
+          <tr><td>96–101</td><td>Skeleton</td><td>skeleton</td><td>lich</td><td>6</td></tr>
+          <tr><td>102–107</td><td>Slime</td><td>slime</td><td>hi-slime</td><td>6</td></tr>
+          <tr><td>108–113</td><td>Demon</td><td>gargoyle</td><td>athtalot</td><td>6</td></tr>
+          <tr><td>114–119</td><td>Siren</td><td>medusa</td><td>lilith</td><td>6</td></tr>
+          <tr><td>120–131</td><td>Undead / Spirit</td><td>zombie</td><td>ghost</td><td>12</td></tr>
+          <tr><td>132–137</td><td>Elemental</td><td>woodman</td><td>mazin</td><td>6</td></tr>
+          <tr><td>138–143</td><td>Bird 2</td><td>albatros</td><td>phoenix</td><td>6</td></tr>
+          <tr><td>144–149</td><td>Dragon</td><td>dragon</td><td>tiamat</td><td>6</td></tr>
+          <tr><td>150–164</td><td>Human warriors</td><td>karateka</td><td>wizard</td><td>15</td></tr>
+          <tr><td>165–172</td><td>Vampire / Machine</td><td>vampire</td><td>machine</td><td>8</td></tr>
+          <tr><td>173–188</td><td>Player class stubs</td><td colspan="2">(human/mutant variants)</td><td>16</td></tr>
+          <tr><td>189–199</td><td>Bosses</td><td>gen-bu</td><td>creator</td><td>11</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>MONSTER TYPES (ROM DATA)</h2>
+    <p>Each monster has a type value from the Monster Type Table at <code>0x1B1F0</code> (2 nibbles per byte).
+    Five distinct values: 0=standard (most monsters), and four elemental types whose values match the
+    element bitmask used by weapons and armor (fire=1, ice=2, elec=4, poison=8).
+    Combat significance (e.g., elemental weakness) is not yet confirmed from ROM.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>TYPE</th><th>COUNT</th><th>LABEL</th><th>FAMILY GROUPS</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>0</code></td><td>100</td><td>Standard</td><td>Insect, Plant, Crustacean, Canine, Bovine, Pachyderm, Bird, Worm, Werebeast, Eye, Slime, Elemental, Bird 2, Bosses</td></tr>
+          <tr><td style="color:var(--cyan)"><code>1</code></td><td>18</td><td style="color:var(--cyan)">Aquatic</td><td>Fish/Aquatic (6–11), Shellfish (24–29), Mollusk (54–59)</td></tr>
+          <tr><td style="color:var(--green)"><code>2</code></td><td>22</td><td style="color:var(--green)">Humanoid</td><td>Goblinoid (78–83), Human warriors (150–164), some Vampire/Machine</td></tr>
+          <tr><td style="color:var(--gold)"><code>4</code></td><td>30</td><td style="color:var(--gold)">Reptilian</td><td>Snake (48–53), Lizard (66–71), Mythical (84–89), Siren (114–119), Dragon (144–149)</td></tr>
+          <tr><td style="color:var(--purple,#cc88ff)"><code>8</code></td><td>30</td><td style="color:var(--purple,#cc88ff)">Undead</td><td>Skeleton (96–101), Demon (108–113), Undead/Spirit (120–131)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.72rem;color:var(--dim2);margin-top:6px;">
+      Source: ROM <code>0x1B1F0</code> (HIGH confidence for values; MEDIUM for combat meaning).
+      Filterable in <a href="monsters.html">MONSTERS</a> page.
+    </p>
+  </section>
+
+  <section>
+    <h2>STATUS CONDITIONS (ROM DATA)</h2>
+    <p>Seven status conditions have been identified from the status cure item bitmasks at <code>0x1B700</code>.
+    Each status cure item has an X field that is a bitmask clearing exactly one bit of the status byte.
+    Status names are <strong>MEDIUM confidence</strong> — inferred from item names; needs BGB to confirm exact meanings.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>BIT</th><th>CURE ITEM</th><th>STATUS (INFERRED)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1 (0xFD)</td><td><strong>needle</strong></td><td>Stone / Petrification</td></tr>
+          <tr><td>2 (0xFB)</td><td><strong>symbol</strong></td><td>Banish (unknown condition)</td></tr>
+          <tr><td>3 (0xF7)</td><td><strong>eyedrop</strong></td><td>Blind</td></tr>
+          <tr><td>4 (0xEF)</td><td><strong>antdote</strong></td><td>Poison</td></tr>
+          <tr><td>5 (0xDF)</td><td><strong>pan</strong></td><td>Confusion</td></tr>
+          <tr><td>6 (0xBF)</td><td><strong>shocker</strong></td><td>Paralysis</td></tr>
+          <tr><td>7 (0x7F)</td><td><strong>bell</strong></td><td>Sleep</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.72rem;color:var(--dim2);margin-top:6px;">
+      Source: ROM <code>0x1B700</code> item stat table (type byte 0x19), X field = bitmask (HIGH confidence for values; MEDIUM for status names).
+    </p>
+  </section>
+
+  <section>
+    <h2>ABILITY TYPE CODES (ROM DATA)</h2>
+    <p>Each entry in the ability table at <code>0x14640</code> (252 entries × 8 bytes) encodes a
+    type byte at position 7 and a prefix byte at position 0. These are the observed values and
+    their classifications:</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>BYTE VALUE</th><th>POSITION</th><th>CLASSIFICATION</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>0x01</code>, <code>0x03</code></td><td>Type (byte 7)</td><td>Usable item</td></tr>
+          <tr><td><code>0x05</code>, <code>0x0A</code>, <code>0x0B</code>, <code>0x0F</code></td><td>Type (byte 7)</td><td>Ability (mutant / monster use)</td></tr>
+          <tr><td><code>0x14</code>, <code>0x1E</code></td><td>Type (byte 7)</td><td>Weapon (gun / ranged)</td></tr>
+          <tr><td><code>0x32</code></td><td>Type (byte 7)</td><td>Sword / blade</td></tr>
+          <tr><td><code>0xFE</code>, <code>0xFD</code></td><td>Type (byte 7)</td><td>Armor</td></tr>
+          <tr><td><code>0xEC</code></td><td>Prefix (byte 0)</td><td>Sword (renders as <code>'</code> prefix in-game)</td></tr>
+          <tr><td><code>0xEF</code></td><td>Prefix (byte 0)</td><td>Elemental spell</td></tr>
+          <tr><td><code>0xE9</code></td><td>Prefix (byte 0)</td><td>Helmet</td></tr>
+          <tr><td><code>0xED</code></td><td>Prefix (byte 0)</td><td>Chest armor</td></tr>
+          <tr><td><code>0xE8</code></td><td>Prefix (byte 0)</td><td>Gloves</td></tr>
+          <tr><td><code>0xEA</code>, <code>0xEB</code></td><td>Prefix (byte 0)</td><td>Shoes</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<script>
+async function loadBosses() {
+  const monsters = await fetch('data/monsters.json').then(r => r.json());
+  const bosses = monsters.filter(m => m.id >= 189);
+  const tbody = document.getElementById('boss-tbody');
+  // Encounter IDs for each boss ROM ID (from encounter table 0x1A868; world labels community-sourced)
+  const ENC = {189:2,190:3,191:4,192:5,193:2,194:3,195:4,196:5,197:0,198:1,199:1};
+  const ENC_LABEL = {0:'Tower',1:'Final',2:'W1',3:'W2',4:'W3',5:'W4'};
+  bosses.forEach(m => {
+    const tr = document.createElement('tr');
+    const fmt = v => v > 99
+      ? `<span style="color:var(--gold)">${v}*</span>`
+      : v;
+    const encId = ENC[m.id];
+    const encCell = encId != null
+      ? `<span style="color:var(--dim2);font-size:0.7rem">#${encId} </span><span style="color:var(--cyan);font-size:0.7rem">${ENC_LABEL[encId]}</span>`
+      : '—';
+    tr.innerHTML = `
+      <td style="color:var(--dim2)">${m.id}</td>
+      <td><strong>${m.name}</strong></td>
+      <td>${encCell}</td>
+      <td class="num">${m.hp}</td>
+      <td class="num">${fmt(m.str)}</td>
+      <td class="num">${fmt(m.def)}</td>
+      <td class="num">${fmt(m.agi)}</td>
+      <td class="num">${fmt(m.mana)}</td>
+      <td class="num">${m.gold ?? '—'}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+loadBosses();
+</script>
+
+</body>
+</html>

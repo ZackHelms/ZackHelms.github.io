@@ -1,0 +1,1627 @@
+{
+  "_notes": "ROM-extracted meat transformation tables. HIGH confidence (addresses confirmed from RANDO source; class membership and eat table extracted directly from ROM binary).",
+  "_source": "Class member lists: ROM 0x0B2A8 (16 bytes \u00d7 25 classes). Eat transformation: ROM 0x0AFD3 (29 bytes \u00d7 25 eater-classes). Monster name table: ROM 0x14000.",
+  "_how_it_works": "When a monster (ID 0-149) eats meat: (1) find eater class = monster_id // 6; (2) pick random result class from eat_table[eater_class] weighted by result_class_weights; (3) pick random monster from that class weighted by class member weights. Monsters 150-188 and bosses 189-199 cannot eat meat.",
+  "monster_classes": [
+    {
+      "class_id": 0,
+      "members": [
+        {
+          "id": 0,
+          "name": "FLY",
+          "weight": 1
+        },
+        {
+          "id": 1,
+          "name": "DRGONFLY",
+          "weight": 2
+        },
+        {
+          "id": 2,
+          "name": "HORNET",
+          "weight": 2
+        },
+        {
+          "id": 3,
+          "name": "MOSQUITO",
+          "weight": 6
+        },
+        {
+          "id": 4,
+          "name": "CICADA",
+          "weight": 3
+        },
+        {
+          "id": 5,
+          "name": "MANTIS",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 1,
+      "members": [
+        {
+          "id": 6,
+          "name": "BARRACUD",
+          "weight": 1
+        },
+        {
+          "id": 7,
+          "name": "PIRANHA",
+          "weight": 3
+        },
+        {
+          "id": 8,
+          "name": "SHARK",
+          "weight": 3
+        },
+        {
+          "id": 9,
+          "name": "GUNFISH",
+          "weight": 4
+        },
+        {
+          "id": 10,
+          "name": "ELECEEL",
+          "weight": 3
+        },
+        {
+          "id": 11,
+          "name": "LEVIATHN",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 2,
+      "members": [
+        {
+          "id": 12,
+          "name": "CACTUS",
+          "weight": 3
+        },
+        {
+          "id": 13,
+          "name": "P-FLOWER",
+          "weight": 2
+        },
+        {
+          "id": 14,
+          "name": "GARLIC",
+          "weight": 2
+        },
+        {
+          "id": 15,
+          "name": "THORN",
+          "weight": 4
+        },
+        {
+          "id": 16,
+          "name": "F-FLOWER",
+          "weight": 3
+        },
+        {
+          "id": 17,
+          "name": "DARKROSE",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 3,
+      "members": [
+        {
+          "id": 18,
+          "name": "CLIPPER",
+          "weight": 5
+        },
+        {
+          "id": 19,
+          "name": "BEETLE",
+          "weight": 2
+        },
+        {
+          "id": 20,
+          "name": "ANTLION",
+          "weight": 1
+        },
+        {
+          "id": 21,
+          "name": "ATOMANT",
+          "weight": 3
+        },
+        {
+          "id": 22,
+          "name": "SCORPION",
+          "weight": 3
+        },
+        {
+          "id": 23,
+          "name": "SCARAB",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 4,
+      "members": [
+        {
+          "id": 24,
+          "name": "SHRIMP",
+          "weight": 3
+        },
+        {
+          "id": 25,
+          "name": "ATOMCRAB",
+          "weight": 3
+        },
+        {
+          "id": 26,
+          "name": "CRAB",
+          "weight": 2
+        },
+        {
+          "id": 27,
+          "name": "ICECRAB",
+          "weight": 3
+        },
+        {
+          "id": 28,
+          "name": "KINGCRAB",
+          "weight": 3
+        },
+        {
+          "id": 29,
+          "name": "DAGON",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 5,
+      "members": [
+        {
+          "id": 30,
+          "name": "WOLF",
+          "weight": 2
+        },
+        {
+          "id": 31,
+          "name": "JAGUAR",
+          "weight": 3
+        },
+        {
+          "id": 32,
+          "name": "SABERCAT",
+          "weight": 3
+        },
+        {
+          "id": 33,
+          "name": "SNOWCAT",
+          "weight": 3
+        },
+        {
+          "id": 34,
+          "name": "BLACKCAT",
+          "weight": 3
+        },
+        {
+          "id": 35,
+          "name": "FENSWOLF",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 6,
+      "members": [
+        {
+          "id": 36,
+          "name": "REDBULL",
+          "weight": 2
+        },
+        {
+          "id": 37,
+          "name": "RHINO",
+          "weight": 4
+        },
+        {
+          "id": 38,
+          "name": "TRICERAS",
+          "weight": 2
+        },
+        {
+          "id": 39,
+          "name": "BEHEMOTH",
+          "weight": 3
+        },
+        {
+          "id": 40,
+          "name": "BAKU",
+          "weight": 3
+        },
+        {
+          "id": 41,
+          "name": "GANESHA",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 7,
+      "members": [
+        {
+          "id": 42,
+          "name": "CONDOR",
+          "weight": 3
+        },
+        {
+          "id": 43,
+          "name": "RAVEN",
+          "weight": 2
+        },
+        {
+          "id": 44,
+          "name": "HARPY",
+          "weight": 3
+        },
+        {
+          "id": 45,
+          "name": "TEN-GU",
+          "weight": 3
+        },
+        {
+          "id": 46,
+          "name": "GARUDA",
+          "weight": 3
+        },
+        {
+          "id": 47,
+          "name": "NIKE",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 8,
+      "members": [
+        {
+          "id": 48,
+          "name": "SNAKE",
+          "weight": 3
+        },
+        {
+          "id": 49,
+          "name": "SERPENT",
+          "weight": 2
+        },
+        {
+          "id": 50,
+          "name": "ANACONDA",
+          "weight": 3
+        },
+        {
+          "id": 51,
+          "name": "HYDRA",
+          "weight": 3
+        },
+        {
+          "id": 52,
+          "name": "KO-RUN",
+          "weight": 3
+        },
+        {
+          "id": 53,
+          "name": "JORGANDR",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 9,
+      "members": [
+        {
+          "id": 54,
+          "name": "OCTOPUS",
+          "weight": 4
+        },
+        {
+          "id": 55,
+          "name": "CLAM",
+          "weight": 2
+        },
+        {
+          "id": 56,
+          "name": "AMOEBA",
+          "weight": 2
+        },
+        {
+          "id": 57,
+          "name": "AMMONITE",
+          "weight": 3
+        },
+        {
+          "id": 58,
+          "name": "SQUID",
+          "weight": 3
+        },
+        {
+          "id": 59,
+          "name": "KRAKEN",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 10,
+      "members": [
+        {
+          "id": 60,
+          "name": "WORM",
+          "weight": 5
+        },
+        {
+          "id": 61,
+          "name": "P-WORM",
+          "weight": 2
+        },
+        {
+          "id": 62,
+          "name": "CRAWLER",
+          "weight": 1
+        },
+        {
+          "id": 63,
+          "name": "LAVAWORM",
+          "weight": 3
+        },
+        {
+          "id": 64,
+          "name": "SANDWORM",
+          "weight": 3
+        },
+        {
+          "id": 65,
+          "name": "GIGAWORM",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 11,
+      "members": [
+        {
+          "id": 66,
+          "name": "LIZARD",
+          "weight": 1
+        },
+        {
+          "id": 67,
+          "name": "P-FROG",
+          "weight": 1
+        },
+        {
+          "id": 68,
+          "name": "GECKO",
+          "weight": 7
+        },
+        {
+          "id": 69,
+          "name": "DINOSAUR",
+          "weight": 2
+        },
+        {
+          "id": 70,
+          "name": "SALAMAND",
+          "weight": 3
+        },
+        {
+          "id": 71,
+          "name": "BASILISK",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 12,
+      "members": [
+        {
+          "id": 72,
+          "name": "WERERAT",
+          "weight": 2
+        },
+        {
+          "id": 73,
+          "name": "WEREWOLF",
+          "weight": 2
+        },
+        {
+          "id": 74,
+          "name": "CATWOMAN",
+          "weight": 5
+        },
+        {
+          "id": 75,
+          "name": "MINOTAUR",
+          "weight": 2
+        },
+        {
+          "id": 76,
+          "name": "RAKSHASA",
+          "weight": 3
+        },
+        {
+          "id": 77,
+          "name": "ANUBIS",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 13,
+      "members": [
+        {
+          "id": 78,
+          "name": "GOBLIN",
+          "weight": 1
+        },
+        {
+          "id": 79,
+          "name": "ONI",
+          "weight": 5
+        },
+        {
+          "id": 80,
+          "name": "OGRE",
+          "weight": 3
+        },
+        {
+          "id": 81,
+          "name": "GIANT",
+          "weight": 3
+        },
+        {
+          "id": 82,
+          "name": "TITAN",
+          "weight": 2
+        },
+        {
+          "id": 83,
+          "name": "SUSANO-O",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 14,
+      "members": [
+        {
+          "id": 84,
+          "name": "GRIFFIN",
+          "weight": 4
+        },
+        {
+          "id": 85,
+          "name": "MANTCORE",
+          "weight": 3
+        },
+        {
+          "id": 86,
+          "name": "CHIMERA",
+          "weight": 2
+        },
+        {
+          "id": 87,
+          "name": "NUE",
+          "weight": 3
+        },
+        {
+          "id": 88,
+          "name": "SPHINX",
+          "weight": 2
+        },
+        {
+          "id": 89,
+          "name": "KI-RIN",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 15,
+      "members": [
+        {
+          "id": 90,
+          "name": "BIGEYE",
+          "weight": 5
+        },
+        {
+          "id": 91,
+          "name": "GAZER",
+          "weight": 2
+        },
+        {
+          "id": 92,
+          "name": "SEEKER",
+          "weight": 3
+        },
+        {
+          "id": 93,
+          "name": "WATCHER",
+          "weight": 2
+        },
+        {
+          "id": 94,
+          "name": "EVILEYE",
+          "weight": 2
+        },
+        {
+          "id": 95,
+          "name": "BEHOLDER",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 16,
+      "members": [
+        {
+          "id": 96,
+          "name": "SKELETON",
+          "weight": 2
+        },
+        {
+          "id": 97,
+          "name": "REDBONE",
+          "weight": 6
+        },
+        {
+          "id": 98,
+          "name": "DOKURO",
+          "weight": 2
+        },
+        {
+          "id": 99,
+          "name": "WARRIOR",
+          "weight": 2
+        },
+        {
+          "id": 100,
+          "name": "BONEKING",
+          "weight": 2
+        },
+        {
+          "id": 101,
+          "name": "LICH",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 17,
+      "members": [
+        {
+          "id": 102,
+          "name": "SLIME",
+          "weight": 6
+        },
+        {
+          "id": 103,
+          "name": "JELLY",
+          "weight": 2
+        },
+        {
+          "id": 104,
+          "name": "TORORO",
+          "weight": 2
+        },
+        {
+          "id": 105,
+          "name": "GUMMY",
+          "weight": 2
+        },
+        {
+          "id": 106,
+          "name": "PUDDING",
+          "weight": 2
+        },
+        {
+          "id": 107,
+          "name": "HI-SLIME",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 18,
+      "members": [
+        {
+          "id": 108,
+          "name": "GARGOYLE",
+          "weight": 5
+        },
+        {
+          "id": 109,
+          "name": "IMP",
+          "weight": 4
+        },
+        {
+          "id": 110,
+          "name": "DEMON",
+          "weight": 2
+        },
+        {
+          "id": 111,
+          "name": "DEMOLORD",
+          "weight": 1
+        },
+        {
+          "id": 112,
+          "name": "DEMOKING",
+          "weight": 2
+        },
+        {
+          "id": 113,
+          "name": "ATHTALOT",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 19,
+      "members": [
+        {
+          "id": 114,
+          "name": "MEDUSA",
+          "weight": 4
+        },
+        {
+          "id": 115,
+          "name": "SIREN",
+          "weight": 5
+        },
+        {
+          "id": 116,
+          "name": "LAMIA",
+          "weight": 2
+        },
+        {
+          "id": 117,
+          "name": "NAGA",
+          "weight": 1
+        },
+        {
+          "id": 118,
+          "name": "SCYLLA",
+          "weight": 2
+        },
+        {
+          "id": 119,
+          "name": "LILITH",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 20,
+      "members": [
+        {
+          "id": 120,
+          "name": "ZOMBIE",
+          "weight": 1
+        },
+        {
+          "id": 121,
+          "name": "GHOUL",
+          "weight": 6
+        },
+        {
+          "id": 122,
+          "name": "MOU-JYA",
+          "weight": 3
+        },
+        {
+          "id": 123,
+          "name": "WIGHT",
+          "weight": 2
+        },
+        {
+          "id": 124,
+          "name": "GHAST",
+          "weight": 2
+        },
+        {
+          "id": 125,
+          "name": "REVNANT",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 21,
+      "members": [
+        {
+          "id": 126,
+          "name": "O-BAKE",
+          "weight": 1
+        },
+        {
+          "id": 127,
+          "name": "PHANTOM",
+          "weight": 6
+        },
+        {
+          "id": 128,
+          "name": "BURUBURU",
+          "weight": 3
+        },
+        {
+          "id": 129,
+          "name": "WRAITH",
+          "weight": 2
+        },
+        {
+          "id": 130,
+          "name": "SPECTOR",
+          "weight": 2
+        },
+        {
+          "id": 131,
+          "name": "GHOST",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 22,
+      "members": [
+        {
+          "id": 132,
+          "name": "WOODMAN",
+          "weight": 6
+        },
+        {
+          "id": 133,
+          "name": "CLAYMAN",
+          "weight": 2
+        },
+        {
+          "id": 134,
+          "name": "STONEMAN",
+          "weight": 2
+        },
+        {
+          "id": 135,
+          "name": "IRONMAN",
+          "weight": 2
+        },
+        {
+          "id": 136,
+          "name": "FIREMAN",
+          "weight": 2
+        },
+        {
+          "id": 137,
+          "name": "MAZIN",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 23,
+      "members": [
+        {
+          "id": 138,
+          "name": "ALBATROS",
+          "weight": 4
+        },
+        {
+          "id": 139,
+          "name": "EAGLE",
+          "weight": 4
+        },
+        {
+          "id": 140,
+          "name": "THUNDER",
+          "weight": 2
+        },
+        {
+          "id": 141,
+          "name": "COCATRIS",
+          "weight": 2
+        },
+        {
+          "id": 142,
+          "name": "ROCK",
+          "weight": 2
+        },
+        {
+          "id": 143,
+          "name": "PHOENIX",
+          "weight": 2
+        }
+      ]
+    },
+    {
+      "class_id": 24,
+      "members": [
+        {
+          "id": 144,
+          "name": "DRAGON1",
+          "weight": 6
+        },
+        {
+          "id": 145,
+          "name": "DRAGON2",
+          "weight": 2
+        },
+        {
+          "id": 146,
+          "name": "DRAGON3",
+          "weight": 2
+        },
+        {
+          "id": 147,
+          "name": "DRAGON4",
+          "weight": 2
+        },
+        {
+          "id": 148,
+          "name": "DRAGON5",
+          "weight": 2
+        },
+        {
+          "id": 149,
+          "name": "TIAMAT",
+          "weight": 2
+        }
+      ]
+    }
+  ],
+  "eat_transformation": [
+    {
+      "eater_class": 0,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 1,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 2,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 2,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 3,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 2,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 4,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 5,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 6,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 7,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 8,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "15": 2,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 9,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 10,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 11,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 12,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 13,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 14,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 15,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 16,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 17,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 18,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 19,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "15": 2,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 20,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 21,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 2,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 22,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 2,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 23,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 2,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    },
+    {
+      "eater_class": 24,
+      "result_class_weights": {
+        "0": 1,
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1,
+        "11": 1,
+        "12": 1,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "16": 1,
+        "17": 1,
+        "18": 1,
+        "19": 1,
+        "20": 1,
+        "21": 1,
+        "22": 1,
+        "23": 1,
+        "24": 1
+      }
+    }
+  ]
+}

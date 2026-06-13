@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monsters — FFL1</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+#monster-table td:nth-child(3),
+#monster-table td:nth-child(4),
+#monster-table td:nth-child(5),
+#monster-table td:nth-child(6),
+#monster-table td:nth-child(7) { font-variant-numeric: tabular-nums; text-align:right; }
+
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.class-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 10px 12px;
+  font-size: 0.72rem;
+}
+.class-card-title {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 0.7rem;
+  color: var(--dim2);
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.class-member {
+  display: flex; justify-content: space-between;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--border);
+}
+.class-member:last-child { border-bottom: none; }
+.class-member .m-name { color: var(--white); }
+.class-member.m-top .m-name { color: var(--gold); }
+.class-member .m-weight { color: var(--dim2); font-size: 0.65rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FFL1</h1>
+  <div class="breadcrumb">
+    <a href="/">tythos.com</a><span>/</span>
+    <a href="index.html">FFL1</a><span>/</span>
+    <span>Monsters</span>
+  </div>
+</header>
+<nav>
+  <a href="index.html">HOME</a>
+  <a href="general.html">GENERAL</a>
+  <a href="monsters.html" class="active">MONSTERS</a>
+  <a href="mutants.html">MUTANTS</a>
+  <a href="humans.html">HUMANS</a>
+  <a href="items.html">ITEMS</a>
+  <a href="shops.html">SHOPS</a>
+  <a href="encounters.html">ENCOUNTERS</a>
+  <a href="game.html">▶ PLAY</a>
+</nav>
+
+<main>
+  <div class="page-title">MONSTER CLASS</div>
+  <div class="page-sub">ROM-EXTRACTED DATA ONLY</div>
+
+  <div class="callout warn">
+    <strong>Data source notice:</strong> Monster stats and the meat transformation table are
+    extracted directly from the ROM. <strong>Trigger conditions</strong> (how many meats eaten,
+    combat conditions) and <strong>meat slot count</strong> have not been extracted from the ROM
+    binary. The transformation classes section below shows what you can become, not when.
+  </div>
+
+  <section>
+    <h2>ALL MONSTERS (ROM DATA)</h2>
+    <p>All 200 entries from the ROM monster table. HP from <code>0x1B254</code> (2-byte LE).
+    STR/DEF/AGI/MANA from <code>0x1AAE8</code> bytes 2–5 (9-byte stride).
+    Gold from BCD table at <code>0x1B2A4</code> via lower nibble of stat byte 6.
+    Values exceeding 99 are highlighted — 99 is a display cap in-game, not the stored value.
+    Ability lists from pointer at stat bytes 7–8 (bank-6 CPU address), decoded from item
+    stat table at <code>0x1B700</code>. Cyan = attack, dim = passive defense (D/E items).</p>
+
+    <div class="filter-bar">
+      <input type="text" id="search" placeholder="Search by name…">
+      <select id="family-filter">
+        <option value="">All families</option>
+      </select>
+      <select id="tier-filter">
+        <option value="">All tiers</option>
+        <option value="0">Tier 0 — boss/scripted only</option>
+        <option value="10">Tier 10 — earliest (World 1)</option>
+        <option value="9">Tier 9</option>
+        <option value="8">Tier 8</option>
+        <option value="7">Tier 7</option>
+        <option value="6">Tier 6</option>
+        <option value="5">Tier 5</option>
+        <option value="4">Tier 4</option>
+        <option value="3">Tier 3</option>
+        <option value="2">Tier 2</option>
+        <option value="1">Tier 1 — latest</option>
+      </select>
+      <select id="type-filter">
+        <option value="">All types</option>
+        <option value="0">Type 0 — Standard</option>
+        <option value="1">Type 1 — Aquatic</option>
+        <option value="2">Type 2 — Humanoid</option>
+        <option value="4">Type 4 — Reptilian</option>
+        <option value="8">Type 8 — Undead</option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table id="monster-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>NAME</th>
+            <th>HP</th>
+            <th>STR</th>
+            <th>DEF</th>
+            <th>AGI</th>
+            <th>MANA</th>
+            <th>GOLD</th>
+            <th>ABILITIES</th>
+            <th>FAMILY / TYPE</th>
+          </tr>
+        </thead>
+        <tbody id="monster-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>MONSTER CLASSES &amp; MEAT TRANSFORMATION</h2>
+    <p style="font-size:0.82rem;margin-bottom:8px;">
+      There are 25 monster classes (IDs 0–149; class = ID ÷ 6). When a monster eats meat,
+      it picks a random result class (roughly equal chance for each of the 25 classes), then
+      picks a random member of that class weighted by the values below.
+      <strong style="color:var(--gold)">Gold names</strong> = highest probability in that class.
+      Monsters 150+ (human warriors, bosses) cannot eat meat.
+    </p>
+    <p style="font-size:0.72rem;color:var(--dim2);margin-bottom:14px;">
+      Source: ROM <code>0x0B2A8</code> (class members + weights) · <code>0x0AFD3</code> (eat table) — HIGH confidence
+    </p>
+    <div id="class-grid" class="class-grid"></div>
+  </section>
+</main>
+
+<script>
+async function init() {
+  const [monsters, txData, abilities] = await Promise.all([
+    fetch('data/monsters.json').then(r => r.json()),
+    fetch('data/transformation.json').then(r => r.json()),
+    fetch('data/abilities.json').then(r => r.json())
+  ]);
+  const abilityById = {};
+  abilities.forEach(a => { abilityById[a.id] = a; });
+
+  // Build family filter from actual data
+  const families = [...new Set(monsters.map(m => m.family))].sort();
+  const sel = document.getElementById('family-filter');
+  families.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f; opt.textContent = f;
+    sel.appendChild(opt);
+  });
+
+  const tbody = document.getElementById('monster-tbody');
+  const rows = [];
+
+  monsters.forEach(m => {
+    const tr = document.createElement('tr');
+    tr.dataset.name = m.name.toLowerCase();
+    tr.dataset.family = m.family;
+    tr.dataset.tier = String(m.encounter_tier ?? '');
+    tr.dataset.mtype = String(m.monster_type ?? '');
+
+    const fmt = v => v > 99
+      ? `<span style="color:var(--gold)">${v}*</span>`
+      : v;
+
+    tr.innerHTML = `
+      <td style="color:var(--dim2)">${m.id}</td>
+      <td>${m.name}</td>
+      <td>${m.hp}</td>
+      <td>${fmt(m.str)}</td>
+      <td>${fmt(m.def)}</td>
+      <td>${fmt(m.agi)}</td>
+      <td>${fmt(m.mana)}</td>
+      <td>${m.gold ?? '—'}</td>
+      <td style="font-size:0.62rem;white-space:nowrap">${(m.ability_ids || []).map(id => {
+        if (id === 0xFE || id === 0xFF) return `<span style="color:var(--dim2)">—</span>`;
+        const ab = abilityById[id];
+        if (!ab) return `<span style="color:var(--dim2)">?${id}</span>`;
+        const isPassive = ab.type === 'armor';
+        return `<span style="color:${isPassive ? 'var(--dim2)' : 'var(--cyan)'}">${ab.name}</span>`;
+      }).join('<span style="color:var(--dim2)"> · </span>')}</td>
+      <td style="white-space:nowrap"><span class="tag tag-cyan" style="font-size:0.58rem">${m.family}</span>${m.monster_type ? ` <span style="font-size:0.55rem;color:${['','var(--cyan)','var(--green)','','var(--gold)','','','','var(--purple,#cc88ff)'][m.monster_type]}">${['','AQU','HUM','','REP','','','','UND'][m.monster_type]}</span>` : ''}</td>`;
+    tbody.appendChild(tr);
+    rows.push(tr);
+  });
+
+  function applyFilters() {
+    const q = document.getElementById('search').value.toLowerCase();
+    const fam = document.getElementById('family-filter').value;
+    const tier = document.getElementById('tier-filter').value;
+    const mtype = document.getElementById('type-filter').value;
+    rows.forEach(r => {
+      const matchName = !q || r.dataset.name.includes(q);
+      const matchFam = !fam || r.dataset.family === fam;
+      const matchTier = !tier || r.dataset.tier === tier;
+      const matchType = !mtype || r.dataset.mtype === mtype;
+      r.classList.toggle('hidden', !(matchName && matchFam && matchTier && matchType));
+    });
+  }
+  document.getElementById('search').addEventListener('input', applyFilters);
+  document.getElementById('family-filter').addEventListener('change', applyFilters);
+  document.getElementById('tier-filter').addEventListener('change', applyFilters);
+  document.getElementById('type-filter').addEventListener('change', applyFilters);
+
+  // Monster class grid
+  const classGrid = document.getElementById('class-grid');
+  txData.monster_classes.forEach(cls => {
+    const maxW = Math.max(...cls.members.map(m => m.weight));
+    const card = document.createElement('div');
+    card.className = 'class-card';
+    const membersHtml = cls.members.map(m => `
+      <div class="class-member${m.weight === maxW ? ' m-top' : ''}">
+        <span class="m-name">${m.name}</span>
+        <span class="m-weight">wt ${m.weight}</span>
+      </div>`).join('');
+    card.innerHTML = `<div class="class-card-title">CLASS ${cls.class_id}</div>${membersHtml}`;
+    classGrid.appendChild(card);
+  });
+}
+init();
+</script>
+</body>
+</html>
