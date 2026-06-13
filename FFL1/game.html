@@ -531,20 +531,28 @@
 
     function renderClass() {
       fillDMG(0,0,160,144,C0);
-      drawStr('WHO ARE YOU?', 4, 4, C3, C0);
-      fillDMG(0,14,160,1,C3);
+      // Row layout (tile-aligned, 16px per row, 8px top margin):
+      //   x=2       cursor ring (selected row only)
+      //   x=12      row number 1–8
+      //   x=24–39   portrait sprite gap (16×16; sprite tiles not yet extracted — see TODO.md)
+      //   x=44      class name (left-aligned, fixed column)
+      //   x=112     gender (M / F; blank for non-human classes)
       for (let i=0; i<CLASSES.length; i++) {
         const cl = CLASSES[i];
-        const py = 20 + i*14;
-        const sel = i===classSel;
-        fillDMG(0, py-1, 160, 12, sel?C3:C0);
-        const label = cl.name+(cl.gender?' '+cl.gender:'');
-        drawStr(label, 20, py, sel?C0:C3, sel?C3:C0);
-        if (sel && blinkOn) {
-          ctx.fillStyle = `rgb(${C0[0]},${C0[1]},${C0[2]})`;
+        const rowY = 8 + i*16;         // top of row
+        const textY = rowY + 4;        // center 8px text in 16px row
+
+        drawStr(String(i+1), 12, textY, C3, C0);
+        drawStr(cl.name, 44, textY, C3, C0);
+        if (cl.gender) drawStr(cl.gender, 112, textY, C3, C0);
+
+        if (i===classSel) {
+          // Circular cursor ring — matches ROM visual (no row inversion)
+          ctx.strokeStyle = `rgb(${C3[0]},${C3[1]},${C3[2]})`;
+          ctx.lineWidth = 1.5;
           ctx.beginPath();
-          ctx.moveTo(10,py+1); ctx.lineTo(16,py+4); ctx.lineTo(10,py+7);
-          ctx.closePath(); ctx.fill();
+          ctx.arc(5, rowY+8, 4, 0, Math.PI*2);
+          ctx.stroke();
         }
       }
     }
