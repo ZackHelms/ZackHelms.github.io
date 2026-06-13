@@ -68,8 +68,9 @@
   <div class="callout warn">
     <strong>Slot mechanic unverified:</strong> Each encounter stores 5 monster slots. The game mechanic
     that determines which slots are active in a given battle has not yet been decoded from the ROM.
-    Encounters 0–5 are world-boss fights. <strong>Zone assignments</strong> (which encounter IDs map
-    to which overworld area or dungeon floor) are also not yet confirmed from ROM.
+    Encounters 0–5 are world-boss fights — their world labels are shown (boss IDs from ROM; world
+    assignments are community-sourced). <strong>Random encounter zone assignments</strong> (which
+    encounter IDs 6–127 map to which overworld area or dungeon floor) are not yet confirmed from ROM.
   </div>
 
   <section>
@@ -119,6 +120,11 @@ async function init() {
 
   // IDs that are "filler" in boss/scripted encounters
   const FILLER_IDS = new Set([0, 128, 129]); // fly, buruburu, wraith
+
+  // Boss encounter labels: enc ID → world label (ROM IDs confirmed; world assignments community-sourced)
+  const BOSS_LABELS = {
+    0: 'Tower of God', 1: 'Final (Tower)', 2: 'World 1', 3: 'World 2', 4: 'World 3', 5: 'World 4'
+  };
 
   function encType(enc) {
     const ids = enc.monsters.map(m => m.id);
@@ -183,9 +189,13 @@ async function init() {
       ? `<span class="tier-badge">${Math.min(...allTiers)}–${Math.max(...allTiers)}</span>`
       : '';
 
+    const bossLabel = etype === 'boss' && BOSS_LABELS[eid]
+      ? `<span style="color:var(--dim2);font-size:0.62rem;display:block;margin-top:2px">${BOSS_LABELS[eid]}</span>`
+      : '';
+
     tr.innerHTML = `
       <td>${eid}</td>
-      <td><span class="type-badge ${badgeClass}">${badgeText}</span></td>
+      <td><span class="type-badge ${badgeClass}">${badgeText}</span>${bossLabel}</td>
       <td><div class="slot-list">${chips}</div></td>
       <td>${tierRange}</td>`;
     tbody.appendChild(tr);
