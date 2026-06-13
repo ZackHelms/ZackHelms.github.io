@@ -396,7 +396,12 @@ Item type prefix bytes (byte 0 of ability name entry):
 | ROM location | `0x14E40` (Bank 5) |
 | RAM load dest | `0xC800` (DTE1) and `0xC860` (DTE2) |
 | Load code | Bank 0 at `0x02DD` |
-| Note | DTE is recursive; ALL story text is DTE-compressed; raw byte search for English words is impossible |
+| Note | DTE is recursive; ALL dialog text is DTE-compressed; raw byte search for English words is impossible |
+| Dialog text range | `0x14F3E`–`0x17D37` (Bank 5, 11,770 bytes, immediately after DTE tables) |
+| Dialog encoding | Direct chars use **lowercase range** `0xA4`–`0xBD` (display as uppercase). ALL of `0x50`–`0x8F` are DTE1 codes (no overlap with A–F letters). `0xBE`=apostrophe, `0x0D`=newline, `0x00`=string terminator. |
+| Extracted strings | 251 strings decoded to `data/dialog.json` (MEDIUM confidence; control code semantics partially unknown) |
+| Confirmed dialog | "THERE IS A TOWN HIDDEN IN THE CLOUDS" ~`0x173E0`; "IF YOU WANT TO DRINK HERE" ~`0x15281`; character names "JEANNE", "SAYAKA" at `0x15039`–`0x1504B` |
+| Story intro | NOT FOUND in bank 5; likely in bank 1 or 3 with game startup code |
 
 ### Bank 3 UI Strings (confirmed)
 **Confidence: HIGH** — verified by byte read at `0x0ECC8`.

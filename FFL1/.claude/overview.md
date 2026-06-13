@@ -23,7 +23,8 @@ FFL1/
   data/             ← Game data files
     monsters.json   ← 200 monsters: name, HP, STR, DEF, AGI, MANA, gold — all HIGH confidence from ROM
     abilities.json  ← 252 abilities/items/weapons: name + type — FROM ROM
-    dialog.md       ← story/NPC text; marked MEDIUM confidence (web-sourced, not DTE-decoded)
+    dialog.md       ← story intro text; marked MEDIUM confidence (web-sourced; ROM location unknown)
+    dialog.json     ← 251 NPC dialog strings DTE-decoded from ROM 0x14F3E (MEDIUM confidence)
   v001/             ← Archived first-pass JS game engine (not actively developed)
     game.html, js/, css/, data/
   index.html        ← Hub page (tythos.com/FFL1/)

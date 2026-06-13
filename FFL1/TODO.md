@@ -160,13 +160,15 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 - **Cursor sprite tile index** — the ring cursor at the left of the selected row.
   *(covered by BGB Task 3)*
 
-- **DTE decoder implementation** — story/dialog text is DTE-compressed; raw byte search
-  is impossible. Need to implement a decoder using the tables at `0x14E40` (loaded to RAM
-  `0xC800`) to verify `data/dialog.md` story text and extract NPC dialog.
-  - DTE tables extracted: DTE1 = 64 entries at `0x14E40` (codes `0x50–0x8F`); DTE2 = 55 entries at `0x14EC0` (codes `0xC0–0xF6`)
-  - Dialog encoding differs from name encoding: in dialog mode `0x50–0x8F` are DTE codes (NOT direct letters); direct chars at `0x90–0xBD`
-  - Story text NOT in bank 5 (ability name table occupies `0x14640–0x14E3F`); dialog must be in another bank — location unknown
-  - Blocked on: finding dialog text bank/offset (requires BGB text-display breakpoint or full-ROM DTE sweep)
+- **DTE decoder implementation** — NPC dialog located. Need to build a full decoder and extract all dialog text.
+  - ✅ DTE tables confirmed: DTE1 = 64 bigrams at `0x14E40` (codes `0x50–0x8F`); DTE2 = 55 bigrams at `0x14EC0` (codes `0xC0–0xF6`)
+  - ✅ Dialog encoding: uses lowercase-range bytes `0xA4–0xBD` for direct chars; `0x50–0x8F` and `0xC0–0xF6` are all DTE codes; `0xBE`=apostrophe; `0x0D`=newline; `0x00`=string terminator
+  - ✅ NPC dialog text location: bank 5, `0x14F3E–0x17D37` (11,770 bytes). Confirmed samples: "THERE IS A TOWN HIDDEN IN THE CLOUDS", "ANYONE WHO VISITS HIS..."
+  - Full DTE1 bigram table: `__,E_,HE,_T,TH,OU,S_,T_,ER,_A,_I,RE,IN,IS,AN,D_,_W,TO,O_,YO,OR,_O,AR,AT,_Y,ST,HA,N_,_S,EA,_H,_M,R_,VE,U_,_F,HI,ON,IT,_D,LL,TE,ME,EN,ND,_B,TH,OF,ES,E-THE,LE,WE,SE,ED,AS,RO,OW,Y_,LD,I_,DE,??_,YO,WA`
+  - Story intro text NOT found in bank 5; may be in bank 1/3 or use different encoding
+  - ✅ Decoder written; 251 strings extracted to `data/dialog.json` (MEDIUM confidence)
+  - **Next:** map dialog string offsets to in-game triggers/locations (NPC coordinates, shop interiors, etc.) — requires BGB to trace which string offset the game reads for each NPC *(blocked on: BGB session)*
+  - Story intro text still not found — may need BGB text-renderer breakpoint to locate
 
 - **WRAM address verification** — gold, character HP/stats. *(covered by BGB Task 4)*
 

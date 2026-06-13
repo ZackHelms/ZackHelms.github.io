@@ -57,7 +57,8 @@ these as facts in wiki pages or context files:
 - Stat item effect amounts
 - Armor stat bonus values
 - World structure (which bosses appear where, crystal ball requirements)
-- Story / intro text — DTE-compressed in ROM; no raw bytes searchable without full DTE decode; web-sourced version stored in data/dialog.md (MEDIUM confidence). DTE tables extracted: DTE1 at 0x14E40 (64 bigrams, codes 0x50–0x8F), DTE2 at 0x14EC0 (55 bigrams, codes 0xC0–0xF6). Dialog encoding ≠ name encoding: 0x50–0x8F are DTE1 codes in dialog (not letters). Story text bank/offset not yet found.
+- NPC dialog text — FOUND: bank 5 at 0x14F3E–0x17D37 (11,770 bytes). DTE-encoded. DTE tables: DTE1 at 0x14E40 (64 bigrams 0x50–0x8F), DTE2 at 0x14EC0 (55 bigrams 0xC0–0xF6). Dialog encoding uses lowercase-range direct chars (0xA4–0xBD) NOT uppercase (0x8A–0xA3), so ALL of 0x50–0x8F are active DTE codes. 0xBE = apostrophe. 0x0D = newline. 0x00 = string terminator. MEDIUM confidence (text recognized, control code semantics partially decoded). Confirmed samples: "THERE IS A TOWN HIDDEN IN THE CLOUDS" at ~0x173E0; "ANYONE WHO VISITS HIS..." at ~0x16D00.
+- Story / intro text — location not yet found. Web-sourced "IT HAS BEEN SAID THAT THE TOWER..." not located in ROM with DTE compression search. May be in bank 1/3 or use a different encoding. Stored in data/dialog.md (MEDIUM confidence).
 - Name-entry UI layout — row/column counts, cell sizes, END/DEL positions not confirmed from ROM
 - CONTINUE save-file format — not yet extracted
 
