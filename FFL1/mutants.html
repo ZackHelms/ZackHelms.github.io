@@ -53,11 +53,42 @@
   <div class="callout warn">
     <strong>Data source notice:</strong> Mutant stat-growth rates, ability-gain probabilities,
     and stat cap values have not been fully decoded from ROM.
-    The growth threshold table at <code>0x1BF00</code> has been located (8 threshold values:
-    35, 69, 99, 117, 135, 143, 147, 255), suggesting a diminishing-returns system across
-    the full internal stat range 0–255. Exact growth probabilities and amounts require BGB
-    to trace the growth routine. Only the ability database (ROM-extracted) is presented here.
+    The growth threshold table at <code>0x1BF00</code> has been located (see below).
+    Exact growth probabilities and amounts require BGB to trace the growth routine.
+    Only the threshold values and ability database (both ROM-extracted) are presented here.
   </div>
+
+  <section>
+    <h2>STAT GROWTH THRESHOLD TABLE (ROM DATA)</h2>
+    <p style="font-size:0.82rem;margin-bottom:12px;">
+      Eight threshold bytes at <code>0x1BF00</code> divide the internal 0–255 stat range into zones.
+      Stats in lower zones grow more easily; higher zones represent diminishing returns.
+      The game likely compares a stat's current value against these thresholds to determine
+      growth probability or amount. Exact formula requires BGB — <strong>MEDIUM confidence</strong>
+      for zone interpretation; <strong>HIGH confidence</strong> for raw values.
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>ZONE</th><th>STAT RANGE</th><th>THRESHOLD BYTE</th><th>INTERPRETATION</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>0 – 35</td><td><code>35</code></td><td style="color:var(--green)">Fastest growth</td></tr>
+          <tr><td>2</td><td>36 – 69</td><td><code>69</code></td><td style="color:var(--green)">Fast growth</td></tr>
+          <tr><td>3</td><td>70 – 99</td><td><code>99</code></td><td style="color:var(--cyan)">Moderate (below display cap)</td></tr>
+          <tr><td>4</td><td>100 – 117</td><td><code>117</code></td><td style="color:var(--cyan)">Moderate (above display cap)</td></tr>
+          <tr><td>5</td><td>118 – 135</td><td><code>135</code></td><td style="color:var(--gold)">Slow</td></tr>
+          <tr><td>6</td><td>136 – 143</td><td><code>143</code></td><td style="color:var(--gold)">Very slow</td></tr>
+          <tr><td>7</td><td>144 – 147</td><td><code>147</code></td><td style="color:var(--dim2)">Extremely slow</td></tr>
+          <tr><td>8</td><td>148 – 255</td><td><code>255</code></td><td style="color:var(--dim2)">Near-impossible / cap zone</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.72rem;color:var(--dim2);margin-top:8px;">
+      Source: ROM <code>0x1BF00</code>, 8 bytes. Growth probability/amount per zone not yet extracted (requires BGB breakpoint at growth routine).
+      Display cap is 99 in-game; internal max is higher (estimated 255 based on boss stats exceeding 99).
+    </p>
+  </section>
 
   <section>
     <h2>ABILITY DATABASE (ROM DATA)</h2>
