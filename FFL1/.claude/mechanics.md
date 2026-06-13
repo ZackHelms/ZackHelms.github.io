@@ -35,7 +35,7 @@
 - **Monster gold** — gold table BCD encoding and lower-nibble indexing confirmed from FFLRandomizer source; monsters.json updated.
 
 ### UNVERIFIED (still needs checking)
-- **Stat byte 6 upper nibble** — contains some per-monster data (varies); lower nibble is gold index. Upper nibble purpose not yet identified.
+- **Stat byte 6 upper nibble** — likely encounter area tier. Pattern: within each family, weakest monster has upper=9/10, strongest has upper=2. Upper=0 = boss/scripted-only (all bosses 189+, player stubs 173–188, named NPCs like kingswrd/steward/hunter). Interpretation: monsters only appear in random encounters on floors where zone_tier ≥ this value (or similar). Needs BGB read breakpoint at 0x1AAEE to confirm exact usage.
 - **Stat bytes 7–8** — RESOLVED. These are the monster ability list pointer (little-endian bank-6 CPU address). Fully decoded — see "Monster ability lists" in Extracted section above.
 - **Monster drop byte** — original "byte 6 of 8-byte entry" note was wrong stride era; current byte 6 = gold+unknown packed field. Actual item-drop mechanic not yet located in ROM.
 

@@ -22,22 +22,21 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 ### Mystery 1: Stat table byte 6 — upper nibble
 **Location:** `0x1AAE8 + idx*9 + 6` — upper nibble only (bits 4–7). Lower nibble is confirmed as gold table index.
 
-**Observed values (upper nibble):**
-| Monster | id | byte6 raw | upper nibble |
-|---------|-----|-----------|--------------|
-| fly | 0 | 0xA1 | 0xA = 10 |
-| drgonfly | 1 | 0x83 | 0x8 = 8 |
-| hornet | 2 | 0x74 | 0x7 = 7 |
-| mosquito | 3 | 0x74 | 0x7 = 7 |
-| cicada | 4 | 0x29 | 0x2 = 2 |
-| mantis | 5 | 0x29 | 0x2 = 2 |
-| barracud | 6 | 0x92 | 0x9 = 9 |
-| gen-bu | 189 | 0x06 | 0x0 = 0 |
-| sei-ryu | 190 | 0x0C | 0x0 = 0 |
+**Observed values:** upper nibble range is 0–10. Distribution: upper=0 → 31 monsters; upper=2 → 39; upper=10 → 15.
 
-**Key observation:** Bosses (189+) all have upper nibble = 0. Regular monsters vary. The RANDO code (`WriteCharacterGoldTableIndex`) sometimes uses `|=` to preserve the upper nibble, but `WriteMonsterData` zeros the entire byte first — so the RANDO is inconsistent and likely doesn't know what the upper nibble means.
+**Newly observed pattern:** Within each 6-monster family, the upper nibble DECREASES with monster strength:
+- wolf (weakest canine, id=30): upper=9
+- jaguar (id=31): upper=8
+- sabercat (id=32): upper=6
+- snowcat (id=33): upper=4
+- blackcat (id=34): upper=2
+- fenswolf (strongest canine, id=35): upper=2
 
-**RANDO verdict (from source audit):** No `Read*` function ever accesses the upper nibble of byte 6. `AdjustMonsterGoldOffset` accidentally destroys it. Given the RANDO comment "All monsters are Monster race, meat drop 3" and the observation that bosses = 0 (bosses can't be eaten), the upper nibble most likely encodes **meat category / drop tier**.
+This pattern holds for insects, canines, fish, and other families checked. Upper nibble appears to encode **encounter area tier** — weakest monsters (upper=9/10) appear in World 1/early dungeons; strongest (upper=2) appear in late-game/tower areas. Upper=0 = scripted/boss-only encounters (bosses 189+, player class stubs 173–188, and specific named NPC enemies like kingswrd/steward/hunter).
+
+**Why upper nibble matters:** Likely used by the encounter table logic to filter which monsters can appear on a given floor/world — a monster only appears in random encounters if its upper nibble ≤ current encounter zone's "max tier." Needs BGB to confirm.
+
+**RANDO verdict (from source audit):** No `Read*` function in the RANDO ever reads this field. `WriteMonsterData` zeros the full byte, destroying it. RANDO does not understand this field.
 
 **How to investigate:** BGB — set a read breakpoint on CPU address `0x7AEE` in bank 6 (= file `0x1AAEE`, monster 0 byte 6). The PC at the breakpoint is the game code that uses this byte.
 

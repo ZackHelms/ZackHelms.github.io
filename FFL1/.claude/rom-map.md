@@ -65,7 +65,7 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 | 3 | DEF | |
 | 4 | AGI | |
 | 5 | MANA | |
-| 6 | Gold + unknown | **Lower nibble** = gold table index (0–15) into BCD gold table at `0x1B2A4`; **upper nibble = unknown** — RANDO never reads it; `WriteMonsterData` zeroes the entire byte then `|=` the gold index, accidentally destroying the upper nibble. Likely encodes meat category or encounter rank (bosses all have 0). Needs BGB to confirm. |
+| 6 | Gold + encounter tier | **Lower nibble** = gold table index (0–15) into BCD gold table at `0x1B2A4`; **upper nibble = encounter area tier** — within each family, weakest monsters have upper=9 or 10, strongest have upper=2 or 1. Upper=0 = scripted/boss-only (bosses 189+, player stubs 173–188, named NPC enemies kingswrd/steward/hunter). Pattern: fly upper=10, drgonfly=8, hornet=7, mosquito=7, cicada=2, mantis=2. Likely used to filter which monsters appear in a given encounter zone. RANDO never reads this field and accidentally destroys it with `WriteMonsterData`. Needs BGB read breakpoint at CPU `0x7AEE` bank 6 to confirm usage. |
 | 7 | Ability offset lo | Low byte of bank-6 CPU address pointing to monster's ability list |
 | 8 | Ability offset hi | High byte; combined `(byte8 << 8) | byte7` = CPU address (e.g., fly → 0x7321 → file 0x1B321) |
 
