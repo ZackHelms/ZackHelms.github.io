@@ -16,7 +16,8 @@
       216,
       225
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 3
   },
   {
     "id": 1,
@@ -36,7 +37,8 @@
       216,
       225
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 4
   },
   {
     "id": 2,
@@ -57,7 +59,8 @@
       216,
       225
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 5
   },
   {
     "id": 3,
@@ -79,7 +82,8 @@
       216,
       225
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 6
   },
   {
     "id": 4,
@@ -101,7 +105,8 @@
       225,
       216
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 5,
@@ -125,7 +130,8 @@
       212,
       216
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 6,
@@ -144,7 +150,8 @@
       209,
       224
     ],
-    "encounter_tier": 9
+    "encounter_tier": 9,
+    "num_abilities": 3
   },
   {
     "id": 7,
@@ -163,7 +170,8 @@
       209,
       224
     ],
-    "encounter_tier": 9
+    "encounter_tier": 9,
+    "num_abilities": 3
   },
   {
     "id": 8,
@@ -183,7 +191,8 @@
       209,
       224
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 4
   },
   {
     "id": 9,
@@ -203,7 +212,8 @@
       209,
       224
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 4
   },
   {
     "id": 10,
@@ -225,7 +235,8 @@
       209,
       211
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 11,
@@ -249,7 +260,8 @@
       216,
       209
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 12,
@@ -267,7 +279,8 @@
       196,
       155
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 2
   },
   {
     "id": 13,
@@ -286,7 +299,8 @@
       230,
       163
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 3
   },
   {
     "id": 14,
@@ -306,7 +320,8 @@
       176,
       128
     ],
-    "encounter_tier": 6
+    "encounter_tier": 6,
+    "num_abilities": 4
   },
   {
     "id": 15,
@@ -327,7 +342,8 @@
       159,
       212
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 5
   },
   {
     "id": 16,
@@ -349,7 +365,8 @@
       209,
       225
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 17,
@@ -373,7 +390,8 @@
       212,
       214
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 18,
@@ -391,7 +409,8 @@
       137,
       225
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 2
   },
   {
     "id": 19,
@@ -411,7 +430,8 @@
       216,
       225
     ],
-    "encounter_tier": 6
+    "encounter_tier": 6,
+    "num_abilities": 4
   },
   {
     "id": 20,
@@ -432,7 +452,8 @@
       164,
       225
     ],
-    "encounter_tier": 5
+    "encounter_tier": 5,
+    "num_abilities": 5
   },
   {
     "id": 21,
@@ -454,7 +475,8 @@
       209,
       225
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 6
   },
   {
     "id": 22,
@@ -477,7 +499,8 @@
       134,
       225
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 7
   },
   {
     "id": 23,
@@ -501,7 +524,8 @@
       212,
       216
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 24,
@@ -520,7 +544,8 @@
       209,
       224
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 3
   },
   {
     "id": 25,
@@ -540,7 +565,8 @@
       209,
       224
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 4
   },
   {
     "id": 26,
@@ -561,7 +587,8 @@
       209,
       224
     ],
-    "encounter_tier": 5
+    "encounter_tier": 5,
+    "num_abilities": 5
   },
   {
     "id": 27,
@@ -583,7 +610,8 @@
       210,
       224
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 6
   },
   {
     "id": 28,
@@ -606,7 +634,8 @@
       209,
       224
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 7
   },
   {
     "id": 29,
@@ -630,7 +659,8 @@
       213,
       209
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 30,
@@ -647,7 +677,8 @@
     "ability_ids": [
       140
     ],
-    "encounter_tier": 9
+    "encounter_tier": 9,
+    "num_abilities": 1
   },
   {
     "id": 31,
@@ -665,7 +696,8 @@
       149,
       140
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 2
   },
   {
     "id": 32,
@@ -684,7 +716,8 @@
       151,
       249
     ],
-    "encounter_tier": 6
+    "encounter_tier": 6,
+    "num_abilities": 3
   },
   {
     "id": 33,
@@ -705,7 +738,8 @@
       223,
       210
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 5
   },
   {
     "id": 34,
@@ -727,7 +761,8 @@
       249,
       250
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 35,
@@ -751,7 +786,8 @@
       209,
       131
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 36,
@@ -769,7 +805,8 @@
       167,
       225
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 2
   },
   {
     "id": 37,
@@ -788,7 +825,8 @@
       135,
       225
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 3
   },
   {
     "id": 38,
@@ -807,7 +845,8 @@
       145,
       225
     ],
-    "encounter_tier": 5
+    "encounter_tier": 5,
+    "num_abilities": 3
   },
   {
     "id": 39,
@@ -827,7 +866,8 @@
       145,
       225
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 4
   },
   {
     "id": 40,
@@ -849,7 +889,8 @@
       134,
       225
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 41,
@@ -873,7 +914,8 @@
       134,
       248
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 42,
@@ -891,7 +933,8 @@
       138,
       216
     ],
-    "encounter_tier": 9
+    "encounter_tier": 9,
+    "num_abilities": 2
   },
   {
     "id": 43,
@@ -910,7 +953,8 @@
       138,
       216
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 3
   },
   {
     "id": 44,
@@ -930,7 +974,8 @@
       171,
       216
     ],
-    "encounter_tier": 6
+    "encounter_tier": 6,
+    "num_abilities": 4
   },
   {
     "id": 45,
@@ -951,7 +996,8 @@
       192,
       216
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 5
   },
   {
     "id": 46,
@@ -973,7 +1019,8 @@
       192,
       216
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 47,
@@ -997,7 +1044,8 @@
       250,
       216
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 48,
@@ -1015,7 +1063,8 @@
       140,
       225
     ],
-    "encounter_tier": 9
+    "encounter_tier": 9,
+    "num_abilities": 2
   },
   {
     "id": 49,
@@ -1034,7 +1083,8 @@
       156,
       225
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 3
   },
   {
     "id": 50,
@@ -1054,7 +1104,8 @@
       159,
       225
     ],
-    "encounter_tier": 6
+    "encounter_tier": 6,
+    "num_abilities": 4
   },
   {
     "id": 51,
@@ -1075,7 +1126,8 @@
       215,
       223
     ],
-    "encounter_tier": 3
+    "encounter_tier": 3,
+    "num_abilities": 5
   },
   {
     "id": 52,
@@ -1097,7 +1149,8 @@
       215,
       212
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 53,
@@ -1121,7 +1174,8 @@
       216,
       131
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 54,
@@ -1140,7 +1194,8 @@
       166,
       224
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 3
   },
   {
     "id": 55,
@@ -1160,7 +1215,8 @@
       166,
       224
     ],
-    "encounter_tier": 6
+    "encounter_tier": 6,
+    "num_abilities": 4
   },
   {
     "id": 56,
@@ -1181,7 +1237,8 @@
       209,
       224
     ],
-    "encounter_tier": 5
+    "encounter_tier": 5,
+    "num_abilities": 5
   },
   {
     "id": 57,
@@ -1203,7 +1260,8 @@
       209,
       224
     ],
-    "encounter_tier": 3
+    "encounter_tier": 3,
+    "num_abilities": 6
   },
   {
     "id": 58,
@@ -1226,7 +1284,8 @@
       200,
       209
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 7
   },
   {
     "id": 59,
@@ -1250,7 +1309,8 @@
       194,
       209
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 60,
@@ -1268,7 +1328,8 @@
       140,
       225
     ],
-    "encounter_tier": 9
+    "encounter_tier": 9,
+    "num_abilities": 2
   },
   {
     "id": 61,
@@ -1288,7 +1349,8 @@
       207,
       225
     ],
-    "encounter_tier": 6
+    "encounter_tier": 6,
+    "num_abilities": 4
   },
   {
     "id": 62,
@@ -1309,7 +1371,8 @@
       206,
       225
     ],
-    "encounter_tier": 5
+    "encounter_tier": 5,
+    "num_abilities": 5
   },
   {
     "id": 63,
@@ -1330,7 +1393,8 @@
       209,
       225
     ],
-    "encounter_tier": 3
+    "encounter_tier": 3,
+    "num_abilities": 5
   },
   {
     "id": 64,
@@ -1353,7 +1417,8 @@
       225,
       249
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 7
   },
   {
     "id": 65,
@@ -1377,7 +1442,8 @@
       216,
       209
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 66,
@@ -1395,7 +1461,8 @@
       140,
       225
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 2
   },
   {
     "id": 67,
@@ -1414,7 +1481,8 @@
       207,
       225
     ],
-    "encounter_tier": 9
+    "encounter_tier": 9,
+    "num_abilities": 3
   },
   {
     "id": 68,
@@ -1434,7 +1502,8 @@
       172,
       225
     ],
-    "encounter_tier": 9
+    "encounter_tier": 9,
+    "num_abilities": 4
   },
   {
     "id": 69,
@@ -1455,7 +1524,8 @@
       215,
       225
     ],
-    "encounter_tier": 3
+    "encounter_tier": 3,
+    "num_abilities": 5
   },
   {
     "id": 70,
@@ -1477,7 +1547,8 @@
       209,
       225
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 71,
@@ -1501,7 +1572,8 @@
       218,
       250
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 72,
@@ -1518,7 +1590,8 @@
     "ability_ids": [
       157
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 1
   },
   {
     "id": 73,
@@ -1536,7 +1609,8 @@
       157,
       215
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 2
   },
   {
     "id": 74,
@@ -1555,7 +1629,8 @@
       157,
       215
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 3
   },
   {
     "id": 75,
@@ -1575,7 +1650,8 @@
       215,
       250
     ],
-    "encounter_tier": 3
+    "encounter_tier": 3,
+    "num_abilities": 4
   },
   {
     "id": 76,
@@ -1596,7 +1672,8 @@
       243,
       215
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 5
   },
   {
     "id": 77,
@@ -1620,7 +1697,8 @@
       133,
       131
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 8
   },
   {
     "id": 78,
@@ -1637,7 +1715,8 @@
     "ability_ids": [
       149
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 1
   },
   {
     "id": 79,
@@ -1655,7 +1734,8 @@
       149,
       167
     ],
-    "encounter_tier": 9
+    "encounter_tier": 9,
+    "num_abilities": 2
   },
   {
     "id": 80,
@@ -1674,7 +1754,8 @@
       140,
       203
     ],
-    "encounter_tier": 5
+    "encounter_tier": 5,
+    "num_abilities": 3
   },
   {
     "id": 81,
@@ -1694,7 +1775,8 @@
       200,
       199
     ],
-    "encounter_tier": 3
+    "encounter_tier": 3,
+    "num_abilities": 4
   },
   {
     "id": 82,
@@ -1716,7 +1798,8 @@
       129,
       134
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 6
   },
   {
     "id": 83,
@@ -1740,7 +1823,8 @@
       134,
       219
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 84,
@@ -1759,7 +1843,8 @@
       138,
       216
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 3
   },
   {
     "id": 85,
@@ -1779,7 +1864,8 @@
       155,
       216
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 4
   },
   {
     "id": 86,
@@ -1800,7 +1886,8 @@
       185,
       216
     ],
-    "encounter_tier": 5
+    "encounter_tier": 5,
+    "num_abilities": 5
   },
   {
     "id": 87,
@@ -1822,7 +1909,8 @@
       188,
       216
     ],
-    "encounter_tier": 3
+    "encounter_tier": 3,
+    "num_abilities": 6
   },
   {
     "id": 88,
@@ -1845,7 +1933,8 @@
       250,
       216
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 7
   },
   {
     "id": 89,
@@ -1869,7 +1958,8 @@
       133,
       219
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 90,
@@ -1887,7 +1977,8 @@
       162,
       216
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 2
   },
   {
     "id": 91,
@@ -1906,7 +1997,8 @@
       250,
       216
     ],
-    "encounter_tier": 6
+    "encounter_tier": 6,
+    "num_abilities": 3
   },
   {
     "id": 92,
@@ -1926,7 +2018,8 @@
       250,
       216
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 4
   },
   {
     "id": 93,
@@ -1947,7 +2040,8 @@
       250,
       216
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 5
   },
   {
     "id": 94,
@@ -1969,7 +2063,8 @@
       250,
       216
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 6
   },
   {
     "id": 95,
@@ -1993,7 +2088,8 @@
       217,
       216
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 96,
@@ -2012,7 +2108,8 @@
       248,
       223
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 3
   },
   {
     "id": 97,
@@ -2032,7 +2129,8 @@
       248,
       223
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 4
   },
   {
     "id": 98,
@@ -2053,7 +2151,8 @@
       248,
       223
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 5
   },
   {
     "id": 99,
@@ -2075,7 +2174,8 @@
       248,
       223
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 100,
@@ -2099,7 +2199,8 @@
       218,
       223
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 101,
@@ -2123,7 +2224,8 @@
       215,
       218
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 102,
@@ -2142,7 +2244,8 @@
       248,
       223
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 3
   },
   {
     "id": 103,
@@ -2163,7 +2266,8 @@
       216,
       223
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 5
   },
   {
     "id": 104,
@@ -2184,7 +2288,8 @@
       216,
       223
     ],
-    "encounter_tier": 5
+    "encounter_tier": 5,
+    "num_abilities": 5
   },
   {
     "id": 105,
@@ -2206,7 +2311,8 @@
       216,
       223
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 106,
@@ -2229,7 +2335,8 @@
       248,
       216
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 7
   },
   {
     "id": 107,
@@ -2253,7 +2360,8 @@
       248,
       216
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 108,
@@ -2270,7 +2378,8 @@
     "ability_ids": [
       149
     ],
-    "encounter_tier": 9
+    "encounter_tier": 9,
+    "num_abilities": 1
   },
   {
     "id": 109,
@@ -2289,7 +2398,8 @@
       198,
       216
     ],
-    "encounter_tier": 6
+    "encounter_tier": 6,
+    "num_abilities": 3
   },
   {
     "id": 110,
@@ -2310,7 +2420,8 @@
       209,
       216
     ],
-    "encounter_tier": 3
+    "encounter_tier": 3,
+    "num_abilities": 5
   },
   {
     "id": 111,
@@ -2332,7 +2443,8 @@
       209,
       216
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 112,
@@ -2355,7 +2467,8 @@
       209,
       216
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 7
   },
   {
     "id": 113,
@@ -2379,7 +2492,8 @@
       219,
       216
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 114,
@@ -2397,7 +2511,8 @@
       156,
       173
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 2
   },
   {
     "id": 115,
@@ -2416,7 +2531,8 @@
       245,
       171
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 3
   },
   {
     "id": 116,
@@ -2437,7 +2553,8 @@
       198,
       169
     ],
-    "encounter_tier": 3
+    "encounter_tier": 3,
+    "num_abilities": 5
   },
   {
     "id": 117,
@@ -2459,7 +2576,8 @@
       129,
       169
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 118,
@@ -2482,7 +2600,8 @@
       194,
       169
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 7
   },
   {
     "id": 119,
@@ -2506,7 +2625,8 @@
       191,
       219
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 120,
@@ -2525,7 +2645,8 @@
       214,
       223
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 3
   },
   {
     "id": 121,
@@ -2545,7 +2666,8 @@
       214,
       223
     ],
-    "encounter_tier": 9
+    "encounter_tier": 9,
+    "num_abilities": 4
   },
   {
     "id": 122,
@@ -2566,7 +2688,8 @@
       214,
       223
     ],
-    "encounter_tier": 5
+    "encounter_tier": 5,
+    "num_abilities": 5
   },
   {
     "id": 123,
@@ -2588,7 +2711,8 @@
       210,
       223
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 124,
@@ -2611,7 +2735,8 @@
       214,
       223
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 7
   },
   {
     "id": 125,
@@ -2635,7 +2760,8 @@
       210,
       214
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 126,
@@ -2654,7 +2780,8 @@
       214,
       223
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 3
   },
   {
     "id": 127,
@@ -2675,7 +2802,8 @@
       218,
       216
     ],
-    "encounter_tier": 9
+    "encounter_tier": 9,
+    "num_abilities": 5
   },
   {
     "id": 128,
@@ -2698,7 +2826,8 @@
       218,
       216
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 7
   },
   {
     "id": 129,
@@ -2720,7 +2849,8 @@
       218,
       216
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 130,
@@ -2743,7 +2873,8 @@
       218,
       216
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 7
   },
   {
     "id": 131,
@@ -2767,7 +2898,8 @@
       218,
       216
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 132,
@@ -2785,7 +2917,8 @@
       139,
       223
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 2
   },
   {
     "id": 133,
@@ -2805,7 +2938,8 @@
       225,
       214
     ],
-    "encounter_tier": 5
+    "encounter_tier": 5,
+    "num_abilities": 4
   },
   {
     "id": 134,
@@ -2826,7 +2960,8 @@
       191,
       218
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 5
   },
   {
     "id": 135,
@@ -2848,7 +2983,8 @@
       218,
       219
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 136,
@@ -2871,7 +3007,8 @@
       218,
       219
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 7
   },
   {
     "id": 137,
@@ -2895,7 +3032,8 @@
       218,
       219
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 138,
@@ -2913,7 +3051,8 @@
       138,
       216
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 2
   },
   {
     "id": 139,
@@ -2933,7 +3072,8 @@
       249,
       216
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 4
   },
   {
     "id": 140,
@@ -2954,7 +3094,8 @@
       249,
       216
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 5
   },
   {
     "id": 141,
@@ -2976,7 +3117,8 @@
       250,
       249
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 142,
@@ -2999,7 +3141,8 @@
       250,
       216
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 7
   },
   {
     "id": 143,
@@ -3023,7 +3166,8 @@
       216,
       209
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 144,
@@ -3042,7 +3186,8 @@
       185,
       216
     ],
-    "encounter_tier": 6
+    "encounter_tier": 6,
+    "num_abilities": 3
   },
   {
     "id": 145,
@@ -3062,7 +3207,8 @@
       185,
       216
     ],
-    "encounter_tier": 5
+    "encounter_tier": 5,
+    "num_abilities": 4
   },
   {
     "id": 146,
@@ -3083,7 +3229,8 @@
       164,
       216
     ],
-    "encounter_tier": 3
+    "encounter_tier": 3,
+    "num_abilities": 5
   },
   {
     "id": 147,
@@ -3105,7 +3252,8 @@
       209,
       216
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 148,
@@ -3128,7 +3276,8 @@
       209,
       216
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 7
   },
   {
     "id": 149,
@@ -3152,7 +3301,8 @@
       216,
       219
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 8
   },
   {
     "id": 150,
@@ -3169,7 +3319,8 @@
     "ability_ids": [
       115
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 1
   },
   {
     "id": 151,
@@ -3187,7 +3338,8 @@
       195,
       45
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 2
   },
   {
     "id": 152,
@@ -3206,7 +3358,8 @@
       135,
       145
     ],
-    "encounter_tier": 6
+    "encounter_tier": 6,
+    "num_abilities": 3
   },
   {
     "id": 153,
@@ -3227,7 +3380,8 @@
       66,
       249
     ],
-    "encounter_tier": 3
+    "encounter_tier": 3,
+    "num_abilities": 5
   },
   {
     "id": 154,
@@ -3249,7 +3403,8 @@
       63,
       69
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 6
   },
   {
     "id": 155,
@@ -3266,7 +3421,8 @@
     "ability_ids": [
       36
     ],
-    "encounter_tier": 10
+    "encounter_tier": 10,
+    "num_abilities": 1
   },
   {
     "id": 156,
@@ -3285,7 +3441,8 @@
       58,
       62
     ],
-    "encounter_tier": 6
+    "encounter_tier": 6,
+    "num_abilities": 3
   },
   {
     "id": 157,
@@ -3305,7 +3462,8 @@
       235,
       198
     ],
-    "encounter_tier": 5
+    "encounter_tier": 5,
+    "num_abilities": 4
   },
   {
     "id": 158,
@@ -3326,7 +3484,8 @@
       237,
       243
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 5
   },
   {
     "id": 159,
@@ -3349,7 +3508,8 @@
       52,
       55
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 7
   },
   {
     "id": 160,
@@ -3366,7 +3526,8 @@
     "ability_ids": [
       17
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 1
   },
   {
     "id": 161,
@@ -3384,7 +3545,8 @@
       111,
       2
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 2
   },
   {
     "id": 162,
@@ -3403,7 +3565,8 @@
       111,
       2
     ],
-    "encounter_tier": 7
+    "encounter_tier": 7,
+    "num_abilities": 3
   },
   {
     "id": 163,
@@ -3424,7 +3587,8 @@
       109,
       104
     ],
-    "encounter_tier": 4
+    "encounter_tier": 4,
+    "num_abilities": 5
   },
   {
     "id": 164,
@@ -3446,7 +3610,8 @@
       112,
       113
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 165,
@@ -3469,7 +3634,8 @@
       221,
       223
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 7
   },
   {
     "id": 166,
@@ -3486,7 +3652,8 @@
     "ability_ids": [
       61
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 1
   },
   {
     "id": 167,
@@ -3504,7 +3671,8 @@
       33,
       75
     ],
-    "encounter_tier": 8
+    "encounter_tier": 8,
+    "num_abilities": 2
   },
   {
     "id": 168,
@@ -3524,7 +3692,8 @@
       66,
       214
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 4
   },
   {
     "id": 169,
@@ -3544,7 +3713,8 @@
       232,
       248
     ],
-    "encounter_tier": 3
+    "encounter_tier": 3,
+    "num_abilities": 4
   },
   {
     "id": 170,
@@ -3566,7 +3736,8 @@
       215,
       102
     ],
-    "encounter_tier": 2
+    "encounter_tier": 2,
+    "num_abilities": 6
   },
   {
     "id": 171,
@@ -3589,7 +3760,8 @@
       214,
       250
     ],
-    "encounter_tier": 1
+    "encounter_tier": 1,
+    "num_abilities": 7
   },
   {
     "id": 172,
@@ -3613,7 +3785,8 @@
       72,
       218
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 8
   },
   {
     "id": 173,
@@ -3630,7 +3803,8 @@
     "ability_ids": [
       32
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 1
   },
   {
     "id": 174,
@@ -3647,7 +3821,8 @@
     "ability_ids": [
       45
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 1
   },
   {
     "id": 175,
@@ -3668,7 +3843,8 @@
       254,
       32
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 5
   },
   {
     "id": 176,
@@ -3689,7 +3865,8 @@
       254,
       45
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 5
   },
   {
     "id": 177,
@@ -3707,7 +3884,8 @@
       33,
       94
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 2
   },
   {
     "id": 178,
@@ -3725,7 +3903,8 @@
       46,
       94
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 2
   },
   {
     "id": 179,
@@ -3746,7 +3925,8 @@
       254,
       33
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 5
   },
   {
     "id": 180,
@@ -3767,7 +3947,8 @@
       254,
       46
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 5
   },
   {
     "id": 181,
@@ -3784,7 +3965,8 @@
     "ability_ids": [
       35
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 1
   },
   {
     "id": 182,
@@ -3801,7 +3983,8 @@
     "ability_ids": [
       46
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 1
   },
   {
     "id": 183,
@@ -3821,7 +4004,8 @@
       254,
       254
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 4
   },
   {
     "id": 184,
@@ -3841,7 +4025,8 @@
       254,
       254
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 4
   },
   {
     "id": 185,
@@ -3858,7 +4043,8 @@
     "ability_ids": [
       37
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 1
   },
   {
     "id": 186,
@@ -3875,7 +4061,8 @@
     "ability_ids": [
       47
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 1
   },
   {
     "id": 187,
@@ -3895,7 +4082,8 @@
       241,
       254
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 4
   },
   {
     "id": 188,
@@ -3915,7 +4103,8 @@
       237,
       254
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 4
   },
   {
     "id": 189,
@@ -3936,7 +4125,8 @@
       212,
       214
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 5
   },
   {
     "id": 190,
@@ -3957,7 +4147,8 @@
       211,
       214
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 5
   },
   {
     "id": 191,
@@ -3978,7 +4169,8 @@
       210,
       214
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 5
   },
   {
     "id": 192,
@@ -3999,7 +4191,8 @@
       209,
       214
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 5
   },
   {
     "id": 193,
@@ -4021,7 +4214,8 @@
       191,
       218
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 6
   },
   {
     "id": 194,
@@ -4044,7 +4238,8 @@
       219,
       214
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 7
   },
   {
     "id": 195,
@@ -4067,7 +4262,8 @@
       219,
       214
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 7
   },
   {
     "id": 196,
@@ -4090,7 +4286,8 @@
       219,
       214
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 7
   },
   {
     "id": 197,
@@ -4110,7 +4307,8 @@
       164,
       222
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 4
   },
   {
     "id": 198,
@@ -4134,7 +4332,8 @@
       219,
       218
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 8
   },
   {
     "id": 199,
@@ -4158,6 +4357,7 @@
       131,
       222
     ],
-    "encounter_tier": 0
+    "encounter_tier": 0,
+    "num_abilities": 8
   }
 ]

@@ -89,6 +89,20 @@
       <select id="family-filter">
         <option value="">All families</option>
       </select>
+      <select id="tier-filter">
+        <option value="">All tiers</option>
+        <option value="0">Tier 0 — boss/scripted only</option>
+        <option value="10">Tier 10 — earliest (World 1)</option>
+        <option value="9">Tier 9</option>
+        <option value="8">Tier 8</option>
+        <option value="7">Tier 7</option>
+        <option value="6">Tier 6</option>
+        <option value="5">Tier 5</option>
+        <option value="4">Tier 4</option>
+        <option value="3">Tier 3</option>
+        <option value="2">Tier 2</option>
+        <option value="1">Tier 1 — latest</option>
+      </select>
     </div>
 
     <div class="table-wrap">
@@ -154,6 +168,7 @@ async function init() {
     const tr = document.createElement('tr');
     tr.dataset.name = m.name.toLowerCase();
     tr.dataset.family = m.family;
+    tr.dataset.tier = String(m.encounter_tier ?? '');
 
     const fmt = v => v > 99
       ? `<span style="color:var(--gold)">${v}*</span>`
@@ -183,14 +198,17 @@ async function init() {
   function applyFilters() {
     const q = document.getElementById('search').value.toLowerCase();
     const fam = document.getElementById('family-filter').value;
+    const tier = document.getElementById('tier-filter').value;
     rows.forEach(r => {
       const matchName = !q || r.dataset.name.includes(q);
       const matchFam = !fam || r.dataset.family === fam;
-      r.classList.toggle('hidden', !(matchName && matchFam));
+      const matchTier = !tier || r.dataset.tier === tier;
+      r.classList.toggle('hidden', !(matchName && matchFam && matchTier));
     });
   }
   document.getElementById('search').addEventListener('input', applyFilters);
   document.getElementById('family-filter').addEventListener('change', applyFilters);
+  document.getElementById('tier-filter').addEventListener('change', applyFilters);
 
   // Monster class grid
   const classGrid = document.getElementById('class-grid');
