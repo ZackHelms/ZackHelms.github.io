@@ -5,6 +5,7 @@
 ### Extracted
 - Monster names — name table at 0x14000 (200 × 8 bytes) — HIGH confidence
 - Monster HP — HP table at 0x1B254; indexed via byte 1 of stat entry (NOT directly by monster ID); indices 0–21 = regular HP curve, 22+ = boss HP values — HIGH confidence
+- Monster gold — gold table at 0x1B2A4 (4-digit packed BCD, 16 entries); index = lower nibble of stat byte 6; verified against FFLRandomizer source — HIGH confidence
 - Ability names — ability table at 0x14640 (252 × 8 bytes) — HIGH confidence
 - Ability type classification — type byte (byte 7) and prefix byte (byte 0) of each ability record — HIGH confidence
 - Character encoding — 0x8A='a'…0xA3='z', 0x40='A'…0x59='Z', 0xA4='0'…0xAD='9' — HIGH confidence
@@ -16,9 +17,14 @@
 - Stat table location — ROM 0x1AAE8, **9-byte stride** (corrected from earlier 8-byte assumption) — HIGH confidence for stride; field layout MEDIUM confidence
 - Mutant growth rate thresholds — ROM 0x1BF00 (8 threshold bytes + 5 amount bytes) — MEDIUM confidence
 
-### UNVERIFIED (extracted but may be wrong — do not use without re-checking)
-- **monsters.json STR/DEF/AGI/MANA** — extracted with wrong 8-byte stride; values are incorrect. Re-extraction needed with 9-byte stride at 0x1AAE8. HP values are correct.
-- **Monster drop byte** — referenced as "byte 6 of 8-byte entry" in old notes; byte position may shift with 9-byte stride correction.
+### Previously Unverified — Now Resolved
+- **monsters.json STR/DEF/AGI/MANA** — re-extracted with correct 9-byte stride at 0x1AAE8; values now HIGH confidence. monsters.json updated.
+- **Monster gold** — gold table BCD encoding and lower-nibble indexing confirmed from FFLRandomizer source; monsters.json updated.
+
+### UNVERIFIED (still needs checking)
+- **Stat byte 6 upper nibble** — contains some per-monster data (varies); lower nibble is gold index. Upper nibble purpose not yet identified.
+- **Stat bytes 7–8** — unknown; many regular monsters share constant values (e.g., byte8=0x73). Not yet identified. Possibly ability list pointer or encounter data.
+- **Monster drop byte** — original "byte 6 of 8-byte entry" note was wrong stride era; current byte 6 = gold+unknown packed field. Actual item-drop mechanic not yet located in ROM.
 
 ### Not Yet Extracted
 The following mechanics have NOT been extracted from the ROM binary. Do not present

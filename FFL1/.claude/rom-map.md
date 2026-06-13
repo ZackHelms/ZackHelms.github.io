@@ -47,31 +47,31 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 | Source | [DC], verified |
 
 ### Monster Stat Table
-**Confidence: MEDIUM** — 9-byte stride confirmed by boss HP sequence (see notes); field layout partially inferred.
+**Confidence: HIGH (stride, bytes 0–6); LOW (bytes 7–8 — not yet verified)**
 
 | Field | Value |
 |---|---|
 | File offset | `0x1AAE8` |
 | Entry count | 200 |
 | Entry size | **9 bytes** (not 8 — see verification note below) |
-| Source | [RANDO], stride verified |
+| Source | [RANDO], stride and field layout verified against source code |
 
 **Field layout per entry (9 bytes):**
 | Byte | Field | Notes |
 |---|---|---|
-| 0 | Race / type flags | Includes monster family, meat drop flags |
+| 0 | Race / type flags | Includes monster family, meat drop flags; exact bit layout not fully mapped |
 | 1 | HP table index | Index into HP table at `0x1B254` (see HP Table below) |
 | 2 | STR | Raw stat; display capped at 99, internal max 255 |
 | 3 | DEF | |
 | 4 | AGI | |
 | 5 | MANA | |
-| 6 | Gold table index | Index into gold reward table at `0x1B2A4` |
-| 7 | Ability offset lo | |
-| 8 | Ability offset hi | |
+| 6 | Gold + unknown | **Lower nibble** = gold table index (0–15) into BCD gold table at `0x1B2A4`; upper nibble = unknown (not gold) |
+| 7 | Unknown | Not yet identified; constant 0x21 for many regular monsters |
+| 8 | Unknown | Not yet identified; constant 0x73 for many regular monsters |
 
 **Stride verification:** With 9-byte stride, boss entries 189–199 yield byte-1 values 22, 23, 24, 25, 26, 27, 28, 29, 31, 30, 31 — a clean sequential walk through the boss HP sub-table (HP: 250, 600, 1000, 1500, 1500, 1750, 2000, 2500, 2000, 5000, 5000). With 8-byte stride, the same byte-1 values decode to incoherent HP values (295, 36, 36312, 514, 20…). 9-byte stride is correct.
 
-**NOTE:** Our `monsters.json` and `mechanics.md` were extracted using an assumed 8-byte stride and may have incorrect stat values for entries above index ~20. HP values are correct (separate table, directly indexed by monster ID). Stats need re-extraction with 9-byte stride.
+**Gold table key verified:** `ReadCharacterGoldTableIndex` in FFLRandomizer source reads `filebytes[0x1AAEE + idx*9] & 0x0F` — confirming lower nibble of byte 6 is the gold index. Gold table uses 4-digit packed BCD encoding (see Gold Reward Table).
 
 ### Monster HP Table
 **Confidence: HIGH** — verified; values match expected game HP for all tested indices.
@@ -100,13 +100,36 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 | Source | [RANDO] |
 
 ### Gold Reward Table
-**Confidence: MEDIUM** — address from [RANDO/DC]; byte read shows small values at start (consistent with low-level monster gold drops).
+**Confidence: HIGH** — address, stride, and BCD encoding verified against FFLRandomizer source (`ReadGoldTableValue`).
 
 | Field | Value |
 |---|---|
 | File offset | `0x1B2A4` |
-| Entry size | 2 bytes, little-endian |
-| Source | [RANDO] |
+| Entry size | 2 bytes, **4-digit packed BCD** |
+| Entry count | 16 (indices 0–15; fit in lower nibble of stat byte 6) |
+| Source | [RANDO], code-verified |
+
+**BCD decode:** byte0 = `(thousands<<4)|hundreds`, byte1 = `(tens<<4)|units`. Example: `[0x09, 0x00]` = 900 GP.
+
+**Table values:**
+| Index | Bytes (hex) | GP | Used by |
+|-------|-------------|-----|---------|
+| 0 | 00 00 | 0 | many (no reward) |
+| 1 | 00 40 | 40 | fly, barracud tier |
+| 2 | 01 20 | 120 | |
+| 3 | 02 40 | 240 | drgonfly tier |
+| 4 | 04 00 | 400 | hornet/mosquito/shark tier |
+| 5 | 06 00 | 600 | garlic tier |
+| 6 | 09 00 | 900 | gen-bu |
+| 7 | 12 00 | 1200 | gunfish tier |
+| 8 | 16 00 | 1600 | |
+| 9 | 20 00 | 2000 | cicada/mantis tier |
+| 10 | 24 00 | 2400 | |
+| 11 | 40 00 | 4000 | |
+| 12 | 48 00 | 4800 | sei-ryu |
+| 13 | 55 00 | 5500 | byak-ko |
+| 14 | 65 00 | 6500 | su-zaku |
+| 15 | 99 99 | 9999 | ashura |
 
 ### Ability / Item Name Table
 **Confidence: HIGH** — verified; matches ability names decoded from ROM in previous sessions.

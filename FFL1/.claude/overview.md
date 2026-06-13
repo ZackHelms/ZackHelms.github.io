@@ -21,7 +21,7 @@ FFL1/
     gameboy.png             ← Shell background image
   rom/              ← ROM binary (gitignored — place ffl1.gb here for emulator)
   data/             ← Game data files
-    monsters.json   ← 200 monsters: name, HP — FROM ROM; WARNING: stat columns unverified (see below)
+    monsters.json   ← 200 monsters: name, HP, STR, DEF, AGI, MANA, gold — all HIGH confidence from ROM
     abilities.json  ← 252 abilities/items/weapons: name + type — FROM ROM
     dialog.md       ← story/NPC text; marked MEDIUM confidence (web-sourced, not DTE-decoded)
   v001/             ← Archived first-pass JS game engine (not actively developed)
@@ -39,7 +39,7 @@ FFL1/
 
 ## ROM-Extracted Data
 Data files directly sourced from the ROM binary:
-- `monsters.json` — **names (HIGH)** from 0x14000; **HP (HIGH)** from 0x1B254 via HP table index in stat entry; **STR/DEF/AGI/MANA (UNVERIFIED)** — extracted with wrong 8-byte stride, need re-extraction with 9-byte stride
+- `monsters.json` — **names (HIGH)** from 0x14000; **HP (HIGH)** from 0x1B254; **STR/DEF/AGI/MANA (HIGH)** re-extracted with verified 9-byte stride at 0x1AAE8; **gold (HIGH)** from BCD table at 0x1B2A4 via lower nibble of stat byte 6
 - `abilities.json` — names and type bytes from 0x14640 (HIGH confidence)
 - `img/title_screen.png` — 160×144 pixel-accurate title screen (nearest-neighbor from emulator screenshot)
 - `img/tile_sheet_1bpp_large.png` — 119 font tiles from ROM offset 0x0F100
