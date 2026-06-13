@@ -78,7 +78,7 @@
       <table>
         <thead>
           <tr>
-            <th>ROM ID</th><th>NAME</th><th>HP</th><th>STR</th><th>DEF</th><th>AGI</th><th>MANA</th><th>GOLD</th>
+            <th>ROM ID</th><th>NAME</th><th>ENC</th><th>HP</th><th>STR</th><th>DEF</th><th>AGI</th><th>MANA</th><th>GOLD</th>
           </tr>
         </thead>
         <tbody id="boss-tbody"></tbody>
@@ -86,6 +86,8 @@
     </div>
     <p style="font-size:0.72rem;color:var(--dim2);margin-top:8px;">
       Indices 189–199. HP from 0x1B254 (2-byte LE, verified). Gold from BCD table at 0x1B2A4.
+      ENC = encounter table ID from 0x1A868; world labels (W1–W4/Tower/Final) community-sourced.
+      IDs 189–192 = first forms; 193–196 = second forms (same world guardian, harder); 197 = Tower Su-Zaku.
       Values shown are raw stored integers; in-game display caps stats at 99.
     </p>
   </section>
@@ -224,14 +226,22 @@ async function loadBosses() {
   const monsters = await fetch('data/monsters.json').then(r => r.json());
   const bosses = monsters.filter(m => m.id >= 189);
   const tbody = document.getElementById('boss-tbody');
+  // Encounter IDs for each boss ROM ID (from encounter table 0x1A868; world labels community-sourced)
+  const ENC = {189:2,190:3,191:4,192:5,193:2,194:3,195:4,196:5,197:0,198:1,199:1};
+  const ENC_LABEL = {0:'Tower',1:'Final',2:'W1',3:'W2',4:'W3',5:'W4'};
   bosses.forEach(m => {
     const tr = document.createElement('tr');
     const fmt = v => v > 99
       ? `<span style="color:var(--gold)">${v}*</span>`
       : v;
+    const encId = ENC[m.id];
+    const encCell = encId != null
+      ? `<span style="color:var(--dim2);font-size:0.7rem">#${encId} </span><span style="color:var(--cyan);font-size:0.7rem">${ENC_LABEL[encId]}</span>`
+      : '—';
     tr.innerHTML = `
       <td style="color:var(--dim2)">${m.id}</td>
       <td><strong>${m.name}</strong></td>
+      <td>${encCell}</td>
       <td class="num">${m.hp}</td>
       <td class="num">${fmt(m.str)}</td>
       <td class="num">${fmt(m.def)}</td>
