@@ -21,6 +21,7 @@
 }
 .ability-item .a-name { color: var(--cyan); margin-bottom: 2px; }
 .ability-item .a-type { color: var(--dim2); font-size: 0.62rem; }
+.ability-item .a-gp  { color: var(--neon-green); font-size: 0.62rem; float: right; }
 </style>
 </head>
 <body>
@@ -57,8 +58,10 @@
   <section>
     <h2>ABILITY DATABASE (ROM DATA)</h2>
     <p>All 252 entries from the ability table at <code>0x14640</code>. Each entry is 8 bytes:
-    names use the FFL character encoding (0x8A=a…0xA3=z), type is derived from byte 7,
-    and prefix from byte 0. Filter by name or type below.</p>
+    names use the FFL character encoding (<code>0x8A</code>='A'…<code>0xA3</code>='Z',
+    <code>0x80</code>–<code>0x89</code>='0'–'9'), type from byte 7, prefix from byte 0,
+    uses count from byte 7 of the name record, GP from <code>0x17E10</code>.
+    Filter by name or type below.</p>
 
     <div class="filter-bar">
       <input type="text" id="ability-search" placeholder="Search abilities…">
@@ -98,8 +101,8 @@ async function init() {
       spell: 'tag-purple', ability: 'tag-cyan', usable_item: 'tag-green',
       sword: 'tag-gold', weapon: 'tag-gold', armor: 'tag-cyan'
     }[a.type] || '';
-    el.innerHTML = `<div class="a-name">${a.name || '—'}</div>
-      <div class="a-type"><span class="tag ${typeColor}">${a.type}</span></div>`;
+    el.innerHTML = `<div class="a-name">${a.name || '—'}${a.gp ? `<span class="a-gp">${a.gp.toLocaleString()}</span>` : ''}</div>
+      <div class="a-type"><span class="tag ${typeColor}">${a.type}</span>${a.uses != null ? `<span style="color:var(--dim2);font-size:0.6rem;margin-left:6px">×${a.uses}</span>` : ''}</div>`;
     grid.appendChild(el);
     items.push(el);
   });

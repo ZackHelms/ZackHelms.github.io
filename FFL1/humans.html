@@ -48,7 +48,7 @@
     <div class="table-wrap">
       <table id="armor-table">
         <thead>
-          <tr><th>NAME</th><th>SLOT (from prefix byte)</th></tr>
+          <tr><th>NAME</th><th>SLOT (from prefix byte)</th><th>GP</th></tr>
         </thead>
         <tbody id="armor-tbody"></tbody>
       </table>
@@ -65,7 +65,7 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>NAME</th><th>TYPE CODE</th></tr>
+          <tr><th>NAME</th><th>USES</th><th>GP</th></tr>
         </thead>
         <tbody id="usable-tbody"></tbody>
       </table>
@@ -85,7 +85,8 @@ async function init() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${a.name}</strong></td>
-      <td><span class="tag tag-cyan">${a.prefix || '—'}</span></td>`;
+      <td><span class="tag tag-cyan">${a.prefix || '—'}</span></td>
+      <td style="color:var(--neon-green)">${a.gp ? a.gp.toLocaleString() + ' GP' : '—'}</td>`;
     aTbody.appendChild(tr);
   });
 
@@ -95,7 +96,8 @@ async function init() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${u.name}</strong></td>
-      <td style="color:var(--dim2);font-size:0.72rem">usable_item</td>`;
+      <td style="color:var(--dim2)">${u.uses ?? '—'}</td>
+      <td style="color:var(--neon-green)">${u.gp ? u.gp.toLocaleString() + ' GP' : '—'}</td>`;
     uTbody.appendChild(tr);
   });
 }
