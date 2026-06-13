@@ -61,7 +61,7 @@ This pattern holds for insects, canines, fish, and other families checked. Upper
 
 ## Data Re-Extraction Needed (correctness bugs)
 
-- ✅ **Extract item GP costs and shop inventories from ROM** — shops.json fully replaced with ROM data (14 shops × 10 items each, prices as 6-digit BCD from 0x17E10). abilities.json updated with `gp` field for all 252 items. item_prices.json created as standalone lookup. **QUESTION FOR USER:** Shop location assignments (world/town) are not known — can you map shop indices 1–14 to their in-game locations? (see shops.json)
+- ✅ **Extract item GP costs and shop inventories from ROM** — shops.json fully replaced with ROM data (14 shops × 10 items each, prices as 6-digit BCD from 0x17E10). abilities.json updated with `gp` field for items 0–127 only (table is 128 items × 3 bytes ending at 0x17F8F; items 128+ were incorrectly reading the starting-character table at 0x17F90 — garbage values removed). All 89 shop items have IDs ≤ 124 (verified). **QUESTION FOR USER:** Shop location assignments (world/town) are not known — can you map shop indices 1–14 to their in-game locations? (see shops.json)
 
 - **Replace v001 data files with ROM-verified data** — the following files in `FFL1/data/`
   are from the v001 game engine era and contain fabricated or web-sourced values not from
@@ -84,9 +84,7 @@ This pattern holds for insects, canines, fish, and other families checked. Upper
   - ✅ `data/shops.json` — replaced with ROM-extracted data (see above).
   - ✅ `data/transformation.json` — replaced with ROM data. 25 monster classes × 16 weighted members (0x0B2A8); 25×29 eat transformation table with result class weights (0x0AFD3). Monster class = monster_id // 6 for IDs 0–149; monsters 150+ cannot be eaten. HIGH confidence.
   - ✅ `data/encounters.json` — replaced with ROM data. 128 encounters × 5 monster slots from 0x1A868. MEDIUM confidence for structure (which slots are active in battle not yet decoded; enc 0-5 appear to be boss encounters). **QUESTION FOR USER:** Which encounters map to which overworld zones/floors?
-  - `data/world.json` — world structure "reconstructed from game knowledge" (LOW confidence).
-    *(discovered during: wiki audit)* Extract from ROM when encounter zone / world structure
-    is mapped.
+  - ✅ `data/world.json` — deleted. Fabricated world structure with wrong boss assignments and invented location names; unreferenced by any page. Removed to avoid misleading future sessions. *(remainder: extract actual world structure from ROM when encounter zone / world structure data is located)*
   - ✅ `data/items.json` — deleted. Fabricated stats (base_power, stat_bonus, equip restrictions); wiki pages use abilities.json. Removed to avoid misleading future sessions.
 
 ## BGB Session — Breakpoints to Set

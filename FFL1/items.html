@@ -46,10 +46,10 @@
 
   <div class="callout info">
     <strong>Data source:</strong> Names, type, uses from <code>0x14640</code>; GP prices from
-    <code>0x17E10</code> (6-digit BCD); weapon power and armor defense from item stat table at
-    <code>0x1B700</code>. Element from Y field (HIGH confidence for single-element values).
-    Status cure items: X field bitmask confirmed (which status condition each cures) — MEDIUM confidence
-    for status names (inferred from item names; needs BGB to confirm exact bit meanings).
+    <code>0x17E10</code> (6-digit BCD, items 0–127 only; 128+ are monster/NPC-only abilities with no GP).
+    Weapon power and armor defense from item stat table at <code>0x1B700</code>.
+    Element from Y field (HIGH confidence for single-element values).
+    Status cure items: X field bitmask confirmed — MEDIUM confidence for status names (inferred from item names; needs BGB).
     Numeric effect amounts for spells and stat-boost usable items not yet extracted.
   </div>
 
