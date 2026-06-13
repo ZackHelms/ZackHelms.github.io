@@ -48,21 +48,8 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 
 ---
 
-### Mystery 3: Character encoding bytes 0xF2 and 0x82 in monster names
-**Location:** Name table at `0x14000`, 200 × 8 bytes, same encoding as the general character table.
-
-**Observed:**
-- `0xF2` appears in boss names: gen-bu (id 189) = `[gen, 0xF2, bu]`, sei-ryu = `[sei, 0xF2, ryu]`, byak-ko = `[byak, 0xF2, ko]`, su-zaku = `[su, 0xF2, zaku]`, p-flower (id 13) = `[p, 0xF2, flower]`
-- `0x82` appears at the end of strong boss forms: "gen-bu II" form (id 193) name bytes end with `0x82`, "sei-ryu II" (id 194) similarly; likely represents the "2" or "II" suffix used for the powered-up boss variants in the 3rd and 4th worlds
-
-**Current decoder treatment:** `0xF2` mapped to `'-'` (hyphen/dash) based on context. `0x82` mapped to `'2'` tentatively. These are guesses.
-
-**Confirmed encoding range** (from rom-map.md): `0x8A`–`0xA3` = a–z, `0x40`–`0x59` = A–Z, `0xA4`–`0xAD` = 0–9. `0xF2` and `0x82` fall outside the known alphanumeric ranges and may be:
-- Special punctuation (hyphen, period, apostrophe)
-- DTE pair codes that happen to also appear in the name table (unlikely — DTE is for story text only)
-- Extended characters from the full font tile sheet
-
-**How to investigate:** Look at font tile sheet `img/tile_sheet_1bpp_large.png` — tile index encodes the glyph. The character byte value maps to a tile index by some formula; check which tile 0xF2 and 0x82 render in the game's BG tile decoder. Alternatively, look up those tile indices in the BGB VRAM viewer while a boss name is displayed on screen.
+### ✅ Mystery 3 — RESOLVED: 0xF2 = '-', 0x82 = '2'
+**Confirmed from [RANDO]:** `FFLNameTextToASCII` explicitly maps `0xF2 → '-'` (hyphen) and `0x82` falls in range `0x80–0x89` which decodes to digits `chr(b - 0x50)`, so `0x82 - 0x50 = 0x32 = '2'`. Verified by decoding all 200 monster names from ROM: GEN-BU, SEI-RYU, BYAK-KO, SU-ZAKU all decode correctly, and GEN-BU2 (id 193) decodes as "GEN-BU2". Character encoding table in rom-map.md corrected (previous table had uppercase/lowercase/digit ranges wrong). *(Also discovered: correct digit range is 0x80–0x89, not 0xA4–0xAD as previously noted)*
 
 ---
 
@@ -73,7 +60,7 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 
 ## Data Re-Extraction Needed (correctness bugs)
 
-- **Extract item GP costs from ROM** — format now confirmed (6-digit packed BCD, `0x17E10 + item_id*3`, Mystery 4 resolved). Re-extract `data/shops.json` prices from ROM binary using this formula.
+- ✅ **Extract item GP costs and shop inventories from ROM** — shops.json fully replaced with ROM data (14 shops × 10 items each, prices as 6-digit BCD from 0x17E10). abilities.json updated with `gp` field for all 252 items. item_prices.json created as standalone lookup. **QUESTION FOR USER:** Shop location assignments (world/town) are not known — can you map shop indices 1–14 to their in-game locations? (see shops.json)
 
 - **Replace v001 data files with ROM-verified data** — the following files in `FFL1/data/`
   are from the v001 game engine era and contain fabricated or web-sourced values not from
@@ -88,52 +75,109 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
     - Equip restrictions (human/mutant/monster) → needs ROM extraction (not yet found)
   - `data/encounters.json` — encounter rates/tables fabricated.
     *(discovered during: wiki audit)* Extract from ROM when encounter zone data is found.
-  - `data/shops.json` — shop prices "approximate from FAQ sources" (LOW confidence).
-    *(discovered during: wiki audit)* Extract from ROM (item GP cost table at `0x17E10`
-    once format is verified; shop inventory lists address not yet found).
+  - ✅ `data/shops.json` — replaced with ROM-extracted data (see above).
   - `data/transformation.json` — transformation table "based on FFLMonsterCalc community
-    documentation" (LOW confidence). *(discovered during: wiki audit)* Extract from ROM
-    (transformation table noted at `0x0AFD3` in old data; needs verification).
+    documentation" (LOW confidence). *(discovered during: wiki audit)* Eat table at `0x0AFD3`
+    (29 bytes × 25 monster classes); result lists at `0x0B2A8` (16 bytes × 25 classes).
+    Addresses confirmed from RANDO; byte layout not yet decoded. Next step: extract and decode.
   - `data/world.json` — world structure "reconstructed from game knowledge" (LOW confidence).
     *(discovered during: wiki audit)* Extract from ROM when encounter zone / world structure
     is mapped.
 
+## BGB Session — Breakpoints to Set
+
+**Setup:** Download BGB (Windows emulator with built-in debugger). Load `rom/ffl1.gb`. Use `Debugger → Breakpoints` to add read/write/execute breakpoints. After each fires, record the **PC** (program counter), **bank** (shown in CPU state panel), and nearby disassembly.
+
+---
+
+### BGB Task 1 — Stat table byte 6 upper nibble (Mystery 1)
+1. `Debugger → Breakpoints → Add`: address `7AEE`, type **Read**, bank **6**.
+2. Walk into any encounter. When it fires, note: PC, bank, and what instruction ran (look for `AND F0` or `SRL A` in the disassembly pane — those would extract the upper nibble).
+3. **Report back:** PC, bank, and 2–3 instructions after the read.
+
+**Unlocks:** Identifies what the upper nibble of monster stat byte 6 controls (likely meat category).
+
+---
+
+### BGB Task 2 — Character portrait sprites (class select screen)
+1. Reach the class select "WHO ARE YOU?" screen.
+2. Open `Debugger → OAM Viewer`. Screenshot or copy out all 8 sprite entries (Y, X, tile#, flags).
+3. Open `Debugger → VRAM Viewer` → OBJ tiles. Note what each tile index from step 2 looks like.
+4. **Report back:** Table of sprite slot → tile_index for each of the 8 class rows.
+
+**Unlocks:** Character portraits on the class select screen (currently blocked).
+
+---
+
+### BGB Task 3 — Cursor sprite tile (class select screen)
+1. On class select screen, in the OAM Viewer, find the ring cursor sprite (leftmost column).
+2. Note its tile index and palette byte.
+3. **Report back:** OAM slot, tile_index, palette.
+
+**Unlocks:** Cursor sprite rendering.
+
+---
+
+### BGB Task 4 — WRAM gold and stat address verification
+1. Start a new game. Note your starting GP.
+2. `Debugger → Memory Viewer` → go to `CC8D`. Note the 3 bytes at CC8D–CC8F (should encode your GP).
+3. Spend some GP or use cheat to change it. Note updated bytes.
+4. Also check `CC06` (first character's current HP).
+5. **Report back:** 3 bytes at CC8D and 1 byte at CC06, and whether they match your in-game values.
+
+**Unlocks:** Confirmed WRAM addresses for live GP and HP display in the webapp.
+
+---
+
+### BGB Task 5 — Combat engine entry point
+1. Walk the overworld until a random encounter triggers.
+2. The instant the battle screen appears, press **Esc** to pause BGB.
+3. Note the **PC** and **bank** shown in the CPU state panel. Step forward 5–10 instructions and screenshot the disassembly.
+4. **Report back:** PC, bank, and the first few instructions.
+
+**Unlocks:** Entry point for the battle loop; needed before implementing combat.
+
+---
+
+### BGB Task 6 — Overworld tilemap
+1. Start a game, exit the tower base building, stand on the world map.
+2. Open `Debugger → VRAM Viewer` → BG Map (Map 0, address 9800). Take a screenshot.
+3. Open VRAM Viewer → BG Tiles. Take a screenshot.
+4. Note the tile indices for: water, ground path, tower entrance, and any landmark tile.
+5. **Report back:** Both screenshots + tile index list.
+
+**Unlocks:** Overworld tilemap layout for the webapp's world map rendering.
+
+---
+
 ## Missing ROM Data (requires tools or deeper analysis)
 
 - **Class select screen rendering routine** — need the ROM address(es) that render
-  the WHO ARE YOU screen. Best approach: set a BGB breakpoint on VRAM writes when the
-  screen first appears; the PC at that point is the render routine.
+  the WHO ARE YOU screen. *(covered by BGB Task 2)*
 
-- **Character portrait sprite tile indices** — which Bank 2 tiles form the 8 character
-  portraits shown on the class select screen. Approach: BGB OAM viewer during class select,
-  or trace the render routine once found.
+- **Character portrait sprite tile indices** — which tile indices form the 8 class portraits.
+  *(covered by BGB Task 2)*
 
-- **Cursor sprite tile index** — the circular ring icon at the left of the selected row
-  on the class select screen. Same approach as above.
+- **Cursor sprite tile index** — the ring cursor at the left of the selected row.
+  *(covered by BGB Task 3)*
 
 - **DTE decoder implementation** — story/dialog text is DTE-compressed; raw byte search
   is impossible. Need to implement a decoder using the tables at `0x14E40` (loaded to RAM
   `0xC800`) to verify `data/dialog.md` story text and extract NPC dialog.
 
-- **WRAM address verification** — gold, character HP/stats, and other live addresses from
-  GameShark codes are LOW confidence. Verify by: loading ROM in BGB, using memory viewer
-  to watch values change during gameplay, cross-referencing with the code.
+- **WRAM address verification** — gold, character HP/stats. *(covered by BGB Task 4)*
 
 - **Save / SRAM layout** — `0xA000`–`0xBFFF` battery-backed SRAM; internal structure
-  (character slots, inventory, flags, world state) not documented. Requires either:
-  a save-file hex comparison approach (save in different states, diff the bytes), or
-  tracing SRAM write instructions in the ROM.
+  (character slots, inventory, flags, world state) not documented. Requires save-file
+  hex comparison approach (save in different states, diff the bytes).
 
 - **Encounter zone data** — which ROM offsets define random encounter rates and monster
   tables for each world map area. Needed before implementing overworld traversal.
 
-- **Overworld tilemap layout** — dynamically built at runtime (no static tilemap in ROM).
-  Approach: BGB VRAM/tilemap viewer while standing on the world map; record tile indices
-  and BG map layout, then cross-reference with Bank 2 tile grid.
+- **Overworld tilemap layout** — dynamically built at runtime. *(covered by BGB Task 6)*
 
-- **Combat engine addresses** — where the battle loop, damage formula, and turn-order
-  code live. Needed before implementing any combat. Trace from a known entry point
-  (e.g., when encounter triggers, what is the next PC value?).
+- **Combat engine addresses** — battle loop, damage formula, turn-order code.
+  *(covered by BGB Task 5)*
 
 - **Music / SFX data** — not a near-term priority; note for completeness.
 

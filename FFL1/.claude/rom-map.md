@@ -356,19 +356,35 @@ HUMAN(M), HUMAN(F), MUTANT(M), MUTANT(F), CLIPPER, REDBULL, WERERAT, ZOMBIE
 
 ## Text Encoding
 
-### Character Encoding Table
-**Confidence: HIGH** — verified against name table and ability table byte reads.
+### Character Encoding Table (Name Text)
+**Confidence: HIGH** — verified by decoding all 200 monster names and 252 ability names from ROM using RANDO `FFLNameTextToASCII`; all names match expected values.
+
+**NOTE:** Previous table (from Data Crystal) had uppercase/lowercase/digit ranges WRONG. RANDO source is authoritative.
 
 ```
-0x8A=a  0x8B=b  0x8C=c  0x8D=d  0x8E=e  0x8F=f
-0x90=g  0x91=h  0x92=i  0x93=j  0x94=k  0x95=l
-0x96=m  0x97=n  0x98=o  0x99=p  0x9A=q  0x9B=r
-0x9C=s  0x9D=t  0x9E=u  0x9F=v  0xA0=w  0xA1=x
-0xA2=y  0xA3=z
-0x40=A  0x41=B  …  0x59=Z
-0xA4=0  0xA5=1  …  0xAD=9
-0x32=' '  0xF2='-'  0x82='+'  0xEC="'"  0xFF=terminator
+Digits:    0x80='0'  0x81='1'  0x82='2'  …  0x89='9'   (byte - 0x50)
+Uppercase: 0x8A='A'  0x8B='B'  0x8C='C'  …  0xA3='Z'   (byte - 0x49)
+Lowercase: 0xA4='a'  0xA5='b'  0xA6='c'  …  0xBD='z'   (byte - 0x43)
+
+Special / symbol bytes:
+  0xFF = ' ' (space / name padding)
+  0xF2 = '-' (hyphen — used in "GEN-BU", "SEI-RYU", etc.)
+  0xF0 = '.' (period)
+  0x42 = ♥  (HP item icon)
+  0x40 = stat-up symbol (appears in stat-boost items before digit)
+  0x43 = '>' (resist — prefix on elemental armor e.g. ">FIRE")
+  0x44 = '<' (weakness — prefix on some items)
+  0x45 = '/' (slash)
+
+Item type prefix bytes (byte 0 of ability name entry):
+  0xEC = sword  0xED = helm  0xE8 = body armor
+  0xEA = gloves  0xEB = shoes  0xEF = book/magic
+  0xEE = gun  0xE9 = shield
 ```
+
+**Note on 0x40–0x59 range:** Previous table claimed these were A–Z (uppercase). RANDO does NOT map this range to letters; 0x40 appears in ability names as a stat symbol. These bytes may encode symbols or special UI characters. Do not use as A–Z.
+
+**Separate encoding for story/DTE text:** The DTE compression table (at 0x14E40) uses a different byte-to-character mapping for dialog and story text. Do not apply the name-text encoding to dialog bytes.
 
 ### DTE (Double Tile Encoding) Compression
 **Confidence: HIGH** — table location verified by direct byte read in previous sessions.

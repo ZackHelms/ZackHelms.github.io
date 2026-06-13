@@ -22,9 +22,11 @@
 - DTE table location — ROM 0x14E40 (bank 5) → loaded to RAM $C800 at startup — HIGH confidence
 - Stat table location — ROM 0x1AAE8, **9-byte stride** (corrected from earlier 8-byte assumption) — HIGH confidence for stride; field layout MEDIUM confidence; byte 0 format partially decoded: `0x7B + (num_abils × 8)` for race=Monster/meat_drop=3
 - Mutant growth rate thresholds — ROM 0x1BF00 (8 threshold bytes + 5 amount bytes) — MEDIUM confidence
-- Item GP cost table — ROM 0x17E10, 3 bytes per item, **6-digit packed BCD** (each nibble = one decimal digit); confirmed from FFLRandomizer `ReadGPCost` — HIGH confidence
+- Item GP cost table — ROM 0x17E10, 3 bytes per item, **6-digit packed BCD** (each nibble = one decimal digit); confirmed from FFLRandomizer `ReadGPCost` — HIGH confidence. All 252 prices extracted to `data/abilities.json` (gp field) and `data/item_prices.json`.
 - Item stat table — ROM 0x1B700, 8 bytes per item: FlagsA, FlagsB, Type, AltUses, X, Y, GFX, (GroupFlag bit7 + SFX bits6-0) — MEDIUM confidence
 - Item uses count — stored as byte 7 of the ability name table entry (ROM 0x14647 + item_id×8), NOT in the stat table — HIGH confidence (from RANDO `ReadItemUses`)
+- Shop inventories — 14 shops at ROM 0x17D38–0x17E0F; 10 item IDs per shop; extracted to `data/shops.json` — HIGH confidence for item IDs and prices; UNVERIFIED for world/location assignments
+- Character name encoding — corrected: 0x80–0x89='0'–'9', 0x8A–0xA3='A'–'Z', 0xA4–0xBD='a'–'z', 0xFF=' ', 0xF2='-'. Previous table (Data Crystal) had wrong ranges — HIGH confidence (RANDO source + full 200-name decode verified)
 
 ### Previously Unverified — Now Resolved
 - **monsters.json STR/DEF/AGI/MANA** — re-extracted with correct 9-byte stride at 0x1AAE8; values now HIGH confidence. monsters.json updated.
