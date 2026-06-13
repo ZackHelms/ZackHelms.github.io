@@ -154,12 +154,14 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 |---|---|
 | File offset | `0x17E10` |
 | Entry size | 3 bytes per item |
-| Entry count | 252 (same as ability name table) |
+| Entry count | **128** (items 0–127 only; table ends at `0x17F8F`) |
 | Format | **6-digit packed BCD** — each nibble = one decimal digit; supports 0–999,999 GP |
 
 **BCD decode:** `byte0 = (100000s<<4)|10000s`, `byte1 = (1000s<<4)|100s`, `byte2 = (10s<<4)|1s`. Examples: 6,789 GP → `[0x00, 0x67, 0x89]`; 10,480 GP → `[0x01, 0x04, 0x80]`. Prior "incoherent" readings were caused by incorrect 3-byte LE integer interpretation.
 
 `ReadItemCost(filebytes, item_id)` = `ReadGPCost(filebytes, 0x17E10 + 3 * item_id)`
+
+**Table boundary:** 0x17E10 + 128×3 = 0x17F8F (end of table). 0x17F90 = starting character table (unrelated). Items 128–251 are monster/NPC-only abilities with no shop GP. The RANDO `ReadGPCost` call works for all 252 IDs but returns garbage for 128+ (reads unrelated bank 5 data). All 89 shop items have IDs ≤ 124 (cross-verified).
 
 ### Item Full Stat Table
 **Confidence: MEDIUM** — address and field names from [RANDO]; stride confirmed (8 bytes/item, same as ability name table).
