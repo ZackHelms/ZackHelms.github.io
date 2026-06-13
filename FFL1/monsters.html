@@ -11,6 +11,36 @@
 #monster-table td:nth-child(5),
 #monster-table td:nth-child(6),
 #monster-table td:nth-child(7) { font-variant-numeric: tabular-nums; text-align:right; }
+
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.class-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 10px 12px;
+  font-size: 0.72rem;
+}
+.class-card-title {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 0.7rem;
+  color: var(--dim2);
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.class-member {
+  display: flex; justify-content: space-between;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--border);
+}
+.class-member:last-child { border-bottom: none; }
+.class-member .m-name { color: var(--white); }
+.class-member.m-top .m-name { color: var(--gold); }
+.class-member .m-weight { color: var(--dim2); font-size: 0.65rem; }
 </style>
 </head>
 <body>
@@ -39,9 +69,10 @@
   <div class="page-sub">ROM-EXTRACTED DATA ONLY</div>
 
   <div class="callout warn">
-    <strong>Data source notice:</strong> Stats are extracted directly from the ROM. Mechanics
-    governing how the Monster class plays (transformation rules, meat slot count, trigger conditions)
-    have not been extracted from the ROM binary and are not presented here.
+    <strong>Data source notice:</strong> Monster stats and the meat transformation table are
+    extracted directly from the ROM. <strong>Trigger conditions</strong> (how many meats eaten,
+    combat conditions) and <strong>meat slot count</strong> have not been extracted from the ROM
+    binary. The transformation classes section below shows what you can become, not when.
   </div>
 
   <section>
@@ -77,11 +108,29 @@
       </table>
     </div>
   </section>
+
+  <section>
+    <h2>MONSTER CLASSES &amp; MEAT TRANSFORMATION</h2>
+    <p style="font-size:0.82rem;margin-bottom:8px;">
+      There are 25 monster classes (IDs 0–149; class = ID ÷ 6). When a monster eats meat,
+      it picks a random result class (roughly equal chance for each of the 25 classes), then
+      picks a random member of that class weighted by the values below.
+      <strong style="color:var(--gold)">Gold names</strong> = highest probability in that class.
+      Monsters 150+ (human warriors, bosses) cannot eat meat.
+    </p>
+    <p style="font-size:0.72rem;color:var(--dim2);margin-bottom:14px;">
+      Source: ROM <code>0x0B2A8</code> (class members + weights) · <code>0x0AFD3</code> (eat table) — HIGH confidence
+    </p>
+    <div id="class-grid" class="class-grid"></div>
+  </section>
 </main>
 
 <script>
 async function init() {
-  const monsters = await fetch('data/monsters.json').then(r => r.json());
+  const [monsters, txData] = await Promise.all([
+    fetch('data/monsters.json').then(r => r.json()),
+    fetch('data/transformation.json').then(r => r.json())
+  ]);
 
   // Build family filter from actual data
   const families = [...new Set(monsters.map(m => m.family))].sort();
@@ -129,6 +178,21 @@ async function init() {
   }
   document.getElementById('search').addEventListener('input', applyFilters);
   document.getElementById('family-filter').addEventListener('change', applyFilters);
+
+  // Monster class grid
+  const classGrid = document.getElementById('class-grid');
+  txData.monster_classes.forEach(cls => {
+    const maxW = Math.max(...cls.members.map(m => m.weight));
+    const card = document.createElement('div');
+    card.className = 'class-card';
+    const membersHtml = cls.members.map(m => `
+      <div class="class-member${m.weight === maxW ? ' m-top' : ''}">
+        <span class="m-name">${m.name}</span>
+        <span class="m-weight">wt ${m.weight}</span>
+      </div>`).join('');
+    card.innerHTML = `<div class="class-card-title">CLASS ${cls.class_id}</div>${membersHtml}`;
+    classGrid.appendChild(card);
+  });
 }
 init();
 </script>
