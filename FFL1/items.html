@@ -87,7 +87,9 @@
   <div id="tab-armor" class="tab-pane">
     <p style="font-size:0.82rem;margin-bottom:16px;">
       Slot from <code>FlagsA</code> bits at <code>0x1B700</code>. DEF from X field (HIGH confidence).
-      Element resistance from Y field where Y encodes a single element or "all".
+      Element resistance from Y field. Items without a slot are <strong>passive elemental defenses</strong>
+      (D-/E-items) — they appear in monster ability lists, not in player equipment slots.
+      Extended element types (stone/para/weapon/quake) are MEDIUM confidence (inferred from item names).
     </p>
     <div class="table-wrap">
       <table>
@@ -179,9 +181,13 @@ async function init() {
   // ARMOR
   const aTbody = document.getElementById('armor-tbody');
   ab.filter(a => a.type === 'armor').forEach(a => {
-    const slotTag = a.slot ? '<span class="tag ' + (SLOT_COLOR[a.slot] || 'tag-cyan') + '">' + a.slot + '</span>' : '<span class="tag">' + (a.prefix || '—') + '</span>';
-    const elemTag = a.element ? '<span class="tag ' + (ELEM_COLOR[a.element] || '') + '">' + a.element + '</span>' : '—';
+    const isPassive = !a.slot; // D-items / E-items have no equipment slot
+    const slotTag = a.slot
+      ? '<span class="tag ' + (SLOT_COLOR[a.slot] || 'tag-cyan') + '">' + a.slot + '</span>'
+      : '<span class="tag" style="color:var(--dim2)">passive</span>';
+    const elemTag = a.element ? '<span class="tag ' + (ELEM_COLOR[a.element] || 'tag-cyan') + '">' + a.element + '</span>' : '—';
     const tr = document.createElement('tr');
+    tr.style.opacity = isPassive ? '0.65' : '1';
     tr.innerHTML = `
       <td><strong>${a.name}</strong></td>
       <td>${slotTag}</td>
