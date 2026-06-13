@@ -245,6 +245,15 @@ This pattern holds for insects, canines, fish, and other families checked. Upper
   **QUESTION FOR USER:** Can you map shop indices 1–14 to their in-game towns/worlds? (From the price ranges, shops 1–2 look like World 1, shops 3–4 World 2, etc. — but ROM confirmation needed.)
   *(discovered during: shop price extraction)*
 
-- ✅ **encounters.html wiki page** — created from ROM-extracted encounters.json (128 encounters × 5 slots). Added to nav on all wiki pages and to index.html wiki grid. Shows boss/scripted/random classification by monster tier. Slot usage mechanic and zone assignments remain UNVERIFIED.
+- ✅ **encounters.html wiki page** — created from ROM-extracted encounters.json (128 encounters × 5 slots). Added to nav on all wiki pages and to index.html wiki grid. Shows boss/scripted/random classification by monster tier. Slot usage mechanic and zone assignments remain UNVERIFIED. Boss encounters (0–5) labeled with world assignments from encounter table + community knowledge.
   **QUESTION FOR USER:** Which encounter IDs map to which overworld zones/dungeon floors?
   *(discovered during: encounter data audit)*
+
+- ✅ **Fix GP table boundary bug** — Item GP cost table at 0x17E10 covers items 0–127 only (128 items × 3 bytes ending at 0x17F8F). Items 128+ were incorrectly reading the starting-character table at 0x17F90, producing implausible values up to 1.6M GP. Fixed: removed gp field for 124 items (IDs 128–251). All 89 shop items have IDs ≤ 124 (cross-verified). Updated rom-map.md and mechanics.md.
+  *(discovered during: autonomous cleanup pass)*
+
+- ✅ **D-item and E-item element data** — Passive defense items (Dfire, Dice, Delec, etc., IDs 209–225, 248) have Y field in stat table 0x1B700 encoding the element they defend against. Standard elements (fire/ice/elec/poison/all) extracted (HIGH confidence). Extended types (stone=Y16, para=Y32, weapon=Y64, quake=Y128) MEDIUM confidence (inferred from names). Added element field to abilities.json. items.html ARMOR tab now shows passive D/E-items as dimmed 'passive' slot.
+  *(discovered during: autonomous cleanup pass)*
+
+- ✅ **Boss roster and encounter improvements** — general.html boss table now shows encounter ID and world label per boss (ROM enc IDs from encounter table; world labels community-sourced). encounters.html boss encounters labeled with World 1–4/Tower/Final. mutants.html now shows growth threshold table (8 zones from ROM 0x1BF00). index.html stat cap section updated to distinguish ROM-confirmed vs community-sourced data.
+  *(discovered during: autonomous cleanup pass)*
