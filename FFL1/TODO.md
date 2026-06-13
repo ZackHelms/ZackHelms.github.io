@@ -160,12 +160,12 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 
 ## Near-term Feature Work
 
-- **Class select screen (webapp)** — currently does not match the ROM. Issues to fix:
-  1. Remove "WHO ARE YOU?" header (not present in original)
-  2. Add row numbers (1–8) at left
-  3. Add character portrait sprites (requires sprite tile extraction above)
-  4. Fix cursor style: circular icon at row left, no full-row inversion
-  5. Fix name/gender column alignment (fixed columns, not concatenated)
+- **Class select screen (webapp)** — partially complete; one item blocked on BGB session.
+  1. ✅ Remove "WHO ARE YOU?" header (not present in original)
+  2. ✅ Add row numbers (1–8) at left
+  3. Add character portrait sprites — *(blocked on: BGB OAM viewer to identify Bank 2 sprite tile indices; see Missing ROM Data above)*
+  4. ✅ Fix cursor style: circular ring at row left, no full-row inversion
+  5. ✅ Fix name/gender column alignment (fixed columns: name x=44, gender x=112)
 
 - **Walking animation** — 2-frame walk cycle (front/side/back views) per class.
   Requires: character sprite tile extraction from Bank 2.
@@ -184,3 +184,15 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 - Town interiors and NPC dialog (DTE decoder needed first)
 - Save / load (CONTINUE) functionality
 - SRAM / localStorage persistence
+
+## Done
+
+- ✅ **Re-extract monsters.json stats with 9-byte stride** — STR/DEF/AGI/MANA corrected at
+  `0x1AAE8`; gold added via BCD gold table at `0x1B2A4` (lower nibble of stat byte 6).
+  Key discovery: gold table uses 4-digit packed BCD, not plain integers; index is 4-bit (0–15).
+  *(was: Data Re-Extraction Needed — monsters.json stats)*
+
+- ✅ **Class select screen layout (4 of 5 sub-items)** — removed WHO ARE YOU? header; added
+  row numbers 1–8; fixed cursor to circular ring with no row inversion; fixed name/gender to
+  fixed columns. Portrait sprites (sub-item 3) remain blocked on BGB session.
+  *(was: Near-term Feature Work — class select screen)*

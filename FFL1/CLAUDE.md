@@ -15,6 +15,31 @@ Before working on any FFL1 task, read the relevant `.claude/` file:
 
 ---
 
+## SOP: TODO list hygiene (after completing any task)
+
+**Every time** a TODO item is worked on, update `TODO.md` before ending the session:
+
+### 1. If the item is fully complete
+- Mark it done with `✅` prefix **or** move it to a `## Done` section at the bottom of `TODO.md`.
+
+### 2. If the item is only partially complete
+- Mark each completed sub-item with `✅` inline.
+- Leave remaining sub-items unchanged.
+- If the original item was one bullet with no sub-items, split it: add a `✅ Done:` note inline and a new bullet for what remains.
+
+### 3. Any new TODO items discovered during the work
+- Add them to the appropriate section of `TODO.md`.
+- Include a **lineage note** in parentheses on the same line so future sessions know where it came from. Examples:
+  - *(user requested)*
+  - *(remainder of: class select screen task)*
+  - *(discovered during: monster stat re-extraction)*
+  - *(blocked on: BGB sprite extraction)*
+
+### 4. ROM Mystery items
+- Any newly discovered unknown ROM field → add to the `## ROM Mysteries` section (see that section's format for the required fields: location, observed values, key observations, hunches, how to investigate).
+
+---
+
 ## SOP: After any ROM exploration session
 
 **Every time** you explore the ROM binary (tile dumps, data extraction, disassembly, image generation), do the following before ending the session:
