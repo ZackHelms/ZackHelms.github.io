@@ -136,18 +136,19 @@
 
 <script>
 async function init() {
-  const data = await fetch('data/items.json').then(r => r.json());
+  // Load from ROM-verified abilities.json (not v001-era items.json which had fabricated stats)
+  const ab = await fetch('data/abilities.json').then(r => r.json());
 
-  // WEAPONS
+  // WEAPONS / SWORDS
   const wTbody = document.getElementById('weapon-tbody');
   const wRows = [];
-  [...data.weapons].forEach(w => {
+  ab.filter(a => a.type === 'weapon' || a.type === 'sword').forEach(w => {
     const tr = document.createElement('tr');
     tr.dataset.name = w.name.toLowerCase();
-    tr.dataset.type = w.weapon_type || 'weapon';
+    tr.dataset.type = w.type;
     tr.innerHTML = `
       <td><strong>${w.name}</strong></td>
-      <td><span class="tag tag-gold">${w.weapon_type || 'weapon'}</span></td>`;
+      <td><span class="tag tag-gold">${w.type}</span></td>`;
     wTbody.appendChild(tr);
     wRows.push(tr);
   });
@@ -164,24 +165,25 @@ async function init() {
 
   // ARMOR
   const aTbody = document.getElementById('armor-tbody');
-  data.armor.forEach(a => {
+  ab.filter(a => a.type === 'armor').forEach(a => {
+    const slotLabel = a.prefix || '—';
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${a.name}</strong></td>
-      <td><span class="tag tag-cyan">${a.armor_type || '—'}</span></td>`;
+      <td><span class="tag tag-cyan">${slotLabel}</span></td>`;
     aTbody.appendChild(tr);
   });
 
   // SPELLS / ABILITIES
   const spTbody = document.getElementById('spell-tbody');
   const spRows = [];
-  [...data.spells, ...(data.abilities || [])].forEach(s => {
+  ab.filter(a => a.type === 'spell' || a.type === 'ability').forEach(s => {
     const tr = document.createElement('tr');
     tr.dataset.name = s.name.toLowerCase();
-    tr.dataset.type = s.type || 'spell';
+    tr.dataset.type = s.type;
     tr.innerHTML = `
       <td><strong>${s.name}</strong></td>
-      <td><span class="tag tag-purple">${s.type || 'spell'}</span></td>`;
+      <td><span class="tag tag-purple">${s.type}</span></td>`;
     spTbody.appendChild(tr);
     spRows.push(tr);
   });
@@ -196,9 +198,9 @@ async function init() {
   document.getElementById('spell-search').addEventListener('input', filterSpells);
   document.getElementById('spell-type-filter').addEventListener('change', filterSpells);
 
-  // USABLE
+  // USABLE ITEMS
   const uTbody = document.getElementById('usable-tbody');
-  data.usable.forEach(u => {
+  ab.filter(a => a.type === 'usable_item').forEach(u => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${u.name}</strong></td>

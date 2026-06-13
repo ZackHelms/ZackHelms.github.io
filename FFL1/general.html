@@ -57,8 +57,8 @@
       </div>
       <div class="card">
         <div class="card-title">MONSTER</div>
-        <p>Transformation class. Drop data (can_drop_meat, meat_level) extracted from ROM.
-        Transformation mechanics not yet extracted.</p>
+        <p>Transformation class. Transformation mechanics (eat count, trigger, target selection)
+        not yet extracted from ROM.</p>
         <a href="monsters.html" style="font-size:0.72rem; color:var(--cyan);">→ Monsters page</a>
       </div>
     </div>
@@ -74,15 +74,15 @@
       <table>
         <thead>
           <tr>
-            <th>ROM ID</th><th>NAME</th><th>HP</th><th>STR</th><th>DEF</th><th>AGI</th><th>MANA</th>
+            <th>ROM ID</th><th>NAME</th><th>HP</th><th>STR</th><th>DEF</th><th>AGI</th><th>MANA</th><th>GOLD</th>
           </tr>
         </thead>
         <tbody id="boss-tbody"></tbody>
       </table>
     </div>
     <p style="font-size:0.72rem;color:var(--dim2);margin-top:8px;">
-      Indices 189–199. Note: boss HP values from 0x1B254 may be stored as 2-byte little-endian;
-      values shown are the raw decoded integers.
+      Indices 189–199. HP from 0x1B254 (2-byte LE, verified). Gold from BCD table at 0x1B2A4.
+      Values shown are raw stored integers; in-game display caps stats at 99.
     </p>
   </section>
 
@@ -178,7 +178,8 @@ async function loadBosses() {
       <td class="num">${fmt(m.str)}</td>
       <td class="num">${fmt(m.def)}</td>
       <td class="num">${fmt(m.agi)}</td>
-      <td class="num">${fmt(m.mana)}</td>`;
+      <td class="num">${fmt(m.mana)}</td>
+      <td class="num">${m.gold ?? '—'}</td>`;
     tbody.appendChild(tr);
   });
 }

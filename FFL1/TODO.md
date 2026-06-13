@@ -112,7 +112,30 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
 
 - **Verify item GP cost table** — address `0x17E10` from FFLRandomizer source, but
   3-byte LE interpretation gives incoherent prices. See Mystery 4 in ROM Mysteries section for
-  investigation approach. Correct format → `rom-map.md` + update items.html.
+  investigation approach. Correct format → `rom-map.md`.
+
+- **Replace v001 data files with ROM-verified data** — the following files in `FFL1/data/`
+  are from the v001 game engine era and contain fabricated or web-sourced values not from
+  ROM. They are no longer used by any wiki page (as of this cleanup), but they exist in the
+  repo and could mislead future sessions. Extract correct values from ROM and replace each:
+  - `data/items.json` — contains `base_power`, `uses`, `stat_bonus`, `heal_amount`, `equip`
+    restrictions — all fabricated. *(discovered during: wiki audit)*
+    - Weapon stats (power, uses, element) → needs ROM extraction (ability table bytes + item
+      stat table; address not yet found)
+    - Armor stat bonuses → needs ROM extraction (address not yet found)
+    - Usable item effects (heal amount, stat boost) → needs ROM extraction (not yet found)
+    - Equip restrictions (human/mutant/monster) → needs ROM extraction (not yet found)
+  - `data/encounters.json` — encounter rates/tables fabricated.
+    *(discovered during: wiki audit)* Extract from ROM when encounter zone data is found.
+  - `data/shops.json` — shop prices "approximate from FAQ sources" (LOW confidence).
+    *(discovered during: wiki audit)* Extract from ROM (item GP cost table at `0x17E10`
+    once format is verified; shop inventory lists address not yet found).
+  - `data/transformation.json` — transformation table "based on FFLMonsterCalc community
+    documentation" (LOW confidence). *(discovered during: wiki audit)* Extract from ROM
+    (transformation table noted at `0x0AFD3` in old data; needs verification).
+  - `data/world.json` — world structure "reconstructed from game knowledge" (LOW confidence).
+    *(discovered during: wiki audit)* Extract from ROM when encounter zone / world structure
+    is mapped.
 
 ## Missing ROM Data (requires tools or deeper analysis)
 
@@ -191,6 +214,13 @@ Once resolved, move findings to `.claude/rom-map.md` and collapse this entry to 
   `0x1AAE8`; gold added via BCD gold table at `0x1B2A4` (lower nibble of stat byte 6).
   Key discovery: gold table uses 4-digit packed BCD, not plain integers; index is 4-bit (0–15).
   *(was: Data Re-Extraction Needed — monsters.json stats)*
+
+- ✅ **Wiki page audit and cleanup** — fixed all wiki pages to use ROM-verified data sources:
+  monsters.html: removed broken MEAT LV column (fields no longer in monsters.json), added gold
+  column; general.html: corrected MONSTER card text, fixed boss HP note; items.html and
+  humans.html: both switched from fabricated items.json to ROM-verified abilities.json.
+  Remaining v001 data files documented in Data Re-Extraction Needed section.
+  *(user requested)*
 
 - ✅ **Class select screen layout (4 of 5 sub-items)** — removed WHO ARE YOU? header; added
   row numbers 1–8; fixed cursor to circular ring with no row inversion; fixed name/gender to

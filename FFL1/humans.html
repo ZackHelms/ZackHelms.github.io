@@ -75,21 +75,22 @@
 
 <script>
 async function init() {
-  const itemsData = await fetch('data/items.json').then(r => r.json());
+  // Load from ROM-verified abilities.json (not v001-era items.json which had fabricated stat_bonus/equip data)
+  const ab = await fetch('data/abilities.json').then(r => r.json());
 
-  // Armor table
+  // Armor table — filtered to type='armor'; slot from prefix field
   const aTbody = document.getElementById('armor-tbody');
-  itemsData.armor.forEach(a => {
+  ab.filter(a => a.type === 'armor').forEach(a => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${a.name}</strong></td>
-      <td><span class="tag tag-cyan">${a.armor_type || '—'}</span></td>`;
+      <td><span class="tag tag-cyan">${a.prefix || '—'}</span></td>`;
     aTbody.appendChild(tr);
   });
 
-  // Usable items table
+  // Usable items table — filtered to type='usable_item'
   const uTbody = document.getElementById('usable-tbody');
-  itemsData.usable.forEach(u => {
+  ab.filter(a => a.type === 'usable_item').forEach(u => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${u.name}</strong></td>

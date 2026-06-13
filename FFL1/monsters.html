@@ -44,25 +44,11 @@
   </div>
 
   <section>
-    <h2>MEAT DROP DATA (ROM)</h2>
-    <p>Each monster entry includes a drop byte at position 6 of the stat record at
-    <code>0x1AAE8</code>. From this byte we extract:</p>
-    <ul style="font-size:0.82rem; padding-left:20px; margin:8px 0 0;">
-      <li><strong>can_drop_meat</strong> — whether this monster can drop a meat item</li>
-      <li><strong>meat_level</strong> — the level encoded in the drop byte</li>
-    </ul>
-    <p style="font-size:0.78rem;color:var(--dim2);margin-top:8px;">
-      Note: what the meat_level value controls in gameplay has not been verified from ROM code.
-      The meat system mechanics (eat count to transform, trigger conditions, transformation target)
-      are not yet extracted.
-    </p>
-  </section>
-
-  <section>
     <h2>ALL MONSTERS (ROM DATA)</h2>
     <p>All 200 entries from the ROM monster table. HP from <code>0x1B254</code> (2-byte LE).
-    STR/DEF/AGI/MANA from <code>0x1AAE8</code> bytes 2–5 per entry.
-    Values exceeding 99 are highlighted — 99 is a display cap, not the stored value.</p>
+    STR/DEF/AGI/MANA from <code>0x1AAE8</code> bytes 2–5 (9-byte stride).
+    Gold from BCD table at <code>0x1B2A4</code> via lower nibble of stat byte 6.
+    Values exceeding 99 are highlighted — 99 is a display cap in-game, not the stored value.</p>
 
     <div class="filter-bar">
       <input type="text" id="search" placeholder="Search by name…">
@@ -82,8 +68,8 @@
             <th>DEF</th>
             <th>AGI</th>
             <th>MANA</th>
+            <th>GOLD</th>
             <th>FAMILY</th>
-            <th>MEAT LV</th>
           </tr>
         </thead>
         <tbody id="monster-tbody"></tbody>
@@ -117,10 +103,6 @@ async function init() {
       ? `<span style="color:var(--gold)">${v}*</span>`
       : v;
 
-    const meatCell = m.can_drop_meat
-      ? `<span class="tag tag-green">${m.meat_level}</span>`
-      : `<span style="color:var(--dim)">—</span>`;
-
     tr.innerHTML = `
       <td style="color:var(--dim2)">${m.id}</td>
       <td>${m.name}</td>
@@ -129,8 +111,8 @@ async function init() {
       <td>${fmt(m.def)}</td>
       <td>${fmt(m.agi)}</td>
       <td>${fmt(m.mana)}</td>
-      <td><span class="tag tag-cyan" style="font-size:0.58rem">${m.family}</span></td>
-      <td>${meatCell}</td>`;
+      <td>${m.gold ?? '—'}</td>
+      <td><span class="tag tag-cyan" style="font-size:0.58rem">${m.family}</span></td>`;
     tbody.appendChild(tr);
     rows.push(tr);
   });
