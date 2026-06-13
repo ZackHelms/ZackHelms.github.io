@@ -40,7 +40,7 @@ FFL1/
 
 ## ROM-Extracted Data
 Data files directly sourced from the ROM binary:
-- `monsters.json` — **names (HIGH)** from 0x14000; **HP (HIGH)** from 0x1B254; **STR/DEF/AGI/MANA (HIGH)** re-extracted with verified 9-byte stride at 0x1AAE8; **gold (HIGH)** from BCD table at 0x1B2A4 via lower nibble of stat byte 6; **ability_ids (HIGH)** decoded from packed ability lists at 0x1B321+; **encounter_tier (MEDIUM)** from upper nibble of stat byte 6; **num_abilities** derived from ability_ids length
+- `monsters.json` — **names (HIGH)** from 0x14000; **HP (HIGH)** from 0x1B254; **STR/DEF/AGI/MANA (HIGH)** re-extracted with verified 9-byte stride at 0x1AAE8; **gold (HIGH)** from BCD table at 0x1B2A4 via lower nibble of stat byte 6; **ability_ids (HIGH)** decoded from packed ability lists at 0x1B321+; **encounter_tier (MEDIUM)** from upper nibble of stat byte 6; **num_abilities** derived from ability_ids length; **monster_type (HIGH values/MEDIUM meaning)** from 0x1B1F0 (0=standard, 1=aquatic, 2=humanoid, 4=reptilian, 8=undead)
 - `abilities.json` — names and type bytes from 0x14640 (HIGH confidence); **power/defense/heal** from item stat table X field (HIGH); **element** from Y field (MEDIUM); **slot** from FlagsA bits (HIGH); **gp** from 0x17E10 BCD table (HIGH); **uses** from AltUses byte +3 at 0x1B700 (HIGH)
 - `img/title_screen.png` — 160×144 pixel-accurate title screen (nearest-neighbor from emulator screenshot)
 - `img/tile_sheet_1bpp_large.png` — 119 font tiles from ROM offset 0x0F100

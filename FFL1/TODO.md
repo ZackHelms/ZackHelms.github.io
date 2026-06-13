@@ -245,3 +245,7 @@ This pattern holds for insects, canines, fish, and other families checked. Upper
 - ✅ **shops.html wiki page** — created from ROM-extracted shops.json (14 shops × 10 items, 6-digit BCD prices). Added to nav on all wiki pages and to index.html wiki grid. Shop location (world/town) assignments remain UNVERIFIED — awaiting user input.
   **QUESTION FOR USER:** Can you map shop indices 1–14 to their in-game towns/worlds? (From the price ranges, shops 1–2 look like World 1, shops 3–4 World 2, etc. — but ROM confirmation needed.)
   *(discovered during: shop price extraction)*
+
+- ✅ **encounters.html wiki page** — created from ROM-extracted encounters.json (128 encounters × 5 slots). Added to nav on all wiki pages and to index.html wiki grid. Shows boss/scripted/random classification by monster tier. Slot usage mechanic and zone assignments remain UNVERIFIED.
+  **QUESTION FOR USER:** Which encounter IDs map to which overworld zones/dungeon floors?
+  *(discovered during: encounter data audit)*

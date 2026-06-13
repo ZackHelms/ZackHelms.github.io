@@ -47,7 +47,7 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 | Source | [DC], verified |
 
 ### Monster Stat Table
-**Confidence: HIGH (stride, bytes 0–6); LOW (bytes 7–8 — not yet verified)**
+**Confidence: HIGH (stride, bytes 0–8)**
 
 | Field | Value |
 |---|---|
@@ -93,13 +93,14 @@ CPU address when switched: `file_offset_within_bank + 0x4000`.
 | 22+ | Explicit HP values for bosses and strong monsters (250, 600, 1000, 1500, 1500, 1750, 2000, 2500, 2000, 5000, 5000 for boss indices 189–199) |
 
 ### Monster Type Table
-**Confidence: MEDIUM** — address from [RANDO]; byte read confirms plausible values (0x00 and 0x11 pattern matches insect/fish family groupings).
+**Confidence: HIGH (values); MEDIUM (combat meaning)** — values byte-verified. 5 distinct values: 0 (standard, 100 monsters), 1 (aquatic: fish/shellfish/mollusk, 18), 2 (humanoid: goblinoids/humans, 22), 4 (reptilian: snakes/lizards/dragons, 30), 8 (undead/dark: skeletons/demons/spirits, 30). Values are powers of 2, matching the element bitmask values used in the item stat table (fire=1, ice=2, elec=4, poison=8). Likely indicates elemental affinity or weakness. Extracted to `data/monsters.json` as `monster_type` field.
 
 | Field | Value |
 |---|---|
 | File offset | `0x1B1F0` |
-| Format | 2 types packed per byte (lo nibble = even index, hi nibble = odd index) |
-| Source | [RANDO] |
+| Entry count | 200 (2 per byte: lo nibble = even index, hi nibble = odd index) |
+| Values | 0=standard, 1=aquatic, 2=humanoid, 4=reptilian, 8=undead |
+| Source | [RANDO], byte-verified |
 
 ### Gold Reward Table
 **Confidence: HIGH** — address, stride, and BCD encoding verified against FFLRandomizer source (`ReadGoldTableValue`).

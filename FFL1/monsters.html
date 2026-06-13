@@ -61,6 +61,7 @@
   <a href="humans.html">HUMANS</a>
   <a href="items.html">ITEMS</a>
   <a href="shops.html">SHOPS</a>
+  <a href="encounters.html">ENCOUNTERS</a>
   <a href="game.html">▶ PLAY</a>
 </nav>
 
@@ -103,6 +104,14 @@
         <option value="2">Tier 2</option>
         <option value="1">Tier 1 — latest</option>
       </select>
+      <select id="type-filter">
+        <option value="">All types</option>
+        <option value="0">Type 0 — Standard</option>
+        <option value="1">Type 1 — Aquatic</option>
+        <option value="2">Type 2 — Humanoid</option>
+        <option value="4">Type 4 — Reptilian</option>
+        <option value="8">Type 8 — Undead</option>
+      </select>
     </div>
 
     <div class="table-wrap">
@@ -118,7 +127,7 @@
             <th>MANA</th>
             <th>GOLD</th>
             <th>ABILITIES</th>
-            <th>FAMILY</th>
+            <th>FAMILY / TYPE</th>
           </tr>
         </thead>
         <tbody id="monster-tbody"></tbody>
@@ -169,6 +178,7 @@ async function init() {
     tr.dataset.name = m.name.toLowerCase();
     tr.dataset.family = m.family;
     tr.dataset.tier = String(m.encounter_tier ?? '');
+    tr.dataset.mtype = String(m.monster_type ?? '');
 
     const fmt = v => v > 99
       ? `<span style="color:var(--gold)">${v}*</span>`
@@ -190,7 +200,7 @@ async function init() {
         const isPassive = ab.type === 'armor';
         return `<span style="color:${isPassive ? 'var(--dim2)' : 'var(--cyan)'}">${ab.name}</span>`;
       }).join('<span style="color:var(--dim2)"> · </span>')}</td>
-      <td><span class="tag tag-cyan" style="font-size:0.58rem">${m.family}</span></td>`;
+      <td style="white-space:nowrap"><span class="tag tag-cyan" style="font-size:0.58rem">${m.family}</span>${m.monster_type ? ` <span style="font-size:0.55rem;color:${['','var(--cyan)','var(--green)','','var(--gold)','','','','var(--purple,#cc88ff)'][m.monster_type]}">${['','AQU','HUM','','REP','','','','UND'][m.monster_type]}</span>` : ''}</td>`;
     tbody.appendChild(tr);
     rows.push(tr);
   });
@@ -199,16 +209,19 @@ async function init() {
     const q = document.getElementById('search').value.toLowerCase();
     const fam = document.getElementById('family-filter').value;
     const tier = document.getElementById('tier-filter').value;
+    const mtype = document.getElementById('type-filter').value;
     rows.forEach(r => {
       const matchName = !q || r.dataset.name.includes(q);
       const matchFam = !fam || r.dataset.family === fam;
       const matchTier = !tier || r.dataset.tier === tier;
-      r.classList.toggle('hidden', !(matchName && matchFam && matchTier));
+      const matchType = !mtype || r.dataset.mtype === mtype;
+      r.classList.toggle('hidden', !(matchName && matchFam && matchTier && matchType));
     });
   }
   document.getElementById('search').addEventListener('input', applyFilters);
   document.getElementById('family-filter').addEventListener('change', applyFilters);
   document.getElementById('tier-filter').addEventListener('change', applyFilters);
+  document.getElementById('type-filter').addEventListener('change', applyFilters);
 
   // Monster class grid
   const classGrid = document.getElementById('class-grid');
