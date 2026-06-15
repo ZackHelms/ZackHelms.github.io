@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>LowRes Game — v0.1 DEBUG</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #0a0a0a;
+      overflow: hidden;
+      font-family: monospace;
+      touch-action: none;
+    }
+
+    /* ── Layout shells ── */
+    #app {
+      display: flex;
+      width: 100%; height: 100%;
+    }
+
+    /* Portrait: column layout — screen on top, controls below */
+    @media (orientation: portrait) {
+      #app { flex-direction: column; align-items: center; }
+      #screen-wrap { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; width: 100%; }
+      #controls { flex: 0 0 160px; width: 100%; }
+      #controls-portrait { display: flex; }
+      #controls-landscape { display: none; }
+    }
+
+    /* Landscape: screen centered, side panels fixed over it */
+    @media (orientation: landscape) {
+      #app { flex-direction: row; align-items: center; justify-content: center; }
+      #screen-wrap { display: flex; align-items: center; justify-content: center; height: 100%; width: 100%; }
+      #controls { display: none; }
+      #controls-portrait { display: none; }
+      #controls-landscape { display: flex; }
+    }
+
+    /* ── Canvas ── */
+    #game-canvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      display: block;
+    }
+
+    /* ── Controls shared ── */
+    .ctrl-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      width: 100%;
+    }
+
+    /* D-pad */
+    .dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 40px);
+      grid-template-rows: repeat(3, 40px);
+      gap: 2px;
+    }
+    .dpad-btn {
+      background: #333;
+      border: 1px solid #555;
+      border-radius: 4px;
+      color: #eee;
+      font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .dpad-btn:active { background: #555; }
+    .dpad-center { background: #222; border-color: #222; }
+
+    /* Action buttons */
+    .action-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .meta-group {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-round {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      border: 1px solid #555;
+      background: #333;
+      color: #eee;
+      font-size: 11px;
+      font-weight: bold;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .btn-round:active { background: #555; }
+    .btn-a { background: #5a1a1a; border-color: #c03030; }
+    .btn-b { background: #1a3a1a; border-color: #30a030; }
+    .btn-meta {
+      width: 44px; height: 22px;
+      border-radius: 11px;
+      font-size: 9px;
+    }
+
+    /* ── Landscape side panels ── */
+    #controls-landscape {
+      height: 100%;
+      flex-direction: row;
+      align-items: stretch;
+      width: 100%;
+      position: fixed;
+      top: 0; left: 0;
+      pointer-events: none;
+      justify-content: space-between;
+    }
+    #controls-landscape > * { pointer-events: auto; }
+
+    .side-left {
+      width: 120px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .side-right {
+      width: 120px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: space-between;
+      padding: 20px 0;
+    }
+    .side-spacer { flex: 1; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Portrait controls (below screen) ── -->
+  <div id="screen-wrap">
+    <canvas id="game-canvas"></canvas>
+  </div>
+
+  <div id="controls">
+    <div class="ctrl-wrap" id="controls-portrait">
+
+      <!-- D-pad -->
+      <div class="dpad">
+        <div></div>
+        <div class="dpad-btn" id="btn-up">▲</div>
+        <div></div>
+        <div class="dpad-btn" id="btn-left-p">◀</div>
+        <div class="dpad-center"></div>
+        <div class="dpad-btn" id="btn-right-p">▶</div>
+        <div></div>
+        <div class="dpad-btn" id="btn-down-p">▼</div>
+        <div></div>
+      </div>
+
+      <!-- Select + Start -->
+      <div class="action-group">
+        <div class="meta-group">
+          <div class="btn-round btn-meta" id="btn-select">SEL</div>
+          <div class="btn-round btn-meta" id="btn-start">STA</div>
+        </div>
+      </div>
+
+      <!-- B + A -->
+      <div class="action-group">
+        <div class="btn-round btn-b" id="btn-b">B</div>
+        <div class="btn-round btn-a" id="btn-a">A</div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Landscape controls (overlaid on sides) ── -->
+<div id="controls-landscape">
+  <div class="side-left">
+    <div class="dpad">
+      <div></div>
+      <div class="dpad-btn" id="btn-up-l">▲</div>
+      <div></div>
+      <div class="dpad-btn" id="btn-left">◀</div>
+      <div class="dpad-center"></div>
+      <div class="dpad-btn" id="btn-right">▶</div>
+      <div></div>
+      <div class="dpad-btn" id="btn-down">▼</div>
+      <div></div>
+    </div>
+  </div>
+
+  <div class="side-spacer"></div>
+
+  <div class="side-right">
+    <div class="meta-group">
+      <div class="btn-round btn-meta" id="btn-select-l">SEL</div>
+      <div class="btn-round btn-meta" id="btn-start-l">STA</div>
+    </div>
+    <div class="action-group">
+      <div class="btn-round btn-b" id="btn-b-l">B</div>
+      <div class="btn-round btn-a" id="btn-a-l">A</div>
+    </div>
+  </div>
+</div>
+
+<script src="engine.js"></script>
+<script src="game.js"></script>
+<script>
+  // Wire landscape d-pad buttons to the same input directions
+  // (portrait buttons are wired in game.js via btn-up/btn-left etc. —
+  //  landscape buttons need separate binding after game is created)
+  // We patch after DOMContentLoaded; game.js fires first.
+  window.addEventListener('DOMContentLoaded', () => {
+    // Wait one microtask for game.js boot to complete
+    setTimeout(() => {
+      if (!window._game) return;
+      const g = window._game;
+      const extra = [
+        ['btn-up-l',    'up'],
+        ['btn-down',    'down'],
+        ['btn-left',    'left'],
+        ['btn-right',   'right'],
+        ['btn-left-p',  'left'],
+        ['btn-right-p', 'right'],
+        ['btn-down-p',  'down'],
+      ];
+      extra.forEach(([id, dir]) => {
+        const el = document.getElementById(id);
+        if (el) g.input.bindButton(el, dir);
+      });
+    }, 0);
+  });
+</script>
+</body>
+</html>
