@@ -193,41 +193,36 @@ window.addEventListener('DOMContentLoaded', async () => {
   const game = new Game(canvas, settings);
   window._game = game;
 
-  // Portrait d-pad
-  const dpadP = document.getElementById('dpad-portrait');
-  if (dpadP) game.input.bindDpad(dpadP, {
-    'btn-up':      'up',
-    'btn-down-p':  'down',
-    'btn-left-p':  'left',
-    'btn-right-p': 'right',
-  });
-
-  // Landscape d-pad
-  const dpadL = document.getElementById('dpad-landscape');
-  if (dpadL) game.input.bindDpad(dpadL, {
-    'btn-up-l':  'up',
-    'btn-down':  'down',
-    'btn-left':  'left',
-    'btn-right': 'right',
-  });
-
-  // Inert buttons (Select/Start/A/B) — visual feedback only in v0.1
-  ['btn-select', 'btn-start', 'btn-b', 'btn-a',
-   'btn-select-l', 'btn-start-l', 'btn-b-l', 'btn-a-l'].forEach(id => {
+  // D-pad buttons (both portrait and landscape share the same actions)
+  const dpadBtns = {
+    'btn-up': 'up', 'btn-down-p': 'down', 'btn-left-p': 'left', 'btn-right-p': 'right',
+    'btn-up-l': 'up', 'btn-down': 'down', 'btn-left': 'left', 'btn-right': 'right',
+  };
+  for (const [id, action] of Object.entries(dpadBtns)) {
     const el = document.getElementById(id);
-    if (el) game.input.bindVisual(el);
-  });
+    if (el) game.input.register(el, action);
+  }
 
-  // Reset: restart game state (like a power cycle)
+  // Action buttons — visual state only in v0.1
+  const actionBtns = {
+    'btn-a': 'a', 'btn-a-l': 'a',
+    'btn-b': 'b', 'btn-b-l': 'b',
+    'btn-select': 'select', 'btn-select-l': 'select',
+    'btn-start': 'start', 'btn-start-l': 'start',
+  };
+  for (const [id, action] of Object.entries(actionBtns)) {
+    const el = document.getElementById(id);
+    if (el) game.input.register(el, action);
+  }
+
+  // Utility buttons — fire on first contact (tap or slide-to)
   ['btn-reset', 'btn-reset-l'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('pointerdown', () => game.reset());
+    if (el) game.input.register(el, null, { onEnter: () => game.reset() });
   });
-
-  // Reload: hard-reload the page to bust asset cache; localStorage is preserved
   ['btn-reload', 'btn-reload-l'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('pointerdown', () => location.reload(true));
+    if (el) game.input.register(el, null, { onEnter: () => location.reload(true) });
   });
 
   game.start();

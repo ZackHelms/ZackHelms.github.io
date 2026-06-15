@@ -4,7 +4,7 @@ const GAME_W = 160;
 const GAME_H = 144;
 const TILE = 16;
 
-// ── Renderer ────────────────────────────────────────────────────────────────
+// ── Renderer ─────────────────────────────────────────────────────────────────
 
 class Renderer {
   constructor(canvas) {
@@ -54,30 +54,122 @@ class Renderer {
   }
 }
 
-// ── Input ────────────────────────────────────────────────────────────────────
+// ── Input ─────────────────────────────────────────────────────────────────────
 //
-// Visual state is managed here via the .btn-active CSS class.
-// Keyboard and touch are tracked separately so releasing one doesn't
-// clear the other.
+// Unified pointer tracking: any active pointer that slides over a registered
+// button activates it; sliding away deactivates it. Works from anywhere on
+// screen — no need to start the touch on the button itself. Multiple simultaneous
+// pointers are fully supported so all buttons can be held at once. D-pad opposing
+// directions (left/right, up/down) cancel each other in `held`.
 
 class Input {
   constructor() {
-    this._kb    = { left: false, right: false, up: false, down: false };
-    this._touch = { left: false, right: false, up: false, down: false };
-    // Elements to visually activate per direction (populated by bindDpad)
-    this._dirEls = { left: [], right: [], up: [], down: [] };
+    this._kb          = {};        // direction -> bool (keyboard state)
+    this._touchCounts = {};        // action -> int (pointers currently holding it)
+    this._elemCounts  = {};        // elementId -> int (pointers currently on it)
+    this._btnRegistry = {};        // elementId -> { el, action, onEnter, onLeave }
+    this._pointers    = new Map(); // pointerId -> current elementId (or null)
     this._bindKeys();
+    this._bindGlobalTouch();
   }
 
-  // Read-only composite: direction is active if keyboard OR touch holds it.
+  // Register a button element. action is a logical name ('left', 'a', …) or null
+  // for utility buttons. onEnter fires when a pointer first lands on the button.
+  register(el, action = null, { onEnter, onLeave } = {}) {
+    this._btnRegistry[el.id] = { el, action, onEnter, onLeave };
+    if (action !== null && !(action in this._touchCounts)) this._touchCounts[action] = 0;
+    this._elemCounts[el.id] = 0;
+  }
+
+  // Composite held state: keyboard OR touch. D-pad opposing directions cancel.
   get held() {
-    const kb = this._kb, t = this._touch;
+    const t  = this._touchCounts;
+    const kb = this._kb;
     return {
-      left:  kb.left  || t.left,
-      right: kb.right || t.right,
-      up:    kb.up    || t.up,
-      down:  kb.down  || t.down,
+      left:   (kb.left  || false) || ((t.left  > 0) && !(t.right > 0)),
+      right:  (kb.right || false) || ((t.right > 0) && !(t.left  > 0)),
+      up:     (kb.up    || false) || ((t.up    > 0) && !(t.down  > 0)),
+      down:   (kb.down  || false) || ((t.down  > 0) && !(t.up    > 0)),
+      a:      (t.a      || 0) > 0,
+      b:      (t.b      || 0) > 0,
+      select: (t.select || 0) > 0,
+      start:  (t.start  || 0) > 0,
     };
+  }
+
+  clearAll() {
+    this._kb = {};
+    for (const action of Object.keys(this._touchCounts)) this._touchCounts[action] = 0;
+    for (const id     of Object.keys(this._elemCounts))  this._elemCounts[id]      = 0;
+    this._pointers.clear();
+    for (const id of Object.keys(this._btnRegistry)) this._refreshEl(id);
+  }
+
+  _refreshEl(id) {
+    const reg = this._btnRegistry[id];
+    if (!reg) return;
+    const touchOn = (this._elemCounts[id] || 0) > 0;
+    const kbOn    = reg.action ? (this._kb[reg.action] || false) : false;
+    reg.el.classList.toggle('btn-active', touchOn || kbOn);
+  }
+
+  _refreshAction(action) {
+    for (const id of Object.keys(this._btnRegistry)) {
+      if (this._btnRegistry[id].action === action) this._refreshEl(id);
+    }
+  }
+
+  _idAt(cx, cy) {
+    const el = document.elementFromPoint(cx, cy);
+    return (el?.id && el.id in this._btnRegistry) ? el.id : null;
+  }
+
+  _activate(pointerId, newId) {
+    const oldId = this._pointers.get(pointerId) ?? null;
+    if (oldId === newId) return;
+
+    if (oldId !== null) {
+      const reg = this._btnRegistry[oldId];
+      if (reg) {
+        reg.onLeave?.();
+        if (reg.action !== null) this._touchCounts[reg.action]--;
+        this._elemCounts[oldId]--;
+        this._refreshEl(oldId);
+      }
+    }
+
+    this._pointers.set(pointerId, newId);
+
+    if (newId !== null) {
+      const reg = this._btnRegistry[newId];
+      if (reg) {
+        reg.onEnter?.();
+        if (reg.action !== null) this._touchCounts[reg.action]++;
+        this._elemCounts[newId]++;
+        this._refreshEl(newId);
+      }
+    }
+  }
+
+  _bindGlobalTouch() {
+    document.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._pointers.set(e.pointerId, null);
+      this._activate(e.pointerId, this._idAt(e.clientX, e.clientY));
+    });
+
+    document.addEventListener('pointermove', (e) => {
+      if (!this._pointers.has(e.pointerId)) return;
+      this._activate(e.pointerId, this._idAt(e.clientX, e.clientY));
+    });
+
+    const release = (e) => {
+      if (!this._pointers.has(e.pointerId)) return;
+      this._activate(e.pointerId, null);
+      this._pointers.delete(e.pointerId);
+    };
+    document.addEventListener('pointerup',     release);
+    document.addEventListener('pointercancel', release);
   }
 
   _bindKeys() {
@@ -89,92 +181,17 @@ class Input {
     window.addEventListener('keydown', e => {
       if (!map[e.key]) return;
       e.preventDefault();
-      if (this._kb[map[e.key]]) return; // already held
-      this._kb[map[e.key]] = true;
-      this._refreshDirVisual(map[e.key]);
+      const dir = map[e.key];
+      if (this._kb[dir]) return;
+      this._kb[dir] = true;
+      this._refreshAction(dir);
     });
     window.addEventListener('keyup', e => {
       if (!map[e.key]) return;
-      this._kb[map[e.key]] = false;
-      this._refreshDirVisual(map[e.key]);
+      const dir = map[e.key];
+      this._kb[dir] = false;
+      this._refreshAction(dir);
     });
-  }
-
-  // Update visual state of all registered elements for a direction.
-  _refreshDirVisual(dir) {
-    const active = this._kb[dir] || this._touch[dir];
-    for (const el of this._dirEls[dir]) {
-      el.classList.toggle('btn-active', active);
-    }
-  }
-
-  clearAll() {
-    this._kb    = { left: false, right: false, up: false, down: false };
-    this._touch = { left: false, right: false, up: false, down: false };
-  }
-
-  // Bind an element that has no game-state effect (Select/Start/A/B in v0.1).
-  // Shows .btn-active + red outline on press via touch.
-  bindVisual(el) {
-    el.addEventListener('pointerdown',  () => el.classList.add('btn-active'));
-    el.addEventListener('pointerup',    () => el.classList.remove('btn-active'));
-    el.addEventListener('pointerleave', () => el.classList.remove('btn-active'));
-    el.addEventListener('pointercancel',() => el.classList.remove('btn-active'));
-  }
-
-  // Bind a d-pad container. dirMap: { elementId -> direction }
-  // Multiple simultaneous pointers are tracked so diagonal presses work.
-  bindDpad(containerEl, dirMap) {
-    for (const [id, dir] of Object.entries(dirMap)) {
-      const el = document.getElementById(id);
-      if (el && !this._dirEls[dir].includes(el)) this._dirEls[dir].push(el);
-    }
-
-    const dirForId = dirMap;
-
-    // pointerId → active direction (or null when finger is off all buttons)
-    const pointers = new Map();
-
-    const syncTouch = () => {
-      const activeDirs = new Set(pointers.values());
-      activeDirs.delete(null);
-      for (const dir of ['left', 'right', 'up', 'down']) {
-        const nowActive = activeDirs.has(dir);
-        if (this._touch[dir] !== nowActive) {
-          this._touch[dir] = nowActive;
-          this._refreshDirVisual(dir);
-        }
-      }
-    };
-
-    const getDirAt = (cx, cy) => {
-      const target = document.elementFromPoint(cx, cy);
-      return (target && target.id in dirForId) ? dirForId[target.id] : null;
-    };
-
-    containerEl.addEventListener('pointerdown', (e) => {
-      containerEl.setPointerCapture(e.pointerId);
-      pointers.set(e.pointerId, getDirAt(e.clientX, e.clientY));
-      syncTouch();
-    });
-
-    containerEl.addEventListener('pointermove', (e) => {
-      if (!pointers.has(e.pointerId)) return;
-      const newDir = getDirAt(e.clientX, e.clientY);
-      if (pointers.get(e.pointerId) !== newDir) {
-        pointers.set(e.pointerId, newDir);
-        syncTouch();
-      }
-    });
-
-    const release = (e) => {
-      if (!pointers.has(e.pointerId)) return;
-      pointers.delete(e.pointerId);
-      syncTouch();
-    };
-
-    containerEl.addEventListener('pointerup',     release);
-    containerEl.addEventListener('pointercancel', release);
   }
 }
 
