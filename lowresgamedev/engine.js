@@ -108,6 +108,11 @@ class Input {
     }
   }
 
+  clearAll() {
+    this._kb    = { left: false, right: false, up: false, down: false };
+    this._touch = { left: false, right: false, up: false, down: false };
+  }
+
   // Bind an element that has no game-state effect (Select/Start/A/B in v0.1).
   // Shows .btn-active + red outline on press via touch.
   bindVisual(el) {
@@ -118,64 +123,54 @@ class Input {
   }
 
   // Bind a d-pad container. dirMap: { elementId -> direction }
-  // One pointer is tracked; the active button follows the finger as it moves.
+  // Multiple simultaneous pointers are tracked so diagonal presses work.
   bindDpad(containerEl, dirMap) {
-    // Register each button element for keyboard visual feedback
     for (const [id, dir] of Object.entries(dirMap)) {
       const el = document.getElementById(id);
       if (el && !this._dirEls[dir].includes(el)) this._dirEls[dir].push(el);
     }
 
-    // id→dir and dir→id lookups for this specific dpad
     const dirForId = dirMap;
-    const idForDir = {};
-    for (const [id, dir] of Object.entries(dirMap)) idForDir[dir] = id;
 
-    let capturedPointerId = null;
-    let activeDir = null; // direction currently pressed by touch on this dpad
+    // pointerId → active direction (or null when finger is off all buttons)
+    const pointers = new Map();
 
-    const setTouchDir = (newDir) => {
-      if (newDir === activeDir) return;
-
-      // Clear previous
-      if (activeDir) {
-        this._touch[activeDir] = false;
-        // Visual: only show red if keyboard still holds it
-        const prevEl = document.getElementById(idForDir[activeDir]);
-        if (prevEl) prevEl.classList.toggle('btn-active', this._kb[activeDir]);
-      }
-
-      activeDir = newDir;
-
-      // Activate new
-      if (newDir) {
-        this._touch[newDir] = true;
-        const nextEl = document.getElementById(idForDir[newDir]);
-        if (nextEl) nextEl.classList.add('btn-active');
+    const syncTouch = () => {
+      const activeDirs = new Set(pointers.values());
+      activeDirs.delete(null);
+      for (const dir of ['left', 'right', 'up', 'down']) {
+        const nowActive = activeDirs.has(dir);
+        if (this._touch[dir] !== nowActive) {
+          this._touch[dir] = nowActive;
+          this._refreshDirVisual(dir);
+        }
       }
     };
 
-    const update = (e) => {
-      const target = document.elementFromPoint(e.clientX, e.clientY);
-      setTouchDir((target && target.id in dirForId) ? dirForId[target.id] : null);
+    const getDirAt = (cx, cy) => {
+      const target = document.elementFromPoint(cx, cy);
+      return (target && target.id in dirForId) ? dirForId[target.id] : null;
     };
 
     containerEl.addEventListener('pointerdown', (e) => {
-      if (capturedPointerId !== null) return;
-      capturedPointerId = e.pointerId;
       containerEl.setPointerCapture(e.pointerId);
-      update(e);
+      pointers.set(e.pointerId, getDirAt(e.clientX, e.clientY));
+      syncTouch();
     });
 
     containerEl.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== capturedPointerId) return;
-      update(e);
+      if (!pointers.has(e.pointerId)) return;
+      const newDir = getDirAt(e.clientX, e.clientY);
+      if (pointers.get(e.pointerId) !== newDir) {
+        pointers.set(e.pointerId, newDir);
+        syncTouch();
+      }
     });
 
     const release = (e) => {
-      if (e.pointerId !== capturedPointerId) return;
-      capturedPointerId = null;
-      setTouchDir(null);
+      if (!pointers.has(e.pointerId)) return;
+      pointers.delete(e.pointerId);
+      syncTouch();
     };
 
     containerEl.addEventListener('pointerup',     release);

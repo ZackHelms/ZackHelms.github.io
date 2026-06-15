@@ -33,7 +33,7 @@ function drawDebugTileAt(ctx, sx, sy, sz, col, row) {
 // ── Game ──────────────────────────────────────────────────────────────────────
 
 class Game {
-  constructor(canvas) {
+  constructor(canvas, settings = {}) {
     this.renderer = new Renderer(canvas);
     this.input = new Input();
 
@@ -53,7 +53,8 @@ class Game {
     // Animation
     this.animFrame = 0;
     this.animTimer = 0;
-    this.ANIM_INTERVAL = 1.0;
+    const fps = settings.walk_animation_framerate ?? 1;
+    this.ANIM_INTERVAL = 1 / fps;
     this.sprites = [null, null];
     this._loadSprites();
 
@@ -69,6 +70,19 @@ class Game {
   }
 
   start() { this.loop.start(); }
+
+  reset() {
+    this.tileX = Math.floor(MAP_COLS / 2);
+    this.tileY = Math.floor(MAP_ROWS / 2);
+    this.charX = this.tileX * TILE;
+    this.charY = this.tileY * TILE;
+    this.targetTileX = this.tileX;
+    this.targetTileY = this.tileY;
+    this.moving = false;
+    this.animFrame = 0;
+    this.animTimer = 0;
+    this.input.clearAll();
+  }
 
   // If not already moving and a direction is held, commit to one tile of movement.
   // Called when movement completes (to chain the next tile) and each tick when idle.
@@ -168,9 +182,15 @@ class Game {
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+  let settings = {};
+  try {
+    const res = await fetch('settings.json');
+    if (res.ok) settings = await res.json();
+  } catch (_) {}
+
   const canvas = document.getElementById('game-canvas');
-  const game = new Game(canvas);
+  const game = new Game(canvas, settings);
   window._game = game;
 
   // Portrait d-pad
@@ -196,6 +216,18 @@ window.addEventListener('DOMContentLoaded', () => {
    'btn-select-l', 'btn-start-l', 'btn-b-l', 'btn-a-l'].forEach(id => {
     const el = document.getElementById(id);
     if (el) game.input.bindVisual(el);
+  });
+
+  // Reset: restart game state (like a power cycle)
+  ['btn-reset', 'btn-reset-l'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('pointerdown', () => game.reset());
+  });
+
+  // Reload: hard-reload the page to bust asset cache; localStorage is preserved
+  ['btn-reload', 'btn-reload-l'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('pointerdown', () => location.reload(true));
   });
 
   game.start();

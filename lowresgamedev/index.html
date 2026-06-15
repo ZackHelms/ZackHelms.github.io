@@ -100,11 +100,38 @@
       -webkit-user-select: none;
     }
     .btn-a { background: #5a1a1a; border-color: #c03030; }
-    .btn-b { background: #1a3a1a; border-color: #30a030; }
+    .btn-b { background: #1a3a1a; border-color: #30a030; margin-top: 20px; }
     .btn-meta {
       width: 44px; height: 22px;
       border-radius: 11px;
       font-size: 9px;
+    }
+
+    /* B + A side-by-side: B on left shifted down so its top = A's center */
+    .btn-ab-group {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    /* Utility buttons (RST / RLD) below Select+Start */
+    .util-group {
+      display: flex;
+      gap: 6px;
+    }
+    .btn-util {
+      width: 44px; height: 20px;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #1a1a1a;
+      color: #666;
+      font-size: 8px;
+      font-weight: bold;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
     }
 
     /* ── Active state (replaces CSS :active — managed by JS) ── */
@@ -129,7 +156,8 @@
 
     .side-left {
       width: 120px;
-      display: flex; align-items: center; justify-content: center;
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 16px;
     }
     .side-right {
       width: 120px;
@@ -164,16 +192,20 @@
         <div></div>
       </div>
 
-      <!-- Select + Start -->
+      <!-- Select + Start + RST/RLD -->
       <div class="action-group">
         <div class="meta-group">
           <div class="btn-round btn-meta" id="btn-select">SEL</div>
           <div class="btn-round btn-meta" id="btn-start">STA</div>
         </div>
+        <div class="util-group">
+          <div class="btn-util" id="btn-reset">RST</div>
+          <div class="btn-util" id="btn-reload">RLD</div>
+        </div>
       </div>
 
       <!-- B + A -->
-      <div class="action-group">
+      <div class="btn-ab-group">
         <div class="btn-round btn-b" id="btn-b">B</div>
         <div class="btn-round btn-a" id="btn-a">A</div>
       </div>
@@ -202,11 +234,17 @@
   <div class="side-spacer"></div>
 
   <div class="side-right">
-    <div class="meta-group">
-      <div class="btn-round btn-meta" id="btn-select-l">SEL</div>
-      <div class="btn-round btn-meta" id="btn-start-l">STA</div>
-    </div>
     <div class="action-group">
+      <div class="meta-group">
+        <div class="btn-round btn-meta" id="btn-select-l">SEL</div>
+        <div class="btn-round btn-meta" id="btn-start-l">STA</div>
+      </div>
+      <div class="util-group">
+        <div class="btn-util" id="btn-reset-l">RST</div>
+        <div class="btn-util" id="btn-reload-l">RLD</div>
+      </div>
+    </div>
+    <div class="btn-ab-group">
       <div class="btn-round btn-b" id="btn-b-l">B</div>
       <div class="btn-round btn-a" id="btn-a-l">A</div>
     </div>
