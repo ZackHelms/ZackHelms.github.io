@@ -143,10 +143,12 @@ window.addEventListener('DOMContentLoaded', () => {
   const game = new Game(canvas);
   window._game = game;
 
-  // Wire up d-pad buttons (portrait primary IDs)
-  ['up', 'down', 'left', 'right'].forEach(dir => {
-    const btn = document.getElementById(`btn-${dir}`);
-    if (btn) game.input.bindButton(btn, dir);
+  const dpad = document.getElementById('dpad-portrait');
+  if (dpad) game.input.bindDpad(dpad, {
+    'btn-up':      'up',
+    'btn-down-p':  'down',
+    'btn-left-p':  'left',
+    'btn-right-p': 'right',
   });
 
   game.start();

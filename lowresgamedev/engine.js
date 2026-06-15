@@ -96,6 +96,41 @@ class Input {
     el.addEventListener('pointerleave', stop);
     el.addEventListener('pointercancel', stop);
   }
+
+  // D-pad: tracks one pointer; direction follows the finger as it moves across buttons.
+  bindDpad(containerEl, dirMap) {
+    let capturedId = null;
+    const dirs = new Set(Object.values(dirMap));
+
+    const clearDirs = () => dirs.forEach(d => { this.held[d] = false; });
+
+    const update = (e) => {
+      clearDirs();
+      const target = document.elementFromPoint(e.clientX, e.clientY);
+      if (target && target.id in dirMap) this.held[dirMap[target.id]] = true;
+    };
+
+    containerEl.addEventListener('pointerdown', (e) => {
+      if (capturedId !== null) return;
+      capturedId = e.pointerId;
+      containerEl.setPointerCapture(e.pointerId);
+      update(e);
+    });
+
+    containerEl.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== capturedId) return;
+      update(e);
+    });
+
+    const release = (e) => {
+      if (e.pointerId !== capturedId) return;
+      capturedId = null;
+      clearDirs();
+    };
+
+    containerEl.addEventListener('pointerup', release);
+    containerEl.addEventListener('pointercancel', release);
+  }
 }
 
 // ── Animation loop ───────────────────────────────────────────────────────────
