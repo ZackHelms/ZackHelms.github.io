@@ -73,7 +73,6 @@
       user-select: none;
       -webkit-user-select: none;
     }
-    .dpad-btn:active { background: #555; }
     .dpad-center { background: #222; border-color: #222; }
 
     /* Action buttons */
@@ -100,13 +99,19 @@
       user-select: none;
       -webkit-user-select: none;
     }
-    .btn-round:active { background: #555; }
     .btn-a { background: #5a1a1a; border-color: #c03030; }
     .btn-b { background: #1a3a1a; border-color: #30a030; }
     .btn-meta {
       width: 44px; height: 22px;
       border-radius: 11px;
       font-size: 9px;
+    }
+
+    /* ── Active state (replaces CSS :active — managed by JS) ── */
+    .btn-active {
+      background: #555 !important;
+      outline: 2px solid red;
+      outline-offset: 2px;
     }
 
     /* ── Landscape side panels ── */
@@ -210,23 +215,5 @@
 
 <script src="engine.js"></script>
 <script src="game.js"></script>
-<script>
-  // Wire landscape d-pad buttons to the same input directions
-  // (portrait buttons are wired in game.js via btn-up/btn-left etc. —
-  //  landscape buttons need separate binding after game is created)
-  // We patch after DOMContentLoaded; game.js fires first.
-  window.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-      if (!window._game) return;
-      const dpadL = document.getElementById('dpad-landscape');
-      if (dpadL) window._game.input.bindDpad(dpadL, {
-        'btn-up-l':  'up',
-        'btn-down':  'down',
-        'btn-left':  'left',
-        'btn-right': 'right',
-      });
-    }, 0);
-  });
-</script>
 </body>
 </html>

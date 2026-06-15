@@ -4,26 +4,14 @@ const MAP_COLS = 36;
 const MAP_ROWS = 36;
 const COORDS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'; // base-36
 
-const MOVE_SPEED = 80; // pixels per second
+const MOVE_SPEED = 80; // pixels per second (1 tile = 0.2 s at this speed)
 
 // ── Debug tile renderer ───────────────────────────────────────────────────────
 
-function makeDebugTileCache() {
-  const cache = {};
-  return function drawDebugTile(ctx, sx, sy, sz) {
-    const key = `${sx},${sy},${sz}`;
-    // We receive draw coords, but we need tile coords — pass them externally
-    // This version receives (ctx, sx, sy, sz, col, row) — see call site
-    throw new Error('use drawDebugTileAt');
-  };
-}
-
 function drawDebugTileAt(ctx, sx, sy, sz, col, row) {
-  // Background: dark slate
   ctx.fillStyle = '#1a1a2e';
   ctx.fillRect(sx, sy, sz, sz);
 
-  // Subtle grid line
   ctx.strokeStyle = '#2a2a4e';
   ctx.lineWidth = 1;
   ctx.strokeRect(sx + 0.5, sy + 0.5, sz - 1, sz - 1);
@@ -36,11 +24,8 @@ function drawDebugTileAt(ctx, sx, sy, sz, col, row) {
   const cx = sx + sz / 2;
   const cy = sy + sz / 2;
 
-  // Column label — dark gray, left half
   ctx.fillStyle = '#888';
   ctx.fillText(COORDS[col], cx - sz * 0.18, cy);
-
-  // Row label — lighter gray, right half
   ctx.fillStyle = '#ccc';
   ctx.fillText(COORDS[row], cx + sz * 0.18, cy);
 }
@@ -52,16 +37,24 @@ class Game {
     this.renderer = new Renderer(canvas);
     this.input = new Input();
 
-    // Character pixel position (top-left of sprite)
-    // Start near center of map
-    this.charX = (MAP_COLS / 2) * TILE;
-    this.charY = (MAP_ROWS / 2) * TILE;
+    // Integer tile position — where the character currently stands
+    this.tileX = Math.floor(MAP_COLS / 2);
+    this.tileY = Math.floor(MAP_ROWS / 2);
+
+    // Pixel position used for rendering (interpolates toward target)
+    this.charX = this.tileX * TILE;
+    this.charY = this.tileY * TILE;
+
+    // Tile-locked movement: target is always exactly one tile away
+    this.targetTileX = this.tileX;
+    this.targetTileY = this.tileY;
+    this.moving = false;
 
     // Animation
     this.animFrame = 0;
     this.animTimer = 0;
-    this.ANIM_INTERVAL = 1.0; // seconds per frame
-    this.sprites = [null, null]; // loaded below
+    this.ANIM_INTERVAL = 1.0;
+    this.sprites = [null, null];
     this._loadSprites();
 
     this.loop = new Loop((dt) => this._tick(dt));
@@ -77,22 +70,62 @@ class Game {
 
   start() { this.loop.start(); }
 
+  // If not already moving and a direction is held, commit to one tile of movement.
+  // Called when movement completes (to chain the next tile) and each tick when idle.
+  _tryStartMove(inp) {
+    let dir = null;
+    if      (inp.right) dir = 'right';
+    else if (inp.left)  dir = 'left';
+    else if (inp.down)  dir = 'down';
+    else if (inp.up)    dir = 'up';
+    if (!dir) return;
+
+    let nx = this.tileX, ny = this.tileY;
+    if (dir === 'right') nx++;
+    else if (dir === 'left')  nx--;
+    else if (dir === 'down')  ny++;
+    else if (dir === 'up')    ny--;
+
+    nx = Math.max(0, Math.min(nx, MAP_COLS - 1));
+    ny = Math.max(0, Math.min(ny, MAP_ROWS - 1));
+
+    if (nx === this.tileX && ny === this.tileY) return; // already at map edge
+
+    this.targetTileX = nx;
+    this.targetTileY = ny;
+    this.moving = true;
+  }
+
   _tick(dt) {
     const inp = this.input.held;
-    const moving = inp.left || inp.right || inp.up || inp.down;
 
-    // Movement
-    if (inp.left)  this.charX -= MOVE_SPEED * dt;
-    if (inp.right) this.charX += MOVE_SPEED * dt;
-    if (inp.up)    this.charY -= MOVE_SPEED * dt;
-    if (inp.down)  this.charY += MOVE_SPEED * dt;
+    if (this.moving) {
+      const tx = this.targetTileX * TILE;
+      const ty = this.targetTileY * TILE;
+      const step = MOVE_SPEED * dt;
+      const dx = tx - this.charX;
+      const dy = ty - this.charY;
+      const dist = Math.abs(dx) + Math.abs(dy); // Manhattan — only one axis moves at a time
 
-    // Clamp to map bounds (keep sprite fully on map)
-    this.charX = Math.max(0, Math.min(this.charX, (MAP_COLS - 1) * TILE));
-    this.charY = Math.max(0, Math.min(this.charY, (MAP_ROWS - 1) * TILE));
+      if (dist <= step) {
+        // Snap to target tile
+        this.charX = tx;
+        this.charY = ty;
+        this.tileX = this.targetTileX;
+        this.tileY = this.targetTileY;
+        this.moving = false;
+        // Immediately chain to next tile if input is still held
+        this._tryStartMove(inp);
+      } else {
+        this.charX += Math.sign(dx) * Math.min(step, Math.abs(dx));
+        this.charY += Math.sign(dy) * Math.min(step, Math.abs(dy));
+      }
+    } else {
+      this._tryStartMove(inp);
+    }
 
-    // Animate only when moving
-    if (moving) {
+    // Animation runs while moving, resets to frame 0 when idle
+    if (this.moving) {
       this.animTimer += dt;
       if (this.animTimer >= this.ANIM_INTERVAL) {
         this.animTimer -= this.ANIM_INTERVAL;
@@ -110,12 +143,10 @@ class Game {
     const r = this.renderer;
     r.clear();
 
-    // Camera: character is centered on screen
-    // camX/camY = pixel offset of top-left of viewport into the map
+    // Camera: character is always centered
     const camX = this.charX + TILE / 2 - GAME_W / 2;
     const camY = this.charY + TILE / 2 - GAME_H / 2;
 
-    // ── Background tiles ──
     const startCol = Math.max(0, Math.floor(camX / TILE) - 1);
     const startRow = Math.max(0, Math.floor(camY / TILE) - 1);
     const endCol   = Math.min(MAP_COLS - 1, Math.ceil((camX + GAME_W) / TILE));
@@ -129,7 +160,6 @@ class Game {
       }
     }
 
-    // ── Sprite (between bg and fg — no fg yet) ──
     if (this.sprites[this.animFrame]?.complete) {
       r.drawSprite(this.sprites[this.animFrame], this.charX, this.charY, camX, camY);
     }
@@ -143,12 +173,29 @@ window.addEventListener('DOMContentLoaded', () => {
   const game = new Game(canvas);
   window._game = game;
 
-  const dpad = document.getElementById('dpad-portrait');
-  if (dpad) game.input.bindDpad(dpad, {
+  // Portrait d-pad
+  const dpadP = document.getElementById('dpad-portrait');
+  if (dpadP) game.input.bindDpad(dpadP, {
     'btn-up':      'up',
     'btn-down-p':  'down',
     'btn-left-p':  'left',
     'btn-right-p': 'right',
+  });
+
+  // Landscape d-pad
+  const dpadL = document.getElementById('dpad-landscape');
+  if (dpadL) game.input.bindDpad(dpadL, {
+    'btn-up-l':  'up',
+    'btn-down':  'down',
+    'btn-left':  'left',
+    'btn-right': 'right',
+  });
+
+  // Inert buttons (Select/Start/A/B) — visual feedback only in v0.1
+  ['btn-select', 'btn-start', 'btn-b', 'btn-a',
+   'btn-select-l', 'btn-start-l', 'btn-b-l', 'btn-a-l'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) game.input.bindVisual(el);
   });
 
   game.start();

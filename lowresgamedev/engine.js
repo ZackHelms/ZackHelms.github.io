@@ -12,8 +12,6 @@ class Renderer {
     this.ctx = canvas.getContext('2d');
     this.ctx.imageSmoothingEnabled = false;
     this.scale = 1;
-    this.offsetX = 0;
-    this.offsetY = 0;
     this._resize();
     window.addEventListener('resize', () => this._resize());
   }
@@ -21,21 +19,16 @@ class Renderer {
   _resize() {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    // Compute available area (leave room for controls below/beside)
-    // Controls height in portrait; controls width in landscape handled in CSS
     const isPortrait = vw <= vh;
-    const availW = isPortrait ? vw : vw - 160;  // 160px for side controls
-    const availH = isPortrait ? vh - 160 : vh;  // 160px for bottom controls
+    const availW = isPortrait ? vw : vw - 160;
+    const availH = isPortrait ? vh - 160 : vh;
 
     const scaleX = availW / GAME_W;
     const scaleY = availH / GAME_H;
     this.scale = Math.min(scaleX, scaleY);
 
-    const drawW = Math.floor(GAME_W * this.scale);
-    const drawH = Math.floor(GAME_H * this.scale);
-
-    this.canvas.width = drawW;
-    this.canvas.height = drawH;
+    this.canvas.width  = Math.floor(GAME_W * this.scale);
+    this.canvas.height = Math.floor(GAME_H * this.scale);
     this.ctx.imageSmoothingEnabled = false;
   }
 
@@ -44,18 +37,13 @@ class Renderer {
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  // Draw a tile-layer item at tile coords (tx, ty) with pixel offset (camX, camY)
-  drawTile(imageOrFn, tx, ty, camX, camY) {
+  drawTile(fn, tx, ty, camX, camY) {
     const sx = Math.round((tx * TILE - camX) * this.scale);
     const sy = Math.round((ty * TILE - camY) * this.scale);
     const sz = Math.round(TILE * this.scale);
     if (sx + sz < 0 || sy + sz < 0 ||
         sx > this.canvas.width || sy > this.canvas.height) return;
-    if (typeof imageOrFn === 'function') {
-      imageOrFn(this.ctx, sx, sy, sz);
-    } else {
-      this.ctx.drawImage(imageOrFn, sx, sy, sz, sz);
-    }
+    fn(this.ctx, sx, sy, sz);
   }
 
   drawSprite(img, pixelX, pixelY, camX, camY) {
@@ -67,11 +55,29 @@ class Renderer {
 }
 
 // ── Input ────────────────────────────────────────────────────────────────────
+//
+// Visual state is managed here via the .btn-active CSS class.
+// Keyboard and touch are tracked separately so releasing one doesn't
+// clear the other.
 
 class Input {
   constructor() {
-    this.held = { left: false, right: false, up: false, down: false };
+    this._kb    = { left: false, right: false, up: false, down: false };
+    this._touch = { left: false, right: false, up: false, down: false };
+    // Elements to visually activate per direction (populated by bindDpad)
+    this._dirEls = { left: [], right: [], up: [], down: [] };
     this._bindKeys();
+  }
+
+  // Read-only composite: direction is active if keyboard OR touch holds it.
+  get held() {
+    const kb = this._kb, t = this._touch;
+    return {
+      left:  kb.left  || t.left,
+      right: kb.right || t.right,
+      up:    kb.up    || t.up,
+      down:  kb.down  || t.down,
+    };
   }
 
   _bindKeys() {
@@ -81,54 +87,98 @@ class Input {
       a: 'left', d: 'right', w: 'up', s: 'down',
     };
     window.addEventListener('keydown', e => {
-      if (map[e.key]) { this.held[map[e.key]] = true; e.preventDefault(); }
+      if (!map[e.key]) return;
+      e.preventDefault();
+      if (this._kb[map[e.key]]) return; // already held
+      this._kb[map[e.key]] = true;
+      this._refreshDirVisual(map[e.key]);
     });
     window.addEventListener('keyup', e => {
-      if (map[e.key]) this.held[map[e.key]] = false;
+      if (!map[e.key]) return;
+      this._kb[map[e.key]] = false;
+      this._refreshDirVisual(map[e.key]);
     });
   }
 
-  bindButton(el, dir) {
-    const start = () => { this.held[dir] = true; };
-    const stop  = () => { this.held[dir] = false; };
-    el.addEventListener('pointerdown', start);
-    el.addEventListener('pointerup',   stop);
-    el.addEventListener('pointerleave', stop);
-    el.addEventListener('pointercancel', stop);
+  // Update visual state of all registered elements for a direction.
+  _refreshDirVisual(dir) {
+    const active = this._kb[dir] || this._touch[dir];
+    for (const el of this._dirEls[dir]) {
+      el.classList.toggle('btn-active', active);
+    }
   }
 
-  // D-pad: tracks one pointer; direction follows the finger as it moves across buttons.
-  bindDpad(containerEl, dirMap) {
-    let capturedId = null;
-    const dirs = new Set(Object.values(dirMap));
+  // Bind an element that has no game-state effect (Select/Start/A/B in v0.1).
+  // Shows .btn-active + red outline on press via touch.
+  bindVisual(el) {
+    el.addEventListener('pointerdown',  () => el.classList.add('btn-active'));
+    el.addEventListener('pointerup',    () => el.classList.remove('btn-active'));
+    el.addEventListener('pointerleave', () => el.classList.remove('btn-active'));
+    el.addEventListener('pointercancel',() => el.classList.remove('btn-active'));
+  }
 
-    const clearDirs = () => dirs.forEach(d => { this.held[d] = false; });
+  // Bind a d-pad container. dirMap: { elementId -> direction }
+  // One pointer is tracked; the active button follows the finger as it moves.
+  bindDpad(containerEl, dirMap) {
+    // Register each button element for keyboard visual feedback
+    for (const [id, dir] of Object.entries(dirMap)) {
+      const el = document.getElementById(id);
+      if (el && !this._dirEls[dir].includes(el)) this._dirEls[dir].push(el);
+    }
+
+    // id→dir and dir→id lookups for this specific dpad
+    const dirForId = dirMap;
+    const idForDir = {};
+    for (const [id, dir] of Object.entries(dirMap)) idForDir[dir] = id;
+
+    let capturedPointerId = null;
+    let activeDir = null; // direction currently pressed by touch on this dpad
+
+    const setTouchDir = (newDir) => {
+      if (newDir === activeDir) return;
+
+      // Clear previous
+      if (activeDir) {
+        this._touch[activeDir] = false;
+        // Visual: only show red if keyboard still holds it
+        const prevEl = document.getElementById(idForDir[activeDir]);
+        if (prevEl) prevEl.classList.toggle('btn-active', this._kb[activeDir]);
+      }
+
+      activeDir = newDir;
+
+      // Activate new
+      if (newDir) {
+        this._touch[newDir] = true;
+        const nextEl = document.getElementById(idForDir[newDir]);
+        if (nextEl) nextEl.classList.add('btn-active');
+      }
+    };
 
     const update = (e) => {
-      clearDirs();
       const target = document.elementFromPoint(e.clientX, e.clientY);
-      if (target && target.id in dirMap) this.held[dirMap[target.id]] = true;
+      setTouchDir((target && target.id in dirForId) ? dirForId[target.id] : null);
     };
 
     containerEl.addEventListener('pointerdown', (e) => {
-      if (capturedId !== null) return;
-      capturedId = e.pointerId;
+      if (capturedPointerId !== null) return;
+      capturedPointerId = e.pointerId;
       containerEl.setPointerCapture(e.pointerId);
       update(e);
     });
 
     containerEl.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== capturedId) return;
+      if (e.pointerId !== capturedPointerId) return;
       update(e);
     });
 
     const release = (e) => {
-      if (e.pointerId !== capturedId) return;
-      capturedId = null;
-      clearDirs();
+      if (e.pointerId !== capturedPointerId) return;
+      capturedPointerId = null;
+      setTouchDir(null);
     };
 
-    containerEl.addEventListener('pointerup', release);
+    containerEl.addEventListener('pointerup',     release);
     containerEl.addEventListener('pointercancel', release);
   }
 }
