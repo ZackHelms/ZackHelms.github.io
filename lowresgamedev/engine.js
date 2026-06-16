@@ -39,9 +39,13 @@ class Renderer {
   }
 
   _resize() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const isPortrait = vw <= vh;
+    const vv = window.visualViewport;
+    const vw = vv ? vv.width  : window.innerWidth;
+    const vh = vv ? vv.height : window.innerHeight;
+    // screen.orientation.angle updates atomically on rotation (before innerWidth/Height
+    // settle in iOS PWA mode), preventing stale-dimension misdetection.
+    const angle = window.screen?.orientation?.angle;
+    const isPortrait = angle !== undefined ? (angle % 180 === 0) : (vw <= vh);
 
     let availW, availH;
     if (isPortrait) {

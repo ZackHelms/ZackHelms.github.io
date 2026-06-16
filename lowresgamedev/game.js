@@ -205,7 +205,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   function recalcPortraitPad() {
     if (!lowerEl) return;
-    if (window.innerWidth > window.innerHeight) return; // landscape: skip
+    const angle = window.screen?.orientation?.angle;
+    const isLandscape = angle !== undefined ? (angle % 180 !== 0) : (window.innerWidth > window.innerHeight);
+    if (isLandscape) return;
     // Reset before measuring so we get the natural (un-padded) height
     root.style.setProperty('--controls-lower-bottom-pad', '0px');
     const lowerNaturalH = lowerEl.offsetHeight;
