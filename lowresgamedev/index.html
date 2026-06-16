@@ -237,6 +237,54 @@
       padding: 20px 10px;
     }
     .side-spacer { flex: 1; pointer-events: none; }
+
+    /* ── Start menu (overlay + dialog) ── */
+    #menu-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(20, 20, 24, 0.55);
+      display: flex; align-items: center; justify-content: center;
+      padding: 12px;
+    }
+    #menu-overlay[hidden] { display: none; }
+    #menu-dialog {
+      background: #1a1a1a;
+      border: 2px solid #555;
+      border-radius: 8px;
+      width: min(90vw, 320px);
+      max-height: 86vh;
+      overflow-y: auto;
+      color: #eee;
+      box-shadow: 0 6px 28px rgba(0, 0, 0, 0.6);
+    }
+    #menu-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid #333;
+    }
+    #menu-title { font-weight: bold; font-size: 14px; }
+    #menu-close {
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 4px; color: #aaa; cursor: pointer; font-size: 16px;
+    }
+    #menu-close:hover { background: #333; color: #fff; }
+    #menu-body { padding: 12px; }
+    .menu-view[hidden] { display: none; }
+    .menu-opt, .menu-actions button {
+      display: block; width: 100%; margin: 6px 0; padding: 10px;
+      background: #333; border: 1px solid #555; border-radius: 6px;
+      color: #eee; font-family: monospace; font-size: 13px; cursor: pointer;
+    }
+    .menu-opt:hover, .menu-actions button:hover { background: #444; }
+    #menu-status { min-height: 16px; margin-top: 8px; font-size: 11px; color: #8bac0f; text-align: center; }
+    .settings-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+    .settings-row label { font-size: 11px; color: #aaa; }
+    .settings-row input, .settings-row select {
+      background: #0e0e0e; border: 1px solid #555; border-radius: 4px;
+      color: #eee; font-family: monospace; font-size: 12px; padding: 6px;
+    }
+    .menu-actions { display: flex; gap: 8px; margin-top: 6px; }
+    .menu-actions button { margin: 0; }
   </style>
 </head>
 <body>
@@ -336,7 +384,38 @@
   </div>
 </div>
 
+<!-- ── Start menu ── -->
+<div id="menu-overlay" hidden>
+  <div id="menu-dialog">
+    <div id="menu-header">
+      <span id="menu-title">Menu</span>
+      <div id="menu-close" title="Close">✕</div>
+    </div>
+    <div id="menu-body">
+
+      <!-- Main view: Save / Load / Settings -->
+      <div id="menu-main" class="menu-view">
+        <button class="menu-opt" data-action="save">Save</button>
+        <button class="menu-opt" data-action="load">Load</button>
+        <button class="menu-opt" data-view="settings">Settings</button>
+      </div>
+
+      <!-- Settings view: built dynamically from settings + manifest -->
+      <div id="menu-settings" class="menu-view" hidden>
+        <form id="settings-form" autocomplete="off"></form>
+        <div class="menu-actions">
+          <button id="settings-apply" type="button">Apply &amp; Reload</button>
+          <button data-view="main" type="button">Back</button>
+        </div>
+      </div>
+
+      <div id="menu-status"></div>
+    </div>
+  </div>
+</div>
+
 <script src="engine.js"></script>
 <script src="game.js"></script>
+<script src="menu.js"></script>
 </body>
 </html>

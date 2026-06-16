@@ -57,6 +57,10 @@ class Game {
     this.mirrorX = false;
     this.moveSpeed = settings.move_speed ?? MOVE_SPEED;
     this.spritePrefix = settings.char1_sprite_prefix ?? 'sprite001';
+    this.map = settings.map ?? 'debug';
+
+    // When true (start menu open), the loop keeps drawing but ignores input.
+    this.paused = false;
 
     const fps = settings.walk_animation_framerate ?? 1;
     this.ANIM_INTERVAL = 1 / fps;
@@ -64,6 +68,42 @@ class Game {
     this._loadSprites();
 
     this.loop = new Loop((dt) => this._tick(dt));
+  }
+
+  // ── Save / load ──────────────────────────────────────────────────────────
+  // Game state is intentionally minimal for now: active character (sprite
+  // prefix), map, and tile coordinates.
+
+  getState() {
+    return {
+      char1_sprite_prefix: this.spritePrefix,
+      map: this.map,
+      tileX: this.tileX,
+      tileY: this.tileY,
+    };
+  }
+
+  loadState(state) {
+    if (!state) return;
+    if (state.map) this.map = state.map;
+    if (state.char1_sprite_prefix && state.char1_sprite_prefix !== this.spritePrefix) {
+      this.spritePrefix = state.char1_sprite_prefix;
+      this._loadSprites();
+    }
+    const tx = Number.isInteger(state.tileX) ? state.tileX : this.tileX;
+    const ty = Number.isInteger(state.tileY) ? state.tileY : this.tileY;
+    this.tileX = Math.max(0, Math.min(tx, MAP_COLS - 1));
+    this.tileY = Math.max(0, Math.min(ty, MAP_ROWS - 1));
+    this.charX = this.tileX * TILE;
+    this.charY = this.tileY * TILE;
+    this.targetTileX = this.tileX;
+    this.targetTileY = this.tileY;
+    this.moving = false;
+    this.animFrame = 0;
+    this.animTimer = 0;
+    this.direction = 'front';
+    this.mirrorX = false;
+    this.input.clearAll();
   }
 
   _loadSprites() {
@@ -122,6 +162,10 @@ class Game {
   }
 
   _tick(dt) {
+    // While the start menu is open, freeze gameplay but keep rendering the
+    // current frame behind the overlay.
+    if (this.paused) { this._draw(); return; }
+
     const inp = this.input.held;
 
     if (this.moving) {
@@ -201,6 +245,23 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (res.ok) settings = await res.json();
   } catch (_) {}
 
+  // Settings edited in the in-game menu are persisted as overrides in
+  // localStorage and merged over the settings.json defaults at boot. (A static
+  // site can't rewrite settings.json; edit that file to change the defaults.)
+  const settingsDefaults = { ...settings };
+  let overrides = {};
+  try { overrides = JSON.parse(localStorage.getItem(MENU_OVERRIDES_KEY)) || {}; } catch (_) {}
+  settings = { ...settings, ...overrides };
+
+  // Available character types / maps for the Settings menu dropdowns.
+  let manifest = { sprites: [], maps: ['debug'] };
+  try {
+    const res = await fetch('assets/manifest.json');
+    if (res.ok) manifest = await res.json();
+  } catch (_) {}
+  window._settings = settings;
+  window._manifest = manifest;
+
   // Apply CSS variables from settings before canvas resize
   const root = document.documentElement;
   root.style.setProperty('--portrait-margin-top',        (settings.portrait_margin_top        ?? 8) + 'px');
@@ -244,17 +305,27 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (el) game.input.register(el, action);
   }
 
-  // Action buttons — visual state only in v0.1
+  // Start menu controller (defined in menu.js)
+  const menu = initMenu(game, settings, manifest, settingsDefaults);
+  window._menu = menu;
+
+  // Action buttons — visual state only in v0.1 (Start opens the menu below)
   const actionBtns = {
     'btn-a': 'a', 'btn-a-l': 'a',
     'btn-b': 'b', 'btn-b-l': 'b',
     'btn-select': 'select', 'btn-select-l': 'select',
-    'btn-start': 'start', 'btn-start-l': 'start',
   };
   for (const [id, action] of Object.entries(actionBtns)) {
     const el = document.getElementById(id);
     if (el) game.input.register(el, action);
   }
+
+  // Start button opens the start menu (fires on first contact, like the
+  // utility buttons). Keeps the 'start' action for held-state visuals.
+  ['btn-start', 'btn-start-l'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) game.input.register(el, 'start', { onEnter: () => menu.open() });
+  });
 
   // Utility buttons — fire on first contact (tap or slide-to)
   ['btn-reload', 'btn-reload-l'].forEach(id => {

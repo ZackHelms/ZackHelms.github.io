@@ -209,8 +209,16 @@ class Input {
     }
   }
 
+  // Pointer events inside the start menu must reach native controls (<select>,
+  // <input>, buttons) and must not drive game buttons, so the global handler
+  // ignores anything originating within #menu-overlay.
+  _inMenu(e) {
+    return !!(e.target && e.target.closest && e.target.closest('#menu-overlay'));
+  }
+
   _bindGlobalTouch() {
     document.addEventListener('pointerdown', (e) => {
+      if (this._inMenu(e)) return;
       e.preventDefault();
       this._pointers.set(e.pointerId, null);
       this._activate(e.pointerId, this._idAt(e.clientX, e.clientY));
