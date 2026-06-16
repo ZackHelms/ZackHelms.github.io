@@ -192,10 +192,21 @@ window.addEventListener('DOMContentLoaded', async () => {
   } catch (_) {}
 
   // Apply CSS variables from settings before canvas resize
-  document.documentElement.style.setProperty(
-    '--portrait-margin-top',
-    (settings.portrait_margin_top ?? 8) + 'px'
-  );
+  const root = document.documentElement;
+  root.style.setProperty('--portrait-margin-top',        (settings.portrait_margin_top        ?? 8) + 'px');
+  root.style.setProperty('--game-screen-margin',         (settings.game_screen_margin         ?? 4) + 'px');
+  root.style.setProperty('--portrait-btn-divider-offset',(settings.portrait_btn_divider_offset ?? 4) + 'px');
+
+  // Position the divider at portrait_btn_divider_pos px from the bottom of the screen.
+  // Extra padding is added below #controls-lower so the buttons sit at the right height.
+  const dividerPos    = settings.portrait_btn_divider_pos    ?? 90;
+  const dividerOffset = settings.portrait_btn_divider_offset ?? 4;
+  const lowerEl = document.getElementById('controls-lower');
+  if (lowerEl) {
+    const lowerNaturalH = lowerEl.offsetHeight; // forces synchronous reflow
+    const extraPad = Math.max(0, dividerPos - dividerOffset - lowerNaturalH);
+    root.style.setProperty('--controls-lower-bottom-pad', extraPad + 'px');
+  }
 
   const canvas = document.getElementById('game-canvas');
   const game = new Game(canvas, settings);

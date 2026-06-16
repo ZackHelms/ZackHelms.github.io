@@ -46,7 +46,13 @@
       #controls-landscape { display: flex; }
     }
 
-    /* ── Canvas ── */
+    /* ── Canvas + frame ── */
+    #screen-frame {
+      background: #2a2a2a;
+      padding: var(--game-screen-margin, 4px);
+      display: inline-block;
+      line-height: 0;
+    }
     #game-canvas {
       image-rendering: pixelated;
       image-rendering: crisp-edges;
@@ -67,6 +73,16 @@
       height: 1px;
       background: #444;
       width: 100%;
+      margin: var(--portrait-btn-divider-offset, 4px) 0;
+    }
+
+    /* Lower controls group: Select/Start + Reset/Reload/Debug */
+    #controls-lower {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      padding-bottom: var(--controls-lower-bottom-pad, 0px);
     }
 
     .ctrl-row-meta {
@@ -227,7 +243,9 @@
 <div id="app">
 
   <div id="screen-wrap">
-    <canvas id="game-canvas"></canvas>
+    <div id="screen-frame">
+      <canvas id="game-canvas"></canvas>
+    </div>
   </div>
 
   <!-- ── Portrait controls (below screen) ── -->
@@ -256,21 +274,26 @@
       <!-- Debug separator (only visible in debug mode) -->
       <div class="debug-separator"></div>
 
-      <!-- Row 2: Select + Start -->
-      <div class="ctrl-row-meta">
-        <div class="meta-group">
-          <div class="btn-round btn-meta tap-target" id="btn-select">Select</div>
-          <div class="btn-round btn-meta tap-target" id="btn-start">Start</div>
-        </div>
-      </div>
+      <!-- Lower group: Select/Start + Reset/Reload/Debug -->
+      <div id="controls-lower">
 
-      <!-- Row 3: Reset + Reload + Debug -->
-      <div class="ctrl-row-util">
-        <div class="util-group">
-          <div class="btn-util tap-target" id="btn-reset">Reset</div>
-          <div class="btn-util tap-target" id="btn-reload">Reload</div>
-          <div class="btn-util tap-target" id="btn-debug">Debug</div>
+        <!-- Row 2: Select + Start -->
+        <div class="ctrl-row-meta">
+          <div class="meta-group">
+            <div class="btn-round btn-meta tap-target" id="btn-select">Select</div>
+            <div class="btn-round btn-meta tap-target" id="btn-start">Start</div>
+          </div>
         </div>
+
+        <!-- Row 3: Reset + Reload + Debug -->
+        <div class="ctrl-row-util">
+          <div class="util-group">
+            <div class="btn-util tap-target" id="btn-reset">Reset</div>
+            <div class="btn-util tap-target" id="btn-reload">Reload</div>
+            <div class="btn-util tap-target" id="btn-debug">Debug</div>
+          </div>
+        </div>
+
       </div>
 
     </div>

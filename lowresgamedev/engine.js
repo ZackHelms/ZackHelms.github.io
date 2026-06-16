@@ -36,6 +36,13 @@ class Renderer {
       availH = vh;
     }
 
+    // Subtract game screen margin (the #screen-frame padding on each side)
+    const margin = parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--game-screen-margin')
+    ) || 0;
+    availW = Math.max(0, availW - margin * 2);
+    availH = Math.max(0, availH - margin * 2);
+
     const scaleX = availW / GAME_W;
     const scaleY = availH / GAME_H;
     this.scale = Math.min(scaleX, scaleY);

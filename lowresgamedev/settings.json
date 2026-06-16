@@ -2,6 +2,9 @@
   "walk_animation_framerate": 8,
   "move_speed": 80,
   "portrait_margin_top": 8,
+  "game_screen_margin": 4,
+  "portrait_btn_divider_pos": 90,
+  "portrait_btn_divider_offset": 4,
   "button_size_multiplier": 1.0,
   "game_screen_tile_width": 10,
   "game_screen_tile_height": 9
