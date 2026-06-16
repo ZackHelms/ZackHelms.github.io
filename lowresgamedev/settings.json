@@ -1,4 +1,5 @@
 {
+  "char1_sprite_prefix": "sprite001",
   "walk_animation_framerate": 8,
   "move_speed": 80,
   "portrait_margin_top": 8,

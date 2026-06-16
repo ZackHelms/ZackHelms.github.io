@@ -92,11 +92,18 @@ class Renderer {
     fn(this.ctx, sx, sy, sz);
   }
 
-  drawSprite(img, pixelX, pixelY, camX, camY) {
+  drawSprite(img, pixelX, pixelY, camX, camY, mirrorX = false) {
     const sx = Math.round((pixelX - camX) * this.scale);
     const sy = Math.round((pixelY - camY) * this.scale);
     const sz = Math.round(TILE * this.scale);
-    this.ctx.drawImage(img, sx, sy, sz, sz);
+    if (mirrorX) {
+      this.ctx.save();
+      this.ctx.scale(-1, 1);
+      this.ctx.drawImage(img, -(sx + sz), sy, sz, sz);
+      this.ctx.restore();
+    } else {
+      this.ctx.drawImage(img, sx, sy, sz, sz);
+    }
   }
 }
 

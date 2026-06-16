@@ -54,7 +54,9 @@ class Game {
     this.animFrame = 0;
     this.animTimer = 0;
     this.direction = 'front';
+    this.mirrorX = false;
     this.moveSpeed = settings.move_speed ?? MOVE_SPEED;
+    this.spritePrefix = settings.char1_sprite_prefix ?? 'sprite001';
 
     const fps = settings.walk_animation_framerate ?? 1;
     this.ANIM_INTERVAL = 1 / fps;
@@ -65,10 +67,10 @@ class Game {
   }
 
   _loadSprites() {
-    for (const dir of ['front', 'back', 'left', 'right']) {
+    for (const dir of ['front', 'back', 'side']) {
       this.sprites[dir] = ['a', 'b'].map(f => {
         const img = new Image();
-        img.src = `assets/sprite-${dir}-${f}.png`;
+        img.src = `assets/${this.spritePrefix}-${dir}-${f}.png`;
         return img;
       });
     }
@@ -87,6 +89,7 @@ class Game {
     this.animFrame = 0;
     this.animTimer = 0;
     this.direction = 'front';
+    this.mirrorX = false;
     this.input.clearAll();
   }
 
@@ -111,7 +114,8 @@ class Game {
 
     if (nx === this.tileX && ny === this.tileY) return; // already at map edge
 
-    this.direction = { right: 'right', left: 'left', down: 'front', up: 'back' }[dir];
+    this.direction = { right: 'side', left: 'side', down: 'front', up: 'back' }[dir];
+    this.mirrorX = (dir === 'left');
     this.targetTileX = nx;
     this.targetTileY = ny;
     this.moving = true;
@@ -183,7 +187,7 @@ class Game {
 
     const frames = this.sprites[this.direction];
     if (frames?.[this.animFrame]?.complete) {
-      r.drawSprite(frames[this.animFrame], this.charX, this.charY, camX, camY);
+      r.drawSprite(frames[this.animFrame], this.charX, this.charY, camX, camY, this.mirrorX);
     }
   }
 }
