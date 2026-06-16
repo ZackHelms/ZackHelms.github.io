@@ -1,8 +1,24 @@
 // engine.js — renderer, input, animation loop
 
-const GAME_W = 160;
-const GAME_H = 144;
+// Viewport dimensions in pixels = (tiles × TILE). These are `let` because the
+// number of visible tiles is configurable via settings (game_screen_tile_width /
+// _height); the canvas is rendered at this internal resolution and the Renderer
+// scales it to fit the screen, so fewer tiles = more zoomed in. Defaults are the
+// Game Boy 10×9 tile screen.
+let GAME_W = 160;
+let GAME_H = 144;
 const TILE = 16;
+
+// Set the visible viewport size in tiles. Must be called BEFORE constructing the
+// Game (the Renderer reads GAME_W/GAME_H on its first resize). The character is
+// always centered, so e.g. width 8 shows the player's tile plus 3.5 tiles on
+// each side.
+function setViewportTiles(tilesW, tilesH) {
+  const w = Math.round(Number(tilesW));
+  const h = Math.round(Number(tilesH));
+  if (Number.isFinite(w) && w > 0) GAME_W = w * TILE;
+  if (Number.isFinite(h) && h > 0) GAME_H = h * TILE;
+}
 
 // ── Renderer ─────────────────────────────────────────────────────────────────
 

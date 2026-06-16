@@ -291,6 +291,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   // iOS fires orientationchange before the viewport updates; delay matches Renderer workaround
   window.addEventListener('orientationchange', () => setTimeout(recalcPortraitPad, 150));
 
+  // Visible viewport size in tiles (character is always centered). Must run
+  // before the Game/Renderer is constructed.
+  setViewportTiles(
+    settings.game_screen_tile_width  ?? 10,
+    settings.game_screen_tile_height ?? 9,
+  );
+
   const canvas = document.getElementById('game-canvas');
   const game = new Game(canvas, settings);
   window._game = game;

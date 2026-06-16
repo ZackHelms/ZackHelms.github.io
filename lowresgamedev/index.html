@@ -277,11 +277,23 @@
     }
     .menu-opt:hover, .menu-actions button:hover { background: #444; }
     #menu-status { min-height: 16px; margin-top: 8px; font-size: 11px; color: #8bac0f; text-align: center; }
-    .settings-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
-    .settings-row label { font-size: 11px; color: #aaa; }
+    /* Two columns: setting key on the left, value/input on the right.
+       Saves vertical space vs. stacking the label above the field. */
+    .settings-row {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      align-items: center;
+      column-gap: 8px;
+      margin-bottom: 5px;
+    }
+    .settings-row label {
+      font-size: 11px; color: #aaa;
+      overflow-wrap: anywhere; line-height: 1.2;
+    }
     .settings-row input, .settings-row select {
+      width: 100%; box-sizing: border-box;
       background: #0e0e0e; border: 1px solid #555; border-radius: 4px;
-      color: #eee; font-family: monospace; font-size: 12px; padding: 6px;
+      color: #eee; font-family: monospace; font-size: 12px; padding: 5px;
     }
     .menu-actions { display: flex; gap: 8px; margin-top: 6px; }
     .menu-actions button { margin: 0; }
