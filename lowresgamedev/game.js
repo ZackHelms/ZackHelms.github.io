@@ -202,11 +202,21 @@ window.addEventListener('DOMContentLoaded', async () => {
   const dividerPos    = settings.portrait_btn_divider_pos    ?? 90;
   const dividerOffset = settings.portrait_btn_divider_offset ?? 4;
   const lowerEl = document.getElementById('controls-lower');
-  if (lowerEl) {
-    const lowerNaturalH = lowerEl.offsetHeight; // forces synchronous reflow
+
+  function recalcPortraitPad() {
+    if (!lowerEl) return;
+    if (window.innerWidth > window.innerHeight) return; // landscape: skip
+    // Reset before measuring so we get the natural (un-padded) height
+    root.style.setProperty('--controls-lower-bottom-pad', '0px');
+    const lowerNaturalH = lowerEl.offsetHeight;
     const extraPad = Math.max(0, dividerPos - dividerOffset - lowerNaturalH);
     root.style.setProperty('--controls-lower-bottom-pad', extraPad + 'px');
   }
+
+  recalcPortraitPad();
+  window.addEventListener('resize', recalcPortraitPad);
+  // iOS fires orientationchange before the viewport updates; delay matches Renderer workaround
+  window.addEventListener('orientationchange', () => setTimeout(recalcPortraitPad, 150));
 
   const canvas = document.getElementById('game-canvas');
   const game = new Game(canvas, settings);
