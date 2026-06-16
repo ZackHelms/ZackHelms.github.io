@@ -4,7 +4,7 @@ const MAP_COLS = 36;
 const MAP_ROWS = 36;
 const COORDS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'; // base-36
 
-const MOVE_SPEED = 80; // pixels per second (1 tile = 0.2 s at this speed)
+const MOVE_SPEED = 80; // pixels per second — default, overridable via settings.json
 
 // ── Debug tile renderer ───────────────────────────────────────────────────────
 
@@ -53,6 +53,8 @@ class Game {
     // Animation
     this.animFrame = 0;
     this.animTimer = 0;
+    this.moveSpeed = settings.move_speed ?? MOVE_SPEED;
+
     const fps = settings.walk_animation_framerate ?? 1;
     this.ANIM_INTERVAL = 1 / fps;
     this.sprites = [null, null];
@@ -116,7 +118,7 @@ class Game {
     if (this.moving) {
       const tx = this.targetTileX * TILE;
       const ty = this.targetTileY * TILE;
-      const step = MOVE_SPEED * dt;
+      const step = this.moveSpeed * dt;
       const dx = tx - this.charX;
       const dy = ty - this.charY;
       const dist = Math.abs(dx) + Math.abs(dy); // Manhattan — only one axis moves at a time
@@ -189,6 +191,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (res.ok) settings = await res.json();
   } catch (_) {}
 
+  // Apply CSS variables from settings before canvas resize
+  document.documentElement.style.setProperty(
+    '--portrait-margin-top',
+    (settings.portrait_margin_top ?? 8) + 'px'
+  );
+
   const canvas = document.getElementById('game-canvas');
   const game = new Game(canvas, settings);
   window._game = game;
@@ -223,6 +231,22 @@ window.addEventListener('DOMContentLoaded', async () => {
   ['btn-reload', 'btn-reload-l'].forEach(id => {
     const el = document.getElementById(id);
     if (el) game.input.register(el, null, { onEnter: () => location.reload(true) });
+  });
+
+  // Debug toggle — shows tap target outlines with orange fill
+  let debugMode = false;
+  const debugEls = [];
+  function toggleDebug() {
+    debugMode = !debugMode;
+    document.body.classList.toggle('debug-mode', debugMode);
+    debugEls.forEach(el => el.classList.toggle('debug-btn-active', debugMode));
+  }
+  ['btn-debug', 'btn-debug-l'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      debugEls.push(el);
+      game.input.register(el, null, { onEnter: toggleDebug });
+    }
   });
 
   game.start();

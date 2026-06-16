@@ -24,9 +24,16 @@
     /* Portrait: column layout — screen on top, controls below */
     @media (orientation: portrait) {
       #app { flex-direction: column; align-items: center; }
-      #screen-wrap { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; width: 100%; }
-      #controls { flex: 0 0 160px; width: 100%; }
-      #controls-portrait { display: flex; }
+      #screen-wrap {
+        flex: 1 1 auto;
+        display: flex;
+        align-items: flex-start;
+        padding-top: var(--portrait-margin-top, 8px);
+        justify-content: center;
+        width: 100%;
+      }
+      #controls { flex: 0 0 auto; width: 100%; }
+      #controls-portrait { display: flex; flex-direction: column; width: 100%; }
       #controls-landscape { display: none; }
     }
 
@@ -46,8 +53,8 @@
       display: block;
     }
 
-    /* ── Controls shared ── */
-    .ctrl-wrap {
+    /* ── Portrait control rows ── */
+    .ctrl-row-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -55,11 +62,32 @@
       width: 100%;
     }
 
-    /* D-pad */
+    .debug-separator {
+      display: none;
+      height: 1px;
+      background: #444;
+      width: 100%;
+    }
+
+    .ctrl-row-meta {
+      display: flex;
+      justify-content: center;
+      padding: 6px 16px 2px;
+      width: 100%;
+    }
+
+    .ctrl-row-util {
+      display: flex;
+      justify-content: center;
+      padding: 4px 16px 8px;
+      width: 100%;
+    }
+
+    /* ── D-pad (10% bigger: 40→44px cells) ── */
     .dpad {
       display: grid;
-      grid-template-columns: repeat(3, 40px);
-      grid-template-rows: repeat(3, 40px);
+      grid-template-columns: repeat(3, 44px);
+      grid-template-rows: repeat(3, 44px);
       gap: 2px;
     }
     .dpad-btn {
@@ -75,7 +103,7 @@
     }
     .dpad-center { background: #222; border-color: #222; }
 
-    /* Action buttons */
+    /* ── Action / meta buttons ── */
     .action-group {
       display: flex;
       flex-direction: column;
@@ -86,8 +114,16 @@
       display: flex;
       gap: 8px;
     }
+    .util-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    /* Round buttons (A, B): 20% bigger — 40→48px */
     .btn-round {
-      width: 40px; height: 40px;
+      width: 48px; height: 48px;
       border-radius: 50%;
       border: 1px solid #555;
       background: #333;
@@ -100,28 +136,27 @@
       -webkit-user-select: none;
     }
     .btn-a { background: #5a1a1a; border-color: #c03030; }
-    .btn-b { background: #1a3a1a; border-color: #30a030; margin-top: 20px; }
+    .btn-b { background: #1a3a1a; border-color: #30a030; margin-top: 24px; }
+
+    /* Select / Start pill buttons: 44×22 → 62×26px */
     .btn-meta {
-      width: 44px; height: 22px;
-      border-radius: 11px;
-      font-size: 9px;
+      width: 62px; height: 26px;
+      border-radius: 13px;
+      font-size: 8px;
+      white-space: nowrap;
     }
 
-    /* B + A side-by-side: B on left shifted down so its top = A's center */
+    /* B + A horizontal: gap = half of A diameter (48/2 = 24px) */
     .btn-ab-group {
       display: flex;
       flex-direction: row;
       align-items: flex-start;
-      gap: 6px;
+      gap: 24px;
     }
 
-    /* Utility buttons (RST / RLD) below Select+Start */
-    .util-group {
-      display: flex;
-      gap: 6px;
-    }
+    /* Utility buttons (Reset / Reload / Debug): 44×20 → 62×24px */
     .btn-util {
-      width: 44px; height: 20px;
+      width: 62px; height: 24px;
       border-radius: 4px;
       border: 1px solid #444;
       background: #1a1a1a;
@@ -132,13 +167,34 @@
       cursor: pointer;
       user-select: none;
       -webkit-user-select: none;
+      white-space: nowrap;
     }
 
-    /* ── Active state (replaces CSS :active — managed by JS) ── */
+    /* Debug button "on" state */
+    .debug-btn-active {
+      border-color: orange !important;
+      color: orange !important;
+      background: #1a1500 !important;
+    }
+
+    /* ── Button active state (pointer held) ── */
     .btn-active {
       background: #555 !important;
       outline: 2px solid red;
       outline-offset: 2px;
+    }
+
+    /* ── Debug mode: highlight all tap targets ── */
+    body.debug-mode .tap-target {
+      outline: 1px solid orange;
+      background-color: rgba(255, 165, 0, 0.2) !important;
+    }
+    body.debug-mode .tap-target.btn-active {
+      outline: 2px solid red;
+      outline-offset: 2px;
+    }
+    body.debug-mode .debug-separator {
+      display: block;
     }
 
     /* ── Landscape side panels ── */
@@ -155,58 +211,66 @@
     #controls-landscape > * { pointer-events: auto; }
 
     .side-left {
-      width: 128px;
+      width: 140px;
       display: flex; align-items: center; justify-content: center;
     }
     .side-right {
-      width: 120px;
+      width: 150px;
       display: flex; flex-direction: column;
       align-items: center; justify-content: space-between;
-      padding: 20px 0;
+      padding: 20px 10px;
     }
-    .side-spacer { flex: 1; }
+    .side-spacer { flex: 1; pointer-events: none; }
   </style>
 </head>
 <body>
 <div id="app">
 
-  <!-- ── Portrait controls (below screen) ── -->
   <div id="screen-wrap">
     <canvas id="game-canvas"></canvas>
   </div>
 
+  <!-- ── Portrait controls (below screen) ── -->
   <div id="controls">
-    <div class="ctrl-wrap" id="controls-portrait">
+    <div id="controls-portrait">
 
-      <!-- D-pad -->
-      <div class="dpad" id="dpad-portrait">
-        <div></div>
-        <div class="dpad-btn" id="btn-up">▲</div>
-        <div></div>
-        <div class="dpad-btn" id="btn-left-p">◀</div>
-        <div class="dpad-center"></div>
-        <div class="dpad-btn" id="btn-right-p">▶</div>
-        <div></div>
-        <div class="dpad-btn" id="btn-down-p">▼</div>
-        <div></div>
+      <!-- Row 1: D-pad left, A/B right -->
+      <div class="ctrl-row-top">
+        <div class="dpad" id="dpad-portrait">
+          <div></div>
+          <div class="dpad-btn tap-target" id="btn-up">▲</div>
+          <div></div>
+          <div class="dpad-btn tap-target" id="btn-left-p">◀</div>
+          <div class="dpad-center"></div>
+          <div class="dpad-btn tap-target" id="btn-right-p">▶</div>
+          <div></div>
+          <div class="dpad-btn tap-target" id="btn-down-p">▼</div>
+          <div></div>
+        </div>
+        <div class="btn-ab-group">
+          <div class="btn-round btn-b tap-target" id="btn-b">B</div>
+          <div class="btn-round btn-a tap-target" id="btn-a">A</div>
+        </div>
       </div>
 
-      <!-- Select + Start + RST/RLD -->
-      <div class="action-group">
+      <!-- Debug separator (only visible in debug mode) -->
+      <div class="debug-separator"></div>
+
+      <!-- Row 2: Select + Start -->
+      <div class="ctrl-row-meta">
         <div class="meta-group">
-          <div class="btn-round btn-meta" id="btn-select">SEL</div>
-          <div class="btn-round btn-meta" id="btn-start">STA</div>
-        </div>
-        <div class="util-group">
-          <div class="btn-util" id="btn-reset">RST</div>
-          <div class="btn-util" id="btn-reload">RLD</div>
+          <div class="btn-round btn-meta tap-target" id="btn-select">Select</div>
+          <div class="btn-round btn-meta tap-target" id="btn-start">Start</div>
         </div>
       </div>
 
-      <!-- B + A -->
-      <div class="btn-ab-group">
-        <div class="btn-round btn-b" id="btn-b">B</div>
-        <div class="btn-round btn-a" id="btn-a">A</div>
+      <!-- Row 3: Reset + Reload + Debug -->
+      <div class="ctrl-row-util">
+        <div class="util-group">
+          <div class="btn-util tap-target" id="btn-reset">Reset</div>
+          <div class="btn-util tap-target" id="btn-reload">Reload</div>
+          <div class="btn-util tap-target" id="btn-debug">Debug</div>
+        </div>
       </div>
 
     </div>
@@ -219,13 +283,13 @@
   <div class="side-left">
     <div class="dpad" id="dpad-landscape">
       <div></div>
-      <div class="dpad-btn" id="btn-up-l">▲</div>
+      <div class="dpad-btn tap-target" id="btn-up-l">▲</div>
       <div></div>
-      <div class="dpad-btn" id="btn-left">◀</div>
+      <div class="dpad-btn tap-target" id="btn-left">◀</div>
       <div class="dpad-center"></div>
-      <div class="dpad-btn" id="btn-right">▶</div>
+      <div class="dpad-btn tap-target" id="btn-right">▶</div>
       <div></div>
-      <div class="dpad-btn" id="btn-down">▼</div>
+      <div class="dpad-btn tap-target" id="btn-down">▼</div>
       <div></div>
     </div>
   </div>
@@ -235,17 +299,18 @@
   <div class="side-right">
     <div class="action-group">
       <div class="meta-group">
-        <div class="btn-round btn-meta" id="btn-select-l">SEL</div>
-        <div class="btn-round btn-meta" id="btn-start-l">STA</div>
+        <div class="btn-round btn-meta tap-target" id="btn-select-l">Select</div>
+        <div class="btn-round btn-meta tap-target" id="btn-start-l">Start</div>
       </div>
       <div class="util-group">
-        <div class="btn-util" id="btn-reset-l">RST</div>
-        <div class="btn-util" id="btn-reload-l">RLD</div>
+        <div class="btn-util tap-target" id="btn-reset-l">Reset</div>
+        <div class="btn-util tap-target" id="btn-reload-l">Reload</div>
+        <div class="btn-util tap-target" id="btn-debug-l">Debug</div>
       </div>
     </div>
     <div class="btn-ab-group">
-      <div class="btn-round btn-b" id="btn-b-l">B</div>
-      <div class="btn-round btn-a" id="btn-a-l">A</div>
+      <div class="btn-round btn-b tap-target" id="btn-b-l">B</div>
+      <div class="btn-round btn-a tap-target" id="btn-a-l">A</div>
     </div>
   </div>
 </div>

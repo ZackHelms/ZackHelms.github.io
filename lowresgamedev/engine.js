@@ -20,8 +20,21 @@ class Renderer {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const isPortrait = vw <= vh;
-    const availW = isPortrait ? vw : vw - 160;
-    const availH = isPortrait ? vh - 160 : vh;
+
+    let availW, availH;
+    if (isPortrait) {
+      const ctrlEl = document.getElementById('controls');
+      const ctrlH = ctrlEl ? ctrlEl.offsetHeight : 220;
+      const marginTop = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--portrait-margin-top')
+      ) || 8;
+      availW = vw;
+      availH = vh - ctrlH - marginTop;
+    } else {
+      // side-left: 140px, side-right: 150px
+      availW = vw - 140 - 150;
+      availH = vh;
+    }
 
     const scaleX = availW / GAME_W;
     const scaleY = availH / GAME_H;
