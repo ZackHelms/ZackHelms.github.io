@@ -53,21 +53,24 @@ class Game {
     // Animation
     this.animFrame = 0;
     this.animTimer = 0;
+    this.direction = 'front';
     this.moveSpeed = settings.move_speed ?? MOVE_SPEED;
 
     const fps = settings.walk_animation_framerate ?? 1;
     this.ANIM_INTERVAL = 1 / fps;
-    this.sprites = [null, null];
+    this.sprites = {};
     this._loadSprites();
 
     this.loop = new Loop((dt) => this._tick(dt));
   }
 
   _loadSprites() {
-    for (let i = 0; i < 2; i++) {
-      const img = new Image();
-      img.src = `assets/sprite001-${i === 0 ? 'a' : 'b'}.png`;
-      this.sprites[i] = img;
+    for (const dir of ['front', 'back', 'left', 'right']) {
+      this.sprites[dir] = ['a', 'b'].map(f => {
+        const img = new Image();
+        img.src = `assets/sprite-${dir}-${f}.png`;
+        return img;
+      });
     }
   }
 
@@ -83,6 +86,7 @@ class Game {
     this.moving = false;
     this.animFrame = 0;
     this.animTimer = 0;
+    this.direction = 'front';
     this.input.clearAll();
   }
 
@@ -107,6 +111,7 @@ class Game {
 
     if (nx === this.tileX && ny === this.tileY) return; // already at map edge
 
+    this.direction = { right: 'right', left: 'left', down: 'front', up: 'back' }[dir];
     this.targetTileX = nx;
     this.targetTileY = ny;
     this.moving = true;
@@ -176,8 +181,9 @@ class Game {
       }
     }
 
-    if (this.sprites[this.animFrame]?.complete) {
-      r.drawSprite(this.sprites[this.animFrame], this.charX, this.charY, camX, camY);
+    const frames = this.sprites[this.direction];
+    if (frames?.[this.animFrame]?.complete) {
+      r.drawSprite(frames[this.animFrame], this.charX, this.charY, camX, camY);
     }
   }
 }
