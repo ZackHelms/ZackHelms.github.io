@@ -14,6 +14,28 @@ class Renderer {
     this.scale = 1;
     this._resize();
     window.addEventListener('resize', () => this._resize());
+    window.addEventListener('orientationchange', () => this._onOrientationChange());
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => this._resize());
+    }
+  }
+
+  // iOS Safari: position:fixed elements whose display changes via CSS media query on
+  // orientation change get stale compositing-layer hit regions. A temporary transform
+  // on the fixed overlay forces the GPU layer to rebuild, fixing tap-target alignment.
+  _onOrientationChange() {
+    setTimeout(() => {
+      const el = document.getElementById('controls-landscape');
+      if (el) {
+        el.style.transform = 'translateZ(0)';
+        requestAnimationFrame(() => {
+          el.style.transform = '';
+          this._resize();
+        });
+      } else {
+        this._resize();
+      }
+    }, 100);
   }
 
   _resize() {
@@ -140,7 +162,12 @@ class Input {
   }
 
   _idAt(cx, cy) {
-    const el = document.elementFromPoint(cx, cy);
+    // On mobile, pointer clientX/Y are visual-viewport-relative while elementFromPoint
+    // may use layout-viewport coordinates; visualViewport.offset corrects the delta.
+    const vv = window.visualViewport;
+    const x = cx + (vv?.offsetLeft ?? 0);
+    const y = cy + (vv?.offsetTop  ?? 0);
+    const el = document.elementFromPoint(x, y);
     return (el?.id && el.id in this._btnRegistry) ? el.id : null;
   }
 

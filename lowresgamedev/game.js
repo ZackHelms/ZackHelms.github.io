@@ -235,10 +235,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Utility buttons — fire on first contact (tap or slide-to)
-  ['btn-reset', 'btn-reset-l'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) game.input.register(el, null, { onEnter: () => game.reset() });
-  });
   ['btn-reload', 'btn-reload-l'].forEach(id => {
     const el = document.getElementById(id);
     if (el) game.input.register(el, null, { onEnter: () => location.reload(true) });
