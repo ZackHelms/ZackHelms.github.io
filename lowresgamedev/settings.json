@@ -1,5 +1,5 @@
 {
-  "char1_sprite_prefix": "sprite-human-m",
+  "char1_sprite_prefix": "human-m",
   "map": "debug",
   "walk_animation_framerate": 8,
   "move_speed": 80,

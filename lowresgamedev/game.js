@@ -56,7 +56,7 @@ class Game {
     this.direction = 'front';
     this.mirrorX = false;
     this.moveSpeed = settings.move_speed ?? MOVE_SPEED;
-    this.spritePrefix = settings.char1_sprite_prefix ?? 'sprite001';
+    this.spritePrefix = settings.char1_sprite_prefix ?? 'human-m';
     this.map = settings.map ?? 'debug';
 
     // When true (start menu open), the loop keeps drawing but ignores input.
