@@ -320,15 +320,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   const actionBtns = {
     'btn-a': 'a', 'btn-a-l': 'a',
     'btn-b': 'b', 'btn-b-l': 'b',
-    'btn-select': 'select', 'btn-select-l': 'select',
   };
   for (const [id, action] of Object.entries(actionBtns)) {
     const el = document.getElementById(id);
     if (el) game.input.register(el, action);
   }
 
-  // Start button opens the start menu (fires on first contact, like the
-  // utility buttons). Keeps the 'start' action for held-state visuals.
+  // Menu button (id btn-start) opens the start menu (fires on first contact,
+  // like the utility buttons). Keeps the 'start' action for held-state visuals.
   ['btn-start', 'btn-start-l'].forEach(id => {
     const el = document.getElementById(id);
     if (el) game.input.register(el, 'start', { onEnter: () => menu.open() });

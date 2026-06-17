@@ -76,20 +76,13 @@
       margin: var(--portrait-btn-divider-offset, 4px) 0;
     }
 
-    /* Lower controls group: Select/Start + Reset/Reload/Debug */
+    /* Lower controls group: single row — Menu, Debug, Reload */
     #controls-lower {
       display: flex;
       flex-direction: column;
       align-items: center;
       width: 100%;
       padding-bottom: var(--controls-lower-bottom-pad, 0px);
-    }
-
-    .ctrl-row-meta {
-      display: flex;
-      justify-content: center;
-      padding: 6px 16px 2px;
-      width: 100%;
     }
 
     .ctrl-row-util {
@@ -126,15 +119,12 @@
       align-items: center;
       gap: 6px;
     }
-    .meta-group {
-      display: flex;
-      gap: 8px;
-    }
     .util-group {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
       justify-content: center;
+      align-items: center;
     }
 
     /* Round buttons (A, B): 20% bigger — 40→48px */
@@ -334,25 +324,15 @@
       <!-- Debug separator (only visible in debug mode) -->
       <div class="debug-separator"></div>
 
-      <!-- Lower group: Select/Start + Reset/Reload/Debug -->
+      <!-- Lower group: single row — Menu, Debug, Reload -->
       <div id="controls-lower">
-
-        <!-- Row 2: Select + Start -->
-        <div class="ctrl-row-meta">
-          <div class="meta-group">
-            <div class="btn-round btn-meta tap-target" id="btn-select">Select</div>
-            <div class="btn-round btn-meta tap-target" id="btn-start">Start</div>
-          </div>
-        </div>
-
-        <!-- Row 3: Reload + Debug -->
         <div class="ctrl-row-util">
           <div class="util-group">
-            <div class="btn-util tap-target" id="btn-reload">Reload</div>
+            <div class="btn-round btn-meta tap-target" id="btn-start">Menu</div>
             <div class="btn-util tap-target" id="btn-debug">Debug</div>
+            <div class="btn-util tap-target" id="btn-reload">Reload</div>
           </div>
         </div>
-
       </div>
 
     </div>
@@ -379,15 +359,11 @@
   <div class="side-spacer"></div>
 
   <div class="side-right">
+    <!-- Single column — Menu, Debug, Reload -->
     <div class="action-group">
-      <div class="meta-group">
-        <div class="btn-round btn-meta tap-target" id="btn-select-l">Select</div>
-        <div class="btn-round btn-meta tap-target" id="btn-start-l">Start</div>
-      </div>
-      <div class="util-group">
-        <div class="btn-util tap-target" id="btn-reload-l">Reload</div>
-        <div class="btn-util tap-target" id="btn-debug-l">Debug</div>
-      </div>
+      <div class="btn-round btn-meta tap-target" id="btn-start-l">Menu</div>
+      <div class="btn-util tap-target" id="btn-debug-l">Debug</div>
+      <div class="btn-util tap-target" id="btn-reload-l">Reload</div>
     </div>
     <div class="btn-ab-group">
       <div class="btn-round btn-b tap-target" id="btn-b-l">B</div>
