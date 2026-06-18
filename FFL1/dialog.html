@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dialog — FFL1</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.filter-row { display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+.filter-row input { flex:1; min-width:160px; }
+.dlg-count { font-size:0.7rem; color:var(--dim2); white-space:nowrap; }
+
+.dlg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.dlg-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.dlg-card-header {
+  padding: 7px 12px;
+  background: var(--panel2);
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.dlg-idx { font-family:'Black Ops One',sans-serif; font-size:0.66rem; color:var(--dim2); letter-spacing:1px; }
+.dlg-offset { font-size:0.64rem; color:var(--cyan); }
+.dlg-text {
+  padding: 10px 12px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--white);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.dlg-text.empty { color: var(--dim2); font-style: italic; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FFL1</h1>
+  <div class="breadcrumb">
+    <a href="/">tythos.com</a><span>/</span>
+    <a href="index.html">FFL1</a><span>/</span>
+    <span>Dialog</span>
+  </div>
+</header>
+<nav>
+  <a href="index.html">HOME</a>
+  <a href="general.html">GENERAL</a>
+  <a href="monsters.html">MONSTERS</a>
+  <a href="mutants.html">MUTANTS</a>
+  <a href="humans.html">HUMANS</a>
+  <a href="items.html">ITEMS</a>
+  <a href="shops.html">SHOPS</a>
+  <a href="encounters.html">ENCOUNTERS</a>
+  <a href="dialog.html" class="active">DIALOG</a>
+  <a href="game.html">▶ PLAY</a>
+</nav>
+
+<main>
+  <div class="page-title">DIALOG</div>
+  <div class="page-sub">ROM-EXTRACTED TEXT — MEDIUM CONFIDENCE</div>
+
+  <div class="callout warn">
+    <strong>Data source notice:</strong> 251 NPC/story strings extracted from ROM bank 5
+    (<code>0x14F3E</code>–<code>0x17D37</code>), DTE-decoded using the tables at <code>0x14E40</code>
+    (DTE1) and <code>0x14EC0</code> (DTE2). <strong>MEDIUM confidence</strong> — the DTE expansion is
+    correct, but some control-code semantics are still unknown, so line breaks and a few characters
+    may be garbled (e.g. runs of <code>N</code> are stripped control codes). String→NPC trigger
+    mapping is not yet decoded.
+  </div>
+
+  <div class="filter-row">
+    <input type="text" id="dlg-search" placeholder="Search dialog text or offset…">
+    <span class="dlg-count" id="dlg-count"></span>
+  </div>
+
+  <div id="dlg-grid" class="dlg-grid"></div>
+</main>
+
+<script>
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+async function init() {
+  const data = await fetch('data/dialog.json').then(r => r.json());
+  const strings = data.strings || [];
+  const grid = document.getElementById('dlg-grid');
+  const cards = [];
+
+  strings.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.className = 'dlg-card';
+    const text = (s.text || '').trim();
+    card.dataset.search = (text + ' ' + (s.offset || '')).toLowerCase();
+    card.innerHTML = `
+      <div class="dlg-card-header">
+        <span class="dlg-idx">#${i}</span>
+        <span class="dlg-offset">${esc(s.offset || '')}</span>
+      </div>
+      <div class="dlg-text${text ? '' : ' empty'}">${text ? esc(text) : '(empty string)'}</div>`;
+    grid.appendChild(card);
+    cards.push(card);
+  });
+
+  const countEl = document.getElementById('dlg-count');
+  function applyFilter() {
+    const q = document.getElementById('dlg-search').value.toLowerCase().trim();
+    let shown = 0;
+    cards.forEach(c => {
+      const match = !q || c.dataset.search.includes(q);
+      c.classList.toggle('hidden', !match);
+      if (match) shown++;
+    });
+    countEl.textContent = `${shown} / ${cards.length} strings`;
+  }
+  document.getElementById('dlg-search').addEventListener('input', applyFilter);
+  applyFilter();
+}
+init();
+</script>
+</body>
+</html>
