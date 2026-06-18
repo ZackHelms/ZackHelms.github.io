@@ -9,6 +9,10 @@ It is fine to push directly to the `main` branch for this repository. No pull re
 - `games/` — self-contained single-file HTML games (CSS + JS inline, no shared libs)
 - `games/index.html` — games hub; add a card here for every new game
 - `town-game-isometric/` — standalone isometric town-game project
+- `FFL1/` — **generated/published, do NOT edit by hand.** This directory is overwritten
+  by `publish.sh` in the separate [`ZackHelms/FFL1`](https://github.com/ZackHelms/FFL1)
+  repo, which replaces it with the contents of that repo's `webapp/` folder. Make FFL1
+  web app changes in the FFL1 repo's `webapp/`, then run its `publish.sh` to deploy here.
 
 ## Adding a new game
 
