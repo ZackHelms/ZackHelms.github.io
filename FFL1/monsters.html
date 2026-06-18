@@ -41,6 +41,28 @@
 .class-member .m-name { color: var(--white); }
 .class-member.m-top .m-name { color: var(--gold); }
 .class-member .m-weight { color: var(--dim2); font-size: 0.65rem; }
+
+/* Eat-transformation reachability matrix */
+.eat-wrap { overflow-x: auto; margin-top: 14px; }
+.eat-matrix { border-collapse: collapse; font-size: 0.6rem; }
+.eat-matrix th, .eat-matrix td {
+  border: 1px solid var(--border);
+  width: 16px; height: 16px;
+  text-align: center; padding: 0;
+}
+.eat-matrix thead th { color: var(--dim2); font-weight: normal; }
+.eat-matrix th.row-lbl {
+  width: auto; white-space: nowrap; text-align: right;
+  padding: 0 6px; color: var(--white); font-weight: normal;
+}
+.eat-matrix tr.restricted th.row-lbl { color: var(--gold); }
+.eat-matrix th.row-lbl .rl-rep { color: var(--dim2); }
+.eat-cell-1 { background: color-mix(in srgb, var(--cyan) 38%, transparent); }
+.eat-cell-2 { background: color-mix(in srgb, var(--gold) 60%, transparent); }
+.eat-cell-0 { background: transparent; }
+.eat-corner { background: transparent; border: none !important; }
+.eat-legend { display:flex; gap:14px; flex-wrap:wrap; font-size:0.68rem; margin:10px 0 0; align-items:center; }
+.eat-legend .sw { display:inline-block; width:13px; height:13px; border:1px solid var(--border); vertical-align:-2px; margin-right:4px; }
 </style>
 </head>
 <body>
@@ -139,8 +161,8 @@
     <h2>MONSTER CLASSES &amp; MEAT TRANSFORMATION</h2>
     <p style="font-size:0.82rem;margin-bottom:8px;">
       There are 25 monster classes (IDs 0–149; class = ID ÷ 6). When a monster eats meat,
-      it picks a random result class (roughly equal chance for each of the 25 classes), then
-      picks a random member of that class weighted by the values below.
+      it picks a random <em>result class</em> from the eat table below, then picks a random
+      member of that class weighted by the values shown in the grid.
       <strong style="color:var(--gold)">Gold names</strong> = highest probability in that class.
       Monsters 150+ (human warriors, bosses) cannot eat meat.
     </p>
@@ -148,6 +170,29 @@
       Source: ROM <code>0x0B2A8</code> (class members + weights) · <code>0x0AFD3</code> (eat table) — HIGH confidence
     </p>
     <div id="class-grid" class="class-grid"></div>
+
+    <h3 style="font-family:'Black Ops One',sans-serif;font-size:0.95rem;letter-spacing:1px;margin:26px 0 4px;">
+      EAT TABLE — WHAT EACH CLASS CAN BECOME
+    </h3>
+    <p style="font-size:0.82rem;margin-bottom:6px;">
+      Row = the class doing the eating; column = the class it can turn into. Most classes can
+      become <strong>any</strong> of the 25 classes with equal odds, but
+      <strong style="color:var(--gold)">7 eater classes (gold labels)</strong> are restricted —
+      some result classes are blocked entirely (empty cell) and a few are
+      <strong style="color:var(--gold)">twice as likely</strong> (gold cell). The actual result
+      monster is then drawn from that class using the member weights in the cards above.
+    </p>
+    <p style="font-size:0.72rem;color:var(--dim2);margin-bottom:8px;">
+      Source: ROM <code>0x0AFD3</code> (eat table, 25 eater classes × 25 result-class weights) — HIGH confidence
+    </p>
+    <div class="eat-legend">
+      <span><span class="sw eat-cell-1"></span>can become (weight 1)</span>
+      <span><span class="sw eat-cell-2"></span>double chance (weight 2)</span>
+      <span><span class="sw eat-cell-0"></span>cannot become (weight 0)</span>
+    </div>
+    <div class="eat-wrap">
+      <table class="eat-matrix"><thead id="eat-head"></thead><tbody id="eat-body"></tbody></table>
+    </div>
   </section>
 </main>
 
@@ -237,6 +282,34 @@ async function init() {
     card.innerHTML = `<div class="class-card-title">CLASS ${cls.class_id}</div>${membersHtml}`;
     classGrid.appendChild(card);
   });
+
+  // Eat-transformation matrix: eater class (row) -> result class weight (col)
+  const classRep = {};   // class_id -> representative (highest-weight) member name
+  txData.monster_classes.forEach(cls => {
+    classRep[cls.class_id] = cls.members.reduce((a, b) => (b.weight > a.weight ? b : a)).name;
+  });
+  const eatByEater = {};
+  txData.eat_transformation.forEach(e => { eatByEater[e.eater_class] = e.result_class_weights; });
+  const numClasses = txData.monster_classes.length;
+
+  const eatHead = document.getElementById('eat-head');
+  const headCells = ['<th class="eat-corner"></th>'];
+  for (let c = 0; c < numClasses; c++) {
+    headCells.push(`<th title="class ${c} · ${classRep[c]}">${c}</th>`);
+  }
+  eatHead.innerHTML = `<tr>${headCells.join('')}</tr>`;
+
+  const eatBody = document.getElementById('eat-body');
+  for (let r = 0; r < numClasses; r++) {
+    const weights = eatByEater[r] || {};
+    const restricted = Object.values(weights).some(w => w !== 1);
+    const cells = [`<th class="row-lbl">${r} <span class="rl-rep">${classRep[r]}</span></th>`];
+    for (let c = 0; c < numClasses; c++) {
+      const w = weights[c] ?? weights[String(c)] ?? 0;
+      cells.push(`<td class="eat-cell-${w}" title="${classRep[r]} → ${classRep[c]} (weight ${w})">${w === 2 ? '2' : ''}</td>`);
+    }
+    eatBody.innerHTML += `<tr class="${restricted ? 'restricted' : ''}">${cells.join('')}</tr>`;
+  }
 }
 init();
 </script>

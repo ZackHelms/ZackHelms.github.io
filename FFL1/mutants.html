@@ -141,6 +141,7 @@ async function init() {
     if (a.power != null) statParts.push(`<span style="color:var(--neon-green);font-size:0.6rem">PWR ${a.power}</span>`);
     if (a.defense != null) statParts.push(`<span style="color:var(--neon-green);font-size:0.6rem">DEF ${a.defense}</span>`);
     if (a.heal != null) statParts.push(`<span style="color:var(--neon-green);font-size:0.6rem">HEAL ${a.heal}</span>`);
+    if (a.status_clears) statParts.push(`<span style="color:var(--cyan);font-size:0.6rem">CURES ${a.status_clears.toUpperCase()}</span>`);
     if (a.element) statParts.push(`<span class="tag ${ELEM_COLOR[a.element] || ''}" style="font-size:0.55rem;padding:1px 4px">${a.element}</span>`);
     el.innerHTML = `<div class="a-name">${a.name || '—'}${a.gp ? `<span class="a-gp">${a.gp.toLocaleString()}</span>` : ''}</div>
       <div class="a-type"><span class="tag ${typeColor}">${a.type}</span>${a.uses != null ? `<span style="color:var(--dim2);font-size:0.6rem;margin-left:6px">${a.uses === 254 ? '×∞' : '×' + a.uses}</span>` : (a.type_byte != null ? `<span style="color:var(--dim2);font-size:0.6rem;margin-left:6px">×${a.type_byte}</span>` : '')}</div>
