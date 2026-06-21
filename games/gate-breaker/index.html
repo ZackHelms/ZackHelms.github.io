@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Gate Breaker</title>
+<style>
+  html,body{margin:0;padding:0;background:#07070f;}
+  #root{min-height:100vh;}
+</style>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+// ============================================================================
+// GATE BREAKER — Complete Unified Edition
+// Pure local game engine. NO API calls, NO fetch, NO external dependencies.
+// Single file. Save slots persist via window.storage (when available) with
+// an in-memory fallback so the game never breaks if storage is unavailable.
+// ============================================================================
+
+const BG="#07070f", BLUE="#4a9eff", TEXT="#c9d1e0", MUTED="#4a5a7a", N_SLOTS=6;
+
+// ---------------------------------------------------------------------------
+// STORAGE — works inside Claude artifacts (window.storage) AND in any normal
+// browser/StackBlitz environment (falls back to localStorage automatically).
+// ---------------------------------------------------------------------------
+const memStore = {};
+function hasArtifactStorage(){ return typeof window!=="undefined" && window.storage && typeof window.storage.get==="function"; }
+function hasLocalStorage(){ try{ return typeof window!=="undefined" && !!window.localStorage; }catch{ return false; } }
+const withTimeout=(p,ms=1500)=>Promise.race([p, new Promise(res=>setTimeout(()=>res(null),ms))]);
+
+async function storageGet(key){
+  if(hasArtifactStorage()){
+    try{ const r=await withTimeout(window.storage.get(key)); if(r?.value!=null) return r.value; }catch{}
+  }
+  if(hasLocalStorage()){
+    try{ const v=window.localStorage.getItem(key); if(v!=null) return v; }catch{}
+  }
+  return memStore[key] ?? null;
+}
+async function storageSet(key,val){
+  memStore[key]=val;
+  if(hasArtifactStorage()){ try{ await withTimeout(window.storage.set(key,val)); }catch{} }
+  if(hasLocalStorage()){ try{ window.localStorage.setItem(key,val); }catch{} }
+}
+async function storageDel(key){
+  delete memStore[key];
+  if(hasArtifactStorage()){ try{ await withTimeout(window.storage.delete(key)); }catch{} }
+  if(hasLocalStorage()){ try{ window.localStorage.removeItem(key); }catch{} }
+}
+async function loadSlots(){
+  const out=[];
+  for(let i=0;i<N_SLOTS;i++){
+    try{ const raw=await storageGet("gbslot_"+i); out.push(raw?JSON.parse(raw):null); }
+    catch{ out.push(null); }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// GAME DATA
+// ---------------------------------------------------------------------------
+const CLASSES={
+  Warrior:{hp:120,mp:40,atk:18,def:14,mgp:4,spd:8,ability:"Berserker Slash",desc:"High damage melee strike. Deals 2x ATK damage."},
+  Mage:    {hp:70, mp:100,atk:6, def:5, mgp:22,spd:9, ability:"Fireball",      desc:"Magic burst. Deals 3x MGP damage."},
+  Archer:  {hp:90, mp:60, atk:14,def:8, mgp:8, spd:14,ability:"Arrow Rain",    desc:"Multi-hit. Deals 1.5x ATK, hits 3 times."},
+  Assassin:{hp:80, mp:60, atk:20,def:6, mgp:6, spd:16,ability:"Shadow Strike", desc:"Critical strike. 50% chance for 3x ATK damage."},
+  Healer:  {hp:100,mp:90, atk:8, def:10,mgp:14,spd:8, ability:"Holy Light",    desc:"Heals 40% of max HP."},
+};
+
+// Hunter Rank — separate from gate rank. Reflects the hunter's own power level,
+// determined by character level. Shown in the UI as a title/badge.
+const HUNTER_RANKS=[
+  {min:1, max:2, rank:"E", title:"Awakened Novice"},
+  {min:3, max:5, rank:"D", title:"Recognized Hunter"},
+  {min:6, max:8, rank:"C", title:"Veteran Hunter"},
+  {min:9, max:12,rank:"B", title:"Elite Hunter"},
+  {min:13,max:17,rank:"A", title:"National-Level Hunter"},
+  {min:18,max:999,rank:"S", title:"Monarch-Class Hunter"},
+];
+function hunterRankFor(level){
+  return HUNTER_RANKS.find(r=>level>=r.min && level<=r.max) || HUNTER_RANKS[HUNTER_RANKS.length-1];
+}
+
+const ENEMIES={
+  E:[{name:"Goblin",hp:30,atk:5,def:2,stones:10,xp:15},
+     {name:"Forest Spider",hp:25,atk:6,def:1,stones:8,xp:12},
+     {name:"Mud Troll",hp:45,atk:7,def:3,stones:15,xp:20}],
+  D:[{name:"Orc Warrior",hp:80,atk:14,def:6,stones:30,xp:40},
+     {name:"Dark Elf",hp:60,atk:18,def:4,stones:35,xp:45},
+     {name:"Stone Golem",hp:120,atk:10,def:12,stones:50,xp:60}],
+  C:[{name:"Vampire Lord",hp:150,atk:22,def:10,stones:80,xp:100},
+     {name:"Wyvern",hp:180,atk:25,def:8,stones:90,xp:110},
+     {name:"Death Knight",hp:160,atk:20,def:15,stones:85,xp:105}],
+  B:[{name:"Frost Giant",hp:260,atk:30,def:16,stones:160,xp:180},
+     {name:"Chimera",hp:220,atk:34,def:12,stones:170,xp:190},
+     {name:"Abyss Walker",hp:240,atk:28,def:18,stones:175,xp:195}],
+  A:[{name:"Ancient Dragon",hp:400,atk:42,def:24,stones:320,xp:380},
+     {name:"Demon General",hp:380,atk:46,def:20,stones:330,xp:390},
+     {name:"Titan Construct",hp:450,atk:38,def:28,stones:340,xp:400}],
+  S:[{name:"Shadow Sovereign's Knight",hp:600,atk:55,def:32,stones:600,xp:700},
+     {name:"World-Class Beast",hp:650,atk:58,def:28,stones:620,xp:720},
+     {name:"Monarch's Herald",hp:580,atk:60,def:30,stones:640,xp:740}],
+};
+
+const BOSSES={
+  E:{name:"Shadow Wolf",hp:120,atk:12,def:5,stones:50,xp:80},
+  D:{name:"Iron Golem King",hp:280,atk:22,def:14,stones:120,xp:200},
+  C:{name:"Dragon Lich",hp:500,atk:35,def:18,stones:300,xp:500},
+  B:{name:"Frost Wyrm Queen",hp:750,atk:45,def:22,stones:550,xp:750},
+  A:{name:"Demon King Baran",hp:1100,atk:58,def:30,stones:900,xp:1200},
+  S:{name:"The Architect",hp:1800,atk:75,def:38,stones:2000,xp:2500},
+};
+
+const DUNGEONS={
+  E:["Goblin Cave","Forest Ruins","Rat King's Den"],
+  D:["Orc Stronghold","Dark Elf Sanctum","Ancient Tomb"],
+  C:["Vampire Castle","Wyvern Nest","Death Citadel"],
+  B:["Frozen Wasteland","Chimera's Lair","Abyssal Rift"],
+  A:["Dragon's Peak","Demon Fortress","Titan's Forge"],
+  S:["The Shadow Realm","World Boundary Gate","Monarch's Throne"],
+};
+
+const RANK_MIN_LEVEL={E:1,D:3,C:6,B:9,A:13,S:18};
+const RANK_ROOMS={E:4,D:6,C:8,B:9,A:11,S:13};
+const RANK_COLOR={E:"#4a9eff",D:"#55cc88",C:"#ddaa33",B:"#ff8844",A:"#ff4488",S:"#cc44ff"};
+
+// Difficulty multiplier per rank — gentle ramp E->C, steep ramp C->S.
+// Applied to enemy/boss HP, ATK, DEF so late-game gates are genuinely dangerous.
+const RANK_DIFFICULTY={ E:1.0, D:1.08, C:1.18, B:1.55, A:2.3, S:3.6 };
+
+// Side Quest red-gate flavor names, used when a random-rank red gate spawns
+const RED_GATE_NAMES=["Bleeding Rift","Crimson Tear","Hollow Wound","Festering Gate","Scarlet Maw"];
+
+
+// Items tiered by player level. More + better items unlock as you level up.
+const ALL_STORE_ITEMS=[
+  // Tier 0 — always available
+  {name:"Health Potion",     cost:20,  minLv:1, rarity:"Common",    type:"potion", heal:30,     desc:"Restores 30 HP"},
+  {name:"Mana Potion",       cost:15,  minLv:1, rarity:"Common",    type:"mana",   restore:20,  desc:"Restores 20 Mana"},
+  {name:"Iron Sword",        cost:80,  minLv:1, rarity:"Common",    type:"weapon", atkBonus:8,  desc:"+8 ATK"},
+  {name:"Leather Armor",     cost:60,  minLv:1, rarity:"Common",    type:"armor",  defBonus:5,  desc:"+5 DEF"},
+  {name:"Wooden Staff",      cost:70,  minLv:1, rarity:"Common",    type:"weapon", mgpBonus:8,  desc:"+8 MGP"},
+  {name:"Speed Boots",       cost:55,  minLv:1, rarity:"Common",    type:"armor",  spdBonus:4,  desc:"+4 SPD"},
+  // Tier 1 — level 2+
+  {name:"Hi-Potion",         cost:45,  minLv:2, rarity:"Uncommon",  type:"potion", heal:60,     desc:"Restores 60 HP"},
+  {name:"Ether Flask",       cost:35,  minLv:2, rarity:"Uncommon",  type:"mana",   restore:45,  desc:"Restores 45 Mana"},
+  {name:"Steel Sword",       cost:160, minLv:2, rarity:"Uncommon",  type:"weapon", atkBonus:16, desc:"+16 ATK"},
+  {name:"Chain Mail",        cost:140, minLv:2, rarity:"Uncommon",  type:"armor",  defBonus:12, desc:"+12 DEF"},
+  {name:"Battle Axe",        cost:180, minLv:2, rarity:"Uncommon",  type:"weapon", atkBonus:20, desc:"+20 ATK"},
+  {name:"Mage Robe",         cost:130, minLv:2, rarity:"Uncommon",  type:"armor",  defBonus:6, mgpBonus:8, desc:"+6 DEF +8 MGP"},
+  // Tier 2 — level 4+
+  {name:"Elixir",            cost:90,  minLv:4, rarity:"Rare",      type:"potion", heal:120,    desc:"Restores 120 HP"},
+  {name:"Arcane Crystal",    cost:80,  minLv:4, rarity:"Rare",      type:"mana",   restore:80,  desc:"Restores 80 Mana"},
+  {name:"Shadow Dagger",     cost:280, minLv:4, rarity:"Rare",      type:"weapon", atkBonus:24, spdBonus:6, desc:"+24 ATK +6 SPD"},
+  {name:"Knight Plate",      cost:320, minLv:4, rarity:"Rare",      type:"armor",  defBonus:22, desc:"+22 DEF"},
+  {name:"Arcane Staff",      cost:300, minLv:4, rarity:"Rare",      type:"weapon", mgpBonus:28, desc:"+28 MGP"},
+  {name:"Phantom Boots",     cost:260, minLv:4, rarity:"Rare",      type:"armor",  spdBonus:10, defBonus:6, desc:"+10 SPD +6 DEF"},
+  // Tier 3 — level 6+
+  {name:"Phoenix Potion",    cost:180, minLv:6, rarity:"Epic",      type:"potion", heal:250,    desc:"Restores 250 HP"},
+  {name:"Mana Surge Vial",   cost:160, minLv:6, rarity:"Epic",      type:"mana",   restore:150, desc:"Restores 150 Mana"},
+  {name:"Flame Sword",       cost:600, minLv:6, rarity:"Epic",      type:"weapon", atkBonus:38, desc:"+38 ATK, Fire damage"},
+  {name:"Dragon Scale Mail", cost:650, minLv:6, rarity:"Epic",      type:"armor",  defBonus:35, desc:"+35 DEF"},
+  {name:"Soul Scythe",       cost:700, minLv:6, rarity:"Epic",      type:"weapon", atkBonus:30, mgpBonus:20, desc:"+30 ATK +20 MGP"},
+  {name:"Void Robes",        cost:580, minLv:6, rarity:"Epic",      type:"armor",  defBonus:18, mgpBonus:22, desc:"+18 DEF +22 MGP"},
+  // Tier 4 — level 9+ (B rank unlocked)
+  {name:"Berserker Greatsword",cost:950, minLv:9, rarity:"Epic",    type:"weapon", atkBonus:48, desc:"+48 ATK"},
+  {name:"Titan's Bulwark",   cost:980,  minLv:9, rarity:"Epic",     type:"armor",  defBonus:42, desc:"+42 DEF"},
+  {name:"Sovereign Elixir",  cost:350,  minLv:9, rarity:"Legendary",type:"potion", heal:9999,   desc:"Fully restores HP"},
+  {name:"Divine Mana Orb",   cost:300,  minLv:9, rarity:"Legendary",type:"mana",   restore:9999,desc:"Fully restores Mana"},
+  // Tier 5 — level 13+ (A rank unlocked)
+  {name:"Demon King Blade",  cost:1400, minLv:13,rarity:"Legendary",type:"weapon", atkBonus:60, desc:"+60 ATK, Dark damage"},
+  {name:"Shadow Monarch Armor",cost:1500,minLv:13,rarity:"Legendary",type:"armor", defBonus:55, desc:"+55 DEF"},
+  {name:"Archmage Tome",     cost:1450, minLv:13,rarity:"Legendary",type:"weapon", mgpBonus:65, desc:"+65 MGP"},
+  // Tier 6 — level 18+ (S rank unlocked)
+  {name:"World Destroyer",   cost:2600, minLv:18,rarity:"Mythic",   type:"weapon", atkBonus:90, mgpBonus:40, desc:"+90 ATK +40 MGP"},
+  {name:"Aegis of Eternity", cost:2700, minLv:18,rarity:"Mythic",   type:"armor",  defBonus:80, spdBonus:15, desc:"+80 DEF +15 SPD"},
+  {name:"Monarch's Crown",   cost:3000, minLv:18,rarity:"Mythic",   type:"armor",  defBonus:50, mgpBonus:50, spdBonus:20, desc:"+50 DEF +50 MGP +20 SPD"},
+];
+const RARITY_COLOR={Common:"#aaaaaa",Uncommon:"#55cc55",Rare:"#4488ff",Epic:"#aa44ff",Legendary:"#ffaa00",Mythic:"#ff3366"};
+function getStoreItems(level){ return ALL_STORE_ITEMS.filter(it=>it.minLv<=level); }
+
+function roll(sides=20){ return Math.floor(Math.random()*sides)+1; }
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+
+const MAX_POTIONS=5; // shared cap across all consumables combined
+const BASE_WEAPON={name:"Bare Hands",atkBonus:0,mgpBonus:0,spdBonus:0,rarity:"—",desc:"No bonus"};
+const BASE_ARMOR ={name:"Cloth Armor",defBonus:0,mgpBonus:0,spdBonus:0,rarity:"—",desc:"No bonus"};
+
+function newPlayer(name,cls){
+  const base=CLASSES[cls];
+  return{ name,cls,level:1,xp:0,xpNext:100,
+    baseHp:base.hp,baseMp:base.mp,baseAtk:base.atk,baseDef:base.def,baseMgp:base.mgp,baseSpd:base.spd,
+    hp:base.hp,mp:base.mp,
+    ability:base.ability,abilityCd:0,
+    ownedWeapons:[],ownedArmors:[],     // names of owned gear, can switch freely
+    equippedWeapon:"Bare Hands",equippedArmor:"Cloth Armor",
+    inventory:[],stones:0,abilityDesc:base.desc,
+    defeatedBosses:[],                 // ranks whose boss has been cleared at least once
+  };
+}
+
+// Recompute derived stats (maxHp/maxMp/atk/def/mgp/spd) from base class stats
+// PLUS only the currently equipped weapon/armor — gear no longer stacks.
+function recomputeStats(p){
+  const w=ALL_STORE_ITEMS.find(it=>it.name===p.equippedWeapon) || BASE_WEAPON;
+  const ar=ALL_STORE_ITEMS.find(it=>it.name===p.equippedArmor) || BASE_ARMOR;
+  const maxHp=p.baseHp;
+  const maxMp=p.baseMp;
+  const atk=p.baseAtk + (w.atkBonus||0);
+  const def=p.baseDef + (ar.defBonus||0);
+  const mgp=p.baseMgp + (w.mgpBonus||0) + (ar.mgpBonus||0);
+  const spd=p.baseSpd + (w.spdBonus||0) + (ar.spdBonus||0);
+  const hp=Math.min(p.hp, maxHp);
+  const mp=Math.min(p.mp, maxMp);
+  return {...p, maxHp,maxMp,atk,def,mgp,spd,hp,mp};
+}
+
+function levelUp(p){
+  const next={...p,level:p.level+1,xp:p.xp-p.xpNext,xpNext:Math.floor(p.xpNext*1.4)};
+  next.baseHp+=10; next.baseMp+=8;
+  next.baseAtk+=2; next.baseDef+=1; next.baseMgp+=2; next.baseSpd+=1;
+  const recomputed=recomputeStats(next);
+  recomputed.hp=recomputed.maxHp; recomputed.mp=recomputed.maxMp; // full heal on level up
+  return recomputed;
+}
+
+// ---------------------------------------------------------------------------
+// GAME ENGINE
+// ---------------------------------------------------------------------------
+function createGame(playerName, playerClass){
+  return{
+    phase:"hub", player:recomputeStats(newPlayer(playerName, playerClass)),
+    dungeon:null, floor:0, room:0, totalRooms:0,
+    enemy:null, isBoss:false, log:[], options:[],
+    isQuest:false, isBossRush:false,
+  };
+}
+
+function availableRanks(level){
+  return Object.keys(RANK_MIN_LEVEL).filter(r=>level>=RANK_MIN_LEVEL[r]);
+}
+
+function hubOptions(g){
+  const ranks=availableRanks(g.player.level);
+  const opts=[...ranks.map(r=>`Enter ${r}-rank Gate`), "Visit Store", "Equip Gear", "Rest (heal full HP/MP)", "View Hunter Profile"];
+  if(g.player.defeatedBosses.length>0) opts.push("Boss Rush");
+  if(g.player.level>=2) opts.push("Side Quest (Red Gate)");
+  return opts;
+}
+
+function processAction(g, actionText){
+  const G={...g, player:{...g.player, inventory:[...g.player.inventory]}, log:[...g.log], options:[]};
+  const a=actionText.toLowerCase();
+
+  // ---- HUB ----
+  if(G.phase==="hub"){
+    if(a.includes("profile")){
+      const p=G.player; const hr=hunterRankFor(p.level);
+      const weaponDef=ALL_STORE_ITEMS.find(it=>it.name===p.equippedWeapon);
+      const armorDef=ALL_STORE_ITEMS.find(it=>it.name===p.equippedArmor);
+      const weaponLine=weaponDef
+        ? `⚔️ ${p.equippedWeapon} [${weaponDef.rarity}] — ${weaponDef.desc}`
+        : `⚔️ ${p.equippedWeapon} — no bonus`;
+      const armorLine=armorDef
+        ? `🛡 ${p.equippedArmor} [${armorDef.rarity}] — ${armorDef.desc}`
+        : `🛡 ${p.equippedArmor} — no bonus`;
+      const counts={};
+      p.inventory.forEach(it=>{ counts[it]=(counts[it]||0)+1; });
+      const bagLines=Object.keys(counts).length
+        ? Object.entries(counts).map(([name,n])=>{
+            const def=ALL_STORE_ITEMS.find(it=>it.name===name);
+            const tag=def?` [${def.rarity}]`:"";
+            return `  • ${name}${tag} x${n}`;
+          })
+        : ["  (empty)"];
+      const ownedWLines=p.ownedWeapons.length
+        ? p.ownedWeapons.map(n=>`  • ${n}${n===p.equippedWeapon?" (equipped)":""}`)
+        : ["  (none owned — using Bare Hands)"];
+      const ownedALines=p.ownedArmors.length
+        ? p.ownedArmors.map(n=>`  • ${n}${n===p.equippedArmor?" (equipped)":""}`)
+        : ["  (none owned — using Cloth Armor)"];
+      G.log=[`🎖 ${p.name} — ${hr.title}`,
+        `Hunter Rank: ${hr.rank} | Character Level: ${p.level}`,
+        `HP:${p.maxHp} MP:${p.maxMp} ATK:${p.atk} DEF:${p.def} MGP:${p.mgp} SPD:${p.spd}`,
+        ``,
+        `— EQUIPPED —`,
+        weaponLine,
+        armorLine,
+        ``,
+        `— OWNED WEAPONS —`,
+        ...ownedWLines,
+        ``,
+        `— OWNED ARMOR —`,
+        ...ownedALines,
+        ``,
+        `— BAG (${p.inventory.length}/${MAX_POTIONS}) —`,
+        ...bagLines,
+        ``,
+        `Bosses defeated: ${p.defeatedBosses.length?p.defeatedBosses.join(", "):"None yet"}`,
+        `Essence Stones: ${p.stones}💎`];
+      G.options=hubOptions(G);
+      return G;
+    }
+
+    if(a.includes("equip gear")){
+      G.phase="equip";
+      const p=G.player;
+      G.log=["⚙️ Equipment Loadout",
+        `Currently equipped: ⚔️ ${p.equippedWeapon} | 🛡 ${p.equippedArmor}`,
+        "Choose a weapon or armor to equip:"];
+      const wOpts=p.ownedWeapons.map(n=>`Equip Weapon: ${n}`);
+      const aOpts=p.ownedArmors.map(n=>`Equip Armor: ${n}`);
+      G.options=[...wOpts,...aOpts,"Unequip Weapon (Bare Hands)","Unequip Armor (Cloth Armor)","Back to Hub"];
+      return G;
+    }
+    if(a.includes("rest")){
+      G.player.hp=G.player.maxHp; G.player.mp=G.player.maxMp; G.player.abilityCd=0;
+      G.log=["You rest at the Hunter Association. HP and MP fully restored."];
+      G.options=hubOptions(G);
+      return G;
+    }
+    if(a.includes("store")){
+      G.phase="store";
+      const avail=getStoreItems(G.player.level);
+      const newUnlocks=avail.filter(it=>it.minLv===G.player.level);
+      G.log=["🏪 Hunter Association Store — Lv "+G.player.level,
+        "Your Essence Stones: "+G.player.stones+"💎",
+        ...(newUnlocks.length?["🆕 New items unlocked at your level!"]:[])];
+      G.options=avail.map(it=>`Buy ${it.name} (${it.cost}💎) [${it.rarity}] — ${it.desc}`).concat(["Leave Store"]);
+      return G;
+    }
+    if(a.includes("boss rush")){
+      G.phase="bossrush_select";
+      G.log=["💀 Boss Rush — refight any boss you've previously defeated, 1-on-1, no rooms to clear.",
+        "Rewards are reduced (50%) since there's no dungeon risk."];
+      G.options=[...G.player.defeatedBosses.map(r=>`Refight ${r}-Rank Boss: ${BOSSES[r].name}`),"Back to Hub"];
+      return G;
+    }
+    if(a.includes("side quest")){
+      const ranks=availableRanks(G.player.level);
+      const rank=ranks[Math.floor(Math.random()*ranks.length)];
+      const gateName=RED_GATE_NAMES[Math.floor(Math.random()*RED_GATE_NAMES.length)];
+      const totalRooms=Math.max(2,Math.floor(RANK_ROOMS[rank]*0.6));
+      G.dungeon={name:gateName,rank}; G.isQuest=true;
+      G.floor=1; G.room=0; G.totalRooms=totalRooms;
+      G.phase="dungeon";
+      G.log=[`🔴 A Red Gate tears open — ${gateName} (${rank}-rank)!`,
+        `Side Quest: clear ${totalRooms} rooms for bonus rewards (1.5x Stones & XP).`,
+        `This gate is unstable — anything could happen.`];
+      G.options=["Advance to next room","Search the area","Check stats"];
+      return G;
+    }
+    const rankMatch=a.match(/([edcbas])-rank/);
+    if(rankMatch){
+      const rank=rankMatch[1].toUpperCase();
+      const dungeonName=DUNGEONS[rank][Math.floor(Math.random()*3)];
+      const totalRooms=RANK_ROOMS[rank];
+      G.dungeon={name:dungeonName,rank}; G.isQuest=false;
+      G.floor=1; G.room=0; G.totalRooms=totalRooms;
+      G.phase="dungeon";
+      const danger=(rank==="A"||rank==="S")?" ⚠️ EXTREME DANGER — permadeath risk!":"";
+      G.log=[`🌀 A ${rank}-rank gate shimmers before you.${danger}`,
+        `You step inside the ${dungeonName}.`,
+        `Darkness surrounds you. ${totalRooms} rooms lie ahead.`];
+      G.options=["Advance to next room","Search the area","Check stats"];
+      return G;
+    }
+    G.log=["Choose an action from the options below."];
+    G.options=hubOptions(G);
+    return G;
+  }
+
+  // ---- EQUIP MENU ----
+  if(G.phase==="equip"){
+    if(a.includes("back to hub")){
+      G.phase="hub"; G.log=["You return to the Hub."]; G.options=hubOptions(G); return G;
+    }
+    if(a.includes("unequip weapon")){
+      G.player.equippedWeapon="Bare Hands";
+      G.player=recomputeStats(G.player);
+      G.log=["Unequipped weapon. Using Bare Hands."];
+    } else if(a.includes("unequip armor")){
+      G.player.equippedArmor="Cloth Armor";
+      G.player=recomputeStats(G.player);
+      G.log=["Unequipped armor. Using Cloth Armor."];
+    } else if(a.includes("equip weapon:")){
+      const wname=actionText.split(":")[1]?.trim();
+      const owned=G.player.ownedWeapons.find(n=>n.toLowerCase()===wname?.toLowerCase());
+      if(owned){
+        G.player.equippedWeapon=owned;
+        G.player=recomputeStats(G.player);
+        G.log=[`⚔️ Equipped ${owned}!`];
+      } else {
+        G.log=["You don't own that weapon."];
+      }
+    } else if(a.includes("equip armor:")){
+      const aname=actionText.split(":")[1]?.trim();
+      const owned=G.player.ownedArmors.find(n=>n.toLowerCase()===aname?.toLowerCase());
+      if(owned){
+        G.player.equippedArmor=owned;
+        G.player=recomputeStats(G.player);
+        G.log=[`🛡 Equipped ${owned}!`];
+      } else {
+        G.log=["You don't own that armor."];
+      }
+    } else {
+      G.log=["Choose gear to equip, or go back."];
+    }
+    const p=G.player;
+    const wOpts=p.ownedWeapons.map(n=>`Equip Weapon: ${n}`);
+    const aOpts=p.ownedArmors.map(n=>`Equip Armor: ${n}`);
+    G.options=[...wOpts,...aOpts,"Unequip Weapon (Bare Hands)","Unequip Armor (Cloth Armor)","Back to Hub"];
+    return G;
+  }
+
+  // ---- BOSS RUSH SELECT ----
+  if(G.phase==="bossrush_select"){
+    if(a.includes("back to hub")){
+      G.phase="hub"; G.log=["You return to the Hub."]; G.options=hubOptions(G); return G;
+    }
+    const rankMatch2=a.match(/refight ([edcbas])-rank boss/);
+    if(rankMatch2){
+      const rank=rankMatch2[1].toUpperCase();
+      const boss=BOSSES[rank];
+      const mult=RANK_DIFFICULTY[rank];
+      const scaledHp=Math.round(boss.hp*mult);
+      const scaledAtk=Math.round(boss.atk*mult);
+      const scaledDef=Math.round(boss.def*mult);
+      G.enemy={name:boss.name,hp:scaledHp,currentHp:scaledHp,atk:scaledAtk,def:scaledDef,
+        stones:Math.round(boss.stones*0.5),xp:Math.round(boss.xp*0.5)};
+      G.isBoss=true; G.isBossRush=true; G.isQuest=false;
+      G.dungeon={name:"Boss Rush Arena",rank};
+      G.phase="combat";
+      G.log=[`💀 Boss Rush: ${boss.name} (${rank}-Rank) awaits!`,
+        `${boss.name} HP: ${scaledHp} | ATK: ${scaledAtk} | DEF: ${scaledDef}`];
+      G.options=buildCombatOptions(G);
+      return G;
+    }
+    G.log=["Pick a boss to refight."];
+    G.options=[...G.player.defeatedBosses.map(r=>`Refight ${r}-Rank Boss: ${BOSSES[r].name}`),"Back to Hub"];
+    return G;
+  }
+
+  // ---- STORE ----
+  if(G.phase==="store"){
+    if(a.includes("leave")){
+      G.phase="hub"; G.log=["You leave the store."]; G.options=hubOptions(G); return G;
+    }
+    const avail2=getStoreItems(G.player.level);
+    const item=avail2.find(it=>a.includes(it.name.toLowerCase()));
+    if(item){
+      const isConsumable=item.type==="potion"||item.type==="mana";
+      if(isConsumable && G.player.inventory.length>=MAX_POTIONS){
+        G.log=[`❌ Bag is full! You can carry at most ${MAX_POTIONS} potions/items at once.`,
+          `Use or discard something first.`];
+      } else if(G.player.stones<item.cost){
+        G.log=[`❌ Not enough Essence Stones. Need ${item.cost}💎, you have ${G.player.stones}💎.`];
+      } else {
+        G.player.stones-=item.cost;
+        if(isConsumable){
+          G.player.inventory.push(item.name);
+          G.log=[`✅ Bought ${item.name}! [${item.rarity}] Added to bag (${G.player.inventory.length}/${MAX_POTIONS}).`];
+        } else if(item.type==="weapon"){
+          if(!G.player.ownedWeapons.includes(item.name)) G.player.ownedWeapons.push(item.name);
+          G.log=[`✅ Bought ${item.name}! [${item.rarity}] Added to your weapon collection.`,
+            `Visit "Equip Gear" from the Hub to wield it.`];
+        } else if(item.type==="armor"){
+          if(!G.player.ownedArmors.includes(item.name)) G.player.ownedArmors.push(item.name);
+          G.log=[`✅ Bought ${item.name}! [${item.rarity}] Added to your armor collection.`,
+            `Visit "Equip Gear" from the Hub to wear it.`];
+        }
+        G.log.push(`Stones remaining: ${G.player.stones}💎`);
+      }
+      G.options=avail2.map(it=>`Buy ${it.name} (${it.cost}💎) [${it.rarity}] — ${it.desc}`).concat(["Leave Store"]);
+      return G;
+    }
+    G.log=["Pick an item to buy or leave the store.",`Bag: ${G.player.inventory.length}/${MAX_POTIONS} | Stones: ${G.player.stones}💎`];
+    G.options=avail2.map(it=>`Buy ${it.name} (${it.cost}💎) [${it.rarity}] — ${it.desc}`).concat(["Leave Store"]);
+    return G;
+  }
+
+  // ---- DUNGEON EXPLORATION ----
+  if(G.phase==="dungeon"){
+    if(a.includes("stats")){
+      const p=G.player; const hr=hunterRankFor(p.level);
+      G.log=[`📊 ${p.name} the ${p.cls} — ${hr.rank}-Rank Hunter`,
+        `HP: ${p.hp}/${p.maxHp} | MP: ${p.mp}/${p.maxMp}`,
+        `ATK: ${p.atk} | DEF: ${p.def} | MGP: ${p.mgp} | SPD: ${p.spd}`,
+        `Level: ${p.level} | XP: ${p.xp}/${p.xpNext}`,
+        `Weapon: ${p.equippedWeapon} | Armor: ${p.equippedArmor}`,
+        `Inventory: ${p.inventory.length?p.inventory.join(", "):"Empty"}`,
+        `Stones: ${p.stones}💎`];
+      G.options=["Advance to next room","Search the area"];
+      return G;
+    }
+    if(a.includes("search")){
+      const found=roll(10);
+      if(found>=7){
+        const s=roll(20)+5; G.player.stones+=s;
+        G.log=[`🔍 You search the shadows...`,`💎 Found ${s} Essence Stones hidden in a crevice!`];
+      } else if(found>=4){
+        G.player.hp=clamp(G.player.hp+15,0,G.player.maxHp);
+        G.log=[`🔍 You find a small health crystal. Restored 15 HP.`];
+      } else {
+        G.log=[`🔍 Nothing but dust and bones.`];
+      }
+      G.options=["Advance to next room","Check stats"];
+      return G;
+    }
+    const potion=G.player.inventory.find(it=>a.includes(it.toLowerCase()));
+    if(potion){
+      const idx=G.player.inventory.indexOf(potion);
+      G.player.inventory.splice(idx,1);
+      const itemDef=ALL_STORE_ITEMS.find(it=>it.name===potion);
+      if(itemDef?.type==="potion"){
+        const h=Math.min(itemDef.heal,G.player.maxHp-G.player.hp); G.player.hp+=h;
+        G.log=[`🧪 Used ${potion}. Restored ${h} HP.`];
+      } else if(itemDef?.type==="mana"){
+        const m=Math.min(itemDef.restore,G.player.maxMp-G.player.mp); G.player.mp+=m;
+        G.log=[`🧪 Used ${potion}. Restored ${m} MP.`];
+      }
+      G.options=["Advance to next room","Check stats"];
+      return G;
+    }
+    // Advance
+    G.room+=1;
+    if(G.room>G.totalRooms){
+      G.phase="hub";
+      G.log=[`🚪 You find the gate exit and escape the ${G.dungeon.name}!`];
+      G.options=hubOptions(G);
+      return G;
+    }
+    const isBoss=G.room===G.totalRooms;
+    const mult=RANK_DIFFICULTY[G.dungeon.rank];
+    if(isBoss){
+      const boss=BOSSES[G.dungeon.rank];
+      const hp=Math.round(boss.hp*mult), atk=Math.round(boss.atk*mult), def=Math.round(boss.def*mult);
+      G.enemy={name:boss.name,hp,currentHp:hp,atk,def,stones:boss.stones,xp:boss.xp};
+      G.isBoss=true; G.isBossRush=false; G.phase="combat";
+      G.log=[`💀 BOSS ROOM! The ${boss.name} blocks your path!`,
+        `${boss.name} HP: ${hp} | ATK: ${atk} | DEF: ${def}`];
+    } else {
+      const pool=ENEMIES[G.dungeon.rank];
+      const base=pool[Math.floor(Math.random()*pool.length)];
+      const hp=Math.round(base.hp*mult), atk=Math.round(base.atk*mult), def=Math.round(base.def*mult);
+      G.enemy={name:base.name,hp,currentHp:hp,atk,def,stones:base.stones,xp:base.xp};
+      G.isBoss=false; G.isBossRush=false; G.phase="combat";
+      G.log=[`⚔️ Room ${G.room}/${G.totalRooms}: A ${base.name} appears!`,
+        `${base.name} HP: ${hp} | ATK: ${atk} | DEF: ${def}`];
+    }
+    G.options=buildCombatOptions(G);
+    return G;
+  }
+
+  // ---- COMBAT ----
+  if(G.phase==="combat"){
+    const p=G.player; const e=G.enemy; let combatLog=[];
+
+    const potionC=p.inventory.find(it=>a.includes(it.toLowerCase()));
+    if(potionC){
+      const idx=p.inventory.indexOf(potionC);
+      p.inventory.splice(idx,1);
+      const itemDef=ALL_STORE_ITEMS.find(it=>it.name===potionC);
+      if(itemDef?.type==="potion"){
+        const h=Math.min(itemDef.heal,p.maxHp-p.hp); p.hp+=h;
+        combatLog.push(`🧪 Used ${potionC}. Restored ${h} HP.`);
+      } else if(itemDef?.type==="mana"){
+        const m=Math.min(itemDef.restore,p.maxMp-p.mp); p.mp+=m;
+        combatLog.push(`🧪 Used ${potionC}. Restored ${m} MP.`);
+      }
+      const eRoll=roll(20);
+      const eDmg=Math.max(1,e.atk-p.def+Math.floor((eRoll-10)/3));
+      p.hp-=eDmg;
+      combatLog.push(`${e.name} strikes back! (d20=${eRoll}) → ${eDmg} damage.`);
+      G.log=combatLog;
+      if(p.hp<=0) return handleDeath(G);
+      G.options=buildCombatOptions(G); return G;
+    }
+
+    if(a.includes("flee")||a.includes("retreat")){
+      const fleeRoll=roll(20);
+      if(fleeRoll+p.spd>12){
+        G.phase="dungeon"; G.enemy=null;
+        G.log=[`💨 You flee successfully! (d20=${fleeRoll}+${p.spd}=${fleeRoll+p.spd} > 12)`];
+        G.options=G.room<G.totalRooms?["Advance to next room","Search the area","Check stats"]:["Exit dungeon"];
+        return G;
+      } else {
+        const eDmg=Math.max(1,e.atk-p.def);
+        p.hp-=eDmg;
+        combatLog.push(`❌ Flee failed! (d20=${fleeRoll}) The ${e.name} hits you for ${eDmg} damage.`);
+        G.log=combatLog;
+        if(p.hp<=0) return handleDeath(G);
+        G.options=buildCombatOptions(G); return G;
+      }
+    }
+
+    if(a.includes("ability")||a.includes(p.ability.toLowerCase())){
+      if(p.abilityCd>0){
+        combatLog.push(`⏳ ${p.ability} is on cooldown (${p.abilityCd} turns left).`);
+        G.log=combatLog; G.options=buildCombatOptions(G); return G;
+      }
+      const cost=20;
+      if(p.mp<cost){
+        combatLog.push(`❌ Not enough MP! Need ${cost}, have ${p.mp}.`);
+        G.log=combatLog; G.options=buildCombatOptions(G); return G;
+      }
+      p.mp-=cost; p.abilityCd=3;
+      let dmg=0;
+      if(p.cls==="Warrior") dmg=p.atk*2;
+      else if(p.cls==="Mage") dmg=p.mgp*3;
+      else if(p.cls==="Archer") dmg=Math.floor(p.atk*1.5)*3;
+      else if(p.cls==="Assassin"){ const crit=roll(2)===1; dmg=crit?p.atk*3:p.atk; combatLog.push(crit?"💥 CRITICAL HIT!":"Normal hit."); }
+      else if(p.cls==="Healer"){ const h=Math.floor(p.maxHp*0.4); p.hp=clamp(p.hp+h,0,p.maxHp); combatLog.push(`💚 Holy Light heals ${h} HP!`); dmg=p.mgp; }
+      dmg=Math.max(1,dmg-e.def);
+      e.currentHp-=dmg;
+      combatLog.push(`✨ ${p.ability}! Deals ${dmg} damage. ${e.name} HP: ${Math.max(0,e.currentHp)}/${e.hp}`);
+    } else {
+      const pRoll=roll(20);
+      const dmg=Math.max(1,p.atk-e.def+Math.floor((pRoll-10)/3));
+      e.currentHp-=dmg;
+      if(p.abilityCd>0) p.abilityCd--;
+      combatLog.push(`⚔️ You attack! (d20=${pRoll}+${p.atk}-${e.def}=${pRoll+p.atk-e.def}) → ${dmg} damage. ${e.name} HP: ${Math.max(0,e.currentHp)}/${e.hp}`);
+    }
+
+    if(e.currentHp<=0){
+      const questBonus=G.isQuest?1.5:1;
+      const stonesEarned=Math.round(e.stones*questBonus);
+      const xpEarned=Math.round(e.xp*questBonus);
+      p.stones+=stonesEarned; p.xp+=xpEarned;
+      const lvUp=p.xp>=p.xpNext;
+      if(lvUp) G.player=levelUp({...p});
+      combatLog.push(`💀 ${e.name} defeated! +${stonesEarned}💎 +${xpEarned}XP${G.isQuest?" (quest bonus!)":""}`);
+      if(lvUp){
+        combatLog.push(`🎉 LEVEL UP! Now level ${G.player.level}!`);
+        const newRank=hunterRankFor(G.player.level);
+        const oldRank=hunterRankFor(p.level);
+        if(newRank.rank!==oldRank.rank) combatLog.push(`🎖 HUNTER RANK UP! You are now ${newRank.rank}-Rank: ${newRank.title}!`);
+      }
+      G.enemy=null; G.log=combatLog;
+      if(G.isBossRush){
+        // Boss Rush always returns straight to hub regardless of outcome
+        G.log.push(`🏆 ${e.name} defeated in Boss Rush!`);
+        G.phase="hub"; G.isBossRush=false; G.options=hubOptions(G);
+        return G;
+      }
+      G.phase="dungeon";
+      if(G.isBoss){
+        if(!G.player.defeatedBosses.includes(G.dungeon.rank)){
+          G.player.defeatedBosses=[...G.player.defeatedBosses,G.dungeon.rank];
+          G.log.push(`📖 New boss recorded! ${G.dungeon.rank}-Rank bosses now available in Boss Rush.`);
+        }
+        G.log.push(`🏆 BOSS DEFEATED! The ${G.dungeon.name} is cleared!`);
+        G.phase="hub"; G.isQuest=false; G.options=hubOptions(G);
+      } else {
+        G.options=G.room<G.totalRooms?["Advance to next room","Search the area","Check stats"]:["Exit dungeon"];
+      }
+      return G;
+    }
+
+    const eRoll=roll(20);
+    const eDmg=Math.max(1,e.atk-p.def+Math.floor((eRoll-10)/3));
+    p.hp-=eDmg;
+    combatLog.push(`🔴 ${e.name} strikes! (d20=${eRoll}) → ${eDmg} damage. Your HP: ${Math.max(0,p.hp)}/${p.maxHp}`);
+    G.log=combatLog;
+    if(p.hp<=0) return handleDeath(G);
+    G.options=buildCombatOptions(G);
+    return G;
+  }
+
+  G.log=["You are dead. Start a new game."]; G.options=["Start Over"]; return G;
+}
+
+function buildCombatOptions(G){
+  const p=G.player, e=G.enemy;
+  const opts=[`Attack ${e.name}`, `Use Ability: ${p.ability}${p.abilityCd>0?` (CD:${p.abilityCd})`:""}`];
+  if(p.inventory.length>0) opts.push(`Use Item: ${p.inventory[0]}`);
+  if(!G.isBoss) opts.push("Flee");
+  return opts;
+}
+function handleDeath(G){
+  G.phase="dead"; G.player.hp=0;
+  G.log.push(`☠️ You have been defeated in the ${G.dungeon?.name||"dungeon"}...`,
+    "Your Essence Stones have been lost. Press Start Over.");
+  G.options=["Start Over"];
+  return G;
+}
+
+// ---------------------------------------------------------------------------
+// 3D-STYLE SCENE CANVAS — perspective floor grid + parallax + lighting
+// ---------------------------------------------------------------------------
+function SceneCanvas({phase, rank}){
+  const ref=useRef(null);
+  useEffect(()=>{
+    const c=ref.current; if(!c) return;
+    const ctx=c.getContext("2d");
+    let raf, t=0;
+    function resize(){ c.width=c.offsetWidth; c.height=c.offsetHeight; }
+    resize();
+    window.addEventListener("resize",resize);
+
+    const stars=Array.from({length:50},()=>({x:Math.random(),y:Math.random()*0.6,r:Math.random()*1.4+0.3}));
+    const embers=Array.from({length:36},()=>({x:Math.random(),y:1+Math.random()*0.3,vy:-(0.0005+Math.random()*0.001),r:Math.random()*2+0.5,life:Math.random()}));
+
+    function drawFloorGrid(W,H,horizonY,color,speed){
+      // Perspective floor — lines converge toward horizon, creates 3D depth
+      ctx.save();
+      ctx.strokeStyle=color; ctx.lineWidth=1;
+      const vanishX=W*0.5;
+      // Horizontal depth lines
+      for(let i=0;i<8;i++){
+        const f=i/7;
+        const y=horizonY+(H-horizonY)*Math.pow(f,1.8);
+        ctx.globalAlpha=0.05+f*0.18;
+        ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+      }
+      // Vertical converging lines
+      const offset=(t*speed)%1;
+      for(let i=-6;i<=6;i++){
+        const xBottom=W*0.5+i*W*0.14;
+        ctx.globalAlpha=0.12;
+        ctx.beginPath();
+        ctx.moveTo(vanishX,horizonY);
+        ctx.lineTo(xBottom,H);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function draw(){
+      t+=0.016;
+      const W=c.width,H=c.height;
+      ctx.clearRect(0,0,W,H);
+      const isCombat=phase==="combat";
+      const isDanger=rank==="A"||rank==="S";
+      const accent=isCombat?(isDanger?"180,0,120":"200,30,70"):RANK_COLOR_RGB(rank);
+
+      // Sky gradient
+      const horizonY=H*0.42;
+      const sky=ctx.createLinearGradient(0,0,0,horizonY);
+      sky.addColorStop(0, isCombat?"#0c0008":"#05050d");
+      sky.addColorStop(1, isCombat?"rgba(180,0,80,0.12)":`rgba(${accent},0.10)`);
+      ctx.fillStyle=sky; ctx.fillRect(0,0,W,horizonY);
+
+      // Floor gradient
+      const floor=ctx.createLinearGradient(0,horizonY,0,H);
+      floor.addColorStop(0, isCombat?"#1a0008":"#08081a");
+      floor.addColorStop(1,"#020205");
+      ctx.fillStyle=floor; ctx.fillRect(0,horizonY,W,H-horizonY);
+
+      // Stars / ceiling specks (hub & dungeon only)
+      if(!isCombat){
+        stars.forEach(s=>{
+          const tw=Math.sin(t*2+s.x*12)*0.3+0.7;
+          ctx.beginPath(); ctx.arc(s.x*W, s.y*horizonY, s.r, 0, Math.PI*2);
+          ctx.fillStyle=`rgba(${accent},${tw*0.4})`; ctx.fill();
+        });
+      }
+
+      // Perspective floor grid — gives 3D depth illusion
+      drawFloorGrid(W,H,horizonY,`rgba(${accent},0.5)`, isCombat?0.15:0.06);
+
+      // Central glowing focal point (portal in hub, enemy in combat, void in dungeon)
+      const fx=W*0.5, fy=horizonY*0.65;
+      if(phase==="hub"){
+        const gr=Math.min(W,H)*0.16;
+        const glow=ctx.createRadialGradient(fx,fy,0,fx,fy,gr*2);
+        glow.addColorStop(0,`rgba(${accent},0.22)`); glow.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.fillStyle=glow; ctx.fillRect(0,0,W,H);
+        for(let ring=0;ring<4;ring++){
+          ctx.save(); ctx.translate(fx,fy);
+          ctx.rotate(t*0.4*(ring%2===0?1:-1)*(0.7+ring*0.25));
+          ctx.beginPath();
+          ctx.ellipse(0,0,gr*(0.5+ring*0.16),gr*(0.5+ring*0.16)*0.4,0,0,Math.PI*2);
+          ctx.strokeStyle=`rgba(${accent},${0.45-ring*0.09})`; ctx.lineWidth=1.6-ring*0.25; ctx.stroke();
+          ctx.restore();
+        }
+      } else if(phase==="combat"){
+        const er=Math.min(W,H)*0.15;
+        const pulse=Math.sin(t*2.4)*0.06;
+        const glow=ctx.createRadialGradient(fx,fy,0,fx,fy,er*2.2);
+        glow.addColorStop(0,`rgba(${accent},0.3)`); glow.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.fillStyle=glow; ctx.fillRect(0,0,W,H);
+        ctx.save(); ctx.translate(fx,fy); ctx.scale(1+pulse,1-pulse);
+        ctx.beginPath(); ctx.ellipse(0,0,er*0.6,er*0.8,0,0,Math.PI*2);
+        ctx.fillStyle="rgba(25,0,12,0.9)"; ctx.fill();
+        ctx.strokeStyle=`rgba(${accent},0.6)`; ctx.lineWidth=2; ctx.stroke();
+        ctx.fillStyle=`rgba(255,70,70,0.95)`;
+        ctx.beginPath(); ctx.arc(-er*0.2,0,er*0.08,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(er*0.2,0,er*0.08,0,Math.PI*2); ctx.fill();
+        ctx.restore();
+        // Lightning flashes for danger ranks
+        if(isDanger && Math.random()<0.015){
+          ctx.strokeStyle="rgba(255,180,255,0.5)"; ctx.lineWidth=1.5;
+          ctx.beginPath(); ctx.moveTo(W*0.5,0);
+          ctx.lineTo(W*0.5+W*0.06,H*0.3); ctx.lineTo(W*0.5-W*0.04,H*0.55);
+          ctx.stroke();
+        }
+      } else {
+        // dungeon — distant glowing rift
+        const gr=Math.min(W,H)*0.1;
+        const glow=ctx.createRadialGradient(fx,fy,0,fx,fy,gr*2);
+        glow.addColorStop(0,`rgba(${accent},0.15)`); glow.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.fillStyle=glow; ctx.fillRect(0,0,W,H);
+        ctx.beginPath(); ctx.ellipse(fx,fy,gr*0.4,gr*0.7,0,0,Math.PI*2);
+        ctx.fillStyle=`rgba(${accent},0.18)`; ctx.fill();
+        // torches
+        [[0.12,0.34],[0.88,0.34]].forEach(([fxr,fyr])=>{
+          const flicker=Math.sin(t*8+fxr*10)*0.25;
+          const tg=ctx.createRadialGradient(fxr*W,fyr*H,0,fxr*W,fyr*H,W*0.1);
+          tg.addColorStop(0,`rgba(255,150,40,${0.28+flicker})`); tg.addColorStop(1,"rgba(0,0,0,0)");
+          ctx.fillStyle=tg; ctx.fillRect(0,0,W,H);
+          ctx.fillStyle=`rgba(255,${130+flicker*100},20,0.9)`;
+          ctx.beginPath(); ctx.arc(fxr*W,fyr*H,3,0,Math.PI*2); ctx.fill();
+        });
+      }
+
+      // Floating embers/dust
+      embers.forEach(p=>{
+        p.y+=p.vy; p.life+=0.006;
+        if(p.life>1||p.y<0){ p.x=Math.random(); p.y=1.05; p.life=0; }
+        const al=1-p.life;
+        ctx.beginPath(); ctx.arc(p.x*W,p.y*H,p.r,0,Math.PI*2);
+        ctx.fillStyle = isCombat ? `rgba(255,${90+Math.random()*40},30,${al*0.65})` : `rgba(${accent},${al*0.35})`;
+        ctx.fill();
+      });
+
+      raf=requestAnimationFrame(draw);
+    }
+    draw();
+    return ()=>{ cancelAnimationFrame(raf); window.removeEventListener("resize",resize); };
+  },[phase,rank]);
+  return <canvas ref={ref} style={{position:"absolute",inset:0,width:"100%",height:"100%",display:"block"}}/>;
+}
+function RANK_COLOR_RGB(rank){
+  const map={E:"74,158,255",D:"85,204,136",C:"221,170,51",B:"255,136,68",A:"255,68,136",S:"204,68,255"};
+  return map[rank] || "74,158,255";
+}
+
+// ---------------------------------------------------------------------------
+// UI HELPERS
+// ---------------------------------------------------------------------------
+const pBtn={background:"linear-gradient(135deg,#234daa,#622fa0)",border:"none",borderRadius:8,padding:"11px",color:"white",fontFamily:"'Courier New',monospace",fontSize:"0.81rem",fontWeight:700,cursor:"pointer",width:"100%"};
+const gBtn={background:"rgba(74,158,255,0.08)",border:"1px solid rgba(74,158,255,0.22)",borderRadius:7,padding:"6px 12px",color:BLUE,fontFamily:"'Courier New',monospace",fontSize:"0.72rem",cursor:"pointer"};
+
+// ---------------------------------------------------------------------------
+// SAVE / EXIT DIALOG
+// ---------------------------------------------------------------------------
+function SaveDialog({onSave,onDiscard,onCancel}){
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.75)"}}>
+      <div style={{background:"#0d0d1f",border:"1px solid rgba(74,158,255,0.35)",borderRadius:12,padding:"26px 24px",maxWidth:320,width:"90%",fontFamily:"'Courier New',monospace",color:TEXT,display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{fontSize:"1.4rem",textAlign:"center"}}>💾</div>
+        <h3 style={{textAlign:"center",fontFamily:"serif",fontSize:"1.1rem",color:BLUE,letterSpacing:"0.1em"}}>SAVE & EXIT?</h3>
+        <p style={{fontSize:"0.72rem",color:MUTED,textAlign:"center",lineHeight:1.6}}>Do you want to save your progress before leaving?</p>
+        <button style={{padding:"10px",background:"linear-gradient(135deg,#234daa,#622fa0)",border:"none",borderRadius:7,color:"white",fontFamily:"'Courier New',monospace",fontSize:"0.8rem",fontWeight:700,cursor:"pointer"}} onClick={onSave}>💾 Save & Exit</button>
+        <button style={{padding:"10px",background:"rgba(255,80,80,0.12)",border:"1px solid rgba(255,80,80,0.3)",borderRadius:7,color:"#ff8888",fontFamily:"'Courier New',monospace",fontSize:"0.8rem",cursor:"pointer"}} onClick={onDiscard}>🗑 Exit Without Saving</button>
+        <button style={{padding:"8px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,color:MUTED,fontFamily:"'Courier New',monospace",fontSize:"0.75rem",cursor:"pointer"}} onClick={onCancel}>✕ Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CHARACTER SETUP
+// ---------------------------------------------------------------------------
+function Setup({onDone}){
+  const[name,setName]=useState("");
+  const[cls,setCls]=useState("Warrior");
+  return(
+    <div style={{minHeight:"100vh",background:`linear-gradient(160deg,${BG},#0c0c1c,${BG})`,display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Courier New',monospace",color:TEXT}}>
+      <div style={{width:"100%",maxWidth:440,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(74,158,255,0.2)",borderRadius:14,padding:"28px 22px",display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{fontSize:"2rem",textAlign:"center",animation:"spin 9s linear infinite"}}>🌀</div>
+        <h2 style={{fontFamily:"serif",fontWeight:900,fontSize:"1.5rem",letterSpacing:"0.12em",textAlign:"center",color:BLUE}}>CREATE HUNTER</h2>
+        <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(74,158,255,0.3),transparent)"}}/>
+        <div>
+          <p style={{fontSize:"0.7rem",color:MUTED,marginBottom:6}}>HUNTER NAME</p>
+          <input style={{width:"100%",padding:"9px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(74,158,255,0.22)",borderRadius:7,color:TEXT,fontFamily:"'Courier New',monospace",fontSize:"0.82rem",outline:"none"}}
+            placeholder="Enter your name…" value={name} onChange={e=>setName(e.target.value)}/>
+        </div>
+        <div>
+          <p style={{fontSize:"0.7rem",color:MUTED,marginBottom:8}}>CHOOSE CLASS</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
+            {Object.entries(CLASSES).map(([c,data])=>(
+              <button key={c} onClick={()=>setCls(c)} style={{padding:"9px 8px",background:cls===c?"rgba(74,158,255,0.18)":"rgba(255,255,255,0.03)",border:cls===c?"1px solid rgba(74,158,255,0.5)":"1px solid rgba(74,158,255,0.15)",borderRadius:8,color:cls===c?TEXT:MUTED,fontFamily:"'Courier New',monospace",fontSize:"0.72rem",cursor:"pointer",textAlign:"left"}}>
+                <div style={{fontWeight:700,marginBottom:2,color:cls===c?BLUE:MUTED}}>{c}</div>
+                <div style={{fontSize:"0.6rem",opacity:0.8}}>{data.ability}</div>
+                <div style={{fontSize:"0.58rem",opacity:0.6,marginTop:1}}>HP:{data.hp} ATK:{data.atk} DEF:{data.def}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{background:"rgba(74,158,255,0.06)",border:"1px solid rgba(74,158,255,0.15)",borderRadius:7,padding:"8px 12px",fontSize:"0.68rem",color:"#7aaabb",lineHeight:1.6}}>
+          <strong style={{color:BLUE}}>{cls}</strong> — {CLASSES[cls].desc}
+        </div>
+        <button style={{...pBtn,opacity:name.trim()?1:0.4}} disabled={!name.trim()} onClick={()=>onDone(name.trim(),cls)}>BEGIN HUNT ▶</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// WELCOME SCREEN
+// ---------------------------------------------------------------------------
+function Welcome({onStart}){
+  return(
+    <div style={{minHeight:"100vh",background:`linear-gradient(160deg,${BG},#0c0c1c,${BG})`,display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Courier New',monospace",color:TEXT}}>
+      <div style={{width:"100%",maxWidth:440,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(74,158,255,0.2)",borderRadius:14,padding:"30px 24px",display:"flex",flexDirection:"column",gap:13}}>
+        <div style={{fontSize:"2.2rem",textAlign:"center",animation:"spin 9s linear infinite"}}>🌀</div>
+        <h1 style={{fontFamily:"serif",fontWeight:900,fontSize:"2rem",letterSpacing:"0.12em",textAlign:"center",background:`linear-gradient(90deg,${BLUE},#a855f7,${BLUE})`,backgroundSize:"200%",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",animation:"shimmer 3s linear infinite"}}>GATE BREAKER</h1>
+        <p style={{textAlign:"center",fontSize:"0.62rem",letterSpacing:"0.2em",color:MUTED}}>RANKS E THROUGH S · HUNTER ASSOCIATION</p>
+        <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(74,158,255,0.3),transparent)"}}/>
+        <p style={{fontSize:"0.68rem",color:MUTED,lineHeight:1.65}}>A turn-based dungeon RPG. Fight monsters, collect Essence Stones, level up, and rise from E-Rank Novice to S-Rank Monarch. 6 save slots with separate characters.</p>
+        <div style={{fontSize:"0.65rem",color:"#5a8a5a",lineHeight:1.6,padding:"7px 10px",background:"rgba(90,138,90,0.08)",borderRadius:6,border:"1px solid rgba(90,138,90,0.2)"}}>
+          ✓ Fully offline — no internet, no API key required
+        </div>
+        <button style={pBtn} onClick={onStart}>SELECT SAVE SLOT ▶</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SAVE SLOTS SCREEN
+// ---------------------------------------------------------------------------
+function Slots({onPick,onBack}){
+  const[slots,setSlots]=useState(null);
+  const[conf,setConf]=useState(null);
+  useEffect(()=>{
+    const fallback=setTimeout(()=>setSlots(p=>p??Array(N_SLOTS).fill(null)),3000);
+    loadSlots().then(s=>{ clearTimeout(fallback); setSlots(s); });
+    return ()=>clearTimeout(fallback);
+  },[]);
+  async function del(i,e){
+    e.stopPropagation();
+    if(conf===i){
+      await storageDel("gbslot_"+i);
+      setSlots(p=>{ const n=[...p]; n[i]=null; return n; });
+      setConf(null);
+    } else { setConf(i); setTimeout(()=>setConf(c=>c===i?null:c),3000); }
+  }
+  return(
+    <div style={{minHeight:"100vh",background:`linear-gradient(160deg,${BG},#0c0c1c,${BG})`,padding:"24px 14px",fontFamily:"'Courier New',monospace",color:TEXT}}>
+      <div style={{maxWidth:680,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+          <button style={gBtn} onClick={onBack}>← Back</button>
+          <h2 style={{fontFamily:"serif",fontSize:"1.25rem",letterSpacing:"0.1em",color:BLUE}}>SAVE SLOTS</h2>
+        </div>
+        <p style={{fontSize:"0.65rem",color:MUTED,marginBottom:14}}>Each slot is a separate hunter with independent progress. Progress is saved when you tap "Save & Exit".</p>
+        {!slots?<p style={{color:MUTED,textAlign:"center",marginTop:36}}>Loading…</p>:(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10}}>
+            {slots.map((s,i)=>{
+              const hr=s?.player?hunterRankFor(s.player.level):null;
+              return(
+              <div key={i} onClick={()=>onPick(i,s)} style={{background:s?"rgba(74,158,255,0.06)":"rgba(255,255,255,0.02)",border:s?"1px solid rgba(74,158,255,0.25)":"1px dashed rgba(74,158,255,0.15)",borderRadius:10,padding:"13px",cursor:"pointer",display:"flex",flexDirection:"column",gap:3,minHeight:108,...(s?{}:{alignItems:"center",justifyContent:"center"})}}>
+                <div style={{fontSize:"0.55rem",letterSpacing:"0.2em",color:"#252f4a"}}>SLOT {i+1}</div>
+                {s?(<>
+                  <div style={{fontSize:"0.9rem",fontWeight:700,color:"#a0c4ff"}}>{s.player?.name||"Hunter"}</div>
+                  <div style={{fontSize:"0.65rem",color:"#6a88bb"}}>{s.player?.cls||"?"} · Lv {s.player?.level||1} {hr?`· ${hr.rank}-Rank`:""}</div>
+                  <div style={{fontSize:"0.65rem",color:"#a87dff"}}>💎 {s.player?.stones||0}</div>
+                  <div style={{fontSize:"0.65rem",color:"#5a8a5a"}}>{s.phase==="dungeon"||s.phase==="combat"?`⚔️ In ${s.dungeon?.name||"dungeon"}`:"🏠 At Hub"}</div>
+                  <div style={{fontSize:"0.57rem",color:"#252f4a",marginTop:2}}>{s.savedAt?new Date(s.savedAt).toLocaleDateString():"—"}</div>
+                  <button onClick={e=>del(i,e)} style={{marginTop:6,padding:"2px 8px",fontSize:"0.59rem",cursor:"pointer",borderRadius:5,alignSelf:"flex-start",background:conf===i?"rgba(255,80,80,0.28)":"rgba(255,80,80,0.09)",border:conf===i?"1px solid rgba(255,80,80,0.5)":"1px solid rgba(255,80,80,0.2)",color:conf===i?"#ffaaaa":"#ff6b6b"}}>
+                    {conf===i?"Confirm?":"🗑"}
+                  </button>
+                </>):(<div style={{color:"#252f4a",fontSize:"0.9rem"}}>＋ New</div>)}
+              </div>);
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MAIN GAME SCREEN
+// ---------------------------------------------------------------------------
+function Game({slotIdx,savedGame,onExit}){
+  const[gs,setGs]=useState(savedGame||null);
+  const[showSaveDialog,setShowSaveDialog]=useState(false);
+  const logRef=useRef(null);
+
+  useEffect(()=>{ if(logRef.current) logRef.current.scrollTop=logRef.current.scrollHeight; },[gs]);
+
+  async function persistGs(g){
+    await storageSet("gbslot_"+slotIdx, JSON.stringify({...g,savedAt:new Date().toISOString()}));
+  }
+  function handleSetup(name,cls){
+    const g=createGame(name,cls);
+    g.log=["Welcome, "+name+" the "+cls+"!","You stand at the Hunter Association Hub.","Choose a gate rank to begin your hunt, or rest to recover."];
+    g.options=hubOptions(g);
+    setGs(g);
+  }
+  function handleAction(action){
+    if(!gs) return;
+    if(action==="Start Over"){ setGs(null); return; }
+    setGs(processAction(gs,action));
+  }
+  function handleExitClick(){ setShowSaveDialog(true); }
+  async function handleSaveAndExit(){ if(gs) await persistGs(gs); setShowSaveDialog(false); onExit(); }
+  function handleDiscardAndExit(){ setShowSaveDialog(false); onExit(); }
+
+  if(!gs) return <Setup onDone={handleSetup}/>;
+
+  const p=gs.player;
+  const hpPct=p.hp/p.maxHp;
+  const hpColor=hpPct>0.5?"#5abb5a":hpPct>0.25?"#aaaa55":"#bb5555";
+  const phase=gs.phase;
+  const hr=hunterRankFor(p.level);
+
+  return(
+    <div style={{minHeight:"100vh",maxWidth:740,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",fontFamily:"'Courier New',monospace",color:TEXT}}>
+      {showSaveDialog && <SaveDialog onSave={handleSaveAndExit} onDiscard={handleDiscardAndExit} onCancel={()=>setShowSaveDialog(false)}/>}
+
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 13px",background:"rgba(0,0,0,0.85)",borderBottom:"1px solid rgba(74,158,255,0.2)",flexShrink:0,position:"relative",zIndex:2}}>
+        <div style={{display:"flex",alignItems:"center",gap:7}}>
+          <span>🌀</span>
+          <div>
+            <div style={{fontFamily:"serif",fontWeight:900,fontSize:"0.88rem",letterSpacing:"0.12em",color:BLUE}}>GATE BREAKER</div>
+            <div style={{fontSize:"0.56rem",color:MUTED}}>{p.name} · {p.cls} · Lv {p.level} · <span style={{color:RANK_COLOR[hr.rank]}}>{hr.rank}-Rank</span> · 💎 {p.stones}</div>
+          </div>
+        </div>
+        <button style={gBtn} onClick={handleExitClick}>⇦ Slots</button>
+      </div>
+
+      {/* Stats bar */}
+      <div style={{background:"rgba(0,0,0,0.82)",borderBottom:"1px solid rgba(74,158,255,0.18)",padding:"6px 13px",flexShrink:0,position:"relative",zIndex:2}}>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:"0.63rem",color:"#6a8abb"}}>
+          <span>❤️ {p.hp}/{p.maxHp}</span>
+          <span>💧 {p.mp}/{p.maxMp}</span>
+          <span>⚔️ ATK:{p.atk}</span>
+          <span>🛡 DEF:{p.def}</span>
+          <span>✨ MGP:{p.mgp}</span>
+          <span>XP:{p.xp}/{p.xpNext}</span>
+          {gs.dungeon && <span style={{color:RANK_COLOR[gs.dungeon.rank]}}>📍 {gs.dungeon.name} {gs.room}/{gs.totalRooms}</span>}
+        </div>
+        <div style={{height:4,background:"rgba(255,255,255,0.08)",borderRadius:2,marginTop:4,overflow:"hidden"}}>
+          <div style={{height:"100%",width:(hpPct*100)+"%",background:hpColor,borderRadius:2,transition:"width 0.3s"}}/>
+        </div>
+      </div>
+
+      {/* Scene + Log */}
+      <div style={{flex:1,position:"relative",minHeight:220,overflow:"hidden"}}>
+        <SceneCanvas phase={phase} rank={gs.dungeon?.rank || "E"}/>
+        <div ref={logRef} style={{position:"relative",zIndex:1,height:"100%",overflowY:"auto",padding:"13px 15px",fontSize:"0.8rem",lineHeight:1.9}}>
+          {gs.log.map((line,i)=>(
+            <div key={i} style={{marginBottom:5,
+              color:line.startsWith("☠️")||line.startsWith("🔴")?"#ff8888"
+                   :line.startsWith("💀")||line.startsWith("🏆")||line.startsWith("🎖")?"#aaffaa"
+                   :line.startsWith("⚔️")||line.startsWith("✨")?"#aaddff"
+                   :TEXT,
+              textShadow:"0 1px 8px rgba(0,0,0,0.9)",
+            }}>{line}</div>
+          ))}
+        </div>
+      </div>
+
+      {/* Options */}
+      <div style={{padding:"6px 11px 13px",display:"flex",flexDirection:"column",gap:5,borderTop:"1px solid rgba(74,158,255,0.18)",background:"rgba(0,0,0,0.88)",flexShrink:0,position:"relative",zIndex:2}}>
+        {gs.options.map((o,i)=>(
+          <button key={i} onClick={()=>handleAction(o)} style={{textAlign:"left",background:"rgba(74,158,255,0.07)",border:"1px solid rgba(74,158,255,0.2)",borderRadius:7,padding:"9px 13px",color:"#a0c4ff",fontFamily:"'Courier New',monospace",fontSize:"0.76rem",cursor:"pointer",lineHeight:1.4}}>
+            <span style={{color:"#8b7aff",fontWeight:700,marginRight:5}}>[{i+1}]</span>{o}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ROOT APP
+// ---------------------------------------------------------------------------
+function App(){
+  const[screen,setScreen]=useState("welcome");
+  const[idx,setIdx]=useState(null);
+  const[data,setData]=useState(null);
+  return(<>
+    <style>{`
+      *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+      html,body{background:${BG};}
+      @keyframes spin{to{transform:rotate(360deg)}}
+      @keyframes shimmer{to{background-position:200% center}}
+      input::placeholder{color:#253348;}
+      button:disabled{opacity:.35;cursor:not-allowed;}
+      ::-webkit-scrollbar{width:4px;}
+      ::-webkit-scrollbar-thumb{background:#1a2a44;border-radius:2px;}
+    `}</style>
+    {screen==="welcome" && <Welcome onStart={()=>setScreen("slots")}/>}
+    {screen==="slots"   && <Slots onBack={()=>setScreen("welcome")} onPick={(i,d)=>{ setIdx(i); setData(d??null); setScreen("game"); }}/>}
+    {screen==="game"    && <Game key={idx} slotIdx={idx} savedGame={data} onExit={()=>{ setData(null); setScreen("slots"); }}/>}
+  </>);
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
