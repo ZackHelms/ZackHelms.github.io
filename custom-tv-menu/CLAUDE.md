@@ -81,12 +81,21 @@ Always read/write through the `store` object — don't touch localStorage direct
 When extending: respect the cache TTL, keep calls keyed off `store.getSettings()`, and
 degrade gracefully when `tmdb.hasKey()` is false (the app must stay usable on mock data).
 
-## Publishing to ZackHelms.github.io (later)
+## Publishing to ZackHelms.github.io
 
-Mirror the FFL1 pattern: copy this repo's contents into
-`ZackHelms.github.io/custom-tv-menu/` and commit to `main`. Because routing is hash-based
-and all paths are relative (`./js/...`), it works unchanged from a subfolder. Do this only
-when asked.
+Use `publish.py` (mirrors the FFL1 `publish.sh` pattern). It exports this repo's
+committed **HEAD** tree via `git archive` and replaces `ZackHelms.github.io/custom-tv-menu/`
+wholesale, so the publish is deterministic and removals propagate. It refuses to run on a
+dirty working tree (HEAD is what ships). Routing is hash-based and all paths are relative
+(`./js/...`), so it works unchanged from the subfolder. Served by direct URL only — no link
+from the site homepage. Publish only when asked.
+
+```bash
+python3 publish.py --dry-run            # preview the file list
+python3 publish.py                      # sync files, leave the site repo staged/uncommitted
+python3 publish.py --commit --push      # sync, commit, and push the site repo's main
+# --target PATH or $CTM_SITE_REPO overrides the default ../ZackHelms.github.io
+```
 
 ## Standing rule
 
