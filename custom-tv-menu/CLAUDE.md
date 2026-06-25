@@ -90,10 +90,13 @@ dirty working tree (HEAD is what ships). Routing is hash-based and all paths are
 (`./js/...`), so it works unchanged from the subfolder. Served by direct URL only — no link
 from the site homepage. Publish only when asked.
 
+By default `./publish.py` syncs, commits, and pushes the site repo's `main`.
+
 ```bash
-python3 publish.py --dry-run            # preview the file list
-python3 publish.py                      # sync files, leave the site repo staged/uncommitted
-python3 publish.py --commit --push      # sync, commit, and push the site repo's main
+./publish.py                # sync, commit, and push the site repo's main (default)
+./publish.py --dry-run      # preview the file list, change nothing
+./publish.py --no-push      # sync + commit, but don't push
+./publish.py --no-commit    # sync files only, leave the site repo staged
 # --target PATH or $CTM_SITE_REPO overrides the default ../ZackHelms.github.io
 ```
 
