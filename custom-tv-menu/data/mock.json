@@ -1,21 +1,4 @@
 {
-  "_comment": "Seed data used on first run and before a TMDB key is added. poster:null renders a generated placeholder. Replaced/augmented by live data in Phase 2.",
-  "favorites": [
-    { "id": 1396,  "mediaType": "tv",    "title": "Breaking Bad",        "poster": null, "genres": ["Drama", "Crime"],            "service": "netflix",    "addedAt": "2026-05-01T18:00:00Z", "lastWatchedAt": "2026-06-20T21:30:00Z" },
-    { "id": 1399,  "mediaType": "tv",    "title": "Game of Thrones",     "poster": null, "genres": ["Drama", "Fantasy"],          "service": "max",        "addedAt": "2026-04-10T18:00:00Z", "lastWatchedAt": "2026-06-24T22:10:00Z" },
-    { "id": 66732, "mediaType": "tv",    "title": "Stranger Things",     "poster": null, "genres": ["Drama", "Sci-Fi", "Horror"], "service": "netflix",    "addedAt": "2026-06-01T12:00:00Z", "lastWatchedAt": "2026-06-18T20:00:00Z" },
-    { "id": 94997, "mediaType": "tv",    "title": "House of the Dragon",  "poster": null, "genres": ["Drama", "Fantasy"],          "service": "max",        "addedAt": "2026-03-15T12:00:00Z", "lastWatchedAt": "2026-05-30T19:00:00Z" },
-    { "id": 1429,  "mediaType": "tv",    "title": "Attack on Titan",     "poster": null, "genres": ["Animation", "Action", "Drama"], "service": "crunchyroll","addedAt": "2026-06-10T12:00:00Z", "lastWatchedAt": "2026-06-23T23:00:00Z" },
-    { "id": 27205, "mediaType": "movie", "title": "Inception",           "poster": null, "genres": ["Sci-Fi", "Action"],          "service": "max",        "addedAt": "2026-02-20T12:00:00Z", "lastWatchedAt": "2026-04-12T20:30:00Z" },
-    { "id": 84958, "mediaType": "tv",    "title": "Loki",                "poster": null, "genres": ["Sci-Fi", "Drama"],           "service": "disneyplus", "addedAt": "2026-05-22T12:00:00Z", "lastWatchedAt": "2026-06-15T18:45:00Z" },
-    { "id": 1668,  "mediaType": "tv",    "title": "Friends",             "poster": null, "genres": ["Comedy"],                    "service": "max",        "addedAt": "2026-01-05T12:00:00Z", "lastWatchedAt": "2026-06-25T08:00:00Z" }
-  ],
-  "watched": [
-    { "id": 95396, "mediaType": "tv",    "title": "Severance",           "poster": null, "service": "appletv",   "lastWatchedAt": "2026-06-25T07:30:00Z" },
-    { "id": 60625, "mediaType": "tv",    "title": "Rick and Morty",      "poster": null, "service": "max",       "lastWatchedAt": "2026-06-24T16:00:00Z" },
-    { "id": 2316,  "mediaType": "tv",    "title": "The Office",          "poster": null, "service": "peacock",   "lastWatchedAt": "2026-06-22T19:20:00Z" },
-    { "id": 122226,"mediaType": "tv",    "title": "Ted Lasso",           "poster": null, "service": "appletv",   "lastWatchedAt": "2026-06-19T20:00:00Z" },
-    { "id": 76479, "mediaType": "tv",    "title": "The Boys",            "poster": null, "service": "prime",     "lastWatchedAt": "2026-06-17T21:00:00Z" },
-    { "id": 71912, "mediaType": "tv",    "title": "The Witcher",         "poster": null, "service": "netflix",   "lastWatchedAt": "2026-06-12T22:00:00Z" }
-  ]
+  "favorites": [],
+  "watched": []
 }

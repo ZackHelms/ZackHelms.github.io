@@ -81,6 +81,18 @@ export function mountSettings(container) {
     'Get a free key at <strong>themoviedb.org</strong> → Settings → API. ' +
     'Stored locally in this browser only. Powers Search and service availability.' }));
 
+  // --- Reset ---
+  section.appendChild(el('h3', { class: 'group-head', text: 'Data' }));
+  section.appendChild(el('button', { class: 'btn danger', 'data-focusable': '',
+    onclick: () => {
+      if (!confirm('Clear all favorites, watched history, and settings? This cannot be undone.')) return;
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('ctm.'))
+        .forEach(k => localStorage.removeItem(k));
+      location.reload();
+    },
+  }, ['Clear all data']));
+
   container.appendChild(section);
   focusFirst();
 }
