@@ -1,0 +1,197 @@
+/* Custom TV Menu — theme + layout.
+   Designed for a black screen, large readable type, and a highly visible pulsing
+   focus highlight for TV-remote navigation. Animations use box-shadow only (compositor
+   friendly) to keep movement snappy on low-power devices like a Raspberry Pi. */
+
+:root {
+  --bg: #000000;
+  --focus: #ffeb00;
+  --pulse-speed: 1.6s;
+
+  --panel: #0c0c12;
+  --panel-2: #14141c;
+  --text: #f2f2f5;
+  --muted: #9a9aa6;
+  --accent: #2a2a38;
+  --radius: 10px;
+  --nav-w: 200px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  display: grid;
+  grid-template-columns: var(--nav-w) 1fr;
+  min-height: 100vh;
+}
+
+/* ---------- Left nav ---------- */
+#nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px 12px;
+  background: var(--panel);
+  border-right: 1px solid var(--accent);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.nav-item {
+  appearance: none;
+  border: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.nav-item.active { color: var(--text); background: var(--panel-2); }
+
+/* ---------- Main view ---------- */
+#view { padding: 28px 32px; outline: none; }
+.section { margin-bottom: 40px; }
+.section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 16px; margin-bottom: 16px;
+}
+h2 { font-size: 1.6rem; margin: 0; }
+h3.group-head { font-size: 1.05rem; color: var(--muted); margin: 22px 0 10px; font-weight: 600; }
+.empty { color: var(--muted); font-size: 1rem; }
+.hint { color: var(--muted); font-size: .9rem; max-width: 640px; line-height: 1.5; }
+
+/* ---------- Controls (sort / group) ---------- */
+.controls { display: flex; gap: 22px; flex-wrap: wrap; }
+.control-group { display: flex; align-items: center; gap: 8px; }
+.control-label { color: var(--muted); font-size: .85rem; text-transform: uppercase; letter-spacing: .05em; }
+.segmented { display: inline-flex; background: var(--panel-2); border-radius: var(--radius); padding: 3px; }
+.seg {
+  appearance: none; border: 2px solid transparent; background: transparent;
+  color: var(--muted); padding: 7px 12px; border-radius: 8px; cursor: pointer; font-size: .92rem;
+}
+.seg.active { background: var(--accent); color: var(--text); }
+
+/* ---------- Favorites grid ---------- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 18px;
+}
+.card {
+  appearance: none; border: 2px solid transparent; background: var(--panel);
+  color: var(--text); border-radius: var(--radius); padding: 0; overflow: hidden;
+  cursor: pointer; text-align: left; display: flex; flex-direction: column;
+}
+.card-meta { padding: 10px 12px; }
+.card-title { font-size: .98rem; font-weight: 600; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-sub { display: flex; align-items: center; gap: 8px; margin-top: 6px; color: var(--muted); font-size: .82rem; }
+
+.poster { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; display: block; background: var(--panel-2); }
+.poster.placeholder { display: flex; align-items: center; justify-content: center; }
+.poster.placeholder span { font-size: 3rem; font-weight: 800; color: rgba(255,255,255,.85); }
+
+/* ---------- Watched list ---------- */
+.wlist { display: flex; flex-direction: column; gap: 10px; }
+.wrow {
+  appearance: none; border: 2px solid transparent; background: var(--panel);
+  color: var(--text); border-radius: var(--radius); padding: 8px; cursor: pointer;
+  display: flex; align-items: center; gap: 14px; text-align: left;
+}
+.wrow .poster { width: 60px; aspect-ratio: 2 / 3; border-radius: 6px; }
+.wrow .poster.placeholder span { font-size: 1.4rem; }
+.wrow-meta { display: flex; flex-direction: column; gap: 4px; }
+
+/* ---------- Service badges ---------- */
+.svc-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; height: 22px; padding: 0 6px; border-radius: 6px;
+  font-size: .72rem; font-weight: 800; color: #fff; text-transform: lowercase;
+  text-shadow: 0 1px 2px rgba(0,0,0,.5);
+}
+.svc-badge.big { min-width: 48px; height: 40px; font-size: 1rem; border-radius: 8px; }
+.svc-badge.unknown { background: var(--accent); color: var(--muted); }
+
+/* ---------- Register / service tiles ---------- */
+.svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+.svc-tile, .svc-choice {
+  border: 2px solid transparent; background: var(--panel); border-radius: var(--radius);
+  padding: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  cursor: pointer; color: var(--text);
+}
+.svc-tile.on { background: var(--panel-2); }
+.svc-tile.on .svc-check { color: var(--focus); }
+.svc-name { font-size: 1.05rem; font-weight: 600; }
+.svc-check { font-size: .85rem; color: var(--muted); }
+.svc-choice.mine { outline: 1px solid var(--accent); }
+.svc-actions { display: flex; gap: 8px; margin-top: 4px; }
+
+/* ---------- Buttons / forms ---------- */
+.btn {
+  appearance: none; border: 2px solid var(--accent); background: var(--panel-2);
+  color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;
+  font-size: .9rem; text-decoration: none; display: inline-flex; align-items: center;
+}
+.btn.play { background: #1b3a1b; border-color: #2c5c2c; }
+.btn.danger { background: #3a1b1b; border-color: #5c2c2c; margin-top: 20px; }
+
+.field { display: flex; align-items: center; gap: 16px; padding: 10px 0; max-width: 560px; }
+.field-label { flex: 0 0 200px; color: var(--muted); }
+.field input[type="text"], .field input[type="password"], .field select {
+  background: var(--panel-2); border: 2px solid var(--accent); color: var(--text);
+  border-radius: 8px; padding: 8px 10px; font-size: 1rem; min-width: 220px;
+}
+.field input[type="color"] { width: 56px; height: 36px; border: 2px solid var(--accent);
+  border-radius: 8px; background: var(--panel-2); cursor: pointer; }
+.range-wrap { display: flex; align-items: center; gap: 12px; }
+.range-val { color: var(--muted); min-width: 40px; }
+input[type="range"] { accent-color: var(--focus); }
+
+/* ---------- Search ---------- */
+.search-bar { margin-bottom: 14px; }
+.search-input {
+  width: 100%; max-width: 640px; background: var(--panel-2); border: 2px solid var(--accent);
+  color: var(--text); border-radius: var(--radius); padding: 14px 16px; font-size: 1.2rem;
+}
+
+/* ---------- Title detail ---------- */
+.title-head { display: flex; gap: 24px; margin-bottom: 10px; flex-wrap: wrap; }
+.title-head .poster { width: 200px; border-radius: var(--radius); }
+.title-info { flex: 1; min-width: 260px; }
+.title-info .genres { color: var(--muted); margin: 8px 0; }
+.title-info .overview { line-height: 1.6; max-width: 720px; color: #d8d8de; }
+
+/* ---------- Focus highlight (the pulsing yellow border) ---------- */
+@keyframes focusPulse {
+  0%, 100% { box-shadow: 0 0 0 4px var(--focus); }
+  50%      { box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus) 50%, transparent); }
+}
+.focused {
+  border-color: var(--focus) !important;
+  outline: none;
+  animation: focusPulse var(--pulse-speed) ease-in-out infinite;
+  position: relative;
+  z-index: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focused { animation: none; box-shadow: 0 0 0 4px var(--focus); }
+}
+
+/* Larger tap/focus targets on TV-sized screens */
+@media (min-width: 1600px) {
+  :root { --nav-w: 240px; }
+  #view { padding: 40px 56px; }
+  h2 { font-size: 2rem; }
+}

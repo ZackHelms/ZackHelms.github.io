@@ -1,0 +1,14 @@
+{
+  "_comment": "Streaming service catalog. providerId = TMDB watch-provider id (used by Phase 2 search/availability). deepLink uses {query} (URL-encoded title). color/short are used for the local logo badge until real TMDB logos are wired in.",
+  "services": [
+    { "id": "netflix",     "name": "Netflix",            "providerId": 8,    "short": "N",  "color": "#e50914", "deepLink": "https://www.netflix.com/search?q={query}" },
+    { "id": "disneyplus",  "name": "Disney+",            "providerId": 337,  "short": "D+", "color": "#113ccf", "deepLink": "https://www.disneyplus.com/search?q={query}" },
+    { "id": "hulu",        "name": "Hulu",               "providerId": 15,   "short": "h",  "color": "#1ce783", "deepLink": "https://www.hulu.com/search?q={query}" },
+    { "id": "prime",       "name": "Prime Video",        "providerId": 9,    "short": "pv", "color": "#00a8e1", "deepLink": "https://www.amazon.com/s?k={query}&i=instant-video" },
+    { "id": "max",         "name": "Max",                "providerId": 1899, "short": "M",  "color": "#0046ff", "deepLink": "https://play.max.com/search?q={query}" },
+    { "id": "appletv",     "name": "Apple TV+",          "providerId": 350,  "short": "tv", "color": "#000000", "deepLink": "https://tv.apple.com/search?term={query}" },
+    { "id": "paramount",   "name": "Paramount+",         "providerId": 531,  "short": "P+", "color": "#0064ff", "deepLink": "https://www.paramountplus.com/search/?query={query}" },
+    { "id": "peacock",     "name": "Peacock",            "providerId": 386,  "short": "pk", "color": "#000000", "deepLink": "https://www.peacocktv.com/search?q={query}" },
+    { "id": "crunchyroll", "name": "Crunchyroll",        "providerId": 283,  "short": "cr", "color": "#f47521", "deepLink": "https://www.crunchyroll.com/search?q={query}" }
+  ]
+}
