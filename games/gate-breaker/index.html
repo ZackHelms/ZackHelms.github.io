@@ -317,24 +317,11 @@ const {
   useRef,
   useEffect
 } = React;
-
-// ============================================================================
-// GATE BREAKER — Complete Unified Edition
-// Pure local game engine. NO API calls, NO fetch, NO external dependencies.
-// Single file. Save slots persist via window.storage (when available) with
-// an in-memory fallback so the game never breaks if storage is unavailable.
-// ============================================================================
-
 const BG = "#07070f",
   BLUE = "#4a9eff",
   TEXT = "#c9d1e0",
   MUTED = "#4a5a7a",
   N_SLOTS = 6;
-
-// ---------------------------------------------------------------------------
-// STORAGE — works inside Claude artifacts (window.storage) AND in any normal
-// browser/StackBlitz environment (falls back to localStorage automatically).
-// ---------------------------------------------------------------------------
 const memStore = {};
 function hasArtifactStorage() {
   return typeof window !== "undefined" && window.storage && typeof window.storage.get === "function";
@@ -400,10 +387,6 @@ async function loadSlots() {
   }
   return out;
 }
-
-// ---------------------------------------------------------------------------
-// GAME DATA
-// ---------------------------------------------------------------------------
 const CLASSES = {
   Warrior: {
     hp: 120,
@@ -456,9 +439,6 @@ const CLASSES = {
     desc: "Heals 40% of max HP."
   }
 };
-
-// Hunter Rank — separate from gate rank. Reflects the hunter's own power level,
-// determined by character level. Shown in the UI as a title/badge.
 const HUNTER_RANKS = [{
   min: 1,
   max: 2,
@@ -709,9 +689,6 @@ const RANK_COLOR = {
   A: "#ff4488",
   S: "#cc44ff"
 };
-
-// Difficulty multiplier per rank — gentle ramp E->C, steep ramp C->S.
-// Applied to enemy/boss HP, ATK, DEF so late-game gates are genuinely dangerous.
 const RANK_DIFFICULTY = {
   E: 1.0,
   D: 1.08,
@@ -720,14 +697,8 @@ const RANK_DIFFICULTY = {
   A: 2.3,
   S: 3.6
 };
-
-// Side Quest red-gate flavor names, used when a random-rank red gate spawns
 const RED_GATE_NAMES = ["Bleeding Rift", "Crimson Tear", "Hollow Wound", "Festering Gate", "Scarlet Maw"];
-
-// Items tiered by player level. More + better items unlock as you level up.
-const ALL_STORE_ITEMS = [
-// Tier 0 — always available
-{
+const ALL_STORE_ITEMS = [{
   name: "Health Potion",
   cost: 20,
   minLv: 1,
@@ -775,9 +746,7 @@ const ALL_STORE_ITEMS = [
   type: "armor",
   spdBonus: 4,
   desc: "+4 SPD"
-},
-// Tier 1 — level 2+
-{
+}, {
   name: "Hi-Potion",
   cost: 45,
   minLv: 2,
@@ -826,9 +795,7 @@ const ALL_STORE_ITEMS = [
   defBonus: 6,
   mgpBonus: 8,
   desc: "+6 DEF +8 MGP"
-},
-// Tier 2 — level 4+
-{
+}, {
   name: "Elixir",
   cost: 90,
   minLv: 4,
@@ -878,9 +845,7 @@ const ALL_STORE_ITEMS = [
   spdBonus: 10,
   defBonus: 6,
   desc: "+10 SPD +6 DEF"
-},
-// Tier 3 — level 6+
-{
+}, {
   name: "Phoenix Potion",
   cost: 180,
   minLv: 6,
@@ -930,9 +895,7 @@ const ALL_STORE_ITEMS = [
   defBonus: 18,
   mgpBonus: 22,
   desc: "+18 DEF +22 MGP"
-},
-// Tier 4 — level 9+ (B rank unlocked)
-{
+}, {
   name: "Berserker Greatsword",
   cost: 950,
   minLv: 9,
@@ -964,9 +927,7 @@ const ALL_STORE_ITEMS = [
   type: "mana",
   restore: 9999,
   desc: "Fully restores Mana"
-},
-// Tier 5 — level 13+ (A rank unlocked)
-{
+}, {
   name: "Demon King Blade",
   cost: 1400,
   minLv: 13,
@@ -990,9 +951,7 @@ const ALL_STORE_ITEMS = [
   type: "weapon",
   mgpBonus: 65,
   desc: "+65 MGP"
-},
-// Tier 6 — level 18+ (S rank unlocked)
-{
+}, {
   name: "World Destroyer",
   cost: 2600,
   minLv: 18,
@@ -1038,7 +997,7 @@ function roll(sides = 20) {
 function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
-const MAX_POTIONS = 5; // shared cap across all consumables combined
+const MAX_POTIONS = 5;
 const BASE_WEAPON = {
   name: "Bare Hands",
   atkBonus: 0,
@@ -1075,18 +1034,14 @@ function newPlayer(name, cls) {
     abilityCd: 0,
     ownedWeapons: [],
     ownedArmors: [],
-    // names of owned gear, can switch freely
     equippedWeapon: "Bare Hands",
     equippedArmor: "Cloth Armor",
     inventory: [],
     stones: 0,
     abilityDesc: base.desc,
-    defeatedBosses: [] // ranks whose boss has been cleared at least once
+    defeatedBosses: []
   };
 }
-
-// Recompute derived stats (maxHp/maxMp/atk/def/mgp/spd) from base class stats
-// PLUS only the currently equipped weapon/armor — gear no longer stacks.
 function recomputeStats(p) {
   const w = ALL_STORE_ITEMS.find(it => it.name === p.equippedWeapon) || BASE_WEAPON;
   const ar = ALL_STORE_ITEMS.find(it => it.name === p.equippedArmor) || BASE_ARMOR;
@@ -1125,13 +1080,9 @@ function levelUp(p) {
   next.baseSpd += 1;
   const recomputed = recomputeStats(next);
   recomputed.hp = recomputed.maxHp;
-  recomputed.mp = recomputed.maxMp; // full heal on level up
+  recomputed.mp = recomputed.maxMp;
   return recomputed;
 }
-
-// ---------------------------------------------------------------------------
-// GAME ENGINE
-// ---------------------------------------------------------------------------
 function createGame(playerName, playerClass) {
   return {
     phase: "hub",
@@ -1169,8 +1120,6 @@ function processAction(g, actionText) {
     options: []
   };
   const a = actionText.toLowerCase();
-
-  // ---- HUB ----
   if (G.phase === "hub") {
     if (a.includes("profile")) {
       const p = G.player;
@@ -1266,8 +1215,6 @@ function processAction(g, actionText) {
     G.options = hubOptions(G);
     return G;
   }
-
-  // ---- EQUIP MENU ----
   if (G.phase === "equip") {
     if (a.includes("back to hub")) {
       G.phase = "hub";
@@ -1312,8 +1259,6 @@ function processAction(g, actionText) {
     G.options = [...wOpts, ...aOpts, "Unequip Weapon (Bare Hands)", "Unequip Armor (Cloth Armor)", "Back to Hub"];
     return G;
   }
-
-  // ---- BOSS RUSH SELECT ----
   if (G.phase === "bossrush_select") {
     if (a.includes("back to hub")) {
       G.phase = "hub";
@@ -1354,8 +1299,6 @@ function processAction(g, actionText) {
     G.options = [...G.player.defeatedBosses.map(r => `Refight ${r}-Rank Boss: ${BOSSES[r].name}`), "Back to Hub"];
     return G;
   }
-
-  // ---- STORE ----
   if (G.phase === "store") {
     if (a.includes("leave")) {
       G.phase = "hub";
@@ -1392,8 +1335,6 @@ function processAction(g, actionText) {
     G.options = avail2.map(it => `Buy ${it.name} (${it.cost}💎) [${it.rarity}] — ${it.desc}`).concat(["Leave Store"]);
     return G;
   }
-
-  // ---- DUNGEON EXPLORATION ----
   if (G.phase === "dungeon") {
     if (a.includes("stats")) {
       const p = G.player;
@@ -1434,7 +1375,6 @@ function processAction(g, actionText) {
       G.options = ["Advance to next room", "Check stats"];
       return G;
     }
-    // Advance
     G.room += 1;
     if (G.room > G.totalRooms) {
       G.phase = "hub";
@@ -1485,8 +1425,6 @@ function processAction(g, actionText) {
     G.options = buildCombatOptions(G);
     return G;
   }
-
-  // ---- COMBAT ----
   if (G.phase === "combat") {
     const p = G.player;
     const e = G.enemy;
@@ -1589,7 +1527,6 @@ function processAction(g, actionText) {
       G.enemy = null;
       G.log = combatLog;
       if (G.isBossRush) {
-        // Boss Rush always returns straight to hub regardless of outcome
         G.log.push(`🏆 ${e.name} defeated in Boss Rush!`);
         G.phase = "hub";
         G.isBossRush = false;
@@ -1639,10 +1576,6 @@ function handleDeath(G) {
   G.options = ["Start Over"];
   return G;
 }
-
-// ---------------------------------------------------------------------------
-// 3D-STYLE SCENE CANVAS — perspective floor grid + parallax + lighting
-// ---------------------------------------------------------------------------
 function SceneCanvas({
   phase,
   rank
@@ -1677,12 +1610,10 @@ function SceneCanvas({
       life: Math.random()
     }));
     function drawFloorGrid(W, H, horizonY, color, speed) {
-      // Perspective floor — lines converge toward horizon, creates 3D depth
       ctx.save();
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
       const vanishX = W * 0.5;
-      // Horizontal depth lines
       for (let i = 0; i < 8; i++) {
         const f = i / 7;
         const y = horizonY + (H - horizonY) * Math.pow(f, 1.8);
@@ -1692,14 +1623,11 @@ function SceneCanvas({
         ctx.lineTo(W, y);
         ctx.stroke();
       }
-      // Vertical converging lines
-      const offset = t * speed % 1;
       for (let i = -6; i <= 6; i++) {
-        const xBottom = W * 0.5 + i * W * 0.14;
         ctx.globalAlpha = 0.12;
         ctx.beginPath();
         ctx.moveTo(vanishX, horizonY);
-        ctx.lineTo(xBottom, H);
+        ctx.lineTo(W * 0.5 + i * W * 0.14, H);
         ctx.stroke();
       }
       ctx.restore();
@@ -1712,23 +1640,17 @@ function SceneCanvas({
       const isCombat = phase === "combat";
       const isDanger = rank === "A" || rank === "S";
       const accent = isCombat ? isDanger ? "180,0,120" : "200,30,70" : RANK_COLOR_RGB(rank);
-
-      // Sky gradient
       const horizonY = H * 0.42;
       const sky = ctx.createLinearGradient(0, 0, 0, horizonY);
       sky.addColorStop(0, isCombat ? "#0c0008" : "#05050d");
       sky.addColorStop(1, isCombat ? "rgba(180,0,80,0.12)" : `rgba(${accent},0.10)`);
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, W, horizonY);
-
-      // Floor gradient
       const floor = ctx.createLinearGradient(0, horizonY, 0, H);
       floor.addColorStop(0, isCombat ? "#1a0008" : "#08081a");
       floor.addColorStop(1, "#020205");
       ctx.fillStyle = floor;
       ctx.fillRect(0, horizonY, W, H - horizonY);
-
-      // Stars / ceiling specks (hub & dungeon only)
       if (!isCombat) {
         stars.forEach(s => {
           const tw = Math.sin(t * 2 + s.x * 12) * 0.3 + 0.7;
@@ -1738,11 +1660,7 @@ function SceneCanvas({
           ctx.fill();
         });
       }
-
-      // Perspective floor grid — gives 3D depth illusion
       drawFloorGrid(W, H, horizonY, `rgba(${accent},0.5)`, isCombat ? 0.15 : 0.06);
-
-      // Central glowing focal point (portal in hub, enemy in combat, void in dungeon)
       const fx = W * 0.5,
         fy = horizonY * 0.65;
       if (phase === "hub") {
@@ -1789,7 +1707,6 @@ function SceneCanvas({
         ctx.arc(er * 0.2, 0, er * 0.08, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
-        // Lightning flashes for danger ranks
         if (isDanger && Math.random() < 0.015) {
           ctx.strokeStyle = "rgba(255,180,255,0.5)";
           ctx.lineWidth = 1.5;
@@ -1800,7 +1717,6 @@ function SceneCanvas({
           ctx.stroke();
         }
       } else {
-        // dungeon — distant glowing rift
         const gr = Math.min(W, H) * 0.1;
         const glow = ctx.createRadialGradient(fx, fy, 0, fx, fy, gr * 2);
         glow.addColorStop(0, `rgba(${accent},0.15)`);
@@ -1811,7 +1727,6 @@ function SceneCanvas({
         ctx.ellipse(fx, fy, gr * 0.4, gr * 0.7, 0, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${accent},0.18)`;
         ctx.fill();
-        // torches
         [[0.12, 0.34], [0.88, 0.34]].forEach(([fxr, fyr]) => {
           const flicker = Math.sin(t * 8 + fxr * 10) * 0.25;
           const tg = ctx.createRadialGradient(fxr * W, fyr * H, 0, fxr * W, fyr * H, W * 0.1);
@@ -1825,8 +1740,6 @@ function SceneCanvas({
           ctx.fill();
         });
       }
-
-      // Floating embers/dust
       embers.forEach(p => {
         p.y += p.vy;
         p.life += 0.006;
@@ -1871,10 +1784,6 @@ function RANK_COLOR_RGB(rank) {
   };
   return map[rank] || "74,158,255";
 }
-
-// ---------------------------------------------------------------------------
-// UI HELPERS
-// ---------------------------------------------------------------------------
 const pBtn = {
   background: "linear-gradient(135deg,#234daa,#622fa0)",
   border: "none",
@@ -1897,10 +1806,6 @@ const gBtn = {
   fontSize: "0.72rem",
   cursor: "pointer"
 };
-
-// ---------------------------------------------------------------------------
-// SAVE / EXIT DIALOG
-// ---------------------------------------------------------------------------
 function SaveDialog({
   onSave,
   onDiscard,
@@ -1989,10 +1894,6 @@ function SaveDialog({
     onClick: onCancel
   }, "✕ Cancel")));
 }
-
-// ---------------------------------------------------------------------------
-// CHARACTER SETUP
-// ---------------------------------------------------------------------------
 function Setup({
   onDone
 }) {
@@ -2128,10 +2029,6 @@ function Setup({
     onClick: () => onDone(name.trim(), cls)
   }, "BEGIN HUNT ▶")));
 }
-
-// ---------------------------------------------------------------------------
-// WELCOME SCREEN
-// ---------------------------------------------------------------------------
 function Welcome({
   onStart
 }) {
@@ -2210,10 +2107,6 @@ function Welcome({
     onClick: onStart
   }, "SELECT SAVE SLOT ▶")));
 }
-
-// ---------------------------------------------------------------------------
-// SAVE SLOTS SCREEN
-// ---------------------------------------------------------------------------
 function Slots({
   onPick,
   onBack
@@ -2365,10 +2258,6 @@ function Slots({
     }, "＋ New"));
   }))));
 }
-
-// ---------------------------------------------------------------------------
-// MAIN GAME SCREEN
-// ---------------------------------------------------------------------------
 function Game({
   slotIdx,
   savedGame,
@@ -2573,10 +2462,6 @@ function Game({
     }
   }, "[", i + 1, "]"), o))));
 }
-
-// ---------------------------------------------------------------------------
-// ROOT APP
-// ---------------------------------------------------------------------------
 function App() {
   const [screen, setScreen] = useState("welcome");
   const [idx, setIdx] = useState(null);
