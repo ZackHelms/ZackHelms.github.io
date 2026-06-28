@@ -16,10 +16,22 @@
       #game canvas {
         image-rendering: pixelated;
       }
+      /* Publish stamp: empty in dev; publish.sh injects the build date here so
+         it's clear which version is live. Lower-right corner, gray. */
+      #build-stamp {
+        position: fixed;
+        right: 4px;
+        bottom: 3px;
+        color: #808080;
+        font: 11px/1 ui-monospace, monospace;
+        pointer-events: none;
+        user-select: none;
+      }
     </style>
     <script type="module" crossorigin src="./assets/index-C1jiDky3.js"></script>
   </head>
   <body>
     <div id="game"></div>
+    <div id="build-stamp">Sun Jun 28 12:21:45 EDT 2026</div>
   </body>
 </html>
