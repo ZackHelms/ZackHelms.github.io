@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>JRPG Studio — Sprite Editor</title>
+    <style>
+      main.studio-main {
+        display: grid;
+        grid-template-columns: 240px 1fr 320px;
+        gap: 16px;
+        align-items: start;
+      }
+      #asset-list .entry {
+        display: block;
+        width: 100%;
+        text-align: left;
+        margin: 4px 0;
+      }
+      #asset-list .entry.selected {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      #pose-tabs button,
+      #brushes button {
+        margin: 2px;
+      }
+      #pose-tabs button.primary,
+      #brushes button.primary {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      #pixel-canvas {
+        display: block;
+        image-rendering: pixelated;
+        cursor: crosshair;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        margin-top: 8px;
+      }
+      #preview .pane {
+        display: inline-block;
+        text-align: center;
+        margin: 0 6px;
+      }
+      #preview canvas {
+        display: block;
+        image-rendering: pixelated;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: #8caa8c;
+      }
+      #preview .pane span {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      #ref-grid img {
+        width: 64px;
+        image-rendering: pixelated;
+        border: 1px solid var(--border);
+        margin: 2px;
+        background: #555;
+      }
+      #transport {
+        margin-top: 12px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/index-Bl93jp6K.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Ch_P6dwh.css">
+  </head>
+  <body>
+    <header class="studio-bar">
+      <h1><a href="../" style="color: inherit; text-decoration: none">JRPG Studio</a> · Sprite Editor</h1>
+      <span id="game-slot"></span>
+      <span class="spacer"></span>
+      <span id="auth-slot"></span>
+    </header>
+    <main class="studio-main">
+      <section class="panel" id="list-panel">
+        <div id="kind-tabs"></div>
+        <div id="asset-list"></div>
+        <div id="list-actions"></div>
+      </section>
+      <section class="panel" id="editor-panel">
+        <div id="pose-tabs"></div>
+        <div id="brushes"></div>
+        <canvas id="pixel-canvas"></canvas>
+        <div id="ref-grid"></div>
+        <div id="transport"></div>
+      </section>
+      <section class="panel" id="preview-panel">
+        <div class="muted">live walk preview (tall tier)</div>
+        <div id="preview"></div>
+        <div id="preview-note" class="muted"></div>
+      </section>
+    </main>
+    <div id="build-stamp">Wed Jul  1 23:14:39 EDT 2026</div>
+  </body>
+</html>
