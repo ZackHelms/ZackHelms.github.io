@@ -6,42 +6,58 @@
     <title>JRPG Studio — Sprite Editor</title>
     <style>
       main.studio-main {
-        display: grid;
-        grid-template-columns: 240px 1fr 320px;
-        gap: 16px;
-        align-items: start;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+        min-height: 0;
       }
-      #asset-list .entry {
-        display: block;
-        width: 100%;
-        text-align: left;
-        margin: 4px 0;
+      #side-col {
+        display: contents;
       }
-      #asset-list .entry.selected {
-        border-color: var(--accent);
-        color: var(--accent);
+      #top-row {
+        order: 0;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        padding-left: 48px; /* clear the fixed hamburger button */
       }
-      #pose-tabs button,
-      #brushes button {
-        margin: 2px;
+      #transport {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
       }
-      #pose-tabs button.primary,
-      #brushes button.primary {
-        border-color: var(--accent);
-        color: var(--accent);
-      }
-      .divider {
-        border: none;
-        border-top: 1px solid var(--border);
-        margin: 10px 0;
+      #canvas-area {
+        order: 1;
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
       }
       #pixel-canvas {
-        display: block;
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        touch-action: none;
         image-rendering: pixelated;
         cursor: crosshair;
         border: 1px solid var(--border);
         border-radius: 4px;
-        margin-top: 8px;
+      }
+      #ref-grid img {
+        width: 64px;
+        image-rendering: pixelated;
+        border: 1px solid var(--border);
+        margin: 2px;
+        background: #555;
+      }
+      #preview-area {
+        order: 2;
       }
       #preview .pane {
         display: inline-block;
@@ -54,57 +70,65 @@
         border: 1px solid var(--border);
         border-radius: 4px;
         background: #8caa8c;
+        max-width: 100%;
+        height: auto;
       }
       #preview .pane span {
         font-size: 11px;
         color: var(--muted);
       }
-      #ref-grid img {
-        width: 64px;
-        image-rendering: pixelated;
-        border: 1px solid var(--border);
-        margin: 2px;
-        background: #555;
-      }
-      #transport {
-        margin-top: 12px;
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        flex-wrap: wrap;
+      @media (orientation: landscape) {
+        main.studio-main {
+          flex-direction: row;
+        }
+        /* left column: dropdowns top, preview grid bottom */
+        #side-col {
+          display: flex;
+          flex-direction: column;
+          width: min(40%, 340px);
+          min-width: 240px;
+        }
+        #top-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        #preview-area {
+          margin-top: auto;
+        }
+        #preview-area #preview {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 4px;
+        }
+        /* right: the editor canvas */
+        #canvas-area {
+          flex: 1;
+          min-height: 0;
+        }
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-BAKM5c-H.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-Ch_P6dwh.css">
+    <script type="module" crossorigin src="./assets/index-CU24xIRr.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BPh0Ro2i.css">
   </head>
   <body>
-    <header class="studio-bar">
-      <h1><a href="../" style="color: inherit; text-decoration: none">JRPG Studio</a> · Sprite Editor</h1>
-      <span id="game-slot"></span>
-      <span class="spacer"></span>
-      <span id="auth-slot"></span>
-    </header>
-    <main class="studio-main">
-      <section class="panel" id="list-panel">
-        <div id="kind-tabs"></div>
-        <hr class="divider" />
-        <div id="asset-list"></div>
-        <div id="list-actions"></div>
-      </section>
-      <section class="panel" id="editor-panel">
-        <div id="pose-tabs"></div>
-        <hr class="divider" id="editor-divider" />
-        <div id="brushes"></div>
+    <div id="drawer-root"></div>
+    <main class="studio-main" id="layout">
+      <div id="side-col">
+        <div id="top-row">
+          <span id="part-slot"></span>
+          <span id="tool-slot"></span>
+          <span id="transport"></span>
+        </div>
+        <section id="preview-area">
+          <div id="preview"></div>
+          <div id="preview-note" class="muted"></div>
+        </section>
+      </div>
+      <section id="canvas-area">
         <canvas id="pixel-canvas"></canvas>
-        <div id="ref-grid"></div>
-        <div id="transport"></div>
-      </section>
-      <section class="panel" id="preview-panel">
-        <div class="muted">live walk preview (tall tier)</div>
-        <div id="preview"></div>
-        <div id="preview-note" class="muted"></div>
+        <div id="ref-grid" class="scroll-y"></div>
       </section>
     </main>
-    <div id="build-stamp">Thu Jul  2 15:13:32 EDT 2026</div>
+    <div id="build-stamp">Thu Jul  2 17:02:17 EDT 2026</div>
   </body>
 </html>

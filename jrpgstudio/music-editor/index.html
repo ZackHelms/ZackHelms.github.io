@@ -6,82 +6,96 @@
     <title>JRPG Studio — Music Editor</title>
     <style>
       main.studio-main {
-        display: grid;
-        grid-template-columns: 260px 1fr;
-        gap: 16px;
-        align-items: start;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+        min-height: 0;
       }
-      #score-list .entry {
-        display: block;
-        width: 100%;
-        text-align: left;
-        margin: 4px 0;
+      #side-col {
+        display: contents;
       }
-      #score-list .entry.selected {
-        border-color: var(--accent);
-        color: var(--accent);
+      #top-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        padding-left: 48px; /* clear the fixed hamburger button */
       }
-      #score-fields .row,
-      #tracks .row {
+      #transport {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      #score-fields-content .row,
+      #track-controls .row {
         display: flex;
         align-items: center;
         gap: 8px;
         margin: 6px 0;
       }
-      #score-fields .row label {
+      #score-fields-content .row label {
         min-width: 90px;
         color: var(--muted);
       }
-      #tracks .track {
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        padding: 4px 10px;
-        margin: 6px 0;
-      }
-      #tracks .track.editing {
-        border-color: var(--accent);
+      #score-fields summary {
+        cursor: pointer;
+        color: var(--muted);
       }
       #grid-scroll {
-        overflow-x: auto;
+        flex: 1;
+        min-height: 0;
+        overflow: auto; /* the note grid is intrinsically larger than the screen — pans both axes */
         border: 1px solid var(--border);
         border-radius: 4px;
-        margin-top: 10px;
       }
       #grid-scroll canvas {
         display: block;
         image-rendering: pixelated;
         cursor: crosshair;
       }
-      #transport {
-        margin-top: 12px;
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        flex-wrap: wrap;
+      @media (orientation: landscape) {
+        main.studio-main {
+          flex-direction: row;
+        }
+        /* left column: transport/track select top, score settings below */
+        #side-col {
+          display: flex;
+          flex-direction: column;
+          width: min(40%, 340px);
+          min-width: 240px;
+        }
+        #top-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        /* right: the note grid */
+        #grid-scroll {
+          flex: 1;
+          min-height: 0;
+        }
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-CWALHIiz.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-Ch_P6dwh.css">
+    <script type="module" crossorigin src="./assets/index-unkx2a4F.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BPh0Ro2i.css">
   </head>
   <body>
-    <header class="studio-bar">
-      <h1><a href="../" style="color: inherit; text-decoration: none">JRPG Studio</a> · Music Editor</h1>
-      <span id="game-slot"></span>
-      <span class="spacer"></span>
-      <span id="auth-slot"></span>
-    </header>
-    <main class="studio-main">
-      <section class="panel" id="list-panel">
-        <div id="score-list"></div>
-        <div id="list-actions"></div>
-      </section>
-      <section class="panel" id="editor-panel">
-        <div id="score-fields"></div>
-        <div id="tracks"></div>
-        <div id="grid-scroll"></div>
-        <div id="transport"></div>
-      </section>
+    <div id="drawer-root"></div>
+    <main class="studio-main" id="layout">
+      <div id="side-col">
+        <div id="top-row">
+          <span id="track-slot"></span>
+          <span id="transport"></span>
+        </div>
+        <div id="track-controls"></div>
+        <details id="score-fields">
+          <summary>score settings</summary>
+          <div id="score-fields-content"></div>
+        </details>
+      </div>
+      <div id="grid-scroll"></div>
     </main>
-    <div id="build-stamp">Thu Jul  2 15:13:32 EDT 2026</div>
+    <div id="build-stamp">Thu Jul  2 17:02:17 EDT 2026</div>
   </body>
 </html>
