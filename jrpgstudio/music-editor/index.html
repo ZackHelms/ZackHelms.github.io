@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>JRPG Studio — Sound Editor</title>
+    <title>JRPG Studio — Music Editor</title>
     <style>
       main.studio-main {
         display: grid;
@@ -11,60 +11,74 @@
         gap: 16px;
         align-items: start;
       }
-      #asset-list .entry {
+      #score-list .entry {
         display: block;
         width: 100%;
         text-align: left;
         margin: 4px 0;
       }
-      #asset-list .entry.selected {
+      #score-list .entry.selected {
         border-color: var(--accent);
         color: var(--accent);
       }
-      #editor .row {
+      #score-fields .row,
+      #tracks .row {
         display: flex;
         align-items: center;
         gap: 8px;
-        margin: 8px 0;
+        margin: 6px 0;
       }
-      #editor .row label {
-        min-width: 110px;
+      #score-fields .row label {
+        min-width: 90px;
         color: var(--muted);
       }
-      #editor input[type='range'] {
-        flex: 1;
-      }
-      #editor .osc {
+      #tracks .track {
         border: 1px solid var(--border);
         border-radius: 4px;
-        padding: 6px 10px;
-        margin: 8px 0;
+        padding: 4px 10px;
+        margin: 6px 0;
+      }
+      #tracks .track.editing {
+        border-color: var(--accent);
+      }
+      #grid-scroll {
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        margin-top: 10px;
+      }
+      #grid-scroll canvas {
+        display: block;
+        image-rendering: pixelated;
+        cursor: crosshair;
       }
       #transport {
         margin-top: 12px;
         display: flex;
         gap: 10px;
         align-items: center;
+        flex-wrap: wrap;
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-BocD8V9_.js"></script>
+    <script type="module" crossorigin src="./assets/index-CQ6oICG2.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-Ch_P6dwh.css">
   </head>
   <body>
     <header class="studio-bar">
-      <h1><a href="../" style="color: inherit; text-decoration: none">JRPG Studio</a> · Sound Editor</h1>
+      <h1><a href="../" style="color: inherit; text-decoration: none">JRPG Studio</a> · Music Editor</h1>
       <span id="game-slot"></span>
       <span class="spacer"></span>
       <span id="auth-slot"></span>
     </header>
     <main class="studio-main">
       <section class="panel" id="list-panel">
-        <div id="kind-tabs"></div>
-        <div id="asset-list"></div>
+        <div id="score-list"></div>
         <div id="list-actions"></div>
       </section>
       <section class="panel" id="editor-panel">
-        <div id="editor"></div>
+        <div id="score-fields"></div>
+        <div id="tracks"></div>
+        <div id="grid-scroll"></div>
         <div id="transport"></div>
       </section>
     </main>
