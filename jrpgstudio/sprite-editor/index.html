@@ -48,55 +48,6 @@
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      /* Save-button feedback. The visible label and a hidden "saved!" ghost are
-         stacked in the same grid cell, so the button is always sized for the
-         wider word and never resizes when the label flips to "saved!". */
-      #transport .save-btn {
-        position: relative;
-        display: inline-grid;
-      }
-      #transport .save-btn > span {
-        grid-area: 1 / 1;
-        text-align: center;
-      }
-      #transport .save-btn .save-ghost {
-        visibility: hidden;
-      }
-      /* Pressed: darken like a real button being held down. */
-      #transport .save-btn:active:not(:disabled) {
-        filter: brightness(0.8);
-      }
-      /* Saving: hide the solid border and march a dotted marquee around the
-         edge (four edge gradients scrolling in a continuous loop). */
-      #transport .save-btn.is-saving {
-        border-color: transparent;
-      }
-      #transport .save-btn.is-saving::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: 4px;
-        pointer-events: none;
-        background-image:
-          linear-gradient(90deg, var(--accent) 50%, transparent 50%),
-          linear-gradient(90deg, var(--accent) 50%, transparent 50%),
-          linear-gradient(0deg, var(--accent) 50%, transparent 50%),
-          linear-gradient(0deg, var(--accent) 50%, transparent 50%);
-        background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
-        background-size: 6px 1px, 6px 1px, 1px 6px, 1px 6px;
-        background-position: 0 0, 0 100%, 0 0, 100% 0;
-        animation: save-marching-ants 0.5s infinite linear;
-      }
-      @keyframes save-marching-ants {
-        to {
-          background-position: 6px 0, -6px 100%, 0 -6px, 100% 6px;
-        }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        #transport .save-btn.is-saving::after {
-          animation: none;
-        }
-      }
       #canvas-area {
         order: 1;
         flex: 1;
@@ -167,8 +118,8 @@
         }
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-Cryf5K28.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BPh0Ro2i.css">
+    <script type="module" crossorigin src="./assets/index-aUyR3jaD.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BSU1s74H.css">
   </head>
   <body>
     <div id="drawer-root"></div>
@@ -190,6 +141,6 @@
         <div id="ref-grid" class="scroll-y"></div>
       </section>
     </main>
-    <div id="build-stamp">Thu Jul  2 23:12:26 EDT 2026</div>
+    <div id="build-stamp">Thu Jul  2 23:57:28 EDT 2026</div>
   </body>
 </html>
