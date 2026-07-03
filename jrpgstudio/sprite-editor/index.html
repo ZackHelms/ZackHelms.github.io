@@ -18,16 +18,35 @@
       #top-row {
         order: 0;
         display: flex;
+        flex-direction: column;
         gap: 8px;
-        align-items: center;
-        flex-wrap: wrap;
         padding-left: 48px; /* clear the fixed hamburger button */
       }
+      /* Row 1: the two dropdowns side by side, label text hidden (scoped —
+         the drawer's selects keep their labels). */
+      #selects-row {
+        display: flex;
+        gap: 8px;
+      }
+      #selects-row > span {
+        flex: 1;
+        min-width: 0;
+      }
+      #selects-row .select-row label {
+        display: none;
+      }
+      /* Row 2: filename (shrinks with ellipsis) + duplicate + save. */
       #transport {
         display: flex;
         gap: 10px;
         align-items: center;
-        flex-wrap: wrap;
+      }
+      #transport .status {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       #canvas-area {
         order: 1;
@@ -73,10 +92,6 @@
         max-width: 100%;
         height: auto;
       }
-      #preview .pane span {
-        font-size: 11px;
-        color: var(--muted);
-      }
       @media (orientation: landscape) {
         main.studio-main {
           flex-direction: row;
@@ -87,10 +102,6 @@
           flex-direction: column;
           width: min(40%, 340px);
           min-width: 240px;
-        }
-        #top-row {
-          flex-direction: column;
-          align-items: stretch;
         }
         #preview-area {
           margin-top: auto;
@@ -107,7 +118,7 @@
         }
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-CU24xIRr.js"></script>
+    <script type="module" crossorigin src="./assets/index-DePKC0b4.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-BPh0Ro2i.css">
   </head>
   <body>
@@ -115,13 +126,14 @@
     <main class="studio-main" id="layout">
       <div id="side-col">
         <div id="top-row">
-          <span id="part-slot"></span>
-          <span id="tool-slot"></span>
-          <span id="transport"></span>
+          <div id="selects-row">
+            <span id="part-slot"></span>
+            <span id="tool-slot"></span>
+          </div>
+          <div id="transport"></div>
         </div>
         <section id="preview-area">
           <div id="preview"></div>
-          <div id="preview-note" class="muted"></div>
         </section>
       </div>
       <section id="canvas-area">
@@ -129,6 +141,6 @@
         <div id="ref-grid" class="scroll-y"></div>
       </section>
     </main>
-    <div id="build-stamp">Thu Jul  2 17:31:51 EDT 2026</div>
+    <div id="build-stamp">Thu Jul  2 21:17:27 EDT 2026</div>
   </body>
 </html>
