@@ -48,6 +48,12 @@ Top-down RTS-lite. Command stick-figure army across 50 waves. Recruit troops,
 use abilities, defeat bosses including a Final Overlord. Largest game by line count.
 ~54 functions. `stick-commander-3d.v001.html` is a saved checkpoint.
 
+### CROISSANT CLICKER (`croissant-clicker.html`, ~700 lines)
+Cookie Clicker-style idle/incremental. Click to bake, buy 10 tiers of buildings,
+unlock click/building upgrades and achievements, catch golden croissants for
+bonuses, ascend for permanent prestige multipliers. DOM-driven UI with a canvas
+overlay for click particles. Detailed context: `.claude/croissant-clicker.md`.
+
 ---
 
 ## Adding a New Game
