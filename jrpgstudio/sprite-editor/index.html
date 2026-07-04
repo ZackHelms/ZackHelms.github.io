@@ -92,6 +92,22 @@
         max-width: 100%;
         height: auto;
       }
+      #preview .tier-label {
+        font-size: 11px;
+        line-height: 1.3;
+      }
+      #preview .tier-label:empty {
+        display: none;
+      }
+      /* Portrait (mobile) is height-constrained and the preview sits at the
+         bottom, so the generated short-tier panes are hidden there; the tall
+         tier — the actual edit surface — always shows. Landscape/desktop has the
+         room and renders every tier row (improve-usability-01, ADR-0021). */
+      @media (orientation: portrait) {
+        #preview .pane.tier-short {
+          display: none;
+        }
+      }
       @media (orientation: landscape) {
         main.studio-main {
           flex-direction: row;
@@ -106,9 +122,11 @@
         #preview-area {
           margin-top: auto;
         }
+        /* Three columns so each height tier (tall, then each short tier) fills
+           its own row of front/side/back panes. */
         #preview-area #preview {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 4px;
         }
         /* right: the editor canvas */
@@ -118,8 +136,8 @@
         }
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-BQst14Mr.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DVZXFIzl.css">
+    <script type="module" crossorigin src="./assets/index-BDvuyNEl.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DrVYjEjo.css">
   </head>
   <body>
     <div id="drawer-root"></div>
@@ -141,6 +159,6 @@
         <div id="ref-grid" class="scroll-y"></div>
       </section>
     </main>
-    <div id="build-stamp">Sat Jul  4 05:38:03 EDT 2026</div>
+    <div id="build-stamp">Sat Jul  4 06:17:32 EDT 2026</div>
   </body>
 </html>
