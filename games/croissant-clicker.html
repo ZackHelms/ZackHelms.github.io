@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Croissant Clicker</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
@@ -19,14 +19,18 @@
   --dim: #8899bb;
   --purple: #b44fff;
 }
-* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+* {
+  margin:0; padding:0; box-sizing:border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none; -ms-user-select: none; user-select: none;
+  touch-action: manipulation;
+}
 html, body {
   background: var(--bg);
   color: var(--white);
   font-family: 'Share Tech Mono', monospace;
   height: 100%;
   overflow: hidden;
-  user-select: none;
 }
 body { display: flex; flex-direction: column; }
 
