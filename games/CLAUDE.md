@@ -16,6 +16,35 @@ Detailed context for individual games lives in `.claude/<game>.md` at the repo r
 | Input | Touch + mouse events, `user-select:none`, `touch-action:manipulation` |
 | No dependencies | Zero external JS libs; Google Fonts is the only external resource |
 | Responsive | Portrait/landscape via `@media (orientation:landscape)` or `100dvh` layout |
+| Build badge | Every game has a `<div id="build-badge">` right after `<body>` — see below |
+
+---
+
+## Build Timestamp Badge (SOP — required for every game)
+
+Every game file (and `games/index.html`, the hub) has a small fixed-position
+badge in the top-right corner showing when it was last built, so the page's
+live version can be visually checked against what a session just shipped:
+
+```html
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build YYYY-MM-DD HH:MM UTC</div>
+```
+
+It goes immediately after the `<body>` tag. `pointer-events:none` and the max
+z-index keep it purely a visual watermark — it never intercepts clicks or
+sits behind other UI.
+
+**Whenever you create or edit any game file, as the last step before
+committing:**
+1. Get the current UTC timestamp: `date -u '+%Y-%m-%d %H:%M UTC'`.
+2. Update that file's `#build-badge` text to the new timestamp (add the badge
+   if the file doesn't have one yet).
+3. State that exact timestamp string in your reply when you report the
+   update as complete, so the user can compare it against what renders live
+   once deployed.
+
+Excluded: frozen checkpoint files (e.g. `stick-commander-3d.v001.html`) —
+they're intentionally never modified, so they don't get a badge.
 
 ---
 
@@ -90,5 +119,6 @@ DOM-driven UI with a canvas overlay for click particles.
 
 1. Create `games/<slug>.html` as a single self-contained file
 2. Add a card to `games/index.html` (copy an existing card, update icon/name/desc/href)
-3. Create `.claude/<slug>.md` with architecture notes before the session gets long
-4. Commit and push to `main`
+3. Add the build-timestamp badge (see above) with the current UTC timestamp
+4. Create `.claude/<slug>.md` with architecture notes before the session gets long
+5. Commit and push to `main`, stating the badge timestamp in your reply
