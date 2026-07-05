@@ -26,8 +26,15 @@ canvas overlay for click particles/floating numbers.
   that building's output.
 - **Click upgrades** (`CLICK_UPGRADE_DEFS`): 6 hand-authored, unlock by lifetime
   baked thresholds, mix of flat add / multiplier / "% of CPS" effects.
-- **Achievements** (`ACHIEVEMENT_DEFS`): 21 milestone-based, each unlocked one
+- **Achievements** (`ACHIEVEMENT_DEFS`): 22 milestone-based, each unlocked one
   grants +0.25% to `achievementMultiplier()` (global production).
+- **Store Upgrade**: a standalone repeatable purchase (`state.storeLevel`,
+  separate from `BUILDING_DEFS`/`BUILDING_UPGRADES` since it doesn't produce
+  CPS directly — it multiplies it). Cost is `10000 * 8^level`
+  (`getStoreUpgradeCost()`); each level compounds money (CPS only, not click
+  power) by another 30% via `storeUpgradeMultiplier() = 1.3^level`. Rendered
+  as a highlighted row pinned above the buy-quantity bar in the Buildings tab.
+  Resets to 0 on rebirth, same as building/click upgrades.
 - **Golden croissant**: spawns every 45–90s at a random point in the click
   area, expires after 13s unclicked. 50/50 Frenzy (7x production, 30s) or
   Lucky (instant croissant bonus).

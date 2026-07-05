@@ -161,6 +161,12 @@ main {
 .cost-label { font-size: 0.5rem; color: var(--dim); }
 .checkmark { color: var(--green); font-size: 0.9rem; }
 
+.store-row.store-upgrade-row {
+  background: rgba(180,79,255,0.06); border-bottom: 1px solid var(--purple);
+}
+.store-row.store-upgrade-row:hover { background: rgba(180,79,255,0.12); }
+.store-row.store-upgrade-row .row-name { color: var(--purple); }
+
 .qty-bar {
   display: flex; align-items: center; gap: 6px; padding: 8px 12px;
   border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 2;
@@ -353,6 +359,10 @@ const GOLDEN_MIN_MS = 45000;
 const GOLDEN_MAX_MS = 90000;
 const GOLDEN_LIFETIME_MS = 13000;
 
+const STORE_UPGRADE_BASE_COST = 10000;
+const STORE_UPGRADE_COST_MULT = 8;
+const STORE_UPGRADE_MONEY_MULT = 1.3;
+
 const BUILDING_DEFS = [
   { name: 'Rolling Pin',            icon: '🥖', baseCost: 15,          baseCps: 0.1,     desc: 'A trusty pin for laminating dough by hand.' },
   { name: 'Apprentice Baker',       icon: '🧑‍🍳', baseCost: 100,        baseCps: 1,       desc: 'Kneads dough while you look away.' },
@@ -403,6 +413,7 @@ const ACHIEVEMENT_DEFS = [
   { id:'a18', icon:'🔥', name:'Frenzy Fan',          desc:'Trigger 10 frenzies.',              cond: s => s.frenzyCount >= 10 },
   { id:'a19', icon:'🌀', name:'Reborn',              desc:'Rebirth for the first time.',       cond: s => s.rebirthCount >= 1 },
   { id:'a20', icon:'🧈', name:'Enlightened Baker',   desc:'Accumulate 10 Golden Butter.',      cond: s => s.goldenButter >= 10 },
+  { id:'a21', icon:'🏪', name:'Storefront Mogul',    desc:'Reach Store Upgrade level 10.',     cond: s => s.storeLevel >= 10 },
 ];
 
 // ── State ──────────────────────────────────────────────────────
@@ -419,6 +430,7 @@ function freshState() {
     frenzyActive: false,
     frenzyEndTime: 0,
     buyQuantity: 1,
+    storeLevel: 0,
     nextGoldenIn: rand(GOLDEN_MIN_MS, GOLDEN_MAX_MS),
     buildings: BUILDING_DEFS.map(() => ({ count: 0 })),
     buildingUpgrades: {},
@@ -471,6 +483,8 @@ function achievementMultiplier() { return 1 + unlockedAchievementCount() * 0.002
 function rebirthMoneyMultiplier() { return 1 + state.goldenButter * 0.01; }
 function rebirthSpeedMultiplier() { return 1 + state.goldenButter * 0.01; }
 function frenzyMultiplier() { return state.frenzyActive ? FRENZY_MULT : 1; }
+function storeUpgradeMultiplier() { return Math.pow(STORE_UPGRADE_MONEY_MULT, state.storeLevel); }
+function getStoreUpgradeCost() { return Math.ceil(STORE_UPGRADE_BASE_COST * Math.pow(STORE_UPGRADE_COST_MULT, state.storeLevel)); }
 
 function getBuildingTierCount(i) {
   let n = 0;
@@ -484,7 +498,7 @@ function getCps() {
     const mult = Math.pow(2, getBuildingTierCount(i));
     total += b.count * BUILDING_DEFS[i].baseCps * mult;
   });
-  return total * achievementMultiplier() * rebirthMoneyMultiplier() * frenzyMultiplier();
+  return total * achievementMultiplier() * rebirthMoneyMultiplier() * storeUpgradeMultiplier() * frenzyMultiplier();
 }
 
 function getClickPower() {
@@ -540,6 +554,45 @@ const frenzyBanner = document.getElementById('frenzy-banner');
 const rebirthBtn = document.getElementById('rebirth-btn');
 const buildingsTab = document.getElementById('tab-buildings');
 const upgradesTab = document.getElementById('tab-upgrades');
+
+// ── Store upgrade (repeatable, +30% money per level) ──────────
+let storeUpgradeRowRef = null;
+function initStoreUpgradeRow() {
+  const row = document.createElement('div');
+  row.className = 'store-row store-upgrade-row';
+  row.innerHTML = `
+    <div class="row-icon">🏪</div>
+    <div class="row-info">
+      <div class="row-name">Store Upgrade</div>
+      <div class="row-sub">Level <span class="cnt">0</span> · +30% money each level · current bonus: <span class="cps">+0%</span></div>
+      <div class="row-desc">Renovate your storefront. Each level makes every croissant sold worth 30% more money, forever (until you rebirth).</div>
+    </div>
+    <div class="row-cost"><span class="cost-val">${formatCroissants(getStoreUpgradeCost())}</span><div class="cost-label">croissants</div></div>
+  `;
+  row.addEventListener('click', buyStoreUpgrade);
+  buildingsTab.appendChild(row);
+  storeUpgradeRowRef = {
+    row, cntEl: row.querySelector('.cnt'), cpsEl: row.querySelector('.cps'), costEl: row.querySelector('.cost-val'),
+  };
+}
+
+function updateStoreUpgradeRow() {
+  const cost = getStoreUpgradeCost();
+  const bonusPct = Math.round((storeUpgradeMultiplier() - 1) * 100);
+  storeUpgradeRowRef.cntEl.textContent = state.storeLevel;
+  storeUpgradeRowRef.cpsEl.textContent = `+${bonusPct}%`;
+  storeUpgradeRowRef.costEl.textContent = formatCroissants(cost);
+  storeUpgradeRowRef.row.classList.toggle('unaffordable', state.croissants < cost);
+}
+
+function buyStoreUpgrade() {
+  const cost = getStoreUpgradeCost();
+  if (state.croissants < cost) return;
+  state.croissants -= cost;
+  state.storeLevel++;
+  checkAchievements();
+  updateAll();
+}
 
 // ── Buy-quantity bar ───────────────────────────────────────────
 function initQtyBar() {
@@ -762,6 +815,7 @@ document.getElementById('rebirth-confirm-btn').addEventListener('click', () => {
   state.buildings = BUILDING_DEFS.map(() => ({ count: 0 }));
   state.buildingUpgrades = {};
   state.clickUpgrades = {};
+  state.storeLevel = 0;
   state.frenzyActive = false;
   closeModal('rebirth-modal');
   checkAchievements();
@@ -939,6 +993,7 @@ function updateAll() {
   cpsLineEl.textContent = formatRate(getCps()) + ' per second';
   lifetimeLineEl.textContent = `Lifetime baked: ${formatCroissants(state.totalBakedAllTime)} · Golden Butter: ${state.goldenButter}`;
   clickPowerValEl.textContent = formatCroissants(getClickPower());
+  updateStoreUpgradeRow();
   updateBuildingRows();
 
   const gain = computeGoldenButterGain();
@@ -1025,6 +1080,7 @@ function load() {
 
 // ── Init ───────────────────────────────────────────────────────
 load();
+initStoreUpgradeRow();
 initQtyBar();
 initBuildingRows();
 updateQtyBarUI();
