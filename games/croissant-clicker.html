@@ -66,6 +66,8 @@ header h1 {
 .header-btn:hover { border-color: var(--gold); color: var(--gold); }
 .header-btn.rebirth-btn { border-color: var(--purple); color: var(--purple); display: none; }
 .header-btn.rebirth-btn.ready { display: inline-block; box-shadow: 0 0 12px #b44fff55; }
+.header-btn.big-rebirth-btn { border-color: #ff8c42; color: #ff8c42; display: none; }
+.header-btn.big-rebirth-btn.ready { display: inline-block; box-shadow: 0 0 12px #ff8c4255; }
 .header-btn.danger:hover { border-color: var(--red); color: var(--red); }
 .header-btn.reload-btn:hover { border-color: var(--blue); color: var(--blue); }
 
@@ -263,6 +265,7 @@ main {
   <h1>CROISSANT CLICKER</h1>
   <div class="header-spacer"></div>
   <button class="header-btn rebirth-btn" id="rebirth-btn">✨ REBIRTH</button>
+  <button class="header-btn big-rebirth-btn" id="big-rebirth-btn">🐔 BIG REBIRTH</button>
   <button class="header-btn" id="ach-btn">🏆 ACHIEVEMENTS</button>
   <button class="header-btn danger" id="reset-btn">RESET</button>
   <button class="header-btn reload-btn" id="reload-btn" title="Force reload the latest version">⟳ RELOAD</button>
@@ -271,7 +274,7 @@ main {
 <div id="stat-bar">
   <div id="croissant-count">0<span class="unit">croissants</span></div>
   <div id="cps-line">0.0 per second</div>
-  <div id="lifetime-line">Lifetime baked: 0 · Golden Butter: 0</div>
+  <div id="lifetime-line">Lifetime baked: 0 · Golden Butter: 0 · Chicken Croissants: 0</div>
 </div>
 
 <main>
@@ -322,12 +325,27 @@ main {
   </div>
 </div>
 
+<!-- Big Rebirth modal -->
+<div class="modal-overlay" id="big-rebirth-modal">
+  <div class="modal-box">
+    <div class="modal-head"><h2>BIG REBIRTH</h2><button class="modal-close" data-close="big-rebirth-modal">✕</button></div>
+    <div class="modal-body">
+      <p>Big Rebirthing resets everything a normal Rebirth does — <b>plus your Golden Butter</b> — but grants permanent <b style="color:#ff8c42">Chicken Croissants</b> 🐔 based on your Golden Butter. Each Chicken Croissant makes every croissant worth <b>5 times more money</b>, forever — far stronger than Golden Butter, but a much deeper reset.</p>
+      <p id="big-rebirth-preview"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn" data-close="big-rebirth-modal">CANCEL</button>
+      <button class="modal-btn primary" id="big-rebirth-confirm-btn">BIG REBIRTH</button>
+    </div>
+  </div>
+</div>
+
 <!-- Reset modal -->
 <div class="modal-overlay" id="reset-modal">
   <div class="modal-box">
     <div class="modal-head"><h2>HARD RESET</h2><button class="modal-close" data-close="reset-modal">✕</button></div>
     <div class="modal-body">
-      <p>This erases <b style="color:var(--red)">everything</b> — croissants, buildings, upgrades, achievements, and Golden Butter. This cannot be undone.</p>
+      <p>This erases <b style="color:var(--red)">everything</b> — croissants, buildings, upgrades, achievements, Golden Butter, and Chicken Croissants. This cannot be undone.</p>
     </div>
     <div class="modal-actions">
       <button class="modal-btn" data-close="reset-modal">CANCEL</button>
@@ -362,6 +380,9 @@ const GOLDEN_LIFETIME_MS = 13000;
 const STORE_UPGRADE_BASE_COST = 10000;
 const STORE_UPGRADE_COST_MULT = 8;
 const STORE_UPGRADE_MONEY_MULT = 1.3;
+
+const BIG_REBIRTH_UNLOCK_GB = 50;
+const CHICKEN_CROISSANT_MONEY_MULT = 5;
 
 const BUILDING_DEFS = [
   { name: 'Rolling Pin',            icon: '🥖', baseCost: 15,          baseCps: 0.1,     desc: 'A trusty pin for laminating dough by hand.' },
@@ -414,6 +435,7 @@ const ACHIEVEMENT_DEFS = [
   { id:'a19', icon:'🌀', name:'Reborn',              desc:'Rebirth for the first time.',       cond: s => s.rebirthCount >= 1 },
   { id:'a20', icon:'🧈', name:'Enlightened Baker',   desc:'Accumulate 10 Golden Butter.',      cond: s => s.goldenButter >= 10 },
   { id:'a21', icon:'🏪', name:'Storefront Mogul',    desc:'Reach Store Upgrade level 10.',     cond: s => s.storeLevel >= 10 },
+  { id:'a22', icon:'🐔', name:'Chicken Dinner',      desc:'Earn your first Chicken Croissant.', cond: s => s.chickenCroissants >= 1 },
 ];
 
 // ── State ──────────────────────────────────────────────────────
@@ -424,9 +446,11 @@ function freshState() {
     croissants: 0,
     totalBakedAllTime: 0,
     goldenButter: 0,
+    chickenCroissants: 0,
     goldenClicks: 0,
     frenzyCount: 0,
     rebirthCount: 0,
+    bigRebirthCount: 0,
     frenzyActive: false,
     frenzyEndTime: 0,
     buyQuantity: 1,
@@ -485,6 +509,8 @@ function rebirthSpeedMultiplier() { return 1 + state.goldenButter * 0.01; }
 function frenzyMultiplier() { return state.frenzyActive ? FRENZY_MULT : 1; }
 function storeUpgradeMultiplier() { return Math.pow(STORE_UPGRADE_MONEY_MULT, state.storeLevel); }
 function getStoreUpgradeCost() { return Math.ceil(STORE_UPGRADE_BASE_COST * Math.pow(STORE_UPGRADE_COST_MULT, state.storeLevel)); }
+function bigRebirthMoneyMultiplier() { return Math.pow(CHICKEN_CROISSANT_MONEY_MULT, state.chickenCroissants); }
+function computeChickenCroissantGain() { return Math.floor(Math.cbrt(state.goldenButter / BIG_REBIRTH_UNLOCK_GB)); }
 
 function getBuildingTierCount(i) {
   let n = 0;
@@ -498,7 +524,7 @@ function getCps() {
     const mult = Math.pow(2, getBuildingTierCount(i));
     total += b.count * BUILDING_DEFS[i].baseCps * mult;
   });
-  return total * achievementMultiplier() * rebirthMoneyMultiplier() * storeUpgradeMultiplier() * frenzyMultiplier();
+  return total * achievementMultiplier() * rebirthMoneyMultiplier() * storeUpgradeMultiplier() * bigRebirthMoneyMultiplier() * frenzyMultiplier();
 }
 
 function getClickPower() {
@@ -552,6 +578,7 @@ const clickArea = document.getElementById('click-area');
 const croissantBtn = document.getElementById('croissant-btn');
 const frenzyBanner = document.getElementById('frenzy-banner');
 const rebirthBtn = document.getElementById('rebirth-btn');
+const bigRebirthBtn = document.getElementById('big-rebirth-btn');
 const buildingsTab = document.getElementById('tab-buildings');
 const upgradesTab = document.getElementById('tab-upgrades');
 
@@ -824,6 +851,35 @@ document.getElementById('rebirth-confirm-btn').addEventListener('click', () => {
   showToast(`✨ Reborn! +${state.goldenButter}% click speed, +${state.goldenButter}% money`);
 });
 
+// ── Big Rebirth ────────────────────────────────────────────────
+bigRebirthBtn.addEventListener('click', () => {
+  const gain = computeChickenCroissantGain();
+  const extra = Math.max(0, gain - state.chickenCroissants);
+  document.getElementById('big-rebirth-preview').innerHTML =
+    extra > 0
+      ? `You will gain <b style="color:#ff8c42">+${extra} Chicken Croissant${extra===1?'':'s'}</b> (total ${gain}), for a permanent <b>×${Math.pow(CHICKEN_CROISSANT_MONEY_MULT, gain).toLocaleString('en-US')}</b> money multiplier, forever. This will also reset your <b style="color:var(--purple)">${state.goldenButter} Golden Butter</b> back to 0.`
+      : `No new Chicken Croissants to gain yet — earn at least ${BIG_REBIRTH_UNLOCK_GB} Golden Butter first.`;
+  openModal('big-rebirth-modal');
+});
+
+document.getElementById('big-rebirth-confirm-btn').addEventListener('click', () => {
+  const gain = computeChickenCroissantGain();
+  state.chickenCroissants = Math.max(state.chickenCroissants, gain);
+  state.bigRebirthCount++;
+  state.goldenButter = 0;
+  state.croissants = 0;
+  state.buildings = BUILDING_DEFS.map(() => ({ count: 0 }));
+  state.buildingUpgrades = {};
+  state.clickUpgrades = {};
+  state.storeLevel = 0;
+  state.frenzyActive = false;
+  closeModal('big-rebirth-modal');
+  checkAchievements();
+  refreshUpgradesTab();
+  updateAll();
+  showToast(`🐔 Big Reborn! ×${bigRebirthMoneyMultiplier().toLocaleString('en-US')} money, forever`);
+});
+
 // ── Reset ───────────────────────────────────────────────────────
 document.getElementById('reset-btn').addEventListener('click', () => openModal('reset-modal'));
 document.getElementById('reset-confirm-btn').addEventListener('click', () => {
@@ -991,13 +1047,16 @@ function triggerLucky() {
 function updateAll() {
   croissantCountEl.innerHTML = formatCroissants(state.croissants) + '<span class="unit">croissants</span>';
   cpsLineEl.textContent = formatRate(getCps()) + ' per second';
-  lifetimeLineEl.textContent = `Lifetime baked: ${formatCroissants(state.totalBakedAllTime)} · Golden Butter: ${state.goldenButter}`;
+  lifetimeLineEl.textContent = `Lifetime baked: ${formatCroissants(state.totalBakedAllTime)} · Golden Butter: ${state.goldenButter} · Chicken Croissants: ${state.chickenCroissants}`;
   clickPowerValEl.textContent = formatCroissants(getClickPower());
   updateStoreUpgradeRow();
   updateBuildingRows();
 
   const gain = computeGoldenButterGain();
   rebirthBtn.classList.toggle('ready', gain > state.goldenButter);
+
+  const bigGain = computeChickenCroissantGain();
+  bigRebirthBtn.classList.toggle('ready', bigGain > state.chickenCroissants);
 
   frenzyBanner.classList.toggle('show', state.frenzyActive);
 }

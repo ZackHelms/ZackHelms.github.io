@@ -45,6 +45,18 @@ canvas overlay for click particles/floating numbers.
   — rather than one shared multiplier, so click speed and passive income can
   be balanced/tuned separately later. Resets croissants/buildings/upgrades but
   NOT `totalBakedAllTime`, `goldenButter`, or achievements.
+- **Big Rebirth**: a deeper second prestige tier, gated on `state.goldenButter`
+  itself (`computeChickenCroissantGain()` = `floor(cbrt(goldenButter / 50))`,
+  so it only becomes possible — and the header button only appears via its
+  `.ready` class — once Golden Butter reaches 50). Confirming it does
+  everything a normal Rebirth does PLUS resets `goldenButter` to 0, and grants
+  Chicken Croissants (`chickenCroissants = max(chickenCroissants, gain)`,
+  banked the same way as Golden Butter). Each Chicken Croissant is a
+  standalone +400%-compounding (`bigRebirthMoneyMultiplier() = 5^n`) money-only
+  multiplier stacked into `getCps()` alongside the others — intentionally far
+  stronger than a Golden Butter point, to justify sacrificing the Golden
+  Butter stockpile. `totalBakedAllTime` is untouched, so a normal Rebirth is
+  usually immediately available again right after a Big Rebirth.
 
 ## Save/offline
 
