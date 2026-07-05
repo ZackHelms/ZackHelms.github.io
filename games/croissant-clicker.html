@@ -67,6 +67,7 @@ header h1 {
 .header-btn.ascend-btn { border-color: var(--purple); color: var(--purple); display: none; }
 .header-btn.ascend-btn.ready { display: inline-block; box-shadow: 0 0 12px #b44fff55; }
 .header-btn.danger:hover { border-color: var(--red); color: var(--red); }
+.header-btn.reload-btn:hover { border-color: var(--blue); color: var(--blue); }
 
 /* ── Stat bar ───────────────────────────────────────── */
 #stat-bar {
@@ -243,6 +244,7 @@ main {
   <button class="header-btn ascend-btn" id="ascend-btn">✨ ASCEND</button>
   <button class="header-btn" id="ach-btn">🏆 ACHIEVEMENTS</button>
   <button class="header-btn danger" id="reset-btn">RESET</button>
+  <button class="header-btn reload-btn" id="reload-btn" title="Force reload the latest version">⟳ RELOAD</button>
 </header>
 
 <div id="stat-bar">
@@ -707,6 +709,24 @@ document.getElementById('reset-confirm-btn').addEventListener('click', () => {
   renderAchievements();
   updateAll();
   showToast('Progress erased.');
+});
+
+// ── Force reload ───────────────────────────────────────────────
+document.getElementById('reload-btn').addEventListener('click', async () => {
+  save();
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch (e) { /* best-effort cache clear */ }
+  const url = new URL(window.location.href);
+  url.searchParams.set('_r', Date.now().toString());
+  window.location.replace(url.toString());
 });
 
 // ── Toasts ─────────────────────────────────────────────────────
