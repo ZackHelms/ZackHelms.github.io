@@ -78,13 +78,12 @@ header h1 {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-#player-count {
+#money-count {
   font-family: 'Black Ops One', sans-serif;
   font-size: clamp(1.6rem, 6vw, 2.6rem);
   color: var(--white);
   text-shadow: 0 0 14px #ff7a1a33;
 }
-#player-count .unit { font-size: 0.5em; color: var(--orange); margin-left: 6px; }
 #pps-line { font-size: 0.68rem; color: var(--orange); letter-spacing: 1px; margin-top: 2px; }
 #lifetime-line { font-size: 0.55rem; color: var(--dim); letter-spacing: 1px; margin-top: 2px; }
 
@@ -110,6 +109,10 @@ main {
   margin-top: 6px; font-size: 0.6rem; color: var(--dim); letter-spacing: 1px;
 }
 #click-power-label b { color: var(--green); }
+#win-progress-label {
+  margin-top: 4px; font-size: 0.56rem; color: var(--dim); letter-spacing: 1px;
+}
+#win-progress-label b { color: var(--gold); }
 
 .golden-ball {
   position: absolute; z-index: 4; font-size: 2.6rem; cursor: pointer;
@@ -146,14 +149,20 @@ main {
 }
 .tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .tab-btn {
-  flex: 1; background: none; border: none; color: var(--dim); padding: 10px;
-  font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; letter-spacing: 2px;
+  flex: 1; background: none; border: none; color: var(--dim); padding: 8px 2px;
+  font-family: 'Share Tech Mono', monospace; font-size: 0.56rem; letter-spacing: 1px;
   cursor: pointer; border-bottom: 2px solid transparent; font-weight: 700;
   touch-action: manipulation;
 }
 .tab-btn.active { color: var(--orange); border-bottom-color: var(--orange); }
 .tab-content { flex: 1; overflow-y: auto; min-height: 0; }
 .tab-content.hidden { display: none; }
+
+.upgrade-section-title {
+  padding: 8px 12px 4px; font-size: 0.58rem; color: var(--orange); letter-spacing: 2px;
+  font-weight: 700; text-transform: uppercase; border-bottom: 1px solid var(--border);
+  background: rgba(255,122,26,0.06);
+}
 
 .store-row {
   display: flex; align-items: center; gap: 10px; padding: 9px 12px;
@@ -171,12 +180,34 @@ main {
 .row-desc { font-size: 0.56rem; color: var(--dim); margin-top: 2px; line-height: 1.4; }
 .row-cost { text-align: right; flex-shrink: 0; }
 .cost-val { font-size: 0.72rem; color: var(--orange); font-weight: 700; display: block; }
-.cost-label { font-size: 0.5rem; color: var(--dim); }
 .checkmark { color: var(--green); font-size: 0.9rem; }
+.rarity-tag {
+  font-size: 0.48rem; font-weight: 700; padding: 1px 6px; border-radius: 10px;
+  letter-spacing: 0.5px; margin-left: 4px; white-space: nowrap;
+}
 
 #empty-upgrades {
   padding: 30px 16px; text-align: center; color: var(--dim); font-size: 0.62rem; line-height: 1.6;
 }
+
+/* ── Feature panels (Stadium / Mascot) ──────────────── */
+.feature-panel {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.feature-icon { font-size: 2.2rem; flex-shrink: 0; width: 44px; text-align: center; }
+.feature-info { flex: 1; min-width: 0; }
+.feature-title { font-size: 0.78rem; font-weight: 700; color: var(--white); letter-spacing: 0.5px; }
+.feature-sub { font-size: 0.58rem; color: var(--dim); margin-top: 4px; line-height: 1.6; }
+.feature-btn {
+  background: var(--bg); border: 1px solid var(--orange); color: var(--orange);
+  border-radius: 6px; padding: 8px 12px; font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 1px; cursor: pointer; text-align: center;
+  touch-action: manipulation; flex-shrink: 0; line-height: 1.6;
+}
+.feature-btn:hover { box-shadow: 0 0 10px #ff7a1a44; }
+.feature-btn.disabled { opacity: 0.4; box-shadow: none; }
+.feature-cost { display: block; color: var(--white); font-size: 0.62rem; margin-top: 2px; }
 
 /* ── Modals ─────────────────────────────────────────── */
 .modal-overlay {
@@ -248,6 +279,7 @@ main {
   #ball-btn { font-size: clamp(4.5rem, 30vw, 7rem); }
   header h1 { font-size: 0.85rem; }
   .header-btn { padding: 6px 8px; font-size: 0.56rem; }
+  .tab-btn { font-size: 0.5rem; padding: 7px 2px; }
 }
 </style>
 </head>
@@ -264,9 +296,9 @@ main {
 </header>
 
 <div id="stat-bar">
-  <div id="player-count">0<span class="unit">players</span></div>
-  <div id="pps-line">0.0 per second</div>
-  <div id="lifetime-line">Lifetime recruited: 0 · Championship Banners: 0</div>
+  <div id="money-count">$0</div>
+  <div id="pps-line">$0.0/sec</div>
+  <div id="lifetime-line">Lifetime earned: $0 · Team Wins: 0 · Championship Banners: 0</div>
 </div>
 
 <main>
@@ -275,7 +307,8 @@ main {
     <div id="frenzy-banner">🔥 SLAM DUNK FRENZY — PRODUCTION x7!</div>
     <div id="ball-bob">
       <div id="ball-btn">🏀</div>
-      <div id="click-power-label">Players per Click: <b id="click-power-val">1</b></div>
+      <div id="click-power-label">Money per Click: <b id="click-power-val">$1</b></div>
+      <div id="win-progress-label">Next Team Win in <b id="win-progress-val">100</b> taps</div>
     </div>
   </div>
 
@@ -283,9 +316,33 @@ main {
     <div class="tabs">
       <button class="tab-btn active" data-tab="buildings">RECRUITING</button>
       <button class="tab-btn" data-tab="upgrades">UPGRADES</button>
+      <button class="tab-btn" data-tab="fans">FANS</button>
+      <button class="tab-btn" data-tab="mascot">MASCOT</button>
     </div>
     <div class="tab-content" id="tab-buildings"></div>
     <div class="tab-content hidden" id="tab-upgrades"></div>
+    <div class="tab-content hidden" id="tab-fans">
+      <div class="feature-panel">
+        <div class="feature-icon">🏟️</div>
+        <div class="feature-info">
+          <div class="feature-title">Stadium — Level <span id="stadium-level">0</span></div>
+          <div class="feature-sub">Fan Capacity: <span id="stadium-fan-usage">0 / 10</span><br>Production Bonus: <span id="stadium-bonus">+0%</span></div>
+        </div>
+        <button class="feature-btn" id="stadium-upgrade-btn">LEVEL UP<span class="feature-cost">$1,000</span></button>
+      </div>
+      <div id="fan-rows"></div>
+    </div>
+    <div class="tab-content hidden" id="tab-mascot">
+      <div class="feature-panel">
+        <div class="feature-icon" id="mascot-icon">❔</div>
+        <div class="feature-info">
+          <div class="feature-title" id="mascot-name">No Mascot</div>
+          <div class="feature-sub">Level <span id="mascot-level">0</span> · Production Bonus: <span id="mascot-bonus">+0%</span></div>
+        </div>
+        <button class="feature-btn" id="mascot-upgrade-btn">EVOLVE<span class="feature-cost">$2,500</span></button>
+      </div>
+      <div class="row-desc" style="padding:14px 16px;">Every mascot level grants a permanent money multiplier. At key levels the mascot evolves into a wilder, more powerful mutation with an even bigger bonus.</div>
+    </div>
   </div>
 </main>
 
@@ -307,7 +364,7 @@ main {
   <div class="modal-box">
     <div class="modal-head"><h2>CHAMPIONSHIP RUN</h2><button class="modal-close" data-close="ascend-modal">✕</button></div>
     <div class="modal-body">
-      <p>Retiring the roster resets your players, recruiters, and upgrades — but grants permanent <b style="color:var(--purple)">Championship Banners</b> based on your lifetime recruits, each worth <b>+2%</b> production forever.</p>
+      <p>Retiring the roster resets your money, recruiters, upgrades, fans, stadium, and mascot progress — but grants permanent <b style="color:var(--purple)">Championship Banners</b> based on your lifetime earnings, each worth <b>+2%</b> production forever.</p>
       <p id="ascend-preview"></p>
     </div>
     <div class="modal-actions">
@@ -322,7 +379,7 @@ main {
   <div class="modal-box">
     <div class="modal-head"><h2>HARD RESET</h2><button class="modal-close" data-close="reset-modal">✕</button></div>
     <div class="modal-body">
-      <p>This erases <b style="color:var(--red)">everything</b> — players, recruiters, upgrades, achievements, and Championship Banners. This cannot be undone.</p>
+      <p>This erases <b style="color:var(--red)">everything</b> — money, recruiters, upgrades, fans, stadium, mascot, achievements, and Championship Banners. This cannot be undone.</p>
     </div>
     <div class="modal-actions">
       <button class="modal-btn" data-close="reset-modal">CANCEL</button>
@@ -357,6 +414,15 @@ const CLICKER_INTERVAL_MS = 5000;
 const CLICKER_COST_MULT = 1.10;
 const CLICKER_BONUS_EVERY = 10;
 const CLICKER_BONUS_AMOUNT = 5;
+const WIN_EVERY_TAPS = 100;
+const FAN_BASE_CAP = 10;
+const STADIUM_BASE_COST = 1000;
+const STADIUM_COST_MULT = 1.6;
+const STADIUM_FAN_CAP_PER_LEVEL = 20;
+const STADIUM_MULT_PER_LEVEL = 0.03;
+const MASCOT_BASE_COST = 2500;
+const MASCOT_COST_MULT = 1.8;
+const MASCOT_MULT_PER_LEVEL = 0.05;
 
 // index 0 is the special "Clicker" item (auto-clicking pointer finger).
 // The rest are standard passive recruiters, same shape as Cookie Clicker buildings.
@@ -379,6 +445,7 @@ const TIER_CONFIG = [
   { req: 50, costMul: 400, label: 'Franchise Prestige' },
 ];
 
+// One-time purchases. target: 'click' | 'pps' | 'both' — which stat the bonus applies to.
 const CLICK_UPGRADE_DEFS = [
   { id:'cu0', name:'Grippy High-Tops',        desc:'+1 click power.',              cost: 50,      unlockAt: 0,       type:'add',  value: 1  },
   { id:'cu1', name:'Game Ball Leather',       desc:'+2 click power.',              cost: 500,     unlockAt: 100,     type:'add',  value: 2  },
@@ -388,14 +455,88 @@ const CLICK_UPGRADE_DEFS = [
   { id:'cu5', name:'Hall of Fame Legacy',     desc:'+100 click power.',            cost: 5000000, unlockAt: 1000000, type:'add',  value: 100 },
 ];
 
+const PLAYER_TYPE_DEFS = [
+  { id:'pt0',  name:'Bench Warmer',                desc:'+1 click power.',                     cost: 30,                unlockAt: 0,               target:'click', type:'add',  value: 1 },
+  { id:'pt1',  name:'Walk-On Prospect',             desc:'+2 money per second.',                cost: 250,               unlockAt: 50,              target:'pps',   type:'add',  value: 2 },
+  { id:'pt2',  name:'Sixth Man',                    desc:'+3 click power.',                     cost: 2000,              unlockAt: 500,             target:'click', type:'add',  value: 3 },
+  { id:'pt3',  name:'Role Player',                  desc:'x1.5 passive income.',                cost: 8000,              unlockAt: 2000,            target:'pps',   type:'mult', value: 1.5 },
+  { id:'pt4',  name:'Rookie Sensation',             desc:'+8 click power.',                     cost: 25000,             unlockAt: 8000,            target:'click', type:'add',  value: 8 },
+  { id:'pt5',  name:'Starting Center',              desc:'x2 click power.',                     cost: 80000,             unlockAt: 20000,           target:'click', type:'mult', value: 2 },
+  { id:'pt6',  name:'Sharpshooter',                 desc:'+25 click power.',                    cost: 250000,            unlockAt: 60000,           target:'click', type:'add',  value: 25 },
+  { id:'pt7',  name:'Franchise Player',              desc:'x1.8 passive income.',                cost: 900000,            unlockAt: 200000,          target:'pps',   type:'mult', value: 1.8 },
+  { id:'pt8',  name:'All-Star',                     desc:'x2 click power AND passive income.',  cost: 4000000,           unlockAt: 800000,          target:'both',  type:'mult', value: 2 },
+  { id:'pt9',  name:'All-NBA Talent',               desc:'+150 click power.',                   cost: 15000000,          unlockAt: 3000000,         target:'click', type:'add',  value: 150 },
+  { id:'pt10', name:'Olympian',                     desc:'x1.6 passive income.',                cost: 60000000,          unlockAt: 10000000,        target:'pps',   type:'mult', value: 1.6 },
+  { id:'pt11', name:'Hall of Famer',                desc:'x2.5 click power.',                   cost: 300000000,         unlockAt: 50000000,        target:'click', type:'mult', value: 2.5 },
+  { id:'pt12', name:'GOAT Candidate',               desc:'+2,000 click power.',                 cost: 1500000000,        unlockAt: 250000000,       target:'click', type:'add',  value: 2000 },
+  { id:'pt13', name:'Global Icon',                  desc:'x2 passive income.',                  cost: 9000000000,        unlockAt: 1000000000,      target:'pps',   type:'mult', value: 2 },
+  { id:'pt14', name:'Legend of the Multiverse',     desc:'x3 click power AND passive income.',  cost: 60000000000,       unlockAt: 8000000000,      target:'both',  type:'mult', value: 3 },
+];
+
+const COACH_DEFS = [
+  { id:'co0',  name:'Volunteer Assistant',          desc:'+1 money per second.',                cost: 80,                unlockAt: 0,               target:'pps',   type:'add',  value: 1 },
+  { id:'co1',  name:'Shooting Coach',               desc:'+3 click power.',                     cost: 1500,              unlockAt: 300,             target:'click', type:'add',  value: 3 },
+  { id:'co2',  name:'Defense Coordinator',          desc:'x1.4 passive income.',                cost: 12000,             unlockAt: 3000,            target:'pps',   type:'mult', value: 1.4 },
+  { id:'co3',  name:'Conditioning Coach',           desc:'+15 money per second.',               cost: 60000,             unlockAt: 15000,           target:'pps',   type:'add',  value: 15 },
+  { id:'co4',  name:'Analytics Coach',              desc:'x1.5 passive income.',                cost: 220000,            unlockAt: 50000,           target:'pps',   type:'mult', value: 1.5 },
+  { id:'co5',  name:'Player Development Coach',     desc:'x1.5 click power.',                   cost: 700000,            unlockAt: 150000,          target:'click', type:'mult', value: 1.5 },
+  { id:'co6',  name:'Strength & Conditioning Guru', desc:'+300 money per second.',              cost: 3000000,           unlockAt: 600000,          target:'pps',   type:'add',  value: 300 },
+  { id:'co7',  name:'Sports Psychologist',          desc:'x1.6 click power AND passive income.',cost: 12000000,          unlockAt: 2500000,         target:'both',  type:'mult', value: 1.6 },
+  { id:'co8',  name:'Video Coordinator',            desc:'x1.7 passive income.',                cost: 50000000,          unlockAt: 9000000,         target:'pps',   type:'mult', value: 1.7 },
+  { id:'co9',  name:'Head Scout',                   desc:'+5,000 money per second.',            cost: 250000000,         unlockAt: 40000000,        target:'pps',   type:'add',  value: 5000 },
+  { id:'co10', name:'General Manager',              desc:'x2 passive income.',                  cost: 1200000000,        unlockAt: 150000000,       target:'pps',   type:'mult', value: 2 },
+  { id:'co11', name:'Legendary Head Coach',         desc:'x2.2 click power AND passive income.',cost: 10000000000,       unlockAt: 1200000000,      target:'both',  type:'mult', value: 2.2 },
+];
+
+const MUTATION_DEFS = [
+  { id:'mu0',  name:'Freakish Wingspan',              desc:'+10 click power.',                    cost: 100000,                unlockAt: 20000,               target:'click', type:'add',  value: 10 },
+  { id:'mu1',  name:'Enhanced Reflexes',              desc:'x1.3 click power.',                   cost: 400000,                unlockAt: 80000,               target:'click', type:'mult', value: 1.3 },
+  { id:'mu2',  name:'Vertical Leap Mutation',         desc:'+50 money per second.',               cost: 1500000,               unlockAt: 300000,              target:'pps',   type:'add',  value: 50 },
+  { id:'mu3',  name:'Adrenaline Overdrive',           desc:'x1.4 passive income.',                cost: 6000000,               unlockAt: 1000000,             target:'pps',   type:'mult', value: 1.4 },
+  { id:'mu4',  name:'Photographic Playbook Memory',   desc:'x1.5 click power AND passive income.',cost: 20000000,              unlockAt: 4000000,             target:'both',  type:'mult', value: 1.5 },
+  { id:'mu5',  name:'Cybernetic Knee Replacement',    desc:'+500 click power.',                   cost: 80000000,              unlockAt: 15000000,            target:'click', type:'add',  value: 500 },
+  { id:'mu6',  name:'Nanobot Muscle Repair',          desc:'x1.6 passive income.',                cost: 300000000,             unlockAt: 60000000,            target:'pps',   type:'mult', value: 1.6 },
+  { id:'mu7',  name:'Quantum Court Vision',           desc:'x1.7 click power.',                   cost: 1000000000,            unlockAt: 200000000,           target:'click', type:'mult', value: 1.7 },
+  { id:'mu8',  name:'Bionic Shooting Arm',            desc:'+15,000 click power.',                cost: 4000000000,            unlockAt: 800000000,           target:'click', type:'add',  value: 15000 },
+  { id:'mu9',  name:'Neural Overclock',               desc:'x1.8 click power AND passive income.',cost: 15000000000,           unlockAt: 3000000000,          target:'both',  type:'mult', value: 1.8 },
+  { id:'mu10', name:'Gene-Edited Endurance',          desc:'x2 passive income.',                  cost: 60000000000,           unlockAt: 12000000000,         target:'pps',   type:'mult', value: 2 },
+  { id:'mu11', name:'Synthetic Lung Capacity',        desc:'+500,000 money per second.',          cost: 250000000000,          unlockAt: 50000000000,         target:'pps',   type:'add',  value: 500000 },
+  { id:'mu12', name:'AI-Assisted Coaching Chip',      desc:'x2.2 passive income.',                cost: 1000000000000,         unlockAt: 200000000000,        target:'pps',   type:'mult', value: 2.2 },
+  { id:'mu13', name:'Cloned Star Prospect',           desc:'x2 click power.',                     cost: 4000000000000,         unlockAt: 800000000000,        target:'click', type:'mult', value: 2 },
+  { id:'mu14', name:'Multiversal Scouting Algorithm', desc:'x2 click power AND passive income.',  cost: 15000000000000,        unlockAt: 3000000000000,       target:'both',  type:'mult', value: 2 },
+  { id:'mu15', name:'Time-Dilated Practice Facility', desc:'x2.5 passive income.',                cost: 60000000000000,        unlockAt: 12000000000000,      target:'pps',   type:'mult', value: 2.5 },
+  { id:'mu16', name:'Reality-Warping Playbook',       desc:'x2.5 click power.',                   cost: 250000000000000,       unlockAt: 50000000000000,      target:'click', type:'mult', value: 2.5 },
+  { id:'mu17', name:'Singularity Draft Pick',         desc:'x3 click power AND passive income.',  cost: 1000000000000000,      unlockAt: 200000000000000,     target:'both',  type:'mult', value: 3 },
+];
+
+// Repeatable fan purchases, capped by stadium capacity. Each fan owned adds a small
+// percentage bonus to overall money production; rarer fans give a bigger bonus each.
+const FAN_TIER_DEFS = [
+  { id:'fan0', name:'Casual Fan',               icon:'🙂', rarity:'Common',    color:'#8899bb', baseCost: 200,        costMult: 1.12, bonusPercent: 0.4, desc:'Shows up when the team is winning.' },
+  { id:'fan1', name:'Season Ticket Holder',     icon:'🎟️', rarity:'Rare',      color:'#4488ff', baseCost: 5000,       costMult: 1.14, bonusPercent: 1.2, desc:'Never misses a home game.' },
+  { id:'fan2', name:'Superfan',                 icon:'🤩', rarity:'Epic',      color:'#b44fff', baseCost: 150000,     costMult: 1.16, bonusPercent: 3.5, desc:'Face paint, foam finger, the works.' },
+  { id:'fan3', name:'Celebrity Courtside Fan',  icon:'🌟', rarity:'Legendary', color:'#ffc300', baseCost: 5000000,    costMult: 1.18, bonusPercent: 9,   desc:'Front row, every game, cameras love them.' },
+  { id:'fan4', name:'Mythic Ultra Fan',         icon:'👑', rarity:'Mythic',    color:'#ff2244', baseCost: 250000000,  costMult: 1.20, bonusPercent: 22,  desc:'Legend says they have never missed a possession.' },
+];
+
+const MASCOT_TIERS = [
+  { at: 0,  name: 'No Mascot',                icon: '❔' },
+  { at: 1,  name: 'Team Mascot',               icon: '🐻' },
+  { at: 5,  name: 'Mutant Mascot',             icon: '🦍' },
+  { at: 10, name: 'Cyber Mascot',              icon: '🤖' },
+  { at: 20, name: 'Cosmic Mascot',             icon: '👽' },
+  { at: 35, name: 'Ancient Dragon Mascot',     icon: '🐉' },
+  { at: 50, name: 'Multiversal Mascot Deity',  icon: '🌌' },
+];
+
 const ACHIEVEMENT_DEFS = [
-  { id:'a0',  icon:'🏀', name:'First Recruit',       desc:'Recruit your first player.',        cond: s => s.totalRecruitedAllTime >= 1 },
-  { id:'a1',  icon:'🏀', name:'Starting Five',       desc:'Recruit 100 total.',                cond: s => s.totalRecruitedAllTime >= 100 },
-  { id:'a2',  icon:'🏀', name:'Full Roster',         desc:'Recruit 10,000 total.',             cond: s => s.totalRecruitedAllTime >= 1e4 },
-  { id:'a3',  icon:'🏀', name:'League Legend',       desc:'Recruit 1,000,000 total.',          cond: s => s.totalRecruitedAllTime >= 1e6 },
-  { id:'a4',  icon:'🏀', name:'Basketball Tycoon',   desc:'Recruit 100,000,000 total.',        cond: s => s.totalRecruitedAllTime >= 1e8 },
-  { id:'a5',  icon:'🏀', name:'Hoops Empire',        desc:'Recruit 10 billion total.',         cond: s => s.totalRecruitedAllTime >= 1e10 },
-  { id:'a6',  icon:'🏀', name:'Legendary Franchise', desc:'Recruit 1 trillion total.',         cond: s => s.totalRecruitedAllTime >= 1e12 },
+  { id:'a0',  icon:'🏀', name:'First Paycheck',      desc:'Earn your first dollar.',           cond: s => s.totalEarnedAllTime >= 1 },
+  { id:'a1',  icon:'🏀', name:'Starting Five',       desc:'Earn $100 total.',                  cond: s => s.totalEarnedAllTime >= 100 },
+  { id:'a2',  icon:'🏀', name:'Full Roster',         desc:'Earn $10,000 total.',               cond: s => s.totalEarnedAllTime >= 1e4 },
+  { id:'a3',  icon:'🏀', name:'League Legend',       desc:'Earn $1,000,000 total.',            cond: s => s.totalEarnedAllTime >= 1e6 },
+  { id:'a4',  icon:'🏀', name:'Basketball Tycoon',   desc:'Earn $100,000,000 total.',          cond: s => s.totalEarnedAllTime >= 1e8 },
+  { id:'a5',  icon:'🏀', name:'Hoops Empire',        desc:'Earn $10 billion total.',           cond: s => s.totalEarnedAllTime >= 1e10 },
+  { id:'a6',  icon:'🏀', name:'Legendary Franchise', desc:'Earn $1 trillion total.',           cond: s => s.totalEarnedAllTime >= 1e12 },
   { id:'a7',  icon:'👆', name:'Quick Hands',         desc:'Own a Clicker.',                    cond: s => s.buildings[0].count >= 1 },
   { id:'a8',  icon:'👆', name:'Ten Fingers',         desc:'Own 10 Clickers.',                  cond: s => s.buildings[0].count >= 10 },
   { id:'a9',  icon:'🏀', name:'Pickup Regular',      desc:'Own 10 Playground Courts.',         cond: s => s.buildings[1].count >= 10 },
@@ -411,6 +552,14 @@ const ACHIEVEMENT_DEFS = [
   { id:'a19', icon:'🔥', name:'Frenzy Fan',          desc:'Trigger 10 slam dunk frenzies.',    cond: s => s.frenzyCount >= 10 },
   { id:'a20', icon:'🏆', name:'Champion',            desc:'Win your first championship.',      cond: s => s.ascendCount >= 1 },
   { id:'a21', icon:'🏆', name:'Dynasty',             desc:'Accumulate 10 Championship Banners.', cond: s => s.banners >= 10 },
+  { id:'a22', icon:'🏆', name:'Home Opener',         desc:'Win your first game (every 100 taps).', cond: s => s.teamWins >= 1 },
+  { id:'a23', icon:'🏆', name:'Winning Season',      desc:'Win 25 games.',                     cond: s => s.teamWins >= 25 },
+  { id:'a24', icon:'🏟️', name:'Stadium Upgrade',     desc:'Reach Stadium Level 5.',            cond: s => s.stadiumLevel >= 5 },
+  { id:'a25', icon:'🏟️', name:'Sold-Out Arena',      desc:'Reach Stadium Level 15.',           cond: s => s.stadiumLevel >= 15 },
+  { id:'a26', icon:'🐻', name:'Meet the Mascot',     desc:'Evolve your mascot once.',          cond: s => s.mascotLevel >= 1 },
+  { id:'a27', icon:'👽', name:'Cosmic Mascot',       desc:'Evolve your mascot to Level 20.',   cond: s => s.mascotLevel >= 20 },
+  { id:'a28', icon:'👑', name:'Full House',          desc:'Fill your stadium with fans.',      cond: s => getTotalFans() >= getFanCapacity() },
+  { id:'a29', icon:'👑', name:'Mythic Following',    desc:'Recruit a Mythic Ultra Fan.',       cond: s => s.fans[4] && s.fans[4].count >= 1 },
 ];
 
 // ── State ──────────────────────────────────────────────────────
@@ -418,8 +567,8 @@ let state = null;
 
 function freshState() {
   return {
-    players: 0,
-    totalRecruitedAllTime: 0,
+    money: 0,
+    totalEarnedAllTime: 0,
     banners: 0,
     goldenClicks: 0,
     frenzyCount: 0,
@@ -430,6 +579,14 @@ function freshState() {
     buildings: BUILDING_DEFS.map(() => ({ count: 0 })),
     buildingUpgrades: {},
     clickUpgrades: {},
+    playerUpgrades: {},
+    coachUpgrades: {},
+    mutationUpgrades: {},
+    fans: FAN_TIER_DEFS.map(() => ({ count: 0 })),
+    stadiumLevel: 0,
+    mascotLevel: 0,
+    tapCount: 0,
+    teamWins: 0,
     achievements: {},
     lastSave: null,
   };
@@ -454,6 +611,14 @@ BUILDING_DEFS.forEach((d, i) => {
   });
 });
 
+// One-time upgrade categories rendered together in the UPGRADES tab.
+const UPGRADE_CATEGORIES = [
+  { title: 'CLICK UPGRADES',    defs: CLICK_UPGRADE_DEFS, stateKey: 'clickUpgrades',    icon: '👟' },
+  { title: 'PLAYER TYPES',      defs: PLAYER_TYPE_DEFS,   stateKey: 'playerUpgrades',   icon: '🏀' },
+  { title: 'ASSISTANT COACHES', defs: COACH_DEFS,         stateKey: 'coachUpgrades',    icon: '🧑‍🏫' },
+  { title: 'MUTATIONS',         defs: MUTATION_DEFS,      stateKey: 'mutationUpgrades', icon: '🧬' },
+];
+
 // ── Number formatting ─────────────────────────────────────────
 const SUFFIXES = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc','UDc','DDc','TDc'];
 function formatNum(n, decimals = 2) {
@@ -461,7 +626,7 @@ function formatNum(n, decimals = 2) {
   let tier = Math.min(Math.floor(Math.log10(n) / 3), SUFFIXES.length - 1);
   return (n / Math.pow(1000, tier)).toFixed(decimals) + SUFFIXES[tier];
 }
-function formatPlayers(n) {
+function formatMoney(n) {
   n = Math.floor(n);
   if (n < 1e6) return n.toLocaleString('en-US');
   return formatNum(n, 3);
@@ -489,18 +654,52 @@ function getClickerBonus() {
   return Math.floor(state.buildings[0].count / CLICKER_BONUS_EVERY) * CLICKER_BONUS_AMOUNT;
 }
 
+// Combined add/mult bonuses from every one-time upgrade category, split by target stat.
+function getUpgradeBonuses() {
+  let clickAdd = 0, clickMult = 1, ppsAdd = 0, ppsMult = 1;
+  UPGRADE_CATEGORIES.forEach(cat => {
+    cat.defs.forEach(u => {
+      if (!state[cat.stateKey][u.id]) return;
+      const target = u.target || 'click';
+      if (target === 'click' || target === 'both') {
+        if (u.type === 'add') clickAdd += u.value; else clickMult *= u.value;
+      }
+      if (target === 'pps' || target === 'both') {
+        if (u.type === 'add') ppsAdd += u.value; else ppsMult *= u.value;
+      }
+    });
+  });
+  return { clickAdd, clickMult, ppsAdd, ppsMult };
+}
+
+function getFanCapacity() { return FAN_BASE_CAP + state.stadiumLevel * STADIUM_FAN_CAP_PER_LEVEL; }
+function getTotalFans() { return state.fans.reduce((s, f) => s + f.count, 0); }
+function getFanMultiplier() {
+  let bonus = 0;
+  state.fans.forEach((f, i) => { bonus += f.count * FAN_TIER_DEFS[i].bonusPercent; });
+  return 1 + bonus / 100;
+}
+function getFanCost(i) {
+  const d = FAN_TIER_DEFS[i];
+  return Math.ceil(d.baseCost * Math.pow(d.costMult, state.fans[i].count));
+}
+function getStadiumCost() { return Math.ceil(STADIUM_BASE_COST * Math.pow(STADIUM_COST_MULT, state.stadiumLevel)); }
+function getStadiumMultiplier() { return 1 + state.stadiumLevel * STADIUM_MULT_PER_LEVEL; }
+function getMascotCost() { return Math.ceil(MASCOT_BASE_COST * Math.pow(MASCOT_COST_MULT, state.mascotLevel)); }
+function getMascotMultiplier() { return 1 + state.mascotLevel * MASCOT_MULT_PER_LEVEL; }
+function getMascotTier() {
+  let cur = MASCOT_TIERS[0];
+  MASCOT_TIERS.forEach(t => { if (state.mascotLevel >= t.at) cur = t; });
+  return cur;
+}
+
 // Base click power before the global (achievement/prestige/frenzy) multiplier.
 // Kept separate from getCps() so the Clicker's auto-click contribution and the
 // player's manual click power apply the global multiplier exactly once.
 function getBaseClickPower() {
-  let add = 0, mult = 1;
-  CLICK_UPGRADE_DEFS.forEach(u => {
-    if (!state.clickUpgrades[u.id]) return;
-    if (u.type === 'add') add += u.value;
-    else if (u.type === 'mult') mult *= u.value;
-  });
-  add += getClickerBonus();
-  return (1 + add) * mult;
+  const b = getUpgradeBonuses();
+  const clickerBonus = getClickerBonus();
+  return (1 + b.clickAdd + clickerBonus) * b.clickMult;
 }
 
 function getClickPower() {
@@ -509,15 +708,20 @@ function getClickPower() {
 
 function getCps() {
   let total = 0;
-  state.buildings.forEach((b, i) => {
+  state.buildings.forEach((bld, i) => {
     const d = BUILDING_DEFS[i];
     if (d.special === 'autoclick') {
-      total += (b.count / (CLICKER_INTERVAL_MS / 1000)) * getBaseClickPower();
+      total += (bld.count / (CLICKER_INTERVAL_MS / 1000)) * getBaseClickPower();
       return;
     }
     const mult = Math.pow(2, getBuildingTierCount(i));
-    total += b.count * d.baseCps * mult;
+    total += bld.count * d.baseCps * mult;
   });
+  const bonuses = getUpgradeBonuses();
+  total = (total + bonuses.ppsAdd) * bonuses.ppsMult;
+  total *= getFanMultiplier();
+  total *= getStadiumMultiplier();
+  total *= getMascotMultiplier();
   return total * achievementMultiplier() * prestigeMultiplier() * frenzyMultiplier();
 }
 
@@ -529,20 +733,23 @@ function getBuildingCost(i) {
 }
 
 function computeBannerGain() {
-  return Math.floor(Math.cbrt(state.totalRecruitedAllTime / 1e9));
+  return Math.floor(Math.cbrt(state.totalEarnedAllTime / 1e9));
 }
 
 // ── DOM refs ───────────────────────────────────────────────────
-const playerCountEl = document.getElementById('player-count');
+const moneyCountEl = document.getElementById('money-count');
 const ppsLineEl = document.getElementById('pps-line');
 const lifetimeLineEl = document.getElementById('lifetime-line');
 const clickPowerValEl = document.getElementById('click-power-val');
+const winProgressValEl = document.getElementById('win-progress-val');
 const clickArea = document.getElementById('click-area');
 const ballBtn = document.getElementById('ball-btn');
 const frenzyBanner = document.getElementById('frenzy-banner');
 const ascendBtn = document.getElementById('ascend-btn');
 const buildingsTab = document.getElementById('tab-buildings');
 const upgradesTab = document.getElementById('tab-upgrades');
+const fansTab = document.getElementById('tab-fans');
+const mascotTab = document.getElementById('tab-mascot');
 
 // ── Building rows (built once, updated in place) ─────────────
 const buildingRowRefs = [];
@@ -554,10 +761,10 @@ function initBuildingRows() {
       <div class="row-icon">${d.icon}</div>
       <div class="row-info">
         <div class="row-name">${d.name}</div>
-        <div class="row-sub">Owned: <span class="cnt">0</span> · <span class="cps">0</span> pps each</div>
+        <div class="row-sub">Owned: <span class="cnt">0</span> · <span class="cps">$0/sec each</span></div>
         <div class="row-desc">${d.desc}</div>
       </div>
-      <div class="row-cost"><span class="cost-val">${formatPlayers(d.baseCost)}</span><div class="cost-label">players</div></div>
+      <div class="row-cost"><span class="cost-val">$${formatMoney(d.baseCost)}</span></div>
     `;
     row.addEventListener('click', () => buyBuilding(i));
     buildingsTab.appendChild(row);
@@ -574,101 +781,200 @@ function updateBuildingRows() {
     const cost = getBuildingCost(i);
     ref.cntEl.textContent = b.count;
     if (d.special === 'autoclick') {
-      ref.cpsEl.textContent = formatRate(getBaseClickPower() / (CLICKER_INTERVAL_MS / 1000)) + ' (auto-click, +5 power per 10 owned)';
+      ref.cpsEl.textContent = '$' + formatRate(getBaseClickPower() / (CLICKER_INTERVAL_MS / 1000)) + '/sec each (auto-click, +5 power per 10 owned)';
     } else {
       const tierMult = Math.pow(2, getBuildingTierCount(i));
-      ref.cpsEl.textContent = formatRate(d.baseCps * tierMult);
+      ref.cpsEl.textContent = '$' + formatRate(d.baseCps * tierMult) + '/sec each';
     }
-    ref.costEl.textContent = formatPlayers(cost);
-    ref.row.classList.toggle('unaffordable', state.players < cost);
+    ref.costEl.textContent = '$' + formatMoney(cost);
+    ref.row.classList.toggle('unaffordable', state.money < cost);
   });
 }
 
 function buyBuilding(i) {
   const cost = getBuildingCost(i);
-  if (state.players < cost) return;
-  state.players -= cost;
+  if (state.money < cost) return;
+  state.money -= cost;
   state.buildings[i].count++;
   checkAchievements();
   refreshUpgradesTab();
   updateAll();
 }
 
-// ── Upgrades tab (rebuilt on change; small list) ─────────────
-function isClickUpgradeUnlocked(u) { return state.totalRecruitedAllTime >= u.unlockAt || state.clickUpgrades[u.id]; }
+// ── Upgrades tab (rebuilt on change; organized into sections) ─
+function isUpgradeUnlocked(u, stateKey) { return state.totalEarnedAllTime >= u.unlockAt || state[stateKey][u.id]; }
 function isBuildingUpgradeUnlocked(u) { return state.buildings[u.buildingIndex].count >= u.req || state.buildingUpgrades[u.id]; }
+
+function renderUpgradeRow(container, iconOrHtml, u, purchased, onBuy) {
+  const row = document.createElement('div');
+  row.className = 'store-row' + (purchased ? ' purchased' : (state.money < u.cost ? ' unaffordable' : ''));
+  row.innerHTML = `
+    <div class="row-icon">${iconOrHtml}</div>
+    <div class="row-info">
+      <div class="row-name">${u.name}</div>
+      <div class="row-desc">${u.desc}</div>
+    </div>
+    <div class="row-cost">${purchased ? '<span class="checkmark">✓</span>' : `<span class="cost-val">$${formatMoney(u.cost)}</span>`}</div>
+  `;
+  if (!purchased) row.addEventListener('click', onBuy);
+  container.appendChild(row);
+}
 
 function refreshUpgradesTab() {
   upgradesTab.innerHTML = '';
   let shown = 0;
 
-  CLICK_UPGRADE_DEFS.forEach(u => {
-    if (!isClickUpgradeUnlocked(u)) return;
-    shown++;
-    const purchased = !!state.clickUpgrades[u.id];
-    const row = document.createElement('div');
-    row.className = 'store-row' + (purchased ? ' purchased' : (state.players < u.cost ? ' unaffordable' : ''));
-    row.innerHTML = `
-      <div class="row-icon">👟</div>
-      <div class="row-info">
-        <div class="row-name">${u.name}</div>
-        <div class="row-desc">${u.desc}</div>
-      </div>
-      <div class="row-cost">${purchased ? '<span class="checkmark">✓</span>' : `<span class="cost-val">${formatPlayers(u.cost)}</span><div class="cost-label">players</div>`}</div>
-    `;
-    if (!purchased) row.addEventListener('click', () => buyClickUpgrade(u.id));
-    upgradesTab.appendChild(row);
+  UPGRADE_CATEGORIES.forEach(cat => {
+    const visible = cat.defs.filter(u => isUpgradeUnlocked(u, cat.stateKey));
+    if (visible.length === 0) return;
+    shown += visible.length;
+    const header = document.createElement('div');
+    header.className = 'upgrade-section-title';
+    header.textContent = cat.title;
+    upgradesTab.appendChild(header);
+    visible.forEach(u => {
+      const purchased = !!state[cat.stateKey][u.id];
+      renderUpgradeRow(upgradesTab, cat.icon, u, purchased, () => buyUpgrade(cat, u.id));
+    });
   });
 
-  BUILDING_UPGRADES.forEach(u => {
-    if (!isBuildingUpgradeUnlocked(u)) return;
-    shown++;
-    const purchased = !!state.buildingUpgrades[u.id];
-    const row = document.createElement('div');
-    row.className = 'store-row' + (purchased ? ' purchased' : (state.players < u.cost ? ' unaffordable' : ''));
-    row.innerHTML = `
-      <div class="row-icon">${u.icon}</div>
-      <div class="row-info">
-        <div class="row-name">${u.name}</div>
-        <div class="row-desc">${u.desc}</div>
-      </div>
-      <div class="row-cost">${purchased ? '<span class="checkmark">✓</span>' : `<span class="cost-val">${formatPlayers(u.cost)}</span><div class="cost-label">players</div>`}</div>
-    `;
-    if (!purchased) row.addEventListener('click', () => buyBuildingUpgrade(u.id));
-    upgradesTab.appendChild(row);
-  });
+  const visibleBuildingUpgrades = BUILDING_UPGRADES.filter(isBuildingUpgradeUnlocked);
+  if (visibleBuildingUpgrades.length > 0) {
+    shown += visibleBuildingUpgrades.length;
+    const header = document.createElement('div');
+    header.className = 'upgrade-section-title';
+    header.textContent = 'FACILITY UPGRADES';
+    upgradesTab.appendChild(header);
+    visibleBuildingUpgrades.forEach(u => {
+      const purchased = !!state.buildingUpgrades[u.id];
+      renderUpgradeRow(upgradesTab, u.icon, u, purchased, () => buyBuildingUpgrade(u.id));
+    });
+  }
 
   if (shown === 0) {
-    upgradesTab.innerHTML = '<div id="empty-upgrades">No upgrades available yet.<br>Recruit more players and hire recruiters to unlock some.</div>';
+    upgradesTab.innerHTML = '<div id="empty-upgrades">No upgrades available yet.<br>Earn more money and hire recruiters to unlock some.</div>';
   }
 }
 
-function buyClickUpgrade(id) {
-  const u = CLICK_UPGRADE_DEFS.find(x => x.id === id);
-  if (!u || state.clickUpgrades[id] || state.players < u.cost) return;
-  state.players -= u.cost;
-  state.clickUpgrades[id] = true;
+function buyUpgrade(cat, id) {
+  const u = cat.defs.find(x => x.id === id);
+  if (!u || state[cat.stateKey][id] || state.money < u.cost) return;
+  state.money -= u.cost;
+  state[cat.stateKey][id] = true;
   refreshUpgradesTab();
   updateAll();
 }
 
 function buyBuildingUpgrade(id) {
   const u = BUILDING_UPGRADES.find(x => x.id === id);
-  if (!u || state.buildingUpgrades[id] || state.players < u.cost) return;
-  state.players -= u.cost;
+  if (!u || state.buildingUpgrades[id] || state.money < u.cost) return;
+  state.money -= u.cost;
   state.buildingUpgrades[id] = true;
   refreshUpgradesTab();
   updateAll();
 }
 
+// ── Fans tab (rows built once, updated in place) ─────────────
+const fanRowRefs = [];
+function initFanRows() {
+  const container = document.getElementById('fan-rows');
+  FAN_TIER_DEFS.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = 'store-row';
+    row.innerHTML = `
+      <div class="row-icon">${d.icon}</div>
+      <div class="row-info">
+        <div class="row-name">${d.name}<span class="rarity-tag" style="background:${d.color}22;color:${d.color};border:1px solid ${d.color}66">${d.rarity}</span></div>
+        <div class="row-sub">Owned: <span class="cnt">0</span> · Bonus: <span class="bonus">+0%</span></div>
+        <div class="row-desc">${d.desc}</div>
+      </div>
+      <div class="row-cost"><span class="cost-val">$${formatMoney(d.baseCost)}</span></div>
+    `;
+    row.addEventListener('click', () => buyFan(i));
+    container.appendChild(row);
+    fanRowRefs.push({
+      row, cntEl: row.querySelector('.cnt'), bonusEl: row.querySelector('.bonus'), costEl: row.querySelector('.cost-val'),
+    });
+  });
+}
+
+function updateFanRows() {
+  const cap = getFanCapacity();
+  const used = getTotalFans();
+  fanRowRefs.forEach((ref, i) => {
+    const d = FAN_TIER_DEFS[i];
+    const cost = getFanCost(i);
+    const full = used >= cap;
+    ref.cntEl.textContent = state.fans[i].count;
+    ref.bonusEl.textContent = '+' + (state.fans[i].count * d.bonusPercent).toFixed(1) + '%';
+    ref.costEl.textContent = full ? 'STADIUM FULL' : ('$' + formatMoney(cost));
+    ref.row.classList.toggle('unaffordable', full || state.money < cost);
+  });
+}
+
+function buyFan(i) {
+  if (getTotalFans() >= getFanCapacity()) { showToast('🏟️ Stadium is full — level it up to fit more fans!'); return; }
+  const cost = getFanCost(i);
+  if (state.money < cost) return;
+  state.money -= cost;
+  state.fans[i].count++;
+  checkAchievements();
+  updateAll();
+}
+
+// ── Stadium & Mascot leveling ─────────────────────────────────
+function levelUpStadium() {
+  const cost = getStadiumCost();
+  if (state.money < cost) return;
+  state.money -= cost;
+  state.stadiumLevel++;
+  checkAchievements();
+  updateAll();
+  showToast(`🏟️ Stadium upgraded to Level ${state.stadiumLevel}!`);
+}
+
+function levelUpMascot() {
+  const cost = getMascotCost();
+  if (state.money < cost) return;
+  state.money -= cost;
+  state.mascotLevel++;
+  checkAchievements();
+  updateAll();
+  showToast(`${getMascotTier().icon} Mascot evolved to ${getMascotTier().name} (Level ${state.mascotLevel})!`);
+}
+
+function renderFeaturePanels() {
+  const cap = getFanCapacity();
+  const used = getTotalFans();
+  const stadiumCost = getStadiumCost();
+  document.getElementById('stadium-level').textContent = state.stadiumLevel;
+  document.getElementById('stadium-fan-usage').textContent = `${used} / ${cap}`;
+  document.getElementById('stadium-bonus').textContent = `+${Math.round(state.stadiumLevel * STADIUM_MULT_PER_LEVEL * 100)}%`;
+  const stadiumBtn = document.getElementById('stadium-upgrade-btn');
+  stadiumBtn.innerHTML = `LEVEL UP<span class="feature-cost">$${formatMoney(stadiumCost)}</span>`;
+  stadiumBtn.classList.toggle('disabled', state.money < stadiumCost);
+
+  const tier = getMascotTier();
+  const mascotCost = getMascotCost();
+  document.getElementById('mascot-icon').textContent = tier.icon;
+  document.getElementById('mascot-name').textContent = tier.name;
+  document.getElementById('mascot-level').textContent = state.mascotLevel;
+  document.getElementById('mascot-bonus').textContent = `+${Math.round(state.mascotLevel * MASCOT_MULT_PER_LEVEL * 100)}%`;
+  const mascotBtn = document.getElementById('mascot-upgrade-btn');
+  mascotBtn.innerHTML = `EVOLVE<span class="feature-cost">$${formatMoney(mascotCost)}</span>`;
+  mascotBtn.classList.toggle('disabled', state.money < mascotCost);
+
+  updateFanRows();
+}
+
 // ── Tabs ───────────────────────────────────────────────────────
+const TAB_CONTENTS = { buildings: buildingsTab, upgrades: upgradesTab, fans: fansTab, mascot: mascotTab };
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const target = btn.dataset.tab;
-    buildingsTab.classList.toggle('hidden', target !== 'buildings');
-    upgradesTab.classList.toggle('hidden', target !== 'upgrades');
+    Object.entries(TAB_CONTENTS).forEach(([key, el]) => el.classList.toggle('hidden', key !== target));
   });
 });
 
@@ -724,7 +1030,7 @@ ascendBtn.addEventListener('click', () => {
   document.getElementById('ascend-preview').innerHTML =
     extra > 0
       ? `You will gain <b style="color:var(--purple)">+${extra} Championship Banners</b> (total ${gain}), for a permanent <b>+${(gain*2)}%</b> production boost.`
-      : `No new banners to win yet — recruit more players first.`;
+      : `No new banners to win yet — earn more money first.`;
   openModal('ascend-modal');
 });
 
@@ -732,10 +1038,16 @@ document.getElementById('ascend-confirm-btn').addEventListener('click', () => {
   const gain = computeBannerGain();
   state.banners = Math.max(state.banners, gain);
   state.ascendCount++;
-  state.players = 0;
+  state.money = 0;
   state.buildings = BUILDING_DEFS.map(() => ({ count: 0 }));
   state.buildingUpgrades = {};
   state.clickUpgrades = {};
+  state.playerUpgrades = {};
+  state.coachUpgrades = {};
+  state.mutationUpgrades = {};
+  state.fans = FAN_TIER_DEFS.map(() => ({ count: 0 }));
+  state.stadiumLevel = 0;
+  state.mascotLevel = 0;
   state.frenzyActive = false;
   closeModal('ascend-modal');
   checkAchievements();
@@ -841,14 +1153,25 @@ function handleClick(clientX, clientY) {
   const x = clientX - rect.left;
   const y = clientY - rect.top;
   const power = getClickPower();
-  state.players += power;
-  state.totalRecruitedAllTime += power;
+  state.money += power;
+  state.totalEarnedAllTime += power;
+  state.tapCount++;
   spawnCrumbs(x, y, 6);
-  spawnFloater(x, y, '+' + formatPlayers(power), '#ffc300');
+  spawnFloater(x, y, '+$' + formatMoney(power), '#ffc300');
   ballBtn.style.transform = 'scale(0.88) rotate(-4deg)';
   setTimeout(() => { ballBtn.style.transform = 'scale(1) rotate(0deg)'; }, 90);
+  if (state.tapCount % WIN_EVERY_TAPS === 0) triggerTeamWin(x, y);
   checkAchievements();
   updateAll();
+}
+
+function triggerTeamWin(x, y) {
+  state.teamWins++;
+  const bonus = Math.max(getCps() * 60, state.money * 0.1, 500);
+  state.money += bonus;
+  state.totalEarnedAllTime += bonus;
+  spawnFloater(x, y - 30, 'TEAM WIN!', '#39ff14');
+  showToast(`🏆 TEAM WIN! Home crowd bonus +$${formatMoney(bonus)}`);
 }
 
 ballBtn.addEventListener('pointerdown', e => {
@@ -865,7 +1188,6 @@ window.addEventListener('keydown', e => {
 });
 
 // ── Auto-clicker (pointer finger) visuals ───────────────────────
-let autoClickAccumulatorMs = 0;
 function spawnAutoFinger() {
   const rect = ballBtn.getBoundingClientRect();
   const areaRect = clickArea.getBoundingClientRect();
@@ -877,7 +1199,7 @@ function spawnAutoFinger() {
   clickArea.appendChild(finger);
   setTimeout(() => finger.remove(), 450);
 }
-function processAutoClicks(income) {
+function processAutoClicks() {
   const clickerCount = state.buildings[0].count;
   if (clickerCount <= 0) return;
   // Spawn a small number of visual pointer-finger taps proportional to owned clickers,
@@ -920,19 +1242,21 @@ function triggerFrenzy() {
   showToast('🔥 SLAM DUNK FRENZY! Production x7 for 30 seconds!');
 }
 function triggerLucky() {
-  const bonus = Math.max(getCps() * 900, state.players * 0.15, 100);
-  state.players += bonus;
-  state.totalRecruitedAllTime += bonus;
-  showToast(`🎉 Buzzer beater! +${formatPlayers(bonus)}`);
+  const bonus = Math.max(getCps() * 900, state.money * 0.15, 100);
+  state.money += bonus;
+  state.totalEarnedAllTime += bonus;
+  showToast(`🎉 Buzzer beater! +$${formatMoney(bonus)}`);
 }
 
 // ── Display update ────────────────────────────────────────────
 function updateAll() {
-  playerCountEl.innerHTML = formatPlayers(state.players) + '<span class="unit">players</span>';
-  ppsLineEl.textContent = formatRate(getCps()) + ' per second';
-  lifetimeLineEl.textContent = `Lifetime recruited: ${formatPlayers(state.totalRecruitedAllTime)} · Championship Banners: ${state.banners}`;
-  clickPowerValEl.textContent = formatPlayers(getClickPower());
+  moneyCountEl.textContent = '$' + formatMoney(state.money);
+  ppsLineEl.textContent = '$' + formatRate(getCps()) + '/sec';
+  lifetimeLineEl.textContent = `Lifetime earned: $${formatMoney(state.totalEarnedAllTime)} · Team Wins: ${state.teamWins} · Championship Banners: ${state.banners}`;
+  clickPowerValEl.textContent = '$' + formatMoney(getClickPower());
+  winProgressValEl.textContent = WIN_EVERY_TAPS - (state.tapCount % WIN_EVERY_TAPS);
   updateBuildingRows();
+  renderFeaturePanels();
 
   const gain = computeBannerGain();
   ascendBtn.classList.toggle('ready', gain > state.banners);
@@ -954,9 +1278,9 @@ function gameLoop(ts) {
   if (state.frenzyActive && ts > state.frenzyEndTime) state.frenzyActive = false;
 
   const income = getCps() * (dt / 1000);
-  state.players += income;
-  state.totalRecruitedAllTime += income;
-  processAutoClicks(income);
+  state.money += income;
+  state.totalEarnedAllTime += income;
+  processAutoClicks();
 
   state.nextGoldenIn -= dt;
   if (state.nextGoldenIn <= 0) {
@@ -992,9 +1316,20 @@ function load() {
     const parsed = JSON.parse(raw);
     const fresh = freshState();
     state = Object.assign(fresh, parsed);
+    // Migrate pre-currency-rename saves (players -> money).
+    if (parsed.money === undefined && parsed.players !== undefined) state.money = parsed.players;
+    if (parsed.totalEarnedAllTime === undefined && parsed.totalRecruitedAllTime !== undefined) state.totalEarnedAllTime = parsed.totalRecruitedAllTime;
     state.buildings = BUILDING_DEFS.map((d, i) => ({ count: (parsed.buildings && parsed.buildings[i] && parsed.buildings[i].count) || 0 }));
     state.buildingUpgrades = parsed.buildingUpgrades || {};
     state.clickUpgrades = parsed.clickUpgrades || {};
+    state.playerUpgrades = parsed.playerUpgrades || {};
+    state.coachUpgrades = parsed.coachUpgrades || {};
+    state.mutationUpgrades = parsed.mutationUpgrades || {};
+    state.fans = FAN_TIER_DEFS.map((d, i) => ({ count: (parsed.fans && parsed.fans[i] && parsed.fans[i].count) || 0 }));
+    state.stadiumLevel = parsed.stadiumLevel || 0;
+    state.mascotLevel = parsed.mascotLevel || 0;
+    state.tapCount = parsed.tapCount || 0;
+    state.teamWins = parsed.teamWins || 0;
     state.achievements = parsed.achievements || {};
     state.frenzyActive = false;
 
@@ -1003,11 +1338,11 @@ function load() {
       if (elapsed > 30000) {
         const earned = getCps() * (elapsed / 1000) * OFFLINE_EFFICIENCY;
         if (earned > 0) {
-          state.players += earned;
-          state.totalRecruitedAllTime += earned;
+          state.money += earned;
+          state.totalEarnedAllTime += earned;
           const mins = Math.floor(elapsed / 60000);
           document.getElementById('offline-body').innerHTML =
-            `<p>You were away for ${mins} minute${mins===1?'':'s'}.</p><p>Your program kept recruiting and signed <b style="color:var(--orange)">${formatPlayers(earned)}</b> players while you were gone (${(OFFLINE_EFFICIENCY*100)}% efficiency).</p>`;
+            `<p>You were away for ${mins} minute${mins===1?'':'s'}.</p><p>Your program kept playing games and earned <b style="color:var(--orange)">$${formatMoney(earned)}</b> while you were gone (${(OFFLINE_EFFICIENCY*100)}% efficiency).</p>`;
           openModal('offline-modal');
         }
       }
@@ -1028,6 +1363,9 @@ document.addEventListener('touchend', e => {
 // ── Init ───────────────────────────────────────────────────────
 load();
 initBuildingRows();
+initFanRows();
+document.getElementById('stadium-upgrade-btn').addEventListener('click', levelUpStadium);
+document.getElementById('mascot-upgrade-btn').addEventListener('click', levelUpMascot);
 refreshUpgradesTab();
 renderAchievements();
 resizeCanvas();

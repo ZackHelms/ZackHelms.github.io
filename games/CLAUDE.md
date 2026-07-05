@@ -55,14 +55,21 @@ bonuses, rebirth for permanent +1% click speed / +1% money per Golden Butter.
 DOM-driven UI with a canvas overlay for click particles. Detailed context:
 `.claude/croissant-clicker.md`.
 
-### BASKETBALL CLICKER (`basketball-clicker.html`, ~700 lines)
+### BASKETBALL CLICKER (`basketball-clicker.html`, ~1500 lines)
 Cookie Clicker-style idle/incremental themed around building a basketball
-program. Click the ball for "players"; the first shop item, Clicker, spawns
-an auto-clicking pointer finger every 5s and grants +5 click power per 10
-owned. Buy 9 more recruiter buildings, unlock click/building upgrades and
-achievements, catch golden basketballs for bonuses, win championships for
-permanent prestige multipliers. DOM-driven UI with a canvas overlay for click
-particles.
+program. Currency is money; click the ball to earn it. The first shop item,
+Clicker, spawns an auto-clicking pointer finger every 5s and grants +5 click
+power per 10 owned. Buy 9 more recruiter buildings, plus 51 one-time upgrades
+across Click Upgrades, Player Types, Assistant Coaches, and Mutations (each
+targets click power, passive income, or both), and Facility (building-tier)
+upgrades. A Fans tab sells 5 rarity-tiered fan types (Common → Mythic) that
+each add a small production %, capped by Stadium level (leveling the stadium
+raises the fan cap and adds a flat production bonus). A Mascot levels up
+independently for its own production bonus, evolving through named tiers at
+milestones. Every 100 taps of the ball triggers a "Team Win" bonus payout.
+Golden basketballs still spawn for frenzy/lucky bonuses, and championship
+ascension grants permanent prestige multipliers. DOM-driven UI with a canvas
+overlay for click particles.
 
 ---
 
