@@ -28,35 +28,50 @@ canvas overlay for click particles/floating numbers.
   baked thresholds, mix of flat add / multiplier / "% of CPS" effects.
 - **Achievements** (`ACHIEVEMENT_DEFS`): 22 milestone-based, each unlocked one
   grants +0.25% to `achievementMultiplier()` (global production).
-- **Store Upgrade**: a standalone repeatable purchase (`state.storeLevel`,
-  separate from `BUILDING_DEFS`/`BUILDING_UPGRADES` since it doesn't produce
-  CPS directly — it multiplies it). Cost is `10000 * 8^level`
-  (`getStoreUpgradeCost()`); each level compounds money (CPS only, not click
-  power) by another 30% via `storeUpgradeMultiplier() = 1.3^level`. Rendered
-  as a highlighted row pinned above the buy-quantity bar in the Buildings tab.
-  Resets to 0 on rebirth, same as building/click upgrades.
+- **Boosts tab** (3rd tab, `initBoostRows()`/`updateBoostRows()`): three
+  independent repeatable purchases, each built from the same generic
+  `initBoostRow(container, opts)` / `updateBoostRow(ref)` helpers so they
+  share row markup/afford-check logic but read/write distinct state:
+  - **Money Boost** (`state.storeLevel`, formerly "Store Upgrade") — cost
+    `10000 * 8^level`, each level compounds money (CPS only) by +30% via
+    `storeUpgradeMultiplier() = 1.3^level`.
+  - **Speed Boost** (`state.speedBoostLevel`) — same cost/compounding shape
+    (`10000 * 8^level`, `speedBoostMultiplier() = 1.3^level`) but multiplies
+    click power instead of CPS.
+  - **Click Power** (`state.clickPowerBoostLevel`) — cheaper linear track
+    (cost `25 * 4^level`), each level adds a flat `+1` to click power's
+    additive base (`clickPowerBoostBonus()`), for early-game impact before
+    the percentage tracks compound meaningfully.
+  All three reset to 0 on both Rebirth and Big Rebirth.
 - **Golden croissant**: spawns every 45–90s at a random point in the click
   area, expires after 13s unclicked. 50/50 Frenzy (7x production, 30s) or
   Lucky (instant croissant bonus).
-- **Rebirth**: `computeGoldenButterGain()` = `floor(cbrt(totalBakedAllTime / 1e9))`.
-  Rebirthing sets `goldenButter = max(goldenButter, gain)` (never decreases).
+- **Rebirth**: gain is INCREMENTAL, not lifetime-cumulative — `totalBakedAllTime`
+  never resets, so gain is computed off `totalBakedAllTime` minus a baseline
+  snapshot (`state.totalBakedAtLastRebirth`, updated to the current
+  `totalBakedAllTime` every time you rebirth): `computeGoldenButterGain() =
+  floor(cbrt((totalBakedAllTime - totalBakedAtLastRebirth) / 1e9))`.
+  Rebirthing does `goldenButter += gain` — genuinely STACKS across repeated
+  rebirths — rather than the old `max(goldenButter, gain)`. The incremental
+  baseline is what prevents that from being a free-infinite-rebirth exploit:
+  spamming rebirth with no new production in between always yields gain 0.
   Each point of Golden Butter is two independent permanent +1% multipliers —
   `rebirthSpeedMultiplier()` (click power) and `rebirthMoneyMultiplier()` (CPS)
-  — rather than one shared multiplier, so click speed and passive income can
-  be balanced/tuned separately later. Resets croissants/buildings/upgrades but
-  NOT `totalBakedAllTime`, `goldenButter`, or achievements.
-- **Big Rebirth**: a deeper second prestige tier, gated on `state.goldenButter`
-  itself (`computeChickenCroissantGain()` = `floor(cbrt(goldenButter / 50))`,
-  so it only becomes possible — and the header button only appears via its
-  `.ready` class — once Golden Butter reaches 50). Confirming it does
-  everything a normal Rebirth does PLUS resets `goldenButter` to 0, and grants
-  Chicken Croissants (`chickenCroissants = max(chickenCroissants, gain)`,
-  banked the same way as Golden Butter). Each Chicken Croissant is a
-  standalone +400%-compounding (`bigRebirthMoneyMultiplier() = 5^n`) money-only
-  multiplier stacked into `getCps()` alongside the others — intentionally far
-  stronger than a Golden Butter point, to justify sacrificing the Golden
-  Butter stockpile. `totalBakedAllTime` is untouched, so a normal Rebirth is
-  usually immediately available again right after a Big Rebirth.
+  — rather than one shared multiplier. Resets croissants/buildings/upgrades/
+  boosts but NOT `totalBakedAllTime`, `totalBakedAtLastRebirth`, `goldenButter`,
+  or achievements.
+- **Big Rebirth**: same incremental-stacking pattern one layer up — gated on
+  `state.goldenButter` minus a `state.goldenButterAtLastBigRebirth` baseline:
+  `computeChickenCroissantGain() = floor(cbrt((goldenButter -
+  goldenButterAtLastBigRebirth) / 50))`. The header button's `.ready` class
+  lights up once that's > 0 (i.e. 50+ Golden Butter earned since the last Big
+  Rebirth). Confirming it does everything a normal Rebirth does PLUS
+  `chickenCroissants += gain` (stacks) and resets both `goldenButter` and
+  `goldenButterAtLastBigRebirth` to 0 — deliberately does NOT touch
+  `totalBakedAtLastRebirth`, so any unclaimed progress toward the next normal
+  Rebirth's Golden Butter gain survives a Big Rebirth. Each Chicken Croissant
+  is a standalone +400%-compounding (`bigRebirthMoneyMultiplier() = 5^n`)
+  money-only multiplier stacked into `getCps()` alongside the others.
 
 ## Save/offline
 

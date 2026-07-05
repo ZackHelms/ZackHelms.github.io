@@ -77,10 +77,14 @@ Top-down RTS-lite. Command stick-figure army across 50 waves. Recruit troops,
 use abilities, defeat bosses including a Final Overlord. Largest game by line count.
 ~54 functions. `stick-commander-3d.v001.html` is a saved checkpoint.
 
-### CROISSANT CLICKER (`croissant-clicker.html`, ~700 lines)
-Cookie Clicker-style idle/incremental. Click to bake, buy 10 tiers of buildings,
-unlock click/building upgrades and achievements, catch golden croissants for
-bonuses, rebirth for permanent +1% click speed / +1% money per Golden Butter.
+### CROISSANT CLICKER (`croissant-clicker.html`, ~800 lines)
+Cookie Clicker-style idle/incremental. Click to bake, buy 10 tiers of
+buildings, unlock click/building upgrades and achievements, catch golden
+croissants for bonuses. A Boosts tab has 3 independent repeatable purchases
+(Money %, Speed %, flat Click Power). Rebirth grants Golden Butter (+1% click
+speed / +1% money each) based on production since your last rebirth, and
+genuinely stacks across repeated rebirths; a deeper Big Rebirth converts
+Golden Butter into Chicken Croissants (+400% money each, compounding).
 DOM-driven UI with a canvas overlay for click particles. Detailed context:
 `.claude/croissant-clicker.md`.
 
