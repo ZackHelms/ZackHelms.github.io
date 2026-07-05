@@ -343,7 +343,7 @@ main {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-05 19:51 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-05 21:02 UTC</div>
 
 <header>
   <a id="back-link" href="index.html">&larr; GAMES</a>
@@ -399,6 +399,7 @@ main {
         <button class="bulk-buy-btn active" data-qty="1">x1</button>
         <button class="bulk-buy-btn" data-qty="10">x10</button>
         <button class="bulk-buy-btn" data-qty="100">x100</button>
+        <button class="bulk-buy-btn" data-qty="max">MAX</button>
       </div>
     </div>
     <div class="tab-content hidden" id="tab-upgrades"></div>
@@ -416,6 +417,7 @@ main {
         <button class="bulk-buy-btn active" data-qty="1">x1</button>
         <button class="bulk-buy-btn" data-qty="10">x10</button>
         <button class="bulk-buy-btn" data-qty="100">x100</button>
+        <button class="bulk-buy-btn" data-qty="max">MAX</button>
       </div>
       <div id="fan-rows"></div>
     </div>
@@ -444,6 +446,7 @@ main {
         <button class="bulk-buy-btn active" data-qty="1">x1</button>
         <button class="bulk-buy-btn" data-qty="10">x10</button>
         <button class="bulk-buy-btn" data-qty="100">x100</button>
+        <button class="bulk-buy-btn" data-qty="max">MAX</button>
       </div>
       <div id="totem-rows"></div>
     </div>
@@ -1275,6 +1278,18 @@ function getCps() {
   return total * achievementMultiplier() * prestigeMultiplier() * frenzyMultiplier();
 }
 
+// Largest whole quantity affordable at `money`, given the cost of the very next single
+// unit (`nextUnitCost`) and the ratio each subsequent unit's cost grows by (`ratio`).
+// Solves the geometric-series sum via logarithms, then nudges by ±1 to correct for
+// floating-point rounding right at the affordability boundary.
+function maxAffordable(nextUnitCost, ratio, money) {
+  if (money < nextUnitCost) return 0;
+  let n = Math.max(0, Math.floor(Math.log(1 + money * (ratio - 1) / nextUnitCost) / Math.log(ratio)));
+  while (n > 0 && nextUnitCost * (Math.pow(ratio, n) - 1) / (ratio - 1) > money) n--;
+  while (nextUnitCost * (Math.pow(ratio, n + 1) - 1) / (ratio - 1) <= money) n++;
+  return n;
+}
+
 // Cumulative cost of buying `qty` copies of building i starting from its current count,
 // via the geometric-series sum. Reduces to the single-item cost when qty === 1.
 function getBuildingCost(i, qty = 1) {
@@ -1399,13 +1414,16 @@ const totemsTab = document.getElementById('tab-totems');
 const ascensionsTab = document.getElementById('tab-ascensions');
 const headerTitleEl = document.querySelector('header h1');
 
-// ── Bulk-buy toggle (x1 / x10 / x100) ─────────────────────────
+// ── Bulk-buy toggle (x1 / x10 / x100 / Max) ───────────────────
 // Shared across the Recruiting, Fans, and Totems tabs — each has its own bar,
 // all synced to the same buyQty and kept in visual sync by matching data-qty.
+// buyQty is either a number (1/10/100) or the literal string 'max', resolved
+// per-row at buy/display time since "max affordable" differs row to row.
 let buyQty = 1;
+function parseBuyQtyAttr(raw) { return raw === 'max' ? 'max' : parseInt(raw, 10); }
 function setBuyQty(qty) {
   buyQty = qty;
-  document.querySelectorAll('.bulk-buy-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.qty, 10) === qty));
+  document.querySelectorAll('.bulk-buy-btn').forEach(b => b.classList.toggle('active', parseBuyQtyAttr(b.dataset.qty) === qty));
   updateBuildingRows();
   updateFanRows();
   updateTotemRows();
@@ -1413,7 +1431,7 @@ function setBuyQty(qty) {
 document.querySelectorAll('.bulk-buy-btn').forEach(btn => {
   btn.addEventListener('pointerdown', e => {
     e.preventDefault();
-    setBuyQty(parseInt(btn.dataset.qty, 10));
+    setBuyQty(parseBuyQtyAttr(btn.dataset.qty));
   });
 });
 
@@ -1440,11 +1458,23 @@ function initBuildingRows() {
   });
 }
 
+// Resolves buyQty to an actual number for building i — 'max' computes the largest
+// quantity affordable right now, given that building's next-unit cost/growth ratio.
+function resolveBuildingQty(i) {
+  if (buyQty !== 'max') return buyQty;
+  const b = state.buildings[i];
+  const d = BUILDING_DEFS[i];
+  const r = d.special === 'autoclick' ? CLICKER_COST_MULT : 1.15;
+  const unitCost = d.baseCost * Math.pow(r, b.count);
+  return maxAffordable(unitCost, r, state.money);
+}
+
 function updateBuildingRows() {
   BUILDING_DEFS.forEach((d, i) => {
     const ref = buildingRowRefs[i];
     const b = state.buildings[i];
-    const cost = getBuildingCost(i, buyQty);
+    const qty = resolveBuildingQty(i);
+    const cost = getBuildingCost(i, Math.max(qty, 1));
     ref.cntEl.textContent = b.count;
     if (d.special === 'autoclick') {
       ref.cpsEl.textContent = '$' + formatRate(getBaseClickPower() / (CLICKER_INTERVAL_MS / 1000)) + '/sec each (auto-click, +5 power per 10 owned)';
@@ -1452,16 +1482,19 @@ function updateBuildingRows() {
       const tierMult = Math.pow(2, getBuildingTierCount(i));
       ref.cpsEl.textContent = '$' + formatRate(d.baseCps * tierMult) + '/sec each';
     }
-    ref.costEl.textContent = '$' + formatMoney(cost) + (buyQty > 1 ? ` (x${buyQty})` : '');
+    const qtyLabel = buyQty === 'max' ? `MAX x${qty}` : (buyQty > 1 ? `x${buyQty}` : '');
+    ref.costEl.textContent = '$' + formatMoney(cost) + (qtyLabel ? ` (${qtyLabel})` : '');
     ref.row.classList.toggle('unaffordable', state.money < cost);
   });
 }
 
 function buyBuilding(i) {
-  const cost = getBuildingCost(i, buyQty);
+  const qty = resolveBuildingQty(i);
+  if (qty <= 0) return;
+  const cost = getBuildingCost(i, qty);
   if (state.money < cost) return;
   state.money -= cost;
-  state.buildings[i].count += buyQty;
+  state.buildings[i].count += qty;
   checkAchievements();
   refreshUpgradesTab();
   updateAll();
@@ -1571,23 +1604,40 @@ function initFanRows() {
   });
 }
 
+// Resolves buyQty for fan tier i — 'max' computes the largest quantity that's both
+// affordable and fits the remaining Stadium capacity. `full` is true when there's no
+// room at all (distinct from merely unaffordable, so the STADIUM FULL message is
+// only shown when capacity, not money, is the blocker).
+function resolveFanQty(i) {
+  const d = FAN_TIER_DEFS[i];
+  const roomLeft = Math.max(0, getFanCapacity() - getTotalFans());
+  if (buyQty !== 'max') return { qty: buyQty, full: roomLeft < buyQty };
+  const unitCost = d.baseCost * Math.pow(d.costMult, state.fans[i].count);
+  return { qty: Math.min(maxAffordable(unitCost, d.costMult, state.money), roomLeft), full: roomLeft <= 0 };
+}
+
 function updateFanRows() {
-  const cap = getFanCapacity();
-  const used = getTotalFans();
-  const fitsQty = (used + buyQty) <= cap;
   fanRowRefs.forEach((ref, i) => {
     const d = FAN_TIER_DEFS[i];
-    const cost = getFanCost(i, buyQty);
+    const { qty, full } = resolveFanQty(i);
     ref.cntEl.textContent = state.fans[i].count;
     ref.bonusEl.textContent = '+' + (state.fans[i].count * d.bonusPercent).toFixed(1) + '%';
-    ref.costEl.textContent = !fitsQty ? 'STADIUM FULL' : ('$' + formatMoney(cost) + (buyQty > 1 ? ` (x${buyQty})` : ''));
-    ref.row.classList.toggle('unaffordable', !fitsQty || state.money < cost);
+    if (full) {
+      ref.costEl.textContent = 'STADIUM FULL';
+      ref.row.classList.toggle('unaffordable', true);
+    } else {
+      const cost = getFanCost(i, Math.max(qty, 1));
+      const qtyLabel = buyQty === 'max' ? `MAX x${qty}` : (buyQty > 1 ? `x${buyQty}` : '');
+      ref.costEl.textContent = '$' + formatMoney(cost) + (qtyLabel ? ` (${qtyLabel})` : '');
+      ref.row.classList.toggle('unaffordable', state.money < cost);
+    }
   });
 }
 
 function buyFan(i) {
-  const qty = buyQty;
-  if (getTotalFans() + qty > getFanCapacity()) { showToast("🏟️ Stadium doesn't have room for that many — level it up first!"); return; }
+  const { qty, full } = resolveFanQty(i);
+  if (full) { showToast("🏟️ Stadium doesn't have room for that many — level it up first!"); return; }
+  if (qty <= 0) return;
   const cost = getFanCost(i, qty);
   if (state.money < cost) return;
   state.money -= cost;
@@ -1620,23 +1670,36 @@ function initTotemRows() {
   });
 }
 
+function resolveTotemQty(i) {
+  const d = TOTEM_TIER_DEFS[i];
+  const roomLeft = Math.max(0, getTotemCapacity() - getTotalTotems());
+  if (buyQty !== 'max') return { qty: buyQty, full: roomLeft < buyQty };
+  const unitCost = d.baseCost * Math.pow(d.costMult, state.totems[i].count);
+  return { qty: Math.min(maxAffordable(unitCost, d.costMult, state.money), roomLeft), full: roomLeft <= 0 };
+}
+
 function updateTotemRows() {
-  const cap = getTotemCapacity();
-  const used = getTotalTotems();
-  const fitsQty = (used + buyQty) <= cap;
   totemRowRefs.forEach((ref, i) => {
     const d = TOTEM_TIER_DEFS[i];
-    const cost = getTotemCost(i, buyQty);
+    const { qty, full } = resolveTotemQty(i);
     ref.cntEl.textContent = state.totems[i].count;
     ref.bonusEl.textContent = '+' + (state.totems[i].count * d.bonusPercent).toFixed(1) + '%';
-    ref.costEl.textContent = !fitsQty ? 'POLE FULL' : ('$' + formatMoney(cost) + (buyQty > 1 ? ` (x${buyQty})` : ''));
-    ref.row.classList.toggle('unaffordable', !fitsQty || state.money < cost);
+    if (full) {
+      ref.costEl.textContent = 'POLE FULL';
+      ref.row.classList.toggle('unaffordable', true);
+    } else {
+      const cost = getTotemCost(i, Math.max(qty, 1));
+      const qtyLabel = buyQty === 'max' ? `MAX x${qty}` : (buyQty > 1 ? `x${buyQty}` : '');
+      ref.costEl.textContent = '$' + formatMoney(cost) + (qtyLabel ? ` (${qtyLabel})` : '');
+      ref.row.classList.toggle('unaffordable', state.money < cost);
+    }
   });
 }
 
 function buyTotem(i) {
-  const qty = buyQty;
-  if (getTotalTotems() + qty > getTotemCapacity()) { showToast("🗿 Totem pole doesn't have room for that many — level it up first!"); return; }
+  const { qty, full } = resolveTotemQty(i);
+  if (full) { showToast("🗿 Totem pole doesn't have room for that many — level it up first!"); return; }
+  if (qty <= 0) return;
   const cost = getTotemCost(i, qty);
   if (state.money < cost) return;
   state.money -= cost;
