@@ -64,8 +64,8 @@ header h1 {
   touch-action: manipulation;
 }
 .header-btn:hover { border-color: var(--gold); color: var(--gold); }
-.header-btn.ascend-btn { border-color: var(--purple); color: var(--purple); display: none; }
-.header-btn.ascend-btn.ready { display: inline-block; box-shadow: 0 0 12px #b44fff55; }
+.header-btn.rebirth-btn { border-color: var(--purple); color: var(--purple); display: none; }
+.header-btn.rebirth-btn.ready { display: inline-block; box-shadow: 0 0 12px #b44fff55; }
 .header-btn.danger:hover { border-color: var(--red); color: var(--red); }
 .header-btn.reload-btn:hover { border-color: var(--blue); color: var(--blue); }
 
@@ -241,7 +241,7 @@ main {
   <a id="back-link" href="index.html">&larr; GAMES</a>
   <h1>CROISSANT CLICKER</h1>
   <div class="header-spacer"></div>
-  <button class="header-btn ascend-btn" id="ascend-btn">✨ ASCEND</button>
+  <button class="header-btn rebirth-btn" id="rebirth-btn">✨ REBIRTH</button>
   <button class="header-btn" id="ach-btn">🏆 ACHIEVEMENTS</button>
   <button class="header-btn danger" id="reset-btn">RESET</button>
   <button class="header-btn reload-btn" id="reload-btn" title="Force reload the latest version">⟳ RELOAD</button>
@@ -286,17 +286,17 @@ main {
   </div>
 </div>
 
-<!-- Ascend modal -->
-<div class="modal-overlay" id="ascend-modal">
+<!-- Rebirth modal -->
+<div class="modal-overlay" id="rebirth-modal">
   <div class="modal-box">
-    <div class="modal-head"><h2>ASCEND</h2><button class="modal-close" data-close="ascend-modal">✕</button></div>
+    <div class="modal-head"><h2>REBIRTH</h2><button class="modal-close" data-close="rebirth-modal">✕</button></div>
     <div class="modal-body">
-      <p>Ascending resets your croissants, buildings, and upgrades — but grants permanent <b style="color:var(--purple)">Golden Butter</b> based on your lifetime baking, each worth <b>+2%</b> production forever.</p>
-      <p id="ascend-preview"></p>
+      <p>Rebirthing resets your croissants, buildings, and upgrades — but grants permanent <b style="color:var(--purple)">Golden Butter</b> based on your lifetime baking. Each Golden Butter is worth <b>+1% click speed</b> and <b>+1% money</b>, forever.</p>
+      <p id="rebirth-preview"></p>
     </div>
     <div class="modal-actions">
-      <button class="modal-btn" data-close="ascend-modal">CANCEL</button>
-      <button class="modal-btn primary" id="ascend-confirm-btn">ASCEND</button>
+      <button class="modal-btn" data-close="rebirth-modal">CANCEL</button>
+      <button class="modal-btn primary" id="rebirth-confirm-btn">REBIRTH</button>
     </div>
   </div>
 </div>
@@ -386,7 +386,7 @@ const ACHIEVEMENT_DEFS = [
   { id:'a16', icon:'🧙', name:'Baked By Magic',      desc:'Own 10 Golden Whisk Sorcerers.',    cond: s => s.buildings[9].count >= 10 },
   { id:'a17', icon:'✨', name:'Golden Touch',        desc:'Click a golden croissant.',         cond: s => s.goldenClicks >= 1 },
   { id:'a18', icon:'🔥', name:'Frenzy Fan',          desc:'Trigger 10 frenzies.',              cond: s => s.frenzyCount >= 10 },
-  { id:'a19', icon:'🌀', name:'Ascended',            desc:'Ascend for the first time.',        cond: s => s.ascendCount >= 1 },
+  { id:'a19', icon:'🌀', name:'Reborn',              desc:'Rebirth for the first time.',       cond: s => s.rebirthCount >= 1 },
   { id:'a20', icon:'🧈', name:'Enlightened Baker',   desc:'Accumulate 10 Golden Butter.',      cond: s => s.goldenButter >= 10 },
 ];
 
@@ -400,7 +400,7 @@ function freshState() {
     goldenButter: 0,
     goldenClicks: 0,
     frenzyCount: 0,
-    ascendCount: 0,
+    rebirthCount: 0,
     frenzyActive: false,
     frenzyEndTime: 0,
     nextGoldenIn: rand(GOLDEN_MIN_MS, GOLDEN_MAX_MS),
@@ -452,7 +452,8 @@ function unlockedAchievementCount() {
   return ACHIEVEMENT_DEFS.reduce((acc, a) => acc + (state.achievements[a.id] ? 1 : 0), 0);
 }
 function achievementMultiplier() { return 1 + unlockedAchievementCount() * 0.0025; }
-function prestigeMultiplier() { return 1 + state.goldenButter * 0.02; }
+function rebirthMoneyMultiplier() { return 1 + state.goldenButter * 0.01; }
+function rebirthSpeedMultiplier() { return 1 + state.goldenButter * 0.01; }
 function frenzyMultiplier() { return state.frenzyActive ? FRENZY_MULT : 1; }
 
 function getBuildingTierCount(i) {
@@ -467,7 +468,7 @@ function getCps() {
     const mult = Math.pow(2, getBuildingTierCount(i));
     total += b.count * BUILDING_DEFS[i].baseCps * mult;
   });
-  return total * achievementMultiplier() * prestigeMultiplier() * frenzyMultiplier();
+  return total * achievementMultiplier() * rebirthMoneyMultiplier() * frenzyMultiplier();
 }
 
 function getClickPower() {
@@ -479,7 +480,7 @@ function getClickPower() {
     else if (u.type === 'cpsPercent') cpsPercent += u.value;
   });
   const base = (1 + add) * mult + getCps() * cpsPercent;
-  return base * achievementMultiplier() * prestigeMultiplier() * frenzyMultiplier();
+  return base * achievementMultiplier() * rebirthSpeedMultiplier() * frenzyMultiplier();
 }
 
 function getBuildingCost(i) {
@@ -499,7 +500,7 @@ const clickPowerValEl = document.getElementById('click-power-val');
 const clickArea = document.getElementById('click-area');
 const croissantBtn = document.getElementById('croissant-btn');
 const frenzyBanner = document.getElementById('frenzy-banner');
-const ascendBtn = document.getElementById('ascend-btn');
+const rebirthBtn = document.getElementById('rebirth-btn');
 const buildingsTab = document.getElementById('tab-buildings');
 const upgradesTab = document.getElementById('tab-upgrades');
 
@@ -672,31 +673,31 @@ document.querySelectorAll('.modal-overlay').forEach(ov => {
 
 document.getElementById('ach-btn').addEventListener('click', () => { renderAchievements(); openModal('ach-modal'); });
 
-// ── Ascend ──────────────────────────────────────────────────────
-ascendBtn.addEventListener('click', () => {
+// ── Rebirth ─────────────────────────────────────────────────────
+rebirthBtn.addEventListener('click', () => {
   const gain = computeGoldenButterGain();
   const extra = Math.max(0, gain - state.goldenButter);
-  document.getElementById('ascend-preview').innerHTML =
+  document.getElementById('rebirth-preview').innerHTML =
     extra > 0
-      ? `You will gain <b style="color:var(--purple)">+${extra} Golden Butter</b> (total ${gain}), for a permanent <b>+${(gain*2)}%</b> production boost.`
+      ? `You will gain <b style="color:var(--purple)">+${extra} Golden Butter</b> (total ${gain}), for a permanent <b>+${gain}%</b> click speed and <b>+${gain}%</b> money, forever.`
       : `No new Golden Butter to gain yet — bake more croissants first.`;
-  openModal('ascend-modal');
+  openModal('rebirth-modal');
 });
 
-document.getElementById('ascend-confirm-btn').addEventListener('click', () => {
+document.getElementById('rebirth-confirm-btn').addEventListener('click', () => {
   const gain = computeGoldenButterGain();
   state.goldenButter = Math.max(state.goldenButter, gain);
-  state.ascendCount++;
+  state.rebirthCount++;
   state.croissants = 0;
   state.buildings = BUILDING_DEFS.map(() => ({ count: 0 }));
   state.buildingUpgrades = {};
   state.clickUpgrades = {};
   state.frenzyActive = false;
-  closeModal('ascend-modal');
+  closeModal('rebirth-modal');
   checkAchievements();
   refreshUpgradesTab();
   updateAll();
-  showToast(`✨ Ascended! Permanent bonus: +${(state.goldenButter*2)}%`);
+  showToast(`✨ Reborn! +${state.goldenButter}% click speed, +${state.goldenButter}% money`);
 });
 
 // ── Reset ───────────────────────────────────────────────────────
@@ -871,7 +872,7 @@ function updateAll() {
   updateBuildingRows();
 
   const gain = computeGoldenButterGain();
-  ascendBtn.classList.toggle('ready', gain > state.goldenButter);
+  rebirthBtn.classList.toggle('ready', gain > state.goldenButter);
 
   frenzyBanner.classList.toggle('show', state.frenzyActive);
 }

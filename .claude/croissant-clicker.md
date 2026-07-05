@@ -27,11 +27,13 @@ canvas overlay for click particles/floating numbers.
 - **Golden croissant**: spawns every 45–90s at a random point in the click
   area, expires after 13s unclicked. 50/50 Frenzy (7x production, 30s) or
   Lucky (instant croissant bonus).
-- **Ascension**: `computeGoldenButterGain()` = `floor(cbrt(totalBakedAllTime / 1e9))`.
-  Ascending sets `goldenButter = max(goldenButter, gain)` (never decreases),
-  each point of Golden Butter is a permanent +2% multiplier. Resets
-  croissants/buildings/upgrades but NOT `totalBakedAllTime`, `goldenButter`,
-  or achievements.
+- **Rebirth**: `computeGoldenButterGain()` = `floor(cbrt(totalBakedAllTime / 1e9))`.
+  Rebirthing sets `goldenButter = max(goldenButter, gain)` (never decreases).
+  Each point of Golden Butter is two independent permanent +1% multipliers —
+  `rebirthSpeedMultiplier()` (click power) and `rebirthMoneyMultiplier()` (CPS)
+  — rather than one shared multiplier, so click speed and passive income can
+  be balanced/tuned separately later. Resets croissants/buildings/upgrades but
+  NOT `totalBakedAllTime`, `goldenButter`, or achievements.
 
 ## Save/offline
 
@@ -40,14 +42,22 @@ canvas overlay for click particles/floating numbers.
 - On load, if the gap since `lastSave` exceeds 30s (capped at 4h), grants
   50%-efficiency offline earnings and shows a modal.
 - Hard reset (header button) wipes `localStorage` entirely, including
-  Golden Butter — distinct from ascension, which is a soft/partial reset.
+  Golden Butter — distinct from rebirth, which is a soft/partial reset.
 
 ## Testing notes
 
 Playwright wasn't preinstalled in this environment; `playwright-core` was
 installed ad hoc into the scratchpad dir to smoke-test clicking, purchases,
-golden-croissant clicks, ascension, save/offline-earnings, and hard reset —
+golden-croissant clicks, rebirth, save/offline-earnings, and hard reset —
 all verified working. Note: Playwright's actionability check treats the
 golden croissant as "unstable" because of its CSS pulse/spin animation;
 real pointer clicks are unaffected, but automated tests against it should
 dispatch `PointerEvent` directly rather than using `locator.click()`.
+
+Also note: this sandbox's network proxy resets the Google Fonts request
+(`net::ERR_CONNECTION_RESET`), and the pre-installed headless Chromium build
+here hangs on same-page client-initiated navigation (`location.replace`/
+`reload`/`href=`) while that request is pending/failed. Mock the font request
+to succeed (`page.route('**://fonts.googleapis.com/**', ...)`) when testing
+the reload button in this environment — it works fine both with the mock and
+on the real deployed site.

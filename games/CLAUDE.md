@@ -51,8 +51,9 @@ use abilities, defeat bosses including a Final Overlord. Largest game by line co
 ### CROISSANT CLICKER (`croissant-clicker.html`, ~700 lines)
 Cookie Clicker-style idle/incremental. Click to bake, buy 10 tiers of buildings,
 unlock click/building upgrades and achievements, catch golden croissants for
-bonuses, ascend for permanent prestige multipliers. DOM-driven UI with a canvas
-overlay for click particles. Detailed context: `.claude/croissant-clicker.md`.
+bonuses, rebirth for permanent +1% click speed / +1% money per Golden Butter.
+DOM-driven UI with a canvas overlay for click particles. Detailed context:
+`.claude/croissant-clicker.md`.
 
 ### BASKETBALL CLICKER (`basketball-clicker.html`, ~700 lines)
 Cookie Clicker-style idle/incremental themed around building a basketball
