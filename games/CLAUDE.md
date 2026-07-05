@@ -55,21 +55,28 @@ bonuses, rebirth for permanent +1% click speed / +1% money per Golden Butter.
 DOM-driven UI with a canvas overlay for click particles. Detailed context:
 `.claude/croissant-clicker.md`.
 
-### BASKETBALL CLICKER (`basketball-clicker.html`, ~1500 lines)
+### BASKETBALL CLICKER (`basketball-clicker.html`, ~1550 lines)
 Cookie Clicker-style idle/incremental themed around building a basketball
 program. Currency is money; click the ball to earn it. The first shop item,
 Clicker, spawns an auto-clicking pointer finger every 5s and grants +5 click
-power per 10 owned. Buy 9 more recruiter buildings, plus 51 one-time upgrades
-across Click Upgrades, Player Types, Assistant Coaches, and Mutations (each
-targets click power, passive income, or both), and Facility (building-tier)
-upgrades. A Fans tab sells 5 rarity-tiered fan types (Common → Mythic) that
-each add a small production %, capped by Stadium level (leveling the stadium
-raises the fan cap and adds a flat production bonus). A Mascot levels up
-independently for its own production bonus, evolving through named tiers at
-milestones. Every 100 taps of the ball triggers a "Team Win" bonus payout.
-Golden basketballs still spawn for frenzy/lucky bonuses, and championship
-ascension grants permanent prestige multipliers. DOM-driven UI with a canvas
-overlay for click particles.
+power per 10 owned. Buy 29 more recruiter buildings (30 total, up to The
+Basketball Singularity), plus 51 one-time upgrades across Click Upgrades,
+Player Types, Assistant Coaches, and Mutations (each targets click power,
+passive income, or both) and Facility (building-tier) upgrades. The UPGRADES
+tab shows only the single next unpurchased upgrade per category — visible
+even when locked, with its unlock requirement shown — rather than a full
+list. Mutations are themed as a sequence (Gold, Radiation, Neon, Plasma,
+Crystal, Inferno, ...). A Fans tab sells 5 rarity-tiered fan types
+(Common → Mythic) that each add a small production %, capped by Stadium
+level (leveling the stadium raises the fan cap and adds a flat production
+bonus). A Mascot levels up independently for its own production bonus,
+evolving through named tiers at milestones. A Totems tab mirrors Fans but
+boosts click power instead, using the same Gold/Radiation/Neon/Plasma/Crystal
+theme sequence, capped by a separately-levelable Totem Pole. Every 100 taps
+of the ball triggers a "Team Win" bonus payout. Golden basketballs still
+spawn for frenzy/lucky bonuses, and championship ascension grants permanent
+prestige multipliers. DOM-driven UI with a canvas overlay for click
+particles.
 
 ---
 

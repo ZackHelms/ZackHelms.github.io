@@ -149,8 +149,8 @@ main {
 }
 .tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .tab-btn {
-  flex: 1; background: none; border: none; color: var(--dim); padding: 8px 2px;
-  font-family: 'Share Tech Mono', monospace; font-size: 0.56rem; letter-spacing: 1px;
+  flex: 1; background: none; border: none; color: var(--dim); padding: 8px 1px;
+  font-family: 'Share Tech Mono', monospace; font-size: 0.5rem; letter-spacing: 0.5px;
   cursor: pointer; border-bottom: 2px solid transparent; font-weight: 700;
   touch-action: manipulation;
 }
@@ -173,6 +173,8 @@ main {
 .store-row.unaffordable { opacity: 0.4; cursor: default; }
 .store-row.unaffordable:hover { background: none; }
 .store-row.purchased { opacity: 0.5; }
+.store-row.locked { opacity: 0.4; cursor: default; }
+.store-row.locked:hover { background: none; }
 .row-icon { font-size: 1.6rem; flex-shrink: 0; width: 34px; text-align: center; }
 .row-info { flex: 1; min-width: 0; }
 .row-name { font-size: 0.7rem; color: var(--white); font-weight: 700; letter-spacing: 0.5px; }
@@ -186,11 +188,7 @@ main {
   letter-spacing: 0.5px; margin-left: 4px; white-space: nowrap;
 }
 
-#empty-upgrades {
-  padding: 30px 16px; text-align: center; color: var(--dim); font-size: 0.62rem; line-height: 1.6;
-}
-
-/* ── Feature panels (Stadium / Mascot) ──────────────── */
+/* ── Feature panels (Stadium / Mascot / Totem Pole) ─── */
 .feature-panel {
   display: flex; align-items: center; gap: 12px; padding: 14px 16px;
   border-bottom: 1px solid var(--border);
@@ -279,7 +277,7 @@ main {
   #ball-btn { font-size: clamp(4.5rem, 30vw, 7rem); }
   header h1 { font-size: 0.85rem; }
   .header-btn { padding: 6px 8px; font-size: 0.56rem; }
-  .tab-btn { font-size: 0.5rem; padding: 7px 2px; }
+  .tab-btn { font-size: 0.44rem; padding: 7px 1px; }
 }
 </style>
 </head>
@@ -318,6 +316,7 @@ main {
       <button class="tab-btn" data-tab="upgrades">UPGRADES</button>
       <button class="tab-btn" data-tab="fans">FANS</button>
       <button class="tab-btn" data-tab="mascot">MASCOT</button>
+      <button class="tab-btn" data-tab="totems">TOTEMS</button>
     </div>
     <div class="tab-content" id="tab-buildings"></div>
     <div class="tab-content hidden" id="tab-upgrades"></div>
@@ -343,6 +342,17 @@ main {
       </div>
       <div class="row-desc" style="padding:14px 16px;">Every mascot level grants a permanent money multiplier. At key levels the mascot evolves into a wilder, more powerful mutation with an even bigger bonus.</div>
     </div>
+    <div class="tab-content hidden" id="tab-totems">
+      <div class="feature-panel">
+        <div class="feature-icon">🗿</div>
+        <div class="feature-info">
+          <div class="feature-title">Totem Pole — Level <span id="totem-pole-level">0</span></div>
+          <div class="feature-sub">Totem Capacity: <span id="totem-pole-usage">0 / 5</span><br>Click Power Bonus: <span id="totem-pole-bonus">+0%</span></div>
+        </div>
+        <button class="feature-btn" id="totem-pole-upgrade-btn">LEVEL UP<span class="feature-cost">$3,000</span></button>
+      </div>
+      <div id="totem-rows"></div>
+    </div>
   </div>
 </main>
 
@@ -364,7 +374,7 @@ main {
   <div class="modal-box">
     <div class="modal-head"><h2>CHAMPIONSHIP RUN</h2><button class="modal-close" data-close="ascend-modal">✕</button></div>
     <div class="modal-body">
-      <p>Retiring the roster resets your money, recruiters, upgrades, fans, stadium, and mascot progress — but grants permanent <b style="color:var(--purple)">Championship Banners</b> based on your lifetime earnings, each worth <b>+2%</b> production forever.</p>
+      <p>Retiring the roster resets your money, recruiters, upgrades, fans, stadium, mascot, and totem progress — but grants permanent <b style="color:var(--purple)">Championship Banners</b> based on your lifetime earnings, each worth <b>+2%</b> production forever.</p>
       <p id="ascend-preview"></p>
     </div>
     <div class="modal-actions">
@@ -379,7 +389,7 @@ main {
   <div class="modal-box">
     <div class="modal-head"><h2>HARD RESET</h2><button class="modal-close" data-close="reset-modal">✕</button></div>
     <div class="modal-body">
-      <p>This erases <b style="color:var(--red)">everything</b> — money, recruiters, upgrades, fans, stadium, mascot, achievements, and Championship Banners. This cannot be undone.</p>
+      <p>This erases <b style="color:var(--red)">everything</b> — money, recruiters, upgrades, fans, stadium, mascot, totems, achievements, and Championship Banners. This cannot be undone.</p>
     </div>
     <div class="modal-actions">
       <button class="modal-btn" data-close="reset-modal">CANCEL</button>
@@ -423,6 +433,11 @@ const STADIUM_MULT_PER_LEVEL = 0.03;
 const MASCOT_BASE_COST = 2500;
 const MASCOT_COST_MULT = 1.8;
 const MASCOT_MULT_PER_LEVEL = 0.05;
+const TOTEM_BASE_CAP = 5;
+const TOTEM_POLE_BASE_COST = 3000;
+const TOTEM_POLE_COST_MULT = 1.7;
+const TOTEM_CAP_PER_LEVEL = 15;
+const TOTEM_POLE_MULT_PER_LEVEL = 0.04;
 
 // index 0 is the special "Clicker" item (auto-clicking pointer finger).
 // The rest are standard passive recruiters, same shape as Cookie Clicker buildings.
@@ -437,6 +452,26 @@ const BUILDING_DEFS = [
   { name: 'Sports Agency',            icon: '📣', baseCost: 330000000,   baseCps: 44000,   desc: 'Agents flood your roster with their star clients.' },
   { name: 'Global Scouting Network',  icon: '🛰️', baseCost: 5100000000, baseCps: 260000,  desc: 'Satellites track basketball talent across the globe.' },
   { name: 'Multiverse Draft Portal',  icon: '🌀', baseCost: 75000000000,baseCps: 1600000, desc: 'Pulls elite players in from parallel dimensions.' },
+  { name: 'Time-Traveling Scout',           icon: '🕰️', baseCost: 1e12,    baseCps: 9.6e6,  desc: 'Recruits legends from any era of the game.' },
+  { name: 'AI Draft Algorithm',             icon: '🤖', baseCost: 1.3e13,  baseCps: 5.8e7,  desc: 'Predicts breakout stars before anyone else.' },
+  { name: 'VR Metaverse Arena',             icon: '🕶️', baseCost: 1.7e14,  baseCps: 3.5e8,  desc: 'Trains players in a fully simulated league.' },
+  { name: 'Genetic Engineering Lab',        icon: '🧪', baseCost: 2.2e15,  baseCps: 2.1e9,  desc: 'Splices athletic genes into new prospects.' },
+  { name: 'Orbital Training Station',       icon: '🛸', baseCost: 2.9e16,  baseCps: 1.25e10, desc: 'Zero-gravity drills build superhuman players.' },
+  { name: 'Lunar Basketball Academy',       icon: '🌙', baseCost: 3.8e17,  baseCps: 7.5e10, desc: "The moon's low gravity produces incredible dunks." },
+  { name: 'Martian Farm League',            icon: '🔴', baseCost: 5e18,    baseCps: 4.5e11, desc: 'An entire planet dedicated to developing talent.' },
+  { name: 'Dyson Sphere Broadcast Network', icon: '☀️', baseCost: 6.5e19,  baseCps: 2.7e12, desc: 'Beams the game to every star in the galaxy — and recruits from all of them.' },
+  { name: 'Galactic Scouting Armada',       icon: '🌌', baseCost: 8.5e20,  baseCps: 1.6e13, desc: 'A fleet of scout ships combs the Milky Way.' },
+  { name: 'Wormhole Recruitment Hub',       icon: '🕳️', baseCost: 1.1e22,  baseCps: 9.8e13, desc: 'Shortcuts across space-time to sign prospects instantly.' },
+  { name: 'Quantum Draft Simulator',        icon: '💻', baseCost: 1.5e23,  baseCps: 5.9e14, desc: 'Simulates every possible draft outcome and picks the best one.' },
+  { name: 'Celestial Hoops Shrine',         icon: '🛐', baseCost: 1.9e24,  baseCps: 3.5e15, desc: 'Basketball gods bless your program with talent.' },
+  { name: 'Chrono-Sphere Player Incubator', icon: '⏳', baseCost: 2.5e25,  baseCps: 2.1e16, desc: 'Grows fully-formed players in accelerated time.' },
+  { name: 'Nebula Talent Forge',            icon: '🌠', baseCost: 3.3e26,  baseCps: 1.3e17, desc: 'Forges new players from stellar dust.' },
+  { name: 'Cosmic Basketball Overmind',     icon: '🧠', baseCost: 4.3e27,  baseCps: 7.6e17, desc: 'A hive-mind coordinates recruiting across all of reality.' },
+  { name: 'Universal Hoops Federation HQ', icon: '🏛️', baseCost: 5.6e28,  baseCps: 4.6e18, desc: 'Governs basketball across every known universe.' },
+  { name: 'Reality Engine Player Factory',  icon: '⚙️', baseCost: 7.3e29,  baseCps: 2.7e19, desc: 'Manufactures players from raw reality itself.' },
+  { name: 'Infinite Recursion Draft Loop',  icon: '♾️', baseCost: 9.5e30,  baseCps: 1.65e20, desc: 'Recruits recruiters who recruit more recruiters, forever.' },
+  { name: 'Prism of a Thousand Timelines',  icon: '🔮', baseCost: 1.24e32, baseCps: 9.9e20, desc: 'Views every possible timeline and drafts from all of them at once.' },
+  { name: 'The Basketball Singularity',     icon: '🌈', baseCost: 1.6e33,  baseCps: 5.9e21, desc: 'All basketball, everywhere, all at once, converges into your program.' },
 ];
 
 const TIER_CONFIG = [
@@ -488,25 +523,27 @@ const COACH_DEFS = [
   { id:'co11', name:'Legendary Head Coach',         desc:'x2.2 click power AND passive income.',cost: 10000000000,       unlockAt: 1200000000,      target:'both',  type:'mult', value: 2.2 },
 ];
 
+// Named after the mutation-theme sequence: Gold, Radiation, Neon, and onward.
+// Each purchase reskins the "next mutation" slot to the next theme in the list.
 const MUTATION_DEFS = [
-  { id:'mu0',  name:'Freakish Wingspan',              desc:'+10 click power.',                    cost: 100000,                unlockAt: 20000,               target:'click', type:'add',  value: 10 },
-  { id:'mu1',  name:'Enhanced Reflexes',              desc:'x1.3 click power.',                   cost: 400000,                unlockAt: 80000,               target:'click', type:'mult', value: 1.3 },
-  { id:'mu2',  name:'Vertical Leap Mutation',         desc:'+50 money per second.',               cost: 1500000,               unlockAt: 300000,              target:'pps',   type:'add',  value: 50 },
-  { id:'mu3',  name:'Adrenaline Overdrive',           desc:'x1.4 passive income.',                cost: 6000000,               unlockAt: 1000000,             target:'pps',   type:'mult', value: 1.4 },
-  { id:'mu4',  name:'Photographic Playbook Memory',   desc:'x1.5 click power AND passive income.',cost: 20000000,              unlockAt: 4000000,             target:'both',  type:'mult', value: 1.5 },
-  { id:'mu5',  name:'Cybernetic Knee Replacement',    desc:'+500 click power.',                   cost: 80000000,              unlockAt: 15000000,            target:'click', type:'add',  value: 500 },
-  { id:'mu6',  name:'Nanobot Muscle Repair',          desc:'x1.6 passive income.',                cost: 300000000,             unlockAt: 60000000,            target:'pps',   type:'mult', value: 1.6 },
-  { id:'mu7',  name:'Quantum Court Vision',           desc:'x1.7 click power.',                   cost: 1000000000,            unlockAt: 200000000,           target:'click', type:'mult', value: 1.7 },
-  { id:'mu8',  name:'Bionic Shooting Arm',            desc:'+15,000 click power.',                cost: 4000000000,            unlockAt: 800000000,           target:'click', type:'add',  value: 15000 },
-  { id:'mu9',  name:'Neural Overclock',               desc:'x1.8 click power AND passive income.',cost: 15000000000,           unlockAt: 3000000000,          target:'both',  type:'mult', value: 1.8 },
-  { id:'mu10', name:'Gene-Edited Endurance',          desc:'x2 passive income.',                  cost: 60000000000,           unlockAt: 12000000000,         target:'pps',   type:'mult', value: 2 },
-  { id:'mu11', name:'Synthetic Lung Capacity',        desc:'+500,000 money per second.',          cost: 250000000000,          unlockAt: 50000000000,         target:'pps',   type:'add',  value: 500000 },
-  { id:'mu12', name:'AI-Assisted Coaching Chip',      desc:'x2.2 passive income.',                cost: 1000000000000,         unlockAt: 200000000000,        target:'pps',   type:'mult', value: 2.2 },
-  { id:'mu13', name:'Cloned Star Prospect',           desc:'x2 click power.',                     cost: 4000000000000,         unlockAt: 800000000000,        target:'click', type:'mult', value: 2 },
-  { id:'mu14', name:'Multiversal Scouting Algorithm', desc:'x2 click power AND passive income.',  cost: 15000000000000,        unlockAt: 3000000000000,       target:'both',  type:'mult', value: 2 },
-  { id:'mu15', name:'Time-Dilated Practice Facility', desc:'x2.5 passive income.',                cost: 60000000000000,        unlockAt: 12000000000000,      target:'pps',   type:'mult', value: 2.5 },
-  { id:'mu16', name:'Reality-Warping Playbook',       desc:'x2.5 click power.',                   cost: 250000000000000,       unlockAt: 50000000000000,      target:'click', type:'mult', value: 2.5 },
-  { id:'mu17', name:'Singularity Draft Pick',         desc:'x3 click power AND passive income.',  cost: 1000000000000000,      unlockAt: 200000000000000,     target:'both',  type:'mult', value: 3 },
+  { id:'mu0',  name:'Gold Mutation',        icon:'🥇', desc:'+10 click power.',                    cost: 100000,                unlockAt: 20000,               target:'click', type:'add',  value: 10 },
+  { id:'mu1',  name:'Radiation Mutation',   icon:'☢️', desc:'x1.3 click power.',                   cost: 400000,                unlockAt: 80000,               target:'click', type:'mult', value: 1.3 },
+  { id:'mu2',  name:'Neon Mutation',        icon:'💡', desc:'+50 money per second.',               cost: 1500000,               unlockAt: 300000,              target:'pps',   type:'add',  value: 50 },
+  { id:'mu3',  name:'Plasma Mutation',      icon:'⚡', desc:'x1.4 passive income.',                cost: 6000000,               unlockAt: 1000000,             target:'pps',   type:'mult', value: 1.4 },
+  { id:'mu4',  name:'Crystal Mutation',     icon:'💎', desc:'x1.5 click power AND passive income.',cost: 20000000,              unlockAt: 4000000,             target:'both',  type:'mult', value: 1.5 },
+  { id:'mu5',  name:'Inferno Mutation',     icon:'🔥', desc:'+500 click power.',                   cost: 80000000,              unlockAt: 15000000,            target:'click', type:'add',  value: 500 },
+  { id:'mu6',  name:'Frost Mutation',       icon:'❄️', desc:'x1.6 passive income.',                cost: 300000000,             unlockAt: 60000000,            target:'pps',   type:'mult', value: 1.6 },
+  { id:'mu7',  name:'Toxic Mutation',       icon:'☣️', desc:'x1.7 click power.',                   cost: 1000000000,            unlockAt: 200000000,           target:'click', type:'mult', value: 1.7 },
+  { id:'mu8',  name:'Electric Mutation',    icon:'🌩️', desc:'+15,000 click power.',                cost: 4000000000,            unlockAt: 800000000,           target:'click', type:'add',  value: 15000 },
+  { id:'mu9',  name:'Void Mutation',        icon:'🕳️', desc:'x1.8 click power AND passive income.',cost: 15000000000,           unlockAt: 3000000000,          target:'both',  type:'mult', value: 1.8 },
+  { id:'mu10', name:'Cosmic Mutation',      icon:'🌌', desc:'x2 passive income.',                  cost: 60000000000,           unlockAt: 12000000000,         target:'pps',   type:'mult', value: 2 },
+  { id:'mu11', name:'Shadow Mutation',      icon:'🌑', desc:'+500,000 money per second.',          cost: 250000000000,          unlockAt: 50000000000,         target:'pps',   type:'add',  value: 500000 },
+  { id:'mu12', name:'Solar Mutation',       icon:'☀️', desc:'x2.2 passive income.',                cost: 1000000000000,         unlockAt: 200000000000,        target:'pps',   type:'mult', value: 2.2 },
+  { id:'mu13', name:'Quantum Mutation',     icon:'⚛️', desc:'x2 click power.',                     cost: 4000000000000,         unlockAt: 800000000000,        target:'click', type:'mult', value: 2 },
+  { id:'mu14', name:'Diamond Mutation',     icon:'💠', desc:'x2 click power AND passive income.',  cost: 15000000000000,        unlockAt: 3000000000000,       target:'both',  type:'mult', value: 2 },
+  { id:'mu15', name:'Phantom Mutation',     icon:'👻', desc:'x2.5 passive income.',                cost: 60000000000000,        unlockAt: 12000000000000,      target:'pps',   type:'mult', value: 2.5 },
+  { id:'mu16', name:'Celestial Mutation',   icon:'🌠', desc:'x2.5 click power.',                   cost: 250000000000000,       unlockAt: 50000000000000,      target:'click', type:'mult', value: 2.5 },
+  { id:'mu17', name:'Singularity Mutation', icon:'🔮', desc:'x3 click power AND passive income.',  cost: 1000000000000000,      unlockAt: 200000000000000,     target:'both',  type:'mult', value: 3 },
 ];
 
 // Repeatable fan purchases, capped by stadium capacity. Each fan owned adds a small
@@ -517,6 +554,17 @@ const FAN_TIER_DEFS = [
   { id:'fan2', name:'Superfan',                 icon:'🤩', rarity:'Epic',      color:'#b44fff', baseCost: 150000,     costMult: 1.16, bonusPercent: 3.5, desc:'Face paint, foam finger, the works.' },
   { id:'fan3', name:'Celebrity Courtside Fan',  icon:'🌟', rarity:'Legendary', color:'#ffc300', baseCost: 5000000,    costMult: 1.18, bonusPercent: 9,   desc:'Front row, every game, cameras love them.' },
   { id:'fan4', name:'Mythic Ultra Fan',         icon:'👑', rarity:'Mythic',    color:'#ff2244', baseCost: 250000000,  costMult: 1.20, bonusPercent: 22,  desc:'Legend says they have never missed a possession.' },
+];
+
+// Repeatable totem purchases, capped by Totem Pole capacity. Each totem owned adds a
+// small percentage bonus to click power, using the same mutation-theme naming order
+// as the Mutations upgrade category (Gold, Radiation, Neon, and onward).
+const TOTEM_TIER_DEFS = [
+  { id:'tot0', name:'Gold Totem',      icon:'🥇', color:'#ffc300', baseCost: 400,       costMult: 1.13, bonusPercent: 0.5, desc:"A gleaming totem said to bring good fortune to shooters." },
+  { id:'tot1', name:'Radiation Totem', icon:'☢️', color:'#39ff14', baseCost: 8000,      costMult: 1.15, bonusPercent: 1.5, desc:'Glows faintly. Definitely fine to stand next to.' },
+  { id:'tot2', name:'Neon Totem',      icon:'💡', color:'#4488ff', baseCost: 200000,    costMult: 1.17, bonusPercent: 4,   desc:'Pulses with electric light in time with every made shot.' },
+  { id:'tot3', name:'Plasma Totem',    icon:'⚡', color:'#b44fff', baseCost: 6000000,   costMult: 1.19, bonusPercent: 10,  desc:'Crackling energy arcs between the rafters.' },
+  { id:'tot4', name:'Crystal Totem',   icon:'💎', color:'#ff2244', baseCost: 300000000, costMult: 1.21, bonusPercent: 25, desc:"A flawless crystal said to focus a shooter's aim perfectly." },
 ];
 
 const MASCOT_TIERS = [
@@ -560,6 +608,9 @@ const ACHIEVEMENT_DEFS = [
   { id:'a27', icon:'👽', name:'Cosmic Mascot',       desc:'Evolve your mascot to Level 20.',   cond: s => s.mascotLevel >= 20 },
   { id:'a28', icon:'👑', name:'Full House',          desc:'Fill your stadium with fans.',      cond: s => getTotalFans() >= getFanCapacity() },
   { id:'a29', icon:'👑', name:'Mythic Following',    desc:'Recruit a Mythic Ultra Fan.',       cond: s => s.fans[4] && s.fans[4].count >= 1 },
+  { id:'a30', icon:'🌈', name:'Cosmic Empire',       desc:'Own the Basketball Singularity (final recruiter).', cond: s => s.buildings[29] && s.buildings[29].count >= 1 },
+  { id:'a31', icon:'🥇', name:'Totem Pole Beginner', desc:'Place your first totem.',           cond: s => getTotalTotems() >= 1 },
+  { id:'a32', icon:'💎', name:'Totem Master',        desc:'Fill your totem pole capacity.',    cond: s => getTotalTotems() >= getTotemCapacity() },
 ];
 
 // ── State ──────────────────────────────────────────────────────
@@ -585,6 +636,8 @@ function freshState() {
     fans: FAN_TIER_DEFS.map(() => ({ count: 0 })),
     stadiumLevel: 0,
     mascotLevel: 0,
+    totems: TOTEM_TIER_DEFS.map(() => ({ count: 0 })),
+    totemPoleLevel: 0,
     tapCount: 0,
     teamWins: 0,
     achievements: {},
@@ -693,13 +746,29 @@ function getMascotTier() {
   return cur;
 }
 
+function getTotemCapacity() { return TOTEM_BASE_CAP + state.totemPoleLevel * TOTEM_CAP_PER_LEVEL; }
+function getTotalTotems() { return state.totems.reduce((s, t) => s + t.count, 0); }
+function getTotemMultiplier() {
+  let bonus = 0;
+  state.totems.forEach((t, i) => { bonus += t.count * TOTEM_TIER_DEFS[i].bonusPercent; });
+  return 1 + bonus / 100;
+}
+function getTotemCost(i) {
+  const d = TOTEM_TIER_DEFS[i];
+  return Math.ceil(d.baseCost * Math.pow(d.costMult, state.totems[i].count));
+}
+function getTotemPoleCost() { return Math.ceil(TOTEM_POLE_BASE_COST * Math.pow(TOTEM_POLE_COST_MULT, state.totemPoleLevel)); }
+function getTotemPoleMultiplier() { return 1 + state.totemPoleLevel * TOTEM_POLE_MULT_PER_LEVEL; }
+
 // Base click power before the global (achievement/prestige/frenzy) multiplier.
 // Kept separate from getCps() so the Clicker's auto-click contribution and the
-// player's manual click power apply the global multiplier exactly once.
+// player's manual click power apply the global multiplier exactly once. Totems
+// boost this directly, so they also strengthen every Clicker's auto-tap.
 function getBaseClickPower() {
   const b = getUpgradeBonuses();
   const clickerBonus = getClickerBonus();
-  return (1 + b.clickAdd + clickerBonus) * b.clickMult;
+  const totemMult = getTotemMultiplier() * getTotemPoleMultiplier();
+  return (1 + b.clickAdd + clickerBonus) * b.clickMult * totemMult;
 }
 
 function getClickPower() {
@@ -750,6 +819,7 @@ const buildingsTab = document.getElementById('tab-buildings');
 const upgradesTab = document.getElementById('tab-upgrades');
 const fansTab = document.getElementById('tab-fans');
 const mascotTab = document.getElementById('tab-mascot');
+const totemsTab = document.getElementById('tab-totems');
 
 // ── Building rows (built once, updated in place) ─────────────
 const buildingRowRefs = [];
@@ -801,59 +871,66 @@ function buyBuilding(i) {
   updateAll();
 }
 
-// ── Upgrades tab (rebuilt on change; organized into sections) ─
-function isUpgradeUnlocked(u, stateKey) { return state.totalEarnedAllTime >= u.unlockAt || state[stateKey][u.id]; }
-function isBuildingUpgradeUnlocked(u) { return state.buildings[u.buildingIndex].count >= u.req || state.buildingUpgrades[u.id]; }
+// ── Upgrades tab (rebuilt on change) ──────────────────────────
+// Each "upgrade center" (category) shows exactly one row: the next upgrade in
+// that category you haven't bought yet, in definition order. It's always
+// visible — locked (not yet reached) upgrades show their requirement instead
+// of a price, so there's always a goal to see, not just a wall of choices.
+function renderNextUpgradeSection(container, title, totalCount, purchasedCount, next, unlocked, requirementText, icon, cost, onBuy) {
+  const header = document.createElement('div');
+  header.className = 'upgrade-section-title';
+  header.textContent = `${title} (${purchasedCount}/${totalCount})`;
+  container.appendChild(header);
 
-function renderUpgradeRow(container, iconOrHtml, u, purchased, onBuy) {
+  if (!next) {
+    const doneRow = document.createElement('div');
+    doneRow.className = 'store-row purchased';
+    doneRow.innerHTML = `<div class="row-icon">✅</div><div class="row-info"><div class="row-name">All ${title} purchased!</div></div>`;
+    container.appendChild(doneRow);
+    return;
+  }
+
   const row = document.createElement('div');
-  row.className = 'store-row' + (purchased ? ' purchased' : (state.money < u.cost ? ' unaffordable' : ''));
+  row.className = 'store-row' + (!unlocked ? ' locked' : (state.money < cost ? ' unaffordable' : ''));
   row.innerHTML = `
-    <div class="row-icon">${iconOrHtml}</div>
+    <div class="row-icon">${unlocked ? icon : '🔒'}</div>
     <div class="row-info">
-      <div class="row-name">${u.name}</div>
-      <div class="row-desc">${u.desc}</div>
+      <div class="row-name">${next.name}</div>
+      <div class="row-desc">${next.desc}</div>
+      ${!unlocked ? `<div class="row-sub">🔒 ${requirementText}</div>` : ''}
     </div>
-    <div class="row-cost">${purchased ? '<span class="checkmark">✓</span>' : `<span class="cost-val">$${formatMoney(u.cost)}</span>`}</div>
+    <div class="row-cost">${unlocked ? `<span class="cost-val">$${formatMoney(cost)}</span>` : ''}</div>
   `;
-  if (!purchased) row.addEventListener('click', onBuy);
+  if (unlocked) row.addEventListener('click', onBuy);
   container.appendChild(row);
 }
 
 function refreshUpgradesTab() {
   upgradesTab.innerHTML = '';
-  let shown = 0;
 
   UPGRADE_CATEGORIES.forEach(cat => {
-    const visible = cat.defs.filter(u => isUpgradeUnlocked(u, cat.stateKey));
-    if (visible.length === 0) return;
-    shown += visible.length;
-    const header = document.createElement('div');
-    header.className = 'upgrade-section-title';
-    header.textContent = cat.title;
-    upgradesTab.appendChild(header);
-    visible.forEach(u => {
-      const purchased = !!state[cat.stateKey][u.id];
-      renderUpgradeRow(upgradesTab, cat.icon, u, purchased, () => buyUpgrade(cat, u.id));
-    });
+    const purchasedCount = cat.defs.filter(u => state[cat.stateKey][u.id]).length;
+    const next = cat.defs.find(u => !state[cat.stateKey][u.id]);
+    const unlocked = next ? state.totalEarnedAllTime >= next.unlockAt : false;
+    renderNextUpgradeSection(
+      upgradesTab, cat.title, cat.defs.length, purchasedCount, next, unlocked,
+      next ? `Unlocks at $${formatMoney(next.unlockAt)} lifetime earned` : '',
+      next ? (next.icon || cat.icon) : cat.icon,
+      next ? next.cost : 0,
+      () => buyUpgrade(cat, next.id)
+    );
   });
 
-  const visibleBuildingUpgrades = BUILDING_UPGRADES.filter(isBuildingUpgradeUnlocked);
-  if (visibleBuildingUpgrades.length > 0) {
-    shown += visibleBuildingUpgrades.length;
-    const header = document.createElement('div');
-    header.className = 'upgrade-section-title';
-    header.textContent = 'FACILITY UPGRADES';
-    upgradesTab.appendChild(header);
-    visibleBuildingUpgrades.forEach(u => {
-      const purchased = !!state.buildingUpgrades[u.id];
-      renderUpgradeRow(upgradesTab, u.icon, u, purchased, () => buyBuildingUpgrade(u.id));
-    });
-  }
-
-  if (shown === 0) {
-    upgradesTab.innerHTML = '<div id="empty-upgrades">No upgrades available yet.<br>Earn more money and hire recruiters to unlock some.</div>';
-  }
+  const facilityPurchasedCount = BUILDING_UPGRADES.filter(u => state.buildingUpgrades[u.id]).length;
+  const nextFacility = BUILDING_UPGRADES.find(u => !state.buildingUpgrades[u.id]);
+  const facilityUnlocked = nextFacility ? state.buildings[nextFacility.buildingIndex].count >= nextFacility.req : false;
+  renderNextUpgradeSection(
+    upgradesTab, 'FACILITY UPGRADES', BUILDING_UPGRADES.length, facilityPurchasedCount, nextFacility, facilityUnlocked,
+    nextFacility ? `Requires ${nextFacility.req} ${BUILDING_DEFS[nextFacility.buildingIndex].name} owned (have ${state.buildings[nextFacility.buildingIndex].count})` : '',
+    nextFacility ? nextFacility.icon : '🏗️',
+    nextFacility ? nextFacility.cost : 0,
+    () => buyBuildingUpgrade(nextFacility.id)
+  );
 }
 
 function buyUpgrade(cat, id) {
@@ -922,6 +999,64 @@ function buyFan(i) {
   updateAll();
 }
 
+// ── Totems tab (rows built once, updated in place) ───────────
+const totemRowRefs = [];
+function initTotemRows() {
+  const container = document.getElementById('totem-rows');
+  TOTEM_TIER_DEFS.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = 'store-row';
+    row.innerHTML = `
+      <div class="row-icon">${d.icon}</div>
+      <div class="row-info">
+        <div class="row-name" style="color:${d.color}">${d.name}</div>
+        <div class="row-sub">Owned: <span class="cnt">0</span> · Bonus: <span class="bonus">+0%</span></div>
+        <div class="row-desc">${d.desc}</div>
+      </div>
+      <div class="row-cost"><span class="cost-val">$${formatMoney(d.baseCost)}</span></div>
+    `;
+    row.addEventListener('click', () => buyTotem(i));
+    container.appendChild(row);
+    totemRowRefs.push({
+      row, cntEl: row.querySelector('.cnt'), bonusEl: row.querySelector('.bonus'), costEl: row.querySelector('.cost-val'),
+    });
+  });
+}
+
+function updateTotemRows() {
+  const cap = getTotemCapacity();
+  const used = getTotalTotems();
+  totemRowRefs.forEach((ref, i) => {
+    const d = TOTEM_TIER_DEFS[i];
+    const cost = getTotemCost(i);
+    const full = used >= cap;
+    ref.cntEl.textContent = state.totems[i].count;
+    ref.bonusEl.textContent = '+' + (state.totems[i].count * d.bonusPercent).toFixed(1) + '%';
+    ref.costEl.textContent = full ? 'POLE FULL' : ('$' + formatMoney(cost));
+    ref.row.classList.toggle('unaffordable', full || state.money < cost);
+  });
+}
+
+function buyTotem(i) {
+  if (getTotalTotems() >= getTotemCapacity()) { showToast('🗿 Totem pole is full — level it up to place more totems!'); return; }
+  const cost = getTotemCost(i);
+  if (state.money < cost) return;
+  state.money -= cost;
+  state.totems[i].count++;
+  checkAchievements();
+  updateAll();
+}
+
+function levelUpTotemPole() {
+  const cost = getTotemPoleCost();
+  if (state.money < cost) return;
+  state.money -= cost;
+  state.totemPoleLevel++;
+  checkAchievements();
+  updateAll();
+  showToast(`🗿 Totem Pole upgraded to Level ${state.totemPoleLevel}!`);
+}
+
 // ── Stadium & Mascot leveling ─────────────────────────────────
 function levelUpStadium() {
   const cost = getStadiumCost();
@@ -964,11 +1099,22 @@ function renderFeaturePanels() {
   mascotBtn.innerHTML = `EVOLVE<span class="feature-cost">$${formatMoney(mascotCost)}</span>`;
   mascotBtn.classList.toggle('disabled', state.money < mascotCost);
 
+  const totemCap = getTotemCapacity();
+  const totemUsed = getTotalTotems();
+  const totemPoleCost = getTotemPoleCost();
+  document.getElementById('totem-pole-level').textContent = state.totemPoleLevel;
+  document.getElementById('totem-pole-usage').textContent = `${totemUsed} / ${totemCap}`;
+  document.getElementById('totem-pole-bonus').textContent = `+${Math.round(state.totemPoleLevel * TOTEM_POLE_MULT_PER_LEVEL * 100)}%`;
+  const totemPoleBtn = document.getElementById('totem-pole-upgrade-btn');
+  totemPoleBtn.innerHTML = `LEVEL UP<span class="feature-cost">$${formatMoney(totemPoleCost)}</span>`;
+  totemPoleBtn.classList.toggle('disabled', state.money < totemPoleCost);
+
   updateFanRows();
+  updateTotemRows();
 }
 
 // ── Tabs ───────────────────────────────────────────────────────
-const TAB_CONTENTS = { buildings: buildingsTab, upgrades: upgradesTab, fans: fansTab, mascot: mascotTab };
+const TAB_CONTENTS = { buildings: buildingsTab, upgrades: upgradesTab, fans: fansTab, mascot: mascotTab, totems: totemsTab };
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1048,6 +1194,8 @@ document.getElementById('ascend-confirm-btn').addEventListener('click', () => {
   state.fans = FAN_TIER_DEFS.map(() => ({ count: 0 }));
   state.stadiumLevel = 0;
   state.mascotLevel = 0;
+  state.totems = TOTEM_TIER_DEFS.map(() => ({ count: 0 }));
+  state.totemPoleLevel = 0;
   state.frenzyActive = false;
   closeModal('ascend-modal');
   checkAchievements();
@@ -1328,6 +1476,8 @@ function load() {
     state.fans = FAN_TIER_DEFS.map((d, i) => ({ count: (parsed.fans && parsed.fans[i] && parsed.fans[i].count) || 0 }));
     state.stadiumLevel = parsed.stadiumLevel || 0;
     state.mascotLevel = parsed.mascotLevel || 0;
+    state.totems = TOTEM_TIER_DEFS.map((d, i) => ({ count: (parsed.totems && parsed.totems[i] && parsed.totems[i].count) || 0 }));
+    state.totemPoleLevel = parsed.totemPoleLevel || 0;
     state.tapCount = parsed.tapCount || 0;
     state.teamWins = parsed.teamWins || 0;
     state.achievements = parsed.achievements || {};
@@ -1364,8 +1514,10 @@ document.addEventListener('touchend', e => {
 load();
 initBuildingRows();
 initFanRows();
+initTotemRows();
 document.getElementById('stadium-upgrade-btn').addEventListener('click', levelUpStadium);
 document.getElementById('mascot-upgrade-btn').addEventListener('click', levelUpMascot);
+document.getElementById('totem-pole-upgrade-btn').addEventListener('click', levelUpTotemPole);
 refreshUpgradesTab();
 renderAchievements();
 resizeCanvas();
