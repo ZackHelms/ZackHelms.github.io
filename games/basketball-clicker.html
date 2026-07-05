@@ -225,6 +225,49 @@ main {
 }
 .ascension-progress-fill { height: 100%; background: var(--purple); }
 
+#team-name-input {
+  margin-top: 6px; width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--white); border-radius: 5px; padding: 7px 10px;
+  font-family: 'Share Tech Mono', monospace; font-size: 0.68rem;
+}
+#team-name-input:focus { outline: none; border-color: var(--orange); }
+#admin-panel.hidden { display: none; }
+#admin-panel .upgrade-section-title { color: var(--gold); }
+.admin-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; }
+.admin-btn-grid .feature-btn { width: 100%; border-color: var(--gold); color: var(--gold); }
+.admin-btn-grid .feature-btn:hover { box-shadow: 0 0 10px #ffc30055; }
+
+/* ── Portal transition (sport-switch travel effect) ─────────── */
+#portal-overlay {
+  position: fixed; inset: 0; z-index: 500; background: #000005;
+  display: none; align-items: center; justify-content: center; overflow: hidden;
+  pointer-events: none;
+}
+#portal-overlay.active { display: flex; }
+#portal-ring {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, var(--purple) 25%, #4488ff 55%, transparent 72%);
+  box-shadow: 0 0 60px 20px var(--purple);
+}
+#portal-overlay.active #portal-ring { animation: portal-zoom 1.1s cubic-bezier(0.6,0,0.9,0.4) forwards; }
+@keyframes portal-zoom {
+  0% { transform: scale(0.2); opacity: 0.3; }
+  55% { transform: scale(6); opacity: 1; }
+  100% { transform: scale(50); opacity: 0; }
+}
+#portal-stars { position: absolute; inset: 0; }
+.portal-streak {
+  position: absolute; top: 50%; left: 50%; width: 3px; height: 3px;
+  background: #fff; border-radius: 50%; box-shadow: 0 0 4px 1px #fff;
+  transform: translate(-50%,-50%) rotate(var(--angle)) translateX(0);
+}
+#portal-overlay.active .portal-streak { animation: portal-streak-fly 1.1s ease-in forwards; }
+@keyframes portal-streak-fly {
+  0% { transform: translate(-50%,-50%) rotate(var(--angle)) translateX(0) scaleX(1); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translate(-50%,-50%) rotate(var(--angle)) translateX(var(--dist)) scaleX(30); opacity: 0; }
+}
+
 /* ── Modals ─────────────────────────────────────────── */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100;
@@ -338,7 +381,18 @@ main {
       <button class="tab-btn" data-tab="mascot">MASCOT</button>
       <button class="tab-btn" data-tab="totems">TOTEMS</button>
     </div>
-    <div class="tab-content hidden" id="tab-ascensions"></div>
+    <div class="tab-content hidden" id="tab-ascensions">
+      <div class="feature-panel" id="team-name-panel">
+        <div class="feature-icon">🏷️</div>
+        <div class="feature-info">
+          <div class="feature-title">Team Name</div>
+          <div class="feature-sub">Name your franchise across every sport.</div>
+          <input type="text" id="team-name-input" placeholder="Enter a team name..." maxlength="24">
+        </div>
+      </div>
+      <div id="admin-panel" class="hidden"></div>
+      <div id="sport-cards"></div>
+    </div>
     <div class="tab-content" id="tab-buildings">
       <div class="bulk-buy-bar" id="bulk-buy-bar">
         <span class="bulk-buy-label">BUY:</span>
@@ -396,6 +450,11 @@ main {
   </div>
 </main>
 
+<div id="portal-overlay">
+  <div id="portal-stars"></div>
+  <div id="portal-ring"></div>
+</div>
+
 <div id="toast-container"></div>
 
 <!-- Achievements modal -->
@@ -452,10 +511,10 @@ main {
 <script>
 // ── Constants ──────────────────────────────────────────────────
 const SAVE_KEY_BASKETBALL = 'basketballClickerSave';
-const SAVE_KEY_SOCCER = 'basketballClickerSave_soccer';
 const ACTIVE_SPORT_KEY = 'basketballClickerActiveSport';
-const SOCCER_UNLOCKED_KEY = 'basketballClickerSoccerUnlocked';
-function saveKeyFor(sportKey) { return sportKey === 'soccer' ? SAVE_KEY_SOCCER : SAVE_KEY_BASKETBALL; }
+const EXTRA_SPORTS_UNLOCKED_KEY = 'basketballClickerExtraSportsUnlocked';
+const TEAM_NAME_KEY = 'basketballClickerTeamName';
+function saveKeyFor(sportKey) { return sportKey === 'basketball' ? SAVE_KEY_BASKETBALL : `basketballClickerSave_${sportKey}`; }
 const AUTOSAVE_MS = 15000;
 const OFFLINE_CAP_MS = 4 * 60 * 60 * 1000;
 const OFFLINE_EFFICIENCY = 0.5;
@@ -621,30 +680,30 @@ const BASKETBALL_MASCOT_TIERS = [
   { at: 50, name: 'Multiversal Mascot Deity',  icon: '🌌' },
 ];
 
-// ── Soccer: a full parallel sport theme, unlocked via ascension ─────────
-// Everything soccer reuses basketball's exact numeric progression (costs, cps,
+// ── Soccer, Baseball, Football: full parallel sport themes, unlocked via ─
+// ascension. Each reuses basketball's exact numeric progression (costs, cps,
 // bonuses, unlock thresholds) — only names/icons/descriptions differ — except
-// that every cost & unlock threshold is multiplied by SOCCER_COST_MULT, so
-// soccer content costs more for the same production, as requested.
-const SOCCER_COST_MULT = 5;
-const SOCCER_UNLOCK_THRESHOLD = 1e34; // 10 decillion lifetime earned in Basketball
+// that every cost & unlock threshold is multiplied by EXTRA_SPORT_COST_MULT,
+// so extra-sport content costs more for the same production, as requested.
+const EXTRA_SPORT_COST_MULT = 5;
+const SPORT_UNLOCK_THRESHOLD = 1e34; // 10 decillion lifetime earned in Basketball
 
 function deriveBuildingDefs(theme) {
   return BASKETBALL_BUILDING_DEFS.map((d, i) => ({
     name: theme[i].name, icon: theme[i].icon, desc: theme[i].desc,
-    baseCost: d.baseCost * SOCCER_COST_MULT, baseCps: d.baseCps, special: d.special,
+    baseCost: d.baseCost * EXTRA_SPORT_COST_MULT, baseCps: d.baseCps, special: d.special,
   }));
 }
 function deriveNamedDefs(baseArr, theme) {
   return baseArr.map((d, i) => ({
     ...d, name: theme[i].name, icon: theme[i].icon || d.icon,
-    cost: d.cost * SOCCER_COST_MULT, unlockAt: d.unlockAt * SOCCER_COST_MULT,
+    cost: d.cost * EXTRA_SPORT_COST_MULT, unlockAt: d.unlockAt * EXTRA_SPORT_COST_MULT,
   }));
 }
 function deriveFanOrTotemDefs(baseArr, theme) {
   return baseArr.map((d, i) => ({
     ...d, name: theme[i].name, icon: theme[i].icon, desc: theme[i].desc,
-    baseCost: d.baseCost * SOCCER_COST_MULT,
+    baseCost: d.baseCost * EXTRA_SPORT_COST_MULT,
   }));
 }
 function deriveMascotTiers(theme) {
@@ -655,33 +714,33 @@ const SOCCER_BUILDING_THEME = [
   { name:'Ball Boy',                        icon:'⚽', desc:'Chases down the ball and kicks it back to you every 5 seconds. Every 10 hired permanently adds +5 to your click power.' },
   { name:'Sunday League Team',              icon:'🥅', desc:'Weekend pickup matches keep turning up new talent.' },
   { name:'Youth Academy',                    icon:'🧒', desc:'Scouts the youth ranks for rising stars.' },
-  { name:'Summer Football Camp',             icon:'⛺', desc:'Runs camps that funnel campers straight into your club.' },
+  { name:'Summer Soccer Camp',               icon:'⛺', desc:'Runs camps that funnel campers straight into your club.' },
   { name:'College Soccer Program',           icon:'🎓', desc:'Signs standout college players to your roster.' },
   { name:'Pro Scout Minibus',                icon:'🚐', desc:'Tours pro leagues worldwide chasing hidden gems.' },
   { name:'Training Ground',                  icon:'🏟️', desc:'State-of-the-art development, running around the clock.' },
   { name:'Player Agency',                    icon:'📣', desc:'Agents flood your roster with their star clients.' },
-  { name:'Worldwide Scouting Network',       icon:'🛰️', desc:'Satellites track football talent across the globe.' },
+  { name:'Worldwide Scouting Network',       icon:'🛰️', desc:'Satellites track soccer talent across the globe.' },
   { name:'Multiverse Transfer Portal',       icon:'🌀', desc:'Pulls elite players in from parallel dimensions.' },
   { name:'Time-Traveling Scout',             icon:'🕰️', desc:'Recruits legends from any era of the game.' },
   { name:'AI Transfer Algorithm',            icon:'🤖', desc:'Predicts breakout stars before anyone else.' },
   { name:'VR Metaverse Stadium',             icon:'🕶️', desc:'Trains players in a fully simulated league.' },
   { name:'Genetic Engineering Lab',          icon:'🧪', desc:'Splices athletic genes into new prospects.' },
   { name:'Orbital Training Station',         icon:'🛸', desc:'Zero-gravity drills build superhuman players.' },
-  { name:'Lunar Football Academy',           icon:'🌙', desc:"The moon's low gravity produces incredible free kicks." },
+  { name:'Lunar Soccer Academy',             icon:'🌙', desc:"The moon's low gravity produces incredible free kicks." },
   { name:'Martian Sunday League',            icon:'🔴', desc:'An entire planet dedicated to developing talent.' },
   { name:'Dyson Sphere Broadcast Network',   icon:'☀️', desc:'Beams the game to every star in the galaxy — and recruits from all of them.' },
   { name:'Galactic Scouting Armada',         icon:'🌌', desc:'A fleet of scout ships combs the Milky Way.' },
   { name:'Wormhole Transfer Hub',            icon:'🕳️', desc:'Shortcuts across space-time to sign prospects instantly.' },
   { name:'Quantum Transfer Simulator',       icon:'💻', desc:'Simulates every possible transfer window and picks the best one.' },
-  { name:'Celestial Football Shrine',        icon:'🛐', desc:'Football gods bless your club with talent.' },
+  { name:'Celestial Soccer Shrine',          icon:'🛐', desc:'Soccer gods bless your club with talent.' },
   { name:'Chrono-Sphere Player Incubator',   icon:'⏳', desc:'Grows fully-formed players in accelerated time.' },
   { name:'Nebula Talent Forge',              icon:'🌠', desc:'Forges new players from stellar dust.' },
-  { name:'Cosmic Football Overmind',         icon:'🧠', desc:'A hive-mind coordinates recruiting across all of reality.' },
-  { name:'Universal Football Federation HQ', icon:'🏛️', desc:'Governs football across every known universe.' },
+  { name:'Cosmic Soccer Overmind',           icon:'🧠', desc:'A hive-mind coordinates recruiting across all of reality.' },
+  { name:'World Soccer Federation HQ',       icon:'🏛️', desc:'Governs soccer across every known universe.' },
   { name:'Reality Engine Player Factory',    icon:'⚙️', desc:'Manufactures players from raw reality itself.' },
   { name:'Infinite Recursion Transfer Loop', icon:'♾️', desc:'Recruits recruiters who recruit more recruiters, forever.' },
   { name:'Prism of a Thousand Timelines',    icon:'🔮', desc:'Views every possible timeline and signs from all of them at once.' },
-  { name:'The Football Singularity',        icon:'🌈', desc:'All football, everywhere, all at once, converges into your club.' },
+  { name:'The Soccer Singularity',           icon:'🌈', desc:'All soccer, everywhere, all at once, converges into your club.' },
 ];
 const SOCCER_CLICK_UPGRADE_THEME = [
   { name:'Grippy Cleats' }, { name:'Match Ball Leather' }, { name:'Playmaker Instincts' },
@@ -691,7 +750,7 @@ const SOCCER_PLAYER_TYPE_THEME = [
   { name:'Bench Warmer' }, { name:'Trialist' }, { name:'Super Sub' }, { name:'Squad Player' },
   { name:'Academy Prodigy' }, { name:'Starting Striker' }, { name:'Deadly Finisher' },
   { name:'Club Legend' }, { name:'World Class Talent' }, { name:"Ballon d'Or Contender" },
-  { name:'World Cup Winner' }, { name:'Footballing Icon' }, { name:'GOAT Candidate' },
+  { name:'World Cup Winner' }, { name:'Soccer Icon' }, { name:'GOAT Candidate' },
   { name:'Global Icon' }, { name:'Legend of the Multiverse' },
 ];
 const SOCCER_COACH_THEME = [
@@ -740,6 +799,186 @@ const SOCCER_FAN_TIER_DEFS = deriveFanOrTotemDefs(BASKETBALL_FAN_TIER_DEFS, SOCC
 const SOCCER_TOTEM_TIER_DEFS = deriveFanOrTotemDefs(BASKETBALL_TOTEM_TIER_DEFS, SOCCER_TOTEM_THEME);
 const SOCCER_MASCOT_TIERS = deriveMascotTiers(SOCCER_MASCOT_THEME);
 
+// ── Baseball ──────────────────────────────────────────────────
+const BASEBALL_BUILDING_THEME = [
+  { name:'Batboy',                           icon:'⚾', desc:'Chases down the ball and tosses it back to you every 5 seconds. Every 10 hired permanently adds +5 to your click power.' },
+  { name:'Sandlot Team',                     icon:'🥎', desc:'Weekend pickup games keep turning up new talent.' },
+  { name:'Little League Academy',            icon:'🧢', desc:'Scouts the little leagues for rising stars.' },
+  { name:'Summer Baseball Camp',             icon:'⛺', desc:'Runs camps that funnel campers straight into your organization.' },
+  { name:'College Baseball Program',         icon:'🎓', desc:'Signs standout college players to your roster.' },
+  { name:'Pro Scout Van',                    icon:'🚐', desc:'Tours minor leagues worldwide chasing hidden gems.' },
+  { name:'Training Facility',                icon:'🏟️', desc:'State-of-the-art development, running around the clock.' },
+  { name:'Player Agency',                    icon:'📣', desc:'Agents flood your roster with their star clients.' },
+  { name:'Worldwide Scouting Network',       icon:'🛰️', desc:'Satellites track baseball talent across the globe.' },
+  { name:'Multiverse Trade Portal',          icon:'🌀', desc:'Pulls elite players in from parallel dimensions.' },
+  { name:'Time-Traveling Scout',             icon:'🕰️', desc:'Recruits legends from any era of the game.' },
+  { name:'AI Trade Algorithm',               icon:'🤖', desc:'Predicts breakout stars before anyone else.' },
+  { name:'VR Metaverse Ballpark',            icon:'🕶️', desc:'Trains players in a fully simulated league.' },
+  { name:'Genetic Engineering Lab',          icon:'🧪', desc:'Splices athletic genes into new prospects.' },
+  { name:'Orbital Training Station',         icon:'🛸', desc:'Zero-gravity drills build superhuman players.' },
+  { name:'Lunar Baseball Academy',           icon:'🌙', desc:"The moon's low gravity produces incredible home runs." },
+  { name:'Martian Sandlot League',           icon:'🔴', desc:'An entire planet dedicated to developing talent.' },
+  { name:'Dyson Sphere Broadcast Network',   icon:'☀️', desc:'Beams the game to every star in the galaxy — and recruits from all of them.' },
+  { name:'Galactic Scouting Armada',         icon:'🌌', desc:'A fleet of scout ships combs the Milky Way.' },
+  { name:'Wormhole Trade Hub',               icon:'🕳️', desc:'Shortcuts across space-time to sign prospects instantly.' },
+  { name:'Quantum Trade Simulator',          icon:'💻', desc:'Simulates every possible trade outcome and picks the best one.' },
+  { name:'Celestial Diamond Shrine',         icon:'🛐', desc:'Baseball gods bless your organization with talent.' },
+  { name:'Chrono-Sphere Player Incubator',   icon:'⏳', desc:'Grows fully-formed players in accelerated time.' },
+  { name:'Nebula Talent Forge',              icon:'🌠', desc:'Forges new players from stellar dust.' },
+  { name:'Cosmic Baseball Overmind',         icon:'🧠', desc:'A hive-mind coordinates recruiting across all of reality.' },
+  { name:'Universal Baseball Federation HQ', icon:'🏛️', desc:'Governs baseball across every known universe.' },
+  { name:'Reality Engine Player Factory',    icon:'⚙️', desc:'Manufactures players from raw reality itself.' },
+  { name:'Infinite Recursion Trade Loop',    icon:'♾️', desc:'Recruits recruiters who recruit more recruiters, forever.' },
+  { name:'Prism of a Thousand Timelines',    icon:'🔮', desc:'Views every possible timeline and signs from all of them at once.' },
+  { name:'The Baseball Singularity',         icon:'🌈', desc:'All baseball, everywhere, all at once, converges into your organization.' },
+];
+const BASEBALL_CLICK_UPGRADE_THEME = [
+  { name:'Grippy Batting Gloves' }, { name:'Genuine Cowhide Leather' }, { name:'Clutch Hitter Instincts' },
+  { name:'Custom Signature Jersey' }, { name:'MVP Trophy' }, { name:'Hall of Fame Legacy' },
+];
+const BASEBALL_PLAYER_TYPE_THEME = [
+  { name:'Bench Warmer' }, { name:'Walk-On Prospect' }, { name:'Utility Player' }, { name:'Role Player' },
+  { name:'Rookie Sensation' }, { name:'Starting Pitcher' }, { name:'Power Hitter' },
+  { name:'Franchise Player' }, { name:'All-Star' }, { name:'All-MLB Talent' },
+  { name:'Olympian' }, { name:'Hall of Famer' }, { name:'GOAT Candidate' },
+  { name:'Global Icon' }, { name:'Legend of the Multiverse' },
+];
+const BASEBALL_COACH_THEME = [
+  { name:'Volunteer Assistant' }, { name:'Batting Coach' }, { name:'Pitching Coach' },
+  { name:'Conditioning Coach' }, { name:'Analytics Coach' }, { name:'Player Development Coach' },
+  { name:'Strength & Conditioning Guru' }, { name:'Sports Psychologist' }, { name:'Video Coordinator' },
+  { name:'Head Scout' }, { name:'General Manager' }, { name:'Legendary Head Coach' },
+];
+const BASEBALL_MUTATION_THEME = [
+  { name:'Golden Bat Mutation',       icon:'🥇' }, { name:'Radioactive Glove Mutation', icon:'☢️' },
+  { name:'Neon Cleats Mutation',      icon:'💡' }, { name:'Plasma Fastball Mutation',  icon:'⚡' },
+  { name:'Crystal Ball Mutation',     icon:'💎' }, { name:'Inferno Swing Mutation',    icon:'🔥' },
+  { name:'Frostbite Slide Mutation',  icon:'❄️' }, { name:'Toxic Curveball Mutation',  icon:'☣️' },
+  { name:'Electric Grand Slam Mutation', icon:'🌩️' }, { name:'Void Pitch Mutation',    icon:'🕳️' },
+  { name:'Cosmic Curve Mutation',     icon:'🌌' }, { name:'Shadow Steal Mutation',     icon:'🌑' },
+  { name:'Solar Homerun Mutation',    icon:'☀️' }, { name:'Quantum Pitch Mutation',    icon:'⚛️' },
+  { name:'Diamond Bat Mutation',      icon:'💠' }, { name:'Phantom Pickoff Mutation',  icon:'👻' },
+  { name:'Celestial Grand Slam Mutation', icon:'🌠' }, { name:'Singularity Slugger Mutation', icon:'🔮' },
+];
+const BASEBALL_FAN_THEME = [
+  { name:'Casual Supporter',      icon:'🙂', desc:'Shows up when the team is winning.' },
+  { name:'Season Ticket Holder',  icon:'🎟️', desc:'Never misses a home game.' },
+  { name:'Bleacher Creature',     icon:'📯', desc:'Loud, proud, and never sits down.' },
+  { name:'Celebrity Box-Seat Fan',icon:'🌟', desc:'Front row, every game, cameras love them.' },
+  { name:'Legendary Diamond Diehard', icon:'👑', desc:'Legend says they have never missed a pitch.' },
+];
+const BASEBALL_MASCOT_THEME = [
+  { name:'No Mascot', icon:'❔' }, { name:'Team Mascot', icon:'🦅' }, { name:'Mutant Mascot', icon:'🦍' },
+  { name:'Cyber Mascot', icon:'🤖' }, { name:'Cosmic Mascot', icon:'👽' },
+  { name:'Ancient Dragon Mascot', icon:'🐉' }, { name:'Multiversal Mascot Deity', icon:'🌌' },
+];
+const BASEBALL_TOTEM_THEME = [
+  { name:'Golden Bat Totem', icon:'🥇', desc:'A gleaming totem said to bring good fortune to hitters.' },
+  { name:'Radioactive Totem', icon:'☢️', desc:'Glows faintly. Definitely fine to stand next to.' },
+  { name:'Neon Totem',        icon:'💡', desc:'Pulses with electric light in time with every hit.' },
+  { name:'Plasma Totem',      icon:'⚡', desc:'Crackling energy arcs between the dugouts.' },
+  { name:'Crystal Ball Totem',icon:'💎', desc:"A flawless crystal said to focus a hitter's aim perfectly." },
+];
+
+const BASEBALL_BUILDING_DEFS = deriveBuildingDefs(BASEBALL_BUILDING_THEME);
+const BASEBALL_CLICK_UPGRADE_DEFS = deriveNamedDefs(BASKETBALL_CLICK_UPGRADE_DEFS, BASEBALL_CLICK_UPGRADE_THEME);
+const BASEBALL_PLAYER_TYPE_DEFS = deriveNamedDefs(BASKETBALL_PLAYER_TYPE_DEFS, BASEBALL_PLAYER_TYPE_THEME);
+const BASEBALL_COACH_DEFS = deriveNamedDefs(BASKETBALL_COACH_DEFS, BASEBALL_COACH_THEME);
+const BASEBALL_MUTATION_DEFS = deriveNamedDefs(BASKETBALL_MUTATION_DEFS, BASEBALL_MUTATION_THEME);
+const BASEBALL_FAN_TIER_DEFS = deriveFanOrTotemDefs(BASKETBALL_FAN_TIER_DEFS, BASEBALL_FAN_THEME);
+const BASEBALL_TOTEM_TIER_DEFS = deriveFanOrTotemDefs(BASKETBALL_TOTEM_TIER_DEFS, BASEBALL_TOTEM_THEME);
+const BASEBALL_MASCOT_TIERS = deriveMascotTiers(BASEBALL_MASCOT_THEME);
+
+// ── Football (American) ──────────────────────────────────────
+const FOOTBALL_BUILDING_THEME = [
+  { name:'Water Boy',                        icon:'🏈', desc:'Chases down the ball and gets it back to you every 5 seconds. Every 10 hired permanently adds +5 to your click power.' },
+  { name:'Pickup Game Squad',                icon:'🏈', desc:'Weekend pickup games keep turning up new talent.' },
+  { name:'Pop Warner League',                icon:'🧒', desc:'Scouts the youth leagues for rising stars.' },
+  { name:'Summer Football Camp',             icon:'⛺', desc:'Runs camps that funnel campers straight into your franchise.' },
+  { name:'College Football Program',         icon:'🎓', desc:'Signs standout college players to your roster.' },
+  { name:'Pro Scout Van',                    icon:'🚐', desc:'Tours pro leagues worldwide chasing hidden gems.' },
+  { name:'Training Facility',                icon:'🏟️', desc:'State-of-the-art development, running around the clock.' },
+  { name:'Player Agency',                    icon:'📣', desc:'Agents flood your roster with their star clients.' },
+  { name:'Worldwide Scouting Network',       icon:'🛰️', desc:'Satellites track football talent across the globe.' },
+  { name:'Multiverse Draft Portal',          icon:'🌀', desc:'Pulls elite players in from parallel dimensions.' },
+  { name:'Time-Traveling Scout',             icon:'🕰️', desc:'Recruits legends from any era of the game.' },
+  { name:'AI Draft Algorithm',               icon:'🤖', desc:'Predicts breakout stars before anyone else.' },
+  { name:'VR Metaverse Stadium',             icon:'🕶️', desc:'Trains players in a fully simulated league.' },
+  { name:'Genetic Engineering Lab',          icon:'🧪', desc:'Splices athletic genes into new prospects.' },
+  { name:'Orbital Training Station',         icon:'🛸', desc:'Zero-gravity drills build superhuman players.' },
+  { name:'Lunar Football Academy',           icon:'🌙', desc:"The moon's low gravity produces incredible Hail Marys." },
+  { name:'Martian Gridiron League',          icon:'🔴', desc:'An entire planet dedicated to developing talent.' },
+  { name:'Dyson Sphere Broadcast Network',   icon:'☀️', desc:'Beams the game to every star in the galaxy — and recruits from all of them.' },
+  { name:'Galactic Scouting Armada',         icon:'🌌', desc:'A fleet of scout ships combs the Milky Way.' },
+  { name:'Wormhole Draft Hub',               icon:'🕳️', desc:'Shortcuts across space-time to sign prospects instantly.' },
+  { name:'Quantum Draft Simulator',          icon:'💻', desc:'Simulates every possible draft outcome and picks the best one.' },
+  { name:'Celestial Gridiron Shrine',        icon:'🛐', desc:'Football gods bless your franchise with talent.' },
+  { name:'Chrono-Sphere Player Incubator',   icon:'⏳', desc:'Grows fully-formed players in accelerated time.' },
+  { name:'Nebula Talent Forge',              icon:'🌠', desc:'Forges new players from stellar dust.' },
+  { name:'Cosmic Football Overmind',         icon:'🧠', desc:'A hive-mind coordinates recruiting across all of reality.' },
+  { name:'Universal Football Federation HQ', icon:'🏛️', desc:'Governs football across every known universe.' },
+  { name:'Reality Engine Player Factory',    icon:'⚙️', desc:'Manufactures players from raw reality itself.' },
+  { name:'Infinite Recursion Draft Loop',    icon:'♾️', desc:'Recruits recruiters who recruit more recruiters, forever.' },
+  { name:'Prism of a Thousand Timelines',    icon:'🔮', desc:'Views every possible timeline and drafts from all of them at once.' },
+  { name:'The Football Singularity',        icon:'🌈', desc:'All football, everywhere, all at once, converges into your franchise.' },
+];
+const FOOTBALL_CLICK_UPGRADE_THEME = [
+  { name:'Grippy Turf Shoes' }, { name:'Genuine Pigskin Leather' }, { name:'Quarterback Instincts' },
+  { name:'Custom Signature Jersey' }, { name:'MVP Trophy' }, { name:'Hall of Fame Legacy' },
+];
+const FOOTBALL_PLAYER_TYPE_THEME = [
+  { name:'Bench Warmer' }, { name:'Practice Squad Player' }, { name:'Special Teams Ace' }, { name:'Depth Chart Player' },
+  { name:'Combine Standout' }, { name:'Starting Quarterback' }, { name:'Touchdown Machine' },
+  { name:'Franchise Player' }, { name:'All-Pro Talent' }, { name:'Heisman Contender' },
+  { name:'Super Bowl Champion' }, { name:'Gridiron Icon' }, { name:'GOAT Candidate' },
+  { name:'Global Icon' }, { name:'Legend of the Multiverse' },
+];
+const FOOTBALL_COACH_THEME = [
+  { name:'Volunteer Assistant' }, { name:'Quarterback Coach' }, { name:'Defensive Coordinator' },
+  { name:'Conditioning Coach' }, { name:'Analytics Coach' }, { name:'Player Development Coach' },
+  { name:'Strength & Conditioning Guru' }, { name:'Sports Psychologist' }, { name:'Video Coordinator' },
+  { name:'Head Scout' }, { name:'General Manager' }, { name:'Legendary Head Coach' },
+];
+const FOOTBALL_MUTATION_THEME = [
+  { name:'Golden Helmet Mutation',    icon:'🥇' }, { name:'Radioactive Pads Mutation', icon:'☢️' },
+  { name:'Neon Jersey Mutation',      icon:'💡' }, { name:'Plasma Spiral Mutation',    icon:'⚡' },
+  { name:'Crystal Pigskin Mutation',  icon:'💎' }, { name:'Inferno Blitz Mutation',    icon:'🔥' },
+  { name:'Frostbite Sack Mutation',   icon:'❄️' }, { name:'Toxic Fumble Mutation',     icon:'☣️' },
+  { name:'Electric Touchdown Mutation', icon:'🌩️' }, { name:'Void Snap Mutation',      icon:'🕳️' },
+  { name:'Cosmic Spiral Mutation',    icon:'🌌' }, { name:'Shadow Juke Mutation',      icon:'🌑' },
+  { name:'Solar Field Goal Mutation', icon:'☀️' }, { name:'Quantum Route Mutation',    icon:'⚛️' },
+  { name:'Diamond Helmet Mutation',   icon:'💠' }, { name:'Phantom Pick-Six Mutation', icon:'👻' },
+  { name:'Celestial Hail Mary Mutation', icon:'🌠' }, { name:'Singularity Blitz Mutation', icon:'🔮' },
+];
+const FOOTBALL_FAN_THEME = [
+  { name:'Casual Supporter',       icon:'🙂', desc:'Shows up when the team is winning.' },
+  { name:'Season Ticket Holder',   icon:'🎟️', desc:'Never misses a home game.' },
+  { name:'Face-Painted Fanatic',   icon:'🎨', desc:'Freezing tailgate weather never stops them.' },
+  { name:'Celebrity Sideline Fan', icon:'🌟', desc:'Front row, every game, cameras love them.' },
+  { name:'Legendary Superfan',     icon:'👑', desc:'Legend says they have never missed a snap.' },
+];
+const FOOTBALL_MASCOT_THEME = [
+  { name:'No Mascot', icon:'❔' }, { name:'Team Mascot', icon:'🐺' }, { name:'Mutant Mascot', icon:'🦍' },
+  { name:'Cyber Mascot', icon:'🤖' }, { name:'Cosmic Mascot', icon:'👽' },
+  { name:'Ancient Dragon Mascot', icon:'🐉' }, { name:'Multiversal Mascot Deity', icon:'🌌' },
+];
+const FOOTBALL_TOTEM_THEME = [
+  { name:'Golden Helmet Totem', icon:'🥇', desc:'A gleaming totem said to bring good fortune on game day.' },
+  { name:'Radioactive Totem',   icon:'☢️', desc:'Glows faintly. Definitely fine to stand next to.' },
+  { name:'Neon Totem',          icon:'💡', desc:'Pulses with electric light in time with every touchdown.' },
+  { name:'Plasma Totem',        icon:'⚡', desc:'Crackling energy arcs between the goalposts.' },
+  { name:'Crystal Pigskin Totem', icon:'💎', desc:"A flawless crystal said to focus a quarterback's aim perfectly." },
+];
+
+const FOOTBALL_BUILDING_DEFS = deriveBuildingDefs(FOOTBALL_BUILDING_THEME);
+const FOOTBALL_CLICK_UPGRADE_DEFS = deriveNamedDefs(BASKETBALL_CLICK_UPGRADE_DEFS, FOOTBALL_CLICK_UPGRADE_THEME);
+const FOOTBALL_PLAYER_TYPE_DEFS = deriveNamedDefs(BASKETBALL_PLAYER_TYPE_DEFS, FOOTBALL_PLAYER_TYPE_THEME);
+const FOOTBALL_COACH_DEFS = deriveNamedDefs(BASKETBALL_COACH_DEFS, FOOTBALL_COACH_THEME);
+const FOOTBALL_MUTATION_DEFS = deriveNamedDefs(BASKETBALL_MUTATION_DEFS, FOOTBALL_MUTATION_THEME);
+const FOOTBALL_FAN_TIER_DEFS = deriveFanOrTotemDefs(BASKETBALL_FAN_TIER_DEFS, FOOTBALL_FAN_THEME);
+const FOOTBALL_TOTEM_TIER_DEFS = deriveFanOrTotemDefs(BASKETBALL_TOTEM_TIER_DEFS, FOOTBALL_TOTEM_THEME);
+const FOOTBALL_MASCOT_TIERS = deriveMascotTiers(FOOTBALL_MASCOT_THEME);
+
 const SPORTS = {
   basketball: {
     label: 'BASKETBALL', ballIcon: '🏀', ballName: 'basketball',
@@ -756,6 +995,22 @@ const SPORTS = {
     playerTypeDefs: SOCCER_PLAYER_TYPE_DEFS, coachDefs: SOCCER_COACH_DEFS,
     mutationDefs: SOCCER_MUTATION_DEFS, fanTierDefs: SOCCER_FAN_TIER_DEFS,
     mascotTiers: SOCCER_MASCOT_TIERS, totemTierDefs: SOCCER_TOTEM_TIER_DEFS,
+  },
+  baseball: {
+    label: 'BASEBALL', ballIcon: '⚾', ballName: 'baseball',
+    frenzyLabel: 'GRAND SLAM FRENZY', luckyLabel: 'Walk-off!',
+    buildingDefs: BASEBALL_BUILDING_DEFS, clickUpgradeDefs: BASEBALL_CLICK_UPGRADE_DEFS,
+    playerTypeDefs: BASEBALL_PLAYER_TYPE_DEFS, coachDefs: BASEBALL_COACH_DEFS,
+    mutationDefs: BASEBALL_MUTATION_DEFS, fanTierDefs: BASEBALL_FAN_TIER_DEFS,
+    mascotTiers: BASEBALL_MASCOT_TIERS, totemTierDefs: BASEBALL_TOTEM_TIER_DEFS,
+  },
+  football: {
+    label: 'FOOTBALL', ballIcon: '🏈', ballName: 'football',
+    frenzyLabel: 'TOUCHDOWN FRENZY', luckyLabel: 'Hail Mary!',
+    buildingDefs: FOOTBALL_BUILDING_DEFS, clickUpgradeDefs: FOOTBALL_CLICK_UPGRADE_DEFS,
+    playerTypeDefs: FOOTBALL_PLAYER_TYPE_DEFS, coachDefs: FOOTBALL_COACH_DEFS,
+    mutationDefs: FOOTBALL_MUTATION_DEFS, fanTierDefs: FOOTBALL_FAN_TIER_DEFS,
+    mascotTiers: FOOTBALL_MASCOT_TIERS, totemTierDefs: FOOTBALL_TOTEM_TIER_DEFS,
   },
 };
 
@@ -852,9 +1107,15 @@ function applySport(sportKey) {
 }
 
 // ── State ──────────────────────────────────────────────────────
+// `state` always refers to whichever sport is currently active (an alias for
+// sportStates[currentSport]). Every unlocked sport that's been touched this
+// session keeps its own live, ticking state object in `sportStates` so its
+// income keeps accruing in the background even while you're playing another.
 let state = null;
+let sportStates = {};
 
-function freshState() {
+function freshStateFor(sportKey) {
+  const s = SPORTS[sportKey];
   return {
     money: 0,
     totalEarnedAllTime: 0,
@@ -865,16 +1126,16 @@ function freshState() {
     frenzyActive: false,
     frenzyEndTime: 0,
     nextGoldenIn: rand(GOLDEN_MIN_MS, GOLDEN_MAX_MS),
-    buildings: BUILDING_DEFS.map(() => ({ count: 0 })),
+    buildings: s.buildingDefs.map(() => ({ count: 0 })),
     buildingUpgrades: {},
     clickUpgrades: {},
     playerUpgrades: {},
     coachUpgrades: {},
     mutationUpgrades: {},
-    fans: FAN_TIER_DEFS.map(() => ({ count: 0 })),
+    fans: s.fanTierDefs.map(() => ({ count: 0 })),
     stadiumLevel: 0,
     mascotLevel: 0,
-    totems: TOTEM_TIER_DEFS.map(() => ({ count: 0 })),
+    totems: s.totemTierDefs.map(() => ({ count: 0 })),
     totemPoleLevel: 0,
     tapCount: 0,
     teamWins: 0,
@@ -882,6 +1143,7 @@ function freshState() {
     lastSave: null,
   };
 }
+function freshState() { return freshStateFor(currentSport); }
 
 function rand(min, max) { return min + Math.random() * (max - min); }
 
@@ -1026,6 +1288,97 @@ function getBuildingCost(i, qty = 1) {
 
 function computeBannerGain() {
   return Math.floor(Math.cbrt(state.totalEarnedAllTime / 1e9));
+}
+
+// ── Background income (every unlocked, touched sport earns simultaneously) ──
+// These mirror getCps()/getBaseClickPower() and friends exactly, but take an
+// explicit (st, sportKey) pair instead of reading the mutable "active sport"
+// globals, so a sport's income can keep accruing while a different sport is
+// the one actually on screen. Achievement count uses Object.keys(st.achievements)
+// directly (ids are stable across sports) instead of needing that sport's
+// achievement-definitions array.
+function getBuildingTierCountFor(st, i) {
+  let n = 0;
+  TIER_CONFIG.forEach((t, ti) => { if (st.buildingUpgrades[`bu_${i}_${ti}`]) n++; });
+  return n;
+}
+function getClickerBonusFor(st) {
+  return Math.floor(st.buildings[0].count / CLICKER_BONUS_EVERY) * CLICKER_BONUS_AMOUNT;
+}
+function getUpgradeBonusesFor(st, sportKey) {
+  const s = SPORTS[sportKey];
+  const categories = [
+    { defs: s.clickUpgradeDefs, stateKey: 'clickUpgrades' },
+    { defs: s.playerTypeDefs,   stateKey: 'playerUpgrades' },
+    { defs: s.coachDefs,        stateKey: 'coachUpgrades' },
+    { defs: s.mutationDefs,     stateKey: 'mutationUpgrades' },
+  ];
+  let clickAdd = 0, clickMult = 1, ppsAdd = 0, ppsMult = 1;
+  categories.forEach(cat => {
+    cat.defs.forEach(u => {
+      if (!st[cat.stateKey][u.id]) return;
+      const target = u.target || 'click';
+      if (target === 'click' || target === 'both') { if (u.type === 'add') clickAdd += u.value; else clickMult *= u.value; }
+      if (target === 'pps' || target === 'both') { if (u.type === 'add') ppsAdd += u.value; else ppsMult *= u.value; }
+    });
+  });
+  return { clickAdd, clickMult, ppsAdd, ppsMult };
+}
+function getFanMultiplierFor(st, sportKey) {
+  let bonus = 0;
+  st.fans.forEach((f, i) => { bonus += f.count * SPORTS[sportKey].fanTierDefs[i].bonusPercent; });
+  return 1 + bonus / 100;
+}
+function getTotemMultiplierFor(st, sportKey) {
+  let bonus = 0;
+  st.totems.forEach((t, i) => { bonus += t.count * SPORTS[sportKey].totemTierDefs[i].bonusPercent; });
+  return 1 + bonus / 100;
+}
+function getTotemPoleMultiplierFor(st) { return 1 + st.totemPoleLevel * TOTEM_POLE_MULT_PER_LEVEL; }
+function getStadiumMultiplierFor(st) { return 1 + st.stadiumLevel * STADIUM_MULT_PER_LEVEL; }
+function getMascotMultiplierFor(st) { return 1 + st.mascotLevel * MASCOT_MULT_PER_LEVEL; }
+function achievementMultiplierFor(st) { return 1 + Object.keys(st.achievements).length * 0.0025; }
+function prestigeMultiplierFor(st) { return 1 + st.banners * 0.02; }
+function frenzyMultiplierFor(st) { return st.frenzyActive ? FRENZY_MULT : 1; }
+
+function getBaseClickPowerFor(st, sportKey) {
+  const b = getUpgradeBonusesFor(st, sportKey);
+  const clickerBonus = getClickerBonusFor(st);
+  const totemMult = getTotemMultiplierFor(st, sportKey) * getTotemPoleMultiplierFor(st);
+  return (1 + b.clickAdd + clickerBonus) * b.clickMult * totemMult;
+}
+
+function computeCpsForSport(st, sportKey) {
+  const s = SPORTS[sportKey];
+  let total = 0;
+  st.buildings.forEach((bld, i) => {
+    const d = s.buildingDefs[i];
+    if (d.special === 'autoclick') {
+      total += (bld.count / (CLICKER_INTERVAL_MS / 1000)) * getBaseClickPowerFor(st, sportKey);
+      return;
+    }
+    const mult = Math.pow(2, getBuildingTierCountFor(st, i));
+    total += bld.count * d.baseCps * mult;
+  });
+  const bonuses = getUpgradeBonusesFor(st, sportKey);
+  total = (total + bonuses.ppsAdd) * bonuses.ppsMult;
+  total *= getFanMultiplierFor(st, sportKey);
+  total *= getStadiumMultiplierFor(st);
+  total *= getMascotMultiplierFor(st);
+  return total * achievementMultiplierFor(st) * prestigeMultiplierFor(st) * frenzyMultiplierFor(st);
+}
+
+// Ticks every OTHER unlocked, touched sport's income simultaneously — the active
+// sport's own income is already applied via getCps() in the main game loop.
+function tickBackgroundSports(dtMs) {
+  Object.keys(sportStates).forEach(key => {
+    if (key === currentSport) return;
+    const st = sportStates[key];
+    if (st.frenzyActive && performance.now() > st.frenzyEndTime) st.frenzyActive = false;
+    const income = computeCpsForSport(st, key) * (dtMs / 1000);
+    st.money += income;
+    st.totalEarnedAllTime += income;
+  });
 }
 
 // ── DOM refs ───────────────────────────────────────────────────
@@ -1324,15 +1677,15 @@ function levelUpMascot() {
 }
 
 // ── Ascensions & sport switching ─────────────────────────────
-let soccerUnlocked = false;
+let extraSportsUnlocked = false;
 
 function hasSportSave(sportKey) { return localStorage.getItem(saveKeyFor(sportKey)) !== null; }
 
-function checkSoccerUnlock() {
-  if (!soccerUnlocked && currentSport === 'basketball' && state.totalEarnedAllTime >= SOCCER_UNLOCK_THRESHOLD) {
-    soccerUnlocked = true;
+function checkExtraSportsUnlock() {
+  if (!extraSportsUnlocked && currentSport === 'basketball' && state.totalEarnedAllTime >= SPORT_UNLOCK_THRESHOLD) {
+    extraSportsUnlocked = true;
     save();
-    showToast('⚽ SOCCER UNLOCKED! Visit the ASCENSIONS tab to begin a new journey.');
+    showToast('🌌 NEW SPORTS UNLOCKED! Visit the ASCENSIONS tab to explore Soccer, Baseball, and Football.');
   }
 }
 
@@ -1341,72 +1694,193 @@ function updateHeaderForSport() {
   ballBtn.textContent = SPORTS[currentSport].ballIcon;
 }
 
+// Plays a "flying into a portal in outer space" transition, calling swapFn at the
+// peak of the zoom (hidden behind the full-screen flash) so the actual sport swap
+// isn't visible mid-effect, then fades the overlay back out.
+function playPortalTransition(swapFn) {
+  const overlay = document.getElementById('portal-overlay');
+  const starsContainer = document.getElementById('portal-stars');
+  starsContainer.innerHTML = '';
+  for (let i = 0; i < 40; i++) {
+    const streak = document.createElement('div');
+    streak.className = 'portal-streak';
+    streak.style.setProperty('--angle', (Math.random() * 360) + 'deg');
+    streak.style.setProperty('--dist', (40 + Math.random() * 20) + 'vmax');
+    streak.style.animationDelay = (Math.random() * 0.15) + 's';
+    starsContainer.appendChild(streak);
+  }
+  overlay.classList.add('active');
+  setTimeout(swapFn, 550);
+  setTimeout(() => overlay.classList.remove('active'), 1150);
+}
+
 function switchSport(targetSport) {
   if (targetSport === currentSport) return;
-  save(); // persist the sport we're leaving
+  playPortalTransition(() => {
+    save(); // persist the sport we're leaving (and everything else already touched)
 
-  applySport(targetSport);
-  loadSportState(targetSport);
-  save(); // persist the (possibly fresh) target state + active-sport marker immediately
+    applySport(targetSport);
+    // Reuse the in-memory, already-ticking state if this sport has been touched
+    // this session — reloading from localStorage would rewind its background
+    // earnings back to whatever was last saved.
+    if (sportStates[targetSport]) {
+      state = sportStates[targetSport];
+    } else {
+      loadSportState(targetSport, false);
+    }
+    save();
 
-  buildingsTab.querySelectorAll('.store-row').forEach(r => r.remove());
-  buildingRowRefs.length = 0;
-  initBuildingRows();
+    buildingsTab.querySelectorAll('.store-row').forEach(r => r.remove());
+    buildingRowRefs.length = 0;
+    initBuildingRows();
 
-  document.getElementById('fan-rows').innerHTML = '';
-  fanRowRefs.length = 0;
-  initFanRows();
+    document.getElementById('fan-rows').innerHTML = '';
+    fanRowRefs.length = 0;
+    initFanRows();
 
-  document.getElementById('totem-rows').innerHTML = '';
-  totemRowRefs.length = 0;
-  initTotemRows();
+    document.getElementById('totem-rows').innerHTML = '';
+    totemRowRefs.length = 0;
+    initTotemRows();
 
-  refreshUpgradesTab();
-  renderAchievements();
-  updateHeaderForSport();
-  updateAll();
-  showToast(`${SPORTS[targetSport].ballIcon} Now playing ${SPORTS[targetSport].label}!`);
+    refreshUpgradesTab();
+    checkAchievements();
+    renderAchievements();
+    updateHeaderForSport();
+    updateAll();
+    showToast(`${SPORTS[targetSport].ballIcon} Now playing ${SPORTS[targetSport].label}!`);
+  });
 }
 
 function renderAscensionsTab() {
-  ascensionsTab.innerHTML = '';
+  const container = document.getElementById('sport-cards');
+  if (!container) return;
+  container.innerHTML = '';
   Object.keys(SPORTS).forEach(key => {
     const sport = SPORTS[key];
     const card = document.createElement('div');
     card.className = 'feature-panel';
 
-    if (key === 'soccer' && !soccerUnlocked) {
+    if (key !== 'basketball' && !extraSportsUnlocked) {
       const liveEarned = currentSport === 'basketball' ? state.totalEarnedAllTime : 0;
-      const progress = Math.min(100, (liveEarned / SOCCER_UNLOCK_THRESHOLD) * 100);
+      const progress = Math.min(100, (liveEarned / SPORT_UNLOCK_THRESHOLD) * 100);
       card.innerHTML = `
         <div class="feature-icon">🔒</div>
         <div class="feature-info">
           <div class="feature-title">${sport.ballIcon} ${sport.label} — LOCKED</div>
-          <div class="feature-sub">Reach $${formatMoney(SOCCER_UNLOCK_THRESHOLD)} lifetime earned in Basketball to ascend.
+          <div class="feature-sub">Reach $${formatMoney(SPORT_UNLOCK_THRESHOLD)} lifetime earned in Basketball to ascend.
             <div class="ascension-progress-bar"><div class="ascension-progress-fill" style="width:${progress}%"></div></div>
             ${progress.toFixed(4)}% there
           </div>
         </div>
       `;
-      ascensionsTab.appendChild(card);
+      container.appendChild(card);
       return;
     }
 
     const isActive = key === currentSport;
+    const st = sportStates[key];
     const label = isActive ? 'CURRENTLY PLAYING' : (hasSportSave(key) ? `SWITCH TO ${sport.label}` : `ASCEND TO ${sport.label}`);
+    let statLine = 'Never started — begins fresh';
+    if (st) {
+      const cps = isActive ? getCps() : computeCpsForSport(st, key);
+      statLine = `$${formatMoney(st.money)} · $${formatRate(cps)}/sec`;
+    }
     card.innerHTML = `
       <div class="feature-icon">${sport.ballIcon}</div>
       <div class="feature-info">
         <div class="feature-title">${sport.label}</div>
-        <div class="feature-sub">${isActive ? 'Active now' : (hasSportSave(key) ? 'Saved progress waiting' : 'Never started — begins fresh')}</div>
+        <div class="feature-sub">${isActive ? 'Active now · ' + statLine : statLine}</div>
       </div>
       <button class="feature-btn${isActive ? ' disabled' : ''}" ${isActive ? 'disabled' : ''}>${label}</button>
     `;
     if (!isActive) {
       card.querySelector('button').addEventListener('pointerdown', e => { e.preventDefault(); switchSport(key); });
     }
-    ascensionsTab.appendChild(card);
+    container.appendChild(card);
   });
+}
+
+// ── Team name & All-Stars admin powers ────────────────────────
+// The team name is a single global identity shared across every sport (not
+// per-sport state), since the "All-Stars" cheat unlock should apply account-wide.
+let teamName = localStorage.getItem(TEAM_NAME_KEY) || '';
+function saveTeamName() { localStorage.setItem(TEAM_NAME_KEY, teamName); }
+function isAdminName(name) { return name.trim().toLowerCase() === 'all-stars'; }
+
+function initTeamNamePanel() {
+  const input = document.getElementById('team-name-input');
+  input.value = teamName;
+  input.addEventListener('input', e => {
+    teamName = e.target.value;
+    saveTeamName();
+    renderAdminPanel();
+  });
+  renderAdminPanel();
+}
+
+function renderAdminPanel() {
+  const panel = document.getElementById('admin-panel');
+  if (!isAdminName(teamName)) { panel.classList.add('hidden'); panel.innerHTML = ''; return; }
+  panel.classList.remove('hidden');
+  panel.innerHTML = `
+    <div class="upgrade-section-title">⭐ ALL-STARS ADMIN POWERS ⭐</div>
+    <div class="admin-btn-grid">
+      <button class="feature-btn" id="admin-plus100">+100 OF EVERYTHING</button>
+      <button class="feature-btn" id="admin-x100money">MULTIPLY MONEY x100</button>
+      <button class="feature-btn" id="admin-unlockupgrades">UNLOCK ALL UPGRADES</button>
+      <button class="feature-btn" id="admin-maxlevels">+10 STADIUM/MASCOT/POLE LEVELS</button>
+      <button class="feature-btn" id="admin-instantwin">INSTANT TEAM WIN</button>
+      <button class="feature-btn" id="admin-decillion">+1 DECILLION MONEY</button>
+    </div>
+  `;
+  const bind = (id, fn) => document.getElementById(id).addEventListener('pointerdown', e => { e.preventDefault(); fn(); });
+  bind('admin-plus100', adminPlus100);
+  bind('admin-x100money', adminMultiplyMoney);
+  bind('admin-unlockupgrades', adminUnlockUpgrades);
+  bind('admin-maxlevels', adminMaxLevels);
+  bind('admin-instantwin', adminInstantWin);
+  bind('admin-decillion', adminAddDecillion);
+}
+
+function adminPlus100() {
+  state.buildings.forEach(b => b.count += 100);
+  state.fans.forEach(f => f.count += 100);
+  state.totems.forEach(t => t.count += 100);
+  checkAchievements();
+  refreshUpgradesTab();
+  updateAll();
+  showToast('⭐ +100 of everything!');
+}
+function adminMultiplyMoney() {
+  state.money *= 100;
+  updateAll();
+  showToast('⭐ Money x100!');
+}
+function adminUnlockUpgrades() {
+  UPGRADE_CATEGORIES.forEach(cat => cat.defs.forEach(u => { state[cat.stateKey][u.id] = true; }));
+  BUILDING_UPGRADES.forEach(u => { state.buildingUpgrades[u.id] = true; });
+  refreshUpgradesTab();
+  updateAll();
+  showToast('⭐ All upgrades unlocked!');
+}
+function adminMaxLevels() {
+  state.stadiumLevel += 10;
+  state.mascotLevel += 10;
+  state.totemPoleLevel += 10;
+  checkAchievements();
+  updateAll();
+  showToast('⭐ +10 Stadium/Mascot/Totem Pole levels!');
+}
+function adminInstantWin() {
+  triggerTeamWin(clickArea.clientWidth / 2, clickArea.clientHeight / 2);
+  updateAll();
+}
+function adminAddDecillion() {
+  state.money += 1e33;
+  state.totalEarnedAllTime += 1e33;
+  checkAchievements();
+  updateAll();
+  showToast('⭐ +1 decillion money!');
 }
 
 function renderFeaturePanels() {
@@ -1544,6 +2018,7 @@ document.getElementById('reset-confirm-btn').addEventListener('pointerdown', e =
   e.preventDefault();
   localStorage.removeItem(saveKeyFor(currentSport));
   state = freshState();
+  sportStates[currentSport] = state;
   closeModal('reset-modal');
   refreshUpgradesTab();
   renderAchievements();
@@ -1743,7 +2218,7 @@ function updateAll() {
   winProgressValEl.textContent = WIN_EVERY_TAPS - (state.tapCount % WIN_EVERY_TAPS);
   updateBuildingRows();
   renderFeaturePanels();
-  checkSoccerUnlock();
+  checkExtraSportsUnlock();
   renderAscensionsTab();
 
   const gain = computeBannerGain();
@@ -1769,6 +2244,7 @@ function gameLoop(ts) {
   state.money += income;
   state.totalEarnedAllTime += income;
   processAutoClicks();
+  tickBackgroundSports(dt);
 
   state.nextGoldenIn -= dt;
   if (state.nextGoldenIn <= 0) {
@@ -1792,58 +2268,81 @@ function gameLoop(ts) {
 }
 
 // ── Save / Load ────────────────────────────────────────────────
+// Saves EVERY unlocked sport that's been touched this session (not just the
+// active one), since they've all been earning simultaneously in the background.
 function save() {
-  state.lastSave = Date.now();
-  localStorage.setItem(saveKeyFor(currentSport), JSON.stringify(state));
+  const now = Date.now();
+  Object.keys(sportStates).forEach(key => {
+    const st = sportStates[key];
+    st.lastSave = now;
+    localStorage.setItem(saveKeyFor(key), JSON.stringify(st));
+  });
   localStorage.setItem(ACTIVE_SPORT_KEY, currentSport);
-  localStorage.setItem(SOCCER_UNLOCKED_KEY, soccerUnlocked ? '1' : '0');
+  localStorage.setItem(EXTRA_SPORTS_UNLOCKED_KEY, extraSportsUnlocked ? '1' : '0');
+  saveTeamName();
 }
 
-// Loads sportKey's save into the global `state`. Assumes applySport(sportKey) has
-// already run, so BUILDING_DEFS/FAN_TIER_DEFS/etc. already point at the right theme.
-function loadSportState(sportKey) {
-  const raw = localStorage.getItem(saveKeyFor(sportKey));
-  if (!raw) { state = freshState(); return; }
-  try {
-    const parsed = JSON.parse(raw);
-    const fresh = freshState();
-    state = Object.assign(fresh, parsed);
-    // Migrate pre-currency-rename saves (players -> money).
-    if (parsed.money === undefined && parsed.players !== undefined) state.money = parsed.players;
-    if (parsed.totalEarnedAllTime === undefined && parsed.totalRecruitedAllTime !== undefined) state.totalEarnedAllTime = parsed.totalRecruitedAllTime;
-    state.buildings = BUILDING_DEFS.map((d, i) => ({ count: (parsed.buildings && parsed.buildings[i] && parsed.buildings[i].count) || 0 }));
-    state.buildingUpgrades = parsed.buildingUpgrades || {};
-    state.clickUpgrades = parsed.clickUpgrades || {};
-    state.playerUpgrades = parsed.playerUpgrades || {};
-    state.coachUpgrades = parsed.coachUpgrades || {};
-    state.mutationUpgrades = parsed.mutationUpgrades || {};
-    state.fans = FAN_TIER_DEFS.map((d, i) => ({ count: (parsed.fans && parsed.fans[i] && parsed.fans[i].count) || 0 }));
-    state.stadiumLevel = parsed.stadiumLevel || 0;
-    state.mascotLevel = parsed.mascotLevel || 0;
-    state.totems = TOTEM_TIER_DEFS.map((d, i) => ({ count: (parsed.totems && parsed.totems[i] && parsed.totems[i].count) || 0 }));
-    state.totemPoleLevel = parsed.totemPoleLevel || 0;
-    state.tapCount = parsed.tapCount || 0;
-    state.teamWins = parsed.teamWins || 0;
-    state.achievements = parsed.achievements || {};
-    state.frenzyActive = false;
+// Builds a ready-to-use state object for sportKey from a parsed save blob,
+// applying the same migrations/offline-catchup as a fresh load always has.
+function buildStateFromParsed(parsed, sportKey) {
+  const s = SPORTS[sportKey];
+  const fresh = freshStateFor(sportKey);
+  const st = Object.assign(fresh, parsed);
+  // Migrate pre-currency-rename saves (players -> money).
+  if (parsed.money === undefined && parsed.players !== undefined) st.money = parsed.players;
+  if (parsed.totalEarnedAllTime === undefined && parsed.totalRecruitedAllTime !== undefined) st.totalEarnedAllTime = parsed.totalRecruitedAllTime;
+  st.buildings = s.buildingDefs.map((d, i) => ({ count: (parsed.buildings && parsed.buildings[i] && parsed.buildings[i].count) || 0 }));
+  st.buildingUpgrades = parsed.buildingUpgrades || {};
+  st.clickUpgrades = parsed.clickUpgrades || {};
+  st.playerUpgrades = parsed.playerUpgrades || {};
+  st.coachUpgrades = parsed.coachUpgrades || {};
+  st.mutationUpgrades = parsed.mutationUpgrades || {};
+  st.fans = s.fanTierDefs.map((d, i) => ({ count: (parsed.fans && parsed.fans[i] && parsed.fans[i].count) || 0 }));
+  st.stadiumLevel = parsed.stadiumLevel || 0;
+  st.mascotLevel = parsed.mascotLevel || 0;
+  st.totems = s.totemTierDefs.map((d, i) => ({ count: (parsed.totems && parsed.totems[i] && parsed.totems[i].count) || 0 }));
+  st.totemPoleLevel = parsed.totemPoleLevel || 0;
+  st.tapCount = parsed.tapCount || 0;
+  st.teamWins = parsed.teamWins || 0;
+  st.achievements = parsed.achievements || {};
+  st.frenzyActive = false;
+  return st;
+}
 
-    if (parsed.lastSave) {
-      const elapsed = Math.min(Date.now() - parsed.lastSave, OFFLINE_CAP_MS);
-      if (elapsed > 30000) {
-        const earned = getCps() * (elapsed / 1000) * OFFLINE_EFFICIENCY;
-        if (earned > 0) {
-          state.money += earned;
-          state.totalEarnedAllTime += earned;
-          const mins = Math.floor(elapsed / 60000);
-          document.getElementById('offline-body').innerHTML =
-            `<p>You were away for ${mins} minute${mins===1?'':'s'}.</p><p>Your ${SPORTS[sportKey].label.toLowerCase()} program kept playing games and earned <b style="color:var(--orange)">$${formatMoney(earned)}</b> while you were gone (${(OFFLINE_EFFICIENCY*100)}% efficiency).</p>`;
-          openModal('offline-modal');
+// Loads sportKey's save (or creates a fresh one) into sportStates[sportKey], and
+// into the global `state` alias if it's the active sport. `quiet` suppresses the
+// welcome-back modal, used when silently resuming other sports in the background.
+function loadSportState(sportKey, quiet = false) {
+  const raw = localStorage.getItem(saveKeyFor(sportKey));
+  let st;
+  if (!raw) {
+    st = freshStateFor(sportKey);
+  } else {
+    try {
+      const parsed = JSON.parse(raw);
+      st = buildStateFromParsed(parsed, sportKey);
+      if (parsed.lastSave) {
+        const elapsed = Math.min(Date.now() - parsed.lastSave, OFFLINE_CAP_MS);
+        if (elapsed > 30000) {
+          const earned = computeCpsForSport(st, sportKey) * (elapsed / 1000) * OFFLINE_EFFICIENCY;
+          if (earned > 0) {
+            st.money += earned;
+            st.totalEarnedAllTime += earned;
+            if (!quiet) {
+              const mins = Math.floor(elapsed / 60000);
+              document.getElementById('offline-body').innerHTML =
+                `<p>You were away for ${mins} minute${mins===1?'':'s'}.</p><p>Your ${SPORTS[sportKey].label.toLowerCase()} program kept playing games and earned <b style="color:var(--orange)">$${formatMoney(earned)}</b> while you were gone (${(OFFLINE_EFFICIENCY*100)}% efficiency).</p>`;
+              openModal('offline-modal');
+            }
+          }
         }
       }
+    } catch (e) {
+      st = freshStateFor(sportKey);
     }
-  } catch (e) {
-    state = freshState();
   }
+  sportStates[sportKey] = st;
+  if (sportKey === currentSport) state = st;
 }
 
 // ── Completely disable zoom on touch devices ─────────────────────
@@ -1853,8 +2352,14 @@ function loadSportState(sportKey) {
 // (not just ones under some timing threshold). That kills double-tap-zoom
 // outright instead of racing a 300ms window. Multi-touch (pinch) is blocked
 // separately at 'touchstart', and Safari's proprietary gesture events (its
-// pinch-zoom path bypasses touch events entirely) are blocked too.
-document.addEventListener('touchend', e => e.preventDefault(), { passive: false });
+// pinch-zoom path bypasses touch events entirely) are blocked too. Text
+// inputs are excluded — touchend's default action is also what focuses them
+// on a tap, so cancelling it there would make the team name field untappable.
+document.addEventListener('touchend', e => {
+  const tag = e.target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
+  e.preventDefault();
+}, { passive: false });
 document.addEventListener('touchstart', e => {
   if (e.touches.length > 1) e.preventDefault();
 }, { passive: false });
@@ -1863,17 +2368,29 @@ document.addEventListener('gesturechange', e => e.preventDefault());
 document.addEventListener('gestureend', e => e.preventDefault());
 
 // ── Init ───────────────────────────────────────────────────────
-soccerUnlocked = localStorage.getItem(SOCCER_UNLOCKED_KEY) === '1';
-const bootSport = (soccerUnlocked && localStorage.getItem(ACTIVE_SPORT_KEY) === 'soccer') ? 'soccer' : 'basketball';
+extraSportsUnlocked = localStorage.getItem(EXTRA_SPORTS_UNLOCKED_KEY) === '1';
+const savedActiveSport = localStorage.getItem(ACTIVE_SPORT_KEY);
+const bootSport = (extraSportsUnlocked && SPORTS[savedActiveSport]) ? savedActiveSport : 'basketball';
 applySport(bootSport);
-loadSportState(bootSport);
+loadSportState(bootSport, false);
 updateHeaderForSport();
+
+// Silently resume any OTHER sport that already has save data, so its production
+// keeps ticking in the background even before you switch to it this session.
+// (loadSportState resolves everything via the explicit sportKey, not the mutable
+// "active" globals, so this is safe to do without touching applySport/currentSport.)
+Object.keys(SPORTS).forEach(key => {
+  if (key === bootSport) return;
+  if (hasSportSave(key)) loadSportState(key, true);
+});
+
 initBuildingRows();
 initFanRows();
 initTotemRows();
 document.getElementById('stadium-upgrade-btn').addEventListener('pointerdown', e => { e.preventDefault(); levelUpStadium(); });
 document.getElementById('mascot-upgrade-btn').addEventListener('pointerdown', e => { e.preventDefault(); levelUpMascot(); });
 document.getElementById('totem-pole-upgrade-btn').addEventListener('pointerdown', e => { e.preventDefault(); levelUpTotemPole(); });
+initTeamNamePanel();
 refreshUpgradesTab();
 renderAchievements();
 renderAscensionsTab();

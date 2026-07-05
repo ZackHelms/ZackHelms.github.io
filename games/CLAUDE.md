@@ -84,7 +84,7 @@ bonuses, rebirth for permanent +1% click speed / +1% money per Golden Butter.
 DOM-driven UI with a canvas overlay for click particles. Detailed context:
 `.claude/croissant-clicker.md`.
 
-### BASKETBALL CLICKER (`basketball-clicker.html`, ~1900 lines)
+### BASKETBALL CLICKER (`basketball-clicker.html`, ~2400 lines)
 Cookie Clicker-style idle/incremental themed around building a basketball
 program. Currency is money; click the ball to earn it. The RECRUITING tab has
 a x1/x10/x100 bulk-buy toggle and 30 recruiter buildings (Clicker's auto-click
@@ -105,13 +105,26 @@ re-priced per sport: `applySport(key)` reassigns a set of `let`-bound "active
 def" pointers (`BUILDING_DEFS`, `CLICK_UPGRADE_DEFS`, etc.) that every other
 function already reads by name, so no other code needs to know which sport is
 active. An ASCENSIONS tab (leftmost tab) lets a player who reaches 10
-decillion ($1e34) lifetime earned in Basketball ascend into a full parallel
-Soccer Clicker — same mechanics, soccer-flavored content, all costs and
-unlock thresholds ×5 more expensive (`SOCCER_COST_MULT`). Each sport has its
-own independent save slot (separate localStorage keys) and can be freely
-switched between from the Ascensions tab without losing progress in either.
-Golden balls, frenzy, and lucky-bonus text adapt to the active sport's theme.
-DOM-driven UI with a canvas overlay for click particles.
+decillion ($1e34) lifetime earned in Basketball ascend into three full
+parallel sports — Soccer, Baseball, and Football — all unlocked at that same
+threshold. Each is the same mechanics with sport-flavored content, at 5x
+basketball's costs/unlock thresholds (`EXTRA_SPORT_COST_MULT`). Every
+unlocked, touched sport keeps its own state object in a `sportStates` cache
+and earns passive income *simultaneously* and continuously — not just while
+its tab is open — via `computeCpsForSport(st, sportKey)` and
+`tickBackgroundSports()`, a parallel set of "For"-suffixed functions that
+mirror `getCps()`/`getBaseClickPower()` etc. but take an explicit state+sport
+pair instead of reading the mutable active-sport globals. `state` is always
+an alias for `sportStates[currentSport]`. Switching sports plays a portal
+warp transition (`playPortalTransition()`) and swaps in the target sport's
+already-ticking cached state (or loads/creates it on first visit) rather than
+re-reading localStorage, so in-memory background progress is never lost.
+`save()` persists every cached sport, not just the active one. A global team
+name (shared across all sports) lives on the Ascensions tab; naming it
+"All-Stars" reveals an admin cheat panel (+100 of everything, x100 money,
+unlock all upgrades, +10 levels, instant win, +1 decillion). Golden balls,
+frenzy, and lucky-bonus text adapt to the active sport's theme. DOM-driven UI
+with a canvas overlay for click particles.
 
 ---
 
