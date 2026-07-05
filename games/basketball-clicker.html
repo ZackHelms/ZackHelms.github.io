@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Basketball Clicker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg: #06060e;
+  --panel: #0b0b16;
+  --border: #1a1a30;
+  --green: #39ff14;
+  --gold: #ffc300;
+  --blue: #4488ff;
+  --red: #ff2244;
+  --white: #dde3ff;
+  --dim: #8899bb;
+  --purple: #b44fff;
+  --orange: #ff7a1a;
+}
+* {
+  margin:0; padding:0; box-sizing:border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none; -ms-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+html, body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Share Tech Mono', monospace;
+  height: 100%;
+  overflow: hidden;
+}
+body { display: flex; flex-direction: column; }
+
+/* ── Header ─────────────────────────────────────────── */
+header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+#back-link {
+  color: var(--dim); text-decoration: none; font-size: 0.68rem;
+  letter-spacing: 1px; font-weight: 700; flex-shrink: 0;
+}
+#back-link:hover { color: var(--orange); }
+header h1 {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: clamp(1rem, 3vw, 1.5rem);
+  color: var(--orange);
+  text-shadow: 0 0 16px #ff7a1a55;
+  letter-spacing: 3px;
+  flex-shrink: 0;
+}
+.header-spacer { flex: 1; }
+.header-btn {
+  background: var(--bg); color: var(--white); border: 1px solid var(--border);
+  border-radius: 5px; padding: 7px 12px; font-family: 'Share Tech Mono', monospace;
+  font-size: 0.62rem; letter-spacing: 1px; cursor: pointer; font-weight: 700;
+  touch-action: manipulation;
+}
+.header-btn:hover { border-color: var(--orange); color: var(--orange); }
+.header-btn.ascend-btn { border-color: var(--purple); color: var(--purple); display: none; }
+.header-btn.ascend-btn.ready { display: inline-block; box-shadow: 0 0 12px #b44fff55; }
+.header-btn.danger:hover { border-color: var(--red); color: var(--red); }
+.header-btn.reload-btn { border-color: var(--blue); color: var(--blue); }
+.header-btn.reload-btn:hover { border-color: var(--blue); color: var(--white); box-shadow: 0 0 12px #4488ff55; }
+
+/* ── Stat bar ───────────────────────────────────────── */
+#stat-bar {
+  text-align: center; padding: 10px 10px 6px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#player-count {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: clamp(1.6rem, 6vw, 2.6rem);
+  color: var(--white);
+  text-shadow: 0 0 14px #ff7a1a33;
+}
+#player-count .unit { font-size: 0.5em; color: var(--orange); margin-left: 6px; }
+#pps-line { font-size: 0.68rem; color: var(--orange); letter-spacing: 1px; margin-top: 2px; }
+#lifetime-line { font-size: 0.55rem; color: var(--dim); letter-spacing: 1px; margin-top: 2px; }
+
+/* ── Main layout ────────────────────────────────────── */
+main {
+  flex: 1; display: flex; overflow: hidden; min-height: 0;
+}
+#click-area {
+  flex: 1.3; position: relative; display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, #1a1208 0%, var(--bg) 75%);
+}
+#fx-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+#ball-bob { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; animation: bob 3s ease-in-out infinite; }
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+#ball-btn {
+  font-size: clamp(6rem, 24vw, 11rem);
+  line-height: 1; cursor: pointer; touch-action: manipulation;
+  filter: drop-shadow(0 0 30px #ff7a1a44);
+  transition: transform 0.08s ease-out;
+}
+#click-power-label {
+  margin-top: 6px; font-size: 0.6rem; color: var(--dim); letter-spacing: 1px;
+}
+#click-power-label b { color: var(--green); }
+
+.golden-ball {
+  position: absolute; z-index: 4; font-size: 2.6rem; cursor: pointer;
+  filter: drop-shadow(0 0 18px #ffc300cc) brightness(1.3);
+  touch-action: manipulation;
+  animation: golden-pulse 1s ease-in-out infinite, golden-spin 4s linear infinite;
+}
+@keyframes golden-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+@keyframes golden-spin { from { filter: drop-shadow(0 0 18px #ffc300cc) brightness(1.3) hue-rotate(0deg); } to { filter: drop-shadow(0 0 18px #ffc300cc) brightness(1.3) hue-rotate(20deg); } }
+
+.auto-finger {
+  position: absolute; z-index: 4; font-size: 1.6rem; pointer-events: none;
+  filter: drop-shadow(0 0 8px #39ff1488);
+  animation: finger-tap 0.4s ease-out forwards;
+}
+@keyframes finger-tap {
+  0% { transform: translate(-50%,-50%) scale(0.6); opacity: 0; }
+  30% { transform: translate(-50%,-50%) scale(1.1); opacity: 1; }
+  100% { transform: translate(-50%,-50%) scale(0.9); opacity: 0; }
+}
+
+#frenzy-banner {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  background: rgba(180,79,255,0.18); border: 1px solid var(--purple); border-radius: 20px;
+  padding: 5px 16px; font-size: 0.65rem; color: var(--purple); letter-spacing: 1px;
+  z-index: 5; display: none; font-weight: 700; white-space: nowrap;
+}
+#frenzy-banner.show { display: block; }
+
+/* ── Store panel ────────────────────────────────────── */
+#store-panel {
+  width: 380px; flex-shrink: 0; display: flex; flex-direction: column;
+  border-left: 1px solid var(--border); background: var(--panel); min-height: 0;
+}
+.tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.tab-btn {
+  flex: 1; background: none; border: none; color: var(--dim); padding: 10px;
+  font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; letter-spacing: 2px;
+  cursor: pointer; border-bottom: 2px solid transparent; font-weight: 700;
+  touch-action: manipulation;
+}
+.tab-btn.active { color: var(--orange); border-bottom-color: var(--orange); }
+.tab-content { flex: 1; overflow-y: auto; min-height: 0; }
+.tab-content.hidden { display: none; }
+
+.store-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border-bottom: 1px solid var(--border); cursor: pointer; touch-action: manipulation;
+  transition: background 0.15s;
+}
+.store-row:hover { background: rgba(255,255,255,0.03); }
+.store-row.unaffordable { opacity: 0.4; cursor: default; }
+.store-row.unaffordable:hover { background: none; }
+.store-row.purchased { opacity: 0.5; }
+.row-icon { font-size: 1.6rem; flex-shrink: 0; width: 34px; text-align: center; }
+.row-info { flex: 1; min-width: 0; }
+.row-name { font-size: 0.7rem; color: var(--white); font-weight: 700; letter-spacing: 0.5px; }
+.row-sub { font-size: 0.56rem; color: var(--dim); margin-top: 2px; }
+.row-desc { font-size: 0.56rem; color: var(--dim); margin-top: 2px; line-height: 1.4; }
+.row-cost { text-align: right; flex-shrink: 0; }
+.cost-val { font-size: 0.72rem; color: var(--orange); font-weight: 700; display: block; }
+.cost-label { font-size: 0.5rem; color: var(--dim); }
+.checkmark { color: var(--green); font-size: 0.9rem; }
+
+#empty-upgrades {
+  padding: 30px 16px; text-align: center; color: var(--dim); font-size: 0.62rem; line-height: 1.6;
+}
+
+/* ── Modals ─────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100;
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  max-width: 480px; width: 100%; max-height: 80vh; display: flex; flex-direction: column;
+  box-shadow: 0 0 40px #00000088;
+}
+.modal-head {
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-head h2 {
+  font-family: 'Black Ops One', sans-serif; font-size: 1rem; color: var(--orange); letter-spacing: 2px;
+}
+.modal-close {
+  background: none; border: none; color: var(--dim); font-size: 1.2rem; cursor: pointer;
+  touch-action: manipulation; line-height: 1;
+}
+.modal-close:hover { color: var(--red); }
+.modal-body { padding: 16px 18px; overflow-y: auto; font-size: 0.7rem; line-height: 1.7; color: var(--white); }
+.modal-body p { margin-bottom: 10px; }
+.modal-actions { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+.modal-btn {
+  background: var(--bg); border: 1px solid var(--border); color: var(--white);
+  padding: 8px 16px; border-radius: 5px; cursor: pointer; font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem; letter-spacing: 1px; font-weight: 700; touch-action: manipulation;
+}
+.modal-btn.primary { border-color: var(--orange); color: var(--orange); }
+.modal-btn.confirm-danger { border-color: var(--red); color: var(--red); }
+
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.ach-cell {
+  border: 1px solid var(--border); border-radius: 6px; padding: 8px; text-align: center;
+  background: var(--bg);
+}
+.ach-cell.unlocked { border-color: var(--orange); box-shadow: 0 0 10px #ff7a1a22; }
+.ach-icon { font-size: 1.4rem; }
+.ach-cell.locked .ach-icon { filter: grayscale(1) brightness(0.5); }
+.ach-name { font-size: 0.56rem; font-weight: 700; margin-top: 4px; color: var(--white); }
+.ach-cell.locked .ach-name { color: var(--dim); }
+.ach-desc { font-size: 0.5rem; color: var(--dim); margin-top: 3px; line-height: 1.4; }
+#ach-progress { font-size: 0.6rem; color: var(--dim); margin-bottom: 10px; }
+
+/* ── Toasts ─────────────────────────────────────────── */
+#toast-container {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 200; display: flex; flex-direction: column-reverse; gap: 6px; align-items: center;
+  pointer-events: none; width: 100%; max-width: 90vw;
+}
+.toast {
+  background: rgba(11,11,22,0.95); border: 1px solid var(--orange); color: var(--white);
+  padding: 8px 16px; border-radius: 20px; font-size: 0.65rem; letter-spacing: 0.5px;
+  opacity: 0; transform: translateY(10px); transition: opacity 0.3s, transform 0.3s;
+  white-space: nowrap; box-shadow: 0 0 16px #ff7a1a22;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.fade { opacity: 0; }
+
+/* ── Responsive ─────────────────────────────────────── */
+@media (max-width: 760px) {
+  main { flex-direction: column; }
+  #click-area { flex: 1.1; min-height: 0; }
+  #store-panel { width: 100%; flex: 1; border-left: none; border-top: 1px solid var(--border); }
+  #ball-btn { font-size: clamp(4.5rem, 30vw, 7rem); }
+  header h1 { font-size: 0.85rem; }
+  .header-btn { padding: 6px 8px; font-size: 0.56rem; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a id="back-link" href="index.html">&larr; GAMES</a>
+  <h1>BASKETBALL CLICKER</h1>
+  <div class="header-spacer"></div>
+  <button class="header-btn ascend-btn" id="ascend-btn">🏆 CHAMPIONSHIP</button>
+  <button class="header-btn" id="ach-btn">🏅 ACHIEVEMENTS</button>
+  <button class="header-btn danger" id="reset-btn">RESET</button>
+  <button class="header-btn reload-btn" id="reload-btn" title="Force reload latest version">⟳ RELOAD</button>
+</header>
+
+<div id="stat-bar">
+  <div id="player-count">0<span class="unit">players</span></div>
+  <div id="pps-line">0.0 per second</div>
+  <div id="lifetime-line">Lifetime recruited: 0 · Championship Banners: 0</div>
+</div>
+
+<main>
+  <div id="click-area">
+    <canvas id="fx-canvas"></canvas>
+    <div id="frenzy-banner">🔥 SLAM DUNK FRENZY — PRODUCTION x7!</div>
+    <div id="ball-bob">
+      <div id="ball-btn">🏀</div>
+      <div id="click-power-label">Players per Click: <b id="click-power-val">1</b></div>
+    </div>
+  </div>
+
+  <div id="store-panel">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="buildings">RECRUITING</button>
+      <button class="tab-btn" data-tab="upgrades">UPGRADES</button>
+    </div>
+    <div class="tab-content" id="tab-buildings"></div>
+    <div class="tab-content hidden" id="tab-upgrades"></div>
+  </div>
+</main>
+
+<div id="toast-container"></div>
+
+<!-- Achievements modal -->
+<div class="modal-overlay" id="ach-modal">
+  <div class="modal-box">
+    <div class="modal-head"><h2>ACHIEVEMENTS</h2><button class="modal-close" data-close="ach-modal">✕</button></div>
+    <div class="modal-body">
+      <div id="ach-progress"></div>
+      <div class="ach-grid" id="ach-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Ascend modal -->
+<div class="modal-overlay" id="ascend-modal">
+  <div class="modal-box">
+    <div class="modal-head"><h2>CHAMPIONSHIP RUN</h2><button class="modal-close" data-close="ascend-modal">✕</button></div>
+    <div class="modal-body">
+      <p>Retiring the roster resets your players, recruiters, and upgrades — but grants permanent <b style="color:var(--purple)">Championship Banners</b> based on your lifetime recruits, each worth <b>+2%</b> production forever.</p>
+      <p id="ascend-preview"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn" data-close="ascend-modal">CANCEL</button>
+      <button class="modal-btn primary" id="ascend-confirm-btn">RETIRE ROSTER</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset modal -->
+<div class="modal-overlay" id="reset-modal">
+  <div class="modal-box">
+    <div class="modal-head"><h2>HARD RESET</h2><button class="modal-close" data-close="reset-modal">✕</button></div>
+    <div class="modal-body">
+      <p>This erases <b style="color:var(--red)">everything</b> — players, recruiters, upgrades, achievements, and Championship Banners. This cannot be undone.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn" data-close="reset-modal">CANCEL</button>
+      <button class="modal-btn confirm-danger" id="reset-confirm-btn">ERASE EVERYTHING</button>
+    </div>
+  </div>
+</div>
+
+<!-- Offline earnings modal -->
+<div class="modal-overlay" id="offline-modal">
+  <div class="modal-box">
+    <div class="modal-head"><h2>WELCOME BACK</h2><button class="modal-close" data-close="offline-modal">✕</button></div>
+    <div class="modal-body" id="offline-body"></div>
+    <div class="modal-actions">
+      <button class="modal-btn primary" data-close="offline-modal">COLLECT</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────
+const SAVE_KEY = 'basketballClickerSave';
+const AUTOSAVE_MS = 15000;
+const OFFLINE_CAP_MS = 4 * 60 * 60 * 1000;
+const OFFLINE_EFFICIENCY = 0.5;
+const FRENZY_MULT = 7;
+const FRENZY_DURATION_MS = 30000;
+const GOLDEN_MIN_MS = 45000;
+const GOLDEN_MAX_MS = 90000;
+const GOLDEN_LIFETIME_MS = 13000;
+const CLICKER_INTERVAL_MS = 5000;
+const CLICKER_COST_MULT = 1.10;
+const CLICKER_BONUS_EVERY = 10;
+const CLICKER_BONUS_AMOUNT = 5;
+
+// index 0 is the special "Clicker" item (auto-clicking pointer finger).
+// The rest are standard passive recruiters, same shape as Cookie Clicker buildings.
+const BUILDING_DEFS = [
+  { name: 'Clicker',                  icon: '👆', baseCost: 15,          special: 'autoclick', desc: 'A pointer finger that taps the ball for you every 5 seconds. Every 10 bought permanently adds +5 to your click power.' },
+  { name: 'Playground Court',         icon: '🏀', baseCost: 100,         baseCps: 1,       desc: 'Neighborhood pickup games keep turning up new talent.' },
+  { name: 'High School Gym',          icon: '🧢', baseCost: 1100,        baseCps: 8,       desc: 'Scouts the varsity team for rising stars.' },
+  { name: 'Summer Ball Camp',         icon: '🏕️', baseCost: 12000,       baseCps: 47,      desc: 'Runs camps that funnel campers straight into your program.' },
+  { name: 'College Program',          icon: '🎓', baseCost: 130000,      baseCps: 260,     desc: 'Signs standout college players to your roster.' },
+  { name: 'Pro Scout Van',            icon: '🚐', baseCost: 1400000,     baseCps: 1400,    desc: 'Tours pro leagues worldwide chasing hidden gems.' },
+  { name: 'Training Facility',        icon: '🏋️', baseCost: 20000000,    baseCps: 7800,    desc: 'State-of-the-art development, running around the clock.' },
+  { name: 'Sports Agency',            icon: '📣', baseCost: 330000000,   baseCps: 44000,   desc: 'Agents flood your roster with their star clients.' },
+  { name: 'Global Scouting Network',  icon: '🛰️', baseCost: 5100000000, baseCps: 260000,  desc: 'Satellites track basketball talent across the globe.' },
+  { name: 'Multiverse Draft Portal',  icon: '🌀', baseCost: 75000000000,baseCps: 1600000, desc: 'Pulls elite players in from parallel dimensions.' },
+];
+
+const TIER_CONFIG = [
+  { req: 10, costMul: 12,  label: 'Playbook Update' },
+  { req: 25, costMul: 80,  label: 'Pro Coaching Staff' },
+  { req: 50, costMul: 400, label: 'Franchise Prestige' },
+];
+
+const CLICK_UPGRADE_DEFS = [
+  { id:'cu0', name:'Grippy High-Tops',        desc:'+1 click power.',              cost: 50,      unlockAt: 0,       type:'add',  value: 1  },
+  { id:'cu1', name:'Game Ball Leather',       desc:'+2 click power.',              cost: 500,     unlockAt: 100,     type:'add',  value: 2  },
+  { id:'cu2', name:'Point Guard Instincts',   desc:'x2 click power.',              cost: 5000,    unlockAt: 1000,    type:'mult', value: 2  },
+  { id:'cu3', name:'Custom Signature Jersey', desc:'+10 click power.',             cost: 50000,   unlockAt: 10000,   type:'add',  value: 10 },
+  { id:'cu4', name:'MVP Trophy',              desc:'x2 click power.',              cost: 500000,  unlockAt: 100000,  type:'mult', value: 2  },
+  { id:'cu5', name:'Hall of Fame Legacy',     desc:'+100 click power.',            cost: 5000000, unlockAt: 1000000, type:'add',  value: 100 },
+];
+
+const ACHIEVEMENT_DEFS = [
+  { id:'a0',  icon:'🏀', name:'First Recruit',       desc:'Recruit your first player.',        cond: s => s.totalRecruitedAllTime >= 1 },
+  { id:'a1',  icon:'🏀', name:'Starting Five',       desc:'Recruit 100 total.',                cond: s => s.totalRecruitedAllTime >= 100 },
+  { id:'a2',  icon:'🏀', name:'Full Roster',         desc:'Recruit 10,000 total.',             cond: s => s.totalRecruitedAllTime >= 1e4 },
+  { id:'a3',  icon:'🏀', name:'League Legend',       desc:'Recruit 1,000,000 total.',          cond: s => s.totalRecruitedAllTime >= 1e6 },
+  { id:'a4',  icon:'🏀', name:'Basketball Tycoon',   desc:'Recruit 100,000,000 total.',        cond: s => s.totalRecruitedAllTime >= 1e8 },
+  { id:'a5',  icon:'🏀', name:'Hoops Empire',        desc:'Recruit 10 billion total.',         cond: s => s.totalRecruitedAllTime >= 1e10 },
+  { id:'a6',  icon:'🏀', name:'Legendary Franchise', desc:'Recruit 1 trillion total.',         cond: s => s.totalRecruitedAllTime >= 1e12 },
+  { id:'a7',  icon:'👆', name:'Quick Hands',         desc:'Own a Clicker.',                    cond: s => s.buildings[0].count >= 1 },
+  { id:'a8',  icon:'👆', name:'Ten Fingers',         desc:'Own 10 Clickers.',                  cond: s => s.buildings[0].count >= 10 },
+  { id:'a9',  icon:'🏀', name:'Pickup Regular',      desc:'Own 10 Playground Courts.',         cond: s => s.buildings[1].count >= 10 },
+  { id:'a10', icon:'🧢', name:'Varsity Watcher',     desc:'Own 25 High School Gyms.',          cond: s => s.buildings[2].count >= 25 },
+  { id:'a11', icon:'🏕️', name:'Camp Director',       desc:'Own 25 Summer Ball Camps.',         cond: s => s.buildings[3].count >= 25 },
+  { id:'a12', icon:'🎓', name:'Blue Blood Program',  desc:'Own 25 College Programs.',          cond: s => s.buildings[4].count >= 25 },
+  { id:'a13', icon:'🚐', name:'Frequent Flyer',      desc:'Own 25 Pro Scout Vans.',            cond: s => s.buildings[5].count >= 25 },
+  { id:'a14', icon:'🏋️', name:'Iron Sharpens Iron',  desc:'Own 50 Training Facilities.',       cond: s => s.buildings[6].count >= 50 },
+  { id:'a15', icon:'📣', name:'Agency Empire',       desc:'Own 25 Sports Agencies.',           cond: s => s.buildings[7].count >= 25 },
+  { id:'a16', icon:'🛰️', name:'Eyes Everywhere',     desc:'Own 10 Global Scouting Networks.',  cond: s => s.buildings[8].count >= 10 },
+  { id:'a17', icon:'🌀', name:'Interdimensional GM', desc:'Own 10 Multiverse Draft Portals.',  cond: s => s.buildings[9].count >= 10 },
+  { id:'a18', icon:'✨', name:'Golden Touch',        desc:'Click a golden basketball.',        cond: s => s.goldenClicks >= 1 },
+  { id:'a19', icon:'🔥', name:'Frenzy Fan',          desc:'Trigger 10 slam dunk frenzies.',    cond: s => s.frenzyCount >= 10 },
+  { id:'a20', icon:'🏆', name:'Champion',            desc:'Win your first championship.',      cond: s => s.ascendCount >= 1 },
+  { id:'a21', icon:'🏆', name:'Dynasty',             desc:'Accumulate 10 Championship Banners.', cond: s => s.banners >= 10 },
+];
+
+// ── State ──────────────────────────────────────────────────────
+let state = null;
+
+function freshState() {
+  return {
+    players: 0,
+    totalRecruitedAllTime: 0,
+    banners: 0,
+    goldenClicks: 0,
+    frenzyCount: 0,
+    ascendCount: 0,
+    frenzyActive: false,
+    frenzyEndTime: 0,
+    nextGoldenIn: rand(GOLDEN_MIN_MS, GOLDEN_MAX_MS),
+    buildings: BUILDING_DEFS.map(() => ({ count: 0 })),
+    buildingUpgrades: {},
+    clickUpgrades: {},
+    achievements: {},
+    lastSave: null,
+  };
+}
+
+function rand(min, max) { return min + Math.random() * (max - min); }
+
+// ── Derived building upgrade list (skip index 0, the special Clicker) ──
+const BUILDING_UPGRADES = [];
+BUILDING_DEFS.forEach((d, i) => {
+  if (d.special) return;
+  TIER_CONFIG.forEach((t, ti) => {
+    BUILDING_UPGRADES.push({
+      id: `bu_${i}_${ti}`,
+      buildingIndex: i,
+      req: t.req,
+      cost: Math.ceil(d.baseCost * t.costMul),
+      name: `${t.label}: ${d.name}`,
+      desc: `Doubles ${d.name} production. Requires ${t.req} owned.`,
+      icon: d.icon,
+    });
+  });
+});
+
+// ── Number formatting ─────────────────────────────────────────
+const SUFFIXES = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc','UDc','DDc','TDc'];
+function formatNum(n, decimals = 2) {
+  if (n < 1000) return n.toFixed(n % 1 === 0 ? 0 : decimals);
+  let tier = Math.min(Math.floor(Math.log10(n) / 3), SUFFIXES.length - 1);
+  return (n / Math.pow(1000, tier)).toFixed(decimals) + SUFFIXES[tier];
+}
+function formatPlayers(n) {
+  n = Math.floor(n);
+  if (n < 1e6) return n.toLocaleString('en-US');
+  return formatNum(n, 3);
+}
+function formatRate(n) {
+  if (n < 1000) return n.toFixed(1);
+  return formatNum(n, 2);
+}
+
+// ── Derived stats ──────────────────────────────────────────────
+function unlockedAchievementCount() {
+  return ACHIEVEMENT_DEFS.reduce((acc, a) => acc + (state.achievements[a.id] ? 1 : 0), 0);
+}
+function achievementMultiplier() { return 1 + unlockedAchievementCount() * 0.0025; }
+function prestigeMultiplier() { return 1 + state.banners * 0.02; }
+function frenzyMultiplier() { return state.frenzyActive ? FRENZY_MULT : 1; }
+
+function getBuildingTierCount(i) {
+  let n = 0;
+  TIER_CONFIG.forEach((t, ti) => { if (state.buildingUpgrades[`bu_${i}_${ti}`]) n++; });
+  return n;
+}
+
+function getClickerBonus() {
+  return Math.floor(state.buildings[0].count / CLICKER_BONUS_EVERY) * CLICKER_BONUS_AMOUNT;
+}
+
+// Base click power before the global (achievement/prestige/frenzy) multiplier.
+// Kept separate from getCps() so the Clicker's auto-click contribution and the
+// player's manual click power apply the global multiplier exactly once.
+function getBaseClickPower() {
+  let add = 0, mult = 1;
+  CLICK_UPGRADE_DEFS.forEach(u => {
+    if (!state.clickUpgrades[u.id]) return;
+    if (u.type === 'add') add += u.value;
+    else if (u.type === 'mult') mult *= u.value;
+  });
+  add += getClickerBonus();
+  return (1 + add) * mult;
+}
+
+function getClickPower() {
+  return getBaseClickPower() * achievementMultiplier() * prestigeMultiplier() * frenzyMultiplier();
+}
+
+function getCps() {
+  let total = 0;
+  state.buildings.forEach((b, i) => {
+    const d = BUILDING_DEFS[i];
+    if (d.special === 'autoclick') {
+      total += (b.count / (CLICKER_INTERVAL_MS / 1000)) * getBaseClickPower();
+      return;
+    }
+    const mult = Math.pow(2, getBuildingTierCount(i));
+    total += b.count * d.baseCps * mult;
+  });
+  return total * achievementMultiplier() * prestigeMultiplier() * frenzyMultiplier();
+}
+
+function getBuildingCost(i) {
+  const b = state.buildings[i];
+  const d = BUILDING_DEFS[i];
+  const costMult = d.special === 'autoclick' ? CLICKER_COST_MULT : 1.15;
+  return Math.ceil(d.baseCost * Math.pow(costMult, b.count));
+}
+
+function computeBannerGain() {
+  return Math.floor(Math.cbrt(state.totalRecruitedAllTime / 1e9));
+}
+
+// ── DOM refs ───────────────────────────────────────────────────
+const playerCountEl = document.getElementById('player-count');
+const ppsLineEl = document.getElementById('pps-line');
+const lifetimeLineEl = document.getElementById('lifetime-line');
+const clickPowerValEl = document.getElementById('click-power-val');
+const clickArea = document.getElementById('click-area');
+const ballBtn = document.getElementById('ball-btn');
+const frenzyBanner = document.getElementById('frenzy-banner');
+const ascendBtn = document.getElementById('ascend-btn');
+const buildingsTab = document.getElementById('tab-buildings');
+const upgradesTab = document.getElementById('tab-upgrades');
+
+// ── Building rows (built once, updated in place) ─────────────
+const buildingRowRefs = [];
+function initBuildingRows() {
+  BUILDING_DEFS.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = 'store-row';
+    row.innerHTML = `
+      <div class="row-icon">${d.icon}</div>
+      <div class="row-info">
+        <div class="row-name">${d.name}</div>
+        <div class="row-sub">Owned: <span class="cnt">0</span> · <span class="cps">0</span> pps each</div>
+        <div class="row-desc">${d.desc}</div>
+      </div>
+      <div class="row-cost"><span class="cost-val">${formatPlayers(d.baseCost)}</span><div class="cost-label">players</div></div>
+    `;
+    row.addEventListener('click', () => buyBuilding(i));
+    buildingsTab.appendChild(row);
+    buildingRowRefs.push({
+      row, cntEl: row.querySelector('.cnt'), cpsEl: row.querySelector('.cps'), costEl: row.querySelector('.cost-val'),
+    });
+  });
+}
+
+function updateBuildingRows() {
+  BUILDING_DEFS.forEach((d, i) => {
+    const ref = buildingRowRefs[i];
+    const b = state.buildings[i];
+    const cost = getBuildingCost(i);
+    ref.cntEl.textContent = b.count;
+    if (d.special === 'autoclick') {
+      ref.cpsEl.textContent = formatRate(getBaseClickPower() / (CLICKER_INTERVAL_MS / 1000)) + ' (auto-click, +5 power per 10 owned)';
+    } else {
+      const tierMult = Math.pow(2, getBuildingTierCount(i));
+      ref.cpsEl.textContent = formatRate(d.baseCps * tierMult);
+    }
+    ref.costEl.textContent = formatPlayers(cost);
+    ref.row.classList.toggle('unaffordable', state.players < cost);
+  });
+}
+
+function buyBuilding(i) {
+  const cost = getBuildingCost(i);
+  if (state.players < cost) return;
+  state.players -= cost;
+  state.buildings[i].count++;
+  checkAchievements();
+  refreshUpgradesTab();
+  updateAll();
+}
+
+// ── Upgrades tab (rebuilt on change; small list) ─────────────
+function isClickUpgradeUnlocked(u) { return state.totalRecruitedAllTime >= u.unlockAt || state.clickUpgrades[u.id]; }
+function isBuildingUpgradeUnlocked(u) { return state.buildings[u.buildingIndex].count >= u.req || state.buildingUpgrades[u.id]; }
+
+function refreshUpgradesTab() {
+  upgradesTab.innerHTML = '';
+  let shown = 0;
+
+  CLICK_UPGRADE_DEFS.forEach(u => {
+    if (!isClickUpgradeUnlocked(u)) return;
+    shown++;
+    const purchased = !!state.clickUpgrades[u.id];
+    const row = document.createElement('div');
+    row.className = 'store-row' + (purchased ? ' purchased' : (state.players < u.cost ? ' unaffordable' : ''));
+    row.innerHTML = `
+      <div class="row-icon">👟</div>
+      <div class="row-info">
+        <div class="row-name">${u.name}</div>
+        <div class="row-desc">${u.desc}</div>
+      </div>
+      <div class="row-cost">${purchased ? '<span class="checkmark">✓</span>' : `<span class="cost-val">${formatPlayers(u.cost)}</span><div class="cost-label">players</div>`}</div>
+    `;
+    if (!purchased) row.addEventListener('click', () => buyClickUpgrade(u.id));
+    upgradesTab.appendChild(row);
+  });
+
+  BUILDING_UPGRADES.forEach(u => {
+    if (!isBuildingUpgradeUnlocked(u)) return;
+    shown++;
+    const purchased = !!state.buildingUpgrades[u.id];
+    const row = document.createElement('div');
+    row.className = 'store-row' + (purchased ? ' purchased' : (state.players < u.cost ? ' unaffordable' : ''));
+    row.innerHTML = `
+      <div class="row-icon">${u.icon}</div>
+      <div class="row-info">
+        <div class="row-name">${u.name}</div>
+        <div class="row-desc">${u.desc}</div>
+      </div>
+      <div class="row-cost">${purchased ? '<span class="checkmark">✓</span>' : `<span class="cost-val">${formatPlayers(u.cost)}</span><div class="cost-label">players</div>`}</div>
+    `;
+    if (!purchased) row.addEventListener('click', () => buyBuildingUpgrade(u.id));
+    upgradesTab.appendChild(row);
+  });
+
+  if (shown === 0) {
+    upgradesTab.innerHTML = '<div id="empty-upgrades">No upgrades available yet.<br>Recruit more players and hire recruiters to unlock some.</div>';
+  }
+}
+
+function buyClickUpgrade(id) {
+  const u = CLICK_UPGRADE_DEFS.find(x => x.id === id);
+  if (!u || state.clickUpgrades[id] || state.players < u.cost) return;
+  state.players -= u.cost;
+  state.clickUpgrades[id] = true;
+  refreshUpgradesTab();
+  updateAll();
+}
+
+function buyBuildingUpgrade(id) {
+  const u = BUILDING_UPGRADES.find(x => x.id === id);
+  if (!u || state.buildingUpgrades[id] || state.players < u.cost) return;
+  state.players -= u.cost;
+  state.buildingUpgrades[id] = true;
+  refreshUpgradesTab();
+  updateAll();
+}
+
+// ── Tabs ───────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const target = btn.dataset.tab;
+    buildingsTab.classList.toggle('hidden', target !== 'buildings');
+    upgradesTab.classList.toggle('hidden', target !== 'upgrades');
+  });
+});
+
+// ── Achievements modal ─────────────────────────────────────────
+const achGrid = document.getElementById('ach-grid');
+const achProgress = document.getElementById('ach-progress');
+function renderAchievements() {
+  achGrid.innerHTML = '';
+  const unlocked = unlockedAchievementCount();
+  achProgress.textContent = `${unlocked} / ${ACHIEVEMENT_DEFS.length} unlocked — +${(unlocked * 0.25).toFixed(2)}% production bonus`;
+  ACHIEVEMENT_DEFS.forEach(a => {
+    const on = !!state.achievements[a.id];
+    const cell = document.createElement('div');
+    cell.className = 'ach-cell ' + (on ? 'unlocked' : 'locked');
+    cell.innerHTML = `
+      <div class="ach-icon">${on ? a.icon : '❓'}</div>
+      <div class="ach-name">${on ? a.name : '???'}</div>
+      <div class="ach-desc">${on ? a.desc : 'Locked'}</div>
+    `;
+    achGrid.appendChild(cell);
+  });
+}
+
+function checkAchievements() {
+  let changed = false;
+  ACHIEVEMENT_DEFS.forEach(a => {
+    if (!state.achievements[a.id] && a.cond(state)) {
+      state.achievements[a.id] = true;
+      changed = true;
+      showToast(`🏅 Achievement unlocked: ${a.name}`);
+    }
+  });
+  if (changed) renderAchievements();
+  return changed;
+}
+
+// ── Modals ─────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('[data-close]').forEach(btn => {
+  btn.addEventListener('click', () => closeModal(btn.dataset.close));
+});
+document.querySelectorAll('.modal-overlay').forEach(ov => {
+  ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('show'); });
+});
+
+document.getElementById('ach-btn').addEventListener('click', () => { renderAchievements(); openModal('ach-modal'); });
+
+// ── Ascend (Championship) ──────────────────────────────────────
+ascendBtn.addEventListener('click', () => {
+  const gain = computeBannerGain();
+  const extra = Math.max(0, gain - state.banners);
+  document.getElementById('ascend-preview').innerHTML =
+    extra > 0
+      ? `You will gain <b style="color:var(--purple)">+${extra} Championship Banners</b> (total ${gain}), for a permanent <b>+${(gain*2)}%</b> production boost.`
+      : `No new banners to win yet — recruit more players first.`;
+  openModal('ascend-modal');
+});
+
+document.getElementById('ascend-confirm-btn').addEventListener('click', () => {
+  const gain = computeBannerGain();
+  state.banners = Math.max(state.banners, gain);
+  state.ascendCount++;
+  state.players = 0;
+  state.buildings = BUILDING_DEFS.map(() => ({ count: 0 }));
+  state.buildingUpgrades = {};
+  state.clickUpgrades = {};
+  state.frenzyActive = false;
+  closeModal('ascend-modal');
+  checkAchievements();
+  refreshUpgradesTab();
+  updateAll();
+  showToast(`🏆 Championship won! Permanent bonus: +${(state.banners*2)}%`);
+});
+
+// ── Reset ───────────────────────────────────────────────────────
+document.getElementById('reset-btn').addEventListener('click', () => openModal('reset-modal'));
+document.getElementById('reset-confirm-btn').addEventListener('click', () => {
+  localStorage.removeItem(SAVE_KEY);
+  state = freshState();
+  closeModal('reset-modal');
+  refreshUpgradesTab();
+  renderAchievements();
+  updateAll();
+  showToast('Progress erased.');
+});
+
+// ── Reload (force fresh version + clear caches) ─────────────────
+document.getElementById('reload-btn').addEventListener('click', async () => {
+  try {
+    save();
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if (navigator.serviceWorker) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch (e) { /* ignore, still reload below */ }
+  window.location.href = window.location.pathname + '?v=' + Date.now();
+});
+
+// ── Toasts ─────────────────────────────────────────────────────
+const toastContainer = document.getElementById('toast-container');
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  toastContainer.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.add('fade'); setTimeout(() => t.remove(), 350); }, 3200);
+}
+
+// ── Canvas FX ────────────────────────────────────────────────────
+const fxCanvas = document.getElementById('fx-canvas');
+const fxCtx = fxCanvas.getContext('2d');
+let particles = [];
+let floaters = [];
+
+function resizeCanvas() {
+  fxCanvas.width = clickArea.clientWidth;
+  fxCanvas.height = clickArea.clientHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+
+function spawnCrumbs(x, y, count) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 5,
+      vy: -Math.random() * 5 - 1,
+      size: 2 + Math.random() * 3,
+      life: 1, maxLife: 0.6 + Math.random() * 0.5,
+      color: Math.random() < 0.5 ? '255,122,26' : '255,195,0',
+    });
+  }
+}
+function spawnFloater(x, y, text, color) {
+  floaters.push({ x, y, text, life: 1, maxLife: 1.1, color });
+}
+
+function updateDrawFx(dt) {
+  fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt / (p.maxLife * 1000);
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.x += p.vx; p.y += p.vy; p.vy += 0.18;
+    fxCtx.fillStyle = `rgba(${p.color},${p.life})`;
+    fxCtx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i];
+    f.life -= dt / (f.maxLife * 1000);
+    if (f.life <= 0) { floaters.splice(i, 1); continue; }
+    fxCtx.save();
+    fxCtx.globalAlpha = Math.min(1, f.life * 1.5);
+    fxCtx.font = 'bold 15px "Share Tech Mono", monospace';
+    fxCtx.textAlign = 'center';
+    fxCtx.fillStyle = f.color;
+    fxCtx.fillText(f.text, f.x, f.y - (1 - f.life) * 40);
+    fxCtx.restore();
+  }
+}
+
+// ── Click handling ────────────────────────────────────────────
+function handleClick(clientX, clientY) {
+  const rect = clickArea.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+  const power = getClickPower();
+  state.players += power;
+  state.totalRecruitedAllTime += power;
+  spawnCrumbs(x, y, 6);
+  spawnFloater(x, y, '+' + formatPlayers(power), '#ffc300');
+  ballBtn.style.transform = 'scale(0.88) rotate(-4deg)';
+  setTimeout(() => { ballBtn.style.transform = 'scale(1) rotate(0deg)'; }, 90);
+  checkAchievements();
+  updateAll();
+}
+
+ballBtn.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  handleClick(e.clientX, e.clientY);
+});
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' && document.activeElement.tagName !== 'BUTTON') {
+    e.preventDefault();
+    const rect = ballBtn.getBoundingClientRect();
+    handleClick(rect.left + rect.width/2, rect.top + rect.height/2);
+  }
+});
+
+// ── Auto-clicker (pointer finger) visuals ───────────────────────
+let autoClickAccumulatorMs = 0;
+function spawnAutoFinger() {
+  const rect = ballBtn.getBoundingClientRect();
+  const areaRect = clickArea.getBoundingClientRect();
+  const finger = document.createElement('div');
+  finger.className = 'auto-finger';
+  finger.textContent = '👆';
+  finger.style.left = (rect.left + rect.width/2 - areaRect.left + (Math.random()-0.5)*30) + 'px';
+  finger.style.top = (rect.top + rect.height/2 - areaRect.top + (Math.random()-0.5)*30) + 'px';
+  clickArea.appendChild(finger);
+  setTimeout(() => finger.remove(), 450);
+}
+function processAutoClicks(income) {
+  const clickerCount = state.buildings[0].count;
+  if (clickerCount <= 0) return;
+  // Spawn a small number of visual pointer-finger taps proportional to owned clickers,
+  // purely cosmetic — the actual income is already applied via getCps() each frame.
+  if (Math.random() < Math.min(1, clickerCount / 20)) spawnAutoFinger();
+}
+
+// ── Golden basketball ─────────────────────────────────────────
+let goldenEl = null;
+function spawnGolden() {
+  if (goldenEl) return;
+  goldenEl = document.createElement('div');
+  goldenEl.className = 'golden-ball';
+  goldenEl.textContent = '🏀';
+  const w = clickArea.clientWidth, h = clickArea.clientHeight;
+  const pad = 60;
+  goldenEl.style.left = rand(pad, Math.max(pad + 1, w - pad)) + 'px';
+  goldenEl.style.top = rand(pad, Math.max(pad + 1, h - pad)) + 'px';
+  clickArea.appendChild(goldenEl);
+
+  const timeout = setTimeout(() => removeGolden(), GOLDEN_LIFETIME_MS);
+  goldenEl.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    clearTimeout(timeout);
+    state.goldenClicks++;
+    if (Math.random() < 0.5) triggerFrenzy(); else triggerLucky();
+    removeGolden();
+    checkAchievements();
+    updateAll();
+  });
+}
+function removeGolden() {
+  if (goldenEl) { goldenEl.remove(); goldenEl = null; }
+}
+function triggerFrenzy() {
+  state.frenzyActive = true;
+  state.frenzyEndTime = performance.now() + FRENZY_DURATION_MS;
+  state.frenzyCount++;
+  showToast('🔥 SLAM DUNK FRENZY! Production x7 for 30 seconds!');
+}
+function triggerLucky() {
+  const bonus = Math.max(getCps() * 900, state.players * 0.15, 100);
+  state.players += bonus;
+  state.totalRecruitedAllTime += bonus;
+  showToast(`🎉 Buzzer beater! +${formatPlayers(bonus)}`);
+}
+
+// ── Display update ────────────────────────────────────────────
+function updateAll() {
+  playerCountEl.innerHTML = formatPlayers(state.players) + '<span class="unit">players</span>';
+  ppsLineEl.textContent = formatRate(getCps()) + ' per second';
+  lifetimeLineEl.textContent = `Lifetime recruited: ${formatPlayers(state.totalRecruitedAllTime)} · Championship Banners: ${state.banners}`;
+  clickPowerValEl.textContent = formatPlayers(getClickPower());
+  updateBuildingRows();
+
+  const gain = computeBannerGain();
+  ascendBtn.classList.toggle('ready', gain > state.banners);
+
+  frenzyBanner.classList.toggle('show', state.frenzyActive);
+}
+
+// ── Main loop ──────────────────────────────────────────────────
+let lastTime = null;
+let uiAccumulator = 0;
+let upgradesAccumulator = 0;
+
+function gameLoop(ts) {
+  requestAnimationFrame(gameLoop);
+  if (!lastTime) lastTime = ts;
+  const dt = Math.min(ts - lastTime, 100);
+  lastTime = ts;
+
+  if (state.frenzyActive && ts > state.frenzyEndTime) state.frenzyActive = false;
+
+  const income = getCps() * (dt / 1000);
+  state.players += income;
+  state.totalRecruitedAllTime += income;
+  processAutoClicks(income);
+
+  state.nextGoldenIn -= dt;
+  if (state.nextGoldenIn <= 0) {
+    spawnGolden();
+    state.nextGoldenIn = rand(GOLDEN_MIN_MS, GOLDEN_MAX_MS);
+  }
+
+  updateDrawFx(dt);
+
+  uiAccumulator += dt;
+  if (uiAccumulator >= 200) {
+    uiAccumulator = 0;
+    updateAll();
+  }
+  upgradesAccumulator += dt;
+  if (upgradesAccumulator >= 1000) {
+    upgradesAccumulator = 0;
+    if (checkAchievements()) { /* already refreshed */ }
+    refreshUpgradesTab();
+  }
+}
+
+// ── Save / Load ────────────────────────────────────────────────
+function save() {
+  state.lastSave = Date.now();
+  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+}
+
+function load() {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) { state = freshState(); return; }
+  try {
+    const parsed = JSON.parse(raw);
+    const fresh = freshState();
+    state = Object.assign(fresh, parsed);
+    state.buildings = BUILDING_DEFS.map((d, i) => ({ count: (parsed.buildings && parsed.buildings[i] && parsed.buildings[i].count) || 0 }));
+    state.buildingUpgrades = parsed.buildingUpgrades || {};
+    state.clickUpgrades = parsed.clickUpgrades || {};
+    state.achievements = parsed.achievements || {};
+    state.frenzyActive = false;
+
+    if (parsed.lastSave) {
+      const elapsed = Math.min(Date.now() - parsed.lastSave, OFFLINE_CAP_MS);
+      if (elapsed > 30000) {
+        const earned = getCps() * (elapsed / 1000) * OFFLINE_EFFICIENCY;
+        if (earned > 0) {
+          state.players += earned;
+          state.totalRecruitedAllTime += earned;
+          const mins = Math.floor(elapsed / 60000);
+          document.getElementById('offline-body').innerHTML =
+            `<p>You were away for ${mins} minute${mins===1?'':'s'}.</p><p>Your program kept recruiting and signed <b style="color:var(--orange)">${formatPlayers(earned)}</b> players while you were gone (${(OFFLINE_EFFICIENCY*100)}% efficiency).</p>`;
+          openModal('offline-modal');
+        }
+      }
+    }
+  } catch (e) {
+    state = freshState();
+  }
+}
+
+// ── Prevent double-tap-to-zoom on touch devices ─────────────────
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e => {
+  const now = Date.now();
+  if (now - lastTouchEnd <= 300) e.preventDefault();
+  lastTouchEnd = now;
+}, { passive: false });
+
+// ── Init ───────────────────────────────────────────────────────
+load();
+initBuildingRows();
+refreshUpgradesTab();
+renderAchievements();
+resizeCanvas();
+checkAchievements();
+updateAll();
+requestAnimationFrame(gameLoop);
+
+setInterval(save, AUTOSAVE_MS);
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+window.addEventListener('beforeunload', save);
+</script>
+</body>
+</html>

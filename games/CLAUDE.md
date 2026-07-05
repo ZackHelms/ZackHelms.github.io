@@ -54,6 +54,15 @@ unlock click/building upgrades and achievements, catch golden croissants for
 bonuses, ascend for permanent prestige multipliers. DOM-driven UI with a canvas
 overlay for click particles. Detailed context: `.claude/croissant-clicker.md`.
 
+### BASKETBALL CLICKER (`basketball-clicker.html`, ~700 lines)
+Cookie Clicker-style idle/incremental themed around building a basketball
+program. Click the ball for "players"; the first shop item, Clicker, spawns
+an auto-clicking pointer finger every 5s and grants +5 click power per 10
+owned. Buy 9 more recruiter buildings, unlock click/building upgrades and
+achievements, catch golden basketballs for bonuses, win championships for
+permanent prestige multipliers. DOM-driven UI with a canvas overlay for click
+particles.
+
 ---
 
 ## Adding a New Game
