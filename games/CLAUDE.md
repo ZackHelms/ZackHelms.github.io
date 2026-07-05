@@ -55,28 +55,34 @@ bonuses, rebirth for permanent +1% click speed / +1% money per Golden Butter.
 DOM-driven UI with a canvas overlay for click particles. Detailed context:
 `.claude/croissant-clicker.md`.
 
-### BASKETBALL CLICKER (`basketball-clicker.html`, ~1550 lines)
+### BASKETBALL CLICKER (`basketball-clicker.html`, ~1900 lines)
 Cookie Clicker-style idle/incremental themed around building a basketball
-program. Currency is money; click the ball to earn it. The first shop item,
-Clicker, spawns an auto-clicking pointer finger every 5s and grants +5 click
-power per 10 owned. Buy 29 more recruiter buildings (30 total, up to The
-Basketball Singularity), plus 51 one-time upgrades across Click Upgrades,
-Player Types, Assistant Coaches, and Mutations (each targets click power,
-passive income, or both) and Facility (building-tier) upgrades. The UPGRADES
-tab shows only the single next unpurchased upgrade per category — visible
-even when locked, with its unlock requirement shown — rather than a full
-list. Mutations are themed as a sequence (Gold, Radiation, Neon, Plasma,
-Crystal, Inferno, ...). A Fans tab sells 5 rarity-tiered fan types
-(Common → Mythic) that each add a small production %, capped by Stadium
-level (leveling the stadium raises the fan cap and adds a flat production
-bonus). A Mascot levels up independently for its own production bonus,
-evolving through named tiers at milestones. A Totems tab mirrors Fans but
-boosts click power instead, using the same Gold/Radiation/Neon/Plasma/Crystal
-theme sequence, capped by a separately-levelable Totem Pole. Every 100 taps
-of the ball triggers a "Team Win" bonus payout. Golden basketballs still
-spawn for frenzy/lucky bonuses, and championship ascension grants permanent
-prestige multipliers. DOM-driven UI with a canvas overlay for click
-particles.
+program. Currency is money; click the ball to earn it. The RECRUITING tab has
+a x1/x10/x100 bulk-buy toggle and 30 recruiter buildings (Clicker's auto-click
+special item through The Basketball Singularity). 51 one-time upgrades span
+Click Upgrades, Player Types, Assistant Coaches, and Mutations (each targets
+click power, passive income, or both) plus Facility (building-tier) upgrades.
+The UPGRADES tab shows only the single next unpurchased upgrade per
+category — visible even when locked, with its unlock requirement shown —
+rather than a full list. Mutations are themed as a sequence (Gold, Radiation,
+Neon, Plasma, Crystal, Inferno, ...). A Fans tab sells 5 rarity-tiered fan
+types capped by Stadium level; a Mascot levels up independently through named
+tiers; a Totems tab mirrors Fans but boosts click power, capped by a
+separately-levelable Totem Pole. Every 100 taps triggers a "Team Win" bonus.
+
+The game is architected around a `SPORTS` registry so the entire content set
+(buildings/upgrades/fans/mascot/totems/achievements) can be re-themed and
+re-priced per sport: `applySport(key)` reassigns a set of `let`-bound "active
+def" pointers (`BUILDING_DEFS`, `CLICK_UPGRADE_DEFS`, etc.) that every other
+function already reads by name, so no other code needs to know which sport is
+active. An ASCENSIONS tab (leftmost tab) lets a player who reaches 10
+decillion ($1e34) lifetime earned in Basketball ascend into a full parallel
+Soccer Clicker — same mechanics, soccer-flavored content, all costs and
+unlock thresholds ×5 more expensive (`SOCCER_COST_MULT`). Each sport has its
+own independent save slot (separate localStorage keys) and can be freely
+switched between from the Ascensions tab without losing progress in either.
+Golden balls, frenzy, and lucky-bonus text adapt to the active sport's theme.
+DOM-driven UI with a canvas overlay for click particles.
 
 ---
 

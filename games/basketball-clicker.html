@@ -150,7 +150,7 @@ main {
 .tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .tab-btn {
   flex: 1; background: none; border: none; color: var(--dim); padding: 8px 1px;
-  font-family: 'Share Tech Mono', monospace; font-size: 0.5rem; letter-spacing: 0.5px;
+  font-family: 'Share Tech Mono', monospace; font-size: 0.44rem; letter-spacing: 0.2px;
   cursor: pointer; border-bottom: 2px solid transparent; font-weight: 700;
   touch-action: manipulation;
 }
@@ -188,6 +188,18 @@ main {
   letter-spacing: 0.5px; margin-left: 4px; white-space: nowrap;
 }
 
+.bulk-buy-bar {
+  display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+  border-bottom: 1px solid var(--border); background: rgba(255,122,26,0.04);
+}
+.bulk-buy-label { font-size: 0.56rem; color: var(--dim); letter-spacing: 1px; margin-right: 2px; }
+.bulk-buy-btn {
+  background: var(--bg); border: 1px solid var(--border); color: var(--dim);
+  border-radius: 4px; padding: 4px 10px; font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem; font-weight: 700; cursor: pointer; touch-action: manipulation;
+}
+.bulk-buy-btn.active { border-color: var(--orange); color: var(--orange); }
+
 /* ── Feature panels (Stadium / Mascot / Totem Pole) ─── */
 .feature-panel {
   display: flex; align-items: center; gap: 12px; padding: 14px 16px;
@@ -206,6 +218,12 @@ main {
 .feature-btn:hover { box-shadow: 0 0 10px #ff7a1a44; }
 .feature-btn.disabled { opacity: 0.4; box-shadow: none; }
 .feature-cost { display: block; color: var(--white); font-size: 0.62rem; margin-top: 2px; }
+
+.ascension-progress-bar {
+  width: 100%; height: 6px; background: var(--bg); border-radius: 3px;
+  margin: 6px 0 4px; overflow: hidden;
+}
+.ascension-progress-fill { height: 100%; background: var(--purple); }
 
 /* ── Modals ─────────────────────────────────────────── */
 .modal-overlay {
@@ -277,7 +295,7 @@ main {
   #ball-btn { font-size: clamp(4.5rem, 30vw, 7rem); }
   header h1 { font-size: 0.85rem; }
   .header-btn { padding: 6px 8px; font-size: 0.56rem; }
-  .tab-btn { font-size: 0.44rem; padding: 7px 1px; }
+  .tab-btn { font-size: 0.38rem; padding: 7px 1px; }
 }
 </style>
 </head>
@@ -312,13 +330,22 @@ main {
 
   <div id="store-panel">
     <div class="tabs">
+      <button class="tab-btn" data-tab="ascensions">ASCENSIONS</button>
       <button class="tab-btn active" data-tab="buildings">RECRUITING</button>
       <button class="tab-btn" data-tab="upgrades">UPGRADES</button>
       <button class="tab-btn" data-tab="fans">FANS</button>
       <button class="tab-btn" data-tab="mascot">MASCOT</button>
       <button class="tab-btn" data-tab="totems">TOTEMS</button>
     </div>
-    <div class="tab-content" id="tab-buildings"></div>
+    <div class="tab-content hidden" id="tab-ascensions"></div>
+    <div class="tab-content" id="tab-buildings">
+      <div class="bulk-buy-bar" id="bulk-buy-bar">
+        <span class="bulk-buy-label">BUY:</span>
+        <button class="bulk-buy-btn active" data-qty="1">x1</button>
+        <button class="bulk-buy-btn" data-qty="10">x10</button>
+        <button class="bulk-buy-btn" data-qty="100">x100</button>
+      </div>
+    </div>
     <div class="tab-content hidden" id="tab-upgrades"></div>
     <div class="tab-content hidden" id="tab-fans">
       <div class="feature-panel">
@@ -389,7 +416,7 @@ main {
   <div class="modal-box">
     <div class="modal-head"><h2>HARD RESET</h2><button class="modal-close" data-close="reset-modal">✕</button></div>
     <div class="modal-body">
-      <p>This erases <b style="color:var(--red)">everything</b> — money, recruiters, upgrades, fans, stadium, mascot, totems, achievements, and Championship Banners. This cannot be undone.</p>
+      <p>This erases <b style="color:var(--red)">everything for the sport you're currently playing</b> — money, recruiters, upgrades, fans, stadium, mascot, totems, achievements, and Championship Banners. Your progress in the other sport (if unlocked) is unaffected. This cannot be undone.</p>
     </div>
     <div class="modal-actions">
       <button class="modal-btn" data-close="reset-modal">CANCEL</button>
@@ -411,7 +438,11 @@ main {
 
 <script>
 // ── Constants ──────────────────────────────────────────────────
-const SAVE_KEY = 'basketballClickerSave';
+const SAVE_KEY_BASKETBALL = 'basketballClickerSave';
+const SAVE_KEY_SOCCER = 'basketballClickerSave_soccer';
+const ACTIVE_SPORT_KEY = 'basketballClickerActiveSport';
+const SOCCER_UNLOCKED_KEY = 'basketballClickerSoccerUnlocked';
+function saveKeyFor(sportKey) { return sportKey === 'soccer' ? SAVE_KEY_SOCCER : SAVE_KEY_BASKETBALL; }
 const AUTOSAVE_MS = 15000;
 const OFFLINE_CAP_MS = 4 * 60 * 60 * 1000;
 const OFFLINE_EFFICIENCY = 0.5;
@@ -441,7 +472,7 @@ const TOTEM_POLE_MULT_PER_LEVEL = 0.04;
 
 // index 0 is the special "Clicker" item (auto-clicking pointer finger).
 // The rest are standard passive recruiters, same shape as Cookie Clicker buildings.
-const BUILDING_DEFS = [
+const BASKETBALL_BUILDING_DEFS = [
   { name: 'Clicker',                  icon: '👆', baseCost: 15,          special: 'autoclick', desc: 'A pointer finger that taps the ball for you every 5 seconds. Every 10 bought permanently adds +5 to your click power.' },
   { name: 'Playground Court',         icon: '🏀', baseCost: 100,         baseCps: 1,       desc: 'Neighborhood pickup games keep turning up new talent.' },
   { name: 'High School Gym',          icon: '🧢', baseCost: 1100,        baseCps: 8,       desc: 'Scouts the varsity team for rising stars.' },
@@ -481,7 +512,7 @@ const TIER_CONFIG = [
 ];
 
 // One-time purchases. target: 'click' | 'pps' | 'both' — which stat the bonus applies to.
-const CLICK_UPGRADE_DEFS = [
+const BASKETBALL_CLICK_UPGRADE_DEFS = [
   { id:'cu0', name:'Grippy High-Tops',        desc:'+1 click power.',              cost: 50,      unlockAt: 0,       type:'add',  value: 1  },
   { id:'cu1', name:'Game Ball Leather',       desc:'+2 click power.',              cost: 500,     unlockAt: 100,     type:'add',  value: 2  },
   { id:'cu2', name:'Point Guard Instincts',   desc:'x2 click power.',              cost: 5000,    unlockAt: 1000,    type:'mult', value: 2  },
@@ -490,7 +521,7 @@ const CLICK_UPGRADE_DEFS = [
   { id:'cu5', name:'Hall of Fame Legacy',     desc:'+100 click power.',            cost: 5000000, unlockAt: 1000000, type:'add',  value: 100 },
 ];
 
-const PLAYER_TYPE_DEFS = [
+const BASKETBALL_PLAYER_TYPE_DEFS = [
   { id:'pt0',  name:'Bench Warmer',                desc:'+1 click power.',                     cost: 30,                unlockAt: 0,               target:'click', type:'add',  value: 1 },
   { id:'pt1',  name:'Walk-On Prospect',             desc:'+2 money per second.',                cost: 250,               unlockAt: 50,              target:'pps',   type:'add',  value: 2 },
   { id:'pt2',  name:'Sixth Man',                    desc:'+3 click power.',                     cost: 2000,              unlockAt: 500,             target:'click', type:'add',  value: 3 },
@@ -508,7 +539,7 @@ const PLAYER_TYPE_DEFS = [
   { id:'pt14', name:'Legend of the Multiverse',     desc:'x3 click power AND passive income.',  cost: 60000000000,       unlockAt: 8000000000,      target:'both',  type:'mult', value: 3 },
 ];
 
-const COACH_DEFS = [
+const BASKETBALL_COACH_DEFS = [
   { id:'co0',  name:'Volunteer Assistant',          desc:'+1 money per second.',                cost: 80,                unlockAt: 0,               target:'pps',   type:'add',  value: 1 },
   { id:'co1',  name:'Shooting Coach',               desc:'+3 click power.',                     cost: 1500,              unlockAt: 300,             target:'click', type:'add',  value: 3 },
   { id:'co2',  name:'Defense Coordinator',          desc:'x1.4 passive income.',                cost: 12000,             unlockAt: 3000,            target:'pps',   type:'mult', value: 1.4 },
@@ -525,7 +556,7 @@ const COACH_DEFS = [
 
 // Named after the mutation-theme sequence: Gold, Radiation, Neon, and onward.
 // Each purchase reskins the "next mutation" slot to the next theme in the list.
-const MUTATION_DEFS = [
+const BASKETBALL_MUTATION_DEFS = [
   { id:'mu0',  name:'Gold Mutation',        icon:'🥇', desc:'+10 click power.',                    cost: 100000,                unlockAt: 20000,               target:'click', type:'add',  value: 10 },
   { id:'mu1',  name:'Radiation Mutation',   icon:'☢️', desc:'x1.3 click power.',                   cost: 400000,                unlockAt: 80000,               target:'click', type:'mult', value: 1.3 },
   { id:'mu2',  name:'Neon Mutation',        icon:'💡', desc:'+50 money per second.',               cost: 1500000,               unlockAt: 300000,              target:'pps',   type:'add',  value: 50 },
@@ -548,7 +579,7 @@ const MUTATION_DEFS = [
 
 // Repeatable fan purchases, capped by stadium capacity. Each fan owned adds a small
 // percentage bonus to overall money production; rarer fans give a bigger bonus each.
-const FAN_TIER_DEFS = [
+const BASKETBALL_FAN_TIER_DEFS = [
   { id:'fan0', name:'Casual Fan',               icon:'🙂', rarity:'Common',    color:'#8899bb', baseCost: 200,        costMult: 1.12, bonusPercent: 0.4, desc:'Shows up when the team is winning.' },
   { id:'fan1', name:'Season Ticket Holder',     icon:'🎟️', rarity:'Rare',      color:'#4488ff', baseCost: 5000,       costMult: 1.14, bonusPercent: 1.2, desc:'Never misses a home game.' },
   { id:'fan2', name:'Superfan',                 icon:'🤩', rarity:'Epic',      color:'#b44fff', baseCost: 150000,     costMult: 1.16, bonusPercent: 3.5, desc:'Face paint, foam finger, the works.' },
@@ -559,7 +590,7 @@ const FAN_TIER_DEFS = [
 // Repeatable totem purchases, capped by Totem Pole capacity. Each totem owned adds a
 // small percentage bonus to click power, using the same mutation-theme naming order
 // as the Mutations upgrade category (Gold, Radiation, Neon, and onward).
-const TOTEM_TIER_DEFS = [
+const BASKETBALL_TOTEM_TIER_DEFS = [
   { id:'tot0', name:'Gold Totem',      icon:'🥇', color:'#ffc300', baseCost: 400,       costMult: 1.13, bonusPercent: 0.5, desc:"A gleaming totem said to bring good fortune to shooters." },
   { id:'tot1', name:'Radiation Totem', icon:'☢️', color:'#39ff14', baseCost: 8000,      costMult: 1.15, bonusPercent: 1.5, desc:'Glows faintly. Definitely fine to stand next to.' },
   { id:'tot2', name:'Neon Totem',      icon:'💡', color:'#4488ff', baseCost: 200000,    costMult: 1.17, bonusPercent: 4,   desc:'Pulses with electric light in time with every made shot.' },
@@ -567,7 +598,7 @@ const TOTEM_TIER_DEFS = [
   { id:'tot4', name:'Crystal Totem',   icon:'💎', color:'#ff2244', baseCost: 300000000, costMult: 1.21, bonusPercent: 25, desc:"A flawless crystal said to focus a shooter's aim perfectly." },
 ];
 
-const MASCOT_TIERS = [
+const BASKETBALL_MASCOT_TIERS = [
   { at: 0,  name: 'No Mascot',                icon: '❔' },
   { at: 1,  name: 'Team Mascot',               icon: '🐻' },
   { at: 5,  name: 'Mutant Mascot',             icon: '🦍' },
@@ -577,41 +608,235 @@ const MASCOT_TIERS = [
   { at: 50, name: 'Multiversal Mascot Deity',  icon: '🌌' },
 ];
 
-const ACHIEVEMENT_DEFS = [
-  { id:'a0',  icon:'🏀', name:'First Paycheck',      desc:'Earn your first dollar.',           cond: s => s.totalEarnedAllTime >= 1 },
-  { id:'a1',  icon:'🏀', name:'Starting Five',       desc:'Earn $100 total.',                  cond: s => s.totalEarnedAllTime >= 100 },
-  { id:'a2',  icon:'🏀', name:'Full Roster',         desc:'Earn $10,000 total.',               cond: s => s.totalEarnedAllTime >= 1e4 },
-  { id:'a3',  icon:'🏀', name:'League Legend',       desc:'Earn $1,000,000 total.',            cond: s => s.totalEarnedAllTime >= 1e6 },
-  { id:'a4',  icon:'🏀', name:'Basketball Tycoon',   desc:'Earn $100,000,000 total.',          cond: s => s.totalEarnedAllTime >= 1e8 },
-  { id:'a5',  icon:'🏀', name:'Hoops Empire',        desc:'Earn $10 billion total.',           cond: s => s.totalEarnedAllTime >= 1e10 },
-  { id:'a6',  icon:'🏀', name:'Legendary Franchise', desc:'Earn $1 trillion total.',           cond: s => s.totalEarnedAllTime >= 1e12 },
-  { id:'a7',  icon:'👆', name:'Quick Hands',         desc:'Own a Clicker.',                    cond: s => s.buildings[0].count >= 1 },
-  { id:'a8',  icon:'👆', name:'Ten Fingers',         desc:'Own 10 Clickers.',                  cond: s => s.buildings[0].count >= 10 },
-  { id:'a9',  icon:'🏀', name:'Pickup Regular',      desc:'Own 10 Playground Courts.',         cond: s => s.buildings[1].count >= 10 },
-  { id:'a10', icon:'🧢', name:'Varsity Watcher',     desc:'Own 25 High School Gyms.',          cond: s => s.buildings[2].count >= 25 },
-  { id:'a11', icon:'🏕️', name:'Camp Director',       desc:'Own 25 Summer Ball Camps.',         cond: s => s.buildings[3].count >= 25 },
-  { id:'a12', icon:'🎓', name:'Blue Blood Program',  desc:'Own 25 College Programs.',          cond: s => s.buildings[4].count >= 25 },
-  { id:'a13', icon:'🚐', name:'Frequent Flyer',      desc:'Own 25 Pro Scout Vans.',            cond: s => s.buildings[5].count >= 25 },
-  { id:'a14', icon:'🏋️', name:'Iron Sharpens Iron',  desc:'Own 50 Training Facilities.',       cond: s => s.buildings[6].count >= 50 },
-  { id:'a15', icon:'📣', name:'Agency Empire',       desc:'Own 25 Sports Agencies.',           cond: s => s.buildings[7].count >= 25 },
-  { id:'a16', icon:'🛰️', name:'Eyes Everywhere',     desc:'Own 10 Global Scouting Networks.',  cond: s => s.buildings[8].count >= 10 },
-  { id:'a17', icon:'🌀', name:'Interdimensional GM', desc:'Own 10 Multiverse Draft Portals.',  cond: s => s.buildings[9].count >= 10 },
-  { id:'a18', icon:'✨', name:'Golden Touch',        desc:'Click a golden basketball.',        cond: s => s.goldenClicks >= 1 },
-  { id:'a19', icon:'🔥', name:'Frenzy Fan',          desc:'Trigger 10 slam dunk frenzies.',    cond: s => s.frenzyCount >= 10 },
-  { id:'a20', icon:'🏆', name:'Champion',            desc:'Win your first championship.',      cond: s => s.ascendCount >= 1 },
-  { id:'a21', icon:'🏆', name:'Dynasty',             desc:'Accumulate 10 Championship Banners.', cond: s => s.banners >= 10 },
-  { id:'a22', icon:'🏆', name:'Home Opener',         desc:'Win your first game (every 100 taps).', cond: s => s.teamWins >= 1 },
-  { id:'a23', icon:'🏆', name:'Winning Season',      desc:'Win 25 games.',                     cond: s => s.teamWins >= 25 },
-  { id:'a24', icon:'🏟️', name:'Stadium Upgrade',     desc:'Reach Stadium Level 5.',            cond: s => s.stadiumLevel >= 5 },
-  { id:'a25', icon:'🏟️', name:'Sold-Out Arena',      desc:'Reach Stadium Level 15.',           cond: s => s.stadiumLevel >= 15 },
-  { id:'a26', icon:'🐻', name:'Meet the Mascot',     desc:'Evolve your mascot once.',          cond: s => s.mascotLevel >= 1 },
-  { id:'a27', icon:'👽', name:'Cosmic Mascot',       desc:'Evolve your mascot to Level 20.',   cond: s => s.mascotLevel >= 20 },
-  { id:'a28', icon:'👑', name:'Full House',          desc:'Fill your stadium with fans.',      cond: s => getTotalFans() >= getFanCapacity() },
-  { id:'a29', icon:'👑', name:'Mythic Following',    desc:'Recruit a Mythic Ultra Fan.',       cond: s => s.fans[4] && s.fans[4].count >= 1 },
-  { id:'a30', icon:'🌈', name:'Cosmic Empire',       desc:'Own the Basketball Singularity (final recruiter).', cond: s => s.buildings[29] && s.buildings[29].count >= 1 },
-  { id:'a31', icon:'🥇', name:'Totem Pole Beginner', desc:'Place your first totem.',           cond: s => getTotalTotems() >= 1 },
-  { id:'a32', icon:'💎', name:'Totem Master',        desc:'Fill your totem pole capacity.',    cond: s => getTotalTotems() >= getTotemCapacity() },
+// ── Soccer: a full parallel sport theme, unlocked via ascension ─────────
+// Everything soccer reuses basketball's exact numeric progression (costs, cps,
+// bonuses, unlock thresholds) — only names/icons/descriptions differ — except
+// that every cost & unlock threshold is multiplied by SOCCER_COST_MULT, so
+// soccer content costs more for the same production, as requested.
+const SOCCER_COST_MULT = 5;
+const SOCCER_UNLOCK_THRESHOLD = 1e34; // 10 decillion lifetime earned in Basketball
+
+function deriveBuildingDefs(theme) {
+  return BASKETBALL_BUILDING_DEFS.map((d, i) => ({
+    name: theme[i].name, icon: theme[i].icon, desc: theme[i].desc,
+    baseCost: d.baseCost * SOCCER_COST_MULT, baseCps: d.baseCps, special: d.special,
+  }));
+}
+function deriveNamedDefs(baseArr, theme) {
+  return baseArr.map((d, i) => ({
+    ...d, name: theme[i].name, icon: theme[i].icon || d.icon,
+    cost: d.cost * SOCCER_COST_MULT, unlockAt: d.unlockAt * SOCCER_COST_MULT,
+  }));
+}
+function deriveFanOrTotemDefs(baseArr, theme) {
+  return baseArr.map((d, i) => ({
+    ...d, name: theme[i].name, icon: theme[i].icon, desc: theme[i].desc,
+    baseCost: d.baseCost * SOCCER_COST_MULT,
+  }));
+}
+function deriveMascotTiers(theme) {
+  return BASKETBALL_MASCOT_TIERS.map((t, i) => ({ at: t.at, name: theme[i].name, icon: theme[i].icon }));
+}
+
+const SOCCER_BUILDING_THEME = [
+  { name:'Ball Boy',                        icon:'⚽', desc:'Chases down the ball and kicks it back to you every 5 seconds. Every 10 hired permanently adds +5 to your click power.' },
+  { name:'Sunday League Team',              icon:'🥅', desc:'Weekend pickup matches keep turning up new talent.' },
+  { name:'Youth Academy',                    icon:'🧒', desc:'Scouts the youth ranks for rising stars.' },
+  { name:'Summer Football Camp',             icon:'⛺', desc:'Runs camps that funnel campers straight into your club.' },
+  { name:'College Soccer Program',           icon:'🎓', desc:'Signs standout college players to your roster.' },
+  { name:'Pro Scout Minibus',                icon:'🚐', desc:'Tours pro leagues worldwide chasing hidden gems.' },
+  { name:'Training Ground',                  icon:'🏟️', desc:'State-of-the-art development, running around the clock.' },
+  { name:'Player Agency',                    icon:'📣', desc:'Agents flood your roster with their star clients.' },
+  { name:'Worldwide Scouting Network',       icon:'🛰️', desc:'Satellites track football talent across the globe.' },
+  { name:'Multiverse Transfer Portal',       icon:'🌀', desc:'Pulls elite players in from parallel dimensions.' },
+  { name:'Time-Traveling Scout',             icon:'🕰️', desc:'Recruits legends from any era of the game.' },
+  { name:'AI Transfer Algorithm',            icon:'🤖', desc:'Predicts breakout stars before anyone else.' },
+  { name:'VR Metaverse Stadium',             icon:'🕶️', desc:'Trains players in a fully simulated league.' },
+  { name:'Genetic Engineering Lab',          icon:'🧪', desc:'Splices athletic genes into new prospects.' },
+  { name:'Orbital Training Station',         icon:'🛸', desc:'Zero-gravity drills build superhuman players.' },
+  { name:'Lunar Football Academy',           icon:'🌙', desc:"The moon's low gravity produces incredible free kicks." },
+  { name:'Martian Sunday League',            icon:'🔴', desc:'An entire planet dedicated to developing talent.' },
+  { name:'Dyson Sphere Broadcast Network',   icon:'☀️', desc:'Beams the game to every star in the galaxy — and recruits from all of them.' },
+  { name:'Galactic Scouting Armada',         icon:'🌌', desc:'A fleet of scout ships combs the Milky Way.' },
+  { name:'Wormhole Transfer Hub',            icon:'🕳️', desc:'Shortcuts across space-time to sign prospects instantly.' },
+  { name:'Quantum Transfer Simulator',       icon:'💻', desc:'Simulates every possible transfer window and picks the best one.' },
+  { name:'Celestial Football Shrine',        icon:'🛐', desc:'Football gods bless your club with talent.' },
+  { name:'Chrono-Sphere Player Incubator',   icon:'⏳', desc:'Grows fully-formed players in accelerated time.' },
+  { name:'Nebula Talent Forge',              icon:'🌠', desc:'Forges new players from stellar dust.' },
+  { name:'Cosmic Football Overmind',         icon:'🧠', desc:'A hive-mind coordinates recruiting across all of reality.' },
+  { name:'Universal Football Federation HQ', icon:'🏛️', desc:'Governs football across every known universe.' },
+  { name:'Reality Engine Player Factory',    icon:'⚙️', desc:'Manufactures players from raw reality itself.' },
+  { name:'Infinite Recursion Transfer Loop', icon:'♾️', desc:'Recruits recruiters who recruit more recruiters, forever.' },
+  { name:'Prism of a Thousand Timelines',    icon:'🔮', desc:'Views every possible timeline and signs from all of them at once.' },
+  { name:'The Football Singularity',        icon:'🌈', desc:'All football, everywhere, all at once, converges into your club.' },
 ];
+const SOCCER_CLICK_UPGRADE_THEME = [
+  { name:'Grippy Cleats' }, { name:'Match Ball Leather' }, { name:'Playmaker Instincts' },
+  { name:'Custom Signature Kit' }, { name:"Ballon d'Or Trophy" }, { name:'Hall of Fame Legacy' },
+];
+const SOCCER_PLAYER_TYPE_THEME = [
+  { name:'Bench Warmer' }, { name:'Trialist' }, { name:'Super Sub' }, { name:'Squad Player' },
+  { name:'Academy Prodigy' }, { name:'Starting Striker' }, { name:'Deadly Finisher' },
+  { name:'Club Legend' }, { name:'World Class Talent' }, { name:"Ballon d'Or Contender" },
+  { name:'World Cup Winner' }, { name:'Footballing Icon' }, { name:'GOAT Candidate' },
+  { name:'Global Icon' }, { name:'Legend of the Multiverse' },
+];
+const SOCCER_COACH_THEME = [
+  { name:'Volunteer Assistant' }, { name:'Finishing Coach' }, { name:'Defensive Coordinator' },
+  { name:'Conditioning Coach' }, { name:'Analytics Coach' }, { name:'Player Development Coach' },
+  { name:'Strength & Conditioning Guru' }, { name:'Sports Psychologist' }, { name:'Video Coordinator' },
+  { name:'Head Scout' }, { name:'Sporting Director' }, { name:'Legendary Head Coach' },
+];
+const SOCCER_MUTATION_THEME = [
+  { name:'Golden Boot Mutation',       icon:'🥇' }, { name:'Radioactive Kit Mutation', icon:'☢️' },
+  { name:'Neon Boots Mutation',        icon:'💡' }, { name:'Plasma Free-Kick Mutation', icon:'⚡' },
+  { name:'Crystal Ball Mutation',      icon:'💎' }, { name:'Inferno Strike Mutation',  icon:'🔥' },
+  { name:'Frostbite Tackle Mutation',  icon:'❄️' }, { name:'Toxic Slide Mutation',     icon:'☣️' },
+  { name:'Electric Volley Mutation',   icon:'🌩️' }, { name:'Void Through-Ball Mutation', icon:'🕳️' },
+  { name:'Cosmic Curve Mutation',      icon:'🌌' }, { name:'Shadow Dribble Mutation',  icon:'🌑' },
+  { name:'Solar Header Mutation',      icon:'☀️' }, { name:'Quantum Pass Mutation',    icon:'⚛️' },
+  { name:'Diamond Boot Mutation',      icon:'💠' }, { name:'Phantom Nutmeg Mutation',  icon:'👻' },
+  { name:'Celestial Chip Mutation',    icon:'🌠' }, { name:'Singularity Screamer Mutation', icon:'🔮' },
+];
+const SOCCER_FAN_THEME = [
+  { name:'Casual Supporter',         icon:'🙂', desc:'Shows up when the team is winning.' },
+  { name:'Season Ticket Holder',     icon:'🎟️', desc:'Never misses a home match.' },
+  { name:'Ultras Member',            icon:'🧣', desc:'Drums, flares, and songs for 90 minutes straight.' },
+  { name:'Celebrity Pitch-Side Fan', icon:'🌟', desc:'Front row, every match, cameras love them.' },
+  { name:'Legendary Capo Ultra',     icon:'👑', desc:'Legend says they have never missed a chant.' },
+];
+const SOCCER_MASCOT_THEME = [
+  { name:'No Mascot', icon:'❔' }, { name:'Team Mascot', icon:'🦁' }, { name:'Mutant Mascot', icon:'🦍' },
+  { name:'Cyber Mascot', icon:'🤖' }, { name:'Cosmic Mascot', icon:'👽' },
+  { name:'Ancient Dragon Mascot', icon:'🐉' }, { name:'Multiversal Mascot Deity', icon:'🌌' },
+];
+const SOCCER_TOTEM_THEME = [
+  { name:'Golden Boot Totem',  icon:'🥇', desc:'A gleaming totem said to bring good fortune to finishers.' },
+  { name:'Radioactive Totem', icon:'☢️', desc:'Glows faintly. Definitely fine to stand next to.' },
+  { name:'Neon Totem',        icon:'💡', desc:'Pulses with electric light in time with every goal.' },
+  { name:'Plasma Totem',      icon:'⚡', desc:'Crackling energy arcs between the stands.' },
+  { name:'Crystal Ball Totem',icon:'💎', desc:"A flawless crystal said to focus a striker's aim perfectly." },
+];
+
+const SOCCER_BUILDING_DEFS = deriveBuildingDefs(SOCCER_BUILDING_THEME);
+const SOCCER_CLICK_UPGRADE_DEFS = deriveNamedDefs(BASKETBALL_CLICK_UPGRADE_DEFS, SOCCER_CLICK_UPGRADE_THEME);
+const SOCCER_PLAYER_TYPE_DEFS = deriveNamedDefs(BASKETBALL_PLAYER_TYPE_DEFS, SOCCER_PLAYER_TYPE_THEME);
+const SOCCER_COACH_DEFS = deriveNamedDefs(BASKETBALL_COACH_DEFS, SOCCER_COACH_THEME);
+const SOCCER_MUTATION_DEFS = deriveNamedDefs(BASKETBALL_MUTATION_DEFS, SOCCER_MUTATION_THEME);
+const SOCCER_FAN_TIER_DEFS = deriveFanOrTotemDefs(BASKETBALL_FAN_TIER_DEFS, SOCCER_FAN_THEME);
+const SOCCER_TOTEM_TIER_DEFS = deriveFanOrTotemDefs(BASKETBALL_TOTEM_TIER_DEFS, SOCCER_TOTEM_THEME);
+const SOCCER_MASCOT_TIERS = deriveMascotTiers(SOCCER_MASCOT_THEME);
+
+const SPORTS = {
+  basketball: {
+    label: 'BASKETBALL', ballIcon: '🏀', ballName: 'basketball',
+    frenzyLabel: 'SLAM DUNK FRENZY', luckyLabel: 'Buzzer beater!',
+    buildingDefs: BASKETBALL_BUILDING_DEFS, clickUpgradeDefs: BASKETBALL_CLICK_UPGRADE_DEFS,
+    playerTypeDefs: BASKETBALL_PLAYER_TYPE_DEFS, coachDefs: BASKETBALL_COACH_DEFS,
+    mutationDefs: BASKETBALL_MUTATION_DEFS, fanTierDefs: BASKETBALL_FAN_TIER_DEFS,
+    mascotTiers: BASKETBALL_MASCOT_TIERS, totemTierDefs: BASKETBALL_TOTEM_TIER_DEFS,
+  },
+  soccer: {
+    label: 'SOCCER', ballIcon: '⚽', ballName: 'soccer ball',
+    frenzyLabel: 'GOLAZO FRENZY', luckyLabel: 'Golazo!',
+    buildingDefs: SOCCER_BUILDING_DEFS, clickUpgradeDefs: SOCCER_CLICK_UPGRADE_DEFS,
+    playerTypeDefs: SOCCER_PLAYER_TYPE_DEFS, coachDefs: SOCCER_COACH_DEFS,
+    mutationDefs: SOCCER_MUTATION_DEFS, fanTierDefs: SOCCER_FAN_TIER_DEFS,
+    mascotTiers: SOCCER_MASCOT_TIERS, totemTierDefs: SOCCER_TOTEM_TIER_DEFS,
+  },
+};
+
+// Active-sport pointers. applySport() reassigns all of these; nothing else needs to
+// change since every function below reads these by name, not by captured value.
+let BUILDING_DEFS, CLICK_UPGRADE_DEFS, PLAYER_TYPE_DEFS, COACH_DEFS, MUTATION_DEFS,
+    FAN_TIER_DEFS, MASCOT_TIERS, TOTEM_TIER_DEFS, BUILDING_UPGRADES, UPGRADE_CATEGORIES,
+    ACHIEVEMENT_DEFS, currentSport;
+
+function buildBuildingUpgrades() {
+  const arr = [];
+  BUILDING_DEFS.forEach((d, i) => {
+    if (d.special) return;
+    TIER_CONFIG.forEach((t, ti) => {
+      arr.push({
+        id: `bu_${i}_${ti}`,
+        buildingIndex: i,
+        req: t.req,
+        cost: Math.ceil(d.baseCost * t.costMul),
+        name: `${t.label}: ${d.name}`,
+        desc: `Doubles ${d.name} production. Requires ${t.req} owned.`,
+        icon: d.icon,
+      });
+    });
+  });
+  return arr;
+}
+
+function buildUpgradeCategories() {
+  return [
+    { title: 'CLICK UPGRADES',    defs: CLICK_UPGRADE_DEFS, stateKey: 'clickUpgrades',    icon: '👟' },
+    { title: 'PLAYER TYPES',      defs: PLAYER_TYPE_DEFS,   stateKey: 'playerUpgrades',   icon: SPORTS[currentSport].ballIcon },
+    { title: 'ASSISTANT COACHES', defs: COACH_DEFS,         stateKey: 'coachUpgrades',    icon: '🧑‍🏫' },
+    { title: 'MUTATIONS',         defs: MUTATION_DEFS,      stateKey: 'mutationUpgrades', icon: '🧬' },
+  ];
+}
+
+// Achievement definitions are regenerated per sport switch so building/fan/mascot/totem
+// names and icons always match whichever sport is currently active. Conditions are
+// sport-agnostic (they only read numeric state), so unlock progress carries over cleanly.
+function buildAchievementDefs() {
+  const ball = SPORTS[currentSport].ballIcon;
+  return [
+    { id:'a0',  icon:ball, name:'First Paycheck',      desc:'Earn your first dollar.',           cond: s => s.totalEarnedAllTime >= 1 },
+    { id:'a1',  icon:ball, name:'Starting Five',       desc:'Earn $100 total.',                  cond: s => s.totalEarnedAllTime >= 100 },
+    { id:'a2',  icon:ball, name:'Full Roster',         desc:'Earn $10,000 total.',               cond: s => s.totalEarnedAllTime >= 1e4 },
+    { id:'a3',  icon:ball, name:'League Legend',       desc:'Earn $1,000,000 total.',            cond: s => s.totalEarnedAllTime >= 1e6 },
+    { id:'a4',  icon:ball, name:`${SPORTS[currentSport].label[0]}${SPORTS[currentSport].label.slice(1).toLowerCase()} Tycoon`, desc:'Earn $100,000,000 total.', cond: s => s.totalEarnedAllTime >= 1e8 },
+    { id:'a5',  icon:ball, name:'Hoops Empire',        desc:'Earn $10 billion total.',           cond: s => s.totalEarnedAllTime >= 1e10 },
+    { id:'a6',  icon:ball, name:'Legendary Franchise', desc:'Earn $1 trillion total.',           cond: s => s.totalEarnedAllTime >= 1e12 },
+    { id:'a7',  icon: BUILDING_DEFS[0].icon, name:'Quick Hands',    desc:`Own a ${BUILDING_DEFS[0].name}.`,     cond: s => s.buildings[0].count >= 1 },
+    { id:'a8',  icon: BUILDING_DEFS[0].icon, name:'Ten Fingers',    desc:`Own 10 ${BUILDING_DEFS[0].name}s.`,   cond: s => s.buildings[0].count >= 10 },
+    { id:'a9',  icon: BUILDING_DEFS[1].icon, name:'Pickup Regular', desc:`Own 10 ${BUILDING_DEFS[1].name}s.`,   cond: s => s.buildings[1].count >= 10 },
+    { id:'a10', icon: BUILDING_DEFS[2].icon, name:'Varsity Watcher', desc:`Own 25 ${BUILDING_DEFS[2].name}s.`,  cond: s => s.buildings[2].count >= 25 },
+    { id:'a11', icon: BUILDING_DEFS[3].icon, name:'Camp Director',  desc:`Own 25 ${BUILDING_DEFS[3].name}s.`,   cond: s => s.buildings[3].count >= 25 },
+    { id:'a12', icon: BUILDING_DEFS[4].icon, name:'Blue Blood Program', desc:`Own 25 ${BUILDING_DEFS[4].name}s.`, cond: s => s.buildings[4].count >= 25 },
+    { id:'a13', icon: BUILDING_DEFS[5].icon, name:'Frequent Flyer', desc:`Own 25 ${BUILDING_DEFS[5].name}s.`,   cond: s => s.buildings[5].count >= 25 },
+    { id:'a14', icon: BUILDING_DEFS[6].icon, name:'Iron Sharpens Iron', desc:`Own 50 ${BUILDING_DEFS[6].name}s.`, cond: s => s.buildings[6].count >= 50 },
+    { id:'a15', icon: BUILDING_DEFS[7].icon, name:'Agency Empire',  desc:`Own 25 ${BUILDING_DEFS[7].name}s.`,   cond: s => s.buildings[7].count >= 25 },
+    { id:'a16', icon: BUILDING_DEFS[8].icon, name:'Eyes Everywhere', desc:`Own 10 ${BUILDING_DEFS[8].name}s.`,  cond: s => s.buildings[8].count >= 10 },
+    { id:'a17', icon: BUILDING_DEFS[9].icon, name:'Interdimensional GM', desc:`Own 10 ${BUILDING_DEFS[9].name}s.`, cond: s => s.buildings[9].count >= 10 },
+    { id:'a18', icon:'✨', name:'Golden Touch', desc:`Click a golden ${SPORTS[currentSport].ballName}.`, cond: s => s.goldenClicks >= 1 },
+    { id:'a19', icon:'🔥', name:'Frenzy Fan',   desc:'Trigger 10 frenzies.',              cond: s => s.frenzyCount >= 10 },
+    { id:'a20', icon:'🏆', name:'Champion',     desc:'Win your first championship.',      cond: s => s.ascendCount >= 1 },
+    { id:'a21', icon:'🏆', name:'Dynasty',      desc:'Accumulate 10 Championship Banners.', cond: s => s.banners >= 10 },
+    { id:'a22', icon:'🏆', name:'Home Opener',  desc:'Win your first game (every 100 taps).', cond: s => s.teamWins >= 1 },
+    { id:'a23', icon:'🏆', name:'Winning Season', desc:'Win 25 games.',                   cond: s => s.teamWins >= 25 },
+    { id:'a24', icon:'🏟️', name:'Stadium Upgrade', desc:'Reach Stadium Level 5.',          cond: s => s.stadiumLevel >= 5 },
+    { id:'a25', icon:'🏟️', name:'Sold-Out Arena', desc:'Reach Stadium Level 15.',          cond: s => s.stadiumLevel >= 15 },
+    { id:'a26', icon: MASCOT_TIERS[1].icon, name:'Meet the Mascot', desc:'Evolve your mascot once.', cond: s => s.mascotLevel >= 1 },
+    { id:'a27', icon: MASCOT_TIERS[4].icon, name: MASCOT_TIERS[4].name, desc:'Evolve your mascot to Level 20.', cond: s => s.mascotLevel >= 20 },
+    { id:'a28', icon: FAN_TIER_DEFS[4].icon, name:'Full House', desc:'Fill your stadium with fans.', cond: s => getTotalFans() >= getFanCapacity() },
+    { id:'a29', icon: FAN_TIER_DEFS[4].icon, name:'Mythic Following', desc:`Recruit a ${FAN_TIER_DEFS[4].name}.`, cond: s => s.fans[4] && s.fans[4].count >= 1 },
+    { id:'a30', icon: BUILDING_DEFS[29].icon, name:`${SPORTS[currentSport].label[0]}${SPORTS[currentSport].label.slice(1).toLowerCase()} Empire`, desc:`Own the ${BUILDING_DEFS[29].name} (final recruiter).`, cond: s => s.buildings[29] && s.buildings[29].count >= 1 },
+    { id:'a31', icon: TOTEM_TIER_DEFS[0].icon, name:'Totem Pole Beginner', desc:'Place your first totem.', cond: s => getTotalTotems() >= 1 },
+    { id:'a32', icon: TOTEM_TIER_DEFS[4].icon, name:'Totem Master', desc:'Fill your totem pole capacity.', cond: s => getTotalTotems() >= getTotemCapacity() },
+  ];
+}
+
+function applySport(sportKey) {
+  const s = SPORTS[sportKey];
+  BUILDING_DEFS = s.buildingDefs;
+  CLICK_UPGRADE_DEFS = s.clickUpgradeDefs;
+  PLAYER_TYPE_DEFS = s.playerTypeDefs;
+  COACH_DEFS = s.coachDefs;
+  MUTATION_DEFS = s.mutationDefs;
+  FAN_TIER_DEFS = s.fanTierDefs;
+  MASCOT_TIERS = s.mascotTiers;
+  TOTEM_TIER_DEFS = s.totemTierDefs;
+  currentSport = sportKey;
+  BUILDING_UPGRADES = buildBuildingUpgrades();
+  UPGRADE_CATEGORIES = buildUpgradeCategories();
+  ACHIEVEMENT_DEFS = buildAchievementDefs();
+}
 
 // ── State ──────────────────────────────────────────────────────
 let state = null;
@@ -646,31 +871,6 @@ function freshState() {
 }
 
 function rand(min, max) { return min + Math.random() * (max - min); }
-
-// ── Derived building upgrade list (skip index 0, the special Clicker) ──
-const BUILDING_UPGRADES = [];
-BUILDING_DEFS.forEach((d, i) => {
-  if (d.special) return;
-  TIER_CONFIG.forEach((t, ti) => {
-    BUILDING_UPGRADES.push({
-      id: `bu_${i}_${ti}`,
-      buildingIndex: i,
-      req: t.req,
-      cost: Math.ceil(d.baseCost * t.costMul),
-      name: `${t.label}: ${d.name}`,
-      desc: `Doubles ${d.name} production. Requires ${t.req} owned.`,
-      icon: d.icon,
-    });
-  });
-});
-
-// One-time upgrade categories rendered together in the UPGRADES tab.
-const UPGRADE_CATEGORIES = [
-  { title: 'CLICK UPGRADES',    defs: CLICK_UPGRADE_DEFS, stateKey: 'clickUpgrades',    icon: '👟' },
-  { title: 'PLAYER TYPES',      defs: PLAYER_TYPE_DEFS,   stateKey: 'playerUpgrades',   icon: '🏀' },
-  { title: 'ASSISTANT COACHES', defs: COACH_DEFS,         stateKey: 'coachUpgrades',    icon: '🧑‍🏫' },
-  { title: 'MUTATIONS',         defs: MUTATION_DEFS,      stateKey: 'mutationUpgrades', icon: '🧬' },
-];
 
 // ── Number formatting ─────────────────────────────────────────
 const SUFFIXES = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc','UDc','DDc','TDc'];
@@ -794,11 +994,15 @@ function getCps() {
   return total * achievementMultiplier() * prestigeMultiplier() * frenzyMultiplier();
 }
 
-function getBuildingCost(i) {
+// Cumulative cost of buying `qty` copies of building i starting from its current count,
+// via the geometric-series sum. Reduces to the single-item cost when qty === 1.
+function getBuildingCost(i, qty = 1) {
   const b = state.buildings[i];
   const d = BUILDING_DEFS[i];
-  const costMult = d.special === 'autoclick' ? CLICKER_COST_MULT : 1.15;
-  return Math.ceil(d.baseCost * Math.pow(costMult, b.count));
+  const r = d.special === 'autoclick' ? CLICKER_COST_MULT : 1.15;
+  const unitCost = d.baseCost * Math.pow(r, b.count);
+  if (qty === 1) return Math.ceil(unitCost);
+  return Math.ceil(unitCost * (Math.pow(r, qty) - 1) / (r - 1));
 }
 
 function computeBannerGain() {
@@ -820,6 +1024,19 @@ const upgradesTab = document.getElementById('tab-upgrades');
 const fansTab = document.getElementById('tab-fans');
 const mascotTab = document.getElementById('tab-mascot');
 const totemsTab = document.getElementById('tab-totems');
+const ascensionsTab = document.getElementById('tab-ascensions');
+const headerTitleEl = document.querySelector('header h1');
+
+// ── Bulk-buy toggle (x1 / x10 / x100) ─────────────────────────
+let buyQty = 1;
+document.querySelectorAll('.bulk-buy-btn').forEach(btn => {
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    buyQty = parseInt(btn.dataset.qty, 10);
+    document.querySelectorAll('.bulk-buy-btn').forEach(b => b.classList.toggle('active', b === btn));
+    updateBuildingRows();
+  });
+});
 
 // ── Building rows (built once, updated in place) ─────────────
 const buildingRowRefs = [];
@@ -836,7 +1053,7 @@ function initBuildingRows() {
       </div>
       <div class="row-cost"><span class="cost-val">$${formatMoney(d.baseCost)}</span></div>
     `;
-    row.addEventListener('click', () => buyBuilding(i));
+    row.addEventListener('pointerdown', e => { e.preventDefault(); buyBuilding(i); });
     buildingsTab.appendChild(row);
     buildingRowRefs.push({
       row, cntEl: row.querySelector('.cnt'), cpsEl: row.querySelector('.cps'), costEl: row.querySelector('.cost-val'),
@@ -848,7 +1065,7 @@ function updateBuildingRows() {
   BUILDING_DEFS.forEach((d, i) => {
     const ref = buildingRowRefs[i];
     const b = state.buildings[i];
-    const cost = getBuildingCost(i);
+    const cost = getBuildingCost(i, buyQty);
     ref.cntEl.textContent = b.count;
     if (d.special === 'autoclick') {
       ref.cpsEl.textContent = '$' + formatRate(getBaseClickPower() / (CLICKER_INTERVAL_MS / 1000)) + '/sec each (auto-click, +5 power per 10 owned)';
@@ -856,16 +1073,16 @@ function updateBuildingRows() {
       const tierMult = Math.pow(2, getBuildingTierCount(i));
       ref.cpsEl.textContent = '$' + formatRate(d.baseCps * tierMult) + '/sec each';
     }
-    ref.costEl.textContent = '$' + formatMoney(cost);
+    ref.costEl.textContent = '$' + formatMoney(cost) + (buyQty > 1 ? ` (x${buyQty})` : '');
     ref.row.classList.toggle('unaffordable', state.money < cost);
   });
 }
 
 function buyBuilding(i) {
-  const cost = getBuildingCost(i);
+  const cost = getBuildingCost(i, buyQty);
   if (state.money < cost) return;
   state.money -= cost;
-  state.buildings[i].count++;
+  state.buildings[i].count += buyQty;
   checkAchievements();
   refreshUpgradesTab();
   updateAll();
@@ -901,7 +1118,7 @@ function renderNextUpgradeSection(container, title, totalCount, purchasedCount, 
     </div>
     <div class="row-cost">${unlocked ? `<span class="cost-val">$${formatMoney(cost)}</span>` : ''}</div>
   `;
-  if (unlocked) row.addEventListener('click', onBuy);
+  if (unlocked) row.addEventListener('pointerdown', e => { e.preventDefault(); onBuy(); });
   container.appendChild(row);
 }
 
@@ -967,7 +1184,7 @@ function initFanRows() {
       </div>
       <div class="row-cost"><span class="cost-val">$${formatMoney(d.baseCost)}</span></div>
     `;
-    row.addEventListener('click', () => buyFan(i));
+    row.addEventListener('pointerdown', e => { e.preventDefault(); buyFan(i); });
     container.appendChild(row);
     fanRowRefs.push({
       row, cntEl: row.querySelector('.cnt'), bonusEl: row.querySelector('.bonus'), costEl: row.querySelector('.cost-val'),
@@ -1015,7 +1232,7 @@ function initTotemRows() {
       </div>
       <div class="row-cost"><span class="cost-val">$${formatMoney(d.baseCost)}</span></div>
     `;
-    row.addEventListener('click', () => buyTotem(i));
+    row.addEventListener('pointerdown', e => { e.preventDefault(); buyTotem(i); });
     container.appendChild(row);
     totemRowRefs.push({
       row, cntEl: row.querySelector('.cnt'), bonusEl: row.querySelector('.bonus'), costEl: row.querySelector('.cost-val'),
@@ -1078,6 +1295,92 @@ function levelUpMascot() {
   showToast(`${getMascotTier().icon} Mascot evolved to ${getMascotTier().name} (Level ${state.mascotLevel})!`);
 }
 
+// ── Ascensions & sport switching ─────────────────────────────
+let soccerUnlocked = false;
+
+function hasSportSave(sportKey) { return localStorage.getItem(saveKeyFor(sportKey)) !== null; }
+
+function checkSoccerUnlock() {
+  if (!soccerUnlocked && currentSport === 'basketball' && state.totalEarnedAllTime >= SOCCER_UNLOCK_THRESHOLD) {
+    soccerUnlocked = true;
+    save();
+    showToast('⚽ SOCCER UNLOCKED! Visit the ASCENSIONS tab to begin a new journey.');
+  }
+}
+
+function updateHeaderForSport() {
+  headerTitleEl.textContent = SPORTS[currentSport].label + ' CLICKER';
+  ballBtn.textContent = SPORTS[currentSport].ballIcon;
+}
+
+function switchSport(targetSport) {
+  if (targetSport === currentSport) return;
+  save(); // persist the sport we're leaving
+
+  applySport(targetSport);
+  loadSportState(targetSport);
+  save(); // persist the (possibly fresh) target state + active-sport marker immediately
+
+  buildingsTab.querySelectorAll('.store-row').forEach(r => r.remove());
+  buildingRowRefs.length = 0;
+  initBuildingRows();
+
+  document.getElementById('fan-rows').innerHTML = '';
+  fanRowRefs.length = 0;
+  initFanRows();
+
+  document.getElementById('totem-rows').innerHTML = '';
+  totemRowRefs.length = 0;
+  initTotemRows();
+
+  refreshUpgradesTab();
+  renderAchievements();
+  updateHeaderForSport();
+  updateAll();
+  showToast(`${SPORTS[targetSport].ballIcon} Now playing ${SPORTS[targetSport].label}!`);
+}
+
+function renderAscensionsTab() {
+  ascensionsTab.innerHTML = '';
+  Object.keys(SPORTS).forEach(key => {
+    const sport = SPORTS[key];
+    const card = document.createElement('div');
+    card.className = 'feature-panel';
+
+    if (key === 'soccer' && !soccerUnlocked) {
+      const liveEarned = currentSport === 'basketball' ? state.totalEarnedAllTime : 0;
+      const progress = Math.min(100, (liveEarned / SOCCER_UNLOCK_THRESHOLD) * 100);
+      card.innerHTML = `
+        <div class="feature-icon">🔒</div>
+        <div class="feature-info">
+          <div class="feature-title">${sport.ballIcon} ${sport.label} — LOCKED</div>
+          <div class="feature-sub">Reach $${formatMoney(SOCCER_UNLOCK_THRESHOLD)} lifetime earned in Basketball to ascend.
+            <div class="ascension-progress-bar"><div class="ascension-progress-fill" style="width:${progress}%"></div></div>
+            ${progress.toFixed(4)}% there
+          </div>
+        </div>
+      `;
+      ascensionsTab.appendChild(card);
+      return;
+    }
+
+    const isActive = key === currentSport;
+    const label = isActive ? 'CURRENTLY PLAYING' : (hasSportSave(key) ? `SWITCH TO ${sport.label}` : `ASCEND TO ${sport.label}`);
+    card.innerHTML = `
+      <div class="feature-icon">${sport.ballIcon}</div>
+      <div class="feature-info">
+        <div class="feature-title">${sport.label}</div>
+        <div class="feature-sub">${isActive ? 'Active now' : (hasSportSave(key) ? 'Saved progress waiting' : 'Never started — begins fresh')}</div>
+      </div>
+      <button class="feature-btn${isActive ? ' disabled' : ''}" ${isActive ? 'disabled' : ''}>${label}</button>
+    `;
+    if (!isActive) {
+      card.querySelector('button').addEventListener('pointerdown', e => { e.preventDefault(); switchSport(key); });
+    }
+    ascensionsTab.appendChild(card);
+  });
+}
+
 function renderFeaturePanels() {
   const cap = getFanCapacity();
   const used = getTotalFans();
@@ -1114,7 +1417,7 @@ function renderFeaturePanels() {
 }
 
 // ── Tabs ───────────────────────────────────────────────────────
-const TAB_CONTENTS = { buildings: buildingsTab, upgrades: upgradesTab, fans: fansTab, mascot: mascotTab, totems: totemsTab };
+const TAB_CONTENTS = { ascensions: ascensionsTab, buildings: buildingsTab, upgrades: upgradesTab, fans: fansTab, mascot: mascotTab, totems: totemsTab };
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1207,11 +1510,12 @@ document.getElementById('ascend-confirm-btn').addEventListener('click', () => {
 // ── Reset ───────────────────────────────────────────────────────
 document.getElementById('reset-btn').addEventListener('click', () => openModal('reset-modal'));
 document.getElementById('reset-confirm-btn').addEventListener('click', () => {
-  localStorage.removeItem(SAVE_KEY);
+  localStorage.removeItem(saveKeyFor(currentSport));
   state = freshState();
   closeModal('reset-modal');
   refreshUpgradesTab();
   renderAchievements();
+  renderAscensionsTab();
   updateAll();
   showToast('Progress erased.');
 });
@@ -1361,7 +1665,7 @@ function spawnGolden() {
   if (goldenEl) return;
   goldenEl = document.createElement('div');
   goldenEl.className = 'golden-ball';
-  goldenEl.textContent = '🏀';
+  goldenEl.textContent = SPORTS[currentSport].ballIcon;
   const w = clickArea.clientWidth, h = clickArea.clientHeight;
   const pad = 60;
   goldenEl.style.left = rand(pad, Math.max(pad + 1, w - pad)) + 'px';
@@ -1387,13 +1691,14 @@ function triggerFrenzy() {
   state.frenzyActive = true;
   state.frenzyEndTime = performance.now() + FRENZY_DURATION_MS;
   state.frenzyCount++;
-  showToast('🔥 SLAM DUNK FRENZY! Production x7 for 30 seconds!');
+  frenzyBanner.textContent = `🔥 ${SPORTS[currentSport].frenzyLabel} — PRODUCTION x7!`;
+  showToast(`🔥 ${SPORTS[currentSport].frenzyLabel}! Production x7 for 30 seconds!`);
 }
 function triggerLucky() {
   const bonus = Math.max(getCps() * 900, state.money * 0.15, 100);
   state.money += bonus;
   state.totalEarnedAllTime += bonus;
-  showToast(`🎉 Buzzer beater! +$${formatMoney(bonus)}`);
+  showToast(`🎉 ${SPORTS[currentSport].luckyLabel} +$${formatMoney(bonus)}`);
 }
 
 // ── Display update ────────────────────────────────────────────
@@ -1405,6 +1710,8 @@ function updateAll() {
   winProgressValEl.textContent = WIN_EVERY_TAPS - (state.tapCount % WIN_EVERY_TAPS);
   updateBuildingRows();
   renderFeaturePanels();
+  checkSoccerUnlock();
+  renderAscensionsTab();
 
   const gain = computeBannerGain();
   ascendBtn.classList.toggle('ready', gain > state.banners);
@@ -1454,11 +1761,15 @@ function gameLoop(ts) {
 // ── Save / Load ────────────────────────────────────────────────
 function save() {
   state.lastSave = Date.now();
-  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  localStorage.setItem(saveKeyFor(currentSport), JSON.stringify(state));
+  localStorage.setItem(ACTIVE_SPORT_KEY, currentSport);
+  localStorage.setItem(SOCCER_UNLOCKED_KEY, soccerUnlocked ? '1' : '0');
 }
 
-function load() {
-  const raw = localStorage.getItem(SAVE_KEY);
+// Loads sportKey's save into the global `state`. Assumes applySport(sportKey) has
+// already run, so BUILDING_DEFS/FAN_TIER_DEFS/etc. already point at the right theme.
+function loadSportState(sportKey) {
+  const raw = localStorage.getItem(saveKeyFor(sportKey));
   if (!raw) { state = freshState(); return; }
   try {
     const parsed = JSON.parse(raw);
@@ -1492,7 +1803,7 @@ function load() {
           state.totalEarnedAllTime += earned;
           const mins = Math.floor(elapsed / 60000);
           document.getElementById('offline-body').innerHTML =
-            `<p>You were away for ${mins} minute${mins===1?'':'s'}.</p><p>Your program kept playing games and earned <b style="color:var(--orange)">$${formatMoney(earned)}</b> while you were gone (${(OFFLINE_EFFICIENCY*100)}% efficiency).</p>`;
+            `<p>You were away for ${mins} minute${mins===1?'':'s'}.</p><p>Your ${SPORTS[sportKey].label.toLowerCase()} program kept playing games and earned <b style="color:var(--orange)">$${formatMoney(earned)}</b> while you were gone (${(OFFLINE_EFFICIENCY*100)}% efficiency).</p>`;
           openModal('offline-modal');
         }
       }
@@ -1511,15 +1822,20 @@ document.addEventListener('touchend', e => {
 }, { passive: false });
 
 // ── Init ───────────────────────────────────────────────────────
-load();
+soccerUnlocked = localStorage.getItem(SOCCER_UNLOCKED_KEY) === '1';
+const bootSport = (soccerUnlocked && localStorage.getItem(ACTIVE_SPORT_KEY) === 'soccer') ? 'soccer' : 'basketball';
+applySport(bootSport);
+loadSportState(bootSport);
+updateHeaderForSport();
 initBuildingRows();
 initFanRows();
 initTotemRows();
-document.getElementById('stadium-upgrade-btn').addEventListener('click', levelUpStadium);
-document.getElementById('mascot-upgrade-btn').addEventListener('click', levelUpMascot);
-document.getElementById('totem-pole-upgrade-btn').addEventListener('click', levelUpTotemPole);
+document.getElementById('stadium-upgrade-btn').addEventListener('pointerdown', e => { e.preventDefault(); levelUpStadium(); });
+document.getElementById('mascot-upgrade-btn').addEventListener('pointerdown', e => { e.preventDefault(); levelUpMascot(); });
+document.getElementById('totem-pole-upgrade-btn').addEventListener('pointerdown', e => { e.preventDefault(); levelUpTotemPole(); });
 refreshUpgradesTab();
 renderAchievements();
+renderAscensionsTab();
 resizeCanvas();
 checkAchievements();
 updateAll();
