@@ -356,6 +356,12 @@ main {
         </div>
         <button class="feature-btn" id="stadium-upgrade-btn">LEVEL UP<span class="feature-cost">$1,000</span></button>
       </div>
+      <div class="bulk-buy-bar">
+        <span class="bulk-buy-label">BUY:</span>
+        <button class="bulk-buy-btn active" data-qty="1">x1</button>
+        <button class="bulk-buy-btn" data-qty="10">x10</button>
+        <button class="bulk-buy-btn" data-qty="100">x100</button>
+      </div>
       <div id="fan-rows"></div>
     </div>
     <div class="tab-content hidden" id="tab-mascot">
@@ -377,6 +383,12 @@ main {
           <div class="feature-sub">Totem Capacity: <span id="totem-pole-usage">0 / 5</span><br>Click Power Bonus: <span id="totem-pole-bonus">+0%</span></div>
         </div>
         <button class="feature-btn" id="totem-pole-upgrade-btn">LEVEL UP<span class="feature-cost">$3,000</span></button>
+      </div>
+      <div class="bulk-buy-bar">
+        <span class="bulk-buy-label">BUY:</span>
+        <button class="bulk-buy-btn active" data-qty="1">x1</button>
+        <button class="bulk-buy-btn" data-qty="10">x10</button>
+        <button class="bulk-buy-btn" data-qty="100">x100</button>
       </div>
       <div id="totem-rows"></div>
     </div>
@@ -932,9 +944,12 @@ function getFanMultiplier() {
   state.fans.forEach((f, i) => { bonus += f.count * FAN_TIER_DEFS[i].bonusPercent; });
   return 1 + bonus / 100;
 }
-function getFanCost(i) {
+// Cumulative cost of buying `qty` copies of fan tier i, via the geometric-series sum.
+function getFanCost(i, qty = 1) {
   const d = FAN_TIER_DEFS[i];
-  return Math.ceil(d.baseCost * Math.pow(d.costMult, state.fans[i].count));
+  const unitCost = d.baseCost * Math.pow(d.costMult, state.fans[i].count);
+  if (qty === 1) return Math.ceil(unitCost);
+  return Math.ceil(unitCost * (Math.pow(d.costMult, qty) - 1) / (d.costMult - 1));
 }
 function getStadiumCost() { return Math.ceil(STADIUM_BASE_COST * Math.pow(STADIUM_COST_MULT, state.stadiumLevel)); }
 function getStadiumMultiplier() { return 1 + state.stadiumLevel * STADIUM_MULT_PER_LEVEL; }
@@ -953,9 +968,12 @@ function getTotemMultiplier() {
   state.totems.forEach((t, i) => { bonus += t.count * TOTEM_TIER_DEFS[i].bonusPercent; });
   return 1 + bonus / 100;
 }
-function getTotemCost(i) {
+// Cumulative cost of buying `qty` copies of totem tier i, via the geometric-series sum.
+function getTotemCost(i, qty = 1) {
   const d = TOTEM_TIER_DEFS[i];
-  return Math.ceil(d.baseCost * Math.pow(d.costMult, state.totems[i].count));
+  const unitCost = d.baseCost * Math.pow(d.costMult, state.totems[i].count);
+  if (qty === 1) return Math.ceil(unitCost);
+  return Math.ceil(unitCost * (Math.pow(d.costMult, qty) - 1) / (d.costMult - 1));
 }
 function getTotemPoleCost() { return Math.ceil(TOTEM_POLE_BASE_COST * Math.pow(TOTEM_POLE_COST_MULT, state.totemPoleLevel)); }
 function getTotemPoleMultiplier() { return 1 + state.totemPoleLevel * TOTEM_POLE_MULT_PER_LEVEL; }
@@ -1028,13 +1046,20 @@ const ascensionsTab = document.getElementById('tab-ascensions');
 const headerTitleEl = document.querySelector('header h1');
 
 // ── Bulk-buy toggle (x1 / x10 / x100) ─────────────────────────
+// Shared across the Recruiting, Fans, and Totems tabs — each has its own bar,
+// all synced to the same buyQty and kept in visual sync by matching data-qty.
 let buyQty = 1;
+function setBuyQty(qty) {
+  buyQty = qty;
+  document.querySelectorAll('.bulk-buy-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.qty, 10) === qty));
+  updateBuildingRows();
+  updateFanRows();
+  updateTotemRows();
+}
 document.querySelectorAll('.bulk-buy-btn').forEach(btn => {
   btn.addEventListener('pointerdown', e => {
     e.preventDefault();
-    buyQty = parseInt(btn.dataset.qty, 10);
-    document.querySelectorAll('.bulk-buy-btn').forEach(b => b.classList.toggle('active', b === btn));
-    updateBuildingRows();
+    setBuyQty(parseInt(btn.dataset.qty, 10));
   });
 });
 
@@ -1195,23 +1220,24 @@ function initFanRows() {
 function updateFanRows() {
   const cap = getFanCapacity();
   const used = getTotalFans();
+  const fitsQty = (used + buyQty) <= cap;
   fanRowRefs.forEach((ref, i) => {
     const d = FAN_TIER_DEFS[i];
-    const cost = getFanCost(i);
-    const full = used >= cap;
+    const cost = getFanCost(i, buyQty);
     ref.cntEl.textContent = state.fans[i].count;
     ref.bonusEl.textContent = '+' + (state.fans[i].count * d.bonusPercent).toFixed(1) + '%';
-    ref.costEl.textContent = full ? 'STADIUM FULL' : ('$' + formatMoney(cost));
-    ref.row.classList.toggle('unaffordable', full || state.money < cost);
+    ref.costEl.textContent = !fitsQty ? 'STADIUM FULL' : ('$' + formatMoney(cost) + (buyQty > 1 ? ` (x${buyQty})` : ''));
+    ref.row.classList.toggle('unaffordable', !fitsQty || state.money < cost);
   });
 }
 
 function buyFan(i) {
-  if (getTotalFans() >= getFanCapacity()) { showToast('🏟️ Stadium is full — level it up to fit more fans!'); return; }
-  const cost = getFanCost(i);
+  const qty = buyQty;
+  if (getTotalFans() + qty > getFanCapacity()) { showToast("🏟️ Stadium doesn't have room for that many — level it up first!"); return; }
+  const cost = getFanCost(i, qty);
   if (state.money < cost) return;
   state.money -= cost;
-  state.fans[i].count++;
+  state.fans[i].count += qty;
   checkAchievements();
   updateAll();
 }
@@ -1243,23 +1269,24 @@ function initTotemRows() {
 function updateTotemRows() {
   const cap = getTotemCapacity();
   const used = getTotalTotems();
+  const fitsQty = (used + buyQty) <= cap;
   totemRowRefs.forEach((ref, i) => {
     const d = TOTEM_TIER_DEFS[i];
-    const cost = getTotemCost(i);
-    const full = used >= cap;
+    const cost = getTotemCost(i, buyQty);
     ref.cntEl.textContent = state.totems[i].count;
     ref.bonusEl.textContent = '+' + (state.totems[i].count * d.bonusPercent).toFixed(1) + '%';
-    ref.costEl.textContent = full ? 'POLE FULL' : ('$' + formatMoney(cost));
-    ref.row.classList.toggle('unaffordable', full || state.money < cost);
+    ref.costEl.textContent = !fitsQty ? 'POLE FULL' : ('$' + formatMoney(cost) + (buyQty > 1 ? ` (x${buyQty})` : ''));
+    ref.row.classList.toggle('unaffordable', !fitsQty || state.money < cost);
   });
 }
 
 function buyTotem(i) {
-  if (getTotalTotems() >= getTotemCapacity()) { showToast('🗿 Totem pole is full — level it up to place more totems!'); return; }
-  const cost = getTotemCost(i);
+  const qty = buyQty;
+  if (getTotalTotems() + qty > getTotemCapacity()) { showToast("🗿 Totem pole doesn't have room for that many — level it up first!"); return; }
+  const cost = getTotemCost(i, qty);
   if (state.money < cost) return;
   state.money -= cost;
-  state.totems[i].count++;
+  state.totems[i].count += qty;
   checkAchievements();
   updateAll();
 }
@@ -1419,7 +1446,8 @@ function renderFeaturePanels() {
 // ── Tabs ───────────────────────────────────────────────────────
 const TAB_CONTENTS = { ascensions: ascensionsTab, buildings: buildingsTab, upgrades: upgradesTab, fans: fansTab, mascot: mascotTab, totems: totemsTab };
 document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const target = btn.dataset.tab;
@@ -1464,16 +1492,17 @@ function checkAchievements() {
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 document.querySelectorAll('[data-close]').forEach(btn => {
-  btn.addEventListener('click', () => closeModal(btn.dataset.close));
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); closeModal(btn.dataset.close); });
 });
 document.querySelectorAll('.modal-overlay').forEach(ov => {
-  ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('show'); });
+  ov.addEventListener('pointerdown', e => { if (e.target === ov) ov.classList.remove('show'); });
 });
 
-document.getElementById('ach-btn').addEventListener('click', () => { renderAchievements(); openModal('ach-modal'); });
+document.getElementById('ach-btn').addEventListener('pointerdown', e => { e.preventDefault(); renderAchievements(); openModal('ach-modal'); });
 
 // ── Ascend (Championship) ──────────────────────────────────────
-ascendBtn.addEventListener('click', () => {
+ascendBtn.addEventListener('pointerdown', e => {
+  e.preventDefault();
   const gain = computeBannerGain();
   const extra = Math.max(0, gain - state.banners);
   document.getElementById('ascend-preview').innerHTML =
@@ -1483,7 +1512,8 @@ ascendBtn.addEventListener('click', () => {
   openModal('ascend-modal');
 });
 
-document.getElementById('ascend-confirm-btn').addEventListener('click', () => {
+document.getElementById('ascend-confirm-btn').addEventListener('pointerdown', e => {
+  e.preventDefault();
   const gain = computeBannerGain();
   state.banners = Math.max(state.banners, gain);
   state.ascendCount++;
@@ -1508,8 +1538,9 @@ document.getElementById('ascend-confirm-btn').addEventListener('click', () => {
 });
 
 // ── Reset ───────────────────────────────────────────────────────
-document.getElementById('reset-btn').addEventListener('click', () => openModal('reset-modal'));
-document.getElementById('reset-confirm-btn').addEventListener('click', () => {
+document.getElementById('reset-btn').addEventListener('pointerdown', e => { e.preventDefault(); openModal('reset-modal'); });
+document.getElementById('reset-confirm-btn').addEventListener('pointerdown', e => {
+  e.preventDefault();
   localStorage.removeItem(saveKeyFor(currentSport));
   state = freshState();
   closeModal('reset-modal');
@@ -1521,7 +1552,8 @@ document.getElementById('reset-confirm-btn').addEventListener('click', () => {
 });
 
 // ── Reload (force fresh version + clear caches) ─────────────────
-document.getElementById('reload-btn').addEventListener('click', async () => {
+document.getElementById('reload-btn').addEventListener('pointerdown', async e => {
+  e.preventDefault();
   try {
     save();
     if (window.caches) {
@@ -1813,13 +1845,21 @@ function loadSportState(sportKey) {
   }
 }
 
-// ── Prevent double-tap-to-zoom on touch devices ─────────────────
-let lastTouchEnd = 0;
-document.addEventListener('touchend', e => {
-  const now = Date.now();
-  if (now - lastTouchEnd <= 300) e.preventDefault();
-  lastTouchEnd = now;
+// ── Completely disable zoom on touch devices ─────────────────────
+// Every interactive element in the game now fires on 'pointerdown', not the
+// synthetic 'click' that follows 'touchend' — so nothing here depends on that
+// synthetic click, and it's safe to unconditionally cancel it on every tap
+// (not just ones under some timing threshold). That kills double-tap-zoom
+// outright instead of racing a 300ms window. Multi-touch (pinch) is blocked
+// separately at 'touchstart', and Safari's proprietary gesture events (its
+// pinch-zoom path bypasses touch events entirely) are blocked too.
+document.addEventListener('touchend', e => e.preventDefault(), { passive: false });
+document.addEventListener('touchstart', e => {
+  if (e.touches.length > 1) e.preventDefault();
 }, { passive: false });
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
+document.addEventListener('gestureend', e => e.preventDefault());
 
 // ── Init ───────────────────────────────────────────────────────
 soccerUnlocked = localStorage.getItem(SOCCER_UNLOCKED_KEY) === '1';
