@@ -17,6 +17,10 @@ canvas overlay for click particles/floating numbers.
 ## Systems
 
 - **Buildings** (`BUILDING_DEFS`): 10 tiers, cost scales `baseCost * 1.15^count`.
+  A buy-quantity bar (1/10/100/Max, `state.buyQuantity`) sits above the list;
+  `getBulkCost(i, qty)` sums the geometric series in closed form (no loop),
+  and `getMaxAffordable(i)` solves the inverse via `log`/`log(1.15)` then
+  nudges ±1 to correct for floating-point edge cases at the boundary.
 - **Building upgrades** (`BUILDING_UPGRADES`, generated from `TIER_CONFIG`):
   each building gets 3 auto-generated upgrades (own 10/25/50) that each double
   that building's output.

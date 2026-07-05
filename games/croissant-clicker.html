@@ -156,9 +156,24 @@ main {
 .row-sub { font-size: 0.56rem; color: var(--dim); margin-top: 2px; }
 .row-desc { font-size: 0.56rem; color: var(--dim); margin-top: 2px; line-height: 1.4; }
 .row-cost { text-align: right; flex-shrink: 0; }
+.qty-tag { font-size: 0.52rem; color: var(--blue); font-weight: 700; display: block; }
 .cost-val { font-size: 0.72rem; color: var(--gold); font-weight: 700; display: block; }
 .cost-label { font-size: 0.5rem; color: var(--dim); }
 .checkmark { color: var(--green); font-size: 0.9rem; }
+
+.qty-bar {
+  display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 2;
+  background: var(--panel);
+}
+.qty-label { font-size: 0.58rem; color: var(--dim); letter-spacing: 1px; font-weight: 700; margin-right: 4px; }
+.qty-btn {
+  background: var(--bg); border: 1px solid var(--border); color: var(--dim);
+  border-radius: 4px; padding: 5px 10px; font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem; font-weight: 700; cursor: pointer; touch-action: manipulation;
+}
+.qty-btn:hover { border-color: var(--gold); color: var(--gold); }
+.qty-btn.active { border-color: var(--green); color: var(--green); background: rgba(57,255,20,0.08); }
 
 #empty-upgrades {
   padding: 30px 16px; text-align: center; color: var(--dim); font-size: 0.62rem; line-height: 1.6;
@@ -403,6 +418,7 @@ function freshState() {
     rebirthCount: 0,
     frenzyActive: false,
     frenzyEndTime: 0,
+    buyQuantity: 1,
     nextGoldenIn: rand(GOLDEN_MIN_MS, GOLDEN_MAX_MS),
     buildings: BUILDING_DEFS.map(() => ({ count: 0 })),
     buildingUpgrades: {},
@@ -488,6 +504,27 @@ function getBuildingCost(i) {
   return Math.ceil(BUILDING_DEFS[i].baseCost * Math.pow(1.15, b.count));
 }
 
+function getBulkCost(i, qty) {
+  if (qty <= 0) return 0;
+  const b = state.buildings[i];
+  const base = BUILDING_DEFS[i].baseCost;
+  return Math.ceil(base * Math.pow(1.15, b.count) * (Math.pow(1.15, qty) - 1) / 0.15);
+}
+
+function getMaxAffordable(i) {
+  const currentCost = getBuildingCost(i);
+  if (state.croissants < currentCost) return 0;
+  let n = Math.floor(Math.log(1 + (state.croissants / currentCost) * 0.15) / Math.log(1.15));
+  n = Math.max(0, n);
+  while (n > 0 && getBulkCost(i, n) > state.croissants) n--;
+  while (getBulkCost(i, n + 1) <= state.croissants) n++;
+  return n;
+}
+
+function getDisplayQty(i) {
+  return state.buyQuantity === 'max' ? getMaxAffordable(i) : state.buyQuantity;
+}
+
 function computeGoldenButterGain() {
   return Math.floor(Math.cbrt(state.totalBakedAllTime / 1e9));
 }
@@ -504,6 +541,34 @@ const rebirthBtn = document.getElementById('rebirth-btn');
 const buildingsTab = document.getElementById('tab-buildings');
 const upgradesTab = document.getElementById('tab-upgrades');
 
+// ── Buy-quantity bar ───────────────────────────────────────────
+function initQtyBar() {
+  const bar = document.createElement('div');
+  bar.className = 'qty-bar';
+  bar.innerHTML = `
+    <span class="qty-label">BUY</span>
+    <button class="qty-btn" data-qty="1">1</button>
+    <button class="qty-btn" data-qty="10">10</button>
+    <button class="qty-btn" data-qty="100">100</button>
+    <button class="qty-btn" data-qty="max">MAX</button>
+  `;
+  buildingsTab.appendChild(bar);
+  bar.querySelectorAll('.qty-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.buyQuantity = btn.dataset.qty === 'max' ? 'max' : parseInt(btn.dataset.qty, 10);
+      updateQtyBarUI();
+      updateBuildingRows();
+    });
+  });
+}
+
+function updateQtyBarUI() {
+  document.querySelectorAll('.qty-btn').forEach(btn => {
+    const val = btn.dataset.qty === 'max' ? 'max' : parseInt(btn.dataset.qty, 10);
+    btn.classList.toggle('active', val === state.buyQuantity);
+  });
+}
+
 // ── Building rows (built once, updated in place) ─────────────
 const buildingRowRefs = [];
 function initBuildingRows() {
@@ -517,12 +582,13 @@ function initBuildingRows() {
         <div class="row-sub">Owned: <span class="cnt">0</span> · <span class="cps">0</span> cps each</div>
         <div class="row-desc">${d.desc}</div>
       </div>
-      <div class="row-cost"><span class="cost-val">${formatCroissants(d.baseCost)}</span><div class="cost-label">croissants</div></div>
+      <div class="row-cost"><span class="qty-tag">×<span class="qty-num">1</span></span><span class="cost-val">${formatCroissants(d.baseCost)}</span><div class="cost-label">croissants</div></div>
     `;
     row.addEventListener('click', () => buyBuilding(i));
     buildingsTab.appendChild(row);
     buildingRowRefs.push({
-      row, cntEl: row.querySelector('.cnt'), cpsEl: row.querySelector('.cps'), costEl: row.querySelector('.cost-val'),
+      row, cntEl: row.querySelector('.cnt'), cpsEl: row.querySelector('.cps'),
+      costEl: row.querySelector('.cost-val'), qtyEl: row.querySelector('.qty-num'),
     });
   });
 }
@@ -532,19 +598,23 @@ function updateBuildingRows() {
     const ref = buildingRowRefs[i];
     const b = state.buildings[i];
     const tierMult = Math.pow(2, getBuildingTierCount(i));
-    const cost = getBuildingCost(i);
+    const qty = getDisplayQty(i);
+    const cost = qty > 0 ? getBulkCost(i, qty) : getBuildingCost(i);
     ref.cntEl.textContent = b.count;
     ref.cpsEl.textContent = formatRate(d.baseCps * tierMult);
     ref.costEl.textContent = formatCroissants(cost);
-    ref.row.classList.toggle('unaffordable', state.croissants < cost);
+    ref.qtyEl.textContent = qty > 0 ? qty : 0;
+    ref.row.classList.toggle('unaffordable', qty <= 0 || state.croissants < cost);
   });
 }
 
 function buyBuilding(i) {
-  const cost = getBuildingCost(i);
+  const qty = getDisplayQty(i);
+  if (qty <= 0) return;
+  const cost = getBulkCost(i, qty);
   if (state.croissants < cost) return;
   state.croissants -= cost;
-  state.buildings[i].count++;
+  state.buildings[i].count += qty;
   checkAchievements();
   refreshUpgradesTab();
   updateAll();
@@ -955,7 +1025,9 @@ function load() {
 
 // ── Init ───────────────────────────────────────────────────────
 load();
+initQtyBar();
 initBuildingRows();
+updateQtyBarUI();
 refreshUpgradesTab();
 renderAchievements();
 resizeCanvas();
