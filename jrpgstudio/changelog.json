@@ -1,6 +1,16 @@
 {
-  "lastSha": "449fae542f5f1f9751524eb33772d85310938b1f",
+  "lastSha": "b0f375c0ebce8053db875c97c17edd5137198896",
   "groups": [
+    {
+      "datetime": "Mon Jul  6 16:30:05 EDT 2026",
+      "sha": "b0f375c0ebce8053db875c97c17edd5137198896",
+      "entries": [
+        "feat(render): paint-in-code 8x8 bitmap font + deterministic bake tool",
+        "feat(render): pixel-perfect integer scaling in the Phaser host",
+        "feat(music): combat-std + combat-boss battle themes",
+        "feat(tools): bgm:check — numeric mix + loop-seam report for scores"
+      ]
+    },
     {
       "datetime": "Mon Jul  6 14:50:56 EDT 2026",
       "sha": "449fae542f5f1f9751524eb33772d85310938b1f",
