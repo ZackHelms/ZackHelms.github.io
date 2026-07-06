@@ -1,0 +1,32 @@
+{
+  "lastSha": "449fae542f5f1f9751524eb33772d85310938b1f",
+  "groups": [
+    {
+      "datetime": "Mon Jul  6 14:50:56 EDT 2026",
+      "sha": "449fae542f5f1f9751524eb33772d85310938b1f",
+      "entries": [
+        "feat(web): clickable build-stamp opens a datetime-grouped changelog modal",
+        "content(dialogue): collapse most NPC dialogue to a single screen",
+        "feat(hometown): plant saplings from the Items menu",
+        "fix(ui): escape the toast dedup separator instead of a raw NUL byte",
+        "feat(ui): timed fade toast overlay + item gain/loss notifications",
+        "feat(ui): pulsing blue-cyan graphical selection cursor on all screens",
+        "feat(ui): silver-pipe chrome, fixed sections, wrapped item descriptions, auto-height dialog",
+        "feat(art): add gear icons (spellbook/sword/bow/axe/pickaxe) + iconFor map",
+        "feat(party): add waist armor slot, cloth starting loadout, save v11",
+        "feat(monster-editor): Monster Editor + Map Zone Monster Pools app",
+        "feat(tools): sync Canon enemies + zones to the asset store (new kinds + migration)",
+        "feat(hometown): town defense -- Dad's ask, tower crafting, camp battles, cave barrier, finale",
+        "feat(hometown): defense world-state (save v10), defense flow, goblin camp builder",
+        "feat(canon): defense quests, archer-tower recipe, goblin leader, defense dialogue, camp maps",
+        "feat(engine): defense tiles, goblin-leader sprite, wandering monster NPCs, bump hook, tile explosion, barrier-down cue",
+        "feat(hometown): rescue Lyla -- Dad joins, gate opens, boss fight, rescue cutscene, party swap",
+        "feat(canon): rescue-lyla quest, stone sword, Lyla, rescue dialogue",
+        "feat(engine): field monster NPCs, lying pose, queued toasts",
+        "feat(hometown): open the overworld behind ?debug — gate warps, generalized harvest + encounters; Canon map entry",
+        "feat(hometown): overworld-00 — regions, patchy path, clearing, harvest scatter, zone truth",
+        "feat(engine): overworld terrain tiles — mountain, big tree/boulder, town mini-tile set"
+      ]
+    }
+  ]
+}

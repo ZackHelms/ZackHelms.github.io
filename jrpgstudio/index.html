@@ -76,20 +76,121 @@
         border-radius: 10px;
         padding: 1px 8px;
       }
+      /* Top-right reload button: matches the panel palette, unobtrusive. */
+      #reload-btn {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font: 13px/1 ui-monospace, 'Cascadia Mono', 'Source Code Pro', monospace;
+        cursor: pointer;
+      }
+      #reload-btn:hover,
+      #reload-btn:focus-visible {
+        border-color: var(--accent);
+        color: var(--accent);
+        outline: none;
+      }
       /* Publish stamp: empty in dev; publish.sh injects the build date here so
-         it's clear which version is live. Lower-right corner, gray (ADR-0007). */
+         it's clear which version is live. Lower-right corner, gray (ADR-0007).
+         Clickable in published builds — opens the changelog modal (a no-op in
+         dev, where the stamp is empty and there is no ./changelog.json). */
       #build-stamp {
         position: fixed;
         right: 4px;
         bottom: 3px;
         color: #808080;
         font: 11px/1 ui-monospace, monospace;
-        pointer-events: none;
+        pointer-events: auto;
+        cursor: pointer;
         user-select: none;
+      }
+      /* Full-screen changelog modal (polish-01 #15): dark scrim + opaque panel,
+         top-right ✕, Esc to close, scrollable body. Framework-free. */
+      #changelog-modal[hidden] {
+        display: none;
+      }
+      #changelog-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #changelog-scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.72);
+      }
+      #changelog-panel {
+        position: relative;
+        width: min(680px, calc(100vw - 32px));
+        max-height: calc(100vh - 48px);
+        display: flex;
+        flex-direction: column;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+      }
+      #changelog-panel h2 {
+        margin: 0;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+      }
+      #changelog-close {
+        position: absolute;
+        top: 10px;
+        right: 12px;
+        background: transparent;
+        color: var(--muted);
+        border: none;
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 4px 8px;
+      }
+      #changelog-close:hover,
+      #changelog-close:focus-visible {
+        color: var(--text);
+        outline: none;
+      }
+      #changelog-body {
+        overflow-y: auto;
+        padding: 8px 20px 20px;
+        font-size: 14px;
+      }
+      #changelog-body .cl-group {
+        margin: 16px 0 0;
+      }
+      #changelog-body .cl-date {
+        font-size: 12px;
+        color: var(--accent);
+        letter-spacing: 0.04em;
+        margin: 0 0 6px;
+      }
+      #changelog-body ul {
+        list-style: disc;
+        margin: 0;
+        padding-left: 18px;
+      }
+      #changelog-body li {
+        margin: 3px 0;
+        color: var(--text);
+      }
+      #changelog-body .cl-empty {
+        color: var(--muted);
       }
     </style>
   </head>
   <body>
+    <button id="reload-btn" type="button" aria-label="Reload" onclick="location.reload()">⟳ Reload</button>
     <main>
       <h1>JRPG Studio</h1>
       <p class="tagline">Classic 16-bit JRPGs, and the tools that build them.</p>
@@ -108,6 +209,79 @@
         <li><a class="entry" href="./monster-editor/?kind=zone">Map Zone Monster Pools</a></li>
       </ul>
     </main>
-    <div id="build-stamp">Mon Jul  6 10:13:26 EDT 2026</div>
+    <div id="build-stamp">Mon Jul  6 14:50:56 EDT 2026</div>
+    <div id="changelog-modal" hidden>
+      <div id="changelog-scrim"></div>
+      <div id="changelog-panel" role="dialog" aria-modal="true" aria-label="Changelog">
+        <button id="changelog-close" type="button" aria-label="Close changelog">✕</button>
+        <h2>Changelog</h2>
+        <div id="changelog-body"></div>
+      </div>
+    </div>
+    <!-- Changelog modal wiring (polish-01 #15). Published-only: the build-stamp
+         is empty in dev and there is no ./changelog.json, so the click is a safe
+         no-op. Same inline snippet lives in games/hometown/index.html. -->
+    <script>
+      (() => {
+        const stamp = document.getElementById('build-stamp');
+        const modal = document.getElementById('changelog-modal');
+        if (!stamp || !modal) return;
+        const body = document.getElementById('changelog-body');
+        const closeBtn = document.getElementById('changelog-close');
+        const scrim = document.getElementById('changelog-scrim');
+        const esc = (s) =>
+          String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+        const onKey = (e) => {
+          if (e.key === 'Escape') closeModal();
+        };
+        const closeModal = () => {
+          modal.hidden = true;
+          document.removeEventListener('keydown', onKey);
+        };
+        const openModal = () => {
+          modal.hidden = false;
+          document.addEventListener('keydown', onKey);
+          if (closeBtn) closeBtn.focus();
+        };
+        const render = (data) => {
+          const groups = data && Array.isArray(data.groups) ? data.groups : [];
+          if (!groups.length) {
+            body.innerHTML = '<p class="cl-empty">No changes recorded yet.</p>';
+            return;
+          }
+          body.innerHTML = groups
+            .map((g) => {
+              const entries = Array.isArray(g.entries) ? g.entries : [];
+              const items = entries.map((e) => '<li>' + esc(e) + '</li>').join('');
+              return (
+                '<div class="cl-group"><p class="cl-date">' +
+                esc(g.datetime || '') +
+                '</p><ul>' +
+                items +
+                '</ul></div>'
+              );
+            })
+            .join('');
+        };
+        stamp.addEventListener('click', () => {
+          // Dev builds leave the stamp empty — no stamp, no modal.
+          if (!stamp.textContent?.trim()) return;
+          fetch('./changelog.json', { cache: 'no-store' })
+            .then((r) => {
+              if (!r.ok) throw new Error('no changelog');
+              return r.json();
+            })
+            .then((data) => {
+              render(data);
+              openModal();
+            })
+            .catch(() => {
+              /* 404 / parse error (dev): safe no-op */
+            });
+        });
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        if (scrim) scrim.addEventListener('click', closeModal);
+      })();
+    </script>
   </body>
 </html>
