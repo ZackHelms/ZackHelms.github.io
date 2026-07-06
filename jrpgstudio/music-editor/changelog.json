@@ -1,6 +1,13 @@
 {
-  "lastSha": "b0f375c0ebce8053db875c97c17edd5137198896",
+  "lastSha": "ce0ae5f2ade7ab3f223b945a53138df64ae044e7",
   "groups": [
+    {
+      "datetime": "Mon Jul  6 20:42:23 UTC 2026",
+      "sha": "ce0ae5f2ade7ab3f223b945a53138df64ae044e7",
+      "entries": [
+        "feat(audio): wire combat BGM into battles (combat-std / combat-boss)"
+      ]
+    },
     {
       "datetime": "Mon Jul  6 16:30:05 EDT 2026",
       "sha": "b0f375c0ebce8053db875c97c17edd5137198896",
