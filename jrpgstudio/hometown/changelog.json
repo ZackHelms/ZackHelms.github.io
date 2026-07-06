@@ -1,6 +1,13 @@
 {
-  "lastSha": "a3d5e51ee7ce682c0cab171c6c623ce97e2a51aa",
+  "lastSha": "a019360378c11aaf0dbd9aff6c7e328a1dcbe7ab",
   "groups": [
+    {
+      "datetime": "Mon Jul  6 19:43:48 EDT 2026",
+      "sha": "a019360378c11aaf0dbd9aff6c7e328a1dcbe7ab",
+      "entries": [
+        "fix(tools): flip bitmap-font UV V-coordinate (the real garbled-text bug)"
+      ]
+    },
     {
       "datetime": "Mon Jul  6 19:24:52 EDT 2026",
       "sha": "a3d5e51ee7ce682c0cab171c6c623ce97e2a51aa",
