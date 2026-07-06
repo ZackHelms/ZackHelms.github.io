@@ -26,8 +26,18 @@ canvas overlay for click particles/floating numbers.
   that building's output.
 - **Click upgrades** (`CLICK_UPGRADE_DEFS`): 6 hand-authored, unlock by lifetime
   baked thresholds, mix of flat add / multiplier / "% of CPS" effects.
-- **Achievements** (`ACHIEVEMENT_DEFS`): 22 milestone-based, each unlocked one
+- **Achievements** (`ACHIEVEMENT_DEFS`): 26 milestone-based, each unlocked one
   grants +0.25% to `achievementMultiplier()` (global production).
+- **Medals** (`MEDAL_DEFS`, rendered at the top of the Upgrades tab): 5
+  one-time purchases, unlocked strictly sequentially — `isMedalUnlocked(i)`
+  requires medal `i-1` owned — with escalating cost (1M/100M/10B/1T/100T) and
+  escalating bonus (+30/50/100/500/1000%). `medalMultiplier()` sums the
+  percent of every owned medal into one `1 + total/100` multiplier applied to
+  BOTH `getCps()` and `getClickPower()` (unlike the Boosts/Rebirth systems,
+  which keep money and speed as separate tracks — medals are deliberately "of
+  everything" per the request). Medals are permanent: NOT reset by Rebirth or
+  Big Rebirth, only wiped by a full hard reset — closer in spirit to
+  achievements than to the Boosts tab.
 - **Boosts tab** (3rd tab, `initBoostRows()`/`updateBoostRows()`): three
   independent repeatable purchases, each built from the same generic
   `initBoostRow(container, opts)` / `updateBoostRow(ref)` helpers so they
