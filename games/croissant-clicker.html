@@ -174,7 +174,6 @@ main {
 }
 .store-row.medal-row:hover { background: rgba(255,195,0,0.15); }
 .store-row.medal-row .row-name { color: var(--gold); }
-.store-row.medal-row.purchased { opacity: 0.6; }
 
 .qty-bar {
   display: flex; align-items: center; gap: 6px; padding: 8px 12px;
@@ -266,7 +265,7 @@ main {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-06 13:37 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-06 20:22 UTC</div>
 
 <header>
   <a id="back-link" href="index.html">&larr; GAMES</a>
@@ -430,13 +429,28 @@ const CLICK_UPGRADE_DEFS = [
   { id:'cu5', name:'Legendary Croissant Touch',desc:'Click power +1% of your CPS.',    cost: 5000000, unlockAt: 1000000, type:'cpsPercent', value: 0.01 },
 ];
 
-const MEDAL_DEFS = [
-  { id:'medal0', name:'Bronze Medal',   icon:'🥉', percent: 30,   cost: 1000000 },
-  { id:'medal1', name:'Silver Medal',   icon:'🥈', percent: 50,   cost: 100000000 },
-  { id:'medal2', name:'Gold Medal',     icon:'🥇', percent: 100,  cost: 10000000000 },
-  { id:'medal3', name:'Platinum Medal', icon:'🏆', percent: 500,  cost: 1000000000000 },
-  { id:'medal4', name:'Diamond Medal',  icon:'💎', percent: 1000, cost: 100000000000000 },
-];
+// Medals are unlimited: named/fixed-percent for the first 5 tiers, then the
+// pattern continues forever (percent doubles each tier; cost keeps the same
+// x100-per-tier scaling already implicit in the first 5 costs below).
+const MEDAL_TIER_NAMES   = ['Bronze Medal', 'Silver Medal', 'Gold Medal', 'Platinum Medal', 'Diamond Medal'];
+const MEDAL_TIER_ICONS   = ['🥉', '🥈', '🥇', '🏆', '💎'];
+const MEDAL_BASE_PERCENTS = [30, 50, 100, 500, 1000];
+const MEDAL_BASE_COST = 1000000;
+const MEDAL_COST_MULT = 100;
+
+function getMedalPercent(n) {
+  if (n <= MEDAL_BASE_PERCENTS.length) return MEDAL_BASE_PERCENTS[n - 1];
+  return MEDAL_BASE_PERCENTS[MEDAL_BASE_PERCENTS.length - 1] * Math.pow(2, n - MEDAL_BASE_PERCENTS.length);
+}
+function getMedalCost(n) {
+  return Math.ceil(MEDAL_BASE_COST * Math.pow(MEDAL_COST_MULT, n - 1));
+}
+function getMedalName(n) {
+  return n <= MEDAL_TIER_NAMES.length ? MEDAL_TIER_NAMES[n - 1] : `Medal #${n}`;
+}
+function getMedalIcon(n) {
+  return n <= MEDAL_TIER_ICONS.length ? MEDAL_TIER_ICONS[n - 1] : '🎖️';
+}
 
 const ACHIEVEMENT_DEFS = [
   { id:'a0',  icon:'🥐', name:'First Crumb',         desc:'Bake your first croissant.',        cond: s => s.totalBakedAllTime >= 1 },
@@ -464,7 +478,7 @@ const ACHIEVEMENT_DEFS = [
   { id:'a22', icon:'🐔', name:'Chicken Dinner',      desc:'Earn your first Chicken Croissant.', cond: s => s.chickenCroissants >= 1 },
   { id:'a23', icon:'👊', name:'Heavy Hitter',        desc:'Reach Click Power boost level 10.', cond: s => s.clickPowerBoostLevel >= 10 },
   { id:'a24', icon:'⚡', name:'Quick Hands',         desc:'Reach Speed Boost level 10.',       cond: s => s.speedBoostLevel >= 10 },
-  { id:'a25', icon:'🏅', name:'Decorated',           desc:'Earn all 5 medals.',                cond: s => MEDAL_DEFS.every(m => s.medals[m.id]) },
+  { id:'a25', icon:'🏅', name:'Decorated',           desc:'Earn 5 medals.',                    cond: s => s.medalLevel >= 5 },
 ];
 
 // ── State ──────────────────────────────────────────────────────
@@ -488,11 +502,11 @@ function freshState() {
     storeLevel: 0,
     clickPowerBoostLevel: 0,
     speedBoostLevel: 0,
+    medalLevel: 0,
     nextGoldenIn: rand(GOLDEN_MIN_MS, GOLDEN_MAX_MS),
     buildings: BUILDING_DEFS.map(() => ({ count: 0 })),
     buildingUpgrades: {},
     clickUpgrades: {},
-    medals: {},
     achievements: {},
     lastSave: null,
   };
@@ -554,7 +568,7 @@ function clickPowerBoostBonus() { return state.clickPowerBoostLevel * CLICK_POWE
 function getClickPowerBoostCost() { return Math.ceil(CLICK_POWER_BOOST_BASE_COST * Math.pow(CLICK_POWER_BOOST_COST_MULT, state.clickPowerBoostLevel)); }
 function medalMultiplier() {
   let totalPercent = 0;
-  MEDAL_DEFS.forEach(m => { if (state.medals[m.id]) totalPercent += m.percent; });
+  for (let n = 1; n <= state.medalLevel; n++) totalPercent += getMedalPercent(n);
   return 1 + totalPercent / 100;
 }
 
@@ -787,29 +801,28 @@ function buyBuilding(i) {
 // ── Upgrades tab (rebuilt on change; small list) ─────────────
 function isClickUpgradeUnlocked(u) { return state.totalBakedAllTime >= u.unlockAt || state.clickUpgrades[u.id]; }
 function isBuildingUpgradeUnlocked(u) { return state.buildings[u.buildingIndex].count >= u.req || state.buildingUpgrades[u.id]; }
-function isMedalUnlocked(index) { return index === 0 || !!state.medals[MEDAL_DEFS[index - 1].id]; }
-
 function refreshUpgradesTab() {
   upgradesTab.innerHTML = '';
   let shown = 0;
 
-  MEDAL_DEFS.forEach((m, i) => {
-    if (!isMedalUnlocked(i)) return;
+  {
+    const n = state.medalLevel + 1;
+    const cost = getMedalCost(n);
     shown++;
-    const purchased = !!state.medals[m.id];
     const row = document.createElement('div');
-    row.className = 'store-row medal-row' + (purchased ? ' purchased' : (state.croissants < m.cost ? ' unaffordable' : ''));
+    row.className = 'store-row medal-row' + (state.croissants < cost ? ' unaffordable' : '');
     row.innerHTML = `
-      <div class="row-icon">${m.icon}</div>
+      <div class="row-icon">${getMedalIcon(n)}</div>
       <div class="row-info">
-        <div class="row-name">${m.name}</div>
-        <div class="row-desc">Permanently boosts all money and click power by +${m.percent}%, forever. Never resets, not even on Rebirth.</div>
+        <div class="row-name">${getMedalName(n)} <span style="color:var(--dim);font-weight:400;">(medal #${n})</span></div>
+        <div class="row-sub">Medals earned: ${state.medalLevel} · total bonus: +${Math.round((medalMultiplier() - 1) * 100)}%</div>
+        <div class="row-desc">Permanently boosts all money and click power by another +${getMedalPercent(n)}%, forever. Never resets, not even on Rebirth. No limit — medals can be earned forever.</div>
       </div>
-      <div class="row-cost">${purchased ? '<span class="checkmark">✓</span>' : `<span class="cost-val">${formatCroissants(m.cost)}</span><div class="cost-label">croissants</div>`}</div>
+      <div class="row-cost"><span class="cost-val">${formatCroissants(cost)}</span><div class="cost-label">croissants</div></div>
     `;
-    if (!purchased) row.addEventListener('click', () => buyMedal(m.id));
+    row.addEventListener('click', buyMedal);
     upgradesTab.appendChild(row);
-  });
+  }
 
   CLICK_UPGRADE_DEFS.forEach(u => {
     if (!isClickUpgradeUnlocked(u)) return;
@@ -870,16 +883,16 @@ function buyBuildingUpgrade(id) {
   updateAll();
 }
 
-function buyMedal(id) {
-  const m = MEDAL_DEFS.find(x => x.id === id);
-  const index = MEDAL_DEFS.indexOf(m);
-  if (!m || state.medals[id] || !isMedalUnlocked(index) || state.croissants < m.cost) return;
-  state.croissants -= m.cost;
-  state.medals[id] = true;
+function buyMedal() {
+  const n = state.medalLevel + 1;
+  const cost = getMedalCost(n);
+  if (state.croissants < cost) return;
+  state.croissants -= cost;
+  state.medalLevel = n;
   checkAchievements();
   refreshUpgradesTab();
   updateAll();
-  showToast(`🏅 ${m.name} earned! +${m.percent}% money and click power, forever.`);
+  showToast(`🏅 ${getMedalName(n)} earned! +${getMedalPercent(n)}% money and click power, forever.`);
 }
 
 // ── Tabs ───────────────────────────────────────────────────────
@@ -1236,7 +1249,6 @@ function load() {
     state.buildings = BUILDING_DEFS.map((d, i) => ({ count: (parsed.buildings && parsed.buildings[i] && parsed.buildings[i].count) || 0 }));
     state.buildingUpgrades = parsed.buildingUpgrades || {};
     state.clickUpgrades = parsed.clickUpgrades || {};
-    state.medals = parsed.medals || {};
     state.achievements = parsed.achievements || {};
     state.frenzyActive = false;
 

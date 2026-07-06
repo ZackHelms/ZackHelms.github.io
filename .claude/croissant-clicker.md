@@ -28,16 +28,24 @@ canvas overlay for click particles/floating numbers.
   baked thresholds, mix of flat add / multiplier / "% of CPS" effects.
 - **Achievements** (`ACHIEVEMENT_DEFS`): 26 milestone-based, each unlocked one
   grants +0.25% to `achievementMultiplier()` (global production).
-- **Medals** (`MEDAL_DEFS`, rendered at the top of the Upgrades tab): 5
-  one-time purchases, unlocked strictly sequentially — `isMedalUnlocked(i)`
-  requires medal `i-1` owned — with escalating cost (1M/100M/10B/1T/100T) and
-  escalating bonus (+30/50/100/500/1000%). `medalMultiplier()` sums the
-  percent of every owned medal into one `1 + total/100` multiplier applied to
-  BOTH `getCps()` and `getClickPower()` (unlike the Boosts/Rebirth systems,
-  which keep money and speed as separate tracks — medals are deliberately "of
-  everything" per the request). Medals are permanent: NOT reset by Rebirth or
-  Big Rebirth, only wiped by a full hard reset — closer in spirit to
-  achievements than to the Boosts tab.
+- **Medals** (`state.medalLevel`, rendered as a single row at the top of the
+  Upgrades tab): unlimited — there is no fixed list. `getMedalPercent(n)` /
+  `getMedalCost(n)` / `getMedalName(n)` / `getMedalIcon(n)` are pure functions
+  of the medal number `n`, not a static array. The first 5 are fixed/named
+  (`MEDAL_BASE_PERCENTS = [30,50,100,500,1000]`, cost `1e6 * 100^(n-1)` —
+  1M/100M/10B/1T/100T); beyond n=5 the name falls back to `Medal #n`, the icon
+  to 🎖️, the percent keeps doubling (`1000 * 2^(n-5)`), and cost keeps the
+  same x100-per-tier scaling. `medalMultiplier()` sums `getMedalPercent(n)`
+  for `n` from 1 to `state.medalLevel` into one `1 + total/100` multiplier
+  applied to BOTH `getCps()` and `getClickPower()` (unlike the Boosts/Rebirth
+  systems, which keep money and speed as separate tracks — medals are
+  deliberately "of everything"). The row always displays medal
+  `state.medalLevel + 1` (the next one to buy); buying it just increments
+  `medalLevel` — no per-medal purchased-state bookkeeping needed since it's a
+  single always-increasing counter. Medals are permanent: NOT reset by
+  Rebirth or Big Rebirth, only wiped by a full hard reset — closer in spirit
+  to achievements than to the Boosts tab. "Decorated" achievement fires at
+  `medalLevel >= 5`.
 - **Boosts tab** (3rd tab, `initBoostRows()`/`updateBoostRows()`): three
   independent repeatable purchases, each built from the same generic
   `initBoostRow(container, opts)` / `updateBoostRow(ref)` helpers so they

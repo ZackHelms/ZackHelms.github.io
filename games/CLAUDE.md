@@ -81,9 +81,10 @@ use abilities, defeat bosses including a Final Overlord. Largest game by line co
 Cookie Clicker-style idle/incremental. Click to bake, buy 10 tiers of
 buildings, unlock click/building upgrades and achievements, catch golden
 croissants for bonuses. A Boosts tab has 3 independent repeatable purchases
-(Money %, Speed %, flat Click Power). 5 sequential permanent Medals (Bronze
-through Diamond) each add +30/50/100/500/1000% to both money and click power,
-escalating in cost, and never reset (not even by Rebirth). Rebirth grants
+(Money %, Speed %, flat Click Power). Unlimited permanent Medals (Bronze
+through Diamond, then "Medal #6", "#7", ...) each add to both money and click
+power — +30/50/100/500/1000% for the first 5, doubling forever after — at
+escalating cost, and never reset (not even by Rebirth). Rebirth grants
 Golden Butter (+1% click speed / +1% money each) based on production since
 your last rebirth, and genuinely stacks across repeated rebirths; a deeper
 Big Rebirth converts Golden Butter into Chicken Croissants (+400% money each,
