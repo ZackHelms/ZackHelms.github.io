@@ -1,6 +1,13 @@
 {
-  "lastSha": "e1e66e8db5ed394f072e342f4455198717ff1690",
+  "lastSha": "a3d5e51ee7ce682c0cab171c6c623ce97e2a51aa",
   "groups": [
+    {
+      "datetime": "Mon Jul  6 19:24:52 EDT 2026",
+      "sha": "a3d5e51ee7ce682c0cab171c6c623ce97e2a51aa",
+      "entries": [
+        "fix(publish): sync the Pages checkout before copying; guard HTML/asset consistency and .env"
+      ]
+    },
     {
       "datetime": "Mon Jul  6 19:04:15 EDT 2026",
       "sha": "e1e66e8db5ed394f072e342f4455198717ff1690",
