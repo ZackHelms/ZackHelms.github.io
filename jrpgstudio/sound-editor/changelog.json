@@ -1,6 +1,14 @@
 {
-  "lastSha": "db5c0f379fe13bbab3c2227686c570805ab79c21",
+  "lastSha": "e1e66e8db5ed394f072e342f4455198717ff1690",
   "groups": [
+    {
+      "datetime": "Mon Jul  6 19:04:15 EDT 2026",
+      "sha": "e1e66e8db5ed394f072e342f4455198717ff1690",
+      "entries": [
+        "feat(engine): auto-fit tiles-visible sizing (integer-zoom, crisp)",
+        "fix(tools): gutter + half-texel-inset UVs in bitmap-font bake (iOS texel bleed)"
+      ]
+    },
     {
       "datetime": "Mon Jul  6 17:46:38 EDT 2026",
       "sha": "db5c0f379fe13bbab3c2227686c570805ab79c21",
