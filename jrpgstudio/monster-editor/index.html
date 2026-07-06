@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>JRPG Studio — Sound Editor</title>
+    <title>JRPG Studio — Monster Editor</title>
     <style>
       main.studio-main {
         display: flex;
@@ -32,17 +32,34 @@
         margin: 8px 0;
       }
       #editor .row label {
-        min-width: 90px;
+        min-width: 96px;
         color: var(--muted);
       }
-      #editor input[type='range'] {
+      #editor input[type='text'],
+      #editor input[type='number'],
+      #editor textarea,
+      #editor select {
         flex: 1;
+        min-width: 0;
+      }
+      #editor input[type='number'] {
+        flex: 0 0 6em;
+      }
+      #editor textarea {
+        resize: vertical;
       }
       #editor .osc {
         border: 1px solid var(--border);
         border-radius: 4px;
         padding: 6px 10px;
         margin: 8px 0;
+      }
+      #editor .osc .row {
+        margin: 4px 0;
+      }
+      #editor .pct {
+        flex: 0 0 3.5em;
+        text-align: right;
       }
       @media (orientation: landscape) {
         main.studio-main {
@@ -57,7 +74,7 @@
         }
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-BqkyyeKT.js"></script>
+    <script type="module" crossorigin src="./assets/index-4yGJnzH_.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-DrVYjEjo.css">
   </head>
   <body>
