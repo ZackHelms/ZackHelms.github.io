@@ -1,6 +1,15 @@
 {
-  "lastSha": "4621256f580aa8e32aff7f47b1120b9223174a85",
+  "lastSha": "59708467aa97e329f59e2120164f60dec8cd62f9",
   "groups": [
+    {
+      "datetime": "Mon Jul  6 22:39:01 EDT 2026",
+      "sha": "59708467aa97e329f59e2120164f60dec8cd62f9",
+      "entries": [
+        "fix(hometown): character-create fits the narrow mobile framebuffer",
+        "fix(runtime): mobile display fit, menu overflow, and facing-right avatar",
+        "feat(studio): oversee outcome ledger + summarizer"
+      ]
+    },
     {
       "datetime": "Mon Jul  6 20:26:18 EDT 2026",
       "sha": "4621256f580aa8e32aff7f47b1120b9223174a85",
