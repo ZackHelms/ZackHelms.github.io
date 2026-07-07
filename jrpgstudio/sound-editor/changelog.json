@@ -1,6 +1,13 @@
 {
-  "lastSha": "a019360378c11aaf0dbd9aff6c7e328a1dcbe7ab",
+  "lastSha": "4621256f580aa8e32aff7f47b1120b9223174a85",
   "groups": [
+    {
+      "datetime": "Mon Jul  6 20:26:18 EDT 2026",
+      "sha": "4621256f580aa8e32aff7f47b1120b9223174a85",
+      "entries": [
+        "fix(runtime): gutter avatar spritesheet frames (facing-right black bar at DPR 3)"
+      ]
+    },
     {
       "datetime": "Mon Jul  6 19:43:48 EDT 2026",
       "sha": "a019360378c11aaf0dbd9aff6c7e328a1dcbe7ab",
