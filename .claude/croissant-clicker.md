@@ -73,11 +73,15 @@ canvas overlay for click particles/floating numbers.
   rebirths — rather than the old `max(goldenButter, gain)`. The incremental
   baseline is what prevents that from being a free-infinite-rebirth exploit:
   spamming rebirth with no new production in between always yields gain 0.
-  Each point of Golden Butter is two independent permanent +1% multipliers —
+  Each point of Golden Butter is two independent permanent
+  `REBIRTH_PERCENT_PER_BUTTER`% (currently 30%) multipliers —
   `rebirthSpeedMultiplier()` (click power) and `rebirthMoneyMultiplier()` (CPS)
   — rather than one shared multiplier. Resets croissants/buildings/upgrades/
   boosts but NOT `totalBakedAllTime`, `totalBakedAtLastRebirth`, `goldenButter`,
-  or achievements.
+  or achievements. All rebirth-preview/toast text derives the displayed %
+  from `REBIRTH_PERCENT_PER_BUTTER` rather than assuming 1:1 with the Golden
+  Butter count — the static modal description text is the one place the rate
+  is hand-written and needs updating by hand if this constant changes again.
 - **Big Rebirth**: same incremental-stacking pattern one layer up — gated on
   `state.goldenButter` minus a `state.goldenButterAtLastBigRebirth` baseline:
   `computeChickenCroissantGain() = floor(cbrt((goldenButter -

@@ -265,7 +265,7 @@ main {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-06 20:22 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-07 13:28 UTC</div>
 
 <header>
   <a id="back-link" href="index.html">&larr; GAMES</a>
@@ -324,7 +324,7 @@ main {
   <div class="modal-box">
     <div class="modal-head"><h2>REBIRTH</h2><button class="modal-close" data-close="rebirth-modal">✕</button></div>
     <div class="modal-body">
-      <p>Rebirthing resets your croissants, buildings, and upgrades — but grants permanent <b style="color:var(--purple)">Golden Butter</b> based on your lifetime baking. Each Golden Butter is worth <b>+1% click speed</b> and <b>+1% money</b>, forever.</p>
+      <p>Rebirthing resets your croissants, buildings, and upgrades — but grants permanent <b style="color:var(--purple)">Golden Butter</b> based on your lifetime baking. Each Golden Butter is worth <b>+30% click speed</b> and <b>+30% money</b>, forever.</p>
       <p id="rebirth-preview"></p>
     </div>
     <div class="modal-actions">
@@ -389,6 +389,8 @@ const GOLDEN_LIFETIME_MS = 13000;
 const STORE_UPGRADE_BASE_COST = 10000;
 const STORE_UPGRADE_COST_MULT = 8;
 const STORE_UPGRADE_MONEY_MULT = 1.3;
+
+const REBIRTH_PERCENT_PER_BUTTER = 30;
 
 const BIG_REBIRTH_UNLOCK_GB = 50;
 const CHICKEN_CROISSANT_MONEY_MULT = 5;
@@ -552,8 +554,8 @@ function unlockedAchievementCount() {
   return ACHIEVEMENT_DEFS.reduce((acc, a) => acc + (state.achievements[a.id] ? 1 : 0), 0);
 }
 function achievementMultiplier() { return 1 + unlockedAchievementCount() * 0.0025; }
-function rebirthMoneyMultiplier() { return 1 + state.goldenButter * 0.01; }
-function rebirthSpeedMultiplier() { return 1 + state.goldenButter * 0.01; }
+function rebirthMoneyMultiplier() { return 1 + state.goldenButter * (REBIRTH_PERCENT_PER_BUTTER / 100); }
+function rebirthSpeedMultiplier() { return 1 + state.goldenButter * (REBIRTH_PERCENT_PER_BUTTER / 100); }
 function frenzyMultiplier() { return state.frenzyActive ? FRENZY_MULT : 1; }
 function storeUpgradeMultiplier() { return Math.pow(STORE_UPGRADE_MONEY_MULT, state.storeLevel); }
 function getStoreUpgradeCost() { return Math.ceil(STORE_UPGRADE_BASE_COST * Math.pow(STORE_UPGRADE_COST_MULT, state.storeLevel)); }
@@ -957,7 +959,7 @@ rebirthBtn.addEventListener('click', () => {
   const gain = computeGoldenButterGain();
   document.getElementById('rebirth-preview').innerHTML =
     gain > 0
-      ? `You will gain <b style="color:var(--purple)">+${gain} Golden Butter</b> — stacking onto your current ${state.goldenButter} for a new total of <b>${state.goldenButter + gain}</b>, for a permanent <b>+${state.goldenButter + gain}%</b> click speed and <b>+${state.goldenButter + gain}%</b> money, forever.`
+      ? `You will gain <b style="color:var(--purple)">+${gain} Golden Butter</b> — stacking onto your current ${state.goldenButter} for a new total of <b>${state.goldenButter + gain}</b>, for a permanent <b>+${(state.goldenButter + gain) * REBIRTH_PERCENT_PER_BUTTER}%</b> click speed and <b>+${(state.goldenButter + gain) * REBIRTH_PERCENT_PER_BUTTER}%</b> money, forever.`
       : `No new Golden Butter to gain yet — bake more croissants first.`;
   openModal('rebirth-modal');
 });
@@ -979,7 +981,7 @@ document.getElementById('rebirth-confirm-btn').addEventListener('click', () => {
   checkAchievements();
   refreshUpgradesTab();
   updateAll();
-  showToast(`✨ Reborn! +${gain} Golden Butter (total ${state.goldenButter}) — +${state.goldenButter}% click speed, +${state.goldenButter}% money`);
+  showToast(`✨ Reborn! +${gain} Golden Butter (total ${state.goldenButter}) — +${state.goldenButter * REBIRTH_PERCENT_PER_BUTTER}% click speed, +${state.goldenButter * REBIRTH_PERCENT_PER_BUTTER}% money`);
 });
 
 // ── Big Rebirth ────────────────────────────────────────────────
