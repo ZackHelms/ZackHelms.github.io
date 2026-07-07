@@ -1,6 +1,15 @@
 {
-  "lastSha": "54eb94a57b2ca9bc9526f02c929684c54854753a",
+  "lastSha": "55c0138189c3c83c9ef6f89b74d3c41d6e642e32",
   "groups": [
+    {
+      "datetime": "Tue Jul  7 06:54:08 EDT 2026",
+      "sha": "55c0138189c3c83c9ef6f89b74d3c41d6e642e32",
+      "entries": [
+        "fix(runtime): reconcile canvas display size on rotation (landscape squish)",
+        "fix(engine): DPR-aware auto-fit zoom for finer, still-crisp View-size steps",
+        "fix(engine): stack Team/Shop menu panes on the narrow portrait framebuffer"
+      ]
+    },
     {
       "datetime": "Tue Jul  7 00:43:04 EDT 2026",
       "sha": "54eb94a57b2ca9bc9526f02c929684c54854753a",
