@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      Mobile hardening (plan 0001, task 7). viewport-fit=cover + the
+      safe-area CSS below let fixed UI (chrome bar, rotate overlay) offset
+      around the iPhone notch/home-indicator; user-scalable=no is a backstop
+      for pinch-zoom (src/ui/gesture-guard.ts also blocks gesturestart/
+      dblclick, since user-scalable alone doesn't stop every zoom gesture).
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#1a1a2e" />
+    <!--
+      Add-to-Home-Screen standalone support: iPhone Safari has no element
+      Fullscreen API (research note, Part B #7) — running as an installed
+      PWA (display: standalone, chrome hidden) is the fallback src/ui/chrome.ts
+      offers instead of a fullscreen button on that platform.
+    -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <!--
+      Manifest/icon hrefs below are deliberately relative (no leading "/"):
+      the app deploys under /games/zed-shooter/ (vite.config.ts base: './'),
+      and a same-directory-relative href resolves correctly against wherever
+      index.html itself is served from, regardless of that base setting —
+      no dependence on how Vite's HTML plugin rewrites link tags for files
+      copied verbatim from public/.
+    -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <title>ZED-FPS</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        /* position: fixed + inset: 0 (rather than just overflow: hidden)
+           blocks iOS Safari's rubber-band overscroll, which `overflow`
+           alone does not fully suppress. */
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #000;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #app {
+        width: 100%;
+        height: 100%;
+        display: block;
+        touch-action: none;
+      }
+      #app canvas {
+        display: block;
+        touch-action: none;
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/index-_oNTBg-a.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>
