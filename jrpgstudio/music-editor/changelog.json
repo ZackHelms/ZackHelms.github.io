@@ -1,6 +1,13 @@
 {
-  "lastSha": "59708467aa97e329f59e2120164f60dec8cd62f9",
+  "lastSha": "54eb94a57b2ca9bc9526f02c929684c54854753a",
   "groups": [
+    {
+      "datetime": "Tue Jul  7 00:43:04 EDT 2026",
+      "sha": "54eb94a57b2ca9bc9526f02c929684c54854753a",
+      "entries": [
+        "feat(tools): port-game-to-rn command + script; ADR-0024 RN WebView packaging"
+      ]
+    },
     {
       "datetime": "Mon Jul  6 22:39:01 EDT 2026",
       "sha": "59708467aa97e329f59e2120164f60dec8cd62f9",
