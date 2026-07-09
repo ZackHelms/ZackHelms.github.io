@@ -77,18 +77,21 @@ Top-down RTS-lite. Command stick-figure army across 50 waves. Recruit troops,
 use abilities, defeat bosses including a Final Overlord. Largest game by line count.
 ~54 functions. `stick-commander-3d.v001.html` is a saved checkpoint.
 
-### CROISSANT CLICKER (`croissant-clicker.html`, ~850 lines)
+### CROISSANT CLICKER (`croissant-clicker.html`, ~950 lines)
 Cookie Clicker-style idle/incremental. Click to bake, buy 10 tiers of
 buildings, unlock click/building upgrades and achievements, catch golden
 croissants for bonuses. A Boosts tab has 3 independent repeatable purchases
-(Money %, Speed %, flat Click Power). Unlimited permanent Medals (Bronze
-through Diamond, then "Medal #6", "#7", ...) each add to both money and click
-power — +30/50/100/500/1000% for the first 5, doubling forever after — at
-escalating cost, and never reset (not even by Rebirth). Rebirth grants
-Golden Butter (+30% click speed / +30% money each) based on production since
-your last rebirth, and genuinely stacks across repeated rebirths; a deeper
-Big Rebirth converts Golden Butter into Chicken Croissants (+400% money each,
-compounding). DOM-driven UI with a canvas overlay for click particles.
+(Money %, Speed %, flat Click Power). A dedicated Medals tab has unlimited
+permanent Medals (Bronze through Diamond, then "Medal #6", "#7", ...) each
+adding to both money and click power — +30/50/100/500/1000% for the first 5,
+doubling forever after — gated by a separately-purchasable Medal Capacity
+(starts at 5 slots); medals and capacity never reset, not even by Rebirth.
+Rebirth grants Golden Butter (+30% click speed / +30% money each) based on
+production since your last rebirth, and genuinely stacks across repeated
+rebirths. A much deeper Big Rebirth (requires 10,000+ Golden Butter) converts
+it into Chicken Croissants, each worth +900% money, compounding — i.e. each
+Chicken Croissant is worth 10x a normal croissant's money contribution.
+DOM-driven UI with a canvas overlay for click particles.
 Detailed context: `.claude/croissant-clicker.md`.
 
 ### BASKETBALL CLICKER (`basketball-clicker.html`, ~2400 lines)

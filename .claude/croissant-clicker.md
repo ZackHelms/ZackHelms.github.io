@@ -28,24 +28,35 @@ canvas overlay for click particles/floating numbers.
   baked thresholds, mix of flat add / multiplier / "% of CPS" effects.
 - **Achievements** (`ACHIEVEMENT_DEFS`): 26 milestone-based, each unlocked one
   grants +0.25% to `achievementMultiplier()` (global production).
-- **Medals** (`state.medalLevel`, rendered as a single row at the top of the
-  Upgrades tab): unlimited — there is no fixed list. `getMedalPercent(n)` /
-  `getMedalCost(n)` / `getMedalName(n)` / `getMedalIcon(n)` are pure functions
-  of the medal number `n`, not a static array. The first 5 are fixed/named
-  (`MEDAL_BASE_PERCENTS = [30,50,100,500,1000]`, cost `1e6 * 100^(n-1)` —
-  1M/100M/10B/1T/100T); beyond n=5 the name falls back to `Medal #n`, the icon
-  to 🎖️, the percent keeps doubling (`1000 * 2^(n-5)`), and cost keeps the
-  same x100-per-tier scaling. `medalMultiplier()` sums `getMedalPercent(n)`
-  for `n` from 1 to `state.medalLevel` into one `1 + total/100` multiplier
-  applied to BOTH `getCps()` and `getClickPower()` (unlike the Boosts/Rebirth
-  systems, which keep money and speed as separate tracks — medals are
-  deliberately "of everything"). The row always displays medal
-  `state.medalLevel + 1` (the next one to buy); buying it just increments
-  `medalLevel` — no per-medal purchased-state bookkeeping needed since it's a
-  single always-increasing counter. Medals are permanent: NOT reset by
-  Rebirth or Big Rebirth, only wiped by a full hard reset — closer in spirit
-  to achievements than to the Boosts tab. "Decorated" achievement fires at
-  `medalLevel >= 5`.
+- **Medals** (`state.medalLevel`, own 4th tab — `refreshMedalsTab()`, called
+  from init, the ~1s upgrades-accumulator tick, and every purchase/rebirth/
+  reset action that can change croissants or capacity, same cadence
+  `refreshUpgradesTab()` uses): unlimited — there is no fixed list.
+  `getMedalPercent(n)` / `getMedalCost(n)` / `getMedalName(n)` /
+  `getMedalIcon(n)` are pure functions of the medal number `n`, not a static
+  array. The first 5 are fixed/named (`MEDAL_BASE_PERCENTS =
+  [30,50,100,500,1000]`, cost `1e6 * 100^(n-1)` — 1M/100M/10B/1T/100T);
+  beyond n=5 the name falls back to `Medal #n`, the icon to 🎖️, the percent
+  keeps doubling (`1000 * 2^(n-5)`), and cost keeps the same x100-per-tier
+  scaling. `medalMultiplier()` sums `getMedalPercent(n)` for `n` from 1 to
+  `state.medalLevel` into one `1 + total/100` multiplier applied to BOTH
+  `getCps()` and `getClickPower()` (unlike the Boosts/Rebirth systems, which
+  keep money and speed as separate tracks — medals are deliberately "of
+  everything"). The tab always shows medal `state.medalLevel + 1` (the next
+  one to buy); buying it just increments `medalLevel`.
+  - **Medal Capacity** (`state.medalCapacityLevel`, rendered above the medal
+    row): gates how many medals you can hold — `getMedalCapacity() =
+    MEDAL_CAPACITY_BASE(5) + medalCapacityLevel`. `buyMedal()` is a no-op
+    once `medalLevel >= getMedalCapacity()` (the row shows a locked "Medal
+    Case Full" state instead). Each capacity level costs half of whatever
+    medal it newly makes room for (`getMedalCapacityCost() =
+    getMedalCost(capacity+1) * 0.5`), keeping the two curves self-consistent
+    without a separate arbitrary cost formula.
+  - Both `medalLevel` and `medalCapacityLevel` are permanent: NOT reset by
+    Rebirth or Big Rebirth, only wiped by a full hard reset — closer in
+    spirit to achievements than to the Boosts tab. "Decorated" achievement
+    fires at `medalLevel >= 5` (reachable at base capacity, no capacity
+    purchase required).
 - **Boosts tab** (3rd tab, `initBoostRows()`/`updateBoostRows()`): three
   independent repeatable purchases, each built from the same generic
   `initBoostRow(container, opts)` / `updateBoostRow(ref)` helpers so they
@@ -85,14 +96,18 @@ canvas overlay for click particles/floating numbers.
 - **Big Rebirth**: same incremental-stacking pattern one layer up — gated on
   `state.goldenButter` minus a `state.goldenButterAtLastBigRebirth` baseline:
   `computeChickenCroissantGain() = floor(cbrt((goldenButter -
-  goldenButterAtLastBigRebirth) / 50))`. The header button's `.ready` class
-  lights up once that's > 0 (i.e. 50+ Golden Butter earned since the last Big
-  Rebirth). Confirming it does everything a normal Rebirth does PLUS
-  `chickenCroissants += gain` (stacks) and resets both `goldenButter` and
+  goldenButterAtLastBigRebirth) / BIG_REBIRTH_UNLOCK_GB))`, where
+  `BIG_REBIRTH_UNLOCK_GB = 10000` — a deliberately "a lot" threshold per the
+  request, requiring at least 10,000 Golden Butter earned since the last Big
+  Rebirth before the header button's `.ready` class lights up at all.
+  Confirming it does everything a normal Rebirth does PLUS `chickenCroissants
+  += gain` (stacks) and resets both `goldenButter` and
   `goldenButterAtLastBigRebirth` to 0 — deliberately does NOT touch
   `totalBakedAtLastRebirth`, so any unclaimed progress toward the next normal
   Rebirth's Golden Butter gain survives a Big Rebirth. Each Chicken Croissant
-  is a standalone +400%-compounding (`bigRebirthMoneyMultiplier() = 5^n`)
+  is a standalone +900%-compounding (`bigRebirthMoneyMultiplier() =
+  CHICKEN_CROISSANT_MONEY_MULT^n`, `CHICKEN_CROISSANT_MONEY_MULT = 10` — i.e.
+  each Chicken Croissant is worth 10x a normal croissant's money contribution)
   money-only multiplier stacked into `getCps()` alongside the others.
 
 ## Save/offline

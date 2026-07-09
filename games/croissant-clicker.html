@@ -134,8 +134,8 @@ main {
 }
 .tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .tab-btn {
-  flex: 1; background: none; border: none; color: var(--dim); padding: 10px;
-  font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; letter-spacing: 2px;
+  flex: 1; background: none; border: none; color: var(--dim); padding: 10px 2px;
+  font-family: 'Share Tech Mono', monospace; font-size: 0.58rem; letter-spacing: 1px;
   cursor: pointer; border-bottom: 2px solid transparent; font-weight: 700;
   touch-action: manipulation;
 }
@@ -265,7 +265,7 @@ main {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-07 13:28 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-09 17:05 UTC</div>
 
 <header>
   <a id="back-link" href="index.html">&larr; GAMES</a>
@@ -299,10 +299,12 @@ main {
       <button class="tab-btn active" data-tab="buildings">BUILDINGS</button>
       <button class="tab-btn" data-tab="upgrades">UPGRADES</button>
       <button class="tab-btn" data-tab="boosts">BOOSTS</button>
+      <button class="tab-btn" data-tab="medals">MEDALS</button>
     </div>
     <div class="tab-content" id="tab-buildings"></div>
     <div class="tab-content hidden" id="tab-upgrades"></div>
     <div class="tab-content hidden" id="tab-boosts"></div>
+    <div class="tab-content hidden" id="tab-medals"></div>
   </div>
 </main>
 
@@ -339,7 +341,7 @@ main {
   <div class="modal-box">
     <div class="modal-head"><h2>BIG REBIRTH</h2><button class="modal-close" data-close="big-rebirth-modal">✕</button></div>
     <div class="modal-body">
-      <p>Big Rebirthing resets everything a normal Rebirth does — <b>plus your Golden Butter</b> — but grants permanent <b style="color:#ff8c42">Chicken Croissants</b> 🐔 based on your Golden Butter. Each Chicken Croissant makes every croissant worth <b>5 times more money</b>, forever — far stronger than Golden Butter, but a much deeper reset.</p>
+      <p>Big Rebirthing resets everything a normal Rebirth does — <b>plus your Golden Butter</b> — but grants permanent <b style="color:#ff8c42">Chicken Croissants</b> 🐔 based on your Golden Butter (requires at least 10,000 to earn your first one). Each Chicken Croissant makes every croissant worth <b>10 times more money</b>, forever — far stronger than Golden Butter, but a much deeper reset.</p>
       <p id="big-rebirth-preview"></p>
     </div>
     <div class="modal-actions">
@@ -392,8 +394,8 @@ const STORE_UPGRADE_MONEY_MULT = 1.3;
 
 const REBIRTH_PERCENT_PER_BUTTER = 30;
 
-const BIG_REBIRTH_UNLOCK_GB = 50;
-const CHICKEN_CROISSANT_MONEY_MULT = 5;
+const BIG_REBIRTH_UNLOCK_GB = 10000;
+const CHICKEN_CROISSANT_MONEY_MULT = 10;
 
 const CLICK_POWER_BOOST_BASE_COST = 25;
 const CLICK_POWER_BOOST_COST_MULT = 4;
@@ -454,6 +456,16 @@ function getMedalIcon(n) {
   return n <= MEDAL_TIER_ICONS.length ? MEDAL_TIER_ICONS[n - 1] : '🎖️';
 }
 
+// Medal capacity gates how many medals you can hold at once (starts at the
+// original 5-medal case); each capacity level costs half of whatever medal
+// it newly makes room for, keeping the two curves self-consistent.
+const MEDAL_CAPACITY_BASE = 5;
+function getMedalCapacity() { return MEDAL_CAPACITY_BASE + state.medalCapacityLevel; }
+function getMedalCapacityCost() {
+  const unlocksMedalN = getMedalCapacity() + 1;
+  return Math.ceil(getMedalCost(unlocksMedalN) * 0.5);
+}
+
 const ACHIEVEMENT_DEFS = [
   { id:'a0',  icon:'🥐', name:'First Crumb',         desc:'Bake your first croissant.',        cond: s => s.totalBakedAllTime >= 1 },
   { id:'a1',  icon:'🥐', name:'Dozen Croissants',    desc:'Bake 100 total.',                   cond: s => s.totalBakedAllTime >= 100 },
@@ -505,6 +517,7 @@ function freshState() {
     clickPowerBoostLevel: 0,
     speedBoostLevel: 0,
     medalLevel: 0,
+    medalCapacityLevel: 0,
     nextGoldenIn: rand(GOLDEN_MIN_MS, GOLDEN_MAX_MS),
     buildings: BUILDING_DEFS.map(() => ({ count: 0 })),
     buildingUpgrades: {},
@@ -646,6 +659,7 @@ const bigRebirthBtn = document.getElementById('big-rebirth-btn');
 const buildingsTab = document.getElementById('tab-buildings');
 const upgradesTab = document.getElementById('tab-upgrades');
 const boostsTab = document.getElementById('tab-boosts');
+const medalsTab = document.getElementById('tab-medals');
 
 // ── Boosts (repeatable, independent upgrade tracks) ────────────
 function initBoostRow(container, opts) {
@@ -807,25 +821,6 @@ function refreshUpgradesTab() {
   upgradesTab.innerHTML = '';
   let shown = 0;
 
-  {
-    const n = state.medalLevel + 1;
-    const cost = getMedalCost(n);
-    shown++;
-    const row = document.createElement('div');
-    row.className = 'store-row medal-row' + (state.croissants < cost ? ' unaffordable' : '');
-    row.innerHTML = `
-      <div class="row-icon">${getMedalIcon(n)}</div>
-      <div class="row-info">
-        <div class="row-name">${getMedalName(n)} <span style="color:var(--dim);font-weight:400;">(medal #${n})</span></div>
-        <div class="row-sub">Medals earned: ${state.medalLevel} · total bonus: +${Math.round((medalMultiplier() - 1) * 100)}%</div>
-        <div class="row-desc">Permanently boosts all money and click power by another +${getMedalPercent(n)}%, forever. Never resets, not even on Rebirth. No limit — medals can be earned forever.</div>
-      </div>
-      <div class="row-cost"><span class="cost-val">${formatCroissants(cost)}</span><div class="cost-label">croissants</div></div>
-    `;
-    row.addEventListener('click', buyMedal);
-    upgradesTab.appendChild(row);
-  }
-
   CLICK_UPGRADE_DEFS.forEach(u => {
     if (!isClickUpgradeUnlocked(u)) return;
     shown++;
@@ -886,15 +881,70 @@ function buyBuildingUpgrade(id) {
 }
 
 function buyMedal() {
+  if (state.medalLevel >= getMedalCapacity()) return;
   const n = state.medalLevel + 1;
   const cost = getMedalCost(n);
   if (state.croissants < cost) return;
   state.croissants -= cost;
   state.medalLevel = n;
   checkAchievements();
-  refreshUpgradesTab();
+  refreshMedalsTab();
   updateAll();
   showToast(`🏅 ${getMedalName(n)} earned! +${getMedalPercent(n)}% money and click power, forever.`);
+}
+
+function buyMedalCapacity() {
+  const cost = getMedalCapacityCost();
+  if (state.croissants < cost) return;
+  state.croissants -= cost;
+  state.medalCapacityLevel++;
+  refreshMedalsTab();
+  updateAll();
+  showToast(`📦 Medal capacity increased to ${getMedalCapacity()}!`);
+}
+
+// ── Medals tab (rebuilt on change) ──────────────────────────────
+function refreshMedalsTab() {
+  medalsTab.innerHTML = '';
+
+  const capCost = getMedalCapacityCost();
+  const capRow = document.createElement('div');
+  capRow.className = 'store-row boost-row' + (state.croissants < capCost ? ' unaffordable' : '');
+  capRow.innerHTML = `
+    <div class="row-icon">📦</div>
+    <div class="row-info">
+      <div class="row-name">Medal Capacity</div>
+      <div class="row-sub">Capacity: ${getMedalCapacity()} · Medals earned: ${state.medalLevel}/${getMedalCapacity()}</div>
+      <div class="row-desc">Expands your medal case by +1 slot, letting you earn one more medal. No limit.</div>
+    </div>
+    <div class="row-cost"><span class="cost-val">${formatCroissants(capCost)}</span><div class="cost-label">croissants</div></div>
+  `;
+  capRow.addEventListener('click', buyMedalCapacity);
+  medalsTab.appendChild(capRow);
+
+  const atCapacity = state.medalLevel >= getMedalCapacity();
+  const n = state.medalLevel + 1;
+  const cost = getMedalCost(n);
+  const medalRow = document.createElement('div');
+  medalRow.className = 'store-row medal-row' + (atCapacity ? ' unaffordable' : (state.croissants < cost ? ' unaffordable' : ''));
+  medalRow.innerHTML = atCapacity ? `
+      <div class="row-icon">🔒</div>
+      <div class="row-info">
+        <div class="row-name">Medal Case Full</div>
+        <div class="row-sub">Medals earned: ${state.medalLevel}/${getMedalCapacity()} · total bonus: +${Math.round((medalMultiplier() - 1) * 100)}%</div>
+        <div class="row-desc">Buy Medal Capacity above to earn more medals.</div>
+      </div>
+    ` : `
+      <div class="row-icon">${getMedalIcon(n)}</div>
+      <div class="row-info">
+        <div class="row-name">${getMedalName(n)} <span style="color:var(--dim);font-weight:400;">(medal #${n})</span></div>
+        <div class="row-sub">Medals earned: ${state.medalLevel}/${getMedalCapacity()} · total bonus: +${Math.round((medalMultiplier() - 1) * 100)}%</div>
+        <div class="row-desc">Permanently boosts all money and click power by another +${getMedalPercent(n)}%, forever. Never resets, not even on Rebirth.</div>
+      </div>
+      <div class="row-cost"><span class="cost-val">${formatCroissants(cost)}</span><div class="cost-label">croissants</div></div>
+    `;
+  if (!atCapacity) medalRow.addEventListener('click', buyMedal);
+  medalsTab.appendChild(medalRow);
 }
 
 // ── Tabs ───────────────────────────────────────────────────────
@@ -906,6 +956,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     buildingsTab.classList.toggle('hidden', target !== 'buildings');
     upgradesTab.classList.toggle('hidden', target !== 'upgrades');
     boostsTab.classList.toggle('hidden', target !== 'boosts');
+    medalsTab.classList.toggle('hidden', target !== 'medals');
   });
 });
 
@@ -980,6 +1031,7 @@ document.getElementById('rebirth-confirm-btn').addEventListener('click', () => {
   closeModal('rebirth-modal');
   checkAchievements();
   refreshUpgradesTab();
+  refreshMedalsTab();
   updateAll();
   showToast(`✨ Reborn! +${gain} Golden Butter (total ${state.goldenButter}) — +${state.goldenButter * REBIRTH_PERCENT_PER_BUTTER}% click speed, +${state.goldenButter * REBIRTH_PERCENT_PER_BUTTER}% money`);
 });
@@ -1012,6 +1064,7 @@ document.getElementById('big-rebirth-confirm-btn').addEventListener('click', () 
   closeModal('big-rebirth-modal');
   checkAchievements();
   refreshUpgradesTab();
+  refreshMedalsTab();
   updateAll();
   showToast(`🐔 Big Reborn! ×${bigRebirthMoneyMultiplier().toLocaleString('en-US')} money, forever`);
 });
@@ -1023,6 +1076,7 @@ document.getElementById('reset-confirm-btn').addEventListener('click', () => {
   state = freshState();
   closeModal('reset-modal');
   refreshUpgradesTab();
+  refreshMedalsTab();
   renderAchievements();
   updateAll();
   showToast('Progress erased.');
@@ -1232,6 +1286,7 @@ function gameLoop(ts) {
     upgradesAccumulator = 0;
     if (checkAchievements()) { /* already refreshed */ }
     refreshUpgradesTab();
+    refreshMedalsTab();
   }
 }
 
@@ -1280,6 +1335,7 @@ initQtyBar();
 initBuildingRows();
 updateQtyBarUI();
 refreshUpgradesTab();
+refreshMedalsTab();
 renderAchievements();
 resizeCanvas();
 checkAchievements();
