@@ -13,6 +13,10 @@ It is fine to push directly to the `main` branch for this repository. No pull re
   by `publish.sh` in the separate [`ZackHelms/FFL1`](https://github.com/ZackHelms/FFL1)
   repo, which replaces it with the contents of that repo's `webapp/` folder. Make FFL1
   web app changes in the FFL1 repo's `webapp/`, then run its `publish.sh` to deploy here.
+- `games/zed-shooter/` — **generated/published, do NOT edit by hand.** Overwritten by
+  `50-publish.sh` in the separate [`ZackHelms/zed-fps`](https://github.com/ZackHelms/zed-fps)
+  repo with that repo's Vite build output (the script also maintains this game's card in
+  `games/index.html`). Make changes in zed-fps, then publish from there.
 
 ## Adding a new game
 
