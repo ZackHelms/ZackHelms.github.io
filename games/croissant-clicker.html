@@ -265,7 +265,7 @@ main {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-09 17:05 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-12 03:18 UTC</div>
 
 <header>
   <a id="back-link" href="index.html">&larr; GAMES</a>
@@ -416,6 +416,16 @@ const BUILDING_DEFS = [
   { name: 'Viennoiserie Factory',   icon: '🏭', baseCost: 330000000,   baseCps: 44000,   desc: 'Industrial lamination at massive scale.' },
   { name: 'Croissant Cathedral',    icon: '🏰', baseCost: 5100000000,  baseCps: 260000,  desc: 'A monument devoted entirely to pastry.' },
   { name: 'Golden Whisk Sorcerer',  icon: '🧙', baseCost: 75000000000, baseCps: 1600000, desc: 'Conjures croissants from pure butter magic.' },
+  { name: 'Time-Warping Toaster',   icon: '⏳', baseCost: 1100000000000,               baseCps: 9600000,          desc: 'Toasts the bread before it was even kneaded.' },
+  { name: 'Croissant Dimension Portal', icon: '🌀', baseCost: 18000000000000,          baseCps: 60000000,         desc: 'Pulls fresh croissants from a parallel pastry dimension.' },
+  { name: 'Butter Comet',           icon: '☄️', baseCost: 310000000000000,             baseCps: 380000000,        desc: 'A comet of pure butter, harvested in orbit.' },
+  { name: 'Yeast Colossus',         icon: '🗿', baseCost: 5500000000000000,            baseCps: 2500000000,       desc: 'A titan of living yeast, forever rising.' },
+  { name: 'Quantum Kneader',        icon: '⚛️', baseCost: 105000000000000000,          baseCps: 17000000000,      desc: 'Kneads dough across infinite quantum states at once.' },
+  { name: 'Pastry Moon Base',       icon: '🌕', baseCost: 2100000000000000000,         baseCps: 120000000000,     desc: 'An orbital bakery, baking free of gravity.' },
+  { name: 'Interstellar Bakeshop',  icon: '🚀', baseCost: 46000000000000000000,        baseCps: 900000000000,     desc: 'A franchise spanning a thousand star systems.' },
+  { name: 'Croissant Singularity',  icon: '🕳️', baseCost: 1100000000000000000000,      baseCps: 7200000000000,    desc: 'A black hole that emits nothing but croissants.' },
+  { name: "Butter God's Altar",     icon: '⛩️', baseCost: 29000000000000000000000,     baseCps: 61000000000000,   desc: "An offering site to the deity of butter itself." },
+  { name: 'The Eternal Oven',       icon: '♾️', baseCost: 800000000000000000000000,    baseCps: 550000000000000,  desc: 'Bakes across all of time and space, all at once.' },
 ];
 
 const TIER_CONFIG = [
@@ -493,6 +503,16 @@ const ACHIEVEMENT_DEFS = [
   { id:'a23', icon:'👊', name:'Heavy Hitter',        desc:'Reach Click Power boost level 10.', cond: s => s.clickPowerBoostLevel >= 10 },
   { id:'a24', icon:'⚡', name:'Quick Hands',         desc:'Reach Speed Boost level 10.',       cond: s => s.speedBoostLevel >= 10 },
   { id:'a25', icon:'🏅', name:'Decorated',           desc:'Earn 5 medals.',                    cond: s => s.medalLevel >= 5 },
+  { id:'a26', icon:'⏳', name:'Ahead Of Schedule',   desc:'Own 10 Time-Warping Toasters.',     cond: s => s.buildings[10].count >= 10 },
+  { id:'a27', icon:'🌀', name:'Portal Pastries',     desc:'Own 25 Croissant Dimension Portals.', cond: s => s.buildings[11].count >= 25 },
+  { id:'a28', icon:'☄️', name:'Buttery Skies',       desc:'Own 25 Butter Comets.',             cond: s => s.buildings[12].count >= 25 },
+  { id:'a29', icon:'🗿', name:'Rise Of The Titan',   desc:'Own 10 Yeast Colossi.',             cond: s => s.buildings[13].count >= 10 },
+  { id:'a30', icon:'⚛️', name:'Quantum Croissants',  desc:'Own 25 Quantum Kneaders.',          cond: s => s.buildings[14].count >= 25 },
+  { id:'a31', icon:'🌕', name:'One Small Bake',      desc:'Own 10 Pastry Moon Bases.',         cond: s => s.buildings[15].count >= 10 },
+  { id:'a32', icon:'🚀', name:'Galactic Bakery',     desc:'Own 25 Interstellar Bakeshops.',    cond: s => s.buildings[16].count >= 25 },
+  { id:'a33', icon:'🕳️', name:'Event Horizon',       desc:'Own 10 Croissant Singularities.',   cond: s => s.buildings[17].count >= 10 },
+  { id:'a34', icon:'⛩️', name:'Blessed By Butter',   desc:'Own 10 Butter God\'s Altars.',       cond: s => s.buildings[18].count >= 10 },
+  { id:'a35', icon:'♾️', name:'Beyond Time',         desc:'Own 5 Eternal Ovens.',              cond: s => s.buildings[19].count >= 5 },
 ];
 
 // ── State ──────────────────────────────────────────────────────

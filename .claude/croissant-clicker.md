@@ -16,7 +16,8 @@ canvas overlay for click particles/floating numbers.
 
 ## Systems
 
-- **Buildings** (`BUILDING_DEFS`): 10 tiers, cost scales `baseCost * 1.15^count`.
+- **Buildings** (`BUILDING_DEFS`): 20 tiers (Rolling Pin through The Eternal
+  Oven), cost scales `baseCost * 1.15^count`.
   A buy-quantity bar (1/10/100/Max, `state.buyQuantity`) sits above the list;
   `getBulkCost(i, qty)` sums the geometric series in closed form (no loop),
   and `getMaxAffordable(i)` solves the inverse via `log`/`log(1.15)` then
@@ -26,7 +27,7 @@ canvas overlay for click particles/floating numbers.
   that building's output.
 - **Click upgrades** (`CLICK_UPGRADE_DEFS`): 6 hand-authored, unlock by lifetime
   baked thresholds, mix of flat add / multiplier / "% of CPS" effects.
-- **Achievements** (`ACHIEVEMENT_DEFS`): 26 milestone-based, each unlocked one
+- **Achievements** (`ACHIEVEMENT_DEFS`): 36 milestone-based, each unlocked one
   grants +0.25% to `achievementMultiplier()` (global production).
 - **Medals** (`state.medalLevel`, own 4th tab — `refreshMedalsTab()`, called
   from init, the ~1s upgrades-accumulator tick, and every purchase/rebirth/
