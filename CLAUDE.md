@@ -18,6 +18,10 @@ It is fine to push directly to the `main` branch for this repository. No pull re
   repo with that repo's Vite build output (the script also maintains this game's card in
   `games/index.html`). Make changes in zed-fps, then publish from there.
 
+- `games/qntmchmst/` — **generated/published, do NOT edit by hand.** Overwritten by
+  `50-publish.sh` in the separate [`ZackHelms/qntmchmst`](https://github.com/ZackHelms/qntmchmst)
+  repo with that repo's Vite build output (the script also maintains this game's card in
+  `games/index.html`). Make changes in qntmchmst, then publish from there.
 ## Adding a new game
 
 1. Create `games/<slug>.html` as a single self-contained file
