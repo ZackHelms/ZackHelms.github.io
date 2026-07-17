@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Quantum Chemist</title>
     <style>
+      /* Kills the iOS long-press selection callout + magnifier loupe (fourth-playtest fix);
+         form inputs opt back in locally. Fallback if a device still shows it: contextmenu/
+         selectstart preventDefault handlers. */
       html,
       body {
         margin: 0;
@@ -12,13 +15,21 @@
         background: #04050b;
         overflow: hidden;
         overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      body {
+        touch-action: manipulation;
       }
       #app {
         position: fixed;
         inset: 0;
+        -webkit-user-select: none;
+        user-select: none;
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-Cviz6Xdj.js"></script>
+    <script type="module" crossorigin src="./assets/index-B5aiw68F.js"></script>
   </head>
   <body>
     <div id="app"></div>
