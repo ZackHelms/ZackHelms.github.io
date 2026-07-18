@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0e1116">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🪨</text></svg>">
+<title>zmhstudio · boulder isolation viewer</title>
+<script type="module" src="./model-viewer.min.js"></script>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #171c24; --panel2: #1f2732; --edge: #2b3543;
+    --ink: #e8edf4; --dim: #9aa7b6; --accent: #6ea8fe;
+    --good: #46d39a; --ok: #6ea8fe; --default: #c9b458; --bad: #f2665e;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+
+  header { padding: 10px 14px 8px; border-bottom: 1px solid var(--edge); flex: 0 0 auto; }
+  header h1 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: .2px; }
+  header p { margin: 2px 0 0; font-size: 12px; color: var(--dim); }
+
+  /* variant switcher */
+  #tabs { display: flex; gap: 6px; padding: 8px 10px; overflow-x: auto; flex: 0 0 auto;
+    border-bottom: 1px solid var(--edge); -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+  .tab { flex: 0 0 auto; border: 1px solid var(--edge); background: var(--panel);
+    color: var(--ink); border-radius: 10px; padding: 7px 11px; font-size: 12.5px;
+    line-height: 1.15; cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+    min-width: 92px; transition: border-color .12s, background .12s; }
+  .tab .lab { font-weight: 650; display: flex; align-items: center; gap: 6px; }
+  .tab .tri { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .tab .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .tab[data-tag=good]    .dot { background: var(--good); }
+  .tab[data-tag=ok]      .dot { background: var(--ok); }
+  .tab[data-tag=default] .dot { background: var(--default); }
+  .tab[data-tag=bad]     .dot { background: var(--bad); }
+  .tab.active { border-color: var(--accent); background: var(--panel2); }
+  .tab.active .tri { color: var(--ink); }
+
+  /* viewer */
+  .stage { position: relative; flex: 1 1 auto; min-height: 0; }
+  model-viewer { width: 100%; height: 100%; background:
+      radial-gradient(120% 90% at 50% 15%, #1a222d 0%, #0e1116 70%); --poster-color: transparent; }
+  #err { position: absolute; inset: 0; display: none; place-items: center; text-align: center;
+    padding: 24px; color: var(--dim); font-size: 13px; }
+
+  /* floating controls */
+  .fab { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+  .fab button { border: 1px solid var(--edge); background: rgba(23,28,36,.82);
+    backdrop-filter: blur(6px); color: var(--ink); border-radius: 9px; padding: 7px 10px;
+    font-size: 12px; cursor: pointer; }
+  .fab button.on { border-color: var(--accent); color: var(--accent); }
+
+  /* info bar */
+  #info { flex: 0 0 auto; border-top: 1px solid var(--edge); background: var(--panel);
+    padding: 9px 14px 12px; }
+  #info .row1 { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  #info .cfg { font-weight: 650; font-size: 13.5px; }
+  #info .tri { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  #info .note { margin-top: 3px; font-size: 12.5px; color: var(--dim); }
+  #info .note b { color: var(--ink); font-weight: 600; }
+  #hint { margin-top: 6px; font-size: 11px; color: #6b7887; }
+  @media (min-width: 720px) {
+    header h1 { font-size: 16px; }
+    .tab { min-width: 108px; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Boulder isolation sweep &middot; <span style="color:var(--dim);font-weight:500">zmh-3d scan</span></h1>
+    <p>Same video, same SfM/depth — only the <code>--isolate</code> cull differs. Drag to rotate, pinch to zoom.</p>
+  </header>
+
+  <div id="tabs" role="tablist"></div>
+
+  <div class="stage">
+    <model-viewer id="mv"
+      camera-controls
+      touch-action="none"
+      interaction-prompt="none"
+      environment-image="neutral"
+      shadow-intensity="0.55"
+      shadow-softness="0.9"
+      exposure="1.05"
+      min-field-of-view="8deg"
+      max-field-of-view="55deg"
+      camera-orbit="180deg 82deg auto"
+      alt="Isolated boulder mesh">
+      <div id="err" slot="poster">Couldn’t load the 3D viewer.<br>Check your connection and reload.</div>
+    </model-viewer>
+    <div class="fab">
+      <button id="btnSpin" title="Auto-rotate">⟳ Spin</button>
+      <button id="btnReset" title="Reset view">Reset</button>
+    </div>
+  </div>
+
+  <div id="info">
+    <div class="row1"><span class="cfg" id="iCfg">—</span><span class="tri" id="iTri"></span></div>
+    <div class="note" id="iNote"></div>
+    <div id="hint">One finger: rotate · Two fingers: pinch-zoom / pan · Angle is kept when you switch models.</div>
+  </div>
+
+<script type="module">
+  const MODELS = [
+    { id:'grnd_r090', file:'models/grnd_r090.glb', label:'grnd_r090', tri:9389,
+      cfg:'sphere ×0.90  +  ground-cull', tag:'good',
+      note:'<b>Tightest clean.</b> Boulder intact, least turf. Recommended for a game prop.' },
+    { id:'grnd', file:'models/grnd.glb', label:'grnd', tri:16255,
+      cfg:'sphere ×1.15  +  ground-cull', tag:'good',
+      note:'<b>Safest fidelity.</b> Full boulder width, flat base disc removed, thin contact fringe.' },
+    { id:'baseline', file:'models/baseline.glb', label:'baseline', tri:19822,
+      cfg:'sphere ×1.15,  ground off', tag:'default',
+      note:'<b>Current default.</b> Keeps a noticeable turf halo around the base.' },
+    { id:'r090', file:'models/r090.glb', label:'r090', tri:10705,
+      cfg:'sphere ×0.90,  ground off', tag:'ok',
+      note:'Boulder intact, halo down to a thin sliver — but the disc is still there.' },
+    { id:'r075', file:'models/r075.glb', label:'r075', tri:5868,
+      cfg:'sphere ×0.75,  ground off', tag:'bad',
+      note:'<b>Too tight.</b> The cull sphere slices into the boulder itself (flat faces, holes).' },
+  ];
+
+  const mv = document.getElementById('mv');
+  const tabs = document.getElementById('tabs');
+  const iCfg = document.getElementById('iCfg');
+  const iTri = document.getElementById('iTri');
+  const iNote = document.getElementById('iNote');
+  const fmt = n => n.toLocaleString('en-US');
+
+  // Preserve the viewing angle (theta/phi) across model swaps; let radius auto-fit each mesh.
+  let keepAngle = null;
+
+  function select(idx, el) {
+    const m = MODELS[idx];
+    // capture current angle before swapping
+    try { const o = mv.getCameraOrbit(); keepAngle = { theta: o.theta, phi: o.phi }; } catch (e) {}
+    mv.src = m.file;
+    iCfg.textContent = m.cfg;
+    iTri.textContent = fmt(m.tri) + ' tri';
+    iNote.innerHTML = m.note;
+    [...tabs.children].forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  mv.addEventListener('load', () => {
+    if (keepAngle) {
+      mv.cameraOrbit = `${keepAngle.theta}rad ${keepAngle.phi}rad auto`;
+      mv.jumpCameraToGoal();
+    }
+  });
+
+  MODELS.forEach((m, i) => {
+    const b = document.createElement('button');
+    b.className = 'tab'; b.dataset.tag = m.tag; b.setAttribute('role', 'tab');
+    b.innerHTML = `<span class="lab"><span class="dot"></span>${m.label}</span><span class="tri">${fmt(m.tri)} tri</span>`;
+    b.addEventListener('click', () => select(i, b));
+    tabs.appendChild(b);
+  });
+
+  // default to the recommended pick
+  select(0, tabs.children[0]);
+
+  // controls
+  const btnSpin = document.getElementById('btnSpin');
+  btnSpin.addEventListener('click', () => {
+    const on = mv.toggleAttribute('auto-rotate');
+    btnSpin.classList.toggle('on', on);
+  });
+  document.getElementById('btnReset').addEventListener('click', () => {
+    keepAngle = null;
+    mv.cameraOrbit = '180deg 82deg auto';
+    mv.fieldOfView = 'auto';
+    mv.jumpCameraToGoal();
+  });
+
+  mv.addEventListener('error', () => { document.getElementById('err').style.display = 'grid'; });
+</script>
+</body>
+</html>
