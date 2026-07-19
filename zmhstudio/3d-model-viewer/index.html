@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#0e1116">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🪨</text></svg>">
-<title>zmhstudio · boulder isolation viewer</title>
+<title>zmhstudio · boulder scan viewer</title>
 <script type="module" src="./model-viewer.min.js"></script>
 <style>
   :root {
@@ -77,8 +77,8 @@
 <body>
   <header>
     <div class="htext">
-      <h1>Boulder isolation sweep &middot; <span style="color:var(--dim);font-weight:500">zmh-3d scan</span></h1>
-      <p>Same video, same SfM/depth — only the <code>--isolate</code> cull differs. Drag to rotate, pinch to zoom.</p>
+      <h1>Boulder scan viewer &middot; <span style="color:var(--dim);font-weight:500">zmh-3d scan</span></h1>
+      <p>Top two: the <code>--watertight</code> cap A/B (same scan, cap on vs off). Below: the <code>--isolate</code> sweep. Drag to rotate, pinch to zoom — <b>tilt down to inspect the base</b>.</p>
     </div>
     <a class="inspect" href="./inspector.html" title="Open the normal-map light inspector">🔦 inspect lighting</a>
   </header>
@@ -114,6 +114,12 @@
 
 <script type="module">
   const MODELS = [
+    { id:'boulder_capped', file:'models/boulder_capped.glb', label:'capped', tri:17172,
+      cfg:'grnd  +  --watertight auto  (zmh3dm)', tag:'good',
+      note:'<b>Watertight cap.</b> 23 open boundary loops → 0 via a flat-texel centroid-fan (+720 tris). Solid flat underside; visible surface atlas byte-identical to “open” (texel fill <b>97.99%</b>). Tilt down to see the closed base.' },
+    { id:'boulder_open', file:'models/boulder_open.glb', label:'open', tri:16452,
+      cfg:'grnd  +  --watertight off', tag:'default',
+      note:'<b>Uncapped baseline.</b> Same SfM/depth/texture as “capped” — only the cap differs. Tilt down and you look into the hollow open bottom (doubleSided shows the interior surface, not a see-through void).' },
     { id:'grnd_r090', file:'models/grnd_r090.glb', label:'grnd_r090', tri:9389,
       cfg:'sphere ×0.90  +  ground-cull', tag:'good',
       note:'<b>Tightest clean.</b> Boulder intact, least turf. Recommended for a game prop.' },
