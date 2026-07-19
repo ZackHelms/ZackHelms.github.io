@@ -148,9 +148,12 @@
   import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-  // Reuse the comparison page's five models + labels.
+  // The normal-detail bake (option a — finer TSDF + hard-decimated low mesh)
+  // is the default, since this page exists to inspect the normal map; the
+  // isolation-sweep boulders (flat maps) follow for reference.
   const MODELS = [
-    { file:'models/grnd_r090.glb', label:'grnd_r090 — tightest clean' },
+    { file:'models/boulder_normaldetail.glb', label:'normal-detail — 512/8k bake (option a)' },
+    { file:'models/grnd_r090.glb', label:'grnd_r090 — tightest clean (flat map)' },
     { file:'models/grnd.glb',      label:'grnd — safest fidelity' },
     { file:'models/baseline.glb',  label:'baseline — current default' },
     { file:'models/r090.glb',      label:'r090 — thin base sliver' },
