@@ -38,6 +38,41 @@ camera ever saw).
 To bump the vendored bundle: `npm pack @google/model-viewer@<ver>` and replace
 `model-viewer.min.js` with `dist/model-viewer.min.js` from the tarball.
 
+## Inspector (normal-map lighting)
+
+`inspector.html` is a companion page for judging how the baked **normal map**
+reads under a moving light — something the comparison page's soft image-based
+lighting deliberately can't show. It's a small **three.js** scene with a dark
+background, very low ambient, and one movable `DirectionalLight` key:
+
+- **Light pad** (bottom-left): drag the handle to move the key light around the
+  frame; the edge of the pad is a grazing angle — maximum normal-map relief.
+- **🔒 Lock light**: freeze the light in view space, then orbit the object to
+  rake the surface under a static light (the CD's "move light, then rotate the
+  object" mode).
+- **Normal map ON / OFF**: A/B the identical view with the baked normal map
+  toggled (`material.normalMap = saved | null`).
+- **Normal strength**: exaggerate or verify the bake (`material.normalScale`).
+- **Light intensity**, **Graze** preset, and **Reset**.
+- **Model picker**: the same five models; the light + camera are kept when you
+  switch. Each model is auto-centred and scaled to a common size, and the
+  default view faces the well-captured side.
+
+three.js is **vendored** locally under `vendor/` (no CDN, no build step),
+pinned to **three@0.169.0**: `build/three.module.js` at `vendor/three.module.js`
+plus the `GLTFLoader`, `OrbitControls`, and `BufferGeometryUtils` addons under
+`vendor/jsm/…`, wired through an HTML import map (`three` +
+`three/addons/`). Color management is left to GLTFLoader (albedo sRGB, normal
+map linear) with `renderer.outputColorSpace = SRGBColorSpace`.
+
+To bump three: `npm pack three@<ver>` and copy from the tarball —
+`build/three.module.js` → `vendor/three.module.js`, and the
+`examples/jsm/loaders/GLTFLoader.js`, `examples/jsm/controls/OrbitControls.js`,
+`examples/jsm/utils/BufferGeometryUtils.js` files into the matching
+`vendor/jsm/…` paths (keep the `jsm/` layout — GLTFLoader imports
+`../utils/BufferGeometryUtils.js`). Update the pin comment next to the import
+map in `inspector.html`.
+
 ## Adding more models
 
 1. Drop a `.glb` into `models/`.
