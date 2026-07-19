@@ -106,7 +106,7 @@
   <header>
     <div class="htext">
       <h1>Normal-map light inspector &middot; <span style="color:var(--dim);font-weight:500">zmh-3d scan</span></h1>
-      <p>Drag the light around the pad. Lock it, then rotate the object to rake the surface.</p>
+      <p>Two modes: <b>Rotate model</b> (turn the object under a held light) and <b>Rotate light</b> (sweep the light over a fixed object). Toggle with the mode button; the pad is a fine light control in both.</p>
     </div>
     <a class="back" href="./index.html" title="Back to the isolation comparison">&larr; comparison</a>
   </header>
@@ -126,7 +126,7 @@
         <select id="model"></select>
       </label>
       <button class="ctl on" id="btnNormal" title="Toggle the baked normal map">Normal map: ON</button>
-      <button class="ctl" id="btnLock" title="Lock the light in view space, then orbit the object">🔓 Lock light</button>
+      <button class="ctl" id="btnMode" title="Toggle what dragging the object does: rotate the model, or move the light">🔄 Rotate model</button>
       <div class="spacer"></div>
       <button class="ctl" id="btnGraze" title="Snap the light to a hard grazing angle">Graze</button>
       <button class="ctl" id="btnReset" title="Reset light, camera and sliders">Reset</button>
@@ -213,10 +213,15 @@
   scene.add(key.target);
 
   // ---- light state ----------------------------------------------------------
-  // lightDir = world-space unit vector, from model centre toward the light.
-  const lightDir = DEFAULT_LIGHTDIR.clone();
-  let lockLight = false;
-  const viewCoord = { x: 0, y: 0, depth: 1 }; // pad coords frozen in view space while locked
+  // The light is ALWAYS defined in VIEW space: viewCoord is a point on the unit
+  // hemisphere (x,y in the view disk, depth toward the camera). Every frame we
+  // rebuild the world-space lightDir from viewCoord through the current camera
+  // basis. So in 'model' mode (orbit enabled) the light holds its screen
+  // position while the object turns under it (raking); in 'light' mode (orbit
+  // disabled) a drag edits viewCoord so the light sweeps a fixed object.
+  const lightDir = DEFAULT_LIGHTDIR.clone();   // world-space, derived each frame (render + readout)
+  let mode = 'model';                          // 'model' | 'light'
+  const viewCoord = { x: 0, y: 0, depth: 1 };  // source of truth (view space)
 
   // reusable camera-basis vectors
   const camForward = new THREE.Vector3();
@@ -231,33 +236,31 @@
     camUp.copy(camRight).cross(camForward).normalize();                // screen up
   }
 
-  // Set the light from pad coords (x,y in the unit disk; centre = front-lit, edge = grazing).
+  // Set the light from disk coords (x,y in the unit disk; centre = front-lit,
+  // edge = grazing). Always writes VIEW space (used by the pad and, in light
+  // mode, by the whole-canvas drag).
   function setPad(x, y) {
     const r = Math.hypot(x, y);
     if (r > 1) { x /= r; y /= r; }
-    const depth = Math.sqrt(Math.max(0, 1 - x * x - y * y));
-    if (lockLight) {
-      viewCoord.x = x; viewCoord.y = y; viewCoord.depth = depth;
-    } else {
-      computeBasis();
-      lightDir.set(0, 0, 0)
-        .addScaledVector(camRight, x)
-        .addScaledVector(camUp, y)
-        .addScaledVector(camForward, -depth)  // light sits on the camera side
-        .normalize();
-    }
+    viewCoord.x = x; viewCoord.y = y;
+    viewCoord.depth = Math.sqrt(Math.max(0, 1 - x * x - y * y));
   }
 
-  function setLock(on) {
-    lockLight = on;
-    if (on) {
-      computeBasis();
-      viewCoord.x = lightDir.dot(camRight);
-      viewCoord.y = lightDir.dot(camUp);
-      viewCoord.depth = -lightDir.dot(camForward);
-    }
-    btnLock.classList.toggle('on', on);
-    btnLock.textContent = on ? '🔒 Light locked' : '🔓 Lock light';
+  // Convert the current world-space lightDir into view coords (used at boot /
+  // reset so DEFAULT_LIGHTDIR survives as a view-space position).
+  function seedViewCoordFromWorld() {
+    computeBasis();
+    viewCoord.x = lightDir.dot(camRight);
+    viewCoord.y = lightDir.dot(camUp);
+    viewCoord.depth = -lightDir.dot(camForward);
+  }
+
+  function setMode(next) {
+    mode = next;
+    controls.enabled = (mode === 'model');   // model: drag orbits; light: drag moves the light
+    btnMode.classList.toggle('on', mode === 'light');
+    btnMode.textContent = mode === 'model' ? '🔄 Rotate model' : '🔄 Rotate light';
+    updateReadout();
   }
 
   const handle = document.getElementById('handle');
@@ -276,14 +279,15 @@
     controls.update();
     computeBasis();
 
-    if (lockLight) {
-      // reconstruct the world light direction so it rides with the camera (fixed in view space)
-      lightDir.set(0, 0, 0)
-        .addScaledVector(camRight, viewCoord.x)
-        .addScaledVector(camUp, viewCoord.y)
-        .addScaledVector(camForward, -viewCoord.depth)
-        .normalize();
-    }
+    // The light lives in VIEW space (viewCoord); rebuild its world direction
+    // every frame against the current camera basis. In 'model' mode the camera
+    // orbits and the light rides along (raking a turning surface); in 'light'
+    // mode the camera is fixed and viewCoord is what the drag edits.
+    lightDir.set(0, 0, 0)
+      .addScaledVector(camRight, viewCoord.x)
+      .addScaledVector(camUp, viewCoord.y)
+      .addScaledVector(camForward, -viewCoord.depth)
+      .normalize();
 
     key.position.copy(controls.target).addScaledVector(lightDir, LIGHT_DIST);
     key.target.position.copy(controls.target);
@@ -406,7 +410,7 @@
   // ---- UI wiring ------------------------------------------------------------
   const modelSel   = document.getElementById('model');
   const btnNormal  = document.getElementById('btnNormal');
-  const btnLock    = document.getElementById('btnLock');
+  const btnMode    = document.getElementById('btnMode');
   const btnGraze   = document.getElementById('btnGraze');
   const btnReset   = document.getElementById('btnReset');
   const intInput   = document.getElementById('intensity');
@@ -428,7 +432,7 @@
     applyNormalState();
   });
 
-  btnLock.addEventListener('click', () => setLock(!lockLight));
+  btnMode.addEventListener('click', () => setMode(mode === 'model' ? 'light' : 'model'));
 
   btnGraze.addEventListener('click', () => setPad(0.94, 0.14)); // hard rake from the right edge
 
@@ -448,7 +452,8 @@
     controls.target.set(0, 0, 0);
     controls.update();
     lightDir.copy(DEFAULT_LIGHTDIR);
-    setLock(false);
+    seedViewCoordFromWorld();   // convert the default world light into view coords
+    setMode('model');
     normalOn = true;
     btnNormal.classList.add('on');
     btnNormal.textContent = 'Normal map: ON';
@@ -480,10 +485,34 @@
   pad.addEventListener('pointerup', stopDrag);
   pad.addEventListener('pointercancel', stopDrag);
 
+  // In 'light' mode the whole canvas is a big light pad: a drag maps the touch
+  // point (relative to the stage centre) onto the light disk. OrbitControls is
+  // disabled in this mode, so it won't also orbit; in 'model' mode this handler
+  // no-ops and OrbitControls owns the drag.
+  let lightDrag = false;
+  function stageToLight(e) {
+    const rect = stage.getBoundingClientRect();
+    const rad = Math.min(rect.width, rect.height) / 2 || 1;
+    setPad((e.clientX - (rect.left + rect.width / 2)) / rad,
+           -(e.clientY - (rect.top + rect.height / 2)) / rad);
+  }
+  const canvasEl = renderer.domElement;
+  canvasEl.addEventListener('pointerdown', e => {
+    if (mode !== 'light') return;
+    lightDrag = true; canvasEl.setPointerCapture(e.pointerId); stageToLight(e);
+    e.preventDefault();
+  });
+  canvasEl.addEventListener('pointermove', e => {
+    if (lightDrag && mode === 'light') { stageToLight(e); e.preventDefault(); }
+  });
+  const stopLightDrag = () => { lightDrag = false; };
+  canvasEl.addEventListener('pointerup', stopLightDrag);
+  canvasEl.addEventListener('pointercancel', stopLightDrag);
+
   function updateReadout() {
     const az = Math.round(THREE.MathUtils.radToDeg(Math.atan2(lightDir.x, lightDir.z)));
     const el = Math.round(THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(lightDir.y, -1, 1))));
-    readout.innerHTML = `light <b>${az}&deg;</b> az &middot; <b>${el}&deg;</b> el<br>${lockLight ? 'locked · orbit to rotate' : 'drag pad to move'}`;
+    readout.innerHTML = `light <b>${az}&deg;</b> az &middot; <b>${el}&deg;</b> el<br>${mode === 'model' ? 'drag: rotate model · light held' : 'drag: move light · model held'}`;
   }
 
   // ---- resize ---------------------------------------------------------------
@@ -508,7 +537,7 @@
       savedNormalMap: !!m.userData._normalMap,
       normalScale: m.normalScale ? m.normalScale.x : null,
     })),
-    setPad, setLock,
+    setPad, setMode, getMode: () => mode, controlsEnabled: () => controls.enabled,
     setNormal: (on) => { if (normalOn !== on) btnNormal.click(); },
     setIntensity: (v) => { key.intensity = v; intInput.value = v; valInt.textContent = (+v).toFixed(1); },
     setView: (az, el, dist) => {
@@ -521,6 +550,8 @@
 
   // ---- go -------------------------------------------------------------------
   resize();
+  seedViewCoordFromWorld();   // DEFAULT_LIGHTDIR -> view coords against the default camera
+  setMode('model');           // default: drag rotates the model, light held in view
   loadModel(MODELS[0].file);
   updateReadout();
   // refresh the readout periodically (light dir changes as you drag / orbit)
