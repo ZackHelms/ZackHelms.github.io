@@ -11,17 +11,19 @@ Live: `https://tythos.com/zmhstudio/3d-model-viewer/`
 
 ## What's loaded
 
-### Pumpkin (draft — partial)
+### Pumpkin (draft) — sgbm vs ml depth pair
 
-`pumpkin` — a matte-white decorative pumpkin with gold-leaf accents, draft scan
-from a ~53&nbsp;s phone orbit (two clips stitched). SfM was clean (36/48 frames,
-0.36&nbsp;px reproj) but the **textureless white body** gives block-matching
-stereo nothing to lock onto — depth coverage ~13% (median 0%), only 9 views
-fused — so the mesh is a torn partial shell (mostly the high-texture gold-leaf
-cluster). The intended fix is `--depth ml` (Depth Anything V2 monocular depth,
-which needs no surface texture); its weights aren't loaded in this session yet.
-A *different* failure from the firepit's see-through mesh — this one is fixable.
-Newest scan, so it loads first (tagged **bad**).
+A matte-white decorative pumpkin with gold-leaf accents, draft scan from a
+~53&nbsp;s phone orbit (two clips stitched). Same capture, same SfM (36/48
+frames, 0.36&nbsp;px reproj) — only the depth backend differs:
+
+- `pumpkin (ml)` — `--depth ml` (Depth Anything V2 monocular depth; weights
+  committed to zmhstudio 2026-07-20): coverage ~63%, 33/36 views fused, the
+  full body recovered. Still draft-ragged in patches. Loads first (**ok**).
+- `pumpkin (sgbm)` — the before-shot (**bad**): the textureless white body
+  gives block-matching stereo nothing to lock onto — coverage ~13% (median
+  0%), 9 views fused, a torn shell of mostly the gold-leaf cluster. A
+  *different* failure from the firepit's see-through mesh.
 
 ### Firepit (draft)
 
