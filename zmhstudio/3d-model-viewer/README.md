@@ -11,6 +11,18 @@ Live: `https://tythos.com/zmhstudio/3d-model-viewer/`
 
 ## What's loaded
 
+### Pumpkin (draft — partial)
+
+`pumpkin` — a matte-white decorative pumpkin with gold-leaf accents, draft scan
+from a ~53&nbsp;s phone orbit (two clips stitched). SfM was clean (36/48 frames,
+0.36&nbsp;px reproj) but the **textureless white body** gives block-matching
+stereo nothing to lock onto — depth coverage ~13% (median 0%), only 9 views
+fused — so the mesh is a torn partial shell (mostly the high-texture gold-leaf
+cluster). The intended fix is `--depth ml` (Depth Anything V2 monocular depth,
+which needs no surface texture); its weights aren't loaded in this session yet.
+A *different* failure from the firepit's see-through mesh — this one is fixable.
+Newest scan, so it loads first (tagged **bad**).
+
 ### Firepit (draft)
 
 `firepit` — a mesh-lidded metal firepit, draft scan from a 43&nbsp;s phone

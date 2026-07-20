@@ -125,6 +125,9 @@
 
 <script type="module">
   const MODELS = [
+    { id:'pumpkin', file:'models/pumpkin.glb', label:'pumpkin', tri:7999,
+      cfg:'isolate auto ×1.15  ·  open  (draft)', tag:'bad',
+      note:'<b>White pumpkin — textureless-surface failure.</b> Draft scan from a ~53&thinsp;s phone orbit (two clips stitched; 36/48 frames registered at 0.36&thinsp;px reproj — SfM was fine). But the matte-white body gives block-matching stereo no local texture to lock onto: depth coverage was ~13% (median 0%), only <b>9 views</b> fused, so the mesh came out a torn partial shell — essentially just the high-texture gold-leaf cluster and ridge shadows survived. The designed fix is <code>--depth ml</code> (Depth Anything V2 monocular depth, which needs no surface texture); its weights aren’t loaded in this session yet. A <i>different</i> failure from the firepit’s see-through mesh — this one is fixable.' },
     { id:'firepit', file:'models/firepit.glb', label:'firepit', tri:8000,
       cfg:'sphere ×1.0  +  ground-cull  ·  open  (draft)', tag:'ok',
       note:'<b>Firepit — mesh-lid subject.</b> Draft scan from a 43&thinsp;s phone orbit (48 frames, 0.40&thinsp;px reproj). Solid lattice body and legs; the see-through wire-mesh dome reconstructs as a torn shell — photogrammetry can’t resolve see-through mesh. Ground-cull ×1.0 removed most of the patio skirt. <b>Open</b> (uncapped — the new default): you see the outer surface and, through the openings, the interior — no centroid-fan cap.' },
@@ -154,7 +157,7 @@
   // Build stamp + cache-busting. Models load with `?v=<CB>`; CB is the build
   // stamp normally, or the fresh `?cb=` value the Reload button navigates with,
   // so a hard reload re-fetches every GLB past the browser / Pages CDN cache.
-  const BUILD = '2026-07-20 01:12 UTC';
+  const BUILD = '2026-07-20 02:29 UTC';
   const CB = new URLSearchParams(location.search).get('cb') || BUILD;
   const withCB = (u) => u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(CB);
 
