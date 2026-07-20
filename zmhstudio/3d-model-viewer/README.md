@@ -1,17 +1,28 @@
 # zmhstudio · 3D model viewer
 
 A tiny static viewer for comparing GLB meshes on a phone — drag to rotate any
-direction, pinch to zoom. Built to judge the **subject-isolation** sweep from
-the `zmh-3d` **scan** (video → 3D) pipeline, where the only variable across
-models is the `--isolate` cull applied before meshing.
+direction, pinch to zoom. It hosts outputs from the `zmh-3d` **scan** (video →
+3D) pipeline. It began as the **subject-isolation** sweep for one boulder
+capture (models differing only in the `--isolate` cull), and now also carries
+whole scans of other subjects as they come out of the pipeline.
 
 Live: `https://tythos.com/zmhstudio/3d-model-viewer/`
 (also `https://zackhelms.github.io/zmhstudio/3d-model-viewer/`)
 
 ## What's loaded
 
-All five are the **same source video**, same SfM + depth — only the isolate
-cull differs. Triangle counts are the raw fused-mesh counts.
+### Firepit (draft)
+
+`firepit` — a mesh-lidded metal firepit, draft scan from a 43&nbsp;s phone
+orbit. Solid lattice body + legs; the see-through wire-mesh dome reconstructs as
+a torn shell (photogrammetry can't resolve see-through mesh). `--isolate-ground`
+at sphere ×1.0 stripped most of the patio. A *different capture* from the
+boulder set below.
+
+### Boulder isolation sweep
+
+The five below are the **same source video**, same SfM + depth — only the
+isolate cull differs. Triangle counts are the raw fused-mesh counts.
 
 | model | `--isolate` settings | tri | verdict |
 |---|---|---|---|
@@ -78,8 +89,11 @@ map in `inspector.html`.
 1. Drop a `.glb` into `models/`.
 2. Add one entry to the `MODELS` array in `index.html` (`file`, `label`, `tri`,
    `cfg`, `tag` = good|ok|default|bad, `note`).
+3. Add a matching entry to the `MODELS` array in `inspector.html` (`file`,
+   `label`) so the model is also viewable under the normal-map light.
 
-That's the whole contract — no other file to touch.
+New scans go at the **top** of each array (newest-first — the first entry is the
+default each page loads). That's the whole contract — no other file to touch.
 
 ## Provenance
 

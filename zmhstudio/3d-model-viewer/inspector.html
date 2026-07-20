@@ -148,10 +148,12 @@
   import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-  // The normal-detail bake (option a — finer TSDF + hard-decimated low mesh)
-  // is the default, since this page exists to inspect the normal map; the
-  // isolation-sweep boulders (flat maps) follow for reference.
+  // The firepit (newest scan) leads as the default — it carries a real baked
+  // normal map, like the normal-detail boulder that follows. This page exists
+  // to inspect the normal map; the isolation-sweep boulders (flat maps) trail
+  // for reference.
   const MODELS = [
+    { file:'models/firepit.glb', label:'firepit — mesh-lid subject (draft)' },
     { file:'models/boulder_normaldetail.glb', label:'normal-detail — 512/8k bake (option a)' },
     { file:'models/grnd_r090.glb', label:'grnd_r090 — tightest clean (flat map)' },
     { file:'models/grnd.glb',      label:'grnd — safest fidelity' },

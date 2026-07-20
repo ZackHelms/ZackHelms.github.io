@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#0e1116">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🪨</text></svg>">
-<title>zmhstudio · boulder scan viewer</title>
+<title>zmhstudio · 3D scan viewer</title>
 <script type="module" src="./model-viewer.min.js"></script>
 <style>
   :root {
@@ -77,8 +77,8 @@
 <body>
   <header>
     <div class="htext">
-      <h1>Boulder scan viewer &middot; <span style="color:var(--dim);font-weight:500">zmh-3d scan</span></h1>
-      <p>Top two: the <code>--watertight</code> cap A/B (same scan, cap on vs off). Below: the <code>--isolate</code> sweep. Drag to rotate, pinch to zoom — <b>tilt down to inspect the base</b>.</p>
+      <h1>3D scan viewer &middot; <span style="color:var(--dim);font-weight:500">zmh-3d scan</span></h1>
+      <p>Scan outputs from the <code>zmh-3d</code> video→3D pipeline. Drag to rotate, pinch to zoom — <b>tilt down to inspect the base</b>.</p>
     </div>
     <a class="inspect" href="./inspector.html" title="Open the normal-map light inspector">🔦 inspect lighting</a>
   </header>
@@ -114,6 +114,9 @@
 
 <script type="module">
   const MODELS = [
+    { id:'firepit', file:'models/firepit.glb', label:'firepit', tri:9446,
+      cfg:'sphere ×1.0  +  ground-cull  (draft)', tag:'ok',
+      note:'<b>Firepit — mesh-lid subject.</b> Draft scan from a 43&thinsp;s phone orbit (48 frames, 0.40&thinsp;px reproj). Solid lattice body and legs; the see-through wire-mesh dome reconstructs as a torn shell — photogrammetry can’t resolve see-through mesh. Ground-cull ×1.0 removed most of the patio skirt.' },
     { id:'boulder_capped', file:'models/boulder_capped.glb', label:'capped', tri:17172,
       cfg:'grnd  +  --watertight auto  (zmh3dm)', tag:'good',
       note:'<b>Watertight cap.</b> 23 open boundary loops → 0 via a flat-texel centroid-fan (+720 tris). Solid flat underside; visible surface atlas byte-identical to “open” (texel fill <b>97.99%</b>). Tilt down to see the closed base.' },
@@ -174,7 +177,7 @@
     tabs.appendChild(b);
   });
 
-  // default to the recommended pick
+  // default to the newest model (top of the list)
   select(0, tabs.children[0]);
 
   // controls
