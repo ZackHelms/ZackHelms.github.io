@@ -41,10 +41,17 @@
   header h1 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: .2px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   header p { margin: 2px 0 0; font-size: 12px; color: var(--dim); }
-  header .back { margin-left: auto; flex: 0 0 auto; font-size: 12px; color: var(--accent);
+  header .back { flex: 0 0 auto; font-size: 12px; color: var(--accent);
     text-decoration: none; border: 1px solid var(--edge); background: var(--panel);
     border-radius: 9px; padding: 6px 10px; white-space: nowrap; }
   header .back:hover { border-color: var(--accent); }
+  header .hdr-right { margin-left: auto; flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+  header .hdr-reload { font-size: 12px; color: var(--accent); border: 1px solid var(--edge);
+    background: var(--panel); border-radius: 9px; padding: 6px 10px; cursor: pointer;
+    white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+  header .hdr-reload:active { transform: translateY(1px); }
+  .buildstamp { position: absolute; right: 8px; bottom: 7px; z-index: 4; font-size: 10px;
+    color: #6b7887; font-variant-numeric: tabular-nums; pointer-events: none; user-select: none; }
 
   /* stage / canvas */
   .stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;
@@ -108,7 +115,10 @@
       <h1>Normal-map light inspector &middot; <span style="color:var(--dim);font-weight:500">zmh-3d scan</span></h1>
       <p>Two modes: <b>Rotate model</b> (turn the object under a held light) and <b>Rotate light</b> (sweep the light over a fixed object). Toggle with the mode button; the pad is a fine light control in both.</p>
     </div>
-    <a class="back" href="./index.html" title="Back to the isolation comparison">&larr; comparison</a>
+    <div class="hdr-right">
+      <button class="hdr-reload" id="btnReload" title="Hard reload — clears cache and re-fetches models">↻ Reload</button>
+      <a class="back" href="./index.html" title="Back to the isolation comparison">&larr; comparison</a>
+    </div>
   </header>
 
   <div class="stage" id="stage">
@@ -118,6 +128,7 @@
       <div class="padlab">key light · edge = grazing</div>
     </div>
     <div id="err">Couldn&rsquo;t start the 3D inspector.<br>Reload the page.</div>
+    <div class="buildstamp" id="buildstamp"></div>
   </div>
 
   <div id="panel">
@@ -161,6 +172,12 @@
     { file:'models/r090.glb',      label:'r090 — thin base sliver' },
     { file:'models/r075.glb',      label:'r075 — too tight' },
   ];
+
+  // Build stamp + cache-busting (see index.html): models load with `?v=<CB>`
+  // so the Reload button's fresh `?cb=` re-fetches every GLB past the cache.
+  const BUILD = '2026-07-20 01:12 UTC';
+  const CB = new URLSearchParams(location.search).get('cb') || BUILD;
+  const withCB = (u) => u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(CB);
 
   const DEFAULT_INTENSITY = 2.6;
   const DEFAULT_AMBIENT   = 0.10;
@@ -377,7 +394,7 @@
   }
 
   function loadModel(file) {
-    loader.load(file, (gltf) => {
+    loader.load(withCB(file), (gltf) => {
       if (currentHolder) { scene.remove(currentHolder); disposeHolder(currentHolder); }
 
       const root = gltf.scene;
@@ -558,6 +575,10 @@
   seedViewCoordFromWorld();   // DEFAULT_LIGHTDIR -> view coords against the default camera
   setMode('model');           // default: drag rotates the model, light held in view
   loadModel(MODELS[0].file);
+  document.getElementById('btnReload').addEventListener('click', () => {
+    location.href = location.pathname + '?cb=' + Date.now();
+  });
+  document.getElementById('buildstamp').textContent = 'built ' + BUILD;
   updateReadout();
   // refresh the readout periodically (light dir changes as you drag / orbit)
   setInterval(updateReadout, 250);
