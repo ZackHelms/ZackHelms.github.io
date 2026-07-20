@@ -114,9 +114,9 @@
 
 <script type="module">
   const MODELS = [
-    { id:'firepit', file:'models/firepit.glb', label:'firepit', tri:9446,
-      cfg:'sphere ×1.0  +  ground-cull  (draft)', tag:'ok',
-      note:'<b>Firepit — mesh-lid subject.</b> Draft scan from a 43&thinsp;s phone orbit (48 frames, 0.40&thinsp;px reproj). Solid lattice body and legs; the see-through wire-mesh dome reconstructs as a torn shell — photogrammetry can’t resolve see-through mesh. Ground-cull ×1.0 removed most of the patio skirt.' },
+    { id:'firepit', file:'models/firepit.glb', label:'firepit', tri:8000,
+      cfg:'sphere ×1.0  +  ground-cull  ·  open  (draft)', tag:'ok',
+      note:'<b>Firepit — mesh-lid subject.</b> Draft scan from a 43&thinsp;s phone orbit (48 frames, 0.40&thinsp;px reproj). Solid lattice body and legs; the see-through wire-mesh dome reconstructs as a torn shell — photogrammetry can’t resolve see-through mesh. Ground-cull ×1.0 removed most of the patio skirt. <b>Open</b> (uncapped — the new default): you see the outer surface and, through the openings, the interior — no centroid-fan cap.' },
     { id:'boulder_capped', file:'models/boulder_capped.glb', label:'capped', tri:17172,
       cfg:'grnd  +  --watertight auto  (zmh3dm)', tag:'good',
       note:'<b>Watertight cap.</b> 23 open boundary loops → 0 via a flat-texel centroid-fan (+720 tris). Solid flat underside; visible surface atlas byte-identical to “open” (texel fill <b>97.99%</b>). Tilt down to see the closed base.' },
