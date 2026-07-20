@@ -125,6 +125,9 @@
 
 <script type="module">
   const MODELS = [
+    { id:'pumpkin_quality', file:'models/pumpkin_quality.glb', label:'pumpkin (quality)', tri:39999,
+      cfg:'preset quality  ·  depth ml  ·  295 frames @1920  ·  open', tag:'bad',
+      note:'<b>Quality preset backfired on ML depth — a real finding.</b> 295 frames at 1920&thinsp;px, all registered (0.49&thinsp;px reproj), but the mesh came out a fragmented shell: 17,484 disconnected pieces before cleanup (vs 3,237 in the draft), coverage 45% vs 63%. Why: DA-V2 monocular depth is only <i>affine-fitted per frame</i> to scene scale — 219 views voting at slightly different scales contradict each other in the finer TSDF voxels and the surface shreds. A re-fuse at the draft&rsquo;s coarser voxel confetti&rsquo;d too, so the driver is many-view scale inconsistency, not voxel size alone. <b>With <code>--depth ml</code>, draft&rsquo;s smaller frame budget is currently the sweet spot</b> — see &ldquo;pumpkin (ml)&rdquo; below (still the best from this capture). Heavy file (~30&thinsp;MB), slow first load.' },
     { id:'pumpkin', file:'models/pumpkin.glb', label:'pumpkin (ml)', tri:7999,
       cfg:'depth ml  ·  isolate auto ×1.15  ·  open  (draft)', tag:'ok',
       note:'<b>White pumpkin — the ML-depth fix.</b> Same capture and SfM as “pumpkin (sgbm)”, re-run with <code>--depth ml</code> (Depth Anything V2 monocular depth — no surface texture needed, weights now committed to zmhstudio): depth coverage jumped ~13%&thinsp;→&thinsp;~63% and <b>33 of 36</b> views fused (vs 9), recovering the full body — gold-leaf crown, ridges, rounded volume. Still a draft: some ragged patches and holes remain (visible as interior showing through); the next levers are <code>--preset quality</code> and a slower, closer orbit.' },
@@ -160,7 +163,7 @@
   // Build stamp + cache-busting. Models load with `?v=<CB>`; CB is the build
   // stamp normally, or the fresh `?cb=` value the Reload button navigates with,
   // so a hard reload re-fetches every GLB past the browser / Pages CDN cache.
-  const BUILD = '2026-07-20 13:18 UTC';
+  const BUILD = '2026-07-20 19:45 UTC';
   const CB = new URLSearchParams(location.search).get('cb') || BUILD;
   const withCB = (u) => u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(CB);
 

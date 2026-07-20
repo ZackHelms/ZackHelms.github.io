@@ -11,6 +11,17 @@ Live: `https://tythos.com/zmhstudio/3d-model-viewer/`
 
 ## What's loaded
 
+### Pumpkin (quality) — many-view ML-depth shred
+
+`pumpkin (quality)` — the same capture at `--preset quality` (295 frames @
+1920&nbsp;px, all registered): **worse, not better**. DA-V2 monocular depth is
+affine-fitted per frame, so 219 views at slightly inconsistent scales
+contradict each other during TSDF fusion and the shell fragments (17,484
+components before cleanup; a coarser-voxel re-fuse confetti'd too, so it's the
+view-count scale inconsistency, not voxel size). With `--depth ml` the draft
+frame budget is currently the sweet spot. Kept (tagged **bad**) as the
+documented failure; ~30&nbsp;MB, slow first load.
+
 ### Pumpkin (draft) — sgbm vs ml depth pair
 
 A matte-white decorative pumpkin with gold-leaf accents, draft scan from a
