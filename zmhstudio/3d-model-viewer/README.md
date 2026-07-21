@@ -11,6 +11,29 @@ Live: `https://tythos.com/zmhstudio/3d-model-viewer/`
 
 ## What's loaded
 
+### Pumpkin80 — the 80-photo stills recapture (2026-07-21)
+
+Seven models from one capture: 80 iPhone-13 stills (3024², eye-level orbit +
+top-down pass, black marble counter at night) of the same white-and-gold
+pumpkin, run through the scan pipeline as the real-capture A/B for
+`--ml-harmonize` (zmh3dp) plus an sgbm comparison.
+
+- `pumpkin80 (q60 sgbm)` — **good, best pumpkin yet**: quality preset capped
+  to the 60 sharpest stills so matching stays exhaustive (all 60 registered,
+  0.62 px); solid body, detailed gold-leaf crown, holes on the white sides.
+- `pumpkin80 (draft sgbm)` — **good**: sharp well-lit stills nearly doubled
+  sgbm's coverage vs the video capture; 746 components, coherent draft body.
+- `pumpkin80 (q20 ml island)` — **ok, the finding**: sequential matching
+  (built for video) registered only a 20-still island — and that
+  self-consistent cluster produced ml's first coherent body on this subject
+  (20/20 fits, 0 interpolated). ml shreds across inconsistent view clusters,
+  not with view count per se.
+- The four `harmonize ON/OFF` A/B entries (q60 + draft) — **bad**: on this
+  capture the per-view fits swing ~80–120× (one whole ring degenerate at 0
+  inliers; reflective marble + night windows), which is beyond what
+  trajectory smoothing can absorb. ON beats OFF on every stat and both
+  confetti — the real-capture verdict on harmonization as shipped.
+
 ### Pumpkin (quality) — many-view ML-depth shred
 
 `pumpkin (quality)` — the same capture at `--preset quality` (295 frames @
@@ -30,7 +53,9 @@ frames, 0.36&nbsp;px reproj) — only the depth backend differs:
 
 - `pumpkin (ml)` — `--depth ml` (Depth Anything V2 monocular depth; weights
   committed to zmhstudio 2026-07-20): coverage ~63%, 33/36 views fused, the
-  full body recovered. Still draft-ragged in patches. Loads first (**ok**).
+  full body recovered — by the stats. Retagged **bad** 2026-07-21 after the
+  CD's eyeball verdict: squished/warped, silhouette lost, leaves scrambled —
+  the stats masked a global warp.
 - `pumpkin (sgbm)` — the before-shot (**bad**): the textureless white body
   gives block-matching stereo nothing to lock onto — coverage ~13% (median
   0%), 9 views fused, a torn shell of mostly the gold-leaf cluster. A
