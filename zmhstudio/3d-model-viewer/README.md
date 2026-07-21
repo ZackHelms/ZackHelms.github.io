@@ -11,6 +11,16 @@ Live: `https://tythos.com/zmhstudio/3d-model-viewer/`
 
 ## What's loaded
 
+### Pumpkin80 hull completion — zmh3dq stage 1 (2026-07-21)
+
+- `pumpkin80 (q60 sgbm + hull)` — **good (stats; CD shape-bar verdict
+  pending)**: the q60 sgbm run re-fused with `--complete hull` (silhouette
+  visual-hull completion, the new scan stage). GrabCut silhouettes on 60/60
+  views fill synthetic depth only where real depth never landed: fuse
+  33→60 integrated views, 158K→347K verts, components 8,021→5,394 —
+  coverage doubled and fragmentation down together. Lower half + stem-top
+  should be closed from the sides/above; texture is real photo albedo.
+
 ### Pumpkin80 — the 80-photo stills recapture (2026-07-21)
 
 Seven models from one capture: 80 iPhone-13 stills (3024², eye-level orbit +
@@ -23,11 +33,13 @@ pumpkin, run through the scan pipeline as the real-capture A/B for
   0.62 px); solid body, detailed gold-leaf crown, holes on the white sides.
 - `pumpkin80 (draft sgbm)` — **good**: sharp well-lit stills nearly doubled
   sgbm's coverage vs the video capture; 746 components, coherent draft body.
-- `pumpkin80 (q20 ml island)` — **ok, the finding**: sequential matching
-  (built for video) registered only a 20-still island — and that
-  self-consistent cluster produced ml's first coherent body on this subject
-  (20/20 fits, 0 interpolated). ml shreds across inconsistent view clusters,
-  not with view count per se.
+- `pumpkin80 (q20 ml island)` — **bad (retagged 2026-07-21 after CD
+  eyeball)**: sequential matching (built for video) registered only a
+  20-still island — a self-consistent cluster that produced ml's first
+  coherent body on this subject (20/20 fits, 0 interpolated). But the CD's
+  shape verdict: the white sides pull in with the wrong curvature — cluster
+  consistency ≠ shape fidelity. ml shreds across inconsistent view
+  clusters, not with view count per se.
 - The four `harmonize ON/OFF` A/B entries (q60 + draft) — **bad**: on this
   capture the per-view fits swing ~80–120× (one whole ring degenerate at 0
   inliers; reflective marble + night windows), which is beyond what

@@ -125,6 +125,9 @@
 
 <script type="module">
   const MODELS = [
+    { id:'pumpkin80_q60_sgbm_hull', file:'models/pumpkin80_q60_sgbm_hull.glb', label:'pumpkin80 (q60 sgbm + hull)', tri:39999,
+      cfg:'preset quality  ·  depth sgbm  ·  complete hull  ·  60/60 stills @1920  ·  open', tag:'good',
+      note:'<b>First hull-completed model (zmh3dq stage 1).</b> Same q60 sgbm run, re-fused with <code>--complete hull</code>: a visual hull carved from per-view silhouettes (GrabCut seeded by the isolate sphere — <b>60/60 views usable</b>, night capture) fills synthetic depth ONLY where real depth never landed. Fuse went <b>33&rarr;60 integrated views</b>, 158K&rarr;347K verts, components <b>8,021&rarr;5,394</b> — coverage doubled AND fragmentation down, first time both moved the right way. The white lower half + stem-top should now be closed from the sides/above; texture stays real photo albedo. Hull limits: concavities bridge, underside may still gap. ~38&thinsp;MB.' },
     { id:'pumpkin80_q60_sgbm', file:'models/pumpkin80_q60_sgbm.glb', label:'pumpkin80 (q60 sgbm)', tri:40000,
       cfg:'preset quality  ·  depth sgbm  ·  60/60 stills @1920  ·  exhaustive  ·  open', tag:'good',
       note:'<b>The 80-photo recapture pays off — best pumpkin yet.</b> 80 iPhone stills (3024&thinsp;², two rings: eye-level orbit + top-down pass), sharpness-cut to the best 60, <b>all 60 registered</b> at 0.62&thinsp;px via exhaustive matching. sgbm coverage stays modest (~17%) on the matte white body, but every view votes at a consistent geometric scale: 8,021 components fused into a solid pumpkin with the most detailed gold-leaf crown of any run, stem included. Holes remain on the textureless white sides. ~40&thinsp;MB, slow first load.' },
@@ -132,8 +135,8 @@
       cfg:'depth sgbm  ·  46/48 stills @1024  ·  exhaustive  ·  open  (draft)', tag:'good',
       note:'<b>Stills fix sgbm&rsquo;s texture starvation.</b> Same 80-photo capture at draft (48 sharpest @1024, 46 registered, 0.46&thinsp;px). Where the old video capture starved block-matching (median 0% coverage), sharp well-lit stills nearly doubled mean coverage (~24%): <b>746 components</b>, a coherent body — correct silhouette, formed stem, legible leaves, holes on the white sides. The capture was a big part of the problem, not just the matte surface.' },
     { id:'pumpkin80_q20_ml_island', file:'models/pumpkin80_q20_ml_island.glb', label:'pumpkin80 (q20 ml island)', tri:40000,
-      cfg:'preset quality  ·  depth ml  ·  harmonize on  ·  20-view island  ·  open', tag:'ok',
-      note:'<b>ml&rsquo;s first coherent body — from a happy accident.</b> The quality preset&rsquo;s sequential matching (built for video) chained only <b>20 of the 80 stills</b> into one registered island — and that self-consistent cluster is exactly where per-view affine fits agree: 20/20 fitted, 0 interpolated, and the fused body <b>holds</b> (stem, crown, rounded volume; fringe shred at the base). The lesson: ml shreds across <i>inconsistent view clusters</i>, not with view count per se. ~40&thinsp;MB.' },
+      cfg:'preset quality  ·  depth ml  ·  harmonize on  ·  20-view island  ·  open', tag:'bad',
+      note:'<b>ml&rsquo;s first coherent body — from a happy accident.</b> The quality preset&rsquo;s sequential matching (built for video) chained only <b>20 of the 80 stills</b> into one registered island — and that self-consistent cluster is exactly where per-view affine fits agree: 20/20 fitted, 0 interpolated, and the fused body <b>holds</b> (stem, crown, rounded volume; fringe shred at the base). The lesson: ml shreds across <i>inconsistent view clusters</i>, not with view count per se. <b>CD eyeball (2026-07-21): retagged bad</b> — &ldquo;doesn&rsquo;t hold the shape correctly, the white sides are in a bit too much and don&rsquo;t have the proper curvature from the side&rdquo;: cluster consistency &ne; shape fidelity; ml under-curves the textureless regions. ~40&thinsp;MB.' },
     { id:'pumpkin80_q60_ml_on', file:'models/pumpkin80_q60_ml_on.glb', label:'pumpkin80 (q60 ml, harmonize ON)', tri:35452,
       cfg:'preset quality  ·  depth ml  ·  harmonize ON  ·  60 stills @1920  ·  open', tag:'bad',
       note:'<b>Harmonization A/B, many-view half — does NOT rescue this capture.</b> All 60 views fitted (15 interpolated by the outlier gate), but the raw per-view scale fits swing 0.18&thinsp;&rarr;&thinsp;14.5 (80&times;) — the whole eye-level ring fit degenerate (0 inliers of ~1,900 anchors; the reflective black marble + night windows likely confuse monocular depth). Trajectory smoothing (&lambda;=2.0) can&rsquo;t absorb that much noise: 45,772 components, a striated flake cloud. It still beats OFF on every stat (largest component ~9&times; bigger), so the mechanism works — the underlying fits are simply unusable here.' },
@@ -184,7 +187,7 @@
   // Build stamp + cache-busting. Models load with `?v=<CB>`; CB is the build
   // stamp normally, or the fresh `?cb=` value the Reload button navigates with,
   // so a hard reload re-fetches every GLB past the browser / Pages CDN cache.
-  const BUILD = '2026-07-21 13:40 UTC';
+  const BUILD = '2026-07-21 21:35 UTC';
   const CB = new URLSearchParams(location.search).get('cb') || BUILD;
   const withCB = (u) => u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(CB);
 
