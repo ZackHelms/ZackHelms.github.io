@@ -3,189 +3,202 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZMHSTUDIO — the one-human game studio</title>
+<meta name="theme-color" content="#0e1116">
+<title>zmhstudio — a one-human game studio</title>
 <meta name="description" content="zmhstudio: a Claude Code plugin marketplace powering Zack Helms's one-human game studio — production tooling, 3D pipelines, pixel art, and synth scores, all AI-operated.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #06060e;
-  --panel: #0b0b16;
-  --panel2: #10101f;
-  --border: #1a1a30;
-  --green: #39ff14;
-  --gold: #ffc300;
-  --blue: #4488ff;
-  --red: #ff2244;
-  --white: #dde3ff;
-  --dim: #8899bb;
-  --purple: #b44fff;
-  --cyan: #22ddcc;
+  --bg: #0e1116;
+  --panel: #171c24;
+  --panel2: #1f2732;
+  --edge: #2b3543;
+  --ink: #e8edf4;
+  --dim: #9aa7b6;
+  --faint: #6b7887;
+  --accent: #6ea8fe;
+  --green: #46d39a;
+  --gold: #c9b458;
+  --purple: #a78bfa;
+  --red: #f2665e;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 body {
   background: var(--bg);
-  color: var(--white);
-  font-family: 'Share Tech Mono', monospace;
+  background-image: radial-gradient(110% 60% at 50% -8%, #161d28 0%, var(--bg) 62%);
+  background-repeat: no-repeat;
+  color: var(--ink);
+  font-family: var(--sans);
   line-height: 1.65;
   overflow-x: hidden;
 }
-#bgfx {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  opacity: 0.55;
-}
-main { position: relative; z-index: 1; max-width: 980px; margin: 0 auto; padding: 0 20px 80px; }
-h1, h2, h3 { font-family: 'Black Ops One', cursive; font-weight: 400; letter-spacing: 1px; }
+main { max-width: 920px; margin: 0 auto; padding: 0 22px 72px; }
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.015em; }
 
 /* ---------- hero ---------- */
-header.hero { text-align: center; padding: 88px 0 40px; }
-.hero h1 {
-  font-size: clamp(2.4rem, 8vw, 4.6rem);
-  color: var(--green);
-  text-shadow: 0 0 18px rgba(57,255,20,0.45), 0 0 60px rgba(57,255,20,0.15);
+header.hero { text-align: center; padding: 92px 0 44px; }
+.hero .wordmark {
+  font-family: var(--mono);
+  font-size: clamp(2.1rem, 6.5vw, 3.4rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
+.hero .wordmark .tld { color: var(--accent); }
 .hero .tagline {
-  margin-top: 14px;
-  font-size: clamp(1rem, 3vw, 1.25rem);
-  color: var(--white);
+  margin-top: 12px;
+  font-size: clamp(1.02rem, 2.6vw, 1.22rem);
+  font-weight: 500;
+  color: var(--ink);
 }
 .hero .sub {
-  margin: 18px auto 0;
-  max-width: 640px;
+  margin: 14px auto 0;
+  max-width: 600px;
   color: var(--dim);
-  font-size: 0.95rem;
+  font-size: 0.96rem;
 }
 .hero .roles {
-  display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;
-  margin-top: 26px;
+  display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 30px;
 }
 .role-chip {
-  border: 1px solid var(--border); background: var(--panel);
-  padding: 8px 16px; border-radius: 6px; font-size: 0.85rem;
+  border: 1px solid var(--edge); background: var(--panel);
+  padding: 10px 18px; border-radius: 10px; font-size: 0.86rem;
+  color: var(--dim); text-align: left;
 }
-.role-chip b { display: block; font-size: 0.72rem; letter-spacing: 2px; text-transform: uppercase; }
+.role-chip b { display: block; font-weight: 600; font-size: 0.8rem; margin-bottom: 1px; }
 .role-chip.cd b { color: var(--gold); }
-.role-chip.le b { color: var(--cyan); }
+.role-chip.le b { color: var(--accent); }
 
 /* ---------- sections ---------- */
-section { margin-top: 64px; }
+section { margin-top: 68px; }
 section > h2 {
-  font-size: clamp(1.3rem, 4vw, 1.8rem);
-  color: var(--gold);
-  text-shadow: 0 0 12px rgba(255,195,0,0.3);
-  margin-bottom: 18px;
+  font-size: clamp(1.25rem, 3.4vw, 1.55rem);
+  color: var(--ink);
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--edge);
 }
-section > h2 .num { color: var(--dim); font-size: 0.75em; margin-right: 10px; }
-section p { color: var(--white); margin-bottom: 14px; }
+section > h2 .num {
+  font-family: var(--mono); font-weight: 400;
+  color: var(--faint); font-size: 0.7em; margin-right: 12px;
+  position: relative; top: -1px;
+}
+section p { color: var(--ink); margin-bottom: 14px; font-size: 0.96rem; }
 section p.dim { color: var(--dim); font-size: 0.92rem; }
-em { color: var(--cyan); font-style: normal; }
-strong { color: var(--gold); font-weight: normal; }
-a { color: var(--blue); text-decoration: none; }
+em { color: var(--accent); font-style: normal; }
+strong { color: var(--ink); font-weight: 600; }
+a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 code {
-  background: var(--panel2); border: 1px solid var(--border);
-  padding: 1px 6px; border-radius: 4px; font-family: inherit; font-size: 0.9em;
-  color: var(--cyan); white-space: nowrap;
+  background: var(--panel2); border: 1px solid var(--edge);
+  padding: 1px 6px; border-radius: 5px;
+  font-family: var(--mono); font-size: 0.84em;
+  color: var(--ink); white-space: nowrap;
 }
 
 /* ---------- loop diagram ---------- */
 .loop {
-  display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch;
-  margin: 24px 0 8px;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch;
+  margin: 22px 0 10px;
 }
 .loop .step {
   flex: 1 1 150px;
-  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
-  padding: 14px 12px; text-align: center; position: relative;
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 10px;
+  padding: 14px 13px; text-align: center;
 }
 .loop .step .k {
-  font-family: 'Black Ops One', cursive; font-size: 0.82rem; letter-spacing: 1px;
-  color: var(--green); display: block; margin-bottom: 6px;
+  font-weight: 600; font-size: 0.9rem;
+  color: var(--ink); display: block; margin-bottom: 5px;
 }
-.loop .step .d { font-size: 0.78rem; color: var(--dim); }
-.loop .arrow {
-  align-self: center; color: var(--green); font-size: 1.1rem;
-  text-shadow: 0 0 8px rgba(57,255,20,0.5);
-}
+.loop .step .d { font-size: 0.79rem; color: var(--dim); line-height: 1.5; }
+.loop .arrow { align-self: center; color: var(--faint); font-size: 0.95rem; }
 @media (max-width: 700px) {
   .loop { flex-direction: column; }
   .loop .arrow { transform: rotate(90deg); align-self: center; }
 }
 
 /* ---------- plugin cards ---------- */
-.plugins { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 8px; }
+.plugins { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 10px; }
 .card {
-  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 12px;
   padding: 20px; display: flex; flex-direction: column; gap: 10px;
-  transition: border-color 0.2s, transform 0.2s;
+  border-top: 2px solid var(--card-accent, var(--edge));
+  transition: border-color 0.15s, transform 0.15s;
 }
-.card:hover { border-color: var(--accent, var(--green)); transform: translateY(-2px); }
-.card h3 { font-size: 1.05rem; color: var(--accent, var(--green)); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.card:hover { border-color: var(--card-accent, var(--accent)); transform: translateY(-2px); }
+.card h3 {
+  font-family: var(--mono); font-weight: 500; font-size: 1rem;
+  color: var(--card-accent, var(--ink));
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
 .card .pill {
-  font-family: 'Share Tech Mono', monospace; font-size: 0.62rem; letter-spacing: 2px;
-  padding: 2px 9px; border-radius: 20px; border: 1px solid currentColor;
+  font-family: var(--sans); font-weight: 600; font-size: 0.68rem;
+  padding: 2px 10px; border-radius: 20px; border: 1px solid currentColor;
 }
 .pill.live { color: var(--green); }
 .pill.partial { color: var(--gold); }
 .card p { font-size: 0.88rem; color: var(--dim); margin: 0; }
-.card p b { color: var(--white); font-weight: normal; }
+.card p b { color: var(--ink); font-weight: 600; }
 .card ul { list-style: none; margin: 0; }
-.card li { font-size: 0.82rem; color: var(--dim); padding-left: 16px; position: relative; margin-top: 5px; }
-.card li::before { content: '»'; position: absolute; left: 0; color: var(--accent, var(--green)); }
-.card.producer { --accent: var(--green); }
-.card.d3 { --accent: var(--purple); }
-.card.pixart { --accent: var(--gold); }
-.card.synth { --accent: var(--blue); }
+.card li { font-size: 0.83rem; color: var(--dim); padding-left: 16px; position: relative; margin-top: 6px; line-height: 1.5; }
+.card li::before { content: '–'; position: absolute; left: 0; color: var(--card-accent, var(--accent)); }
+.card.producer { --card-accent: var(--green); }
+.card.d3 { --card-accent: var(--purple); }
+.card.pixart { --card-accent: var(--gold); }
+.card.synth { --card-accent: var(--accent); }
 
 /* ---------- principles ---------- */
-.principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .prin {
-  background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--cyan);
-  border-radius: 6px; padding: 14px 16px;
+  background: var(--panel); border: 1px solid var(--edge);
+  border-radius: 10px; padding: 15px 17px;
 }
-.prin b { color: var(--cyan); display: block; margin-bottom: 4px; font-size: 0.9rem; }
-.prin span { font-size: 0.82rem; color: var(--dim); }
+.prin b { color: var(--ink); font-weight: 600; display: block; margin-bottom: 4px; font-size: 0.9rem; }
+.prin span { font-size: 0.83rem; color: var(--dim); }
 
 /* ---------- artifacts ---------- */
-.artifacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.artifacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
 a.art {
-  display: block; background: var(--panel); border: 1px solid var(--border);
-  border-radius: 10px; padding: 20px; color: inherit;
-  transition: border-color 0.2s, transform 0.2s;
+  display: block; background: var(--panel); border: 1px solid var(--edge);
+  border-radius: 12px; padding: 20px; color: inherit;
+  transition: border-color 0.15s, transform 0.15s;
 }
-a.art:hover { text-decoration: none; border-color: var(--blue); transform: translateY(-2px); }
-a.art .t { font-family: 'Black Ops One', cursive; color: var(--blue); font-size: 1rem; margin-bottom: 8px; }
-a.art .d { font-size: 0.85rem; color: var(--dim); }
-a.art .go { display: block; margin-top: 12px; font-size: 0.78rem; color: var(--green); letter-spacing: 1px; }
+a.art:hover { text-decoration: none; border-color: var(--accent); transform: translateY(-2px); }
+a.art .t { font-weight: 600; color: var(--ink); font-size: 1rem; margin-bottom: 7px; }
+a.art .d { font-size: 0.86rem; color: var(--dim); }
+a.art .go { display: block; margin-top: 14px; font-size: 0.84rem; font-weight: 500; color: var(--accent); }
 
 /* ---------- terminal block ---------- */
 .term {
-  background: #04040a; border: 1px solid var(--border); border-radius: 8px;
+  background: #0a0d12; border: 1px solid var(--edge); border-radius: 10px;
   padding: 16px 18px; margin: 16px 0; overflow-x: auto;
+  font-family: var(--mono);
 }
-.term .ln { white-space: pre; font-size: 0.88rem; }
+.term .ln { white-space: pre; font-size: 0.85rem; }
 .term .ln .prompt { color: var(--green); }
-.term .ln .cmd { color: var(--white); }
-.term .ln.note { color: var(--dim); font-size: 0.78rem; white-space: normal; }
+.term .ln .cmd { color: var(--ink); }
+.term .ln.note { color: var(--faint); font-size: 0.78rem; white-space: normal; margin-top: 6px; }
 
 footer {
-  position: relative; z-index: 1;
-  border-top: 1px solid var(--border); margin-top: 30px; padding: 26px 20px 40px;
-  text-align: center; color: var(--dim); font-size: 0.8rem;
+  border-top: 1px solid var(--edge); margin-top: 34px; padding: 26px 22px 42px;
+  text-align: center; color: var(--faint); font-size: 0.82rem;
 }
-footer a { color: var(--dim); text-decoration: underline; }
+footer a { color: var(--dim); }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-22 05:08 UTC</div>
-<canvas id="bgfx"></canvas>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-22 14:01 UTC</div>
 
 <main>
 <header class="hero">
-  <h1>ZMHSTUDIO</h1>
-  <div class="tagline">a one-human game studio, run like a big one</div>
+  <h1 class="wordmark">zmhstudio<span class="tld">.</span></h1>
+  <div class="tagline">A one-human game studio, run like a big one</div>
   <p class="sub">One person sets the creative direction. An AI lead engineer plans,
   builds, tests, and ships. This page explains the machine that makes that work.</p>
   <div class="roles">
@@ -195,7 +208,7 @@ footer a { color: var(--dim); text-decoration: underline; }
 </header>
 
 <section id="what">
-  <h2><span class="num">01</span>WHAT IT IS</h2>
+  <h2><span class="num">01</span>What it is</h2>
   <p><strong>zmhstudio</strong> is a <em>Claude Code plugin marketplace</em>: a single
   repository that distributes shared studio tooling — as installable plugins — to every
   game project in the studio (an FPS, a JRPG, an action slicer, a Roblox experiment, and
@@ -209,20 +222,20 @@ footer a { color: var(--dim); text-decoration: underline; }
 </section>
 
 <section id="loop">
-  <h2><span class="num">02</span>THE PRODUCTION LOOP</h2>
+  <h2><span class="num">02</span>The production loop</h2>
   <p>Every project runs the same loop, driven by the <em>zmh-producer</em> plugin.
   The Creative Director's decisions enter at the top; working, validated features
   come out the bottom — with the AI doing every step in between autonomously.</p>
   <div class="loop">
-    <div class="step"><span class="k">BACKLOG</span><span class="d">every idea lives in a bucketed TODO, groomed by interview</span></div>
-    <div class="arrow">▶</div>
-    <div class="step"><span class="k">PLAN</span><span class="d">each item becomes a written, reviewable implementation plan</span></div>
-    <div class="arrow">▶</div>
-    <div class="step"><span class="k">OVERSEE</span><span class="d">the AI implements the plan end-to-end in an isolated worktree</span></div>
-    <div class="arrow">▶</div>
-    <div class="step"><span class="k">GATE</span><span class="d">nothing integrates without a green validation pass</span></div>
-    <div class="arrow">▶</div>
-    <div class="step"><span class="k">SHIP</span><span class="d">integrate, publish, and fold learnings back into context</span></div>
+    <div class="step"><span class="k">Backlog</span><span class="d">every idea lives in a bucketed TODO, groomed by interview</span></div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="k">Plan</span><span class="d">each item becomes a written, reviewable implementation plan</span></div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="k">Oversee</span><span class="d">the AI implements the plan end-to-end in an isolated worktree</span></div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="k">Gate</span><span class="d">nothing integrates without a green validation pass</span></div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="k">Ship</span><span class="d">integrate, publish, and fold learnings back into context</span></div>
   </div>
   <p class="dim">A ledger records every run — which model did the work, whether it
   passed first try, where it escalated — and a mining command periodically reads it
@@ -230,13 +243,13 @@ footer a { color: var(--dim); text-decoration: underline; }
 </section>
 
 <section id="plugins">
-  <h2><span class="num">03</span>THE PLUGIN FAMILY</h2>
+  <h2><span class="num">03</span>The plugin family</h2>
   <p class="dim">Every plugin carries the <code>zmh-</code> prefix on purpose: typing
   <code>/zmh</code> in Claude Code autocompletes the whole family. Build order:
   producer → synth → 3d → pixart.</p>
   <div class="plugins">
     <div class="card producer">
-      <h3>zmh-producer <span class="pill live">LIVE</span></h3>
+      <h3>zmh-producer <span class="pill live">Live</span></h3>
       <p><b>The production loop itself.</b> Seven commands that take a repo from
       empty scaffold to autonomous burndown:</p>
       <ul>
@@ -248,7 +261,7 @@ footer a { color: var(--dim); text-decoration: underline; }
       </ul>
     </div>
     <div class="card d3">
-      <h3>zmh-3d <span class="pill live">LIVE</span></h3>
+      <h3>zmh-3d <span class="pill live">Live</span></h3>
       <p><b>Four 3D asset pipelines</b>, all CPU-only and deterministic:</p>
       <ul>
         <li>voxel characters — seeded zombies (6 decay stages) &amp; dog variants</li>
@@ -258,14 +271,14 @@ footer a { color: var(--dim); text-decoration: underline; }
       </ul>
     </div>
     <div class="card pixart">
-      <h3>zmh-pixart <span class="pill live">LIVE</span></h3>
+      <h3>zmh-pixart <span class="pill live">Live</span></h3>
       <p><b>Deterministic pixel-icon pipeline.</b> A JSON icon spec — palette plus
       an ordered list of drawing ops (rects, lines, discs, mirrored bitmaps) —
       renders to crisp PNGs or a single vendorable TypeScript module. Same spec in,
       same pixels out, forever.</p>
     </div>
     <div class="card synth">
-      <h3>zmh-synth <span class="pill partial">PARTIAL</span></h3>
+      <h3>zmh-synth <span class="pill partial">Partial</span></h3>
       <p><b>Music &amp; SFX synthesis.</b> The knowledge layer is live: a
       tracker-style score format, synthesized-instrument recipes, and genre grids
       that already produced a shipped ten-track game soundtrack. The
@@ -275,7 +288,7 @@ footer a { color: var(--dim); text-decoration: underline; }
 </section>
 
 <section id="principles">
-  <h2><span class="num">04</span>HOUSE RULES</h2>
+  <h2><span class="num">04</span>House rules</h2>
   <div class="principles">
     <div class="prin"><b>Deterministic by default</b>
       <span>Same spec + same seed = identical output, every time. Assets are regenerable artifacts, not precious binaries.</span></div>
@@ -286,39 +299,39 @@ footer a { color: var(--dim); text-decoration: underline; }
     <div class="prin"><b>Gates before merges</b>
       <span>Command edits pass LLM-judged evals; implementations pass validation gates; plans are preflighted against the real tree before any work starts.</span></div>
     <div class="prin"><b>Plans are permanent</b>
-      <span>Every design doc stays in the repo and marks itself IMPLEMENTED when it lands — the "why" is never deleted.</span></div>
+      <span>Every design doc stays in the repo and marks itself implemented when it lands — the "why" is never deleted.</span></div>
     <div class="prin"><b>Wholly-owned assets</b>
       <span>Seed templates are authored programmatically with a license ledger — no scraped models, no rights ambiguity.</span></div>
   </div>
 </section>
 
 <section id="artifacts">
-  <h2><span class="num">05</span>SEE IT WORKING</h2>
+  <h2><span class="num">05</span>See it working</h2>
   <div class="artifacts">
     <a class="art" href="/zmhstudio/3d-model-viewer/">
-      <div class="t">3D MODEL VIEWER</div>
+      <div class="t">3D model viewer</div>
       <div class="d">Live gallery of photogrammetry-scan outputs — boulders, a
       firepit, pumpkins — straight from the zmh-3d scan pipeline, including the
       documented failures. Science means keeping the bad runs too.</div>
-      <span class="go">OPEN VIEWER ▶</span>
+      <span class="go">Open viewer →</span>
     </a>
     <a class="art" href="/zmhstudio/3d-model-viewer/inspector.html">
-      <div class="t">MESH INSPECTOR</div>
+      <div class="t">Mesh inspector</div>
       <div class="d">The same models under a debugging lens — wireframes, normals,
       and normal-map lighting for close-up pipeline forensics.</div>
-      <span class="go">OPEN INSPECTOR ▶</span>
+      <span class="go">Open inspector →</span>
     </a>
     <a class="art" href="/games/">
-      <div class="t">THE GAMES</div>
+      <div class="t">The games</div>
       <div class="d">The studio's actual output — playable in the browser. Several
       are built and shipped through the zmhstudio production loop.</div>
-      <span class="go">PLAY ▶</span>
+      <span class="go">Play →</span>
     </a>
   </div>
 </section>
 
 <section id="install">
-  <h2><span class="num">06</span>UNDER THE HOOD</h2>
+  <h2><span class="num">06</span>Under the hood</h2>
   <p>Inside any repo with access, the whole studio installs in two lines of Claude Code:</p>
   <div class="term">
     <div class="ln"><span class="prompt">&gt; </span><span class="cmd">/plugin marketplace add ZackHelms/zmhstudio</span></div>
@@ -332,66 +345,8 @@ footer a { color: var(--dim); text-decoration: underline; }
 </main>
 
 <footer>
-  ZMHSTUDIO — Creative Director: Zack Helms · Lead Engineer: Claude ·
-  <a href="/games/">games</a> · <a href="/zmhstudio/3d-model-viewer/">3d viewer</a>
+  zmhstudio — Creative Director: Zack Helms · Lead Engineer: Claude ·
+  <a href="/games/">Games</a> · <a href="/zmhstudio/3d-model-viewer/">3D viewer</a>
 </footer>
-
-<script>
-(function () {
-  var canvas = document.getElementById('bgfx');
-  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var ctx = canvas.getContext('2d');
-  var W, H, dpr;
-  var COLORS = ['#39ff14', '#ffc300', '#4488ff', '#b44fff', '#22ddcc'];
-  var voxels = [];
-
-  function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    W = window.innerWidth; H = window.innerHeight;
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  function spawn(n) {
-    voxels = [];
-    for (var i = 0; i < n; i++) {
-      voxels.push({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        s: 2 + Math.random() * 4,
-        vy: 0.08 + Math.random() * 0.25,
-        c: COLORS[(Math.random() * COLORS.length) | 0],
-        a: 0.06 + Math.random() * 0.16
-      });
-    }
-  }
-
-  function draw() {
-    ctx.clearRect(0, 0, W, H);
-    for (var i = 0; i < voxels.length; i++) {
-      var v = voxels[i];
-      ctx.globalAlpha = v.a;
-      ctx.fillStyle = v.c;
-      ctx.fillRect(v.x | 0, v.y | 0, v.s, v.s);
-      v.y -= v.vy;
-      if (v.y < -6) { v.y = H + 6; v.x = Math.random() * W; }
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  var last = 0;
-  function frame(t) {
-    if (t - last > 33) { last = t; draw(); }
-    requestAnimationFrame(frame);
-  }
-
-  resize();
-  spawn(Math.min(90, ((W * H) / 18000) | 0));
-  window.addEventListener('resize', function () { resize(); spawn(Math.min(90, ((W * H) / 18000) | 0)); });
-  draw();
-  if (!reduced) requestAnimationFrame(frame);
-})();
-</script>
 </body>
 </html>
