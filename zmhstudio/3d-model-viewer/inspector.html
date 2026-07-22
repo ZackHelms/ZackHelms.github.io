@@ -164,6 +164,8 @@
   // to inspect the normal map; the isolation-sweep boulders (flat maps) trail
   // for reference.
   const MODELS = [
+    { file:'models/pumpkin80_q60_sgbm_hull2_t10.glb', label:'pumpkin80 (hull v2, texture-min 10) — check leaf relief' },
+    { file:'models/pumpkin80_q60_sgbm_hull2_t8.glb', label:'pumpkin80 (hull v2, texture-min 8) — experiment' },
     { file:'models/pumpkin80_q60_sgbm_hull2.glb', label:'pumpkin80 (q60 sgbm + hull v2) — arbitrated + faired' },
     { file:'models/pumpkin80_q60_sgbm_hull.glb', label:'pumpkin80 (q60 sgbm + hull) — retagged ok (white strata)' },
     { file:'models/pumpkin80_q60_sgbm.glb', label:'pumpkin80 (q60 sgbm) — best pumpkin yet' },
@@ -187,7 +189,7 @@
 
   // Build stamp + cache-busting (see index.html): models load with `?v=<CB>`
   // so the Reload button's fresh `?cb=` re-fetches every GLB past the cache.
-  const BUILD = '2026-07-22 05:20 UTC';
+  const BUILD = '2026-07-22 06:35 UTC';
   const CB = new URLSearchParams(location.search).get('cb') || BUILD;
   const withCB = (u) => u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(CB);
 

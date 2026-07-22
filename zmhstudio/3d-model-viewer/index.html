@@ -125,6 +125,12 @@
 
 <script type="module">
   const MODELS = [
+    { id:'pumpkin80_q60_sgbm_hull2_t10', file:'models/pumpkin80_q60_sgbm_hull2_t10.glb', label:'pumpkin80 (hull v2, texture-min 10)', tri:40000,
+      cfg:'v2 pipeline  ·  MERGE_TEXTURE_MIN 10.0 (experiment; shipped default 6.0)', tag:'default',
+      note:'<b>Threshold experiment, top of the sanctioned range.</b> Same v2 pipeline, the texture gate’s threshold raised 6.0&rarr;10.0 via a runtime override (the shipped default is unchanged): <b>5.33M real px demoted</b> (vs v2’s 2.99M), components 4,082&rarr;3,900. Overseer A/B vs v2: marginally smoother in places, but the stubborn criss-cross on one side persists — those welts sit in regions that read as textured even at this threshold (shadow boundaries on the white), so the lever is showing diminishing returns. Risk to check under the inspector’s raking light: dim gold-leaf relief softening (~17% of leaf px demote at 10). ~36&thinsp;MB.' },
+    { id:'pumpkin80_q60_sgbm_hull2_t8', file:'models/pumpkin80_q60_sgbm_hull2_t8.glb', label:'pumpkin80 (hull v2, texture-min 8)', tri:39999,
+      cfg:'v2 pipeline  ·  MERGE_TEXTURE_MIN 8.0 (experiment; shipped default 6.0)', tag:'default',
+      note:'<b>Threshold experiment, midpoint.</b> Same v2 pipeline, texture gate threshold 6.0&rarr;8.0 via runtime override: <b>4.09M real px demoted</b> (vs v2’s 2.99M), components 4,082&rarr;3,959. Sits between v2 and the t10 entry on every number; compare all three on the white body and the leaf crown. ~36&thinsp;MB.' },
     { id:'pumpkin80_q60_sgbm_hull2', file:'models/pumpkin80_q60_sgbm_hull2.glb', label:'pumpkin80 (q60 sgbm + hull v2)', tri:40000,
       cfg:'preset quality  ·  depth sgbm  ·  complete hull  ·  arbitrated merge  ·  60/60 stills  ·  open', tag:'good',
       note:'<b>Hull v2 — texture-arbitrated merge + faired hull (zmh3dqb stage 1b).</b> Answers the 2026-07-22 shape-bar verdict on v1 (shelf strata + criss-cross welts on the white body): real depth now keeps its merge win only where the image has local texture to justify the stereo match, so noisy sgbm depth on the textureless white defers to the hull — itself Taubin-faired before raycasting (no more voxel staircase). <b>2.99M real px demoted</b> across 33 views; components <b>5,394&rarr;4,082</b>; hull stage 1,936s&rarr;527s (silhouettes at &le;720px). A/B vs v1: deep quilting &rarr; shallow surface creasing — markedly smoother, not yet perfectly smooth; the remaining white-body gap and the absent soft lobes belong to stage 2 (revolve prior). ~37&thinsp;MB.' },
@@ -190,7 +196,7 @@
   // Build stamp + cache-busting. Models load with `?v=<CB>`; CB is the build
   // stamp normally, or the fresh `?cb=` value the Reload button navigates with,
   // so a hard reload re-fetches every GLB past the browser / Pages CDN cache.
-  const BUILD = '2026-07-22 05:20 UTC';
+  const BUILD = '2026-07-22 06:35 UTC';
   const CB = new URLSearchParams(location.search).get('cb') || BUILD;
   const withCB = (u) => u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(CB);
 
