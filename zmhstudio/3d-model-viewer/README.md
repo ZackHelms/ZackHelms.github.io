@@ -11,15 +11,31 @@ Live: `https://tythos.com/zmhstudio/3d-model-viewer/`
 
 ## What's loaded
 
+### Pumpkin80 hull v2 — zmh3dqb stage 1b (2026-07-22)
+
+- `pumpkin80 (q60 sgbm + hull v2)` — **good**: same capture, hull completion
+  with texture-arbitrated merge + Taubin-faired hull. The CD's 6-angle
+  verdict on v1 (shelf strata + criss-cross welts on the white body) traced
+  to "real always wins" merge semantics baking noisy sgbm depth on the
+  textureless white into the TSDF; now real depth keeps its win only where
+  the image has local texture (2.99M px demoted across 33 views), and the
+  hull canvas is smoothed before raycasting. Components 5,394→4,082; hull
+  stage 1,936s→527s (silhouettes extract at ≤720 px). A/B vs v1: deep
+  quilting → shallow surface creasing — markedly smoother, not yet perfect;
+  the residual white-body gap and the absent soft lobes are stage 2's
+  revolve prior.
+
 ### Pumpkin80 hull completion — zmh3dq stage 1 (2026-07-21)
 
-- `pumpkin80 (q60 sgbm + hull)` — **good (stats; CD shape-bar verdict
-  pending)**: the q60 sgbm run re-fused with `--complete hull` (silhouette
-  visual-hull completion, the new scan stage). GrabCut silhouettes on 60/60
-  views fill synthetic depth only where real depth never landed: fuse
-  33→60 integrated views, 158K→347K verts, components 8,021→5,394 —
-  coverage doubled and fragmentation down together. Lower half + stem-top
-  should be closed from the sides/above; texture is real photo albedo.
+- `pumpkin80 (q60 sgbm + hull)` — **ok (retagged from good 2026-07-22 after
+  the CD's 6-angle verdict; superseded by hull v2)**: the q60 sgbm run
+  re-fused with `--complete hull` (silhouette visual-hull completion, the
+  new scan stage). GrabCut silhouettes on 60/60 views fill synthetic depth
+  only where real depth never landed: fuse 33→60 integrated views,
+  158K→347K verts, components 8,021→5,394 — coverage doubled and
+  fragmentation down together. Closure and silhouette passed the CD bar,
+  but the white body carried layered shelf strata + criss-cross welts (the
+  merge kept noisy textureless stereo depth); texture is real photo albedo.
 
 ### Pumpkin80 — the 80-photo stills recapture (2026-07-21)
 

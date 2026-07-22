@@ -125,9 +125,12 @@
 
 <script type="module">
   const MODELS = [
+    { id:'pumpkin80_q60_sgbm_hull2', file:'models/pumpkin80_q60_sgbm_hull2.glb', label:'pumpkin80 (q60 sgbm + hull v2)', tri:40000,
+      cfg:'preset quality  ·  depth sgbm  ·  complete hull  ·  arbitrated merge  ·  60/60 stills  ·  open', tag:'good',
+      note:'<b>Hull v2 — texture-arbitrated merge + faired hull (zmh3dqb stage 1b).</b> Answers the 2026-07-22 shape-bar verdict on v1 (shelf strata + criss-cross welts on the white body): real depth now keeps its merge win only where the image has local texture to justify the stereo match, so noisy sgbm depth on the textureless white defers to the hull — itself Taubin-faired before raycasting (no more voxel staircase). <b>2.99M real px demoted</b> across 33 views; components <b>5,394&rarr;4,082</b>; hull stage 1,936s&rarr;527s (silhouettes at &le;720px). A/B vs v1: deep quilting &rarr; shallow surface creasing — markedly smoother, not yet perfectly smooth; the remaining white-body gap and the absent soft lobes belong to stage 2 (revolve prior). ~37&thinsp;MB.' },
     { id:'pumpkin80_q60_sgbm_hull', file:'models/pumpkin80_q60_sgbm_hull.glb', label:'pumpkin80 (q60 sgbm + hull)', tri:39999,
-      cfg:'preset quality  ·  depth sgbm  ·  complete hull  ·  60/60 stills @1920  ·  open', tag:'good',
-      note:'<b>First hull-completed model (zmh3dq stage 1).</b> Same q60 sgbm run, re-fused with <code>--complete hull</code>: a visual hull carved from per-view silhouettes (GrabCut seeded by the isolate sphere — <b>60/60 views usable</b>, night capture) fills synthetic depth ONLY where real depth never landed. Fuse went <b>33&rarr;60 integrated views</b>, 158K&rarr;347K verts, components <b>8,021&rarr;5,394</b> — coverage doubled AND fragmentation down, first time both moved the right way. The white lower half + stem-top should now be closed from the sides/above; texture stays real photo albedo. Hull limits: concavities bridge, underside may still gap. ~38&thinsp;MB.' },
+      cfg:'preset quality  ·  depth sgbm  ·  complete hull  ·  60/60 stills @1920  ·  open', tag:'ok',
+      note:'<b>First hull-completed model (zmh3dq stage 1).</b> Same q60 sgbm run, re-fused with <code>--complete hull</code>: a visual hull carved from per-view silhouettes (GrabCut seeded by the isolate sphere — <b>60/60 views usable</b>, night capture) fills synthetic depth ONLY where real depth never landed. Fuse went <b>33&rarr;60 integrated views</b>, 158K&rarr;347K verts, components <b>8,021&rarr;5,394</b> — coverage doubled AND fragmentation down, first time both moved the right way. <i>Retagged ok 2026-07-22 after the CD 6-angle verdict: closure + silhouette pass, but the white body carries layered shelf strata + criss-cross welts — "real always wins" merge baked noisy textureless depth in. Superseded by hull v2.</i> ~38&thinsp;MB.' },
     { id:'pumpkin80_q60_sgbm', file:'models/pumpkin80_q60_sgbm.glb', label:'pumpkin80 (q60 sgbm)', tri:40000,
       cfg:'preset quality  ·  depth sgbm  ·  60/60 stills @1920  ·  exhaustive  ·  open', tag:'good',
       note:'<b>The 80-photo recapture pays off — best pumpkin yet.</b> 80 iPhone stills (3024&thinsp;², two rings: eye-level orbit + top-down pass), sharpness-cut to the best 60, <b>all 60 registered</b> at 0.62&thinsp;px via exhaustive matching. sgbm coverage stays modest (~17%) on the matte white body, but every view votes at a consistent geometric scale: 8,021 components fused into a solid pumpkin with the most detailed gold-leaf crown of any run, stem included. Holes remain on the textureless white sides. ~40&thinsp;MB, slow first load.' },
@@ -187,7 +190,7 @@
   // Build stamp + cache-busting. Models load with `?v=<CB>`; CB is the build
   // stamp normally, or the fresh `?cb=` value the Reload button navigates with,
   // so a hard reload re-fetches every GLB past the browser / Pages CDN cache.
-  const BUILD = '2026-07-21 21:35 UTC';
+  const BUILD = '2026-07-22 05:20 UTC';
   const CB = new URLSearchParams(location.search).get('cb') || BUILD;
   const withCB = (u) => u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(CB);
 
