@@ -15,7 +15,8 @@ Detailed context for individual games lives in `.claude/<game>.md` at the repo r
 | Rendering | Canvas 2D, `requestAnimationFrame` loop, delta-time capped at ~100 ms |
 | Input | Touch + mouse events, `user-select:none`, `touch-action:manipulation` |
 | No dependencies | Zero external JS libs; Google Fonts is the only external resource |
-| Responsive | Portrait/landscape via `@media (orientation:landscape)` or `100dvh` layout |
+| Responsive | Portrait/landscape via `@media (orientation:landscape)` or `100dvh` layout; a canvas inside a flex column needs `min-height:0` or its intrinsic 300:150 ratio overflows landscape |
+| Audio | WebAudio-synthesized only (no audio files): lazy AudioContext on first gesture (iOS), `sfxGain`/`musicGain` masters, oscillator/noise SFX + lookahead-sequencer music loop, persisted 🔊/🔇 mute top-left, suspend on `visibilitychange` (SFX+music standard since the 2026-07-24 five-game batch) |
 | Build badge | Every game has a `<div id="build-badge">` right after `<body>` — see below |
 
 ---

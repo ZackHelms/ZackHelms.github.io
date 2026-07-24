@@ -18,3 +18,14 @@ Deterministic helpers for working on this repo.
 
   For deeper gameplay-driving tests (touch drags, deterministic physics
   scenarios), see `.claude/notes/20260724-headless-mobile-game-testing.md`.
+
+- `stamp-badge.sh` — sets each given page's `#build-badge` to the current
+  UTC time (badge SOP: `games/CLAUDE.md` § Build Timestamp Badge). Replaces
+  whatever timestamp/placeholder the badge holds — no need to know the old
+  string. One invocation = one identical timestamp across all files. Prints
+  `STAMPED <file> <ts>` per file; exits 1 (`NO-BADGE`/`NO-FILE`) so gates
+  fail loudly. Run it as the last step before commit on every changed page:
+
+  ```
+  .claude/scripts/stamp-badge.sh games/index.html games/<slug>/index.html
+  ```

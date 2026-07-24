@@ -63,3 +63,40 @@ multi-game batch.
 Push to `main` **is** the publish, but `git push` ≠ live — verify the
 "pages build and deployment" run for the pushed SHA concludes `success`
 (`mcp__github__actions_list`), per `.claude/zmh/producer.md` § Publish.
+Gotcha: that MCP tool's response is ~400k chars and overflows context even
+at `per_page:1`; it gets saved to a tool-results file instead — extract with
+`jq -r '.workflow_runs[] | select(.head_sha=="<sha>") | [.status,.conclusion] | @tsv'`
+on that file.
+
+## Second batch confirmations (2026-07-24, five games: Neon Stack, Blade Spin, Neon Crossing, Neon Air Hockey, Meteor Defense — commit 5ccb853)
+
+The pattern held at N=5, again with zero game-code fixes at orchestrator
+review (each agent's own drive found-and-fixed its bugs pre-handoff;
+26–41 assertions per game). New learnings to fold into future briefs:
+
+- **Audio is now a batch requirement** (SFX + looping background music,
+  all WebAudio-synthesized, zero audio files) and the brief pattern worked
+  first-try in all five games: lazy AudioContext on first gesture →
+  `sfxGain`/`musicGain` masters; SFX = short oscillator/noise envelopes;
+  music = 16+-step lookahead sequencer (setInterval ~100 ms scheduling
+  ~0.3 s ahead of `ac.currentTime`; bass + lead + noise-buffer hats;
+  musicGain ≈ 0.5, per-voice 0.03–0.08); persisted 🔊/🔇 mute top-left that
+  stops propagation; `visibilitychange` → suspend/resume. Assign each game
+  a distinct tempo/key/mood in its brief or you'll get five identical loops.
+- **Repeated cross-agent bug — canvas in a flex column needs
+  `min-height:0`:** two of five agents independently shipped-then-fixed a
+  landscape overflow where `flex:1` canvas transferred its intrinsic
+  300:150 min-content size and pushed play elements off-screen at 844×390.
+  Put `min-height:0` in the hard-conventions checklist of every future
+  brief (now also in `games/CLAUDE.md` § Shared Conventions).
+- **Remote stop-hook vs in-flight agents:** the remote session's stop hook
+  demands committing untracked files at every turn end, but mid-batch the
+  unfinished agents' `games/<slug>/` dirs are untracked WIP owned by
+  running subagents. Resolution: commit-and-push each game to the WIP
+  branch as its builder lands (batch 1/5 … 5/5 commits), never `git add -A`
+  mid-batch, and tell the hook why the rest waits. Bonus: per-game commits
+  make each game's diff reviewable in isolation.
+- Headless AudioContext assertions need Chromium launched with
+  `--autoplay-policy=no-user-gesture-required` (detail in
+  `20260724-headless-mobile-game-testing.md`).
+- Icons taken by this batch: 🏗️ 🗡️ 🐸 🏒 ☄️.
