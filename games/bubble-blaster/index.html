@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Bubble Blaster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff; --red:#ff2244;
+  --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  height:100%; background:var(--bg); overflow:hidden;
+  font-family:'Share Tech Mono', monospace; color:var(--white);
+  -webkit-user-select:none; user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  overscroll-behavior:none;
+}
+#app { display:flex; flex-direction:column; height:100dvh; }
+#hud {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:calc(env(safe-area-inset-top, 0px) + 8px) 14px 6px;
+  gap:6px; font-size:0.72rem;
+}
+.hud-label { font-size:0.52rem; letter-spacing:2px; color:var(--dim); }
+.hud-val { font-size:0.95rem; line-height:1.15; }
+#h-score .hud-val { color:var(--green); }
+#h-streak .hud-val { color:var(--purple); }
+#h-best .hud-val { color:var(--gold); }
+#h-best { text-align:right; }
+#h-row { text-align:center; }
+#pips { line-height:1.15; padding-top:3px; }
+.pip {
+  display:inline-block; width:8px; height:8px; border-radius:50%;
+  border:1px solid var(--border); margin:0 2px; background:transparent;
+}
+.pip.on { background:var(--blue); box-shadow:0 0 6px rgba(68,136,255,0.7); }
+#pips.warn .pip.on {
+  background:var(--red); box-shadow:0 0 7px rgba(255,34,68,0.85);
+  animation:pipblink 0.5s steps(2) infinite;
+}
+@keyframes pipblink { 50% { opacity:0.3; } }
+#game { flex:1; display:block; width:100%; touch-action:none; }
+.overlay {
+  position:fixed; inset:0; z-index:50;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(6,6,14,0.88); text-align:center; padding:24px;
+  touch-action:none;
+}
+.overlay.hidden { display:none; }
+.ov-title {
+  font-family:'Black Ops One', sans-serif; font-size:1.9rem; letter-spacing:4px;
+  color:var(--green); text-shadow:0 0 24px rgba(57,255,20,0.7); margin-bottom:14px;
+}
+.ov-sub { font-size:0.75rem; color:var(--dim); letter-spacing:1px; line-height:2; margin-bottom:26px; }
+.ov-score {
+  font-family:'Black Ops One', sans-serif; font-size:1.5rem; letter-spacing:3px;
+  color:var(--gold); text-shadow:0 0 18px rgba(255,195,0,0.6); margin-bottom:8px;
+}
+.ov-tap {
+  font-size:0.85rem; color:var(--white); letter-spacing:3px;
+  border:1px solid var(--border); background:var(--panel);
+  padding:12px 26px; border-radius:8px;
+  animation:pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.45;} }
+#banner {
+  position:fixed; left:0; right:0; top:30%; z-index:40; text-align:center;
+  pointer-events:none; opacity:0; transition:opacity 0.25s;
+}
+#banner.show { opacity:1; }
+#banner .b-big {
+  font-family:'Black Ops One', sans-serif; font-size:1.4rem; letter-spacing:4px;
+  color:var(--gold); text-shadow:0 0 22px rgba(255,195,0,0.8);
+}
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 07:01 UTC</div>
+<div id="app">
+  <div id="hud">
+    <div id="h-score"><div class="hud-label">SCORE</div><div class="hud-val" id="v-score">0</div></div>
+    <div id="h-streak"><div class="hud-label">STREAK</div><div class="hud-val" id="v-streak">x1</div></div>
+    <div id="h-row"><div class="hud-label">NEXT ROW</div><div id="pips"></div></div>
+    <div id="h-best"><div class="hud-label">BEST</div><div class="hud-val" id="v-best">0</div></div>
+  </div>
+  <canvas id="game"></canvas>
+</div>
+
+<div id="banner"><div class="b-big" id="b-big"></div></div>
+
+<div class="overlay" id="ov-start">
+  <div class="ov-title">BUBBLE BLASTER</div>
+  <div class="ov-sub">
+    DRAG TO AIM &bull; RELEASE TO FIRE<br>
+    MATCH 3+ TO POP &bull; DROP CLUSTERS FOR 2X<br>
+    TAP THE NEXT BUBBLE TO SWAP<br>
+    THE BOARD DROPS EVERY 6 SHOTS
+  </div>
+  <div class="ov-tap">TAP TO BLAST</div>
+</div>
+
+<div class="overlay hidden" id="ov-over">
+  <div class="ov-title" style="color:var(--red); text-shadow:0 0 24px rgba(255,34,68,0.7);">OVERRUN</div>
+  <div class="ov-score" id="o-score">0</div>
+  <div class="ov-sub" id="o-sub"></div>
+  <div class="ov-tap">TAP TO BLAST AGAIN</div>
+</div>
+
+<script>
+'use strict';
+// ------------------------------------------------------------- constants
+const TAU = Math.PI * 2;
+const UW = 100, UH = 186;               // playfield unit space
+const R = UW / 16;                      // bubble radius (6.25) — 8 per even row
+const ROW_H = R * Math.sqrt(3);         // hex row pitch (~10.83)
+const HIT_D = 2 * R * 0.88;             // flight sticks inside this distance
+const START_ROWS = 5;
+const SHOTS_PER_ROW = 6;                // board advances after this many shots
+const DEAD_Y = 140;                     // bubble bottom past this = game over
+const SH_X = 50, SH_Y = 162;            // shooter position
+const NX_X = 78, NX_Y = 168;            // next-bubble slot
+const NEXT_TAP_R = 10;                  // tap radius (units) for swap
+const FLY_SPEED = 250;                  // units/s
+const MIN_ANGLE = 8 * Math.PI / 180;    // min aim elevation above horizontal
+const POP_MIN = 3, PTS_POP = 10, PTS_FALL = 20, STREAK_CAP = 5;
+const BASE_COLORS = 4, RED_AT = 400, CYAN_AT = 1000;
+const CLEAR_BONUS = 250;
+const GRAV = 480;                       // falling-cluster gravity
+// each color pairs with a glyph for colorblind readability
+const COLORS = [
+  { hex:'#39ff14', glyph:'dot' },
+  { hex:'#4488ff', glyph:'ring' },
+  { hex:'#ffc300', glyph:'diamond' },
+  { hex:'#b44fff', glyph:'cross' },
+  { hex:'#ff2244', glyph:'tri' },       // unlocks at RED_AT
+  { hex:'#24e0ff', glyph:'x' },         // unlocks at CYAN_AT
+];
+
+// ------------------------------------------------------------- state
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let dpr = 1, cw = 0, ch = 0, scale = 1, ox = 0, oy = 0;
+
+let state = 'title';                    // title | play | over
+let grid = [];                          // rows: {par:0|1, cells:[colorIdx|null]}
+let fly = null;                         // {x,y,dx,dy,ci,trail[]}
+let cur = 0, nxt = 1;                   // barrel + next color indices
+let scoreV = 0, streak = 0;
+let shotsSinceRow = 0, shotsFired = 0;
+let unlockedN = BASE_COLORS;
+let dropT = 0;                          // row-advance drop tween (1 -> 0)
+let shake = 0, overT = 0, simTime = 0;
+let press = null;                       // {sx,sy,cx,cy,t} screen px
+let aim = null;                         // {dx,dy} unit dir, valid only
+let fallers = [], rings = [], particles = [], popups = [];
+let best = 0;
+try { best = +(localStorage.getItem('bubbleBlaster.best') || 0); } catch (e) {}
+
+const $ = id => document.getElementById(id);
+
+// ------------------------------------------------------------- audio
+let AC = null;
+function audio() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function beep(freq, dur, type, gain, slideTo) {
+  const ac = audio(); if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, ac.currentTime);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, ac.currentTime + dur);
+  g.gain.setValueAtTime(gain || 0.12, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+  o.connect(g).connect(ac.destination);
+  o.start(); o.stop(ac.currentTime + dur);
+}
+const sndFire   = () => beep(240, 0.07, 'triangle', 0.11, 460);
+const sndBounce = () => beep(300, 0.04, 'square', 0.05);
+const sndStick  = () => beep(170, 0.06, 'sine', 0.10);
+const sndPop    = n => { for (let i = 0; i < Math.min(n, 6); i++) setTimeout(() => beep(440 + i * 90, 0.08, 'sine', 0.12), i * 45); };
+const sndDrop   = () => beep(520, 0.14, 'sine', 0.11, 150);
+const sndSwap   = () => beep(500, 0.05, 'triangle', 0.08, 700);
+const sndRow    = () => beep(120, 0.18, 'square', 0.09, 70);
+const sndClear  = () => { beep(523, 0.1, 'sine', 0.13); setTimeout(() => beep(659, 0.1, 'sine', 0.13), 90); setTimeout(() => beep(784, 0.16, 'sine', 0.14), 180); };
+const sndUnlock = () => { beep(392, 0.09, 'sine', 0.12); setTimeout(() => beep(587, 0.14, 'sine', 0.12), 90); };
+const sndOver   = () => { beep(240, 0.4, 'sawtooth', 0.15, 40); setTimeout(() => beep(150, 0.5, 'square', 0.1, 30), 90); };
+
+// ------------------------------------------------------------- layout
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cw = canvas.clientWidth; ch = canvas.clientHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const pad = 6;
+  scale = Math.min((cw - pad * 2) / UW, (ch - pad * 2) / UH);
+  ox = (cw - UW * scale) / 2;
+  oy = (ch - UH * scale) / 2;
+  makeSprites();
+}
+const px = x => ox + x * scale;
+const py = y => oy + y * scale;
+function toUnit(clientX, clientY) {
+  const r = canvas.getBoundingClientRect();
+  return [(clientX - r.left - ox) / scale, (clientY - r.top - oy) / scale];
+}
+
+// ------------------------------------------------------------- bubble sprites
+// pre-rendered per color at current scale so the board render is drawImage-only
+let sprites = [];
+function drawGlyph(c2, cx, cy, g, kind) {
+  c2.fillStyle = 'rgba(6,6,14,0.5)';
+  c2.strokeStyle = 'rgba(6,6,14,0.5)';
+  c2.lineWidth = Math.max(1, g * 0.42);
+  c2.lineCap = 'round';
+  c2.beginPath();
+  if (kind === 'dot') { c2.arc(cx, cy, g * 0.55, 0, TAU); c2.fill(); }
+  else if (kind === 'ring') { c2.arc(cx, cy, g * 0.75, 0, TAU); c2.stroke(); }
+  else if (kind === 'diamond') {
+    c2.moveTo(cx, cy - g); c2.lineTo(cx + g, cy); c2.lineTo(cx, cy + g); c2.lineTo(cx - g, cy);
+    c2.closePath(); c2.fill();
+  } else if (kind === 'cross') {
+    c2.moveTo(cx - g, cy); c2.lineTo(cx + g, cy);
+    c2.moveTo(cx, cy - g); c2.lineTo(cx, cy + g); c2.stroke();
+  } else if (kind === 'tri') {
+    c2.moveTo(cx, cy - g); c2.lineTo(cx + g * 0.9, cy + g * 0.7); c2.lineTo(cx - g * 0.9, cy + g * 0.7);
+    c2.closePath(); c2.fill();
+  } else if (kind === 'x') {
+    c2.moveTo(cx - g * 0.75, cy - g * 0.75); c2.lineTo(cx + g * 0.75, cy + g * 0.75);
+    c2.moveTo(cx + g * 0.75, cy - g * 0.75); c2.lineTo(cx - g * 0.75, cy + g * 0.75); c2.stroke();
+  }
+}
+function makeSprites() {
+  if (!(scale > 0)) return;
+  sprites = COLORS.map(col => {
+    const rp = R * scale;
+    const S = Math.ceil((rp + 6) * 2);
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = Math.max(2, Math.round(S * dpr));
+    const c2 = cv.getContext('2d');
+    c2.scale(dpr, dpr);
+    const c = S / 2;
+    c2.shadowColor = col.hex; c2.shadowBlur = rp * 0.4;
+    c2.fillStyle = col.hex; c2.globalAlpha = 0.92;
+    c2.beginPath(); c2.arc(c, c, rp * 0.94, 0, TAU); c2.fill();
+    c2.shadowBlur = 0; c2.globalAlpha = 1;
+    const g = c2.createRadialGradient(c - rp * 0.3, c - rp * 0.35, rp * 0.1, c, c, rp);
+    g.addColorStop(0, 'rgba(255,255,255,0.35)');
+    g.addColorStop(0.35, 'rgba(255,255,255,0.05)');
+    g.addColorStop(1, 'rgba(6,6,14,0.45)');
+    c2.fillStyle = g;
+    c2.beginPath(); c2.arc(c, c, rp * 0.94, 0, TAU); c2.fill();
+    c2.strokeStyle = 'rgba(255,255,255,0.22)'; c2.lineWidth = Math.max(1, rp * 0.07);
+    c2.beginPath(); c2.arc(c, c, rp * 0.9, 0, TAU); c2.stroke();
+    drawGlyph(c2, c, c, rp * 0.4, col.glyph);
+    return { cv, S };
+  });
+}
+function drawSprite(ci, ux, uy, s, alpha) {
+  const sp = sprites[ci]; if (!sp) return;
+  const w = sp.S * (s || 1);
+  if (alpha !== undefined) ctx.globalAlpha = alpha;
+  ctx.drawImage(sp.cv, px(ux) - w / 2, py(uy) - w / 2, w, w);
+  if (alpha !== undefined) ctx.globalAlpha = 1;
+}
+
+// ------------------------------------------------------------- grid helpers
+// hex-offset rows: par 0 = 8 cols flush left, par 1 = 7 cols shifted right R
+function rowLen(par) { return par ? 7 : 8; }
+function cellX(par, c) { return R * (par ? 2 : 1) + c * 2 * R; }
+function cellY(r) { return R + r * ROW_H; }
+function makeRow(par) { return { par, cells: new Array(rowLen(par)).fill(null) }; }
+function appendEmptyRow() { grid.push(makeRow(grid.length ? 1 - grid[grid.length - 1].par : 0)); }
+function neighborsOf(r, c) {
+  const out = [], row = grid[r];
+  if (!row) return out;
+  if (c > 0) out.push([r, c - 1]);
+  if (c < row.cells.length - 1) out.push([r, c + 1]);
+  const off = row.par ? 0 : -1;         // par0 sees {c-1,c} above/below; par1 sees {c,c+1}
+  for (const dr of [-1, 1]) {
+    const r2 = grid[r + dr];
+    if (!r2) continue;
+    for (const dc of [0, 1]) {
+      const cc = c + off + dc;
+      if (cc >= 0 && cc < r2.cells.length) out.push([r + dr, cc]);
+    }
+  }
+  return out;
+}
+function gridCount() {
+  let n = 0;
+  for (const row of grid) for (const v of row.cells) if (v !== null) n++;
+  return n;
+}
+function colorsOnBoard() {
+  const s = new Set();
+  for (const row of grid) for (const v of row.cells) if (v !== null) s.add(v);
+  return s;
+}
+function lowestBubbleY() {
+  let m = -1;
+  for (let r = 0; r < grid.length; r++)
+    if (grid[r].cells.some(v => v !== null)) m = cellY(r);
+  return m;
+}
+
+// ------------------------------------------------------------- flow
+function newRowCells(par) {
+  const cells = [];
+  for (let c = 0; c < rowLen(par); c++) {
+    if (c > 0 && Math.random() < 0.3) cells.push(cells[c - 1]);   // bias toward runs
+    else cells.push(Math.floor(Math.random() * unlockedN));
+  }
+  return cells;
+}
+function spawnRows(n) {
+  grid = [];
+  for (let r = 0; r < n; r++) {
+    const row = makeRow(r % 2);
+    row.cells = newRowCells(row.par);
+    grid.push(row);
+  }
+}
+function dealColor() {
+  const pool = [...colorsOnBoard()];
+  if (!pool.length) for (let i = 0; i < unlockedN; i++) pool.push(i);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function reset() {
+  scoreV = 0; streak = 0; shotsSinceRow = 0; shotsFired = 0;
+  unlockedN = BASE_COLORS;
+  spawnRows(START_ROWS);
+  cur = dealColor(); nxt = dealColor();
+  fly = null; press = null; aim = null;
+  fallers = []; rings = []; particles = []; popups = [];
+  dropT = 0; shake = 0; overT = 0;
+  state = 'play';
+  updateHud();
+}
+function updateHud() {
+  $('v-score').textContent = scoreV;
+  $('v-streak').textContent = 'x' + Math.min(STREAK_CAP, streak + 1);
+  $('v-best').textContent = best;
+  const remaining = SHOTS_PER_ROW - shotsSinceRow;
+  const pips = $('pips');
+  pips.classList.toggle('warn', remaining <= 2);
+  for (let i = 0; i < pips.children.length; i++)
+    pips.children[i].classList.toggle('on', i < remaining);
+}
+function showBanner(t, ms) {
+  $('b-big').textContent = t;
+  $('banner').classList.add('show');
+  clearTimeout(showBanner.t);
+  showBanner.t = setTimeout(() => $('banner').classList.remove('show'), ms || 900);
+}
+function checkUnlocks() {
+  const n = BASE_COLORS + (scoreV >= RED_AT ? 1 : 0) + (scoreV >= CYAN_AT ? 1 : 0);
+  if (n > unlockedN) {
+    unlockedN = n;
+    showBanner(n === 5 ? 'RED UNLOCKED!' : 'CYAN UNLOCKED!', 1100);
+    sndUnlock();
+  }
+}
+function checkDeadline() {
+  for (let r = 0; r < grid.length; r++) {
+    if (cellY(r) + R <= DEAD_Y) continue;
+    if (grid[r].cells.some(v => v !== null)) { gameOver(); return true; }
+  }
+  return false;
+}
+function gameOver() {
+  if (state !== 'play') return;
+  state = 'over'; overT = 0; shake = 0.5;
+  sndOver();
+  for (let r = 0; r < grid.length; r++) {                // spill the whole board
+    const row = grid[r];
+    for (let c = 0; c < row.cells.length; c++) {
+      if (row.cells[c] === null) continue;
+      fallers.push({
+        x: cellX(row.par, c), y: cellY(r),
+        vx: (Math.random() - 0.5) * 36, vy: -30 - Math.random() * 50,
+        ci: row.cells[c],
+      });
+    }
+  }
+  grid = [makeRow(0)];
+  const isBest = scoreV > best;
+  if (isBest) { best = scoreV; try { localStorage.setItem('bubbleBlaster.best', best); } catch (e) {} }
+  setTimeout(() => {
+    $('o-score').textContent = scoreV + (isBest ? '  ★ NEW BEST' : '');
+    $('o-sub').innerHTML = 'SHOTS FIRED ' + shotsFired + '<br>BEST ' + best;
+    $('ov-over').classList.remove('hidden');
+    updateHud();
+  }, 800);
+}
+
+// ------------------------------------------------------------- shooting
+function swapBubbles() {
+  if (state !== 'play' || fly) return;
+  const t = cur; cur = nxt; nxt = t;
+  sndSwap();
+  ringFx(NX_X, NX_Y, '#dde3ff');
+}
+function shoot(dx, dy) {
+  if (state !== 'play' || fly) return;
+  const len = Math.hypot(dx, dy);
+  if (len < 0.0001 || dy >= 0) return;
+  fly = { x: SH_X, y: SH_Y, dx: dx / len, dy: dy / len, ci: cur, trail: [] };
+  shotsFired++;
+  cur = nxt; nxt = dealColor();
+  sndFire();
+}
+function hitsGrid(x, y) {
+  for (let r = 0; r < grid.length; r++) {
+    if (Math.abs(cellY(r) - y) > HIT_D) continue;
+    const row = grid[r];
+    for (let c = 0; c < row.cells.length; c++) {
+      if (row.cells[c] === null) continue;
+      const dx = cellX(row.par, c) - x, dy = cellY(r) - y;
+      if (dx * dx + dy * dy < HIT_D * HIT_D) return true;
+    }
+  }
+  return false;
+}
+function stepFly(dt) {
+  if (!fly) return;
+  let dist = FLY_SPEED * dt;
+  while (dist > 0 && fly) {
+    const d = Math.min(1.8, dist); dist -= d;
+    fly.x += fly.dx * d; fly.y += fly.dy * d;
+    if (fly.x < R) { fly.x = 2 * R - fly.x; fly.dx = -fly.dx; sndBounce(); }
+    else if (fly.x > UW - R) { fly.x = 2 * (UW - R) - fly.x; fly.dx = -fly.dx; sndBounce(); }
+    fly.trail.push([fly.x, fly.y]);
+    if (fly.trail.length > 10) fly.trail.shift();
+    if (fly.y <= R || hitsGrid(fly.x, fly.y)) land();
+  }
+}
+// nearest empty cell that is supported (row 0 or touching a filled cell);
+// cells are exclusive, so a snapped bubble can never overlap or float
+function findSnapCell(x, y) {
+  const rT = Math.max(0, Math.round((y - R) / ROW_H));
+  while (grid.length <= rT + 1) appendEmptyRow();
+  let bc = null, bd = Infinity, fb = null, fd = Infinity;
+  for (let r = 0; r < grid.length; r++) {
+    const row = grid[r];
+    for (let c = 0; c < row.cells.length; c++) {
+      if (row.cells[c] !== null) continue;
+      const d = Math.hypot(cellX(row.par, c) - x, cellY(r) - y);
+      if (d < fd) { fd = d; fb = [r, c]; }
+      if (d >= bd) continue;
+      if (r === 0 || neighborsOf(r, c).some(n => grid[n[0]].cells[n[1]] !== null)) {
+        bd = d; bc = [r, c];
+      }
+    }
+  }
+  return bc || fb;
+}
+function land() {
+  const lx = fly.x, ly = fly.y, ci = fly.ci;
+  fly = null;
+  const rc = findSnapCell(lx, ly);
+  grid[rc[0]].cells[rc[1]] = ci;
+  sndStick();
+  resolveLanding(rc[0], rc[1]);
+}
+
+// ------------------------------------------------------------- board resolution
+function floodMatch(r, c, ci) {
+  const seen = new Set([r + ':' + c]), q = [[r, c]], out = [[r, c]];
+  while (q.length) {
+    const [rr, cc] = q.pop();
+    for (const [r2, c2] of neighborsOf(rr, cc)) {
+      const k = r2 + ':' + c2;
+      if (seen.has(k) || grid[r2].cells[c2] !== ci) continue;
+      seen.add(k); q.push([r2, c2]); out.push([r2, c2]);
+    }
+  }
+  return out;
+}
+function attachedSet() {
+  const seen = new Set(), q = [];
+  if (!grid.length) return seen;
+  for (let c = 0; c < grid[0].cells.length; c++)
+    if (grid[0].cells[c] !== null) { seen.add('0:' + c); q.push([0, c]); }
+  while (q.length) {
+    const [rr, cc] = q.pop();
+    for (const [r2, c2] of neighborsOf(rr, cc)) {
+      const k = r2 + ':' + c2;
+      if (grid[r2].cells[c2] === null || seen.has(k)) continue;
+      seen.add(k); q.push([r2, c2]);
+    }
+  }
+  return seen;
+}
+function trimRows() {
+  while (grid.length > 1 && grid[grid.length - 1].cells.every(v => v === null)) grid.pop();
+}
+function advanceRow() {
+  const par = grid.length ? 1 - grid[0].par : 0;
+  const row = makeRow(par);
+  row.cells = newRowCells(par);
+  grid.unshift(row);
+  shotsSinceRow = 0;
+  dropT = 1;
+  shake = Math.max(shake, 0.28);
+  sndRow();
+  updateHud();
+  checkDeadline();
+}
+function resolveLanding(r, c) {
+  const ci = grid[r].cells[c];
+  const lx = cellX(grid[r].par, c), ly = cellY(r);
+  ringFx(lx, ly, COLORS[ci].hex);
+  // flood-fill match from the landed cell
+  const cluster = floodMatch(r, c, ci);
+  let popped = 0, fell = 0;
+  if (cluster.length >= POP_MIN) {
+    for (const [rr, cc] of cluster) {
+      popFx(rr, cc);
+      grid[rr].cells[cc] = null;
+    }
+    popped = cluster.length;
+    sndPop(popped);
+    // anything no longer connected to the ceiling row falls
+    const keep = attachedSet();
+    for (let rr = 0; rr < grid.length; rr++) {
+      const row = grid[rr];
+      for (let cc = 0; cc < row.cells.length; cc++) {
+        if (row.cells[cc] === null || keep.has(rr + ':' + cc)) continue;
+        fallers.push({
+          x: cellX(row.par, cc), y: cellY(rr),
+          vx: (Math.random() - 0.5) * 24, vy: -14 - Math.random() * 20,
+          ci: row.cells[cc],
+        });
+        row.cells[cc] = null;
+        fell++;
+      }
+    }
+    if (fell) sndDrop();
+  }
+  // streak scoring: consecutive popping shots ramp x1 -> x5
+  if (popped) {
+    const mult = Math.min(STREAK_CAP, streak + 1);
+    const gained = (popped * PTS_POP + fell * PTS_FALL) * mult;
+    scoreV += gained;
+    streak++;
+    popup(lx, ly - 4, '+' + gained, mult > 1 ? '#ffc300' : '#dde3ff');
+    if (mult >= 3) showBanner('STREAK x' + mult, 650);
+    shake = Math.max(shake, Math.min(0.3, 0.06 + popped * 0.02));
+    checkUnlocks();
+  } else {
+    streak = 0;
+  }
+  trimRows();
+  if (checkDeadline()) return;
+  if (gridCount() === 0) {                 // cleared the whole board
+    scoreV += CLEAR_BONUS;
+    popup(50, 60, '+' + CLEAR_BONUS, '#39ff14');
+    showBanner('BOARD CLEAR!', 1000);
+    sndClear();
+    spawnRows(START_ROWS);
+    shotsSinceRow = 0;
+  } else {
+    shotsSinceRow++;
+    if (shotsSinceRow >= SHOTS_PER_ROW) {
+      advanceRow();
+      if (state !== 'play') return;
+    }
+  }
+  // keep the queue honest: never deal a color that left the board
+  const onb = colorsOnBoard();
+  if (onb.size) {
+    if (!onb.has(nxt)) nxt = dealColor();
+    if (!onb.has(cur)) cur = dealColor();
+  }
+  updateHud();
+}
+
+// ------------------------------------------------------------- effects
+function burst(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * TAU, sp = 14 + Math.random() * 44;
+    particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.35 + Math.random() * 0.3, c: color });
+  }
+}
+function popFx(r, c) {
+  const row = grid[r], ci = row.cells[c];
+  if (ci === null) return;
+  const x = cellX(row.par, c), y = cellY(r);
+  rings.push({ x, y, t: 0, c: COLORS[ci].hex });
+  burst(x, y, COLORS[ci].hex, 7);
+}
+function ringFx(x, y, c) { rings.push({ x, y, t: 0, c }); }
+function popup(x, y, txt, c) { popups.push({ x, y, txt, c, life: 0.9 }); }
+function stepFx(dt) {
+  for (const p of particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += GRAV * 0.25 * dt; }
+  particles = particles.filter(p => p.life > 0);
+  for (const f of fallers) { f.vy += GRAV * dt; f.x += f.vx * dt; f.y += f.vy * dt; }
+  fallers = fallers.filter(f => f.y < UH + R * 2);
+  for (const g of rings) g.t += dt;
+  rings = rings.filter(g => g.t < 0.4);
+  for (const p of popups) { p.life -= dt; p.y -= 8 * dt; }
+  popups = popups.filter(p => p.life > 0);
+}
+
+// ------------------------------------------------------------- input
+let lastTap = 0;
+function pointerScreen(e) {
+  const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+  return [t.clientX, t.clientY];
+}
+function updateAim() {
+  aim = null;
+  if (!press || state !== 'play') return;
+  const [ux, uy] = toUnit(press.cx, press.cy);
+  const dx = ux - SH_X, dy = uy - SH_Y;
+  const len = Math.hypot(dx, dy);
+  if (len < 0.001 || dy >= 0) return;                      // must aim upward
+  if (Math.atan2(-dy, Math.abs(dx)) < MIN_ANGLE) return;   // too flat: cancel
+  aim = { dx: dx / len, dy: dy / len };
+}
+function onDown(e) {
+  e.preventDefault(); audio();
+  if (state !== 'play') return;
+  const [x, y] = pointerScreen(e);
+  press = { sx: x, sy: y, cx: x, cy: y, t: performance.now() };
+  updateAim();
+}
+function onMove(e) {
+  if (!press) return;
+  e.preventDefault();
+  const [x, y] = pointerScreen(e);
+  press.cx = x; press.cy = y;
+  updateAim();
+}
+function onUp(e) {
+  e.preventDefault();
+  if (!press) return;
+  const p = press, g = aim;
+  press = null; aim = null;
+  if (state !== 'play') return;
+  const dur = performance.now() - p.t;
+  const moved = Math.hypot(p.cx - p.sx, p.cy - p.sy);
+  if (dur < 350 && moved < 14) {                           // a tap, not a drag
+    const [ux, uy] = toUnit(p.sx, p.sy);
+    if (Math.hypot(ux - NX_X, uy - NX_Y) < NEXT_TAP_R) { swapBubbles(); return; }
+  }
+  if (g) shoot(g.dx, g.dy);
+}
+canvas.addEventListener('touchstart', onDown, { passive: false });
+canvas.addEventListener('touchmove', onMove, { passive: false });
+canvas.addEventListener('touchend', onUp, { passive: false });
+canvas.addEventListener('touchcancel', () => { press = null; aim = null; }, { passive: true });
+canvas.addEventListener('mousedown', onDown);
+window.addEventListener('mousemove', e => { if (press) onMove(e); });
+window.addEventListener('mouseup', e => { if (press) onUp(e); });
+
+function uiTap(e) {
+  e.preventDefault();
+  const now = performance.now();
+  if (now - lastTap < 400) return;                         // iOS touchend + click
+  lastTap = now;
+  audio();
+  if (state === 'title') { $('ov-start').classList.add('hidden'); reset(); }
+  else if (state === 'over' && overT > 0.7) { $('ov-over').classList.add('hidden'); reset(); }
+}
+$('ov-start').addEventListener('touchend', uiTap, { passive: false });
+$('ov-start').addEventListener('click', uiTap);
+$('ov-over').addEventListener('touchend', uiTap, { passive: false });
+$('ov-over').addEventListener('click', uiTap);
+
+// ------------------------------------------------------------- guide line
+// marches the shot ray, mirroring flight physics; shows at most one bounce
+function traceGuide(dx, dy) {
+  const pts = [];
+  let x = SH_X, y = SH_Y, vx = dx, vy = dy, bounces = 0;
+  for (let i = 0; i < 400; i++) {
+    x += vx * 1.2; y += vy * 1.2;
+    if (x < R) { x = 2 * R - x; vx = -vx; bounces++; if (bounces > 1) break; }
+    else if (x > UW - R) { x = 2 * (UW - R) - x; vx = -vx; bounces++; if (bounces > 1) break; }
+    pts.push([x, y]);
+    if (y <= R || hitsGrid(x, y)) break;
+  }
+  return pts;
+}
+
+// ------------------------------------------------------------- render
+function render() {
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.save();
+  if (shake > 0) ctx.translate((Math.random() - 0.5) * shake * 12, (Math.random() - 0.5) * shake * 12);
+
+  // playfield
+  ctx.fillStyle = '#0b0b16';
+  ctx.fillRect(px(0), py(0), UW * scale, UH * scale);
+  ctx.fillStyle = 'rgba(68,136,255,0.06)';                 // faint hex lattice
+  for (let r = 0; r < 13; r++) {
+    const par = r % 2;
+    for (let c = 0; c < rowLen(par); c++) {
+      ctx.beginPath(); ctx.arc(px(cellX(par, c)), py(cellY(r)), 1.5, 0, TAU); ctx.fill();
+    }
+  }
+
+  // ceiling lip
+  ctx.fillStyle = 'rgba(68,136,255,0.35)';
+  ctx.fillRect(px(0), py(0) - 3, UW * scale, 3);
+
+  // deadline
+  const danger = lowestBubbleY() + R > DEAD_Y - 2 * ROW_H;
+  ctx.strokeStyle = 'rgba(255,34,68,' + (danger ? 0.4 + 0.4 * Math.abs(Math.sin(simTime * 4)) : 0.25) + ')';
+  ctx.lineWidth = danger ? 2 : 1.5;
+  ctx.setLineDash([6, 6]);
+  ctx.beginPath(); ctx.moveTo(px(0), py(DEAD_Y)); ctx.lineTo(px(UW), py(DEAD_Y)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // board bubbles (drop tween eases new-row advance)
+  const yoffU = -dropT * dropT * ROW_H;
+  for (let r = 0; r < grid.length; r++) {
+    const row = grid[r];
+    for (let c = 0; c < row.cells.length; c++) {
+      if (row.cells[c] === null) continue;
+      drawSprite(row.cells[c], cellX(row.par, c), cellY(r) + yoffU, 1);
+    }
+  }
+
+  // aim guide
+  if (press && aim && !fly && state === 'play') {
+    const pts = traceGuide(aim.dx, aim.dy);
+    const col = COLORS[cur].hex;
+    ctx.fillStyle = col; ctx.globalAlpha = 0.75;
+    const dotR = Math.max(2, scale * 0.55);
+    let acc = 0, prev = [SH_X, SH_Y];
+    for (const p of pts) {
+      acc += Math.hypot(p[0] - prev[0], p[1] - prev[1]); prev = p;
+      if (acc >= 4) {
+        acc = 0;
+        ctx.beginPath(); ctx.arc(px(p[0]), py(p[1]), dotR, 0, TAU); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    const end = pts[pts.length - 1];
+    if (end) {                                             // ghost of the snap cell
+      const rc = findSnapCell(end[0], end[1]);
+      if (rc) {
+        ctx.setLineDash([4, 4]); ctx.strokeStyle = col; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(px(cellX(grid[rc[0]].par, rc[1])), py(cellY(rc[0])), R * scale * 0.92, 0, TAU);
+        ctx.stroke();
+        ctx.setLineDash([]); ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  // flying bubble + trail
+  if (fly) {
+    ctx.fillStyle = COLORS[fly.ci].hex;
+    for (let i = 0; i < fly.trail.length; i++) {
+      const t = fly.trail[i];
+      ctx.globalAlpha = (i / fly.trail.length) * 0.3;
+      ctx.beginPath(); ctx.arc(px(t[0]), py(t[1]), scale * 1.4, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    drawSprite(fly.ci, fly.x, fly.y, 1);
+  }
+
+  // falling clusters
+  for (const f of fallers) {
+    const a = f.y > UH - 8 ? Math.max(0, (UH + R * 2 - f.y) / (R * 2 + 8)) : 1;
+    drawSprite(f.ci, f.x, f.y, 1, a);
+  }
+
+  // pop rings
+  for (const g of rings) {
+    ctx.globalAlpha = Math.max(0, 1 - g.t / 0.4);
+    ctx.strokeStyle = g.c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(px(g.x), py(g.y), (R * 0.6 + g.t * 34) * scale, 0, TAU); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // particles
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life * 2.2);
+    ctx.fillStyle = p.c;
+    ctx.fillRect(px(p.x) - 1.5, py(p.y) - 1.5, 3, 3);
+  }
+  ctx.globalAlpha = 1;
+
+  // shooter
+  if (state !== 'over') {
+    ctx.strokeStyle = 'rgba(136,153,187,0.5)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(px(SH_X), py(SH_Y), R * 1.3 * scale, 0, TAU); ctx.stroke();
+    drawSprite(cur, SH_X, SH_Y, 1);
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = 'rgba(136,153,187,0.6)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(px(NX_X), py(NX_Y), R * 0.95 * scale, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    drawSprite(nxt, NX_X, NX_Y, 0.66);
+    ctx.font = Math.max(9, Math.round(scale * 2.4)) + "px 'Share Tech Mono', monospace";
+    ctx.textAlign = 'center'; ctx.fillStyle = '#8899bb';
+    ctx.fillText('NEXT', px(NX_X), py(NX_Y) + R * scale + 11);
+  }
+
+  // score popups
+  ctx.font = Math.max(11, Math.round(scale * 3.4)) + "px 'Share Tech Mono', monospace";
+  ctx.textAlign = 'center';
+  for (const p of popups) {
+    ctx.globalAlpha = Math.min(1, p.life * 1.8);
+    ctx.fillStyle = p.c;
+    ctx.fillText(p.txt, px(p.x), py(p.y));
+  }
+  ctx.globalAlpha = 1;
+
+  // side + top rails
+  ctx.strokeStyle = 'rgba(57,255,20,0.55)'; ctx.lineWidth = 2.5;
+  ctx.shadowColor = '#39ff14'; ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(UH)); ctx.lineTo(px(0), py(0));
+  ctx.lineTo(px(UW), py(0)); ctx.lineTo(px(UW), py(UH));
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.restore();
+}
+
+// ------------------------------------------------------------- main loop
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  let dt = (now - last) / 1000; last = now;
+  if (dt > 0.1) dt = 0.1;
+  simTime += dt;
+  if (state === 'play') stepFly(dt);
+  if (state === 'over') overT += dt;
+  dropT = Math.max(0, dropT - dt / 0.22);
+  shake = Math.max(0, shake - dt * 1.6);
+  stepFx(dt);
+  render();
+}
+(function buildPips() {
+  const p = $('pips');
+  for (let i = 0; i < SHOTS_PER_ROW; i++) {
+    const s = document.createElement('span');
+    s.className = 'pip on';
+    p.appendChild(s);
+  }
+})();
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 60));
+resize();
+spawnRows(START_ROWS);                    // backdrop board behind the title
+cur = dealColor(); nxt = dealColor();
+updateHud();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
