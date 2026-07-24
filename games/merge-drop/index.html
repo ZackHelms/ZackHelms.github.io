@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Merge Drop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff; --red:#ff2244;
+  --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  height:100%; background:var(--bg); overflow:hidden;
+  font-family:'Share Tech Mono', monospace; color:var(--white);
+  -webkit-user-select:none; user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  overscroll-behavior:none;
+}
+#app { display:flex; flex-direction:column; height:100dvh; }
+#hud {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:calc(env(safe-area-inset-top, 0px) + 8px) 14px 6px;
+  gap:8px;
+}
+.hud-box { min-width:72px; }
+.hud-box.right { text-align:right; }
+.hud-label { font-size:0.55rem; letter-spacing:2px; color:var(--dim); }
+.hud-val { font-size:1.15rem; color:var(--green); line-height:1.1; }
+.hud-box.right .hud-val { color:var(--gold); }
+#title-mini {
+  font-family:'Black Ops One', sans-serif; font-size:0.8rem;
+  letter-spacing:3px; color:var(--purple); text-align:center;
+  text-shadow:0 0 12px rgba(180,79,255,0.6);
+}
+#game { flex:1; display:block; width:100%; touch-action:none; }
+.overlay {
+  position:fixed; inset:0; z-index:50;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(6,6,14,0.88); text-align:center; padding:24px;
+  touch-action:none;
+}
+.overlay.hidden { display:none; }
+.ov-title {
+  font-family:'Black Ops One', sans-serif; font-size:2.2rem; letter-spacing:4px;
+  color:var(--purple); text-shadow:0 0 24px rgba(180,79,255,0.8); margin-bottom:14px;
+}
+.ov-sub { font-size:0.75rem; color:var(--dim); letter-spacing:1px; line-height:2; margin-bottom:26px; }
+.ov-score { font-size:1.6rem; color:var(--green); margin-bottom:6px; }
+.ov-best { font-size:0.8rem; color:var(--gold); margin-bottom:26px; }
+.ov-tap {
+  font-size:0.85rem; color:var(--white); letter-spacing:3px;
+  border:1px solid var(--border); background:var(--panel);
+  padding:12px 26px; border-radius:8px;
+  animation:pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.45;} }
+#chain-hint { color:var(--gold); }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 04:29 UTC</div>
+<div id="app">
+  <div id="hud">
+    <div class="hud-box"><div class="hud-label">SCORE</div><div class="hud-val" id="score">0</div></div>
+    <div id="title-mini">MERGE<br>DROP</div>
+    <div class="hud-box right"><div class="hud-label">BEST</div><div class="hud-val" id="best">0</div></div>
+  </div>
+  <canvas id="game"></canvas>
+</div>
+
+<div class="overlay" id="ov-start">
+  <div class="ov-title">MERGE DROP</div>
+  <div class="ov-sub">
+    DRAG TO AIM &bull; RELEASE TO DROP<br>
+    MATCHING ORBS MERGE &amp; GROW<br>
+    <span id="chain-hint">CHAIN MERGES FOR BONUS POINTS</span><br>
+    DON'T OVERFLOW THE TANK
+  </div>
+  <div class="ov-tap">TAP TO START</div>
+</div>
+
+<div class="overlay hidden" id="ov-over">
+  <div class="ov-title" style="color:var(--red);text-shadow:0 0 24px rgba(255,34,68,0.8);">TANK BREACH</div>
+  <div class="ov-score" id="ov-score">0</div>
+  <div class="ov-best" id="ov-best">BEST 0</div>
+  <div class="ov-tap">TAP TO RETRY</div>
+</div>
+
+<script>
+'use strict';
+// ---------------------------------------------------------------- constants
+const TIERS = [
+  { f:0.050, c:'#39ff14', pts:1  },
+  { f:0.066, c:'#4488ff', pts:3  },
+  { f:0.084, c:'#b44fff', pts:6  },
+  { f:0.105, c:'#ffc300', pts:10 },
+  { f:0.128, c:'#ff2244', pts:15 },
+  { f:0.153, c:'#00e5ff', pts:21 },
+  { f:0.180, c:'#ff7a1a', pts:28 },
+  { f:0.210, c:'#ff4fd8', pts:36 },
+  { f:0.244, c:'#dde3ff', pts:45 },
+  { f:0.282, c:'#7cff5e', pts:55 },
+  { f:0.330, c:'#ffe066', pts:66 },
+];
+const DROP_WEIGHTS = [30, 26, 20, 14, 10];   // droppable tiers 0-4
+const SUBDT = 1 / 120;                        // physics substep
+const RESTITUTION = 0.12;
+const DANGER_TIME = 1.3;                      // seconds above the line before loss
+const DROP_COOLDOWN = 0.42;
+const CHAIN_WINDOW = 1.0;
+
+// ---------------------------------------------------------------- state
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let dpr = 1, cw = 0, ch = 0;                  // css-px canvas size
+let jar = { x:0, y:0, w:0, h:0 };             // play tank rect (css px)
+let dangerY = 0, spawnY = 0;
+let orbCache = [];                            // pre-rendered orb sprites per tier
+
+let state = 'start';                          // start | play | over
+let orbs = [];
+let particles = [];
+let floats = [];
+let score = 0;
+let best = +(localStorage.getItem('mergeDrop.best') || 0);
+let curTier = 0, nextTier = 0;
+let dropTimer = 0;                            // cooldown until next drop allowed
+let aiming = false, aimX = 0;
+let chain = 0, chainTimer = 0;
+let dangerPulse = 0;
+let shake = 0;
+
+const $ = id => document.getElementById(id);
+$('best').textContent = best;
+
+// ---------------------------------------------------------------- audio
+let AC = null, muted = false;
+function audio() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function beep(freq, dur, type, gain, slideTo) {
+  const ac = audio(); if (!ac || muted) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, ac.currentTime);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, ac.currentTime + dur);
+  g.gain.setValueAtTime(gain || 0.12, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+  o.connect(g).connect(ac.destination);
+  o.start(); o.stop(ac.currentTime + dur);
+}
+const sndDrop  = () => beep(140, 0.08, 'triangle', 0.10);
+const sndMerge = t => beep(240 * Math.pow(2, t / 7), 0.16, 'sine', 0.16, 240 * Math.pow(2, t / 7) * 1.5);
+const sndOver  = () => beep(220, 0.7, 'sawtooth', 0.12, 55);
+
+// ---------------------------------------------------------------- layout
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cw = canvas.clientWidth; ch = canvas.clientHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const m = Math.max(8, cw * 0.03);
+  const bottomPad = 14;
+  jar.x = m;
+  jar.w = cw - m * 2;
+  jar.y = Math.min(ch * 0.15, 110);
+  jar.h = ch - jar.y - bottomPad;
+  dangerY = jar.y + jar.w * 0.10;
+  spawnY = jar.y - jar.w * 0.02;
+  buildOrbCache();
+}
+function tierR(t) { return TIERS[t].f * jar.w; } // radius as a fraction of tank width
+function buildOrbCache() {
+  orbCache = TIERS.map((tier, t) => {
+    const r = tierR(t);
+    const pad = Math.ceil(r * 0.35) + 2;
+    const s = Math.ceil((r + pad) * 2 * dpr);
+    const oc = document.createElement('canvas');
+    oc.width = s; oc.height = s;
+    const c2 = oc.getContext('2d');
+    c2.scale(dpr, dpr);
+    const cxy = (r + pad);
+    // glow
+    c2.shadowColor = tier.c;
+    c2.shadowBlur = r * 0.45;
+    // body gradient
+    const g = c2.createRadialGradient(cxy - r * 0.3, cxy - r * 0.35, r * 0.1, cxy, cxy, r);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.25, tier.c);
+    g.addColorStop(1, shade(tier.c, 0.45));
+    c2.fillStyle = g;
+    c2.beginPath(); c2.arc(cxy, cxy, r, 0, Math.PI * 2); c2.fill();
+    c2.shadowBlur = 0;
+    // rim
+    c2.strokeStyle = 'rgba(6,6,14,0.55)';
+    c2.lineWidth = Math.max(1.5, r * 0.06);
+    c2.beginPath(); c2.arc(cxy, cxy, r - c2.lineWidth * 0.5, 0, Math.PI * 2); c2.stroke();
+    // gloss
+    c2.strokeStyle = 'rgba(255,255,255,0.5)';
+    c2.lineWidth = Math.max(1.5, r * 0.09);
+    c2.lineCap = 'round';
+    c2.beginPath(); c2.arc(cxy, cxy, r * 0.68, -Math.PI * 0.85, -Math.PI * 0.45); c2.stroke();
+    // tier glyph
+    const fs = Math.max(9, r * 0.62);
+    c2.font = fs + "px 'Share Tech Mono', monospace";
+    c2.textAlign = 'center'; c2.textBaseline = 'middle';
+    c2.fillStyle = 'rgba(6,6,14,0.62)';
+    c2.fillText(String(t + 1), cxy, cxy + fs * 0.06);
+    return { img: oc, r, pad };
+  });
+}
+function shade(hex, k) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) * k, g = ((n >> 8) & 255) * k, b = (n & 255) * k;
+  return 'rgb(' + (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ')';
+}
+
+// ---------------------------------------------------------------- game setup
+function pickTier() {
+  const total = DROP_WEIGHTS.reduce((a, b) => a + b, 0);
+  let roll = Math.random() * total;
+  for (let i = 0; i < DROP_WEIGHTS.length; i++) { roll -= DROP_WEIGHTS[i]; if (roll <= 0) return i; }
+  return 0;
+}
+function reset() {
+  orbs = []; particles = []; floats = [];
+  score = 0; chain = 0; chainTimer = 0; dropTimer = 0; shake = 0;
+  curTier = pickTier(); nextTier = pickTier();
+  aimX = jar.x + jar.w / 2; aiming = false;
+  $('score').textContent = '0';
+}
+function newOrb(t, x, y, vx, vy) {
+  return { t, x, y, vx: vx || 0, vy: vy || 0, r: tierR(t), age: 0, over: 0, dead: false, pop: 0.001 };
+}
+
+// ---------------------------------------------------------------- physics
+function physStep(dt) {
+  const grav = jar.w * 5.4;
+  const damp = Math.pow(0.995, dt * 120);
+  for (const o of orbs) {
+    o.age += dt;
+    if (o.pop < 1) o.pop = Math.min(1, o.pop + dt * 6);
+    o.vy += grav * dt;
+    o.vx *= damp; o.vy *= damp;
+    o.x += o.vx * dt; o.y += o.vy * dt;
+  }
+  const mergeQ = [];
+  for (let iter = 0; iter < 3; iter++) {
+    // walls + floor
+    for (const o of orbs) {
+      if (o.x - o.r < jar.x)        { o.x = jar.x + o.r;        if (o.vx < 0) o.vx *= -RESTITUTION; }
+      if (o.x + o.r > jar.x + jar.w){ o.x = jar.x + jar.w - o.r; if (o.vx > 0) o.vx *= -RESTITUTION; }
+      if (o.y + o.r > jar.y + jar.h){
+        o.y = jar.y + jar.h - o.r;
+        if (o.vy > 0) o.vy *= -RESTITUTION;
+        o.vx *= 0.985; // floor friction
+      }
+    }
+    // pairs
+    for (let i = 0; i < orbs.length; i++) {
+      const a = orbs[i]; if (a.dead) continue;
+      for (let j = i + 1; j < orbs.length; j++) {
+        const b = orbs[j]; if (b.dead) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const rs = a.r + b.r;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= rs * rs) continue;
+        const d = Math.sqrt(d2) || 0.0001;
+        const nx = dx / d, ny = dy / d;
+        if (iter === 0 && a.t === b.t && d < rs + 1) mergeQ.push([a, b]);
+        const ma = a.r * a.r, mb = b.r * b.r, mt = ma + mb;
+        const pen = (rs - d) * 0.85;
+        a.x -= nx * pen * (mb / mt); a.y -= ny * pen * (mb / mt);
+        b.x += nx * pen * (ma / mt); b.y += ny * pen * (ma / mt);
+        const rvn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+        if (rvn < 0) {
+          const jimp = -(1 + RESTITUTION) * rvn / (1 / ma + 1 / mb);
+          a.vx -= jimp * nx / ma; a.vy -= jimp * ny / ma;
+          b.vx += jimp * nx / mb; b.vy += jimp * ny / mb;
+        }
+      }
+    }
+  }
+  // merges
+  for (const [a, b] of mergeQ) {
+    if (a.dead || b.dead) continue;
+    a.dead = true; b.dead = true;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    chain = (chainTimer > 0) ? chain + 1 : 1;
+    chainTimer = CHAIN_WINDOW;
+    if (a.t === TIERS.length - 1) {                    // two max orbs annihilate
+      addScore(500 * chain, mx, my, 'NOVA!');
+      burst(mx, my, '#ffe066', 46, a.r * 1.4);
+      shake = 10; sndMerge(TIERS.length + 2);
+    } else {
+      const nt = a.t + 1;
+      const m = newOrb(nt, mx, my, (a.vx + b.vx) * 0.35, Math.min((a.vy + b.vy) * 0.35, 0));
+      orbs.push(m);
+      addScore(TIERS[nt].pts * chain, mx, my, chain > 1 ? '×' + chain : '');
+      burst(mx, my, TIERS[nt].c, 12 + nt * 2, m.r);
+      sndMerge(nt);
+    }
+  }
+  if (mergeQ.length) orbs = orbs.filter(o => !o.dead);
+  // danger tracking
+  let anyHot = false;
+  for (const o of orbs) {
+    if (o.age > 0.6 && o.y - o.r < dangerY) { o.over += dt; anyHot = true; if (o.over > DANGER_TIME) return gameOver(); }
+    else o.over = Math.max(0, o.over - dt * 2);
+  }
+  dangerPulse = anyHot ? Math.min(1, dangerPulse + dt * 4) : Math.max(0, dangerPulse - dt * 2);
+}
+function addScore(pts, x, y, suffix) {
+  score += pts;
+  $('score').textContent = score;
+  floats.push({ x, y, txt: '+' + pts + (suffix ? ' ' + suffix : ''), life: 1 });
+}
+function burst(x, y, color, n, r) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, sp = (0.4 + Math.random()) * r * 3.2;
+    particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.5 + Math.random() * 0.35, c: color, s: 1.5 + Math.random() * 2.5 });
+  }
+}
+function gameOver() {
+  if (state !== 'play') return;
+  state = 'over';
+  sndOver();
+  if (score > best) { best = score; localStorage.setItem('mergeDrop.best', best); }
+  $('best').textContent = best;
+  $('ov-score').textContent = score;
+  $('ov-best').textContent = 'BEST ' + best;
+  setTimeout(() => $('ov-over').classList.remove('hidden'), 550);
+}
+
+// ---------------------------------------------------------------- input
+function evtX(e) {
+  const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+  return t.clientX - canvas.getBoundingClientRect().left;
+}
+function clampAim(x) {
+  const r = tierR(curTier);
+  return Math.min(Math.max(x, jar.x + r + 2), jar.x + jar.w - r - 2);
+}
+function onDown(e) {
+  e.preventDefault(); audio();
+  if (state === 'play' && dropTimer <= 0) { aiming = true; aimX = clampAim(evtX(e)); }
+}
+function onMove(e) {
+  e.preventDefault();
+  if (aiming) aimX = clampAim(evtX(e));
+}
+function onUp(e) {
+  e.preventDefault();
+  if (state === 'play' && aiming && dropTimer <= 0) {
+    aiming = false;
+    orbs.push(newOrb(curTier, aimX, spawnY));
+    sndDrop();
+    dropTimer = DROP_COOLDOWN;
+    curTier = nextTier; nextTier = pickTier();
+    aimX = clampAim(aimX);
+  }
+  aiming = false;
+}
+canvas.addEventListener('touchstart', onDown, { passive: false });
+canvas.addEventListener('touchmove', onMove, { passive: false });
+canvas.addEventListener('touchend', onUp, { passive: false });
+canvas.addEventListener('touchcancel', () => { aiming = false; }, { passive: true });
+canvas.addEventListener('mousedown', onDown);
+window.addEventListener('mousemove', e => { if (aiming) onMove(e); });
+window.addEventListener('mouseup', e => { if (state === 'play') onUp(e); });
+
+$('ov-start').addEventListener('touchend', startGame, { passive: false });
+$('ov-start').addEventListener('click', startGame);
+$('ov-over').addEventListener('touchend', startGame, { passive: false });
+$('ov-over').addEventListener('click', startGame);
+let lastStart = 0;
+function startGame(e) {
+  e.preventDefault();
+  const now = performance.now();
+  if (now - lastStart < 400) return; // debounce touchend+click double fire
+  lastStart = now;
+  audio();
+  $('ov-start').classList.add('hidden');
+  $('ov-over').classList.add('hidden');
+  reset();
+  state = 'play';
+}
+
+// ---------------------------------------------------------------- render
+function drawOrb(o) {
+  const c = orbCache[o.t];
+  const s = o.pop < 1 ? 0.35 + 0.65 * easeOut(o.pop) : 1;
+  const size = (c.r + c.pad) * 2 * s;
+  ctx.drawImage(c.img, o.x - size / 2, o.y - size / 2, size, size);
+}
+function easeOut(t) { return 1 - (1 - t) * (1 - t); }
+function render() {
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.save();
+  if (shake > 0.2) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+
+  // tank
+  ctx.fillStyle = '#0b0b16';
+  ctx.fillRect(jar.x, jar.y, jar.w, jar.h);
+  ctx.strokeStyle = '#1a1a30'; ctx.lineWidth = 2;
+  ctx.strokeRect(jar.x, jar.y, jar.w, jar.h);
+  // subtle grid
+  ctx.strokeStyle = 'rgba(68,136,255,0.05)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let gx = jar.x + 24; gx < jar.x + jar.w; gx += 24) { ctx.moveTo(gx, jar.y); ctx.lineTo(gx, jar.y + jar.h); }
+  for (let gy = jar.y + 24; gy < jar.y + jar.h; gy += 24) { ctx.moveTo(jar.x, gy); ctx.lineTo(jar.x + jar.w, gy); }
+  ctx.stroke();
+  // glowing side rails
+  ctx.strokeStyle = 'rgba(180,79,255,0.5)'; ctx.lineWidth = 3;
+  ctx.shadowColor = '#b44fff'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(jar.x, jar.y); ctx.lineTo(jar.x, jar.y + jar.h); ctx.lineTo(jar.x + jar.w, jar.y + jar.h); ctx.lineTo(jar.x + jar.w, jar.y);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // danger line
+  const dp = 0.35 + dangerPulse * 0.65 * (0.6 + 0.4 * Math.sin(performance.now() / 90));
+  ctx.strokeStyle = 'rgba(255,34,68,' + dp + ')';
+  ctx.lineWidth = 2; ctx.setLineDash([8, 8]);
+  ctx.beginPath(); ctx.moveTo(jar.x, dangerY); ctx.lineTo(jar.x + jar.w, dangerY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // orbs
+  for (const o of orbs) drawOrb(o);
+
+  // aim ghost + guide
+  if (state === 'play') {
+    const r = tierR(curTier);
+    const gx = clampAim(aimX);
+    if (dropTimer <= 0) {
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = TIERS[curTier].c; ctx.lineWidth = 1.5; ctx.setLineDash([4, 8]);
+      ctx.beginPath(); ctx.moveTo(gx, spawnY + r); ctx.lineTo(gx, jar.y + jar.h - 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = aiming ? 1 : 0.85;
+      const c = orbCache[curTier];
+      ctx.drawImage(c.img, gx - c.r - c.pad, spawnY - c.r - c.pad, (c.r + c.pad) * 2, (c.r + c.pad) * 2);
+      ctx.globalAlpha = 1;
+    }
+    // next preview (top-right inside tank header zone)
+    const nr = Math.min(tierR(nextTier), jar.w * 0.05);
+    const nx = jar.x + jar.w - 16 - nr, ny = jar.y - 20 - nr;
+    ctx.font = "9px 'Share Tech Mono', monospace";
+    ctx.fillStyle = '#8899bb'; ctx.textAlign = 'right';
+    ctx.fillText('NEXT', nx - nr - 8, ny + 3);
+    const nc = orbCache[nextTier];
+    const sc = nr / nc.r;
+    ctx.drawImage(nc.img, nx - (nc.r + nc.pad) * sc, ny - (nc.r + nc.pad) * sc, (nc.r + nc.pad) * 2 * sc, (nc.r + nc.pad) * 2 * sc);
+  }
+
+  // particles
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life * 1.6);
+    ctx.fillStyle = p.c;
+    ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
+  }
+  ctx.globalAlpha = 1;
+
+  // floating score text
+  ctx.textAlign = 'center';
+  for (const f of floats) {
+    ctx.globalAlpha = Math.max(0, f.life);
+    ctx.font = "bold 15px 'Share Tech Mono', monospace";
+    ctx.fillStyle = '#ffc300';
+    ctx.fillText(f.txt, f.x, f.y - (1 - f.life) * 40);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------- main loop
+let last = performance.now(), acc = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  let dt = (now - last) / 1000; last = now;
+  if (dt > 0.1) dt = 0.1;                        // cap per repo convention
+
+  if (state === 'play') {
+    acc += dt;
+    let steps = 0;
+    while (acc >= SUBDT && steps < 8) { physStep(SUBDT); acc -= SUBDT; steps++; }
+    if (steps === 8) acc = 0;
+    if (dropTimer > 0) dropTimer -= dt;
+    if (chainTimer > 0) chainTimer -= dt; else chain = 0;
+  }
+  for (const p of particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 600 * dt; }
+  particles = particles.filter(p => p.life > 0);
+  for (const f of floats) f.life -= dt * 1.1;
+  floats = floats.filter(f => f.life > 0);
+  shake = Math.max(0, shake - dt * 30);
+
+  render();
+}
+window.addEventListener('resize', () => {
+  const old = { x: jar.x, w: jar.w, bottom: jar.y + jar.h };
+  resize();
+  if (state === 'play' && old.w > 0) {
+    // remap live orbs into the new tank (device rotation mid-game)
+    for (const o of orbs) {
+      o.x = jar.x + ((o.x - old.x) / old.w) * jar.w;
+      o.y = (jar.y + jar.h) - (old.bottom - o.y) * (jar.w / old.w);
+      o.r = tierR(o.t);
+    }
+    aimX = clampAim(jar.x + jar.w / 2);
+  } else reset();
+});
+resize();
+reset();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
