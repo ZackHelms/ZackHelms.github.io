@@ -54,8 +54,9 @@ local-2p.
 | Grid Defense | `grid-defense/` | tower-defense-classic | drag-place, tap | wave-survival | wave-defense, resource-economy, tower-upgrades | solo | `.claude/grid-defense.md` |
 | Neon Tripeaks | `tri-peaks/` | card-deck | tap | quick-round, daily-challenge | card-chain, combo-multiplier, seeded-determinism | solo | `.claude/tri-peaks.md` |
 | Shadow Circuit | `shadow-circuit/` | stealth, maze | tap-to-move | level-campaign | vision-cones, line-of-sight, procedural-generation | solo | `.claude/shadow-circuit.md` |
+| Neon Recall | `neon-recall/` | memory-board | tap | level-campaign, local-2p | memory-match, resource-economy, combo-multiplier | solo, local-2p | `.claude/neon-recall.md` |
 
-33 games (31 in-repo + 2 external builds).
+34 games (32 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -79,13 +80,13 @@ local-2p.
 ### Absent — highest-novelty targets
 - **Genres:** `trivia` ·
   `roguelike` · `platformer` ·
-  `memory-board` · `driver-racing` (steer the vehicle — Horse Race is
+  `driver-racing` (steer the vehicle — Horse Race is
   influence-only).
 - **Inputs:** `tilt` (iOS motion-permission prompt — low priority) ·
   `pinch-rotate`.
-- **Players:** local-2p is now covered real-time (air hockey) and
-  turn-based (neon-tactics pass-and-play); a `memory-board` or card game
-  could add a third flavor.
+- **Players:** local-2p now has three flavors — real-time (air hockey),
+  turn-based tactics (neon-tactics), and memory duel (neon-recall);
+  further 2P additions need a genuinely new interaction shape.
 
 ### Example picks this table would suggest next
 A `card-deck` game (absent genre, calm pacing — tri-peaks solitaire or a

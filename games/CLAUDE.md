@@ -305,6 +305,14 @@ the exit; ghost bonus for alarm-free floors; 3-life runs, endless floors.
 Synth SFX + tense pulse music (hats surge while chased). Detailed context:
 `.claude/shadow-circuit.md`.
 
+### NEON RECALL (`neon-recall/index.html`, ~640 lines)
+Pair-matching memory board. Solo: round campaign on a mistake budget
+("scans"), streak scoring, growing grids, one hidden power pair per round
+(peek / +2 scans / bomb). Versus: 9-pair pass-and-play hot-seat — match
+keeps the turn, odd pair count means no draws. 15 canvas-drawn vector
+glyphs. Synth SFX + marimba-ping music loop. Detailed context:
+`.claude/neon-recall.md`.
+
 ### METEOR DEFENSE (`meteor-defense/index.html`, ~1130 lines)
 Missile-Command-style tap interceptor. Blast rings chain through meteors
 (splitters, comets, UFOs) falling on six neon buildings; per-wave ammo
