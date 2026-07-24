@@ -249,9 +249,13 @@ tense sequencer music. Detailed context: `.claude/meteor-defense.md`.
    card (e.g. Sorcery already owns 🔮)
 3. Add the build-timestamp badge (see above) with the current UTC timestamp
 4. Create `.claude/<slug>.md` with architecture notes before the session gets long
-5. Run the smoke gate on every changed page:
+5. Add the game's row to `.claude/games-index.md` **and refresh its coverage
+   summary** (facet vocabulary: `templates/design/game-facets.md` in the
+   zmhstudio repo) — when *choosing* what game to build, read that index's
+   coverage summary first
+6. Run the smoke gate on every changed page:
    `node .claude/scripts/smoke-mobile.cjs <pages...>` (see `.claude/scripts/README.md`)
-6. Commit and push to `main`, stating the badge timestamp in your reply
-7. Verify the "pages build and deployment" workflow for the pushed SHA goes
+7. Commit and push to `main`, stating the badge timestamp in your reply
+8. Verify the "pages build and deployment" workflow for the pushed SHA goes
    green — `git push` ≠ live; a failed Pages build silently keeps serving
    the previous deploy

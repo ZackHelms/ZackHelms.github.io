@@ -24,9 +24,11 @@ It is fine to push directly to the `main` branch for this repository. No pull re
   `games/index.html`). Make changes in qntmchmst, then publish from there.
 ## Adding a new game
 
+0. Choose the concept from the coverage gaps in `.claude/games-index.md`
+   (the games catalog + facet coverage map)
 1. Create `games/<slug>.html` (or `games/<slug>/index.html` in its own
    subdirectory) as a single self-contained file
-2. Add a card to `games/index.html`
+2. Add a card to `games/index.html` and a row to `.claude/games-index.md`
 3. Commit and push to `main` (full checklist: `games/CLAUDE.md` § Adding a New Game)
 
 ## Code style
