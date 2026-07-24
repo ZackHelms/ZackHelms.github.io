@@ -202,6 +202,36 @@ steering with screen wrap, static/moving/crumble platforms + springs,
 gold orbs and comets, upward-only camera, reachability-guaranteed
 generator, milestone hue shifts. Detailed context: `.claude/sky-hopper.md`.
 
+### NEON STACK (`neon-stack/index.html`, ~715 lines)
+Tap-timing tower stacker. A slab slides above the tower; tap to drop,
+overhang slices off as debris, perfect drops (±2.5 u window) chain combos
+and every 3rd regrows width. Speed ramps to a hard cap; zero overlap ends
+the run. Synth SFX + synthwave music loop. Detailed context: `.claude/neon-stack.md`.
+
+### BLADE SPIN (`blade-spin/index.html`, ~890 lines)
+Knife-Hit-style timing thrower. Tap to hurl blades into a spinning disc;
+hitting stuck blades/spikes ends the run, gems are bonus pickups. Four
+deterministic rotation patterns, seeded per-level layouts, boss discs every
+5th level. Synth SFX + percussive music loop. Detailed context: `.claude/blade-spin.md`.
+
+### NEON CROSSING (`neon-crossing/index.html`, ~1080 lines)
+Crossy-Road-style endless lane hopper. Tap/swipe hops across grass, roads,
+log rivers, and rail lines; auto-scroll camera with idle pressure; fairness-
+guaranteed row generator (car gaps, log cadence, rail warnings). Synth SFX +
+chiptune music loop. Detailed context: `.claude/neon-crossing.md`.
+
+### NEON AIR HOCKEY (`air-hockey/index.html`, ~850 lines)
+Vs-AI air hockey on a portrait neon table. Drag mallet, 240 Hz substepped
+puck physics with rounded corners + goal posts, three AI difficulties
+(speed/reaction/aim-error table), first to 7; per-difficulty W-L record.
+Synth SFX + arena music loop. Detailed context: `.claude/air-hockey.md`.
+
+### METEOR DEFENSE (`meteor-defense/index.html`, ~1130 lines)
+Missile-Command-style tap interceptor. Blast rings chain through meteors
+(splitters, comets, UFOs) falling on six neon buildings; per-wave ammo
+budgets, intermission bonuses, mercy rebuild every 5th wave. Synth SFX +
+tense sequencer music. Detailed context: `.claude/meteor-defense.md`.
+
 ---
 
 ## Adding a New Game
