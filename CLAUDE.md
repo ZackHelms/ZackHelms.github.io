@@ -46,6 +46,10 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Sorcery (`games/sorcery.html`) | `.claude/sorcery.md` | Any work on the sorcery tower-defense game |
 | Merge Drop (`games/merge-drop/`) | `.claude/merge-drop.md` | Any work on the orb-merge physics puzzler |
 | Neon Golf (`games/neon-golf/`) | `.claude/neon-golf.md` | Any work on the mini-golf game — hole design lives in its `HOLES[]` data |
+| Neon Pinball (`games/neon-pinball/`) | `.claude/neon-pinball.md` | Any work on the pinball game — table geometry, flipper/segment physics |
+| Gravity Runner (`games/gravity-runner/`) | `.claude/gravity-runner.md` | Any work on the gravity-flip endless runner — pattern spawning, fairness |
+| Brick Breaker (`games/brick-breaker/`) | `.claude/brick-breaker.md` | Any work on the brick breaker — level maps, brick types, power-ups |
+| Neon Snake Arena (`games/snake-arena/`) | `.claude/snake-arena.md` | Any work on the analog snake — body path, combo, mine pacing |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 

@@ -150,6 +150,30 @@ subdirectory. Detailed context: `.claude/merge-drop.md`.
 (+1 stroke), boost pads, oscillating mover walls. Par scoring, scorecard,
 best-round persistence. Detailed context: `.claude/neon-golf.md`.
 
+### NEON PINBALL (`neon-pinball/index.html`, ~800 lines)
+Portrait pinball. Two-thumb flippers (screen halves), hold-to-charge plunger,
+segment/capsule physics at 240 Hz substeps, one-way lane gate, bumpers,
+slingshots, 3-target drop bank, rollover lanes, ball save, end-of-ball bonus
+with multiplier, multiball. Detailed context: `.claude/neon-pinball.md`.
+
+### GRAVITY RUNNER (`gravity-runner/index.html`, ~600 lines)
+One-thumb endless runner: tap to flip gravity between floor and ceiling,
+dodge spike/gate/block patterns (procedural, always survivable), collect
+orbs, speed ramps forever. Distance+orbs scoring, best persistence.
+Detailed context: `.claude/gravity-runner.md`.
+
+### BRICK BREAKER (`brick-breaker/index.html`, ~700 lines)
+Arkanoid-style. Drag-anywhere paddle, tap to launch; 8 ASCII-map levels that
+loop with rising speed; normal/armored/steel/explosive/power-up bricks;
+falling power-ups (wide, multiball, laser, slow-mo, extra life). 3 lives,
+best-score persistence. Detailed context: `.claude/brick-breaker.md`.
+
+### NEON SNAKE ARENA (`snake-arena/index.html`, ~600 lines)
+Smooth analog snake: hold+drag virtual joystick steering, breadcrumb-path
+body, combo-multiplier orb eating, timed gold orbs, telegraphed mine
+hazards, wall/self death. Best-score persistence.
+Detailed context: `.claude/snake-arena.md`.
+
 ---
 
 ## Adding a New Game
