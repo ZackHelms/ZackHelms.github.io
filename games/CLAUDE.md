@@ -231,6 +231,12 @@ Top-HUD toggle for local 2-player mode (multi-touch, second finger owns the
 top mallet; AI + records off). Synth SFX + arena music loop. Detailed
 context: `.claude/air-hockey.md`.
 
+### STAR SURGE (`star-surge/index.html`, ~750 lines)
+Vertical shmup: drag-steer, auto-fire, 5 stages × 3 waves + boss (bosses
+are persisted checkpoints). Drones/shooters/spinners/tankers, aimed and
+ring bullet patterns under a 90-bullet cap, P/S/G powerups (weapon tiers,
+shield, surge bomb), stage-hued enemies. Detailed context: `.claude/star-surge.md`.
+
 ### NEON TACTICS (`neon-tactics/index.html`, ~700 lines)
 Turn-based squad tactics, 7×9 grid: 2 strikers, sniper (Bresenham LOS,
 walls block), tank, medic vs a mirrored squad. Move+act per unit, seeded

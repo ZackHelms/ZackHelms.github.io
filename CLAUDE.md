@@ -66,6 +66,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Meteor Defense (`games/meteor-defense/`) | `.claude/meteor-defense.md` | Any work on the meteor interceptor — wave/ammo budgets, chain blasts, mercy rebuild |
 | Word Circuit (`games/word-circuit/`) | `.claude/word-circuit.md` | Any work on the word hunt — embedded dictionary, board gen/solver, drag path rules |
 | Neon Tactics (`games/neon-tactics/`) | `.claude/neon-tactics.md` | Any work on the squad tactics — rules engine, LOS, AI scoring, pass-and-play flow |
+| Star Surge (`games/star-surge/`) | `.claude/star-surge.md` | Any work on the shmup — wave director, boss phases, powerups, bullet caps |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 

@@ -50,8 +50,9 @@ local-2p.
 | Meteor Defense | `meteor-defense/` | defense | tap | wave-survival | wave-defense, resource-economy, combo-multiplier | solo | `.claude/meteor-defense.md` |
 | Word Circuit | `word-circuit/` | word | drag-connect | daily-challenge, timed-round | word-building, seeded-determinism | solo | `.claude/word-circuit.md` |
 | Neon Tactics | `neon-tactics/` | turn-based-tactics | tap | match-vs-ai, local-2p | grid-combat, line-of-sight, ai-opponent | vs-ai, local-2p | `.claude/neon-tactics.md` |
+| Star Surge | `star-surge/` | shmup | drag-steer | level-campaign | bullet-dodging, boss-fights, meta-progression | solo | `.claude/star-surge.md` |
 
-29 games (27 in-repo + 2 external builds).
+30 games (28 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -71,7 +72,7 @@ local-2p.
 
 ### Absent — highest-novelty targets
 - **Genres:** `card-deck` · `trivia` ·
-  `roguelike` · `platformer` · `shmup` · `maze` · `stealth` ·
+  `roguelike` · `platformer` · `maze` · `stealth` ·
   `memory-board` · `tower-defense-classic` (build/place towers — Sorcery is
   cast-spells defense) · `driver-racing` (steer the vehicle — Horse Race is
   influence-only).
