@@ -297,6 +297,14 @@ stock pays out on a win. Fairness-checked deterministic deals; seeded
 DAILY DEAL + free play. Synth SFX + swung lounge music loop. Detailed
 context: `.claude/tri-peaks.md`.
 
+### SHADOW CIRCUIT (`shadow-circuit/index.html`, ~700 lines)
+Top-down stealth-maze. Tap-to-move BFS pathfinding through procedural
+mazes; guards patrol with LOS vision cones (patrol → chase → returning
+state machine), shadow tiles hide a still player. Collect all cores, reach
+the exit; ghost bonus for alarm-free floors; 3-life runs, endless floors.
+Synth SFX + tense pulse music (hats surge while chased). Detailed context:
+`.claude/shadow-circuit.md`.
+
 ### METEOR DEFENSE (`meteor-defense/index.html`, ~1130 lines)
 Missile-Command-style tap interceptor. Blast rings chain through meteors
 (splitters, comets, UFOs) falling on six neon buildings; per-wave ammo

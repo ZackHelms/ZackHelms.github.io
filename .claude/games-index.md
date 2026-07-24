@@ -53,8 +53,9 @@ local-2p.
 | Star Surge | `star-surge/` | shmup | drag-steer | level-campaign | bullet-dodging, boss-fights, meta-progression | solo | `.claude/star-surge.md` |
 | Grid Defense | `grid-defense/` | tower-defense-classic | drag-place, tap | wave-survival | wave-defense, resource-economy, tower-upgrades | solo | `.claude/grid-defense.md` |
 | Neon Tripeaks | `tri-peaks/` | card-deck | tap | quick-round, daily-challenge | card-chain, combo-multiplier, seeded-determinism | solo | `.claude/tri-peaks.md` |
+| Shadow Circuit | `shadow-circuit/` | stealth, maze | tap-to-move | level-campaign | vision-cones, line-of-sight, procedural-generation | solo | `.claude/shadow-circuit.md` |
 
-32 games (30 in-repo + 2 external builds).
+33 games (31 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -71,12 +72,13 @@ local-2p.
   · `rhythm` (piano tiles, pre-synth-era) · `hex-grid` (bubble-blaster) ·
   `word` + `drag-connect` + `timed-round` (word-circuit) · `card-deck` +
   `quick-round` (tri-peaks) · `daily-challenge` (word-circuit, tri-peaks) ·
+  `stealth`/`maze` + `tap-to-move` + `vision-cones` (shadow-circuit) ·
   `seeded-determinism` (blade-spin, word-circuit, tri-peaks — an
   established house pattern now).
 
 ### Absent — highest-novelty targets
 - **Genres:** `trivia` ·
-  `roguelike` · `platformer` · `maze` · `stealth` ·
+  `roguelike` · `platformer` ·
   `memory-board` · `driver-racing` (steer the vehicle — Horse Race is
   influence-only).
 - **Inputs:** `tilt` (iOS motion-permission prompt — low priority) ·
