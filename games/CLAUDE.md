@@ -137,12 +137,34 @@ unlock all upgrades, +10 levels, instant win, +1 decillion). Golden balls,
 frenzy, and lucky-bonus text adapt to the active sport's theme. DOM-driven UI
 with a canvas overlay for click particles.
 
+### MERGE DROP (`merge-drop/index.html`, ~590 lines)
+Suika-style one-thumb physics merge puzzler. Drag to aim, release to drop;
+same-tier orbs merge and grow through 11 tiers, chained merges multiply
+points, overflow past the danger line ends the run. Fixed-substep circle
+physics with per-tier pre-rendered orb sprites. First game in its own
+subdirectory. Detailed context: `.claude/merge-drop.md`.
+
+### NEON GOLF (`neon-golf/index.html`, ~660 lines)
+9-hole drag-back-and-release mini-golf. Holes are data entries in a fixed
+100×160 unit space; hazards: walls, over-unity bumpers, sand, water
+(+1 stroke), boost pads, oscillating mover walls. Par scoring, scorecard,
+best-round persistence. Detailed context: `.claude/neon-golf.md`.
+
 ---
 
 ## Adding a New Game
 
-1. Create `games/<slug>.html` as a single self-contained file
-2. Add a card to `games/index.html` (copy an existing card, update icon/name/desc/href)
+1. Create `games/<slug>.html` — or `games/<slug>/index.html` (own
+   subdirectory; used by Merge Drop and Neon Golf) — as a single
+   self-contained file either way
+2. Add a card to `games/index.html` (copy an existing card, update
+   icon/name/desc/href) — pick an icon emoji **not already used** by another
+   card (e.g. Sorcery already owns 🔮)
 3. Add the build-timestamp badge (see above) with the current UTC timestamp
 4. Create `.claude/<slug>.md` with architecture notes before the session gets long
-5. Commit and push to `main`, stating the badge timestamp in your reply
+5. Run the smoke gate on every changed page:
+   `node .claude/scripts/smoke-mobile.cjs <pages...>` (see `.claude/scripts/README.md`)
+6. Commit and push to `main`, stating the badge timestamp in your reply
+7. Verify the "pages build and deployment" workflow for the pushed SHA goes
+   green — `git push` ≠ live; a failed Pages build silently keeps serving
+   the previous deploy

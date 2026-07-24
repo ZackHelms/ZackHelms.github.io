@@ -24,9 +24,10 @@ It is fine to push directly to the `main` branch for this repository. No pull re
   `games/index.html`). Make changes in qntmchmst, then publish from there.
 ## Adding a new game
 
-1. Create `games/<slug>.html` as a single self-contained file
+1. Create `games/<slug>.html` (or `games/<slug>/index.html` in its own
+   subdirectory) as a single self-contained file
 2. Add a card to `games/index.html`
-3. Commit and push to `main`
+3. Commit and push to `main` (full checklist: `games/CLAUDE.md` § Adding a New Game)
 
 ## Code style
 
@@ -43,9 +44,18 @@ Each game with significant design complexity has a dedicated context file in `.c
 |---|---|---|
 | Adventure (`games/adventure.html`) | `.claude/adventure.md` | Any work on the adventure RPG — character systems, combat, RP encounters, save system, progression |
 | Sorcery (`games/sorcery.html`) | `.claude/sorcery.md` | Any work on the sorcery tower-defense game |
+| Merge Drop (`games/merge-drop/`) | `.claude/merge-drop.md` | Any work on the orb-merge physics puzzler |
+| Neon Golf (`games/neon-golf/`) | `.claude/neon-golf.md` | Any work on the mini-golf game — hole design lives in its `HOLES[]` data |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 
 ## Shared game conventions
 
 See `games/CLAUDE.md` for the full shared conventions table (fonts, palette, input, etc.).
+
+## zmh-producer
+
+This repo carries a zmh-producer config at `.claude/zmh/producer.md`
+(environment, backlog layout, validation gate, integration/publish rules for
+the `/zmh-producer:*` commands). The smoke gate it names lives in
+`.claude/scripts/`; session learnings go to `.claude/notes/`.
