@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Neon Crossing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff; --red:#ff2244;
+  --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  height:100%; background:var(--bg); overflow:hidden;
+  font-family:'Share Tech Mono', monospace; color:var(--white);
+  -webkit-user-select:none; user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  overscroll-behavior:none;
+}
+#app { display:flex; flex-direction:column; height:100dvh; }
+#hud {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  padding:calc(env(safe-area-inset-top, 0px) + 20px)
+          calc(env(safe-area-inset-right, 0px) + 14px)
+          6px
+          calc(env(safe-area-inset-left, 0px) + 10px);
+  gap:8px; font-size:0.72rem;
+}
+.hud-label { font-size:0.52rem; letter-spacing:2px; color:var(--dim); }
+.hud-val { font-size:0.95rem; line-height:1.15; }
+#h-dist .hud-val { color:var(--green); font-size:1.25rem; }
+#h-score .hud-val { color:var(--gold); }
+#h-best .hud-val { color:var(--purple); }
+#h-best { text-align:right; }
+#mute-btn {
+  position:relative; z-index:60;
+  font-size:15px; line-height:1; padding:6px 9px;
+  background:var(--panel); color:var(--white);
+  border:1px solid var(--border); border-radius:8px;
+  font-family:inherit; cursor:pointer;
+  -webkit-user-select:none; user-select:none;
+}
+#game { flex:1; display:block; width:100%; touch-action:none; user-select:none; -webkit-user-select:none; }
+.overlay {
+  position:fixed; inset:0; z-index:50;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(6,6,14,0.88); text-align:center; padding:24px;
+  touch-action:none;
+}
+.overlay.hidden { display:none; }
+.ov-title {
+  font-family:'Black Ops One', sans-serif; font-size:1.9rem; letter-spacing:4px;
+  color:var(--green); text-shadow:0 0 24px rgba(57,255,20,0.7); margin-bottom:14px;
+}
+.ov-sub { font-size:0.72rem; color:var(--dim); letter-spacing:1px; line-height:2; margin-bottom:24px; }
+.ov-score {
+  font-family:'Black Ops One', sans-serif; font-size:1.5rem; letter-spacing:3px;
+  color:var(--gold); text-shadow:0 0 18px rgba(255,195,0,0.6); margin-bottom:8px;
+}
+.ov-tap {
+  font-size:0.85rem; color:var(--white); letter-spacing:3px;
+  border:1px solid var(--border); background:var(--panel);
+  padding:12px 26px; border-radius:8px;
+  animation:pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.45;} }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 00:00 UTC</div>
+<div id="app">
+  <div id="hud">
+    <button id="mute-btn" aria-label="toggle sound">🔊</button>
+    <div id="h-dist"><div class="hud-label">DIST</div><div class="hud-val" id="v-dist">0</div></div>
+    <div id="h-score"><div class="hud-label">SCORE</div><div class="hud-val" id="v-score">0</div></div>
+    <div id="h-best"><div class="hud-label">BEST</div><div class="hud-val" id="v-best">0</div></div>
+  </div>
+  <canvas id="game"></canvas>
+</div>
+
+<div class="overlay" id="ov-start">
+  <div class="ov-title">NEON CROSSING</div>
+  <div class="ov-sub">
+    TAP = HOP FORWARD<br>
+    SWIPE = LEFT &bull; RIGHT &bull; BACK<br>
+    DODGE CARS &amp; TRAINS &bull; RIDE THE LOGS<br>
+    DON'T FALL BEHIND THE SCROLL
+  </div>
+  <div class="ov-tap">START</div>
+</div>
+
+<div class="overlay hidden" id="ov-dead">
+  <div class="ov-title" style="color:var(--red); text-shadow:0 0 24px rgba(255,34,68,0.7);" id="d-title">SQUASHED</div>
+  <div class="ov-score" id="d-score">0</div>
+  <div class="ov-sub" id="d-sub"></div>
+  <div class="ov-tap">RETRY</div>
+</div>
+
+<script>
+'use strict';
+// ------------------------------------------------------------- constants
+// Grid units: lane coordinate u in COLUMN units (playfield spans u 0..9,
+// column c covers [c, c+1), tile centers at c+0.5). Rows indexed by integer
+// r increasing FORWARD (up the screen). camY = row coordinate at the
+// canvas bottom edge. Cars/logs/trains travel a circular track of SPAN
+// tiles centered on the playfield so lane traffic covers any screen width.
+const COLS = 9;                          // playfield columns (fixed logic width)
+const EXT = 14;                          // lane track extension beyond playfield each side
+const SPAN = COLS + 2 * EXT;             // circular lane track length (37 tiles)
+const HOP_DUR = 0.09;                    // hop tween seconds
+const CAR_LEN = 1.35;                    // car length in tiles
+const CAR_GAP_MIN = 2.6;                 // min clear gap between cars (fairness)
+const CAR_SPEED_MAX = 4.2;               // cars speed cap tiles/s (fairness)
+const LOG_SPEED_MAX = 2.4;               // logs speed cap tiles/s (fairness)
+const LOG_CADENCE = 3.0;                 // max seconds between log fronts at a column
+const TRAIN_SPEED = 22;                  // train sweep tiles/s
+const TRAIN_LEN = 16;                    // train length tiles
+const WARN_MIN = 1.2;                    // min rail warning seconds (fairness)
+const SCROLL0 = 0.55;                    // base camera rows/s
+const SCROLL_MAX = 1.35;                 // camera speed cap
+const IDLE_LIMIT = 6;                    // s without forward progress -> pressure
+const IDLE_MULT = 2.8;                   // camera multiplier under pressure
+const FROG_HALF = 0.32;                  // frog half-width in tiles (hitbox)
+const ORB_PTS = 5;
+const CAR_COLORS = ['#4488ff', '#b44fff', '#ffc300', '#ff2244', '#22ddff'];
+
+// ------------------------------------------------------------- state
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let dpr = 1, cw = 0, ch = 0;
+let TILE = 40, X0 = 0, VISROWS = 18;
+
+let state = 'title';                     // title | play | dead (tests use 'paused')
+let simTime = 0, playT = 0, deathT = 0;
+let player = newPlayer();
+let rows = new Map();                    // r -> row object (see mk* factories)
+let genRow = 0;                          // next row index to generate
+let bandType = 'grass', bandLeft = 0;    // current generator band
+let runNonGrass = 0, prevType = 'grass'; // composition trackers
+let camY = -6, camSpeed = SCROLL0;
+let maxRow = 0, orbsGot = 0;
+let lastProgressT = 0, pressure = false, idleWarnT = 0;
+let deathCause = '', deathPos = { u: 4.5, ry: 0 };
+let particles = [], texts = [], rings = [];
+let queuedDir = null, bumpT = 0, shake = 0;
+let best = 0;
+try { best = +(localStorage.getItem('neon-crossing-best') || 0); } catch (e) {}
+
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const wrapLane = x => ((x + EXT) % SPAN + SPAN) % SPAN - EXT;
+const rowAt = r => rows.get(r);
+
+function newPlayer() {
+  return { col: 4, row: 0, px: 4.5, py: 0, hop: null, onLog: false,
+           dir: 'up', squashT: 0, blinkT: 2.5 };
+}
+
+// ------------------------------------------------------------- audio
+let AC = null, sfxGain = null, musicGain = null, noiseBuf = null;
+let muted = false;
+try { muted = localStorage.getItem('neon-crossing-mute') === '1'; } catch (e) {}
+let musicPlaying = false, musicTimer = null, musicStep = 0, nextNoteTime = 0;
+
+function audio() {
+  if (!AC) {
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      sfxGain = AC.createGain(); sfxGain.connect(AC.destination);
+      musicGain = AC.createGain(); musicGain.connect(AC.destination);
+      const len = Math.floor(AC.sampleRate * 0.25);
+      noiseBuf = AC.createBuffer(1, len, AC.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      applyMute();
+    } catch (e) {}
+  }
+  if (AC && AC.state === 'suspended' && !muted) AC.resume();
+  return AC;
+}
+function applyMute() {
+  if (!AC) return;
+  sfxGain.gain.value = muted ? 0 : 1;
+  musicGain.gain.value = muted ? 0 : 0.5;
+}
+function setMuted(m) {
+  muted = m;
+  try { localStorage.setItem('neon-crossing-mute', m ? '1' : '0'); } catch (e) {}
+  applyMute();
+  $('mute-btn').textContent = m ? '🔇' : '🔊';
+  if (AC && !m && AC.state === 'suspended') AC.resume();
+}
+function beep(freq, dur, type, gain, slideTo, at) {
+  if (!AC || !sfxGain) return;
+  const t0 = at || AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  g.gain.setValueAtTime(gain || 0.1, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(sfxGain);
+  o.start(t0); o.stop(t0 + dur);
+}
+function noiseHitTo(dest, t0, dur, gain) {
+  if (!AC || !noiseBuf) return;
+  const s = AC.createBufferSource(), g = AC.createGain();
+  s.buffer = noiseBuf; s.loop = true;
+  g.gain.setValueAtTime(gain, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  s.connect(g).connect(dest);
+  s.start(t0); s.stop(t0 + dur);
+}
+const sfxNoise = (dur, gain) => { if (AC && sfxGain) noiseHitTo(sfxGain, AC.currentTime, dur, gain); };
+const sndHop     = () => beep(430, 0.06, 'square', 0.07, 660);
+const sndBlocked = () => beep(140, 0.06, 'square', 0.05, 110);
+const sndOrb     = () => { beep(880, 0.07, 'sine', 0.1); setTimeout(() => beep(1320, 0.1, 'sine', 0.09), 55); };
+const sndSplash  = () => { sfxNoise(0.32, 0.12); beep(300, 0.35, 'sine', 0.1, 70); };
+const sndSquash  = () => { beep(95, 0.16, 'square', 0.13, 55); sfxNoise(0.08, 0.09); };
+const sndTrain   = () => { beep(233, 0.7, 'sawtooth', 0.08); beep(277, 0.7, 'sawtooth', 0.06); sfxNoise(1.1, 0.05); };
+const sndSwept   = () => beep(220, 0.5, 'sawtooth', 0.12, 55);
+const sndWarn    = () => { beep(1180, 0.09, 'sine', 0.07); setTimeout(() => beep(1180, 0.09, 'sine', 0.06), 130); };
+const sndIdle    = () => beep(320, 0.18, 'square', 0.06, 240);
+const sndFanfare = () => { beep(523, 0.12, 'square', 0.08); setTimeout(() => beep(659, 0.12, 'square', 0.08), 110); setTimeout(() => beep(784, 0.12, 'square', 0.08), 220); setTimeout(() => beep(1047, 0.24, 'square', 0.09), 330); };
+
+// music: 128 BPM square-wave chiptune, C major, 32-step (2-bar) loop.
+// Lookahead scheduler: setInterval(100ms) schedules ~0.3s ahead.
+const BPM = 128, SPB = 60 / BPM / 4;     // seconds per 16th step
+const CHORD_ROOTS = [48, 43, 45, 41];    // C3 G2 A2 F2 (midi)
+const LEAD = [72,-1,76,-1,79,-1,76,-1, 71,-1,74,-1,79,-1,74,-1,
+              69,-1,72,-1,76,-1,72,-1, 69,-1,72,-1,77,-1,76,-1];
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function tone(freq, t0, dur, type, gain) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(musicGain);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function kick(t0) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(150, t0);
+  o.frequency.exponentialRampToValueAtTime(44, t0 + 0.11);
+  g.gain.setValueAtTime(0.08, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.13);
+  o.connect(g).connect(musicGain);
+  o.start(t0); o.stop(t0 + 0.14);
+}
+function scheduleStep(i, t0) {
+  const ci = (i >> 3) & 3, s = i & 7;
+  if (s % 2 === 0) {                                        // bouncy bass
+    const off = s === 4 ? 7 : (s === 2 || s === 6 ? 12 : 0);
+    tone(mtof(CHORD_ROOTS[ci] + off), t0, 0.1, 'square', 0.055);
+  }
+  if (LEAD[i] > 0) tone(mtof(LEAD[i]), t0, 0.15, 'square', 0.042);
+  if (i % 8 === 0) kick(t0);
+  if (i % 16 === 4 || i % 16 === 12) noiseHitTo(musicGain, t0, 0.08, 0.045);
+  if (i % 2 === 1) noiseHitTo(musicGain, t0, 0.03, i % 4 === 3 ? 0.04 : 0.026);
+}
+function startMusic() {
+  if (!AC || !musicGain || musicPlaying) return;
+  musicPlaying = true;
+  musicStep = 0;
+  nextNoteTime = AC.currentTime + 0.06;
+  musicTimer = setInterval(() => {
+    if (!AC) return;
+    while (nextNoteTime < AC.currentTime + 0.3) {
+      scheduleStep(musicStep % 32, nextNoteTime);
+      musicStep++;
+      nextNoteTime += SPB;
+    }
+  }, 100);
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) return;
+  if (document.hidden) AC.suspend();
+  else if (!muted) AC.resume();
+});
+
+// ------------------------------------------------------------- layout
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cw = canvas.clientWidth; ch = canvas.clientHeight;
+  canvas.width = Math.round(cw * dpr);
+  canvas.height = Math.round(ch * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // portrait: exactly 9 columns fill the width; landscape: tile from height,
+  // more columns visible either side of the (centered) 9-column playfield.
+  TILE = Math.min(cw / COLS, ch / 10);
+  X0 = (cw - COLS * TILE) / 2;
+  VISROWS = ch / TILE;
+  if (typeof genRow === 'number' && rows.size) genRowsTo(Math.ceil(camY + VISROWS) + 8);
+}
+const ux = u => X0 + u * TILE;            // lane u -> screen x
+const rowY = r => ch - (r - camY) * TILE; // bottom edge of row r -> screen y
+
+// ------------------------------------------------------------- generator
+// Fairness invariants (asserted by the headless drive):
+//  - grass rows: <=3 trees, >=3 open tiles, and from EVERY open column of the
+//    previous row an open tile of this row is reachable with at most one
+//    lateral hop on the previous row (no impassable tree walls)
+//  - road lanes: clear gap between consecutive cars >= 2.6 tiles (circular
+//    track + uniform motion preserves gaps forever); speed <= CAR_SPEED_MAX
+//  - river lanes: log front-to-front spacing / speed <= 3.0 s (a reachable
+//    log within bounded wait); speed <= LOG_SPEED_MAX
+//  - rail rows: warning phase >= 1.2 s before the train
+//  - composition: <=3 consecutive non-grass rows, <=2 consecutive river rows
+function distributeGaps(n, total, gmin, gmax) {
+  const g = new Array(n).fill(gmin);
+  let rem = total - n * gmin, guard = 0;
+  while (rem > 0.01 && guard++ < 4000) {
+    const i = (Math.random() * n) | 0;
+    const add = Math.min(rem, 0.2 + Math.random() * 1.2, gmax - g[i]);
+    if (add > 0.001) { g[i] += add; rem -= add; }
+  }
+  for (let i = 0; i < n && rem > 0.001; i++) {
+    const add = Math.min(rem, gmax - g[i]); g[i] += add; rem -= add;
+  }
+  return g;
+}
+function openColsArr(row) {
+  const out = [];
+  for (let c = 0; c < COLS; c++)
+    if (row.type !== 'grass' || row.trees.indexOf(c) < 0) out.push(c);
+  return out;
+}
+function mkGrass(r, safe) {
+  const row = { r, type: 'grass', trees: [], orb: -1, orbGot: false };
+  if (!safe) {
+    const roll = Math.random();
+    const n = roll < 0.22 ? 0 : roll < 0.52 ? 1 : roll < 0.8 ? 2 : 3;
+    const cols = [];
+    for (let c = 0; c < COLS; c++) cols.push(c);
+    for (let i = cols.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      const t = cols[i]; cols[i] = cols[j]; cols[j] = t;
+    }
+    row.trees = cols.slice(0, n).sort((a, b) => a - b);
+    // reachability fix: from every open column c of the previous row there
+    // must be an open c' in {c-1,c,c+1} with (c'==c or c' open in prev row)
+    const prev = rows.get(r - 1);
+    if (prev) {
+      const prevOpen = openColsArr(prev);
+      for (const c of prevOpen) {
+        let ok = false;
+        for (const d of [0, -1, 1]) {
+          const c2 = c + d;
+          if (c2 < 0 || c2 >= COLS) continue;
+          if (row.trees.indexOf(c2) >= 0) continue;
+          if (d === 0 || prevOpen.indexOf(c2) >= 0) { ok = true; break; }
+        }
+        if (!ok) row.trees.splice(row.trees.indexOf(c), 1); // open c itself
+      }
+    }
+    if (Math.random() < 0.3) {
+      const open = openColsArr(row);
+      row.orb = open[(Math.random() * open.length) | 0];
+    }
+  }
+  return row;
+}
+function mkRoad(r) {
+  const dir = Math.random() < 0.5 ? -1 : 1;
+  let sp = (1.1 + Math.min(r * 0.012, 1.7)) * (0.75 + Math.random() * 0.5);
+  sp = clamp(sp, 0.9, CAR_SPEED_MAX);
+  const n = 5 + ((Math.random() * 3) | 0);
+  const gaps = distributeGaps(n, SPAN - n * CAR_LEN, CAR_GAP_MIN, 12);
+  const cars = [];
+  let x = -EXT + Math.random() * SPAN;
+  for (let i = 0; i < n; i++) {
+    cars.push({ x: wrapLane(x), c: CAR_COLORS[(Math.random() * CAR_COLORS.length) | 0] });
+    x += CAR_LEN + gaps[i];
+  }
+  return { r, type: 'road', vel: dir * sp, cars };
+}
+function mkRiver(r) {
+  const dir = Math.random() < 0.5 ? -1 : 1;
+  const n = 8, lens = [];
+  let sum = 0;
+  for (let i = 0; i < n; i++) { const L = 2 + (Math.random() < 0.4 ? 1 : 0); lens.push(L); sum += L; }
+  const gaps = distributeGaps(n, SPAN - sum, 1.2, 4.0);
+  let spacingMax = 0;
+  for (let i = 0; i < n; i++) spacingMax = Math.max(spacingMax, lens[i] + gaps[i]);
+  let sp = 0.9 + Math.random() * 1.1;
+  sp = Math.min(Math.max(sp, spacingMax / LOG_CADENCE), LOG_SPEED_MAX);
+  const logs = [];
+  let x = -EXT + Math.random() * SPAN;
+  for (let i = 0; i < n; i++) {
+    logs.push({ x: wrapLane(x), len: lens[i] });
+    x += lens[i] + gaps[i];
+  }
+  return { r, type: 'river', vel: dir * sp, logs };
+}
+function mkRail(r) {
+  return { r, type: 'rail', phase: 'idle', t: Math.random() * 2,
+           idleDur: 1.6 + Math.random() * 3.2, warnDur: 1.25 + Math.random() * 0.55,
+           trainDir: Math.random() < 0.5 ? -1 : 1, trainX: 0, chimeT: 0 };
+}
+function pickBand(r) {
+  const allowed = 3 - runNonGrass;
+  if (allowed <= 0) { bandType = 'grass'; bandLeft = 1 + (Math.random() < 0.45 ? 1 : 0); return; }
+  const t = clamp(r / 150, 0, 1);
+  const wG = 0.34 - 0.10 * t;
+  const wRoad = 0.30 + 0.08 * t;
+  const wRiv = (prevType === 'river' || r < 6) ? 0 : 0.20 + 0.04 * t;
+  const wRail = r < 12 ? 0 : 0.12 + 0.08 * t;
+  const roll = Math.random() * (wG + wRoad + wRiv + wRail);
+  if (roll < wG) { bandType = 'grass'; bandLeft = 1 + ((Math.random() * 2) | 0); }
+  else if (roll < wG + wRoad) { bandType = 'road'; bandLeft = 1 + ((Math.random() * Math.min(3, allowed)) | 0); bandLeft = Math.min(bandLeft, allowed); }
+  else if (roll < wG + wRoad + wRiv) { bandType = 'river'; bandLeft = Math.min(1 + (Math.random() < 0.45 ? 1 : 0), Math.min(2, allowed)); }
+  else { bandType = 'rail'; bandLeft = 1; }
+}
+function genNextRow() {
+  const r = genRow;
+  let type;
+  if (r <= 2) { type = 'grass'; bandLeft = 0; }
+  else {
+    if (bandLeft <= 0) pickBand(r);
+    type = bandType; bandLeft--;
+  }
+  let row;
+  if (type === 'grass') row = mkGrass(r, r <= 2);
+  else if (type === 'road') row = mkRoad(r);
+  else if (type === 'river') row = mkRiver(r);
+  else row = mkRail(r);
+  rows.set(r, row);
+  runNonGrass = type === 'grass' ? 0 : runNonGrass + 1;
+  prevType = type;
+  genRow = r + 1;
+  return row;
+}
+function genRowsTo(target) {
+  while (genRow <= target) genNextRow();
+}
+
+// ------------------------------------------------------------- flow
+function reset() {
+  playT = 0; deathT = 0;
+  player = newPlayer();
+  rows = new Map();
+  camY = -Math.max(4, VISROWS * 0.35);
+  camSpeed = SCROLL0;
+  genRow = Math.floor(camY) - 4;
+  bandType = 'grass'; bandLeft = 0; runNonGrass = 0; prevType = 'grass';
+  maxRow = 0; orbsGot = 0;
+  lastProgressT = 0; pressure = false; idleWarnT = 0;
+  particles = []; texts = []; rings = [];
+  queuedDir = null; bumpT = 0; shake = 0;
+  deathCause = '';
+  genRowsTo(Math.ceil(camY + VISROWS) + 8);
+  state = 'play';
+  startMusic();
+  updateHud();
+}
+function score() { return maxRow + orbsGot * ORB_PTS; }
+function updateHud() {
+  $('v-dist').textContent = maxRow;
+  $('v-score').textContent = score();
+  $('v-best').textContent = best;
+}
+function addText(u, ry, str, c) { texts.push({ u, ry, str, c, life: 0.9, rise: 0 }); }
+function burst(u, ry, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 1.2 + Math.random() * 3.6;
+    particles.push({ u, ry, vu: Math.cos(a) * sp, vry: Math.sin(a) * sp,
+                     life: 0.35 + Math.random() * 0.35, c: color, s: 3 });
+  }
+}
+const DEATH_TITLES = { car: 'SQUASHED', splash: 'SPLASHED', train: 'ZAPPED', swept: 'SWEPT AWAY' };
+function die(cause) {
+  state = 'dead'; deathCause = cause; deathT = 0;
+  player.hop = null; queuedDir = null;
+  deathPos = { u: player.px, ry: player.py };
+  if (cause === 'car') { sndSquash(); shake = 0.5; burst(player.px, player.py, '#ff2244', 16); burst(player.px, player.py, '#39ff14', 10); }
+  else if (cause === 'splash') { sndSplash(); rings.push({ u: player.px, ry: player.py, t: 0 }); rings.push({ u: player.px, ry: player.py, t: -0.15 }); burst(player.px, player.py, '#4488ff', 14); }
+  else if (cause === 'train') { sndSquash(); sndTrain(); shake = 0.7; burst(player.px, player.py, '#ffc300', 20); burst(player.px, player.py, '#ffffff', 10); }
+  else { sndSwept(); burst(player.px, player.py, '#8899bb', 10); }
+  const s = score();
+  const isBest = s > best;
+  if (isBest) { best = s; try { localStorage.setItem('neon-crossing-best', best); } catch (e) {} }
+  if (isBest) setTimeout(sndFanfare, 500);
+  setTimeout(() => {
+    $('d-title').textContent = DEATH_TITLES[cause] || 'DEAD';
+    $('d-score').textContent = s + (isBest ? '  ★ NEW BEST' : '');
+    $('d-sub').innerHTML = 'DIST ' + maxRow + ' &bull; ORBS ' + orbsGot + '<br>BEST ' + best;
+    $('ov-dead').classList.remove('hidden');
+    updateHud();
+  }, 900);
+}
+
+// ------------------------------------------------------------- hops
+function baseColOf() { return clamp(Math.round(player.px - 0.5), 0, COLS - 1); }
+function logAt(row, u) {
+  for (const L of row.logs)
+    if (u >= L.x - 0.25 && u <= L.x + L.len + 0.25) return L;
+  return null;
+}
+function startHop(dir) {
+  const D = { up: [0, 1], down: [0, -1], left: [-1, 0], right: [1, 0] }[dir];
+  if (!D) return;
+  player.dir = dir;
+  const bc = baseColOf();
+  const tc = bc + D[0], tr = player.row + D[1];
+  if (tc < 0 || tc >= COLS) { sndBlocked(); bumpT = 0.12; return; }
+  const row = rowAt(tr);
+  if (!row) { sndBlocked(); bumpT = 0.12; return; }
+  if (row.type === 'grass' && row.trees.indexOf(tc) >= 0) { sndBlocked(); bumpT = 0.12; return; }
+  player.hop = { t: 0, fx: player.px, fy: player.py, tx: tc + 0.5, ty: tr, col: tc, row: tr };
+  player.onLog = false;
+  sndHop();
+}
+function hopInput(dir) {
+  if (state !== 'play') return;
+  if (player.hop) { queuedDir = dir; return; }   // buffer at most 1
+  startHop(dir);
+}
+function endHop() {
+  const h = player.hop;
+  player.px = h.tx; player.py = h.ty; player.col = h.col; player.row = h.row;
+  player.hop = null; player.squashT = 0.1;
+  if (player.row > maxRow) { maxRow = player.row; lastProgressT = playT; }
+  const row = rowAt(player.row);
+  if (row) {
+    if (row.type === 'grass') {
+      if (row.orb === player.col && !row.orbGot) {
+        row.orbGot = true; orbsGot++;
+        sndOrb(); burst(player.px, player.py, '#ffc300', 10);
+        addText(player.px, player.py, '+5', '#ffc300');
+      }
+    } else if (row.type === 'river') {
+      const lg = logAt(row, player.px);
+      if (lg) player.onLog = true;
+      else { die('splash'); return; }
+    }
+  }
+  updateHud();
+  if (queuedDir) { const d = queuedDir; queuedDir = null; startHop(d); }
+}
+
+// ------------------------------------------------------------- sim
+function updateRow(row, dt) {
+  if (row.type === 'road') {
+    for (const c of row.cars) c.x = wrapLane(c.x + row.vel * dt);
+  } else if (row.type === 'river') {
+    for (const L of row.logs) L.x = wrapLane(L.x + row.vel * dt);
+  } else if (row.type === 'rail') {
+    row.t += dt;
+    const vis = row.r > camY - 1 && row.r < camY + VISROWS + 1;
+    if (row.phase === 'idle') {
+      if (row.t >= row.idleDur) { row.phase = 'warn'; row.t = 0; row.chimeT = 0; }
+    } else if (row.phase === 'warn') {
+      row.chimeT -= dt;
+      if (row.chimeT <= 0) { row.chimeT = 0.45; if (vis && state === 'play') sndWarn(); }
+      if (row.t >= row.warnDur) {
+        row.phase = 'train'; row.t = 0;
+        row.trainX = row.trainDir > 0 ? -EXT - TRAIN_LEN : COLS + EXT;
+        if (vis && state === 'play') sndTrain();
+      }
+    } else if (row.phase === 'train') {
+      row.trainX += row.trainDir * TRAIN_SPEED * dt;
+      if (row.trainDir > 0 ? row.trainX > COLS + EXT : row.trainX + TRAIN_LEN < -EXT) {
+        row.phase = 'idle'; row.t = 0; row.idleDur = 2.2 + Math.random() * 3.5;
+      }
+    }
+  }
+}
+function step(dt) {
+  playT += dt;
+
+  // hop tween / log carry
+  if (player.hop) {
+    const h = player.hop;
+    h.t += dt;
+    const k = Math.min(1, h.t / HOP_DUR);
+    player.px = h.fx + (h.tx - h.fx) * k;
+    player.py = h.fy + (h.ty - h.fy) * k;
+    if (k >= 1) { endHop(); if (state !== 'play' && state !== 'paused') return; }
+  } else {
+    const srow = rowAt(player.row);
+    if (srow && srow.type === 'river') {
+      if (player.onLog) {
+        player.px += srow.vel * dt;
+        if (player.px < -0.1 || player.px > COLS + 0.1) { die('swept'); return; }
+      } else { die('splash'); return; }
+    }
+  }
+
+  // lanes + rails
+  for (const row of rows.values()) updateRow(row, dt);
+
+  // hazards on the row under the frog (nearest row while mid-hop)
+  const rr = Math.round(player.py);
+  const hrow = rowAt(rr);
+  if (hrow) {
+    if (hrow.type === 'road') {
+      for (const c of hrow.cars) {
+        const cc = c.x + CAR_LEN / 2;
+        if (Math.abs(cc - player.px) < CAR_LEN / 2 + FROG_HALF - 0.05) { die('car'); return; }
+      }
+    } else if (hrow.type === 'rail' && hrow.phase === 'train') {
+      if (player.px > hrow.trainX - 0.2 && player.px < hrow.trainX + TRAIN_LEN + 0.2) { die('train'); return; }
+    }
+  }
+
+  // camera: auto-scroll (gently ramping), idle pressure, forward follow
+  pressure = playT - lastProgressT > IDLE_LIMIT;
+  const target = Math.min(SCROLL0 + maxRow * 0.0045, SCROLL_MAX) * (pressure ? IDLE_MULT : 1);
+  camSpeed += (target - camSpeed) * Math.min(1, dt * 2.5);
+  camY += camSpeed * dt;
+  const lead = player.py - camY;
+  const anchor = VISROWS * 0.62;
+  if (lead > anchor) camY += (lead - anchor) * Math.min(1, dt * 5);
+  if (pressure) {
+    idleWarnT -= dt;
+    if (idleWarnT <= 0) { idleWarnT = 0.9; sndIdle(); }
+  } else idleWarnT = 0;
+
+  // swept below the bottom edge
+  if (player.py + 1 < camY) { die('swept'); return; }
+
+  // world upkeep
+  genRowsTo(Math.ceil(camY + VISROWS) + 8);
+  for (const k of rows.keys()) if (k < Math.floor(camY) - 4) rows.delete(k);
+
+  player.squashT = Math.max(0, player.squashT - dt);
+  player.blinkT -= dt;
+  if (player.blinkT < -0.12) player.blinkT = 2.2 + Math.random() * 2.8;
+
+  updateHud();
+}
+
+// ------------------------------------------------------------- input
+let touchStart = null, lastTap = 0;
+function pointerPos(e) {
+  const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+  return [t.clientX, t.clientY];
+}
+function onDown(e) {
+  e.preventDefault(); audio();
+  const [x, y] = pointerPos(e);
+  touchStart = { x, y };
+}
+function onMove(e) { e.preventDefault(); }
+function onUp(e) {
+  e.preventDefault();
+  if (!touchStart) return;
+  const [x, y] = pointerPos(e);
+  const dx = x - touchStart.x, dy = y - touchStart.y;
+  touchStart = null;
+  if (state !== 'play') return;
+  if (Math.hypot(dx, dy) < 24) hopInput('up');                 // tap = forward
+  else if (Math.abs(dx) > Math.abs(dy)) hopInput(dx > 0 ? 'right' : 'left');
+  else hopInput(dy > 0 ? 'down' : 'up');
+}
+canvas.addEventListener('touchstart', onDown, { passive: false });
+canvas.addEventListener('touchmove', onMove, { passive: false });
+canvas.addEventListener('touchend', onUp, { passive: false });
+canvas.addEventListener('touchcancel', e => { e.preventDefault(); touchStart = null; }, { passive: false });
+canvas.addEventListener('mousedown', onDown);
+window.addEventListener('mousemove', e => { if (touchStart) onMove(e); });
+window.addEventListener('mouseup', e => { if (touchStart) onUp(e); });
+window.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  const map = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
+                ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
+  if (map[e.code]) { audio(); hopInput(map[e.code]); }
+});
+
+function uiTap(e) {
+  e.preventDefault();
+  const now = performance.now();
+  if (now - lastTap < 400) return;      // iOS fires touchend AND click per tap
+  lastTap = now;
+  audio();
+  if (state === 'title') { $('ov-start').classList.add('hidden'); reset(); }
+  else if (state === 'dead' && deathT > 0.7) { $('ov-dead').classList.add('hidden'); reset(); }
+}
+$('ov-start').addEventListener('touchend', uiTap, { passive: false });
+$('ov-start').addEventListener('click', uiTap);
+$('ov-dead').addEventListener('touchend', uiTap, { passive: false });
+$('ov-dead').addEventListener('click', uiTap);
+
+let lastMuteTap = 0;
+$('mute-btn').addEventListener('click', e => {
+  e.preventDefault(); e.stopPropagation();
+  const now = performance.now();
+  if (now - lastMuteTap < 350) return;
+  lastMuteTap = now;
+  audio();
+  setMuted(!muted);
+});
+$('mute-btn').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+$('mute-btn').addEventListener('touchend', e => e.stopPropagation(), { passive: true });
+if (muted) $('mute-btn').textContent = '🔇';
+
+// ------------------------------------------------------------- render
+function rr2(x, y, w, h, r) {
+  const rad = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rad);
+  ctx.arcTo(x + w, y + h, x, y + h, rad);
+  ctx.arcTo(x, y + h, x, y, rad);
+  ctx.arcTo(x, y, x + w, y, rad);
+  ctx.closePath();
+}
+function drawRowBase(r) {
+  const yB = rowY(r), yT = yB - TILE;
+  const row = rows.get(r);
+  const type = row ? row.type : 'grass';
+  if (type === 'grass') {
+    ctx.fillStyle = (r & 1) ? '#081408' : '#071206';
+    ctx.fillRect(0, yT, cw, TILE);
+    ctx.strokeStyle = 'rgba(57,255,20,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let c = 0; c <= COLS; c++) { const x = ux(c); ctx.moveTo(x, yT); ctx.lineTo(x, yB); }
+    ctx.moveTo(0, yT); ctx.lineTo(cw, yT);
+    ctx.stroke();
+  } else if (type === 'road') {
+    ctx.fillStyle = '#0e0e15';
+    ctx.fillRect(0, yT, cw, TILE);
+    const above = rows.get(r + 1);
+    if (above && above.type === 'road') {
+      ctx.setLineDash([TILE * 0.35, TILE * 0.3]);
+      ctx.strokeStyle = 'rgba(221,227,255,0.12)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, yT); ctx.lineTo(cw, yT); ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle = 'rgba(221,227,255,0.10)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(0, yT); ctx.lineTo(cw, yT); ctx.stroke();
+    }
+  } else if (type === 'river') {
+    ctx.fillStyle = '#051130';
+    ctx.fillRect(0, yT, cw, TILE);
+    ctx.strokeStyle = 'rgba(90,160,255,0.12)';
+    ctx.lineWidth = 1.5;
+    for (let k = 0; k < 2; k++) {
+      const w = cw * 0.16;
+      const speed = 26 + k * 17 + (r % 3) * 6;
+      const off = ((simTime * speed + r * 133 + k * 210) % (cw + w)) - w;
+      const yy = yT + TILE * (0.3 + 0.4 * k);
+      ctx.beginPath(); ctx.moveTo(off, yy); ctx.lineTo(off + w, yy); ctx.stroke();
+    }
+  } else { // rail
+    ctx.fillStyle = '#131007';
+    ctx.fillRect(0, yT, cw, TILE);
+    ctx.strokeStyle = 'rgba(120,90,40,0.55)';
+    ctx.lineWidth = 2;
+    for (let x = -TILE; x < cw + TILE; x += TILE * 0.55) {
+      ctx.beginPath(); ctx.moveTo(x, yT + TILE * 0.14); ctx.lineTo(x - TILE * 0.1, yB - TILE * 0.14); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(255,195,0,0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, yT + TILE * 0.3); ctx.lineTo(cw, yT + TILE * 0.3);
+    ctx.moveTo(0, yB - TILE * 0.3); ctx.lineTo(cw, yB - TILE * 0.3);
+    ctx.stroke();
+  }
+}
+function drawTree(c, r) {
+  const x = ux(c + 0.5), y = rowY(r) - TILE / 2;
+  ctx.shadowColor = '#39ff14'; ctx.shadowBlur = 8;
+  ctx.fillStyle = '#123f16';
+  ctx.strokeStyle = 'rgba(57,255,20,0.85)';
+  ctx.lineWidth = 1.5;
+  const R = TILE * 0.42;
+  for (const [ox, oy, rr] of [[-0.16, 0.1, 0.62], [0.18, 0.06, 0.55], [0, -0.16, 0.7]]) {
+    ctx.beginPath();
+    ctx.arc(x + ox * R, y + oy * R, rr * R, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(57,255,20,0.35)';
+  ctx.beginPath(); ctx.arc(x - R * 0.2, y - R * 0.3, R * 0.14, 0, Math.PI * 2); ctx.fill();
+}
+function drawOrb(c, r) {
+  const x = ux(c + 0.5), y = rowY(r) - TILE / 2 + Math.sin(simTime * 3 + r) * TILE * 0.05;
+  const R = TILE * 0.15;
+  ctx.shadowColor = '#ffc300'; ctx.shadowBlur = 12;
+  ctx.fillStyle = '#ffc300';
+  ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(255,195,0,0.55)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let k = 0; k < 4; k++) {
+    const a = simTime * 2 + k * Math.PI / 2;
+    ctx.moveTo(x + Math.cos(a) * R * 1.4, y + Math.sin(a) * R * 1.4);
+    ctx.lineTo(x + Math.cos(a) * R * 2, y + Math.sin(a) * R * 2);
+  }
+  ctx.stroke();
+}
+function drawCar(car, row) {
+  const yC = rowY(row.r) - TILE / 2;
+  const x = ux(car.x), w = CAR_LEN * TILE, h = TILE * 0.72;
+  const yT = yC - h / 2;
+  const fwd = row.vel > 0 ? 1 : -1;
+  ctx.shadowColor = car.c; ctx.shadowBlur = 10;
+  ctx.fillStyle = car.c;
+  rr2(x, yT, w, h, TILE * 0.16); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(6,6,14,0.55)';                      // windshield band
+  const wx = fwd > 0 ? x + w * 0.58 : x + w * 0.18;
+  rr2(wx, yT + h * 0.14, w * 0.24, h * 0.72, 3); ctx.fill();
+  const hx = fwd > 0 ? x + w : x;                            // headlights
+  ctx.fillStyle = 'rgba(255,255,220,0.9)';
+  ctx.shadowColor = '#ffffcc'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(hx, yT + h * 0.24, TILE * 0.06, 0, Math.PI * 2);
+  ctx.arc(hx, yT + h * 0.76, TILE * 0.06, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  const beam = ctx.createLinearGradient(hx, 0, hx + fwd * TILE * 1.1, 0);
+  beam.addColorStop(0, 'rgba(255,255,210,0.16)');
+  beam.addColorStop(1, 'rgba(255,255,210,0)');
+  ctx.fillStyle = beam;
+  ctx.fillRect(fwd > 0 ? hx : hx - TILE * 1.1, yT, TILE * 1.1, h);
+  ctx.fillStyle = 'rgba(255,34,68,0.85)';                    // taillights
+  const tx = fwd > 0 ? x + 1 : x + w - 3;
+  ctx.fillRect(tx, yT + h * 0.16, 2, h * 0.2);
+  ctx.fillRect(tx, yT + h * 0.64, 2, h * 0.2);
+}
+function drawLog(L, row) {
+  const yC = rowY(row.r) - TILE / 2;
+  const x = ux(L.x), w = L.len * TILE, h = TILE * 0.64;
+  ctx.shadowColor = 'rgba(120,220,255,0.5)'; ctx.shadowBlur = 6;
+  ctx.fillStyle = '#7a4a1f';
+  rr2(x, yC - h / 2, w, h, h * 0.4); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(50,28,10,0.9)';
+  ctx.lineWidth = 1.5;
+  for (let i = 1; i < L.len * 2; i++) {
+    const lx = x + (w / (L.len * 2)) * i;
+    ctx.beginPath(); ctx.moveTo(lx, yC - h * 0.32); ctx.lineTo(lx, yC + h * 0.32); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(255,220,150,0.35)';
+  rr2(x, yC - h / 2, w, h, h * 0.4); ctx.stroke();
+}
+function drawRail(row) {
+  const yB = rowY(row.r), yT = yB - TILE;
+  if (row.phase === 'warn') {
+    const p = 0.5 + 0.5 * Math.sin(simTime * 16);
+    ctx.fillStyle = 'rgba(255,120,20,' + (0.10 + 0.14 * p) + ')';
+    ctx.fillRect(0, yT, cw, TILE);
+    ctx.fillStyle = p > 0.5 ? '#ff2244' : '#ffc300';
+    ctx.shadowColor = '#ff2244'; ctx.shadowBlur = 10;
+    for (let u = 0.5; u < COLS; u += 3) {
+      ctx.beginPath(); ctx.arc(ux(u), yT + TILE * 0.5, TILE * 0.09, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  }
+  if (row.phase === 'train') {
+    const x = ux(row.trainX), w = TRAIN_LEN * TILE, h = TILE * 0.84;
+    const yC = yB - TILE / 2;
+    ctx.shadowColor = '#b44fff'; ctx.shadowBlur = 14;
+    ctx.fillStyle = '#1c1430';
+    rr2(x, yC - h / 2, w, h, 5); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#b44fff'; ctx.lineWidth = 1.5;
+    rr2(x, yC - h / 2, w, h, 5); ctx.stroke();
+    ctx.fillStyle = '#ffc300';
+    ctx.shadowColor = '#ffc300'; ctx.shadowBlur = 8;
+    for (let i = 0.6; i < TRAIN_LEN - 0.4; i += 0.9)
+      ctx.fillRect(x + i * TILE, yC - h * 0.22, TILE * 0.42, h * 0.34);
+    ctx.shadowBlur = 0;
+    const hx = row.trainDir > 0 ? x + w : x;
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(hx, yC, TILE * 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+}
+function drawRowContents(r) {
+  const row = rows.get(r);
+  if (!row) return;
+  if (row.type === 'grass') {
+    if (row.orb >= 0 && !row.orbGot) drawOrb(row.orb, r);
+    for (const c of row.trees) drawTree(c, r);
+  } else if (row.type === 'road') {
+    for (const c of row.cars) drawCar(c, row);
+  } else if (row.type === 'river') {
+    for (const L of row.logs) drawLog(L, row);
+  } else if (row.type === 'rail') {
+    drawRail(row);
+  }
+}
+function drawFrogShape(x, y, ang, sSide, sFwd, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.rotate(ang);
+  ctx.scale(sSide, sFwd);
+  const R = TILE * 0.31;
+  // legs
+  ctx.fillStyle = '#17a30a';
+  for (const [lx, ly] of [[-0.85, -0.62], [0.85, -0.62], [-0.92, 0.66], [0.92, 0.66]]) {
+    ctx.beginPath();
+    ctx.ellipse(lx * R, ly * R, R * 0.3, R * 0.42, lx * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // body
+  ctx.shadowColor = '#39ff14'; ctx.shadowBlur = 14;
+  ctx.fillStyle = '#39ff14';
+  ctx.beginPath(); ctx.ellipse(0, 0, R, R * 1.18, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  // back stripe
+  ctx.fillStyle = 'rgba(10,80,16,0.55)';
+  ctx.beginPath(); ctx.ellipse(0, R * 0.16, R * 0.5, R * 0.72, 0, 0, Math.PI * 2); ctx.fill();
+  // eyes (front = -y)
+  const blink = player.blinkT < 0;
+  for (const s of [-1, 1]) {
+    const ex = s * R * 0.52, ey = -R * 0.92;
+    ctx.fillStyle = '#2bd410';
+    ctx.beginPath(); ctx.arc(ex, ey, R * 0.34, 0, Math.PI * 2); ctx.fill();
+    if (blink) {
+      ctx.strokeStyle = '#06060e'; ctx.lineWidth = Math.max(1, TILE * 0.03);
+      ctx.beginPath(); ctx.moveTo(ex - R * 0.2, ey); ctx.lineTo(ex + R * 0.2, ey); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#eaffea';
+      ctx.beginPath(); ctx.arc(ex, ey, R * 0.22, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#06060e';
+      ctx.beginPath(); ctx.arc(ex, ey - R * 0.07, R * 0.11, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+const DIR_ANG = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 };
+function drawFrog() {
+  const h = player.hop;
+  let lift = 0, sF = 1, sS = 1;
+  if (h) {
+    const k = Math.min(1, h.t / HOP_DUR);
+    const arc = Math.sin(Math.PI * k);
+    lift = arc * TILE * 0.3;
+    sF = 1 + 0.25 * arc; sS = 1 - 0.16 * arc;
+  } else if (player.squashT > 0) {
+    const k = player.squashT / 0.1;
+    sF = 1 - 0.22 * k; sS = 1 + 0.2 * k;
+  } else {
+    const br = 1 + 0.025 * Math.sin(simTime * 4);
+    sF = br; sS = 2 - br;
+  }
+  const x = ux(player.px), y = rowY(player.py) - TILE / 2;
+  if (lift > 0) {                       // ground shadow while airborne
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.ellipse(x, y, TILE * 0.24, TILE * 0.13, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  const bump = bumpT > 0 ? Math.sin(bumpT * 60) * TILE * 0.05 : 0;
+  drawFrogShape(x + bump, y - lift, DIR_ANG[player.dir] || 0, sS, sF, 1);
+}
+function drawDeadFrog() {
+  const x = ux(deathPos.u), y = rowY(deathPos.ry) - TILE / 2;
+  const t = deathT;
+  if (deathCause === 'car') {
+    drawFrogShape(x, y, DIR_ANG[player.dir] || 0, 1.8, 0.14, Math.max(0, 1 - t * 0.8));
+  } else if (deathCause === 'splash') {
+    const k = clamp(1 - t * 1.8, 0, 1);
+    if (k > 0) drawFrogShape(x, y, DIR_ANG[player.dir] || 0, k, k, k);
+  } else if (deathCause === 'train') {
+    if (t < 0.55) {
+      const fl = Math.sin(t * 42) > 0;
+      drawFrogShape(x, y, DIR_ANG[player.dir] || 0, 1, 1, fl ? 1 : 0.15);
+      if (fl) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          const a = t * 30 + i * 2.1;
+          ctx.beginPath();
+          ctx.moveTo(x + Math.cos(a) * TILE * 0.3, y + Math.sin(a) * TILE * 0.3);
+          ctx.lineTo(x + Math.cos(a) * TILE * 0.7, y + Math.sin(a) * TILE * 0.7);
+          ctx.stroke();
+        }
+      }
+    }
+  } else { // swept
+    const k = clamp(1 - t * 1.2, 0, 1);
+    if (k > 0) drawFrogShape(x, y + t * TILE * 2.2, (DIR_ANG[player.dir] || 0) + t * 6, k, k, k);
+  }
+}
+function render() {
+  ctx.fillStyle = '#04040a';
+  ctx.fillRect(0, 0, cw, ch);
+  ctx.save();
+  if (shake > 0) ctx.translate((Math.random() - 0.5) * shake * 12, (Math.random() - 0.5) * shake * 12);
+
+  const r0 = Math.floor(camY) - 1, r1 = Math.ceil(camY + VISROWS) + 1;
+  for (let r = r0; r <= r1; r++) drawRowBase(r);
+  for (let r = r0; r <= r1; r++) drawRowContents(r);
+
+  // playfield bounds: dim beyond the 9 columns (landscape), glow edge lines
+  if (X0 > 2) {
+    ctx.fillStyle = 'rgba(4,4,10,0.55)';
+    ctx.fillRect(0, 0, X0, ch);
+    ctx.fillRect(X0 + COLS * TILE, 0, cw - X0 - COLS * TILE, ch);
+    ctx.strokeStyle = 'rgba(57,255,20,0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(X0, 0); ctx.lineTo(X0, ch);
+    ctx.moveTo(X0 + COLS * TILE, 0); ctx.lineTo(X0 + COLS * TILE, ch);
+    ctx.stroke();
+  }
+
+  // splash rings
+  for (const g of rings) {
+    if (g.t < 0) continue;
+    const k = g.t / 0.6;
+    if (k > 1) continue;
+    ctx.globalAlpha = 1 - k;
+    ctx.strokeStyle = '#4488ff'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(ux(g.u), rowY(g.ry) - TILE / 2, TILE * (0.15 + k * 0.8), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  if (state !== 'dead') drawFrog();
+  else drawDeadFrog();
+
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life * 2.2);
+    ctx.fillStyle = p.c;
+    ctx.fillRect(ux(p.u) - p.s / 2, rowY(p.ry) - TILE / 2 - p.s / 2, p.s, p.s);
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.font = '700 13px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center';
+  for (const t of texts) {
+    ctx.globalAlpha = clamp(t.life * 1.6, 0, 1);
+    ctx.fillStyle = t.c;
+    ctx.fillText(t.str, ux(t.u), rowY(t.ry) - TILE / 2 - t.rise);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // idle-pressure warning vignette
+  if (pressure && state === 'play') {
+    const a = 0.10 + 0.09 * Math.sin(simTime * 10);
+    ctx.fillStyle = 'rgba(255,34,68,' + a + ')';
+    const b = 16;
+    ctx.fillRect(0, 0, cw, b); ctx.fillRect(0, ch - b, cw, b);
+    ctx.fillRect(0, 0, b, ch); ctx.fillRect(cw - b, 0, b, ch);
+  }
+}
+
+// ------------------------------------------------------------- main loop
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  let dt = (now - last) / 1000; last = now;
+  if (dt > 0.1) dt = 0.1;
+  simTime += dt;
+  if (state === 'play') step(dt);
+  if (state === 'dead') deathT += dt;
+  shake = Math.max(0, shake - dt);
+  bumpT = Math.max(0, bumpT - dt);
+  for (const p of particles) { p.life -= dt; p.u += p.vu * dt; p.ry += p.vry * dt; }
+  particles = particles.filter(p => p.life > 0);
+  for (const g of rings) g.t += dt;
+  rings = rings.filter(g => g.t < 0.6);
+  for (const t of texts) { t.life -= dt; t.rise += 26 * dt; }
+  texts = texts.filter(t => t.life > 0);
+  render();
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 60));
+resize();
+reset();
+state = 'title';
+updateHud();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
