@@ -290,6 +290,36 @@ for everyone, UTC-dated) + free play; 90 s rounds; solver-computed
 found/total; backtrack undo; missed-gems reveal. Embedded curated ~5.3k-word
 dictionary. Detailed context: `.claude/word-circuit.md`.
 
+### NEON TRIPEAKS (`tri-peaks/index.html`, ~620 lines)
+Classic 28-card tri-peaks solitaire. Tap uncovered cards one rank up/down
+from the waste (K↔A wraps); streak bonuses, peak-clear bonuses, leftover
+stock pays out on a win. Fairness-checked deterministic deals; seeded
+DAILY DEAL + free play. Synth SFX + swung lounge music loop. Detailed
+context: `.claude/tri-peaks.md`.
+
+### SHADOW CIRCUIT (`shadow-circuit/index.html`, ~700 lines)
+Top-down stealth-maze. Tap-to-move BFS pathfinding through procedural
+mazes; guards patrol with LOS vision cones (patrol → chase → returning
+state machine), shadow tiles hide a still player. Collect all cores, reach
+the exit; ghost bonus for alarm-free floors; 3-life runs, endless floors.
+Synth SFX + tense pulse music (hats surge while chased). Detailed context:
+`.claude/shadow-circuit.md`.
+
+### NEON RECALL (`neon-recall/index.html`, ~640 lines)
+Pair-matching memory board. Solo: round campaign on a mistake budget
+("scans"), streak scoring, growing grids, one hidden power pair per round
+(peek / +2 scans / bomb). Versus: 9-pair pass-and-play hot-seat — match
+keeps the turn, odd pair count means no draws. 15 canvas-drawn vector
+glyphs. Synth SFX + marimba-ping music loop. Detailed context:
+`.claude/neon-recall.md`.
+
+### NEON DRIFT (`neon-drift/index.html`, ~700 lines)
+Top-down drift time-trialer. Hold left/right screen halves to steer an
+auto-accelerating car through 3 Catmull-Rom circuits (sequential unlocks);
+grip-lag drift physics, mud-slow rough, anti-cut lap tracking, per-track
+best time + ghost replay, engine-pitch oscillator + synthwave loop.
+Detailed context: `.claude/neon-drift.md`.
+
 ### METEOR DEFENSE (`meteor-defense/index.html`, ~1130 lines)
 Missile-Command-style tap interceptor. Blast rings chain through meteors
 (splitters, comets, UFOs) falling on six neon buildings; per-wave ammo
@@ -305,7 +335,10 @@ tense sequencer music. Detailed context: `.claude/meteor-defense.md`.
    self-contained file either way
 2. Add a card to `games/index.html` (copy an existing card, update
    icon/name/desc/href) — pick an icon emoji **not already used** by another
-   card (e.g. Sorcery already owns 🔮)
+   card (e.g. Sorcery already owns 🔮) — **and add the game's entry to the
+   hub's `GAMES` facet dataset** (same file, § coverage heuristics script;
+   it mirrors the games-index row and feeds the 📊 COVERAGE HEURISTICS
+   dashboard — a drive test asserts cards ↔ dataset stay in sync)
 3. Add the standard hub back button (see § Hub Back Button) — ← top-left,
    mute button to its right — and the WebAudio SFX + music stack per the
    Audio convention row

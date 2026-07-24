@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Neon Drift</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+:root {
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff; --red:#ff2244;
+  --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; }
+body {
+  background:var(--bg); color:var(--white);
+  font-family:'Share Tech Mono', monospace;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  position:fixed; inset:0;
+}
+#cv { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+#back-btn {
+  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:30;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:32px;
+  text-align:center; text-decoration:none; touch-action:manipulation;
+  -webkit-user-select:none; user-select:none;
+}
+#mute {
+  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:30;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
+  text-align:center; padding:0; touch-action:manipulation;
+}
+#restart {
+  position:absolute; top:calc(var(--sat) + 8px); left:102px; z-index:30;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
+  text-align:center; padding:0; touch-action:manipulation; display:none;
+}
+#overlay {
+  position:absolute; inset:0; z-index:20; display:flex;
+  flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(6,6,14,0.92); padding:20px; text-align:center;
+  padding-top:calc(var(--sat) + 20px); padding-bottom:calc(var(--sab) + 20px);
+  overflow-y:auto;
+}
+#overlay.hidden { display:none; }
+#overlay h1 {
+  font-family:'Black Ops One', sans-serif; color:var(--red);
+  font-size:clamp(1.7rem, 8vw, 2.5rem); letter-spacing:4px;
+  text-shadow:0 0 24px #ff224466; margin-bottom:4px;
+}
+#overlay h2 {
+  font-family:'Black Ops One', sans-serif; color:var(--gold);
+  font-size:1.5rem; letter-spacing:3px; margin-bottom:8px;
+}
+.sub { color:var(--dim); font-size:0.68rem; letter-spacing:3px; margin-bottom:18px; }
+.btn {
+  font-family:'Black Ops One', sans-serif; letter-spacing:2px;
+  background:var(--panel); color:var(--green);
+  border:1px solid var(--green); border-radius:8px;
+  font-size:1.0rem; padding:13px 30px; margin:7px; min-width:250px;
+  touch-action:manipulation; cursor:pointer;
+}
+.btn.gold { color:var(--gold); border-color:var(--gold); }
+.btn.locked { color:#3a3a55; border-color:#22223a; }
+.btn small { display:block; font-family:'Share Tech Mono', monospace; font-size:0.62rem; letter-spacing:1px; margin-top:3px; }
+.stat { color:var(--white); font-size:0.85rem; margin:3px 0; letter-spacing:1px; }
+.stat b { color:var(--gold); }
+.howto { color:var(--dim); font-size:0.7rem; max-width:320px; line-height:1.7; margin-top:16px; }
+.howto em { color:var(--green); font-style:normal; }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 23:23 UTC</div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute">🔊</button>
+<button id="restart">↺</button>
+<canvas id="cv"></canvas>
+<div id="overlay"></div>
+<script>
+'use strict';
+/* ============ Tracks (closed Catmull-Rom centerlines, world units) ============ */
+const TRACKS = [
+  {
+    name: 'OVAL RUSH', halfW: 78,
+    pts: [[500, 150], [820, 260], [860, 700], [820, 1140], [500, 1250], [180, 1140], [140, 700], [180, 260]],
+  },
+  {
+    name: 'HAIRPIN HEX', halfW: 68,
+    pts: [[500, 140], [830, 240], [870, 560], [700, 700], [860, 860], [820, 1180], [500, 1270], [200, 1160], [150, 860], [320, 700], [160, 560], [190, 250]],
+  },
+  {
+    name: 'CIRCUIT ZED', halfW: 60,
+    pts: [[480, 130], [750, 180], [870, 400], [760, 560], [880, 760], [800, 1000], [600, 1080], [620, 1220], [380, 1270], [200, 1150], [260, 950], [150, 760], [230, 560], [150, 380], [300, 190]],
+  },
+];
+const LAPS = 3;
+function catmull(p0, p1, p2, p3, t) {
+  const t2 = t * t, t3 = t2 * t;
+  return [
+    0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
+    0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3),
+  ];
+}
+function sampleTrack(tr) {
+  const pts = tr.pts, n = pts.length, out = [];
+  const per = 30;
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+    for (let k = 0; k < per; k++) out.push(catmull(p0, p1, p2, p3, k / per));
+  }
+  return out;
+}
+
+/* ============ State (top-level: reachable from page.evaluate) ============ */
+let state = 'menu';   // menu | count | play | finish
+let trackIdx = 0;
+let samples = [];     // centerline samples of current track
+let halfW = 70;
+let car = { x: 0, y: 0, ang: 0, v: 0, vx: 0, vy: 0 };
+let steerL = false, steerR = false;
+let lastIdx = 0, prog = 0, lap = 1;
+let raceT = 0, countT = 0, lapTimes = [], lapStartT = 0;
+let ghostData = null; // best-run frames [[x,y,ang],...] at 30 fps
+let ghostRec = [];
+let recTick = 0;
+let skids = [];       // {x,y,t}
+let finished = { time: 0, isBest: false };
+
+const VMAX = 340, ACCEL = 240, ROUGH_VMAX = 130, STEER = 2.7, GRIP = 6.5, ROUGH_GRIP = 3.2;
+
+function wrapDiff(d, n) { d %= n; if (d > n / 2) d -= n; if (d < -n / 2) d += n; return d; }
+function nearestIdx(from, x, y) {
+  const n = samples.length;
+  let best = from, bd = 1e18;
+  for (let o = -30; o <= 30; o++) {
+    const i = (from + o + n) % n;
+    const dx = samples[i][0] - x, dy = samples[i][1] - y;
+    const d = dx * dx + dy * dy;
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
+function onTrack(x, y, idxHint) {
+  const i = nearestIdx(idxHint !== undefined ? idxHint : lastIdx, x, y);
+  const dx = samples[i][0] - x, dy = samples[i][1] - y;
+  return dx * dx + dy * dy <= (halfW + 6) * (halfW + 6);
+}
+
+/* ============ Race lifecycle ============ */
+function loadTrack(ti) {
+  trackIdx = ti;
+  samples = sampleTrack(TRACKS[ti]);
+  halfW = TRACKS[ti].halfW;
+}
+function startRace(ti) {
+  loadTrack(ti);
+  const a0 = Math.atan2(samples[3][1] - samples[0][1], samples[3][0] - samples[0][0]);
+  car = { x: samples[0][0], y: samples[0][1], ang: a0, v: 0, vx: Math.cos(a0), vy: Math.sin(a0) };
+  steerL = steerR = false;
+  lastIdx = 0; prog = 0; lap = 1;
+  raceT = 0; lapTimes = []; lapStartT = 0;
+  ghostRec = []; recTick = 0; skids = [];
+  ghostData = null;
+  try {
+    const j = JSON.parse(localStorage.getItem('neonDrift.ghost' + (ti + 1)) || 'null');
+    if (j && Array.isArray(j.f) && j.f.length) ghostData = j.f;
+  } catch (e) {}
+  state = 'count'; countT = 3.0;
+  overlay.classList.add('hidden');
+  restartBtn.style.display = 'block';
+  sfxBeep(0);
+}
+function bestKey() { return 'neonDrift.best' + (trackIdx + 1); }
+function loadBest(ti) { return parseInt(localStorage.getItem('neonDrift.best' + (ti + 1)) || '0', 10) || 0; }
+function unlockedTracks() { return Math.min(3, parseInt(localStorage.getItem('neonDrift.unlocked') || '1', 10) || 1); }
+function finishRace() {
+  state = 'finish';
+  finished.time = raceT;
+  const prev = loadBest(trackIdx);
+  finished.isBest = !prev || Math.round(raceT * 1000) < prev;
+  try {
+    if (finished.isBest) {
+      localStorage.setItem(bestKey(), String(Math.round(raceT * 1000)));
+      localStorage.setItem('neonDrift.ghost' + (trackIdx + 1), JSON.stringify({ t: Math.round(raceT * 1000), f: ghostRec }));
+    }
+    const un = unlockedTracks();
+    if (trackIdx + 2 > un && trackIdx + 2 <= 3) localStorage.setItem('neonDrift.unlocked', String(trackIdx + 2));
+  } catch (e) {}
+  sfxFinish();
+  setTimeout(showFinish, 700);
+}
+
+/* ============ Update ============ */
+function update(dt) {
+  skids.forEach(s => s.t += dt);
+  if (skids.length > 500) skids.splice(0, skids.length - 500);
+  skids = skids.filter(s => s.t < 4);
+  if (state === 'count') {
+    const prev = Math.ceil(countT);
+    countT -= dt;
+    if (countT <= 0) { state = 'play'; lapStartT = 0; sfxBeep(2); }
+    else if (Math.ceil(countT) !== prev) sfxBeep(1);
+    return;
+  }
+  if (state !== 'play' && state !== 'finish') return;
+  if (state === 'play') raceT += dt;
+  // steering (speed-scaled)
+  const dir = (steerR ? 1 : 0) - (steerL ? 1 : 0);
+  const drive = state === 'play';
+  const track = onTrack(car.x, car.y);
+  if (drive) {
+    car.ang += STEER * dir * dt * (0.45 + 0.55 * car.v / VMAX);
+    const vcap = track ? VMAX : ROUGH_VMAX;
+    if (car.v < vcap) car.v = Math.min(vcap, car.v + ACCEL * dt * (track ? 1 : 0.6));
+    else car.v = Math.max(vcap, car.v - 300 * dt);
+  } else {
+    car.v = Math.max(0, car.v - 300 * dt); // finish: coast down
+  }
+  // velocity direction lags heading = drift
+  const grip = (track ? GRIP : ROUGH_GRIP) * dt;
+  const hx = Math.cos(car.ang), hy = Math.sin(car.ang);
+  car.vx += (hx - car.vx) * Math.min(1, grip);
+  car.vy += (hy - car.vy) * Math.min(1, grip);
+  const vlen = Math.hypot(car.vx, car.vy) || 1;
+  car.vx /= vlen; car.vy /= vlen;
+  car.x += car.vx * car.v * dt;
+  car.y += car.vy * car.v * dt;
+  // skid marks while drifting hard
+  const slip = Math.abs(hx * car.vy - hy * car.vx);
+  if (car.v > VMAX * 0.5 && (slip > 0.22 || !track)) {
+    skids.push({ x: car.x - hx * 10, y: car.y - hy * 10, t: 0 });
+    if (sfxSkidT <= 0) { sfxSkid(); sfxSkidT = 0.09; }
+  }
+  if (sfxSkidT > 0) sfxSkidT -= dt;
+  // progress + laps
+  if (state === 'play') {
+    const ni = nearestIdx(lastIdx, car.x, car.y);
+    const delta = wrapDiff(ni - lastIdx, samples.length);
+    if (delta > 0 && delta < 26) prog += delta;
+    lastIdx = ni;
+    if (prog >= samples.length * 0.92 && ni < 12) {
+      lapTimes.push(raceT - lapStartT);
+      lapStartT = raceT;
+      prog = 0;
+      if (lap >= LAPS) { finishRace(); return; }
+      lap++;
+      sfxLap();
+    }
+    // ghost recording at ~30 fps
+    recTick++;
+    if (recTick % 2 === 0 && ghostRec.length < 6000) {
+      ghostRec.push([Math.round(car.x), Math.round(car.y), Math.round(car.ang * 100) / 100]);
+    }
+  }
+}
+
+/* ============ Overlays ============ */
+const overlay = document.getElementById('overlay');
+const restartBtn = document.getElementById('restart');
+let lastTapT = 0;
+function bindTap(el, fn) {
+  const h = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    audioInit(); // menu tap may be the first iOS gesture
+    const now = Date.now();
+    if (now - lastTapT < 400) return;
+    lastTapT = now;
+    fn();
+  };
+  el.addEventListener('touchend', h, { passive: false });
+  el.addEventListener('click', h);
+}
+function fmtT(s) {
+  const m = Math.floor(s / 60), sec = s - m * 60;
+  return m + ':' + (sec < 10 ? '0' : '') + sec.toFixed(2);
+}
+function showMenu() {
+  state = 'menu';
+  restartBtn.style.display = 'none';
+  overlay.classList.remove('hidden');
+  const un = unlockedTracks();
+  let html =
+    '<h1>NEON DRIFT</h1>' +
+    '<div class="sub">3 LAPS · BEAT YOUR GHOST</div>';
+  TRACKS.forEach((tr, i) => {
+    const locked = i + 1 > un;
+    const best = loadBest(i);
+    html += locked
+      ? '<button class="btn locked" disabled>' + tr.name + '<small>FINISH ' + TRACKS[i - 1].name + ' TO UNLOCK</small></button>'
+      : '<button class="btn' + (i === 2 ? ' gold' : '') + '" id="b-t' + i + '">' + tr.name + '<small>' + (best ? 'BEST ' + fmtT(best / 1000) + ' · GHOST READY' : 'NO TIME SET') + '</small></button>';
+  });
+  html += '<div class="howto">Hold the <em>left or right half</em> of the screen to steer — the car accelerates itself. Stay on the asphalt: the glow-edged road is fast, the dark rough is mud-slow. Finish 3 laps to set a time; your best run comes back as a <em>ghost car</em> to race against.</div>';
+  overlay.innerHTML = html;
+  TRACKS.forEach((tr, i) => {
+    const b = document.getElementById('b-t' + i);
+    if (b) bindTap(b, () => startRace(i));
+  });
+}
+function showFinish() {
+  overlay.classList.remove('hidden');
+  const un = unlockedTracks();
+  let html =
+    '<h1 style="color:var(--green)">FINISH</h1>' +
+    '<div class="sub">' + TRACKS[trackIdx].name + '</div>' +
+    '<h2>' + fmtT(finished.time) + (finished.isBest ? ' ★' : '') + '</h2>' +
+    lapTimes.map((t, i) => '<div class="stat">LAP ' + (i + 1) + ': <b>' + fmtT(t) + '</b></div>').join('') +
+    '<div class="stat">' + (finished.isBest ? '★ NEW BEST — GHOST SAVED' : 'BEST: ' + fmtT(loadBest(trackIdx) / 1000)) + '</div>';
+  if (trackIdx + 1 < 3 && trackIdx + 2 <= un) html += '<button class="btn gold" id="b-next">NEXT: ' + TRACKS[trackIdx + 1].name + '</button>';
+  html += '<button class="btn" id="b-retry">RETRY</button>' +
+    '<button class="btn" id="b-menu" style="color:var(--dim);border-color:var(--border)">MENU</button>';
+  overlay.innerHTML = html;
+  const bn = document.getElementById('b-next');
+  if (bn) bindTap(bn, () => startRace(trackIdx + 1));
+  bindTap(document.getElementById('b-retry'), () => startRace(trackIdx));
+  bindTap(document.getElementById('b-menu'), showMenu);
+}
+bindTap(restartBtn, () => { if (state === 'play' || state === 'count' || state === 'finish') startRace(trackIdx); });
+
+/* ============ Rendering ============ */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W = 390, H = 844, DPR = 1, safeTop = 0, safeBottom = 0;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 3);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const cs = getComputedStyle(document.documentElement);
+  safeTop = parseFloat(cs.getPropertyValue('--sat')) || 0;
+  safeBottom = parseFloat(cs.getPropertyValue('--sab')) || 0;
+}
+window.addEventListener('resize', resize);
+function drawCar(x, y, ang, col, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.rotate(ang);
+  ctx.shadowColor = col; ctx.shadowBlur = 12;
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(13, 0); ctx.lineTo(-9, -7); ctx.lineTo(-6, 0); ctx.lineTo(-9, 7);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  if (state === 'menu') return;
+  const camX = car.x - W / 2, camY = car.y - H / 2;
+  ctx.save();
+  ctx.translate(-camX, -camY);
+  // off-track backdrop grid
+  ctx.strokeStyle = 'rgba(60,70,140,0.08)'; ctx.lineWidth = 1;
+  const gx0 = Math.floor(camX / 80) * 80, gy0 = Math.floor(camY / 80) * 80;
+  for (let x = gx0; x < camX + W + 80; x += 80) { ctx.beginPath(); ctx.moveTo(x, camY); ctx.lineTo(x, camY + H); ctx.stroke(); }
+  for (let y = gy0; y < camY + H + 80; y += 80) { ctx.beginPath(); ctx.moveTo(camX, y); ctx.lineTo(camX + W, y); ctx.stroke(); }
+  // track: edge glow, asphalt, dashed centerline
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath();
+  samples.forEach((s, i) => { if (i === 0) ctx.moveTo(s[0], s[1]); else ctx.lineTo(s[0], s[1]); });
+  ctx.closePath();
+  ctx.strokeStyle = '#232355'; ctx.lineWidth = halfW * 2 + 10; ctx.stroke();
+  ctx.strokeStyle = '#0e0e20'; ctx.lineWidth = halfW * 2; ctx.stroke();
+  ctx.setLineDash([14, 22]);
+  ctx.strokeStyle = 'rgba(136,153,187,0.25)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.setLineDash([]);
+  // start/finish line
+  const s0 = samples[0], s1 = samples[2];
+  const na = Math.atan2(s1[1] - s0[1], s1[0] - s0[0]) + Math.PI / 2;
+  ctx.save();
+  ctx.translate(s0[0], s0[1]);
+  ctx.rotate(na - Math.PI / 2);
+  for (let k = -1; k <= 1; k += 1) {
+    for (let m = 0; m < 2; m++) {
+      ctx.fillStyle = (k + m) % 2 === 0 ? '#dde3ff' : '#0b0b16';
+      ctx.fillRect(-4 + m * 4, k * halfW * 0.66 - halfW * 0.33, 4, halfW * 0.66);
+    }
+  }
+  ctx.restore();
+  // skids
+  ctx.fillStyle = 'rgba(180,79,255,0.20)';
+  skids.forEach(s => {
+    ctx.globalAlpha = Math.max(0, 1 - s.t / 4) * 0.5;
+    ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, 7); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+  // ghost
+  if (ghostData && (state === 'play' || state === 'count')) {
+    const gi = Math.min(ghostData.length - 1, Math.max(0, Math.floor(raceT * 30)));
+    const g = ghostData[gi];
+    if (g) drawCar(g[0], g[1], g[2], '#4488ff', 0.4);
+  }
+  // player car
+  drawCar(car.x, car.y, car.ang, '#39ff14', 1);
+  ctx.restore();
+  // HUD
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillStyle = '#ffc300';
+  ctx.font = '700 24px "Black Ops One", sans-serif';
+  ctx.fillText(fmtT(raceT), W / 2, safeTop + 10);
+  ctx.font = '12px "Share Tech Mono", monospace';
+  ctx.fillStyle = '#8899bb';
+  ctx.fillText('LAP ' + Math.min(lap, LAPS) + '/' + LAPS + ' · ' + TRACKS[trackIdx].name, W / 2, safeTop + 42);
+  const best = loadBest(trackIdx);
+  if (best) {
+    ctx.fillStyle = '#4488ff';
+    ctx.fillText('BEST ' + fmtT(best / 1000), W / 2, safeTop + 60);
+  }
+  // speed bar (bottom, thumb-safe center)
+  const bw = W * 0.4, bx = (W - bw) / 2, by = H - safeBottom - 26;
+  ctx.fillStyle = '#0b0b16';
+  ctx.fillRect(bx, by, bw, 8);
+  ctx.fillStyle = onTrack(car.x, car.y) ? '#39ff14' : '#ff2244';
+  ctx.fillRect(bx, by, bw * (car.v / VMAX), 8);
+  ctx.strokeStyle = '#1a1a30'; ctx.strokeRect(bx, by, bw, 8);
+  // steer zone hints
+  if (state === 'play' && raceT < 4) {
+    ctx.fillStyle = 'rgba(136,153,187,0.5)';
+    ctx.font = '13px "Share Tech Mono", monospace';
+    ctx.fillText('◄ HOLD', W * 0.16, H - safeBottom - 60);
+    ctx.fillText('HOLD ►', W * 0.84, H - safeBottom - 60);
+  }
+  // minimap
+  const mw = 78, mh = 104, mx = W - mw - 10, my = safeTop + 76;
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = 'rgba(11,11,22,0.7)';
+  ctx.fillRect(mx - 5, my - 5, mw + 10, mh + 10);
+  ctx.beginPath();
+  samples.forEach((s, i) => {
+    const px = mx + s[0] / 1000 * mw, py = my + s[1] / 1400 * mh;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  });
+  ctx.closePath();
+  ctx.strokeStyle = '#2a2a55'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.fillStyle = '#39ff14';
+  ctx.beginPath(); ctx.arc(mx + car.x / 1000 * mw, my + car.y / 1400 * mh, 3, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1;
+  // countdown
+  if (state === 'count') {
+    ctx.fillStyle = '#ffc300';
+    ctx.font = '700 64px "Black Ops One", sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(Math.ceil(countT)), W / 2, H * 0.38);
+  } else if (state === 'play' && raceT < 1) {
+    ctx.fillStyle = '#39ff14';
+    ctx.font = '700 52px "Black Ops One", sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('GO!', W / 2, H * 0.38);
+  }
+}
+
+/* ============ Loop ============ */
+let lastT = 0;
+function frame(t) {
+  const dt = Math.min(0.1, (t - lastT) / 1000 || 0);
+  lastT = t;
+  update(dt);
+  draw();
+  if (engOsc) {
+    engOsc.frequency.value = 58 + (car.v / VMAX) * 150;
+    engGain.gain.value = (muted || (state !== 'play' && state !== 'count')) ? 0 : 0.05 + 0.03 * (car.v / VMAX);
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ============ Input: hold left/right screen halves ============ */
+const activeTouches = new Map(); // identifier -> 'L' | 'R'
+function refreshSteer() {
+  steerL = [...activeTouches.values()].includes('L');
+  steerR = [...activeTouches.values()].includes('R');
+}
+cv.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  audioInit();
+  for (const t of e.changedTouches) activeTouches.set(t.identifier, t.clientX < W / 2 ? 'L' : 'R');
+  refreshSteer();
+}, { passive: false });
+cv.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  for (const t of e.changedTouches) if (activeTouches.has(t.identifier)) activeTouches.set(t.identifier, t.clientX < W / 2 ? 'L' : 'R');
+  refreshSteer();
+}, { passive: false });
+const endTouch = (e) => {
+  e.preventDefault();
+  for (const t of e.changedTouches) activeTouches.delete(t.identifier);
+  refreshSteer();
+};
+cv.addEventListener('touchend', endTouch, { passive: false });
+cv.addEventListener('touchcancel', endTouch, { passive: false });
+cv.addEventListener('mousedown', (e) => {
+  audioInit();
+  activeTouches.set('m', e.clientX < W / 2 ? 'L' : 'R');
+  refreshSteer();
+});
+window.addEventListener('mouseup', () => { activeTouches.delete('m'); refreshSteer(); });
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft') { activeTouches.set('kl', 'L'); refreshSteer(); }
+  if (e.key === 'ArrowRight') { activeTouches.set('kr', 'R'); refreshSteer(); }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.key === 'ArrowLeft') { activeTouches.delete('kl'); refreshSteer(); }
+  if (e.key === 'ArrowRight') { activeTouches.delete('kr'); refreshSteer(); }
+});
+
+/* ============ Audio ============ */
+let AC = null, sfxGain = null, musicGain = null, musicTimer = null, musicStep = 0, musicNext = 0;
+let engOsc = null, engGain = null, sfxSkidT = 0;
+let muted = localStorage.getItem('neonDrift-mute') === '1';
+const muteBtn = document.getElementById('mute');
+muteBtn.textContent = muted ? '🔇' : '🔊';
+function audioInit() {
+  if (AC) return;
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    sfxGain = AC.createGain(); sfxGain.gain.value = muted ? 0 : 0.4; sfxGain.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.gain.value = muted ? 0 : 0.13; musicGain.connect(AC.destination);
+    engOsc = AC.createOscillator();
+    engOsc.type = 'sawtooth'; engOsc.frequency.value = 58;
+    engGain = AC.createGain(); engGain.gain.value = 0;
+    const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+    engOsc.connect(lp); lp.connect(engGain); engGain.connect(sfxGain);
+    engOsc.start();
+    noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.1, AC.sampleRate);
+    const nd = noiseBuf.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    musicNext = AC.currentTime + 0.1;
+    musicTimer = setInterval(scheduleMusic, 25);
+  } catch (e) { AC = null; }
+}
+{
+  const h = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    audioInit();
+    muted = !muted;
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+    try { localStorage.setItem('neonDrift-mute', muted ? '1' : '0'); } catch (err) {}
+    if (sfxGain) sfxGain.gain.value = muted ? 0 : 0.4;
+    if (musicGain) musicGain.gain.value = muted ? 0 : 0.13;
+  };
+  muteBtn.addEventListener('touchend', h, { passive: false });
+  muteBtn.addEventListener('click', h);
+}
+function tone(freq, dur, type, vol, when, dest) {
+  if (!AC || !isFinite(freq)) return;
+  const t = when || AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(dest || sfxGain);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+let noiseBuf = null;
+function sfxSkid() {
+  if (!AC) return;
+  if (!noiseBuf) {
+    noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.1, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const t = AC.currentTime;
+  const s = AC.createBufferSource(), g = AC.createGain(), f = AC.createBiquadFilter();
+  s.buffer = noiseBuf; f.type = 'bandpass'; f.frequency.value = 2200;
+  g.gain.setValueAtTime(0.06, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+  s.connect(f); f.connect(g); g.connect(sfxGain);
+  s.start(t); s.stop(t + 0.12);
+}
+function sfxBeep(kind) {
+  if (!AC) return;
+  if (kind === 2) { tone(660, 0.25, 'square', 0.25); tone(880, 0.3, 'square', 0.18, AC.currentTime + 0.08); }
+  else tone(330, 0.16, 'square', 0.2);
+}
+function sfxLap() { if (!AC) return; [523, 784].forEach((f, i) => tone(f, 0.15, 'square', 0.18, AC.currentTime + i * 0.09)); }
+function sfxFinish() { if (!AC) return; [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, 'square', 0.16, AC.currentTime + i * 0.1)); }
+// synthwave, 122 BPM: driving 8th-note bass + offbeat stab + hats
+const DB = [110, 110, 220, 110, 130.8, 130.8, 261.6, 130.8, 87.3, 87.3, 174.6, 87.3, 98, 98, 196, 98];
+function scheduleMusic() {
+  if (!AC || muted) { if (AC) musicNext = Math.max(musicNext, AC.currentTime + 0.1); return; }
+  const stepDur = 60 / 122 / 2;
+  while (musicNext < AC.currentTime + 0.35) {
+    const s = musicStep % 16;
+    const t = musicNext;
+    tone(DB[s], 0.18, 'sawtooth', 0.22, t, musicGain);
+    if (s % 4 === 2) tone(DB[s] * 4, 0.1, 'square', 0.1, t, musicGain);
+    if (s % 2 === 1 && noiseBuf) {
+      const src = AC.createBufferSource(), g = AC.createGain(), f = AC.createBiquadFilter();
+      src.buffer = noiseBuf; f.type = 'highpass'; f.frequency.value = 8000;
+      g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+      src.connect(f); f.connect(g); g.connect(musicGain);
+      src.start(t); src.stop(t + 0.05);
+    }
+    musicStep++;
+    musicNext += stepDur;
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) return;
+  if (document.hidden) AC.suspend(); else AC.resume();
+});
+
+/* ============ Boot ============ */
+resize();
+loadTrack(0);
+showMenu();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

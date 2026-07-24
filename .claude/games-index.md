@@ -11,6 +11,9 @@ covering absent/rare facet values, not just a new theme.
 coverage summary in the same commit (step in `games/CLAUDE.md` § Adding a
 New Game). External-build games (zed-shooter, qntmchmst) get rows too —
 they occupy design space even though their source lives elsewhere.
+The hub's 📊 COVERAGE HEURISTICS dashboard (`games/index.html`, `GAMES`
+array) embeds a copy of this catalog's facets — update it in the same
+commit as the row.
 
 Axis legend (values are open enums; reuse before inventing):
 **Genre** shelf label · **Input** thumb mechanic · **Session** shape of one
@@ -52,44 +55,53 @@ local-2p.
 | Neon Tactics | `neon-tactics/` | turn-based-tactics | tap | match-vs-ai, local-2p | grid-combat, line-of-sight, ai-opponent | vs-ai, local-2p | `.claude/neon-tactics.md` |
 | Star Surge | `star-surge/` | shmup | drag-steer | level-campaign | bullet-dodging, boss-fights, meta-progression | solo | `.claude/star-surge.md` |
 | Grid Defense | `grid-defense/` | tower-defense-classic | drag-place, tap | wave-survival | wave-defense, resource-economy, tower-upgrades | solo | `.claude/grid-defense.md` |
+| Neon Tripeaks | `tri-peaks/` | card-deck | tap | quick-round, daily-challenge | card-chain, combo-multiplier, seeded-determinism | solo | `.claude/tri-peaks.md` |
+| Shadow Circuit | `shadow-circuit/` | stealth, maze | tap-to-move | level-campaign | vision-cones, line-of-sight, procedural-generation | solo | `.claude/shadow-circuit.md` |
+| Neon Recall | `neon-recall/` | memory-board | tap | level-campaign, local-2p | memory-match, resource-economy, combo-multiplier | solo, local-2p | `.claude/neon-recall.md` |
+| Neon Drift | `neon-drift/` | driver-racing | two-thumb | time-trial | physics-sim, ghost-replay, timing-precision | solo | `.claude/neon-drift.md` |
 
-31 games (29 in-repo + 2 external builds).
+35 games (33 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
 ### Saturated — avoid without a named twist
-- **Input `tap`-only:** 12 games. **`endless-highscore`:** 11 games.
+- **Input `tap`-only:** 14 games. **`endless-highscore`:** 11 games.
 - **Genre `arcade-classic`:** 5. `idle-clicker`: 2 (both very deep — don't
   add a third). One-thumb neon arcade in general is the house specialty and
   the most crowded shelf.
 
 ### Rare — one game each; a second with a different spin is fair game
-- `hold-charge` (pinball plunger) · `two-thumb` (pinball) · `swipe`-led
+- `hold-charge` (pinball plunger) · `two-thumb` (pinball flippers,
+  neon-drift hold-steer) · `swipe`-led
   (neon-slice) · `virtual-joystick` (zed-shooter) · `par-course` (neon-golf)
-  · `match-vs-ai` + `local-2p` (air hockey, neon-tactics) · `open-sandbox` (town builder)
+  · `time-trial` + `ghost-replay` (neon-drift)
+  · `match-vs-ai` + `local-2p` (air hockey, neon-tactics, neon-recall) · `open-sandbox` (town builder)
   · `rhythm` (piano tiles, pre-synth-era) · `hex-grid` (bubble-blaster) ·
-  `seeded-determinism` (blade-spin, word-circuit daily) · `word` +
-  `drag-connect` + `daily-challenge`/`timed-round` (word-circuit).
+  `word` + `drag-connect` + `timed-round` (word-circuit) · `card-deck` +
+  `quick-round` (tri-peaks) · `daily-challenge` (word-circuit, tri-peaks) ·
+  `stealth`/`maze` + `tap-to-move` + `vision-cones` (shadow-circuit) ·
+  `seeded-determinism` (blade-spin, word-circuit, tri-peaks — an
+  established house pattern now).
 
 ### Absent — highest-novelty targets
-- **Genres:** `card-deck` · `trivia` ·
-  `roguelike` · `platformer` · `maze` · `stealth` ·
-  `memory-board` · `driver-racing` (steer the vehicle — Horse Race is
-  influence-only).
+- **Genres:** `trivia` · `roguelike` · `platformer`.
 - **Inputs:** `tilt` (iOS motion-permission prompt — low priority) ·
   `pinch-rotate`.
-- **Players:** local-2p is now covered real-time (air hockey) and
-  turn-based (neon-tactics pass-and-play); a `memory-board` or card game
-  could add a third flavor.
+- **Players:** local-2p now has three flavors — real-time (air hockey),
+  turn-based tactics (neon-tactics), and memory duel (neon-recall);
+  further 2P additions need a genuinely new interaction shape.
 
 ### Example picks this table would suggest next
-A `card-deck` game (absent genre, calm pacing — tri-peaks solitaire or a
-push-your-luck hand), a `stealth`/`maze` hybrid (two absent genres in one
-build), a `memory-board` with pass-and-play (absent genre + third local-2p
-flavor), a `driver-racing` top-down time-trialer (absent genre), or a
-`daily-challenge` mode retrofit onto another seeded game (blade-spin
-already has `seeded-determinism`; word-circuit proved the daily pattern).
+A `trivia` quiz (absent genre — embedded question bank, timed answers), a
+`roguelike` run-based dungeon (absent genre — procedural floors,
+permadeath, relic builds), a `platformer` (absent genre — one-thumb
+tap-jump; the only classic shelf still empty), a `pinch-rotate` puzzle
+(absent input), or a `daily-challenge` retrofit onto another seeded game
+(blade-spin already has `seeded-determinism`).
 
-*(The 2026-07-24 batch — word-circuit, neon-tactics, star-surge,
-grid-defense — filled the former `word`, `turn-based-tactics`, `shmup`,
-`tower-defense-classic`, and `daily-challenge` gaps.)*
+*(The first 2026-07-24 batch — word-circuit, neon-tactics, star-surge,
+grid-defense — filled the `word`, `turn-based-tactics`, `shmup`,
+`tower-defense-classic`, and `daily-challenge` gaps. The second batch —
+tri-peaks, shadow-circuit, neon-recall, neon-drift — filled `card-deck`,
+`stealth`, `maze`, `memory-board`, and `driver-racing`, adding
+`tap-to-move` input and `time-trial`/`quick-round` sessions.)*
