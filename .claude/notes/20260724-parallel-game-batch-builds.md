@@ -68,6 +68,14 @@ at `per_page:1`; it gets saved to a tool-results file instead — extract with
 `jq -r '.workflow_runs[] | select(.head_sha=="<sha>") | [.status,.conclusion] | @tsv'`
 on that file.
 
+Stall variant (hit 2026-07-24, push `631a6e5`): sometimes **no workflow run
+is created at all** for a push — the commit is verifiably on GitHub `main`
+(`mcp__github__list_commits`) but the runs list never gains an entry, and
+Pages silently keeps serving the previous deploy. Same fix as the 503 case
+(zmhstudio note `20260720-firepit-…-pages-503.md`): after ~10 min with no
+run, `git commit --allow-empty` + push to re-trigger, then verify the new
+run concludes `success`.
+
 ## Second batch confirmations (2026-07-24, five games: Neon Stack, Blade Spin, Neon Crossing, Neon Air Hockey, Meteor Defense — commit 5ccb853)
 
 The pattern held at N=5, again with zero game-code fixes at orchestrator
