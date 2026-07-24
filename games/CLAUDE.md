@@ -335,7 +335,10 @@ tense sequencer music. Detailed context: `.claude/meteor-defense.md`.
    self-contained file either way
 2. Add a card to `games/index.html` (copy an existing card, update
    icon/name/desc/href) — pick an icon emoji **not already used** by another
-   card (e.g. Sorcery already owns 🔮)
+   card (e.g. Sorcery already owns 🔮) — **and add the game's entry to the
+   hub's `GAMES` facet dataset** (same file, § coverage heuristics script;
+   it mirrors the games-index row and feeds the 📊 COVERAGE HEURISTICS
+   dashboard — a drive test asserts cards ↔ dataset stay in sync)
 3. Add the standard hub back button (see § Hub Back Button) — ← top-left,
    mute button to its right — and the WebAudio SFX + music stack per the
    Audio convention row

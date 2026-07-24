@@ -11,6 +11,9 @@ covering absent/rare facet values, not just a new theme.
 coverage summary in the same commit (step in `games/CLAUDE.md` § Adding a
 New Game). External-build games (zed-shooter, qntmchmst) get rows too —
 they occupy design space even though their source lives elsewhere.
+The hub's 📊 COVERAGE HEURISTICS dashboard (`games/index.html`, `GAMES`
+array) embeds a copy of this catalog's facets — update it in the same
+commit as the row.
 
 Axis legend (values are open enums; reuse before inventing):
 **Genre** shelf label · **Input** thumb mechanic · **Session** shape of one

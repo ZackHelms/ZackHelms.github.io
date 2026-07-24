@@ -31,7 +31,9 @@ coverage gaps → build → test → ship → report). Manual steps:
    (the games catalog + facet coverage map)
 1. Create `games/<slug>.html` (or `games/<slug>/index.html` in its own
    subdirectory) as a single self-contained file
-2. Add a card to `games/index.html` and a row to `.claude/games-index.md`
+2. Add a card to `games/index.html` (plus an entry in that file's `GAMES`
+   facet dataset — it feeds the hub's 📊 coverage dashboard) and a row to
+   `.claude/games-index.md`
 3. Commit and push to `main` (full checklist: `games/CLAUDE.md` § Adding a New Game)
 
 ## Code style
