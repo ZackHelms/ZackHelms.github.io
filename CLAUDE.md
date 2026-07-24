@@ -71,6 +71,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Neon Tripeaks (`games/tri-peaks/`) | `.claude/tri-peaks.md` | Any work on the tripeaks solitaire — board geometry/exposure, deal fairness, streak scoring, daily seed |
 | Shadow Circuit (`games/shadow-circuit/`) | `.claude/shadow-circuit.md` | Any work on the stealth maze — maze/patrol generation, vision-cone detection, chase state machine |
 | Neon Recall (`games/neon-recall/`) | `.claude/neon-recall.md` | Any work on the memory board — flip rules, scan budget, power pairs, versus turn logic |
+| Neon Drift (`games/neon-drift/`) | `.claude/neon-drift.md` | Any work on the drift racer — track splines, drift physics, lap/anti-cut tracking, ghost replay |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 

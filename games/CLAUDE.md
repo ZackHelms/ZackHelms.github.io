@@ -313,6 +313,13 @@ keeps the turn, odd pair count means no draws. 15 canvas-drawn vector
 glyphs. Synth SFX + marimba-ping music loop. Detailed context:
 `.claude/neon-recall.md`.
 
+### NEON DRIFT (`neon-drift/index.html`, ~700 lines)
+Top-down drift time-trialer. Hold left/right screen halves to steer an
+auto-accelerating car through 3 Catmull-Rom circuits (sequential unlocks);
+grip-lag drift physics, mud-slow rough, anti-cut lap tracking, per-track
+best time + ghost replay, engine-pitch oscillator + synthwave loop.
+Detailed context: `.claude/neon-drift.md`.
+
 ### METEOR DEFENSE (`meteor-defense/index.html`, ~1130 lines)
 Missile-Command-style tap interceptor. Blast rings chain through meteors
 (splitters, comets, UFOs) falling on six neon buildings; per-wave ammo
