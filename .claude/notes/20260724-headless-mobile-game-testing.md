@@ -63,6 +63,19 @@ the fuller gameplay-driving pattern and the traps hit.
   "CONTINUE · STAGE 2" had become stage 3 by the time the menu re-rendered).
 - `page.reload()` wipes helpers injected via `page.evaluate` — wrap helper
   installation in a function and re-run it after every reload.
+- **The rAF loop keeps simulating between evaluates.** Manual
+  `update(1/60)` stepping inside one evaluate is deterministic, but the
+  page's own rAF loop runs in real time between evaluates — in neon-drift
+  the unsteered car drove itself onto the rough during a 400 ms
+  `waitForTimeout`, so an absolute engine-pitch assert read the rough-speed
+  value. Assert *relations* sampled atomically in a single evaluate (freq
+  vs `car.v` read together), never absolutes across two evaluates.
+- **Live NPCs interfere with unrelated assertions.** A patrol guard caught
+  the player mid-walk in shadow-circuit's movement test and respawned them
+  at start, failing a position assert that had nothing to do with movement.
+  Isolate the rule under test: clear the actor array (`guards = []`) or
+  zero the AI's speed via its real config (same family as the air-hockey
+  rally case above).
 
 ## Real bug classes the drives caught (2026-07-24 four-game batch)
 
@@ -86,6 +99,35 @@ All four games shipped only after a scripted drive failed first:
   (`pendingStage`), never a parallel timer.
 - **Stale canvas-UI hitboxes** (grid-defense; now a Shared Conventions row
   in `games/CLAUDE.md`).
+
+Second four-game batch (2026-07-24: tri-peaks, shadow-circuit, neon-recall,
+neon-drift) added three more review/screenshot-caught classes:
+
+- **Two mode branches advancing one entity in the same frame.** Shadow
+  Circuit's chase→patrol handoff set `mode='patrol'` AND left a return
+  path — the patrol ping-pong and the return-path walk then both moved the
+  guard every frame. Rule: an entity's movement lives in exactly ONE mode
+  branch; if a transition needs travel, model it as its own explicit mode
+  (`returning`), not a flag layered on another mode.
+- **Terminal checks must be state-guarded (idempotent).** Neon Recall's
+  bomb power can clear the board *inside* `applyPower`, and `flipTile`
+  calls `checkBoardDone` again right after — without a
+  `state === 'play'` guard the round bonus paid twice. Any
+  board-done/win/lose check reachable from both a side effect and its
+  caller needs the guard.
+- **Shared lazily-created audio resources.** Neon Drift's noise buffer was
+  created lazily by the skid SFX but also needed by the music hats — hats
+  stayed silent until the first skid. Create shared buffers in
+  `audioInit`. Same review pass: overlay/menu `bindTap` handlers must call
+  `audioInit()` too — on iOS the first gesture is usually a DOM menu
+  button, not the canvas.
+
+Also from that batch: **stage action-game screenshots by deterministic
+placement, not scripted driving** — two attempts at "drive into turn 1"
+put the drift car in empty rough (the corner arrives sooner than a blind
+frame count assumes); placing the car on the racing line with matching
+heading/velocity and hand-built skid/ghost props was deterministic and
+shot-perfect on the first try.
 
 Also: error-free smoke + green drives did NOT catch word-circuit's canvas
 rendering at 2× zoom (missing `width:100%;height:100%` CSS — Shared

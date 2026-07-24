@@ -127,3 +127,27 @@ real game bugs pre-ship** — catalogued in
 - Per-game commit + stamp-badge + smoke on {game, hub} per commit scales
   cleanly; final Pages verification once after the `main` merge.
 - Icons taken by this batch: 🔤 ♟️ 🚀 🗼.
+
+## Fourth batch (2026-07-24, four games + hub feature via /create-new-games: Neon Tripeaks, Shadow Circuit, Neon Recall, Neon Drift — commits 99d6a0a…7b994e3, merge 8b414eb)
+
+Sequential orchestrator-built again at N=4 plus a fifth work item (the
+hub's 📊 COVERAGE HEURISTICS dashboard) — the pattern holds. 112 drive
+assertions; four real bugs caught pre-ship, three by the pre-test review
+read and one by the screenshot gate (all catalogued in
+`20260724-headless-mobile-game-testing.md` § Real bug classes). Notes:
+
+- The batch closed the last five easy genre gaps (`card-deck`, `stealth`,
+  `maze`, `memory-board`, `driver-racing`); remaining absent genres are
+  trivia / roguelike / platformer — future batches need those or new
+  input/session axes for novelty.
+- **Hub feature alongside games works as a fifth commit** with the same
+  per-commit stamp+smoke discipline. The dashboard embeds a `GAMES` facet
+  dataset mirroring `.claude/games-index.md`; the sync is kept honest by a
+  drive assertion (cards ↔ dataset both directions) — prefer that pattern
+  (embedded copy + automated sync check) over trying to fetch/parse the
+  markdown at runtime.
+- Chart styling followed the dataviz palette validator: the house
+  green/gold pair is CVD-inseparable (ΔE 1.9 deutan) — one hue per chart
+  section, green and gold sections never adjacent, labels+counts carry
+  identity.
+- Icons taken by this batch: 🃏 🥷 🧠 🏎️.
