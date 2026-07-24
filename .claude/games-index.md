@@ -48,8 +48,9 @@ local-2p.
 | Neon Crossing | `neon-crossing/` | arcade-classic | tap, swipe | endless-highscore | lane-navigation, procedural-generation | solo | `.claude/neon-crossing.md` |
 | Neon Air Hockey | `air-hockey/` | sports | drag-paddle | match-vs-ai, local-2p | physics-sim, deflection, ai-opponent | vs-ai, local-2p | `.claude/air-hockey.md` |
 | Meteor Defense | `meteor-defense/` | defense | tap | wave-survival | wave-defense, resource-economy, combo-multiplier | solo | `.claude/meteor-defense.md` |
+| Word Circuit | `word-circuit/` | word | drag-connect | daily-challenge, timed-round | word-building, seeded-determinism | solo | `.claude/word-circuit.md` |
 
-27 games (25 in-repo + 2 external builds).
+28 games (26 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -64,19 +65,17 @@ local-2p.
   (neon-slice) · `virtual-joystick` (zed-shooter) · `par-course` (neon-golf)
   · `match-vs-ai` + `local-2p` (air hockey) · `open-sandbox` (town builder)
   · `rhythm` (piano tiles, pre-synth-era) · `hex-grid` (bubble-blaster) ·
-  `seeded-determinism` (blade-spin).
+  `seeded-determinism` (blade-spin, word-circuit daily) · `word` +
+  `drag-connect` + `daily-challenge`/`timed-round` (word-circuit).
 
 ### Absent — highest-novelty targets
-- **Genres:** `card-deck` · `word` · `trivia` · `turn-based-tactics` ·
+- **Genres:** `card-deck` · `trivia` · `turn-based-tactics` ·
   `roguelike` · `platformer` · `shmup` · `maze` · `stealth` ·
   `memory-board` · `tower-defense-classic` (build/place towers — Sorcery is
   cast-spells defense) · `driver-racing` (steer the vehicle — Horse Race is
   influence-only).
 - **Inputs:** `tilt` (iOS motion-permission prompt — low priority) ·
   `pinch-rotate`.
-- **Session shapes:** `daily-challenge` (seeded same-run-for-everyone —
-  pairs naturally with `seeded-determinism`, which blade-spin already
-  proved out).
 - **Players:** local-2p beyond air hockey (turn-based pass-and-play would
   also cover `turn-based-tactics` or `memory-board` in the same build).
 

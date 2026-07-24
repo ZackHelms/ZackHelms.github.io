@@ -231,6 +231,12 @@ Top-HUD toggle for local 2-player mode (multi-touch, second finger owns the
 top mallet; AI + records off). Synth SFX + arena music loop. Detailed
 context: `.claude/air-hockey.md`.
 
+### WORD CIRCUIT (`word-circuit/index.html`, ~660 lines + 31 KB dictionary)
+Drag-connect word hunt on a 5×5 Big-Boggle grid. Seeded DAILY board (same
+for everyone, UTC-dated) + free play; 90 s rounds; solver-computed
+found/total; backtrack undo; missed-gems reveal. Embedded curated ~5.3k-word
+dictionary. Detailed context: `.claude/word-circuit.md`.
+
 ### METEOR DEFENSE (`meteor-defense/index.html`, ~1130 lines)
 Missile-Command-style tap interceptor. Blast rings chain through meteors
 (splitters, comets, UFOs) falling on six neon buildings; per-wave ammo
