@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Grid Defense</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+:root {
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff; --red:#ff2244;
+  --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; }
+body {
+  background:var(--bg); color:var(--white);
+  font-family:'Share Tech Mono', monospace;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  position:fixed; inset:0;
+}
+#cv { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+#mute {
+  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:30;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
+  text-align:center; padding:0; touch-action:manipulation;
+}
+#overlay {
+  position:absolute; inset:0; z-index:20; display:flex;
+  flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(6,6,14,0.90); padding:20px; text-align:center;
+  padding-top:calc(var(--sat) + 20px); padding-bottom:calc(var(--sab) + 20px);
+  overflow-y:auto;
+}
+#overlay.hidden { display:none; }
+#overlay h1 {
+  font-family:'Black Ops One', sans-serif; color:var(--green);
+  font-size:clamp(1.7rem, 8vw, 2.6rem); letter-spacing:4px;
+  text-shadow:0 0 24px #39ff1466; margin-bottom:4px;
+}
+#overlay h2 {
+  font-family:'Black Ops One', sans-serif; color:var(--gold);
+  font-size:1.5rem; letter-spacing:3px; margin-bottom:8px;
+}
+.sub { color:var(--dim); font-size:0.68rem; letter-spacing:3px; margin-bottom:18px; }
+.btn {
+  font-family:'Black Ops One', sans-serif; letter-spacing:2px;
+  background:var(--panel); color:var(--green);
+  border:1px solid var(--green); border-radius:8px;
+  font-size:1.0rem; padding:13px 30px; margin:7px; min-width:230px;
+  box-shadow:0 0 18px #39ff1422; touch-action:manipulation;
+}
+.btn.alt { color:var(--blue); border-color:var(--blue); box-shadow:0 0 18px #4488ff22; }
+.btn.small { font-size:0.8rem; padding:10px 20px; min-width:180px; }
+.btn:active { transform:scale(0.96); }
+.rules { color:var(--dim); font-size:0.68rem; line-height:1.9; margin-top:14px; max-width:340px; }
+.rules b { color:var(--white); }
+.score-big {
+  font-family:'Black Ops One', sans-serif; color:var(--white);
+  font-size:2.6rem; text-shadow:0 0 24px #dde3ff44; margin:4px 0;
+}
+.stat { color:var(--dim); font-size:0.78rem; letter-spacing:1px; margin:3px 0; }
+.stat b { color:var(--gold); }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 19:07 UTC</div>
+<canvas id="cv"></canvas>
+<button id="mute">🔊</button>
+<div id="overlay"></div>
+<script>
+'use strict';
+/* =============================== CONSTANTS ============================== */
+const COLS = 9, ROWS = 13;
+const WIN_WAVE = 20;
+const START_MONEY = 90, START_LIVES = 20;
+const INTERMISSION = 8;
+// serpentine path waypoints in (row, col); enters top, exits bottom
+const WAYPOINTS = [[-1, 1], [3, 1], [3, 7], [6, 7], [6, 1], [9, 1], [9, 7], [12, 7], [13.5, 7]];
+const TOWERS = {
+  pulse: { name: 'PULSE', cost: 40, dmg: 6,  rate: 0.5, range: 2.5, col: '#39ff14', desc: 'rapid single-target' },
+  nova:  { name: 'NOVA',  cost: 70, dmg: 9,  rate: 1.1, range: 2.1, aoe: 1.3, col: '#ffc300', desc: 'splash damage' },
+  frost: { name: 'FROST', cost: 60, dmg: 2,  rate: 0.8, range: 2.2, slow: 0.45, slowT: 1.3, col: '#4488ff', desc: 'slows targets' },
+  rail:  { name: 'RAIL',  cost: 100, dmg: 30, rate: 2.2, range: 4.0, col: '#b44fff', desc: 'long-range pierce' },
+};
+const CREEPS = {
+  runt:  { hp: 14, spd: 60, bounty: 6,  r: 9,  col: '#39ff14' },
+  fast:  { hp: 10, spd: 96, bounty: 7,  r: 8,  col: '#4488ff' },
+  brute: { hp: 46, spd: 42, bounty: 12, r: 12, col: '#ffc300' },
+  swarm: { hp: 6,  spd: 72, bounty: 3,  r: 6,  col: '#dde3ff' },
+  boss:  { hp: 380, spd: 33, bounty: 60, r: 15, col: '#ff2244' },
+};
+
+/* =============================== STATE ================================== */
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const overlay = document.getElementById('overlay');
+let W = 0, H = 0, dpr = 1, safeTop = 0, safeBot = 0;
+let boardX = 0, boardY = 0, cell = 42;
+let state = 'menu';               // menu | play | over | victory
+let money = START_MONEY, lives = START_LIVES;
+let wave = 0;                     // completed waves; current = wave+1 while spawning
+let waveActive = false;
+let interT = 0;                   // intermission countdown
+let towers = [];                  // {type,r,c,lvl,cd,spent}
+let creeps = [];                  // {type,hp,maxHp,d,slow,slowT,dead}
+let spawnList = [];               // [{t,type}] relative to wave start
+let waveT = 0;
+let beams = [];                   // visual {x0,y0,x1,y1,col,t,dur,aoe?}
+let floats = [];
+let selTower = null;              // selected placed tower (index)
+let dragCard = null;              // tower type being placed
+let dragPos = null;               // {x,y} current drag point
+let shake = 0;
+let endless = false;
+let pathCells = new Set();
+let segs = [];                    // path polyline segments in px
+let totalLen = 0;
+let bestWave = +(localStorage.getItem('gridDefense.best') || 0);
+let hasWon = localStorage.getItem('gridDefense.won') === '1';
+
+/* =============================== AUDIO ================================== */
+let AC = null, sfxGain = null, musicGain = null, musicTimer = null, musicStep = 0, musicNext = 0;
+let muted = localStorage.getItem('gridDefense-mute') === '1';
+const muteBtn = document.getElementById('mute');
+function initAudio() {
+  if (AC) return;
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    sfxGain = AC.createGain(); sfxGain.gain.value = muted ? 0 : 0.4; sfxGain.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.gain.value = muted ? 0 : 0.15; musicGain.connect(AC.destination);
+    musicNext = AC.currentTime + 0.1;
+    musicTimer = setInterval(scheduleMusic, 25);
+  } catch (e) { AC = null; }
+}
+function applyMute() {
+  muteBtn.textContent = muted ? '🔇' : '🔊';
+  localStorage.setItem('gridDefense-mute', muted ? '1' : '0');
+  if (sfxGain) sfxGain.gain.value = muted ? 0 : 0.4;
+  if (musicGain) musicGain.gain.value = muted ? 0 : 0.15;
+}
+function tone(freq, dur, type, vol, when, dest) {
+  if (!AC || !isFinite(freq)) return;
+  const t = when || AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || 'triangle'; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol || 0.3, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(dest || sfxGain);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function sfxPulse() { tone(740, 0.05, 'square', 0.08); }
+function sfxNova() { tone(180, 0.2, 'sawtooth', 0.2); tone(120, 0.25, 'square', 0.12, AC && AC.currentTime + 0.05); }
+function sfxFrost() { tone(1180, 0.12, 'sine', 0.12); tone(880, 0.1, 'sine', 0.1, AC && AC.currentTime + 0.06); }
+function sfxRail() { tone(1400, 0.06, 'sawtooth', 0.15); tone(240, 0.18, 'sawtooth', 0.18, AC && AC.currentTime + 0.03); }
+function sfxBuild() { tone(330, 0.08, 'triangle', 0.25); tone(494, 0.1, 'triangle', 0.2, AC && AC.currentTime + 0.07); }
+function sfxSell() { tone(587, 0.08, 'triangle', 0.2); tone(392, 0.12, 'triangle', 0.18, AC && AC.currentTime + 0.06); }
+function sfxLeak() { tone(140, 0.3, 'sawtooth', 0.35); shake = 0.3; }
+function sfxHorn() { if (!AC) return; [262, 330, 392].forEach((f, i) => tone(f, 0.2, 'square', 0.15, AC.currentTime + i * 0.1)); }
+function sfxWin() { if (!AC) return; [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.25, 'square', 0.15, AC.currentTime + i * 0.11)); }
+function sfxLose() { if (!AC) return; [330, 262, 196, 147].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.18, AC.currentTime + i * 0.15)); }
+const BASSLINE = [43.7, 0, 43.7, 0, 49, 0, 36.7, 0];
+function scheduleMusic() {
+  if (!AC || state !== 'play') return;
+  const stepDur = 60 / 92 / 2;
+  while (musicNext < AC.currentTime + 0.12) {
+    const s = musicStep % 8;
+    if (BASSLINE[s]) tone(BASSLINE[s] * 2, stepDur * 1.6, 'triangle', 0.5, musicNext, musicGain);
+    if (waveActive && s % 2 === 1) tone(1800, 0.015, 'square', 0.04, musicNext, musicGain);
+    musicNext += stepDur; musicStep++;
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) return;
+  if (document.hidden) AC.suspend(); else AC.resume();
+});
+
+/* =============================== HELPERS ================================ */
+function bindTap(el, fn) {
+  let last = 0;
+  const h = e => {
+    e.preventDefault();
+    const now = Date.now();
+    if (now - last < 400) return;
+    last = now;
+    initAudio();
+    fn();
+  };
+  el.addEventListener('touchend', h, { passive: false });
+  el.addEventListener('click', h);
+}
+bindTap(muteBtn, () => { muted = !muted; applyMute(); });
+applyMute();
+function cellCx(c) { return boardX + c * cell + cell / 2; }
+function cellCy(r) { return boardY + r * cell + cell / 2; }
+function buildPath() {
+  pathCells = new Set();
+  segs = []; totalLen = 0;
+  for (let i = 0; i < WAYPOINTS.length - 1; i++) {
+    const [r0, c0] = WAYPOINTS[i], [r1, c1] = WAYPOINTS[i + 1];
+    const x0 = cellCx(c0), y0 = cellCy(r0), x1 = cellCx(c1), y1 = cellCy(r1);
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    segs.push({ x0, y0, x1, y1, len, start: totalLen });
+    totalLen += len;
+    // mark covered cells
+    const steps = Math.ceil(Math.max(Math.abs(r1 - r0), Math.abs(c1 - c0))) * 2 + 1;
+    for (let s = 0; s <= steps; s++) {
+      const r = Math.round(r0 + (r1 - r0) * s / steps), c = Math.round(c0 + (c1 - c0) * s / steps);
+      if (r >= 0 && r < ROWS && c >= 0 && c < COLS) pathCells.add(r + ',' + c);
+    }
+  }
+}
+function posAt(d) {
+  d = Math.max(0, d);
+  for (const s of segs) {
+    if (d <= s.start + s.len) {
+      const t = (d - s.start) / s.len;
+      return { x: s.x0 + (s.x1 - s.x0) * t, y: s.y0 + (s.y1 - s.y0) * t };
+    }
+  }
+  const s = segs[segs.length - 1];
+  return { x: s.x1, y: s.y1 };
+}
+function towerAt(r, c) { return towers.find(t => t.r === r && t.c === c) || null; }
+function canBuild(r, c) {
+  return r >= 0 && r < ROWS && c >= 0 && c < COLS && !pathCells.has(r + ',' + c) && !towerAt(r, c);
+}
+function towerRange(t) { const T = TOWERS[t.type]; return T.range * cell * (1 + 0.1 * (t.lvl - 1)); }
+function towerDmg(t) { const T = TOWERS[t.type]; return Math.round(T.dmg * (1 + 0.45 * (t.lvl - 1))); }
+function upCost(t) { return Math.round(TOWERS[t.type].cost * 0.8) * t.lvl; }
+function sellValue(t) { return Math.round(t.spent * 0.7); }
+
+/* =============================== WAVES ================================== */
+function buildSpawnList(n) {
+  // wave n (1-based) composition; deterministic
+  const list = [];
+  let t = 0;
+  const hpMul = 1 + (n - 1) * 0.22;
+  const add = (type, dt) => { list.push({ t: t += dt, type }); };
+  if (n % 5 === 0) {
+    add('boss', 0.5);
+    for (let i = 0; i < Math.min(8, 2 + n / 2); i++) add('runt', 0.9);
+    if (n >= 10) add('boss', 2);
+  } else {
+    for (let i = 0; i < 5 + n; i++) add('runt', 0.85);
+    if (n >= 2) for (let i = 0; i < Math.floor(n / 2) + 1; i++) add('fast', 0.6);
+    if (n >= 4) for (let i = 0; i < Math.floor(n / 3) + 1; i++) add('brute', 1.4);
+    if (n >= 6) for (let i = 0; i < 6 + Math.floor(n / 2); i++) add('swarm', 0.32);
+  }
+  return { list, hpMul };
+}
+function startWave() {
+  const n = wave + 1;
+  const built = buildSpawnList(n);
+  spawnList = built.list;
+  spawnHpMul = built.hpMul;
+  waveT = 0; waveActive = true;
+  sfxHorn();
+}
+let spawnHpMul = 1;
+function spawnCreep(type) {
+  const d = CREEPS[type];
+  const jitter = (Math.random() - 0.5) * cell * 0.3;
+  creeps.push({
+    type, hp: Math.round(d.hp * spawnHpMul), maxHp: Math.round(d.hp * spawnHpMul),
+    d: 0, off: jitter, slowT: 0, dead: false,
+  });
+}
+function startGame() {
+  money = START_MONEY; lives = START_LIVES;
+  wave = 0; waveActive = false; interT = 3;
+  towers = []; creeps = []; spawnList = []; beams = []; floats = [];
+  selTower = null; dragCard = null; endless = false;
+  musicStep = 0;
+  if (AC) musicNext = AC.currentTime + 0.1;
+  state = 'play';
+  overlay.classList.add('hidden');
+}
+function endGame(won) {
+  state = won ? 'victory' : 'over';
+  const reached = wave + (waveActive ? 1 : 0);
+  if (reached > bestWave) { bestWave = reached; localStorage.setItem('gridDefense.best', String(bestWave)); }
+  if (won) { hasWon = true; localStorage.setItem('gridDefense.won', '1'); sfxWin(); }
+  else sfxLose();
+  setTimeout(() => showEndScreen(won), 900);
+}
+
+/* =============================== COMBAT ================================= */
+function creepPos(c) {
+  const p = posAt(c.d);
+  // small perpendicular offset so packs don't perfectly stack
+  return { x: p.x + c.off * 0.5, y: p.y + c.off * 0.5 };
+}
+function fireTower(t) {
+  const T = TOWERS[t.type];
+  const rng = towerRange(t);
+  const tx = cellCx(t.c), ty = cellCy(t.r);
+  // classic "first" targeting: furthest along path within range
+  let target = null;
+  for (const c of creeps) {
+    if (c.dead) continue;
+    const p = creepPos(c);
+    if ((p.x - tx) * (p.x - tx) + (p.y - ty) * (p.y - ty) <= rng * rng) {
+      if (!target || c.d > target.d) target = c;
+    }
+  }
+  if (!target) return false;
+  const tp = creepPos(target);
+  const dmg = towerDmg(t);
+  if (t.type === 'nova') {
+    const aoe = T.aoe * cell;
+    beams.push({ x0: tx, y0: ty, x1: tp.x, y1: tp.y, col: T.col, t: 0, dur: 0.15, aoe: { x: tp.x, y: tp.y, r: aoe } });
+    for (const c of creeps) {
+      if (c.dead) continue;
+      const p = creepPos(c);
+      if ((p.x - tp.x) * (p.x - tp.x) + (p.y - tp.y) * (p.y - tp.y) <= aoe * aoe) damageCreep(c, dmg);
+    }
+    sfxNova();
+  } else {
+    beams.push({ x0: tx, y0: ty, x1: tp.x, y1: tp.y, col: T.col, t: 0, dur: 0.12 });
+    damageCreep(target, dmg);
+    if (t.type === 'frost') {
+      target.slowT = T.slowT + 0.3 * (t.lvl - 1);
+      sfxFrost();
+    } else if (t.type === 'rail') sfxRail();
+    else sfxPulse();
+  }
+  return true;
+}
+function damageCreep(c, dmg) {
+  if (c.dead) return;
+  c.hp -= dmg;
+  if (c.hp <= 0) {
+    c.dead = true;
+    const b = CREEPS[c.type].bounty;
+    money += b;
+    const p = creepPos(c);
+    floats.push({ x: p.x, y: p.y, txt: '+' + b, color: '#ffc300', t: 0 });
+  }
+}
+function leak(c) {
+  c.dead = true;
+  const loss = c.type === 'boss' ? 3 : 1;
+  lives -= loss;
+  sfxLeak();
+  floats.push({ x: cellCx(WAYPOINTS[WAYPOINTS.length - 1][1]), y: boardY + ROWS * cell - 8, txt: '-' + loss, color: '#ff2244', t: 0 });
+  if (lives <= 0) { lives = 0; endGame(false); }
+}
+
+/* =============================== UPDATE ================================= */
+function update(dt) {
+  if (state !== 'play') return;
+  if (waveActive) {
+    waveT += dt;
+    while (spawnList.length && spawnList[0].t <= waveT) spawnCreep(spawnList.shift().type);
+    if (spawnList.length === 0 && creeps.every(c => c.dead)) {
+      // wave cleared
+      waveActive = false;
+      wave++;
+      const bonus = 12 + wave;
+      money += bonus;
+      floats.push({ x: W / 2, y: boardY + 40, txt: 'WAVE ' + wave + ' CLEAR +' + bonus, color: '#39ff14', t: 0 });
+      if (wave >= WIN_WAVE && !endless) { endGame(true); return; }
+      interT = INTERMISSION;
+    }
+  } else {
+    interT -= dt;
+    if (interT <= 0) startWave();
+  }
+  // creeps advance
+  for (const c of creeps) {
+    if (c.dead) continue;
+    const def = CREEPS[c.type];
+    c.slowT = Math.max(0, c.slowT - dt);
+    const spd = def.spd * (c.slowT > 0 ? 0.55 : 1);
+    c.d += spd * dt;
+    if (c.d >= totalLen) leak(c);
+    if (state !== 'play') return;
+  }
+  creeps = creeps.filter(c => !c.dead);
+  // towers fire
+  for (const t of towers) {
+    t.cd -= dt;
+    if (t.cd <= 0) {
+      if (fireTower(t)) t.cd = TOWERS[t.type].rate;
+      else t.cd = 0.08;   // rescan soon
+    }
+  }
+  // fx
+  for (const b of beams) b.t += dt;
+  beams = beams.filter(b => b.t < b.dur);
+  for (const f of floats) f.t += dt;
+  floats = floats.filter(f => f.t < 1.0);
+  shake = Math.max(0, shake - dt * 2.5);
+}
+
+/* =============================== INPUT ================================== */
+let cardRects = [];               // computed each draw
+let panelBtns = {};               // upgrade/sell rects when a tower is selected
+let nextBtnRect = null;
+function cellFromPoint(x, y) {
+  const c = Math.floor((x - boardX) / cell), r = Math.floor((y - boardY) / cell);
+  return (r >= 0 && r < ROWS && c >= 0 && c < COLS) ? { r, c } : null;
+}
+function buildTower(type, r, c) {
+  const T = TOWERS[type];
+  if (money < T.cost || !canBuild(r, c)) return false;
+  money -= T.cost;
+  towers.push({ type, r, c, lvl: 1, cd: 0, spent: T.cost });
+  sfxBuild();
+  return true;
+}
+function pt(e) { const t = e.changedTouches ? e.changedTouches[0] : e; return { x: t.clientX, y: t.clientY }; }
+function onDown(e) {
+  e.preventDefault(); initAudio();
+  if (state !== 'play') return;
+  const p = pt(e);
+  for (const cr of cardRects) {
+    if (p.x >= cr.x && p.x <= cr.x + cr.w && p.y >= cr.y && p.y <= cr.y + cr.h) {
+      dragCard = cr.type; dragPos = { x: p.x, y: p.y }; selTower = null;
+      return;
+    }
+  }
+  dragPos = null;
+}
+function onMove(e) {
+  e.preventDefault();
+  if (dragCard) { const p = pt(e); dragPos = { x: p.x, y: p.y }; }
+}
+function onUp(e) {
+  e.preventDefault();
+  const p = pt(e);
+  if (state !== 'play') { dragCard = null; dragPos = null; return; }
+  if (dragCard) {
+    const cl = cellFromPoint(p.x, p.y);
+    if (cl) buildTower(dragCard, cl.r, cl.c);
+    dragCard = null; dragPos = null;
+    if (cl) return;
+  }
+  // taps
+  if (nextBtnRect && p.x >= nextBtnRect.x && p.x <= nextBtnRect.x + nextBtnRect.w &&
+      p.y >= nextBtnRect.y && p.y <= nextBtnRect.y + nextBtnRect.h && !waveActive) {
+    const bonus = Math.max(0, Math.ceil(interT)) * 2;
+    money += bonus;
+    if (bonus > 0) floats.push({ x: W / 2, y: boardY + 60, txt: 'EARLY +' + bonus, color: '#ffc300', t: 0 });
+    interT = 0;
+    return;
+  }
+  if (selTower !== null) {
+    const t = towers[selTower];
+    if (t && panelBtns.up && p.x >= panelBtns.up.x && p.x <= panelBtns.up.x + panelBtns.up.w && p.y >= panelBtns.up.y && p.y <= panelBtns.up.y + panelBtns.up.h) {
+      if (t.lvl < 3 && money >= upCost(t)) {
+        money -= upCost(t); t.spent += upCost(t); t.lvl++;
+        sfxBuild();
+      }
+      return;
+    }
+    if (t && panelBtns.sell && p.x >= panelBtns.sell.x && p.x <= panelBtns.sell.x + panelBtns.sell.w && p.y >= panelBtns.sell.y && p.y <= panelBtns.sell.y + panelBtns.sell.h) {
+      money += sellValue(t);
+      towers.splice(selTower, 1);
+      selTower = null;
+      sfxSell();
+      return;
+    }
+  }
+  const cl = cellFromPoint(p.x, p.y);
+  if (cl) {
+    const idx = towers.findIndex(t => t.r === cl.r && t.c === cl.c);
+    selTower = idx >= 0 ? idx : null;
+  } else selTower = null;
+}
+cv.addEventListener('touchstart', onDown, { passive: false });
+cv.addEventListener('touchmove', onMove, { passive: false });
+cv.addEventListener('touchend', onUp, { passive: false });
+cv.addEventListener('touchcancel', e => { e.preventDefault(); dragCard = null; dragPos = null; }, { passive: false });
+cv.addEventListener('mousedown', onDown);
+cv.addEventListener('mousemove', e => { if (dragCard) onMove(e); });
+cv.addEventListener('mouseup', onUp);
+
+/* =============================== SCREENS ================================ */
+function showMenu() {
+  state = 'menu';
+  overlay.innerHTML =
+    '<h1>GRID DEFENSE</h1>' +
+    '<div class="sub">-- HOLD THE LINE --</div>' +
+    '<button class="btn" id="b-start">DEFEND' + (bestWave ? ' · BEST WAVE ' + bestWave : '') + '</button>' +
+    '<div class="rules"><b>Drag a tower card</b> onto any open tile — the horde follows the road.<br>' +
+    '<b style="color:var(--green)">PULSE</b> rapid · <b style="color:var(--gold)">NOVA</b> splash · ' +
+    '<b style="color:var(--blue)">FROST</b> slow · <b style="color:var(--purple)">RAIL</b> sniper<br>' +
+    'Tap a tower to <b>upgrade</b> (3 levels) or sell 70%.<br>' +
+    'Call waves early for bonus cash. Survive <b>' + WIN_WAVE + ' waves</b>.' +
+    (hasWon ? '<br><span style="color:var(--gold)">★ defended — endless unlocked after win ★</span>' : '') + '</div>';
+  overlay.classList.remove('hidden');
+  bindTap(document.getElementById('b-start'), startGame);
+}
+function showEndScreen(won) {
+  const reached = wave + (waveActive ? 1 : 0);
+  overlay.innerHTML =
+    '<h2 style="color:' + (won ? 'var(--gold)' : 'var(--red)') + '">' + (won ? 'GRID SECURED' : 'GRID BREACHED') + '</h2>' +
+    '<div class="sub">' + (won ? 'all ' + WIN_WAVE + ' waves held' : 'fell on wave ' + reached) + '</div>' +
+    '<div class="score-big">' + (won ? WIN_WAVE : reached) + '<span style="font-size:1.1rem;color:var(--dim)"> waves</span></div>' +
+    '<div class="stat">BEST <b>' + bestWave + '</b></div>' +
+    '<div style="margin-top:16px">' +
+    (won ? '<button class="btn small" id="b-endless">KEEP GOING · ENDLESS</button><br>' : '') +
+    '<button class="btn small" id="b-again">' + (won ? 'NEW DEFENSE' : 'RETRY') + '</button><br>' +
+    '<button class="btn small alt" id="b-menu">MENU</button></div>';
+  overlay.classList.remove('hidden');
+  if (won) bindTap(document.getElementById('b-endless'), () => {
+    endless = true; state = 'play'; interT = INTERMISSION;
+    overlay.classList.add('hidden');
+  });
+  bindTap(document.getElementById('b-again'), startGame);
+  bindTap(document.getElementById('b-menu'), showMenu);
+}
+
+/* =============================== LAYOUT ================================= */
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cs = getComputedStyle(document.documentElement);
+  safeTop = parseFloat(cs.getPropertyValue('--sat')) || 0;
+  safeBot = parseFloat(cs.getPropertyValue('--sab')) || 0;
+  const topPad = safeTop + 52, botPad = safeBot + 108;
+  cell = Math.min((W - 8) / COLS, (H - topPad - botPad) / ROWS);
+  boardX = (W - cell * COLS) / 2;
+  boardY = topPad + Math.max(0, (H - topPad - botPad - cell * ROWS) / 2);
+  buildPath();
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* =============================== RENDER ================================= */
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function drawTower(t, x, y, ghost) {
+  const T = TOWERS[t.type];
+  const s = cell * 0.34;
+  ctx.save();
+  ctx.translate(x, y);
+  if (ghost) ctx.globalAlpha = 0.55;
+  ctx.strokeStyle = T.col; ctx.fillStyle = T.col + '2a'; ctx.lineWidth = 2;
+  ctx.shadowColor = T.col; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  if (t.type === 'pulse') { ctx.arc(0, 0, s * 0.85, 0, 7); }
+  else if (t.type === 'nova') { ctx.moveTo(0, -s); ctx.lineTo(s, s * 0.8); ctx.lineTo(-s, s * 0.8); ctx.closePath(); }
+  else if (t.type === 'frost') { ctx.moveTo(0, -s); ctx.lineTo(s, 0); ctx.lineTo(0, s); ctx.lineTo(-s, 0); ctx.closePath(); }
+  else { ctx.rect(-s * 0.7, -s, s * 1.4, s * 2); }
+  ctx.fill(); ctx.stroke();
+  ctx.shadowBlur = 0;
+  // level pips
+  for (let i = 0; i < t.lvl; i++) {
+    ctx.fillStyle = T.col;
+    ctx.fillRect(-s + i * 7, s + 4, 5, 3);
+  }
+  ctx.restore();
+}
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#06060e'; ctx.fillRect(0, 0, W, H);
+  if (state === 'menu') return;
+  let ox = 0, oy = 0;
+  if (shake > 0) { ox = (Math.random() - 0.5) * 9 * shake; oy = (Math.random() - 0.5) * 9 * shake; }
+  ctx.save(); ctx.translate(ox, oy);
+
+  // grid + path
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const x = boardX + c * cell, y = boardY + r * cell;
+    if (pathCells.has(r + ',' + c)) {
+      ctx.fillStyle = '#10102255';
+      ctx.fillStyle = '#141428';
+      ctx.fillRect(x, y, cell, cell);
+    } else {
+      ctx.strokeStyle = '#1a1a30'; ctx.lineWidth = 1;
+      ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
+    }
+  }
+  // path edges glow
+  ctx.strokeStyle = '#26264d'; ctx.lineWidth = 2;
+  for (const s of segs) {
+    ctx.beginPath(); ctx.moveTo(s.x0, s.y0); ctx.lineTo(s.x1, s.y1); ctx.stroke();
+  }
+  // exit marker
+  ctx.fillStyle = '#ff224433';
+  ctx.fillRect(boardX + 7 * cell, boardY + 12 * cell, cell, cell);
+  ctx.strokeStyle = '#ff2244'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(boardX + 7 * cell + 2, boardY + 12 * cell + 2, cell - 4, cell - 4);
+
+  // towers
+  towers.forEach((t, i) => {
+    drawTower(t, cellCx(t.c), cellCy(t.r), false);
+    if (i === selTower) {
+      ctx.strokeStyle = TOWERS[t.type].col + '66';
+      ctx.beginPath(); ctx.arc(cellCx(t.c), cellCy(t.r), towerRange(t), 0, 7); ctx.stroke();
+    }
+  });
+
+  // creeps
+  for (const c of creeps) {
+    if (c.dead) continue;
+    const def = CREEPS[c.type];
+    const p = creepPos(c);
+    ctx.fillStyle = def.col + '33'; ctx.strokeStyle = def.col; ctx.lineWidth = 2;
+    ctx.shadowColor = def.col; ctx.shadowBlur = 7;
+    ctx.beginPath();
+    if (c.type === 'boss') {
+      for (let i = 0; i < 6; i++) {
+        const a = Math.PI / 3 * i + c.d * 0.01;
+        i === 0 ? ctx.moveTo(p.x + Math.cos(a) * def.r, p.y + Math.sin(a) * def.r)
+                : ctx.lineTo(p.x + Math.cos(a) * def.r, p.y + Math.sin(a) * def.r);
+      }
+      ctx.closePath();
+    } else ctx.arc(p.x, p.y, def.r, 0, 7);
+    ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+    if (c.slowT > 0) { ctx.strokeStyle = '#4488ff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(p.x, p.y, def.r + 3, 0, 7); ctx.stroke(); }
+    // hp bar
+    const frac = c.hp / c.maxHp;
+    if (frac < 1) {
+      ctx.fillStyle = '#1a1a30'; ctx.fillRect(p.x - 10, p.y - def.r - 8, 20, 3);
+      ctx.fillStyle = frac > 0.4 ? '#39ff14' : '#ff2244';
+      ctx.fillRect(p.x - 10, p.y - def.r - 8, 20 * frac, 3);
+    }
+  }
+  // beams
+  for (const b of beams) {
+    ctx.globalAlpha = Math.max(0, 1 - b.t / b.dur);
+    ctx.strokeStyle = b.col; ctx.lineWidth = 2.5;
+    ctx.shadowColor = b.col; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.moveTo(b.x0, b.y0); ctx.lineTo(b.x1, b.y1); ctx.stroke();
+    if (b.aoe) { ctx.beginPath(); ctx.arc(b.aoe.x, b.aoe.y, b.aoe.r * (b.t / b.dur), 0, 7); ctx.stroke(); }
+    ctx.shadowBlur = 0;
+  }
+  ctx.globalAlpha = 1;
+
+  // drag ghost
+  if (dragCard && dragPos) {
+    const cl = cellFromPoint(dragPos.x, dragPos.y);
+    const T = TOWERS[dragCard];
+    if (cl) {
+      const ok = canBuild(cl.r, cl.c) && money >= T.cost;
+      const gx = cellCx(cl.c), gy = cellCy(cl.r);
+      ctx.strokeStyle = ok ? T.col + '55' : '#ff224466';
+      ctx.beginPath(); ctx.arc(gx, gy, T.range * cell, 0, 7); ctx.stroke();
+      ctx.fillStyle = ok ? T.col + '22' : '#ff224422';
+      ctx.fillRect(boardX + cl.c * cell, boardY + cl.r * cell, cell, cell);
+      drawTower({ type: dragCard, lvl: 1 }, gx, gy, true);
+    } else {
+      drawTower({ type: dragCard, lvl: 1 }, dragPos.x, dragPos.y, true);
+    }
+  }
+
+  // floats
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (const f of floats) {
+    ctx.globalAlpha = Math.max(0, 1 - f.t);
+    ctx.fillStyle = f.color; ctx.font = "13px 'Black Ops One'";
+    ctx.fillText(f.txt, f.x, f.y - f.t * 36);
+    ctx.globalAlpha = 1;
+  }
+
+  // top HUD
+  ctx.textAlign = 'left';
+  ctx.font = "13px 'Black Ops One'";
+  ctx.fillStyle = '#ffc300'; ctx.fillText('$' + money, 56, safeTop + 12);
+  ctx.fillStyle = lives > 5 ? '#39ff14' : '#ff2244'; ctx.fillText('♥' + lives, 130, safeTop + 12);
+  ctx.fillStyle = '#8899bb'; ctx.fillText('WAVE ' + Math.min(wave + (waveActive ? 1 : 0), endless ? 999 : 99) + (endless ? '' : '/' + WIN_WAVE), 190, safeTop + 12);
+  // next wave button / countdown
+  nextBtnRect = null;
+  if (!waveActive && state === 'play') {
+    const bw = 96, bh = 30;
+    nextBtnRect = { x: W - bw - 10, y: safeTop + 6, w: bw, h: bh };
+    ctx.strokeStyle = '#ffc300'; ctx.fillStyle = '#ffc30015'; ctx.lineWidth = 1.5;
+    roundRect(nextBtnRect.x, nextBtnRect.y, bw, bh, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ffc300'; ctx.font = "11px 'Black Ops One'"; ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('NEXT ' + Math.ceil(interT) + 's', nextBtnRect.x + bw / 2, nextBtnRect.y + bh / 2);
+    ctx.textBaseline = 'top';
+  }
+
+  // tower panel (selected)
+  panelBtns = {};
+  const barY = boardY + ROWS * cell + 6;
+  if (selTower !== null && towers[selTower]) {
+    cardRects = [];   // build bar hidden — its hitboxes must not swallow panel taps
+    const t = towers[selTower];
+    const T = TOWERS[t.type];
+    ctx.textAlign = 'left';
+    ctx.font = "12px 'Black Ops One'"; ctx.fillStyle = T.col;
+    ctx.fillText(T.name + ' L' + t.lvl, 12, barY + 6);
+    ctx.font = "11px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
+    ctx.fillText('dmg ' + towerDmg(t) + ' · ' + T.desc, 12, barY + 24);
+    const bw = 106, bh = 34;
+    if (t.lvl < 3) {
+      panelBtns.up = { x: W - bw * 2 - 24, y: barY + 2, w: bw, h: bh };
+      const afford = money >= upCost(t);
+      ctx.strokeStyle = afford ? '#39ff14' : '#8899bb'; ctx.fillStyle = afford ? '#39ff1415' : '#8899bb10';
+      roundRect(panelBtns.up.x, panelBtns.up.y, bw, bh, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = afford ? '#39ff14' : '#8899bb'; ctx.font = "11px 'Black Ops One'"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('UP $' + upCost(t), panelBtns.up.x + bw / 2, panelBtns.up.y + bh / 2);
+    }
+    panelBtns.sell = { x: W - bw - 12, y: barY + 2, w: bw, h: bh };
+    ctx.strokeStyle = '#ff2244'; ctx.fillStyle = '#ff224415';
+    roundRect(panelBtns.sell.x, panelBtns.sell.y, bw, bh, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ff2244'; ctx.font = "11px 'Black Ops One'"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('SELL $' + sellValue(t), panelBtns.sell.x + bw / 2, panelBtns.sell.y + bh / 2);
+    ctx.textBaseline = 'top';
+  } else {
+    // build bar
+    cardRects = [];
+    const types = Object.keys(TOWERS);
+    const cw = Math.min(88, (W - 20 - 3 * 8) / 4), ch = 58;
+    let x = (W - (cw * 4 + 8 * 3)) / 2;
+    for (const type of types) {
+      const T = TOWERS[type];
+      const afford = money >= T.cost;
+      cardRects.push({ type, x, y: barY, w: cw, h: ch });
+      ctx.strokeStyle = afford ? T.col : '#1a1a30';
+      ctx.fillStyle = afford ? T.col + '12' : '#0b0b16';
+      ctx.lineWidth = 1.5;
+      roundRect(x, barY, cw, ch, 8); ctx.fill(); ctx.stroke();
+      drawTower({ type, lvl: 1 }, x + cw / 2, barY + 22, !afford);
+      ctx.fillStyle = afford ? T.col : '#8899bb';
+      ctx.font = "10px 'Black Ops One'"; ctx.textAlign = 'center';
+      ctx.fillText('$' + T.cost, x + cw / 2, barY + ch - 15);
+      x += cw + 8;
+    }
+  }
+  ctx.restore();
+}
+
+/* =============================== LOOP =================================== */
+let lastT = performance.now();
+function loop(now) {
+  const dt = Math.min((now - lastT) / 1000, 0.1);
+  lastT = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+showMenu();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

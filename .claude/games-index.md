@@ -51,8 +51,9 @@ local-2p.
 | Word Circuit | `word-circuit/` | word | drag-connect | daily-challenge, timed-round | word-building, seeded-determinism | solo | `.claude/word-circuit.md` |
 | Neon Tactics | `neon-tactics/` | turn-based-tactics | tap | match-vs-ai, local-2p | grid-combat, line-of-sight, ai-opponent | vs-ai, local-2p | `.claude/neon-tactics.md` |
 | Star Surge | `star-surge/` | shmup | drag-steer | level-campaign | bullet-dodging, boss-fights, meta-progression | solo | `.claude/star-surge.md` |
+| Grid Defense | `grid-defense/` | tower-defense-classic | drag-place, tap | wave-survival | wave-defense, resource-economy, tower-upgrades | solo | `.claude/grid-defense.md` |
 
-30 games (28 in-repo + 2 external builds).
+31 games (29 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -73,8 +74,7 @@ local-2p.
 ### Absent — highest-novelty targets
 - **Genres:** `card-deck` · `trivia` ·
   `roguelike` · `platformer` · `maze` · `stealth` ·
-  `memory-board` · `tower-defense-classic` (build/place towers — Sorcery is
-  cast-spells defense) · `driver-racing` (steer the vehicle — Horse Race is
+  `memory-board` · `driver-racing` (steer the vehicle — Horse Race is
   influence-only).
 - **Inputs:** `tilt` (iOS motion-permission prompt — low priority) ·
   `pinch-rotate`.
@@ -82,8 +82,14 @@ local-2p.
   turn-based (neon-tactics pass-and-play); a `memory-board` or card game
   could add a third flavor.
 
-### Example picks this table would have suggested
-A `word` or `card-deck` game (absent genre, calm pacing contrast), a
-pass-and-play `turn-based-tactics` board (absent genre + rare local-2p), a
-`shmup` with `drag-steer` (absent genre, proven input), or a
-`daily-challenge` mode retrofit onto an existing seeded game.
+### Example picks this table would suggest next
+A `card-deck` game (absent genre, calm pacing — tri-peaks solitaire or a
+push-your-luck hand), a `stealth`/`maze` hybrid (two absent genres in one
+build), a `memory-board` with pass-and-play (absent genre + third local-2p
+flavor), a `driver-racing` top-down time-trialer (absent genre), or a
+`daily-challenge` mode retrofit onto another seeded game (blade-spin
+already has `seeded-determinism`; word-circuit proved the daily pattern).
+
+*(The 2026-07-24 batch — word-circuit, neon-tactics, star-surge,
+grid-defense — filled the former `word`, `turn-based-tactics`, `shmup`,
+`tower-defense-classic`, and `daily-challenge` gaps.)*

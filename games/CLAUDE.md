@@ -231,6 +231,13 @@ Top-HUD toggle for local 2-player mode (multi-touch, second finger owns the
 top mallet; AI + records off). Synth SFX + arena music loop. Detailed
 context: `.claude/air-hockey.md`.
 
+### GRID DEFENSE (`grid-defense/index.html`, ~780 lines)
+Classic tower defense: drag PULSE/NOVA/FROST/RAIL towers beside a
+serpentine road, 3 upgrade levels + 70% sell, first-targeting instant-hit
+beams, 20 deterministic waves (bosses every 5th) with early-call bonus,
+then optional endless. Best wave + win persisted. Detailed context:
+`.claude/grid-defense.md`.
+
 ### STAR SURGE (`star-surge/index.html`, ~750 lines)
 Vertical shmup: drag-steer, auto-fire, 5 stages × 3 waves + boss (bosses
 are persisted checkpoints). Drones/shooters/spinners/tankers, aimed and
