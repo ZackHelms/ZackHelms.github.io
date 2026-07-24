@@ -56,6 +56,41 @@ the fuller gameplay-driving pattern and the traps hit.
 - iOS fires both `touchend` and `click` for one tap on overlay elements —
   the games debounce (400 ms) their start/retry handlers for this; tests
   should tap once and not assume a second event is a second intent.
+- **Stress sweeps mutate persistence:** a long simulated-combat sweep can
+  legitimately kill bosses and advance persisted checkpoints/bests. Later
+  assertions must compare against the stored localStorage value, never a
+  hard-coded stage/score from earlier in the test file (hit in star-surge:
+  "CONTINUE · STAGE 2" had become stage 3 by the time the menu re-rendered).
+- `page.reload()` wipes helpers injected via `page.evaluate` — wrap helper
+  installation in a function and re-run it after every reload.
+
+## Real bug classes the drives caught (2026-07-24 four-game batch)
+
+Unlike the traps above, these were genuine game bugs — the drive was right.
+All four games shipped only after a scripted drive failed first:
+
+- **`findIndex` −1 collides with computed indices.** Word-circuit's
+  backtrack check `idx === path.length - 2` matched a *new* cell whenever
+  the path had 1 tile (both sides −1) — every second letter popped the path
+  empty. Guard `idx !== -1` before comparing findIndex results to computed
+  positions.
+- **Mode flags must be cleared in the single transition function.** Neon
+  Tactics' `aiActive` was only cleared on match end; `doAction →
+  maybeAutoEnd → endTurn` mid-AI-turn left it set, so the AI kept acting on
+  the player's turn. Rule: whatever function performs the state transition
+  (`endTurn`) owns resetting every mode flag.
+- **setTimeout racing a per-frame director loop.** Star-surge's post-boss
+  stage advance via `setTimeout(startWave, 1900)` raced the wave director's
+  own "queue empty + field clear → advance" check → double-spawn/skipped
+  wave. Sequence game-state through an explicit flag the director consumes
+  (`pendingStage`), never a parallel timer.
+- **Stale canvas-UI hitboxes** (grid-defense; now a Shared Conventions row
+  in `games/CLAUDE.md`).
+
+Also: error-free smoke + green drives did NOT catch word-circuit's canvas
+rendering at 2× zoom (missing `width:100%;height:100%` CSS — Shared
+Conventions row). Only the mid-play **screenshot review** exposed it —
+treat the screenshot as part of the gate, not just report garnish.
 
 ## Related SOP
 

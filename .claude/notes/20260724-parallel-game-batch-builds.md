@@ -100,3 +100,22 @@ review (each agent's own drive found-and-fixed its bugs pre-handoff;
   `--autoplay-policy=no-user-gesture-required` (detail in
   `20260724-headless-mobile-game-testing.md`).
 - Icons taken by this batch: 🏗️ 🗡️ 🐸 🏒 ☄️.
+
+## Third batch (2026-07-24, four games via /create-new-games 4: Word Circuit, Neon Tactics, Star Surge, Grid Defense — commits a43442c…561d098)
+
+**Sequential orchestrator-built variant** — no subagents; the session built,
+tested, documented, and committed each game in turn on the WIP branch, then
+merged to `main` once. Works fine at N=4 and trades wall-clock for tighter
+quality control: unlike the parallel batches (zero orchestrator-found bugs
+because agents fixed their own), this batch's scripted drives caught **four
+real game bugs pre-ship** — catalogued in
+`20260724-headless-mobile-game-testing.md` § Real bug classes. Notes:
+
+- Concept picks came from `.claude/games-index.md` § Coverage summary (the
+  batch closed the `word`, `turn-based-tactics`, `shmup`,
+  `tower-defense-classic`, and `daily-challenge` gaps); refresh the
+  coverage summary in each game's own commit — the per-commit rule kept the
+  index honest mid-batch.
+- Per-game commit + stamp-badge + smoke on {game, hub} per commit scales
+  cleanly; final Pages verification once after the `main` merge.
+- Icons taken by this batch: 🔤 ♟️ 🚀 🗼.

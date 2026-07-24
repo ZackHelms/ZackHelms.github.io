@@ -16,6 +16,8 @@ Detailed context for individual games lives in `.claude/<game>.md` at the repo r
 | Input | Touch + mouse events, `user-select:none`, `touch-action:manipulation` |
 | No dependencies | Zero external JS libs; Google Fonts is the only external resource |
 | Responsive | Portrait/landscape via `@media (orientation:landscape)` or `100dvh` layout; a canvas inside a flex column needs `min-height:0` or its intrinsic 300:150 ratio overflows landscape |
+| Canvas sizing | A fullscreen canvas needs explicit CSS `width:100%;height:100%` — `position:absolute;inset:0` alone does NOT stretch a replaced element, it renders at its intrinsic (dpr-scaled) attribute size and the page looks 2–3× zoomed |
+| Canvas-drawn UI | Buttons/cards drawn on the canvas keep their hitbox arrays (`cardRects`-style) in JS — any branch that hides the widgets MUST clear the arrays too, or invisible stale hitboxes swallow taps (2026-07-24 grid-defense bug) |
 | Audio | WebAudio-synthesized only (no audio files): lazy AudioContext on first gesture (iOS), `sfxGain`/`musicGain` masters, oscillator/noise SFX + lookahead-sequencer music loop, persisted 🔊/🔇 mute top-left, suspend on `visibilitychange` (SFX+music standard since the 2026-07-24 five-game batch) |
 | Build badge | Every game has a `<div id="build-badge">` right after `<body>` — see below |
 
