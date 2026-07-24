@@ -78,6 +78,21 @@ html, body {
   animation:pulse 1.4s ease-in-out infinite;
 }
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.45;} }
+.hidden { display:none !important; }
+.ov-row {
+  display:flex; gap:10px; flex-wrap:wrap; justify-content:center;
+  max-width:340px; margin-bottom:18px;
+}
+.ov-btn {
+  font-family:'Share Tech Mono', monospace;
+  font-size:0.8rem; letter-spacing:2px; color:var(--white);
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  padding:12px 18px; cursor:pointer; touch-action:manipulation;
+}
+.ov-btn.ck {
+  color:var(--green); border-color:rgba(57,255,20,0.45);
+  box-shadow:0 0 12px rgba(57,255,20,0.15);
+}
 #banner {
   position:fixed; left:0; right:0; top:24%; z-index:40; text-align:center;
   pointer-events:none; opacity:0; transition:opacity 0.25s;
@@ -97,7 +112,7 @@ html, body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 13:26 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 13:45 UTC</div>
 <div id="app">
   <div id="hud">
     <div id="h-level"><div class="hud-label">LEVEL</div><div class="hud-val" id="v-level">1</div></div>
@@ -117,7 +132,12 @@ html, body {
     TAP TO HURL A BLADE INTO THE SPINNING DISC<br>
     STICK ALL YOUR BLADES TO CLEAR THE LEVEL<br>
     DON'T HIT STUCK BLADES OR SPIKES<br>
-    GEMS = +25 &bull; EVERY 5TH DISC IS A BOSS
+    GEMS = +25 &bull; EVERY 5TH DISC IS A BOSS<br>
+    CHECKPOINT AT EVERY BOSS LEVEL
+  </div>
+  <div id="start-ck" class="hidden">
+    <div class="ov-sub" style="margin-bottom:10px;">START FROM</div>
+    <div class="ov-row" id="start-row"></div>
   </div>
   <div class="ov-tap">TAP TO THROW</div>
 </div>
@@ -126,7 +146,8 @@ html, body {
   <div class="ov-title" style="color:var(--red); text-shadow:0 0 24px rgba(255,34,68,0.7);" id="d-title">CLANG!</div>
   <div class="ov-score" id="d-score">0</div>
   <div class="ov-sub" id="d-sub"></div>
-  <div class="ov-tap">TAP TO RETRY</div>
+  <div class="ov-row hidden" id="dead-row"></div>
+  <div class="ov-tap" id="dead-tap">TAP TO RETRY</div>
 </div>
 
 <script>
@@ -166,6 +187,8 @@ let particles = [], texts = [];
 let hitFlash = null;                    // {kind:'spike'|'blade', i, t}
 let shake = 0;
 let best = 0, bestLvl = 0, gemsLife = 0, gemsRun = 0;
+let ckpt = 0;                           // highest checkpoint level unlocked (5, 10, 15, ...)
+let deadCkpt = 0;                       // checkpoint offered on the current death overlay (0 = none)
 let muted = false;
 
 const $ = id => document.getElementById(id);
@@ -179,6 +202,8 @@ function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 best = +(lsGet('blade-spin-best') || 0);
 bestLvl = +(lsGet('blade-spin-bestlvl') || 0);
 gemsLife = +(lsGet('blade-spin-gems') || 0);
+// back-compat: players with a pre-checkpoint bestLvl get their earned checkpoints
+ckpt = Math.max(+(lsGet('blade-spin-ckpt') || 0), Math.floor(bestLvl / 5) * 5);
 muted = lsGet('blade-spin-mute') === '1';
 
 // ------------------------------------------------------------- audio
@@ -236,6 +261,7 @@ const sndGem      = () => { beep(880, 0.09, 'sine', 0.09); beep(1174.66, 0.09, '
 const sndClang    = () => { beep(317, 0.18, 'square', 0.12, 260); beep(473, 0.16, 'square', 0.09, 380, 0.005); beep(92, 0.34, 'sawtooth', 0.1, 55, 0.02); noiseSfx(0.14, 0.12, 2600, 900); };
 const sndClear    = () => { noiseSfx(0.22, 0.1, 900, 4200); beep(523.25, 0.1, 'triangle', 0.1); beep(659.25, 0.1, 'triangle', 0.1, 0, 0.09); beep(783.99, 0.12, 'triangle', 0.1, 0, 0.18); beep(1046.5, 0.2, 'triangle', 0.1, 0, 0.27); };
 const sndBossRiser = () => { beep(55, 0.9, 'sawtooth', 0.12, 220); beep(58, 0.9, 'sawtooth', 0.08, 226, 0.02); };
+const sndCkpt     = () => { beep(523.25, 0.08, 'sine', 0.09); beep(783.99, 0.14, 'sine', 0.09, 0, 0.09); };
 const sndOver     = () => { beep(330, 0.4, 'sawtooth', 0.11, 110); beep(165, 0.5, 'square', 0.08, 60, 0.12); };
 
 // music: 16-step sequencer @120BPM (16ths, 0.125s/step), lookahead scheduler.
@@ -416,13 +442,19 @@ function applyLevel(n) {
   state = 'drop';
   if (c.boss) { showBanner('⚔ ' + c.name + ' ⚔', 1800, true); sndBossRiser(); }
   else if (n > 1) showBanner('LEVEL ' + n, 800, false);
+  // every 5th level (= every boss) is a checkpoint, unlocked the moment it's reached
+  if (n >= 5 && n % 5 === 0) {
+    if (n > ckpt) { ckpt = n; lsSet('blade-spin-ckpt', ckpt); refreshStartRow(); }
+    addText(DISC_CX, DISC_CY + disc.r + 14, 'CHECKPOINT ✓', '#39ff14');
+    sndCkpt();
+  }
   updateHud();
 }
-function startRun() {
-  score = 0; gemsRun = 0;
+function startRun(fromLevel) {
+  score = 0; gemsRun = 0; deadCkpt = 0;
   freeBlades = []; shards = []; particles = []; texts = [];
   startMusic();
-  applyLevel(1);
+  applyLevel(fromLevel || 1);
 }
 function updateHud() {
   $('v-level').textContent = level;
@@ -511,6 +543,19 @@ function doCollision(hit) {
     $('d-score').textContent = score + (score >= best && score > 0 ? '  ★ BEST' : '');
     $('d-sub').innerHTML = 'LEVEL ' + level + ' &bull; GEMS +' + gemsRun +
       '<br>BEST ' + best + ' &bull; BEST LEVEL ' + bestLvl;
+    // highest checkpoint this run passed through; 0 = died before level 5
+    deadCkpt = Math.floor(level / 5) * 5;
+    const row = $('dead-row');
+    row.innerHTML = '';
+    if (deadCkpt > 0) {
+      row.appendChild(mkBtn('CHECKPOINT · LV ' + deadCkpt, 'ck', () => beginRun(deadCkpt)));
+      row.appendChild(mkBtn('FROM START', '', () => beginRun(1)));
+      row.classList.remove('hidden');
+      $('dead-tap').classList.add('hidden');
+    } else {
+      row.classList.add('hidden');
+      $('dead-tap').classList.remove('hidden');
+    }
     $('ov-dead').classList.remove('hidden');
     updateHud();
   }, 950);
@@ -580,14 +625,50 @@ window.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); audio(); throwBlade(); }
 });
 
+function beginRun(fromLevel) {
+  $('ov-start').classList.add('hidden');
+  $('ov-dead').classList.add('hidden');
+  startRun(fromLevel);
+}
+// overlay button factory: debounced touch+click, never bubbles to the
+// overlay's tap-anywhere handler
+function mkBtn(label, cls, fn) {
+  const b = document.createElement('button');
+  b.className = 'ov-btn' + (cls ? ' ' + cls : '');
+  b.textContent = label;
+  const h = e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const now = performance.now();
+    if (now - lastTap < 400) return;
+    lastTap = now;
+    audio();
+    fn();
+  };
+  b.addEventListener('touchend', h, { passive: false });
+  b.addEventListener('click', h);
+  return b;
+}
+function refreshStartRow() {
+  const row = $('start-row');
+  if (!row) return;
+  row.innerHTML = '';
+  if (ckpt < 5) { $('start-ck').classList.add('hidden'); return; }
+  row.appendChild(mkBtn('LV 1', '', () => beginRun(1)));
+  for (let l = 5; l <= ckpt; l += 5)
+    row.appendChild(mkBtn('LV ' + l, 'ck', () => beginRun(l)));
+  $('start-ck').classList.remove('hidden');
+}
 function uiTap(e) {
   e.preventDefault();
   const now = performance.now();
   if (now - lastTap < 400) return;      // iOS fires touchend AND click per tap
   lastTap = now;
   audio();
-  if (state === 'title') { $('ov-start').classList.add('hidden'); startRun(); }
-  else if (state === 'over' && overT > 0.7) { $('ov-dead').classList.add('hidden'); startRun(); }
+  if (state === 'title') beginRun(1);
+  // with checkpoint buttons showing, retry needs an explicit choice —
+  // tap-anywhere stays only for the pre-checkpoint (deadCkpt 0) overlay
+  else if (state === 'over' && overT > 0.7 && deadCkpt === 0) beginRun(1);
 }
 $('ov-start').addEventListener('touchend', uiTap, { passive: false });
 $('ov-start').addEventListener('click', uiTap);
@@ -883,6 +964,7 @@ resize();
 applyLevel(1);          // populate a disc behind the title overlay
 state = 'title';
 discY = DISC_CY;
+refreshStartRow();
 updateHud();
 requestAnimationFrame(frame);
 </script>

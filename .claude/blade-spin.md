@@ -69,7 +69,31 @@ percussion, +50 clear bonus.
 (boss total 61 with the last stick). localStorage (all try/catch via
 `lsGet/lsSet`): `blade-spin-best`, `blade-spin-bestlvl` (both written on
 game over), `blade-spin-gems` (lifetime, written on collect — HUD shows
-lifetime), `blade-spin-mute`.
+lifetime), `blade-spin-ckpt` (see Checkpoints), `blade-spin-mute`.
+
+## Checkpoints (every 5 levels)
+
+- Every multiple-of-5 level (= every boss) is a checkpoint, unlocked the
+  moment `applyLevel(n)` runs for it — not on clear — with a
+  `CHECKPOINT ✓` float text + `sndCkpt` chime. `ckpt` (top-level let)
+  holds the highest unlocked level; persisted to `blade-spin-ckpt` only
+  when it grows. Back-compat at boot:
+  `ckpt = max(stored ckpt, floor(bestLvl/5)*5)` so pre-checkpoint players
+  keep their earned progress.
+- `startRun(fromLevel)` starts a fresh run (score 0, gemsRun 0) at any
+  level; `beginRun(lv)` is the overlay-facing wrapper (hides both
+  overlays). Starting *from* a checkpoint can't inflate `ckpt` (only a
+  strictly higher multiple of 5 raises it); `best` can't be farmed either
+  — a later start skips all earlier levels' points.
+- **Death overlay:** `deadCkpt = floor(level/5)*5` at death. If > 0 the
+  overlay shows two `mkBtn` buttons — `CHECKPOINT · LV n` / `FROM START` —
+  and **tap-anywhere retry is disabled** (uiTap checks `deadCkpt === 0`);
+  if 0, the classic TAP TO RETRY tap-anywhere path is unchanged.
+- **Start overlay:** `refreshStartRow()` builds `#start-row` (`LV 1` +
+  one button per unlocked checkpoint) inside `#start-ck`, hidden while
+  `ckpt < 5`. Rebuilt at boot and whenever ckpt grows.
+- `mkBtn` buttons debounce via the shared `lastTap` and `stopPropagation`
+  so a button tap never doubles into the overlay's tap-anywhere handler.
 
 ## State machine & architecture
 
@@ -82,7 +106,7 @@ advance `flying.tipY`, resolve on edge crossing).
 
 Key top-level lets (all reachable from `page.evaluate`): `state score level
 K bladesLeft disc discY stuck spikes gems flying freeBlades shards particles
-texts hitFlash best bestLvl gemsLife muted ac musicTimer`.
+texts hitFlash best bestLvl gemsLife ckpt deadCkpt muted ac musicTimer`.
 
 Functions: `genLevel`/`discOmega`/`readyTipY` (generator) ·
 `applyLevel`/`startRun`/`levelClear`/`doCollision` (flow) ·
@@ -147,6 +171,12 @@ scratchpad `blade-spin/blade-drive.cjs` (playwright-core, iPhone 13 profile,
   `state='paused'` after any call that mutates it.
 - `resolveImpact()` collision path needs no `flying` object, but stick math
   assumes the tip is at the disc edge — always set `flying` before calling.
+- Checkpoint drive (scratchpad `blade-spin/ckpt-drive.cjs`, 24 assertions):
+  death-overlay buttons appear ~950 ms after the collision — wait ≥1.2 s
+  before querying `#dead-row`. Reset `lastTap = 0` before each scripted
+  tap/click or the shared 400 ms debounce eats it. Buttons are activated
+  with a dispatched `MouseEvent` (`cancelable:true`); tap-anywhere-disabled
+  is asserted by tapping the overlay and checking `state === 'over'` holds.
 
 ## Gotchas / follow-up ideas
 

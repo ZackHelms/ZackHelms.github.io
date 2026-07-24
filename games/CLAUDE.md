@@ -209,11 +209,13 @@ overhang slices off as debris, perfect drops (±2.5 u window) chain combos
 and every 3rd regrows width. Speed ramps to a hard cap; zero overlap ends
 the run. Synth SFX + synthwave music loop. Detailed context: `.claude/neon-stack.md`.
 
-### BLADE SPIN (`blade-spin/index.html`, ~890 lines)
+### BLADE SPIN (`blade-spin/index.html`, ~950 lines)
 Knife-Hit-style timing thrower. Tap to hurl blades into a spinning disc;
 hitting stuck blades/spikes ends the run, gems are bonus pickups. Four
 deterministic rotation patterns, seeded per-level layouts, boss discs every
-5th level. Synth SFX + percussive music loop. Detailed context: `.claude/blade-spin.md`.
+5th level; every boss level is a persisted checkpoint (die → restart from
+checkpoint or start; start screen offers any reached checkpoint). Synth SFX
++ percussive music loop. Detailed context: `.claude/blade-spin.md`.
 
 ### NEON CROSSING (`neon-crossing/index.html`, ~1080 lines)
 Crossy-Road-style endless lane hopper. Tap/swipe hops across grass, roads,
