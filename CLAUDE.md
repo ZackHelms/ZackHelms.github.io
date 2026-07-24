@@ -24,6 +24,9 @@ It is fine to push directly to the `main` branch for this repository. No pull re
   `games/index.html`). Make changes in qntmchmst, then publish from there.
 ## Adding a new game
 
+`/create-new-games <N>` runs the whole batch commission (concept picks from
+coverage gaps → build → test → ship → report). Manual steps:
+
 0. Choose the concept from the coverage gaps in `.claude/games-index.md`
    (the games catalog + facet coverage map)
 1. Create `games/<slug>.html` (or `games/<slug>/index.html` in its own
