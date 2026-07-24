@@ -290,6 +290,13 @@ for everyone, UTC-dated) + free play; 90 s rounds; solver-computed
 found/total; backtrack undo; missed-gems reveal. Embedded curated ~5.3k-word
 dictionary. Detailed context: `.claude/word-circuit.md`.
 
+### NEON TRIPEAKS (`tri-peaks/index.html`, ~620 lines)
+Classic 28-card tri-peaks solitaire. Tap uncovered cards one rank up/down
+from the waste (K↔A wraps); streak bonuses, peak-clear bonuses, leftover
+stock pays out on a win. Fairness-checked deterministic deals; seeded
+DAILY DEAL + free play. Synth SFX + swung lounge music loop. Detailed
+context: `.claude/tri-peaks.md`.
+
 ### METEOR DEFENSE (`meteor-defense/index.html`, ~1130 lines)
 Missile-Command-style tap interceptor. Blast rings chain through meteors
 (splitters, comets, UFOs) falling on six neon buildings; per-wave ammo

@@ -68,6 +68,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Neon Tactics (`games/neon-tactics/`) | `.claude/neon-tactics.md` | Any work on the squad tactics — rules engine, LOS, AI scoring, pass-and-play flow |
 | Star Surge (`games/star-surge/`) | `.claude/star-surge.md` | Any work on the shmup — wave director, boss phases, powerups, bullet caps |
 | Grid Defense (`games/grid-defense/`) | `.claude/grid-defense.md` | Any work on the tower defense — path/waypoints, tower table, wave composition, drag-place UX |
+| Neon Tripeaks (`games/tri-peaks/`) | `.claude/tri-peaks.md` | Any work on the tripeaks solitaire — board geometry/exposure, deal fairness, streak scoring, daily seed |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 

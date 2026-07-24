@@ -52,8 +52,9 @@ local-2p.
 | Neon Tactics | `neon-tactics/` | turn-based-tactics | tap | match-vs-ai, local-2p | grid-combat, line-of-sight, ai-opponent | vs-ai, local-2p | `.claude/neon-tactics.md` |
 | Star Surge | `star-surge/` | shmup | drag-steer | level-campaign | bullet-dodging, boss-fights, meta-progression | solo | `.claude/star-surge.md` |
 | Grid Defense | `grid-defense/` | tower-defense-classic | drag-place, tap | wave-survival | wave-defense, resource-economy, tower-upgrades | solo | `.claude/grid-defense.md` |
+| Neon Tripeaks | `tri-peaks/` | card-deck | tap | quick-round, daily-challenge | card-chain, combo-multiplier, seeded-determinism | solo | `.claude/tri-peaks.md` |
 
-31 games (29 in-repo + 2 external builds).
+32 games (30 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -68,11 +69,13 @@ local-2p.
   (neon-slice) · `virtual-joystick` (zed-shooter) · `par-course` (neon-golf)
   · `match-vs-ai` + `local-2p` (air hockey, neon-tactics) · `open-sandbox` (town builder)
   · `rhythm` (piano tiles, pre-synth-era) · `hex-grid` (bubble-blaster) ·
-  `seeded-determinism` (blade-spin, word-circuit daily) · `word` +
-  `drag-connect` + `daily-challenge`/`timed-round` (word-circuit).
+  `word` + `drag-connect` + `timed-round` (word-circuit) · `card-deck` +
+  `quick-round` (tri-peaks) · `daily-challenge` (word-circuit, tri-peaks) ·
+  `seeded-determinism` (blade-spin, word-circuit, tri-peaks — an
+  established house pattern now).
 
 ### Absent — highest-novelty targets
-- **Genres:** `card-deck` · `trivia` ·
+- **Genres:** `trivia` ·
   `roguelike` · `platformer` · `maze` · `stealth` ·
   `memory-board` · `driver-racing` (steer the vehicle — Horse Race is
   influence-only).
