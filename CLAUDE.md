@@ -50,6 +50,10 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Gravity Runner (`games/gravity-runner/`) | `.claude/gravity-runner.md` | Any work on the gravity-flip endless runner — pattern spawning, fairness |
 | Brick Breaker (`games/brick-breaker/`) | `.claude/brick-breaker.md` | Any work on the brick breaker — level maps, brick types, power-ups |
 | Neon Snake Arena (`games/snake-arena/`) | `.claude/snake-arena.md` | Any work on the analog snake — body path, combo, mine pacing |
+| Neon Slice (`games/neon-slice/`) | `.claude/neon-slice.md` | Any work on the swipe slicer — volley fairness, blade hit test, combo/slow-mo |
+| Bubble Blaster (`games/bubble-blaster/`) | `.claude/bubble-blaster.md` | Any work on the bubble shooter — hex-grid math, snap/match/drop, row pressure |
+| Block Fit (`games/block-fit/`) | `.claude/block-fit.md` | Any work on the drag puzzle — piece set, drag-lift UX, clears, dead-deal guard |
+| Sky Hopper (`games/sky-hopper/`) | `.claude/sky-hopper.md` | Any work on the vertical bouncer — physics, generator reachability, platform mix |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 

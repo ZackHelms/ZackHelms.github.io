@@ -174,6 +174,34 @@ body, combo-multiplier orb eating, timed gold orbs, telegraphed mine
 hazards, wall/self death. Best-score persistence.
 Detailed context: `.claude/snake-arena.md`.
 
+### GATE BREAKER (`gate-breaker/index.html`, ~2500 lines)
+Dungeon-crawler RPG: character progression, combat, gear systems, boss
+battles, six save slots. No dedicated `.claude/` context file yet.
+
+### NEON SLICE (`neon-slice/index.html`, ~730 lines)
+Fruit-Ninja-style swipe slicer. Gems arc up in volleys; fast swipes slice
+(blade-speed threshold), one-swipe chains bank combo bonuses with slow-mo,
+bombs cost a life, dropped gems cost a life (3 hearts), frenzy volleys.
+Detailed context: `.claude/neon-slice.md`.
+
+### BUBBLE BLASTER (`bubble-blaster/index.html`, ~870 lines)
+Endless hex-grid bubble shooter. Drag-aim with one-bounce dotted guide +
+snap-cell ghost, 3+ pops, detached clusters fall for 2x, streak multiplier
+x1–x5, board drops a row every 6 shots, color unlocks at score milestones,
+colorblind glyphs baked into sprites. Detailed context: `.claude/bubble-blaster.md`.
+
+### BLOCK FIT (`block-fit/index.html`, ~750 lines)
+1010!-style drag-and-place puzzle. 9×9 board, 3-slot tray, 19-shape piece
+set, dragged piece floats 90 px above the finger with green/red snap ghost,
+row+column clears with streak bonuses, no-dead-deal dealing, out-of-moves
+game over. Detailed context: `.claude/block-fit.md`.
+
+### SKY HOPPER (`sky-hopper/index.html`, ~790 lines)
+Doodle-Jump-style vertical bouncer. Auto-bounce, hold+drag relative
+steering with screen wrap, static/moving/crumble platforms + springs,
+gold orbs and comets, upward-only camera, reachability-guaranteed
+generator, milestone hue shifts. Detailed context: `.claude/sky-hopper.md`.
+
 ---
 
 ## Adding a New Game
