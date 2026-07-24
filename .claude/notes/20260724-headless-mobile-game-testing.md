@@ -32,6 +32,15 @@ the fuller gameplay-driving pattern and the traps hit.
   directions per level and assert (a) it never escapes the playfield bounds
   and (b) it always comes to rest — catches tunneling and energy leaks
   cheaply (54 shots across Neon Golf's 9 holes ran in seconds).
+- **WebAudio assertions:** launch Chromium with
+  `--autoplay-policy=no-user-gesture-required`, then after a synthetic
+  start tap assert the top-level `AC` exists with `state==='running'`, the
+  music scheduler interval id is set, and the sequencer step counter
+  advances between two sampled evaluates. Mute-toggle tests: tap the DOM
+  button, assert the muted flag + localStorage `<slug>-mute` + master gain
+  values, then reload and assert persistence. "Comes to rest" sweeps on
+  games with AI (air hockey) need the AI's speed param zeroed via its real
+  config — a live AI legitimately keeps rallying forever.
 
 ## Test-design traps hit (the game was right, the test was wrong)
 
