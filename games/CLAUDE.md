@@ -231,6 +231,13 @@ Top-HUD toggle for local 2-player mode (multi-touch, second finger owns the
 top mallet; AI + records off). Synth SFX + arena music loop. Detailed
 context: `.claude/air-hockey.md`.
 
+### NEON TACTICS (`neon-tactics/index.html`, ~700 lines)
+Turn-based squad tactics, 7×9 grid: 2 strikers, sniper (Bresenham LOS,
+walls block), tank, medic vs a mirrored squad. Move+act per unit, seeded
+mirrored wall layouts, destroy the enemy core (8 HP) or wipe the squad.
+Greedy scored AI with exposure penalty; 2P pass-and-play with handoff
+screens; vs-AI W-L record. Detailed context: `.claude/neon-tactics.md`.
+
 ### WORD CIRCUIT (`word-circuit/index.html`, ~660 lines + 31 KB dictionary)
 Drag-connect word hunt on a 5×5 Big-Boggle grid. Seeded DAILY board (same
 for everyone, UTC-dated) + free play; 90 s rounds; solver-computed

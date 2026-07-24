@@ -49,8 +49,9 @@ local-2p.
 | Neon Air Hockey | `air-hockey/` | sports | drag-paddle | match-vs-ai, local-2p | physics-sim, deflection, ai-opponent | vs-ai, local-2p | `.claude/air-hockey.md` |
 | Meteor Defense | `meteor-defense/` | defense | tap | wave-survival | wave-defense, resource-economy, combo-multiplier | solo | `.claude/meteor-defense.md` |
 | Word Circuit | `word-circuit/` | word | drag-connect | daily-challenge, timed-round | word-building, seeded-determinism | solo | `.claude/word-circuit.md` |
+| Neon Tactics | `neon-tactics/` | turn-based-tactics | tap | match-vs-ai, local-2p | grid-combat, line-of-sight, ai-opponent | vs-ai, local-2p | `.claude/neon-tactics.md` |
 
-28 games (26 in-repo + 2 external builds).
+29 games (27 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -63,21 +64,22 @@ local-2p.
 ### Rare — one game each; a second with a different spin is fair game
 - `hold-charge` (pinball plunger) · `two-thumb` (pinball) · `swipe`-led
   (neon-slice) · `virtual-joystick` (zed-shooter) · `par-course` (neon-golf)
-  · `match-vs-ai` + `local-2p` (air hockey) · `open-sandbox` (town builder)
+  · `match-vs-ai` + `local-2p` (air hockey, neon-tactics) · `open-sandbox` (town builder)
   · `rhythm` (piano tiles, pre-synth-era) · `hex-grid` (bubble-blaster) ·
   `seeded-determinism` (blade-spin, word-circuit daily) · `word` +
   `drag-connect` + `daily-challenge`/`timed-round` (word-circuit).
 
 ### Absent — highest-novelty targets
-- **Genres:** `card-deck` · `trivia` · `turn-based-tactics` ·
+- **Genres:** `card-deck` · `trivia` ·
   `roguelike` · `platformer` · `shmup` · `maze` · `stealth` ·
   `memory-board` · `tower-defense-classic` (build/place towers — Sorcery is
   cast-spells defense) · `driver-racing` (steer the vehicle — Horse Race is
   influence-only).
 - **Inputs:** `tilt` (iOS motion-permission prompt — low priority) ·
   `pinch-rotate`.
-- **Players:** local-2p beyond air hockey (turn-based pass-and-play would
-  also cover `turn-based-tactics` or `memory-board` in the same build).
+- **Players:** local-2p is now covered real-time (air hockey) and
+  turn-based (neon-tactics pass-and-play); a `memory-board` or card game
+  could add a third flavor.
 
 ### Example picks this table would have suggested
 A `word` or `card-deck` game (absent genre, calm pacing contrast), a
