@@ -223,11 +223,13 @@ log rivers, and rail lines; auto-scroll camera with idle pressure; fairness-
 guaranteed row generator (car gaps, log cadence, rail warnings). Synth SFX +
 chiptune music loop. Detailed context: `.claude/neon-crossing.md`.
 
-### NEON AIR HOCKEY (`air-hockey/index.html`, ~850 lines)
+### NEON AIR HOCKEY (`air-hockey/index.html`, ~900 lines)
 Vs-AI air hockey on a portrait neon table. Drag mallet, 240 Hz substepped
 puck physics with rounded corners + goal posts, three AI difficulties
 (speed/reaction/aim-error table), first to 7; per-difficulty W-L record.
-Synth SFX + arena music loop. Detailed context: `.claude/air-hockey.md`.
+Top-HUD toggle for local 2-player mode (multi-touch, second finger owns the
+top mallet; AI + records off). Synth SFX + arena music loop. Detailed
+context: `.claude/air-hockey.md`.
 
 ### METEOR DEFENSE (`meteor-defense/index.html`, ~1130 lines)
 Missile-Command-style tap interceptor. Blast rings chain through meteors

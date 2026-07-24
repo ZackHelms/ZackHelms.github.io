@@ -25,17 +25,26 @@ html, body {
 #app { display:flex; flex-direction:column; height:100dvh;
   padding-bottom:env(safe-area-inset-bottom, 0px); }
 #hud {
-  display:grid; grid-template-columns:56px 1fr 120px; align-items:center;
+  display:grid; grid-template-columns:120px 1fr 120px; align-items:center;
   padding:calc(env(safe-area-inset-top, 0px) + 6px)
           calc(env(safe-area-inset-right, 0px) + 10px)
           4px
           calc(env(safe-area-inset-left, 0px) + 10px);
 }
+#hud-left { display:flex; gap:6px;
+  position:relative; z-index:60; }      /* stays tappable above the overlays (z 50) */
 #mute-btn {
   width:42px; height:30px; font-size:15px; line-height:28px; text-align:center;
   background:var(--panel); border:1px solid var(--border); border-radius:8px;
   color:var(--white); touch-action:manipulation; cursor:pointer;
 }
+#mode-btn {
+  height:30px; padding:0 9px; font-size:0.6rem; letter-spacing:1px;
+  line-height:28px; text-align:center; white-space:nowrap;
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  color:var(--white); touch-action:manipulation; cursor:pointer;
+}
+.hidden { display:none !important; }
 #hud-mid { text-align:center; }
 #v-score { font-family:'Black Ops One', sans-serif; font-size:1.02rem; letter-spacing:2px; line-height:1.2; }
 #v-diff { font-size:0.55rem; letter-spacing:2px; color:var(--dim); }
@@ -81,10 +90,13 @@ html, body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 13:26 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 13:55 UTC</div>
 <div id="app">
   <div id="hud">
-    <div id="mute-btn">🔊</div>
+    <div id="hud-left">
+      <div id="mute-btn">🔊</div>
+      <div id="mode-btn">🤖 AI</div>
+    </div>
     <div id="hud-mid">
       <div id="v-score">YOU 0 — 0 AI</div>
       <div id="v-diff">FIRST TO 7</div>
@@ -101,11 +113,12 @@ html, body {
     SMACK THE PUCK INTO THE TOP GOAL<br>
     DEFEND YOUR OWN &bull; FIRST TO 7 WINS
   </div>
-  <div class="diff-row">
+  <div class="diff-row" id="diff-row">
     <button class="diff-btn" id="db-ROOKIE" style="--c:var(--green)">ROOKIE<span class="rec" id="rec-ROOKIE">0W – 0L</span></button>
     <button class="diff-btn" id="db-PRO" style="--c:var(--gold)">PRO<span class="rec" id="rec-PRO">0W – 0L</span></button>
     <button class="diff-btn" id="db-LEGEND" style="--c:var(--red)">LEGEND<span class="rec" id="rec-LEGEND">0W – 0L</span></button>
   </div>
+  <button class="ov-btn primary hidden" id="btn-2p">START 2-PLAYER</button>
 </div>
 
 <div class="overlay hidden" id="ov-over">
@@ -155,11 +168,14 @@ let dpr = 1, cw = 0, ch = 0, scale = 1, ox = 0, oy = 0;
 
 let state = 'title';                    // title | count | play | over (tests use 'paused')
 let diff = 'PRO', aiP = AI.PRO;
+let mode = 'ai';                        // 'ai' (vs AI) | '2p' (second player owns the top mallet)
 let scoreP = 0, scoreA = 0;
 let puck = { x: 50, y: 120, vx: 0, vy: 0, trail: [] };
 let pMal = { x: 50, y: 138, vx: 0, vy: 0 };
 let aMal = { x: 50, y: AI_HOME_Y, vx: 0, vy: 0, tx: 50, ty: AI_HOME_Y, spd: 85 };
-let dragTarget = null;                  // {x,y} world-space mallet target (input or test script)
+let dragTarget = null;                  // {x,y} world-space P1 mallet target (input or test script)
+let dragTarget2 = null;                 // {x,y} P2 (top) mallet target, 2P mode only
+let ptP1 = null, ptP2 = null;           // active pointer ids ('mouse' or touch identifier)
 let countT = 0, blips = [];
 let simT = 0, renderT = 0;
 let puckHist = [];                      // delayed puck snapshots for AI reaction lag
@@ -175,6 +191,7 @@ try {
 } catch (e) {}
 let muted = false;
 try { muted = localStorage.getItem('air-hockey-mute') === '1'; } catch (e) {}
+try { if (localStorage.getItem('air-hockey-mode') === '2p') mode = '2p'; } catch (e) {}
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -339,7 +356,18 @@ const py = y => oy + y * scale;
 
 // ------------------------------------------------------------- flow
 function updateHud() {
-  $('v-score').textContent = 'YOU ' + scoreP + ' — ' + scoreA + ' AI';
+  $('v-score').textContent = mode === '2p'
+    ? 'P1 ' + scoreP + ' — ' + scoreA + ' P2'
+    : 'YOU ' + scoreP + ' — ' + scoreA + ' AI';
+}
+function applyMode() {                  // reflect the mode everywhere it shows
+  $('mode-btn').textContent = mode === '2p' ? '👥 2P' : '🤖 AI';
+  $('diff-row').classList.toggle('hidden', mode === '2p');
+  $('btn-2p').classList.toggle('hidden', mode !== '2p');
+  $('btn-diff').textContent = mode === '2p' ? 'MENU' : 'CHANGE DIFFICULTY';
+  if (state === 'play' || state === 'count')
+    $('v-diff').textContent = (mode === '2p' ? '2 PLAYER' : diff) + ' · FIRST TO ' + WIN_SCORE;
+  updateHud();
 }
 function updateRecUI() {
   for (const k of ['ROOKIE', 'PRO', 'LEGEND'])
@@ -365,12 +393,12 @@ function startMatch(d) {
   puck = { x: 50, y: 120, vx: 0, vy: 0, trail: [] };
   puckHist = []; simT = 0;
   aiErr = 0; aiErrT = 0;
-  dragTarget = null;
+  dragTarget = null; dragTarget2 = null; ptP1 = null; ptP2 = null;
   particles = [];
   goalMsgT = 0; goalFlash = 0; shake = 0;
   $('ov-start').classList.add('hidden');
   $('ov-over').classList.add('hidden');
-  $('v-diff').textContent = d + ' · FIRST TO ' + WIN_SCORE;
+  $('v-diff').textContent = (mode === '2p' ? '2 PLAYER' : d) + ' · FIRST TO ' + WIN_SCORE;
   updateHud();
   audio();
   startMusic();
@@ -383,19 +411,25 @@ function showStart() {
   $('ov-start').classList.remove('hidden');
   updateRecUI();
 }
-function matchOver(win) {
+function matchOver(win) {                // win = the bottom player took the match
   state = 'over';
   stopMusic();
   puck.vx = 0; puck.vy = 0;
-  rec[diff][win ? 'w' : 'l']++;
-  saveRec(); updateRecUI();
-  if (win) sndFanfare(); else sndSting();
+  if (mode !== '2p') {                   // 2P matches never touch the vs-AI record
+    rec[diff][win ? 'w' : 'l']++;
+    saveRec(); updateRecUI();
+  }
+  if (win || mode === '2p') sndFanfare(); else sndSting();
   const t = $('o-title');
-  t.textContent = win ? 'YOU WIN' : 'YOU LOSE';
+  t.textContent = mode === '2p' ? (win ? 'P1 WINS' : 'P2 WINS') : (win ? 'YOU WIN' : 'YOU LOSE');
   t.style.color = win ? 'var(--green)' : 'var(--red)';
   t.style.textShadow = win ? '0 0 24px rgba(57,255,20,0.7)' : '0 0 24px rgba(255,34,68,0.7)';
-  $('o-score').textContent = 'YOU ' + scoreP + ' — ' + scoreA + ' AI';
-  $('o-sub').textContent = diff + ' · RECORD ' + rec[diff].w + 'W – ' + rec[diff].l + 'L';
+  $('o-score').textContent = mode === '2p'
+    ? 'P1 ' + scoreP + ' — ' + scoreA + ' P2'
+    : 'YOU ' + scoreP + ' — ' + scoreA + ' AI';
+  $('o-sub').textContent = mode === '2p'
+    ? '2 PLAYER MATCH'
+    : diff + ' · RECORD ' + rec[diff].w + 'W – ' + rec[diff].l + 'L';
   clearTimeout(matchOver.t);
   matchOver.t = setTimeout(() => { if (state === 'over') $('ov-over').classList.remove('hidden'); }, 900);
 }
@@ -404,7 +438,9 @@ function goalFor(who) {
   updateHud();
   shake = 0.5; goalFlash = 0.4;
   flashCol = who === 'P' ? '#39ff14' : '#ff2244';
-  goalMsg = who === 'P' ? 'GOAL!' : 'AI SCORES';
+  goalMsg = who === 'P'
+    ? (mode === '2p' ? 'P1 SCORES!' : 'GOAL!')
+    : (mode === '2p' ? 'P2 SCORES!' : 'AI SCORES');
   goalMsgT = 1.1;
   burst(clamp(puck.x, 10, UW - 10), who === 'P' ? 3 : UH - 3, flashCol, 20);
   sndHorn();
@@ -541,34 +577,43 @@ function malletHit(m) {
     if (-vn > 60) burst(puck.x, puck.y, m === pMal ? '#39ff14' : '#ff2244', 6);
   }
 }
+function chaseMallet(m, tgt, yMin, yMax, h) {
+  // finger-chase used by every human-driven mallet: proportional pursuit of
+  // the drag target, clamped to its half, velocity from actual displacement
+  const mx = m.x, my = m.y;
+  if (tgt) {
+    const tx = clamp(tgt.x, MAL_R, UW - MAL_R);
+    const ty = clamp(tgt.y, yMin, yMax);
+    m.x += clamp((tx - m.x) * PMAL_K, -PMAL_VMAX, PMAL_VMAX) * h;
+    m.y += clamp((ty - m.y) * PMAL_K, -PMAL_VMAX, PMAL_VMAX) * h;
+  }
+  m.x = clamp(m.x, MAL_R, UW - MAL_R);
+  m.y = clamp(m.y, yMin, yMax);
+  malletCorners(m);
+  m.vx = (m.x - mx) / h; m.vy = (m.y - my) / h;
+}
 function physSub(h) {
-  // --- player mallet: chase the drag target, velocity from actual movement
-  const pox = pMal.x, poy = pMal.y;
-  if (dragTarget) {
-    const tx = clamp(dragTarget.x, MAL_R, UW - MAL_R);
-    const ty = clamp(dragTarget.y, CENTER + MAL_R, UH - MAL_R);
-    pMal.x += clamp((tx - pMal.x) * PMAL_K, -PMAL_VMAX, PMAL_VMAX) * h;
-    pMal.y += clamp((ty - pMal.y) * PMAL_K, -PMAL_VMAX, PMAL_VMAX) * h;
-  }
-  pMal.x = clamp(pMal.x, MAL_R, UW - MAL_R);
-  pMal.y = clamp(pMal.y, CENTER + MAL_R, UH - MAL_R);   // strictly bottom half
-  malletCorners(pMal);
-  pMal.vx = (pMal.x - pox) / h; pMal.vy = (pMal.y - poy) / h;
+  // --- P1 mallet: strictly bottom half
+  chaseMallet(pMal, dragTarget, CENTER + MAL_R, UH - MAL_R, h);
 
-  // --- AI mallet: move toward its think target at its speed cap
-  const aox = aMal.x, aoy = aMal.y;
-  {
-    const dx = aMal.tx - aMal.x, dy = aMal.ty - aMal.y;
-    const d = Math.hypot(dx, dy);
-    if (d > 0.001) {
-      const s = Math.min(d, aMal.spd * h);
-      aMal.x += dx / d * s; aMal.y += dy / d * s;
+  // --- top mallet: player 2's finger in 2P mode, else the AI seek
+  if (mode === '2p') {
+    chaseMallet(aMal, dragTarget2, MAL_R, CENTER - MAL_R, h);
+  } else {
+    const aox = aMal.x, aoy = aMal.y;
+    {
+      const dx = aMal.tx - aMal.x, dy = aMal.ty - aMal.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 0.001) {
+        const s = Math.min(d, aMal.spd * h);
+        aMal.x += dx / d * s; aMal.y += dy / d * s;
+      }
     }
+    aMal.x = clamp(aMal.x, MAL_R, UW - MAL_R);
+    aMal.y = clamp(aMal.y, MAL_R, CENTER - MAL_R);      // strictly top half
+    malletCorners(aMal);
+    aMal.vx = (aMal.x - aox) / h; aMal.vy = (aMal.y - aoy) / h;
   }
-  aMal.x = clamp(aMal.x, MAL_R, UW - MAL_R);
-  aMal.y = clamp(aMal.y, MAL_R, CENTER - MAL_R);        // strictly top half
-  malletCorners(aMal);
-  aMal.vx = (aMal.x - aox) / h; aMal.vy = (aMal.y - aoy) / h;
 
   // --- puck (frozen during countdown / match over / title)
   if (state === 'count' || state === 'over' || state === 'title') return;
@@ -587,7 +632,7 @@ function physSub(h) {
 }
 function step(dt) {
   simT += dt;
-  aiThink(dt);
+  if (mode !== '2p') aiThink(dt);
   if (state === 'count') {
     countT -= dt;
     if (blips.length && countT <= blips[0]) { blips.shift(); sndBlip(false); }
@@ -603,34 +648,53 @@ function step(dt) {
 }
 
 // ------------------------------------------------------------- input
-function evtWorld(e) {
-  const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+function ptWorld(t) {                    // one touch point / mouse event -> world coords
   const r = canvas.getBoundingClientRect();
   return [(t.clientX - r.left - ox) / scale, (t.clientY - r.top - oy) / scale];
 }
-function onDown(e) {
-  e.preventDefault(); audio();
+// pointer assignment: each pointer belongs to the mallet of the half it
+// STARTED in. In AI mode every pointer drives P1 (as before); in 2P mode a
+// top-half start claims the top mallet. FINGER_OFF pushes each mallet from
+// the finger toward that player's own view (up for P1, down for P2).
+function pointDown(id, x, y) {
   if (state !== 'play' && state !== 'count') return;
-  const [x, y] = evtWorld(e);
-  dragTarget = { x, y: y - FINGER_OFF };   // mallet rides above the finger
+  if (mode === '2p' && y <= CENTER) {
+    if (ptP2 === null) { ptP2 = id; dragTarget2 = { x, y: y + FINGER_OFF }; }
+  } else if (ptP1 === null) {
+    ptP1 = id; dragTarget = { x, y: y - FINGER_OFF };
+  }
 }
-function onMove(e) {
+function pointMove(id, x, y) {
+  if (id === ptP1 && dragTarget) { dragTarget.x = x; dragTarget.y = y - FINGER_OFF; }
+  else if (id === ptP2 && dragTarget2) { dragTarget2.x = x; dragTarget2.y = y + FINGER_OFF; }
+}
+function pointUp(id) {
+  if (id === ptP1) { ptP1 = null; dragTarget = null; }
+  if (id === ptP2) { ptP2 = null; dragTarget2 = null; }
+}
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault(); audio();
+  for (const t of e.changedTouches) { const [x, y] = ptWorld(t); pointDown(t.identifier, x, y); }
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
   e.preventDefault();
-  if (!dragTarget) return;
-  const [x, y] = evtWorld(e);
-  dragTarget.x = x; dragTarget.y = y - FINGER_OFF;
-}
-function onUp(e) {
+  for (const t of e.changedTouches) { const [x, y] = ptWorld(t); pointMove(t.identifier, x, y); }
+}, { passive: false });
+const touchUp = e => {
   e.preventDefault();
-  dragTarget = null;
-}
-canvas.addEventListener('touchstart', onDown, { passive: false });
-canvas.addEventListener('touchmove', onMove, { passive: false });
-canvas.addEventListener('touchend', onUp, { passive: false });
-canvas.addEventListener('touchcancel', onUp, { passive: false });
-canvas.addEventListener('mousedown', onDown);
-window.addEventListener('mousemove', e => { if (dragTarget) onMove(e); });
-window.addEventListener('mouseup', e => { if (dragTarget) onUp(e); });
+  for (const t of e.changedTouches) pointUp(t.identifier);
+};
+canvas.addEventListener('touchend', touchUp, { passive: false });
+canvas.addEventListener('touchcancel', touchUp, { passive: false });
+canvas.addEventListener('mousedown', e => {
+  audio();
+  const [x, y] = ptWorld(e); pointDown('mouse', x, y);
+});
+window.addEventListener('mousemove', e => {
+  if (ptP1 !== 'mouse' && ptP2 !== 'mouse') return;
+  const [x, y] = ptWorld(e); pointMove('mouse', x, y);
+});
+window.addEventListener('mouseup', () => pointUp('mouse'));
 
 let lastTap = 0;
 function bindTap(el, fn) {              // iOS fires touchend AND click per tap
@@ -647,8 +711,15 @@ function bindTap(el, fn) {              // iOS fires touchend AND click per tap
 bindTap($('db-ROOKIE'), () => startMatch('ROOKIE'));
 bindTap($('db-PRO'), () => startMatch('PRO'));
 bindTap($('db-LEGEND'), () => startMatch('LEGEND'));
+bindTap($('btn-2p'), () => startMatch(diff));
 bindTap($('btn-rematch'), () => startMatch(diff));
 bindTap($('btn-diff'), showStart);
+bindTap($('mode-btn'), () => {          // live toggle — works even mid-match
+  mode = mode === 'ai' ? '2p' : 'ai';
+  try { localStorage.setItem('air-hockey-mode', mode); } catch (e) {}
+  dragTarget2 = null; ptP2 = null;      // top mallet waits for its new owner
+  applyMode();
+});
 bindTap($('mute-btn'), () => {
   muted = !muted;
   try { localStorage.setItem('air-hockey-mute', muted ? '1' : '0'); } catch (e) {}
@@ -841,6 +912,7 @@ resize();
 updateHud();
 updateRecUI();
 applyMute();
+applyMode();
 requestAnimationFrame(frame);
 </script>
 </body>

@@ -4,7 +4,37 @@ Vs-AI physics air hockey on a portrait vertical table. Drag anywhere to move
 your mallet (it rides `FINGER_OFF` 6u above the finger so the thumb never
 hides it); smack the puck into the top goal, defend the bottom one; first to
 7 wins. Three AI difficulties (ROOKIE / PRO / LEGEND) picked on the start
-overlay, per-difficulty W–L record persisted. Single self-contained file.
+overlay, per-difficulty W–L record persisted. A top-HUD toggle switches to
+local 2-player mode (second finger owns the top mallet). Single
+self-contained file.
+
+## 2-player mode
+
+- `mode` top-level let: `'ai' | '2p'`, persisted `air-hockey-mode`. Toggled
+  by `#mode-btn` (top HUD, next to mute) **at any time, including
+  mid-match** — `applyMode()` refreshes every label (HUD `P1 n — m P2` vs
+  `YOU n — m AI`, `v-diff` `2 PLAYER`, goal msgs `P1/P2 SCORES!`, over-title
+  `P1/P2 WINS`, `btn-diff` text `MENU`), and swaps the start overlay between
+  the difficulty row and one `START 2-PLAYER` button (`.hidden` class).
+- **Input:** each pointer belongs to the mallet of the half it *started*
+  in (`pointDown/pointMove/pointUp` keyed by touch identifier or
+  `'mouse'`; `ptP1`/`ptP2` + `dragTarget`/`dragTarget2`). In AI mode every
+  pointer drives P1 (original behavior). P2's `FINGER_OFF` is **+6u**
+  (mallet toward P2's own view = screen-down). Extra same-half touches are
+  ignored while a slot is held; `touchend` releases only its own id.
+- **Physics:** `chaseMallet(m, tgt, yMin, yMax, h)` is the shared
+  human-mallet chase (extracted from the old inline P1 code — behavior
+  identical); in 2P `physSub` runs it for `aMal` with top-half clamps, else
+  the AI seek runs. `step()` skips `aiThink` entirely in 2P; toggling back
+  revives it next frame (aMal.tx/ty are recomputed every aiThink).
+- **Records:** `matchOver` skips `rec` updates in 2P — the vs-AI W–L table
+  never counts hot-seat games. Fanfare plays for either winner in 2P.
+- **HUD stacking trap (real bug found by the drive):** the full-screen
+  overlays (`z-index:50`) sat above the HUD, so `#mode-btn`/`#mute-btn`
+  were untappable on the title screen. `#hud-left` gets
+  `position:relative; z-index:60` to stay tappable above the overlay —
+  Playwright's "element intercepts pointer events" tap timeout is exactly
+  this bug surfacing; don't force-tap around it.
 
 ## Unit space & physics
 
@@ -79,11 +109,13 @@ win fanfare / lose sting.
 `state`: `title | count | play | over` (tests use `'paused'` — rAF only
 steps `play`/`count`, but a direct `step()` call always simulates; puck is
 frozen only in `count/over/title`). Top-level lets reachable from
-`page.evaluate`: `puck, pMal, aMal, dragTarget, scoreP, scoreA, diff, aiP,
-countT, muted, musicTimer, rec, AC…`. localStorage (try/catch):
-`air-hockey-record` `{ROOKIE:{w,l},PRO:{w,l},LEGEND:{w,l}}` (shown on the
-start-overlay buttons), `air-hockey-mute`. Overlay/HUD buttons share a
-400 ms tap debounce (`bindTap` — iOS fires touchend AND click).
+`page.evaluate`: `puck, pMal, aMal, mode, dragTarget, dragTarget2, ptP1,
+ptP2, scoreP, scoreA, diff, aiP, countT, muted, musicTimer, rec, AC…`.
+localStorage (try/catch): `air-hockey-record`
+`{ROOKIE:{w,l},PRO:{w,l},LEGEND:{w,l}}` (shown on the start-overlay
+buttons; never written in 2P), `air-hockey-mode`, `air-hockey-mute`.
+Overlay/HUD buttons share a 400 ms tap debounce (`bindTap` — iOS fires
+touchend AND click; reset `lastTap = 0` before scripted taps).
 
 ## Fairness rules (asserted headlessly, must keep holding)
 
@@ -117,6 +149,12 @@ Traps hit:
 - `matchOver()` fills `#o-title` text immediately but unhides the overlay on
   a 900 ms timeout — assert `textContent`, don't wait for visibility.
 - Sweep/rally loops: set `muted=true` first so synth helpers no-op.
+- 2P drive (scratchpad `air-hockey/2p-drive.cjs`, 21 checks): synthesize
+  simultaneous touches with two `new Touch({identifier, target: canvas,
+  clientX, clientY})` in one `TouchEvent` — the handlers iterate
+  `changedTouches`, so both mallets bind in a single dispatch. World→client:
+  `rect.left + ox + wx*scale`. Assert AI dormancy by giving `aMal` a stale
+  `tx/ty` and checking it doesn't move in 2P.
 
 ## Tuning knobs / follow-up ideas
 
