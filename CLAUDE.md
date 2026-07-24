@@ -54,6 +54,11 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Bubble Blaster (`games/bubble-blaster/`) | `.claude/bubble-blaster.md` | Any work on the bubble shooter — hex-grid math, snap/match/drop, row pressure |
 | Block Fit (`games/block-fit/`) | `.claude/block-fit.md` | Any work on the drag puzzle — piece set, drag-lift UX, clears, dead-deal guard |
 | Sky Hopper (`games/sky-hopper/`) | `.claude/sky-hopper.md` | Any work on the vertical bouncer — physics, generator reachability, platform mix |
+| Neon Stack (`games/neon-stack/`) | `.claude/neon-stack.md` | Any work on the tower stacker — slide/trim math, perfect window, regrow rules |
+| Blade Spin (`games/blade-spin/`) | `.claude/blade-spin.md` | Any work on the blade thrower — disc rotation patterns, level generator, collision arcs |
+| Neon Crossing (`games/neon-crossing/`) | `.claude/neon-crossing.md` | Any work on the lane hopper — row generator fairness, log riding, camera pressure |
+| Neon Air Hockey (`games/air-hockey/`) | `.claude/air-hockey.md` | Any work on the air hockey — puck/mallet physics, AI difficulty table |
+| Meteor Defense (`games/meteor-defense/`) | `.claude/meteor-defense.md` | Any work on the meteor interceptor — wave/ammo budgets, chain blasts, mercy rebuild |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 
