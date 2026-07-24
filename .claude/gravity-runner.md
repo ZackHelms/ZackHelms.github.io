@@ -32,3 +32,13 @@ Single self-contained file.
   spawn slack — tune there, not in individual patterns.
 - Death overlay is delayed 650 ms and retry-guarded by `deathT > 0.7` so a
   frantic flip-tap can't skip the score screen.
+
+## Audio + back button (2026-07-24 retrofit)
+
+- SFX kept as-is but routed through a `sfxGain` master; `musicGain` (0.18) carries a
+  driving synthwave loop (~132 BPM, 64-step lookahead sequencer: Am–F–C–G pulsing 8th
+  saw bass, four-on-floor kick, offbeat hats + bar-4 hat-roll build, gliding lead pad)
+  started on first gesture.
+- `#back-btn` (`../index.html`) top-left, `#mute-btn` at +52px (key
+  `gravityRunner.mute`); `#hud` gained 96px left padding to clear them; AC suspends on
+  `visibilitychange`.

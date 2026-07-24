@@ -25,8 +25,26 @@ html, body {
 #app { display:flex; flex-direction:column; height:100dvh; }
 #hud {
   display:flex; align-items:center; justify-content:space-between;
-  padding:calc(env(safe-area-inset-top, 0px) + 8px) 14px 6px;
+  padding:calc(env(safe-area-inset-top, 0px) + 40px) 14px 6px;
   gap:6px; font-size:0.72rem;
+}
+#back-btn {
+  position:fixed; z-index:60;
+  top:calc(env(safe-area-inset-top, 0px) + 6px);
+  left:calc(env(safe-area-inset-left, 0px) + 8px);
+  width:38px; height:30px; display:flex; align-items:center; justify-content:center;
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  color:var(--dim); font-size:16px; text-decoration:none;
+  -webkit-user-select:none; user-select:none;
+}
+#mute-btn {
+  position:fixed; z-index:60;
+  top:calc(env(safe-area-inset-top, 0px) + 6px);
+  left:calc(env(safe-area-inset-left, 0px) + 52px);
+  width:38px; height:30px; font-size:15px; line-height:1;
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  color:var(--white); padding:0;
+  touch-action:manipulation; -webkit-user-select:none; user-select:none;
 }
 .hud-label { font-size:0.52rem; letter-spacing:2px; color:var(--dim); }
 .hud-val { font-size:0.95rem; line-height:1.15; }
@@ -81,7 +99,9 @@ html, body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 04:29 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
+<button id="mute-btn" aria-label="Toggle sound">🔊</button>
 <div id="app">
   <div id="hud">
     <div id="h-hole"><div class="hud-label">HOLE</div><div class="hud-val" id="v-hole">1/9</div></div>
@@ -170,11 +190,35 @@ let best = +(localStorage.getItem('neonGolf.best') || 0);
 const $ = id => document.getElementById(id);
 
 // ------------------------------------------------------------- audio
-let AC = null;
+let AC = null, sfxGain = null, musicGain = null, noiseBuf = null;
+let muted = false;
+try { muted = localStorage.getItem('neonGolf.mute') === '1'; } catch (e) {}
 function audio() {
-  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
-  if (AC && AC.state === 'suspended') AC.resume();
+  if (!AC) {
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      sfxGain = AC.createGain();   sfxGain.connect(AC.destination);
+      musicGain = AC.createGain(); musicGain.connect(AC.destination);
+      applyGains();
+    } catch (e) { AC = null; }
+  }
+  if (AC && AC.state === 'suspended' && !muted) AC.resume();
+  if (AC) startMusic();
   return AC;
+}
+function applyGains() {
+  if (!AC) return;
+  sfxGain.gain.value = muted ? 0 : 1;
+  musicGain.gain.value = muted ? 0 : 0.15;
+}
+function getNoise() {
+  if (!noiseBuf && AC) {
+    const len = Math.floor(AC.sampleRate * 0.25);
+    noiseBuf = AC.createBuffer(1, len, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuf;
 }
 function beep(freq, dur, type, gain, slideTo) {
   const ac = audio(); if (!ac) return;
@@ -184,7 +228,7 @@ function beep(freq, dur, type, gain, slideTo) {
   if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, ac.currentTime + dur);
   g.gain.setValueAtTime(gain || 0.12, ac.currentTime);
   g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
-  o.connect(g).connect(ac.destination);
+  o.connect(g).connect(sfxGain);
   o.start(); o.stop(ac.currentTime + dur);
 }
 const sndShot   = p => beep(90 + p * 60, 0.09, 'triangle', 0.14);
@@ -192,6 +236,128 @@ const sndWall   = () => beep(180, 0.05, 'square', 0.05);
 const sndBumper = () => beep(320, 0.12, 'sine', 0.15, 620);
 const sndSplash = () => beep(300, 0.35, 'sawtooth', 0.10, 60);
 const sndSink   = () => { beep(523, 0.12, 'sine', 0.14); setTimeout(() => beep(659, 0.12, 'sine', 0.14), 110); setTimeout(() => beep(784, 0.2, 'sine', 0.16), 220); };
+
+// ------------------------------------------------------------- music
+// clubhouse lounge groove ~100 BPM: 64-step (4-bar) 16th sequencer.
+// jazzy EP-ish chords Cmaj7 -> C7 (mixolydian wink) -> Fmaj7 -> Fm6,
+// quarter-note walking bass, brushed-hat noise ticks + swishes.
+const STEP_DUR = 60 / 100 / 4;                // 16th note at 100 BPM
+const NOTE = { C2:65.41, E2:82.41, F2:87.31, G2:98, Ab2:103.83, A2:110,
+  Bb2:116.54, C3:130.81, E3:164.81, F3:174.61, G3:196, Ab3:207.65, A3:220,
+  Bb3:233.08, B3:246.94, C4:261.63, D4:293.66, E4:329.63, G4:392, A4:440 };
+const CHORDS = [                              // one chord per bar
+  ['E3','G3','B3','D4'],                      // Cmaj7 (rootless)
+  ['E3','G3','Bb3','D4'],                     // C7 — the mixolydian wink
+  ['F3','A3','C4','E4'],                      // Fmaj7
+  ['F3','Ab3','C4','D4'] ];                   // Fm6 back home
+const WALK = [                                // bass note per beat, 4 per bar
+  'C2','E2','G2','A2',  'C3','Bb2','A2','G2',
+  'F2','A2','C3','A2',  'F2','Ab2','C3','G2' ];
+const SPRINKLE = { 14:'G4', 30:'E4', 46:'A4', 62:'D4' }; // EP top-note winks
+let musicTimer = null, musicStep = 0, nextNoteTime = 0;
+function mEp(notes, t, vol, dur) {            // electric-piano-ish chord hit
+  for (const n of notes) {
+    const f = NOTE[n];
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(musicGain);
+    o.start(t); o.stop(t + dur + 0.05);
+    const o2 = AC.createOscillator(), g2 = AC.createGain(); // bell overtone
+    o2.type = 'triangle'; o2.frequency.value = f * 2;
+    g2.gain.setValueAtTime(0.0001, t);
+    g2.gain.linearRampToValueAtTime(vol * 0.3, t + 0.012);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.5);
+    o2.connect(g2).connect(musicGain);
+    o2.start(t); o2.stop(t + dur * 0.5 + 0.05);
+  }
+}
+function mBass(n, t) {                        // relaxed walking quarter note
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'triangle'; o.frequency.value = NOTE[n];
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.15, t + 0.03);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + STEP_DUR * 3.4);
+  o.connect(g).connect(musicGain);
+  o.start(t); o.stop(t + STEP_DUR * 3.4 + 0.05);
+}
+function mThump(t) {                          // very soft lounge kick
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(95, t);
+  o.frequency.exponentialRampToValueAtTime(52, t + 0.1);
+  g.gain.setValueAtTime(0.09, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+  o.connect(g).connect(musicGain);
+  o.start(t); o.stop(t + 0.16);
+}
+function mTick(t, vol) {                      // brushed-hat tick
+  if (!getNoise()) return;
+  const s = AC.createBufferSource(); s.buffer = noiseBuf;
+  const f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7500;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
+  s.connect(f).connect(g).connect(musicGain);
+  s.start(t); s.stop(t + 0.05);
+}
+function mSwish(t) {                          // brush swish on 2 & 4
+  if (!getNoise()) return;
+  const s = AC.createBufferSource(); s.buffer = noiseBuf;
+  const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 4000; f.Q.value = 0.7;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.028, t + 0.03);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+  s.connect(f).connect(g).connect(musicGain);
+  s.start(t); s.stop(t + 0.18);
+}
+function musicPlayStep(stp, t) {
+  const bar = (stp / 16) | 0, sub = stp % 16;
+  if (sub === 0) mEp(CHORDS[bar], t, 0.05, STEP_DUR * 13);
+  if (sub === 10) mEp(CHORDS[bar], t, 0.032, STEP_DUR * 4);   // lazy push
+  if (sub % 4 === 0) mBass(WALK[bar * 4 + sub / 4], t);
+  if (sub === 0 || sub === 8) mThump(t);
+  if (sub % 2 === 0)                          // swung 8th ticks
+    mTick(t + (sub % 4 === 2 ? STEP_DUR * 0.33 : 0), sub % 4 === 0 ? 0.024 : 0.015);
+  if (sub === 4 || sub === 12) mSwish(t);
+  const sp = SPRINKLE[stp]; if (sp) mEp([sp], t, 0.04, 0.5);
+}
+function musicSchedule() {
+  if (!AC) return;
+  while (nextNoteTime < AC.currentTime + 0.18) {   // ~0.18 s lookahead
+    musicPlayStep(musicStep, nextNoteTime);
+    musicStep = (musicStep + 1) % 64;
+    nextNoteTime += STEP_DUR;
+  }
+}
+function startMusic() {
+  if (!AC || musicTimer) return;
+  musicStep = 0; nextNoteTime = AC.currentTime + 0.1;
+  musicTimer = setInterval(musicSchedule, 25);
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) return;
+  if (document.hidden) AC.suspend();
+  else if (!muted) AC.resume();
+});
+let lastMuteTap = 0;
+function muteTap(e) {
+  e.preventDefault(); e.stopPropagation();
+  const now = performance.now();
+  if (now - lastMuteTap < 400) return;         // iOS touchend+click double fire
+  lastMuteTap = now;
+  muted = !muted;
+  try { localStorage.setItem('neonGolf.mute', muted ? '1' : '0'); } catch (err) {}
+  audio();
+  applyGains();
+  $('mute-btn').textContent = muted ? '🔇' : '🔊';
+}
+$('mute-btn').addEventListener('touchend', muteTap, { passive: false });
+$('mute-btn').addEventListener('click', muteTap);
+$('mute-btn').textContent = muted ? '🔇' : '🔊';
 
 // ------------------------------------------------------------- layout
 function resize() {

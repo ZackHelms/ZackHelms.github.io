@@ -47,3 +47,12 @@ flipper e 0.35; anti-stuck nudge fires after 2.5 s below speed 3.
 - `hitTarget` bounces the ball right with a hardcoded `+30` vx because the
   bank hugs the left wall; if targets move, generalize the bounce.
 - `localStorage` key: `neonPinball.best`.
+
+## Audio & back button (2026-07-24 retrofit)
+
+Existing `beep()` SFX now route through a `sfxGain` master; `musicGain` carries a
+64-step lookahead-sequencer arcade-rock loop (~140 BPM, E-minor-pentatonic saw riff,
+rolling octave bass Em–Em–G–A/B turnaround, noise kit). `#back-btn` + `#mute-btn`
+(persisted `neonPinball.mute`) sit fixed top-left over the HUD strip — HUD gained
+98 px left padding, and both buttons end above the canvas top so the two-thumb
+flipper zones are untouched; AudioContext suspends on `visibilitychange`.

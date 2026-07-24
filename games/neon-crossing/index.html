@@ -37,6 +37,13 @@ html, body {
 #h-score .hud-val { color:var(--gold); }
 #h-best .hud-val { color:var(--purple); }
 #h-best { text-align:right; }
+#back-btn {
+  position:relative; z-index:60;
+  font-size:15px; line-height:1; padding:6px 9px;
+  background:var(--panel); color:var(--white);
+  border:1px solid var(--border); border-radius:8px;
+  text-decoration:none; -webkit-user-select:none; user-select:none;
+}
 #mute-btn {
   position:relative; z-index:60;
   font-size:15px; line-height:1; padding:6px 9px;
@@ -72,9 +79,10 @@ html, body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 13:26 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
 <div id="app">
   <div id="hud">
+    <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
     <button id="mute-btn" aria-label="toggle sound">🔊</button>
     <div id="h-dist"><div class="hud-label">DIST</div><div class="hud-val" id="v-dist">0</div></div>
     <div id="h-score"><div class="hud-label">SCORE</div><div class="hud-val" id="v-score">0</div></div>

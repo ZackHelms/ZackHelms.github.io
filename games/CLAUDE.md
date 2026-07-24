@@ -18,7 +18,8 @@ Detailed context for individual games lives in `.claude/<game>.md` at the repo r
 | Responsive | Portrait/landscape via `@media (orientation:landscape)` or `100dvh` layout; a canvas inside a flex column needs `min-height:0` or its intrinsic 300:150 ratio overflows landscape |
 | Canvas sizing | A fullscreen canvas needs explicit CSS `width:100%;height:100%` — `position:absolute;inset:0` alone does NOT stretch a replaced element, it renders at its intrinsic (dpr-scaled) attribute size and the page looks 2–3× zoomed |
 | Canvas-drawn UI | Buttons/cards drawn on the canvas keep their hitbox arrays (`cardRects`-style) in JS — any branch that hides the widgets MUST clear the arrays too, or invisible stale hitboxes swallow taps (2026-07-24 grid-defense bug) |
-| Audio | WebAudio-synthesized only (no audio files): lazy AudioContext on first gesture (iOS), `sfxGain`/`musicGain` masters, oscillator/noise SFX + lookahead-sequencer music loop, persisted 🔊/🔇 mute top-left, suspend on `visibilitychange` (SFX+music standard since the 2026-07-24 five-game batch) |
+| Audio | WebAudio-synthesized only (no audio files): lazy AudioContext on first gesture (iOS), `sfxGain`/`musicGain` masters, oscillator/noise SFX + lookahead-sequencer music loop, persisted 🔊/🔇 mute top-left, suspend on `visibilitychange` (SFX+music standard for **every** game — retrofitted repo-wide 2026-07-24) |
+| Back button | Every game has a top-left ← link back to the games hub, left-most control, mute button immediately to its right — see § Hub Back Button |
 | Build badge | Every game has a `<div id="build-badge">` right after `<body>` — see below |
 
 ---
@@ -51,6 +52,32 @@ they're intentionally never modified, so they don't get a badge.
 
 ---
 
+## Hub Back Button (SOP — required for every game)
+
+Every game page has a small left-arrow link back to the games hub as the
+**left-most top-left control** (iOS-style back affordance); the 🔊/🔇 mute
+button sits immediately to its right:
+
+```html
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+```
+
+Root-level `games/<slug>.html` pages use `href="index.html"`; games in their
+own subdirectory use `href="../index.html"`. Style it like the game's mute
+button — a small fixed/absolute panel button (~38×30,
+`background:var(--panel); border:1px solid var(--border); border-radius:8px`),
+safe-area-aware offsets, `text-decoration:none`, and it must not overlap the
+game's HUD or swallow gameplay input at the iPhone 13 viewport (390×844).
+
+Games that predate this SOP (Basketball/Croissant Clicker, Horse Race, Piano
+Tiles) carry a `#back-link` "← GAMES" text link instead — both forms satisfy
+the rule; new games use the `#back-btn` form.
+
+Excluded: externally-published games (`zed-shooter/`, `qntmchmst/` — their
+source repos own their UI) and frozen checkpoint files.
+
+---
+
 ## Games Inventory
 
 ### STICK WARS (`stick-wars.html`, ~1500 lines)
@@ -60,10 +87,11 @@ unlock upgrades between waves. Canvas 2D, side-scrolling combat. ~60 functions.
 ### TOWN BUILDER (`town-game-1.html`, ~1000 lines)
 Isometric town-building sim. Place buildings, grow settlement, manage resources.
 Isometric grid projection, click-to-place mechanics. Lighter codebase (~6 functions).
+Synth SFX + pastoral music loop.
 
 ### HORSE RACE (`horse-race.html`, ~735 lines)
 Tap to drop carrots; four horses race to claim them. Tap-driven speed mechanic.
-~16 functions; simpler state machine.
+~16 functions; simpler state machine. Synth SFX + galloping shuffle music loop.
 
 ### PIANO TILES (`piano-tiles.html`, ~1515 lines)
 Falling-tile rhythm game. Two songs (`kpopsong1`, `boss_fight_parade`) with `.md`
@@ -78,7 +106,8 @@ Detailed context: `.claude/sorcery.md`. Audit slash command: `/sorcery-audit`.
 ### STICK COMMANDER 3D (`stick-commander-3d.html`, ~2167 lines)
 Top-down RTS-lite. Command stick-figure army across 50 waves. Recruit troops,
 use abilities, defeat bosses including a Final Overlord. Largest game by line count.
-~54 functions. `stick-commander-3d.v001.html` is a saved checkpoint.
+~54 functions. Synth SFX + martial-march music loop. `stick-commander-3d.v001.html`
+is a saved checkpoint.
 
 ### CROISSANT CLICKER (`croissant-clicker.html`, ~960 lines)
 Cookie Clicker-style idle/incremental. Click to bake, buy 20 tiers of
@@ -145,13 +174,15 @@ Suika-style one-thumb physics merge puzzler. Drag to aim, release to drop;
 same-tier orbs merge and grow through 11 tiers, chained merges multiply
 points, overflow past the danger line ends the run. Fixed-substep circle
 physics with per-tier pre-rendered orb sprites. First game in its own
-subdirectory. Detailed context: `.claude/merge-drop.md`.
+subdirectory. Synth SFX + mellow lo-fi music loop.
+Detailed context: `.claude/merge-drop.md`.
 
 ### NEON GOLF (`neon-golf/index.html`, ~660 lines)
 9-hole drag-back-and-release mini-golf. Holes are data entries in a fixed
 100×160 unit space; hazards: walls, over-unity bumpers, sand, water
 (+1 stroke), boost pads, oscillating mover walls. Par scoring, scorecard,
-best-round persistence. Detailed context: `.claude/neon-golf.md`.
+best-round persistence. Synth SFX + clubhouse-lounge music loop.
+Detailed context: `.claude/neon-golf.md`.
 
 ### NEON PINBALL (`neon-pinball/index.html`, ~800 lines)
 Portrait pinball. Two-thumb flippers (screen halves), hold-to-charge plunger,
@@ -275,15 +306,18 @@ tense sequencer music. Detailed context: `.claude/meteor-defense.md`.
 2. Add a card to `games/index.html` (copy an existing card, update
    icon/name/desc/href) — pick an icon emoji **not already used** by another
    card (e.g. Sorcery already owns 🔮)
-3. Add the build-timestamp badge (see above) with the current UTC timestamp
-4. Create `.claude/<slug>.md` with architecture notes before the session gets long
-5. Add the game's row to `.claude/games-index.md` **and refresh its coverage
+3. Add the standard hub back button (see § Hub Back Button) — ← top-left,
+   mute button to its right — and the WebAudio SFX + music stack per the
+   Audio convention row
+4. Add the build-timestamp badge (see above) with the current UTC timestamp
+5. Create `.claude/<slug>.md` with architecture notes before the session gets long
+6. Add the game's row to `.claude/games-index.md` **and refresh its coverage
    summary** (facet vocabulary: `templates/design/game-facets.md` in the
    zmhstudio repo) — when *choosing* what game to build, read that index's
    coverage summary first
-6. Run the smoke gate on every changed page:
+7. Run the smoke gate on every changed page:
    `node .claude/scripts/smoke-mobile.cjs <pages...>` (see `.claude/scripts/README.md`)
-7. Commit and push to `main`, stating the badge timestamp in your reply
-8. Verify the "pages build and deployment" workflow for the pushed SHA goes
+8. Commit and push to `main`, stating the badge timestamp in your reply
+9. Verify the "pages build and deployment" workflow for the pushed SHA goes
    green — `git push` ≠ live; a failed Pages build silently keeps serving
    the previous deploy

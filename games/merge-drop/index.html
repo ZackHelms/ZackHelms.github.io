@@ -25,8 +25,26 @@ html, body {
 #app { display:flex; flex-direction:column; height:100dvh; }
 #hud {
   display:flex; align-items:center; justify-content:space-between;
-  padding:calc(env(safe-area-inset-top, 0px) + 8px) 14px 6px;
+  padding:calc(env(safe-area-inset-top, 0px) + 40px) 14px 6px;
   gap:8px;
+}
+#back-btn {
+  position:fixed; z-index:60;
+  top:calc(env(safe-area-inset-top, 0px) + 6px);
+  left:calc(env(safe-area-inset-left, 0px) + 8px);
+  width:38px; height:30px; display:flex; align-items:center; justify-content:center;
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  color:var(--dim); font-size:16px; text-decoration:none;
+  -webkit-user-select:none; user-select:none;
+}
+#mute-btn {
+  position:fixed; z-index:60;
+  top:calc(env(safe-area-inset-top, 0px) + 6px);
+  left:calc(env(safe-area-inset-left, 0px) + 52px);
+  width:38px; height:30px; font-size:15px; line-height:1;
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  color:var(--white); padding:0;
+  touch-action:manipulation; -webkit-user-select:none; user-select:none;
 }
 .hud-box { min-width:72px; }
 .hud-box.right { text-align:right; }
@@ -64,7 +82,9 @@ html, body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 04:29 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
+<button id="mute-btn" aria-label="Toggle sound">🔊</button>
 <div id="app">
   <div id="hud">
     <div class="hud-box"><div class="hud-label">SCORE</div><div class="hud-val" id="score">0</div></div>
@@ -140,26 +160,177 @@ const $ = id => document.getElementById(id);
 $('best').textContent = best;
 
 // ---------------------------------------------------------------- audio
-let AC = null, muted = false;
+let AC = null, sfxGain = null, musicGain = null, noiseBuf = null;
+let muted = false;
+try { muted = localStorage.getItem('mergeDrop.mute') === '1'; } catch (e) {}
 function audio() {
-  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
-  if (AC && AC.state === 'suspended') AC.resume();
+  if (!AC) {
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      sfxGain = AC.createGain();   sfxGain.connect(AC.destination);
+      musicGain = AC.createGain(); musicGain.connect(AC.destination);
+      applyGains();
+    } catch (e) { AC = null; }
+  }
+  if (AC && AC.state === 'suspended' && !muted) AC.resume();
+  if (AC) startMusic();
   return AC;
 }
+function applyGains() {
+  if (!AC) return;
+  sfxGain.gain.value = muted ? 0 : 1;
+  musicGain.gain.value = muted ? 0 : 0.16;
+}
+function getNoise() {
+  if (!noiseBuf && AC) {
+    const len = Math.floor(AC.sampleRate * 0.25);
+    noiseBuf = AC.createBuffer(1, len, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuf;
+}
 function beep(freq, dur, type, gain, slideTo) {
-  const ac = audio(); if (!ac || muted) return;
+  const ac = audio(); if (!ac) return;
   const o = ac.createOscillator(), g = ac.createGain();
   o.type = type || 'sine';
   o.frequency.setValueAtTime(freq, ac.currentTime);
   if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, ac.currentTime + dur);
   g.gain.setValueAtTime(gain || 0.12, ac.currentTime);
   g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
-  o.connect(g).connect(ac.destination);
+  o.connect(g).connect(sfxGain);
   o.start(); o.stop(ac.currentTime + dur);
 }
 const sndDrop  = () => beep(140, 0.08, 'triangle', 0.10);
 const sndMerge = t => beep(240 * Math.pow(2, t / 7), 0.16, 'sine', 0.16, 240 * Math.pow(2, t / 7) * 1.5);
 const sndOver  = () => beep(220, 0.7, 'sawtooth', 0.12, 55);
+
+// ---------------------------------------------------------------- music
+// mellow lo-fi head-nod loop ~84 BPM: 64-step (4-bar) 16th sequencer.
+// dusty Fmaj7 -> Em7 -> Dm7 -> Cmaj7 triangle-stack chords through a low
+// lowpass, lazy root+fifth bass, soft kick/snap, understated swung hats.
+const STEP_DUR = 60 / 84 / 4;                 // 16th note at 84 BPM
+const NOTE = { C2:65.41, D2:73.42, E2:82.41, F2:87.31, G2:98, A2:110, B2:123.47,
+  C3:130.81, D3:146.83, E3:164.81, F3:174.61, G3:196, A3:220, B3:246.94,
+  C4:261.63, D4:293.66, E4:329.63, G4:392, A4:440 };
+const CHORDS = [                              // one chord per bar
+  ['F3','A3','C4','E4'],                      // Fmaj7
+  ['E3','G3','B3','D4'],                      // Em7
+  ['D3','F3','A3','C4'],                      // Dm7
+  ['C3','E3','G3','B3'] ];                    // Cmaj7
+const BASS_PAT = {};                          // step -> [note, lenSteps]
+BASS_PAT[0]  = ['F2', 9]; BASS_PAT[10] = ['C3', 4];
+BASS_PAT[16] = ['E2', 9]; BASS_PAT[26] = ['B2', 4];
+BASS_PAT[32] = ['D2', 9]; BASS_PAT[42] = ['A2', 4];
+BASS_PAT[48] = ['C2', 9]; BASS_PAT[58] = ['G2', 4];
+const SPRINKLE = { 24:'G4', 40:'A4', 56:'E4', 62:'G4' };  // sparse top plinks
+let musicTimer = null, musicStep = 0, nextNoteTime = 0;
+function mChord(notes, t) {
+  for (const n of notes) {
+    const o = AC.createOscillator(), f = AC.createBiquadFilter(), g = AC.createGain();
+    o.type = 'triangle'; o.frequency.value = NOTE[n];
+    o.detune.value = (Math.random() - 0.5) * 7;      // dusty tape wobble
+    f.type = 'lowpass'; f.frequency.value = 900; f.Q.value = 0.6;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.055, t + 0.07);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + STEP_DUR * 14);
+    o.connect(f).connect(g).connect(musicGain);
+    o.start(t); o.stop(t + STEP_DUR * 14 + 0.05);
+  }
+}
+function mBass(n, t, lenSteps) {
+  const d = lenSteps * STEP_DUR;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine'; o.frequency.value = NOTE[n];
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.17, t + 0.05);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g).connect(musicGain);
+  o.start(t); o.stop(t + d + 0.05);
+}
+function mPlink(n, t) {
+  const o = AC.createOscillator(), f = AC.createBiquadFilter(), g = AC.createGain();
+  o.type = 'sine'; o.frequency.value = NOTE[n];
+  f.type = 'lowpass'; f.frequency.value = 1600;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.045, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+  o.connect(f).connect(g).connect(musicGain);
+  o.start(t); o.stop(t + 0.55);
+}
+function mThump(t) {                          // soft lo-fi kick
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(105, t);
+  o.frequency.exponentialRampToValueAtTime(48, t + 0.12);
+  g.gain.setValueAtTime(0.16, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+  o.connect(g).connect(musicGain);
+  o.start(t); o.stop(t + 0.2);
+}
+function mSnap(t) {                           // muffled snare on 2 & 4
+  if (!getNoise()) return;
+  const s = AC.createBufferSource(); s.buffer = noiseBuf;
+  const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1700; f.Q.value = 0.9;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.11, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+  s.connect(f).connect(g).connect(musicGain);
+  s.start(t); s.stop(t + 0.15);
+}
+function mHat(t, vol) {
+  if (!getNoise()) return;
+  const s = AC.createBufferSource(); s.buffer = noiseBuf;
+  const f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 6000;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+  s.connect(f).connect(g).connect(musicGain);
+  s.start(t); s.stop(t + 0.06);
+}
+function musicPlayStep(stp, t) {
+  const bar = (stp / 16) | 0, sub = stp % 16;
+  if (sub === 0) mChord(CHORDS[bar], t);
+  const bn = BASS_PAT[stp]; if (bn) mBass(bn[0], t, bn[1]);
+  if (sub === 0 || sub === 7) mThump(t);      // head-nod kick: 1 + and-of-2
+  if (sub === 4 || sub === 12) mSnap(t);
+  if (sub % 2 === 0)                          // swung 8th hats, offbeats lazy
+    mHat(t + (sub % 4 === 2 ? STEP_DUR * 0.33 : 0), sub % 4 === 0 ? 0.028 : 0.018);
+  const sp = SPRINKLE[stp]; if (sp) mPlink(sp, t);
+}
+function musicSchedule() {
+  if (!AC) return;
+  while (nextNoteTime < AC.currentTime + 0.18) {   // ~0.18 s lookahead
+    musicPlayStep(musicStep, nextNoteTime);
+    musicStep = (musicStep + 1) % 64;
+    nextNoteTime += STEP_DUR;
+  }
+}
+function startMusic() {
+  if (!AC || musicTimer) return;
+  musicStep = 0; nextNoteTime = AC.currentTime + 0.1;
+  musicTimer = setInterval(musicSchedule, 25);
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) return;
+  if (document.hidden) AC.suspend();
+  else if (!muted) AC.resume();
+});
+let lastMuteTap = 0;
+function muteTap(e) {
+  e.preventDefault(); e.stopPropagation();
+  const now = performance.now();
+  if (now - lastMuteTap < 400) return;         // iOS touchend+click double fire
+  lastMuteTap = now;
+  muted = !muted;
+  try { localStorage.setItem('mergeDrop.mute', muted ? '1' : '0'); } catch (err) {}
+  audio();
+  applyGains();
+  $('mute-btn').textContent = muted ? '🔇' : '🔊';
+}
+$('mute-btn').addEventListener('touchend', muteTap, { passive: false });
+$('mute-btn').addEventListener('click', muteTap);
+$('mute-btn').textContent = muted ? '🔇' : '🔊';
 
 // ---------------------------------------------------------------- layout
 function resize() {

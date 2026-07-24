@@ -22,8 +22,15 @@ body {
   position:fixed; inset:0;
 }
 #cv { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
-#mute {
+#back-btn {
   position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:30;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:32px;
+  text-align:center; text-decoration:none; touch-action:manipulation;
+  -webkit-user-select:none; user-select:none;
+}
+#mute {
+  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:30;
   background:var(--panel); border:1px solid var(--border); border-radius:6px;
   color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
   text-align:center; padding:0; touch-action:manipulation;
@@ -68,8 +75,9 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 18:57 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
 <canvas id="cv"></canvas>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
 <div id="overlay"></div>
 <script>

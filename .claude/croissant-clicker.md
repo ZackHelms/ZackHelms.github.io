@@ -137,3 +137,13 @@ here hangs on same-page client-initiated navigation (`location.replace`/
 to succeed (`page.route('**://fonts.googleapis.com/**', ...)`) when testing
 the reload button in this environment — it works fine both with the mock and
 on the real deployed site.
+
+## Audio
+
+WebAudio synth (2026-07-24 retrofit): `sfxGain`/`musicGain` masters, lazy context on
+first gesture (capture-phase unlock — the golden croissant `stopPropagation`s), mute
+persisted to `croissantClickerMute`, suspend on `visibilitychange`. BGM is a 16-bar A/B
+café-waltz in F (3/4, 108 BPM): triangle bass beat 1, detuned-saw accordion stabs beats
+2+3, music-box sine lead. Bake SFX is deliberately soft, pitch-varied, and throttled to
+~1 per 55 ms so constant clicking never fatigues; the 🔊 mute button lives in the header
+button row (the header top-left is owned by `#back-link`).

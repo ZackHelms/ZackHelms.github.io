@@ -103,3 +103,12 @@ Specifics for this game:
 - Aim fine-tune: slow the guide/dampen aim when the finger drags far.
 - Combo sfx pitch ramp with streak; persistent stats (games, clears).
 - Difficulty ramp: `SHOTS_PER_ROW` shrinks to 5/4 at score milestones.
+
+## Audio + back button (2026-07-24 retrofit)
+
+- SFX kept as-is but routed through a `sfxGain` master; `musicGain` (0.17) carries a
+  bouncy C-major pop loop (~116 BPM, 64-step lookahead sequencer: C–Am–F–G, plucky
+  triangle melody, oom-pah sine bass, hat ticks) started on first gesture.
+- `#back-btn` (`../index.html`) top-left, `#mute-btn` at +52px (key
+  `bubbleBlaster.mute`); `#hud` gained 96px left padding to clear them; AC suspends on
+  `visibilitychange`.

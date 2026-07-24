@@ -33,6 +33,12 @@ html, body {
 }
 #hud-left { display:flex; gap:6px;
   position:relative; z-index:60; }      /* stays tappable above the overlays (z 50) */
+#back-btn {
+  display:block; width:36px; height:30px; font-size:16px; line-height:28px;
+  text-align:center; background:var(--panel); border:1px solid var(--border);
+  border-radius:8px; color:var(--white); text-decoration:none;
+  touch-action:manipulation; user-select:none;
+}
 #mute-btn {
   width:42px; height:30px; font-size:15px; line-height:28px; text-align:center;
   background:var(--panel); border:1px solid var(--border); border-radius:8px;
@@ -90,10 +96,11 @@ html, body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 13:55 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
 <div id="app">
   <div id="hud">
     <div id="hud-left">
+      <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
       <div id="mute-btn">🔊</div>
       <div id="mode-btn">🤖 AI</div>
     </div>

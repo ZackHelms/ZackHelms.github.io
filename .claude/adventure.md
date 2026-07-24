@@ -170,6 +170,10 @@ Scripted story arc running after the tutorial. New mechanics:
 | `infected_boar` | 38/10/4 | 24 |
 | `insect_swarm` | 12/3/0 | 8 |
 
+## Audio (2026-07-24 retrofit)
+
+WebAudio synth stack per `games/CLAUDE.md`: `sfxGain`/`musicGain` masters, lazy context on first gesture, mute persisted to `adventure_mute`, suspend on `visibilitychange`. SFX hooks: delegated UI tap, attack hit/miss, spell/heal, party damage, loot, purchase (inn/shop `effect.cost`), level-up, victory (`showCombatResults`), defeat (`partyWipe`). BGM: 8-bar A-minor exploration loop at ~76 BPM (Am Am F G | Am C Em E) — harp-like plucked arps over drone bass + fifth pad, soft noise thump/shaker; loops across all screens.
+
 ## TODO
 
 - [ ] Story review pass — revisit Green Eyes narrative text for tone, pacing, and continuity; incorporate any feedback from playtesting
@@ -179,7 +183,6 @@ Scripted story arc running after the tutorial. New mechanics:
 - [ ] More enemy variety (skeleton, dark mage, goblin)
 - [ ] Robot parts system
 - [ ] Random name lists expansion
-- [ ] Sound effects (Web Audio API, no external files)
 - [ ] Difficulty modes (Casual / Normal / Hardcore permadeath)
 
 ## LATER
@@ -206,3 +209,4 @@ Scripted story arc running after the tutorial. New mechanics:
 - [x] Inn rest mechanic
 - [x] Level-up system with stat scaling
 - [x] Green Eyes quest — full scripted arc (nodes 7–20) with 4 side quests, 5 puzzles, insect-swarm fail-combat, conditional hub gating, ambiguous ending (2026-06-09)
+- [x] Sound effects + music (Web Audio API, no external files) + hub back button (2026-07-24)

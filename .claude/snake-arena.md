@@ -33,3 +33,13 @@ avoid mines/walls/yourself. Single self-contained file.
 - Spawners retry up to 40 times to avoid the head/mines; they intentionally
   fall through with a plain random spot rather than infinite-looping on a
   crowded field.
+
+## Audio + back button (2026-07-24 retrofit)
+
+- Standard stack: `sfxGain`/`musicGain` masters (SFX `beep()` routes through
+  `sfxGain` at 1.0 — original loudness), 64-step lookahead sequencer BGM
+  ("slinky pulse techno": sinuous 8th-note filtered-saw bass A→F, soft kick,
+  tight hats, sparse detuned lead curls, 126 BPM), `visibilitychange`
+  suspend. Mute key `snakeArena.mute`; `#back-btn` + `#mute-btn` fixed
+  top-left with `#hud` shifted right 98px; joystick drag-anywhere untouched
+  (listeners on the canvas, below the HUD strip).

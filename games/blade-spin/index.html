@@ -25,11 +25,12 @@ html, body {
 #app { display:flex; flex-direction:column; height:100dvh; }
 #hud {
   display:flex; align-items:center; justify-content:space-between;
-  /* top padding keeps every HUD element clear of the build badge zone (top-right ~120x16px) */
+  /* top padding keeps every HUD element clear of the build badge zone (top-right ~120x16px);
+     left padding clears the back + mute buttons (8..86px) */
   padding:calc(env(safe-area-inset-top, 0px) + 20px)
           calc(env(safe-area-inset-right, 0px) + 14px)
           6px
-          calc(env(safe-area-inset-left, 0px) + 52px);
+          calc(env(safe-area-inset-left, 0px) + 94px);
   gap:6px; font-size:0.72rem;
 }
 .hud-label { font-size:0.52rem; letter-spacing:2px; color:var(--dim); }
@@ -46,10 +47,19 @@ html, body {
   display:block; width:100%;
   touch-action:none; -webkit-user-select:none; user-select:none;
 }
-#mute {
+#back-btn {
   position:fixed; z-index:60;
   top:calc(env(safe-area-inset-top, 0px) + 6px);
   left:calc(env(safe-area-inset-left, 0px) + 8px);
+  width:36px; height:30px; font-size:16px; line-height:28px; text-align:center;
+  background:var(--panel); color:var(--white);
+  border:1px solid var(--border); border-radius:8px;
+  text-decoration:none; touch-action:manipulation; user-select:none;
+}
+#mute {
+  position:fixed; z-index:60;
+  top:calc(env(safe-area-inset-top, 0px) + 6px);
+  left:calc(env(safe-area-inset-left, 0px) + 50px);
   width:36px; height:30px; font-size:15px; line-height:1;
   background:var(--panel); color:var(--white);
   border:1px solid var(--border); border-radius:8px;
@@ -112,7 +122,7 @@ html, body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 13:45 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
 <div id="app">
   <div id="hud">
     <div id="h-level"><div class="hud-label">LEVEL</div><div class="hud-val" id="v-level">1</div></div>
@@ -122,6 +132,7 @@ html, body {
   </div>
   <canvas id="game"></canvas>
 </div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" aria-label="mute">🔊</button>
 
 <div id="banner"><div class="b-big" id="b-big"></div></div>

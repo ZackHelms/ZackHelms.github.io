@@ -25,9 +25,23 @@ html, body {
 #app { display:flex; flex-direction:column; height:100dvh; }
 #hud {
   display:flex; align-items:center; justify-content:space-between;
-  padding:calc(env(safe-area-inset-top, 0px) + 8px) 14px 6px;
+  padding:calc(env(safe-area-inset-top, 0px) + 8px) 14px 6px
+          calc(env(safe-area-inset-left, 0px) + 98px);
   gap:6px; font-size:0.72rem;
 }
+#back-btn{position:fixed;z-index:60;
+  top:calc(env(safe-area-inset-top,0px) + 6px);
+  left:calc(env(safe-area-inset-left,0px) + 8px);
+  width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  color:var(--dim);font-size:16px;text-decoration:none;user-select:none;}
+#mute-btn{position:fixed;z-index:60;
+  top:calc(env(safe-area-inset-top,0px) + 6px);
+  left:calc(env(safe-area-inset-left,0px) + 52px);
+  width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  color:var(--dim);font-size:15px;line-height:1;padding:0;user-select:none;
+  font-family:inherit;cursor:pointer;}
 .hud-label { font-size:0.52rem; letter-spacing:2px; color:var(--dim); }
 .hud-val { font-size:0.95rem; line-height:1.15; }
 #h-score .hud-val { color:var(--green); }
@@ -73,7 +87,9 @@ html, body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 07:01 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute-btn" aria-label="Toggle sound">🔊</button>
 <div id="app">
   <div id="hud">
     <div id="h-score"><div class="hud-label">SCORE</div><div class="hud-val" id="v-score">0</div></div>
@@ -155,11 +171,35 @@ try { best = +(localStorage.getItem('neonSlice.best') || 0); } catch (e) {}
 const $ = id => document.getElementById(id);
 
 // ---------- audio
-let AC = null;
+let AC = null, sfxGain = null, musicGain = null, noiseBuf = null;
+let muted = false;
+try { muted = localStorage.getItem('neonSlice.mute') === '1'; } catch (e) {}
 function audio() {
-  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
-  if (AC && AC.state === 'suspended') AC.resume();
+  if (!AC) {
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      sfxGain = AC.createGain();   sfxGain.connect(AC.destination);
+      musicGain = AC.createGain(); musicGain.connect(AC.destination);
+      applyGains();
+    } catch (e) { AC = null; }
+  }
+  if (AC && AC.state === 'suspended' && !muted) AC.resume();
+  if (AC && !musicTimer) startMusic();
   return AC;
+}
+function applyGains() {
+  if (!AC) return;
+  sfxGain.gain.value = muted ? 0 : 0.9;
+  musicGain.gain.value = muted ? 0 : 0.16;
+}
+function getNoise() {
+  if (!noiseBuf && AC) {
+    const len = Math.floor(AC.sampleRate * 0.2);
+    noiseBuf = AC.createBuffer(1, len, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuf;
 }
 function beep(freq, dur, type, gain, slideTo) {
   const ac = audio(); if (!ac) return;
@@ -169,7 +209,7 @@ function beep(freq, dur, type, gain, slideTo) {
   if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, ac.currentTime + dur);
   g.gain.setValueAtTime(gain || 0.12, ac.currentTime);
   g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
-  o.connect(g).connect(ac.destination);
+  o.connect(g).connect(sfxGain);
   o.start(); o.stop(ac.currentTime + dur);
 }
 const sndSlice  = n => beep(300 + Math.min(n, 8) * 70, 0.07, 'sawtooth', 0.06, 1300);
@@ -179,6 +219,111 @@ const sndMiss   = () => beep(280, 0.25, 'square', 0.08, 110);
 const sndCombo  = n => { beep(520, 0.07, 'sine', 0.12); setTimeout(() => beep(660, 0.07, 'sine', 0.12), 60); setTimeout(() => beep(880 + n * 40, 0.12, 'sine', 0.12), 120); };
 const sndFrenzy = () => { beep(440, 0.09, 'square', 0.08); setTimeout(() => beep(587, 0.09, 'square', 0.08), 90); setTimeout(() => beep(880, 0.16, 'square', 0.08), 180); };
 const sndOver   = () => { beep(240, 0.4, 'sawtooth', 0.16, 40); setTimeout(() => beep(150, 0.5, 'square', 0.1, 30), 90); };
+
+// ---------- music
+// dojo action ~128 BPM: 16th-note lookahead sequencer, 64-step (4-bar) loop.
+// Taiko-style deep noise drums, A-minor-pentatonic plucked motif, and a
+// sustained fifth drone (A for 3 bars, dipping to G in bar 4) underneath.
+const STEP_DUR = 60 / 128 / 4;          // 16th at 128 BPM
+const NF = { G2:98, A2:110, E4:329.63, G4:392, A4:440, C5:523.25, D5:587.33, E5:659.25 };
+const DRONE_ROOT = ['A2', 'A2', 'A2', 'G2'];
+const LEAD = [];                        // sparse plucked motif
+// bar 1 — statement
+LEAD[0]='A4'; LEAD[4]='C5'; LEAD[6]='D5'; LEAD[8]='E5'; LEAD[12]='D5'; LEAD[14]='C5';
+// bar 2 — breath
+LEAD[16]='A4'; LEAD[22]='G4'; LEAD[24]='A4';
+// bar 3 — answer from above
+LEAD[32]='E5'; LEAD[34]='D5'; LEAD[36]='C5'; LEAD[40]='A4'; LEAD[42]='C5'; LEAD[44]='D5';
+// bar 4 — tense turn over the G drone, leading back home
+LEAD[48]='G4'; LEAD[54]='E4'; LEAD[56]='G4'; LEAD[60]='A4';
+let musicTimer = null, musicStep = 0, nextNoteTime = 0;
+function mDrone(f, t) {
+  const dur = STEP_DUR * 17;            // slight bar overlap → seamless pad
+  const o1 = AC.createOscillator(), o2 = AC.createOscillator(),
+        fl = AC.createBiquadFilter(), g = AC.createGain();
+  o1.type = 'sawtooth'; o1.frequency.value = f;
+  o2.type = 'sawtooth'; o2.frequency.value = f * 1.5 * 1.003;   // detuned fifth
+  fl.type = 'lowpass'; fl.frequency.value = 340; fl.Q.value = 1;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.035, t + 0.5);
+  g.gain.setValueAtTime(0.035, t + dur - 0.5);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o1.connect(fl); o2.connect(fl); fl.connect(g); g.connect(musicGain);
+  o1.start(t); o2.start(t);
+  o1.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+}
+function mPluck(f, t) {
+  const o = AC.createOscillator(), fl = AC.createBiquadFilter(), g = AC.createGain();
+  o.type = 'triangle'; o.frequency.value = f;
+  fl.type = 'lowpass';
+  fl.frequency.setValueAtTime(2600, t);
+  fl.frequency.exponentialRampToValueAtTime(700, t + 0.18);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.085, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+  o.connect(fl); fl.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t + 0.4);
+}
+function mTaiko(t, vol) {               // "don" — deep drum: sine drop + low noise
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(95, t);
+  o.frequency.exponentialRampToValueAtTime(38, t + 0.12);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+  o.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t + 0.24);
+  if (!getNoise()) return;
+  const s = AC.createBufferSource(); s.buffer = noiseBuf;
+  const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 300;
+  const ng = AC.createGain();
+  ng.gain.setValueAtTime(vol * 0.8, t);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+  s.connect(f); f.connect(ng); ng.connect(musicGain);
+  s.start(t); s.stop(t + 0.12);
+}
+function mRim(t) {                      // "ka" — stick click on the rim
+  if (!getNoise()) return;
+  const s = AC.createBufferSource(); s.buffer = noiseBuf;
+  const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 3200; f.Q.value = 2;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.05, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+  s.connect(f); f.connect(g); g.connect(musicGain);
+  s.start(t); s.stop(t + 0.06);
+}
+function musicPlayStep(stp, t) {
+  const bar = (stp / 16) | 0, q = stp % 16;
+  if (q === 0) mDrone(NF[DRONE_ROOT[bar]], t);
+  const n = LEAD[stp]; if (n) mPluck(NF[n], t);
+  // taiko pattern: don . . don-ka phrasing, busier every other bar
+  if (q === 0) mTaiko(t, 0.15);
+  if (q === 6) mTaiko(t, 0.10);
+  if (q === 8) mTaiko(t, 0.13);
+  if (bar & 1) {
+    if (q === 4) mRim(t);
+    if (q === 10) mTaiko(t, 0.09);
+  }
+  if (q === 12 || q === 14) mRim(t);
+}
+function musicSchedule() {
+  if (!AC) return;
+  while (nextNoteTime < AC.currentTime + 0.18) {   // ~0.18 s lookahead
+    musicPlayStep(musicStep, nextNoteTime);
+    musicStep = (musicStep + 1) % 64;
+    nextNoteTime += STEP_DUR;
+  }
+}
+function startMusic() {
+  if (!AC || musicTimer) return;
+  musicStep = 0; nextNoteTime = AC.currentTime + 0.06;
+  musicTimer = setInterval(musicSchedule, 25);
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) return;
+  if (document.hidden) AC.suspend();
+  else if (!muted) AC.resume();
+});
 
 // ---------- layout
 function resize() {
@@ -513,6 +658,21 @@ $('ov-start').addEventListener('click', uiTap);
 $('ov-dead').addEventListener('touchend', uiTap, { passive: false });
 $('ov-dead').addEventListener('click', uiTap);
 
+let lastMuteTap = 0;
+function muteTap(e) {
+  e.preventDefault(); e.stopPropagation();
+  const now = performance.now();
+  if (now - lastMuteTap < 400) return;
+  lastMuteTap = now;
+  muted = !muted;
+  try { localStorage.setItem('neonSlice.mute', muted ? '1' : '0'); } catch (err) {}
+  audio();
+  applyGains();
+  $('mute-btn').textContent = muted ? '🔇' : '🔊';
+}
+$('mute-btn').addEventListener('touchend', muteTap, { passive: false });
+$('mute-btn').addEventListener('click', muteTap);
+
 // ---------- render
 function drawGemPath(type, R) {
   ctx.beginPath();
@@ -724,6 +884,7 @@ function frame(now) {
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => { resize(); setTimeout(resize, 250); });
 resize();
+$('mute-btn').textContent = muted ? '🔇' : '🔊';
 updateHud();
 requestAnimationFrame(frame);
 </script>

@@ -47,3 +47,10 @@ line for `DANGER_TIME` (1.3 s).
 - Spawn row (`spawnY`) is slightly above the tank; the danger check's
   `age > 0.6` guard is what lets freshly dropped orbs pass through the danger
   band without instantly losing.
+
+## Audio & chrome (2026-07-24 retrofit)
+
+SFX route through a `sfxGain` master; `musicGain` carries a mellow lo-fi BGM loop
+(~84 BPM, 64-step lookahead sequencer: Fmaj7→Em7→Dm7→Cmaj7 lowpassed-triangle chords,
+lazy root+fifth bass, swung hats). 🔊/🔇 mute persists to `mergeDrop.mute`; standard
+`#back-btn` + `#mute-btn` sit top-left (HUD top padding bumped to +40px to clear them).

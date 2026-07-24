@@ -78,6 +78,16 @@ assert open-combo state *before* lifting the finger. Slow-creep test (2 px
 per 40 ms) verifies the no-slice threshold. Drops: push a gem below `UH`
 with `vy>0` and wait a frame.
 
+## Audio & back button (2026-07-24 retrofit)
+
+Existing `beep()` SFX now route through a `sfxGain` master; `musicGain` carries a
+64-step lookahead-sequencer dojo-action loop (~128 BPM, taiko-style deep noise
+drums + rim clicks, A-minor-pentatonic plucked motif, sustained fifth drone A→G).
+`#back-btn` + `#mute-btn` (persisted `neonSlice.mute`) sit fixed top-left over the
+HUD strip (HUD gained 98 px left padding); both end above the canvas top, so blade
+swipes are unaffected — verified a swipe starting just under the buttons still
+slices. AudioContext suspends on `visibilitychange`.
+
 ## Follow-up ideas
 
 - Power-up gems: freeze-time (blue clock), 2× score window, screen-clear.

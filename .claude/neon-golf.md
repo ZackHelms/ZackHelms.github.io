@@ -50,3 +50,10 @@ range 30, width 28, stubs 12 wide.
   `touchend`+`click` firing.
 - `simTime` drives movers, water shimmer, boost chevrons, and cup pulse — it
   advances in every state, so attract visuals keep animating on overlays.
+
+## Audio & chrome (2026-07-24 retrofit)
+
+SFX route through a `sfxGain` master; `musicGain` carries a clubhouse lounge BGM loop
+(~100 BPM, 64-step lookahead sequencer: EP-ish Cmaj7→C7→Fmaj7→Fm6 chords, quarter-note
+walking bass, brushed-hat ticks/swishes). 🔊/🔇 mute persists to `neonGolf.mute`; standard
+`#back-btn` + `#mute-btn` sit top-left (HUD top padding bumped to +40px to clear them).

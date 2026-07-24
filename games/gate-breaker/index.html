@@ -7,10 +7,24 @@
 <style>
   html,body{margin:0;padding:0;background:#07070f;}
   #root{min-height:100vh;}
+  #back-btn{position:fixed;z-index:60;
+    top:calc(env(safe-area-inset-top,0px) + 6px);
+    left:calc(env(safe-area-inset-left,0px) + 8px);
+    width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+    background:#0d0d1f;border:1px solid rgba(74,158,255,0.25);border-radius:8px;
+    color:#6a8abb;font-size:16px;text-decoration:none;user-select:none;}
+  #mute-btn{position:fixed;z-index:60;
+    top:calc(env(safe-area-inset-top,0px) + 6px);
+    left:calc(env(safe-area-inset-left,0px) + 52px);
+    width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+    background:#0d0d1f;border:1px solid rgba(74,158,255,0.25);border-radius:8px;
+    color:#6a8abb;font-size:14px;cursor:pointer;user-select:none;padding:0;}
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-05 19:17 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute-btn" aria-label="Toggle sound">🔊</button>
 <div id="root"></div>
 <script>/**
  * @license React
@@ -1805,6 +1819,7 @@ const gBtn = {
   color: BLUE,
   fontFamily: "'Courier New',monospace",
   fontSize: "0.72rem",
+  whiteSpace: "nowrap",
   cursor: "pointer"
 };
 function SaveDialog({
@@ -2141,7 +2156,7 @@ function Slots({
     style: {
       minHeight: "100vh",
       background: `linear-gradient(160deg,${BG},#0c0c1c,${BG})`,
-      padding: "24px 14px",
+      padding: "52px 14px 24px",
       fontFamily: "'Courier New',monospace",
       color: TEXT
     }
@@ -2330,7 +2345,7 @@ function Game({
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      padding: "9px 13px",
+      padding: "9px 13px 9px 96px",
       background: "rgba(0,0,0,0.85)",
       borderBottom: "1px solid rgba(74,158,255,0.2)",
       flexShrink: 0,
@@ -2496,6 +2511,257 @@ function App() {
   }));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+<script>
+/* ------------------------------------------------------------------------
+ * Retrofit (2026-07-24): hub back button + WebAudio SFX/BGM + mute.
+ * Plain vanilla JS at file scope — lives entirely outside the React app.
+ * Game events are observed by wrapping the global processAction() state
+ * machine (pre/post state diff); generic menu taps via click delegation.
+ * ---------------------------------------------------------------------- */
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------- persisted mute
+  var muted = false;
+  try { muted = localStorage.getItem("gbmute") === "1"; } catch (e) {}
+  var muteBtn = document.getElementById("mute-btn");
+  function paintMute() { muteBtn.textContent = muted ? "🔇" : "🔊"; }
+  paintMute();
+
+  // ---------------------------------------------------- audio core
+  var ac = null, sfxGain = null, musicGain = null, noiseBuf = null;
+  function ensureAudio() {
+    if (!ac) {
+      try {
+        ac = new (window.AudioContext || window.webkitAudioContext)();
+        sfxGain = ac.createGain(); sfxGain.connect(ac.destination);
+        musicGain = ac.createGain(); musicGain.connect(ac.destination);
+        applyGains();
+      } catch (e) { ac = null; }
+    }
+    if (ac && ac.state === "suspended" && !muted) ac.resume();
+    return ac;
+  }
+  function applyGains() {
+    if (!ac) return;
+    sfxGain.gain.value = muted ? 0 : 0.9;
+    musicGain.gain.value = muted ? 0 : 0.17;
+  }
+  function getNoise() {
+    if (!noiseBuf && ac) {
+      var len = Math.floor(ac.sampleRate * 1.0);
+      noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+      var d = noiseBuf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return noiseBuf;
+  }
+
+  // ---------------------------------------------------- sfx primitives
+  function beep(freq, dur, type, vol, slideTo, when) {
+    var a = ensureAudio(); if (!a) return;
+    var t = a.currentTime + (when || 0);
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(vol || 0.1, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(sfxGain);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  function noiseHit(vol, dur, freq, type, when) {
+    var a = ensureAudio(); if (!a || !getNoise()) return;
+    var t = a.currentTime + (when || 0);
+    var s = a.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+    var f = a.createBiquadFilter(); f.type = type || "highpass"; f.frequency.value = freq;
+    var g = a.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(sfxGain);
+    s.start(t); s.stop(t + dur + 0.02);
+  }
+
+  // ---------------------------------------------------- sfx vocabulary
+  var lastSfxAt = -1e9;
+  function mark() { lastSfxAt = performance.now(); }
+  function sndTick()    { beep(300, 0.04, "square", 0.05, 240); }
+  function sndAttack()  { noiseHit(0.10, 0.09, 2400); beep(420, 0.09, "square", 0.07, 150); }
+  function sndHurt(dl)  { beep(150, 0.16, "sine", 0.20, 55, dl); noiseHit(0.07, 0.12, 500, "lowpass", dl); }
+  function sndLoot()    { beep(660, 0.08, "sine", 0.09); beep(990, 0.10, "sine", 0.09, 0, 0.07); }
+  function sndLevel()   { [587.33, 739.99, 880, 1174.66].forEach(function (f, i) { beep(f, 0.14, "sine", 0.10, 0, i * 0.09); }); }
+  function sndVictory() { [523.25, 659.25, 783.99].forEach(function (f, i) { beep(f, 0.10, "triangle", 0.10, 0, i * 0.07); }); }
+  function sndEnc()     { beep(110, 0.30, "sawtooth", 0.08, 78); noiseHit(0.05, 0.30, 300, "lowpass"); }
+  function sndBoss()    { beep(65, 0.80, "sawtooth", 0.13, 49); beep(92, 0.70, "sawtooth", 0.07, 65, 0.05); noiseHit(0.09, 0.70, 220, "lowpass"); }
+  function sndDeath()   { beep(220, 0.90, "sawtooth", 0.12, 40); beep(110, 1.00, "sine", 0.18, 30, 0.10); }
+
+  // ---------------------------------------------------- music
+  // Brooding dark-fantasy dungeon loop, ~76 BPM, D minor, 8-bar (64-step,
+  // 8th-note) lookahead sequencer: heavy detuned bass drone walking
+  // i (D) -> VI (Bb) -> VII (C), sparse echoing triangle pluck motif,
+  // deep tom "lub-dub" heartbeat each bar, faint low-passed cavern air.
+  var BPM = 76, STEP = 60 / BPM / 2, BARLEN = 8, NSTEPS = 64;
+  var DRONE = { 0: 73.42, 4: 58.27, 6: 65.41 };   // bar -> root: D2, Bb1, C2
+  var FIFTH = { 0: 110.0, 4: 87.31, 6: 98.0 };    // A2, F2, G2
+  var DRONE_BARS = { 0: 4, 4: 2, 6: 2 };
+  var PLUCK = {                                   // step -> freq (D natural minor)
+    3: 293.66, 13: 349.23, 18: 329.63, 22: 293.66, 28: 220.0,
+    35: 349.23, 41: 293.66, 50: 329.63, 54: 392.0, 60: 440.0
+  };
+  function mDrone(root, fifth, bars, t) {
+    var dur = bars * BARLEN * STEP;
+    var fl = ac.createBiquadFilter(); fl.type = "lowpass"; fl.frequency.value = 230; fl.Q.value = 0.8;
+    var g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05, t + 1.4);
+    g.gain.setValueAtTime(0.05, t + dur - 0.8);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.3);
+    fl.connect(g); g.connect(musicGain);
+    [[root, "sawtooth", 1], [root * 1.006, "sawtooth", 1], [fifth, "sine", 0.6]].forEach(function (v) {
+      var o = ac.createOscillator(), og = ac.createGain();
+      o.type = v[1]; o.frequency.value = v[0]; og.gain.value = v[2];
+      o.connect(og); og.connect(fl);
+      o.start(t); o.stop(t + dur + 0.4);
+    });
+  }
+  function mHeart(t, v) {
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(105, t);
+    o.frequency.exponentialRampToValueAtTime(42, t + 0.22);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(v, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+    o.connect(g); g.connect(musicGain);
+    o.start(t); o.stop(t + 0.3);
+  }
+  function mPluck(f, t, v) {
+    var o = ac.createOscillator(), fl = ac.createBiquadFilter(), g = ac.createGain();
+    o.type = "triangle"; o.frequency.value = f;
+    fl.type = "lowpass"; fl.frequency.value = 1600;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(v, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+    o.connect(fl); fl.connect(g); g.connect(musicGain);
+    o.start(t); o.stop(t + 0.6);
+  }
+  function mAir(t) {
+    if (!getNoise()) return;
+    var s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+    var f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 320;
+    var g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.016, t + 1.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 6.0);
+    s.connect(f); f.connect(g); g.connect(musicGain);
+    s.start(t); s.stop(t + 6.2);
+  }
+  function musicStepPlay(stp, t) {
+    var bar = Math.floor(stp / BARLEN), sub = stp % BARLEN;
+    if (sub === 0 && DRONE[bar] != null) mDrone(DRONE[bar], FIFTH[bar], DRONE_BARS[bar], t);
+    if (sub === 0) mHeart(t, 0.32);
+    if (sub === 1) mHeart(t, 0.19);
+    if (sub === 0 && (bar === 0 || bar === 4)) mAir(t);
+    var pf = PLUCK[stp];
+    if (pf) {                                  // pluck + two fading cavern echoes
+      mPluck(pf, t, 0.055);
+      mPluck(pf, t + STEP * 1.5, 0.026);
+      mPluck(pf, t + STEP * 3, 0.012);
+    }
+  }
+  var musicTimer = null, musicStep = 0, nextNoteTime = 0;
+  function musicSchedule() {
+    if (!ac) return;
+    while (nextNoteTime < ac.currentTime + 0.18) {
+      musicStepPlay(musicStep, nextNoteTime);
+      musicStep = (musicStep + 1) % NSTEPS;
+      nextNoteTime += STEP;
+    }
+  }
+  function startMusic() {
+    if (!ensureAudio()) return;
+    if (musicTimer) return;
+    musicStep = 0; nextNoteTime = ac.currentTime + 0.1;
+    musicTimer = setInterval(musicSchedule, 25);
+  }
+
+  // ---------------------------------------------------- game-event hook
+  // processAction(g, action) is the game's whole state machine (a global
+  // function declaration, so the binding is reassignable); wrap it and
+  // diff pre/post state. NOTE: g.enemy is NOT copied by processAction (it
+  // mutates in place), so enemy HP must be captured before the call.
+  function audioOnAction(pre, G) {
+    if (!ensureAudio()) return;
+    var p = G.player;
+    if (G.phase === "dead" && pre.phase !== "dead") { sndDeath(); mark(); return; }
+    var played = false;
+    if (p && p.level > pre.level) { sndLevel(); played = true; }
+    else if (pre.enemyHp != null && !G.enemy && p && p.stones > pre.stones) { sndVictory(); played = true; }
+    if (G.phase === "combat" && pre.phase !== "combat") {
+      if (G.isBoss) sndBoss(); else sndEnc();
+      played = true;
+    }
+    var struck = G.phase === "combat" && G.enemy && pre.enemyHp != null && G.enemy.currentHp < pre.enemyHp;
+    if (struck && !played) { sndAttack(); played = true; }
+    if (p && p.hp < pre.hp) { sndHurt(struck ? 0.22 : 0); played = true; }
+    if (!played && p && (p.stones > pre.stones ||
+        p.inventory.length > pre.bag ||
+        p.ownedWeapons.length + p.ownedArmors.length > pre.gear ||
+        p.equippedWeapon !== pre.weapon || p.equippedArmor !== pre.armor)) {
+      sndLoot(); played = true;
+    }
+    if (played) mark();
+  }
+  if (typeof processAction === "function") {
+    var origProcess = processAction;
+    processAction = function (g, actionText) {
+      var pre = {
+        phase: g && g.phase,
+        hp: g && g.player ? g.player.hp : 0,
+        level: g && g.player ? g.player.level : 0,
+        stones: g && g.player ? g.player.stones : 0,
+        bag: g && g.player ? g.player.inventory.length : 0,
+        gear: g && g.player ? g.player.ownedWeapons.length + g.player.ownedArmors.length : 0,
+        weapon: g && g.player ? g.player.equippedWeapon : "",
+        armor: g && g.player ? g.player.equippedArmor : "",
+        enemyHp: g && g.enemy ? g.enemy.currentHp : null
+      };
+      var G = origProcess(g, actionText);
+      try { audioOnAction(pre, G); } catch (e) {}
+      return G;
+    };
+  }
+
+  // ---------------------------------------------------- generic wiring
+  // Soft menu tick for any button tap that didn't already trigger a
+  // game-event sound (this bubble listener runs after React's handlers).
+  document.addEventListener("click", function (e) {
+    var el = e.target;
+    if (el && el.closest && el.closest("button") && el.closest("#mute-btn") === null &&
+        performance.now() - lastSfxAt > 80) sndTick();
+  });
+  // Lazy context + music start on first user gesture (iOS unlock).
+  function unlock() { if (ensureAudio()) startMusic(); }
+  document.addEventListener("pointerdown", unlock, { capture: true });
+  document.addEventListener("keydown", unlock, { capture: true });
+
+  muteBtn.addEventListener("click", function () {
+    muted = !muted;
+    try { localStorage.setItem("gbmute", muted ? "1" : "0"); } catch (e) {}
+    if (ensureAudio()) {
+      applyGains();
+      if (!muted) { ac.resume(); startMusic(); }
+    }
+    paintMute();
+  });
+
+  document.addEventListener("visibilitychange", function () {
+    if (!ac) return;
+    if (document.hidden) ac.suspend();
+    else if (!muted) ac.resume();
+  });
+})();
 </script>
 </body>
 </html>

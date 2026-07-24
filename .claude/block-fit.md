@@ -84,3 +84,8 @@ with a dotless tray, then call `checkGameOver()`.
   clear base (10), line multiplier caps.
 - Follow-up ideas: hold-slot swap, score-based color themes, combo sound
   ramp, daily-seed mode, subtle board heatmap hinting at risky corners.
+
+## Audio / back button (2026-07-24 retrofit)
+
+- `sfxGain`/`musicGain` masters (beeps unchanged, now routed via `sfxGain`); BGM = chill ~90 BPM downtempo 4-bar loop (Cmaj7→Am7→Fmaj7♯11→Gadd9 filtered-triangle pads, sine bass, sparse plucks, faint ticks) on a 25 ms lookahead sequencer, starts on first gesture.
+- Mute 🔊/🔇 persists to `blockFit.mute`; AC suspends on `visibilitychange`. `#back-btn` → `../index.html` top-left, mute at +52px; HUD top padding pushed to safe+40px so neither overlaps the SCORE block.

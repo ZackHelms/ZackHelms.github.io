@@ -401,10 +401,27 @@ body {
 .tgb-icon{font-size:0.9rem;} .tgb-name{font-size:0.42rem;} .tgb-cost{font-size:0.4rem;color:var(--purple);}
 .tg-gear-btn.owned .tgb-cost{color:var(--green);}
 .wd-up-earn{font-size:0.62rem;color:var(--purple);font-family:'Black Ops One',sans-serif;}
+
+/* ── BACK + MUTE BUTTONS (fixed top-left corner) ── */
+#back-btn, #mute-btn {
+  position: fixed; z-index: 60;
+  top: calc(env(safe-area-inset-top, 0px) + 6px);
+  width: 38px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  color: #8899bb; font-size: 16px; text-decoration: none; user-select: none;
+}
+#back-btn { left: calc(env(safe-area-inset-left, 0px) + 8px); }
+#mute-btn { left: calc(env(safe-area-inset-left, 0px) + 52px); font-size: 14px; cursor: pointer; padding: 0; font-family: inherit; }
+/* HUD clears the corner buttons: portrait shifts row 1 right, landscape starts the hud after them */
+@media (orientation: portrait)  { .hud-r1 { padding-left: 84px; flex-wrap: wrap; } }
+@media (orientation: landscape) { #hud { left: 96px; } }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-05 19:17 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
+<a id="back-btn" href="index.html" aria-label="Back to games">←</a>
+<button id="mute-btn" aria-label="Toggle sound">🔊</button>
 
 <!-- ── TOP HUD (compact, 2 rows portrait / 1 row landscape) ──────────────── -->
 <div id="hud">
@@ -539,6 +556,16 @@ body {
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <script>
+(function () {
+// ── Offline guard: the 3D engine loads from a CDN — degrade gracefully without it
+if (typeof THREE === 'undefined') {
+  const sub = document.querySelector('#titleScreen .ov-sub');
+  if (sub) sub.textContent = 'No connection — the 3D engine could not load. Reconnect and reload to play.';
+  const sb = document.getElementById('startBtn');
+  if (sb) { sb.disabled = true; sb.style.opacity = '0.35'; }
+  return;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -642,6 +669,247 @@ const TROOP_GEAR = [
 ];
 
 function hasCmdGear(id) { return GEAR.cmdEquipped.includes(id); }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUDIO — WebAudio synth (no audio files): SFX + martial-march music loop
+// ═══════════════════════════════════════════════════════════════════════════════
+let ac = null, sfxGain = null, musicGain = null, noiseBuf = null;
+let muted = false;
+try { muted = localStorage.getItem('stick-commander-mute') === '1'; } catch (e) {}
+
+function audio() {
+  if (!ac) {
+    try {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      sfxGain = ac.createGain();   sfxGain.connect(ac.destination);
+      musicGain = ac.createGain(); musicGain.connect(ac.destination);
+      applyGains();
+    } catch (e) { ac = null; }
+  }
+  if (ac && ac.state === 'suspended' && !muted) ac.resume();
+  return ac;
+}
+function applyGains() {
+  if (!ac) return;
+  sfxGain.gain.value   = muted ? 0 : 0.9;
+  musicGain.gain.value = muted ? 0 : 0.16;
+}
+function getNoise() {
+  if (!noiseBuf && ac) {
+    const len = Math.floor(ac.sampleRate * 0.2);
+    noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuf;
+}
+function beep(freq, dur, type, gain, slideTo) {
+  const a = audio(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, a.currentTime);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, a.currentTime + dur);
+  g.gain.setValueAtTime(gain || 0.1, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
+  o.connect(g).connect(sfxGain);
+  o.start(); o.stop(a.currentTime + dur + 0.02);
+}
+function noiseHit(vol, dur, filterType, freq) {
+  const a = audio(); if (!a || !getNoise()) return;
+  const s = a.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+  const f = a.createBiquadFilter(); f.type = filterType || 'highpass'; f.frequency.value = freq || 2500;
+  const g = a.createGain();
+  g.gain.setValueAtTime(vol, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
+  s.connect(f); f.connect(g); g.connect(sfxGain);
+  s.start(); s.stop(a.currentTime + dur + 0.02);
+}
+
+// ── SFX ──────────────────────────────────────────────────────────────────────
+let _lastHitS = 0, _lastKillS = 0, _lastCryS = 0;
+const sndDeploy = () => {   // troop placed: radio-ack blip + boot thump
+  beep(392, 0.05, 'square', 0.07); beep(98, 0.09, 'sine', 0.12, 65);
+  setTimeout(() => beep(587, 0.07, 'square', 0.06), 55);
+};
+const sndDeny = () => beep(140, 0.12, 'square', 0.07, 105);
+function sndHit() {         // combat impact — throttled, it fires constantly
+  const a = audio(); if (!a) return;
+  if (a.currentTime - _lastHitS < 0.08) return;
+  _lastHitS = a.currentTime;
+  noiseHit(0.05, 0.04, 'highpass', 2600);
+  beep(165, 0.045, 'square', 0.04, 120);
+}
+function sndKill() {        // enemy down + gold — throttled
+  const a = audio(); if (!a) return;
+  if (a.currentTime - _lastKillS < 0.07) return;
+  _lastKillS = a.currentTime;
+  beep(660, 0.05, 'square', 0.05);
+  setTimeout(() => beep(988, 0.06, 'square', 0.045), 45);
+}
+function sndCrystalHit() {  // crystal under attack — throttled alarm
+  const a = audio(); if (!a) return;
+  if (a.currentTime - _lastCryS < 0.3) return;
+  _lastCryS = a.currentTime;
+  beep(311, 0.16, 'square', 0.07, 155);
+  noiseHit(0.06, 0.1, 'bandpass', 900);
+}
+function sndAbility(id) {
+  if (id === 'lightning') { noiseHit(0.2, 0.2, 'highpass', 1200); beep(220, 0.3, 'sawtooth', 0.12, 50); return; }
+  if (id === 'freeze')    { beep(1047, 0.18, 'sine', 0.08, 1568); setTimeout(() => beep(1319, 0.2, 'sine', 0.06, 1760), 90); return; }
+  if (id === 'healcrys')  { beep(523, 0.09, 'sine', 0.08); setTimeout(() => beep(784, 0.14, 'sine', 0.08), 90); return; }
+  beep(440, 0.1, 'square', 0.07); setTimeout(() => beep(659, 0.12, 'square', 0.07), 80); // inspire / default
+}
+const sndWaveStart = () => { // war-horn call + snare
+  noiseHit(0.07, 0.09, 'bandpass', 1900);
+  beep(147, 0.24, 'sawtooth', 0.09); beep(220, 0.24, 'sawtooth', 0.06);
+  setTimeout(() => { beep(196, 0.32, 'sawtooth', 0.09); beep(294, 0.32, 'sawtooth', 0.055); }, 240);
+};
+const sndBoss = () => {      // low dread horn
+  beep(110, 0.6, 'sawtooth', 0.13, 55); beep(55, 0.7, 'sine', 0.15, 40);
+  noiseHit(0.12, 0.25, 'lowpass', 500);
+  setTimeout(() => beep(104, 0.7, 'sawtooth', 0.12, 49), 380);
+};
+const sndWaveClear = () => {
+  beep(587, 0.09, 'square', 0.07);
+  setTimeout(() => beep(784, 0.09, 'square', 0.07), 85);
+  setTimeout(() => beep(880, 0.16, 'square', 0.08), 170);
+};
+const sndUnlock = () => {
+  beep(523, 0.07, 'sine', 0.08);
+  setTimeout(() => beep(659, 0.07, 'sine', 0.08), 65);
+  setTimeout(() => beep(784, 0.13, 'sine', 0.09), 130);
+};
+const sndVictory = () => {
+  [[587, 0], [698, 130], [880, 260], [1175, 420]].forEach(([f, d]) =>
+    setTimeout(() => { const l = d === 420 ? 0.5 : 0.16; beep(f, l, 'square', 0.08); beep(f / 2, l, 'sine', 0.08); }, d));
+};
+const sndDefeat = () => {
+  beep(392, 0.8, 'sawtooth', 0.1, 62);
+  setTimeout(() => beep(98, 0.8, 'sine', 0.15, 46), 200);
+};
+
+// ── MUSIC — martial march loop: D dorian, 112 BPM, 4 bars = 64 16th steps.
+//    War-drum boom + snare taps with roll flourishes (filtered noise), steady
+//    square low-brass bass in quarters over Dm | Dm | G | C, terse fife-like
+//    triangle motif, quiet saw pad. Scheduled by a 25 ms lookahead sequencer.
+const STEP_DUR = 60 / 112 / 4;
+const MNF = { D2:73.42, G2:98.00, A2:110.00, C3:130.81, D3:146.83, G3:196.00,
+              A3:220.00, C4:261.63, D4:293.66, A4:440.00, C5:523.25, D5:587.33,
+              E5:659.26, F5:698.46, G5:783.99, A5:880.00, B5:987.77 };
+const BASS_Q  = [['D2','A2','D2','A2'], ['D2','A2','D2','A2'], ['G2','D3','G2','D3'], ['C3','G2','C3','G2']];
+const PAD_BAR = [['D3','A3'], ['D3','A3'], ['G3','D4'], ['C4','G3']];
+const LEAD64 = [];
+LEAD64[0]  = 'D5'; LEAD64[4]  = 'F5'; LEAD64[6]  = 'E5'; LEAD64[8]  = 'D5'; LEAD64[12] = 'A4';
+LEAD64[16] = 'D5'; LEAD64[20] = 'F5'; LEAD64[22] = 'G5'; LEAD64[24] = 'A5';
+LEAD64[32] = 'A5'; LEAD64[36] = 'B5'; LEAD64[38] = 'A5'; LEAD64[40] = 'G5'; LEAD64[44] = 'D5';
+LEAD64[48] = 'E5'; LEAD64[52] = 'G5'; LEAD64[54] = 'E5'; LEAD64[56] = 'D5'; LEAD64[60] = 'C5';
+let musicTimer = null, musicStep = 0, nextNoteTime = 0;
+function mBass(f, t, d) {
+  const o = ac.createOscillator(), fl = ac.createBiquadFilter(), g = ac.createGain();
+  o.type = 'square'; o.frequency.value = f;
+  fl.type = 'lowpass'; fl.frequency.value = 420; fl.Q.value = 1;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.10, t + 0.02);
+  g.gain.setValueAtTime(0.10, t + d * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(fl); fl.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t + d + 0.03);
+}
+function mLead(f, t) {
+  const o = ac.createOscillator(), fl = ac.createBiquadFilter(), g = ac.createGain();
+  o.type = 'triangle'; o.frequency.value = f;
+  fl.type = 'lowpass'; fl.frequency.value = 2600;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.055, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+  o.connect(fl); fl.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t + 0.28);
+}
+function mPad(f, t, d) {
+  const o = ac.createOscillator(), fl = ac.createBiquadFilter(), g = ac.createGain();
+  o.type = 'sawtooth'; o.frequency.value = f;
+  fl.type = 'lowpass'; fl.frequency.value = 700;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.016, t + 0.4);
+  g.gain.setValueAtTime(0.016, t + d * 0.75);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(fl); fl.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t + d + 0.05);
+}
+function mDrum(t) {          // war-drum boom
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(130, t);
+  o.frequency.exponentialRampToValueAtTime(46, t + 0.1);
+  g.gain.setValueAtTime(0.20, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+  o.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t + 0.15);
+}
+function mSnare(t, vol) {
+  if (!getNoise()) return;
+  const s = ac.createBufferSource(); s.buffer = noiseBuf;
+  const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1900; f.Q.value = 0.8;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+  s.connect(f); f.connect(g); g.connect(musicGain);
+  s.start(t); s.stop(t + 0.09);
+}
+function musicPlayStep(stp, t) {
+  const bar = (stp / 16) | 0, sub = stp % 16;
+  if (sub % 4 === 0) mBass(MNF[BASS_Q[bar][sub / 4]], t, STEP_DUR * 3.4);
+  if (sub === 0) PAD_BAR[bar].forEach(n => mPad(MNF[n], t, STEP_DUR * 15.5));
+  const ln = LEAD64[stp]; if (ln) mLead(MNF[ln], t);
+  if (sub === 0 || sub === 8)  mDrum(t);
+  if (sub === 4 || sub === 12) mSnare(t, 0.08);
+  if (sub === 10) mSnare(t, 0.018);                                             // ghost tick
+  if ((bar === 1 || bar === 3) && sub >= 14) mSnare(t, sub === 14 ? 0.03 : 0.05); // roll into the downbeat
+}
+function musicSchedule() {
+  if (!ac) return;
+  while (nextNoteTime < ac.currentTime + 0.16) {   // ~0.16 s lookahead
+    musicPlayStep(musicStep, nextNoteTime);
+    musicStep = (musicStep + 1) % 64;
+    nextNoteTime += STEP_DUR;
+  }
+}
+function startMusic() {
+  const a = audio(); if (!a || musicTimer) return;
+  musicStep = 0; nextNoteTime = a.currentTime + 0.1;
+  musicTimer = setInterval(musicSchedule, 25);
+}
+
+// First user gesture unlocks the context and starts the loop (iOS requirement);
+// later gestures just resume a suspended context.
+function unlockAudio() { if (audio()) startMusic(); }
+document.addEventListener('pointerdown', unlockAudio, { passive: true });
+document.addEventListener('touchend',    unlockAudio, { passive: true });
+document.addEventListener('keydown',     unlockAudio);
+
+document.addEventListener('visibilitychange', () => {
+  if (!ac) return;
+  if (document.hidden) ac.suspend();
+  else if (!muted) ac.resume();
+});
+
+// ── Mute button (persisted) ──────────────────────────────────────────────────
+const muteBtn = document.getElementById('mute-btn');
+muteBtn.textContent = muted ? '🔇' : '🔊';
+let lastMuteTap = 0;
+function muteTap(e) {
+  e.preventDefault(); e.stopPropagation();
+  const now = performance.now();
+  if (now - lastMuteTap < 400) return;   // iOS fires touchend AND click per tap
+  lastMuteTap = now;
+  muted = !muted;
+  try { localStorage.setItem('stick-commander-mute', muted ? '1' : '0'); } catch (err) {}
+  audio(); applyGains();
+  if (!muted) startMusic();
+  muteBtn.textContent = muted ? '🔇' : '🔊';
+}
+muteBtn.addEventListener('touchend', muteTap, { passive: false });
+muteBtn.addEventListener('click', muteTap);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // THREE.JS SCENE SETUP
@@ -1227,6 +1495,7 @@ function updateUnits(dt) {
           if (GS.crystalHp <= 0) { GS.crystalHp = 0; endGame(false); return; }
           addFloat3D(new THREE.Vector3(0, 2, 0), `-${dmg}`, '#ff4444');
           flashCrystal(false);
+          sndCrystalHit();
         }
       }
     }
@@ -1237,6 +1506,7 @@ function updateUnits(dt) {
 // COMBAT
 // ═══════════════════════════════════════════════════════════════════════════════
 function dealDamage(attacker, target) {
+  sndHit();
   if (target.team === 'enemy' && target.shield > 0) {
     target.shield--;
     target.mat.emissive && target.mat.emissive.setHex(0x8888ff);
@@ -1256,6 +1526,7 @@ function dealDamage(attacker, target) {
 function handleDeath(unit) {
   spawnDeathParticles(unit.group.position, unit.mat.color.getHex());
   if (unit.team === 'enemy') {
+    sndKill();
     GS.gold  += unit.reward;
     GS.score += unit.reward * 3;
     GS.waveGoldEarned += unit.reward;
@@ -1286,6 +1557,7 @@ function rollUnlocks(enemy) {
 
 function unlockTroop(type) {
   GS.unlockedTroops.add(type);
+  sndUnlock();
   const def = TROOP_DEFS[type];
   const toast = document.getElementById('unlockToast');
   document.getElementById('unlockToastText').textContent = `🔓 ${def.name} UNLOCKED!`;
@@ -1365,11 +1637,12 @@ function useAbility(id) {
   const def = ABILITY_DEFS.find(a => a.id === id);
   if (!def) return;
   if (GS.abilityCds[id] > 0) return;
-  if (GS.mana < def.mana) { addFloat3D(new THREE.Vector3(0, 3, 0), 'NOT ENOUGH MANA', '#ff4444'); return; }
+  if (GS.mana < def.mana) { sndDeny(); addFloat3D(new THREE.Vector3(0, 3, 0), 'NOT ENOUGH MANA', '#ff4444'); return; }
 
   GS.mana -= def.mana;
   const cdMult = hasCmdGear('quickcast_orb') ? 0.75 : 1.0;
   GS.abilityCds[id] = def.cd * cdMult;
+  sndAbility(id);
 
   switch (id) {
     case 'freeze': {
@@ -1544,6 +1817,7 @@ function flashCrystal(good) {
 // WAVE MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════════════
 function startWave(n) {
+  sndWaveStart();
   GS.waveWon = false;
   GS.bossUnit = null;
   document.getElementById('bossBar').classList.remove('visible');
@@ -1588,6 +1862,7 @@ function spawnBossUnit() {
   document.getElementById('bossNameLbl').textContent = bd.name;
   document.getElementById('bossBar').classList.add('visible');
   addFloat3D(new THREE.Vector3(e.group.position.x, 3, e.group.position.z), `☠ ${bd.name}!`, '#ff2244');
+  sndBoss();
 }
 
 function checkWaveWin() {
@@ -1610,6 +1885,7 @@ function checkWaveWin() {
 }
 
 function showWaveComplete(goldBonus, upEarned = 0) {
+  sndWaveClear();
   GS.phase = 'between';
   const n = GS.wave;
 
@@ -1752,11 +2028,12 @@ function handleFieldTap(clientX, clientY) {
   const pt = hits[0].point;
   const distFromCenter = Math.sqrt(pt.x * pt.x + pt.z * pt.z);
   const def = TROOP_DEFS[GS.selectedTroop];
-  if (distFromCenter < MIN_PLACE_DIST)   { addFloat3D(new THREE.Vector3(pt.x, 1, pt.z), 'TOO CLOSE!', '#ff4444'); return; }
-  if (distFromCenter > FIELD_RADIUS + 3) { addFloat3D(new THREE.Vector3(pt.x, 1, pt.z), 'OUT OF RANGE!', '#ff4444'); return; }
-  if (GS.gold < def.cost)                { addFloat3D(new THREE.Vector3(pt.x, 1, pt.z), 'NOT ENOUGH GOLD', '#ff4444'); return; }
+  if (distFromCenter < MIN_PLACE_DIST)   { sndDeny(); addFloat3D(new THREE.Vector3(pt.x, 1, pt.z), 'TOO CLOSE!', '#ff4444'); return; }
+  if (distFromCenter > FIELD_RADIUS + 3) { sndDeny(); addFloat3D(new THREE.Vector3(pt.x, 1, pt.z), 'OUT OF RANGE!', '#ff4444'); return; }
+  if (GS.gold < def.cost)                { sndDeny(); addFloat3D(new THREE.Vector3(pt.x, 1, pt.z), 'NOT ENOUGH GOLD', '#ff4444'); return; }
 
   GS.gold -= def.cost;
+  sndDeploy();
   const troop = spawnTroop(GS.selectedTroop, pt.x, pt.z);
   GS.troops.push(troop);
   GS.waveTroopsAdded[GS.selectedTroop] = (GS.waveTroopsAdded[GS.selectedTroop] || 0) + 1;
@@ -1863,6 +2140,7 @@ function updateHUD() {
 // ═══════════════════════════════════════════════════════════════════════════════
 function endGame(victory) {
   GS.phase = victory ? 'victory' : 'gameover';
+  if (victory) sndVictory(); else sndDefeat();
   clearInterval(_cdInterval);
   document.getElementById('waveDone').classList.remove('visible');
   document.getElementById('waveInterludeOverlay').classList.remove('visible');
@@ -1900,6 +2178,8 @@ function syncHudHeight() {
 window.addEventListener('resize', syncHudHeight);
 // Run after first render
 requestAnimationFrame(() => requestAnimationFrame(syncHudHeight));
+// Re-sync if hud content rewraps (e.g. row 1 wraps when gold/score digits grow)
+if (window.ResizeObserver) new ResizeObserver(syncHudHeight).observe(document.getElementById('hud'));
 
 document.getElementById('startBtn').addEventListener('click',     startGame);
 document.getElementById('retryBtn').addEventListener('click',     startGame);
@@ -2163,6 +2443,7 @@ function buildTabGear() {
 // ── Start loop ────────────────────────────────────────────────────────────────
 applyCameraOrbit();
 requestAnimationFrame(gameLoop);
+})();
 </script>
 </body>
 </html>

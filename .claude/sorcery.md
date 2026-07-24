@@ -265,3 +265,7 @@ Fonts: `'Black Ops One'` (headings), `'Share Tech Mono'` (body/mono).
 **New particle type:** Push `{type:'mytype', ...fields}` to `G.particles[]`. Add a `drawMytypePtcl()` function and call it from `draw()` in the correct z-order.
 
 **New overlay:** Add HTML element, CSS `display:none → display:flex` via `.show` class, wire into `pushPause()`/`popPause()` if it should pause gameplay.
+
+## Audio
+
+WebAudio (2026-07-24 retrofit): lazy `ensureAudio()` on first gesture, `sfxGain`/`musicGain` masters, mute persisted at `sorcery_mute`, suspend on `visibilitychange`. SFX: `sndCast/sndWall/sndKill/sndBaseHit/sndWave/sndBoss/sndLevelUp/sndChoose/sndOver`. Music: dark arcane 4-bar Am|Am|F|E loop at 90 BPM (detuned-saw drone + sub, triangle bass pulse, sparse sine-bell arpeggio, low tom thumps) via 25 ms lookahead sequencer (`musicPlayStep`/`musicSchedule`). Fixed top-left `#back-btn` + `#mute-btn`; portrait `#hud` gets `padding-left:96px` (≤791px) and landscape `#hud` `padding-top:44px` to clear them.

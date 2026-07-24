@@ -33,3 +33,8 @@ Single self-contained file.
   which is what terminates the recursion. Keep that order.
 - Steel bricks give +5 per ding (anti-frustration), and lasers can't break
   them.
+
+## Audio / back button (2026-07-24 retrofit)
+
+- `sfxGain`/`musicGain` masters (beeps unchanged, now routed via `sfxGain`); BGM = bright ~132 BPM chiptune 8-bar A/B loop (square lead over C-G-Am-F then F-G-Am-G, pumping octave triangle bass, noise hats + backbeat snare) on a 25 ms lookahead sequencer, starts on first gesture.
+- Mute 🔊/🔇 persists to `brickBreaker.mute`; AC suspends on `visibilitychange`. `#back-btn` → `../index.html` top-left, mute at +52px; HUD top padding pushed to safe+40px so neither overlaps the SCORE block.

@@ -39,10 +39,19 @@ html, body {
 #hud-sub { font-size:0.6rem; letter-spacing:2px; color:var(--dim); margin-top:2px; }
 #v-score { color:var(--gold); }
 #v-best { color:var(--purple); }
-#mute-btn {
+#back-btn {
   position:fixed; z-index:60;
   top:calc(env(safe-area-inset-top, 0px) + 6px);
   left:calc(env(safe-area-inset-left, 0px) + 8px);
+  width:38px; height:30px; font-size:16px; line-height:28px; text-align:center;
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  color:var(--white); text-decoration:none;
+  touch-action:manipulation; -webkit-user-select:none; user-select:none;
+}
+#mute-btn {
+  position:fixed; z-index:60;
+  top:calc(env(safe-area-inset-top, 0px) + 6px);
+  left:calc(env(safe-area-inset-left, 0px) + 52px);
   width:38px; height:30px; font-size:15px; line-height:1;
   background:var(--panel); border:1px solid var(--border); border-radius:8px;
   color:var(--white); padding:0;
@@ -83,13 +92,14 @@ html, body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 13:26 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
 <canvas id="game"></canvas>
 <div id="hud">
   <div class="hud-label">HEIGHT</div>
   <div id="v-height">0</div>
   <div id="hud-sub"><span id="v-score">SCORE 0</span> &nbsp;&bull;&nbsp; <span id="v-best">BEST 0</span></div>
 </div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute-btn">🔊</button>
 
 <div id="banner"><div class="b-big" id="b-big"></div></div>

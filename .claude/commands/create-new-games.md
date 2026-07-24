@@ -17,6 +17,10 @@ end without waiting for mid-task input beyond the one question round below.
 - They must be **fun on mobile, iPhone 13 especially** (390×844 @3x):
   touch-first input, one-thumb where the concept allows, safe-area-aware
   HUD, no hover dependence, 60 fps.
+- Each includes the standard page chrome: a **top-left ← back button** to
+  the games hub as the left-most control with the 🔊/🔇 mute button beside
+  it (`games/CLAUDE.md` § Hub Back Button), and the full WebAudio SFX +
+  thematic music stack per the Audio convention row.
 - Use the zmhstudio plugin commands where they apply (this repo carries a
   producer config at `.claude/zmh/producer.md`); skip them where they don't
   — building games directly per this repo's SOP is the normal path.

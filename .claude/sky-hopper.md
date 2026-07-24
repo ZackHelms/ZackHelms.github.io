@@ -92,3 +92,13 @@ short way around.
 - Ideas: jetpack/propeller pickup riff on the spring, breakaway cloud
   platforms above 3000m, enemies (the classic doodle counterpart), daily
   seed run, sfx toggle persisted alongside best.
+
+## Audio + back button (2026-07-24 retrofit)
+
+- Standard stack: `sfxGain`/`musicGain` masters (SFX `beep()` routes through
+  `sfxGain` at 1.0 — original loudness), 64-step lookahead sequencer BGM
+  ("airy ascent": C-G-Am-F bell arpeggio climbs + octave-hop triangle bass +
+  pad swells, 120 BPM), `visibilitychange` suspend. Mute key
+  `skyHopper.mute`; `#back-btn` + `#mute-btn` sit fixed top-left, so `#hud`
+  gained 98px left padding to clear them; canvas drag-steer is untouched
+  (input listeners live on the canvas, below the HUD strip).

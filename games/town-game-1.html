@@ -8,11 +8,204 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #1a1208; overflow: hidden; }
         #root { width: 100vw; height: 100vh; }
+        #back-btn{position:fixed;z-index:60;
+          top:calc(env(safe-area-inset-top,0px) + 6px);
+          left:calc(env(safe-area-inset-left,0px) + 8px);
+          width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+          background:#251808;border:1px solid #4a3010;border-radius:8px;
+          color:#c0a060;font-size:16px;text-decoration:none;user-select:none;}
+        #mute-btn{position:fixed;z-index:60;
+          top:calc(env(safe-area-inset-top,0px) + 6px);
+          left:calc(env(safe-area-inset-left,0px) + 52px);
+          width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+          background:#251808;border:1px solid #4a3010;border-radius:8px;
+          color:#c0a060;font-size:15px;cursor:pointer;user-select:none;padding:0;}
+        @media (max-width:479px){ .tg-title{ display:none; } }
     </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-05 19:17 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
+    <a id="back-btn" href="index.html" aria-label="Back to games">←</a>
+    <button id="mute-btn" aria-label="Mute">🔊</button>
     <div id="root"></div>
+    <script>
+// ---- Audio engine (WebAudio, plain JS — exposed to the React game as window.TG) ----
+(function () {
+  const MUTE_KEY = 'town-game-mute';
+  let ac = null, sfxGain = null, musicGain = null, noiseBuf = null;
+  let muted = false;
+  try { muted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) {}
+
+  function ensureAudio() {
+    if (!ac) {
+      try {
+        ac = new (window.AudioContext || window.webkitAudioContext)();
+        sfxGain = ac.createGain(); sfxGain.connect(ac.destination);
+        musicGain = ac.createGain(); musicGain.connect(ac.destination);
+        applyGains();
+      } catch (e) { ac = null; }
+    }
+    if (ac && ac.state === 'suspended' && !muted) ac.resume();
+    return ac;
+  }
+  function applyGains() {
+    if (!ac) return;
+    sfxGain.gain.value = muted ? 0 : 0.9;
+    musicGain.gain.value = muted ? 0 : 0.16;
+  }
+  function getNoise() {
+    if (!noiseBuf && ac) {
+      const len = Math.floor(ac.sampleRate * 0.25);
+      noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return noiseBuf;
+  }
+  function beep(freq, dur, type, gain, slideTo, delay) {
+    const a = ensureAudio(); if (!a) return;
+    const t = a.currentTime + (delay || 0);
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(gain || 0.1, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(sfxGain);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+
+  // ---- SFX ----
+  const sfxTap     = () => beep(700, 0.05, 'triangle', 0.07);
+  const sfxInvalid = () => { beep(220, 0.11, 'square', 0.06, 165); beep(165, 0.16, 'square', 0.05, 118, 0.1); };
+  const sfxPlace   = () => {
+    beep(90, 0.16, 'sine', 0.22, 55);                     // warm thunk
+    beep(523.25, 0.09, 'triangle', 0.08, 0, 0.06);        // rising chime
+    beep(659.25, 0.13, 'triangle', 0.08, 0, 0.14);
+  };
+  const sfxCollect = () => { beep(587.33, 0.07, 'triangle', 0.1); beep(880, 0.1, 'triangle', 0.09, 0, 0.06); };
+  const sfxQuest   = () => {
+    beep(523.25, 0.1, 'triangle', 0.1);
+    beep(659.25, 0.1, 'triangle', 0.1, 0, 0.09);
+    beep(783.99, 0.1, 'triangle', 0.1, 0, 0.18);
+    beep(1046.5, 0.24, 'triangle', 0.1, 0, 0.27);
+  };
+  const sfxDay = () => { beep(659.25, 0.14, 'sine', 0.09); beep(987.77, 0.26, 'sine', 0.08, 0, 0.12); };
+
+  // ---- Music: pastoral building-sim loop, ~90 BPM, C major, 8 bars ----
+  // Gentle plucked arpeggio + soft sine pad + unhurried bass + light woodblock ticks.
+  const STEP = 60 / 90 / 2;              // 8th-note grid at 90 BPM
+  const BAR_DUR = STEP * 8;
+  const N = { C3:130.81, D3:146.83, E3:164.81, F3:174.61, G3:196, A3:220, B3:246.94, A2:110,
+              C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392, A4:440, B4:493.88,
+              C5:523.25, D5:587.33, E5:659.25 };
+  // chord per bar: C  Am  F  G | C  Am  Dm  G
+  const BASS = [N.C3, N.A2, N.F3, N.G3, N.C3, N.A2, N.D3, N.G3];
+  const PADS = [
+    [N.C3, N.G3, N.E4], [N.A2, N.E3, N.C4], [N.F3, N.A3, N.C4], [N.G3, N.B3, N.D4],
+    [N.C3, N.G3, N.E4], [N.A2, N.E3, N.C4], [N.D3, N.F3, N.A3], [N.G3, N.B3, N.D4],
+  ];
+  const ARP = [
+    [N.C4, 0, N.G4, N.E4, 0, N.C5, 0, N.G4],
+    [N.A3, 0, N.E4, N.C4, 0, N.A4, 0, N.E4],
+    [N.F4, 0, N.C5, N.A4, 0, N.F4, 0, N.C5],
+    [N.G4, 0, N.D5, N.B4, 0, N.G4, 0, N.D4],
+    [N.E4, 0, N.G4, N.C5, 0, N.E5, 0, N.C5],
+    [N.A4, 0, N.C5, N.E5, 0, N.C5, 0, N.A4],
+    [N.D4, 0, N.F4, N.A4, 0, N.D5, 0, N.A4],
+    [N.G4, 0, N.B4, N.D5, 0, N.B4, 0, N.G4],
+  ];
+  function mPluck(f, t) {
+    const o = ac.createOscillator(), fl = ac.createBiquadFilter(), g = ac.createGain();
+    o.type = 'triangle'; o.frequency.value = f;
+    fl.type = 'lowpass'; fl.frequency.value = 2200;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.09, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+    o.connect(fl); fl.connect(g); g.connect(musicGain);
+    o.start(t); o.stop(t + 0.6);
+  }
+  function mBass(f, t) {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.14, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.62);
+    o.connect(g); g.connect(musicGain);
+    o.start(t); o.stop(t + 0.68);
+  }
+  function mPad(freqs, t, dur) {
+    freqs.forEach(f => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.022, t + 0.5);
+      g.gain.setValueAtTime(0.022, t + dur - 0.5);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(musicGain);
+      o.start(t); o.stop(t + dur + 0.05);
+    });
+  }
+  function mTick(t, vol) {
+    if (!getNoise()) return;
+    const s = ac.createBufferSource(); s.buffer = noiseBuf;
+    const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1700; f.Q.value = 3;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    s.connect(f); f.connect(g); g.connect(musicGain);
+    s.start(t); s.stop(t + 0.07);
+  }
+  let musicTimer = null, musicStep = 0, nextNoteTime = 0;
+  function schedStep(stp, t) {
+    const bar = Math.floor(stp / 8), pos = stp % 8;
+    if (pos === 0) { mPad(PADS[bar], t, BAR_DUR); mBass(BASS[bar], t); }
+    if (pos === 4) mBass(BASS[bar], t);
+    const n = ARP[bar][pos]; if (n) mPluck(n, t);
+    if (pos === 2 || pos === 6) mTick(t, 0.05);
+    if (pos === 7 && (bar === 3 || bar === 7)) mTick(t, 0.03);
+  }
+  function musicSchedule() {
+    if (!ac) return;
+    while (nextNoteTime < ac.currentTime + 0.18) {
+      schedStep(musicStep, nextNoteTime);
+      musicStep = (musicStep + 1) % 64;
+      nextNoteTime += STEP;
+    }
+  }
+  function startMusic() {
+    const a = ensureAudio(); if (!a || musicTimer) return;
+    musicStep = 0; nextNoteTime = a.currentTime + 0.06;
+    musicTimer = setInterval(musicSchedule, 25);
+  }
+
+  // ---- mute button / unlock / visibility ----
+  const muteBtn = document.getElementById('mute-btn');
+  function renderMute() { muteBtn.textContent = muted ? '🔇' : '🔊'; }
+  renderMute();
+  function toggleMute(e) {
+    e.preventDefault(); e.stopPropagation();
+    muted = !muted;
+    try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch (err) {}
+    if (ensureAudio()) applyGains();
+    if (!muted) { startMusic(); sfxTap(); }
+    renderMute();
+  }
+  muteBtn.addEventListener('click', toggleMute);
+  muteBtn.addEventListener('touchend', toggleMute, { passive: false });
+  function audioUnlock() { if (ensureAudio()) startMusic(); }
+  document.addEventListener('touchstart', audioUnlock, { passive: true });
+  document.addEventListener('mousedown', audioUnlock);
+  document.addEventListener('keydown', audioUnlock);
+  document.addEventListener('visibilitychange', () => {
+    if (!ac) return;
+    if (document.hidden) ac.suspend();
+    else if (!muted) ac.resume();
+  });
+
+  window.TG = { tap: sfxTap, invalid: sfxInvalid, place: sfxPlace, collect: sfxCollect, quest: sfxQuest, day: sfxDay };
+})();
+    </script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -564,6 +757,7 @@ function TownGame() {
       setInventory(inv=>{ const ni={...inv}; for(const [r,a] of Object.entries(yields)) ni[r]=(ni[r]||0)+a; return ni; });
       setTotalGathered(tg=>{ const n={...tg}; for(const [r,a] of Object.entries(yields)) n[r]=(n[r]||0)+a; return n; });
       setSkillXP(xp=>({...xp,[xk]:xp[xk]+10}));
+      TG.collect();
       const newHp=tls[idx].resource.hp-1;
       const ys=Object.entries(yields).map(([k,v])=>`+${v} ${k}`).join(", ");
       if(newHp<=0){ setTiles(p=>{ const n=[...p]; n[idx]={...n[idx],resource:null}; return n; }); addLog(`Harvested ${rd.label}. Got: ${ys}.`); }
@@ -581,16 +775,16 @@ function TownGame() {
     const bm=buildModeRef.current;
     if(bm){
       const tls=tilesRef.current;
-      if(tls[idx].type!=="grass"){ addLog("Can only build on grass. Pick a green tile."); return; }
-      if(tls[idx].resource||tls[idx].building){ addLog("Tile occupied. Choose an empty grass tile."); return; }
+      if(tls[idx].type!=="grass"){ TG.invalid(); addLog("Can only build on grass. Pick a green tile."); return; }
+      if(tls[idx].resource||tls[idx].building){ TG.invalid(); addLog("Tile occupied. Choose an empty grass tile."); return; }
       const bd=BUILDINGS[bm];
       const rep=reputationRef.current;
-      if(rep<bd.repReq){ addLog(`${bd.label} needs ${bd.repReq} rep. You have ${rep}.`); return; }
+      if(rep<bd.repReq){ TG.invalid(); addLog(`${bd.label} needs ${bd.repReq} rep. You have ${rep}.`); return; }
       const disc=skillLevel("Building")*0.1;
       const inv=inventoryRef.current;
       for(const [r,a] of Object.entries(bd.cost)){
         const n=Math.ceil(a*(1-disc));
-        if((inv[r]||0)<n){ addLog(`Need ${n} ${r} for ${bd.label}. Have ${inv[r]||0}.`); return; }
+        if((inv[r]||0)<n){ TG.invalid(); addLog(`Need ${n} ${r} for ${bd.label}. Have ${inv[r]||0}.`); return; }
       }
       setInventory(inv2=>{ const ni={...inv2}; for(const [r,a] of Object.entries(bd.cost)) ni[r]-=Math.ceil(a*(1-disc)); return ni; });
       const nb={ type:bm, x:tile.x, y:tile.y, id:Date.now() };
@@ -598,10 +792,12 @@ function TownGame() {
       setTiles(p=>{ const n=[...p]; n[idx]={...n[idx],building:nb}; return n; });
       setSkillXP(xp=>({...xp,Building:xp.Building+20}));
       setReputation(r=>r+5);
+      TG.place();
       addLog(`Built ${bd.label} at (${tile.x},${tile.y}). +5 rep.`);
       setBuildMode(null);
       return;
     }
+    TG.tap();
     targetRef.current={x:tile.x,y:tile.y};
     setTarget({x:tile.x,y:tile.y});
     pendingActionRef.current=(arrivedTile)=>fireTileAction(arrivedTile);
@@ -609,11 +805,12 @@ function TownGame() {
 
   const eatFood = useCallback(()=>{
     const inv=inventoryRef.current;
-    if(inv.food<=0){ addLog("No food! Gather from Berry Bushes, Trees, or Deer."); return; }
+    if(inv.food<=0){ TG.invalid(); addLog("No food! Gather from Berry Bushes, Trees, or Deer."); return; }
     setHunger(h=>{
-      if(h>=100){ addLog("Already full. Save your food."); return h; }
+      if(h>=100){ TG.invalid(); addLog("Already full. Save your food."); return h; }
       setInventory(i=>({...i,food:i.food-1}));
       const nh=Math.min(100,h+25);
+      TG.collect();
       addLog(`Ate 1 food. Hunger: ${nh}%. ${inv.food-1} food left.`);
       return nh;
     });
@@ -624,14 +821,15 @@ function TownGame() {
     const huts=buildings.filter(b=>b.type==="HUT").length;
     const rep=reputationRef.current;
     const repN=30+villagers.length*20;
-    if(huts===0){ addLog("No Huts! Go to Build tab and place a Hut first."); return; }
-    if(huts<=villagers.length){ addLog(`All ${huts} Hut(s) occupied. Build another Hut.`); return; }
-    if(rep<repN){ addLog(`Need ${repN} rep to recruit. Have ${rep}. Complete quests.`); return; }
-    if(villagers.length>=maxV){ addLog(`At cap (${maxV} villagers). Level up Leadership.`); return; }
+    if(huts===0){ TG.invalid(); addLog("No Huts! Go to Build tab and place a Hut first."); return; }
+    if(huts<=villagers.length){ TG.invalid(); addLog(`All ${huts} Hut(s) occupied. Build another Hut.`); return; }
+    if(rep<repN){ TG.invalid(); addLog(`Need ${repN} rep to recruit. Have ${rep}. Complete quests.`); return; }
+    if(villagers.length>=maxV){ TG.invalid(); addLog(`At cap (${maxV} villagers). Level up Leadership.`); return; }
     const names=["Aldric","Marta","Bran","Elspeth","Godric","Hilde","Osbert","Wulfric"];
     const name=names[Math.floor(Math.random()*names.length)];
     setVillagers(v=>[...v,{name,role:"Farmer",id:Date.now()}]);
     setSkillXP(xp=>({...xp,Leadership:xp.Leadership+30}));
+    TG.quest();
     addLog(`${name} joined! Eats 1 food/day. Leadership XP +30.`);
   },[buildings,villagers,skillLevel,addLog]);
 
@@ -639,19 +837,21 @@ function TownGame() {
     const bd=BUILDINGS[key];
     const rep=reputationRef.current;
     const inv=inventoryRef.current;
-    if(rep<bd.repReq){ addLog(`${bd.label} needs ${bd.repReq} rep. You have ${rep}.`); return; }
+    if(rep<bd.repReq){ TG.invalid(); addLog(`${bd.label} needs ${bd.repReq} rep. You have ${rep}.`); return; }
     const canAfford=Object.entries(bd.cost).every(([r,a])=>(inv[r]||0)>=a);
     if(!canAfford){
       const miss=Object.entries(bd.cost).filter(([r,a])=>(inv[r]||0)<a).map(([r,a])=>`${a-(inv[r]||0)} more ${r}`).join(", ");
-      addLog(`Can't afford ${bd.label}. Need: ${miss}.`); return;
+      TG.invalid(); addLog(`Can't afford ${bd.label}. Need: ${miss}.`); return;
     }
-    if(buildModeRef.current===key){ setBuildMode(null); addLog("Build mode off."); return; }
+    if(buildModeRef.current===key){ TG.tap(); setBuildMode(null); addLog("Build mode off."); return; }
+    TG.tap();
     setBuildMode(key);
     addLog(`Build mode: ${bd.label}. Tap an empty grass tile on the map.`);
     setTab(null);
   },[addLog]);
 
   const advanceDay = useCallback(()=>{
+    TG.day();
     setDay(d=>{
       const nd=d+1;
       if(nd%10===0) setSeason(s=>{ const ns=(s+1)%4; addLog(`-- Season: ${SEASONS[ns]} --`); return ns; });
@@ -675,14 +875,15 @@ function TownGame() {
     });
   },[addLog]);
 
-  const handleTabTap = useCallback((t)=>{ setTab(prev=>prev===t?null:t); },[]);
-  const cancelBuild  = useCallback(()=>{ setBuildMode(null); addLog("Build mode cancelled."); },[addLog]);
+  const handleTabTap = useCallback((t)=>{ TG.tap(); setTab(prev=>prev===t?null:t); },[]);
+  const cancelBuild  = useCallback(()=>{ TG.tap(); setBuildMode(null); addLog("Build mode cancelled."); },[addLog]);
 
   // Quest check
   const gameState={buildings,villagers,totalGathered,inventory,reputation};
   useEffect(()=>{
     QUESTS.forEach(q=>{
       if(!completedQuests.includes(q.id)&&q.check(gameState)){
+        TG.quest();
         setCompletedQuests(p=>[...p,q.id]);
         setReputation(r=>r+q.reward.rep);
         setInventory(inv=>{ const ni={...inv}; Object.entries(q.reward).forEach(([k,v])=>{ if(k!=="rep") ni[k]=(ni[k]||0)+v; }); return ni; });
@@ -830,13 +1031,13 @@ function TownGame() {
       )}
 
       {/* ==== HEADER z=50 ==== */}
-      <div style={{ position:"absolute", top:0, left:0, right:0, height:HEADER_H, zIndex:50, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 10px", background:"linear-gradient(90deg,#2a1a08,#3a2510)", borderBottom:"2px solid #6a4a20" }}>
+      <div style={{ position:"absolute", top:0, left:0, right:0, height:HEADER_H, zIndex:50, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 10px 0 94px", background:"linear-gradient(90deg,#2a1a08,#3a2510)", borderBottom:"2px solid #6a4a20" }}>
         <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
           <button
-            onTouchEnd={(e)=>{e.stopPropagation();setSettingsOpen(true);setSettingsView(null);}}
+            onTouchEnd={(e)=>{e.stopPropagation();TG.tap();setSettingsOpen(true);setSettingsView(null);}}
             style={{background:"none",border:"1px solid #4a3010",borderRadius:"5px",color:"#c0a060",fontSize:"18px",width:"32px",height:"32px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0}}
           >⚙</button>
-          <span style={{fontWeight:"bold",fontSize:"13px",color:"#f0c060",letterSpacing:"1px"}}>TOWN GAME</span>
+          <span className="tg-title" style={{fontWeight:"bold",fontSize:"13px",color:"#f0c060",letterSpacing:"1px"}}>TOWN GAME</span>
         </div>
         <div style={{display:"flex",gap:"7px",fontSize:"11px",flexWrap:"nowrap"}}>
           <span>📅{day}</span>
