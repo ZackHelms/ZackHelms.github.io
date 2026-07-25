@@ -362,6 +362,26 @@ Missile-Command-style tap interceptor. Blast rings chain through meteors
 budgets, intermission bonuses, mercy rebuild every 5th wave. Synth SFX +
 tense sequencer music. Detailed context: `.claude/meteor-defense.md`.
 
+### BALLPARK (`ballpark/index.html`, ~640 lines)
+Estimation trivia — no multiple choice. Every question has a numeric answer
+and a log or linear dial; drag anywhere in the thumb band to move the needle,
+LOCK IN, and score by how close you landed (distance along the dial, not
+relative error). 100+ questions across 8 categories, 10 per run, streak
+multiplier to x3, +500 bullseye. Seeded DAILY TEN (same for everyone, UTC
+date) + free play; personal best and daily results persisted. Synth SFX +
+game-show shuffle loop. Detailed context: `.claude/ballpark.md`.
+
+### TILT LABYRINTH (`tilt-labyrinth/index.html`, ~640 lines)
+The wooden hole-maze. Tip the phone (`deviceorientation`, iOS permission
+requested on ROLL, auto-levelled to however you hold it) or drag anywhere as
+a fallback — both write one tilt vector. A steel ball rolls on a 100×140 oak
+board past holes into a brass cup; slow balls drop in from a rim, fast ones
+skim it, dead centre always swallows. 10 hand-authored boards (first roll →
+spiral → gauntlet), star ratings by time and falls, sequential unlocks +
+board picker. Realistic rendering: grained oak, raised walls with tilt-thrown
+shadows, specular steel ball, spirit-level bubble. Detailed context:
+`.claude/tilt-labyrinth.md`.
+
 ### LOCKSPORT (`locksport/index.html`, ~640 lines)
 Realistic side-view single-pin-picking sim. Tension is auto-applied (a
 left-thumb tension pad appears from the spool levels on); drag a hook/rake in

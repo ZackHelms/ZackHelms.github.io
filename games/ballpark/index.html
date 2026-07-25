@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Ballpark</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30; --green:#39ff14;
+  --gold:#ffc300; --blue:#4488ff; --red:#ff2244; --white:#dde3ff;
+  --dim:#8899bb; --purple:#b44fff;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);touch-action:manipulation}
+body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none;-webkit-user-select:none}
+#wrap{position:fixed;inset:0}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#back-btn{position:fixed;top:calc(6px + env(safe-area-inset-top));left:8px;z-index:80;
+  width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  color:var(--dim);font-size:17px;text-decoration:none}
+#mute-btn{position:fixed;top:calc(6px + env(safe-area-inset-top));left:52px;z-index:80;
+  width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  color:var(--dim);font-size:14px;cursor:pointer}
+#act-btn{position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(18px + env(safe-area-inset-bottom));z-index:60;display:none;
+  width:250px;padding:16px 0;text-align:center;
+  background:var(--panel);border:1px solid #5a4a16;border-radius:14px;
+  color:var(--gold);font-family:'Black Ops One',cursive;font-size:19px;
+  letter-spacing:3px;cursor:pointer}
+#act-btn:active{background:#141007}
+#act-btn.go{border-color:#1f5a16;color:var(--green)}
+.overlay{position:fixed;inset:0;z-index:70;background:rgba(4,4,10,0.9);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:24px;overflow-y:auto}
+.overlay h1{font-family:'Black Ops One',cursive;font-size:42px;color:var(--gold);
+  text-shadow:0 0 24px rgba(255,195,0,0.45);letter-spacing:2px;line-height:1.05}
+.overlay h2{font-family:'Black Ops One',cursive;font-size:28px;color:var(--gold);letter-spacing:2px}
+.overlay .sub{color:var(--dim);font-size:13px;margin:12px 0 20px;max-width:330px;line-height:1.6}
+.big-btn{background:var(--panel);border:1px solid #5a4a16;border-radius:12px;
+  color:var(--gold);font-family:'Black Ops One',cursive;font-size:17px;
+  letter-spacing:2px;padding:14px 40px;margin:6px 0;cursor:pointer;min-width:250px}
+.big-btn.alt{border-color:#1f4a7a;color:var(--blue)}
+.small-btn{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:13px;
+  letter-spacing:1px;padding:10px 24px;margin:6px 0;cursor:pointer}
+#end-score{font-family:'Black Ops One',cursive;font-size:52px;color:var(--green);
+  text-shadow:0 0 26px rgba(57,255,20,0.4);margin:2px 0}
+#end-stats{color:var(--dim);font-size:13px;line-height:1.7;margin-bottom:14px}
+#menu-best{color:var(--dim);font-size:12px;line-height:1.7;margin-top:14px}
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 19:45 UTC</div>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute-btn" aria-label="Toggle sound">🔊</button>
+<button id="act-btn">LOCK IN</button>
+
+<div id="menu" class="overlay" style="display:flex">
+  <h1>BALLPARK</h1>
+  <div class="sub">Nobody knows the exact number.<br>
+  <b>Slide the dial</b> to your best guess — the closer you land,<br>the more it pays. Ten questions, no multiple choice.</div>
+  <button id="daily-btn" class="big-btn">DAILY TEN</button>
+  <button id="free-btn" class="big-btn alt">FREE PLAY</button>
+  <div id="menu-best"></div>
+</div>
+
+<div id="end" class="overlay">
+  <h2 id="end-title">RUN COMPLETE</h2>
+  <div id="end-score">0</div>
+  <div id="end-stats"></div>
+  <button id="again-btn" class="big-btn">PLAY AGAIN</button>
+  <button id="emenu-btn" class="small-btn">MENU</button>
+</div>
+
+<script>
+'use strict';
+/* ===================== QUESTION BANK =====================
+   { q, a:answer, u:unit, lo, hi, s:'log'|'lin', c:category }
+   lo/hi bound the dial. Scoring is by distance along the dial,
+   so a log scale makes order-of-magnitude guesses fair.        */
+const BANK = [
+  // --- SPACE ---
+  {q:'Average distance from the Earth to the Moon',a:384400,u:'km',lo:1e4,hi:1e7,s:'log',c:'SPACE'},
+  {q:'Average distance from the Earth to the Sun',a:149600000,u:'km',lo:1e6,hi:1e10,s:'log',c:'SPACE'},
+  {q:"Earth's diameter at the equator",a:12742,u:'km',lo:1e3,hi:1e6,s:'log',c:'SPACE'},
+  {q:"The Sun's diameter",a:1391000,u:'km',lo:1e4,hi:1e8,s:'log',c:'SPACE'},
+  {q:'The speed of light, in kilometres per second',a:299792,u:'km/s',lo:1e3,hi:1e7,s:'log',c:'SPACE'},
+  {q:'Length of one day on Mars',a:24.6,u:'hours',lo:1,hi:200,s:'log',c:'SPACE'},
+  {q:'Distance to Proxima Centauri, our nearest star',a:4.2,u:'light years',lo:0.5,hi:500,s:'log',c:'SPACE'},
+  {q:'Age of the universe',a:13.8,u:'billion years',lo:0.5,hi:200,s:'log',c:'SPACE'},
+  {q:'Altitude of the International Space Station',a:408,u:'km',lo:10,hi:100000,s:'log',c:'SPACE'},
+  {q:'Orbital speed of the ISS',a:27600,u:'km/h',lo:100,hi:1e6,s:'log',c:'SPACE'},
+  {q:'Time for sunlight to reach the Earth',a:8.3,u:'minutes',lo:0.1,hi:1000,s:'log',c:'SPACE'},
+  {q:"Surface gravity on the Moon",a:1.62,u:'m/s²',lo:0.05,hi:50,s:'log',c:'SPACE'},
+  {q:"Temperature of the Sun's surface",a:5500,u:'°C',lo:100,hi:1e6,s:'log',c:'SPACE'},
+  {q:"Mars' diameter",a:6779,u:'km',lo:100,hi:1e6,s:'log',c:'SPACE'},
+  {q:'Number of days Apollo 11 took to reach the Moon',a:4,u:'days',lo:1,hi:100,s:'log',c:'SPACE'},
+
+  // --- EARTH ---
+  {q:'Height of Mount Everest above sea level',a:8849,u:'m',lo:100,hi:1e5,s:'log',c:'EARTH'},
+  {q:'Depth of the Mariana Trench',a:10935,u:'m',lo:100,hi:1e5,s:'log',c:'EARTH'},
+  {q:'Length of the Nile',a:6650,u:'km',lo:100,hi:1e5,s:'log',c:'EARTH'},
+  {q:'Length of the Amazon',a:6400,u:'km',lo:100,hi:1e5,s:'log',c:'EARTH'},
+  {q:'Area of the Sahara desert',a:9200000,u:'km²',lo:1e4,hi:1e9,s:'log',c:'EARTH'},
+  {q:'Depth of Lake Baikal, the deepest lake',a:1642,u:'m',lo:50,hi:20000,s:'log',c:'EARTH'},
+  {q:'Height of Angel Falls, the tallest waterfall',a:979,u:'m',lo:20,hi:20000,s:'log',c:'EARTH'},
+  {q:'Number of countries in Africa',a:54,u:'countries',lo:5,hi:200,s:'lin',c:'EARTH'},
+  {q:'Total length of the Great Wall of China',a:21196,u:'km',lo:100,hi:1e5,s:'log',c:'EARTH'},
+  {q:'Population of the Tokyo metropolitan area',a:37000000,u:'people',lo:1e5,hi:1e9,s:'log',c:'EARTH'},
+  {q:'World population today',a:8000000000,u:'people',lo:1e8,hi:1e11,s:'log',c:'EARTH'},
+  {q:'Flight distance from London to New York',a:5570,u:'km',lo:100,hi:1e5,s:'log',c:'EARTH'},
+  {q:'Thickness of the Earth’s crust under the continents',a:35,u:'km',lo:1,hi:1000,s:'log',c:'EARTH'},
+  {q:'Percentage of the Earth’s surface covered by ocean',a:71,u:'%',lo:0,hi:100,s:'lin',c:'EARTH'},
+  {q:'Height of Niagara Falls (Horseshoe)',a:51,u:'m',lo:2,hi:2000,s:'log',c:'EARTH'},
+
+  // --- BODY ---
+  {q:'Bones in the adult human body',a:206,u:'bones',lo:20,hi:2000,s:'log',c:'BODY'},
+  {q:'Bones a human baby is born with',a:270,u:'bones',lo:20,hi:2000,s:'log',c:'BODY'},
+  {q:'Times an average heart beats in a day',a:100000,u:'beats',lo:1e3,hi:1e7,s:'log',c:'BODY'},
+  {q:'Length of the human small intestine',a:6.5,u:'m',lo:0.2,hi:100,s:'log',c:'BODY'},
+  {q:'Blood in an average adult body',a:5,u:'litres',lo:0.2,hi:100,s:'log',c:'BODY'},
+  {q:'Chromosomes in a human cell',a:46,u:'chromosomes',lo:2,hi:500,s:'log',c:'BODY'},
+  {q:'Weight of an adult human brain',a:1400,u:'g',lo:50,hi:20000,s:'log',c:'BODY'},
+  {q:'Lifespan of a red blood cell',a:120,u:'days',lo:1,hi:2000,s:'log',c:'BODY'},
+  {q:'Breaths an average person takes in a day',a:20000,u:'breaths',lo:100,hi:1e6,s:'log',c:'BODY'},
+  {q:'Top speed of a nerve signal',a:120,u:'m/s',lo:1,hi:5000,s:'log',c:'BODY'},
+  {q:'Teeth in a full adult set',a:32,u:'teeth',lo:4,hi:200,s:'log',c:'BODY'},
+  {q:'Normal human body temperature',a:37,u:'°C',lo:20,hi:60,s:'lin',c:'BODY'},
+  {q:'Taste buds on an average tongue',a:10000,u:'taste buds',lo:100,hi:1e6,s:'log',c:'BODY'},
+
+  // --- ANIMALS ---
+  {q:'Top speed of a cheetah',a:112,u:'km/h',lo:1,hi:1000,s:'log',c:'ANIMALS'},
+  {q:'Dive speed of a peregrine falcon',a:390,u:'km/h',lo:10,hi:2000,s:'log',c:'ANIMALS'},
+  {q:'Length of an adult blue whale',a:30,u:'m',lo:1,hi:300,s:'log',c:'ANIMALS'},
+  {q:'Weight of an adult blue whale',a:150000,u:'kg',lo:100,hi:1e7,s:'log',c:'ANIMALS'},
+  {q:'Length of an elephant pregnancy',a:22,u:'months',lo:1,hi:100,s:'log',c:'ANIMALS'},
+  {q:'Height of an adult male giraffe',a:5.5,u:'m',lo:0.5,hi:50,s:'log',c:'ANIMALS'},
+  {q:'Wingbeats per second of a hummingbird',a:53,u:'beats/s',lo:1,hi:1000,s:'log',c:'ANIMALS'},
+  {q:'Weight of an ostrich egg',a:1400,u:'g',lo:10,hi:50000,s:'log',c:'ANIMALS'},
+  {q:'Hearts in an octopus',a:3,u:'hearts',lo:1,hi:20,s:'lin',c:'ANIMALS'},
+  {q:'Flight speed of a honeybee',a:24,u:'km/h',lo:1,hi:500,s:'log',c:'ANIMALS'},
+  {q:'Lifespan of a housefly',a:28,u:'days',lo:1,hi:1000,s:'log',c:'ANIMALS'},
+  {q:'Number of legs on a lobster',a:10,u:'legs',lo:2,hi:50,s:'lin',c:'ANIMALS'},
+  {q:'Weight of a newborn giant panda',a:100,u:'g',lo:5,hi:20000,s:'log',c:'ANIMALS'},
+
+  // --- HISTORY (years) ---
+  {q:'Year humans first walked on the Moon',a:1969,u:'',lo:1900,hi:2025,s:'lin',c:'HISTORY'},
+  {q:'Year the Second World War ended',a:1945,u:'',lo:1900,hi:2025,s:'lin',c:'HISTORY'},
+  {q:'Year the Berlin Wall fell',a:1989,u:'',lo:1900,hi:2025,s:'lin',c:'HISTORY'},
+  {q:'Year the first iPhone went on sale',a:2007,u:'',lo:1970,hi:2025,s:'lin',c:'HISTORY'},
+  {q:'Year the Titanic sank',a:1912,u:'',lo:1850,hi:2000,s:'lin',c:'HISTORY'},
+  {q:'Year the Wright brothers first flew',a:1903,u:'',lo:1850,hi:2000,s:'lin',c:'HISTORY'},
+  {q:'Year the French Revolution began',a:1789,u:'',lo:1500,hi:2000,s:'lin',c:'HISTORY'},
+  {q:'Year the US Declaration of Independence was signed',a:1776,u:'',lo:1500,hi:2000,s:'lin',c:'HISTORY'},
+  {q:'Year the Western Roman Empire fell',a:476,u:'',lo:0,hi:1500,s:'lin',c:'HISTORY'},
+  {q:'Year of the first modern Olympic Games',a:1896,u:'',lo:1700,hi:2025,s:'lin',c:'HISTORY'},
+  {q:'Year the Eiffel Tower was completed',a:1889,u:'',lo:1700,hi:2025,s:'lin',c:'HISTORY'},
+  {q:'Year of the Chernobyl disaster',a:1986,u:'',lo:1900,hi:2025,s:'lin',c:'HISTORY'},
+  {q:'Year Gutenberg printed his famous Bible',a:1455,u:'',lo:1000,hi:1900,s:'lin',c:'HISTORY'},
+  {q:'Age of the Great Pyramid of Giza',a:4500,u:'years',lo:100,hi:50000,s:'log',c:'HISTORY'},
+  {q:'Year the first email was sent',a:1971,u:'',lo:1900,hi:2025,s:'lin',c:'HISTORY'},
+  {q:'Years ago the last ice age ended',a:11700,u:'years',lo:1000,hi:1e6,s:'log',c:'HISTORY'},
+  {q:'Years ago the dinosaurs went extinct',a:66000000,u:'years',lo:1e5,hi:1e9,s:'log',c:'HISTORY'},
+
+  // --- BUILT ---
+  {q:'Height of the Eiffel Tower',a:330,u:'m',lo:10,hi:10000,s:'log',c:'BUILT'},
+  {q:'Height of the Burj Khalifa',a:828,u:'m',lo:10,hi:10000,s:'log',c:'BUILT'},
+  {q:'Height of the Statue of Liberty, base to torch',a:93,u:'m',lo:5,hi:5000,s:'log',c:'BUILT'},
+  {q:'Height of the Empire State Building to its tip',a:443,u:'m',lo:10,hi:10000,s:'log',c:'BUILT'},
+  {q:'Main span of the Golden Gate Bridge',a:1280,u:'m',lo:50,hi:20000,s:'log',c:'BUILT'},
+  {q:'Original height of the Great Pyramid',a:147,u:'m',lo:5,hi:5000,s:'log',c:'BUILT'},
+  {q:'Length of the Channel Tunnel',a:50,u:'km',lo:1,hi:2000,s:'log',c:'BUILT'},
+  {q:'Length of the Panama Canal',a:82,u:'km',lo:1,hi:2000,s:'log',c:'BUILT'},
+  {q:'Height of the Leaning Tower of Pisa',a:57,u:'m',lo:2,hi:2000,s:'log',c:'BUILT'},
+  {q:'Depth of the deepest mine on Earth',a:4,u:'km',lo:0.1,hi:100,s:'log',c:'BUILT'},
+
+  // --- SCIENCE ---
+  {q:'Speed of sound in air at sea level',a:343,u:'m/s',lo:10,hi:10000,s:'log',c:'SCIENCE'},
+  {q:'Elements on the periodic table',a:118,u:'elements',lo:10,hi:1000,s:'log',c:'SCIENCE'},
+  {q:'Atmospheric pressure at sea level',a:101,u:'kPa',lo:1,hi:10000,s:'log',c:'SCIENCE'},
+  {q:'Bytes in one kilobyte (the binary kind)',a:1024,u:'bytes',lo:10,hi:1e5,s:'log',c:'SCIENCE'},
+  {q:'Bits in an IPv4 address',a:32,u:'bits',lo:4,hi:512,s:'log',c:'SCIENCE'},
+  {q:'Characters in the standard ASCII set',a:128,u:'characters',lo:8,hi:5000,s:'log',c:'SCIENCE'},
+  {q:'Freezing point of water in Fahrenheit',a:32,u:'°F',lo:-50,hi:150,s:'lin',c:'SCIENCE'},
+  {q:'Boiling point of water in Fahrenheit',a:212,u:'°F',lo:0,hi:500,s:'lin',c:'SCIENCE'},
+  {q:'Caffeine in a typical cup of brewed coffee',a:95,u:'mg',lo:1,hi:5000,s:'log',c:'SCIENCE'},
+  {q:'Percentage of air that is nitrogen',a:78,u:'%',lo:0,hi:100,s:'lin',c:'SCIENCE'},
+  {q:'Half-life of carbon-14',a:5730,u:'years',lo:10,hi:1e6,s:'log',c:'SCIENCE'},
+
+  // --- SPORT & CULTURE ---
+  {q:'Length of a marathon',a:42.195,u:'km',lo:1,hi:500,s:'log',c:'SPORT'},
+  {q:'Length of an Olympic swimming pool',a:50,u:'m',lo:5,hi:500,s:'log',c:'SPORT'},
+  {q:'Height of a basketball hoop',a:3.05,u:'m',lo:0.5,hi:20,s:'lin',c:'SPORT'},
+  {q:'Diameter of a golf hole',a:108,u:'mm',lo:10,hi:1000,s:'log',c:'SPORT'},
+  {q:'Dimples on a typical golf ball',a:336,u:'dimples',lo:20,hi:5000,s:'log',c:'SPORT'},
+  {q:'Keys on a standard piano',a:88,u:'keys',lo:10,hi:500,s:'log',c:'SPORT'},
+  {q:'Symphonies Beethoven completed',a:9,u:'symphonies',lo:1,hi:60,s:'lin',c:'SPORT'},
+  {q:'Plays Shakespeare is credited with',a:39,u:'plays',lo:5,hi:200,s:'log',c:'SPORT'},
+  {q:'Books in the Harry Potter series',a:7,u:'books',lo:1,hi:30,s:'lin',c:'SPORT'},
+  {q:'Height of the Mona Lisa painting',a:77,u:'cm',lo:5,hi:1000,s:'log',c:'SPORT'},
+  {q:'Running time of the film Titanic',a:195,u:'minutes',lo:30,hi:600,s:'lin',c:'SPORT'},
+  {q:'Squares on a chessboard',a:64,u:'squares',lo:9,hi:400,s:'lin',c:'SPORT'},
+  {q:'Length of a football (soccer) pitch',a:105,u:'m',lo:20,hi:500,s:'lin',c:'SPORT'},
+];
+const RUN_LEN = 10;
+const HIT_BAND = 0.25;   // dial-fraction distance that still scores
+const BULLSEYE = 0.02;   // dial-fraction for a bullseye bonus
+
+/* ===================== STATE ===================== */
+let W=390,H=844,dpr=1;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+let game='menu';                 // menu | guess | reveal | end
+let mode='daily';                // daily | free
+let run=[],qi=0,score=0,streak=0,bestStreak=0;
+let guessPos=0.5;                // needle position, 0..1 along the dial
+let revealT=0, revealPts=0, revealAcc=0, revealBull=false, lastGain=0;
+let results=[];
+let shake=0, flash=0;
+let save={best:0,plays:0,daily:{}};
+try{const s=localStorage.getItem('ballpark'); if(s) save=Object.assign(save,JSON.parse(s));}catch(e){}
+function persist(){ try{ localStorage.setItem('ballpark',JSON.stringify(save)); }catch(e){} }
+function todayKey(){ return new Date().toISOString().slice(0,10); }
+
+/* ===================== RNG / RUN BUILD ===================== */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function seedFromString(s){ let h=2166136261; for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);} return h>>>0; }
+function buildRun(seed){
+  const rng=mulberry32(seed), pool=BANK.map((q,i)=>i), out=[];
+  for(let k=pool.length-1;k>0;k--){const j=Math.floor(rng()*(k+1));[pool[k],pool[j]]=[pool[j],pool[k]];}
+  const seenCat={};
+  // spread categories: walk the shuffled pool, prefer unseen categories first
+  for(const idx of pool){
+    if(out.length>=RUN_LEN) break;
+    const c=BANK[idx].c;
+    if((seenCat[c]||0)<2){ out.push(idx); seenCat[c]=(seenCat[c]||0)+1; }
+  }
+  for(const idx of pool){ if(out.length>=RUN_LEN) break; if(!out.includes(idx)) out.push(idx); }
+  return out.slice(0,RUN_LEN);
+}
+/* ===================== DIAL MATH ===================== */
+function posOf(q,v){
+  if(q.s==='log'){
+    const l0=Math.log10(q.lo), l1=Math.log10(q.hi);
+    return (Math.log10(Math.max(v,1e-9))-l0)/(l1-l0);
+  }
+  return (v-q.lo)/(q.hi-q.lo);
+}
+function valOf(q,p){
+  p=Math.max(0,Math.min(1,p));
+  if(q.s==='log'){
+    const l0=Math.log10(q.lo), l1=Math.log10(q.hi);
+    return Math.pow(10,l0+p*(l1-l0));
+  }
+  return q.lo+p*(q.hi-q.lo);
+}
+function roundNice(q,v){
+  if(q.s==='lin'){ return Math.round(v); }
+  if(v>=1000) { const mag=Math.pow(10,Math.floor(Math.log10(v))-2); return Math.round(v/mag)*mag; }
+  if(v>=100) return Math.round(v);
+  if(v>=10) return Math.round(v*10)/10;
+  return Math.round(v*100)/100;
+}
+function fmt(v){
+  const av=Math.abs(v);
+  if(av>=1e9) return (v/1e9).toFixed(av>=1e10?0:1).replace(/\.0$/,'')+' billion';
+  if(av>=1e6) return (v/1e6).toFixed(av>=1e7?0:1).replace(/\.0$/,'')+' million';
+  if(av>=1000) return Math.round(v).toLocaleString('en-US');
+  if(av>=100) return String(Math.round(v));
+  if(av>=10) return String(Math.round(v*10)/10);
+  if(av>=1) return String(Math.round(v*100)/100);
+  return String(Math.round(v*1000)/1000);
+}
+function curQ(){ return BANK[run[qi]]; }
+
+/* ===================== AUDIO ===================== */
+let AC=null,sfxGain=null,musicGain=null,noiseBuf=null,musicTimer=null,mStep=0,mNext=0;
+let muted=localStorage.getItem('ballpark-mute')==='1';
+function audioInit(){
+  if(AC){ if(AC.state==='suspended') AC.resume(); return; }
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  sfxGain=AC.createGain(); sfxGain.connect(AC.destination);
+  musicGain=AC.createGain(); musicGain.connect(AC.destination);
+  const len=AC.sampleRate*1.0, nb=AC.createBuffer(1,len,AC.sampleRate), d=nb.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+  noiseBuf=nb;
+  applyMute();
+  musicTimer=setInterval(schedMusic,25); mNext=AC.currentTime+0.05;
+}
+function applyMute(){
+  if(!AC) return;
+  sfxGain.gain.value=muted?0:0.45; musicGain.gain.value=muted?0:0.14;
+  document.getElementById('mute-btn').textContent=muted?'🔇':'🔊';
+}
+function tone(freq,dur,vol,type,slide){
+  if(!AC||muted) return;
+  const o=AC.createOscillator(); o.type=type||'sine';
+  o.frequency.setValueAtTime(freq,AC.currentTime);
+  if(slide) o.frequency.exponentialRampToValueAtTime(slide,AC.currentTime+dur);
+  const g=AC.createGain(); g.gain.setValueAtTime(vol,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+dur);
+  o.connect(g); g.connect(sfxGain); o.start(); o.stop(AC.currentTime+dur+0.02);
+}
+function noise(dur,f0,f1,vol){
+  if(!AC||muted) return;
+  const s=AC.createBufferSource(); s.buffer=noiseBuf;
+  const f=AC.createBiquadFilter(); f.type='bandpass';
+  f.frequency.setValueAtTime(f0,AC.currentTime);
+  if(f1) f.frequency.exponentialRampToValueAtTime(f1,AC.currentTime+dur);
+  const g=AC.createGain(); g.gain.setValueAtTime(vol,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+dur);
+  s.connect(f); f.connect(g); g.connect(sfxGain); s.start(); s.stop(AC.currentTime+dur+0.02);
+}
+let lastTick=0;
+const S={
+  tick:()=>{ const n=performance.now(); if(n-lastTick<32) return; lastTick=n; tone(1800,0.015,0.06,'square'); },
+  lock:()=>{ tone(320,0.09,0.3,'square',180); noise(0.05,900,300,0.14); },
+  sweep:()=>{ tone(500,0.5,0.12,'sine',1400); },
+  good:(t)=>{ [0,80,160].forEach((d,i)=>setTimeout(()=>tone([523,659,784][i]*(t?1.5:1),0.22,0.2,'triangle'),d)); },
+  bull:()=>{ [0,70,140,210].forEach((d,i)=>setTimeout(()=>tone([784,988,1175,1568][i],0.3,0.22,'triangle'),d)); noise(0.3,4000,900,0.12); },
+  miss:()=>{ tone(200,0.3,0.22,'sawtooth',90); },
+  end:()=>{ [523,659,784,1047,1319].forEach((f,i)=>setTimeout(()=>tone(f,0.6,0.16,'triangle'),i*110)); },
+};
+// Light game-show shuffle: walking bass + soft off-beat stabs.
+const BASS=[65.4,65.4,87.3,98.0,65.4,65.4,73.4,87.3];
+function schedMusic(){
+  if(!AC||muted||document.hidden) return;
+  while(mNext<AC.currentTime+0.12){
+    const st=mStep%8;
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.type='triangle'; o.frequency.value=BASS[st];
+    g.gain.setValueAtTime(0.34,mNext); g.gain.exponentialRampToValueAtTime(0.001,mNext+0.34);
+    o.connect(g); g.connect(musicGain); o.start(mNext); o.stop(mNext+0.36);
+    if(st%2===1){ // hat
+      const s=AC.createBufferSource(); s.buffer=noiseBuf;
+      const f=AC.createBiquadFilter(); f.type='highpass'; f.frequency.value=7000;
+      const hg=AC.createGain(); hg.gain.setValueAtTime(0.10,mNext); hg.gain.exponentialRampToValueAtTime(0.001,mNext+0.07);
+      s.connect(f); f.connect(hg); hg.connect(musicGain); s.start(mNext); s.stop(mNext+0.09);
+    }
+    if(st===0||st===5){ // chord stab
+      [261.6,311.1,392].forEach(fr=>{ const c=AC.createOscillator(),cg=AC.createGain();
+        c.type='sine'; c.frequency.value=fr;
+        cg.gain.setValueAtTime(0.07,mNext); cg.gain.exponentialRampToValueAtTime(0.001,mNext+0.5);
+        c.connect(cg); cg.connect(musicGain); c.start(mNext); c.stop(mNext+0.52); });
+    }
+    mNext+=0.30; mStep++;
+  }
+}
+document.addEventListener('visibilitychange',()=>{ if(AC){ if(document.hidden) AC.suspend(); else if(!muted) AC.resume(); }});
+
+/* ===================== FLOW ===================== */
+function startRun(m){
+  mode=m;
+  const seed = m==='daily' ? seedFromString('bp-'+todayKey()) : (Math.random()*4294967296)>>>0;
+  run=buildRun(seed); qi=0; score=0; streak=0; bestStreak=0; results=[];
+  guessPos=0.5; game='guess'; revealT=0;
+  document.getElementById('menu').style.display='none';
+  document.getElementById('end').style.display='none';
+  setAct('LOCK IN',false);
+}
+function setAct(label,go){
+  const b=document.getElementById('act-btn');
+  b.textContent=label; b.style.display='block';
+  b.classList.toggle('go',!!go);
+}
+function lockIn(){
+  if(game!=='guess') return;
+  const q=curQ();
+  const truth=posOf(q,q.a);
+  const d=Math.abs(guessPos-truth);
+  revealAcc=Math.max(0,1-d/HIT_BAND);
+  revealBull=d<=BULLSEYE;
+  const mult=1+Math.min(4,streak)*0.5;              // x1 .. x3
+  revealPts=Math.round(1000*revealAcc*mult)+(revealBull?500:0);
+  lastGain=revealPts; score+=revealPts;
+  if(revealAcc>0){ streak++; bestStreak=Math.max(bestStreak,streak); } else streak=0;
+  results.push({i:run[qi],guess:valOf(q,guessPos),acc:revealAcc,pts:revealPts,bull:revealBull});
+  game='reveal'; revealT=0; S.lock(); S.sweep();
+  setTimeout(()=>{ if(revealBull) S.bull(); else if(revealAcc>0.5) S.good(false); else if(revealAcc<=0) S.miss(); },520);
+  if(revealBull){ flash=1; }
+  if(revealAcc<=0) shake=1;
+  setAct(qi+1>=RUN_LEN?'SEE RESULTS':'NEXT',true);
+}
+function nextQ(){
+  if(game!=='reveal') return;
+  qi++;
+  if(qi>=RUN_LEN){ endRun(); return; }
+  guessPos=0.5; game='guess'; revealT=0; setAct('LOCK IN',false);
+}
+function endRun(){
+  game='end';
+  save.plays=(save.plays||0)+1;
+  if(score>(save.best||0)) save.best=score;
+  if(mode==='daily') save.daily[todayKey()]={score,best:bestStreak};
+  persist(); S.end();
+  document.getElementById('act-btn').style.display='none';
+  const hits=results.filter(r=>r.acc>0).length, bulls=results.filter(r=>r.bull).length;
+  document.getElementById('end-title').textContent = mode==='daily' ? 'DAILY TEN' : 'FREE PLAY';
+  document.getElementById('end-score').textContent = score.toLocaleString('en-US');
+  document.getElementById('end-stats').innerHTML =
+    hits+' / '+RUN_LEN+' in the ballpark &middot; '+bulls+' bullseye'+(bulls===1?'':'s')+'<br>'+
+    'best streak '+bestStreak+' &middot; personal best '+(save.best||0).toLocaleString('en-US')+
+    (mode==='daily'?'<br><span style="color:#4488ff">daily saved for '+todayKey()+'</span>':'');
+  document.getElementById('end').style.display='flex';
+  syncMenu();
+}
+function syncMenu(){
+  const d=save.daily&&save.daily[todayKey()];
+  document.getElementById('menu-best').innerHTML=
+    'personal best <b style="color:#39ff14">'+(save.best||0).toLocaleString('en-US')+'</b> &middot; '+
+    (save.plays||0)+' run'+((save.plays||0)===1?'':'s')+
+    (d?'<br>today’s daily: <b style="color:#ffc300">'+d.score.toLocaleString('en-US')+'</b> (play it again any time)':'');
+}
+
+/* ===================== INPUT ===================== */
+let dialRect={x:0,y:0,w:0,h:0}, dragZone={x:0,y:0,w:0,h:0}, dragging=false;
+function layout(){
+  dialRect={x:26,y:Math.round(H*0.55),w:W-52,h:14};
+  dragZone={x:0,y:dialRect.y-130,w:W,h:280};   // generous thumb band around the dial
+}
+function posFromX(x){ return Math.max(0,Math.min(1,(x-dialRect.x)/dialRect.w)); }
+function pDown(x,y){
+  audioInit();
+  if(game!=='guess') return;
+  if(y>=dragZone.y&&y<=dragZone.y+dragZone.h){ dragging=true; guessPos=posFromX(x); S.tick(); }
+}
+function pMove(x,y){ if(dragging&&game==='guess'){ const p=posFromX(x); if(Math.abs(p-guessPos)>0.0005){ guessPos=p; S.tick(); } } }
+function pUp(){ dragging=false; }
+cv.addEventListener('touchstart',e=>{e.preventDefault();const t=e.changedTouches[0];pDown(t.clientX,t.clientY);},{passive:false});
+cv.addEventListener('touchmove', e=>{e.preventDefault();const t=e.changedTouches[0];pMove(t.clientX,t.clientY);},{passive:false});
+cv.addEventListener('touchend',  e=>{e.preventDefault();pUp();},{passive:false});
+cv.addEventListener('touchcancel',()=>pUp());
+cv.addEventListener('mousedown',e=>pDown(e.clientX,e.clientY));
+window.addEventListener('mousemove',e=>pMove(e.clientX,e.clientY));
+window.addEventListener('mouseup',()=>pUp());
+
+function bindTap(el,fn){
+  let last=0;
+  const h=e=>{e.preventDefault();const n=performance.now();if(n-last<400)return;last=n;audioInit();fn();};
+  el.addEventListener('touchend',h,{passive:false}); el.addEventListener('click',h);
+}
+bindTap(document.getElementById('mute-btn'),()=>{muted=!muted;localStorage.setItem('ballpark-mute',muted?'1':'0');applyMute();});
+bindTap(document.getElementById('act-btn'),()=>{ if(game==='guess') lockIn(); else if(game==='reveal') nextQ(); });
+bindTap(document.getElementById('daily-btn'),()=>startRun('daily'));
+bindTap(document.getElementById('free-btn'),()=>startRun('free'));
+bindTap(document.getElementById('again-btn'),()=>startRun(mode));
+bindTap(document.getElementById('emenu-btn'),()=>{game='menu';
+  document.getElementById('end').style.display='none';
+  document.getElementById('menu').style.display='flex';
+  document.getElementById('act-btn').style.display='none'; syncMenu();});
+
+/* ===================== RENDER ===================== */
+function wrapText(text,maxW,font){
+  ctx.font=font;
+  const words=text.split(' '),lines=[];let line='';
+  for(const w of words){
+    const t=line?line+' '+w:w;
+    if(ctx.measureText(t).width>maxW&&line){lines.push(line);line=w;} else line=t;
+  }
+  if(line) lines.push(line);
+  return lines;
+}
+function drawBG(){
+  ctx.fillStyle='#06060e'; ctx.fillRect(0,0,W,H);
+  // soft radial spotlight
+  const g=ctx.createRadialGradient(W/2,H*0.30,20,W/2,H*0.30,H*0.75);
+  g.addColorStop(0,'rgba(60,70,140,0.20)'); g.addColorStop(0.55,'rgba(30,34,70,0.08)'); g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // faint grid
+  ctx.strokeStyle='rgba(40,48,90,0.16)'; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=30){ctx.beginPath();ctx.moveTo(x+0.5,0);ctx.lineTo(x+0.5,H);ctx.stroke();}
+  for(let y=0;y<H;y+=30){ctx.beginPath();ctx.moveTo(0,y+0.5);ctx.lineTo(W,y+0.5);ctx.stroke();}
+}
+function draw(){
+  ctx.save();
+  if(shake>0){ ctx.translate((Math.random()-0.5)*shake*9,(Math.random()-0.5)*shake*9); }
+  drawBG();
+  // 'end' also bails: qi has walked past the last question, so curQ() is undefined
+  if(game==='menu'||game==='end'||!run.length){ ctx.restore(); return; }
+
+  const q=curQ(), truth=posOf(q,q.a);
+
+  // ---- HUD ----
+  ctx.font='11px "Share Tech Mono"'; ctx.textAlign='left'; ctx.fillStyle='#8899bb';
+  ctx.fillText((mode==='daily'?'DAILY':'FREE')+'  Q'+(qi+1)+'/'+RUN_LEN, 12, 58);
+  ctx.textAlign='right'; ctx.fillStyle='#39ff14'; ctx.font='14px "Share Tech Mono"';
+  ctx.fillText(score.toLocaleString('en-US'), W-12, 58);
+  if(streak>0){
+    ctx.textAlign='right'; ctx.fillStyle='#ffc300'; ctx.font='11px "Share Tech Mono"';
+    ctx.fillText('STREAK x'+(1+Math.min(4,streak)*0.5).toFixed(1), W-12, 74);
+  }
+  // progress pips
+  for(let i=0;i<RUN_LEN;i++){
+    const px=12+i*((W-24)/RUN_LEN), pw=(W-24)/RUN_LEN-3;
+    const r=results[i];
+    ctx.fillStyle = r ? (r.bull?'#ffc300':(r.acc>0?'#39ff14':'#ff2244')) : (i===qi?'#4488ff':'rgba(136,153,187,0.22)');
+    ctx.fillRect(px,84,pw,3);
+  }
+
+  // ---- category chip ----
+  ctx.font='11px "Share Tech Mono"'; ctx.textAlign='center';
+  const cw=ctx.measureText(q.c).width+22;
+  ctx.fillStyle='rgba(68,136,255,0.12)'; ctx.strokeStyle='rgba(68,136,255,0.45)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.roundRect(W/2-cw/2,104,cw,22,11); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#4488ff'; ctx.fillText(q.c,W/2,119);
+
+  // ---- question ----
+  const lines=wrapText(q.q,W-52,'19px "Share Tech Mono"');
+  ctx.fillStyle='#dde3ff'; ctx.textAlign='center'; ctx.font='19px "Share Tech Mono"';
+  lines.forEach((l,i)=>ctx.fillText(l,W/2,164+i*27));
+
+  // ---- big readout ----
+  const gv=roundNice(q,valOf(q,guessPos));   // the readout always shows YOUR guess
+  ctx.textAlign='center';
+  ctx.font='34px "Black Ops One"';
+  ctx.fillStyle = game==='reveal' ? (revealAcc>0?'#39ff14':'#ff2244') : '#ffc300';
+  ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=18;
+  ctx.fillText(fmt(gv),W/2,H*0.40);
+  ctx.shadowBlur=0;
+  if(q.u){ ctx.font='13px "Share Tech Mono"'; ctx.fillStyle='#8899bb'; ctx.fillText(q.u,W/2,H*0.40+22); }
+
+  // ---- dial ----
+  const d=dialRect;
+  ctx.fillStyle='rgba(20,24,48,0.9)';
+  ctx.beginPath(); ctx.roundRect(d.x,d.y,d.w,d.h,7); ctx.fill();
+  ctx.strokeStyle='rgba(90,105,170,0.5)'; ctx.lineWidth=1; ctx.stroke();
+  // tick marks
+  const ticks = q.s==='log' ? logTicks(q) : linTicks(q);
+  ctx.font='9px "Share Tech Mono"'; ctx.textAlign='center';
+  for(const t of ticks){
+    const tx=d.x+t.p*d.w;
+    ctx.strokeStyle='rgba(136,153,187,0.35)'; ctx.beginPath();
+    ctx.moveTo(tx,d.y+d.h); ctx.lineTo(tx,d.y+d.h+5); ctx.stroke();
+    ctx.fillStyle='rgba(136,153,187,0.55)'; ctx.fillText(t.l,tx,d.y+d.h+16);
+  }
+  // scoring band around the truth (revealed only)
+  if(game==='reveal'){
+    const bx0=d.x+Math.max(0,truth-HIT_BAND)*d.w, bx1=d.x+Math.min(1,truth+HIT_BAND)*d.w;
+    const bg=ctx.createLinearGradient(bx0,0,bx1,0);
+    bg.addColorStop(0,'rgba(57,255,20,0)'); bg.addColorStop(0.5,'rgba(57,255,20,0.30)'); bg.addColorStop(1,'rgba(57,255,20,0)');
+    ctx.fillStyle=bg; ctx.fillRect(bx0,d.y,bx1-bx0,d.h);
+  }
+  // filled portion to needle
+  const nx=d.x+guessPos*d.w;
+  const fg=ctx.createLinearGradient(d.x,0,nx,0);
+  fg.addColorStop(0,'rgba(255,195,0,0.10)'); fg.addColorStop(1,'rgba(255,195,0,0.45)');
+  ctx.fillStyle=fg;
+  ctx.beginPath(); ctx.roundRect(d.x,d.y,Math.max(2,nx-d.x),d.h,7); ctx.fill();
+  // needle
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  ctx.fillStyle='rgba(255,195,0,0.85)'; ctx.fillRect(nx-2,d.y-16,4,d.h+32);
+  ctx.fillStyle='rgba(255,195,0,0.25)'; ctx.fillRect(nx-7,d.y-16,14,d.h+32);
+  ctx.restore();
+  ctx.fillStyle='#ffc300';
+  ctx.beginPath(); ctx.moveTo(nx,d.y-18); ctx.lineTo(nx-7,d.y-28); ctx.lineTo(nx+7,d.y-28); ctx.closePath(); ctx.fill();
+
+  // truth marker sweeps in during reveal
+  if(game==='reveal'){
+    const e=Math.min(1,revealT/0.5), ease=1-Math.pow(1-e,3);
+    const tx=d.x+(guessPos+(truth-guessPos)*ease)*d.w;
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    ctx.fillStyle='rgba(57,255,20,0.9)'; ctx.fillRect(tx-1.5,d.y-16,3,d.h+32);
+    ctx.fillStyle='rgba(57,255,20,0.22)'; ctx.fillRect(tx-6,d.y-16,12,d.h+32);
+    ctx.restore();
+    if(e>=1){
+      ctx.fillStyle='#39ff14'; ctx.font='12px "Share Tech Mono"'; ctx.textAlign='center';
+      ctx.fillText('ACTUAL',tx,d.y+d.h+34);
+      ctx.font='16px "Share Tech Mono"';
+      ctx.fillText(fmt(q.a)+(q.u?' '+q.u:''),W/2,d.y+d.h+58);
+    }
+  } else {
+    ctx.fillStyle='rgba(136,153,187,0.5)'; ctx.font='11px "Share Tech Mono"'; ctx.textAlign='center';
+    ctx.fillText('drag anywhere here to move the dial',W/2,d.y+d.h+46);
+  }
+
+  // ---- score popup ----
+  if(game==='reveal'&&revealT>0.55){
+    const a=Math.min(1,(revealT-0.55)*4);
+    ctx.globalAlpha=a; ctx.textAlign='center';
+    ctx.font='26px "Black Ops One"';
+    ctx.fillStyle=revealBull?'#ffc300':(revealAcc>0?'#39ff14':'#ff2244');
+    ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=16;
+    const lift=Math.min(14,(revealT-0.55)*40);
+    ctx.fillText(revealAcc>0?('+'+lastGain.toLocaleString('en-US')):'MISS',W/2,d.y+d.h+96-lift);
+    ctx.shadowBlur=0;
+    if(revealBull){ ctx.font='14px "Share Tech Mono"'; ctx.fillStyle='#ffc300';
+      ctx.fillText('BULLSEYE  +500',W/2,d.y+d.h+118-lift); }
+    else if(revealAcc>0){ ctx.font='12px "Share Tech Mono"'; ctx.fillStyle='#8899bb';
+      ctx.fillText(Math.round(revealAcc*100)+'% of the band',W/2,d.y+d.h+116-lift); }
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+
+  if(flash>0){
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    ctx.fillStyle='rgba(255,195,0,'+(flash*0.16)+')'; ctx.fillRect(0,0,W,H); ctx.restore();
+  }
+}
+function logTicks(q){
+  const out=[],l0=Math.ceil(Math.log10(q.lo)),l1=Math.floor(Math.log10(q.hi));
+  const step=Math.max(1,Math.round((l1-l0)/4));
+  for(let e=l0;e<=l1;e+=step){
+    const v=Math.pow(10,e);
+    out.push({p:posOf(q,v),l:shortNum(v)});
+  }
+  return out;
+}
+function linTicks(q){
+  const out=[];
+  for(let i=0;i<=4;i++){ const v=q.lo+(q.hi-q.lo)*i/4; out.push({p:i/4,l:shortNum(v)}); }
+  return out;
+}
+function shortNum(v){
+  const av=Math.abs(v);
+  if(av>=1e9) return (v/1e9)+'B';
+  if(av>=1e6) return (v/1e6)+'M';
+  if(av>=1000) return (v/1000)+'k';
+  if(av>=1) return String(Math.round(v));
+  return String(v);
+}
+
+/* ===================== LOOP ===================== */
+let last=0;
+function resize(){
+  dpr=Math.min(window.devicePixelRatio||1,3);
+  W=cv.clientWidth; H=cv.clientHeight;
+  cv.width=W*dpr; cv.height=H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  layout();
+}
+window.addEventListener('resize',resize);
+resize();
+function update(dt){
+  if(game==='reveal') revealT+=dt;
+  shake=Math.max(0,shake-dt*3);
+  flash=Math.max(0,flash-dt*2);
+}
+function frame(ts){
+  const dt=Math.min((ts-last)/1000||0.016,0.1); last=ts;
+  update(dt); draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+syncMenu();
+</script>
+</body>
+</html>

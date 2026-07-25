@@ -140,7 +140,34 @@ golden-reel, vault-breaker) added two more test-was-wrong classes:
   completable inside the timer — is worth the trouble: it validated all
   8 vault layouts in seconds.)
 
-Also from that batch: **stage action-game screenshots by deterministic
+Fourth batch (2026-07-25: locksport, then ballpark + tilt-labyrinth) added
+one more test-was-wrong class and two genuine bug classes:
+
+- **(test wrong) A reset can immediately re-enter the next state.** After
+  locksport's `resetLock()` the lock re-binds at once, so the new binding pin
+  sits at rest in state `'binding'`, not `'free'`. An "everything is down"
+  assert must accept the post-reset state too, not just the idle one.
+- **(real) Draw loops must bail on terminal states, not just the menu.**
+  Ballpark's `draw()` returned early only for `game==='menu'`; at `'end'` the
+  question index has walked past the last question, so `curQ()` was undefined
+  and every frame threw *behind* the end overlay — invisible on screen, caught
+  only by the drive's console-error assert. Keep a console-error check in
+  every suite; it is the cheapest bug detector in the harness.
+- **(real) Deferred UI must capture its data at schedule time.** Tilt
+  Labyrinth's win overlay fires on a 1.25 s `setTimeout` and re-read
+  `lvlIdx`/`save.t[lvlIdx]`; jumping boards from the dropdown during the
+  animation crashed it on `undefined.toFixed()`. Capture every value the
+  callback needs in the closure and bail if the state it belongs to has moved
+  on. (Same family as "setTimeout racing a per-frame director loop" above.)
+
+Also from that batch: **continuous-force games drift hard during a
+screenshot wait.** Tilt Labyrinth's held tilt keeps *accelerating* the ball,
+so a ball staged at a chosen spot was ~40 units away by the time the shot
+landed 300 ms later. Stage near-zero force (tilt ≈ 0.1) and zero velocity —
+the most aggressive instance yet of "the rAF loop keeps simulating between
+evaluates."
+
+Also from the 2026-07-24 batch: **stage action-game screenshots by deterministic
 placement, not scripted driving** — two attempts at "drive into turn 1"
 put the drift car in empty rough (the corner arrives sooner than a blind
 frame count assumes); placing the car on the racing line with matching
