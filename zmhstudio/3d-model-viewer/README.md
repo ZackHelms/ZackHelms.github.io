@@ -13,18 +13,16 @@ Live: `https://tythos.com/zmhstudio/3d-model-viewer/`
 
 ### Texture-threshold experiment — v2 at MERGE_TEXTURE_MIN 8 / 10 (2026-07-22)
 
-- `pumpkin80 (hull v2, texture-min 8)` and `… texture-min 10` — **default
-  (experiment, CD comparison pending)**: the v2 pipeline rerun with the
-  texture gate's threshold raised from the shipped 6.0 via a runtime
+- `pumpkin80 (hull v2, texture-min 8)` and `… texture-min 10` — **ok
+  (resolved 2026-07-25; kept for the record)**: the v2 pipeline rerun with
+  the texture gate's threshold raised from the shipped 6.0 via a runtime
   override (the default in `hull.py` is unchanged). Demoted real px:
   2.99M (v2) → 4.09M (t8) → 5.33M (t10); components 4,082 → 3,959 → 3,900.
-  The CD's v2 verdict ("better… strata/welts still present on some sides")
-  prompted the sweep; the overseer's A/B says the residual criss-cross on
-  the stubborn side persists at all three settings (it sits in regions that
-  read as textured even at 10 — shadow boundaries on the white), so check
-  whether either looks better in the flesh, and check the gold-leaf relief
-  under the inspector's raking light for softening (t10 demotes ~17% of
-  dim-leaf px).
+  **CD three-way verdict: 6 / 8 / 10 "all look effectively the same", all
+  better than v1** — matching the overseer's A/B (the residual criss-cross
+  sits in regions that read as textured even at 10). The threshold path is
+  closed; v2 at the shipped 6.0 stays the canonical stage-1b model, and the
+  white-body endgame is stage 2's revolve prior.
 
 - `pumpkin80 (q60 sgbm + hull v2)` — **good**: same capture, hull completion
   with texture-arbitrated merge + Taubin-faired hull. The CD's 6-angle
