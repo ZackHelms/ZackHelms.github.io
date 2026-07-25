@@ -66,15 +66,42 @@
     font-size: 12px; cursor: pointer; }
   .fab button.on { border-color: var(--accent); color: var(--accent); }
 
-  /* info bar */
+  /* info bar — ONE fixed-height row so the viewport never resizes with the
+     description length; the full note lives in the tap-to-open popup below */
   #info { flex: 0 0 auto; border-top: 1px solid var(--edge); background: var(--panel);
-    padding: 9px 14px 12px; }
-  #info .row1 { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-  #info .cfg { font-weight: 650; font-size: 13.5px; }
-  #info .tri { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
-  #info .note { margin-top: 3px; font-size: 12.5px; color: var(--dim); }
-  #info .note b { color: var(--ink); font-weight: 600; }
-  #hint { margin-top: 6px; font-size: 11px; color: #6b7887; }
+    padding: 8px 14px calc(8px + env(safe-area-inset-bottom)); display: flex;
+    align-items: center; gap: 10px; min-height: 48px; }
+  #info .cfg { font-weight: 650; font-size: 13px; flex: 1 1 auto; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #info .tri { flex: 0 0 auto; font-size: 12px; color: var(--dim);
+    font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #info .descbtn { flex: 0 0 auto; border: 1px solid var(--edge); background: var(--panel2);
+    color: var(--accent); border-radius: 9px; padding: 7px 11px; font-size: 12px;
+    font-weight: 600; cursor: pointer; white-space: nowrap; }
+  #info .descbtn:active { transform: translateY(1px); }
+
+  /* description popup */
+  #descModal { position: fixed; inset: 0; z-index: 30; display: none;
+    background: rgba(6,9,13,.62); backdrop-filter: blur(2px); }
+  #descModal.open { display: grid; place-items: end center; }
+  #descPanel { width: min(680px, calc(100vw - 20px)); max-height: 72dvh;
+    margin: 0 10px calc(60px + env(safe-area-inset-bottom));
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 14px;
+    display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+  #descHead { display: flex; align-items: center; gap: 10px; padding: 11px 14px 9px;
+    border-bottom: 1px solid var(--edge); }
+  #descHead .dcfg { font-weight: 650; font-size: 13.5px; min-width: 0; }
+  #descHead .dtri { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums;
+    white-space: nowrap; }
+  #descHead .dclose { margin-left: auto; flex: 0 0 auto; border: 1px solid var(--edge);
+    background: var(--panel2); color: var(--ink); border-radius: 9px; padding: 5px 10px;
+    font-size: 13px; cursor: pointer; line-height: 1; }
+  #descBody { padding: 10px 14px; overflow-y: auto; font-size: 13px; color: var(--dim);
+    line-height: 1.55; -webkit-overflow-scrolling: touch; }
+  #descBody b { color: var(--ink); font-weight: 600; }
+  #descHint { padding: 8px 14px 10px; font-size: 11px; color: #6b7887;
+    border-top: 1px solid var(--edge); }
   @media (min-width: 720px) {
     header h1 { font-size: 16px; }
     .tab { min-width: 108px; }
@@ -118,9 +145,21 @@
   </div>
 
   <div id="info">
-    <div class="row1"><span class="cfg" id="iCfg">—</span><span class="tri" id="iTri"></span></div>
-    <div class="note" id="iNote"></div>
-    <div id="hint">One finger: rotate · Two fingers: pinch-zoom / pan · Angle is kept when you switch models.</div>
+    <span class="cfg" id="iCfg">—</span>
+    <span class="tri" id="iTri"></span>
+    <button class="descbtn" id="btnDesc" title="Show this model's description">ⓘ Desc</button>
+  </div>
+
+  <div id="descModal" role="dialog" aria-modal="true" aria-label="Model description">
+    <div id="descPanel">
+      <div id="descHead">
+        <span class="dcfg" id="dCfg"></span>
+        <span class="dtri" id="dTri"></span>
+        <button class="dclose" id="btnDescClose" aria-label="Close">✕</button>
+      </div>
+      <div id="descBody"><div id="dNote"></div></div>
+      <div id="descHint">One finger: rotate · Two fingers: pinch-zoom / pan · Angle is kept when you switch models.</div>
+    </div>
   </div>
 
 <script type="module">
@@ -196,7 +235,7 @@
   // Build stamp + cache-busting. Models load with `?v=<CB>`; CB is the build
   // stamp normally, or the fresh `?cb=` value the Reload button navigates with,
   // so a hard reload re-fetches every GLB past the browser / Pages CDN cache.
-  const BUILD = '2026-07-22 06:35 UTC';
+  const BUILD = '2026-07-22 06:55 UTC';
   const CB = new URLSearchParams(location.search).get('cb') || BUILD;
   const withCB = (u) => u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(CB);
 
@@ -204,23 +243,38 @@
   const tabs = document.getElementById('tabs');
   const iCfg = document.getElementById('iCfg');
   const iTri = document.getElementById('iTri');
-  const iNote = document.getElementById('iNote');
   const fmt = n => n.toLocaleString('en-US');
 
   // Preserve the viewing angle (theta/phi) across model swaps; let radius auto-fit each mesh.
   let keepAngle = null;
+  let current = 0;  // index into MODELS — the desc popup reads it at open time
 
   function select(idx, el) {
     const m = MODELS[idx];
+    current = idx;
     // capture current angle before swapping
     try { const o = mv.getCameraOrbit(); keepAngle = { theta: o.theta, phi: o.phi }; } catch (e) {}
     mv.src = withCB(m.file);
     iCfg.textContent = m.cfg;
     iTri.textContent = fmt(m.tri) + ' tri';
-    iNote.innerHTML = m.note;
     [...tabs.children].forEach(c => c.classList.remove('active'));
     el.classList.add('active');
   }
+
+  // description popup — the note text lives here now, not in the bottom bar,
+  // so the viewport height is constant regardless of description length
+  const descModal = document.getElementById('descModal');
+  document.getElementById('btnDesc').addEventListener('click', () => {
+    const m = MODELS[current];
+    document.getElementById('dCfg').textContent = m.label + ' — ' + m.cfg;
+    document.getElementById('dTri').textContent = fmt(m.tri) + ' tri';
+    document.getElementById('dNote').innerHTML = m.note;
+    descModal.classList.add('open');
+  });
+  const closeDesc = () => descModal.classList.remove('open');
+  document.getElementById('btnDescClose').addEventListener('click', closeDesc);
+  descModal.addEventListener('click', (e) => { if (e.target === descModal) closeDesc(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDesc(); });
 
   mv.addEventListener('load', () => {
     if (keepAngle) {
