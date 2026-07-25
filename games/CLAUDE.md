@@ -320,6 +320,42 @@ grip-lag drift physics, mud-slow rough, anti-cut lap tracking, per-track
 best time + ghost replay, engine-pitch oscillator + synthwave loop.
 Detailed context: `.claude/neon-drift.md`.
 
+### ALPINE ASCENT (`alpine-ascent/index.html`, ~900 lines)
+Charge-jump mountain platformer (Jump-King-like). Hold to charge, drag to
+aim (dotted preview arc), release to leap; one fixed seeded mountain, 6
+camp checkpoints to the summit; ice slides, crumble ledges respawn, wind
+above the cloud line bends jumps. Falls cost altitude only. Realistic
+rendering: altitude-graded skies, parallax ridges, god rays, cloud-band
+fog, snow, textured ledges. Camps + summit persisted.
+Detailed context: `.claude/alpine-ascent.md`.
+
+### VAULT BREAKER (`vault-breaker/index.html`, ~900 lines)
+Pinch-rotate safecracking. Two-finger twist (or one-finger drag-around)
+turns the mechanism through three phases per vault: directional tumbler
+pins with steady-hold sweet spots and Geiger proximity ticks, ring-gap
+alignment to the keyway (later rings drift), then a 270° handle spin —
+all against an alarm timer. Seeded deterministic vaults, star ratings,
+level unlocks persisted. Realistic rendering: brushed-steel door with
+rivets, anisotropic machined dial, sparks, gold-vault door-open payoff.
+Detailed context: `.claude/vault-breaker.md`.
+
+### GOLDEN REEL (`golden-reel/index.html`, ~980 lines)
+Dusk-lake fishing. Hold-charge cast (line gear caps range), tap-twitch,
+0.9 s hook-set window, then a reel/release tension fight (runs take line,
+calm reels it back; snap vs land). 8 species in distance zones with
+lure-gated rares; coins buy rod/reel/line/lure upgrades; persistent
+catch log (count + best weight). Realistic rendering: layered sunset,
+sun-glitter water, ripple rings, silhouette fish, rim-lit angler.
+Detailed context: `.claude/golden-reel.md`.
+
+### EMBER DEPTHS (`ember-depths/index.html`, ~1030 lines)
+Turn-based torchlit roguelike. Tap-to-move BFS pathing on an 11×16 grid,
+bump combat, permadeath; drunkard-walk floors, depth-scaled enemies
+(slime/bat/archer/brute/wraith), relic-build chests, stairs-down runs.
+Realistic rendering: pre-rendered stone textures, half-res light map with
+flicker + ember particles, memory fog. Best depth/gold persisted.
+Detailed context: `.claude/ember-depths.md`.
+
 ### METEOR DEFENSE (`meteor-defense/index.html`, ~1130 lines)
 Missile-Command-style tap interceptor. Blast rings chain through meteors
 (splitters, comets, UFOs) falling on six neon buildings; per-wave ammo

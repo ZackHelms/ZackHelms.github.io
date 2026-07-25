@@ -59,8 +59,12 @@ local-2p.
 | Shadow Circuit | `shadow-circuit/` | stealth, maze | tap-to-move | level-campaign | vision-cones, line-of-sight, procedural-generation | solo | `.claude/shadow-circuit.md` |
 | Neon Recall | `neon-recall/` | memory-board | tap | level-campaign, local-2p | memory-match, resource-economy, combo-multiplier | solo, local-2p | `.claude/neon-recall.md` |
 | Neon Drift | `neon-drift/` | driver-racing | two-thumb | time-trial | physics-sim, ghost-replay, timing-precision | solo | `.claude/neon-drift.md` |
+| Ember Depths | `ember-depths/` | roguelike | tap-to-move | run-based | permadeath, relic-builds, procedural-generation, grid-combat | solo | `.claude/ember-depths.md` |
+| Alpine Ascent | `alpine-ascent/` | platformer | hold-charge, drag-aim-release | level-campaign | physics-sim, timing-precision, checkpoint-climb | solo | `.claude/alpine-ascent.md` |
+| Golden Reel | `golden-reel/` | fishing | hold-charge, tap | save-campaign | collection, resource-economy, timing-precision | solo | `.claude/golden-reel.md` |
+| Vault Breaker | `vault-breaker/` | dexterity-puzzle | pinch-rotate | level-campaign | timing-precision, seeded-determinism, star-rating | solo | `.claude/vault-breaker.md` |
 
-35 games (33 in-repo + 2 external builds).
+39 games (37 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -71,7 +75,9 @@ local-2p.
   the most crowded shelf.
 
 ### Rare — one game each; a second with a different spin is fair game
-- `hold-charge` (pinball plunger) · `two-thumb` (pinball flippers,
+- `hold-charge` (pinball plunger, alpine-ascent leap, golden-reel cast —
+  now an established pattern) · `fishing` + `catch-log collection`
+  (golden-reel) · `two-thumb` (pinball flippers,
   neon-drift hold-steer) · `swipe`-led
   (neon-slice) · `virtual-joystick` (zed-shooter) · `par-course` (neon-golf)
   · `time-trial` + `ghost-replay` (neon-drift)
@@ -79,29 +85,33 @@ local-2p.
   · `rhythm` (piano tiles, pre-synth-era) · `hex-grid` (bubble-blaster) ·
   `word` + `drag-connect` + `timed-round` (word-circuit) · `card-deck` +
   `quick-round` (tri-peaks) · `daily-challenge` (word-circuit, tri-peaks) ·
-  `stealth`/`maze` + `tap-to-move` + `vision-cones` (shadow-circuit) ·
+  `stealth`/`maze` + `vision-cones` (shadow-circuit) · `tap-to-move`
+  (shadow-circuit, ember-depths) · `roguelike` + `run-based` +
+  `permadeath` + `relic-builds` (ember-depths) ·
   `seeded-determinism` (blade-spin, word-circuit, tri-peaks — an
   established house pattern now).
 
 ### Absent — highest-novelty targets
-- **Genres:** `trivia` · `roguelike` · `platformer`.
-- **Inputs:** `tilt` (iOS motion-permission prompt — low priority) ·
-  `pinch-rotate`.
+- **Genres:** `trivia`.
+- **Inputs:** `tilt` (iOS motion-permission prompt — low priority).
 - **Players:** local-2p now has three flavors — real-time (air hockey),
   turn-based tactics (neon-tactics), and memory duel (neon-recall);
   further 2P additions need a genuinely new interaction shape.
 
 ### Example picks this table would suggest next
-A `trivia` quiz (absent genre — embedded question bank, timed answers), a
-`roguelike` run-based dungeon (absent genre — procedural floors,
-permadeath, relic builds), a `platformer` (absent genre — one-thumb
-tap-jump; the only classic shelf still empty), a `pinch-rotate` puzzle
-(absent input), or a `daily-challenge` retrofit onto another seeded game
-(blade-spin already has `seeded-determinism`).
+A `trivia` quiz (the last absent genre — embedded question bank, timed
+answers), a `tilt` experiment (absent input, needs the iOS
+motion-permission prompt), or a `daily-challenge` retrofit onto another
+seeded game (blade-spin and vault-breaker both have
+`seeded-determinism`).
 
 *(The first 2026-07-24 batch — word-circuit, neon-tactics, star-surge,
 grid-defense — filled the `word`, `turn-based-tactics`, `shmup`,
 `tower-defense-classic`, and `daily-challenge` gaps. The second batch —
 tri-peaks, shadow-circuit, neon-recall, neon-drift — filled `card-deck`,
 `stealth`, `maze`, `memory-board`, and `driver-racing`, adding
-`tap-to-move` input and `time-trial`/`quick-round` sessions.)*
+`tap-to-move` input and `time-trial`/`quick-round` sessions. The
+2026-07-25 realistic-graphics batch — ember-depths, alpine-ascent,
+golden-reel, vault-breaker — filled `roguelike` + `run-based`,
+`platformer`, the new `fishing` genre, and the `pinch-rotate` input,
+leaving `trivia` and `tilt` as the only absent targets.)*
