@@ -122,6 +122,24 @@ neon-drift) added three more review/screenshot-caught classes:
   `audioInit()` too — on iOS the first gesture is usually a DOM menu
   button, not the canvas.
 
+Third batch (2026-07-25 realistic-graphics: ember-depths, alpine-ascent,
+golden-reel, vault-breaker) added two more test-was-wrong classes:
+
+- **Staged state keeps evolving during the screenshot wait.** Golden
+  Reel's staged fight (tension 88, mode run) snapped during the 600 ms
+  `waitForTimeout` before the shot — run-mode tension climbs ~19/s even
+  unreeled. When staging a scene that then waits in real time, stage
+  *stable* values (calm mode, frozen `modeT: 999`) — same family as "the
+  rAF loop keeps simulating between evaluates."
+- **Auto-solver scripts need the game's own error metric.** Vault
+  Breaker's solver computed a CCW pin approach from the raw CW distance:
+  at the target that maps to −360°, so the script re-rotated a full lap
+  forever and the hold never accumulated. Gate "arrived" on the game's
+  `pinError()`-style function, not on your own re-derivation. (An
+  auto-solver as a fairness gate — proving every generated level
+  completable inside the timer — is worth the trouble: it validated all
+  8 vault layouts in seconds.)
+
 Also from that batch: **stage action-game screenshots by deterministic
 placement, not scripted driving** — two attempts at "drive into turn 1"
 put the drift car in empty rough (the corner arrives sooner than a blind
