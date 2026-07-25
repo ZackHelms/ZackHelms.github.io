@@ -66,8 +66,10 @@ local-2p.
 | Locksport | `locksport/` | lockpicking-sim | drag-probe, tension-hold | level-campaign | feel-simulation, binding-order, star-rating, seeded-determinism | solo | `.claude/locksport.md` |
 | Ballpark | `ballpark/` | trivia | drag-slider | daily-challenge, quick-round | estimation-scoring, streak-multiplier, seeded-determinism | solo | `.claude/ballpark.md` |
 | Tilt Labyrinth | `tilt-labyrinth/` | marble-labyrinth | tilt, drag-steer | level-campaign | physics-sim, hazard-avoidance, star-rating | solo | `.claude/tilt-labyrinth.md` |
+| Sky Lantern | `sky-lantern/` | flight-control | mic-blow, drag-steer | level-campaign | analog-breath, physics-sim, star-rating | solo | `.claude/sky-lantern.md` |
+| Signal Hunt | `signal-hunt/` | hidden-object | pinch-zoom, two-finger-pan, tap | async-versus, daily-challenge, timed-round | visual-search, seeded-determinism, share-code | solo, async-2p | `.claude/signal-hunt.md` |
 
-42 games (40 in-repo + 2 external builds).
+44 games (42 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -86,37 +88,47 @@ local-2p.
   · `time-trial` + `ghost-replay` (neon-drift)
   · `match-vs-ai` + `local-2p` (air hockey, neon-tactics, neon-recall) · `open-sandbox` (town builder)
   · `rhythm` (piano tiles, pre-synth-era) · `hex-grid` (bubble-blaster) ·
-  `word` + `drag-connect` + `timed-round` (word-circuit) · `card-deck` +
-  `quick-round` (tri-peaks) · `daily-challenge` (word-circuit, tri-peaks) ·
+  `word` + `drag-connect` (word-circuit) · `timed-round` (word-circuit,
+  signal-hunt) · `card-deck` +
+  `quick-round` (tri-peaks) · `daily-challenge` (word-circuit, tri-peaks,
+  ballpark, signal-hunt — an established house pattern now) ·
   `stealth`/`maze` + `vision-cones` (shadow-circuit) · `tap-to-move`
   (shadow-circuit, ember-depths) · `roguelike` + `run-based` +
   `permadeath` + `relic-builds` (ember-depths) ·
-  `seeded-determinism` (blade-spin, word-circuit, tri-peaks — an
-  established house pattern now).
+  `seeded-determinism` (blade-spin, word-circuit, tri-peaks, ballpark,
+  signal-hunt — an established house pattern now).
 - `lockpicking-sim` genre + `drag-probe`/`tension-hold` feel input +
   `feel-simulation`/`binding-order` mechanics (locksport — a physical-skill
   simulator, the first "learn a real craft" title).
 - `trivia` + `drag-slider` + `estimation-scoring` (ballpark — graded
   guessing rather than multiple choice) · `marble-labyrinth` + `tilt` +
   `hazard-avoidance` (tilt-labyrinth — the only motion-sensor game).
+- `flight-control` genre + `mic-blow` input + `analog-breath` mechanic
+  (sky-lantern — the only game that listens; hold-to-burn is its fallback,
+  not a second mode worth counting).
+- `hidden-object` genre + `pinch-zoom`/`two-finger-pan` input +
+  `visual-search`/`share-code` mechanics + `async-versus` session +
+  `async-2p` players (signal-hunt — the only game two people play without
+  being in the same room or the same minute).
 
-### Absent — nothing left on the primary axes
-Every genre, input, and session value this catalog tracks now has at least
-one game. Novelty from here has to come from **new facet values**, not from
-filling holes — invent the axis value first, then the game. Open directions:
-- **Inputs:** `voice`/`mic-blow`, `two-finger-pan`, `long-press-hold`,
-  `shake`, `camera`-driven — none exist yet.
-- **Sessions:** `async-versus` (share a seed, compare scores),
-  `weekly-ladder`, `endless-coop`.
-- **Players:** local-2p has three flavors — real-time (air hockey),
-  turn-based tactics (neon-tactics), memory duel (neon-recall); a fourth
-  needs a genuinely new interaction shape.
+### Absent — what's actually left
+Sensor inputs are now down to two: **`shake`** and **`camera`**. Everything
+else on the primary axes has at least one game, so novelty mostly has to come
+from **inventing a new facet value**, not filling a hole. Open directions:
+- **Inputs:** `shake`, `camera`-driven, `long-press-hold`, `two-hand-chord`
+  (both thumbs doing *different* jobs, not mirrored like pinball's flippers).
+- **Sessions:** `weekly-ladder`, `endless-coop`, `relay` (each player adds one
+  move to a shared seeded run and passes the code on — a natural next step now
+  that `share-code` exists and is drive-tested).
+- **Players:** local-2p has three flavours — real-time (air hockey),
+  turn-based tactics (neon-tactics), memory duel (neon-recall) — and
+  `async-2p` now has one (signal-hunt). A `co-op` value has nothing at all.
 
 ### Example picks this table would suggest next
-A `mic-blow` or `shake` game (the last untouched sensor inputs after tilt
-landed), an `async-versus` retrofit onto a seeded game (blade-spin,
-vault-breaker, ballpark and word-circuit all have `seeded-determinism`), or
-a second `trivia` title in a different shape now that the genre is open.
+A `shake` game (one of the two untouched sensors), an `async-versus` retrofit
+onto another seeded title now that signal-hunt has proven the share-code
+pattern (blade-spin, vault-breaker, ballpark and word-circuit are all seeded
+already), or a `co-op` shape, which is the emptiest cell on the players axis.
 
 *(The first 2026-07-24 batch — word-circuit, neon-tactics, star-surge,
 grid-defense — filled the `word`, `turn-based-tactics`, `shmup`,
@@ -130,5 +142,9 @@ golden-reel, vault-breaker — filled `roguelike` + `run-based`,
 2026-07-25 realistic lock-picking build — locksport — added the
 `lockpicking-sim` genre and the two-handed `drag-probe`/`tension-hold`
 feel input. The 2026-07-25 closing pair — ballpark and tilt-labyrinth —
-took the last two absent values, `trivia` and `tilt`, so the coverage map
-has no empty cells left on genre, input, or session.)*
+took the last two absent values, `trivia` and `tilt`. The 2026-07-25
+new-axes pair — sky-lantern and signal-hunt — had nothing left to fill, so
+it invented values instead: the `mic-blow` sensor input with a
+`flight-control` genre, and the `hidden-object` genre with `pinch-zoom` /
+`two-finger-pan` input and the `async-versus` session / `async-2p` players
+that let two people share one seeded grid.)*

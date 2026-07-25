@@ -395,6 +395,26 @@ Realistic rendering: cutaway brass lock on a textured workbench, compressing
 springs, steel/brass pins, machined dial, golden open payoff. Detailed
 context: `.claude/locksport.md`.
 
+### SKY LANTERN (`sky-lantern/index.html`, ~830 lines)
+The repo's first **microphone** game. Blow into the phone to fire a paper
+lantern's burner and climb a festival night sky to the wish line; heat lags
+breath both ways, so you breathe early and coast. Thumb-drag steers; hold-
+anywhere is the automatic fallback when the mic is denied. 6 seeded ascents,
+bamboo poles / temple eaves / kites / bird flocks / gust bands, ember refuels,
+3 tears and it burns through. Three generator fairness gates: corridors exist,
+corridors are *reachable* (solved from the real equation of motion), and moving
+hazards never seal the sky. Detailed context: `.claude/sky-lantern.md`.
+
+### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)
+The repo's first **async-versus** game. Eight rogue signals hide among ~350
+decoys on a 1100×1900 circuit grid; each target is an exact shape+colour pair
+and every decoy shares one attribute but never both (a conjunction search).
+Drag to pan, pinch to zoom, tap to lock; decoy taps cost 4 s, empty grid is
+free. 90-second rounds as DAILY GRID, FREE HUNT, or a duel: an 11-char
+checksummed code carries seed + score, so a friend replays your exact grid and
+the game reports the head-to-head. LABELS assist stamps a unique letter per
+colour for a colour-free hunt. Detailed context: `.claude/signal-hunt.md`.
+
 ---
 
 ## Adding a New Game

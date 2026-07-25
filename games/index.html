@@ -139,7 +139,7 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 19:46 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 21:14 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
@@ -478,6 +478,22 @@ h1 {
         <div class="game-desc">Tip your phone to roll a steel ball across an oak board, past the holes, into the brass cup. 10 boards from a first roll to the gauntlet. Drag works too.</div>
       </div>
     </a>
+
+    <a class="game-card" href="sky-lantern/">
+      <div class="game-icon">🏮</div>
+      <div class="game-info">
+        <div class="game-name">SKY LANTERN</div>
+        <div class="game-desc">Blow into your phone to fire the burner of a paper lantern and climb a festival night sky. It heats slow and cools slow — breathe early. 6 ascents. Hold-to-burn if you'd rather not.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="signal-hunt/">
+      <div class="game-icon">📡</div>
+      <div class="game-info">
+        <div class="game-name">SIGNAL HUNT</div>
+        <div class="game-desc">Eight rogue signals hide in a huge circuit grid — each an exact shape+colour pair, every decoy sharing one but never both. Pan, pinch, tap. Send a friend the code and duel the same grid.</div>
+      </div>
+    </a>
   </div>
 
   <div id="stats">
@@ -539,6 +555,8 @@ const GAMES = [
   { n: 'LOCKSPORT', i: '🗝️', h: 'locksport/', genre: ['lockpicking-sim'], input: ['drag-probe', 'tension-hold'], session: ['level-campaign'], mech: ['feel-simulation', 'binding-order', 'star-rating', 'seeded-determinism'], players: ['solo'] },
   { n: 'BALLPARK', i: '🎚️', h: 'ballpark/', genre: ['trivia'], input: ['drag-slider'], session: ['daily-challenge', 'quick-round'], mech: ['estimation-scoring', 'streak-multiplier', 'seeded-determinism'], players: ['solo'] },
   { n: 'TILT LABYRINTH', i: '🕳️', h: 'tilt-labyrinth/', genre: ['marble-labyrinth'], input: ['tilt', 'drag-steer'], session: ['level-campaign'], mech: ['physics-sim', 'hazard-avoidance', 'star-rating'], players: ['solo'] },
+  { n: 'SKY LANTERN', i: '🏮', h: 'sky-lantern/', genre: ['flight-control'], input: ['mic-blow', 'drag-steer'], session: ['level-campaign'], mech: ['analog-breath', 'physics-sim', 'star-rating'], players: ['solo'] },
+  { n: 'SIGNAL HUNT', i: '📡', h: 'signal-hunt/', genre: ['hidden-object'], input: ['pinch-zoom', 'two-finger-pan', 'tap'], session: ['async-versus', 'daily-challenge', 'timed-round'], mech: ['visual-search', 'seeded-determinism', 'share-code'], players: ['solo', 'async-2p'] },
 ];
 // One hue per section (single-series bars; labels carry identity). Green and
 // gold sections are kept non-adjacent — the pair is CVD-inseparable.
