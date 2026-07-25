@@ -362,6 +362,19 @@ Missile-Command-style tap interceptor. Blast rings chain through meteors
 budgets, intermission bonuses, mercy rebuild every 5th wave. Synth SFX +
 tense sequencer music. Detailed context: `.claude/meteor-defense.md`.
 
+### LOCKSPORT (`locksport/index.html`, ~640 lines)
+Realistic side-view single-pin-picking sim. Tension is auto-applied (a
+left-thumb tension pad appears from the spool levels on); drag a hook/rake in
+the probe zone to feel the binding pin, ratchet it up under friction, and set
+it at the shear line — overlift jams it, RESET drops every pin. Spool drivers
+false-set with a plug over-rotation you beat by easing tension into a green
+band (counter-rotation); serrated drivers give deceptive mini-clicks. 12-lock
+practice path (1 pin → 6-pin all-security OLD IRON), zen + 3-star rating,
+level-select dropdown, seeded generator with an auto-solver fairness gate.
+Realistic rendering: cutaway brass lock on a textured workbench, compressing
+springs, steel/brass pins, machined dial, golden open payoff. Detailed
+context: `.claude/locksport.md`.
+
 ---
 
 ## Adding a New Game

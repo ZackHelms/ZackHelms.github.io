@@ -63,8 +63,9 @@ local-2p.
 | Alpine Ascent | `alpine-ascent/` | platformer | hold-charge, drag-aim-release | level-campaign | physics-sim, timing-precision, checkpoint-climb | solo | `.claude/alpine-ascent.md` |
 | Golden Reel | `golden-reel/` | fishing | hold-charge, tap | save-campaign | collection, resource-economy, timing-precision | solo | `.claude/golden-reel.md` |
 | Vault Breaker | `vault-breaker/` | dexterity-puzzle | pinch-rotate | level-campaign | timing-precision, seeded-determinism, star-rating | solo | `.claude/vault-breaker.md` |
+| Locksport | `locksport/` | lockpicking-sim | drag-probe, tension-hold | level-campaign | feel-simulation, binding-order, star-rating, seeded-determinism | solo | `.claude/locksport.md` |
 
-39 games (37 in-repo + 2 external builds).
+40 games (38 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -90,6 +91,9 @@ local-2p.
   `permadeath` + `relic-builds` (ember-depths) ·
   `seeded-determinism` (blade-spin, word-circuit, tri-peaks — an
   established house pattern now).
+- `lockpicking-sim` genre + `drag-probe`/`tension-hold` feel input +
+  `feel-simulation`/`binding-order` mechanics (locksport — a physical-skill
+  simulator, the first "learn a real craft" title).
 
 ### Absent — highest-novelty targets
 - **Genres:** `trivia`.
@@ -113,5 +117,7 @@ tri-peaks, shadow-circuit, neon-recall, neon-drift — filled `card-deck`,
 `tap-to-move` input and `time-trial`/`quick-round` sessions. The
 2026-07-25 realistic-graphics batch — ember-depths, alpine-ascent,
 golden-reel, vault-breaker — filled `roguelike` + `run-based`,
-`platformer`, the new `fishing` genre, and the `pinch-rotate` input,
-leaving `trivia` and `tilt` as the only absent targets.)*
+`platformer`, the new `fishing` genre, and the `pinch-rotate` input. The
+2026-07-25 realistic lock-picking build — locksport — added the
+`lockpicking-sim` genre and the two-handed `drag-probe`/`tension-hold`
+feel input, leaving `trivia` and `tilt` as the only absent targets.)*
