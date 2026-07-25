@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Alpine Ascent</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+:root {
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff; --red:#ff2244;
+  --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; }
+body {
+  background:var(--bg); color:var(--white);
+  font-family:'Share Tech Mono', monospace;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  position:fixed; inset:0;
+}
+#cv { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+#back-btn {
+  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:30;
+  background:rgba(11,11,22,0.75); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:32px;
+  text-align:center; text-decoration:none; touch-action:manipulation;
+}
+#mute {
+  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:30;
+  background:rgba(11,11,22,0.75); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
+  text-align:center; padding:0; touch-action:manipulation;
+}
+#overlay {
+  position:absolute; inset:0; z-index:20; display:flex;
+  flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(6,8,18,0.88); padding:20px; text-align:center;
+  padding-top:calc(var(--sat) + 20px); padding-bottom:calc(var(--sab) + 20px);
+  overflow-y:auto;
+}
+#overlay.hidden { display:none; }
+#overlay h1 {
+  font-family:'Black Ops One', sans-serif; color:#bfe3ff;
+  font-size:clamp(1.7rem, 8vw, 2.5rem); letter-spacing:4px;
+  text-shadow:0 0 30px #4488ff66; margin-bottom:4px;
+}
+.sub { color:var(--dim); font-size:0.68rem; letter-spacing:3px; margin-bottom:18px; }
+.btn {
+  font-family:'Black Ops One', sans-serif; letter-spacing:2px;
+  background:var(--panel); color:#bfe3ff;
+  border:1px solid #4488ff; border-radius:8px;
+  font-size:1.0rem; padding:13px 30px; margin:7px; min-width:250px;
+  touch-action:manipulation; cursor:pointer;
+}
+.btn.gold { color:var(--gold); border-color:var(--gold); }
+.stat { color:var(--white); font-size:0.85rem; margin:3px 0; letter-spacing:1px; }
+.stat b { color:var(--gold); }
+.howto { color:var(--dim); font-size:0.7rem; max-width:320px; line-height:1.7; margin-top:16px; }
+.howto em { color:#bfe3ff; font-style:normal; }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 02:14 UTC</div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute">🔊</button>
+<canvas id="cv"></canvas>
+<div id="overlay"></div>
+<script>
+'use strict';
+/* =====================================================================
+   ALPINE ASCENT — charge-jump mountain platformer.
+   Hold to charge, drag sideways to aim, release to leap. Climb one fixed
+   mountain through 6 camps to the summit. Falls cost altitude, never a
+   life. Realistic rendering: altitude-graded skies, parallax ridges,
+   cloud band, god rays, drifting snow, textured rock/ice ledges.
+   World units: x 0..100 (screen width), y = altitude in meters (up+).
+   ===================================================================== */
+
+/* ============ Physics constants ============ */
+const G = 60;              // gravity u/s^2
+const VY_MAX = 51.4;       // full-charge vertical launch (apex ~22 u)
+const VX_MAX = 18;         // full aim horizontal launch
+const CHARGE_TIME = 0.85;  // seconds to full charge
+const CHARGE_FLOOR = 0.35; // minimum effective charge
+const PW = 2.0;            // player half-width
+const WORLD_W = 100;
+
+/* ============ Mountain generation (fixed seed → learnable routes) ============ */
+let rngS = 20260725;
+function rnd() { rngS = (rngS * 1103515245 + 12345) & 0x7fffffff; return rngS / 0x7fffffff; }
+function rr(a, b) { return a + rnd() * (b - a); }
+// vertical-gap → allowed horizontal reach (conservative jump envelope)
+function dxAllow(dy) { return dy <= 12 ? 26 : dy <= 15 ? 20 : 14; }
+let plats = [];   // {x,y,w,type,camp} x=left edge; type rock|grass|ice|crumble|camp|summit
+let camps = [];   // camp platforms in order (idx 1..6), camps[6]=summit
+function typeForAlt(y) {
+  const r = rnd();
+  if (y < 180) return r < 0.55 ? 'grass' : 'rock';
+  if (y < 380) return r < 0.75 ? 'rock' : 'ice';
+  if (y < 560) return r < 0.45 ? 'ice' : (r < 0.8 ? 'rock' : 'crumble');
+  return r < 0.35 ? 'crumble' : (r < 0.7 ? 'ice' : 'rock');
+}
+function genMountain() {
+  rngS = 20260725;
+  plats = []; camps = [];
+  plats.push({ x: 0, y: 0, w: WORLD_W, type: 'grass', camp: 0 }); // base ground
+  let x = 40, y = 0, step = 0;
+  for (let c = 1; c <= 6; c++) {
+    for (let s = 0; s < 9; s++) {
+      step++;
+      const dy = rr(11, 17.5);
+      y += dy;
+      const reach = dxAllow(dy) * 0.92;
+      let nx = x + rr(-reach, reach);
+      nx = Math.max(6, Math.min(WORLD_W - 6 - 12, nx));
+      const w = Math.max(9, rr(11, 17) - y * 0.004);
+      // keep the landing zone (platform span) within actual reach of takeoff point
+      if (Math.abs(nx + w / 2 - x) > reach) nx = x + Math.sign(nx + w / 2 - x) * reach - w / 2;
+      nx = Math.max(4, Math.min(WORLD_W - 4 - w, nx));
+      plats.push({ x: nx, y, w, type: typeForAlt(y), camp: 0 });
+      // occasional side branch (optional route, never load-bearing)
+      if (rnd() < 0.3) {
+        const bw = rr(8, 12);
+        let bx = nx + (rnd() < 0.5 ? -1 : 1) * rr(18, 26);
+        bx = Math.max(4, Math.min(WORLD_W - 4 - bw, bx));
+        if (Math.abs(bx - nx) > bw + 2) plats.push({ x: bx, y: y + rr(-3, 3), w: bw, type: typeForAlt(y), camp: 0 });
+      }
+      x = nx + w / 2;
+    }
+    // camp ledge — wide, safe
+    const dy = rr(10, 13);
+    y += dy;
+    const cw = 30;
+    let cx = Math.max(8, Math.min(WORLD_W - 8 - cw, x - cw / 2 + rr(-8, 8)));
+    if (Math.abs(cx + cw / 2 - x) > dxAllow(dy)) cx = Math.max(8, Math.min(WORLD_W - 8 - cw, x + Math.sign(cx + cw / 2 - x) * dxAllow(dy) - cw / 2));
+    const p = { x: cx, y, w: cw, type: 'camp', camp: c };
+    plats.push(p); camps.push(p);
+    x = cx + cw / 2;
+  }
+  // summit
+  const dy = 12;
+  y += dy;
+  const sw = 36;
+  let sx = Math.max(10, Math.min(WORLD_W - 10 - sw, x - sw / 2));
+  const sp = { x: sx, y, w: sw, type: 'summit', camp: 7 };
+  plats.push(sp); camps.push(sp);
+}
+genMountain();
+const SUMMIT_Y = camps[6].y;
+
+/* ============ State (top-level: reachable from page.evaluate) ============ */
+let state = 'menu';   // menu | play | win
+let player = {
+  x: 50, y: 0, vx: 0, vy: 0, onGround: true, ground: null,
+  charging: false, charge: 0, aim: 0, face: 1, jumpStartY: 0, slideT: 0,
+};
+let camY = 0;         // camera bottom altitude
+let curCamp = 0;      // highest camp reached this run
+let stats = { jumps: 0, falls: 0, time: 0 };
+let crumbleState = new Map(); // plat → {t, gone, respawn}
+let windNow = 0;      // current wind accel (u/s^2), altitude-gated
+let banner = null;    // {txt, t}
+let landDust = [];    // particles
+let flakes = [];      // snow
+
+function bestCamp() { return parseInt(localStorage.getItem('alpineAscent.camp') || '0', 10) || 0; }
+function hasSummit() { return localStorage.getItem('alpineAscent.summit') === '1'; }
+function persistCamp(c) { try { if (c > bestCamp()) localStorage.setItem('alpineAscent.camp', String(c)); } catch (err) {} }
+
+/* ============ Wind (altitude 330+, slow 10 s swell — preview-accurate) ============ */
+function windAt(alt, t) {
+  if (alt < 330) return 0;
+  const strength = Math.min(1, (alt - 330) / 200);
+  return Math.sin(t * 0.55) * 9 * strength;
+}
+
+/* ============ Core physics step ============ */
+function update(dt) {
+  if (state !== 'play') return;
+  stats.time += dt;
+  windNow = windAt(player.y, stats.time);
+  if (player.charging && player.onGround) {
+    player.charge = Math.min(1, player.charge + dt / CHARGE_TIME);
+  }
+  if (!player.onGround) {
+    player.vy -= G * dt;
+    player.vx += windNow * dt;
+    let nx = player.x + player.vx * dt;
+    const ny = player.y + player.vy * dt;
+    // side walls bounce
+    if (nx < PW) { nx = PW; player.vx = Math.abs(player.vx) * 0.45; }
+    if (nx > WORLD_W - PW) { nx = WORLD_W - PW; player.vx = -Math.abs(player.vx) * 0.45; }
+    // land on a platform top when crossing it downward
+    if (player.vy < 0) {
+      let hit = null;
+      for (const p of plats) {
+        const cs = crumbleState.get(p);
+        if (cs && cs.gone) continue;
+        if (player.y >= p.y && ny <= p.y &&
+            nx + PW > p.x - 0.5 && nx - PW < p.x + p.w + 0.5) {
+          if (!hit || p.y > hit.y) hit = p;
+        }
+      }
+      if (hit) { landOn(hit, nx); return; }
+    }
+    player.x = nx; player.y = ny;
+    if (player.y < 0) { player.y = 0; landOn(plats[0], player.x); }
+  } else {
+    // grounded: ice slides, everything else grips
+    const p = player.ground;
+    if (p && p.type === 'ice' && Math.abs(player.vx) > 0.01) {
+      player.slideT += dt;
+      player.x += player.vx * dt;
+      player.vx *= Math.exp(-dt * 0.9);
+      if (Math.abs(player.vx) < 0.4) player.vx = 0;
+      // slid off the edge?
+      if (player.x + PW < p.x || player.x - PW > p.x + p.w) {
+        player.onGround = false; player.ground = null; player.vy = 0;
+      }
+      if (player.x < PW) { player.x = PW; player.vx = 0; }
+      if (player.x > WORLD_W - PW) { player.x = WORLD_W - PW; player.vx = 0; }
+    } else player.vx = 0;
+    // crumble under our feet
+    if (p) {
+      const cs = crumbleState.get(p);
+      if (cs && !cs.gone) {
+        cs.t += dt;
+        if (cs.t > 0.55) {
+          cs.gone = true; cs.respawn = 4;
+          player.onGround = false; player.ground = null; player.vy = 0;
+          sfxCrumble();
+        }
+      }
+    }
+  }
+  // crumble respawns
+  for (const [p, cs] of crumbleState) {
+    if (cs.gone) {
+      cs.respawn -= dt;
+      if (cs.respawn <= 0) crumbleState.delete(p);
+    }
+  }
+  // camera follow
+  const target = Math.max(0, player.y - 55);
+  camY += (target - camY) * Math.min(1, dt * 3.2);
+}
+function landOn(p, nx) {
+  const wasAirborne = !player.onGround;
+  player.x = nx; player.y = p.y;
+  player.onGround = true; player.ground = p;
+  if (p.type !== 'ice') player.vx = 0; else player.vx *= 0.55;
+  const fell = player.jumpStartY - p.y > 28;
+  if (wasAirborne) {
+    if (fell) { stats.falls++; sfxFallThud(); shakeT = 0.35; }
+    else sfxLand();
+    for (let i = 0; i < 7; i++) landDust.push({
+      x: nx + rr2(-PW, PW), y: p.y, vx: rr2(-4, 4), vy: rr2(1, 5), t: 0,
+      max: 0.5, snow: p.y > 380,
+    });
+  }
+  player.vy = 0;
+  if (p.type === 'crumble' && !crumbleState.has(p)) crumbleState.set(p, { t: 0, gone: false, respawn: 0 });
+  if (p.camp > 0 && p.camp <= 6 && p.camp > curCamp) {
+    curCamp = p.camp; persistCamp(p.camp);
+    banner = { txt: 'CAMP ' + p.camp + ' · ' + Math.round(p.y) + 'm', t: 2.2 };
+    sfxCamp();
+  }
+  if (p.type === 'summit' && state === 'play') {
+    state = 'win';
+    try { localStorage.setItem('alpineAscent.summit', '1'); } catch (err) {}
+    persistCamp(6);
+    sfxSummit();
+    setTimeout(showWin, 1200);
+  }
+}
+function rr2(a, b) { return a + Math.random() * (b - a); }
+
+/* ============ Jump ============ */
+function beginCharge(px) {
+  if (state !== 'play' || !player.onGround) return false;
+  player.charging = true; player.charge = 0; player.aim = 0;
+  chargeStartX = px;
+  sfxChargeStart();
+  return true;
+}
+function setAim(px) {
+  if (!player.charging) return;
+  player.aim = Math.max(-1, Math.min(1, (px - chargeStartX) / 90));
+  if (player.aim !== 0) player.face = player.aim > 0 ? 1 : -1;
+}
+function releaseJump() {
+  if (!player.charging) return false;
+  player.charging = false;
+  if (!player.onGround) return false;
+  const c = Math.max(CHARGE_FLOOR, player.charge);
+  player.vy = VY_MAX * (0.45 + 0.55 * c);
+  player.vx = VX_MAX * player.aim * (0.5 + 0.5 * c);
+  player.onGround = false; player.ground = null;
+  player.jumpStartY = player.y;
+  stats.jumps++;
+  player.charge = 0;
+  sfxJump();
+  return true;
+}
+let chargeStartX = 0;
+
+/* ============ Trajectory preview (same physics incl. wind) ============ */
+function previewArc() {
+  const c = Math.max(CHARGE_FLOOR, player.charge);
+  let vx = VX_MAX * player.aim * (0.5 + 0.5 * c);
+  let vy = VY_MAX * (0.45 + 0.55 * c);
+  let x = player.x, y = player.y;
+  const pts = [];
+  const dt = 0.05;
+  for (let i = 0; i < 34; i++) {
+    vy -= G * dt; vx += windNow * dt;
+    x += vx * dt; y += vy * dt;
+    if (x < PW) { x = PW; vx = Math.abs(vx) * 0.45; }
+    if (x > WORLD_W - PW) { x = WORLD_W - PW; vx = -Math.abs(vx) * 0.45; }
+    if (i % 2 === 0) pts.push([x, y]);
+    if (vy < 0 && y < player.y - 40) break;
+  }
+  return pts;
+}
+
+/* ============ Run lifecycle ============ */
+function startClimb(fromCamp) {
+  genMountain(); // fixed seed → same mountain, resets crumble map keys
+  crumbleState = new Map();
+  stats = { jumps: 0, falls: 0, time: 0 };
+  curCamp = fromCamp;
+  let p = plats[0];
+  if (fromCamp > 0) p = camps[fromCamp - 1];
+  player.x = p.x + p.w / 2; player.y = p.y;
+  player.vx = 0; player.vy = 0; player.onGround = true; player.ground = p;
+  player.charging = false; player.charge = 0;
+  camY = Math.max(0, player.y - 55);
+  state = 'play';
+  overlayEl.classList.add('hidden');
+  banner = { txt: fromCamp > 0 ? 'CAMP ' + fromCamp + ' · ' + Math.round(p.y) + 'm' : 'BASE CAMP · 0m', t: 2 };
+}
+
+/* ============ Canvas ============ */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const overlayEl = document.getElementById('overlay');
+let W = 390, H = 844, dpr = 1, scale = 4.7;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  scale = W / WORLD_W;
+}
+window.addEventListener('resize', resize);
+resize();
+function sx(x) { return x * scale; }
+function sy(y) { return H - (y - camY) * scale; }
+
+/* ============ Sky / atmosphere ============ */
+// altitude-keyed sky stops: [alt, topColor, bottomColor]
+const SKY = [
+  [0,   [96, 148, 210], [212, 226, 232]],
+  [180, [64, 112, 190], [176, 200, 224]],
+  [380, [70, 90, 150], [150, 160, 190]],
+  [560, [58, 48, 110], [230, 140, 110]],
+  [720, [16, 14, 44], [110, 70, 120]],
+  [860, [6, 6, 24], [50, 40, 90]],
+];
+function lerpC(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+function skyAt(alt) {
+  let i = 0;
+  while (i < SKY.length - 2 && SKY[i + 1][0] < alt) i++;
+  const t = Math.max(0, Math.min(1, (alt - SKY[i][0]) / (SKY[i + 1][0] - SKY[i][0])));
+  return [lerpC(SKY[i][1], SKY[i + 1][1], t), lerpC(SKY[i][2], SKY[i + 1][2], t)];
+}
+function css(c, a) { return `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a === undefined ? 1 : a})`; }
+// parallax ridge lines (precomputed heightfields)
+function makeRidge(seed, amp, base) {
+  const pts = [];
+  let s = seed;
+  const rn = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  let y = base + rn() * amp * 0.5;
+  for (let i = 0; i <= 40; i++) {
+    y += (rn() - 0.5) * amp * 0.55;
+    y = Math.max(base - amp, Math.min(base + amp, y));
+    pts.push(y);
+  }
+  return pts;
+}
+const RIDGES = [
+  { pts: makeRidge(11, 26, 120), par: 0.16, haze: 0.85 },
+  { pts: makeRidge(23, 34, 95), par: 0.34, haze: 0.6 },
+  { pts: makeRidge(47, 42, 70), par: 0.55, haze: 0.32 },
+];
+// stars (screen-space, altitude-gated)
+const STARS = [];
+{
+  let s = 99;
+  const rn = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  for (let i = 0; i < 90; i++) STARS.push([rn(), rn() * 0.7, 0.4 + rn() * 0.8]);
+}
+// clouds (world objects in the 340-540 band)
+const CLOUDS = [];
+{
+  let s = 7;
+  const rn = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  for (let i = 0; i < 14; i++) CLOUDS.push({
+    x: rn() * 130 - 15, y: 340 + rn() * 200, w: 24 + rn() * 30, sp: 0.6 + rn() * 1.1, a: 0.25 + rn() * 0.3,
+  });
+}
+
+/* ============ Platform texture cache ============ */
+const texCache = new Map();
+function platTex(type, w) {
+  const key = type + '|' + Math.round(w);
+  if (texCache.has(key)) return texCache.get(key);
+  const pw = Math.max(8, Math.round(w * scale)), ph = Math.round(3.2 * scale);
+  const c = document.createElement('canvas'); c.width = pw; c.height = ph;
+  const g = c.getContext('2d');
+  if (type === 'ice') {
+    const gr = g.createLinearGradient(0, 0, 0, ph);
+    gr.addColorStop(0, '#d8ecff'); gr.addColorStop(0.25, '#9cc6e8'); gr.addColorStop(1, '#4a7aa8');
+    g.fillStyle = gr; g.fillRect(0, 0, pw, ph);
+    g.fillStyle = 'rgba(255,255,255,0.65)';
+    g.fillRect(0, 0, pw, 2);
+    for (let i = 0; i < pw / 14; i++) {
+      g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1;
+      const x0 = Math.random() * pw;
+      g.beginPath(); g.moveTo(x0, ph * 0.2); g.lineTo(x0 + 6, ph * 0.75); g.stroke();
+    }
+  } else {
+    const rock = type === 'crumble' ? ['#6a5a4c', '#3c332b'] : ['#7d7468', '#453e37'];
+    const gr = g.createLinearGradient(0, 0, 0, ph);
+    gr.addColorStop(0, rock[0]); gr.addColorStop(1, rock[1]);
+    g.fillStyle = gr; g.fillRect(0, 0, pw, ph);
+    // strata
+    g.strokeStyle = 'rgba(0,0,0,0.28)'; g.lineWidth = 1;
+    for (let yy = 4; yy < ph; yy += 5) {
+      g.beginPath(); g.moveTo(0, yy + Math.random() * 2); g.lineTo(pw, yy + Math.random() * 2); g.stroke();
+    }
+    for (let i = 0; i < pw / 6; i++) {
+      g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.08)';
+      g.fillRect(Math.random() * pw, Math.random() * ph, 2 + Math.random() * 3, 1 + Math.random() * 2);
+    }
+    if (type === 'crumble') {
+      g.strokeStyle = 'rgba(10,6,2,0.6)'; g.lineWidth = 1.4;
+      for (let i = 0; i < pw / 22 + 1; i++) {
+        let x0 = Math.random() * pw, y0 = 0;
+        g.beginPath(); g.moveTo(x0, y0);
+        for (let k = 0; k < 3; k++) { x0 += (Math.random() - 0.5) * 8; y0 += ph / 3; g.lineTo(x0, y0); }
+        g.stroke();
+      }
+    }
+    if (type === 'grass') {
+      g.fillStyle = '#4e7a34'; g.fillRect(0, 0, pw, 3);
+      g.fillStyle = '#649b42';
+      for (let i = 0; i < pw / 3; i++) g.fillRect(Math.random() * pw, 0, 1.5, 2 + Math.random() * 2.5);
+    }
+  }
+  texCache.set(key, c);
+  return c;
+}
+
+/* ============ Input ============ */
+let usedTouch = false;
+cv.addEventListener('touchstart', (ev) => {
+  usedTouch = true; audioInit();
+  const t = ev.changedTouches[0];
+  beginCharge(t.clientX);
+  ev.preventDefault();
+}, { passive: false });
+cv.addEventListener('touchmove', (ev) => {
+  const t = ev.changedTouches[0];
+  setAim(t.clientX);
+  ev.preventDefault();
+}, { passive: false });
+cv.addEventListener('touchend', (ev) => { releaseJump(); ev.preventDefault(); }, { passive: false });
+cv.addEventListener('mousedown', (ev) => { if (!usedTouch) { audioInit(); beginCharge(ev.clientX); } });
+cv.addEventListener('mousemove', (ev) => { if (!usedTouch) setAim(ev.clientX); });
+cv.addEventListener('mouseup', () => { if (!usedTouch) releaseJump(); });
+
+/* ============ Overlays ============ */
+function bindTap(el, fn) {
+  let last = 0;
+  const h = (ev) => {
+    ev.preventDefault();
+    const now = Date.now();
+    if (now - last < 400) return;
+    last = now;
+    audioInit();
+    fn();
+  };
+  el.addEventListener('touchend', h, { passive: false });
+  el.addEventListener('click', h);
+}
+function showMenu() {
+  state = 'menu';
+  overlayEl.classList.remove('hidden');
+  const bc = bestCamp();
+  let html = `
+    <h1>ALPINE ASCENT</h1>
+    <div class="sub">CHARGE · AIM · LEAP · 6 CAMPS TO THE SUMMIT</div>
+    <div class="stat">HIGHEST CAMP <b>${bc > 0 ? 'CAMP ' + bc : '—'}</b>${hasSummit() ? ' · <b>SUMMIT ⛿</b>' : ''}</div>
+    <button class="btn" id="go">⛰ CLIMB FROM BASE</button>`;
+  if (bc > 0) html += `<button class="btn gold" id="cont">⛺ CONTINUE FROM CAMP ${bc}</button>`;
+  html += `
+    <div class="howto">
+      <em>Hold</em> anywhere to crouch and charge. <em>Drag sideways</em> while
+      holding to aim the leap — watch the dotted arc. <em>Release</em> to jump.
+      Ice slides, cracked ledges crumble, and up past the cloud line the
+      <em>wind</em> bends every jump. Falling only costs altitude — camps are
+      forever.
+    </div>`;
+  overlayEl.innerHTML = html;
+  bindTap(document.getElementById('go'), () => startClimb(0));
+  const c = document.getElementById('cont');
+  if (c) bindTap(c, () => startClimb(bestCamp()));
+}
+function showWin() {
+  overlayEl.classList.remove('hidden');
+  const m = Math.floor(stats.time / 60), s = Math.floor(stats.time % 60);
+  overlayEl.innerHTML = `
+    <h1 style="color:#ffc300;text-shadow:0 0 30px #ffc30066">SUMMIT ⛿</h1>
+    <div class="sub">${Math.round(SUMMIT_Y)}m — THE TOP OF THE WORLD</div>
+    <div class="stat">TIME <b>${m}:${String(s).padStart(2, '0')}</b></div>
+    <div class="stat">JUMPS <b>${stats.jumps}</b> · FALLS <b>${stats.falls}</b></div>
+    <button class="btn" id="again">⛰ CLIMB AGAIN</button>`;
+  bindTap(document.getElementById('again'), () => startClimb(0));
+}
+
+/* ============ Audio ============ */
+let AC = null, sfxGain = null, musicGain = null, musicTimer = null, musicStep = 0, musicNext = 0;
+let noiseBuf = null, windSrc = null, windGainNode = null, windFilter = null, chargeOsc = null, chargeGain = null;
+let muted = localStorage.getItem('alpine-ascent-mute') === '1';
+const muteBtn = document.getElementById('mute');
+muteBtn.textContent = muted ? '🔇' : '🔊';
+function audioInit() {
+  if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    sfxGain = AC.createGain(); sfxGain.gain.value = muted ? 0 : 0.4; sfxGain.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.gain.value = muted ? 0 : 0.13; musicGain.connect(AC.destination);
+    noiseBuf = AC.createBuffer(1, AC.sampleRate * 1, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    // continuous wind bed (altitude-scaled each frame)
+    windSrc = AC.createBufferSource(); windSrc.buffer = noiseBuf; windSrc.loop = true;
+    windFilter = AC.createBiquadFilter(); windFilter.type = 'bandpass'; windFilter.frequency.value = 400; windFilter.Q.value = 0.6;
+    windGainNode = AC.createGain(); windGainNode.gain.value = 0;
+    windSrc.connect(windFilter); windFilter.connect(windGainNode); windGainNode.connect(musicGain);
+    windSrc.start();
+    // charge hum
+    chargeOsc = AC.createOscillator(); chargeOsc.type = 'triangle'; chargeOsc.frequency.value = 90;
+    chargeGain = AC.createGain(); chargeGain.gain.value = 0;
+    chargeOsc.connect(chargeGain); chargeGain.connect(sfxGain);
+    chargeOsc.start();
+    startMusic();
+  } catch (err) { AC = null; }
+}
+bindTap(muteBtn, () => {
+  muted = !muted;
+  muteBtn.textContent = muted ? '🔇' : '🔊';
+  try { localStorage.setItem('alpine-ascent-mute', muted ? '1' : '0'); } catch (err) {}
+  if (sfxGain) sfxGain.gain.value = muted ? 0 : 0.4;
+  if (musicGain) musicGain.gain.value = muted ? 0 : 0.13;
+});
+function tone(freq, dur, type, vol, when, dest) {
+  if (!AC) return;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || 'sine'; o.frequency.value = freq;
+  const t = when || AC.currentTime;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(dest || sfxGain);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, vol, fFreq, when, dest, fType) {
+  if (!AC) return;
+  const s = AC.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+  const f = AC.createBiquadFilter(); f.type = fType || 'lowpass'; f.frequency.value = fFreq;
+  const g = AC.createGain();
+  const t = when || AC.currentTime;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(dest || sfxGain);
+  s.start(t); s.stop(t + dur + 0.02);
+}
+function sfxChargeStart() { if (chargeGain && AC) chargeGain.gain.setTargetAtTime(0.07, AC.currentTime, 0.05); }
+function sfxJump() {
+  if (chargeGain && AC) chargeGain.gain.setTargetAtTime(0, AC.currentTime, 0.02);
+  noise(0.12, 0.2, 1200, 0, null, 'bandpass');
+  tone(300, 0.15, 'triangle', 0.15);
+}
+function sfxLand() { noise(0.08, 0.18, 500); tone(120, 0.1, 'sine', 0.2); }
+function sfxFallThud() { noise(0.2, 0.3, 300); tone(70, 0.3, 'sine', 0.35); }
+function sfxCrumble() { noise(0.5, 0.25, 250); tone(90, 0.4, 'sawtooth', 0.12); }
+function sfxCamp() { if (!AC) return; const t = AC.currentTime; [392, 523, 659].forEach((f, i) => tone(f, 0.35, 'triangle', 0.18, t + i * 0.12)); }
+function sfxSummit() { if (!AC) return; const t = AC.currentTime; [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.5, 'triangle', 0.18, t + i * 0.14)); }
+/* Music: airy pad + sparse pentatonic bells */
+const BELLS = [523, 0, 0, 0, 587, 0, 784, 0, 0, 659, 0, 0, 0, 880, 0, 0, 523, 0, 0, 659, 0, 0, 587, 0, 0, 0, 784, 0, 0, 0, 0, 0];
+function startMusic() {
+  if (!AC || musicTimer) return;
+  // slow pad: two detuned triangles through lowpass
+  const o1 = AC.createOscillator(), o2 = AC.createOscillator(), lp = AC.createBiquadFilter(), pg = AC.createGain();
+  o1.type = 'triangle'; o1.frequency.value = 131; o2.type = 'triangle'; o2.frequency.value = 196.5;
+  lp.type = 'lowpass'; lp.frequency.value = 500;
+  pg.gain.value = 0.12;
+  const lfo = AC.createOscillator(), lfoG = AC.createGain();
+  lfo.frequency.value = 0.06; lfoG.gain.value = 0.05;
+  lfo.connect(lfoG); lfoG.connect(pg.gain);
+  o1.connect(lp); o2.connect(lp); lp.connect(pg); pg.connect(musicGain);
+  o1.start(); o2.start(); lfo.start();
+  musicStep = 0; musicNext = AC.currentTime + 0.1;
+  musicTimer = setInterval(() => {
+    if (!AC) return;
+    while (musicNext < AC.currentTime + 0.4) {
+      const n = BELLS[musicStep % 32];
+      if (n) {
+        tone(n, 1.8, 'sine', 0.1, musicNext, musicGain);
+        tone(n * 2.01, 0.9, 'sine', 0.03, musicNext, musicGain);
+      }
+      musicNext += 0.30;
+      musicStep++;
+    }
+  }, 130);
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) return;
+  if (document.hidden) AC.suspend(); else AC.resume();
+});
+
+/* ============ Rendering ============ */
+let lastT = 0, timeNow = 0, shakeT = 0;
+function draw(dt) {
+  const midAlt = camY + 90;
+  const [top, bot] = skyAt(midAlt);
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, css(top)); g.addColorStop(1, css(bot));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  // stars (fade in above 620)
+  const starA = Math.max(0, Math.min(1, (midAlt - 620) / 160));
+  if (starA > 0) {
+    for (const s of STARS) {
+      const tw = 0.6 + Math.sin(timeNow * 2 + s[0] * 40) * 0.4;
+      ctx.fillStyle = `rgba(255,255,255,${(starA * 0.85 * tw * s[2]).toFixed(3)})`;
+      ctx.fillRect(s[0] * W, s[1] * H, s[2], s[2]);
+    }
+  }
+  // sun (fixed world altitude 210 → sinks as you climb; alpenglow disc)
+  const sunSy = sy(210 + camY * 0.72), sunSx = W * 0.72;
+  if (sunSy > -80 && sunSy < H + 80) {
+    const warm = midAlt > 420;
+    const sg = ctx.createRadialGradient(sunSx, sunSy, 0, sunSx, sunSy, 90);
+    sg.addColorStop(0, warm ? 'rgba(255,190,120,0.95)' : 'rgba(255,246,220,0.95)');
+    sg.addColorStop(0.25, warm ? 'rgba(255,150,80,0.5)' : 'rgba(255,240,200,0.4)');
+    sg.addColorStop(1, 'rgba(255,220,160,0)');
+    ctx.fillStyle = sg;
+    ctx.beginPath(); ctx.arc(sunSx, sunSy, 90, 0, 7); ctx.fill();
+    // god rays
+    if (midAlt < 560) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.translate(sunSx, sunSy);
+      for (let r = 0; r < 4; r++) {
+        ctx.rotate(Math.PI / 4.3 + Math.sin(timeNow * 0.05 + r) * 0.01);
+        const rg = ctx.createLinearGradient(0, 0, 0, H * 0.9);
+        rg.addColorStop(0, 'rgba(255,235,190,0.10)');
+        rg.addColorStop(1, 'rgba(255,235,190,0)');
+        ctx.fillStyle = rg;
+        ctx.beginPath();
+        ctx.moveTo(0, 0); ctx.lineTo(-26, H * 0.9); ctx.lineTo(30, H * 0.9);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+  // parallax ridges (recede below as you climb)
+  for (const r of RIDGES) {
+    const baseY = sy(0) + camY * scale * (1 - r.par);
+    const hazeC = lerpC([bot[0], bot[1], bot[2]], [60, 70, 96], 1 - r.haze);
+    ctx.fillStyle = css(hazeC, 0.9);
+    ctx.beginPath();
+    ctx.moveTo(0, H + 40);
+    for (let i = 0; i <= 40; i++) {
+      ctx.lineTo((i / 40) * W, baseY - r.pts[i] * scale * 0.55);
+    }
+    ctx.lineTo(W, H + 40);
+    ctx.closePath();
+    ctx.fill();
+  }
+  let shx = 0, shy = 0;
+  if (shakeT > 0) { shakeT -= dt; shx = (Math.random() - 0.5) * 8 * shakeT; shy = (Math.random() - 0.5) * 8 * shakeT; }
+  ctx.save();
+  ctx.translate(shx, shy);
+  // clouds (world band)
+  for (const c of CLOUDS) {
+    c.x += c.sp * dt;
+    if (c.x - c.w > 110) c.x = -c.w - 10;
+    const cy2 = sy(c.y);
+    if (cy2 < -60 || cy2 > H + 60) continue;
+    const cg = ctx.createRadialGradient(sx(c.x), cy2, 0, sx(c.x), cy2, c.w * scale * 0.6);
+    cg.addColorStop(0, `rgba(255,255,255,${c.a})`);
+    cg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = cg;
+    ctx.beginPath();
+    ctx.ellipse(sx(c.x), cy2, c.w * scale * 0.6, c.w * scale * 0.2, 0, 0, 7);
+    ctx.fill();
+  }
+  // platforms
+  for (const p of plats) {
+    const py = sy(p.y);
+    if (py < -60 || py > H + 120) continue;
+    const cs = crumbleState.get(p);
+    let dropY = 0, alpha = 1;
+    if (cs) {
+      if (cs.gone) {
+        const ft = 4 - cs.respawn;
+        if (ft < 0.9) { dropY = ft * ft * 300; alpha = Math.max(0, 1 - ft * 1.3); }
+        else if (cs.respawn < 0.6) alpha = 1 - cs.respawn / 0.6; // fade back in
+        else continue;
+        if (alpha <= 0.02) continue;
+      } else if (cs.t > 0) {
+        dropY = Math.sin(timeNow * 60) * 1.6 * Math.min(1, cs.t * 3);
+      }
+    }
+    ctx.globalAlpha = alpha;
+    if (p.type === 'camp' || p.type === 'summit') {
+      drawCampLedge(p, py + dropY);
+    } else {
+      ctx.drawImage(platTex(p.type, p.w), sx(p.x), py + dropY, p.w * scale, 3.2 * scale);
+      // snowcap on top at altitude
+      if (p.y > 380 && p.type !== 'ice') {
+        ctx.fillStyle = 'rgba(240,246,255,0.9)';
+        ctx.fillRect(sx(p.x), py + dropY - 2, p.w * scale, 3.5);
+      }
+      // icicles under ice ledges
+      if (p.type === 'ice') {
+        ctx.fillStyle = 'rgba(190,225,255,0.75)';
+        for (let i = 0; i < p.w / 5; i++) {
+          const ix = sx(p.x + 2 + i * 5);
+          const il = 5 + ((p.x * 7 + i * 13) % 8);
+          ctx.beginPath();
+          ctx.moveTo(ix, py + dropY + 3.2 * scale);
+          ctx.lineTo(ix + 3, py + dropY + 3.2 * scale);
+          ctx.lineTo(ix + 1.5, py + dropY + 3.2 * scale + il);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  drawPlayer(dt);
+  // dust/snow puffs
+  for (let i = landDust.length - 1; i >= 0; i--) {
+    const d = landDust[i];
+    d.t += dt;
+    if (d.t > d.max) { landDust.splice(i, 1); continue; }
+    d.x += d.vx * dt; d.y += d.vy * dt; d.vy -= 22 * dt;
+    ctx.fillStyle = d.snow ? 'rgba(240,246,255,' : 'rgba(160,140,110,';
+    ctx.fillStyle += (0.6 * (1 - d.t / d.max)).toFixed(2) + ')';
+    ctx.beginPath(); ctx.arc(sx(d.x), sy(d.y), 2.4, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+  // snow flakes (screen space, altitude-density, wind-driven)
+  const density = Math.max(0, Math.min(1, (midAlt - 240) / 260));
+  if (density > 0) {
+    while (flakes.length < 90 * density) flakes.push({ x: Math.random() * W, y: Math.random() * H, s: 1 + Math.random() * 2, sp: 26 + Math.random() * 50 });
+    while (flakes.length > 90 * density + 8) flakes.pop();
+    ctx.fillStyle = 'rgba(240,246,255,0.75)';
+    for (const f of flakes) {
+      f.y += f.sp * dt;
+      f.x += (windNow * 3.2 + Math.sin(timeNow * 1.5 + f.y * 0.02) * 12) * dt * f.s * 0.5;
+      if (f.y > H) { f.y = -4; f.x = Math.random() * W; }
+      if (f.x > W + 4) f.x = -4;
+      if (f.x < -4) f.x = W + 4;
+      ctx.fillRect(f.x, f.y, f.s, f.s);
+    }
+  }
+  // cloud-band fog when camera is inside the band
+  const fogMid = 440, fogHalf = 120;
+  const fogA = Math.max(0, 1 - Math.abs(midAlt - fogMid) / fogHalf) * 0.42;
+  if (fogA > 0.01) {
+    ctx.fillStyle = `rgba(225,232,242,${fogA.toFixed(3)})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+  drawHUD();
+  if (banner && banner.t > 0) {
+    banner.t -= dt;
+    const a = Math.min(1, banner.t / 0.5);
+    ctx.globalAlpha = a;
+    ctx.font = `24px 'Black Ops One', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    ctx.shadowColor = '#4488ff'; ctx.shadowBlur = 18;
+    ctx.fillText(banner.txt, W / 2, H * 0.3);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+function drawCampLedge(p, py) {
+  const px = sx(p.x), pw = p.w * scale;
+  ctx.drawImage(platTex('rock', p.w), px, py, pw, 3.2 * scale);
+  ctx.fillStyle = 'rgba(240,246,255,0.92)';
+  ctx.fillRect(px, py - 2, pw, 3.5);
+  const cx2 = px + pw / 2;
+  if (p.type === 'summit') {
+    // flag
+    const fh = 46;
+    ctx.strokeStyle = '#d8ccb8'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(cx2, py); ctx.lineTo(cx2, py - fh); ctx.stroke();
+    const wave = Math.sin(timeNow * 4) * 3;
+    ctx.fillStyle = '#ffc300';
+    ctx.beginPath();
+    ctx.moveTo(cx2 + 1, py - fh);
+    ctx.lineTo(cx2 + 30, py - fh + 7 + wave);
+    ctx.lineTo(cx2 + 1, py - fh + 15);
+    ctx.closePath(); ctx.fill();
+  } else {
+    // tent
+    ctx.fillStyle = '#a8402e';
+    ctx.beginPath();
+    ctx.moveTo(cx2 - 26, py); ctx.lineTo(cx2 - 10, py - 22); ctx.lineTo(cx2 + 6, py);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#7c2c20';
+    ctx.beginPath();
+    ctx.moveTo(cx2 - 10, py - 22); ctx.lineTo(cx2 + 6, py); ctx.lineTo(cx2 - 2, py);
+    ctx.closePath(); ctx.fill();
+    // campfire
+    const fx = cx2 + 18, fy = py - 2;
+    ctx.strokeStyle = '#5a4028'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(fx - 6, fy); ctx.lineTo(fx + 6, fy - 3); ctx.moveTo(fx - 6, fy - 3); ctx.lineTo(fx + 6, fy); ctx.stroke();
+    const fl = Math.sin(timeNow * 12 + p.y) * 0.2 + 1;
+    const fg = ctx.createRadialGradient(fx, fy - 6, 0, fx, fy - 6, 12 * fl);
+    fg.addColorStop(0, 'rgba(255,220,140,0.95)');
+    fg.addColorStop(0.4, 'rgba(255,130,40,0.6)');
+    fg.addColorStop(1, 'rgba(255,90,20,0)');
+    ctx.fillStyle = fg;
+    ctx.beginPath(); ctx.ellipse(fx, fy - 7, 6 * fl, 10 * fl, 0, 0, 7); ctx.fill();
+  }
+}
+function drawPlayer(dt) {
+  const px = sx(player.x), py = sy(player.y);
+  const crouch = player.charging ? 1 - Math.max(CHARGE_FLOOR, player.charge) * 0.3 : 1;
+  const stretch = !player.onGround ? 1.12 : crouch;
+  const bw = PW * 2 * scale * 0.62, bh = 5.4 * scale * stretch;
+  // shadow
+  if (player.onGround) {
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(px, py + 1.5, bw * 0.7, 3, 0, 0, 7); ctx.fill();
+  }
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.scale(player.face, 1);
+  // legs
+  ctx.fillStyle = '#2c3040';
+  ctx.fillRect(-bw * 0.32, -bh * 0.22, bw * 0.24, bh * 0.22);
+  ctx.fillRect(bw * 0.08, -bh * 0.22, bw * 0.24, bh * 0.22);
+  // backpack
+  ctx.fillStyle = '#6b5638';
+  ctx.beginPath();
+  const bpx = -bw * 0.55;
+  ctx.roundRect(bpx, -bh * 0.78, bw * 0.34, bh * 0.42, 3);
+  ctx.fill();
+  // jacket
+  const jg = ctx.createLinearGradient(0, -bh * 0.85, 0, -bh * 0.2);
+  jg.addColorStop(0, '#e04434'); jg.addColorStop(1, '#8a2018');
+  ctx.fillStyle = jg;
+  ctx.beginPath();
+  ctx.roundRect(-bw * 0.38, -bh * 0.85, bw * 0.76, bh * 0.66, 4);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.fillRect(-bw * 0.38, -bh * 0.85, bw * 0.2, bh * 0.66);
+  // head + beanie
+  ctx.fillStyle = '#e8b48c';
+  ctx.beginPath(); ctx.arc(bw * 0.05, -bh * 0.98, bw * 0.26, 0, 7); ctx.fill();
+  ctx.fillStyle = '#284a7c';
+  ctx.beginPath(); ctx.arc(bw * 0.05, -bh * 1.04, bw * 0.27, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = '#eee';
+  ctx.beginPath(); ctx.arc(bw * 0.05, -bh * 1.3, bw * 0.09, 0, 7); ctx.fill();
+  // scarf trailing
+  ctx.strokeStyle = '#ffc300'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-bw * 0.1, -bh * 0.82);
+  const trail = (-player.vx * 0.6 - windNow * 0.5) * player.face;
+  ctx.quadraticCurveTo(-bw * 0.5 + trail, -bh * 0.75 + Math.sin(timeNow * 7) * 2, -bw * 0.8 + trail * 1.6, -bh * 0.6 + Math.sin(timeNow * 9) * 3);
+  ctx.stroke();
+  ctx.restore();
+  // charge meter + trajectory preview
+  if (player.charging && player.onGround) {
+    const c = Math.max(CHARGE_FLOOR, player.charge);
+    ctx.fillStyle = 'rgba(10,12,24,0.65)';
+    ctx.fillRect(px - 20, py - bh - 20, 40, 7);
+    const cg = ctx.createLinearGradient(px - 20, 0, px + 20, 0);
+    cg.addColorStop(0, '#39ff14'); cg.addColorStop(1, '#ffc300');
+    ctx.fillStyle = cg;
+    ctx.fillRect(px - 19, py - bh - 19, 38 * c, 5);
+    const pts = previewArc();
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    for (let i = 0; i < pts.length; i++) {
+      const a = 1 - i / pts.length;
+      ctx.globalAlpha = a * 0.8;
+      ctx.beginPath(); ctx.arc(sx(pts[i][0]), sy(pts[i][1]), 2.4 - i * 0.04, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+function drawHUD() {
+  ctx.textAlign = 'left';
+  ctx.font = `13px 'Black Ops One', sans-serif`;
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.shadowColor = 'rgba(0,0,20,0.8)'; ctx.shadowBlur = 6;
+  ctx.fillText(Math.round(player.y) + 'm', 104, (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0) + 22);
+  ctx.font = `10px 'Share Tech Mono', monospace`;
+  ctx.fillStyle = '#cfe0ff';
+  ctx.fillText('CAMP ' + curCamp + '/6 · J' + stats.jumps, 104, (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0) + 38);
+  ctx.shadowBlur = 0;
+  // wind indicator
+  if (Math.abs(windNow) > 0.8) {
+    const wx = W - 60, wy = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0) + 60;
+    ctx.fillStyle = 'rgba(10,12,24,0.5)';
+    ctx.beginPath(); ctx.roundRect(wx - 34, wy - 14, 78, 26, 6); ctx.fill();
+    ctx.font = `11px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = '#bfe3ff';
+    const mag = Math.abs(windNow);
+    const arrows2 = mag > 6 ? 3 : mag > 3 ? 2 : 1;
+    const ch = windNow > 0 ? '▶' : '◀';
+    ctx.textAlign = 'center';
+    ctx.fillText('WIND ' + ch.repeat(arrows2), wx + 5, wy + 3);
+    ctx.textAlign = 'left';
+  }
+  // wind audio follow
+  if (windGainNode && AC) {
+    const target = Math.min(0.5, Math.max(0.04, Math.abs(windNow) * 0.05 + Math.max(0, (player.y - 240)) * 0.0004));
+    windGainNode.gain.setTargetAtTime(state === 'play' ? target : 0.05, AC.currentTime, 0.4);
+    if (windFilter) windFilter.frequency.setTargetAtTime(300 + Math.abs(windNow) * 60, AC.currentTime, 0.4);
+  }
+  if (chargeOsc && AC && player.charging) chargeOsc.frequency.setTargetAtTime(90 + Math.max(CHARGE_FLOOR, player.charge) * 240, AC.currentTime, 0.03);
+}
+
+/* ============ Main loop ============ */
+function frame(ts) {
+  const dt = Math.min(0.1, (ts - lastT) / 1000 || 0.016);
+  lastT = ts; timeNow = ts / 1000;
+  update(dt);
+  draw(dt);
+  requestAnimationFrame(frame);
+}
+showMenu();
+// menu backdrop: start camera partway up the mountain for a pretty vista
+camY = 0;
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

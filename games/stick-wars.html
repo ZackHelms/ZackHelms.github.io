@@ -251,10 +251,26 @@ canvas { width:100%; height:auto; display:block; }
   border:1px solid #333; background:var(--panel); color:var(--dim); transition:all 0.15s;
 }
 .ov-lvl-btn:hover, .ov-lvl-btn.sel { border-color:var(--gold); color:var(--gold); background:#1a1508; }
+
+/* ---- BACK + MUTE BUTTONS ---- */
+#back-btn{position:fixed;z-index:80;
+  top:calc(env(safe-area-inset-top,0px) + 6px);
+  left:calc(env(safe-area-inset-left,0px) + 8px);
+  width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  color:#8899bb;font-size:16px;text-decoration:none;user-select:none;}
+#mute-btn{position:fixed;z-index:80;
+  top:calc(env(safe-area-inset-top,0px) + 6px);
+  left:calc(env(safe-area-inset-left,0px) + 52px);
+  width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  color:#8899bb;font-size:14px;cursor:pointer;padding:0;user-select:none;}
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-05 19:17 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
+<a id="back-btn" href="index.html" aria-label="Back to games">←</a>
+<button id="mute-btn" aria-label="Toggle sound">🔊</button>
 
 <header>
   <h1>STICK WARS</h1>
@@ -342,6 +358,181 @@ const CVS = document.getElementById('arena');
 const ctx = CVS.getContext('2d');
 const W = CVS.width, H = CVS.height;
 const GROUND = H - 55;
+
+// =============================================================
+// AUDIO (WebAudio synth — lazy init on first user gesture)
+// =============================================================
+let ac=null, sfxGain=null, musicGain=null, noiseBuf=null;
+let muted=false;
+try { muted = localStorage.getItem('stick-wars-mute')==='1'; } catch(e) {}
+
+function ensureAudio() {
+  if (!ac) {
+    try {
+      ac = new (window.AudioContext||window.webkitAudioContext)();
+      sfxGain = ac.createGain();   sfxGain.connect(ac.destination);
+      musicGain = ac.createGain(); musicGain.connect(ac.destination);
+      applyGains();
+    } catch(e) { ac = null; }
+  }
+  if (ac && ac.state==='suspended' && !muted) ac.resume();
+  return ac;
+}
+function applyGains() {
+  if (!ac) return;
+  sfxGain.gain.value = muted ? 0 : 0.8;
+  musicGain.gain.value = muted ? 0 : 0.16;
+}
+function getNoise() {
+  if (!noiseBuf && ac) {
+    const len = Math.floor(ac.sampleRate*0.25);
+    noiseBuf = ac.createBuffer(1,len,ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i=0;i<len;i++) d[i] = Math.random()*2-1;
+  }
+  return noiseBuf;
+}
+function beep(freq,dur,type,vol,slideTo,when) {
+  if (!ac) return;
+  const t = when||ac.currentTime;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type||'sine';
+  o.frequency.setValueAtTime(freq,t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo,t+dur);
+  g.gain.setValueAtTime(vol||0.12,t);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g).connect(sfxGain);
+  o.start(t); o.stop(t+dur+0.02);
+}
+function noiseHit(vol,dur,freq,ftype) {
+  if (!ac||!getNoise()) return;
+  const s = ac.createBufferSource(); s.buffer = noiseBuf;
+  const f = ac.createBiquadFilter(); f.type = ftype||'highpass'; f.frequency.value = freq||3000;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol,ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+dur);
+  s.connect(f).connect(g).connect(sfxGain);
+  s.start(); s.stop(ac.currentTime+dur+0.03);
+}
+
+// ---- SFX
+let lastHurtT = 0;
+const sndSlash     = ()=>{ if(!ac)return; noiseHit(0.15,0.07,2400,'highpass'); beep(210,0.09,'square',0.09,85); };
+const sndShoot     = ()=>{ if(!ac)return; beep(920,0.12,'sawtooth',0.06,230); noiseHit(0.05,0.05,4000,'highpass'); };
+const sndHurt      = ()=>{ if(!ac)return; if(ac.currentTime-lastHurtT<0.12)return; lastHurtT=ac.currentTime; beep(160,0.14,'sawtooth',0.1,65); noiseHit(0.09,0.1,900,'lowpass'); };
+const sndCoin      = ()=>{ if(!ac)return; beep(987.77,0.055,'square',0.05); beep(1318.5,0.1,'square',0.05,0,ac.currentTime+0.05); };
+const sndUpgrade   = ()=>{ if(!ac)return; const t=ac.currentTime; [523.25,659.25,783.99,1046.5].forEach((f,i)=>beep(f,0.13,'square',0.06,0,t+i*0.07)); };
+const sndNuke      = ()=>{ if(!ac)return; noiseHit(0.32,0.6,650,'lowpass'); beep(110,0.7,'sawtooth',0.13,28); };
+const sndWaveClear = ()=>{ if(!ac)return; const t=ac.currentTime; [659.25,783.99,987.77,1318.5].forEach((f,i)=>beep(f,0.16,'triangle',0.09,0,t+i*0.09)); };
+const sndDefeat    = ()=>{ if(!ac)return; const t=ac.currentTime; beep(330,0.5,'sawtooth',0.09,80,t); beep(220,0.7,'sawtooth',0.08,52,t+0.25); };
+const sndVictory   = ()=>{ if(!ac)return; const t=ac.currentTime; [659.25,783.99,987.77,1318.5,1567.98,1975.53].forEach((f,i)=>beep(f,0.2,'triangle',0.09,0,t+i*0.1)); };
+
+// ---- MUSIC: street-brawl loop — 132 BPM, 4-bar (64-step 16th) A/B form,
+// E-minor-pentatonic saw bass riff, kick/snare/hat filtered-noise groove,
+// short aggressive saw lead stabs (call in bar 2, answer in bar 4).
+const MSTEP = 60/132/4;              // s per 16th step
+const MLOOP = 64;
+const NB_E2=82.41, NB_G2=98.00, NB_A2=110.00, NB_B2=123.47, NB_D3=146.83;
+const NL_E4=329.63, NL_G4=392.00, NL_A4=440.00, NL_B4=493.88, NL_D5=587.33;
+const BASS_PAT = {                    // step -> freq (8th-note chug riff)
+   0:NB_E2, 2:NB_E2, 4:NB_E2, 6:NB_G2, 8:NB_E2,10:NB_E2,12:NB_A2,14:NB_B2,
+  16:NB_E2,18:NB_E2,20:NB_E2,22:NB_G2,24:NB_E2,26:NB_D3,28:NB_B2,30:NB_A2,
+  32:NB_G2,34:NB_G2,36:NB_G2,38:NB_B2,40:NB_G2,42:NB_G2,44:NB_A2,46:NB_B2,
+  48:NB_A2,50:NB_A2,52:NB_A2,54:NB_B2,56:NB_A2,58:NB_G2,60:NB_E2,62:NB_D3
+};
+const LEAD_PAT = { 24:NL_E4, 26:NL_G4, 28:NL_A4, 44:NL_D5, 56:NL_B4, 58:NL_A4, 60:NL_G4, 62:NL_E4 };
+let musicTimer=null, musicStep=0, nextNoteTime=0;
+function mKick(t) {
+  const o=ac.createOscillator(), g=ac.createGain();
+  o.type='sine'; o.frequency.setValueAtTime(150,t);
+  o.frequency.exponentialRampToValueAtTime(42,t+0.11);
+  g.gain.setValueAtTime(0.42,t);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.13);
+  o.connect(g).connect(musicGain); o.start(t); o.stop(t+0.16);
+}
+function mSnare(t) {
+  if (!getNoise()) return;
+  const s=ac.createBufferSource(); s.buffer=noiseBuf;
+  const f=ac.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1900; f.Q.value=0.8;
+  const g=ac.createGain();
+  g.gain.setValueAtTime(0.26,t);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.11);
+  s.connect(f).connect(g).connect(musicGain); s.start(t); s.stop(t+0.14);
+  const o=ac.createOscillator(), g2=ac.createGain();
+  o.type='triangle'; o.frequency.value=190;
+  g2.gain.setValueAtTime(0.11,t);
+  g2.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
+  o.connect(g2).connect(musicGain); o.start(t); o.stop(t+0.09);
+}
+function mHat(t,v) {
+  if (!getNoise()) return;
+  const s=ac.createBufferSource(); s.buffer=noiseBuf;
+  const f=ac.createBiquadFilter(); f.type='highpass'; f.frequency.value=7500;
+  const g=ac.createGain();
+  g.gain.setValueAtTime(v,t);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.04);
+  s.connect(f).connect(g).connect(musicGain); s.start(t); s.stop(t+0.06);
+}
+function mBass(freq,t,lenSteps) {
+  const d=lenSteps*MSTEP;
+  const o=ac.createOscillator(), fl=ac.createBiquadFilter(), g=ac.createGain();
+  o.type='sawtooth'; o.frequency.value=freq;
+  fl.type='lowpass'; fl.frequency.value=520; fl.Q.value=4;
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.2,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+  o.connect(fl).connect(g).connect(musicGain); o.start(t); o.stop(t+d+0.03);
+}
+function mStab(freq,t) {
+  const o=ac.createOscillator(), fl=ac.createBiquadFilter(), g=ac.createGain();
+  o.type='sawtooth'; o.frequency.value=freq;
+  fl.type='lowpass'; fl.frequency.value=2300; fl.Q.value=2;
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.085,t+0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.17);
+  o.connect(fl).connect(g).connect(musicGain); o.start(t); o.stop(t+0.2);
+}
+function musicPlayStep(st,t) {
+  const bar=(st/16)|0, i=st%16;
+  if (i===0||i===8) mKick(t);
+  if ((bar===1||bar===3)&&i===10) mKick(t);          // extra kick for drive
+  if (i===4||i===12) mSnare(t);
+  if (i%2===0) mHat(t, i%4===2?0.05:0.028);          // 8ths, offbeat accent
+  const b=BASS_PAT[st]; if (b) mBass(b,t,2);
+  const l=LEAD_PAT[st]; if (l) mStab(l,t);
+}
+function musicSchedule() {
+  if (!ac) return;
+  while (nextNoteTime < ac.currentTime+0.16) {       // ~0.16 s lookahead
+    musicPlayStep(musicStep,nextNoteTime);
+    musicStep=(musicStep+1)%MLOOP;
+    nextNoteTime+=MSTEP;
+  }
+}
+function startMusic() {
+  if (!ensureAudio()) return;
+  if (musicTimer) return;                            // already looping
+  musicStep=0; nextNoteTime=ac.currentTime+0.08;
+  musicTimer=setInterval(musicSchedule,25);
+}
+function unlockAudio() { if (ensureAudio()) startMusic(); }
+document.addEventListener('pointerdown',unlockAudio,{passive:true});
+document.addEventListener('keydown',unlockAudio);
+document.addEventListener('visibilitychange',()=>{
+  if (!ac) return;
+  if (document.hidden) ac.suspend();
+  else if (!muted) ac.resume();
+});
+
+// ---- mute button
+function updateMuteBtn() { const b=document.getElementById('mute-btn'); if (b) b.textContent = muted?'🔇':'🔊'; }
+document.getElementById('mute-btn').addEventListener('click',()=>{
+  muted=!muted;
+  try { localStorage.setItem('stick-wars-mute', muted?'1':'0'); } catch(e) {}
+  if (ac) { applyGains(); if (!muted&&ac.state==='suspended') ac.resume(); }
+  updateMuteBtn();
+});
+updateMuteBtn();
 
 // =============================================================
 // UPGRADE POOL
@@ -606,6 +797,7 @@ function updateCoins(dt) {
 
 function collectCoin(c) {
   c.collected = true;
+  sndCoin();
   player.totalCoins += c.value;
   player.xp += 20;
   score += 5;
@@ -704,6 +896,7 @@ function applyUpgrade(idx) {
   if (!pendingUpgrades || idx >= pendingUpgrades.length || upgradesLocked) return;
   const u = pendingUpgrades[idx];
   u.apply(player);
+  sndUpgrade();
   log('sc', `Upgrade: ${u.name} - ${u.desc}`);
   floatTxt(player.x, player.y-100, u.name, '#ffc300', 14);
   document.getElementById('upgradeScreen').classList.add('hidden');
@@ -904,6 +1097,7 @@ function dealDmg(target, amount, isCrit, owner) {
   floatTxt(target.x,target.y-105,isCrit?`CRIT! ${actual}`:`${actual}`,col,isCrit?17:13);
   spawnParts(target.x,target.y-55,col,8,1.2,55);
   target.invuln=0.1;
+  if (target===player) sndHurt();
   if (target.hp<=0) {
     target.alive=false; target.hp=0;
     if (target!==player) onEnemyKill(target);
@@ -951,6 +1145,7 @@ function usePlayerAbility(idx) {
       const dmg=getAbilityDmg(ab.baseDmg, idx);
       const isCrit=Math.random()<player.critChance;
       dealDmg(target,dmg,isCrit,player);
+      sndSlash();
       if (player.chainBolt) {
         const others=enemies.filter(e=>e.alive&&e!==target);
         if (others.length>0) { const t2=others[0]; dealDmg(t2,dmg*0.7,false,player); }
@@ -972,6 +1167,7 @@ function usePlayerAbility(idx) {
       });
     }
     spawnParts(player.x+player.facing*22,player.y-50,ab.color,6,0.5,40);
+    sndShoot();
   } else if (ab.type==='shield') {
     player.shielded=true; player.shieldTimer=4+player.powerTier;
     floatTxt(player.x,player.y-105,'BARRIER!','#ffffff');
@@ -988,6 +1184,7 @@ function useNuke() {
   floatTxt(W/2, H/2-40, 'N U K E', '#ff4400', 28);
   setTimeout(()=>{
     if (!gameRunning) return;
+    sndNuke();
     spawnAOEBurst(W/2, GROUND-50, '#ff4400', 200);
     spawnAOEBurst(W/2, GROUND-50, '#ffcc00', 140);
     for (const e of enemies) {
@@ -1234,6 +1431,7 @@ function startWave() {
 function endBattle(won) {
   waveActive=false;
   if (won) {
+    sndWaveClear();
     const cfg=WAVE_CONFIGS[waveIdx];
     let xpGained=0;
     for (const eid of cfg.enemies) { const def=ENEMY_DEFS.find(d=>d.id===eid); if(def) xpGained+=def.xp; }
@@ -1254,6 +1452,7 @@ function endBattle(won) {
     },1500);
   } else {
     player.alive=false;
+    sndDefeat();
     saveBoosts();
     log('ec','YOU HAVE FALLEN...');
     setTimeout(()=>showOverlay('YOU FELL','#ff2244',`SCORE: ${score}  |  LV ${player.level}  |  WAVE ${waveIdx+1}`,true),1000);
@@ -1261,6 +1460,7 @@ function endBattle(won) {
 }
 
 function endRun() {
+  sndVictory();
   log('sc',`ALL WAVES CLEARED! Score: ${score}`);
   showOverlay('VICTORIOUS','#ffc300',`SCORE: ${score}  |  FINAL LEVEL: ${player.level}`,true);
 }

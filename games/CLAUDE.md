@@ -15,7 +15,11 @@ Detailed context for individual games lives in `.claude/<game>.md` at the repo r
 | Rendering | Canvas 2D, `requestAnimationFrame` loop, delta-time capped at ~100 ms |
 | Input | Touch + mouse events, `user-select:none`, `touch-action:manipulation` |
 | No dependencies | Zero external JS libs; Google Fonts is the only external resource |
-| Responsive | Portrait/landscape via `@media (orientation:landscape)` or `100dvh` layout |
+| Responsive | Portrait/landscape via `@media (orientation:landscape)` or `100dvh` layout; a canvas inside a flex column needs `min-height:0` or its intrinsic 300:150 ratio overflows landscape |
+| Canvas sizing | A fullscreen canvas needs explicit CSS `width:100%;height:100%` — `position:absolute;inset:0` alone does NOT stretch a replaced element, it renders at its intrinsic (dpr-scaled) attribute size and the page looks 2–3× zoomed |
+| Canvas-drawn UI | Buttons/cards drawn on the canvas keep their hitbox arrays (`cardRects`-style) in JS — any branch that hides the widgets MUST clear the arrays too, or invisible stale hitboxes swallow taps (2026-07-24 grid-defense bug) |
+| Audio | WebAudio-synthesized only (no audio files): lazy AudioContext on first gesture (iOS), `sfxGain`/`musicGain` masters, oscillator/noise SFX + lookahead-sequencer music loop, persisted 🔊/🔇 mute top-left, suspend on `visibilitychange` (SFX+music standard for **every** game — retrofitted repo-wide 2026-07-24). Shared buffers (noise etc.) are created in `audioInit`, never lazily inside one SFX (another consumer stays silent); overlay/menu tap handlers call `audioInit()` too — the first iOS gesture is usually a DOM button, not the canvas |
+| Back button | Every game has a top-left ← link back to the games hub, left-most control, mute button immediately to its right — see § Hub Back Button |
 | Build badge | Every game has a `<div id="build-badge">` right after `<body>` — see below |
 
 ---
@@ -48,6 +52,32 @@ they're intentionally never modified, so they don't get a badge.
 
 ---
 
+## Hub Back Button (SOP — required for every game)
+
+Every game page has a small left-arrow link back to the games hub as the
+**left-most top-left control** (iOS-style back affordance); the 🔊/🔇 mute
+button sits immediately to its right:
+
+```html
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+```
+
+Root-level `games/<slug>.html` pages use `href="index.html"`; games in their
+own subdirectory use `href="../index.html"`. Style it like the game's mute
+button — a small fixed/absolute panel button (~38×30,
+`background:var(--panel); border:1px solid var(--border); border-radius:8px`),
+safe-area-aware offsets, `text-decoration:none`, and it must not overlap the
+game's HUD or swallow gameplay input at the iPhone 13 viewport (390×844).
+
+Games that predate this SOP (Basketball/Croissant Clicker, Horse Race, Piano
+Tiles) carry a `#back-link` "← GAMES" text link instead — both forms satisfy
+the rule; new games use the `#back-btn` form.
+
+Excluded: externally-published games (`zed-shooter/`, `qntmchmst/` — their
+source repos own their UI) and frozen checkpoint files.
+
+---
+
 ## Games Inventory
 
 ### STICK WARS (`stick-wars.html`, ~1500 lines)
@@ -57,10 +87,11 @@ unlock upgrades between waves. Canvas 2D, side-scrolling combat. ~60 functions.
 ### TOWN BUILDER (`town-game-1.html`, ~1000 lines)
 Isometric town-building sim. Place buildings, grow settlement, manage resources.
 Isometric grid projection, click-to-place mechanics. Lighter codebase (~6 functions).
+Synth SFX + pastoral music loop.
 
 ### HORSE RACE (`horse-race.html`, ~735 lines)
 Tap to drop carrots; four horses race to claim them. Tap-driven speed mechanic.
-~16 functions; simpler state machine.
+~16 functions; simpler state machine. Synth SFX + galloping shuffle music loop.
 
 ### PIANO TILES (`piano-tiles.html`, ~1515 lines)
 Falling-tile rhythm game. Two songs (`kpopsong1`, `boss_fight_parade`) with `.md`
@@ -75,7 +106,8 @@ Detailed context: `.claude/sorcery.md`. Audit slash command: `/sorcery-audit`.
 ### STICK COMMANDER 3D (`stick-commander-3d.html`, ~2167 lines)
 Top-down RTS-lite. Command stick-figure army across 50 waves. Recruit troops,
 use abilities, defeat bosses including a Final Overlord. Largest game by line count.
-~54 functions. `stick-commander-3d.v001.html` is a saved checkpoint.
+~54 functions. Synth SFX + martial-march music loop. `stick-commander-3d.v001.html`
+is a saved checkpoint.
 
 ### CROISSANT CLICKER (`croissant-clicker.html`, ~960 lines)
 Cookie Clicker-style idle/incremental. Click to bake, buy 20 tiers of
@@ -137,12 +169,237 @@ unlock all upgrades, +10 levels, instant win, +1 decillion). Golden balls,
 frenzy, and lucky-bonus text adapt to the active sport's theme. DOM-driven UI
 with a canvas overlay for click particles.
 
+### MERGE DROP (`merge-drop/index.html`, ~590 lines)
+Suika-style one-thumb physics merge puzzler. Drag to aim, release to drop;
+same-tier orbs merge and grow through 11 tiers, chained merges multiply
+points, overflow past the danger line ends the run. Fixed-substep circle
+physics with per-tier pre-rendered orb sprites. First game in its own
+subdirectory. Synth SFX + mellow lo-fi music loop.
+Detailed context: `.claude/merge-drop.md`.
+
+### NEON GOLF (`neon-golf/index.html`, ~660 lines)
+9-hole drag-back-and-release mini-golf. Holes are data entries in a fixed
+100×160 unit space; hazards: walls, over-unity bumpers, sand, water
+(+1 stroke), boost pads, oscillating mover walls. Par scoring, scorecard,
+best-round persistence. Synth SFX + clubhouse-lounge music loop.
+Detailed context: `.claude/neon-golf.md`.
+
+### NEON PINBALL (`neon-pinball/index.html`, ~800 lines)
+Portrait pinball. Two-thumb flippers (screen halves), hold-to-charge plunger,
+segment/capsule physics at 240 Hz substeps, one-way lane gate, bumpers,
+slingshots, 3-target drop bank, rollover lanes, ball save, end-of-ball bonus
+with multiplier, multiball. Detailed context: `.claude/neon-pinball.md`.
+
+### GRAVITY RUNNER (`gravity-runner/index.html`, ~600 lines)
+One-thumb endless runner: tap to flip gravity between floor and ceiling,
+dodge spike/gate/block patterns (procedural, always survivable), collect
+orbs, speed ramps forever. Distance+orbs scoring, best persistence.
+Detailed context: `.claude/gravity-runner.md`.
+
+### BRICK BREAKER (`brick-breaker/index.html`, ~700 lines)
+Arkanoid-style. Drag-anywhere paddle, tap to launch; 8 ASCII-map levels that
+loop with rising speed; normal/armored/steel/explosive/power-up bricks;
+falling power-ups (wide, multiball, laser, slow-mo, extra life). 3 lives,
+best-score persistence. Detailed context: `.claude/brick-breaker.md`.
+
+### NEON SNAKE ARENA (`snake-arena/index.html`, ~600 lines)
+Smooth analog snake: hold+drag virtual joystick steering, breadcrumb-path
+body, combo-multiplier orb eating, timed gold orbs, telegraphed mine
+hazards, wall/self death. Best-score persistence.
+Detailed context: `.claude/snake-arena.md`.
+
+### GATE BREAKER (`gate-breaker/index.html`, ~2500 lines)
+Dungeon-crawler RPG: character progression, combat, gear systems, boss
+battles, six save slots. No dedicated `.claude/` context file yet.
+
+### NEON SLICE (`neon-slice/index.html`, ~730 lines)
+Fruit-Ninja-style swipe slicer. Gems arc up in volleys; fast swipes slice
+(blade-speed threshold), one-swipe chains bank combo bonuses with slow-mo,
+bombs cost a life, dropped gems cost a life (3 hearts), frenzy volleys.
+Detailed context: `.claude/neon-slice.md`.
+
+### BUBBLE BLASTER (`bubble-blaster/index.html`, ~870 lines)
+Endless hex-grid bubble shooter. Drag-aim with one-bounce dotted guide +
+snap-cell ghost, 3+ pops, detached clusters fall for 2x, streak multiplier
+x1–x5, board drops a row every 6 shots, color unlocks at score milestones,
+colorblind glyphs baked into sprites. Detailed context: `.claude/bubble-blaster.md`.
+
+### BLOCK FIT (`block-fit/index.html`, ~750 lines)
+1010!-style drag-and-place puzzle. 9×9 board, 3-slot tray, 19-shape piece
+set, dragged piece floats 90 px above the finger with green/red snap ghost,
+row+column clears with streak bonuses, no-dead-deal dealing, out-of-moves
+game over. Detailed context: `.claude/block-fit.md`.
+
+### SKY HOPPER (`sky-hopper/index.html`, ~790 lines)
+Doodle-Jump-style vertical bouncer. Auto-bounce, hold+drag relative
+steering with screen wrap, static/moving/crumble platforms + springs,
+gold orbs and comets, upward-only camera, reachability-guaranteed
+generator, milestone hue shifts. Detailed context: `.claude/sky-hopper.md`.
+
+### NEON STACK (`neon-stack/index.html`, ~715 lines)
+Tap-timing tower stacker. A slab slides above the tower; tap to drop,
+overhang slices off as debris, perfect drops (±2.5 u window) chain combos
+and every 3rd regrows width. Speed ramps to a hard cap; zero overlap ends
+the run. Synth SFX + synthwave music loop. Detailed context: `.claude/neon-stack.md`.
+
+### BLADE SPIN (`blade-spin/index.html`, ~950 lines)
+Knife-Hit-style timing thrower. Tap to hurl blades into a spinning disc;
+hitting stuck blades/spikes ends the run, gems are bonus pickups. Four
+deterministic rotation patterns, seeded per-level layouts, boss discs every
+5th level; every boss level is a persisted checkpoint (die → restart from
+checkpoint or start; start screen offers any reached checkpoint). Synth SFX
++ percussive music loop. Detailed context: `.claude/blade-spin.md`.
+
+### NEON CROSSING (`neon-crossing/index.html`, ~1080 lines)
+Crossy-Road-style endless lane hopper. Tap/swipe hops across grass, roads,
+log rivers, and rail lines; auto-scroll camera with idle pressure; fairness-
+guaranteed row generator (car gaps, log cadence, rail warnings). Synth SFX +
+chiptune music loop. Detailed context: `.claude/neon-crossing.md`.
+
+### NEON AIR HOCKEY (`air-hockey/index.html`, ~900 lines)
+Vs-AI air hockey on a portrait neon table. Drag mallet, 240 Hz substepped
+puck physics with rounded corners + goal posts, three AI difficulties
+(speed/reaction/aim-error table), first to 7; per-difficulty W-L record.
+Top-HUD toggle for local 2-player mode (multi-touch, second finger owns the
+top mallet; AI + records off). Synth SFX + arena music loop. Detailed
+context: `.claude/air-hockey.md`.
+
+### GRID DEFENSE (`grid-defense/index.html`, ~780 lines)
+Classic tower defense: drag PULSE/NOVA/FROST/RAIL towers beside a
+serpentine road, 3 upgrade levels + 70% sell, first-targeting instant-hit
+beams, 20 deterministic waves (bosses every 5th) with early-call bonus,
+then optional endless. Best wave + win persisted. Detailed context:
+`.claude/grid-defense.md`.
+
+### STAR SURGE (`star-surge/index.html`, ~750 lines)
+Vertical shmup: drag-steer, auto-fire, 5 stages × 3 waves + boss (bosses
+are persisted checkpoints). Drones/shooters/spinners/tankers, aimed and
+ring bullet patterns under a 90-bullet cap, P/S/G powerups (weapon tiers,
+shield, surge bomb), stage-hued enemies. Detailed context: `.claude/star-surge.md`.
+
+### NEON TACTICS (`neon-tactics/index.html`, ~700 lines)
+Turn-based squad tactics, 7×9 grid: 2 strikers, sniper (Bresenham LOS,
+walls block), tank, medic vs a mirrored squad. Move+act per unit, seeded
+mirrored wall layouts, destroy the enemy core (8 HP) or wipe the squad.
+Greedy scored AI with exposure penalty; 2P pass-and-play with handoff
+screens; vs-AI W-L record. Detailed context: `.claude/neon-tactics.md`.
+
+### WORD CIRCUIT (`word-circuit/index.html`, ~660 lines + 31 KB dictionary)
+Drag-connect word hunt on a 5×5 Big-Boggle grid. Seeded DAILY board (same
+for everyone, UTC-dated) + free play; 90 s rounds; solver-computed
+found/total; backtrack undo; missed-gems reveal. Embedded curated ~5.3k-word
+dictionary. Detailed context: `.claude/word-circuit.md`.
+
+### NEON TRIPEAKS (`tri-peaks/index.html`, ~620 lines)
+Classic 28-card tri-peaks solitaire. Tap uncovered cards one rank up/down
+from the waste (K↔A wraps); streak bonuses, peak-clear bonuses, leftover
+stock pays out on a win. Fairness-checked deterministic deals; seeded
+DAILY DEAL + free play. Synth SFX + swung lounge music loop. Detailed
+context: `.claude/tri-peaks.md`.
+
+### SHADOW CIRCUIT (`shadow-circuit/index.html`, ~700 lines)
+Top-down stealth-maze. Tap-to-move BFS pathfinding through procedural
+mazes; guards patrol with LOS vision cones (patrol → chase → returning
+state machine), shadow tiles hide a still player. Collect all cores, reach
+the exit; ghost bonus for alarm-free floors; 3-life runs, endless floors.
+Synth SFX + tense pulse music (hats surge while chased). Detailed context:
+`.claude/shadow-circuit.md`.
+
+### NEON RECALL (`neon-recall/index.html`, ~640 lines)
+Pair-matching memory board. Solo: round campaign on a mistake budget
+("scans"), streak scoring, growing grids, one hidden power pair per round
+(peek / +2 scans / bomb). Versus: 9-pair pass-and-play hot-seat — match
+keeps the turn, odd pair count means no draws. 15 canvas-drawn vector
+glyphs. Synth SFX + marimba-ping music loop. Detailed context:
+`.claude/neon-recall.md`.
+
+### NEON DRIFT (`neon-drift/index.html`, ~700 lines)
+Top-down drift time-trialer. Hold left/right screen halves to steer an
+auto-accelerating car through 3 Catmull-Rom circuits (sequential unlocks);
+grip-lag drift physics, mud-slow rough, anti-cut lap tracking, per-track
+best time + ghost replay, engine-pitch oscillator + synthwave loop.
+Detailed context: `.claude/neon-drift.md`.
+
+### ALPINE ASCENT (`alpine-ascent/index.html`, ~900 lines)
+Charge-jump mountain platformer (Jump-King-like). Hold to charge, drag to
+aim (dotted preview arc), release to leap; one fixed seeded mountain, 6
+camp checkpoints to the summit; ice slides, crumble ledges respawn, wind
+above the cloud line bends jumps. Falls cost altitude only. Realistic
+rendering: altitude-graded skies, parallax ridges, god rays, cloud-band
+fog, snow, textured ledges. Camps + summit persisted.
+Detailed context: `.claude/alpine-ascent.md`.
+
+### VAULT BREAKER (`vault-breaker/index.html`, ~900 lines)
+Pinch-rotate safecracking. Two-finger twist (or one-finger drag-around)
+turns the mechanism through three phases per vault: directional tumbler
+pins with steady-hold sweet spots and Geiger proximity ticks, ring-gap
+alignment to the keyway (later rings drift), then a 270° handle spin —
+all against an alarm timer. Seeded deterministic vaults, star ratings,
+level unlocks persisted. Realistic rendering: brushed-steel door with
+rivets, anisotropic machined dial, sparks, gold-vault door-open payoff.
+Detailed context: `.claude/vault-breaker.md`.
+
+### GOLDEN REEL (`golden-reel/index.html`, ~980 lines)
+Dusk-lake fishing. Hold-charge cast (line gear caps range), tap-twitch,
+0.9 s hook-set window, then a reel/release tension fight (runs take line,
+calm reels it back; snap vs land). 8 species in distance zones with
+lure-gated rares; coins buy rod/reel/line/lure upgrades; persistent
+catch log (count + best weight). Realistic rendering: layered sunset,
+sun-glitter water, ripple rings, silhouette fish, rim-lit angler.
+Detailed context: `.claude/golden-reel.md`.
+
+### EMBER DEPTHS (`ember-depths/index.html`, ~1030 lines)
+Turn-based torchlit roguelike. Tap-to-move BFS pathing on an 11×16 grid,
+bump combat, permadeath; drunkard-walk floors, depth-scaled enemies
+(slime/bat/archer/brute/wraith), relic-build chests, stairs-down runs.
+Realistic rendering: pre-rendered stone textures, half-res light map with
+flicker + ember particles, memory fog. Best depth/gold persisted.
+Detailed context: `.claude/ember-depths.md`.
+
+### METEOR DEFENSE (`meteor-defense/index.html`, ~1130 lines)
+Missile-Command-style tap interceptor. Blast rings chain through meteors
+(splitters, comets, UFOs) falling on six neon buildings; per-wave ammo
+budgets, intermission bonuses, mercy rebuild every 5th wave. Synth SFX +
+tense sequencer music. Detailed context: `.claude/meteor-defense.md`.
+
+### LOCKSPORT (`locksport/index.html`, ~640 lines)
+Realistic side-view single-pin-picking sim. Tension is auto-applied (a
+left-thumb tension pad appears from the spool levels on); drag a hook/rake in
+the probe zone to feel the binding pin, ratchet it up under friction, and set
+it at the shear line — overlift jams it, RESET drops every pin. Spool drivers
+false-set with a plug over-rotation you beat by easing tension into a green
+band (counter-rotation); serrated drivers give deceptive mini-clicks. 12-lock
+practice path (1 pin → 6-pin all-security OLD IRON), zen + 3-star rating,
+level-select dropdown, seeded generator with an auto-solver fairness gate.
+Realistic rendering: cutaway brass lock on a textured workbench, compressing
+springs, steel/brass pins, machined dial, golden open payoff. Detailed
+context: `.claude/locksport.md`.
+
 ---
 
 ## Adding a New Game
 
-1. Create `games/<slug>.html` as a single self-contained file
-2. Add a card to `games/index.html` (copy an existing card, update icon/name/desc/href)
-3. Add the build-timestamp badge (see above) with the current UTC timestamp
-4. Create `.claude/<slug>.md` with architecture notes before the session gets long
-5. Commit and push to `main`, stating the badge timestamp in your reply
+1. Create `games/<slug>.html` — or `games/<slug>/index.html` (own
+   subdirectory; used by Merge Drop and Neon Golf) — as a single
+   self-contained file either way
+2. Add a card to `games/index.html` (copy an existing card, update
+   icon/name/desc/href) — pick an icon emoji **not already used** by another
+   card (e.g. Sorcery already owns 🔮) — **and add the game's entry to the
+   hub's `GAMES` facet dataset** (same file, § coverage heuristics script;
+   it mirrors the games-index row and feeds the 📊 COVERAGE HEURISTICS
+   dashboard — a drive test asserts cards ↔ dataset stay in sync)
+3. Add the standard hub back button (see § Hub Back Button) — ← top-left,
+   mute button to its right — and the WebAudio SFX + music stack per the
+   Audio convention row
+4. Add the build-timestamp badge (see above) with the current UTC timestamp
+5. Create `.claude/<slug>.md` with architecture notes before the session gets long
+6. Add the game's row to `.claude/games-index.md` **and refresh its coverage
+   summary** (facet vocabulary: `templates/design/game-facets.md` in the
+   zmhstudio repo) — when *choosing* what game to build, read that index's
+   coverage summary first
+7. Run the smoke gate on every changed page:
+   `node .claude/scripts/smoke-mobile.cjs <pages...>` (see `.claude/scripts/README.md`)
+8. Commit and push to `main`, stating the badge timestamp in your reply
+9. Verify the "pages build and deployment" workflow for the pushed SHA goes
+   green — `git push` ≠ live; a failed Pages build silently keeps serving
+   the previous deploy

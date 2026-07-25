@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Neon Recall</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+:root {
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff; --red:#ff2244;
+  --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; }
+body {
+  background:var(--bg); color:var(--white);
+  font-family:'Share Tech Mono', monospace;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  position:fixed; inset:0;
+}
+#cv { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+#back-btn {
+  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:30;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:32px;
+  text-align:center; text-decoration:none; touch-action:manipulation;
+  -webkit-user-select:none; user-select:none;
+}
+#mute {
+  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:30;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
+  text-align:center; padding:0; touch-action:manipulation;
+}
+#overlay {
+  position:absolute; inset:0; z-index:20; display:flex;
+  flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(6,6,14,0.92); padding:20px; text-align:center;
+  padding-top:calc(var(--sat) + 20px); padding-bottom:calc(var(--sab) + 20px);
+  overflow-y:auto;
+}
+#overlay.hidden { display:none; }
+#overlay h1 {
+  font-family:'Black Ops One', sans-serif; color:var(--blue);
+  font-size:clamp(1.7rem, 8vw, 2.5rem); letter-spacing:4px;
+  text-shadow:0 0 24px #4488ff66; margin-bottom:4px;
+}
+#overlay h2 {
+  font-family:'Black Ops One', sans-serif; color:var(--gold);
+  font-size:1.5rem; letter-spacing:3px; margin-bottom:8px;
+}
+.sub { color:var(--dim); font-size:0.68rem; letter-spacing:3px; margin-bottom:18px; }
+.btn {
+  font-family:'Black Ops One', sans-serif; letter-spacing:2px;
+  background:var(--panel); color:var(--green);
+  border:1px solid var(--green); border-radius:8px;
+  font-size:1.0rem; padding:13px 30px; margin:7px; min-width:240px;
+  touch-action:manipulation; cursor:pointer;
+}
+.btn.purple { color:var(--purple); border-color:var(--purple); }
+.btn.gold { color:var(--gold); border-color:var(--gold); }
+.stat { color:var(--white); font-size:0.85rem; margin:3px 0; letter-spacing:1px; }
+.stat b { color:var(--gold); }
+.howto { color:var(--dim); font-size:0.7rem; max-width:320px; line-height:1.7; margin-top:16px; }
+.howto em { color:var(--green); font-style:normal; }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 23:12 UTC</div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute">🔊</button>
+<canvas id="cv"></canvas>
+<div id="overlay"></div>
+<script>
+'use strict';
+/* ============ RNG ============ */
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ============ State (top-level: reachable from page.evaluate) ============ */
+let state = 'menu';      // menu | play | clear | over
+let mode = 'solo';       // solo | vs
+let tiles = [];          // {id, power, up, taken, fl(0..1), pulse}
+let GC = 4, GR = 4;      // grid cols/rows
+let firstIdx = -1;
+let lockT = 0;           // mismatch view timer (input locked while > 0)
+let pendA = -1, pendB = -1; // tiles shown during lock
+let round = 1, score = 0, misses = 0, matchStreak = 0;
+let runSeed = 0;
+let peekT = 0;
+let curPlayer = 1;       // vs mode
+let vsScores = { 1: 0, 2: 0 };
+let passT = 0;           // "pass the phone" banner timer
+let popups = [];
+let clearT = 0;
+
+const ROUND_GRID = [
+  { c: 3, r: 4 }, { c: 4, r: 4 }, { c: 4, r: 5 }, { c: 4, r: 6 }, { c: 5, r: 6 },
+];
+const POWERS = ['peek', 'turns', 'bomb'];
+function roundGrid(rn) { return ROUND_GRID[Math.min(rn - 1, ROUND_GRID.length - 1)]; }
+function missBudget(rn) {
+  const pairs = roundGrid(rn).c * roundGrid(rn).r / 2;
+  return Math.max(4, Math.round(pairs - rn));
+}
+
+/* ============ Board setup ============ */
+function buildBoard(pairs, rng, withPower, rn) {
+  const ids = [];
+  for (let i = 0; i < pairs; i++) { ids.push(i, i); }
+  for (let i = ids.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  const powerId = withPower && rn >= 2 ? Math.floor(rng() * pairs) : -1;
+  const powerType = powerId >= 0 ? POWERS[(rn - 2) % POWERS.length] : null;
+  tiles = ids.map(id => ({ id, power: id === powerId ? powerType : null, up: false, taken: false, fl: 0, pulse: 0 }));
+}
+function startSolo(seedOverride) {
+  mode = 'solo';
+  runSeed = seedOverride !== undefined ? seedOverride : (Math.random() * 1e9) | 0;
+  round = 1; score = 0;
+  startRound();
+}
+function startRound() {
+  const g = roundGrid(round);
+  GC = g.c; GR = g.r;
+  buildBoard(GC * GR / 2, mulberry32((runSeed + round * 7919) | 0), true, round);
+  misses = missBudget(round);
+  firstIdx = -1; lockT = 0; pendA = pendB = -1;
+  matchStreak = 0; peekT = 0; popups = []; clearT = 0;
+  state = 'play';
+  overlay.classList.add('hidden');
+}
+function startVersus(seedOverride) {
+  mode = 'vs';
+  runSeed = seedOverride !== undefined ? seedOverride : (Math.random() * 1e9) | 0;
+  GC = 3; GR = 6; // 9 pairs — odd, so versus can never draw
+  buildBoard(9, mulberry32(runSeed | 0), false, 1);
+  curPlayer = 1; vsScores = { 1: 0, 2: 0 };
+  firstIdx = -1; lockT = 0; pendA = pendB = -1;
+  peekT = 0; passT = 0; popups = []; clearT = 0;
+  state = 'play';
+  overlay.classList.add('hidden');
+}
+
+/* ============ Rules ============ */
+function remainingPairs() { return tiles.filter(t => !t.taken).length / 2; }
+function flipTile(i) {
+  if (state !== 'play' || lockT > 0) return false;
+  const t = tiles[i];
+  if (!t || t.taken || t.up) return false;
+  t.up = true;
+  sfxFlip(firstIdx < 0 ? 0 : 1);
+  if (firstIdx < 0) { firstIdx = i; return true; }
+  const a = tiles[firstIdx], b = t;
+  const ai = firstIdx;
+  firstIdx = -1;
+  if (a.id === b.id) {
+    a.taken = b.taken = true;
+    a.pulse = b.pulse = 1;
+    if (mode === 'solo') {
+      matchStreak++;
+      const gain = 100 + 50 * (matchStreak - 1);
+      score += gain;
+      popupAt(i, '+' + gain + (matchStreak > 1 ? ' x' + matchStreak : ''), '#39ff14');
+      sfxMatch(matchStreak);
+      if (a.power) applyPower(a.power, i);
+    } else {
+      vsScores[curPlayer]++;
+      popupAt(i, 'P' + curPlayer + ' +1', curPlayer === 1 ? '#39ff14' : '#b44fff');
+      sfxMatch(1);
+      // match grants another turn — curPlayer unchanged
+    }
+    checkBoardDone();
+  } else {
+    lockT = 0.9; pendA = ai; pendB = i;
+    sfxMiss();
+  }
+  return true;
+}
+function resolveMismatch() {
+  if (pendA >= 0) tiles[pendA].up = false;
+  if (pendB >= 0) tiles[pendB].up = false;
+  pendA = pendB = -1;
+  if (mode === 'solo') {
+    matchStreak = 0;
+    misses--;
+    if (misses <= 0 && remainingPairs() > 0) { endSolo(); return; }
+  } else {
+    curPlayer = curPlayer === 1 ? 2 : 1;
+    passT = 1.1;
+    sfxPass();
+  }
+}
+function applyPower(p, atIdx) {
+  if (p === 'peek') {
+    peekT = 1.3;
+    popupAt(atIdx, 'PEEK!', '#4488ff');
+    sfxPower();
+  } else if (p === 'turns') {
+    misses += 2;
+    popupAt(atIdx, '+2 SCANS', '#ffc300');
+    sfxPower();
+  } else if (p === 'bomb') {
+    const left = [...new Set(tiles.filter(t => !t.taken).map(t => t.id))];
+    if (left.length) {
+      const id = left[Math.floor(Math.random() * left.length)];
+      tiles.forEach(t => { if (t.id === id) { t.taken = true; t.up = true; t.pulse = 1; } });
+      score += 100;
+      popupAt(atIdx, 'BOMB! +100', '#ff2244');
+      sfxPower();
+      checkBoardDone();
+    }
+  }
+}
+function checkBoardDone() {
+  // guard: a bomb power can clear the board inside applyPower, and flipTile
+  // calls again right after — without this the round bonus double-pays
+  if (state !== 'play' || remainingPairs() > 0) return;
+  if (mode === 'solo') {
+    const bonus = 250 + misses * 150;
+    score += bonus;
+    sfxClear();
+    state = 'clear'; clearT = 1.5;
+    showClear(bonus);
+  } else {
+    state = 'over';
+    sfxClear();
+    setTimeout(showVsOver, 600);
+  }
+}
+function endSolo() {
+  state = 'over';
+  sfxOver();
+  try {
+    const b = parseInt(localStorage.getItem('neonRecall.best') || '0', 10) || 0;
+    if (score > b) localStorage.setItem('neonRecall.best', String(score));
+    const br = parseInt(localStorage.getItem('neonRecall.bestRound') || '0', 10) || 0;
+    if (round > br) localStorage.setItem('neonRecall.bestRound', String(round));
+  } catch (e) {}
+  setTimeout(showSoloOver, 700);
+}
+function popupAt(i, txt, col) {
+  const p = tileXY(i);
+  popups.push({ x: p.x + TS / 2, y: p.y, t: 0, txt, col });
+}
+
+/* ============ Update ============ */
+function update(dt) {
+  popups.forEach(p => p.t += dt);
+  popups = popups.filter(p => p.t < 1.1);
+  tiles.forEach(t => {
+    const target = (t.up || t.taken) ? 1 : 0;
+    t.fl += (target - t.fl) * Math.min(1, dt * 10);
+    if (t.pulse > 0) t.pulse = Math.max(0, t.pulse - dt * 2);
+  });
+  if (peekT > 0) peekT -= dt;
+  if (passT > 0) passT -= dt;
+  if (lockT > 0) {
+    lockT -= dt;
+    if (lockT <= 0) resolveMismatch();
+  }
+  if (state === 'clear') {
+    clearT -= dt;
+    if (clearT <= 0) { round++; startRound(); }
+  }
+}
+
+/* ============ Overlays ============ */
+const overlay = document.getElementById('overlay');
+let lastTapT = 0;
+function bindTap(el, fn) {
+  const h = (e) => {
+    e.preventDefault();
+    const now = Date.now();
+    if (now - lastTapT < 400) return;
+    lastTapT = now;
+    fn();
+  };
+  el.addEventListener('touchend', h, { passive: false });
+  el.addEventListener('click', h);
+}
+function showMenu() {
+  state = 'menu';
+  overlay.classList.remove('hidden');
+  const b = parseInt(localStorage.getItem('neonRecall.best') || '0', 10) || 0;
+  const br = parseInt(localStorage.getItem('neonRecall.bestRound') || '0', 10) || 0;
+  overlay.innerHTML =
+    '<h1>NEON RECALL</h1>' +
+    '<div class="sub">MATCH THE GRID · MIND THE SCANS</div>' +
+    '<button class="btn" id="b-solo">SOLO RUN</button>' +
+    '<button class="btn purple" id="b-vs">VERSUS · PASS &amp; PLAY</button>' +
+    (b ? '<div class="stat">BEST: <b>' + b + '</b> · ROUND <b>' + br + '</b></div>' : '') +
+    '<div class="howto">Flip two tiles; matches score and chain a <em>streak</em>. Every mismatch burns a <em>SCAN</em> — run dry and the run ends. Boards grow each round, and from round 2 one hidden pair is a <em>power pair</em>: peek, +2 scans, or a bomb. Versus: match = point + go again, 9 pairs so someone always wins.</div>';
+  bindTap(document.getElementById('b-solo'), () => startSolo());
+  bindTap(document.getElementById('b-vs'), () => startVersus());
+}
+function showClear(bonus) {
+  overlay.classList.remove('hidden');
+  overlay.innerHTML =
+    '<h1 style="color:var(--green)">ROUND ' + round + ' CLEAR</h1>' +
+    '<div class="stat">+' + bonus + ' BONUS (' + Math.max(0, misses) + ' scans left)</div>' +
+    '<h2>' + score + '</h2>';
+  setTimeout(() => { if (state === 'clear') overlay.classList.add('hidden'); }, 1300);
+}
+function showSoloOver() {
+  overlay.classList.remove('hidden');
+  const b = parseInt(localStorage.getItem('neonRecall.best') || '0', 10) || 0;
+  overlay.innerHTML =
+    '<h1 style="color:var(--red)">SCANS DEPLETED</h1>' +
+    '<div class="sub">ROUND ' + round + '</div>' +
+    '<h2>' + score + '</h2>' +
+    '<div class="stat">' + (score >= b && score > 0 ? '★ NEW BEST' : 'BEST: ' + b) + '</div>' +
+    '<button class="btn" id="b-again">RUN IT BACK</button>' +
+    '<button class="btn gold" id="b-menu">MENU</button>';
+  bindTap(document.getElementById('b-again'), () => startSolo());
+  bindTap(document.getElementById('b-menu'), showMenu);
+}
+function showVsOver() {
+  overlay.classList.remove('hidden');
+  const w = vsScores[1] > vsScores[2] ? 1 : 2;
+  overlay.innerHTML =
+    '<h1 style="color:' + (w === 1 ? 'var(--green)' : 'var(--purple)') + '">P' + w + ' WINS</h1>' +
+    '<h2>' + vsScores[1] + ' — ' + vsScores[2] + '</h2>' +
+    '<button class="btn purple" id="b-again">REMATCH</button>' +
+    '<button class="btn gold" id="b-menu">MENU</button>';
+  bindTap(document.getElementById('b-again'), () => startVersus());
+  bindTap(document.getElementById('b-menu'), showMenu);
+}
+
+/* ============ Layout / rendering ============ */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W = 390, H = 844, DPR = 1, safeTop = 0, safeBottom = 0;
+let TS = 80, ox = 12, oy = 120, gap = 8;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 3);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const cs = getComputedStyle(document.documentElement);
+  safeTop = parseFloat(cs.getPropertyValue('--sat')) || 0;
+  safeBottom = parseFloat(cs.getPropertyValue('--sab')) || 0;
+  layoutBoard();
+}
+function layoutBoard() {
+  const top = safeTop + 96, bot = safeBottom + 30;
+  gap = 8;
+  TS = Math.min(96, (W - 24 - gap * (GC - 1)) / GC, (H - top - bot - gap * (GR - 1)) / GR);
+  ox = (W - (TS * GC + gap * (GC - 1))) / 2;
+  oy = top + (H - top - bot - (TS * GR + gap * (GR - 1))) / 2;
+}
+window.addEventListener('resize', resize);
+function tileXY(i) {
+  const c = i % GC, r = Math.floor(i / GC);
+  return { x: ox + c * (TS + gap), y: oy + r * (TS + gap) };
+}
+const GLYPH_COLS = ['#39ff14', '#ffc300', '#4488ff', '#ff2244', '#b44fff', '#dde3ff'];
+function drawGlyph(id, cx, cy, s) {
+  const col = GLYPH_COLS[id % 6];
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.strokeStyle = col; ctx.fillStyle = col;
+  ctx.lineWidth = Math.max(2.5, s * 0.09);
+  ctx.shadowColor = col; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  switch (id % 15) {
+    case 0: ctx.arc(0, 0, s * 0.42, 0, 7); ctx.stroke(); break;
+    case 1: ctx.strokeRect(-s * 0.36, -s * 0.36, s * 0.72, s * 0.72); break;
+    case 2: ctx.moveTo(0, -s * 0.42); ctx.lineTo(s * 0.4, s * 0.32); ctx.lineTo(-s * 0.4, s * 0.32); ctx.closePath(); ctx.stroke(); break;
+    case 3: ctx.moveTo(0, -s * 0.44); ctx.lineTo(s * 0.34, 0); ctx.lineTo(0, s * 0.44); ctx.lineTo(-s * 0.34, 0); ctx.closePath(); ctx.stroke(); break;
+    case 4: for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / 5, b = a + Math.PI / 5; ctx.lineTo(Math.cos(a) * s * 0.44, Math.sin(a) * s * 0.44); ctx.lineTo(Math.cos(b) * s * 0.2, Math.sin(b) * s * 0.2); } ctx.closePath(); ctx.fill(); break;
+    case 5: ctx.moveTo(-s * 0.36, 0); ctx.lineTo(s * 0.36, 0); ctx.moveTo(0, -s * 0.36); ctx.lineTo(0, s * 0.36); ctx.stroke(); break;
+    case 6: ctx.arc(0, 0, s * 0.4, 0, 7); ctx.moveTo(s * 0.18, 0); ctx.arc(0, 0, s * 0.18, 0, 7); ctx.stroke(); break;
+    case 7: ctx.arc(s * 0.1, 0, s * 0.4, Math.PI * 0.6, Math.PI * 1.4, false); ctx.arc(-s * 0.14, 0, s * 0.32, Math.PI * 1.35, Math.PI * 0.65, true); ctx.closePath(); ctx.fill(); break;
+    case 8: ctx.moveTo(s * 0.12, -s * 0.44); ctx.lineTo(-s * 0.2, s * 0.06); ctx.lineTo(0.02 * s, s * 0.06); ctx.lineTo(-s * 0.12, s * 0.44); ctx.lineTo(s * 0.2, -s * 0.06); ctx.lineTo(-0.02 * s, -s * 0.06); ctx.closePath(); ctx.fill(); break;
+    case 9: ctx.moveTo(0, s * 0.38); ctx.bezierCurveTo(-s * 0.62, -s * 0.12, -s * 0.2, -s * 0.52, 0, -s * 0.18); ctx.bezierCurveTo(s * 0.2, -s * 0.52, s * 0.62, -s * 0.12, 0, s * 0.38); ctx.fill(); break;
+    case 10: for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 - Math.PI / 6; ctx.lineTo(Math.cos(a) * s * 0.42, Math.sin(a) * s * 0.42); } ctx.closePath(); ctx.stroke(); break;
+    case 11: ctx.moveTo(-s * 0.4, 0); ctx.bezierCurveTo(-s * 0.2, -s * 0.44, s * 0.0, s * 0.44, s * 0.4, 0); ctx.stroke(); break;
+    case 12: ctx.moveTo(-s * 0.34, -s * 0.34); ctx.lineTo(s * 0.34, s * 0.34); ctx.moveTo(s * 0.34, -s * 0.34); ctx.lineTo(-s * 0.34, s * 0.34); ctx.stroke(); break;
+    case 13: ctx.moveTo(-s * 0.4, s * 0.3); ctx.lineTo(-s * 0.4, -s * 0.1); ctx.lineTo(-s * 0.13, -s * 0.1); ctx.lineTo(-s * 0.13, s * 0.3); ctx.moveTo(s * 0.13, s * 0.3); ctx.lineTo(s * 0.13, -s * 0.35); ctx.lineTo(s * 0.4, -s * 0.35); ctx.lineTo(s * 0.4, s * 0.3); ctx.stroke(); break;
+    default: ctx.arc(0, 0, s * 0.42, 0, 7); ctx.moveTo(-s * 0.42, 0); ctx.lineTo(s * 0.42, 0); ctx.stroke(); break;
+  }
+  ctx.restore();
+}
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  if (state === 'menu') return;
+  layoutBoard();
+  // HUD
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  if (mode === 'solo') {
+    ctx.fillStyle = '#ffc300';
+    ctx.font = '700 26px "Black Ops One", sans-serif';
+    ctx.fillText(String(score), W / 2, safeTop + 10);
+    ctx.font = '12px "Share Tech Mono", monospace';
+    ctx.fillStyle = '#8899bb';
+    ctx.fillText('ROUND ' + round, W / 2, safeTop + 44);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = misses <= 2 ? '#ff2244' : '#4488ff';
+    ctx.fillText('SCANS ' + Math.max(0, misses), W - 10, safeTop + 22);
+    if (matchStreak > 1) {
+      ctx.fillStyle = '#39ff14';
+      ctx.fillText('STREAK x' + matchStreak, W - 10, safeTop + 40);
+    }
+  } else {
+    ctx.font = '700 20px "Black Ops One", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = curPlayer === 1 ? '#39ff14' : '#1e5c12';
+    ctx.fillText('P1 ' + vsScores[1], 104, safeTop + 14);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = curPlayer === 2 ? '#b44fff' : '#4a2a66';
+    ctx.fillText(vsScores[2] + ' P2', W - 12, safeTop + 14);
+    ctx.textAlign = 'center';
+    ctx.font = '11px "Share Tech Mono", monospace';
+    ctx.fillStyle = '#8899bb';
+    ctx.fillText(remainingPairs() + ' PAIRS LEFT', W / 2, safeTop + 46);
+  }
+  // tiles
+  const peeking = peekT > 0;
+  tiles.forEach((t, i) => {
+    const { x, y } = tileXY(i);
+    if (t.taken && t.pulse <= 0) {
+      ctx.globalAlpha = 0.16;
+      roundRect(x, y, TS, TS, 10);
+      ctx.strokeStyle = '#1a1a30'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.globalAlpha = 1;
+      return;
+    }
+    const showFace = t.fl > 0.5 || (peeking && !t.taken);
+    const sx = Math.abs(t.fl - 0.5) * 2; // 1 -> 0 -> 1 flip squeeze
+    ctx.save();
+    ctx.translate(x + TS / 2, y + TS / 2);
+    ctx.scale(peeking && t.fl < 0.5 ? 1 : Math.max(0.06, sx), 1);
+    if (t.pulse > 0) {
+      ctx.shadowColor = '#39ff14'; ctx.shadowBlur = 20 * t.pulse;
+    }
+    roundRect(-TS / 2, -TS / 2, TS, TS, 10);
+    ctx.fillStyle = showFace ? '#0d0d1c' : '#10102a';
+    ctx.fill();
+    ctx.strokeStyle = showFace ? '#3a3a60' : '#232345';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    if (showFace) {
+      drawGlyph(t.id, 0, 0, TS * 0.62);
+      if (t.power) {
+        ctx.font = (TS * 0.2) + 'px "Share Tech Mono", monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffc300';
+        ctx.fillText(t.power === 'peek' ? '👁' : t.power === 'turns' ? '+2' : '✸', 0, TS * 0.34);
+      }
+    } else {
+      // back pattern
+      ctx.strokeStyle = '#1c1c3e'; ctx.lineWidth = 1.5;
+      roundRect(-TS / 2 + 7, -TS / 2 + 7, TS - 14, TS - 14, 6);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, TS * 0.14, 0, 7);
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+  // popups
+  popups.forEach(p => {
+    const t = p.t / 1.1;
+    ctx.globalAlpha = Math.max(0, 1 - t);
+    ctx.fillStyle = p.col;
+    ctx.font = '700 16px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.txt, Math.max(50, Math.min(W - 50, p.x)), p.y - 8 - t * 34);
+    ctx.globalAlpha = 1;
+  });
+  // pass banner (vs)
+  if (mode === 'vs' && passT > 0 && state === 'play') {
+    ctx.globalAlpha = Math.min(1, passT * 3);
+    ctx.fillStyle = 'rgba(6,6,14,0.82)';
+    ctx.fillRect(0, H / 2 - 44, W, 88);
+    ctx.fillStyle = curPlayer === 1 ? '#39ff14' : '#b44fff';
+    ctx.font = '700 24px "Black Ops One", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('P' + curPlayer + ' — YOUR TURN', W / 2, H / 2);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* ============ Loop ============ */
+let lastT = 0;
+function frame(t) {
+  const dt = Math.min(0.1, (t - lastT) / 1000 || 0);
+  lastT = t;
+  update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+/* ============ Input ============ */
+let touchSX = 0, touchSY = 0, touchT0 = 0;
+function tapAt(x, y) {
+  if (state !== 'play') return;
+  for (let i = 0; i < tiles.length; i++) {
+    const p = tileXY(i);
+    if (x >= p.x && x <= p.x + TS && y >= p.y && y <= p.y + TS) { flipTile(i); return; }
+  }
+}
+cv.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  audioInit();
+  const t = e.changedTouches[0];
+  touchSX = t.clientX; touchSY = t.clientY; touchT0 = Date.now();
+}, { passive: false });
+cv.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  if (Date.now() - touchT0 < 600 && Math.hypot(t.clientX - touchSX, t.clientY - touchSY) < 18) tapAt(t.clientX, t.clientY);
+}, { passive: false });
+cv.addEventListener('mousedown', (e) => { audioInit(); touchSX = e.clientX; touchSY = e.clientY; touchT0 = Date.now(); });
+cv.addEventListener('mouseup', (e) => {
+  if (Date.now() - touchT0 < 600 && Math.hypot(e.clientX - touchSX, e.clientY - touchSY) < 18) tapAt(e.clientX, e.clientY);
+});
+
+/* ============ Audio ============ */
+let AC = null, sfxGain = null, musicGain = null, musicTimer = null, musicStep = 0, musicNext = 0;
+let muted = localStorage.getItem('neonRecall-mute') === '1';
+const muteBtn = document.getElementById('mute');
+muteBtn.textContent = muted ? '🔇' : '🔊';
+function audioInit() {
+  if (AC) return;
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    sfxGain = AC.createGain(); sfxGain.gain.value = muted ? 0 : 0.4; sfxGain.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.gain.value = muted ? 0 : 0.13; musicGain.connect(AC.destination);
+    musicNext = AC.currentTime + 0.1;
+    musicTimer = setInterval(scheduleMusic, 25);
+  } catch (e) { AC = null; }
+}
+{
+  const h = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    audioInit();
+    muted = !muted;
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+    try { localStorage.setItem('neonRecall-mute', muted ? '1' : '0'); } catch (err) {}
+    if (sfxGain) sfxGain.gain.value = muted ? 0 : 0.4;
+    if (musicGain) musicGain.gain.value = muted ? 0 : 0.13;
+  };
+  muteBtn.addEventListener('touchend', h, { passive: false });
+  muteBtn.addEventListener('click', h);
+}
+function tone(freq, dur, type, vol, when, dest) {
+  if (!AC || !isFinite(freq)) return;
+  const t = when || AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(dest || sfxGain);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function sfxFlip(second) { tone(second ? 520 : 440, 0.05, 'sine', 0.16); }
+function sfxMatch(stk) {
+  if (!AC) return;
+  const base = 523 * Math.pow(2, Math.min(7, stk - 1) / 12);
+  tone(base, 0.12, 'triangle', 0.3);
+  tone(base * 1.25, 0.16, 'sine', 0.2, AC.currentTime + 0.06);
+  tone(base * 1.5, 0.2, 'sine', 0.16, AC.currentTime + 0.12);
+}
+function sfxMiss() { tone(180, 0.12, 'sawtooth', 0.1); tone(150, 0.16, 'sawtooth', 0.08, AC && AC.currentTime + 0.08); }
+function sfxPass() { tone(392, 0.1, 'square', 0.12); tone(494, 0.12, 'square', 0.12, AC && AC.currentTime + 0.1); }
+function sfxPower() { if (!AC) return; [660, 880, 1100].forEach((f, i) => tone(f, 0.12, 'sine', 0.18, AC.currentTime + i * 0.05)); }
+function sfxClear() { if (!AC) return; [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.22, 'square', 0.15, AC.currentTime + i * 0.09)); }
+function sfxOver() { if (!AC) return; [440, 349, 262, 196].forEach((f, i) => tone(f, 0.28, 'sawtooth', 0.15, AC.currentTime + i * 0.13)); }
+// bright marimba-ish loop, 108 BPM major pentatonic
+const PING_SEQ = [523.3, 0, 659.3, 0, 784, 0, 659.3, 0, 587.3, 0, 784, 0, 880, 0, 784, 0, 523.3, 0, 587.3, 0, 659.3, 0, 880, 0, 784, 0, 659.3, 0, 587.3, 0, 523.3, 0];
+function scheduleMusic() {
+  if (!AC || muted) { if (AC) musicNext = Math.max(musicNext, AC.currentTime + 0.1); return; }
+  const stepDur = 60 / 108 / 2;
+  while (musicNext < AC.currentTime + 0.35) {
+    const s = musicStep % 32;
+    const t = musicNext;
+    if (PING_SEQ[s]) {
+      tone(PING_SEQ[s], 0.14, 'triangle', 0.3, t, musicGain);
+      tone(PING_SEQ[s] / 2, 0.3, 'sine', 0.2, t, musicGain);
+    }
+    if (s % 8 === 0) tone(130.8, 0.4, 'sine', 0.4, t, musicGain);
+    musicStep++;
+    musicNext += stepDur;
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) return;
+  if (document.hidden) AC.suspend(); else AC.resume();
+});
+
+/* ============ Boot ============ */
+resize();
+showMenu();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

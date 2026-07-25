@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Neon Tactics</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+:root {
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff; --red:#ff2244;
+  --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; }
+body {
+  background:var(--bg); color:var(--white);
+  font-family:'Share Tech Mono', monospace;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  position:fixed; inset:0;
+}
+#cv { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+#back-btn {
+  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:30;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:32px;
+  text-align:center; text-decoration:none; touch-action:manipulation;
+  -webkit-user-select:none; user-select:none;
+}
+#mute {
+  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:30;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
+  text-align:center; padding:0; touch-action:manipulation;
+}
+#overlay {
+  position:absolute; inset:0; z-index:20; display:flex;
+  flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(6,6,14,0.92); padding:20px; text-align:center;
+  padding-top:calc(var(--sat) + 20px); padding-bottom:calc(var(--sab) + 20px);
+  overflow-y:auto;
+}
+#overlay.hidden { display:none; }
+#overlay h1 {
+  font-family:'Black Ops One', sans-serif; color:var(--green);
+  font-size:clamp(1.7rem, 8vw, 2.6rem); letter-spacing:4px;
+  text-shadow:0 0 24px #39ff1466; margin-bottom:4px;
+}
+#overlay h2 {
+  font-family:'Black Ops One', sans-serif; color:var(--gold);
+  font-size:1.5rem; letter-spacing:3px; margin-bottom:8px;
+}
+.sub { color:var(--dim); font-size:0.68rem; letter-spacing:3px; margin-bottom:18px; }
+.btn {
+  font-family:'Black Ops One', sans-serif; letter-spacing:2px;
+  background:var(--panel); color:var(--green);
+  border:1px solid var(--green); border-radius:8px;
+  font-size:1.0rem; padding:13px 30px; margin:7px; min-width:230px;
+  box-shadow:0 0 18px #39ff1422; touch-action:manipulation;
+}
+.btn.alt { color:var(--purple); border-color:var(--purple); box-shadow:0 0 18px #b44fff22; }
+.btn.small { font-size:0.8rem; padding:10px 20px; min-width:180px; }
+.btn:active { transform:scale(0.96); }
+.rules { color:var(--dim); font-size:0.68rem; line-height:1.9; margin-top:14px; max-width:340px; }
+.rules b { color:var(--white); }
+.stat { color:var(--dim); font-size:0.78rem; letter-spacing:1px; margin:3px 0; }
+.stat b { color:var(--gold); }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
+<canvas id="cv"></canvas>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute">🔊</button>
+<div id="overlay"></div>
+<script>
+'use strict';
+/* =============================== CONSTANTS ============================== */
+const COLS = 7, ROWS = 9;
+const TYPES = {
+  striker: { name: 'STRIKER', hp: 6, mv: 3, atk: 3, rng: 1 },
+  sniper:  { name: 'SNIPER',  hp: 4, mv: 2, atk: 3, rng: 3 },
+  tank:    { name: 'TANK',    hp: 10, mv: 2, atk: 2, rng: 1 },
+  medic:   { name: 'MEDIC',   hp: 4, mv: 3, atk: 1, rng: 1, heal: 3 },
+};
+const CORE_HP = 8;
+const WALL_COUNT = 7;          // per half (mirrored)
+const SIDE_COL = { A: '#39ff14', B: '#b44fff' };
+const AI_STEP_DELAY = 0.55;    // seconds between AI unit activations
+
+/* =============================== STATE ================================== */
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const overlay = document.getElementById('overlay');
+let W = 0, H = 0, dpr = 1, safeTop = 0, safeBot = 0;
+let boardX = 0, boardY = 0, cell = 46;
+let state = 'menu';            // menu | play | pass | over
+let mode = 'ai';               // ai | 2p
+let walls = [];                // [{r,c}]
+let units = [];                // {id,side,type,r,c,hp,moved,acted}
+let cores = {};                // {A:{r,c,hp}, B:{r,c,hp}}
+let turnSide = 'A';
+let turnNum = 1;
+let selId = null;
+let moveSet = new Set();       // "r,c" reachable for selected
+let targetSet = new Set();     // "r,c" attackable/healable for selected
+let aiTimer = 0, aiActive = false;
+let anims = [];                // {type,x0,y0,x1,y1,t,dur,unit?...}
+let floats = [];
+let shake = 0;
+let winner = null;
+let seed = 1;
+let record = { w: 0, l: 0 };
+try { record = JSON.parse(localStorage.getItem('neonTactics.record') || '{"w":0,"l":0}'); } catch (e) { record = { w: 0, l: 0 }; }
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const key = (r, c) => r + ',' + c;
+
+/* =============================== AUDIO ================================== */
+let AC = null, sfxGain = null, musicGain = null, musicTimer = null, musicStep = 0, musicNext = 0;
+let muted = localStorage.getItem('neonTactics-mute') === '1';
+const muteBtn = document.getElementById('mute');
+function initAudio() {
+  if (AC) return;
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    sfxGain = AC.createGain(); sfxGain.gain.value = muted ? 0 : 0.5; sfxGain.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.gain.value = muted ? 0 : 0.16; musicGain.connect(AC.destination);
+    musicNext = AC.currentTime + 0.1;
+    musicTimer = setInterval(scheduleMusic, 25);
+  } catch (e) { AC = null; }
+}
+function applyMute() {
+  muteBtn.textContent = muted ? '🔇' : '🔊';
+  localStorage.setItem('neonTactics-mute', muted ? '1' : '0');
+  if (sfxGain) sfxGain.gain.value = muted ? 0 : 0.5;
+  if (musicGain) musicGain.gain.value = muted ? 0 : 0.16;
+}
+function tone(freq, dur, type, vol, when, dest) {
+  if (!AC || !isFinite(freq)) return;
+  const t = when || AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || 'triangle'; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol || 0.3, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(dest || sfxGain);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function sfxSelect() { tone(660, 0.06, 'triangle', 0.2); }
+function sfxMove() { tone(330, 0.1, 'sine', 0.25); tone(440, 0.08, 'sine', 0.2, AC && AC.currentTime + 0.06); }
+function sfxHit() { tone(150, 0.15, 'sawtooth', 0.3); tone(90, 0.2, 'square', 0.2, AC && AC.currentTime + 0.04); }
+function sfxHeal() { tone(523, 0.1, 'sine', 0.22); tone(784, 0.14, 'sine', 0.2, AC && AC.currentTime + 0.08); }
+function sfxDown() { tone(220, 0.3, 'sawtooth', 0.3); tone(110, 0.4, 'sawtooth', 0.25, AC && AC.currentTime + 0.1); }
+function sfxCore() { tone(880, 0.08, 'square', 0.25); tone(440, 0.2, 'square', 0.22, AC && AC.currentTime + 0.08); }
+function sfxTurn() { tone(392, 0.1, 'triangle', 0.25); tone(523, 0.12, 'triangle', 0.22, AC && AC.currentTime + 0.09); }
+function sfxWin() { if (!AC) return; [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, 'square', 0.18, AC.currentTime + i * 0.12)); }
+function sfxLose() { if (!AC) return; [330, 262, 196].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.2, AC.currentTime + i * 0.15)); }
+const MB = [55, 0, 0, 65.4, 0, 0, 49, 0];
+function scheduleMusic() {
+  if (!AC || state !== 'play') return;
+  const stepDur = 60 / 76 / 2;
+  while (musicNext < AC.currentTime + 0.12) {
+    const s = musicStep % 8;
+    if (MB[s]) tone(MB[s], stepDur * 2.2, 'triangle', 0.55, musicNext, musicGain);
+    if (s === 2 || s === 6) tone(2200, 0.02, 'square', 0.05, musicNext, musicGain);
+    musicNext += stepDur; musicStep++;
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) return;
+  if (document.hidden) AC.suspend(); else AC.resume();
+});
+
+/* =============================== HELPERS ================================ */
+function bindTap(el, fn) {
+  let last = 0;
+  const h = e => {
+    e.preventDefault();
+    const now = Date.now();
+    if (now - last < 400) return;
+    last = now;
+    initAudio();
+    fn();
+  };
+  el.addEventListener('touchend', h, { passive: false });
+  el.addEventListener('click', h);
+}
+bindTap(muteBtn, () => { muted = !muted; applyMute(); });
+applyMute();
+
+function unitAt(r, c) { return units.find(u => u.r === r && u.c === c) || null; }
+function isWall(r, c) { return walls.some(w => w.r === r && w.c === c); }
+function isCore(r, c) { return (cores.A.r === r && cores.A.c === c) || (cores.B.r === r && cores.B.c === c); }
+function inBoard(r, c) { return r >= 0 && r < ROWS && c >= 0 && c < COLS; }
+function manhattan(r0, c0, r1, c1) { return Math.abs(r0 - r1) + Math.abs(c0 - c1); }
+
+function bfsMoves(u) {
+  const res = new Set();
+  const dist = { [key(u.r, u.c)]: 0 };
+  const q = [[u.r, u.c]];
+  while (q.length) {
+    const [r, c] = q.shift();
+    const d = dist[key(r, c)];
+    if (d >= u.mv) continue;
+    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nr = r + dr, nc = c + dc, k = key(nr, nc);
+      if (!inBoard(nr, nc) || k in dist) continue;
+      if (isWall(nr, nc) || isCore(nr, nc) || unitAt(nr, nc)) continue;
+      dist[k] = d + 1; res.add(k); q.push([nr, nc]);
+    }
+  }
+  return res;
+}
+function hasLOS(r0, c0, r1, c1) {
+  // Bresenham; intermediate walls block
+  let x0 = c0, y0 = r0, x1 = c1, y1 = r1;
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  while (!(x0 === x1 && y0 === y1)) {
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x0 += sx; }
+    if (e2 < dx) { err += dx; y0 += sy; }
+    if (x0 === x1 && y0 === y1) break;
+    if (isWall(y0, x0)) return false;
+  }
+  return true;
+}
+function attackTargets(u, fromR, fromC) {
+  const r = fromR === undefined ? u.r : fromR, c = fromC === undefined ? u.c : fromC;
+  const out = [];
+  for (const e of units) {
+    if (e.side === u.side) continue;
+    if (manhattan(r, c, e.r, e.c) <= u.rng && hasLOS(r, c, e.r, e.c)) out.push({ kind: 'unit', obj: e });
+  }
+  const ec = cores[u.side === 'A' ? 'B' : 'A'];
+  if (ec.hp > 0 && manhattan(r, c, ec.r, ec.c) <= u.rng && hasLOS(r, c, ec.r, ec.c)) out.push({ kind: 'core', obj: ec });
+  if (u.type === 'medic') {
+    for (const a of units) {
+      if (a.side !== u.side || a === u || a.hp >= TYPES[a.type].hp) continue;
+      if (manhattan(r, c, a.r, a.c) <= u.rng) out.push({ kind: 'heal', obj: a });
+    }
+  }
+  return out;
+}
+
+/* =============================== SETUP ================================== */
+let nextId = 1;
+function spawnSide(side) {
+  const back = side === 'A' ? ROWS - 1 : 0;
+  const front = side === 'A' ? ROWS - 2 : 1;
+  const defs = [
+    ['tank', front, 3], ['striker', front, 1], ['striker', front, 5],
+    ['sniper', back, 2], ['medic', back, 4],
+  ];
+  for (const [type, r, c] of defs) {
+    units.push({ id: nextId++, side, type, r, c, hp: TYPES[type].hp,
+      mv: TYPES[type].mv, atk: TYPES[type].atk, rng: TYPES[type].rng, moved: false, acted: false });
+  }
+  cores[side] = { side, r: back, c: 3, hp: CORE_HP };
+}
+function genWalls(s) {
+  const rnd = mulberry32(s >>> 0);
+  walls = [];
+  let guard = 0;
+  while (walls.length < WALL_COUNT && guard++ < 400) {
+    const r = 2 + Math.floor(rnd() * 3);          // rows 2-4 (top half, off spawn rows)
+    const c = Math.floor(rnd() * COLS);
+    const mr = ROWS - 1 - r, mc = COLS - 1 - c;   // 180° mirror
+    if (walls.some(w => (w.r === r && w.c === c) || (w.r === mr && w.c === mc))) continue;
+    if (r === mr && c === mc) continue;
+    walls.push({ r, c }, { r: mr, c: mc });
+    if (walls.length >= WALL_COUNT * 2) break;
+  }
+}
+function startGame(m, seedOverride) {
+  mode = m;
+  seed = seedOverride !== undefined ? seedOverride : (Math.random() * 0xffffffff) >>> 0;
+  units = []; cores = {}; nextId = 1;
+  spawnSide('A'); spawnSide('B');
+  genWalls(seed);
+  turnSide = 'A'; turnNum = 1; selId = null;
+  moveSet = new Set(); targetSet = new Set();
+  anims = []; floats = []; winner = null; aiActive = false;
+  musicStep = 0;
+  if (AC) musicNext = AC.currentTime + 0.1;
+  state = 'play';
+  overlay.classList.add('hidden');
+}
+
+/* =============================== GAME FLOW ============================== */
+function refreshSel() {
+  const u = units.find(x => x.id === selId);
+  moveSet = new Set(); targetSet = new Set();
+  if (!u) return;
+  if (!u.moved) moveSet = bfsMoves(u);
+  if (!u.acted) for (const t of attackTargets(u)) targetSet.add(key(t.obj.r, t.obj.c));
+}
+function px(c) { return boardX + c * cell + cell / 2; }
+function py(r) { return boardY + r * cell + cell / 2; }
+
+function doMove(u, r, c) {
+  anims.push({ type: 'move', unit: u, x0: px(u.c), y0: py(u.r), x1: px(c), y1: py(r), t: 0, dur: 0.16 });
+  u.r = r; u.c = c; u.moved = true;
+  sfxMove();
+  refreshSel();
+}
+function applyDamage(u, target) {
+  if (target.kind === 'core') {
+    target.obj.hp -= u.atk;
+    shake = 0.35; sfxCore();
+    floats.push({ x: px(target.obj.c), y: py(target.obj.r), txt: '-' + u.atk, color: '#ffc300', t: 0 });
+    if (target.obj.hp <= 0) { target.obj.hp = 0; endMatch(u.side); }
+  } else {
+    target.obj.hp -= u.atk;
+    sfxHit(); shake = 0.18;
+    floats.push({ x: px(target.obj.c), y: py(target.obj.r), txt: '-' + u.atk, color: '#ff2244', t: 0 });
+    if (target.obj.hp <= 0) {
+      sfxDown();
+      units = units.filter(x => x !== target.obj);
+      const alive = units.filter(x => x.side === target.obj.side).length;
+      if (alive === 0) endMatch(u.side);
+    }
+  }
+}
+function doAction(u, target) {
+  const tx = px(target.obj.c), ty = py(target.obj.r);
+  if (target.kind === 'heal') {
+    target.obj.hp = Math.min(TYPES[target.obj.type].hp, target.obj.hp + (TYPES[u.type].heal || 0));
+    sfxHeal();
+    floats.push({ x: tx, y: ty, txt: '+' + (TYPES[u.type].heal || 0), color: '#39ff14', t: 0 });
+  } else {
+    anims.push({ type: 'shot', x0: px(u.c), y0: py(u.r), x1: tx, y1: ty, t: 0, dur: 0.14, color: SIDE_COL[u.side] });
+    applyDamage(u, target);
+  }
+  u.acted = true; u.moved = true;   // acting also spends the move
+  if (state === 'play') refreshSel();
+  maybeAutoEnd();
+}
+function maybeAutoEnd() {
+  if (state !== 'play') return;
+  const left = units.filter(x => x.side === turnSide && (!x.moved || !x.acted));
+  if (left.length === 0) endTurn();
+}
+function endTurn() {
+  if (state !== 'play') return;
+  aiActive = false;
+  selId = null; moveSet = new Set(); targetSet = new Set();
+  turnSide = turnSide === 'A' ? 'B' : 'A';
+  if (turnSide === 'A') turnNum++;
+  for (const u of units) { u.moved = false; u.acted = false; }
+  sfxTurn();
+  if (mode === '2p') {
+    state = 'pass';
+    showPassScreen();
+  } else if (turnSide === 'B') {
+    aiActive = true; aiTimer = AI_STEP_DELAY;
+  }
+}
+function endMatch(winSide) {
+  winner = winSide; state = 'over';
+  aiActive = false; selId = null;
+  if (mode === 'ai') {
+    if (winSide === 'A') { record.w++; sfxWin(); } else { record.l++; sfxLose(); }
+    localStorage.setItem('neonTactics.record', JSON.stringify(record));
+  } else { sfxWin(); }
+  setTimeout(showEndScreen, 700);
+}
+
+/* =============================== AI ===================================== */
+function aiThreat(r, c, side) {
+  // how many enemies of `side` could plausibly hit (r,c) next turn
+  let n = 0;
+  for (const e of units) {
+    if (e.side === side) continue;
+    if (manhattan(e.r, e.c, r, c) <= e.mv + e.rng) n++;
+  }
+  return n;
+}
+function aiStepOne() {
+  const u = units.find(x => x.side === 'B' && (!x.moved || !x.acted));
+  if (!u) { aiActive = false; endTurn(); return; }
+  const dests = [key(u.r, u.c), ...(!u.moved ? bfsMoves(u) : [])];
+  const ecore = cores.A;
+  let best = null;
+  for (const dk of dests) {
+    const [dr, dc] = dk.split(',').map(Number);
+    const targets = u.acted ? [] : attackTargets(u, dr, dc);
+    const baseAdv = -(manhattan(dr, dc, ecore.r, ecore.c)) * 2 - aiThreat(dr, dc, 'B') * 4;
+    if (targets.length === 0) {
+      const score = baseAdv;
+      if (!best || score > best.score) best = { score, dr, dc, target: null };
+    }
+    for (const t of targets) {
+      let score = baseAdv;
+      if (t.kind === 'core') { score += u.atk * 12 + (t.obj.hp <= u.atk ? 200 : 0); }
+      else if (t.kind === 'heal') { score += Math.min(TYPES[t.obj.type].hp - t.obj.hp, TYPES[u.type].heal || 0) * 6; }
+      else { score += Math.min(t.obj.hp, u.atk) * 8 + (t.obj.hp <= u.atk ? 100 : 0); }
+      if (!best || score > best.score) best = { score, dr, dc, target: t };
+    }
+  }
+  if (!best) { u.moved = true; u.acted = true; return; }
+  if (best.dr !== u.r || best.dc !== u.c) doMove(u, best.dr, best.dc);
+  else u.moved = true;
+  if (best.target) {
+    // re-resolve target from new position (object identity kept)
+    doAction(u, best.target);
+  } else {
+    u.acted = true;
+    maybeAutoEnd();
+  }
+}
+
+/* =============================== INPUT ================================== */
+function cellFromPoint(x, y) {
+  const c = Math.floor((x - boardX) / cell), r = Math.floor((y - boardY) / cell);
+  return inBoard(r, c) ? { r, c } : null;
+}
+let endBtnRect = { x: 0, y: 0, w: 0, h: 0 };
+function onTap(x, y) {
+  if (state !== 'play') return;
+  if (mode === 'ai' && turnSide === 'B') return;   // AI acting
+  if (x >= endBtnRect.x && x <= endBtnRect.x + endBtnRect.w && y >= endBtnRect.y && y <= endBtnRect.y + endBtnRect.h) {
+    endTurn(); return;
+  }
+  const cl = cellFromPoint(x, y);
+  if (!cl) return;
+  const sel = units.find(u => u.id === selId);
+  const tapped = unitAt(cl.r, cl.c);
+  const k = key(cl.r, cl.c);
+  if (sel) {
+    if (targetSet.has(k) && !sel.acted) {
+      const t = attackTargets(sel).find(t => t.obj.r === cl.r && t.obj.c === cl.c);
+      if (t) { doAction(sel, t); return; }
+    }
+    if (moveSet.has(k) && !sel.moved) { doMove(sel, cl.r, cl.c); return; }
+    if (tapped && tapped.side === turnSide && tapped.id !== sel.id) {
+      selId = tapped.id; sfxSelect(); refreshSel(); return;
+    }
+    selId = null; moveSet = new Set(); targetSet = new Set();
+    return;
+  }
+  if (tapped && tapped.side === turnSide && (!tapped.moved || !tapped.acted)) {
+    selId = tapped.id; sfxSelect(); refreshSel();
+  }
+}
+let touchStart = null;
+cv.addEventListener('touchstart', e => { e.preventDefault(); initAudio(); const t = e.changedTouches[0]; touchStart = { x: t.clientX, y: t.clientY }; }, { passive: false });
+cv.addEventListener('touchend', e => {
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  if (touchStart && Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) < 18) onTap(t.clientX, t.clientY);
+  touchStart = null;
+}, { passive: false });
+cv.addEventListener('mousedown', e => { initAudio(); onTap(e.clientX, e.clientY); });
+
+/* =============================== SCREENS ================================ */
+function showMenu() {
+  state = 'menu';
+  overlay.innerHTML =
+    '<h1>NEON TACTICS</h1>' +
+    '<div class="sub">-- OUTMANEUVER · OUTGUN --</div>' +
+    '<button class="btn" id="b-ai">VS AI' + (record.w + record.l > 0 ? ' · ' + record.w + 'W-' + record.l + 'L' : '') + '</button>' +
+    '<button class="btn alt" id="b-2p">2 PLAYER · PASS &amp; PLAY</button>' +
+    '<div class="rules">Take turns moving your squad. Each unit <b>moves + attacks</b> once a turn.<br>' +
+    '<b>▲ STRIKER</b> fast melee · <b>◆ SNIPER</b> range 3 · <b>■ TANK</b> HP wall · <b>✚ MEDIC</b> heals 3<br>' +
+    'Walls block movement &amp; sniper fire.<br>' +
+    'Win: <b>destroy the enemy CORE</b> or wipe the squad.</div>';
+  overlay.classList.remove('hidden');
+  bindTap(document.getElementById('b-ai'), () => startGame('ai'));
+  bindTap(document.getElementById('b-2p'), () => startGame('2p'));
+}
+function showPassScreen() {
+  const who = turnSide === 'A' ? 'PLAYER 1' : 'PLAYER 2';
+  const col = turnSide === 'A' ? 'var(--green)' : 'var(--purple)';
+  overlay.innerHTML =
+    '<h2 style="color:' + col + '">' + who + '</h2>' +
+    '<div class="sub">PASS THE PHONE</div>' +
+    '<button class="btn' + (turnSide === 'B' ? ' alt' : '') + '" id="b-go">START TURN ' + turnNum + '</button>';
+  overlay.classList.remove('hidden');
+  bindTap(document.getElementById('b-go'), () => { state = 'play'; overlay.classList.add('hidden'); });
+}
+function showEndScreen() {
+  let head, sub;
+  if (mode === 'ai') {
+    head = winner === 'A' ? 'VICTORY' : 'DEFEAT';
+    sub = winner === 'A' ? 'enemy core destroyed' : 'your forces have fallen';
+  } else {
+    head = (winner === 'A' ? 'PLAYER 1' : 'PLAYER 2') + ' WINS';
+    sub = 'core secured';
+  }
+  overlay.innerHTML =
+    '<h2 style="color:' + (winner === 'A' ? 'var(--green)' : 'var(--purple)') + '">' + head + '</h2>' +
+    '<div class="sub">' + sub + '</div>' +
+    '<div class="stat">TURNS <b>' + turnNum + '</b></div>' +
+    (mode === 'ai' ? '<div class="stat">RECORD <b>' + record.w + 'W - ' + record.l + 'L</b></div>' : '') +
+    '<div style="margin-top:16px">' +
+    '<button class="btn small" id="b-again">REMATCH</button><br>' +
+    '<button class="btn small alt" id="b-menu">MENU</button></div>';
+  overlay.classList.remove('hidden');
+  bindTap(document.getElementById('b-again'), () => startGame(mode));
+  bindTap(document.getElementById('b-menu'), showMenu);
+}
+
+/* =============================== LAYOUT ================================= */
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cs = getComputedStyle(document.documentElement);
+  safeTop = parseFloat(cs.getPropertyValue('--sat')) || 0;
+  safeBot = parseFloat(cs.getPropertyValue('--sab')) || 0;
+  const topPad = safeTop + 58, botPad = safeBot + 96;
+  cell = Math.min((W - 12) / COLS, (H - topPad - botPad) / ROWS);
+  boardX = (W - cell * COLS) / 2;
+  boardY = topPad + (H - topPad - botPad - cell * ROWS) / 2;
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* =============================== RENDER ================================= */
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function drawUnit(u, x, y) {
+  const col = SIDE_COL[u.side];
+  const s = cell * 0.30;
+  ctx.strokeStyle = col; ctx.fillStyle = col + '33'; ctx.lineWidth = 2;
+  ctx.shadowColor = col; ctx.shadowBlur = (u.side === turnSide && !u.acted && state === 'play') ? 10 : 3;
+  ctx.beginPath();
+  if (u.type === 'striker') {
+    const dir = u.side === 'A' ? -1 : 1;
+    ctx.moveTo(x, y + dir * s); ctx.lineTo(x - s, y - dir * s * 0.8); ctx.lineTo(x + s, y - dir * s * 0.8);
+    ctx.closePath();
+  } else if (u.type === 'sniper') {
+    ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y);
+    ctx.closePath();
+  } else if (u.type === 'tank') {
+    ctx.rect(x - s, y - s, s * 2, s * 2);
+  } else {
+    const w = s * 0.55;
+    ctx.rect(x - w / 2, y - s, w, s * 2); ctx.rect(x - s, y - w / 2, s * 2, w);
+  }
+  ctx.fill(); ctx.stroke();
+  ctx.shadowBlur = 0;
+  if (u.moved && u.acted) { ctx.fillStyle = 'rgba(6,6,14,0.55)'; ctx.beginPath(); ctx.arc(x, y, s * 1.5, 0, 7); ctx.fill(); }
+  // hp bar
+  const bw = cell * 0.6, bh = 4;
+  const frac = u.hp / TYPES[u.type].hp;
+  ctx.fillStyle = '#1a1a30'; ctx.fillRect(x - bw / 2, y + cell * 0.32, bw, bh);
+  ctx.fillStyle = frac > 0.5 ? col : '#ffc300';
+  ctx.fillRect(x - bw / 2, y + cell * 0.32, bw * frac, bh);
+}
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#06060e'; ctx.fillRect(0, 0, W, H);
+  if (state === 'menu') return;
+  let ox = 0, oy = 0;
+  if (shake > 0) { ox = (Math.random() - 0.5) * 10 * shake; oy = (Math.random() - 0.5) * 10 * shake; }
+  ctx.save(); ctx.translate(ox, oy);
+
+  // banner
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.font = "15px 'Black Ops One'";
+  const myTurn = !(mode === 'ai' && turnSide === 'B');
+  ctx.fillStyle = SIDE_COL[turnSide];
+  const label = mode === 'ai' ? (turnSide === 'A' ? 'YOUR TURN' : 'ENEMY TURN') : (turnSide === 'A' ? 'PLAYER 1' : 'PLAYER 2');
+  ctx.fillText(label + ' · T' + turnNum, W / 2, safeTop + 16);
+
+  // board
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const x = boardX + c * cell, y = boardY + r * cell;
+    ctx.strokeStyle = '#1a1a30'; ctx.lineWidth = 1;
+    ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
+    const k = key(r, c);
+    if (moveSet.has(k)) { ctx.fillStyle = 'rgba(57,255,20,0.13)'; ctx.fillRect(x + 2, y + 2, cell - 4, cell - 4); }
+    if (targetSet.has(k)) {
+      ctx.strokeStyle = '#ff2244'; ctx.lineWidth = 2;
+      ctx.shadowColor = '#ff2244'; ctx.shadowBlur = 8;
+      ctx.strokeRect(x + 3, y + 3, cell - 6, cell - 6);
+      ctx.shadowBlur = 0;
+    }
+  }
+  // walls
+  for (const w of walls) {
+    const x = boardX + w.c * cell, y = boardY + w.r * cell;
+    ctx.fillStyle = '#12122a'; ctx.strokeStyle = '#4488ff'; ctx.lineWidth = 1.5;
+    roundRect(x + 4, y + 4, cell - 8, cell - 8, 4); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#4488ff44';
+    ctx.beginPath(); ctx.moveTo(x + 8, y + cell - 8); ctx.lineTo(x + cell - 8, y + 8); ctx.stroke();
+  }
+  // cores
+  for (const s of ['A', 'B']) {
+    const co = cores[s];
+    if (!co) continue;
+    const x = px(co.c), y = py(co.r);
+    const col = SIDE_COL[s];
+    ctx.strokeStyle = col; ctx.lineWidth = 2.5;
+    ctx.shadowColor = col; ctx.shadowBlur = 12;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 3 * i - Math.PI / 6;
+      const hx = x + Math.cos(a) * cell * 0.34, hy = y + Math.sin(a) * cell * 0.34;
+      i === 0 ? ctx.moveTo(hx, hy) : ctx.lineTo(hx, hy);
+    }
+    ctx.closePath(); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = col; ctx.font = (cell * 0.3) + "px 'Black Ops One'";
+    ctx.textBaseline = 'middle'; ctx.fillText(co.hp, x, y + 1);
+    ctx.textBaseline = 'top';
+  }
+  // units (skip ones mid move-anim; drawn from anim)
+  const animUnits = new Set(anims.filter(a => a.type === 'move').map(a => a.unit));
+  for (const u of units) if (!animUnits.has(u)) drawUnit(u, px(u.c), py(u.r));
+  for (const a of anims) {
+    if (a.type === 'move') {
+      const t = Math.min(1, a.t / a.dur);
+      drawUnit(a.unit, a.x0 + (a.x1 - a.x0) * t, a.y0 + (a.y1 - a.y0) * t);
+    } else if (a.type === 'shot') {
+      const t = Math.min(1, a.t / a.dur);
+      ctx.strokeStyle = a.color; ctx.lineWidth = 3;
+      ctx.shadowColor = a.color; ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(a.x0, a.y0);
+      ctx.lineTo(a.x0 + (a.x1 - a.x0) * t, a.y0 + (a.y1 - a.y0) * t);
+      ctx.stroke(); ctx.shadowBlur = 0;
+    }
+  }
+  // selected unit stat panel + END TURN
+  const sel = units.find(u => u.id === selId);
+  const py0 = boardY + ROWS * cell + 10;
+  ctx.textAlign = 'left';
+  if (sel) {
+    const T = TYPES[sel.type];
+    ctx.font = "13px 'Black Ops One'"; ctx.fillStyle = SIDE_COL[sel.side];
+    ctx.fillText(T.name, 14, py0);
+    ctx.font = "12px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
+    ctx.fillText('HP ' + sel.hp + '/' + T.hp + '  ATK ' + T.atk + (T.heal ? '  HEAL ' + T.heal : '') + '  RNG ' + T.rng + '  MOV ' + T.mv, 14, py0 + 18);
+    ctx.fillText((sel.moved ? '✓moved' : '·move') + '  ' + (sel.acted ? '✓acted' : '·act'), 14, py0 + 34);
+  } else if (state === 'play' && myTurn) {
+    ctx.font = "12px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
+    ctx.fillText('tap a unit — move, then strike', 14, py0 + 8);
+  }
+  const bw = 118, bh = 40;
+  endBtnRect = { x: W - bw - 12, y: py0, w: bw, h: bh };
+  if (state === 'play' && myTurn) {
+    ctx.strokeStyle = '#ffc300'; ctx.fillStyle = '#ffc30015'; ctx.lineWidth = 1.5;
+    roundRect(endBtnRect.x, endBtnRect.y, bw, bh, 8); ctx.fill(); ctx.stroke();
+    ctx.font = "13px 'Black Ops One'"; ctx.fillStyle = '#ffc300'; ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('END TURN', endBtnRect.x + bw / 2, endBtnRect.y + bh / 2);
+    ctx.textBaseline = 'top';
+  }
+  // floats
+  ctx.textAlign = 'center';
+  for (const f of floats) {
+    ctx.globalAlpha = Math.max(0, 1 - f.t / 0.9);
+    ctx.fillStyle = f.color; ctx.font = "16px 'Black Ops One'";
+    ctx.fillText(f.txt, f.x, f.y - 14 - f.t * 40);
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+/* =============================== LOOP =================================== */
+let lastT = performance.now();
+function loop(now) {
+  const dt = Math.min((now - lastT) / 1000, 0.1);
+  lastT = now;
+  for (const a of anims) a.t += dt;
+  anims = anims.filter(a => a.t < a.dur);
+  for (const f of floats) f.t += dt;
+  floats = floats.filter(f => f.t < 0.9);
+  shake = Math.max(0, shake - dt * 2.5);
+  if (state === 'play' && aiActive && anims.length === 0) {
+    aiTimer -= dt;
+    if (aiTimer <= 0) { aiTimer = AI_STEP_DELAY; aiStepOne(); }
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+showMenu();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

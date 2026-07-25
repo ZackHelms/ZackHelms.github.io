@@ -65,12 +65,84 @@ h1 {
   color: var(--green);
 }
 .game-desc { font-size: 0.55rem; color: var(--dim); line-height: 1.5; }
+
+/* --- coverage heuristics dashboard --- */
+#stats-btn {
+  font-family: 'Share Tech Mono', monospace;
+  background: var(--panel); color: var(--gold);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 9px 20px; font-size: 0.7rem; letter-spacing: 2px;
+  margin-bottom: 22px; cursor: pointer; touch-action: manipulation;
+}
+#stats-btn:hover { border-color: var(--gold); box-shadow: 0 0 16px #ffc30022; }
+#stats {
+  position: fixed; inset: 0; z-index: 100; display: none;
+  background: var(--bg); overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(env(safe-area-inset-top, 0px) + 18px) 16px 70px;
+}
+#stats.open { display: block; }
+.stats-head {
+  display: flex; align-items: center; justify-content: space-between;
+  max-width: 640px; margin: 0 auto;
+}
+.stats-head h2 {
+  font-family: 'Black Ops One', sans-serif; color: var(--gold);
+  letter-spacing: 3px; font-size: 1.1rem; text-shadow: 0 0 18px #ffc30044;
+}
+.stats-close {
+  background: var(--panel); border: 1px solid var(--border); color: var(--white);
+  border-radius: 6px; width: 38px; height: 34px; font-size: 15px;
+  cursor: pointer; touch-action: manipulation;
+}
+.stats-sub { max-width: 640px; margin: 4px auto 0; font-size: 0.58rem; color: var(--dim); letter-spacing: 2px; }
+.facet-section { max-width: 640px; margin: 22px auto 0; }
+.facet-section h3 {
+  font-family: 'Black Ops One', sans-serif; font-size: 0.78rem;
+  letter-spacing: 2px; margin-bottom: 8px;
+}
+.facet-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px; border-radius: 5px; cursor: pointer; touch-action: manipulation;
+}
+.facet-row:hover, .facet-row:active { background: rgba(255,255,255,0.045); }
+.facet-label {
+  width: 43%; font-size: 0.62rem; color: var(--white); letter-spacing: 1px;
+  text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.facet-bar-wrap { flex: 1; height: 14px; background: rgba(255,255,255,0.03); border-radius: 0 4px 4px 0; }
+.facet-bar { height: 14px; border-radius: 0 4px 4px 0; min-width: 3px; }
+.facet-count { width: 24px; font-size: 0.66rem; color: var(--dim); }
+#facet-dialog {
+  position: fixed; inset: 0; z-index: 120; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(6,6,14,0.72); padding: 24px;
+}
+#facet-dialog.open { display: flex; }
+.dlg-panel {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  max-width: 420px; width: 100%; max-height: 70vh; overflow-y: auto;
+  -webkit-overflow-scrolling: touch; padding: 16px; box-shadow: 0 0 50px #000;
+}
+.dlg-panel h4 {
+  font-family: 'Black Ops One', sans-serif; letter-spacing: 2px; font-size: 0.8rem;
+  color: var(--white); margin-bottom: 10px;
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+}
+.dlg-game {
+  display: flex; gap: 10px; align-items: center; padding: 8px 6px;
+  border-radius: 6px; text-decoration: none; color: var(--white);
+}
+.dlg-game:hover { background: #12122a; }
+.dlg-game .gi { font-size: 1.15rem; }
+.dlg-game .gn { font-family: 'Black Ops One', sans-serif; font-size: 0.68rem; letter-spacing: 1.5px; color: var(--green); }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-05 19:17 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 04:57 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
+  <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
 
   <div class="grid">
     <a class="game-card" href="zed-shooter/">
@@ -166,6 +238,388 @@ h1 {
         <div class="game-desc">Dungeon-crawler RPG with character progression, combat, gear systems, and boss battles. Six save slots, runs entirely in-browser.</div>
       </div>
     </a>
+
+    <a class="game-card" href="merge-drop/">
+      <div class="game-icon">🫧</div>
+      <div class="game-info">
+        <div class="game-name">MERGE DROP</div>
+        <div class="game-desc">Drop glowing orbs into the tank — matching orbs merge and grow. Chain merges for bonus points and don't overflow. One-thumb physics puzzler.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="neon-golf/">
+      <div class="game-icon">⛳</div>
+      <div class="game-info">
+        <div class="game-name">NEON GOLF</div>
+        <div class="game-desc">9 holes of glowing mini-golf. Drag back and release to shoot past bumpers, sand, water, and moving gates. Beat par, chase your best round.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="neon-pinball/">
+      <div class="game-icon">🕹️</div>
+      <div class="game-info">
+        <div class="game-name">NEON PINBALL</div>
+        <div class="game-desc">Two-thumb pinball. Charge the plunger, rip the flippers, light the lanes, clear the target bank for multiball. Chase a monster bonus.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="gravity-runner/">
+      <div class="game-icon">🌀</div>
+      <div class="game-info">
+        <div class="game-name">GRAVITY RUNNER</div>
+        <div class="game-desc">Tap to flip gravity and run the neon corridor. Dodge spikes and gates, grab gold orbs, and hang on as the world speeds up.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="brick-breaker/">
+      <div class="game-icon">🧱</div>
+      <div class="game-info">
+        <div class="game-name">BRICK BREAKER</div>
+        <div class="game-desc">Drag the paddle, smash the wall. Armored, steel, and exploding bricks across 8 levels — catch wide, laser, slow-mo, and multiball drops.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="snake-arena/">
+      <div class="game-icon">🐍</div>
+      <div class="game-info">
+        <div class="game-name">NEON SNAKE ARENA</div>
+        <div class="game-desc">Steer a glowing serpent with your thumb. Eat orbs to grow, chain combos, snag gold before it fades — and dodge the mines closing in.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="neon-slice/">
+      <div class="game-icon">🔪</div>
+      <div class="game-info">
+        <div class="game-name">NEON SLICE</div>
+        <div class="game-desc">Swipe to slice glowing gems out of the air. Chain combos in one swipe for slow-mo bonuses — but don't cut the bombs or drop a gem.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="bubble-blaster/">
+      <div class="game-icon">🎯</div>
+      <div class="game-info">
+        <div class="game-name">BUBBLE BLASTER</div>
+        <div class="game-desc">Drag to aim, release to pop. Match 3+ bubbles, drop whole clusters for double points, and hold the line — the board drops every 6 shots.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="block-fit/">
+      <div class="game-icon">🧩</div>
+      <div class="game-info">
+        <div class="game-name">BLOCK FIT</div>
+        <div class="game-desc">Drag pieces onto the 9×9 grid and fill rows or columns to clear them. No rotation, no timer — just don't run out of moves.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="sky-hopper/">
+      <div class="game-icon">🐇</div>
+      <div class="game-info">
+        <div class="game-name">SKY HOPPER</div>
+        <div class="game-desc">Bounce a neon hopper up an endless sky. Drag to steer, hit springs to launch, dodge crumbling platforms, and chase the next milestone.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="neon-stack/">
+      <div class="game-icon">🏗️</div>
+      <div class="game-info">
+        <div class="game-name">NEON STACK</div>
+        <div class="game-desc">Tap to drop sliding blocks and build the tallest tower. Overhangs get sliced away — nail perfect drops to grow back and chain combos.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="blade-spin/">
+      <div class="game-icon">🗡️</div>
+      <div class="game-info">
+        <div class="game-name">BLADE SPIN</div>
+        <div class="game-desc">Tap to hurl blades into the spinning disc — but never into another blade. Dodge spikes, snag gems, and crack boss discs wide open.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="neon-crossing/">
+      <div class="game-icon">🐸</div>
+      <div class="game-info">
+        <div class="game-name">NEON CROSSING</div>
+        <div class="game-desc">Hop a neon frog across roads, rivers, and rail lines. Tap to leap, swipe to dodge, ride the logs — and don't let the screen sweep you away.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="air-hockey/">
+      <div class="game-icon">🏒</div>
+      <div class="game-info">
+        <div class="game-name">NEON AIR HOCKEY</div>
+        <div class="game-desc">Drag your mallet and smash the puck home. Three AI difficulties, real rebounds, first to seven goals takes the match — or flip to 2P and battle a friend on one screen.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="grid-defense/">
+      <div class="game-icon">🗼</div>
+      <div class="game-info">
+        <div class="game-name">GRID DEFENSE</div>
+        <div class="game-desc">Drag pulse, nova, frost, and rail towers beside the neon road and hold 20 waves. Upgrade, sell, call waves early — don't let the horde through.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="star-surge/">
+      <div class="game-icon">🚀</div>
+      <div class="game-info">
+        <div class="game-name">STAR SURGE</div>
+        <div class="game-desc">Drag to weave through the bullet storm — your ship fires itself. Five stages of drones, spinners, and boss octagons. Grab power, shields, and surge bombs.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="neon-tactics/">
+      <div class="game-icon">♟️</div>
+      <div class="game-info">
+        <div class="game-name">NEON TACTICS</div>
+        <div class="game-desc">Command a five-unit neon squad in turn-based grid battles. Flank past walls, snipe through lanes, crack the enemy core — vs AI or pass-and-play.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="word-circuit/">
+      <div class="game-icon">🔤</div>
+      <div class="game-info">
+        <div class="game-name">WORD CIRCUIT</div>
+        <div class="game-desc">Trace neighboring letters to spell words before the clock runs out. Same daily board for everyone — or free play. Longer words, bigger points.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="tri-peaks/">
+      <div class="game-icon">🃏</div>
+      <div class="game-info">
+        <div class="game-name">NEON TRIPEAKS</div>
+        <div class="game-desc">Clear three card peaks by chaining ranks up or down from the waste pile. Streaks stack bonuses; a seeded daily deal is the same for everyone.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="shadow-circuit/">
+      <div class="game-icon">🥷</div>
+      <div class="game-info">
+        <div class="game-name">SHADOW CIRCUIT</div>
+        <div class="game-desc">Sneak through neon mazes past patrolling guard cones. Tap to move, hide in shadows, steal every core, and ghost to the exit unseen.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="neon-recall/">
+      <div class="game-icon">🧠</div>
+      <div class="game-info">
+        <div class="game-name">NEON RECALL</div>
+        <div class="game-desc">Memory match on a scan budget — every miss costs you. Growing boards hide power pairs; or pass the phone for a no-draw versus duel.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="neon-drift/">
+      <div class="game-icon">🏎️</div>
+      <div class="game-info">
+        <div class="game-name">NEON DRIFT</div>
+        <div class="game-desc">Thumb-steer a drift car through 3-lap neon time trials. Stay on the glowing asphalt, slide the corners, and race the ghost of your best run.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="meteor-defense/">
+      <div class="game-icon">☄️</div>
+      <div class="game-info">
+        <div class="game-name">METEOR DEFENSE</div>
+        <div class="game-desc">Tap the sky to burst incoming meteors before they level your neon city. Chain blasts for multipliers, manage your ammo, survive the waves.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="ember-depths/">
+      <div class="game-icon">🔥</div>
+      <div class="game-info">
+        <div class="game-name">EMBER DEPTHS</div>
+        <div class="game-desc">Tap your way through torchlit dungeons one turn at a time. Bump to fight, loot relics that stack into a build, descend forever — death is permanent.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="alpine-ascent/">
+      <div class="game-icon">⛰️</div>
+      <div class="game-info">
+        <div class="game-name">ALPINE ASCENT</div>
+        <div class="game-desc">Hold to charge, drag to aim, release to leap up the mountain. Ice slides, ledges crumble, wind howls — six camps stand between you and the summit.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="golden-reel/">
+      <div class="game-icon">🎣</div>
+      <div class="game-info">
+        <div class="game-name">GOLDEN REEL</div>
+        <div class="game-desc">Cast into a sunset lake, set the hook, and reel through the runs before the line snaps. Buy better tackle, fill the log, find Old Goldscale.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="vault-breaker/">
+      <div class="game-icon">🔐</div>
+      <div class="game-info">
+        <div class="game-name">VAULT BREAKER</div>
+        <div class="game-desc">Twist two fingers to crack the safe — feel for the pins, align the rings, spin the handle. The alarm timer never stops. Steel, listen, gold.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="locksport/">
+      <div class="game-icon">🗝️</div>
+      <div class="game-info">
+        <div class="game-name">LOCKSPORT</div>
+        <div class="game-desc">A real single-pin-picking bench, side-view cutaway. Feel for the binding pin, ride it to the shear line, beat spools and serrations. 12 locks, no timer.</div>
+      </div>
+    </a>
   </div>
+
+  <div id="stats">
+    <div class="stats-head">
+      <h2>COVERAGE HEURISTICS</h2>
+      <button class="stats-close" id="stats-close" aria-label="Close">✕</button>
+    </div>
+    <div class="stats-sub" id="stats-sub"></div>
+    <div id="stats-body"></div>
+  </div>
+  <div id="facet-dialog">
+    <div class="dlg-panel" id="dlg-panel"></div>
+  </div>
+
+<script>
+'use strict';
+// Facet catalog — mirrors .claude/games-index.md. MAINTENANCE: every new game
+// adds its entry here in the same commit as its hub card (and index row).
+const GAMES = [
+  { n: 'ZED SHOOTER', i: '🧟', h: 'zed-shooter/', genre: ['shooter'], input: ['virtual-joystick', 'kb-mouse'], session: ['wave-survival'], mech: ['meta-progression'], players: ['solo'] },
+  { n: 'QUANTUM CHEMIST', i: '⚛️', h: 'qntmchmst/', genre: ['grid-puzzle'], input: ['tap', 'drag-place'], session: ['level-campaign'], mech: ['match-clear'], players: ['solo'] },
+  { n: 'STICK WARS', i: '⚔️', h: 'stick-wars.html', genre: ['brawler'], input: ['tap'], session: ['wave-survival'], mech: ['meta-progression', 'resource-economy'], players: ['solo'] },
+  { n: 'TOWN BUILDER', i: '🏘️', h: 'town-game-1.html', genre: ['builder-sim'], input: ['tap', 'drag-place'], session: ['open-sandbox'], mech: ['resource-economy'], players: ['solo'] },
+  { n: 'HORSE RACE', i: '🐎', h: 'horse-race.html', genre: ['racing'], input: ['tap'], session: ['endless-highscore'], mech: ['collection'], players: ['solo'] },
+  { n: 'PIANO TILES', i: '🎹', h: 'piano-tiles.html', genre: ['rhythm'], input: ['multi-tap-zones'], session: ['level-campaign'], mech: ['timing-precision'], players: ['solo'] },
+  { n: 'SORCERY', i: '🔮', h: 'sorcery.html', genre: ['defense'], input: ['tap', 'hold'], session: ['wave-survival'], mech: ['wave-defense', 'meta-progression'], players: ['solo'] },
+  { n: 'STICK COMMANDER 3D', i: '👑', h: 'stick-commander-3d.html', genre: ['rts-strategy'], input: ['tap'], session: ['level-campaign'], mech: ['resource-economy', 'boss-fights'], players: ['solo'] },
+  { n: 'ADVENTURE', i: '🗺️', h: 'adventure.html', genre: ['rpg-adventure'], input: ['tap'], session: ['save-campaign'], mech: ['meta-progression', 'collection'], players: ['solo'] },
+  { n: 'CROISSANT CLICKER', i: '🥐', h: 'croissant-clicker.html', genre: ['idle-clicker'], input: ['tap'], session: ['idle-persistent'], mech: ['resource-economy', 'meta-progression'], players: ['solo'] },
+  { n: 'BASKETBALL CLICKER', i: '🏀', h: 'basketball-clicker.html', genre: ['idle-clicker'], input: ['tap'], session: ['idle-persistent'], mech: ['resource-economy', 'meta-progression'], players: ['solo'] },
+  { n: 'GATE BREAKER', i: '🏰', h: 'gate-breaker/', genre: ['dungeon-crawler'], input: ['tap'], session: ['save-campaign'], mech: ['meta-progression', 'boss-fights'], players: ['solo'] },
+  { n: 'MERGE DROP', i: '🫧', h: 'merge-drop/', genre: ['physics-puzzle'], input: ['drag-aim-release'], session: ['endless-highscore'], mech: ['physics-sim', 'merging', 'combo-multiplier'], players: ['solo'] },
+  { n: 'NEON GOLF', i: '⛳', h: 'neon-golf/', genre: ['sports'], input: ['drag-aim-release'], session: ['par-course'], mech: ['physics-sim', 'trajectory-aiming'], players: ['solo'] },
+  { n: 'NEON PINBALL', i: '🕹️', h: 'neon-pinball/', genre: ['arcade-classic'], input: ['two-thumb', 'hold-charge'], session: ['endless-highscore'], mech: ['physics-sim', 'deflection', 'combo-multiplier'], players: ['solo'] },
+  { n: 'GRAVITY RUNNER', i: '🌀', h: 'gravity-runner/', genre: ['endless-runner'], input: ['tap'], session: ['endless-highscore'], mech: ['procedural-generation', 'timing-precision'], players: ['solo'] },
+  { n: 'BRICK BREAKER', i: '🧱', h: 'brick-breaker/', genre: ['arcade-classic'], input: ['drag-paddle'], session: ['level-campaign'], mech: ['deflection', 'meta-progression'], players: ['solo'] },
+  { n: 'NEON SNAKE ARENA', i: '🐍', h: 'snake-arena/', genre: ['arcade-classic'], input: ['drag-steer'], session: ['endless-highscore'], mech: ['collection', 'combo-multiplier'], players: ['solo'] },
+  { n: 'NEON SLICE', i: '🔪', h: 'neon-slice/', genre: ['arcade-classic'], input: ['swipe'], session: ['endless-highscore'], mech: ['gesture', 'combo-multiplier'], players: ['solo'] },
+  { n: 'BUBBLE BLASTER', i: '🎯', h: 'bubble-blaster/', genre: ['match-puzzle'], input: ['drag-aim-release'], session: ['endless-highscore'], mech: ['match-clear', 'trajectory-aiming', 'hex-grid'], players: ['solo'] },
+  { n: 'BLOCK FIT', i: '🧩', h: 'block-fit/', genre: ['grid-puzzle'], input: ['drag-place'], session: ['endless-highscore'], mech: ['match-clear'], players: ['solo'] },
+  { n: 'SKY HOPPER', i: '🐇', h: 'sky-hopper/', genre: ['endless-climber'], input: ['drag-steer'], session: ['endless-highscore'], mech: ['physics-sim', 'procedural-generation'], players: ['solo'] },
+  { n: 'NEON STACK', i: '🏗️', h: 'neon-stack/', genre: ['timing-skill'], input: ['tap'], session: ['endless-highscore'], mech: ['timing-precision', 'stacking', 'combo-multiplier'], players: ['solo'] },
+  { n: 'BLADE SPIN', i: '🗡️', h: 'blade-spin/', genre: ['timing-skill'], input: ['tap'], session: ['level-campaign'], mech: ['timing-precision', 'seeded-determinism', 'boss-fights'], players: ['solo'] },
+  { n: 'NEON CROSSING', i: '🐸', h: 'neon-crossing/', genre: ['arcade-classic'], input: ['tap', 'swipe'], session: ['endless-highscore'], mech: ['lane-navigation', 'procedural-generation'], players: ['solo'] },
+  { n: 'NEON AIR HOCKEY', i: '🏒', h: 'air-hockey/', genre: ['sports'], input: ['drag-paddle'], session: ['match-vs-ai', 'local-2p'], mech: ['physics-sim', 'deflection', 'ai-opponent'], players: ['vs-ai', 'local-2p'] },
+  { n: 'METEOR DEFENSE', i: '☄️', h: 'meteor-defense/', genre: ['defense'], input: ['tap'], session: ['wave-survival'], mech: ['wave-defense', 'resource-economy', 'combo-multiplier'], players: ['solo'] },
+  { n: 'WORD CIRCUIT', i: '🔤', h: 'word-circuit/', genre: ['word'], input: ['drag-connect'], session: ['daily-challenge', 'timed-round'], mech: ['word-building', 'seeded-determinism'], players: ['solo'] },
+  { n: 'NEON TACTICS', i: '♟️', h: 'neon-tactics/', genre: ['turn-based-tactics'], input: ['tap'], session: ['match-vs-ai', 'local-2p'], mech: ['grid-combat', 'line-of-sight', 'ai-opponent'], players: ['vs-ai', 'local-2p'] },
+  { n: 'STAR SURGE', i: '🚀', h: 'star-surge/', genre: ['shmup'], input: ['drag-steer'], session: ['level-campaign'], mech: ['bullet-dodging', 'boss-fights', 'meta-progression'], players: ['solo'] },
+  { n: 'GRID DEFENSE', i: '🗼', h: 'grid-defense/', genre: ['tower-defense-classic'], input: ['drag-place', 'tap'], session: ['wave-survival'], mech: ['wave-defense', 'resource-economy', 'tower-upgrades'], players: ['solo'] },
+  { n: 'NEON TRIPEAKS', i: '🃏', h: 'tri-peaks/', genre: ['card-deck'], input: ['tap'], session: ['quick-round', 'daily-challenge'], mech: ['card-chain', 'combo-multiplier', 'seeded-determinism'], players: ['solo'] },
+  { n: 'SHADOW CIRCUIT', i: '🥷', h: 'shadow-circuit/', genre: ['stealth', 'maze'], input: ['tap-to-move'], session: ['level-campaign'], mech: ['vision-cones', 'line-of-sight', 'procedural-generation'], players: ['solo'] },
+  { n: 'NEON RECALL', i: '🧠', h: 'neon-recall/', genre: ['memory-board'], input: ['tap'], session: ['level-campaign', 'local-2p'], mech: ['memory-match', 'resource-economy', 'combo-multiplier'], players: ['solo', 'local-2p'] },
+  { n: 'NEON DRIFT', i: '🏎️', h: 'neon-drift/', genre: ['driver-racing'], input: ['two-thumb'], session: ['time-trial'], mech: ['physics-sim', 'ghost-replay', 'timing-precision'], players: ['solo'] },
+  { n: 'EMBER DEPTHS', i: '🔥', h: 'ember-depths/', genre: ['roguelike'], input: ['tap-to-move'], session: ['run-based'], mech: ['permadeath', 'relic-builds', 'procedural-generation', 'grid-combat'], players: ['solo'] },
+  { n: 'ALPINE ASCENT', i: '⛰️', h: 'alpine-ascent/', genre: ['platformer'], input: ['hold-charge', 'drag-aim-release'], session: ['level-campaign'], mech: ['physics-sim', 'timing-precision', 'checkpoint-climb'], players: ['solo'] },
+  { n: 'GOLDEN REEL', i: '🎣', h: 'golden-reel/', genre: ['fishing'], input: ['hold-charge', 'tap'], session: ['save-campaign'], mech: ['collection', 'resource-economy', 'timing-precision'], players: ['solo'] },
+  { n: 'VAULT BREAKER', i: '🔐', h: 'vault-breaker/', genre: ['dexterity-puzzle'], input: ['pinch-rotate'], session: ['level-campaign'], mech: ['timing-precision', 'seeded-determinism', 'star-rating'], players: ['solo'] },
+  { n: 'LOCKSPORT', i: '🗝️', h: 'locksport/', genre: ['lockpicking-sim'], input: ['drag-probe', 'tension-hold'], session: ['level-campaign'], mech: ['feel-simulation', 'binding-order', 'star-rating', 'seeded-determinism'], players: ['solo'] },
+];
+// One hue per section (single-series bars; labels carry identity). Green and
+// gold sections are kept non-adjacent — the pair is CVD-inseparable.
+const AXES = [
+  { key: 'genre', title: 'GENRE', col: '#39ff14' },
+  { key: 'input', title: 'INPUT', col: '#4488ff' },
+  { key: 'session', title: 'SESSION', col: '#ffc300' },
+  { key: 'mech', title: 'KEY MECHANICS', col: '#b44fff' },
+  { key: 'players', title: 'PLAYERS', col: '#ff2244' },
+];
+const statsEl = document.getElementById('stats');
+const dlgEl = document.getElementById('facet-dialog');
+const dlgPanel = document.getElementById('dlg-panel');
+let statsBuilt = false;
+function axisCounts(key) {
+  const map = new Map();
+  GAMES.forEach(g => g[key].forEach(v => {
+    if (!map.has(v)) map.set(v, []);
+    map.get(v).push(g);
+  }));
+  return [...map.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+}
+function buildStats() {
+  if (statsBuilt) return;
+  statsBuilt = true;
+  document.getElementById('stats-sub').textContent = GAMES.length + ' GAMES · TAP A BAR FOR THE MATCHING LIST';
+  const body = document.getElementById('stats-body');
+  AXES.forEach(ax => {
+    const rows = axisCounts(ax.key);
+    const max = rows.length ? rows[0][1].length : 1;
+    const sec = document.createElement('div');
+    sec.className = 'facet-section';
+    const h = document.createElement('h3');
+    h.textContent = ax.title;
+    h.style.color = ax.col;
+    sec.appendChild(h);
+    rows.forEach(([val, games]) => {
+      const row = document.createElement('div');
+      row.className = 'facet-row';
+      row.setAttribute('data-axis', ax.key);
+      row.setAttribute('data-value', val);
+      const lb = document.createElement('div');
+      lb.className = 'facet-label';
+      lb.textContent = val;
+      const wrap = document.createElement('div');
+      wrap.className = 'facet-bar-wrap';
+      const bar = document.createElement('div');
+      bar.className = 'facet-bar';
+      bar.style.width = (games.length / max * 100) + '%';
+      bar.style.background = ax.col;
+      bar.style.boxShadow = '0 0 8px ' + ax.col + '44';
+      wrap.appendChild(bar);
+      const ct = document.createElement('div');
+      ct.className = 'facet-count';
+      ct.textContent = games.length;
+      row.appendChild(lb); row.appendChild(wrap); row.appendChild(ct);
+      row.addEventListener('click', () => openFacetDialog(ax, val, games));
+      sec.appendChild(row);
+    });
+    body.appendChild(sec);
+  });
+}
+function openFacetDialog(ax, val, games) {
+  dlgPanel.innerHTML = '';
+  const h = document.createElement('h4');
+  const span = document.createElement('span');
+  span.textContent = ax.title + ' · ' + val + ' (' + games.length + ')';
+  const x = document.createElement('button');
+  x.className = 'stats-close';
+  x.textContent = '✕';
+  x.setAttribute('aria-label', 'Close');
+  x.addEventListener('click', () => dlgEl.classList.remove('open'));
+  h.appendChild(span); h.appendChild(x);
+  dlgPanel.appendChild(h);
+  games.forEach(g => {
+    const a = document.createElement('a');
+    a.className = 'dlg-game';
+    a.href = g.h;
+    const gi = document.createElement('span'); gi.className = 'gi'; gi.textContent = g.i;
+    const gn = document.createElement('span'); gn.className = 'gn'; gn.textContent = g.n;
+    a.appendChild(gi); a.appendChild(gn);
+    dlgPanel.appendChild(a);
+  });
+  dlgEl.classList.add('open');
+}
+document.getElementById('stats-btn').addEventListener('click', () => {
+  buildStats();
+  statsEl.classList.add('open');
+});
+document.getElementById('stats-close').addEventListener('click', () => {
+  statsEl.classList.remove('open');
+  dlgEl.classList.remove('open');
+});
+dlgEl.addEventListener('click', (e) => { if (e.target === dlgEl) dlgEl.classList.remove('open'); });
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (dlgEl.classList.contains('open')) dlgEl.classList.remove('open');
+  else statsEl.classList.remove('open');
+});
+</script>
 </body>
 </html>

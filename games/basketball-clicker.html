@@ -50,6 +50,14 @@ header {
   letter-spacing: 1px; font-weight: 700; flex-shrink: 0;
 }
 #back-link:hover { color: var(--orange); }
+#mute-btn {
+  width: 38px; height: 30px; flex-shrink: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--dim); font-size: 15px; line-height: 1; cursor: pointer;
+  touch-action: manipulation;
+}
+#mute-btn:hover { border-color: var(--orange); }
 header h1 {
   font-family: 'Black Ops One', sans-serif;
   font-size: clamp(1rem, 3vw, 1.5rem);
@@ -343,10 +351,11 @@ main {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-05 21:02 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
 
 <header>
   <a id="back-link" href="index.html">&larr; GAMES</a>
+  <button id="mute-btn" aria-label="Toggle sound">🔊</button>
   <h1>BASKETBALL CLICKER</h1>
   <div class="header-spacer"></div>
   <button class="header-btn ascend-btn" id="ascend-btn">🏆 CHAMPIONSHIP</button>
@@ -1414,6 +1423,215 @@ const totemsTab = document.getElementById('tab-totems');
 const ascensionsTab = document.getElementById('tab-ascensions');
 const headerTitleEl = document.querySelector('header h1');
 
+// ── Audio (WebAudio, all-synth — no audio files) ───────────────
+// Lazy AudioContext unlocked on the first user gesture (iOS requirement);
+// sfxGain/musicGain masters; ONE mute button silences both, persisted with a
+// camelCase localStorage key matching this game's existing save-key style.
+const MUTE_KEY = 'basketballClickerMute';
+const muteBtn = document.getElementById('mute-btn');
+let audioMuted = false;
+try { audioMuted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) {}
+let ac = null, sfxGain = null, musicGain = null, noiseBuf = null;
+
+function ensureAudio() {
+  if (!ac) {
+    try {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      sfxGain = ac.createGain();   sfxGain.connect(ac.destination);
+      musicGain = ac.createGain(); musicGain.connect(ac.destination);
+      applyMuteGains();
+    } catch (e) { ac = null; }
+  }
+  if (ac && ac.state === 'suspended' && !audioMuted) ac.resume();
+  return ac;
+}
+function applyMuteGains() {
+  if (!ac) return;
+  sfxGain.gain.value = audioMuted ? 0 : 0.85;
+  musicGain.gain.value = audioMuted ? 0 : 0.17;
+}
+function getNoise() {
+  if (!noiseBuf && ac) {
+    const len = Math.floor(ac.sampleRate * 1.0);
+    noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuf;
+}
+function beep(freq, dur, type, vol, slideTo, delay) {
+  const a = ensureAudio(); if (!a) return;
+  const t = a.currentTime + (delay || 0);
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(vol || 0.1, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(sfxGain);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function noiseHit(vol, dur, filterType, filterFreq, delay) {
+  const a = ensureAudio(); if (!a || !getNoise()) return;
+  const t = a.currentTime + (delay || 0);
+  const s = a.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+  const f = a.createBiquadFilter(); f.type = filterType || 'highpass'; f.frequency.value = filterFreq || 3000;
+  const g = a.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(sfxGain);
+  s.start(t); s.stop(t + dur + 0.02);
+}
+
+// ── SFX ────────────────────────────────────────────────────────
+// Ball click fires constantly, so it's deliberately tiny — a soft ball-bounce
+// "thock" with random pitch (so machine-gun tapping never drones), throttled
+// to at most one sound per 55 ms regardless of tap rate.
+let lastClickSfxAt = 0;
+function sndClick() {
+  const now = performance.now();
+  if (now - lastClickSfxAt < 55) return;
+  lastClickSfxAt = now;
+  const f = 210 * (0.92 + Math.random() * 0.16);
+  beep(f, 0.06, 'sine', 0.07, f * 0.62);
+}
+function sndBuy()     { beep(660, 0.06, 'square', 0.05); beep(990, 0.09, 'square', 0.05, 0, 0.06); }
+function sndUpgrade() { beep(523.25, 0.07, 'triangle', 0.09); beep(659.25, 0.07, 'triangle', 0.09, 0, 0.07); beep(783.99, 0.12, 'triangle', 0.09, 0, 0.14); }
+function sndGolden()  { [880, 1174.7, 1568, 2093].forEach((f, i) => beep(f, 0.09, 'sine', 0.08, 0, i * 0.05)); }
+function sndFrenzy()  { beep(150, 0.5, 'sawtooth', 0.07, 620); beep(300, 0.5, 'square', 0.05, 1240); noiseHit(0.06, 0.55, 'bandpass', 1200); }
+function sndTeamWin() { beep(175, 0.28, 'sawtooth', 0.06); [523.25, 659.25, 783.99].forEach((f, i) => beep(f, 0.1, 'square', 0.06, 0, 0.06 + i * 0.09)); noiseHit(0.07, 0.5, 'bandpass', 1400, 0.12); }
+function sndAch()     { beep(1318.5, 0.1, 'triangle', 0.09); beep(1760, 0.22, 'triangle', 0.08, 0, 0.09); }
+function sndPortal()  { beep(700, 0.8, 'sawtooth', 0.08, 70); noiseHit(0.06, 0.7, 'highpass', 500); beep(523.25, 0.14, 'sine', 0.08, 783.99, 0.6); }
+function sndBanner()  { [392, 523.25, 659.25, 783.99].forEach((f, i) => beep(f, i === 3 ? 0.45 : 0.13, 'triangle', 0.1, 0, i * 0.12)); }
+
+// ── Music: "game-day arena" jock jam — 116 BPM, 8-bar loop ─────
+// A section (bars 1-4, C-C-F-G): four-on-the-floor kick, hand-clap flams on
+// beats 2 & 4, funky sawtooth bass riff, offbeat stadium-organ square stabs.
+// B section (bars 5-8, Am-F-C-G): same groove + an anthemic saw-organ lead,
+// so long idle sessions get a two-part loop instead of one grating bar.
+// Scheduled by a 25 ms lookahead sequencer against ac.currentTime.
+const MSTEP = 60 / 116 / 4;                    // seconds per 16th note
+const MIDI = m => 440 * Math.pow(2, (m - 69) / 12);
+const MCHORDS = [                              // one per bar: bass root midi + triad intervals
+  { r: 36, t: [0, 4, 7] }, { r: 36, t: [0, 4, 7] }, { r: 41, t: [0, 4, 7] }, { r: 43, t: [0, 4, 7] },
+  { r: 45, t: [0, 3, 7] }, { r: 41, t: [0, 4, 7] }, { r: 36, t: [0, 4, 7] }, { r: 43, t: [0, 4, 7] },
+];
+const MBASS = [0, null, null, 0, null, null, 7, null, 12, null, 0, null, 7, null, 10, null]; // semitones above root, per 16th
+const MLEAD = {};                              // absolute step -> [midi, lenSteps]
+[[64, 76, 4], [70, 79, 2], [72, 81, 6], [80, 81, 2], [84, 79, 2], [88, 77, 4], [94, 76, 2],
+ [96, 76, 4], [102, 74, 2], [104, 72, 6], [112, 74, 4], [120, 71, 4], [124, 74, 4]]
+  .forEach(ev => { MLEAD[ev[0]] = [ev[1], ev[2]]; });
+
+function mKick(t) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(150, t);
+  o.frequency.exponentialRampToValueAtTime(45, t + 0.11);
+  g.gain.setValueAtTime(0.32, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+  o.connect(g).connect(musicGain);
+  o.start(t); o.stop(t + 0.15);
+}
+function mClap(t) {
+  if (!getNoise()) return;
+  for (let i = 0; i < 2; i++) {                // two offset bursts = hand-clap flam
+    const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+    const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1350; f.Q.value = 0.9;
+    const g = ac.createGain();
+    const t0 = t + i * 0.02, v = i === 0 ? 0.11 : 0.08, d = i === 0 ? 0.05 : 0.14;
+    g.gain.setValueAtTime(v, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    s.connect(f); f.connect(g); g.connect(musicGain);
+    s.start(t0); s.stop(t0 + d + 0.02);
+  }
+}
+function mBassNote(freq, t, dur) {
+  const o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+  o.type = 'sawtooth'; o.frequency.value = freq;
+  f.type = 'lowpass'; f.frequency.value = 750; f.Q.value = 1.2;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.18, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(f); f.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+function mOrganStab(chord, t, dur) {
+  const f = ac.createBiquadFilter(), g = ac.createGain();
+  f.type = 'lowpass'; f.frequency.value = 2400;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.05, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  f.connect(g); g.connect(musicGain);
+  chord.t.forEach(iv => {
+    const o = ac.createOscillator();
+    o.type = 'square';
+    o.frequency.value = MIDI(chord.r + 24 + iv);
+    o.connect(f);
+    o.start(t); o.stop(t + dur + 0.02);
+  });
+}
+function mLeadNote(freq, t, dur) {
+  const o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+  o.type = 'sawtooth'; o.frequency.value = freq;
+  f.type = 'lowpass'; f.frequency.value = 1600; f.Q.value = 1;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.085, t + 0.02);
+  g.gain.setValueAtTime(0.085, t + Math.max(0.03, dur - 0.09));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(f); f.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+
+let musicTimer = null, mStepIdx = 0, mNextT = 0;
+function mPlayStep(step, t) {
+  const bar = step >> 4, sib = step & 15;
+  const ch = MCHORDS[bar];
+  if (sib % 4 === 0) mKick(t);
+  if (sib === 4 || sib === 12) mClap(t);
+  const b = MBASS[sib];
+  if (b !== null) mBassNote(MIDI(ch.r + b), t, MSTEP * 1.6);
+  if (sib === 2 || sib === 6 || sib === 10 || sib === 14) mOrganStab(ch, t, MSTEP * 1.15);
+  const L = MLEAD[step];
+  if (L) mLeadNote(MIDI(L[0]), t, MSTEP * L[1] * 0.92);
+}
+function mSchedule() {
+  if (!ac) return;
+  while (mNextT < ac.currentTime + 0.18) {     // ~0.18 s lookahead vs 25 ms timer
+    mPlayStep(mStepIdx, mNextT);
+    mStepIdx = (mStepIdx + 1) & 127;           // 128 16ths = 8 bars, loops clean
+    mNextT += MSTEP;
+  }
+}
+function startMusic() {
+  const a = ensureAudio(); if (!a || musicTimer) return;
+  mStepIdx = 0; mNextT = a.currentTime + 0.1;
+  musicTimer = setInterval(mSchedule, 25);
+}
+
+// First gesture anywhere unlocks the context and starts the loop; listeners
+// stay attached so later gestures re-resume after iOS audio interruptions.
+document.addEventListener('pointerdown', () => { if (ensureAudio()) startMusic(); }, true);
+window.addEventListener('keydown', () => { if (ensureAudio()) startMusic(); });
+
+// Suspend while hidden (the game's own visibilitychange save hook is separate).
+document.addEventListener('visibilitychange', () => {
+  if (!ac) return;
+  if (document.hidden) ac.suspend();
+  else if (!audioMuted) ac.resume();
+});
+
+// Mute toggle — one button silences SFX + music together, persisted.
+function updateMuteBtn() { muteBtn.textContent = audioMuted ? '🔇' : '🔊'; }
+muteBtn.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  audioMuted = !audioMuted;
+  try { localStorage.setItem(MUTE_KEY, audioMuted ? '1' : '0'); } catch (err) {}
+  if (!audioMuted && ensureAudio()) startMusic();
+  applyMuteGains();
+  updateMuteBtn();
+});
+updateMuteBtn();
+
 // ── Bulk-buy toggle (x1 / x10 / x100 / Max) ───────────────────
 // Shared across the Recruiting, Fans, and Totems tabs — each has its own bar,
 // all synced to the same buyQty and kept in visual sync by matching data-qty.
@@ -1495,6 +1713,7 @@ function buyBuilding(i) {
   if (state.money < cost) return;
   state.money -= cost;
   state.buildings[i].count += qty;
+  sndBuy();
   checkAchievements();
   refreshUpgradesTab();
   updateAll();
@@ -1567,6 +1786,7 @@ function buyUpgrade(cat, id) {
   if (!u || state[cat.stateKey][id] || state.money < u.cost) return;
   state.money -= u.cost;
   state[cat.stateKey][id] = true;
+  sndUpgrade();
   refreshUpgradesTab();
   updateAll();
 }
@@ -1576,6 +1796,7 @@ function buyBuildingUpgrade(id) {
   if (!u || state.buildingUpgrades[id] || state.money < u.cost) return;
   state.money -= u.cost;
   state.buildingUpgrades[id] = true;
+  sndUpgrade();
   refreshUpgradesTab();
   updateAll();
 }
@@ -1642,6 +1863,7 @@ function buyFan(i) {
   if (state.money < cost) return;
   state.money -= cost;
   state.fans[i].count += qty;
+  sndBuy();
   checkAchievements();
   updateAll();
 }
@@ -1704,6 +1926,7 @@ function buyTotem(i) {
   if (state.money < cost) return;
   state.money -= cost;
   state.totems[i].count += qty;
+  sndBuy();
   checkAchievements();
   updateAll();
 }
@@ -1713,6 +1936,7 @@ function levelUpTotemPole() {
   if (state.money < cost) return;
   state.money -= cost;
   state.totemPoleLevel++;
+  sndUpgrade();
   checkAchievements();
   updateAll();
   showToast(`🗿 Totem Pole upgraded to Level ${state.totemPoleLevel}!`);
@@ -1724,6 +1948,7 @@ function levelUpStadium() {
   if (state.money < cost) return;
   state.money -= cost;
   state.stadiumLevel++;
+  sndUpgrade();
   checkAchievements();
   updateAll();
   showToast(`🏟️ Stadium upgraded to Level ${state.stadiumLevel}!`);
@@ -1734,6 +1959,7 @@ function levelUpMascot() {
   if (state.money < cost) return;
   state.money -= cost;
   state.mascotLevel++;
+  sndUpgrade();
   checkAchievements();
   updateAll();
   showToast(`${getMascotTier().icon} Mascot evolved to ${getMascotTier().name} (Level ${state.mascotLevel})!`);
@@ -1772,6 +1998,7 @@ function playPortalTransition(swapFn) {
     streak.style.animationDelay = (Math.random() * 0.15) + 's';
     starsContainer.appendChild(streak);
   }
+  sndPortal();
   overlay.classList.add('active');
   setTimeout(swapFn, 550);
   setTimeout(() => overlay.classList.remove('active'), 1150);
@@ -2022,7 +2249,7 @@ function checkAchievements() {
       showToast(`🏅 Achievement unlocked: ${a.name}`);
     }
   });
-  if (changed) renderAchievements();
+  if (changed) { sndAch(); renderAchievements(); }
   return changed;
 }
 
@@ -2069,6 +2296,7 @@ document.getElementById('ascend-confirm-btn').addEventListener('pointerdown', e 
   state.totemPoleLevel = 0;
   state.frenzyActive = false;
   closeModal('ascend-modal');
+  sndBanner();
   checkAchievements();
   refreshUpgradesTab();
   updateAll();
@@ -2179,6 +2407,7 @@ function handleClick(clientX, clientY) {
   state.money += power;
   state.totalEarnedAllTime += power;
   state.tapCount++;
+  sndClick();
   spawnCrumbs(x, y, 6);
   spawnFloater(x, y, '+$' + formatMoney(power), '#ffc300');
   ballBtn.style.transform = 'scale(0.88) rotate(-4deg)';
@@ -2193,6 +2422,7 @@ function triggerTeamWin(x, y) {
   const bonus = Math.max(getCps() * 60, state.money * 0.1, 500);
   state.money += bonus;
   state.totalEarnedAllTime += bonus;
+  sndTeamWin();
   spawnFloater(x, y - 30, 'TEAM WIN!', '#39ff14');
   showToast(`🏆 TEAM WIN! Home crowd bonus +$${formatMoney(bonus)}`);
 }
@@ -2249,6 +2479,7 @@ function spawnGolden() {
     e.stopPropagation();
     clearTimeout(timeout);
     state.goldenClicks++;
+    sndGolden();
     if (Math.random() < 0.5) triggerFrenzy(); else triggerLucky();
     removeGolden();
     checkAchievements();
@@ -2262,6 +2493,7 @@ function triggerFrenzy() {
   state.frenzyActive = true;
   state.frenzyEndTime = performance.now() + FRENZY_DURATION_MS;
   state.frenzyCount++;
+  sndFrenzy();
   frenzyBanner.textContent = `🔥 ${SPORTS[currentSport].frenzyLabel} — PRODUCTION x7!`;
   showToast(`🔥 ${SPORTS[currentSport].frenzyLabel}! Production x7 for 30 seconds!`);
 }

@@ -25,6 +25,9 @@
 }
 </script>
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0e1116; --panel: #171c24; --panel2: #1f2732; --edge: #2b3543;
@@ -32,7 +35,7 @@
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
   body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
 
   header { padding: 10px 14px 8px; border-bottom: 1px solid var(--edge); flex: 0 0 auto;
@@ -117,7 +120,7 @@
     </div>
     <div class="hdr-right">
       <button class="hdr-reload" id="btnReload" title="Hard reload — clears cache and re-fetches models">↻ Reload</button>
-      <a class="back" href="./index.html" title="Back to the isolation comparison">&larr; comparison</a>
+      <a class="back" href="./index.html" title="Back to the isolation comparison">&larr; Comparison</a>
     </div>
   </header>
 
@@ -125,7 +128,7 @@
     <div class="readout" id="readout"></div>
     <div class="pad-wrap">
       <div id="pad"><div id="handle"></div></div>
-      <div class="padlab">key light · edge = grazing</div>
+      <div class="padlab">Key light · edge = grazing</div>
     </div>
     <div id="err">Couldn&rsquo;t start the 3D inspector.<br>Reload the page.</div>
     <div class="buildstamp" id="buildstamp"></div>
@@ -189,7 +192,7 @@
 
   // Build stamp + cache-busting (see index.html): models load with `?v=<CB>`
   // so the Reload button's fresh `?cb=` re-fetches every GLB past the cache.
-  const BUILD = '2026-07-22 06:35 UTC';
+  const BUILD = '2026-07-22 14:01 UTC';
   const CB = new URLSearchParams(location.search).get('cb') || BUILD;
   const withCB = (u) => u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(CB);
 

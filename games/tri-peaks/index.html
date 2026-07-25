@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Neon Tripeaks</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+:root {
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff; --red:#ff2244;
+  --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; }
+body {
+  background:var(--bg); color:var(--white);
+  font-family:'Share Tech Mono', monospace;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  position:fixed; inset:0;
+}
+#cv { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+#back-btn {
+  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:30;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:32px;
+  text-align:center; text-decoration:none; touch-action:manipulation;
+  -webkit-user-select:none; user-select:none;
+}
+#mute {
+  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:30;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
+  text-align:center; padding:0; touch-action:manipulation;
+}
+#overlay {
+  position:absolute; inset:0; z-index:20; display:flex;
+  flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(6,6,14,0.92); padding:20px; text-align:center;
+  padding-top:calc(var(--sat) + 20px); padding-bottom:calc(var(--sab) + 20px);
+  overflow-y:auto;
+}
+#overlay.hidden { display:none; }
+#overlay h1 {
+  font-family:'Black Ops One', sans-serif; color:var(--green);
+  font-size:clamp(1.7rem, 8vw, 2.6rem); letter-spacing:4px;
+  text-shadow:0 0 24px #39ff1466; margin-bottom:4px;
+}
+#overlay h2 {
+  font-family:'Black Ops One', sans-serif; color:var(--gold);
+  font-size:1.5rem; letter-spacing:3px; margin-bottom:8px;
+}
+.sub { color:var(--dim); font-size:0.68rem; letter-spacing:3px; margin-bottom:18px; }
+.btn {
+  font-family:'Black Ops One', sans-serif; letter-spacing:2px;
+  background:var(--panel); color:var(--green);
+  border:1px solid var(--green); border-radius:8px;
+  font-size:1.0rem; padding:13px 30px; margin:7px; min-width:240px;
+  touch-action:manipulation; cursor:pointer;
+}
+.btn.gold { color:var(--gold); border-color:var(--gold); }
+.stat { color:var(--white); font-size:0.85rem; margin:3px 0; letter-spacing:1px; }
+.stat b { color:var(--gold); }
+.howto { color:var(--dim); font-size:0.7rem; max-width:320px; line-height:1.7; margin-top:16px; }
+.howto em { color:var(--green); font-style:normal; }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 22:55 UTC</div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute">🔊</button>
+<canvas id="cv"></canvas>
+<div id="overlay"></div>
+<script>
+'use strict';
+/* ============ RNG / seeding ============ */
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function hashStr(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+function utcDateStr() {
+  const d = new Date();
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+}
+const DAILY_EPOCH = Date.UTC(2026, 0, 1);
+function dailyNumber() {
+  return Math.floor((Date.now() - DAILY_EPOCH) / 86400000) + 1;
+}
+
+/* ============ Board geometry (classic 28-card tri-peaks) ============ */
+const POSITIONS = [];
+[1.5, 4.5, 7.5].forEach(p => POSITIONS.push({ row: 0, p }));
+[1, 2, 4, 5, 7, 8].forEach(p => POSITIONS.push({ row: 1, p }));
+for (let i = 0; i < 9; i++) POSITIONS.push({ row: 2, p: 0.5 + i });
+for (let i = 0; i < 10; i++) POSITIONS.push({ row: 3, p: i });
+// coverIdx[i] = board indices in row+1 that must be removed before i is exposed
+const coverIdx = POSITIONS.map((pos) =>
+  POSITIONS.reduce((acc, q, j) => {
+    if (q.row === pos.row + 1 && (q.p === pos.p - 0.5 || q.p === pos.p + 0.5)) acc.push(j);
+    return acc;
+  }, [])
+);
+
+const SUITS = ['♠', '♥', '♦', '♣'];
+const RANK_TXT = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+function adjacent(a, b) { const d = (a - b + 13) % 13; return d === 1 || d === 12; }
+
+/* ============ Game state (top-level lets: reachable from page.evaluate) ============ */
+let board = [];        // 28 {rank, suit, removed}
+let stock = [];        // face-down draw pile
+let waste = [];        // waste pile; last = top
+let score = 0, streak = 0, peaksCleared = 0;
+let state = 'menu';    // menu | play | won | over
+let mode = 'free';     // free | daily
+let curSeed = 0;
+let anims = [];        // flying cards {x0,y0,x1,y1,t,card}
+let popups = [];       // floating text {x,y,t,txt,col}
+let shakeI = -1, shakeT = 0; // rejected-tap feedback
+
+/* ============ Dealing (fairness-checked, deterministic per seed) ============ */
+function makeDeck(rng) {
+  const d = [];
+  for (let s = 0; s < 4; s++) for (let r = 0; r < 13; r++) d.push({ rank: r, suit: s });
+  for (let i = d.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [d[i], d[j]] = [d[j], d[i]];
+  }
+  return d;
+}
+function greedySim(bd, st, wtop) {
+  const removed = bd.map(() => false);
+  const stk = st.map(c => c.rank);
+  let cleared = 0, top = wtop;
+  for (;;) {
+    let played = false;
+    for (let i = 0; i < 28; i++) {
+      if (!removed[i] && coverIdx[i].every(j => removed[j]) && adjacent(bd[i].rank, top)) {
+        removed[i] = true; top = bd[i].rank; cleared++; played = true; break;
+      }
+    }
+    if (played) { if (cleared === 28) break; continue; }
+    if (stk.length) { top = stk.pop(); continue; }
+    break;
+  }
+  return cleared;
+}
+function genDeal(seed) {
+  for (let at = 0; at < 60; at++) {
+    const rng = mulberry32((seed + at * 7919) | 0);
+    const deck = makeDeck(rng);
+    const bd = deck.slice(0, 28).map(c => ({ rank: c.rank, suit: c.suit, removed: false }));
+    const st = deck.slice(28, 51);
+    const w = [deck[51]];
+    let open = 0;
+    for (let i = 18; i < 28; i++) if (adjacent(bd[i].rank, w[0].rank)) open++;
+    if (open >= 2 && greedySim(bd, st, w[0].rank) >= 14) return { bd, st, w };
+  }
+  // last attempt unconditionally (never happens in practice)
+  const rng = mulberry32(seed | 0);
+  const deck = makeDeck(rng);
+  return { bd: deck.slice(0, 28).map(c => ({ rank: c.rank, suit: c.suit, removed: false })), st: deck.slice(28, 51), w: [deck[51]] };
+}
+
+function startGame(m, seedOverride) {
+  mode = m || 'free';
+  curSeed = seedOverride !== undefined ? seedOverride
+    : mode === 'daily' ? hashStr('TP-' + utcDateStr())
+    : (Math.random() * 1e9) | 0;
+  const deal = genDeal(curSeed);
+  board = deal.bd; stock = deal.st; waste = deal.w;
+  score = 0; streak = 0; peaksCleared = 0;
+  anims = []; popups = []; shakeI = -1;
+  state = 'play';
+  overlay.classList.add('hidden');
+  musicOn(true);
+}
+
+/* ============ Rules ============ */
+function exposed(i) {
+  return !board[i].removed && coverIdx[i].every(j => board[j].removed);
+}
+function playable(i) {
+  return exposed(i) && adjacent(board[i].rank, waste[waste.length - 1].rank);
+}
+function anyPlayable() {
+  for (let i = 0; i < 28; i++) if (playable(i)) return true;
+  return false;
+}
+function doMoveAt(i) {
+  if (state !== 'play' || i < 0 || i > 27 || !playable(i)) return false;
+  const c = board[i];
+  c.removed = true;
+  waste.push({ rank: c.rank, suit: c.suit });
+  streak++;
+  const gain = 100 + Math.min(4, streak - 1) * 100;
+  score += gain;
+  const pt = cardXY(i), wp = wasteXY();
+  anims.push({ x0: pt.x, y0: pt.y, x1: wp.x, y1: wp.y, t: 0, card: { rank: c.rank, suit: c.suit } });
+  popups.push({ x: pt.x + CW / 2, y: pt.y, t: 0, txt: '+' + gain + (streak > 1 ? '  x' + streak : ''), col: streak > 1 ? 'var(--gold)' : 'var(--green)' });
+  sfxPick(streak);
+  if (POSITIONS[i].row === 0) {
+    peaksCleared++;
+    const bonus = [500, 1000, 2000][peaksCleared - 1];
+    score += bonus;
+    popups.push({ x: pt.x + CW / 2, y: pt.y - 26, t: 0, txt: 'PEAK! +' + bonus, col: 'var(--purple)' });
+    sfxPeak(peaksCleared);
+  }
+  if (board.every(b => b.removed)) { winGame(); return true; }
+  if (!stock.length && !anyPlayable()) endGame(false);
+  return true;
+}
+function flipStock() {
+  if (state !== 'play' || !stock.length) return false;
+  waste.push(stock.pop());
+  streak = 0;
+  sfxFlip();
+  if (!stock.length && !anyPlayable()) endGame(false);
+  return true;
+}
+function winGame() {
+  const bonus = stock.length * 300;
+  score += bonus;
+  if (bonus) popups.push({ x: W / 2, y: H / 2, t: 0, txt: 'STOCK BONUS +' + bonus, col: 'var(--gold)' });
+  sfxWin();
+  endGame(true);
+}
+function endGame(won) {
+  state = won ? 'won' : 'over';
+  if (!won) sfxLose();
+  saveBest();
+  setTimeout(showEnd, won ? 900 : 700);
+}
+
+/* ============ Persistence ============ */
+function loadBest() { return parseInt(localStorage.getItem('triPeaks.best') || '0', 10) || 0; }
+function loadDailyBest() {
+  try {
+    const j = JSON.parse(localStorage.getItem('triPeaks.dailyBest') || 'null');
+    if (j && j.date === utcDateStr()) return j.score;
+  } catch (e) {}
+  return 0;
+}
+function saveBest() {
+  try {
+    if (mode === 'daily') {
+      if (score > loadDailyBest()) localStorage.setItem('triPeaks.dailyBest', JSON.stringify({ date: utcDateStr(), score }));
+    } else if (score > loadBest()) localStorage.setItem('triPeaks.best', String(score));
+  } catch (e) {}
+}
+
+/* ============ Overlay UI ============ */
+const overlay = document.getElementById('overlay');
+let lastTapT = 0;
+function bindTap(el, fn) {
+  const h = (e) => {
+    e.preventDefault();
+    const now = Date.now();
+    if (now - lastTapT < 400) return;
+    lastTapT = now;
+    fn();
+  };
+  el.addEventListener('touchend', h, { passive: false });
+  el.addEventListener('click', h);
+}
+function showMenu() {
+  state = 'menu';
+  overlay.classList.remove('hidden');
+  const db = loadDailyBest(), fb = loadBest();
+  overlay.innerHTML =
+    '<h1>NEON TRIPEAKS</h1>' +
+    '<div class="sub">CLEAR THE THREE PEAKS</div>' +
+    '<button class="btn gold" id="b-daily">DAILY DEAL #' + dailyNumber() + '</button>' +
+    '<button class="btn" id="b-free">FREE PLAY</button>' +
+    '<div class="stat">BEST (FREE): <b>' + fb + '</b></div>' +
+    '<div class="stat">TODAY\'S DAILY BEST: <b>' + db + '</b></div>' +
+    '<div class="howto">Tap any uncovered card <em>one rank above or below</em> the waste card (Ace wraps to King). Chains build a streak bonus — flipping the stock resets it. Clear peaks for big bonuses; leftover stock pays +300 each on a win.</div>';
+  bindTap(document.getElementById('b-daily'), () => startGame('daily'));
+  bindTap(document.getElementById('b-free'), () => startGame('free'));
+}
+function showEnd() {
+  overlay.classList.remove('hidden');
+  const won = state === 'won';
+  const best = mode === 'daily' ? loadDailyBest() : loadBest();
+  overlay.innerHTML =
+    '<h1 style="color:' + (won ? 'var(--green)' : 'var(--red)') + '">' + (won ? 'PEAKS CLEARED!' : 'NO MOVES LEFT') + '</h1>' +
+    '<div class="sub">' + (mode === 'daily' ? 'DAILY DEAL #' + dailyNumber() : 'FREE PLAY') + '</div>' +
+    '<h2>' + score + '</h2>' +
+    '<div class="stat">PEAKS: <b>' + peaksCleared + '/3</b> · CLEARED: <b>' + board.filter(b => b.removed).length + '/28</b></div>' +
+    '<div class="stat">' + (score >= best && score > 0 ? '★ NEW BEST' : 'BEST: ' + best) + '</div>' +
+    '<button class="btn" id="b-again">' + (mode === 'daily' ? 'RETRY DAILY' : 'PLAY AGAIN') + '</button>' +
+    '<button class="btn gold" id="b-menu">MENU</button>';
+  bindTap(document.getElementById('b-again'), () => startGame(mode));
+  bindTap(document.getElementById('b-menu'), showMenu);
+}
+
+/* ============ Layout / rendering ============ */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W = 390, H = 844, DPR = 1, safeTop = 0, safeBottom = 0;
+let CW = 37, CH = 56, boardX = 10, boardY = 100;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 3);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const cs = getComputedStyle(document.documentElement);
+  safeTop = parseFloat(cs.getPropertyValue('--sat')) || 0;
+  safeBottom = parseFloat(cs.getPropertyValue('--sab')) || 0;
+  CW = Math.min(46, (W - 16) / 10);
+  CH = Math.round(CW * 1.5);
+  boardX = (W - 10 * CW) / 2;
+  boardY = Math.min(safeTop + 170, H * 0.2);
+}
+window.addEventListener('resize', resize);
+function cardXY(i) {
+  const pos = POSITIONS[i];
+  return { x: boardX + pos.p * CW, y: boardY + pos.row * CH * 0.55 };
+}
+function wasteXY() {
+  return { x: W / 2 - CW * 0.7, y: Math.max(boardY + CH * 2.65 + 40, H - safeBottom - CH * 1.4 - 130) };
+}
+function stockXY() {
+  const w = wasteXY();
+  return { x: w.x - CW * 2.4, y: w.y };
+}
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function drawCardFace(x, y, w, h, card, borderCol, glow) {
+  ctx.save();
+  if (glow) { ctx.shadowColor = borderCol; ctx.shadowBlur = 10; }
+  roundRect(x, y, w, h, 5);
+  ctx.fillStyle = '#0d0d1c';
+  ctx.fill();
+  ctx.strokeStyle = borderCol; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.restore();
+  const red = card.suit === 1 || card.suit === 2;
+  ctx.fillStyle = red ? '#ff5566' : '#dde3ff';
+  const big = card.rank === 9 ? w * 0.42 : w * 0.52;
+  ctx.font = '700 ' + big + 'px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(RANK_TXT[card.rank], x + w / 2, y + h * 0.34);
+  ctx.font = (w * 0.4) + 'px "Share Tech Mono", monospace';
+  ctx.fillText(SUITS[card.suit], x + w / 2, y + h * 0.72);
+}
+function drawCardBack(x, y, w, h) {
+  roundRect(x, y, w, h, 5);
+  ctx.fillStyle = '#0b0b18';
+  ctx.fill();
+  ctx.strokeStyle = '#232345'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.strokeStyle = '#181832'; ctx.lineWidth = 1;
+  roundRect(x + 4, y + 4, w - 8, h - 8, 3);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x + w / 2, y + 7); ctx.lineTo(x + w - 7, y + h / 2);
+  ctx.lineTo(x + w / 2, y + h - 7); ctx.lineTo(x + 7, y + h / 2);
+  ctx.closePath(); ctx.stroke();
+}
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  // faint grid backdrop
+  ctx.strokeStyle = 'rgba(60,70,140,0.07)'; ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  if (state === 'menu') return;
+  // peak glow triangles
+  [1.5, 4.5, 7.5].forEach((p, k) => {
+    const cx = boardX + p * CW + CW / 2;
+    ctx.fillStyle = peaksCleared > k ? 'rgba(180,79,255,0.10)' : 'rgba(57,255,20,0.045)';
+    ctx.beginPath();
+    ctx.moveTo(cx, boardY - 8);
+    ctx.lineTo(cx - CW * 2.4, boardY + CH * 2.8);
+    ctx.lineTo(cx + CW * 2.4, boardY + CH * 2.8);
+    ctx.closePath(); ctx.fill();
+  });
+  // HUD
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillStyle = '#ffc300';
+  ctx.font = '700 26px "Black Ops One", sans-serif';
+  ctx.fillText(String(score), W / 2, safeTop + 10);
+  ctx.font = '12px "Share Tech Mono", monospace';
+  if (streak > 1) {
+    ctx.fillStyle = '#39ff14';
+    ctx.fillText('STREAK x' + streak, W / 2, safeTop + 44);
+  }
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#8899bb';
+  ctx.fillText(mode === 'daily' ? 'DAILY #' + dailyNumber() : 'FREE', W - 10, safeTop + 22);
+  ctx.fillText('STOCK ' + stock.length, W - 10, safeTop + 40);
+  // board cards, back rows first
+  for (let i = 0; i < 28; i++) {
+    if (board[i].removed) continue;
+    const { x, y } = cardXY(i);
+    let dx = 0;
+    if (i === shakeI && shakeT > 0) dx = Math.sin(shakeT * 60) * 3;
+    if (exposed(i)) {
+      const ok = playable(i);
+      drawCardFace(x + dx, y, CW, CH, board[i], ok ? '#39ff14' : '#3a3a60', ok);
+    } else drawCardBack(x + dx, y, CW, CH);
+  }
+  // stock + waste
+  const sp = stockXY(), wp = wasteXY();
+  const bw = CW * 1.4, bh = CH * 1.4;
+  if (stock.length) {
+    drawCardBack(sp.x + 4, sp.y + 4, bw, bh);
+    drawCardBack(sp.x, sp.y, bw, bh);
+    ctx.fillStyle = '#8899bb'; ctx.font = '11px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('TAP · ' + stock.length, sp.x + bw / 2, sp.y + bh + 8);
+  } else {
+    roundRect(sp.x, sp.y, bw, bh, 6);
+    ctx.strokeStyle = '#1a1a30'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#556'; ctx.font = '11px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('EMPTY', sp.x + bw / 2, sp.y + bh + 8);
+  }
+  if (waste.length) drawCardFace(wp.x, wp.y, bw, bh, waste[waste.length - 1], '#ffc300', true);
+  // flying cards
+  anims.forEach(a => {
+    const t = Math.min(1, a.t / 0.18), e = 1 - (1 - t) * (1 - t);
+    drawCardFace(a.x0 + (a.x1 - a.x0) * e, a.y0 + (a.y1 - a.y0) * e, CW + (CW * 0.4) * e, CH + (CH * 0.4) * e, a.card, '#ffc300', false);
+  });
+  // popups
+  popups.forEach(p => {
+    const t = p.t / 1.1;
+    ctx.globalAlpha = Math.max(0, 1 - t);
+    ctx.fillStyle = p.col.indexOf('gold') >= 0 ? '#ffc300' : p.col.indexOf('purple') >= 0 ? '#b44fff' : '#39ff14';
+    ctx.font = '700 15px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.txt, Math.max(46, Math.min(W - 46, p.x)), p.y - t * 40);
+    ctx.globalAlpha = 1;
+  });
+}
+
+/* ============ Update loop ============ */
+let lastT = 0;
+function update(dt) {
+  anims.forEach(a => a.t += dt);
+  anims = anims.filter(a => a.t < 0.18);
+  popups.forEach(p => p.t += dt);
+  popups = popups.filter(p => p.t < 1.1);
+  if (shakeT > 0) shakeT -= dt;
+}
+function frame(t) {
+  const dt = Math.min(0.1, (t - lastT) / 1000 || 0);
+  lastT = t;
+  update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+/* ============ Input ============ */
+let touchSX = 0, touchSY = 0, touchT0 = 0;
+function hitTest(x, y) {
+  const sp = stockXY(), bw = CW * 1.4, bh = CH * 1.4;
+  if (x >= sp.x - 14 && x <= sp.x + bw + 14 && y >= sp.y - 14 && y <= sp.y + bh + 20) return { type: 'stock' };
+  for (let i = 27; i >= 0; i--) {
+    if (board[i].removed) continue;
+    const c = cardXY(i);
+    if (x >= c.x && x <= c.x + CW && y >= c.y && y <= c.y + CH) return { type: 'card', i };
+  }
+  return null;
+}
+function tapAt(x, y) {
+  if (state !== 'play') return;
+  const hit = hitTest(x, y);
+  if (!hit) return;
+  if (hit.type === 'stock') { flipStock(); return; }
+  if (!doMoveAt(hit.i)) {
+    shakeI = hit.i; shakeT = 0.22;
+    sfxNope();
+  }
+}
+cv.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  audioInit();
+  const t = e.changedTouches[0];
+  touchSX = t.clientX; touchSY = t.clientY; touchT0 = Date.now();
+}, { passive: false });
+cv.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  if (Date.now() - touchT0 < 600 && Math.hypot(t.clientX - touchSX, t.clientY - touchSY) < 18) tapAt(t.clientX, t.clientY);
+}, { passive: false });
+cv.addEventListener('mousedown', (e) => { audioInit(); touchSX = e.clientX; touchSY = e.clientY; touchT0 = Date.now(); });
+cv.addEventListener('mouseup', (e) => {
+  if (Date.now() - touchT0 < 600 && Math.hypot(e.clientX - touchSX, e.clientY - touchSY) < 18) tapAt(e.clientX, e.clientY);
+});
+
+/* ============ Audio (lazy AC + lounge-swing sequencer) ============ */
+let AC = null, sfxGain = null, musicGain = null, musicTimer = null, musicStep = 0, musicNext = 0;
+let muted = localStorage.getItem('triPeaks-mute') === '1';
+const muteBtn = document.getElementById('mute');
+muteBtn.textContent = muted ? '🔇' : '🔊';
+function audioInit() {
+  if (AC) return;
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    sfxGain = AC.createGain(); sfxGain.gain.value = muted ? 0 : 0.4; sfxGain.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.gain.value = muted ? 0 : 0.14; musicGain.connect(AC.destination);
+    musicNext = AC.currentTime + 0.1;
+    musicTimer = setInterval(scheduleMusic, 25);
+  } catch (e) { AC = null; }
+}
+function musicOn(on) { /* sequencer free-runs; hook kept for symmetry */ }
+bindTapMute();
+function bindTapMute() {
+  const h = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    audioInit();
+    muted = !muted;
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+    try { localStorage.setItem('triPeaks-mute', muted ? '1' : '0'); } catch (err) {}
+    if (sfxGain) sfxGain.gain.value = muted ? 0 : 0.4;
+    if (musicGain) musicGain.gain.value = muted ? 0 : 0.14;
+  };
+  muteBtn.addEventListener('touchend', h, { passive: false });
+  muteBtn.addEventListener('click', h);
+}
+function tone(freq, dur, type, vol, when, dest) {
+  if (!AC || !isFinite(freq)) return;
+  const t = when || AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(dest || sfxGain);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+let noiseBuf = null;
+function noise(dur, vol, when) {
+  if (!AC) return;
+  if (!noiseBuf) {
+    noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.1, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const t = when || AC.currentTime;
+  const s = AC.createBufferSource(), g = AC.createGain(), f = AC.createBiquadFilter();
+  s.buffer = noiseBuf; f.type = 'highpass'; f.frequency.value = 5000;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  s.connect(f); f.connect(g); g.connect(musicGain);
+  s.start(t); s.stop(t + dur + 0.02);
+}
+function sfxPick(stk) {
+  if (!AC) return;
+  const base = 392 * Math.pow(2, Math.min(8, Math.max(0, stk - 1)) / 12);
+  tone(base, 0.1, 'triangle', 0.3);
+  tone(base * 1.5, 0.14, 'sine', 0.18, AC.currentTime + 0.05);
+}
+function sfxFlip() { tone(220, 0.06, 'square', 0.14); tone(180, 0.08, 'square', 0.1, AC && AC.currentTime + 0.04); }
+function sfxNope() { tone(140, 0.1, 'sawtooth', 0.12); }
+function sfxPeak(n) { if (!AC) return; [523, 659, 784].forEach((f, i) => tone(f * (1 + (n - 1) * 0.25), 0.18, 'square', 0.16, AC.currentTime + i * 0.07)); }
+function sfxWin() { if (!AC) return; [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.25, 'square', 0.15, AC.currentTime + i * 0.1)); }
+function sfxLose() { if (!AC) return; [392, 330, 262, 196].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.14, AC.currentTime + i * 0.14)); }
+// lounge swing: 4 bars of 8 eighth-notes at ~96 BPM, swung
+const BASS_SEQ = [110, 0, 130.8, 0, 164.8, 0, 130.8, 0, 146.8, 0, 174.6, 0, 220, 0, 174.6, 0, 164.8, 0, 207.7, 0, 246.9, 0, 293.7, 0, 220, 0, 164.8, 0, 130.8, 0, 123.5, 0];
+const CHORD_SEQ = { 3: [440, 523.3], 7: [440, 554.4], 11: [349.2, 440], 15: [392, 493.9], 19: [415.3, 493.9], 23: [493.9, 587.3], 27: [440, 523.3], 31: [329.6, 415.3] };
+function scheduleMusic() {
+  if (!AC || muted) { if (AC) musicNext = Math.max(musicNext, AC.currentTime + 0.1); return; }
+  const stepDur = 60 / 96 / 2;
+  while (musicNext < AC.currentTime + 0.35) {
+    const s = musicStep % 32;
+    const swing = (s % 2 === 1) ? stepDur * 0.3 : 0;
+    const t = musicNext + swing;
+    if (BASS_SEQ[s]) tone(BASS_SEQ[s], 0.3, 'triangle', 0.4, t, musicGain);
+    if (CHORD_SEQ[s]) CHORD_SEQ[s].forEach(f => tone(f, 0.22, 'sine', 0.12, t, musicGain));
+    noise(0.03, s % 4 === 2 ? 0.10 : 0.05, t);
+    musicStep++;
+    musicNext += stepDur;
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) return;
+  if (document.hidden) AC.suspend(); else AC.resume();
+});
+
+/* ============ Boot ============ */
+resize();
+showMenu();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

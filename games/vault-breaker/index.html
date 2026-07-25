@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Vault Breaker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+:root {
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff; --red:#ff2244;
+  --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; }
+body {
+  background:var(--bg); color:var(--white);
+  font-family:'Share Tech Mono', monospace;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  position:fixed; inset:0;
+}
+#cv { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+#back-btn {
+  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:30;
+  background:rgba(11,11,22,0.75); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:32px;
+  text-align:center; text-decoration:none; touch-action:manipulation;
+}
+#mute {
+  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:30;
+  background:rgba(11,11,22,0.75); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
+  text-align:center; padding:0; touch-action:manipulation;
+}
+#overlay {
+  position:absolute; inset:0; z-index:20; display:flex;
+  flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(5,5,12,0.9); padding:20px; text-align:center;
+  padding-top:calc(var(--sat) + 20px); padding-bottom:calc(var(--sab) + 20px);
+  overflow-y:auto;
+}
+#overlay.hidden { display:none; }
+#overlay h1 {
+  font-family:'Black Ops One', sans-serif; color:#c9d4e8;
+  font-size:clamp(1.7rem, 8vw, 2.5rem); letter-spacing:4px;
+  text-shadow:0 0 26px #8899bb44; margin-bottom:4px;
+}
+#overlay h2 {
+  font-family:'Black Ops One', sans-serif; color:var(--gold);
+  font-size:1.4rem; letter-spacing:3px; margin-bottom:8px;
+}
+.sub { color:var(--dim); font-size:0.68rem; letter-spacing:3px; margin-bottom:16px; }
+.btn {
+  font-family:'Black Ops One', sans-serif; letter-spacing:2px;
+  background:var(--panel); color:#c9d4e8;
+  border:1px solid #8899bb; border-radius:8px;
+  font-size:1.0rem; padding:13px 30px; margin:6px; min-width:260px;
+  touch-action:manipulation; cursor:pointer;
+}
+.btn.gold { color:var(--gold); border-color:var(--gold); }
+.vault-grid { display:flex; flex-wrap:wrap; justify-content:center; max-width:330px; margin-top:6px; }
+.vcell {
+  font-family:'Black Ops One', sans-serif; width:64px; padding:8px 0 6px;
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  color:#c9d4e8; margin:4px; font-size:0.9rem; touch-action:manipulation; cursor:pointer;
+}
+.vcell small { display:block; font-size:0.55rem; color:var(--gold); letter-spacing:1px; margin-top:2px; font-family:'Share Tech Mono', monospace; }
+.vcell.locked { color:#3a4258; border-color:#171c2c; }
+.stat { color:var(--white); font-size:0.85rem; margin:3px 0; letter-spacing:1px; }
+.stat b { color:var(--gold); }
+.howto { color:var(--dim); font-size:0.7rem; max-width:330px; line-height:1.7; margin-top:14px; }
+.howto em { color:#c9d4e8; font-style:normal; }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 02:36 UTC</div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute">🔊</button>
+<canvas id="cv"></canvas>
+<div id="overlay"></div>
+<script>
+'use strict';
+/* =====================================================================
+   VAULT BREAKER — pinch-rotate safecracking. Twist two fingers (or drag
+   one around the dial) to spin the mechanism through three lock phases:
+   set the tumbler pins (direction + sweet spot + steady hold), align the
+   ring gaps to the keyway, then spin the handle. Beat the alarm timer.
+   Realistic rendering: brushed steel, machined dial, specular sweeps,
+   riveted door, golden vault-interior payoff.
+   ===================================================================== */
+
+/* ============ Level generation (seeded per vault) ============ */
+let rngS = 1;
+function rnd() { rngS = (rngS * 1103515245 + 12345) & 0x7fffffff; return rngS / 0x7fffffff; }
+function norm(a) { a %= 360; if (a > 180) a -= 360; if (a < -180) a += 360; return a; }
+let level = 1;
+let vault = null; // {pins:[{target,dir,set}], pinTol, rings:[{gap,drift,locked}], ringTol, time}
+function genVault(n) {
+  rngS = (n * 7919 + 13) & 0x7fffffff;
+  const nPins = Math.min(5, 2 + Math.floor(n / 2));
+  const pinTol = Math.max(3.5, 7 - n * 0.35);
+  const pins = [];
+  let prev = 0;
+  for (let i = 0; i < nPins; i++) {
+    let t = 30 + rnd() * 300;
+    if (Math.abs(norm(t - prev)) < 40) t = (t + 80) % 360;
+    pins.push({ target: t, dir: i % 2 === 0 ? 1 : -1, set: false });
+    prev = t;
+  }
+  const nRings = Math.min(5, 2 + Math.floor((n - 1) / 3));
+  const ringTol = Math.max(5, 9 - n * 0.4);
+  const rings = [];
+  for (let i = 0; i < nRings; i++) {
+    rings.push({
+      gap: 40 + rnd() * 280,
+      drift: (n >= 5 && i % 2 === 1) ? (rnd() < 0.5 ? -1 : 1) * Math.min(12, 3 + n * 0.5) : 0,
+      locked: false,
+    });
+  }
+  const time = Math.round((40 + nPins * 9 + nRings * 7) * Math.max(0.6, 1 - n * 0.02));
+  vault = { pins, pinTol, rings, ringTol, time };
+}
+
+/* ============ State (top-level: reachable from page.evaluate) ============ */
+let state = 'menu';      // menu | play | open | alarm
+let phase = 'pins';      // pins | rings | handle
+let dialAngle = 0;       // current dial rotation (deg)
+let rotVel = 0;          // recent rotation speed deg/s (decayed)
+let lastDir = 0;         // sign of last rotation delta
+let pinIdx = 0;
+let ringIdx = 0;
+let holdT = 0;
+let handCW = 0, handCCW = 0;
+let timeLeft = 60;
+let openT = 0;           // door-open animation
+let alarmT = 0;
+let shakeT = 0;
+let sparks = [];
+let toast = null;
+
+function maxLevel() { return parseInt(localStorage.getItem('vaultBreaker.level') || '1', 10) || 1; }
+function starsFor(n) { try { return (JSON.parse(localStorage.getItem('vaultBreaker.stars') || '{}'))[n] || 0; } catch (err) { return 0; } }
+function totalStars() { try { const s = JSON.parse(localStorage.getItem('vaultBreaker.stars') || '{}'); return Object.values(s).reduce((a, b) => a + b, 0); } catch (err) { return 0; } }
+function persistWin(n, stars) {
+  try {
+    if (n + 1 > maxLevel()) localStorage.setItem('vaultBreaker.level', String(n + 1));
+    const s = JSON.parse(localStorage.getItem('vaultBreaker.stars') || '{}');
+    if (stars > (s[n] || 0)) { s[n] = stars; localStorage.setItem('vaultBreaker.stars', JSON.stringify(s)); }
+  } catch (err) {}
+}
+
+/* ============ Core rotation logic ============ */
+function rotate(delta) {
+  if (state !== 'play') return;
+  if (Math.abs(delta) > 45) delta = Math.sign(delta) * 45; // gesture glitch guard
+  dialAngle = (dialAngle + delta) % 360;
+  if (dialAngle < 0) dialAngle += 360;
+  rotVel = rotVel * 0.6 + (delta * 60) * 0.4; // rough deg/s estimate
+  if (delta !== 0) lastDir = Math.sign(delta);
+  if (phase === 'rings' && vault.rings[ringIdx] && !vault.rings[ringIdx].locked) {
+    vault.rings[ringIdx].gap = ((vault.rings[ringIdx].gap + delta) % 360 + 360) % 360;
+  }
+  if (phase === 'handle') {
+    if (delta > 0) { handCW += delta; handCCW = 0; }
+    else if (delta < 0) { handCCW -= delta; handCW = 0; }
+    tickRatchet(Math.abs(delta));
+    if (handCW >= 270 || handCCW >= 270) vaultOpen();
+    return;
+  }
+  tickRatchet(Math.abs(delta));
+}
+function pinError() {
+  const p = vault.pins[pinIdx];
+  return p ? norm(dialAngle - p.target) : 999;
+}
+function ringError() {
+  const r = vault.rings[ringIdx];
+  return r ? norm(r.gap) : 999; // keyway at top = 0
+}
+function update(dt) {
+  if (state === 'open') { openT += dt; return; }
+  if (state === 'alarm') { alarmT += dt; return; }
+  if (state !== 'play') return;
+  timeLeft -= dt;
+  if (timeLeft <= 0) { triggerAlarm(); return; }
+  rotVel *= Math.exp(-dt * 7);
+  // drifting rings
+  if (phase === 'rings') {
+    vault.rings.forEach((r, i) => {
+      if (!r.locked && r.drift && i === ringIdx) r.gap = ((r.gap + r.drift * dt) % 360 + 360) % 360;
+    });
+  }
+  const steady = Math.abs(rotVel) < 26;
+  if (phase === 'pins') {
+    const p = vault.pins[pinIdx];
+    if (p && Math.abs(pinError()) <= vault.pinTol && steady && (lastDir === p.dir || lastDir === 0)) {
+      holdT += dt;
+      if (holdT >= 0.45) setPin();
+    } else holdT = 0;
+  } else if (phase === 'rings') {
+    const r = vault.rings[ringIdx];
+    if (r && Math.abs(ringError()) <= vault.ringTol && steady) {
+      holdT += dt;
+      if (holdT >= 0.4) lockRing();
+    } else holdT = 0;
+  }
+}
+function setPin() {
+  const p = vault.pins[pinIdx];
+  if (!p || p.set) return;
+  p.set = true;
+  pinIdx++;
+  holdT = 0; lastDir = 0; shakeT = 0.2;
+  sparkBurst(0, -R() * 1.02, '#ffd070');
+  sfxPinSet();
+  if (pinIdx >= vault.pins.length) {
+    phase = 'rings'; ringIdx = 0;
+    toast = { txt: 'TUMBLER OPEN — ALIGN THE RINGS', t: 2.2 };
+    sfxPhase();
+  }
+}
+function lockRing() {
+  const r = vault.rings[ringIdx];
+  if (!r || r.locked) return;
+  r.locked = true; r.gap = 0;
+  ringIdx++;
+  holdT = 0; shakeT = 0.25;
+  sparkBurst(0, -ringR(vault.rings.indexOf(r)), '#9cc6e8');
+  sfxRingLock();
+  if (ringIdx >= vault.rings.length) {
+    phase = 'handle'; handCW = 0; handCCW = 0;
+    toast = { txt: 'SPIN THE HANDLE!', t: 2.2 };
+    sfxPhase();
+  }
+}
+function vaultOpen() {
+  if (state !== 'play') return;
+  state = 'open'; openT = 0;
+  const frac = timeLeft / vault.time;
+  const stars = frac > 0.5 ? 3 : frac > 0.25 ? 2 : 1;
+  persistWin(level, stars);
+  sfxOpen();
+  setTimeout(() => showWin(stars), 1700);
+}
+function triggerAlarm() {
+  if (state !== 'play') return;
+  state = 'alarm'; alarmT = 0; timeLeft = 0;
+  sfxAlarm();
+  setTimeout(showAlarm, 1600);
+}
+function startVault(n) {
+  level = n;
+  genVault(n);
+  state = 'play'; phase = 'pins';
+  dialAngle = 0; rotVel = 0; lastDir = 0;
+  pinIdx = 0; ringIdx = 0; holdT = 0; handCW = 0; handCCW = 0;
+  timeLeft = vault.time; openT = 0; alarmT = 0;
+  toast = { txt: vault.pins.length + ' PINS · LISTEN FOR THE CLICKS', t: 2.4 };
+  overlayEl.classList.add('hidden');
+}
+
+/* ============ Sparks ============ */
+function sparkBurst(dx, dy, col) {
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 140;
+    sparks.push({
+      x: CX() + dx, y: CY() + dy,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
+      t: 0, max: 0.35 + Math.random() * 0.35, col,
+    });
+  }
+}
+
+/* ============ Canvas / layout ============ */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const overlayEl = document.getElementById('overlay');
+let W = 390, H = 844, dpr = 1;
+let doorCv = null;
+function CX() { return W / 2; }
+function CY() { return H * 0.46; }
+function R() { return Math.min(W * 0.42, H * 0.26); }
+function ringR(i) { return R() * (0.34 + 0.16 * i); }
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  buildDoor();
+}
+window.addEventListener('resize', resize);
+
+/* ============ Pre-rendered vault door (brushed steel + rivets) ============ */
+function buildDoor() {
+  doorCv = document.createElement('canvas');
+  doorCv.width = Math.round(W * dpr); doorCv.height = Math.round(H * dpr);
+  const g = doorCv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // ambient room behind (revealed at door edges)
+  g.fillStyle = '#05050c';
+  g.fillRect(0, 0, W, H);
+  // door plate
+  const m = 10;
+  const plate = g.createLinearGradient(0, 0, W, H);
+  plate.addColorStop(0, '#3d4350');
+  plate.addColorStop(0.35, '#2b303c');
+  plate.addColorStop(0.6, '#3a404d');
+  plate.addColorStop(1, '#20242e');
+  g.fillStyle = plate;
+  g.beginPath(); g.roundRect(m, m, W - m * 2, H - m * 2, 18); g.fill();
+  // brushed radial texture around dial center
+  g.save();
+  g.beginPath(); g.roundRect(m, m, W - m * 2, H - m * 2, 18); g.clip();
+  for (let i = 0; i < 900; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r0 = R() * 0.5 + Math.random() * Math.max(W, H) * 0.75;
+    const len = 6 + Math.random() * 30;
+    const x0 = CX() + Math.cos(a) * r0, y0 = CY() + Math.sin(a) * r0;
+    g.strokeStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.03)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(x0, y0);
+    g.lineTo(x0 + Math.cos(a + Math.PI / 2) * len, y0 + Math.sin(a + Math.PI / 2) * len);
+    g.stroke();
+  }
+  // scratches
+  for (let i = 0; i < 26; i++) {
+    const x0 = Math.random() * W, y0 = Math.random() * H;
+    const a = Math.random() * Math.PI * 2, len = 12 + Math.random() * 46;
+    g.strokeStyle = `rgba(${Math.random() < 0.5 ? '220,228,240' : '8,10,16'},${(0.04 + Math.random() * 0.05).toFixed(2)})`;
+    g.lineWidth = 0.8;
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + Math.cos(a) * len, y0 + Math.sin(a) * len); g.stroke();
+  }
+  g.restore();
+  // beveled edge
+  g.strokeStyle = 'rgba(255,255,255,0.16)'; g.lineWidth = 2;
+  g.beginPath(); g.roundRect(m + 1, m + 1, W - m * 2 - 2, H - m * 2 - 2, 17); g.stroke();
+  g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = 3;
+  g.beginPath(); g.roundRect(m + 4, m + 4, W - m * 2 - 8, H - m * 2 - 8, 15); g.stroke();
+  // rivets around border
+  const riv = (x, y, r) => {
+    const rg = g.createRadialGradient(x - r * 0.35, y - r * 0.4, 0, x, y, r);
+    rg.addColorStop(0, '#d8dfea'); rg.addColorStop(0.35, '#8a93a4'); rg.addColorStop(1, '#2a2f3a');
+    g.fillStyle = rg;
+    g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+    g.fillStyle = 'rgba(0,0,0,0.35)';
+    g.beginPath(); g.arc(x, y + r * 0.7, r * 0.7, 0, Math.PI); g.fill();
+  };
+  const step = 46;
+  for (let x = m + 24; x < W - m - 18; x += step) { riv(x, m + 22, 5); riv(x, H - m - 22, 5); }
+  for (let y = m + 22 + step; y < H - m - 40; y += step) { riv(m + 22, y, 5); riv(W - m - 22, y, 5); }
+  // corner plates
+  for (const [px, py] of [[m + 14, m + 14], [W - m - 74, m + 14], [m + 14, H - m - 74], [W - m - 74, H - m - 74]]) {
+    g.fillStyle = 'rgba(255,255,255,0.045)';
+    g.beginPath(); g.roundRect(px, py, 60, 60, 8); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 1;
+    g.beginPath(); g.roundRect(px, py, 60, 60, 8); g.stroke();
+  }
+  // hinge blocks on the right
+  for (const hy of [H * 0.22, H * 0.72]) {
+    const hg = g.createLinearGradient(W - m - 14, 0, W - m + 4, 0);
+    hg.addColorStop(0, '#4a515f'); hg.addColorStop(1, '#161a22');
+    g.fillStyle = hg;
+    g.beginPath(); g.roundRect(W - m - 12, hy, 14, 64, 4); g.fill();
+  }
+  // engraved maker plate
+  g.fillStyle = 'rgba(10,12,18,0.5)';
+  g.beginPath(); g.roundRect(CX() - 74, H - m - 56, 148, 30, 6); g.fill();
+  g.font = "11px 'Black Ops One', sans-serif";
+  g.textAlign = 'center';
+  g.fillStyle = 'rgba(180,192,210,0.5)';
+  g.fillText('ZMH SAFE & TRUST CO.', CX(), H - m - 37);
+}
+resize();
+
+/* ============ Input: two-finger twist + one-finger drag-around ============ */
+let touchMode = null;   // 'pinch' | 'drag' | null
+let lastPinchA = 0, lastDragA = 0;
+let usedTouch = false;
+function angBetween(t0, t1) { return Math.atan2(t1.clientY - t0.clientY, t1.clientX - t0.clientX) * 180 / Math.PI; }
+function angFromCenter(t) { return Math.atan2(t.clientY - CY(), t.clientX - CX()) * 180 / Math.PI; }
+cv.addEventListener('touchstart', (ev) => {
+  usedTouch = true; audioInit();
+  if (ev.touches.length >= 2) {
+    touchMode = 'pinch';
+    lastPinchA = angBetween(ev.touches[0], ev.touches[1]);
+  } else if (ev.touches.length === 1) {
+    touchMode = 'drag';
+    lastDragA = angFromCenter(ev.touches[0]);
+  }
+  ev.preventDefault();
+}, { passive: false });
+cv.addEventListener('touchmove', (ev) => {
+  if (touchMode === 'pinch' && ev.touches.length >= 2) {
+    const a = angBetween(ev.touches[0], ev.touches[1]);
+    rotate(norm(a - lastPinchA));
+    lastPinchA = a;
+  } else if (touchMode === 'drag' && ev.touches.length === 1) {
+    const a = angFromCenter(ev.touches[0]);
+    rotate(norm(a - lastDragA));
+    lastDragA = a;
+  }
+  ev.preventDefault();
+}, { passive: false });
+cv.addEventListener('touchend', (ev) => {
+  if (ev.touches.length >= 2) lastPinchA = angBetween(ev.touches[0], ev.touches[1]);
+  else if (ev.touches.length === 1) { touchMode = 'drag'; lastDragA = angFromCenter(ev.touches[0]); }
+  else touchMode = null;
+  ev.preventDefault();
+}, { passive: false });
+let mouseDown = false;
+cv.addEventListener('mousedown', (ev) => { if (!usedTouch) { audioInit(); mouseDown = true; lastDragA = angFromCenter(ev); } });
+cv.addEventListener('mousemove', (ev) => { if (!usedTouch && mouseDown) { const a = angFromCenter(ev); rotate(norm(a - lastDragA)); lastDragA = a; } });
+window.addEventListener('mouseup', () => { mouseDown = false; });
+
+/* ============ Overlays ============ */
+function bindTap(el, fn) {
+  let last = 0;
+  const h = (ev) => {
+    ev.preventDefault(); ev.stopPropagation();
+    const now = Date.now();
+    if (now - last < 400) return;
+    last = now;
+    audioInit();
+    fn();
+  };
+  el.addEventListener('touchend', h, { passive: false });
+  el.addEventListener('click', h);
+}
+function showMenu() {
+  state = 'menu';
+  overlayEl.classList.remove('hidden');
+  const ml = maxLevel();
+  let html = `
+    <h1>VAULT BREAKER</h1>
+    <div class="sub">TWIST · LISTEN · CRACK</div>
+    <div class="stat">★ <b>${totalStars()}</b> · HIGHEST VAULT <b>${ml}</b></div>
+    <button class="btn gold" id="go">🔐 CRACK VAULT ${ml}</button>
+    <div class="vault-grid">`;
+  const show = Math.min(12, ml + 1);
+  for (let i = 1; i <= show; i++) {
+    const locked = i > ml;
+    const st = starsFor(i);
+    html += `<button class="vcell ${locked ? 'locked' : ''}" data-v="${i}" ${locked ? 'disabled' : ''}>${i}<small>${locked ? '🔒' : (st ? '★'.repeat(st) : '·')}</small></button>`;
+  }
+  html += `</div>
+    <div class="howto">
+      <em>Twist two fingers</em> — or drag one around the dial — to turn the
+      mechanism. Set each <em>pin</em>: follow the arrow's direction to the
+      sweet spot (the ticks quicken) and <em>hold steady</em>. Then align
+      every ring's gap to the top keyway. Then spin the handle. The alarm
+      timer is always running.
+    </div>`;
+  overlayEl.innerHTML = html;
+  bindTap(document.getElementById('go'), () => startVault(maxLevel()));
+  overlayEl.querySelectorAll('[data-v]').forEach(b => {
+    if (!b.disabled) bindTap(b, () => startVault(parseInt(b.getAttribute('data-v'), 10)));
+  });
+}
+function showWin(stars) {
+  overlayEl.classList.remove('hidden');
+  overlayEl.innerHTML = `
+    <h2>VAULT ${level} CRACKED</h2>
+    <div class="sub">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)} · ${Math.ceil(timeLeft)}s TO SPARE</div>
+    <div class="stat">TOTAL ★ <b>${totalStars()}</b></div>
+    <button class="btn gold" id="next">🔐 VAULT ${level + 1}</button>
+    <button class="btn" id="menu2">⌂ MENU</button>`;
+  bindTap(document.getElementById('next'), () => startVault(level + 1));
+  bindTap(document.getElementById('menu2'), showMenu);
+}
+function showAlarm() {
+  overlayEl.classList.remove('hidden');
+  overlayEl.innerHTML = `
+    <h2 style="color:#ff2244;text-shadow:0 0 26px #ff224466">SILENT ALARM</h2>
+    <div class="sub">THE GUARDS ARE COMING — VAULT ${level} HOLDS</div>
+    <button class="btn gold" id="retry">🔐 TRY AGAIN</button>
+    <button class="btn" id="menu2">⌂ MENU</button>`;
+  bindTap(document.getElementById('retry'), () => startVault(level));
+  bindTap(document.getElementById('menu2'), showMenu);
+}
+
+/* ============ Audio ============ */
+let AC = null, sfxGain = null, musicGain = null, musicTimer = null, musicStep = 0, musicNext = 0;
+let noiseBuf = null, tickAcc = 0, geigerT = 0;
+let muted = localStorage.getItem('vault-breaker-mute') === '1';
+const muteBtn = document.getElementById('mute');
+muteBtn.textContent = muted ? '🔇' : '🔊';
+function audioInit() {
+  if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    sfxGain = AC.createGain(); sfxGain.gain.value = muted ? 0 : 0.4; sfxGain.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.gain.value = muted ? 0 : 0.12; musicGain.connect(AC.destination);
+    noiseBuf = AC.createBuffer(1, AC.sampleRate * 1, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    startMusic();
+  } catch (err) { AC = null; }
+}
+bindTap(muteBtn, () => {
+  muted = !muted;
+  muteBtn.textContent = muted ? '🔇' : '🔊';
+  try { localStorage.setItem('vault-breaker-mute', muted ? '1' : '0'); } catch (err) {}
+  if (sfxGain) sfxGain.gain.value = muted ? 0 : 0.4;
+  if (musicGain) musicGain.gain.value = muted ? 0 : 0.12;
+});
+function tone(freq, dur, type, vol, when, dest) {
+  if (!AC) return;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || 'sine'; o.frequency.value = freq;
+  const t = when || AC.currentTime;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(dest || sfxGain);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function noiseHit(dur, vol, fFreq, when, dest, fType) {
+  if (!AC) return;
+  const s = AC.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+  const f = AC.createBiquadFilter(); f.type = fType || 'lowpass'; f.frequency.value = fFreq;
+  const g = AC.createGain();
+  const t = when || AC.currentTime;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(dest || sfxGain);
+  s.start(t); s.stop(t + dur + 0.02);
+}
+function tickRatchet(mag) {
+  tickAcc += mag;
+  if (tickAcc > 7) {
+    tickAcc = 0;
+    tone(1600 + Math.random() * 300, 0.02, 'square', 0.06);
+  }
+}
+function sfxPinSet() { if (!AC) return; tone(190, 0.12, 'square', 0.25); tone(95, 0.25, 'sine', 0.3); noiseHit(0.1, 0.2, 3000, AC.currentTime, null, 'bandpass'); tone(1200, 0.3, 'sine', 0.08, AC.currentTime + 0.05); }
+function sfxRingLock() { if (!AC) return; tone(150, 0.15, 'square', 0.28); tone(75, 0.3, 'sine', 0.32); tone(900, 0.4, 'triangle', 0.1, AC.currentTime + 0.08); }
+function sfxPhase() { if (!AC) return; const t = AC.currentTime; [523, 659, 880].forEach((f, i) => tone(f, 0.25, 'triangle', 0.14, t + i * 0.09)); }
+function sfxOpen() {
+  if (!AC) return;
+  const t = AC.currentTime;
+  [0, 0.25, 0.5].forEach((d, i) => { tone(130 - i * 25, 0.3, 'square', 0.3, t + d); noiseHit(0.2, 0.25, 700, t + d); });
+  noiseHit(1.4, 0.12, 400, t + 0.8);
+  [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.8, 'triangle', 0.14, t + 1.0 + i * 0.13));
+}
+function sfxAlarm() {
+  if (!AC) return;
+  const t = AC.currentTime;
+  for (let i = 0; i < 4; i++) { tone(880, 0.18, 'square', 0.16, t + i * 0.4); tone(660, 0.18, 'square', 0.16, t + i * 0.4 + 0.2); }
+}
+/* Music: low heist pulse */
+function startMusic() {
+  if (!AC || musicTimer) return;
+  musicStep = 0; musicNext = AC.currentTime + 0.1;
+  musicTimer = setInterval(() => {
+    if (!AC) return;
+    while (musicNext < AC.currentTime + 0.4) {
+      const s = musicStep % 16;
+      const urgent = state === 'play' && vault && timeLeft < vault.time * 0.25;
+      tone(s % 8 < 4 ? 55 : 49, 0.22, 'triangle', s % 2 === 0 ? 0.22 : 0.1, musicNext, musicGain);
+      if (s % 4 === 2) noiseHit(0.03, 0.1, 6000, musicNext, musicGain, 'highpass');
+      if (urgent && s % 4 === 0) tone(1245, 0.05, 'sine', 0.06, musicNext, musicGain);
+      if (s === 0) { tone(110, 1.8, 'sine', 0.05, musicNext, musicGain); tone(165, 1.8, 'sine', 0.03, musicNext, musicGain); }
+      musicNext += urgent ? 0.19 : 0.24;
+      musicStep++;
+    }
+  }, 110);
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) return;
+  if (document.hidden) AC.suspend(); else AC.resume();
+});
+
+/* ============ Rendering ============ */
+let lastT = 0, timeNow = 0;
+function metalArc(cx, cy, r0, r1, segs, baseL, contrast) {
+  // anisotropic brushed metal ring: lightness varies with absolute angle vs light at -135°
+  for (let i = 0; i < segs; i++) {
+    const a0 = (i / segs) * Math.PI * 2, a1 = ((i + 1.15) / segs) * Math.PI * 2;
+    const lightA = -Math.PI * 0.75;
+    const l = baseL + Math.cos(a0 - lightA) * contrast + Math.cos((a0 - lightA) * 2) * contrast * 0.3;
+    ctx.fillStyle = `rgb(${l | 0},${(l * 1.04) | 0},${(l * 1.14) | 0})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r1, a0, a1);
+    ctx.arc(cx, cy, r0, a1, a0, true);
+    ctx.closePath(); ctx.fill();
+  }
+}
+function draw(dt) {
+  ctx.clearRect(0, 0, W, H);
+  let shx = 0, shy = 0;
+  if (shakeT > 0) { shakeT -= dt; shx = (Math.random() - 0.5) * 6 * shakeT; shy = (Math.random() - 0.5) * 6 * shakeT; }
+  ctx.save();
+  ctx.translate(shx, shy);
+  // door slides right when opening
+  const slide = state === 'open' ? Math.min(1, openT / 1.5) : 0;
+  const ease = slide * slide * (3 - 2 * slide);
+  if (slide > 0) drawVaultInterior();
+  ctx.save();
+  ctx.translate(ease * W * 0.96, ease * -6);
+  ctx.drawImage(doorCv, 0, 0, W, H);
+  drawMechanism(dt);
+  ctx.restore();
+  ctx.restore();
+  // sparks
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const p = sparks[i];
+    p.t += dt;
+    if (p.t > p.max) { sparks.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 260 * dt;
+    ctx.fillStyle = p.col;
+    ctx.globalAlpha = 1 - p.t / p.max;
+    ctx.fillRect(p.x, p.y, 2.2, 2.2);
+  }
+  ctx.globalAlpha = 1;
+  drawHUD(dt);
+  if (state === 'alarm') {
+    const fl = Math.sin(alarmT * 10) > 0;
+    ctx.fillStyle = fl ? 'rgba(255,20,40,0.16)' : 'rgba(120,0,10,0.1)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.font = `30px 'Black Ops One', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = fl ? '#ff2244' : '#aa1020';
+    ctx.shadowColor = '#ff2244'; ctx.shadowBlur = 22;
+    ctx.fillText('⚠ ALARM ⚠', W / 2, H * 0.3);
+    ctx.shadowBlur = 0;
+  }
+}
+function drawVaultInterior() {
+  // golden payoff behind the door
+  const g = ctx.createRadialGradient(CX(), CY(), 0, CX(), CY(), Math.max(W, H) * 0.7);
+  g.addColorStop(0, '#4a3512');
+  g.addColorStop(0.4, '#241806');
+  g.addColorStop(1, '#0a0704');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const gg = ctx.createRadialGradient(CX(), CY() - 30, 0, CX(), CY() - 30, 240);
+  gg.addColorStop(0, 'rgba(255,205,90,0.5)');
+  gg.addColorStop(1, 'rgba(255,180,60,0)');
+  ctx.fillStyle = gg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+  // gold bar stacks
+  const bar = (x, y, w2, h2) => {
+    const bg = ctx.createLinearGradient(x, y, x, y + h2);
+    bg.addColorStop(0, '#ffe9a8'); bg.addColorStop(0.4, '#e8b23c'); bg.addColorStop(1, '#8a5f14');
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.moveTo(x + w2 * 0.1, y); ctx.lineTo(x + w2 * 0.9, y);
+    ctx.lineTo(x + w2, y + h2); ctx.lineTo(x, y + h2);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillRect(x + w2 * 0.16, y + 2, w2 * 0.2, 2.5);
+  };
+  for (let row = 0; row < 4; row++) {
+    const n = 4 - row;
+    for (let i = 0; i < n; i++) {
+      bar(CX() - n * 26 + i * 52 + row * 5, CY() + 130 - row * 22, 46, 18);
+    }
+  }
+  // dust motes in the glow
+  for (let i = 0; i < 16; i++) {
+    const a = (i * 137.5) % 360;
+    const x = CX() + Math.sin(timeNow * 0.3 + i) * 120;
+    const y = CY() - 40 + Math.cos(timeNow * 0.22 + i * 2) * 100;
+    ctx.fillStyle = `rgba(255,225,150,${(0.2 + Math.sin(timeNow + a) * 0.15).toFixed(2)})`;
+    ctx.fillRect(x, y, 1.6, 1.6);
+  }
+}
+function drawMechanism(dt) {
+  const cx = CX(), cy = CY(), r = R();
+  // shadow well behind dial
+  const wg = ctx.createRadialGradient(cx, cy, r * 0.2, cx, cy, r * 1.28);
+  wg.addColorStop(0, 'rgba(0,0,0,0.5)');
+  wg.addColorStop(0.8, 'rgba(0,0,0,0.28)');
+  wg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = wg;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 1.28, 0, 7); ctx.fill();
+  // static bezel
+  metalArc(cx, cy, r * 1.06, r * 1.18, 72, 118, 40);
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 1.18, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r * 1.06, 0, 7); ctx.stroke();
+  // bezel screws
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2 + Math.PI / 8;
+    const sx2 = cx + Math.cos(a) * r * 1.12, sy2 = cy + Math.sin(a) * r * 1.12;
+    const sg = ctx.createRadialGradient(sx2 - 1.5, sy2 - 1.5, 0, sx2, sy2, 4.5);
+    sg.addColorStop(0, '#e8eef8'); sg.addColorStop(0.5, '#7a8494'); sg.addColorStop(1, '#20242e');
+    ctx.fillStyle = sg;
+    ctx.beginPath(); ctx.arc(sx2, sy2, 4.5, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(10,12,18,0.8)'; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(sx2 - 2.6 * Math.cos(a + 0.6), sy2 - 2.6 * Math.sin(a + 0.6));
+    ctx.lineTo(sx2 + 2.6 * Math.cos(a + 0.6), sy2 + 2.6 * Math.sin(a + 0.6));
+    ctx.stroke();
+  }
+  // === rings (between hub and dial edge) — visible in rings/handle phases
+  if (phase !== 'pins') {
+    for (let i = vault.rings.length - 1; i >= 0; i--) {
+      const ring = vault.rings[i];
+      const rr2 = ringR(i);
+      const active = phase === 'rings' && i === ringIdx && !ring.locked;
+      metalArc(cx, cy, rr2 - r * 0.065, rr2 + r * 0.065, 60, ring.locked ? 96 : (active ? 130 : 78), active ? 44 : 26);
+      // gap notch
+      if (!ring.locked) {
+        const ga = (ring.gap - 90) * Math.PI / 180;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(ga);
+        ctx.fillStyle = '#0c0e16';
+        ctx.fillRect(rr2 - r * 0.07, -r * 0.035, r * 0.14, r * 0.07);
+        ctx.restore();
+      } else {
+        // locked: LED at top
+        ctx.fillStyle = '#39ff14';
+        ctx.shadowColor = '#39ff14'; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(cx, cy - rr2, 2.6, 0, 7); ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(cx, cy, rr2 + r * 0.065, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, rr2 - r * 0.065, 0, 7); ctx.stroke();
+    }
+    // keyway marker at top
+    ctx.fillStyle = '#ffc300';
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, cy - r * 0.25);
+    ctx.lineTo(cx + 5, cy - r * 0.25);
+    ctx.lineTo(cx, cy - r * 0.25 + 9);
+    ctx.closePath(); ctx.fill();
+  }
+  // === main dial (pins phase rotates it; later phases it sits set)
+  const da = dialAngle * Math.PI / 180;
+  if (phase === 'pins') {
+    metalArc(cx, cy, r * 0.86, r * 1.05, 72, 132, 46);
+    // machined concentric grooves
+    for (let k = 0; k < 3; k++) {
+      ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, r * (0.885 + k * 0.055), 0, 7); ctx.stroke();
+    }
+    // rotating number/tick ring
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(da);
+    for (let i = 0; i < 72; i++) {
+      const a = i / 72 * Math.PI * 2;
+      const big = i % 6 === 0;
+      ctx.save();
+      ctx.rotate(a);
+      ctx.strokeStyle = 'rgba(16,18,26,0.85)';
+      ctx.lineWidth = big ? 2.2 : 1.1;
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 1.02);
+      ctx.lineTo(0, -r * (big ? 0.92 : 0.965));
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(1.1, -r * 1.015);
+      ctx.lineTo(1.1, -r * (big ? 0.925 : 0.962));
+      ctx.stroke();
+      if (big) {
+        ctx.fillStyle = 'rgba(14,16,24,0.9)';
+        ctx.font = `bold ${Math.round(r * 0.085)}px 'Share Tech Mono', monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText(String(i / 6 * 5), 0, -r * 0.82);
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+    // fixed fiducial marker
+    ctx.fillStyle = '#ffc300';
+    ctx.shadowColor = '#ffc300';
+    const p = vault.pins[pinIdx];
+    const near = p ? Math.max(0, 1 - Math.abs(pinError()) / 30) : 0;
+    ctx.shadowBlur = 4 + near * 14;
+    ctx.beginPath();
+    ctx.moveTo(cx - 6, cy - r * 1.1);
+    ctx.lineTo(cx + 6, cy - r * 1.1);
+    ctx.lineTo(cx, cy - r * 1.1 + 12);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    // geiger ticks near the sweet spot
+    if (p && near > 0.4 && state === 'play') {
+      geigerT -= dt;
+      if (geigerT <= 0) {
+        geigerT = 0.4 - near * 0.33;
+        tone(2100, 0.015, 'square', 0.05 + near * 0.06);
+      }
+    }
+    // hold progress arc around the marker
+    if (holdT > 0) {
+      ctx.strokeStyle = '#39ff14';
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.arc(cx, cy - r * 1.1 + 6, 11, -Math.PI / 2, -Math.PI / 2 + (holdT / 0.45) * Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  // === hub / handle wheel
+  const hubR = r * (phase === 'pins' ? 0.62 : 0.24);
+  const spin = phase === 'handle' ? (handCW - handCCW) * Math.PI / 180 : (phase === 'pins' ? da * 0.15 : 0);
+  metalArc(cx, cy, 0, hubR, 48, 96, 30);
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(cx, cy, hubR, 0, 7); ctx.stroke();
+  if (phase === 'handle') {
+    // 3-spoke ship-wheel handle
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(spin);
+    for (let i = 0; i < 3; i++) {
+      ctx.save();
+      ctx.rotate(i / 3 * Math.PI * 2);
+      const sg2 = ctx.createLinearGradient(-4, 0, 4, 0);
+      sg2.addColorStop(0, '#e0e6f0'); sg2.addColorStop(0.5, '#8a93a4'); sg2.addColorStop(1, '#2c313c');
+      ctx.fillStyle = sg2;
+      ctx.beginPath(); ctx.roundRect(-4.5, -r * 0.72, 9, r * 0.72, 4); ctx.fill();
+      const kg = ctx.createRadialGradient(-2, -r * 0.72 - 2, 0, 0, -r * 0.72, 10);
+      kg.addColorStop(0, '#f0f4fa'); kg.addColorStop(0.5, '#98a2b4'); kg.addColorStop(1, '#2c313c');
+      ctx.fillStyle = kg;
+      ctx.beginPath(); ctx.arc(0, -r * 0.72, 10, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+    metalArc(cx, cy, r * 0.66, r * 0.8, 60, 122, 42);
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.8, 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.66, 0, 7); ctx.stroke();
+    // spin progress
+    const prog = Math.max(handCW, handCCW) / 270;
+    if (prog > 0 && state === 'play') {
+      ctx.strokeStyle = '#ffc300';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.73, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2);
+      ctx.stroke();
+    }
+  } else {
+    // hub center cap + glint
+    const cg = ctx.createRadialGradient(cx - hubR * 0.25, cy - hubR * 0.3, 0, cx, cy, hubR);
+    cg.addColorStop(0, 'rgba(255,255,255,0.28)');
+    cg.addColorStop(0.5, 'rgba(255,255,255,0.04)');
+    cg.addColorStop(1, 'rgba(0,0,0,0.25)');
+    ctx.fillStyle = cg;
+    ctx.beginPath(); ctx.arc(cx, cy, hubR, 0, 7); ctx.fill();
+  }
+  // moving glint across the whole assembly
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const glA = timeNow * 0.24 % (Math.PI * 2);
+  const gl = ctx.createLinearGradient(
+    cx + Math.cos(glA) * r, cy + Math.sin(glA) * r,
+    cx - Math.cos(glA) * r, cy - Math.sin(glA) * r
+  );
+  gl.addColorStop(0.42, 'rgba(255,255,255,0)');
+  gl.addColorStop(0.5, 'rgba(255,255,255,0.07)');
+  gl.addColorStop(0.58, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gl;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 1.18, 0, 7); ctx.fill();
+  ctx.restore();
+  // pin-status LEDs above the dial
+  const nP = vault.pins.length;
+  for (let i = 0; i < nP; i++) {
+    const lx = cx + (i - (nP - 1) / 2) * 26, ly = cy - r * 1.34;
+    ctx.fillStyle = '#10141c';
+    ctx.beginPath(); ctx.arc(lx, ly, 7, 0, 7); ctx.fill();
+    const set = vault.pins[i].set;
+    const cur = phase === 'pins' && i === pinIdx;
+    ctx.fillStyle = set ? '#39ff14' : (cur ? '#ffc300' : '#3a2020');
+    if (set || cur) { ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = cur ? 6 + Math.sin(timeNow * 6) * 3 : 8; }
+    ctx.beginPath(); ctx.arc(lx, ly, 4, 0, 7); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  // direction arrow for current pin
+  if (phase === 'pins' && state === 'play') {
+    const p = vault.pins[pinIdx];
+    if (p) {
+      ctx.font = `16px 'Share Tech Mono', monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffc300';
+      ctx.fillText(p.dir > 0 ? '⟳' : '⟲', cx, cy + r * 1.36);
+    }
+  }
+}
+function drawHUD(dt) {
+  const sat = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
+  // timer bar
+  if (state === 'play' || state === 'alarm') {
+    const frac = vault ? Math.max(0, timeLeft / vault.time) : 0;
+    const bw = W - 130, bx = 104, by = sat + 16;
+    ctx.fillStyle = 'rgba(8,10,16,0.75)';
+    ctx.beginPath(); ctx.roundRect(bx - 4, by - 8, bw + 8, 16, 6); ctx.fill();
+    const tg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    tg.addColorStop(0, '#ff2244'); tg.addColorStop(0.3, '#ffc300'); tg.addColorStop(1, '#39ff14');
+    ctx.fillStyle = tg;
+    ctx.fillRect(bx, by - 4, bw * frac, 8);
+    if (frac < 0.25) {
+      ctx.strokeStyle = `rgba(255,34,68,${(0.5 + Math.sin(timeNow * 12) * 0.5).toFixed(2)})`;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.roundRect(bx - 5, by - 9, bw + 10, 18, 7); ctx.stroke();
+    }
+    ctx.font = `11px 'Black Ops One', sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#c9d4e8';
+    ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4;
+    const phaseTxt = phase === 'pins'
+      ? 'VAULT ' + level + ' · PIN ' + Math.min(pinIdx + 1, vault.pins.length) + '/' + vault.pins.length
+      : phase === 'rings'
+        ? 'VAULT ' + level + ' · RING ' + Math.min(ringIdx + 1, vault.rings.length) + '/' + vault.rings.length
+        : 'VAULT ' + level + ' · SPIN IT!';
+    ctx.fillText(phaseTxt, bx, by + 24);
+    ctx.shadowBlur = 0;
+  }
+  if (toast && toast.t > 0) {
+    toast.t -= dt;
+    ctx.globalAlpha = Math.min(1, toast.t / 0.4);
+    ctx.font = `13px 'Share Tech Mono', monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffc300';
+    ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6;
+    ctx.fillText(toast.txt, W / 2, H * 0.82);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* ============ Main loop ============ */
+function frame(ts) {
+  const dt = Math.min(0.1, (ts - lastT) / 1000 || 0.016);
+  lastT = ts; timeNow = ts / 1000;
+  update(dt);
+  draw(dt);
+  requestAnimationFrame(frame);
+}
+genVault(1);
+showMenu();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

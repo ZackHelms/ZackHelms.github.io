@@ -38,7 +38,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 .btn.purple:hover{box-shadow:0 0 15px #b44fff33;}
 
 /* ── LOAD GAME ── */
-#s-load{padding:20px;}
+#s-load{padding:calc(env(safe-area-inset-top,0px) + 44px) 20px 20px;}
 .screen-header{display:flex;align-items:center;gap:12px;width:100%;max-width:480px;margin-bottom:16px;}
 .screen-title{font-family:'Black Ops One',sans-serif;font-size:1.2rem;color:var(--green);letter-spacing:4px;}
 .saves-list{width:100%;max-width:480px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px;padding-bottom:20px;}
@@ -53,7 +53,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 .empty-saves{color:var(--dim);font-size:0.8rem;text-align:center;margin-top:40px;}
 
 /* ── CHAR CREATE ── */
-#s-create{padding:20px;gap:16px;overflow-y:auto;}
+#s-create{padding:calc(env(safe-area-inset-top,0px) + 44px) 20px 20px;gap:16px;overflow-y:auto;}
 .progress-bar{display:flex;gap:8px;padding:0 0 4px;}
 .prog-slot{width:52px;height:52px;border:2px solid var(--gold);border-radius:6px;background:var(--panel);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0;overflow:hidden;}
 .prog-slot.active{border-color:var(--gold);box-shadow:0 0 10px var(--gold);animation:pulse-gold 1.5s infinite;}
@@ -85,7 +85,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 
 /* ── ADVENTURE FLOW ── */
 #s-adventure{position:relative;}
-.adv-topbar{width:100%;background:var(--panel);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:10px;z-index:10;flex-shrink:0;}
+.adv-topbar{width:100%;background:var(--panel);border-bottom:1px solid var(--border);padding:calc(env(safe-area-inset-top,0px) + 42px) 16px 10px;display:flex;align-items:center;gap:10px;z-index:10;flex-shrink:0;}
 .adv-party-name{font-family:'Black Ops One',sans-serif;font-size:0.85rem;color:var(--green);letter-spacing:2px;flex:1;}
 .adv-gold{font-size:0.75rem;color:var(--gold);}
 .adv-party-btn{background:none;border:1px solid var(--border);padding:6px 10px;border-radius:4px;cursor:pointer;font-size:0.9rem;transition:all 0.2s;}
@@ -113,7 +113,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 
 /* ── COMBAT ── */
 #s-combat{padding:0;gap:0;}
-.combat-enemies{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:14px 16px;background:linear-gradient(180deg,#08081a 0%,var(--bg) 100%);border-bottom:2px solid var(--border);}
+.combat-enemies{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 40px) 16px 12px;background:linear-gradient(180deg,#08081a 0%,var(--bg) 100%);border-bottom:2px solid var(--border);}
 .enemy-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:min(92vw,420px);}
 .enemy-tile{aspect-ratio:1;background:var(--panel);border:1px solid var(--border);border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;cursor:default;transition:border-color 0.2s,box-shadow 0.2s;overflow:hidden;}
 .enemy-tile.targetable{cursor:pointer;}
@@ -185,7 +185,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 
 /* ── PARTY STATUS ── */
 #s-party{padding:0;}
-.party-header{width:100%;background:var(--panel);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.party-header{width:100%;background:var(--panel);border-bottom:1px solid var(--border);padding:calc(env(safe-area-inset-top,0px) + 44px) 16px 12px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .party-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;width:100%;}
 .char-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:14px;width:100%;max-width:480px;margin:0 auto;}
 .char-card-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
@@ -249,6 +249,20 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 .mut-slot-btn:hover{border-color:var(--purple);color:var(--purple);}
 .mut-slot-btn.filled{border-color:#333;color:#555;}
 
+/* ── BACK + MUTE ── */
+#back-btn{position:fixed;z-index:60;
+  top:calc(env(safe-area-inset-top,0px) + 6px);
+  left:calc(env(safe-area-inset-left,0px) + 8px);
+  width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  color:var(--dim);font-size:16px;text-decoration:none;user-select:none;}
+#mute-btn{position:fixed;z-index:60;
+  top:calc(env(safe-area-inset-top,0px) + 6px);
+  left:calc(env(safe-area-inset-left,0px) + 52px);
+  width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  color:var(--dim);font-size:15px;cursor:pointer;padding:0;}
+
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
@@ -256,7 +270,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-05 19:17 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
+<a id="back-btn" href="index.html" aria-label="Back to games">←</a>
+<button id="mute-btn" aria-label="Toggle sound">🔊</button>
 
 <!-- SCREENS -->
 <div id="s-main" class="screen active">
@@ -576,6 +592,197 @@ let pendingMutation = null;
 let pendingMutationChar = null;
 
 // ═══════════════════════════════════════════════════
+// AUDIO (WebAudio synth — no external files)
+// ═══════════════════════════════════════════════════
+
+const MUTE_KEY = 'adventure_mute';
+let ac = null, sfxGain = null, musicGain = null, noiseBuf = null;
+let muted = false;
+try{ muted = localStorage.getItem(MUTE_KEY)==='1'; }catch(e){}
+
+function ensureAudio(){
+  if(!ac){
+    try{
+      ac = new (window.AudioContext||window.webkitAudioContext)();
+      sfxGain = ac.createGain();   sfxGain.connect(ac.destination);
+      musicGain = ac.createGain(); musicGain.connect(ac.destination);
+      applyGains();
+    }catch(e){ ac = null; }
+  }
+  if(ac && ac.state==='suspended' && !muted) ac.resume();
+  return ac;
+}
+function applyGains(){
+  if(!ac) return;
+  sfxGain.gain.value = muted ? 0 : 0.85;
+  musicGain.gain.value = muted ? 0 : 0.16;
+}
+function getNoise(){
+  if(!noiseBuf && ac){
+    const len = Math.floor(ac.sampleRate*0.3);
+    noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i] = Math.random()*2-1;
+  }
+  return noiseBuf;
+}
+function beep(freq, dur, type, gain, slideTo){
+  const a = ensureAudio(); if(!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type||'sine';
+  o.frequency.setValueAtTime(freq, a.currentTime);
+  if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, a.currentTime+dur);
+  g.gain.setValueAtTime(gain||0.1, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime+dur);
+  o.connect(g).connect(sfxGain);
+  o.start(); o.stop(a.currentTime+dur);
+}
+function noiseHit(vol, dur, freq, type){
+  if(!ensureAudio() || !getNoise()) return;
+  const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+  const f = ac.createBiquadFilter(); f.type = type||'highpass'; f.frequency.value = freq||2000;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+dur);
+  s.connect(f); f.connect(g); g.connect(sfxGain);
+  s.start(); s.stop(ac.currentTime+dur+0.02);
+}
+
+// ── SFX (fantasy flavor) ──
+const sndTap      = ()=>beep(560, 0.045, 'triangle', 0.05, 420);
+const sndHit      = ()=>{ noiseHit(0.12, 0.09, 1800); beep(200, 0.1, 'square', 0.07, 80); };
+const sndMiss     = ()=>noiseHit(0.06, 0.14, 900, 'bandpass');
+const sndHurt     = ()=>{ beep(150, 0.16, 'sawtooth', 0.09, 60); noiseHit(0.07, 0.1, 300, 'lowpass'); };
+const sndSpell    = ()=>beep(880, 0.18, 'sawtooth', 0.06, 180);
+const sndHeal     = ()=>{ beep(523, 0.1, 'sine', 0.07); setTimeout(()=>beep(659, 0.1, 'sine', 0.07), 90); setTimeout(()=>beep(784, 0.16, 'sine', 0.07), 180); };
+const sndLoot     = ()=>{ beep(988, 0.07, 'triangle', 0.07); setTimeout(()=>beep(1319, 0.12, 'triangle', 0.07), 70); };
+const sndPurchase = ()=>{ beep(1175, 0.05, 'square', 0.05); setTimeout(()=>beep(1568, 0.09, 'square', 0.05), 60); };
+const sndLevelUp  = ()=>{ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f, 0.14, 'triangle', 0.08), i*90)); };
+const sndVictory  = ()=>{ [440,523,659,880].forEach((f,i)=>setTimeout(()=>beep(f, 0.18, 'triangle', 0.09), i*120)); };
+const sndDefeat   = ()=>{ beep(311, 0.35, 'sawtooth', 0.07, 233); setTimeout(()=>beep(233, 0.55, 'sawtooth', 0.08, 110), 330); };
+
+// ── MUSIC — fantasy exploration loop: A minor, ~76 BPM ──
+// 8-bar loop (Am Am F G | Am C Em E), harp-like plucked arpeggios over a
+// drone bass + soft fifth pad; gentle noise thump on alternate bar heads.
+const M_STEP = 60/76/2;               // 8th note at 76 BPM (~0.395 s)
+const M_NF = {E2:82.41, F2:87.31, G2:98, A2:110, C3:130.81, E3:164.81, F3:174.61,
+  G3:196, A3:220, B3:246.94, C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392,
+  Gs4:415.30, A4:440, B4:493.88, C5:523.25, E5:659.25};
+const M_LEAD = [                       // 64 steps = 8 bars of 8; 0 = rest
+  'A3',0,'E4','A4',0,'C5','A4','E4',   'A3',0,'E4','A4',0,'B4','C5','B4',   // Am Am
+  'F3',0,'C4','F4',0,'A4','F4','C4',   'G3',0,'D4','G4',0,'B4','A4','D4',   // F  G
+  'A3',0,'E4','A4',0,'C5',0,'E5',      'C4',0,'G4','C5',0,'E5','C5','G4',   // Am C
+  'E3',0,'B3','E4',0,'G4','B4','G4',   'E3',0,'B3','E4',0,'Gs4','B4',0 ];   // Em E
+const M_BASS = ['A2','A2','F2','G2','A2','C3','E2','E2'];   // one drone per bar
+let musicTimer = null, musicStep = 0, nextNoteTime = 0;
+
+function mPluck(f, t){                // harp-like pluck
+  const o = ac.createOscillator(), fl = ac.createBiquadFilter(), g = ac.createGain();
+  o.type = 'triangle'; o.frequency.value = f;
+  fl.type = 'lowpass'; fl.frequency.value = 2200; fl.Q.value = 0.7;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.075, t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+0.62);
+  o.connect(fl); fl.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t+0.68);
+}
+function mDrone(f, t){                // bar-long soft bass drone
+  const d = 8*M_STEP;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'triangle'; o.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.11, t+0.3);
+  g.gain.setValueAtTime(0.11, t+d*0.72);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+d);
+  o.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t+d+0.05);
+}
+function mPad(f, t){                  // quiet fifth-above pad, slow swell
+  const d = 8*M_STEP;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'sine'; o.frequency.value = f*1.5;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.035, t+d*0.4);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+d);
+  o.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t+d+0.05);
+}
+function mThump(t){                   // soft low percussion
+  if(!getNoise()) return;
+  const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+  const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 180;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.14, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+0.25);
+  s.connect(f); f.connect(g); g.connect(musicGain);
+  s.start(t); s.stop(t+0.3);
+}
+function mShaker(t){                  // faint high texture
+  if(!getNoise()) return;
+  const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+  const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.018, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+0.08);
+  s.connect(f); f.connect(g); g.connect(musicGain);
+  s.start(t); s.stop(t+0.1);
+}
+function musicPlayStep(stp, t){
+  const n = M_LEAD[stp]; if(n) mPluck(M_NF[n], t);
+  if(stp%8===0){
+    const bar = stp/8;
+    mDrone(M_NF[M_BASS[bar]], t);
+    mPad(M_NF[M_BASS[bar]], t);
+    if(bar%2===0) mThump(t);
+  }
+  if(stp%16===12) mShaker(t);
+}
+function musicSchedule(){
+  if(!ac) return;
+  while(nextNoteTime < ac.currentTime+0.18){   // ~0.18 s lookahead
+    musicPlayStep(musicStep, nextNoteTime);
+    musicStep = (musicStep+1)%64;
+    nextNoteTime += M_STEP;
+  }
+}
+function startMusic(){
+  const a = ensureAudio(); if(!a) return;
+  if(musicTimer) return;                       // already looping
+  musicStep = 0; nextNoteTime = a.currentTime+0.1;
+  musicTimer = setInterval(musicSchedule, 25);
+}
+
+// unlock on first gesture (iOS) + keep music looping across states
+function unlockAudio(){ ensureAudio(); startMusic(); }
+document.addEventListener('pointerdown', unlockAudio);
+document.addEventListener('keydown', unlockAudio);
+
+// delegated UI tap sfx (covers static + dynamically created controls)
+document.addEventListener('click', e=>{
+  const t = e.target && e.target.closest &&
+    e.target.closest('button, .type-card, .gender-card, .prog-slot, .save-row, .flow-dot, .enemy-tile.targetable');
+  if(t && t.id!=='mute-btn') sndTap();
+}, true);
+
+// mute toggle (persisted; mutes both sfx + music)
+const muteBtn = document.getElementById('mute-btn');
+function renderMute(){ muteBtn.textContent = muted ? '🔇' : '🔊'; }
+muteBtn.addEventListener('click', ()=>{
+  muted = !muted;
+  try{ localStorage.setItem(MUTE_KEY, muted?'1':'0'); }catch(e){}
+  ensureAudio(); applyGains();
+  if(ac){ if(muted) ac.suspend(); else { ac.resume(); startMusic(); } }
+  renderMute();
+});
+renderMute();
+
+document.addEventListener('visibilitychange', ()=>{
+  if(!ac) return;
+  if(document.hidden) ac.suspend();
+  else if(!muted) ac.resume();
+});
+
+// ═══════════════════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════════════════
 
@@ -619,6 +826,7 @@ function showModal(title, text, buttons){
 function closeModal(){ document.getElementById('modal-overlay').classList.remove('active'); }
 
 function showLevelUp(name, level){
+  sndLevelUp();
   const banner = document.getElementById('levelup-banner');
   document.getElementById('levelup-text').textContent = `LEVEL UP!\n${name} — Lv.${level}`;
   banner.classList.add('show');
@@ -1868,6 +2076,7 @@ function useHealOnAlly(allyIdx){
   const def = CONSUMABLES[item.id];
   target.hp = Math.min(target.maxHp, target.hp+def.value);
   removeItem(item.id,1);
+  sndHeal();
   addLog(`${target.name} drinks ${def.name} and recovers ${def.value} HP!`,'good');
   endPlayerAction();
 }
@@ -2059,6 +2268,7 @@ function useItemInCombat(itemId, itemDef){
   if(itemDef.effect==='heal'){
     if(itemDef.target==='all'){
       combatState.party.forEach(c=>{ if(!c.ko) c.hp=Math.min(c.maxHp,c.hp+itemDef.value); });
+      sndHeal();
       addLog(`${itemDef.name} heals the party!`,'good');
     } else {
       // need to pick ally
@@ -2109,11 +2319,13 @@ function applyAllyTarget(idx){
     const itemDef = CONSUMABLES[itemId];
     if(itemDef.effect==='heal'){
       ch.hp = Math.min(ch.maxHp, ch.hp+(itemDef.value||30));
+      sndHeal();
       addLog(`${ch.name} healed for ${itemDef.value||30} HP!`,'good');
     } else if(itemDef.effect==='revive'){
       if(ch.ko){
         ch.ko=false;
         ch.hp=1;
+        sndHeal();
         addLog(`${ch.name} revived!`,'good');
       }
     }
@@ -2187,9 +2399,11 @@ function doPlayerAttack(enemyIdx){
   if(Math.random()<hitChance){
     const dmg = calcDmg(ch);
     e.hp = Math.max(0, e.hp-dmg);
+    sndHit();
     addLog(`${ch.name} attacks ${e.name} for ${dmg} damage!`,'hit');
     if(e.hp<=0){ e.dead=true; addLog(`${e.name} defeated!`,'good'); rollLoot(e); }
   } else {
+    sndMiss();
     addLog(`${ch.name} attacks ${e.name}... MISS!`,'');
   }
   combatState.phase='select';
@@ -2228,6 +2442,7 @@ function applyAbilityAllEnemies(ab){
 
 function applyActiveAbility(ab, caster, enemy, ally){
   const lv = caster.level||1;
+  if(ab.id==='heal') sndHeal(); else sndSpell();
   switch(ab.id){
     case 'fire_blast':
       if(enemy){ const d=rand(8+lv,12+lv); enemy.hp=Math.max(0,enemy.hp-d); addLog(`${caster.name} blasts ${enemy.name} with fire for ${d}!`,'dmg'); if(enemy.hp<=0){enemy.dead=true;addLog(`${enemy.name} defeated!`,'good');rollLoot(enemy);}}
@@ -2258,6 +2473,7 @@ function rollLoot(enemy){
   (enemy.loot||[]).forEach(l=>{
     if(chance(l.chance)){
       combatState.loot.push(l.id);
+      sndLoot();
       addLog(`Found: ${ALL_ITEMS[l.id]?.name||l.id}!`,'loot');
     }
   });
@@ -2317,10 +2533,12 @@ function doEnemyTurn(){
       if(target.abilities&&target.abilities.includes('counter')&&chance(0.3)){
         const counterDmg = calcDmg(target);
         e.hp=Math.max(0,e.hp-counterDmg);
+        sndHit();
         addLog(`${target.name} counters for ${counterDmg}!`,'good');
         if(e.hp<=0){e.dead=true;addLog(`${e.name} defeated!`,'good');rollLoot(e);}
       }
       target.hp=Math.max(0,target.hp-dmg);
+      sndHurt();
       addLog(`${e.name} attacks ${target.name} for ${dmg}!`,'dmg');
       if(target.hp<=0){ target.ko=true; target.hp=0; addLog(`${target.name} is knocked out!`,''); }
     } else {
@@ -2355,6 +2573,7 @@ function doEnemyTurn(){
 function attemptFlee(){
   const fleeChance = 0.5 + (G.party.some(c=>c.abilities&&c.abilities.includes('camouflage'))?0.2:0);
   if(chance(fleeChance)){
+    sndMiss();
     addLog('Your party fled successfully!','info');
     setTimeout(()=>{
       combatState=null;
@@ -2371,6 +2590,7 @@ function attemptFlee(){
 }
 
 function partyWipe(){
+  sndDefeat();
   // restore everyone to 1 HP
   G.party.forEach(c=>{ c.hp=Math.max(1,Math.floor(c.maxHp*0.3)); c.ko=false; c.statusEffects=[]; });
   showModal('Party Defeated','Your party retreats to the inn. Everyone recovers enough to continue.',[
@@ -2383,6 +2603,7 @@ function partyWipe(){
 }
 
 function showCombatResults(){
+  sndVictory();
   // apply XP, gold, loot to main party
   const xp = combatState.xpGained;
   const gold = combatState.goldGained;
@@ -2553,7 +2774,7 @@ function renderRP(){
 }
 
 function applyRPEffect(effect){
-  if(effect.addItem) addItem(effect.addItem,1);
+  if(effect.addItem){ addItem(effect.addItem,1); sndLoot(); }
   if(effect.setFlag) G.flags[effect.setFlag]=true;
   if(effect.failCombat!==undefined && rpState) rpState._pendingFailCombat=effect.failCombat;
   if(effect.xpAll){
@@ -2570,15 +2791,18 @@ function applyRPEffect(effect){
   if(effect.restParty){
     if(effect.cost && G.gold>=effect.cost){
       G.gold-=effect.cost;
+      sndPurchase();
       G.party.forEach(c=>{ c.hp=c.maxHp; c.ko=false; c.statusEffects=[]; });
     } else if(effect.cost && G.gold<effect.cost){
       // can't afford — skip rest
     } else {
+      sndHeal();
       G.party.forEach(c=>{ c.hp=c.maxHp; });
     }
   }
   if(effect.cost && !effect.restParty && !effect.addItem){
     G.gold=Math.max(0,G.gold-effect.cost);
+    sndPurchase();
   }
 }
 

@@ -70,6 +70,7 @@ header h1 {
 .header-btn.big-rebirth-btn.ready { display: inline-block; box-shadow: 0 0 12px #ff8c4255; }
 .header-btn.danger:hover { border-color: var(--red); color: var(--red); }
 .header-btn.reload-btn:hover { border-color: var(--blue); color: var(--blue); }
+#mute-btn { font-size: 0.8rem; padding: 5px 10px; min-width: 38px; }
 
 /* ── Stat bar ───────────────────────────────────────── */
 #stat-bar {
@@ -265,7 +266,7 @@ main {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-12 03:18 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
 
 <header>
   <a id="back-link" href="index.html">&larr; GAMES</a>
@@ -276,6 +277,7 @@ main {
   <button class="header-btn" id="ach-btn">🏆 ACHIEVEMENTS</button>
   <button class="header-btn danger" id="reset-btn">RESET</button>
   <button class="header-btn reload-btn" id="reload-btn" title="Force reload the latest version">⟳ RELOAD</button>
+  <button class="header-btn" id="mute-btn" title="Toggle sound" aria-label="Toggle sound">🔊</button>
 </header>
 
 <div id="stat-bar">
@@ -705,6 +707,7 @@ function initBoostRow(container, opts) {
     if (state.croissants < cost) return;
     state.croissants -= cost;
     opts.onBuy();
+    sndBuy();
     checkAchievements();
     updateAll();
   });
@@ -829,6 +832,7 @@ function buyBuilding(i) {
   if (state.croissants < cost) return;
   state.croissants -= cost;
   state.buildings[i].count += qty;
+  sndBuy();
   checkAchievements();
   refreshUpgradesTab();
   updateAll();
@@ -887,6 +891,7 @@ function buyClickUpgrade(id) {
   if (!u || state.clickUpgrades[id] || state.croissants < u.cost) return;
   state.croissants -= u.cost;
   state.clickUpgrades[id] = true;
+  sndUpgrade();
   refreshUpgradesTab();
   updateAll();
 }
@@ -896,6 +901,7 @@ function buyBuildingUpgrade(id) {
   if (!u || state.buildingUpgrades[id] || state.croissants < u.cost) return;
   state.croissants -= u.cost;
   state.buildingUpgrades[id] = true;
+  sndUpgrade();
   refreshUpgradesTab();
   updateAll();
 }
@@ -907,6 +913,7 @@ function buyMedal() {
   if (state.croissants < cost) return;
   state.croissants -= cost;
   state.medalLevel = n;
+  sndMedal();
   checkAchievements();
   refreshMedalsTab();
   updateAll();
@@ -918,6 +925,7 @@ function buyMedalCapacity() {
   if (state.croissants < cost) return;
   state.croissants -= cost;
   state.medalCapacityLevel++;
+  sndBuy();
   refreshMedalsTab();
   updateAll();
   showToast(`📦 Medal capacity increased to ${getMedalCapacity()}!`);
@@ -1009,7 +1017,7 @@ function checkAchievements() {
       showToast(`🏆 Achievement unlocked: ${a.name}`);
     }
   });
-  if (changed) renderAchievements();
+  if (changed) { renderAchievements(); sndAchievement(); }
   return changed;
 }
 
@@ -1048,6 +1056,7 @@ document.getElementById('rebirth-confirm-btn').addEventListener('click', () => {
   state.clickPowerBoostLevel = 0;
   state.speedBoostLevel = 0;
   state.frenzyActive = false;
+  sndRebirth();
   closeModal('rebirth-modal');
   checkAchievements();
   refreshUpgradesTab();
@@ -1081,6 +1090,7 @@ document.getElementById('big-rebirth-confirm-btn').addEventListener('click', () 
   state.clickPowerBoostLevel = 0;
   state.speedBoostLevel = 0;
   state.frenzyActive = false;
+  sndRebirth();
   closeModal('big-rebirth-modal');
   checkAchievements();
   refreshUpgradesTab();
@@ -1130,6 +1140,239 @@ function showToast(msg) {
   requestAnimationFrame(() => t.classList.add('show'));
   setTimeout(() => { t.classList.add('fade'); setTimeout(() => t.remove(), 350); }, 3200);
 }
+
+// ── Audio (WebAudio synth: SFX + café-waltz music loop) ─────────
+const MUTE_KEY = 'croissantClickerMute';
+let muted = false;
+try { muted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) {}
+
+let ac = null, sfxGain = null, musicGain = null, noiseBuf = null;
+
+function ensureAudio() {
+  if (!ac) {
+    try {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      sfxGain = ac.createGain();   sfxGain.connect(ac.destination);
+      musicGain = ac.createGain(); musicGain.connect(ac.destination);
+      applyGains();
+    } catch (e) { ac = null; }
+  }
+  if (ac && ac.state === 'suspended' && !muted) ac.resume();
+  return ac;
+}
+function applyGains() {
+  if (!ac) return;
+  sfxGain.gain.value = muted ? 0 : 0.9;
+  musicGain.gain.value = muted ? 0 : 0.16;
+}
+function getNoise() {
+  if (!noiseBuf && ac) {
+    const len = Math.floor(ac.sampleRate * 0.2);
+    noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuf;
+}
+function tone(f, at, dur, type, gain, slideTo) {
+  const a = ensureAudio(); if (!a) return;
+  const t = a.currentTime + (at || 0);
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(f, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain || 0.1, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(sfxGain);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+function noisePuff(vol, at, dur, hp) {
+  if (!ac || !getNoise()) return;
+  const t = ac.currentTime + (at || 0);
+  const s = ac.createBufferSource(); s.buffer = noiseBuf;
+  const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp || 3000;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f).connect(g).connect(sfxGain);
+  s.start(t); s.stop(t + dur + 0.02);
+}
+
+// SFX — bake stays soft, throttled, pitch-varied: it fires constantly and must never fatigue.
+let lastBakeSfxAt = 0;
+function sndBake() {
+  const a = ensureAudio(); if (!a) return;
+  if (a.currentTime - lastBakeSfxAt < 0.055) return;
+  lastBakeSfxAt = a.currentTime;
+  const f = 540 + Math.random() * 160;
+  tone(f, 0, 0.06, 'triangle', 0.045, f * 0.78);
+  noisePuff(0.015, 0, 0.03, 4500);
+}
+function sndBuy() {
+  tone(349.23, 0, 0.07, 'triangle', 0.08);
+  tone(523.25, 0.07, 0.10, 'triangle', 0.08);
+}
+function sndUpgrade() {
+  tone(523.25, 0,    0.07, 'sine', 0.08);
+  tone(659.25, 0.06, 0.07, 'sine', 0.08);
+  tone(783.99, 0.12, 0.12, 'sine', 0.08);
+}
+function sndAchievement() {
+  if (!ac) return;   // achievements can unlock passively before the first gesture
+  tone(523.25, 0,    0.09, 'triangle', 0.09);
+  tone(659.25, 0.09, 0.09, 'triangle', 0.09);
+  tone(783.99, 0.18, 0.09, 'triangle', 0.09);
+  tone(1046.5, 0.27, 0.22, 'triangle', 0.10);
+}
+function sndGolden() {
+  tone(880,    0,    0.28, 'sine', 0.09, 1760);
+  tone(1318.5, 0.05, 0.26, 'sine', 0.06, 2637);
+  noisePuff(0.05, 0, 0.18, 6000);
+}
+function sndMedal() {
+  tone(523.25, 0,    0.16, 'triangle', 0.08);
+  tone(659.25, 0,    0.16, 'triangle', 0.06);
+  tone(783.99, 0.12, 0.30, 'triangle', 0.08);
+  tone(1046.5, 0.12, 0.30, 'sine',     0.05);
+}
+function sndRebirth() {
+  noisePuff(0.07, 0, 0.5, 1200);
+  tone(196,    0,    0.50, 'sawtooth', 0.05, 784);
+  tone(392,    0.22, 0.45, 'sine',     0.08, 1568);
+  tone(587.33, 0.40, 0.50, 'sine',     0.06, 1174.7);
+}
+
+// Music — Parisian bakery café-waltz: 3/4 at 108 BPM, 16-bar A/B loop in F major.
+// Oom-pah-pah: warm triangle bass on beat 1, detuned-saw "accordion" chord stabs
+// on beats 2+3, sweet music-box sine lead on top, whisper-quiet brush hats.
+const NOTE = { F2:87.31, G2:98.00, A2:110.00, Bb2:116.54, C3:130.81, D3:146.83,
+  F3:174.61, G3:196.00, A3:220.00, Bb3:233.08, C4:261.63, D4:293.66, E4:329.63,
+  F4:349.23, G4:392.00, A4:440.00, Bb4:466.16, C5:523.25, D5:587.33, E5:659.25,
+  F5:698.46, G5:783.99, A5:880.00, Bb5:932.33 };
+const CHORD_TONES = {
+  F:  ['F3','A3','C4'], Dm: ['F3','A3','D4'], Gm: ['G3','Bb3','D4'],
+  C7: ['G3','Bb3','E4'], Bb: ['F3','Bb3','D4'] };
+const BASS_ROOT  = { F:'F2', Dm:'D3', Gm:'G2', C7:'C3', Bb:'Bb2' };
+const BASS_FIFTH = { F:'C3', Dm:'A2', Gm:'D3', C7:'G2', Bb:'F3' };
+const BAR_CHORDS = ['F','F','Dm','Dm','Gm','Gm','C7','C7',   // A section
+                    'Bb','Bb','F','F','Gm','C7','F','F'];    // B section
+const MELODY = [   // 6 eighth-note slots per 3/4 bar (beats 1 & 2 & 3 &)
+  ['C5',0,'A4',0,'F4',0],  ['A4',0,'C5','D5','F5',0],
+  ['E5',0,'D5',0,'A4',0],  ['D5',0,'E5',0,'F5',0],
+  ['G5',0,'D5',0,'Bb4',0], ['D5',0,'Bb4',0,'G4',0],
+  ['E5',0,'G5',0,'E5',0],  ['D5',0,'C5',0,'Bb4',0],
+  ['F5',0,'D5',0,'Bb4',0], ['D5',0,'F5','G5','Bb5',0],
+  ['A5',0,'F5',0,'C5',0],  ['A4',0,'C5',0,'F5',0],
+  ['G5',0,'F5',0,'D5',0],  ['E5',0,'D5',0,'C5',0],
+  ['C5',0,'A4',0,'C5',0],  ['F5',0,0,0,'C5',0],
+];
+const WALTZ_STEP = 60 / 108 / 2;          // one eighth note at 108 BPM
+const WALTZ_STEPS = MELODY.length * 6;    // 96 steps = 16 bars
+let musicTimer = null, musicStep = 0, nextNoteTime = 0;
+
+function mBox(f, t) {                     // music-box lead: sine + faint 4x partial
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'sine'; o.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.055, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.75);
+  o.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t + 0.8);
+  const o2 = ac.createOscillator(), g2 = ac.createGain();
+  o2.type = 'sine'; o2.frequency.value = f * 4;
+  g2.gain.setValueAtTime(0.0001, t);
+  g2.gain.exponentialRampToValueAtTime(0.012, t + 0.008);
+  g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+  o2.connect(g2); g2.connect(musicGain);
+  o2.start(t); o2.stop(t + 0.32);
+}
+function mAccordion(toneNames, t) {       // detuned-saw pair per chord tone, lowpassed
+  toneNames.forEach(n => {
+    const f = NOTE[n];
+    [-7, 7].forEach(cents => {
+      const o = ac.createOscillator(), fl = ac.createBiquadFilter(), g = ac.createGain();
+      o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = cents;
+      fl.type = 'lowpass'; fl.frequency.value = 950; fl.Q.value = 0.7;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.016, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.30);
+      o.connect(fl); fl.connect(g); g.connect(musicGain);
+      o.start(t); o.stop(t + 0.34);
+    });
+  });
+}
+function mBass(f, t, soft) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'triangle'; o.frequency.value = f;
+  const v = soft ? 0.07 : 0.11;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(v, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+  o.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t + 0.55);
+}
+function mBrush(t, vol) {
+  if (!getNoise()) return;
+  const s = ac.createBufferSource(); s.buffer = noiseBuf;
+  const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+  s.connect(f); f.connect(g); g.connect(musicGain);
+  s.start(t); s.stop(t + 0.06);
+}
+function musicPlayStep(stp, t) {
+  const bar = Math.floor(stp / 6), slot = stp % 6;
+  const ch = BAR_CHORDS[bar];
+  if (slot === 0) mBass(NOTE[BASS_ROOT[ch]], t, false);
+  if (slot === 4 && bar % 2 === 1) mBass(NOTE[BASS_FIFTH[ch]], t, true);   // gentle walk
+  if (slot === 2 || slot === 4) { mAccordion(CHORD_TONES[ch], t); mBrush(t, 0.010); }
+  const mn = MELODY[bar][slot];
+  if (mn) mBox(NOTE[mn], t);
+}
+function musicSchedule() {                // ~25 ms lookahead sequencer
+  if (!ac) return;
+  while (nextNoteTime < ac.currentTime + 0.15) {
+    musicPlayStep(musicStep, nextNoteTime);
+    musicStep = (musicStep + 1) % WALTZ_STEPS;
+    nextNoteTime += WALTZ_STEP;
+  }
+}
+function startMusic() {
+  const a = ensureAudio(); if (!a) return;
+  if (musicTimer) return;
+  musicStep = 0; nextNoteTime = a.currentTime + 0.1;
+  musicTimer = setInterval(musicSchedule, 25);
+}
+
+// First user gesture unlocks the context + starts music (capture phase so it
+// runs even when a handler stopPropagation()s, e.g. the golden croissant).
+function unlockAudio() {
+  if (!ensureAudio()) return;
+  startMusic();
+  window.removeEventListener('pointerdown', unlockAudio, true);
+  window.removeEventListener('keydown', unlockAudio, true);
+}
+window.addEventListener('pointerdown', unlockAudio, true);
+window.addEventListener('keydown', unlockAudio, true);
+
+const muteBtn = document.getElementById('mute-btn');
+function updateMuteBtn() { muteBtn.textContent = muted ? '🔇' : '🔊'; }
+muteBtn.addEventListener('click', () => {
+  muted = !muted;
+  try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch (e) {}
+  applyGains();
+  if (ac) { if (muted) ac.suspend(); else ac.resume(); }
+  updateMuteBtn();
+});
+updateMuteBtn();
+
+document.addEventListener('visibilitychange', () => {
+  if (!ac) return;
+  if (document.hidden) ac.suspend();
+  else if (!muted) ac.resume();
+});
 
 // ── Canvas FX ────────────────────────────────────────────────────
 const fxCanvas = document.getElementById('fx-canvas');
@@ -1191,6 +1434,7 @@ function handleClick(clientX, clientY) {
   const power = getClickPower();
   state.croissants += power;
   state.totalBakedAllTime += power;
+  sndBake();
   spawnCrumbs(x, y, 6);
   spawnFloater(x, y, '+' + formatCroissants(power), '#ffc300');
   croissantBtn.style.transform = 'scale(0.88) rotate(-4deg)';
@@ -1231,6 +1475,7 @@ function spawnGolden() {
     e.stopPropagation();
     clearTimeout(timeout);
     state.goldenClicks++;
+    sndGolden();
     if (Math.random() < 0.5) triggerFrenzy(); else triggerLucky();
     removeGolden();
     checkAchievements();
