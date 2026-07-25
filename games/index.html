@@ -139,7 +139,7 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 02:03 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 02:14 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
@@ -430,6 +430,14 @@ h1 {
         <div class="game-desc">Tap your way through torchlit dungeons one turn at a time. Bump to fight, loot relics that stack into a build, descend forever — death is permanent.</div>
       </div>
     </a>
+
+    <a class="game-card" href="alpine-ascent/">
+      <div class="game-icon">⛰️</div>
+      <div class="game-info">
+        <div class="game-name">ALPINE ASCENT</div>
+        <div class="game-desc">Hold to charge, drag to aim, release to leap up the mountain. Ice slides, ledges crumble, wind howls — six camps stand between you and the summit.</div>
+      </div>
+    </a>
   </div>
 
   <div id="stats">
@@ -485,6 +493,7 @@ const GAMES = [
   { n: 'NEON RECALL', i: '🧠', h: 'neon-recall/', genre: ['memory-board'], input: ['tap'], session: ['level-campaign', 'local-2p'], mech: ['memory-match', 'resource-economy', 'combo-multiplier'], players: ['solo', 'local-2p'] },
   { n: 'NEON DRIFT', i: '🏎️', h: 'neon-drift/', genre: ['driver-racing'], input: ['two-thumb'], session: ['time-trial'], mech: ['physics-sim', 'ghost-replay', 'timing-precision'], players: ['solo'] },
   { n: 'EMBER DEPTHS', i: '🔥', h: 'ember-depths/', genre: ['roguelike'], input: ['tap-to-move'], session: ['run-based'], mech: ['permadeath', 'relic-builds', 'procedural-generation', 'grid-combat'], players: ['solo'] },
+  { n: 'ALPINE ASCENT', i: '⛰️', h: 'alpine-ascent/', genre: ['platformer'], input: ['hold-charge', 'drag-aim-release'], session: ['level-campaign'], mech: ['physics-sim', 'timing-precision', 'checkpoint-climb'], players: ['solo'] },
 ];
 // One hue per section (single-series bars; labels carry identity). Green and
 // gold sections are kept non-adjacent — the pair is CVD-inseparable.

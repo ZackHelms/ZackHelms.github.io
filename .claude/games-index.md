@@ -60,8 +60,9 @@ local-2p.
 | Neon Recall | `neon-recall/` | memory-board | tap | level-campaign, local-2p | memory-match, resource-economy, combo-multiplier | solo, local-2p | `.claude/neon-recall.md` |
 | Neon Drift | `neon-drift/` | driver-racing | two-thumb | time-trial | physics-sim, ghost-replay, timing-precision | solo | `.claude/neon-drift.md` |
 | Ember Depths | `ember-depths/` | roguelike | tap-to-move | run-based | permadeath, relic-builds, procedural-generation, grid-combat | solo | `.claude/ember-depths.md` |
+| Alpine Ascent | `alpine-ascent/` | platformer | hold-charge, drag-aim-release | level-campaign | physics-sim, timing-precision, checkpoint-climb | solo | `.claude/alpine-ascent.md` |
 
-36 games (34 in-repo + 2 external builds).
+37 games (35 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -87,7 +88,7 @@ local-2p.
   established house pattern now).
 
 ### Absent — highest-novelty targets
-- **Genres:** `trivia` · `platformer`.
+- **Genres:** `trivia`.
 - **Inputs:** `tilt` (iOS motion-permission prompt — low priority) ·
   `pinch-rotate`.
 - **Players:** local-2p now has three flavors — real-time (air hockey),
@@ -96,10 +97,8 @@ local-2p.
 
 ### Example picks this table would suggest next
 A `trivia` quiz (absent genre — embedded question bank, timed answers), a
-`platformer` (absent genre — one-thumb jumps; the only classic shelf still
-empty), a `pinch-rotate` puzzle (absent input), or a `daily-challenge`
-retrofit onto another seeded game (blade-spin already has
-`seeded-determinism`).
+`pinch-rotate` puzzle (absent input), or a `daily-challenge` retrofit onto
+another seeded game (blade-spin already has `seeded-determinism`).
 
 *(The first 2026-07-24 batch — word-circuit, neon-tactics, star-surge,
 grid-defense — filled the `word`, `turn-based-tactics`, `shmup`,
@@ -108,4 +107,5 @@ tri-peaks, shadow-circuit, neon-recall, neon-drift — filled `card-deck`,
 `stealth`, `maze`, `memory-board`, and `driver-racing`, adding
 `tap-to-move` input and `time-trial`/`quick-round` sessions. The
 2026-07-25 realistic-graphics batch opened with ember-depths filling
-`roguelike` + `run-based`.)*
+`roguelike` + `run-based` and alpine-ascent filling `platformer` with a
+`hold-charge` leap.)*

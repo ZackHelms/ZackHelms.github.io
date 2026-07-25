@@ -320,6 +320,15 @@ grip-lag drift physics, mud-slow rough, anti-cut lap tracking, per-track
 best time + ghost replay, engine-pitch oscillator + synthwave loop.
 Detailed context: `.claude/neon-drift.md`.
 
+### ALPINE ASCENT (`alpine-ascent/index.html`, ~900 lines)
+Charge-jump mountain platformer (Jump-King-like). Hold to charge, drag to
+aim (dotted preview arc), release to leap; one fixed seeded mountain, 6
+camp checkpoints to the summit; ice slides, crumble ledges respawn, wind
+above the cloud line bends jumps. Falls cost altitude only. Realistic
+rendering: altitude-graded skies, parallax ridges, god rays, cloud-band
+fog, snow, textured ledges. Camps + summit persisted.
+Detailed context: `.claude/alpine-ascent.md`.
+
 ### EMBER DEPTHS (`ember-depths/index.html`, ~1030 lines)
 Turn-based torchlit roguelike. Tap-to-move BFS pathing on an 11×16 grid,
 bump combat, permadeath; drunkard-walk floors, depth-scaled enemies
