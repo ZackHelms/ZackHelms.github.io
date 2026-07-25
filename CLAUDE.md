@@ -76,6 +76,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Neon Drift (`games/neon-drift/`) | `.claude/neon-drift.md` | Any work on the drift racer — track splines, drift physics, lap/anti-cut tracking, ghost replay |
 | Ember Depths (`games/ember-depths/`) | `.claude/ember-depths.md` | Any work on the roguelike — turn engine, floor generation, vision/light map, relic effects |
 | Alpine Ascent (`games/alpine-ascent/`) | `.claude/alpine-ascent.md` | Any work on the charge-jump climber — jump envelope, mountain generator, ground types, wind, altitude-graded rendering |
+| Golden Reel (`games/golden-reel/`) | `.claude/golden-reel.md` | Any work on the fishing game — cast/bite/fight state machine, species zones, gear effects, dusk-water rendering |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 

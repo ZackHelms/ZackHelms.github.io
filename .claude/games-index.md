@@ -61,8 +61,9 @@ local-2p.
 | Neon Drift | `neon-drift/` | driver-racing | two-thumb | time-trial | physics-sim, ghost-replay, timing-precision | solo | `.claude/neon-drift.md` |
 | Ember Depths | `ember-depths/` | roguelike | tap-to-move | run-based | permadeath, relic-builds, procedural-generation, grid-combat | solo | `.claude/ember-depths.md` |
 | Alpine Ascent | `alpine-ascent/` | platformer | hold-charge, drag-aim-release | level-campaign | physics-sim, timing-precision, checkpoint-climb | solo | `.claude/alpine-ascent.md` |
+| Golden Reel | `golden-reel/` | fishing | hold-charge, tap | save-campaign | collection, resource-economy, timing-precision | solo | `.claude/golden-reel.md` |
 
-37 games (35 in-repo + 2 external builds).
+38 games (36 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -73,7 +74,9 @@ local-2p.
   the most crowded shelf.
 
 ### Rare — one game each; a second with a different spin is fair game
-- `hold-charge` (pinball plunger) · `two-thumb` (pinball flippers,
+- `hold-charge` (pinball plunger, alpine-ascent leap, golden-reel cast —
+  now an established pattern) · `fishing` + `catch-log collection`
+  (golden-reel) · `two-thumb` (pinball flippers,
   neon-drift hold-steer) · `swipe`-led
   (neon-slice) · `virtual-joystick` (zed-shooter) · `par-course` (neon-golf)
   · `time-trial` + `ghost-replay` (neon-drift)
@@ -107,5 +110,5 @@ tri-peaks, shadow-circuit, neon-recall, neon-drift — filled `card-deck`,
 `stealth`, `maze`, `memory-board`, and `driver-racing`, adding
 `tap-to-move` input and `time-trial`/`quick-round` sessions. The
 2026-07-25 realistic-graphics batch opened with ember-depths filling
-`roguelike` + `run-based` and alpine-ascent filling `platformer` with a
-`hold-charge` leap.)*
+`roguelike` + `run-based`, alpine-ascent filling `platformer` with a
+`hold-charge` leap, and golden-reel adding the new `fishing` genre.)*

@@ -329,6 +329,15 @@ rendering: altitude-graded skies, parallax ridges, god rays, cloud-band
 fog, snow, textured ledges. Camps + summit persisted.
 Detailed context: `.claude/alpine-ascent.md`.
 
+### GOLDEN REEL (`golden-reel/index.html`, ~980 lines)
+Dusk-lake fishing. Hold-charge cast (line gear caps range), tap-twitch,
+0.9 s hook-set window, then a reel/release tension fight (runs take line,
+calm reels it back; snap vs land). 8 species in distance zones with
+lure-gated rares; coins buy rod/reel/line/lure upgrades; persistent
+catch log (count + best weight). Realistic rendering: layered sunset,
+sun-glitter water, ripple rings, silhouette fish, rim-lit angler.
+Detailed context: `.claude/golden-reel.md`.
+
 ### EMBER DEPTHS (`ember-depths/index.html`, ~1030 lines)
 Turn-based torchlit roguelike. Tap-to-move BFS pathing on an 11×16 grid,
 bump combat, permadeath; drunkard-walk floors, depth-scaled enemies
