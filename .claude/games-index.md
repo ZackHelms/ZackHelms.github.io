@@ -64,8 +64,10 @@ local-2p.
 | Golden Reel | `golden-reel/` | fishing | hold-charge, tap | save-campaign | collection, resource-economy, timing-precision | solo | `.claude/golden-reel.md` |
 | Vault Breaker | `vault-breaker/` | dexterity-puzzle | pinch-rotate | level-campaign | timing-precision, seeded-determinism, star-rating | solo | `.claude/vault-breaker.md` |
 | Locksport | `locksport/` | lockpicking-sim | drag-probe, tension-hold | level-campaign | feel-simulation, binding-order, star-rating, seeded-determinism | solo | `.claude/locksport.md` |
+| Ballpark | `ballpark/` | trivia | drag-slider | daily-challenge, quick-round | estimation-scoring, streak-multiplier, seeded-determinism | solo | `.claude/ballpark.md` |
+| Tilt Labyrinth | `tilt-labyrinth/` | marble-labyrinth | tilt, drag-steer | level-campaign | physics-sim, hazard-avoidance, star-rating | solo | `.claude/tilt-labyrinth.md` |
 
-40 games (38 in-repo + 2 external builds).
+42 games (40 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -94,20 +96,27 @@ local-2p.
 - `lockpicking-sim` genre + `drag-probe`/`tension-hold` feel input +
   `feel-simulation`/`binding-order` mechanics (locksport — a physical-skill
   simulator, the first "learn a real craft" title).
+- `trivia` + `drag-slider` + `estimation-scoring` (ballpark — graded
+  guessing rather than multiple choice) · `marble-labyrinth` + `tilt` +
+  `hazard-avoidance` (tilt-labyrinth — the only motion-sensor game).
 
-### Absent — highest-novelty targets
-- **Genres:** `trivia`.
-- **Inputs:** `tilt` (iOS motion-permission prompt — low priority).
-- **Players:** local-2p now has three flavors — real-time (air hockey),
-  turn-based tactics (neon-tactics), and memory duel (neon-recall);
-  further 2P additions need a genuinely new interaction shape.
+### Absent — nothing left on the primary axes
+Every genre, input, and session value this catalog tracks now has at least
+one game. Novelty from here has to come from **new facet values**, not from
+filling holes — invent the axis value first, then the game. Open directions:
+- **Inputs:** `voice`/`mic-blow`, `two-finger-pan`, `long-press-hold`,
+  `shake`, `camera`-driven — none exist yet.
+- **Sessions:** `async-versus` (share a seed, compare scores),
+  `weekly-ladder`, `endless-coop`.
+- **Players:** local-2p has three flavors — real-time (air hockey),
+  turn-based tactics (neon-tactics), memory duel (neon-recall); a fourth
+  needs a genuinely new interaction shape.
 
 ### Example picks this table would suggest next
-A `trivia` quiz (the last absent genre — embedded question bank, timed
-answers), a `tilt` experiment (absent input, needs the iOS
-motion-permission prompt), or a `daily-challenge` retrofit onto another
-seeded game (blade-spin and vault-breaker both have
-`seeded-determinism`).
+A `mic-blow` or `shake` game (the last untouched sensor inputs after tilt
+landed), an `async-versus` retrofit onto a seeded game (blade-spin,
+vault-breaker, ballpark and word-circuit all have `seeded-determinism`), or
+a second `trivia` title in a different shape now that the genre is open.
 
 *(The first 2026-07-24 batch — word-circuit, neon-tactics, star-surge,
 grid-defense — filled the `word`, `turn-based-tactics`, `shmup`,
@@ -120,4 +129,6 @@ golden-reel, vault-breaker — filled `roguelike` + `run-based`,
 `platformer`, the new `fishing` genre, and the `pinch-rotate` input. The
 2026-07-25 realistic lock-picking build — locksport — added the
 `lockpicking-sim` genre and the two-handed `drag-probe`/`tension-hold`
-feel input, leaving `trivia` and `tilt` as the only absent targets.)*
+feel input. The 2026-07-25 closing pair — ballpark and tilt-labyrinth —
+took the last two absent values, `trivia` and `tilt`, so the coverage map
+has no empty cells left on genre, input, or session.)*

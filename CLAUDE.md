@@ -79,6 +79,8 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Golden Reel (`games/golden-reel/`) | `.claude/golden-reel.md` | Any work on the fishing game — cast/bite/fight state machine, species zones, gear effects, dusk-water rendering |
 | Vault Breaker (`games/vault-breaker/`) | `.claude/vault-breaker.md` | Any work on the safecracker — rotation input, pin/ring/handle phases, vault generator, brushed-metal rendering |
 | Locksport (`games/locksport/`) | `.claude/locksport.md` | Any work on the lock-picking sim — binding/shear pin physics, spool/serrated drivers, tension pad, level path, cutaway rendering |
+| Ballpark (`games/ballpark/`) | `.claude/ballpark.md` | Any work on the estimation trivia — question bank + range rules, log/linear dial math, proximity scoring, daily seeding |
+| Tilt Labyrinth (`games/tilt-labyrinth/`) | `.claude/tilt-labyrinth.md` | Any work on the tilt maze — motion/drag input, ball physics, hole capture rules, board authoring + BFS fairness gate |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 

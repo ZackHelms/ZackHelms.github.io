@@ -139,7 +139,7 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 04:57 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 19:46 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
@@ -462,6 +462,22 @@ h1 {
         <div class="game-desc">A real single-pin-picking bench, side-view cutaway. Feel for the binding pin, ride it to the shear line, beat spools and serrations. 12 locks, no timer.</div>
       </div>
     </a>
+
+    <a class="game-card" href="ballpark/">
+      <div class="game-icon">🎚️</div>
+      <div class="game-info">
+        <div class="game-name">BALLPARK</div>
+        <div class="game-desc">Estimation trivia with no multiple choice — slide the dial to your best guess and score by how close you land. 100+ questions, a daily ten, streak multipliers.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="tilt-labyrinth/">
+      <div class="game-icon">🕳️</div>
+      <div class="game-info">
+        <div class="game-name">TILT LABYRINTH</div>
+        <div class="game-desc">Tip your phone to roll a steel ball across an oak board, past the holes, into the brass cup. 10 boards from a first roll to the gauntlet. Drag works too.</div>
+      </div>
+    </a>
   </div>
 
   <div id="stats">
@@ -521,6 +537,8 @@ const GAMES = [
   { n: 'GOLDEN REEL', i: '🎣', h: 'golden-reel/', genre: ['fishing'], input: ['hold-charge', 'tap'], session: ['save-campaign'], mech: ['collection', 'resource-economy', 'timing-precision'], players: ['solo'] },
   { n: 'VAULT BREAKER', i: '🔐', h: 'vault-breaker/', genre: ['dexterity-puzzle'], input: ['pinch-rotate'], session: ['level-campaign'], mech: ['timing-precision', 'seeded-determinism', 'star-rating'], players: ['solo'] },
   { n: 'LOCKSPORT', i: '🗝️', h: 'locksport/', genre: ['lockpicking-sim'], input: ['drag-probe', 'tension-hold'], session: ['level-campaign'], mech: ['feel-simulation', 'binding-order', 'star-rating', 'seeded-determinism'], players: ['solo'] },
+  { n: 'BALLPARK', i: '🎚️', h: 'ballpark/', genre: ['trivia'], input: ['drag-slider'], session: ['daily-challenge', 'quick-round'], mech: ['estimation-scoring', 'streak-multiplier', 'seeded-determinism'], players: ['solo'] },
+  { n: 'TILT LABYRINTH', i: '🕳️', h: 'tilt-labyrinth/', genre: ['marble-labyrinth'], input: ['tilt', 'drag-steer'], session: ['level-campaign'], mech: ['physics-sim', 'hazard-avoidance', 'star-rating'], players: ['solo'] },
 ];
 // One hue per section (single-series bars; labels carry identity). Green and
 // gold sections are kept non-adjacent — the pair is CVD-inseparable.
