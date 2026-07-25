@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Locksport</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30; --green:#39ff14;
+  --gold:#ffc300; --blue:#4488ff; --red:#ff2244; --white:#dde3ff;
+  --dim:#8899bb; --purple:#b44fff;
+  --brass:#c9a44a; --wood:#4a3524;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);touch-action:manipulation}
+body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none;-webkit-user-select:none}
+#wrap{position:fixed;inset:0;display:flex;flex-direction:column}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#back-btn{position:fixed;top:calc(6px + env(safe-area-inset-top));left:8px;z-index:60;
+  width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  color:var(--dim);font-size:17px;text-decoration:none}
+#mute-btn{position:fixed;top:calc(6px + env(safe-area-inset-top));left:52px;z-index:60;
+  width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  color:var(--dim);font-size:14px;cursor:pointer}
+#lvl-sel{position:fixed;top:calc(6px + env(safe-area-inset-top));right:8px;z-index:60;
+  height:30px;max-width:170px;background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;color:var(--gold);font-family:'Share Tech Mono',monospace;
+  font-size:11px;padding:0 6px;display:none}
+.ctl-btn{position:fixed;z-index:60;background:var(--panel);border:1px solid var(--border);
+  border-radius:10px;color:var(--white);font-family:'Share Tech Mono',monospace;
+  font-size:13px;letter-spacing:1px;padding:9px 0;text-align:center;cursor:pointer;display:none}
+#reset-btn{left:8px;bottom:calc(190px + env(safe-area-inset-bottom));width:104px;
+  color:var(--red);border-color:#3a1a26}
+#reset-btn:active{background:#1a0b12}
+#pick-hook,#pick-rake{width:70px;bottom:calc(244px + env(safe-area-inset-bottom));padding:6px 0}
+#pick-hook{right:86px}
+#pick-rake{right:8px}
+.ctl-btn.sel{color:var(--gold);border-color:#5a4a16;background:#141007}
+.overlay{position:fixed;inset:0;z-index:70;background:rgba(4,4,10,0.86);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:24px}
+.overlay h1{font-family:'Black Ops One',cursive;font-size:44px;color:var(--gold);
+  text-shadow:0 0 24px rgba(255,195,0,0.45);letter-spacing:2px}
+.overlay h2{font-family:'Black Ops One',cursive;font-size:30px;color:var(--gold);letter-spacing:2px}
+.overlay .sub{color:var(--dim);font-size:13px;margin:10px 0 22px;max-width:320px;line-height:1.5}
+.big-btn{background:var(--panel);border:1px solid #5a4a16;border-radius:12px;
+  color:var(--gold);font-family:'Black Ops One',cursive;font-size:18px;
+  letter-spacing:2px;padding:14px 46px;margin:8px 0;cursor:pointer}
+.small-btn{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:13px;
+  letter-spacing:1px;padding:10px 26px;margin:6px 0;cursor:pointer}
+#menu-sel{margin:4px 0 14px;height:36px;background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;color:var(--gold);font-family:'Share Tech Mono',monospace;font-size:13px;padding:0 10px}
+#win-stars{font-size:38px;letter-spacing:8px;margin:6px 0 2px}
+#win-stats{color:var(--dim);font-size:13px;margin-bottom:16px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(250px + env(safe-area-inset-bottom));z-index:65;max-width:330px;
+  background:rgba(11,11,22,0.92);border:1px solid #5a4a16;border-radius:10px;
+  color:var(--gold);font-size:12px;line-height:1.5;padding:10px 14px;text-align:center;
+  display:none;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 04:54 UTC</div>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute-btn" aria-label="Toggle sound">🔊</button>
+<select id="lvl-sel" aria-label="Level select"></select>
+<button id="reset-btn" class="ctl-btn">RESET ⟲</button>
+<button id="pick-hook" class="ctl-btn sel">HOOK</button>
+<button id="pick-rake" class="ctl-btn">RAKE</button>
+<div id="toast"></div>
+
+<div id="menu" class="overlay" style="display:flex">
+  <h1>LOCKSPORT</h1>
+  <div class="sub">A pick &amp; tension practice bench.<br>
+  Feel for the binding pin, lift it to the shear line,<br>work the lock open — no timer death, ever.</div>
+  <select id="menu-sel" aria-label="Choose level"></select>
+  <button id="start-btn" class="big-btn">PICK IT</button>
+  <div id="menu-stars" class="sub" style="margin-top:14px"></div>
+</div>
+
+<div id="win" class="overlay">
+  <h2 id="win-title">UNLOCKED</h2>
+  <div id="win-stars">★★★</div>
+  <div id="win-stats"></div>
+  <button id="next-btn" class="big-btn">NEXT LOCK</button>
+  <button id="replay-btn" class="small-btn">REPLAY</button>
+  <button id="menu-btn" class="small-btn">MENU</button>
+</div>
+
+<script>
+'use strict';
+/* ============================== CORE DATA ============================== */
+// Tolerance classes: over = px past shear before an overset jams the pin,
+// step = base stick-slip jump size, creep = max px/frame that still counts
+// as a "slow" push (moves smoothly, no jump risk).
+const TOLS = {
+  loose:{over:11,  step:2.2, creep:0.85},
+  med:  {over:7.5, step:3.2, creep:0.70},
+  tight:{over:4.8, step:4.2, creep:0.55},
+};
+// The practice path: progressively pinned standard locks -> tight
+// tolerances -> spools (false set + counter-rotation) -> serrated -> mixes.
+// drivers: s=standard p=spool r=serrated. rake: raking can set pins here.
+const LEVELS = [
+  {name:'FIRST PIN',    pins:1, drv:'s',      tol:'loose', rake:true,  par:15,  seed:11,
+   tip:'The tension wrench is already turning the plug. Drag on the bench (right side) to slide the pick, push up under the pin — lift until it clicks.'},
+  {name:'TWO PINS',     pins:2, drv:'ss',     tol:'loose', rake:true,  par:26,  seed:23,
+   tip:'Only ONE pin binds at a time. Loose pins spring straight back — find the stiff one that holds its lift.'},
+  {name:'THREE PINS',   pins:3, drv:'sss',    tol:'loose', rake:true,  par:38,  seed:37,
+   tip:'Set pins go floppy — the spring is trapped above the shear line. Leave them alone; re-lifting a set pin can jam it.'},
+  {name:'WARM-UP FOUR', pins:4, drv:'ssss',   tol:'med',   rake:true,  par:52,  seed:41,
+   tip:'Tolerances tighten. Watch the driver against the shear seam and slow down as it gets close.'},
+  {name:'FIVE STACK',   pins:5, drv:'sssss',  tol:'med',   rake:true,  par:68,  seed:53,
+   tip:'A full five-pin cylinder. The RAKE can scrub loose locks like this one open fast — try it.'},
+  {name:'TIGHT FIVE',   pins:5, drv:'sssss',  tol:'tight', rake:false, par:88,  seed:67,
+   tip:'Machined tight: raking just jams it now, and hard pushes overset. Slow is smooth, smooth is fast.'},
+  {name:'FIRST SPOOL',  pins:4, drv:'ssps',   tol:'med',   rake:false, par:80,  seed:71,
+   tip:'A SPOOL driver. On a big clunk (false set) the dial over-rotates — ease the new TENSION pad down into the green band and keep lifting slowly. Too light drops everything.'},
+  {name:'TWIN SPOOLS',  pins:5, drv:'spssp',  tol:'med',   rake:false, par:100, seed:83,
+   tip:'Two spools. Heavy tension pinches a false-set spool solid; the green band lets it walk up past its waist.'},
+  {name:'SERRATED',     pins:5, drv:'srsrs',  tol:'med',   rake:false, par:105, seed:97,
+   tip:'Serrated drivers click many times before they truly set. Real sets swing the dial further. Keep tension out of the red.'},
+  {name:'SECURITY MIX', pins:5, drv:'prspr',  tol:'tight', rake:false, par:125, seed:103,
+   tip:'Spools and serrations in one tight cylinder. Read each driver in the cutaway before you commit.'},
+  {name:'SIX CHAMBERS', pins:6, drv:'pspsps', tol:'tight', rake:false, par:150, seed:113,
+   tip:'Six pins, spools alternating. Patience — count your sets on the dial.'},
+  {name:'OLD IRON',     pins:6, drv:'prprpr', tol:'tight', rake:false, par:185, seed:131,
+   tip:'The bench master: every driver is a security pin. Everything you have learned, in one old lock.'},
+];
+const MIN_SET = 0.22;      // tension below this: binding pin will not hold a set
+const DROP_T  = 0.12;      // tension below this: every set pin drops (player slip)
+const COUNTER_MAX = 0.50;  // spool counter-rotation band ceiling
+const HEAVY_T = 0.75;      // above: serrations stick, creep disabled
+const KEYTIP_REST = 440;   // screen y of a key pin tip at rest
+const Y_SHEAR = 330;       // screen y of the shear line
+
+/* ============================== STATE ============================== */
+let W=390,H=844,dpr=1;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+let game='menu';           // menu | play | open
+let lvlIdx=0;
+let lock=null;             // current lock (pins, order, setCount, ...)
+let tension=0;             // 0..1 actual
+let tensionTarget=0.55;    // where tension eases toward (auto or pad)
+let tensionHeld=0.55;      // pad levels: last pad value (held on release)
+let plugAng=0;             // visual plug rotation, degrees
+let pick={depth:0.5,lift:0,tool:'hook',flex:0};  // depth 0..1 across chambers
+let stats={t:0,resets:0,running:false};
+let openAnim=0;            // 0..1 door-open progression
+let insertAnim=0;          // level-start wrench insert animation
+let resetAnim=0;           // reset release animation
+let particles=[];
+let save={u:1,s:{}};
+try{ const s=localStorage.getItem('locksport'); if(s) save=JSON.parse(s); }catch(e){}
+function persist(){ try{ localStorage.setItem('locksport',JSON.stringify(save)); }catch(e){} }
+
+/* ============================== RNG / GEN ============================== */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function genLock(i){
+  const L=LEVELS[i], rng=mulberry32(L.seed*7919+i*131+7);
+  const n=L.pins, tol=TOLS[L.tol];
+  const order=[...Array(n).keys()];
+  for(let k=n-1;k>0;k--){const j=Math.floor(rng()*(k+1));[order[k],order[j]]=[order[j],order[k]];}
+  const pins=[];
+  for(let p=0;p<n;p++){
+    const keyLen=56+Math.floor(rng()*15)*2;       // 56..84 px -> setLift 26..54
+    pins.push({
+      i:p, drv:L.drv[p], keyLen, setLift:110-keyLen,
+      state:'free',       // free | binding | falseset | set | overset
+      lift:0, pend:0, vy:0, drop:0,
+      spoolDepth: L.drv[p]==='p' ? 12 : 0,
+      serr: L.drv[p]==='r' ? [0.45,0.65,0.83].map(f=>Math.round(f*(110-keyLen))) : [],
+      serrHit:0, wob:rng()*6.28,
+    });
+  }
+  return {lvl:i,n,pins,order,setCount:0,tol,rake:L.rake,rng,jam:false};
+}
+function bindingIndex(){ return (lock&&!lock.jam&&lock.setCount<lock.n) ? lock.order[lock.setCount] : -1; }
+function pinX(p){ const span=(lock.n-1)*46; return W/2-span/2+p*46; }
+
+/* ============================== AUDIO ============================== */
+let AC=null,sfxGain=null,musicGain=null,noiseBuf=null,musicTimer=null,mStep=0,mNext=0;
+let muted=localStorage.getItem('locksport-mute')==='1';
+function audioInit(){
+  if(AC) { if(AC.state==='suspended') AC.resume(); return; }
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  sfxGain=AC.createGain(); sfxGain.connect(AC.destination);
+  musicGain=AC.createGain(); musicGain.connect(AC.destination);
+  const len=AC.sampleRate*1.2, nb=AC.createBuffer(1,len,AC.sampleRate), d=nb.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+  noiseBuf=nb;
+  applyMute();
+  musicTimer=setInterval(schedMusic,25); mNext=AC.currentTime+0.05;
+}
+function applyMute(){
+  if(!AC) return;
+  sfxGain.gain.value=muted?0:0.5; musicGain.gain.value=muted?0:0.16;
+  document.getElementById('mute-btn').textContent=muted?'🔇':'🔊';
+}
+function noiseHit(dur,f0,f1,vol,type){
+  if(!AC||muted) return;
+  const s=AC.createBufferSource(); s.buffer=noiseBuf;
+  const f=AC.createBiquadFilter(); f.type=type||'bandpass';
+  f.frequency.setValueAtTime(f0,AC.currentTime);
+  if(f1) f.frequency.exponentialRampToValueAtTime(f1,AC.currentTime+dur);
+  const g=AC.createGain(); g.gain.setValueAtTime(vol,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+dur);
+  s.connect(f); f.connect(g); g.connect(sfxGain); s.start(); s.stop(AC.currentTime+dur+0.02);
+}
+function toneHit(freq,dur,vol,type,slide){
+  if(!AC||muted) return;
+  const o=AC.createOscillator(); o.type=type||'sine';
+  o.frequency.setValueAtTime(freq,AC.currentTime);
+  if(slide) o.frequency.exponentialRampToValueAtTime(slide,AC.currentTime+dur);
+  const g=AC.createGain(); g.gain.setValueAtTime(vol,AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+dur);
+  o.connect(g); g.connect(sfxGain); o.start(); o.stop(AC.currentTime+dur+0.02);
+}
+const S={
+  probe:  ()=>noiseHit(0.03,2600,0,0.10),
+  grit:   ()=>noiseHit(0.045,900+Math.random()*500,0,0.16),
+  click:  ()=>{toneHit(3100,0.05,0.28,'sine');toneHit(1550,0.09,0.2,'sine');noiseHit(0.03,4000,0,0.14);},
+  clunk:  ()=>{toneHit(210,0.14,0.34,'sine',140);noiseHit(0.07,600,300,0.2,'lowpass');},
+  serr:   ()=>{toneHit(1400,0.04,0.16,'sine');noiseHit(0.02,3000,0,0.08);},
+  jam:    ()=>{noiseHit(0.18,1400,500,0.3);toneHit(160,0.2,0.2,'sawtooth',90);},
+  sproing:(d)=>{setTimeout(()=>{toneHit(900,0.12,0.16,'sine',300);noiseHit(0.05,2000,800,0.1);},d);},
+  creak:  ()=>noiseHit(0.1,300,180,0.09,'lowpass'),
+  open:   ()=>{ if(!AC||muted) return;
+    [0,90,180].forEach((d,i)=>setTimeout(()=>{toneHit(2400-i*300,0.05,0.2,'sine');noiseHit(0.04,3200,0,0.12);},d));
+    setTimeout(()=>{[523,659,784,1047].forEach((f,i)=>toneHit(f,0.9,0.12,'triangle'));toneHit(131,1.1,0.16,'sine');},330);
+  },
+};
+// Sparse noir bench music: low drone + occasional minor plucks.
+const M_NOTES=[110,131,147,165,196,220];
+const M_PAT=[0,-1,-1,2,-1,-1,4,-1,-1,1,-1,-1,3,-1,5,-1];
+function schedMusic(){
+  if(!AC||muted||document.hidden) return;
+  while(mNext<AC.currentTime+0.12){
+    const st=M_PAT[mStep%16];
+    if(mStep%32===0){ const o=AC.createOscillator(),g=AC.createGain();
+      o.type='sine';o.frequency.value=55;g.gain.setValueAtTime(0.0001,mNext);
+      g.gain.linearRampToValueAtTime(0.22,mNext+2);g.gain.linearRampToValueAtTime(0.0001,mNext+14);
+      o.connect(g);g.connect(musicGain);o.start(mNext);o.stop(mNext+14.5);}
+    if(st>=0 && Math.sin(mStep*0.7)>-0.4){
+      const o=AC.createOscillator(),g=AC.createGain();
+      o.type='triangle';o.frequency.value=M_NOTES[st];
+      g.gain.setValueAtTime(0.28,mNext);g.gain.exponentialRampToValueAtTime(0.001,mNext+1.6);
+      o.connect(g);g.connect(musicGain);o.start(mNext);o.stop(mNext+1.7);
+    }
+    mNext+=0.86; mStep++;
+  }
+}
+document.addEventListener('visibilitychange',()=>{ if(AC){ if(document.hidden) AC.suspend(); else if(!muted) AC.resume(); }});
+
+/* ============================== GAME FLOW ============================== */
+function startLevel(i){
+  lvlIdx=i; lock=genLock(i);
+  tension=0; tensionHeld=0.55; tensionTarget=0.55;
+  plugAng=0; openAnim=0; resetAnim=0; insertAnim=1;
+  pick={depth:0.08,lift:0,tool:'hook',flex:0};
+  stats={t:0,resets:0,running:false};
+  game='play'; particles=[];
+  document.getElementById('menu').style.display='none';
+  document.getElementById('win').style.display='none';
+  document.getElementById('reset-btn').style.display='block';
+  document.getElementById('pick-hook').style.display='block';
+  document.getElementById('pick-rake').style.display='block';
+  document.getElementById('lvl-sel').style.display='block';
+  setTool('hook');
+  syncSelects();
+  showToast(LEVELS[i].tip,6500);
+}
+function hasPad(){ return lvlIdx>=6; }
+function releaseAllPins(cascade){
+  let k=0;
+  for(const p of lock.pins){
+    if(p.state!=='free'||p.lift>1){ p.state='free'; p.drop=1; p.vy=0; if(cascade) S.sproing(k*70); k++; }
+    if(p.state==='set') p.lift=p.setLift;
+    p.pend=0; p.serrHit=0; p.freeLift=0;
+  }
+  lock.setCount=0; lock.jam=false;
+}
+function resetLock(){
+  if(game!=='play') return;
+  stats.resets++;
+  resetAnim=1; insertAnim=0;
+  releaseAllPins(true);
+  S.creak();
+}
+function jamPin(p){
+  p.state='overset'; lock.jam=true; S.jam();
+  showToast('JAMMED — a pin is stuck above the shear line. RESET to drop the pins.',3500);
+  for(let i=0;i<6;i++) particles.push({x:pinX(p.i),y:Y_SHEAR,vx:(Math.random()-0.5)*60,vy:-Math.random()*40,l:0.4,c:'#ff2244'});
+}
+function setPin(p){
+  p.state='set'; p.lift=p.setLift; p.pend=0;
+  lock.setCount++; plugPulse=0.25; S.click();
+  for(let i=0;i<5;i++) particles.push({x:pinX(p.i),y:Y_SHEAR,vx:(Math.random()-0.5)*40,vy:-Math.random()*30,l:0.35,c:'#ffc300'});
+  if(lock.setCount>=lock.n) openLock();
+}
+function openLock(){
+  game='open'; stats.running=false; S.open();
+  const st=starsFor(lvlIdx,stats);
+  const prev=save.s[lvlIdx]||0;
+  if(st>prev) save.s[lvlIdx]=st;
+  if(lvlIdx+1<LEVELS.length && save.u<lvlIdx+2) save.u=lvlIdx+2;
+  persist();
+  setTimeout(()=>{
+    const w=document.getElementById('win');
+    document.getElementById('win-stars').innerHTML=
+      '<span style="color:var(--gold)">'+'★'.repeat(st)+'</span><span style="color:#333">'+'★'.repeat(3-st)+'</span>';
+    document.getElementById('win-stats').textContent=
+      LEVELS[lvlIdx].name+' · '+stats.t.toFixed(1)+'s · '+stats.resets+' reset'+(stats.resets===1?'':'s')+' · par '+LEVELS[lvlIdx].par+'s';
+    document.getElementById('next-btn').style.display=(lvlIdx+1<LEVELS.length)?'block':'none';
+    w.style.display='flex'; syncSelects();
+  },1600);
+}
+function starsFor(i,st){
+  const par=LEVELS[i].par;
+  if(st.resets===0 && st.t<=par) return 3;
+  if(st.resets<=2 && st.t<=par*2.2) return 2;
+  return 1;
+}
+function setTool(t){
+  pick.tool=t;
+  document.getElementById('pick-hook').classList.toggle('sel',t==='hook');
+  document.getElementById('pick-rake').classList.toggle('sel',t==='rake');
+}
+let toastTimer=null;
+function showToast(msg,dur){
+  const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{t.style.display='none';},dur||4000);
+}
+function syncSelects(){
+  for(const sel of [document.getElementById('lvl-sel'),document.getElementById('menu-sel')]){
+    sel.innerHTML='';
+    for(let i=0;i<LEVELS.length;i++){
+      const o=document.createElement('option'); o.value=i;
+      const st=save.s[i]||0, locked=i>=save.u;
+      o.textContent=(locked?'🔒 ':'')+'L'+(i+1)+' · '+LEVELS[i].name+(st?' '+'★'.repeat(st):'');
+      o.disabled=locked; sel.appendChild(o);
+    }
+    sel.value=Math.min(lvlIdx,save.u-1);
+  }
+  let tot=0; for(const k in save.s) tot+=save.s[k];
+  document.getElementById('menu-stars').textContent='★ '+tot+' / '+(LEVELS.length*3)+' collected';
+}
+
+/* ============================== SIMULATION ============================== */
+let plugPulse=0;
+function pinContact(p){
+  // which pins the pick tip is touching
+  const tx=pickTipX();
+  if(pick.tool==='rake') return Math.abs(tx-pinX(p.i))<26;
+  return Math.abs(tx-pinX(p.i))<11;
+}
+function pickTipX(){ const span=(lock.n-1)*46+60; return W/2-span/2+pick.depth*span; }
+function update(dt){
+  plugPulse=Math.max(0,plugPulse-dt*2);
+  if(game==='open'){ openAnim=Math.min(1,openAnim+dt*1.1); updateFX(dt); return; }
+  if(game!=='play') return;
+  if(stats.running) stats.t+=dt;
+
+  // tension easing (insert / reset animations override)
+  if(resetAnim>0){ resetAnim=Math.max(0,resetAnim-dt*2.4); tension=Math.max(0,tension-dt*3);
+    if(resetAnim===0) insertAnim=1; }
+  else if(insertAnim>0){ insertAnim=Math.max(0,insertAnim-dt*1.6);
+    tension+= (tensionTarget-tension)*Math.min(1,dt*4); }
+  else {
+    tensionTarget = hasPad()? tensionHeld : 0.55;
+    tension += (tensionTarget-tension)*Math.min(1,dt*10);
+  }
+  // player slipped too light on the pad -> everything drops
+  if(hasPad() && insertAnim===0 && resetAnim===0 && tension<DROP_T && lock.setCount>0){
+    stats.resets++; releaseAllPins(true);
+    showToast('Tension slipped — every set pin dropped.',2600);
+  }
+
+  // visual plug rotation: one small ratchet step per set pin, plus the big
+  // false-set over-rotation that eases back (counter-rotation) as a spool walks up
+  // each set pin nudges the plug a hair; a false-set spool over-rotates hard
+  // (the counter-rotation tell) and eases back as it walks up to a true set
+  let angT=lock.setCount*1.4;
+  for(const p of lock.pins)
+    if(p.state==='falseset') angT+=8*Math.max(0,(p.setLift-p.lift)/p.spoolDepth);
+  plugAng+=(angT-plugAng)*Math.min(1,dt*8);
+
+  const bi=bindingIndex();
+  for(const p of lock.pins){
+    if(p.drop>0){
+      // released by a reset/slip: fall under spring pressure, small bounce —
+      // runs before any state routing so even the next binding pin falls first
+      p.vy+=900*dt; p.lift-=p.vy*dt;
+      if(p.lift<=0){ p.lift=0; p.vy*=-0.32;
+        if(Math.abs(p.vy)<24){ p.vy=0; p.drop=0; } }
+      continue;
+    }
+    const contact=pinContact(p) && insertAnim===0 && resetAnim===0;
+    const target=contact? Math.max(0,pick.tool==='rake'? pick.lift*0.7 : pick.lift) : 0;
+    if(p.state==='free' && p.i!==bi){
+      // non-binding: slides loosely, springs back
+      const springTo=contact? target:0;
+      p.lift += (springTo-p.lift)*Math.min(1,dt*18);
+    } else if(p.i===bi && p.state!=='overset' && p.state!=='set'){
+      if(p.state==='free') p.state='binding';
+      updateBinding(p,contact,target,dt);
+    } else if(p.state==='set'){
+      // key pin floppy under a held driver; re-lifting too far jams it
+      const springTo=contact? target:0;
+      p.freeLift=((p.freeLift||0)+(springTo-(p.freeLift||0))*Math.min(1,dt*18));
+      if(p.freeLift>p.setLift+lock.tol.over){ lock.setCount--; jamPin(p); p.freeLift=0; }
+    }
+  }
+  // rake scrubbing
+  if(pick.tool==='rake' && insertAnim===0) updateRake(dt);
+  updateFX(dt);
+}
+function updateBinding(p,contact,target,dt){
+  const t=tension;
+  // Below working tension the pin holds its ratcheted lift (friction) but
+  // cannot advance; the global DROP_T check handles a full slip.
+  if(t<MIN_SET){ p.pend=0; return; }
+  if(p.state==='falseset'){
+    // spool past false set: walks up only inside the counter-rotation band
+    if(contact && target>p.lift){
+      if(t<=COUNTER_MAX){
+        p.lift=Math.min(p.lift+26*dt,target);
+        if(p.lift>=p.setLift){ setPin(p); }
+      } else if(Math.random()<dt*6) S.grit();
+    }
+    return;
+  }
+  // binding standard/spool/serrated pin below its set point:
+  // ratchets upward, held by friction; stick-slip on fast pushes.
+  if(contact && target>p.lift+0.01){
+    const want=target-p.lift;
+    const q=lock.tol.step*(0.5+t*1.4);
+    const creepOK = t<HEAVY_T;
+    const inflow=Math.min(want, 260*dt);
+    if(creepOK && inflow<=lock.tol.creep){
+      advanceBinding(p,inflow);           // slow smooth creep
+    } else {
+      p.pend+=inflow;
+      let guard=0;
+      while(p.pend>=q && guard++<8){
+        p.pend-=q;
+        if(!advanceBinding(p,q)) break;   // jump; stop if state changed
+        S.grit(); plugPulse=Math.max(plugPulse,0.08);
+      }
+    }
+  } else p.pend=0;
+  // friction holds the lift when the pick backs off (that IS the binding feel)
+}
+function advanceBinding(p,d){
+  // move binding pin up by d px, handling serrations / false set / set / overset
+  let nl=p.lift+d;
+  // serration catches: heavy tension parks the pin AT the serration until
+  // the player eases off — <= crossing so a parked pin re-tests every push
+  for(const s of p.serr){
+    const idx=p.serr.indexOf(s);
+    if(p.lift<=s && nl>s && p.serrHit<idx+1){
+      if(tension>HEAVY_T){ p.lift=s; p.pend=0; if(Math.random()<0.5) S.grit(); return false; }
+      p.serrHit=idx+1; S.serr(); plugPulse=0.14;
+    }
+  }
+  // spool false set
+  if(p.spoolDepth>0 && p.state!=='falseset'){
+    const fl=p.setLift-p.spoolDepth;
+    if(p.lift<fl && nl>=fl){
+      p.lift=fl; p.pend=0; p.state='falseset'; S.clunk(); plugPulse=0.3;
+      return false;
+    }
+  }
+  // shear crossing
+  if(p.lift<p.setLift && nl>=p.setLift){
+    if(nl<=p.setLift+lock.tol.over){ setPin(p); return false; }
+    p.lift=nl; jamPin(p); return false;
+  }
+  if(nl>p.setLift+lock.tol.over && p.state==='binding'){ p.lift=nl; jamPin(p); return false; }
+  p.lift=nl; return true;
+}
+/* rake pass detection: fast horizontal reversals with the tips riding the pins */
+let rakeVX=0,rakeLastDir=0,rakeArm=false;
+function updateRake(dt){
+  const bi=bindingIndex(); if(bi<0) return;
+  const dir=Math.sign(rakeVX);
+  if(Math.abs(rakeVX)>250 && pick.lift>12) rakeArm=true;
+  if(rakeArm && dir!==0 && rakeLastDir!==0 && dir!==rakeLastDir){
+    rakeArm=false;
+    const p=lock.pins[bi], r=lock.rng();
+    if(lock.rake && p.drv==='s'){
+      if(r<0.55){ p.state='binding'; setPin(p);
+        const b2=bindingIndex();
+        if(b2>=0 && lock.pins[b2].drv==='s' && lock.rng()<0.15){ lock.pins[b2].state='binding'; setPin(lock.pins[b2]); }
+      } else S.grit();
+    } else {
+      if(r<0.30){ p.state='binding'; p.lift=p.setLift+lock.tol.over+2; jamPin(p); }
+      else S.grit();
+    }
+  }
+  if(dir!==0) rakeLastDir=dir;
+  rakeVX*=Math.exp(-6*dt);
+}
+function updateFX(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const q=particles[i]; q.x+=q.vx*dt; q.y+=q.vy*dt; q.vy+=200*dt; q.l-=dt;
+    if(q.l<=0) particles.splice(i,1);
+  }
+}
+
+/* ============================== INPUT ============================== */
+const zones={probe:null,pad:null};   // computed in layout()
+let touches={};                       // id -> {zone,x,y}
+function layout(){
+  const bh=8; // bottom inset handled by CSS buttons
+  zones.pad ={x:8,  y:H-178, w:104, h:170};
+  zones.probe={x:120,y:H-236, w:W-128, h:228};
+}
+function inZone(z,x,y){ return x>=z.x&&x<z.x+z.w&&y>=z.y&&y<z.y+z.h; }
+function pDown(id,x,y){
+  audioInit();
+  if(game!=='play') return;
+  if(hasPad() && inZone(zones.pad,x,y)){
+    touches[id]={zone:'pad',x,y}; applyPad(y); S.creak(); return;
+  }
+  if(inZone(zones.probe,x,y)){
+    touches[id]={zone:'probe',x,y};
+    if(!stats.running) stats.running=true;
+    S.probe(); return;
+  }
+}
+function pMove(id,x,y){
+  const t=touches[id]; if(!t) return;
+  const dx=x-t.x, dy=y-t.y; t.x=x; t.y=y;
+  if(t.zone==='pad'){ applyPad(y); return; }
+  if(t.zone==='probe'){
+    const span=(lock.n-1)*46+60;
+    pick.depth=Math.max(0,Math.min(1,pick.depth+dx/span));
+    pick.lift =Math.max(0,Math.min(70,pick.lift-dy*0.55));
+    rakeVX = rakeVX*0.6 + (dx/Math.max(dt0,0.008))*0.4;
+  }
+}
+function pUp(id){ delete touches[id]; }
+function applyPad(y){
+  const z=zones.pad;
+  tensionHeld=Math.max(0,Math.min(1,1-(y-z.y-12)/(z.h-24)));
+}
+cv.addEventListener('touchstart',e=>{e.preventDefault();for(const t of e.changedTouches)pDown(t.identifier,t.clientX,t.clientY);},{passive:false});
+cv.addEventListener('touchmove', e=>{e.preventDefault();for(const t of e.changedTouches)pMove(t.identifier,t.clientX,t.clientY);},{passive:false});
+cv.addEventListener('touchend',  e=>{for(const t of e.changedTouches)pUp(t.identifier);});
+cv.addEventListener('touchcancel',e=>{for(const t of e.changedTouches)pUp(t.identifier);});
+cv.addEventListener('mousedown',e=>pDown('m',e.clientX,e.clientY));
+window.addEventListener('mousemove',e=>pMove('m',e.clientX,e.clientY));
+window.addEventListener('mouseup',()=>pUp('m'));
+
+function bindTap(el,fn){
+  let last=0;
+  const h=e=>{e.preventDefault();const n=performance.now();if(n-last<400)return;last=n;audioInit();fn();};
+  el.addEventListener('touchend',h,{passive:false}); el.addEventListener('click',h);
+}
+bindTap(document.getElementById('mute-btn'),()=>{muted=!muted;localStorage.setItem('locksport-mute',muted?'1':'0');applyMute();});
+bindTap(document.getElementById('reset-btn'),()=>resetLock());
+bindTap(document.getElementById('pick-hook'),()=>setTool('hook'));
+bindTap(document.getElementById('pick-rake'),()=>setTool('rake'));
+bindTap(document.getElementById('start-btn'),()=>startLevel(+document.getElementById('menu-sel').value||0));
+bindTap(document.getElementById('next-btn'),()=>startLevel(Math.min(lvlIdx+1,LEVELS.length-1)));
+bindTap(document.getElementById('replay-btn'),()=>startLevel(lvlIdx));
+bindTap(document.getElementById('menu-btn'),()=>{game='menu';
+  document.getElementById('win').style.display='none';
+  document.getElementById('menu').style.display='flex'; syncSelects();});
+document.getElementById('lvl-sel').addEventListener('change',e=>{audioInit();startLevel(+e.target.value);});
+document.getElementById('menu-sel').addEventListener('change',()=>{});
+
+/* ============================== TEXTURES ============================== */
+let woodTex=null,brassTex=null,steelTex=null;
+function makeTextures(){
+  // aged workbench wood
+  woodTex=document.createElement('canvas'); woodTex.width=W; woodTex.height=H;
+  let c=woodTex.getContext('2d');
+  const wg=c.createLinearGradient(0,0,W,H);
+  wg.addColorStop(0,'#241a10'); wg.addColorStop(0.5,'#1d1509'); wg.addColorStop(1,'#160f06');
+  c.fillStyle=wg; c.fillRect(0,0,W,H);
+  const rw=mulberry32(99);
+  for(let px=0;px<W;px+=52+((px*7)%9)){ // planks
+    c.strokeStyle='rgba(0,0,0,0.5)'; c.lineWidth=2;
+    c.beginPath(); c.moveTo(px,0); c.lineTo(px+(rw()*8-4),H); c.stroke();
+  }
+  for(let i=0;i<260;i++){ // grain streaks
+    const x=rw()*W,y=rw()*H,l=20+rw()*90;
+    c.strokeStyle='rgba('+(rw()<0.5?'0,0,0':'120,85,40')+','+(0.05+rw()*0.09)+')';
+    c.lineWidth=0.8+rw();
+    c.beginPath(); c.moveTo(x,y);
+    c.quadraticCurveTo(x+rw()*6-3,y+l/2,x+rw()*8-4,y+l); c.stroke();
+  }
+  for(let i=0;i<7;i++){ // knots
+    const x=rw()*W,y=rw()*H,r=3+rw()*6;
+    const kg=c.createRadialGradient(x,y,0,x,y,r*2.4);
+    kg.addColorStop(0,'rgba(10,6,2,0.8)'); kg.addColorStop(0.5,'rgba(60,40,18,0.35)'); kg.addColorStop(1,'rgba(0,0,0,0)');
+    c.fillStyle=kg; c.beginPath(); c.arc(x,y,r*2.4,0,7); c.fill();
+  }
+  for(let i=0;i<2600;i++){ // speckle
+    c.fillStyle='rgba('+(rw()<0.5?'0,0,0':'150,110,60')+','+(0.03+rw()*0.05)+')';
+    c.fillRect(rw()*W,rw()*H,1.2,1.2);
+  }
+  // brass plate
+  brassTex=document.createElement('canvas'); brassTex.width=400; brassTex.height=420;
+  c=brassTex.getContext('2d');
+  const bg=c.createLinearGradient(0,0,0,420);
+  bg.addColorStop(0,'#8a6f33'); bg.addColorStop(0.25,'#c9a44a'); bg.addColorStop(0.55,'#9c7c36'); bg.addColorStop(1,'#6b571f');
+  c.fillStyle=bg; c.fillRect(0,0,400,420);
+  const rb=mulberry32(7);
+  for(let i=0;i<420;i++){ // brushed scratches
+    c.strokeStyle='rgba('+(rb()<0.5?'255,235,170':'40,28,5')+','+(0.03+rb()*0.06)+')';
+    c.lineWidth=0.7; const y=rb()*420;
+    c.beginPath(); c.moveTo(0,y); c.lineTo(400,y+rb()*4-2); c.stroke();
+  }
+  for(let i=0;i<26;i++){ // patina blots
+    const x=rb()*400,y=rb()*420,r=4+rb()*16;
+    const pg=c.createRadialGradient(x,y,0,x,y,r);
+    pg.addColorStop(0,'rgba(60,70,40,'+(0.10+rb()*0.12)+')'); pg.addColorStop(1,'rgba(0,0,0,0)');
+    c.fillStyle=pg; c.beginPath(); c.arc(x,y,r,0,7); c.fill();
+  }
+  // steel plate (plug interior)
+  steelTex=document.createElement('canvas'); steelTex.width=400; steelTex.height=200;
+  c=steelTex.getContext('2d');
+  const sg=c.createLinearGradient(0,0,0,200);
+  sg.addColorStop(0,'#565c66'); sg.addColorStop(0.4,'#3c424c'); sg.addColorStop(1,'#262b33');
+  c.fillStyle=sg; c.fillRect(0,0,400,200);
+  const rs=mulberry32(31);
+  for(let i=0;i<300;i++){
+    c.strokeStyle='rgba('+(rs()<0.5?'200,210,225':'10,12,16')+','+(0.03+rs()*0.05)+')';
+    c.lineWidth=0.6; const y=rs()*200;
+    c.beginPath(); c.moveTo(0,y); c.lineTo(400,y+rs()*3-1.5); c.stroke();
+  }
+}
+
+/* ============================== RENDER ============================== */
+function metalPin(x,top,bot,w,hue){
+  // vertical cylinder: dark-light-dark horizontal gradient
+  const g=ctx.createLinearGradient(x-w/2,0,x+w/2,0);
+  if(hue==='brass'){
+    g.addColorStop(0,'#5a4718'); g.addColorStop(0.35,'#e0bb5e'); g.addColorStop(0.55,'#c9a44a'); g.addColorStop(1,'#4a3a12');
+  } else {
+    g.addColorStop(0,'#23272e'); g.addColorStop(0.35,'#aeb6c2'); g.addColorStop(0.55,'#8a93a0'); g.addColorStop(1,'#1c2026');
+  }
+  ctx.fillStyle=g; ctx.fillRect(x-w/2,top,w,bot-top);
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.drawImage(woodTex,0,0,W,H);
+  // warm bench light from upper-left
+  const lg=ctx.createRadialGradient(W*0.22,90,30,W*0.22,90,H*0.95);
+  lg.addColorStop(0,'rgba(255,214,140,0.16)'); lg.addColorStop(0.5,'rgba(255,190,110,0.05)'); lg.addColorStop(1,'rgba(0,0,0,0.42)');
+  ctx.fillStyle=lg; ctx.fillRect(0,0,W,H);
+
+  if(game==='menu'){ drawDust(); return; }
+
+  const n=lock.n, span=(n-1)*46;
+  const lx0=W/2-span/2-58, lx1=W/2+span/2+58;
+  const plugShift=(plugAng+plugPulse*8)*0.55;   // plug bore offset vs housing
+  const yPlugBot=470;
+
+  // --- housing (bible) ---
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=22; ctx.shadowOffsetY=8;
+  ctx.drawImage(brassTex,0,0,400,180, lx0,168, lx1-lx0,Y_SHEAR-168);
+  ctx.restore();
+  // --- plug body ---
+  ctx.drawImage(brassTex,0,190,400,230, lx0+6,Y_SHEAR, lx1-lx0-12,yPlugBot-Y_SHEAR);
+  ctx.fillStyle='rgba(0,0,0,0.22)'; ctx.fillRect(lx0+6,Y_SHEAR,lx1-lx0-12,6);
+  // shear line seam
+  ctx.fillStyle='rgba(8,5,0,0.85)'; ctx.fillRect(lx0,Y_SHEAR-1,lx1-lx0,2);
+  // face plate below plug
+  ctx.drawImage(brassTex,0,300,400,120, lx0-8,yPlugBot, lx1-lx0+16,42);
+  ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(lx0-8,yPlugBot,lx1-lx0+16,4);
+  // mounting screws
+  for(const sx of [lx0-8+14,lx1+8-14]){
+    const g=ctx.createRadialGradient(sx-1,yPlugBot+20,1,sx,yPlugBot+21,7);
+    g.addColorStop(0,'#e8e2cf'); g.addColorStop(0.5,'#8a7c52'); g.addColorStop(1,'#2e2610');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(sx,yPlugBot+21,7,0,7); ctx.fill();
+    ctx.strokeStyle='rgba(20,14,2,0.8)'; ctx.lineWidth=1.6;
+    ctx.beginPath(); ctx.moveTo(sx-4,yPlugBot+19); ctx.lineTo(sx+4,yPlugBot+23); ctx.stroke();
+  }
+
+  // --- keyway channel ---
+  const kwY=430,kwH=26;
+  const kg=ctx.createLinearGradient(0,kwY,0,kwY+kwH);
+  kg.addColorStop(0,'#0a0703'); kg.addColorStop(0.5,'#1c130a'); kg.addColorStop(1,'#050302');
+  ctx.fillStyle=kg; ctx.fillRect(lx0+6,kwY,lx1-lx0-12,kwH);
+  if(game==='open'){ // golden glow pour
+    const gg=ctx.createLinearGradient(0,kwY,0,kwY+kwH);
+    gg.addColorStop(0,'rgba(255,200,80,'+0.7*openAnim+')'); gg.addColorStop(1,'rgba(255,140,20,'+0.25*openAnim+')');
+    ctx.fillStyle=gg; ctx.fillRect(lx0+6,kwY,lx1-lx0-12,kwH);
+  }
+
+  // --- chambers, springs, pins ---
+  for(let i=0;i<n;i++){
+    const x=pinX(i), p=lock.pins[i];
+    const boreW=20;
+    // housing bore
+    ctx.fillStyle='rgba(12,8,2,0.88)';
+    ctx.fillRect(x-boreW/2,190,boreW,Y_SHEAR-190);
+    ctx.fillStyle='rgba(255,230,170,0.07)'; ctx.fillRect(x-boreW/2,190,2.5,Y_SHEAR-190);
+    ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(x+boreW/2-2.5,190,2.5,Y_SHEAR-190);
+    // plug bore (shifted by rotation -> the ledge)
+    ctx.fillStyle='rgba(10,6,2,0.9)';
+    ctx.fillRect(x-boreW/2+plugShift,Y_SHEAR,boreW,kwY-Y_SHEAR);
+    // geometry of the stack
+    const lift = p.state==='set'? 0 : p.lift;
+    const keyTip = KEYTIP_REST-(p.state==='set'? (p.freeLift||0):p.lift);
+    const keyTop = keyTip-p.keyLen;
+    let drvBot, drvTop;
+    if(p.state==='set'){ drvBot=Y_SHEAR; }
+    else if(p.state==='overset'){ drvBot=Y_SHEAR-(p.lift-p.setLift); }
+    else drvBot=keyTop;
+    const drvLen=34; drvTop=drvBot-drvLen;
+    // spring (zigzag, compresses)
+    const sTop=196, coils=7, avail=drvTop-sTop;
+    ctx.strokeStyle='#7a6c4d'; ctx.lineWidth=2.2; ctx.beginPath();
+    for(let cI=0;cI<=coils;cI++){
+      const yy=sTop+avail*cI/coils, xx=x+((cI%2)?5.5:-5.5);
+      cI===0?ctx.moveTo(x,sTop):ctx.lineTo(xx,yy);
+    }
+    ctx.lineTo(x,drvTop); ctx.stroke();
+    ctx.strokeStyle='rgba(255,240,200,0.25)'; ctx.lineWidth=0.8; ctx.stroke();
+    // driver pin (steel; spool waist / serrated ridges)
+    if(p.drv==='p'){
+      metalPin(x,drvTop+9,drvBot-9,8,'steel');     // waist
+      metalPin(x,drvTop,drvTop+10,14,'steel');     // top cap
+      metalPin(x,drvBot-10,drvBot,14,'steel');     // bottom cap
+    } else {
+      metalPin(x,drvTop,drvBot,14,'steel');
+      if(p.drv==='r'){ ctx.strokeStyle='rgba(15,18,22,0.85)'; ctx.lineWidth=1.4;
+        for(let s=1;s<=4;s++){ const yy=drvTop+drvLen*s/5;
+          ctx.beginPath(); ctx.moveTo(x-7,yy); ctx.lineTo(x+7,yy); ctx.stroke(); }
+      }
+    }
+    // key pin rides in the plug bore, so it shifts with plug rotation
+    const kx=x+plugShift;
+    metalPin(kx,keyTop,keyTip-7,13,'brass');
+    ctx.fillStyle='#8a6f2e';
+    ctx.beginPath(); ctx.moveTo(kx-6.5,keyTip-7); ctx.lineTo(kx+6.5,keyTip-7); ctx.lineTo(kx,keyTip); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='rgba(255,235,170,0.35)'; ctx.fillRect(kx-4.5,keyTop,2,Math.max(0,keyTip-7-keyTop));
+    // state glow
+    if(p.state==='set'){
+      ctx.save(); ctx.globalCompositeOperation='lighter';
+      ctx.fillStyle='rgba(80,255,80,0.10)'; ctx.fillRect(x-boreW/2,Y_SHEAR-drvLen-4,boreW,drvLen+4); ctx.restore();
+    }
+    if(p.state==='overset'){
+      ctx.save(); ctx.globalCompositeOperation='lighter';
+      ctx.fillStyle='rgba(255,40,60,'+(0.10+0.06*Math.sin(perf*6))+')';
+      ctx.fillRect(x-boreW/2,keyTop-4,boreW,p.keyLen+10); ctx.restore();
+    }
+    const biNow=bindingIndex();
+    if(i===biNow && p.state==='binding' && p.lift>2){
+      ctx.save(); ctx.globalCompositeOperation='lighter';
+      ctx.fillStyle='rgba(255,195,0,0.06)'; ctx.fillRect(x-boreW/2,keyTop,boreW,KEYTIP_REST-keyTop); ctx.restore();
+    }
+  }
+
+  // --- bolt / latch (right side) ---
+  const boltOut=44*(1-openAnim);
+  const bg2=ctx.createLinearGradient(0,392,0,414);
+  bg2.addColorStop(0,'#b9bfca'); bg2.addColorStop(0.5,'#7d8590'); bg2.addColorStop(1,'#3a4048');
+  ctx.fillStyle=bg2; ctx.fillRect(lx1-6,392,boltOut+8,22);
+  ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(lx1-6,392,boltOut+8,4);
+
+  // --- tension wrench + pick (enter from left at keyway) ---
+  drawTools(lx0,kwY,kwH);
+  // --- plug face inset dial ---
+  drawDial(lx1-4,150);
+  drawDust();
+  // particles
+  for(const q of particles){
+    ctx.globalAlpha=Math.max(0,q.l*2.4); ctx.fillStyle=q.c;
+    ctx.fillRect(q.x-1.5,q.y-1.5,3,3); ctx.globalAlpha=1;
+  }
+  drawHUD(lx0,lx1);
+  if(game==='open') drawOpenPayoff();
+}
+function drawTools(lx0,kwY,kwH){
+  const insOff=insertAnim*90+resetAnim*60;
+  // tension wrench: short L-bar seated low in the keyway, twists with the plug
+  ctx.save();
+  ctx.translate(lx0+20-insOff*0.6,kwY+kwH-6);
+  ctx.rotate((-(plugAng+plugPulse*8)*0.9)*Math.PI/180);
+  const wg=ctx.createLinearGradient(0,-3,0,3);
+  wg.addColorStop(0,'#9aa2ae'); wg.addColorStop(0.5,'#6b7683'); wg.addColorStop(1,'#2c333c');
+  ctx.fillStyle=wg;
+  ctx.fillRect(-2,-3,60,5);                  // in-lock leg (into keyway)
+  ctx.fillRect(-30,-3,30,5);                 // short out leg
+  ctx.fillRect(-30,-3,5,34);                 // handle drop (stays on-screen)
+  ctx.fillStyle='rgba(50,58,68,0.9)';        // handle grip cap
+  ctx.fillRect(-33,26,11,7);
+  ctx.fillStyle='rgba(120,70,30,0.5)';       // rust specks
+  ctx.fillRect(6,0,4,2); ctx.fillRect(30,-1,3,2); ctx.fillRect(-28,14,3,5);
+  ctx.restore();
+  if(game==='menu') return;
+  // pick
+  const tipX=pickTipX(), tipLiftY=Math.min(pick.lift,66);
+  const py=kwY+9;
+  const bi=bindingIndex();
+  const resist=(bi>=0&&pinContact(lock.pins[bi])&&pick.lift>lock.pins[bi].lift)?1:0;
+  pick.flex+=( (resist?6:0)-pick.flex)*0.2;
+  ctx.strokeStyle='#8f97a3'; ctx.lineWidth=3.4; ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(-8,py+26+pick.flex);
+  ctx.quadraticCurveTo(tipX*0.45,py+8+pick.flex*0.5,tipX-14,py-2);
+  ctx.stroke();
+  ctx.strokeStyle='rgba(230,238,250,0.5)'; ctx.lineWidth=1.1; ctx.stroke();
+  // tool tip
+  ctx.strokeStyle='#aeb6c2'; ctx.lineWidth=3;
+  if(pick.tool==='hook'){
+    ctx.beginPath(); ctx.moveTo(tipX-14,py-2);
+    ctx.quadraticCurveTo(tipX-2,py-2,tipX,py-6-tipLiftY*0.22);
+    ctx.stroke();
+    ctx.fillStyle='#cdd4de'; ctx.fillRect(tipX-1.6,py-8-tipLiftY*0.22,3.2,4);
+  } else {
+    ctx.beginPath(); ctx.moveTo(tipX-26,py-1);
+    for(let s=0;s<4;s++) ctx.quadraticCurveTo(tipX-22+s*8+4,py-9-tipLiftY*0.12,tipX-18+s*8,py-1-tipLiftY*0.05);
+    ctx.stroke();
+  }
+}
+function drawDial(cx,cy){
+  const r=32;
+  ctx.save();
+  ctx.translate(cx-r,cy);
+  const fg=ctx.createRadialGradient(-6,-8,4,0,0,r+4);
+  fg.addColorStop(0,'#d8c07a'); fg.addColorStop(0.5,'#9c7c36'); fg.addColorStop(1,'#463612');
+  ctx.fillStyle=fg; ctx.beginPath(); ctx.arc(0,0,r,0,7); ctx.fill();
+  ctx.strokeStyle='rgba(20,12,0,0.8)'; ctx.lineWidth=2.5; ctx.stroke();
+  ctx.strokeStyle='rgba(255,240,190,0.25)'; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(0,0,r-3,0,7); ctx.stroke();
+  for(let a=0;a<12;a++){ // tick marks
+    ctx.save(); ctx.rotate(a*Math.PI/6);
+    ctx.strokeStyle='rgba(30,20,4,0.6)'; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(0,-r+3); ctx.lineTo(0,-r+7); ctx.stroke(); ctx.restore();
+  }
+  // rotating keyway slot
+  const ang=(plugAng+plugPulse*8+(game==='open'?openAnim*40:0))*Math.PI/180;
+  ctx.rotate(ang);
+  ctx.fillStyle='#120b02';
+  ctx.beginPath(); ctx.roundRect(-3.5,-r*0.72,7,r*1.44,3); ctx.fill();
+  ctx.fillStyle='rgba(255,200,80,'+(game==='open'?0.5*openAnim:0.08)+')';
+  ctx.beginPath(); ctx.roundRect(-2,-r*0.6,4,r*1.2,2); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle='var(--dim)';
+  ctx.fillStyle='#8899bb'; ctx.font='9px "Share Tech Mono"'; ctx.textAlign='center';
+  ctx.fillText('PLUG',cx-r,cy+r+12);
+}
+let dust=[];
+function drawDust(){
+  if(dust.length<26&&Math.random()<0.3) dust.push({x:Math.random()*W,y:Math.random()*H*0.7,v:2+Math.random()*5,s:Math.random()*1.4+0.4,a:0.03+Math.random()*0.07});
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  for(let i=dust.length-1;i>=0;i--){ const d=dust[i];
+    d.y+=d.v*dt0; d.x+=Math.sin(perf+d.s*9)*0.1;
+    ctx.fillStyle='rgba(255,220,150,'+d.a+')'; ctx.fillRect(d.x,d.y,d.s,d.s);
+    if(d.y>H*0.8) dust.splice(i,1);
+  }
+  ctx.restore();
+}
+function drawHUD(lx0,lx1){
+  ctx.textAlign='left'; ctx.font='11px "Share Tech Mono"'; ctx.fillStyle='#8899bb';
+  ctx.fillText('L'+(lvlIdx+1)+' · '+LEVELS[lvlIdx].name,10,58);
+  ctx.textAlign='right';
+  ctx.fillText(stats.t.toFixed(1)+'s · '+stats.resets+'⟲',W-10,58);
+  ctx.textAlign='center'; ctx.fillStyle='#ffc300';
+  ctx.font='12px "Share Tech Mono"';
+  ctx.fillText('PINS SET  '+lock.setCount+' / '+lock.n,W/2,78);
+  // probe zone hint frame
+  const z=zones.probe;
+  ctx.strokeStyle='rgba(136,153,187,0.16)'; ctx.lineWidth=1;
+  ctx.strokeRect(z.x+0.5,z.y+0.5,z.w-1,z.h-1);
+  ctx.fillStyle='rgba(136,153,187,0.28)'; ctx.font='10px "Share Tech Mono"';
+  ctx.fillText('PICK CONTROL — drag: slide · up/down: lift',z.x+z.w/2,z.y+14);
+  // tension pad
+  if(hasPad()){
+    const p=zones.pad;
+    ctx.fillStyle='rgba(11,11,22,0.85)';
+    ctx.strokeStyle='#1a1a30';
+    ctx.beginPath(); ctx.roundRect(p.x,p.y,p.w,p.h,12); ctx.fill(); ctx.stroke();
+    // bands: drop / counter(green) / ok / heavy(red)
+    const bx=p.x+14,bw=p.w-28,by=p.y+12,bh=p.h-24;
+    function bandY(v){ return by+bh*(1-v); }
+    ctx.fillStyle='rgba(255,34,68,0.20)'; ctx.fillRect(bx,bandY(1),bw,bandY(HEAVY_T)-bandY(1));
+    ctx.fillStyle='rgba(136,153,187,0.15)'; ctx.fillRect(bx,bandY(HEAVY_T),bw,bandY(COUNTER_MAX)-bandY(HEAVY_T));
+    ctx.fillStyle='rgba(57,255,20,0.20)'; ctx.fillRect(bx,bandY(COUNTER_MAX),bw,bandY(DROP_T+0.04)-bandY(COUNTER_MAX));
+    ctx.fillStyle='rgba(255,34,68,0.24)'; ctx.fillRect(bx,bandY(DROP_T+0.04),bw,bandY(0)-bandY(DROP_T+0.04));
+    // needle
+    const ny=bandY(tension);
+    ctx.fillStyle='#ffc300'; ctx.fillRect(bx-4,ny-1.5,bw+8,3);
+    ctx.beginPath(); ctx.moveTo(bx-8,ny); ctx.lineTo(bx-2,ny-4); ctx.lineTo(bx-2,ny+4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#8899bb'; ctx.font='9px "Share Tech Mono"'; ctx.textAlign='center';
+    ctx.fillText('TENSION',p.x+p.w/2,p.y-6);
+  }
+}
+function drawOpenPayoff(){
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  const g=ctx.createRadialGradient(W/2,400,10,W/2,400,320*openAnim+30);
+  g.addColorStop(0,'rgba(255,210,110,'+0.25*openAnim+')');
+  g.addColorStop(1,'rgba(255,150,30,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H); ctx.restore();
+  if(openAnim>0.6){
+    ctx.font='34px "Black Ops One"'; ctx.textAlign='center';
+    ctx.fillStyle='rgba(255,195,0,'+Math.min(1,(openAnim-0.6)*3)+')';
+    ctx.shadowColor='rgba(255,195,0,0.6)'; ctx.shadowBlur=18;
+    ctx.fillText('UNLOCKED',W/2,140);
+    ctx.shadowBlur=0;
+  }
+}
+
+/* ============================== LOOP ============================== */
+let last=0,perf=0,dt0=1/60;
+function resize(){
+  dpr=Math.min(window.devicePixelRatio||1,3);
+  W=cv.clientWidth; H=cv.clientHeight;
+  cv.width=W*dpr; cv.height=H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  layout(); makeTextures();
+}
+window.addEventListener('resize',resize);
+resize();
+function frame(ts){
+  const dt=Math.min((ts-last)/1000||0.016,0.1); last=ts; dt0=dt; perf+=dt;
+  update(dt); draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+syncSelects();
+</script>
+</body>
+</html>
