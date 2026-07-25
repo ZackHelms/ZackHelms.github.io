@@ -20,6 +20,7 @@ Detailed context for individual games lives in `.claude/<game>.md` at the repo r
 | Canvas-drawn UI | Buttons/cards drawn on the canvas keep their hitbox arrays (`cardRects`-style) in JS — any branch that hides the widgets MUST clear the arrays too, or invisible stale hitboxes swallow taps (2026-07-24 grid-defense bug) |
 | Audio | WebAudio-synthesized only (no audio files): lazy AudioContext on first gesture (iOS), `sfxGain`/`musicGain` masters, oscillator/noise SFX + lookahead-sequencer music loop, persisted 🔊/🔇 mute top-left, suspend on `visibilitychange` (SFX+music standard for **every** game — retrofitted repo-wide 2026-07-24). Shared buffers (noise etc.) are created in `audioInit`, never lazily inside one SFX (another consumer stays silent); overlay/menu tap handlers call `audioInit()` too — the first iOS gesture is usually a DOM button, not the canvas |
 | Back button | Every game has a top-left ← link back to the games hub, left-most control, mute button immediately to its right — see § Hub Back Button |
+| Chrome above overlays | The ← and 🔊 buttons must sit at a **higher z-index than any full-screen overlay** (menu / game-over / win). Give the chrome `z-index:80` and overlays `70`. Otherwise the overlay swallows both, and since music is usually playing *behind* a menu or win screen, the player cannot mute exactly when they most want to (2026-07-25: shipped that way in locksport, caught by a drive test that could not tap `#mute-btn` after a reload) |
 | Build badge | Every game has a `<div id="build-badge">` right after `<body>` — see below |
 
 ---
@@ -437,8 +438,12 @@ colour for a colour-free hunt. Detailed context: `.claude/signal-hunt.md`.
    summary** (facet vocabulary: `templates/design/game-facets.md` in the
    zmhstudio repo) — when *choosing* what game to build, read that index's
    coverage summary first
-7. Run the smoke gate on every changed page:
-   `node .claude/scripts/smoke-mobile.cjs <pages...>` (see `.claude/scripts/README.md`)
+7. Run both gates:
+   - `node .claude/scripts/smoke-mobile.cjs <pages...>` — every changed page
+   - `node .claude/scripts/check-games-sync.cjs` — proves the hub card, the
+     hub `GAMES[]` entry and the games-index row you just wrote actually agree
+     (and that the count line adds up). No Chromium needed.
+   (see `.claude/scripts/README.md`)
 8. Commit and push to `main`, stating the badge timestamp in your reply
 9. Verify the "pages build and deployment" workflow for the pushed SHA goes
    green — `git push` ≠ live; a failed Pages build silently keeps serving

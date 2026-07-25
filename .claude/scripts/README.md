@@ -19,6 +19,24 @@ Deterministic helpers for working on this repo.
   For deeper gameplay-driving tests (touch drags, deterministic physics
   scenarios), see `.claude/notes/20260724-headless-mobile-game-testing.md`.
 
+- `check-games-sync.cjs` — three-way catalog gate. A new game has to land in
+  the hub card, the hub's `GAMES[]` facet dataset, **and** the
+  `.claude/games-index.md` row, and those drift independently. Checks card ↔
+  dataset ↔ index-row parity by href, icon uniqueness, card/dataset/index name
+  agreement, facet-column agreement on all five axes, that every row points at
+  a game that exists on disk with the context file it claims, that the
+  "N games (M in-repo + K external)" line adds up, and that the dashboard's
+  `AXES` still covers every facet axis. Pure node — no Chromium, no deps, so
+  it costs nothing to run. Final line `GAMES-SYNC: GREEN`/`RED`, exit 0/1.
+
+  ```
+  node .claude/scripts/check-games-sync.cjs     # from the repo root
+  ```
+
+  Batches kept hand-rolling a throwaway Playwright script that covered only
+  card ↔ dataset; nothing ever checked the index rows, which is the file every
+  session is told to read *first* when choosing a game to build.
+
 - `stamp-badge.sh` — sets each given page's `#build-badge` to the current
   UTC time (badge SOP: `games/CLAUDE.md` § Build Timestamp Badge). Replaces
   whatever timestamp/placeholder the badge holds — no need to know the old
