@@ -59,8 +59,9 @@ local-2p.
 | Shadow Circuit | `shadow-circuit/` | stealth, maze | tap-to-move | level-campaign | vision-cones, line-of-sight, procedural-generation | solo | `.claude/shadow-circuit.md` |
 | Neon Recall | `neon-recall/` | memory-board | tap | level-campaign, local-2p | memory-match, resource-economy, combo-multiplier | solo, local-2p | `.claude/neon-recall.md` |
 | Neon Drift | `neon-drift/` | driver-racing | two-thumb | time-trial | physics-sim, ghost-replay, timing-precision | solo | `.claude/neon-drift.md` |
+| Ember Depths | `ember-depths/` | roguelike | tap-to-move | run-based | permadeath, relic-builds, procedural-generation, grid-combat | solo | `.claude/ember-depths.md` |
 
-35 games (33 in-repo + 2 external builds).
+36 games (34 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -79,12 +80,14 @@ local-2p.
   · `rhythm` (piano tiles, pre-synth-era) · `hex-grid` (bubble-blaster) ·
   `word` + `drag-connect` + `timed-round` (word-circuit) · `card-deck` +
   `quick-round` (tri-peaks) · `daily-challenge` (word-circuit, tri-peaks) ·
-  `stealth`/`maze` + `tap-to-move` + `vision-cones` (shadow-circuit) ·
+  `stealth`/`maze` + `vision-cones` (shadow-circuit) · `tap-to-move`
+  (shadow-circuit, ember-depths) · `roguelike` + `run-based` +
+  `permadeath` + `relic-builds` (ember-depths) ·
   `seeded-determinism` (blade-spin, word-circuit, tri-peaks — an
   established house pattern now).
 
 ### Absent — highest-novelty targets
-- **Genres:** `trivia` · `roguelike` · `platformer`.
+- **Genres:** `trivia` · `platformer`.
 - **Inputs:** `tilt` (iOS motion-permission prompt — low priority) ·
   `pinch-rotate`.
 - **Players:** local-2p now has three flavors — real-time (air hockey),
@@ -93,15 +96,16 @@ local-2p.
 
 ### Example picks this table would suggest next
 A `trivia` quiz (absent genre — embedded question bank, timed answers), a
-`roguelike` run-based dungeon (absent genre — procedural floors,
-permadeath, relic builds), a `platformer` (absent genre — one-thumb
-tap-jump; the only classic shelf still empty), a `pinch-rotate` puzzle
-(absent input), or a `daily-challenge` retrofit onto another seeded game
-(blade-spin already has `seeded-determinism`).
+`platformer` (absent genre — one-thumb jumps; the only classic shelf still
+empty), a `pinch-rotate` puzzle (absent input), or a `daily-challenge`
+retrofit onto another seeded game (blade-spin already has
+`seeded-determinism`).
 
 *(The first 2026-07-24 batch — word-circuit, neon-tactics, star-surge,
 grid-defense — filled the `word`, `turn-based-tactics`, `shmup`,
 `tower-defense-classic`, and `daily-challenge` gaps. The second batch —
 tri-peaks, shadow-circuit, neon-recall, neon-drift — filled `card-deck`,
 `stealth`, `maze`, `memory-board`, and `driver-racing`, adding
-`tap-to-move` input and `time-trial`/`quick-round` sessions.)*
+`tap-to-move` input and `time-trial`/`quick-round` sessions. The
+2026-07-25 realistic-graphics batch opened with ember-depths filling
+`roguelike` + `run-based`.)*
