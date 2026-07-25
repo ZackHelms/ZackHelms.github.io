@@ -139,7 +139,7 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 02:24 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 02:36 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
@@ -446,6 +446,14 @@ h1 {
         <div class="game-desc">Cast into a sunset lake, set the hook, and reel through the runs before the line snaps. Buy better tackle, fill the log, find Old Goldscale.</div>
       </div>
     </a>
+
+    <a class="game-card" href="vault-breaker/">
+      <div class="game-icon">🔐</div>
+      <div class="game-info">
+        <div class="game-name">VAULT BREAKER</div>
+        <div class="game-desc">Twist two fingers to crack the safe — feel for the pins, align the rings, spin the handle. The alarm timer never stops. Steel, listen, gold.</div>
+      </div>
+    </a>
   </div>
 
   <div id="stats">
@@ -503,6 +511,7 @@ const GAMES = [
   { n: 'EMBER DEPTHS', i: '🔥', h: 'ember-depths/', genre: ['roguelike'], input: ['tap-to-move'], session: ['run-based'], mech: ['permadeath', 'relic-builds', 'procedural-generation', 'grid-combat'], players: ['solo'] },
   { n: 'ALPINE ASCENT', i: '⛰️', h: 'alpine-ascent/', genre: ['platformer'], input: ['hold-charge', 'drag-aim-release'], session: ['level-campaign'], mech: ['physics-sim', 'timing-precision', 'checkpoint-climb'], players: ['solo'] },
   { n: 'GOLDEN REEL', i: '🎣', h: 'golden-reel/', genre: ['fishing'], input: ['hold-charge', 'tap'], session: ['save-campaign'], mech: ['collection', 'resource-economy', 'timing-precision'], players: ['solo'] },
+  { n: 'VAULT BREAKER', i: '🔐', h: 'vault-breaker/', genre: ['dexterity-puzzle'], input: ['pinch-rotate'], session: ['level-campaign'], mech: ['timing-precision', 'seeded-determinism', 'star-rating'], players: ['solo'] },
 ];
 // One hue per section (single-series bars; labels carry identity). Green and
 // gold sections are kept non-adjacent — the pair is CVD-inseparable.

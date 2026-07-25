@@ -329,6 +329,16 @@ rendering: altitude-graded skies, parallax ridges, god rays, cloud-band
 fog, snow, textured ledges. Camps + summit persisted.
 Detailed context: `.claude/alpine-ascent.md`.
 
+### VAULT BREAKER (`vault-breaker/index.html`, ~900 lines)
+Pinch-rotate safecracking. Two-finger twist (or one-finger drag-around)
+turns the mechanism through three phases per vault: directional tumbler
+pins with steady-hold sweet spots and Geiger proximity ticks, ring-gap
+alignment to the keyway (later rings drift), then a 270° handle spin —
+all against an alarm timer. Seeded deterministic vaults, star ratings,
+level unlocks persisted. Realistic rendering: brushed-steel door with
+rivets, anisotropic machined dial, sparks, gold-vault door-open payoff.
+Detailed context: `.claude/vault-breaker.md`.
+
 ### GOLDEN REEL (`golden-reel/index.html`, ~980 lines)
 Dusk-lake fishing. Hold-charge cast (line gear caps range), tap-twitch,
 0.9 s hook-set window, then a reel/release tension fight (runs take line,
