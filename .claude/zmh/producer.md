@@ -41,6 +41,13 @@
   any console/page error; prints `SMOKE: GREEN` / `SMOKE: RED` as its final
   line (exit 0/1). Requires Chromium + `playwright-core` (see § Environment);
   when they are unavailable, state so in the report — never skip silently.
+- Second hard gate, whenever the games catalog changed (a game added,
+  renamed, re-faceted, or removed):
+  `node .claude/scripts/check-games-sync.cjs` — proves the hub card, the hub
+  `GAMES[]` dataset and the `.claude/games-index.md` row agree, and that the
+  index's count line adds up. Prints `GAMES-SYNC: GREEN` / `RED` (exit 0/1).
+  Pure node: no Chromium, no dependencies, so there is never a reason to skip
+  it.
 
 ## Integration (oversee wrap-up)
 - Mode: direct-merge-push

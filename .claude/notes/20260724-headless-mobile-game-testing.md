@@ -179,6 +179,37 @@ rendering at 2× zoom (missing `width:100%;height:100%` CSS — Shared
 Conventions row). Only the mid-play **screenshot review** exposed it —
 treat the screenshot as part of the gate, not just report garnish.
 
+## Fairness gates by level type (pick the cheap one that actually proves it)
+
+Three shapes have now been used. Match the gate to how the level is built:
+
+| Level shape | Gate | Example |
+| --- | --- | --- |
+| Hand-authored **static** geometry (walls + hazards) | **BFS in agent-centre space** with obstacles inflated by the agent's radius + a margin, and hazards inflated to their *capture* radius. Proves a slow, careful route exists. | tilt-labyrinth: 10 boards, 0.5-unit grid |
+| **Generated** levels with continuous motion | Solve the player's real equation of motion for the time available; assert the demanded move is a fraction of what's coverable. Then move the check *into* the generator. | sky-lantern (`.claude/notes/20260725-sensor-input-and-async-versus-games.md`) |
+| A **rules puzzle** with no geometry | An auto-solver that plays by the game's own rules, gated on the game's own error metric. | vault-breaker, locksport |
+
+Two things the BFS variant taught that transfer:
+
+- **Passing BFS is not the same as being playable.** BFS finds a route through
+  a 1-unit slot. Author corridors at ≥ 2× body diameter of clear width and put
+  hazards at a corridor's *edge*, never centred — a centred hazard eats almost
+  the whole lane and leaves a technically-passable sliver. Have the gate print
+  an openness number per level so a suspiciously tight one is visible.
+- Never gate on "did my scripted player finish". A failing bot cannot tell you
+  whether the level or the bot is wrong — the same lesson the sky-lantern batch
+  paid for independently.
+
+## Gate the CONTENT of an embedded bank, not just the code
+
+Any game shipping a data bank (question banks, word lists, level tables) wants
+a cheap content assert alongside the behaviour tests, because bad *data* passes
+every code test. Ballpark's bank gate gets the whole class in six lines: every
+answer must lie strictly inside its own range, **and not within 5% of either
+end** (an answer parked at an edge is either unreachable or free), log ranges
+need positive lower bounds, no duplicate prompts, every entry carries its unit.
+Cheap to write once, and it makes adding 50 more questions a safe operation.
+
 ## Related SOP
 
 After pushing: `git push` ≠ live. Verify the "pages build and deployment"
