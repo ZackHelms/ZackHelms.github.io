@@ -372,8 +372,12 @@ from, and **there is no "you are here" dot**: you keep your place by dragging a
 thumb marker. Baseplate compass with real magnetic declination, "red in the
 shed" alignment, and pace counting. Nine lessons teach real technique in club
 order (orient the map → handrail → thumbing → bearing → pacing → aiming off →
-contours → attack point → night relocation), each debriefed on technique rather
-than just success; then the valley opens for free roam. Terrain and land type
+contours → attack point → night relocation). **Each lesson requires its
+technique** — arriving at the control without following the handrail, holding
+the bearing, counting the paces, aiming off or using the attack point is refused
+with coaching, so lessons cannot be passed by luck. A coach names a technique
+(never your position) when you stall, and you can pencil marks on the map and rub
+them out. Then the valley opens for free roam. Terrain and land type
 are baked into grids at boot so rendering, collision and the map can never
 disagree. Detailed context: `.claude/wayfinder.md`.
 

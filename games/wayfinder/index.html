@@ -91,7 +91,7 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-26 18:29 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-26 19:23 UTC</div>
 <div id="wrap"><canvas id="gl"></canvas><canvas id="ui"></canvas></div>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute-btn" aria-label="Toggle sound">🔊</button>
@@ -108,6 +108,7 @@ canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
     <div id="map-hint"></div>
     <button id="mt-thumb" class="mt">👍 THUMB</button>
     <button id="mt-bearing" class="mt">🧭 BEARING</button>
+    <button id="mt-mark" class="mt">✕ MARK</button>
     <button id="mt-confirm" class="mt go">CONFIRM</button>
     <button id="mt-close" class="mt">CLOSE</button>
   </div>
@@ -411,8 +412,10 @@ let bearingSet = null;             // magnetic bearing the player dialled in
 let mapRot = 0;                    // map rotation in degrees (0 = north up)
 let questIdx = 0, questState = null, roam = false;
 let distanceWalked = 0, legStart = { x: 0, z: 0 };
-let save = { done: [], best: {} };
+let marks = [];                    // pencil marks the player adds to the map
+let save = { done: [], best: {}, marks: [] };
 try { const s = localStorage.getItem('wayfinder'); if (s) save = Object.assign(save, JSON.parse(s)); } catch (e) {}
+if (Array.isArray(save.marks)) marks = save.marks;
 function persist() { try { localStorage.setItem('wayfinder', JSON.stringify(save)); } catch (e) {} }
 
 function timeOfDay() { return (clock % DAY_SECONDS) / DAY_SECONDS; }   // 0 = midnight
@@ -444,6 +447,9 @@ const LESSONS = [
       'Mill Stream runs north–south through the valley. Follow it upstream to the <b>footbridge</b> where the Ridge Track crosses. ' +
       'Stay near the water: you cannot get lost on a handrail.',
     desc: 'Follow Mill Stream to the footbridge.', control: POI.bridge, check: 'goto',
+    needRail: 0.55,          // must actually have been ON the handrail
+    hints: ['Mill Stream runs north–south down the middle of the valley. Walk west or east until you meet running water, then turn upstream.',
+      'Upstream is toward the higher ground in the north. Keep the water within sight on one side.'],
   },
   {
     id: 'thumb', skill: 'THUMBING THE MAP', title: 'KEEP YOUR PLACE',
@@ -452,6 +458,9 @@ const LESSONS = [
       'Follow the Ridge Track east. Three times on the way I will ask you where you are — open the MAP, place your THUMB, and CONFIRM.',
     desc: 'Track east; place your thumb correctly at 3 checks.', control: { x: 700, z: 520 }, check: 'thumb',
     checkpoints: [{ x: 520, z: 560 }, { x: 610, z: 540 }, { x: 700, z: 520 }], tol: 55,
+    needHits: 2,             // at least 2 of 3 thumb placements must be good
+    hints: ['The Ridge Track runs east–west across the valley — get on it and follow it east.',
+      'Every time you pass something you can name — a stream, a junction, a bend — move your thumb onto it.'],
   },
   {
     id: 'bearing', skill: 'TAKING A BEARING', title: 'RED IN THE SHED',
@@ -459,7 +468,10 @@ const LESSONS = [
       '<b>cairn on Beacon Hill</b>. Then walk with the compass in front of you, turning until the red needle sits inside the ' +
       'orienting arrow — "red in the shed" — and the housing glows green. Walk that line.',
     desc: 'Set a bearing to the cairn and walk it to the summit.', control: POI.cairn, check: 'bearing',
-    target: POI.cairn, tolDeg: 8,
+    target: POI.cairn, aimTol: 45,      // the bearing must be taken AT the cairn
+    needOnLine: 0.5,                     // and you must actually walk the line
+    hints: ['Open the MAP, tap 🧭 BEARING, then tap the cairn symbol on top of Beacon Hill.',
+      'Now turn your whole body until the red needle sits inside the orienting arrow — red in the shed — and walk straight ahead.'],
   },
   {
     id: 'pace', skill: 'PACE COUNTING', title: 'MEASURE WITH YOUR LEGS',
@@ -468,6 +480,9 @@ const LESSONS = [
       'and from there walk <b>170 m on bearing 108°</b> into the trees. There is nothing to see there: the count is all you have.',
     desc: 'From the wall end, pace 170 m on bearing 108°.',
     control: null, check: 'pace', from: POI.wallend, distM: 170, magBearing: 108,
+    needPace: 0.22,          // counted distance must be within 22% of the leg
+    hints: ['Start at the west end of the stone wall — the black line across the north of the map.',
+      'Turn PACE on at the wall, then turn until the compass reads 108° and count. About 105 double-paces is 170 m.'],
   },
   {
     id: 'aimoff', skill: 'AIMING OFF', title: 'MISS ON PURPOSE',
@@ -475,7 +490,12 @@ const LESSONS = [
       'So you <b>aim off</b>: deliberately aim to one side, hit the stream, and turn the way you know. ' +
       'The control sits where the <b>Beck</b> leaves the hillside. Hit the Beck first, then follow it to the flag.',
     desc: 'Hit the Beck, then follow it to the control.',
-    control: { x: 560, z: 392 }, check: 'aimoff',
+    // On the BANK, 9 m off the water. A control sitting in the channel itself
+    // cannot be reached — the mover refuses the depth — and real controls are
+    // hung beside a stream, not in it.
+    control: { x: 554, z: 400 }, check: 'aimoff', needTouch: true,
+    hints: ['Do not aim at the control. Aim well to one side of it, so that when you hit the Beck you know which way to turn.',
+      'The Beck runs west off Beacon Hill\'s flank down into Mill Stream. Hit the water, then follow it.'],
   },
   {
     id: 'contour', skill: 'READING CONTOURS', title: 'SHAPE OF THE GROUND',
@@ -484,6 +504,8 @@ const LESSONS = [
       'The control is in the reentrant on Beacon Hill\'s west flank. No path, no stream — read the shape.',
     desc: 'Find the control in the reentrant (contours only).',
     control: { x: 646, z: 268 }, check: 'goto',
+    hints: ['Climb onto Beacon Hill\'s west flank and look for a gully folding into the slope.',
+      'Contours that point uphill are a reentrant. Contours that point downhill are a spur. You want the reentrant.'],
   },
   {
     id: 'attack', skill: 'ATTACK POINTS', title: 'THE LAST 100 METRES',
@@ -491,7 +513,11 @@ const LESSONS = [
       'control — and only then slow down and navigate precisely. Your attack point is <b>The Boulder</b>. ' +
       'Pass it, then make the short precise leg to the control.',
     desc: 'Via The Boulder, then precisely to the control.',
-    control: { x: 726, z: 388 }, check: 'attack', attack: POI.boulder, attackTol: 30,
+    // 115 m WSW of the boulder on open ground. The original site was behind a
+    // 74-degree face: an attack point you cannot navigate from is not one.
+    control: { x: 579, z: 296 }, check: 'attack', attack: POI.boulder, attackTol: 30, needAtk: true,
+    hints: ['Go roughly and fast to The Boulder first — the solid black dot on the map. Do not try to hit the control directly.',
+      'From the boulder it is a short precise leg. Slow down there, not before.'],
   },
   {
     id: 'relocate', skill: 'RELOCATION · NIGHT', title: 'LOST IN THE DARK',
@@ -500,6 +526,8 @@ const LESSONS = [
       'Work it out, place your THUMB where you think you stand and CONFIRM — then find your way back to the start triangle.',
     desc: 'Relocate in the dark, then return to the start.',
     control: POI.start, check: 'relocate', tol: 70,
+    hints: ['Climb to higher ground and look for something you can name — the cairn, the river, the line of the track.',
+      'Or pick a direction, hold it on the compass, and walk until you hit a handrail you can identify. Then you know where you are.'],
   },
 ];
 
@@ -507,7 +535,11 @@ const LESSONS = [
 function startLesson(i) {
   questIdx = i; roam = false;
   const L = LESSONS[i];
-  questState = { phase: 'brief', cpIdx: 0, hits: [], nearRail: 0, samples: 0, touched: false, atk: false, confirmed: false };
+  questState = {
+    phase: 'brief', cpIdx: 0, hits: [], nearRail: 0, samples: 0, touched: false, atk: false, confirmed: false,
+    onLine: 0, moveSamples: 0, paceRef: null, bearingTarget: null,
+    bestDist: 1e9, stall: 0, hintIdx: 0,
+  };
   distanceWalked = 0; legStart = { x: player.x, z: player.z };
   if (L.id === 'relocate') {                       // dropped somewhere unknown, at night
     player.x = 452; player.z = 214; player.yaw = 210;
@@ -533,12 +565,40 @@ function questTargetPos() {
 function questUpdate(dt) {
   const L = activeLesson(); if (!L || questState.phase !== 'run') return;
   const S = questState;
-  // handrail tracking
-  if (L.id === 'handrail') {
+  const moving = player.vSpeed > 0.05;
+  // handrail tracking — only counts while you are actually travelling
+  if (L.id === 'handrail' && moving) {
     S.samples++; if (polyNear(RIVER, player.x, player.z).d < 45) S.nearRail++;
   }
-  if (L.id === 'aimoff' && polyNear(BECK, player.x, player.z).d < 12) S.touched = true;
+  // did you hold the bearing you dialled?
+  if (L.check === 'bearing' && moving && bearingSet !== null) {
+    S.moveSamples++;
+    if (Math.abs(angDiff(trueToMag(player.yaw), bearingSet)) < 15) S.onLine++;
+  }
+  // pace leg starts when you are at the wall with the counter running
+  if (L.check === 'pace' && S.paceRef === null && paceOn &&
+      Math.hypot(player.x - L.from.x, player.z - L.from.z) < 18) {
+    S.paceRef = paceCount;
+    showToast('Counter zeroed at the wall. Now hold 108° and count.', 3000);
+  }
+  // Aiming off only counts if you met the Beck AWAY from the control — the
+  // control sits on the water, so "touched the beck" at the flag is no proof.
+  if (L.id === 'aimoff' && polyNear(BECK, player.x, player.z).d < 12 &&
+      Math.hypot(player.x - L.control.x, player.z - L.control.z) > 45) S.touched = true;
   if (L.id === 'attack' && Math.hypot(player.x - L.attack.x, player.z - L.attack.z) < L.attackTol) S.atk = true;
+  // ---- coach: never says where you are, only what technique to use ----
+  if (L.hints && S.hintIdx < L.hints.length) {
+    const tgt0 = questTargetPos();
+    if (tgt0) {
+      const d = Math.hypot(player.x - tgt0.x, player.z - tgt0.z);
+      if (d < S.bestDist - 8) { S.bestDist = d; S.stall = 0; } else S.stall += dt;
+    } else S.stall += dt;
+    if (S.stall > (S.hintIdx === 0 ? 55 : 80)) {
+      S.stall = 0;
+      showToast('<b style="color:var(--green)">COACH</b><br>' + L.hints[S.hintIdx], 8000);
+      S.hintIdx++;
+    }
+  }
   // thumb checkpoints
   if (L.check === 'thumb' && S.cpIdx < L.checkpoints.length) {
     const cp = L.checkpoints[S.cpIdx];
@@ -558,7 +618,7 @@ function questUpdate(dt) {
       } else if (L.check === 'thumb' && S.cpIdx < L.checkpoints.length) {
         // fall through: still owe checkpoints
       } else {
-        completeLesson();
+        tryComplete();
       }
     }
   }
@@ -585,7 +645,7 @@ function mapConfirm() {
     closeMap();
     if (S.cpIdx >= L.checkpoints.length) {
       const tgt = questTargetPos();
-      if (Math.hypot(player.x - tgt.x, player.z - tgt.z) < 30) completeLesson();
+      if (Math.hypot(player.x - tgt.x, player.z - tgt.z) < 30) tryComplete();
     }
     return;
   }
@@ -599,6 +659,53 @@ function mapConfirm() {
     return;
   }
   closeMap();
+}
+/* Finding the control is not the same as doing it properly. Every lesson that
+   teaches a technique now REQUIRES that technique — stumbling onto the flag by
+   luck tells you what you actually did instead of quietly passing you. */
+function techniqueFailure() {
+  const L = activeLesson(), S = questState;
+  if (!L) return null;
+  if (L.needRail !== undefined) {
+    // a handful of samples is not evidence of anything — you have to walk the leg
+    if (S.samples < 90) return 'You did not travel the leg. Walk it — find Mill Stream and follow the water to the bridge.';
+    const pct = S.nearRail / S.samples;
+    if (pct < L.needRail) return 'You reached the bridge, but you were only near the water for ' +
+      Math.round(pct * 100) + '% of the way. The point of a handrail is to <b>stay on it</b>. Go back to the stream and follow it in.';
+  }
+  if (L.needHits !== undefined) {
+    const good = S.hits.filter(h => h < L.tol).length;
+    if (good < L.needHits) return 'Only ' + good + ' of your ' + S.hits.length +
+      ' thumb placements were within ' + L.tol + ' m. Run the leg again and move your thumb at every feature you pass.';
+  }
+  if (L.aimTol !== undefined) {
+    if (!S.bearingTarget) return 'You got there, but you never took a bearing. Open the MAP, tap 🧭 BEARING and tap the cairn.';
+    const off = Math.hypot(S.bearingTarget.x - L.target.x, S.bearingTarget.z - L.target.z);
+    if (off > L.aimTol) return 'Your bearing was taken to a point ' + Math.round(off) +
+      ' m from the cairn. Take it to the feature itself.';
+    const onLine = S.moveSamples ? S.onLine / S.moveSamples : 0;
+    if (onLine < L.needOnLine) return 'You dialled a bearing but only held it for ' + Math.round(onLine * 100) +
+      '% of your walking. Keep the needle in the shed and follow the line.';
+  }
+  if (L.needPace !== undefined) {
+    if (!paceOn || S.paceRef === null) return 'No pace count. Turn PACE on <b>at the west end of the wall</b>, then walk the leg counting.';
+    if (paceCount < S.paceRef) return 'Your counter was re-zeroed part way. Go back to the wall and start the count again.';
+    const counted = (paceCount - S.paceRef) * PACE_M;
+    const err = Math.abs(counted - L.distM) / L.distM;
+    if (err > L.needPace) return 'Your count came to ' + Math.round(counted) + ' m for a ' + L.distM +
+      ' m leg — ' + Math.round(err * 100) + '% out. Start again at the wall and count every time the same foot lands.';
+  }
+  if (L.needTouch && !S.touched) return 'You found it, but you went straight at it. Aim off deliberately, hit the Beck, and follow the water in — otherwise a miss leaves you guessing which way to turn.';
+  if (L.needAtk && !S.atk) return 'You went straight to the control without using The Boulder. Navigate roughly to the attack point first, then precisely from there.';
+  return null;
+}
+function tryComplete() {
+  const why = techniqueFailure();
+  if (why) {
+    if (questState.warned !== why) { questState.warned = why; sfx.bad(); showToast(why, 8000); }
+    return false;
+  }
+  completeLesson(); return true;
 }
 function completeLesson() {
   const L = activeLesson(); if (!L || questState.phase === 'over') return;
@@ -812,7 +919,7 @@ void main(){
   float h0 = vn(vW.xz*2.6), hx = vn((vW.xz+vec2(e,0.0))*2.6), hz = vn((vW.xz+vec2(0.0,e))*2.6);
   vec3 n = normalize(normalize(vN) + vec3((h0-hx)*1.25, 0.0, (h0-hz)*1.25));
   float d = max(dot(n, uSun), 0.0);
-  float det = vn(vW.xz*0.9)*0.42 + vn(vW.xz*3.7)*0.22 + vn(vW.xz*13.0)*0.07;
+  float det = vn(vW.xz*0.55)*0.26 + vn(vW.xz*3.7)*0.26 + vn(vW.xz*13.0)*0.10;
   vec3 base = vC * (0.78 + det*0.44);
   vec3 col = base * (uAmb + uSunCol*d);
   if(uLamp > 0.5){                                   // headlamp cone at night
@@ -994,18 +1101,34 @@ function initGL() {
 
   // ---- trees (instanced billboards) ----
   const ins = [], size = [], type = [];
-  for (let i = 0; i < 26000; i++) {
+  for (let i = 0; i < 60000; i++) {
     const x = hash2(i, 7) * WORLD, z = hash2(i, 13) * WORLD;
     const f = forestDensity(x, z);
-    if (hash2(i, 29) > f * 0.85) continue;
+    if (hash2(i, 29) > f * 0.92) continue;
     if (waterDepthAt(x, z) > 0.05) continue;
     if (Math.min(polyNear(TRACK, x, z).d, polyNear(LANE, x, z).d) < 4) continue;
     const h = heightAt(x, z);
     if (h > TREELINE) continue;
+    // undergrowth: low scrub thickens the dense stands (drawn with the rock tile,
+    // squashed) so a "fight" area looks like one from outside
+    if (hash2(i, 37) > 0.72 && f > 0.62) {
+      const bs = 1.1 + hash2(i, 43) * 1.5;
+      ins.push(x, h - 0.15, z); size.push(bs * 1.25, bs, 0.44 + hash2(i, 47) * 0.2); type.push(2);
+      continue;
+    }
     const conifer = f > 0.55 ? 1 : (hash2(i, 51) > 0.5 ? 1 : 0);
     const sc = 5.0 + hash2(i, 71) * 6 + (conifer ? 2.5 : 0);
     ins.push(x, h - 0.4, z);
     size.push(sc * 0.42, sc, 0.78 + hash2(i, 91) * 0.42); type.push(conifer);
+  }
+  // Loose stone above the treeline — unmapped scree is fine; it is ground
+  // texture, not a feature anyone would navigate by.
+  for (let i = 0; i < 9000; i++) {
+    const x = hash2(i, 401) * WORLD, z = hash2(i, 409) * WORLD;
+    const h = heightAt(x, z);
+    if (h < TREELINE - 4 || hash2(i, 419) > 0.30) continue;
+    const rs = 0.5 + hash2(i, 421) * 1.4;
+    ins.push(x, h - 0.15, z); size.push(rs * 1.2, rs, 0.72 + hash2(i, 431) * 0.3); type.push(2);
   }
   // Mapped landmarks — every one of these is also drawn on the map.
   for (const lm of [
@@ -1143,7 +1266,7 @@ function render() {
   const vp = m4mul(proj, view);
   const inv = m4inv(vp);
   const sd = sunDir();
-  const fogD = isNight() ? 0.0042 : 0.00165;
+  const fogD = isNight() ? 0.0040 : 0.00122;   // clearer air by day: you can read distant landforms
   const fogCol = [pal.hor[0] * 0.92, pal.hor[1] * 0.92, pal.hor[2] * 0.95];
 
   gl.depthMask(false); gl.disable(gl.DEPTH_TEST);
@@ -1297,6 +1420,7 @@ let mapArm = null;                       // 'thumb' | 'bearing' | null
 function openMap() {
   if (game !== 'play') return;
   game = 'map';
+  mapRot = ((mapRot + 180) % 360 + 360) % 360 - 180;   // keep it inside the slider's range
   document.getElementById('map-screen').style.display = 'flex';
   document.getElementById('map-rot').value = Math.round(mapRot);
   sizeMapCanvas(); drawMap(); updateMapHint();
@@ -1310,6 +1434,7 @@ function updateMapHint() {
   const L = activeLesson();
   let t = 'Drag to pan · pinch to zoom';
   if (mapArm === 'thumb') t = 'Tap the map where you think you are, then CONFIRM';
+  else if (mapArm === 'mark') t = 'Tap to pencil a mark · tap a mark again to rub it out';
   else if (mapArm === 'bearing') t = 'Tap your target — the bearing is taken from your thumb';
   else if (L && L.check === 'orient') t = 'Turn MAP ROTATION until the north lines match the ground, then CONFIRM';
   else if (L && L.check === 'bearing' && bearingSet === null) t = 'Tap 🧭 BEARING, then tap the cairn on Beacon Hill';
@@ -1318,6 +1443,7 @@ function updateMapHint() {
 function syncArmButtons() {
   document.getElementById('mt-thumb').classList.toggle('on', mapArm === 'thumb');
   document.getElementById('mt-bearing').classList.toggle('on', mapArm === 'bearing');
+  document.getElementById('mt-mark').classList.toggle('on', mapArm === 'mark');
 }
 const mapcv = document.getElementById('map-cv'), mctx = mapcv.getContext('2d');
 function sizeMapCanvas() {
@@ -1367,6 +1493,14 @@ function drawMap() {
     g.strokeStyle = 'rgba(192,38,211,0.75)'; g.lineWidth = 1.8 / s; g.setLineDash([8 / s, 6 / s]);
     g.beginPath(); g.moveTo(thumb.x, thumb.z);
     g.lineTo(thumb.x + Math.sin(t) * 420, thumb.z - Math.cos(t) * 420); g.stroke(); g.setLineDash([]);
+  }
+  // pencil marks
+  g.strokeStyle = '#7a1fa8'; g.lineWidth = 2.2 / s;
+  for (const m of marks) {
+    g.beginPath();
+    g.moveTo(m.x - 7, m.z - 7); g.lineTo(m.x + 7, m.z + 7);
+    g.moveTo(m.x + 7, m.z - 7); g.lineTo(m.x - 7, m.z + 7);
+    g.stroke();
   }
   // the thumb (your claimed position — there is no GPS dot)
   g.fillStyle = '#111'; g.strokeStyle = '#fff'; g.lineWidth = 2 / s;
@@ -1559,7 +1693,8 @@ bindTap(document.getElementById('done-menu'), () => {
 });
 bindTap(document.getElementById('map-btn'), () => openMap());
 bindTap(document.getElementById('pace-btn'), () => {
-  paceOn = !paceOn; if (paceOn) { paceCount = 0; paceMetres = 0; }
+  // toggling on zeroes the counter, so the pace leg has to re-arm at the wall
+  paceOn = !paceOn; if (paceOn) { paceCount = 0; paceMetres = 0; if (questState) questState.paceRef = null; }
   document.getElementById('pace-btn').classList.toggle('on', paceOn); sfx.click();
 });
 bindTap(document.getElementById('lamp-btn'), () => {
@@ -1571,6 +1706,7 @@ bindTap(document.getElementById('mt-close'), () => closeMap());
 bindTap(document.getElementById('mt-confirm'), () => mapConfirm());
 bindTap(document.getElementById('mt-thumb'), () => { mapArm = mapArm === 'thumb' ? null : 'thumb'; syncArmButtons(); updateMapHint(); });
 bindTap(document.getElementById('mt-bearing'), () => { mapArm = mapArm === 'bearing' ? null : 'bearing'; syncArmButtons(); updateMapHint(); });
+bindTap(document.getElementById('mt-mark'), () => { mapArm = mapArm === 'mark' ? null : 'mark'; syncArmButtons(); updateMapHint(); });
 document.getElementById('map-rot').addEventListener('input', (e) => { mapRot = +e.target.value; drawMap(); updateMapHint(); });
 
 // world touch: left half = walk, right half = look
@@ -1659,10 +1795,17 @@ mapcv.addEventListener('mouseup', e => {
 });
 function mapTap(sx, sy) {
   const [wx, wz] = screenToMap(sx, sy);
+  if (mapArm === 'mark') {
+    // tapping an existing mark rubs it out; tapping bare map adds one
+    const hit = marks.findIndex(m => Math.hypot(m.x - wx, m.z - wz) < 18 / mapView.scale + 6);
+    if (hit >= 0) marks.splice(hit, 1); else marks.push({ x: wx, z: wz });
+    save.marks = marks; persist(); sfx.click(); drawMap(); return;
+  }
   if (mapArm === 'thumb') { thumb.x = wx; thumb.z = wz; sfx.click(); drawMap(); }
   else if (mapArm === 'bearing') {
     const t = bearingTo(thumb.x, thumb.z, wx, wz);
     bearingSet = trueToMag(t); sfx.click(); mapArm = null; syncArmButtons(); drawMap();
+    if (questState) questState.bearingTarget = { x: wx, z: wz };   // WHAT you aimed at is the skill
     showToast('Bearing set: <b>' + Math.round(bearingSet) + '°</b> magnetic. Now turn until the needle sits in the shed.', 4500);
   }
   updateMapHint();
