@@ -79,10 +79,32 @@ attack point → night relocation. Each has a `check` type consumed by
 | `attack` | control reached; the debrief reports whether you used the Boulder |
 | `relocate` | thumb placed within 70 m of the true position **in the dark**, then walk home |
 
-The debrief grades *technique*, not just success: how much of the handrail leg
-you actually spent on the handrail, your thumb errors in metres, your pace count
-against the real distance, whether you aimed off, whether you used the attack
-point. That is where the teaching happens.
+**Finding the control is not the same as doing it properly.** `tryComplete()`
+runs `techniqueFailure()` before any lesson completes, and arriving without the
+technique is refused with coaching that says what you actually did:
+
+| lesson | requirement |
+| --- | --- |
+| handrail | ≥ 90 travel samples AND ≥ 55% of them within 45 m of the water |
+| thumb | ≥ 2 of 3 thumb placements inside 55 m |
+| bearing | bearing taken to within 45 m of the cairn **and** held on-line for ≥ 50% of walking |
+| pace | counter armed at the wall, counted distance within 22% of 170 m |
+| aim off | met the Beck **> 45 m from the control** (touching it at the flag proves nothing) |
+| attack | passed within 30 m of The Boulder |
+
+The debrief then grades *how well*: handrail percentage, thumb errors in metres,
+pace count against the real distance, and so on. That is where the teaching
+happens.
+
+**Coach hints.** Each lesson carries `hints[]`. If your distance to the target
+stops improving for ~55 s (then ~80 s), the coach names a *technique* — "climb
+for a view", "the track runs east–west", "hit the Beck and turn". It never says
+where you are; that would hand back the dot the whole design removes.
+
+**Map marks.** The MARK tool pencils a purple ✕ anywhere on the map; tapping an
+existing mark rubs it out. Marks persist in the save. This is what orienteers do
+with a pencil — flagging an attack point, or a feature you have positively
+identified while relocating.
 
 ## Rendering (raw WebGL2 — the documented exception)
 
@@ -132,6 +154,17 @@ Gates worth keeping:
 - **BFS walkability gate** — flood-fill the 4 m grid using the *same* rules the
   movement code uses (depth < 1.15, step gradient < 1.25) and assert every
   lesson control, the summit and the footbridge are reachable from the start.
+- **Final-leg gate** — reachability from the start is NOT enough. A control can
+  be reachable the long way round while the leg the lesson *tells you to walk*
+  is blocked. This gate greedily walks each intended leg (attack point →
+  control, Beck → aim-off control, flank → reentrant) and asserts no intended
+  leg crosses ground the mover refuses. It was written after it turned out the
+  attack-point control sat behind a **74° face** from its own attack point, and
+  the aim-off control sat **in the stream channel** where the depth rule makes
+  it unreachable. Both are now on ground you can actually stand on.
+- **Cheat gate** — teleport to each control *without* performing the technique
+  and assert the lesson refuses to complete. This is the test that keeps the
+  teaching honest as the game changes.
 - **Terrain honesty** — summit is Beacon Hill, river bed falls monotonically,
   all six land types present, and the reentrant is a real cross-slope hollow
   that drains downhill.
