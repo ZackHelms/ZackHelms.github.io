@@ -167,6 +167,12 @@
 
 <script type="module">
   const MODELS = [
+    { id:'pumpkin80_hull3_radial8', file:'models/pumpkin80_hull3_radial8.glb', label:'pumpkin80 (hull v3, radial:8)', tri:40000,
+      cfg:'v2 pipeline  ·  --prior radial:8  ·  8-fold folded profile  ·  behind-canvas demotion', tag:'ok',
+      note:'<b>Stage 2, 8-fold variant (zmh3dr) — CD comparison pending.</b> Same v2 pipeline plus <code>--prior radial:8</code>: an axis + radial profile is fitted from 1.31M trusted textured-depth points plus the carve&rsquo;s own boundary, folded 8 ways, and the hull <i>canvas</i> is rebuilt from it — so shape seen in one sector propagates into sectors no silhouette could ever groove. The 8 is measured, not guessed: an angular FFT of v2&rsquo;s mesh puts the strongest lobe-band mode at <b>N=8</b> (~1.6% radius modulation — faint, which is exactly why v2 reads lobeless). Real depth more than 2 voxels <i>behind</i> the fitted surface is demoted to it (one-sided — relief in FRONT is never touched, so the gold leaf is safe): <b>10.56M px demoted, 8.28M by the behind gate</b> vs v2&rsquo;s 2.99M. Components <b>4,082&rarr;1,397</b>. <i>Caveat not hidden: the fitted axis came out 9.98&deg; off the up-estimate — right at the plan&rsquo;s tolerance — and the renders show a faint horizontal ledge on the lower body plus slightly softer gold, both consistent with that tilt.</i> ~30&thinsp;MB.' },
+    { id:'pumpkin80_hull3_revolve', file:'models/pumpkin80_hull3_revolve.glb', label:'pumpkin80 (hull v3, revolve)', tri:40000,
+      cfg:'v2 pipeline  ·  --prior revolve  ·  full circular fold  ·  behind-canvas demotion', tag:'ok',
+      note:'<b>Stage 2, full-revolve variant (zmh3dr) — CD comparison pending.</b> Same fit as the radial:8 entry but folded a full turn: one r(z) profile, azimuth ignored — maximum smoothing, and it <i>propagates</i> no lobes. (It cannot FLATTEN grooves the carve already resolved: the prior is clamped to never grow past the visual hull, so it only ever removes material.) <b>11.23M real px demoted, 9.01M by the behind gate</b> vs v2&rsquo;s 2.99M; components <b>4,082&rarr;1,314</b> — the least fragmented pumpkin yet. The profile filled all 96 height bins from 1.31M trusted points; residual p50/p90 ~7%/~21% of radius (the p90 is the non-axisymmetric gold crown, which the min-clamp protects). <i>Same 9.98&deg; axis-tilt caveat as radial:8.</i> ~27&thinsp;MB.' },
     { id:'pumpkin80_q60_sgbm_hull2_t10', file:'models/pumpkin80_q60_sgbm_hull2_t10.glb', label:'pumpkin80 (hull v2, texture-min 10)', tri:40000,
       cfg:'v2 pipeline  ·  MERGE_TEXTURE_MIN 10.0 (experiment; shipped default 6.0)', tag:'ok',
       note:'<b>Threshold experiment, top of the sanctioned range — resolved.</b> Same v2 pipeline, the texture gate’s threshold raised 6.0&rarr;10.0 via a runtime override: <b>5.33M real px demoted</b> (vs v2’s 2.99M), components 4,082&rarr;3,900. <i>CD three-way verdict (2026-07-25): 6 / 8 / 10 &ldquo;all look effectively the same&rdquo; — the threshold path is closed, the shipped default stays 6.0, and this entry is kept for the record.</i> ~36&thinsp;MB.' },
@@ -238,7 +244,7 @@
   // Build stamp + cache-busting. Models load with `?v=<CB>`; CB is the build
   // stamp normally, or the fresh `?cb=` value the Reload button navigates with,
   // so a hard reload re-fetches every GLB past the browser / Pages CDN cache.
-  const BUILD = '2026-07-25 17:05 UTC';
+  const BUILD = '2026-07-26 00:20 UTC';
   const CB = new URLSearchParams(location.search).get('cb') || BUILD;
   const withCB = (u) => u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(CB);
 
