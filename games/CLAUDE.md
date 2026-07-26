@@ -12,7 +12,7 @@ Detailed context for individual games lives in `.claude/<game>.md` at the repo r
 |-----------|--------|
 | Fonts | `'Black Ops One'` (headings) + `'Share Tech Mono'` (body/mono) via Google Fonts |
 | Palette | `--bg:#06060e` `--panel:#0b0b16` `--border:#1a1a30` `--green:#39ff14` `--gold:#ffc300` `--blue:#4488ff` `--red:#ff2244` `--white:#dde3ff` `--dim:#8899bb` `--purple:#b44fff` |
-| Rendering | Canvas 2D, `requestAnimationFrame` loop, delta-time capped at ~100 ms |
+| Rendering | Canvas 2D, `requestAnimationFrame` loop, delta-time capped at ~100 ms. **Documented exception:** `wayfinder/` renders with hand-written **WebGL2 + GLSL** — real 3D terrain is not achievable in Canvas 2D and Three.js would break the no-external-libraries rule. All its assets are still generated procedurally in-file, it keeps a 2D canvas over the top for the HUD, and it degrades gracefully (simulation, map and compass all still run) when WebGL2 is unavailable. Reach for WebGL only when a game genuinely cannot exist without it |
 | Input | Touch + mouse events, `user-select:none`, `touch-action:manipulation` |
 | No dependencies | Zero external JS libs; Google Fonts is the only external resource |
 | Responsive | Portrait/landscape via `@media (orientation:landscape)` or `100dvh` layout; a canvas inside a flex column needs `min-height:0` or its intrinsic 300:150 ratio overflows landscape |
@@ -362,6 +362,20 @@ Missile-Command-style tap interceptor. Blast rings chain through meteors
 (splitters, comets, UFOs) falling on six neon buildings; per-wave ammo
 budgets, intermission bonuses, mercy rebuild every 5th wave. Synth SFX +
 tense sequencer music. Detailed context: `.claude/meteor-defense.md`.
+
+### WAYFINDER (`wayfinder/index.html`, ~1150 lines)
+First-person 3D orienteering sim, and the repo's only WebGL page. A 1 km valley
+— forest, marsh, a meandering river with a beck, tracks, a stone wall and a
+148 m climbable Beacon Hill — under a 24-minute day/night cycle. You navigate
+with an ISOM-style map generated from the same heightfield the world is built
+from, and **there is no "you are here" dot**: you keep your place by dragging a
+thumb marker. Baseplate compass with real magnetic declination, "red in the
+shed" alignment, and pace counting. Nine lessons teach real technique in club
+order (orient the map → handrail → thumbing → bearing → pacing → aiming off →
+contours → attack point → night relocation), each debriefed on technique rather
+than just success; then the valley opens for free roam. Terrain and land type
+are baked into grids at boot so rendering, collision and the map can never
+disagree. Detailed context: `.claude/wayfinder.md`.
 
 ### BALLPARK (`ballpark/index.html`, ~640 lines)
 Estimation trivia — no multiple choice. Every question has a numeric answer

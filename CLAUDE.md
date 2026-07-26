@@ -81,6 +81,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Locksport (`games/locksport/`) | `.claude/locksport.md` | Any work on the lock-picking sim — binding/shear pin physics, spool/serrated drivers, tension pad, level path, cutaway rendering |
 | Ballpark (`games/ballpark/`) | `.claude/ballpark.md` | Any work on the estimation trivia — question bank + range rules, log/linear dial math, proximity scoring, daily seeding |
 | Tilt Labyrinth (`games/tilt-labyrinth/`) | `.claude/tilt-labyrinth.md` | Any work on the tilt maze — motion/drag input, ball physics, hole capture rules, board authoring + BFS fairness gate |
+| Wayfinder (`games/wayfinder/`) | `.claude/wayfinder.md` | Any work on the orienteering sim — WebGL2 terrain/sky/water renderer, heightfield + land grids, ISOM map generation, compass/bearing/pace maths, the 9-lesson engine |
 | Sky Lantern (`games/sky-lantern/`) | `.claude/sky-lantern.md` | Any work on the breath-flight game — mic RMS→breath mapping, burner/heat model, level generator + its three fairness gates |
 | Signal Hunt (`games/signal-hunt/`) | `.claude/signal-hunt.md` | Any work on the hidden-object hunt — world/decoy generation, pan-pinch input, share codes and duel flow, colourblind labels |
 

@@ -139,7 +139,7 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 21:14 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-26 18:32 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
@@ -494,6 +494,14 @@ h1 {
         <div class="game-desc">Eight rogue signals hide in a huge circuit grid — each an exact shape+colour pair, every decoy sharing one but never both. Pan, pinch, tap. Send a friend the code and duel the same grid.</div>
       </div>
     </a>
+
+    <a class="game-card" href="wayfinder/">
+      <div class="game-icon">🧭</div>
+      <div class="game-info">
+        <div class="game-name">WAYFINDER</div>
+        <div class="game-desc">A 3D valley, a paper map and a compass — and no dot showing where you are. Nine lessons teach real orienteering: bearings, pacing, contours, relocating in the dark.</div>
+      </div>
+    </a>
   </div>
 
   <div id="stats">
@@ -557,6 +565,7 @@ const GAMES = [
   { n: 'TILT LABYRINTH', i: '🕳️', h: 'tilt-labyrinth/', genre: ['marble-labyrinth'], input: ['tilt', 'drag-steer'], session: ['level-campaign'], mech: ['physics-sim', 'hazard-avoidance', 'star-rating'], players: ['solo'] },
   { n: 'SKY LANTERN', i: '🏮', h: 'sky-lantern/', genre: ['flight-control'], input: ['mic-blow', 'drag-steer'], session: ['level-campaign'], mech: ['analog-breath', 'physics-sim', 'star-rating'], players: ['solo'] },
   { n: 'SIGNAL HUNT', i: '📡', h: 'signal-hunt/', genre: ['hidden-object'], input: ['pinch-zoom', 'two-finger-pan', 'tap'], session: ['async-versus', 'daily-challenge', 'timed-round'], mech: ['visual-search', 'seeded-determinism', 'share-code'], players: ['solo', 'async-2p'] },
+  { n: 'WAYFINDER', i: '🧭', h: 'wayfinder/', genre: ['exploration-sim'], input: ['twin-stick', 'drag-slider'], session: ['skill-campaign', 'open-sandbox'], mech: ['first-person-3d', 'map-and-compass', 'day-night-cycle', 'skill-teaching'], players: ['solo'] },
 ];
 // One hue per section (single-series bars; labels carry identity). Green and
 // gold sections are kept non-adjacent — the pair is CVD-inseparable.

@@ -69,7 +69,9 @@ local-2p.
 | Sky Lantern | `sky-lantern/` | flight-control | mic-blow, drag-steer | level-campaign | analog-breath, physics-sim, star-rating | solo | `.claude/sky-lantern.md` |
 | Signal Hunt | `signal-hunt/` | hidden-object | pinch-zoom, two-finger-pan, tap | async-versus, daily-challenge, timed-round | visual-search, seeded-determinism, share-code | solo, async-2p | `.claude/signal-hunt.md` |
 
-44 games (42 in-repo + 2 external builds).
+| Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
+
+45 games (43 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -110,6 +112,11 @@ local-2p.
   `visual-search`/`share-code` mechanics + `async-versus` session +
   `async-2p` players (signal-hunt — the only game two people play without
   being in the same room or the same minute).
+
+- `exploration-sim` genre + `twin-stick` input + `first-person-3d` /
+  `map-and-compass` / `day-night-cycle` mechanics + `skill-campaign` session
+  (wayfinder — the repo's only 3D game and its only real-world-skill trainer;
+  also the only page rendering with WebGL rather than Canvas 2D).
 
 ### Absent — what's actually left
 Sensor inputs are now down to two: **`shake`** and **`camera`**. Everything
