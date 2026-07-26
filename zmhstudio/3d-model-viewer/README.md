@@ -13,28 +13,40 @@ Live: `https://tythos.com/zmhstudio/3d-model-viewer/`
 
 ### Symmetry prior — hull v3 revolve / radial:8 — zmh3dr stage 2 (2026-07-26)
 
-- `pumpkin80 (hull v3, revolve)` and `… radial:8` — **ok (CD three-way
-  comparison pending)**: the v2 pipeline plus the new `--prior` axis. An axis
-  and a folded radial profile are fitted from 1.31M trusted textured-depth
-  points plus the carve's own boundary, and the hull *canvas* is rebuilt from
-  the fit — so shape observed in one sector propagates into the sectors no
-  silhouette could ever groove. Real depth more than 2 voxels *behind* the
-  fitted surface is then demoted to it (one-sided: deviation in front is
-  legitimate protrusion and is never touched, so the gold leaf is safe) — the
-  shape-based discriminator that picks up where the texture gate ran out of
-  levers (6/8/10 all identical, CD 2026-07-25). Demoted real px: 2.99M (v2)
-  → **11.23M** (revolve, 9.01M from the behind gate) / **10.56M** (radial:8,
-  8.28M behind); components 4,082 → **1,314** / **1,397** — the least
-  fragmented pumpkins yet. The fold count is measured, not guessed: an
-  angular FFT of v2's mesh puts the strongest lobe-band mode at N=8 (~1.6%
-  radius modulation — faint, which is exactly why v2 reads lobeless).
-  **Known caveat, stated up front:** the fitted axis came out 9.98° off the
-  up-estimate — right at the plan's tolerance — and both renders carry a
-  faint horizontal ledge on the lower body plus slightly softer gold,
-  consistent with that tilt. Prime suspect is the gold crown's one-sided mass
-  biasing the per-height centroids the axis is fitted through; a
-  lower-body-only axis fit is the candidate stage-2b. Until the CD's verdict,
-  `pumpkin80 (q60 sgbm + hull v2)` stays the canonical model.
+- `pumpkin80 (hull v3, revolve)` and `… radial:8` — **bad (REJECTED by the CD
+  2026-07-26; kept for the record)**. Verdict: *"I dont like how v3 has
+  flattened the gold leaves, also v3 has visible 'latitude' rings. I prefer
+  v2 over v3."* `pumpkin80 (q60 sgbm + hull v2)` remains canonical, and the
+  `--prior` flag stays `off` by default, so the shipped pipeline never had
+  these defects.
+
+  What they were: the v2 pipeline plus the `--prior` axis. An axis and a
+  folded radial profile are fitted from 1.31M trusted textured-depth points
+  plus the carve's own boundary, and the hull *canvas* is rebuilt from the
+  fit, so shape observed in one sector propagates into sectors no silhouette
+  could ever groove. Real depth more than 2 voxels *behind* the fitted
+  surface is then demoted to it. Demoted real px: 2.99M (v2) → **11.23M**
+  (revolve, 9.01M from the behind gate) / **10.56M** (radial:8, 8.28M
+  behind); components 4,082 → **1,314** / **1,397** — the least fragmented
+  pumpkins yet, and a good reminder that component count is a weak proxy for
+  scan quality. Fold count was measured, not guessed: an angular FFT of v2's
+  mesh puts the strongest lobe-band mode at N=8 (~1.6% radius modulation —
+  faint, which is exactly why v2 reads lobeless).
+
+  **Why they failed** (both traced to code after the verdict; the 9.98° axis
+  tilt originally blamed turned out to be a third-order contributor):
+  1. *Flattened gold* — the behind gate is one-sided, which protects
+     **convex** relief, but the gold crown's detail is the **concave** gaps
+     between the leaves. Those gaps are genuinely observed and sit far behind
+     the smooth envelope, so they were demoted and refilled, merging the
+     leaves. Most of those 9.01M "behind" pixels were real surface, not the
+     welt noise they were taken for.
+  2. *Latitude rings* — the profile is resolved by floor bin index with no
+     interpolation, so the rebuilt canvas is a stack of 96 constant-radius
+     shells. The rings are that terracing.
+
+  Candidate stage 2b (not started, needs CD go-ahead): exempt textured pixels
+  from the behind gate, and bilinearly interpolate the profile lookup.
 
 ### Texture-threshold experiment — v2 at MERGE_TEXTURE_MIN 8 / 10 (2026-07-22)
 
