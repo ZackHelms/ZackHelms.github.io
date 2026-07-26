@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Wayfinder</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30; --green:#39ff14;
+  --gold:#ffc300; --blue:#4488ff; --red:#ff2244; --white:#dde3ff;
+  --dim:#8899bb; --purple:#b44fff;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);touch-action:manipulation}
+body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none;-webkit-user-select:none}
+#wrap{position:fixed;inset:0}
+canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
+#gl{z-index:1}
+#ui{z-index:2;touch-action:none}
+#back-btn{position:fixed;top:calc(6px + env(safe-area-inset-top));left:8px;z-index:80;
+  width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  color:var(--dim);font-size:17px;text-decoration:none}
+#mute-btn{position:fixed;top:calc(6px + env(safe-area-inset-top));left:52px;z-index:80;
+  width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  color:var(--dim);font-size:14px;cursor:pointer}
+.hud-btn{position:fixed;z-index:40;background:rgba(11,11,22,0.82);
+  border:1px solid var(--border);border-radius:10px;color:var(--white);
+  font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:1px;
+  text-align:center;cursor:pointer;display:none;padding:9px 0}
+#map-btn{right:8px;bottom:calc(16px + env(safe-area-inset-bottom));width:78px;
+  font-size:14px;color:var(--gold);border-color:#5a4a16}
+#pace-btn{right:8px;bottom:calc(58px + env(safe-area-inset-bottom));width:78px}
+#lamp-btn{right:8px;bottom:calc(96px + env(safe-area-inset-bottom));width:78px}
+.hud-btn.on{color:var(--green);border-color:#1f5a16;background:rgba(10,26,8,0.85)}
+#quest-bar{position:fixed;left:96px;right:8px;top:calc(6px + env(safe-area-inset-top));
+  z-index:40;background:rgba(11,11,22,0.8);border:1px solid var(--border);
+  border-radius:8px;padding:5px 9px;font-size:11px;line-height:1.35;display:none;cursor:pointer}
+#quest-bar b{color:var(--gold);letter-spacing:1px}
+#quest-bar .task{color:var(--dim)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);
+  top:calc(86px + env(safe-area-inset-top));z-index:45;max-width:330px;
+  background:rgba(11,11,22,0.93);border:1px solid #5a4a16;border-radius:10px;
+  color:var(--gold);font-size:12px;line-height:1.5;padding:10px 14px;text-align:center;
+  display:none;pointer-events:none}
+
+/* ---- map screen ---- */
+#map-screen{position:fixed;inset:0;z-index:60;display:none;background:#0a0a12;
+  flex-direction:column}
+#map-cv{position:relative;flex:1;min-height:0;width:100%;touch-action:none}
+#map-tools{flex:0 0 auto;display:flex;gap:6px;padding:8px;
+  padding-bottom:calc(8px + env(safe-area-inset-bottom));background:var(--panel);
+  border-top:1px solid var(--border);flex-wrap:wrap;justify-content:center}
+.mt{background:#12121f;border:1px solid var(--border);border-radius:8px;color:var(--white);
+  font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;
+  padding:9px 10px;cursor:pointer;flex:1 1 auto;min-width:64px;text-align:center}
+.mt.on{color:var(--gold);border-color:#5a4a16;background:#191408}
+.mt.go{color:var(--green);border-color:#1f5a16}
+#rot-row{display:flex;align-items:center;gap:8px;width:100%;padding:0 4px}
+#rot-row label{font-size:10px;color:var(--dim);letter-spacing:1px;white-space:nowrap}
+#map-rot{flex:1;-webkit-appearance:none;height:26px;background:transparent}
+#map-rot::-webkit-slider-runnable-track{height:4px;background:#2a2a44;border-radius:2px}
+#map-rot::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;margin-top:-11px;
+  border-radius:50%;background:var(--gold);border:2px solid #0b0b16}
+#map-rot::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:var(--gold);border:2px solid #0b0b16}
+#map-hint{font-size:10px;color:var(--dim);text-align:center;width:100%;line-height:1.4}
+
+.overlay{position:fixed;inset:0;z-index:70;background:rgba(4,4,10,0.92);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:22px;overflow-y:auto}
+.overlay h1{font-family:'Black Ops One',cursive;font-size:40px;color:var(--gold);
+  text-shadow:0 0 24px rgba(255,195,0,0.45);letter-spacing:2px;line-height:1.05}
+.overlay h2{font-family:'Black Ops One',cursive;font-size:24px;color:var(--gold);letter-spacing:2px}
+.overlay .sub{color:var(--dim);font-size:12.5px;margin:12px 0 18px;max-width:340px;line-height:1.65}
+.overlay .sub b{color:var(--white)}
+.big-btn{background:var(--panel);border:1px solid #5a4a16;border-radius:12px;
+  color:var(--gold);font-family:'Black Ops One',cursive;font-size:16px;
+  letter-spacing:2px;padding:13px 34px;margin:6px 0;cursor:pointer;min-width:240px}
+.big-btn.alt{border-color:#1f4a7a;color:var(--blue)}
+.small-btn{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:12px;
+  letter-spacing:1px;padding:9px 20px;margin:5px 0;cursor:pointer}
+#brief-body{color:var(--dim);font-size:12.5px;line-height:1.7;max-width:340px;margin:10px 0 16px;text-align:left}
+#brief-body .skill{color:var(--green);letter-spacing:1px;font-size:11px;display:block;margin-bottom:6px}
+#brief-body .desc{color:var(--white);display:block;margin-top:10px;font-size:12px}
+#lesson-list{text-align:left;max-width:340px;font-size:11.5px;line-height:1.75;color:var(--dim);margin-bottom:14px}
+#lesson-list .done{color:var(--green)}
+#lesson-list .cur{color:var(--gold)}
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-26 18:29 UTC</div>
+<div id="wrap"><canvas id="gl"></canvas><canvas id="ui"></canvas></div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute-btn" aria-label="Toggle sound">🔊</button>
+<div id="quest-bar"></div>
+<button id="map-btn" class="hud-btn">MAP</button>
+<button id="pace-btn" class="hud-btn">PACE</button>
+<button id="lamp-btn" class="hud-btn">LAMP</button>
+<div id="toast"></div>
+
+<div id="map-screen">
+  <canvas id="map-cv"></canvas>
+  <div id="map-tools">
+    <div id="rot-row"><label>MAP ROTATION</label><input id="map-rot" type="range" min="-180" max="180" value="0" step="1"></div>
+    <div id="map-hint"></div>
+    <button id="mt-thumb" class="mt">👍 THUMB</button>
+    <button id="mt-bearing" class="mt">🧭 BEARING</button>
+    <button id="mt-confirm" class="mt go">CONFIRM</button>
+    <button id="mt-close" class="mt">CLOSE</button>
+  </div>
+</div>
+
+<div id="menu" class="overlay" style="display:flex">
+  <h1>WAYFINDER</h1>
+  <div class="sub">A valley, a paper map, and a compass — <b>no dot showing where you are</b>.
+  Nine lessons teach the way orienteers actually navigate: orient the map, follow a handrail,
+  thumb your position, walk a bearing, count paces, aim off, read contours, pick an attack point,
+  and relocate in the dark.</div>
+  <button id="start-btn" class="big-btn">BEGIN</button>
+  <button id="roam-btn" class="big-btn alt">FREE ROAM</button>
+  <div id="menu-progress" class="sub" style="margin-top:12px"></div>
+</div>
+
+<div id="brief" class="overlay">
+  <h2 id="brief-title">LESSON</h2>
+  <div id="brief-body"></div>
+  <button id="brief-go" class="big-btn">GO</button>
+</div>
+
+<div id="done" class="overlay">
+  <h2 id="done-title">CONTROL PUNCHED</h2>
+  <div id="done-body" class="sub"></div>
+  <button id="done-next" class="big-btn">NEXT LESSON</button>
+  <button id="done-menu" class="small-btn">MENU</button>
+</div>
+
+<div id="lessons" class="overlay">
+  <h2>FIELD BOOK</h2>
+  <div id="lesson-list"></div>
+  <button id="lessons-close" class="small-btn">CLOSE</button>
+</div>
+
+<script>
+'use strict';
+/* =======================================================================
+   WAYFINDER — orienteering exploration sim
+   Rendering is raw WebGL2 (documented exception to the Canvas-2D house
+   convention — see games/CLAUDE.md). Everything below the GFX section is
+   plain deterministic JS with no GPU dependency, so the whole simulation
+   (terrain, movement, bearings, pacing, quest logic) is drive-testable
+   headlessly even where WebGL is unavailable.
+   ======================================================================= */
+
+/* ------------------------- WORLD CONSTANTS ------------------------- */
+const WORLD = 1024;            // metres square
+const GRID  = 4;               // terrain sample spacing (m)
+const NC    = WORLD / GRID;    // 256 cells -> 257 verts per side
+const DAY_SECONDS = 24 * 60;   // full 24-minute day/night cycle
+const DECLINATION = 11.5;      // magnetic declination, degrees EAST
+const EYE = 1.68;              // eye height (m)
+const TREELINE = 118;          // trees stop above this altitude
+const PACE_M = 1.62;           // metres per double-pace (average adult)
+
+/* ------------------------- NOISE ------------------------- */
+function hash2(i, j) {
+  let h = Math.imul(i | 0, 374761393) + Math.imul(j | 0, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+function vnoise(x, y) {
+  const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  const a = hash2(i, j), b = hash2(i + 1, j), c = hash2(i, j + 1), d = hash2(i + 1, j + 1);
+  return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
+}
+function fbm(x, y, oct) {
+  let s = 0, a = 0.5, f = 1, n = 0;
+  for (let o = 0; o < oct; o++) { s += a * vnoise(x * f, y * f); n += a; f *= 2.03; a *= 0.5; }
+  return s / n;
+}
+
+/* ------------------------- NAMED TERRAIN ------------------------- */
+// Hand-placed so every lesson has the feature it needs to teach with.
+const HILLS = [
+  { x: 770, z: 270, r: 260, h: 104, name: 'Beacon Hill' },   // the big climbable one
+  { x: 596, z: 148, r: 150, h: 40, name: 'Crow Knoll' },
+  { x: 840, z: 640, r: 210, h: 62, name: 'Long Fell' },
+  { x: 170, z: 250, r: 165, h: 34, name: 'Ash Rise' },
+  { x: 120, z: 800, r: 150, h: 26, name: 'Kiln Bank' },
+];
+// Mill Stream: the river, north -> south, meandering. Bed drops 40m -> 6m.
+const RIVER = [
+  { x: 300, z: 0 }, { x: 332, z: 120 }, { x: 298, z: 250 }, { x: 342, z: 372 },
+  { x: 312, z: 476 }, { x: 355, z: 600 }, { x: 330, z: 712 }, { x: 378, z: 830 }, { x: 352, z: 1024 },
+];
+// Beck: tributary off Beacon Hill's west flank, joins the river.
+const BECK = [
+  { x: 706, z: 336 }, { x: 640, z: 356 }, { x: 560, z: 392 }, { x: 470, z: 424 }, { x: 356, z: 452 },
+];
+// Ridge Track: the main handrail, west -> east. Crosses the river at the footbridge.
+const TRACK = [
+  { x: 0, z: 640 }, { x: 180, z: 612 }, { x: 355, z: 600 }, { x: 520, z: 560 },
+  { x: 700, z: 520 }, { x: 900, z: 470 }, { x: 1024, z: 452 },
+];
+// Wood Lane: south handrail joining the track.
+const LANE = [
+  { x: 250, z: 1024 }, { x: 268, z: 900 }, { x: 300, z: 790 }, { x: 288, z: 700 }, { x: 330, z: 604 },
+];
+// Stone wall: a hard linear feature in the north.
+const WALL = [{ x: 520, z: 120 }, { x: 640, z: 178 }, { x: 762, z: 168 }, { x: 862, z: 118 }];
+// An explicit gully cut into Beacon Hill's west flank. The contour lesson asks
+// the player to read a reentrant, so there has to genuinely BE one — a lesson
+// pointing at terrain the noise happened not to produce would be a lie.
+const REENTRANT = [{ x: 706, z: 258 }, { x: 668, z: 264 }, { x: 630, z: 272 }, { x: 598, z: 282 }];
+
+const POI = {
+  start:  { x: 300, z: 660, name: 'Start triangle' },
+  bridge: { x: 355, z: 600, name: 'Footbridge' },
+  cairn:  { x: 770, z: 270, name: 'Cairn on Beacon Hill' },
+  boulder:{ x: 688, z: 332, name: 'The Boulder' },
+  ruin:   { x: 186, z: 306, name: 'Ruined fold' },
+  spring: { x: 640, z: 356, name: 'Spring' },
+  wallend:{ x: 520, z: 120, name: 'West end of the wall' },
+  junction:{ x: 330, z: 604, name: 'Wood Lane junction' },
+};
+
+/* ------------------------- POLYLINE HELPERS ------------------------- */
+function segDist(px, pz, ax, az, bx, bz) {
+  const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
+  let t = L2 > 0 ? ((px - ax) * dx + (pz - az) * dz) / L2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = ax + t * dx, cz = az + t * dz;
+  return { d: Math.hypot(px - cx, pz - cz), t: t, cx: cx, cz: cz };
+}
+// Segment lengths are cached once — polyNear is called millions of times while
+// the terrain grids are built, and recomputing the total each call was the
+// single biggest cost in the whole boot.
+function prepPoly(pts) {
+  pts._len = []; pts._total = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const L = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z);
+    pts._len.push(L); pts._total += L;
+  }
+  return pts;
+}
+// Nearest point on a polyline; returns distance and cumulative fraction along it.
+function polyNear(pts, x, z) {
+  if (!pts._len) prepPoly(pts);
+  let bd = 1e9, bs = 0, bx = 0, bz = 0, acc = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const r = segDist(x, z, a.x, a.z, b.x, b.z);
+    if (r.d < bd) { bd = r.d; bs = (acc + r.t * pts._len[i]) / pts._total; bx = r.cx; bz = r.cz; }
+    acc += pts._len[i];
+  }
+  return { d: bd, s: bs, cx: bx, cz: bz };
+}
+
+/* ------------------------- HEIGHTFIELD ------------------------- */
+// Water surface height along a watercourse, by fraction travelled.
+function riverBed(s) { return 40 - 34 * s; }
+function beckBed(s) { const a = 74, b = riverBed(polyNear(RIVER, 356, 452).s); return a + (b - a) * s; }
+
+// EXPENSIVE — evaluated once per grid node at boot, never per frame.
+function rawHeight(x, z) {
+  // rolling base
+  let h = 26 + fbm(x * 0.0042 + 11.3, z * 0.0042 + 5.7, 5) * 34
+            + fbm(x * 0.013 + 3.1, z * 0.013 + 9.4, 3) * 7;
+  // hills (smooth cosine bumps so slopes stay walkable)
+  for (const H of HILLS) {
+    const d = Math.hypot(x - H.x, z - H.z);
+    if (d < H.r) { const t = d / H.r; h += H.h * 0.5 * (1 + Math.cos(Math.PI * t)); }
+  }
+  // river valley: pull the ground down toward the bed over a 90 m falloff
+  const r = polyNear(RIVER, x, z);
+  const rb = riverBed(r.s);
+  if (r.d < 95) {
+    const k = 1 - r.d / 95;
+    h = h * (1 - k * k * 0.94) + (rb + 3 + r.d * 0.10) * (k * k * 0.94);
+    if (r.d < 7) h = Math.min(h, rb - 1.1 * (1 - r.d / 7));   // channel
+  }
+  // beck: a smaller cut
+  const bk = polyNear(BECK, x, z);
+  if (bk.d < 42) {
+    const bb = beckBed(bk.s), k = 1 - bk.d / 42;
+    h = h * (1 - k * k * 0.7) + (bb + 2 + bk.d * 0.14) * (k * k * 0.7);
+    if (bk.d < 3.4) h = Math.min(h, bb - 0.5);
+  }
+  // the reentrant: a gully folded into the hillside (contours point uphill)
+  // Deep enough that it bends three 5 m contour lines — a 2 m dimple would be
+  // invisible on the map and the lesson would be unreadable.
+  const re = polyNear(REENTRANT, x, z);
+  if (re.d < 34) { const k = 1 - re.d / 34; h -= 15.5 * k * k * (0.45 + 0.55 * (1 - re.s)); }
+  // tracks flatten their corridor a touch (a real cut track)
+  const tr = Math.min(polyNear(TRACK, x, z).d, polyNear(LANE, x, z).d);
+  if (tr < 9) { const k = 1 - tr / 9; h = h * (1 - k * 0.16) + (h - 0.5) * (k * 0.16); }
+  return h;
+}
+/* The heightfield is baked once into a 257x257 grid. Everything afterwards —
+   rendering, collision, contours, the map — samples this same grid, so what
+   you walk on, what you see and what the map shows can never disagree. */
+const N1 = NC + 1;
+const HGT = new Float32Array(N1 * N1);
+function buildHeights() {
+  for (let j = 0; j < N1; j++) for (let i = 0; i < N1; i++) HGT[j * N1 + i] = rawHeight(i * GRID, j * GRID);
+}
+function heightAt(x, z) {
+  const fx = Math.max(0, Math.min(WORLD - 0.001, x)) / GRID;
+  const fz = Math.max(0, Math.min(WORLD - 0.001, z)) / GRID;
+  const i = fx | 0, j = fz | 0, tx = fx - i, tz = fz - j;
+  const i1 = i + 1 > NC ? NC : i + 1, j1 = j + 1 > NC ? NC : j + 1;
+  const a = HGT[j * N1 + i], b = HGT[j * N1 + i1], c = HGT[j1 * N1 + i], d = HGT[j1 * N1 + i1];
+  return a * (1 - tx) * (1 - tz) + b * tx * (1 - tz) + c * (1 - tx) * tz + d * tx * tz;
+}
+function slopeAt(x, z) {
+  const e = 3;
+  const hx = heightAt(x + e, z) - heightAt(x - e, z);
+  const hz = heightAt(x, z + e) - heightAt(x, z - e);
+  return Math.hypot(hx, hz) / (2 * e);        // rise over run
+}
+function normalAt(x, z) {
+  const e = 3;
+  const hx = heightAt(x + e, z) - heightAt(x - e, z);
+  const hz = heightAt(x, z + e) - heightAt(x, z - e);
+  const n = [-hx / (2 * e), 1, -hz / (2 * e)];
+  const L = Math.hypot(n[0], n[1], n[2]);
+  return [n[0] / L, n[1] / L, n[2] / L];
+}
+
+/* ------------------------- LAND CLASSIFICATION ------------------------- */
+const LAND = { OPEN: 0, FOREST: 1, DENSE: 2, WATER: 3, MARSH: 4, TRAIL: 5, ROCK: 6 };
+// Movement multiplier — this is what makes route choice a real decision.
+const LAND_SPEED = { 0: 1.0, 1: 0.82, 2: 0.42, 3: 0.3, 4: 0.55, 5: 1.32, 6: 0.75 };
+
+function waterDepthAt(x, z) {
+  const r = polyNear(RIVER, x, z);
+  if (r.d < 8.5) {
+    const surf = riverBed(r.s) - 0.15;
+    const d = surf - heightAt(x, z);
+    if (d > 0) return d;
+  }
+  const b = polyNear(BECK, x, z);
+  if (b.d < 4.2) {
+    const surf = beckBed(b.s) + 0.1;
+    const d = surf - heightAt(x, z);
+    if (d > 0) return d;
+  }
+  return 0;
+}
+function forestDensity(x, z) {
+  const h = heightAt(x, z);
+  let f = fbm(x * 0.0062 + 41.7, z * 0.0062 + 17.2, 4);
+  f = (f - 0.34) * 2.3;                              // spread it out
+  f += 0.30 * Math.max(0, 1 - Math.hypot(x - 470, z - 250) / 230);   // the plantation
+  if (h > TREELINE) f -= (h - TREELINE) * 0.055;     // treeline
+  const r = polyNear(RIVER, x, z);
+  if (r.d < 26) f -= (1 - r.d / 26) * 0.5;           // open river meadows
+  return Math.max(0, Math.min(1, f));
+}
+function isMarsh(x, z) {
+  const r = polyNear(RIVER, x, z);
+  return r.d > 11 && r.d < 78 && slopeAt(x, z) < 0.075 &&
+         fbm(x * 0.008 + 71, z * 0.008 + 23, 3) > 0.47;
+}
+function rawLand(x, z) {
+  if (waterDepthAt(x, z) > 0.05) return LAND.WATER;
+  const tr = Math.min(polyNear(TRACK, x, z).d, polyNear(LANE, x, z).d);
+  if (tr < 2.6) return LAND.TRAIL;
+  const h = heightAt(x, z), s = slopeAt(x, z);
+  if (h > TREELINE + 6 || s > 0.62) return LAND.ROCK;
+  if (isMarsh(x, z)) return LAND.MARSH;
+  const f = forestDensity(x, z);
+  if (f > 0.70) return LAND.DENSE;
+  if (f > 0.30) return LAND.FOREST;
+  return LAND.OPEN;
+}
+// Land type is baked per cell too — the map, the mesh colours and the movement
+// model all read this one array.
+const LANDG = new Uint8Array(NC * NC);
+function buildLand() {
+  for (let j = 0; j < NC; j++) for (let i = 0; i < NC; i++)
+    LANDG[j * NC + i] = rawLand(i * GRID + GRID / 2, j * GRID + GRID / 2);
+}
+function landAt(x, z) {
+  const i = Math.max(0, Math.min(NC - 1, (x / GRID) | 0));
+  const j = Math.max(0, Math.min(NC - 1, (z / GRID) | 0));
+  return LANDG[j * NC + i];
+}
+
+/* ------------------------- BEARINGS / NAV MATH ------------------------- */
+// World convention: +x east, +z south. Bearing 0 = north (-z), clockwise.
+function bearingTo(fx, fz, tx, tz) {
+  const d = (Math.atan2(tx - fx, -(tz - fz)) * 180 / Math.PI + 360) % 360;
+  return d;
+}
+function angDiff(a, b) { let d = ((a - b) % 360 + 540) % 360 - 180; return d; }
+function trueToMag(t) { return (t - DECLINATION + 360) % 360; }   // grid/true -> compass reading
+function magToTrue(m) { return (m + DECLINATION + 360) % 360; }
+
+/* ------------------------- GAME STATE ------------------------- */
+let W = 390, H = 844, dpr = 1;
+let game = 'menu';                 // menu | play | brief | done | map
+let player = { x: POI.start.x, z: POI.start.z, y: 0, yaw: 168, pitch: -4, vSpeed: 0 };
+let clock = 8.2 * 3600 / 24;       // seconds into the 24-min cycle; start mid-morning
+let paceOn = false, paceCount = 0, paceMetres = 0, lampOn = false;
+let thumb = { x: POI.start.x, z: POI.start.z };
+let bearingSet = null;             // magnetic bearing the player dialled in
+let mapRot = 0;                    // map rotation in degrees (0 = north up)
+let questIdx = 0, questState = null, roam = false;
+let distanceWalked = 0, legStart = { x: 0, z: 0 };
+let save = { done: [], best: {} };
+try { const s = localStorage.getItem('wayfinder'); if (s) save = Object.assign(save, JSON.parse(s)); } catch (e) {}
+function persist() { try { localStorage.setItem('wayfinder', JSON.stringify(save)); } catch (e) {} }
+
+function timeOfDay() { return (clock % DAY_SECONDS) / DAY_SECONDS; }   // 0 = midnight
+function sunElevation() {
+  // 0.25 = sunrise, 0.5 = noon, 0.75 = sunset
+  return Math.sin((timeOfDay() - 0.25) * 2 * Math.PI) * 62;            // degrees
+}
+function isNight() { return sunElevation() < -3; }
+function clockString() {
+  const t = timeOfDay() * 24, hh = Math.floor(t), mm = Math.floor((t - hh) * 60);
+  return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+}
+
+/* ------------------------- LESSONS ------------------------- */
+// Each lesson teaches one technique in the order orienteering clubs teach them.
+const LESSONS = [
+  {
+    id: 'orient', skill: 'ORIENTING THE MAP',
+    title: 'THE MAP IS THE TERRAIN',
+    brief: 'A map is not a book — it is a picture of the ground, and it only makes sense when it is turned to match the ground. ' +
+      'Open the MAP and drag <b>MAP ROTATION</b> until the map\'s north lines point the same way as the compass needle, then CONFIRM. ' +
+      'From then on, left on the map is left in front of you.',
+    desc: 'Orient the map to the terrain and confirm.',
+    check: 'orient',
+  },
+  {
+    id: 'handrail', skill: 'HANDRAILS', title: 'FOLLOW THE WATER',
+    brief: 'A <b>handrail</b> is a long feature you can follow without thinking — a stream, a wall, a track. ' +
+      'Mill Stream runs north–south through the valley. Follow it upstream to the <b>footbridge</b> where the Ridge Track crosses. ' +
+      'Stay near the water: you cannot get lost on a handrail.',
+    desc: 'Follow Mill Stream to the footbridge.', control: POI.bridge, check: 'goto',
+  },
+  {
+    id: 'thumb', skill: 'THUMBING THE MAP', title: 'KEEP YOUR PLACE',
+    brief: 'There is no dot on this map, and there is none in real orienteering either. You keep your place with your <b>thumb</b>: ' +
+      'you press it on where you are, and you move it each time you pass something you recognise. ' +
+      'Follow the Ridge Track east. Three times on the way I will ask you where you are — open the MAP, place your THUMB, and CONFIRM.',
+    desc: 'Track east; place your thumb correctly at 3 checks.', control: { x: 700, z: 520 }, check: 'thumb',
+    checkpoints: [{ x: 520, z: 560 }, { x: 610, z: 540 }, { x: 700, z: 520 }], tol: 55,
+  },
+  {
+    id: 'bearing', skill: 'TAKING A BEARING', title: 'RED IN THE SHED',
+    brief: 'To walk a straight line to something you cannot see, you take a <b>bearing</b>. On the MAP, tap BEARING then tap the ' +
+      '<b>cairn on Beacon Hill</b>. Then walk with the compass in front of you, turning until the red needle sits inside the ' +
+      'orienting arrow — "red in the shed" — and the housing glows green. Walk that line.',
+    desc: 'Set a bearing to the cairn and walk it to the summit.', control: POI.cairn, check: 'bearing',
+    target: POI.cairn, tolDeg: 8,
+  },
+  {
+    id: 'pace', skill: 'PACE COUNTING', title: 'MEASURE WITH YOUR LEGS',
+    brief: 'Distance is measured with your legs. Count <b>double-paces</b> — one count every time your left foot lands. ' +
+      'About 62 double-paces covers 100 m for most adults. Turn PACE on, go to the west end of the stone wall, ' +
+      'and from there walk <b>170 m on bearing 108°</b> into the trees. There is nothing to see there: the count is all you have.',
+    desc: 'From the wall end, pace 170 m on bearing 108°.',
+    control: null, check: 'pace', from: POI.wallend, distM: 170, magBearing: 108,
+  },
+  {
+    id: 'aimoff', skill: 'AIMING OFF', title: 'MISS ON PURPOSE',
+    brief: 'Aiming straight at a control on a stream is a coin-flip — miss, and you do not know which way to turn. ' +
+      'So you <b>aim off</b>: deliberately aim to one side, hit the stream, and turn the way you know. ' +
+      'The control sits where the <b>Beck</b> leaves the hillside. Hit the Beck first, then follow it to the flag.',
+    desc: 'Hit the Beck, then follow it to the control.',
+    control: { x: 560, z: 392 }, check: 'aimoff',
+  },
+  {
+    id: 'contour', skill: 'READING CONTOURS', title: 'SHAPE OF THE GROUND',
+    brief: 'Brown lines are height. Close together is steep, far apart is gentle. A <b>reentrant</b> is a small valley folding ' +
+      'into a hillside — the contours point <i>uphill</i>. A <b>spur</b> is the opposite, pointing downhill. ' +
+      'The control is in the reentrant on Beacon Hill\'s west flank. No path, no stream — read the shape.',
+    desc: 'Find the control in the reentrant (contours only).',
+    control: { x: 646, z: 268 }, check: 'goto',
+  },
+  {
+    id: 'attack', skill: 'ATTACK POINTS', title: 'THE LAST 100 METRES',
+    brief: 'On a long leg you navigate roughly and fast until you reach an <b>attack point</b> — a big obvious feature close to the ' +
+      'control — and only then slow down and navigate precisely. Your attack point is <b>The Boulder</b>. ' +
+      'Pass it, then make the short precise leg to the control.',
+    desc: 'Via The Boulder, then precisely to the control.',
+    control: { x: 726, z: 388 }, check: 'attack', attack: POI.boulder, attackTol: 30,
+  },
+  {
+    id: 'relocate', skill: 'RELOCATION · NIGHT', title: 'LOST IN THE DARK',
+    brief: 'Everyone gets lost. You relocate by finding something certain: climb for a view, or walk on a bearing until you hit ' +
+      'a handrail you can identify. It is <b>night</b> and you do not know where you are. ' +
+      'Work it out, place your THUMB where you think you stand and CONFIRM — then find your way back to the start triangle.',
+    desc: 'Relocate in the dark, then return to the start.',
+    control: POI.start, check: 'relocate', tol: 70,
+  },
+];
+
+/* ------------------------- QUEST ENGINE ------------------------- */
+function startLesson(i) {
+  questIdx = i; roam = false;
+  const L = LESSONS[i];
+  questState = { phase: 'brief', cpIdx: 0, hits: [], nearRail: 0, samples: 0, touched: false, atk: false, confirmed: false };
+  distanceWalked = 0; legStart = { x: player.x, z: player.z };
+  if (L.id === 'relocate') {                       // dropped somewhere unknown, at night
+    player.x = 452; player.z = 214; player.yaw = 210;
+    clock = DAY_SECONDS * 0.94;                     // deep night
+    lampOn = true;
+  } else if (L.id === 'pace') {
+    // start the lesson from wherever you are; the leg itself begins at the wall
+  }
+  player.y = heightAt(player.x, player.z);
+  bearingSet = null; paceCount = 0; paceMetres = 0;
+  showBrief(L); syncFlag();
+}
+function activeLesson() { return roam ? null : LESSONS[questIdx]; }
+function questTargetPos() {
+  const L = activeLesson(); if (!L) return null;
+  if (L.check === 'pace') {
+    const b = magToTrue(L.magBearing), rad = b * Math.PI / 180;
+    return { x: L.from.x + Math.sin(rad) * L.distM, z: L.from.z - Math.cos(rad) * L.distM };
+  }
+  return L.control;
+}
+// Called every sim step while playing.
+function questUpdate(dt) {
+  const L = activeLesson(); if (!L || questState.phase !== 'run') return;
+  const S = questState;
+  // handrail tracking
+  if (L.id === 'handrail') {
+    S.samples++; if (polyNear(RIVER, player.x, player.z).d < 45) S.nearRail++;
+  }
+  if (L.id === 'aimoff' && polyNear(BECK, player.x, player.z).d < 12) S.touched = true;
+  if (L.id === 'attack' && Math.hypot(player.x - L.attack.x, player.z - L.attack.z) < L.attackTol) S.atk = true;
+  // thumb checkpoints
+  if (L.check === 'thumb' && S.cpIdx < L.checkpoints.length) {
+    const cp = L.checkpoints[S.cpIdx];
+    if (Math.hypot(player.x - cp.x, player.z - cp.z) < 22 && !S.awaiting) {
+      S.awaiting = true;
+      showToast('CHECK ' + (S.cpIdx + 1) + ' of 3 — open the MAP, place your THUMB where you are, and CONFIRM.', 6000);
+    }
+  }
+  // arrival
+  const tgt = questTargetPos();
+  if (tgt && !S.awaiting) {
+    const d = Math.hypot(player.x - tgt.x, player.z - tgt.z);
+    const need = L.check === 'pace' ? 26 : 14;
+    if (d < need) {
+      if (L.check === 'relocate' && !S.confirmed) {
+        showToast('You are at the start — but you still have to say where you thought you were. Place your THUMB and CONFIRM.', 5000);
+      } else if (L.check === 'thumb' && S.cpIdx < L.checkpoints.length) {
+        // fall through: still owe checkpoints
+      } else {
+        completeLesson();
+      }
+    }
+  }
+}
+// The map's CONFIRM button routes here.
+function mapConfirm() {
+  const L = activeLesson();
+  if (!L) { closeMap(); return; }
+  const S = questState;
+  if (L.check === 'orient') {
+    // oriented when the map's north lines line up with the ground: mapRot ≈ -yaw
+    const err = Math.abs(angDiff(mapRot, -player.yaw));
+    if (err < 12) { S.oriented = true; sfx.good(); closeMap(); completeLesson(); }
+    else { sfx.bad(); showToast('Not yet — the north lines are ' + Math.round(err) + '° off the ground. Turn the map, not yourself.', 4200); }
+    return;
+  }
+  if (L.check === 'thumb' && S.awaiting) {
+    const cp = L.checkpoints[S.cpIdx];
+    const err = Math.hypot(thumb.x - cp.x, thumb.z - cp.z);
+    S.hits.push(Math.round(err));
+    S.awaiting = false; S.cpIdx++;
+    if (err < L.tol) { sfx.good(); showToast('Within ' + Math.round(err) + ' m. That is thumbing.', 3200); }
+    else { sfx.bad(); showToast('Out by ' + Math.round(err) + ' m. Find something you recognise and move your thumb to it.', 4500); }
+    closeMap();
+    if (S.cpIdx >= L.checkpoints.length) {
+      const tgt = questTargetPos();
+      if (Math.hypot(player.x - tgt.x, player.z - tgt.z) < 30) completeLesson();
+    }
+    return;
+  }
+  if (L.check === 'relocate' && !S.confirmed) {
+    const err = Math.hypot(thumb.x - player.x, thumb.z - player.z);
+    S.relocErr = Math.round(err);
+    if (err < L.tol) {
+      S.confirmed = true; sfx.good(); closeMap();
+      showToast('Relocated to within ' + S.relocErr + ' m. Now get back to the start triangle.', 5000);
+    } else { sfx.bad(); showToast('That is ' + S.relocErr + ' m out. Climb for a view, or walk a bearing until you meet something you can name.', 5200); }
+    return;
+  }
+  closeMap();
+}
+function completeLesson() {
+  const L = activeLesson(); if (!L || questState.phase === 'over') return;
+  questState.phase = 'over';
+  const S = questState;
+  if (!save.done.includes(L.id)) save.done.push(L.id);
+  const walked = Math.round(distanceWalked);
+  const straight = Math.round(Math.hypot(player.x - legStart.x, player.z - legStart.z));
+  save.best[L.id] = Math.min(save.best[L.id] === undefined ? 1e9 : save.best[L.id], walked);
+  persist(); sfx.punch();
+  let verdict = '';
+  if (L.id === 'handrail') {
+    const pct = S.samples ? Math.round(100 * S.nearRail / S.samples) : 0;
+    verdict = 'You stayed on the handrail for <b>' + pct + '%</b> of the leg. ' +
+      (pct > 65 ? 'That is how a handrail is used — no thinking required.' : 'Next time hug the water: a handrail only helps while you are on it.');
+  } else if (L.id === 'thumb') {
+    verdict = 'Thumb errors: <b>' + S.hits.join(' m, ') + ' m</b>. Under ' + LESSONS[2].tol + ' m means you genuinely knew where you were.';
+  } else if (L.id === 'bearing') {
+    verdict = 'You dialled <b>' + (bearingSet === null ? '—' : Math.round(bearingSet) + '°') + '</b>. The true bearing was ' +
+      Math.round(trueToMag(bearingTo(POI.bridge.x, POI.bridge.z, POI.cairn.x, POI.cairn.z))) + '° magnetic.';
+  } else if (L.id === 'pace') {
+    verdict = 'You counted <b>' + paceCount + ' double-paces</b> ≈ ' + Math.round(paceMetres) + ' m for a 170 m leg.';
+  } else if (L.id === 'aimoff') {
+    verdict = S.touched ? 'You hit the Beck first and followed it in — textbook aiming off.'
+                        : 'You found it without touching the Beck. That worked, but on a bad day it is a coin-flip.';
+  } else if (L.id === 'attack') {
+    verdict = S.atk ? 'You used The Boulder as your attack point, then navigated precisely from there.'
+                    : 'You went straight in without the attack point. Brave — and much easier to miss by 50 m.';
+  } else if (L.id === 'relocate') {
+    verdict = 'You placed yourself within <b>' + (S.relocErr === undefined ? '—' : S.relocErr + ' m') + '</b> in the dark, then navigated home.';
+  } else {
+    verdict = 'Route: <b>' + walked + ' m</b> walked for a ' + straight + ' m straight line.';
+  }
+  showDone(L, verdict, walked, straight);
+}
+
+/* ------------------------- MOVEMENT ------------------------- */
+let moveVec = { x: 0, y: 0 };      // joystick, -1..1
+function stepSim(dt) {
+  clock += dt;
+  if (game !== 'play') return;
+  const spd = Math.hypot(moveVec.x, moveVec.y);
+  if (spd > 0.02) {
+    const yr = player.yaw * Math.PI / 180;
+    // joystick y = forward (screen up), x = strafe
+    const fx = Math.sin(yr), fz = -Math.cos(yr);
+    const rx = Math.cos(yr), rz = Math.sin(yr);
+    let dx = (fx * moveVec.y + rx * moveVec.x);
+    let dz = (fz * moveVec.y + rz * moveVec.x);
+    const L = Math.hypot(dx, dz); if (L > 0) { dx /= L; dz /= L; }
+    const land = landAt(player.x, player.z);
+    let v = 1.55 * Math.min(1, spd) * 2.0;                 // 3.1 m/s flat-out jog
+    v *= LAND_SPEED[land];
+    // slope: climbing is slow, gentle descent is quick, steep descent is careful
+    const ah = heightAt(player.x + dx * 2, player.z + dz * 2) - heightAt(player.x, player.z);
+    const grade = ah / 2;
+    v *= grade > 0 ? Math.max(0.28, 1 - grade * 2.1) : Math.max(0.45, 1 + grade * 0.55);
+    const nx = player.x + dx * v * dt, nz = player.z + dz * v * dt;
+    const okDepth = waterDepthAt(nx, nz) < 1.15;
+    const okSlope = Math.abs(heightAt(nx, nz) - heightAt(player.x, player.z)) / Math.max(0.001, Math.hypot(nx - player.x, nz - player.z)) < 1.25;
+    if (nx > 2 && nx < WORLD - 2 && nz > 2 && nz < WORLD - 2 && okDepth && okSlope) {
+      const step = Math.hypot(nx - player.x, nz - player.z);
+      player.x = nx; player.z = nz;
+      distanceWalked += step;
+      if (paceOn) { paceMetres += step; paceCount = Math.floor(paceMetres / PACE_M); }
+      footAccum += step;
+    }
+    player.vSpeed = v;
+  } else player.vSpeed = 0;
+  player.y = heightAt(player.x, player.z);
+  questUpdate(dt);
+}
+
+/* ------------------------- AUDIO ------------------------- */
+let AC = null, sfxGain = null, musicGain = null, noiseBuf = null, musicTimer = null, mStep = 0, mNext = 0;
+let windSrc = null, windFilt = null, windGain = null, footAccum = 0, lastFoot = 0;
+let muted = localStorage.getItem('wayfinder-mute') === '1';
+function audioInit() {
+  if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+  AC = new (window.AudioContext || window.webkitAudioContext)();
+  sfxGain = AC.createGain(); sfxGain.connect(AC.destination);
+  musicGain = AC.createGain(); musicGain.connect(AC.destination);
+  const len = AC.sampleRate * 2, nb = AC.createBuffer(1, len, AC.sampleRate), d = nb.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  noiseBuf = nb;
+  // wind bed: looping filtered noise, gain drifts with the day
+  windSrc = AC.createBufferSource(); windSrc.buffer = noiseBuf; windSrc.loop = true;
+  windFilt = AC.createBiquadFilter(); windFilt.type = 'lowpass'; windFilt.frequency.value = 420; windFilt.Q.value = 0.7;
+  windGain = AC.createGain(); windGain.gain.value = 0.05;
+  windSrc.connect(windFilt); windFilt.connect(windGain); windGain.connect(sfxGain); windSrc.start();
+  applyMute();
+  musicTimer = setInterval(schedMusic, 40); mNext = AC.currentTime + 0.1;
+}
+function applyMute() {
+  document.getElementById('mute-btn').textContent = muted ? '🔇' : '🔊';
+  if (!AC) return;
+  sfxGain.gain.value = muted ? 0 : 0.5; musicGain.gain.value = muted ? 0 : 0.11;
+}
+function tone(f, dur, vol, type, slide) {
+  if (!AC || muted) return;
+  const o = AC.createOscillator(); o.type = type || 'sine';
+  o.frequency.setValueAtTime(f, AC.currentTime);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, AC.currentTime + dur);
+  const g = AC.createGain(); g.gain.setValueAtTime(vol, AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+  o.connect(g); g.connect(sfxGain); o.start(); o.stop(AC.currentTime + dur + 0.02);
+}
+function noiseHit(dur, f0, f1, vol, type) {
+  if (!AC || muted) return;
+  const s = AC.createBufferSource(); s.buffer = noiseBuf;
+  const f = AC.createBiquadFilter(); f.type = type || 'bandpass';
+  f.frequency.setValueAtTime(f0, AC.currentTime);
+  if (f1) f.frequency.exponentialRampToValueAtTime(f1, AC.currentTime + dur);
+  const g = AC.createGain(); g.gain.setValueAtTime(vol, AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+  s.connect(f); f.connect(g); g.connect(sfxGain); s.start(); s.stop(AC.currentTime + dur + 0.02);
+}
+const sfx = {
+  step: (wet) => noiseHit(0.09, wet ? 900 : 420, wet ? 300 : 160, wet ? 0.10 : 0.07, 'lowpass'),
+  punch: () => { [0, 90].forEach((d, i) => setTimeout(() => tone(1046 * (i ? 1.5 : 1), 0.13, 0.26, 'square'), d)); },
+  good: () => { [523, 784].forEach((f, i) => setTimeout(() => tone(f, 0.18, 0.2, 'triangle'), i * 90)); },
+  bad: () => tone(190, 0.24, 0.2, 'sawtooth', 120),
+  bird: () => { const f = 2200 + Math.random() * 1400; tone(f, 0.07, 0.05, 'sine', f * 1.4); },
+  owl: () => tone(420, 0.5, 0.05, 'sine', 360),
+  click: () => tone(1400, 0.02, 0.09, 'square'),
+};
+// Sparse, calm outdoor pad — a fifth drifting under everything, brighter by day.
+const PAD = [110, 164.8, 220, 246.9];
+function schedMusic() {
+  if (!AC || muted || document.hidden) return;
+  while (mNext < AC.currentTime + 0.2) {
+    const night = isNight();
+    const f = PAD[mStep % PAD.length] * (night ? 0.5 : 1);
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = night ? 'sine' : 'triangle'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, mNext);
+    g.gain.linearRampToValueAtTime(night ? 0.16 : 0.22, mNext + 2.2);
+    g.gain.linearRampToValueAtTime(0.0001, mNext + 7.5);
+    o.connect(g); g.connect(musicGain); o.start(mNext); o.stop(mNext + 7.8);
+    mNext += 6.0; mStep++;
+  }
+}
+document.addEventListener('visibilitychange', () => { if (AC) { if (document.hidden) AC.suspend(); else if (!muted) AC.resume(); } });
+function ambience(dt) {
+  if (!AC || muted) return;
+  const night = isNight();
+  if (windGain) {
+    const gust = 0.035 + 0.03 * (0.5 + 0.5 * Math.sin(clock * 0.21)) + (player.y > 90 ? 0.03 : 0);
+    windGain.gain.value = gust;
+    windFilt.frequency.value = 300 + 260 * (player.y / 120);
+  }
+  if (!night && Math.random() < dt * 0.5) sfx.bird();
+  if (night && Math.random() < dt * 0.18) sfx.owl();
+  if (footAccum - lastFoot > 1.5) { lastFoot = footAccum; sfx.step(waterDepthAt(player.x, player.z) > 0.05); }
+}
+
+/* ------------------------- WEBGL RENDERER ------------------------- */
+const glcv = document.getElementById('gl');
+let gl = null, gfxOk = false, prog = {}, buf = {}, treeTex = null, terrainCount = 0, waterCount = 0, treeCount = 0;
+function compile(src, type) {
+  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn('shader', gl.getShaderInfoLog(s)); return null; }
+  return s;
+}
+function link(vs, fs) {
+  const v = compile(vs, gl.VERTEX_SHADER), f = compile(fs, gl.FRAGMENT_SHADER);
+  if (!v || !f) return null;
+  const p = gl.createProgram(); gl.attachShader(p, v); gl.attachShader(p, f); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) { console.warn('link', gl.getProgramInfoLog(p)); return null; }
+  return p;
+}
+const SKY_VS = `#version 300 es
+out vec2 vP;
+void main(){ vec2 p = vec2(float((gl_VertexID<<1)&2), float(gl_VertexID&2))*2.0-1.0; vP=p; gl_Position=vec4(p,1.0,1.0); }`;
+const SKY_FS = `#version 300 es
+precision highp float;
+in vec2 vP; out vec4 o;
+uniform mat4 uInvVP; uniform vec3 uCam, uSun, uSkyTop, uSkyHor, uSunCol; uniform float uNight;
+float h21(vec2 p){ p=fract(p*vec2(443.897,441.423)); p+=dot(p,p+19.19); return fract(p.x*p.y); }
+void main(){
+  vec4 c = uInvVP*vec4(vP,1.0,1.0);
+  vec3 dir = normalize(c.xyz/c.w - uCam);
+  float up = clamp(dir.y*1.15+0.06, 0.0, 1.0);
+  vec3 col = mix(uSkyHor, uSkyTop, pow(up, 0.72));
+  float sd = max(dot(dir, uSun), 0.0);
+  col += uSunCol*pow(sd, 900.0)*7.0;                 // disc
+  col += uSunCol*pow(sd, 8.0)*0.30;                  // glow
+  col += uSunCol*pow(sd, 2.0)*0.06*(1.0-up);         // horizon wash
+  if(uNight > 0.01 && dir.y > -0.02){                // stars
+    vec2 g = floor(dir.xz/max(dir.y,0.06)*120.0);
+    float s = h21(g);
+    if(s > 0.9955) col += vec3(0.75,0.8,1.0)*(s-0.9955)*230.0*uNight*clamp(dir.y*3.0,0.0,1.0);
+  }
+  o = vec4(col, 1.0);
+}`;
+const TER_VS = `#version 300 es
+in vec3 aPos; in vec3 aNrm; in vec3 aCol;
+uniform mat4 uVP; out vec3 vN, vC, vW;
+void main(){ vN=aNrm; vC=aCol; vW=aPos; gl_Position=uVP*vec4(aPos,1.0); }`;
+const TER_FS = `#version 300 es
+precision highp float;
+in vec3 vN, vC, vW; out vec4 o;
+uniform vec3 uSun, uSunCol, uAmb, uFog, uCam; uniform float uFogD, uLamp; uniform vec3 uLampDir;
+float h21(vec2 p){ p=fract(p*vec2(443.897,441.423)); p+=dot(p,p+19.19); return fract(p.x*p.y); }
+float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+  return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }
+void main(){
+  // Micro-relief: the mesh is only sampled every 4 m, so the shading detail
+  // between vertices has to come from noise or the ground reads as billiard felt.
+  float e = 0.4;
+  float h0 = vn(vW.xz*2.6), hx = vn((vW.xz+vec2(e,0.0))*2.6), hz = vn((vW.xz+vec2(0.0,e))*2.6);
+  vec3 n = normalize(normalize(vN) + vec3((h0-hx)*1.25, 0.0, (h0-hz)*1.25));
+  float d = max(dot(n, uSun), 0.0);
+  float det = vn(vW.xz*0.9)*0.42 + vn(vW.xz*3.7)*0.22 + vn(vW.xz*13.0)*0.07;
+  vec3 base = vC * (0.78 + det*0.44);
+  vec3 col = base * (uAmb + uSunCol*d);
+  if(uLamp > 0.5){                                   // headlamp cone at night
+    vec3 toC = uCam - vW; float dist = length(toC); vec3 L = toC/dist;
+    float cone = pow(max(dot(-L, uLampDir), 0.0), 14.0);
+    col += base * vec3(1.15,1.06,0.86) * cone * 2.6 / (1.0 + dist*dist*0.006);
+  }
+  float dist = length(uCam - vW);
+  float fog = 1.0 - exp(-pow(dist*uFogD, 2.0));
+  o = vec4(mix(col, uFog, clamp(fog,0.0,1.0)), 1.0);
+}`;
+const WAT_VS = `#version 300 es
+in vec3 aPos; uniform mat4 uVP; out vec3 vW;
+void main(){ vW=aPos; gl_Position=uVP*vec4(aPos,1.0); }`;
+const WAT_FS = `#version 300 es
+precision highp float;
+in vec3 vW; out vec4 o;
+uniform vec3 uSun, uSunCol, uFog, uCam, uSkyHor; uniform float uT, uFogD;
+void main(){
+  float w = sin(vW.x*1.7 + uT*2.1)*0.5 + sin(vW.z*2.3 - uT*1.7)*0.5;
+  vec3 n = normalize(vec3(w*0.10, 1.0, cos(vW.z*1.9 + uT*1.3)*0.10));
+  vec3 V = normalize(uCam - vW);
+  float fres = pow(1.0 - max(dot(n,V),0.0), 3.0);
+  vec3 refl = mix(vec3(0.10,0.20,0.24), uSkyHor, 0.85);
+  vec3 col = mix(vec3(0.055,0.115,0.10), refl, 0.30 + fres*0.62);
+  vec3 hv = normalize(uSun + V);
+  col += uSunCol*pow(max(dot(n,hv),0.0), 220.0)*1.5;
+  float dist = length(uCam - vW);
+  float fog = 1.0 - exp(-pow(dist*uFogD, 2.0));
+  o = vec4(mix(col, uFog, clamp(fog,0.0,1.0)), 1.0);
+}`;
+const TREE_VS = `#version 300 es
+in vec2 aQuad; in vec3 aIns; in vec3 aSize; in float aType;
+uniform mat4 uVP; uniform vec3 uRight, uUp; uniform float uT;
+out vec2 vUv; out float vType, vTint; out vec3 vW;
+void main(){
+  float sway = sin(uT*1.1 + aIns.x*0.3 + aIns.z*0.2) * 0.12 * aQuad.y;
+  vec3 p = aIns + uRight*((aQuad.x+sway)*aSize.x) + vec3(0.0, aQuad.y*aSize.y, 0.0);
+  vUv = vec2(aQuad.x*0.5+0.5, 1.0-aQuad.y); vType = aType; vTint = aSize.z; vW = p;
+  gl_Position = uVP*vec4(p,1.0);
+}`;
+const TREE_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; in float vType, vTint; in vec3 vW; out vec4 o;
+uniform sampler2D uTex; uniform vec3 uSunCol, uAmb, uFog, uCam; uniform float uFogD;
+void main(){
+  vec2 uv = vec2((vUv.x + vType)*0.25, vUv.y);
+  vec4 t = texture(uTex, uv);
+  if(t.a < 0.45) discard;
+  // per-instance tint + darker toward the base: a wood of identical sprites
+  // is the giveaway that you are looking at billboards
+  vec3 col = t.rgb * vTint * (0.62 + 0.38*vUv.y) * (uAmb + uSunCol*0.62);
+  float dist = length(uCam - vW);
+  float fog = 1.0 - exp(-pow(dist*uFogD, 2.0));
+  o = vec4(mix(col, uFog, clamp(fog,0.0,1.0)), 1.0);
+}`;
+
+function landColour(x, z, h, s, land) {
+  // Base palette chosen to read as real ground rather than neon.
+  let c;
+  if (land === LAND.ROCK || s > 0.55) c = [0.44, 0.42, 0.40];
+  else if (land === LAND.TRAIL) c = [0.50, 0.43, 0.32];
+  else if (land === LAND.MARSH) c = [0.36, 0.42, 0.28];
+  else if (land === LAND.DENSE) c = [0.13, 0.24, 0.11];
+  else if (land === LAND.FOREST) c = [0.20, 0.32, 0.14];
+  else c = [0.35, 0.44, 0.20];
+  if (h > TREELINE + 18) { const t = Math.min(1, (h - TREELINE - 18) / 26); c = [c[0] + (0.62 - c[0]) * t, c[1] + (0.63 - c[1]) * t, c[2] + (0.66 - c[2]) * t]; }
+  const v = 0.90 + 0.20 * vnoise(x * 0.05, z * 0.05);
+  return [c[0] * v, c[1] * v, c[2] * v];
+}
+// Billboard atlas: 4 tiles of 128 px — conifer, broadleaf, rock, control flag.
+// Only things that appear on the map get drawn in the world, and vice versa.
+function buildTreeTexture() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+  const g = c.getContext('2d');
+  // --- tile 2: rock / cairn ---
+  g.save(); g.translate(256, 0);
+  const rg = g.createLinearGradient(40, 40, 90, 120);
+  rg.addColorStop(0, '#9d9a92'); rg.addColorStop(0.55, '#6e6b64'); rg.addColorStop(1, '#3d3b36');
+  g.fillStyle = rg;
+  g.beginPath(); g.moveTo(20, 126); g.lineTo(30, 74); g.lineTo(58, 52); g.lineTo(92, 62); g.lineTo(108, 104); g.lineTo(104, 126); g.closePath(); g.fill();
+  g.fillStyle = 'rgba(255,255,255,0.14)';
+  g.beginPath(); g.moveTo(34, 76); g.lineTo(58, 54); g.lineTo(78, 62); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(20,18,16,0.5)'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(40, 96); g.lineTo(88, 88); g.moveTo(48, 112); g.lineTo(96, 106); g.stroke();
+  g.restore();
+  // --- tile 3: orienteering control flag (white/orange, on a stake) ---
+  g.save(); g.translate(384, 0);
+  g.strokeStyle = '#2b2b2b'; g.lineWidth = 5; g.beginPath(); g.moveTo(64, 128); g.lineTo(64, 46); g.stroke();
+  const q = 26, ox = 38, oy = 20;
+  g.fillStyle = '#ffffff'; g.fillRect(ox, oy, q, q); g.fillRect(ox + q, oy + q, q, q);
+  g.fillStyle = '#ff5a1f'; g.fillRect(ox + q, oy, q, q); g.fillRect(ox, oy + q, q, q);
+  g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 2; g.strokeRect(ox, oy, q * 2, q * 2);
+  g.restore();
+  // conifer (tile 0)
+  g.fillStyle = '#3b2a18'; g.fillRect(60, 96, 8, 32);
+  for (let i = 0; i < 5; i++) {
+    const y = 18 + i * 19, w = 14 + i * 9;
+    const grd = g.createLinearGradient(64 - w, 0, 64 + w, 0);
+    grd.addColorStop(0, '#16301199'); grd.addColorStop(0.4, '#2b5220'); grd.addColorStop(1, '#12280f');
+    g.fillStyle = grd; g.beginPath(); g.moveTo(64, y - 22); g.lineTo(64 + w, y + 16); g.lineTo(64 - w, y + 16); g.closePath(); g.fill();
+  }
+  // broadleaf (tile 1)
+  g.fillStyle = '#4a3520'; g.fillRect(188, 84, 9, 44);
+  const bg = g.createRadialGradient(186, 54, 6, 192, 58, 46);
+  bg.addColorStop(0, '#4e7a2e'); bg.addColorStop(0.6, '#35601f'); bg.addColorStop(1, '#1d3a12');
+  g.fillStyle = bg;
+  for (const [ox, oy, r] of [[192, 52, 34], [172, 66, 24], [212, 64, 24], [192, 34, 22]]) {
+    g.beginPath(); g.arc(ox, oy, r, 0, 7); g.fill();
+  }
+  return c;
+}
+function initGL() {
+  gl = glcv.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'high-performance' });
+  if (!gl) { gfxOk = false; return; }
+  prog.sky = link(SKY_VS, SKY_FS);
+  prog.ter = link(TER_VS, TER_FS);
+  prog.wat = link(WAT_VS, WAT_FS);
+  prog.tree = link(TREE_VS, TREE_FS);
+  if (!prog.sky || !prog.ter || !prog.wat || !prog.tree) { gfxOk = false; return; }
+
+  // ---- terrain mesh (one static draw call over the whole 1 km) ----
+  const pos = new Float32Array(N1 * N1 * 3), nrm = new Float32Array(N1 * N1 * 3), col = new Float32Array(N1 * N1 * 3);
+  const hgt = HGT;
+  for (let j = 0; j < N1; j++) for (let i = 0; i < N1; i++) {
+    const k = j * N1 + i;
+    pos[k * 3] = i * GRID; pos[k * 3 + 1] = hgt[k]; pos[k * 3 + 2] = j * GRID;
+  }
+  for (let j = 0; j < N1; j++) for (let i = 0; i < N1; i++) {
+    const k = j * N1 + i;
+    const hl = hgt[j * N1 + Math.max(0, i - 1)], hr = hgt[j * N1 + Math.min(NC, i + 1)];
+    const hu = hgt[Math.max(0, j - 1) * N1 + i], hd = hgt[Math.min(NC, j + 1) * N1 + i];
+    let nx = hl - hr, ny = 2 * GRID, nz = hu - hd;
+    const L = Math.hypot(nx, ny, nz);
+    nrm[k * 3] = nx / L; nrm[k * 3 + 1] = ny / L; nrm[k * 3 + 2] = nz / L;
+    const x = i * GRID, z = j * GRID;
+    const s = Math.hypot(hr - hl, hd - hu) / (2 * GRID);
+    const c = landColour(x, z, hgt[k], s, landAt(x, z));
+    col[k * 3] = c[0]; col[k * 3 + 1] = c[1]; col[k * 3 + 2] = c[2];
+  }
+  const idx = new Uint32Array(NC * NC * 6);
+  let p = 0;
+  for (let j = 0; j < NC; j++) for (let i = 0; i < NC; i++) {
+    const a = j * N1 + i, b = a + 1, c2 = a + N1, d = c2 + 1;
+    idx[p++] = a; idx[p++] = c2; idx[p++] = b; idx[p++] = b; idx[p++] = c2; idx[p++] = d;
+  }
+  terrainCount = idx.length;
+  buf.terVao = gl.createVertexArray(); gl.bindVertexArray(buf.terVao);
+  const mk = (data, loc, size) => {
+    const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
+  };
+  mk(pos, gl.getAttribLocation(prog.ter, 'aPos'), 3);
+  mk(nrm, gl.getAttribLocation(prog.ter, 'aNrm'), 3);
+  mk(col, gl.getAttribLocation(prog.ter, 'aCol'), 3);
+  const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+
+  // ---- water surface (only wet cells) ----
+  const wv = [];
+  for (let j = 0; j < NC; j += 1) for (let i = 0; i < NC; i += 1) {
+    const x = i * GRID + GRID / 2, z = j * GRID + GRID / 2;
+    const r = polyNear(RIVER, x, z), bk = polyNear(BECK, x, z);
+    let surf = null;
+    if (r.d < 10) surf = riverBed(r.s) - 0.15;
+    else if (bk.d < 5) surf = beckBed(bk.s) + 0.1;
+    if (surf === null) continue;
+    if (heightAt(x, z) > surf + 0.6) continue;
+    const x0 = i * GRID, z0 = j * GRID, x1 = x0 + GRID, z1 = z0 + GRID;
+    wv.push(x0, surf, z0, x1, surf, z0, x0, surf, z1, x1, surf, z0, x1, surf, z1, x0, surf, z1);
+  }
+  waterCount = wv.length / 3;
+  buf.watVao = gl.createVertexArray(); gl.bindVertexArray(buf.watVao);
+  const wb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, wb);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(wv), gl.STATIC_DRAW);
+  const wl = gl.getAttribLocation(prog.wat, 'aPos');
+  gl.enableVertexAttribArray(wl); gl.vertexAttribPointer(wl, 3, gl.FLOAT, false, 0, 0);
+
+  // ---- trees (instanced billboards) ----
+  const ins = [], size = [], type = [];
+  for (let i = 0; i < 26000; i++) {
+    const x = hash2(i, 7) * WORLD, z = hash2(i, 13) * WORLD;
+    const f = forestDensity(x, z);
+    if (hash2(i, 29) > f * 0.85) continue;
+    if (waterDepthAt(x, z) > 0.05) continue;
+    if (Math.min(polyNear(TRACK, x, z).d, polyNear(LANE, x, z).d) < 4) continue;
+    const h = heightAt(x, z);
+    if (h > TREELINE) continue;
+    const conifer = f > 0.55 ? 1 : (hash2(i, 51) > 0.5 ? 1 : 0);
+    const sc = 5.0 + hash2(i, 71) * 6 + (conifer ? 2.5 : 0);
+    ins.push(x, h - 0.4, z);
+    size.push(sc * 0.42, sc, 0.78 + hash2(i, 91) * 0.42); type.push(conifer);
+  }
+  // Mapped landmarks — every one of these is also drawn on the map.
+  for (const lm of [
+    { p: POI.boulder, s: 4.2 }, { p: POI.cairn, s: 5.0 },
+    { p: POI.ruin, s: 3.4 }, { p: POI.wallend, s: 2.6 },
+  ]) {
+    ins.push(lm.p.x, heightAt(lm.p.x, lm.p.z) - 0.3, lm.p.z);
+    size.push(lm.s * 0.75, lm.s, 1.0); type.push(2);
+  }
+  treeCount = type.length;
+  buf.treeVao = gl.createVertexArray(); gl.bindVertexArray(buf.treeVao);
+  const quad = new Float32Array([-1, 0, 1, 0, -1, 1, 1, 0, 1, 1, -1, 1]);
+  const qb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, qb);
+  gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+  const ql = gl.getAttribLocation(prog.tree, 'aQuad');
+  gl.enableVertexAttribArray(ql); gl.vertexAttribPointer(ql, 2, gl.FLOAT, false, 0, 0);
+  const insAttr = (arr, name, sz) => {
+    const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.STATIC_DRAW);
+    const l = gl.getAttribLocation(prog.tree, name);
+    gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, sz, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(l, 1);
+  };
+  insAttr(ins, 'aIns', 3); insAttr(size, 'aSize', 3); insAttr(type, 'aType', 1);
+  const tc = buildTreeTexture();
+  treeTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, treeTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tc);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  // ---- the control flag: one instance, moved to the current control ----
+  buf.flagVao = gl.createVertexArray(); gl.bindVertexArray(buf.flagVao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, qb);
+  gl.enableVertexAttribArray(ql); gl.vertexAttribPointer(ql, 2, gl.FLOAT, false, 0, 0);
+  buf.flagIns = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf.flagIns);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, -999, 0]), gl.DYNAMIC_DRAW);
+  const fl = gl.getAttribLocation(prog.tree, 'aIns');
+  gl.enableVertexAttribArray(fl); gl.vertexAttribPointer(fl, 3, gl.FLOAT, false, 0, 0); gl.vertexAttribDivisor(fl, 1);
+  const fs2 = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, fs2);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([1.5, 2.4, 1.0]), gl.STATIC_DRAW);
+  const fsl = gl.getAttribLocation(prog.tree, 'aSize');
+  gl.enableVertexAttribArray(fsl); gl.vertexAttribPointer(fsl, 3, gl.FLOAT, false, 0, 0); gl.vertexAttribDivisor(fsl, 1);
+  const ft = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ft);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([3]), gl.STATIC_DRAW);
+  const ftl = gl.getAttribLocation(prog.tree, 'aType');
+  gl.enableVertexAttribArray(ftl); gl.vertexAttribPointer(ftl, 1, gl.FLOAT, false, 0, 0); gl.vertexAttribDivisor(ftl, 1);
+
+  gl.bindVertexArray(null);
+  gl.enable(gl.DEPTH_TEST);
+  gfxOk = true;
+}
+// Park the flag on the active control (or hide it below the world in free roam).
+function syncFlag() {
+  if (!gfxOk || !buf.flagIns) return;
+  const t = questTargetPos();
+  const p = t ? [t.x, heightAt(t.x, t.z) + 0.1, t.z] : [0, -999, 0];
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf.flagIns);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array(p));
+}
+/* --- tiny mat4 --- */
+function m4mul(a, b) {
+  const o = new Float32Array(16);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++)
+    o[i * 4 + j] = a[j] * b[i * 4] + a[4 + j] * b[i * 4 + 1] + a[8 + j] * b[i * 4 + 2] + a[12 + j] * b[i * 4 + 3];
+  return o;
+}
+function m4persp(fov, asp, n, f) {
+  const t = 1 / Math.tan(fov / 2), o = new Float32Array(16);
+  o[0] = t / asp; o[5] = t; o[10] = (f + n) / (n - f); o[11] = -1; o[14] = 2 * f * n / (n - f);
+  return o;
+}
+function m4look(e, c, u) {
+  const z = [e[0] - c[0], e[1] - c[1], e[2] - c[2]];
+  let L = Math.hypot(z[0], z[1], z[2]); z[0] /= L; z[1] /= L; z[2] /= L;
+  const x = [u[1] * z[2] - u[2] * z[1], u[2] * z[0] - u[0] * z[2], u[0] * z[1] - u[1] * z[0]];
+  L = Math.hypot(x[0], x[1], x[2]) || 1; x[0] /= L; x[1] /= L; x[2] /= L;
+  const y = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]];
+  return new Float32Array([x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0,
+    -(x[0] * e[0] + x[1] * e[1] + x[2] * e[2]), -(y[0] * e[0] + y[1] * e[1] + y[2] * e[2]), -(z[0] * e[0] + z[1] * e[1] + z[2] * e[2]), 1]);
+}
+function m4inv(m) {
+  const i = new Float32Array(16), a = m;
+  const b00 = a[0] * a[5] - a[1] * a[4], b01 = a[0] * a[6] - a[2] * a[4], b02 = a[0] * a[7] - a[3] * a[4],
+    b03 = a[1] * a[6] - a[2] * a[5], b04 = a[1] * a[7] - a[3] * a[5], b05 = a[2] * a[7] - a[3] * a[6],
+    b06 = a[8] * a[13] - a[9] * a[12], b07 = a[8] * a[14] - a[10] * a[12], b08 = a[8] * a[15] - a[11] * a[12],
+    b09 = a[9] * a[14] - a[10] * a[13], b10 = a[9] * a[15] - a[11] * a[13], b11 = a[10] * a[15] - a[11] * a[14];
+  let det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+  if (!det) return i; det = 1 / det;
+  i[0] = (a[5] * b11 - a[6] * b10 + a[7] * b09) * det; i[1] = (a[2] * b10 - a[1] * b11 - a[3] * b09) * det;
+  i[2] = (a[13] * b05 - a[14] * b04 + a[15] * b03) * det; i[3] = (a[10] * b04 - a[9] * b05 - a[11] * b03) * det;
+  i[4] = (a[6] * b08 - a[4] * b11 - a[7] * b07) * det; i[5] = (a[0] * b11 - a[2] * b08 + a[3] * b07) * det;
+  i[6] = (a[14] * b02 - a[12] * b05 - a[15] * b01) * det; i[7] = (a[8] * b05 - a[10] * b02 + a[11] * b01) * det;
+  i[8] = (a[4] * b10 - a[5] * b08 + a[7] * b06) * det; i[9] = (a[1] * b08 - a[0] * b10 - a[3] * b06) * det;
+  i[10] = (a[12] * b04 - a[13] * b02 + a[15] * b00) * det; i[11] = (a[9] * b02 - a[8] * b04 - a[11] * b00) * det;
+  i[12] = (a[5] * b07 - a[4] * b09 - a[6] * b06) * det; i[13] = (a[0] * b09 - a[1] * b07 + a[2] * b06) * det;
+  i[14] = (a[13] * b01 - a[12] * b03 - a[14] * b00) * det; i[15] = (a[8] * b03 - a[9] * b01 + a[10] * b00) * det;
+  return i;
+}
+// Sky/sun colours across the 24-minute day.
+function skyPalette() {
+  const el = sunElevation();
+  const day = Math.max(0, Math.min(1, (el + 4) / 16));
+  const dusk = Math.max(0, 1 - Math.abs(el) / 12);
+  const night = Math.max(0, Math.min(1, -el / 10));
+  const top = [
+    0.05 * night + 0.20 * day + 0.16 * dusk,
+    0.06 * night + 0.42 * day + 0.14 * dusk,
+    0.13 * night + 0.78 * day + 0.26 * dusk];
+  const hor = [
+    0.07 * night + 0.62 * day + 0.72 * dusk,
+    0.08 * night + 0.76 * day + 0.34 * dusk,
+    0.15 * night + 0.90 * day + 0.22 * dusk];
+  const sunCol = [1.0 * day + 1.0 * dusk + 0.12 * night, 0.95 * day + 0.52 * dusk + 0.15 * night, 0.86 * day + 0.24 * dusk + 0.30 * night];
+  const amb = [0.10 + 0.30 * day + 0.10 * dusk, 0.12 + 0.34 * day + 0.07 * dusk, 0.17 + 0.38 * day + 0.06 * dusk];
+  return { top, hor, sunCol, amb, day, night };
+}
+function sunDir() {
+  const el = sunElevation() * Math.PI / 180;
+  const az = (timeOfDay() * 360 + 180) * Math.PI / 180;   // sweeps E->W
+  return [Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)];
+}
+function render() {
+  if (!gfxOk) return;
+  const pal = skyPalette();
+  gl.viewport(0, 0, glcv.width, glcv.height);
+  gl.clearColor(pal.hor[0], pal.hor[1], pal.hor[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  const eye = [player.x, player.y + EYE, player.z];
+  const yr = player.yaw * Math.PI / 180, pr = player.pitch * Math.PI / 180;
+  const fwd = [Math.sin(yr) * Math.cos(pr), Math.sin(pr), -Math.cos(yr) * Math.cos(pr)];
+  const at = [eye[0] + fwd[0], eye[1] + fwd[1], eye[2] + fwd[2]];
+  const proj = m4persp(1.13, glcv.width / glcv.height, 0.25, 1400);
+  const view = m4look(eye, at, [0, 1, 0]);
+  const vp = m4mul(proj, view);
+  const inv = m4inv(vp);
+  const sd = sunDir();
+  const fogD = isNight() ? 0.0042 : 0.00165;
+  const fogCol = [pal.hor[0] * 0.92, pal.hor[1] * 0.92, pal.hor[2] * 0.95];
+
+  gl.depthMask(false); gl.disable(gl.DEPTH_TEST);
+  gl.useProgram(prog.sky);
+  gl.uniformMatrix4fv(gl.getUniformLocation(prog.sky, 'uInvVP'), false, inv);
+  gl.uniform3fv(gl.getUniformLocation(prog.sky, 'uCam'), eye);
+  gl.uniform3fv(gl.getUniformLocation(prog.sky, 'uSun'), sd);
+  gl.uniform3fv(gl.getUniformLocation(prog.sky, 'uSkyTop'), pal.top);
+  gl.uniform3fv(gl.getUniformLocation(prog.sky, 'uSkyHor'), pal.hor);
+  gl.uniform3fv(gl.getUniformLocation(prog.sky, 'uSunCol'), pal.sunCol);
+  gl.uniform1f(gl.getUniformLocation(prog.sky, 'uNight'), pal.night);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.depthMask(true); gl.enable(gl.DEPTH_TEST);
+
+  gl.useProgram(prog.ter);
+  gl.uniformMatrix4fv(gl.getUniformLocation(prog.ter, 'uVP'), false, vp);
+  gl.uniform3fv(gl.getUniformLocation(prog.ter, 'uSun'), sd);
+  gl.uniform3fv(gl.getUniformLocation(prog.ter, 'uSunCol'), pal.sunCol.map(v => v * (0.35 + 0.85 * pal.day)));
+  gl.uniform3fv(gl.getUniformLocation(prog.ter, 'uAmb'), pal.amb);
+  gl.uniform3fv(gl.getUniformLocation(prog.ter, 'uFog'), fogCol);
+  gl.uniform3fv(gl.getUniformLocation(prog.ter, 'uCam'), eye);
+  gl.uniform1f(gl.getUniformLocation(prog.ter, 'uFogD'), fogD);
+  gl.uniform1f(gl.getUniformLocation(prog.ter, 'uLamp'), (lampOn && isNight()) ? 1 : 0);
+  gl.uniform3fv(gl.getUniformLocation(prog.ter, 'uLampDir'), fwd);
+  gl.bindVertexArray(buf.terVao);
+  gl.drawElements(gl.TRIANGLES, terrainCount, gl.UNSIGNED_INT, 0);
+
+  if (waterCount) {
+    gl.useProgram(prog.wat);
+    gl.uniformMatrix4fv(gl.getUniformLocation(prog.wat, 'uVP'), false, vp);
+    gl.uniform3fv(gl.getUniformLocation(prog.wat, 'uSun'), sd);
+    gl.uniform3fv(gl.getUniformLocation(prog.wat, 'uSunCol'), pal.sunCol);
+    gl.uniform3fv(gl.getUniformLocation(prog.wat, 'uFog'), fogCol);
+    gl.uniform3fv(gl.getUniformLocation(prog.wat, 'uSkyHor'), pal.hor);
+    gl.uniform3fv(gl.getUniformLocation(prog.wat, 'uCam'), eye);
+    gl.uniform1f(gl.getUniformLocation(prog.wat, 'uT'), clock);
+    gl.uniform1f(gl.getUniformLocation(prog.wat, 'uFogD'), fogD);
+    gl.bindVertexArray(buf.watVao);
+    gl.drawArrays(gl.TRIANGLES, 0, waterCount);
+  }
+  if (treeCount) {
+    gl.useProgram(prog.tree);
+    gl.uniformMatrix4fv(gl.getUniformLocation(prog.tree, 'uVP'), false, vp);
+    const right = [Math.cos(yr), 0, Math.sin(yr)];
+    gl.uniform3fv(gl.getUniformLocation(prog.tree, 'uRight'), right);
+    gl.uniform3fv(gl.getUniformLocation(prog.tree, 'uUp'), [0, 1, 0]);
+    gl.uniform3fv(gl.getUniformLocation(prog.tree, 'uSunCol'), pal.sunCol.map(v => v * (0.3 + 0.8 * pal.day)));
+    gl.uniform3fv(gl.getUniformLocation(prog.tree, 'uAmb'), pal.amb);
+    gl.uniform3fv(gl.getUniformLocation(prog.tree, 'uFog'), fogCol);
+    gl.uniform3fv(gl.getUniformLocation(prog.tree, 'uCam'), eye);
+    gl.uniform1f(gl.getUniformLocation(prog.tree, 'uFogD'), fogD);
+    gl.uniform1f(gl.getUniformLocation(prog.tree, 'uT'), clock);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, treeTex);
+    gl.uniform1i(gl.getUniformLocation(prog.tree, 'uTex'), 0);
+    gl.bindVertexArray(buf.treeVao);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, treeCount);
+    if (buf.flagVao) { gl.bindVertexArray(buf.flagVao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, 1); }
+  }
+  gl.bindVertexArray(null);
+}
+
+/* ------------------------- MAP (ISOM-style, pre-rendered) ------------------------- */
+let mapTex = null;                      // offscreen canvas, 1 px = 1 m
+const MAP_COL = {
+  0: '#f6e6a8',   // open  -> yellow
+  1: '#ffffff',   // runnable forest -> white
+  2: '#a5d9a0',   // dense -> green
+  3: '#9ad4ef',   // water -> blue
+  4: '#c9e6f2',   // marsh -> pale blue
+  5: '#f2e2c0',   // trail corridor
+  6: '#e2ddd4',   // rock/open mountain
+};
+function buildMap() {
+  const c = document.createElement('canvas'); c.width = WORLD; c.height = WORLD;
+  const g = c.getContext('2d');
+  // Vegetation goes down at cell resolution then gets scaled up smoothly, so
+  // the boundaries look drawn rather than pixel-stepped. Contours are stroked
+  // afterwards at full resolution and stay crisp.
+  const lc = document.createElement('canvas'); lc.width = NC; lc.height = NC;
+  const lg = lc.getContext('2d');
+  for (let j = 0; j < NC; j++) for (let i = 0; i < NC; i++) {
+    lg.fillStyle = MAP_COL[LANDG[j * NC + i]];
+    lg.fillRect(i, j, 1, 1);
+  }
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(lc, 0, 0, WORLD, WORLD);
+  // marsh hatching
+  g.strokeStyle = '#5fb4d8'; g.lineWidth = 1;
+  for (let j = 0; j < NC; j += 2) for (let i = 0; i < NC; i += 2) {
+    if (LANDG[j * NC + i] === LAND.MARSH) {
+      const x = i * GRID, z = j * GRID;
+      g.beginPath(); g.moveTo(x - 3, z); g.lineTo(x + 3, z); g.stroke();
+    }
+  }
+  // ---- contours by marching squares on the baked height grid ----
+  // Cell-major: each cell only visits the few levels that actually cross it,
+  // and segments go into two flat arrays so the whole map is two strokes.
+  const hh = HGT, CI = 5, INDEX_EVERY = 25;
+  const segN = [], segI = [];      // [x0,z0,x1,z1, ...]
+  const px = [0, 0, 0, 0], pz = [0, 0, 0, 0];
+  for (let j = 0; j < NC; j++) for (let i = 0; i < NC; i++) {
+    const k = j * N1 + i;
+    const a = hh[k], b = hh[k + 1], d = hh[k + N1 + 1], e = hh[k + N1];
+    let lo = a, hi = a;
+    if (b < lo) lo = b; if (b > hi) hi = b;
+    if (d < lo) lo = d; if (d > hi) hi = d;
+    if (e < lo) lo = e; if (e > hi) hi = e;
+    const x0 = i * GRID, z0 = j * GRID, x1 = x0 + GRID, z1 = z0 + GRID;
+    const first = Math.ceil(lo / CI) * CI;
+    for (let lv = first; lv <= hi; lv += CI) {
+      let n = 0;
+      if ((a < lv) !== (b < lv)) { const t = (lv - a) / (b - a); px[n] = x0 + GRID * t; pz[n] = z0; n++; }
+      if ((b < lv) !== (d < lv)) { const t = (lv - b) / (d - b); px[n] = x1; pz[n] = z0 + GRID * t; n++; }
+      if ((d < lv) !== (e < lv)) { const t = (lv - d) / (e - d); px[n] = x1 - GRID * t; pz[n] = z1; n++; }
+      if ((e < lv) !== (a < lv)) { const t = (lv - e) / (a - e); px[n] = x0; pz[n] = z1 - GRID * t; n++; }
+      const dst = (lv % INDEX_EVERY === 0) ? segI : segN;
+      for (let s = 0; s + 1 < n; s += 2) dst.push(px[s], pz[s], px[s + 1], pz[s + 1]);
+    }
+  }
+  const strokeSegs = (arr, wdt, colr) => {
+    g.strokeStyle = colr; g.lineWidth = wdt; g.beginPath();
+    for (let s = 0; s < arr.length; s += 4) { g.moveTo(arr[s], arr[s + 1]); g.lineTo(arr[s + 2], arr[s + 3]); }
+    g.stroke();
+  };
+  strokeSegs(segN, 0.85, '#c58a3d');
+  strokeSegs(segI, 1.9, '#a3651f');
+  // watercourses drawn as proper blue lines
+  const drawPoly = (pts, style, wdt, dash) => {
+    g.strokeStyle = style; g.lineWidth = wdt; g.setLineDash(dash || []);
+    g.beginPath(); g.moveTo(pts[0].x, pts[0].z);
+    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].z);
+    g.stroke(); g.setLineDash([]);
+  };
+  drawPoly(RIVER, '#3aa3d9', 5); drawPoly(BECK, '#3aa3d9', 2.6);
+  drawPoly(TRACK, '#000', 2.6, [10, 6]); drawPoly(LANE, '#000', 2.0, [8, 6]);
+  drawPoly(WALL, '#000', 2.4);
+  // point features (black = rock & man-made)
+  const dot = (p, r, style, fill) => { g.strokeStyle = style; g.fillStyle = fill || style; g.lineWidth = 2; g.beginPath(); g.arc(p.x, p.z, r, 0, 7); fill ? g.fill() : g.stroke(); };
+  dot(POI.boulder, 4, '#000', '#000');
+  dot(POI.spring, 4, '#3aa3d9');
+  g.strokeStyle = '#000'; g.lineWidth = 2.4;
+  g.beginPath(); g.moveTo(POI.cairn.x - 6, POI.cairn.z + 5); g.lineTo(POI.cairn.x, POI.cairn.z - 6); g.lineTo(POI.cairn.x + 6, POI.cairn.z + 5); g.closePath(); g.stroke();
+  g.strokeRect(POI.ruin.x - 6, POI.ruin.z - 5, 12, 10);
+  g.beginPath(); g.moveTo(POI.bridge.x - 7, POI.bridge.z - 5); g.lineTo(POI.bridge.x + 7, POI.bridge.z - 5);
+  g.moveTo(POI.bridge.x - 7, POI.bridge.z + 5); g.lineTo(POI.bridge.x + 7, POI.bridge.z + 5); g.stroke();
+  mapTex = c;
+}
+// map view state
+let mapView = { cx: POI.start.x, cz: POI.start.z, scale: 1.35 };
+let mapArm = null;                       // 'thumb' | 'bearing' | null
+function openMap() {
+  if (game !== 'play') return;
+  game = 'map';
+  document.getElementById('map-screen').style.display = 'flex';
+  document.getElementById('map-rot').value = Math.round(mapRot);
+  sizeMapCanvas(); drawMap(); updateMapHint();
+}
+function closeMap() {
+  game = 'play'; mapArm = null;
+  document.getElementById('map-screen').style.display = 'none';
+  syncArmButtons();
+}
+function updateMapHint() {
+  const L = activeLesson();
+  let t = 'Drag to pan · pinch to zoom';
+  if (mapArm === 'thumb') t = 'Tap the map where you think you are, then CONFIRM';
+  else if (mapArm === 'bearing') t = 'Tap your target — the bearing is taken from your thumb';
+  else if (L && L.check === 'orient') t = 'Turn MAP ROTATION until the north lines match the ground, then CONFIRM';
+  else if (L && L.check === 'bearing' && bearingSet === null) t = 'Tap 🧭 BEARING, then tap the cairn on Beacon Hill';
+  document.getElementById('map-hint').textContent = t;
+}
+function syncArmButtons() {
+  document.getElementById('mt-thumb').classList.toggle('on', mapArm === 'thumb');
+  document.getElementById('mt-bearing').classList.toggle('on', mapArm === 'bearing');
+}
+const mapcv = document.getElementById('map-cv'), mctx = mapcv.getContext('2d');
+function sizeMapCanvas() {
+  const r = mapcv.getBoundingClientRect();
+  mapcv.width = Math.max(2, Math.round(r.width * dpr));
+  mapcv.height = Math.max(2, Math.round(r.height * dpr));
+}
+// map <-> screen with rotation
+function mapToScreen(x, z) {
+  const s = mapView.scale * dpr, a = mapRot * Math.PI / 180;
+  const dx = x - mapView.cx, dz = z - mapView.cz;
+  const rx = dx * Math.cos(a) - dz * Math.sin(a), rz = dx * Math.sin(a) + dz * Math.cos(a);
+  return [mapcv.width / 2 + rx * s, mapcv.height / 2 + rz * s];
+}
+function screenToMap(sx, sy) {
+  const s = mapView.scale * dpr, a = -mapRot * Math.PI / 180;
+  const dx = (sx * dpr - mapcv.width / 2) / s, dz = (sy * dpr - mapcv.height / 2) / s;
+  return [mapView.cx + dx * Math.cos(a) - dz * Math.sin(a), mapView.cz + dx * Math.sin(a) + dz * Math.cos(a)];
+}
+function drawMap() {
+  if (!mapTex) return;
+  const g = mctx, w = mapcv.width, h = mapcv.height;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.fillStyle = '#0a0a12'; g.fillRect(0, 0, w, h);
+  const s = mapView.scale * dpr;
+  g.save();
+  g.translate(w / 2, h / 2); g.rotate(mapRot * Math.PI / 180); g.scale(s, s); g.translate(-mapView.cx, -mapView.cz);
+  g.imageSmoothingEnabled = true;
+  g.drawImage(mapTex, 0, 0);
+  // magnetic north lines (drawn in map space, offset by declination)
+  g.save();
+  g.translate(WORLD / 2, WORLD / 2); g.rotate(-DECLINATION * Math.PI / 180); g.translate(-WORLD / 2, -WORLD / 2);
+  g.strokeStyle = 'rgba(20,20,120,0.42)'; g.lineWidth = 1.1 / s;
+  for (let x = -WORLD; x < WORLD * 2; x += 60) { g.beginPath(); g.moveTo(x, -WORLD); g.lineTo(x, WORLD * 2); g.stroke(); }
+  g.restore();
+  // course overlay (purple, as on a real map)
+  const L = activeLesson();
+  g.strokeStyle = '#c026d3'; g.lineWidth = 2.4 / s;
+  const tri = (p) => { g.beginPath(); g.moveTo(p.x, p.z - 9); g.lineTo(p.x + 8, p.z + 6); g.lineTo(p.x - 8, p.z + 6); g.closePath(); g.stroke(); };
+  tri(POI.start);
+  const tgt = questTargetPos();
+  if (tgt && L && L.check !== 'relocate') { g.beginPath(); g.arc(tgt.x, tgt.z, 13, 0, 7); g.stroke(); }
+  if (L && L.check === 'pace') { g.beginPath(); g.arc(L.from.x, L.from.z, 6, 0, 7); g.stroke(); }
+  // bearing line from thumb
+  if (bearingSet !== null) {
+    const t = magToTrue(bearingSet) * Math.PI / 180;
+    g.strokeStyle = 'rgba(192,38,211,0.75)'; g.lineWidth = 1.8 / s; g.setLineDash([8 / s, 6 / s]);
+    g.beginPath(); g.moveTo(thumb.x, thumb.z);
+    g.lineTo(thumb.x + Math.sin(t) * 420, thumb.z - Math.cos(t) * 420); g.stroke(); g.setLineDash([]);
+  }
+  // the thumb (your claimed position — there is no GPS dot)
+  g.fillStyle = '#111'; g.strokeStyle = '#fff'; g.lineWidth = 2 / s;
+  g.beginPath(); g.arc(thumb.x, thumb.z, 6, 0, 7); g.fill(); g.stroke();
+  g.restore();
+  // scale bar + legend
+  const barM = 100, px = barM * s;
+  g.fillStyle = 'rgba(10,10,18,0.72)'; g.fillRect(8, h - 34 * dpr, px + 16, 26 * dpr);
+  g.fillStyle = '#fff'; g.fillRect(16, h - 16 * dpr, px, 2 * dpr);
+  g.fillRect(16, h - 21 * dpr, 2 * dpr, 10 * dpr); g.fillRect(16 + px - 2 * dpr, h - 21 * dpr, 2 * dpr, 10 * dpr);
+  g.font = (10 * dpr) + 'px "Share Tech Mono"'; g.fillText('100 m', 18, h - 24 * dpr);
+  // north arrow reflects rotation, so you can see when the map is oriented
+  const cx2 = w - 30 * dpr, cy2 = 30 * dpr, a2 = (mapRot - DECLINATION) * Math.PI / 180;
+  g.strokeStyle = '#c02020'; g.lineWidth = 2.4 * dpr;
+  g.beginPath(); g.moveTo(cx2 - Math.sin(a2) * 14 * dpr, cy2 + Math.cos(a2) * 14 * dpr);
+  g.lineTo(cx2 + Math.sin(a2) * 14 * dpr, cy2 - Math.cos(a2) * 14 * dpr); g.stroke();
+  g.fillStyle = '#c02020'; g.font = 'bold ' + (11 * dpr) + 'px "Share Tech Mono"';
+  g.fillText('N', cx2 + Math.sin(a2) * 20 * dpr - 4 * dpr, cy2 - Math.cos(a2) * 20 * dpr + 4 * dpr);
+}
+
+/* ------------------------- HUD (2D overlay) ------------------------- */
+const uicv = document.getElementById('ui'), uctx = uicv.getContext('2d');
+let joy = { active: false, id: -1, ox: 0, oy: 0, x: 0, y: 0 };
+function drawHUD() {
+  const g = uctx;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  if (game === 'menu' || game === 'map') return;
+  if (!gfxOk) {
+    g.fillStyle = '#0a0a12'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#8899bb'; g.font = '13px "Share Tech Mono"'; g.textAlign = 'center';
+    g.fillText('This valley needs WebGL2.', W / 2, H / 2 - 10);
+    g.fillText('The map and compass still work.', W / 2, H / 2 + 12);
+    g.textAlign = 'left';
+  }
+  const bottom = H - 20;
+  // --- compass (baseplate style) ---
+  const cx = 62, cy = bottom - 62, R = 44;
+  g.save();
+  g.globalAlpha = 0.92;
+  g.fillStyle = 'rgba(8,10,16,0.62)'; g.beginPath(); g.arc(cx, cy, R + 6, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(180,195,230,0.5)'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.stroke();
+  // housing rotates to the dialled bearing; ticks every 30°
+  const hAng = bearingSet === null ? 0 : -bearingSet * Math.PI / 180;
+  g.save(); g.translate(cx, cy); g.rotate(hAng);
+  g.strokeStyle = 'rgba(200,215,245,0.55)'; g.lineWidth = 1.4;
+  for (let a = 0; a < 360; a += 30) {
+    const r2 = a % 90 === 0 ? R - 12 : R - 7;
+    g.beginPath(); g.moveTo(Math.sin(a * Math.PI / 180) * R, -Math.cos(a * Math.PI / 180) * R);
+    g.lineTo(Math.sin(a * Math.PI / 180) * r2, -Math.cos(a * Math.PI / 180) * r2); g.stroke();
+  }
+  // orienting arrow ("the shed")
+  if (bearingSet !== null) {
+    g.strokeStyle = '#e8484f'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(-9, 6); g.lineTo(0, -R + 10); g.lineTo(9, 6); g.stroke();
+  }
+  g.restore();
+  // needle: points to magnetic north relative to where the player faces
+  const nAng = (-player.yaw - DECLINATION) * Math.PI / 180;
+  const inShed = bearingSet !== null && Math.abs(angDiff(trueToMag(player.yaw), bearingSet)) < 4;
+  g.save(); g.translate(cx, cy); g.rotate(nAng);
+  g.fillStyle = inShed ? '#39ff14' : '#e8484f';
+  g.beginPath(); g.moveTo(0, -R + 8); g.lineTo(6, 4); g.lineTo(-6, 4); g.closePath(); g.fill();
+  g.fillStyle = 'rgba(220,230,255,0.85)';
+  g.beginPath(); g.moveTo(0, R - 8); g.lineTo(5, -3); g.lineTo(-5, -3); g.closePath(); g.fill();
+  g.restore();
+  g.fillStyle = inShed ? '#39ff14' : '#dde3ff'; g.font = '11px "Share Tech Mono"'; g.textAlign = 'center';
+  g.fillText(Math.round(trueToMag(player.yaw)) + '°', cx, cy + R + 18);
+  if (bearingSet !== null) { g.fillStyle = '#ffc300'; g.fillText('SET ' + Math.round(bearingSet) + '°', cx, cy - R - 10); }
+  g.restore();
+  // --- clock + pace ---
+  g.textAlign = 'right'; g.font = '12px "Share Tech Mono"';
+  g.fillStyle = isNight() ? '#8899bb' : '#ffc300';
+  g.fillText((isNight() ? '☾ ' : '☀ ') + clockString(), W - 92, 24 + (window.safeTop || 0));
+  if (paceOn) {
+    g.fillStyle = '#39ff14'; g.font = '13px "Share Tech Mono"'; g.textAlign = 'center';
+    g.fillText(paceCount + ' dbl-paces  ≈ ' + Math.round(paceMetres) + ' m', W / 2, bottom - 96);
+  }
+  // --- joystick ---
+  if (joy.active) {
+    g.strokeStyle = 'rgba(200,215,245,0.35)'; g.lineWidth = 2;
+    g.beginPath(); g.arc(joy.ox, joy.oy, 46, 0, 7); g.stroke();
+    g.fillStyle = 'rgba(200,215,245,0.45)';
+    g.beginPath(); g.arc(joy.ox + joy.x * 40, joy.oy + joy.y * 40, 18, 0, 7); g.fill();
+  } else if (game === 'play') {
+    g.fillStyle = 'rgba(200,215,245,0.16)'; g.font = '10px "Share Tech Mono"'; g.textAlign = 'left';
+    g.fillText('drag here to walk', 18, bottom - 4);
+    g.textAlign = 'right'; g.fillText('drag to look', W - 96, bottom - 4);
+  }
+  // --- control flag when close ---
+  const tgt = questTargetPos();
+  if (tgt) {
+    const d = Math.hypot(player.x - tgt.x, player.z - tgt.z);
+    if (d < 60) {
+      g.textAlign = 'center'; g.fillStyle = '#c026d3'; g.font = '12px "Share Tech Mono"';
+      g.fillText('control flag ' + Math.round(d) + ' m', W / 2, 120);
+    }
+  }
+  g.textAlign = 'left';
+}
+
+/* ------------------------- UI GLUE ------------------------- */
+let toastTimer = null;
+function showToast(msg, dur) {
+  const t = document.getElementById('toast'); t.innerHTML = msg; t.style.display = 'block';
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.display = 'none'; }, dur || 4000);
+}
+function showBrief(L) {
+  game = 'brief';
+  document.getElementById('brief-title').textContent = L.title;
+  document.getElementById('brief-body').innerHTML =
+    '<span class="skill">LESSON ' + (questIdx + 1) + ' / ' + LESSONS.length + ' · ' + L.skill + '</span>' + L.brief +
+    '<span class="desc">▸ ' + L.desc + '</span>';
+  document.getElementById('brief').style.display = 'flex';
+  document.getElementById('menu').style.display = 'none';
+  document.getElementById('done').style.display = 'none';
+}
+function beginRun() {
+  document.getElementById('brief').style.display = 'none';
+  game = 'play'; questState.phase = 'run';
+  legStart = { x: player.x, z: player.z }; distanceWalked = 0;
+  showHudButtons(true); updateQuestBar();
+}
+function showDone(L, verdict, walked, straight) {
+  game = 'done';
+  document.getElementById('done-title').textContent = L.check === 'orient' ? 'MAP ORIENTED' : 'CONTROL PUNCHED';
+  document.getElementById('done-body').innerHTML =
+    '<b style="color:var(--green)">' + L.skill + '</b><br>' + verdict +
+    (L.check === 'orient' ? '' : '<br><br>' + walked + ' m walked · ' + straight + ' m straight line');
+  document.getElementById('done-next').textContent = questIdx + 1 < LESSONS.length ? 'NEXT LESSON' : 'FREE ROAM';
+  document.getElementById('done').style.display = 'flex';
+  showHudButtons(false);
+  updateMenuProgress();
+}
+function showHudButtons(on) {
+  for (const id of ['map-btn', 'pace-btn', 'lamp-btn']) document.getElementById(id).style.display = on ? 'block' : 'none';
+  document.getElementById('quest-bar').style.display = on ? 'block' : 'none';
+}
+function updateQuestBar() {
+  const L = activeLesson();
+  const bar = document.getElementById('quest-bar');
+  if (!L) { bar.innerHTML = '<b>FREE ROAM</b> <span class="task">— the whole valley. Tap for the field book.</span>'; return; }
+  bar.innerHTML = '<b>' + L.skill + '</b> <span class="task">— ' + L.desc + '</span>';
+}
+function updateMenuProgress() {
+  const n = save.done.length;
+  document.getElementById('menu-progress').innerHTML =
+    n === 0 ? 'No lessons completed yet.' :
+    '<b style="color:var(--green)">' + n + ' / ' + LESSONS.length + '</b> lessons complete' +
+    (n >= LESSONS.length ? ' — the valley is yours.' : '');
+}
+function showLessons() {
+  const el = document.getElementById('lesson-list');
+  el.innerHTML = LESSONS.map((L, i) => {
+    const cls = save.done.includes(L.id) ? 'done' : (i === questIdx && !roam ? 'cur' : '');
+    return '<div class="' + cls + '">' + (save.done.includes(L.id) ? '✔' : (i === questIdx && !roam ? '▸' : '·')) +
+      ' <b>' + L.skill + '</b><br><span style="opacity:.8">' + L.desc + '</span></div>';
+  }).join('');
+  document.getElementById('lessons').style.display = 'flex';
+}
+
+/* ------------------------- INPUT ------------------------- */
+function bindTap(el, fn) {
+  let last = 0;
+  const h = (e) => { e.preventDefault(); const n = performance.now(); if (n - last < 380) return; last = n; audioInit(); fn(); };
+  el.addEventListener('touchend', h, { passive: false }); el.addEventListener('click', h);
+}
+bindTap(document.getElementById('mute-btn'), () => { muted = !muted; localStorage.setItem('wayfinder-mute', muted ? '1' : '0'); applyMute(); });
+bindTap(document.getElementById('start-btn'), () => {
+  const next = LESSONS.findIndex(L => !save.done.includes(L.id));
+  startLesson(next < 0 ? 0 : next);
+});
+bindTap(document.getElementById('roam-btn'), () => {
+  roam = true; questState = { phase: 'run' }; game = 'play';
+  player.x = POI.start.x; player.z = POI.start.z; player.y = heightAt(player.x, player.z);
+  document.getElementById('menu').style.display = 'none';
+  showHudButtons(true); updateQuestBar();
+});
+bindTap(document.getElementById('brief-go'), () => beginRun());
+bindTap(document.getElementById('done-next'), () => {
+  document.getElementById('done').style.display = 'none';
+  if (questIdx + 1 < LESSONS.length) startLesson(questIdx + 1);
+  else { roam = true; questState = { phase: 'run' }; game = 'play'; showHudButtons(true); updateQuestBar(); }
+});
+bindTap(document.getElementById('done-menu'), () => {
+  document.getElementById('done').style.display = 'none';
+  document.getElementById('menu').style.display = 'flex';
+  game = 'menu'; showHudButtons(false); updateMenuProgress();
+});
+bindTap(document.getElementById('map-btn'), () => openMap());
+bindTap(document.getElementById('pace-btn'), () => {
+  paceOn = !paceOn; if (paceOn) { paceCount = 0; paceMetres = 0; }
+  document.getElementById('pace-btn').classList.toggle('on', paceOn); sfx.click();
+});
+bindTap(document.getElementById('lamp-btn'), () => {
+  lampOn = !lampOn; document.getElementById('lamp-btn').classList.toggle('on', lampOn); sfx.click();
+});
+bindTap(document.getElementById('quest-bar'), () => showLessons());
+bindTap(document.getElementById('lessons-close'), () => { document.getElementById('lessons').style.display = 'none'; });
+bindTap(document.getElementById('mt-close'), () => closeMap());
+bindTap(document.getElementById('mt-confirm'), () => mapConfirm());
+bindTap(document.getElementById('mt-thumb'), () => { mapArm = mapArm === 'thumb' ? null : 'thumb'; syncArmButtons(); updateMapHint(); });
+bindTap(document.getElementById('mt-bearing'), () => { mapArm = mapArm === 'bearing' ? null : 'bearing'; syncArmButtons(); updateMapHint(); });
+document.getElementById('map-rot').addEventListener('input', (e) => { mapRot = +e.target.value; drawMap(); updateMapHint(); });
+
+// world touch: left half = walk, right half = look
+const touches = {};
+function onDown(id, x, y) {
+  audioInit();
+  if (game !== 'play') return;
+  if (x < W * 0.5 && y > H * 0.45) { joy.active = true; joy.id = id; joy.ox = x; joy.oy = y; joy.x = 0; joy.y = 0; touches[id] = 'joy'; }
+  else { touches[id] = 'look'; touches['lx' + id] = x; touches['ly' + id] = y; }
+}
+function onMove(id, x, y) {
+  const k = touches[id];
+  if (k === 'joy') {
+    const dx = x - joy.ox, dy = y - joy.oy, L = Math.hypot(dx, dy), m = Math.min(1, L / 46);
+    joy.x = L ? dx / L * m : 0; joy.y = L ? dy / L * m : 0;
+    moveVec.x = joy.x; moveVec.y = -joy.y;
+  } else if (k === 'look') {
+    const px = touches['lx' + id], py = touches['ly' + id];
+    player.yaw = (player.yaw + (x - px) * 0.26 + 360) % 360;
+    player.pitch = Math.max(-70, Math.min(60, player.pitch - (y - py) * 0.20));
+    touches['lx' + id] = x; touches['ly' + id] = y;
+  }
+}
+function onUp(id) {
+  if (touches[id] === 'joy') { joy.active = false; moveVec.x = 0; moveVec.y = 0; }
+  delete touches[id]; delete touches['lx' + id]; delete touches['ly' + id];
+}
+uicv.addEventListener('touchstart', e => { e.preventDefault(); for (const t of e.changedTouches) onDown(t.identifier, t.clientX, t.clientY); }, { passive: false });
+uicv.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.changedTouches) onMove(t.identifier, t.clientX, t.clientY); }, { passive: false });
+uicv.addEventListener('touchend', e => { e.preventDefault(); for (const t of e.changedTouches) onUp(t.identifier); }, { passive: false });
+uicv.addEventListener('touchcancel', e => { for (const t of e.changedTouches) onUp(t.identifier); });
+uicv.addEventListener('mousedown', e => onDown('m', e.clientX, e.clientY));
+window.addEventListener('mousemove', e => { if (touches['m']) onMove('m', e.clientX, e.clientY); });
+window.addEventListener('mouseup', () => onUp('m'));
+
+// map touch: pan / pinch / tap-to-place
+let mapDrag = null, pinch = null;
+function mapPointer(e) { const r = mapcv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+mapcv.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (e.touches.length === 2) {
+    const [a, b] = [e.touches[0], e.touches[1]];
+    pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), s: mapView.scale };
+  } else if (e.touches.length === 1) {
+    const r = mapcv.getBoundingClientRect();
+    mapDrag = { x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top, moved: 0 };
+  }
+}, { passive: false });
+mapcv.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 2 && pinch) {
+    const [a, b] = [e.touches[0], e.touches[1]];
+    const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    mapView.scale = Math.max(0.5, Math.min(6, pinch.s * d / pinch.d));
+    drawMap(); return;
+  }
+  if (mapDrag && e.touches.length === 1) {
+    const r = mapcv.getBoundingClientRect();
+    const x = e.touches[0].clientX - r.left, y = e.touches[0].clientY - r.top;
+    const dx = x - mapDrag.x, dy = y - mapDrag.y;
+    mapDrag.moved += Math.hypot(dx, dy);
+    const a = -mapRot * Math.PI / 180;
+    mapView.cx -= (dx * Math.cos(a) - dy * Math.sin(a)) / mapView.scale;
+    mapView.cz -= (dx * Math.sin(a) + dy * Math.cos(a)) / mapView.scale;
+    mapDrag.x = x; mapDrag.y = y; drawMap();
+  }
+}, { passive: false });
+mapcv.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (mapDrag && mapDrag.moved < 8) mapTap(mapDrag.x, mapDrag.y);
+  mapDrag = null; pinch = null;
+}, { passive: false });
+mapcv.addEventListener('mousedown', e => { const [x, y] = mapPointer(e); mapDrag = { x, y, moved: 0 }; });
+mapcv.addEventListener('mousemove', e => {
+  if (!mapDrag) return;
+  const [x, y] = mapPointer(e); const dx = x - mapDrag.x, dy = y - mapDrag.y;
+  mapDrag.moved += Math.hypot(dx, dy);
+  const a = -mapRot * Math.PI / 180;
+  mapView.cx -= (dx * Math.cos(a) - dy * Math.sin(a)) / mapView.scale;
+  mapView.cz -= (dx * Math.sin(a) + dy * Math.cos(a)) / mapView.scale;
+  mapDrag.x = x; mapDrag.y = y; drawMap();
+});
+mapcv.addEventListener('mouseup', e => {
+  if (mapDrag && mapDrag.moved < 8) { const [x, y] = mapPointer(e); mapTap(x, y); }
+  mapDrag = null;
+});
+function mapTap(sx, sy) {
+  const [wx, wz] = screenToMap(sx, sy);
+  if (mapArm === 'thumb') { thumb.x = wx; thumb.z = wz; sfx.click(); drawMap(); }
+  else if (mapArm === 'bearing') {
+    const t = bearingTo(thumb.x, thumb.z, wx, wz);
+    bearingSet = trueToMag(t); sfx.click(); mapArm = null; syncArmButtons(); drawMap();
+    showToast('Bearing set: <b>' + Math.round(bearingSet) + '°</b> magnetic. Now turn until the needle sits in the shed.', 4500);
+  }
+  updateMapHint();
+}
+
+/* ------------------------- LOOP ------------------------- */
+let last = 0;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  W = window.innerWidth; H = window.innerHeight;
+  for (const c of [glcv, uicv]) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+  if (game === 'map') { sizeMapCanvas(); drawMap(); }
+}
+window.addEventListener('resize', resize);
+function frame(ts) {
+  const dt = Math.min((ts - last) / 1000 || 0.016, 0.1); last = ts;
+  stepSim(dt); ambience(dt);
+  if (game !== 'map') render();
+  drawHUD();
+  requestAnimationFrame(frame);
+}
+/* boot — grids first, everything else samples them */
+[RIVER, BECK, TRACK, LANE, WALL, REENTRANT].forEach(prepPoly);
+buildHeights();
+buildLand();
+buildMap();
+resize();
+try { initGL(); syncFlag(); } catch (e) { console.warn('gl init failed', e); gfxOk = false; }
+updateMenuProgress();
+player.y = heightAt(player.x, player.z);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
