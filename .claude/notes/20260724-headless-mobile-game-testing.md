@@ -188,6 +188,38 @@ Three shapes have now been used. Match the gate to how the level is built:
 | Hand-authored **static** geometry (walls + hazards) | **BFS in agent-centre space** with obstacles inflated by the agent's radius + a margin, and hazards inflated to their *capture* radius. Proves a slow, careful route exists. | tilt-labyrinth: 10 boards, 0.5-unit grid |
 | **Generated** levels with continuous motion | Solve the player's real equation of motion for the time available; assert the demanded move is a fraction of what's coverable. Then move the check *into* the generator. | sky-lantern (`.claude/notes/20260725-sensor-input-and-async-versus-games.md`) |
 | A **rules puzzle** with no geometry | An auto-solver that plays by the game's own rules, gated on the game's own error metric. | vault-breaker, locksport |
+| A **3D world with authored objectives** | BFS reachability **plus** a walk of each *intended leg* — see below. | wayfinder |
+
+### Reachability is not the same as the route you told the player to take
+
+The most expensive gate lesson so far (wayfinder, 2026-07-26). A BFS gate
+proved every control reachable from the start and passed — while the leg the
+lesson *instructs* was blocked by a **74° face**, because BFS happily routed
+the long way round the hill. A second control sat **in a stream channel**,
+where the movement code's own depth rule made it unreachable at all.
+
+So for any game that names a route ("go via the boulder", "follow the stream
+in"), add a **final-leg gate**: greedily walk each intended leg with the real
+movement code and assert it arrives, and assert no intended leg crosses ground
+the mover refuses. Generalised: *test the path your design tells the player to
+walk, not just that the destination exists somewhere on the graph.*
+
+Corollary for placing objectives: put them where the player can stand. A
+control on a stream belongs on the **bank**, not the centreline — the same
+depth rule that makes water an obstacle makes a mid-channel objective
+unreachable.
+
+### Gate the teaching, not just the outcome (the cheat gate)
+
+For any game whose point is that the player performs a technique, arrival is
+not evidence. Write a gate that **teleports straight to the objective without
+performing the technique and asserts the game refuses to complete it.** In
+wayfinder this immediately exposed that five of nine lessons could be passed by
+wandering into the control, and later caught two subtler holes: a "touched the
+stream" flag that was trivially true because the control sat *on* the stream,
+and a handrail percentage computed from so few samples that a single frame of
+stale velocity satisfied it. Rule: a technique flag needs a **minimum sample
+count** and must be measurable *away from* the objective.
 
 Two things the BFS variant taught that transfer:
 
@@ -209,6 +241,33 @@ answer must lie strictly inside its own range, **and not within 5% of either
 end** (an answer parked at an edge is either unreachable or free), log ranges
 need positive lower bounds, no duplicate prompts, every entry carries its unit.
 Cheap to write once, and it makes adding 50 more questions a safe operation.
+
+## Measuring boot time: `page.goto` lies in this sandbox
+
+Wayfinder appeared to take **16 s to load**, which sent me optimising the wrong
+thing. Every game in the repo measures ~12.8 s to *DOMContentLoaded* here —
+that is the blocked `fonts.googleapis.com` request, not the page. Wayfinder's
+real work was ~1.3 s on top of that baseline.
+
+- Never conclude anything about boot cost from `page.goto` timing. Time the
+  build functions directly with `performance.now()` inside `page.evaluate`, or
+  compare against another game as a control.
+- The live site is unaffected — fonts load normally there.
+
+## Testing a WebGL page headlessly
+
+- Launch with `--use-gl=swiftshader --enable-unsafe-swiftshader`. Without them
+  the context may be missing entirely and you will "prove" a rendering bug that
+  does not exist.
+- Software GL runs at roughly **0.4 s/frame** for a scene a real GPU eats.
+  Screenshot waits need seconds, not milliseconds — and **you cannot measure
+  on-device frame rate this way**. Say so in the report rather than implying a
+  number you did not measure; ask the CD, who has the phone.
+- Filter `WebGL|SwiftShader|GroupMarker` out of the console-error assert, but
+  keep the assert — it is still what catches genuine page errors.
+- Keep the simulation layer free of GPU dependencies (`gfxOk` false must not
+  throw). Then the whole drive suite runs regardless of whether rendering
+  works, which is what makes any of the above testable.
 
 ## Related SOP
 

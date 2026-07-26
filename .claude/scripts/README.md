@@ -18,6 +18,8 @@ Deterministic helpers for working on this repo.
 
   For deeper gameplay-driving tests (touch drags, deterministic physics
   scenarios), see `.claude/notes/20260724-headless-mobile-game-testing.md`.
+  Drive suites worth keeping across sessions live in `.claude/tests/` — see
+  that folder's README for when a suite earns a place there.
 
 - `check-games-sync.cjs` — three-way catalog gate. A new game has to land in
   the hub card, the hub's `GAMES[]` facet dataset, **and** the

@@ -95,5 +95,6 @@ See `games/CLAUDE.md` for the full shared conventions table (fonts, palette, inp
 
 This repo carries a zmh-producer config at `.claude/zmh/producer.md`
 (environment, backlog layout, validation gate, integration/publish rules for
-the `/zmh-producer:*` commands). The smoke gate it names lives in
-`.claude/scripts/`; session learnings go to `.claude/notes/`.
+the `/zmh-producer:*` commands). The gates it names live in `.claude/scripts/`;
+gameplay drive suites worth keeping live in `.claude/tests/`; session learnings
+go to `.claude/notes/`.
