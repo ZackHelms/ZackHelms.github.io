@@ -16,6 +16,19 @@ Deterministic helpers for working on this repo.
     node .claude/scripts/smoke-mobile.cjs games/index.html games/neon-golf/index.html
   ```
 
+  **Remote sessions need no install.** `playwright-core` ships nested inside
+  the globally-installed `playwright`, so point `NODE_PATH` at that and go
+  (verified 2026-07-27). A top-level `playwright-core` does not exist there,
+  which is why a bare `NODE_PATH=/opt/node22/lib/node_modules` still fails:
+
+  ```
+  NODE_PATH=/opt/node22/lib/node_modules/playwright/node_modules \
+    node .claude/scripts/smoke-mobile.cjs signals/index.html
+  ```
+
+  The gate is not games-only — it is an error-free-load check for any page in
+  the repo, `signals/index.html` included.
+
   For deeper gameplay-driving tests (touch drags, deterministic physics
   scenarios), see `.claude/notes/20260724-headless-mobile-game-testing.md`.
   Drive suites worth keeping across sessions live in `.claude/tests/` — see

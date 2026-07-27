@@ -32,7 +32,9 @@ try {
   ({ chromium } = require('playwright-core'));
 } catch (e) {
   console.error('smoke-mobile: playwright-core not resolvable.');
-  console.error('  fix: npm install playwright-core (any dir), then run with');
+  console.error('  remote sessions: it is nested inside the global playwright —');
+  console.error('       NODE_PATH=/opt/node22/lib/node_modules/playwright/node_modules node .claude/scripts/smoke-mobile.cjs ...');
+  console.error('  otherwise: npm install playwright-core (any dir), then run with');
   console.error('       NODE_PATH=<that dir>/node_modules node .claude/scripts/smoke-mobile.cjs ...');
   console.log('SMOKE: RED');
   process.exit(1);

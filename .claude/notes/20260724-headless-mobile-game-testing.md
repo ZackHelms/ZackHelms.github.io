@@ -76,6 +76,15 @@ the fuller gameplay-driving pattern and the traps hit.
   Isolate the rule under test: clear the actor array (`guards = []`) or
   zero the AI's speed via its real config (same family as the air-hockey
   rally case above).
+- **Array-destructuring a string yields characters, not fields.** A harness
+  that packs two values into one `$eval` return (`text + '||' + status`) and
+  then writes `const [body, st] = await page.$eval(...)` gets the first two
+  *characters* of the string — `$eval` returns a string, and array
+  destructuring iterates it. Every one of 49 checks "failed" with one-letter
+  values before the cause was obvious. Split explicitly, and pick a separator
+  that cannot occur in the payload (`||` is also a JS operator and reads as a
+  bug at a glance; `@@` is clearer). Generalised: when a check fails
+  *uniformly across every case*, suspect the harness before the subject.
 
 ## Real bug classes the drives caught (2026-07-24 four-game batch)
 
@@ -275,3 +284,14 @@ After pushing: `git push` ≠ live. Verify the "pages build and deployment"
 workflow run for the pushed SHA concludes `success` (three jobs: build,
 report-build-status, deploy), then compare the page's `#build-badge`
 timestamp against the live page. Config: `.claude/zmh/producer.md` § Publish.
+
+**The live-badge half of that check is not available from a remote session**
+(traced 2026-07-27). The container's egress proxy answers `CONNECT` for both
+`tythos.com` and `zackhelms.github.io` with **403**, so `curl` reports HTTP 000
+and `WebFetch` returns 403 — the block is on the host, not the path, and there
+is no way around it from inside. Do not spend a polling loop on it: verify the
+Actions run via `mcp__github__actions_list` / `actions_get` (that *does* work,
+through the MCP server rather than the proxy), then **state in the report that
+the served bytes were not confirmed** and hand the CD the exact badge string to
+eyeball. Claiming "verified live" from a green Actions run alone is precisely
+the stale-deploy failure the SOP exists to catch.
