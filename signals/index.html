@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Every signal a web app can monitor — feature-detected and probed live in your own browser, with iPhone/iOS Safari status and native-bridge notes.">
+<meta name="theme-color" content="#06060e">
+<title>SIGNALS — what a web app can actually monitor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg: #06060e;
+  --panel: #0b0b16;
+  --panel2: #101020;
+  --border: #1a1a30;
+  --green: #39ff14;
+  --gold: #ffc300;
+  --blue: #4488ff;
+  --red: #ff2244;
+  --purple: #b44fff;
+  --white: #dde3ff;
+  --dim: #8899bb;
+  --dimmer: #454568;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html { -webkit-text-size-adjust:100%; }
+body {
+  background: var(--bg);
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--white);
+  min-height: 100vh;
+  padding: calc(env(safe-area-inset-top,0px) + 26px) 14px calc(env(safe-area-inset-bottom,0px) + 60px);
+  line-height: 1.5;
+}
+.wrap { max-width: 940px; margin: 0 auto; }
+
+/* ---------- header ---------- */
+h1 {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: clamp(1.5rem, 7vw, 2.6rem);
+  color: var(--green);
+  text-shadow: 0 0 22px #39ff1455;
+  letter-spacing: 5px;
+  line-height: 1.1;
+}
+.tagline { font-size: 0.72rem; color: var(--dim); letter-spacing: 1px; margin-top: 8px; max-width: 60ch; }
+.tagline b { color: var(--white); font-weight: normal; }
+
+/* ---------- verdict ---------- */
+#verdict {
+  margin: 18px 0 0; padding: 14px 16px;
+  background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--green);
+  border-radius: 6px;
+}
+#verdict .big { font-family:'Black Ops One',sans-serif; font-size: 1.05rem; letter-spacing:2px; color: var(--green); }
+#verdict .tallies { display:flex; flex-wrap:wrap; gap: 6px 14px; margin-top: 9px; font-size: 0.66rem; }
+#verdict .tally b { font-weight: normal; }
+#env {
+  margin-top: 12px; font-size: 0.6rem; color: var(--dim);
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(155px,1fr)); gap: 3px 16px;
+  border-top: 1px solid var(--border); padding-top: 10px;
+}
+#env span b { color: var(--dimmer); font-weight: normal; }
+.warn {
+  margin-top: 12px; padding: 9px 12px; font-size: 0.64rem; line-height:1.55;
+  background: #2a0a10; border: 1px solid var(--red); border-radius: 5px; color: #ffb3c0;
+}
+
+/* ---------- controls ---------- */
+#controls {
+  position: sticky; top: 0; z-index: 40;
+  margin: 20px -14px 0; padding: 10px 14px;
+  background: rgba(6,6,14,0.94); backdrop-filter: blur(9px);
+  border-bottom: 1px solid var(--border);
+}
+#search {
+  width: 100%; font-family:'Share Tech Mono',monospace; font-size: 0.78rem;
+  background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--white); padding: 9px 11px;
+}
+#search:focus { outline:none; border-color: var(--green); }
+#search::placeholder { color: var(--dimmer); }
+.chips { display:flex; flex-wrap:wrap; gap: 6px; margin-top: 8px; }
+.chip-btn {
+  font-family:'Share Tech Mono',monospace; font-size: 0.6rem; letter-spacing: 1px;
+  background: var(--panel2); color: var(--dim);
+  border: 1px solid var(--border); border-radius: 20px;
+  padding: 5px 11px; cursor: pointer; touch-action: manipulation; white-space: nowrap;
+}
+.chip-btn.on { color: var(--bg); background: var(--green); border-color: var(--green); font-weight:bold; }
+.chip-btn.on[data-f="gate"] { background: var(--gold); border-color: var(--gold); }
+.chip-btn.on[data-f="no"] { background: var(--red); border-color: var(--red); color: var(--white); }
+.chip-btn.on[data-f="native"] { background: var(--purple); border-color: var(--purple); color: var(--white); }
+
+/* ---------- groups ---------- */
+.group { margin-top: 30px; }
+.group > h2 {
+  font-family:'Black Ops One',sans-serif; font-size: 0.86rem; letter-spacing: 3px;
+  color: var(--gold); text-shadow: 0 0 16px #ffc30033;
+  display:flex; align-items:baseline; gap: 10px; flex-wrap:wrap;
+}
+.group > h2 .gcount { font-family:'Share Tech Mono',monospace; font-size:0.6rem; color: var(--dimmer); letter-spacing:1px; }
+.group > .gnote { font-size: 0.63rem; color: var(--dim); margin-top: 4px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px,1fr)); gap: 10px; margin-top: 11px; }
+
+/* ---------- signal card ---------- */
+.sig {
+  background: var(--panel); border: 1px solid var(--border);
+  border-left: 3px solid var(--dimmer); border-radius: 6px;
+  padding: 11px 13px; display:flex; flex-direction: column; gap: 7px;
+}
+.sig[data-state="yes"]    { border-left-color: var(--green); }
+.sig[data-state="gate"]   { border-left-color: var(--gold); }
+.sig[data-state="no"]     { border-left-color: var(--red); }
+.sig[data-state="native"] { border-left-color: var(--purple); }
+.sig.hide { display: none; }
+.sig-head { display:flex; align-items:flex-start; justify-content:space-between; gap: 8px; }
+.sig-head h3 {
+  font-family:'Black Ops One',sans-serif; font-size: 0.72rem; letter-spacing: 1.4px;
+  color: var(--white); font-weight: normal; line-height: 1.35;
+}
+.state {
+  font-size: 0.5rem; letter-spacing: 1px; padding: 3px 7px; border-radius: 3px;
+  white-space: nowrap; flex-shrink: 0; font-weight: bold;
+}
+.state[data-s="yes"]    { background:#0d2b06; color: var(--green); border:1px solid #1d5c11; }
+.state[data-s="gate"]   { background:#2b2205; color: var(--gold); border:1px solid #5c4a11; }
+.state[data-s="no"]     { background:#2b070d; color: #ff7788; border:1px solid #5c1620; }
+.state[data-s="native"] { background:#1d0a2b; color: #d29bff; border:1px solid #451a66; }
+.what { font-size: 0.65rem; color: var(--dim); line-height: 1.55; }
+.api {
+  font-size: 0.58rem; color: var(--blue); background: #080814;
+  border: 1px solid var(--border); border-radius: 4px; padding: 5px 7px;
+  display: block; overflow-x: auto; white-space: pre; -webkit-overflow-scrolling: touch;
+}
+.tagrow { display:flex; flex-wrap:wrap; gap: 4px; }
+.tag {
+  font-size: 0.5rem; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 3px;
+  border: 1px solid var(--border); color: var(--dim); background: var(--panel2);
+}
+.tag.ios-yes     { color: var(--green); border-color:#1d5c11; }
+.tag.ios-partial { color: var(--gold);  border-color:#5c4a11; }
+.tag.ios-no      { color: #ff7788;      border-color:#5c1620; }
+.note { font-size: 0.6rem; color: var(--dim); line-height: 1.6; border-top: 1px dashed var(--border); padding-top: 6px; }
+.note b { color: var(--white); font-weight: normal; }
+.note.nat { color: #c39aeb; }
+.note.nat b { color: #e3ccff; }
+.probe-btn {
+  font-family:'Share Tech Mono',monospace; font-size: 0.62rem; letter-spacing: 2px;
+  background: var(--panel2); color: var(--green); border: 1px solid #1d5c11;
+  border-radius: 5px; padding: 8px 10px; cursor: pointer; touch-action: manipulation;
+  align-self: flex-start;
+}
+.probe-btn:hover { box-shadow: 0 0 14px #39ff1422; }
+.probe-btn.running { background: var(--green); color: var(--bg); font-weight: bold; }
+.probe-btn:disabled { opacity: 0.4; cursor: default; }
+.readout:empty { display:none; }
+.readout {
+  background: #080814; border: 1px solid var(--border); border-radius: 4px; padding: 7px 8px;
+}
+.rd {
+  font-family:'Share Tech Mono',monospace; font-size: 0.6rem; color: var(--green);
+  white-space: pre-wrap; word-break: break-word; line-height: 1.6; min-height: 1em;
+}
+.rd.err { color: #ff7788; }
+.readout video { display:block; margin-top: 6px; border:1px solid var(--border); border-radius:3px; width:130px; height:auto; background:#000; }
+.readout input, .readout button.mini {
+  font-family:'Share Tech Mono',monospace; font-size: 0.62rem; margin-top: 6px;
+  background: var(--panel2); border:1px solid var(--border); border-radius:4px;
+  color: var(--white); padding: 6px 8px;
+}
+.readout button.mini { color: var(--gold); cursor:pointer; touch-action:manipulation; }
+.hint { font-size: 0.55rem; color: var(--dimmer); margin-top: 5px; }
+
+/* ---------- footer / actions ---------- */
+#actions { display:flex; flex-wrap:wrap; gap: 8px; margin-top: 30px; }
+.act {
+  font-family:'Share Tech Mono',monospace; font-size: 0.64rem; letter-spacing: 1.5px;
+  background: var(--panel); color: var(--gold); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px 15px; cursor: pointer; touch-action: manipulation;
+}
+.act:hover { border-color: var(--gold); }
+footer { margin-top: 26px; border-top: 1px solid var(--border); padding-top: 16px; font-size: 0.6rem; color: var(--dimmer); line-height: 1.7; }
+footer b { color: var(--dim); font-weight: normal; }
+footer a { color: var(--blue); }
+.legend { display:flex; flex-wrap:wrap; gap: 4px 14px; margin-top: 10px; font-size: 0.6rem; color: var(--dim); }
+.legend i { font-style: normal; font-weight: bold; }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-27 17:04 UTC</div>
+
+<div class="wrap">
+  <h1>SIGNALS</h1>
+  <p class="tagline">
+    Every kind of signal a web app can monitor — <b>feature-detected and probed live in the browser you are holding right now</b>.
+    Green badges are measured, not claimed. Notes on iPhone support and on what needs a native app are editorial.
+  </p>
+
+  <div id="verdict">
+    <div class="big" id="verdict-line">detecting…</div>
+    <div class="tallies" id="tallies"></div>
+    <div id="env"></div>
+    <div id="warnings"></div>
+  </div>
+
+  <div id="controls">
+    <input id="search" type="search" placeholder="filter signals — try 'camera', 'bluetooth', 'heart'" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <main id="catalog"></main>
+
+  <div id="actions">
+    <button class="act" id="copy-report">COPY CAPABILITY REPORT</button>
+    <button class="act" id="expand-all">SHOW EVERYTHING</button>
+  </div>
+
+  <footer>
+    <div class="legend">
+      <span><i style="color:#39ff14">LIVE</i> readable right now</span>
+      <span><i style="color:#ffc300">PERMISSION</i> present, needs your consent or a tap</span>
+      <span><i style="color:#ff7788">ABSENT</i> no API in this browser</span>
+      <span><i style="color:#d29bff">NATIVE</i> no web API anywhere — needs an app</span>
+    </div>
+    <p style="margin-top:12px">
+      <b>Method.</b> Status badges come from real feature detection and, where a probe exists, from actually starting the
+      signal and reading it. Absent means absent <i>here</i> — the same page on a different device will score differently,
+      which is the point. Nothing is uploaded anywhere; every probe runs locally and the page has no analytics, no backend
+      and no third-party code (Google Fonts is the only external request).
+    </p>
+    <p style="margin-top:8px"><b>Source:</b> one self-contained HTML file in <a href="https://github.com/ZackHelms/ZackHelms.github.io">ZackHelms.github.io</a> / <code>signals/</code>.</p>
+  </footer>
+</div>
+
+<script>
+/* ============================================================
+   SIGNALS — live capability probe
+   One file, no dependencies. Data table first, engine below.
+   ============================================================ */
+
+/* ---------- tiny helpers ---------- */
+const $  = s => document.querySelector(s);
+const ce = (t, c) => { const n = document.createElement(t); if (c) n.className = c; return n; };
+const esc = s => String(s).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const num = (v, d) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d === undefined ? 2 : d) : '—';
+const pad = (s, n) => String(s).padEnd(n);
+const bar = (v, max, w) => { const f = Math.max(0, Math.min(w, Math.round(v / max * w))); return '█'.repeat(f) + '░'.repeat(w - f); };
+const inWin = k => { try { return k in window; } catch (e) { return false; } };
+const onNav = k => { try { return k in navigator; } catch (e) { return false; } };
+
+/* Throttled DOM writes: probes can fire at 60Hz, the screen updates at 10Hz. */
+const pending = new Map();
+setInterval(() => { pending.forEach((txt, node) => { node.textContent = txt; }); pending.clear(); }, 100);
+
+/* ============================================================
+   THE CATALOG
+   det()  -> 'yes' | 'gate' | 'no'
+   probe(io) -> optional async; io.set() throttled, io.now() immediate,
+                io.onstop(fn) registers cleanup, io.box is the DOM container.
+   ============================================================ */
+
+const GROUPS = [
+  { id:'motion',  name:'MOTION & ORIENTATION', note:'The phone’s inertial stack. On iOS these are the one sensor family Apple did ship to the web — behind an explicit tap-triggered permission.' },
+  { id:'loc',     name:'LOCATION & HEADING',   note:'GPS-class positioning. Foreground only on the web; anything that must keep tracking with the screen off is native territory.' },
+  { id:'audio',   name:'AUDIO INPUT',          note:'Once you hold a microphone stream, everything downstream — level, spectrum, pitch, speech — is ordinary maths in JS.' },
+  { id:'vision',  name:'CAMERA & VISION',      note:'A camera frame is a signal source: brightness, colour, motion energy, and with more work barcodes, faces and pulse.' },
+  { id:'power',   name:'POWER & THERMALS',     note:'Battery and CPU-pressure telemetry. Apple removed most of this from the web as a fingerprinting surface.' },
+  { id:'net',     name:'NETWORK & CONNECTIVITY', note:'Some of this is a declared API; the rest you measure yourself with a stopwatch and a fetch — which works everywhere.' },
+  { id:'device',  name:'DEVICE & PLATFORM',    note:'Static-ish facts about the machine: cores, memory, GPU, storage, locale, attached media devices.' },
+  { id:'display', name:'DISPLAY & USER PREFERENCES', note:'Screen geometry plus the accessibility and appearance settings the OS is willing to expose. Excellent iOS support.' },
+  { id:'input',   name:'INPUT & PERIPHERALS',  note:'Human-generated signals — touch pressure and contact size, keys, controllers, clipboard.' },
+  { id:'radio',   name:'EXTERNAL RADIOS & WIRED HARDWARE', note:'The whole "talk to a gadget" family. This is where iOS Safari says no to every single item.' },
+  { id:'life',    name:'ATTENTION & LIFECYCLE', note:'Is anyone looking? Foreground, focus, idleness, installed-app mode, and keeping the screen awake.' },
+  { id:'perf',    name:'PERFORMANCE & RUNTIME', note:'The page observing itself: frame rate, jank, layout stability, memory, paint milestones.' },
+  { id:'bg',      name:'PUSH, BACKGROUND & FILES', note:'Work that outlives the tab. iOS grants a narrow slice of this, and only to home-screen web apps.' }
+];
+
+const SIGNALS = [
+
+/* ---------------- MOTION & ORIENTATION ---------------- */
+{
+  g:'motion', id:'devicemotion', n:'Device motion (accelerometer + gyroscope)',
+  w:'Linear acceleration with and without gravity, plus rotation rate on three axes. The raw feed behind step counting, shake detection, tilt controls and impact detection.',
+  api:'window.addEventListener("devicemotion", …)\nDeviceMotionEvent.requestPermission()',
+  ios:'yes', perm:'tap + permission', https:true,
+  iosn:'<b>Works on iPhone 13.</b> iOS 13+ demands <b>DeviceMotionEvent.requestPermission()</b> called synchronously inside a real tap handler, over HTTPS. Sample rate is capped near 60&nbsp;Hz.',
+  det: () => !inWin('DeviceMotionEvent') ? 'no' : (typeof DeviceMotionEvent.requestPermission === 'function' ? 'gate' : 'yes'),
+  probe: async io => {
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      const r = await DeviceMotionEvent.requestPermission();
+      if (r !== 'granted') { io.err('Permission "' + r + '". iOS only grants this from a direct tap on a secure origin.'); return; }
+    }
+    let got = 0;
+    const h = e => {
+      got++;
+      const a = e.acceleration || {}, ag = e.accelerationIncludingGravity || {}, r = e.rotationRate || {};
+      const mag = Math.hypot(ag.x || 0, ag.y || 0, ag.z || 0);
+      io.set(
+        'accel (no gravity)  x ' + num(a.x) + '  y ' + num(a.y) + '  z ' + num(a.z) + ' m/s²\n' +
+        'accel (w/ gravity)  x ' + num(ag.x) + '  y ' + num(ag.y) + '  z ' + num(ag.z) + '\n' +
+        'rotation rate       α ' + num(r.alpha, 1) + '  β ' + num(r.beta, 1) + '  γ ' + num(r.gamma, 1) + ' °/s\n' +
+        'interval ' + num(e.interval, 1) + ' ms   samples ' + got + '\n' +
+        '|g| ' + bar(mag, 20, 22) + ' ' + num(mag, 1)
+      );
+    };
+    window.addEventListener('devicemotion', h);
+    io.onstop(() => window.removeEventListener('devicemotion', h));
+    io.now('granted — move the device…');
+    io.watchdog(() => got === 0, 'Permission granted but no events arrived. Desktops without an IMU report zeroes or nothing at all.');
+  }
+},
+{
+  g:'motion', id:'deviceorientation', n:'Device orientation (attitude & compass)',
+  w:'Where the device is pointing: alpha/beta/gamma Euler angles, and on Apple hardware a true magnetic compass heading in degrees.',
+  api:'window.addEventListener("deviceorientation", …)\nevent.webkitCompassHeading   // Safari only',
+  ios:'yes', perm:'tap + permission', https:true,
+  iosn:'<b>Works on iPhone 13</b>, same permission gate as motion. Bonus: Safari exposes <b>webkitCompassHeading</b> (0–360°, true heading) plus an accuracy value — the standard <code>alpha</code> is relative on iOS, so the WebKit property is the one worth reading.',
+  det: () => !inWin('DeviceOrientationEvent') ? 'no' : (typeof DeviceOrientationEvent.requestPermission === 'function' ? 'gate' : 'yes'),
+  probe: async io => {
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== 'granted') { io.err('Permission "' + r + '".'); return; }
+    }
+    let got = 0;
+    const h = e => {
+      got++;
+      const head = (typeof e.webkitCompassHeading === 'number') ? e.webkitCompassHeading : null;
+      io.set(
+        'alpha (yaw)   ' + num(e.alpha, 1) + '°   ' + (e.absolute ? '[absolute]' : '[relative]') + '\n' +
+        'beta  (pitch) ' + num(e.beta, 1) + '°\n' +
+        'gamma (roll)  ' + num(e.gamma, 1) + '°\n' +
+        (head === null
+          ? 'webkitCompassHeading: not exposed by this browser'
+          : 'compass heading ' + num(head, 1) + '° (±' + num(e.webkitCompassAccuracy, 0) + ')  ' +
+            ['N','NE','E','SE','S','SW','W','NW'][Math.round(head / 45) % 8]) +
+        '\nsamples ' + got
+      );
+    };
+    window.addEventListener('deviceorientation', h);
+    io.onstop(() => window.removeEventListener('deviceorientation', h));
+    io.now('granted — rotate the device…');
+    io.watchdog(() => got === 0, 'No orientation events — this machine has no orientation sensor.');
+  }
+},
+{
+  g:'motion', id:'screenorientation', n:'Screen orientation',
+  w:'Which way the UI is rotated (portrait/landscape, primary/secondary) and the angle in degrees, with an event on every change.',
+  api:'screen.orientation.type / .angle + "change" event',
+  ios:'yes', perm:'none',
+  iosn:'Supported on iPhone 13. The <b>lock()</b> method is not — iOS refuses programmatic orientation locking in Safari.',
+  det: () => (inWin('screen') && screen.orientation) ? 'yes' : (inWin('onorientationchange') ? 'yes' : 'no'),
+  probe: async io => {
+    const read = () => {
+      const o = screen.orientation;
+      io.set(
+        'type   ' + (o ? o.type : 'n/a (legacy)') + '\n' +
+        'angle  ' + (o ? o.angle : window.orientation) + '°\n' +
+        'lock() ' + (o && typeof o.lock === 'function' ? 'present (rejects on iOS)' : 'absent') + '\n' +
+        'viewport ' + innerWidth + '×' + innerHeight
+      );
+    };
+    read();
+    const t = setInterval(read, 400);
+    if (screen.orientation) screen.orientation.addEventListener('change', read);
+    io.onstop(() => { clearInterval(t); if (screen.orientation) screen.orientation.removeEventListener('change', read); });
+  }
+},
+{
+  g:'motion', id:'sensor-accel', n:'Accelerometer (Generic Sensor API)',
+  w:'A calibrated accelerometer with a configurable sample frequency — the modern, better-specified replacement for devicemotion.',
+  api:'new Accelerometer({frequency: 60}) / LinearAccelerationSensor / GravitySensor',
+  ios:'no', perm:'permission',
+  iosn:'<b>Not implemented in WebKit</b>, so unavailable on iPhone 13 in every browser (all iOS browsers are WebKit underneath). Use <code>devicemotion</code> instead — it gives you the same physics with a clumsier API.',
+  nat:'Nothing needed — the legacy event covers it on iOS.',
+  det: () => inWin('Accelerometer') ? 'gate' : 'no',
+  probe: async io => {
+    const s = new Accelerometer({ frequency: 30 });
+    s.addEventListener('reading', () => io.set('x ' + num(s.x) + '  y ' + num(s.y) + '  z ' + num(s.z) + ' m/s²\ntimestamp ' + num(s.timestamp, 0)));
+    s.addEventListener('error', e => io.err(e.error && e.error.name));
+    s.start(); io.onstop(() => s.stop());
+  }
+},
+{
+  g:'motion', id:'sensor-gyro', n:'Gyroscope (Generic Sensor API)',
+  w:'Angular velocity in rad/s about three axes, sampled at a rate you choose.',
+  api:'new Gyroscope({frequency: 60})',
+  ios:'no', perm:'permission',
+  iosn:'Not in WebKit. <code>devicemotion.rotationRate</code> is the iPhone equivalent (degrees/s rather than rad/s).',
+  det: () => inWin('Gyroscope') ? 'gate' : 'no',
+  probe: async io => {
+    const s = new Gyroscope({ frequency: 30 });
+    s.addEventListener('reading', () => io.set('x ' + num(s.x, 3) + '  y ' + num(s.y, 3) + '  z ' + num(s.z, 3) + ' rad/s'));
+    s.addEventListener('error', e => io.err(e.error && e.error.name));
+    s.start(); io.onstop(() => s.stop());
+  }
+},
+{
+  g:'motion', id:'sensor-mag', n:'Magnetometer (raw magnetic field)',
+  w:'Raw magnetic flux density in microtesla on three axes — a metal detector, a compass, or a door-open sensor if you attach a magnet.',
+  api:'new Magnetometer({frequency: 10})',
+  ios:'no', perm:'permission',
+  iosn:'<b>No raw magnetometer on iPhone via the web.</b> Safari gives you the derived <code>webkitCompassHeading</code> only. If you need field strength in µT — magnet detection, interference mapping — that is a native app.',
+  nat:'iOS: Core Motion <code>CMMagnetometerData</code> (raw) or <code>CMDeviceMotion.magneticField</code> (calibrated).',
+  det: () => inWin('Magnetometer') ? 'gate' : 'no',
+  probe: async io => {
+    const s = new Magnetometer({ frequency: 10 });
+    s.addEventListener('reading', () => io.set('x ' + num(s.x, 1) + '  y ' + num(s.y, 1) + '  z ' + num(s.z, 1) + ' μT\n|B| ' + num(Math.hypot(s.x, s.y, s.z), 1) + ' μT'));
+    s.addEventListener('error', e => io.err(e.error && e.error.name));
+    s.start(); io.onstop(() => s.stop());
+  }
+},
+{
+  g:'motion', id:'sensor-orient', n:'Absolute orientation (quaternion)',
+  w:'A fused accelerometer+gyro+magnetometer attitude estimate as a quaternion or 4×4 rotation matrix — what you want for AR and stable tilt.',
+  api:'new AbsoluteOrientationSensor() / RelativeOrientationSensor()',
+  ios:'no', perm:'permission',
+  iosn:'Not in WebKit. On iPhone you fuse it yourself from <code>deviceorientation</code>, or accept the drift.',
+  det: () => inWin('AbsoluteOrientationSensor') ? 'gate' : 'no',
+  probe: async io => {
+    const s = new AbsoluteOrientationSensor({ frequency: 20 });
+    s.addEventListener('reading', () => io.set('quaternion [' + (s.quaternion || []).map(v => num(v, 3)).join(', ') + ']'));
+    s.addEventListener('error', e => io.err(e.error && e.error.name));
+    s.start(); io.onstop(() => s.stop());
+  }
+},
+{
+  g:'motion', id:'ambientlight', n:'Ambient light level',
+  w:'Illuminance in lux from the front-facing light sensor — auto-dimming, "is it dark in here", presence heuristics.',
+  api:'new AmbientLightSensor({frequency: 1})',
+  ios:'no', perm:'permission',
+  iosn:'<b>No ambient light API on iPhone at all</b> — not in Safari, and Apple exposes no public native one either. The practical workaround on iOS is to open the camera and measure mean frame brightness (see <b>Camera frame statistics</b> below), which is legal but lights up the privacy indicator.',
+  nat:'No public iOS framework. <code>UIScreen.main.brightness</code> only tells you the screen setting, not the room.',
+  det: () => inWin('AmbientLightSensor') ? 'gate' : 'no',
+  probe: async io => {
+    const s = new AmbientLightSensor({ frequency: 2 });
+    s.addEventListener('reading', () => io.set('illuminance ' + num(s.illuminance, 0) + ' lux'));
+    s.addEventListener('error', e => io.err(e.error && e.error.name));
+    s.start(); io.onstop(() => s.stop());
+  }
+},
+{
+  g:'motion', id:'steps', n:'Step count & activity type',
+  w:'Steps taken, distance, floors climbed, and whether the user is walking, running, cycling or driving.',
+  api:'— no web API —',
+  ios:'no', perm:'n/a', nativeOnly:true,
+  iosn:'You can approximate step <i>cadence</i> in JS by band-pass filtering <code>devicemotion</code>, but only while the page is open and awake, and it never matches the coprocessor. Historical steps, floors and activity classification are native-only.',
+  nat:'iOS: <b>Core Motion</b> — <code>CMPedometer</code> (steps, distance, floors, cadence, including up to 7 days of history recorded while your app was closed) and <code>CMMotionActivityManager</code> (stationary/walking/running/automotive/cycling with confidence).'
+},
+{
+  g:'motion', id:'baro', n:'Barometric pressure & relative altitude',
+  w:'Air pressure in kPa and derived relative altitude — floor changes indoors, weather trends, stair detection.',
+  api:'— no web API —',
+  ios:'no', perm:'n/a', nativeOnly:true,
+  iosn:'The iPhone 13 has a barometer. <b>No browser can read it</b> — there is no specification for it, let alone a WebKit implementation.',
+  nat:'iOS: <b>Core Motion</b> <code>CMAltimeter.startRelativeAltitudeUpdates</code> (pressure + relative altitude) and <code>startAbsoluteAltitudeUpdates</code> (iOS 15+, fused with GPS).'
+},
+
+/* ---------------- LOCATION ---------------- */
+{
+  g:'loc', id:'geolocation', n:'Geolocation (position, speed, heading)',
+  w:'Latitude, longitude and accuracy, plus altitude, ground speed and course over ground when the fix supports them. Continuous via watchPosition.',
+  api:'navigator.geolocation.watchPosition(cb, err, {enableHighAccuracy:true})',
+  ios:'yes', perm:'permission', https:true,
+  iosn:'<b>Fully works on iPhone 13</b> over HTTPS after a permission prompt. Two gotchas: <code>speed</code> and <code>heading</code> are only non-null once you are actually moving (they come from GPS doppler, not the compass), and the fix stops the moment Safari is backgrounded.',
+  det: () => onNav('geolocation') ? 'gate' : 'no',
+  probe: async io => {
+    let n = 0;
+    const id = navigator.geolocation.watchPosition(p => {
+      const c = p.coords; n++;
+      io.set(
+        'lat/lon   ' + c.latitude.toFixed(5) + ', ' + c.longitude.toFixed(5) + '\n' +
+        'accuracy  ±' + num(c.accuracy, 1) + ' m\n' +
+        'altitude  ' + num(c.altitude, 1) + ' m  (±' + num(c.altitudeAccuracy, 1) + ')\n' +
+        'speed     ' + (c.speed === null ? 'null — stand still and it stays null' : num(c.speed, 2) + ' m/s') + '\n' +
+        'heading   ' + (c.heading === null ? 'null — only valid while moving' : num(c.heading, 1) + '°') + '\n' +
+        'fixes ' + n + '   age ' + num((Date.now() - p.timestamp) / 1000, 1) + ' s'
+      );
+    }, e => io.err('error ' + e.code + ': ' + e.message), { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    io.onstop(() => navigator.geolocation.clearWatch(id));
+    io.now('waiting for a fix…');
+  }
+},
+{
+  g:'loc', id:'permissions', n:'Permission states',
+  w:'Query whether geolocation, camera, microphone or notifications are granted, denied or still prompting — without triggering a prompt.',
+  api:'navigator.permissions.query({name:"geolocation"})',
+  ios:'partial', perm:'none',
+  iosn:'Safari implements the API but supports <b>fewer permission names</b> than Chromium — <code>camera</code> and <code>microphone</code> queries typically throw <code>TypeError</code>. Probe it and see exactly which names your iPhone answers.',
+  det: () => (onNav('permissions') && navigator.permissions.query) ? 'yes' : 'no',
+  probe: async io => {
+    const names = ['geolocation','notifications','camera','microphone','persistent-storage','accelerometer','gyroscope','magnetometer','clipboard-read','push','midi','ambient-light-sensor','screen-wake-lock','compute-pressure','bluetooth','idle-detection'];
+    const out = [];
+    for (const nm of names) {
+      try { const st = await navigator.permissions.query({ name: nm }); out.push(pad(nm, 22) + st.state); }
+      catch (e) { out.push(pad(nm, 22) + '— not queryable'); }
+    }
+    io.now(out.join('\n'));
+  }
+},
+{
+  g:'loc', id:'geofence', n:'Background location & geofencing',
+  w:'Being woken when the user enters or leaves a region, or moves significantly — with your code not running beforehand.',
+  api:'— no web API (Geofencing API was abandoned) —',
+  ios:'no', perm:'n/a', nativeOnly:true,
+  iosn:'A web page cannot run in the background on iOS at all. Close the tab or lock the phone and every watch stops. This is the single hardest wall between a web app and a location-aware product.',
+  nat:'iOS: <b>Core Location</b> — <code>startMonitoring(for: CLCircularRegion)</code>, <code>startMonitoringSignificantLocationChanges()</code>, or a <code>CLLocationManager</code> with <code>allowsBackgroundLocationUpdates</code> and the Always authorisation. All three can relaunch a terminated app.'
+},
+
+/* ---------------- AUDIO ---------------- */
+{
+  g:'audio', id:'mic', n:'Microphone level & spectrum',
+  w:'Raw PCM from the mic, and from it: RMS loudness in dBFS, an FFT spectrum, dominant frequency, spectral centroid. Sound-triggered anything.',
+  api:'getUserMedia({audio:true}) → AudioContext → AnalyserNode',
+  ios:'yes', perm:'permission', https:true,
+  iosn:'<b>Works on iPhone 13</b> over HTTPS. Two iOS rules: the <code>AudioContext</code> must be created or resumed inside a user gesture, and any other audio your page plays will duck. Safari also gives no <code>deviceId</code> labels until permission is granted.',
+  det: () => (onNav('mediaDevices') && navigator.mediaDevices.getUserMedia && inWin('AudioContext')) ? 'gate' : (inWin('webkitAudioContext') ? 'gate' : 'no'),
+  probe: async io => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    io.onstop(() => stream.getTracks().forEach(t => t.stop()));
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ac = new AC(); await ac.resume();
+    io.onstop(() => ac.close());
+    const an = ac.createAnalyser(); an.fftSize = 2048; an.smoothingTimeConstant = 0.75;
+    ac.createMediaStreamSource(stream).connect(an);
+    const td = new Float32Array(an.fftSize), fd = new Uint8Array(an.frequencyBinCount);
+    let peakHold = -100, raf;
+    const loop = () => {
+      an.getFloatTimeDomainData(td); an.getByteFrequencyData(fd);
+      let sum = 0; for (let i = 0; i < td.length; i++) sum += td[i] * td[i];
+      const rms = Math.sqrt(sum / td.length);
+      const db = 20 * Math.log10(rms + 1e-9);
+      if (db > peakHold) peakHold = db;
+      let maxI = 0, wsum = 0, wtot = 0;
+      for (let i = 1; i < fd.length; i++) { if (fd[i] > fd[maxI]) maxI = i; wsum += i * fd[i]; wtot += fd[i]; }
+      const hz = maxI * ac.sampleRate / an.fftSize;
+      const centroid = wtot ? (wsum / wtot) * ac.sampleRate / an.fftSize : 0;
+      let spec = ''; for (let b = 0; b < 24; b++) spec += '▁▂▃▄▅▆▇█'[Math.min(7, fd[Math.floor(b * 1.6) + 1] >> 5)];
+      io.set(
+        'level  ' + bar(db + 90, 90, 24) + ' ' + num(db, 1) + ' dBFS\n' +
+        'peak held ' + num(peakHold, 1) + ' dBFS\n' +
+        'dominant  ' + num(hz, 0) + ' Hz    centroid ' + num(centroid, 0) + ' Hz\n' +
+        'spectrum  ' + spec + '\n' +
+        'sampleRate ' + ac.sampleRate + ' Hz   baseLatency ' + num(ac.baseLatency * 1000, 1) + ' ms'
+      );
+      raf = requestAnimationFrame(loop);
+    };
+    loop(); io.onstop(() => cancelAnimationFrame(raf));
+  }
+},
+{
+  g:'audio', id:'speech', n:'Speech recognition (voice → text)',
+  w:'Continuous speech-to-text with interim results and confidence scores. A hands-free command channel.',
+  api:'new webkitSpeechRecognition() / SpeechRecognition',
+  ios:'yes', perm:'permission', https:true,
+  iosn:'<b>Works on iPhone 13</b> as <code>webkitSpeechRecognition</code>. Recognition is performed by Apple’s servers, so it needs a network connection and your audio leaves the device. Long sessions get cut off — restart on <code>onend</code>.',
+  det: () => (inWin('SpeechRecognition') || inWin('webkitSpeechRecognition')) ? 'gate' : 'no',
+  probe: async io => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const r = new SR(); r.continuous = true; r.interimResults = true; r.lang = navigator.language || 'en-US';
+    let final = '';
+    r.onresult = e => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0];
+        if (e.results[i].isFinal) final += t.transcript + ' [' + num(t.confidence, 2) + '] ';
+        else interim += t.transcript;
+      }
+      io.now('final: ' + (final || '—') + '\ninterim: ' + (interim || '—'));
+    };
+    r.onerror = e => io.err('error: ' + e.error);
+    r.onend = () => io.now(io.pre.textContent + '\n[session ended]');
+    r.start(); io.onstop(() => { try { r.stop(); } catch (e) {} });
+    io.now('listening — say something…');
+  }
+},
+{
+  g:'audio', id:'audioctx', n:'Audio pipeline properties',
+  w:'Hardware sample rate, output latency, and the context state — a proxy for which audio route is active (speaker vs AirPods change the numbers).',
+  api:'new AudioContext() → .sampleRate / .baseLatency / .outputLatency / .state',
+  ios:'partial', perm:'gesture',
+  iosn:'Supported, but Safari reports <b>no <code>outputLatency</code></b> and suspends contexts aggressively. iPhone hardware rate is usually 48000&nbsp;Hz; switching to Bluetooth audio can change it under you.',
+  det: () => (inWin('AudioContext') || inWin('webkitAudioContext')) ? 'gate' : 'no',
+  probe: async io => {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ac = new AC(); await ac.resume(); io.onstop(() => ac.close());
+    const read = () => io.set(
+      'state        ' + ac.state + '\n' +
+      'sampleRate   ' + ac.sampleRate + ' Hz\n' +
+      'baseLatency  ' + num(ac.baseLatency * 1000, 2) + ' ms\n' +
+      'outputLatency ' + (typeof ac.outputLatency === 'number' ? num(ac.outputLatency * 1000, 2) + ' ms' : 'not exposed (Safari)') + '\n' +
+      'destination channels ' + ac.destination.maxChannelCount + '\n' +
+      'currentTime  ' + num(ac.currentTime, 2) + ' s'
+    );
+    read(); const t = setInterval(read, 500); io.onstop(() => clearInterval(t));
+  }
+},
+{
+  g:'audio', id:'mediarecorder', n:'Media recording',
+  w:'Capture mic or camera to an encoded blob — voice notes, evidence clips, anything you want to keep rather than merely observe.',
+  api:'new MediaRecorder(stream, {mimeType}) + isTypeSupported()',
+  ios:'partial', perm:'permission', https:true,
+  iosn:'Present since iOS 14.3 but the codec menu is Apple’s: expect <b>audio/mp4</b> and <b>video/mp4</b>, not the WebM/Opus everyone else defaults to. Always branch on <code>isTypeSupported</code> — hardcoding webm is the classic iOS bug.',
+  det: () => inWin('MediaRecorder') ? 'yes' : 'no',
+  probe: async io => {
+    const types = ['audio/webm','audio/webm;codecs=opus','audio/mp4','audio/mpeg','audio/ogg;codecs=opus','video/webm','video/webm;codecs=vp9','video/mp4','video/mp4;codecs=h264','video/quicktime'];
+    io.now(types.map(t => pad(t, 30) + (MediaRecorder.isTypeSupported(t) ? '✓' : '✗')).join('\n'));
+  }
+},
+
+/* ---------------- CAMERA & VISION ---------------- */
+{
+  g:'vision', id:'camera', n:'Camera frame statistics',
+  w:'Every frame is data: mean luminance (a stand-in for the missing ambient-light sensor), average colour, and inter-frame motion energy for presence detection.',
+  api:'getUserMedia({video:{facingMode}}) → canvas.drawImage → getImageData',
+  ios:'yes', perm:'permission', https:true,
+  iosn:'<b>Works on iPhone 13</b> over HTTPS. Requires <code>playsinline</code> on the video element or iOS takes it fullscreen. Front and rear cameras via <code>facingMode</code>; the ultra-wide and telephoto lenses are selectable only as separate <code>deviceId</code>s, and the stream drops the instant Safari backgrounds.',
+  det: () => (onNav('mediaDevices') && navigator.mediaDevices.getUserMedia) ? 'gate' : 'no',
+  probe: async io => {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 320 } } });
+    io.onstop(() => stream.getTracks().forEach(t => t.stop()));
+    /* The video must be in the document and visible — iOS Safari will not
+       decode frames into a detached or display:none element. */
+    const v = ce('video');
+    v.playsInline = true; v.setAttribute('playsinline', ''); v.muted = true; v.autoplay = true;
+    v.srcObject = stream; io.box.appendChild(v);
+    io.onstop(() => v.remove());
+    await v.play().catch(() => {});
+    const c = ce('canvas'); c.width = 64; c.height = 48;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    const track = stream.getVideoTracks()[0];
+    const st = track.getSettings ? track.getSettings() : {};
+    let prev = null, raf, frames = 0;
+    const loop = () => {
+      frames++;
+      ctx.drawImage(v, 0, 0, c.width, c.height);
+      const d = ctx.getImageData(0, 0, c.width, c.height).data;
+      let r = 0, g = 0, b = 0, diff = 0;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i+1]; b += d[i+2]; }
+      const px = d.length / 4;
+      r /= px; g /= px; b /= px;
+      const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      if (prev) { for (let i = 0; i < d.length; i += 4) diff += Math.abs(d[i] - prev[i]); diff /= px; }
+      prev = new Uint8ClampedArray(d);
+      io.set(
+        'resolution ' + (st.width || v.videoWidth) + '×' + (st.height || v.videoHeight) + ' @ ' + (st.frameRate ? num(st.frameRate, 0) : '?') + ' fps\n' +
+        'facing     ' + (st.facingMode || 'unknown') + '\n' +
+        'brightness ' + bar(luma, 255, 22) + ' ' + num(luma, 0) + '/255\n' +
+        'mean RGB   ' + num(r, 0) + ', ' + num(g, 0) + ', ' + num(b, 0) + '\n' +
+        'motion     ' + bar(diff, 30, 22) + ' ' + num(diff, 1) + '\n' +
+        'frames ' + frames
+      );
+      raf = requestAnimationFrame(loop);
+    };
+    loop(); io.onstop(() => cancelAnimationFrame(raf));
+  }
+},
+{
+  g:'vision', id:'torch', n:'Camera torch & advanced controls',
+  w:'Turning the LED on, and setting zoom, focus distance, exposure or ISO. The torch is the enabling piece for camera-based pulse measurement.',
+  api:'track.getCapabilities().torch → track.applyConstraints({advanced:[{torch:true}]})',
+  ios:'no', perm:'permission',
+  iosn:'<b>Safari exposes no torch, zoom, focus or exposure control.</b> <code>getCapabilities()</code> either is missing or returns a bare object on iPhone. Any camera trick that needs the flash — PPG heart rate, low-light scanning — is out of reach on the web here.',
+  nat:'iOS: <b>AVFoundation</b> — <code>AVCaptureDevice.torchMode</code>, <code>videoZoomFactor</code>, <code>setFocusModeLocked</code>, <code>setExposureModeCustom</code>.',
+  det: () => (onNav('mediaDevices') && inWin('MediaStreamTrack') && MediaStreamTrack.prototype.getCapabilities) ? 'gate' : 'no',
+  probe: async io => {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    io.onstop(() => stream.getTracks().forEach(t => t.stop()));
+    const track = stream.getVideoTracks()[0];
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    const keys = Object.keys(caps);
+    io.now(
+      'capabilities exposed: ' + (keys.length || 'none') + '\n' +
+      (keys.length ? keys.map(k => pad(k, 20) + JSON.stringify(caps[k]).slice(0, 40)).join('\n') : '(this browser hides all of them)') +
+      '\n\ntorch: ' + ('torch' in caps ? 'SUPPORTED' : 'not available')
+    );
+  }
+},
+{
+  g:'vision', id:'shapedetect', n:'Barcode / face / text detection',
+  w:'Native, GPU-accelerated detection of QR and barcodes, face bounding boxes, and printed text directly from a video frame.',
+  api:'new BarcodeDetector() / FaceDetector() / TextDetector()',
+  ios:'no', perm:'none',
+  iosn:'Not in Safari. On iPhone you either ship a JS/WASM decoder yourself (jsQR, ZXing and friends work fine on a canvas frame at maybe 15–30&nbsp;fps) or go native, where Apple’s own Vision framework is excellent.',
+  nat:'iOS: <b>Vision</b> (<code>VNDetectBarcodesRequest</code>, <code>VNDetectFaceRectanglesRequest</code>, <code>VNRecognizeTextRequest</code>) or <code>AVCaptureMetadataOutput</code> for live barcodes.',
+  det: () => inWin('BarcodeDetector') ? 'yes' : 'no',
+  probe: async io => {
+    const fmts = await BarcodeDetector.getSupportedFormats();
+    io.now('BarcodeDetector formats:\n' + fmts.join(', ') + '\n\nFaceDetector ' + (inWin('FaceDetector') ? '✓' : '✗') + '   TextDetector ' + (inWin('TextDetector') ? '✓' : '✗'));
+  }
+},
+{
+  g:'vision', id:'ppg', n:'Heart rate from the camera (PPG)',
+  w:'Fingertip on the lens with the LED lit: the red channel oscillates with your pulse, and an FFT of that gives beats per minute.',
+  api:'derived — camera frames + torch + peak detection',
+  ios:'no', perm:'permission',
+  iosn:'The frame maths is easy in JS; the blocker is the torch. Without flash control, iPhone Safari readings are unusable in anything but bright, steady light. Treat this as <b>native-only on iOS in practice</b>.',
+  nat:'iOS: AVFoundation for locked exposure and torch, or skip it entirely — <b>HealthKit</b> already has real heart rate from the Watch, and <code>AVCaptureDevice</code> gives you far better raw frames than a canvas.'
+},
+{
+  g:'vision', id:'imagecapture', n:'Still photo capture & photo settings',
+  w:'Taking a full-resolution still from a live camera track, separate from the preview stream, with white balance and exposure controls.',
+  api:'new ImageCapture(track).takePhoto() / getPhotoCapabilities()',
+  ios:'no', perm:'permission',
+  iosn:'Not in Safari. The universal fallback is <code>&lt;input type="file" accept="image/*" capture="environment"&gt;</code>, which opens the real iOS camera UI and hands you a full-quality HEIC/JPEG — often better than what ImageCapture would have given you.',
+  det: () => inWin('ImageCapture') ? 'gate' : 'no'
+},
+
+/* ---------------- POWER ---------------- */
+{
+  g:'power', id:'battery', n:'Battery level & charging state',
+  w:'Charge fraction, whether it is plugged in, and estimated seconds to full or empty, with events on every change.',
+  api:'navigator.getBattery() → .level / .charging / .chargingTime / .dischargingTime',
+  ios:'no', perm:'none',
+  iosn:'<b>Removed from Safari and Firefox as a fingerprinting vector</b> — it was too good at re-identifying users across sites. No battery information of any kind is available to a web page on iPhone 13.',
+  nat:'iOS: <code>UIDevice.current.isBatteryMonitoringEnabled = true</code> then <code>batteryLevel</code> / <code>batteryState</code>, plus <code>ProcessInfo.isLowPowerModeEnabled</code>.',
+  det: () => onNav('getBattery') ? 'yes' : 'no',
+  probe: async io => {
+    const b = await navigator.getBattery();
+    const read = () => io.set(
+      'level        ' + bar(b.level, 1, 20) + ' ' + Math.round(b.level * 100) + '%\n' +
+      'charging     ' + b.charging + '\n' +
+      'chargingTime ' + (isFinite(b.chargingTime) ? num(b.chargingTime / 60, 1) + ' min' : '∞') + '\n' +
+      'dischargingTime ' + (isFinite(b.dischargingTime) ? num(b.dischargingTime / 60, 1) + ' min' : '∞')
+    );
+    read();
+    ['levelchange','chargingchange','chargingtimechange','dischargingtimechange'].forEach(e => b.addEventListener(e, read));
+    io.onstop(() => ['levelchange','chargingchange','chargingtimechange','dischargingtimechange'].forEach(e => b.removeEventListener(e, read)));
+  }
+},
+{
+  g:'power', id:'pressure', n:'CPU pressure / thermal state',
+  w:'A coarse nominal→fair→serious→critical signal telling you the device is struggling, so you can shed work before frames start dropping.',
+  api:'new PressureObserver(cb).observe("cpu")',
+  ios:'no', perm:'permission',
+  iosn:'Not in Safari. The workable iPhone proxy is watching your own frame rate and long-task counts (see the Performance group) and degrading quality when they slip.',
+  nat:'iOS: <code>ProcessInfo.thermalState</code> (nominal/fair/serious/critical) with a change notification, plus <code>isLowPowerModeEnabled</code>.',
+  det: () => inWin('PressureObserver') ? 'gate' : 'no',
+  probe: async io => {
+    const o = new PressureObserver(recs => { const r = recs[recs.length - 1]; io.set('source ' + r.source + '\nstate  ' + r.state + '\ntime   ' + num(r.time, 0)); });
+    await o.observe('cpu', { sampleInterval: 1000 });
+    io.onstop(() => o.disconnect());
+    io.now('observing cpu pressure…');
+  }
+},
+
+/* ---------------- NETWORK ---------------- */
+{
+  g:'net', id:'online', n:'Online / offline state',
+  w:'Whether the browser believes it has a network, with events when that flips. The one connectivity signal that works literally everywhere.',
+  api:'navigator.onLine + window "online" / "offline" events',
+  ios:'yes', perm:'none',
+  iosn:'Works on iPhone 13. Caveat everywhere: <code>onLine</code> means "an interface is up", not "the internet is reachable" — captive portals and dead Wi-Fi still report true. Pair it with the RTT probe below.',
+  det: () => onNav('onLine') ? 'yes' : 'no',
+  probe: async io => {
+    let flips = 0;
+    const read = () => io.set('navigator.onLine  ' + navigator.onLine + '\ntransitions seen  ' + flips + '\n(toggle airplane mode to test)');
+    read();
+    const h = () => { flips++; read(); };
+    addEventListener('online', h); addEventListener('offline', h);
+    io.onstop(() => { removeEventListener('online', h); removeEventListener('offline', h); });
+  }
+},
+{
+  g:'net', id:'netinfo', n:'Connection type & quality (declared)',
+  w:'The browser’s own estimate: effective type (2g/3g/4g), downlink in Mbps, round-trip estimate, and the user’s Data Saver preference.',
+  api:'navigator.connection.effectiveType / .downlink / .rtt / .saveData',
+  ios:'no', perm:'none',
+  iosn:'<b>Not implemented in Safari</b>, so nothing on iPhone 13 — no way to tell Wi-Fi from cellular, and no Low Data Mode flag. Measure it yourself instead: the RTT probe next to this card works on every browser.',
+  nat:'iOS: <b>Network</b> framework <code>NWPathMonitor</code> — reports wifi/cellular/wired, expensive, constrained (Low Data Mode).',
+  det: () => (onNav('connection') || onNav('mozConnection') || onNav('webkitConnection')) ? 'yes' : 'no',
+  probe: async io => {
+    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const read = () => io.set(
+      'effectiveType ' + c.effectiveType + '\n' +
+      'downlink      ' + c.downlink + ' Mbps (capped/rounded)\n' +
+      'rtt           ' + c.rtt + ' ms\n' +
+      'saveData      ' + c.saveData + '\n' +
+      'type          ' + (c.type || 'not exposed')
+    );
+    read(); c.addEventListener('change', read); io.onstop(() => c.removeEventListener('change', read));
+  }
+},
+{
+  g:'net', id:'rtt', n:'Round-trip latency (measured yourself)',
+  w:'Time a real request to your own origin actually takes. No API needed — a clock and a fetch — which is why it works on every platform.',
+  api:'performance.now() around fetch(url, {method:"HEAD", cache:"no-store"})',
+  ios:'yes', perm:'none',
+  iosn:'<b>Works everywhere including iPhone 13.</b> This is the honest answer to "how good is the connection" when Network Information is unavailable — and it measures the path that actually matters, yours.',
+  det: () => inWin('fetch') ? 'yes' : 'no',
+  probe: async io => {
+    const url = location.pathname;
+    const samples = [];
+    for (let i = 0; i < 8; i++) {
+      const t0 = performance.now();
+      try { await fetch(url + '?rtt=' + i + '.' + t0, { method: 'HEAD', cache: 'no-store' }); }
+      catch (e) { io.err('fetch failed: ' + e.message + ' (offline, or opened from file://)'); return; }
+      samples.push(performance.now() - t0);
+      const s = samples.slice().sort((a, b) => a - b);
+      io.now(
+        'samples ' + samples.length + '/8\n' +
+        'min ' + num(s[0], 1) + ' ms   median ' + num(s[s.length >> 1], 1) + ' ms   max ' + num(s[s.length - 1], 1) + ' ms\n' +
+        'jitter (max-min) ' + num(s[s.length - 1] - s[0], 1) + ' ms\n' +
+        samples.map(v => bar(v, 400, 18) + ' ' + num(v, 0) + ' ms').join('\n')
+      );
+    }
+  }
+},
+{
+  g:'net', id:'webrtc', n:'WebRTC transport statistics',
+  w:'Live round-trip time, jitter, packet loss and bitrate from a real peer connection — the richest network telemetry the web offers.',
+  api:'RTCPeerConnection.getStats() → candidate-pair / inbound-rtp reports',
+  ios:'yes', perm:'none',
+  iosn:'<b>Works on iPhone 13.</b> This probe wires two peer connections together inside this one page, so it needs no server and no permissions — the numbers are loopback, but the API surface it demonstrates is the same one a real call uses.',
+  det: () => inWin('RTCPeerConnection') ? 'yes' : 'no',
+  probe: async io => {
+    const a = new RTCPeerConnection(), b = new RTCPeerConnection();
+    io.onstop(() => { try { a.close(); b.close(); } catch (e) {} });
+    const dc = a.createDataChannel('probe', { ordered: true });
+    a.onicecandidate = e => e.candidate && b.addIceCandidate(e.candidate).catch(() => {});
+    b.onicecandidate = e => e.candidate && a.addIceCandidate(e.candidate).catch(() => {});
+    await a.setLocalDescription(await a.createOffer());
+    await b.setRemoteDescription(a.localDescription);
+    await b.setLocalDescription(await b.createAnswer());
+    await a.setRemoteDescription(b.localDescription);
+    io.now('negotiating…');
+    const payload = 'x'.repeat(8192);
+    let sent = 0;
+    const push = setInterval(() => { if (dc.readyState === 'open' && dc.bufferedAmount < 262144) { dc.send(payload); sent += payload.length; } }, 100);
+    const t = setInterval(async () => {
+      const st = await a.getStats();
+      let pair = null, rtt = null;
+      st.forEach(r => { if (r.type === 'candidate-pair' && (r.state === 'succeeded' || r.nominated)) pair = r; });
+      if (pair && typeof pair.currentRoundTripTime === 'number') rtt = pair.currentRoundTripTime * 1000;
+      io.set(
+        'connection    ' + a.connectionState + ' / ice ' + a.iceConnectionState + '\n' +
+        'data channel  ' + dc.readyState + '\n' +
+        (pair
+          ? 'round trip    ' + (rtt === null ? 'n/a' : num(rtt, 2) + ' ms') + '\n' +
+            'bytes sent    ' + num((pair.bytesSent || 0) / 1024, 1) + ' KiB\n' +
+            'bytes recv    ' + num((pair.bytesReceived || 0) / 1024, 1) + ' KiB\n' +
+            'available out ' + (pair.availableOutgoingBitrate ? num(pair.availableOutgoingBitrate / 1e6, 2) + ' Mbps' : 'n/a')
+          : 'no succeeded candidate pair yet') +
+        '\npushed ' + num(sent / 1024, 0) + ' KiB through the channel'
+      );
+    }, 400);
+    io.onstop(() => { clearInterval(t); clearInterval(push); });
+  }
+},
+{
+  g:'net', id:'restiming', n:'Resource & navigation timing',
+  w:'Per-request DNS, TLS, TTFB and transfer size for everything the page loads, plus whether it came from cache.',
+  api:'new PerformanceObserver(cb).observe({type:"resource"}) / performance.getEntriesByType("navigation")',
+  ios:'yes', perm:'none',
+  iosn:'Supported on iPhone 13. Note Safari zeroes <code>transferSize</code> for cross-origin resources without <code>Timing-Allow-Origin</code> — same-origin numbers are trustworthy, third-party ones are not.',
+  det: () => inWin('PerformanceObserver') ? 'yes' : 'no',
+  probe: async io => {
+    const nav = performance.getEntriesByType('navigation')[0];
+    const lines = [];
+    if (nav) lines.push(
+      'THIS PAGE LOAD\n' +
+      '  dns      ' + num(nav.domainLookupEnd - nav.domainLookupStart, 1) + ' ms\n' +
+      '  tcp+tls  ' + num(nav.connectEnd - nav.connectStart, 1) + ' ms\n' +
+      '  ttfb     ' + num(nav.responseStart - nav.requestStart, 1) + ' ms\n' +
+      '  transfer ' + num(nav.transferSize / 1024, 1) + ' KiB (decoded ' + num(nav.decodedBodySize / 1024, 1) + ' KiB)\n' +
+      '  domInteractive ' + num(nav.domInteractive, 0) + ' ms   complete ' + num(nav.duration, 0) + ' ms\n' +
+      '  protocol ' + (nav.nextHopProtocol || 'hidden') + '   type ' + nav.type
+    );
+    const res = performance.getEntriesByType('resource').slice(-6);
+    lines.push('\nRECENT RESOURCES');
+    res.forEach(r => lines.push('  ' + pad(r.name.split('/').pop().slice(0, 26), 28) + num(r.duration, 0) + ' ms  ' + num(r.transferSize / 1024, 1) + ' KiB'));
+    io.now(lines.join('\n'));
+    const obs = new PerformanceObserver(l => {
+      l.getEntries().forEach(r => io.now(io.pre.textContent + '\n  + ' + r.name.split('/').pop().slice(0, 26) + ' ' + num(r.duration, 0) + ' ms'));
+    });
+    obs.observe({ type: 'resource', buffered: false });
+    io.onstop(() => obs.disconnect());
+  }
+},
+{
+  g:'net', id:'pushchan', n:'Server push channels',
+  w:'Keeping a socket open so a server can hand you signals as they happen — telemetry, alerts, presence — instead of you polling for them.',
+  api:'new WebSocket(url) / new EventSource(url)',
+  ios:'yes', perm:'none',
+  iosn:'Both work on iPhone 13 while the page is in the foreground. They are severed when Safari backgrounds or the screen locks; there is no web mechanism to keep a socket alive on iOS.',
+  det: () => (inWin('WebSocket') && inWin('EventSource')) ? 'yes' : 'no',
+  probe: async io => io.now('WebSocket   ' + (inWin('WebSocket') ? '✓' : '✗') + '\nEventSource ' + (inWin('EventSource') ? '✓' : '✗') + '\nfetch streams ' + (inWin('ReadableStream') ? '✓' : '✗') + '\n\n(no server on this static host to connect to)')
+},
+
+/* ---------------- DEVICE & PLATFORM ---------------- */
+{
+  g:'device', id:'hw', n:'CPU cores, memory & platform',
+  w:'How much machine you are running on — logical cores, approximate RAM, platform and architecture hints for sizing your workloads.',
+  api:'navigator.hardwareConcurrency / .deviceMemory / .userAgentData',
+  ios:'partial', perm:'none',
+  iosn:'<code>hardwareConcurrency</code> works on iPhone 13 (reports 6 for the A15). <code>deviceMemory</code> and <code>userAgentData</code> are Chromium-only, so no RAM figure and no structured platform data on iOS.',
+  det: () => onNav('hardwareConcurrency') ? 'yes' : 'no',
+  probe: async io => {
+    const uad = navigator.userAgentData;
+    io.now(
+      'hardwareConcurrency ' + (navigator.hardwareConcurrency || 'n/a') + ' logical cores\n' +
+      'deviceMemory        ' + (navigator.deviceMemory ? navigator.deviceMemory + ' GiB (bucketed)' : 'not exposed') + '\n' +
+      'platform            ' + (navigator.platform || 'n/a') + '\n' +
+      'maxTouchPoints      ' + navigator.maxTouchPoints + '\n' +
+      'languages           ' + (navigator.languages || []).join(', ') + '\n' +
+      'userAgentData       ' + (uad ? JSON.stringify({ mobile: uad.mobile, platform: uad.platform }) : 'not exposed (Safari/Firefox)') + '\n' +
+      'pdfViewerEnabled    ' + (navigator.pdfViewerEnabled !== undefined ? navigator.pdfViewerEnabled : 'n/a')
+    );
+  }
+},
+{
+  g:'device', id:'gpu', n:'GPU & graphics capability',
+  w:'Which renderer is behind the canvas, how big a texture it can hold, and whether WebGPU is available — a strong device-class signal.',
+  api:'WEBGL_debug_renderer_info / navigator.gpu.requestAdapter()',
+  ios:'partial', perm:'none',
+  iosn:'WebGL2 works on iPhone 13. Safari <b>masks the renderer string</b> for privacy, so you get "Apple GPU" rather than the exact chip. WebGPU shipped in Safari 26 and the iPhone 13 supports it — probe to confirm on your build.',
+  det: () => 'yes',
+  probe: async io => {
+    const c = ce('canvas');
+    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    let s = 'WebGL   ' + (gl ? (c.getContext('webgl2') ? '2.0' : '1.0') : 'unavailable') + '\n';
+    if (gl) {
+      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      s += 'vendor    ' + (dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR)) + '\n' +
+           'renderer  ' + (dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) + '\n' +
+           'max texture ' + gl.getParameter(gl.MAX_TEXTURE_SIZE) + 'px   max varyings ' + gl.getParameter(gl.MAX_VARYING_VECTORS) + '\n' +
+           'extensions  ' + gl.getSupportedExtensions().length + '\n';
+    }
+    io.now(s + 'WebGPU  ' + (onNav('gpu') ? 'present — requesting adapter…' : 'not available'));
+    if (onNav('gpu')) {
+      try {
+        const ad = await navigator.gpu.requestAdapter();
+        io.now(s + 'WebGPU  ' + (ad ? 'adapter acquired\n  maxBufferSize ' + (ad.limits ? ad.limits.maxBufferSize : '?') + '\n  features ' + [...(ad.features || [])].slice(0, 4).join(', ') : 'no adapter'));
+      } catch (e) { io.now(s + 'WebGPU  requestAdapter failed: ' + e.message); }
+    }
+  }
+},
+{
+  g:'device', id:'storage', n:'Storage quota & persistence',
+  w:'How many bytes you are using, how many you may use, and whether the browser has promised not to evict your data under pressure.',
+  api:'navigator.storage.estimate() / .persisted() / .persist()',
+  ios:'partial', perm:'none',
+  iosn:'<code>estimate()</code> works on iPhone 13 but Safari reports a coarse quota. The sharper iOS problem is eviction: data from a site you have not visited <b>can be cleared after 7 days</b> unless the site is installed to the Home Screen.',
+  det: () => (onNav('storage') && navigator.storage.estimate) ? 'yes' : 'no',
+  probe: async io => {
+    const e = await navigator.storage.estimate();
+    let p = 'unknown';
+    try { p = await navigator.storage.persisted(); } catch (err) {}
+    io.now(
+      'usage  ' + num(e.usage / 1048576, 2) + ' MiB\n' +
+      'quota  ' + num(e.quota / 1048576, 1) + ' MiB (' + num(e.quota / 1073741824, 2) + ' GiB)\n' +
+      'used   ' + bar(e.usage / e.quota, 1, 20) + ' ' + num(e.usage / e.quota * 100, 3) + '%\n' +
+      'persisted ' + p + '\n' +
+      (e.usageDetails ? 'breakdown ' + JSON.stringify(e.usageDetails) : '')
+    );
+  }
+},
+{
+  g:'device', id:'mediadevices', n:'Attached cameras, mics & speakers',
+  w:'An inventory of media hardware and a live event when something is plugged in or removed — headphones connected, external camera attached.',
+  api:'navigator.mediaDevices.enumerateDevices() + "devicechange" event',
+  ios:'partial', perm:'none',
+  iosn:'Enumeration works on iPhone 13 but device <b>labels are blank until you grant camera or mic permission</b>. <code>devicechange</code> fires for AirPods and wired headsets; there is no <code>setSinkId</code> on Safari, so you cannot choose an output.',
+  det: () => (onNav('mediaDevices') && navigator.mediaDevices.enumerateDevices) ? 'yes' : 'no',
+  probe: async io => {
+    const read = async () => {
+      const ds = await navigator.mediaDevices.enumerateDevices();
+      const by = {};
+      ds.forEach(d => { (by[d.kind] = by[d.kind] || []).push(d.label || '(label hidden — grant permission)'); });
+      io.now(Object.keys(by).map(k => k + ' ×' + by[k].length + '\n' + by[k].map(l => '   ' + l).join('\n')).join('\n') +
+        '\n\nsetSinkId (choose output) ' + (inWin('HTMLMediaElement') && 'setSinkId' in HTMLMediaElement.prototype ? '✓' : '✗'));
+    };
+    await read();
+    navigator.mediaDevices.addEventListener('devicechange', read);
+    io.onstop(() => navigator.mediaDevices.removeEventListener('devicechange', read));
+  }
+},
+{
+  g:'device', id:'locale', n:'Locale, timezone & clock',
+  w:'The user’s language, region, calendar, numbering system, timezone and clock skew — context every app should adapt to.',
+  api:'Intl.DateTimeFormat().resolvedOptions() / navigator.languages',
+  ios:'yes', perm:'none',
+  iosn:'Fully supported on iPhone 13. Note Safari reports the timezone honestly even in Private Browsing, so it stays a reliable signal.',
+  det: () => 'yes',
+  probe: async io => {
+    const r = Intl.DateTimeFormat().resolvedOptions();
+    io.now(
+      'locale     ' + r.locale + '\n' +
+      'timeZone   ' + r.timeZone + ' (UTC' + (new Date().getTimezoneOffset() > 0 ? '-' : '+') + num(Math.abs(new Date().getTimezoneOffset()) / 60, 1) + ')\n' +
+      'calendar   ' + r.calendar + '   numbering ' + r.numberingSystem + '\n' +
+      'languages  ' + (navigator.languages || []).join(', ') + '\n' +
+      'now        ' + new Date().toISOString() + '\n' +
+      'hour cycle ' + (r.hourCycle || 'n/a')
+    );
+  }
+},
+
+/* ---------------- DISPLAY & PREFERENCES ---------------- */
+{
+  g:'display', id:'screen', n:'Screen geometry & pixel density',
+  w:'Physical and available screen size, device pixel ratio, colour depth — plus live updates when the user zooms or rotates.',
+  api:'screen.width/height/availWidth, devicePixelRatio, matchMedia("(resolution: …)")',
+  ios:'yes', perm:'none',
+  iosn:'Works on iPhone 13, which reports <b>390×844 CSS px at DPR 3</b> (1170×2532 physical). Safari does not expose <code>screen.isExtended</code> or multi-display info.',
+  det: () => 'yes',
+  probe: async io => {
+    const read = () => io.set(
+      'screen        ' + screen.width + '×' + screen.height + ' css px\n' +
+      'available     ' + screen.availWidth + '×' + screen.availHeight + '\n' +
+      'window inner  ' + innerWidth + '×' + innerHeight + '\n' +
+      'devicePixelRatio ' + devicePixelRatio + '  → ' + Math.round(screen.width * devicePixelRatio) + '×' + Math.round(screen.height * devicePixelRatio) + ' physical\n' +
+      'colorDepth    ' + screen.colorDepth + '-bit\n' +
+      'isExtended    ' + (screen.isExtended !== undefined ? screen.isExtended : 'not exposed') + '\n' +
+      'outer window  ' + outerWidth + '×' + outerHeight + '  (chrome height ' + (outerHeight - innerHeight) + ')'
+    );
+    read(); const t = setInterval(read, 500); io.onstop(() => clearInterval(t));
+  }
+},
+{
+  g:'display', id:'visualviewport', n:'Visual viewport & keyboard height',
+  w:'The part of the page actually visible — which shrinks when the on-screen keyboard appears, and shifts when the user pinch-zooms.',
+  api:'window.visualViewport.height / .offsetTop / .scale + "resize" event',
+  ios:'yes', perm:'none',
+  iosn:'<b>The way to detect the iOS keyboard.</b> iPhone Safari fires no keyboard event, but <code>visualViewport.height</code> collapses when it opens — subtract from <code>innerHeight</code> and you have the keyboard height. Tap the field in this probe to watch it happen.',
+  det: () => inWin('visualViewport') ? 'yes' : 'no',
+  probe: async io => {
+    const i = ce('input'); i.type = 'text'; i.placeholder = 'tap here to raise the keyboard';
+    io.box.appendChild(i);
+    const vv = visualViewport;
+    const read = () => io.set(
+      'visualViewport ' + num(vv.width, 0) + '×' + num(vv.height, 0) + '\n' +
+      'layout inner   ' + innerWidth + '×' + innerHeight + '\n' +
+      'implied keyboard ' + num(Math.max(0, innerHeight - vv.height - vv.offsetTop), 0) + ' px\n' +
+      'offsetTop ' + num(vv.offsetTop, 0) + '   pageTop ' + num(vv.pageTop, 0) + '\n' +
+      'scale     ' + num(vv.scale, 3) + (vv.scale > 1.01 ? '  (pinch-zoomed)' : '')
+    );
+    read(); vv.addEventListener('resize', read); vv.addEventListener('scroll', read);
+    io.onstop(() => { vv.removeEventListener('resize', read); vv.removeEventListener('scroll', read); i.remove(); });
+  }
+},
+{
+  g:'display', id:'prefs', n:'Accessibility & appearance preferences',
+  w:'Dark mode, reduced motion, increased contrast, reduced transparency, forced colours — OS-level settings, live, with change events.',
+  api:'matchMedia("(prefers-color-scheme: dark)").addEventListener("change", …)',
+  ios:'yes', perm:'none',
+  iosn:'<b>Excellent on iPhone 13.</b> Dark mode, Reduce Motion, Increase Contrast and Reduce Transparency all propagate from iOS Settings to Safari live — flip one in Settings › Accessibility with this probe running and watch it change.',
+  det: () => inWin('matchMedia') ? 'yes' : 'no',
+  probe: async io => {
+    const qs = ['(prefers-color-scheme: dark)','(prefers-reduced-motion: reduce)','(prefers-contrast: more)','(prefers-reduced-transparency: reduce)','(prefers-reduced-data: reduce)','(forced-colors: active)','(inverted-colors: inverted)','(dynamic-range: high)','(video-dynamic-range: high)','(color-gamut: p3)','(monochrome)','(display-mode: standalone)','(display-mode: fullscreen)','(orientation: portrait)','(scripting: enabled)'];
+    const mls = qs.map(q => matchMedia(q));
+    const read = () => io.set(mls.map((m, i) => (m.matches ? '● ' : '○ ') + pad(qs[i], 38) + m.matches).join('\n'));
+    read(); mls.forEach(m => m.addEventListener('change', read));
+    io.onstop(() => mls.forEach(m => m.removeEventListener('change', read)));
+  }
+},
+{
+  g:'display', id:'inputcaps', n:'Pointer & hover capability',
+  w:'Whether the primary input is a fine pointer or a coarse finger, and whether hover exists — the honest way to branch UI instead of sniffing the user agent.',
+  api:'matchMedia("(pointer: coarse)") / "(any-hover: hover)"',
+  ios:'yes', perm:'none',
+  iosn:'Works on iPhone 13, which reports <code>pointer: coarse</code> and <code>hover: none</code>. Attach a trackpad or mouse via Bluetooth and <code>any-pointer: fine</code> starts matching — a genuine live signal.',
+  det: () => inWin('matchMedia') ? 'yes' : 'no',
+  probe: async io => {
+    const qs = ['(pointer: fine)','(pointer: coarse)','(pointer: none)','(any-pointer: fine)','(any-pointer: coarse)','(hover: hover)','(hover: none)','(any-hover: hover)'];
+    const mls = qs.map(q => matchMedia(q));
+    const read = () => io.set(mls.map((m, i) => (m.matches ? '● ' : '○ ') + pad(qs[i], 22) + m.matches).join('\n') + '\nmaxTouchPoints ' + navigator.maxTouchPoints);
+    read(); mls.forEach(m => m.addEventListener('change', read));
+    io.onstop(() => mls.forEach(m => m.removeEventListener('change', read)));
+  }
+},
+{
+  g:'display', id:'screendetails', n:'Multi-display / window management',
+  w:'How many displays are attached, their sizes and which is primary — for placing windows on a specific monitor.',
+  api:'window.getScreenDetails() (Window Management API)',
+  ios:'no', perm:'permission',
+  iosn:'Not in Safari, and moot on a phone. Desktop Chromium only.',
+  det: () => inWin('getScreenDetails') ? 'gate' : 'no',
+  probe: async io => {
+    const d = await getScreenDetails();
+    io.now('screens: ' + d.screens.length + '\n' + d.screens.map(s => '  ' + s.width + '×' + s.height + ' @' + s.left + ',' + s.top + (s.isPrimary ? ' [primary]' : '') + ' ' + s.label).join('\n'));
+  }
+},
+
+/* ---------------- INPUT & PERIPHERALS ---------------- */
+{
+  g:'input', id:'pointer', n:'Touch pressure, size & tilt',
+  w:'Every pointer event carries more than coordinates: contact patch size, normalised pressure, stylus tilt and twist, and how many fingers are down.',
+  api:'pointermove event → .pressure / .width / .height / .tiltX / .pointerType',
+  ios:'partial', perm:'none',
+  iosn:'Pointer Events work on iPhone 13, but <b>iPhone has no 3D Touch since the XS</b> — <code>pressure</code> reads a constant 1.0 for an active touch. <code>width</code>/<code>height</code> (contact patch) do vary and can act as a crude pressure proxy. Real <code>tiltX</code>/<code>twist</code> need an Apple Pencil on iPad.',
+  det: () => inWin('PointerEvent') ? 'yes' : 'no',
+  probe: async io => {
+    io.box.insertAdjacentHTML('beforeend', '<div class="hint">Press and drag anywhere on this card.</div>');
+    const target = io.card || io.box;
+    const live = new Map();
+    const h = e => {
+      if (e.type === 'pointerup' || e.type === 'pointercancel') live.delete(e.pointerId); else live.set(e.pointerId, e);
+      const es = [...live.values()];
+      io.set(
+        'active pointers ' + es.length + '\n' +
+        (es.length ? es.map(e => (
+          'type ' + e.pointerType + '  primary ' + e.isPrimary + '\n' +
+          '  pressure ' + bar(e.pressure, 1, 14) + ' ' + num(e.pressure, 3) + '\n' +
+          '  contact  ' + num(e.width, 1) + '×' + num(e.height, 1) + ' px\n' +
+          '  tilt     x ' + num(e.tiltX, 0) + '° y ' + num(e.tiltY, 0) + '°   twist ' + num(e.twist, 0) + '°\n' +
+          '  at       ' + num(e.clientX, 0) + ', ' + num(e.clientY, 0)
+        )).join('\n') : '(waiting for a touch)')
+      );
+    };
+    ['pointerdown','pointermove','pointerup','pointercancel'].forEach(t => target.addEventListener(t, h));
+    io.onstop(() => ['pointerdown','pointermove','pointerup','pointercancel'].forEach(t => target.removeEventListener(t, h)));
+    io.now('(waiting for a touch)');
+  }
+},
+{
+  g:'input', id:'gamepad', n:'Game controllers',
+  w:'Axes, buttons and analog triggers from any connected controller, plus rumble on supported hardware.',
+  api:'navigator.getGamepads() + "gamepadconnected" event + .vibrationActuator',
+  ios:'yes', perm:'gesture',
+  iosn:'<b>Works on iPhone 13.</b> Pair a PS5 DualSense, Xbox or MFi controller in Bluetooth settings and Safari surfaces it through the Gamepad API. This is the one Bluetooth device class iOS Safari can see — because the OS presents it as a controller, not a radio. Rumble is not exposed.',
+  det: () => onNav('getGamepads') ? 'gate' : 'no',
+  probe: async io => {
+    let raf;
+    const loop = () => {
+      const gps = [...(navigator.getGamepads() || [])].filter(Boolean);
+      io.set(gps.length
+        ? gps.map(g =>
+            g.id.slice(0, 44) + '\n' +
+            '  axes    ' + g.axes.map(a => num(a, 2)).join('  ') + '\n' +
+            '  buttons ' + g.buttons.map(b => b.pressed ? '■' : '□').join('') + '\n' +
+            '  triggers ' + g.buttons.filter(b => b.value > 0 && b.value < 1).map(b => num(b.value, 2)).join(' ') + '\n' +
+            '  rumble  ' + (g.vibrationActuator ? 'available' : 'not exposed')
+          ).join('\n')
+        : 'no controller detected\n(pair one in Bluetooth settings, then press a button)');
+      raf = requestAnimationFrame(loop);
+    };
+    loop(); io.onstop(() => cancelAnimationFrame(raf));
+  }
+},
+{
+  g:'input', id:'idletime', n:'User activity & idle time (derived)',
+  w:'Seconds since the last key, tap, scroll or pointer move. No API required — just listeners and a timestamp — so it works everywhere.',
+  api:'derived from keydown / pointerdown / scroll / wheel timestamps',
+  ios:'yes', perm:'none',
+  iosn:'Works on iPhone 13, with the obvious limit: it only counts activity <i>inside your page</i>. System-wide idleness needs the Idle Detection API, which Safari does not have.',
+  det: () => 'yes',
+  probe: async io => {
+    let last = performance.now(), counts = { key: 0, pointer: 0, scroll: 0 };
+    const mk = k => () => { last = performance.now(); counts[k]++; };
+    const hs = [['keydown', mk('key')], ['pointerdown', mk('pointer')], ['pointermove', mk('pointer')], ['scroll', mk('scroll')], ['wheel', mk('scroll')]];
+    hs.forEach(([t, f]) => addEventListener(t, f, { passive: true }));
+    const read = () => io.set(
+      'idle for ' + num((performance.now() - last) / 1000, 1) + ' s\n' +
+      'keys ' + counts.key + '   pointer ' + counts.pointer + '   scroll ' + counts.scroll + '\n' +
+      'document.hasFocus() ' + document.hasFocus()
+    );
+    read();
+    const tmr = setInterval(read, 200);
+    io.onstop(() => { clearInterval(tmr); hs.forEach(([t, f]) => removeEventListener(t, f)); });
+  }
+},
+{
+  g:'input', id:'idledetect', n:'System-wide idle & screen lock',
+  w:'Whether the whole machine is idle or the screen is locked, not merely whether your tab is inactive.',
+  api:'new IdleDetector().start({threshold: 60000})',
+  ios:'no', perm:'permission',
+  iosn:'Not in Safari (WebKit formally opposes the spec). Use the derived in-page idle timer above, plus Page Visibility to catch the screen locking.',
+  det: () => inWin('IdleDetector') ? 'gate' : 'no',
+  probe: async io => {
+    const st = await IdleDetector.requestPermission();
+    if (st !== 'granted') { io.err('permission ' + st); return; }
+    const d = new IdleDetector();
+    d.addEventListener('change', () => io.set('user   ' + d.userState + '\nscreen ' + d.screenState));
+    await d.start({ threshold: 60000 });
+    io.onstop(() => { try { d.stop && d.stop(); } catch (e) {} });
+  }
+},
+{
+  g:'input', id:'clipboard', n:'Clipboard',
+  w:'Reading what the user pastes, or the clipboard contents outright with permission.',
+  api:'paste event / navigator.clipboard.readText()',
+  ios:'partial', perm:'permission',
+  iosn:'The <code>paste</code> event works on iPhone 13. <code>readText()</code> exists but Safari requires a <b>user gesture every time</b> and shows a "Paste" confirmation button — there is no persistent grant, by design.',
+  det: () => (onNav('clipboard') && navigator.clipboard.readText) ? 'gate' : (inWin('ClipboardEvent') ? 'yes' : 'no'),
+  probe: async io => {
+    const b = ce('button'); b.className = 'mini'; b.textContent = 'read clipboard';
+    b.onclick = async () => { try { io.now('clipboard: ' + (await navigator.clipboard.readText()).slice(0, 120)); } catch (e) { io.err('denied: ' + e.message); } };
+    io.box.appendChild(b);
+    const h = e => io.now('pasted: ' + (e.clipboardData ? e.clipboardData.getData('text').slice(0, 120) : '?') + '\ntypes: ' + (e.clipboardData ? [...e.clipboardData.types].join(', ') : '?'));
+    addEventListener('paste', h); io.onstop(() => removeEventListener('paste', h));
+    io.now('paste something, or tap the button');
+  }
+},
+{
+  g:'input', id:'vibration', n:'Haptics / vibration (output)',
+  w:'Not a sensor — an actuator. Included because it is the other half of a signal loop, and because it is a textbook iOS gap.',
+  api:'navigator.vibrate([100, 50, 100])',
+  ios:'no', perm:'none',
+  iosn:'<b>Not supported on iPhone at all.</b> The taptic engine is native-only from a browser’s perspective. The widely-shared hack of firing a hidden <code>&lt;input type="checkbox" switch&gt;</code> is unreliable and not something to build on.',
+  nat:'iOS: <b>Core Haptics</b> (<code>CHHapticEngine</code>, fully custom patterns) or <code>UIImpactFeedbackGenerator</code> for the standard taps.',
+  det: () => onNav('vibrate') ? 'yes' : 'no',
+  probe: async io => { navigator.vibrate([120, 60, 120, 60, 240]); io.now('pattern sent — feel anything?'); }
+},
+
+/* ---------------- EXTERNAL RADIOS & WIRED ---------------- */
+{
+  g:'radio', id:'bluetooth', n:'Bluetooth LE peripherals',
+  w:'Talking GATT to real hardware: heart-rate straps, thermometers, scales, cycling power meters, glucose monitors, custom boards.',
+  api:'navigator.bluetooth.requestDevice({filters:[{services:["heart_rate"]}]})',
+  ios:'no', perm:'gesture', https:true,
+  iosn:'<b>Not in iOS Safari, and no iOS browser can add it</b> — App Store rules force every browser onto WebKit. If you must reach BLE from a web page on iPhone 13, the only route is a third-party WebKit-wrapper browser like <b>Bluefy</b>, which bolts Web Bluetooth onto a WKWebView. That works but you cannot ask normal users to install a different browser.',
+  nat:'iOS: <b>Core Bluetooth</b> (<code>CBCentralManager</code>) in a native app — full BLE central and peripheral, including background reconnection.',
+  det: () => onNav('bluetooth') ? 'gate' : 'no',
+  probe: async io => {
+    const av = navigator.bluetooth.getAvailability ? await navigator.bluetooth.getAvailability() : 'unknown';
+    io.now('navigator.bluetooth present\nadapter available: ' + av + '\n\n(requestDevice() needs a user gesture and opens a chooser — not auto-run here)');
+  }
+},
+{
+  g:'radio', id:'nfc', n:'NFC tags',
+  w:'Reading and writing NDEF records on tags you tap — inventory, access, pairing shortcuts, physical bookmarks.',
+  api:'new NDEFReader().scan()',
+  ios:'no', perm:'gesture', https:true,
+  iosn:'<b>Chrome on Android only</b> — never Safari. The iPhone 13 hardware reads NFC happily (background tag reading is on by default), but only for native apps and system handlers.',
+  nat:'iOS: <b>Core NFC</b> — <code>NFCNDEFReaderSession</code> for NDEF, <code>NFCTagReaderSession</code> for raw ISO7816/ISO15693/MIFARE. Needs a paid developer account and the NFC entitlement.',
+  det: () => inWin('NDEFReader') ? 'gate' : 'no'
+},
+{
+  g:'radio', id:'usb', n:'USB devices',
+  w:'Claiming an interface on a plugged-in USB device and exchanging bulk or control transfers — microcontrollers, instruments, custom peripherals.',
+  api:'navigator.usb.requestDevice({filters:[]})',
+  ios:'no', perm:'gesture', https:true,
+  iosn:'Not in Safari; WebKit’s standards position on it is "opposed". Nothing on iPhone 13.',
+  nat:'iOS: essentially closed. <b>ExternalAccessory</b> requires the device to be MFi-certified; the <b>DriverKit</b> USB family is iPadOS-only. USB is the weakest iOS story of the whole group.',
+  det: () => onNav('usb') ? 'gate' : 'no'
+},
+{
+  g:'radio', id:'serial', n:'Serial ports',
+  w:'Byte-level read/write over USB-serial or a real UART — Arduino, GPS pucks, industrial sensors, anything speaking a line protocol.',
+  api:'navigator.serial.requestPort() → port.readable / port.writable',
+  ios:'no', perm:'gesture', https:true,
+  iosn:'Not in Safari. Nothing on iPhone 13.',
+  nat:'iOS: MFi-certified accessory + ExternalAccessory framework, or bridge the device over BLE and use Core Bluetooth.',
+  det: () => onNav('serial') ? 'gate' : 'no'
+},
+{
+  g:'radio', id:'hid', n:'Human interface devices (raw)',
+  w:'Raw input and feature reports from HID hardware the browser does not natively understand — flight sticks, macro pads, exotic controllers.',
+  api:'navigator.hid.requestDevice({filters:[]})',
+  ios:'no', perm:'gesture', https:true,
+  iosn:'Not in Safari. On iPhone 13 the Gamepad API is the only slice of HID you get, and only for controllers iOS already recognises.',
+  det: () => onNav('hid') ? 'gate' : 'no'
+},
+{
+  g:'radio', id:'midi', n:'MIDI instruments',
+  w:'Note, velocity, aftertouch, CC and clock messages from a connected keyboard or controller.',
+  api:'navigator.requestMIDIAccess({sysex:false})',
+  ios:'no', perm:'permission',
+  iosn:'<b>Not in Safari on any platform</b>, and Apple has shown no sign of changing that — MIDI device IDs are treated as a fingerprinting surface. Confirmed still absent as of 2026.',
+  nat:'iOS: <b>Core MIDI</b> — full USB, Bluetooth-MIDI and network MIDI support in a native app.',
+  det: () => onNav('requestMIDIAccess') ? 'gate' : 'no',
+  probe: async io => {
+    const a = await navigator.requestMIDIAccess({ sysex: false });
+    const ins = [...a.inputs.values()];
+    io.now('inputs ' + ins.length + '\n' + ins.map(i => '  ' + i.name + ' (' + i.manufacturer + ')').join('\n') + '\noutputs ' + a.outputs.size + '\n\nplay a note…');
+    ins.forEach(i => { i.onmidimessage = m => io.set('status 0x' + m.data[0].toString(16) + '  data ' + [...m.data].slice(1).join(' ')); });
+    io.onstop(() => ins.forEach(i => { i.onmidimessage = null; }));
+  }
+},
+
+/* ---------------- ATTENTION & LIFECYCLE ---------------- */
+{
+  g:'life', id:'visibility', n:'Page visibility',
+  w:'Whether your page is the foreground tab. The trigger for pausing work, and on mobile the closest thing to "the user left".',
+  api:'document.visibilityState + "visibilitychange" event',
+  ios:'yes', perm:'none',
+  iosn:'<b>Works on iPhone 13 and matters more here than anywhere.</b> Locking the screen, switching apps or even swiping to another tab suspends your JavaScript entirely — timers stop, streams die. Assume everything halts on hidden.',
+  det: () => 'visibilityState' in document ? 'yes' : 'no',
+  probe: async io => {
+    let hides = 0, hiddenSince = null, totalHidden = 0;
+    const read = () => io.set(
+      'visibilityState ' + document.visibilityState + '\n' +
+      'times hidden    ' + hides + '\n' +
+      'total hidden    ' + num(totalHidden / 1000, 1) + ' s\n' +
+      'hasFocus()      ' + document.hasFocus() + '\n' +
+      '(switch apps or lock the screen, then come back)'
+    );
+    const h = () => {
+      if (document.visibilityState === 'hidden') { hides++; hiddenSince = Date.now(); }
+      else if (hiddenSince) { totalHidden += Date.now() - hiddenSince; hiddenSince = null; }
+      read();
+    };
+    read();
+    document.addEventListener('visibilitychange', h);
+    const t = setInterval(read, 500);
+    io.onstop(() => { document.removeEventListener('visibilitychange', h); clearInterval(t); });
+  }
+},
+{
+  g:'life', id:'wakelock', n:'Screen wake lock',
+  w:'Keeping the display on while your page is showing something worth looking at — a recording, a timer, a set of instructions.',
+  api:'navigator.wakeLock.request("screen")',
+  ios:'yes', perm:'gesture', https:true,
+  iosn:'<b>Supported on iPhone 13</b> since iOS 16.4. The lock is released automatically when the page hides, so re-request it on <code>visibilitychange</code> — the single most common bug with this API.',
+  det: () => onNav('wakeLock') ? 'gate' : 'no',
+  probe: async io => {
+    const s = await navigator.wakeLock.request('screen');
+    io.now('wake lock ACQUIRED — the screen will not dim.\ntype ' + s.type + '   released ' + s.released);
+    s.addEventListener('release', () => io.now('wake lock released (usually because the page was hidden)'));
+    io.onstop(() => { try { s.release(); } catch (e) {} });
+  }
+},
+{
+  g:'life', id:'standalone', n:'Installed / home-screen mode',
+  w:'Whether you are running as an installed app rather than a browser tab — which on iOS unlocks a different, larger set of capabilities.',
+  api:'matchMedia("(display-mode: standalone)") / navigator.standalone',
+  ios:'yes', perm:'none',
+  iosn:'<b>The most consequential flag on iOS.</b> Safari exposes the non-standard <code>navigator.standalone</code>, and from iOS 26 any site added to the Home Screen opens as a web app even without a manifest. Push notifications and reliable storage only exist on this side of the line.',
+  det: () => 'yes',
+  probe: async io => io.now(
+    'display-mode: standalone  ' + matchMedia('(display-mode: standalone)').matches + '\n' +
+    'display-mode: fullscreen  ' + matchMedia('(display-mode: fullscreen)').matches + '\n' +
+    'display-mode: browser     ' + matchMedia('(display-mode: browser)').matches + '\n' +
+    'navigator.standalone      ' + (navigator.standalone !== undefined ? navigator.standalone : 'not exposed (non-Safari)') + '\n\n' +
+    (navigator.standalone || matchMedia('(display-mode: standalone)').matches
+      ? 'INSTALLED — push and durable storage are available to you.'
+      : 'Running as a browser tab. On iOS, Share → Add to Home Screen to change this.')
+  )
+},
+
+/* ---------------- PERFORMANCE ---------------- */
+{
+  g:'perf', id:'fps', n:'Frame rate & jank',
+  w:'Real rendering throughput and dropped frames — a proxy for thermal throttling, background load and how hard your own code is working.',
+  api:'requestAnimationFrame timestamps',
+  ios:'yes', perm:'none',
+  iosn:'Works on iPhone 13, which is capped at <b>60&nbsp;Hz</b> (ProMotion 120&nbsp;Hz is Pro models only). Note iOS throttles rAF hard when the page is not visible, so treat gaps as backgrounding rather than as jank.',
+  det: () => 'yes',
+  probe: async io => {
+    let last = performance.now(), frames = 0, jank = 0, worst = 0, raf, hist = [];
+    const loop = t => {
+      const dt = t - last; last = t; frames++;
+      if (dt > 33) jank++;
+      if (dt > worst) worst = dt;
+      hist.push(dt); if (hist.length > 60) hist.shift();
+      const avg = hist.reduce((a, b) => a + b, 0) / hist.length;
+      io.set(
+        'fps       ' + bar(1000 / avg, 120, 20) + ' ' + num(1000 / avg, 1) + '\n' +
+        'frame time ' + num(avg, 2) + ' ms avg   worst ' + num(worst, 1) + ' ms\n' +
+        'frames ' + frames + '   janky (>33ms) ' + jank + '  (' + num(jank / frames * 100, 1) + '%)'
+      );
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    io.onstop(() => cancelAnimationFrame(raf));
+  }
+},
+{
+  g:'perf', id:'vitals', n:'Paint, layout-shift & interaction timing',
+  w:'When the page first painted, its largest element landed, how much the layout jumped, and how long each interaction took to be handled.',
+  api:'PerformanceObserver on "paint" / "largest-contentful-paint" / "layout-shift" / "event" / "longtask"',
+  ios:'partial', perm:'none',
+  iosn:'Safari supports <code>paint</code> and <code>event</code> timing; <b>layout-shift, largest-contentful-paint and longtask are Chromium-only</b>, so CLS and LCP cannot be measured on iPhone 13 from the page itself. Probe to see exactly which entry types your build accepts.',
+  det: () => inWin('PerformanceObserver') ? 'yes' : 'no',
+  probe: async io => {
+    const types = PerformanceObserver.supportedEntryTypes || [];
+    const state = { paint: [], cls: 0, lcp: 0, longtasks: 0, longMs: 0, slowest: 0 };
+    const render = () => io.set(
+      'supported entry types:\n  ' + (types.length ? types.join(', ') : 'unknown') + '\n\n' +
+      'paint     ' + (state.paint.length ? state.paint.join('  ') : 'none yet') + '\n' +
+      'LCP       ' + (state.lcp ? num(state.lcp, 0) + ' ms' : 'not measurable here') + '\n' +
+      'CLS       ' + (types.includes('layout-shift') ? num(state.cls, 4) : 'not measurable here') + '\n' +
+      'long tasks ' + (types.includes('longtask') ? state.longtasks + ' (' + num(state.longMs, 0) + ' ms total)' : 'not measurable here') + '\n' +
+      'slowest interaction ' + num(state.slowest, 1) + ' ms'
+    );
+    const obs = [];
+    const watch = (type, fn) => {
+      if (!types.includes(type)) return;
+      try { const o = new PerformanceObserver(l => { l.getEntries().forEach(fn); render(); }); o.observe({ type: type, buffered: true }); obs.push(o); } catch (e) {}
+    };
+    watch('paint', e => state.paint.push(e.name + ' ' + num(e.startTime, 0) + 'ms'));
+    watch('largest-contentful-paint', e => { state.lcp = e.startTime; });
+    watch('layout-shift', e => { if (!e.hadRecentInput) state.cls += e.value; });
+    watch('longtask', e => { state.longtasks++; state.longMs += e.duration; });
+    watch('event', e => { if (e.duration > state.slowest) state.slowest = e.duration; });
+    render();
+    io.onstop(() => obs.forEach(o => o.disconnect()));
+  }
+},
+{
+  g:'perf', id:'memory', n:'JavaScript heap & memory',
+  w:'How much memory your own page is holding — the signal behind leak detection and adaptive cache sizing.',
+  api:'performance.memory / performance.measureUserAgentSpecificMemory()',
+  ios:'no', perm:'none',
+  iosn:'<b>No memory introspection in Safari.</b> The practical iPhone consequence is worse than the missing number: Safari kills tabs that grow too large with no warning and no event, so you cannot even detect that you are approaching the limit.',
+  nat:'iOS: <code>os_proc_available_memory()</code> and <code>ProcessInfo</code> memory pressure notifications, plus real <code>didReceiveMemoryWarning</code> callbacks.',
+  det: () => (inWin('performance') && performance.memory) ? 'yes' : 'no',
+  probe: async io => {
+    const read = () => { const m = performance.memory; io.set(
+      'usedJSHeapSize  ' + num(m.usedJSHeapSize / 1048576, 1) + ' MiB\n' +
+      'totalJSHeapSize ' + num(m.totalJSHeapSize / 1048576, 1) + ' MiB\n' +
+      'jsHeapSizeLimit ' + num(m.jsHeapSizeLimit / 1048576, 0) + ' MiB\n' +
+      'used ' + bar(m.usedJSHeapSize / m.jsHeapSizeLimit, 1, 20) + ' ' + num(m.usedJSHeapSize / m.jsHeapSizeLimit * 100, 1) + '%'); };
+    read(); const t = setInterval(read, 500); io.onstop(() => clearInterval(t));
+  }
+},
+
+/* ---------------- PUSH, BACKGROUND & FILES ---------------- */
+{
+  g:'bg', id:'notifications', n:'Notifications',
+  w:'Putting a message on the user’s lock screen — the payoff for most of the monitoring on this page.',
+  api:'Notification.requestPermission() / registration.showNotification()',
+  ios:'partial', perm:'permission', https:true,
+  iosn:'<b>Only for home-screen web apps on iPhone 13.</b> In a normal Safari tab this is unavailable; add the site to the Home Screen (iOS 16.4+) and it appears. The permission prompt must also follow a user gesture. Probe this page both ways — the badge will change.',
+  det: () => !inWin('Notification') ? 'no' : (Notification.permission === 'granted' ? 'yes' : 'gate'),
+  probe: async io => {
+    const b = ce('button'); b.className = 'mini'; b.textContent = 'request permission';
+    b.onclick = async () => { const r = await Notification.requestPermission(); io.now('permission now: ' + r); };
+    io.box.appendChild(b);
+    io.now('Notification.permission = ' + Notification.permission + '\nmaxActions ' + (Notification.maxActions !== undefined ? Notification.maxActions : 'n/a'));
+  }
+},
+{
+  g:'bg', id:'push', n:'Web push (server → device)',
+  w:'A server waking your app with a message even when nobody has the page open. The only way a web app learns about anything while closed.',
+  api:'registration.pushManager.subscribe({userVisibleOnly:true, applicationServerKey})',
+  ios:'partial', perm:'install + permission', https:true,
+  iosn:'<b>Works on iPhone 13 only when installed to the Home Screen</b> (iOS 16.4+). Not available in a Safari tab, at all. Every push must show a visible notification — <code>userVisibleOnly</code> is mandatory, so you cannot use push for silent background data sync.',
+  nat:'iOS native: APNs with silent/background pushes, <code>BGAppRefreshTask</code>, and Live Activities — none of which have a web equivalent.',
+  det: () => (inWin('PushManager') && 'serviceWorker' in navigator) ? 'gate' : 'no',
+  probe: async io => io.now(
+    'PushManager      ' + (inWin('PushManager') ? '✓' : '✗') + '\n' +
+    'serviceWorker    ' + ('serviceWorker' in navigator ? '✓' : '✗') + '\n' +
+    'Notification     ' + (inWin('Notification') ? '✓' : '✗') + '\n' +
+    'installed (standalone) ' + (navigator.standalone || matchMedia('(display-mode: standalone)').matches) + '\n\n' +
+    '(this page registers no service worker, so no live subscription to show)'
+  )
+},
+{
+  g:'bg', id:'bgsync', n:'Background sync & periodic work',
+  w:'Deferring work until connectivity returns, or asking the browser to run your code every few hours whether or not the user visits.',
+  api:'registration.sync.register() / registration.periodicSync.register()',
+  ios:'no', perm:'permission',
+  iosn:'<b>Neither is in Safari.</b> This is the hardest limit on iPhone: a web app cannot schedule any work it does not run in a live foreground tab. If your product needs to check something every hour, that is a native app, full stop.',
+  nat:'iOS: <b>BackgroundTasks</b> — <code>BGAppRefreshTask</code> (opportunistic, OS-scheduled) and <code>BGProcessingTask</code> (longer, plugged-in work), plus silent APNs pushes to trigger a fetch.',
+  det: () => (inWin('ServiceWorkerRegistration') && ('sync' in ServiceWorkerRegistration.prototype || 'periodicSync' in ServiceWorkerRegistration.prototype)) ? 'yes' : 'no'
+},
+{
+  g:'bg', id:'screencapture', n:'Screen capture',
+  w:'Recording or streaming the screen, a window or another tab — plus, on desktop, the audio going with it.',
+  api:'navigator.mediaDevices.getDisplayMedia({video:true})',
+  ios:'no', perm:'gesture', https:true,
+  iosn:'<b>Not available on iPhone.</b> macOS Safari has it; iOS Safari does not, and iPadOS only gained it recently. The native route is a Broadcast Upload Extension, which is genuinely awkward to build.',
+  nat:'iOS: <b>ReplayKit</b> (<code>RPScreenRecorder</code>) in-app, or a Broadcast Upload Extension for system-wide capture.',
+  det: () => (onNav('mediaDevices') && navigator.mediaDevices.getDisplayMedia) ? 'gate' : 'no'
+},
+{
+  g:'bg', id:'filesystem', n:'File system access',
+  w:'Reading and writing real files and directories the user picks, with handles that persist across sessions.',
+  api:'showOpenFilePicker() / showDirectoryPicker() / navigator.storage.getDirectory()',
+  ios:'partial', perm:'gesture',
+  iosn:'The picker APIs are Chromium-only. But the <b>Origin Private File System</b> (<code>navigator.storage.getDirectory()</code>) does work in Safari and is a real, fast, synchronous-in-a-worker filesystem — just private to your origin. For user files on iPhone, <code>&lt;input type="file"&gt;</code> reaches the Files app and iCloud Drive.',
+  det: () => inWin('showOpenFilePicker') ? 'gate' : ((onNav('storage') && navigator.storage.getDirectory) ? 'yes' : 'no'),
+  probe: async io => {
+    let s = 'showOpenFilePicker      ' + (inWin('showOpenFilePicker') ? '✓' : '✗') + '\n' +
+            'showDirectoryPicker     ' + (inWin('showDirectoryPicker') ? '✓' : '✗') + '\n' +
+            'OPFS getDirectory       ' + (onNav('storage') && navigator.storage.getDirectory ? '✓' : '✗') + '\n';
+    io.now(s);
+    if (onNav('storage') && navigator.storage.getDirectory) {
+      try {
+        const root = await navigator.storage.getDirectory();
+        const fh = await root.getFileHandle('signals-probe.txt', { create: true });
+        const w = await fh.createWritable(); await w.write('probe ' + new Date().toISOString()); await w.close();
+        const f = await fh.getFile();
+        io.now(s + '\nOPFS write/read OK — ' + f.size + ' bytes: "' + (await f.text()).slice(0, 40) + '"');
+        await root.removeEntry('signals-probe.txt');
+      } catch (e) { io.now(s + '\nOPFS test failed: ' + e.message); }
+    }
+  }
+},
+{
+  g:'bg', id:'crosstab', n:'Cross-tab & cross-context messaging',
+  w:'Other copies of your own app as a signal source — coordinating tabs, noticing a second window, sharing state without a server.',
+  api:'new BroadcastChannel(name) / window "storage" event',
+  ios:'yes', perm:'none',
+  iosn:'Both work on iPhone 13. The <code>storage</code> event has the wider reach; BroadcastChannel is the cleaner API and is supported in Safari 15.4+.',
+  det: () => inWin('BroadcastChannel') ? 'yes' : 'no',
+  probe: async io => {
+    const ch = new BroadcastChannel('signals-probe');
+    let heard = 0;
+    ch.onmessage = e => { heard++; io.now('heard ' + heard + ' message(s) from another tab\nlast: ' + JSON.stringify(e.data)); };
+    const t = setInterval(() => ch.postMessage({ t: Date.now(), from: 'this tab' }), 1000);
+    const h = e => io.now('storage event: ' + e.key + ' = ' + e.newValue);
+    addEventListener('storage', h);
+    io.now('broadcasting once a second.\nOpen this page in a second tab to see messages arrive.');
+    io.onstop(() => { clearInterval(t); ch.close(); removeEventListener('storage', h); });
+  }
+}
+];
+
+/* ============================================================
+   NATIVE-ONLY — signals the iPhone 13 produces that no browser
+   on any platform can reach.
+   ============================================================ */
+const NATIVE_ONLY = [
+  { n:'Health & fitness history', w:'Heart rate, resting HR, HRV, blood oxygen, ECG, sleep stages, workouts, VO₂ max, respiratory rate, cycle tracking, mindful minutes.', nat:'<b>HealthKit</b> — read and write with per-type user consent. Also the bridge to Apple Watch data, which is where most of these actually originate.' },
+  { n:'Step count, distance & floors', w:'Pedometer data, including up to seven days of history recorded while your app was not running.', nat:'<b>Core Motion</b> — <code>CMPedometer</code>.' },
+  { n:'Activity classification', w:'Stationary / walking / running / cycling / automotive, with a confidence level.', nat:'<b>Core Motion</b> — <code>CMMotionActivityManager</code>.' },
+  { n:'Barometric pressure & altitude', w:'Absolute pressure in kPa and relative altitude in metres. The iPhone 13 has the sensor; no web API exists for it anywhere.', nat:'<b>Core Motion</b> — <code>CMAltimeter</code>.' },
+  { n:'Raw magnetometer field', w:'Magnetic flux in µT on three axes — metal detection, magnet-based switches, interference mapping.', nat:'<b>Core Motion</b> — <code>CMMagnetometerData</code>.' },
+  { n:'Background location & geofences', w:'Region entry/exit and significant-change updates that relaunch a terminated app.', nat:'<b>Core Location</b> — region monitoring, significant location change, background updates.' },
+  { n:'BLE peripherals', w:'Heart-rate straps, scales, thermometers, sensors, custom firmware — including reconnecting in the background.', nat:'<b>Core Bluetooth</b> — <code>CBCentralManager</code>.' },
+  { n:'NFC tags', w:'Reading and writing NDEF, and raw ISO7816 / MIFARE sessions.', nat:'<b>Core NFC</b> — needs the NFC entitlement.' },
+  { n:'Battery & thermal state', w:'Charge level, charging state, Low Power Mode, and the four-step thermal pressure ladder.', nat:'<code>UIDevice</code> battery monitoring + <code>ProcessInfo.thermalState</code>.' },
+  { n:'Screen time & app usage', w:'Which apps are used and for how long, plus the ability to shield them.', nat:'<b>DeviceActivity</b> / <b>FamilyControls</b> — requires a special Apple entitlement.' },
+  { n:'Camera hardware control', w:'Torch, manual focus and exposure, ISO, RAW capture, depth maps from the LiDAR-less dual system, and multi-cam.', nat:'<b>AVFoundation</b> — <code>AVCaptureDevice</code>.' },
+  { n:'Always-on audio & haptics', w:'Recording with the screen off, and custom haptic patterns from the Taptic Engine.', nat:'<code>AVAudioSession</code> background audio mode + <b>Core Haptics</b>.' },
+  { n:'Cellular & Wi-Fi details', w:'Carrier, radio technology, current SSID. Signal strength in dBm is private API — not available even to native App Store apps.', nat:'<code>CTTelephonyNetworkInfo</code>, <b>NEHotspotNetwork</b> (with entitlement), <b>Network</b> framework path monitoring.' },
+  { n:'Motion coprocessor history', w:'Sensor recording that continues while your app is suspended, batched and delivered later.', nat:'<b>Core Motion</b> — <code>CMSensorRecorder</code>.' }
+];
+
+/* ============================================================
+   ENGINE
+   ============================================================ */
+
+const stateOf = s => {
+  if (s.nativeOnly) return 'native';
+  try { return s.det ? s.det() : 'no'; } catch (e) { return 'no'; }
+};
+const STATE_LABEL = { yes:'LIVE', gate:'PERMISSION', no:'ABSENT', native:'NATIVE' };
+const IOS_LABEL   = { yes:'iPhone 13: yes', partial:'iPhone 13: partial', no:'iPhone 13: no' };
+
+const running = new Map();   // id -> array of cleanup fns
+
+function makeIO(card) {
+  const box = card.querySelector('.readout');
+  box.innerHTML = '';
+  const pre = ce('pre', 'rd');
+  box.appendChild(pre);
+  const stops = [];
+  return {
+    box, pre, card, _stops: stops,
+    set(t) { pending.set(pre, t); },
+    now(t) { pending.delete(pre); pre.textContent = t; },
+    err(t) { pending.delete(pre); pre.textContent = t; pre.classList.add('err'); },
+    onstop(f) { stops.push(f); },
+    watchdog(cond, msg) {
+      const h = setTimeout(() => { if (cond()) this.now(msg); }, 1800);
+      stops.push(() => clearTimeout(h));
+    }
+  };
+}
+
+function stopProbe(id, btn) {
+  const stops = running.get(id);
+  if (!stops) return;
+  stops.forEach(f => { try { f(); } catch (e) {} });
+  running.delete(id);
+  if (btn) { btn.classList.remove('running'); btn.textContent = 'PROBE'; }
+}
+
+async function startProbe(sig, card, btn) {
+  const io = makeIO(card);
+  running.set(sig.id, io._stops);
+  btn.classList.add('running'); btn.textContent = 'STOP';
+  io.now('starting…');
+  try {
+    await sig.probe(io);
+  } catch (e) {
+    io.err((e && e.name ? e.name + ': ' : '') + (e && e.message ? e.message : String(e)));
+  }
+}
+
+function buildCard(sig) {
+  const st = stateOf(sig);
+  const card = ce('article', 'sig');
+  card.dataset.id = sig.id;
+  card.dataset.state = st;
+  card.dataset.text = (sig.n + ' ' + sig.w + ' ' + sig.api + ' ' + (sig.iosn || '') + ' ' + (sig.nat || '')).toLowerCase().replace(/<[^>]+>/g, '');
+
+  const tags = [];
+  if (sig.ios) tags.push('<span class="tag ios-' + sig.ios + '">' + IOS_LABEL[sig.ios] + '</span>');
+  if (sig.perm && sig.perm !== 'none' && sig.perm !== 'n/a') tags.push('<span class="tag">' + esc(sig.perm) + '</span>');
+  if (sig.https) tags.push('<span class="tag">HTTPS only</span>');
+
+  card.innerHTML =
+    '<div class="sig-head"><h3>' + esc(sig.n) + '</h3><span class="state" data-s="' + st + '">' + STATE_LABEL[st] + '</span></div>' +
+    '<p class="what">' + esc(sig.w) + '</p>' +
+    '<code class="api">' + esc(sig.api) + '</code>' +
+    (tags.length ? '<div class="tagrow">' + tags.join('') + '</div>' : '') +
+    (sig.iosn ? '<p class="note">' + sig.iosn + '</p>' : '') +
+    (sig.nat ? '<p class="note nat">Native route → ' + sig.nat + '</p>' : '') +
+    (sig.probe && st !== 'no' && st !== 'native' ? '<button class="probe-btn">PROBE</button>' : '') +
+    '<div class="readout"></div>';
+
+  const btn = card.querySelector('.probe-btn');
+  if (btn) btn.addEventListener('click', () => {
+    if (running.has(sig.id)) stopProbe(sig.id, btn);
+    else startProbe(sig, card, btn);
+  });
+  return card;
+}
+
+/* ---------- render ---------- */
+const catalog = $('#catalog');
+const counts = { yes: 0, gate: 0, no: 0, native: 0 };
+
+GROUPS.forEach(g => {
+  const mine = SIGNALS.filter(s => s.g === g.id);
+  if (!mine.length) return;
+  const sec = ce('section', 'group');
+  sec.dataset.group = g.id;
+  const live = mine.filter(s => stateOf(s) === 'yes').length;
+  sec.innerHTML = '<h2>' + esc(g.name) + ' <span class="gcount">' + live + '/' + mine.length + ' live here</span></h2><p class="gnote">' + esc(g.note) + '</p>';
+  const grid = ce('div', 'grid');
+  mine.forEach(s => { counts[stateOf(s)]++; grid.appendChild(buildCard(s)); });
+  sec.appendChild(grid);
+  catalog.appendChild(sec);
+});
+
+/* native-only section */
+{
+  const sec = ce('section', 'group');
+  sec.dataset.group = 'nativeonly';
+  sec.innerHTML = '<h2>IPHONE SIGNALS NO BROWSER CAN REACH <span class="gcount">' + NATIVE_ONLY.length + ' · native app required</span></h2>' +
+    '<p class="gnote">These exist on the iPhone 13 and have no web API on any platform. If your product depends on one of them, that is the moment a native app (or a small companion app feeding a web front-end) stops being optional.</p>';
+  const grid = ce('div', 'grid');
+  NATIVE_ONLY.forEach(x => {
+    const c = ce('article', 'sig');
+    c.dataset.state = 'native';
+    c.dataset.text = (x.n + ' ' + x.w + ' ' + x.nat).toLowerCase().replace(/<[^>]+>/g, '');
+    c.innerHTML = '<div class="sig-head"><h3>' + esc(x.n) + '</h3><span class="state" data-s="native">NATIVE</span></div>' +
+      '<p class="what">' + esc(x.w) + '</p>' +
+      '<p class="note nat">Native route → ' + x.nat + '</p>';
+    grid.appendChild(c);
+    counts.native++;
+  });
+  sec.appendChild(grid);
+  catalog.appendChild(sec);
+}
+
+/* ---------- verdict & environment ---------- */
+const total = counts.yes + counts.gate + counts.no + counts.native;
+$('#verdict-line').textContent = counts.yes + ' of ' + total + ' signals are readable right now, ' + counts.gate + ' more with permission.';
+$('#tallies').innerHTML = [
+  ['#39ff14', counts.yes, 'live'],
+  ['#ffc300', counts.gate, 'need permission'],
+  ['#ff7788', counts.no, 'absent here'],
+  ['#d29bff', counts.native, 'native only']
+].map(([c, n, l]) => '<span class="tally" style="color:' + c + '">● <b>' + n + '</b> ' + l + '</span>').join('');
+
+const envRows = [
+  ['secure context', window.isSecureContext],
+  ['origin', location.origin.replace(/^https?:\/\//, '')],
+  ['viewport', innerWidth + '×' + innerHeight + ' @' + devicePixelRatio + 'x'],
+  ['screen', screen.width + '×' + screen.height],
+  ['cores', navigator.hardwareConcurrency || '?'],
+  ['touch points', navigator.maxTouchPoints],
+  ['installed app', (navigator.standalone === true || matchMedia('(display-mode: standalone)').matches)],
+  ['pointer', matchMedia('(pointer: coarse)').matches ? 'coarse (touch)' : 'fine'],
+  ['dark mode', matchMedia('(prefers-color-scheme: dark)').matches],
+  ['reduced motion', matchMedia('(prefers-reduced-motion: reduce)').matches],
+  ['timezone', Intl.DateTimeFormat().resolvedOptions().timeZone],
+  ['engine', /applewebkit/i.test(navigator.userAgent) && !/chrome|crios|edg/i.test(navigator.userAgent) ? 'WebKit (Safari)' : (/firefox|fxios/i.test(navigator.userAgent) ? 'Gecko' : 'Chromium')]
+];
+$('#env').innerHTML = envRows.map(([k, v]) => '<span><b>' + esc(k) + '</b> ' + esc(v) + '</span>').join('');
+
+const warns = [];
+if (!window.isSecureContext) warns.push('<b>Not a secure context.</b> Geolocation, camera, microphone, motion and most of the permission-gated signals below are disabled until this page is served over HTTPS. Everything is scoring lower than it should.');
+if (/applewebkit/i.test(navigator.userAgent) && !/chrome|crios|edg/i.test(navigator.userAgent) && navigator.maxTouchPoints > 0 && !(navigator.standalone === true || matchMedia('(display-mode: standalone)').matches))
+  warns.push('You are in a Safari <b>tab</b> on iOS. Notifications, web push and durable storage only appear once this page is added to the Home Screen — install it and re-run to see the badges change.');
+$('#warnings').innerHTML = warns.map(w => '<div class="warn">' + w + '</div>').join('');
+
+/* ---------- filters ---------- */
+const FILTERS = [['all','ALL · ' + total], ['yes','LIVE HERE · ' + counts.yes], ['gate','NEEDS PERMISSION · ' + counts.gate], ['no','ABSENT · ' + counts.no], ['native','NATIVE ONLY · ' + counts.native]];
+let filter = 'all', query = '';
+$('#chips').innerHTML = FILTERS.map(([f, l]) => '<button class="chip-btn' + (f === 'all' ? ' on' : '') + '" data-f="' + f + '">' + l + '</button>').join('');
+
+function applyFilter() {
+  document.querySelectorAll('.sig').forEach(c => {
+    const okState = filter === 'all' || c.dataset.state === filter;
+    const okText = !query || (c.dataset.text || '').includes(query);
+    c.classList.toggle('hide', !(okState && okText));
+  });
+  document.querySelectorAll('.group').forEach(sec => {
+    sec.style.display = sec.querySelectorAll('.sig:not(.hide)').length ? '' : 'none';
+  });
+}
+$('#chips').addEventListener('click', e => {
+  const b = e.target.closest('.chip-btn'); if (!b) return;
+  filter = b.dataset.f;
+  document.querySelectorAll('.chip-btn').forEach(x => x.classList.toggle('on', x === b));
+  applyFilter();
+});
+$('#search').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); applyFilter(); });
+$('#expand-all').addEventListener('click', () => {
+  filter = 'all'; query = ''; $('#search').value = '';
+  document.querySelectorAll('.chip-btn').forEach(x => x.classList.toggle('on', x.dataset.f === 'all'));
+  applyFilter();
+  scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+/* ---------- report export ---------- */
+$('#copy-report').addEventListener('click', async () => {
+  const lines = [];
+  lines.push('SIGNALS capability report');
+  lines.push('generated ' + new Date().toISOString());
+  lines.push('');
+  lines.push('ENVIRONMENT');
+  envRows.forEach(([k, v]) => lines.push('  ' + pad(k, 16) + v));
+  lines.push('  ' + pad('userAgent', 16) + navigator.userAgent);
+  lines.push('');
+  lines.push('TALLY  live ' + counts.yes + ' | permission ' + counts.gate + ' | absent ' + counts.no + ' | native-only ' + counts.native);
+  lines.push('');
+  GROUPS.forEach(g => {
+    const mine = SIGNALS.filter(s => s.g === g.id);
+    if (!mine.length) return;
+    lines.push(g.name);
+    mine.forEach(s => lines.push('  [' + pad(STATE_LABEL[stateOf(s)], 10) + '] ' + s.n));
+    lines.push('');
+  });
+  const txt = lines.join('\n');
+  const btn = $('#copy-report');
+  try {
+    await navigator.clipboard.writeText(txt);
+    btn.textContent = 'COPIED ✓';
+  } catch (e) {
+    const ta = ce('textarea');
+    ta.value = txt; ta.style.cssText = 'position:fixed;top:10%;left:5%;width:90%;height:60%;z-index:999;font-size:11px';
+    document.body.appendChild(ta); ta.select();
+    btn.textContent = 'SELECT & COPY, THEN TAP AGAIN';
+    btn.onclick = () => { ta.remove(); location.reload(); };
+    return;
+  }
+  setTimeout(() => { btn.textContent = 'COPY CAPABILITY REPORT'; }, 2200);
+});
+
+/* stop every probe when the page hides — iOS suspends us anyway,
+   and a live camera or mic must not survive a tab switch. */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'hidden') return;
+  [...running.keys()].forEach(id => {
+    const card = document.querySelector('.sig[data-id="' + id + '"]');
+    stopProbe(id, card && card.querySelector('.probe-btn'));
+  });
+});
+</script>
+</body>
+</html>

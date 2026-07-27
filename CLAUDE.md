@@ -8,6 +8,10 @@ It is fine to push directly to the `main` branch for this repository. No pull re
 
 - `games/` — self-contained single-file HTML games (CSS + JS inline, no shared libs)
 - `games/index.html` — games hub; add a card here for every new game
+- `signals/` — **not a game.** Single-file reference app cataloguing every signal a web
+  app can monitor, feature-detected and probed live in the visitor's own browser, with
+  per-signal iOS Safari status and native-bridge notes. Data-table-driven: to add a
+  signal, append one object to `SIGNALS[]` (or `NATIVE_ONLY[]`). See `signals/README.md`
 - `town-game-isometric/` — standalone isometric town-game project
 - `FFL1/` — **generated/published, do NOT edit by hand.** This directory is overwritten
   by `publish.sh` in the separate [`ZackHelms/FFL1`](https://github.com/ZackHelms/FFL1)
