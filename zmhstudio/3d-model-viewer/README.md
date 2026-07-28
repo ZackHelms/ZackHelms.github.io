@@ -11,6 +11,41 @@ Live: `https://tythos.com/zmhstudio/3d-model-viewer/`
 
 ## What's loaded
 
+### Edward Everett statue — first outdoor landmark scan (2026-07-28)
+
+34 hand-held iPhone-13 stills, one ground-level orbit of a dark-bronze statue
+in the Boston Public Garden, shot upward from below. A new subject class for
+this pipeline: a landmark you cannot get close to, so the subject is a
+*minority* of its own scene. Five frames were hand-cropped to different widths
+before upload; measured against their neighbours they cost nothing
+(`CameraMode.AUTO` gives each its own intrinsics).
+
+- `statue34 (q sgbm + hull)` — **good**, best of the three. SfM was never the
+  problem (34/34 registered, 0.635 px). The quality preset's default
+  `tsdf_voxel_divisor=512` nonetheless produced **3,417 triangles in 226
+  fragments**. **Traced cause:** `fuse.py:125-132` normalizes the TSDF grid
+  from the *sparse SfM cloud's* robust bbox, and only **28.2%** of sparse
+  points lie on this subject — bbox diagonal 66.42 units vs a 3.37-unit
+  subject, so the statue got **26 voxels across** where the pumpkin got 277.
+  Divisor 5460 restores parity (**3,417→265,394 tris from identical depth
+  maps**); `--complete hull` then reaches **577,258**. Residual defect: porous
+  skin, 11,602 components, because sgbm coverage is 18.7% on dark specular
+  bronze.
+- `statue34 (q sgbm, no hull)` — **ok**, the A/B reference isolating hull's
+  contribution: 265,394 tris / 14,168 components, albedo 98.1%.
+- `statue34 (q ml + hull)` — **bad**. The ml-vs-sgbm verdict reproduces on a
+  second independent capture: hull rejected **6.44M** real px as untrustworthy
+  vs sgbm's 1.88M, and the result does not read as a statue. Its albedo figure
+  (95.7%) is *higher* than the good entry's 85.0% and means nothing — a
+  smaller mesh has less unobserved hull fill to bake onto. Albedo coverage is
+  not a quality proxy.
+
+**Standing lesson:** the normalization bug fails *silently*, emitting a
+plausible small mesh rather than an error, and it will hit any subject that
+isn't most of its own scene. The durable fix (normalize on the isolate sphere
+when isolation is active, rather than hand-tuning `--tsdf-voxel-divisor` per
+capture) is on the zmhstudio backlog.
+
 ### Symmetry prior — hull v3 revolve / radial:8 — zmh3dr stage 2 (2026-07-26)
 
 - `pumpkin80 (hull v3, revolve)` and `… radial:8` — **bad (REJECTED by the CD
