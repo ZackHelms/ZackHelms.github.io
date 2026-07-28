@@ -20,7 +20,24 @@ this pipeline: a landmark you cannot get close to, so the subject is a
 before upload; measured against their neighbours they cost nothing
 (`CameraMode.AUTO` gives each its own intrinsics).
 
-- `statue34 (q sgbm + hull)` — **good**, best of the three. SfM was never the
+- `statue34 (adjacent-pair stereo + hull)` — **good, best statue**. A Fable-5
+  consult found a *second* instance of the same background-inflation defect,
+  in stereo partner selection. `_choose_partners` (`depth_sgbm.py:133`) tries
+  `PARTNER_OFFSETS = (-2, 2, -4, 4)` first and reaches the fallback list
+  holding ±1 only if those yield *zero* partners — never, here. And ±1 would
+  fail the gate regardless: `BASELINE_RANGE`'s floor is
+  `0.02 × 42.963 = 0.859` units against a **0.724** median adjacent baseline.
+  Confirmed in the run data: all 116 pairs at ±2/±4, **zero at ±1**, so every
+  match was attempted at **≥22° vergence** on glossy bronze. Allowing ±1 took
+  mean coverage **18.7%→37.7%** and the worst view **2.0%→18.8% (9.4×)**.
+  The result has *fewer* triangles than the entry below (409,562 vs 577,258)
+  and is clearly better — albedo **85.0%→95.7%**, because more of the mesh is
+  observed rather than hull-guessed. **Triangle count is not quality.** The
+  shipped offsets are right for *video* (1–7°/step); this capture steps 11.1°.
+  The durable fix is a vergence-angle gate — scale-free, and it reproduces
+  today's video behaviour automatically.
+- `statue34 (q sgbm + hull, ±2/±4)` — **ok**, superseded; kept as the A/B for
+  the partner-offset bug. SfM was never the
   problem (34/34 registered, 0.635 px). The quality preset's default
   `tsdf_voxel_divisor=512` nonetheless produced **3,417 triangles in 226
   fragments**. **Traced cause:** `fuse.py:125-132` normalizes the TSDF grid
