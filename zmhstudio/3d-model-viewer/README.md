@@ -20,7 +20,26 @@ this pipeline: a landmark you cannot get close to, so the subject is a
 before upload; measured against their neighbours they cost nothing
 (`CameraMode.AUTO` gives each its own intrinsics).
 
-- `statue34 (adjacent-pair stereo + hull)` — **good, best statue**. A Fable-5
+- `statue34 (zmh3dv shipped defaults)` — **good, best statue (2026-07-29)**.
+  Both subject-scale bugs are shipped fixes now (zmhstudio zmh3dv):
+  `--sgbm-partner-gate auto` picks stereo partners by vergence angle at the
+  subject centre (engaged at orbit residual 0.021, chose ±1/±2) and
+  `--fuse-norm auto` normalizes the TSDF frame on the isolate cull sphere
+  (**512 voxels across the subject** vs the bbox path's 26). This run used
+  **zero override flags**: mean coverage 37.5%, worst view 18.7%, 1.60M
+  high-mesh triangles → one component. The porous-skin residual stands
+  (105,196 boundary edges — sgbm's ceiling on dark specular bronze).
+- `statue34 (zmh3dv, poisson fuse)` — **ok — closed, but wears scene junk**.
+  Same run re-fused `--fuse-backend poisson` (screened Poisson depth 9, 2%
+  density trim): boundary edges 105,196 → **4,330 (24× fewer)**, one dominant
+  component at 99.3%. But low-support scraps TSDF discarded as fragments get
+  welded onto the closed surface and bake sky/foliage — shreds draped on the
+  coat. **Boundary-edge count joins the poor-proxy list** (it measured 24×
+  better on the visually worse mesh). Default stays `tsdf`; follow-up is
+  junk suppression before the solve, not more closure.
+- `statue34 (adjacent-pair stereo + hull)` — **superseded 2026-07-29** by the
+  zmh3dv-defaults entry (its runtime override is now the shipped behaviour);
+  kept as the discovery record. A Fable-5
   consult found a *second* instance of the same background-inflation defect,
   in stereo partner selection. `_choose_partners` (`depth_sgbm.py:133`) tries
   `PARTNER_OFFSETS = (-2, 2, -4, 4)` first and reaches the fallback list
