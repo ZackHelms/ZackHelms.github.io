@@ -110,3 +110,33 @@ camera and mic paths get exercised too.
 
 Also update the `#build-badge` timestamp on every edit, per the repo SOP — it
 is how you tell a deployed change from a cached one.
+
+## Downstream consumer: the iOS app
+
+This page is **copied**, not linked, into a native iOS app. `ZackHelms/rn-ios-flightdeck`
+carries it at `games/signals/www/index.html`, where it is the **WEB** tab of an
+app whose **NATIVE** tab probes the same signal classes through CoreMotion,
+CoreLocation, AVFoundation, Network.framework and CoreBluetooth — so the two can
+be compared on one phone. It shipped to TestFlight 2026-07-30.
+
+**Editing this file does not update the app.** That needs a re-import from a
+session working in flightdeck:
+
+```bash
+scripts/import-web-game.sh signals <path-to-this-repo>/signals "Signals"
+```
+
+which replaces only `www/`, then a dispatch of `ios-build.yml`.
+
+Two things worth knowing when reasoning about this page's iOS behaviour:
+
+- **Inside that app it runs in a WKWebView, which is not Safari.** Since iOS 15
+  WebKit denies `DeviceOrientationEvent.requestPermission()` unless the host app
+  implements `requestDeviceOrientationAndMotionPermissionFor`, which
+  `react-native-webview` does not. Motion, orientation and compass read DENIED
+  there for shell reasons, not device reasons — the app shows a banner saying so.
+  Judge this page's real iOS behaviour in Safari, never in that tab.
+- The native side measured **14 signals that no browser can reach on iOS**,
+  which is the concrete answer to the question this page raises. If you extend
+  `NATIVE_ONLY[]` here, the app's `src/catalog.ts` is where the native
+  counterpart would go.

@@ -98,3 +98,39 @@ worked: one `Map<Node,string>` of pending writes flushed by a single 100 ms
 interval, so a 60 Hz probe cannot thrash the DOM; per-probe `onstop(fn)`
 cleanup arrays; and a global `visibilitychange` handler that stops every
 running probe — a camera or mic must never survive a tab switch.
+
+## Follow-up: the native side was built, and it answers the wall
+
+2026-07-30. The "would this need a native app?" question above stopped being
+rhetorical — a native iOS app shipped to TestFlight
+(`ZackHelms/rn-ios-flightdeck`, `games/signals`), pairing a **NATIVE** tab over
+CoreMotion / CoreLocation / AVFoundation / Network.framework / CoreBluetooth
+with a **WEB** tab running this very page, on one phone.
+
+Measured result: **14 of 21 catalogued native signals are unreachable from any
+browser on iOS**, 7 partial, 0 equal. The ones that most sharply justify going
+native, and are worth remembering when scoping any future web feature here:
+
+- **Pedometer** — steps, distance and floors *since midnight*, accumulated by
+  the motion coprocessor while the app was closed. This is the background-
+  execution wall from the top of this note, made concrete: no web API can
+  produce it, and no amount of PWA work changes that.
+- **Barometer** — pressure and ~10 cm altitude resolution. No web equivalent
+  anywhere.
+- **BLE scan**, **haptics**, **torch**, **battery**, **thermal state**,
+  **Wi-Fi-vs-cellular** — each already listed above as absent on iPhone; all of
+  them work natively, so the absence really is a web-platform boundary rather
+  than a device limitation.
+
+Two corrections to how this page's own results should be read:
+
+- **A WKWebView is not Safari.** In the app's WEB tab, motion/orientation/compass
+  read DENIED regardless of hardware, because WebKit refuses
+  `DeviceOrientationEvent.requestPermission()` unless the host app implements a
+  delegate `react-native-webview` does not. Never judge this page's iOS
+  behaviour from an embedded web view.
+- **`getUserMedia` does work from a `file://` bundle origin** in WKWebView,
+  given the Info.plist usage strings — contrary to the reasonable assumption
+  that a local origin would be refused.
+
+`signals/README.md` § Downstream consumer covers the re-import mechanics.
