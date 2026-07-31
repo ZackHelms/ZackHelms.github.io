@@ -136,6 +136,17 @@ the envelope rises.
    (Crosswind).
 9. **Dock for down**: drop the well back in its bucket to restore plain
    gravity mid-plan.
+10. **Push the puddle** (taught by L13 Queue): solids shove liquid —
+   drag a stone into a puddle to bulldoze it through a slot or along a
+   shelf that gravity alone won't take it past.
+11. **Launch and freeze** (advanced — CD-discovered, 2026-07-31): shove
+   a puddle hard with a dragged solid to fling it airborne, then frost it
+   mid-flight so it crystallizes where it could never rest. Reserved for a
+   future Acrobatics block; no earlier level may require it.
+12. **Fence with stone** (CD 2026-07-31): solids ignore the gravity
+   well — park them as walls to pen a cloud or puddle in place, then
+   grav-push or grav-pull one gem at a time through a maze when flames
+   and frosts are scarce.
 
 ## Generator + endless + STUCK
 
