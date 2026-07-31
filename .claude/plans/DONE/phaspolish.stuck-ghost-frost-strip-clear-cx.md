@@ -1,6 +1,6 @@
 # phaspolish — Phasic Now-bucket trio: STUCK ghost-replay, frost strip below L25, complexity on the clear screen
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-07-31 (3824b99, 3f5c763, 7af059b, a0c917d on worktree-oversee+phaspolish)
 **Requested:** 2026-07-31 (all three are CD decisions from the 2026-07-31 rounds).
 **Scope:** `games/phasic/index.html`, `.claude/tests/drive-phasic.cjs`, `.claude/phasic.md`, `games/CLAUDE.md` (blurb only if needed).
 

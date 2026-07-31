@@ -11,11 +11,6 @@ backlog entry here.
 
 ## Now
 
-- [phasic] STUCK ghost-replay + strip frost buckets below L25 + complexity
-  score on the clear screen (three CD decisions 2026-07-31, bundled: same
-  file, same risk profile, each a single task).
-  **Plan ready (2026-07-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phaspolish.stuck-ghost-frost-strip-clear-cx.md`
 - [phasic] In-game wiki (cogwheel → WIKI: home page, topic pages incl.
   tactics, search box under the reload button) + tactic #10 "push the
   puddle" (L13 Queue) into the registry. (CD request 2026-07-31, verbatim
