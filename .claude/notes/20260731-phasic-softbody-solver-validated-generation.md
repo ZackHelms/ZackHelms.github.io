@@ -116,3 +116,11 @@ salts 90–95). Consequences that made this worth it:
 - **Rescue-band fallthrough is the canary.** A template/weave change that
   drops any sub-65 index to rescue salts (≥90) has broken difficulty —
   the suite's per-index `salt` in `genInfo()` makes this checkable.
+- **Solver-validates ≠ player-can (phasfreeze, 2026-07-31).** The script
+  runner's `{c:}` freeze op deploys the gravity well below the board and
+  retries when a freeze is refused — so the replay gate stayed green on
+  every level whose settled T5 puddle refused 100% of first frosts for a
+  player who simply let it rest (the structural `h−0.9 > 1.9` cap
+  disease). When a validation path has a built-in recovery a player would
+  never discover, its green is a proxy metric: audit what the *bare* play
+  path does before trusting it for fairness.
