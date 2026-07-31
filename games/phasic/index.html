@@ -55,7 +55,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 16:41 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 17:31 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -1060,10 +1060,17 @@ function placeGrav(x,y){ // clamp to the ring just outside the field border
 
 
 /* ============ procedural levels (17+) + endless ============
-   Constructive single-shelf "drawer" template: sockets packed along the
-   floor, gems scattered up top, one shelf with a wide gap (+ optional
-   slot). Every candidate is beaten by the in-game solver BEFORE it is
-   served — a level you receive is a level that has already been solved.
+   Constructive board templates, picked per candidate:
+     'drawer'    — one shelf with a wide gap (+ optional slot), sockets
+                   packed along the floor, gems scattered up top.
+     'two-shelf' — shelves at rows 4 and 8 whose gaps are offset by >=2
+                   columns, so every route crosses the staging floor
+                   (rows 5-7) instead of dropping straight home.
+     'attic'     — a ceiling shelf with a flue up one side; the born-gas
+                   gem sockets in the loft and is condensed up there, the
+                   Kettle / Balloon Route shape.
+   Every candidate is beaten by the in-game solver BEFORE it is served —
+   a level you receive is a level that has already been solved.
    Deterministic per level index (seeded rng + seeded gas wander), so
    level 23 is the same on every device. */
 function dragToCell(o,cx2,cy2){
@@ -1084,6 +1091,8 @@ const SHAPE_STR={ M:['X'], R:['XX','XX'], B:['XX','.X'], O:['XX.','.XX'],
 const NAME_A=['Quiet','Molten','Frozen','Drifting','Tidy','Loose','Deep','Bright','Split','Slow','Warm','Still','Late','Spare','Neat','Wild'];
 const NAME_B=['Drawer','Shelf','Pantry','Cabinet','Workshop','Foundry','Cellar','Gallery','Locker','Atelier','Cupboard','Vault','Corner','Bench','Alcove','Attic'];
 const GEN_HINTS=['Bring it to order.','Tidy the drawer.','Everything has a socket.','Order from chaos.','Put it all away.'];
+const GEN_HINTS2=['Two shelves, one route.','Both gaps, in order.','Stage it in the middle, then land it.','The gaps do not line up.','Down one floor at a time.'];
+const GEN_HINTSA=['The vapor rises — meet it up top.','Send it up the flue, bring it down solid.','Herd the cloud into the loft.','Cool it where it lands, not where it started.','The loft has a socket too.'];
 function genName(i){ const r=mulberry((i*2654435761)>>>0);
   return NAME_A[(r()*NAME_A.length)|0]+' '+NAME_B[(r()*NAME_B.length)|0]; }
 function stampGen(rows,shape,ax,ay,ch){
@@ -1098,9 +1107,22 @@ function buildGen(i,salt){
   // factor set by curriculum block
   const useFlames=b>=1, useGrav=b>=2, useBaseL=b>=3, useBaseG=b>=4,
         useHole=b>=5, useBush=b>=6, useFan=b>=7;
+  /* Template pick — ALWAYS the first draw of the stream, and never drawn on
+     the rescue path, so a 'drawer' candidate consumes every later draw in
+     exactly the order it always has. Two-shelf needs the well (block 2+);
+     the loft needs a born-gas gem, which the curriculum only has from
+     block 4 on. */
+  let template='drawer';
+  if(!easy){ const tr=r();
+    if(b>=2&&tr<0.40) template='two-shelf';
+    else if(b>=4&&tr<0.75) template='attic'; }
+  const TWO=template==='two-shelf', LOFT=template==='attic';
+  const shelfRow=TWO?8:LOFT?7:5;   // the shelf the sockets below it are reached through
+  const TOPROW=4, CEIL=2;          // two-shelf's upper shelf / attic's ceiling
   let K=easy?2:Math.min(6, b===0?Math.max(1,p+1):2+(((p+2)/3)|0)+(b>=2?1:0)+extra);
   const wg=easy?4:(!useFlames?4:(p<3?3:(r()<0.5?3:2)));
-  const pool=['M','R','B','O','Y','G','C','P'].filter(L=>L!=='P'||wg>=4||useFlames);
+  // the loft board has no room for a 3-tall gem (2-row bands above and below)
+  const pool=['M','R','B','O','Y','G','C','P'].filter(L=>(L!=='P'||wg>=4||useFlames)&&(!LOFT||GEMH[L]<3));
   for(let a2=pool.length-1;a2>0;a2--){ const b2=(r()*(a2+1))|0; const t2=pool[a2]; pool[a2]=pool[b2]; pool[b2]=t2; }
   if(useFlames&&!easy&&p>=1){ // guarantee at least one gem that must melt
     const wide=pool.find(L=>GEMW[L]>wg);
@@ -1114,9 +1136,17 @@ function buildGen(i,salt){
     else if(GEMH[L]<3&&topW+w+(topW?1:0)<=10&&GEMW[L]<=wg){ gems.push({L,tier:1}); topW+=w+(topW?1:0); }
   }
   if(gems.length<Math.min(K,2)) return null;
+  // the loft gem is born gas and sockets up top, so it leaves the floor packing
+  let atticGem=null;
+  if(LOFT){
+    atticGem=gems.find(g2=>g2.tier===0);
+    if(!atticGem) return null;
+    botW=0; for(const g2 of gems) if(g2.tier===0&&g2!==atticGem) botW+=GEMW[g2.L]+(botW?1:0);
+  }
   // base states (non-solid bases always socket in the bottom tier)
   let nL=0,nG=0;
-  if(!easy){
+  if(atticGem){ atticGem.base='gas'; nG=1; }
+  else if(!easy){
     for(const g2 of gems){
       if(g2.tier!==0) continue;
       if(useBaseG&&nG<1&&p>=2&&r()<0.5){ g2.base='gas'; nG++; }
@@ -1125,67 +1155,127 @@ function buildGen(i,salt){
   }
   const rows=Array.from({length:GH},()=>Array(GW).fill('.'));
   const gx=(r()*(GW-wg+1))|0;
-  for(let x=0;x<GW;x++) rows[5][x]='#';
-  for(let x=gx;x<gx+wg;x++) rows[5][x]='.';
+  for(let x=0;x<GW;x++) rows[shelfRow][x]='#';
+  for(let x=gx;x<gx+wg;x++) rows[shelfRow][x]='.';
+  let gxT=-1, shaft0=-1, shaft1=-1;
+  if(TWO){ // upper shelf: its gap is offset >=2 columns, so nothing falls straight through
+    const cands=[]; for(let x=0;x<=GW-wg;x++) if(Math.abs(x-gx)>=2) cands.push(x);
+    gxT=cands[(r()*cands.length)|0];
+    for(let x=0;x<GW;x++) rows[TOPROW][x]='#';
+    for(let x=gxT;x<gxT+wg;x++) rows[TOPROW][x]='.';
+  } else if(LOFT){ // ceiling shelf with a flue up one side
+    const right=r()<0.5;               // loft pocket side; the flue is opposite it
+    shaft0=right?0:GW-2; shaft1=right?1:GW-1;
+    for(let x=0;x<GW;x++) if(x<shaft0||x>shaft1) rows[CEIL][x]='#';
+  }
   let slots=0;
   if(!easy&&b>=1&&p>=3&&r()<0.75){ const sx2=(r()*GW)|0;
-    if(sx2<gx-1||sx2>gx+wg){ rows[5][sx2]='.'; slots=1; } }
-  // sockets: bottom tier bottom-aligned to row 11, top tier bottom-aligned to row 4
-  let x0=((10-botW)/2)|0;
-  for(const g2 of gems) if(g2.tier===0){ g2.sax=x0; g2.say=GH-GEMH[g2.L];
-    stampGen(rows,SHAPE_STR[g2.L],x0,g2.say,g2.L.toLowerCase()); x0+=GEMW[g2.L]+1; }
-  let x1=((10-topW)/2)|0;
-  for(const g2 of gems) if(g2.tier===1){ g2.sax=x1; g2.say=5-GEMH[g2.L];
-    stampGen(rows,SHAPE_STR[g2.L],x1,g2.say,g2.L.toLowerCase()); x1+=GEMW[g2.L]+1; }
-  // obstacles
+    if(sx2<gx-1||sx2>gx+wg){ rows[shelfRow][sx2]='.'; slots=1; } }
+  // sockets: bottom tier bottom-aligned to row 11, upper tier resting on the shelf
+  const bot0=gems.filter(g2=>g2.tier===0&&g2!==atticGem), tier1=gems.filter(g2=>g2.tier===1);
+  /* Packing: left-to-right in gem order, unless a gap centre is given — then
+     the run is filled from whichever END is currently farther from that gap,
+     so each side of the gap fills outside-in and an arriving gem never has to
+     climb over one already parked. */
+  const packRow=(list,wid,sayOf,gapC)=>{
+    let lo=((10-wid)/2)|0, hi=lo+wid;
+    for(const g2 of list){ const w=GEMW[g2.L]; let xp;
+      if(gapC===undefined||Math.abs(lo+w/2-gapC)>=Math.abs(hi-w/2-gapC)){ xp=lo; lo+=w+1; }
+      else { xp=hi-w; hi-=w+1; }
+      g2.sax=xp; g2.say=sayOf(g2);
+      stampGen(rows,SHAPE_STR[g2.L],xp,g2.say,g2.L.toLowerCase()); } };
+  const packSockets=(bo,t1,bc,tc)=>{
+    packRow(bo,botW,g2=>GH-GEMH[g2.L],bc);
+    packRow(t1,topW,g2=>shelfRow-GEMH[g2.L],tc);
+    if(atticGem){ // the loft socket sits on the ceiling shelf, far side from the flue
+      const w=GEMW[atticGem.L];
+      atticGem.sax=shaft0===0?GW-w:0; atticGem.say=CEIL-GEMH[atticGem.L];
+      stampGen(rows,SHAPE_STR[atticGem.L],atticGem.sax,atticGem.say,atticGem.L.toLowerCase()); } };
+  if(!TWO) packSockets(bot0,tier1);
+  // obstacles — the loft board keeps its flue clear and hangs them on the far wall
   let nObs=0;
-  if(useFan&&!easy){ const side=r()<0.5; const fy=1+((r()*2)|0);
-    if(rows[fy][side?0:9]==='.'){ rows[fy][side?0:9]=side?'>':'<'; nObs++; } }
-  if(useBush&&!easy){ const bx2=r()<0.5?0:9; // side column tuft in the top band
-    for(let yy=0;yy<3;yy++) if(rows[yy][bx2]==='.') rows[yy][bx2]='%';
+  if(useFan&&!easy){
+    if(LOFT){ const fx2=shaft0===0?GW-1:0, fy=3+((r()*2)|0);
+      if(rows[fy][fx2]==='.'){ rows[fy][fx2]=fx2?'<':'>'; nObs++; } }   // blows toward the flue
+    else { const side=r()<0.5; const fy=1+((r()*2)|0);
+      if(rows[fy][side?0:9]==='.'){ rows[fy][side?0:9]=side?'>':'<'; nObs++; } } }
+  if(useBush&&!easy){ // side column tuft in the travel band
+    const bx2=LOFT?(shaft0===0?GW-1:0):(r()<0.5?0:9), by0=LOFT?3:0;
+    for(let yy=by0;yy<by0+3;yy++) if(rows[yy][bx2]==='.') rows[yy][bx2]='%';
     nObs++; }
-  if(useHole&&!easy){
-    const bad=new Set();
-    for(let x=gx-1;x<=gx+wg;x++) bad.add(x);
-    for(const g2 of gems) if(g2.tier===0) for(let x=g2.sax-1;x<=g2.sax+GEMW[g2.L];x++) bad.add(x);
-    const cands=[]; for(let x=0;x<GW;x++) if(!bad.has(x)&&rows[5][x]==='#') cands.push(x);
-    if(cands.length){ const hx2=cands[(r()*cands.length)|0]; rows[10][hx2]='@'; nObs++; }
-  }
-  // scatter starts in the upper travel rows (0..2), avoiding obstacles + sockets
-  const occ=Array.from({length:5},()=>Array(GW).fill(false));
-  for(let yy=0;yy<5;yy++) for(let xx=0;xx<GW;xx++) if(rows[yy][xx]!=='.') occ[yy][xx]=true;
-  for(const g2 of gems){
-    const w=GEMW[g2.L], h2=GEMH[g2.L]; let ok=false;
-    const maxAy=Math.max(0,3-h2);
-    for(let t2=0;t2<120&&!ok;t2++){
-      const ax=(r()*(GW-w+1))|0, ay=(r()*(maxAy+1))|0;
-      let free=true;
-      for(let yy=0;yy<h2&&free;yy++) for(let xx=0;xx<w;xx++)
-        if(SHAPE_STR[g2.L][yy][xx]==='X'&&occ[ay+yy][ax+xx]) free=false;
-      if(!free) continue;
-      for(let yy=0;yy<h2;yy++) for(let xx=0;xx<w;xx++)
-        if(SHAPE_STR[g2.L][yy][xx]==='X') occ[ay+yy][ax+xx]=true;
-      stampGen(rows,SHAPE_STR[g2.L],ax,ay,g2.L); ok=true;
+  // scatter starts in the travel band above the shelf, avoiding obstacles + sockets
+  const scatTop=LOFT?3:0, scatBot=LOFT?6:2;
+  const scatter=()=>{
+    const occ=Array.from({length:GH},()=>Array(GW).fill(false));
+    for(let yy=0;yy<GH;yy++) for(let xx=0;xx<GW;xx++) if(rows[yy][xx]!=='.') occ[yy][xx]=true;
+    if(LOFT) for(let yy=scatTop;yy<=scatBot;yy++) for(let xx=shaft0;xx<=shaft1;xx++) occ[yy][xx]=true;
+    for(const g2 of gems){
+      const w=GEMW[g2.L], h2=GEMH[g2.L]; let ok=false;
+      const maxAy=Math.max(scatTop,scatBot-h2+1);
+      for(let t2=0;t2<120&&!ok;t2++){
+        const ax=(r()*(GW-w+1))|0, ay=scatTop+((r()*(maxAy-scatTop+1))|0);
+        let free=true;
+        for(let yy=0;yy<h2&&free;yy++) for(let xx=0;xx<w;xx++)
+          if(SHAPE_STR[g2.L][yy][xx]==='X'&&occ[ay+yy][ax+xx]) free=false;
+        if(!free) continue;
+        for(let yy=0;yy<h2;yy++) for(let xx=0;xx<w;xx++)
+          if(SHAPE_STR[g2.L][yy][xx]==='X') occ[ay+yy][ax+xx]=true;
+        stampGen(rows,SHAPE_STR[g2.L],ax,ay,g2.L); g2.ax=ax; ok=true;
+      }
+      if(!ok) return false;
     }
-    if(!ok) return null;
+    return true;
+  };
+  /* Two-shelf boards scatter FIRST, then hand out sockets: every gem funnels
+     through the upper gap, so the one standing nearest it leaves first — and
+     whoever leaves first has to take the slot farthest from its shelf's gap,
+     or it parks itself across the lane the rest still need. */
+  if(TWO){
+    if(!scatter()) return null;
+    const rank=g2=>Math.abs((g2.ax+GEMW[g2.L]/2)-(gxT+wg/2));
+    const order=l=>l.slice().sort((a,b2)=>(a.base?0:1)-(b2.base?0:1)||rank(a)-rank(b2));
+    packSockets(order(bot0),order(tier1),gx+wg/2,gxT+wg/2);
   }
-  const meltN=gems.filter(g2=>GEMW[g2.L]>wg).length;
+  if(useHole&&!easy){
+    if(TWO){ // the void hangs in the staging band, clear of the run between the gaps
+      const lo=Math.min(gx,gxT)-1, hi=Math.max(gx,gxT)+wg, cands=[];
+      for(let x=0;x<GW;x++) if((x<lo||x>hi)&&rows[TOPROW][x]==='#'&&rows[6][x]==='.'
+        &&rows[6][Math.max(0,x-1)]==='.'&&rows[6][Math.min(GW-1,x+1)]==='.') cands.push(x);
+      if(cands.length){ rows[6][cands[(r()*cands.length)|0]]='@'; nObs++; }
+    } else {
+      const bad=new Set();
+      for(let x=gx-1;x<=gx+wg;x++) bad.add(x);
+      for(const g2 of gems) if(g2.tier===0&&g2!==atticGem) for(let x=g2.sax-1;x<=g2.sax+GEMW[g2.L];x++) bad.add(x);
+      const cands=[]; for(let x=0;x<GW;x++) if(!bad.has(x)&&rows[shelfRow][x]==='#') cands.push(x);
+      if(cands.length){ const hx2=cands[(r()*cands.length)|0]; rows[10][hx2]='@'; nObs++; }
+    }
+  }
+  if(!TWO&&!scatter()) return null;
+  const meltN=gems.filter(g2=>GEMW[g2.L]>wg&&g2!==atticGem).length;
   const base={}; for(const g2 of gems) if(g2.base) base[g2.L]=g2.base;
+  const hints=TWO?GEN_HINTS2:LOFT?GEN_HINTSA:GEN_HINTS;
   const cx={gems:gems.length, flames:meltN+(nG?0:0), frosts:nL+2*nG,
     grav:useGrav?1:0, obstacles:nObs, basePts:nL*2+nG*3};
-  return { name:genName(i), hint:GEN_HINTS[(r()*GEN_HINTS.length)|0],
+  return { name:genName(i), hint:hints[(r()*hints.length)|0], template,
     heat:useFlames?Math.max(meltN?1:0,(p>=6||extra)?2:(meltN?1:0)):0,
     cold: b>=3 ? (nL+2*nG)+(p>=6?1:0) : 0,
     grav:useGrav?1:0, base:Object.keys(base).length?base:undefined, cx,
     map:rows.map(q=>q.join('')) };
 }
-function levelGaps(){
+function levelGaps(row){
+  const y=row===undefined?5:row;
   const gaps=[]; let run=0,st=0;
-  for(let x=0;x<=GW;x++){ const open=x<GW&&!walls[5*GW+x];
+  for(let x=0;x<=GW;x++){ const open=x<GW&&!walls[y*GW+x];
     if(open){ if(!run) st=x; run++; } else { if(run) gaps.push({x:st,w:run}); run=0; } }
   return gaps.sort((a,b)=>b.w-a.w);
 }
+function gapAnchor(g,w){ // left-most anchor that centres a w-wide gem in gap g
+  return Math.min(Math.max(g.x, g.x+((g.w-w)>>1)), g.x+g.w-w);
+}
 function makeScript(){
+  const tpl=(lvl&&lvl.template)||'drawer';
+  if(tpl==='two-shelf') return scriptTwoShelf();
+  if(tpl==='attic') return scriptAttic();
   const gaps=levelGaps(); if(!gaps.length) return null;
   const script=[];
   // base-state gems first (they are already flowing), then bottom-tier solids
@@ -1219,6 +1309,88 @@ function makeScript(){
     const h=GEMH[o.letter], tty=Math.max(0,3-h);
     script.push({d:[o.letter,[[o.sax,tty],[o.sax,o.say]]]});
   }
+  script.push({w:[1.2]});
+  return script;
+}
+/* two-shelf: every route crosses BOTH gaps in turn. Solids walk the staging
+   floor between them; pours are walked across it by the well, which is
+   re-parked under each gap as the liquid clears the shelf above it. Floor
+   sockets are filled far-to-near so the run under the lower gap stays open. */
+function scriptTwoShelf(){
+  const top=levelGaps(4), bot=levelGaps(8);
+  if(!top.length||!bot.length) return null;
+  const script=[], WY=13.5, mid=g=>g.x+g.w/2-0.5;
+  // how far a socket sits from the gem's entry gap — the same metric buildGen
+  // packed by, so filling far-first replays the packing outside-in
+  const edge=(o,q)=>Math.abs(o.sax+GEMW[o.letter]/2-(q.x+q.w/2));
+  const baseGems=objs.filter(o=>o.base>0);
+  const botSolid=objs.filter(o=>o.base===0&&o.say>8).sort((a,b2)=>edge(b2,bot[0])-edge(a,bot[0]));
+  const stageSolid=objs.filter(o=>o.base===0&&o.say<=8).sort((a,b2)=>edge(b2,top[0])-edge(a,top[0]));
+  for(const o of baseGems){
+    const w=GEMW[o.letter];
+    if(o.base===2) script.push({c:[o.letter]});      // condense the vapor first
+    script.push({g:[mid(top[0]),WY]},{u:[o.letter,'miny','>',5.2,35]},
+      {g:[mid(bot[0]),WY]},{u:[o.letter,'miny','>',9.2,35]},
+      {g:[o.sax+w/2-0.5,WY]},{w:[1.5]},{c:[o.letter]},{w:[0.8]},
+      {d:[o.letter,[[o.sax,o.say]]]});
+  }
+  for(const o of botSolid){
+    const w=GEMW[o.letter], h=GEMH[o.letter];
+    const gt=top.find(q=>q.w>=w), gb=bot.find(q=>q.w>=w);
+    if(gt&&gb){
+      const xt=gapAnchor(gt,w), xb=gapAnchor(gb,w);
+      // row 3 is the one lane the scatter never fills: cross the crowd there
+      script.push({d:[o.letter,[[xt,4-h],[xt,8-h],[xb,8-h],[xb,o.say],[o.sax,o.say]]]});
+    } else { // too wide for the gaps: melt above the upper one and pour it down both
+      const mx=Math.max(0,Math.min(GW-w, top[0].x-((w-top[0].w)>>1)));
+      script.push({g:[mid(top[0]),WY]},{d:[o.letter,[[mx,4-h]]]},{h:[o.letter]},
+        {u:[o.letter,'miny','>',5.2,30]},{g:[mid(bot[0]),WY]},
+        {u:[o.letter,'miny','>',9.2,30]},{g:[o.sax+w/2-0.5,WY]},
+        {w:[1.5]},{t:[o.letter]},{w:[0.8]},{d:[o.letter,[[o.sax,o.say]]]});
+    }
+  }
+  for(const o of stageSolid){ const w=GEMW[o.letter], h=GEMH[o.letter];
+    const xt=gapAnchor(top.find(q=>q.w>=w)||top[0],w);
+    script.push({d:[o.letter,[[xt,4-h],[xt,o.say],[o.sax,o.say]]]});
+  }
+  script.push({w:[1.2]});
+  return script;
+}
+/* attic: the born-gas gem is herded up the flue (park the well under it —
+   gas flees to the farthest reachable cell, which is the far corner of the
+   loft), condensed and frozen up there, then slid home; the rest of the
+   board is an ordinary drawer run under the ceiling shelf. */
+function scriptAttic(){
+  const gaps=levelGaps(7); if(!gaps.length) return null;
+  const script=[], WY=13.5;
+  const loft=objs.find(o=>o.say<2);
+  if(loft){
+    let s0=-1,s1=-1;
+    for(let x=0;x<GW;x++) if(!walls[2*GW+x]){ if(s0<0) s0=x; s1=x; }
+    if(s0<0) return null;
+    const w=GEMW[loft.letter];
+    script.push({g:[(s0+s1)/2,WY]},                  // park under the flue
+      {u:[loft.letter,'maxy','<',2,40]},             // the whole cloud is in the loft
+      {g:[loft.sax+w/2-0.5,WY]},                     // rain it onto its own socket
+      {c:[loft.letter]},{w:[1.4]},{c:[loft.letter]},{w:[0.8]},
+      {d:[loft.letter,[[loft.sax,loft.say]]]});
+  }
+  const rest=objs.filter(o=>o!==loft&&o.base===0);
+  const botSolid=rest.filter(o=>o.say>7).sort((a,b2)=>Math.abs(a.startAx-gaps[0].x)-Math.abs(b2.startAx-gaps[0].x));
+  const midSolid=rest.filter(o=>o.say<=7).sort((a,b2)=>b2.sax-a.sax);
+  for(const o of botSolid){
+    const w=GEMW[o.letter], h=GEMH[o.letter], ty=10-h;
+    const g=gaps.find(q=>q.w>=w);
+    if(g){ script.push({d:[o.letter,[[gapAnchor(g,w),3],[gapAnchor(g,w),ty],[o.sax,ty],[o.sax,o.say]]]}); }
+    else {
+      const wide=gaps[0];
+      const mx=Math.max(0,Math.min(GW-w, wide.x-((w-wide.w)>>1)));
+      script.push({g:[o.sax+w/2-0.5,WY]},{d:[o.letter,[[mx,3]]]},{h:[o.letter]},
+        {u:[o.letter,'miny','>',10.2,30]},{w:[1.5]},{t:[o.letter]},{w:[0.8]},
+        {d:[o.letter,[[o.sax,ty],[o.sax,o.say]]]});
+    }
+  }
+  for(const o of midSolid) script.push({d:[o.letter,[[o.sax,3],[o.sax,o.say]]]});
   script.push({w:[1.2]});
   return script;
 }
@@ -1850,7 +2022,8 @@ if(TEST){
     authored:Object.keys(AUTH).length, save:()=>save,
     complexity:()=>lvl&&lvl.cx?{score:cxScore(lvl.cx),...lvl.cx}:null,
     stuck:()=>stuckSolve(),
-    genInfo:()=>genCache[lvlIdx]?{salt:genCache[lvlIdx].salt,hasScript:!!genCache[lvlIdx].script}:null,
+    genInfo:()=>genCache[lvlIdx]?{salt:genCache[lvlIdx].salt,hasScript:!!genCache[lvlIdx].script,
+      template:(genCache[lvlIdx].def&&genCache[lvlIdx].def.template)||'drawer'}:null,
     replayGen:()=>{ const c=genCache[lvlIdx]; if(!c||!c.script) return false;
       solving=true; const ok=runScriptFast(c.script); solving=false;
       for(const o of objs) updateHome(o); return ok; },
