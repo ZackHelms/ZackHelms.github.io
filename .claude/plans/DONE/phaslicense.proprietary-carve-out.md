@@ -1,6 +1,8 @@
 # phaslicense — proprietary license carve-out for games/phasic/ + in-game and wiki links
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-07-31 (burndown run 3) — commits
+42fd23e..1f96ce5; suite 284→289; forward-only carve-out live (LICENSE,
+root preamble, settings link, wiki footer)
 **Requested:** 2026-07-31 (CD: IP protection ahead of the App Store; facts
 verified that day — root license is Apache 2.0, not MIT; carve-out is
 forward-only; Apache §6 never granted the PHASIC name).

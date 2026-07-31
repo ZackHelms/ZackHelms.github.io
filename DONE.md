@@ -1,5 +1,14 @@
 # DONE — done log
 
+- 2026-07-31 [phasic] phaslicense oversee run: games/phasic/ is now
+  proprietary — folder LICENSE (all rights reserved, play-only, reviewed
+  against the 8-item requirement list), root LICENSE.txt scope-exception
+  preamble (Apache body byte-identical), settings-cogwheel LICENSE
+  button, © footer on every wiki route. Forward-only: pre-2026-07-31
+  Apache copies stay Apache; the PHASIC name was never trademark-
+  licensed (Apache §6). Suite 284→289. (42fd23e..1f96ce5 + wrap-up docs;
+  plan archived to .claude/plans/DONE/)
+
 - 2026-07-31 [phasic] phaschrome oversee run: mobile chrome/layout round —
   rotation squish TRACED (degenerate viewport drove CELL negative; the
   oldCell>0 guard then dropped every healing rescale — permanent until
