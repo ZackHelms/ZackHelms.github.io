@@ -424,6 +424,21 @@ bamboo poles / temple eaves / kites / bird flocks / gust bands, ember refuels,
 corridors are *reachable* (solved from the real equation of motion), and moving
 hazards never seal the sky. Detailed context: `.claude/sky-lantern.md`.
 
+### GEMFLOW (`gemflow/index.html`, ~1200 lines)
+Phase-change block sort, and the repo's first soft-body simulation — also the
+web-first prototype of a planned iOS title. Gems are clusters of beveled
+squares (8 colors, 1–5 cells, fixed shapes, **no rotation**); the level clears
+when every gem sits SOLID in its matching socket. Flames from the HOT bucket
+melt solid→liquid→gas one latched step at a time; frost from the COLD bucket
+condenses and freezes (needs room for the true footprint, or it refuses);
+frost on a flame-latched gem cancels both back to their buckets. Liquid falls
+toward a draggable point-gravity well and can be LIFTED over walls by parking
+the well high; gas flees the well along a value-iterated highest-reachable
+guidance field (that's how it finds flues). 12 authored tutorial-ramp levels,
+socket-snap freezes, 10 seeded generative songs rotating per level, separate
+music/SFX volume + mutes. Drive suite: `.claude/tests/drive-gemflow.cjs`.
+Detailed context: `.claude/gemflow.md`.
+
 ### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)
 The repo's first **async-versus** game. Eight rogue signals hide among ~350
 decoys on a 1100×1900 circuit grid; each target is an exact shape+colour pair

@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>GEMFLOW</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30; --green:#39ff14; --gold:#ffc300;
+  --blue:#4488ff; --red:#ff2244; --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
+  font-family:'Share Tech Mono',monospace;color:var(--white);
+  user-select:none;-webkit-user-select:none;touch-action:manipulation;overscroll-behavior:none}
+#wrap{position:fixed;inset:0;display:flex;flex-direction:column}
+#topbar{display:flex;align-items:center;gap:6px;
+  padding:calc(env(safe-area-inset-top,0px) + 6px) 8px 6px 8px;z-index:80;position:relative}
+.tbtn{width:38px;height:30px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--white);
+  font-family:'Share Tech Mono',monospace;font-size:15px;text-decoration:none;cursor:pointer}
+.tbtn:active{background:#141428}
+#lvlsel{flex:1 1 auto;min-width:0;height:30px;background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;color:var(--gold);font-family:'Share Tech Mono',monospace;font-size:12px;
+  padding:0 6px;appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center}
+#cv{flex:1 1 auto;min-height:0;width:100%;height:100%;display:block;touch-action:none}
+.overlay{position:fixed;inset:0;z-index:70;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;background:rgba(4,4,10,0.86);backdrop-filter:blur(3px);text-align:center;padding:24px}
+.overlay.hide{display:none}
+.otitle{font-family:'Black Ops One',cursive;font-size:34px;letter-spacing:2px;
+  background:linear-gradient(180deg,#8be9ff,#b44fff);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;margin-bottom:10px}
+.osub{color:var(--dim);font-size:13px;line-height:1.6;max-width:320px;margin-bottom:18px}
+.obtn{font-family:'Black Ops One',cursive;font-size:17px;letter-spacing:1px;color:#06060e;
+  background:linear-gradient(180deg,#8be9ff,#4488ff);border:none;border-radius:10px;
+  padding:12px 34px;margin:6px;cursor:pointer}
+.obtn.alt{background:linear-gradient(180deg,#39264a,#1a1430);color:var(--white);border:1px solid var(--border);font-size:14px}
+#clearstars{font-size:26px;letter-spacing:6px;color:var(--gold);margin-bottom:8px}
+.setrow{display:flex;align-items:center;gap:10px;width:280px;margin:8px 0}
+.setrow label{flex:0 0 74px;text-align:right;color:var(--dim);font-size:12px}
+.setrow input[type=range]{flex:1 1 auto;accent-color:var(--purple)}
+.setrow .mtog{width:44px;height:30px;background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;color:var(--white);font-size:14px;cursor:pointer}
+#toast{position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(env(safe-area-inset-bottom,0px) + 118px);z-index:65;max-width:86%;
+  background:rgba(10,10,24,0.92);border:1px solid var(--border);border-radius:10px;
+  padding:9px 14px;font-size:12.5px;color:var(--gold);text-align:center;line-height:1.5;
+  opacity:0;transition:opacity .3s;pointer-events:none}
+#hintbar{position:fixed;left:50%;transform:translateX(-50%);
+  top:calc(env(safe-area-inset-top,0px) + 44px);z-index:60;max-width:92%;width:92%;
+  color:var(--dim);font-size:11px;letter-spacing:.5px;line-height:1.45;text-align:center;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  pointer-events:none;text-shadow:0 1px 2px #000}
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 06:24 UTC</div>
+<div id="wrap">
+  <div id="topbar">
+    <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
+    <button id="mute-btn" class="tbtn" aria-label="Mute">&#128266;</button>
+    <button id="gear-btn" class="tbtn" aria-label="Settings">&#9881;</button>
+    <select id="lvlsel" aria-label="Level select"></select>
+    <button id="reload-btn" class="tbtn" aria-label="Restart level">&#8635;</button>
+  </div>
+  <canvas id="cv"></canvas>
+</div>
+<div id="hintbar"></div>
+<div id="toast"></div>
+
+<div id="menu" class="overlay">
+  <div class="otitle">GEMFLOW</div>
+  <div class="osub">Gems have three states. Fire melts, frost freezes, and the gravity
+  well decides which way the world falls.<br><br>Drag solids. Pour liquids. Herd gas.
+  Crystallize every gem into its matching socket.</div>
+  <button id="play-btn" class="obtn">PLAY</button>
+</div>
+
+<div id="clear" class="overlay hide">
+  <div class="otitle" style="font-size:26px">LEVEL CLEAR</div>
+  <div id="clearstars">&#9670;&#9670;&#9670;</div>
+  <div id="clearname" class="osub" style="margin-bottom:8px"></div>
+  <button id="next-btn" class="obtn">NEXT LEVEL</button>
+  <button id="replay-btn" class="obtn alt">REPLAY</button>
+</div>
+
+<div id="settings" class="overlay hide">
+  <div class="otitle" style="font-size:24px">SETTINGS</div>
+  <div class="setrow"><label>MUSIC</label><input id="mus-vol" type="range" min="0" max="100" value="60"><button id="mus-mute" class="mtog">&#127925;</button></div>
+  <div class="setrow"><label>SFX</label><input id="sfx-vol" type="range" min="0" max="100" value="80"><button id="sfx-mute" class="mtog">&#128266;</button></div>
+  <div class="osub" style="margin-top:14px">Tap a gem to send its latched flames home.<br>Frost on a hot gem cancels both.</div>
+  <button id="set-close" class="obtn" style="margin-top:6px">DONE</button>
+</div>
+
+<script>
+'use strict';
+/* ============ GEMFLOW — phase-change block sort ============
+   Solids drag through openings they fit. Heat melts (solid→liquid→gas),
+   cold condenses/freezes (gas→liquid→solid). Liquid falls toward the
+   gravity well (a point), gas flees it. One source = one step; sources
+   latch on the gem until tapped home. Freeze needs room for the true
+   footprint (no rotation, ever). Win: every gem solid in its socket. */
+
+const GW = 10, GH = 12;                    // field size in cells
+const COLORS = {
+  R:{name:'RUBY',    c:'#ff2244', hi:'#ff8899', lo:'#8d0f22'},
+  O:{name:'AMBER',   c:'#ff8c1a', hi:'#ffc47d', lo:'#8f4a05'},
+  Y:{name:'CITRINE', c:'#ffd60a', hi:'#fff29b', lo:'#8f7500'},
+  G:{name:'PERIDOT', c:'#3dd45c', hi:'#a4f7b4', lo:'#12702a'},
+  C:{name:'AQUA',    c:'#22d3ee', hi:'#a2eefb', lo:'#0b6b7a'},
+  B:{name:'SAPPHIRE',c:'#4488ff', hi:'#a8c8ff', lo:'#1c3c8f'},
+  P:{name:'AMETHYST',c:'#b44fff', hi:'#dcaaff', lo:'#5c1f8f'},
+  M:{name:'ROSE',    c:'#ff4fd8', hi:'#ffabee', lo:'#8f1f75'},
+};
+
+/* Levels: 12-row maps of 10 chars. '#' wall, '.' empty,
+   UPPER = gem start cells, lower = that gem's socket cells.
+   Socket footprint must exactly match the gem's (validated at load). */
+const LEVELS = [
+{ name:'FIRST FACETS', heat:0, cold:0, grav:0,
+  hint:'Drag each gem into its glowing socket.',
+  map:['..........',
+       '.RR.......',
+       '.RR.......',
+       '..........',
+       '..........',
+       '..........',
+       '....M.....',
+       '..........',
+       '..........',
+       '...rr.....',
+       '...rr...m.',
+       '..........']},
+{ name:'SHAPE GATES', heat:0, cold:0, grav:0,
+  hint:'Solids only pass through openings they fit. No rotating.',
+  map:['..........',
+       '.BB....RR.',
+       '..B....RR.',
+       '..........',
+       '##..##...#',
+       '..........',
+       '..........',
+       '..........',
+       '..........',
+       '.bb..#.rr.',
+       '..b..#.rr.',
+       '.....#....']},
+{ name:'MELTDOWN', heat:1, cold:1, grav:0,
+  hint:'Fire melts. Liquid pours through the slot. Tap the gem to reclaim the flame, then frost it solid.',
+  map:['..........',
+       '....RR....',
+       '....RR....',
+       '..........',
+       '..........',
+       '####.#####',
+       '..........',
+       '..........',
+       '..........',
+       '....rr....',
+       '....rr....',
+       '..........']},
+{ name:'ROOM TO POUR', heat:1, cold:1, grav:0,
+  hint:'A gem needs room to crystallize — a one-tall shelf will refuse the frost. Let it pour on.',
+  map:['..........',
+       '....RR....',
+       '....RR....',
+       '..........',
+       '####.#####',
+       '..........',
+       '######.###',
+       '..........',
+       '..........',
+       '....rr....',
+       '....rr....',
+       '..........']},
+{ name:'ONE FLAME', heat:1, cold:1, grav:0,
+  hint:'One flame, one frost. Reclaim them and use them twice.',
+  map:['..........',
+       '.BB....RR.',
+       '..B....RR.',
+       '..........',
+       '##.####.##',
+       '.....#....',
+       '.....#....',
+       '.....#....',
+       '.....#....',
+       '.bb..#.rr.',
+       '..b..#.rr.',
+       '.....#....']},
+{ name:'SIDEWAYS', heat:1, cold:1, grav:1,
+  hint:'Drag the gravity well around the frame — liquid falls TOWARD it, wherever it sits.',
+  map:['..........',
+       '......RR..',
+       '......RR..',
+       '..........',
+       '..........',
+       'rr........',
+       'rr........',
+       '..........',
+       '..........',
+       '..........',
+       '..........',
+       '..........']},
+{ name:'POINT PULL', heat:1, cold:1, grav:1,
+  hint:'The well is a point, not a direction. Lower-left pulls differently than lower-right.',
+  map:['..........',
+       '....OO....',
+       '.....OO...',
+       '..........',
+       '..........',
+       '..........',
+       '....##....',
+       '....##....',
+       '....##....',
+       '.oo.##....',
+       '..oo##....',
+       '....##....']},
+{ name:'THE KETTLE', heat:2, cold:2, grav:1,
+  hint:'A second flame boils liquid to steam, and steam FLEES the well — park it far right to push the cloud across the attic, then bring it back under the basin before you frost.',
+  map:['..........',
+       '..........',
+       '#pppp##..#',
+       '#######..#',
+       '#######..#',
+       '..........',
+       '..........',
+       '..........',
+       '..PPPP....',
+       '..........',
+       '..........',
+       '..........']},
+{ name:'BALLOON ROUTE', heat:2, cold:2, grav:1,
+  hint:'Gas flees the well. Liquid seeks it. You will need to move the well more than once.',
+  map:['......yy..',
+       '.....yy...',
+       '....######',
+       '..........',
+       '..........',
+       '..........',
+       '..........',
+       '..........',
+       '..YY......',
+       '.YY.......',
+       '..........',
+       '..........']},
+{ name:'QUEUE', heat:1, cold:1, grav:0,
+  hint:'Some gems fit the gap as solids — no fire needed. Spend flames only where shape demands it.',
+  map:['..........',
+       '.GGG....M.',
+       '..G.......',
+       '..........',
+       '####.#####',
+       '..........',
+       '..........',
+       '..........',
+       '..........',
+       '.ggg......',
+       '..g.....m.',
+       '..........']},
+{ name:'REFLOW', heat:1, cold:1, grav:1,
+  hint:'Put the well ABOVE a puddle’s level and it will lift the liquid over walls.',
+  map:['..........',
+       '.RR.......',
+       '.RR.......',
+       '......####',
+       '..........',
+       '..........',
+       '..........',
+       '..........',
+       '...#..##..',
+       '...#..##..',
+       '...#..##rr',
+       '...#..##rr']},
+{ name:'MASTER FACET', heat:1, cold:1, grav:1,
+  hint:'Everything you know: melt, pour, drain, drag the well, and crystallize on the far side.',
+  map:['..........',
+       '.CCC....M.',
+       '..C.......',
+       '..C.......',
+       '##.#######',
+       '..........',
+       '..........',
+       '..........',
+       '#######.##',
+       '.......ccc',
+       'm.......c.',
+       '........c.']},
+];
+
+/* ============ state ============ */
+const $ = id => document.getElementById(id);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const TEST = /[?&]test=1/.test(location.search);
+let save; try{ save = JSON.parse(localStorage.getItem('gemflow_v1')||'{}'); }catch(e){ save={}; }
+save = Object.assign({done:[], mus:60, sfx:80, musMute:false, sfxMute:false}, save);
+const persist = ()=>{ try{ localStorage.setItem('gemflow_v1', JSON.stringify(save)); }catch(e){} };
+
+let cv,ctx,DPR=1,W=0,H=0;
+let FX=0,FY=0,CELL=32,BR=20,BZ=92;         // field origin, cell px, border px, bucket zone px
+let game='menu', lvlIdx=0, lvl=null;
+let walls=null, objs=[], heatN=0, coldN=0, gravSrc=null;
+let dragObj=null, dragSrc=null, dragGrav=false, finger={x:0,y:0};
+let flying=[], fx=[], shakeT=0, tSim=0, lvlT=0;
+let woodCanvas=null, clearPending=false;
+
+/* ============ level parse ============ */
+function keyPat(cells){ // canonical offset signature of a cell set
+  let mx=1e9,my=1e9; for(const c of cells){ mx=Math.min(mx,c.x); my=Math.min(my,c.y); }
+  return cells.map(c=>(c.x-mx)+','+(c.y-my)).sort().join(';');
+}
+function loadLevel(i){
+  lvlIdx=i; lvl=LEVELS[i]; game='play'; lvlT=0; clearPending=false;
+  walls=new Uint8Array(GW*GH); objs=[]; flying=[]; fx=[];
+  dragObj=dragSrc=null; dragGrav=false;
+  heatN=lvl.heat; coldN=lvl.cold;
+  const gemCells={}, sockCells={};
+  for(let y=0;y<GH;y++) for(let x=0;x<GW;x++){
+    const ch=lvl.map[y][x];
+    if(ch==='#') walls[y*GW+x]=1;
+    else if(ch>='A'&&ch<='Z'){ (gemCells[ch]=gemCells[ch]||[]).push({x,y}); }
+    else if(ch>='a'&&ch<='z'){ const L=ch.toUpperCase(); (sockCells[L]=sockCells[L]||[]).push({x,y}); }
+  }
+  for(const L in gemCells){
+    const cells=gemCells[L], sock=sockCells[L];
+    if(!sock || keyPat(cells)!==keyPat(sock))
+      console.error('GEMFLOW level '+i+': gem '+L+' footprint != socket footprint');
+    let ax=1e9,ay=1e9,sx=1e9,sy=1e9;
+    for(const c of cells){ ax=Math.min(ax,c.x); ay=Math.min(ay,c.y); }
+    for(const c of sock){ sx=Math.min(sx,c.x); sy=Math.min(sy,c.y); }
+    const off=cells.map(c=>({x:c.x-ax,y:c.y-ay})).sort((a,b)=>a.y-b.y||a.x-b.x);
+    objs.push({ letter:L, col:COLORS[L], off, sax:sx, say:sy, sock,
+      axp:0, ayp:0, startAx:ax, startAy:ay,
+      phase:'solid', heats:0, colds:0, locked:false,
+      ps:off.map(()=>({x:0,y:0,px:0,py:0,wp:Math.random()*6.28})),
+      freezeT:0, ftarg:null, jx:0,jy:0,jvx:0,jvy:0, mst:[], mstT:0, sloshCd:0 });
+  }
+  gravSrc = lvl.grav ? {x:0,y:0} : null;
+  gasV=null;
+  layout();
+  for(const o of objs){ o.axp=FX+o.startAx*CELL; o.ayp=FY+o.startAy*CELL; syncSolid(o); }
+  if(gravSrc){ gravSrc.x=FX+GW*CELL/2; gravSrc.y=FY+GH*CELL+BR*0.55; }
+  $('hintbar').textContent = 'L'+(i+1)+' · '+lvl.name+' — '+lvl.hint;
+  const tst=$('toast'); tst.style.opacity=0;
+  buildLvlSel();
+  if(typeof songStart==='function') songStart(i%10);
+}
+const cellX=c=>FX+(c+0.5)*CELL, cellY=c=>FY+(c+0.5)*CELL;
+function syncSolid(o){ // set particles onto the solid lattice at pixel anchor
+  for(let k=0;k<o.off.length;k++){ const p=o.ps[k];
+    p.x=p.px=o.axp+(o.off[k].x+0.5)*CELL; p.y=p.py=o.ayp+(o.off[k].y+0.5)*CELL; }
+}
+
+/* ============ layout ============ */
+function layout(){
+  const r=cv.getBoundingClientRect(); W=r.width; H=r.height;
+  DPR=Math.min(window.devicePixelRatio||1,3);
+  cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  BZ=clamp(H*0.125,80,112); BR=clamp(W*0.055,16,26);
+  const pad=6, aw=W-2*pad-2*BR, ah=H-2*pad-2*BR-BZ;
+  const oldCell=CELL, oldFX=FX, oldFY=FY;
+  CELL=Math.min(aw/GW, ah/GH);
+  FX=(W-CELL*GW)/2; FY=pad+BR+Math.max(0,(ah-CELL*GH)*0.30);
+  woodCanvas=null;
+  if(lvl&&oldCell>0){ const s=CELL/oldCell;
+    for(const o of objs){ o.axp=FX+(o.axp-oldFX)*s; o.ayp=FY+(o.ayp-oldFY)*s;
+      for(const p of o.ps){ p.x=FX+(p.x-oldFX)*s; p.y=FY+(p.y-oldFY)*s; p.px=p.x; p.py=p.y; } }
+    if(gravSrc){ gravSrc.x=FX+(gravSrc.x-oldFX)*s; gravSrc.y=FY+(gravSrc.y-oldFY)*s; }
+  }
+}
+
+/* ============ gravity field ============ */
+function gdir(x,y){ // unit "down" at a point
+  if(!gravSrc) return {x:0,y:1};
+  let dx=gravSrc.x-x, dy=gravSrc.y-y; const d=Math.hypot(dx,dy)||1;
+  return {x:dx/d, y:dy/d};
+}
+/* Gas guidance: value-iterated "highest reachable point" field so gas
+   genuinely seeps along ceilings toward chimneys instead of pinning under
+   the first wall. Rebuilt when the gravity well moves. */
+let gasV=null, gasGX=0, gasGY=0;
+function buildGasField(){
+  gasV=new Float32Array(GW*GH).fill(-1e9);
+  const gp = gravSrc ? {x:(gravSrc.x-FX)/CELL-0.5, y:(gravSrc.y-FY)/CELL-0.5}
+                     : {x:GW/2-0.5, y:GH+60};
+  gasGX=gp.x; gasGY=gp.y;
+  for(let y=0;y<GH;y++) for(let x=0;x<GW;x++)
+    if(!walls[y*GW+x]) gasV[y*GW+x]=Math.hypot(x-gp.x,y-gp.y);
+  for(let it=0;it<200;it++){
+    let ch=false;
+    for(let y=0;y<GH;y++) for(let x=0;x<GW;x++){
+      const k=y*GW+x; if(walls[k]) continue;
+      let best=gasV[k];
+      if(x>0&&!walls[k-1]) best=Math.max(best,gasV[k-1]-0.05);
+      if(x<GW-1&&!walls[k+1]) best=Math.max(best,gasV[k+1]-0.05);
+      if(y>0&&!walls[k-GW]) best=Math.max(best,gasV[k-GW]-0.05);
+      if(y<GH-1&&!walls[k+GW]) best=Math.max(best,gasV[k+GW]-0.05);
+      if(best>gasV[k]+1e-6){ gasV[k]=best; ch=true; }
+    }
+    if(!ch) break;
+  }
+}
+function gasGuide(p){ // accel direction toward the best open neighbor cell
+  if(!gasV) buildGasField();
+  if(gravSrc){ const gx=(gravSrc.x-FX)/CELL-0.5, gy=(gravSrc.y-FY)/CELL-0.5;
+    if(Math.abs(gx-gasGX)+Math.abs(gy-gasGY)>0.4) buildGasField(); }
+  const cx=clamp(Math.floor((p.x-FX)/CELL),0,GW-1), cy=clamp(Math.floor((p.y-FY)/CELL),0,GH-1);
+  const k=cy*GW+cx; let bx=0,by=0,bv=gasV[k]+0.01;
+  if(cx>0&&!walls[k-1]&&gasV[k-1]>bv){bv=gasV[k-1];bx=-1;by=0;}
+  if(cx<GW-1&&!walls[k+1]&&gasV[k+1]>bv){bv=gasV[k+1];bx=1;by=0;}
+  if(cy>0&&!walls[k-GW]&&gasV[k-GW]>bv){bv=gasV[k-GW];bx=0;by=-1;}
+  if(cy<GH-1&&!walls[k+GW]&&gasV[k+GW]>bv){bv=gasV[k+GW];bx=0;by=1;}
+  return {x:bx,y:by};
+}
+
+/* ============ collision helpers ============ */
+function wallAt(cx,cy){ if(cx<0||cy<0||cx>=GW||cy>=GH) return 1; return walls[cy*GW+cx]; }
+function collideParticleWalls(p,r){
+  const L=FX,T=FY,R2=FX+GW*CELL,B2=FY+GH*CELL;
+  if(p.x<L+r)p.x=L+r; if(p.x>R2-r)p.x=R2-r; if(p.y<T+r)p.y=T+r; if(p.y>B2-r)p.y=B2-r;
+  const cx=Math.floor((p.x-FX)/CELL), cy=Math.floor((p.y-FY)/CELL);
+  for(let yy=cy-1;yy<=cy+1;yy++) for(let xx=cx-1;xx<=cx+1;xx++){
+    if(!wallAt(xx,yy)) continue;
+    const wl=FX+xx*CELL, wt=FY+yy*CELL;
+    const nx=clamp(p.x,wl,wl+CELL), ny=clamp(p.y,wt,wt+CELL);
+    let dx=p.x-nx, dy=p.y-ny, d=Math.hypot(dx,dy);
+    if(d===0){ const pl=p.x-wl, pr=wl+CELL-p.x, pt=p.y-wt, pb=wt+CELL-p.y;
+      const m=Math.min(pl,pr,pt,pb);
+      if(m===pl)p.x=wl-r; else if(m===pr)p.x=wl+CELL+r; else if(m===pt)p.y=wt-r; else p.y=wt+CELL+r;
+    } else if(d<r){ p.x=nx+dx/d*r; p.y=ny+dy/d*r; }
+  }
+}
+function solidRects(exclude){
+  const out=[];
+  for(const o of objs){ if(o===exclude) continue;
+    if(o.phase==='solid'||o.phase==='freezing'){ const h=CELL*0.47;
+      for(const p of o.ps) out.push({l:p.x-h,t:p.y-h,r:p.x+h,b:p.y+h});
+    }}
+  return out;
+}
+function collideParticleRects(p,r,rects){
+  for(const q of rects){
+    const nx=clamp(p.x,q.l,q.r), ny=clamp(p.y,q.t,q.b);
+    let dx=p.x-nx, dy=p.y-ny, d=Math.hypot(dx,dy);
+    if(d===0){ const pl=p.x-q.l, pr=q.r-p.x, pt=p.y-q.t, pb=q.b-p.y;
+      const m=Math.min(pl,pr,pt,pb);
+      if(m===pl)p.x=q.l-r; else if(m===pr)p.x=q.r+r; else if(m===pt)p.y=q.t-r; else p.y=q.b+r;
+    } else if(d<r){ p.x=nx+dx/d*r; p.y=ny+dy/d*r; }
+  }
+}
+
+/* ============ solid drag (kinematic, axis-separated, fit-gated) ============ */
+function solidFits(o,axp,ayp,rects){
+  const h=CELL*0.462;
+  for(const of2 of o.off){
+    const x=axp+(of2.x+0.5)*CELL, y=ayp+(of2.y+0.5)*CELL;
+    if(x-h<FX-0.5||x+h>FX+GW*CELL+0.5||y-h<FY-0.5||y+h>FY+GH*CELL+0.5) return false;
+    const c0x=Math.floor((x-h-FX)/CELL), c1x=Math.floor((x+h-FX)/CELL);
+    const c0y=Math.floor((y-h-FY)/CELL), c1y=Math.floor((y+h-FY)/CELL);
+    for(let yy=c0y;yy<=c1y;yy++) for(let xx=c0x;xx<=c1x;xx++)
+      if(wallAt(xx,yy)) return false;
+    for(const q of rects) if(x+h>q.l&&x-h<q.r&&y+h>q.t&&y-h<q.b) return false;
+  }
+  return true;
+}
+function moveSolid(o,tx,ty){
+  const rects=solidRects(o);
+  const maxStep=CELL*0.30;
+  for(let it=0;it<8;it++){
+    let dx=tx-o.axp, dy=ty-o.ayp;
+    const d=Math.hypot(dx,dy); if(d<0.5) break;
+    const s=Math.min(d,maxStep); dx=dx/d*s; dy=dy/d*s;
+    let moved=false;
+    if(dx&&solidFits(o,o.axp+dx,o.ayp,rects)){ o.axp+=dx; moved=true; }
+    if(dy&&solidFits(o,o.axp,o.ayp+dy,rects)){ o.ayp+=dy; moved=true; }
+    if(!moved) break;
+  }
+  // magnetic half-cell alignment near tight gaps (feel assist)
+  const gx=FX+Math.round((o.axp-FX)/(CELL*0.5))*(CELL*0.5);
+  const gy=FY+Math.round((o.ayp-FY)/(CELL*0.5))*(CELL*0.5);
+  if(Math.abs(gx-o.axp)<CELL*0.10&&solidFits(o,gx,o.ayp,rects)) o.axp+=(gx-o.axp)*0.35;
+  if(Math.abs(gy-o.ayp)<CELL*0.10&&solidFits(o,o.axp,gy,rects)) o.ayp+=(gy-o.ayp)*0.35;
+  syncSolid(o);
+  // shove fluid particles out of the way
+  const h=CELL*0.47, mine=[];
+  for(const p of o.ps) mine.push({l:p.x-h,t:p.y-h,r:p.x+h,b:p.y+h});
+  for(const u of objs){ if(u===o||u.phase==='solid') continue;
+    for(const p of u.ps) collideParticleRects(p,CELL*0.34,mine); }
+}
+
+/* ============ physics ============ */
+const HSTEP=1/120;
+let acc=0;
+function stepSim(dt){
+  acc+=dt; let n=0;
+  while(acc>=HSTEP&&n<8){ acc-=HSTEP; sub(HSTEP); n++; }
+  if(n===8) acc=0;
+}
+function sub(h){
+  tSim+=h; lvlT+=h;
+  const GACC=CELL*26, BUOY=CELL*8;
+  for(const o of objs){
+    if(o.locked) continue;
+    if(o.phase==='solid'){
+      o.jvx+=(-o.jx*140-o.jvx*9)*h; o.jvy+=(-o.jy*140-o.jvy*9)*h;
+      o.jx+=o.jvx*h; o.jy+=o.jvy*h;
+      continue;
+    }
+    if(o.phase==='freezing'){ freezeStep(o,h); continue; }
+    const gas=o.phase==='gas';
+    for(const p of o.ps){
+      const g=gdir(p.x,p.y);
+      let ax=g.x*(gas?-BUOY:GACC), ay=g.y*(gas?-BUOY:GACC);
+      if(gas){ p.wp+=h*2.1; ax+=Math.sin(p.wp)*CELL*3.4; ay+=Math.cos(p.wp*0.83)*CELL*2.2;
+        const gu=gasGuide(p); ax+=gu.x*CELL*26; ay+=gu.y*CELL*26; }
+      const vx=(p.x-p.px)*(gas?0.988:0.982), vy=(p.y-p.py)*(gas?0.988:0.982);
+      p.px=p.x; p.py=p.y;
+      p.x+=vx+ax*h*h; p.y+=vy+ay*h*h;
+    }
+    o.mstT-=h;
+    if(o.mstT<=0||!o.mst.length){ o.mst=mst(o.ps); o.mstT=0.12; }
+    const maxd=CELL*(gas?2.55:1.48), rest=CELL*0.98;
+    for(let iter=0;iter<4;iter++){
+      for(const e of o.mst){
+        const a=o.ps[e[0]],b=o.ps[e[1]];
+        let dx=b.x-a.x, dy=b.y-a.y; const d=Math.hypot(dx,dy);
+        if(d>maxd){ const f=(d-maxd)/d*0.5; a.x+=dx*f; a.y+=dy*f; b.x-=dx*f; b.y-=dy*f; }
+        else if(!gas&&d>rest){ // cohesion: puddles hold together instead of spreading flat
+          const f=(d-rest)/d*0.045; a.x+=dx*f; a.y+=dy*f; b.x-=dx*f; b.y-=dy*f; }
+      }
+      // spec: liquid squares stay ~1 apart, gas squares ~2 apart — the wide
+      // gas spacing is what makes a cloud blanket a chamber instead of bunching
+      const mind=CELL*(gas?1.9:0.84), mf=gas?0.10:0.28;
+      for(let i2=0;i2<o.ps.length;i2++) for(let j2=i2+1;j2<o.ps.length;j2++){
+        const a=o.ps[i2],b=o.ps[j2];
+        let dx=b.x-a.x, dy=b.y-a.y; let d=Math.hypot(dx,dy);
+        if(d<mind){ if(d<1e-4){dx=1;dy=0;d=1;} const f=(mind-d)/d*mf;
+          a.x-=dx*f; a.y-=dy*f; b.x+=dx*f; b.y+=dy*f; }
+      }
+    }
+  }
+  // fluid vs solids/walls/other fluids
+  const R=CELL*0.40;
+  for(let i2=0;i2<objs.length;i2++){ const A=objs[i2];
+    if(A.phase==='solid'||A.phase==='freezing') continue;
+    const rects=solidRects(A);
+    for(const p of A.ps){ collideParticleRects(p,CELL*0.34,rects); collideParticleWalls(p,R); }
+    for(let j2=i2+1;j2<objs.length;j2++){ const Bo=objs[j2];
+      if(Bo.phase==='solid'||Bo.phase==='freezing') continue;
+      for(const a of A.ps) for(const b of Bo.ps){
+        let dx=b.x-a.x, dy=b.y-a.y; let d=Math.hypot(dx,dy); const md=CELL*0.78;
+        if(d<md){ if(d<1e-4){dx=1;dy=0;d=1;} const f=(md-d)/d*0.25;
+          a.x-=dx*f; a.y-=dy*f; b.x+=dx*f; b.y+=dy*f; }
+      }
+    }
+  }
+  // freezing gems still push fluids away while snapping
+  for(const o of objs){ if(o.phase!=='freezing') continue;
+    const h2=CELL*0.45, mine=[];
+    for(const p of o.ps) mine.push({l:p.x-h2,t:p.y-h2,r:p.x+h2,b:p.y+h2});
+    for(const u of objs){ if(u===o||u.phase==='solid'||u.phase==='freezing') continue;
+      for(const p of u.ps) collideParticleRects(p,CELL*0.30,mine); }
+  }
+  // slosh SFX on fast liquid
+  for(const o of objs){ if(o.phase!=='liquid') continue;
+    o.sloshCd-=h; let v=0; for(const p of o.ps) v=Math.max(v,Math.hypot(p.x-p.px,p.y-p.py));
+    if(v>CELL*0.11&&o.sloshCd<=0){ o.sloshCd=0.55+Math.random()*0.4; sfxSlosh(); }
+  }
+}
+function mst(ps){ // Prim over ≤5 nodes
+  const n=ps.length, inT=[0], edges=[];
+  const used=new Array(n).fill(false); used[0]=true;
+  while(inT.length<n){
+    let bi=-1,bj=-1,bd=1e18;
+    for(const i2 of inT) for(let j2=0;j2<n;j2++){ if(used[j2]) continue;
+      const d=(ps[i2].x-ps[j2].x)**2+(ps[i2].y-ps[j2].y)**2;
+      if(d<bd){bd=d;bi=i2;bj=j2;} }
+    used[bj]=true; inT.push(bj); edges.push([bi,bj]);
+  }
+  return edges;
+}
+
+/* ============ phase transitions ============ */
+function centroid(o){ let x=0,y=0; for(const p of o.ps){x+=p.x;y+=p.y;} return {x:x/o.ps.length,y:y/o.ps.length}; }
+function melt(o){ // solid -> liquid
+  o.phase='liquid'; for(const p of o.ps){ p.px=p.x; p.py=p.y; }
+  o.mst=[]; sfxMelt(); puffFx(o,'melt');
+}
+function boil(o){ o.phase='gas'; o.mst=[]; sfxBoil(); puffFx(o,'boil'); }
+function condense(o){ o.phase='liquid'; o.mst=[]; for(const p of o.ps){p.px=p.x;p.py=p.y;} sfxCondense(); puffFx(o,'cond'); }
+function occupiedCells(exclude){
+  const occ=new Uint8Array(GW*GH);
+  for(let k=0;k<GW*GH;k++) occ[k]=walls[k];
+  for(const o of objs){ if(o===exclude) continue;
+    for(const p of o.ps){
+      const cx=Math.floor((p.x-FX)/CELL), cy=Math.floor((p.y-FY)/CELL);
+      if(cx>=0&&cy>=0&&cx<GW&&cy<GH) occ[cy*GW+cx]=1;
+    }}
+  return occ;
+}
+function tryFreeze(o,dry){ // liquid -> solid; needs room for true footprint; dry=diagnose only
+  const c=centroid(o), occ=occupiedCells(o);
+  const cax=(c.x-FX)/CELL-0.5, cay=(c.y-FY)/CELL-0.5; // centroid as anchor-space
+  let mox=0,moy=0; for(const of2 of o.off){mox+=of2.x;moy+=of2.y;}
+  mox/=o.off.length; moy/=o.off.length;
+  const bx=cax-mox, by=cay-moy; // ideal anchor
+  const cand=[];
+  // socket first, if in reach
+  const sd=Math.hypot(o.sax-bx,o.say-by);
+  if(sd<=2.3) cand.push({x:o.sax,y:o.say,d:-1,sock:true});
+  for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){
+    const ax=Math.round(bx)+dx, ay=Math.round(by)+dy;
+    const d=Math.hypot(ax-bx,ay-by); if(d>1.7) continue;
+    cand.push({x:ax,y:ay,d});
+  }
+  cand.sort((a,b)=>a.d-b.d);
+  const diag=dry?{b:[bx,by],sd,cands:[]}:null;
+  for(const cd of cand){
+    let ok=true;
+    for(const of2 of o.off){
+      const x=cd.x+of2.x, y=cd.y+of2.y;
+      if(x<0||y<0||x>=GW||y>=GH||occ[y*GW+x]){ ok=false; break; }
+    }
+    if(diag) diag.cands.push({x:cd.x,y:cd.y,d:cd.d,cellsOk:ok});
+    if(!ok) continue;
+    // greedy match particles -> cells; every jump must be plausible
+    const targets=o.off.map(of2=>({x:cellX(cd.x+of2.x), y:cellY(cd.y+of2.y)}));
+    const takenP=new Array(o.ps.length).fill(false), map=new Array(targets.length).fill(-1);
+    let far=false;
+    for(let t=0;t<targets.length;t++){
+      let bi=-1,bd=1e18;
+      for(let p2=0;p2<o.ps.length;p2++){ if(takenP[p2]) continue;
+        const d=(o.ps[p2].x-targets[t].x)**2+(o.ps[p2].y-targets[t].y)**2;
+        if(d<bd){bd=d;bi=p2;} }
+      takenP[bi]=true; map[t]=bi;
+      // the socket gets a longer jello reach — close counts, it snaps in
+      if(Math.sqrt(bd)>CELL*(cd.sock?2.35:1.9)){ far=true;
+        if(diag) diag.cands[diag.cands.length-1].jump=Math.sqrt(bd)/CELL;
+        break; }
+    }
+    if(far) continue;
+    if(diag){ diag.pick=[cd.x,cd.y]; return diag; }
+    // commit: reorder particles so ps[k] freezes into off[k]
+    const nps=targets.map((_,t)=>o.ps[map[t]]);
+    o.ps=nps; o.axp=FX+cd.x*CELL; o.ayp=FY+cd.y*CELL;
+    o.ftarg=targets; o.freezeT=0; o.phase='freezing'; o.mst=[];
+    return true;
+  }
+  return diag||false;
+}
+function freezeStep(o,h){
+  o.freezeT+=h;
+  const T=0.5, k=Math.min(1,o.freezeT/T);
+  // springy overshoot ease
+  const e=1-Math.pow(1-k,3), wob=Math.sin(k*Math.PI*3)*(1-k)*0.18;
+  for(let i2=0;i2<o.ps.length;i2++){
+    const p=o.ps[i2], t=o.ftarg[i2];
+    p.x+= (t.x-p.x)*(0.16+e*0.5); p.y+=(t.y-p.y)*(0.16+e*0.5);
+    p.x+= (t.x-p.x)*wob; p.y+=(t.y-p.y)*wob;
+    p.px=p.x; p.py=p.y;
+  }
+  if(o.freezeT>=T){
+    o.phase='solid'; syncSolid(o);
+    o.jvx=(Math.random()-0.5)*CELL*3; o.jvy=CELL*2.4; // jello arrival jiggle
+    sfxThunk(); sparkFx(o);
+    checkSocket(o,true);
+  }
+}
+
+/* ============ sources ============ */
+function bucketRects(){
+  const bw=Math.min(W*0.24,120), bh=BZ-14, y=H-BZ+6;
+  return { hot:{x:10,y,w:bw,h:bh}, cold:{x:W-10-bw,y,w:bw,h:bh} };
+}
+function objAt(x,y,fluidToo){
+  for(const o of objs){ if(o.locked) continue;
+    for(const p of o.ps){
+      const r=o.phase==='solid'?CELL*0.62:CELL*0.72;
+      if(Math.abs(x-p.x)<r&&Math.abs(y-p.y)<r) return o;
+    }}
+  return null;
+}
+function dropSourceOn(kind,o){ // returns true if consumed from bucket
+  if(o.locked) return false;
+  if(kind==='heat'){
+    if(o.colds>0){ o.colds--; coldN++; flyBack('cold',centroid(o)); sfxCancel(); toast('Fire and frost cancel out.'); return false; }
+    if(o.phase==='solid'){ o.heats++; melt(o); return true; }
+    if(o.phase==='liquid'){ o.heats++; boil(o); return true; }
+    reject(o,'Nothing left to melt — it is already gas.'); return false;
+  } else {
+    if(o.heats>0){ o.heats--; heatN++; flyBack('heat',centroid(o)); sfxCancel(); toast('Frost quenched a flame — both fly home.'); return false; }
+    if(o.phase==='gas'){ o.colds++; condense(o); return true; }
+    if(o.phase==='liquid'){
+      if(tryFreeze(o)){ o.colds++; return true; }
+      reject(o,'No room to crystallize here.'); return false;
+    }
+    reject(o,'Already solid.'); return false;
+  }
+}
+function reject(o,msg){ shakeT=0.35; sfxError(); toast(msg);
+  if(navigator.vibrate) navigator.vibrate(60);
+  if(o&&o.phase==='solid'){ o.jvx=(Math.random()-0.5)*CELL*5; o.jvy=-CELL*3; } }
+function tapHome(o){ // release most recent source
+  if(o.heats>0){ o.heats--; heatN++; flyBack('heat',centroid(o)); sfxRelease(); return true; }
+  if(o.colds>0){ o.colds--; coldN++; flyBack('cold',centroid(o)); sfxRelease(); return true; }
+  return false;
+}
+function flyBack(kind,from){
+  const b=bucketRects(), t=kind==='heat'?b.hot:b.cold;
+  flying.push({kind, x:from.x, y:from.y, tx:t.x+t.w/2, ty:t.y+t.h*0.45, t:0});
+}
+function stepFlying(dt){
+  for(let i2=flying.length-1;i2>=0;i2--){ const f=flying[i2];
+    f.t+=dt*2.2; if(f.t>=1){ flying.splice(i2,1); continue; }
+  }
+}
+function flyPos(f){ const k=1-Math.pow(1-f.t,2);
+  return {x:f.x+(f.tx-f.x)*k, y:f.y+(f.ty-f.y)*k - Math.sin(k*Math.PI)*40}; }
+
+/* ============ win ============ */
+function checkSocket(o,fresh){
+  if(o.phase!=='solid'||o.locked) return;
+  const ax=Math.round((o.axp-FX)/CELL), ay=Math.round((o.ayp-FY)/CELL);
+  const alignedX=Math.abs(o.axp-(FX+ax*CELL))<CELL*0.42, alignedY=Math.abs(o.ayp-(FY+ay*CELL))<CELL*0.42;
+  if(ax===o.sax&&ay===o.say&&alignedX&&alignedY){
+    if(o.heats>0||o.colds>0) return; // sources must be home first
+    o.locked=true; o.axp=FX+o.sax*CELL; o.ayp=FY+o.say*CELL; syncSolid(o);
+    o.jx=o.jy=o.jvx=o.jvy=0;
+    sfxLock(); sparkFx(o);
+    if(objs.every(u=>u.locked)&&!clearPending){ clearPending=true; setTimeout(levelClear,650); }
+  }
+}
+function levelClear(){
+  if(game!=='play'||!objs.every(o=>o.locked)) return;
+  game='clear'; save.done[lvlIdx]=true; persist(); sfxWin();
+  const stars = lvlT<50?3 : lvlT<110?2 : 1;
+  $('clearstars').textContent='◆'.repeat(stars)+'◇'.repeat(3-stars);
+  $('clearname').textContent='L'+(lvlIdx+1)+' · '+lvl.name+' · '+Math.round(lvlT)+'s';
+  $('next-btn').style.display = lvlIdx+1<LEVELS.length?'':'none';
+  $('clear').classList.remove('hide');
+  buildLvlSel();
+}
+
+/* ============ fx / toast ============ */
+function puffFx(o,kind){ for(const p of o.ps) fx.push({x:p.x,y:p.y,t:0,kind}); }
+function sparkFx(o){ for(const p of o.ps) for(let s=0;s<3;s++)
+  fx.push({x:p.x,y:p.y,t:0,kind:'spark',a:Math.random()*6.28,sp:CELL*(1+Math.random()*2)}); }
+function stepFx(dt){ for(let i2=fx.length-1;i2>=0;i2--){ const f=fx[i2];
+  f.t+=dt; if(f.t>0.7) fx.splice(i2,1); } }
+let toastTimer=null;
+function toast(msg){ const el=$('toast'); el.textContent=msg; el.style.opacity=1;
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>{ el.style.opacity=0; },2600); }
+
+/* ============ input ============ */
+function evPos(e){ const r=cv.getBoundingClientRect();
+  const t=e.touches?e.touches[0]:e; return {x:t.clientX-r.left, y:t.clientY-r.top}; }
+let tapCand=null;
+function onDown(e){
+  if(game!=='play') return;
+  audioInit(); e.preventDefault();
+  const p=evPos(e); finger=p;
+  const b=bucketRects();
+  // buckets
+  if(p.x>=b.hot.x&&p.x<=b.hot.x+b.hot.w&&p.y>=b.hot.y){ if(heatN>0){ dragSrc={kind:'heat'}; sfxPickup(); } else reject(null,'No flames left in the bucket.'); return; }
+  if(p.x>=b.cold.x&&p.x<=b.cold.x+b.cold.w&&p.y>=b.cold.y){ if(coldN>0){ dragSrc={kind:'cold'}; sfxPickup(); } else reject(null,'No frost left in the bucket.'); return; }
+  // gravity orb
+  if(gravSrc&&Math.hypot(p.x-gravSrc.x,p.y-gravSrc.y)<Math.max(26,BR*1.15)){ dragGrav=true; sfxPickup(); return; }
+  // gems
+  const o=objAt(p.x,p.y);
+  if(o){
+    tapCand={o, x:p.x, y:p.y, t:performance.now()};
+    if(o.phase==='solid'&&!o.locked){ dragObj=o; o.gox=o.axp-p.x; o.goy=o.ayp-p.y; }
+  }
+}
+function onMove(e){
+  if(game!=='play') return;
+  e.preventDefault(); const p=evPos(e); finger=p;
+  if(tapCand&&Math.hypot(p.x-tapCand.x,p.y-tapCand.y)>12) tapCand=null;
+  if(dragGrav){ placeGrav(p.x,p.y); return; }
+  if(dragObj) moveSolid(dragObj, p.x+dragObj.gox, p.y+dragObj.goy);
+}
+function onUp(e){
+  if(game!=='play') return;
+  e.preventDefault();
+  const p=finger;
+  if(dragSrc){ const o=objAt(p.x,p.y);
+    if(o){ const used=dropSourceOn(dragSrc.kind,o);
+      if(used){ if(dragSrc.kind==='heat') heatN--; else coldN--; sfxAttach(); } }
+    else flyBack(dragSrc.kind,{x:p.x,y:p.y});
+    dragSrc=null; return; }
+  if(dragGrav){ dragGrav=false; return; }
+  if(dragObj){ const o=dragObj; dragObj=null;
+    // settle to lattice + socket check
+    const ax=Math.round((o.axp-FX)/CELL), ay=Math.round((o.ayp-FY)/CELL);
+    const sx2=FX+ax*CELL, sy2=FY+ay*CELL, rects=solidRects(o);
+    if(Math.abs(sx2-o.axp)<CELL*0.42&&Math.abs(sy2-o.ayp)<CELL*0.42&&solidFits(o,sx2,sy2,rects)){
+      o.axp=sx2; o.ayp=sy2; }
+    syncSolid(o); o.jvx=(Math.random()-0.5)*CELL; o.jvy=CELL*1.2;
+    checkSocket(o,false); }
+  if(tapCand&&performance.now()-tapCand.t<420){
+    const o=tapCand.o;
+    if(!tapHome(o)&&o.phase==='solid') { o.jvx=(Math.random()-0.5)*CELL*2; o.jvy=-CELL*1.6; sfxTap(); }
+  }
+  tapCand=null;
+}
+function placeGrav(x,y){ // clamp to the ring just outside the field border
+  const m=BR*0.55;
+  const L=FX-m, T=FY-m, R2=FX+GW*CELL+m, B2=FY+GH*CELL+m;
+  const cx=clamp(x,L,R2), cy=clamp(y,T,B2);
+  // project to nearest edge of the ring rect
+  const dl=Math.abs(cx-L), dr=Math.abs(R2-cx), dt2=Math.abs(cy-T), db=Math.abs(B2-cy);
+  const md=Math.min(dl,dr,dt2,db);
+  if(md===dl) gravSrc.x=L, gravSrc.y=cy;
+  else if(md===dr) gravSrc.x=R2, gravSrc.y=cy;
+  else if(md===dt2) gravSrc.x=cx, gravSrc.y=T;
+  else gravSrc.x=cx, gravSrc.y=B2;
+}
+
+/* ============ render ============ */
+function buildWood(){
+  const c=document.createElement('canvas'); c.width=c.height=160;
+  const g=c.getContext('2d');
+  g.fillStyle='#6b4a2c'; g.fillRect(0,0,160,160);
+  for(let y=0;y<160;y+=32){ // planks
+    const gr=g.createLinearGradient(0,y,0,y+32);
+    gr.addColorStop(0,'#7a5433'); gr.addColorStop(0.5,'#66452a'); gr.addColorStop(1,'#57391f');
+    g.fillStyle=gr; g.fillRect(0,y,160,31);
+  }
+  g.strokeStyle='rgba(40,24,10,0.55)'; g.lineWidth=1;
+  for(let i2=0;i2<26;i2++){ // grain
+    const y=Math.random()*160, a=Math.random()*6.28;
+    g.beginPath();
+    for(let x=0;x<=160;x+=8) g.lineTo(x, y+Math.sin(x*0.05+a)*3+Math.sin(x*0.11+a*2)*1.5);
+    g.stroke();
+  }
+  for(let i2=0;i2<4;i2++){ // knots
+    const x=Math.random()*160,y=Math.random()*160;
+    g.strokeStyle='rgba(46,28,12,0.7)';
+    for(let r2=2;r2<8;r2+=2){ g.beginPath(); g.ellipse(x,y,r2*1.4,r2,0.3,0,6.28); g.stroke(); }
+  }
+  woodCanvas=c;
+}
+function drawWood(){
+  if(!woodCanvas) buildWood();
+  const pat=ctx.createPattern(woodCanvas,'repeat');
+  const L=FX,T=FY,R2=FX+GW*CELL,B2=FY+GH*CELL;
+  ctx.fillStyle=pat;
+  ctx.fillRect(L-BR,T-BR,(R2-L)+2*BR,BR);        // top
+  ctx.fillRect(L-BR,B2,(R2-L)+2*BR,BR);          // bottom
+  ctx.fillRect(L-BR,T,BR,B2-T);                  // left
+  ctx.fillRect(R2,T,BR,B2-T);                    // right
+  ctx.strokeStyle='rgba(255,220,170,0.16)'; ctx.lineWidth=2;
+  ctx.strokeRect(L-BR+1,T-BR+1,(R2-L)+2*BR-2,(B2-T)+2*BR-2);
+  ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.strokeRect(L-1,T-1,R2-L+2,B2-T+2);
+  // interior walls
+  for(let y=0;y<GH;y++) for(let x=0;x<GW;x++){ if(!walls[y*GW+x]) continue;
+    const wx=FX+x*CELL, wy=FY+y*CELL;
+    ctx.fillStyle=pat; ctx.fillRect(wx,wy,CELL+0.5,CELL+0.5);
+    ctx.fillStyle='rgba(255,220,170,0.09)'; ctx.fillRect(wx,wy,CELL,2);
+    ctx.fillStyle='rgba(0,0,0,0.30)'; ctx.fillRect(wx,wy+CELL-2,CELL,2);
+  }
+}
+function rrect(x,y,w,h,r){ ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function drawSockets(){
+  for(const o of objs){
+    const pulse=0.47+0.20*Math.sin(tSim*3+o.say);
+    for(const c of o.sock){
+      const x=FX+c.x*CELL, y=FY+c.y*CELL, m=CELL*0.10;
+      if(o.locked){ ctx.fillStyle=o.col.c+'22'; ctx.fillRect(x,y,CELL,CELL); continue; }
+      ctx.fillStyle='rgba(0,0,0,0.32)'; ctx.fillRect(x+2,y+2,CELL-4,CELL-4);
+      ctx.globalAlpha=pulse;
+      ctx.strokeStyle=o.col.c; ctx.lineWidth=1.6; ctx.setLineDash([5,4]);
+      rrect(x+m,y+m,CELL-2*m,CELL-2*m,CELL*0.14); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha=1;
+      ctx.fillStyle=o.col.c+'12'; ctx.fillRect(x+m,y+m,CELL-2*m,CELL-2*m);
+    }
+  }
+}
+function drawGem(o){
+  const col=o.col;
+  if(o.phase==='solid'||o.phase==='freezing'){
+    const k = o.phase==='freezing' ? Math.min(1,o.freezeT/0.5) : 1;
+    const jx=o.jx||0, jy=o.jy||0;
+    // merged silhouette then bevel facets per square
+    for(const p of o.ps){
+      const s=CELL*0.94*(0.75+0.25*k), h=s/2, x=p.x+jx, y=p.y+jy;
+      const r=CELL*0.16;
+      const gr=ctx.createLinearGradient(x-h,y-h,x+h,y+h);
+      gr.addColorStop(0,col.hi); gr.addColorStop(0.42,col.c); gr.addColorStop(1,col.lo);
+      ctx.fillStyle=gr; rrect(x-h,y-h,s,s,r); ctx.fill();
+      if(o.locked){ ctx.strokeStyle=col.hi; ctx.globalAlpha=0.7; ctx.lineWidth=1.4; rrect(x-h,y-h,s,s,r); ctx.stroke(); ctx.globalAlpha=1; }
+      // facet bevels
+      ctx.globalAlpha=0.5*k; ctx.fillStyle=col.hi;
+      ctx.beginPath(); ctx.moveTo(x-h+2,y-h+2); ctx.lineTo(x+h-2,y-h+2); ctx.lineTo(x,y); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha=0.4*k; ctx.fillStyle=col.lo;
+      ctx.beginPath(); ctx.moveTo(x-h+2,y+h-2); ctx.lineTo(x+h-2,y+h-2); ctx.lineTo(x,y); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha=0.85; ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(x-s*0.22,y-s*0.24,s*0.07,0,6.28); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+  } else if(o.phase==='liquid'){
+    // pass 1: dark rim blobs + MST bridges, pass 2: bright core
+    const edges=o.mst;
+    ctx.lineCap='round';
+    for(let pass=0;pass<2;pass++){
+      const rr2=CELL*(pass?0.40:0.52);
+      ctx.fillStyle=pass?col.c:col.lo; ctx.strokeStyle=pass?col.c:col.lo;
+      ctx.lineWidth=rr2*2*0.9;
+      for(const e of edges){ const a=o.ps[e[0]],b=o.ps[e[1]];
+        if(Math.hypot(a.x-b.x,a.y-b.y)<CELL*1.7){ ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); } }
+      for(const p of o.ps){ const v=Math.hypot(p.x-p.px,p.y-p.py);
+        const wob=1+Math.min(0.22,v*0.06);
+        ctx.beginPath(); ctx.arc(p.x,p.y,rr2*wob,0,6.28); ctx.fill(); }
+    }
+    ctx.globalAlpha=0.55; ctx.fillStyle=col.hi;
+    for(const p of o.ps){ ctx.beginPath(); ctx.arc(p.x-CELL*0.12,p.y-CELL*0.14,CELL*0.11,0,6.28); ctx.fill(); }
+    ctx.globalAlpha=1;
+  } else { // gas
+    for(const p of o.ps){
+      const pl=1+0.16*Math.sin(p.wp*1.7);
+      const r2=CELL*0.62*pl;
+      const gr=ctx.createRadialGradient(p.x,p.y,r2*0.1,p.x,p.y,r2);
+      gr.addColorStop(0,col.c+'70'); gr.addColorStop(0.7,col.c+'30'); gr.addColorStop(1,col.c+'00');
+      ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(p.x,p.y,r2,0,6.28); ctx.fill();
+      ctx.globalAlpha=0.6; ctx.fillStyle=col.hi;
+      ctx.beginPath(); ctx.arc(p.x,p.y,CELL*0.07,0,6.28); ctx.fill(); ctx.globalAlpha=1;
+    }
+  }
+  // latched sources ride the gem
+  const c=centroid(o); let s=0;
+  for(let i2=0;i2<o.heats;i2++,s++) drawSourceOrb('heat', c.x+Math.cos(tSim*1.3+s*2.1)*CELL*0.55, c.y+Math.sin(tSim*1.3+s*2.1)*CELL*0.4-CELL*0.5, 0.8);
+  for(let i2=0;i2<o.colds;i2++,s++) drawSourceOrb('cold', c.x+Math.cos(tSim*1.3+s*2.1)*CELL*0.55, c.y+Math.sin(tSim*1.3+s*2.1)*CELL*0.4-CELL*0.5, 0.8);
+}
+function drawSourceOrb(kind,x,y,sc){
+  const r2=13*sc;
+  ctx.fillStyle='#f4f6ff'; ctx.beginPath(); ctx.arc(x,y,r2,0,6.28); ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1; ctx.stroke();
+  const hot=kind==='heat';
+  const f1=hot?'#ff5a1f':'#3fa9ff', f2=hot?'#ffd60a':'#b8f1ff';
+  const fl=Math.sin(tSim*17+x)*0.18+Math.sin(tSim*29+y)*0.12;
+  ctx.fillStyle=f1;
+  ctx.beginPath();
+  ctx.moveTo(x,y+r2*0.5);
+  ctx.bezierCurveTo(x-r2*0.55,y+r2*0.1, x-r2*(0.3+fl), y-r2*0.35, x, y-r2*(0.62+fl));
+  ctx.bezierCurveTo(x+r2*(0.3-fl), y-r2*0.35, x+r2*0.55, y+r2*0.1, x, y+r2*0.5);
+  ctx.fill();
+  ctx.fillStyle=f2;
+  ctx.beginPath(); ctx.ellipse(x,y+r2*0.12,r2*0.2,r2*(0.3+fl*0.5),0,0,6.28); ctx.fill();
+}
+function drawBuckets(){
+  const b=bucketRects();
+  for(const side of ['hot','cold']){
+    const q=b[side], hot=side==='hot';
+    const gr=ctx.createLinearGradient(q.x,q.y,q.x,q.y+q.h);
+    gr.addColorStop(0,'#3a3f52'); gr.addColorStop(1,'#1c1f2c');
+    ctx.fillStyle=gr;
+    ctx.beginPath();
+    ctx.moveTo(q.x,q.y); ctx.lineTo(q.x+q.w,q.y);
+    ctx.lineTo(q.x+q.w-8,q.y+q.h); ctx.lineTo(q.x+8,q.y+q.h); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle=hot?'rgba(255,90,31,0.8)':'rgba(63,169,255,0.8)'; ctx.lineWidth=2; ctx.stroke();
+    const glow=ctx.createRadialGradient(q.x+q.w/2,q.y+q.h*0.4,2,q.x+q.w/2,q.y+q.h*0.4,q.w*0.42);
+    glow.addColorStop(0,hot?'rgba(255,120,30,0.5)':'rgba(80,180,255,0.5)'); glow.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=glow; ctx.fillRect(q.x,q.y,q.w,q.h);
+    const n=(hot?heatN:coldN)-((dragSrc&&dragSrc.kind===(hot?'heat':'cold'))?1:0);
+    if(n>0) drawSourceOrb(hot?'heat':'cold', q.x+q.w/2, q.y+q.h*0.42, 1);
+    ctx.fillStyle='#fff'; ctx.font='bold 13px "Share Tech Mono"'; ctx.textAlign='center';
+    ctx.beginPath(); ctx.arc(q.x+q.w-14,q.y+12,10,0,6.28);
+    ctx.fillStyle=hot?'#ff5a1f':'#3fa9ff'; ctx.fill();
+    ctx.fillStyle='#06060e'; ctx.fillText(String(n), q.x+q.w-14, q.y+16.5);
+    ctx.fillStyle='var(--dim)'; ctx.fillStyle='#8899bb'; ctx.font='10px "Share Tech Mono"';
+    ctx.fillText(hot?'HOT':'COLD', q.x+q.w/2, q.y+q.h-6);
+  }
+}
+function drawGrav(){
+  if(!gravSrc) return;
+  const x=gravSrc.x,y=gravSrc.y, r2=Math.max(15,BR*0.72);
+  const pl=1+0.08*Math.sin(tSim*2.6);
+  const halo=ctx.createRadialGradient(x,y,r2*0.3,x,y,r2*2.6);
+  halo.addColorStop(0,'rgba(180,79,255,0.35)'); halo.addColorStop(1,'rgba(180,79,255,0)');
+  ctx.fillStyle=halo; ctx.beginPath(); ctx.arc(x,y,r2*2.6,0,6.28); ctx.fill();
+  ctx.fillStyle='#05040a'; ctx.beginPath(); ctx.arc(x,y,r2*pl,0,6.28); ctx.fill();
+  ctx.strokeStyle='#b44fff'; ctx.lineWidth=2;
+  for(let a2=0;a2<3;a2++){ ctx.globalAlpha=0.7-a2*0.2;
+    ctx.beginPath(); ctx.arc(x,y,r2*(0.35+a2*0.22),tSim*(2.2-a2*0.5)+a2*2.1,tSim*(2.2-a2*0.5)+a2*2.1+4.1); ctx.stroke(); }
+  ctx.globalAlpha=1;
+  const ring=(tSim*0.7)%1;
+  ctx.globalAlpha=(1-ring)*0.5; ctx.beginPath(); ctx.arc(x,y,r2*(1+ring*1.3),0,6.28); ctx.stroke();
+  ctx.globalAlpha=1;
+}
+function drawFx(){
+  for(const f of fx){
+    const k=f.t/0.7;
+    if(f.kind==='spark'){ const d=f.sp*f.t;
+      ctx.globalAlpha=1-k; ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(f.x+Math.cos(f.a)*d, f.y+Math.sin(f.a)*d-f.t*CELL*1.2, 2.2*(1-k), 0, 6.28); ctx.fill();
+    } else {
+      ctx.globalAlpha=(1-k)*0.5;
+      ctx.strokeStyle=f.kind==='melt'?'#ff8c1a':f.kind==='boil'?'#dde3ff':'#8be9ff';
+      ctx.beginPath(); ctx.arc(f.x,f.y-k*CELL*0.6,CELL*0.25+k*CELL*0.7,0,6.28); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha=1;
+}
+function render(){
+  ctx.clearRect(0,0,W,H);
+  if(!lvl){ ctx.fillStyle='#0a0c16'; ctx.fillRect(0,0,W,H); return; }
+  ctx.save();
+  if(shakeT>0){ ctx.translate((Math.random()-0.5)*shakeT*16,(Math.random()-0.5)*shakeT*16); }
+  // field bg
+  ctx.fillStyle='#0a0c16'; ctx.fillRect(FX,FY,GW*CELL,GH*CELL);
+  ctx.fillStyle='rgba(120,140,200,0.06)';
+  for(let y=0;y<GH;y++) for(let x=0;x<GW;x++) ctx.fillRect(FX+x*CELL+CELL/2-0.7,FY+y*CELL+CELL/2-0.7,1.4,1.4);
+  drawSockets();
+  for(const o of objs) if(o.locked) drawGem(o);
+  for(const o of objs) if(!o.locked) drawGem(o);
+  drawFx();
+  drawWood();
+  drawGrav();
+  drawBuckets();
+  for(const f of flying){ const p2=flyPos(f); drawSourceOrb(f.kind,p2.x,p2.y,0.9); }
+  if(dragSrc) drawSourceOrb(dragSrc.kind,finger.x,finger.y,1.1);
+  ctx.restore();
+}
+
+
+/* ============ audio ============ */
+let ac=null, sfxGain=null, musicGain=null, noiseBuf=null, songTimer=null;
+function audioInit(){
+  if(ac) { if(ac.state==='suspended') ac.resume(); return; }
+  try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
+  sfxGain=ac.createGain(); musicGain=ac.createGain();
+  sfxGain.connect(ac.destination); musicGain.connect(ac.destination);
+  noiseBuf=ac.createBuffer(1,ac.sampleRate,ac.sampleRate);
+  const d=noiseBuf.getChannelData(0);
+  for(let i2=0;i2<d.length;i2++) d[i2]=Math.random()*2-1;
+  applyVolumes(); songTimer=setInterval(musTick,60);
+}
+function applyVolumes(){
+  $('mute-btn').textContent = (save.sfxMute&&save.musMute)?'🔇':'🔊';
+  $('sfx-mute').textContent = save.sfxMute?'🔇':'🔊';
+  $('mus-mute').textContent = save.musMute?'🔇':'🎵';
+  if(!ac) return;
+  sfxGain.gain.value = save.sfxMute?0:(save.sfx/100)*0.9;
+  musicGain.gain.value = save.musMute?0:(save.mus/100)*0.42;
+}
+function tone(freq,dur,type,vol,when,slide,dest){
+  if(!ac) return;
+  const t=(when||ac.currentTime), o=ac.createOscillator(), g=ac.createGain();
+  o.type=type||'sine'; o.frequency.setValueAtTime(freq,t);
+  if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(20,slide),t+dur);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+  o.connect(g); g.connect(dest||sfxGain); o.start(t); o.stop(t+dur+0.05);
+}
+function noise(dur,vol,fLo,fHi,when,slideHz){
+  if(!ac) return;
+  const t=(when||ac.currentTime), s=ac.createBufferSource(), g=ac.createGain(), f=ac.createBiquadFilter();
+  s.buffer=noiseBuf; s.loop=true;
+  f.type='bandpass'; f.frequency.setValueAtTime((fLo+fHi)/2,t); f.Q.value=0.8;
+  if(slideHz) f.frequency.exponentialRampToValueAtTime(Math.max(40,slideHz),t+dur);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+  s.connect(f); f.connect(g); g.connect(sfxGain); s.start(t); s.stop(t+dur+0.05);
+}
+const sfxMelt =()=>{ tone(520,0.5,'sawtooth',0.10,0,120); noise(0.55,0.12,900,2400,0,300); };
+const sfxBoil =()=>{ if(!ac)return; for(let i2=0;i2<5;i2++) tone(260+i2*90+Math.random()*60,0.12,'sine',0.09,ac.currentTime+i2*0.07,700); noise(0.6,0.10,1800,4200); };
+const sfxCondense=()=>{ if(!ac)return; noise(0.5,0.11,3600,1200,0,500); for(let i2=0;i2<3;i2++) tone(900-i2*180,0.12,'sine',0.08,ac.currentTime+i2*0.09); };
+const sfxThunk=()=>{ tone(150,0.22,'sine',0.30,0,60); tone(90,0.30,'triangle',0.22,0,45); noise(0.06,0.16,2000,5000); };
+const sfxLock =()=>{ if(!ac)return; const t=ac.currentTime; [660,880,1320].forEach((f,i2)=>tone(f,0.28,'triangle',0.14,t+i2*0.07)); };
+const sfxError=()=>{ if(!ac)return; tone(160,0.22,'square',0.13,0,110); tone(110,0.3,'square',0.10,ac.currentTime+0.1,80); };
+const sfxSlosh=()=>{ noise(0.28,0.07,500,1400,0,300); };
+const sfxPickup=()=>{ tone(700,0.07,'sine',0.10,0,900); };
+const sfxAttach=()=>{ tone(300,0.1,'sine',0.12,0,540); noise(0.12,0.06,2500,5000); };
+const sfxRelease=()=>{ tone(540,0.1,'sine',0.10,0,300); };
+const sfxTap  =()=>{ tone(420,0.05,'sine',0.06); };
+const sfxCancel=()=>{ if(!ac)return; const t=ac.currentTime; tone(880,0.16,'triangle',0.12,t); tone(587,0.2,'triangle',0.12,t+0.09); noise(0.3,0.09,2000,4500,t); };
+const sfxWin  =()=>{ if(!ac)return; const t=ac.currentTime; [523,659,784,1046,1318].forEach((f,i2)=>tone(f,0.4,'triangle',0.15,t+i2*0.11)); };
+
+/* 10 procedural songs — tiny generative sequencer, seeded per song */
+function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0;
+  let t2=Math.imul(a^a>>>15,1|a); t2=t2+Math.imul(t2^t2>>>7,61|t2)^t2;
+  return ((t2^t2>>>14)>>>0)/4294967296; }; }
+const SONGS=[
+  {bpm:92, root:57, minor:1, prog:[0,5,3,4], lead:'triangle', bass:'sine',    hat:0.5, arp:0},
+  {bpm:108,root:60, minor:0, prog:[0,3,4,3], lead:'square',   bass:'triangle',hat:0.7, arp:1},
+  {bpm:84, root:55, minor:1, prog:[0,2,5,4], lead:'sine',     bass:'sine',    hat:0.3, arp:1},
+  {bpm:116,root:62, minor:0, prog:[0,4,5,3], lead:'sawtooth', bass:'triangle',hat:0.8, arp:0},
+  {bpm:76, root:53, minor:1, prog:[0,5,1,4], lead:'triangle', bass:'sine',    hat:0.2, arp:1},
+  {bpm:100,root:59, minor:0, prog:[0,3,1,4], lead:'square',   bass:'sine',    hat:0.6, arp:0},
+  {bpm:124,root:57, minor:1, prog:[0,6,5,4], lead:'sawtooth', bass:'square',  hat:0.9, arp:1},
+  {bpm:88, root:64, minor:0, prog:[0,4,1,5], lead:'sine',     bass:'triangle',hat:0.4, arp:0},
+  {bpm:104,root:55, minor:1, prog:[0,3,6,4], lead:'triangle', bass:'sine',    hat:0.7, arp:1},
+  {bpm:96, root:62, minor:0, prog:[0,5,3,4], lead:'square',   bass:'triangle',hat:0.5, arp:0},
+];
+let song=null, songRng=null, musNext=0, musStep=0;
+function songStart(i){
+  song=SONGS[i%SONGS.length]; songRng=mulberry(1234+i*77); musStep=0;
+  if(ac) musNext=ac.currentTime+0.1;
+}
+const midiHz=m=>440*Math.pow(2,(m-69)/12);
+function musTick(){
+  if(!ac||!song||save.musMute||ac.state!=='running') return;
+  if(musNext<ac.currentTime) musNext=ac.currentTime+0.05;
+  const spb=60/song.bpm, step8=spb/2;
+  const scale=song.minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11];
+  while(musNext<ac.currentTime+0.2){
+    const bar=Math.floor(musStep/8)%4, s8=musStep%8;
+    const deg=song.prog[bar];
+    const rootM=song.root+scale[deg%7]+(deg>=7?12:0);
+    const t=musNext;
+    if(s8===0||s8===4) tone(midiHz(rootM-24),step8*1.8,song.bass,0.16,t,undefined,musicGain);
+    if(s8===2&&songRng()<0.6) tone(midiHz(rootM-12),step8*0.9,song.bass,0.10,t,undefined,musicGain);
+    if(songRng()<song.hat){
+      const s2=ac.createBufferSource(),g2=ac.createGain(),f2=ac.createBiquadFilter();
+      s2.buffer=noiseBuf; s2.loop=true; f2.type='highpass'; f2.frequency.value=7000;
+      g2.gain.setValueAtTime(0.05,t); g2.gain.exponentialRampToValueAtTime(0.001,t+0.05);
+      s2.connect(f2); f2.connect(g2); g2.connect(musicGain); s2.start(t); s2.stop(t+0.08);
+    }
+    if((song.arp?s8%2===0:(s8===0||s8===3||s8===6))&&songRng()<0.8){
+      const ni=[0,2,4,2,0,4,2,4][s8]; const oct=songRng()<0.25?12:0;
+      tone(midiHz(song.root+12+scale[(deg+ni)%7]+oct),step8*(song.arp?0.9:1.6),song.lead,0.07,t,undefined,musicGain);
+    }
+    musNext+=step8; musStep++;
+  }
+}
+document.addEventListener('visibilitychange',()=>{ if(!ac) return;
+  if(document.hidden) ac.suspend(); else ac.resume(); });
+
+/* ============ UI wiring ============ */
+function buildLvlSel(){
+  const sel=$('lvlsel'); sel.innerHTML='';
+  for(let i2=0;i2<LEVELS.length;i2++){
+    const unlocked = i2===0 || save.done[i2-1] || save.done[i2];
+    const op=document.createElement('option');
+    op.value=i2; op.disabled=!unlocked;
+    op.textContent='L'+(i2+1)+' · '+LEVELS[i2].name+(save.done[i2]?' ✓':unlocked?'':' 🔒');
+    if(i2===lvlIdx) op.selected=true;
+    sel.appendChild(op);
+  }
+}
+$('play-btn').onclick=()=>{ audioInit(); $('menu').classList.add('hide');
+  let i2=0; while(i2<LEVELS.length-1&&save.done[i2]) i2++;
+  loadLevel(i2); };
+$('next-btn').onclick=()=>{ audioInit(); $('clear').classList.add('hide'); loadLevel(Math.min(lvlIdx+1,LEVELS.length-1)); };
+$('replay-btn').onclick=()=>{ audioInit(); $('clear').classList.add('hide'); loadLevel(lvlIdx); };
+$('reload-btn').onclick=()=>{ audioInit(); if(lvl){ $('clear').classList.add('hide'); loadLevel(lvlIdx); sfxTap(); } };
+$('lvlsel').onchange=e=>{ audioInit(); $('clear').classList.add('hide'); loadLevel(+e.target.value); };
+$('gear-btn').onclick=()=>{ audioInit(); $('settings').classList.remove('hide'); };
+$('set-close').onclick=()=>{ $('settings').classList.add('hide'); };
+$('mute-btn').onclick=()=>{ audioInit();
+  const allMuted=save.sfxMute&&save.musMute;
+  save.sfxMute=save.musMute=!allMuted; persist(); applyVolumes(); };
+$('sfx-mute').onclick=()=>{ save.sfxMute=!save.sfxMute; persist(); applyVolumes(); };
+$('mus-mute').onclick=()=>{ save.musMute=!save.musMute; persist(); applyVolumes(); };
+$('mus-vol').oninput=e=>{ save.mus=+e.target.value; save.musMute=false; persist(); applyVolumes(); };
+$('sfx-vol').oninput=e=>{ save.sfx=+e.target.value; save.sfxMute=false; persist(); applyVolumes(); };
+
+/* ============ boot + loop ============ */
+cv=$('cv'); ctx=cv.getContext('2d');
+$('mus-vol').value=save.mus; $('sfx-vol').value=save.sfx;
+window.addEventListener('resize',()=>layout());
+cv.addEventListener('mousedown',onDown); cv.addEventListener('mousemove',onMove);
+window.addEventListener('mouseup',onUp);
+cv.addEventListener('touchstart',onDown,{passive:false});
+cv.addEventListener('touchmove',onMove,{passive:false});
+cv.addEventListener('touchend',onUp,{passive:false});
+layout(); buildLvlSel(); applyVolumes();
+let lastT=0;
+function loop(t){
+  const dt=Math.min(0.1,(t-lastT)/1000||0.016); lastT=t;
+  if(game==='play'){ if(!TEST) stepSim(dt); stepFlying(dt); stepFx(dt);
+    if(shakeT>0) shakeT-=dt;
+    for(const o of objs) if(o.phase==='solid'&&!o.locked&&o!==dragObj) checkSocket(o,false);
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ============ test API ============ */
+if(TEST){
+  window.__GF={
+    load:i2=>{ $('menu').classList.add('hide'); $('clear').classList.add('hide'); loadLevel(i2); },
+    state:()=>({ game, lvl:lvlIdx, heatN, coldN,
+      objs:objs.map(o=>{ const xs=o.ps.map(p=>(p.x-FX)/CELL), ys=o.ps.map(p=>(p.y-FY)/CELL);
+        return { L:o.letter, phase:o.phase, heats:o.heats, colds:o.colds, locked:o.locked,
+        ax:Math.round((o.axp-FX)/CELL), ay:Math.round((o.ayp-FY)/CELL),
+        cx:(centroid(o).x-FX)/CELL, cy:(centroid(o).y-FY)/CELL,
+        minx:Math.min(...xs), maxx:Math.max(...xs), miny:Math.min(...ys), maxy:Math.max(...ys) }; }) }),
+    applySource:(kind,L)=>{ const o=objs.find(u=>u.letter===L); if(!o) return false;
+      if((kind==='heat'?heatN:coldN)<=0) return false;
+      const used=dropSourceOn(kind,o); if(used){ if(kind==='heat') heatN--; else coldN--; } return used; },
+    tapHome:L=>{ const o=objs.find(u=>u.letter===L); return o?tapHome(o):false; },
+    dragTo:(L,cx2,cy2)=>{ const o=objs.find(u=>u.letter===L);
+      if(!o||o.phase!=='solid'||o.locked) return false;
+      moveSolid(o, FX+cx2*CELL, FY+cy2*CELL);
+      const ax=Math.round((o.axp-FX)/CELL), ay=Math.round((o.ayp-FY)/CELL);
+      const rects=solidRects(o);
+      if(Math.abs(FX+ax*CELL-o.axp)<CELL*0.42&&Math.abs(FY+ay*CELL-o.ayp)<CELL*0.42&&solidFits(o,FX+ax*CELL,FY+ay*CELL,rects)){
+        o.axp=FX+ax*CELL; o.ayp=FY+ay*CELL; }
+      syncSolid(o); checkSocket(o,false); return true; },
+    setGrav:(cx2,cy2)=>{ if(!gravSrc) return false; placeGrav(FX+cx2*CELL, FY+cy2*CELL); return true; },
+    step:s=>{ const n=Math.round(s/(1/120)); for(let i2=0;i2<n;i2++) sub(1/120);
+      stepFlying(s);
+      for(const o of objs) if(o.phase==='solid'&&!o.locked) checkSocket(o,false); },
+    gravAt:()=>gravSrc?{x:(gravSrc.x-FX)/CELL,y:(gravSrc.y-FY)/CELL}:null,
+    freezeDry:L=>{ const o=objs.find(u=>u.letter===L); return o?tryFreeze(o,true):null; },
+    parts:L=>{ const o=objs.find(u=>u.letter===L);
+      return o?o.ps.map(p=>({x:(p.x-FX)/CELL,y:(p.y-FY)/CELL})):null; },
+    levels:LEVELS.length, save:()=>save,
+  };
+}
+</script>
+</body>
+</html>
