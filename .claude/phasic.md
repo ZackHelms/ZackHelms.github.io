@@ -29,6 +29,14 @@ verbs, no keyboard, the back/reload chrome is web-only by design.
 - **Freeze needs room**: placement search around the puddle's ideal anchor
   (radius 1.7 cells, per-particle jump ≤1.9 cells; the SOCKET placement gets
   a longer 2.35 reach and is tried first — "close counts, it snaps in").
+  **Settled puddles get a fair reach** (phasfreeze fix, 2026-07-31): a
+  RESTING puddle (max per-particle drift ≤ CELL·0.01 per sub-step) widens
+  the non-socket jump cap to `min(2.6, max(1.9, h−0.9+0.45))` for an h-tall
+  footprint — a 1-row pancake must reach h−0.9 cells up, so the flat 1.9
+  structurally refused EVERY settled 3-tall gem — and seeds extra candidate
+  anchors that stand the footprint on the puddle's resting row. Moving
+  puddles keep 1.9 exactly, so mid-air/mid-pour freezes still refuse. Rule
+  of thumb: at rest with real room, the first frost takes.
   No valid placement → refusal: error buzz, shake, toast, `navigator.vibrate`
   (no-op on iOS Safari — real haptics arrive in the iOS build).
 - **Gravity well** (0–1 per level): lives in a middle GRAV bucket between
