@@ -802,6 +802,17 @@ function tryFreeze(o,dry){ // liquid -> solid; needs room for true footprint; dr
   let mox=0,moy=0; for(const of2 of o.off){mox+=of2.x;moy+=of2.y;}
   mox/=o.off.length; moy/=o.off.length;
   const bx=cax-mox, by=cay-moy; // ideal anchor
+  // A settled puddle lies one row deep with its particles ~0.4 cells above the
+  // surface, so the top row of an h-tall footprint is always h-0.9 cells up:
+  // 1.9 refuses every 3-tall gem that is not already centred on its socket.
+  // REST_V is per-particle drift per 1/120 s sub-step — settled reads ≤0.0005,
+  // a pour or a well-dragged puddle reads 0.04-0.09, so only true rest widens.
+  const REST_V=CELL*0.01;
+  let mv=0; for(const p of o.ps) mv=Math.max(mv,Math.hypot(p.x-p.px,p.y-p.py));
+  const rest=mv<=REST_V;
+  let ofw=0,ofh=0; for(const of2 of o.off){ if(of2.x>ofw) ofw=of2.x; if(of2.y>ofh) ofh=of2.y; }
+  ofw++; ofh++;                                             // footprint extent in cells
+  const jcap=rest?Math.min(2.6,Math.max(1.9,ofh-0.9+0.45)):1.9;
   const cand=[];
   // socket first, if in reach
   const sd=Math.hypot(o.sax-bx,o.say-by);
@@ -810,6 +821,17 @@ function tryFreeze(o,dry){ // liquid -> solid; needs room for true footprint; dr
     const ax=Math.round(bx)+dx, ay=Math.round(by)+dy;
     const d=Math.hypot(ax-bx,ay-by); if(d>1.7) continue;
     cand.push({x:ax,y:ay,d});
+  }
+  if(rest){ // the centroid of a pancake sits ~1.5 rows below the anchor that
+    let my=-1e9; for(const p of o.ps) if(p.y>my) my=p.y;   // stands the shape ON it —
+    const ry=Math.floor((my-FY)/CELL);                     // or one row up, when the
+    for(let k=0;k<2;k++){ const ay=ry-ofh+1-k;             // puddle shares its floor row
+      for(let dx=-2;dx<=2;dx++){
+        const ax=Math.round(bx)+dx;
+        if(ax<0||ay<0||ax+ofw>GW||ay+ofh>GH) continue;
+        if(cand.some(q=>q.x===ax&&q.y===ay)) continue;
+        cand.push({x:ax,y:ay,d:Math.hypot(ax-bx,ay-by)});
+      } }
   }
   cand.sort((a,b)=>a.d-b.d);
   const diag=dry?{b:[bx,by],sd,cands:[]}:null;
@@ -832,7 +854,7 @@ function tryFreeze(o,dry){ // liquid -> solid; needs room for true footprint; dr
         if(d<bd){bd=d;bi=p2;} }
       takenP[bi]=true; map[t]=bi;
       // the socket gets a longer jello reach — close counts, it snaps in
-      if(Math.sqrt(bd)>CELL*(cd.sock?2.35:1.9)){ far=true;
+      if(Math.sqrt(bd)>CELL*(cd.sock?Math.max(2.35,jcap):jcap)){ far=true;
         if(diag) diag.cands[diag.cands.length-1].jump=Math.sqrt(bd)/CELL;
         break; }
     }
