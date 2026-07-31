@@ -116,6 +116,30 @@ function check(name, cond, extra) {
   async function shot(name) {
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name + '.png') });
   }
+  // ---- phasfreeze helpers: settled-puddle freeze fix (commit 16c4a28) ----
+  const REST_V = 0.01; // CELL*0.01 in cell units — mirrors tryFreeze's own REST_V threshold
+  function maxJumpBetween(a, b) { // per-particle distance between two parts() snapshots, cell units
+    let m = 0;
+    for (let k = 0; k < a.length; k++) m = Math.max(m, Math.hypot(a[k].x - b[k].x, a[k].y - b[k].y));
+    return m;
+  }
+  async function driftNow(L) { // one sub-step's worth of per-particle motion — the same
+    const before = await g('G=>G.parts("' + L + '")');           // measure tryFreeze itself
+    await step(1 / 120);                                          // uses to decide RESTING
+    return maxJumpBetween(before, await g('G=>G.parts("' + L + '")'));
+  }
+  async function ensureLiquid(L) { // liquid-base gems are already liquid; solids get melted; gas skipped
+    const o2 = await obj(L);
+    if (!o2 || o2.phase === 'gas') return false;
+    if (o2.phase === 'solid') { await g('G=>G.grant(1,0)'); if (!(await apply('heat', L))) return false; }
+    return true;
+  }
+  async function realFreeze(L) { // the actual play-path commit: tap frees a latched flame, else throw frost
+    const o2 = await obj(L);
+    if (o2.heats > 0) return tap(L);
+    await g('G=>G.grant(0,1)');
+    return apply('cold', L);
+  }
 
   // ---------- boot ----------
   check('test API present', await page.evaluate('!!window.__GF'));
@@ -609,6 +633,92 @@ function check(name, cond, extra) {
     const ok = await g('G=>G.replayGen()');
     check('endless L' + (i + 1) + ': generated + solver-replayed to a win', ok && (await st()).objs.every(x => x.home));
   }
+
+  // ---------- phasfreeze: settled-puddle freeze fix (commit 16c4a28) ----------
+  // tryFreeze now widens the per-particle jump cap for RESTING puddles only —
+  // scaled to footprint height, min(2.6, max(1.9, footprintHeight-0.9+0.45)) —
+  // and seeds surface-row anchors, so a settled 3-tall gem (T5, letter C)
+  // reaches its true footprint instead of refusing at the old fixed 1.9 cap.
+  // A still-falling/dragged puddle keeps the plain 1.9 cap — the mid-air
+  // freeze exploit stays dead. Indices are scanned at runtime (the generator
+  // re-rolls whenever templates change) — never hardcode a level number here.
+  const FREEZE_SCAN_HI = 96;
+
+  // T5/C: a moving puddle still refuses (the exploit stays dead); the same
+  // puddle once truly at rest now finds room and freezes within the wider cap.
+  let t5 = null;
+  for (let i = 0; i < FREEZE_SCAN_HI; i++) {
+    await load(i);
+    if (!(await g('G=>G.genInfo()'))) continue; // generated levels only
+    if (!(await ensureLiquid('C'))) continue;
+    await step(0.5); // early in the pour — fixed, deterministic
+    const earlyDrift = await driftNow('C');
+    if (earlyDrift <= REST_V) continue; // didn't catch it moving; try another index
+    const earlyDry = await g('G=>G.freezeDry("C")');
+    if (earlyDry && earlyDry.pick) continue; // already fits while moving — not the case we want
+    await step(6); // settle
+    const restDrift = await driftNow('C');
+    if (restDrift > REST_V) continue; // hasn't settled yet at this fixed budget
+    const dry = await g('G=>G.freezeDry("C")');
+    if (!dry || !dry.pick) continue; // still refuses settled — not the fixed disease's case
+    t5 = { idx: i, earlyDrift, earlyDry, restDrift, dry };
+    break;
+  }
+  check('phasfreeze: scan finds a settled T5/C level with open floor to freeze into' +
+    (t5 ? ' (found L' + (t5.idx + 1) + ')' : ' — none found, generator may have changed shape'),
+    !!t5, t5);
+
+  if (t5) {
+    check('T5 L' + (t5.idx + 1) + ': mid-pour puddle is genuinely moving (drift ' + t5.earlyDrift.toFixed(4) +
+      ' > rest ' + REST_V + ') and freeze is refused — the mid-air exploit stays dead',
+      t5.earlyDrift > REST_V && !(t5.earlyDry && t5.earlyDry.pick), t5.earlyDry);
+    check('T5 L' + (t5.idx + 1) + ': settled puddle rests (drift ' + t5.restDrift.toFixed(4) +
+      ' <= rest ' + REST_V + ') and freezeDry now finds a candidate at ' + JSON.stringify(t5.dry.pick),
+      t5.restDrift <= REST_V && !!(t5.dry && t5.dry.pick), t5.dry);
+    const t5Committed = await realFreeze('C');
+    const t5PreCommit = await g('G=>G.parts("C")'); // post-reorder, pre-move: target-order snapshot
+    await step(1.2);
+    o = await obj('C');
+    check('T5 L' + (t5.idx + 1) + ': settled freeze commits via the play path and reaches solid within ~1.2s',
+      t5Committed && o.phase === 'solid', o);
+    const t5MaxJump = maxJumpBetween(t5PreCommit, await g('G=>G.parts("C")'));
+    check('T5 L' + (t5.idx + 1) + ": every particle's commit jump stays <= 2.6 cells (max " + t5MaxJump.toFixed(3) + ')',
+      t5MaxJump <= 2.6 + 1e-6, t5MaxJump);
+  }
+
+  // I4/P invariant: settled I4 ALWAYS froze, before and after this fix (h=1
+  // forces only a small jump even at the old fixed cap) — a cheap guard that
+  // the common case stays working.
+  let i4 = null;
+  for (let i = 0; i < FREEZE_SCAN_HI; i++) {
+    await load(i);
+    if (!(await g('G=>G.genInfo()'))) continue;
+    if (!(await ensureLiquid('P'))) continue;
+    await step(6);
+    const restDrift = await driftNow('P');
+    if (restDrift > REST_V) continue;
+    const dry = await g('G=>G.freezeDry("P")');
+    if (!dry || !dry.pick) continue;
+    i4 = { idx: i, restDrift, dry };
+    break;
+  }
+  let i4Result = null;
+  if (i4) {
+    const i4Committed = await realFreeze('P');
+    const i4PreCommit = await g('G=>G.parts("P")');
+    await step(1.2);
+    o = await obj('P');
+    const i4MaxJump = maxJumpBetween(i4PreCommit, await g('G=>G.parts("P")'));
+    i4Result = { committed: i4Committed, phase: o.phase, maxJump: i4MaxJump };
+  }
+  check('phasfreeze invariant: settled I4/P still freezes on the first try' +
+    (i4 ? ' (found L' + (i4.idx + 1) + ', jump ' + i4Result.maxJump.toFixed(3) + ')' : ' — none found, generator may have changed shape'),
+    !!i4 && i4Result.committed && i4Result.phase === 'solid' && i4Result.maxJump <= 2.6 + 1e-6,
+    { i4, i4Result });
+
+  // Room to Pour's shelf refusal (L20, above) already pins the no-room
+  // negative and is unaffected by this fix (moving puddle, small footprint,
+  // never reaches REST_V during the drain) — no duplicate check needed here.
 
   // ---------- complexity ramps ----------
   const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
