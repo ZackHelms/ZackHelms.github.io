@@ -150,18 +150,24 @@ the envelope rises.
 
 ## Generator + endless + STUCK
 
-Levels without an `AUTH` entry come from `buildGen(i,salt)`: single-shelf
-drawer, sockets packed bottom (and a second tier bottom-aligned to row 4
-when the gem count overflows one row), gems scattered in rows 0–2, factor
-set from the curriculum block, difficulty from position-in-block and an
-endless bonus past 64. Every candidate is **beaten by the in-game solver
-before being served** (`makeScript()` plans drag/melt/frost routes;
-`runScriptFast()` executes headlessly on the real sim — deaths abort);
-salts 0–19 are tried, then validated easy rescue salts 90–95. Deterministic
-per index (seeded rng + seeded gas wander), so level 23 is identical on
-every device. **STUCK** (settings) reloads the level and plays the stored solver script as a visible ghost at 4x (input locked, SOLVING… in the hint bar, SFX on); authored levels and script-less emergencies instead get a staggered fly-home (one gem every 0.3s via the freeze animation). Either way the clear records normally.
-`__GF.replayGen()` re-runs the stored winning script — the drive suite
-replays every generated level below 65 plus endless spot checks.
+Levels without an `AUTH` entry come from `buildGen(i,salt)` on one of three
+board templates, drawn seeded-first per candidate: **drawer** (the original
+single shelf), **two-shelf** (shelves rows 4+8, offset gaps, a staging
+floor — sockets dealt scatter-first, packed outside-in from each gap), and
+**gas attic** (ceiling shelf + flue; the born-gas gem sockets in the loft;
+block 4+ only). In the obstacle blocks the generator **weaves the hazard
+into the solution path** (odds ramp within each block): a void directly
+under a slot the pour must cross, with a guaranteed 1x1 plug stone (the
+Stopper, generalized); a mid-field hedge that forces a vapor crossing;
+a fan lane the script rides with the well docked. Woven candidates that
+solve are preferred over plain ones; every candidate is still **beaten by
+the in-game solver before being served** (`makeScript` routes per template
+and weave; `runScriptFast` executes on the real sim — deaths abort, so a
+served hazard is a beaten hazard); salts 0-19, then validated easy rescue
+salts 90-95 (never woven, always drawer). Deterministic per index.
+**STUCK** replays the stored script as the visible ghost. `__GF.mapInfo()`
+exposes the board as geometry (template, weave, obstacle cells, shelves/
+gaps, gems, script) for the drive suite's in-path gates.
 
 ## Wiki (games/phasic/wiki.html)
 

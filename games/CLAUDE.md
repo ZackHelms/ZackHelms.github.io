@@ -442,11 +442,14 @@ flees it along a reachable-height guidance field — how it finds flues).
 liquid base state, gas base state, then obstacles (black hole consumes and
 forces a retry; bushes stop stone and drink liquid but pass vapor; fans
 blow only gas) — 24 authored tutorials/set-pieces, every other level
-generated with that block's factor set and a formalized complexity score,
+generated with that block's factor set and a formalized complexity score
+on three board templates (drawer, two-shelf, gas attic) with hazards woven
+into the solution path in the obstacle blocks,
 endless past 64, each generated level beaten by the in-game solver before
 it is served. STUCK (settings) replays the solver script as a visible ghost; a WIKI button beside it opens the searchable in-game wiki (games/phasic/wiki.html, 12-tactic registry). 10 seeded generative
-songs, separate music/SFX volume + mutes. Drive suite (195 checks incl.
-the generated-content replay gate and the complexity-ramp assert):
+songs, separate music/SFX volume + mutes. Drive suite (246 checks incl.
+the generated-content replay gate, the in-path weave gates and the
+complexity-ramp assert):
 `.claude/tests/drive-phasic.cjs`. Detailed context: `.claude/phasic.md`
 (includes the maintained tactics registry).
 
