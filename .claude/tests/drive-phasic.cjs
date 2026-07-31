@@ -136,6 +136,7 @@ function check(name, cond, extra) {
   check('L1: home by a single drag', (await st()).objs.every(o => o.home));
   await page.waitForTimeout(900);
   check('L1: level clear fires', (await st()).game === 'clear');
+  check('clear screen shows the complexity score', await page.evaluate('document.getElementById("clearcx").textContent') === 'COMPLEXITY ' + (await g('G=>G.complexity()')).score);
 
   // ---------- L2 First Facets ----------
   await load(1);
@@ -165,7 +166,7 @@ function check(name, cond, extra) {
   await dragPath('R', [[1, 2], [1, 7]]);
   check('L8: the crowded drawer unpacked entirely by hand', await allHome(0.6), await st());
 
-  // ---------- L9 Meltdown: melt, pour, frost-quench freezes from afar ----------
+  // ---------- L9 Meltdown: melt, pour, tap-to-revert (no frost bucket below L25) ----------
   await load(8);
   let o = await dragPath('R', [[4, 6]]);
   check('L9: 2x2 solid cannot pass the 1-wide slot', o.ay <= 3, o);
@@ -174,14 +175,36 @@ function check(name, cond, extra) {
   check('L9: liquid drained through the slot', (await obj('R')).cy > 6);
   await step(1.5);
   await shot('phasic-liquid');
-  s = await st();
-  check('L9: frost thrown at the hot gem is not consumed', !(await apply('cold', 'R')) && (await st()).coldN === s.coldN);
-  await step(1.2);
-  o = await obj('R'); s = await st();
-  check('L9: the quench took the flame home AND cooled it solid', s.heatN === 1 && o.phase === 'solid' && o.heats === 0, o);
+  check('L9: tap freezes it solid', await tapRetry('R'));
   check('L9: home after nudge', await ensureHome('R', 4, 9));
   await page.waitForTimeout(900);
   check('L9: clear fires', (await st()).game === 'clear');
+
+  // ---------- mechanic rules: quench both ways (frost debuts at L25, so these
+  // borrow a bucket unit via the TEST-only grant() verb to exercise the rule) ----------
+  await load(8); // Meltdown again — heat:1, cold:0 after the frost strip
+  await g('G=>G.grant(0,1)'); // hand it a frost to throw, as if a bucket existed
+  check('quench: heat melts the gem', await apply('heat', 'R') && (await obj('R')).phase === 'liquid');
+  await step(4);
+  check('quench: liquid drained to open floor', (await obj('R')).cy > 6);
+  s = await st();
+  check('quench: frost thrown at the hot gem is not consumed', !(await apply('cold', 'R')) && (await st()).coldN === s.coldN);
+  await step(1.2);
+  o = await obj('R'); s = await st();
+  check('quench: the quench took the flame home AND cooled it solid', s.heatN === 1 && o.phase === 'solid' && o.heats === 0, o);
+
+  await load(24); // Standing Water — born liquid, cold:1, the symmetric case
+  await step(3);
+  check('quench: frost freezes the born-liquid gem', await apply('cold', 'R'));
+  await step(1.2);
+  o = await obj('R');
+  check('quench: solid with a latched frost', o.phase === 'solid' && o.frosts === 1, o);
+  await g('G=>G.grant(1,0)'); // hand it a flame to throw, as if a bucket existed
+  s = await st();
+  check('quench: heat thrown at the frosted gem is not consumed as a flame', !(await apply('heat', 'R')) && (await st()).heatN === s.heatN);
+  await step(1.2);
+  o = await obj('R'); s = await st();
+  check('quench: fire freed the frost instead — the gem warms back to liquid', o.phase === 'liquid' && o.frosts === 0 && s.coldN === 1, o);
 
   // ---------- L10 Room to Pour: tap refused without room, flame stays ----------
   await load(9);
@@ -289,7 +312,7 @@ function check(name, cond, extra) {
   check('L20: rain landed in the basin, not back down the flue', o.cy < 3.4, o);
   check('L20: second tap freezes it to stone', await tapRetry('P'));
   await step(1.0);
-  check('L20: solved without touching the frost bucket', (await st()).coldN === 2 && await ensureHome('P', 1, 2) && await allHome(0.4), await st());
+  check('L20: solved — no frost bucket exists below L25', (await st()).coldN === 0 && await ensureHome('P', 1, 2) && await allHome(0.4), await st());
 
   // ---------- L21 Balloon Route ----------
   await load(20);
@@ -493,12 +516,36 @@ function check(name, cond, extra) {
     avg(scores[0]).toFixed(1) + ' -> ' + avg(scores[7]).toFixed(1) + ')',
     avg(scores[7]) > avg(scores[0]));
 
-  // ---------- STUCK: auto-solve and skip ----------
+  // ---------- STUCK: the stored solver script plays as a visible ghost ----------
+  async function stuckPlay(maxS) { // drive the ghost on sim time; -1 = never cleared
+    const cap = maxS || 60;
+    let t = 0;
+    for (; t < cap; t++) {
+      const cur = await st();
+      if (cur.game === 'clear') break;
+      if (cur.objs.every(o => o.home)) break; // solved — the 650 ms clear timer is wall-clock
+      await step(1);
+    }
+    await page.waitForTimeout(900);
+    return (await st()).game === 'clear' ? t : -1;
+  }
   await load(65);
   await g('G=>G.stuck()');
-  await page.waitForTimeout(900);
-  check('STUCK: auto-solve completes the level', (await st()).game === 'clear');
+  await step(0.1);
+  check('STUCK: no instant teleport — the ghost is still playing', (await st()).game === 'play', await st());
+  const ghostT = await stuckPlay(60);
+  check('STUCK: the ghost replays the solver script to a win (' + ghostT + 's sim)', ghostT > 0, await st());
   check('STUCK: progress recorded', (await g('G=>G.save()')).done[65] === true);
+
+  // ---------- STUCK fallback: authored level, no stored script ----------
+  await load(1);
+  check('STUCK fallback: an authored level has no solver script', (await g('G=>G.genInfo()')) === null);
+  await g('G=>G.stuck()');
+  await step(0.1);
+  check('STUCK fallback: no instant teleport — the gems fly home in sequence', (await st()).game === 'play', await st());
+  const fallT = await stuckPlay(60);
+  check('STUCK fallback: staggered fly-home clears the level (' + fallT + 's sim)', fallT > 0, await st());
+  check('STUCK fallback: progress recorded', (await g('G=>G.save()')).done[1] === true);
 
   // ---------- budgets sane on fresh authored loads ----------
   for (const i of [0,1,2,7,8,9,10,11,12,13,15,16,17,18,19,20,21,22,24,32,40,48,56,57]) {
@@ -506,6 +553,16 @@ function check(name, cond, extra) {
     s = await st();
     check('budget L' + (i + 1) + ' fresh-load sane', s.heatN >= 0 && s.coldN >= 0);
   }
+
+  // ---------- frost strip: no cold bucket exists below L25 ----------
+  for (const i of [0,1,2,7,8,9,10,11,12,13,15,16,17,18,19,20,21,22]) {
+    await load(i);
+    check('L' + (i + 1) + ' fresh-load: no frost bucket below L25', (await st()).coldN === 0);
+  }
+  await load(24);
+  check('L25 fresh-load: frost bucket debuts at 1 (Standing Water)', (await st()).coldN === 1);
+  await load(32);
+  check('L33 fresh-load: frost bucket at 2 (Loose Vapor)', (await st()).coldN === 2);
 
   // ---------- console errors ----------
   check('no console/page errors across the whole run', errors.length === 0, errors.slice(0, 6));

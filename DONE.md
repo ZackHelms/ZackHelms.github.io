@@ -1,5 +1,11 @@
 # DONE — done log
 
+- 2026-07-31 [phasic] phaspolish oversee run: STUCK now plays the solver
+  script as a visible 4x ghost (staggered fly-home fallback for authored
+  levels), frost buckets stripped below L25 (frost debuts at Standing
+  Water), complexity score shown on the level-clear screen. Suite 195→228
+  checks. (3824b99..a0c917d; plan archived to .claude/plans/DONE/)
+
 - 2026-07-31 [phasic] CD playtest of the 8-block curriculum: **passed,
   signed off** (with two new requests recorded to the backlog: tactic #10
   "push the puddle", and the in-game wiki → `phaswiki` plan).

@@ -25,7 +25,7 @@ verbs, no keyboard, the back/reload chrome is web-only by design.
 - **Base states** (`def.base = {P:'liquid'|'gas'}`): a born-liquid gem needs
   one latched frost to sit solid in its socket, a born-gas gem needs two —
   and taking that frost back melts it again. Win with latched frosts is
-  legal. This is what gives the cold bucket a real job.
+  legal. This is what gives the cold bucket a real job — the frost bucket first appears at L25 Standing Water; every level below it has cold:0 and shows no COLD bucket at all.
 - **Freeze needs room**: placement search around the puddle's ideal anchor
   (radius 1.7 cells, per-particle jump ≤1.9 cells; the SOCKET placement gets
   a longer 2.35 reach and is tried first — "close counts, it snaps in").
@@ -62,7 +62,7 @@ pairwise work is trivial.
   under the first wall forever. Rebuilt when the well moves >0.4 cell.
 - **Freeze anim**: `tryFreeze` commits particle→cell matching, `freezeStep`
   runs a 0.5 s springy snap (overshoot wobble) that shoves fluids aside, then
-  `checkSocket` locks if it landed on the socket anchor with sources home.
+  `updateHome` locks if it landed on the socket anchor with sources home.
 
 ## Curriculum: one new idea every 8 levels (CD design, 2026-07-31)
 
@@ -148,7 +148,7 @@ before being served** (`makeScript()` plans drag/melt/frost routes;
 `runScriptFast()` executes headlessly on the real sim — deaths abort);
 salts 0–19 are tried, then validated easy rescue salts 90–95. Deterministic
 per index (seeded rng + seeded gas wander), so level 23 is identical on
-every device. **STUCK** (settings) auto-solves and records the clear.
+every device. **STUCK** (settings) reloads the level and plays the stored solver script as a visible ghost at 4x (input locked, SOLVING… in the hint bar, SFX on); authored levels and script-less emergencies instead get a staggered fly-home (one gem every 0.3s via the freeze animation). Either way the clear records normally.
 `__GF.replayGen()` re-runs the stored winning script — the drive suite
 replays every generated level below 65 plus endless spot checks.
 
