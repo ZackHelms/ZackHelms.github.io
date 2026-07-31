@@ -295,3 +295,13 @@ through the MCP server rather than the proxy), then **state in the report that
 the served bytes were not confirmed** and hand the CD the exact badge string to
 eyeball. Claiming "verified live" from a green Actions run alone is precisely
 the stale-deploy failure the SOP exists to catch.
+
+## Solver-validated generation (2026-07-31, Phasic)
+
+For endless/procedural content, validate at GENERATION time: constructive
+template → run an in-game solver on the real sim (seed the sim's noise as
+well as the generator rng, or level N differs per device) → discard failing
+seeds → store the winning verb script. The suite then replays every
+generated level's script as its fairness gate, and an auto-solve/skip
+button falls out of the same machinery. Full trace:
+`20260731-phasic-softbody-solver-validated-generation.md`.
