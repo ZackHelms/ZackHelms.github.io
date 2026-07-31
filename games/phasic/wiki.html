@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>PHASIC WIKI</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06060e; --panel:#0b0b16; --border:#1a1a30; --green:#39ff14; --gold:#ffc300;
+  --blue:#4488ff; --red:#ff2244; --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;min-height:100%;background:var(--bg);color:var(--white);
+  font-family:'Share Tech Mono',monospace;-webkit-text-size-adjust:100%}
+body{padding-bottom:48px}
+a{color:inherit}
+#wikihead{position:sticky;top:0;z-index:80;background:var(--bg);border-bottom:1px solid var(--border)}
+#topbar{display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 6px 10px}
+.tbtn{width:38px;height:30px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--white);
+  font-family:'Share Tech Mono',monospace;font-size:15px;text-decoration:none;cursor:pointer}
+.tbtn:active{background:#141428}
+#wiki-title{flex:1 1 auto;min-width:0;display:block;font-family:'Black Ops One',cursive;font-size:15px;
+  letter-spacing:1px;text-align:center;text-decoration:none;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  background:linear-gradient(180deg,#8be9ff,#b44fff);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent}
+#searchrow{display:flex;justify-content:flex-end;padding:0 10px 10px 10px}
+#wiki-search{width:100%;max-width:220px;height:32px;background:var(--panel);
+  border:1px solid var(--border);border-radius:8px;color:var(--white);
+  font-family:'Share Tech Mono',monospace;font-size:13px;padding:0 10px}
+#wiki-search::placeholder{color:var(--dim)}
+#wiki-search:focus{outline:1px solid var(--purple)}
+main{max-width:640px;margin:0 auto;padding:4px 16px 40px 16px}
+.breadcrumb{font-size:11px;color:var(--dim);margin:2px 0 10px 0}
+.breadcrumb a{color:var(--blue);text-decoration:none}
+.wiki-h1{font-family:'Black Ops One',cursive;font-size:21px;letter-spacing:1px;
+  margin:8px 0 10px 0;color:var(--white);display:flex;align-items:center;gap:8px}
+.wiki-icon{font-size:20px}
+.wiki-lead{color:var(--dim);font-size:13px;line-height:1.65;margin-bottom:16px}
+.wiki-section{margin-bottom:20px}
+.wiki-section h2{font-family:'Black Ops One',cursive;font-size:14px;letter-spacing:.5px;
+  color:var(--gold);margin-bottom:8px}
+.wiki-section p{font-size:13.5px;line-height:1.7;color:var(--white);margin-bottom:8px}
+.wiki-section ul{list-style:none;margin:0 0 4px 0;padding:0}
+.wiki-section li{font-size:13.5px;line-height:1.7;color:var(--white);margin-bottom:10px;
+  padding-left:18px;position:relative}
+.wiki-section li:before{content:'\25C6';position:absolute;left:0;color:var(--purple);font-size:9px;top:6px}
+.tactic-item{margin-bottom:12px;padding:10px 12px;background:var(--panel);
+  border:1px solid var(--border);border-radius:10px}
+.tactic-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:4px}
+.tactic-num{display:inline-block;color:var(--gold);font-family:'Black Ops One',cursive;font-size:13px}
+.tactic-item p{font-size:13px;line-height:1.65;color:var(--dim);margin:0}
+.tag{display:inline-block;font-size:10px;color:var(--blue);border:1px solid var(--border);
+  border-radius:6px;padding:1px 6px}
+.tag.adv{color:var(--red)}
+.cardgrid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:6px}
+@media (min-width:480px){.cardgrid{grid-template-columns:1fr 1fr}}
+.pcard{display:flex;flex-direction:column;gap:3px;background:var(--panel);
+  border:1px solid var(--border);border-radius:10px;padding:12px 14px;
+  text-decoration:none;color:var(--white)}
+.pcard:active{background:#141428}
+.pcard-icon{font-size:19px}
+.pcard-title{font-family:'Black Ops One',cursive;font-size:13.5px;letter-spacing:.5px;color:var(--white)}
+.pcard-desc{font-size:11.5px;color:var(--dim);line-height:1.5}
+.search-heading{font-size:12px;color:var(--dim);margin:10px 0 12px 0;letter-spacing:.5px}
+.osub{color:var(--dim);font-size:13px;line-height:1.6}
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 16:18 UTC</div>
+<div id="wikihead">
+  <div id="topbar">
+    <a id="back-btn" class="tbtn" href="index.html" aria-label="Back to game">&#8592;</a>
+    <a id="wiki-title" href="#home">PHASIC WIKI</a>
+    <button id="reload-btn" class="tbtn" aria-label="Reload">&#8635;</button>
+  </div>
+  <div id="searchrow">
+    <input id="wiki-search" type="search" placeholder="search&hellip;" aria-label="Search wiki" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  </div>
+</div>
+<main id="content"></main>
+
+<script>
+'use strict';
+/* ============ PHASIC WIKI — player reference ============
+   Pure document: hash-routed pages driven by PAGES[], plus a live
+   search box. No game code, no ?test=1 API, no localStorage, no canvas. */
+
+var PAGES = [
+  { id:'home', title:'Home', icon:'🏠', html: `
+    <div class="wiki-lead">Everything you need to know about PHASIC in one
+    place &mdash; how phases work, what the gravity well does, the obstacle
+    field guide, the full tactics list, and how the campaign is built. Pick
+    a page below, or search top right.</div>
+  ` },
+
+  { id:'basics', title:'The Basics', icon:'🎮', html: `
+    <div class="wiki-section">
+      <h2>Goal</h2>
+      <p>Every gem starts somewhere on the board and has one matching
+      socket. Clear the level by getting every gem crystallized &mdash;
+      solid &mdash; and resting in its own socket. The instant the last one
+      locks in, you win. Nothing else on the board matters at that point,
+      not even where the gravity well is parked.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>Drag and fit</h2>
+      <p>Drag solid gems anywhere on the board. A shape can only pass
+      through an opening it can physically fit through &mdash; there is
+      <strong>no rotation, ever</strong>. If a gem's shape won't fit where
+      you need it to go, the fix is never spinning it, it's changing its
+      phase (see Phases) and trying again as liquid or gas.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>Sockets</h2>
+      <p>Each socket is shaped to match exactly one gem. Drop a crystallized
+      gem near its socket and it snaps home. Being home is never permanent
+      though &mdash; a gem resting in its socket can still be dragged back
+      out or melted again at any time, which matters when a later step of
+      your plan needs to shuffle something you already solved.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>Win rule, precisely</h2>
+      <p>Solid, in socket, all gems, at the same time. Leftover puddles or
+      drifting gas from other gems don't block a win, and you're free to
+      leave the gravity well wherever you last placed it.</p>
+    </div>
+  ` },
+
+  { id:'phases', title:'Phases', icon:'🔥', html: `
+    <div class="wiki-lead">Every gem moves along one ladder: solid &harr;
+    liquid &harr; gas. Fire pushes a gem up that ladder, frost pulls it
+    back down.</div>
+    <div class="wiki-section">
+      <h2>Flames: melt and boil</h2>
+      <p>Touch fire to a solid gem and it melts into liquid. Touch fire to
+      that liquid again and it boils into gas. Each flame you spend latches
+      onto the gem and holds it at its new phase.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>Frost: condense and freeze</h2>
+      <p>Touch frost to a gas gem and it condenses into liquid. Touch frost
+      to that liquid again and it freezes solid. Freezing needs open room
+      shaped roughly like the gem, near wherever the puddle is currently
+      sitting &mdash; if there's nowhere for it to land, the freeze is
+      refused (a buzz and a shake) rather than wasting the frost.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>Tap to take a step back</h2>
+      <p>Tap any gem to pull off whichever heat or cold source landed on it
+      most recently, and the gem steps back one phase in the direction that
+      source had pushed it. If a gem has both flames and frosts on it, the
+      most recent flame comes off first.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>Quench from a distance</h2>
+      <p>You don't have to tap a gem to cool it &mdash; throw frost at a
+      flamed gem and it quenches one flame for free, without spending the
+      frost as a placed source. It works the other way too: throw fire at a
+      frosted gem and it frees up a frost the same way.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>Base states</h2>
+      <p>Not every gem starts solid. Some are born already liquid, and a
+      few are born as gas. A born-liquid gem needs one latched frost to
+      hold solid in its socket; a born-gas gem needs two. Pull that
+      frost back off later and the gem melts right back to the state it
+      was born in.</p>
+    </div>
+  ` },
+
+  { id:'gravity', title:'The Gravity Well', icon:'🌌', html: `
+    <div class="wiki-lead">The GRAV bucket sits in the middle of the tray,
+    between HOT and COLD. It doesn't spend charges like fire or frost
+    &mdash; you just move it.</div>
+    <div class="wiki-section">
+      <h2>Docked = plain down</h2>
+      <p>Leave the well sitting in its bucket and gravity behaves the way
+      you'd expect: everything liquid falls straight down.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>On the ring = a point source</h2>
+      <p>Drag the well out of its bucket onto the ring around the edge of
+      the board and it becomes a point &mdash; gravity now pulls toward
+      wherever you parked it, instead of just "down."</p>
+    </div>
+    <div class="wiki-section">
+      <h2>Liquid falls toward it, gas flees it</h2>
+      <p>Puddles stream toward the well's position. Clouds of gas drift the
+      opposite way, away from it. The same well placement herds liquid and
+      gas in two different directions at once &mdash; useful when you have
+      both on the board together.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>The lift trick</h2>
+      <p>Park the well <em>above</em> a puddle's current level and gravity
+      will haul that liquid up and over a wall it could never climb under
+      plain down-gravity. This is the key idea behind a handful of the
+      trickier levels.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>Dock to reset</h2>
+      <p>Drop the well back into its bucket any time to instantly return to
+      plain, straight-down gravity. Handy when a plan gets messy and you
+      want a clean, predictable baseline again.</p>
+    </div>
+  ` },
+
+  { id:'obstacles', title:'Obstacles', icon:'🧱', html: `
+    <div class="wiki-lead">A few tiles on later boards don't move gems
+    themselves &mdash; they change what's allowed to pass through them.</div>
+    <div class="wiki-section">
+      <h2>The void</h2>
+      <p>A dark, pulling tile that drags in nearby liquid and gas and
+      destroys anything that actually touches it &mdash; including a solid
+      you drag or freeze onto it. Losing a gem to the void ends the level
+      on the spot, but it costs you nothing worse than a RETRY: the level
+      just starts over.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>The hedge</h2>
+      <p>A dense, thorny tile that physically blocks solids and instantly
+      destroys any liquid that touches it &mdash; but gas drifts straight
+      through untouched. If a puddle needs to get past a hedge, boil it to
+      vapor first and cross as gas.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>Fans</h2>
+      <p>Fans blow a steady gust that only affects gas &mdash; solids and
+      liquids ignore them completely. A fan can push a cloud somewhere the
+      gravity well has no line on, for free.</p>
+    </div>
+  ` },
+
+  { id:'tactics', title:'Tactics', icon:'🎯', html: `
+    <div class="wiki-lead">Twelve moves worth knowing. A few are taught
+    directly by a level, the rest you'll stumble into &mdash; either way,
+    here's the full list.</div>
+
+    <div class="tactic-item">
+      <div class="tactic-head"><span class="tactic-num">1.</span>
+        <strong>The Stopper</strong>
+        <span class="tag">taught at Level 58</span></div>
+      <p>Plug a slot with a small stone so a pour can cross over it instead
+      of draining away &mdash; then unplug the slot and put the stone
+      wherever it's actually needed.</p>
+    </div>
+
+    <div class="tactic-item">
+      <div class="tactic-head"><span class="tactic-num">2.</span>
+        <strong>Freeze near, slide home</strong></div>
+      <p>You don't need to freeze a gem exactly on its socket &mdash; freeze
+      it wherever there's room nearby, then just drag the solid the rest of
+      the way home.</p>
+    </div>
+
+    <div class="tactic-item">
+      <div class="tactic-head"><span class="tactic-num">3.</span>
+        <strong>The well lifts</strong>
+        <span class="tag">seen in Reflow</span></div>
+      <p>Park the gravity well above a puddle's current level and let
+      gravity haul that liquid up and over a wall it could never climb on
+      its own.</p>
+    </div>
+
+    <div class="tactic-item">
+      <div class="tactic-head"><span class="tactic-num">4.</span>
+        <strong>Herd from the far side</strong>
+        <span class="tag">seen in Kettle &amp; Overgrowth</span></div>
+      <p>Gas flees the gravity well, so park the well on the opposite side
+      from where you actually want a cloud to end up.</p>
+    </div>
+
+    <div class="tactic-item">
+      <div class="tactic-head"><span class="tactic-num">5.</span>
+        <strong>Quench from afar</strong></div>
+      <p>Throw frost at a flamed gem to cool it one step without spending
+      the frost as a placed source &mdash; and fire does the same trick to
+      a frosted gem, in reverse.</p>
+    </div>
+
+    <div class="tactic-item">
+      <div class="tactic-head"><span class="tactic-num">6.</span>
+        <strong>Melt on the socket's side</strong>
+        <span class="tag">taught by Glassworks</span></div>
+      <p>Carry a gem across a gap so it's already sitting near its socket
+      <em>before</em> you melt it &mdash; that way the puddle it becomes
+      lands right where it needs to freeze.</p>
+    </div>
+
+    <div class="tactic-item">
+      <div class="tactic-head"><span class="tactic-num">7.</span>
+        <strong>Steam the hedge</strong>
+        <span class="tag">taught by Overgrowth</span></div>
+      <p>Hedges stop stone and drink liquid on contact, but let vapor drift
+      straight through. Boil a puddle to gas to cross one safely.</p>
+    </div>
+
+    <div class="tactic-item">
+      <div class="tactic-head"><span class="tactic-num">8.</span>
+        <strong>Ride the fan</strong>
+        <span class="tag">taught by Crosswind</span></div>
+      <p>Fans push gas for free into places the gravity well simply can't
+      reach &mdash; let one carry a cloud the rest of the way.</p>
+    </div>
+
+    <div class="tactic-item">
+      <div class="tactic-head"><span class="tactic-num">9.</span>
+        <strong>Dock for down</strong></div>
+      <p>Drop the gravity well back into its bucket any time to restore
+      plain, straight-down gravity in the middle of a plan &mdash; a fast
+      reset when things get tangled.</p>
+    </div>
+
+    <div class="tactic-item">
+      <div class="tactic-head"><span class="tactic-num">10.</span>
+        <strong>Push the puddle</strong>
+        <span class="tag">taught at Level 13, Queue</span></div>
+      <p>Solids shove liquid aside &mdash; drag a stone straight into a
+      puddle to bulldoze it through a slot or along a shelf that gravity
+      alone can't carry it past.</p>
+    </div>
+
+    <div class="tactic-item">
+      <div class="tactic-head"><span class="tactic-num">11.</span>
+        <strong>Launch and freeze</strong>
+        <span class="tag adv">advanced</span></div>
+      <p>Shove a puddle hard with a dragged solid to send it briefly
+      airborne, then hit it with frost mid-flight so it crystallizes
+      somewhere it could never simply come to rest. No level currently
+      requires this one &mdash; it's a flashy trick to have in your back
+      pocket.</p>
+    </div>
+
+    <div class="tactic-item">
+      <div class="tactic-head"><span class="tactic-num">12.</span>
+        <strong>Fence with stone</strong>
+        <span class="tag adv">advanced</span></div>
+      <p>Solids ignore the gravity well entirely &mdash; park them as walls
+      to pen a cloud or puddle in place. Then grav-push or grav-pull one
+      gem at a time through the gap you left, which stretches flames and
+      frosts a lot further when they're running scarce.</p>
+    </div>
+  ` },
+
+  { id:'levels', title:'The Campaign', icon:'🗺️', html: `
+    <div class="wiki-section">
+      <h2>Built in blocks of eight</h2>
+      <p>The campaign is organized into blocks of eight levels. The first
+      level of every block is a short, hand-built tutorial that teaches
+      exactly one new idea. The rest of that block reuses everything
+      you've learned so far, with the puzzles getting a little trickier as
+      the block goes on.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>Roughly what shows up, and roughly when</h2>
+      <ul>
+        <li>Dragging solids through openings they fit &mdash; the very
+        first thing you learn.</li>
+        <li>Fire: melting and boiling, and tapping a gem to take a step
+        back.</li>
+        <li>The gravity well, and herding drifting gas.</li>
+        <li>Gems that start out already liquid, needing frost just to hold
+        their solid shape.</li>
+        <li>Gems that start out as gas, needing two frosts.</li>
+        <li>The void.</li>
+        <li>The hedge.</li>
+        <li>Fans.</li>
+      </ul>
+    </div>
+    <div class="wiki-section">
+      <h2>Complexity score</h2>
+      <p>When you clear a level, the results screen shows a small
+      complexity number underneath your stars. It's a rough measure of how
+      much the level actually asked of you &mdash; gem count, how many
+      phase changes it took, whether gravity or an obstacle was involved.
+      It's just there for your own sense of how a level stacked up against
+      the ones around it, nothing to chase.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>Endless</h2>
+      <p>Once you're past the campaign's hand-built levels, the game keeps
+      generating fresh ones forever, mixing every idea you've picked up
+      along the way, with the difficulty continuing to climb gently the
+      further you go.</p>
+    </div>
+    <div class="wiki-section">
+      <h2>STUCK?</h2>
+      <p>Every generated level is guaranteed solvable &mdash; the game
+      proves it before the level is ever handed to you. If you genuinely
+      get stuck, open the settings menu and tap STUCK: it reloads the
+      level and plays out a full winning solution as a fast ghost replay,
+      so you can watch the trick and try it yourself next time.</p>
+    </div>
+  ` },
+];
+
+var contentEl = document.getElementById('content');
+var searchInput = document.getElementById('wiki-search');
+
+function stripTags(html){
+  var d = document.createElement('div');
+  d.innerHTML = html;
+  return (d.textContent || d.innerText || '').replace(/\s+/g, ' ').trim();
+}
+
+function snippet(text, around, len){
+  if (text.length <= len) return text;
+  var start = Math.max(0, around - Math.floor(len / 2));
+  if (start + len > text.length) start = Math.max(0, text.length - len);
+  var out = text.slice(start, start + len);
+  if (start > 0) out = '…' + out;
+  if (start + len < text.length) out = out + '…';
+  return out;
+}
+
+function otherPages(){
+  return PAGES.filter(function (p) { return p.id !== 'home'; });
+}
+
+function cardGrid(pages, snippets){
+  var grid = document.createElement('div');
+  grid.className = 'cardgrid';
+  pages.forEach(function (p, i) {
+    var a = document.createElement('a');
+    a.className = 'pcard';
+    a.href = '#' + p.id;
+    var icon = document.createElement('span');
+    icon.className = 'pcard-icon';
+    icon.textContent = p.icon;
+    var title = document.createElement('span');
+    title.className = 'pcard-title';
+    title.textContent = p.title;
+    var desc = document.createElement('span');
+    desc.className = 'pcard-desc';
+    desc.textContent = snippets ? snippets[i] : snippet(stripTags(p.html), 0, 90);
+    a.appendChild(icon);
+    a.appendChild(title);
+    a.appendChild(desc);
+    grid.appendChild(a);
+  });
+  return grid;
+}
+
+function currentPageId(){
+  var h = (location.hash || '').replace('#', '');
+  return PAGES.some(function (p) { return p.id === h; }) ? h : 'home';
+}
+
+function render(){
+  var id = currentPageId();
+  var page = PAGES.filter(function (p) { return p.id === id; })[0];
+  document.title = id === 'home' ? 'PHASIC WIKI' : ('PHASIC WIKI — ' + page.title);
+
+  contentEl.innerHTML = '';
+
+  if (id !== 'home') {
+    var bc = document.createElement('div');
+    bc.className = 'breadcrumb';
+    var homeLink = document.createElement('a');
+    homeLink.href = '#home';
+    homeLink.textContent = '⌂ Home';
+    bc.appendChild(homeLink);
+    bc.appendChild(document.createTextNode(' / ' + page.title));
+    contentEl.appendChild(bc);
+  }
+
+  var h1 = document.createElement('h1');
+  h1.className = 'wiki-h1';
+  var h1icon = document.createElement('span');
+  h1icon.className = 'wiki-icon';
+  h1icon.textContent = page.icon;
+  h1.appendChild(h1icon);
+  h1.appendChild(document.createTextNode(page.title));
+  contentEl.appendChild(h1);
+
+  var body = document.createElement('div');
+  body.innerHTML = page.html;
+  contentEl.appendChild(body);
+
+  if (id === 'home') {
+    contentEl.appendChild(cardGrid(otherPages()));
+  }
+
+  searchInput.value = '';
+}
+
+function doSearch(q){
+  q = q.trim();
+  if (!q) { render(); return; }
+  var qlc = q.toLowerCase();
+
+  var matches = [];
+  otherPages().forEach(function (p) {
+    var text = stripTags(p.html);
+    var hay = (p.title + ' ' + text).toLowerCase();
+    var idx = hay.indexOf(qlc);
+    if (idx === -1) return;
+    var tidx = text.toLowerCase().indexOf(qlc);
+    matches.push({ page: p, snip: snippet(text, tidx === -1 ? 0 : tidx, 90) });
+  });
+
+  contentEl.innerHTML = '';
+
+  var heading = document.createElement('div');
+  heading.className = 'search-heading';
+  heading.textContent = matches.length + ' result' + (matches.length === 1 ? '' : 's') + ' for “' + q + '”';
+  contentEl.appendChild(heading);
+
+  if (!matches.length) {
+    var empty = document.createElement('div');
+    empty.className = 'osub';
+    empty.textContent = 'No pages matched. Try a shorter or different word.';
+    contentEl.appendChild(empty);
+    return;
+  }
+
+  contentEl.appendChild(cardGrid(
+    matches.map(function (m) { return m.page; }),
+    matches.map(function (m) { return m.snip; })
+  ));
+}
+
+document.getElementById('reload-btn').addEventListener('click', function () { location.reload(); });
+searchInput.addEventListener('input', function () { doSearch(searchInput.value); });
+window.addEventListener('hashchange', render);
+render();
+</script>
+</body>
+</html>

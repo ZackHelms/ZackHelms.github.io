@@ -1,6 +1,6 @@
 # Phasic — phase-change block sort (`games/phasic/index.html`)
 
-One self-contained file, ~1250 lines, Canvas 2D. **Web-first prototype of a
+Game: one self-contained file (~1850 lines, Canvas 2D) plus games/phasic/wiki.html (~530 lines, DOM). **Web-first prototype of a
 planned iOS title** — design decisions favor things that port: pure touch
 verbs, no keyboard, the back/reload chrome is web-only by design.
 
@@ -136,6 +136,17 @@ the envelope rises.
    (Crosswind).
 9. **Dock for down**: drop the well back in its bucket to restore plain
    gravity mid-plan.
+10. **Push the puddle** (taught by L13 Queue): solids shove liquid —
+   drag a stone into a puddle to bulldoze it through a slot or along a
+   shelf that gravity alone won't take it past.
+11. **Launch and freeze** (advanced — CD-discovered, 2026-07-31): shove
+   a puddle hard with a dragged solid to fling it airborne, then frost it
+   mid-flight so it crystallizes where it could never rest. Reserved for a
+   future Acrobatics block; no earlier level may require it.
+12. **Fence with stone** (CD 2026-07-31): solids ignore the gravity
+   well — park them as walls to pen a cloud or puddle in place, then
+   grav-push or grav-pull one gem at a time through a maze when flames
+   and frosts are scarce.
 
 ## Generator + endless + STUCK
 
@@ -151,6 +162,17 @@ per index (seeded rng + seeded gas wander), so level 23 is identical on
 every device. **STUCK** (settings) reloads the level and plays the stored solver script as a visible ghost at 4x (input locked, SOLVING… in the hint bar, SFX on); authored levels and script-less emergencies instead get a staggered fly-home (one gem every 0.3s via the freeze animation). Either way the clear records normally.
 `__GF.replayGen()` re-runs the stored winning script — the drive suite
 replays every generated level below 65 plus endless spot checks.
+
+## Wiki (games/phasic/wiki.html)
+
+Player-facing wiki, reachable from the cogwheel settings menu (WIKI
+button). One self-contained DOM page (no canvas, no game code): a
+`PAGES[]` array of `{id, title, icon, html}` drives hash-routed pages —
+home, basics, phases, gravity, obstacles, tactics (mirrors this file's
+registry, all 12), levels — plus a live search box under the reload
+button (title + tag-stripped text; query rendered via textContent only).
+Adding a page = appending one PAGES[] object. Keep the tactics page in
+sync with this file's registry when either changes.
 
 ## Tone
 

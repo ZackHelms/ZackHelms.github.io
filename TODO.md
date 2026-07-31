@@ -11,13 +11,6 @@ backlog entry here.
 
 ## Now
 
-- [phasic] In-game wiki (cogwheel → WIKI: home page, topic pages incl.
-  tactics, search box under the reload button) + tactic #10 "push the
-  puddle" (L13 Queue) into the registry. (CD request 2026-07-31, verbatim
-  in the plan, given with the playtest sign-off.)
-  **Plan ready (2026-07-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phaswiki.in-game-wiki-and-tactics.md`
-
 - [phasic] **Freeze-refusal fairness bug** (CD screenshots 2026-07-31, live
   build 14:01): a big liquid gem pancakes flat and frost then refuses with
   "No room to crystallize here" despite visible clearance — seen on L27
@@ -29,6 +22,16 @@ backlog entry here.
   (`/zmh-producer:backlog-plan-gen the freeze-refusal bug`).
 - [phasic] Move the PHASIC card to the TOP of the games hub list
   (`games/index.html` card order; keep games-sync green). (CD 2026-07-31.)
+
+- [phasic] Raise the HOT/GRAV/COLD buckets by ~half a bucket height — at
+  the screen's bottom edge, grabbing a source keeps triggering the iOS
+  swipe-up-to-background gesture (CD 2026-07-31). Layout: `bucketRects`/
+  `BZ` accounting; keep the drag hit areas at least as generous.
+- [phasic] Now-playing line at the very bottom of the screen: track number
+  + song title (CD 2026-07-31). The 10 `SONGS[]` have no names yet —
+  naming them is part of the item (CD can rename after). Pairs naturally
+  with the bucket raise (same freed bottom strip) — bundle at plan-gen;
+  coordinate with the phasaudio plan's per-block song assignment.
 
 ## Needs Zack
 
