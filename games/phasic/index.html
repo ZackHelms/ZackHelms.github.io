@@ -427,7 +427,7 @@ let walls=null, objs=[], heatN=0, coldN=0, gravSrc=null;
 let holes=[], bushes=new Set(), fans=[], fanBeam={}, failT=0;
 let dragObj=null, dragSrc=null, dragGrav=false, finger={x:0,y:0};
 let flying=[], fx=[], shakeT=0, tSim=0, lvlT=0;
-let woodCanvas=null, clearPending=false, solving=false;
+let woodCanvas=null, clearPending=false, solving=false, ghost=null;
 
 /* ============ level parse ============ */
 function keyPat(cells){ // canonical offset signature of a cell set
@@ -478,6 +478,7 @@ function setupLevel(def,i){
   if(gravSrc){ gravSrc.x=FX+GW*CELL/2; gravSrc.y=FY+GH*CELL+BR*0.55; }
 }
 function loadLevel(i){
+  if(ghost) ghostEnd();      // a reload cancels any solver ghost in flight
   const def=getLevel(i);
   setupLevel(def,i);
   $('failov').classList.add('hide');
@@ -697,7 +698,7 @@ function sub(h){
     }
   }
   // black holes: pull nearby fluid, consume on contact; bushes drink liquid
-  for(const o of objs){ if(o.dead||o.phase==='solid'||o.phase==='freezing') continue;
+  for(const o of objs){ if(o.dead||o.flyHome||o.phase==='solid'||o.phase==='freezing') continue;
     for(const p of o.ps){
       for(const q of holes){
         const hx2=cellX(q.x), hy2=cellY(q.y);
@@ -715,7 +716,7 @@ function sub(h){
   }
   // any solid overlapping the void is fed to it (dragged there or frozen onto it)
   if(holes.length) for(const o of objs){
-    if(o.dead||(o.phase!=='solid'&&o.phase!=='freezing')) continue;
+    if(o.dead||o.flyHome||(o.phase!=='solid'&&o.phase!=='freezing')) continue; // a fly-home gem is untouchable
     for(const p of o.ps){ let hit=false;
       for(const q of holes)
         if(Math.hypot(cellX(q.x)-p.x,cellY(q.y)-p.y)<CELL*0.55){ hit=true; break; }
@@ -989,7 +990,7 @@ function evPos(e){ const r=cv.getBoundingClientRect();
   const t=e.touches?e.touches[0]:e; return {x:t.clientX-r.left, y:t.clientY-r.top}; }
 let tapCand=null;
 function onDown(e){
-  if(game!=='play') return;
+  if(game!=='play'||ghost) return;   // hands off while the solver ghost is playing
   audioInit(); e.preventDefault();
   const p=evPos(e); finger=p;
   const b=bucketRects();
@@ -1220,12 +1221,17 @@ function makeScript(){
   script.push({w:[1.2]});
   return script;
 }
-function runScriptFast(script){
+/* The solver executor is a generator so the same code can be drained
+   synchronously (level validation, below) or advanced a few sub-steps per
+   frame (the STUCK ghost). It yields 1 per sim sub-step it spends; ops that
+   cost no sim time do not yield. runScriptFast drains it to completion, so
+   the validation path sees exactly the sub()/updateHome sequence it always did. */
+function* scriptRunner(script){
   if(!script) return false;
   let budget=300*120;
-  const take=n=>{ n=Math.max(0,Math.min(n,budget)); budget-=n;
-    for(let k=0;k<n;k++) sub(HSTEP);
-    for(const o of objs) updateHome(o); };
+  function* take(n){ n=Math.max(0,Math.min(n,budget)); budget-=n;
+    for(let k=0;k<n;k++){ sub(HSTEP); yield 1; }
+    for(const o of objs) updateHome(o); }
   const byL=L=>objs.find(u=>u.letter===L);
   for(const op of script){
     if(op.d){ const o=byL(op.d[0]); if(!o) return false;
@@ -1233,7 +1239,7 @@ function runScriptFast(script){
         for(const wp of op.d[1]){
           for(let it=0; it<80; it++){
             const bx=o.axp, by=o.ayp;
-            dragToCell(o, wp[0], wp[1]); take(3);
+            dragToCell(o, wp[0], wp[1]); yield* take(3);
             const ax=Math.round((o.axp-FX)/CELL), ay=Math.round((o.ayp-FY)/CELL);
             if(ax===wp[0]&&ay===wp[1]) break;
             if(Math.abs(o.axp-bx)<0.4&&Math.abs(o.ayp-by)<0.4&&it>3) break;
@@ -1242,7 +1248,7 @@ function runScriptFast(script){
         const last=op.d[1][op.d[1].length-1];
         const ax=Math.round((o.axp-FX)/CELL), ay=Math.round((o.ayp-FY)/CELL);
         if(ax===last[0]&&ay===last[1]) break;
-        take(120); // let traffic settle, then re-run the route once
+        yield* take(120); // let traffic settle, then re-run the route once
       }
     }
     else if(op.h){ const o=byL(op.h[0]); if(!o||heatN<=0) return false;
@@ -1251,32 +1257,38 @@ function runScriptFast(script){
       let ok=false;
       for(let a=0;a<5&&!ok;a++){
         if(coldN>0&&dropSourceOn('cold',o)){ coldN--; ok=true; }
-        else take(240);
+        else yield* take(240);
       }
       if(!ok&&gravSrc){ gravSrc.docked=false;
-        placeGrav(FX+(o.sax+1)*CELL, FY+(GH+2)*CELL); take(360);
+        placeGrav(FX+(o.sax+1)*CELL, FY+(GH+2)*CELL); yield* take(360);
         if(coldN>0&&dropSourceOn('cold',o)){ coldN--; ok=true; } }
       if(!ok) return false; }
     else if(op.t){ const o=byL(op.t[0]); if(!o) return false;
       let ok=false;
-      for(let a=0;a<5&&!ok;a++){ ok=removeFlame(o); if(!ok) take(240); }
+      for(let a=0;a<5&&!ok;a++){ ok=removeFlame(o); if(!ok) yield* take(240); }
       if(!ok&&gravSrc){ gravSrc.docked=false;
-        placeGrav(FX+(o.sax+1)*CELL, FY+(GH+2)*CELL); take(360); ok=removeFlame(o); }
+        placeGrav(FX+(o.sax+1)*CELL, FY+(GH+2)*CELL); yield* take(360); ok=removeFlame(o); }
       if(!ok) return false; }
     else if(op.g){ if(gravSrc){ gravSrc.docked=false; placeGrav(FX+op.g[0]*CELL, FY+op.g[1]*CELL); } }
     else if(op.u){ const o=byL(op.u[0]); if(!o) return false;
       const prop=op.u[1],cmp=op.u[2],val=op.u[3],maxS=op.u[4];
       let t2=0, ok=false;
-      while(t2<maxS&&budget>0){ take(60); t2+=0.5;
+      while(t2<maxS&&budget>0){ yield* take(60); t2+=0.5;
         const ys=o.ps.map(p2=>(p2.y-FY)/CELL), xs=o.ps.map(p2=>(p2.x-FX)/CELL);
         const v={miny:Math.min(...ys),maxy:Math.max(...ys),minx:Math.min(...xs),maxx:Math.max(...xs)}[prop];
         if(cmp==='>'?v>val:v<val){ ok=true; break; } }
       if(!ok) return false; }
-    else if(op.w){ take(Math.round(op.w[0]*120)); }
+    else if(op.w){ yield* take(Math.round(op.w[0]*120)); }
     if(budget<=0) return false;
     if(objs.some(o=>o.dead)) return false;
   }
   return objs.every(o=>o.home);
+}
+function runScriptFast(script){ // synchronous drain — the level-validation path
+  const r=scriptRunner(script);
+  let res=r.next();
+  while(!res.done) res=r.next();
+  return res.value;
 }
 const genCache={};
 function getLevel(i){
@@ -1301,18 +1313,77 @@ function getLevel(i){
   const def=buildGen(i,99); genCache[i]={def,script:null,salt:99};
   return def;
 }
-function stuckSolve(){ // the STUCK button: auto-solve and move on
-  if(game!=='play'&&game!=='fail') return;
-  if(game==='fail'){ $('failov').classList.add('hide'); loadLevel(lvlIdx); }
-  game='play';
+/* ============ STUCK: the solver plays it for you ============
+   The stored generation-time script is replayed as a visible ghost — the same
+   executor the validator drains, advanced 8 sub-steps per frame (~4x real
+   time). Levels with no script (all 24 authored, plus salt-99 emergencies)
+   get a staggered fly-home instead: one gem every 0.3 s, each riding the
+   normal freeze animation into its socket. Both are driven by the same
+   generator protocol, so TEST can step them deterministically. */
+const GHOST_SUBS=8;                 // script replay: sub-steps per rAF frame (60fps * 8 / 120Hz = 4x)
+const FLY_SUBS=2;                   // fly-home fallback: real time, so the 0.3 s stagger reads
+function ghostHint(){ if(lvl) $('hintbar').textContent='L'+(lvlIdx+1)+' · '+lvl.name+' — '+lvl.hint; }
+function ghostClearFlags(){ for(const o of objs){ o.flyHome=false; o.locked=false; } }
+function ghostEnd(){ // level left play, or was reloaded out from under the ghost
+  if(!ghost) return;
+  ghost=null; ghostClearFlags(); ghostHint();
+}
+function ghostAdvance(n){ // spend up to n sim sub-steps inside the running script
+  if(!ghost) return;
+  let k=0;
+  while(k<n){
+    const r=ghost.run.next();
+    if(r.done){ ghostDone(r.value); return; }
+    k+=r.value||1;
+  }
+}
+function ghostDone(ok){ // script finished: won, or fell over and owes a fallback
+  const wasFall=!!(ghost&&ghost.fall);
+  ghost=null; ghostClearFlags();
+  const won=ok&&objs.length&&objs.every(o=>o.home);
+  if(!won&&!wasFall&&game==='play'){ startFlyHome(); return; }
+  ghostHint();
+  for(const o of objs) updateHome(o);   // win records through the normal path
+}
+function* flyHomeRunner(){ // no script: send them home one at a time, visibly
+  failT=0; flying.length=0;
+  for(const o of objs){ o.flyHome=true; o.locked=true; } // hold still until called
   for(const o of objs){
+    o.locked=false;
     heatN+=o.heats; o.heats=0;
     coldN+=o.frosts; o.frosts=o.base; coldN=Math.max(0,coldN-o.base); // frosts hold non-solid bases
-    o.dead=false; o.phase='solid'; o.freezeT=0; o.ftarg=null;
-    o.axp=FX+o.sax*CELL; o.ayp=FY+o.say*CELL; syncSolid(o);
+    o.dead=false; o.deadT=0; o.home=false; o.jx=o.jy=o.jvx=o.jvy=0;
+    const targets=o.off.map(of2=>({x:cellX(o.sax+of2.x), y:cellY(o.say+of2.y)}));
+    const taken=new Array(o.ps.length).fill(false), nps=[];
+    for(const t of targets){ // nearest particle per socket cell, so nothing crosses
+      let bi=-1,bd=1e18;
+      for(let p2=0;p2<o.ps.length;p2++){ if(taken[p2]) continue;
+        const d=(o.ps[p2].x-t.x)**2+(o.ps[p2].y-t.y)**2; if(d<bd){bd=d;bi=p2;} }
+      taken[bi]=true; nps.push(o.ps[bi]);
+    }
+    o.ps=nps; o.axp=FX+o.sax*CELL; o.ayp=FY+o.say*CELL;
+    o.ftarg=targets; o.freezeT=0; o.phase='freezing'; o.mst=[];
+    for(let k=0;k<36;k++){ sub(HSTEP); yield 1; }     // 0.3 s before the next one goes
   }
-  flying.length=0; toast('Solved for you — no shame in it.');
+  for(let k=0;k<75;k++){ sub(HSTEP); yield 1; }       // let the last freeze land
+  ghostClearFlags();
   for(const o of objs) updateHome(o);
+  return true;
+}
+function startFlyHome(){
+  ghost={run:flyHomeRunner(), fall:true, subs:FLY_SUBS};
+  $('hintbar').textContent='SOLVING…';
+}
+function stuckSolve(){ // the STUCK button: watch the solver do it
+  if(ghost) return;                              // already playing
+  if(game!=='play'&&game!=='fail') return;
+  $('failov').classList.add('hide');
+  loadLevel(lvlIdx);                             // the script assumes a fresh board
+  toast('Solving it for you — watch.');
+  const c=genCache[lvlIdx];
+  if(c&&c.script){ ghost={run:scriptRunner(c.script), fall:false, subs:GHOST_SUBS};
+    $('hintbar').textContent='SOLVING…'; return; }
+  startFlyHome();
 }
 
 /* ============ render ============ */
@@ -1734,10 +1805,14 @@ layout(); buildLvlSel(); applyVolumes();
 let lastT=0;
 function loop(t){
   const dt=Math.min(0.1,(t-lastT)/1000||0.016); lastT=t;
-  if(game==='play'){ if(!TEST) stepSim(dt); stepFlying(dt); stepFx(dt);
+  if(game==='play'){
+    if(ghost){ if(!TEST) ghostAdvance(ghost.subs); }   // the ghost owns the sim while it plays
+    else if(!TEST) stepSim(dt);
+    stepFlying(dt); stepFx(dt);
     if(shakeT>0) shakeT-=dt;
     for(const o of objs) updateHome(o);
   }
+  else if(ghost) ghostEnd();                           // cleared/failed out from under it
   render();
   requestAnimationFrame(loop);
 }
@@ -1761,7 +1836,10 @@ if(TEST){
     dragTo:(L,cx2,cy2)=>dragToCell(objs.find(u=>u.letter===L),cx2,cy2),
     setGrav:(cx2,cy2)=>{ if(!gravSrc) return false; gravSrc.docked=false; placeGrav(FX+cx2*CELL, FY+cy2*CELL); return true; },
     dockGrav:()=>{ if(!gravSrc) return false; gravSrc.docked=true; return true; },
-    step:s=>{ const n=Math.round(s/(1/120)); for(let i2=0;i2<n;i2++) sub(1/120);
+    step:s=>{ const n=Math.round(s/(1/120));
+      // a running ghost owns the sim: spend the same sub-step budget inside it
+      if(ghost&&game==='play') ghostAdvance(n);
+      else for(let i2=0;i2<n;i2++) sub(1/120);
       stepFlying(s);
       for(const o of objs) updateHome(o); },
     gravAt:()=>gravSrc?{x:(gravSrc.x-FX)/CELL,y:(gravSrc.y-FY)/CELL,docked:!!gravSrc.docked}:null,

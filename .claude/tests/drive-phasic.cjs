@@ -516,12 +516,36 @@ function check(name, cond, extra) {
     avg(scores[0]).toFixed(1) + ' -> ' + avg(scores[7]).toFixed(1) + ')',
     avg(scores[7]) > avg(scores[0]));
 
-  // ---------- STUCK: auto-solve and skip ----------
+  // ---------- STUCK: the stored solver script plays as a visible ghost ----------
+  async function stuckPlay(maxS) { // drive the ghost on sim time; -1 = never cleared
+    const cap = maxS || 60;
+    let t = 0;
+    for (; t < cap; t++) {
+      const cur = await st();
+      if (cur.game === 'clear') break;
+      if (cur.objs.every(o => o.home)) break; // solved — the 650 ms clear timer is wall-clock
+      await step(1);
+    }
+    await page.waitForTimeout(900);
+    return (await st()).game === 'clear' ? t : -1;
+  }
   await load(65);
   await g('G=>G.stuck()');
-  await page.waitForTimeout(900);
-  check('STUCK: auto-solve completes the level', (await st()).game === 'clear');
+  await step(0.1);
+  check('STUCK: no instant teleport — the ghost is still playing', (await st()).game === 'play', await st());
+  const ghostT = await stuckPlay(60);
+  check('STUCK: the ghost replays the solver script to a win (' + ghostT + 's sim)', ghostT > 0, await st());
   check('STUCK: progress recorded', (await g('G=>G.save()')).done[65] === true);
+
+  // ---------- STUCK fallback: authored level, no stored script ----------
+  await load(1);
+  check('STUCK fallback: an authored level has no solver script', (await g('G=>G.genInfo()')) === null);
+  await g('G=>G.stuck()');
+  await step(0.1);
+  check('STUCK fallback: no instant teleport — the gems fly home in sequence', (await st()).game === 'play', await st());
+  const fallT = await stuckPlay(60);
+  check('STUCK fallback: staggered fly-home clears the level (' + fallT + 's sim)', fallT > 0, await st());
+  check('STUCK fallback: progress recorded', (await g('G=>G.save()')).done[1] === true);
 
   // ---------- budgets sane on fresh authored loads ----------
   for (const i of [0,1,2,7,8,9,10,11,12,13,15,16,17,18,19,20,21,22,24,32,40,48,56,57]) {
