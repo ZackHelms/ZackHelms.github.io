@@ -70,7 +70,7 @@ local-2p.
 | Signal Hunt | `signal-hunt/` | hidden-object | pinch-zoom, two-finger-pan, tap | async-versus, daily-challenge, timed-round | visual-search, seeded-determinism, share-code | solo, async-2p | `.claude/signal-hunt.md` |
 
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
-| Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
+| Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
 46 games (44 in-repo + 2 external builds).
 
@@ -120,10 +120,11 @@ local-2p.
   also the only page rendering with WebGL rather than Canvas 2D).
 
 - `phase-puzzle` genre + `phase-change` / `soft-body-physics` /
-  `point-gravity` mechanics (phasic — the only soft-body simulation: gems
-  melt to liquid, boil to gas and refreeze, with a gravity well that lives
-  in its own bucket; earmarked as the first web-first prototype of a future
-  iOS title).
+  `point-gravity` mechanics + `endless-levels` session (phasic — the only
+  soft-body simulation and the first game with solver-validated procedural
+  levels forever: 16 authored, then endless seeded drawers, each beaten by
+  the in-game solver before it is served; earmarked as the first web-first
+  prototype of a future iOS title).
 
 ### Absent — what's actually left
 Sensor inputs are now down to two: **`shake`** and **`camera`**. Everything

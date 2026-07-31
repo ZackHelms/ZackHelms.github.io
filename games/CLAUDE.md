@@ -426,21 +426,24 @@ hazards never seal the sky. Detailed context: `.claude/sky-lantern.md`.
 
 ### PHASIC (`phasic/index.html`, ~1250 lines)
 Phase-change block sort, and the repo's first soft-body simulation — also the
-web-first prototype of a planned iOS title. Casual-first by design: most
-levels are "bring order to chaos" tidying, with occasional clever ones. Gems
-are clusters of beveled squares (8 colors, 1–5 cells, fixed shapes, **no
-rotation**); the level clears when every gem sits SOLID in its matching
-socket. Flames from the HOT bucket melt solid→liquid→gas one latched step at
-a time; frost from the COLD bucket condenses and freezes (needs room for the
-true footprint, or it refuses); frost on a flame-latched gem cancels both
-back to their buckets. The gravity well lives in a middle GRAV bucket —
-docked means plain down; drag it onto the ring around the frame for point
-gravity (liquid falls toward it, and can be LIFTED over walls by parking it
-high; gas flees it along a value-iterated highest-reachable guidance field —
-that's how it finds flues); drop it back in the bucket to restore down.
-16 authored levels, socket-snap freezes, 10 seeded generative songs rotating
-per level, separate music/SFX volume + mutes. Drive suite:
-`.claude/tests/drive-phasic.cjs`. Detailed context: `.claude/phasic.md`.
+web-first prototype of a planned iOS title. Casual-first: most levels are
+"bring order to chaos" tidying, with occasional clever ones. Gems are
+clusters of beveled squares (8 colors, 1–5 cells, fixed shapes, **no
+rotation**); the level clears when every gem rests SOLID in its matching
+socket (gems are never locked — anything can be dragged out or re-melted).
+**Reversion model: phase = flame count** — flames melt solid→liquid→gas one
+latched step at a time, and tapping a gem takes a flame back and cools it
+one step (liquid needs room to crystallize or the flame stays); frost is a
+thrown quench that removes a flame without being consumed. The gravity well
+lives in a middle GRAV bucket — docked means plain down, on the ring it is
+a point source (liquid falls toward it and can be LIFTED over walls; gas
+flees it along a reachable-height guidance field — how it finds flues).
+16 authored levels, then **endless seeded procedural levels from 17 on**,
+each beaten by the in-game solver before it is served, with a STUCK
+auto-solve-and-skip button in settings. 10 seeded generative songs,
+separate music/SFX volume + mutes. Drive suite (120 checks incl. the
+generated-content replay gate): `.claude/tests/drive-phasic.cjs`. Detailed
+context: `.claude/phasic.md`.
 
 ### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)
 The repo's first **async-versus** game. Eight rogue signals hide among ~350

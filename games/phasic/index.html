@@ -55,7 +55,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 06:51 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 12:23 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -89,7 +89,8 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
   <div class="otitle" style="font-size:24px">SETTINGS</div>
   <div class="setrow"><label>MUSIC</label><input id="mus-vol" type="range" min="0" max="100" value="60"><button id="mus-mute" class="mtog">&#127925;</button></div>
   <div class="setrow"><label>SFX</label><input id="sfx-vol" type="range" min="0" max="100" value="80"><button id="sfx-mute" class="mtog">&#128266;</button></div>
-  <div class="osub" style="margin-top:14px">Tap a gem to send its latched flames home.<br>Frost on a hot gem cancels both.</div>
+  <div class="osub" style="margin-top:14px">Tap a gem to take a flame back — it cools one step.<br>Frost quenches a flame from afar.</div>
+  <button id="stuck-btn" class="obtn alt">STUCK? SOLVE &amp; SKIP</button>
   <button id="set-close" class="obtn" style="margin-top:6px">DONE</button>
 </div>
 
@@ -118,7 +119,7 @@ const COLORS = {
    UPPER = gem start cells, lower = that gem's socket cells.
    Socket footprint must exactly match the gem's (validated at load). */
 const LEVELS = [
-{ name:'FIRST FACETS', heat:0, cold:0, grav:0,
+{ name:'First Facets', heat:0, cold:0, grav:0,
   hint:'Drag each gem into its glowing socket.',
   map:['..........',
        '.RR.......',
@@ -132,7 +133,7 @@ const LEVELS = [
        '...rr.....',
        '...rr...m.',
        '..........']},
-{ name:'SHAPE GATES', heat:0, cold:0, grav:0,
+{ name:'Shape Gates', heat:0, cold:0, grav:0,
   hint:'Solids only pass through openings they fit. No rotating.',
   map:['..........',
        '.BB....RR.',
@@ -146,8 +147,8 @@ const LEVELS = [
        '.bb..#.rr.',
        '..b..#.rr.',
        '.....#....']},
-{ name:'MELTDOWN', heat:1, cold:1, grav:0,
-  hint:'Fire melts. Liquid pours through the slot. Tap the gem to reclaim the flame, then frost it solid.',
+{ name:'Meltdown', heat:1, cold:1, grav:0,
+  hint:'Fire melts — liquid pours through the slot. Tap the gem to take the flame back, and it crystallizes as it cools.',
   map:['..........',
        '....RR....',
        '....RR....',
@@ -160,8 +161,8 @@ const LEVELS = [
        '....rr....',
        '....rr....',
        '..........']},
-{ name:'ROOM TO POUR', heat:1, cold:1, grav:0,
-  hint:'A gem needs room to crystallize — a one-tall shelf will refuse the frost. Let it pour on.',
+{ name:'Room to Pour', heat:1, cold:1, grav:0,
+  hint:'A gem needs room to crystallize — a one-tall shelf will refuse. Let it pour all the way down first.',
   map:['..........',
        '....RR....',
        '....RR....',
@@ -174,7 +175,7 @@ const LEVELS = [
        '....rr....',
        '....rr....',
        '..........']},
-{ name:'GEM DRAWER', heat:1, cold:1, grav:0,
+{ name:'Gem Drawer', heat:1, cold:1, grav:0,
   hint:'Tidy the drawer. Most gems fit the wide gap — only the long one needs fire.',
   map:['..........',
        '.M..BB....',
@@ -188,8 +189,8 @@ const LEVELS = [
        '.rr...bb..',
        '.rr.m..b..',
        '..pppp....']},
-{ name:'ONE FLAME', heat:1, cold:1, grav:0,
-  hint:'One flame, one frost. Reclaim them and use them twice.',
+{ name:'One Flame', heat:1, cold:1, grav:0,
+  hint:'One flame for two gems. Take it back and use it again.',
   map:['..........',
        '.BB....RR.',
        '..B....RR.',
@@ -202,7 +203,7 @@ const LEVELS = [
        '.bb..#.rr.',
        '..b..#.rr.',
        '.....#....']},
-{ name:'SIDEWAYS', heat:1, cold:1, grav:1,
+{ name:'Sideways', heat:1, cold:1, grav:1,
   hint:'Drag the gravity well around the frame — liquid falls TOWARD it, wherever it sits.',
   map:['..........',
        '......RR..',
@@ -216,7 +217,7 @@ const LEVELS = [
        '..........',
        '..........',
        '..........']},
-{ name:'POINT PULL', heat:1, cold:1, grav:1,
+{ name:'Point Pull', heat:1, cold:1, grav:1,
   hint:'The well is a point, not a direction. Lower-left pulls differently than lower-right.',
   map:['..........',
        '....OO....',
@@ -230,7 +231,7 @@ const LEVELS = [
        '.oo.##....',
        '..oo##....',
        '....##....']},
-{ name:'SPRING CLEANING', heat:1, cold:1, grav:1,
+{ name:'Spring Cleaning', heat:1, cold:1, grav:1,
   hint:'A jumbled pile. Most of it just needs putting away — the blue one needs the well.',
   map:['ggg...yy..',
        '.g...yy...',
@@ -244,8 +245,8 @@ const LEVELS = [
        '..G.YY#bb.',
        '.BBYY.#.b.',
        '..BM..#...']},
-{ name:'THE KETTLE', heat:2, cold:2, grav:1,
-  hint:'A second flame boils liquid to steam, and steam FLEES the well — park it far right to push the cloud across the attic, then bring it back under the basin before you frost.',
+{ name:'The Kettle', heat:2, cold:2, grav:1,
+  hint:'A second flame boils liquid to steam, and steam FLEES the well — park it far right to push the cloud across the attic. Then take the flames back one at a time: steam to rain to stone.',
   map:['..........',
        '..........',
        '#pppp##..#',
@@ -258,8 +259,8 @@ const LEVELS = [
        '..........',
        '..........',
        '..........']},
-{ name:'BALLOON ROUTE', heat:2, cold:2, grav:1,
-  hint:'Gas flees the well. Liquid seeks it. You will need to move the well more than once.',
+{ name:'Balloon Route', heat:2, cold:2, grav:1,
+  hint:'Gas flees the well, liquid seeks it. Herd the cloud into the pocket, then reclaim the flames up there.',
   map:['......yy..',
        '.....yy...',
        '....######',
@@ -272,7 +273,7 @@ const LEVELS = [
        '.YY.......',
        '..........',
        '..........']},
-{ name:'QUEUE', heat:1, cold:1, grav:0,
+{ name:'Queue', heat:1, cold:1, grav:0,
   hint:'Some gems fit the gap as solids — no fire needed. Spend flames only where shape demands it.',
   map:['..........',
        '.GGG....M.',
@@ -286,8 +287,8 @@ const LEVELS = [
        '.ggg......',
        '..g.....m.',
        '..........']},
-{ name:'GLASSWORKS', heat:2, cold:2, grav:0,
-  hint:'A production line: melt, pour through the comb, freeze, repeat. Two of each source — keep them cycling.',
+{ name:'Glassworks', heat:2, cold:2, grav:0,
+  hint:'A production line: melt, pour through the comb, reclaim, repeat.',
   map:['..........',
        '.RR..OO...',
        '.RR...OO..',
@@ -300,7 +301,7 @@ const LEVELS = [
        '.rr.oo..yy',
        '.rr..ooyy.',
        '..m.......']},
-{ name:'REFLOW', heat:1, cold:1, grav:1,
+{ name:'Reflow', heat:1, cold:1, grav:1,
   hint:'Put the well ABOVE a puddle’s level and it will lift the liquid over walls.',
   map:['..........',
        '.RR.......',
@@ -314,7 +315,7 @@ const LEVELS = [
        '...#..##..',
        '...#..##rr',
        '...#..##rr']},
-{ name:'MASTER FACET', heat:1, cold:1, grav:1,
+{ name:'Master Facet', heat:1, cold:1, grav:1,
   hint:'Everything you know: melt, pour, drain, drag the well, and crystallize on the far side.',
   map:['..........',
        '.CCC....M.',
@@ -328,7 +329,7 @@ const LEVELS = [
        '.......ccc',
        'm.......c.',
        '........c.']},
-{ name:'FULL SPECTRUM', heat:2, cold:2, grav:1,
+{ name:'Full Spectrum', heat:2, cold:2, grav:1,
   hint:'Every gem, one drawer. Bring the whole spectrum to order.',
   map:['..M.CCCBB.',
        'PPPP.C..B.',
@@ -358,15 +359,15 @@ let game='menu', lvlIdx=0, lvl=null;
 let walls=null, objs=[], heatN=0, coldN=0, gravSrc=null;
 let dragObj=null, dragSrc=null, dragGrav=false, finger={x:0,y:0};
 let flying=[], fx=[], shakeT=0, tSim=0, lvlT=0;
-let woodCanvas=null, clearPending=false;
+let woodCanvas=null, clearPending=false, solving=false;
 
 /* ============ level parse ============ */
 function keyPat(cells){ // canonical offset signature of a cell set
   let mx=1e9,my=1e9; for(const c of cells){ mx=Math.min(mx,c.x); my=Math.min(my,c.y); }
   return cells.map(c=>(c.x-mx)+','+(c.y-my)).sort().join(';');
 }
-function loadLevel(i){
-  lvlIdx=i; lvl=LEVELS[i]; game='play'; lvlT=0; clearPending=false;
+function setupLevel(def,i){
+  lvlIdx=i; lvl=def; game='play'; lvlT=0; clearPending=false;
   walls=new Uint8Array(GW*GH); objs=[]; flying=[]; fx=[];
   dragObj=dragSrc=null; dragGrav=false;
   heatN=lvl.heat; coldN=lvl.cold;
@@ -387,8 +388,8 @@ function loadLevel(i){
     const off=cells.map(c=>({x:c.x-ax,y:c.y-ay})).sort((a,b)=>a.y-b.y||a.x-b.x);
     objs.push({ letter:L, col:COLORS[L], off, sax:sx, say:sy, sock,
       axp:0, ayp:0, startAx:ax, startAy:ay,
-      phase:'solid', heats:0, colds:0, locked:false,
-      ps:off.map(()=>({x:0,y:0,px:0,py:0,wp:Math.random()*6.28})),
+      phase:'solid', heats:0, colds:0, home:false,
+      ps:off.map((_,k)=>({x:0,y:0,px:0,py:0,wp:((i*97+objs.length*31+k*17)%628)/100})),
       freezeT:0, ftarg:null, jx:0,jy:0,jvx:0,jvy:0, mst:[], mstT:0, sloshCd:0 });
   }
   gravSrc = lvl.grav ? {x:0,y:0,docked:true} : null; // starts in its bucket: plain down
@@ -396,7 +397,11 @@ function loadLevel(i){
   layout();
   for(const o of objs){ o.axp=FX+o.startAx*CELL; o.ayp=FY+o.startAy*CELL; syncSolid(o); }
   if(gravSrc){ gravSrc.x=FX+GW*CELL/2; gravSrc.y=FY+GH*CELL+BR*0.55; }
-  $('hintbar').textContent = 'L'+(i+1)+' · '+lvl.name+' — '+lvl.hint;
+}
+function loadLevel(i){
+  const def=getLevel(i);
+  setupLevel(def,i);
+  $('hintbar').textContent = 'L'+(i+1)+' · '+def.name+' — '+def.hint;
   const tst=$('toast'); tst.style.opacity=0;
   buildLvlSel();
   if(typeof songStart==='function') songStart(i%10);
@@ -643,7 +648,7 @@ function mst(ps){ // Prim over ≤5 nodes
 /* ============ phase transitions ============ */
 function centroid(o){ let x=0,y=0; for(const p of o.ps){x+=p.x;y+=p.y;} return {x:x/o.ps.length,y:y/o.ps.length}; }
 function melt(o){ // solid -> liquid
-  o.phase='liquid'; for(const p of o.ps){ p.px=p.x; p.py=p.y; }
+  o.phase='liquid'; o.home=false; for(const p of o.ps){ p.px=p.x; p.py=p.y; }
   o.mst=[]; sfxMelt(); puffFx(o,'melt');
 }
 function boil(o){ o.phase='gas'; o.mst=[]; sfxBoil(); puffFx(o,'boil'); }
@@ -723,7 +728,7 @@ function freezeStep(o,h){
     o.phase='solid'; syncSolid(o);
     o.jvx=(Math.random()-0.5)*CELL*3; o.jvy=CELL*2.4; // jello arrival jiggle
     sfxThunk(); sparkFx(o);
-    checkSocket(o,true);
+    updateHome(o);
   }
 }
 
@@ -737,7 +742,7 @@ function bucketRects(){
 }
 const inRect=(x,y,q,m)=>q&&x>=q.x-(m||0)&&x<=q.x+q.w+(m||0)&&y>=q.y-(m||0)&&y<=q.y+q.h+(m||0);
 function objAt(x,y,fluidToo){
-  for(const o of objs){ if(o.locked) continue;
+  for(const o of objs){
     for(const p of o.ps){
       const r=o.phase==='solid'?CELL*0.62:CELL*0.72;
       if(Math.abs(x-p.x)<r&&Math.abs(y-p.y)<r) return o;
@@ -745,27 +750,33 @@ function objAt(x,y,fluidToo){
   return null;
 }
 function dropSourceOn(kind,o){ // returns true if consumed from bucket
-  if(o.locked) return false;
+  if(o.phase==='freezing') return false;
   if(kind==='heat'){
-    if(o.colds>0){ o.colds--; coldN++; flyBack('cold',centroid(o)); sfxCancel(); toast('Fire and frost cancel out.'); return false; }
-    if(o.phase==='solid'){ o.heats++; melt(o); return true; }
-    if(o.phase==='liquid'){ o.heats++; boil(o); return true; }
+    if(o.phase==='solid'){ o.heats=1; melt(o); return true; }
+    if(o.phase==='liquid'&&o.heats>0){ o.heats=2; boil(o); return true; }
     reject(o,'Nothing left to melt — it is already gas.'); return false;
   } else {
-    if(o.heats>0){ o.heats--; heatN++; flyBack('heat',centroid(o)); sfxCancel(); toast('Frost quenched a flame — both fly home.'); return false; }
-    if(o.phase==='gas'){ o.colds++; condense(o); return true; }
-    if(o.phase==='liquid'){
-      if(tryFreeze(o)){ o.colds++; return true; }
-      reject(o,'No room to crystallize here.'); return false;
+    // frost quenches a flame from afar — same as a tap, and it flies home free
+    if(o.heats>0){
+      if(removeFlame(o)){ sfxCancel(); toast('Frost quenched a flame — the gem cools a step.'); }
+      return false;
     }
     reject(o,'Already solid.'); return false;
   }
 }
-function reject(o,msg){ shakeT=0.35; sfxError(); toast(msg);
+function reject(o,msg){ if(solving) return; shakeT=0.35; sfxError(); toast(msg);
   if(navigator.vibrate) navigator.vibrate(60);
   if(o&&o.phase==='solid'){ o.jvx=(Math.random()-0.5)*CELL*5; o.jvy=-CELL*3; } }
-function tapHome(o){ // release most recent source
-  if(o.heats>0){ o.heats--; heatN++; flyBack('heat',centroid(o)); sfxRelease(); return true; }
+function removeFlame(o){ // reversion: a flame taken back cools the gem one step
+  if(o.phase==='freezing') return false;
+  if(o.heats>0){
+    if(o.phase==='gas'){ o.heats--; heatN++; flyBack('heat',centroid(o)); condense(o); return true; }
+    if(o.phase==='liquid'){
+      if(tryFreeze(o)){ o.heats--; heatN++; flyBack('heat',centroid(o)); sfxRelease(); return true; }
+      reject(o,'No room to crystallize here — let it flow somewhere roomier.'); return false;
+    }
+    o.heats--; heatN++; flyBack('heat',centroid(o)); sfxRelease(); return true;
+  }
   if(o.colds>0){ o.colds--; coldN++; flyBack('cold',centroid(o)); sfxRelease(); return true; }
   return false;
 }
@@ -782,25 +793,31 @@ function flyPos(f){ const k=1-Math.pow(1-f.t,2);
   return {x:f.x+(f.tx-f.x)*k, y:f.y+(f.ty-f.y)*k - Math.sin(k*Math.PI)*40}; }
 
 /* ============ win ============ */
-function checkSocket(o,fresh){
-  if(o.phase!=='solid'||o.locked) return;
-  const ax=Math.round((o.axp-FX)/CELL), ay=Math.round((o.ayp-FY)/CELL);
-  const alignedX=Math.abs(o.axp-(FX+ax*CELL))<CELL*0.42, alignedY=Math.abs(o.ayp-(FY+ay*CELL))<CELL*0.42;
-  if(ax===o.sax&&ay===o.say&&alignedX&&alignedY){
-    if(o.heats>0||o.colds>0) return; // sources must be home first
-    o.locked=true; o.axp=FX+o.sax*CELL; o.ayp=FY+o.say*CELL; syncSolid(o);
+function updateHome(o){ // a gem is "home" while it rests solid in its socket — never locked
+  const was=o.home;
+  let home=false;
+  if(o.phase==='solid'&&o!==dragObj){
+    const ax=Math.round((o.axp-FX)/CELL), ay=Math.round((o.ayp-FY)/CELL);
+    if(ax===o.sax&&ay===o.say&&
+       Math.abs(o.axp-(FX+ax*CELL))<CELL*0.42&&Math.abs(o.ayp-(FY+ay*CELL))<CELL*0.42) home=true;
+  }
+  o.home=home;
+  if(home&&!was){
+    o.axp=FX+o.sax*CELL; o.ayp=FY+o.say*CELL; syncSolid(o);
     o.jx=o.jy=o.jvx=o.jvy=0;
-    sfxLock(); sparkFx(o);
-    if(objs.every(u=>u.locked)&&!clearPending){ clearPending=true; setTimeout(levelClear,650); }
+    if(!solving){ sfxLock(); sparkFx(o); }
+  }
+  if(!clearPending&&!solving&&objs.length&&objs.every(u=>u.home)){
+    clearPending=true; setTimeout(levelClear,650);
   }
 }
 function levelClear(){
-  if(game!=='play'||!objs.every(o=>o.locked)) return;
+  if(game!=='play'||!objs.every(o=>o.home)){ clearPending=false; return; }
   game='clear'; save.done[lvlIdx]=true; persist(); sfxWin();
   const stars = lvlT<50?3 : lvlT<110?2 : 1;
   $('clearstars').textContent='◆'.repeat(stars)+'◇'.repeat(3-stars);
   $('clearname').textContent='L'+(lvlIdx+1)+' · '+lvl.name+' · '+Math.round(lvlT)+'s';
-  $('next-btn').style.display = lvlIdx+1<LEVELS.length?'':'none';
+  $('next-btn').style.display = '';
   $('clear').classList.remove('hide');
   buildLvlSel();
 }
@@ -836,7 +853,7 @@ function onDown(e){
   const o=objAt(p.x,p.y);
   if(o){
     tapCand={o, x:p.x, y:p.y, t:performance.now()};
-    if(o.phase==='solid'&&!o.locked){ dragObj=o; o.gox=o.axp-p.x; o.goy=o.ayp-p.y; }
+    if(o.phase==='solid'){ dragObj=o; o.gox=o.axp-p.x; o.goy=o.ayp-p.y; }
   }
 }
 function onMove(e){
@@ -851,8 +868,9 @@ function onUp(e){
   e.preventDefault();
   const p=finger;
   if(dragSrc){ const o=objAt(p.x,p.y);
-    if(o){ const used=dropSourceOn(dragSrc.kind,o);
-      if(used){ if(dragSrc.kind==='heat') heatN--; else coldN--; sfxAttach(); } }
+    let used=false;
+    if(o) used=dropSourceOn(dragSrc.kind,o);
+    if(used){ if(dragSrc.kind==='heat') heatN--; else coldN--; sfxAttach(); }
     else flyBack(dragSrc.kind,{x:p.x,y:p.y});
     dragSrc=null; return; }
   if(dragGrav){ dragGrav=false; return; }
@@ -863,10 +881,10 @@ function onUp(e){
     if(Math.abs(sx2-o.axp)<CELL*0.42&&Math.abs(sy2-o.ayp)<CELL*0.42&&solidFits(o,sx2,sy2,rects)){
       o.axp=sx2; o.ayp=sy2; }
     syncSolid(o); o.jvx=(Math.random()-0.5)*CELL; o.jvy=CELL*1.2;
-    checkSocket(o,false); }
+    updateHome(o); }
   if(tapCand&&performance.now()-tapCand.t<420){
     const o=tapCand.o;
-    if(!tapHome(o)&&o.phase==='solid') { o.jvx=(Math.random()-0.5)*CELL*2; o.jvy=-CELL*1.6; sfxTap(); }
+    if(!removeFlame(o)&&o.phase==='solid') { o.jvx=(Math.random()-0.5)*CELL*2; o.jvy=-CELL*1.6; sfxTap(); }
   }
   tapCand=null;
 }
@@ -884,6 +902,174 @@ function placeGrav(x,y){ // clamp to the ring just outside the field border
   else if(md===dr) gravSrc.x=R2, gravSrc.y=cy;
   else if(md===dt2) gravSrc.x=cx, gravSrc.y=T;
   else gravSrc.x=cx, gravSrc.y=B2;
+}
+
+
+/* ============ procedural levels (17+) + endless ============
+   Constructive single-shelf "drawer" template: sockets packed along the
+   floor, gems scattered up top, one shelf with a wide gap (+ optional
+   slot). Every candidate is beaten by the in-game solver BEFORE it is
+   served — a level you receive is a level that has already been solved.
+   Deterministic per level index (seeded rng + seeded gas wander), so
+   level 23 is the same on every device. */
+function dragToCell(o,cx2,cy2){
+  if(!o||o.phase!=='solid') return false;
+  moveSolid(o, FX+cx2*CELL, FY+cy2*CELL);
+  const ax=Math.round((o.axp-FX)/CELL), ay=Math.round((o.ayp-FY)/CELL);
+  const rects=solidRects(o);
+  if(Math.abs(FX+ax*CELL-o.axp)<CELL*0.42&&Math.abs(FY+ay*CELL-o.ayp)<CELL*0.42&&solidFits(o,FX+ax*CELL,FY+ay*CELL,rects)){
+    o.axp=FX+ax*CELL; o.ayp=FY+ay*CELL; }
+  syncSolid(o); updateHome(o); return true;
+}
+function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0;
+  let t2=Math.imul(a^a>>>15,1|a); t2=t2+Math.imul(t2^t2>>>7,61|t2)^t2;
+  return ((t2^t2>>>14)>>>0)/4294967296; }; }
+const GEMW={M:1,R:2,B:2,O:3,Y:3,G:3,C:3,P:4}, GEMH={M:1,R:2,B:2,O:2,Y:2,G:2,C:3,P:1};
+const SHAPE_STR={ M:['X'], R:['XX','XX'], B:['XX','.X'], O:['XX.','.XX'],
+  Y:['.XX','XX.'], G:['XXX','.X.'], C:['XXX','.X.','.X.'], P:['XXXX'] };
+const NAME_A=['Quiet','Molten','Frozen','Drifting','Tidy','Loose','Deep','Bright','Split','Slow','Warm','Still','Late','Spare','Neat','Wild'];
+const NAME_B=['Drawer','Shelf','Pantry','Cabinet','Workshop','Foundry','Cellar','Gallery','Locker','Atelier','Cupboard','Vault','Corner','Bench','Alcove','Attic'];
+const GEN_HINTS=['Bring it to order.','Tidy the drawer.','Everything has a socket.','Order from chaos.','Put it all away.'];
+function genName(i){ const r=mulberry((i*2654435761)>>>0);
+  return NAME_A[(r()*NAME_A.length)|0]+' '+NAME_B[(r()*NAME_B.length)|0]; }
+function stampGen(rows,shape,ax,ay,ch){
+  for(let yy=0;yy<shape.length;yy++) for(let xx=0;xx<shape[yy].length;xx++)
+    if(shape[yy][xx]==='X') rows[ay+yy][ax+xx]=ch;
+}
+function buildGen(i,salt){
+  const easy=salt>=90;
+  const r=mulberry(((i*7919+salt*104729)^0x9E3779B9)>>>0);
+  const d=easy?1:Math.max(1,i-15);
+  const pool=['M','R','B','O','Y','G','C','P'].filter(L=>L!=='P'||(d>=4&&!easy));
+  for(let a=pool.length-1;a>0;a--){ const b2=(r()*(a+1))|0; const t2=pool[a]; pool[a]=pool[b2]; pool[b2]=t2; }
+  const K=easy?2:Math.min(4, 2+Math.min(2,(d/5)|0)+((r()<0.35)?1:0));
+  const gems=[]; let wsum=0;
+  for(const L of pool){ if(gems.length>=K) break;
+    const add=GEMW[L]+(gems.length?1:0);
+    if(wsum+add<=10){ gems.push(L); wsum+=add; } }
+  if(gems.length<2) return null;
+  const rows=Array.from({length:GH},()=>Array(GW).fill('.'));
+  const wg=easy?4:(d<6?3:(r()<0.6?3:2));
+  const gx=(r()*(GW-wg+1))|0;
+  for(let x=0;x<GW;x++) rows[5][x]='#';
+  for(let x=gx;x<gx+wg;x++) rows[5][x]='.';
+  if(!easy&&d>=3&&r()<0.75){ const sx2=(r()*GW)|0;
+    if(sx2<gx-1||sx2>gx+wg) rows[5][sx2]='.'; }
+  let x0=((10-wsum)/2)|0;
+  for(const L of gems){ stampGen(rows,SHAPE_STR[L],x0,GH-GEMH[L],L.toLowerCase()); x0+=GEMW[L]+1; }
+  const occ=Array.from({length:5},()=>Array(GW).fill(false));
+  for(const L of gems){
+    const w=GEMW[L], h=GEMH[L]; let ok=false;
+    for(let t2=0;t2<90&&!ok;t2++){
+      const ax=(r()*(GW-w+1))|0, ay=(r()*(5-h+1))|0;
+      let free=true;
+      for(let yy=0;yy<h&&free;yy++) for(let xx=0;xx<w;xx++)
+        if(SHAPE_STR[L][yy][xx]==='X'&&occ[ay+yy][ax+xx]) free=false;
+      if(!free) continue;
+      for(let yy=0;yy<h;yy++) for(let xx=0;xx<w;xx++)
+        if(SHAPE_STR[L][yy][xx]==='X') occ[ay+yy][ax+xx]=true;
+      stampGen(rows,SHAPE_STR[L],ax,ay,L); ok=true;
+    }
+    if(!ok) return null;
+  }
+  const needMelt=gems.some(L=>GEMW[L]>wg);
+  return { name:genName(i), hint:GEN_HINTS[(r()*GEN_HINTS.length)|0],
+    heat:(needMelt||d>=2)?(d>=9?2:1):0, cold:d>=2?1:0, grav:(!easy&&d>=2)?1:0,
+    map:rows.map(q=>q.join('')) };
+}
+function levelGaps(){
+  const gaps=[]; let run=0,st=0;
+  for(let x=0;x<=GW;x++){ const open=x<GW&&!walls[5*GW+x];
+    if(open){ if(!run) st=x; run++; } else { if(run) gaps.push({x:st,w:run}); run=0; } }
+  return gaps.sort((a,b)=>b.w-a.w);
+}
+function makeScript(){
+  const gaps=levelGaps(); if(!gaps.length) return null;
+  const script=[];
+  const order=[...objs].sort((a,b)=>b.sax-a.sax);
+  for(const o of order){
+    const w=GEMW[o.letter], h=GEMH[o.letter], ty=9-h;
+    const g=gaps.find(q=>q.w>=w);
+    if(g){
+      const gx2=Math.min(Math.max(g.x, g.x+((g.w-w)>>1)), g.x+g.w-w);
+      script.push({d:[o.letter,[[gx2,2],[gx2,ty],[o.sax,ty],[o.sax,o.say]]]});
+    } else {
+      const wide=gaps[0];
+      const mx=Math.max(0,Math.min(GW-w, wide.x-((w-wide.w)>>1)));
+      if(gravSrc) script.push({g:[o.sax+w/2-0.5,13.5]});
+      script.push({d:[o.letter,[[mx,2]]]},{h:[o.letter]},
+        {u:[o.letter,'miny','>',10.2,30]},{w:[1.5]},{t:[o.letter]},{w:[0.8]},
+        {d:[o.letter,[[o.sax,ty],[o.sax,o.say]]]});
+    }
+  }
+  script.push({w:[1.2]});
+  return script;
+}
+function runScriptFast(script){
+  if(!script) return false;
+  let budget=300*120;
+  const take=n=>{ n=Math.max(0,Math.min(n,budget)); budget-=n;
+    for(let k=0;k<n;k++) sub(HSTEP);
+    for(const o of objs) updateHome(o); };
+  const byL=L=>objs.find(u=>u.letter===L);
+  for(const op of script){
+    if(op.d){ const o=byL(op.d[0]); if(!o) return false;
+      for(const wp of op.d[1]){
+        for(let it=0; it<80; it++){
+          const bx=o.axp, by=o.ayp;
+          dragToCell(o, wp[0], wp[1]); take(3);
+          const ax=Math.round((o.axp-FX)/CELL), ay=Math.round((o.ayp-FY)/CELL);
+          if(ax===wp[0]&&ay===wp[1]) break;
+          if(Math.abs(o.axp-bx)<0.4&&Math.abs(o.ayp-by)<0.4&&it>3) break;
+        }
+      }
+    }
+    else if(op.h){ const o=byL(op.h[0]); if(!o||heatN<=0) return false;
+      if(dropSourceOn('heat',o)) heatN--; else return false; }
+    else if(op.t){ const o=byL(op.t[0]); if(!o) return false;
+      let ok=false;
+      for(let a=0;a<5&&!ok;a++){ ok=removeFlame(o); if(!ok) take(240); }
+      if(!ok&&gravSrc){ gravSrc.docked=false;
+        placeGrav(FX+(o.sax+1)*CELL, FY+(GH+2)*CELL); take(360); ok=removeFlame(o); }
+      if(!ok) return false; }
+    else if(op.g){ if(gravSrc){ gravSrc.docked=false; placeGrav(FX+op.g[0]*CELL, FY+op.g[1]*CELL); } }
+    else if(op.u){ const o=byL(op.u[0]); if(!o) return false;
+      const prop=op.u[1],cmp=op.u[2],val=op.u[3],maxS=op.u[4];
+      let t2=0, ok=false;
+      while(t2<maxS&&budget>0){ take(60); t2+=0.5;
+        const ys=o.ps.map(p2=>(p2.y-FY)/CELL), xs=o.ps.map(p2=>(p2.x-FX)/CELL);
+        const v={miny:Math.min(...ys),maxy:Math.max(...ys),minx:Math.min(...xs),maxx:Math.max(...xs)}[prop];
+        if(cmp==='>'?v>val:v<val){ ok=true; break; } }
+      if(!ok) return false; }
+    else if(op.w){ take(Math.round(op.w[0]*120)); }
+    if(budget<=0) return false;
+  }
+  return objs.every(o=>o.home);
+}
+const genCache={};
+function getLevel(i){
+  if(i<LEVELS.length) return LEVELS[i];
+  if(genCache[i]) return genCache[i].def;
+  for(let salt=0;salt<8;salt++){
+    const def=buildGen(i,salt); if(!def) continue;
+    solving=true; setupLevel(def,i);
+    const script=makeScript();
+    const ok=runScriptFast(script);
+    solving=false;
+    if(ok){ genCache[i]={def,script,salt}; return def; }
+  }
+  const def=buildGen(i,99); genCache[i]={def,script:null,salt:99};
+  return def;
+}
+function stuckSolve(){ // the STUCK button: auto-solve and move on
+  if(game!=='play') return;
+  for(const o of objs){
+    heatN+=o.heats; coldN+=o.colds; o.heats=o.colds=0;
+    o.phase='solid'; o.freezeT=0; o.ftarg=null;
+    o.axp=FX+o.sax*CELL; o.ayp=FY+o.say*CELL; syncSolid(o);
+  }
+  flying.length=0; toast('Solved for you — no shame in it.');
+  for(const o of objs) updateHome(o);
 }
 
 /* ============ render ============ */
@@ -938,7 +1124,7 @@ function drawSockets(){
     const pulse=0.47+0.20*Math.sin(tSim*3+o.say);
     for(const c of o.sock){
       const x=FX+c.x*CELL, y=FY+c.y*CELL, m=CELL*0.10;
-      if(o.locked){ ctx.fillStyle=o.col.c+'22'; ctx.fillRect(x,y,CELL,CELL); continue; }
+      if(o.home){ ctx.fillStyle=o.col.c+'22'; ctx.fillRect(x,y,CELL,CELL); continue; }
       ctx.fillStyle='rgba(0,0,0,0.32)'; ctx.fillRect(x+2,y+2,CELL-4,CELL-4);
       ctx.globalAlpha=pulse;
       ctx.strokeStyle=o.col.c; ctx.lineWidth=1.6; ctx.setLineDash([5,4]);
@@ -960,7 +1146,7 @@ function drawGem(o){
       const gr=ctx.createLinearGradient(x-h,y-h,x+h,y+h);
       gr.addColorStop(0,col.hi); gr.addColorStop(0.42,col.c); gr.addColorStop(1,col.lo);
       ctx.fillStyle=gr; rrect(x-h,y-h,s,s,r); ctx.fill();
-      if(o.locked){ ctx.strokeStyle=col.hi; ctx.globalAlpha=0.7; ctx.lineWidth=1.4; rrect(x-h,y-h,s,s,r); ctx.stroke(); ctx.globalAlpha=1; }
+      if(o.home){ ctx.strokeStyle=col.hi; ctx.globalAlpha=0.7; ctx.lineWidth=1.4; rrect(x-h,y-h,s,s,r); ctx.stroke(); ctx.globalAlpha=1; }
       // facet bevels
       ctx.globalAlpha=0.5*k; ctx.fillStyle=col.hi;
       ctx.beginPath(); ctx.moveTo(x-h+2,y-h+2); ctx.lineTo(x+h-2,y-h+2); ctx.lineTo(x,y); ctx.closePath(); ctx.fill();
@@ -1034,6 +1220,7 @@ function drawBuckets(){
   }
   for(const side of ['hot','cold']){
     const q=b[side], hot=side==='hot';
+    if((hot?lvl.heat:lvl.cold)<=0) continue;
     const gr=ctx.createLinearGradient(q.x,q.y,q.x,q.y+q.h);
     gr.addColorStop(0,'#3a3f52'); gr.addColorStop(1,'#1c1f2c');
     ctx.fillStyle=gr;
@@ -1105,8 +1292,8 @@ function render(){
   ctx.fillStyle='rgba(120,140,200,0.06)';
   for(let y=0;y<GH;y++) for(let x=0;x<GW;x++) ctx.fillRect(FX+x*CELL+CELL/2-0.7,FY+y*CELL+CELL/2-0.7,1.4,1.4);
   drawSockets();
-  for(const o of objs) if(o.locked) drawGem(o);
-  for(const o of objs) if(!o.locked) drawGem(o);
+  for(const o of objs) if(o.home) drawGem(o);
+  for(const o of objs) if(!o.home) drawGem(o);
   drawFx();
   drawWood();
   drawBuckets();
@@ -1138,7 +1325,7 @@ function applyVolumes(){
   musicGain.gain.value = save.musMute?0:(save.mus/100)*0.42;
 }
 function tone(freq,dur,type,vol,when,slide,dest){
-  if(!ac) return;
+  if(!ac||solving) return;
   const t=(when||ac.currentTime), o=ac.createOscillator(), g=ac.createGain();
   o.type=type||'sine'; o.frequency.setValueAtTime(freq,t);
   if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(20,slide),t+dur);
@@ -1147,7 +1334,7 @@ function tone(freq,dur,type,vol,when,slide,dest){
   o.connect(g); g.connect(dest||sfxGain); o.start(t); o.stop(t+dur+0.05);
 }
 function noise(dur,vol,fLo,fHi,when,slideHz){
-  if(!ac) return;
+  if(!ac||solving) return;
   const t=(when||ac.currentTime), s=ac.createBufferSource(), g=ac.createGain(), f=ac.createBiquadFilter();
   s.buffer=noiseBuf; s.loop=true;
   f.type='bandpass'; f.frequency.setValueAtTime((fLo+fHi)/2,t); f.Q.value=0.8;
@@ -1171,9 +1358,6 @@ const sfxCancel=()=>{ if(!ac)return; const t=ac.currentTime; tone(880,0.16,'tria
 const sfxWin  =()=>{ if(!ac)return; const t=ac.currentTime; [523,659,784,1046,1318].forEach((f,i2)=>tone(f,0.4,'triangle',0.15,t+i2*0.11)); };
 
 /* 10 procedural songs — tiny generative sequencer, seeded per song */
-function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0;
-  let t2=Math.imul(a^a>>>15,1|a); t2=t2+Math.imul(t2^t2>>>7,61|t2)^t2;
-  return ((t2^t2>>>14)>>>0)/4294967296; }; }
 const SONGS=[
   {bpm:92, root:57, minor:1, prog:[0,5,3,4], lead:'triangle', bass:'sine',    hat:0.5, arp:0},
   {bpm:108,root:60, minor:0, prog:[0,3,4,3], lead:'square',   bass:'triangle',hat:0.7, arp:1},
@@ -1223,24 +1407,28 @@ document.addEventListener('visibilitychange',()=>{ if(!ac) return;
 /* ============ UI wiring ============ */
 function buildLvlSel(){
   const sel=$('lvlsel'); sel.innerHTML='';
-  for(let i2=0;i2<LEVELS.length;i2++){
+  let hi=15; for(let k=0;k<save.done.length;k++) if(save.done[k]) hi=Math.max(hi,k);
+  const N=Math.max(32,hi+2,lvlIdx+2); // authored 16 + generated 17-32 + endless beyond
+  for(let i2=0;i2<N;i2++){
     const unlocked = i2===0 || save.done[i2-1] || save.done[i2];
     const op=document.createElement('option');
     op.value=i2; op.disabled=!unlocked;
-    op.textContent='L'+(i2+1)+' · '+LEVELS[i2].name+(save.done[i2]?' ✓':unlocked?'':' 🔒');
+    const nm=i2<LEVELS.length?LEVELS[i2].name:genName(i2);
+    op.textContent=(i2+1)+' · '+nm+(save.done[i2]?' ✓':unlocked?'':' 🔒');
     if(i2===lvlIdx) op.selected=true;
     sel.appendChild(op);
   }
 }
 $('play-btn').onclick=()=>{ audioInit(); $('menu').classList.add('hide');
-  let i2=0; while(i2<LEVELS.length-1&&save.done[i2]) i2++;
+  let i2=0; while(save.done[i2]) i2++;
   loadLevel(i2); };
-$('next-btn').onclick=()=>{ audioInit(); $('clear').classList.add('hide'); loadLevel(Math.min(lvlIdx+1,LEVELS.length-1)); };
+$('next-btn').onclick=()=>{ audioInit(); $('clear').classList.add('hide'); loadLevel(lvlIdx+1); };
 $('replay-btn').onclick=()=>{ audioInit(); $('clear').classList.add('hide'); loadLevel(lvlIdx); };
 $('reload-btn').onclick=()=>{ audioInit(); if(lvl){ $('clear').classList.add('hide'); loadLevel(lvlIdx); sfxTap(); } };
 $('lvlsel').onchange=e=>{ audioInit(); $('clear').classList.add('hide'); loadLevel(+e.target.value); };
 $('gear-btn').onclick=()=>{ audioInit(); $('settings').classList.remove('hide'); };
 $('set-close').onclick=()=>{ $('settings').classList.add('hide'); };
+$('stuck-btn').onclick=()=>{ $('settings').classList.add('hide'); stuckSolve(); };
 $('mute-btn').onclick=()=>{ audioInit();
   const allMuted=save.sfxMute&&save.musMute;
   save.sfxMute=save.musMute=!allMuted; persist(); applyVolumes(); };
@@ -1264,7 +1452,7 @@ function loop(t){
   const dt=Math.min(0.1,(t-lastT)/1000||0.016); lastT=t;
   if(game==='play'){ if(!TEST) stepSim(dt); stepFlying(dt); stepFx(dt);
     if(shakeT>0) shakeT-=dt;
-    for(const o of objs) if(o.phase==='solid'&&!o.locked&&o!==dragObj) checkSocket(o,false);
+    for(const o of objs) updateHome(o);
   }
   render();
   requestAnimationFrame(loop);
@@ -1277,32 +1465,30 @@ if(TEST){
     load:i2=>{ $('menu').classList.add('hide'); $('clear').classList.add('hide'); loadLevel(i2); },
     state:()=>({ game, lvl:lvlIdx, heatN, coldN,
       objs:objs.map(o=>{ const xs=o.ps.map(p=>(p.x-FX)/CELL), ys=o.ps.map(p=>(p.y-FY)/CELL);
-        return { L:o.letter, phase:o.phase, heats:o.heats, colds:o.colds, locked:o.locked,
+        return { L:o.letter, phase:o.phase, heats:o.heats, colds:o.colds, home:o.home,
         ax:Math.round((o.axp-FX)/CELL), ay:Math.round((o.ayp-FY)/CELL),
         cx:(centroid(o).x-FX)/CELL, cy:(centroid(o).y-FY)/CELL,
         minx:Math.min(...xs), maxx:Math.max(...xs), miny:Math.min(...ys), maxy:Math.max(...ys) }; }) }),
     applySource:(kind,L)=>{ const o=objs.find(u=>u.letter===L); if(!o) return false;
       if((kind==='heat'?heatN:coldN)<=0) return false;
       const used=dropSourceOn(kind,o); if(used){ if(kind==='heat') heatN--; else coldN--; } return used; },
-    tapHome:L=>{ const o=objs.find(u=>u.letter===L); return o?tapHome(o):false; },
-    dragTo:(L,cx2,cy2)=>{ const o=objs.find(u=>u.letter===L);
-      if(!o||o.phase!=='solid'||o.locked) return false;
-      moveSolid(o, FX+cx2*CELL, FY+cy2*CELL);
-      const ax=Math.round((o.axp-FX)/CELL), ay=Math.round((o.ayp-FY)/CELL);
-      const rects=solidRects(o);
-      if(Math.abs(FX+ax*CELL-o.axp)<CELL*0.42&&Math.abs(FY+ay*CELL-o.ayp)<CELL*0.42&&solidFits(o,FX+ax*CELL,FY+ay*CELL,rects)){
-        o.axp=FX+ax*CELL; o.ayp=FY+ay*CELL; }
-      syncSolid(o); checkSocket(o,false); return true; },
+    tapHome:L=>{ const o=objs.find(u=>u.letter===L); return o?removeFlame(o):false; },
+    dragTo:(L,cx2,cy2)=>dragToCell(objs.find(u=>u.letter===L),cx2,cy2),
     setGrav:(cx2,cy2)=>{ if(!gravSrc) return false; gravSrc.docked=false; placeGrav(FX+cx2*CELL, FY+cy2*CELL); return true; },
     dockGrav:()=>{ if(!gravSrc) return false; gravSrc.docked=true; return true; },
     step:s=>{ const n=Math.round(s/(1/120)); for(let i2=0;i2<n;i2++) sub(1/120);
       stepFlying(s);
-      for(const o of objs) if(o.phase==='solid'&&!o.locked) checkSocket(o,false); },
+      for(const o of objs) updateHome(o); },
     gravAt:()=>gravSrc?{x:(gravSrc.x-FX)/CELL,y:(gravSrc.y-FY)/CELL,docked:!!gravSrc.docked}:null,
     freezeDry:L=>{ const o=objs.find(u=>u.letter===L); return o?tryFreeze(o,true):null; },
     parts:L=>{ const o=objs.find(u=>u.letter===L);
       return o?o.ps.map(p=>({x:(p.x-FX)/CELL,y:(p.y-FY)/CELL})):null; },
-    levels:LEVELS.length, save:()=>save,
+    authored:LEVELS.length, save:()=>save,
+    stuck:()=>stuckSolve(),
+    genInfo:()=>genCache[lvlIdx]?{salt:genCache[lvlIdx].salt,hasScript:!!genCache[lvlIdx].script}:null,
+    replayGen:()=>{ const c=genCache[lvlIdx]; if(!c||!c.script) return false;
+      solving=true; const ok=runScriptFast(c.script); solving=false;
+      for(const o of objs) updateHome(o); return ok; },
   };
 }
 </script>

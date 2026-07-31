@@ -8,16 +8,21 @@ verbs, no keyboard, the back/reload chrome is web-only by design.
 
 - Gems are clusters of small beveled squares (1–5 cells, 8 colors, fixed
   canonical shapes — R 2x2, O Z4, Y S4, G T4, C T5, B L3, P I4, M 1x1).
-- **Win = every gem SOLID in its matching socket** (socket footprint always
-  equals the gem's; validated at load, `keyPat`). Sources must be tapped home
-  before a gem can lock.
+- **Win = every gem SOLID resting in its matching socket** (footprint always
+  equals the gem's; validated at load, `keyPat`). Nothing else matters — the
+  gravity well can still be deployed. Gems are never locked: a gem sitting
+  home (`o.home`) can be dragged out or melted again at any time.
 - **No rotation, ever.** If a shape doesn't fit an opening, the answer is
   phase change. Solids are weightless (a deliberate call: pegboard feel,
   sockets can sit anywhere, drag puzzles stay fair).
-- **One source = one step.** Heat: solid→liquid, liquid→gas. Cold: gas→liquid,
-  liquid→solid. A source stays latched on the gem until single-tapped home
-  (flies back to its bucket). Phase persists after release. Cold onto a gem
-  with a latched heat cancels BOTH (and vice versa) — no phase change.
+- **REVERSION model (CD change 2026-07-31): phase = flame count.** 0 flames
+  = solid, 1 = liquid, 2 = gas. A flame latches when dropped; single-tapping
+  the gem takes the most recent flame back AND cools it one step (gas
+  condenses; liquid runs the freeze room-search — no room means the flame
+  stays latched and you get the refusal buzz). Frost is a thrown quench: on
+  a flamed gem it removes one flame (same as a tap) and is never consumed;
+  on a flameless gem it has nothing to do. The cold bucket is therefore a
+  convenience verb, not a required one — budgets keep it around for feel.
 - **Freeze needs room**: placement search around the puddle's ideal anchor
   (radius 1.7 cells, per-particle jump ≤1.9 cells; the SOCKET placement gets
   a longer 2.35 reach and is tried first — "close counts, it snaps in").
@@ -56,6 +61,27 @@ pairwise work is trivial.
   runs a 0.5 s springy snap (overshoot wobble) that shoves fluids aside, then
   `checkSocket` locks if it landed on the socket anchor with sources home.
 
+## Generator + endless + STUCK
+
+Authored levels are 0–15 (`LEVELS[]`). **Levels 17+ are procedural**
+(`getLevel(i)` → `buildGen(i,salt)`): a constructive single-shelf "drawer"
+template — sockets packed along the floor, gems scattered up top, one shelf
+at row 5 with a wide gap (+ optional 1-wide slot), difficulty `d=i-15`
+scales gem count (2→4), gap width (4→2), budgets and the well. Every
+candidate is **beaten by the in-game solver before it is served**
+(`makeScript()` plans drag routes through wide-enough gaps and
+melt-pour-tap routes otherwise; `runScriptFast()` executes it headlessly on
+the real sim; failing salts are discarded, so a served level is a solved
+level). Generation is deterministic per index — seeded rng plus seeded gas
+wander (`p.wp`) — so level 23 is identical on every device. Endless: NEXT
+LEVEL simply never stops; the level list grows as you clear. **STUCK**
+(settings menu) auto-solves the current level — gems snap home, progress
+is recorded — so no level can ever wall the player. Generated maps live in
+`genCache` with their winning script (`__GF.replayGen()` re-runs it; the
+drive suite replays all of 17–32 plus endless spot checks as the
+generated-content gate). Next generator iteration when wanted: two-shelf
+and gas/attic templates.
+
 ## Levels + tone
 
 **CD direction (2026-07-31): casual and fun first.** The majority of levels
@@ -65,7 +91,7 @@ chaos levels are GEM DRAWER, SPRING CLEANING, GLASSWORKS and the all-8-gem
 FULL SPECTRUM finale; the smart moments are THE KETTLE, REFLOW and MASTER
 FACET. Keep this ratio when adding levels.
 
-16 authored maps (`LEVELS[]`, 10×12 ASCII: `#` wall, UPPER gem, lower socket).
+16 authored maps (indices 0-15) (`LEVELS[]`, 10×12 ASCII: `#` wall, UPPER gem, lower socket).
 Ramp: drag → fit gates → melt (+cancel rule) → freeze-needs-room →
 GEM DRAWER (chaos-lite) → source economy → well intro (SIDEWAYS) → point
 pull → SPRING CLEANING (chaos + one well-dance) → **kettle** (boil + herd
@@ -83,11 +109,12 @@ smoke gate catches a bad map edit.
 dragTo/setGrav/state/parts/freezeDry`. `freezeDry` returns the placement
 search's candidate list — the tool that found both freeze bugs.
 
-`.claude/tests/drive-phasic.cjs` (87 checks): a scripted player solution for
-all 16 levels (final-leg gate), plus fit-gating negatives (2x2/T4 refused by a
+`.claude/tests/drive-phasic.cjs` (120 checks): a scripted player solution for
+all 16 authored levels (final-leg gate), plus fit-gating negatives (2x2/T4 refused by a
 1-wide slot, 1x1 passes), freeze-refusal on the 1-tall shelf without consuming
-the frost, the cancel rule with bucket restoration, locked-gem immunity,
-sources-home-before-lock, gravity dock/undock, and the console-error assert. Freeze-near-then-
+the frost, the cancel rule with bucket restoration, live-socket re-melting, win-with-deployed-well, the generated-content
+replay gate (17-32 + endless), STUCK, menu format, and the console-error
+assert. Freeze-near-then-
 slide (`ensureLock`) is a legitimate player move the suite uses.
 
 ## Audio
