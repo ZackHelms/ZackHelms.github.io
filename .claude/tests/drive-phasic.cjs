@@ -970,6 +970,16 @@ function check(name, cond, extra) {
   check('phaschrome: portrait bucket rects unchanged by the landscape excursion (bit-identical)',
     JSON.stringify(bPortraitBefore) === JSON.stringify(bPortraitAfter), { bPortraitBefore, bPortraitAfter });
 
+  // ---------- phaschrome: now-playing line at the very bottom of the screen ----------
+  await load(0);
+  const songTitle0 = await page.evaluate('SONGS[0].t');
+  check('phaschrome: load(0) — nowPlaying shows track 01 with SONGS[0].t (' + songTitle0 + ')',
+    (await g('G=>G.nowPlaying()')) === '01 · ' + songTitle0);
+  await load(9);
+  const songTitle9 = await page.evaluate('SONGS[9].t');
+  check('phaschrome: load(9), i%10=9 — nowPlaying formats a double-digit track (10 · ' + songTitle9 + ')',
+    (await g('G=>G.nowPlaying()')) === '10 · ' + songTitle9);
+
   // ---------- wiki: home, tactics page, live search (second page, same context) ----------
   const wpage = await ctx.newPage();
   wpage.on('pageerror', e => errors.push('pageerror(wiki): ' + e.message));

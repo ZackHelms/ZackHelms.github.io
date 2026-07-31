@@ -55,7 +55,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 22:32 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 22:41 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -2195,6 +2195,17 @@ function drawFx(){
   }
   ctx.globalAlpha=1;
 }
+// now-playing line — bottom-center in portrait (the strip freed by the bucket
+// raise, below the buckets, above the safe-area edge), bottom-left in
+// landscape (clear of the right-side bucket column). Drawn outside the
+// shake save/restore so a failure jolt never jitters this read-out.
+function drawNowPlaying(){
+  if(!nowPlayingStr) return;
+  ctx.fillStyle='rgba(136,153,187,0.55)'; // var(--dim) #8899bb, dimmed further
+  ctx.font='10px "Share Tech Mono"'; ctx.textBaseline='alphabetic';
+  if(LAND){ ctx.textAlign='left'; ctx.fillText(nowPlayingStr, 10, H-8); }
+  else { ctx.textAlign='center'; ctx.fillText(nowPlayingStr, W/2, H-8); }
+}
 function render(){
   ctx.clearRect(0,0,W,H);
   if(!lvl){ ctx.fillStyle='#0a0c16'; ctx.fillRect(0,0,W,H); return; }
@@ -2216,6 +2227,7 @@ function render(){
   for(const f of flying){ const p2=flyPos(f); drawSourceOrb(f.kind,p2.x,p2.y,0.9); }
   if(dragSrc) drawSourceOrb(dragSrc.kind,finger.x,finger.y,1.1);
   ctx.restore();
+  drawNowPlaying();
 }
 
 
@@ -2274,20 +2286,24 @@ const sfxWin  =()=>{ if(!ac)return; const t=ac.currentTime; [523,659,784,1046,13
 
 /* 10 procedural songs — tiny generative sequencer, seeded per song */
 const SONGS=[
-  {bpm:92, root:57, minor:1, prog:[0,5,3,4], lead:'triangle', bass:'sine',    hat:0.5, arp:0},
-  {bpm:108,root:60, minor:0, prog:[0,3,4,3], lead:'square',   bass:'triangle',hat:0.7, arp:1},
-  {bpm:84, root:55, minor:1, prog:[0,2,5,4], lead:'sine',     bass:'sine',    hat:0.3, arp:1},
-  {bpm:116,root:62, minor:0, prog:[0,4,5,3], lead:'sawtooth', bass:'triangle',hat:0.8, arp:0},
-  {bpm:76, root:53, minor:1, prog:[0,5,1,4], lead:'triangle', bass:'sine',    hat:0.2, arp:1},
-  {bpm:100,root:59, minor:0, prog:[0,3,1,4], lead:'square',   bass:'sine',    hat:0.6, arp:0},
-  {bpm:124,root:57, minor:1, prog:[0,6,5,4], lead:'sawtooth', bass:'square',  hat:0.9, arp:1},
-  {bpm:88, root:64, minor:0, prog:[0,4,1,5], lead:'sine',     bass:'triangle',hat:0.4, arp:0},
-  {bpm:104,root:55, minor:1, prog:[0,3,6,4], lead:'triangle', bass:'sine',    hat:0.7, arp:1},
-  {bpm:96, root:62, minor:0, prog:[0,5,3,4], lead:'square',   bass:'triangle',hat:0.5, arp:0},
+  {bpm:92, root:57, minor:1, prog:[0,5,3,4], lead:'triangle', bass:'sine',    hat:0.5, arp:0, t:'First Light'},
+  {bpm:108,root:60, minor:0, prog:[0,3,4,3], lead:'square',   bass:'triangle',hat:0.7, arp:1, t:'Copper Squares'},
+  {bpm:84, root:55, minor:1, prog:[0,2,5,4], lead:'sine',     bass:'sine',    hat:0.3, arp:1, t:'Slow Thaw'},
+  {bpm:116,root:62, minor:0, prog:[0,4,5,3], lead:'sawtooth', bass:'triangle',hat:0.8, arp:0, t:'Vapor Trail'},
+  {bpm:76, root:53, minor:1, prog:[0,5,1,4], lead:'triangle', bass:'sine',    hat:0.2, arp:1, t:'Deep Cellar'},
+  {bpm:100,root:59, minor:0, prog:[0,3,1,4], lead:'square',   bass:'sine',    hat:0.6, arp:0, t:'Warm Static'},
+  {bpm:124,root:57, minor:1, prog:[0,6,5,4], lead:'sawtooth', bass:'square',  hat:0.9, arp:1, t:'Ride the Flue'},
+  {bpm:88, root:64, minor:0, prog:[0,4,1,5], lead:'sine',     bass:'triangle',hat:0.4, arp:0, t:'Still Water'},
+  {bpm:104,root:55, minor:1, prog:[0,3,6,4], lead:'triangle', bass:'sine',    hat:0.7, arp:1, t:'Amber Drift'},
+  {bpm:96, root:62, minor:0, prog:[0,5,3,4], lead:'square',   bass:'triangle',hat:0.5, arp:0, t:'Night Drawer'},
 ];
-let song=null, songRng=null, musNext=0, musStep=0;
+let song=null, songRng=null, musNext=0, musStep=0, nowPlayingStr='';
 function songStart(i){
-  song=SONGS[i%SONGS.length]; songRng=mulberry(1234+i*77); musStep=0;
+  const idx=i%SONGS.length;
+  song=SONGS[idx]; songRng=mulberry(1234+i*77); musStep=0;
+  // shown regardless of musMute — the "current track" is a property of the
+  // level, not of whether the synth is actually audible right now
+  nowPlayingStr = String(idx+1).padStart(2,'0')+' · '+song.t;
   if(ac) musNext=ac.currentTime+0.1;
 }
 const midiHz=m=>440*Math.pow(2,(m-69)/12);
@@ -2415,6 +2431,7 @@ if(TEST){
       return { W,H,CELL,FX,FY,cvW:cv.width,cvH:cv.height,rectW:r.width,rectH:r.height }; },
     relayout:()=>{ layout(); return true; },
     buckets:()=>bucketRects(),
+    nowPlaying:()=>nowPlayingStr||'',
     authored:Object.keys(AUTH).length, save:()=>save,
     complexity:()=>lvl&&lvl.cx?{score:cxScore(lvl.cx),...lvl.cx}:null,
     stuck:()=>stuckSolve(),
