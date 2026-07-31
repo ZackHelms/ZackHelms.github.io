@@ -444,7 +444,7 @@ forces a retry; bushes stop stone and drink liquid but pass vapor; fans
 blow only gas) — 24 authored tutorials/set-pieces, every other level
 generated with that block's factor set and a formalized complexity score,
 endless past 64, each generated level beaten by the in-game solver before
-it is served. STUCK (settings) auto-solves and skips. 10 seeded generative
+it is served. STUCK (settings) replays the solver script as a visible ghost; a WIKI button beside it opens the searchable in-game wiki (games/phasic/wiki.html, 12-tactic registry). 10 seeded generative
 songs, separate music/SFX volume + mutes. Drive suite (195 checks incl.
 the generated-content replay gate and the complexity-ramp assert):
 `.claude/tests/drive-phasic.cjs`. Detailed context: `.claude/phasic.md`
