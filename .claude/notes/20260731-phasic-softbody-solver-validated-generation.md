@@ -87,3 +87,32 @@ salts 90–95). Consequences that made this worth it:
 - Two-band generated sockets: travel lanes (rows 0–2 top, 6–8 bottom)
   must stay ≥ the tallest crossing gem, or parked sockets block later
   travelers; 3-tall gems always socket in the bottom band.
+
+## Template + weaving lessons (added after the 2026-07-31 burndown)
+
+- **One shared script runner is the invariant.** Validation (`runScriptFast`
+  = synchronous drain, `solving` on) and the STUCK ghost (paced by
+  frames/`__GF.step`, `solving` off) both execute `scriptRunner`. Any new
+  script op (e.g. the `{g:[]}` dock-the-well form) is automatically
+  understood by both — and any op added anywhere ELSE would desync them.
+  Extend the runner, never fork it.
+- **Byte-diff proof for determinism-preserving refactors.** When adding a
+  new seeded draw ahead of existing ones, prove old outputs survive: patch
+  a baseline copy with a stand-in `r()` and diff every candidate def
+  (index × salt) against the new code's same-template output. The template
+  pick was proven this way over 1105 candidates before shipping.
+- **Packing-order conflicts collapse template solve rates.** Two-shelf's
+  first cut solved 19% of candidates — scatter wanted nearest-gap-first,
+  shelf packing wanted farthest-first. Deal sockets FROM the scatter
+  (scatter-first, pack outside-in from each gap) → 42%. When a new
+  template underperforms, measure per-salt solve rates and look for two
+  heuristics fighting; don't just add salts.
+- **Plain candidates win the salt race unless woven ones are preferred.**
+  In-path hazards are rarer than plain solvable boards, so `getLevel`
+  must prefer the first WOVEN candidate that solves (blocks 5–7) or
+  hazards stay decorative forever. Weave odds ramp within a block
+  (0.2 + 0.12·p) so hazards lean late and the complexity envelope stays
+  truthful.
+- **Rescue-band fallthrough is the canary.** A template/weave change that
+  drops any sub-65 index to rescue salts (≥90) has broken difficulty —
+  the suite's per-index `salt` in `genInfo()` makes this checkable.
