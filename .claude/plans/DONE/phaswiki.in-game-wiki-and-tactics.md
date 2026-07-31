@@ -1,6 +1,6 @@
 # phaswiki — Phasic in-game wiki (cogwheel entry, searchable topic pages) + tactics #10–12
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-07-31 (6711ad9, b768bfc, 502eaa2, 44b274b, 21929a2 on worktree-oversee+phaswiki)
 **Requested:** 2026-07-31 (CD, verbatim with the playtest sign-off: "add to
 tactic list what i have to do in lv 13 where i push a liquid object with a
 solid object. Create a wiki for this game (accessible via cogwheel menu)

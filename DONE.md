@@ -1,5 +1,11 @@
 # DONE — done log
 
+- 2026-07-31 [phasic] phaswiki oversee run: in-game wiki shipped
+  (cogwheel → WIKI, 7 hash-routed pages, live search under the reload
+  button) with the tactics registry grown to 12 (push the puddle, launch
+  and freeze, fence with stone) and a liquid-shove suite guard. Suite
+  228→236 checks. (6711ad9..21929a2; plan archived to .claude/plans/DONE/)
+
 - 2026-07-31 [phasic] phaspolish oversee run: STUCK now plays the solver
   script as a visible 4x ghost (staggered fly-home fallback for authored
   levels), frost buckets stripped below L25 (frost debuts at Standing

@@ -11,13 +11,6 @@ backlog entry here.
 
 ## Now
 
-- [phasic] In-game wiki (cogwheel → WIKI: home page, topic pages incl.
-  tactics, search box under the reload button) + tactic #10 "push the
-  puddle" (L13 Queue) into the registry. (CD request 2026-07-31, verbatim
-  in the plan, given with the playtest sign-off.)
-  **Plan ready (2026-07-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phaswiki.in-game-wiki-and-tactics.md`
-
 - [phasic] **Freeze-refusal fairness bug** (CD screenshots 2026-07-31, live
   build 14:01): a big liquid gem pancakes flat and frost then refuses with
   "No room to crystallize here" despite visible clearance — seen on L27
