@@ -53,6 +53,25 @@ backlog entry here.
   **Plan ready (2026-07-31)** — run:
   `/zmh-producer:oversee-implementation .claude/plans/phasaudio.obstacle-sfx-and-block-music.md`
 
+- [phasic] Block-lesson level naming (CD 2026-07-31): every level name in
+  a curriculum block begins with the same word, the word that describes
+  the block's lesson (tutorials AND generated names — `genName` would draw
+  from a per-block lead word + suffix pool). Interpretation to confirm at
+  plan-gen: lead-word list per block (e.g. Drag/Flame/Gravity/Frost/
+  Vapor/Void/Hedge/Wind) and whether legacy tutorial names like "The
+  Kettle" get prefixed or renamed.
+- [phasic] **Gravity block (L17–24) must REQUIRE the orb** (CD 2026-07-31,
+  verbatim intent): "Currently I am able to use another object to push the
+  liquid or gas object where i need it to go." Opener like old L10 (Room
+  to Pour shape): one object + one flame + the grav orb, orb-mandatory.
+  Then maze-like levels needing careful orb use to push gas / pull liquid
+  through mazes past obstacles (bushes, fans, voids) as needed; complexity
+  ramps with more objects in various states and traps like voids. Design
+  notes: needs anti-shove layouts (the push-the-puddle tactic must not
+  bypass the lesson — fence solids out or omit spare solids); flag for the
+  plan-gen interview: obstacles formally debut in blocks 5–7, so using
+  bushes/fans/voids inside block-2 mazes reshuffles the curriculum
+  introduction order — CD call on how to reconcile.
 - [phasic] Custom game icon (hub card + future iOS app icon): a 2x2 red
   gem — lower third solid, middle third liquid (translucent), top third
   gaseous (semi-transparent) — on a transparent background with a leafy
