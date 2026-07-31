@@ -891,6 +891,85 @@ function check(name, cond, extra) {
   check('phaschrome: the event storm settles back on the real portrait geometry',
     sameGeom(mBase, mAfterWired), { mBase, mAfterWired });
 
+  // ---------- phaschrome: landscape puts the buckets in a right-side column ----------
+  // CD request (2026-07-31): in landscape, move HOT/GRAV/COLD off the bottom
+  // row and into a right-side column so the play field gets the full height.
+  // L1 has no buckets at all; level index 25 is this region's canonical
+  // heat+grav+cold level (probed live — heatN 1, coldN 1, a docked well) so
+  // it exercises all three column slots at once, same convention the frost-
+  // strip checks above use for picking a level by what it actually contains.
+  // GW/GH mirror index.html's own `const GW=10,GH=12` — the field is always
+  // that shape (a rotated board is explicitly out of scope for this plan).
+  const GW = 10, GH = 12;
+  const buckets = () => g('G=>G.buckets()');
+
+  await viewport(VP_PORTRAIT);
+  await load(25);
+  const bPortraitBefore = await buckets(), mPortraitBefore = await metricsNow();
+  check('phaschrome: L26 (index 25) has heat+grav+cold — a real column test level',
+    bPortraitBefore.hot && bPortraitBefore.cold && bPortraitBefore.grav, bPortraitBefore);
+  check('phaschrome: portrait bucket row — HOT/COLD share a y (unchanged row layout)',
+    bPortraitBefore.hot.y === bPortraitBefore.cold.y &&
+    bPortraitBefore.hot.x < bPortraitBefore.grav.x && bPortraitBefore.grav.x < bPortraitBefore.cold.x,
+    bPortraitBefore);
+
+  await viewport(VP_LANDSCAPE);
+  const mLand = await metricsNow(), bLand = await buckets();
+  const fieldRight = mLand.FX + GW * mLand.CELL;
+  check('phaschrome: landscape — canvas is wide (W>H), CELL positive (' + mLand.CELL.toFixed(2) + ')',
+    mLand.W > mLand.H && mLand.CELL > 0, mLand);
+  check('phaschrome: landscape — every bucket rect sits right of the field (fieldRight ' +
+    fieldRight.toFixed(1) + ')',
+    ['hot', 'grav', 'cold'].every(k => bLand[k].x > fieldRight), { fieldRight, bLand });
+  check('phaschrome: landscape — column is ordered HOT above GRAV above COLD',
+    bLand.hot.y < bLand.grav.y && bLand.grav.y < bLand.cold.y, bLand);
+  const heightUsed = (mLand.FY + GH * mLand.CELL) / mLand.H;
+  check('phaschrome: landscape — field uses >90% of the available height (' +
+    (heightUsed * 100).toFixed(1) + '%, FY ' + mLand.FY.toFixed(1) + ' + GH*CELL ' +
+    (GH * mLand.CELL).toFixed(1) + ' of H ' + mLand.H + ')',
+    heightUsed > 0.9, { heightUsed, mLand });
+
+  // landscape grab sanity: a real mouse grab from the HOT column bucket lands
+  // a flame on a gem, proving the HOT hit-test's new upper y bound (needed so
+  // it stops swallowing taps meant for GRAV/COLD below it in the column)
+  // didn't also break grabbing from HOT itself. Uses Playwright's own mouse
+  // API against the wired mousedown/mousemove/mouseup listeners — no new
+  // game-side test hooks needed.
+  const stLand = await st();
+  const target = stLand.objs.find(o => o.phase === 'solid' && o.frosts === 0);
+  check('phaschrome: landscape grab sanity — L26 has a meltable solid gem to target',
+    !!target, stLand.objs);
+  if (target) {
+    const canvasRect = await page.evaluate(() => {
+      const r = document.getElementById('cv').getBoundingClientRect();
+      return { left: r.left, top: r.top };
+    });
+    const hotPt = { x: canvasRect.left + bLand.hot.x + bLand.hot.w / 2, y: canvasRect.top + bLand.hot.y + bLand.hot.h * 0.4 };
+    // aim at the gem's centroid (already particle-average pixel-frame cell
+    // units), not its anchor cell — an anchor corner need not be occupied by
+    // any actual particle for a non-rectangular gem footprint
+    const gemPt = {
+      x: canvasRect.left + mLand.FX + target.cx * mLand.CELL,
+      y: canvasRect.top + mLand.FY + target.cy * mLand.CELL,
+    };
+    const heatsBefore = target.heats;
+    await page.mouse.move(hotPt.x, hotPt.y);
+    await page.mouse.down();
+    await page.mouse.move(gemPt.x, gemPt.y, { steps: 5 });
+    await page.mouse.up();
+    await page.waitForTimeout(50);
+    const after = (await st()).objs.find(o => o.L === target.L);
+    check('phaschrome: landscape — real mouse grab from the HOT column bucket lands a flame on ' +
+      target.L, after && after.heats === heatsBefore + 1, { before: heatsBefore, after: after && after.heats });
+  }
+
+  await viewport(VP_PORTRAIT);
+  const bPortraitAfter = await buckets(), mPortraitAfter = await metricsNow();
+  check('phaschrome: portrait metrics unchanged by the landscape excursion (bit-identical)',
+    sameGeom(mPortraitBefore, mPortraitAfter), { mPortraitBefore, mPortraitAfter });
+  check('phaschrome: portrait bucket rects unchanged by the landscape excursion (bit-identical)',
+    JSON.stringify(bPortraitBefore) === JSON.stringify(bPortraitAfter), { bPortraitBefore, bPortraitAfter });
+
   // ---------- wiki: home, tactics page, live search (second page, same context) ----------
   const wpage = await ctx.newPage();
   wpage.on('pageerror', e => errors.push('pageerror(wiki): ' + e.message));

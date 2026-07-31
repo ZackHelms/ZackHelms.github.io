@@ -55,7 +55,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 22:11 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 22:32 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -422,7 +422,10 @@ save = Object.assign({done:[], mus:60, sfx:80, musMute:false, sfxMute:false}, sa
 const persist = ()=>{ try{ localStorage.setItem('phasic_v1', JSON.stringify(save)); }catch(e){} };
 
 let cv,ctx,DPR=1,W=0,H=0;
-let FX=0,FY=0,CELL=32,BR=20,BZ=92;         // field origin, cell px, border px, bucket zone px
+let FX=0,FY=0,CELL=32,BR=20,BZ=92,CZ=104,LAND=false;
+// field origin, cell px, border px, bucket zone px (portrait: bottom strip
+// height); CZ is the landscape equivalent (right-column strip width); LAND
+// is the current-layout orientation flag (W>H), set once per layout() call
 let game='menu', lvlIdx=0, lvl=null;
 let walls=null, objs=[], heatN=0, coldN=0, gravSrc=null;
 let holes=[], bushes=new Set(), fans=[], fanBeam={}, failT=0;
@@ -512,11 +515,20 @@ function layout(){
   DPR=Math.min(window.devicePixelRatio||1,3);
   cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
   ctx.setTransform(DPR,0,0,DPR,0,0);
+  LAND=W>H;
   BZ=clamp(H*0.125,Math.min(80,H*0.42),112); BR=clamp(W*0.055,16,26);
-  const pad=6, aw=W-2*pad-2*BR, ah=H-2*pad-2*BR-BZ;
+  CZ=clamp(W*0.125,Math.min(96,W*0.42),140);
+  const pad=6;
+  // Portrait reserves BZ from the height for the bottom bucket row; landscape
+  // reserves CZ from the width for the right bucket column instead — the two
+  // strips are mutually exclusive, so only one is ever subtracted. Everything
+  // below is unchanged algebra when !LAND (aw/ah/FX/FY are bit-identical to
+  // before this branch existed), which is what keeps portrait layout pinned.
+  const aw=W-2*pad-2*BR-(LAND?CZ:0), ah=H-2*pad-2*BR-(LAND?0:BZ);
   const oldCell=CELL, oldFX=FX, oldFY=FY;
   CELL=Math.max(1,Math.min(aw/GW, ah/GH));
-  FX=(W-CELL*GW)/2; FY=pad+BR+Math.max(0,(ah-CELL*GH)*0.30);
+  FX = LAND ? pad+BR+Math.max(0,(aw-CELL*GW)/2) : (W-CELL*GW)/2;
+  FY = LAND ? pad+BR+Math.max(0,(ah-CELL*GH)/2) : pad+BR+Math.max(0,(ah-CELL*GH)*0.30);
   woodCanvas=null;
   // identical rect => identical CELL/FX/FY => strictly a no-op (never even a
   // float round-trip through the subtract-and-re-add), so repeated layouts on
@@ -923,6 +935,18 @@ function freezeStep(o,h){
 
 /* ============ sources ============ */
 function bucketRects(){
+  if(LAND){
+    // landscape: a right-side COLUMN in the CZ strip layout() reserved from
+    // the width — HOT top, GRAV middle, COLD bottom — so the field claims the
+    // full height instead of sharing it with a bottom row (2026-07-31 CD
+    // request). Positions are fixed regardless of whether this level has a
+    // gravity well, exactly like the portrait row fixes hot/cold regardless.
+    const bw=Math.min(CZ-16,140), bh=Math.min(H*0.24,110), gap=Math.max(8,H*0.02);
+    const x=W-10-bw, totalH=bh*3+gap*2, top=Math.max(10,(H-totalH)/2);
+    const r={ hot:{x,y:top,w:bw,h:bh}, cold:{x,y:top+2*(bh+gap),w:bw,h:bh} };
+    if(lvl&&lvl.grav) r.grav={x,y:top+(bh+gap),w:bw,h:bh};
+    return r;
+  }
   // raised half a bucket-height off the true bottom edge so a grab from the
   // buckets lands well clear of iOS's swipe-up-from-the-bottom-edge app
   // switcher gesture (2026-07-31 CD device report); BZ still reserves the
@@ -1058,8 +1082,13 @@ function onDown(e){
   // gravity dock (middle bucket)
   if(gravSrc&&gravSrc.docked&&inRect(p.x,p.y,b.grav,8)){
     gravSrc.docked=false; gravSrc.x=p.x; gravSrc.y=p.y; dragGrav=true; sfxPickup(); return; }
-  // buckets
-  if(p.x>=b.hot.x&&p.x<=b.hot.x+b.hot.w&&p.y>=b.hot.y){ if(heatN>0){ dragSrc={kind:'heat'}; sfxPickup(); } else reject(null,'No flames left in the bucket.'); return; }
+  // buckets — HOT's y-test was historically unbounded downward (nothing sat
+  // below the bottom bucket row in portrait, so it never mattered). In the
+  // landscape COLUMN, GRAV and COLD sit below HOT in that same x-range, so an
+  // unbounded HOT test would swallow taps meant for them; cap it there only
+  // (Infinity keeps portrait's check exactly as it was — no behavior change).
+  const hotYMax = LAND ? b.hot.y+b.hot.h : Infinity;
+  if(p.x>=b.hot.x&&p.x<=b.hot.x+b.hot.w&&p.y>=b.hot.y&&p.y<=hotYMax){ if(heatN>0){ dragSrc={kind:'heat'}; sfxPickup(); } else reject(null,'No flames left in the bucket.'); return; }
   if(p.x>=b.cold.x&&p.x<=b.cold.x+b.cold.w&&p.y>=b.cold.y){ if(coldN>0){ dragSrc={kind:'cold'}; sfxPickup(); } else reject(null,'No frost left in the bucket.'); return; }
   // gravity orb on the ring
   if(gravSrc&&!gravSrc.docked&&Math.hypot(p.x-gravSrc.x,p.y-gravSrc.y)<Math.max(26,BR*1.15)){ dragGrav=true; sfxPickup(); return; }
@@ -2385,6 +2414,7 @@ if(TEST){
     metrics:()=>{ const r=cv.getBoundingClientRect();
       return { W,H,CELL,FX,FY,cvW:cv.width,cvH:cv.height,rectW:r.width,rectH:r.height }; },
     relayout:()=>{ layout(); return true; },
+    buckets:()=>bucketRects(),
     authored:Object.keys(AUTH).length, save:()=>save,
     complexity:()=>lvl&&lvl.cx?{score:cxScore(lvl.cx),...lvl.cx}:null,
     stuck:()=>stuckSolve(),
