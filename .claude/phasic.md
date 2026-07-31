@@ -218,8 +218,38 @@ visibilitychange suspend). SFX: melt gliss+hiss, boil bubbles, condense
 reverse-hiss, freeze thunk, crystalline lock arp, slosh (velocity-triggered,
 throttled), cancel dual-chime, error buzz, win fanfare. **Music: 10 seeded
 generative songs** (`SONGS[]` — bpm/root/mode/prog/waves/hat/arp; mulberry32
-per song), rotating `level % 10`. Settings overlay: separate music/SFX
+per song), rotating `level % 10`. Each song carries a `t:` title (01 First
+Light, 02 Copper Squares, 03 Slow Thaw, 04 Vapor Trail, 05 Deep Cellar,
+06 Warm Static, 07 Ride the Flue, 08 Still Water, 09 Amber Drift,
+10 Night Drawer — CD renames at will); a dim `NN · Title` now-playing line
+draws at the very bottom (center in portrait, bottom-left in landscape;
+drawn outside the shake transform; `__GF.nowPlaying()`). Settings overlay:
+separate music/SFX
 sliders + mutes (persisted `phasic_v1`); top-left 🔊 is the master toggle.
+
+## Chrome / layout (phaschrome round, 2026-07-31)
+
+- **Buckets ride half a height high in portrait** (`bucketRects` y =
+  `H-BZ+6-bh*0.5`) so grabs stay clear of the iOS swipe-up edge; the toast
+  offset moved in lockstep (161px). Field geometry (CELL/FX/FY) unchanged.
+- **Landscape = right-side bucket column** (HOT/GRAV/COLD, `CZ` width
+  strip; `layout()` branches on `W>H`): the field uses >90% of canvas
+  height (was ~68%). Portrait math is bit-identical. The HOT grab test is
+  y-bounded only in landscape. The board stays portrait-shaped 10×12 —
+  a rotated board layout is a future design question, not chrome.
+- **Rotation-squish fix (TRACED): a degenerate viewport (canvas shorter
+  than ~124px) drove `CELL` negative**, corrupting the pixel-space
+  particle state; the `oldCell>0` guard then dropped every later rescale,
+  making it permanent until reload. Fix: `CELL` floored at 1, BZ's 80px
+  clamp floor degrades on short boxes (`Math.min(80,H*0.42)` — identity
+  for H≥191), repeated `layout()` is a strict no-op, and a post-layout
+  self-check re-runs `layout()` once if the canvas backing store disagrees
+  with the bounding rect by >2px. Which iOS event sequence delivers the
+  degenerate box on device is an UNTRACED HYPOTHESIS — the invariant is
+  pinned instead (suite: rotation round-trips, short-viewport sweeps,
+  degenerate-box excursion, 10× layout idempotence). Lifecycle: `reflow()`
+  runs `layout()` now + next rAF + 300ms on `resize`, `orientationchange`,
+  and `visualViewport.resize`.
 
 ## Known trade-offs / iOS-port notes
 

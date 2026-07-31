@@ -43,7 +43,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 .setrow .mtog{width:44px;height:30px;background:var(--panel);border:1px solid var(--border);
   border-radius:8px;color:var(--white);font-size:14px;cursor:pointer}
 #toast{position:fixed;left:50%;transform:translateX(-50%);
-  bottom:calc(env(safe-area-inset-bottom,0px) + 118px);z-index:65;max-width:86%;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 161px);z-index:65;max-width:86%;
   background:rgba(10,10,24,0.92);border:1px solid var(--border);border-radius:10px;
   padding:9px 14px;font-size:12.5px;color:var(--gold);text-align:center;line-height:1.5;
   opacity:0;transition:opacity .3s;pointer-events:none}
@@ -55,7 +55,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 21:40 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 22:44 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -422,7 +422,10 @@ save = Object.assign({done:[], mus:60, sfx:80, musMute:false, sfxMute:false}, sa
 const persist = ()=>{ try{ localStorage.setItem('phasic_v1', JSON.stringify(save)); }catch(e){} };
 
 let cv,ctx,DPR=1,W=0,H=0;
-let FX=0,FY=0,CELL=32,BR=20,BZ=92;         // field origin, cell px, border px, bucket zone px
+let FX=0,FY=0,CELL=32,BR=20,BZ=92,CZ=104,LAND=false;
+// field origin, cell px, border px, bucket zone px (portrait: bottom strip
+// height); CZ is the landscape equivalent (right-column strip width); LAND
+// is the current-layout orientation flag (W>H), set once per layout() call
 let game='menu', lvlIdx=0, lvl=null;
 let walls=null, objs=[], heatN=0, coldN=0, gravSrc=null;
 let holes=[], bushes=new Set(), fans=[], fanBeam={}, failT=0;
@@ -495,22 +498,65 @@ function syncSolid(o){ // set particles onto the solid lattice at pixel anchor
 }
 
 /* ============ layout ============ */
+/* Gem particles live in PIXELS and are only ever moved by the relative
+   transform below, so the transform chain must never break: skip one link and
+   the gems stay in the old frame forever while the field is drawn in the new
+   one — the "irrecoverably squished after a rotation" bug (only a level reload
+   healed it, because setupLevel re-derives positions from startAx/startAy).
+   The chain used to break whenever CELL came out <= 0, which happened for any
+   canvas shorter than ~124 px because BZ's 80 px floor did not shrink with H:
+   ah went negative, CELL went negative, and the next layout's `oldCell>0`
+   guard then dropped its transform. Both ends are now guarded — BZ degrades on
+   a short box and CELL has a hard positive floor — so oldCell>0 always holds
+   after the first layout. */
+let layoutDepth=0;
 function layout(){
   const r=cv.getBoundingClientRect(); W=r.width; H=r.height;
   DPR=Math.min(window.devicePixelRatio||1,3);
   cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
   ctx.setTransform(DPR,0,0,DPR,0,0);
-  BZ=clamp(H*0.125,80,112); BR=clamp(W*0.055,16,26);
-  const pad=6, aw=W-2*pad-2*BR, ah=H-2*pad-2*BR-BZ;
+  LAND=W>H;
+  BZ=clamp(H*0.125,Math.min(80,H*0.42),112); BR=clamp(W*0.055,16,26);
+  CZ=clamp(W*0.125,Math.min(96,W*0.42),140);
+  const pad=6;
+  // Portrait reserves BZ from the height for the bottom bucket row; landscape
+  // reserves CZ from the width for the right bucket column instead — the two
+  // strips are mutually exclusive, so only one is ever subtracted. Everything
+  // below is unchanged algebra when !LAND (aw/ah/FX/FY are bit-identical to
+  // before this branch existed), which is what keeps portrait layout pinned.
+  const aw=W-2*pad-2*BR-(LAND?CZ:0), ah=H-2*pad-2*BR-(LAND?0:BZ);
   const oldCell=CELL, oldFX=FX, oldFY=FY;
-  CELL=Math.min(aw/GW, ah/GH);
-  FX=(W-CELL*GW)/2; FY=pad+BR+Math.max(0,(ah-CELL*GH)*0.30);
+  CELL=Math.max(1,Math.min(aw/GW, ah/GH));
+  FX = LAND ? pad+BR+Math.max(0,(aw-CELL*GW)/2) : (W-CELL*GW)/2;
+  FY = LAND ? pad+BR+Math.max(0,(ah-CELL*GH)/2) : pad+BR+Math.max(0,(ah-CELL*GH)*0.30);
   woodCanvas=null;
-  if(lvl&&oldCell>0){ const s=CELL/oldCell;
+  // identical rect => identical CELL/FX/FY => strictly a no-op (never even a
+  // float round-trip through the subtract-and-re-add), so repeated layouts on
+  // a settled viewport cannot drift the board
+  if(lvl&&oldCell>0&&(CELL!==oldCell||FX!==oldFX||FY!==oldFY)){ const s=CELL/oldCell;
     for(const o of objs){ o.axp=FX+(o.axp-oldFX)*s; o.ayp=FY+(o.ayp-oldFY)*s;
       for(const p of o.ps){ p.x=FX+(p.x-oldFX)*s; p.y=FY+(p.y-oldFY)*s; p.px=p.x; p.py=p.y; } }
     if(gravSrc){ gravSrc.x=FX+(gravSrc.x-oldFX)*s; gravSrc.y=FY+(gravSrc.y-oldFY)*s; }
   }
+  // self-heal: iOS can hand us a stale box during a rotation and then never
+  // fire another event. If the canvas we just sized disagrees with the box the
+  // DOM reports now, redo it once against the settled box.
+  if(layoutDepth<1){
+    layoutDepth++;
+    const r2=cv.getBoundingClientRect();
+    if(Math.abs(cv.width/DPR-r2.width)>2||Math.abs(cv.height/DPR-r2.height)>2) layout();
+    layoutDepth--;
+  }
+}
+/* Rotation lifecycle: three event sources because iOS delivers the geometry
+   change inconsistently across them, and three passes because the box can
+   settle a beat (or several) after the event. Each extra pass is a strict
+   no-op once the box is stable. */
+let reflowT=0;
+function reflow(){
+  layout();
+  requestAnimationFrame(()=>layout());
+  clearTimeout(reflowT); reflowT=setTimeout(()=>layout(),300);
 }
 
 /* ============ gravity field ============ */
@@ -889,7 +935,23 @@ function freezeStep(o,h){
 
 /* ============ sources ============ */
 function bucketRects(){
-  const bw=Math.min(W*0.24,120), bh=BZ-14, y=H-BZ+6;
+  if(LAND){
+    // landscape: a right-side COLUMN in the CZ strip layout() reserved from
+    // the width — HOT top, GRAV middle, COLD bottom — so the field claims the
+    // full height instead of sharing it with a bottom row (2026-07-31 CD
+    // request). Positions are fixed regardless of whether this level has a
+    // gravity well, exactly like the portrait row fixes hot/cold regardless.
+    const bw=Math.min(CZ-16,140), bh=Math.min(H*0.24,110), gap=Math.max(8,H*0.02);
+    const x=W-10-bw, totalH=bh*3+gap*2, top=Math.max(10,(H-totalH)/2);
+    const r={ hot:{x,y:top,w:bw,h:bh}, cold:{x,y:top+2*(bh+gap),w:bw,h:bh} };
+    if(lvl&&lvl.grav) r.grav={x,y:top+(bh+gap),w:bw,h:bh};
+    return r;
+  }
+  // raised half a bucket-height off the true bottom edge so a grab from the
+  // buckets lands well clear of iOS's swipe-up-from-the-bottom-edge app
+  // switcher gesture (2026-07-31 CD device report); BZ still reserves the
+  // same bottom strip, so layout()'s field geometry (CELL/FX/FY) is untouched.
+  const bw=Math.min(W*0.24,120), bh=BZ-14, y=H-BZ+6-bh*0.5;
   const r={ hot:{x:10,y,w:bw,h:bh}, cold:{x:W-10-bw,y,w:bw,h:bh} };
   if(lvl&&lvl.grav){ const gw2=Math.min(W*0.19,88);
     r.grav={x:W/2-gw2/2, y:y+3, w:gw2, h:bh-3}; }
@@ -1020,8 +1082,13 @@ function onDown(e){
   // gravity dock (middle bucket)
   if(gravSrc&&gravSrc.docked&&inRect(p.x,p.y,b.grav,8)){
     gravSrc.docked=false; gravSrc.x=p.x; gravSrc.y=p.y; dragGrav=true; sfxPickup(); return; }
-  // buckets
-  if(p.x>=b.hot.x&&p.x<=b.hot.x+b.hot.w&&p.y>=b.hot.y){ if(heatN>0){ dragSrc={kind:'heat'}; sfxPickup(); } else reject(null,'No flames left in the bucket.'); return; }
+  // buckets — HOT's y-test was historically unbounded downward (nothing sat
+  // below the bottom bucket row in portrait, so it never mattered). In the
+  // landscape COLUMN, GRAV and COLD sit below HOT in that same x-range, so an
+  // unbounded HOT test would swallow taps meant for them; cap it there only
+  // (Infinity keeps portrait's check exactly as it was — no behavior change).
+  const hotYMax = LAND ? b.hot.y+b.hot.h : Infinity;
+  if(p.x>=b.hot.x&&p.x<=b.hot.x+b.hot.w&&p.y>=b.hot.y&&p.y<=hotYMax){ if(heatN>0){ dragSrc={kind:'heat'}; sfxPickup(); } else reject(null,'No flames left in the bucket.'); return; }
   if(p.x>=b.cold.x&&p.x<=b.cold.x+b.cold.w&&p.y>=b.cold.y){ if(coldN>0){ dragSrc={kind:'cold'}; sfxPickup(); } else reject(null,'No frost left in the bucket.'); return; }
   // gravity orb on the ring
   if(gravSrc&&!gravSrc.docked&&Math.hypot(p.x-gravSrc.x,p.y-gravSrc.y)<Math.max(26,BR*1.15)){ dragGrav=true; sfxPickup(); return; }
@@ -2128,6 +2195,17 @@ function drawFx(){
   }
   ctx.globalAlpha=1;
 }
+// now-playing line — bottom-center in portrait (the strip freed by the bucket
+// raise, below the buckets, above the safe-area edge), bottom-left in
+// landscape (clear of the right-side bucket column). Drawn outside the
+// shake save/restore so a failure jolt never jitters this read-out.
+function drawNowPlaying(){
+  if(!nowPlayingStr) return;
+  ctx.fillStyle='rgba(136,153,187,0.55)'; // var(--dim) #8899bb, dimmed further
+  ctx.font='10px "Share Tech Mono"'; ctx.textBaseline='alphabetic';
+  if(LAND){ ctx.textAlign='left'; ctx.fillText(nowPlayingStr, 10, H-8); }
+  else { ctx.textAlign='center'; ctx.fillText(nowPlayingStr, W/2, H-8); }
+}
 function render(){
   ctx.clearRect(0,0,W,H);
   if(!lvl){ ctx.fillStyle='#0a0c16'; ctx.fillRect(0,0,W,H); return; }
@@ -2149,6 +2227,7 @@ function render(){
   for(const f of flying){ const p2=flyPos(f); drawSourceOrb(f.kind,p2.x,p2.y,0.9); }
   if(dragSrc) drawSourceOrb(dragSrc.kind,finger.x,finger.y,1.1);
   ctx.restore();
+  drawNowPlaying();
 }
 
 
@@ -2207,20 +2286,24 @@ const sfxWin  =()=>{ if(!ac)return; const t=ac.currentTime; [523,659,784,1046,13
 
 /* 10 procedural songs — tiny generative sequencer, seeded per song */
 const SONGS=[
-  {bpm:92, root:57, minor:1, prog:[0,5,3,4], lead:'triangle', bass:'sine',    hat:0.5, arp:0},
-  {bpm:108,root:60, minor:0, prog:[0,3,4,3], lead:'square',   bass:'triangle',hat:0.7, arp:1},
-  {bpm:84, root:55, minor:1, prog:[0,2,5,4], lead:'sine',     bass:'sine',    hat:0.3, arp:1},
-  {bpm:116,root:62, minor:0, prog:[0,4,5,3], lead:'sawtooth', bass:'triangle',hat:0.8, arp:0},
-  {bpm:76, root:53, minor:1, prog:[0,5,1,4], lead:'triangle', bass:'sine',    hat:0.2, arp:1},
-  {bpm:100,root:59, minor:0, prog:[0,3,1,4], lead:'square',   bass:'sine',    hat:0.6, arp:0},
-  {bpm:124,root:57, minor:1, prog:[0,6,5,4], lead:'sawtooth', bass:'square',  hat:0.9, arp:1},
-  {bpm:88, root:64, minor:0, prog:[0,4,1,5], lead:'sine',     bass:'triangle',hat:0.4, arp:0},
-  {bpm:104,root:55, minor:1, prog:[0,3,6,4], lead:'triangle', bass:'sine',    hat:0.7, arp:1},
-  {bpm:96, root:62, minor:0, prog:[0,5,3,4], lead:'square',   bass:'triangle',hat:0.5, arp:0},
+  {bpm:92, root:57, minor:1, prog:[0,5,3,4], lead:'triangle', bass:'sine',    hat:0.5, arp:0, t:'First Light'},
+  {bpm:108,root:60, minor:0, prog:[0,3,4,3], lead:'square',   bass:'triangle',hat:0.7, arp:1, t:'Copper Squares'},
+  {bpm:84, root:55, minor:1, prog:[0,2,5,4], lead:'sine',     bass:'sine',    hat:0.3, arp:1, t:'Slow Thaw'},
+  {bpm:116,root:62, minor:0, prog:[0,4,5,3], lead:'sawtooth', bass:'triangle',hat:0.8, arp:0, t:'Vapor Trail'},
+  {bpm:76, root:53, minor:1, prog:[0,5,1,4], lead:'triangle', bass:'sine',    hat:0.2, arp:1, t:'Deep Cellar'},
+  {bpm:100,root:59, minor:0, prog:[0,3,1,4], lead:'square',   bass:'sine',    hat:0.6, arp:0, t:'Warm Static'},
+  {bpm:124,root:57, minor:1, prog:[0,6,5,4], lead:'sawtooth', bass:'square',  hat:0.9, arp:1, t:'Ride the Flue'},
+  {bpm:88, root:64, minor:0, prog:[0,4,1,5], lead:'sine',     bass:'triangle',hat:0.4, arp:0, t:'Still Water'},
+  {bpm:104,root:55, minor:1, prog:[0,3,6,4], lead:'triangle', bass:'sine',    hat:0.7, arp:1, t:'Amber Drift'},
+  {bpm:96, root:62, minor:0, prog:[0,5,3,4], lead:'square',   bass:'triangle',hat:0.5, arp:0, t:'Night Drawer'},
 ];
-let song=null, songRng=null, musNext=0, musStep=0;
+let song=null, songRng=null, musNext=0, musStep=0, nowPlayingStr='';
 function songStart(i){
-  song=SONGS[i%SONGS.length]; songRng=mulberry(1234+i*77); musStep=0;
+  const idx=i%SONGS.length;
+  song=SONGS[idx]; songRng=mulberry(1234+i*77); musStep=0;
+  // shown regardless of musMute — the "current track" is a property of the
+  // level, not of whether the synth is actually audible right now
+  nowPlayingStr = String(idx+1).padStart(2,'0')+' · '+song.t;
   if(ac) musNext=ac.currentTime+0.1;
 }
 const midiHz=m=>440*Math.pow(2,(m-69)/12);
@@ -2289,7 +2372,9 @@ $('sfx-vol').oninput=e=>{ save.sfx=+e.target.value; save.sfxMute=false; persist(
 /* ============ boot + loop ============ */
 cv=$('cv'); ctx=cv.getContext('2d');
 $('mus-vol').value=save.mus; $('sfx-vol').value=save.sfx;
-window.addEventListener('resize',()=>layout());
+window.addEventListener('resize',reflow);
+window.addEventListener('orientationchange',reflow);
+if(window.visualViewport) window.visualViewport.addEventListener('resize',reflow);
 cv.addEventListener('mousedown',onDown); cv.addEventListener('mousemove',onMove);
 window.addEventListener('mouseup',onUp);
 cv.addEventListener('touchstart',onDown,{passive:false});
@@ -2340,6 +2425,13 @@ if(TEST){
     freezeDry:L=>{ const o=objs.find(u=>u.letter===L); return o?tryFreeze(o,true):null; },
     parts:L=>{ const o=objs.find(u=>u.letter===L);
       return o?o.ps.map(p=>({x:(p.x-FX)/CELL,y:(p.y-FY)/CELL})):null; },
+    // layout geometry as the renderer sees it, next to what the DOM says the
+    // canvas box actually is — the rotation-squish invariant lives here
+    metrics:()=>{ const r=cv.getBoundingClientRect();
+      return { W,H,CELL,FX,FY,cvW:cv.width,cvH:cv.height,rectW:r.width,rectH:r.height }; },
+    relayout:()=>{ layout(); return true; },
+    buckets:()=>bucketRects(),
+    nowPlaying:()=>nowPlayingStr||'',
     authored:Object.keys(AUTH).length, save:()=>save,
     complexity:()=>lvl&&lvl.cx?{score:cxScore(lvl.cx),...lvl.cx}:null,
     stuck:()=>stuckSolve(),

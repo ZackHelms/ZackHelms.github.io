@@ -1,6 +1,8 @@
 # phaschrome — mobile chrome/layout round: bucket raise, rotation squish fix, landscape buckets, now-playing line
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-07-31 (burndown run 2) — commits
+0a52e1d..c3b3208; suite 252→284; squish traced to degenerate-viewport
+CELL<0 (iOS trigger stays a labeled hypothesis — see follow-up)
 **Requested:** 2026-07-31 (four CD items, bundled: same file, same
 layout/chrome subsystem, each a single task).
 **Scope:** `games/phasic/index.html`, `.claude/tests/drive-phasic.cjs`, `.claude/phasic.md`.

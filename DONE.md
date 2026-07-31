@@ -1,5 +1,17 @@
 # DONE — done log
 
+- 2026-07-31 [phasic] phaschrome oversee run: mobile chrome/layout round —
+  rotation squish TRACED (degenerate viewport drove CELL negative; the
+  oldCell>0 guard then dropped every healing rescale — permanent until
+  reload) and fixed with CELL≥1 + degrading BZ clamp + strict no-op
+  relayout + post-layout self-check + resize/orientationchange/
+  visualViewport lifecycle (iOS trigger sequence stays a labeled
+  hypothesis; invariant pinned instead); buckets raised bh/2 in portrait
+  (toast follows); landscape gets a right-side bucket column (field 68%→
+  91% of canvas height, portrait bit-identical); 10 songs titled + dim
+  "NN · Title" now-playing line at the very bottom. Suite 252→284.
+  (0a52e1d..c3b3208 + wrap-up docs; plan archived to .claude/plans/DONE/)
+
 - 2026-07-31 [phasic] phasfreeze oversee run: the freeze-refusal fairness
   bug traced and fixed — a settled 1-row puddle must reach h−0.9 cells to
   build an h-tall shape, so the flat 1.9 jump cap structurally refused
