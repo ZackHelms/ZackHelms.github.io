@@ -37,6 +37,7 @@ catch (e) { console.error('playwright-core not resolvable (NODE_PATH).'); consol
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const GAME = path.join(repoRoot, 'games', 'phasic', 'index.html');
+const WIKI = path.join(repoRoot, 'games', 'phasic', 'wiki.html');
 const SHOTS = process.env.PHASIC_SHOTS || '';
 const candidates = [process.env.SMOKE_CHROMIUM, '/opt/pw-browsers/chromium'].filter(Boolean);
 const executablePath = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
@@ -121,6 +122,10 @@ function check(name, cond, extra) {
   check('24 authored levels across the curriculum', await g('G=>G.authored') === 24);
   for (const i of [0,1,2,7,8,9,10,11,12,13,15,16,17,18,19,20,21,22,24,32,40,48,56,57]) await load(i);
   check('all authored maps parse with matching footprints', errors.length === 0, errors);
+
+  // ---------- WIKI: settings overlay button to wiki.html ----------
+  const wikiHref = await page.evaluate('(function(){var el=document.getElementById("wiki-btn");return el?el.getAttribute("href"):null;})()');
+  check('settings overlay has a WIKI link to wiki.html', wikiHref === 'wiki.html', wikiHref);
 
   // ---------- menu format: one line, Title Case, 32+ rows ----------
   await load(0);
@@ -339,6 +344,19 @@ function check(name, cond, extra) {
   const r12 = await meltPourTap('G', 1, 9, 's=>{const o=s.objs.find(u=>u.L==="G");return o.cy>7;}', 20);
   check('L13: T-gem melted through, tapped solid, slid home', r12.drained && r12.tapped && r12.home, r12);
   check('L13: solved', await allHome(0.4), await st());
+
+  // ---------- shove guard: a dragged solid displaces a resting puddle (tactic #10) ----------
+  await load(12); // Queue, fresh: G tetromino + M 1x1, heat:1, no cold
+  await apply('heat', 'G'); // melt the T-tetromino
+  await step(2.5); // let the puddle settle above the shelf/slot (matches the L13 geometry above)
+  let shoveParts = await g('G=>G.parts("G")');
+  const shoveX0 = shoveParts.reduce((a, p) => a + p.x, 0) / shoveParts.length;
+  await dragPath('M', [[8, 3], [2, 3]]); // stage beside the shelf, then drag the stone straight through the puddle
+  await step(1.0);
+  shoveParts = await g('G=>G.parts("G")');
+  const shoveX1 = shoveParts.reduce((a, p) => a + p.x, 0) / shoveParts.length;
+  check('shove guard: dragging M into the resting puddle displaces it >=0.8 cells in the push direction (' +
+    (shoveX0 - shoveX1).toFixed(2) + ')', shoveX0 - shoveX1 >= 0.8, { shoveX0, shoveX1 });
 
   // ---------- L14 Glassworks: the production line ----------
   await load(13);
@@ -563,6 +581,38 @@ function check(name, cond, extra) {
   check('L25 fresh-load: frost bucket debuts at 1 (Standing Water)', (await st()).coldN === 1);
   await load(32);
   check('L33 fresh-load: frost bucket at 2 (Loose Vapor)', (await st()).coldN === 2);
+
+  // ---------- wiki: home, tactics page, live search (second page, same context) ----------
+  const wpage = await ctx.newPage();
+  wpage.on('pageerror', e => errors.push('pageerror(wiki): ' + e.message));
+  wpage.on('console', m => { if (m.type() === 'error' && !IGNORE.test(m.text())) errors.push('console(wiki): ' + m.text()); });
+  await wpage.goto('file://' + WIKI, { waitUntil: 'load', timeout: 20000 });
+  await wpage.waitForTimeout(300);
+  const wp = (expr) => wpage.evaluate(expr);
+
+  const pagesLen = await wp('window.PAGES.length');
+  check('wiki: PAGES has 7+ entries', pagesLen >= 7, pagesLen);
+  const homeCards = await wp('document.querySelectorAll("#content .pcard").length');
+  check('wiki: home renders exactly PAGES.length-1 link cards', homeCards === pagesLen - 1, { pagesLen, homeCards });
+
+  await wp('location.hash = "#tactics"');
+  await wpage.waitForTimeout(150);
+  const tacticCount = await wp('document.querySelectorAll("#content .tactic-item").length');
+  check('wiki: #tactics renders exactly 12 numbered entries', tacticCount === 12, tacticCount);
+
+  await wp('(function(){var el=document.getElementById("wiki-search");el.value="stopper";el.dispatchEvent(new Event("input",{bubbles:true}));})()');
+  await wpage.waitForTimeout(150);
+  const searchResults = await wp('document.querySelectorAll("#content .pcard").length');
+  check('wiki: search "stopper" surfaces 1+ result', searchResults >= 1, searchResults);
+  const firstResultHref = await wp('(function(){var a=document.querySelector("#content .pcard");return a?a.getAttribute("href"):null;})()');
+  check('wiki: "stopper" result links to #tactics', firstResultHref === '#tactics', firstResultHref);
+
+  await wp('(function(){var el=document.getElementById("wiki-search");el.value="";el.dispatchEvent(new Event("input",{bubbles:true}));})()');
+  await wpage.waitForTimeout(150);
+  const restoredTacticCount = await wp('document.querySelectorAll("#content .tactic-item").length');
+  check('wiki: clearing search restores the current page content', restoredTacticCount === 12, restoredTacticCount);
+
+  await wpage.close();
 
   // ---------- console errors ----------
   check('no console/page errors across the whole run', errors.length === 0, errors.slice(0, 6));
