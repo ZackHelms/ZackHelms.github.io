@@ -524,6 +524,92 @@ function check(name, cond, extra) {
     check('endless L' + (i + 1) + ': generated + solver-replayed to a win', ok && (await st()).objs.every(x => x.home));
   }
 
+  // ---------- phasweave: template coverage across the generated indices below 65 ----------
+  // GEN_IDX above is the scan set; genInfo().template + genInfo().weave are recorded per
+  // index as we pass over it so the block-scoped weave gates below don't re-scan.
+  const seenTemplates = new Set();
+  const weaveByIdx = {};
+  for (const i of GEN_IDX) {
+    await load(i);
+    const info = await g('G=>G.genInfo()');
+    if (info) seenTemplates.add(info.template);
+    if (info && info.weave) weaveByIdx[i] = info.weave;
+  }
+  check('template coverage: two-shelf appears among generated levels below 65',
+    seenTemplates.has('two-shelf'), [...seenTemplates]);
+  check('template coverage: attic appears among generated levels below 65',
+    seenTemplates.has('attic'), [...seenTemplates]);
+
+  // ---------- phasweave: in-path weave gates, one per obstacle block ----------
+  // Curriculum block index ranges (0-based load() index; block N spans i in [8N, 8N+7]).
+  // Block 5 = L41-48 (i 40-47), block 6 = L49-56 (i 48-55), block 7 = L57-64 (i 56-63);
+  // the authored tutorial at the head of each (L41/L49/L57/L58) is not in GEN_IDX.
+  const block5 = GEN_IDX.filter(i => i >= 40 && i <= 47);
+  const block6 = GEN_IDX.filter(i => i >= 48 && i <= 55);
+  const block7 = GEN_IDX.filter(i => i >= 56 && i <= 63);
+
+  // block 5: hole-under-gap + plug — the hole sits at (sx, shelfR+1), directly
+  // beneath a real gap column of the shelf it crosses (not a defensive corner).
+  let plugIdx = null, plugFound = null;
+  for (const i of block5) {
+    const wv = weaveByIdx[i];
+    if (!wv || wv.k !== 'plug') continue;
+    await load(i);
+    const mi = await g('G=>G.mapInfo()');
+    const hy = wv.shelfR + 1;
+    const holeHere = mi.holes.some(h => h.x === wv.sx && h.y === hy);
+    const shelf = mi.shelves.find(sh => sh.y === wv.shelfR);
+    const underGap = !!shelf && shelf.gaps.some(gp => wv.sx >= gp.x && wv.sx < gp.x + gp.w);
+    if (holeHere && underGap) { plugIdx = i; plugFound = { wv, holeHere, underGap, shelf }; break; }
+  }
+  check('block 5 (L41-48): a plug weave hides the hole under a shelf gap column (found L' +
+    (plugIdx === null ? '-' : plugIdx + 1) + ')', plugIdx !== null, { candidates: block5, found: plugFound });
+
+  // block 6: mid-field bush column — a hedge in columns 1-8 (the travel band),
+  // not the old defensive side column (0 or 9).
+  let bushIdx = null, bushFound = null;
+  for (const i of block6) {
+    const wv = weaveByIdx[i];
+    if (!wv || wv.k !== 'bush') continue;
+    await load(i);
+    const mi = await g('G=>G.mapInfo()');
+    const midField = wv.bx >= 1 && wv.bx <= 8;
+    const painted = mi.bushes.some(bs => bs.x === wv.bx);
+    if (midField && painted) { bushIdx = i; bushFound = { wv, painted }; break; }
+  }
+  check('block 6 (L49-56): a bush weave stands mid-field (col 1-8), not the old side column (found L' +
+    (bushIdx === null ? '-' : bushIdx + 1) + ')', bushIdx !== null, { candidates: block6, found: bushFound });
+
+  // block 7: fan lane — the beam crosses the staging band (rows 0-2) across
+  // enough columns that the cloud has to actually ride it, not just skim past.
+  let fanIdx = null, fanFound = null;
+  for (const i of block7) {
+    const wv = weaveByIdx[i];
+    if (!wv || wv.k !== 'fan') continue;
+    await load(i);
+    const mi = await g('G=>G.mapInfo()');
+    const cols = new Set(mi.beam.filter(bm => bm.y >= 0 && bm.y <= 2).map(bm => bm.x));
+    if (cols.size >= 3) { fanIdx = i; fanFound = { wv, cols: [...cols] }; break; }
+  }
+  check('block 7 (L57-64): a fan weave beam crosses the staging band (rows 0-2) across >=3 columns (found L' +
+    (fanIdx === null ? '-' : fanIdx + 1) + ')', fanIdx !== null, { candidates: block7, found: fanFound });
+
+  // ---------- phasweave: woven replays — the found index per pattern still beats its own hazard ----------
+  for (const [label, idx] of [['plug', plugIdx], ['bush', bushIdx], ['fan', fanIdx]]) {
+    if (idx === null) continue;
+    await load(idx);
+    const ok = await g('G=>G.replayGen()');
+    const home = ok && (await st()).objs.every(x => x.home);
+    check('woven replay (' + label + ', L' + (idx + 1) + '): solver script beats the in-path hazard', home);
+  }
+
+  // ---------- phasweave: deeper endless spot checks ----------
+  for (const i of [85, 110]) {
+    await load(i);
+    const ok = await g('G=>G.replayGen()');
+    check('endless L' + (i + 1) + ': generated + solver-replayed to a win', ok && (await st()).objs.every(x => x.home));
+  }
+
   // ---------- complexity ramps ----------
   const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
   for (const b of Object.keys(scores)) {
