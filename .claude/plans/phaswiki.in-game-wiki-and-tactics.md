@@ -1,4 +1,4 @@
-# phaswiki — Phasic in-game wiki (cogwheel entry, searchable topic pages) + tactic #10
+# phaswiki — Phasic in-game wiki (cogwheel entry, searchable topic pages) + tactics #10–11
 
 **Status:** DRAFT
 **Requested:** 2026-07-31 (CD, verbatim with the playtest sign-off: "add to
@@ -19,11 +19,12 @@ search textbox on top right (under the standard reload button").
 
 A player-facing wiki ships inside `games/phasic/`: a WIKI button in the
 cogwheel settings menu opens `wiki.html` — home page of topic links, a
-tactics page carrying the full registry (now 10 entries including the CD's
-push-a-liquid-with-a-solid move from L13 Queue), a live search box top-right
-under the reload button. The new tactic is also recorded in the
-`.claude/phasic.md` registry, and the shove mechanic it relies on gains a
-drive-suite guard.
+tactics page carrying the full registry (now 11 entries: the CD's
+push-a-liquid-with-a-solid move from L13 Queue, plus the launch-and-freeze
+acrobatics move the CD discovered on L29, marked advanced), a live search
+box top-right under the reload button. The new tactics are also recorded in
+the `.claude/phasic.md` registry, and the shove mechanic they rely on gains
+a drive-suite guard.
 
 ## Context
 
@@ -42,7 +43,7 @@ zmh-producer scaffold rubric).
 
 | # | Task | Category | Model | Effort | Rationale |
 | - | ---- | -------- | ----- | ------ | --------- |
-| 1 | Record tactic #10 in `.claude/phasic.md` | docs | haiku | low | verbatim content below |
+| 1 | Record tactics #10–11 in `.claude/phasic.md` | docs | haiku | low | verbatim content below |
 | 2 | Build `games/phasic/wiki.html` (hash-routed pages, search, house chrome) | single-system code | sonnet | high | content authoring + UI judgment inside clear conventions |
 | 3 | WIKI button in the settings overlay | mechanical-edit | haiku | medium | verbatim content below; exact target |
 | 4 | Suite + gates: wiki DOM checks, shove-mechanic guard, smoke on both pages | tests | sonnet | high | new page checks + a physics assertion need judgment |
@@ -69,7 +70,7 @@ zmh-producer scaffold rubric).
   - Page set (v1): `home` (link cards to every other page), `basics`
     (goal, drag/fit, sockets, win rule), `phases` (flame/frost/tap
     reversion, base states), `gravity` (the well, dock, lift, gas
-    herding), `obstacles` (void, hedge, fans), `tactics` (all 10, numbered,
+    herding), `obstacles` (void, hedge, fans), `tactics` (all 11, numbered,
     with the teaching level named where one exists), `levels` (curriculum
     blocks, complexity score, endless, STUCK). Write for players — no code
     or test-API references.
@@ -89,10 +90,14 @@ zmh-producer scaffold rubric).
   - **No hub/catalog changes**: the wiki is part of the Phasic game, not a
     new game — `games/index.html`, `GAMES[]` and `.claude/games-index.md`
     are untouched, so the games-sync gate is not triggered.
-  - Tactic #10 (task 1), verbatim, appended to the registry:
+  - Tactics #10 and #11 (task 1), verbatim, appended to the registry:
     `10. **Push the puddle** (taught by L13 Queue): solids shove liquid —
     drag a stone into a puddle to bulldoze it through a slot or along a
     shelf that gravity alone won't take it past.`
+    `11. **Launch and freeze** (advanced — CD-discovered, 2026-07-31): shove
+    a puddle hard with a dragged solid to fling it airborne, then frost it
+    mid-flight so it crystallizes where it could never rest. Reserved for a
+    future Acrobatics block; no earlier level may require it.`
   - iOS-port note: the wiki is content, not web-only chrome — it ports; the
     back/reload buttons on it are web-only like the game's own.
 - **Embedded-content QA (required):** the task-3 snippet was written against
@@ -114,11 +119,11 @@ zmh-producer scaffold rubric).
 
 ## Steps
 
-1. Append tactic #10 (verbatim above) to `.claude/phasic.md:118-138`.
+1. Append tactics #10 and #11 (verbatim above) to `.claude/phasic.md:118-138`.
 2. Build `games/phasic/wiki.html` per the decision defaults. Done-criteria:
    loads clean at iPhone 13 viewport with zero console errors; every
    `PAGES[]` entry reachable from home and from the hash directly; tactics
-   page lists exactly 10 entries; search "stopper" surfaces the tactics
+   page lists exactly 11 entries; search "stopper" surfaces the tactics
    page; search box visually under the reload button.
 3. Add the WIKI button (verbatim above). Done: settings overlay shows it;
    tapping navigates (href relative — game and wiki share the directory).
@@ -126,7 +131,7 @@ zmh-producer scaffold rubric).
    - Settings overlay contains `#wiki-btn` with `href="wiki.html"`.
    - New page context on `wiki.html?` (plain load, no `?test=1` needed):
      home link count === `PAGES.length - 1`; `location.hash='#tactics'`
-     renders 10 numbered tactics; typing "stopper" into the search input
+     renders 11 numbered tactics; typing "stopper" into the search input
      yields ≥1 result linking `#tactics`; no console errors.
    - **Shove-mechanic guard** (protects tactic #10's physics): in a new L13
      Queue block — melt G through the slot region, let the puddle rest,
