@@ -93,11 +93,6 @@ backlog entry here.
 
 ## Next
 
-- [phasic] Obstacle-weaving generator: holes/bushes/fans placed IN solution
-  paths (solver keeps validating); two-shelf and gas/attic templates. (CD:
-  next engineering priority.)
-  **Plan ready (2026-07-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phasweave.obstacle-weaving-generator.md`
 - [phasic] Dedicated obstacle SFX (void gulp, bush slurp, fan hum) +
   per-block music (songs by curriculum block instead of `level % 10`) —
   merged: both audio-subsystem items.

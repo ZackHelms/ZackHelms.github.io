@@ -1,6 +1,6 @@
 # phasweave — Phasic obstacle-weaving generator: hazards in the solution path, new templates
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-07-31 (6bc1f9a, 31987d9, 71cb7b6, 76a0fd6 on worktree-oversee+phasweave)
 **Requested:** 2026-07-31 (CD: "next engineering priority after the playtest").
 **Scope:** `games/phasic/index.html` (generator/solver only), `.claude/tests/drive-phasic.cjs`, `.claude/phasic.md`.
 
