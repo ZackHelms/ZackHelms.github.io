@@ -30,6 +30,16 @@ backlog entry here.
 - [phasic] Move the PHASIC card to the TOP of the games hub list
   (`games/index.html` card order; keep games-sync green). (CD 2026-07-31.)
 
+- [phasic] Raise the HOT/GRAV/COLD buckets by ~half a bucket height — at
+  the screen's bottom edge, grabbing a source keeps triggering the iOS
+  swipe-up-to-background gesture (CD 2026-07-31). Layout: `bucketRects`/
+  `BZ` accounting; keep the drag hit areas at least as generous.
+- [phasic] Now-playing line at the very bottom of the screen: track number
+  + song title (CD 2026-07-31). The 10 `SONGS[]` have no names yet —
+  naming them is part of the item (CD can rename after). Pairs naturally
+  with the bucket raise (same freed bottom strip) — bundle at plan-gen;
+  coordinate with the phasaudio plan's per-block song assignment.
+
 ## Needs Zack
 
 - (none — the 2026-07-31 rounds answered everything asked; curriculum
