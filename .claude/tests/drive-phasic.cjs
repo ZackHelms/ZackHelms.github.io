@@ -136,6 +136,7 @@ function check(name, cond, extra) {
   check('L1: home by a single drag', (await st()).objs.every(o => o.home));
   await page.waitForTimeout(900);
   check('L1: level clear fires', (await st()).game === 'clear');
+  check('clear screen shows the complexity score', await page.evaluate('document.getElementById("clearcx").textContent') === 'COMPLEXITY ' + (await g('G=>G.complexity()')).score);
 
   // ---------- L2 First Facets ----------
   await load(1);
