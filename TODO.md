@@ -32,6 +32,20 @@ backlog entry here.
   naming them is part of the item (CD can rename after). Pairs naturally
   with the bucket raise (same freed bottom strip) — bundle at plan-gen;
   coordinate with the phasaudio plan's per-block song assignment.
+- [phasic] Landscape layout: in landscape orientation move the three
+  buckets (HOT/GRAV/COLD) to the RIGHT side of the screen so the play
+  field gets the full vertical real estate (CD 2026-07-31). Bundle with
+  the bucket raise / now-playing items — same layout round.
+- [phasic] **Rotation squish bug** (CD 2026-07-31, device-observed):
+  rotate portrait → landscape → portrait and the game renders squished;
+  further rotations never recover — only a restart does. Symptom
+  recorded, cause NOT yet traced — debug first (candidates to check, not
+  conclusions: stale `100dvh` after iOS rotation; canvas flex box vs
+  bounding-rect measured mid-rotation; single `resize` listener with no
+  `orientationchange`/`visualViewport` handler or deferred re-layout).
+  The fix plan must include a headless reproduction: drive the viewport
+  390x844 → 844x390 → 390x844 in the suite and assert the field's
+  rendered aspect recovers. Bundle with the layout round above.
 
 - [phasic] **Proprietary license carve-out** (CD 2026-07-31; needs a
   plan): add `games/phasic/LICENSE` (all-rights-reserved proprietary
