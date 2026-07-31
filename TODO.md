@@ -11,52 +11,27 @@ backlog entry here.
 
 ## Now
 
-- [phasic] **Freeze-refusal fairness bug** (CD screenshots 2026-07-31, live
-  build 14:01): a big liquid gem pancakes flat and frost then refuses with
-  "No room to crystallize here" despite visible clearance — seen on L27
-  Spare Gallery (P/I4 on the upper shelf) and L29 Split Foundry (C/T5 on
-  the floor). Hypothesis only (untraced): a spread puddle's outer particles
-  exceed the per-particle jump cap (1.9 cells) for tall/wide footprints —
-  investigate with `__GF.freezeDry` before proposing a fix. Fairness-
-  critical in block 3+ where frost is the only tool. Needs a plan
-  (`/zmh-producer:backlog-plan-gen the freeze-refusal bug`).
-- [phasic] Move the PHASIC card to the TOP of the games hub list
-  (`games/index.html` card order; keep games-sync green). (CD 2026-07-31.)
-
-- [phasic] Raise the HOT/GRAV/COLD buckets by ~half a bucket height — at
-  the screen's bottom edge, grabbing a source keeps triggering the iOS
-  swipe-up-to-background gesture (CD 2026-07-31). Layout: `bucketRects`/
-  `BZ` accounting; keep the drag hit areas at least as generous.
-- [phasic] Now-playing line at the very bottom of the screen: track number
-  + song title (CD 2026-07-31). The 10 `SONGS[]` have no names yet —
-  naming them is part of the item (CD can rename after). Pairs naturally
-  with the bucket raise (same freed bottom strip) — bundle at plan-gen;
-  coordinate with the phasaudio plan's per-block song assignment.
-- [phasic] Landscape layout: in landscape orientation move the three
-  buckets (HOT/GRAV/COLD) to the RIGHT side of the screen so the play
-  field gets the full vertical real estate (CD 2026-07-31). Bundle with
-  the bucket raise / now-playing items — same layout round.
-- [phasic] **Rotation squish bug** (CD 2026-07-31, device-observed):
-  rotate portrait → landscape → portrait and the game renders squished;
-  further rotations never recover — only a restart does. Symptom
-  recorded, cause NOT yet traced — debug first (candidates to check, not
-  conclusions: stale `100dvh` after iOS rotation; canvas flex box vs
-  bounding-rect measured mid-rotation; single `resize` listener with no
-  `orientationchange`/`visualViewport` handler or deferred re-layout).
-  The fix plan must include a headless reproduction: drive the viewport
-  390x844 → 844x390 → 390x844 in the suite and assert the field's
-  rendered aspect recovers. Bundle with the layout round above.
-
-- [phasic] **Proprietary license carve-out** (CD 2026-07-31; needs a
-  plan): add `games/phasic/LICENSE` (all-rights-reserved proprietary
-  notice, © Zack Helms), amend root `LICENSE.txt` with an explicit
-  exception clause ("games/phasic/ is NOT licensed under Apache 2.0 —
-  all rights reserved, see games/phasic/LICENSE"), link it from the
-  game's settings menu and a footer link on every wiki page. Facts
-  verified 2026-07-31: the root license is **Apache 2.0, not MIT**; a
-  carve-out is forward-only (copies already distributed under Apache 2.0
-  keep those rights for those versions — the grant is irrevocable);
-  Apache §6 never licensed the PHASIC name/trademark in the first place.
+- [phasic] **Freeze-refusal fairness bug** (CD screenshots 2026-07-31):
+  frost refused with visible clearance on big settled puddles (L27 P/I4,
+  L29 C/T5); hypothesis untraced — the plan's task 1 is the trace.
+  **Plan ready (2026-07-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phasfreeze.freeze-refusal-fairness-fix.md`
+- [phasic] Mobile chrome/layout round (four CD items merged: bucket raise
+  ~half height for the iOS swipe-up guard · rotation squish bug with a
+  headless repro gate · landscape buckets in a right-side column · song
+  titles + now-playing line at the very bottom).
+  **Plan ready (2026-07-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phaschrome.mobile-chrome-layout-round.md`
+- [phasic] Proprietary license carve-out (games/phasic/LICENSE, root
+  LICENSE.txt exception preamble, settings-menu link, wiki footers;
+  forward-only — facts in the plan).
+  **Plan ready (2026-07-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phaslicense.proprietary-carve-out.md`
+- [phasic] Brand round (two CD items merged: PHASIC card to the top of
+  the hub · the 2x2 phase-gem icon per CD spec — hub card, favicon/
+  apple-touch-icon, 1024x1024 iOS master).
+  **Plan ready (2026-07-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phasbrand.hub-top-and-icon.md`
 
 ## Needs Zack
 
@@ -75,8 +50,8 @@ backlog entry here.
   months to registration) vs engage an IP attorney (typ. $500-2000 +
   fees — recommended for the clearance opinion given Phasic Labs).
   Decide filing entity (you personally vs an LLC). Consider filing the
-  logo mark too once the queued 2x2-gem icon exists (it's the brand).
-  File intent-to-use (1(b)) now if the App Store launch is months out.
+  logo mark too once the 2x2-gem icon ships (phasbrand). File
+  intent-to-use (1(b)) now if the App Store launch is months out.
 - [phasic·IP] US copyright registration of the game (copyright.gov eCO,
   ~$45-65) — protection is automatic without it, but registration
   before/soon after publication unlocks statutory damages + fees in
@@ -95,35 +70,21 @@ backlog entry here.
 
 - [phasic] Dedicated obstacle SFX (void gulp, bush slurp, fan hum) +
   per-block music (songs by curriculum block instead of `level % 10`) —
-  merged: both audio-subsystem items.
+  merged: both audio-subsystem items. Note: phaschrome names the songs;
+  this plan changes which one plays per level — order-independent.
   **Plan ready (2026-07-31)** — run:
   `/zmh-producer:oversee-implementation .claude/plans/phasaudio.obstacle-sfx-and-block-music.md`
-
-- [phasic] Block-lesson level naming (CD 2026-07-31): every level name in
-  a curriculum block begins with the same word, the word that describes
-  the block's lesson (tutorials AND generated names — `genName` would draw
-  from a per-block lead word + suffix pool). Interpretation to confirm at
-  plan-gen: lead-word list per block (e.g. Drag/Flame/Gravity/Frost/
-  Vapor/Void/Hedge/Wind) and whether legacy tutorial names like "The
-  Kettle" get prefixed or renamed.
-- [phasic] **Gravity block (L17–24) must REQUIRE the orb** (CD 2026-07-31,
-  verbatim intent): "Currently I am able to use another object to push the
-  liquid or gas object where i need it to go." Opener like old L10 (Room
-  to Pour shape): one object + one flame + the grav orb, orb-mandatory.
-  Then maze-like levels needing careful orb use to push gas / pull liquid
-  through mazes past obstacles (bushes, fans, voids) as needed; complexity
-  ramps with more objects in various states and traps like voids. Design
-  notes: needs anti-shove layouts (the push-the-puddle tactic must not
-  bypass the lesson — fence solids out or omit spare solids); flag for the
-  plan-gen interview: obstacles formally debut in blocks 5–7, so using
-  bushes/fans/voids inside block-2 mazes reshuffles the curriculum
-  introduction order — CD call on how to reconcile.
-- [phasic] Custom game icon (hub card + future iOS app icon): a 2x2 red
-  gem — lower third solid, middle third liquid (translucent), top third
-  gaseous (semi-transparent) — on a transparent background with a leafy
-  bush behind the gem. Deliver as an inline/hub-card image plus a
-  1024x1024 master for the iOS icon; wire favicon/apple-touch-icon on the
-  game page. (CD spec 2026-07-31, verbatim in this entry.)
+- [phasic] Orb-mandatory gravity block (L17–24): new one-gem opener,
+  anti-shove hardening of the authored maps, walls-only orb-maze
+  generation. *Decided 2026-07-31: block-2 mazes are walls-only —
+  obstacles keep their block 5–7 debuts.*
+  **Plan ready (2026-07-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phasgrav.orb-mandatory-gravity-block.md`
+- [phasic] Block-lesson naming: display-layer "Word · Name" prefix for
+  blocks 0–7. *Decided 2026-07-31: prefix everything; tutorials keep
+  their names; endless unprefixed.* Run LAST (after phasgrav renames).
+  **Plan ready (2026-07-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phasnames.block-lesson-naming.md`
 
 ## Later
 
@@ -132,8 +93,11 @@ backlog entry here.
   with no gravity orb or other facilitating tools whose obstacles REQUIRE
   shoving a puddle airborne with a solid and frosting it mid-flight.
   Tutorial authored with the CD; tactic must never be required in earlier
-  blocks (CD 2026-07-31 — it emerged as a workaround on L29, which is the
-  freeze-refusal bug above, not intended design).
+  blocks (CD 2026-07-31 — it emerged as a workaround on L29, which is
+  the freeze-refusal bug phasfreeze now owns, not intended design).
+- [phasic] Obstacle-era gravmazes: bushes/fans/voids woven into orb
+  mazes in blocks 5+ — deferred by the CD's walls-only decision; revisit
+  after the block-2 playtest verdict (phasweave + phasgrav machinery).
 - [phasic] iOS port scoping: shell choice (WKWebView wrap vs Swift port),
   real haptics, native level picker, drop web-only chrome. Notes:
   `.claude/phasic.md` § iOS-port notes.
