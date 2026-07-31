@@ -11,12 +11,6 @@ backlog entry here.
 
 ## Now
 
-- [phasic] Mobile chrome/layout round (four CD items merged: bucket raise
-  ~half height for the iOS swipe-up guard · rotation squish bug with a
-  headless repro gate · landscape buckets in a right-side column · song
-  titles + now-playing line at the very bottom).
-  **Plan ready (2026-07-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phaschrome.mobile-chrome-layout-round.md`
 - [phasic] Proprietary license carve-out (games/phasic/LICENSE, root
   LICENSE.txt exception preamble, settings-menu link, wiki footers;
   forward-only — facts in the plan).
