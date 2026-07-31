@@ -1168,9 +1168,9 @@ function buildGen(i,salt){
     shaft0=right?0:GW-2; shaft1=right?1:GW-1;
     for(let x=0;x<GW;x++) if(x<shaft0||x>shaft1) rows[CEIL][x]='#';
   }
-  let slots=0;
+  let slots=0, slotX=-1;
   if(!easy&&b>=1&&p>=3&&r()<0.75){ const sx2=(r()*GW)|0;
-    if(sx2<gx-1||sx2>gx+wg){ rows[shelfRow][sx2]='.'; slots=1; } }
+    if(sx2<gx-1||sx2>gx+wg){ rows[shelfRow][sx2]='.'; slots=1; slotX=sx2; } }
   // sockets: bottom tier bottom-aligned to row 11, upper tier resting on the shelf
   const bot0=gems.filter(g2=>g2.tier===0&&g2!==atticGem), tier1=gems.filter(g2=>g2.tier===1);
   /* Packing: left-to-right in gem order, unless a gap centre is given — then
@@ -1192,17 +1192,19 @@ function buildGen(i,salt){
       atticGem.sax=shaft0===0?GW-w:0; atticGem.say=CEIL-GEMH[atticGem.L];
       stampGen(rows,SHAPE_STR[atticGem.L],atticGem.sax,atticGem.say,atticGem.L.toLowerCase()); } };
   if(!TWO) packSockets(bot0,tier1);
-  // obstacles — the loft board keeps its flue clear and hangs them on the far wall
-  let nObs=0;
+  /* obstacles — the loft board keeps its flue clear and hangs them on the far
+     wall. Each placement remembers its own rect so the weaving pass below can
+     lift that obstacle out of its corner and re-stand it in a real route. */
+  let nObs=0, defFan=null, defBush=null, defHole=null;
   if(useFan&&!easy){
     if(LOFT){ const fx2=shaft0===0?GW-1:0, fy=3+((r()*2)|0);
-      if(rows[fy][fx2]==='.'){ rows[fy][fx2]=fx2?'<':'>'; nObs++; } }   // blows toward the flue
-    else { const side=r()<0.5; const fy=1+((r()*2)|0);
-      if(rows[fy][side?0:9]==='.'){ rows[fy][side?0:9]=side?'>':'<'; nObs++; } } }
+      if(rows[fy][fx2]==='.'){ rows[fy][fx2]=fx2?'<':'>'; defFan={x0:fx2,x1:fx2,y0:fy,y1:fy}; nObs++; } }   // blows toward the flue
+    else { const side=r()<0.5; const fy=1+((r()*2)|0), fx2=side?0:9;
+      if(rows[fy][fx2]==='.'){ rows[fy][fx2]=side?'>':'<'; defFan={x0:fx2,x1:fx2,y0:fy,y1:fy}; nObs++; } } }
   if(useBush&&!easy){ // side column tuft in the travel band
     const bx2=LOFT?(shaft0===0?GW-1:0):(r()<0.5?0:9), by0=LOFT?3:0;
     for(let yy=by0;yy<by0+3;yy++) if(rows[yy][bx2]==='.') rows[yy][bx2]='%';
-    nObs++; }
+    defBush={x0:bx2,x1:bx2,y0:by0,y1:by0+2}; nObs++; }
   // scatter starts in the travel band above the shelf, avoiding obstacles + sockets
   const scatTop=LOFT?3:0, scatBot=LOFT?6:2;
   const scatter=()=>{
@@ -1220,7 +1222,7 @@ function buildGen(i,salt){
         if(!free) continue;
         for(let yy=0;yy<h2;yy++) for(let xx=0;xx<w;xx++)
           if(SHAPE_STR[g2.L][yy][xx]==='X') occ[ay+yy][ax+xx]=true;
-        stampGen(rows,SHAPE_STR[g2.L],ax,ay,g2.L); g2.ax=ax; ok=true;
+        stampGen(rows,SHAPE_STR[g2.L],ax,ay,g2.L); g2.ax=ax; g2.ay=ay; ok=true;
       }
       if(!ok) return false;
     }
@@ -1230,34 +1232,230 @@ function buildGen(i,salt){
      through the upper gap, so the one standing nearest it leaves first — and
      whoever leaves first has to take the slot farthest from its shelf's gap,
      or it parks itself across the lane the rest still need. */
-  if(TWO){
-    if(!scatter()) return null;
-    const rank=g2=>Math.abs((g2.ax+GEMW[g2.L]/2)-(gxT+wg/2));
-    const order=l=>l.slice().sort((a,b2)=>(a.base?0:1)-(b2.base?0:1)||rank(a)-rank(b2));
-    packSockets(order(bot0),order(tier1),gx+wg/2,gxT+wg/2);
-  }
+  const rank=g2=>Math.abs((g2.ax+GEMW[g2.L]/2)-(gxT+wg/2));
+  const order=l=>l.slice().sort((a,b2)=>(a.base?0:1)-(b2.base?0:1)||rank(a)-rank(b2));
+  const packTwo=()=>packSockets(order(bot0),order(tier1),gx+wg/2,gxT+wg/2);
+  if(TWO){ if(!scatter()) return null; packTwo(); }
   if(useHole&&!easy){
     if(TWO){ // the void hangs in the staging band, clear of the run between the gaps
       const lo=Math.min(gx,gxT)-1, hi=Math.max(gx,gxT)+wg, cands=[];
       for(let x=0;x<GW;x++) if((x<lo||x>hi)&&rows[TOPROW][x]==='#'&&rows[6][x]==='.'
         &&rows[6][Math.max(0,x-1)]==='.'&&rows[6][Math.min(GW-1,x+1)]==='.') cands.push(x);
-      if(cands.length){ rows[6][cands[(r()*cands.length)|0]]='@'; nObs++; }
+      if(cands.length){ const hx2=cands[(r()*cands.length)|0];
+        rows[6][hx2]='@'; defHole={x0:hx2,x1:hx2,y0:6,y1:6}; nObs++; }
     } else {
       const bad=new Set();
       for(let x=gx-1;x<=gx+wg;x++) bad.add(x);
       for(const g2 of gems) if(g2.tier===0&&g2!==atticGem) for(let x=g2.sax-1;x<=g2.sax+GEMW[g2.L];x++) bad.add(x);
       const cands=[]; for(let x=0;x<GW;x++) if(!bad.has(x)&&rows[shelfRow][x]==='#') cands.push(x);
-      if(cands.length){ const hx2=cands[(r()*cands.length)|0]; rows[10][hx2]='@'; nObs++; }
+      if(cands.length){ const hx2=cands[(r()*cands.length)|0];
+        rows[10][hx2]='@'; defHole={x0:hx2,x1:hx2,y0:10,y1:10}; nObs++; }
     }
   }
   if(!TWO&&!scatter()) return null;
+  /* ---------------- in-path obstacle weaving ----------------
+     Every draw below happens AFTER every layout draw above it, so a candidate
+     whose weave rolls "no" is exactly the board the unwoven generator built.
+     Each pattern lifts the hazard of its own kind out of its defensive corner
+     and stands it in a route the solver has to take; the plan travels to
+     makeScript in def.weave, and the salt loop still has to beat the result —
+     a woven layout nobody can solve just fails its salt, like any other. */
+  let weave=null, wFlames=0, wHeat=0;   // complexity cost vs the budget actually needed
+  const openAt=(x,y)=>x>=0&&x<GW&&y>=0&&y<GH&&rows[y][x]==='.';
+  const bandTop=(TWO?TOPROW:shelfRow)-1;      // last row of the upper travel band
+  const bandGap=TWO?gxT:gx;                   // the gap that band drains through
+  const unplace=d=>{ if(!d) return; nObs--;
+    for(let y=d.y0;y<=d.y1;y++) for(let x=d.x0;x<=d.x1;x++)
+      if('@%<>^v'.includes(rows[y][x])) rows[y][x]='.'; };
+  const bandClear=(x,y0,y1)=>{ for(let y=y0;y<=y1;y++) if(!openAt(x,y)) return false; return true; };
+  /* A hazard that has to own a whole column cannot wait for the scatter to
+     leave one empty — it almost never does. So the weave may lift the scatter,
+     stand its hazard up, and lay the gems out again around it: still the same
+     seeded stream, still after every earlier draw, and reverted whole if the
+     re-lay fails or the layout it produces is not the one the pattern wanted. */
+  const snapRows=()=>({r:rows.map(q=>q.slice()),
+    g:gems.map(g2=>[g2.ax,g2.ay,g2.sax,g2.say])});
+  const undoRows=sn=>{ for(let y=0;y<GH;y++) rows[y]=sn.r[y];
+    gems.forEach((g2,k)=>{ g2.ax=sn.g[k][0]; g2.ay=sn.g[k][1]; g2.sax=sn.g[k][2]; g2.say=sn.g[k][3]; }); };
+  const relay=stamp=>{                            // returns false if the gems no longer fit
+    for(const g2 of gems) stampGen(rows,SHAPE_STR[g2.L],g2.ax,g2.ay,'.');
+    // two-shelf sockets are handed out by scatter rank, so they are re-dealt
+    // from the new layout rather than left pointing at the old one
+    if(TWO) for(const g2 of gems) stampGen(rows,SHAPE_STR[g2.L],g2.sax,g2.say,'.');
+    stamp();
+    if(!scatter()) return false;
+    if(TWO) packTwo();
+    return true;
+  };
+  /* (a) hole-under-gap + plug — the Stopper, generated. A fresh 1-wide slot is
+     cut in the shelf the pour must cross and the void is hung in the cell
+     directly beneath it, so an unplugged pour drains straight into it. The
+     board is given the 1x1 stone that plugs it if it did not draw one. */
+  const weavePlug=()=>{
+    if(!useHole||LOFT||!useGrav) return null;
+    /* the plug is a guarantee, not a coincidence: if the board did not happen
+       to draw the 1x1 stone, one is added here with its own floor socket, so a
+       woven Stopper level always ships the piece that beats it */
+    const plug=gems.find(g2=>g2.L==='M');
+    if(plug&&plug.base) return null;    // the board's own stone is already flowing
+    const spare=(x,y)=>rows[y][x]==='.'||(defHole&&y===defHole.y0&&x===defHole.x0);
+    let addSock=-1, addStart=null;
+    if(!plug){
+      const sc=[]; for(let x=0;x<GW;x++) if(spare(x,GH-1)&&spare(x,GH-2)&&spare(x,GH-3)) sc.push(x);
+      const st=[]; for(let y=0;y<=2;y++) for(let x=0;x<GW;x++) if(y<shelfRow&&spare(x,y)) st.push([x,y]);
+      if(!sc.length||!st.length) return null;
+      addSock=sc[(r()*sc.length)|0]; addStart=st[(r()*st.length)|0];
+    }
+    const floor=gems.filter(g2=>g2.tier===0&&g2.L!=='M'&&!g2.base);
+    const shelfR=TWO?TOPROW:shelfRow, hy=shelfR+1;
+    const tall=gems.filter(g2=>GEMH[g2.L]>2);
+    const cands=[];
+    for(let sx=0;sx<GW;sx++){
+      if(sx>=bandGap-1&&sx<=bandGap+wg) continue;   // keep well clear of the drain gap
+      if(rows[shelfR][sx]!=='#') continue;          // cut a NEW slot, never widen the gap
+      if(!openAt(sx,hy)) continue;                  // room for the void beneath it
+      if(rows[shelfR][sx-1]==='.'||rows[shelfR][sx+1]==='.') continue;
+      const east=bandGap>sx;
+      // a 3-tall gem travels through the very row the void wants: on one shelf
+      // that is the gap-to-socket lane, on two it is the run between the gaps
+      let ok=true;
+      if(TWO){ if(tall.length&&sx>=Math.min(gx,gxT)-1&&sx<=Math.max(gx,gxT)+wg) ok=false; }
+      else for(const g2 of tall) if(east?!(g2.sax>sx):!(g2.sax+GEMW[g2.L]-1<sx)){ ok=false; break; }
+      /* a gem born liquid is already falling while the stone is still on its
+         way to the slot, so nothing may be born directly over it; the script
+         parks the well under the drain gap before the plug drag, which walks
+         every other pour toward the gap rather than down the slot */
+      if(!ok) continue;
+      /* the slot must sit between where the pour starts and the gap it drains
+         through, or the melt would never have to cross it. A gem that does not
+         already stand beyond the slot is walked there first, along the lane
+         between the scatter band and the shelf that nothing else ever uses. */
+      for(const g2 of floor){
+        const w2=GEMW[g2.L], sy=shelfR-GEMH[g2.L];
+        if(east?g2.ax+w2-1<sx:g2.ax>sx){ cands.push({sx,gem:g2.L,wide:w2>wg,stage:-1,sy}); continue; }
+        const st=east?sx-w2:sx+1;
+        if(sy<3||st<0||st+w2>GW) continue;
+        cands.push({sx,gem:g2.L,wide:w2>wg,stage:st,sy});
+      }
+    }
+    if(!cands.length) return null;
+    const pool=cands.filter(c=>c.wide).length?cands.filter(c=>c.wide):cands;
+    const c=pool[(r()*pool.length)|0];
+    unplace(defHole); defHole=null;
+    // the crossed shelf ends up with exactly two openings — the drain gap and
+    // the plugged slot — or the pour splits between them and never fully drains
+    if(!TWO&&slotX>=0&&slotX!==c.sx) rows[shelfRow][slotX]='#';
+    if(!plug){ rows[GH-1][addSock]='m'; rows[addStart[1]][addStart[0]]='M';
+      gems.push({L:'M',tier:0,ax:addStart[0],ay:addStart[1],sax:addSock,say:GH-1}); }
+    rows[shelfR][c.sx]='.';                          // the slot
+    rows[hy][c.sx]='@'; nObs++;                      // the void directly under it
+    if(!c.wide){ wFlames+=1; wHeat=Math.max(wHeat,1); }   // it must melt now even though it would fit
+    return {k:'plug', sx:c.sx, hy, shelfR, plug:'M', gem:c.gem, stage:c.stage, sy:c.sy};
+  };
+  /* (b) mid-field hedge — a bush column bisecting the upper travel band, sited
+     so exactly one gem is cut off from the gap its whole board drains through.
+     Stone cannot pass it and liquid dies on it, so that gem's only way over is
+     as vapor: the level is woven with the flame budget to boil it. */
+  const weaveBush=()=>{
+    if(!useBush||LOFT) return null;
+    const cols=[];
+    for(let bx=2;bx<=GW-3;bx++){
+      if(bx>=bandGap-1&&bx<=bandGap+wg) continue;
+      // only gems may be re-laid: a socket or a wall in the column is immovable
+      let ok=true;
+      for(let y=0;y<=bandTop;y++){ const ch=rows[y][bx];
+        if(ch!=='.'&&'ROYGCBPM'.indexOf(ch)<0){ ok=false; break; } }
+      if(ok) cols.push(bx);
+    }
+    if(!cols.length) return null;
+    const off=(r()*cols.length)|0;
+    for(let k=0;k<cols.length;k++){
+      const bx=cols[(k+off)%cols.length], east=bandGap>bx;
+      const sn=snapRows();
+      const stamp=()=>{ for(let y=0;y<=bandTop;y++) rows[y][bx]='%'; };
+      if(bandClear(bx,0,bandTop)) stamp();
+      else if(!relay(stamp)){ undoRows(sn); continue; }
+      const far=[]; let bad=false;
+      for(const g2 of gems){ const w=GEMW[g2.L];
+        if(g2.ax<=bx&&g2.ax+w-1>=bx) bad=true;                  // straddles the hedge line
+        else if((g2.ax>bx)!==east) far.push(g2);
+        if(g2.say<=bandTop&&((g2.sax>bx)!==east||(g2.sax+w-1>bx)!==east)) bad=true;
+      }
+      if(bad||!far.length||far.length>3||far.some(g2=>g2.tier!==0||g2.base)){ undoRows(sn); continue; }
+      unplace(defBush); defBush=null;
+      // the crossing costs two flames, taken back and re-thrown gem by gem, so
+      // two in the bucket cover the whole hedge however many it cuts off
+      nObs++; wFlames+=2; wHeat=Math.max(wHeat,2);
+      return {k:'bush', bx, y0:0, y1:bandTop, gem:far[0].L, gems:far.map(g2=>g2.L), dir:east?1:-1};
+    }
+    return null;
+  };
+  /* (c) fan lane — a fan on a side wall whose beam runs along the top of the
+     travel band. The gem it carries is one too wide for the gap (it has to go
+     fluid anyway); the script docks the well for that leg, so the beam is the
+     only thing pushing the cloud sideways — the Crosswind lesson, which is
+     likewise solved with no gravity well at all. */
+  const weaveFan=()=>{
+    if(!useFan||LOFT) return null;
+    const slots=[];
+    for(const side of [0,1]) for(const inset of [0,1]) for(const fy of [0,1]){
+      const dir=side?-1:1, fx2=side?GW-1-inset:inset, ch=rows[fy][fx2];
+      if(fy>bandTop) continue;
+      if(ch!=='.'&&'ROYGCBPM'.indexOf(ch)<0) continue;  // only a gem may be re-laid out of the way
+      let reach=0;                                   // the beam is stopped by walls and hedges only
+      for(let k=1;k<=5;k++){ const x=fx2+dir*k;
+        if(x<0||x>=GW||rows[fy][x]==='#'||rows[fy][x]==='%') break; reach=k; }
+      if(reach<4) continue;
+      const end=fx2+dir*reach;
+      if((bandGap-end)*dir<0) continue;                      // the drain gap must be downwind
+      slots.push({fx2,fy,dir,end});
+    }
+    if(!slots.length) return null;
+    const off=(r()*slots.length)|0;
+    for(let k=0;k<slots.length;k++){
+      const f=slots[(k+off)%slots.length];
+      const sn=snapRows();
+      const stamp=()=>{ rows[f.fy][f.fx2]=f.dir>0?'>':'<'; };
+      if(rows[f.fy][f.fx2]==='.') stamp();
+      else if(!relay(stamp)){ undoRows(sn); continue; }
+      const wide=[], any=[];
+      for(const g2 of gems){
+        if(g2.tier!==0||g2.base) continue;
+        const lead=f.dir>0?g2.ax+GEMW[g2.L]-1:g2.ax;
+        // it stands in the beam, clear of the fan's own cell (which the beam
+        // does not reach, and where a docked well would let the cloud park)
+        if((g2.ax-f.fx2)*f.dir<2&&(lead-f.fx2)*f.dir<2) continue;
+        if((lead-f.end)*f.dir>-1) continue;                  // upwind of the beam's end
+        if((g2.sax-f.end)*f.dir<0) continue;                 // and belongs downwind
+        (GEMW[g2.L]>wg?wide:any).push(g2.L);
+      }
+      const pool=wide.length?wide:any;
+      if(!pool.length){ undoRows(sn); continue; }
+      const gem=pool[(r()*pool.length)|0];
+      unplace(defFan); defFan=null;
+      nObs++; wFlames+=2; wHeat=Math.max(wHeat,2);
+      return {k:'fan', fx:f.fx2, fy:f.fy, dir:f.dir, end:f.end, gem};
+    }
+    return null;
+  };
+  /* The block's newest idea gets first claim on the weave — a block-7 board
+     tries the fan lane before the hedge and the hedge before the stopper — and
+     each pattern declines any board it cannot stand its hazard in a route on,
+     which is the real filter; most boards still come out unwoven. */
+  if(!easy&&!LOFT&&b>=5&&r()<0.2+0.12*p){   // the hazard leans later in each block
+    const kinds=[];
+    if(useFan)  kinds.push(weaveFan);
+    if(useBush) kinds.push(weaveBush);
+    if(useHole) kinds.push(weavePlug);
+    for(let k=0;k<kinds.length&&!weave;k++) weave=kinds[k]();
+  }
   const meltN=gems.filter(g2=>GEMW[g2.L]>wg&&g2!==atticGem).length;
   const base={}; for(const g2 of gems) if(g2.base) base[g2.L]=g2.base;
   const hints=TWO?GEN_HINTS2:LOFT?GEN_HINTSA:GEN_HINTS;
-  const cx={gems:gems.length, flames:meltN+(nG?0:0), frosts:nL+2*nG,
+  const cx={gems:gems.length, flames:meltN+wFlames, frosts:nL+2*nG,
     grav:useGrav?1:0, obstacles:nObs, basePts:nL*2+nG*3};
-  return { name:genName(i), hint:hints[(r()*hints.length)|0], template,
-    heat:useFlames?Math.max(meltN?1:0,(p>=6||extra)?2:(meltN?1:0)):0,
+  return { name:genName(i), hint:hints[(r()*hints.length)|0], template, weave,
+    heat:Math.max(wHeat, useFlames?Math.max(meltN?1:0,(p>=6||extra)?2:(meltN?1:0)):0),
     cold: b>=3 ? (nL+2*nG)+(p>=6?1:0) : 0,
     grav:useGrav?1:0, base:Object.keys(base).length?base:undefined, cx,
     map:rows.map(q=>q.join('')) };
@@ -1274,40 +1472,101 @@ function gapAnchor(g,w){ // left-most anchor that centres a w-wide gem in gap g
 }
 function makeScript(){
   const tpl=(lvl&&lvl.template)||'drawer';
-  if(tpl==='two-shelf') return scriptTwoShelf();
+  const wv=(lvl&&lvl.weave)||null;
+  if(tpl==='two-shelf') return scriptTwoShelf(wv);
   if(tpl==='attic') return scriptAttic();
+  return scriptDrawer(wv);
+}
+/* ---- weave legs, shared by both shelved templates ----
+   A woven board hands makeScript a plan (def.weave) instead of a surprise: the
+   hazard sits in a route, so the route is written to beat it with the tactic
+   the curriculum taught. Nothing here relaxes the executor — a leg that gets
+   its gem eaten aborts the script and the candidate loses its salt. */
+function boilAcross(wv,L){ // (b)/(c): melt+boil are both instant, so the liquid
+  const ops=[];            // never exists next to the hazard — only vapor crosses
+  if(wv.k==='bush'){
+    ops.push({g:[wv.dir>0?0.2:GW-0.2,13.5]});           // well on the gem's own side: gas flees over the hedge
+    ops.push({h:[L]},{h:[L]});
+    ops.push(wv.dir>0 ? {u:[L,'minx','>',wv.bx+0.8,40]}
+                      : {u:[L,'maxx','<',wv.bx-0.8,40]});
+  } else {                       // fan lane: the well goes back in its bucket, so
+    ops.push({g:[]});            // nothing but the beam is pushing the cloud sideways
+    ops.push({h:[L]},{h:[L]});
+    ops.push(wv.dir>0 ? {u:[L,'maxx','>',wv.end-0.5,40]}
+                      : {u:[L,'minx','<',wv.end+0.5,40]});
+  }
+  return ops;
+}
+/* The stone's way into the slot: drop to the empty lane just above the shelf
+   in its own column first, then slide along it. moveSolid has no pathfinder —
+   a diagonal at the scatter rows wedges between two gems and never arrives. */
+function plugRoute(o,sx,shelfR){ return [[o.startAx,shelfR-1],[sx,shelfR-1],[sx,shelfR]]; }
+function scriptDrawer(wv){
   const gaps=levelGaps(); if(!gaps.length) return null;
-  const script=[];
+  const script=[], WY=13.5, wide=gaps[0], midW=wide.x+wide.w/2-0.5;
+  const byL=L=>objs.find(o=>o.letter===L);
+  const plugO=wv&&wv.k==='plug'?byL(wv.plug):null;
+  const wovList=wv?(wv.gems||[wv.gem]).map(byL):[];
+  if(wv&&(wovList.some(o=>!o)||(wv.k==='plug'&&!plugO))) return null;
+  const woven=o=>wovList.indexOf(o)>=0;
+  // liquid loose above the shelf -> down the gap -> frozen in its socket
+  // a 3-tall gem sits a row higher when it is home, so "low enough to freeze
+  // into its socket" is not the same depth for every gem
+  const lowY=o=>Math.min(10.2, GH-GEMH[o.letter]+0.2);
+  const drainTail=(o,guard)=>{ const w=GEMW[o.letter], h=GEMH[o.letter], ty=9-h;
+    const ops=guard?[{u:[o.letter,'miny','>',6.4,32]}]:[];   // clear of the shelf band first
+    return ops.concat([{g:[o.sax+w/2-0.5,WY]},
+      {u:[o.letter,'miny','>',lowY(o),30]},{w:[1.5]},{t:[o.letter]},{w:[0.8]},
+      {d:[o.letter,[[o.sax,ty],[o.sax,o.say]]]}]); };
   // base-state gems first (they are already flowing), then bottom-tier solids
   // (nearest gap first, so the top band empties), then top-tier solids
   const baseGems=objs.filter(o=>o.base>0);
-  const botSolid=objs.filter(o=>o.base===0&&o.say>5).sort((a,b2)=>Math.abs(a.startAx-gaps[0].x)-Math.abs(b2.startAx-gaps[0].x));
-  const topSolid=objs.filter(o=>o.base===0&&o.say<5).sort((a,b2)=>b2.sax-a.sax);
+  const botSolid=objs.filter(o=>o.base===0&&o.say>5&&o!==plugO).sort((a,b2)=>Math.abs(a.startAx-gaps[0].x)-Math.abs(b2.startAx-gaps[0].x));
+  const topSolid=objs.filter(o=>o.base===0&&o.say<5&&o!==plugO).sort((a,b2)=>b2.sax-a.sax);
+  // the well goes to the drain gap before anything moves, so whatever is
+  // already flowing walks toward the gap instead of down the open slot
+  if(plugO) script.push({g:[midW,WY]},{d:[plugO.letter,plugRoute(plugO,wv.sx,wv.shelfR)]});
   for(const o of baseGems){
     const h=GEMH[o.letter], ty=9-h;
     if(gravSrc) script.push({g:[o.sax+GEMW[o.letter]/2-0.5,13.5]});
     if(o.base===2) script.push({c:[o.letter]}); // condense the vapor first
-    script.push({u:[o.letter,'miny','>',10.2,35]},{w:[1.5]},{c:[o.letter]},{w:[0.8]},
+    script.push({u:[o.letter,'miny','>',lowY(o),35]},{w:[1.5]},{c:[o.letter]},{w:[0.8]},
       {d:[o.letter,[[o.sax,ty],[o.sax,o.say]]]});
   }
   for(const o of botSolid){
     const w=GEMW[o.letter], h=GEMH[o.letter], ty=9-h;
+    if(woven(o)){
+      if(wv.k==='plug'){  // pour it across the plugged slot, void and all
+        if(wv.stage>=0) script.push({d:[o.letter,[[o.startAx,wv.sy],[wv.stage,wv.sy]]]});
+        script.push({g:[midW,WY]},{h:[o.letter]},...drainTail(o,true));
+      }
+      else             // vapor over the hedge / down the fan lane, then drain
+        script.push(...boilAcross(wv,o.letter),{g:[midW,WY]},{t:[o.letter]},
+          ...drainTail(o,wv.k==='bush'));
+      continue;
+    }
     const g=gaps.find(q=>q.w>=w);
     if(g){
       const gx2=Math.min(Math.max(g.x, g.x+((g.w-w)>>1)), g.x+g.w-w);
       script.push({d:[o.letter,[[gx2,1],[gx2,ty],[o.sax,ty],[o.sax,o.say]]]});
     } else {
-      const wide=gaps[0];
       const mx=Math.max(0,Math.min(GW-w, wide.x-((w-wide.w)>>1)));
       if(gravSrc) script.push({g:[o.sax+w/2-0.5,13.5]});
       script.push({d:[o.letter,[[mx,1]]]},{h:[o.letter]},
-        {u:[o.letter,'miny','>',10.2,30]},{w:[1.5]},{t:[o.letter]},{w:[0.8]},
+        {u:[o.letter,'miny','>',lowY(o),30]},{w:[1.5]},{t:[o.letter]},{w:[0.8]},
         {d:[o.letter,[[o.sax,ty],[o.sax,o.say]]]});
     }
   }
   for(const o of topSolid){
     const h=GEMH[o.letter], tty=Math.max(0,3-h);
     script.push({d:[o.letter,[[o.sax,tty],[o.sax,o.say]]]});
+  }
+  if(plugO){ // unplug last, and walk it home the long way round the void
+    const legs=[[wv.sx,wv.shelfR-1]];
+    if(plugO.say>wv.shelfR){ const xg=gapAnchor(wide,1);
+      legs.push([xg,wv.shelfR-1],[xg,8],[plugO.sax,8]); }
+    legs.push([plugO.sax,plugO.say]);
+    script.push({d:[plugO.letter,legs]});
   }
   script.push({w:[1.2]});
   return script;
@@ -1316,16 +1575,28 @@ function makeScript(){
    floor between them; pours are walked across it by the well, which is
    re-parked under each gap as the liquid clears the shelf above it. Floor
    sockets are filled far-to-near so the run under the lower gap stays open. */
-function scriptTwoShelf(){
+function scriptTwoShelf(wv){
   const top=levelGaps(4), bot=levelGaps(8);
   if(!top.length||!bot.length) return null;
   const script=[], WY=13.5, mid=g=>g.x+g.w/2-0.5;
   // how far a socket sits from the gem's entry gap — the same metric buildGen
   // packed by, so filling far-first replays the packing outside-in
   const edge=(o,q)=>Math.abs(o.sax+GEMW[o.letter]/2-(q.x+q.w/2));
+  const byL=L=>objs.find(o=>o.letter===L);
+  const plugO=wv&&wv.k==='plug'?byL(wv.plug):null;
+  const wovList=wv?(wv.gems||[wv.gem]).map(byL):[];
+  if(wv&&(wovList.some(o=>!o)||(wv.k==='plug'&&!plugO))) return null;
+  const woven=o=>wovList.indexOf(o)>=0;
+  // liquid loose above the upper shelf -> both gaps in turn -> frozen home
+  const drainTail=(o,guard)=>{ const w=GEMW[o.letter];
+    const ops=guard?[{u:[o.letter,'miny','>',5.2,32]}]:[];
+    return ops.concat([{g:[mid(bot[0]),WY]},
+      {u:[o.letter,'miny','>',9.2,32]},{g:[o.sax+w/2-0.5,WY]},
+      {w:[1.5]},{t:[o.letter]},{w:[0.8]},{d:[o.letter,[[o.sax,o.say]]]}]); };
   const baseGems=objs.filter(o=>o.base>0);
-  const botSolid=objs.filter(o=>o.base===0&&o.say>8).sort((a,b2)=>edge(b2,bot[0])-edge(a,bot[0]));
-  const stageSolid=objs.filter(o=>o.base===0&&o.say<=8).sort((a,b2)=>edge(b2,top[0])-edge(a,top[0]));
+  const botSolid=objs.filter(o=>o.base===0&&o.say>8&&o!==plugO).sort((a,b2)=>edge(b2,bot[0])-edge(a,bot[0]));
+  const stageSolid=objs.filter(o=>o.base===0&&o.say<=8&&o!==plugO).sort((a,b2)=>edge(b2,top[0])-edge(a,top[0]));
+  if(plugO) script.push({g:[mid(top[0]),WY]},{d:[plugO.letter,plugRoute(plugO,wv.sx,wv.shelfR)]});
   for(const o of baseGems){
     const w=GEMW[o.letter];
     if(o.base===2) script.push({c:[o.letter]});      // condense the vapor first
@@ -1336,6 +1607,15 @@ function scriptTwoShelf(){
   }
   for(const o of botSolid){
     const w=GEMW[o.letter], h=GEMH[o.letter];
+    if(woven(o)){
+      if(wv.k==='plug'){
+        if(wv.stage>=0) script.push({d:[o.letter,[[o.startAx,wv.sy],[wv.stage,wv.sy]]]});
+        script.push({g:[mid(top[0]),WY]},{h:[o.letter]},...drainTail(o,true));
+      }
+      else script.push(...boilAcross(wv,o.letter),{g:[mid(top[0]),WY]},{t:[o.letter]},
+        ...drainTail(o,wv.k==='bush'));
+      continue;
+    }
     const gt=top.find(q=>q.w>=w), gb=bot.find(q=>q.w>=w);
     if(gt&&gb){
       const xt=gapAnchor(gt,w), xb=gapAnchor(gb,w);
@@ -1352,6 +1632,13 @@ function scriptTwoShelf(){
   for(const o of stageSolid){ const w=GEMW[o.letter], h=GEMH[o.letter];
     const xt=gapAnchor(top.find(q=>q.w>=w)||top[0],w);
     script.push({d:[o.letter,[[xt,4-h],[xt,o.say],[o.sax,o.say]]]});
+  }
+  if(plugO){ // unplug last, and walk it home the long way round the void
+    const legs=[[wv.sx,wv.shelfR-1]], xt=gapAnchor(top[0],1), xb=gapAnchor(bot[0],1);
+    legs.push([xt,wv.shelfR-1],[xt,7]);
+    if(plugO.say>7) legs.push([xb,7],[xb,plugO.say]);
+    legs.push([plugO.sax,plugO.say]);
+    script.push({d:[plugO.letter,legs]});
   }
   script.push({w:[1.2]});
   return script;
@@ -1442,7 +1729,8 @@ function* scriptRunner(script){
       if(!ok&&gravSrc){ gravSrc.docked=false;
         placeGrav(FX+(o.sax+1)*CELL, FY+(GH+2)*CELL); yield* take(360); ok=removeFlame(o); }
       if(!ok) return false; }
-    else if(op.g){ if(gravSrc){ gravSrc.docked=false; placeGrav(FX+op.g[0]*CELL, FY+op.g[1]*CELL); } }
+    else if(op.g){ if(gravSrc){ if(!op.g.length) gravSrc.docked=true;   // {g:[]} = back in its bucket
+      else { gravSrc.docked=false; placeGrav(FX+op.g[0]*CELL, FY+op.g[1]*CELL); } } }
     else if(op.u){ const o=byL(op.u[0]); if(!o) return false;
       const prop=op.u[1],cmp=op.u[2],val=op.u[3],maxS=op.u[4];
       let t2=0, ok=false;
@@ -1464,17 +1752,28 @@ function runScriptFast(script){ // synchronous drain — the level-validation pa
   return res.value;
 }
 const genCache={};
+const WEAVE_SCAN=19;    // salts an obstacle-block level looks through for a woven winner
 function getLevel(i){
   if(AUTH[i]) return AUTH[i];
   if(genCache[i]) return genCache[i].def;
+  /* The first candidate that solves wins — except in the obstacle blocks,
+     where a woven board that solves outranks a plain one from an earlier salt.
+     In-path hazards are the whole point of blocks 5-7, and they are rare
+     enough that the plain layouts would otherwise always win the race. */
+  const scan=blockOf(i)>=5?WEAVE_SCAN:0;
+  let plain=null;
   for(let salt=0;salt<20;salt++){
     const def=buildGen(i,salt); if(!def) continue;
     solving=true; setupLevel(def,i);
     const script=makeScript();
     const ok=runScriptFast(script);
     solving=false;
-    if(ok){ genCache[i]={def,script,salt}; return def; }
+    if(!ok) continue;
+    if(def.weave){ genCache[i]={def,script,salt}; return def; }
+    if(!plain) plain=({def,script,salt});
+    if(salt>=scan) break;
   }
+  if(plain){ genCache[i]=plain; return plain.def; }
   for(let salt=90;salt<96;salt++){ // trivially-easy rescue template, still validated
     const def=buildGen(i,salt); if(!def) continue;
     solving=true; setupLevel(def,i);
@@ -2023,7 +2322,21 @@ if(TEST){
     complexity:()=>lvl&&lvl.cx?{score:cxScore(lvl.cx),...lvl.cx}:null,
     stuck:()=>stuckSolve(),
     genInfo:()=>genCache[lvlIdx]?{salt:genCache[lvlIdx].salt,hasScript:!!genCache[lvlIdx].script,
-      template:(genCache[lvlIdx].def&&genCache[lvlIdx].def.template)||'drawer'}:null,
+      template:(genCache[lvlIdx].def&&genCache[lvlIdx].def.template)||'drawer',
+      weave:(genCache[lvlIdx].def&&genCache[lvlIdx].def.weave)||null}:null,
+    // the board as geometry: where the hazards stand, which columns each shelf
+    // is open through, and where every gem starts and belongs — enough to ask
+    // whether a hazard is in a route rather than parked in a corner
+    mapInfo:()=>({ template:(lvl&&lvl.template)||null, weave:(lvl&&lvl.weave)||null,
+      holes:holes.map(q=>({x:q.x,y:q.y})),
+      bushes:Array.from(bushes).map(k=>({x:k%GW,y:(k/GW)|0})),
+      fans:fans.map(f=>({x:f.x,y:f.y,dx:f.dx,dy:f.dy})),
+      beam:Object.keys(fanBeam).map(k=>({x:(+k)%GW,y:((+k)/GW)|0})),
+      shelves:[2,4,5,7,8].filter(y=>{ let n=0; for(let x=0;x<GW;x++) if(walls[y*GW+x]) n++; return n>0; })
+        .map(y=>({y,gaps:levelGaps(y).map(q=>({x:q.x,w:q.w}))})),
+      gems:objs.map(o=>({L:o.letter,ax:o.startAx,ay:o.startAy,sax:o.sax,say:o.say,
+        w:GEMW[o.letter],h:GEMH[o.letter],base:o.base})),
+      script:(genCache[lvlIdx]&&genCache[lvlIdx].script)||null }),
     replayGen:()=>{ const c=genCache[lvlIdx]; if(!c||!c.script) return false;
       solving=true; const ok=runScriptFast(c.script); solving=false;
       for(const o of objs) updateHome(o); return ok; },
