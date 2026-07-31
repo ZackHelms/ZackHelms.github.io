@@ -11,11 +11,6 @@ backlog entry here.
 
 ## Now
 
-- [phasic] **Freeze-refusal fairness bug** (CD screenshots 2026-07-31):
-  frost refused with visible clearance on big settled puddles (L27 P/I4,
-  L29 C/T5); hypothesis untraced — the plan's task 1 is the trace.
-  **Plan ready (2026-07-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phasfreeze.freeze-refusal-fairness-fix.md`
 - [phasic] Mobile chrome/layout round (four CD items merged: bucket raise
   ~half height for the iOS swipe-up guard · rotation squish bug with a
   headless repro gate · landscape buckets in a right-side column · song

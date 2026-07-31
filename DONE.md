@@ -1,5 +1,15 @@
 # DONE — done log
 
+- 2026-07-31 [phasic] phasfreeze oversee run: the freeze-refusal fairness
+  bug traced and fixed — a settled 1-row puddle must reach h−0.9 cells to
+  build an h-tall shape, so the flat 1.9 jump cap structurally refused
+  EVERY settled 3-tall gem (13/13); fix = resting-gated footprint-scaled
+  cap (≤2.6) + surface-row anchor seeding. 0 regressions over a
+  314-puddle sweep; mid-air/mid-pour refusals byte-identical; the CD's
+  L27 I4 case proved a mid-pour sighting, not a second bug. Suite
+  246→252 checks. (16c4a28..23b13e8 + wrap-up docs; plan archived to
+  .claude/plans/DONE/)
+
 - 2026-07-31 [phasic] phasweave oversee run: generated levels gain two new
   board templates (two-shelf, gas attic — drawer determinism proven by
   byte-diff) and in-path obstacle weaving in blocks 5-7 (void under the

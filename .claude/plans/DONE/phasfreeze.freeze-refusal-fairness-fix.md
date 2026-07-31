@@ -1,6 +1,8 @@
 # phasfreeze — trace and fix the freeze-refusal fairness bug (frost refused with visible clearance)
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-07-31 (burndown run 1) — commits
+16c4a28..23b13e8; suite 246→252; traced cause: flat 1.9 jump cap vs the
+structural h−0.9 reach of settled puddles (see follow-up)
 **Requested:** 2026-07-31 (CD screenshots: L27 Spare Gallery P/I4 on the upper shelf, L29 Split Foundry C/T5 on the floor — "No room to crystallize here" despite plenty of room; the CD's launch-and-freeze move was a workaround for this).
 **Scope:** `games/phasic/index.html` (freeze placement search + possibly puddle cohesion), `.claude/tests/drive-phasic.cjs`, `.claude/phasic.md`.
 
