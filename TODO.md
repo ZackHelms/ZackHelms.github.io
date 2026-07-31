@@ -11,11 +11,6 @@ backlog entry here.
 
 ## Now
 
-- [phasic] Proprietary license carve-out (games/phasic/LICENSE, root
-  LICENSE.txt exception preamble, settings-menu link, wiki footers;
-  forward-only — facts in the plan).
-  **Plan ready (2026-07-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phaslicense.proprietary-carve-out.md`
 - [phasic] Brand round (two CD items merged: PHASIC card to the top of
   the hub · the 2x2 phase-gem icon per CD spec — hub card, favicon/
   apple-touch-icon, 1024x1024 iOS master).

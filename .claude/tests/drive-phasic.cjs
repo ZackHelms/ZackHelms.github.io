@@ -1010,6 +1010,38 @@ function check(name, cond, extra) {
   const restoredTacticCount = await wp('document.querySelectorAll("#content .tactic-item").length');
   check('wiki: clearing search restores the current page content', restoredTacticCount === 12, restoredTacticCount);
 
+  // ---------- phaslicense: LICENSE file, settings link, wiki footer ----------
+  const licenseText = fs.readFileSync(path.join(repoRoot, 'games', 'phasic', 'LICENSE'), 'utf8');
+  const licenseFirstLine = licenseText.split('\n')[0];
+  check('phaslicense: LICENSE file exists, non-empty, first line names PHASIC',
+    licenseText.length > 0 && licenseFirstLine.includes('PHASIC'), licenseFirstLine);
+
+  const licHref = await page.evaluate('(function(){var el=document.getElementById("lic-btn");return el?el.getAttribute("href"):null;})()');
+  check('phaslicense: settings overlay has a LICENSE link to LICENSE', licHref === 'LICENSE', licHref);
+
+  await wp('location.hash = "#home"');
+  await wpage.waitForTimeout(150);
+  const footHome = await wp(`(function(){
+    var el = document.getElementById('wiki-foot');
+    if (!el) return null;
+    var r = el.getBoundingClientRect();
+    var a = el.querySelector('a');
+    return { text: el.textContent, visible: el.offsetParent !== null && r.width > 0 && r.height > 0, href: a ? a.getAttribute('href') : null };
+  })()`);
+  check('phaslicense: wiki #home footer is present, visible, and reads "All rights reserved"',
+    !!footHome && footHome.visible && /All rights reserved/i.test(footHome.text), footHome);
+
+  await wp('location.hash = "#tactics"');
+  await wpage.waitForTimeout(150);
+  const footTactics = await wp(`(function(){
+    var el = document.getElementById('wiki-foot');
+    return el ? el.textContent : null;
+  })()`);
+  check('phaslicense: wiki footer still present after navigating to #tactics, same text',
+    footTactics !== null && footTactics === footHome.text, { footHome: footHome && footHome.text, footTactics });
+
+  check('phaslicense: wiki footer link href is LICENSE', !!footHome && footHome.href === 'LICENSE', footHome);
+
   await wpage.close();
 
   // ---------- console errors ----------
