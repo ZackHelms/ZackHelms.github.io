@@ -1,0 +1,37 @@
+PHASIC (games/phasic/) — PROPRIETARY LICENSE
+
+Copyright (c) 2026 Zack Helms. All rights reserved.
+
+1. SCOPE
+   This license covers everything in the games/phasic/ directory: game
+   code, art, level data, music/generative audio code, text, and the
+   in-game wiki (collectively, "the Software").
+
+2. NO PERMISSION GRANTED
+   No permission is granted to copy, modify, distribute, sublicense,
+   sell, or create derivative works of the Software, in whole or in
+   part, without prior written permission from the copyright holder.
+
+3. TRADEMARK
+   The PHASIC name, its logo, and associated branding are reserved.
+   No trademark rights are granted by this license.
+
+4. PERMITTED USE
+   You may play PHASIC where it is officially published — the
+   copyright holder's website, and any official app-store release —
+   for personal, non-commercial use. This is not a license to the
+   underlying Software.
+
+5. RELATIONSHIP TO THE REPOSITORY LICENSE
+   This directory is EXCLUDED from the repository's Apache License
+   2.0 (see the repository's LICENSE.txt). This exception applies
+   from 2026-07-31 forward. It does not affect copies of earlier
+   versions of this directory already distributed under the Apache
+   License 2.0 — those copies remain under that license.
+
+6. PERMISSIONS AND CONTACT
+   For permission requests, contact the copyright holder via the
+   GitHub repository ZackHelms/ZackHelms.github.io.
+
+7. NO WARRANTY
+   The Software is provided "as is," without warranty of any kind.
