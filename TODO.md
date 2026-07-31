@@ -11,33 +11,35 @@ backlog entry here.
 
 ## Now
 
-- [phasic] CD playtest of the 8-block curriculum (L1–16 plus a sampled
-  level from each later block); feed pacing verdicts back here.
-- [phasic] STUCK ghost-replay: visibly play the stored solver script
-  (fast-forward ticker) instead of the instant snap. (CD 2026-07-31:
-  prioritize right after the playtest.)
-- [phasic] Strip cold buckets from blocks 1–2 (levels 9–24) — frost first
-  appears at Standing Water (L25) where it gains its real job. Update
-  budget checks and any hints that mention frost. (CD decision 2026-07-31.)
-- [phasic] Show the complexity score on the level-clear screen (small line
-  next to the stars). (CD decision 2026-07-31.)
+- [phasic] STUCK ghost-replay + strip frost buckets below L25 + complexity
+  score on the clear screen (three CD decisions 2026-07-31, bundled: same
+  file, same risk profile, each a single task).
+  **Plan ready (2026-07-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phaspolish.stuck-ghost-frost-strip-clear-cx.md`
+- [phasic] In-game wiki (cogwheel → WIKI: home page, topic pages incl.
+  tactics, search box under the reload button) + tactic #10 "push the
+  puddle" (L13 Queue) into the registry. (CD request 2026-07-31, verbatim
+  in the plan, given with the playtest sign-off.)
+  **Plan ready (2026-07-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phaswiki.in-game-wiki-and-tactics.md`
 
 ## Needs Zack
 
-- (none — the 2026-07-31 round answered: strip early frost ✓, obstacle
-  weaving is the next engineering priority ✓, score on clear screen ✓,
-  ghost-replay soon ✓)
+- (none — the 2026-07-31 rounds answered everything asked; curriculum
+  playtest signed off, see DONE.md)
 
 ## Next
 
-- [phasic] Obstacle-weaving generator: holes/bushes/fans placed IN
-  solution paths (the solver keeps validating); bushes and fans beyond
-  side columns; two-shelf and gas/attic generated templates. (CD: next
-  engineering priority after the playtest.)
-- [phasic] Dedicated SFX for the new events — void gulp, bush slurp, fan
-  hum ambient (currently reuse the error buzz or nothing).
-- [phasic] Per-block music: assign songs by curriculum block instead of
-  `level % 10`.
+- [phasic] Obstacle-weaving generator: holes/bushes/fans placed IN solution
+  paths (solver keeps validating); two-shelf and gas/attic templates. (CD:
+  next engineering priority.)
+  **Plan ready (2026-07-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phasweave.obstacle-weaving-generator.md`
+- [phasic] Dedicated obstacle SFX (void gulp, bush slurp, fan hum) +
+  per-block music (songs by curriculum block instead of `level % 10`) —
+  merged: both audio-subsystem items.
+  **Plan ready (2026-07-31)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phasaudio.obstacle-sfx-and-block-music.md`
 
 ## Later
 

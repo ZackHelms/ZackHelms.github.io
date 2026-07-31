@@ -1,5 +1,8 @@
 # DONE — done log
 
+- 2026-07-31 [phasic] CD playtest of the 8-block curriculum: **passed,
+  signed off** (with two new requests recorded to the backlog: tactic #10
+  "push the puddle", and the in-game wiki → `phaswiki` plan).
 - 2026-07-31 [phasic] v4: curriculum blocks of 8 (drag → flames → grav+gas
   → liquid base → gas base → void → bush → fan), formalized complexity
   metric, symmetric base-state reversion, three obstacles with fail/retry,
