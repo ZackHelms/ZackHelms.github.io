@@ -32,19 +32,67 @@ backlog entry here.
   naming them is part of the item (CD can rename after). Pairs naturally
   with the bucket raise (same freed bottom strip) — bundle at plan-gen;
   coordinate with the phasaudio plan's per-block song assignment.
+- [phasic] Landscape layout: in landscape orientation move the three
+  buckets (HOT/GRAV/COLD) to the RIGHT side of the screen so the play
+  field gets the full vertical real estate (CD 2026-07-31). Bundle with
+  the bucket raise / now-playing items — same layout round.
+- [phasic] **Rotation squish bug** (CD 2026-07-31, device-observed):
+  rotate portrait → landscape → portrait and the game renders squished;
+  further rotations never recover — only a restart does. Symptom
+  recorded, cause NOT yet traced — debug first (candidates to check, not
+  conclusions: stale `100dvh` after iOS rotation; canvas flex box vs
+  bounding-rect measured mid-rotation; single `resize` listener with no
+  `orientationchange`/`visualViewport` handler or deferred re-layout).
+  The fix plan must include a headless reproduction: drive the viewport
+  390x844 → 844x390 → 390x844 in the suite and assert the field's
+  rendered aspect recovers. Bundle with the layout round above.
+
+- [phasic] **Proprietary license carve-out** (CD 2026-07-31; needs a
+  plan): add `games/phasic/LICENSE` (all-rights-reserved proprietary
+  notice, © Zack Helms), amend root `LICENSE.txt` with an explicit
+  exception clause ("games/phasic/ is NOT licensed under Apache 2.0 —
+  all rights reserved, see games/phasic/LICENSE"), link it from the
+  game's settings menu and a footer link on every wiki page. Facts
+  verified 2026-07-31: the root license is **Apache 2.0, not MIT**; a
+  carve-out is forward-only (copies already distributed under Apache 2.0
+  keep those rights for those versions — the grant is irrevocable);
+  Apache §6 never licensed the PHASIC name/trademark in the first place.
 
 ## Needs Zack
 
-- (none — the 2026-07-31 rounds answered everything asked; curriculum
-  playtest signed off, see DONE.md)
+- [phasic·IP] USPTO clearance search for "PHASIC" before filing:
+  https://www.uspto.gov/trademarks/search — check live + dead marks in
+  Class 9 (downloadable game software) and Class 41 (online game
+  services; the web version is arguably 41). Also search the Apple App
+  Store for "Phasic" directly. Known name-adjacent actors to clear
+  against (found 2026-07-31): **Phasic Labs** (UK indie game developer,
+  made "Guide The Light"), **phasicfun.com** (web games portal),
+  Mattel's **PHASE 10** family (huge mark, different word but same
+  aisle). Gameplay mechanics are not trademark territory — the name/
+  logo/slogan are.
+- [phasic·IP] Decide: self-file via USPTO TEAS ($350/class base fee, +$200/class
+  for a custom goods description; ~4.4 months to first action, ~10-18
+  months to registration) vs engage an IP attorney (typ. $500-2000 +
+  fees — recommended for the clearance opinion given Phasic Labs).
+  Decide filing entity (you personally vs an LLC). Consider filing the
+  logo mark too once the queued 2x2-gem icon exists (it's the brand).
+  File intent-to-use (1(b)) now if the App Store launch is months out.
+- [phasic·IP] US copyright registration of the game (copyright.gov eCO,
+  ~$45-65) — protection is automatic without it, but registration
+  before/soon after publication unlocks statutory damages + fees in
+  infringement suits.
+- [phasic·IP] Apple Developer Program enrollment ($99/yr) + reserve the
+  app name "Phasic" in App Store Connect as early as possible (name
+  reservations are first-come within Apple's rules).
+- [phasic·IP] Decision: keep Phasic's source public (today: public repo,
+  Pages-served, readable by anyone) vs move Phasic development private /
+  ship only built+minified output before the App Store launch — the
+  license carve-out forbids copying going forward, but public source
+  makes copying trivial to do and hard to notice. Maximum protection =
+  private source for the iOS build.
 
 ## Next
 
-- [phasic] Obstacle-weaving generator: holes/bushes/fans placed IN solution
-  paths (solver keeps validating); two-shelf and gas/attic templates. (CD:
-  next engineering priority.)
-  **Plan ready (2026-07-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phasweave.obstacle-weaving-generator.md`
 - [phasic] Dedicated obstacle SFX (void gulp, bush slurp, fan hum) +
   per-block music (songs by curriculum block instead of `level % 10`) —
   merged: both audio-subsystem items.

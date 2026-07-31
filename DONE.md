@@ -1,5 +1,13 @@
 # DONE — done log
 
+- 2026-07-31 [phasic] phasweave oversee run: generated levels gain two new
+  board templates (two-shelf, gas attic — drawer determinism proven by
+  byte-diff) and in-path obstacle weaving in blocks 5-7 (void under the
+  pour line with a guaranteed plug stone, mid-field hedge vapor crossing,
+  ridden fan lane with the well docked) — solver-validated throughout, no
+  rescue fallthrough below 65. Suite 236→246 checks incl. scanning weave
+  gates. (6bc1f9a..76a0fd6; plan archived to .claude/plans/DONE/)
+
 - 2026-07-31 [phasic] phaswiki oversee run: in-game wiki shipped
   (cogwheel → WIKI, 7 hash-routed pages, live search under the reload
   button) with the tactics registry grown to 12 (push the puddle, launch
