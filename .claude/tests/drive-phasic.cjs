@@ -778,6 +778,119 @@ function check(name, cond, extra) {
   await load(32);
   check('L33 fresh-load: frost bucket at 2 (Loose Vapor)', (await st()).coldN === 2);
 
+  // ---------- phaschrome: rotation lifecycle — the squish repro, pinned ----------
+  // Gem particles live in PIXELS, and layout() only ever moves them by a
+  // RELATIVE transform (new CELL / old CELL). Break one link in that chain and
+  // the gems stay in the old frame forever while the field draws in the new one
+  // — the CD's "portrait -> landscape -> portrait squishes it irrecoverably,
+  // rotating again does not fix it, only a restart does" report (a restart heals
+  // because setupLevel re-derives positions from startAx/startAy).
+  //
+  // Traced break: CELL came out <= 0 for any canvas shorter than ~124 px,
+  // because BZ's 80 px floor did not shrink with H, so `ah` went negative. The
+  // NEXT layout's `oldCell>0` guard then silently dropped its transform, and
+  // every later layout faithfully applied correct relative transforms on top of
+  // a corrupted absolute state. Pre-fix, a 390x160 excursion collapsed L1's
+  // first gem from 1.0-cell particle spacing to 0.042 and a full rotation round
+  // trip did not heal it.
+  //
+  // These pin the INVARIANT, not the trigger: after any viewport excursion the
+  // geometry and the gems come back, and a repeated layout() is a strict no-op.
+  const VP_PORTRAIT = { width: 390, height: 844 };
+  const VP_LANDSCAPE = { width: 844, height: 390 };
+  const EPS_CELL = 1e-9;  // float residue of a similarity-transform round trip
+  const metricsNow = () => g('G=>G.metrics()');
+  const gemPts = (L) => g('G=>G.parts("' + L + '")');
+  const sameGeom = (a, b) => a.W === b.W && a.H === b.H && a.CELL === b.CELL &&
+    a.FX === b.FX && a.FY === b.FY && a.cvW === b.cvW && a.cvH === b.cvH;
+  const backingMatchesBox = (m) => m.rectW > 0 && m.rectH > 0 &&
+    Math.abs(m.cvW / m.rectW - m.cvH / m.rectH) < 1e-6;   // no stretch: one scale on both axes
+  const maxCellDrift = (a, b) => (!a || !b || a.length !== b.length) ? Infinity
+    : Math.max(...a.map((p, i) => Math.max(Math.abs(p.x - b[i].x), Math.abs(p.y - b[i].y))));
+  async function viewport(vp) { await page.setViewportSize(vp); await page.waitForTimeout(320); }
+
+  await viewport(VP_PORTRAIT);
+  await load(0);
+  const chromeL = (await st()).objs[0].L;
+  const mBase = await metricsNow(), pBase = await gemPts(chromeL);
+  check('phaschrome: portrait baseline — canvas backing store matches its CSS box (' +
+    mBase.cvW + 'x' + mBase.cvH + ' over ' + mBase.rectW + 'x' + mBase.rectH + '), CELL ' + mBase.CELL.toFixed(2),
+    backingMatchesBox(mBase) && mBase.CELL > 0, mBase);
+
+  // (a) the round trip the CD reports, run twice in a row
+  for (let round = 1; round <= 2; round++) {
+    await viewport(VP_LANDSCAPE);
+    const mL = await metricsNow();
+    check('phaschrome: round ' + round + ' landscape — box is wide, CELL > 0 (' + mL.CELL.toFixed(2) +
+      '), backing store unstretched (' + mL.cvW + 'x' + mL.cvH + ')',
+      mL.W > mL.H && mL.CELL > 0 && backingMatchesBox(mL), mL);
+    await viewport(VP_PORTRAIT);
+    const mP = await metricsNow(), pP = await gemPts(chromeL);
+    check('phaschrome: round ' + round + ' back to portrait — CELL/FX/FY/canvas recover exactly',
+      sameGeom(mBase, mP), { mBase, mP });
+    const d = maxCellDrift(pBase, pP);
+    check('phaschrome: round ' + round + ' back to portrait — gems land back on their cells (max drift ' +
+      d.toExponential(2) + ' cells)', d < EPS_CELL, { d, pP: pP && pP.slice(0, 2) });
+  }
+
+  // (a2) the traced trigger itself: a box short enough that the bucket strip
+  // alone overruns it. This is what used to drive CELL negative.
+  for (const h of [200, 160, 140, 120]) {
+    await viewport({ width: 390, height: h });
+    const mS = await metricsNow();
+    check('phaschrome: ' + h + 'px-tall viewport keeps CELL positive (' + mS.CELL.toFixed(3) + ')',
+      mS.CELL > 0, mS);
+  }
+  await viewport(VP_PORTRAIT);
+  const mHeal = await metricsNow(), pHeal = await gemPts(chromeL);
+  check('phaschrome: geometry recovers after the degenerate-box excursion', sameGeom(mBase, mHeal), { mBase, mHeal });
+  const dHeal = maxCellDrift(pBase, pHeal);
+  check('phaschrome: gems recover after the degenerate-box excursion (max drift ' +
+    dHeal.toExponential(2) + ' cells) — the squish is no longer one-way', dHeal < EPS_CELL, { dHeal });
+
+  // (b) idempotence: the rescale is relative, so per-call residue would compound
+  const mIdem0 = await metricsNow(), pIdem0 = await gemPts(chromeL);
+  for (let i = 0; i < 10; i++) await g('G=>G.relayout()');
+  const mIdem1 = await metricsNow(), pIdem1 = await gemPts(chromeL);
+  check('phaschrome: 10 consecutive layout() calls on a settled box leave the geometry bit-identical',
+    JSON.stringify(mIdem0) === JSON.stringify(mIdem1), { mIdem0, mIdem1 });
+  check('phaschrome: 10 consecutive layout() calls leave every gem particle bit-identical',
+    JSON.stringify(pIdem0) === JSON.stringify(pIdem1),
+    { a: pIdem0 && pIdem0.slice(0, 2), b: pIdem1 && pIdem1.slice(0, 2) });
+
+  // (c) the lifecycle hardening is actually wired. A CSS-only box change fires
+  // no window resize, so anything that heals it can only be a listener firing.
+  const wired = await page.evaluate(`(() => {
+    const w = document.getElementById('wrap'), out = { hasVV: !!window.visualViewport };
+    w.style.height = '600px';
+    out.staleAfterCssChange = window.__GF.metrics();
+    window.dispatchEvent(new Event('orientationchange'));
+    out.afterOrientationChange = window.__GF.metrics();
+    w.style.height = '700px';
+    if (window.visualViewport) window.visualViewport.dispatchEvent(new Event('resize'));
+    out.afterVisualViewport = window.__GF.metrics();
+    w.style.height = '';
+    window.dispatchEvent(new Event('resize'));
+    out.afterResize = window.__GF.metrics();
+    return out;
+  })()`);
+  await page.waitForTimeout(400);   // let the rAF + 300 ms follow-up passes land
+  check('phaschrome: a CSS-only box change really does go unnoticed until an event fires',
+    Math.abs(wired.staleAfterCssChange.H - wired.staleAfterCssChange.rectH) > 2, wired.staleAfterCssChange);
+  check('phaschrome: orientationchange runs layout() (box ' +
+    wired.afterOrientationChange.rectH + 'px, canvas took it)',
+    Math.abs(wired.afterOrientationChange.H - wired.afterOrientationChange.rectH) < 0.5 &&
+    backingMatchesBox(wired.afterOrientationChange), wired.afterOrientationChange);
+  check('phaschrome: visualViewport.resize runs layout()', wired.hasVV &&
+    Math.abs(wired.afterVisualViewport.H - wired.afterVisualViewport.rectH) < 0.5 &&
+    backingMatchesBox(wired.afterVisualViewport), wired.afterVisualViewport);
+  check('phaschrome: window resize runs layout()',
+    Math.abs(wired.afterResize.H - wired.afterResize.rectH) < 0.5 &&
+    backingMatchesBox(wired.afterResize), wired.afterResize);
+  const mAfterWired = await metricsNow();
+  check('phaschrome: the event storm settles back on the real portrait geometry',
+    sameGeom(mBase, mAfterWired), { mBase, mAfterWired });
+
   // ---------- wiki: home, tactics page, live search (second page, same context) ----------
   const wpage = await ctx.newPage();
   wpage.on('pageerror', e => errors.push('pageerror(wiki): ' + e.message));

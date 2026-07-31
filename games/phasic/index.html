@@ -495,22 +495,56 @@ function syncSolid(o){ // set particles onto the solid lattice at pixel anchor
 }
 
 /* ============ layout ============ */
+/* Gem particles live in PIXELS and are only ever moved by the relative
+   transform below, so the transform chain must never break: skip one link and
+   the gems stay in the old frame forever while the field is drawn in the new
+   one — the "irrecoverably squished after a rotation" bug (only a level reload
+   healed it, because setupLevel re-derives positions from startAx/startAy).
+   The chain used to break whenever CELL came out <= 0, which happened for any
+   canvas shorter than ~124 px because BZ's 80 px floor did not shrink with H:
+   ah went negative, CELL went negative, and the next layout's `oldCell>0`
+   guard then dropped its transform. Both ends are now guarded — BZ degrades on
+   a short box and CELL has a hard positive floor — so oldCell>0 always holds
+   after the first layout. */
+let layoutDepth=0;
 function layout(){
   const r=cv.getBoundingClientRect(); W=r.width; H=r.height;
   DPR=Math.min(window.devicePixelRatio||1,3);
   cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
   ctx.setTransform(DPR,0,0,DPR,0,0);
-  BZ=clamp(H*0.125,80,112); BR=clamp(W*0.055,16,26);
+  BZ=clamp(H*0.125,Math.min(80,H*0.42),112); BR=clamp(W*0.055,16,26);
   const pad=6, aw=W-2*pad-2*BR, ah=H-2*pad-2*BR-BZ;
   const oldCell=CELL, oldFX=FX, oldFY=FY;
-  CELL=Math.min(aw/GW, ah/GH);
+  CELL=Math.max(1,Math.min(aw/GW, ah/GH));
   FX=(W-CELL*GW)/2; FY=pad+BR+Math.max(0,(ah-CELL*GH)*0.30);
   woodCanvas=null;
-  if(lvl&&oldCell>0){ const s=CELL/oldCell;
+  // identical rect => identical CELL/FX/FY => strictly a no-op (never even a
+  // float round-trip through the subtract-and-re-add), so repeated layouts on
+  // a settled viewport cannot drift the board
+  if(lvl&&oldCell>0&&(CELL!==oldCell||FX!==oldFX||FY!==oldFY)){ const s=CELL/oldCell;
     for(const o of objs){ o.axp=FX+(o.axp-oldFX)*s; o.ayp=FY+(o.ayp-oldFY)*s;
       for(const p of o.ps){ p.x=FX+(p.x-oldFX)*s; p.y=FY+(p.y-oldFY)*s; p.px=p.x; p.py=p.y; } }
     if(gravSrc){ gravSrc.x=FX+(gravSrc.x-oldFX)*s; gravSrc.y=FY+(gravSrc.y-oldFY)*s; }
   }
+  // self-heal: iOS can hand us a stale box during a rotation and then never
+  // fire another event. If the canvas we just sized disagrees with the box the
+  // DOM reports now, redo it once against the settled box.
+  if(layoutDepth<1){
+    layoutDepth++;
+    const r2=cv.getBoundingClientRect();
+    if(Math.abs(cv.width/DPR-r2.width)>2||Math.abs(cv.height/DPR-r2.height)>2) layout();
+    layoutDepth--;
+  }
+}
+/* Rotation lifecycle: three event sources because iOS delivers the geometry
+   change inconsistently across them, and three passes because the box can
+   settle a beat (or several) after the event. Each extra pass is a strict
+   no-op once the box is stable. */
+let reflowT=0;
+function reflow(){
+  layout();
+  requestAnimationFrame(()=>layout());
+  clearTimeout(reflowT); reflowT=setTimeout(()=>layout(),300);
 }
 
 /* ============ gravity field ============ */
@@ -2289,7 +2323,9 @@ $('sfx-vol').oninput=e=>{ save.sfx=+e.target.value; save.sfxMute=false; persist(
 /* ============ boot + loop ============ */
 cv=$('cv'); ctx=cv.getContext('2d');
 $('mus-vol').value=save.mus; $('sfx-vol').value=save.sfx;
-window.addEventListener('resize',()=>layout());
+window.addEventListener('resize',reflow);
+window.addEventListener('orientationchange',reflow);
+if(window.visualViewport) window.visualViewport.addEventListener('resize',reflow);
 cv.addEventListener('mousedown',onDown); cv.addEventListener('mousemove',onMove);
 window.addEventListener('mouseup',onUp);
 cv.addEventListener('touchstart',onDown,{passive:false});
@@ -2340,6 +2376,11 @@ if(TEST){
     freezeDry:L=>{ const o=objs.find(u=>u.letter===L); return o?tryFreeze(o,true):null; },
     parts:L=>{ const o=objs.find(u=>u.letter===L);
       return o?o.ps.map(p=>({x:(p.x-FX)/CELL,y:(p.y-FY)/CELL})):null; },
+    // layout geometry as the renderer sees it, next to what the DOM says the
+    // canvas box actually is — the rotation-squish invariant lives here
+    metrics:()=>{ const r=cv.getBoundingClientRect();
+      return { W,H,CELL,FX,FY,cvW:cv.width,cvH:cv.height,rectW:r.width,rectH:r.height }; },
+    relayout:()=>{ layout(); return true; },
     authored:Object.keys(AUTH).length, save:()=>save,
     complexity:()=>lvl&&lvl.cx?{score:cxScore(lvl.cx),...lvl.cx}:null,
     stuck:()=>stuckSolve(),
