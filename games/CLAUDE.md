@@ -438,12 +438,17 @@ thrown quench that removes a flame without being consumed. The gravity well
 lives in a middle GRAV bucket — docked means plain down, on the ring it is
 a point source (liquid falls toward it and can be LIFTED over walls; gas
 flees it along a reachable-height guidance field — how it finds flues).
-16 authored levels, then **endless seeded procedural levels from 17 on**,
-each beaten by the in-game solver before it is served, with a STUCK
-auto-solve-and-skip button in settings. 10 seeded generative songs,
-separate music/SFX volume + mutes. Drive suite (120 checks incl. the
-generated-content replay gate): `.claude/tests/drive-phasic.cjs`. Detailed
-context: `.claude/phasic.md`.
+**Curriculum: one new idea every 8 levels** — drag, flames, gravity+gas,
+liquid base state, gas base state, then obstacles (black hole consumes and
+forces a retry; bushes stop stone and drink liquid but pass vapor; fans
+blow only gas) — 24 authored tutorials/set-pieces, every other level
+generated with that block's factor set and a formalized complexity score,
+endless past 64, each generated level beaten by the in-game solver before
+it is served. STUCK (settings) auto-solves and skips. 10 seeded generative
+songs, separate music/SFX volume + mutes. Drive suite (195 checks incl.
+the generated-content replay gate and the complexity-ramp assert):
+`.claude/tests/drive-phasic.cjs`. Detailed context: `.claude/phasic.md`
+(includes the maintained tactics registry).
 
 ### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)
 The repo's first **async-versus** game. Eight rogue signals hide among ~350

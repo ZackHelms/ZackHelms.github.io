@@ -15,6 +15,14 @@
 //   * LIVE SOCKETS: a gem resting home can still be dragged out and melted.
 //   * WIN RULE: level clears when all gems sit home, even with the gravity
 //     well still deployed on the ring.
+//   * CURRICULUM: 8 blocks of 8 — drag, flames, grav+gas, liquid base,
+//     gas base, black hole, bush, fan — tutorials authored, rest generated;
+//     the complexity score (gems + 2*flames + 2*frosts + 2*grav +
+//     2*obstacles + basePts) ramps within and across blocks.
+//   * BASE STATES: born-liquid gems need a latched frost to sit home
+//     (removing it melts them again); born-gas gems need two.
+//   * OBSTACLES: the void consumes gems (fail + retry); bushes stop stone
+//     and drink liquid but pass vapor; fans blow vapor and nothing else.
 //   * MENU: level list entries are one line, "N · Title Case ✓".
 //   * STUCK: auto-solve-and-skip completes any level.
 //   * Console-error assert (also catches the footprint validator).
@@ -110,224 +118,245 @@ function check(name, cond, extra) {
 
   // ---------- boot ----------
   check('test API present', await page.evaluate('!!window.__GF'));
-  check('16 authored levels', await g('G=>G.authored') === 16);
-  for (let i = 0; i < 16; i++) await load(i); // footprint validator per map
+  check('24 authored levels across the curriculum', await g('G=>G.authored') === 24);
+  for (const i of [0,1,2,7,8,9,10,11,12,13,15,16,17,18,19,20,21,22,24,32,40,48,56,57]) await load(i);
   check('all authored maps parse with matching footprints', errors.length === 0, errors);
 
   // ---------- menu format: one line, Title Case, 32+ rows ----------
   await load(0);
   const opts = await page.evaluate('[...document.querySelectorAll("#lvlsel option")].map(o=>o.textContent)');
-  check('level list has 32+ one-line entries', opts.length >= 32 && opts.every(t => !t.includes('\n')), opts.length);
+  check('level list has 64+ one-line entries', opts.length >= 64 && opts.every(t => !t.includes('\n')), opts.length);
   check('level entries read "N · Title Case"', opts.every(t => /^\d+ · \S/.test(t)) && opts.every(t => /[a-z]/.test(t)), opts.slice(0, 3));
 
-  // ---------- L1 First Facets: pure drag ----------
+  // ---------- L1 The First Gem: one gem, one socket ----------
   let s = await st();
-  check('L1: 2 gems, no sources', s.objs.length === 2 && s.heatN === 0 && s.coldN === 0);
-  await dragPath('R', [[3, 9]]);
-  await dragPath('M', [[8, 10]]);
+  check('L1: exactly one gem, no tools', s.objs.length === 1 && s.heatN === 0 && s.coldN === 0);
+  await dragPath('R', [[4, 9]]);
   await step(0.3);
-  check('L1: both gems home by drag alone', (await st()).objs.every(o => o.home), await st());
+  check('L1: home by a single drag', (await st()).objs.every(o => o.home));
   await page.waitForTimeout(900);
   check('L1: level clear fires', (await st()).game === 'clear');
 
-  // ---------- L2 Shape Gates ----------
+  // ---------- L2 First Facets ----------
   await load(1);
+  await dragPath('R', [[3, 9]]);
+  await dragPath('M', [[8, 10]]);
+  check('L2: two gems tidied', await allHome(0.4), await st());
+
+  // ---------- L3 Shape Gates ----------
+  await load(2);
   await dragPath('B', [[2, 1], [2, 6], [1, 9]]);
   await dragPath('R', [[7, 1], [7, 9]]);
-  check('L2: L-tromino + square dragged through their gates', await allHome(0.5), await st());
+  check('L9: L-tromino + square dragged through their gates', await allHome(0.5), await st());
 
-  // ---------- L3 Meltdown: melt, pour, frost-quench freezes from afar ----------
-  await load(2);
+  // ---------- L8 The Whole Spectrum: all eight, no tools ----------
+  await load(7);
+  check('L8: 8 gems, zero tools', (await st()).objs.length === 8 && (await st()).heatN === 0);
+  // unpack order (hand-verified against every socket marking): G clears the
+  // left approach, P dives the left edge and slides under G's future home,
+  // M follows the same edge to its corner, then C, B, Y, O, ruby last.
+  await dragPath('G', [[1, 5], [1, 7], [4, 8], [5, 9]]);
+  await dragPath('P', [[0, 2], [0, 10], [0, 11], [3, 11]]);
+  await dragPath('M', [[0, 2], [0, 5], [0, 10], [0, 11]]);
+  await dragPath('C', [[1, 2], [1, 9]]);
+  await dragPath('B', [[1, 1], [1, 7], [7, 7], [8, 8], [8, 10]]);
+  await dragPath('Y', [[1, 4], [1, 7], [4, 7], [7, 7]]);
+  await dragPath('O', [[1, 5], [1, 7], [4, 7]]);
+  await dragPath('R', [[1, 2], [1, 7]]);
+  check('L8: the crowded drawer unpacked entirely by hand', await allHome(0.6), await st());
+
+  // ---------- L9 Meltdown: melt, pour, frost-quench freezes from afar ----------
+  await load(8);
   let o = await dragPath('R', [[4, 6]]);
-  check('L3: 2x2 solid cannot pass the 1-wide slot', o.ay <= 3, o);
-  check('L3: heat melts', await apply('heat', 'R') && (await obj('R')).phase === 'liquid');
+  check('L9: 2x2 solid cannot pass the 1-wide slot', o.ay <= 3, o);
+  check('L9: heat melts', await apply('heat', 'R') && (await obj('R')).phase === 'liquid');
   await step(4);
-  check('L3: liquid drained through the slot', (await obj('R')).cy > 6);
+  check('L9: liquid drained through the slot', (await obj('R')).cy > 6);
   await step(1.5);
   await shot('phasic-liquid');
   s = await st();
-  check('L3: frost thrown at the hot gem is not consumed', !(await apply('cold', 'R')) && (await st()).coldN === s.coldN);
+  check('L9: frost thrown at the hot gem is not consumed', !(await apply('cold', 'R')) && (await st()).coldN === s.coldN);
   await step(1.2);
   o = await obj('R'); s = await st();
-  check('L3: the quench took the flame home AND cooled it solid', s.heatN === 1 && o.phase === 'solid' && o.heats === 0, o);
-  check('L3: home after nudge', await ensureHome('R', 4, 9));
+  check('L9: the quench took the flame home AND cooled it solid', s.heatN === 1 && o.phase === 'solid' && o.heats === 0, o);
+  check('L9: home after nudge', await ensureHome('R', 4, 9));
   await page.waitForTimeout(900);
-  check('L3: clear fires', (await st()).game === 'clear');
+  check('L9: clear fires', (await st()).game === 'clear');
 
-  // ---------- L4 Room to Pour: tap refused without room, flame stays ----------
-  await load(3);
+  // ---------- L10 Room to Pour: tap refused without room, flame stays ----------
+  await load(9);
   await apply('heat', 'R'); await step(1.6);
   o = await obj('R');
-  check('L4: liquid resting on the shelf', o.cy > 4 && o.cy < 6.2, o);
-  check('L4: tap on the shelf is refused — no room to crystallize', !(await tap('R')));
+  check('L20: liquid resting on the shelf', o.cy > 4 && o.cy < 6.2, o);
+  check('L20: tap on the shelf is refused — no room to crystallize', !(await tap('R')));
   o = await obj('R'); s = await st();
-  check('L4: the flame stays latched after the refusal', o.heats === 1 && o.phase === 'liquid' && s.heatN === 0, o);
+  check('L20: the flame stays latched after the refusal', o.heats === 1 && o.phase === 'liquid' && s.heatN === 0, o);
   await step(5);
-  check('L4: liquid drained to the floor room', (await obj('R')).cy > 7);
-  check('L4: tap now freezes', await tapRetry('R'));
+  check('L20: liquid drained to the floor room', (await obj('R')).cy > 7);
+  check('L20: tap now freezes', await tapRetry('R'));
   await step(1.0);
-  check('L4: solved', await ensureHome('R', 4, 9) && await allHome(0.4), await st());
+  check('L20: solved', await ensureHome('R', 4, 9) && await allHome(0.4), await st());
 
-  // ---------- L5 Gem Drawer ----------
-  await load(4);
+  // ---------- L11 Gem Drawer ----------
+  await load(10);
   await dragPath('R', [[1, 5], [1, 9]]);
   await dragPath('B', [[2, 3], [2, 7], [6, 9]]);
   await dragPath('M', [[2, 1], [2, 8], [4, 10]]);
   s = await st();
-  check('L5: three gems tidied by drag alone', s.objs.filter(x => x.home).length === 3, s.objs);
+  check('L11: three gems tidied by drag alone (gem drawer)', s.objs.filter(x => x.home).length === 3, s.objs);
   const r5 = await meltPourTap('P', 2, 11, 's=>{const o=s.objs.find(u=>u.L==="P");return o.miny>10.3;}', 25);
-  check('L5: long gem melted through the comb and tapped solid', r5.drained && r5.tapped, r5);
-  check('L5: drawer fully tidied', r5.home && await allHome(0.4), await st());
+  check('L11: long gem melted through the comb and tapped solid', r5.drained && r5.tapped, r5);
+  check('L11: drawer fully tidied', r5.home && await allHome(0.4), await st());
 
-  // ---------- L6 One Flame: reuse + live sockets ----------
-  await load(5);
+  // ---------- L12 One Flame: reuse + live sockets ----------
+  await load(11);
   await apply('heat', 'B'); await step(3.5);
-  check('L6: the one flame is busy', (await st()).heatN === 0);
-  check('L6: tap freezes and frees the flame', await tapRetry('B') && (await st()).heatN === 1);
-  check('L6: first gem home', await ensureHome('B', 1, 9));
+  check('L12: the one flame is busy', (await st()).heatN === 0);
+  check('L12: tap freezes and frees the flame', await tapRetry('B') && (await st()).heatN === 1);
+  check('L12: first gem home', await ensureHome('B', 1, 9));
   // live sockets: a home gem can still be melted and re-frozen
-  check('L6: a home gem can be melted again', await apply('heat', 'B') && (await obj('B')).phase === 'liquid');
-  check('L6: it is no longer home while molten', !(await obj('B')).home);
+  check('L12: a home gem can be melted again', await apply('heat', 'B') && (await obj('B')).phase === 'liquid');
+  check('L12: it is no longer home while molten', !(await obj('B')).home);
   await step(2.5);
-  check('L6: tap re-freezes it', await tapRetry('B'));
-  check('L6: back home', await ensureHome('B', 1, 9));
+  check('L12: tap re-freezes it', await tapRetry('B'));
+  check('L12: back home', await ensureHome('B', 1, 9));
   await apply('heat', 'R'); await step(3.5);
-  check('L6: tap freezes the second gem', await tapRetry('R'));
-  check('L6: solved with a single flame', await ensureHome('R', 7, 9) && await allHome(0.4), await st());
+  check('L12: tap freezes the second gem', await tapRetry('R'));
+  check('L13: solved with a single flame', await ensureHome('R', 7, 9) && await allHome(0.4), await st());
 
-  // ---------- L7 Sideways: the well leaves its bucket; win with well deployed ----------
-  await load(6);
+  // ---------- L17 Sideways: the well leaves its bucket; win with well deployed ----------
+  await load(16);
   let gv = await g('G=>G.gravAt()');
-  check('L7: well starts DOCKED (uniform down)', gv && gv.docked === true, gv);
+  check('L17: well starts DOCKED (uniform down)', gv && gv.docked === true, gv);
   await apply('heat', 'R'); await step(2.5);
   o = await obj('R');
-  check('L7: docked well means the melt fell straight down', o.cy > 9 && o.cx > 5.2, o);
+  check('L17: docked well means the melt fell straight down', o.cy > 9 && o.cx > 5.2, o);
   await setGrav(-1.2, 5.5);
   gv = await g('G=>G.gravAt()');
-  check('L7: placing the well undocks it', gv && gv.docked === false, gv);
+  check('L17: placing the well undocks it', gv && gv.docked === false, gv);
   let t = await stepUntil('s=>{const o=s.objs[0];return o.cx<1.8&&o.cy>4&&o.cy<7.6;}', 30);
-  check('L7: liquid pooled against the left wall at the well (' + t + 's)', t > 0, await obj('R'));
-  check('L7: tap freezes it there', await tapRetry('R'));
-  check('L7: home', await ensureHome('R', 0, 5));
+  check('L17: liquid pooled against the left wall at the well (' + t + 's)', t > 0, await obj('R'));
+  check('L17: tap freezes it there', await tapRetry('R'));
+  check('L17: home', await ensureHome('R', 0, 5));
   await page.waitForTimeout(900);
   gv = await g('G=>G.gravAt()');
-  check('L7: level cleared WITH the well still deployed on the ring', (await st()).game === 'clear' && gv && gv.docked === false, gv);
+  check('L17: level cleared WITH the well still deployed on the ring', (await st()).game === 'clear' && gv && gv.docked === false, gv);
 
-  // ---------- L8 Point Pull ----------
-  await load(7);
+  // ---------- L18 Point Pull ----------
+  await load(17);
   await apply('heat', 'O');
   await setGrav(1.5, 13.5);
   t = await stepUntil('s=>{const o=s.objs[0];return o.cy>8.6&&o.cx<3.6;}', 30);
-  check('L8: point placement chose the LEFT branch (' + t + 's)', t > 0, await obj('O'));
+  check('L18: point placement chose the LEFT branch (' + t + 's)', t > 0, await obj('O'));
   check('L8: tap freezes', await tapRetry('O'));
-  check('L8: solved', await ensureHome('O', 1, 9) && await allHome(0.4), await st());
+  check('L18: solved', await ensureHome('O', 1, 9) && await allHome(0.4), await st());
 
-  // ---------- L9 Spring Cleaning ----------
-  await load(8);
+  // ---------- L19 Spring Cleaning ----------
+  await load(18);
   gv = await g('G=>G.gravAt()');
-  check('L9: well starts docked', gv && gv.docked === true, gv);
+  check('L19: well starts docked', gv && gv.docked === true, gv);
   await dragPath('G', [[1, 4], [0, 0]]);
   await dragPath('Y', [[3, 4], [5, 0]]);
   await dragPath('M', [[3, 7], [4, 4]]);
   s = await st();
-  check('L9: pile mostly tidied by drag', s.objs.filter(x => x.home).length === 3, s.objs);
+  check('L19: pile mostly tidied by drag', s.objs.filter(x => x.home).length === 3, s.objs);
   await apply('heat', 'B'); await step(3);
   o = await obj('B');
-  check('L9: melt fell straight down under docked gravity', o.cy > 9.5 && o.cx < 5, o);
+  check('L19: melt fell straight down under docked gravity', o.cy > 9.5 && o.cx < 5, o);
   await setGrav(10.5, 6);
   t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="B");return o.cx>6.8&&o.cy<7.8;}', 40);
-  check('L9: well lifted the liquid over the divider (' + t + 's)', t > 0, await obj('B'));
+  check('L19: well lifted the liquid over the divider (' + t + 's)', t > 0, await obj('B'));
   await setGrav(8, 13.5);
   t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="B");return o.cy>8.8;}', 30);
-  check('L9: liquid funneled into the chamber (' + t + 's)', t > 0, await obj('B'));
+  check('L19: liquid funneled into the chamber (' + t + 's)', t > 0, await obj('B'));
   await step(1.5);
-  check('L9: tap freezes in the chamber', await tapRetry('B'));
-  check('L9: solved', await ensureHome('B', 7, 9) && await allHome(0.4), await st());
+  check('L19: tap freezes in the chamber', await tapRetry('B'));
+  check('L19: solved', await ensureHome('B', 7, 9) && await allHome(0.4), await st());
 
-  // ---------- L10 The Kettle: steam to rain to stone, frost never needed ----------
-  await load(9);
+  // ---------- L20 The Kettle: steam to rain to stone, frost never needed ----------
+  await load(19);
   await apply('heat', 'P'); await step(2);
   await apply('heat', 'P');
-  check('L10: second flame boils to gas', (await obj('P')).phase === 'gas');
+  check('L20: second flame boils to gas', (await obj('P')).phase === 'gas');
   await setGrav(9.5, 13.5);
   t = await stepUntil('s=>{const o=s.objs[0];return o.maxy<2.6&&o.maxx<6.6;}', 90);
-  check('L10: steam herded across the attic (' + t + 's)', t > 0, await obj('P'));
+  check('L20: steam herded across the attic (' + t + 's)', t > 0, await obj('P'));
   await shot('phasic-gas');
   await setGrav(2.5, 13.5);
-  check('L10: first tap condenses steam to rain', await tap('P') && (await obj('P')).phase === 'liquid');
+  check('L20: first tap condenses steam to rain', await tap('P') && (await obj('P')).phase === 'liquid');
   await step(3);
   o = await obj('P');
-  check('L10: rain landed in the basin, not back down the flue', o.cy < 3.4, o);
-  check('L10: second tap freezes it to stone', await tapRetry('P'));
+  check('L20: rain landed in the basin, not back down the flue', o.cy < 3.4, o);
+  check('L20: second tap freezes it to stone', await tapRetry('P'));
   await step(1.0);
-  check('L10: solved without touching the frost bucket', (await st()).coldN === 2 && await ensureHome('P', 1, 2) && await allHome(0.4), await st());
+  check('L20: solved without touching the frost bucket', (await st()).coldN === 2 && await ensureHome('P', 1, 2) && await allHome(0.4), await st());
 
-  // ---------- L11 Balloon Route ----------
-  await load(10);
+  // ---------- L21 Balloon Route ----------
+  await load(20);
   await setGrav(0.5, 13.5);
   await apply('heat', 'Y'); await step(1.5); await apply('heat', 'Y');
   t = await stepUntil('s=>{const o=s.objs[0];return o.maxy<1.95&&o.minx>4.3;}', 90);
-  check('L11: gas herded fully into the ceiling pocket (' + t + 's)', t > 0, await obj('Y'));
+  check('L21: gas herded fully into the ceiling pocket (' + t + 's)', t > 0, await obj('Y'));
   await setGrav(5.8, 13.5);
-  check('L11: tap condenses in the pocket', await tap('Y'));
+  check('L21: tap condenses in the pocket', await tap('Y'));
   await step(2.5);
   o = await obj('Y');
-  check('L11: condensate held on the pocket floor', o.cy < 2.6, o);
-  check('L11: tap freezes', await tapRetry('Y'));
-  check('L11: solved', await ensureHome('Y', 5, 0) && await allHome(0.4), await st());
+  check('L21: condensate held on the pocket floor', o.cy < 2.6, o);
+  check('L21: tap freezes', await tapRetry('Y'));
+  check('L21: solved', await ensureHome('Y', 5, 0) && await allHome(0.4), await st());
 
-  // ---------- L12 Queue ----------
-  await load(11);
+  // ---------- L13 Queue ----------
+  await load(12);
   o = await dragPath('G', [[3, 6]]);
-  check('L12: T-tetromino cannot pass the 1-wide slot', o.ay <= 3, o);
+  check('L13: T-tetromino cannot pass the 1-wide slot', o.ay <= 3, o);
   await dragPath('G', [[0, 1]]);
   await dragPath('M', [[4, 1], [4, 6], [8, 10]]);
-  check('L12: 1x1 gem dragged through the slot solid', (await obj('M')).home, await obj('M'));
+  check('L13: 1x1 gem dragged through the slot solid', (await obj('M')).home, await obj('M'));
   await dragPath('G', [[3, 1]]);
   const r12 = await meltPourTap('G', 1, 9, 's=>{const o=s.objs.find(u=>u.L==="G");return o.cy>7;}', 20);
-  check('L12: T-gem melted through, tapped solid, slid home', r12.drained && r12.tapped && r12.home, r12);
-  check('L12: solved', await allHome(0.4), await st());
+  check('L13: T-gem melted through, tapped solid, slid home', r12.drained && r12.tapped && r12.home, r12);
+  check('L13: solved', await allHome(0.4), await st());
 
-  // ---------- L13 Glassworks: the production line ----------
-  await load(12);
+  // ---------- L14 Glassworks: the production line ----------
+  await load(13);
   await dragPath('M', [[7, 8], [2, 11]]);
-  check('L13: 1x1 gem dropped through the comb', (await obj('M')).home, await obj('M'));
+  check('L14: 1x1 gem dropped through the comb', (await obj('M')).home, await obj('M'));
   await dragPath('Y', [[6, 3]]);
   let r13 = await meltPourTap('Y', 7, 9, 's=>{const o=s.objs.find(u=>u.L==="Y");return o.miny>9.8;}', 25);
-  check('L13: citrine melted, poured, tapped solid on its own side', r13.drained && r13.home, r13);
+  check('L14: citrine melted, poured, tapped solid on its own side', r13.drained && r13.home, r13);
   await dragPath('O', [[3, 1]]);
   r13 = await meltPourTap('O', 4, 9, 's=>{const o=s.objs.find(u=>u.L==="O");return o.miny>9.8;}', 25);
-  check('L13: amber cycled through the same flame', r13.drained && r13.home, r13);
+  check('L14: amber cycled through the same flame', r13.drained && r13.home, r13);
   r13 = await meltPourTap('R', 1, 9, 's=>{const o=s.objs.find(u=>u.L==="R");return o.miny>9.8;}', 25);
-  check('L13: ruby last — line cleared', r13.drained && r13.home && await allHome(0.4), await st());
+  check('L14: ruby last — line cleared', r13.drained && r13.home && await allHome(0.4), await st());
 
-  // ---------- L14 Reflow ----------
-  await load(13);
+  // ---------- L22 Reflow ----------
+  await load(21);
   await setGrav(1.5, 13.5);
   await apply('heat', 'R'); await step(3);
-  check('L14: puddle starts in a bottom pocket', (await obj('R')).cy > 8);
+  check('L22: puddle starts in a bottom pocket', (await obj('R')).cy > 8);
   await setGrav(11.2, 4.0);
   t = await stepUntil('s=>{const o=s.objs[0];return o.cx>7.6;}', 40);
-  check('L14: liquid lifted over both pillars (' + t + 's)', t > 0, await obj('R'));
+  check('L22: liquid lifted over both pillars (' + t + 's)', t > 0, await obj('R'));
   await setGrav(8.7, 13.5);
   await step(4);
-  check('L14: tap freezes in the pocket', await tapRetry('R'));
-  check('L14: solved by moving the well mid-flow', await ensureHome('R', 8, 10) && await allHome(0.4), await st());
+  check('L22: tap freezes in the pocket', await tapRetry('R'));
+  check('L22: solved by moving the well mid-flow', await ensureHome('R', 8, 10) && await allHome(0.4), await st());
 
-  // ---------- L15 Master Facet ----------
-  await load(14);
+  // ---------- L23 Master Facet ----------
+  await load(22);
   await apply('heat', 'C'); await step(2.5);
-  check('L15: melt cleared the doorway', (await obj('C')).cy > 4);
+  check('L23: melt cleared the doorway', (await obj('C')).cy > 4);
   await dragPath('M', [[2, 1], [2, 6], [7, 6], [7, 9], [1, 9], [0, 10]]);
-  check('L15: 1x1 gem escorted through both slots', (await obj('M')).home, await obj('M'));
+  check('L23: 1x1 gem escorted through both slots', (await obj('M')).home, await obj('M'));
   await setGrav(8.7, 13.5);
   t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="C");return o.cy>8.6;}', 30);
-  check('L15: liquid drained through both slots (' + t + 's)', t > 0, await obj('C'));
+  check('L23: liquid drained through both slots (' + t + 's)', t > 0, await obj('C'));
   await step(3);
-  check('L15: tap freezes', await tapRetry('C'));
-  check('L15: solved', await ensureHome('C', 7, 9) && await allHome(0.6), await st());
+  check('L23: tap freezes', await tapRetry('C'));
+  check('L23: solved', await ensureHome('C', 7, 9) && await allHome(0.6), await st());
 
-  // ---------- L16 Full Spectrum ----------
+  // ---------- L16 Full Spectrum (flame finale of the flames block) ----------
   await load(15);
   s = await st();
   check('L16: all 8 gems present', s.objs.length === 8, s.objs.map(x => x.L));
@@ -346,33 +375,136 @@ function check(name, cond, extra) {
   check('L16: campaign clear overlay fires', (await st()).game === 'clear');
   await shot('phasic-final');
 
-  // ---------- generated levels 17-32: a served level is a solved level ----------
-  for (let i = 16; i < 32; i++) {
+  // ---------- L25 Standing Water: liquid base state, frost holds it ----------
+  await load(24);
+  o = await obj('R');
+  check('L25: gem is born liquid', o.phase === 'liquid' && o.heats === 0, o);
+  await step(3);
+  check('L25: frost freezes the born-liquid gem', await apply('cold', 'R'));
+  await step(1.2);
+  o = await obj('R');
+  check('L25: solid with a latched frost', o.phase === 'solid' && o.frosts === 1, o);
+  check('L25: taking the frost back MELTS it again', await tap('R') && (await obj('R')).phase === 'liquid' && (await st()).coldN === 1);
+  await step(2.5);
+  check('L25: frost again', await apply('cold', 'R'));
+  await step(1.2);
+  check('L25: home with the frost still latched', await ensureHome('R', 4, 9));
+  await page.waitForTimeout(900);
+  check('L25: level clears with a latched frost (win rule)', (await st()).game === 'clear' && (await st()).coldN === 0);
+
+  // ---------- L33 Loose Vapor: gas base state, two frosts ----------
+  await load(32);
+  o = await obj('Y');
+  check('L33: gem is born gas', o.phase === 'gas', o);
+  await step(2);
+  check('L33: first frost condenses', await apply('cold', 'Y') && (await obj('Y')).phase === 'liquid');
+  await step(3);
+  let froze33 = false;
+  for (let a33 = 0; a33 < 5; a33++) { if (await apply('cold', 'Y')) { froze33 = true; break; } await step(2); }
+  check('L33: second frost freezes', froze33);
+  await step(1.4);
+  o = await obj('Y');
+  check('L33: solid with two latched frosts', o.phase === 'solid' && o.frosts === 2, o);
+  check('L33: solved', await ensureHome('Y', 3, 9) && await allHome(0.4), await st());
+
+  // ---------- L41 The Void: consumption, fail, retry ----------
+  await load(40);
+  await dragPath('R', [[3, 5], [3, 6]]); // feed it to the void
+  await step(1.5);
+  o = await obj('R');
+  check('L41: the void consumed the gem', o.dead === true, o);
+  check('L41: fail state raised', (await st()).game === 'fail');
+  await load(40); // retry
+  check('L41: retry restores the gem', !(await obj('R')).dead && (await st()).game === 'play');
+  await dragPath('R', [[7, 1], [7, 10]]); // safe route around the void
+  check('L41: solved by going around', await allHome(0.4), await st());
+
+  // ---------- L49 Overgrowth: bush stops stone, drinks liquid, passes vapor ----------
+  await load(48);
+  o = await dragPath('Y', [[6, 8]]);
+  check('L49: bush blocks the solid gem', o.ax <= 3, o);
+  await apply('heat', 'Y'); await step(1.2); await apply('heat', 'Y');
+  check('L49: boiled to vapor', (await obj('Y')).phase === 'gas');
+  await setGrav(0.5, 13.5); // bottom-left: vapor flees up and to the RIGHT
+  t = await stepUntil('s=>{const o=s.objs[0];return o.minx>5.6;}', 60);
+  check('L49: vapor slipped through the hedge (' + t + 's)', t > 0, await obj('Y'));
+  await setGrav(7.5, 13.5);
+  check('L49: tap condenses on the far side', await tap('Y'));
+  await step(3);
+  check('L49: tap freezes', await tapRetry('Y'));
+  check('L49: solved', await ensureHome('Y', 6, 10) && await allHome(0.4), await st());
+
+  // ---------- L57 Crosswind: fans blow vapor and nothing else ----------
+  await load(56);
+  await apply('heat', 'Y'); await step(1.2); await apply('heat', 'Y');
+  t = await stepUntil('s=>{const o=s.objs[0];return o.cx>6.2&&o.cy<3;}', 60);
+  check('L57: the fan blew the vapor into the alcove (' + t + 's)', t > 0, await obj('Y'));
+  check('L57: tap condenses in the alcove', await tap('Y'));
+  await step(3);
+  check('L57: tap freezes', await tapRetry('Y'));
+  check('L57: solved with no gravity well at all', await ensureHome('Y', 6, 2) && await allHome(0.4), await st());
+
+  // ---------- L58 The Stopper: the plug-the-slot tactic ----------
+  await load(57);
+  await apply('heat', 'R'); // no plug, plain gravity: the pour drains into the void
+  t = await stepUntil('s=>s.objs.some(o=>o.dead)', 20);
+  check('L58: unplugged pour drains into the void (' + t + 's)', t > 0);
+  await step(1.5);
+  check('L58: fail raised', (await st()).game === 'fail');
+  await load(57); // retry, now use the tactic
+  await dragPath('M', [[2, 3], [2, 5]]); // plug the slot with the stone
+  check('L58: stone parked IN the slot', (await obj('M')).ax === 2 && (await obj('M')).ay === 5, await obj('M'));
+  await setGrav(8.7, 13.5);
+  await apply('heat', 'R');
+  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="R");return o.miny>9.6;}', 30);
+  check('L58: the pour crossed the plugged slot and drained safely (' + t + 's)', t > 0, await obj('R'));
+  await step(1.5);
+  check('L58: tap freezes', await tapRetry('R'));
+  check('L58: ruby home', await ensureHome('R', 7, 10));
+  await dragPath('M', [[2, 3], [7, 3], [7, 8], [1, 8], [0, 10], [0, 11]]); // unplug, around the void
+  check('L58: tactic complete — stone unplugged and put away', await allHome(0.5), await st());
+
+  // ---------- generated curriculum: every served level is a solved level ----------
+  const GEN_IDX = [3,4,5,6, 14, 23, 25,26,27,28,29,30,31, 33,34,35,36,37,38,39,
+    41,42,43,44,45,46,47, 49,50,51,52,53,54,55, 58,59,60,61,62,63];
+  const scores = {};
+  for (const i of GEN_IDX) {
     await load(i);
     const info = await g('G=>G.genInfo()');
+    const cx = await g('G=>G.complexity()');
     const ok = info && info.hasScript && await g('G=>G.replayGen()');
     const done = ok && (await st()).objs.every(x => x.home);
-    check('gen L' + (i + 1) + ': validated script replays to a win (salt ' + (info && info.salt) + ')', done, info);
+    (scores[(i / 8) | 0] = scores[(i / 8) | 0] || []).push(cx ? cx.score : -1);
+    check('gen L' + (i + 1) + ': solver script replays to a win (salt ' + (info && info.salt) + ', cx ' + (cx && cx.score) + ')', done, info);
   }
-  // endless spot checks
-  for (const i of [40, 75]) {
+  for (const i of [70, 100]) {
     await load(i);
     const ok = await g('G=>G.replayGen()');
     check('endless L' + (i + 1) + ': generated + solver-replayed to a win', ok && (await st()).objs.every(x => x.home));
   }
 
+  // ---------- complexity ramps ----------
+  const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+  for (const b of Object.keys(scores)) {
+    const a = scores[b];
+    if (a.length >= 2) check('complexity block ' + b + ': last generated >= first (' + a.join(',') + ')', a[a.length - 1] >= a[0] - 1);
+  }
+  check('complexity envelope: later blocks harder than block 0 (' +
+    avg(scores[0]).toFixed(1) + ' -> ' + avg(scores[7]).toFixed(1) + ')',
+    avg(scores[7]) > avg(scores[0]));
+
   // ---------- STUCK: auto-solve and skip ----------
-  await load(33);
+  await load(65);
   await g('G=>G.stuck()');
   await page.waitForTimeout(900);
   check('STUCK: auto-solve completes the level', (await st()).game === 'clear');
-  check('STUCK: progress recorded', (await g('G=>G.save()')).done[33] === true);
+  check('STUCK: progress recorded', (await g('G=>G.save()')).done[65] === true);
 
   // ---------- budgets sane on fresh authored loads ----------
-  for (let i = 0; i < 16; i++) {
+  for (const i of [0,1,2,7,8,9,10,11,12,13,15,16,17,18,19,20,21,22,24,32,40,48,56,57]) {
     await load(i);
     s = await st();
-    check('budget L' + (i + 1) + ' fresh-load matches spec', s.heatN >= 0 && s.coldN >= 0);
+    check('budget L' + (i + 1) + ' fresh-load sane', s.heatN >= 0 && s.coldN >= 0);
   }
 
   // ---------- console errors ----------

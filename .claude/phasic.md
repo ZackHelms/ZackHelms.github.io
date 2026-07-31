@@ -15,14 +15,17 @@ verbs, no keyboard, the back/reload chrome is web-only by design.
 - **No rotation, ever.** If a shape doesn't fit an opening, the answer is
   phase change. Solids are weightless (a deliberate call: pegboard feel,
   sockets can sit anywhere, drag puzzles stay fair).
-- **REVERSION model (CD change 2026-07-31): phase = flame count.** 0 flames
-  = solid, 1 = liquid, 2 = gas. A flame latches when dropped; single-tapping
-  the gem takes the most recent flame back AND cools it one step (gas
-  condenses; liquid runs the freeze room-search — no room means the flame
-  stays latched and you get the refusal buzz). Frost is a thrown quench: on
-  a flamed gem it removes one flame (same as a tap) and is never consumed;
-  on a flameless gem it has nothing to do. The cold bucket is therefore a
-  convenience verb, not a required one — budgets keep it around for feel.
+- **SYMMETRIC REVERSION model: phase = base + flames − frosts** (clamped
+  solid…gas). Flames latch and raise the phase; frosts latch and lower it;
+  tapping removes the most recent source (flames first) and steps the phase
+  back the way that source had moved it — freezing always runs the
+  room-search (no room → the source stays latched, refusal buzz). Frost
+  thrown at a flamed gem quenches a flame unconsumed (and fire thrown at a
+  frosted gem frees a frost unconsumed).
+- **Base states** (`def.base = {P:'liquid'|'gas'}`): a born-liquid gem needs
+  one latched frost to sit solid in its socket, a born-gas gem needs two —
+  and taking that frost back melts it again. Win with latched frosts is
+  legal. This is what gives the cold bucket a real job.
 - **Freeze needs room**: placement search around the puddle's ideal anchor
   (radius 1.7 cells, per-particle jump ≤1.9 cells; the SOCKET placement gets
   a longer 2.35 reach and is tried first — "close counts, it snaps in").
@@ -61,44 +64,99 @@ pairwise work is trivial.
   runs a 0.5 s springy snap (overshoot wobble) that shoves fluids aside, then
   `checkSocket` locks if it landed on the socket anchor with sources home.
 
+## Curriculum: one new idea every 8 levels (CD design, 2026-07-31)
+
+The campaign is **blocks of 8**. The first level of each block is a
+hand-authored tutorial that teaches the block's new factor; the rest of the
+block is generated with everything introduced so far, complexity rising.
+`AUTH` (sparse map, curriculum index → def) holds the 24 authored levels;
+`getLevel(i)` fills every other index from the generator.
+
+| Block | Levels | Introduces | Authored |
+|---|---|---|---|
+| 0 | 1–8 | drag + fit; gem count ramps 1→8 | 1 The First Gem · 2 First Facets · 3 Shape Gates · 8 The Whole Spectrum (all 8, open drawer) |
+| 1 | 9–16 | flames (melt/boil + tap-revert) | 9 Meltdown · 10 Room to Pour · 11 Gem Drawer · 12 One Flame · 13 Queue · 14 Glassworks · 16 Full Spectrum |
+| 2 | 17–24 | gravity well + gas herding | 17 Sideways · 18 Point Pull · 19 Spring Cleaning · 20 The Kettle · 21 Balloon Route · 22 Reflow · 23 Master Facet |
+| 3 | 25–32 | liquid base state (frost holds it) | 25 Standing Water |
+| 4 | 33–40 | gas base state (two frosts) | 33 Loose Vapor |
+| 5 | 41–48 | black hole obstacle | 41 The Void |
+| 6 | 49–56 | bush obstacle | 49 Overgrowth |
+| 7 | 57–64 | fan obstacle | 57 Crosswind · 58 The Stopper (tactic level) |
+| ∞ | 65+ | endless, all factors mixed | — |
+
+Future mechanics (added by the CD in later sessions) get their own 8-block
+inserted before the endless tail, same pattern: tutorial first, then mix.
+
+## Complexity metric (formalized)
+
+Every level carries `cx` (annotated on authored defs, computed by the
+generator) and `cxScore(cx)`:
+
+    score = gems + 2·flames + 2·frosts + 2·grav + 2·obstacles + basePts
+    (flames/frosts = required applications; grav = well needed/present;
+     basePts = 2 per born-liquid gem + 3 per born-gas gem)
+
+`__GF.complexity()` exposes it; the drive suite asserts the generated ramp
+is non-decreasing within blocks and that later blocks outscore block 0.
+Generation doesn't chase perfect monotonicity (CD: it doesn't have to) —
+the envelope rises.
+
+## Obstacles
+
+- **Black hole** (`@`): pulls nearby liquid/gas (radius 1.5, tuned so
+  floor-crossing liquid ≥1 cell below survives) and consumes anything whose
+  square touches it — including a solid dragged or frozen onto it (freeze
+  placement treats hole cells as occupied). A consumed gem = LOST overlay +
+  RETRY. Death also aborts a solver run, so generated holes are provably
+  avoidable.
+- **Bush** (`%`): blocks solids (counts in `solidBlockAt`), **drinks
+  liquid** (contact = death), lets gas pass untouched.
+- **Fan** (`^v<>`): a tile that blows only gas — beam of ≤5 cells until a
+  wall, strong accel, suppresses the gas guidance field in the beam. The
+  tile itself is solid to stone and liquid.
+
+## Tactics registry (maintain this list — CD request)
+
+1. **The Stopper** (taught L58): plug a slot with a small stone so a pour
+   can cross over it instead of draining — then unplug and put the stone away.
+2. **Freeze near, slide home**: crystallize where there's room, drag the
+   solid the last stretch.
+3. **The well lifts**: park the well above a puddle's level and point
+   gravity hauls liquid up over walls (Reflow).
+4. **Herd from the far side**: gas flees the well — park it opposite where
+   you want the cloud (Kettle, Overgrowth).
+5. **Quench from afar**: throw frost at a flamed gem to cool it a step
+   without spending the frost (and fire frees a frost, symmetrically).
+6. **Melt on the socket's side**: carry a gem over the gap nearest its
+   socket before melting, so the pour lands where it will freeze
+   (Glassworks).
+7. **Steam the hedge**: bushes stop stone and drink liquid — boil and cross
+   as vapor (Overgrowth).
+8. **Ride the fan**: fans move gas for free where the well can't reach
+   (Crosswind).
+9. **Dock for down**: drop the well back in its bucket to restore plain
+   gravity mid-plan.
+
 ## Generator + endless + STUCK
 
-Authored levels are 0–15 (`LEVELS[]`). **Levels 17+ are procedural**
-(`getLevel(i)` → `buildGen(i,salt)`): a constructive single-shelf "drawer"
-template — sockets packed along the floor, gems scattered up top, one shelf
-at row 5 with a wide gap (+ optional 1-wide slot), difficulty `d=i-15`
-scales gem count (2→4), gap width (4→2), budgets and the well. Every
-candidate is **beaten by the in-game solver before it is served**
-(`makeScript()` plans drag routes through wide-enough gaps and
-melt-pour-tap routes otherwise; `runScriptFast()` executes it headlessly on
-the real sim; failing salts are discarded, so a served level is a solved
-level). Generation is deterministic per index — seeded rng plus seeded gas
-wander (`p.wp`) — so level 23 is identical on every device. Endless: NEXT
-LEVEL simply never stops; the level list grows as you clear. **STUCK**
-(settings menu) auto-solves the current level — gems snap home, progress
-is recorded — so no level can ever wall the player. Generated maps live in
-`genCache` with their winning script (`__GF.replayGen()` re-runs it; the
-drive suite replays all of 17–32 plus endless spot checks as the
-generated-content gate). Next generator iteration when wanted: two-shelf
-and gas/attic templates.
+Levels without an `AUTH` entry come from `buildGen(i,salt)`: single-shelf
+drawer, sockets packed bottom (and a second tier bottom-aligned to row 4
+when the gem count overflows one row), gems scattered in rows 0–2, factor
+set from the curriculum block, difficulty from position-in-block and an
+endless bonus past 64. Every candidate is **beaten by the in-game solver
+before being served** (`makeScript()` plans drag/melt/frost routes;
+`runScriptFast()` executes headlessly on the real sim — deaths abort);
+salts 0–19 are tried, then validated easy rescue salts 90–95. Deterministic
+per index (seeded rng + seeded gas wander), so level 23 is identical on
+every device. **STUCK** (settings) auto-solves and records the clear.
+`__GF.replayGen()` re-runs the stored winning script — the drive suite
+replays every generated level below 65 plus endless spot checks.
 
-## Levels + tone
+## Tone
 
-**CD direction (2026-07-31): casual and fun first.** The majority of levels
-should feel like "bring order to chaos" — tidying a jumble is the core
-accomplishment — with only the occasional "I'm pretty smart" puzzle. The
-chaos levels are GEM DRAWER, SPRING CLEANING, GLASSWORKS and the all-8-gem
-FULL SPECTRUM finale; the smart moments are THE KETTLE, REFLOW and MASTER
-FACET. Keep this ratio when adding levels.
-
-16 authored maps (indices 0-15) (`LEVELS[]`, 10×12 ASCII: `#` wall, UPPER gem, lower socket).
-Ramp: drag → fit gates → melt (+cancel rule) → freeze-needs-room →
-GEM DRAWER (chaos-lite) → source economy → well intro (SIDEWAYS) → point
-pull → SPRING CLEANING (chaos + one well-dance) → **kettle** (boil + herd
-gas with the well; the well must be taught before any gas level — gas has no
-horizontal control without it) → balloon pocket → mixed queue → GLASSWORKS
-(melt-pour-freeze production line) → well-lift (REFLOW) → MASTER FACET →
-FULL SPECTRUM.
+Casual-first: the majority of levels are "bring order to chaos" tidying;
+the occasional "I'm pretty smart" moment (Kettle, Reflow, Master Facet,
+The Stopper). Keep that ratio when authoring new tutorials.
 Gem/socket footprint equality is console-error-validated per load, so the
 smoke gate catches a bad map edit.
 
@@ -109,8 +167,8 @@ smoke gate catches a bad map edit.
 dragTo/setGrav/state/parts/freezeDry`. `freezeDry` returns the placement
 search's candidate list — the tool that found both freeze bugs.
 
-`.claude/tests/drive-phasic.cjs` (120 checks): a scripted player solution for
-all 16 authored levels (final-leg gate), plus fit-gating negatives (2x2/T4 refused by a
+`.claude/tests/drive-phasic.cjs` (195 checks): a scripted player solution for
+all 24 authored levels (final-leg gate), plus fit-gating negatives (2x2/T4 refused by a
 1-wide slot, 1x1 passes), freeze-refusal on the 1-tall shelf without consuming
 the frost, the cancel rule with bucket restoration, live-socket re-melting, win-with-deployed-well, the generated-content
 replay gate (17-32 + endless), STUCK, menu format, and the console-error
