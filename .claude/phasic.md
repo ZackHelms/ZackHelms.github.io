@@ -251,6 +251,17 @@ sliders + mutes (persisted `phasic_v1`); top-left 🔊 is the master toggle.
   runs `layout()` now + next rAF + 300ms on `resize`, `orientationchange`,
   and `visualViewport.resize`.
 
+## Licensing (2026-07-31)
+
+games/phasic/ is proprietary — its own LICENSE (all rights reserved,
+play-only permission) excludes it from the repo's root Apache 2.0 grant
+via a scope-exception preamble prepended to LICENSE.txt. Forward-only:
+copies distributed under Apache 2.0 before 2026-07-31 stay Apache. The
+PHASIC name was never trademark-licensed (Apache §6). In-game: settings
+cogwheel → LICENSE button; every wiki page shows a © footer linking it.
+CD-side IP actions (USPTO, copyright reg., Apple) live in TODO.md
+## Needs Zack.
+
 ## Known trade-offs / iOS-port notes
 
 - Frictionless liquid: a puddle with one particle over a lip can slowly
