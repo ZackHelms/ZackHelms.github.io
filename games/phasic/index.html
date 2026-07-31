@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>GEMFLOW</title>
+<title>PHASIC</title>
 <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -55,7 +55,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 06:24 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 06:51 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -70,7 +70,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 <div id="toast"></div>
 
 <div id="menu" class="overlay">
-  <div class="otitle">GEMFLOW</div>
+  <div class="otitle">PHASIC</div>
   <div class="osub">Gems have three states. Fire melts, frost freezes, and the gravity
   well decides which way the world falls.<br><br>Drag solids. Pour liquids. Herd gas.
   Crystallize every gem into its matching socket.</div>
@@ -95,7 +95,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 
 <script>
 'use strict';
-/* ============ GEMFLOW — phase-change block sort ============
+/* ============ PHASIC — phase-change block sort ============
    Solids drag through openings they fit. Heat melts (solid→liquid→gas),
    cold condenses/freezes (gas→liquid→solid). Liquid falls toward the
    gravity well (a point), gas flees it. One source = one step; sources
@@ -174,6 +174,20 @@ const LEVELS = [
        '....rr....',
        '....rr....',
        '..........']},
+{ name:'GEM DRAWER', heat:1, cold:1, grav:0,
+  hint:'Tidy the drawer. Most gems fit the wide gap — only the long one needs fire.',
+  map:['..........',
+       '.M..BB....',
+       '.....B....',
+       '.RR.......',
+       '.RR.PPPP..',
+       '..........',
+       '#...###.##',
+       '..........',
+       '..........',
+       '.rr...bb..',
+       '.rr.m..b..',
+       '..pppp....']},
 { name:'ONE FLAME', heat:1, cold:1, grav:0,
   hint:'One flame, one frost. Reclaim them and use them twice.',
   map:['..........',
@@ -216,6 +230,20 @@ const LEVELS = [
        '.oo.##....',
        '..oo##....',
        '....##....']},
+{ name:'SPRING CLEANING', heat:1, cold:1, grav:1,
+  hint:'A jumbled pile. Most of it just needs putting away — the blue one needs the well.',
+  map:['ggg...yy..',
+       '.g...yy...',
+       '..........',
+       '..........',
+       '....m.....',
+       '..........',
+       '..........',
+       '..........',
+       '.GGG..#.##',
+       '..G.YY#bb.',
+       '.BBYY.#.b.',
+       '..BM..#...']},
 { name:'THE KETTLE', heat:2, cold:2, grav:1,
   hint:'A second flame boils liquid to steam, and steam FLEES the well — park it far right to push the cloud across the attic, then bring it back under the basin before you frost.',
   map:['..........',
@@ -258,6 +286,20 @@ const LEVELS = [
        '.ggg......',
        '..g.....m.',
        '..........']},
+{ name:'GLASSWORKS', heat:2, cold:2, grav:0,
+  hint:'A production line: melt, pour through the comb, freeze, repeat. Two of each source — keep them cycling.',
+  map:['..........',
+       '.RR..OO...',
+       '.RR...OO..',
+       '..YY......',
+       '.YY....M..',
+       '..........',
+       '#.##.##.##',
+       '..........',
+       '..........',
+       '.rr.oo..yy',
+       '.rr..ooyy.',
+       '..m.......']},
 { name:'REFLOW', heat:1, cold:1, grav:1,
   hint:'Put the well ABOVE a puddle’s level and it will lift the liquid over walls.',
   map:['..........',
@@ -286,15 +328,29 @@ const LEVELS = [
        '.......ccc',
        'm.......c.',
        '........c.']},
+{ name:'FULL SPECTRUM', heat:2, cold:2, grav:1,
+  hint:'Every gem, one drawer. Bring the whole spectrum to order.',
+  map:['..M.CCCBB.',
+       'PPPP.C..B.',
+       '.....C.RR.',
+       '.GGG...RR.',
+       '..G..YYOO.',
+       '....YY..OO',
+       '#...##.###',
+       '.rr.oo..yy',
+       '.rr..ooyy.',
+       '.ccc.ggg..',
+       '..c...g.bb',
+       '..cppppm.b']},
 ];
 
 /* ============ state ============ */
 const $ = id => document.getElementById(id);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const TEST = /[?&]test=1/.test(location.search);
-let save; try{ save = JSON.parse(localStorage.getItem('gemflow_v1')||'{}'); }catch(e){ save={}; }
+let save; try{ save = JSON.parse(localStorage.getItem('phasic_v1')||'{}'); }catch(e){ save={}; }
 save = Object.assign({done:[], mus:60, sfx:80, musMute:false, sfxMute:false}, save);
-const persist = ()=>{ try{ localStorage.setItem('gemflow_v1', JSON.stringify(save)); }catch(e){} };
+const persist = ()=>{ try{ localStorage.setItem('phasic_v1', JSON.stringify(save)); }catch(e){} };
 
 let cv,ctx,DPR=1,W=0,H=0;
 let FX=0,FY=0,CELL=32,BR=20,BZ=92;         // field origin, cell px, border px, bucket zone px
@@ -324,7 +380,7 @@ function loadLevel(i){
   for(const L in gemCells){
     const cells=gemCells[L], sock=sockCells[L];
     if(!sock || keyPat(cells)!==keyPat(sock))
-      console.error('GEMFLOW level '+i+': gem '+L+' footprint != socket footprint');
+      console.error('PHASIC level '+i+': gem '+L+' footprint != socket footprint');
     let ax=1e9,ay=1e9,sx=1e9,sy=1e9;
     for(const c of cells){ ax=Math.min(ax,c.x); ay=Math.min(ay,c.y); }
     for(const c of sock){ sx=Math.min(sx,c.x); sy=Math.min(sy,c.y); }
@@ -335,7 +391,7 @@ function loadLevel(i){
       ps:off.map(()=>({x:0,y:0,px:0,py:0,wp:Math.random()*6.28})),
       freezeT:0, ftarg:null, jx:0,jy:0,jvx:0,jvy:0, mst:[], mstT:0, sloshCd:0 });
   }
-  gravSrc = lvl.grav ? {x:0,y:0} : null;
+  gravSrc = lvl.grav ? {x:0,y:0,docked:true} : null; // starts in its bucket: plain down
   gasV=null;
   layout();
   for(const o of objs){ o.axp=FX+o.startAx*CELL; o.ayp=FY+o.startAy*CELL; syncSolid(o); }
@@ -371,20 +427,21 @@ function layout(){
 }
 
 /* ============ gravity field ============ */
-function gdir(x,y){ // unit "down" at a point
-  if(!gravSrc) return {x:0,y:1};
+function gdir(x,y){ // unit "down" at a point; docked well = plain down
+  if(!gravSrc||gravSrc.docked) return {x:0,y:1};
   let dx=gravSrc.x-x, dy=gravSrc.y-y; const d=Math.hypot(dx,dy)||1;
   return {x:dx/d, y:dy/d};
 }
 /* Gas guidance: value-iterated "highest reachable point" field so gas
    genuinely seeps along ceilings toward chimneys instead of pinning under
    the first wall. Rebuilt when the gravity well moves. */
-let gasV=null, gasGX=0, gasGY=0;
+let gasV=null, gasGX=0, gasGY=0, gasGD=false;
 function buildGasField(){
   gasV=new Float32Array(GW*GH).fill(-1e9);
-  const gp = gravSrc ? {x:(gravSrc.x-FX)/CELL-0.5, y:(gravSrc.y-FY)/CELL-0.5}
-                     : {x:GW/2-0.5, y:GH+60};
-  gasGX=gp.x; gasGY=gp.y;
+  const act = gravSrc&&!gravSrc.docked;
+  const gp = act ? {x:(gravSrc.x-FX)/CELL-0.5, y:(gravSrc.y-FY)/CELL-0.5}
+                 : {x:GW/2-0.5, y:GH+60};
+  gasGX=gp.x; gasGY=gp.y; gasGD=act;
   for(let y=0;y<GH;y++) for(let x=0;x<GW;x++)
     if(!walls[y*GW+x]) gasV[y*GW+x]=Math.hypot(x-gp.x,y-gp.y);
   for(let it=0;it<200;it++){
@@ -403,7 +460,9 @@ function buildGasField(){
 }
 function gasGuide(p){ // accel direction toward the best open neighbor cell
   if(!gasV) buildGasField();
-  if(gravSrc){ const gx=(gravSrc.x-FX)/CELL-0.5, gy=(gravSrc.y-FY)/CELL-0.5;
+  const act=gravSrc&&!gravSrc.docked;
+  if(act!==gasGD) buildGasField();
+  else if(act){ const gx=(gravSrc.x-FX)/CELL-0.5, gy=(gravSrc.y-FY)/CELL-0.5;
     if(Math.abs(gx-gasGX)+Math.abs(gy-gasGY)>0.4) buildGasField(); }
   const cx=clamp(Math.floor((p.x-FX)/CELL),0,GW-1), cy=clamp(Math.floor((p.y-FY)/CELL),0,GH-1);
   const k=cy*GW+cx; let bx=0,by=0,bv=gasV[k]+0.01;
@@ -531,7 +590,7 @@ function sub(h){
       }
       // spec: liquid squares stay ~1 apart, gas squares ~2 apart — the wide
       // gas spacing is what makes a cloud blanket a chamber instead of bunching
-      const mind=CELL*(gas?1.9:0.84), mf=gas?0.10:0.28;
+      const mind=CELL*(gas?1.6:0.84), mf=gas?0.10:0.28;
       for(let i2=0;i2<o.ps.length;i2++) for(let j2=i2+1;j2<o.ps.length;j2++){
         const a=o.ps[i2],b=o.ps[j2];
         let dx=b.x-a.x, dy=b.y-a.y; let d=Math.hypot(dx,dy);
@@ -671,8 +730,12 @@ function freezeStep(o,h){
 /* ============ sources ============ */
 function bucketRects(){
   const bw=Math.min(W*0.24,120), bh=BZ-14, y=H-BZ+6;
-  return { hot:{x:10,y,w:bw,h:bh}, cold:{x:W-10-bw,y,w:bw,h:bh} };
+  const r={ hot:{x:10,y,w:bw,h:bh}, cold:{x:W-10-bw,y,w:bw,h:bh} };
+  if(lvl&&lvl.grav){ const gw2=Math.min(W*0.19,88);
+    r.grav={x:W/2-gw2/2, y:y+3, w:gw2, h:bh-3}; }
+  return r;
 }
+const inRect=(x,y,q,m)=>q&&x>=q.x-(m||0)&&x<=q.x+q.w+(m||0)&&y>=q.y-(m||0)&&y<=q.y+q.h+(m||0);
 function objAt(x,y,fluidToo){
   for(const o of objs){ if(o.locked) continue;
     for(const p of o.ps){
@@ -761,11 +824,14 @@ function onDown(e){
   audioInit(); e.preventDefault();
   const p=evPos(e); finger=p;
   const b=bucketRects();
+  // gravity dock (middle bucket)
+  if(gravSrc&&gravSrc.docked&&inRect(p.x,p.y,b.grav,8)){
+    gravSrc.docked=false; gravSrc.x=p.x; gravSrc.y=p.y; dragGrav=true; sfxPickup(); return; }
   // buckets
   if(p.x>=b.hot.x&&p.x<=b.hot.x+b.hot.w&&p.y>=b.hot.y){ if(heatN>0){ dragSrc={kind:'heat'}; sfxPickup(); } else reject(null,'No flames left in the bucket.'); return; }
   if(p.x>=b.cold.x&&p.x<=b.cold.x+b.cold.w&&p.y>=b.cold.y){ if(coldN>0){ dragSrc={kind:'cold'}; sfxPickup(); } else reject(null,'No frost left in the bucket.'); return; }
-  // gravity orb
-  if(gravSrc&&Math.hypot(p.x-gravSrc.x,p.y-gravSrc.y)<Math.max(26,BR*1.15)){ dragGrav=true; sfxPickup(); return; }
+  // gravity orb on the ring
+  if(gravSrc&&!gravSrc.docked&&Math.hypot(p.x-gravSrc.x,p.y-gravSrc.y)<Math.max(26,BR*1.15)){ dragGrav=true; sfxPickup(); return; }
   // gems
   const o=objAt(p.x,p.y);
   if(o){
@@ -805,6 +871,9 @@ function onUp(e){
   tapCand=null;
 }
 function placeGrav(x,y){ // clamp to the ring just outside the field border
+  const b=bucketRects();
+  if(inRect(x,y,b.grav,14)){ gravSrc.docked=true; return; } // home again: plain down
+  gravSrc.docked=false;
   const m=BR*0.55;
   const L=FX-m, T=FY-m, R2=FX+GW*CELL+m, B2=FY+GH*CELL+m;
   const cx=clamp(x,L,R2), cy=clamp(y,T,B2);
@@ -952,6 +1021,17 @@ function drawSourceOrb(kind,x,y,sc){
 }
 function drawBuckets(){
   const b=bucketRects();
+  if(b.grav){ const q=b.grav;
+    const gr=ctx.createLinearGradient(q.x,q.y,q.x,q.y+q.h);
+    gr.addColorStop(0,'#241a34'); gr.addColorStop(1,'#120d1c');
+    ctx.fillStyle=gr;
+    ctx.beginPath();
+    ctx.moveTo(q.x,q.y); ctx.lineTo(q.x+q.w,q.y);
+    ctx.lineTo(q.x+q.w-7,q.y+q.h); ctx.lineTo(q.x+7,q.y+q.h); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(180,79,255,0.8)'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle='#8899bb'; ctx.font='10px "Share Tech Mono"'; ctx.textAlign='center';
+    ctx.fillText('GRAV', q.x+q.w/2, q.y+q.h-6);
+  }
   for(const side of ['hot','cold']){
     const q=b[side], hot=side==='hot';
     const gr=ctx.createLinearGradient(q.x,q.y,q.x,q.y+q.h);
@@ -976,6 +1056,17 @@ function drawBuckets(){
 }
 function drawGrav(){
   if(!gravSrc) return;
+  if(gravSrc.docked&&!dragGrav){ // resting in its bucket
+    const b=bucketRects().grav; if(!b) return;
+    const x=b.x+b.w/2, y=b.y+b.h*0.44, r2=Math.max(12,BR*0.55);
+    const pl=1+0.08*Math.sin(tSim*2.6);
+    ctx.fillStyle='#05040a'; ctx.beginPath(); ctx.arc(x,y,r2*pl,0,6.28); ctx.fill();
+    ctx.strokeStyle='#b44fff'; ctx.lineWidth=2;
+    for(let a2=0;a2<2;a2++){ ctx.globalAlpha=0.7-a2*0.25;
+      ctx.beginPath(); ctx.arc(x,y,r2*(0.4+a2*0.26),tSim*(2.2-a2*0.5)+a2*2.1,tSim*(2.2-a2*0.5)+a2*2.1+4.1); ctx.stroke(); }
+    ctx.globalAlpha=1;
+    return;
+  }
   const x=gravSrc.x,y=gravSrc.y, r2=Math.max(15,BR*0.72);
   const pl=1+0.08*Math.sin(tSim*2.6);
   const halo=ctx.createRadialGradient(x,y,r2*0.3,x,y,r2*2.6);
@@ -1018,8 +1109,8 @@ function render(){
   for(const o of objs) if(!o.locked) drawGem(o);
   drawFx();
   drawWood();
-  drawGrav();
   drawBuckets();
+  drawGrav();
   for(const f of flying){ const p2=flyPos(f); drawSourceOrb(f.kind,p2.x,p2.y,0.9); }
   if(dragSrc) drawSourceOrb(dragSrc.kind,finger.x,finger.y,1.1);
   ctx.restore();
@@ -1202,11 +1293,12 @@ if(TEST){
       if(Math.abs(FX+ax*CELL-o.axp)<CELL*0.42&&Math.abs(FY+ay*CELL-o.ayp)<CELL*0.42&&solidFits(o,FX+ax*CELL,FY+ay*CELL,rects)){
         o.axp=FX+ax*CELL; o.ayp=FY+ay*CELL; }
       syncSolid(o); checkSocket(o,false); return true; },
-    setGrav:(cx2,cy2)=>{ if(!gravSrc) return false; placeGrav(FX+cx2*CELL, FY+cy2*CELL); return true; },
+    setGrav:(cx2,cy2)=>{ if(!gravSrc) return false; gravSrc.docked=false; placeGrav(FX+cx2*CELL, FY+cy2*CELL); return true; },
+    dockGrav:()=>{ if(!gravSrc) return false; gravSrc.docked=true; return true; },
     step:s=>{ const n=Math.round(s/(1/120)); for(let i2=0;i2<n;i2++) sub(1/120);
       stepFlying(s);
       for(const o of objs) if(o.phase==='solid'&&!o.locked) checkSocket(o,false); },
-    gravAt:()=>gravSrc?{x:(gravSrc.x-FX)/CELL,y:(gravSrc.y-FY)/CELL}:null,
+    gravAt:()=>gravSrc?{x:(gravSrc.x-FX)/CELL,y:(gravSrc.y-FY)/CELL,docked:!!gravSrc.docked}:null,
     freezeDry:L=>{ const o=objs.find(u=>u.letter===L); return o?tryFreeze(o,true):null; },
     parts:L=>{ const o=objs.find(u=>u.letter===L);
       return o?o.ps.map(p=>({x:(p.x-FX)/CELL,y:(p.y-FY)/CELL})):null; },

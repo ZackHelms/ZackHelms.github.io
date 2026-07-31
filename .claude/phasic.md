@@ -1,6 +1,6 @@
-# Gemflow — phase-change block sort (`games/gemflow/index.html`)
+# Phasic — phase-change block sort (`games/phasic/index.html`)
 
-One self-contained file, ~1200 lines, Canvas 2D. **Web-first prototype of a
+One self-contained file, ~1250 lines, Canvas 2D. **Web-first prototype of a
 planned iOS title** — design decisions favor things that port: pure touch
 verbs, no keyboard, the back/reload chrome is web-only by design.
 
@@ -23,10 +23,12 @@ verbs, no keyboard, the back/reload chrome is web-only by design.
   a longer 2.35 reach and is tried first — "close counts, it snaps in").
   No valid placement → refusal: error buzz, shake, toast, `navigator.vibrate`
   (no-op on iOS Safari — real haptics arrive in the iOS build).
-- **Gravity well** (0–1 per level): a point source dragged around the ring
-  just outside the border (`placeGrav` projects to the ring). Liquid falls
-  TOWARD it, gas flees it. No well → plain down. Key depth: a well placed
-  ABOVE a puddle's level lifts liquid over walls (L11 REFLOW teaches this).
+- **Gravity well** (0–1 per level): lives in a middle GRAV bucket between
+  HOT and COLD. Docked = plain down. Drag it out onto the ring just outside
+  the border (`placeGrav` projects to the ring; dropping it on the bucket
+  re-docks it — `gravSrc.docked`). Liquid falls TOWARD it, gas flees it.
+  Key depth: a well placed ABOVE a puddle's level lifts liquid over walls
+  (REFLOW teaches this). The gas guidance field rebuilds on dock/undock.
 
 ## Physics (the part worth rereading before touching)
 
@@ -42,7 +44,7 @@ pairwise work is trivial.
   max 1.48 cells, **cohesion** pulls tether pairs back toward 0.98
   (f=0.045) — without it a 4-square puddle spreads into a 4.3-cell pancake
   and freeze placement can never cover it (found by the drive suite).
-- **Gas**: buoyancy = −gravity ×CELL·8, wander noise, spacing ~**1.9 cells**
+- **Gas**: buoyancy = −gravity ×CELL·8, wander noise, spacing ~**1.6 cells**
   (the spec's "within two square distances" — also what makes a cloud blanket
   a chamber), tethers max 2.55, and a **guidance field**: `buildGasField`
   value-iterates "highest reachable potential" over open cells (potential =
@@ -54,13 +56,23 @@ pairwise work is trivial.
   runs a 0.5 s springy snap (overshoot wobble) that shoves fluids aside, then
   `checkSocket` locks if it landed on the socket anchor with sources home.
 
-## Levels
+## Levels + tone
 
-12 authored maps (`LEVELS[]`, 10×12 ASCII: `#` wall, UPPER gem, lower socket).
-Teaching ramp: drag → fit gates → melt (+cancel rule) → freeze-needs-room →
-source economy → well intro → point pull → **kettle** (boil + herd gas with
-the well; the well must exist before any gas level — gas has no horizontal
-control without it) → balloon pocket → mixed queue → well-lift → finale.
+**CD direction (2026-07-31): casual and fun first.** The majority of levels
+should feel like "bring order to chaos" — tidying a jumble is the core
+accomplishment — with only the occasional "I'm pretty smart" puzzle. The
+chaos levels are GEM DRAWER, SPRING CLEANING, GLASSWORKS and the all-8-gem
+FULL SPECTRUM finale; the smart moments are THE KETTLE, REFLOW and MASTER
+FACET. Keep this ratio when adding levels.
+
+16 authored maps (`LEVELS[]`, 10×12 ASCII: `#` wall, UPPER gem, lower socket).
+Ramp: drag → fit gates → melt (+cancel rule) → freeze-needs-room →
+GEM DRAWER (chaos-lite) → source economy → well intro (SIDEWAYS) → point
+pull → SPRING CLEANING (chaos + one well-dance) → **kettle** (boil + herd
+gas with the well; the well must be taught before any gas level — gas has no
+horizontal control without it) → balloon pocket → mixed queue → GLASSWORKS
+(melt-pour-freeze production line) → well-lift (REFLOW) → MASTER FACET →
+FULL SPECTRUM.
 Gem/socket footprint equality is console-error-validated per load, so the
 smoke gate catches a bad map edit.
 
@@ -71,11 +83,11 @@ smoke gate catches a bad map edit.
 dragTo/setGrav/state/parts/freezeDry`. `freezeDry` returns the placement
 search's candidate list — the tool that found both freeze bugs.
 
-`.claude/tests/drive-gemflow.cjs` (64 checks): a scripted player solution for
-all 12 levels (final-leg gate), plus fit-gating negatives (2x2/T4 refused by a
+`.claude/tests/drive-phasic.cjs` (87 checks): a scripted player solution for
+all 16 levels (final-leg gate), plus fit-gating negatives (2x2/T4 refused by a
 1-wide slot, 1x1 passes), freeze-refusal on the 1-tall shelf without consuming
 the frost, the cancel rule with bucket restoration, locked-gem immunity,
-sources-home-before-lock, and the console-error assert. Freeze-near-then-
+sources-home-before-lock, gravity dock/undock, and the console-error assert. Freeze-near-then-
 slide (`ensureLock`) is a legitimate player move the suite uses.
 
 ## Audio
@@ -86,7 +98,7 @@ reverse-hiss, freeze thunk, crystalline lock arp, slosh (velocity-triggered,
 throttled), cancel dual-chime, error buzz, win fanfare. **Music: 10 seeded
 generative songs** (`SONGS[]` — bpm/root/mode/prog/waves/hat/arp; mulberry32
 per song), rotating `level % 10`. Settings overlay: separate music/SFX
-sliders + mutes (persisted `gemflow_v1`); top-left 🔊 is the master toggle.
+sliders + mutes (persisted `phasic_v1`); top-left 🔊 is the master toggle.
 
 ## Known trade-offs / iOS-port notes
 

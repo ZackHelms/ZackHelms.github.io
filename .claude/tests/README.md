@@ -11,7 +11,7 @@ design invariants rather than just poking the UI.
 | Suite | Game | Why it lives here |
 | --- | --- | --- |
 | `drive-wayfinder.cjs` | `games/wayfinder/` | 82 checks including a BFS walkability gate, a final-leg gate (every route the lessons instruct is walkable), and a cheat gate (each lesson refuses to complete without its technique). These caught an objective placed behind a 74° face and another placed inside a stream channel. |
-| `drive-gemflow.cjs` | `games/gemflow/` | 64 checks: a scripted player solution for every level (final-leg gate on the soft-body sim), fit-gating negatives, freeze-needs-room refusal, the heat/cold cancel rule with bucket accounting, and locked-gem immunity. These caught freeze teleporting a puddle into mid-air, liquid spreading too flat to ever refreeze (missing cohesion), and gas physically unable to find a flue (missing pressure guidance). |
+| `drive-phasic.cjs` | `games/phasic/` | 87 checks: a scripted player solution for every one of the 16 levels (final-leg gate on the soft-body sim), fit-gating negatives, freeze-needs-room refusal, the heat/cold cancel rule with bucket accounting, gravity-well dock/undock, and locked-gem immunity. These caught freeze teleporting a puddle into mid-air, liquid spreading too flat to ever refreeze (missing cohesion), gas physically unable to find a flue (missing pressure guidance), and gas clouds too widely spaced to fit their destination pocket. |
 
 Run them the same way as the smoke gate:
 

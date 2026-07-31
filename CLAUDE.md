@@ -88,7 +88,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Wayfinder (`games/wayfinder/`) | `.claude/wayfinder.md` | Any work on the orienteering sim — WebGL2 terrain/sky/water renderer, heightfield + land grids, ISOM map generation, compass/bearing/pace maths, the 9-lesson engine |
 | Sky Lantern (`games/sky-lantern/`) | `.claude/sky-lantern.md` | Any work on the breath-flight game — mic RMS→breath mapping, burner/heat model, level generator + its three fairness gates |
 | Signal Hunt (`games/signal-hunt/`) | `.claude/signal-hunt.md` | Any work on the hidden-object hunt — world/decoy generation, pan-pinch input, share codes and duel flow, colourblind labels |
-| Gemflow (`games/gemflow/`) | `.claude/gemflow.md` | Any work on the phase-change block sort — soft-body particle physics, melt/boil/freeze rules, gas guidance field, gravity well, level maps, iOS-port notes |
+| Phasic (`games/phasic/`) | `.claude/phasic.md` | Any work on the phase-change block sort — soft-body particle physics, melt/boil/freeze rules, gas guidance field, gravity-well bucket, level maps, iOS-port notes |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 
