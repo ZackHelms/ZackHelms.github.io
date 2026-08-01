@@ -158,6 +158,20 @@ function check(name, cond, extra) {
   check('level list has 64+ one-line entries', opts.length >= 64 && opts.every(t => !t.includes('\n')), opts.length);
   check('level entries read "N · Title Case"', opts.every(t => /^\d+ · \S/.test(t)) && opts.every(t => /[a-z]/.test(t)), opts.slice(0, 3));
 
+  // ---------- phasnames: block-word prefix on curriculum entries + hint bar ----------
+  const BLOCK_WORD = ['Drag','Flame','Gravity','Frost','Vapor','Void','Hedge','Wind'];
+  const badBlockEntries = [];
+  for (let b = 0; b < 8; b++) {
+    for (let idx = 8 * b; idx <= 8 * b + 7; idx++) {
+      const expected = (idx + 1) + ' · ' + BLOCK_WORD[b] + ' · ';
+      if (!opts[idx] || !opts[idx].startsWith(expected)) badBlockEntries.push({ idx, got: opts[idx], expected });
+    }
+  }
+  check('phasnames: every curriculum entry (0-63) reads "N · <block word> · Name"',
+    badBlockEntries.length === 0, badBlockEntries.slice(0, 3));
+  const hintbar0 = await page.evaluate('document.getElementById("hintbar").textContent');
+  check('phasnames: L1 hint bar starts "L1 · Drag · "', hintbar0.startsWith('L1 · Drag · '), hintbar0);
+
   // ---------- L1 The First Gem: one gem, one socket ----------
   let s = await st();
   check('L1: exactly one gem, no tools', s.objs.length === 1 && s.heatN === 0 && s.coldN === 0);
@@ -1230,6 +1244,17 @@ function check(name, cond, extra) {
   const songTitle9 = await page.evaluate('SONGS[9].t');
   check('phasaudio: load(69) endless (69%10=9) — nowPlaying pads to 10 with SONGS[9].t (' + songTitle9 + ')',
     (await g('G=>G.nowPlaying()')) === '10 · ' + songTitle9);
+
+  // ---------- phasnames: endless entries (index 64+) carry no block word ----------
+  const optsEndless = await page.evaluate('[...document.querySelectorAll("#lvlsel option")].map(o=>o.textContent)');
+  const BLOCK_WORD_RE = /^\d+ · (Drag|Flame|Gravity|Frost|Vapor|Void|Hedge|Wind) · /;
+  const badEndlessEntries = [];
+  for (let idx = 64; idx < optsEndless.length; idx++) {
+    const t = optsEndless[idx];
+    if (!/^\d+ · \S/.test(t) || BLOCK_WORD_RE.test(t)) badEndlessEntries.push({ idx, got: t });
+  }
+  check('phasnames: endless entries (index 64+) are one line, unprefixed by a block word',
+    optsEndless.length > 64 && badEndlessEntries.length === 0, badEndlessEntries.slice(0, 3));
 
   // ---------- wiki: home, tactics page, live search (second page, same context) ----------
   const wpage = await ctx.newPage();
