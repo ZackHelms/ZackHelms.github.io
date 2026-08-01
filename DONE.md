@@ -1,5 +1,20 @@
 # DONE — done log
 
+- 2026-08-01 [phasic] phasgrav oversee run: the gravity block (L17–24) is
+  now genuinely orb-mandatory. New opener 'The Side Pocket' (index 16,
+  one 2x2 gem + flame + orb, walled side alcove); Spring Cleaning left
+  the block (def kept, unused). The CD's shove exploit proved broader —
+  four maps were solvable by dragging the gem home AS STONE (no melt);
+  all hardened by geometry (1-cell mouths, solid-unreachable pockets),
+  The Kettle already proof, Master Facet's real shove killed (divide +
+  far cellar). 'gravmaze' template for generated block-2 boards (sealed
+  3-row tunnel + baffles; the literal 1-row serpentine is unsolvable for
+  the soft-body pour, 0/24 vs 40/40 — lesson recorded); determinism
+  byte-diff proven (only index 23's sub-0.60 salts changed). Suite
+  317→335 (BFS impassability, docked-well negatives, per-map anti-cheese
+  drags). save.done 16–18 shifted meaning. (2c759e6..c105ae4 + wrap-up
+  docs; plan archived to .claude/plans/DONE/)
+
 - 2026-08-01 [phasic] phasaudio oversee run: obstacle SFX + per-block
   music — the void gulps (300→40 Hz sine + thump + swallowed noise), the
   hedge slurps (bandpass sweep + two blips), fan levels hum (one shared
