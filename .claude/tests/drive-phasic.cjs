@@ -240,15 +240,15 @@ function check(name, cond, extra) {
   await load(9);
   await apply('heat', 'R'); await step(1.6);
   o = await obj('R');
-  check('L20: liquid resting on the shelf', o.cy > 4 && o.cy < 6.2, o);
-  check('L20: tap on the shelf is refused — no room to crystallize', !(await tap('R')));
+  check('L10: liquid resting on the shelf', o.cy > 4 && o.cy < 6.2, o);
+  check('L10: tap on the shelf is refused — no room to crystallize', !(await tap('R')));
   o = await obj('R'); s = await st();
-  check('L20: the flame stays latched after the refusal', o.heats === 1 && o.phase === 'liquid' && s.heatN === 0, o);
+  check('L10: the flame stays latched after the refusal', o.heats === 1 && o.phase === 'liquid' && s.heatN === 0, o);
   await step(5);
-  check('L20: liquid drained to the floor room', (await obj('R')).cy > 7);
-  check('L20: tap now freezes', await tapRetry('R'));
+  check('L10: liquid drained to the floor room', (await obj('R')).cy > 7);
+  check('L10: tap now freezes', await tapRetry('R'));
   await step(1.0);
-  check('L20: solved', await ensureHome('R', 4, 9) && await allHome(0.4), await st());
+  check('L10: solved', await ensureHome('R', 4, 9) && await allHome(0.4), await st());
 
   // ---------- L11 Gem Drawer ----------
   await load(10);
@@ -277,56 +277,77 @@ function check(name, cond, extra) {
   check('L12: tap freezes the second gem', await tapRetry('R'));
   check('L13: solved with a single flame', await ensureHome('R', 7, 9) && await allHome(0.4), await st());
 
-  // ---------- L17 Sideways: the well leaves its bucket; win with well deployed ----------
+  // ---------- L17 The Side Pocket: the gravity block opens ORB-MANDATORY ----------
+  // The socket lives in a walled 2x2 alcove whose only mouth is a 1-cell-tall
+  // slot at (7,6): no 2x2 solid fits it, and plain down-drainage can only fall
+  // past it. The single route is melt -> undock the well onto the right ring at
+  // the mouth's height -> the pour climbs the plinth wall and in -> freeze.
   await load(16);
+  s = await st();
+  check('L17: one gem, one flame, the well — and no frost', s.objs.length === 1 && s.heatN === 1 && s.coldN === 0, s);
   let gv = await g('G=>G.gravAt()');
   check('L17: well starts DOCKED (uniform down)', gv && gv.docked === true, gv);
-  await apply('heat', 'R'); await step(2.5);
+  o = await dragPath('R', [[8, 5]]);
+  check('L17: the 2x2 solid cannot be dragged into the alcove — the mouth is 1 cell tall', o.ax < 7, o);
+  await apply('heat', 'R');
+  let t = await stepUntil('s=>{const o=s.objs[0];return o.miny>10;}', 25);
   o = await obj('R');
-  check('L17: docked well means the melt fell straight down', o.cy > 9 && o.cx > 5.2, o);
-  await setGrav(-1.2, 5.5);
+  check('L17: docked, the melt drains straight down and never enters the alcove (' + t + 's)', t > 0 && o.maxx < 7, o);
+  await setGrav(11.5, 6.5);
   gv = await g('G=>G.gravAt()');
   check('L17: placing the well undocks it', gv && gv.docked === false, gv);
-  let t = await stepUntil('s=>{const o=s.objs[0];return o.cx<1.8&&o.cy>4&&o.cy<7.6;}', 30);
-  check('L17: liquid pooled against the left wall at the well (' + t + 's)', t > 0, await obj('R'));
-  check('L17: tap freezes it there', await tapRetry('R'));
-  check('L17: home', await ensureHome('R', 0, 5));
+  t = await stepUntil('s=>{const o=s.objs[0];return o.minx>7.2&&o.maxy<7;}', 30);
+  check('L17: the well pulled the pour up the wall and through the slot (' + t + 's)', t > 0, await obj('R'));
+  check('L17: tap freezes it in the alcove', await tapRetry('R'));
+  check('L17: solved — the socket is reachable only with the well', await ensureHome('R', 8, 5) && await allHome(0.4), await st());
+
+  // ---------- L18 Sideways: the well leaves its bucket; win with well deployed ----------
+  // Anti-shove (phasgrav task 2): the socket is a floor-level 2x2 nook behind the
+  // 1-tall mouth at (2,11) — no 2x2 solid fits, so the gem cannot be walked home
+  // as stone and the sideways pull is the only route.
+  await load(17);
+  gv = await g('G=>G.gravAt()');
+  check('L18: well starts DOCKED (uniform down)', gv && gv.docked === true, gv);
+  o = await dragPath('R', [[6, 10], [2, 10], [0, 10]]);
+  check('L18: the 2x2 solid cannot be dragged into the floor nook — the mouth is 1 cell tall', !o.home && o.ax >= 3, o);
+  await load(17);
+  await apply('heat', 'R'); await step(3.5);
+  o = await obj('R');
+  check('L18: docked well means the melt fell straight down, clear of the nook', o.cy > 10.5 && o.cx > 5.2, o);
+  await setGrav(-1.2, 11.5);
+  gv = await g('G=>G.gravAt()');
+  check('L18: placing the well undocks it', gv && gv.docked === false, gv);
+  t = await stepUntil('s=>{const o=s.objs[0];return o.cx<1.6&&o.cy>9.4;}', 30);
+  check('L18: liquid walked along the floor into the nook at the well (' + t + 's)', t > 0, await obj('R'));
+  check('L18: tap freezes it there', await tapRetry('R'));
+  check('L18: home', await ensureHome('R', 0, 10));
   await page.waitForTimeout(900);
   gv = await g('G=>G.gravAt()');
-  check('L17: level cleared WITH the well still deployed on the ring', (await st()).game === 'clear' && gv && gv.docked === false, gv);
+  check('L18: level cleared WITH the well still deployed on the ring', (await st()).game === 'clear' && gv && gv.docked === false, gv);
 
-  // ---------- L18 Point Pull ----------
-  await load(17);
+  // ---------- L19 Point Pull ----------
+  // Anti-shove (phasgrav task 2): the left cellar is roofed with one 1-wide chute
+  // at (0,8) and every row of this gem is 2 cells wide, so no drag reaches it.
+  await load(18);
+  o = await dragPath('O', [[1, 4], [1, 7], [1, 10], [0, 10]]);
+  check('L19: the S-gem cannot be dragged into the left cellar — the chute is 1 wide', !o.home && o.ay <= 7, o);
+  await load(18);
   await apply('heat', 'O');
   await setGrav(1.5, 13.5);
-  t = await stepUntil('s=>{const o=s.objs[0];return o.cy>8.6&&o.cx<3.6;}', 30);
-  check('L18: point placement chose the LEFT branch (' + t + 's)', t > 0, await obj('O'));
-  check('L8: tap freezes', await tapRetry('O'));
-  check('L18: solved', await ensureHome('O', 1, 9) && await allHome(0.4), await st());
-
-  // ---------- L19 Spring Cleaning ----------
-  await load(18);
-  gv = await g('G=>G.gravAt()');
-  check('L19: well starts docked', gv && gv.docked === true, gv);
-  await dragPath('G', [[1, 4], [0, 0]]);
-  await dragPath('Y', [[3, 4], [5, 0]]);
-  await dragPath('M', [[3, 7], [4, 4]]);
-  s = await st();
-  check('L19: pile mostly tidied by drag', s.objs.filter(x => x.home).length === 3, s.objs);
-  await apply('heat', 'B'); await step(3);
-  o = await obj('B');
-  check('L19: melt fell straight down under docked gravity', o.cy > 9.5 && o.cx < 5, o);
-  await setGrav(10.5, 6);
-  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="B");return o.cx>6.8&&o.cy<7.8;}', 40);
-  check('L19: well lifted the liquid over the divider (' + t + 's)', t > 0, await obj('B'));
-  await setGrav(8, 13.5);
-  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="B");return o.cy>8.8;}', 30);
-  check('L19: liquid funneled into the chamber (' + t + 's)', t > 0, await obj('B'));
-  await step(1.5);
-  check('L19: tap freezes in the chamber', await tapRetry('B'));
-  check('L19: solved', await ensureHome('B', 7, 9) && await allHome(0.4), await st());
+  t = await stepUntil('s=>{const o=s.objs[0];return o.cy>9.4&&o.cx<3.6;}', 40);
+  check('L19: point placement chose the LEFT branch and dropped down the chute (' + t + 's)', t > 0, await obj('O'));
+  check('L19: tap freezes', await tapRetry('O'));
+  check('L19: solved', await ensureHome('O', 1, 10) && await allHome(0.4), await st());
 
   // ---------- L20 The Kettle: steam to rain to stone, frost never needed ----------
+  // Anti-shove (phasgrav task 2): this map needed no hardening — it carries a single
+  // gem (so no second solid exists to shove with) and that gem is 4 cells wide while
+  // the only way up is a 2-wide flue, so no solid can ever stand in the attic.
+  await load(19);
+  s = await st();
+  o = await dragPath('P', [[2, 5], [7, 5], [7, 1], [1, 2]]);
+  check('L20: lone 4x1 gem can never reach the 2-wide flue — no solid ever enters the attic',
+    s.objs.length === 1 && !o.home && o.ay >= 5, o);
   await load(19);
   await apply('heat', 'P'); await step(2);
   await apply('heat', 'P');
@@ -345,6 +366,11 @@ function check(name, cond, extra) {
   check('L20: solved — no frost bucket exists below L25', (await st()).coldN === 0 && await ensureHome('P', 1, 2) && await allHome(0.4), await st());
 
   // ---------- L21 Balloon Route ----------
+  // Anti-shove (phasgrav task 2): the ceiling pocket's doorway is the single cell
+  // (4,1) — this gem is 2 rows tall, so only the cloud can get through.
+  await load(20);
+  o = await dragPath('Y', [[1, 4], [1, 0], [3, 0], [5, 0]]);
+  check('L21: the 2-tall gem cannot be dragged into the ceiling pocket — the doorway is 1 cell', !o.home && o.ax <= 3, o);
   await load(20);
   await setGrav(0.5, 13.5);
   await apply('heat', 'Y'); await step(1.5); await apply('heat', 'Y');
@@ -397,6 +423,11 @@ function check(name, cond, extra) {
   check('L14: ruby last — line cleared', r13.drained && r13.home && await allHome(0.4), await st());
 
   // ---------- L22 Reflow ----------
+  // Anti-shove (phasgrav task 2): the far pocket is capped except for the 1-wide
+  // chute at column 9 — a 2x2 solid cannot descend it, so the lift is the only way in.
+  await load(21);
+  o = await dragPath('R', [[1, 5], [8, 5], [8, 7], [8, 10]]);
+  check('L22: the 2x2 solid cannot be dragged into the far pocket — the chute is 1 wide', !o.home && o.ay <= 7, o);
   await load(21);
   await setGrav(1.5, 13.5);
   await apply('heat', 'R'); await step(3);
@@ -404,20 +435,48 @@ function check(name, cond, extra) {
   await setGrav(11.2, 4.0);
   t = await stepUntil('s=>{const o=s.objs[0];return o.cx>7.6;}', 40);
   check('L22: liquid lifted over both pillars (' + t + 's)', t > 0, await obj('R'));
-  await setGrav(8.7, 13.5);
-  await step(4);
+  await setGrav(9.5, 13.5);
+  t = await stepUntil('s=>{const o=s.objs[0];return o.cy>9.8&&o.cx>7.6;}', 30);
+  check('L22: the corner well dropped it down the chute into the pocket (' + t + 's)', t > 0, await obj('R'));
+  await step(3);
   check('L22: tap freezes in the pocket', await tapRetry('R'));
   check('L22: solved by moving the well mid-flow', await ensureHome('R', 8, 10) && await allHome(0.4), await st());
 
   // ---------- L23 Master Facet ----------
+  // Anti-shove (phasgrav task 2): both slots sit in column 2, so the pour drops
+  // straight into the left cellar and never rests on a floor it could be pushed
+  // along. The socket is across a 3-tall divide (columns 5-6) reachable only by
+  // lifting the puddle onto the row-8 lane — the 1x1 escort shares the cellar and
+  // still cannot move it across. That negative is asserted before the solution.
+  await load(22);
+  await apply('heat', 'C'); await step(6);
+  await dragPath('M', [[2, 1], [2, 5], [2, 8], [0, 11]]);
+  let shovePeak = -1;
+  for (let k = 0; k < 3; k++) for (const row of [11, 10, 9]) {
+    await dragPath('M', [[0, row], [4, row]]);
+    shovePeak = Math.max(shovePeak, (await obj('C')).maxx);
+    await step(0.3);
+    shovePeak = Math.max(shovePeak, (await obj('C')).maxx);
+    await dragPath('M', [[0, row]]);
+  }
+  await step(2);
+  o = await obj('C');
+  check('L23 anti-cheese: shoving the puddle with the 1x1 never crosses the divide (peak x ' +
+    shovePeak.toFixed(2) + ')', shovePeak < 6.5 && !o.home, { shovePeak, cx: o.cx });
+
   await load(22);
   await apply('heat', 'C'); await step(2.5);
   check('L23: melt cleared the doorway', (await obj('C')).cy > 4);
-  await dragPath('M', [[2, 1], [2, 6], [7, 6], [7, 9], [1, 9], [0, 10]]);
+  await dragPath('M', [[2, 1], [2, 5], [2, 8], [0, 11]]);
   check('L23: 1x1 gem escorted through both slots', (await obj('M')).home, await obj('M'));
-  await setGrav(8.7, 13.5);
-  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="C");return o.cy>8.6;}', 30);
-  check('L23: liquid drained through both slots (' + t + 's)', t > 0, await obj('C'));
+  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="C");return o.cy>10.4&&o.cx<5;}', 30);
+  check('L23: liquid drained through both slots into the left cellar (' + t + 's)', t > 0, await obj('C'));
+  await setGrav(11.5, 8.5);
+  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="C");return o.cx>6.8&&o.cy<9.4;}', 60);
+  check('L23: the well lifted the pour over the 3-tall divide onto the lane (' + t + 's)', t > 0, await obj('C'));
+  await setGrav(8.5, 13.5);
+  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="C");return o.cy>9.8&&o.cx>6.8;}', 40);
+  check('L23: dropped into the far cellar (' + t + 's)', t > 0, await obj('C'));
   await step(3);
   check('L23: tap freezes', await tapRetry('C'));
   check('L23: solved', await ensureHome('C', 7, 9) && await allHome(0.6), await st());
@@ -552,6 +611,101 @@ function check(name, cond, extra) {
     await load(i);
     const ok = await g('G=>G.replayGen()');
     check('endless L' + (i + 1) + ': generated + solver-replayed to a win', ok && (await st()).objs.every(x => x.home));
+  }
+
+  // ---------- phasgrav: gravmaze coverage, BFS impassability, docked-well negative ----------
+  // Block 2 (L17-24) has exactly one generated slot — L24 (index 23); L17-23
+  // are all authored (see the L17-L23 checks above). Scanning GEN_IDX for
+  // block 2 rather than hardcoding "23" means this stays scan-derived: today
+  // it finds one index, and that one index IS full block-2 gravmaze coverage
+  // — obstacle-era gravmazes (blocks 5+) are a follow-up, not this plan.
+  const block2GenIdx = GEN_IDX.filter(i => i >= 16 && i <= 23);
+  check('phasgrav: block-2 generated-index scan finds exactly L24 — index 23 is the ONLY possible ' +
+    'gravmaze index until obstacle-era mazes land (found ' + block2GenIdx.map(i => i + 1).join(',') + ')',
+    block2GenIdx.length === 1 && block2GenIdx[0] === 23, block2GenIdx);
+
+  // shape offsets come straight from the page's own SHAPE_STR (a top-level
+  // const, visible to page.evaluate like SONGS/blockOf already are elsewhere
+  // in this suite) — never duplicated/hardcoded here, so a shape edit can't
+  // silently desync the BFS from what the game actually draws.
+  const SHAPES = await page.evaluate('SHAPE_STR');
+  function shapeOff(L) {
+    const rows = SHAPES[L], off = [];
+    for (let y = 0; y < rows.length; y++) for (let x = 0; x < rows[y].length; x++) if (rows[y][x] === 'X') off.push({ x, y });
+    return off;
+  }
+  function fitsAt(off, ax, ay, wallRows, gw2, gh2) { // walls-only fit test, mirrors solidFits's wall check
+    for (const c of off) {
+      const x = ax + c.x, y = ay + c.y;
+      if (x < 0 || y < 0 || x >= gw2 || y >= gh2) return false;
+      if (wallRows[y][x] === '1') return false;
+    }
+    return true;
+  }
+  function bfsReach(off, sax, say, wallRows, gw2, gh2) { // every lattice anchor a drag can reach from spawn
+    const seen = new Set(), key = (x, y) => x + ',' + y;
+    if (!fitsAt(off, sax, say, wallRows, gw2, gh2)) return seen;
+    seen.add(key(sax, say));
+    const q = [[sax, say]];
+    while (q.length) {
+      const [ax, ay] = q.shift();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = ax + dx, ny = ay + dy, k = key(nx, ny);
+        if (seen.has(k) || !fitsAt(off, nx, ny, wallRows, gw2, gh2)) continue;
+        seen.add(k); q.push([nx, ny]);
+      }
+    }
+    return seen;
+  }
+
+  for (const gIdx of block2GenIdx) {
+    await load(gIdx);
+    const mi = await g('G=>G.mapInfo()');
+    check('phasgrav: gravmaze coverage — L' + (gIdx + 1) + ' (the only generated block-2 index today) ships ' +
+      'mapInfo().maze truthy, i.e. the gravmaze template actually shipped there', !!mi.maze, mi.maze);
+    // gravmaze replay (win, all home) is already asserted exactly by the
+    // 'gen L24: solver script replays to a win' check in the GEN_IDX loop
+    // above (info.hasScript && replayGen() to a win with every obj home) —
+    // extending that existing check rather than duplicating it here.
+
+    if (!mi.maze) continue;
+    const mz = mi.maze, gw2 = mi.walls[0].length, gh2 = mi.walls.length;
+    let tunnelBreach = null, missingHome = null;
+    for (const gm of mi.gems) {
+      const off = shapeOff(gm.L);
+      const reach = bfsReach(off, gm.ax, gm.ay, mi.walls, gw2, gh2);
+      for (const key of reach) {
+        const [ax, ay] = key.split(',').map(Number);
+        if (off.some(c => ay + c.y >= mz.ceil)) { tunnelBreach = { L: gm.L, ax, ay }; break; }
+      }
+      if (tunnelBreach) break;
+      if (gm.L !== mz.L && !reach.has(gm.sax + ',' + gm.say)) missingHome = gm.L;
+    }
+    check('L' + (gIdx + 1) + ' gravmaze BFS (walls-only lattice): no solid gem placement, including the ' +
+      'maze gem itself, ever reaches a tunnel cell (row >= ceil ' + mz.ceil + ')',
+      tunnelBreach === null, { tunnelBreach, mz });
+    check('L' + (gIdx + 1) + ' gravmaze BFS: every non-maze solid can still reach its own socket by plain drag',
+      missingHome === null, { missingHome, gems: mi.gems });
+
+    // docked-well negative: melt the maze gem and leave the well DOCKED
+    // (uniform down — setGrav is never called), then confirm plain drainage
+    // alone cannot solve it. Measured form (task 3): the mouth only lets
+    // part of the gem's overhead footprint through, so the pour parks near
+    // the mouth end, columns away from the alcove, and freeze refuses there.
+    await load(gIdx);
+    let gv = await g('G=>G.gravAt()');
+    check('L' + (gIdx + 1) + ' docked-well negative: well starts DOCKED (uniform down)', gv && gv.docked === true, gv);
+    await apply('heat', mz.L);
+    for (let k = 0; k < 12; k++) await step(5); // ~60s sim, docked the whole way
+    const o4 = await obj(mz.L);
+    const pocketCx = mz.pc + mz.mw / 2;
+    check('L' + (gIdx + 1) + ' docked-well negative: melt under docked gravity parks the pour columns away ' +
+      'from the alcove (cx ' + o4.cx.toFixed(2) + ' vs pocket cx ' + pocketCx.toFixed(2) + ')',
+      Math.abs(o4.cx - pocketCx) > 3, o4);
+    check('L' + (gIdx + 1) + ' docked-well negative: not home after ~60s of docked-only sim', !o4.home, o4);
+    const tapOk4 = await tap(mz.L);
+    check('L' + (gIdx + 1) + ' docked-well negative: the freeze tap is refused while parked off the socket',
+      !tapOk4, { tapOk4, o4 });
   }
 
   // ---------- phasweave: template coverage across the generated indices below 65 ----------

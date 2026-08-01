@@ -48,12 +48,6 @@ backlog entry here.
 
 ## Next
 
-- [phasic] Orb-mandatory gravity block (L17–24): new one-gem opener,
-  anti-shove hardening of the authored maps, walls-only orb-maze
-  generation. *Decided 2026-07-31: block-2 mazes are walls-only —
-  obstacles keep their block 5–7 debuts.*
-  **Plan ready (2026-07-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phasgrav.orb-mandatory-gravity-block.md`
 - [phasic] Block-lesson naming: display-layer "Word · Name" prefix for
   blocks 0–7. *Decided 2026-07-31: prefix everything; tutorials keep
   their names; endless unprefixed.* Run LAST (after phasgrav renames).

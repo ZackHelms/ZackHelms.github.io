@@ -84,7 +84,7 @@ block is generated with everything introduced so far, complexity rising.
 |---|---|---|---|
 | 0 | 1–8 | drag + fit; gem count ramps 1→8 | 1 The First Gem · 2 First Facets · 3 Shape Gates · 8 The Whole Spectrum (all 8, open drawer) |
 | 1 | 9–16 | flames (melt/boil + tap-revert) | 9 Meltdown · 10 Room to Pour · 11 Gem Drawer · 12 One Flame · 13 Queue · 14 Glassworks · 16 Full Spectrum |
-| 2 | 17–24 | gravity well + gas herding | 17 Sideways · 18 Point Pull · 19 Spring Cleaning · 20 The Kettle · 21 Balloon Route · 22 Reflow · 23 Master Facet |
+| 2 | 17–24 | gravity well + gas herding | 16 The Side Pocket · 17 Sideways · 18 Point Pull · 19 The Kettle · 20 Balloon Route · 21 Reflow · 22 Master Facet · 23 generated L24 |
 | 3 | 25–32 | liquid base state (frost holds it) | 25 Standing Water |
 | 4 | 33–40 | gas base state (two frosts) | 33 Loose Vapor |
 | 5 | 41–48 | black hole obstacle | 41 The Void |
@@ -296,6 +296,18 @@ CD-side IP actions (USPTO, copyright reg., Apple) live in TODO.md
   { … background: url('phasic/icon.svg') …; font-size: 0; }`.
 - **Suite:** `phasbrand` group, 11 checks (files/magic bytes, head rels, hub-first
   card, CSS rule, live computed-style render) — suite total 300.
+
+## Gravity block is orb-mandatory (phasgrav round, 2026-08-01)
+
+The CD's reported exploit (shove the puddle with a solid) turned out broader: four maps (Sideways, Point Pull, Balloon Route, Reflow) could be solved by dragging the gem home as STONE — no melt at all. Hardened by geometry, never by disabling mechanics (tactics #10-12 stay legal game-wide): 1-cell mouths no solid footprint fits, socket pockets beyond any solid-reachable cell, pour-only routes. The Kettle was already proof (single gem, flue). Master Facet's real shove exploit killed by a 3-tall divide + far-cellar socket.
+
+Anti-shove property is pinned by suite negatives per map (drag-impossibility, L23 18-pass shove-peak, L24 BFS impassability + docked-well negative). Suite total 335.
+
+`gravmaze` template: block-2-only generated boards (60% odds, index 23 is the only generated block-2 index until obstacle-era mazes), sealed 3-row tunnel under the drawer, 1-cell mouth, 2-3 alternating roof/floor baffles, roofed socket alcove. IMPORTANT recorded lesson: a literal 1-row serpentine channel is UNSOLVABLE for the soft-body pour (0/24 — particles can't file through 1-cell gates into 1-row legs); the 3-row tunnel with 1-cell gates is the working shape (40/40). `getLevel` prefers gravmaze candidates in block 2 (same scan mechanism as woven boards in blocks 5-7). Determinism proven by byte-diff: only index 23's sub-0.60-salt candidates changed.
+
+Traced-but-inert corner: the maze-gem pool still includes 'B' (L-tromino) whose notch cell can rest at the mouth row without breaching the tunnel — doesn't threaten anti-shove; noted in case a future audit trips on it.
+
+`save.done` indices 16-18 shifted meaning with the AUTH reshuffle (acceptable — CD is the only player).
 
 ## Known trade-offs / iOS-port notes
 

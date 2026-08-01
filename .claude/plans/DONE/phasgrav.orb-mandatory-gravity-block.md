@@ -1,6 +1,6 @@
 # phasgrav — the gravity block (L17–24) requires the orb: anti-shove tutorials + walls-only orb-maze generation
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-08-01 (2c759e6..c105ae4 on worktree-oversee+phasgrav; all tasks first-pass; exploit found broader than reported — 4 maps drag-as-stone solvable; gravmaze shipped as a 3-row tunnel, the plan's literal 1-row serpentine measured unsolvable 0/24 — see follow-up)
 **Requested:** 2026-07-31 (CD, verbatim intent: "the 8 levels that
 introduce the gravity orb should require the gravity orb to be used.
 Currently I am able to use another object to push the liquid or gas object
