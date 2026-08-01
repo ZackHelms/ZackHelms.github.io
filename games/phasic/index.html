@@ -57,7 +57,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-01 03:54 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-01 04:52 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -1195,6 +1195,10 @@ function placeGrav(x,y){ // clamp to the ring just outside the field border
      'attic'     — a ceiling shelf with a flue up one side; the born-gas
                    gem sockets in the loft and is condensed up there, the
                    Kettle / Balloon Route shape.
+     'gravmaze'  — the gravity block's walls-only orb maze: a sealed tunnel
+                   under the drawer, entered through a single cell and weaving
+                   past floor/roof baffles to an alcove only a pour steered by
+                   the well can reach.
    Every candidate is beaten by the in-game solver BEFORE it is served —
    a level you receive is a level that has already been solved.
    Deterministic per level index (seeded rng + seeded gas wander), so
@@ -1219,6 +1223,7 @@ const NAME_B=['Drawer','Shelf','Pantry','Cabinet','Workshop','Foundry','Cellar',
 const GEN_HINTS=['Bring it to order.','Tidy the drawer.','Everything has a socket.','Order from chaos.','Put it all away.'];
 const GEN_HINTS2=['Two shelves, one route.','Both gaps, in order.','Stage it in the middle, then land it.','The gaps do not line up.','Down one floor at a time.'];
 const GEN_HINTSA=['The vapor rises — meet it up top.','Send it up the flue, bring it down solid.','Herd the cloud into the loft.','Cool it where it lands, not where it started.','The loft has a socket too.'];
+const GEN_HINTSM=['Only liquid fits this channel. Melt it, then lead it.','Walk the well around the baffles, one leg at a time.','Stone cannot turn these corners — a pour can.','Down the mouth, along, down, along: the pocket is at the end.','Plain down only ever reaches the first baffle.'];
 function genName(i){ const r=mulberry((i*2654435761)>>>0);
   return NAME_A[(r()*NAME_A.length)|0]+' '+NAME_B[(r()*NAME_B.length)|0]; }
 function stampGen(rows,shape,ax,ay,ch){
@@ -1226,6 +1231,101 @@ function stampGen(rows,shape,ax,ay,ch){
     if(shape[yy][xx]==='X') rows[ay+yy][ax+xx]=ch;
 }
 function blockOf(i){ return Math.min((i/8)|0, 7); }
+/* ---- 'gravmaze': the gravity block's walls-only orb maze ----
+   A tunnel three rows deep runs the width of the board under a walled
+   ceiling whose ONLY opening is a single cell at one end. Inside, 2-3 wall
+   baffles alternate: a floor stub the pour has to be lifted over, a roof
+   stub it has to be brought back down and ducked under — and at the far end
+   a roofed alcove holding the maze gem's socket. Because the mouth is one
+   cell wide and no gem on the board is 1x1, NO solid can enter the tunnel at
+   all, so nothing can be pushed, dragged or shoved along it: the gem has to
+   be melted and its pour walked past every baffle by moving the well. Plain
+   down drainage drops it through the mouth and parks it on the floor for
+   good, which is the whole lesson of the block. Block 2 has no obstacles, so
+   the maze is made of walls alone (the CD's walls-only decision); above the
+   ceiling the board is an ordinary drawer whose gems drag straight home.
+   Every draw below is this candidate's own — the template pick is still the
+   stream's first draw, so an unpicked gravmaze costs the others nothing. */
+function buildMaze(r,i,p){
+  const rows=Array.from({length:GH},()=>Array(GW).fill('.'));
+  const right=r()<0.5;                   // the end of the tunnel the pocket sits at
+  const mp=['R','B','O','Y','G'];        // 2-tall gems: the alcove is their footprint
+  for(let a=mp.length-1;a>0;a--){
+    const b2=(r()*(a+1))|0; const t=mp[a]; mp[a]=mp[b2]; mp[b2]=t; }
+  const ML=mp[0], mw=GEMW[ML], mh=GEMH[ML];
+  const CEIL=GH-4, TOP=GH-3, FLOOR=GH-1; // the walled ceiling, then the 3-row tunnel
+  const mx=right?0:GW-1;                 // the mouth, at the end away from the pocket
+  const pc=right?GW-mw:0, py=GH-mh;      // the alcove
+  for(let x=0;x<GW;x++) rows[CEIL][x]='#';
+  rows[CEIL][mx]='.';                                  // the mouth
+  for(let x=pc;x<pc+mw;x++) rows[TOP][x]='#';          // roofed: a pocket, not a dead end
+  /* Baffles in travel order, roof stub first: the pour lands on the tunnel
+     floor, so its first crossing is a duck, and the lift comes later, once
+     the puddle is columns away from the mouth it could otherwise be drawn
+     back up through. Two stubs may never stand side by side either — a floor
+     stub next to a roof stub seals the tunnel outright. */
+  const lo=right?2:mw+1, hi=right?GW-mw-2:GW-3;
+  let nb=2+(r()<0.5?1:0);
+  while(nb>2&&hi-lo<2*(nb-1)) nb--;
+  if(hi-lo<2*(nb-1)) return null;
+  const step=nb>1?(hi-lo)/(nb-1):0, baffles=[];
+  for(let j=0;j<nb;j++){
+    const bx=Math.round(right?lo+step*j:hi-step*j), k=(j%2===0)?'roof':'floor';
+    baffles.push({x:bx,k});
+    if(k==='floor'){ rows[TOP+1][bx]='#'; rows[FLOOR][bx]='#'; }   // climb over it
+    else { rows[TOP][bx]='#'; rows[TOP+1][bx]='#'; }               // duck under it
+  }
+  stampGen(rows,SHAPE_STR[ML],pc,py,ML.toLowerCase());
+  const mgx=right?0:GW-mw;                             // the gem waits on the ceiling,
+  stampGen(rows,SHAPE_STR[ML],mgx,CEIL-mh,ML);         // right over the mouth
+  const gems=[{L:ML,ax:mgx,ay:CEIL-mh,sax:pc,say:py,maze:true}];
+  // above the ceiling: floor sockets, every one of them a plain drag away
+  const nSol=Math.min(3,1+(p>=3?1:0)+(p>=6?1:0));
+  /* No 1x1 stone and no L-tromino up here: M fits the mouth outright, and B's
+     notch lets its lower cell dip into a mouth cut at the right-hand edge —
+     either one could be walked into the channel and used to shove the pour.
+     Every other shape needs at least two adjacent cells in the ceiling row,
+     and the shapes with a single-cell chin (G, C) are three wide, so centring
+     that chin on an edge mouth runs them off the board. */
+  const sp=['R','O','Y','G','C','P'].filter(L=>L!==ML&&GEMH[L]<CEIL);
+  for(let a=sp.length-1;a>0;a--){ const b2=(r()*(a+1))|0; const t=sp[a]; sp[a]=sp[b2]; sp[b2]=t; }
+  let cur=right?GW-1:0;                  // packed from the pocket end back, so the
+  for(const L of sp){                    // mouth end stays clear for the pour
+    if(gems.length>nSol) break;
+    const w=GEMW[L], sax=right?cur-w+1:cur;
+    if(right?sax<mw:sax+w-1>GW-mw-1) continue;   // never over the gem's own columns
+    const g2={L,sax,say:CEIL-GEMH[L]};
+    stampGen(rows,SHAPE_STR[L],g2.sax,g2.say,L.toLowerCase());
+    gems.push(g2); cur=right?sax-2:sax+w+1; }
+  if(gems.length<2) return null;
+  /* Scatter is column-free but row-jealous: two gems that share a row can
+     collide crossing it, and this board has no shelf lane to cross on. */
+  const occ=Array.from({length:GH},()=>Array(GW).fill(false));
+  for(let y=0;y<GH;y++) for(let x=0;x<GW;x++) if(rows[y][x]!=='.') occ[y][x]=true;
+  const usedRow={};
+  for(const g2 of gems){ if(g2.maze) continue;
+    const w=GEMW[g2.L], h2=GEMH[g2.L]; let ok=false;
+    for(let t=0;t<160&&!ok;t++){
+      const ax=(r()*(GW-w+1))|0, ay=(r()*(CEIL-h2))|0;
+      let free=true;
+      if(t<80) for(let yy=ay;yy<ay+h2;yy++) if(usedRow[yy]) free=false;
+      for(let yy=0;yy<h2&&free;yy++) for(let xx=0;xx<w;xx++)
+        if(SHAPE_STR[g2.L][yy][xx]==='X'&&occ[ay+yy][ax+xx]) free=false;
+      if(!free) continue;
+      for(let yy=0;yy<h2;yy++) for(let xx=0;xx<w;xx++)
+        if(SHAPE_STR[g2.L][yy][xx]==='X') occ[ay+yy][ax+xx]=true;
+      for(let yy=ay;yy<ay+h2;yy++) usedRow[yy]=1;
+      stampGen(rows,SHAPE_STR[g2.L],ax,ay,g2.L); g2.ax=ax; g2.ay=ay; ok=true;
+    }
+    if(!ok) return null;
+  }
+  return { name:genName(i), hint:GEN_HINTSM[(r()*GEN_HINTSM.length)|0],
+    template:'gravmaze', weave:null,
+    maze:{L:ML,right,mx,ceil:CEIL,top:TOP,floorY:FLOOR,baffles,pc,py,mw,mh},
+    heat:1, cold:0, grav:1,
+    cx:{gems:gems.length, flames:1, frosts:0, grav:1, obstacles:0, basePts:0},
+    map:rows.map(q=>q.join('')) };
+}
 function buildGen(i,salt){
   const easy=salt>=90;
   const r=mulberry(((i*7919+salt*104729)^0x9E3779B9)>>>0);
@@ -1240,8 +1340,12 @@ function buildGen(i,salt){
      block 4 on. */
   let template='drawer';
   if(!easy){ const tr=r();
-    if(b>=2&&tr<0.40) template='two-shelf';
+    if(b===2&&tr<0.60) template='gravmaze';   // the gravity block's own shape
+    else if(b>=2&&tr<0.40) template='two-shelf';
     else if(b>=4&&tr<0.75) template='attic'; }
+  /* gravmaze builds its own board from here on, so every other block's
+     candidate consumes the identical draw stream it always did. */
+  if(template==='gravmaze') return buildMaze(r,i,p);
   const TWO=template==='two-shelf', LOFT=template==='attic';
   const shelfRow=TWO?8:LOFT?7:5;   // the shelf the sockets below it are reached through
   const TOPROW=4, CEIL=2;          // two-shelf's upper shelf / attic's ceiling
@@ -1599,9 +1703,54 @@ function gapAnchor(g,w){ // left-most anchor that centres a w-wide gem in gap g
 function makeScript(){
   const tpl=(lvl&&lvl.template)||'drawer';
   const wv=(lvl&&lvl.weave)||null;
+  if(tpl==='gravmaze') return scriptMaze(lvl&&lvl.maze);
   if(tpl==='two-shelf') return scriptTwoShelf(wv);
   if(tpl==='attic') return scriptAttic();
   return scriptDrawer(wv);
+}
+/* gravmaze: the drawer above the ceiling is plain drags, then the pour is
+   walked down the tunnel. The well parks below the mouth so the melt funnels
+   in, then takes the side ring toward the pocket — HIGH (level with the
+   tunnel roof) to lift the puddle over a floor stub, LOW (level with the
+   tunnel floor) to bring it back down and under a roof stub — and finishes at
+   the floor ring on the pocket's side so the puddle packs into the alcove and
+   crystallizes there. Every op is a verb the player has: place the well and
+   wait. Placing it straight below a stub is the trap that does not work — the
+   pull flattens the puddle onto the wall it is standing on instead of moving
+   it along, which is exactly why the level needs the ring. */
+function scriptMaze(mz){
+  if(!mz) return null;
+  const o=objs.find(u=>u.letter===mz.L); if(!o) return null;
+  const script=[], WY=GH+1.5;
+  const dir=mz.right?1:-1;                    // the way the tunnel runs to the pocket
+  const ringTo=mz.right?GW+2:-2;              // the ring the pull has to come from
+  // lowest gem first: its lane clears before anything above it needs to cross
+  for(const u of objs.filter(u2=>u2!==o).sort((a,b2)=>b2.startAy-a.startAy))
+    script.push({d:[u.letter,[[u.sax,u.startAy],[u.sax,u.say]]]});
+  script.push({g:[mz.mx+0.5,WY]},{h:[mz.L]},
+    {u:[mz.L,'miny','>',mz.ceil+0.9,35]});    // the whole pour is down the mouth
+  /* A stub is crossed by parking the well two columns PAST it, on the ring
+     the puddle has to travel toward: overhead to climb a floor stub, below to
+     duck a roof stub. The puddle converges on the well's column, so a well at
+     the far end instead stretches it thin against the next stub and its tail
+     never clears the gate (measured: every candidate died there); a well
+     level with a stub just presses the puddle into the stub's face. */
+  for(const b of mz.baffles)
+    /* Two gates per stub: the leader is past its cell, and then the WHOLE
+       puddle has taken the posture the next stub needs — every particle up at
+       the roof after a climb, every particle down on the floor after a duck.
+       "All of it past the stub" cannot be asked for: four particles at their
+       minimum spacing are 2.5 cells long, so the tail is still inside the gate
+       cell when the head is already jammed against the next wall. */
+    script.push({g:[clamp(b.x+dir*2,0,GW-1)+0.5, b.k==='floor'?-2:WY]},
+      dir>0?{u:[mz.L,'maxx','>',b.x+1,30]}:{u:[mz.L,'minx','<',b.x,30]},
+      b.k==='floor'?{u:[mz.L,'maxy','<',mz.top+1.2,30]}
+                   :{u:[mz.L,'miny','>',mz.floorY-0.5,30]});
+  script.push({g:[mz.pc+mz.mw/2,WY]},         // down onto the floor and into the alcove
+    dir>0?{u:[mz.L,'maxx','>',mz.pc+0.4,30]}:{u:[mz.L,'minx','<',mz.pc+mz.mw-0.4,30]},
+    {u:[mz.L,'maxy','>',mz.py+0.9,30]},
+    {w:[1.6]},{t:[mz.L]},{w:[0.8]},{d:[mz.L,[[mz.pc,mz.py]]]},{w:[1.2]});
+  return script;
 }
 /* ---- weave legs, shared by both shelved templates ----
    A woven board hands makeScript a plan (def.weave) instead of a surprise: the
@@ -1882,11 +2031,15 @@ const WEAVE_SCAN=19;    // salts an obstacle-block level looks through for a wov
 function getLevel(i){
   if(AUTH[i]) return AUTH[i];
   if(genCache[i]) return genCache[i].def;
-  /* The first candidate that solves wins — except in the obstacle blocks,
-     where a woven board that solves outranks a plain one from an earlier salt.
-     In-path hazards are the whole point of blocks 5-7, and they are rare
-     enough that the plain layouts would otherwise always win the race. */
-  const scan=blockOf(i)>=5?WEAVE_SCAN:0;
+  /* The first candidate that solves wins — except where a block's own idea is
+     rarer than a plain board. In the obstacle blocks a woven layout outranks a
+     plain one from an earlier salt; in the gravity block the orb maze does.
+     In-path hazards are the whole point of blocks 5-7 and the maze is the
+     whole point of block 2, and both are rare enough that an ordinary drawer
+     would otherwise win the salt race nearly every time (level 24 drew 0.718
+     on the template roll at salt 0 and would have shipped as a drawer). */
+  const scan=(blockOf(i)>=5||blockOf(i)===2)?WEAVE_SCAN:0;
+  const wanted=d=>!!d.weave||d.template==='gravmaze';
   let plain=null;
   for(let salt=0;salt<20;salt++){
     const def=buildGen(i,salt); if(!def) continue;
@@ -1895,7 +2048,7 @@ function getLevel(i){
     const ok=runScriptFast(script);
     solving=false;
     if(!ok) continue;
-    if(def.weave){ genCache[i]={def,script,salt}; return def; }
+    if(wanted(def)){ genCache[i]={def,script,salt}; return def; }
     if(!plain) plain=({def,script,salt});
     if(salt>=scan) break;
   }
@@ -2517,6 +2670,8 @@ if(TEST){
     // is open through, and where every gem starts and belongs — enough to ask
     // whether a hazard is in a route rather than parked in a corner
     mapInfo:()=>({ template:(lvl&&lvl.template)||null, weave:(lvl&&lvl.weave)||null,
+      maze:(lvl&&lvl.maze)||null,
+      walls:Array.from({length:GH},(_,y)=>Array.from({length:GW},(_,x)=>walls[y*GW+x]?1:0).join('')),
       holes:holes.map(q=>({x:q.x,y:q.y})),
       bushes:Array.from(bushes).map(k=>({x:k%GW,y:(k/GW)|0})),
       fans:fans.map(f=>({x:f.x,y:f.y,dx:f.dx,dy:f.dy})),
