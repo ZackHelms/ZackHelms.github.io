@@ -38,6 +38,7 @@ catch (e) { console.error('playwright-core not resolvable (NODE_PATH).'); consol
 const repoRoot = path.resolve(__dirname, '..', '..');
 const GAME = path.join(repoRoot, 'games', 'phasic', 'index.html');
 const WIKI = path.join(repoRoot, 'games', 'phasic', 'wiki.html');
+const HUB = path.join(repoRoot, 'games', 'index.html');
 const SHOTS = process.env.PHASIC_SHOTS || '';
 const candidates = [process.env.SMOKE_CHROMIUM, '/opt/pw-browsers/chromium'].filter(Boolean);
 const executablePath = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
@@ -1043,6 +1044,76 @@ function check(name, cond, extra) {
   check('phaslicense: wiki footer link href is LICENSE', !!footHome && footHome.href === 'LICENSE', footHome);
 
   await wpage.close();
+
+  // ---------- phasbrand: icon files, head links, hub-first card, icon CSS ----------
+  const iconSvgPath = path.join(repoRoot, 'games', 'phasic', 'icon.svg');
+  const iconPngPath = path.join(repoRoot, 'games', 'phasic', 'icon-1024.png');
+  const iconSvgStat = fs.existsSync(iconSvgPath) ? fs.statSync(iconSvgPath) : null;
+  const iconPngStat = fs.existsSync(iconPngPath) ? fs.statSync(iconPngPath) : null;
+  check('phasbrand: games/phasic/icon.svg exists and is non-empty',
+    !!iconSvgStat && iconSvgStat.size > 0, iconSvgStat && iconSvgStat.size);
+  check('phasbrand: games/phasic/icon-1024.png exists and is non-empty',
+    !!iconPngStat && iconPngStat.size > 0, iconPngStat && iconPngStat.size);
+
+  const iconSvgText = iconSvgStat ? fs.readFileSync(iconSvgPath, 'utf8') : '';
+  check('phasbrand: icon.svg contains viewBox="0 0 512 512"',
+    /viewBox="0 0 512 512"/.test(iconSvgText), iconSvgText.slice(0, 80));
+
+  const pngMagic = iconPngStat ? fs.readFileSync(iconPngPath).subarray(0, 8) : Buffer.alloc(0);
+  const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  check('phasbrand: icon-1024.png starts with the PNG magic bytes',
+    pngMagic.equals(PNG_MAGIC), pngMagic.toString('hex'));
+
+  const headLinks = await page.evaluate(() => {
+    const svgLink = document.querySelector('head link[rel="icon"][type="image/svg+xml"]');
+    const touchLink = document.querySelector('head link[rel="apple-touch-icon"]');
+    return {
+      svgHref: svgLink ? svgLink.getAttribute('href') : null,
+      touchHref: touchLink ? touchLink.getAttribute('href') : null,
+    };
+  });
+  check('phasbrand: game head has rel="icon" type="image/svg+xml" href="icon.svg"',
+    headLinks.svgHref === 'icon.svg', headLinks);
+  check('phasbrand: game head has rel="apple-touch-icon" href="icon-1024.png"',
+    headLinks.touchHref === 'icon-1024.png', headLinks);
+
+  const hubSrc = fs.readFileSync(HUB, 'utf8');
+  const cssRuleMatch = hubSrc.match(/\.game-card\[href="phasic\/"\]\s*\.game-icon\s*\{([^}]*)\}/);
+  const cssDecl = cssRuleMatch ? cssRuleMatch[1] : '';
+  check('phasbrand: hub CSS has a .game-card[href="phasic/"] .game-icon rule with a phasic/icon.svg background and font-size: 0',
+    !!cssRuleMatch && /background\s*:[^;]*phasic\/icon\.svg/.test(cssDecl) && /font-size\s*:\s*0\b/.test(cssDecl),
+    cssRuleMatch ? cssDecl.trim() : null);
+
+  const hubPage = await ctx.newPage();
+  hubPage.on('pageerror', e => errors.push('pageerror(hub): ' + e.message));
+  hubPage.on('console', m => { if (m.type() === 'error' && !IGNORE.test(m.text())) errors.push('console(hub): ' + m.text()); });
+  await hubPage.goto('file://' + HUB, { waitUntil: 'load', timeout: 20000 });
+  await hubPage.waitForTimeout(300);
+
+  const firstCard = await hubPage.evaluate(() => {
+    const a = document.querySelector('a.game-card');
+    if (!a) return null;
+    const iconEl = a.querySelector('.game-icon');
+    return { href: a.getAttribute('href'), iconText: iconEl ? iconEl.textContent : null };
+  });
+  check('phasbrand: hub grid\'s FIRST game-card links href="phasic/"',
+    !!firstCard && firstCard.href === 'phasic/', firstCard);
+  check('phasbrand: hub grid\'s first game-card icon div text is still 💠',
+    !!firstCard && firstCard.iconText === '💠', firstCard);
+
+  const iconStyle = await hubPage.evaluate(() => {
+    const a = document.querySelector('a.game-card[href="phasic/"]');
+    const el = a ? a.querySelector('.game-icon') : null;
+    if (!el) return null;
+    const cs = getComputedStyle(el);
+    return { fontSize: cs.fontSize, backgroundImage: cs.backgroundImage };
+  });
+  check('phasbrand: live computed style — PHASIC card .game-icon fontSize is 0px',
+    !!iconStyle && iconStyle.fontSize === '0px', iconStyle);
+  check('phasbrand: live computed style — PHASIC card .game-icon backgroundImage is set (not none)',
+    !!iconStyle && iconStyle.backgroundImage !== 'none', iconStyle);
+
+  await hubPage.close();
 
   // ---------- console errors ----------
   check('no console/page errors across the whole run', errors.length === 0, errors.slice(0, 6));
