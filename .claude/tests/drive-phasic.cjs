@@ -240,15 +240,15 @@ function check(name, cond, extra) {
   await load(9);
   await apply('heat', 'R'); await step(1.6);
   o = await obj('R');
-  check('L20: liquid resting on the shelf', o.cy > 4 && o.cy < 6.2, o);
-  check('L20: tap on the shelf is refused — no room to crystallize', !(await tap('R')));
+  check('L10: liquid resting on the shelf', o.cy > 4 && o.cy < 6.2, o);
+  check('L10: tap on the shelf is refused — no room to crystallize', !(await tap('R')));
   o = await obj('R'); s = await st();
-  check('L20: the flame stays latched after the refusal', o.heats === 1 && o.phase === 'liquid' && s.heatN === 0, o);
+  check('L10: the flame stays latched after the refusal', o.heats === 1 && o.phase === 'liquid' && s.heatN === 0, o);
   await step(5);
-  check('L20: liquid drained to the floor room', (await obj('R')).cy > 7);
-  check('L20: tap now freezes', await tapRetry('R'));
+  check('L10: liquid drained to the floor room', (await obj('R')).cy > 7);
+  check('L10: tap now freezes', await tapRetry('R'));
   await step(1.0);
-  check('L20: solved', await ensureHome('R', 4, 9) && await allHome(0.4), await st());
+  check('L10: solved', await ensureHome('R', 4, 9) && await allHome(0.4), await st());
 
   // ---------- L11 Gem Drawer ----------
   await load(10);
@@ -611,6 +611,101 @@ function check(name, cond, extra) {
     await load(i);
     const ok = await g('G=>G.replayGen()');
     check('endless L' + (i + 1) + ': generated + solver-replayed to a win', ok && (await st()).objs.every(x => x.home));
+  }
+
+  // ---------- phasgrav: gravmaze coverage, BFS impassability, docked-well negative ----------
+  // Block 2 (L17-24) has exactly one generated slot — L24 (index 23); L17-23
+  // are all authored (see the L17-L23 checks above). Scanning GEN_IDX for
+  // block 2 rather than hardcoding "23" means this stays scan-derived: today
+  // it finds one index, and that one index IS full block-2 gravmaze coverage
+  // — obstacle-era gravmazes (blocks 5+) are a follow-up, not this plan.
+  const block2GenIdx = GEN_IDX.filter(i => i >= 16 && i <= 23);
+  check('phasgrav: block-2 generated-index scan finds exactly L24 — index 23 is the ONLY possible ' +
+    'gravmaze index until obstacle-era mazes land (found ' + block2GenIdx.map(i => i + 1).join(',') + ')',
+    block2GenIdx.length === 1 && block2GenIdx[0] === 23, block2GenIdx);
+
+  // shape offsets come straight from the page's own SHAPE_STR (a top-level
+  // const, visible to page.evaluate like SONGS/blockOf already are elsewhere
+  // in this suite) — never duplicated/hardcoded here, so a shape edit can't
+  // silently desync the BFS from what the game actually draws.
+  const SHAPES = await page.evaluate('SHAPE_STR');
+  function shapeOff(L) {
+    const rows = SHAPES[L], off = [];
+    for (let y = 0; y < rows.length; y++) for (let x = 0; x < rows[y].length; x++) if (rows[y][x] === 'X') off.push({ x, y });
+    return off;
+  }
+  function fitsAt(off, ax, ay, wallRows, gw2, gh2) { // walls-only fit test, mirrors solidFits's wall check
+    for (const c of off) {
+      const x = ax + c.x, y = ay + c.y;
+      if (x < 0 || y < 0 || x >= gw2 || y >= gh2) return false;
+      if (wallRows[y][x] === '1') return false;
+    }
+    return true;
+  }
+  function bfsReach(off, sax, say, wallRows, gw2, gh2) { // every lattice anchor a drag can reach from spawn
+    const seen = new Set(), key = (x, y) => x + ',' + y;
+    if (!fitsAt(off, sax, say, wallRows, gw2, gh2)) return seen;
+    seen.add(key(sax, say));
+    const q = [[sax, say]];
+    while (q.length) {
+      const [ax, ay] = q.shift();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = ax + dx, ny = ay + dy, k = key(nx, ny);
+        if (seen.has(k) || !fitsAt(off, nx, ny, wallRows, gw2, gh2)) continue;
+        seen.add(k); q.push([nx, ny]);
+      }
+    }
+    return seen;
+  }
+
+  for (const gIdx of block2GenIdx) {
+    await load(gIdx);
+    const mi = await g('G=>G.mapInfo()');
+    check('phasgrav: gravmaze coverage — L' + (gIdx + 1) + ' (the only generated block-2 index today) ships ' +
+      'mapInfo().maze truthy, i.e. the gravmaze template actually shipped there', !!mi.maze, mi.maze);
+    // gravmaze replay (win, all home) is already asserted exactly by the
+    // 'gen L24: solver script replays to a win' check in the GEN_IDX loop
+    // above (info.hasScript && replayGen() to a win with every obj home) —
+    // extending that existing check rather than duplicating it here.
+
+    if (!mi.maze) continue;
+    const mz = mi.maze, gw2 = mi.walls[0].length, gh2 = mi.walls.length;
+    let tunnelBreach = null, missingHome = null;
+    for (const gm of mi.gems) {
+      const off = shapeOff(gm.L);
+      const reach = bfsReach(off, gm.ax, gm.ay, mi.walls, gw2, gh2);
+      for (const key of reach) {
+        const [ax, ay] = key.split(',').map(Number);
+        if (off.some(c => ay + c.y >= mz.ceil)) { tunnelBreach = { L: gm.L, ax, ay }; break; }
+      }
+      if (tunnelBreach) break;
+      if (gm.L !== mz.L && !reach.has(gm.sax + ',' + gm.say)) missingHome = gm.L;
+    }
+    check('L' + (gIdx + 1) + ' gravmaze BFS (walls-only lattice): no solid gem placement, including the ' +
+      'maze gem itself, ever reaches a tunnel cell (row >= ceil ' + mz.ceil + ')',
+      tunnelBreach === null, { tunnelBreach, mz });
+    check('L' + (gIdx + 1) + ' gravmaze BFS: every non-maze solid can still reach its own socket by plain drag',
+      missingHome === null, { missingHome, gems: mi.gems });
+
+    // docked-well negative: melt the maze gem and leave the well DOCKED
+    // (uniform down — setGrav is never called), then confirm plain drainage
+    // alone cannot solve it. Measured form (task 3): the mouth only lets
+    // part of the gem's overhead footprint through, so the pour parks near
+    // the mouth end, columns away from the alcove, and freeze refuses there.
+    await load(gIdx);
+    let gv = await g('G=>G.gravAt()');
+    check('L' + (gIdx + 1) + ' docked-well negative: well starts DOCKED (uniform down)', gv && gv.docked === true, gv);
+    await apply('heat', mz.L);
+    for (let k = 0; k < 12; k++) await step(5); // ~60s sim, docked the whole way
+    const o4 = await obj(mz.L);
+    const pocketCx = mz.pc + mz.mw / 2;
+    check('L' + (gIdx + 1) + ' docked-well negative: melt under docked gravity parks the pour columns away ' +
+      'from the alcove (cx ' + o4.cx.toFixed(2) + ' vs pocket cx ' + pocketCx.toFixed(2) + ')',
+      Math.abs(o4.cx - pocketCx) > 3, o4);
+    check('L' + (gIdx + 1) + ' docked-well negative: not home after ~60s of docked-only sim', !o4.home, o4);
+    const tapOk4 = await tap(mz.L);
+    check('L' + (gIdx + 1) + ' docked-well negative: the freeze tap is refused while parked off the socket',
+      !tapOk4, { tapOk4, o4 });
   }
 
   // ---------- phasweave: template coverage across the generated indices below 65 ----------
