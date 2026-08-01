@@ -48,11 +48,7 @@ backlog entry here.
 
 ## Next
 
-- [phasic] Block-lesson naming: display-layer "Word · Name" prefix for
-  blocks 0–7. *Decided 2026-07-31: prefix everything; tutorials keep
-  their names; endless unprefixed.* Run LAST (after phasgrav renames).
-  **Plan ready (2026-07-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phasnames.block-lesson-naming.md`
+- (none)
 
 ## Later
 
