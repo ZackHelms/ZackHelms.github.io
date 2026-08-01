@@ -57,7 +57,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-01 02:42 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-01 03:14 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -242,6 +242,9 @@ const LEVELS = [
        '.oo.##....',
        '..oo##....',
        '....##....']},
+/* UNUSED (legacy pool): dropped out of the gravity block when 'The Side Pocket'
+   became its opener — mostly a drag level, the weakest orb lesson of the seven.
+   Kept whole so a future block can pick it back up; AUTH simply skips LEVELS[8]. */
 { name:'Spring Cleaning', heat:1, cold:0, grav:1,
   hint:'A jumbled pile. Most of it just needs putting away — the blue one needs the well.',
   map:['ggg...yy..',
@@ -371,6 +374,15 @@ whole:{ name:'The Whole Spectrum', heat:0, cold:0, grav:0,
   hint:'All eight gems, no walls, no tools — just a crowded drawer. Unpack it.',
   map:['..M.CCCBB.','PPPP.C..B.','.....C.RR.','.GGG...RR.','..G..YYOO.','....YY..OO',
        '..........','.rr.oo..yy','.rr..ooyy.','.ccc.ggg..','..c...g.bb','m.cpppp..b']},
+gravity:{ name:'The Side Pocket', heat:1, cold:0, grav:1,
+  cx:{gems:1,flames:1,frosts:0,grav:1,obstacles:0,basePts:0},
+  hint:'Liquid falls TOWARD the gravity well. Melt the gem, then lift the well out of its middle bucket and set it beside the alcove — the pour will climb the wall to reach it.',
+  /* orb-mandatory by geometry: the socket sits in a walled 2x2 alcove whose only
+     mouth is the 1-tall slot at (7,6). No 2x2 solid fits through a 1-tall gap, and
+     plain down-drainage can only ever fall past the mouth — the pour reaches the
+     alcove exactly when the well is set on the right ring at the mouth's height. */
+  map:['..........','..RR......','..RR......','..........','.......###','.......#rr',
+       '........rr','.......###','.......###','.......###','.......###','.......###']},
 water:{ name:'Standing Water', heat:0, cold:1, grav:0, base:{R:'liquid'},
   cx:{gems:1,flames:0,frosts:1,grav:0,obstacles:0,basePts:2},
   hint:'This gem was born liquid. Catch it with frost to make it stone — and know that taking the frost back melts it again.',
@@ -406,7 +418,7 @@ stopper:{ name:'The Stopper', heat:1, cold:0, grav:1,
 /* ============ state ============ */
 const AUTH={ 0:NEWL.first, 1:LEVELS[0], 2:LEVELS[1], 7:NEWL.whole,
   8:LEVELS[2], 9:LEVELS[3], 10:LEVELS[4], 11:LEVELS[5], 12:LEVELS[11], 13:LEVELS[12], 15:LEVELS[15],
-  16:LEVELS[6], 17:LEVELS[7], 18:LEVELS[8], 19:LEVELS[9], 20:LEVELS[10], 21:LEVELS[13], 22:LEVELS[14],
+  16:NEWL.gravity, 17:LEVELS[6], 18:LEVELS[7], 19:LEVELS[9], 20:LEVELS[10], 21:LEVELS[13], 22:LEVELS[14],
   24:NEWL.water, 32:NEWL.vapor, 40:NEWL.voidl, 48:NEWL.growth, 56:NEWL.wind, 57:NEWL.stopper };
 // complexity annotations for the legacy authored levels (flames = required
 // flame applications, frosts = required frost applications)

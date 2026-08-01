@@ -277,54 +277,56 @@ function check(name, cond, extra) {
   check('L12: tap freezes the second gem', await tapRetry('R'));
   check('L13: solved with a single flame', await ensureHome('R', 7, 9) && await allHome(0.4), await st());
 
-  // ---------- L17 Sideways: the well leaves its bucket; win with well deployed ----------
+  // ---------- L17 The Side Pocket: the gravity block opens ORB-MANDATORY ----------
+  // The socket lives in a walled 2x2 alcove whose only mouth is a 1-cell-tall
+  // slot at (7,6): no 2x2 solid fits it, and plain down-drainage can only fall
+  // past it. The single route is melt -> undock the well onto the right ring at
+  // the mouth's height -> the pour climbs the plinth wall and in -> freeze.
   await load(16);
+  s = await st();
+  check('L17: one gem, one flame, the well — and no frost', s.objs.length === 1 && s.heatN === 1 && s.coldN === 0, s);
   let gv = await g('G=>G.gravAt()');
   check('L17: well starts DOCKED (uniform down)', gv && gv.docked === true, gv);
-  await apply('heat', 'R'); await step(2.5);
+  o = await dragPath('R', [[8, 5]]);
+  check('L17: the 2x2 solid cannot be dragged into the alcove — the mouth is 1 cell tall', o.ax < 7, o);
+  await apply('heat', 'R');
+  let t = await stepUntil('s=>{const o=s.objs[0];return o.miny>10;}', 25);
   o = await obj('R');
-  check('L17: docked well means the melt fell straight down', o.cy > 9 && o.cx > 5.2, o);
-  await setGrav(-1.2, 5.5);
+  check('L17: docked, the melt drains straight down and never enters the alcove (' + t + 's)', t > 0 && o.maxx < 7, o);
+  await setGrav(11.5, 6.5);
   gv = await g('G=>G.gravAt()');
   check('L17: placing the well undocks it', gv && gv.docked === false, gv);
-  let t = await stepUntil('s=>{const o=s.objs[0];return o.cx<1.8&&o.cy>4&&o.cy<7.6;}', 30);
-  check('L17: liquid pooled against the left wall at the well (' + t + 's)', t > 0, await obj('R'));
-  check('L17: tap freezes it there', await tapRetry('R'));
-  check('L17: home', await ensureHome('R', 0, 5));
+  t = await stepUntil('s=>{const o=s.objs[0];return o.minx>7.2&&o.maxy<7;}', 30);
+  check('L17: the well pulled the pour up the wall and through the slot (' + t + 's)', t > 0, await obj('R'));
+  check('L17: tap freezes it in the alcove', await tapRetry('R'));
+  check('L17: solved — the socket is reachable only with the well', await ensureHome('R', 8, 5) && await allHome(0.4), await st());
+
+  // ---------- L18 Sideways: the well leaves its bucket; win with well deployed ----------
+  await load(17);
+  gv = await g('G=>G.gravAt()');
+  check('L18: well starts DOCKED (uniform down)', gv && gv.docked === true, gv);
+  await apply('heat', 'R'); await step(2.5);
+  o = await obj('R');
+  check('L18: docked well means the melt fell straight down', o.cy > 9 && o.cx > 5.2, o);
+  await setGrav(-1.2, 5.5);
+  gv = await g('G=>G.gravAt()');
+  check('L18: placing the well undocks it', gv && gv.docked === false, gv);
+  t = await stepUntil('s=>{const o=s.objs[0];return o.cx<1.8&&o.cy>4&&o.cy<7.6;}', 30);
+  check('L18: liquid pooled against the left wall at the well (' + t + 's)', t > 0, await obj('R'));
+  check('L18: tap freezes it there', await tapRetry('R'));
+  check('L18: home', await ensureHome('R', 0, 5));
   await page.waitForTimeout(900);
   gv = await g('G=>G.gravAt()');
-  check('L17: level cleared WITH the well still deployed on the ring', (await st()).game === 'clear' && gv && gv.docked === false, gv);
+  check('L18: level cleared WITH the well still deployed on the ring', (await st()).game === 'clear' && gv && gv.docked === false, gv);
 
-  // ---------- L18 Point Pull ----------
-  await load(17);
+  // ---------- L19 Point Pull ----------
+  await load(18);
   await apply('heat', 'O');
   await setGrav(1.5, 13.5);
   t = await stepUntil('s=>{const o=s.objs[0];return o.cy>8.6&&o.cx<3.6;}', 30);
-  check('L18: point placement chose the LEFT branch (' + t + 's)', t > 0, await obj('O'));
-  check('L8: tap freezes', await tapRetry('O'));
-  check('L18: solved', await ensureHome('O', 1, 9) && await allHome(0.4), await st());
-
-  // ---------- L19 Spring Cleaning ----------
-  await load(18);
-  gv = await g('G=>G.gravAt()');
-  check('L19: well starts docked', gv && gv.docked === true, gv);
-  await dragPath('G', [[1, 4], [0, 0]]);
-  await dragPath('Y', [[3, 4], [5, 0]]);
-  await dragPath('M', [[3, 7], [4, 4]]);
-  s = await st();
-  check('L19: pile mostly tidied by drag', s.objs.filter(x => x.home).length === 3, s.objs);
-  await apply('heat', 'B'); await step(3);
-  o = await obj('B');
-  check('L19: melt fell straight down under docked gravity', o.cy > 9.5 && o.cx < 5, o);
-  await setGrav(10.5, 6);
-  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="B");return o.cx>6.8&&o.cy<7.8;}', 40);
-  check('L19: well lifted the liquid over the divider (' + t + 's)', t > 0, await obj('B'));
-  await setGrav(8, 13.5);
-  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="B");return o.cy>8.8;}', 30);
-  check('L19: liquid funneled into the chamber (' + t + 's)', t > 0, await obj('B'));
-  await step(1.5);
-  check('L19: tap freezes in the chamber', await tapRetry('B'));
-  check('L19: solved', await ensureHome('B', 7, 9) && await allHome(0.4), await st());
+  check('L19: point placement chose the LEFT branch (' + t + 's)', t > 0, await obj('O'));
+  check('L19: tap freezes', await tapRetry('O'));
+  check('L19: solved', await ensureHome('O', 1, 9) && await allHome(0.4), await st());
 
   // ---------- L20 The Kettle: steam to rain to stone, frost never needed ----------
   await load(19);
