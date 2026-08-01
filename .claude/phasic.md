@@ -262,6 +262,29 @@ cogwheel → LICENSE button; every wiki page shows a © footer linking it.
 CD-side IP actions (USPTO, copyright reg., Apple) live in TODO.md
 ## Needs Zack.
 
+## Brand icon (phasbrand round, 2026-08-01)
+
+- **`games/phasic/icon.svg`** — hand-authored 512x512-viewBox brand mark: 2x2
+  beveled ruby squares (game palette `#ff2244`/`#ff8899`/`#8d0f22`, drawGem bevel
+  style) over a leafy bush (bush palette `#123c1a`/`#2e7d32`/`#66bb6a`); horizontal
+  phase thirds across the whole gem block — bottom third opaque faceted solid,
+  middle third ~55%-opacity liquid with wavy top edge at the 1/3 line, top third
+  mostly-transparent gas puffs. Fully self-contained SVG (no external refs) — used
+  as favicon and inside CSS `url()`.
+- **`games/phasic/icon-1024.png`** — 1024x1024 RGBA master rasterized from the SVG
+  (playwright, `omitBackground`), keeps transparency. **iOS caveat:** App Store
+  icons disallow transparency — flattening onto an opaque background happens in
+  the future iOS pipeline, never here. Never run an optimizer/minifier on this
+  master.
+- **Game head links:** `rel="icon"` (SVG) + `rel="apple-touch-icon"` (PNG).
+- **Hub integration:** PHASIC card is FIRST in the hub grid; card markup keeps
+  `💠` as the icon-div text (the games-sync gate parses cards with a text-only-icon
+  regex and enforces card↔dataset icon equality — do not put an `<img>` in the
+  icon div); SVG renders via hub CSS rule `.game-card[href="phasic/"] .game-icon
+  { … background: url('phasic/icon.svg') …; font-size: 0; }`.
+- **Suite:** `phasbrand` group, 11 checks (files/magic bytes, head rels, hub-first
+  card, CSS rule, live computed-style render) — suite total 300.
+
 ## Known trade-offs / iOS-port notes
 
 - Frictionless liquid: a puddle with one particle over a lip can slowly
