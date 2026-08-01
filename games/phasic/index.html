@@ -494,7 +494,7 @@ function loadLevel(i){
   $('hintbar').textContent = 'L'+(i+1)+' · '+def.name+' — '+def.hint;
   const tst=$('toast'); tst.style.opacity=0;
   buildLvlSel();
-  if(typeof songStart==='function') songStart(i%10);
+  if(typeof songStart==='function') songStart(i<64?blockOf(i):i%10);
   if(fans.length>0) fanHumStart();
 }
 const cellX=c=>FX+(c+0.5)*CELL, cellY=c=>FY+(c+0.5)*CELL;
