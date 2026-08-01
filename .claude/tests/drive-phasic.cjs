@@ -31,6 +31,7 @@
 'use strict';
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 let chromium;
 try { ({ chromium } = require('playwright-core')); }
 catch (e) { console.error('playwright-core not resolvable (NODE_PATH).'); console.log('PHASIC DRIVE: 0 passed, 1 failed'); process.exit(1); }
@@ -807,6 +808,226 @@ function check(name, cond, extra) {
     const ok = await g('G=>G.replayGen()');
     check('endless L' + (i + 1) + ': generated + solver-replayed to a win', ok && (await st()).objs.every(x => x.home));
   }
+
+  // ---------- phasmazes: obstacle-era hazard mazes (blocks 5-7) — block-2
+  // byte-identity pin, determinism, per-kind coverage/replay, BFS fairness
+  // negatives ----------
+  // buildGen/mulberry are page-global functions (reachable via page.evaluate
+  // exactly like SHAPE_STR/blockOf above); mapInfo()/genInfo()/replayGen()
+  // are the TEST hooks documented at the top of this file. block2GenIdx is
+  // the SAME scan-derived array phasgrav computed above — reused here, never
+  // recomputed, so both sections agree on what "the generated block-2 index"
+  // even means.
+
+  // ---- (a) BLOCK-2 BYTE-IDENTITY — the run's hardest gate, now permanent.
+  // The hazard-maze template draw lives on a SEPARATE index-seeded mulberry
+  // (buildGen's mzIdx const) that only ever runs for b>=5, so a block-2
+  // candidate's own draw stream is untouched by construction — this gate
+  // proves it stays that way by hashing buildGen(i,salt)'s actual output for
+  // every block-2 generated index, across every salt getLevel's own scan can
+  // reach (0-19 the main scan, 90-95 the rescue band, 99 the emergency
+  // fallback — mirrored exactly off getLevel above), into one pinned
+  // SHA-256. A second corpus over block 3 (pre-maze drawer/two-shelf/attic
+  // content, unaffected by anything this plan touches) is pinned the same
+  // way as a harness-drift canary: if BOTH hashes move, suspect the harness
+  // (e.g. a JSON key-order change); if ONLY block-2 moves, it's real.
+  //
+  // *** PINNED HASHES ARE CD-SIGNED-OFF BLOCK-2 CONTENT (2026-08-01 block-2
+  // playtest verdict). A future edit that moves PINNED_BLOCK2_HASH is either
+  // a deliberate block-2 redesign — re-pin consciously, with a fresh CD
+  // verdict recorded — or a regression to fix. Never silently update the
+  // constant to make a red check green. ***
+  const HASH_SALTS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 90, 91, 92, 93, 94, 95, 99];
+  function stableStringify(val) { // recursive sorted-key JSON — key-order-proof hashing
+    if (val === null || typeof val !== 'object') return JSON.stringify(val);
+    if (Array.isArray(val)) return '[' + val.map(stableStringify).join(',') + ']';
+    const keys = Object.keys(val).sort();
+    return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(val[k])).join(',') + '}';
+  }
+  async function buildDefCorpus(indices) { // every buildGen(i,salt) def, in index-then-salt order
+    const entries = [];
+    for (const i of indices) for (const salt of HASH_SALTS) {
+      const def = await page.evaluate('buildGen(' + i + ',' + salt + ')');
+      entries.push({ i, salt, def });
+    }
+    return entries;
+  }
+  const PINNED_BLOCK2_HASH = '817f920cae53eb842e11daaef6fc3926ccfcc2e4ede58d1203d7ea3c89516b1d';
+  const PINNED_BLOCK3_CONTROL_HASH = '472939e0fa31d2e93c78aa4d91bfd2d0a342c92548cf700b8e232b25c95e3bb7';
+  const block3GenIdx = GEN_IDX.filter(i => i >= 24 && i <= 31); // control: block 3 (Frost/liquid-base), pre-maze content
+
+  const block2Hash = crypto.createHash('sha256').update(stableStringify(await buildDefCorpus(block2GenIdx))).digest('hex');
+  check('phasmazes: BLOCK-2 BYTE-IDENTITY — buildGen defs for every block-2 generated index (L' +
+    block2GenIdx.map(i => i + 1).join(',L') + ') across salts ' + HASH_SALTS.length +
+    ' (0-19,90-95,99) hash to the pinned SHA-256',
+    block2Hash === PINNED_BLOCK2_HASH, { block2Hash, PINNED_BLOCK2_HASH });
+
+  const block3Hash = crypto.createHash('sha256').update(stableStringify(await buildDefCorpus(block3GenIdx))).digest('hex');
+  check('phasmazes: control corpus — block 3 (L' + block3GenIdx.map(i => i + 1).join(',L') +
+    ', pre-maze content) buildGen defs hash to their own pinned SHA-256 (harness-drift canary for the gate above)',
+    block3Hash === PINNED_BLOCK3_CONTROL_HASH, { block3Hash, PINNED_BLOCK3_CONTROL_HASH });
+
+  // ---- (b) DETERMINISM: two FRESH page loads (genCache is page-lifetime —
+  // an in-page second load would just read the cache and prove nothing about
+  // the generator itself) of one hazard-maze index must produce byte-
+  // identical mapInfo. Same fresh-reload technique the phasdaily section
+  // below establishes for its own determinism gate — reproduced locally
+  // here since phasdaily's helpers are declared later in this file and
+  // aren't in scope yet at this point in the script. ----
+  async function mazesReload() {
+    await page.goto('file://' + GAME + '?test=1', { waitUntil: 'load', timeout: 20000 });
+    await page.waitForTimeout(400);
+  }
+  function serializeMazeBoard(mi) { // walls+gems+template+holes+bushes+fans+beam+maze, order-independent
+    const s2 = arr => arr.map(x => JSON.stringify(x)).sort();
+    return stableStringify({
+      template: mi.template, maze: mi.maze, walls: mi.walls,
+      gems: s2(mi.gems.map(g2 => ({ L: g2.L, ax: g2.ax, ay: g2.ay, sax: g2.sax, say: g2.say, w: g2.w, h: g2.h, base: g2.base }))),
+      holes: s2(mi.holes), bushes: s2(mi.bushes), fans: s2(mi.fans), beam: s2(mi.beam),
+    });
+  }
+  await mazesReload();
+  await load(50);
+  const detSerial1 = serializeMazeBoard(await g('G=>G.mapInfo()'));
+  await mazesReload();
+  await load(50);
+  const detSerial2 = serializeMazeBoard(await g('G=>G.mapInfo()'));
+  check('phasmazes determinism: L51 (bush maze, index 50) generates an identical board (walls+gems+' +
+    'template+holes+bushes+fans+beam+maze) across two fresh page loads',
+    detSerial1 === detSerial2, { equal: detSerial1 === detSerial2 });
+
+  // ---- (c) PER-KIND COVERAGE + REPLAY: void (42), bush (50), fan (60), plus
+  // the width-decline case (43 — walls-only is the correct fallback when the
+  // maze gem is too wide for the void's alcove, not a broken hazard). ----
+  async function loadMazeInfo(i) {
+    await load(i);
+    return { info: await g('G=>G.genInfo()'), mi: await g('G=>G.mapInfo()') };
+  }
+  const { info: info42, mi: mi42 } = await loadMazeInfo(42);
+  check('phasmazes: L43 (index 42) ships the gravmaze template', info42 && info42.template === 'gravmaze', info42);
+  check('phasmazes: L43 void maze — holes present, bushes/fans absent',
+    mi42.holes.length >= 1 && mi42.bushes.length === 0 && mi42.fans.length === 0,
+    { holes: mi42.holes.length, bushes: mi42.bushes.length, fans: mi42.fans.length });
+  const replay42 = await g('G=>G.replayGen()');
+  check('phasmazes: L43 void maze — solver script replays to a win (the served board is solver-beaten)',
+    replay42 === true && (await st()).objs.every(x => x.home), replay42);
+
+  const { info: info50, mi: mi50 } = await loadMazeInfo(50);
+  check('phasmazes: L51 (index 50) ships the gravmaze template', info50 && info50.template === 'gravmaze', info50);
+  check('phasmazes: L51 bush maze — bushes present, holes/fans absent',
+    mi50.bushes.length >= 1 && mi50.holes.length === 0 && mi50.fans.length === 0,
+    { holes: mi50.holes.length, bushes: mi50.bushes.length, fans: mi50.fans.length });
+  const replay50 = await g('G=>G.replayGen()');
+  check('phasmazes: L51 bush maze — solver script replays to a win (the served board is solver-beaten)',
+    replay50 === true && (await st()).objs.every(x => x.home), replay50);
+
+  const { info: info60, mi: mi60 } = await loadMazeInfo(60);
+  check('phasmazes: L61 (index 60) ships the gravmaze template', info60 && info60.template === 'gravmaze', info60);
+  check('phasmazes: L61 fan maze — fans+beam present, holes/bushes absent',
+    mi60.fans.length >= 1 && mi60.beam.length >= 1 && mi60.holes.length === 0 && mi60.bushes.length === 0,
+    { holes: mi60.holes.length, bushes: mi60.bushes.length, fans: mi60.fans.length, beam: mi60.beam.length });
+  const replay60 = await g('G=>G.replayGen()');
+  check('phasmazes: L61 fan maze — solver script replays to a win (the served board is solver-beaten)',
+    replay60 === true && (await st()).objs.every(x => x.home), replay60);
+
+  const { info: info43, mi: mi43 } = await loadMazeInfo(43);
+  check('phasmazes: L44 (index 43) ships the gravmaze template', info43 && info43.template === 'gravmaze', info43);
+  check('phasmazes: L44 width-decline gravmaze — ZERO hazards (holes+bushes+fans all empty; the maze ' +
+    'gem is 3 wide so void declined and no newer kind is eligible at block 5 — walls-only is correct here)',
+    mi43.holes.length === 0 && mi43.bushes.length === 0 && mi43.fans.length === 0,
+    { holes: mi43.holes.length, bushes: mi43.bushes.length, fans: mi43.fans.length });
+
+  // ---- (d) BFS NEGATIVES per kind, computed in node from mapInfo (mirrors
+  // phasgrav's BFS style above: walls row-strings are '1'/'0' per cell). ----
+  function wallOpen(wallRows, x, y) { // true if (x,y) is on-grid and NOT a '#' wall
+    if (y < 0 || y >= wallRows.length || x < 0 || x >= wallRows[0].length) return false;
+    return wallRows[y][x] === '0';
+  }
+  function mazeBfsRoute(wallRows, extraBlocked, x0, y0, x1, y1) { // 4-neighbour BFS; walls + extraBlocked(x,y) both block
+    const open = (x, y) => wallOpen(wallRows, x, y) && !extraBlocked(x, y);
+    const seen = new Set();
+    const key = (x, y) => x + ',' + y;
+    if (!open(x0, y0) || !open(x1, y1)) return { reach: false, seen };
+    seen.add(key(x0, y0));
+    const q = [[x0, y0]];
+    while (q.length) {
+      const [cx, cy] = q.shift();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = cx + dx, ny = cy + dy, k = key(nx, ny);
+        if (seen.has(k) || !open(nx, ny)) continue;
+        seen.add(k); q.push([nx, ny]);
+      }
+    }
+    return { reach: seen.has(key(x1, y1)), seen };
+  }
+
+  // bush (L51, index 50): liquid is drunk by a bush on contact — a route
+  // that treats '%' cells as blocked must FAIL; the same route with '%'
+  // passable (the vapor path) must SUCCEED, since that is the only way past
+  // the hedge (mirrors mazeRouteOk's own liquid-vs-gas bush rule).
+  const gemR50 = mi50.gems.find(g2 => g2.L === mi50.maze.L);
+  const bushSet50 = new Set(mi50.bushes.map(b => b.x + ',' + b.y));
+  const mouth50 = [mi50.maze.mx, mi50.maze.top], sock50 = [gemR50.sax, gemR50.say];
+  const bushBlockedRoute = mazeBfsRoute(mi50.walls, (x, y) => bushSet50.has(x + ',' + y), mouth50[0], mouth50[1], sock50[0], sock50[1]);
+  check('phasmazes: L51 bush maze — liquid route (bush cells blocked) from mouth to socket FAILS (the hedge drinks a plain pour)',
+    !bushBlockedRoute.reach, { mouth: mouth50, sock: sock50, bushes: mi50.bushes });
+  const bushOpenRoute = mazeBfsRoute(mi50.walls, () => false, mouth50[0], mouth50[1], sock50[0], sock50[1]);
+  check('phasmazes: L51 bush maze — vapor route (bush cells passable) from mouth to socket SUCCEEDS (the only way past the hedge)',
+    bushOpenRoute.reach, { mouth: mouth50, sock: sock50 });
+
+  // fan (L61, index 60): the beam must cover the floor-baffle climb gate (the
+  // one open tunnel row at that column — TOP+1 and FLOOR are walled by the
+  // baffle itself), forcing a liquid crossing instead of a vapor float over
+  // it; the fan tile is solid to stone/liquid (mirrors solidBlockAt /
+  // collideParticleWalls in the page source) so it must not read as open in
+  // the walls grid AND must be excluded from the BFS traversal graph, yet a
+  // liquid route must still exist around it — an obstruction, not a seal.
+  const floorBaffle60 = mi60.maze.baffles.find(b => b.k === 'floor');
+  check('phasmazes: L61 fan maze has a floor baffle to derive the climb gate from', !!floorBaffle60, mi60.maze.baffles);
+  const climbGateCells = [];
+  for (let y = mi60.maze.top; y <= mi60.maze.floorY; y++)
+    if (wallOpen(mi60.walls, floorBaffle60.x, y)) climbGateCells.push({ x: floorBaffle60.x, y });
+  const beamSet60 = new Set(mi60.beam.map(b => b.x + ',' + b.y));
+  check('phasmazes: L61 fan maze — every open tunnel cell above the floor baffle (the climb gate, x=' +
+    floorBaffle60.x + ') is in the fan beam',
+    climbGateCells.length > 0 && climbGateCells.every(c => beamSet60.has(c.x + ',' + c.y)),
+    { climbGateCells, beam: mi60.beam });
+  const fan60 = mi60.fans[0];
+  check('phasmazes: L61 fan maze — the fan tile is NOT a "#" wall cell (a distinct hazard the BFS graph ' +
+    'must exclude on its own, not get for free from the walls grid)',
+    wallOpen(mi60.walls, fan60.x, fan60.y), fan60);
+  const gemR60 = mi60.gems.find(g2 => g2.L === mi60.maze.L);
+  const mouth60 = [mi60.maze.mx, mi60.maze.top], sock60 = [gemR60.sax, gemR60.say];
+  const fanBlockedRoute = mazeBfsRoute(mi60.walls, (x, y) => x === fan60.x && y === fan60.y, mouth60[0], mouth60[1], sock60[0], sock60[1]);
+  check('phasmazes: L61 fan maze — liquid route from mouth to socket SUCCEEDS with the fan tile excluded from the graph (the obstruction narrows the route, it never seals it)',
+    fanBlockedRoute.reach, { mouth: mouth60, sock: sock60, fan: fan60 });
+  check('phasmazes: L61 fan maze — the fan tile cell itself never enters the open-route BFS graph',
+    !fanBlockedRoute.seen.has(fan60.x + ',' + fan60.y), { fan: fan60, seenSize: fanBlockedRoute.seen.size });
+
+  // void (L43, index 42): a careful route (every open cell strictly >=1.5
+  // from every hole, matching the page's own mazeRouteOk pull-radius rule —
+  // it blocks at <1.5) must exist from mouth to socket, AND at least one
+  // open tunnel cell must sit within that same 1.5-cell pull — the overshot
+  // threat is real, not decorative.
+  const gemR42 = mi42.gems.find(g2 => g2.L === mi42.maze.L);
+  const mouth42 = [mi42.maze.mx, mi42.maze.top], sock42 = [gemR42.sax, gemR42.say];
+  const nearHole42 = (x, y) => mi42.holes.some(h => Math.hypot(h.x - x, h.y - y) < 1.5);
+  const voidSafeRoute = mazeBfsRoute(mi42.walls, nearHole42, mouth42[0], mouth42[1], sock42[0], sock42[1]);
+  check('phasmazes: L43 void maze — a careful route (every cell >=1.5 from every hole) exists from mouth to socket',
+    voidSafeRoute.reach, { mouth: mouth42, sock: sock42, holes: mi42.holes });
+  let threatCell42 = null;
+  for (let y = mi42.maze.top; y <= mi42.maze.floorY && !threatCell42; y++)
+    for (let x = 0; x < mi42.walls[0].length && !threatCell42; x++) {
+      if (!wallOpen(mi42.walls, x, y)) continue;
+      if (mi42.holes.some(h => h.x === x && h.y === y)) continue; // the hole's own cell, not a route cell
+      if (nearHole42(x, y)) threatCell42 = { x, y };
+    }
+  check('phasmazes: L43 void maze — at least one open tunnel cell sits within the hole\'s 1.5-cell pull (the overshot threat is real, not decorative)',
+    threatCell42 !== null, threatCell42);
+
+  // ---- (e) cleanup: leave no maze level loaded — low-index authored level,
+  // same section-boundary convention the rest of this suite uses. ----
+  await load(0);
 
   // ---------- phasfreeze: settled-puddle freeze fix (commit 16c4a28) ----------
   // tryFreeze now widens the per-particle jump cap for RESTING puddles only —
