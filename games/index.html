@@ -57,6 +57,7 @@ h1 {
   transform: translateY(-2px);
 }
 .game-icon { font-size: 1.8rem; flex-shrink: 0; }
+.game-card[href="phasic/"] .game-icon { width: 2.1rem; height: 2.1rem; background: url('phasic/icon.svg') center/contain no-repeat; font-size: 0; }
 .game-info { display: flex; flex-direction: column; gap: 3px; }
 .game-name {
   font-family: 'Black Ops One', sans-serif;
@@ -139,12 +140,20 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-31 12:23 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-01 01:41 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
 
   <div class="grid">
+    <a class="game-card" href="phasic/">
+      <div class="game-icon">💠</div>
+      <div class="game-info">
+        <div class="game-name">PHASIC</div>
+        <div class="game-desc">Gems have three states. Melt them through slots, boil them up flues, steer the fall with a gravity well you can pluck from its bucket, and crystallize every gem back into its socket.</div>
+      </div>
+    </a>
+
     <a class="game-card" href="zed-shooter/">
       <div class="game-icon">🧟</div>
       <div class="game-info">
@@ -500,14 +509,6 @@ h1 {
       <div class="game-info">
         <div class="game-name">WAYFINDER</div>
         <div class="game-desc">A 3D valley, a paper map and a compass — and no dot showing where you are. Nine lessons teach real orienteering: bearings, pacing, contours, relocating in the dark.</div>
-      </div>
-    </a>
-
-    <a class="game-card" href="phasic/">
-      <div class="game-icon">💠</div>
-      <div class="game-info">
-        <div class="game-name">PHASIC</div>
-        <div class="game-desc">Gems have three states. Melt them through slots, boil them up flues, steer the fall with a gravity well you can pluck from its bucket, and crystallize every gem back into its socket.</div>
       </div>
     </a>
   </div>
