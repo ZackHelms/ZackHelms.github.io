@@ -77,6 +77,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
   well decides which way the world falls.<br><br>Drag solids. Pour liquids. Herd gas.
   Crystallize every gem into its matching socket.</div>
   <button id="play-btn" class="obtn">PLAY</button>
+  <button id="daily-btn" class="obtn alt">DAILY</button>
 </div>
 
 <div id="failov" class="overlay hide">
@@ -455,12 +456,25 @@ let save; try{ save = JSON.parse(localStorage.getItem('phasic_v1')||'{}'); }catc
 save = Object.assign({done:[], mus:60, sfx:80, musMute:false, sfxMute:false}, save);
 const persist = ()=>{ try{ localStorage.setItem('phasic_v1', JSON.stringify(save)); }catch(e){} };
 
+/* ============ daily challenge ============
+   A date-derived index far above any curriculum boundary (DAILY_BASE) is
+   just another endless index — getLevel(dailyIdx()) generates + solver-
+   proves it like any other. dayPin lets TEST pin the day number so suite
+   runs never depend on the wall clock; dateKey() derives from that same
+   pinned day so it stays in lockstep with dailyIdx(). */
+const DAILY_BASE=100000;
+let dayPin=null;
+const dayNum=()=>dayPin!=null?dayPin:Math.floor(Date.now()/86400000);
+const dailyIdx=()=>DAILY_BASE+dayNum();
+const dateKey=()=>new Date(dayNum()*86400000).toISOString().slice(0,10);
+
 let cv,ctx,DPR=1,W=0,H=0;
 let FX=0,FY=0,CELL=32,BR=20,BZ=92,CZ=104,LAND=false;
 // field origin, cell px, border px, bucket zone px (portrait: bottom strip
 // height); CZ is the landscape equivalent (right-column strip width); LAND
 // is the current-layout orientation flag (W>H), set once per layout() call
 let game='menu', lvlIdx=0, lvl=null;
+let dailyMode=false;   // set by #daily-btn, kept OUT of `save` — see loadLevel/levelClear/buildLvlSel guards
 let walls=null, objs=[], heatN=0, coldN=0, gravSrc=null;
 let holes=[], bushes=new Set(), fans=[], fanBeam={}, failT=0;
 let dragObj=null, dragSrc=null, dragGrav=false, finger={x:0,y:0};
@@ -522,7 +536,7 @@ function loadLevel(i){
   const def=getLevel(i);
   setupLevel(def,i);
   $('failov').classList.add('hide');
-  $('hintbar').textContent = 'L'+(i+1)+' · '+lvlName(i,def)+' — '+def.hint;
+  $('hintbar').textContent = (dailyMode ? 'DAILY '+dateKey()+' · ' : 'L'+(i+1)+' · ')+lvlName(i,def)+' — '+def.hint;
   const tst=$('toast'); tst.style.opacity=0;
   buildLvlSel();
   if(typeof songStart==='function') songStart(i<64?blockOf(i):i%10);
@@ -1087,10 +1101,13 @@ function updateHome(o){ // a gem is "home" while it rests solid in its socket �
 }
 function levelClear(){
   if(game!=='play'||!objs.every(o=>o.home)){ clearPending=false; return; }
-  game='clear'; fanHumStop(); save.done[lvlIdx]=true; persist(); sfxWin();
+  game='clear'; fanHumStop();
+  if(dailyMode){ save.daily=save.daily||{}; save.daily[dateKey()]={t:Math.round(lvlT)}; }
+  else{ save.done[lvlIdx]=true; }
+  persist(); sfxWin();
   const stars = lvlT<50?3 : lvlT<110?2 : 1;
   $('clearstars').textContent='◆'.repeat(stars)+'◇'.repeat(3-stars);
-  $('clearname').textContent='L'+(lvlIdx+1)+' · '+lvlName(lvlIdx,lvl)+' · '+Math.round(lvlT)+'s';
+  $('clearname').textContent=(dailyMode ? 'DAILY '+dateKey()+' · ' : 'L'+(lvlIdx+1)+' · ')+lvlName(lvlIdx,lvl)+' · '+Math.round(lvlT)+'s';
   $('clearcx').textContent = lvl.cx ? 'COMPLEXITY '+cxScore(lvl.cx) : '';
   $('next-btn').style.display = '';
   $('clear').classList.remove('hide');
@@ -2076,7 +2093,7 @@ function getLevel(i){
    generator protocol, so TEST can step them deterministically. */
 const GHOST_SUBS=8;                 // script replay: sub-steps per rAF frame (60fps * 8 / 120Hz = 4x)
 const FLY_SUBS=2;                   // fly-home fallback: real time, so the 0.3 s stagger reads
-function ghostHint(){ if(lvl) $('hintbar').textContent='L'+(lvlIdx+1)+' · '+lvlName(lvlIdx,lvl)+' — '+lvl.hint; }
+function ghostHint(){ if(lvl) $('hintbar').textContent=(dailyMode ? 'DAILY '+dateKey()+' · ' : 'L'+(lvlIdx+1)+' · ')+lvlName(lvlIdx,lvl)+' — '+lvl.hint; }
 function ghostClearFlags(){ for(const o of objs){ o.flyHome=false; o.locked=false; } }
 function ghostEnd(){ // level left play, or was reloaded out from under the ghost
   if(!ghost) return;
@@ -2568,6 +2585,9 @@ document.addEventListener('visibilitychange',()=>{ if(!ac) return;
 
 /* ============ UI wiring ============ */
 function buildLvlSel(){
+  if(dailyMode) return;  // poison-trap 2 guard: never derive N from a ~100k daily lvlIdx —
+                          // the list is left exactly as it was before the daily loaded, and
+                          // the normal (non-daily) load paths rebuild it once daily mode ends
   const sel=$('lvlsel'); sel.innerHTML='';
   let hi=15; for(let k=0;k<save.done.length;k++) if(save.done[k]) hi=Math.max(hi,k);
   const N=Math.max(64,hi+2,lvlIdx+2); // 8 curriculum blocks of 8, endless beyond
@@ -2581,14 +2601,19 @@ function buildLvlSel(){
     sel.appendChild(op);
   }
 }
-$('play-btn').onclick=()=>{ audioInit(); $('menu').classList.add('hide');
+function updateDailyBtn(){ $('daily-btn').textContent = 'DAILY'+((save.daily||{})[dateKey()]?' ✓':''); }
+$('play-btn').onclick=()=>{ audioInit(); $('menu').classList.add('hide'); dailyMode=false;
   let i2=0; while(save.done[i2]) i2++;
   loadLevel(i2); };
-$('next-btn').onclick=()=>{ audioInit(); $('clear').classList.add('hide'); loadLevel(lvlIdx+1); };
+$('daily-btn').onclick=()=>{ audioInit(); $('menu').classList.add('hide');
+  dailyMode=true; loadLevel(dailyIdx()); };
+$('next-btn').onclick=()=>{ audioInit(); $('clear').classList.add('hide');
+  if(dailyMode){ dailyMode=false; $('menu').classList.remove('hide'); updateDailyBtn(); }
+  else loadLevel(lvlIdx+1); };
 $('replay-btn').onclick=()=>{ audioInit(); $('clear').classList.add('hide'); loadLevel(lvlIdx); };
 $('retry-btn').onclick=()=>{ audioInit(); $('failov').classList.add('hide'); loadLevel(lvlIdx); };
 $('reload-btn').onclick=()=>{ audioInit(); if(lvl){ $('clear').classList.add('hide'); $('failov').classList.add('hide'); loadLevel(lvlIdx); sfxTap(); } };
-$('lvlsel').onchange=e=>{ audioInit(); $('clear').classList.add('hide'); loadLevel(+e.target.value); };
+$('lvlsel').onchange=e=>{ audioInit(); $('clear').classList.add('hide'); dailyMode=false; loadLevel(+e.target.value); };
 $('gear-btn').onclick=()=>{ audioInit(); $('settings').classList.remove('hide'); };
 $('set-close').onclick=()=>{ $('settings').classList.add('hide'); };
 $('stuck-btn').onclick=()=>{ $('settings').classList.add('hide'); stuckSolve(); };
@@ -2611,7 +2636,7 @@ window.addEventListener('mouseup',onUp);
 cv.addEventListener('touchstart',onDown,{passive:false});
 cv.addEventListener('touchmove',onMove,{passive:false});
 cv.addEventListener('touchend',onUp,{passive:false});
-layout(); buildLvlSel(); applyVolumes();
+layout(); buildLvlSel(); applyVolumes(); updateDailyBtn();
 let lastT=0;
 function loop(t){
   const dt=Math.min(0.1,(t-lastT)/1000||0.016); lastT=t;
@@ -2631,7 +2656,8 @@ requestAnimationFrame(loop);
 /* ============ test API ============ */
 if(TEST){
   window.__GF={
-    load:i2=>{ $('menu').classList.add('hide'); $('clear').classList.add('hide'); loadLevel(i2); },
+    load:i2=>{ dailyMode=false; $('menu').classList.add('hide'); $('clear').classList.add('hide'); loadLevel(i2); },
+    setDay:n=>{ dayPin=n; },
     state:()=>({ game, lvl:lvlIdx, heatN, coldN,
       objs:objs.map(o=>{ const xs=o.ps.map(p=>(p.x-FX)/CELL), ys=o.ps.map(p=>(p.y-FY)/CELL);
         return { L:o.letter, phase:o.phase, heats:o.heats, frosts:o.frosts, base:o.base, dead:o.dead, home:o.home,
