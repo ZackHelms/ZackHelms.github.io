@@ -1,6 +1,6 @@
 # phasaudio — Phasic dedicated obstacle SFX + per-block music
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-08-01 (8ce92e4..5f730af on worktree-oversee+phasaudio; all tasks first-pass; one pre-existing L9 now-playing expectation updated for the behavior change — see follow-up)
 **Requested:** 2026-07-31 (backlog Next items from the refine round).
 **Scope:** `games/phasic/index.html` (audio section + `killGem`/`setupLevel`
 hooks), `.claude/tests/drive-phasic.cjs`, `.claude/phasic.md`.

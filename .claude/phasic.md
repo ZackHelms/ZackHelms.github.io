@@ -214,18 +214,30 @@ slide (`ensureLock`) is a legitimate player move the suite uses.
 ## Audio
 
 House WebAudio stack (lazy init, sfxGain/musicGain, shared noise buffer,
-visibilitychange suspend). SFX: melt gliss+hiss, boil bubbles, condense
+visibilitychange suspend). **SFX:** melt gliss+hiss, boil bubbles, condense
 reverse-hiss, freeze thunk, crystalline lock arp, slosh (velocity-triggered,
-throttled), cancel dual-chime, error buzz, win fanfare. **Music: 10 seeded
-generative songs** (`SONGS[]` — bpm/root/mode/prog/waves/hat/arp; mulberry32
-per song), rotating `level % 10`. Each song carries a `t:` title (01 First
-Light, 02 Copper Squares, 03 Slow Thaw, 04 Vapor Trail, 05 Deep Cellar,
-06 Warm Static, 07 Ride the Flue, 08 Still Water, 09 Amber Drift,
-10 Night Drawer — CD renames at will); a dim `NN · Title` now-playing line
-draws at the very bottom (center in portrait, bottom-left in landscape;
-drawn outside the shake transform; `__GF.nowPlaying()`). Settings overlay:
-separate music/SFX
+throttled), cancel dual-chime, win fanfare; **obstacle deaths** — void plays
+a dedicated **gulp** (descending 300→40 Hz sine + low thump + swallowed noise
+tail), bush plays a **slurp** (bandpass noise 800→300 Hz + two descending blips);
+`sfxError` remains for genuine rejects only. **Fan ambient hum:** one shared loop
+node (bandpass noise ~185 Hz, slow LFO, ≤0.05 into sfxGain), idempotent
+`fanHumStart/fanHumStop`, started by `loadLevel` when `fans.length>0`, stopped at
+`loadLevel` top + fail/clear transitions, never during `solving`/validation
+(those call `setupLevel` directly); `ac.suspend()` on `visibilitychange` silences
+it for free. It is SFX — governed by the SFX slider/mute, no new setting.
+**Music: 10 seeded generative songs** (`SONGS[]` — bpm/root/mode/prog/waves/hat/arp;
+mulberry32 per song), per-block assignment — `songStart(i<64?blockOf(i):i%10)`:
+curriculum blocks 0–7 own songs 0–7; endless (i≥64) rotates all 10 (songs 9–10
+appear only in endless — accepted shape, `SONGS[]` stays at 10). Each song carries
+a `t:` title (01 First Light, 02 Copper Squares, 03 Slow Thaw, 04 Vapor Trail,
+05 Deep Cellar, 06 Warm Static, 07 Ride the Flue, 08 Still Water, 09 Amber Drift,
+10 Night Drawer — CD renames at will); a dim `NN · Title` now-playing line draws
+at the very bottom (center in portrait, bottom-left in landscape; drawn outside
+the shake transform; `__GF.nowPlaying()`). Settings overlay: separate music/SFX
 sliders + mutes (persisted `phasic_v1`); top-left 🔊 is the master toggle.
+**TEST API:** `?test=1` freezes rAF sim; `window.__SFXLOG` (when set) logs
+`gulp`/`slurp`/`hum-on`/`hum-off`/`['song', idx]` before any `ac` guard.
+**Suite:** `phasaudio` group, 17 checks — suite total 317.
 
 ## Chrome / layout (phaschrome round, 2026-07-31)
 
