@@ -1,6 +1,9 @@
 # phasnames — block-lesson naming: every level displays its block's lead word as a prefix
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-08-01 — commits `b9994a7`..`f1fd53b` on
+`worktree-oversee+phasnames` (+ wrap-up docs), merged to `main` same day.
+All 3 tasks first-pass; a 4th display site (`ghostHint`) was added in
+preflight; suite 335→338. See `.follow-up.md`.
 **Requested:** 2026-07-31 (CD: "each set of 8 levels begins with the same
 word that describes the lesson"; same-day decision: **prefix everything**
 — uniform "Word · Name", tutorials keep their names).

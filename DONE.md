@@ -1,5 +1,17 @@
 # DONE — done log
 
+- 2026-08-01 [phasic] phasnames oversee run: block-lesson naming — every
+  curriculum level (indices 0–63) displays as `Word · Name` via
+  `BLOCK_WORD=['Drag','Flame','Gravity','Frost','Vapor','Void','Hedge',
+  'Wind']` + `lvlName(i,def)`, at four display sites (level-select
+  `N · Word · Name`, hint bar, ghost-replay hint, clear screen; the
+  ghost-hint site was a preflight addition — the plan listed three).
+  Display-layer only — defs, `genName`, `AUTH`, saves untouched; endless
+  (64+) unprefixed by design. Suite 335→338 (per-block menu scan,
+  `L1 · Drag ·` hintbar, endless-unprefixed). Curriculum-table block-2
+  row relabeled to level numbers in passing. (b9994a7..f1fd53b + wrap-up
+  docs; plan archived to .claude/plans/DONE/)
+
 - 2026-08-01 [phasic] phasgrav oversee run: the gravity block (L17–24) is
   now genuinely orb-mandatory. New opener 'The Side Pocket' (index 16,
   one 2x2 gem + flame + orb, walled side alcove); Spring Cleaning left

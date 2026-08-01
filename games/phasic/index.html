@@ -57,7 +57,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-01 05:13 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-01 12:32 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -522,7 +522,7 @@ function loadLevel(i){
   const def=getLevel(i);
   setupLevel(def,i);
   $('failov').classList.add('hide');
-  $('hintbar').textContent = 'L'+(i+1)+' · '+def.name+' — '+def.hint;
+  $('hintbar').textContent = 'L'+(i+1)+' · '+lvlName(i,def)+' — '+def.hint;
   const tst=$('toast'); tst.style.opacity=0;
   buildLvlSel();
   if(typeof songStart==='function') songStart(i<64?blockOf(i):i%10);
@@ -1090,7 +1090,7 @@ function levelClear(){
   game='clear'; fanHumStop(); save.done[lvlIdx]=true; persist(); sfxWin();
   const stars = lvlT<50?3 : lvlT<110?2 : 1;
   $('clearstars').textContent='◆'.repeat(stars)+'◇'.repeat(3-stars);
-  $('clearname').textContent='L'+(lvlIdx+1)+' · '+lvl.name+' · '+Math.round(lvlT)+'s';
+  $('clearname').textContent='L'+(lvlIdx+1)+' · '+lvlName(lvlIdx,lvl)+' · '+Math.round(lvlT)+'s';
   $('clearcx').textContent = lvl.cx ? 'COMPLEXITY '+cxScore(lvl.cx) : '';
   $('next-btn').style.display = '';
   $('clear').classList.remove('hide');
@@ -1231,6 +1231,9 @@ function stampGen(rows,shape,ax,ay,ch){
     if(shape[yy][xx]==='X') rows[ay+yy][ax+xx]=ch;
 }
 function blockOf(i){ return Math.min((i/8)|0, 7); }
+const BLOCK_WORD=['Drag','Flame','Gravity','Frost','Vapor','Void','Hedge','Wind'];
+function lvlName(i,def){ const nm=def?def.name:genName(i);
+  return i<64 ? BLOCK_WORD[blockOf(i)]+' · '+nm : nm; }
 /* ---- 'gravmaze': the gravity block's walls-only orb maze ----
    A tunnel three rows deep runs the width of the board under a walled
    ceiling whose ONLY opening is a single cell at one end. Inside, 2-3 wall
@@ -2073,7 +2076,7 @@ function getLevel(i){
    generator protocol, so TEST can step them deterministically. */
 const GHOST_SUBS=8;                 // script replay: sub-steps per rAF frame (60fps * 8 / 120Hz = 4x)
 const FLY_SUBS=2;                   // fly-home fallback: real time, so the 0.3 s stagger reads
-function ghostHint(){ if(lvl) $('hintbar').textContent='L'+(lvlIdx+1)+' · '+lvl.name+' — '+lvl.hint; }
+function ghostHint(){ if(lvl) $('hintbar').textContent='L'+(lvlIdx+1)+' · '+lvlName(lvlIdx,lvl)+' — '+lvl.hint; }
 function ghostClearFlags(){ for(const o of objs){ o.flyHome=false; o.locked=false; } }
 function ghostEnd(){ // level left play, or was reloaded out from under the ghost
   if(!ghost) return;
@@ -2572,7 +2575,7 @@ function buildLvlSel(){
     const unlocked = i2===0 || save.done[i2-1] || save.done[i2];
     const op=document.createElement('option');
     op.value=i2; op.disabled=!unlocked;
-    const nm=AUTH[i2]?AUTH[i2].name:genName(i2);
+    const nm=lvlName(i2,AUTH[i2]);
     op.textContent=(i2+1)+' · '+nm+(save.done[i2]?' ✓':unlocked?'':' 🔒');
     if(i2===lvlIdx) op.selected=true;
     sel.appendChild(op);

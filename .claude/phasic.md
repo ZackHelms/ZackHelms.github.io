@@ -84,13 +84,22 @@ block is generated with everything introduced so far, complexity rising.
 |---|---|---|---|
 | 0 | 1–8 | drag + fit; gem count ramps 1→8 | 1 The First Gem · 2 First Facets · 3 Shape Gates · 8 The Whole Spectrum (all 8, open drawer) |
 | 1 | 9–16 | flames (melt/boil + tap-revert) | 9 Meltdown · 10 Room to Pour · 11 Gem Drawer · 12 One Flame · 13 Queue · 14 Glassworks · 16 Full Spectrum |
-| 2 | 17–24 | gravity well + gas herding | 16 The Side Pocket · 17 Sideways · 18 Point Pull · 19 The Kettle · 20 Balloon Route · 21 Reflow · 22 Master Facet · 23 generated L24 |
+| 2 | 17–24 | gravity well + gas herding | 17 The Side Pocket · 18 Sideways · 19 Point Pull · 20 The Kettle · 21 Balloon Route · 22 Reflow · 23 Master Facet (L24 generated) |
 | 3 | 25–32 | liquid base state (frost holds it) | 25 Standing Water |
 | 4 | 33–40 | gas base state (two frosts) | 33 Loose Vapor |
 | 5 | 41–48 | black hole obstacle | 41 The Void |
 | 6 | 49–56 | bush obstacle | 49 Overgrowth |
 | 7 | 57–64 | fan obstacle | 57 Crosswind · 58 The Stopper (tactic level) |
 | ∞ | 65+ | endless, all factors mixed | — |
+
+**Block-lesson naming (phasnames, 2026-08-01):** every curriculum level
+displays as `Word · Name` — `BLOCK_WORD=['Drag','Flame','Gravity','Frost',
+'Vapor','Void','Hedge','Wind']` (one word per block, beside `blockOf`) and
+`lvlName(i,def)` wrap the stored name at the four display sites (level-select
+options — `N · Word · Name`, hint bar, ghost-replay hint, clear screen).
+Display-layer only: defs, `genName`, `AUTH`, `genCache` and saves are
+untouched, so determinism is unaffected. Endless (index 64+) is unprefixed
+(not a lesson block; CD can add a word with a one-line change).
 
 Future mechanics (added by the CD in later sessions) get their own 8-block
 inserted before the endless tail, same pattern: tutorial first, then mix.
