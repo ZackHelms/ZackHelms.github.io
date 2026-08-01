@@ -1,5 +1,15 @@
 # DONE — done log
 
+- 2026-08-01 [phasic] phasaudio oversee run: obstacle SFX + per-block
+  music — the void gulps (300→40 Hz sine + thump + swallowed noise), the
+  hedge slurps (bandpass sweep + two blips), fan levels hum (one shared
+  ~185 Hz loop, LFO, ≤0.05, loadLevel lifecycle, silent during solving/
+  validation); sfxError back to genuine rejects only. Songs: blocks 0–7
+  own songs 0–7 (`i<64?blockOf(i):i%10`), endless keeps the 10-song
+  rotation. TEST-only `__SFXLOG` proves wiring; bush/fan check levels
+  runtime-derived. Suite 300→317. (8ce92e4..5f730af + wrap-up docs; plan
+  archived to .claude/plans/DONE/)
+
 - 2026-08-01 [phasic] phasbrand oversee run: the brand round — hand-
   authored 2x2 phase-gem icon (`games/phasic/icon.svg`, 512 viewBox,
   ruby+bush game palettes, phase thirds: solid/liquid/gas bottom-to-top)

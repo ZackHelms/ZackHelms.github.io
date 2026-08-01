@@ -48,12 +48,6 @@ backlog entry here.
 
 ## Next
 
-- [phasic] Dedicated obstacle SFX (void gulp, bush slurp, fan hum) +
-  per-block music (songs by curriculum block instead of `level % 10`) —
-  merged: both audio-subsystem items. Note: phaschrome names the songs;
-  this plan changes which one plays per level — order-independent.
-  **Plan ready (2026-07-31)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phasaudio.obstacle-sfx-and-block-music.md`
 - [phasic] Orb-mandatory gravity block (L17–24): new one-gem opener,
   anti-shove hardening of the authored maps, walls-only orb-maze
   generation. *Decided 2026-07-31: block-2 mazes are walls-only —
