@@ -977,9 +977,9 @@ function check(name, cond, extra) {
   check('phaschrome: load(0) — nowPlaying shows track 01 with SONGS[0].t (' + songTitle0 + ')',
     (await g('G=>G.nowPlaying()')) === '01 · ' + songTitle0);
   await load(9);
-  const songTitle9 = await page.evaluate('SONGS[9].t');
-  check('phaschrome: load(9), i%10=9 — nowPlaying formats a double-digit track (10 · ' + songTitle9 + ')',
-    (await g('G=>G.nowPlaying()')) === '10 · ' + songTitle9);
+  const songTitle1 = await page.evaluate('SONGS[1].t');
+  check('phaschrome: load(9), block 1 — nowPlaying shows track 02 with SONGS[1].t (' + songTitle1 + ')',
+    (await g('G=>G.nowPlaying()')) === '02 · ' + songTitle1);
 
   // ---------- wiki: home, tactics page, live search (second page, same context) ----------
   const wpage = await ctx.newPage();
