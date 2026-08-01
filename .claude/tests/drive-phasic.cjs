@@ -302,33 +302,52 @@ function check(name, cond, extra) {
   check('L17: solved — the socket is reachable only with the well', await ensureHome('R', 8, 5) && await allHome(0.4), await st());
 
   // ---------- L18 Sideways: the well leaves its bucket; win with well deployed ----------
+  // Anti-shove (phasgrav task 2): the socket is a floor-level 2x2 nook behind the
+  // 1-tall mouth at (2,11) — no 2x2 solid fits, so the gem cannot be walked home
+  // as stone and the sideways pull is the only route.
   await load(17);
   gv = await g('G=>G.gravAt()');
   check('L18: well starts DOCKED (uniform down)', gv && gv.docked === true, gv);
-  await apply('heat', 'R'); await step(2.5);
+  o = await dragPath('R', [[6, 10], [2, 10], [0, 10]]);
+  check('L18: the 2x2 solid cannot be dragged into the floor nook — the mouth is 1 cell tall', !o.home && o.ax >= 3, o);
+  await load(17);
+  await apply('heat', 'R'); await step(3.5);
   o = await obj('R');
-  check('L18: docked well means the melt fell straight down', o.cy > 9 && o.cx > 5.2, o);
-  await setGrav(-1.2, 5.5);
+  check('L18: docked well means the melt fell straight down, clear of the nook', o.cy > 10.5 && o.cx > 5.2, o);
+  await setGrav(-1.2, 11.5);
   gv = await g('G=>G.gravAt()');
   check('L18: placing the well undocks it', gv && gv.docked === false, gv);
-  t = await stepUntil('s=>{const o=s.objs[0];return o.cx<1.8&&o.cy>4&&o.cy<7.6;}', 30);
-  check('L18: liquid pooled against the left wall at the well (' + t + 's)', t > 0, await obj('R'));
+  t = await stepUntil('s=>{const o=s.objs[0];return o.cx<1.6&&o.cy>9.4;}', 30);
+  check('L18: liquid walked along the floor into the nook at the well (' + t + 's)', t > 0, await obj('R'));
   check('L18: tap freezes it there', await tapRetry('R'));
-  check('L18: home', await ensureHome('R', 0, 5));
+  check('L18: home', await ensureHome('R', 0, 10));
   await page.waitForTimeout(900);
   gv = await g('G=>G.gravAt()');
   check('L18: level cleared WITH the well still deployed on the ring', (await st()).game === 'clear' && gv && gv.docked === false, gv);
 
   // ---------- L19 Point Pull ----------
+  // Anti-shove (phasgrav task 2): the left cellar is roofed with one 1-wide chute
+  // at (0,8) and every row of this gem is 2 cells wide, so no drag reaches it.
+  await load(18);
+  o = await dragPath('O', [[1, 4], [1, 7], [1, 10], [0, 10]]);
+  check('L19: the S-gem cannot be dragged into the left cellar — the chute is 1 wide', !o.home && o.ay <= 7, o);
   await load(18);
   await apply('heat', 'O');
   await setGrav(1.5, 13.5);
-  t = await stepUntil('s=>{const o=s.objs[0];return o.cy>8.6&&o.cx<3.6;}', 30);
-  check('L19: point placement chose the LEFT branch (' + t + 's)', t > 0, await obj('O'));
+  t = await stepUntil('s=>{const o=s.objs[0];return o.cy>9.4&&o.cx<3.6;}', 40);
+  check('L19: point placement chose the LEFT branch and dropped down the chute (' + t + 's)', t > 0, await obj('O'));
   check('L19: tap freezes', await tapRetry('O'));
-  check('L19: solved', await ensureHome('O', 1, 9) && await allHome(0.4), await st());
+  check('L19: solved', await ensureHome('O', 1, 10) && await allHome(0.4), await st());
 
   // ---------- L20 The Kettle: steam to rain to stone, frost never needed ----------
+  // Anti-shove (phasgrav task 2): this map needed no hardening — it carries a single
+  // gem (so no second solid exists to shove with) and that gem is 4 cells wide while
+  // the only way up is a 2-wide flue, so no solid can ever stand in the attic.
+  await load(19);
+  s = await st();
+  o = await dragPath('P', [[2, 5], [7, 5], [7, 1], [1, 2]]);
+  check('L20: lone 4x1 gem can never reach the 2-wide flue — no solid ever enters the attic',
+    s.objs.length === 1 && !o.home && o.ay >= 5, o);
   await load(19);
   await apply('heat', 'P'); await step(2);
   await apply('heat', 'P');
@@ -347,6 +366,11 @@ function check(name, cond, extra) {
   check('L20: solved — no frost bucket exists below L25', (await st()).coldN === 0 && await ensureHome('P', 1, 2) && await allHome(0.4), await st());
 
   // ---------- L21 Balloon Route ----------
+  // Anti-shove (phasgrav task 2): the ceiling pocket's doorway is the single cell
+  // (4,1) — this gem is 2 rows tall, so only the cloud can get through.
+  await load(20);
+  o = await dragPath('Y', [[1, 4], [1, 0], [3, 0], [5, 0]]);
+  check('L21: the 2-tall gem cannot be dragged into the ceiling pocket — the doorway is 1 cell', !o.home && o.ax <= 3, o);
   await load(20);
   await setGrav(0.5, 13.5);
   await apply('heat', 'Y'); await step(1.5); await apply('heat', 'Y');
@@ -399,6 +423,11 @@ function check(name, cond, extra) {
   check('L14: ruby last — line cleared', r13.drained && r13.home && await allHome(0.4), await st());
 
   // ---------- L22 Reflow ----------
+  // Anti-shove (phasgrav task 2): the far pocket is capped except for the 1-wide
+  // chute at column 9 — a 2x2 solid cannot descend it, so the lift is the only way in.
+  await load(21);
+  o = await dragPath('R', [[1, 5], [8, 5], [8, 7], [8, 10]]);
+  check('L22: the 2x2 solid cannot be dragged into the far pocket — the chute is 1 wide', !o.home && o.ay <= 7, o);
   await load(21);
   await setGrav(1.5, 13.5);
   await apply('heat', 'R'); await step(3);
@@ -406,20 +435,48 @@ function check(name, cond, extra) {
   await setGrav(11.2, 4.0);
   t = await stepUntil('s=>{const o=s.objs[0];return o.cx>7.6;}', 40);
   check('L22: liquid lifted over both pillars (' + t + 's)', t > 0, await obj('R'));
-  await setGrav(8.7, 13.5);
-  await step(4);
+  await setGrav(9.5, 13.5);
+  t = await stepUntil('s=>{const o=s.objs[0];return o.cy>9.8&&o.cx>7.6;}', 30);
+  check('L22: the corner well dropped it down the chute into the pocket (' + t + 's)', t > 0, await obj('R'));
+  await step(3);
   check('L22: tap freezes in the pocket', await tapRetry('R'));
   check('L22: solved by moving the well mid-flow', await ensureHome('R', 8, 10) && await allHome(0.4), await st());
 
   // ---------- L23 Master Facet ----------
+  // Anti-shove (phasgrav task 2): both slots sit in column 2, so the pour drops
+  // straight into the left cellar and never rests on a floor it could be pushed
+  // along. The socket is across a 3-tall divide (columns 5-6) reachable only by
+  // lifting the puddle onto the row-8 lane — the 1x1 escort shares the cellar and
+  // still cannot move it across. That negative is asserted before the solution.
+  await load(22);
+  await apply('heat', 'C'); await step(6);
+  await dragPath('M', [[2, 1], [2, 5], [2, 8], [0, 11]]);
+  let shovePeak = -1;
+  for (let k = 0; k < 3; k++) for (const row of [11, 10, 9]) {
+    await dragPath('M', [[0, row], [4, row]]);
+    shovePeak = Math.max(shovePeak, (await obj('C')).maxx);
+    await step(0.3);
+    shovePeak = Math.max(shovePeak, (await obj('C')).maxx);
+    await dragPath('M', [[0, row]]);
+  }
+  await step(2);
+  o = await obj('C');
+  check('L23 anti-cheese: shoving the puddle with the 1x1 never crosses the divide (peak x ' +
+    shovePeak.toFixed(2) + ')', shovePeak < 6.5 && !o.home, { shovePeak, cx: o.cx });
+
   await load(22);
   await apply('heat', 'C'); await step(2.5);
   check('L23: melt cleared the doorway', (await obj('C')).cy > 4);
-  await dragPath('M', [[2, 1], [2, 6], [7, 6], [7, 9], [1, 9], [0, 10]]);
+  await dragPath('M', [[2, 1], [2, 5], [2, 8], [0, 11]]);
   check('L23: 1x1 gem escorted through both slots', (await obj('M')).home, await obj('M'));
-  await setGrav(8.7, 13.5);
-  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="C");return o.cy>8.6;}', 30);
-  check('L23: liquid drained through both slots (' + t + 's)', t > 0, await obj('C'));
+  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="C");return o.cy>10.4&&o.cx<5;}', 30);
+  check('L23: liquid drained through both slots into the left cellar (' + t + 's)', t > 0, await obj('C'));
+  await setGrav(11.5, 8.5);
+  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="C");return o.cx>6.8&&o.cy<9.4;}', 60);
+  check('L23: the well lifted the pour over the 3-tall divide onto the lane (' + t + 's)', t > 0, await obj('C'));
+  await setGrav(8.5, 13.5);
+  t = await stepUntil('s=>{const o=s.objs.find(u=>u.L==="C");return o.cy>9.8&&o.cx>6.8;}', 40);
+  check('L23: dropped into the far cellar (' + t + 's)', t > 0, await obj('C'));
   await step(3);
   check('L23: tap freezes', await tapRetry('C'));
   check('L23: solved', await ensureHome('C', 7, 9) && await allHome(0.6), await st());

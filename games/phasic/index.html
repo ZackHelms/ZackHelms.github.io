@@ -57,7 +57,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-01 03:14 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-01 03:54 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -215,21 +215,29 @@ const LEVELS = [
        '..b..#.rr.',
        '.....#....']},
 { name:'Sideways', heat:1, cold:0, grav:1,
-  hint:'Drag the gravity well around the frame — liquid falls TOWARD it, wherever it sits.',
+  hint:'Drag the gravity well around the frame — liquid falls TOWARD it, wherever it sits. Set it low on the left and the pour slides along the floor into the nook.',
+  /* anti-shove geometry: the socket is a floor-level 2x2 nook whose only mouth is
+     the 1-tall gap at (2,11). No 2x2 solid fits a 1-tall gap, so the gem can never
+     be dragged home as stone; plain down-drainage lands five columns to the right.
+     Only a sideways pull walks the pour in — this level's whole lesson. */
   map:['..........',
        '......RR..',
        '......RR..',
        '..........',
        '..........',
-       'rr........',
-       'rr........',
        '..........',
        '..........',
        '..........',
        '..........',
-       '..........']},
+       '###.......',
+       'rr#.......',
+       'rr........']},
 { name:'Point Pull', heat:1, cold:0, grav:1,
   hint:'The well is a point, not a direction. Lower-left pulls differently than lower-right.',
+  /* anti-shove geometry: the left cellar is roofed at row 8 with a single 1-wide
+     chute at (0,8). Every row of this gem is 2 cells wide, so no drag can ever put
+     it in the cellar — the pour has to be walked left along the shelf and dropped
+     down the chute, which only a point set past the far-left corner does. */
   map:['..........',
        '....OO....',
        '.....OO...',
@@ -238,10 +246,10 @@ const LEVELS = [
        '..........',
        '....##....',
        '....##....',
+       '.#####....',
        '....##....',
        '.oo.##....',
-       '..oo##....',
-       '....##....']},
+       '..oo##....']},
 /* UNUSED (legacy pool): dropped out of the gravity block when 'The Side Pocket'
    became its opener — mostly a drag level, the weakest orb lesson of the seven.
    Kept whole so a future block can pick it back up; AUTH simply skips LEVELS[8]. */
@@ -275,7 +283,10 @@ const LEVELS = [
        '..........']},
 { name:'Balloon Route', heat:2, cold:0, grav:1,
   hint:'Gas flees the well, liquid seeks it. Herd the cloud into the pocket, then reclaim the flames up there.',
-  map:['......yy..',
+  /* anti-shove geometry: the ceiling pocket's doorway is the single cell (4,1) —
+     (4,0) is capped and (4,2) is the shelf. This gem is 2 rows tall, so it can
+     never be walked in as stone; only a herded cloud gets through the gap. */
+  map:['....#.yy..',
        '.....yy...',
        '....######',
        '..........',
@@ -317,6 +328,9 @@ const LEVELS = [
        '..m.......']},
 { name:'Reflow', heat:1, cold:0, grav:1,
   hint:'Put the well ABOVE a puddle’s level and it will lift the liquid over walls.',
+  /* anti-shove geometry: the far pocket is capped, leaving only the 1-wide chute at
+     column 9. No 2x2 solid fits down it, so the gem cannot be walked home as stone —
+     the puddle has to be lifted over both pillars and dropped in from the corner. */
   map:['..........',
        '.RR.......',
        '.RR.......',
@@ -325,12 +339,17 @@ const LEVELS = [
        '..........',
        '..........',
        '..........',
-       '...#..##..',
-       '...#..##..',
+       '...#..###.',
+       '...#..###.',
        '...#..##rr',
        '...#..##rr']},
 { name:'Master Facet', heat:1, cold:0, grav:1,
-  hint:'Everything you know: melt, pour, drain, drag the well, and crystallize on the far side.',
+  hint:'Everything you know: melt, pour, drain through both slots, walk the little one home — then LIFT the pour over the divide and crystallize on the far side.',
+  /* anti-shove geometry: both slots sit in column 2, so the pour never rests on a
+     floor it could be pushed along — it drops straight into the left cellar. The
+     only way across to the socket is UP over the 3-tall divide (columns 5-6) and
+     along the row-8 lane, which a shoved stone cannot do: the 1x1 escort shares
+     the cellar and still cannot move the puddle one cell nearer home. */
   map:['..........',
        '.CCC....M.',
        '..C.......',
@@ -338,11 +357,11 @@ const LEVELS = [
        '##.#######',
        '..........',
        '..........',
+       '##.#######',
        '..........',
-       '#######.##',
-       '.......ccc',
-       'm.......c.',
-       '........c.']},
+       '.....##ccc',
+       '.....##.c.',
+       'm....##.c.']},
 { name:'Full Spectrum', heat:2, cold:0, grav:1,
   hint:'Every gem, one drawer. Bring the whole spectrum to order.',
   map:['..M.CCCBB.',
