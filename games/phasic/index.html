@@ -57,7 +57,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-01 20:36 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-01 21:57 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -1241,6 +1241,11 @@ const GEN_HINTS=['Bring it to order.','Tidy the drawer.','Everything has a socke
 const GEN_HINTS2=['Two shelves, one route.','Both gaps, in order.','Stage it in the middle, then land it.','The gaps do not line up.','Down one floor at a time.'];
 const GEN_HINTSA=['The vapor rises — meet it up top.','Send it up the flue, bring it down solid.','Herd the cloud into the loft.','Cool it where it lands, not where it started.','The loft has a socket too.'];
 const GEN_HINTSM=['Only liquid fits this channel. Melt it, then lead it.','Walk the well around the baffles, one leg at a time.','Stone cannot turn these corners — a pour can.','Down the mouth, along, down, along: the pocket is at the end.','Plain down only ever reaches the first baffle.'];
+// obstacle-era maze hints, one list per hazard kind (blocks 5-7 only)
+const GEN_HINTSMH={
+  void:['The recess past the mouth is hungry — catch the pour before it wanders.','Park the well past the drop, or the pit drinks the spill.','A careful pour walks away from the pit; a sloppy one feeds it.'],
+  bush:['The hedge drinks any pour — cross it as vapor, cool it beyond.','Boil at the hedge and let the well herd the cloud through.','Liquid dies on the leaves. Steam over, condense past.'],
+  fan:['The fan guards the last gate — cross it as liquid, not as cloud.','Vapor gets blown back up the tunnel. Stay a pour.','This wind hates a cloud. Walk the puddle under it.']};
 function genName(i){ const r=mulberry((i*2654435761)>>>0);
   return NAME_A[(r()*NAME_A.length)|0]+' '+NAME_B[(r()*NAME_B.length)|0]; }
 function stampGen(rows,shape,ax,ay,ch){
@@ -1251,6 +1256,38 @@ function blockOf(i){ return Math.min((i/8)|0, 7); }
 const BLOCK_WORD=['Drag','Flame','Gravity','Frost','Vapor','Void','Hedge','Wind'];
 function lvlName(i,def){ const nm=def?def.name:genName(i);
   return i<64 ? BLOCK_WORD[blockOf(i)]+' · '+nm : nm; }
+/* Build-time route prover for hazard mazes: 4-neighbour BFS over cells open
+   to the given phase. Liquid is blocked by walls, bushes and fan tiles — and
+   by any cell within the void's 1.5-cell pull, measured centre-to-centre,
+   because the pull reaches through walls, so it is the ROUTE that has to
+   stay clear, not just the void's own cell. Gas passes bushes and fan tiles
+   (only walls stop it) but respects the same pull radius. This is a
+   connectivity proof only — the solver run on the real sim stays the real
+   fairness gate; a candidate that fails here never spends a salt. */
+function mazeRouteOk(rows,phase,x0,y0,x1,y1){
+  const holes2=[];
+  for(let y=0;y<GH;y++) for(let x=0;x<GW;x++) if(rows[y][x]==='@') holes2.push([x,y]);
+  const blocked=(x,y)=>{
+    if(x<0||y<0||x>=GW||y>=GH) return true;
+    const ch=rows[y][x];
+    if(ch==='#') return true;
+    if(phase==='liquid'&&(ch==='%'||'^v<>'.includes(ch))) return true;
+    for(const q of holes2) if(Math.hypot(q[0]-x,q[1]-y)<1.5) return true;
+    return false;
+  };
+  if(blocked(x0,y0)||blocked(x1,y1)) return false;
+  const seen=new Set([y0*GW+x0]), q=[[x0,y0]];
+  while(q.length){
+    const [cx,cy]=q.shift();
+    if(cx===x1&&cy===y1) return true;
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx=cx+dx, ny=cy+dy, k=ny*GW+nx;
+      if(seen.has(k)||blocked(nx,ny)) continue;
+      seen.add(k); q.push([nx,ny]);
+    }
+  }
+  return false;
+}
 /* ---- 'gravmaze': the gravity block's walls-only orb maze ----
    A tunnel three rows deep runs the width of the board under a walled
    ceiling whose ONLY opening is a single cell at one end. Inside, 2-3 wall
@@ -1266,7 +1303,7 @@ function lvlName(i,def){ const nm=def?def.name:genName(i);
    ceiling the board is an ordinary drawer whose gems drag straight home.
    Every draw below is this candidate's own — the template pick is still the
    stream's first draw, so an unpicked gravmaze costs the others nothing. */
-function buildMaze(r,i,p){
+function buildMaze(r,i,p,b){
   const rows=Array.from({length:GH},()=>Array(GW).fill('.'));
   const right=r()<0.5;                   // the end of the tunnel the pocket sits at
   const mp=['R','B','O','Y','G'];        // 2-tall gems: the alcove is their footprint
@@ -1274,7 +1311,21 @@ function buildMaze(r,i,p){
     const b2=(r()*(a+1))|0; const t=mp[a]; mp[a]=mp[b2]; mp[b2]=t; }
   const ML=mp[0], mw=GEMW[ML], mh=GEMH[ML];
   const CEIL=GH-4, TOP=GH-3, FLOOR=GH-1; // the walled ceiling, then the 3-row tunnel
-  const mx=right?0:GW-1;                 // the mouth, at the end away from the pocket
+  /* ---- obstacle-era hazard (blocks 5-7): ONE hazard per maze, the block's
+     newest idea first — fan in 7, bush in 6, void in 5, mirroring the
+     weave-kinds convention — falling back to an older kind only when the
+     newest declines the board, and to the walls-only maze when all decline.
+     The kind is a pure function of block + maze-gem width (the void needs a
+     2-wide alcove or its recess starves the baffle span), so the r stream is
+     consumed EXACTLY as the walls-only maze consumes it: block-2 boards are
+     byte-identical by construction — b<5 never enters a hazard branch. */
+  const hzKind = b>=7?'fan' : b>=6?'bush' : (b>=5&&mw===2?'void':null);
+  /* void: the mouth moves two columns in, leaving a sealed recess whose far
+     floor cell holds the void — an overshot pour drifts inside its 1.5-cell
+     pull and dies; a careful one (well parked a column downstream) lands two
+     clear columns off and walks away. Never ON the route: the route runs the
+     other way, and the build-time BFS below measures the pull against it. */
+  const mx=hzKind==='void'?(right?2:GW-3):(right?0:GW-1); // the mouth, away from the pocket
   const pc=right?GW-mw:0, py=GH-mh;      // the alcove
   for(let x=0;x<GW;x++) rows[CEIL][x]='#';
   rows[CEIL][mx]='.';                                  // the mouth
@@ -1283,9 +1334,23 @@ function buildMaze(r,i,p){
      floor, so its first crossing is a duck, and the lift comes later, once
      the puddle is columns away from the mouth it could otherwise be drawn
      back up through. Two stubs may never stand side by side either — a floor
-     stub next to a roof stub seals the tunnel outright. */
-  const lo=right?2:mw+1, hi=right?GW-mw-2:GW-3;
+     stub next to a roof stub seals the tunnel outright. A void maze pulls
+     the range in so the first baffle stays two clear of the moved mouth; a
+     bush maze pulls it in the same way so the hedge at the mouth end keeps
+     two clear columns to its first stub. */
+  const shiftIn=hzKind==='void'||hzKind==='bush';
+  const lo=right?(shiftIn?4:2):mw+1,
+        hi=right?GW-mw-2:(shiftIn?GW-5:GW-3);
   let nb=2+(r()<0.5?1:0);
+  /* A bush maze keeps exactly ONE stub, the roof duck. Its pour is born by
+     condensation MID-tunnel (wherever the gas line strung out), so with a
+     roof+floor pair the puddle can land between the stubs and the duck leg
+     then piles it into a one-column tower against the floor stub's face —
+     the all-at-floor gate never holds (measured on the 20-salt corpus).
+     One roof stub leaves open floor on both sides: a puddle born anywhere
+     ducks it, or is already past it, and either way the gates hold. */
+  if(hzKind==='bush') nb=1;
+  else if(hzKind==='fan') nb=2;        // roof then floor: the beam must guard the floor gate
   while(nb>2&&hi-lo<2*(nb-1)) nb--;
   if(hi-lo<2*(nb-1)) return null;
   const step=nb>1?(hi-lo)/(nb-1):0, baffles=[];
@@ -1294,6 +1359,47 @@ function buildMaze(r,i,p){
     baffles.push({x:bx,k});
     if(k==='floor'){ rows[TOP+1][bx]='#'; rows[FLOOR][bx]='#'; }   // climb over it
     else { rows[TOP][bx]='#'; rows[TOP+1][bx]='#'; }               // duck under it
+  }
+  /* Hazard placement. The sealing rules bind it exactly as they bind the
+     baffles: nothing stands adjacent to a stub, nothing narrows the 3-row
+     tunnel to one row along a liquid leg, the 1-cell mouth stays the only
+     way in. Every placement is then re-proved by BFS before the candidate
+     is allowed to spend a salt on the solver. */
+  let hazard=null;
+  if(hzKind==='void'){
+    const vx=right?0:GW-1;               // the far floor cell of the recess
+    rows[FLOOR][vx]='@';
+    hazard={k:'void',x:vx,y:FLOOR};
+  } else if(hzKind==='bush'){
+    /* a full-height hedge across the tunnel one column past the mouth — the
+       pour cannot pass it at any row, the cloud passes it at every row, so
+       plain-down drainage is fatal and melt-to-GAS is the only way in: boil
+       up top, sink the cloud through the mouth and the leaves, condense in
+       the long open run beyond (a strung-out gas line needs ~1.6 cells per
+       particle — the run past the hedge is the one place it always fits),
+       then walk the pour through the baffles as ever. */
+    const bx=right?1:GW-2;
+    for(let y=TOP;y<=FLOOR;y++) rows[y][bx]='%';
+    hazard={k:'bush',x:bx};
+  } else if(hzKind==='fan'){
+    /* obstruction role (one role per board): the alcove-roof cell nearest
+       the tunnel becomes a fan blowing back toward the mouth, so its beam
+       covers the floor baffle's climb gate — the last stretch cannot be
+       crossed as vapor, only as the liquid walk. The tile replaces a wall
+       cell, so the alcove stays roofed for stone and pour alike. */
+    const fx=right?pc:pc+mw-1;
+    rows[TOP][fx]=right?'<':'>';
+    hazard={k:'fan',x:fx,y:TOP,dir:right?-1:1};
+  }
+  if(hazard){
+    const tx=right?pc:pc+mw-1;                          // alcove floor target
+    if(hazard.k==='bush'){
+      // the cloud's way in: mouth landing through the leaves to the pocket
+      if(!mazeRouteOk(rows,'gas',mx,TOP,tx,FLOOR)) return null;
+      // the pour's way on: from the first clear column past the hedge —
+      // where the vapor re-condenses — the liquid walk must still exist
+      if(!mazeRouteOk(rows,'liquid',hazard.x+(right?1:-1),FLOOR,tx,FLOOR)) return null;
+    } else if(!mazeRouteOk(rows,'liquid',mx,TOP,tx,FLOOR)) return null;
   }
   stampGen(rows,SHAPE_STR[ML],pc,py,ML.toLowerCase());
   const mgx=right?0:GW-mw;                             // the gem waits on the ceiling,
@@ -1314,6 +1420,11 @@ function buildMaze(r,i,p){
     if(gems.length>nSol) break;
     const w=GEMW[L], sax=right?cur-w+1:cur;
     if(right?sax<mw:sax+w-1>GW-mw-1) continue;   // never over the gem's own columns
+    /* a void maze's mouth moved inward, out of the maze-gem columns the line
+       above protects — a socketed solid over the mouth seals the drop from
+       above (measured: a 4-wide slab parked on it starved the pour), so the
+       mouth column is excluded from the packing too */
+    if(hzKind==='void'&&(right?sax<=mx:sax+w-1>=mx)) continue;
     const g2={L,sax,say:CEIL-GEMH[L]};
     stampGen(rows,SHAPE_STR[L],g2.sax,g2.say,L.toLowerCase());
     gems.push(g2); cur=right?sax-2:sax+w+1; }
@@ -1339,11 +1450,19 @@ function buildMaze(r,i,p){
     }
     if(!ok) return null;
   }
-  return { name:genName(i), hint:GEN_HINTSM[(r()*GEN_HINTSM.length)|0],
+  /* Budget: a bush maze needs melt AND boil (heat:2) — the re-condense is a
+     documented revert-tap route, not a frost: a tap on gas condenses with no
+     room needed and hands the flame back, so cold stays 0 and both flames
+     return through the two reverts. Fan and void mazes keep the walls-only
+     budget. Every added field is hazard-gated so a b<5 def is byte-identical
+     to what this function always returned. */
+  const hintPool=hazard?GEN_HINTSMH[hazard.k]:GEN_HINTSM;
+  return { name:genName(i), hint:hintPool[(r()*hintPool.length)|0],
     template:'gravmaze', weave:null,
-    maze:{L:ML,right,mx,ceil:CEIL,top:TOP,floorY:FLOOR,baffles,pc,py,mw,mh},
-    heat:1, cold:0, grav:1,
-    cx:{gems:gems.length, flames:1, frosts:0, grav:1, obstacles:0, basePts:0},
+    maze:{L:ML,right,mx,ceil:CEIL,top:TOP,floorY:FLOOR,baffles,pc,py,mw,mh,...(hazard?{hazard}:{})},
+    heat:hazard&&hazard.k==='bush'?2:1, cold:0, grav:1,
+    cx:{gems:gems.length, flames:hazard&&hazard.k==='bush'?2:1, frosts:0, grav:1,
+        obstacles:hazard?1:0, basePts:0},
     map:rows.map(q=>q.join('')) };
 }
 function buildGen(i,salt){
@@ -1358,14 +1477,28 @@ function buildGen(i,salt){
      exactly the order it always has. Two-shelf needs the well (block 2+);
      the loft needs a born-gas gem, which the curriculum only has from
      block 4 on. */
+  /* Obstacle-era maze rarity lives on the INDEX, not the salt: the getLevel
+     scan serves the first wanted candidate it finds, so per-salt odds
+     amplify to near-certainty across 20 salts (measured at tr<0.15/salt:
+     22 of 25 obstacle-era indices shipped mazes — the norm, not a
+     highlight, every block-6/7 weave crowded out, every endless sample the
+     same fan maze). So a separate index-seeded draw makes ~1 in 4 indices
+     maze-eligible, and within one the maze wins its salt race decisively;
+     the other four fifths keep their weaves. The knob is the 0.20 eligibility
+     threshold (one maze index in five; the chosen mix constant spreads the
+     eligible indices 2/1/2 across blocks 5/6/7 with ~21% of endless). Index
+     23's block-2 draw and every b<5 stream are untouched — the extra
+     mulberry never even runs below block 5. */
+  const mzIdx=b>=5&&mulberry(Math.imul(i^0x85EBCA6B,2654435761)>>>0)()<0.20;
   let template='drawer';
   if(!easy){ const tr=r();
     if(b===2&&tr<0.60) template='gravmaze';   // the gravity block's own shape
+    else if(mzIdx&&tr<0.60) template='gravmaze'; // obstacle era: maze + its block's hazard
     else if(b>=2&&tr<0.40) template='two-shelf';
     else if(b>=4&&tr<0.75) template='attic'; }
   /* gravmaze builds its own board from here on, so every other block's
      candidate consumes the identical draw stream it always did. */
-  if(template==='gravmaze') return buildMaze(r,i,p);
+  if(template==='gravmaze') return buildMaze(r,i,p,b);
   const TWO=template==='two-shelf', LOFT=template==='attic';
   const shelfRow=TWO?8:LOFT?7:5;   // the shelf the sockets below it are reached through
   const TOPROW=4, CEIL=2;          // two-shelf's upper shelf / attic's ceiling
@@ -1744,10 +1877,44 @@ function scriptMaze(mz){
   const script=[], WY=GH+1.5;
   const dir=mz.right?1:-1;                    // the way the tunnel runs to the pocket
   const ringTo=mz.right?GW+2:-2;              // the ring the pull has to come from
+  const hz=mz.hazard||null;                   // obstacle-era mazes carry one hazard
   // lowest gem first: its lane clears before anything above it needs to cross
   for(const u of objs.filter(u2=>u2!==o).sort((a,b2)=>b2.startAy-a.startAy))
     script.push({d:[u.letter,[[u.sax,u.startAy],[u.sax,u.say]]]});
-  script.push({g:[mz.mx+0.5,WY]},{h:[mz.L]},
+  /* A void maze parks the landing well one column downstream of the mouth,
+     so the heap converges two clear columns outside the recess's pull —
+     the overshot pour is the player's mistake, never the script's.
+     A bush maze cannot land a pour at all: the hedge stands one column past
+     the mouth and drinks it. So the gem is melted AND boiled up in the
+     drawer and herded down in two stages — "herd from the far side", twice.
+     Stage 1: the well parks on the TOP ring over the POCKET end, so flee
+     and the reachable-height guidance agree all the way: away from the
+     well, along the drawer, down the mouth. The cloud stacks up in the
+     mouth column — a timed herd, never a gate: four particles at gas
+     spacing are ~4.8 cells of stack, so "everything below the ceiling"
+     cannot be asked for yet (measured: the top particle rides above the
+     ceiling line for as long as the well holds this side). A single well
+     over the mouth from the start instead lets the leader run up the
+     tunnel and its MST spring yank the last particle along the ceiling
+     TOP, past the mouth, where it wedges — also measured.
+     Stage 2: the well flips to the TOP ring over the mouth, the whole
+     field reverses, and the stack disperses through the leaves (gas
+     passes a bush untouched) into the long open run beyond — which is
+     when both real gates can be held: every particle a clear margin past
+     the bush column, and none left up in the drawer. Then condense: a
+     tap, not a frost — gas->liquid needs no room, and the flame it hands
+     back pays down the boil (heat:2 covers melt+boil; both return through
+     the two reverts). From there the puddle is exactly where a walls-only
+     landing would have walked it, and the baffle legs below take over
+     unchanged. */
+  if(hz&&hz.k==='bush')
+    script.push({g:[mz.right?GW-0.5:0.5,-2]},{h:[mz.L]},{h:[mz.L]},
+      {w:[8]},                                // stage 1: gather the cloud at the mouth end
+      {g:[mz.mx+0.5,-2]},                     // stage 2: reverse the field at the ring
+      dir>0?{u:[mz.L,'minx','>',hz.x+1.5,45]}:{u:[mz.L,'maxx','<',hz.x-0.5,45]},
+      {u:[mz.L,'miny','>',mz.ceil+0.9,30]},   // ...and nothing left up in the drawer
+      {t:[mz.L]});
+  else script.push({g:[(hz&&hz.k==='void'?mz.mx+dir:mz.mx)+0.5,WY]},{h:[mz.L]},
     {u:[mz.L,'miny','>',mz.ceil+0.9,35]});    // the whole pour is down the mouth
   /* A stub is crossed by parking the well two columns PAST it, on the ring
      the puddle has to travel toward: overhead to climb a floor stub, below to

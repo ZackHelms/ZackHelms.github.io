@@ -1,5 +1,21 @@
 # DONE — done log
 
+- 2026-08-01 [phasic] phasmazes oversee run: obstacle-era gravmazes — the
+  generated maze template now carries one hazard in blocks 5–7 and endless
+  (newest idea first: fan b≥7 / bush b≥6 / void b≥5 when the maze gem is
+  2-wide; width-decline falls back to walls-only). Eligibility is
+  index-seeded (~0.20 of obstacle-era indices, ceiling 0.30) — a measured
+  correction to the plan's per-salt odds: getLevel's wanted-scan hunts
+  across all 20 salts, so 0.15/salt shipped mazes on 22/25 indices and
+  crowded out every weave. Void = sealed floor recess behind a moved
+  mouth; bush = full-height hedge one past the mouth (heat:2, revert-tap
+  re-condense); fan = obstruction beam over the climb gate. mazeRouteOk
+  build-time BFS rejects; scriptMaze hazard legs; 84/84 corpus
+  solver-beaten. Block-2 byte-identity proven (1080-def zero-diff) and
+  PINNED in the suite (SHA-256 + block-3 control canary; re-pin only on a
+  CD-approved block-2 redesign). Suite 351→374. (dbe322b..618cee0 +
+  wrap-up docs; plan archived to .claude/plans/DONE/)
+
 - 2026-08-01 [phasic] phasdaily oversee run: daily challenge — a menu DAILY
   button serves one shared solver-proven generated level per UTC date
   (index = `DAILY_BASE` 100000 + UTC day number; `dateKey` YYYY-MM-DD).

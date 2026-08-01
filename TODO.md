@@ -57,14 +57,9 @@ backlog entry here.
 
 ## Later
 
-*(all three plan-ready — recommended burndown order is this file order:
-mazes → acro → port, so the first TestFlight payload carries everything)*
+*(both plan-ready — recommended burndown order is this file order:
+acro → port, so the first TestFlight payload carries everything)*
 
-- [phasic] Obstacle-era gravmazes: bushes/fans/voids woven into orb
-  mazes in blocks 5–7 (phasweave + phasgrav machinery). *Un-gated
-  2026-08-01: CD signed off the block-2 playtest.*
-  **Plan ready (2026-08-01)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phasmazes.obstacle-era-gravmazes.md`
 - [phasic] "Acrobatics" → the Launch block: 9th curriculum block (levels
   65–72) built on launch-and-freeze; orb-less boards make the tactic
   mandatory; endless moves to 73+ with save migration. *Decided

@@ -1,6 +1,6 @@
 # phasmazes — obstacle-era gravmazes: hazards woven into orb mazes in blocks 5–7
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-08-01 — commits dbe322b..618cee0, merged to main
 **Requested:** 2026-08-01 (Later item un-gated by the CD's block-2 playtest
 sign-off, 2026-08-01: "bushes/fans/voids woven into orb mazes in blocks 5+ —
 deferred by the CD's walls-only decision; revisit after the block-2 playtest
