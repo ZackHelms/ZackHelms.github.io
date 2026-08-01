@@ -36,15 +36,20 @@ backlog entry here.
   ~$45-65) — protection is automatic without it, but registration
   before/soon after publication unlocks statutory damages + fees in
   infringement suits.
-- [phasic·IP] Apple Developer Program enrollment ($99/yr) + reserve the
-  app name "Phasic" in App Store Connect as early as possible (name
-  reservations are first-come within Apple's rules).
-- [phasic·IP] Decision: keep Phasic's source public (today: public repo,
-  Pages-served, readable by anyone) vs move Phasic development private /
-  ship only built+minified output before the App Store launch — the
-  license carve-out forbids copying going forward, but public source
-  makes copying trivial to do and hard to notice. Maximum protection =
-  private source for the iOS build.
+- [phasic·IP] Reserve the app name "Phasic" in App Store Connect as early
+  as possible (name reservations are first-come within Apple's rules; the
+  name is unique across the entire App Store — have a backup like "Phasic
+  Gems"). *Amended 2026-08-01: the enrollment half is already DONE — the
+  account is active (Team `TT479XD8ZL`, distribution cert to 2027-05-10)
+  and has shipped TestFlight builds via rn-ios-flightdeck. The reservation
+  is step 3 of flightdeck's `apple-app-setup` per-game checklist, which
+  the phasport plan hands you in full.*
+- [phasic·IP] Source visibility. *Decided 2026-08-01: keep Phasic's source
+  public until the App Store submission nears — Pages keeps serving the
+  web version, the license carve-out stands, and the iOS copy lives in the
+  already-private rn-ios-flightdeck repo. Revisit at submission time
+  (going private then = its own plan: Pages restructure / built-output
+  only).*
 
 ## Next
 
@@ -52,21 +57,33 @@ backlog entry here.
 
 ## Later
 
-- [phasic] "Acrobatics" curriculum block (8 levels, future insert before
-  the endless tail): built around the launch-and-freeze tactic — levels
-  with no gravity orb or other facilitating tools whose obstacles REQUIRE
-  shoving a puddle airborne with a solid and frosting it mid-flight.
-  Tutorial authored with the CD; tactic must never be required in earlier
-  blocks (CD 2026-07-31 — it emerged as a workaround on L29, which is
-  the freeze-refusal bug phasfreeze now owns, not intended design).
+*(all four plan-ready — recommended burndown order is this file order:
+daily → mazes → acro → port, so the first TestFlight payload carries
+everything)*
+
+- [phasic] Daily challenge: one shared solver-proven level per UTC date
+  (date-derived generated index; results in `save.daily`, never
+  `save.done`; share codes deferred).
+  **Plan ready (2026-08-01)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phasdaily.daily-challenge.md`
 - [phasic] Obstacle-era gravmazes: bushes/fans/voids woven into orb
-  mazes in blocks 5+ — deferred by the CD's walls-only decision; revisit
-  after the block-2 playtest verdict (phasweave + phasgrav machinery).
-- [phasic] iOS port scoping: shell choice (WKWebView wrap vs Swift port),
-  real haptics, native level picker, drop web-only chrome. Notes:
-  `.claude/phasic.md` § iOS-port notes.
-- [phasic] Daily-challenge / share-code retrofit (house pattern; the
-  generator is already seeded and deterministic per index).
+  mazes in blocks 5–7 (phasweave + phasgrav machinery). *Un-gated
+  2026-08-01: CD signed off the block-2 playtest.*
+  **Plan ready (2026-08-01)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phasmazes.obstacle-era-gravmazes.md`
+- [phasic] "Acrobatics" → the Launch block: 9th curriculum block (levels
+  65–72) built on launch-and-freeze; orb-less boards make the tactic
+  mandatory; endless moves to 73+ with save migration. *Decided
+  2026-08-01: tutorial drafted as a proposal, CD auditions it.*
+  **Plan ready (2026-08-01)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phasacro.acrobatics-block.md`
+- [phasic] iOS app via rn-ios-flightdeck: GameShell WebView wrap of the
+  latest web build (the CD's flightdeck choice settles the old scoping
+  question; native picker/haptics stay follow-ups). The TestFlight build
+  itself is CD-authorized (10× billed minutes) after the per-game Apple
+  checklist.
+  **Plan ready (2026-08-01)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/phasport.rn-flightdeck-ios-app.md`
 
 ## Icebox
 

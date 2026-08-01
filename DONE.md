@@ -25,7 +25,9 @@
   byte-diff proven (only index 23's sub-0.60 salts changed). Suite
   317→335 (BFS impassability, docked-well negatives, per-map anti-cheese
   drags). save.done 16–18 shifted meaning. (2c759e6..c105ae4 + wrap-up
-  docs; plan archived to .claude/plans/DONE/)
+  docs; plan archived to .claude/plans/DONE/) *CD playtest verdict:
+  PASSED, 2026-08-01 — block 2 signed off; the gravmazes follow-on was
+  un-gated and planned the same day (phasmazes).*
 
 - 2026-08-01 [phasic] phasaudio oversee run: obstacle SFX + per-block
   music — the void gulps (300→40 Hz sine + thump + swallowed noise), the
