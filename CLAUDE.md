@@ -88,7 +88,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Wayfinder (`games/wayfinder/`) | `.claude/wayfinder.md` | Any work on the orienteering sim — WebGL2 terrain/sky/water renderer, heightfield + land grids, ISOM map generation, compass/bearing/pace maths, the 9-lesson engine |
 | Sky Lantern (`games/sky-lantern/`) | `.claude/sky-lantern.md` | Any work on the breath-flight game — mic RMS→breath mapping, burner/heat model, level generator + its three fairness gates |
 | Signal Hunt (`games/signal-hunt/`) | `.claude/signal-hunt.md` | Any work on the hidden-object hunt — world/decoy generation, pan-pinch input, share codes and duel flow, colourblind labels |
-| Phasic (`games/phasic/`) | `.claude/phasic.md` | Any work on the phase-change block sort — soft-body particle physics, symmetric phase/base rules, gas guidance field, gravity-well bucket, curriculum blocks + complexity metric, generator/solver (three board templates, in-path obstacle weaving), STUCK ghost-replay, in-game wiki + tactics registry, iOS-port notes |
+| Phasic (`games/phasic/`) | `.claude/phasic.md` | Any work on the phase-change block sort — soft-body particle physics, symmetric phase/base rules, gas guidance field, gravity-well bucket, curriculum blocks + complexity metric, generator/solver (three board templates, in-path obstacle weaving), STUCK ghost-replay, in-game wiki + tactics registry, resting-freeze fairness rule, chrome/layout (landscape column, rotation self-heal), proprietary-license carve-out, iOS-port notes |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 

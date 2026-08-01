@@ -424,7 +424,7 @@ bamboo poles / temple eaves / kites / bird flocks / gust bands, ember refuels,
 corridors are *reachable* (solved from the real equation of motion), and moving
 hazards never seal the sky. Detailed context: `.claude/sky-lantern.md`.
 
-### PHASIC (`phasic/index.html`, ~1250 lines)
+### PHASIC (`phasic/index.html`, ~2460 lines)
 Phase-change block sort, and the repo's first soft-body simulation — also the
 web-first prototype of a planned iOS title. Casual-first: most levels are
 "bring order to chaos" tidying, with occasional clever ones. Gems are
@@ -447,9 +447,18 @@ on three board templates (drawer, two-shelf, gas attic) with hazards woven
 into the solution path in the obstacle blocks,
 endless past 64, each generated level beaten by the in-game solver before
 it is served. STUCK (settings) replays the solver script as a visible ghost; a WIKI button beside it opens the searchable in-game wiki (games/phasic/wiki.html, 12-tactic registry). 10 seeded generative
-songs, separate music/SFX volume + mutes. Drive suite (246 checks incl.
-the generated-content replay gate, the in-path weave gates and the
-complexity-ramp assert):
+songs (titled; dim `NN · Title` now-playing line at the very bottom),
+separate music/SFX volume + mutes. Settled puddles get a footprint-scaled
+freeze reach (resting-gated, ≤2.6 cells — the flat 1.9 cap structurally
+refused every settled 3-tall gem); layout self-heals against
+degenerate-viewport squish (CELL≥1 floor + relayout on rotation/
+visualViewport events); landscape puts the buckets in a right-side column;
+buckets ride half a height above the iOS swipe-up edge. **games/phasic/ is
+proprietary** — its own LICENSE + a scope-exception preamble in the root
+LICENSE.txt (settings-cogwheel link, wiki footer). Drive suite (289 checks
+incl. the generated-content replay gate, the in-path weave gates, the
+complexity-ramp assert, rotation/landscape geometry checks and the
+settled-freeze regressions):
 `.claude/tests/drive-phasic.cjs`. Detailed context: `.claude/phasic.md`
 (includes the maintained tactics registry).
 

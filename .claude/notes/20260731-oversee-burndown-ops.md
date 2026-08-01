@@ -51,3 +51,12 @@ guidance table) and effort conveyed in the prompt. That worked first-pass
 for 10 of 11 tasks. If effort tiers ever need to be real (implementer-low
 vs -high system prompts), install the zmh-producer scaffold agents; until
 a task fails for effort-shaped reasons, the override approach is enough.
+- **Read/Edit path traps around EnterWorktree.** The Edit tool targets
+  whatever absolute path was Read — a file Read from the primary checkout
+  BEFORE entering the worktree leaves later Edits aimed at the primary
+  copy, silently off-branch (2026-07-31: a TODO.md bookkeeping edit landed
+  in the primary tree; caught by `git status`, reverted with
+  `git checkout -- TODO.md`, redone against the worktree path). After
+  EnterWorktree, re-Read every file you intend to Edit via its
+  worktree-absolute path, and end every wrap-up with `git status --short` in
+  BOTH the worktree and the primary checkout.
