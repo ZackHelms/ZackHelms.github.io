@@ -1,6 +1,6 @@
 # phasbrand — Phasic to the top of the hub + the phase-gem icon (hub card, favicon, iOS master)
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-08-01 (da1997e..de567c6 on worktree-oversee+phasbrand; 1 warm retry on icon band geometry; `<img>`-in-card shape replaced by pure-CSS rule per sync-gate regex — see follow-up)
 **Requested:** 2026-07-31 (two CD items bundled — both are Phasic-brand
 presentation and both touch `games/index.html`).
 **Scope:** `games/index.html` (card order + card icon), `games/phasic/icon.svg`

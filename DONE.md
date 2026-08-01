@@ -1,5 +1,15 @@
 # DONE — done log
 
+- 2026-08-01 [phasic] phasbrand oversee run: the brand round — hand-
+  authored 2x2 phase-gem icon (`games/phasic/icon.svg`, 512 viewBox,
+  ruby+bush game palettes, phase thirds: solid/liquid/gas bottom-to-top)
+  + 1024x1024 RGBA master (`icon-1024.png`, transparency kept — iOS
+  flatten happens in the future iOS pipeline) + favicon/apple-touch head
+  links; PHASIC card moved to FIRST on the hub wearing the icon via a
+  pure-CSS rule (card markup untouched — the sync gate's card regex is
+  text-only-icon, so `💠` stays the div text). Suite 289→300.
+  (da1997e..de567c6 + wrap-up docs; plan archived to .claude/plans/DONE/)
+
 - 2026-07-31 [phasic] phaslicense oversee run: games/phasic/ is now
   proprietary — folder LICENSE (all rights reserved, play-only, reviewed
   against the 8-item requirement list), root LICENSE.txt scope-exception
