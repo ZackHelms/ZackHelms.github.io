@@ -475,10 +475,15 @@ function check(name, cond, extra) {
 
   // ---------- L41 The Void: consumption, fail, retry ----------
   await load(40);
+  const voidLogPreLen = await page.evaluate('(window.__SFXLOG||[]).length');
   await dragPath('R', [[3, 5], [3, 6]]); // feed it to the void
   await step(1.5);
   o = await obj('R');
   check('L41: the void consumed the gem', o.dead === true, o);
+  const voidLogTail = (await page.evaluate('window.__SFXLOG||[]')).slice(voidLogPreLen);
+  check('phasaudio: void death logs gulp, not slurp (log tail ' + JSON.stringify(voidLogTail) + ')',
+    voidLogTail.length > 0 && voidLogTail[voidLogTail.length - 1] === 'gulp' && !voidLogTail.includes('slurp'),
+    voidLogTail);
   check('L41: fail state raised', (await st()).game === 'fail');
   await load(40); // retry
   check('L41: retry restores the gem', !(await obj('R')).dead && (await st()).game === 'play');
@@ -779,6 +784,93 @@ function check(name, cond, extra) {
   await load(32);
   check('L33 fresh-load: frost bucket at 2 (Loose Vapor)', (await st()).coldN === 2);
 
+  // ---------- phasaudio: dedicated obstacle SFX + per-block music ----------
+  // TEST-only window.__SFXLOG. gulp/slurp/hum-on/hum-off/song pushes all
+  // happen before any `ac` guard, so the log fills even without an
+  // AudioContext. Bush/fan levels are scan-derived (mapInfo().bushes /
+  // .fans per load), never hardcoded — the void gulp check above extends
+  // the suite's own existing L41 navigation instead.
+  check('phasaudio: window.__SFXLOG is an array after a level load',
+    await page.evaluate('Array.isArray(window.__SFXLOG)'));
+
+  // bush -> slurp: derive the first curriculum level with a bush obstacle,
+  // melt its gem to liquid (one heat — boiling to gas would let it pass),
+  // then pull it straight into the hedge with the gravity well (liquid
+  // falls TOWARD the point source) and confirm the kill logs slurp.
+  let audBushIdx = null, audBushMap = null;
+  for (let i = 0; i < 64 && audBushIdx === null; i++) {
+    await load(i);
+    const mi = await g('G=>G.mapInfo()');
+    if (mi.bushes.length > 0) { audBushIdx = i; audBushMap = mi; }
+  }
+  check('phasaudio: derived the first curriculum level with a bush obstacle (found L' +
+    (audBushIdx === null ? '-' : audBushIdx + 1) + ')', audBushIdx !== null, audBushIdx);
+
+  if (audBushIdx !== null) {
+    await load(audBushIdx);
+    const bushGem = (await st()).objs[0].L;
+    const bushO = await obj(bushGem);
+    check('phasaudio: heat melts the bush-level gem to liquid',
+      await apply('heat', bushGem) && (await obj(bushGem)).phase === 'liquid');
+    const bushLogPreLen = await page.evaluate('(window.__SFXLOG||[]).length');
+    await setGrav(audBushMap.bushes[0].x + 0.5, bushO.cy); // pull straight into the hedge column
+    const bushDeadT = await stepUntil('s=>s.objs.some(o=>o.dead)', 20);
+    check('phasaudio: liquid pulled into the hedge dies (' + bushDeadT + 's)', bushDeadT > 0, await obj(bushGem));
+    const bushLogTail = (await page.evaluate('window.__SFXLOG||[]')).slice(bushLogPreLen);
+    check('phasaudio: bush death logs slurp, not gulp (log tail ' + JSON.stringify(bushLogTail) + ')',
+      bushLogTail.length > 0 && bushLogTail[bushLogTail.length - 1] === 'slurp' && !bushLogTail.includes('gulp'),
+      bushLogTail);
+    await step(1.5); // fail overlay raises ~0.9s after the kill (failT), as the L41 block also waits out
+    check('phasaudio: fail state raised after the bush kill', (await st()).game === 'fail');
+    await load(audBushIdx); // reload — same reload-after-fail pattern as the L41 block
+    check('phasaudio: reload after the bush kill restores play', (await st()).game === 'play' && !(await obj(bushGem)).dead);
+  }
+
+  // fan hum: derive the first curriculum level with a fan (never trust a
+  // fixed level number — templates re-roll), confirm loading it starts the
+  // ambient hum, then confirm a fan-free level stops it with no new hum-on.
+  let audFanIdx = null;
+  for (let i = 0; i < 64 && audFanIdx === null; i++) {
+    await load(i);
+    const mi = await g('G=>G.mapInfo()');
+    if (mi.fans.length > 0) audFanIdx = i;
+  }
+  check('phasaudio: derived the first curriculum level with a fan obstacle (found L' +
+    (audFanIdx === null ? '-' : audFanIdx + 1) + ')', audFanIdx !== null, audFanIdx);
+
+  if (audFanIdx !== null) {
+    // hum-off's TEST log is gated on fanHumNodes (an honest "a real node was
+    // torn down" signal, unlike hum-on's ac-decoupled "would have started"
+    // signal) — a real AudioContext is needed to actually spin up the node
+    // fanHumStop() can be observed tearing down. Headless chromium can
+    // construct one with no user gesture (verified: ac.state === 'running').
+    await page.evaluate('audioInit()');
+    await load(0); // known fan-free level, hum guaranteed off before measuring the on-transition
+    check('phasaudio: sanity — L1 has no fans', (await g('G=>G.mapInfo()')).fans.length === 0);
+    const humOnPreLen = await page.evaluate('(window.__SFXLOG||[]).length');
+    await load(audFanIdx);
+    const humOnLog = (await page.evaluate('window.__SFXLOG||[]')).slice(humOnPreLen);
+    check('phasaudio: loading the fan level (L' + (audFanIdx + 1) + ') appends hum-on', humOnLog.includes('hum-on'), humOnLog);
+
+    const humOffPreLen = await page.evaluate('(window.__SFXLOG||[]).length');
+    await load(0); // fan-free level — hum stops at the top of loadLevel
+    const humOffLog = (await page.evaluate('window.__SFXLOG||[]')).slice(humOffPreLen);
+    check('phasaudio: loading a fan-free level (L1) appends hum-off with no new hum-on',
+      humOffLog.includes('hum-off') && !humOffLog.includes('hum-on'), humOffLog);
+  }
+
+  // per-block music: songStart(i<64?blockOf(i):i%10) — assert against the
+  // log's LAST song entry (a level's load can also push hum-on/off around it).
+  for (const i of [0, 9, 60, 70]) {
+    const expected = i < 64 ? await page.evaluate('blockOf(' + i + ')') : i % 10;
+    await load(i);
+    const songLog = await page.evaluate('window.__SFXLOG||[]');
+    let lastSong = null;
+    for (let k = songLog.length - 1; k >= 0; k--) { if (Array.isArray(songLog[k]) && songLog[k][0] === 'song') { lastSong = songLog[k]; break; } }
+    check('phasaudio: load(' + i + ') logs song index ' + expected + ' (last song entry ' + JSON.stringify(lastSong) + ')',
+      !!lastSong && lastSong[1] === expected, lastSong);
+  }
+
   // ---------- phaschrome: rotation lifecycle — the squish repro, pinned ----------
   // Gem particles live in PIXELS, and layout() only ever moves them by a
   // RELATIVE transform (new CELL / old CELL). Break one link in that chain and
@@ -980,6 +1072,10 @@ function check(name, cond, extra) {
   const songTitle1 = await page.evaluate('SONGS[1].t');
   check('phaschrome: load(9), block 1 — nowPlaying shows track 02 with SONGS[1].t (' + songTitle1 + ')',
     (await g('G=>G.nowPlaying()')) === '02 · ' + songTitle1);
+  await load(69); // endless, 69%10=9 — double-digit now-playing (coverage the L9 per-block update lost)
+  const songTitle9 = await page.evaluate('SONGS[9].t');
+  check('phasaudio: load(69) endless (69%10=9) — nowPlaying pads to 10 with SONGS[9].t (' + songTitle9 + ')',
+    (await g('G=>G.nowPlaying()')) === '10 · ' + songTitle9);
 
   // ---------- wiki: home, tactics page, live search (second page, same context) ----------
   const wpage = await ctx.newPage();
