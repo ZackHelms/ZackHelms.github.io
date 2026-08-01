@@ -57,15 +57,9 @@ backlog entry here.
 
 ## Later
 
-*(all four plan-ready — recommended burndown order is this file order:
-daily → mazes → acro → port, so the first TestFlight payload carries
-everything)*
+*(all three plan-ready — recommended burndown order is this file order:
+mazes → acro → port, so the first TestFlight payload carries everything)*
 
-- [phasic] Daily challenge: one shared solver-proven level per UTC date
-  (date-derived generated index; results in `save.daily`, never
-  `save.done`; share codes deferred).
-  **Plan ready (2026-08-01)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phasdaily.daily-challenge.md`
 - [phasic] Obstacle-era gravmazes: bushes/fans/voids woven into orb
   mazes in blocks 5–7 (phasweave + phasgrav machinery). *Un-gated
   2026-08-01: CD signed off the block-2 playtest.*
