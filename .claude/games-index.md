@@ -70,7 +70,7 @@ local-2p.
 | Signal Hunt | `signal-hunt/` | hidden-object | pinch-zoom, two-finger-pan, tap | async-versus, daily-challenge, timed-round | visual-search, seeded-determinism, share-code | solo, async-2p | `.claude/signal-hunt.md` |
 
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
-| Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
+| Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
 46 games (44 in-repo + 2 external builds).
 
@@ -94,7 +94,7 @@ local-2p.
   `word` + `drag-connect` (word-circuit) · `timed-round` (word-circuit,
   signal-hunt) · `card-deck` +
   `quick-round` (tri-peaks) · `daily-challenge` (word-circuit, tri-peaks,
-  ballpark, signal-hunt — an established house pattern now) ·
+  ballpark, signal-hunt, phasic — an established house pattern now) ·
   `stealth`/`maze` + `vision-cones` (shadow-circuit) · `tap-to-move`
   (shadow-circuit, ember-depths) · `roguelike` + `run-based` +
   `permadeath` + `relic-builds` (ember-depths) ·

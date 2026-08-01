@@ -1390,6 +1390,141 @@ function check(name, cond, extra) {
 
   await hubPage.close();
 
+  // ---------- phasdaily: daily challenge — determinism, persistence split, menu invariance ----------
+  // DAILY_BASE=100000; dailyIdx()=DAILY_BASE+dayNum(); dateKey() derives from
+  // the SAME pinned dayNum(), so setDay(n) (TEST-only) keeps both in lockstep
+  // without depending on the wall clock. Every determinism probe reloads the
+  // page first: genCache is a page-lifetime cache keyed by index, so a
+  // same-page second click for the same day would just be served from cache
+  // and prove nothing about the generator itself being deterministic — only
+  // a fresh page (fresh genCache) followed by the same pinned day is a real
+  // test. Reload points reuse the boot goto verbatim; the pageerror/console
+  // listeners are bound to the `page` object once at the top of this file and
+  // survive navigation, so no re-wiring is needed after a reload.
+  const dailyDateKey = n => new Date(n * 86400000).toISOString().slice(0, 10);
+  async function dailyReload() {
+    await page.goto('file://' + GAME + '?test=1', { waitUntil: 'load', timeout: 20000 });
+    await page.waitForTimeout(400);
+  }
+  async function dailyClickBtn(id) {
+    await page.evaluate('(function(){var el=document.getElementById("' + id + '");if(el)el.click();})()');
+  }
+  async function dailyWaitForLvl(target, maxMs) { // the daily generates+solves at click time
+    const cap = maxMs || 60000, t0 = Date.now();     // (possibly several salts) — poll instead
+    while (Date.now() - t0 < cap) {                  // of assuming a fixed wait is long enough
+      if ((await st()).lvl === target) return true;
+      await page.waitForTimeout(200);
+    }
+    return false;
+  }
+  function serializeBoard(mi) { // walls + gems + template + holes/bushes/fans, order-independent
+    const s2 = arr => arr.map(x => JSON.stringify(x)).sort();
+    return JSON.stringify({
+      template: mi.template, walls: mi.walls,
+      gems: s2(mi.gems.map(g2 => ({ L: g2.L, ax: g2.ax, ay: g2.ay, sax: g2.sax, say: g2.say, w: g2.w, h: g2.h, base: g2.base }))),
+      holes: s2(mi.holes), bushes: s2(mi.bushes), fans: s2(mi.fans),
+    });
+  }
+
+  // (a) determinism: reload -> pin day A -> DAILY -> capture; reload again ->
+  // pin the SAME day A -> DAILY -> capture; the two boards must be identical.
+  const DAY_A = 20000, DAY_B = 20001;
+  await dailyReload();
+  const DAILY_BASE_ = await page.evaluate('DAILY_BASE'); // read from the page, never hardcoded twice
+  const idxA = DAILY_BASE_ + DAY_A, idxB = DAILY_BASE_ + DAY_B;
+
+  await g('G=>G.setDay(' + DAY_A + ')');
+  await dailyClickBtn('daily-btn');
+  const gotA1 = await dailyWaitForLvl(idxA, 60000);
+  const mi1 = await g('G=>G.mapInfo()');
+  check('phasdaily determinism: pinned day ' + DAY_A + ' loads daily index ' + idxA + ' (run 1)',
+    gotA1 && (await st()).lvl === idxA, await st());
+  const serial1 = serializeBoard(mi1);
+
+  await dailyReload(); // fresh genCache — an in-page second click would be served from cache
+  await g('G=>G.setDay(' + DAY_A + ')');
+  await dailyClickBtn('daily-btn');
+  const gotA2 = await dailyWaitForLvl(idxA, 60000);
+  const mi2 = await g('G=>G.mapInfo()');
+  check('phasdaily determinism: pinned day ' + DAY_A + ' loads daily index ' + idxA + ' (run 2, fresh reload)',
+    gotA2 && (await st()).lvl === idxA, await st());
+  const serial2 = serializeBoard(mi2);
+
+  check('phasdaily determinism: the same pinned day generates an identical board (walls+gems+template+' +
+    'holes/bushes/fans) across two fresh page loads',
+    gotA1 && gotA2 && serial1 === serial2, { equal: serial1 === serial2, serial1, serial2 });
+
+  // (b) a different pinned day, after another reload, produces a different board.
+  await dailyReload();
+  await g('G=>G.setDay(' + DAY_B + ')');
+  await dailyClickBtn('daily-btn');
+  const gotB = await dailyWaitForLvl(idxB, 60000);
+  const mi3 = await g('G=>G.mapInfo()');
+  check('phasdaily determinism: pinned day ' + DAY_B + ' loads daily index ' + idxB,
+    gotB && (await st()).lvl === idxB, await st());
+  const serial3 = serializeBoard(mi3);
+  check('phasdaily determinism: a different pinned day (' + DAY_B + ' vs ' + DAY_A + ') produces a board that ' +
+    'differs from (a) in at least one field',
+    gotB && serial3 !== serial1, { same: serial3 === serial1 });
+
+  // (d) display: while the daily (day B) is loaded, the hint bar reads
+  // "DAILY <dateKey> · <name>", not the "L<n> · " form.
+  const dayBKey = dailyDateKey(DAY_B);
+  const hintbarDaily = await page.evaluate('document.getElementById("hintbar").textContent');
+  check('phasdaily display: hint bar starts "DAILY " and contains the pinned date key ' + dayBKey +
+    ' while the daily is loaded', hintbarDaily.startsWith('DAILY ') && hintbarDaily.includes(dayBKey), hintbarDaily);
+
+  // (c) persistence split: clear the loaded daily via the solver-grant path
+  // (replayGen) and confirm the clear writes ONLY save.daily, never
+  // save.done, and never touches the (frozen-in-daily-mode) #lvlsel list.
+  const lvlselCountBefore = await page.evaluate('document.querySelectorAll("#lvlsel option").length');
+  const saveBefore = await g('G=>G.save()');
+  const doneLenBefore = saveBefore.done.length;
+  const genInfoDaily = await g('G=>G.genInfo()');
+  const replayOk = !!(genInfoDaily && genInfoDaily.hasScript) && await g('G=>G.replayGen()');
+  check('phasdaily persistence: replayGen() (the solver-grant clear path) returns true for the pinned daily',
+    replayOk, genInfoDaily);
+  await page.waitForTimeout(900); // levelClear() fires off updateHome's 650ms clearPending timer
+  const saveAfter = await g('G=>G.save()');
+  const dailyKeys = Object.keys(saveAfter.daily || {});
+  check('phasdaily persistence: save().daily has exactly the pinned date key ' + dayBKey + ' with a numeric t',
+    dailyKeys.length === 1 && dailyKeys[0] === dayBKey && typeof (saveAfter.daily || {})[dayBKey].t === 'number',
+    saveAfter.daily);
+  check('phasdaily persistence: save().done.length is unchanged by the daily clear (' +
+    doneLenBefore + ' -> ' + saveAfter.done.length + ')',
+    saveAfter.done.length === doneLenBefore, { doneLenBefore, doneLenAfter: saveAfter.done.length });
+  const lvlselCountDuring = await page.evaluate('document.querySelectorAll("#lvlsel option").length');
+  check('phasdaily persistence: #lvlsel option count unchanged while the daily was open (' +
+    lvlselCountBefore + ' -> ' + lvlselCountDuring + ')',
+    lvlselCountDuring === lvlselCountBefore, { lvlselCountBefore, lvlselCountDuring });
+
+  // (e) ✓ label + return: NEXT LEVEL from a daily clear goes back to the menu
+  // (there is no "next daily"), not lvlIdx+1, and the DAILY button picks up
+  // its ✓ suffix now that today's (pinned) daily is recorded.
+  await dailyClickBtn('next-btn');
+  const menuHiddenAfterNext = await page.evaluate('document.getElementById("menu").classList.contains("hide")');
+  const dailyBtnText = await page.evaluate('document.getElementById("daily-btn").textContent');
+  check('phasdaily return: NEXT LEVEL from a daily clear shows the menu (not .hide)',
+    menuHiddenAfterNext === false, menuHiddenAfterNext);
+  check('phasdaily return: the DAILY button label ends with the ✓ suffix after the clear',
+    dailyBtnText.endsWith('✓'), dailyBtnText);
+
+  // #lvlsel invariance: loading a normal level after the daily rebuilds the
+  // list (buildLvlSel's daily-mode early-return no longer applies) — the
+  // rebuilt count matches the pre-daily count from (c), proving the daily
+  // excursion left no residue on the curriculum list.
+  await load(3);
+  const lvlselCountAfterNormal = await page.evaluate('document.querySelectorAll("#lvlsel option").length');
+  check('phasdaily return: #lvlsel option count after returning and loading a normal level matches the ' +
+    'pre-daily count (' + lvlselCountBefore + ' -> ' + lvlselCountAfterNormal + ')',
+    lvlselCountAfterNormal === lvlselCountBefore, { lvlselCountBefore, lvlselCountAfterNormal });
+
+  // leave no daily state behind for later checks: load(3) above already reset
+  // dailyMode to false (same convention as every other section boundary in
+  // this suite); release the day pin too so nothing downstream could ever
+  // observe a stale pinned day.
+  await g('G=>G.setDay(null)');
+
   // ---------- console errors ----------
   check('no console/page errors across the whole run', errors.length === 0, errors.slice(0, 6));
 

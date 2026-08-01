@@ -209,7 +209,7 @@ smoke gate catches a bad map edit.
 
 `?test=1` freezes the rAF sim (render only); everything advances through
 `window.__GF.step(s)` — deterministic. Verbs: `load/applySource/tapHome/
-dragTo/setGrav/state/parts/freezeDry`. `freezeDry` returns the placement
+dragTo/setGrav/setDay/state/parts/freezeDry`. `freezeDry` returns the placement
 search's candidate list — the tool that found both freeze bugs.
 
 `.claude/tests/drive-phasic.cjs` (195 checks): a scripted player solution for
@@ -317,6 +317,10 @@ Anti-shove property is pinned by suite negatives per map (drag-impossibility, L2
 Traced-but-inert corner: the maze-gem pool still includes 'B' (L-tromino) whose notch cell can rest at the mouth row without breaching the tunnel — doesn't threaten anti-shove; noted in case a future audit trips on it.
 
 `save.done` indices 16-18 shifted meaning with the AUTH reshuffle (acceptable — CD is the only player).
+
+## Daily challenge (phasdaily round, 2026-08-01)
+
+Level index derives from UTC day: `DAILY_BASE=100000` + UTC day number, an endless-flavored index solver-proven like any other; base chosen far above any future curriculum boundary. **Poison traps guarded:** `save.done` sparse-array trap — a ~100k index would JSON-serialize ~100k nulls, so daily results live in `save.daily[dateKey]={t:seconds}` separate, never `save.done`. `buildLvlSel` skips its rebuild in daily mode (option-list would otherwise grow ~100k entries); skipped on load and after clear. **Daily mode set/clear/preserve:** set via DAILY button; cleared by PLAY, level select, NEXT-from-daily, TEST load; preserved across retry/replay/reload/STUCK. **Save shape:** `save.daily = {[YYYY-MM-DD]: {t:seconds}}`, guarded reads, optional key on `phasic_v1`. **TEST:** `__GF.setDay(n)` pins the day number (dateKey derives from the same pin), so suite never depends on wall clock. **Display:** `DAILY YYYY-MM-DD · <name>` at hint bar / clear screen / ghost hint. NEXT returns to menu.
 
 ## Known trade-offs / iOS-port notes
 

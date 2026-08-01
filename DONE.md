@@ -1,5 +1,18 @@
 # DONE — done log
 
+- 2026-08-01 [phasic] phasdaily oversee run: daily challenge — a menu DAILY
+  button serves one shared solver-proven generated level per UTC date
+  (index = `DAILY_BASE` 100000 + UTC day number; `dateKey` YYYY-MM-DD).
+  Results go to `save.daily[date]={t:seconds}`, never `save.done`, and
+  `buildLvlSel` skips its rebuild in daily mode — both ~100k-index
+  poison-traps guarded (sparse save array; 100k-option level list, which
+  fires at LOAD, not just clear). Display `DAILY <date> · <name>` at all
+  three sites (hint bar, clear screen, ghost hint); NEXT-from-daily returns
+  to the menu; retry/replay/STUCK preserve daily mode; TEST `setDay(n)`
+  day-pin keeps the suite clock-free. Catalog re-faceted (+`daily-challenge`,
+  sync gate green). Suite 338→351. (ba26051..07113a1 + wrap-up docs; plan
+  archived to .claude/plans/DONE/)
+
 - 2026-08-01 [phasic] phasnames oversee run: block-lesson naming — every
   curriculum level (indices 0–63) displays as `Word · Name` via
   `BLOCK_WORD=['Drag','Flame','Gravity','Frost','Vapor','Void','Hedge',

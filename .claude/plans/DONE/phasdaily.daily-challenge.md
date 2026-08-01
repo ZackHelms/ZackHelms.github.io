@@ -1,6 +1,6 @@
 # phasdaily — daily challenge: one shared solver-proven level per UTC date
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-08-01 — commits ba26051..07113a1, merged to main
 **Requested:** 2026-08-01 (backlog Later item: "Daily-challenge / share-code
 retrofit (house pattern; the generator is already seeded and deterministic
 per index)").
