@@ -77,7 +77,7 @@ pairwise work is trivial.
 The campaign is **blocks of 8**. The first level of each block is a
 hand-authored tutorial that teaches the block's new factor; the rest of the
 block is generated with everything introduced so far, complexity rising.
-`AUTH` (sparse map, curriculum index → def) holds the 24 authored levels;
+`AUTH` (sparse map, curriculum index → def) holds the 25 authored levels;
 `getLevel(i)` fills every other index from the generator.
 
 | Block | Levels | Introduces | Authored |
@@ -90,16 +90,18 @@ block is generated with everything introduced so far, complexity rising.
 | 5 | 41–48 | black hole obstacle | 41 The Void |
 | 6 | 49–56 | bush obstacle | 49 Overgrowth |
 | 7 | 57–64 | fan obstacle | 57 Crosswind · 58 The Stopper (tactic level) |
-| ∞ | 65+ | endless, all factors mixed | — |
+| 8 | 65–72 | launch-and-freeze (orb-less; no facilitating tool) | 65 The Flue |
+| ∞ | 73+ | endless, all factors mixed | — |
 
 **Block-lesson naming (phasnames, 2026-08-01):** every curriculum level
 displays as `Word · Name` — `BLOCK_WORD=['Drag','Flame','Gravity','Frost',
-'Vapor','Void','Hedge','Wind']` (one word per block, beside `blockOf`) and
-`lvlName(i,def)` wrap the stored name at the four display sites (level-select
-options — `N · Word · Name`, hint bar, ghost-replay hint, clear screen).
-Display-layer only: defs, `genName`, `AUTH`, `genCache` and saves are
-untouched, so determinism is unaffected. Endless (index 64+) is unprefixed
-(not a lesson block; CD can add a word with a one-line change).
+'Vapor','Void','Hedge','Wind','Launch']` (one word per block, beside
+`blockOf`) and `lvlName(i,def)` wrap the stored name at the four display
+sites (level-select options — `N · Word · Name`, hint bar, ghost-replay
+hint, clear screen). Display-layer only: defs, `genName`, `AUTH`, `genCache`
+and saves are untouched, so determinism is unaffected. Endless (index
+`CURRICULUM_END`+, currently 72+) is unprefixed (not a lesson block; CD can
+add a word with a one-line change).
 
 Future mechanics (added by the CD in later sessions) get their own 8-block
 inserted before the endless tail, same pattern: tutorial first, then mix.
@@ -156,10 +158,11 @@ the envelope rises.
 10. **Push the puddle** (taught by L13 Queue): solids shove liquid —
    drag a stone into a puddle to bulldoze it through a slot or along a
    shelf that gravity alone won't take it past.
-11. **Launch and freeze** (advanced — CD-discovered, 2026-07-31): shove
-   a puddle hard with a dragged solid to fling it airborne, then frost it
-   mid-flight so it crystallizes where it could never rest. Reserved for a
-   future Acrobatics block; no earlier level may require it.
+11. **Launch and freeze** (CD-discovered, 2026-07-31): shove a puddle hard
+   with a dragged solid to fling it airborne, then frost it mid-flight so
+   it crystallizes where it could never rest. Home block: **Launch (block 8,
+   taught at L65 The Flue)** — see § Launch block below. No earlier level
+   (blocks 0–7) may require it.
 12. **Fence with stone** (CD 2026-07-31): solids ignore the gravity
    well — park them as walls to pen a cloud or puddle in place, then
    grav-push or grav-pull one gem at a time through a maze when flames
@@ -212,12 +215,13 @@ smoke gate catches a bad map edit.
 dragTo/setGrav/setDay/state/parts/freezeDry`. `freezeDry` returns the placement
 search's candidate list — the tool that found both freeze bugs.
 
-`.claude/tests/drive-phasic.cjs` (195 checks): a scripted player solution for
-all 24 authored levels (final-leg gate), plus fit-gating negatives (2x2/T4 refused by a
-1-wide slot, 1x1 passes), freeze-refusal on the 1-tall shelf without consuming
-the frost, the cancel rule with bucket restoration, live-socket re-melting, win-with-deployed-well, the generated-content
-replay gate (17-32 + endless), STUCK, menu format, and the console-error
-assert. Freeze-near-then-
+`.claude/tests/drive-phasic.cjs` (399 checks as of the phasacro round): a
+scripted player solution for all 25 authored levels (final-leg gate), plus
+fit-gating negatives (2x2/T4 refused by a 1-wide slot, 1x1 passes),
+freeze-refusal on the 1-tall shelf without consuming the frost, the cancel
+rule with bucket restoration, live-socket re-melting, win-with-deployed-well,
+the generated-content replay gate (17-32 + endless, incl. block-8 Launch
+boards), STUCK, menu format, and the console-error assert. Freeze-near-then-
 slide (`ensureLock`) is a legitimate player move the suite uses.
 
 ## Audio
@@ -235,9 +239,10 @@ node (bandpass noise ~185 Hz, slow LFO, ≤0.05 into sfxGain), idempotent
 (those call `setupLevel` directly); `ac.suspend()` on `visibilitychange` silences
 it for free. It is SFX — governed by the SFX slider/mute, no new setting.
 **Music: 10 seeded generative songs** (`SONGS[]` — bpm/root/mode/prog/waves/hat/arp;
-mulberry32 per song), per-block assignment — `songStart(i<64?blockOf(i):i%10)`:
-curriculum blocks 0–7 own songs 0–7; endless (i≥64) rotates all 10 (songs 9–10
-appear only in endless — accepted shape, `SONGS[]` stays at 10). Each song carries
+mulberry32 per song), per-block assignment — `songStart(i<CURRICULUM_END?blockOf(i):i%10)`:
+curriculum blocks 0–8 own songs 0–8 (block 8 Launch plays song index 8, `'09 · '`);
+endless (i≥CURRICULUM_END, currently 72) rotates all 10 (song 10 appears only in
+endless — accepted shape, `SONGS[]` stays at 10). Each song carries
 a `t:` title (01 First Light, 02 Copper Squares, 03 Slow Thaw, 04 Vapor Trail,
 05 Deep Cellar, 06 Warm Static, 07 Ride the Flue, 08 Still Water, 09 Amber Drift,
 10 Night Drawer — CD renames at will); a dim `NN · Title` now-playing line draws
@@ -325,6 +330,20 @@ Gravmaze template now generates in obstacle blocks (5–7) with one hazard per m
 ## Daily challenge (phasdaily round, 2026-08-01)
 
 Level index derives from UTC day: `DAILY_BASE=100000` + UTC day number, an endless-flavored index solver-proven like any other; base chosen far above any future curriculum boundary. **Poison traps guarded:** `save.done` sparse-array trap — a ~100k index would JSON-serialize ~100k nulls, so daily results live in `save.daily[dateKey]={t:seconds}` separate, never `save.done`. `buildLvlSel` skips its rebuild in daily mode (option-list would otherwise grow ~100k entries); skipped on load and after clear. **Daily mode set/clear/preserve:** set via DAILY button; cleared by PLAY, level select, NEXT-from-daily, TEST load; preserved across retry/replay/reload/STUCK. **Save shape:** `save.daily = {[YYYY-MM-DD]: {t:seconds}}`, guarded reads, optional key on `phasic_v1`. **TEST:** `__GF.setDay(n)` pins the day number (dateKey derives from the same pin), so suite never depends on wall clock. **Display:** `DAILY YYYY-MM-DD · <name>` at hint bar / clear screen / ghost hint. NEXT returns to menu.
+
+## Launch block (phasacro round, 2026-08-02)
+
+Block 8 "Launch" (curriculum indices 64-71, levels 65-72) is orb-less by construction — no gravity well ever appears, no obstacle factor either — so launch-and-freeze (tactic #11) is the ONLY way home: shove a settled puddle airborne with a dragged solid, then frost it mid-flight so it crystallizes where it could never rest.
+
+`CURRICULUM_END=72` caps `blockOf(i)` at 8 and is the single constant every former literal-64 site now reads from (`lvlName`, `songStart`, `buildLvlSel`'s `N`, `buildGen`'s endless `extra`); `BLOCK_WORD` gains `'Launch'` (9 entries). A one-way save migration runs once per storage (gated on `save.acroV`): the first load where `save.done.length>64` splices 8 `undefined` slots into `save.done` at index 64, so pre-move endless completion marks shift up by 8 while curriculum marks 0-63 are untouched (JSON round-trips the splice holes to `null`, not `undefined` — assert nullish); shorter saves need no splice but still get the flag.
+
+`AUTH[64]` ("The Flue" — CD hasn't auditioned it yet, name/hint implementer-drafted and flagged for rename, same as phasgrav's Side Pocket): a roofed pillar pocket fed only by a 1-wide flue whose mouth faces straight down. Three invariants make it launch-mandatory, all proved in-harness and re-asserted by the suite: no drag-reachable stone anchor comes within the 2.3-cell socket-snap radius (the 2-wide ruby fits neither the flue nor past the pocket wall); gravity-flow closure from every melt-reachable cell never wets the pocket or flue (liquid never climbs); every resting-freeze position the puddle can actually reach (floor, pillar roof) idealizes to sd>2.3, so the socket is never offered as a freeze candidate.
+
+`buildLaunch` regenerates this same shape for indices 65-71 — mirrored left/right, decoy gems ramping with `p` — and re-proves all three invariants per candidate via `launchGeomOk` (R1 stone-unreachable BFS, R2 pour-closure-excluded, R3 resting-snap-excluded) before a salt is ever spent on it; a candidate that fails any of them is simply discarded.
+
+`scriptLaunch`'s solver leg: melt the launch gem, let it settle ~1.5s, a DOUBLE out-in hammer ram (a single ram only carries the puddle's leading drop up the 1-wide flue), then the revert **tap** (`{t:}`) freezes it mid-flight — never `{c:}`: `dropSourceOn('cold', ...)` (and therefore `applySource('cold', L)`) reports `false` on exactly this commit path, because it takes the melt's flame back (`removeFlame`) rather than latching a new frost, so a `{c:}` op burns every retry for nothing. Always assert the commit via `state().objs[..].phase`, never the `applySource` boolean.
+
+`getLevel` skips its multi-salt scan for block-8 curriculum (`scan=0`, `i<CURRICULUM_END`) since every candidate there IS the block's own idea, with no rarer woven/maze form to hold out for. Endless (`i>=CURRICULUM_END`, now 72+) falls through to the ordinary path and keeps every factor including gravmazes: `mzIdx` is only computed after block-8 curriculum's early `return buildLaunch(...)`, so it structurally never fires inside 64-71 even though `blockOf` maps both curriculum block 8 and all of endless to `8`.
 
 ## Known trade-offs / iOS-port notes
 
