@@ -1611,6 +1611,25 @@ function check(name, cond, extra) {
 
   await hubPage.close();
 
+  // ---------- phasport: shell-chrome guard ----------
+  // The iOS WKWebView shell loads this page via file:// with no ?test=1 —
+  // a fresh page + GAME with no query string reproduces exactly that
+  // condition. The hub back-arrow must be hidden (it would 404 the shell,
+  // which bundles no games hub) via computed display, not just an inline
+  // style read, since the guard could in principle be undone by later CSS.
+  const shellPage = await ctx.newPage();
+  shellPage.on('pageerror', e => errors.push('pageerror(phasport): ' + e.message));
+  shellPage.on('console', m => { if (m.type() === 'error' && !IGNORE.test(m.text())) errors.push('console(phasport): ' + m.text()); });
+  await shellPage.goto('file://' + GAME, { waitUntil: 'load', timeout: 20000 });
+  await shellPage.waitForTimeout(300);
+  const shellBackDisplay = await shellPage.evaluate(() => {
+    const el = document.getElementById('back-btn');
+    return el ? getComputedStyle(el).display : null;
+  });
+  check('phasport: file:// load without ?test=1 — #back-btn computed display is none (iOS shell guard)',
+    shellBackDisplay === 'none', shellBackDisplay);
+  await shellPage.close();
+
   // ---------- phasdaily: daily challenge — determinism, persistence split, menu invariance ----------
   // DAILY_BASE=100000; dailyIdx()=DAILY_BASE+dayNum(); dateKey() derives from
   // the SAME pinned dayNum(), so setDay(n) (TEST-only) keeps both in lockstep

@@ -57,7 +57,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-02 05:12 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-02 13:29 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -476,6 +476,18 @@ function cxScore(cx){ return cx.gems + 2*cx.flames + 2*cx.frosts + 2*cx.grav + 2
 const $ = id => document.getElementById(id);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const TEST = /[?&]test=1/.test(location.search);
+// iOS shell guard: the WKWebView shell loads this page via file:// with no
+// ?test=1. The hub back-arrow would 404 the WebView (there is no games hub
+// bundled), and the build badge is site chrome — both are meaningless
+// outside a browser tab on the real site, so hide them. No-op under TEST
+// (drive suite loads via file:// too) and under http/https (the live site).
+// #back-btn and #build-badge are both parsed above this <script> tag, so
+// they already exist in the DOM at this point — no DOMContentLoaded needed.
+if(location.protocol==='file:' && !TEST){
+  const bb=$('back-btn'), bd=$('build-badge');
+  if(bb) bb.style.display='none';
+  if(bd) bd.style.display='none';
+}
 let save; try{ save = JSON.parse(localStorage.getItem('phasic_v1')||'{}'); }catch(e){ save={}; }
 save = Object.assign({done:[], mus:60, sfx:80, musMute:false, sfxMute:false}, save);
 const persist = ()=>{ try{ localStorage.setItem('phasic_v1', JSON.stringify(save)); }catch(e){} };
