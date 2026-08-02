@@ -57,15 +57,6 @@ backlog entry here.
 
 ## Later
 
-*(both plan-ready — recommended burndown order is this file order:
-acro → port, so the first TestFlight payload carries everything)*
-
-- [phasic] "Acrobatics" → the Launch block: 9th curriculum block (levels
-  65–72) built on launch-and-freeze; orb-less boards make the tactic
-  mandatory; endless moves to 73+ with save migration. *Decided
-  2026-08-01: tutorial drafted as a proposal, CD auditions it.*
-  **Plan ready (2026-08-01)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phasacro.acrobatics-block.md`
 - [phasic] iOS app via rn-ios-flightdeck: GameShell WebView wrap of the
   latest web build (the CD's flightdeck choice settles the old scoping
   question; native picker/haptics stay follow-ups). The TestFlight build
