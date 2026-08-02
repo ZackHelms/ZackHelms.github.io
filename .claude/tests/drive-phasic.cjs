@@ -145,7 +145,7 @@ function check(name, cond, extra) {
 
   // ---------- boot ----------
   check('test API present', await page.evaluate('!!window.__GF'));
-  check('24 authored levels across the curriculum', await g('G=>G.authored') === 24);
+  check('25 authored levels across the curriculum', await g('G=>G.authored') === 25);
   for (const i of [0,1,2,7,8,9,10,11,12,13,15,16,17,18,19,20,21,22,24,32,40,48,56,57]) await load(i);
   check('all authored maps parse with matching footprints', errors.length === 0, errors);
 

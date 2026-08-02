@@ -57,7 +57,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-02 03:45 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-02 04:26 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -433,13 +433,37 @@ stopper:{ name:'The Stopper', heat:1, cold:0, grav:1,
   hint:'Plug the slot with a stone so the pour can pass over it — the void waits below.',
   map:['..........','RR..M.....','RR........','..........','..........','##.####.##',
        '..........','..@.......','..........','..........','.......rr.','m......rr.']},
+launch:{ name:'The Flue', heat:1, cold:1, grav:0,
+  cx:{gems:2,flames:3,frosts:0,grav:0,obstacles:0,basePts:0},
+  hint:'No pour ever climbs a wall — melt the ruby where it lies, ram the puddle with the stone until it leaps up the flue, and freeze it in mid-air.',
+  /* launch-mandatory geometry (both directions proved in-harness, task 3 of
+     the phasacro plan). The socket pair is walled on its left, roofed by five
+     rows of stone, and fed only by the 1-WIDE flue beneath it:
+     - drag-as-stone: a 2-wide stone fits neither the flue nor past the col-7
+       wall, so no drag reaches the socket — and, the stronger statement the
+       2.35-cell socket snap actually demands, NO drag-reachable stone
+       position is within snap range either, so melt-here-then-take-the-
+       flame-back cannot bridge in from anywhere the stone can stand.
+     - pour: the pocket's only opening faces DOWN. Liquid never climbs, so
+       gravity flow cannot reach it (BFS over the open cells agrees).
+     - freeze-bridge: enumerating every legal 2-particle configuration in the
+       snap neighbourhood, EVERY one that the socket would accept has both
+       drops inside the flue/pocket (cells 8,8 · 9,8 · 9,9 · 9,10) — cells no
+       stone can occupy and no pour can wet. The two surfaces a puddle can
+       settle on unaided, the floor and the pillar roof, are both far outside
+       the 2.3-cell candidate radius, so a resting freeze is never offered it.
+     What is left is the block's tactic: jab the settled puddle with the loose
+     stone until it rides up the flue, and freeze it up there. */
+  map:['..........','..........','..........','.......###','.......###','.......###',
+       '.......###','.......###','.......#rr','.......##.','.......##.','m.M.....RR']},
 };
 
 /* ============ state ============ */
 const AUTH={ 0:NEWL.first, 1:LEVELS[0], 2:LEVELS[1], 7:NEWL.whole,
   8:LEVELS[2], 9:LEVELS[3], 10:LEVELS[4], 11:LEVELS[5], 12:LEVELS[11], 13:LEVELS[12], 15:LEVELS[15],
   16:NEWL.gravity, 17:LEVELS[6], 18:LEVELS[7], 19:LEVELS[9], 20:LEVELS[10], 21:LEVELS[13], 22:LEVELS[14],
-  24:NEWL.water, 32:NEWL.vapor, 40:NEWL.voidl, 48:NEWL.growth, 56:NEWL.wind, 57:NEWL.stopper };
+  24:NEWL.water, 32:NEWL.vapor, 40:NEWL.voidl, 48:NEWL.growth, 56:NEWL.wind, 57:NEWL.stopper,
+  64:NEWL.launch };
 // complexity annotations for the legacy authored levels (flames = required
 // flame applications, frosts = required frost applications)
 const LEGACY_CX=[[2,0,0,0,0],[2,0,0,0,0],[1,1,0,0,0],[1,1,0,0,0],[4,1,0,0,0],[2,2,0,0,0],
