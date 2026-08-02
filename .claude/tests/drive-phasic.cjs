@@ -1248,10 +1248,10 @@ function check(name, cond, extra) {
       humOffLog.includes('hum-off') && !humOffLog.includes('hum-on'), humOffLog);
   }
 
-  // per-block music: songStart(i<64?blockOf(i):i%10) — assert against the
+  // per-block music: songStart(i<72?blockOf(i):i%10) — assert against the
   // log's LAST song entry (a level's load can also push hum-on/off around it).
   for (const i of [0, 9, 60, 70]) {
-    const expected = i < 64 ? await page.evaluate('blockOf(' + i + ')') : i % 10;
+    const expected = i < 72 ? await page.evaluate('blockOf(' + i + ')') : i % 10;
     await load(i);
     const songLog = await page.evaluate('window.__SFXLOG||[]');
     let lastSong = null;
@@ -1461,21 +1461,21 @@ function check(name, cond, extra) {
   const songTitle1 = await page.evaluate('SONGS[1].t');
   check('phaschrome: load(9), block 1 — nowPlaying shows track 02 with SONGS[1].t (' + songTitle1 + ')',
     (await g('G=>G.nowPlaying()')) === '02 · ' + songTitle1);
-  await load(69); // endless, 69%10=9 — double-digit now-playing (coverage the L9 per-block update lost)
+  await load(79); // endless, 79%10=9 — double-digit now-playing (coverage the L9 per-block update lost)
   const songTitle9 = await page.evaluate('SONGS[9].t');
-  check('phasaudio: load(69) endless (69%10=9) — nowPlaying pads to 10 with SONGS[9].t (' + songTitle9 + ')',
+  check('phasaudio: load(79) endless (79%10=9) — nowPlaying pads to 10 with SONGS[9].t (' + songTitle9 + ')',
     (await g('G=>G.nowPlaying()')) === '10 · ' + songTitle9);
 
-  // ---------- phasnames: endless entries (index 64+) carry no block word ----------
+  // ---------- phasnames: endless entries (index 72+) carry no block word ----------
   const optsEndless = await page.evaluate('[...document.querySelectorAll("#lvlsel option")].map(o=>o.textContent)');
   const BLOCK_WORD_RE = /^\d+ · (Drag|Flame|Gravity|Frost|Vapor|Void|Hedge|Wind) · /;
   const badEndlessEntries = [];
-  for (let idx = 64; idx < optsEndless.length; idx++) {
+  for (let idx = 72; idx < optsEndless.length; idx++) {
     const t = optsEndless[idx];
     if (!/^\d+ · \S/.test(t) || BLOCK_WORD_RE.test(t)) badEndlessEntries.push({ idx, got: t });
   }
-  check('phasnames: endless entries (index 64+) are one line, unprefixed by a block word',
-    optsEndless.length > 64 && badEndlessEntries.length === 0, badEndlessEntries.slice(0, 3));
+  check('phasnames: endless entries (index 72+) are one line, unprefixed by a block word',
+    optsEndless.length > 72 && badEndlessEntries.length === 0, badEndlessEntries.slice(0, 3));
 
   // ---------- wiki: home, tactics page, live search (second page, same context) ----------
   const wpage = await ctx.newPage();
