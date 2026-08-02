@@ -354,3 +354,10 @@ Block 8 "Launch" (curriculum indices 64-71, levels 65-72) is orb-less by constru
   player slides the solid home (or gets the 2.35 socket snap when close).
 - Level select is a DOM `<select>`; the iOS build will want a native picker.
 - `navigator.vibrate` guards are already in place for Safari.
+- The iOS app lives in `rn-ios-flightdeck` at `games/phasic` (imported
+  2026-08-02). Editing this web game does **not** update it — re-import via
+  `bash scripts/import-web-game.sh phasic <staging-dir> "Phasic"` from the
+  flightdeck root, which replaces only `www/` (the app icons under
+  `games/phasic/ios/…` survive re-imports). The TestFlight build is
+  CD-authorized via flightdeck's `/ios-build-push` (10× billed macOS
+  minutes).
