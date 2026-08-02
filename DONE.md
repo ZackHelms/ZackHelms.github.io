@@ -1,5 +1,17 @@
 # DONE — done log
 
+- 2026-08-02 [phasic] phasport oversee run: the Phasic iOS app —
+  imported into `rn-ios-flightdeck` as a GameShell WKWebView app
+  (`games/phasic`: 5-file www payload incl. wiki + license, 8 flattened
+  app icons from the 1024 master, sourceRepo fixed) with
+  `PREFLIGHT=pass`, `IOS-PRIVACY: GREEN`, jest green; site side gained
+  the file://-outside-test shell-chrome guard (hides `#back-btn` +
+  `#build-badge` in the shell; drive suite 399→400) and the
+  downstream-consumer note in `.claude/phasic.md`. TestFlight build
+  stays CD-authorized — Apple per-game checklist handed over in the
+  follow-up. Site commits `5e7befa..ebe7ef5`; flightdeck `7436db7`
+  (pushed, `6889eee..7436db7`). Plan archived to `.claude/plans/DONE/`.
+
 - 2026-08-02 [phasic] phasacro oversee run: the Launch block — 9th
   curriculum block (levels 65–72, indices 64–71), orb-less boards where
   launch-and-freeze (ram a settled puddle with a stone, frost it

@@ -1,6 +1,9 @@
 # phasport — the Phasic iOS app: RN WebView shell via rn-ios-flightdeck
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-08-02 — site commits `5e7befa..ebe7ef5`,
+merged to main; flightdeck commit `7436db7` pushed to
+`rn-ios-flightdeck` main (`6889eee..7436db7`). TestFlight build remains
+CD-authorized (see the follow-up file's checklist).
 **Requested:** 2026-08-01 (CD: "create an ios app for the latest version of
 the webapp game" via rn-ios-flightdeck).
 **Scope:** `games/phasic/index.html` (shell-chrome guard only) +

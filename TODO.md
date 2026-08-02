@@ -42,8 +42,10 @@ backlog entry here.
   Gems"). *Amended 2026-08-01: the enrollment half is already DONE — the
   account is active (Team `TT479XD8ZL`, distribution cert to 2027-05-10)
   and has shipped TestFlight builds via rn-ios-flightdeck. The reservation
-  is step 3 of flightdeck's `apple-app-setup` per-game checklist, which
-  the phasport plan hands you in full.*
+  is step 3 of flightdeck's `apple-app-setup` per-game checklist, handed
+  to you in full (with the build + playtest steps) in
+  `.claude/plans/DONE/phasport.rn-flightdeck-ios-app.follow-up.md` — the
+  app itself imported preflight-green 2026-08-02.*
 - [phasic·IP] Source visibility. *Decided 2026-08-01: keep Phasic's source
   public until the App Store submission nears — Pages keeps serving the
   web version, the license carve-out stands, and the iOS copy lives in the
@@ -57,13 +59,7 @@ backlog entry here.
 
 ## Later
 
-- [phasic] iOS app via rn-ios-flightdeck: GameShell WebView wrap of the
-  latest web build (the CD's flightdeck choice settles the old scoping
-  question; native picker/haptics stay follow-ups). The TestFlight build
-  itself is CD-authorized (10× billed minutes) after the per-game Apple
-  checklist.
-  **Plan ready (2026-08-01)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/phasport.rn-flightdeck-ios-app.md`
+- (none)
 
 ## Icebox
 
