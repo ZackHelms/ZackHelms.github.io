@@ -1,6 +1,6 @@
 # phasacro — the Acrobatics block: a 9th curriculum block built on launch-and-freeze
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-08-02 — commits 2878020..cd2cdb9, merged to main
 **Requested:** 2026-08-01 (Later item; CD interview 2026-08-01: "Draft it —
 I'll audition" — the tutorial ships as a proposal, the CD auditions it like
 phasgrav's Side Pocket).

@@ -145,8 +145,8 @@ function check(name, cond, extra) {
 
   // ---------- boot ----------
   check('test API present', await page.evaluate('!!window.__GF'));
-  check('24 authored levels across the curriculum', await g('G=>G.authored') === 24);
-  for (const i of [0,1,2,7,8,9,10,11,12,13,15,16,17,18,19,20,21,22,24,32,40,48,56,57]) await load(i);
+  check('25 authored levels across the curriculum', await g('G=>G.authored') === 25);
+  for (const i of [0,1,2,7,8,9,10,11,12,13,15,16,17,18,19,20,21,22,24,32,40,48,56,57,64]) await load(i);
   check('all authored maps parse with matching footprints', errors.length === 0, errors);
 
   // ---------- WIKI: settings overlay button to wiki.html ----------
@@ -160,15 +160,15 @@ function check(name, cond, extra) {
   check('level entries read "N · Title Case"', opts.every(t => /^\d+ · \S/.test(t)) && opts.every(t => /[a-z]/.test(t)), opts.slice(0, 3));
 
   // ---------- phasnames: block-word prefix on curriculum entries + hint bar ----------
-  const BLOCK_WORD = ['Drag','Flame','Gravity','Frost','Vapor','Void','Hedge','Wind'];
+  const BLOCK_WORD = ['Drag','Flame','Gravity','Frost','Vapor','Void','Hedge','Wind','Launch'];
   const badBlockEntries = [];
-  for (let b = 0; b < 8; b++) {
+  for (let b = 0; b < 9; b++) {
     for (let idx = 8 * b; idx <= 8 * b + 7; idx++) {
       const expected = (idx + 1) + ' · ' + BLOCK_WORD[b] + ' · ';
       if (!opts[idx] || !opts[idx].startsWith(expected)) badBlockEntries.push({ idx, got: opts[idx], expected });
     }
   }
-  check('phasnames: every curriculum entry (0-63) reads "N · <block word> · Name"',
+  check('phasnames: every curriculum entry (0-71, incl. block 8 Launch) reads "N · <block word> · Name"',
     badBlockEntries.length === 0, badBlockEntries.slice(0, 3));
   const hintbar0 = await page.evaluate('document.getElementById("hintbar").textContent');
   check('phasnames: L1 hint bar starts "L1 · Drag · "', hintbar0.startsWith('L1 · Drag · '), hintbar0);
@@ -1157,7 +1157,7 @@ function check(name, cond, extra) {
   check('STUCK fallback: progress recorded', (await g('G=>G.save()')).done[1] === true);
 
   // ---------- budgets sane on fresh authored loads ----------
-  for (const i of [0,1,2,7,8,9,10,11,12,13,15,16,17,18,19,20,21,22,24,32,40,48,56,57]) {
+  for (const i of [0,1,2,7,8,9,10,11,12,13,15,16,17,18,19,20,21,22,24,32,40,48,56,57,64]) {
     await load(i);
     s = await st();
     check('budget L' + (i + 1) + ' fresh-load sane', s.heatN >= 0 && s.coldN >= 0);
@@ -1248,10 +1248,10 @@ function check(name, cond, extra) {
       humOffLog.includes('hum-off') && !humOffLog.includes('hum-on'), humOffLog);
   }
 
-  // per-block music: songStart(i<64?blockOf(i):i%10) — assert against the
+  // per-block music: songStart(i<72?blockOf(i):i%10) — assert against the
   // log's LAST song entry (a level's load can also push hum-on/off around it).
   for (const i of [0, 9, 60, 70]) {
-    const expected = i < 64 ? await page.evaluate('blockOf(' + i + ')') : i % 10;
+    const expected = i < 72 ? await page.evaluate('blockOf(' + i + ')') : i % 10;
     await load(i);
     const songLog = await page.evaluate('window.__SFXLOG||[]');
     let lastSong = null;
@@ -1461,21 +1461,21 @@ function check(name, cond, extra) {
   const songTitle1 = await page.evaluate('SONGS[1].t');
   check('phaschrome: load(9), block 1 — nowPlaying shows track 02 with SONGS[1].t (' + songTitle1 + ')',
     (await g('G=>G.nowPlaying()')) === '02 · ' + songTitle1);
-  await load(69); // endless, 69%10=9 — double-digit now-playing (coverage the L9 per-block update lost)
+  await load(79); // endless, 79%10=9 — double-digit now-playing (coverage the L9 per-block update lost)
   const songTitle9 = await page.evaluate('SONGS[9].t');
-  check('phasaudio: load(69) endless (69%10=9) — nowPlaying pads to 10 with SONGS[9].t (' + songTitle9 + ')',
+  check('phasaudio: load(79) endless (79%10=9) — nowPlaying pads to 10 with SONGS[9].t (' + songTitle9 + ')',
     (await g('G=>G.nowPlaying()')) === '10 · ' + songTitle9);
 
-  // ---------- phasnames: endless entries (index 64+) carry no block word ----------
+  // ---------- phasnames: endless entries (index 72+) carry no block word ----------
   const optsEndless = await page.evaluate('[...document.querySelectorAll("#lvlsel option")].map(o=>o.textContent)');
   const BLOCK_WORD_RE = /^\d+ · (Drag|Flame|Gravity|Frost|Vapor|Void|Hedge|Wind) · /;
   const badEndlessEntries = [];
-  for (let idx = 64; idx < optsEndless.length; idx++) {
+  for (let idx = 72; idx < optsEndless.length; idx++) {
     const t = optsEndless[idx];
     if (!/^\d+ · \S/.test(t) || BLOCK_WORD_RE.test(t)) badEndlessEntries.push({ idx, got: t });
   }
-  check('phasnames: endless entries (index 64+) are one line, unprefixed by a block word',
-    optsEndless.length > 64 && badEndlessEntries.length === 0, badEndlessEntries.slice(0, 3));
+  check('phasnames: endless entries (index 72+) are one line, unprefixed by a block word',
+    optsEndless.length > 72 && badEndlessEntries.length === 0, badEndlessEntries.slice(0, 3));
 
   // ---------- wiki: home, tactics page, live search (second page, same context) ----------
   const wpage = await ctx.newPage();
@@ -1745,6 +1745,174 @@ function check(name, cond, extra) {
   // this suite); release the day pin too so nothing downstream could ever
   // observe a stale pinned day.
   await g('G=>G.setDay(null)');
+
+  // ---------- phasacro: block-8 "Launch" — the orb-less launch-and-freeze
+  // curriculum block (indices 64-71, CURRICULUM_END=72). runScriptFast is a
+  // page-global (top-level function declarations in a classic <script> land
+  // on window even under 'use strict'), so the solver-op form of the tutorial's
+  // proven sequence can be replayed directly, the same way __GF.replayGen()
+  // replays a generated level's stored script: solving=true suppresses reject/
+  // SFX noise mid-run, solving=false + a manual updateHome() pass afterward is
+  // what actually flips game to 'clear' (the live win-check at updateHome time
+  // is gated on !solving) — mirrors task 3's proof harness technique. ----------
+  async function runScriptRaw(script) {
+    return page.evaluate('(function(){ solving=true; var ok=runScriptFast(' +
+      JSON.stringify(script) + '); solving=false; for(const o of objs) updateHome(o); return ok; })()');
+  }
+  async function settleQuiet(L, maxSub) { // rest-gated, same REST_V threshold as tryFreeze itself
+    let budget = maxSub || 900;
+    while (budget-- > 0) { if ((await driftNow(L)) <= REST_V) return true; }
+    return false;
+  }
+
+  // (1) TUTORIAL SOLVABILITY — the proven launch-and-freeze op sequence wins
+  await load(64);
+  const LAUNCH_SCRIPT = [{ h: ['R'] }, { w: [1.5] }, { d: ['M', [[4, 11], [8, 11], [4, 11], [8, 11]]] },
+    { w: [0.1] }, { t: ['R'] }, { w: [1] }, { d: ['M', [[0, 11]]] }, { w: [0.5] }];
+  const launchScriptOk = await runScriptRaw(LAUNCH_SCRIPT);
+  await page.waitForTimeout(900); // levelClear()'s 650ms clearPending timer
+  const launchState = await st();
+  check('phasacro: The Flue (index 64) — the proven launch-and-freeze op sequence wins ' +
+    '(runScriptFast return + every gem phase===solid/home)',
+    launchScriptOk && launchState.objs.every(o => o.home && o.phase === 'solid'), launchState);
+  check('phasacro: The Flue — the win reaches the clear screen (game===\"clear\")',
+    launchState.game === 'clear', launchState.game);
+
+  // (3a) TUTORIAL NEGATIVE — freezeDry sweep: melt+settle on the floor where
+  // the launch gem is born, and the socket must never appear as a candidate
+  // (the resting-puddle reach tops out at 2.6 cells; the socket sits farther).
+  await load(64);
+  const miFlue = await g('G=>G.mapInfo()');
+  const rubyGeom = miFlue.gems.find(q => q.L === 'R');
+  const meltedOk = await apply('heat', 'R');
+  await step(1.5);
+  const settledOk = await settleQuiet('R', 900);
+  const fd = await g('G=>G.freezeDry("R")');
+  const socketOffered = fd.cands.some(c => c.x === rubyGeom.sax && c.y === rubyGeom.say);
+  check('phasacro negative (freezeDry): melt+settle at the launch gem\'s floor spawn — ' +
+    'the socket (' + rubyGeom.sax + ',' + rubyGeom.say + ') is never a freeze candidate (sd=' +
+    fd.sd.toFixed(3) + ' > 2.3)',
+    meltedOk && settledOk && !socketOffered && fd.sd > 2.3, { meltedOk, settledOk, socketOffered, fd });
+
+  // (3b) TUTORIAL NEGATIVE — stone-unreachable: BFS the 2-wide ruby footprint
+  // over mapInfo().walls (integer-cell lattice — fast, and the same technique
+  // buildLaunch's own build-time R1 reject uses for generated boards); no
+  // reachable anchor may come within 2.3 of the socket (2.35 snap radius).
+  {
+    const GWn = miFlue.walls[0].length, GHn = miFlue.walls.length;
+    const openCell = (x, y) => x >= 0 && y >= 0 && x < GWn && y < GHn && miFlue.walls[y][x] === '0';
+    const fitsRuby = (x, y) => openCell(x, y) && openCell(x + 1, y);
+    const seenR = new Set([rubyGeom.ax + ',' + rubyGeom.ay]), qR = [[rubyGeom.ax, rubyGeom.ay]];
+    let closestSd = Infinity;
+    while (qR.length) {
+      const [x, y] = qR.pop();
+      closestSd = Math.min(closestSd, Math.hypot(x - rubyGeom.sax, y - rubyGeom.say));
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy, k = nx + ',' + ny;
+        if (seenR.has(k) || !fitsRuby(nx, ny)) continue;
+        seenR.add(k); qR.push([nx, ny]);
+      }
+    }
+    check('phasacro negative (stone-unreachable): BFS over the drag-reachable 2-wide ruby ' +
+      'footprint (' + seenR.size + ' anchors) finds none within 2.3 of the socket — closest ' +
+      closestSd.toFixed(3), closestSd > 2.3, { reachable: seenR.size, closestSd });
+  }
+
+  // (4) BLOCK-8 GENERATED COVERAGE — two curriculum indices, both scripted
+  // 'launch' boards, orb-less by construction (gravAt()===null, not merely
+  // docked), served only because their stored script clears them.
+  for (const i of [66, 71]) {
+    await load(i);
+    const gi = await g('G=>G.genInfo()');
+    const replayOk = await g('G=>G.replayGen()');
+    const gravOrb = await g('G=>G.gravAt()');
+    const cxI = await g('G=>G.complexity()');
+    check('phasacro generated L' + (i + 1) + ' (idx ' + i + '): genInfo template===launch, hasScript',
+      !!gi && gi.template === 'launch' && gi.hasScript === true, gi);
+    check('phasacro generated L' + (i + 1) + ': replayGen() clears it (solver-proven, served-is-solved)',
+      replayOk === true, replayOk);
+    check('phasacro generated L' + (i + 1) + ': no gravity orb on the board (gravAt()===null, not just docked)',
+      gravOrb === null, gravOrb);
+    check('phasacro generated L' + (i + 1) + ': cx budget is orb-less (grav absent/0)',
+      !!cxI && (cxI.grav === 0 || cxI.grav === undefined), cxI);
+  }
+
+  // mirrored-side: 66 and 65 pick opposite pocket sides (verified live: 66
+  // right, 65/68/70 left) — detected from mapInfo().walls' roof band (rows
+  // 3-7) rather than hardcoded, so the assertion holds regardless of which
+  // two indices land on which side for a given salt.
+  function launchSide(mi) {
+    const rightWall = [7, 8, 9].every(x => mi.walls[3][x] === '1');
+    const leftWall = [0, 1, 2].every(x => mi.walls[3][x] === '1');
+    return rightWall ? 'right' : (leftWall ? 'left' : 'unknown');
+  }
+  await load(66);
+  const side66 = launchSide(await g('G=>G.mapInfo()'));
+  await load(65);
+  const side65 = launchSide(await g('G=>G.mapInfo()'));
+  check('phasacro mirrored-side: index 66 and 65 pick opposite pocket sides (66=' + side66 +
+    ', 65=' + side65 + ')', side66 !== 'unknown' && side65 !== 'unknown' && side66 !== side65,
+    { side66, side65 });
+
+  // (5) SONG — a block-8 level starts nowPlaying with '09 · ' (song index 8)
+  await load(67);
+  const launchSong = await g('G=>G.nowPlaying()');
+  check('phasacro song: a block-8 level (idx 67) starts nowPlaying with \"09 · \"',
+    launchSong.startsWith('09 · '), launchSong);
+
+  // (7) ENDLESS BOUNDARY — the 71/72 edge itself: 71 still reads "Launch · ",
+  // 72 is unprefixed. Loading 72 grows #lvlsel past its CURRICULUM_END floor
+  // so the option actually exists to inspect.
+  await load(72);
+  const optsBoundary = await page.evaluate('[...document.querySelectorAll("#lvlsel option")].map(o=>o.textContent)');
+  check('phasacro endless boundary: index 71 (last Launch entry) reads "72 · Launch · Name"',
+    /^72 · Launch · \S/.test(optsBoundary[71]), optsBoundary[71]);
+  check('phasacro endless boundary: index 72 (first endless entry) is unprefixed, no block word',
+    /^73 · \S/.test(optsBoundary[72]) && !/^73 · (Drag|Flame|Gravity|Frost|Vapor|Void|Hedge|Wind|Launch) · /.test(optsBoundary[72]),
+    optsBoundary[72]);
+
+  // (6) MIGRATION — one-way save.done splice at CURRICULUM_END's insert point.
+  // Seeds localStorage.phasic_v1 directly (mirrors the task-2 migration probe
+  // technique) then reloads with dailyReload() so the page's top-level
+  // `save = JSON.parse(...)` + one-shot migration block re-runs fresh.
+  await page.evaluate(() => {
+    const done = new Array(64).fill(true).concat([true, true]); // pre-move: curriculum 0-63 + endless 64,65
+    localStorage.setItem('phasic_v1', JSON.stringify({ done, mus: 60, sfx: 80, musMute: false, sfxMute: false }));
+  });
+  await dailyReload();
+  const migA = await g('G=>G.save()');
+  check('phasacro migration: seed (len 66, pre-move endless marks at 64/65) — done[72]===true ' +
+    '&& done[73]===true (shifted up by 8)', migA.done[72] === true && migA.done[73] === true,
+    [migA.done[72], migA.done[73]]);
+  check('phasacro migration: seed — done.length===74 (8-slot splice at index 64)',
+    migA.done.length === 74, migA.done.length);
+  check('phasacro migration: seed — done[64] is nullish (spliced gap; JSON round-trip turns the ' +
+    'array hole into null, not strict undefined)', migA.done[64] === null || migA.done[64] === undefined,
+    migA.done[64]);
+  check('phasacro migration: seed — acroV===1', migA.acroV === 1, migA.acroV);
+
+  await dailyReload(); // reload again on the now-migrated save: must not re-splice
+  const migA2 = await g('G=>G.save()');
+  check('phasacro migration: reload again on a migrated save — length still 74 (no double-splice)',
+    migA2.done.length === 74, migA2.done.length);
+  check('phasacro migration: reload again — done[72]/[73] unchanged (not re-shifted a second time)',
+    migA2.done[72] === true && migA2.done[73] === true, [migA2.done[72], migA2.done[73]]);
+
+  // seed B: a save shorter than the insert point needs no splice, only the flag
+  await page.evaluate(() => {
+    const done = new Array(10).fill(true);
+    localStorage.setItem('phasic_v1', JSON.stringify({ done, mus: 60, sfx: 80, musMute: false, sfxMute: false }));
+  });
+  await dailyReload();
+  const migB = await g('G=>G.save()');
+  check('phasacro migration: short seed (len 10, below the splice point) — length unchanged at 10',
+    migB.done.length === 10, migB.done.length);
+  check('phasacro migration: short seed — acroV still set to 1', migB.acroV === 1, migB.acroV);
+
+  // cleanup: leave no seeded storage behind — a clean reload restores the
+  // ordinary empty-save boot state for anything that runs after this section
+  await page.evaluate(() => { localStorage.removeItem('phasic_v1'); });
+  await dailyReload();
 
   // ---------- console errors ----------
   check('no console/page errors across the whole run', errors.length === 0, errors.slice(0, 6));

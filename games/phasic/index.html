@@ -57,7 +57,7 @@ html,body{width:100%;height:100dvh;overflow:hidden;background:var(--bg);
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-01 21:57 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-02 05:12 UTC</div>
 <div id="wrap">
   <div id="topbar">
     <a id="back-btn" class="tbtn" href="../index.html" aria-label="Back to games">&#8592;</a>
@@ -433,13 +433,37 @@ stopper:{ name:'The Stopper', heat:1, cold:0, grav:1,
   hint:'Plug the slot with a stone so the pour can pass over it — the void waits below.',
   map:['..........','RR..M.....','RR........','..........','..........','##.####.##',
        '..........','..@.......','..........','..........','.......rr.','m......rr.']},
+launch:{ name:'The Flue', heat:1, cold:1, grav:0,
+  cx:{gems:2,flames:3,frosts:0,grav:0,obstacles:0,basePts:0},
+  hint:'No pour ever climbs a wall — melt the ruby where it lies, ram the puddle with the stone until it leaps up the flue, and freeze it in mid-air.',
+  /* launch-mandatory geometry (both directions proved in-harness, task 3 of
+     the phasacro plan). The socket pair is walled on its left, roofed by five
+     rows of stone, and fed only by the 1-WIDE flue beneath it:
+     - drag-as-stone: a 2-wide stone fits neither the flue nor past the col-7
+       wall, so no drag reaches the socket — and, the stronger statement the
+       2.35-cell socket snap actually demands, NO drag-reachable stone
+       position is within snap range either, so melt-here-then-take-the-
+       flame-back cannot bridge in from anywhere the stone can stand.
+     - pour: the pocket's only opening faces DOWN. Liquid never climbs, so
+       gravity flow cannot reach it (BFS over the open cells agrees).
+     - freeze-bridge: enumerating every legal 2-particle configuration in the
+       snap neighbourhood, EVERY one that the socket would accept has both
+       drops inside the flue/pocket (cells 8,8 · 9,8 · 9,9 · 9,10) — cells no
+       stone can occupy and no pour can wet. The two surfaces a puddle can
+       settle on unaided, the floor and the pillar roof, are both far outside
+       the 2.3-cell candidate radius, so a resting freeze is never offered it.
+     What is left is the block's tactic: jab the settled puddle with the loose
+     stone until it rides up the flue, and freeze it up there. */
+  map:['..........','..........','..........','.......###','.......###','.......###',
+       '.......###','.......###','.......#rr','.......##.','.......##.','m.M.....RR']},
 };
 
 /* ============ state ============ */
 const AUTH={ 0:NEWL.first, 1:LEVELS[0], 2:LEVELS[1], 7:NEWL.whole,
   8:LEVELS[2], 9:LEVELS[3], 10:LEVELS[4], 11:LEVELS[5], 12:LEVELS[11], 13:LEVELS[12], 15:LEVELS[15],
   16:NEWL.gravity, 17:LEVELS[6], 18:LEVELS[7], 19:LEVELS[9], 20:LEVELS[10], 21:LEVELS[13], 22:LEVELS[14],
-  24:NEWL.water, 32:NEWL.vapor, 40:NEWL.voidl, 48:NEWL.growth, 56:NEWL.wind, 57:NEWL.stopper };
+  24:NEWL.water, 32:NEWL.vapor, 40:NEWL.voidl, 48:NEWL.growth, 56:NEWL.wind, 57:NEWL.stopper,
+  64:NEWL.launch };
 // complexity annotations for the legacy authored levels (flames = required
 // flame applications, frosts = required frost applications)
 const LEGACY_CX=[[2,0,0,0,0],[2,0,0,0,0],[1,1,0,0,0],[1,1,0,0,0],[4,1,0,0,0],[2,2,0,0,0],
@@ -455,6 +479,13 @@ const TEST = /[?&]test=1/.test(location.search);
 let save; try{ save = JSON.parse(localStorage.getItem('phasic_v1')||'{}'); }catch(e){ save={}; }
 save = Object.assign({done:[], mus:60, sfx:80, musMute:false, sfxMute:false}, save);
 const persist = ()=>{ try{ localStorage.setItem('phasic_v1', JSON.stringify(save)); }catch(e){} };
+// One-way migration for the block-8 (Launch) curriculum insert: pre-acroV
+// saves had endless completion marks starting at index 64; block 8 now
+// occupies 64-71, so those marks must shift up by 8. Curriculum marks 0-63
+// are untouched. Gated on save.acroV so it runs exactly once per storage
+// lifetime and is never re-applied (re-splicing a save already migrated
+// would corrupt it).
+if(!save.acroV){ if(Array.isArray(save.done)&&save.done.length>64){ save.done.splice(64,0,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined); } save.acroV=1; persist(); }
 
 /* ============ daily challenge ============
    A date-derived index far above any curriculum boundary (DAILY_BASE) is
@@ -539,7 +570,7 @@ function loadLevel(i){
   $('hintbar').textContent = (dailyMode ? 'DAILY '+dateKey()+' · ' : 'L'+(i+1)+' · ')+lvlName(i,def)+' — '+def.hint;
   const tst=$('toast'); tst.style.opacity=0;
   buildLvlSel();
-  if(typeof songStart==='function') songStart(i<64?blockOf(i):i%10);
+  if(typeof songStart==='function') songStart(i<CURRICULUM_END?blockOf(i):i%10);
   if(fans.length>0) fanHumStart();
 }
 const cellX=c=>FX+(c+0.5)*CELL, cellY=c=>FY+(c+0.5)*CELL;
@@ -1216,6 +1247,10 @@ function placeGrav(x,y){ // clamp to the ring just outside the field border
                    under the drawer, entered through a single cell and weaving
                    past floor/roof baffles to an alcove only a pour steered by
                    the well can reach.
+     'launch'    — the Launch block's (block 8, curriculum only) orb-less
+                   board: a corner pocket fed only by a 1-wide downward flue;
+                   the settled puddle is rammed airborne with the loose stone
+                   and frozen mid-flight — the Flue, generated.
    Every candidate is beaten by the in-game solver BEFORE it is served —
    a level you receive is a level that has already been solved.
    Deterministic per level index (seeded rng + seeded gas wander), so
@@ -1246,16 +1281,19 @@ const GEN_HINTSMH={
   void:['The recess past the mouth is hungry — catch the pour before it wanders.','Park the well past the drop, or the pit drinks the spill.','A careful pour walks away from the pit; a sloppy one feeds it.'],
   bush:['The hedge drinks any pour — cross it as vapor, cool it beyond.','Boil at the hedge and let the well herd the cloud through.','Liquid dies on the leaves. Steam over, condense past.'],
   fan:['The fan guards the last gate — cross it as liquid, not as cloud.','Vapor gets blown back up the tunnel. Stay a pour.','This wind hates a cloud. Walk the puddle under it.']};
+// Launch-block (block 8, curriculum) hints — the pocket only opens downward
+const GEN_HINTSL=['No pour ever climbs. Ram the settled puddle and freeze it mid-leap.','Melt it under the flue, hit it hard with the stone, catch it up high.','The pocket only opens downward — launch the puddle and frost the flight.','Settle the puddle first. Then the hammer. Then frost at the top of the leap.','Stone will not fit and liquid will not climb — so make it fly.'];
 function genName(i){ const r=mulberry((i*2654435761)>>>0);
   return NAME_A[(r()*NAME_A.length)|0]+' '+NAME_B[(r()*NAME_B.length)|0]; }
 function stampGen(rows,shape,ax,ay,ch){
   for(let yy=0;yy<shape.length;yy++) for(let xx=0;xx<shape[yy].length;xx++)
     if(shape[yy][xx]==='X') rows[ay+yy][ax+xx]=ch;
 }
-function blockOf(i){ return Math.min((i/8)|0, 7); }
-const BLOCK_WORD=['Drag','Flame','Gravity','Frost','Vapor','Void','Hedge','Wind'];
+const CURRICULUM_END=72;
+function blockOf(i){ return Math.min((i/8)|0, 8); }
+const BLOCK_WORD=['Drag','Flame','Gravity','Frost','Vapor','Void','Hedge','Wind','Launch'];
 function lvlName(i,def){ const nm=def?def.name:genName(i);
-  return i<64 ? BLOCK_WORD[blockOf(i)]+' · '+nm : nm; }
+  return i<CURRICULUM_END ? BLOCK_WORD[blockOf(i)]+' · '+nm : nm; }
 /* Build-time route prover for hazard mazes: 4-neighbour BFS over cells open
    to the given phase. Liquid is blocked by walls, bushes and fan tiles — and
    by any cell within the void's 1.5-cell pull, measured centre-to-centre,
@@ -1465,13 +1503,144 @@ function buildMaze(r,i,p,b){
         obstacles:hazard?1:0, basePts:0},
     map:rows.map(q=>q.join('')) };
 }
+/* ---- 'launch': the Launch block's (block 8, curriculum indices 64-71) own
+   board. No gravity orb, no obstacle factors, no weave: the pocket IS the
+   lesson. The Flue's proven geometry (task 3 of the phasacro plan) is
+   rebuilt by construction every time — a corner pocket at socket row 8
+   whose only mouth faces DOWN through a 1-wide flue, holding a 2-cell-wide
+   1-row socket — because that exact shape is what makes launch-and-freeze
+   structurally the only way home:
+     - the launch gem is 2 wide, so as STONE it fits neither the flue nor
+       past the pocket wall — no drag-reachable anchor is inside the 2.3
+       socket-candidate radius, so melt-here-then-revert cannot bridge in;
+     - the mouth faces down and liquid never climbs, so no pour from any
+       melt position can wet a pocket or flue cell;
+     - every 2-drop liquid pose outside the pocket idealizes to an anchor
+       > 2.3 from the socket, so no settle, perch or fall is ever offered
+       the socket as a freeze candidate.
+   All three are re-proved per candidate (launchGeomOk) rather than trusted
+   from the constructor — a candidate that fails never spends a salt.
+   Difficulty ramps over p: longer hammer walks and 1-3 decoy gems whose
+   plain-drag sockets pack the top band (the third takes the roof-top). */
+function launchGeomOk(rows,L,sax,say,right){
+  const open=(x,y)=>x>=0&&y>=0&&x<GW&&y<GH&&rows[y][x]!=='#';
+  const fits=(x,y)=>open(x,y)&&open(x+1,y);          // the 2-cell launch footprint
+  let ax0=-1,ay0=-1;                                  // its stamped start anchor
+  for(let y=0;y<GH&&ax0<0;y++) for(let x=0;x<GW&&ax0<0;x++)
+    if(rows[y][x]===L){ ax0=x; ay0=y; }
+  if(ax0<0||!fits(ax0,ay0)) return false;
+  /* R1 — stone-unreachable: BFS every walls-only lattice anchor a drag can
+     reach; reject if any comes within 2.5 of the socket anchor (2.3 snap). */
+  const seen=new Set([ax0+','+ay0]), bq=[[ax0,ay0]];
+  while(bq.length){ const [x,y]=bq.pop();
+    if(Math.hypot(x-sax,y-say)<2.5) return false;
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx=x+dx, ny=y+dy, k=nx+','+ny;
+      if(seen.has(k)||!fits(nx,ny)) continue;
+      seen.add(k); bq.push([nx,ny]); } }
+  /* R2 — pour-closure-excluded: a melt can start anywhere the stone can
+     stand, so seed the closure with every cell of every reachable placement
+     and flow down + sideways, never up; the pocket cells and the flue
+     column beneath them must stay dry. */
+  const wet=new Uint8Array(GW*GH), st=[];
+  for(const k of seen){ const [x,y]=k.split(',').map(Number);
+    for(const c of [[x,y],[x+1,y]]) if(!wet[c[1]*GW+c[0]]){ wet[c[1]*GW+c[0]]=1; st.push(c); } }
+  while(st.length){ const [x,y]=st.pop();
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1]]){
+      const nx=x+dx, ny=y+dy;
+      if(!open(nx,ny)||wet[ny*GW+nx]) continue;
+      wet[ny*GW+nx]=1; st.push([nx,ny]); } }
+  const flueX=right?GW-1:0;
+  for(const c of [[sax,say],[sax+1,say],[flueX,say+1],[flueX,say+2]])
+    if(wet[c[1]*GW+c[0]]) return false;
+  /* R3 — resting-snap-excluded: enumerate every 2-drop pose the closure
+     allows (king-move pairs plus both drops squeezed into one cell) and
+     reject if any idealizes inside 2.45 of the socket anchor — margin over
+     tryFreeze's 2.3 candidate radius. The proven geometry's closest pose
+     (both drops in the cell hugging the pocket wall at socket height)
+     measures exactly 2.5. */
+  for(let y=0;y<GH;y++) for(let x=0;x<GW;x++){ if(!wet[y*GW+x]) continue;
+    for(let dy=0;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      if(dy===0&&dx<0) continue;                      // unordered pairs, once each
+      const nx=x+dx, ny=y+dy;
+      if((dx||dy)&&(nx<0||nx>=GW||ny>=GH||!wet[ny*GW+nx])) continue;
+      if(Math.hypot((x+nx)/2-0.5-sax,(y+ny)/2-say)<2.45) return false; } }
+  return true;
+}
+function buildLaunch(r,i,p){
+  const rows=Array.from({length:GH},()=>Array(GW).fill('.'));
+  const right=r()<0.5;                   // the corner the pocket hangs in
+  const SY=8, ROOF=3, F=GH-1;            // socket row / roof top / the floor
+  const px0=right?GW-2:0;                // the pocket's two socket columns
+  const wallX=right?GW-3:2;              // its outer wall column
+  const shaftX=right?GW-2:1;             // walled beside the flue (rows 9-10)
+  for(let y=ROOF;y<SY;y++)               // five rows of roof over the pocket
+    for(let x=right?wallX:0;x<=(right?GW-1:wallX);x++) rows[y][x]='#';
+  rows[SY][wallX]='#';                   // the socket row's outer wall
+  for(let y=SY+1;y<F;y++){ rows[y][wallX]='#'; rows[y][shaftX]='#'; }
+  // the launch gem: a 2-cell 1-row puddle-to-be, born on the floor under
+  // the flue, exactly where the ram wants it
+  const lp=['R','B','O','Y','G'];
+  for(let a=lp.length-1;a>0;a--){ const b2=(r()*(a+1))|0; const t=lp[a]; lp[a]=lp[b2]; lp[b2]=t; }
+  const LL=lp[0];
+  rows[SY][px0]=LL.toLowerCase(); rows[SY][px0+1]=LL.toLowerCase();
+  rows[F][px0]=LL; rows[F][px0+1]=LL;
+  // the hammer and its socket on the far runway; the run-up walks with p
+  const mSax=right?0:GW-1, mAx=right?1+(p%3):GW-2-(p%3);
+  rows[F][mSax]='m'; rows[F][mAx]='M';
+  /* decoys ramp over p (1 / 2 / 3); their sockets pack the top band away
+     from the pocket, and a third takes the roof-top shelf above it. Park
+     order is top scatter band first, so every column a later gem climbs is
+     already clear — scriptLaunch replays this order by startAy. */
+  const nd=1+(p>=4?1:0)+(p>=6?1:0);
+  const roofL=nd>=3?(LL==='R'?'B':'R'):null;   // 2-wide 2-tall fits the 3-col shelf
+  const dpool=['O','Y','G','B','R','P'].filter(L2=>L2!==LL&&L2!==roofL);
+  for(let a=dpool.length-1;a>0;a--){ const b2=(r()*(a+1))|0; const t=dpool[a]; dpool[a]=dpool[b2]; dpool[b2]=t; }
+  const decoys=[];
+  if(roofL) decoys.push({L:roofL,sax:right?wallX+((r()*2)|0):(r()*2)|0,say:0});
+  const nMain=nd-(roofL?1:0);
+  let cur=right?0:GW-1, nM=0;
+  for(const L2 of dpool){ if(nM>=nMain) break;
+    const w=GEMW[L2];
+    if(right){ if(cur+w-1>wallX-1) continue; decoys.push({L:L2,sax:cur,say:0}); cur+=w+1; }
+    else { if(cur-w+1<wallX+1) continue; decoys.push({L:L2,sax:cur-w+1,say:0}); cur-=w+1; }
+    nM++; }
+  if(nM<nMain) return null;
+  for(const d of decoys) stampGen(rows,SHAPE_STR[d.L],d.sax,d.say,d.L.toLowerCase());
+  decoys.forEach((d,k)=>{ const w=GEMW[d.L];
+    const lo=right?0:wallX+1, hi=(right?wallX-1:GW-1)-w+1;
+    d.ax=lo+((r()*(hi-lo+1))|0); d.ay=2+2*k;
+    stampGen(rows,SHAPE_STR[d.L],d.ax,d.ay,d.L); });
+  if(!launchGeomOk(rows,LL,px0,SY,right)) return null;
+  /* Budget: one flame melts the launch gem; the {t:} revert does the
+     freezing and hands it back. The single cold matches the tutorial — a
+     thrown frost is the player's friendlier mid-air catch, never a surplus.
+     cx counts the launch as 2 in the flames term on top of its melt
+     (flames:3), exactly as the tutorial does. */
+  return { name:genName(i), hint:GEN_HINTSL[(r()*GEN_HINTSL.length)|0],
+    template:'launch', weave:null, launch:{L:LL,right},
+    heat:1, cold:1, grav:0,
+    cx:{gems:2+decoys.length, flames:3, frosts:0, grav:0, obstacles:0, basePts:0},
+    map:rows.map(q=>q.join('')) };
+}
 function buildGen(i,salt){
   const easy=salt>=90;
   const r=mulberry(((i*7919+salt*104729)^0x9E3779B9)>>>0);
-  const b=easy?0:blockOf(i), p=i%8, extra=i>=64?Math.min(3,((i-64)/16)|0):0;
+  const b=easy?0:blockOf(i), p=i%8, extra=i>=CURRICULUM_END?Math.min(3,((i-CURRICULUM_END)/16)|0):0;
   // factor set by curriculum block
   const useFlames=b>=1, useGrav=b>=2, useBaseL=b>=3, useBaseG=b>=4,
         useHole=b>=5, useBush=b>=6, useFan=b>=7;
+  /* Block-8 CURRICULUM is the Launch lesson: an orb-less board whose pocket
+     only launch-and-freeze can fill. It takes its own constructor (and its
+     own r stream) here, BEFORE the maze draw, the template pick and every
+     factor above gets a say — which is also what keeps the orb-mandatory
+     gravmaze (mzIdx below keys on b>=5, which block 8 matches) and the
+     weave/hole/bush/fan factors out of the orb-less block. blockOf caps at
+     8, so ENDLESS (i>=CURRICULUM_END) is also b===8 — it must never take
+     this branch: it falls through and keeps every factor, the maze draw and
+     the weave gate exactly as before. easy salts (>=90) come through with
+     b===0, so the rescue band stays the plain drawer it always was. */
+  if(b===8&&i<CURRICULUM_END) return buildLaunch(r,i,p);
   /* Template pick — ALWAYS the first draw of the stream, and never drawn on
      the rescue path, so a 'drawer' candidate consumes every later draw in
      exactly the order it always has. Two-shelf needs the well (block 2+);
@@ -1857,9 +2026,38 @@ function makeScript(){
   const tpl=(lvl&&lvl.template)||'drawer';
   const wv=(lvl&&lvl.weave)||null;
   if(tpl==='gravmaze') return scriptMaze(lvl&&lvl.maze);
+  if(tpl==='launch') return scriptLaunch(lvl&&lvl.launch);
   if(tpl==='two-shelf') return scriptTwoShelf(wv);
   if(tpl==='attic') return scriptAttic();
   return scriptDrawer(wv);
+}
+/* launch: the tutorial's proven sequence, generalized. Melt the launch gem
+   where it was born — on the floor under the flue — and let the puddle
+   settle 1.5 s (the ram wants a resting 1-row puddle, not a moving pour).
+   Then the DOUBLE JAB: the hammer rams out-in twice at the executor's own
+   drag cadence, which is what carries BOTH drops of a 2-particle puddle up
+   a 1-wide flue — a single ram lifts only the leading drop (task-1 spike
+   measurement). 0.1 s after the last ram the puddle is mid-flight inside
+   the pocket's snap, and the revert TAP ({t:}) freezes it into the socket —
+   never {c:}: dropSourceOn('cold') reports false on exactly this commit
+   path and burns the retries. The hammer then walks home, and the decoys
+   drag home top scatter band first, so every column a later gem climbs is
+   already clear; a roof-top socket is entered along rows 0-1, over the
+   roof, because its own scatter row dead-ends into the roof wall. */
+function scriptLaunch(ln){
+  if(!ln) return null;
+  const o=objs.find(u=>u.letter===ln.L), M=objs.find(u=>u.letter==='M');
+  if(!o||!M) return null;
+  const F=GH-1, out=ln.right?GW-6:5, jin=ln.right?GW-2:1;
+  const script=[{h:[ln.L]},{w:[1.5]},
+    {d:['M',[[out,F],[jin,F],[out,F],[jin,F]]]},{w:[0.1]},{t:[ln.L]},{w:[1]},
+    {d:['M',[[M.sax,M.say]]]},{w:[0.5]}];
+  for(const u of objs.filter(u2=>u2!==o&&u2!==M).sort((a,b2)=>a.startAy-b2.startAy))
+    script.push((ln.right?u.sax>=GW-3:u.sax<=2)
+      ? {d:[u.letter,[[u.startAx,0],[u.sax,0]]]}
+      : {d:[u.letter,[[u.sax,u.startAy],[u.sax,u.say]]]});
+  script.push({w:[1.2]});
+  return script;
 }
 /* gravmaze: the drawer above the ceiling is plain drags, then the pour is
    walked down the tunnel. The well parks below the mouth so the melt funnels
@@ -2225,7 +2423,12 @@ function getLevel(i){
      whole point of block 2, and both are rare enough that an ordinary drawer
      would otherwise win the salt race nearly every time (level 24 drew 0.718
      on the template roll at salt 0 and would have shipped as a drawer). */
-  const scan=(blockOf(i)>=5||blockOf(i)===2)?WEAVE_SCAN:0;
+  /* Block-8 CURRICULUM never scans: every candidate there IS the block's own
+     idea (the launch template has no rarer woven/maze form to hold out for),
+     so the first solver-beaten salt serves immediately — endless (also
+     b===8 after the cap) keeps the full scan for its mazes and weaves. */
+  const b0=blockOf(i);
+  const scan=((b0>=5||b0===2)&&!(b0===8&&i<CURRICULUM_END))?WEAVE_SCAN:0;
   const wanted=d=>!!d.weave||d.template==='gravmaze';
   let plain=null;
   for(let salt=0;salt<20;salt++){
@@ -2757,7 +2960,7 @@ function buildLvlSel(){
                           // the normal (non-daily) load paths rebuild it once daily mode ends
   const sel=$('lvlsel'); sel.innerHTML='';
   let hi=15; for(let k=0;k<save.done.length;k++) if(save.done[k]) hi=Math.max(hi,k);
-  const N=Math.max(64,hi+2,lvlIdx+2); // 8 curriculum blocks of 8, endless beyond
+  const N=Math.max(CURRICULUM_END,hi+2,lvlIdx+2); // 9 curriculum blocks of 8, endless beyond
   for(let i2=0;i2<N;i2++){
     const unlocked = i2===0 || save.done[i2-1] || save.done[i2];
     const op=document.createElement('option');

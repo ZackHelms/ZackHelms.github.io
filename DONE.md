@@ -1,5 +1,25 @@
 # DONE — done log
 
+- 2026-08-02 [phasic] phasacro oversee run: the Launch block — 9th
+  curriculum block (levels 65–72, indices 64–71), orb-less boards where
+  launch-and-freeze (ram a settled puddle with a stone, frost it
+  mid-flight) is provably the only way home. `CURRICULUM_END=72`,
+  `blockOf` caps 8, `BLOCK_WORD` +'Launch'; endless now 73+ with a
+  one-way save migration (acroV flag, 8 slots spliced at 64). Tutorial
+  `The Flue` (AUTH[64]): socket in a roofed pillar fed by a 1-wide flue —
+  stone-drag, pour, and resting-freeze all proven impossible (23-proof
+  harness), the double-jab launch proven in-harness first (task-1 spike,
+  deterministic byte-identical). Generated 65–71 via a `buildLaunch`
+  template with three geometry rejects (stone-unreachable,
+  pour-closure-dry, snap-excluded), mirrored sides, decoy ramp; solver
+  launch leg uses `{t:}` — traced: `applySource('cold')` returns false on
+  flame-heated commits. 139/140 salt wins, all serve salt 0; blocks 0–7 +
+  endless byte-identical (pinned hashes held). Block-8 curriculum excluded
+  from gravmazes/weaves; endless keeps everything. Suite 374→399; wiki
+  tactic #11 now names the block. CD audition pending: name/hint +
+  block-8 playtest. (2878020..cd2cdb9 + wrap-up docs; plan archived to
+  .claude/plans/DONE/)
+
 - 2026-08-01 [phasic] phasmazes oversee run: obstacle-era gravmazes — the
   generated maze template now carries one hazard in blocks 5–7 and endless
   (newest idea first: fan b≥7 / bush b≥6 / void b≥5 when the maze gem is
