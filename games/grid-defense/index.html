@@ -200,7 +200,7 @@ input[type=range]::-moz-range-thumb { width:20px; height:20px; border:0; border-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-10 20:14 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-10 20:25 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
@@ -268,7 +268,13 @@ const TOWERS = {
            kind:'single', desc:'Long-range heavy slug. Built for armour and bosses.' },
 };
 const TOWER_ORDER = ['pulse','nova','frost','rail'];
-const UNLOCK_COST = { pulse:0, nova:2, frost:2, rail:2 };
+// Turrets are INTRODUCED on a schedule, not bought: one new turret per level
+// for the first four levels, so the opening is about learning each weapon
+// rather than agonising over an economy. Upgrades arrive later — armory tiers
+// and the skill trees both open at level 5 — so nothing competes with an
+// unlock while the player is still meeting the arsenal.
+const TURRET_LEVEL = { pulse:1, nova:2, frost:3, rail:4 };
+const ARMORY_LEVEL = 5;
 const MAX_TIER = 8;
 const tierCost = t => 2 + 2 * t;              // cores to go from tier t to t+1
 const TIER_DMG = 0.20, TIER_RANGE = 0.05, TIER_RATE = 0.06;
@@ -291,12 +297,15 @@ const CREEPS = {
 // never bites: waves spread over ~60s, so a defence that holds at level 20
 // still holds at 100 with the same headroom. The quadratic term is what
 // turns the back half of the campaign into a real squeeze.
-let HP_A = 0.040, HP_B = 0.00026;   // tunable from the drive suite's sweep
-// Calibrated 2026-08-10 against .claude/tests/drive-grid-defense.cjs: the
-// yardstick auto-player (coverage-optimal placement, fixed skill order, and
-// notably NO use of the COMMAND abilities) first leaks at level 77 and falls
-// at 86. A player who actually spends abilities and builds coherently has the
-// headroom to reach 100 — which is the intended shape, not an accident.
+let HP_A = 0.040, HP_B = 0.00027;   // tunable from the drive suite's sweep
+// Calibrated against .claude/tests/drive-grid-defense.cjs: the yardstick
+// auto-player (coverage-optimal placement, both build and upgrade levers, a
+// fixed skill order, and notably NO use of the COMMAND abilities) starts
+// leaking in the mid-70s and falls in the low-to-mid 80s. A player who
+// actually spends abilities and builds coherently has the headroom to reach
+// 100 — the intended shape, not an accident. Re-tuned when turret unlocks
+// became free (2026-08-10): handing over all four turrets by level 4 and
+// banking their cores made the same bot ~10 levels stronger.
 const HP_ENDLESS = 1.075;    // steeper still past level 100
 const SPD_GROWTH = 0.0032, SPD_CAP = 1.45;
 const CASH_BASE = 95, CASH_GROWTH = 1.028;
@@ -308,7 +317,7 @@ function hpMulFor(L) {
 function spdMulFor(L) { return Math.min(SPD_CAP, 1 + SPD_GROWTH * (L - 1)); }
 function startCashFor(L) { return Math.round(CASH_BASE * Math.pow(CASH_GROWTH, L - 1)); }
 function coresFor(L) { return 2 + Math.floor(L / 15) + (L % 10 === 0 ? 1 : 0); }
-function skillPtsFor(L) { return L < 5 ? 0 : 1 + (L % 10 === 0 ? 2 : 0); }
+function skillPtsFor(L) { return L < 5 ? 0 : 1 + (L % 10 === 0 ? 2 : 0); }   // 5 == ARMORY_LEVEL
 function mapIndexFor(L) { return Math.floor((L - 1) / 10) % MAPS.length; }
 const RESEARCH_COST = 5;     // cores -> 1 skill point
 
@@ -684,13 +693,23 @@ function computeStats() {
 /* ============================ RUN LIFECYCLE =========================== */
 function newRun() {
   const armory = {};
-  for (const k of TOWER_ORDER) armory[k] = { owned: k === 'pulse', tier: 0 };
+  for (const k of TOWER_ORDER) armory[k] = { owned: TURRET_LEVEL[k] <= 1, tier: 0 };
   return {
     ver: 2, level: 1, lives: BASE_LIVES, score: 0, cores: 0, sp: 0,
     armory, skills: {}, endless: false, started: Date.now(),
     levelsCleared: 0, leaksTotal: 0, killsTotal: 0, recorded: false,
   };
 }
+// Hands over every turret the player has reached the level for. Returns the
+// ones that are new so the level-clear screen can introduce them.
+function applyTurretUnlocks(L) {
+  const gained = [];
+  for (const k of TOWER_ORDER) {
+    if (!run.armory[k].owned && L >= TURRET_LEVEL[k]) { run.armory[k].owned = true; gained.push(k); }
+  }
+  return gained;
+}
+function armoryOpen() { return run.level >= ARMORY_LEVEL; }
 function maxLives() { return BASE_LIVES + (S ? S.maxLives : 0); }
 function lastStandActive() { return S.lastStand && run.lives <= 5; }
 let pendingStart = false;   // true between a level clear and the next deploy
@@ -715,7 +734,7 @@ function restoreFrom(key) {
   const data = readJSON(key, null);
   if (!data || !data.run || data.run.ver !== 2) return false;
   run = data.run;
-  for (const k of TOWER_ORDER) if (!run.armory[k]) run.armory[k] = { owned: k === 'pulse', tier: 0 };
+  for (const k of TOWER_ORDER) if (!run.armory[k]) run.armory[k] = { owned: TURRET_LEVEL[k] <= run.level, tier: 0 };
   computeStats();
   loadMap(mapIndexFor(run.level));
   const L = data.level || {};
@@ -757,6 +776,7 @@ function startRun() {
 }
 function startLevel(L) {
   run.level = L;
+  applyTurretUnlocks(L);
   computeStats();
   loadMap(mapIndexFor(L));
   cash = Math.round(startCashFor(L) * S.startCash);
@@ -795,9 +815,10 @@ function completeLevel() {
   const won = L === FINAL_LEVEL && !run.endless;
   run.level = L + 1;
   if (L >= FINAL_LEVEL) run.endless = true;
+  const gained = applyTurretUnlocks(run.level);
   pendingStart = true;
   autosave();
-  showLevelClear({ L, clearScore, noLeak, gotCores, gotSp, won });
+  showLevelClear({ L, clearScore, noLeak, gotCores, gotSp, won, gained });
 }
 function endRun(reason) {
   state = 'dead';
@@ -1242,7 +1263,7 @@ function onUp(e) {
   }
   if (inRect(p, actionBtns.armory)) { if (phase === 'prep') showArmory(true); else sfxDeny(); return; }
   if (inRect(p, actionBtns.skills)) {
-    if (phase === 'prep' && run.level >= 5) showSkills(true);
+    if (phase === 'prep' && run.level >= ARMORY_LEVEL) showSkills(true);
     else sfxDeny();
     return;
   }
@@ -1652,7 +1673,7 @@ function draw() {
   actionBtns.speed  = { x: ax2, y, w: smallW, h: ah2 }; ax2 += smallW + pad;
   actionBtns.ready  = { x: ax2, y, w: readyW, h: ah2 };
   drawButton(actionBtns.armory, '◆ ' + run.cores, '#ffc300', phase === 'prep');
-  drawButton(actionBtns.skills, '★ ' + run.sp, '#b44fff', phase === 'prep' && run.level >= 5);
+  drawButton(actionBtns.skills, '★ ' + run.sp, '#b44fff', phase === 'prep' && run.level >= ARMORY_LEVEL);
   drawButton(actionBtns.speed, speed + 'x', '#4488ff', true);
   if (phase === 'prep') {
     drawButton(actionBtns.ready, 'START WAVE', '#39ff14', true);
@@ -1833,24 +1854,28 @@ function showSlots(mode, back) {
 /* ------------------------------ ARMORY --------------------------------- */
 function armoryRow(type) {
   const T = TOWERS[type], a = run.armory[type];
-  const locked = !a.owned;
-  const cost = locked ? UNLOCK_COST[type] : (a.tier < MAX_TIER ? tierCost(a.tier) : null);
-  const afford = cost !== null && run.cores >= cost;
+  const notYet = !a.owned;
+  const maxed = a.tier >= MAX_TIER;
+  const cost = maxed ? null : tierCost(a.tier);
+  const open = armoryOpen();
+  const afford = !notYet && !maxed && open && run.cores >= cost;
   const pips = [];
   for (let i = 0; i < MAX_TIER; i++) pips.push(`<i class="${i < a.tier ? 'on' : ''}"></i>`);
-  const eff = locked
+  const eff = (notYet || a.tier === 0)
     ? T.desc
     : `${T.desc}<br>TIER ${a.tier}: +${Math.round(TIER_DMG * a.tier * 100)}% dmg · +${Math.round(TIER_RATE * a.tier * 100)}% rate · +${Math.round(TIER_RANGE * a.tier * 100)}% range`;
-  return `<div class="card ${locked ? '' : 'on'}"><div class="arm-row">
-    <canvas class="ticon" data-type="${type}" style="${locked ? 'opacity:0.35' : ''}"></canvas>
+  const label = notYet ? 'ARRIVES<br>LVL ' + TURRET_LEVEL[type]
+    : !open ? 'TIERS<br>LVL ' + ARMORY_LEVEL
+    : maxed ? 'MAX'
+    : 'TIER ' + (a.tier + 1) + '<br>◆' + cost;
+  return `<div class="card ${notYet ? '' : 'on'}"><div class="arm-row">
+    <canvas class="ticon" data-type="${type}" style="${notYet ? 'opacity:0.3' : ''}"></canvas>
     <div class="arm-mid">
-      <div class="arm-name" style="color:${T.col}">${T.name}${locked ? ' · LOCKED' : ''}</div>
+      <div class="arm-name" style="color:${notYet ? 'var(--dim)' : T.col}">${T.name}${notYet ? '' : (run.newTurret === type ? ' · NEW' : '')}</div>
       <div class="arm-desc">${eff}</div>
-      ${locked ? '' : `<div class="tierbar">${pips.join('')}</div>`}
+      ${notYet ? '' : `<div class="tierbar">${pips.join('')}</div>`}
     </div>
-    <button class="buybtn ${locked ? 'locked' : ''}" id="buy-${type}" ${afford ? '' : 'disabled'}>
-      ${cost === null ? 'MAX' : (locked ? 'UNLOCK<br>◆' + cost : 'TIER ' + (a.tier + 1) + '<br>◆' + cost)}
-    </button>
+    <button class="buybtn" id="buy-${type}" ${afford ? '' : 'disabled'}>${label}</button>
   </div></div>`;
 }
 /* fromPrep=true means the player opened the armory mid-build-phase, so DEPLOY
@@ -1858,12 +1883,12 @@ function armoryRow(type) {
    DEPLOY starts the next level.                                            */
 function showArmory(fromPrep) {
   const L = run.level;
-  const canSkills = L >= 5;
+  const canSkills = L >= ARMORY_LEVEL;
   curScreen = 'armory'; armoryFromPrep = !!fromPrep;
   openScreen(`<div class="scr">
     <div class="scr-head" style="padding-bottom:2px">
-      <h2 class="head">ARMORY</h2>
-      <div class="sub">BEFORE LEVEL ${L}</div>
+      <h2 class="head">${armoryOpen() ? 'ARMORY' : 'ARSENAL'}</h2>
+      <div class="sub">BEFORE LEVEL ${L}${armoryOpen() ? '' : ' · UPGRADES AT LVL ' + ARMORY_LEVEL}</div>
       <div style="margin-top:8px">
         <span class="pill cores">◆ <b id="a-cores">${run.cores}</b> CORES</span>
         <span class="pill sp">★ <b>${run.sp}</b> SKILL</span>
@@ -1877,7 +1902,7 @@ function showArmory(fromPrep) {
           <div class="arm-name" style="color:var(--purple)">RESEARCH</div>
           <div class="arm-desc">Melt ${RESEARCH_COST} cores down into 1 skill point. Cores you will never spend are worth more in a tree.</div>
         </div>
-        <button class="buybtn" id="buy-research" style="border-color:var(--purple);color:var(--purple)" ${run.cores >= RESEARCH_COST ? '' : 'disabled'}>◆${RESEARCH_COST}<br>→ ★1</button>
+        <button class="buybtn" id="buy-research" style="border-color:var(--purple);color:var(--purple)" ${armoryOpen() && run.cores >= RESEARCH_COST ? '' : 'disabled'}>${armoryOpen() ? '◆' + RESEARCH_COST + '<br>→ ★1' : 'LVL ' + ARMORY_LEVEL}</button>
       </div></div>
       <div class="rules">Armory upgrades are permanent for this run and apply to every tower of
       that type you place, on top of the level-by-level upgrades you buy with cash.</div>
@@ -1893,25 +1918,22 @@ function showArmory(fromPrep) {
   for (const type of TOWER_ORDER) {
     bind('buy-' + type, () => {
       const a = run.armory[type];
-      if (!a.owned) {
-        if (run.cores < UNLOCK_COST[type]) return;
-        run.cores -= UNLOCK_COST[type]; a.owned = true; sfxUnlock();
-      } else if (a.tier < MAX_TIER) {
-        const c = tierCost(a.tier);
-        if (run.cores < c) return;
-        run.cores -= c; a.tier++; sfxBuild();
-      }
+      if (!a.owned || !armoryOpen() || a.tier >= MAX_TIER) return;
+      const c = tierCost(a.tier);
+      if (run.cores < c) return;
+      run.cores -= c; a.tier++; sfxBuild();
       autosave();
       showArmory(armoryFromPrep);
     });
   }
   bind('buy-research', () => {
-    if (run.cores < RESEARCH_COST) return;
+    if (!armoryOpen() || run.cores < RESEARCH_COST) return;
     run.cores -= RESEARCH_COST; run.sp += 1; sfxUnlock();
     autosave(); showArmory(armoryFromPrep);
   });
   bind('a-skills', () => showSkills(false));
   bind('a-go', () => {
+    run.newTurret = null;
     if (armoryFromPrep) { closeScreen(); resize(); return; }
     closeScreen();
     startLevel(L);
@@ -2065,11 +2087,24 @@ function showLevelClear(info) {
     });
     return;
   }
+  const gained = info.gained || [];
+  run.newTurret = gained[0] || null;
+  const newCard = gained.map(t => {
+    const T = TOWERS[t];
+    return `<div class="card on" style="border-color:${T.col}66"><div class="arm-row">
+      <canvas class="ticon" data-type="${t}"></canvas>
+      <div class="arm-mid">
+        <div class="arm-name" style="color:${T.col}">NEW TURRET · ${T.name}</div>
+        <div class="arm-desc">${T.desc}</div>
+      </div>
+    </div></div>`;
+  }).join('');
   openScreen(`<div class="scr">
     <div class="scr-head"><h2 class="head">LEVEL ${info.L} CLEAR</h2>
       <div class="sub">${MAPS[mapIndexFor(info.L)].name}${info.noLeak ? ' · FLAWLESS' : ''}</div></div>
     <div class="scr-body" style="display:flex;flex-direction:column;justify-content:center">
       <div style="text-align:center"><div class="big">${fmtNum(run.score)}</div><div class="k">SCORE</div></div>
+      ${newCard}
       <div class="card" style="margin-top:14px">
         <div class="kv"><span class="k">LEVEL BONUS</span><span class="v gold">+${fmtNum(info.clearScore)}</span></div>
         <div class="kv"><span class="k">FLAWLESS (NO LEAKS)</span><span class="v ${info.noLeak ? 'green' : 'red'}">${info.noLeak ? 'YES · +' + fmtNum(60 * info.L) : 'no'}</span></div>
@@ -2078,11 +2113,12 @@ function showLevelClear(info) {
       </div>
       <div class="card">
         <div class="kv"><span class="k">CORES EARNED</span><span class="v gold">◆ +${info.gotCores}</span></div>
-        <div class="kv"><span class="k">SKILL POINTS EARNED</span><span class="v" style="color:var(--purple)">★ +${info.gotSp}${info.L < 5 ? ' (unlocks at level 5)' : ''}</span></div>
+        <div class="kv"><span class="k">SKILL POINTS${info.L < ARMORY_LEVEL ? ' (FROM LVL ' + ARMORY_LEVEL + ')' : ' EARNED'}</span><span class="v" style="color:var(--purple)">★ +${info.gotSp}</span></div>
       </div>
     </div>
-    <div class="scr-foot"><button class="btn" id="lc-go">ARMORY · LVL ${nextL}</button></div>
+    <div class="scr-foot"><button class="btn" id="lc-go">${gained.length ? 'ARSENAL' : 'ARMORY'} · LVL ${nextL}</button></div>
   </div>`);
+  paintIcons();
   bind('lc-go', () => showArmory(false));
 }
 function showGameOver() {
@@ -2198,13 +2234,16 @@ window.__GD = {
   sell: (r, c) => { const i = towers.findIndex(t => t.r === r && t.c === c); return i >= 0 ? sellTower(i) : false; },
   buyArmory: type => {
     const a = run.armory[type];
-    if (!a.owned) { if (run.cores < UNLOCK_COST[type]) return false; run.cores -= UNLOCK_COST[type]; a.owned = true; return true; }
-    if (a.tier >= MAX_TIER) return false;
+    if (!a.owned || !armoryOpen() || a.tier >= MAX_TIER) return false;
     const c = tierCost(a.tier);
     if (run.cores < c) return false;
     run.cores -= c; a.tier++; return true;
   },
-  research: () => { if (run.cores < RESEARCH_COST) return false; run.cores -= RESEARCH_COST; run.sp++; return true; },
+  research: () => {
+    if (!armoryOpen() || run.cores < RESEARCH_COST) return false;
+    run.cores -= RESEARCH_COST; run.sp++; return true;
+  },
+  TURRET_LEVEL, ARMORY_LEVEL,
   spendSkill: id => {
     const e = NODE_BY_ID[id]; if (!e) return false;
     const n = e.node, c = nodeCost(n);

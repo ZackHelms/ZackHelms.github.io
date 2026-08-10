@@ -11,16 +11,20 @@ whole run. Lives persist too — the run ends when they hit zero.
 | | earned | spent on | resets |
 |---|---|---|---|
 | `$` cash | `startCashFor(L)` + kill bounties | placing and upgrading towers **this level** | every level |
-| `◆` cores | `coresFor(L)` on each level clear | ARMORY: unlock a turret type, or one permanent tier | never (per run) |
+| `◆` cores | `coresFor(L)` on each level clear | ARMORY (from level 5): permanent turret tiers, or RESEARCH into skill points | never (per run) |
 | `★` skill | `skillPtsFor(L)`, from level 5 | the three trees | never (per run) |
 
-**The level 2/3/4 shop is a deliberate either/or.** `coresFor(L)` pays exactly
-2 for levels 1–4, and both a turret unlock (`UNLOCK_COST`) and a first tier
-(`tierCost(0)`) cost exactly 2. So the player buys the new turret *or* upgrades
-what they own, never both — which is the promise the game makes. The drive
-suite gates this; if core income or either price drifts, the choice silently
-stops being a choice. Surplus cores late in a run convert 5◆→1★ (RESEARCH), so
-cores never go dead.
+**The first four levels are a guided introduction, not a shop.** `TURRET_LEVEL`
+hands over one new turret per level — PULSE, NOVA, FROST, RAIL — free, and
+`ARMORY_LEVEL` (5) keeps *every* purchase (tiers and RESEARCH alike) shut until
+the skill trees open. So levels 1–4 are about meeting each weapon with nothing
+competing for the same cores, and every upgrade decision starts at level 5 at
+once. Cores earned during the intro bank up, which is what makes level 5 a
+moment. The drive suite gates the whole schedule: one card added to the build
+bar per level, cores untouched by an unlock, and tier/research purchases
+refused before 5 and allowed at 5.
+
+Surplus cores late in a run convert 5◆→1★ (RESEARCH), so cores never go dead.
 
 ## Turrets (`TOWERS`)
 
@@ -34,7 +38,11 @@ turret palette took over green and red.
 
 Two independent power axes multiply: per-instance level (cash, 3 base and up to
 5 via ENGINEERING) and armory tier (cores, 8 tiers of +20% dmg / +6% rate /
-+5% range applying to every tower of that type).
++5% range applying to every tower of that type). Turrets themselves are never
+bought — `applyTurretUnlocks(L)` grants them on schedule, called both from
+`completeLevel()` (so the new one is introduced on the level-clear screen and
+present in the shop) and from `startLevel()` as a safety net for loads and
+direct level jumps.
 
 ## Skill trees (`TREES`)
 
@@ -60,12 +68,14 @@ A flat rate does not work here and this was measured, not guessed: waves spread
 over ~60s, so a defence that holds at level 20 holds at 100 with the same
 headroom. The quadratic term is what makes the back half a squeeze.
 
-`HP_A = 0.040, HP_B = 0.00026` was calibrated 2026-08-10 against the drive
-suite's auto-player (coverage-optimal placement, both build and upgrade levers,
-a fixed skill order, and **no use of the COMMAND abilities**): it first leaks
-around level 77 and falls around 80–86. A player who actually spends abilities
-and builds coherently has the headroom to reach 100. `__GD.setCurve(a, b)` is
-the sweep hook; `.claude/tests/drive-grid-defense.cjs` holds the harness.
+`HP_A = 0.040, HP_B = 0.00027` was calibrated against the drive suite's
+auto-player (coverage-optimal placement, both build and upgrade levers, a fixed
+skill order, and **no use of the COMMAND abilities**): it starts leaking in the
+mid-70s and falls in the low-to-mid 80s. Re-tuned when unlocks became free —
+handing over all four turrets by level 4 and banking their cores made the same
+bot roughly ten levels stronger, which is the kind of drift only a harness
+catches. A player who actually spends abilities and builds coherently has the
+headroom to reach 100. `__GD.setCurve(a, b)` is the sweep hook; `.claude/tests/drive-grid-defense.cjs` holds the harness.
 
 Elites are stamped **deterministically** per creep type and spread evenly
 through each group. Rolling them at random let one level land a heavy elite the
@@ -116,7 +126,7 @@ publish the live canvas hitboxes so a drive test can press the drawn UI the way
 a thumb does — the repo's documented failure mode is a hidden widget leaving
 stale hitboxes behind, and this game is where that bug was first found.
 
-Suite: `.claude/tests/drive-grid-defense.cjs` (67 checks — unlock script, tree
-gating, touch drag-place and panel taps, persistence, scoreboard, curve
+Suite: `.claude/tests/drive-grid-defense.cjs` (73 checks — the intro schedule,
+tree gating, touch drag-place and panel taps, persistence, scoreboard, curve
 monotonicity, and a full auto-player campaign). Slow (~5 min); it runs the
 campaign for real.

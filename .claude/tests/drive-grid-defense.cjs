@@ -142,13 +142,9 @@ const AUTOPLAYER = `(() => {
       if (!ok) break;
     }
   }
-  // pre-committed armory order: the three unlocks on schedule, then tiers
+  // turrets arrive on their own schedule now; cores only ever buy tiers,
+  // cheapest-first, and only once the armory opens at level 5
   function armory() {
-    const st = G.st();
-    const L = st.level;
-    if (L === 2 && !st.armory.nova.owned) { G.buyArmory('nova'); return; }
-    if (L === 3 && !st.armory.frost.owned) { G.buyArmory('frost'); return; }
-    if (L === 4 && !st.armory.rail.owned) { G.buyArmory('rail'); return; }
     let guard = 0;
     while (guard++ < 20) {
       const s = G.st();
@@ -258,14 +254,75 @@ const AUTOPLAYER = `(() => {
   const coreCurve = await page.evaluate(() => [1, 2, 3, 4].map(L => window.__GD.coresFor(L)));
   check('levels 1-4 each pay exactly 2 cores', coreCurve.every(c => c === 2), coreCurve);
 
-  // simulate the level-2 shop: 2 cores buys the AOE turret OR a PULSE tier, never both
-  await page.evaluate(() => { window.__GD.run().cores = 2; });
-  check('2 cores unlocks NOVA', await G('G=>G.buyArmory("nova")'));
-  check('...and then a PULSE tier is unaffordable', !(await G('G=>G.buyArmory("pulse")')));
-  check('...cores are spent to zero', (await st()).cores === 0);
-  await page.evaluate(() => { window.__GD.run().cores = 2; });
-  check('the same 2 cores could instead buy a PULSE tier', await G('G=>G.buyArmory("pulse")'));
-  check('...which then blocks unlocking FROST', !(await G('G=>G.buyArmory("frost")')));
+  // The opening is a guided introduction: one new turret per level for the
+  // first four levels, handed over rather than bought, with no upgrade option
+  // competing for the same cores until the trees open at level 5.
+  const intro = await page.evaluate(() => {
+    const G = window.__GD;
+    G.newRun();
+    const out = [];
+    for (let L = 1; L <= 6; L++) {
+      G.startLevel(L);
+      const a = G.st().armory;
+      out.push({ L, owned: Object.keys(a).filter(k => a[k].owned), cores: G.st().cores });
+    }
+    return out;
+  });
+  check('level 1 fields PULSE alone', intro[0].owned.join() === 'pulse', intro[0].owned);
+  check('level 2 introduces NOVA', intro[1].owned.join() === 'pulse,nova', intro[1].owned);
+  check('level 3 introduces FROST', intro[2].owned.join() === 'pulse,nova,frost', intro[2].owned);
+  check('level 4 introduces RAIL', intro[3].owned.join() === 'pulse,nova,frost,rail', intro[3].owned);
+  check('the arsenal is complete from level 4 on', intro[5].owned.length === 4, intro[5].owned);
+
+  const introFree = await page.evaluate(() => {
+    const G = window.__GD;
+    G.newRun();
+    G.run().cores = 7;                    // arbitrary balance, untouched by unlocks
+    G.startLevel(4);
+    return { cores: G.st().cores, owned: Object.keys(G.st().armory).filter(k => G.st().armory[k].owned).length };
+  });
+  check('turrets are introduced, never purchased — cores are not spent',
+    introFree.cores === 7 && introFree.owned === 4, introFree);
+
+  // upgrades are deferred wholesale: nothing in the armory sells before level 5
+  const earlyShop = await page.evaluate(() => {
+    const G = window.__GD;
+    G.newRun(); G.run().cores = 40;
+    const res = {};
+    for (const L of [2, 3, 4]) {
+      G.startLevel(L);
+      res['tier@' + L] = G.buyArmory('pulse');
+      res['research@' + L] = G.research();
+    }
+    G.startLevel(5);
+    res['tier@5'] = G.buyArmory('pulse');
+    res['research@5'] = G.research();
+    res.cores = G.st().cores;
+    return res;
+  });
+  check('no armory tier can be bought on levels 2-4',
+    !earlyShop['tier@2'] && !earlyShop['tier@3'] && !earlyShop['tier@4'], earlyShop);
+  check('research is deferred with it', !earlyShop['research@2'] && !earlyShop['research@4'], earlyShop);
+  check('both open at level 5', earlyShop['tier@5'] && earlyShop['research@5'], earlyShop);
+
+  const banked = await page.evaluate(() => {
+    const G = window.__GD;
+    G.newRun();
+    let cores = 0;
+    for (let L = 1; L <= 4; L++) cores += G.coresFor(L);
+    return cores;
+  });
+  check('the intro levels bank their cores for level 5', banked === 8, banked);
+
+  // the promise a player actually sees: the build bar grows one card a level
+  const barGrowth = [];
+  for (const L of [1, 2, 3, 4]) {
+    await page.evaluate(n => window.__GD.startLevel(n), L);
+    await page.waitForTimeout(60);
+    barGrowth.push(await page.evaluate(() => window.__GD.cardRects().map(c => c.type)));
+  }
+  check('the build bar gains exactly one card per intro level',
+    barGrowth.map(b => b.length).join() === '1,2,3,4', barGrowth);
 
   /* --------------------------- skill trees ---------------------------- */
   await G('G=>G.newRun()');

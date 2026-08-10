@@ -271,10 +271,11 @@ ten waypoint maps (a new one every ten levels), drag-placed turrets with
 spec'd silhouettes — green triangle PULSE, red circle NOVA, blue snowflake
 FROST, purple spike RAIL. Three currencies drive the long arc: per-level
 cash for placing and upgrading, persistent **cores** for the between-levels
-armory (turret unlocks + 8 permanent tiers each), and persistent **skill
-points** for three branching trees (OFFENSE / ENGINEERING / COMMAND, the
-last granting active abilities). Levels 2-4 pay exactly enough for one
-purchase, so each is a real either/or. Lives carry the whole run; wave HP
+armory (8 permanent tiers per turret), and persistent **skill points** for
+three branching trees (OFFENSE / ENGINEERING / COMMAND, the last granting
+active abilities). The first four levels are a guided introduction — one
+new turret handed over per level, with every purchase shut until the
+armory and the trees both open at level 5. Lives carry the whole run; wave HP
 grows on an accelerating exponent calibrated against an auto-player. Main
 menu with continue/load/scoreboard/settings, 3 save slots + auto-save, and
 a top-ten board keyed on score with date, time and level reached. Detailed
