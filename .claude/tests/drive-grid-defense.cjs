@@ -3,10 +3,11 @@
 //
 // The 100-level campaign is a progression system, so the things worth gating
 // are the progression rules and the difficulty ramp, not the rendering:
-//   * UNLOCK SCRIPT: level 1 offers PULSE alone; the level-2/3/4 shops each
-//     pay exactly enough for ONE of {new turret, upgrade a turret you own}.
-//     This is the design promise "you have the choice of X or Y" — if core
-//     income or a price drifts, the choice silently stops being a choice.
+//   * INTRO SCHEDULE: level 1 fields PULSE alone, and levels 2/3/4 each hand
+//     over exactly one more turret — granted, never bought, with every armory
+//     purchase (tiers and RESEARCH) refused until level 5. The player-visible
+//     form of that promise is the build bar gaining one card per level, so
+//     that is what is asserted, alongside cores being untouched by an unlock.
 //   * TREE RULES: a child node refuses a point until a parent holds one;
 //     capstones additionally need their tree gate; points are never created.
 //   * BALANCE RAMP: a scripted, deliberately non-optimal auto-player runs the
