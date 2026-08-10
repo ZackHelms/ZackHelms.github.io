@@ -54,7 +54,7 @@ local-2p.
 | Word Circuit | `word-circuit/` | word | drag-connect | daily-challenge, timed-round | word-building, seeded-determinism | solo | `.claude/word-circuit.md` |
 | Neon Tactics | `neon-tactics/` | turn-based-tactics | tap | match-vs-ai, local-2p | grid-combat, line-of-sight, ai-opponent | vs-ai, local-2p | `.claude/neon-tactics.md` |
 | Star Surge | `star-surge/` | shmup | drag-steer | level-campaign | bullet-dodging, boss-fights, meta-progression | solo | `.claude/star-surge.md` |
-| Grid Defense | `grid-defense/` | tower-defense-classic | drag-place, tap | wave-survival | wave-defense, resource-economy, tower-upgrades | solo | `.claude/grid-defense.md` |
+| Grid Defense | `grid-defense/` | tower-defense-classic | drag-place, tap | level-campaign, wave-survival, endless-highscore, save-campaign | wave-defense, resource-economy, tower-upgrades, meta-progression | solo | `.claude/grid-defense.md` |
 | Neon Tripeaks | `tri-peaks/` | card-deck | tap | quick-round, daily-challenge | card-chain, combo-multiplier, seeded-determinism | solo | `.claude/tri-peaks.md` |
 | Shadow Circuit | `shadow-circuit/` | stealth, maze | tap-to-move | level-campaign | vision-cones, line-of-sight, procedural-generation | solo | `.claude/shadow-circuit.md` |
 | Neon Recall | `neon-recall/` | memory-board | tap | level-campaign, local-2p | memory-match, resource-economy, combo-multiplier | solo, local-2p | `.claude/neon-recall.md` |
@@ -77,7 +77,7 @@ local-2p.
 ## Coverage summary (read this first when picking new games)
 
 ### Saturated — avoid without a named twist
-- **Input `tap`-only:** 14 games. **`endless-highscore`:** 11 games.
+- **Input `tap`-only:** 14 games. **`endless-highscore`:** 12 games.
 - **Genre `arcade-classic`:** 5. `idle-clicker`: 2 (both very deep — don't
   add a third). One-thumb neon arcade in general is the house specialty and
   the most crowded shelf.
@@ -118,6 +118,13 @@ local-2p.
   `map-and-compass` / `day-night-cycle` mechanics + `skill-campaign` session
   (wayfinder — the repo's only 3D game and its only real-world-skill trainer;
   also the only page rendering with WebGL rather than Canvas 2D).
+
+- `tower-defense-classic` + a 100-level `level-campaign` +
+  `meta-progression` (grid-defense — the only game whose long arc is a
+  between-levels economy: an armory of permanent turret tiers plus three
+  branching skill trees, with `save-campaign` slots and a top-ten board.
+  Sorcery is the other tower defense but is spell-cast, single-run and has
+  no persistent build).
 
 - `phase-puzzle` genre + `phase-change` / `soft-body-physics` /
   `point-gravity` mechanics + `endless-levels` session (phasic — the only

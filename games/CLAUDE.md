@@ -265,12 +265,22 @@ Top-HUD toggle for local 2-player mode (multi-touch, second finger owns the
 top mallet; AI + records off). Synth SFX + arena music loop. Detailed
 context: `.claude/air-hockey.md`.
 
-### GRID DEFENSE (`grid-defense/index.html`, ~780 lines)
-Classic tower defense: drag PULSE/NOVA/FROST/RAIL towers beside a
-serpentine road, 3 upgrade levels + 70% sell, first-targeting instant-hit
-beams, 20 deterministic waves (bosses every 5th) with early-call bonus,
-then optional endless. Best wave + win persisted. Detailed context:
-`.claude/grid-defense.md`.
+### GRID DEFENSE (`grid-defense/index.html`, ~2100 lines)
+A 100-level tower-defense **campaign**, then endless. One wave per level,
+ten waypoint maps (a new one every ten levels), drag-placed turrets with
+spec'd silhouettes — green triangle PULSE, red circle NOVA, blue snowflake
+FROST, purple spike RAIL. Three currencies drive the long arc: per-level
+cash for placing and upgrading, persistent **cores** for the between-levels
+armory (8 permanent tiers per turret), and persistent **skill points** for
+three branching trees (OFFENSE / ENGINEERING / COMMAND, the last granting
+active abilities). The first four levels are a guided introduction — one
+new turret handed over per level, with every purchase shut until the
+armory and the trees both open at level 5. Lives carry the whole run; wave HP
+grows on an accelerating exponent calibrated against an auto-player. Main
+menu with continue/load/scoreboard/settings, 3 save slots + auto-save, and
+a top-ten board keyed on score with date, time and level reached. Detailed
+context: `.claude/grid-defense.md`. Drive suite:
+`.claude/tests/drive-grid-defense.cjs`.
 
 ### STAR SURGE (`star-surge/index.html`, ~750 lines)
 Vertical shmup: drag-steer, auto-fire, 5 stages × 3 waves + boss (bosses
