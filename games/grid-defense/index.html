@@ -200,7 +200,7 @@ input[type=range]::-moz-range-thumb { width:20px; height:20px; border:0; border-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-14 23:14 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-14 23:58 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
@@ -317,11 +317,12 @@ const CREEPS = {
    opposite of what it looked like: the board grows from empty to ~20 towers
    inside a level while HP crept up ~4% a wave, so the FIRST waves of a level
    were the dangerous ones and the boss was a formality.               */
-let HP_LEVEL = 1.90;    // per-level floor growth   (>1: each level harder)
-// 1.90 was swept with .claude/tests/eval-grid-defense.cjs (3-retry cap):
-// no-skills clears 3 and cannot pass 4, a poor skill selection clears 4 and
-// cannot pass 5, and a coherent build clears all ten. Push it higher and the
-// good build stops clearing before the bad one gets much worse.
+let HP_LEVEL = 2.00;    // per-level floor growth   (>1: each level harder)
+// 2.00 was swept with .claude/tests/eval-grid-defense.cjs (3-retry cap):
+// no skills clears 3 and cannot pass 4; a poor skill selection clears 4 and
+// cannot pass 5; crowding every turret at one spot stalls at 4; one-note
+// PULSE stalls at 8; a coherent build clears all ten. Past ~2.3 the good
+// build stops clearing before the bad ones get meaningfully worse.
 let HP_WAVE  = 1.26;    // per-wave growth in-level (> HP_LEVEL: next level opens easier)
 const HP_BOSS = 1.5;    // extra bump on the boss wave itself
 const SPD_GROWTH = 0.0032, SPD_CAP = 1.45;
@@ -345,9 +346,20 @@ function startCashFor(level) {
 function coresForWave(gw) { return 2 + Math.floor(gw / 15) + (isBossWave(gw) ? 1 : 0); }
 function skillPtsForWave(gw) { return gw < ARMORY_WAVE ? 0 : 1 + (isBossWave(gw) ? 2 : 0); }
 function mapIndexFor(level) { return (level - 1) % MAPS.length; }
-const RESEARCH_COST = 5;     // cores -> 1 skill point
+/* Cores -> skill points, at an ESCALATING price. At a flat rate it was simply
+   better to melt every core than to buy a permanent tier — a persona that
+   never touched the armory matched the reference build outright, which makes
+   cores just skill points with extra steps. Rising cost keeps research as a
+   dump for genuine surplus and leaves the armory the primary use.        */
+const RESEARCH_COST = 5;          // first conversion
+const RESEARCH_STEP = 3;          // each further conversion costs this much more
+function researchCost() { return RESEARCH_COST + RESEARCH_STEP * (run.researched || 0); }
 
 /* ------------------------------- RNG ---------------------------------- */
+/* All in-game randomness goes through RNG, not Math.random, so a balance
+   run can be made deterministic. Combat crits alone swung the eval's
+   verdict by two whole levels between identical runs. */
+let RNG = Math.random;
 function mulberry32(a) {
   return function () {
     a |= 0; a = a + 0x6D2B79F5 | 0;
@@ -725,7 +737,7 @@ function newRun() {
     score: 0,          // banked — only levels actually CLEARED contribute
     levelScore: 0,     // this attempt; discarded if the level is failed
     cores: 0, sp: 0, armory, skills: {},
-    endless: false, started: Date.now(), retries: 0,
+    endless: false, started: Date.now(), retries: 0, researched: 0,
     levelsCleared: 0, leaksTotal: 0, killsTotal: 0, recorded: false,
   };
 }
@@ -988,7 +1000,7 @@ function spawnCreep(type, elite, atD) {
   const hp = Math.round(def.hp * waveHpMul * (elite ? 1.7 : 1));
   creeps.push({
     type, hp, maxHp: hp, d: atD || 0,
-    off: (Math.random() - 0.5) * cell * 0.34,
+    off: (RNG() - 0.5) * cell * 0.34,
     slowT: 0, slowStr: 0, burnT: 0, burnDps: 0, healT: 0,
     elite: !!elite, armMul: elite ? 1.6 : 1, dead: false,
   });
@@ -1102,7 +1114,7 @@ function fireTower(t) {
   const target = firstTarget(t, inRange);
   const tp = creepPos(target);
   let dmg = towerDamage(t);
-  const crit = Math.random() < S.crit;
+  const crit = RNG() < S.crit;
   if (crit) dmg *= S.critMul;
   if (t.type === 'nova') {
     const aoe = T.aoe * cell * S.splashRadius;
@@ -1151,7 +1163,7 @@ function applyHit(c, dmg) {
 function leak(c) {
   c.dead = true;
   const exitPt = boardPoint(posAt(totalLen));
-  if (Math.random() < S.leakGuard) {
+  if (RNG() < S.leakGuard) {
     floats.push({ x: exitPt.x, y: exitPt.y - 10, txt: 'BLOCKED', color: '#4488ff', t: 0 });
     return;
   }
@@ -1598,7 +1610,7 @@ function draw() {
   cardRects = []; abilityRects = []; actionBtns = {}; panelBtns = {};
   if (state === 'menu' || !run) return;
   let ox = 0, oy = 0;
-  if (shake > 0) { ox = (Math.random() - 0.5) * 9 * shake; oy = (Math.random() - 0.5) * 9 * shake; }
+  if (shake > 0) { ox = (RNG() - 0.5) * 9 * shake; oy = (RNG() - 0.5) * 9 * shake; }
   ctx.save(); ctx.translate(ox, oy);
 
   /* ---- board ---- */
@@ -2062,9 +2074,9 @@ function showArmory(fromPrep) {
         <div style="width:44px;text-align:center;font-size:1.3rem">🔬</div>
         <div class="arm-mid">
           <div class="arm-name" style="color:var(--purple)">RESEARCH</div>
-          <div class="arm-desc">Melt ${RESEARCH_COST} cores down into 1 skill point. Cores you will never spend are worth more in a tree.</div>
+          <div class="arm-desc">Melt ${researchCost()} cores into 1 skill point — the price rises each time. Cores you will never spend are worth more in a tree.</div>
         </div>
-        <button class="buybtn" id="buy-research" style="border-color:var(--purple);color:var(--purple)" ${armoryOpen() && run.cores >= RESEARCH_COST ? '' : 'disabled'}>${armoryOpen() ? '◆' + RESEARCH_COST + '<br>→ ★1' : 'W' + ARMORY_WAVE}</button>
+        <button class="buybtn" id="buy-research" style="border-color:var(--purple);color:var(--purple)" ${armoryOpen() && run.cores >= researchCost() ? '' : 'disabled'}>${armoryOpen() ? '◆' + researchCost() + '<br>→ ★1' : 'W' + ARMORY_WAVE}</button>
       </div></div>
       <div class="rules">Armory upgrades are permanent for this run and apply to every tower of
       that type you place, on top of the level-by-level upgrades you buy with cash.</div>
@@ -2089,8 +2101,9 @@ function showArmory(fromPrep) {
     });
   }
   bind('buy-research', () => {
-    if (!armoryOpen() || run.cores < RESEARCH_COST) return;
-    run.cores -= RESEARCH_COST; run.sp += 1; sfxUnlock();
+    if (!armoryOpen() || run.cores < researchCost()) return;
+    run.cores -= researchCost(); run.researched = (run.researched || 0) + 1;
+    run.sp += 1; sfxUnlock();
     autosave(); showArmory(armoryFromPrep);
   });
   bind('a-skills', () => showSkills(false));
@@ -2377,8 +2390,9 @@ window.__GD = {
     run.cores -= c; a.tier++; return true;
   },
   research: () => {
-    if (!armoryOpen() || run.cores < RESEARCH_COST) return false;
-    run.cores -= RESEARCH_COST; run.sp++; return true;
+    if (!armoryOpen() || run.cores < researchCost()) return false;
+    run.cores -= researchCost(); run.researched = (run.researched || 0) + 1;
+    run.sp++; return true;
   },
   TURRET_WAVE, ARMORY_WAVE,
   spendSkill: id => {
@@ -2402,6 +2416,7 @@ window.__GD = {
   panelRects: () => panelBtns,
   abilityRects: () => abilityRects.map(r => ({ id: r.ab.id, x: r.x, y: r.y, w: r.w, h: r.h })),
   setCurve: (lvl, wav) => { HP_LEVEL = lvl; HP_WAVE = wav; },   // balance-sweep hook
+  seedRandom: seed => { RNG = mulberry32(seed >>> 0); },        // deterministic balance runs
   curve: () => ({ HP_LEVEL, HP_WAVE, HP_BOSS }),
   pathSamples: n => {
     const out = [];

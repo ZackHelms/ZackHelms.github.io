@@ -185,19 +185,39 @@ tweak never fights a mechanics regression:
   `--curve <levelGrowth>,<waveGrowth>` and `--json` are the knobs. Each run
   takes 1-3 seconds, so sweeping is cheap.
 
-Measured at `HP_LEVEL = 1.90` with a 3-retry cap — these are the campaign's
-difficulty *claims*, and the eval fails if they stop being true:
+Measured at `HP_LEVEL = 2.00` with a 3-retry cap and a **seeded RNG**
+(`--seed`, default 12345). These are the campaign's difficulty *claims*, and
+the eval fails if they stop being true:
 
 | persona | outcome |
 | --- | --- |
-| coherent build | clears all ten |
-| no skills at all | clears 3, cannot pass 4 |
+| coherent build | reaches level 10; clears it on most seeds |
+| one-note PULSE, never upgrade | stalls at 7 |
+| crowd every turret at one spot | stalls at 6 |
+| never buy an armory tier | stalls at 6 |
 | poor skill selection | clears 4, cannot pass 5 |
-| crowd every turret at the exit | stalls at 6 |
-| one-note PULSE, never upgrade | stalls at 9 |
-| never buy an armory tier | stalls at 9 |
+| no skills at all | clears 3, cannot pass 4 |
+
+Every lever is load-bearing, and the ladder is stable across seeds — only the
+final level is a coin flip for a good build, which is the intent.
+
+**Seed the RNG or the numbers lie.** Combat crit rolls alone swung a persona's
+verdict by two whole levels between otherwise identical runs; all in-game
+randomness now goes through `RNG` (`__GD.seedRandom(seed)`) for this reason.
+
+Two findings the harness produced that changed the design, not just the tuning:
+- **A short `skills` list strands points.** Eight node ids absorb ~24 of a
+  campaign's ~116, so a strategy plays on a fifth of its budget and looks far
+  worse than it is — this made an entire 23-strategy exploration report a
+  spurious "3.3x gap" against the reference build. The eval now prints
+  `N SKILL POINTS UNSPENT` and offers `spendRest`.
+- **Research had to become an escalating price.** At a flat 5 cores it was
+  strictly better to melt every core than to buy a permanent tier: a persona
+  that never touched the armory *matched the reference build outright*, making
+  cores just skill points with extra steps. Now `5 + 3·(conversions so far)`,
+  which restores the armory as the primary use and research as a surplus dump.
 
 A ceiling worth knowing before re-tuning: pushing the no-skills stall down to
 level 3 while a good build still clears ten needs the trees to be worth ~150×,
-which makes towers nearly irrelevant. 1.90 is the last point before the good
-build stops clearing.
+which makes towers nearly irrelevant. 2.00 is the last point before the good
+build stops reaching the end.

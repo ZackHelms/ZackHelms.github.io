@@ -43,3 +43,16 @@ strategy that clears more easily or scores materially higher is an exploit,
 and that is the most valuable thing the exercise can produce.
 
 Cheap enough to run wide: each strategy takes 1-3 seconds.
+
+**Two traps that make a strategy look worse than it is**, both learned the hard
+way from a 23-strategy agent exploration whose headline finding turned out to be
+an artifact:
+
+1. **A short `skills` list strands points.** Eight node ids can only absorb ~24
+   of a campaign's ~116, so the strategy plays on a fifth of its budget. The
+   report prints `N SKILL POINTS UNSPENT` when this happens — lengthen the list
+   or set `"spendRest": true`.
+2. **Unseeded runs are noisy.** Crit rolls swung a verdict by two levels between
+   identical runs; the harness seeds the game's RNG (`--seed`, default 12345).
+   If you are comparing strategies, hold the seed fixed, and sanity-check a
+   conclusion on a second seed before believing it.
