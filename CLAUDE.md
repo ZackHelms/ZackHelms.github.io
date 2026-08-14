@@ -12,6 +12,13 @@ It is fine to push directly to the `main` branch for this repository. No pull re
   app can monitor, feature-detected and probed live in the visitor's own browser, with
   per-signal iOS Safari status and native-bridge notes. Data-table-driven: to add a
   signal, append one object to `SIGNALS[]` (or `NATIVE_ONLY[]`). See `signals/README.md`
+- `character-lists/` — **not a game.** Personal reference app for remembering who's who
+  in a book/show/film: a hub of titles, each with a name-only character list and a
+  second list of places, and a tap-for-detail dialog. Data-driven — to add a title,
+  write `character-lists/data/<slug>.js` (one `CL.add({...})` call) and add the slug to
+  `data/manifest.js`; **never edit `index.html` to add content.** Spoilers go in each
+  entry's `spoiler` field so `role`/`detail` stay safe to read mid-book. Full field
+  contract in `character-lists/README.md`
 - `town-game-isometric/` — standalone isometric town-game project
 - `FFL1/` — **generated/published, do NOT edit by hand.** This directory is overwritten
   by `publish.sh` in the separate [`ZackHelms/FFL1`](https://github.com/ZackHelms/FFL1)
