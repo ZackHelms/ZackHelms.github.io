@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="A personal cheat-sheet for the books, shows and films you're in the middle of — who is that character again, and where is that place?">
+<meta name="theme-color" content="#06060e">
+<title>CHARACTER LISTS — who was that again?</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗂️</text></svg>">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg: #06060e;
+  --panel: #0b0b16;
+  --panel2: #101020;
+  --panel3: #16162b;
+  --border: #1a1a30;
+  --green: #39ff14;
+  --gold: #ffc300;
+  --blue: #4488ff;
+  --red: #ff2244;
+  --purple: #b44fff;
+  --white: #dde3ff;
+  --dim: #8899bb;
+  --dimmer: #454568;
+  --accent: #39ff14;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html { -webkit-text-size-adjust:100%; }
+body {
+  background: var(--bg);
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--white);
+  min-height: 100vh;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+body.locked { overflow: hidden; }
+.wrap {
+  max-width: 780px; margin: 0 auto;
+  padding: calc(env(safe-area-inset-top,0px) + 24px) 14px calc(env(safe-area-inset-bottom,0px) + 70px);
+}
+a { color: inherit; text-decoration: none; }
+
+/* ---------- header ---------- */
+h1 {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: clamp(1.35rem, 6.4vw, 2.3rem);
+  color: var(--accent);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 35%, transparent);
+  letter-spacing: 4px;
+  line-height: 1.15;
+}
+.tagline { font-size: 0.72rem; color: var(--dim); letter-spacing: 1px; margin-top: 9px; max-width: 62ch; }
+.byline { font-size: 0.68rem; color: var(--dim); letter-spacing: 1px; margin-top: 8px; }
+.blurb { font-size: 0.76rem; color: var(--white); margin-top: 12px; max-width: 66ch; opacity: 0.85; }
+
+.backlink {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.66rem; letter-spacing: 2px; color: var(--dim);
+  border: 1px solid var(--border); background: var(--panel);
+  border-radius: 20px; padding: 6px 13px 6px 10px; margin-bottom: 18px;
+  cursor: pointer;
+}
+.backlink:hover, .backlink:active { color: var(--white); border-color: var(--accent); }
+
+/* ---------- hub cards ---------- */
+.cards { display: grid; gap: 11px; margin-top: 26px; }
+.card {
+  display: block; position: relative;
+  background: var(--panel); border: 1px solid var(--border);
+  border-left: 3px solid var(--card-accent, var(--green));
+  border-radius: 8px; padding: 15px 44px 15px 16px;
+  cursor: pointer; transition: background .12s, border-color .12s;
+}
+.card:hover, .card:active { background: var(--panel2); border-color: var(--border); border-left-color: var(--card-accent); }
+.card::after {
+  content: '›'; position: absolute; right: 17px; top: 50%; transform: translateY(-55%);
+  font-size: 1.5rem; color: var(--dimmer);
+}
+.card .kind {
+  font-size: 0.55rem; letter-spacing: 2.5px; color: var(--card-accent);
+  border: 1px solid color-mix(in srgb, var(--card-accent) 40%, transparent);
+  border-radius: 3px; padding: 2px 7px; display: inline-block; margin-bottom: 9px;
+}
+.card .name {
+  font-family: 'Black Ops One', sans-serif; font-size: 1.02rem;
+  letter-spacing: 1.5px; color: var(--white); line-height: 1.25;
+}
+.card .sub { font-size: 0.66rem; color: var(--dim); margin-top: 6px; letter-spacing: 0.5px; }
+.card .counts { font-size: 0.6rem; color: var(--dimmer); margin-top: 9px; letter-spacing: 1.5px; }
+
+.empty {
+  margin-top: 24px; padding: 20px; text-align: center;
+  border: 1px dashed var(--border); border-radius: 8px;
+  color: var(--dimmer); font-size: 0.72rem;
+}
+
+/* ---------- controls ---------- */
+#controls {
+  position: sticky; top: 0; z-index: 30;
+  margin: 20px -14px 0; padding: 11px 14px 10px;
+  background: rgba(6,6,14,0.95); backdrop-filter: blur(9px);
+  border-bottom: 1px solid var(--border);
+}
+.search {
+  width: 100%; font-family: 'Share Tech Mono', monospace; font-size: 0.8rem;
+  background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--white); padding: 9px 11px;
+}
+.search:focus { outline: none; border-color: var(--accent); }
+.search::placeholder { color: var(--dimmer); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; align-items: center; }
+.chip {
+  font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; letter-spacing: 1.5px;
+  background: var(--panel2); color: var(--dim);
+  border: 1px solid var(--border); border-radius: 20px;
+  padding: 5px 12px; cursor: pointer; white-space: nowrap;
+}
+.chip[aria-pressed="true"] {
+  color: var(--bg); background: var(--accent); border-color: var(--accent); font-weight: bold;
+}
+.chip.spoil { margin-left: auto; }
+.chip.spoil[aria-pressed="true"] { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* ---------- lists ---------- */
+.section { margin-top: 26px; }
+.section h2 {
+  font-family: 'Black Ops One', sans-serif; font-size: 0.82rem;
+  letter-spacing: 3.5px; color: var(--accent); margin-bottom: 4px;
+}
+.section .hint { font-size: 0.6rem; color: var(--dimmer); letter-spacing: 1px; margin-bottom: 11px; }
+.list {
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  background: var(--panel);
+}
+.row {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 10px 13px; border-bottom: 1px solid var(--border);
+  cursor: pointer; text-align: left;
+  background: none; border-left: none; border-right: none; border-top: none;
+  font-family: 'Share Tech Mono', monospace; color: var(--white);
+  transition: background .1s;
+}
+.row:last-child { border-bottom: none; }
+.row:hover, .row:active { background: var(--panel3); }
+.row .rname { font-size: 0.87rem; letter-spacing: 0.5px; flex: 1; line-height: 1.3; }
+.row .chev { color: var(--dimmer); font-size: 1.1rem; line-height: 1; }
+.mono {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 0.62rem; letter-spacing: 0.5px; font-weight: bold;
+  color: #06060e; overflow: hidden; background-size: cover; background-position: center;
+}
+.mono img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.norows { padding: 16px 14px; color: var(--dimmer); font-size: 0.72rem; }
+
+/* ---------- dialog ---------- */
+#shade {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(2,2,8,0.86); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(env(safe-area-inset-top,0px) + 16px) 12px calc(env(safe-area-inset-bottom,0px) + 16px);
+  animation: fade .13s ease-out;
+}
+#shade[hidden] { display: none; }
+@keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+.dialog {
+  position: relative; width: 100%; max-width: 540px; max-height: 100%;
+  display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: 10px; box-shadow: 0 22px 60px rgba(0,0,0,0.75);
+  animation: pop .15s ease-out;
+}
+@keyframes pop { from { transform: translateY(12px) scale(.985); opacity: 0 } to { transform: none; opacity: 1 } }
+.dclose {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(6,6,14,0.8); border: 1px solid var(--border);
+  color: var(--dim); font-size: 1.05rem; line-height: 1; cursor: pointer;
+  font-family: 'Share Tech Mono', monospace;
+}
+.dclose:hover, .dclose:active { color: var(--white); border-color: var(--accent); }
+.dbody { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 0 18px; }
+.portrait {
+  width: 100%; aspect-ratio: 16/7; display: grid; place-items: center;
+  background-size: cover; background-position: center top;
+  border-bottom: 1px solid var(--border); border-radius: 8px 8px 0 0;
+  overflow: hidden;
+}
+.portrait .big {
+  font-family: 'Black Ops One', sans-serif; font-size: 2.4rem;
+  letter-spacing: 3px; color: rgba(6,6,14,0.72);
+  text-shadow: 0 2px 0 rgba(255,255,255,0.14);
+}
+.portrait img { width: 100%; height: 100%; object-fit: cover; }
+.dpad { padding: 15px 17px 0; }
+.dname {
+  font-family: 'Black Ops One', sans-serif; font-size: 1.1rem;
+  letter-spacing: 1.5px; color: var(--white); line-height: 1.3;
+}
+.daka { font-size: 0.68rem; color: var(--dim); margin-top: 5px; letter-spacing: 0.5px; }
+.drole {
+  font-size: 0.76rem; color: var(--accent); margin-top: 9px; letter-spacing: 0.5px;
+}
+.dactor { font-size: 0.68rem; color: var(--dim); margin-top: 5px; }
+.dactor b { color: var(--white); font-weight: normal; }
+.dtags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 11px; }
+.dtag {
+  font-size: 0.55rem; letter-spacing: 1.5px; color: var(--dim);
+  border: 1px solid var(--border); background: var(--panel2);
+  border-radius: 3px; padding: 3px 7px;
+}
+.ddiv { height: 1px; background: var(--border); margin: 15px 0; }
+.ddetail { font-size: 0.79rem; color: var(--white); opacity: 0.9; }
+.ddetail p + p { margin-top: 9px; }
+.dfacts { list-style: none; margin-top: 13px; display: grid; gap: 7px; }
+.dfacts li {
+  font-size: 0.75rem; color: var(--dim); padding-left: 15px; position: relative; line-height: 1.5;
+}
+.dfacts li::before { content: '▸'; position: absolute; left: 0; color: var(--accent); }
+.dfacts li b { color: var(--white); font-weight: normal; }
+
+.spoiler { margin-top: 15px; border: 1px solid var(--red); border-radius: 6px; overflow: hidden; }
+.spoiler > button {
+  width: 100%; text-align: left; cursor: pointer;
+  font-family: 'Share Tech Mono', monospace; font-size: 0.63rem; letter-spacing: 2px;
+  background: #2a0a10; color: #ffb3c0; border: none; padding: 9px 12px;
+}
+.spoiler > div { padding: 11px 12px; font-size: 0.75rem; color: #ffd9e0; background: #180509; line-height: 1.55; }
+.spoiler > div p + p { margin-top: 8px; }
+.spoiler[data-open="false"] > div { display: none; }
+
+/* ---------- footer ---------- */
+footer {
+  margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--border);
+  font-size: 0.6rem; color: var(--dimmer); letter-spacing: 1px;
+}
+footer a { color: var(--dim); border-bottom: 1px dotted var(--dimmer); }
+
+@media (min-width: 620px) {
+  .cards { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="app"></div>
+
+<div id="shade" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-name">
+    <button class="dclose" id="dclose" aria-label="Close">✕</button>
+    <div class="dbody" id="dbody"></div>
+  </div>
+</div>
+
+<script src="data/manifest.js"></script>
+<script>
+/* ============================================================
+   CHARACTER LISTS
+   A hub of titles (books / shows / films); each title page lists
+   its characters and its places, name-only, most important first.
+   Tap a name for a detail dialog.
+
+   Data lives in data/<slug>.js — each file calls CL.add({...}).
+   data/manifest.js lists the slugs, newest interest first.
+   See README.md for the full field contract.
+   ============================================================ */
+
+const CL = {
+  items: [],
+  bySlug: Object.create(null),
+  add(t) { this.items.push(t); this.bySlug[t.slug] = t; }
+};
+
+/* ---------- tiny helpers ---------- */
+
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;');
+
+/** Stable id for an entry, so dialog URLs are shareable and don't churn. */
+function idOf(entry) {
+  return (entry.id || entry.name).toLowerCase()
+    .replace(/["'’“”]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+const HONORIFIC = /^(dr|mr|mrs|ms|st|sgt|det|lt|capt|the|a|an|of|deputy|chief|nurse|officer)\.?$/i;
+
+/** Two-letter monogram: skips honorifics and quoted nicknames. */
+function initials(name) {
+  const words = String(name).replace(/["'’“”()]/g, ' ').split(/[\s.\-\/&]+/)
+    .filter(w => w && !HONORIFIC.test(w));
+  if (!words.length) return String(name).slice(0, 2).toUpperCase();
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+/** Deterministic hue so a given name always gets the same swatch. */
+function hueOf(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  return h;
+}
+
+function swatch(name) {
+  const h = hueOf(name);
+  return `linear-gradient(140deg, hsl(${h} 72% 62%), hsl(${(h + 46) % 360} 68% 44%))`;
+}
+
+/** <img> when the entry supplies a picture, generated monogram otherwise. */
+function faceStyle(entry) {
+  return entry.img
+    ? `background-image:url('${esc(entry.img)}')`
+    : `background:${swatch(entry.name)}`;
+}
+
+function paras(text) {
+  return String(text).split(/\n{2,}/).map(p => `<p>${esc(p.trim())}</p>`).join('');
+}
+
+/* ---------- routing ---------- */
+/* #/                      hub
+   #/<slug>                title page
+   #/<slug>/c/<id>         title page + character dialog
+   #/<slug>/p/<id>         title page + place dialog          */
+
+const app = document.getElementById('app');
+const shade = document.getElementById('shade');
+const dbody = document.getElementById('dbody');
+
+let curSlug = null;      // title currently rendered behind any dialog
+let filter = 'all';      // active season/part filter id
+let query = '';          // search box text
+let openedInApp = false; // true when the dialog was opened by a tap, not a deep link
+
+const spoilersOn = () => localStorage.getItem('cl-spoilers') === '1';
+
+function parseHash() {
+  const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+  return { slug: parts[0] || null, kind: parts[1] || null, id: parts[2] || null };
+}
+
+function route() {
+  const { slug, kind, id } = parseHash();
+
+  if (!slug || !CL.bySlug[slug]) {
+    closeDialog(true);
+    if (curSlug !== null) { curSlug = null; renderHub(); window.scrollTo(0, 0); }
+    else if (!app.dataset.rendered) renderHub();
+    return;
+  }
+
+  if (slug !== curSlug) {
+    curSlug = slug;
+    filter = 'all';
+    query = '';
+    renderTitle(CL.bySlug[slug]);
+    window.scrollTo(0, 0);
+  }
+
+  const entry = (kind === 'c' || kind === 'p') ? findEntry(CL.bySlug[slug], kind, id) : null;
+  if (entry) openDialog(CL.bySlug[slug], entry, kind);
+  else closeDialog(true);
+}
+
+function findEntry(title, kind, id) {
+  const pool = kind === 'p' ? (title.places || []) : (title.characters || []);
+  return pool.find(e => idOf(e) === id) || null;
+}
+
+function go(hash) { location.hash = hash; }
+
+window.addEventListener('hashchange', route);
+
+/* ---------- hub ---------- */
+
+function renderHub() {
+  document.documentElement.style.setProperty('--accent', '#39ff14');
+  document.title = 'CHARACTER LISTS — who was that again?';
+
+  const cards = CL.items.map(t => `
+    <a class="card" href="#/${esc(t.slug)}" style="--card-accent:${esc(t.accent || '#39ff14')}">
+      <span class="kind">${esc((t.kind || 'title').toUpperCase())}</span>
+      <div class="name">${esc(t.title)}</div>
+      <div class="sub">${esc(t.byline || '')}</div>
+      <div class="counts">${(t.characters || []).length} CHARACTERS · ${(t.places || []).length} PLACES</div>
+    </a>`).join('');
+
+  app.innerHTML = `
+    <h1>CHARACTER<br>LISTS</h1>
+    <p class="tagline">Who <b>was</b> that again? A private cheat-sheet for the books, shows
+      and films I'm in the middle of — every character and every place, name-first,
+      most important at the top. Tap a name for the details.</p>
+    ${cards ? `<div class="cards">${cards}</div>` : `<div class="empty">No titles yet.</div>`}
+    <footer>Spoilers stay folded away behind a tap. ·
+      <a href="../">tythos.com</a></footer>`;
+  app.dataset.rendered = '1';
+}
+
+/* ---------- title page ---------- */
+
+function renderTitle(t) {
+  document.documentElement.style.setProperty('--accent', t.accent || '#39ff14');
+  document.title = t.title + ' — Character Lists';
+
+  const filters = (t.filters || []);
+  const chips = filters.length ? `
+    <div class="chips">
+      <button class="chip" data-filter="all" aria-pressed="true">ALL</button>
+      ${filters.map(f => `<button class="chip" data-filter="${esc(f.id)}" aria-pressed="false">${esc(f.label.toUpperCase())}</button>`).join('')}
+      <button class="chip spoil" id="spoiltoggle" aria-pressed="${spoilersOn()}">SPOILERS ${spoilersOn() ? 'ON' : 'OFF'}</button>
+    </div>` : `
+    <div class="chips">
+      <button class="chip spoil" id="spoiltoggle" aria-pressed="${spoilersOn()}">SPOILERS ${spoilersOn() ? 'ON' : 'OFF'}</button>
+    </div>`;
+
+  app.innerHTML = `
+    <a class="backlink" href="#/">‹ ALL TITLES</a>
+    <h1>${esc(t.title)}</h1>
+    ${t.byline ? `<div class="byline">${esc(t.byline)}</div>` : ''}
+    ${t.blurb ? `<p class="blurb">${esc(t.blurb)}</p>` : ''}
+    <div id="controls">
+      <input class="search" id="search" type="search" placeholder="Filter names…"
+             autocomplete="off" autocorrect="off" spellcheck="false">
+      ${chips}
+    </div>
+    <div class="section">
+      <h2>CHARACTERS</h2>
+      <div class="hint">MOST IMPORTANT FIRST · TAP FOR DETAIL</div>
+      <div class="list" id="charlist"></div>
+    </div>
+    ${(t.places || []).length ? `
+    <div class="section">
+      <h2>PLACES</h2>
+      <div class="hint">SETTINGS, LANDMARKS AND TERMS WORTH LOOKING UP</div>
+      <div class="list" id="placelist"></div>
+    </div>` : ''}
+    <footer>${esc(t.footnote || 'Details written from published summaries — spoilers stay folded until tapped.')}</footer>`;
+
+  const search = document.getElementById('search');
+  search.addEventListener('input', () => { query = search.value.trim().toLowerCase(); paintLists(t); });
+
+  app.querySelectorAll('.chip[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      filter = btn.dataset.filter;
+      app.querySelectorAll('.chip[data-filter]').forEach(b =>
+        b.setAttribute('aria-pressed', String(b.dataset.filter === filter)));
+      paintLists(t);
+    });
+  });
+
+  const sp = document.getElementById('spoiltoggle');
+  sp.addEventListener('click', () => {
+    const next = !spoilersOn();
+    localStorage.setItem('cl-spoilers', next ? '1' : '0');
+    sp.setAttribute('aria-pressed', String(next));
+    sp.textContent = 'SPOILERS ' + (next ? 'ON' : 'OFF');
+    if (!shade.hidden) route();   // repaint an open dialog with the new setting
+  });
+
+  paintLists(t);
+}
+
+function matches(entry) {
+  if (filter !== 'all' && !(entry.tags || []).includes(filter)) return false;
+  if (!query) return true;
+  const hay = [entry.name, entry.aka, entry.role, entry.actor].filter(Boolean).join(' ').toLowerCase();
+  return hay.includes(query);
+}
+
+function paintLists(t) {
+  paintList(document.getElementById('charlist'), t.characters || [], 'c');
+  paintList(document.getElementById('placelist'), t.places || [], 'p');
+}
+
+function paintList(host, entries, kind) {
+  if (!host) return;
+  const shown = entries.filter(matches);
+  if (!shown.length) { host.innerHTML = `<div class="norows">Nothing matches.</div>`; return; }
+  host.innerHTML = shown.map(e => `
+    <a class="row" href="#/${esc(curSlug)}/${kind}/${esc(idOf(e))}">
+      <span class="mono" style="${faceStyle(e)}">${e.img ? '' : esc(initials(e.name))}</span>
+      <span class="rname">${esc(e.name)}</span>
+      <span class="chev">›</span>
+    </a>`).join('');
+  host.querySelectorAll('.row').forEach(r =>
+    r.addEventListener('click', () => { openedInApp = true; }));
+}
+
+/* ---------- dialog ---------- */
+
+function openDialog(t, e, kind) {
+  const tagLabels = (e.tags || []).map(id => {
+    const f = (t.filters || []).find(x => x.id === id);
+    return f ? f.label : id;
+  });
+
+  const spoilerBlock = e.spoiler ? `
+    <div class="spoiler" data-open="${spoilersOn()}">
+      <button type="button">⚠ SPOILER — TAP TO ${spoilersOn() ? 'HIDE' : 'REVEAL'}</button>
+      <div>${paras(e.spoiler)}</div>
+    </div>` : '';
+
+  dbody.innerHTML = `
+    <div class="portrait" style="${faceStyle(e)}">
+      ${e.img ? '' : `<span class="big">${esc(initials(e.name))}</span>`}
+    </div>
+    <div class="dpad">
+      <div class="dname" id="dlg-name">${esc(e.name)}</div>
+      ${e.aka ? `<div class="daka">${esc(e.aka)}</div>` : ''}
+      ${e.role ? `<div class="drole">${esc(e.role)}</div>` : ''}
+      ${e.actor ? `<div class="dactor">Played by <b>${esc(e.actor)}</b></div>` : ''}
+      ${tagLabels.length ? `<div class="dtags">${tagLabels.map(l => `<span class="dtag">${esc(l.toUpperCase())}</span>`).join('')}</div>` : ''}
+      ${e.detail ? `<div class="ddiv"></div><div class="ddetail">${paras(e.detail)}</div>` : ''}
+      ${(e.facts || []).length ? `<ul class="dfacts">${e.facts.map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+      ${spoilerBlock}
+    </div>`;
+
+  const sp = dbody.querySelector('.spoiler');
+  if (sp) sp.querySelector('button').addEventListener('click', () => {
+    const open = sp.dataset.open !== 'true';
+    sp.dataset.open = String(open);
+    sp.querySelector('button').textContent = '⚠ SPOILER — TAP TO ' + (open ? 'HIDE' : 'REVEAL');
+  });
+
+  shade.hidden = false;
+  document.body.classList.add('locked');
+  dbody.scrollTop = 0;
+  document.getElementById('dclose').focus({ preventScroll: true });
+}
+
+/** silent=true just tears the dialog down; otherwise it also walks history back. */
+function closeDialog(silent) {
+  if (shade.hidden) return;
+  shade.hidden = true;
+  dbody.innerHTML = '';
+  document.body.classList.remove('locked');
+  if (silent) { openedInApp = false; return; }
+  if (openedInApp) { openedInApp = false; history.back(); }
+  else go('#/' + curSlug);
+}
+
+document.getElementById('dclose').addEventListener('click', () => closeDialog(false));
+shade.addEventListener('click', ev => { if (ev.target === shade) closeDialog(false); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !shade.hidden) closeDialog(false); });
+
+/* ---------- boot ---------- */
+
+/* Data files are plain scripts (no fetch) so the app also runs from file://. */
+(function boot() {
+  const slugs = window.CL_TITLES || [];
+  let left = slugs.length;
+  if (!left) { route(); return; }
+  slugs.forEach(slug => {
+    const s = document.createElement('script');
+    s.src = 'data/' + slug + '.js';
+    s.onload = s.onerror = () => { if (--left === 0) route(); };
+    document.head.appendChild(s);
+  });
+})();
+</script>
+</body>
+</html>
