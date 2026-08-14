@@ -179,4 +179,25 @@ tweak never fights a mechanics regression:
   intro schedule, continuous flow, level retry + rollback, tree gating, touch
   drag-place and panel taps, persistence, scoreboard, curve shape.
 - `.claude/tests/eval-grid-defense.cjs` — balance and pacing, via strategy
-  personas played over the real campaign.
+  personas played over the real campaign. Personas are **data**
+  (`.claude/tests/strategies/`, schema in that folder's README), so a subagent
+  can author them and hunt for exploits; `--strategy f.json`, `--only NAME`,
+  `--curve <levelGrowth>,<waveGrowth>` and `--json` are the knobs. Each run
+  takes 1-3 seconds, so sweeping is cheap.
+
+Measured at `HP_LEVEL = 1.90` with a 3-retry cap — these are the campaign's
+difficulty *claims*, and the eval fails if they stop being true:
+
+| persona | outcome |
+| --- | --- |
+| coherent build | clears all ten |
+| no skills at all | clears 3, cannot pass 4 |
+| poor skill selection | clears 4, cannot pass 5 |
+| crowd every turret at the exit | stalls at 6 |
+| one-note PULSE, never upgrade | stalls at 9 |
+| never buy an armory tier | stalls at 9 |
+
+A ceiling worth knowing before re-tuning: pushing the no-skills stall down to
+level 3 while a good build still clears ten needs the trees to be worth ~150×,
+which makes towers nearly irrelevant. 1.90 is the last point before the good
+build stops clearing.
