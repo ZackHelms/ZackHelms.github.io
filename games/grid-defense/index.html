@@ -200,7 +200,7 @@ input[type=range]::-moz-range-thumb { width:20px; height:20px; border:0; border-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-14 22:51 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-14 23:14 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
@@ -310,32 +310,31 @@ const CREEPS = {
 
 /* --------------------------- DIFFICULTY CURVE -------------------------
    Tuned against the auto-player in .claude/tests/drive-grid-defense.cjs.  */
-// Wave HP grows on an ACCELERATING exponent, not a flat one. A flat rate
-// never bites: waves spread over ~60s, so a defence that holds at level 20
-// still holds at 100 with the same headroom. The quadratic term is what
-// turns the back half of the campaign into a real squeeze.
-let HP_A = 0.040, HP_B = 0.00027;   // tunable from the drive suite's sweep
-// Calibrated against .claude/tests/drive-grid-defense.cjs: the yardstick
-// auto-player (coverage-optimal placement, both build and upgrade levers, a
-// fixed skill order, and notably NO use of the COMMAND abilities) starts
-// leaking in the mid-70s and falls in the low-to-mid 80s. A player who
-// actually spends abilities and builds coherently has the headroom to reach
-// 100 — the intended shape, not an accident. Re-tuned when turret unlocks
-// became free (2026-08-10): handing over all four turrets by level 4 and
-// banking their cores made the same bot ~10 levels stronger.
-const HP_ENDLESS = 1.075;    // steeper still past level 100
+/* Wave HP is a SAWTOOTH, not one smooth ramp, and that is the whole pacing
+   design: waves harden steeply across a level, the boss is a spike on top,
+   and the next level opens far easier than that boss — but on a higher floor
+   than the level before it. A single monotonic curve was measured doing the
+   opposite of what it looked like: the board grows from empty to ~20 towers
+   inside a level while HP crept up ~4% a wave, so the FIRST waves of a level
+   were the dangerous ones and the boss was a formality.               */
+let HP_LEVEL = 1.90;    // per-level floor growth   (>1: each level harder)
+// 1.90 was swept with .claude/tests/eval-grid-defense.cjs (3-retry cap):
+// no-skills clears 3 and cannot pass 4, a poor skill selection clears 4 and
+// cannot pass 5, and a coherent build clears all ten. Push it higher and the
+// good build stops clearing before the bad one gets much worse.
+let HP_WAVE  = 1.26;    // per-wave growth in-level (> HP_LEVEL: next level opens easier)
+const HP_BOSS = 1.5;    // extra bump on the boss wave itself
 const SPD_GROWTH = 0.0032, SPD_CAP = 1.45;
 const CASH_BASE = 95, CASH_GROWTH = 1.028;
 /* Every difficulty and reward curve is a function of the GLOBAL wave index
-   (1..100 in the campaign, higher in endless). Because the curve is monotonic
-   in that index and bosses land on every tenth wave, the pacing the CD asked
-   for falls out for free: waves harden across a level, the boss is a spike,
-   and the next level opens easier than that boss but harder than the level
-   before it.                                                              */
-function hpCurve(x) { return Math.exp(HP_A * x + HP_B * x * x); }
+   (1..100 in the campaign, higher in endless).                          */
+function levelOfWave(gw) { return Math.floor((gw - 1) / WAVES_PER_LEVEL) + 1; }
+function waveInLevel(gw) { return ((gw - 1) % WAVES_PER_LEVEL) + 1; }
 function hpMulFor(gw) {
-  if (gw <= TOTAL_WAVES) return hpCurve(gw - 1);
-  return hpCurve(TOTAL_WAVES - 1) * Math.pow(HP_ENDLESS, gw - TOTAL_WAVES);
+  const L = levelOfWave(gw), w = waveInLevel(gw);
+  let m = Math.pow(HP_LEVEL, L - 1) * Math.pow(HP_WAVE, w - 1);
+  if (w === WAVES_PER_LEVEL) m *= HP_BOSS;
+  return m;
 }
 function spdMulFor(gw) { return Math.min(SPD_CAP, 1 + SPD_GROWTH * (gw - 1)); }
 function isBossWave(gw) { return gw % WAVES_PER_LEVEL === 0; }
@@ -538,51 +537,51 @@ const TIER_PT = [0, 1, 1, 2, 2, 3];   // skill-point cost of one rank, by tier
 const TREES = [
   { id:'offense', name:'OFFENSE', col:'#ff2244', blurb:'Kill faster. Precision on the left, ordnance on the right.', nodes:[
     { id:'drill', name:'WEAPONS DRILL', ic:'🎯', tier:1, row:2, req:[], max:5,
-      info:'+5% damage from every tower, per rank.', eff:(S,r)=>{ S.dmgAll *= 1 + 0.05*r; } },
+      info:'+9% damage from every tower, per rank.', eff:(S,r)=>{ S.dmgAll *= 1 + 0.09*r; } },
 
     { id:'focus', name:'FOCUSED FIRE', ic:'🔻', tier:2, row:0, req:['drill'], max:4,
-      info:'+9% damage from single-target towers (PULSE, RAIL), per rank.', eff:(S,r)=>{ S.dmgSingle *= 1 + 0.09*r; } },
+      info:'+16% damage from single-target towers (PULSE, RAIL), per rank.', eff:(S,r)=>{ S.dmgSingle *= 1 + 0.16*r; } },
     { id:'velocity', name:'CYCLE RATE', ic:'⚡', tier:2, row:2, req:['drill'], max:5,
-      info:'+4% fire rate on every tower, per rank.', eff:(S,r)=>{ S.rate *= 1 + 0.04*r; } },
+      info:'+7% fire rate on every tower, per rank.', eff:(S,r)=>{ S.rate *= 1 + 0.07*r; } },
     { id:'ordnance', name:'ORDNANCE', ic:'💥', tier:2, row:4, req:['drill'], max:4,
-      info:'+9% splash damage (NOVA), per rank.', eff:(S,r)=>{ S.dmgSplash *= 1 + 0.09*r; } },
+      info:'+16% splash damage (NOVA), per rank.', eff:(S,r)=>{ S.dmgSplash *= 1 + 0.16*r; } },
 
     { id:'crit', name:'CRITICAL ARRAY', ic:'✳️', tier:3, row:0, req:['focus'], max:5,
-      info:'+4% chance per shot to crit for 2.5x damage, per rank.', eff:(S,r)=>{ S.crit += 0.04*r; } },
+      info:'+7% chance per shot to crit for 2.5x damage, per rank.', eff:(S,r)=>{ S.crit += 0.07*r; } },
     { id:'pierce', name:'OVERPENETRATION', ic:'➳', tier:3, row:1, req:['focus'], max:2,
       info:'RAIL slugs punch through 1 extra target, per rank.', eff:(S,r)=>{ S.pierce += r; } },
     { id:'deadeye', name:'DEADEYE OPTICS', ic:'🔭', tier:3, row:2, req:['velocity'], max:4,
-      info:'+6% range on every tower, per rank.', eff:(S,r)=>{ S.range *= 1 + 0.06*r; } },
+      info:'+8% range on every tower, per rank.', eff:(S,r)=>{ S.range *= 1 + 0.08*r; } },
     { id:'wideblast', name:'WIDE BLAST', ic:'⭕', tier:3, row:3, req:['ordnance'], max:3,
-      info:'+9% splash radius, per rank.', eff:(S,r)=>{ S.splashRadius *= 1 + 0.09*r; } },
+      info:'+14% splash radius, per rank.', eff:(S,r)=>{ S.splashRadius *= 1 + 0.14*r; } },
     { id:'shrapnel', name:'SHRAPNEL', ic:'🔥', tier:3, row:4, req:['ordnance'], max:3,
-      info:'Hits set a burn worth 10% of the hit per second, per rank.', eff:(S,r)=>{ S.burn += 0.10*r; } },
+      info:'Hits set a burn worth 18% of the hit per second, per rank.', eff:(S,r)=>{ S.burn += 0.18*r; } },
 
     { id:'execute', name:'EXECUTIONER', ic:'☠️', tier:4, row:0, req:['crit'], max:3,
-      info:'+12% damage to targets under 35% health, per rank.', eff:(S,r)=>{ S.execute += 0.12*r; } },
+      info:'+20% damage to targets under 35% health, per rank.', eff:(S,r)=>{ S.execute += 0.20*r; } },
     { id:'armorpen', name:'ARMOUR PIERCING', ic:'🗡️', tier:4, row:1, req:['pierce','crit'], max:4,
-      info:'Ignore 3 points of enemy armour, per rank.', eff:(S,r)=>{ S.armorPen += 3*r; } },
+      info:'Ignore 5 points of enemy armour, per rank.', eff:(S,r)=>{ S.armorPen += 5*r; } },
     { id:'marksman', name:'MARKSMAN', ic:'🎖️', tier:4, row:2, req:['deadeye'], max:3,
-      info:'+18% RAIL damage, per rank.', eff:(S,r)=>{ S.dmgType.rail *= 1 + 0.18*r; } },
+      info:'+28% RAIL damage, per rank.', eff:(S,r)=>{ S.dmgType.rail *= 1 + 0.28*r; } },
     { id:'concussive', name:'CONCUSSIVE', ic:'🌀', tier:4, row:3, req:['wideblast'], max:3,
       info:'Splash also slows everything it touches by 12% for 1s, per rank.', eff:(S,r)=>{ S.splashSlow += 0.12*r; } },
     { id:'incendiary', name:'INCENDIARY', ic:'🧨', tier:4, row:4, req:['shrapnel'], max:3,
-      info:'+6% burn strength and +1s burn duration, per rank.', eff:(S,r)=>{ S.burn += 0.06*r; S.burnDur += r; } },
+      info:'+10% burn strength and +1s burn duration, per rank.', eff:(S,r)=>{ S.burn += 0.10*r; S.burnDur += r; } },
 
     { id:'annihilation', name:'ANNIHILATION', ic:'★', tier:5, row:0, req:['execute','armorpen'], max:1, gate:12,
-      info:'CAPSTONE — every tower deals +35% damage.', eff:(S)=>{ S.dmgAll *= 1.35; } },
+      info:'CAPSTONE — every tower deals +65% damage.', eff:(S)=>{ S.dmgAll *= 1.65; } },
     { id:'hypervelocity', name:'HYPERVELOCITY', ic:'★', tier:5, row:2, req:['marksman'], max:1, gate:12,
-      info:'CAPSTONE — every tower fires 25% faster.', eff:(S)=>{ S.rate *= 1.25; } },
+      info:'CAPSTONE — every tower fires 45% faster.', eff:(S)=>{ S.rate *= 1.45; } },
     { id:'firestorm', name:'FIRESTORM', ic:'★', tier:5, row:4, req:['concussive','incendiary'], max:1, gate:12,
-      info:'CAPSTONE — splash damage +50% and splash radius +30%.', eff:(S)=>{ S.dmgSplash *= 1.5; S.splashRadius *= 1.3; } },
+      info:'CAPSTONE — splash damage +85% and splash radius +35%.', eff:(S)=>{ S.dmgSplash *= 1.85; S.splashRadius *= 1.35; } },
   ]},
 
   { id:'engineering', name:'ENGINEERING', col:'#ffc300', blurb:'More money, cheaper steel, better instruments.', nodes:[
     { id:'logistics', name:'LOGISTICS', ic:'📦', tier:1, row:2, req:[], max:5,
-      info:'+6% starting cash each level, per rank.', eff:(S,r)=>{ S.startCash *= 1 + 0.06*r; } },
+      info:'+10% starting cash each level, per rank.', eff:(S,r)=>{ S.startCash *= 1 + 0.10*r; } },
 
     { id:'contracts', name:'BOUNTY CONTRACTS', ic:'💰', tier:2, row:0, req:['logistics'], max:5,
-      info:'+6% cash from every kill, per rank.', eff:(S,r)=>{ S.bounty *= 1 + 0.06*r; } },
+      info:'+10% cash from every kill, per rank.', eff:(S,r)=>{ S.bounty *= 1 + 0.10*r; } },
     { id:'salvage', name:'SALVAGE', ic:'♻️', tier:2, row:2, req:['logistics'], max:4,
       info:'+5% sell value, per rank (70% base).', eff:(S,r)=>{ S.sellPct += 0.05*r; } },
     { id:'prefab', name:'PREFAB PARTS', ic:'🔩', tier:2, row:4, req:['logistics'], max:5,
@@ -2402,8 +2401,8 @@ window.__GD = {
   actionRects: () => actionBtns,
   panelRects: () => panelBtns,
   abilityRects: () => abilityRects.map(r => ({ id: r.ab.id, x: r.x, y: r.y, w: r.w, h: r.h })),
-  setCurve: (a, b) => { HP_A = a; HP_B = b; },   // balance-sweep hook
-  curve: () => ({ HP_A, HP_B }),
+  setCurve: (lvl, wav) => { HP_LEVEL = lvl; HP_WAVE = wav; },   // balance-sweep hook
+  curve: () => ({ HP_LEVEL, HP_WAVE, HP_BOSS }),
   pathSamples: n => {
     const out = [];
     for (let i = 0; i <= n; i++) out.push(posAt(totalLen * i / n));

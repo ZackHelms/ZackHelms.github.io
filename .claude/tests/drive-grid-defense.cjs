@@ -303,15 +303,24 @@ function check(name, cond, extra) {
     }
     return out;
   });
-  const normals = curve.filter(c => !c.boss), bosses = curve.filter(c => c.boss);
+  const hp = gw => curve[gw - 1].hp;
   check('every wave has creeps', curve.every(c => c.n > 0));
-  check('wave HP rises on every ordinary wave',
-    normals.every((c, i) => i === 0 || c.hp > normals[i - 1].hp),
-    normals.filter((c, i) => i > 0 && c.hp <= normals[i - 1].hp).slice(0, 3));
-  check('wave HP rises on every boss wave',
-    bosses.every((c, i) => i === 0 || c.hp > bosses[i - 1].hp));
-  check('each boss out-spikes the wave before it',
-    bosses.every(b => b.hp > curve[b.gw - 2].hp), bosses.filter(b => b.hp <= curve[b.gw - 2].hp).map(b => b.gw));
+  // The pacing the CD asked for, stated three ways:
+  let risesInLevel = [], opensEasier = [], levelHarder = [];
+  for (let L = 1; L <= 10; L++) {
+    const base = (L - 1) * 10;
+    for (let w = 2; w <= 10; w++) if (hp(base + w) <= hp(base + w - 1)) risesInLevel.push(base + w);
+    if (L > 1) {
+      if (hp(base + 1) >= hp(base)) opensEasier.push(L);            // vs the boss it follows
+      if (hp(base + 1) <= hp(base - 9)) levelHarder.push(L);        // vs the level before it
+    }
+  }
+  check('waves harden across every level, up to the boss', risesInLevel.length === 0, risesInLevel.slice(0, 4));
+  check('each level opens EASIER than the boss it follows', opensEasier.length === 0, opensEasier);
+  check('...but harder than the level before it opened', levelHarder.length === 0, levelHarder);
+  check('the boss is a spike over its own level\'s wave 9',
+    [1,2,3,4,5,6,7,8,9,10].every(L => hp(L * 10) > hp(L * 10 - 1)));
+  check('the campaign ends far harder than it starts', hp(100) / hp(1) > 200, Math.round(hp(100) / hp(1)));
   check('ten levels map to ten distinct maps', await page.evaluate(() => {
     const seen = new Set();
     for (let L = 1; L <= 10; L++) seen.add(window.__GD.MAPS[(L - 1) % window.__GD.MAPS.length].name);
