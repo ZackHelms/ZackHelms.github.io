@@ -200,7 +200,7 @@ input[type=range]::-moz-range-thumb { width:20px; height:20px; border:0; border-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-10 20:25 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-14 22:51 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
@@ -210,12 +210,23 @@ input[type=range]::-moz-range-thumb { width:20px; height:20px; border:0; border-
 'use strict';
 /* ============================== CONSTANTS ============================== */
 const COLS = 9, ROWS = 13;
-const FINAL_LEVEL = 100;
+// A LEVEL is one map and ten escalating waves ending in a boss. Ten levels
+// make the campaign, so the run is still 100 waves of content — but the
+// retry unit is the level, and the board persists across its ten waves,
+// which is what makes upgrading a placed tower worth doing.
+const WAVES_PER_LEVEL = 10;
+const CAMPAIGN_LEVELS = 10;
+const TOTAL_WAVES = WAVES_PER_LEVEL * CAMPAIGN_LEVELS;
 const BASE_LIVES = 20;
-const SCORE_KEY = 'gridDefense.v2.scores';
-const SET_KEY   = 'gridDefense.v2.settings';
-const AUTO_KEY  = 'gridDefense.v2.auto';
-const SLOT_KEY  = i => 'gridDefense.v2.slot' + i;
+// Continuous action: nothing waits on a tap. These are the only pauses.
+const GRACE_T = 7.0;    // build window at the start of a level
+const GAP_T   = 2.5;    // between waves inside a level
+const LEVEL_T = 2.0;    // between levels (the CD asked for two seconds)
+const FAIL_T  = 2.4;    // failed-level toast before the retry
+const SCORE_KEY = 'gridDefense.v3.scores';
+const SET_KEY   = 'gridDefense.v3.settings';
+const AUTO_KEY  = 'gridDefense.v3.auto';
+const SLOT_KEY  = i => 'gridDefense.v3.slot' + i;
 const SLOTS = 3;
 
 /* ------------------------------- MAPS ---------------------------------
@@ -273,8 +284,11 @@ const TOWER_ORDER = ['pulse','nova','frost','rail'];
 // rather than agonising over an economy. Upgrades arrive later — armory tiers
 // and the skill trees both open at level 5 — so nothing competes with an
 // unlock while the player is still meeting the arsenal.
-const TURRET_LEVEL = { pulse:1, nova:2, frost:3, rail:4 };
-const ARMORY_LEVEL = 5;
+// Levels are ~10x longer now, so the introduction is measured in WAVES:
+// the whole arsenal and the meta-game arrive inside level 1 rather than
+// making the player wait twenty minutes for the sniper.
+const TURRET_WAVE = { pulse:1, nova:2, frost:3, rail:4 };
+const ARMORY_WAVE = 5;
 const MAX_TIER = 8;
 const tierCost = t => 2 + 2 * t;              // cores to go from tier t to t+1
 const TIER_DMG = 0.20, TIER_RANGE = 0.05, TIER_RATE = 0.06;
@@ -288,7 +302,10 @@ const CREEPS = {
   armor:  { name:'PLATED', hp:70,  spd:48,  bounty:16, r:12, col:'#9fb3d9', shape:'oct', arm:6 },
   split:  { name:'SEEDER', hp:44,  spd:56,  bounty:14, r:11, col:'#ff5cf0', shape:'hex', splits:2 },
   healer: { name:'MENDER', hp:66,  spd:52,  bounty:20, r:11, col:'#2ee6a8', shape:'cross', heal:0.05 },
-  boss:   { name:'WARDEN', hp:520, spd:33,  bounty:70, r:16, col:'#ff2244', shape:'star', arm:4, leak:3 },
+  // The WARDEN was flatly unkillable next to the creeps before it: 520 base HP
+  // AND 4 armour, which alone ate ~40% of an early PULSE shot. Softer body,
+  // half the armour, and a fatter bounty so killing it funds the next level.
+  boss:   { name:'WARDEN', hp:300, spd:33,  bounty:90, r:16, col:'#ff2244', shape:'star', arm:2, leak:3 },
 };
 
 /* --------------------------- DIFFICULTY CURVE -------------------------
@@ -309,16 +326,26 @@ let HP_A = 0.040, HP_B = 0.00027;   // tunable from the drive suite's sweep
 const HP_ENDLESS = 1.075;    // steeper still past level 100
 const SPD_GROWTH = 0.0032, SPD_CAP = 1.45;
 const CASH_BASE = 95, CASH_GROWTH = 1.028;
+/* Every difficulty and reward curve is a function of the GLOBAL wave index
+   (1..100 in the campaign, higher in endless). Because the curve is monotonic
+   in that index and bosses land on every tenth wave, the pacing the CD asked
+   for falls out for free: waves harden across a level, the boss is a spike,
+   and the next level opens easier than that boss but harder than the level
+   before it.                                                              */
 function hpCurve(x) { return Math.exp(HP_A * x + HP_B * x * x); }
-function hpMulFor(L) {
-  if (L <= FINAL_LEVEL) return hpCurve(L - 1);
-  return hpCurve(FINAL_LEVEL - 1) * Math.pow(HP_ENDLESS, L - FINAL_LEVEL);
+function hpMulFor(gw) {
+  if (gw <= TOTAL_WAVES) return hpCurve(gw - 1);
+  return hpCurve(TOTAL_WAVES - 1) * Math.pow(HP_ENDLESS, gw - TOTAL_WAVES);
 }
-function spdMulFor(L) { return Math.min(SPD_CAP, 1 + SPD_GROWTH * (L - 1)); }
-function startCashFor(L) { return Math.round(CASH_BASE * Math.pow(CASH_GROWTH, L - 1)); }
-function coresFor(L) { return 2 + Math.floor(L / 15) + (L % 10 === 0 ? 1 : 0); }
-function skillPtsFor(L) { return L < 5 ? 0 : 1 + (L % 10 === 0 ? 2 : 0); }   // 5 == ARMORY_LEVEL
-function mapIndexFor(L) { return Math.floor((L - 1) / 10) % MAPS.length; }
+function spdMulFor(gw) { return Math.min(SPD_CAP, 1 + SPD_GROWTH * (gw - 1)); }
+function isBossWave(gw) { return gw % WAVES_PER_LEVEL === 0; }
+// Cash opens a LEVEL, then compounds through its ten waves from bounties.
+function startCashFor(level) {
+  return Math.round(CASH_BASE * Math.pow(CASH_GROWTH, (level - 1) * WAVES_PER_LEVEL));
+}
+function coresForWave(gw) { return 2 + Math.floor(gw / 15) + (isBossWave(gw) ? 1 : 0); }
+function skillPtsForWave(gw) { return gw < ARMORY_WAVE ? 0 : 1 + (isBossWave(gw) ? 2 : 0); }
+function mapIndexFor(level) { return (level - 1) % MAPS.length; }
 const RESEARCH_COST = 5;     // cores -> 1 skill point
 
 /* ------------------------------- RNG ---------------------------------- */
@@ -337,12 +364,12 @@ const ui = document.getElementById('ui');
 let W = 0, H = 0, dpr = 1, safeTop = 0, safeBot = 0;
 let boardX = 0, boardY = 0, cell = 42;
 let state = 'menu';             // menu | play | dead
-let phase = 'prep';             // prep | wave  (only meaningful while state==='play')
+let phase = 'grace';            // grace | wave | gap | levelclear | failed
 let run = null;                 // the campaign run (see newRun)
 let S = null;                   // computed skill stat bag
 let cash = 0;
 let towers = [], creeps = [], spawnQueue = [], spawnList = [], beams = [], floats = [];
-let waveT = 0, levelLeaks = 0, levelKills = 0;
+let waveT = 0, phaseT = 0, levelLeaks = 0, levelKills = 0;
 let selTower = null, dragCard = null, dragPos = null;
 let shake = 0, speed = 1, aimAbility = null;
 let pathCells = new Set(), blockedCells = new Set(), segs = [], totalLen = 0, mapIdx = 0;
@@ -693,31 +720,55 @@ function computeStats() {
 /* ============================ RUN LIFECYCLE =========================== */
 function newRun() {
   const armory = {};
-  for (const k of TOWER_ORDER) armory[k] = { owned: TURRET_LEVEL[k] <= 1, tier: 0 };
+  for (const k of TOWER_ORDER) armory[k] = { owned: TURRET_WAVE[k] <= 1, tier: 0 };
   return {
-    ver: 2, level: 1, lives: BASE_LIVES, score: 0, cores: 0, sp: 0,
-    armory, skills: {}, endless: false, started: Date.now(),
+    ver: 3, level: 1, wave: 1, lives: BASE_LIVES,
+    score: 0,          // banked — only levels actually CLEARED contribute
+    levelScore: 0,     // this attempt; discarded if the level is failed
+    cores: 0, sp: 0, armory, skills: {},
+    endless: false, started: Date.now(), retries: 0,
     levelsCleared: 0, leaksTotal: 0, killsTotal: 0, recorded: false,
   };
 }
-// Hands over every turret the player has reached the level for. Returns the
-// ones that are new so the level-clear screen can introduce them.
-function applyTurretUnlocks(L) {
+function globalWave() { return (run.level - 1) * WAVES_PER_LEVEL + run.wave; }
+// Hands over every turret the run has reached the wave for.
+function applyTurretUnlocks(gw) {
   const gained = [];
   for (const k of TOWER_ORDER) {
-    if (!run.armory[k].owned && L >= TURRET_LEVEL[k]) { run.armory[k].owned = true; gained.push(k); }
+    if (!run.armory[k].owned && gw >= TURRET_WAVE[k]) { run.armory[k].owned = true; gained.push(k); }
   }
   return gained;
 }
-function armoryOpen() { return run.level >= ARMORY_LEVEL; }
+function armoryOpen() { return globalWave() >= ARMORY_WAVE; }
 function maxLives() { return BASE_LIVES + (S ? S.maxLives : 0); }
 function lastStandActive() { return S.lastStand && run.lives <= 5; }
-let pendingStart = false;   // true between a level clear and the next deploy
+
+/* A failed level is rolled back WHOLE — score, cores, skill points and the
+   armory all return to how they stood when the level opened. Without that,
+   a patient player farms a level for cores, dies on purpose, and keeps them. */
+let levelSnapshot = null;
+function takeLevelSnapshot() {
+  levelSnapshot = JSON.stringify({
+    score: run.score, cores: run.cores, sp: run.sp,
+    armory: run.armory, skills: run.skills,
+    killsTotal: run.killsTotal, leaksTotal: run.leaksTotal,
+  });
+}
+function restoreLevelSnapshot() {
+  if (!levelSnapshot) return;
+  const s = JSON.parse(levelSnapshot);
+  run.score = s.score; run.cores = s.cores; run.sp = s.sp;
+  run.armory = s.armory; run.skills = s.skills;
+  run.killsTotal = s.killsTotal; run.leaksTotal = s.leaksTotal;
+  computeStats();
+}
+
+let pendingStart = false;   // true between a level clear and the next level
 function serializeRun() {
   if (pendingStart) return { run: run, level: { pending: true }, stamp: Date.now() };
   return {
     run: run,
-    level: { cash, phase, waveT, levelLeaks, levelKills,
+    level: { cash, phase, phaseT, waveT, levelLeaks, levelKills, snapshot: levelSnapshot,
       towers: towers.map(t => ({ type:t.type, r:t.r, c:t.c, lvl:t.lvl, spent:t.spent, mode:t.mode })),
       creeps: creeps.map(c => ({ type:c.type, hp:c.hp, maxHp:c.maxHp, d:c.d, off:c.off,
         slowT:c.slowT, slowStr:c.slowStr, elite:c.elite, armMul:c.armMul, burnT:c.burnT, burnDps:c.burnDps })),
@@ -732,9 +783,9 @@ function saveTo(key) { return writeJSON(key, serializeRun()); }
 function autosave() { saveTo(AUTO_KEY); }
 function restoreFrom(key) {
   const data = readJSON(key, null);
-  if (!data || !data.run || data.run.ver !== 2) return false;
+  if (!data || !data.run || data.run.ver !== 3) return false;
   run = data.run;
-  for (const k of TOWER_ORDER) if (!run.armory[k]) run.armory[k] = { owned: TURRET_LEVEL[k] <= run.level, tier: 0 };
+  for (const k of TOWER_ORDER) if (!run.armory[k]) run.armory[k] = { owned: false, tier: 0 };
   computeStats();
   loadMap(mapIndexFor(run.level));
   const L = data.level || {};
@@ -743,15 +794,16 @@ function restoreFrom(key) {
     startLevel(run.level);
     return true;
   }
+  levelSnapshot = L.snapshot || null;
   cash = L.cash || 0;
-  phase = L.phase === 'wave' ? 'wave' : 'prep';
+  phase = L.phase || 'grace'; phaseT = L.phaseT || 0;
   waveT = L.waveT || 0; levelLeaks = L.levelLeaks || 0; levelKills = L.levelKills || 0;
-  waveHpMul = L.hpMul || hpMulFor(run.level); waveSpdMul = L.spdMul || spdMulFor(run.level);
+  waveHpMul = L.hpMul || hpMulFor(globalWave()); waveSpdMul = L.spdMul || spdMulFor(globalWave());
   towers = (L.towers || []).map(t => ({ type:t.type, r:t.r, c:t.c, lvl:t.lvl||1, spent:t.spent||0, cd:0, mode:t.mode||'first', adj:0 }));
   recomputeAdjacency();
   creeps = (L.creeps || []).map(c => Object.assign({ dead:false, healT:0 }, c));
   spawnList = (L.spawnList || []).slice();
-  beams = []; floats = []; spawnQueue = []; selTower = null; dragCard = null; aimAbility = null;
+  beams = []; floats = []; toasts = []; spawnQueue = []; selTower = null; dragCard = null; aimAbility = null;
   overdriveT = 0; freezeT = 0; pendingStart = false;
   buildAbilities();
   const saved = L.abilities || [];
@@ -765,87 +817,131 @@ function restoreFrom(key) {
 }
 function hasSave(key) {
   const d = readJSON(key, null);
-  return d && d.run && d.run.ver === 2 ? d : null;
+  return d && d.run && d.run.ver === 3 ? d : null;
 }
 function startRun() {
+  cancelPendingGameOver();
   run = newRun();
   computeStats();
   run.lives = maxLives();
   state = 'play';
   startLevel(1);
 }
+/* Opens a level: fresh board, fresh cash, lives back to full. The armory,
+   the trees and the banked score are the only things that cross the line. */
 function startLevel(L) {
   run.level = L;
-  applyTurretUnlocks(L);
+  run.wave = 1;
+  run.levelScore = 0;
+  run.lives = maxLives();
+  applyTurretUnlocks(globalWave());
   computeStats();
+  takeLevelSnapshot();
   loadMap(mapIndexFor(L));
   cash = Math.round(startCashFor(L) * S.startCash);
-  towers = []; creeps = []; spawnList = []; beams = []; floats = []; spawnQueue = [];
+  towers = []; creeps = []; spawnList = []; beams = []; floats = []; spawnQueue = []; toasts = [];
   selTower = null; dragCard = null; dragPos = null; aimAbility = null;
   waveT = 0; levelLeaks = 0; levelKills = 0;
-  phase = 'prep'; pendingStart = false;
+  phase = 'grace'; phaseT = GRACE_T; pendingStart = false;
   overdriveT = 0; freezeT = 0;
-  waveHpMul = hpMulFor(L); waveSpdMul = spdMulFor(L);
+  waveHpMul = hpMulFor(globalWave()); waveSpdMul = spdMulFor(globalWave());
   buildAbilities();
   musicStep = 0;
   if (AC) musicNext = AC.currentTime + 0.1;
   resize();
   autosave();
+  toast('LEVEL ' + L + (L <= CAMPAIGN_LEVELS ? '/' + CAMPAIGN_LEVELS : ''), MAPS[mapIdx].name, '#39ff14', 2.4);
 }
-function readyWave() {
-  if (phase !== 'prep') return;
-  const built = buildWave(run.level);
+function startWave() {
+  applyTurretUnlocks(globalWave());
+  const built = buildWave(globalWave());
   spawnList = built.list;
   waveHpMul = built.hpMul; waveSpdMul = built.spd;
   waveT = 0; phase = 'wave';
-  selTower = null;
+  if (isBossWave(globalWave())) toast('WARDEN INBOUND', 'wave ' + run.wave + '/' + WAVES_PER_LEVEL, '#ff2244', 2.0);
   sfxHorn();
+}
+function completeWave() {
+  const gw = globalWave();
+  const gotCores = coresForWave(gw), gotSp = skillPtsForWave(gw);
+  run.cores += gotCores; run.sp += gotSp;
+  const waveScore = 40 * gw;
+  run.levelScore += waveScore;
+  if (S.interest > 0) cash += Math.round(cash * S.interest);
+  if (run.wave >= WAVES_PER_LEVEL) { completeLevel(); return; }
+  run.wave++;
+  applyTurretUnlocks(globalWave());
+  phase = 'gap'; phaseT = GAP_T;
+  toast('WAVE ' + (run.wave - 1) + ' CLEAR', '+' + fmtNum(waveScore) + '  ◆' + gotCores + (gotSp ? '  ★' + gotSp : ''), '#ffc300', 1.8);
+  autosave();
 }
 function completeLevel() {
   const L = run.level;
-  phase = 'clear';            // stops the wave-complete check re-firing
+  phase = 'levelclear'; phaseT = LEVEL_T;
   const noLeak = levelLeaks === 0;
-  const clearScore = 100 * L + (noLeak ? 60 * L : 0);
-  run.score += clearScore;
+  const clearBonus = 500 * L + (noLeak ? 300 * L : 0);
+  run.levelScore += clearBonus;
+  run.score += run.levelScore;          // banked at last
   run.levelsCleared++;
-  const gotCores = coresFor(L), gotSp = skillPtsFor(L);
-  run.cores += gotCores; run.sp += gotSp;
-  if (S.interest > 0) cash += Math.round(cash * S.interest);
+  const gained = run.levelScore;
+  run.levelScore = 0;
   sfxWin();
-  const won = L === FINAL_LEVEL && !run.endless;
-  run.level = L + 1;
-  if (L >= FINAL_LEVEL) run.endless = true;
-  const gained = applyTurretUnlocks(run.level);
+  toast('LEVEL ' + L + ' COMPLETE', '+' + fmtNum(gained) + ' pts' + (noLeak ? '  ·  FLAWLESS' : ''), '#39ff14', LEVEL_T + 0.6);
   pendingStart = true;
   autosave();
-  showLevelClear({ L, clearScore, noLeak, gotCores, gotSp, won, gained });
 }
-function endRun(reason) {
+function advanceLevel() {
+  const next = run.level + 1;
+  if (next > CAMPAIGN_LEVELS && !run.endless) { showVictory(); return; }
+  startLevel(next);
+}
+/* Out of lives. In the campaign that costs the attempt, not the run —
+   the level rolls back and replays as many times as it takes. Endless is
+   the high-score chase, so there a death really does end it.             */
+function failLevel() {
+  if (run.endless) { endRun(); return; }
+  run.retries++;
+  run.levelScore = 0;
+  restoreLevelSnapshot();
+  phase = 'failed'; phaseT = FAIL_T;
+  creeps = []; spawnList = []; spawnQueue = [];
+  sfxLose();
+  toast('LEVEL ' + run.level + ' FAILED', 'retrying — attempt ' + (run.retries + 1), '#ff2244', FAIL_T + 0.4);
+}
+let overTimer = null;
+// The game-over screen is deferred so the death registers on screen first.
+// Anything that starts a new run has to cancel it, or the pending screen
+// pops over the fresh run a moment later.
+function cancelPendingGameOver() {
+  if (overTimer) { clearTimeout(overTimer); overTimer = null; }
+}
+function endRun() {
   state = 'dead';
   sfxLose();
   if (!run.recorded) {
     run.recorded = true;
     run.score += 200 * Math.max(0, run.lives);
-    addScore({ ts: Date.now(), level: run.level, score: Math.round(run.score),
-      won: run.levelsCleared >= FINAL_LEVEL, endless: !!run.endless });
+    addScore({ ts: Date.now(), level: run.level, wave: globalWave(), score: Math.round(run.score),
+      retries: run.retries, won: run.levelsCleared >= CAMPAIGN_LEVELS, endless: !!run.endless });
   }
   try { localStorage.removeItem(AUTO_KEY); } catch (e) {}
-  setTimeout(() => showGameOver(reason), 700);
+  cancelPendingGameOver();
+  overTimer = setTimeout(() => { overTimer = null; showGameOver(); }, 700);
 }
 
 /* =============================== WAVES ================================ */
 let waveHpMul = 1, waveSpdMul = 1;
-function bountyScale(L) { return 1 + 0.012 * (L - 1); }
-function waveCounts(L) {
+function bountyScale(gw) { return 1 + 0.012 * (gw - 1); }
+function waveCounts(gw) {
   const cap = (v, m) => Math.max(0, Math.min(m, v));
   return {
-    runt:   cap(5 + Math.floor(L * 0.42), 26),
-    fast:   L >= 3  ? cap(1 + Math.floor((L - 2) * 0.30), 20) : 0,
-    brute:  L >= 5  ? cap(1 + Math.floor((L - 4) * 0.17), 14) : 0,
-    swarm:  L >= 6  ? cap(4 + Math.floor((L - 5) * 0.34), 30) : 0,
-    armor:  L >= 12 ? cap(1 + Math.floor((L - 11) * 0.15), 12) : 0,
-    split:  L >= 18 ? cap(1 + Math.floor((L - 17) * 0.11), 9) : 0,
-    healer: L >= 26 ? cap(1 + Math.floor((L - 25) * 0.055), 5) : 0,
+    runt:   cap(5 + Math.floor(gw * 0.42), 26),
+    fast:   gw >= 3  ? cap(1 + Math.floor((gw - 2) * 0.30), 20) : 0,
+    brute:  gw >= 5  ? cap(1 + Math.floor((gw - 4) * 0.17), 14) : 0,
+    swarm:  gw >= 6  ? cap(4 + Math.floor((gw - 5) * 0.34), 30) : 0,
+    armor:  gw >= 12 ? cap(1 + Math.floor((gw - 11) * 0.15), 12) : 0,
+    split:  gw >= 18 ? cap(1 + Math.floor((gw - 17) * 0.11), 9) : 0,
+    healer: gw >= 26 ? cap(1 + Math.floor((gw - 25) * 0.055), 5) : 0,
   };
 }
 const GROUP_PLAN = {
@@ -857,13 +953,13 @@ const GROUP_PLAN = {
   split:  { gap:1.10, start:12.0 },
   healer: { gap:2.20, start:6.0 },
 };
-function buildWave(L) {
-  const rng = mulberry32(9176 + L * 7919);
-  const hpMul = hpMulFor(L), spd = spdMulFor(L);
-  const boss = L % 10 === 0;
-  const counts = waveCounts(L);
+function buildWave(gw) {
+  const rng = mulberry32(9176 + gw * 7919);
+  const hpMul = hpMulFor(gw), spd = spdMulFor(gw);
+  const boss = isBossWave(gw);
+  const counts = waveCounts(gw);
   if (boss) for (const k of Object.keys(counts)) counts[k] = Math.round(counts[k] * 0.72);
-  const eliteChance = L >= 40 ? Math.min(0.45, (L - 39) * 0.012) : 0;
+  const eliteChance = gw >= 40 ? Math.min(0.45, (gw - 39) * 0.012) : 0;
   const list = [];
   for (const type of Object.keys(counts)) {
     const n = counts[type]; if (!n) continue;
@@ -881,9 +977,9 @@ function buildWave(L) {
     }
   }
   if (boss) {
-    const nb = 1 + (L >= 50 ? 1 : 0) + (L >= 80 ? 1 : 0) + (L > FINAL_LEVEL ? Math.floor((L - FINAL_LEVEL) / 15) : 0);
+    const nb = 1 + (gw >= 50 ? 1 : 0) + (gw >= 80 ? 1 : 0) + (gw > TOTAL_WAVES ? Math.floor((gw - TOTAL_WAVES) / 15) : 0);
     let t = 2.0;
-    for (let i = 0; i < nb; i++) { list.push({ t, type:'boss', elite: L >= 60 }); t += 6; }
+    for (let i = 0; i < nb; i++) { list.push({ t, type:'boss', elite: gw >= 60 }); t += 6; }
   }
   list.sort((a, b) => a.t - b.t);
   return { list, hpMul, spd };
@@ -934,7 +1030,8 @@ function towerRange(t) {
 }
 function buildCostOf(type) { return Math.max(5, Math.round(TOWERS[type].cost * S.buildCost)); }
 function upCostOf(t) { return Math.max(5, Math.round(TOWERS[t.type].cost * 0.8 * t.lvl * S.upCost)); }
-function sellValueOf(t) { return Math.round(t.spent * (phase === 'prep' && S.reclaim ? 1 : S.sellPct)); }
+const buildLull = () => phase === 'grace' || phase === 'gap';
+function sellValueOf(t) { return Math.round(t.spent * (buildLull() && S.reclaim ? 1 : S.sellPct)); }
 function creepPos(c) {
   const p = posAt(c.d);
   return { x: p.x + c.off * 0.5, y: p.y + c.off * 0.5 };
@@ -964,10 +1061,10 @@ function killCreep(c) {
   if (c.dead) return;
   c.dead = true;
   const def = CREEPS[c.type];
-  const b = Math.round((def.bounty * bountyScale(run.level) * S.bounty) + S.perKill);
+  const b = Math.round((def.bounty * bountyScale(globalWave()) * S.bounty) + S.perKill);
   cash += b;
   levelKills++; run.killsTotal++;
-  run.score += Math.round(def.bounty * (1 + 0.06 * run.level));
+  run.levelScore += Math.round(def.bounty * (1 + 0.06 * globalWave()));
   const p = creepPos(c);
   floats.push({ x: p.x, y: p.y, txt: '+' + b, color: '#ffc300', t: 0 });
   if (def.splits) {
@@ -1064,7 +1161,7 @@ function leak(c) {
   levelLeaks++; run.leaksTotal++;
   sfxLeak();
   floats.push({ x: exitPt.x, y: exitPt.y - 10, txt: '-' + loss, color: '#ff2244', t: 0 });
-  if (run.lives <= 0) { run.lives = 0; endRun('breached'); }
+  if (run.lives <= 0) { run.lives = 0; failLevel(); }
 }
 
 /* ============================= ABILITIES ============================== */
@@ -1112,6 +1209,15 @@ function fireAbility(a, x, y) {
   sfxAbility();
   return true;
 }
+/* =============================== TOASTS =============================== */
+/* Transparent, non-blocking status text. Nothing about the flow waits on a
+   toast — it is pure feedback drawn over the board while the action runs.  */
+let toasts = [];
+function toast(txt, sub, col, dur) {
+  toasts.push({ txt, sub: sub || '', col: col || '#dde3ff', t: 0, dur: dur || 2.0 });
+  if (toasts.length > 3) toasts.shift();
+}
+
 /* =============================== UPDATE =============================== */
 let paused = false;
 function healNearby(h) {
@@ -1129,7 +1235,18 @@ function update(dt) {
   if (overdriveT > 0) overdriveT = Math.max(0, overdriveT - dt);
   if (freezeT > 0) freezeT = Math.max(0, freezeT - dt);
 
-  if (phase === 'wave') {
+  /* The whole flow is timers, never a tap: grace -> wave -> gap -> wave ...
+     -> levelclear -> next level, with `failed` looping back to a retry.   */
+  if (phase === 'grace' || phase === 'gap') {
+    phaseT -= dt;
+    if (phaseT <= 0) startWave();
+  } else if (phase === 'levelclear') {
+    phaseT -= dt;
+    if (phaseT <= 0) { advanceLevel(); return; }
+  } else if (phase === 'failed') {
+    phaseT -= dt;
+    if (phaseT <= 0) { startLevel(run.level); return; }
+  } else if (phase === 'wave') {
     waveT += dt;
     while (spawnList.length && spawnList[0].t <= waveT) {
       const s = spawnList.shift();
@@ -1171,7 +1288,10 @@ function update(dt) {
   floats = floats.filter(f => f.t < 1.0);
   shake = Math.max(0, shake - dt * 2.5);
 
-  if (phase === 'wave' && spawnList.length === 0 && creeps.length === 0) completeLevel();
+  for (const t of toasts) t.t += dt;
+  toasts = toasts.filter(t => t.t < t.dur);
+
+  if (phase === 'wave' && spawnList.length === 0 && creeps.length === 0) completeWave();
 }
 
 /* =============================== INPUT ================================ */
@@ -1255,15 +1375,14 @@ function onUp(e) {
     }
   }
   // action row
-  if (inRect(p, actionBtns.ready)) { readyWave(); return; }
   if (inRect(p, actionBtns.speed)) {
     speed = speed === 1 ? 2 : speed === 2 ? 3 : 1;
     settings.speed = speed; saveSettings();
     return;
   }
-  if (inRect(p, actionBtns.armory)) { if (phase === 'prep') showArmory(true); else sfxDeny(); return; }
+  if (inRect(p, actionBtns.armory)) { showArmory(true); return; }
   if (inRect(p, actionBtns.skills)) {
-    if (phase === 'prep' && run.level >= ARMORY_LEVEL) showSkills(true);
+    if (armoryOpen()) showSkills(true);
     else sfxDeny();
     return;
   }
@@ -1530,6 +1649,10 @@ function draw() {
   });
 
   /* ---- creeps ---- */
+  // Clipped to the board: the road's entry waypoint sits off-grid so creeps
+  // walk on from outside, and unclipped they float up into the HUD.
+  ctx.save();
+  ctx.beginPath(); ctx.rect(boardX, boardY, cell * COLS, cell * ROWS); ctx.clip();
   for (const c of creeps) if (!c.dead) drawCreep(c);
 
   /* ---- beams ---- */
@@ -1543,6 +1666,7 @@ function draw() {
     ctx.shadowBlur = 0;
   }
   ctx.globalAlpha = 1;
+  ctx.restore();                 // end board clip (creeps + beams)
 
   /* ---- drag ghost ---- */
   if (dragCard && dragPos) {
@@ -1568,6 +1692,29 @@ function draw() {
     hudText('TAP A TARGET', W / 2, boardY + 16, '#ff2244', "12px 'Black Ops One'", 'center');
   }
 
+  /* ---- toasts ---- */
+  for (let i = 0; i < toasts.length; i++) {
+    const tt = toasts[i];
+    const k = tt.t / tt.dur;
+    const alpha = Math.min(1, Math.min(k * 6, (1 - k) * 4));
+    if (alpha <= 0) continue;
+    const cy = boardY + cell * 2.6 + i * 54;
+    const bw = Math.min(W - 40, 300), bh = tt.sub ? 50 : 34;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.82;
+    ctx.fillStyle = '#06060ecc'; ctx.strokeStyle = tt.col + '99'; ctx.lineWidth = 1.4;
+    roundRect(W / 2 - bw / 2, cy - bh / 2, bw, bh, 9); ctx.fill(); ctx.stroke();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = tt.col; ctx.font = "14px 'Black Ops One'";
+    ctx.fillText(tt.txt, W / 2, cy - (tt.sub ? 8 : 0));
+    if (tt.sub) {
+      ctx.fillStyle = '#8899bb'; ctx.font = "11px 'Share Tech Mono'";
+      ctx.fillText(tt.sub, W / 2, cy + 12);
+    }
+    ctx.restore();
+  }
+
   /* ---- floats ---- */
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   for (const f of floats) {
@@ -1580,12 +1727,15 @@ function draw() {
 
   /* ============================ HUD ============================ */
   const hy = safeTop + 48;
-  const lvlTxt = run.endless && run.level > FINAL_LEVEL ? 'LVL ' + run.level : 'LVL ' + run.level + '/' + FINAL_LEVEL;
-  hudText(lvlTxt, 10, hy, run.level > FINAL_LEVEL ? '#b44fff' : '#dde3ff', "12px 'Black Ops One'", 'left');
+  const endless = run.level > CAMPAIGN_LEVELS;
+  const lvlTxt = endless ? 'LVL ' + run.level : 'LVL ' + run.level + '/' + CAMPAIGN_LEVELS;
+  hudText(lvlTxt, 10, hy, endless ? '#b44fff' : '#dde3ff', "12px 'Black Ops One'", 'left');
+  hudText('W' + globalWave() + (endless ? '' : '/' + TOTAL_WAVES), 10, safeTop + 62, '#5a6180', "9px 'Share Tech Mono'", 'left');
   hudText('♥' + run.lives, W * 0.40, hy, run.lives > 5 ? '#39ff14' : '#ff2244', "12px 'Black Ops One'", 'left');
   hudText('$' + fmtNum(cash), W * 0.56, hy, '#ffc300', "12px 'Black Ops One'", 'left');
   hudText(fmtNum(run.score), W - 10, hy, '#8899bb', "12px 'Black Ops One'", 'right');
-  hudText(MAPS[mapIdx].name, 10, safeTop + 62, '#33385a', "9px 'Share Tech Mono'", 'left');
+  hudText(MAPS[mapIdx].name, 74, safeTop + 62, '#33385a', "9px 'Share Tech Mono'", 'left');
+  if (run.retries) hudText('retry ' + run.retries, W - 10, safeTop + 62, '#5a6180', "9px 'Share Tech Mono'", 'right');
 
   /* ---- bottom stack ---- */
   const stackTop = H - safeBot - bottomStackHeight();
@@ -1672,15 +1822,23 @@ function draw() {
   actionBtns.skills = { x: ax2, y, w: smallW, h: ah2 }; ax2 += smallW + pad;
   actionBtns.speed  = { x: ax2, y, w: smallW, h: ah2 }; ax2 += smallW + pad;
   actionBtns.ready  = { x: ax2, y, w: readyW, h: ah2 };
-  drawButton(actionBtns.armory, '◆ ' + run.cores, '#ffc300', phase === 'prep');
-  drawButton(actionBtns.skills, '★ ' + run.sp, '#b44fff', phase === 'prep' && run.level >= ARMORY_LEVEL);
+  drawButton(actionBtns.armory, '◆ ' + run.cores, '#ffc300', true);
+  drawButton(actionBtns.skills, '★ ' + run.sp, '#b44fff', armoryOpen());
   drawButton(actionBtns.speed, speed + 'x', '#4488ff', true);
-  if (phase === 'prep') {
-    drawButton(actionBtns.ready, 'START WAVE', '#39ff14', true);
-  } else {
+  // Fourth slot is a readout, not a button — nothing here needs pressing.
+  if (phase === 'wave') {
     const total = spawnList.length + creeps.length;
-    drawButton(actionBtns.ready, 'INCOMING', '#ff2244', true, total + ' left');
+    drawButton(actionBtns.ready, isBossWave(globalWave()) ? 'WARDEN' : 'INCOMING', '#ff2244', true, total + ' left');
+  } else if (phase === 'grace') {
+    drawButton(actionBtns.ready, 'BUILD', '#39ff14', true, Math.ceil(phaseT) + 's');
+  } else if (phase === 'gap') {
+    drawButton(actionBtns.ready, 'NEXT WAVE', '#ffc300', true, Math.ceil(phaseT) + 's');
+  } else if (phase === 'levelclear') {
+    drawButton(actionBtns.ready, 'CLEAR', '#39ff14', true, 'level ' + (run.level + 1));
+  } else {
+    drawButton(actionBtns.ready, 'FAILED', '#ff2244', true, 'retrying');
   }
+  actionBtns.ready = null;   // readout only — never a hitbox
 }
 /* =============================== SCREENS ============================== */
 function bindClick(el, fn) { if (el) el.addEventListener('click', e => { initAudio(); fn(e); }); }
@@ -1708,6 +1866,7 @@ function paintIcons() {
 
 /* ------------------------------- MENU --------------------------------- */
 function showMenu() {
+  cancelPendingGameOver();
   state = 'menu';
   run = null; towers = []; creeps = []; abilities = [];
   const auto = hasSave(AUTO_KEY);
@@ -1720,16 +1879,18 @@ function showMenu() {
         <div class="sub">-- 100 LEVELS · HOLD THE LINE --</div>
       </div>
       <div style="margin-top:18px">
-        ${auto ? `<button class="btn" id="m-cont">CONTINUE · LVL ${auto.run.level}</button>` : ''}
+        ${auto ? `<button class="btn" id="m-cont">CONTINUE · LVL ${auto.run.level}/${CAMPAIGN_LEVELS}</button>` : ''}
         <button class="btn ${auto ? 'alt' : ''}" id="m-new">NEW RUN</button>
         <button class="btn ghost" id="m-load">LOAD GAME</button>
         <button class="btn ghost" id="m-scores">SCOREBOARD</button>
         <button class="btn ghost" id="m-set">SETTINGS</button>
       </div>
       <div class="rules">
-        Levels <b>1-100</b>, one wave each, a new map every ten. Cash resets every
-        level — your <b style="color:var(--gold)">armory</b> and
-        <b style="color:var(--purple)">skills</b> do not. Lives carry the whole run.<br>
+        <b>Ten levels</b>, one map each, ten escalating waves ending in a WARDEN —
+        <b>100 waves</b> in all, then endless. The action never stops for a button.
+        Cash resets each level; your <b style="color:var(--gold)">armory</b> and
+        <b style="color:var(--purple)">skills</b> do not. Die and the level replays
+        as often as you need — but the attempt banks nothing.<br>
         ${best ? `Best run: <b>${fmtNum(best.score)}</b> pts · level <b>${best.level}</b>` : 'No runs recorded yet.'}
       </div>
     </div>
@@ -1762,17 +1923,19 @@ function showScoreboard(back) {
       <td class="num">${i + 1}</td>
       <td class="num">${fmtNum(s.score)}</td>
       <td class="num">${s.level}${s.won ? ' ★' : ''}</td>
+      <td class="num">${s.retries === undefined ? '--' : s.retries}</td>
       <td class="when">${fmtWhen(s.ts)}</td></tr>`).join('')
-    : `<tr><td colspan="4" style="color:var(--dim);padding:18px 4px;text-align:center">No runs recorded yet.</td></tr>`;
+    : `<tr><td colspan="5" style="color:var(--dim);padding:18px 4px;text-align:center">No runs recorded yet.</td></tr>`;
   openScreen(`<div class="scr">
     <div class="scr-head"><h2 class="head">TOP 10 RUNS</h2><div class="sub">BY SCORE</div></div>
     <div class="scr-body">
       <table class="scores">
-        <tr><th>#</th><th>SCORE</th><th>LEVEL</th><th>ENDED</th></tr>
+        <tr><th>#</th><th>SCORE</th><th>LVL</th><th>RETRY</th><th>ENDED</th></tr>
         ${rows}
       </table>
-      <div class="rules">★ marks a run that cleared level 100. Score comes from kills,
-      level clears (bigger the deeper you get), flawless levels, and lives left standing.</div>
+      <div class="rules">★ marks a run that cleared all ${CAMPAIGN_LEVELS} levels. Score comes from kills,
+      wave and level clears (bigger the deeper you get), flawless levels and lives left standing —
+      but only from levels you actually cleared, so retries are what separate runs.</div>
     </div>
     <div class="scr-foot"><button class="btn small ghost" id="s-back">BACK</button></div>
   </div>`);
@@ -1864,8 +2027,8 @@ function armoryRow(type) {
   const eff = (notYet || a.tier === 0)
     ? T.desc
     : `${T.desc}<br>TIER ${a.tier}: +${Math.round(TIER_DMG * a.tier * 100)}% dmg · +${Math.round(TIER_RATE * a.tier * 100)}% rate · +${Math.round(TIER_RANGE * a.tier * 100)}% range`;
-  const label = notYet ? 'ARRIVES<br>LVL ' + TURRET_LEVEL[type]
-    : !open ? 'TIERS<br>LVL ' + ARMORY_LEVEL
+  const label = notYet ? 'ARRIVES<br>W' + TURRET_WAVE[type]
+    : !open ? 'TIERS<br>W' + ARMORY_WAVE
     : maxed ? 'MAX'
     : 'TIER ' + (a.tier + 1) + '<br>◆' + cost;
   return `<div class="card ${notYet ? '' : 'on'}"><div class="arm-row">
@@ -1883,12 +2046,12 @@ function armoryRow(type) {
    DEPLOY starts the next level.                                            */
 function showArmory(fromPrep) {
   const L = run.level;
-  const canSkills = L >= ARMORY_LEVEL;
+  const canSkills = armoryOpen();
   curScreen = 'armory'; armoryFromPrep = !!fromPrep;
   openScreen(`<div class="scr">
     <div class="scr-head" style="padding-bottom:2px">
       <h2 class="head">${armoryOpen() ? 'ARMORY' : 'ARSENAL'}</h2>
-      <div class="sub">BEFORE LEVEL ${L}${armoryOpen() ? '' : ' · UPGRADES AT LVL ' + ARMORY_LEVEL}</div>
+      <div class="sub">LEVEL ${L} · WAVE ${run.wave}/${WAVES_PER_LEVEL}${armoryOpen() ? '' : ' · UPGRADES AT WAVE ' + ARMORY_WAVE}</div>
       <div style="margin-top:8px">
         <span class="pill cores">◆ <b id="a-cores">${run.cores}</b> CORES</span>
         <span class="pill sp">★ <b>${run.sp}</b> SKILL</span>
@@ -1902,7 +2065,7 @@ function showArmory(fromPrep) {
           <div class="arm-name" style="color:var(--purple)">RESEARCH</div>
           <div class="arm-desc">Melt ${RESEARCH_COST} cores down into 1 skill point. Cores you will never spend are worth more in a tree.</div>
         </div>
-        <button class="buybtn" id="buy-research" style="border-color:var(--purple);color:var(--purple)" ${armoryOpen() && run.cores >= RESEARCH_COST ? '' : 'disabled'}>${armoryOpen() ? '◆' + RESEARCH_COST + '<br>→ ★1' : 'LVL ' + ARMORY_LEVEL}</button>
+        <button class="buybtn" id="buy-research" style="border-color:var(--purple);color:var(--purple)" ${armoryOpen() && run.cores >= RESEARCH_COST ? '' : 'disabled'}>${armoryOpen() ? '◆' + RESEARCH_COST + '<br>→ ★1' : 'W' + ARMORY_WAVE}</button>
       </div></div>
       <div class="rules">Armory upgrades are permanent for this run and apply to every tower of
       that type you place, on top of the level-by-level upgrades you buy with cash.</div>
@@ -1910,7 +2073,7 @@ function showArmory(fromPrep) {
     <div class="scr-foot">
       <div class="row2">
         ${canSkills ? `<button class="btn small alt" id="a-skills" style="flex:1">★ SKILLS${run.sp ? ' (' + run.sp + ')' : ''}</button>` : ''}
-        <button class="btn small" id="a-go" style="flex:1.4">DEPLOY · LVL ${L}</button>
+        <button class="btn small" id="a-go" style="flex:1.4">RESUME</button>
       </div>
     </div>
   </div>`);
@@ -1934,9 +2097,7 @@ function showArmory(fromPrep) {
   bind('a-skills', () => showSkills(false));
   bind('a-go', () => {
     run.newTurret = null;
-    if (armoryFromPrep) { closeScreen(); resize(); return; }
-    closeScreen();
-    startLevel(L);
+    closeScreen(); resize();      // always a mid-level pause now
   });
 }
 
@@ -1967,7 +2128,7 @@ function showSkills(fromBoard) {
   renderTree();
   bind('sk-back', () => {
     if (skillsFromBoard) { closeScreen(); resize(); }
-    else showArmory(false);
+    else showArmory(true);
   });
 }
 function renderTree() {
@@ -2061,65 +2222,34 @@ function renderDetail() {
 }
 
 /* --------------------------- LEVEL / RUN END --------------------------- */
-function showLevelClear(info) {
-  const nextL = run.level;
-  if (info.won) {
-    openScreen(`<div class="scr"><div class="scr-body" style="display:flex;flex-direction:column;justify-content:center;text-align:center">
-      <h1 class="title" style="color:var(--gold)">GRID SECURED</h1>
-      <div class="sub">ALL 100 LEVELS HELD</div>
-      <div class="big">${fmtNum(run.score)}</div>
-      <div class="k">FINAL SCORE · ♥${run.lives} REMAINING</div>
-      <div class="rules">The grid is yours. Endless mode keeps the waves coming with no ceiling —
-      your score, armory and skills carry straight on. The run only ends when the last life goes.</div>
-      <button class="btn gold" id="lc-endless" style="margin-top:14px">CONTINUE · ENDLESS</button>
-      <button class="btn ghost" id="lc-retire">RETIRE · BANK THE SCORE</button>
-    </div></div>`);
-    sfxWin();
-    bind('lc-endless', () => { closeScreen(); showArmory(false); });
-    bind('lc-retire', () => {
-      if (!run.recorded) {
-        run.recorded = true;
-        run.score += 200 * Math.max(0, run.lives);
-        addScore({ ts: Date.now(), level: info.L, score: Math.round(run.score), won: true, endless: false });
-        try { localStorage.removeItem(AUTO_KEY); } catch (e) {}
-      }
-      showScoreboard(showMenu);
-    });
-    return;
-  }
-  const gained = info.gained || [];
-  run.newTurret = gained[0] || null;
-  const newCard = gained.map(t => {
-    const T = TOWERS[t];
-    return `<div class="card on" style="border-color:${T.col}66"><div class="arm-row">
-      <canvas class="ticon" data-type="${t}"></canvas>
-      <div class="arm-mid">
-        <div class="arm-name" style="color:${T.col}">NEW TURRET · ${T.name}</div>
-        <div class="arm-desc">${T.desc}</div>
-      </div>
-    </div></div>`;
-  }).join('');
-  openScreen(`<div class="scr">
-    <div class="scr-head"><h2 class="head">LEVEL ${info.L} CLEAR</h2>
-      <div class="sub">${MAPS[mapIndexFor(info.L)].name}${info.noLeak ? ' · FLAWLESS' : ''}</div></div>
-    <div class="scr-body" style="display:flex;flex-direction:column;justify-content:center">
-      <div style="text-align:center"><div class="big">${fmtNum(run.score)}</div><div class="k">SCORE</div></div>
-      ${newCard}
-      <div class="card" style="margin-top:14px">
-        <div class="kv"><span class="k">LEVEL BONUS</span><span class="v gold">+${fmtNum(info.clearScore)}</span></div>
-        <div class="kv"><span class="k">FLAWLESS (NO LEAKS)</span><span class="v ${info.noLeak ? 'green' : 'red'}">${info.noLeak ? 'YES · +' + fmtNum(60 * info.L) : 'no'}</span></div>
-        <div class="kv"><span class="k">KILLS</span><span class="v">${levelKills}</span></div>
-        <div class="kv"><span class="k">LIVES</span><span class="v ${run.lives > 5 ? 'green' : 'red'}">♥ ${run.lives} / ${maxLives()}</span></div>
-      </div>
-      <div class="card">
-        <div class="kv"><span class="k">CORES EARNED</span><span class="v gold">◆ +${info.gotCores}</span></div>
-        <div class="kv"><span class="k">SKILL POINTS${info.L < ARMORY_LEVEL ? ' (FROM LVL ' + ARMORY_LEVEL + ')' : ' EARNED'}</span><span class="v" style="color:var(--purple)">★ +${info.gotSp}</span></div>
-      </div>
-    </div>
-    <div class="scr-foot"><button class="btn" id="lc-go">${gained.length ? 'ARSENAL' : 'ARMORY'} · LVL ${nextL}</button></div>
-  </div>`);
-  paintIcons();
-  bind('lc-go', () => showArmory(false));
+/* Clearing a level is a toast now, not a screen — the action never stops.
+   Finishing the campaign is the one moment that earns an interruption.   */
+function showVictory() {
+  run.endless = true;
+  pendingStart = true;
+  autosave();
+  sfxWin();
+  openScreen(`<div class="scr"><div class="scr-body" style="display:flex;flex-direction:column;justify-content:center;text-align:center">
+    <h1 class="title" style="color:var(--gold)">GRID SECURED</h1>
+    <div class="sub">ALL ${CAMPAIGN_LEVELS} LEVELS HELD · ${TOTAL_WAVES} WAVES</div>
+    <div class="big">${fmtNum(run.score)}</div>
+    <div class="k">SCORE · ${run.retries} ${run.retries === 1 ? 'RETRY' : 'RETRIES'}</div>
+    <div class="rules">Endless keeps the waves coming with no ceiling and your build carries
+    straight on — but there are no retries out there. One breach ends the run.</div>
+    <button class="btn gold" id="v-endless" style="margin-top:14px">CONTINUE · ENDLESS</button>
+    <button class="btn ghost" id="v-retire">RETIRE · BANK THE SCORE</button>
+  </div></div>`);
+  bind('v-endless', () => { closeScreen(); startLevel(CAMPAIGN_LEVELS + 1); });
+  bind('v-retire', () => {
+    if (!run.recorded) {
+      run.recorded = true;
+      run.score += 200 * Math.max(0, run.lives);
+      addScore({ ts: Date.now(), level: CAMPAIGN_LEVELS, wave: TOTAL_WAVES, score: Math.round(run.score),
+        retries: run.retries, won: true, endless: false });
+      try { localStorage.removeItem(AUTO_KEY); } catch (e) {}
+    }
+    showScoreboard(showMenu);
+  });
 }
 function showGameOver() {
   const scores = getScores();
@@ -2127,13 +2257,14 @@ function showGameOver() {
   const mine = Math.round(run.score);
   openScreen(`<div class="scr">
     <div class="scr-head"><h2 class="head" style="color:var(--red)">GRID BREACHED</h2>
-      <div class="sub">FELL ON LEVEL ${run.level}</div></div>
+      <div class="sub">FELL ON LEVEL ${run.level} · WAVE ${globalWave()}</div></div>
     <div class="scr-body" style="display:flex;flex-direction:column;justify-content:center;text-align:center">
       <div class="big">${fmtNum(mine)}</div>
       <div class="k">FINAL SCORE</div>
       <div class="card" style="margin-top:12px;text-align:left">
         <div class="kv"><span class="k">LEVEL REACHED</span><span class="v">${run.level}</span></div>
         <div class="kv"><span class="k">LEVELS CLEARED</span><span class="v">${run.levelsCleared}</span></div>
+        <div class="kv"><span class="k">RETRIES USED</span><span class="v">${run.retries}</span></div>
         <div class="kv"><span class="k">TOTAL KILLS</span><span class="v">${fmtNum(run.killsTotal)}</span></div>
         <div class="kv"><span class="k">BEST RUN</span><span class="v gold">${best ? fmtNum(best.score) : '--'}</span></div>
       </div>
@@ -2181,7 +2312,7 @@ function showGameMenu() {
       run.recorded = true;
       run.score += 200 * Math.max(0, run.lives);
       addScore({ ts: Date.now(), level: run.level, score: Math.round(run.score),
-        won: run.levelsCleared >= FINAL_LEVEL, endless: !!run.endless });
+        won: run.levelsCleared >= CAMPAIGN_LEVELS, endless: !!run.endless });
       try { localStorage.removeItem(AUTO_KEY); } catch (e) {}
     }
     showScoreboard(showMenu);
@@ -2214,8 +2345,12 @@ requestAnimationFrame(loop);
 window.__GD = {
   /* read */
   st: () => ({
-    state, phase, level: run ? run.level : 0, lives: run ? run.lives : 0,
-    score: run ? Math.round(run.score) : 0, cores: run ? run.cores : 0, sp: run ? run.sp : 0,
+    state, phase, phaseT, level: run ? run.level : 0, wave: run ? run.wave : 0,
+    gw: run ? globalWave() : 0, retries: run ? run.retries : 0,
+    lives: run ? run.lives : 0,
+    score: run ? Math.round(run.score) : 0,
+    levelScore: run ? Math.round(run.levelScore) : 0,
+    cores: run ? run.cores : 0, sp: run ? run.sp : 0,
     cash, towers: towers.length, creeps: creeps.length, queued: spawnList.length,
     map: MAPS[mapIdx].name, mapIdx, paused, abilities: abilities.map(a => a.id),
     armory: run ? JSON.parse(JSON.stringify(run.armory)) : null,
@@ -2223,11 +2358,14 @@ window.__GD = {
     maxLives: S ? maxLives() : 0, buildable: buildableCells().length,
   }),
   S: () => S, run: () => run, towersRaw: () => towers, creepsRaw: () => creeps,
-  MAPS, TOWERS, CREEPS, TREES, FINAL_LEVEL,
+  MAPS, TOWERS, CREEPS, TREES, WAVES_PER_LEVEL, CAMPAIGN_LEVELS, TOTAL_WAVES,
   /* drive */
   newRun: () => { closeScreen(); startRun(); },
   startLevel: L => { closeScreen(); startLevel(L); },
-  ready: () => { closeScreen(); readyWave(); },
+  ready: () => { closeScreen(); if (phase === 'grace' || phase === 'gap') { phaseT = 0; startWave(); } },
+  skipGap: () => { if (phase !== 'wave') phaseT = 0; },   // fast-forward a timer in tests
+  advance: () => { if (phase === 'levelclear') { advanceLevel(); return true; }
+                   if (phase === 'failed') { startLevel(run.level); return true; } return false; },
   step: (dt, n) => { const k = n || 1; for (let i = 0; i < k; i++) update(dt); },
   build: (type, r, c) => buildTower(type, r, c),
   upgrade: (r, c) => { const t = towerAt(r, c); return t ? upgradeTower(t) : false; },
@@ -2243,7 +2381,7 @@ window.__GD = {
     if (!armoryOpen() || run.cores < RESEARCH_COST) return false;
     run.cores -= RESEARCH_COST; run.sp++; return true;
   },
-  TURRET_LEVEL, ARMORY_LEVEL,
+  TURRET_WAVE, ARMORY_WAVE,
   spendSkill: id => {
     const e = NODE_BY_ID[id]; if (!e) return false;
     const n = e.node, c = nodeCost(n);
@@ -2256,7 +2394,8 @@ window.__GD = {
     return true;
   },
   fireAbility: (id, x, y) => { const a = abilities.find(z => z.id === id); return a ? fireAbility(a, x, y) : false; },
-  buildableCells, wave: L => buildWave(L), hpMulFor, startCashFor, coresFor, skillPtsFor,
+  buildableCells, wave: gw => buildWave(gw), hpMulFor, startCashFor, coresForWave, skillPtsForWave,
+  globalWave, isBossWave,
   /* live hitbox tables, so a drive test can press the canvas-drawn UI the
      way a thumb does rather than calling the actions behind it */
   cardRects: () => cardRects.map(r => ({ type: r.type, x: r.x, y: r.y, w: r.w, h: r.h, afford: r.afford })),

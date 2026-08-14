@@ -73,7 +73,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Word Circuit (`games/word-circuit/`) | `.claude/word-circuit.md` | Any work on the word hunt — embedded dictionary, board gen/solver, drag path rules |
 | Neon Tactics (`games/neon-tactics/`) | `.claude/neon-tactics.md` | Any work on the squad tactics — rules engine, LOS, AI scoring, pass-and-play flow |
 | Star Surge (`games/star-surge/`) | `.claude/star-surge.md` | Any work on the shmup — wave director, boss phases, powerups, bullet caps |
-| Grid Defense (`games/grid-defense/`) | `.claude/grid-defense.md` | Any work on the tower-defense campaign — the three-currency economy (cash/cores/skill points), armory tiers, the three skill trees, the 100-level difficulty curve, maps/waypoints, wave composition, drag-place UX, save/scoreboard |
+| Grid Defense (`games/grid-defense/`) | `.claude/grid-defense.md` | Any work on the tower-defense campaign — the three-currency economy (cash/cores/skill points), armory tiers, the three skill trees, the ten-level/100-wave difficulty curve, continuous flow + retries, maps/waypoints, wave composition, drag-place UX, save/scoreboard |
 | Neon Tripeaks (`games/tri-peaks/`) | `.claude/tri-peaks.md` | Any work on the tripeaks solitaire — board geometry/exposure, deal fairness, streak scoring, daily seed |
 | Shadow Circuit (`games/shadow-circuit/`) | `.claude/shadow-circuit.md` | Any work on the stealth maze — maze/patrol generation, vision-cone detection, chase state machine |
 | Neon Recall (`games/neon-recall/`) | `.claude/neon-recall.md` | Any work on the memory board — flip rules, scan budget, power pairs, versus turn logic |

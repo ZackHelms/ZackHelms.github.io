@@ -265,22 +265,25 @@ Top-HUD toggle for local 2-player mode (multi-touch, second finger owns the
 top mallet; AI + records off). Synth SFX + arena music loop. Detailed
 context: `.claude/air-hockey.md`.
 
-### GRID DEFENSE (`grid-defense/index.html`, ~2100 lines)
-A 100-level tower-defense **campaign**, then endless. One wave per level,
-ten waypoint maps (a new one every ten levels), drag-placed turrets with
-spec'd silhouettes — green triangle PULSE, red circle NOVA, blue snowflake
-FROST, purple spike RAIL. Three currencies drive the long arc: per-level
-cash for placing and upgrading, persistent **cores** for the between-levels
-armory (8 permanent tiers per turret), and persistent **skill points** for
-three branching trees (OFFENSE / ENGINEERING / COMMAND, the last granting
-active abilities). The first four levels are a guided introduction — one
-new turret handed over per level, with every purchase shut until the
-armory and the trees both open at level 5. Lives carry the whole run; wave HP
-grows on an accelerating exponent calibrated against an auto-player. Main
-menu with continue/load/scoreboard/settings, 3 save slots + auto-save, and
-a top-ten board keyed on score with date, time and level reached. Detailed
-context: `.claude/grid-defense.md`. Drive suite:
-`.claude/tests/drive-grid-defense.cjs`.
+### GRID DEFENSE (`grid-defense/index.html`, ~2300 lines)
+A **ten-level tower-defense campaign**, then endless. A level is one map and
+ten escalating waves ending in a WARDEN — 100 waves in all — and the board
+persists across a level's waves, so upgrading a placed tower is worth doing.
+**Nothing waits on a tap**: grace → wave → gap → level clear runs on timers,
+with transparent canvas toasts for feedback. Drag-placed turrets with spec'd
+silhouettes — green triangle PULSE, red circle NOVA, blue snowflake FROST,
+purple spike RAIL — introduced one per wave across waves 1-4. Three currencies:
+per-level cash for placing and upgrading, persistent **cores** for the armory
+(8 permanent tiers per turret), and persistent **skill points** for three
+branching trees (OFFENSE / ENGINEERING / COMMAND, the last granting active
+abilities); both open at wave 5 and are reachable from the HUD any time.
+Lives refill each level and running out replays the level as often as needed —
+but the failed attempt is rolled back whole and banks nothing, so the top-ten
+board ranks score and shows retries. Endless has no retries. Wave HP grows on
+an accelerating exponent keyed to the global wave index and calibrated against
+strategy personas. Detailed context: `.claude/grid-defense.md`. Suites:
+`.claude/tests/drive-grid-defense.cjs` (rules) and
+`.claude/tests/eval-grid-defense.cjs` (balance).
 
 ### STAR SURGE (`star-surge/index.html`, ~750 lines)
 Vertical shmup: drag-steer, auto-fire, 5 stages × 3 waves + boss (bosses
