@@ -25,6 +25,7 @@ local-2p.
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
 | Zed Shooter | `zed-shooter/` | shooter | virtual-joystick, kb-mouse | wave-survival | meta-progression | solo | external: zed-fps repo |
+| Mitochondria Simulator | `mitochondria/` | biology-sim | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox, guided-lessons | systems-simulation, skill-teaching, layer-filters, real-time-3d | solo | `.claude/mitochondria.md` |
 | Quantum Chemist | `qntmchmst/` | grid-puzzle | tap, drag-place | level-campaign | match-clear | solo | external: qntmchmst repo |
 | Stick Wars | `stick-wars.html` | brawler | tap | wave-survival | meta-progression, resource-economy | solo | — |
 | Town Builder | `town-game-1.html` | builder-sim | tap, drag-place | open-sandbox | resource-economy | solo | — |
@@ -72,7 +73,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-46 games (44 in-repo + 2 external builds).
+47 games (45 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -133,6 +134,15 @@ local-2p.
   the in-game solver before it is served; earmarked as the first web-first
   prototype of a future iOS title).
 
+### Newly opened by the 2026-08-15 build
+- `biology-sim` genre + `systems-simulation` / `layer-filters` / `real-time-3d`
+  mechanics + `guided-lessons` session + `orbit-drag` input (mitochondria — the
+  first title that is explicitly **not scored**: an explorable instrument built
+  on a real OXPHOS flux model, with 30 scenarios, 9 step-through walkthroughs,
+  layer toggles and a membrane cutaway. It is also the repo's second WebGL2
+  page after wayfinder, and the first designed to zoom **out** later: phase 2 is
+  cell level, phase 3 whole-body).
+
 ### Absent — what's actually left
 Sensor inputs are now down to two: **`shake`** and **`camera`**. Everything
 else on the primary axes has at least one game, so novelty mostly has to come
@@ -142,6 +152,9 @@ from **inventing a new facet value**, not filling a hole. Open directions:
 - **Sessions:** `weekly-ladder`, `endless-coop`, `relay` (each player adds one
   move to a shared seeded run and passes the code on — a natural next step now
   that `share-code` exists and is drive-tested).
+- **Sessions:** `guided-lessons` now exists (mitochondria) alongside
+  wayfinder's `skill-campaign`; a third non-scored explorable would want a
+  different subject, not a different shape.
 - **Players:** local-2p has three flavours — real-time (air hockey),
   turn-based tactics (neon-tactics), memory duel (neon-recall) — and
   `async-2p` now has one (signal-hunt). A `co-op` value has nothing at all.

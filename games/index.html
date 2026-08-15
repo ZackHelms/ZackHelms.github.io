@@ -140,7 +140,7 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 02:01 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 23:45 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
@@ -167,6 +167,14 @@ h1 {
       <div class="game-info">
         <div class="game-name">ZED SHOOTER</div>
         <div class="game-desc">First-person zombie shooter. Fight escalating waves with WASD/mouse or touch controls, right in your browser.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="mitochondria/">
+      <div class="game-icon">🔬</div>
+      <div class="game-info">
+        <div class="game-name">MITOCHONDRIA SIMULATOR</div>
+        <div class="game-desc">Not a game — an instrument. A human mitochondrion in 3D, running a real model of oxidative phosphorylation. Pick what the body is doing, poison a complex, open the pore, and watch the electron chain, the proton gradient and the ATP turbine respond. Nine step-through walkthroughs, layer filters and a cutaway.</div>
       </div>
     </a>
                                             <a class="game-card" href="qntmchmst/">
@@ -533,6 +541,7 @@ h1 {
 const GAMES = [
   { n: 'GRID DEFENSE', i: '🗼', h: 'grid-defense/', genre: ['tower-defense-classic'], input: ['drag-place', 'tap'], session: ['level-campaign', 'wave-survival', 'endless-highscore', 'save-campaign'], mech: ['wave-defense', 'resource-economy', 'tower-upgrades', 'meta-progression'], players: ['solo'] },
   { n: 'ZED SHOOTER', i: '🧟', h: 'zed-shooter/', genre: ['shooter'], input: ['virtual-joystick', 'kb-mouse'], session: ['wave-survival'], mech: ['meta-progression'], players: ['solo'] },
+  { n: 'MITOCHONDRIA SIMULATOR', i: '🔬', h: 'mitochondria/', genre: ['biology-sim'], input: ['orbit-drag', 'pinch-zoom', 'two-finger-pan', 'tap'], session: ['open-sandbox', 'guided-lessons'], mech: ['systems-simulation', 'skill-teaching', 'layer-filters', 'real-time-3d'], players: ['solo'] },
   { n: 'QUANTUM CHEMIST', i: '⚛️', h: 'qntmchmst/', genre: ['grid-puzzle'], input: ['tap', 'drag-place'], session: ['level-campaign'], mech: ['match-clear'], players: ['solo'] },
   { n: 'STICK WARS', i: '⚔️', h: 'stick-wars.html', genre: ['brawler'], input: ['tap'], session: ['wave-survival'], mech: ['meta-progression', 'resource-economy'], players: ['solo'] },
   { n: 'TOWN BUILDER', i: '🏘️', h: 'town-game-1.html', genre: ['builder-sim'], input: ['tap', 'drag-place'], session: ['open-sandbox'], mech: ['resource-economy'], players: ['solo'] },

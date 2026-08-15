@@ -1,0 +1,2997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="An interactive, biologically realistic 3D simulator of a human mitochondrion — the electron transport chain, chemiosmosis and ATP synthesis, driven by scenarios you choose.">
+<title>Mitochondria Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06060e; --panel:#0b0b16; --panel2:#10101f; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff; --red:#ff2244;
+  --white:#dde3ff; --dim:#8899bb; --purple:#b44fff; --cyan:#31e0ff;
+  --safeT:env(safe-area-inset-top,0px); --safeB:env(safe-area-inset-bottom,0px);
+  --safeL:env(safe-area-inset-left,0px); --safeR:env(safe-area-inset-right,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;background:var(--bg);}
+body{
+  font-family:'Share Tech Mono',monospace;color:var(--white);
+  user-select:none;-webkit-user-select:none;touch-action:none;
+  overscroll-behavior:none;
+}
+canvas{display:block;position:absolute;inset:0;width:100%;height:100%;}
+#gl{z-index:1;}
+#ui{z-index:2;pointer-events:none;}
+
+/* ---------------- chrome ---------------- */
+.chip{
+  position:fixed;z-index:80;height:30px;min-width:38px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(11,11,22,0.88);border:1px solid var(--border);border-radius:8px;
+  color:var(--white);font-family:'Share Tech Mono',monospace;font-size:14px;
+  text-decoration:none;cursor:pointer;backdrop-filter:blur(6px);
+}
+.chip:active{background:#191934;}
+#back-btn{top:calc(6px + var(--safeT));left:calc(6px + var(--safeL));font-size:17px;}
+#mute-btn{top:calc(6px + var(--safeT));left:calc(50px + var(--safeL));}
+#help-btn{top:calc(6px + var(--safeT));left:calc(94px + var(--safeL));}
+#reset-btn{top:calc(6px + var(--safeT));left:calc(138px + var(--safeL));font-size:12px;}
+
+#titlebar{
+  position:fixed;z-index:60;top:calc(42px + var(--safeT));
+  left:calc(6px + var(--safeL));right:calc(6px + var(--safeR));
+  text-align:center;pointer-events:none;
+}
+#titlebar h1{
+  font-family:'Black Ops One',sans-serif;font-size:10px;letter-spacing:2.5px;
+  color:var(--green);text-shadow:0 0 12px rgba(57,255,20,.45);
+}
+#titlebar .scn{
+  font-size:9px;letter-spacing:1.2px;color:var(--dim);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+/* ---------------- readouts (top right) ---------------- */
+#readouts{
+  position:fixed;z-index:55;top:calc(84px + var(--safeT));right:calc(6px + var(--safeR));
+  width:150px;background:rgba(9,9,18,0.72);border:1px solid var(--border);
+  border-radius:9px;padding:7px 8px;backdrop-filter:blur(7px);
+  transition:opacity .2s;
+}
+#readouts.hidden{opacity:0;pointer-events:none;}
+.ro{margin-bottom:5px;}
+.ro:last-child{margin-bottom:0;}
+.ro-top{display:flex;justify-content:space-between;align-items:baseline;font-size:8.5px;letter-spacing:.6px;}
+.ro-lab{color:var(--dim);}
+.ro-val{color:var(--white);font-size:9.5px;}
+.ro-bar{height:3px;background:#15152a;border-radius:2px;margin-top:2px;overflow:hidden;}
+.ro-fill{height:100%;width:0%;border-radius:2px;transition:width .15s linear;}
+
+/* ---------------- narration ---------------- */
+#narr{
+  position:fixed;z-index:58;left:calc(8px + var(--safeL));right:calc(8px + var(--safeR));
+  bottom:calc(var(--dockH,58px) + 8px + var(--safeB));
+  background:rgba(9,9,20,0.9);border:1px solid var(--border);border-left:3px solid var(--green);
+  border-radius:9px;padding:9px 10px;backdrop-filter:blur(8px);display:none;
+  max-height:38vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+}
+#narr.on{display:block;}
+#narr .nh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;}
+#narr .nt{font-family:'Black Ops One',sans-serif;font-size:9.5px;letter-spacing:1.6px;color:var(--green);}
+#narr .nstep{font-size:8.5px;color:var(--dim);white-space:nowrap;}
+#narr .nb{font-size:11px;line-height:1.5;color:var(--white);}
+#narr .nb b{color:var(--gold);font-weight:normal;}
+#narr .nb i{color:var(--cyan);font-style:normal;}
+#narr .nb .eq{display:block;margin:5px 0;padding:5px 7px;background:#0d0d1c;border:1px solid var(--border);
+  border-radius:5px;color:var(--cyan);font-size:10px;letter-spacing:.3px;}
+#narr .nav{display:flex;gap:6px;margin-top:8px;}
+#narr .nav button{flex:1;}
+
+/* ---------------- dock ---------------- */
+#dock{
+  position:fixed;z-index:59;left:0;right:0;bottom:0;
+  background:rgba(8,8,17,0.94);border-top:1px solid var(--border);
+  backdrop-filter:blur(10px);padding-bottom:var(--safeB);
+  display:flex;flex-direction:column;max-height:46vh;
+}
+#tabs{display:flex;border-bottom:1px solid var(--border);}
+#tabs button{
+  flex:1;background:none;border:none;color:var(--dim);padding:9px 2px 8px;
+  font-family:'Black Ops One',sans-serif;font-size:8.5px;letter-spacing:1.5px;cursor:pointer;
+  border-bottom:2px solid transparent;
+}
+#tabs button.on{color:var(--green);border-bottom-color:var(--green);}
+#panes{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:9px 10px 12px;}
+#panes.collapsed{display:none;}
+.pane{display:none;}
+.pane.on{display:block;}
+.grp{margin-bottom:11px;}
+.grp:last-child{margin-bottom:0;}
+.glab{font-size:8.5px;letter-spacing:1.6px;color:var(--dim);margin-bottom:5px;}
+select,button.btn{
+  font-family:'Share Tech Mono',monospace;background:var(--panel2);color:var(--white);
+  border:1px solid var(--border);border-radius:7px;padding:7px 8px;font-size:11px;
+  cursor:pointer;width:100%;
+}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+  background-position:calc(100% - 14px) 50%,calc(100% - 9px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:26px;}
+select:focus{outline:1px solid var(--green);}
+optgroup{background:var(--panel);color:var(--dim);}
+option{background:var(--panel2);color:var(--white);}
+.btnrow{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;}
+.btnrow.three{grid-template-columns:repeat(3,1fr);}
+button.btn{padding:8px 4px;font-size:10px;letter-spacing:.4px;text-align:center;line-height:1.25;}
+button.btn:active{background:#1b1b36;}
+button.btn.acc{border-color:#2a4a24;color:var(--green);}
+button.btn.warn{border-color:#4a2430;color:#ff6b84;}
+button.btn.on{background:#16301a;border-color:var(--green);color:var(--green);}
+button.btn:disabled{opacity:.4;cursor:default;}
+.toggles{display:grid;grid-template-columns:repeat(2,1fr);gap:5px;}
+.tg{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--border);
+  border-radius:6px;padding:6px 7px;cursor:pointer;font-size:10px;color:var(--dim);}
+.tg .box{width:11px;height:11px;border:1px solid #33335c;border-radius:3px;flex:none;}
+.tg.on{color:var(--white);}
+.tg.on .box{background:var(--green);border-color:var(--green);box-shadow:0 0 7px rgba(57,255,20,.55);}
+.sl{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.sl label{font-size:9px;color:var(--dim);width:74px;flex:none;letter-spacing:.5px;}
+.sl input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:#1d1d38;border-radius:2px;}
+.sl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+  background:var(--green);box-shadow:0 0 8px rgba(57,255,20,.6);cursor:pointer;}
+.sl input[type=range]::-moz-range-thumb{width:15px;height:15px;border:none;border-radius:50%;background:var(--green);}
+.sl .v{font-size:9px;color:var(--white);width:38px;text-align:right;flex:none;}
+.note{font-size:9.5px;line-height:1.45;color:var(--dim);}
+.note b{color:var(--gold);font-weight:normal;}
+#dat{width:100%;font-size:9.5px;border-collapse:collapse;}
+#dat td{padding:3px 0;border-bottom:1px solid #12122400;}
+#dat tr td:first-child{color:var(--dim);}
+#dat tr td:last-child{text-align:right;color:var(--white);}
+#dat tr.sec td{color:var(--green);font-family:'Black Ops One',sans-serif;font-size:8px;
+  letter-spacing:1.4px;padding-top:9px;}
+#trace{width:100%;height:64px;display:block;border:1px solid var(--border);border-radius:6px;background:#080814;}
+
+/* handle */
+#handle{height:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+#handle div{width:34px;height:3px;border-radius:2px;background:#2a2a4a;}
+
+/* ---------------- inspector ---------------- */
+#inspect{
+  position:fixed;z-index:70;left:50%;transform:translateX(-50%);
+  top:calc(46px + var(--safeT));width:min(300px,calc(100vw - 20px));
+  background:rgba(10,10,21,0.95);border:1px solid var(--border);border-radius:10px;
+  padding:10px 11px;display:none;box-shadow:0 8px 40px #000;backdrop-filter:blur(8px);
+}
+#inspect.on{display:block;}
+#inspect h3{font-family:'Black Ops One',sans-serif;font-size:10px;letter-spacing:1.6px;margin-bottom:2px;}
+#inspect .sub{font-size:9px;color:var(--dim);margin-bottom:6px;}
+#inspect p{font-size:10.5px;line-height:1.5;color:var(--white);margin-bottom:6px;}
+#inspect .kv{display:flex;justify-content:space-between;font-size:9.5px;color:var(--dim);padding:2px 0;border-top:1px solid #14142a;}
+#inspect .kv span:last-child{color:var(--white);}
+#inspect .x{position:absolute;top:6px;right:8px;color:var(--dim);font-size:14px;cursor:pointer;padding:2px 4px;}
+
+/* ---------------- overlay (help / splash) ---------------- */
+#ov{
+  position:fixed;inset:0;z-index:75;background:rgba(4,4,10,0.93);display:none;
+  align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);
+}
+#ov.on{display:flex;}
+#ov .card{
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  max-width:420px;width:100%;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:18px 16px;box-shadow:0 0 60px #000;
+}
+#ov h2{font-family:'Black Ops One',sans-serif;font-size:14px;letter-spacing:2.5px;color:var(--green);margin-bottom:3px;}
+#ov .tag{font-size:9.5px;color:var(--dim);letter-spacing:1.2px;margin-bottom:12px;}
+#ov h4{font-family:'Black Ops One',sans-serif;font-size:9px;letter-spacing:1.6px;color:var(--gold);margin:12px 0 5px;}
+#ov p,#ov li{font-size:10.5px;line-height:1.55;color:var(--white);}
+#ov ul{padding-left:15px;}
+#ov li{margin-bottom:3px;}
+#ov .dim{color:var(--dim);}
+#ov button{margin-top:15px;}
+
+/* landscape */
+@media (orientation:landscape) and (max-height:520px){
+  #dock{left:auto;right:0;top:0;bottom:0;width:250px;max-height:100%;
+    border-top:none;border-left:1px solid var(--border);padding-bottom:0;}
+  #panes{padding-bottom:calc(12px + var(--safeB));}
+  #readouts{top:calc(84px + var(--safeT));right:calc(258px + var(--safeR));}
+  #narr{right:calc(258px + var(--safeR));bottom:calc(8px + var(--safeB));max-height:46vh;}
+  #titlebar{right:256px;}
+}
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 23:45 UTC</div>
+
+<canvas id="gl"></canvas>
+<canvas id="ui"></canvas>
+
+<a id="back-btn" class="chip" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute-btn" class="chip" aria-label="Toggle sound">🔊</button>
+<button id="help-btn" class="chip" aria-label="Guide">ⓘ</button>
+<button id="reset-btn" class="chip" aria-label="Reset view">⟲</button>
+
+<div id="titlebar">
+  <h1>MITOCHONDRIA SIMULATOR</h1>
+  <div class="scn" id="scn-name">RESTING MUSCLE · STATE 4</div>
+</div>
+
+<div id="readouts"></div>
+
+<div id="inspect"><span class="x" id="inspect-x">✕</span><div id="inspect-body"></div></div>
+
+<div id="narr">
+  <div class="nh"><div class="nt" id="narr-title"></div><div class="nstep" id="narr-step"></div></div>
+  <div class="nb" id="narr-body"></div>
+  <div class="nav">
+    <button class="btn" id="narr-prev">◀ BACK</button>
+    <button class="btn" id="narr-exit">EXIT</button>
+    <button class="btn acc" id="narr-next">NEXT ▶</button>
+  </div>
+</div>
+
+<div id="dock">
+  <div id="handle"><div></div></div>
+  <div id="tabs">
+    <button data-p="run" class="on">RUN</button>
+    <button data-p="learn">LEARN</button>
+    <button data-p="view">VIEW</button>
+    <button data-p="data">DATA</button>
+  </div>
+  <div id="panes">
+    <div class="pane on" id="pane-run">
+      <div class="grp">
+        <div class="glab">SCENARIO — WHAT THE BODY IS DOING</div>
+        <select id="scenario"></select>
+      </div>
+      <div class="grp" id="scn-note-wrap"><div class="note" id="scn-note"></div></div>
+      <div class="grp">
+        <div class="glab">DO SOMETHING TO IT</div>
+        <div class="btnrow three" id="actions"></div>
+      </div>
+      <div class="grp">
+        <div class="glab">DIALS</div>
+        <div id="dials"></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-learn">
+      <div class="grp">
+        <div class="glab">GUIDED WALKTHROUGHS — TAP ONE, THEN STEP WITH ▶</div>
+        <div id="lessons"></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-view">
+      <div class="grp">
+        <div class="glab">LAYERS — HIDE PARTS TO SEE INSIDE</div>
+        <div class="toggles" id="layers"></div>
+      </div>
+      <div class="grp">
+        <div class="glab">SECTION &amp; MOTION</div>
+        <div id="viewsliders"></div>
+        <div class="btnrow" style="margin-top:6px;">
+          <button class="btn" id="spin-btn">AUTO-SPIN</button>
+          <button class="btn" id="slow-btn">SLOW MOTION</button>
+        </div>
+      </div>
+      <div class="grp">
+        <div class="note">Drag to orbit · pinch to zoom · two fingers to pan · tap a protein to inspect it.
+        The <b>cutaway</b> slider slices the membranes away so you can look straight into the matrix.</div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-data">
+      <canvas id="trace"></canvas>
+      <div class="note" style="margin:6px 0 10px;" id="trace-key"></div>
+      <table id="dat"></table>
+    </div>
+  </div>
+</div>
+
+<div id="ov"><div class="card" id="ov-card"></div></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   MITOCHONDRIA SIMULATOR
+   A single-file WebGL2 diorama + biophysical simulation of one human
+   mitochondrion. Geometry, textures and audio are all generated in-file.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------- utils */
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const smoothstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+const expApproach = (cur, tgt, rate, dt) => cur + (tgt - cur) * (1 - Math.exp(-rate * dt));
+const fmt = (v, d) => (Math.abs(v) < 1e-9 ? 0 : v).toFixed(d === undefined ? 1 : d);
+
+/* deterministic RNG so the organelle is the same shape every visit */
+function mulberry(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+/* cheap value noise for organic wobble */
+function noise3(seed) {
+  const r = mulberry(seed), G = 12, tab = new Float32Array(G * G * G);
+  for (let i = 0; i < tab.length; i++) tab[i] = r();
+  const at = (x, y, z) => tab[(((x % G) + G) % G) * G * G + (((y % G) + G) % G) * G + (((z % G) + G) % G)];
+  return (x, y, z) => {
+    const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+    const xf = x - xi, yf = y - yi, zf = z - zi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), w = zf * zf * (3 - 2 * zf);
+    const c = (a, b, t) => a + (b - a) * t;
+    return c(
+      c(c(at(xi, yi, zi), at(xi + 1, yi, zi), u), c(at(xi, yi + 1, zi), at(xi + 1, yi + 1, zi), u), v),
+      c(c(at(xi, yi, zi + 1), at(xi + 1, yi, zi + 1), u), c(at(xi, yi + 1, zi + 1), at(xi + 1, yi + 1, zi + 1), u), v),
+      w) * 2 - 1;
+  };
+}
+
+/* ------------------------------------------------------------ 4x4 maths */
+const M4 = {
+  ident: (o) => { o = o || new Float32Array(16); o.fill(0); o[0] = o[5] = o[10] = o[15] = 1; return o; },
+  mul(a, b, o) {
+    o = o || new Float32Array(16);
+    for (let c = 0; c < 4; c++) {
+      const b0 = b[c * 4], b1 = b[c * 4 + 1], b2 = b[c * 4 + 2], b3 = b[c * 4 + 3];
+      o[c * 4]     = a[0] * b0 + a[4] * b1 + a[8]  * b2 + a[12] * b3;
+      o[c * 4 + 1] = a[1] * b0 + a[5] * b1 + a[9]  * b2 + a[13] * b3;
+      o[c * 4 + 2] = a[2] * b0 + a[6] * b1 + a[10] * b2 + a[14] * b3;
+      o[c * 4 + 3] = a[3] * b0 + a[7] * b1 + a[11] * b2 + a[15] * b3;
+    }
+    return o;
+  },
+  persp(fovy, asp, n, f, o) {
+    o = M4.ident(o); const t = 1 / Math.tan(fovy / 2);
+    o[0] = t / asp; o[5] = t; o[10] = (f + n) / (n - f); o[11] = -1;
+    o[14] = 2 * f * n / (n - f); o[15] = 0; return o;
+  },
+  lookAt(e, c, up, o) {
+    o = o || new Float32Array(16);
+    let zx = e[0] - c[0], zy = e[1] - c[1], zz = e[2] - c[2];
+    let l = Math.hypot(zx, zy, zz) || 1; zx /= l; zy /= l; zz /= l;
+    let xx = up[1] * zz - up[2] * zy, xy = up[2] * zx - up[0] * zz, xz = up[0] * zy - up[1] * zx;
+    l = Math.hypot(xx, xy, xz) || 1; xx /= l; xy /= l; xz /= l;
+    const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+    o[0] = xx; o[1] = yx; o[2] = zx; o[3] = 0;
+    o[4] = xy; o[5] = yy; o[6] = zy; o[7] = 0;
+    o[8] = xz; o[9] = yz; o[10] = zz; o[11] = 0;
+    o[12] = -(xx * e[0] + xy * e[1] + xz * e[2]);
+    o[13] = -(yx * e[0] + yy * e[1] + yz * e[2]);
+    o[14] = -(zx * e[0] + zy * e[1] + zz * e[2]);
+    o[15] = 1; return o;
+  },
+};
+const V3 = {
+  sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+  add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+  scale: (a, s) => [a[0] * s, a[1] * s, a[2] * s],
+  cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+  len: (a) => Math.hypot(a[0], a[1], a[2]),
+  norm: (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+  lerp: (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)],
+};
+/* an orthonormal basis around n */
+function basis(n) {
+  const a = Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const t = V3.norm(V3.cross(a, n));
+  return [t, V3.cross(n, t)];
+}
+
+/* -------------------------------------------------------- mesh builder */
+/* Meshes are plain interleaved arrays: pos(3) nrm(3) col(3) flag(1) = 10 floats.
+   `flag` marks vertices that spin with the ATP-synthase rotor (1) or that
+   belong to a highlightable sub-part (2). */
+class Mesh {
+  constructor() { this.v = []; this.i = []; }
+  get vcount() { return this.v.length / 10; }
+  push(p, n, c, f) { this.v.push(p[0], p[1], p[2], n[0], n[1], n[2], c[0], c[1], c[2], f || 0); }
+  tri(a, b, c) { this.i.push(a, b, c); }
+  /* append a grid of (rows+1)x(cols+1) verts produced by fn(u,v) -> {p,n} */
+  grid(rows, cols, fn, col, flag, wrap) {
+    const base = this.vcount;
+    for (let i = 0; i <= rows; i++) for (let j = 0; j <= cols; j++) {
+      const r = fn(i / rows, j / cols);
+      this.push(r.p, r.n, r.c || col, r.f === undefined ? flag : r.f);
+    }
+    const W = cols + 1;
+    for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) {
+      const j2 = wrap && j === cols - 1 ? 0 : j + 1;
+      const a = base + i * W + j, b = base + i * W + j2;
+      const c = base + (i + 1) * W + j, d = base + (i + 1) * W + j2;
+      this.tri(a, c, b); this.tri(b, c, d);
+    }
+    return base;
+  }
+  /* primitives, all transformed by a frame {o, x, y, z} (unit axes) */
+  prim(kind, fr, s, col, flag) {
+    const put = (lx, ly, lz, nx, ny, nz) => {
+      const p = [
+        fr.o[0] + fr.x[0] * lx + fr.y[0] * ly + fr.z[0] * lz,
+        fr.o[1] + fr.x[1] * lx + fr.y[1] * ly + fr.z[1] * lz,
+        fr.o[2] + fr.x[2] * lx + fr.y[2] * ly + fr.z[2] * lz];
+      const n = V3.norm([
+        fr.x[0] * nx + fr.y[0] * ny + fr.z[0] * nz,
+        fr.x[1] * nx + fr.y[1] * ny + fr.z[1] * nz,
+        fr.x[2] * nx + fr.y[2] * ny + fr.z[2] * nz]);
+      this.push(p, n, col, flag);
+    };
+    const SEG = 14;
+    if (kind === 'sphere') {
+      // s = [rx, ry, rz]
+      const base = this.vcount, R = 9;
+      for (let i = 0; i <= R; i++) for (let j = 0; j <= SEG; j++) {
+        const th = i / R * Math.PI, ph = j / SEG * TAU;
+        const sx = Math.sin(th) * Math.cos(ph), sy = Math.cos(th), sz = Math.sin(th) * Math.sin(ph);
+        put(sx * s[0], sy * s[1], sz * s[2], sx / s[0], sy / s[1], sz / s[2]);
+      }
+      for (let i = 0; i < R; i++) for (let j = 0; j < SEG; j++) {
+        const a = base + i * (SEG + 1) + j, b = a + 1, c = a + SEG + 1, d = c + 1;
+        this.tri(a, c, b); this.tri(b, c, d);
+      }
+    } else if (kind === 'cyl') {
+      // s = [r0, r1, h]  (along local z, centred)
+      const base = this.vcount, h = s[2] / 2;
+      for (let i = 0; i <= 1; i++) for (let j = 0; j <= SEG; j++) {
+        const ph = j / SEG * TAU, r = i ? s[1] : s[0];
+        put(Math.cos(ph) * r, Math.sin(ph) * r, i ? h : -h, Math.cos(ph), Math.sin(ph), (s[0] - s[1]) * 0.6);
+      }
+      for (let j = 0; j < SEG; j++) {
+        const a = base + j, b = a + 1, c = base + SEG + 1 + j, d = c + 1;
+        this.tri(a, c, b); this.tri(b, c, d);
+      }
+      // caps
+      for (let i = 0; i <= 1; i++) {
+        const cb = this.vcount, r = i ? s[1] : s[0], z = i ? h : -h, nz = i ? 1 : -1;
+        put(0, 0, z, 0, 0, nz);
+        for (let j = 0; j <= SEG; j++) put(Math.cos(j / SEG * TAU) * r, Math.sin(j / SEG * TAU) * r, z, 0, 0, nz);
+        for (let j = 0; j < SEG; j++) {
+          if (nz > 0) this.tri(cb, cb + 1 + j, cb + 2 + j); else this.tri(cb, cb + 2 + j, cb + 1 + j);
+        }
+      }
+    } else if (kind === 'box') {
+      // s = [hx, hy, hz]
+      const F = [
+        [[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[-1, 0, 0], [0, -1, 0], [0, 0, 1]],
+        [[0, 1, 0], [0, 0, 1], [1, 0, 0]], [[0, -1, 0], [0, 0, -1], [1, 0, 0]],
+        [[0, 0, 1], [1, 0, 0], [0, 1, 0]], [[0, 0, -1], [-1, 0, 0], [0, 1, 0]]];
+      for (const [n, u, v] of F) {
+        const b = this.vcount;
+        for (const [su, sv] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+          put((n[0] + u[0] * su + v[0] * sv) * s[0], (n[1] + u[1] * su + v[1] * sv) * s[1],
+              (n[2] + u[2] * su + v[2] * sv) * s[2], n[0], n[1], n[2]);
+        }
+        this.tri(b, b + 1, b + 2); this.tri(b + 1, b + 3, b + 2);
+      }
+    }
+    return this;
+  }
+  /* a tube swept along a polyline of points */
+  tube(pts, r, col, flag, closed) {
+    const N = pts.length, SEG = 8, base = this.vcount;
+    for (let i = 0; i < N; i++) {
+      const a = pts[(i - 1 + N) % N], b = pts[(i + 1) % N];
+      const d = V3.norm(V3.sub(b, a)), [u, v] = basis(d);
+      for (let j = 0; j <= SEG; j++) {
+        const ph = j / SEG * TAU, cx = Math.cos(ph), sy = Math.sin(ph);
+        const n = V3.norm([u[0] * cx + v[0] * sy, u[1] * cx + v[1] * sy, u[2] * cx + v[2] * sy]);
+        this.push(V3.add(pts[i], V3.scale(n, r)), n, col, flag);
+      }
+    }
+    const rows = closed ? N : N - 1;
+    for (let i = 0; i < rows; i++) for (let j = 0; j < SEG; j++) {
+      const i2 = (i + 1) % N;
+      const a = base + i * (SEG + 1) + j, b = a + 1;
+      const c = base + i2 * (SEG + 1) + j, d = c + 1;
+      this.tri(a, c, b); this.tri(b, c, d);
+    }
+    return this;
+  }
+  buffers() { return { v: new Float32Array(this.v), i: new Uint32Array(this.i) }; }
+}
+/* ==================================================================== */
+/*  ORGANELLE GEOMETRY                                                  */
+/* ==================================================================== */
+/* A human mitochondrion is a bent rod roughly 0.7 um across and 2-3 um
+   long. We work in "world units" where 1 unit ~= 0.5 um, so the body is
+   about 4.6 x 1.5 units. The inner membrane carries far more area than the
+   outer one because it is thrown into lamellar cristae -- flattened sacs
+   whose lumen is continuous with the intermembrane space through narrow
+   crista junctions. All of that is built here, procedurally. */
+
+const GEO = (() => {
+  const nz = noise3(1337);
+  const L = 2.35;                       // half-length of the body
+  const R = 0.74;                       // nominal radius
+  const bend = 0.20;                    // gentle banana curve
+
+  /* centre-line of the organelle at axial parameter t in [0,1] */
+  function spine(t) {
+    const x = (t - 0.5) * 2 * L;
+    const y = bend * (Math.cos((t - 0.5) * Math.PI) - 0.63) * 2;
+    return [x, y, 0];
+  }
+  function spineDir(t) {
+    const e = 0.004, a = spine(clamp(t - e, 0, 1)), b = spine(clamp(t + e, 0, 1));
+    return V3.norm(V3.sub(b, a));
+  }
+  /* radius profile: rod with rounded caps + organic wobble */
+  function radius(t, ph, shrink) {
+    const cap = Math.pow(Math.sin(Math.PI * clamp(t, 0, 1)), 0.34);
+    const wob = 1 + 0.075 * nz(t * 5.5, Math.cos(ph) * 1.4, Math.sin(ph) * 1.4)
+                  + 0.045 * nz(t * 11, Math.cos(ph) * 3, Math.sin(ph) * 3);
+    return R * cap * wob * (shrink === undefined ? 1 : shrink);
+  }
+  /* surface point of a shell at (t, ph) */
+  function shellPt(t, ph, shrink) {
+    const c = spine(t), d = spineDir(t), [u, v] = basis(d);
+    const r = radius(t, ph, shrink);
+    return [c[0] + (u[0] * Math.cos(ph) + v[0] * Math.sin(ph)) * r,
+            c[1] + (u[1] * Math.cos(ph) + v[1] * Math.sin(ph)) * r,
+            c[2] + (u[2] * Math.cos(ph) + v[2] * Math.sin(ph)) * r];
+  }
+  function shellMesh(shrink, rows, cols, col) {
+    const m = new Mesh();
+    m.grid(rows, cols, (a, b) => {
+      const t = clamp(a, 0.001, 0.999), ph = b * TAU;
+      const p = shellPt(t, ph, shrink);
+      const e = 0.006;
+      const pa = shellPt(clamp(t + e, 0.001, 0.999), ph, shrink);
+      const pb = shellPt(t, ph + 0.02, shrink);
+      const n = V3.norm(V3.cross(V3.sub(pa, p), V3.sub(pb, p)));
+      return { p, n: V3.dot(n, V3.sub(p, spine(t))) < 0 ? V3.scale(n, -1) : n };
+    }, col, 0, true);
+    return m;
+  }
+
+  /* ---- cristae -------------------------------------------------------
+     Each crista is a flattened sac: two membrane leaflets a short distance
+     apart, sealed at a rounded rim, tilted across the body. It is cut away
+     over one arc so the matrix stays continuous around it and so we can see
+     into the lumen. */
+  const CRISTAE = [];
+  (function planCristae() {
+    const rnd = mulberry(24601);
+    const n = 11;
+    for (let i = 0; i < n; i++) {
+      const t = 0.115 + (i + (rnd() - 0.5) * 0.35) * (0.775 / (n - 1));
+      const c = spine(t), d = spineDir(t), [u, v] = basis(d);
+      // tilt the plate away from perpendicular a little
+      const tiltA = (rnd() - 0.5) * 0.62, tiltB = (rnd() - 0.5) * 0.62;
+      const nrm = V3.norm([d[0] + u[0] * tiltA + v[0] * tiltB,
+                           d[1] + u[1] * tiltA + v[1] * tiltB,
+                           d[2] + u[2] * tiltA + v[2] * tiltB]);
+      const [px, py] = basis(nrm);
+      const rad = radius(t, 0) * (0.84 + rnd() * 0.10);
+      CRISTAE.push({
+        t, c, n: nrm, x: px, y: py, rad,
+        half: 0.085 + rnd() * 0.035,                 // half-thickness of the sac
+        gap0: rnd() * TAU, gapW: 0.72 + rnd() * 0.5, // the missing arc (junction side)
+        seed: (rnd() * 1e6) | 0,
+      });
+    }
+  })();
+  const cristaPt = (cr, rho, ang, side) => {
+    // side = +1 / -1 leaflet;  rho in [0,1] radial, ang in radians
+    const wob = 1 + 0.05 * nz(Math.cos(ang) * 2 + cr.t * 9, Math.sin(ang) * 2, cr.t * 4);
+    const rr = rho * cr.rad * wob;
+    const z = side * cr.half * Math.sqrt(Math.max(0, 1 - Math.pow(rho, 7)));
+    return [cr.c[0] + cr.x[0] * Math.cos(ang) * rr + cr.y[0] * Math.sin(ang) * rr + cr.n[0] * z,
+            cr.c[1] + cr.x[1] * Math.cos(ang) * rr + cr.y[1] * Math.sin(ang) * rr + cr.n[1] * z,
+            cr.c[2] + cr.x[2] * Math.cos(ang) * rr + cr.y[2] * Math.sin(ang) * rr + cr.n[2] * z];
+  };
+  function cristaeMesh(col) {
+    const m = new Mesh();
+    for (const cr of CRISTAE) {
+      const span = TAU - cr.gapW;
+      for (const side of [1, -1]) {
+        m.grid(9, 30, (a, b) => {
+          const rho = 0.045 + a * 0.955, ang = cr.gap0 + cr.gapW / 2 + b * span;
+          const p = cristaPt(cr, rho, ang, side);
+          const pa = cristaPt(cr, Math.min(1, rho + 0.012), ang, side);
+          const pb = cristaPt(cr, rho, ang + 0.02, side);
+          let n = V3.norm(V3.cross(V3.sub(pa, p), V3.sub(pb, p)));
+          if (V3.dot(n, cr.n) * side < 0) n = V3.scale(n, -1);
+          return { p, n };
+        }, col, 0, false);
+      }
+      // seal the cut edges so the lumen reads as an enclosed sac
+      for (const edge of [0, 1]) {
+        const ang = cr.gap0 + (edge ? cr.gapW / 2 + span : cr.gapW / 2);
+        m.grid(9, 6, (a, b) => {
+          const rho = 0.045 + a * 0.955, side = b * 2 - 1;
+          const p = cristaPt(cr, rho, ang, side);
+          const t2 = V3.norm(V3.sub(cristaPt(cr, Math.min(1, rho + 0.02), ang, side), p));
+          const n = V3.norm(V3.cross(t2, cr.n));
+          return { p, n: edge ? n : V3.scale(n, -1) };
+        }, col, 0, false);
+      }
+    }
+    return m;
+  }
+
+  return { L, R, spine, spineDir, radius, shellPt, shellMesh, CRISTAE, cristaPt, cristaeMesh, nz };
+})();
+/* ==================================================================== */
+/*  PROTEIN MACHINERY                                                   */
+/* ==================================================================== */
+/* Every complex is modelled in a local frame where +z points into the
+   MATRIX, z=0 is the middle of the bilayer and -z is the intermembrane
+   space (which, on a crista, means the lumen of the sac). Shapes are
+   deliberately stylised but keep the real topology: Complex I's L, the
+   bc1 dimer, the mushroom of ATP synthase with its rotor inside a static
+   head. Vertices flagged 1 spin with the rotor. */
+
+const PROTEIN = {
+  ci:  { name: 'COMPLEX I', full: 'NADH:ubiquinone oxidoreductase', col: [0.26, 0.42, 1.0],
+         mass: '~1.0 MDa · 45 subunits', pumps: 4,
+         txt: 'The largest respiratory enzyme and the entry point for most electrons. It takes a hydride from <b>NADH</b>, hands the electrons down a wire of seven iron–sulfur clusters in its 20 nm matrix arm, and delivers them to <b>ubiquinone</b> in the bilayer. The energy released drives <b>4 H⁺</b> out of the matrix through three antiporter-like channels in the membrane arm — one of them worked at a distance by a long horizontal helix.',
+         facts: [['Electron donor', 'NADH'], ['Acceptor', 'Ubiquinone (Q)'], ['H⁺ pumped', '4 per 2e⁻'], ['Blocked by', 'Rotenone, metformin']] },
+  cii: { name: 'COMPLEX II', full: 'Succinate dehydrogenase', col: [0.16, 0.88, 0.68],
+         mass: '~124 kDa · 4 subunits', pumps: 0,
+         txt: 'The only enzyme that belongs to <i>both</i> the Krebs cycle and the respiratory chain. It oxidises <b>succinate</b> to fumarate and passes the electrons via FAD into the Q pool. It spans only the surface of the membrane and <b>pumps no protons</b> — which is exactly why FADH₂ yields less ATP than NADH.',
+         facts: [['Electron donor', 'FADH₂ / succinate'], ['H⁺ pumped', '0'], ['Also in', 'Krebs cycle step 6'], ['Blocked by', 'Malonate']] },
+  ciii:{ name: 'COMPLEX III', full: 'Cytochrome bc₁ complex', col: [0.80, 0.30, 0.98],
+         mass: '~480 kDa · obligate dimer', pumps: 4,
+         txt: 'Works as a dimer and runs the <b>Q cycle</b>: for every ubiquinol oxidised it splits the two electrons — one goes to cytochrome c, the other recycles back onto a second quinone. The net effect is <b>4 H⁺</b> released into the intermembrane space per pair of electrons, half of them simply carried across by the quinone itself.',
+         facts: [['Electron donor', 'Ubiquinol (QH₂)'], ['Acceptor', 'Cytochrome c'], ['H⁺ released', '4 per 2e⁻'], ['Blocked by', 'Antimycin A']] },
+  civ: { name: 'COMPLEX IV', full: 'Cytochrome c oxidase', col: [1.0, 0.40, 0.20],
+         mass: '~200 kDa · 14 subunits', pumps: 2,
+         txt: 'The end of the line. Four electrons delivered one at a time by cytochrome c are held at a copper–heme centre until a whole <b>O₂</b> molecule can be reduced to <b>two waters</b> without ever letting a partly-reduced radical escape. It pumps <b>2 H⁺</b> and consumes 2 more from the matrix — 4 charges moved per pair of electrons.',
+         facts: [['Electron donor', 'Cytochrome c'], ['Acceptor', 'O₂ → H₂O'], ['H⁺ pumped', '2 per 2e⁻'], ['Blocked by', 'Cyanide, CO, H₂S']] },
+  cv:  { name: 'ATP SYNTHASE', full: 'Complex V · F₁F₀-ATPase', col: [1.0, 0.76, 0.22],
+         mass: '~600 kDa · rotary motor', pumps: -1,
+         txt: 'A molecular turbine. Protons falling back into the matrix turn a ring of <b>8 c-subunits</b>, and the bent γ-shaft inside forces each of the three β-subunits through open → loose → tight in turn, squeezing ADP and phosphate together. One full revolution costs <b>8 H⁺</b> and makes <b>3 ATP</b>. Synthases sit in <b>double rows along the crista rims</b> — the dimers themselves bend the membrane into the fold.',
+         facts: [['Driven by', 'Proton-motive force'], ['Stoichiometry', '8 H⁺ → 3 ATP'], ['Rotation', 'up to ~350 rev/s'], ['Blocked by', 'Oligomycin']] },
+  ant: { name: 'ANT', full: 'Adenine nucleotide translocase', col: [0.95, 0.62, 0.30],
+         mass: '~33 kDa', pumps: 0,
+         txt: 'The busiest protein in the inner membrane. It swaps matrix <b>ATP⁴⁻</b> for cytosolic <b>ADP³⁻</b>, one for one. Because the charges differ, the exchange is driven by the membrane voltage and costs part of the gradient — this is why an exported ATP really costs about <b>3.7 H⁺</b>, not 2.7.',
+         facts: [['Exchanges', 'ATP⁴⁻ out / ADP³⁻ in'], ['Driven by', 'ΔΨ'], ['Abundance', '~10% of inner-membrane protein'], ['Blocked by', 'Atractyloside']] },
+  pic: { name: 'PiC', full: 'Phosphate carrier', col: [0.55, 0.75, 0.95],
+         mass: '~34 kDa', pumps: 0,
+         txt: 'Brings inorganic <b>phosphate</b> into the matrix together with a proton, using ΔpH. Without it ATP synthase would run out of substrate within seconds.',
+         facts: [['Carries', 'Pi + H⁺ inward'], ['Driven by', 'ΔpH']] },
+  mpc: { name: 'MPC', full: 'Mitochondrial pyruvate carrier', col: [0.65, 0.95, 0.45],
+         mass: '~15 kDa heterodimer', pumps: 0,
+         txt: 'The gate for sugar-derived fuel. <b>Pyruvate</b> made by glycolysis in the cytosol is carried across with a proton, then handed to the pyruvate dehydrogenase complex which strips a CO₂ and makes acetyl-CoA + NADH.',
+         facts: [['Carries', 'Pyruvate + H⁺ inward'], ['Feeds', 'PDH → acetyl-CoA'], ['Blocked by', 'UK5099']] },
+  mcu: { name: 'MCU', full: 'Mitochondrial calcium uniporter', col: [1.0, 0.55, 0.10],
+         mass: '~35 kDa · tetramer', pumps: 0,
+         txt: 'A highly selective <b>Ca²⁺</b> channel. Calcium entering the matrix switches on three Krebs-cycle dehydrogenases at once, so a cell that is signalling to work harder also tells its mitochondria to make more fuel. Too much, though, and the permeability transition pore opens.',
+         facts: [['Carries', 'Ca²⁺ inward'], ['Driven by', 'ΔΨ (−170 mV)'], ['Activates', 'PDH, IDH, OGDH'], ['Danger', 'Overload → MPTP']] },
+  ucp: { name: 'UCP1', full: 'Uncoupling protein 1 · thermogenin', col: [1.0, 0.30, 0.34],
+         mass: '~33 kDa', pumps: 0,
+         txt: 'Found in <b>brown adipose tissue</b>. It lets protons leak straight back into the matrix without passing through ATP synthase, so all of the gradient\'s energy comes out as <b>heat</b>. This is how a newborn — who cannot shiver — keeps warm.',
+         facts: [['Carries', 'H⁺ inward (leak)'], ['Product', 'Heat, not ATP'], ['Switched on by', 'Noradrenaline, free fatty acids']] },
+  vdac:{ name: 'VDAC', full: 'Voltage-dependent anion channel · porin', col: [0.40, 0.85, 0.90],
+         mass: '~32 kDa · 19-strand β-barrel', pumps: 0,
+         txt: 'The outer membrane is a sieve, not a barrier: VDAC lets anything under about <b>5 kDa</b> pass freely, which is why the intermembrane space is chemically close to cytosol. It is also the exit that <b>cytochrome c</b> takes when a cell commits to apoptosis.',
+         facts: [['Cut-off', '~5 kDa'], ['Carries', 'ATP, ADP, Pi, pyruvate, ions'], ['Also', 'Apoptosis gateway']] },
+  tom: { name: 'TOM/TIM', full: 'Protein import translocases', col: [0.72, 0.72, 0.85],
+         mass: 'TOM40 + TIM23 machinery', pumps: 0,
+         txt: 'Mitochondrial DNA encodes only <b>13</b> proteins. The other ~1,100 are made in the cytosol and threaded through TOM in the outer membrane and TIM in the inner — a process that itself needs the membrane voltage, which is why an ailing mitochondrion cannot repair itself.',
+         facts: [['Imports', '~99% of the proteome'], ['Needs', 'ΔΨ across the inner membrane'], ['Failure signal', 'PINK1 accumulates → mitophagy']] },
+};
+
+/* ---- build one mesh per protein type -------------------------------- */
+function buildProteinMeshes() {
+  const out = {};
+  const Z = [0, 0, 1], X = [1, 0, 0], Y = [0, 1, 0];
+  const at = (p) => ({ o: p, x: X, y: Y, z: Z });
+  const dark = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
+
+  // COMPLEX I — membrane arm + upright peripheral arm (the famous L)
+  {
+    const m = new Mesh(), c = PROTEIN.ci.col;
+    m.prim('box', at([-0.030, 0, 0]), [0.088, 0.030, 0.036], dark(c, 0.72), 0);
+    m.prim('box', at([0.055, 0, 0.004]), [0.036, 0.032, 0.040], dark(c, 0.86), 0);
+    m.prim('cyl', at([0.052, 0, 0.088]), [0.038, 0.030, 0.10], c, 2);
+    m.prim('cyl', at([0.048, 0, 0.168]), [0.030, 0.024, 0.075], dark(c, 1.15), 2);
+    m.prim('sphere', at([0.046, 0, 0.208]), [0.031, 0.028, 0.026], dark(c, 1.3), 2);
+    // the long lateral helix that couples the pumps
+    m.prim('cyl', { o: [-0.030, 0.033, 0.012], x: Z, y: Y, z: X }, [0.010, 0.010, 0.17], dark(c, 1.25), 0);
+    out.ci = m;
+  }
+  // COMPLEX II — small, sits on the matrix face
+  {
+    const m = new Mesh(), c = PROTEIN.cii.col;
+    m.prim('cyl', at([0, 0, 0.005]), [0.034, 0.030, 0.062], dark(c, 0.7), 0);
+    m.prim('sphere', at([0, 0, 0.062]), [0.046, 0.046, 0.040], c, 2);
+    m.prim('sphere', at([0.012, 0.010, 0.098]), [0.028, 0.028, 0.024], dark(c, 1.25), 2);
+    out.cii = m;
+  }
+  // COMPLEX III — obligate dimer
+  {
+    const m = new Mesh(), c = PROTEIN.ciii.col;
+    for (const s of [-1, 1]) {
+      m.prim('cyl', at([s * 0.046, 0, 0]), [0.044, 0.042, 0.092], dark(c, 0.72), 0);
+      m.prim('sphere', at([s * 0.046, 0, 0.078]), [0.044, 0.040, 0.040], c, 2);
+      m.prim('sphere', at([s * 0.046, 0, -0.070]), [0.036, 0.034, 0.030], dark(c, 0.85), 0);
+      m.prim('sphere', at([s * 0.070, 0, -0.052]), [0.020, 0.020, 0.018], dark(c, 1.3), 0);
+    }
+    out.ciii = m;
+  }
+  // COMPLEX IV — compact barrel
+  {
+    const m = new Mesh(), c = PROTEIN.civ.col;
+    m.prim('cyl', at([0, 0, 0]), [0.058, 0.048, 0.095], dark(c, 0.72), 0);
+    m.prim('sphere', at([0, 0, 0.070]), [0.048, 0.044, 0.032], c, 2);
+    m.prim('sphere', at([0.020, 0.014, -0.062]), [0.026, 0.026, 0.022], dark(c, 1.2), 0);
+    m.prim('sphere', at([-0.022, -0.010, -0.058]), [0.020, 0.020, 0.017], dark(c, 0.9), 0);
+    out.civ = m;
+  }
+  // ATP SYNTHASE — static head + stator, spinning c-ring and shaft (flag 1)
+  {
+    const m = new Mesh(), c = PROTEIN.cv.col;
+    m.prim('cyl', at([0, 0, -0.005]), [0.050, 0.050, 0.078], dark(c, 0.62), 1);   // c-ring (rotor)
+    m.prim('box', at([0.050, 0, -0.005]), [0.012, 0.012, 0.039], dark(c, 0.45), 1); // rotor marker
+    m.prim('cyl', at([0, 0, 0.062]), [0.016, 0.014, 0.058], dark(c, 0.8), 1);      // gamma shaft
+    m.prim('sphere', at([0, 0, 0.145]), [0.068, 0.068, 0.058], c, 2);              // F1 head
+    for (let i = 0; i < 3; i++) {                                                   // beta lobes
+      const a = i / 3 * TAU;
+      m.prim('sphere', at([Math.cos(a) * 0.046, Math.sin(a) * 0.046, 0.160]), [0.030, 0.030, 0.028], dark(c, 1.25), 2);
+    }
+    m.prim('cyl', { o: [0.072, 0, 0.075], x: X, y: Y, z: Z }, [0.013, 0.013, 0.155], dark(c, 0.9), 0); // stator
+    m.prim('sphere', at([0.050, 0, 0.170]), [0.024, 0.024, 0.020], dark(c, 1.05), 0);                  // OSCP
+    out.cv = m;
+  }
+  // carriers / channels — squat barrels with a visible pore
+  const barrel = (key, h, r) => {
+    const m = new Mesh(), c = PROTEIN[key].col;
+    m.prim('cyl', at([0, 0, 0]), [r, r * 0.94, h], c, 0);
+    m.prim('cyl', at([0, 0, h * 0.52]), [r * 0.42, r * 0.42, h * 0.22], [0.03, 0.03, 0.06], 0);
+    m.prim('sphere', at([0, 0, h * 0.60]), [r * 0.86, r * 0.86, 0.012], dark(c, 1.2), 0);
+    out[key] = m;
+  };
+  barrel('ant', 0.085, 0.040); barrel('pic', 0.085, 0.034); barrel('mpc', 0.085, 0.033);
+  barrel('mcu', 0.090, 0.038); barrel('ucp', 0.085, 0.038);
+  barrel('vdac', 0.062, 0.036); barrel('tom', 0.066, 0.042);
+  return out;
+}
+
+/* ---- decide where every molecule sits ------------------------------- */
+/* SITES is the single source of truth shared by the renderer, the picker
+   and the particle system: each entry knows its membrane frame and the two
+   points a proton would be pumped between. */
+const SITES = [];
+function placeProteins() {
+  const rnd = mulberry(90210);
+  const push = (type, p, n, tang, extra) => {
+    const s = Object.assign({ type, p, n: V3.norm(n), t: V3.norm(tang), spin: rnd() * TAU, id: SITES.length }, extra);
+    // matrix-side and IMS-side anchor points for particle traffic
+    s.pM = V3.add(s.p, V3.scale(s.n, 0.11));
+    s.pI = V3.add(s.p, V3.scale(s.n, -0.10));
+    SITES.push(s); return s;
+  };
+
+  /* --- respiratory chain on the crista leaflets --- */
+  GEO.CRISTAE.forEach((cr, ci) => {
+    const span = TAU - cr.gapW;
+    const faceNormal = (rho, ang, side) => {
+      const p = GEO.cristaPt(cr, rho, ang, side);
+      const pa = GEO.cristaPt(cr, Math.min(0.99, rho + 0.02), ang, side);
+      const pb = GEO.cristaPt(cr, rho, ang + 0.03, side);
+      let n = V3.norm(V3.cross(V3.sub(pa, p), V3.sub(pb, p)));
+      if (V3.dot(n, cr.n) * side < 0) n = V3.scale(n, -1);
+      return { p, n, t: V3.norm(V3.sub(pa, p)) };
+    };
+    for (const side of [1, -1]) {
+      // supercomplexes (respirasomes) — I + III2 + IV cluster together in vivo
+      const nClusters = 3;
+      for (let k = 0; k < nClusters; k++) {
+        const rho = 0.30 + rnd() * 0.34, ang = cr.gap0 + cr.gapW / 2 + (0.16 + rnd() * 0.68) * span;
+        const members = [['ci', 0], ['ciii', 0.075], ['civ', 0.14]];
+        for (const [type, off] of members) {
+          const a2 = ang + off / Math.max(0.12, rho * cr.rad) * 0.55;
+          const f = faceNormal(clamp(rho + (rnd() - 0.5) * 0.06, 0.12, 0.86), a2, side);
+          push(type, f.p, f.n, f.t, { crista: ci, side, sc: 1 });
+        }
+      }
+      // lone complex II and a few spare IVs
+      for (let k = 0; k < 2; k++) {
+        const f = faceNormal(0.18 + rnd() * 0.6, cr.gap0 + cr.gapW / 2 + rnd() * span, side);
+        push('cii', f.p, f.n, f.t, { crista: ci, side, sc: 1 });
+      }
+      // ATP synthase dimer rows along the highly curved rim
+      const nDim = 4;
+      for (let k = 0; k < nDim; k++) {
+        const ang = cr.gap0 + cr.gapW / 2 + (0.10 + (k + rnd() * 0.5) / nDim * 0.82) * span;
+        for (const d of [-1, 1]) {
+          const f = faceNormal(0.905, ang + d * 0.075, side);
+          const tilt = V3.norm(V3.add(f.n, V3.scale(V3.norm(V3.sub(f.p, cr.c)), 0.42 * d * 0)));
+          push('cv', f.p, tilt, f.t, { crista: ci, side, rim: true, sc: 1 });
+        }
+      }
+    }
+  });
+
+  /* --- carriers on the inner boundary membrane (normals face the matrix) --- */
+  const innerSite = (t, ph) => {
+    const p = GEO.shellPt(t, ph, 0.87);
+    const c = GEO.spine(t);
+    const n = V3.scale(V3.norm(V3.sub(p, c)), -1);           // inward = matrix side
+    const t2 = V3.norm(V3.sub(GEO.shellPt(clamp(t + 0.01, 0, 1), ph, 0.87), p));
+    return { p, n, t: t2 };
+  };
+  const innerPlan = [['ant', 26], ['pic', 10], ['mpc', 7], ['mcu', 5], ['ucp', 8], ['ci', 5], ['civ', 5], ['cv', 6]];
+  for (const [type, n] of innerPlan) {
+    for (let k = 0; k < n; k++) {
+      const f = innerSite(0.09 + rnd() * 0.82, rnd() * TAU);
+      push(type, f.p, f.n, f.t, { boundary: true, sc: 1 });
+    }
+  }
+  /* --- porins on the outer membrane (normals face outward, into cytosol) --- */
+  const outerPlan = [['vdac', 40], ['tom', 9]];
+  for (const [type, n] of outerPlan) {
+    for (let k = 0; k < n; k++) {
+      const t = 0.06 + rnd() * 0.88, ph = rnd() * TAU;
+      const p = GEO.shellPt(t, ph, 1.0);
+      const nn = V3.norm(V3.sub(p, GEO.spine(t)));
+      const tg = V3.norm(V3.sub(GEO.shellPt(clamp(t + 0.01, 0, 1), ph, 1.0), p));
+      const s = push(type, p, nn, tg, { outer: true, sc: 1 });
+      s.pM = V3.add(s.p, V3.scale(s.n, -0.09));   // for the outer membrane, "in" is the IMS
+      s.pI = V3.add(s.p, V3.scale(s.n, 0.13));
+    }
+  }
+}
+placeProteins();
+const SITES_BY_TYPE = {};
+for (const s of SITES) (SITES_BY_TYPE[s.type] = SITES_BY_TYPE[s.type] || []).push(s);
+
+/* ---- matrix furniture: mtDNA nucleoids, mitoribosomes ----------------
+   Built as unit meshes plus instance lists so they deform with the
+   organelle when it divides. */
+function buildMatrixParts() {
+  const rnd = mulberry(555);
+  const dnaCol = [0.45, 0.95, 1.0], riboCol = [0.86, 0.82, 0.66];
+
+  const nucMesh = new Mesh(), pts = [];
+  const a1 = rnd() * TAU, a2 = rnd() * TAU;
+  for (let i = 0; i < 40; i++) {
+    const u = i / 40 * TAU;
+    pts.push([Math.cos(u) * (0.8 + 0.34 * Math.sin(3 * u + a1)),
+              Math.sin(u) * (0.8 + 0.34 * Math.cos(2 * u + a2)),
+              Math.sin(2 * u + a1) * 0.5]);
+  }
+  nucMesh.tube(pts, 0.075, dnaCol, 2, true);
+
+  const riboMesh = new Mesh(), I = { o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
+  riboMesh.prim('sphere', I, [0.034, 0.030, 0.030], riboCol, 0);
+  riboMesh.prim('sphere', { o: [0.030, 0.014, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] },
+    [0.023, 0.021, 0.021], [0.70, 0.66, 0.55], 0);
+
+  const nodeMesh = new Mesh();
+  nodeMesh.prim('sphere', I, [0.062, 0.056, 0.056], [0.55, 0.85, 0.60], 2);
+
+  const nuc = [], ribo = [];
+  for (let k = 0; k < 5; k++) {
+    const t = 0.17 + k * 0.16 + rnd() * 0.04;
+    const c = GEO.spine(t), rr = GEO.radius(t, 0) * 0.30;
+    nuc.push({ p: [c[0] + (rnd() - 0.5) * 0.30, c[1] + (rnd() - 0.5) * 0.34, c[2] + (rnd() - 0.5) * 0.34],
+               s: rr * (0.85 + rnd() * 0.3), a: rnd() * TAU });
+  }
+  for (let k = 0; k < 28; k++) {
+    const t = 0.10 + rnd() * 0.8, c = GEO.spine(t), rr = GEO.radius(t, 0) * 0.60;
+    ribo.push({ p: [c[0] + (rnd() - 0.5) * 0.5, c[1] + (rnd() - 0.5) * rr * 1.4, c[2] + (rnd() - 0.5) * rr * 1.4],
+                s: 0.8 + rnd() * 0.5, a: rnd() * TAU });
+  }
+  return { nucMesh, riboMesh, nodeMesh, nuc, ribo };
+}
+
+/* Krebs-cycle ring: eight enzyme nodes in the matrix that light in turn */
+const KREBS = (() => {
+  const c = GEO.spine(0.5), r = 0.40, nodes = [];
+  const names = ['Citrate synthase', 'Aconitase', 'Isocitrate DH', 'α-KG DH',
+                 'Succinyl-CoA synthetase', 'Succinate DH', 'Fumarase', 'Malate DH'];
+  const prod = ['—', '—', 'NADH + CO₂', 'NADH + CO₂', 'GTP', 'FADH₂', '—', 'NADH'];
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * TAU;
+    nodes.push({ p: [c[0] + Math.cos(a) * r * 1.5, c[1] + Math.sin(a) * r * 0.75 + 0.05, c[2] + Math.sin(a) * r],
+                 name: names[i], prod: prod[i] });
+  }
+  return nodes;
+})();
+/* ==================================================================== */
+/*  RENDERER                                                            */
+/* ==================================================================== */
+const glc = document.getElementById('gl');
+const uic = document.getElementById('ui');
+const uix = uic.getContext('2d');
+let gl = null, GLOK = false;
+try { gl = glc.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'high-performance' }); } catch (e) { gl = null; }
+GLOK = !!gl;
+
+/* ------------------------------------------------------------ shaders */
+const SH = {};
+/* The organelle can be pinched in two (fission), pulled together (fusion)
+   and swollen (permeability transition). The same deformation is applied
+   on the CPU to protein and particle positions -- keep DEFORM() in step
+   with this function. */
+SH.deform = `
+uniform vec4 uDeform;      // x: waist centre, y: waist width, z: pinch, w: separation
+uniform float uSwell;
+float spineY(float x){ return 0.4*cos(x*0.66843) - 0.252; }
+vec3 deform(vec3 p){
+  float sy = spineY(p.x);
+  vec2 rad = vec2(p.y - sy, p.z) * (1.0 + uSwell*0.30);
+  float g = exp(-pow((p.x - uDeform.x)/max(uDeform.y,0.02), 2.0));
+  rad *= 1.0 - uDeform.z * g;
+  float px = p.x + sign(p.x - uDeform.x) * uDeform.w * smoothstep(0.0, 1.2, abs(p.x-uDeform.x));
+  return vec3(px, sy + rad.x, rad.y);
+}`;
+
+SH.memV = `#version 300 es
+in vec3 aPos; in vec3 aNrm; in vec3 aCol; in float aFlag;
+uniform mat4 uVP; uniform float uTime; uniform float uBreath;
+` + SH.deform + `
+out vec3 vP; out vec3 vN; out vec3 vC;
+void main(){
+  // a slow organic breathing so the organelle never looks like a still model
+  float w = sin(aPos.x*2.1 + uTime*0.55) * 0.5 + sin(aPos.y*3.3 - uTime*0.42) * 0.5;
+  vec3 p = deform(aPos + aNrm * w * uBreath);
+  vP = p; vN = aNrm; vC = aCol;
+  gl_Position = uVP * vec4(p,1.0);
+}`;
+
+SH.memF = `#version 300 es
+precision highp float;
+in vec3 vP; in vec3 vN; in vec3 vC;
+uniform vec3 uCam; uniform vec4 uClip; uniform float uAlpha; uniform float uTime;
+uniform float uSpecK; uniform float uRimK; uniform float uTex; uniform vec3 uTint;
+out vec4 outC;
+
+float h31(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,37.719)))*43758.5453); }
+float vnoise(vec3 p){
+  vec3 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+  float a = mix(mix(mix(h31(i), h31(i+vec3(1,0,0)), f.x), mix(h31(i+vec3(0,1,0)), h31(i+vec3(1,1,0)), f.x), f.y),
+                mix(mix(h31(i+vec3(0,0,1)), h31(i+vec3(1,0,1)), f.x), mix(h31(i+vec3(0,1,1)), h31(i+vec3(1,1,1)), f.x), f.y), f.z);
+  return a;
+}
+void main(){
+  if (dot(vP, uClip.xyz) > uClip.w) discard;
+  vec3 N = normalize(vN);
+  vec3 V = normalize(uCam - vP);
+  if (dot(N,V) < 0.0) N = -N;                       // two-sided
+  vec3 L1 = normalize(vec3(0.55, 0.78, 0.50));
+  vec3 L2 = normalize(vec3(-0.60, -0.25, -0.45));
+
+  // lipid bilayer mottling + embedded-protein speckle
+  float n1 = vnoise(vP*9.0), n2 = vnoise(vP*26.0), n3 = vnoise(vP*62.0);
+  float grain = (n1*0.62 + n2*0.28 + n3*0.10);
+  float speck = smoothstep(0.66, 0.92, n2) * 0.40 + smoothstep(0.84, 0.99, n3) * 0.26;
+
+  float wrap = 0.36;
+  float d1 = clamp((dot(N,L1)+wrap)/(1.0+wrap), 0.0, 1.0);
+  float d2 = clamp((dot(N,L2)+wrap)/(1.0+wrap), 0.0, 1.0);
+  float fres = pow(1.0 - clamp(dot(N,V),0.0,1.0), 4.5);
+
+  vec3 base = vC * uTint * (0.72 + 0.55*grain*uTex);
+  vec3 col = base * (0.30 + 1.05*d1) + base * vec3(0.25,0.42,0.85) * d2 * 0.55;
+  col += vec3(0.35,0.95,0.85) * speck * uTex * 0.22;       // proteins peppering the bilayer
+
+  vec3 H = normalize(L1 + V);
+  float spec = pow(max(dot(N,H),0.0), 52.0) * uSpecK;
+  col += vec3(1.0,0.98,0.92) * spec;
+  col += vC * uTint * fres * uRimK;                        // glassy rim
+
+  float a = clamp(uAlpha + fres * (1.0-uAlpha) * 0.70, 0.0, 1.0);
+  a *= 0.88 + 0.12*grain;
+  outC = vec4(col * a, a);                                 // premultiplied
+}`;
+
+SH.solV = `#version 300 es
+in vec3 aPos; in vec3 aNrm; in vec3 aCol; in float aFlag;
+in vec3 iPos; in vec3 iZ; in vec3 iX; in vec4 iMisc;      // spin, scale, hi, alpha
+uniform mat4 uVP; uniform float uTime;
+out vec3 vP; out vec3 vN; out vec3 vC; out float vHi; out float vA;
+void main(){
+  vec3 z = normalize(iZ);
+  vec3 x = normalize(iX - z*dot(iX,z));
+  vec3 y = cross(z,x);
+  vec3 lp = aPos, ln = aNrm;
+  if (aFlag > 0.5 && aFlag < 1.5) {                        // rotor vertices spin
+    float a = iMisc.x, s = sin(a), c = cos(a);
+    lp = vec3(lp.x*c - lp.y*s, lp.x*s + lp.y*c, lp.z);
+    ln = vec3(ln.x*c - ln.y*s, ln.x*s + ln.y*c, ln.z);
+  }
+  lp *= iMisc.y;
+  vec3 wp = iPos + x*lp.x + y*lp.y + z*lp.z;
+  vec3 wn = normalize(x*ln.x + y*ln.y + z*ln.z);
+  vP = wp; vN = wn; vC = aCol; vHi = iMisc.z; vA = iMisc.w;
+  gl_Position = uVP * vec4(wp,1.0);
+}`;
+
+SH.solF = `#version 300 es
+precision highp float;
+in vec3 vP; in vec3 vN; in vec3 vC; in float vHi; in float vA;
+uniform vec3 uCam; uniform vec4 uClip; uniform float uTime; uniform float uClipSolid;
+out vec4 outC;
+void main(){
+  if (uClipSolid > 0.5 && dot(vP, uClip.xyz) > uClip.w) discard;
+  vec3 N = normalize(vN), V = normalize(uCam - vP);
+  vec3 L1 = normalize(vec3(0.55, 0.78, 0.50));
+  vec3 L2 = normalize(vec3(-0.60, -0.25, -0.45));
+  float d1 = max(dot(N,L1), 0.0), d2 = max(dot(N,L2), 0.0);
+  float fres = pow(1.0 - clamp(dot(N,V),0.0,1.0), 2.6);
+  vec3 col = vC * (0.16 + 1.25*d1) + vC * vec3(0.30,0.45,0.90) * d2 * 0.45;
+  vec3 H = normalize(L1+V);
+  col += vec3(1.0) * pow(max(dot(N,H),0.0), 34.0) * 0.30;
+  col += vC * fres * 0.40;
+  float pulse = 0.55 + 0.45*sin(uTime*4.5);
+  col += (vC*0.85 + vec3(0.09,0.11,0.14)) * vHi * (0.30 + 0.45*pulse);  // highlight glow
+  // everything else falls back to a desaturated silhouette
+  float g = dot(col, vec3(0.32,0.42,0.26));
+  col = mix(mix(vec3(g), col, 0.35) * 0.22, col, clamp(vA,0.0,1.0));
+  outC = vec4(col, 1.0);
+}`;
+
+SH.parV = `#version 300 es
+in vec2 aCorner;
+in vec3 iPos; in vec3 iCol; in vec3 iMisc;                // size, alpha, kind
+uniform mat4 uVP; uniform vec3 uRight; uniform vec3 uUp;
+out vec2 vUV; out vec3 vC; out float vA; out float vK;
+void main(){
+  vec3 wp = iPos + uRight*aCorner.x*iMisc.x + uUp*aCorner.y*iMisc.x;
+  vUV = aCorner; vC = iCol; vA = iMisc.y; vK = iMisc.z;
+  gl_Position = uVP * vec4(wp,1.0);
+}`;
+
+SH.parF = `#version 300 es
+precision highp float;
+in vec2 vUV; in vec3 vC; in float vA; in float vK;
+out vec4 outC;
+void main(){
+  float r = length(vUV);
+  if (r > 1.0) discard;
+  float core = pow(clamp(1.0-r,0.0,1.0), 2.2);
+  float halo = pow(clamp(1.0-r,0.0,1.0), 0.7) * 0.45;
+  // vK>0.5 marks "hard" species (transported molecules) — give them a shell
+  float ring = vK > 0.5 ? smoothstep(0.86,0.62,r)*0.55 : 0.0;
+  float a = clamp((core + halo*0.8 + ring) * vA, 0.0, 1.0);
+  vec3 c = vC * (0.55 + 1.9*core) + vec3(1.0) * pow(core, 6.0) * 0.7;
+  outC = vec4(c * a, a);
+}`;
+
+SH.quadV = `#version 300 es
+in vec2 aCorner; out vec2 vUV;
+void main(){ vUV = aCorner*0.5+0.5; gl_Position = vec4(aCorner,0.0,1.0); }`;
+
+SH.bgF = `#version 300 es
+precision highp float;
+in vec2 vUV; out vec4 outC;
+uniform vec2 uRes; uniform float uTime; uniform float uYaw; uniform float uZoomOut;
+float h21(vec2 p){ return fract(sin(dot(p, vec2(41.7,289.1)))*43758.5453); }
+void main(){
+  vec2 uv = vUV;
+  vec2 q = (uv - 0.5) * vec2(uRes.x/uRes.y, 1.0);
+  // cytosolic depth gradient
+  vec3 col = mix(vec3(0.016,0.020,0.045), vec3(0.045,0.075,0.115), smoothstep(-0.6,0.7,q.y));
+  col += vec3(0.02,0.05,0.06) * (1.0 - smoothstep(0.0,1.1,length(q)));
+  // out-of-focus neighbours drifting in the cytosol
+  for (int i=0;i<9;i++){
+    float fi = float(i);
+    float sx = h21(vec2(fi,3.0))*2.0-1.0, sy = h21(vec2(fi,7.0))*2.0-1.0;
+    float depth = 0.35 + h21(vec2(fi,11.0))*0.8;
+    vec2 c = vec2(sx*1.25 - uYaw*0.16*depth, sy*0.75 + sin(uTime*0.06+fi)*0.03);
+    vec2 d = (q - c);
+    d.x *= 0.34 + h21(vec2(fi,17.0))*0.22;                 // rod-shaped, like a mitochondrion
+    float m = exp(-dot(d,d)*7.0);
+    vec3 tc = mix(vec3(0.10,0.26,0.24), vec3(0.20,0.14,0.30), h21(vec2(fi,23.0)));
+    col += tc * m * (0.16 + 0.55*uZoomOut);
+  }
+  // fine cytosolic speckle
+  float sp = h21(floor(uv*vec2(uRes.x,uRes.y)*0.5));
+  col += vec3(0.02,0.03,0.04) * step(0.9975, sp) * 30.0;
+  col *= 1.0 - 0.55*pow(length(q)*0.78, 2.4);              // vignette
+  outC = vec4(col,1.0);
+}`;
+
+SH.brightF = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 outC;
+uniform sampler2D uTex; uniform float uThresh;
+void main(){
+  vec3 c = texture(uTex, vUV).rgb;
+  float l = dot(c, vec3(0.299,0.587,0.114));
+  outC = vec4(c * smoothstep(uThresh, uThresh+0.45, l), 1.0);
+}`;
+
+SH.blurF = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 outC;
+uniform sampler2D uTex; uniform vec2 uDir;
+void main(){
+  vec3 s = texture(uTex, vUV).rgb * 0.227;
+  s += (texture(uTex, vUV + uDir*1.385).rgb + texture(uTex, vUV - uDir*1.385).rgb) * 0.316;
+  s += (texture(uTex, vUV + uDir*3.231).rgb + texture(uTex, vUV - uDir*3.231).rgb) * 0.070;
+  outC = vec4(s,1.0);
+}`;
+
+SH.compF = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 outC;
+uniform sampler2D uScene; uniform sampler2D uBloom; uniform float uBloomK; uniform float uTime;
+void main(){
+  vec3 c = texture(uScene, vUV).rgb + texture(uBloom, vUV).rgb * uBloomK;
+  c = (c * (2.51*c + 0.03)) / (c * (2.43*c + 0.59) + 0.14);   // ACES-ish
+  float g = fract(sin(dot(vUV*vec2(1024.0,768.0) + uTime, vec2(12.99,78.23)))*43758.55);
+  c += (g-0.5)*0.012;
+  outC = vec4(c,1.0);
+}`;
+
+/* ---------------------------------------------------------- gl helpers */
+function compile(src, type) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) + '\n' + src.slice(0, 400));
+  return s;
+}
+function program(vs, fs, attribs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(vs, gl.VERTEX_SHADER));
+  gl.attachShader(p, compile(fs, gl.FRAGMENT_SHADER));
+  (attribs || []).forEach((a, i) => gl.bindAttribLocation(p, i, a));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const u = new Proxy({}, { get: (t, k) => (k in t ? t[k] : (t[k] = gl.getUniformLocation(p, k))) });
+  return { p, u, use: () => gl.useProgram(p) };
+}
+function makeTex(w, h, fmt, ifmt, type, filter) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, w, h, 0, fmt, type, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+
+const R = { ready: false };
+function initGL() {
+  const hasFloat = !!gl.getExtension('EXT_color_buffer_float');
+  gl.getExtension('OES_texture_float_linear');
+  R.hdrI = hasFloat ? gl.RGBA16F : gl.RGBA8;
+  R.hdrT = hasFloat ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
+
+  R.progMem = program(SH.memV, SH.memF, ['aPos', 'aNrm', 'aCol', 'aFlag']);
+  R.progSol = program(SH.solV, SH.solF, ['aPos', 'aNrm', 'aCol', 'aFlag', 'iPos', 'iZ', 'iX', 'iMisc']);
+  R.progPar = program(SH.parV, SH.parF, ['aCorner', 'iPos', 'iCol', 'iMisc']);
+  R.progBg = program(SH.quadV, SH.bgF, ['aCorner']);
+  R.progBright = program(SH.quadV, SH.brightF, ['aCorner']);
+  R.progBlur = program(SH.quadV, SH.blurF, ['aCorner']);
+  R.progComp = program(SH.quadV, SH.compF, ['aCorner']);
+
+  // fullscreen quad
+  R.quadVAO = gl.createVertexArray();
+  gl.bindVertexArray(R.quadVAO);
+  const qb = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, qb);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.bindVertexArray(null);
+
+  R.fbos = {};
+  R.ready = true;
+}
+
+/* upload a Mesh as a non-instanced VAO */
+function uploadMesh(mesh) {
+  const b = mesh.buffers();
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const vb = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+  gl.bufferData(gl.ARRAY_BUFFER, b.v, gl.STATIC_DRAW);
+  const S = 40;
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, S, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, S, 12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, S, 24);
+  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, S, 36);
+  const ib = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, b.i, gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  return { vao, count: b.i.length };
+}
+/* upload a Mesh plus a dynamic per-instance buffer (13 floats each) */
+function uploadInstanced(mesh, maxInst) {
+  const g = uploadMesh(mesh);
+  gl.bindVertexArray(g.vao);
+  const ib = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, ib);
+  gl.bufferData(gl.ARRAY_BUFFER, maxInst * 13 * 4, gl.DYNAMIC_DRAW);
+  const S = 13 * 4;
+  const set = (loc, size, off) => {
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, size, gl.FLOAT, false, S, off);
+    gl.vertexAttribDivisor(loc, 1);
+  };
+  set(4, 3, 0); set(5, 3, 12); set(6, 3, 24); set(7, 4, 36);
+  gl.bindVertexArray(null);
+  g.ibuf = ib; g.data = new Float32Array(maxInst * 13); g.n = 0; g.max = maxInst;
+  return g;
+}
+function uploadParticles(maxInst) {
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const qb = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, qb);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  const ib = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, ib);
+  gl.bufferData(gl.ARRAY_BUFFER, maxInst * 9 * 4, gl.DYNAMIC_DRAW);
+  const S = 9 * 4;
+  const set = (loc, size, off) => {
+    gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, S, off);
+    gl.vertexAttribDivisor(loc, 1);
+  };
+  set(1, 3, 0); set(2, 3, 12); set(3, 3, 24);
+  gl.bindVertexArray(null);
+  return { vao, ibuf: ib, data: new Float32Array(maxInst * 9), n: 0, max: maxInst };
+}
+/* ---- framebuffers, rebuilt on resize -------------------------------- */
+function makeFBO(w, h, ifmt, type) {
+  const f = gl.createFramebuffer();
+  const tex = makeTex(w, h, gl.RGBA, ifmt, type, gl.LINEAR);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  const rb = gl.createRenderbuffer();
+  gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
+  gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, w, h);
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, rb);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { f, tex, rb, w, h };
+}
+function resizeFBOs(w, h) {
+  const F = R.fbos;
+  for (const k in F) { if (F[k].f) gl.deleteFramebuffer(F[k].f); if (F[k].tex) gl.deleteTexture(F[k].tex); if (F[k].rb) gl.deleteRenderbuffer(F[k].rb); }
+  const hw = Math.max(2, w >> 1), hh = Math.max(2, h >> 1);
+  R.fbos = {
+    scene: makeFBO(w, h, R.hdrI, R.hdrT),
+    a: makeFBO(hw, hh, R.hdrI, R.hdrT),
+    b: makeFBO(hw, hh, R.hdrI, R.hdrT),
+  };
+}
+/* ==================================================================== */
+/*  BIOPHYSICS                                                          */
+/* ==================================================================== */
+/* A coarse-grained but honest OXPHOS model. Everything downstream --
+   every particle, every gauge -- is driven by these fluxes, so what you
+   watch really is what the equations say. Fluxes are in normalised
+   "electron pairs per second"; the proton-motive force is in millivolts.
+   The stoichiometry (4/4/2 H+ pumped, 8 H+ per 3 ATP, +1 H+ to export)
+   is the textbook one, so the P/O ratio falls out at ~2.4 for a mixed
+   diet rather than being hard-coded. */
+const sig = (x) => 1 / (1 + Math.exp(-clamp(x, -40, 40)));
+
+const K = {
+  VSUB: 1.70, VCI: 2.30, VCII: 0.90, VCIII: 2.70, VCIV: 1.45, VCV: 3.00,
+  VDEM: 1.70, VGLY: 0.90,
+  CNAD: 0.34, CFAD: 0.12, CQ: 0.085, CC: 0.055, CADE: 0.60,
+  kC: 105, KLEAK: 0.020, KM_O2: 0.100, H_ATP: 3.67,
+  gCI: [212, 20], gCIII: [218, 22], gCIV: [240, 28], gCV: [104, 18],
+};
+/* how a fuel splits its reducing equivalents between NADH and FADH2 */
+const FUEL = {
+  pyruvate: { nsh: 0.80, fsh: 0.20, gly: 1.00, label: 'Pyruvate (from glucose)' },
+  fat:      { nsh: 0.667, fsh: 0.333, gly: 0.25, label: 'Fatty acids (β-oxidation)' },
+  ketone:   { nsh: 0.75, fsh: 0.25, gly: 0.20, label: 'Ketone bodies' },
+  mixed:    { nsh: 0.76, fsh: 0.24, gly: 0.75, label: 'Mixed fuel' },
+};
+
+const P = {                       // parameters — what the world is doing to us
+  fuel: 'mixed', supply: 0.38, demand: 0.14, o2: 1,
+  ci: 1, cii: 1, ciii: 1, civ: 1, cv: 1,
+  leak: 1, ucp: 0, caCyt: 0, scav: 1, glyMul: 1,
+};
+const S = {                       // state — what the organelle is
+  nadh: 0.25, fadh2: 0.2, qh2: 0.2, cytc: 0.22, dp: 226, adp: 0.08,
+  caM: 0.03, ros: 0.05, mptp: 0, cytcRel: 0, swell: 0,
+  atpTotal: 0, o2Total: 0, heatInt: 1,
+};
+let F = {};                       // last computed flux bundle
+
+function simStep(dt) {
+  const fu = FUEL[P.fuel];
+  const cytcPool = 1 - S.cytcRel * 0.92;
+  const caAct = 0.34 + 0.66 * Math.pow(S.caM, 0.7);
+  const Jsub = K.VSUB * P.supply * (1 - S.nadh) * caAct * (1 - S.mptp);
+  const g = (dp, G) => sig((G[0] - dp) / G[1]);
+
+  const J1 = K.VCI   * P.ci   * S.nadh * (1 - S.qh2) * g(S.dp, K.gCI);
+  const J2 = K.VCII  * P.cii  * S.fadh2 * (1 - S.qh2);
+  const J3 = K.VCIII * P.ciii * S.qh2 * cytcPool * (1 - S.cytc) * g(S.dp, K.gCIII);
+  const J4 = K.VCIV  * P.civ  * cytcPool * S.cytc * (P.o2 / (P.o2 + K.KM_O2)) * g(S.dp, K.gCIV);
+
+  // ATP synthase runs forwards on the gradient, and backwards (hydrolysing
+  // ATP to pump protons out) when the gradient collapses — which is exactly
+  // how a poisoned mitochondrion clings to its membrane voltage.
+  const fwd = S.adp * sig((S.dp - K.gCV[0]) / K.gCV[1]);
+  const rev = (1 - S.adp) * 1.0 * sig((K.gCV[0] - S.dp) / K.gCV[1]);
+  const JATP = K.VCV * P.cv * (fwd - rev) * (1 - 0.92 * S.mptp);
+
+  const Jleak = Math.min(6, K.KLEAK * P.leak * Math.exp((S.dp - 100) / 34));
+  const Jucp  = 2.9 * P.ucp * Math.max(0, S.dp) / 180;
+  const Jmpt  = 7.0 * S.mptp * Math.max(0, S.dp) / 180;
+  const pumped = 4 * J1 + 4 * J3 + 2 * J4;
+  const used = K.H_ATP * JATP + Jleak + Jucp + Jmpt;
+
+  const Jdem = K.VDEM * P.demand * (1 - S.adp);
+  const Jgly = K.VGLY * fu.gly * P.glyMul * 3.0 * S.adp * S.adp;
+  const j4max = K.VCIV * P.civ * (P.o2 / (P.o2 + K.KM_O2));
+  const oxCap = clamp(J4 / Math.max(0.02, j4max), 0, 1);
+  const lact = Jgly * (1 - oxCap * 0.92);
+
+  S.nadh  = clamp(S.nadh  + (Jsub * fu.nsh - J1) / K.CNAD * dt, 0, 1);
+  S.fadh2 = clamp(S.fadh2 + (Jsub * fu.fsh - J2) / K.CFAD * dt, 0, 1);
+  S.qh2   = clamp(S.qh2   + (J1 + J2 - J3) / K.CQ * dt, 0, 1);
+  S.cytc  = clamp(S.cytc  + (J3 - J4) / K.CC * dt, 0, 1);
+  S.dp    = clamp(S.dp + (pumped - used) * K.kC * dt, -20, 260);
+  S.adp   = clamp(S.adp + (Jdem - JATP - Jgly) / K.CADE * dt, 0.001, 1);
+
+  const upt = 1.15 * P.caCyt * smoothstep(60, 150, S.dp) * (1 - S.caM);
+  S.caM = clamp(S.caM + (upt - 0.55 * S.caM) * dt, 0, 1);
+
+  const ret = smoothstep(158, 200, S.dp) * S.qh2 * P.ci;   // reverse electron transport
+  const qo  = S.qh2 * S.qh2 * (1 - P.ciii * 0.9);          // stalled Q cycle
+  const ovr = S.qh2 * S.cytc;                              // whole chain over-reduced
+  const flv = S.nadh * S.nadh * (1 - P.ci * 0.85);         // flavin site of a blocked CI
+  const Jros = 0.34 * ret + 1.10 * qo + 0.45 * ovr + 0.50 * flv + 0.02 * (J1 + J3);
+  S.ros = clamp(S.ros + (Jros - S.ros * 1.7 * P.scav) / 0.30 * dt, 0, 3);
+
+  const risk = S.caM * 1.35 + S.ros * 0.85 - 0.80;
+  if (risk > 0) S.mptp = clamp(S.mptp + risk * 0.55 * dt, 0, 1);
+  if (S.mptp > 0.3) S.cytcRel = clamp(S.cytcRel + (S.mptp - 0.3) * 0.25 * dt, 0, 1);
+  S.swell = expApproach(S.swell, S.mptp, 0.5, dt);
+
+  const heat = (Jleak + Jucp + Jmpt) * Math.max(0, S.dp) * 0.0022
+             + (J1 + J3 + J4) * 0.06 + Jdem * 0.05;
+  S.heatInt = expApproach(S.heatInt, heat, 1.5, dt);
+  S.atpTotal += Math.max(0, JATP) * dt;
+  S.o2Total += 0.5 * J4 * dt;
+
+  F = { Jsub, J1, J2, J3, J4, JATP, Jleak, Jucp, Jmpt, Jdem, Jgly, lact, pumped, used,
+        JO2: 0.5 * J4, heat,
+        PO: J4 > 1e-4 ? Math.max(0, JATP) / J4 : 0,
+        coup: pumped > 1e-4 ? clamp(K.H_ATP * Math.max(0, JATP) / pumped, 0, 1) : 0,
+        reverse: JATP < -0.01 };
+  return F;
+}
+/* the resting reference, so gauges can read "x resting" */
+const REST_REF = { JATP: 0.208, JO2: 0.087, heat: 0.155 };
+
+/* ==================================================================== */
+/*  SCENARIOS                                                           */
+/* ==================================================================== */
+/* Each one is a set of parameter overrides plus a plain-English note.
+   `dyn` lets a scenario evolve over time (a breath-hold, a drug protocol). */
+const SCENARIOS = [
+{ g: 'EVERYDAY PHYSIOLOGY' },
+{ id: 'rest', n: 'Resting muscle · State 4', p: { fuel: 'mixed', supply: 0.38, demand: 0.14 },
+  note: 'Sitting still. ATP demand is tiny, so ADP is scarce and ATP synthase has almost nothing to do. Protons pile up until the membrane voltage is at its highest — and then simply <b>leak</b> back. About half the fuel you burn at rest is spent maintaining a gradient you are not using. That leak is not waste: it is a large part of your basal metabolic rate.' },
+{ id: 'walk', n: 'Brisk walk', p: { fuel: 'mixed', supply: 0.60, demand: 0.50 },
+  note: 'Demand arrives, ADP floods in, and the synthase opens. Voltage sags a little, protons now flow through the turbine instead of leaking, and <b>coupling efficiency jumps</b>. Notice that respiration rose without anyone "deciding" — ADP itself is the throttle. This is respiratory control.' },
+{ id: 'sprint', n: 'All-out sprint', p: { fuel: 'pyruvate', supply: 1.50, demand: 1.55 },
+  note: 'Demand outruns what the chain can deliver. ADP piles up, glycolysis is thrown wide open and the pyruvate it makes faster than mitochondria can swallow is dumped as <b>lactate</b>. Your mitochondria are flat out — the burning is the overflow, not the engine failing.' },
+{ id: 'endurance', n: 'Endurance ride · fat burning', p: { fuel: 'fat', supply: 0.85, demand: 0.80 },
+  note: 'Fatty acids come in on the carnitine shuttle and β-oxidation feeds proportionally <b>more FADH₂</b>. FADH₂ enters at Complex II, which pumps no protons, so fat yields slightly less ATP per oxygen than sugar — watch the <b>P/O ratio</b> fall. It carries far more energy per gram, though, which is why we store it.' },
+{ id: 'fasted', n: 'Overnight fast', p: { fuel: 'fat', supply: 0.60, demand: 0.22 },
+  note: 'Glycogen is low, so lipolysis supplies the fuel. Demand is modest, so the gradient stays high and a little more of the chain sits reduced — conditions that nudge ROS upward.' },
+{ id: 'ketosis', n: 'Ketosis', p: { fuel: 'ketone', supply: 0.72, demand: 0.30 },
+  note: 'The liver converts fat into <b>β-hydroxybutyrate</b>, which crosses into the brain and is turned straight back into acetyl-CoA here. Ketones are a slightly more oxygen-efficient fuel than fat because they skip the FADH₂-heavy first steps of β-oxidation.' },
+{ id: 'fed', n: 'After a big meal', p: { fuel: 'pyruvate', supply: 1.30, demand: 0.18 },
+  note: 'Fuel floods in but nothing needs doing with it. NADH backs up, the Q pool fills, the voltage climbs past 190 mV — and at that voltage electrons start running <b>backwards</b> into Complex I and leaking onto oxygen. This is the single highest-ROS state of ordinary life, and the reason "eat less, move more" shows up in mitochondrial biology.' },
+{ id: 'sleep', n: 'Deep sleep', p: { fuel: 'fat', supply: 0.30, demand: 0.10 },
+  note: 'The quietest setting. Demand bottoms out; almost all proton flow is leak, and the heat it makes is a meaningful share of the warmth in the bed.' },
+{ id: 'cold', n: 'Cold · brown fat', p: { fuel: 'fat', supply: 1.20, demand: 0.18, ucp: 0.85 },
+  note: 'Noradrenaline switches on <b>UCP1</b>, and protons pour straight back into the matrix without touching the turbine. Coupling collapses, oxygen use nearly triples, and every bit of it comes out as <b>heat</b>. A newborn cannot shiver — this is how it stays warm.' },
+{ id: 'shiver', n: 'Shivering', p: { fuel: 'mixed', supply: 1.05, demand: 1.10 },
+  note: 'Muscle contracting uselessly on purpose. The heat is the point; the ATP is spent on it deliberately. Less efficient than brown fat, but every muscle in the body can do it.' },
+{ id: 'heart', n: 'Heart muscle', p: { fuel: 'fat', supply: 0.95, demand: 0.78 },
+  note: 'Cardiac mitochondria fill ~35% of the cell and run on fatty acids almost continuously. Their cristae are packed tighter than anywhere else in the body, and they never get a rest day.' },
+{ id: 'neuron', n: 'Firing neuron', p: { fuel: 'pyruvate', supply: 0.75, demand: 0.60, caCyt: 0.35 },
+  note: 'Restoring ion gradients after every spike is enormously expensive — the brain is 2% of your mass and ~20% of your ATP budget. Each burst of firing also lets <b>Ca²⁺</b> in, which switches on the Krebs dehydrogenases: the same signal that costs energy orders more.' },
+
+{ g: 'STRESS & DAMAGE' },
+{ id: 'altitude', n: 'High altitude', p: { fuel: 'mixed', supply: 0.60, demand: 0.50, o2: 0.35 },
+  note: 'Less oxygen arrives, but Complex IV binds O₂ so tightly that respiration barely notices at first. The cost shows up as a slightly more reduced chain — and over weeks, as more mitochondria and more capillaries.' },
+{ id: 'hypoxia', n: 'Severe hypoxia', p: { fuel: 'pyruvate', supply: 0.80, demand: 0.50, o2: 0.035 },
+  note: 'Now oxygen really is limiting. Electrons queue: cytochrome c stays reduced, the Q pool fills, and ATP falls. Glycolysis takes over and the pyruvate it makes has nowhere to go but <b>lactate</b>. This is ischaemia.' },
+{ id: 'breathhold', n: 'Breath-hold', p: { fuel: 'mixed', supply: 0.60, demand: 0.45, o2: 1 },
+  dyn: (t) => ({ o2: Math.max(0.012, 1 - t / 55) }),
+  note: 'Oxygen falls in real time. Watch how long almost nothing happens — Complex IV has a very high affinity for O₂ — and then how abruptly the chain backs up once it finally runs short.' },
+{ id: 'castorm', n: 'Calcium signal', p: { fuel: 'mixed', supply: 0.70, demand: 0.55, caCyt: 0.55 },
+  note: 'Ca²⁺ pours through the <b>MCU</b>, driven by the −170 mV across the membrane. In the matrix it activates three dehydrogenases at once, so the cell\'s "work harder" signal is also its "make more fuel" signal. Mitochondria sit within 20 nm of the ER to catch these puffs.' },
+{ id: 'caoverload', n: 'Calcium overload → apoptosis', p: { fuel: 'mixed', supply: 0.60, demand: 0.40, caCyt: 1.0, scav: 0.45 },
+  note: 'Too much calcium, too much ROS. The <b>permeability transition pore</b> springs open, the gradient short-circuits, the matrix swells and <b>cytochrome c</b> spills into the cytosol — where it assembles the apoptosome and commits the cell to die. The organelle that powers the cell is also its executioner.' },
+{ id: 'aged', n: 'Aged mitochondrion', p: { fuel: 'mixed', supply: 0.55, demand: 0.40, ci: 0.55, civ: 0.70, scav: 0.60 },
+  note: 'Decades of mtDNA damage have thinned out Complex I and Complex IV. Less capacity, a more reduced chain, more ROS, weaker defences — and ROS damages mtDNA further. Whether that loop drives ageing or merely accompanies it is still argued over.' },
+{ id: 'ros', n: 'Oxidative stress', p: { fuel: 'pyruvate', supply: 1.2, demand: 0.20, scav: 0.30 },
+  note: 'Antioxidant defences (superoxide dismutase, glutathione, peroxiredoxins) are stripped back. Perhaps 0.2% of oxygen consumed normally slips out as superoxide; here it accumulates. A little is a signal the cell uses on purpose — a lot oxidises lipids, protein and mtDNA.' },
+
+{ g: 'CLASSIC EXPERIMENTS' },
+{ id: 'rotenone', n: 'Rotenone — blocks Complex I', p: { fuel: 'mixed', supply: 0.60, demand: 0.50, ci: 0.04 },
+  note: 'A pesticide, and the classic Complex I inhibitor. NADH cannot unload, so it piles up while the Q pool <b>empties</b> — everything upstream reduced, everything downstream oxidised. That crossover point is how the chain\'s order was worked out in the first place. Succinate still gets in at Complex II, so respiration falls but does not stop.' },
+{ id: 'malonate', n: 'Malonate — blocks Complex II', p: { fuel: 'mixed', supply: 0.60, demand: 0.50, cii: 0.04 },
+  note: 'A competitive look-alike for succinate. Only the FADH₂ route is closed, so with mixed fuel the effect is mild — but it is the cleanest way to show that Complex II is a side entrance, not a link in the chain.' },
+{ id: 'antimycin', n: 'Antimycin A — blocks Complex III', p: { fuel: 'mixed', supply: 0.60, demand: 0.50, ciii: 0.03 },
+  note: 'Jams the Q cycle half-finished. Ubiquinol cannot unload, cytochrome c stays oxidised, and the trapped semiquinone hands single electrons straight to O₂ — this is the <b>biggest ROS burst</b> in the whole simulator.' },
+{ id: 'cyanide', n: 'Cyanide — blocks Complex IV', p: { fuel: 'mixed', supply: 0.60, demand: 0.50, civ: 0.02 },
+  note: 'Binds the heme-copper centre where oxygen is reduced. Every carrier upstream fills and stays filled — NADH, Q and cytochrome c all pinned reduced. Oxygen is everywhere and useless. Carbon monoxide and hydrogen sulfide kill the same way.' },
+{ id: 'oligomycin', n: 'Oligomycin — blocks ATP synthase', p: { fuel: 'mixed', supply: 0.60, demand: 0.50, cv: 0.03 },
+  note: 'Plugs the proton channel of F₀. The gradient has nowhere to discharge, voltage climbs to its ceiling, and back-pressure stalls the pumps: <b>oxygen use falls even though nothing touched the chain</b>. What is left is exactly the leak. That is how the leak is measured.' },
+{ id: 'fccp', n: 'FCCP — uncoupler', p: { fuel: 'mixed', supply: 1.40, demand: 0.50, leak: 60 },
+  note: 'A lipid-soluble proton shuttle: it ferries H⁺ straight across the bilayer. Voltage collapses, back-pressure vanishes, and the chain runs at absolute maximum making <b>no ATP at all</b>. DNP — the same trick — was sold as a diet pill in the 1930s and cooked people to death.' },
+{ id: 'seahorse', n: 'Seahorse assay (auto-runs)', p: { fuel: 'mixed', supply: 0.60, demand: 0.50 },
+  dyn: (t) => t < 25 ? {} : t < 50 ? { cv: 0.03 } : t < 75 ? { cv: 0.03, leak: 60, supply: 1.4 } : { cv: 0.03, leak: 60, ci: 0.04, ciii: 0.03, supply: 1.4 },
+  dynLabel: (t) => t < 25 ? 'BASELINE' : t < 50 ? '+ OLIGOMYCIN' : t < 75 ? '+ FCCP' : '+ ROTENONE / ANTIMYCIN',
+  note: 'The standard respirometry protocol, run for you on a 100-second loop. Baseline → <b>oligomycin</b> (what is left is proton leak) → <b>FCCP</b> (maximal capacity) → <b>rotenone + antimycin</b> (everything left is not mitochondrial at all). The gaps between those four levels are ATP-linked respiration, leak, and spare capacity. Watch the O₂ trace in DATA.' },
+];
+const SCN_BY_ID = {}; for (const s of SCENARIOS) if (s.id) SCN_BY_ID[s.id] = s;
+
+/* ==================================================================== */
+/*  ORGANELLE DYNAMICS (fission / fusion / mitophagy)                   */
+/* ==================================================================== */
+const DYN = {
+  mode: 'idle', t: 0,
+  waistX: 0, waistW: 0.55, pinch: 0, sep: 0, engulf: 0, partner: 0,
+  ring: 0,                      // DRP1 constriction ring visibility
+};
+function startDynamic(mode) {
+  if (DYN.mode !== 'idle') return;
+  DYN.mode = mode; DYN.t = 0;
+  if (mode === 'fission') { DYN.waistX = (Math.random() - 0.5) * 1.4; }
+  if (mode === 'fusion') { DYN.waistX = 0; DYN.pinch = 1; DYN.sep = 0.55; DYN.partner = 1; }
+  narrateDynamic(mode);
+}
+function stepDynamic(dt) {
+  if (DYN.mode === 'idle') { DYN.ring = expApproach(DYN.ring, 0, 3, dt); return; }
+  DYN.t += dt;
+  const t = DYN.t;
+  if (DYN.mode === 'fission') {
+    DYN.ring = smoothstep(0, 0.6, t) * (1 - smoothstep(3.6, 4.6, t));
+    DYN.pinch = smoothstep(0.5, 3.0, t);
+    DYN.waistW = lerp(0.55, 0.20, smoothstep(0.5, 3.0, t));
+    DYN.sep = smoothstep(3.0, 5.0, t) * 0.55;
+    if (t > 7.5) { DYN.mode = 'idle'; DYN.pinch = 0; DYN.sep = 0; DYN.waistW = 0.55; }
+  } else if (DYN.mode === 'fusion') {
+    DYN.partner = 1;
+    DYN.sep = 0.55 * (1 - smoothstep(0.3, 2.6, t));
+    DYN.pinch = 1 - smoothstep(2.2, 4.6, t);
+    DYN.ring = (1 - smoothstep(2.0, 3.2, t)) * 0.7;
+    if (t > 6.5) { DYN.mode = 'idle'; DYN.pinch = 0; DYN.sep = 0; DYN.partner = 0; }
+  } else if (DYN.mode === 'mitophagy') {
+    DYN.engulf = smoothstep(0.4, 4.0, t);
+    if (t > 7.0) { DYN.mode = 'idle'; DYN.engulf = 0; }
+  }
+}
+/* CPU twin of the vertex-shader deformation — must stay identical */
+function DEFORM(p) {
+  const sy = 0.4 * Math.cos(p[0] * 0.66843) - 0.252;
+  const s = 1 + S.swell * 0.30;
+  let ry = (p[1] - sy) * s, rz = p[2] * s;
+  const g = Math.exp(-Math.pow((p[0] - DYN.waistX) / Math.max(DYN.waistW, 0.02), 2));
+  const k = 1 - DYN.pinch * g;
+  ry *= k; rz *= k;
+  const px = p[0] + Math.sign(p[0] - DYN.waistX) * DYN.sep * smoothstep(0, 1.2, Math.abs(p[0] - DYN.waistX));
+  return [px, sy + ry, rz];
+}
+/* ==================================================================== */
+/*  MOLECULAR TRAFFIC                                                   */
+/* ==================================================================== */
+/* Particles are spawned at rates taken straight from the flux bundle, so
+   the crowd on screen is a readout, not decoration. Each one walks a list
+   of waypoints through the real geometry. */
+const SPECIES = {
+  h:    { col: [0.55, 0.92, 1.00], size: 0.026, hard: 0, name: 'H⁺' },
+  e:    { col: [0.75, 1.00, 0.95], size: 0.030, hard: 0, name: 'e⁻' },
+  q:    { col: [1.00, 0.85, 0.35], size: 0.030, hard: 1, name: 'Ubiquinone' },
+  cytc: { col: [1.00, 0.45, 0.55], size: 0.030, hard: 1, name: 'Cytochrome c' },
+  nadh: { col: [0.45, 1.00, 0.55], size: 0.042, hard: 1, name: 'NADH' },
+  fadh2:{ col: [0.30, 0.95, 0.80], size: 0.038, hard: 1, name: 'FADH₂' },
+  o2:   { col: [0.60, 0.80, 1.00], size: 0.034, hard: 1, name: 'O₂' },
+  h2o:  { col: [0.40, 0.70, 1.00], size: 0.026, hard: 1, name: 'H₂O' },
+  atp:  { col: [1.00, 0.80, 0.20], size: 0.050, hard: 1, name: 'ATP' },
+  adp:  { col: [0.70, 0.55, 0.30], size: 0.040, hard: 1, name: 'ADP' },
+  pyr:  { col: [0.65, 1.00, 0.45], size: 0.040, hard: 1, name: 'Pyruvate' },
+  fa:   { col: [1.00, 0.72, 0.45], size: 0.044, hard: 1, name: 'Fatty acid' },
+  co2:  { col: [0.72, 0.72, 0.82], size: 0.028, hard: 1, name: 'CO₂' },
+  ca:   { col: [1.00, 0.55, 0.10], size: 0.036, hard: 1, name: 'Ca²⁺' },
+  ros:  { col: [1.00, 0.20, 0.30], size: 0.044, hard: 0, name: 'Superoxide' },
+  heat: { col: [1.00, 0.35, 0.12], size: 0.055, hard: 0, name: 'Heat' },
+  lac:  { col: [0.85, 0.95, 0.40], size: 0.038, hard: 1, name: 'Lactate' },
+  cyt:  { col: [1.00, 0.30, 0.45], size: 0.046, hard: 1, name: 'Cytochrome c (released)' },
+};
+const MAXP = 1500;
+const parts = [];
+const acc = {};
+const prnd = mulberry(7);
+
+function matrixPoint() {
+  const t = 0.10 + prnd() * 0.80, c = GEO.spine(t), r = GEO.radius(t, 0) * 0.80 * Math.sqrt(prnd());
+  const a = prnd() * TAU, d = GEO.spineDir(t), [u, v] = basis(d);
+  return [c[0] + (u[0] * Math.cos(a) + v[0] * Math.sin(a)) * r,
+          c[1] + (u[1] * Math.cos(a) + v[1] * Math.sin(a)) * r,
+          c[2] + (u[2] * Math.cos(a) + v[2] * Math.sin(a)) * r];
+}
+function imsPoint() {
+  const t = 0.08 + prnd() * 0.84, ph = prnd() * TAU;
+  const f = 0.895 + prnd() * 0.08;
+  return GEO.shellPt(t, ph, f);
+}
+function cytosolPoint() {
+  const t = 0.05 + prnd() * 0.9, ph = prnd() * TAU;
+  return GEO.shellPt(t, ph, 1.0 + 0.25 + prnd() * 0.55);
+}
+function pick(arr) { return arr && arr.length ? arr[(prnd() * arr.length) | 0] : null; }
+function pickNear(type, ref) {
+  const list = SITES_BY_TYPE[type]; if (!list) return null;
+  let best = null, bd = 1e9;
+  for (let k = 0; k < 7; k++) {
+    const c = list[(prnd() * list.length) | 0];
+    const d = (c.p[0] - ref[0]) ** 2 + (c.p[1] - ref[1]) ** 2 + (c.p[2] - ref[2]) ** 2;
+    if (d < bd) { bd = d; best = c; }
+  }
+  return best;
+}
+/* same crista + same leaflet if we can, so nothing teleports across the organelle */
+function pickSameLeaflet(type, src) {
+  const list = SITES_BY_TYPE[type]; if (!list) return null;
+  const local = list.filter(s => s.crista === src.crista && s.side === src.side);
+  return local.length ? local[(prnd() * local.length) | 0] : pickNear(type, src.p);
+}
+function spawn(kind, way, spd, extra) {
+  if (parts.length >= MAXP || !way || !way.length || !way[0]) return null;
+  const sp = SPECIES[kind];
+  const p = Object.assign({
+    kind, way, wi: 0, p: way[0].slice(), spd: spd * (0.75 + prnd() * 0.5),
+    age: 0, life: 1e9, size: sp.size, col: sp.col, jit: 0.35, fade: 0, born: 0,
+  }, extra || {});
+  parts.push(p); return p;
+}
+function emit(key, rate, dt, fn) {
+  acc[key] = (acc[key] || 0) + rate * dt;
+  let guard = 24;
+  while (acc[key] >= 1 && guard-- > 0) { acc[key] -= 1; fn(); }
+  if (acc[key] > 3) acc[key] = 3;
+}
+
+const LAY = {                       // layer visibility, wired to the VIEW tab
+  outer: true, inner: true, cristae: true, etc: true, synth: true, carriers: true,
+  protons: true, electrons: true, energy: true, fuel: true, dna: true,
+  krebs: false, ros: true, heat: true, labels: true, cytosol: true,
+};
+
+function spawnTraffic(dt) {
+  const cvs = SITES_BY_TYPE.cv || [];
+  const speed = 1.0;
+
+  /* protons pumped out by each complex, then falling back through a turbine */
+  if (LAY.protons) {
+    const pumpers = [['ci', F.J1 * 4], ['ciii', F.J3 * 4], ['civ', F.J4 * 2]];
+    for (const [type, flux] of pumpers) {
+      emit('h' + type, Math.max(0, flux) * 7.5, dt, () => {
+        const src = pick(SITES_BY_TYPE[type]); if (!src) return;
+        const dst = src.crista !== undefined ? pickSameLeaflet('cv', src) : pickNear('cv', src.p);
+        const way = [src.pM, src.p, src.pI, imsPoint()];
+        if (dst) { way.push(dst.pI, dst.p, dst.pM); }
+        spawn('h', way, 0.85 * speed, { jit: 0.55 });
+      });
+    }
+    /* the leak — protons that simply slip back through the bilayer */
+    emit('hleak', Math.max(0, F.Jleak + F.Jucp + F.Jmpt) * 9, dt, () => {
+      const t = 0.1 + prnd() * 0.8, ph = prnd() * TAU;
+      const a = GEO.shellPt(t, ph, 0.93), b = GEO.shellPt(t, ph, 0.80);
+      spawn('h', [a, b, matrixPoint()], 0.8 * speed, { jit: 0.7, leak: 1 });
+    });
+  }
+  /* electrons down the chain, and the carriers that ferry them */
+  if (LAY.electrons) {
+    emit('e1', Math.max(0, F.J1) * 6, dt, () => {
+      const src = pick(SITES_BY_TYPE.ci); if (!src) return;
+      const c3 = pickSameLeaflet('ciii', src), c4 = c3 ? pickSameLeaflet('civ', c3) : null;
+      const way = [V3.add(src.pM, [0, 0.05, 0]), src.p];
+      if (c3) way.push(c3.p); if (c4) { way.push(c4.p, c4.pM); }
+      spawn('e', way, 1.5 * speed, { jit: 0.15, end: c4 });
+    });
+    emit('e2', Math.max(0, F.J2) * 6, dt, () => {
+      const src = pick(SITES_BY_TYPE.cii); if (!src) return;
+      const c3 = pickSameLeaflet('ciii', src), c4 = c3 ? pickSameLeaflet('civ', c3) : null;
+      const way = [src.pM, src.p];
+      if (c3) way.push(c3.p); if (c4) { way.push(c4.p, c4.pM); }
+      spawn('e', way, 1.5 * speed, { jit: 0.15, end: c4 });
+    });
+    emit('q', Math.max(0, F.J3) * 2.2, dt, () => {
+      const a = pick(SITES_BY_TYPE.ci), b = a ? pickSameLeaflet('ciii', a) : null;
+      if (!a || !b) return;
+      spawn('q', [a.p, V3.lerp(a.p, b.p, 0.5), b.p], 0.55 * speed, { jit: 0.1 });
+    });
+    emit('cc', Math.max(0, F.J4) * 2.4, dt, () => {
+      const a = pick(SITES_BY_TYPE.ciii), b = a ? pickSameLeaflet('civ', a) : null;
+      if (!a || !b) return;
+      spawn('cytc', [a.pI, V3.lerp(a.pI, b.pI, 0.5), b.pI], 0.55 * speed, { jit: 0.3 });
+    });
+  }
+  /* fuel arriving, carbon leaving */
+  if (LAY.fuel) {
+    const fatty = P.fuel === 'fat' || P.fuel === 'ketone';
+    emit('fuel', Math.max(0, F.Jsub) * 5, dt, () => {
+      const v = pick(SITES_BY_TYPE.vdac), m = pick(SITES_BY_TYPE.mpc);
+      if (!v || !m) return;
+      spawn(fatty ? 'fa' : 'pyr', [cytosolPoint(), v.pI, v.p, v.pM, m.pI, m.p, m.pM, matrixPoint()],
+        0.75 * speed, { jit: 0.35, life: 26 });
+    });
+    emit('nadh', Math.max(0, F.Jsub) * 4, dt, () => {
+      const c = pick(SITES_BY_TYPE.ci); if (!c) return;
+      spawn('nadh', [matrixPoint(), V3.add(c.pM, [0, 0.06, 0])], 0.7 * speed, { jit: 0.4 });
+    });
+    emit('fad', Math.max(0, F.Jsub) * 1.6, dt, () => {
+      const c = pick(SITES_BY_TYPE.cii); if (!c) return;
+      spawn('fadh2', [matrixPoint(), c.pM], 0.7 * speed, { jit: 0.4 });
+    });
+    emit('co2', Math.max(0, F.Jsub) * 3.2, dt, () => {
+      const v = pick(SITES_BY_TYPE.vdac); if (!v) return;
+      spawn('co2', [matrixPoint(), v.pM, v.pI, cytosolPoint()], 1.0 * speed, { jit: 0.5 });
+    });
+    emit('o2', Math.max(0, F.J4) * 5, dt, () => {
+      const v = pick(SITES_BY_TYPE.vdac), c = pick(SITES_BY_TYPE.civ);
+      if (!v || !c) return;
+      spawn('o2', [cytosolPoint(), v.pI, v.p, v.pM, matrixPoint(), c.pM], 0.95 * speed, { jit: 0.3, makesWater: 1 });
+    });
+    if (F.lact > 0.02) emit('lac', F.lact * 5, dt, () => {
+      const a = cytosolPoint();
+      spawn('lac', [a, V3.add(a, [(prnd() - .5) * 2, 0.8 + prnd(), (prnd() - .5) * 2])], 0.5, { fadeOut: 1, life: 6 });
+    });
+  }
+  /* the product, and the raw material coming back for it */
+  if (LAY.energy) {
+    emit('atp', Math.max(0, F.JATP) * 9, dt, () => {
+      const c = pick(cvs), a = c ? pickNear('ant', c.p) : null, v = a ? pickNear('vdac', a.p) : null;
+      if (!c || !a || !v) return;
+      spawn('atp', [V3.add(c.pM, [0, 0.09, 0]), matrixPoint(), a.pM, a.p, a.pI, v.pM, v.pI, cytosolPoint()],
+        1.0 * speed, { jit: 0.3, life: 30 });
+    });
+    emit('adp', Math.max(0, F.Jdem) * 8, dt, () => {
+      const v = pick(SITES_BY_TYPE.vdac), a = v ? pickNear('ant', v.p) : null, c = a ? pickNear('cv', a.p) : null;
+      if (!v || !a || !c) return;
+      spawn('adp', [cytosolPoint(), v.pI, v.p, v.pM, a.pI, a.p, a.pM, V3.add(c.pM, [0, 0.07, 0])],
+        1.0 * speed, { jit: 0.3, life: 30 });
+    });
+  }
+  /* calcium, radicals, heat */
+  emit('ca', P.caCyt * 6, dt, () => {
+    const v = pick(SITES_BY_TYPE.vdac), m = v ? pickNear('mcu', v.p) : null;
+    if (!v || !m) return;
+    spawn('ca', [cytosolPoint(), v.pI, v.p, v.pM, m.pI, m.p, m.pM, matrixPoint()], 1.1 * speed, { jit: 0.3 });
+  });
+  if (LAY.ros) emit('ros', S.ros * 9, dt, () => {
+    const c = pick(prnd() < 0.5 ? SITES_BY_TYPE.ci : SITES_BY_TYPE.ciii); if (!c) return;
+    const a = V3.add(c.p, [(prnd() - .5) * .1, (prnd() - .5) * .1, (prnd() - .5) * .1]);
+    spawn('ros', [a, matrixPoint()], 0.45, { jit: 1.3, fadeOut: 1, life: 3.5 });
+  });
+  if (LAY.heat) emit('heat', Math.max(0, F.Jleak + F.Jucp * 2.2 + F.Jmpt) * 7, dt, () => {
+    const t = 0.1 + prnd() * 0.8, ph = prnd() * TAU;
+    const a = GEO.shellPt(t, ph, 0.9);
+    spawn('heat', [a, V3.add(a, V3.scale(V3.norm(V3.sub(a, GEO.spine(t))), 0.9 + prnd()))], 0.55,
+      { jit: 0.9, fadeOut: 1, life: 2.6 });
+  });
+  /* apoptosis: cytochrome c escaping into the cytosol */
+  if (S.cytcRel > 0.02) emit('cyt', S.cytcRel * 7, dt, () => {
+    const v = pick(SITES_BY_TYPE.vdac); if (!v) return;
+    spawn('cyt', [imsPoint(), v.pM, v.pI, V3.add(cytosolPoint(), [0, 0.6, 0])], 0.8, { jit: 0.4, life: 12 });
+  });
+}
+
+function stepParticles(dt) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const q = parts[i];
+    q.age += dt;
+    const tgt = q.way[q.wi + 1];
+    if (!tgt) {
+      // arrived: fire any terminal effect
+      if (q.makesWater && LAY.fuel) for (let k = 0; k < 2; k++)
+        spawn('h2o', [q.p.slice(), matrixPoint()], 0.7, { jit: 0.6, fadeOut: 1, life: 4 });
+      parts.splice(i, 1); continue;
+    }
+    const d = V3.sub(tgt, q.p), L = V3.len(d);
+    const stepLen = q.spd * dt;
+    if (L <= stepLen || L < 1e-4) { q.p = tgt.slice(); q.wi++; }
+    else {
+      const k = stepLen / L;
+      q.p[0] += d[0] * k + (prnd() - 0.5) * q.jit * dt * 0.9;
+      q.p[1] += d[1] * k + (prnd() - 0.5) * q.jit * dt * 0.9;
+      q.p[2] += d[2] * k + (prnd() - 0.5) * q.jit * dt * 0.9;
+    }
+    if (q.age > q.life) { parts.splice(i, 1); continue; }
+    q.fade = q.fadeOut ? clamp(1 - q.age / q.life, 0, 1) : Math.min(1, q.age * 6);
+  }
+}
+
+/* ==================================================================== */
+/*  CAMERA                                                              */
+/* ==================================================================== */
+const CAM = {
+  yaw: 1.15, pitch: 0.55, dist: 6.0, tgt: [0, 0, 0],
+  yawT: 1.15, pitchT: 0.55, distT: 6.0, tgtT: [0, 0, 0],
+  spin: false, eye: [0, 0, 0], vp: new Float32Array(16), right: [1, 0, 0], up: [0, 1, 0],
+  shift: 0, shiftX: 0, fit: 1, cov: { l: 0, r: 0, t: 74, b: 0 }, home: [1.15, 0.55, 6.0],
+};
+/* A mitochondrion is a 2.4:1 rod. On a portrait phone it only fits if we look
+   at it from an angle that lays it diagonally across the screen; in landscape
+   the classic three-quarter view is fine. */
+function camHome(asp) {
+  CAM.home = asp < 0.85 ? [1.15, 0.55, 6.0] : [-0.62, 0.28, 5.2];
+}
+function camGoHome() {
+  CAM.yawT = CAM.home[0]; CAM.pitchT = CAM.home[1]; CAM.distT = CAM.home[2]; CAM.tgtT = [0, 0, 0];
+}
+function camUpdate(dt, asp) {
+  if (CAM.spin) CAM.yawT += dt * 0.14;
+  const k = 1 - Math.exp(-9 * dt);
+  CAM.yaw += (CAM.yawT - CAM.yaw) * k;
+  CAM.pitch += (CAM.pitchT - CAM.pitch) * k;
+  CAM.dist += (CAM.distT - CAM.dist) * k;
+  for (let i = 0; i < 3; i++) CAM.tgt[i] += (CAM.tgtT[i] - CAM.tgt[i]) * k;
+  const cp = Math.cos(CAM.pitch), sp = Math.sin(CAM.pitch);
+  CAM.eye = [CAM.tgt[0] + Math.sin(CAM.yaw) * cp * CAM.dist,
+             CAM.tgt[1] + sp * CAM.dist,
+             CAM.tgt[2] + Math.cos(CAM.yaw) * cp * CAM.dist];
+  const view = M4.lookAt(CAM.eye, CAM.tgt, [0, 1, 0]);
+  const proj = M4.persp(0.85, asp, 0.05, 60);
+  // fit the render into the rectangle the chrome leaves free: shrink to that
+  // box and shift the lens up by half the covered height
+  const fit = clamp(CAM.fit, 0.22, 1);
+  proj[0] *= fit; proj[5] *= fit;
+  proj[8] = -CAM.shiftX; proj[9] = -CAM.shift;
+  M4.mul(proj, view, CAM.vp);
+  CAM.right = [view[0], view[4], view[8]];
+  CAM.up = [view[1], view[5], view[9]];
+}
+function project(p, w, h) {
+  const m = CAM.vp;
+  const x = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12];
+  const y = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
+  const wc = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15];
+  if (wc <= 0.001) return null;
+  return [(x / wc * 0.5 + 0.5) * w, (0.5 - y / wc * 0.5) * h, wc];
+}
+/* ==================================================================== */
+/*  GUIDED WALKTHROUGHS                                                 */
+/* ==================================================================== */
+/* Each step can move the camera (f), highlight protein types (hi),
+   override layers (lay) and push the simulation somewhere (set). */
+const LESSONS = [
+{
+  id: 'anatomy', title: 'ANATOMY OF A MITOCHONDRION', icon: '🫀',
+  blurb: 'Two membranes, four compartments, and its own genome.',
+  steps: [
+  { f: 'whole', lay: { outer: 1, inner: 1, cristae: 1 }, set: { supply: 0.5, demand: 0.4 },
+    b: 'This is one human mitochondrion, roughly <b>0.7 µm across and 2.5 µm long</b> — about the size of a bacterium, which is exactly what its ancestor was. Around 1.5 billion years ago a free-living α-proteobacterium was swallowed by another cell and, instead of being digested, stayed. Every mitochondrion you own is descended from that one event.<span class="eq">Drag to orbit · pinch to zoom · tap any protein to inspect it</span>' },
+  { f: { dist: 5.4 }, hi: ['vdac'], lay: { outer: 1, inner: 0, cristae: 0 },
+    b: 'The <b>outer membrane</b> is a sieve rather than a barrier. It is studded with <i>VDAC</i> porins — β-barrels that let anything under about 5 kDa through — so the space just inside it is chemically almost identical to the cytosol. The real boundary is further in.' },
+  { f: { dist: 5.0 }, lay: { outer: 0.35, inner: 1, cristae: 1 },
+    b: 'The <b>inner membrane</b> is the working surface, and it is nothing like the outer one: no porins, almost nothing crosses it without a dedicated carrier, and about a fifth of its lipid is <i>cardiolipin</i>, a four-tailed lipid found almost nowhere else. Sealing this membrane is what makes everything else possible.' },
+  { f: { dist: 3.6 }, lay: { outer: 0, inner: 0.3, cristae: 1 },
+    b: 'It is thrown into <b>cristae</b> — flattened sacs that multiply the working area maybe fivefold. Each connects to the boundary membrane only through a narrow <i>crista junction</i>, so the space inside a crista is a semi-isolated pocket. Cells that need more power grow more cristae: heart muscle is packed with them.' },
+  { f: { dist: 3.4 }, lay: { outer: 0, inner: 0.25, cristae: 0.35, etc: 1, synth: 1 },
+    b: 'Those sacs are covered in machinery. The blue L-shapes are <b>Complex I</b>, the violet pairs <b>Complex III</b>, the orange barrels <b>Complex IV</b> — and the gold mushrooms along the folded rims are <b>ATP synthase</b>. Together they are about a fifth of all the protein in the membrane.' },
+  { f: { dist: 4.4 }, lay: { outer: 0.2, inner: 0.25, cristae: 0.4, dna: 1 }, hi: [],
+    b: 'The interior — the <b>matrix</b> — is not a fluid but a gel so concentrated with enzyme that it is nearly crystalline. Floating in it are the cyan tangles of <b>mtDNA</b> and its own ribosomes. That genome is 16,569 base pairs and encodes just <b>13 proteins</b>; the other ~1,100 are made in the cytosol and imported.' },
+  { f: { dist: 6.4 }, lay: { outer: 1, inner: 1, cristae: 1 },
+    b: 'So: four compartments — outer membrane, <b>intermembrane space</b>, inner membrane, matrix. The entire trick of this organelle is that it can hold a charge between the second and the fourth. Everything from here on is about that charge.' },
+]},
+{
+  id: 'fuel', title: 'GETTING THE FUEL IN', icon: '🔻',
+  blurb: 'Pyruvate, fatty acids and ketones, and how each gets across.',
+  steps: [
+  { f: 'vdac', lay: { fuel: 1, energy: 0 }, set: { fuel: 'pyruvate', supply: 0.9, demand: 0.55 },
+    b: 'Glycolysis happens out in the cytosol and ends in <b>pyruvate</b>. It nets only 2 ATP per glucose — about 5% of what is available — but needs no oxygen at all. The other 95% is still locked in the pyruvate, and it comes here.' },
+  { f: 'mpc', hi: ['vdac', 'mpc'],
+    b: 'Pyruvate drifts through a VDAC porin without ceremony, then hits the real gate: the <b>mitochondrial pyruvate carrier</b> in the inner membrane, which drags it in alongside a proton. Inside, the pyruvate dehydrogenase complex — a machine of 96 subunits — strips off a CO₂ and hands over <b>acetyl-CoA</b>, banking one NADH on the way.' },
+  { f: 'mpc', set: { fuel: 'fat', supply: 0.9 },
+    b: 'Fat takes a different door. Fatty acids are too big for the carriers, so they are attached to <b>carnitine</b>, shuttled across, and released inside — a checkpoint that decides how much fat a cell burns. Then <b>β-oxidation</b> chops the chain two carbons at a time, and each chop makes one NADH <i>and</i> one FADH₂.' },
+  { f: 'whole', set: { fuel: 'ketone' },
+    b: 'When food is scarce the liver turns fat into <b>ketone bodies</b>, which are water-soluble and cross into the brain — where fatty acids cannot go. β-hydroxybutyrate is converted straight back into acetyl-CoA here. A fasting brain runs mostly on this.' },
+  { f: 'whole', set: { fuel: 'mixed', supply: 0.6, demand: 0.5 },
+    b: 'Three fuels, one destination: <b>acetyl-CoA</b>. Everything you eat that is going to be burned aerobically arrives at that same two-carbon molecule, and from here the pathway is identical no matter where it came from.' },
+]},
+{
+  id: 'krebs', title: 'THE KREBS CYCLE', icon: '🔄',
+  blurb: 'Eight steps that strip electrons off carbon.',
+  steps: [
+  { f: 'krebs', lay: { krebs: 1, outer: 0.15, inner: 0.2, cristae: 0.3, etc: 0.3 }, set: { supply: 0.75, demand: 0.5 },
+    b: 'Hans Krebs worked this out in 1937 — and the paper was rejected by <i>Nature</i>. The cycle takes acetyl-CoA and, over eight enzyme steps, dismantles it completely. It is a cycle rather than a line because the two carbons that arrive are handed to a four-carbon acceptor which is rebuilt at the end.' },
+  { f: 'krebs', lay: { krebs: 1 },
+    b: 'What actually leaves is almost nothing: two molecules of <b>CO₂</b> — the carbon you breathe out. The <i>point</i> of the cycle is not the CO₂. It is the electrons stripped off along the way and loaded onto carriers.' },
+  { f: 'krebs', lay: { krebs: 1 },
+    b: 'Per turn the cycle banks <b>3 NADH</b>, <b>1 FADH₂</b>, and <b>1 GTP</b> (equivalent to one ATP — the only direct payout in the whole cycle). Those carriers are the currency; everything after this is about cashing them in.<span class="eq">acetyl-CoA + 3 NAD⁺ + FAD + GDP + Pi → 2 CO₂ + 3 NADH + FADH₂ + GTP</span>' },
+  { f: 'krebs', lay: { krebs: 1 }, set: { caCyt: 0.6 },
+    b: 'The cycle is regulated by what it is producing. High NADH slows it; ADP speeds it up; and <b>Ca²⁺</b> — the same ion that tells a muscle to contract — directly activates three of its dehydrogenases. Watch the Ca²⁺ arriving now and the fuel flux rising with it.' },
+  { f: 'cii', hi: ['cii'], lay: { krebs: 1, etc: 1 }, set: { caCyt: 0 },
+    b: 'One step of the cycle is not floating in the matrix at all. <b>Succinate dehydrogenase</b> is bolted into the inner membrane — because it is also <b>Complex II</b> of the respiratory chain. The Krebs cycle and the electron transport chain are physically the same object at this point.' },
+]},
+{
+  id: 'etc', title: 'THE ELECTRON TRANSPORT CHAIN', icon: '⚡',
+  blurb: 'Four complexes, one very carefully controlled fall.',
+  steps: [
+  { f: 'ci', hi: ['ci'], lay: { electrons: 1, protons: 1, etc: 1 }, set: { supply: 0.6, demand: 0.5, fuel: 'mixed' },
+    b: 'NADH is a high-energy electron carrier. Burn it directly with oxygen and you get a violent release of heat. The chain exists to make that fall happen in <b>small, harvestable steps</b> instead — each carrier slightly more electron-hungry than the last.' },
+  { f: 'ci', hi: ['ci'],
+    b: '<b>Complex I</b> is the entrance for most electrons and the largest of them. NADH docks on the arm sticking up into the matrix; the electrons then travel a 20 nm wire of seven iron–sulfur clusters to reach ubiquinone in the membrane. The energy released pushes <b>4 H⁺</b> out — including through a channel worked at a distance by a long horizontal helix, like a piston rod.' },
+  { f: 'cii', hi: ['cii'],
+    b: '<b>Complex II</b> is the side door. FADH₂ from succinate and from β-oxidation enters here — but it starts lower down the energy hill, so there is nothing left over to pump with. <b>It moves no protons at all.</b> That single fact is why fat yields slightly less ATP per oxygen than sugar.' },
+  { f: 'ciii', hi: ['ciii'], lay: { electrons: 1 },
+    b: 'Both routes converge on the small, greasy <b>ubiquinone</b> shuttling within the bilayer — the gold dots. It carries electrons to <b>Complex III</b>, which runs the <i>Q cycle</i>: it splits the pair, sending one electron onward and recycling the other, and releases <b>4 H⁺</b> outward per pair in the process.' },
+  { f: 'civ', hi: ['civ'],
+    b: 'From there, <b>cytochrome c</b> — the small pink carrier, loose in the intermembrane space — ferries electrons one at a time to <b>Complex IV</b>. Remember it: this protein has a second job that ends the cell.' },
+  { f: 'civ', hi: ['civ'],
+    b: '<b>Complex IV</b> is where the oxygen you breathed arrives. It holds four electrons at a copper–heme centre until a whole O₂ can be reduced to <b>two waters</b> at once — never releasing a half-reduced radical. It pumps 2 H⁺ and takes 2 more from the matrix for the water. Roughly 90% of the oxygen you inhale is consumed right here.' },
+  { f: 'whole', set: { civ: 0.02 },
+    b: 'Cut this last step — cyanide binds exactly here — and watch what happens. Nothing downstream to accept electrons means <b>every carrier upstream fills and stays full</b>: NADH, the Q pool, cytochrome c, all pinned reduced. The oxygen is still there. It is simply unreachable.' },
+  { f: 'whole', set: { civ: 1 },
+    b: 'Restored. Add up the pumping across a whole NADH: 4 + 4 + 2 = <b>10 protons</b> moved out. FADH₂ skips Complex I and manages only 6. The chain has converted a chemical gradient into an electrical one — and that is the entire trick.' },
+]},
+{
+  id: 'chemi', title: 'CHEMIOSMOSIS & THE TURBINE', icon: '🔋',
+  blurb: 'The idea nobody believed, and the rotary motor that proved it.',
+  steps: [
+  { f: 'whole', lay: { protons: 1 }, set: { supply: 0.6, demand: 0.5 },
+    b: 'In 1961 Peter Mitchell proposed something that sounded absurd: the link between burning food and making ATP is not a chemical intermediate at all, but a <b>proton gradient across a membrane</b>. He was ridiculed for the better part of a decade, then given the Nobel Prize in 1978.' },
+  { f: 'whole', lay: { protons: 1 },
+    b: 'The gradient has two parts. Charge separation gives about <b>150–180 mV</b> of voltage (ΔΨ), and the proton excess gives roughly <b>0.6 pH units</b> (ΔpH) — matrix around pH 7.8, intermembrane space around 7.2. Together they are the <i>proton-motive force</i>.' },
+  { f: 'whole',
+    b: 'That membrane is about <b>5 nm</b> thick. 180 millivolts across 5 nanometres is a field strength near <b>30 million volts per metre</b> — comparable to a lightning strike, held steadily, inside you, right now, across every one of perhaps ten quadrillion mitochondria.' },
+  { f: 'cv', hi: ['cv'], lay: { synth: 1, protons: 1 },
+    b: 'And here is what it is for. <b>ATP synthase</b> is a rotary motor. Protons falling back into the matrix turn a ring of <b>8 c-subunits</b>; the bent γ-shaft inside is forced round with it; and as it turns it cranks each of the three β-subunits through open → loose → tight, squeezing ADP and phosphate together in the tight state.' },
+  { f: 'cv', hi: ['cv'],
+    b: 'Eight protons per revolution, three ATP per revolution — <b>2.7 H⁺ per ATP</b>, an awkward number that falls straight out of the gearing. The motor spins hundreds of times a second. Paul Boyer predicted the rotation, John Walker crystallised it, and they shared the 1997 Nobel Prize.' },
+  { f: 'ant', hi: ['ant'],
+    b: 'One more toll. ATP is made <i>inside</i> and needed <i>outside</i>, so <b>ANT</b> swaps matrix ATP⁴⁻ for cytosolic ADP³⁻ — and because those charges differ, the voltage pays for it. Add the phosphate carrier and an exported ATP really costs about <b>3.7 H⁺</b>.' },
+  { f: 'whole', set: { cv: 0.03 },
+    b: 'Block the turbine with oligomycin and the logic becomes visible: voltage climbs to its ceiling, back-pressure stalls the pumps, and <b>oxygen consumption falls even though the chain was never touched</b>. The chain and the synthase are coupled through nothing but the gradient.' },
+  { f: 'whole', set: { cv: 1 },
+    b: 'Released. Protons rush through, voltage drops, the pumps free up and respiration surges. This is <b>respiratory control</b>: your mitochondria burn fuel at the rate you spend ATP, with no controller anywhere — just ADP arriving.' },
+]},
+{
+  id: 'ledger', title: 'THE BALANCE SHEET', icon: '🧾',
+  blurb: 'What one glucose is actually worth.',
+  steps: [
+  { f: 'whole', set: { fuel: 'pyruvate', supply: 0.7, demand: 0.55 },
+    b: 'Glycolysis: <b>2 ATP</b> and 2 NADH, out in the cytosol. Krebs, twice over: <b>2 GTP</b>, 6 NADH, 2 FADH₂. Everything else has to be cashed in here.' },
+  { f: 'whole',
+    b: 'Divide the protons by the cost: 10 H⁺ per NADH ÷ 3.7 H⁺ per exported ATP ≈ <b>2.5 ATP</b>. FADH₂ manages 6 ÷ 3.7 ≈ <b>1.5</b>. These are the real P/O ratios — not whole numbers, because the c-ring has eight subunits and biology did not round.' },
+  { f: 'whole',
+    b: 'The total comes to roughly <b>30–32 ATP per glucose</b>, of which about 26 come from this organelle. Textbooks used to say 36–38, from an older estimate of 3 ATP per NADH. Check the live <b>P/O ratio</b> in the DATA tab — it is computed from the fluxes, not looked up.' },
+  { f: 'whole', set: { fuel: 'fat' },
+    b: 'Switch to fat and watch P/O <b>fall</b>: β-oxidation makes proportionally more FADH₂, which skips Complex I and its four protons. Per <i>oxygen</i> fat is slightly worse. Per <i>gram</i> it is more than twice as good, which is why you store it and not sugar.' },
+  { f: 'whole', set: { fuel: 'mixed', demand: 0.9, supply: 1.0 },
+    b: 'Scale it up: you turn over roughly <b>your own body weight in ATP every day</b> — but only about 250 g exists at any moment. Each molecule is made and spent perhaps a thousand times a day. There is no store. There is only the flow.' },
+]},
+{
+  id: 'heat', title: 'LEAK, HEAT & BROWN FAT', icon: '🔥',
+  blurb: 'Why a perfectly efficient mitochondrion would be a bad idea.',
+  steps: [
+  { f: 'whole', lay: { heat: 1, protons: 1 }, set: { fuel: 'mixed', supply: 0.38, demand: 0.14, ucp: 0 },
+    b: 'At rest the gradient is nearly full and almost no ADP is arriving. So where do the protons go? Straight back through the membrane. Look at the <b>coupling efficiency</b> gauge: about half the fuel you burn sitting still is spent on a gradient that simply leaks away.' },
+  { f: 'whole',
+    b: 'That is not a defect. Proton leak is a large slice of your <b>basal metabolic rate</b>, and it keeps you warm. It also acts as a safety valve: a fully coupled chain would sit at maximum voltage with nowhere to discharge, and that is precisely the state that makes radicals.' },
+  { f: 'ucp', hi: ['ucp'], set: { fuel: 'fat', supply: 1.2, demand: 0.18, ucp: 0.85 },
+    b: 'Brown fat does it deliberately. Noradrenaline switches on <b>UCP1</b> — a channel that does nothing but let protons home. Coupling collapses, oxygen consumption soars, and every joule comes out as <b>heat</b>. Newborns cannot shiver; this is how they survive their first winter.' },
+  { f: 'whole', set: { ucp: 0, leak: 60, supply: 1.4 },
+    b: 'Now the uncontrolled version. <b>DNP</b> makes the whole membrane leaky, and it was sold as a diet pill in the 1930s: you burn fuel furiously and get no ATP for it. It worked. It also cooked people from the inside, and it is still killing people who buy it online.' },
+]},
+{
+  id: 'ros', title: 'RADICALS, CALCIUM & DEATH', icon: '☠️',
+  blurb: 'The same organelle decides whether the cell lives.',
+  steps: [
+  { f: 'whole', lay: { ros: 1 }, set: { leak: 1, fuel: 'pyruvate', supply: 1.3, demand: 0.18, scav: 1 },
+    b: 'Complex IV is careful with oxygen, but the carriers upstream are not perfect. A fraction of a percent of the oxygen you consume picks up a single electron early and leaves as <b>superoxide</b>. Fuel-rich and idle — just after a big meal — is the worst case: high voltage, a full Q pool, and electrons pushed <i>backwards</i> into Complex I.' },
+  { f: 'whole', set: { ciii: 0.03 },
+    b: 'Antimycin A shows the mechanism at full volume. Jamming the Q cycle half-finished leaves a trapped semiquinone, which hands single electrons straight to O₂. This is the largest radical burst the simulator can make.' },
+  { f: 'whole', set: { ciii: 1, supply: 0.6, demand: 0.5, scav: 1 },
+    b: 'Cells are not defenceless: superoxide dismutase, glutathione peroxidase and peroxiredoxins mop it up in milliseconds. And some of it is <b>wanted</b> — mitochondrial ROS is a genuine signal, used to trigger stress responses. The problem is only ever the balance.' },
+  { f: 'mcu', hi: ['mcu'], set: { caCyt: 0.55 },
+    b: 'Calcium is the other side of the coin. The <b>MCU</b> uses the −170 mV to pull Ca²⁺ in, and in the matrix it activates three dehydrogenases at once. Mitochondria park within 20 nm of the ER to catch these pulses — the same signal that tells a cell to work tells its mitochondria to make fuel.' },
+  { f: 'whole', set: { caCyt: 1.0, scav: 0.45 },
+    b: 'Too much, though, and the <b>permeability transition pore</b> opens: an unselective hole that short-circuits the gradient outright. Voltage collapses, water floods in, the matrix swells and the cristae unfold. This is what kills heart muscle in the minutes <i>after</i> blood flow is restored.' },
+  { f: 'whole',
+    b: 'And as the cristae open, <b>cytochrome c</b> — the same small carrier that has been ferrying electrons all along — escapes into the cytosol. There it binds Apaf-1, builds the <i>apoptosome</i>, and activates the caspases that dismantle the cell. The organelle that powers the cell also holds the switch that ends it.' },
+  { f: 'whole', set: { caCyt: 0, scav: 1, supply: 0.6, demand: 0.5 }, act: 'resetChem',
+    b: 'Reset. In a real cell this point is past no return — the decision is made in seconds and cannot be taken back.' },
+]},
+{
+  id: 'dyn', title: 'DIVIDING, MERGING, INHERITED', icon: '🧬',
+  blurb: 'Mitochondria are a network, and they come only from your mother.',
+  steps: [
+  { f: 'whole', set: { supply: 0.6, demand: 0.5 }, act: 'fission',
+    b: 'They are not the beans in the textbook drawing. Mitochondria constantly divide and merge. <b>Fission</b> starts when the ER wraps a tubule and <i>DRP1</i> assembles a ring that constricts and severs it — happening right now.' },
+  { f: 'whole', act: 'fusion',
+    b: '<b>Fusion</b> runs the other way: mitofusins tether two outer membranes, OPA1 merges the inner ones, and the contents mix. A cell can pool its mtDNA and share components — one healthy mitochondrion can chemically complement a damaged one.' },
+  { f: 'whole', act: 'mitophagy',
+    b: 'When one is beyond saving, its voltage is gone — and voltage is exactly what protein import needs. <b>PINK1</b> can no longer be imported, so it accumulates on the surface, recruits <i>Parkin</i>, and tags the whole organelle for engulfment. Mutations in both genes cause early-onset Parkinson\'s.' },
+  { f: 'whole', lay: { dna: 1 },
+    b: 'That genome deserves a closer look: <b>16,569 base pairs</b>, circular, bacterial in style, with 37 genes — 13 proteins, 22 tRNAs, 2 rRNAs. Every one of those 13 is a subunit of the very complexes you have been watching. Each mitochondrion carries several copies.' },
+  { f: 'whole', lay: { dna: 1 },
+    b: 'Sperm mitochondria are destroyed after fertilisation, so mtDNA comes <b>only from your mother</b> — an unbroken maternal line back through every ancestor you have. It also mutates far faster than nuclear DNA, which is what makes it such a good clock for tracing human migration.' },
+  { f: 'whole', lay: { dna: 1 },
+    b: 'And when some copies are faulty — <b>heteroplasmy</b> — nothing happens until the bad fraction passes a threshold, often 60–90%. Below it you are fine. Above it, the tissues that need the most ATP go first: muscle, heart, retina, brain. That threshold is why mitochondrial disease is so unpredictable within one family.' },
+]},
+];
+
+/* ==================================================================== */
+/*  HELP / ABOUT                                                        */
+/* ==================================================================== */
+const HELP_HTML = `
+<h2>MITOCHONDRIA SIMULATOR</h2>
+<div class="tag">A HUMAN MITOCHONDRION, SIMULATED AND EXPLORABLE</div>
+<p>This is not a scored game. It is an instrument: a biologically-grounded model of
+oxidative phosphorylation with a 3D organelle wrapped around it. Pick a scenario,
+poke it, and watch the chemistry respond.</p>
+<h4>MOVING AROUND</h4>
+<ul>
+<li><b>One finger / drag</b> — orbit</li>
+<li><b>Pinch</b> — zoom · <b>two fingers</b> — pan</li>
+<li><b>Tap a protein</b> — inspect it</li>
+<li><b>Mouse</b> — drag to orbit, wheel to zoom, right-drag or shift-drag to pan</li>
+</ul>
+<h4>THE FOUR TABS</h4>
+<ul>
+<li><b>RUN</b> — choose what the body is doing, then interfere with it</li>
+<li><b>LEARN</b> — nine step-through walkthroughs; the camera and the chemistry follow along</li>
+<li><b>VIEW</b> — hide layers, slice the membranes open, slow time down</li>
+<li><b>DATA</b> — the live numbers and a rolling trace</li>
+</ul>
+<h4>HOW REAL IS IT?</h4>
+<p>The simulation integrates fluxes through Complexes I–IV, ATP synthase, proton leak,
+glycolysis and calcium handling, using textbook stoichiometry: 4/4/2 H⁺ pumped, 8 H⁺
+per 3 ATP, ~1 H⁺ more to export each one. Nothing downstream is faked — the P/O ratio
+of about 2.5 for NADH, the drop in efficiency on fat, the crossover signatures of each
+classic inhibitor and the membrane potentials (~180 mV at rest, ~150 mV working) all
+emerge from those equations.</p>
+<p class="dim">What is stylised: colour and scale are exaggerated so components stay
+tellable apart, complexes are far sparser than the real crowding, and the oxygen dial
+is more sensitive than a real Complex IV so that hypoxia is visible in seconds. Fluxes
+are normalised units, not molar rates.</p>
+<h4>WHAT'S NEXT</h4>
+<p class="dim">Phase 2 zooms out to whole cells — different cell types, different
+mitochondrial densities, ER contacts and the network. Phase 3 zooms out again to
+organ systems. Zoom right out now and you can already see neighbours in the cytosol.</p>
+<button class="btn acc" id="ov-close">START EXPLORING</button>`;
+/* ==================================================================== */
+/*  AUDIO — synthesised, no files                                       */
+/* ==================================================================== */
+const AU = { ctx: null, muted: localStorage.getItem('mito.mute') === '1', started: false };
+function audioInit() {
+  if (AU.ctx) { if (AU.ctx.state === 'suspended') AU.ctx.resume(); return; }
+  const C = window.AudioContext || window.webkitAudioContext;
+  if (!C) return;
+  AU.ctx = new C();
+  AU.master = AU.ctx.createGain(); AU.master.gain.value = AU.muted ? 0 : 1;
+  AU.master.connect(AU.ctx.destination);
+  AU.sfx = AU.ctx.createGain(); AU.sfx.gain.value = 0.5; AU.sfx.connect(AU.master);
+  AU.mus = AU.ctx.createGain(); AU.mus.gain.value = 0.30; AU.mus.connect(AU.master);
+  AU.noise = AU.ctx.createBuffer(1, AU.ctx.sampleRate * 2, AU.ctx.sampleRate);
+  const nd = AU.noise.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  startAmbient();
+}
+function startAmbient() {
+  if (AU.started || !AU.ctx) return; AU.started = true;
+  const t = AU.ctx.currentTime;
+  // a slow cellular drone: two detuned saws through a moving lowpass
+  AU.droneF = AU.ctx.createBiquadFilter();
+  AU.droneF.type = 'lowpass'; AU.droneF.frequency.value = 320; AU.droneF.Q.value = 3;
+  AU.droneF.connect(AU.mus);
+  const dg = AU.ctx.createGain(); dg.gain.value = 0.22; dg.connect(AU.droneF);
+  for (const d of [0, 3, -4]) {
+    const o = AU.ctx.createOscillator();
+    o.type = 'sawtooth'; o.frequency.value = 55 * Math.pow(2, d / 1200 * 100 / 100);
+    o.detune.value = d * 4; o.connect(dg); o.start(t);
+  }
+  const lfo = AU.ctx.createOscillator(), lg = AU.ctx.createGain();
+  lfo.frequency.value = 0.035; lg.gain.value = 130;
+  lfo.connect(lg); lg.connect(AU.droneF.frequency); lfo.start(t);
+  // a soft filtered-noise "wash" — the cytosol
+  const ns = AU.ctx.createBufferSource(); ns.buffer = AU.noise; ns.loop = true;
+  const nf = AU.ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 620; nf.Q.value = 0.7;
+  const ng = AU.ctx.createGain(); ng.gain.value = 0.045;
+  ns.connect(nf); nf.connect(ng); ng.connect(AU.mus); ns.start(t);
+  AU.washGain = ng;
+  AU.next = t + 0.4; AU.stepI = 0;
+  seqTick();
+}
+/* a calm lookahead sequencer — pentatonic pads that follow the ATP output */
+const PENTA = [0, 3, 5, 7, 10, 12, 15, 12, 10, 7, 5, 3];
+function seqTick() {
+  if (!AU.ctx) return;
+  const now = AU.ctx.currentTime;
+  while (AU.next < now + 0.35) {
+    const t = AU.next, i = AU.stepI++;
+    if (i % 2 === 0) {
+      const n = PENTA[(i / 2) % PENTA.length];
+      const f = 220 * Math.pow(2, n / 12);
+      const o = AU.ctx.createOscillator(), g = AU.ctx.createGain();
+      o.type = 'triangle'; o.frequency.value = f;
+      const amp = 0.06 + clamp((F.JATP || 0) * 0.05, 0, 0.05);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.25);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.9);
+      o.connect(g); g.connect(AU.mus); o.start(t); o.stop(t + 2.0);
+    }
+    AU.next += 0.75;
+  }
+  setTimeout(seqTick, 120);
+}
+function blip(freq, dur, type, vol) {
+  if (!AU.ctx || AU.muted) return;
+  const t = AU.ctx.currentTime;
+  const o = AU.ctx.createOscillator(), g = AU.ctx.createGain();
+  o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
+  o.frequency.exponentialRampToValueAtTime(freq * 0.6, t + (dur || 0.12));
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol === undefined ? 0.22 : vol, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.12));
+  o.connect(g); g.connect(AU.sfx); o.start(t); o.stop(t + (dur || 0.12) + 0.02);
+}
+function whoosh(vol) {
+  if (!AU.ctx || AU.muted) return;
+  const t = AU.ctx.currentTime;
+  const s = AU.ctx.createBufferSource(); s.buffer = AU.noise;
+  const f = AU.ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
+  f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(2200, t + 0.3);
+  const g = AU.ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol || 0.16, t + 0.05);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+  s.connect(f); f.connect(g); g.connect(AU.sfx); s.start(t); s.stop(t + 0.5);
+}
+function setMute(m) {
+  AU.muted = m; localStorage.setItem('mito.mute', m ? '1' : '0');
+  if (AU.master) AU.master.gain.setTargetAtTime(m ? 0 : 1, AU.ctx.currentTime, 0.05);
+  document.getElementById('mute-btn').textContent = m ? '🔇' : '🔊';
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AU.ctx) return;
+  if (document.hidden) AU.ctx.suspend(); else AU.ctx.resume();
+});
+
+/* ==================================================================== */
+/*  SCENE ASSEMBLY                                                      */
+/* ==================================================================== */
+const SCENE = {};
+function buildScene() {
+  SCENE.outer = uploadMesh(GEO.shellMesh(1.00, 74, 54, [0.30, 0.72, 0.80]));
+  SCENE.inner = uploadMesh(GEO.shellMesh(0.87, 70, 50, [0.35, 0.95, 0.72]));
+  SCENE.cristae = uploadMesh(GEO.cristaeMesh([0.30, 0.90, 0.68]));
+  const phago = new Mesh();
+  phago.grid(40, 60, (a, b) => {
+    const th = a * Math.PI, ph = b * TAU;
+    const n = [Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)];
+    return { p: [n[0] * 3.15, n[1] * 1.75, n[2] * 1.75], n };
+  }, [0.55, 0.75, 1.0], 0, true);
+  SCENE.phago = uploadMesh(phago);
+
+  const pm = buildProteinMeshes();
+  SCENE.prot = {};
+  const counts = {};
+  for (const s of SITES) counts[s.type] = (counts[s.type] || 0) + 1;
+  for (const k in pm) SCENE.prot[k] = uploadInstanced(pm[k], Math.max(8, (counts[k] || 0) + 4));
+
+  const mp = buildMatrixParts();
+  SCENE.nuc = uploadInstanced(mp.nucMesh, 12); SCENE.nucList = mp.nuc;
+  SCENE.ribo = uploadInstanced(mp.riboMesh, 40); SCENE.riboList = mp.ribo;
+  SCENE.node = uploadInstanced(mp.nodeMesh, 12);
+  SCENE.parts = uploadParticles(MAXP + 200);
+  SCENE.parts.stride = 9;
+}
+
+/* per-frame instance packing ------------------------------------------ */
+let synthAngle = 0, hiSet = null;
+function packProteins() {
+  for (const k in SCENE.prot) SCENE.prot[k].n = 0;
+  const showETC = LAY.etc, showSynth = LAY.synth, showCar = LAY.carriers;
+  for (const s of SITES) {
+    const g = SCENE.prot[s.type]; if (!g || g.n >= g.max) continue;
+    const isETC = s.type === 'ci' || s.type === 'cii' || s.type === 'ciii' || s.type === 'civ';
+    const isSyn = s.type === 'cv';
+    if (isETC && !showETC) continue;
+    if (isSyn && !showSynth) continue;
+    if (!isETC && !isSyn && !showCar) continue;
+    if (s.type === 'ucp' && P.ucp < 0.05) continue;
+    // cristae fold in when the matrix swells
+    const p = DEFORM(s.p);
+    const n0 = V3.add(s.p, V3.scale(s.n, 0.001));
+    const nd = V3.norm(V3.sub(DEFORM(n0), p));
+    const t0 = V3.add(s.p, V3.scale(s.t, 0.001));
+    const td = V3.norm(V3.sub(DEFORM(t0), p));
+    const d = g.data, o = g.n * 13;
+    d[o] = p[0]; d[o + 1] = p[1]; d[o + 2] = p[2];
+    d[o + 3] = nd[0]; d[o + 4] = nd[1]; d[o + 5] = nd[2];
+    d[o + 6] = td[0]; d[o + 7] = td[1]; d[o + 8] = td[2];
+    d[o + 9] = isSyn ? synthAngle + s.spin : s.spin;
+    d[o + 10] = 1;
+    d[o + 11] = hiSet ? (hiSet.has(s.type) ? 1 : 0) : 0;
+    d[o + 12] = hiSet ? (hiSet.has(s.type) ? 1 : 0.22) : 1;
+    g.n++;
+  }
+}
+function packSimpleList(g, list, tint, hi) {
+  g.n = 0;
+  for (const it of list) {
+    if (g.n >= g.max) break;
+    const p = DEFORM(it.p), d = g.data, o = g.n * 13;
+    d[o] = p[0]; d[o + 1] = p[1]; d[o + 2] = p[2];
+    d[o + 3] = 0; d[o + 4] = 0; d[o + 5] = 1;
+    d[o + 6] = Math.cos(it.a); d[o + 7] = Math.sin(it.a); d[o + 8] = 0;
+    d[o + 9] = it.a; d[o + 10] = it.s === undefined ? 1 : it.s;
+    d[o + 11] = it.hi || 0; d[o + 12] = tint === undefined ? 1 : tint;
+    g.n++;
+  }
+}
+function packParticles() {
+  const g = SCENE.parts; g.n = 0;
+  const d = g.data;
+  for (const q of parts) {
+    if (g.n >= g.max) break;
+    const sp = SPECIES[q.kind];
+    if (q.kind === 'h' && !LAY.protons) continue;
+    if ((q.kind === 'e' || q.kind === 'q' || q.kind === 'cytc') && !LAY.electrons) continue;
+    if ((q.kind === 'atp' || q.kind === 'adp') && !LAY.energy) continue;
+    if (q.kind === 'ros' && !LAY.ros) continue;
+    if (q.kind === 'heat' && !LAY.heat) continue;
+    const p = DEFORM(q.p), o = g.n * 9;
+    d[o] = p[0]; d[o + 1] = p[1]; d[o + 2] = p[2];
+    d[o + 3] = sp.col[0]; d[o + 4] = sp.col[1]; d[o + 5] = sp.col[2];
+    d[o + 6] = q.size * (q.kind === 'atp' ? 1.15 : 1); d[o + 7] = clamp(q.fade, 0, 1) * 0.95; d[o + 8] = sp.hard;
+    g.n++;
+  }
+  // DRP1 constriction ring during fission
+  if (DYN.ring > 0.01) {
+    for (let i = 0; i < 34 && g.n < g.max; i++) {
+      const a = i / 34 * TAU, r = 0.62 * (1 - DYN.pinch * 0.92) + 0.05;
+      const sy = 0.4 * Math.cos(DYN.waistX * 0.66843) - 0.252;
+      const o = g.n * 9;
+      d[o] = DYN.waistX; d[o + 1] = sy + Math.cos(a) * r; d[o + 2] = Math.sin(a) * r;
+      d[o + 3] = 1.0; d[o + 4] = 0.35; d[o + 5] = 0.85;
+      d[o + 6] = 0.055; d[o + 7] = DYN.ring; d[o + 8] = 0;
+      g.n++;
+    }
+  }
+}
+
+/* ==================================================================== */
+/*  DRAW                                                                */
+/* ==================================================================== */
+let clipD = 99, viewW = 1, viewH = 1, TIME = 0;
+function drawSolidGroup(g) {
+  if (!g.n) return;
+  gl.bindVertexArray(g.vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, g.ibuf);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, g.data, 0, g.n * 13);
+  gl.drawElementsInstanced(gl.TRIANGLES, g.count, gl.UNSIGNED_INT, 0, g.n);
+}
+function drawMembrane(geo, alpha, tint, spec, rim, tex, clip) {
+  const p = R.progMem;
+  gl.uniform1f(p.u.uAlpha, alpha);
+  gl.uniform3fv(p.u.uTint, tint);
+  gl.uniform1f(p.u.uSpecK, spec);
+  gl.uniform1f(p.u.uRimK, rim);
+  gl.uniform1f(p.u.uTex, tex);
+  gl.uniform4f(p.u.uClip, 0, 0, 1, clip === undefined ? clipD : clip);
+  gl.bindVertexArray(geo.vao);
+  gl.cullFace(gl.FRONT); gl.drawElements(gl.TRIANGLES, geo.count, gl.UNSIGNED_INT, 0);
+  gl.cullFace(gl.BACK);  gl.drawElements(gl.TRIANGLES, geo.count, gl.UNSIGNED_INT, 0);
+}
+function render() {
+  const F0 = R.fbos;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, F0.scene.f);
+  gl.viewport(0, 0, F0.scene.w, F0.scene.h);
+  gl.clearColor(0.02, 0.025, 0.05, 1);
+  gl.depthMask(true);            // glClear honours the write mask — the particle
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);   // pass leaves it off
+
+  /* background */
+  gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.BLEND);
+  R.progBg.use();
+  gl.uniform2f(R.progBg.u.uRes, F0.scene.w, F0.scene.h);
+  gl.uniform1f(R.progBg.u.uTime, TIME);
+  gl.uniform1f(R.progBg.u.uYaw, CAM.yaw);
+  gl.uniform1f(R.progBg.u.uZoomOut, LAY.cytosol ? smoothstep(7, 16, CAM.dist) : 0);
+  gl.bindVertexArray(R.quadVAO);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  /* opaque machinery */
+  gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+  const ps = R.progSol; ps.use();
+  gl.uniformMatrix4fv(ps.u.uVP, false, CAM.vp);
+  gl.uniform3fv(ps.u.uCam, new Float32Array(CAM.eye));
+  gl.uniform1f(ps.u.uTime, TIME);
+  gl.uniform1f(ps.u.uClipSolid, 0);
+  gl.uniform4f(ps.u.uClip, 0, 0, 1, clipD);
+  for (const k in SCENE.prot) drawSolidGroup(SCENE.prot[k]);
+  if (LAY.dna) { drawSolidGroup(SCENE.nuc); drawSolidGroup(SCENE.ribo); }
+  if (LAY.krebs) drawSolidGroup(SCENE.node);
+
+  /* glowing molecular traffic — additive, depth-tested but not writing */
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+  const pp = R.progPar; pp.use();
+  gl.uniformMatrix4fv(pp.u.uVP, false, CAM.vp);
+  gl.uniform3fv(pp.u.uRight, new Float32Array(CAM.right));
+  gl.uniform3fv(pp.u.uUp, new Float32Array(CAM.up));
+  const gpar = SCENE.parts;
+  if (gpar.n) {
+    gl.bindVertexArray(gpar.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gpar.ibuf);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, gpar.data, 0, gpar.n * 9);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, gpar.n);
+  }
+
+  /* translucent membranes, back to front */
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  gl.enable(gl.CULL_FACE);
+  const pmg = R.progMem; pmg.use();
+  gl.uniformMatrix4fv(pmg.u.uVP, false, CAM.vp);
+  gl.uniform3fv(pmg.u.uCam, new Float32Array(CAM.eye));
+  gl.uniform1f(pmg.u.uTime, TIME);
+  gl.uniform1f(pmg.u.uBreath, 0.006);
+  gl.uniform4f(pmg.u.uDeform, DYN.waistX, DYN.waistW, DYN.pinch, DYN.sep);
+  gl.uniform1f(pmg.u.uSwell, S.swell);
+  const cAlpha = 0.22 * (1 - S.swell * 0.45);
+  if (LAY.cristae) drawMembrane(SCENE.cristae, cAlpha * LAY.cristaeA, [1, 1, 1], 0.55, 0.75, 1);
+  if (LAY.inner) drawMembrane(SCENE.inner, 0.12 * LAY.innerA, [1, 1, 1], 0.8, 1.5, 1);
+  if (LAY.outer) drawMembrane(SCENE.outer, 0.09 * LAY.outerA, [0.85, 1, 1.15], 1.0, 1.9, 0.7);
+  if (DYN.engulf > 0.01) {
+    gl.uniform1f(pmg.u.uBreath, 0.02);
+    gl.uniform4f(pmg.u.uDeform, 0, 1, 0, 0);
+    drawMembrane(SCENE.phago, 0.26, [0.7, 0.85, 1.2], 0.6, 1.2, 0.5, -3.4 + DYN.engulf * 7.2);
+  }
+
+  /* post: bright pass, separable blur, composite */
+  gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
+  gl.bindVertexArray(R.quadVAO);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, F0.a.f); gl.viewport(0, 0, F0.a.w, F0.a.h);
+  R.progBright.use();
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, F0.scene.tex);
+  gl.uniform1i(R.progBright.u.uTex, 0); gl.uniform1f(R.progBright.u.uThresh, 0.76);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  R.progBlur.use(); gl.uniform1i(R.progBlur.u.uTex, 0);
+  for (let i = 0; i < 2; i++) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, F0.b.f);
+    gl.bindTexture(gl.TEXTURE_2D, F0.a.tex);
+    gl.uniform2f(R.progBlur.u.uDir, 1.4 / F0.a.w, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, F0.a.f);
+    gl.bindTexture(gl.TEXTURE_2D, F0.b.tex);
+    gl.uniform2f(R.progBlur.u.uDir, 0, 1.4 / F0.a.h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, F0.scene.w, F0.scene.h);
+  R.progComp.use();
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, F0.scene.tex);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, F0.a.tex);
+  gl.uniform1i(R.progComp.u.uScene, 0); gl.uniform1i(R.progComp.u.uBloom, 1);
+  gl.uniform1f(R.progComp.u.uBloomK, 0.62); gl.uniform1f(R.progComp.u.uTime, TIME);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.activeTexture(gl.TEXTURE0);
+}
+/* ==================================================================== */
+/*  2D OVERLAY — labels, leader lines, trace                            */
+/* ==================================================================== */
+LAY.outerA = 1; LAY.innerA = 1; LAY.cristaeA = 1;
+
+const LABELS = (() => {
+  const L = [];
+  const add = (p, txt, col, key) => L.push({ p, txt, col, key });
+  add(GEO.shellPt(0.22, 1.15, 1.02), 'OUTER MEMBRANE', '#66d8e0', 'outer');
+  add(GEO.shellPt(0.35, 2.4, 0.935), 'INTERMEMBRANE SPACE', '#8fd9ff', 'inner');
+  add(GEO.shellPt(0.70, 4.0, 0.885), 'INNER MEMBRANE', '#5cf0b0', 'inner');
+  add(GEO.spine(0.5), 'MATRIX', '#c9d6ff', 'always');
+  const cr = GEO.CRISTAE[3];
+  if (cr) add(GEO.cristaPt(cr, 0.55, cr.gap0 + cr.gapW / 2 + 1.2, 1), 'CRISTA', '#57e8a8', 'cristae');
+  if (cr) add(GEO.cristaPt(cr, 0.99, cr.gap0 + 0.05, 1), 'CRISTA JUNCTION', '#3fbf8a', 'cristae');
+  const pick1 = (t) => (SITES_BY_TYPE[t] || [])[Math.floor((SITES_BY_TYPE[t] || []).length * 0.4)];
+  const tag = (t, name) => { const s = pick1(t); if (s) L.push({ p: s.p, txt: name, col: rgb(PROTEIN[t].col), key: t, site: s }); };
+  tag('ci', 'COMPLEX I'); tag('ciii', 'COMPLEX III'); tag('civ', 'COMPLEX IV');
+  tag('cv', 'ATP SYNTHASE'); tag('ant', 'ANT'); tag('vdac', 'VDAC');
+  L.push({ p: null, nuc: 0, txt: 'mtDNA', col: '#72eaff', key: 'dna' });
+  return L;
+})();
+function rgb(c) { return 'rgb(' + (c[0] * 255 | 0) + ',' + (c[1] * 255 | 0) + ',' + (c[2] * 255 | 0) + ')'; }
+
+const TRACE = { dp: [], atp: [], o2: [], ros: [], mark: [], max: 240, acc: 0 };
+
+function drawOverlay(w, h) {
+  uix.clearRect(0, 0, w, h);
+  if (LAY.labels) {
+    uix.font = '9px "Share Tech Mono", monospace';
+    uix.textBaseline = 'middle';
+    const placed = [];
+    const roL = viewW - CAM.cov.r - 162, roT = 80, roB = 264;
+    let drawn = 0;
+    for (const l of LABELS) {
+      if (drawn >= 5) break;
+      let anchor = l.p;
+      if (l.nuc !== undefined) { const n = SCENE.nucList && SCENE.nucList[l.nuc]; if (!n) continue; anchor = n.p; }
+      const keyOn = l.key === 'always' || l.key === 'dna' ? (l.key === 'dna' ? LAY.dna : true)
+        : (l.key === 'outer' ? LAY.outer : l.key === 'inner' ? LAY.inner : l.key === 'cristae' ? LAY.cristae
+          : (l.key === 'cv' ? LAY.synth : (l.key === 'ci' || l.key === 'ciii' || l.key === 'civ') ? LAY.etc : LAY.carriers));
+      if (!keyOn) continue;
+      const q = project(DEFORM(anchor), w, h); if (!q) continue;
+      const cv = CAM.cov;
+      if (q[1] < cv.t + 6 || q[1] > h - cv.b - 8 || q[0] < cv.l + 6 || q[0] > w - cv.r - 8) continue;
+      const tw = uix.measureText(l.txt).width;
+      let dir = q[0] > w * 0.5 ? -1 : 1;
+      let lx = q[0] + dir * 24, ly = q[1] - 13;
+      if (dir > 0 && lx + tw + 12 > w - 6) dir = -1;
+      if (dir < 0 && q[0] - 24 - tw - 10 < 6) dir = 1;
+      lx = q[0] + dir * 24;
+      const bx0 = dir > 0 ? q[0] : lx - tw - 10, bx1 = dir > 0 ? lx + tw + 10 : q[0];
+      if (bx0 < cv.l + 4 || bx1 > w - cv.r - 4) continue;
+      // never let a label or its leader run under the readouts panel
+      if (bx1 > roL && ly > roT && ly < roB) continue;
+      if (q[0] > roL && q[1] > roT && q[1] < roB) continue;
+      const box = [bx0 - 4, ly - 13, bx1 + 4, ly + 4];
+      let clash = false;
+      for (const pr of placed)
+        if (box[0] < pr[2] && box[2] > pr[0] && box[1] < pr[3] && box[3] > pr[1]) { clash = true; break; }
+      if (clash) continue;
+      placed.push(box); drawn++;
+      uix.fillStyle = 'rgba(6,7,16,0.66)';
+      uix.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+      uix.globalAlpha = 0.9;
+      uix.strokeStyle = l.col; uix.lineWidth = 1;
+      uix.beginPath(); uix.moveTo(q[0], q[1]); uix.lineTo(lx, ly);
+      uix.lineTo(lx + dir * (tw + 7), ly); uix.stroke();
+      uix.beginPath(); uix.arc(q[0], q[1], 2.2, 0, TAU); uix.fillStyle = l.col; uix.fill();
+      uix.globalAlpha = 1;
+      uix.fillStyle = l.col;
+      uix.fillText(l.txt, dir > 0 ? lx + 4 : lx - tw - 4, ly - 5);
+    }
+  }
+  /* scale bar */
+  uix.globalAlpha = 0.55;
+  const a = project([0, -1.35, 0], w, h), b = project([1, -1.35, 0], w, h);
+  if (a && b) {
+    const px = Math.abs(b[0] - a[0]);
+    if (px > 18 && px < w * 0.7) {
+      const y = h - 44;
+      uix.strokeStyle = '#8899bb'; uix.lineWidth = 1;
+      uix.beginPath(); uix.moveTo(14, y); uix.lineTo(14 + px, y);
+      uix.moveTo(14, y - 3); uix.lineTo(14, y + 3);
+      uix.moveTo(14 + px, y - 3); uix.lineTo(14 + px, y + 3); uix.stroke();
+      uix.fillStyle = '#8899bb'; uix.font = '9px "Share Tech Mono", monospace';
+      uix.fillText('0.5 µm', 16, y - 9);
+    }
+  }
+  uix.globalAlpha = 1;
+}
+
+/* ==================================================================== */
+/*  HUD                                                                 */
+/* ==================================================================== */
+const GAUGES = [
+  { k: 'dpsi', lab: 'ΔΨm', col: '#39ff14', max: 200, v: () => 0.82 * S.dp, fmt: (v) => fmt(v, 0) + ' mV' },
+  { k: 'ph', lab: 'MATRIX pH', col: '#4488ff', max: 1, v: () => (7.2 + 0.18 * S.dp / 60 - 7.2) / 0.75, fmt: () => fmt(7.2 + 0.18 * S.dp / 60, 2) },
+  { k: 'atp', lab: 'ATP OUTPUT', col: '#ffc300', max: 1.3, v: () => Math.max(0, F.JATP), fmt: (v) => fmt(v / REST_REF.JATP, 1) + '× rest' },
+  { k: 'o2', lab: 'O₂ USE', col: '#31e0ff', max: 0.32, v: () => F.JO2, fmt: (v) => fmt(v / REST_REF.JO2, 1) + '× rest' },
+  { k: 'coup', lab: 'COUPLING', col: '#b44fff', max: 1, v: () => F.coup, fmt: (v) => fmt(v * 100, 0) + '%' },
+  { k: 'ros', lab: 'ROS', col: '#ff2244', max: 0.9, v: () => S.ros, fmt: (v) => v < 0.12 ? 'low' : v < 0.30 ? 'raised' : v < 0.55 ? 'HIGH' : 'SEVERE' },
+  { k: 'heat', lab: 'HEAT', col: '#ff7a2a', max: 0.9, v: () => S.heatInt, fmt: (v) => fmt(v / REST_REF.heat, 1) + '× rest' },
+];
+function buildHUD() {
+  const el = document.getElementById('readouts');
+  el.innerHTML = GAUGES.map(g => `<div class="ro"><div class="ro-top"><span class="ro-lab">${g.lab}</span>
+    <span class="ro-val" id="ro-${g.k}">–</span></div>
+    <div class="ro-bar"><div class="ro-fill" id="rf-${g.k}" style="background:${g.col};box-shadow:0 0 6px ${g.col}"></div></div></div>`).join('');
+}
+function updateHUD() {
+  for (const g of GAUGES) {
+    const v = g.v();
+    const e = document.getElementById('ro-' + g.k), f = document.getElementById('rf-' + g.k);
+    if (e) e.textContent = g.fmt(v);
+    if (f) f.style.width = clamp(v / g.max, 0, 1) * 100 + '%';
+  }
+  const dt = document.getElementById('dat');
+  if (dt && dockTab === 'data') {
+    const rows = [
+      ['sec', 'PROTON CIRCUIT'],
+      ['ΔΨm (membrane potential)', fmt(0.82 * S.dp, 0) + ' mV'],
+      ['ΔpH', fmt(0.18 * S.dp / 60, 2) + ' units'],
+      ['Proton-motive force', fmt(S.dp, 0) + ' mV'],
+      ['H⁺ pumped out', fmt(F.pumped, 2)],
+      ['H⁺ through synthase', fmt(K.H_ATP * Math.max(0, F.JATP), 2)],
+      ['H⁺ leaked / UCP1 / pore', fmt(F.Jleak + F.Jucp + F.Jmpt, 2)],
+      ['Coupling efficiency', fmt(F.coup * 100, 0) + '%'],
+      ['sec', 'ELECTRON CARRIERS (fraction reduced)'],
+      ['NADH / NAD⁺ pool', fmt(S.nadh * 100, 0) + '%'],
+      ['FADH₂ pool', fmt(S.fadh2 * 100, 0) + '%'],
+      ['Ubiquinol (QH₂) pool', fmt(S.qh2 * 100, 0) + '%'],
+      ['Cytochrome c', fmt(S.cytc * 100, 0) + '%'],
+      ['sec', 'FLUX'],
+      ['Complex I', fmt(F.J1, 2)],
+      ['Complex II', fmt(F.J2, 2)],
+      ['Complex III', fmt(F.J3, 2)],
+      ['Complex IV', fmt(F.J4, 2)],
+      ['ATP synthase', (F.reverse ? '−' : '') + fmt(Math.abs(F.JATP), 2) + (F.reverse ? '  (REVERSE)' : '')],
+      ['O₂ consumption', fmt(F.JO2, 3)],
+      ['P/O ratio', fmt(F.PO, 2)],
+      ['sec', 'CYTOSOL'],
+      ['ATP demand', fmt(F.Jdem, 2)],
+      ['Glycolytic ATP', fmt(F.Jgly, 2)],
+      ['Lactate output', fmt(F.lact, 2)],
+      ['ADP fraction of pool', fmt(S.adp * 100, 0) + '%'],
+      ['sec', 'STRESS'],
+      ['Matrix Ca²⁺', fmt(S.caM * 100, 0) + '%'],
+      ['ROS', fmt(S.ros, 2)],
+      ['Permeability pore', S.mptp < 0.02 ? 'closed' : fmt(S.mptp * 100, 0) + '% OPEN'],
+      ['Cytochrome c released', S.cytcRel < 0.02 ? 'no' : fmt(S.cytcRel * 100, 0) + '%'],
+      ['sec', 'TOTALS THIS RUN'],
+      ['ATP made', '≈ ' + sci(S.atpTotal * 9500) + ' molecules'],
+      ['O₂ consumed', '≈ ' + sci(S.o2Total * 9500 / 2.4) + ' molecules'],
+    ];
+    dt.innerHTML = rows.map(r => r[0] === 'sec'
+      ? `<tr class="sec"><td colspan="2">${r[1]}</td></tr>`
+      : `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+    drawTrace();
+  }
+}
+function sci(v) {
+  if (v < 1000) return fmt(v, 0);
+  const e = Math.floor(Math.log10(v));
+  return fmt(v / Math.pow(10, e), 1) + '×10' + String(e).split('').map(d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[+d]).join('');
+}
+function drawTrace() {
+  const c = document.getElementById('trace');
+  if (!c) return;
+  const w = c.clientWidth || 300, h = 64;
+  if (c.width !== w * 2) { c.width = w * 2; c.height = h * 2; }
+  const x = c.getContext('2d');
+  x.setTransform(2, 0, 0, 2, 0, 0);
+  x.clearRect(0, 0, w, h);
+  x.fillStyle = '#080814'; x.fillRect(0, 0, w, h);
+  const series = [['dp', '#39ff14', 260], ['atp', '#ffc300', 1.4], ['o2', '#31e0ff', 0.34], ['ros', '#ff2244', 1.0]];
+  for (const [k, col, mx] of series) {
+    const a = TRACE[k]; if (a.length < 2) continue;
+    x.strokeStyle = col; x.lineWidth = 1; x.globalAlpha = 0.9;
+    x.beginPath();
+    for (let i = 0; i < a.length; i++) {
+      const px = w - (a.length - 1 - i) / (TRACE.max - 1) * w;
+      const py = h - 3 - clamp(a[i] / mx, 0, 1) * (h - 6);
+      i ? x.lineTo(px, py) : x.moveTo(px, py);
+    }
+    x.stroke();
+  }
+  x.globalAlpha = 0.5; x.strokeStyle = '#ffffff'; x.setLineDash([2, 3]);
+  for (const m of TRACE.mark) {
+    const px = w - (TRACE.dp.length - 1 - m.i) / (TRACE.max - 1) * w;
+    if (px < 0) continue;
+    x.beginPath(); x.moveTo(px, 0); x.lineTo(px, h); x.stroke();
+  }
+  x.setLineDash([]); x.globalAlpha = 1;
+}
+
+/* ==================================================================== */
+/*  UI WIRING                                                           */
+/* ==================================================================== */
+let dockTab = 'run', curScenario = 'rest', lesson = null, lessonI = 0, dynT = 0, slowMo = false;
+const dockH = () => document.getElementById('dock').offsetHeight;
+
+function resetChem() {
+  Object.assign(S, { nadh: 0.25, fadh2: 0.2, qh2: 0.2, cytc: 0.22, dp: 226, adp: 0.08,
+    caM: 0.03, ros: 0.05, mptp: 0, cytcRel: 0, swell: 0 });
+}
+function applyScenario(id, quiet) {
+  const s = SCN_BY_ID[id]; if (!s) return;
+  curScenario = id; dynT = 0;
+  Object.assign(P, { fuel: 'mixed', supply: 0.38, demand: 0.14, o2: 1,
+    ci: 1, cii: 1, ciii: 1, civ: 1, cv: 1, leak: 1, ucp: 0, caCyt: 0, scav: 1, glyMul: 1 });
+  Object.assign(P, s.p);
+  if (S.mptp > 0.05 || S.cytcRel > 0.05) resetChem();
+  document.getElementById('scn-name').textContent = s.n.toUpperCase();
+  document.getElementById('scn-note').innerHTML = s.note;
+  document.getElementById('scenario').value = id;
+  syncDials();
+  TRACE.mark.push({ i: TRACE.dp.length });
+  if (TRACE.mark.length > 6) TRACE.mark.shift();
+  if (!quiet) { blip(520, 0.14, 'sine', 0.16); }
+}
+function scenarioDyn(dt) {
+  const s = SCN_BY_ID[curScenario];
+  if (!s || !s.dyn) return;
+  dynT += dt;
+  const period = s.id === 'seahorse' ? 100 : 70;
+  if (dynT > period) dynT = 0;
+  Object.assign(P, s.p, s.dyn(dynT));
+  if (s.dynLabel) {
+    const el = document.getElementById('scn-name');
+    el.textContent = s.n.toUpperCase() + ' · ' + s.dynLabel(dynT);
+  } else if (s.id === 'breathhold') {
+    document.getElementById('scn-name').textContent =
+      s.n.toUpperCase() + ' · ' + Math.floor(dynT) + 's · O₂ ' + fmt(P.o2 * 100, 0) + '%';
+  }
+  syncDials();
+}
+
+/* --- narration / toasts --- */
+function showNarr(title, body, step, nav) {
+  const n = document.getElementById('narr');
+  n.classList.add('on');
+  document.getElementById('narr-title').textContent = title;
+  document.getElementById('narr-step').textContent = step || '';
+  document.getElementById('narr-body').innerHTML = body;
+  n.querySelector('.nav').style.display = nav ? 'flex' : 'none';
+  n.scrollTop = 0;
+  n.style.setProperty('--dockH', dockH() + 'px');
+}
+function hideNarr() { document.getElementById('narr').classList.remove('on'); }
+let toastTimer = null;
+function toast(title, body, ms) {
+  if (lesson) return;
+  showNarr(title, body, '', false);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { if (!lesson) hideNarr(); }, ms || 6500);
+}
+function narrateDynamic(mode) {
+  const T = {
+    fission: ['FISSION', 'An ER tubule marks the spot and <b>DRP1</b> assembles a constricting ring. The organelle is being cut in two — this is how the network is remodelled, and how damaged segments are separated off for disposal.'],
+    fusion: ['FUSION', 'Two mitochondria are merging: <b>mitofusins</b> tether the outer membranes, <b>OPA1</b> fuses the inner ones, and the matrices mix. Pooling contents lets a healthy genome cover for a damaged one.'],
+    mitophagy: ['MITOPHAGY', 'This mitochondrion has lost its membrane voltage, so <b>PINK1</b> can no longer be imported and piles up on the surface. It recruits <b>Parkin</b>, which tags the whole organelle, and a phagophore closes around it.'],
+  }[mode];
+  if (T) toast(T[0], T[1], 8000);
+}
+
+/* --- lessons --- */
+function applyLay(o) {
+  if (!o) return;
+  for (const k in o) {
+    const v = o[k];
+    if (k === 'outer' || k === 'inner' || k === 'cristae') {
+      LAY[k] = v > 0; LAY[k + 'A'] = v > 0 ? Math.max(0.25, v) : 1;
+    } else LAY[k] = !!v;
+  }
+  syncLayerUI();
+}
+function focusOn(f) {
+  if (!f) return;
+  if (f === 'whole') { camGoHome(); return; }
+  if (f === 'krebs') { CAM.distT = 3.2; CAM.tgtT = GEO.spine(0.5).slice(); return; }
+  if (typeof f === 'string') {
+    const list = SITES_BY_TYPE[f];
+    if (list && list.length) {
+      const s = list[Math.floor(list.length * 0.45)];
+      CAM.tgtT = s.p.slice(); CAM.distT = 3.4;
+      CAM.yawT = Math.atan2(s.n[0], s.n[2]) + 0.35;
+      CAM.pitchT = clamp(Math.asin(clamp(s.n[1], -1, 1)) * 0.6 + 0.12, -0.9, 0.9);
+    }
+    return;
+  }
+  if (f.tgt === undefined) CAM.tgtT = [0, 0, 0];
+  if (f.dist !== undefined) CAM.distT = f.dist * (viewW / Math.max(1, viewH) < 0.85 ? 0.94 : 1);
+  if (f.yaw !== undefined) CAM.yawT = f.yaw;
+  if (f.pitch !== undefined) CAM.pitchT = f.pitch;
+  if (f.tgt) CAM.tgtT = f.tgt.slice();
+}
+function startLesson(id) {
+  lesson = LESSONS.find(l => l.id === id) || null;
+  lessonI = 0;
+  if (!lesson) return;
+  CAM.spin = false;
+  setDockOpen(false);
+  applyLesson();
+  whoosh(0.12);
+}
+function applyLesson() {
+  const st = lesson.steps[lessonI];
+  // a step that points at a protein gets the membranes out of the way for free
+  const focused = st.hi && st.hi.length;
+  applyLay(focused ? { outer: 0.3, inner: 0.4, cristae: 0.55 } : { outer: 1, inner: 1, cristae: 1 });
+  applyLay(st.lay);
+  if (st.set) Object.assign(P, st.set);
+  hiSet = st.hi && st.hi.length ? new Set(st.hi) : null;
+  focusOn(st.f);
+  if (st.act === 'resetChem') resetChem();
+  else if (st.act) startDynamic(st.act);
+  showNarr(lesson.title, st.b, (lessonI + 1) + ' / ' + lesson.steps.length, true);
+  document.getElementById('narr-prev').disabled = lessonI === 0;
+  document.getElementById('narr-next').textContent = lessonI === lesson.steps.length - 1 ? 'FINISH' : 'NEXT ▶';
+}
+function lessonStep(d) {
+  if (!lesson) return;
+  const ni = lessonI + d;
+  if (ni < 0) return;
+  if (ni >= lesson.steps.length) { exitLesson(); return; }
+  lessonI = ni; applyLesson(); blip(660, 0.09, 'triangle', 0.13);
+}
+function exitLesson() {
+  lesson = null; hiSet = null; hideNarr(); camGoHome();
+  applyLay({ outer: 1, inner: 1, cristae: 1 });
+  applyScenario(curScenario, true);
+  setDockOpen(true);
+  blip(380, 0.14, 'sine', 0.13);
+}
+
+/* --- dock --- */
+let dockOpen = true;
+function setDockOpen(o) {
+  dockOpen = o;
+  document.getElementById('panes').classList.toggle('collapsed', !o);
+  requestAnimationFrame(() => document.getElementById('narr').style.setProperty('--dockH', dockH() + 'px'));
+}
+function syncLayerUI() {
+  document.querySelectorAll('#layers .tg').forEach(el => {
+    el.classList.toggle('on', !!LAY[el.dataset.k]);
+  });
+}
+const DIALS = [
+  { k: 'supply', lab: 'FUEL SUPPLY', min: 0, max: 1.6, step: 0.02, f: (v) => fmt(v * 62, 0) + '%' },
+  { k: 'demand', lab: 'ATP DEMAND', min: 0, max: 1.6, step: 0.02, f: (v) => fmt(v * 62, 0) + '%' },
+  { k: 'o2', lab: 'OXYGEN', min: 0.005, max: 1, step: 0.005, f: (v) => fmt(v * 100, 0) + '%' },
+  { k: 'ucp', lab: 'UCP1 (BROWN FAT)', min: 0, max: 1, step: 0.02, f: (v) => fmt(v * 100, 0) + '%' },
+  { k: 'scav', lab: 'ANTIOXIDANTS', min: 0.15, max: 1.5, step: 0.02, f: (v) => fmt(v * 67, 0) + '%' },
+];
+function syncDials() {
+  for (const d of DIALS) {
+    const el = document.getElementById('dial-' + d.k);
+    if (el && document.activeElement !== el) el.value = P[d.k];
+    const v = document.getElementById('dialv-' + d.k);
+    if (v) v.textContent = d.f(P[d.k]);
+  }
+  const fs = document.getElementById('fuel-sel');
+  if (fs) fs.value = P.fuel;
+}
+const ACTIONS = [
+  { n: '+ ADP', c: 'acc', t: 'ADP BOLUS', d: 'A slug of ADP arrives — the classic <b>State 4 → State 3</b> transition. Watch the synthase open, the voltage sag and oxygen consumption jump, with nothing else touched.', f: () => { S.adp = 0.9; } },
+  { n: '+ NADH', c: 'acc', t: 'NADH ADDED', d: 'The NADH pool is filled by hand. Complex I has plenty to work with, so flux and the proton gradient both climb — until back-pressure limits them.', f: () => { S.nadh = 0.95; } },
+  { n: 'Ca²⁺ PULSE', c: '', t: 'CALCIUM PULSE', d: 'A puff of Ca²⁺ from the ER, caught by the <b>MCU</b>. In the matrix it activates three Krebs dehydrogenases, so fuel flux rises a few seconds later.', f: () => { P.caCyt = 0.85; setTimeout(() => { if (SCN_BY_ID[curScenario].p.caCyt === undefined) P.caCyt = 0; }, 7000); } },
+  { n: 'ROS BURST', c: 'warn', t: 'OXIDATIVE BURST', d: 'A wave of superoxide. A little is a genuine signal the cell uses; a lot oxidises lipid, protein and mtDNA — and pushes the permeability pore closer to opening.', f: () => { S.ros = Math.min(1.6, S.ros + 0.8); } },
+  { n: 'CUT O₂', c: 'warn', t: 'OXYGEN CUT', d: 'Oxygen removed. Notice how long nothing happens — Complex IV binds O₂ very tightly — and then how fast the whole chain backs up once it truly runs out.', f: () => { P.o2 = 0.01; } },
+  { n: 'RESTORE O₂', c: '', t: 'REPERFUSION', d: 'Oxygen back. The chain restarts — but it restarts <i>over-reduced</i>, and that first surge is a burst of ROS. This is reperfusion injury: much of the damage after a heart attack happens when the blood comes back.', f: () => { P.o2 = 1; S.ros += 0.35; } },
+  { n: 'FISSION', c: '', f: () => startDynamic('fission') },
+  { n: 'FUSION', c: '', f: () => startDynamic('fusion') },
+  { n: 'MITOPHAGY', c: '', f: () => startDynamic('mitophagy') },
+  { n: 'OPEN PORE', c: 'warn', t: 'PERMEABILITY TRANSITION', d: 'The pore is forced open. The gradient short-circuits, the matrix swells, cristae unfold and <b>cytochrome c</b> escapes to build the apoptosome. The cell is now committed to dying.', f: () => { S.mptp = Math.max(S.mptp, 0.55); S.caM = 0.9; } },
+  { n: 'RESET CHEM', c: '', t: 'RESET', d: 'Pools, gradient and damage restored to their starting values. The scenario is unchanged.', f: () => resetChem() },
+  { n: 'ADD FUEL', c: 'acc', t: 'FUEL ADDED', d: 'Substrate flooded in. If demand is low this is the postprandial state: a full chain, a high voltage, and rising ROS.', f: () => { P.supply = Math.min(1.6, P.supply + 0.5); } },
+];
+
+function buildUI() {
+  /* scenario select */
+  const sel = document.getElementById('scenario');
+  let html = '', open = false;
+  for (const s of SCENARIOS) {
+    if (s.g) { if (open) html += '</optgroup>'; html += `<optgroup label="${s.g}">`; open = true; }
+    else html += `<option value="${s.id}">${s.n}</option>`;
+  }
+  if (open) html += '</optgroup>';
+  sel.innerHTML = html;
+  sel.addEventListener('change', () => { audioInit(); applyScenario(sel.value); });
+
+  /* actions */
+  const act = document.getElementById('actions');
+  act.innerHTML = ACTIONS.map((a, i) => `<button class="btn ${a.c}" data-a="${i}">${a.n}</button>`).join('');
+  act.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-a]'); if (!b) return;
+    audioInit();
+    const a = ACTIONS[+b.dataset.a];
+    a.f(); syncDials(); blip(700, 0.1, 'square', 0.13);
+    if (a.t) toast(a.t, a.d);
+    TRACE.mark.push({ i: TRACE.dp.length });
+    if (TRACE.mark.length > 6) TRACE.mark.shift();
+  });
+
+  /* dials */
+  const dl = document.getElementById('dials');
+  dl.innerHTML =
+    `<div class="sl"><label>FUEL TYPE</label><select id="fuel-sel" style="flex:1;padding:4px 8px;font-size:10px;">
+       ${Object.keys(FUEL).map(k => `<option value="${k}">${FUEL[k].label}</option>`).join('')}</select></div>` +
+    DIALS.map(d => `<div class="sl"><label>${d.lab}</label>
+      <input type="range" id="dial-${d.k}" min="${d.min}" max="${d.max}" step="${d.step}">
+      <span class="v" id="dialv-${d.k}"></span></div>`).join('');
+  for (const d of DIALS) {
+    document.getElementById('dial-' + d.k).addEventListener('input', (e) => {
+      audioInit(); P[d.k] = +e.target.value;
+      document.getElementById('dialv-' + d.k).textContent = d.f(P[d.k]);
+    });
+  }
+  document.getElementById('fuel-sel').addEventListener('change', (e) => { P.fuel = e.target.value; });
+
+  /* lessons */
+  document.getElementById('lessons').innerHTML = LESSONS.map(l =>
+    `<button class="btn" data-l="${l.id}" style="text-align:left;margin-bottom:5px;">
+      <span style="color:var(--gold)">${l.icon} ${l.title}</span><br>
+      <span style="color:var(--dim);font-size:9px;">${l.blurb} · ${l.steps.length} steps</span></button>`).join('');
+  document.getElementById('lessons').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-l]'); if (!b) return;
+    audioInit(); startLesson(b.dataset.l);
+  });
+
+  /* layers */
+  const LAYER_UI = [
+    ['outer', 'Outer membrane'], ['inner', 'Inner membrane'], ['cristae', 'Cristae'],
+    ['etc', 'ETC complexes'], ['synth', 'ATP synthase'], ['carriers', 'Carriers & pores'],
+    ['protons', 'Protons'], ['electrons', 'Electrons & carriers'], ['energy', 'ATP / ADP'],
+    ['fuel', 'Fuel, O₂, CO₂'], ['dna', 'mtDNA & ribosomes'], ['krebs', 'Krebs ring'],
+    ['ros', 'Radicals'], ['heat', 'Heat'], ['labels', 'Labels'], ['cytosol', 'Cytosol'],
+  ];
+  document.getElementById('layers').innerHTML = LAYER_UI.map(([k, n]) =>
+    `<div class="tg${LAY[k] ? ' on' : ''}" data-k="${k}"><div class="box"></div>${n}</div>`).join('');
+  document.getElementById('layers').addEventListener('click', (e) => {
+    const t = e.target.closest('.tg'); if (!t) return;
+    audioInit();
+    const k = t.dataset.k; LAY[k] = !LAY[k];
+    if (LAY[k]) LAY[k + 'A'] = 1;
+    t.classList.toggle('on', LAY[k]); blip(LAY[k] ? 640 : 420, 0.06, 'square', 0.1);
+  });
+
+  /* view sliders */
+  document.getElementById('viewsliders').innerHTML =
+    `<div class="sl"><label>CUTAWAY</label><input type="range" id="cut" min="-0.85" max="1.2" step="0.01" value="1.2">
+     <span class="v" id="cutv">off</span></div>`;
+  document.getElementById('cut').addEventListener('input', (e) => {
+    const v = +e.target.value;
+    clipD = v >= 1.19 ? 99 : v;
+    document.getElementById('cutv').textContent = v >= 1.19 ? 'off' : fmt((1.2 - v) / 2.05 * 100, 0) + '%';
+  });
+  document.getElementById('spin-btn').addEventListener('click', (e) => {
+    CAM.spin = !CAM.spin; e.target.classList.toggle('on', CAM.spin); audioInit();
+  });
+  document.getElementById('slow-btn').addEventListener('click', (e) => {
+    slowMo = !slowMo; e.target.classList.toggle('on', slowMo); audioInit();
+  });
+
+  /* tabs */
+  document.getElementById('tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-p]'); if (!b) return;
+    audioInit();
+    if (b.dataset.p === dockTab && dockOpen) { setDockOpen(false); return; }
+    dockTab = b.dataset.p; setDockOpen(true);
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.pane').forEach(x => x.classList.toggle('on', x.id === 'pane-' + dockTab));
+  });
+  document.getElementById('handle').addEventListener('click', () => { audioInit(); setDockOpen(!dockOpen); });
+
+  /* narration nav */
+  document.getElementById('narr-next').addEventListener('click', () => { audioInit(); lessonStep(1); });
+  document.getElementById('narr-prev').addEventListener('click', () => { audioInit(); lessonStep(-1); });
+  document.getElementById('narr-exit').addEventListener('click', () => { audioInit(); lesson ? exitLesson() : hideNarr(); });
+
+  /* chrome */
+  document.getElementById('mute-btn').addEventListener('click', () => { audioInit(); setMute(!AU.muted); });
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    audioInit(); camGoHome();
+  });
+  document.getElementById('help-btn').addEventListener('click', () => { audioInit(); openHelp(); });
+  document.getElementById('inspect-x').addEventListener('click', () => {
+    document.getElementById('inspect').classList.remove('on');
+  });
+  setMute(AU.muted);
+  document.getElementById('trace-key').innerHTML =
+    '<span style="color:#39ff14">ΔΨm</span> · <span style="color:#ffc300">ATP</span> · ' +
+    '<span style="color:#31e0ff">O₂</span> · <span style="color:#ff2244">ROS</span> · dashed = an event';
+}
+function openHelp() {
+  const ov = document.getElementById('ov');
+  document.getElementById('ov-card').innerHTML = HELP_HTML;
+  ov.classList.add('on');
+  document.getElementById('ov-close').addEventListener('click', () => { audioInit(); ov.classList.remove('on'); });
+  ov.onclick = (e) => { if (e.target === ov) ov.classList.remove('on'); };
+}
+
+/* --- inspector --- */
+function inspectAt(sx, sy, w, h) {
+  let best = null, bd = 46 * 46;
+  for (const s of SITES) {
+    const isETC = ['ci', 'cii', 'ciii', 'civ'].includes(s.type);
+    if (isETC && !LAY.etc) continue;
+    if (s.type === 'cv' && !LAY.synth) continue;
+    if (!isETC && s.type !== 'cv' && !LAY.carriers) continue;
+    const q = project(DEFORM(s.p), w, h); if (!q) continue;
+    const d = (q[0] - sx) ** 2 + (q[1] - sy) ** 2;
+    if (d < bd) { bd = d; best = s; }
+  }
+  const box = document.getElementById('inspect');
+  if (!best) { box.classList.remove('on'); return; }
+  const pr = PROTEIN[best.type];
+  const live = {
+    ci: () => [['Flux now', fmt(F.J1, 2)], ['NADH pool reduced', fmt(S.nadh * 100, 0) + '%']],
+    cii: () => [['Flux now', fmt(F.J2, 2)], ['FADH₂ pool reduced', fmt(S.fadh2 * 100, 0) + '%']],
+    ciii: () => [['Flux now', fmt(F.J3, 2)], ['QH₂ pool reduced', fmt(S.qh2 * 100, 0) + '%']],
+    civ: () => [['Flux now', fmt(F.J4, 2)], ['O₂ available', fmt(P.o2 * 100, 0) + '%']],
+    cv: () => [['ATP flux', (F.reverse ? '−' : '') + fmt(Math.abs(F.JATP), 2)], ['Driving force', fmt(S.dp, 0) + ' mV']],
+    ucp: () => [['Leak flux', fmt(F.Jucp, 2)], ['Activity', fmt(P.ucp * 100, 0) + '%']],
+    mcu: () => [['Matrix Ca²⁺', fmt(S.caM * 100, 0) + '%']],
+    ant: () => [['ATP export', fmt(Math.max(0, F.JATP), 2)], ['ADP fraction', fmt(S.adp * 100, 0) + '%']],
+  }[best.type];
+  document.getElementById('inspect-body').innerHTML =
+    `<h3 style="color:${rgb(pr.col)}">${pr.name}</h3><div class="sub">${pr.full} · ${pr.mass}</div>
+     <p>${pr.txt}</p>` +
+    pr.facts.map(f => `<div class="kv"><span>${f[0]}</span><span>${f[1]}</span></div>`).join('') +
+    (live ? live().map(f => `<div class="kv"><span>${f[0]}</span><span style="color:var(--gold)">${f[1]}</span></div>`).join('') : '');
+  box.classList.add('on');
+  blip(880, 0.07, 'triangle', 0.12);
+}
+
+/* ==================================================================== */
+/*  INPUT                                                               */
+/* ==================================================================== */
+const PT = new Map();
+let lastDist = 0, lastMid = null, downT = 0, moved = 0;
+function ptPos(e) { return [e.clientX, e.clientY]; }
+glc.addEventListener('pointerdown', (e) => {
+  audioInit();
+  glc.setPointerCapture(e.pointerId);
+  PT.set(e.pointerId, ptPos(e));
+  if (PT.size === 1) { downT = performance.now(); moved = 0; }
+  lastDist = 0; lastMid = null;
+});
+glc.addEventListener('pointermove', (e) => {
+  if (!PT.has(e.pointerId)) return;
+  const prev = PT.get(e.pointerId), cur = ptPos(e);
+  PT.set(e.pointerId, cur);
+  const pts = [...PT.values()];
+  if (PT.size === 1) {
+    const dx = cur[0] - prev[0], dy = cur[1] - prev[1];
+    moved += Math.abs(dx) + Math.abs(dy);
+    if (e.shiftKey || e.buttons === 2) panBy(dx, dy);
+    else { CAM.yawT -= dx * 0.0062; CAM.pitchT = clamp(CAM.pitchT + dy * 0.0062, -1.45, 1.45); CAM.spin = false; }
+  } else if (PT.size >= 2) {
+    const d = Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]);
+    const mid = [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2];
+    if (lastDist > 0) CAM.distT = clamp(CAM.distT * (lastDist / Math.max(d, 1)), 0.55, 26);
+    if (lastMid) panBy(mid[0] - lastMid[0], mid[1] - lastMid[1]);
+    lastDist = d; lastMid = mid; moved += 50;
+  }
+});
+function panBy(dx, dy) {
+  const k = CAM.distT * 0.0016;
+  for (let i = 0; i < 3; i++) CAM.tgtT[i] -= CAM.right[i] * dx * k - CAM.up[i] * dy * k;
+}
+function endPointer(e) {
+  if (PT.size === 1 && moved < 9 && performance.now() - downT < 400) {
+    const r = glc.getBoundingClientRect();
+    inspectAt(e.clientX - r.left, e.clientY - r.top, r.width, r.height);
+  }
+  PT.delete(e.pointerId);
+  if (PT.size < 2) { lastDist = 0; lastMid = null; }
+}
+glc.addEventListener('pointerup', endPointer);
+glc.addEventListener('pointercancel', (e) => { PT.delete(e.pointerId); lastDist = 0; lastMid = null; });
+glc.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  CAM.distT = clamp(CAM.distT * Math.exp(e.deltaY * 0.0011), 0.55, 26);
+}, { passive: false });
+glc.addEventListener('contextmenu', (e) => e.preventDefault());
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' && lesson) lessonStep(1);
+  if (e.key === 'ArrowLeft' && lesson) lessonStep(-1);
+  if (e.key === 'Escape') { if (lesson) exitLesson(); else hideNarr(); }
+});
+
+/* ==================================================================== */
+/*  MAIN LOOP                                                           */
+/* ==================================================================== */
+let last = performance.now(), hudAcc = 0, dpr = 1;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(2, Math.round(glc.clientWidth * dpr));
+  const h = Math.max(2, Math.round(glc.clientHeight * dpr));
+  if (glc.width === w && glc.height === h) return;
+  glc.width = w; glc.height = h;
+  uic.width = Math.round(uic.clientWidth * dpr); uic.height = Math.round(uic.clientHeight * dpr);
+  uix.setTransform(dpr, 0, 0, dpr, 0, 0);
+  viewW = uic.clientWidth; viewH = uic.clientHeight;
+  camHome(viewW / Math.max(1, viewH));
+  if (GLOK && R.ready) resizeFBOs(w, h);
+}
+function frame(now) {
+  requestAnimationFrame(frame);
+  let dt = Math.min((now - last) / 1000, 0.1);
+  last = now;
+  TIME += dt;
+  const simDt = dt * (slowMo ? 0.2 : 1);
+
+  resize();
+  scenarioDyn(simDt);
+  // stiff system: fixed substeps keep the gradient integration stable
+  let acc2 = simDt, n = 0;
+  while (acc2 > 0 && n < 40) { const h = Math.min(0.005, acc2); simStep(h); acc2 -= h; n++; }
+  stepDynamic(dt);
+  spawnTraffic(simDt);
+  stepParticles(simDt);
+  synthAngle += Math.max(-2, F.JATP) * 9 * simDt;
+
+  // lift the framing above whatever chrome is covering the bottom (or side)
+  const land = viewW / Math.max(1, viewH) >= 0.85;
+  const narrEl = document.getElementById('narr');
+  const dockEl = document.getElementById('dock');
+  const W = Math.max(1, viewW), H = Math.max(1, viewH);
+  const narrH = narrEl.classList.contains('on') ? narrEl.offsetHeight + 8 : 0;
+  const cov = {
+    l: 0,
+    r: land ? dockEl.offsetWidth : 0,
+    t: 74,
+    b: land ? Math.min(narrH, H * 0.5) : Math.min(dockEl.offsetHeight + narrH, H * 0.62),
+  };
+  CAM.shiftX = expApproach(CAM.shiftX, (cov.l - cov.r) / W, 6, dt);
+  CAM.shift  = expApproach(CAM.shift, (cov.b - cov.t) / H, 6, dt);
+  CAM.fit = expApproach(CAM.fit, Math.min(1 - (cov.l + cov.r) / W, 1 - (cov.t + cov.b) / H), 6, dt);
+  CAM.cov = cov;
+  camUpdate(dt, Math.max(0.2, viewW / Math.max(1, viewH)));
+
+  if (GLOK && R.ready) {
+    packProteins();
+    packSimpleList(SCENE.nuc, LAY.dna ? SCENE.nucList : [], 1);
+    packSimpleList(SCENE.ribo, LAY.dna ? SCENE.riboList : [], 1);
+    if (LAY.krebs) {
+      const ph = (TIME * 0.5) % 8;
+      KREBS.forEach((k, i) => { k.a = 0; k.s = 1; k.hi = Math.max(0, 1 - Math.abs(((i - ph + 8) % 8) - 0)) * 1.0; });
+      packSimpleList(SCENE.node, KREBS.map((k, i) => ({ p: k.p, a: 0, s: 1, hi: k.hi })), 1);
+    } else SCENE.node.n = 0;
+    packParticles();
+    render();
+  }
+  drawOverlay(viewW, viewH);
+
+  hudAcc += dt;
+  if (hudAcc > 0.12) {
+    hudAcc = 0; updateHUD();
+    TRACE.dp.push(S.dp); TRACE.atp.push(Math.max(0, F.JATP));
+    TRACE.o2.push(F.JO2); TRACE.ros.push(S.ros);
+    for (const k of ['dp', 'atp', 'o2', 'ros']) if (TRACE[k].length > TRACE.max) TRACE[k].shift();
+    for (const m of TRACE.mark) m.i--;
+    while (TRACE.mark.length && TRACE.mark[0].i < 0) TRACE.mark.shift();
+  }
+}
+
+/* ==================================================================== */
+/*  BOOT                                                                */
+/* ==================================================================== */
+function boot() {
+  buildHUD(); buildUI();
+  applyScenario('rest', true);
+  setDockOpen(window.innerWidth / Math.max(1, window.innerHeight) >= 0.85);
+  if (GLOK) {
+    try { initGL(); buildScene(); resize(); }
+    catch (err) {
+      GLOK = false;
+      console.error(err);
+    }
+  }
+  if (!GLOK) {
+    document.getElementById('ov-card').innerHTML =
+      `<h2>NO WEBGL2</h2><div class="tag">THE 3D VIEW NEEDS WEBGL2</div>
+       <p>Your browser could not give this page a WebGL2 context, so the organelle cannot be drawn.
+       The simulation itself is still running — the <b>RUN</b>, <b>DATA</b> and gauge panels all work,
+       and every scenario behaves exactly as it would with the 3D view.</p>
+       <button class="btn acc" id="ov-close">CONTINUE WITHOUT 3D</button>`;
+    document.getElementById('ov').classList.add('on');
+    document.getElementById('ov-close').addEventListener('click', () =>
+      document.getElementById('ov').classList.remove('on'));
+    glc.style.background = 'radial-gradient(circle at 50% 40%, #0d1830 0%, #06060e 70%)';
+  } else if (!localStorage.getItem('mito.seen')) {
+    localStorage.setItem('mito.seen', '1');
+    setTimeout(() => toast('A HUMAN MITOCHONDRION',
+      'Drag to orbit, pinch to zoom, tap any protein to inspect it. ' +
+      'Pick what the body is doing under <b>RUN</b>, or take a walkthrough under <b>LEARN</b>. ' +
+      'The full guide is behind the <b>ⓘ</b> button.', 11000), 900);
+  }
+  resize(); camGoHome();
+  CAM.yaw = CAM.yawT; CAM.pitch = CAM.pitchT; CAM.dist = CAM.distT;
+  requestAnimationFrame(frame);
+}
+boot();
+</script>
+</body>
+</html>
