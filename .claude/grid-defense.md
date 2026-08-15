@@ -82,21 +82,26 @@ change — never per frame. Combat just reads `t.syn`.
 
 ## Reading a turret without text
 
-A placed turret carries three readings, **none of them text** — the numbers
+A placed turret carries two readings, **neither of them text** — the numbers
 live on the selection panel, where they are asked for:
 
 | reading | earned with | shown as |
 | --- | --- | --- |
 | LEVEL | cash | the silhouette grows and its outline thickens |
-| TIER | cores | a metal frame on the base plate — copper, then silver, then gold, 1-3px within each metal (`tierFrame()`) |
 | SYNERGY | placement | a coloured bloom on the edge facing each lending neighbour, **in that neighbour's colour** |
+
+The plate keeps a plain 1px border in the turret's own colour. **Tier is not
+drawn on the turret.** It had a copper/silver/gold frame for exactly one build
+and lost: four turret colours plus three metals plus the blooms was too many
+palettes on one tile. Tier reads off the build card's `have/cap` counter
+instead, which is where its real consequence — another deployment slot —
+already lives.
 
 So a NOVA with a PULSE on its right glows green on that right edge, and the
 PULSE glows red on its left — the bloom names *who* is helping and *from which
 side*, which a number never could. `recomputeAdjacency()` records the side and
 the lender's colour in `t.syn.links`; `drawTower()` clips a gradient to the
-base plate so it reads as an inward bulge rather than an outer halo. The old
-`T2` tier text is gone.
+base plate so it reads as an inward bulge rather than an outer halo.
 
 ## The three currencies (this is the design)
 

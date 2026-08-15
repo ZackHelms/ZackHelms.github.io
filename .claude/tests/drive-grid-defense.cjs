@@ -208,12 +208,19 @@ function check(name, cond, extra) {
     links.nova.length === 1 && links.nova[0].dir === 'r' && links.nova[0].col === '#39ff14', links.nova);
   check('...and the PULSE glows red on its left',
     links.pulse.length === 1 && links.pulse[0].dir === 'l' && links.pulse[0].col === '#ff2244', links.pulse);
-  check('the tier frame walks copper -> silver -> gold', await page.evaluate(() => {
-    // T1-3 copper 1-3px, T4-6 silver 1-3px, T7+ gold — read straight off the game
-    const band = t => { const b = Math.min(2, Math.floor((t - 1) / 3)); return ['copper','silver','gold'][b] + (((t - 1) % 3) + 1); };
-    return [1,2,3,4,5,6,7,8].map(band).join(',') ===
-      'copper1,copper2,copper3,silver1,silver2,silver3,gold1,gold2';
-  }));
+  // Tier is deliberately NOT drawn on the turret any more — the metal frames
+  // clashed with four turret colours and the synergy blooms. The build card's
+  // deploy counter is where tier reads now.
+  await page.evaluate(() => { const G = window.__GD; G.newRun(); G.startLevel(2); G.run().cores = 60; });
+  await page.waitForTimeout(120);          // cardRects are filled by the next draw
+  const capCard = await page.evaluate(() => {
+    const G = window.__GD;
+    const before = G.cardRects().find(c => c.type === 'pulse');
+    G.buyArmory('pulse');
+    return { beforeCap: before && before.cap, after: G.deployCap('pulse') };
+  });
+  check('tier is read from the deploy counter, not painted on the turret',
+    capCard.beforeCap === 1 && capCard.after === 2, capCard);
 
   /* ------------------------- continuous flow -------------------------- */
   const flow = await page.evaluate(() => {

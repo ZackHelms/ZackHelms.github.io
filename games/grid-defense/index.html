@@ -200,7 +200,7 @@ input[type=range]::-moz-range-thumb { width:20px; height:20px; border:0; border-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 04:17 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 04:22 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
@@ -1635,19 +1635,16 @@ function drawTurretShape(g, type, x, y, s, lw) {
   }
   g.restore();
 }
-/* A placed turret carries three readings, none of them text:
-     LEVEL (cash)  — the silhouette grows and its outline thickens
-     TIER  (cores) — a metal frame around the base plate: copper, then silver,
-                     then gold, 1-3px within each metal
-     SYNERGY       — a coloured bloom on the edge facing each neighbour that is
-                     lending it something, in THAT NEIGHBOUR'S colour, so a
-                     nova with a pulse on its right glows green on that side.
-   Exact numbers stay on the selection panel, where they are asked for.      */
-function tierFrame(tier) {
-  if (tier <= 0) return null;
-  const band = Math.min(2, Math.floor((tier - 1) / 3));   // copper -> silver -> gold
-  return { col: ['#b87333', '#c9d2dd', '#ffd24a'][band], w: ((tier - 1) % 3) + 1 };
-}
+/* A placed turret carries two readings, neither of them text:
+     LEVEL (cash) — the silhouette grows and its outline thickens
+     SYNERGY      — a coloured bloom on the edge facing each neighbour that is
+                    lending it something, in THAT NEIGHBOUR'S colour, so a
+                    nova with a pulse on its right glows green on that side.
+   The plate keeps a plain 1px border in the turret's own colour. Tier had a
+   copper/silver/gold frame for one build and it lost: four turret colours
+   plus three metals plus the blooms was too many palettes on one tile, and
+   the deploy counters on the build cards already carry the tier reading.
+   Exact level and tier stay on the selection panel, where they are asked for. */
 function drawTower(t, x, y, ghost) {
   const T = TOWERS[t.type];
   const lvl = t.lvl || 1;
@@ -1679,16 +1676,6 @@ function drawTower(t, x, y, ghost) {
       ctx.fillRect(px, py, bs, bs);
     }
     ctx.restore();
-  }
-
-  // tier frame
-  const frame = ghost ? null : tierFrame(run && run.armory[t.type] ? run.armory[t.type].tier : 0);
-  if (frame) {
-    ctx.strokeStyle = frame.col; ctx.lineWidth = frame.w;
-    ctx.shadowColor = frame.col; ctx.shadowBlur = 4;
-    const inset = frame.w / 2;
-    roundRect(px + inset, py + inset, bs - frame.w, bs - frame.w, rad); ctx.stroke();
-    ctx.shadowBlur = 0;
   }
 
   // the turret: bigger and heavier as it levels
@@ -2631,7 +2618,8 @@ window.__GD = {
   globalWave, isBossWave,
   /* live hitbox tables, so a drive test can press the canvas-drawn UI the
      way a thumb does rather than calling the actions behind it */
-  cardRects: () => cardRects.map(r => ({ type: r.type, x: r.x, y: r.y, w: r.w, h: r.h, afford: r.afford })),
+  cardRects: () => cardRects.map(r => ({ type: r.type, x: r.x, y: r.y, w: r.w, h: r.h,
+                                         afford: r.afford, have: r.have, cap: r.cap })),
   actionRects: () => actionBtns,
   panelRects: () => panelBtns,
   abilityRects: () => abilityRects.map(r => ({ id: r.ab.id, x: r.x, y: r.y, w: r.w, h: r.h })),
