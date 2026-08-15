@@ -26,6 +26,12 @@ It is fine to push directly to the `main` branch for this repository. No pull re
   the scene works — rendering passes, simulation model, approximations and limitations —
   keep that panel accurate when changing a scene. Realism is the design goal; the neon
   games aesthetic does not apply inside dioramas (the hub page keeps site styling).
+  Shared conventions + Dragon Vase notes: `.claude/experiments.md`; the two big apps have
+  dedicated context files — **Tree Simulator** (`experiments/lone-tree/`, saw tool +
+  species presets mirroring zmhstudio's tree KB): `.claude/tree-simulator.md`;
+  **ARViewport** (`experiments/rain-on-glass/`, scenes × times × weather × beings +
+  wipeable glass): `.claude/arviewport.md`. Directory names are historical; titles renamed
+  2026-08-15.
 - `town-game-isometric/` — standalone isometric town-game project
 - `FFL1/` — **generated/published, do NOT edit by hand.** This directory is overwritten
   by `publish.sh` in the separate [`ZackHelms/FFL1`](https://github.com/ZackHelms/FFL1)

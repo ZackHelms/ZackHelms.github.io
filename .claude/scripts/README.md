@@ -34,6 +34,20 @@ Deterministic helpers for working on this repo.
   Drive suites worth keeping across sessions live in `.claude/tests/` — see
   that folder's README for when a suite earns a place there.
 
+- `shot-page.cjs` — headless screenshot of any repo page for **visual
+  iteration** (WebGL2 renders via SwiftShader). Same Chromium/`NODE_PATH`
+  requirements as the smoke gate. Options: `w=/h=/dpr=` viewport,
+  `wait=` ms, `click=x,y` (dismiss a splash), repeatable `select=#id:value`
+  (drive pickers). Exits 1 on any PAGEERROR — a parse error kills a page's
+  whole script while the canvas still "renders", so check this even when the
+  PNG looks plausible (added 2026-08-15 after exactly that bit twice).
+
+  ```
+  NODE_PATH=/opt/node22/lib/node_modules/playwright/node_modules \
+    node .claude/scripts/shot-page.cjs experiments/lone-tree/index.html /tmp/t.png \
+    w=900 h=700 wait=2500 select=#species:pine
+  ```
+
 - `check-games-sync.cjs` — three-way catalog gate. A new game has to land in
   the hub card, the hub's `GAMES[]` facet dataset, **and** the
   `.claude/games-index.md` row, and those drift independently. Checks card ↔
