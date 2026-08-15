@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Rain on Glass</title>
+<title>ARViewport</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -71,23 +71,46 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
 
 #nogl { position:fixed; inset:0; z-index:95; display:none; align-items:center; justify-content:center;
   color:#c7d3ea; font-size:0.75rem; letter-spacing:2px; text-align:center; padding:30px; line-height:2.2; }
+
+#selects {
+  position:fixed; z-index:78; top:calc(env(safe-area-inset-top, 0px) + 58px);
+  left:50%; transform:translateX(-50%);
+  display:flex; gap:6px; flex-wrap:wrap; justify-content:center; max-width:94vw;
+}
+#selects select {
+  appearance:none; -webkit-appearance:none;
+  font-family:'Share Tech Mono', monospace; font-size:0.58rem; letter-spacing:1px;
+  color:#dbe4f5; background:rgba(10,14,26,0.5); border:1px solid rgba(160,180,220,0.25);
+  border-radius:14px; padding:6px 10px; cursor:pointer; text-align:center;
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+}
+#selects select option { color:#122; background:#e8ecf5; }
+#wipe-btn { top:calc(env(safe-area-inset-top, 0px) + 10px); left:calc(env(safe-area-inset-left, 0px) + 106px); }
+#wipe-btn.active { border-color:#ffc300; box-shadow:0 0 12px #ffc30066; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 11:51 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 16:53 UTC</div>
 
 <canvas id="glass"></canvas>
 
 <a id="back-btn" class="chrome-btn" href="../" aria-label="Back to experiments">&#8592;</a>
-<button id="mute-btn" class="chrome-btn" aria-label="Toggle rain sound">&#128263;</button>
+<button id="mute-btn" class="chrome-btn" aria-label="Toggle sound">&#128263;</button>
+<button id="wipe-btn" class="chrome-btn" aria-label="Wipe the glass">&#129529;</button>
+<div id="selects">
+  <select id="sel-scene" aria-label="Scene"></select>
+  <select id="sel-time" aria-label="Time of day"></select>
+  <select id="sel-weather" aria-label="Weather"></select>
+  <select id="sel-beings" aria-label="Beings"></select>
+</div>
 <button id="info-btn" class="chrome-btn" aria-label="About this scene">i</button>
 
 <div id="splash">
-  <h1>RAIN ON GLASS</h1>
-  <p>YOUR SCREEN IS A WINDOW ON A WET NIGHT, HELD ON A DARK HILLTOP.<br>
-     TURN AROUND AND THE CITY SKYLINE SLIDES PAST. TILT DOWN &mdash; DARK GROUND.<br>
-     TILT UP &mdash; STARS AND MOON. THE RAIN ALWAYS RUNS WITH REAL GRAVITY,<br>
-     AND A FLAT PANE CATCHES SPATTERING DROPS.</p>
+  <h1>ARVIEWPORT</h1>
+  <p>YOUR SCREEN IS A PANE OF GLASS INTO ANOTHER REALITY.<br>
+     TURN, TILT, LOOK UP AND DOWN &mdash; THE WORLD TRACKS YOUR PHONE.<br>
+     PICK A PLACE, A TIME, THE WEATHER, AND WHAT ROAMS THERE.<br>
+     WIPE THE GLASS CLEAN WITH YOUR FINGER WHEN IT GETS DIRTY.</p>
   <div class="tap">TAP TO BEGIN</div>
 </div>
 
@@ -96,17 +119,39 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
 
 <div id="info">
   <div class="info-inner">
-    <div class="info-head"><h2>RAIN ON GLASS &mdash; HOW IT WORKS</h2><button id="info-close">&#10005;</button></div>
+    <div class="info-head"><h2>ARVIEWPORT &mdash; HOW IT WORKS</h2><button id="info-close">&#10005;</button></div>
 
     <h3>WHAT YOU'RE LOOKING AT</h3>
-    <p>The screen pretends to be a pane of glass you are holding while standing on a dark,
-    unlit, treeless hilltop on a rainy night. The pane is a window into a full 360&deg;
-    world: turn on the spot and the city skyline slides past (a bright downtown, a dim
-    suburb, open country with a few farm lights); tilt down and there is only the dark
-    ground of your hill; tilt up and you get stars and the moon. Meanwhile every visible
-    drop is an individual particle in a simulation: drops land, bead up, grow, merge, and
-    &mdash; once heavy enough for the current tilt of your actual phone &mdash; break loose and run
-    downhill in stuttering rivulets, wiping the misted glass clean where they pass.</p>
+    <p>The screen pretends to be a pane of glass into an alternate reality &mdash; an AR viewport.
+    It is a full 360&deg; world: turn on the spot and the horizon slides past, tilt down to the
+    ground, tilt up to the sky. The selectors combine freely: four <em>places</em> (a city, open
+    prairie, a desert, a harbor), three <em>times of day</em> (each place is repainted with its own
+    day / dusk / night palette, lights coming on after dark, stars and moon at night, sun and
+    blue sky by day), six kinds of <em>weather</em>, and a roster of <em>beings</em> roaming the far side
+    of the glass. In rain, every visible drop is an individual particle: drops land, bead up,
+    merge, and &mdash; once heavy enough for the current tilt of your actual phone &mdash; run downhill
+    in stuttering rivulets. And whatever the weather leaves on the glass, you can wipe off
+    with a pressed finger.</p>
+
+    <h3>WEATHER &amp; THE WIPE</h3>
+    <p>Weather works on both sides of the glass. On the world side: rain falls, snow drifts
+    down as world-anchored flake fields, dust storms and fog swallow the horizon at different
+    rates, and wildfire puts a flickering orange glow, rising embers and a smoke pall over one
+    quarter of the horizon. On the glass side, each weather deposits its own dirt into a
+    <em>grime map</em>: brown dust film, creeping frost from the edges and bottom, gray ash flecks &mdash;
+    and rain gradually washes old grime away. A pressed finger wipes: it clears grime, clears
+    the condensation fog, and sweeps droplets aside along the stroke. On a phone with motion
+    sensors any touch wipes (the view is head-driven); on desktop the &#129529; button switches the
+    drag between looking and wiping.</p>
+
+    <h3>BEINGS</h3>
+    <p>The beings selector (default none) populates the world with silhouettes that live in a
+    separate overlay canvas mapped exactly like the panorama band, redrawn every other frame:
+    walking people with swinging limbs, grazing deer that raise their heads, a flapping bird
+    flock, a slow tall <em>monster</em> that sometimes stops and turns its glowing eyes on you, or a
+    dragon circling the sky that occasionally breathes fire. Because the overlay shares the
+    band mapping, beings hold their compass positions as you turn, and they blur behind fogged
+    glass just like the world does.</p>
 
     <h3>THE RENDERING STACK (TWO LAYERS)</h3>
     <ul>
@@ -183,6 +228,12 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
       &mdash; the skyline's compass position is arbitrary (and can drift), but turning always pans it
       believably. Near straight up/down the euler angles gimbal-flip; matrix smoothing hides
       most of the wobble.</li>
+      <li>Weather is stylised: snow and embers are hash-grid particle fields in azimuth/elevation
+      space (they fall in world space but have no depth layers), fog and dust are elevation-graded
+      colour mixes, and the wildfire never spreads. Beings are hand-painted 2D silhouettes on the
+      panorama band &mdash; they never come closer or change apparent distance, and they walk through
+      scenery. The scene repaint on a selector change is a full texture rebuild, so expect a
+      one-frame hitch.</li>
     </ul>
 
     <h3>TOOLING</h3>
@@ -251,22 +302,29 @@ const PANO_W = 2048, PANO_H = 896;
 let rngSeed = 20260815;
 function rnd() { rngSeed = (rngSeed * 1664525 + 1013904223) >>> 0; return rngSeed / 4294967296; }
 
-function paintPano(ctx, w, h) {
-  const E0 = EL0 * 180 / Math.PI, E1 = EL1 * 180 / Math.PI;   // ≈ -28.6°..60.2°
+/* palettes per time of day */
+const TIME_PAL = {
+  day:   { sky:['#6fb0e6','#8ec3ea','#c2ddef','#e6eef2','#e3ecef'], ground:['#5a7c46','#3f5c33','#2c422a'],
+           lightF: 0, hazeC:'220,232,240', starA: 0, silDark:'#5a6274', silLight:'#7c8698' },
+  dusk:  { sky:['#232a55','#3d3868','#7c4f6e','#c66d4e','#3a2a3a'], ground:['#3a3a34','#26281f','#151710'],
+           lightF: 0.7, hazeC:'255,170,110', starA: 0.35, silDark:'#232336', silLight:'#3a3a52' },
+  night: { sky:['#04060e','#070a18','#0c1024','#191830','#100f1c'], ground:['#101410','#0a0d0a','#050705'],
+           lightF: 1, hazeC:'255,158,72', starA: 1, silDark:'#0b0b18', silLight:'#12122a' },
+};
+
+function paintPano(ctx, w, h, scene, time) {
+  const P = TIME_PAL[time];
+  const E0 = EL0 * 180 / Math.PI, E1 = EL1 * 180 / Math.PI;
   const elY = el => (E1 - el) / (E1 - E0) * h;
   const azX = az => ((az % 360) + 360) % 360 / 360 * w;
-  const degW = w / 360;                                        // px per degree (az)
-  const degH = h / (E1 - E0);                                  // px per degree (el)
-  /* draw a rect at x and wrapped copies so the az seam is continuous */
+  const degW = w / 360, degH = h / (E1 - E0);
   function wrapRect(x, y, rw, rh) {
-    ctx.fillRect(x, y, rw, rh);
-    ctx.fillRect(x - w, y, rw, rh);
-    ctx.fillRect(x + w, y, rw, rh);
+    ctx.fillRect(x, y, rw, rh); ctx.fillRect(x - w, y, rw, rh); ctx.fillRect(x + w, y, rw, rh);
   }
   function wrapGlow(x, y, rx, ry, stops) {
     for (const off of [0, -w, w]) {
       const g = ctx.createRadialGradient(x + off, y, 0, x + off, y, rx);
-      for (const [t, c] of stops) g.addColorStop(t, c);
+      for (const [t2, c] of stops) g.addColorStop(t2, c);
       ctx.save();
       ctx.translate(x + off, y); ctx.scale(1, ry / rx); ctx.translate(-(x + off), -y);
       ctx.fillStyle = g;
@@ -274,132 +332,313 @@ function paintPano(ctx, w, h) {
       ctx.restore();
     }
   }
-
-  /* sky → horizon → ground base gradient */
-  const base = ctx.createLinearGradient(0, 0, 0, h);
+  function wrapPath(fn) { for (const off of [0, -w, w]) { ctx.save(); ctx.translate(off, 0); fn(); ctx.restore(); } }
   const t = el => (E1 - el) / (E1 - E0);
-  base.addColorStop(0, '#04060e');
-  base.addColorStop(t(25), '#070a18');
-  base.addColorStop(t(8), '#101430');
-  base.addColorStop(t(1.5), '#262044');
-  base.addColorStop(t(0), '#161228');
-  base.addColorStop(t(-4), '#07080c');
-  base.addColorStop(1, '#040507');
+  const LF = P.lightF;
+
+  /* sky → horizon → ground base */
+  const base = ctx.createLinearGradient(0, 0, 0, h);
+  base.addColorStop(0, P.sky[0]);
+  base.addColorStop(t(25), P.sky[1]);
+  base.addColorStop(t(8), P.sky[2]);
+  base.addColorStop(t(1.5), P.sky[3]);
+  base.addColorStop(t(0), P.sky[4]);
+  base.addColorStop(t(-4), P.ground[0]);
+  base.addColorStop(t(-14), P.ground[1]);
+  base.addColorStop(1, P.ground[2]);
   ctx.fillStyle = base; ctx.fillRect(0, 0, w, h);
 
-  /* light pollution domes at the horizon (per district) */
-  wrapGlow(azX(130), elY(-1), 110 * degW, 19 * degH, [
-    [0, 'rgba(255,164,80,0.5)'], [0.35, 'rgba(230,124,70,0.24)'], [1, 'rgba(224,120,64,0)']]);
-  wrapGlow(azX(115), elY(2), 70 * degW, 26 * degH, [
-    [0, 'rgba(150,90,160,0.2)'], [0.5, 'rgba(110,70,140,0.1)'], [1, 'rgba(110,70,140,0)']]);
-  wrapGlow(azX(250), elY(-1), 45 * degW, 9 * degH, [
-    [0, 'rgba(255,170,100,0.14)'], [1, 'rgba(255,170,100,0)']]);
-  wrapGlow(azX(338), elY(-0.5), 22 * degW, 6 * degH, [
-    [0, 'rgba(150,180,230,0.1)'], [1, 'rgba(150,180,230,0)']]);
-
-  /* stars in the band sky (the shader draws the ones above the band) */
-  for (let i = 0; i < 620; i++) {
+  /* band stars (night/dusk) */
+  if (P.starA > 0) for (let i = 0; i < 620; i++) {
     const el = 3 + rnd() * (E1 - 4);
-    const alpha = (0.15 + rnd() * 0.75) * Math.min(1, (el - 2) / 14);
+    const alpha = (0.15 + rnd() * 0.75) * Math.min(1, (el - 2) / 14) * P.starA;
     ctx.fillStyle = `rgba(215,225,255,${alpha.toFixed(3)})`;
-    const sz = rnd() < 0.88 ? 1 : 2;
-    ctx.fillRect(rnd() * w, elY(el) + rnd(), sz, sz);
+    ctx.fillRect(rnd() * w, elY(el) + rnd(), rnd() < 0.88 ? 1 : 2, rnd() < 0.88 ? 1 : 2);
   }
 
-  /* --- CITY district, az 60..200 --- */
-  for (let layer = 0; layer < 2; layer++) {
-    const col = layer === 0 ? '#12122a' : '#0b0b18';
-    let az = 58 + rnd() * 4;
-    while (az < 202) {
-      const bw = 2.5 + rnd() * 6;                             // deg
-      const bh = layer === 0 ? 1.5 + rnd() * rnd() * 7 : 2.5 + rnd() * rnd() * 12;
-      const x = azX(az), y = elY(bh);
-      ctx.fillStyle = col;
-      wrapRect(x, y, bw * degW + 1, elY(-6) - y);
-      if (layer === 1) {
-        /* lit windows */
-        const cols = Math.max(1, (bw / 0.9) | 0), rows = Math.max(1, (bh / 0.75) | 0);
-        for (let ci = 0; ci < cols; ci++) for (let ri = 0; ri < rows; ri++) {
-          if (rnd() < 0.3) {
-            const warm = rnd() < 0.82;
-            ctx.fillStyle = warm ? `rgba(255,${200 + (rnd() * 45 | 0)},130,${0.55 + rnd() * 0.45})`
-                                 : `rgba(165,215,255,${0.5 + rnd() * 0.4})`;
+  /* ============ SCENES ============ */
+  if (scene === 'city') {
+    wrapGlow(azX(130), elY(-1), 110 * degW, 19 * degH, [
+      [0, `rgba(${P.hazeC},${0.5 * Math.max(LF, 0.35)})`], [0.35, `rgba(${P.hazeC},${0.24 * Math.max(LF, 0.3)})`], [1, `rgba(${P.hazeC},0)`]]);
+    if (time === 'dusk') wrapGlow(azX(115), elY(2), 70 * degW, 26 * degH, [
+      [0, 'rgba(150,90,160,0.2)'], [0.5, 'rgba(110,70,140,0.1)'], [1, 'rgba(110,70,140,0)']]);
+    for (let layer = 0; layer < 2; layer++) {
+      const col = layer === 0 ? P.silLight : P.silDark;
+      let az = 58 + rnd() * 4;
+      while (az < 202) {
+        const bw = 2.5 + rnd() * 6;
+        const bh = layer === 0 ? 1.5 + rnd() * rnd() * 7 : 2.5 + rnd() * rnd() * 12;
+        const x = azX(az), y = elY(bh);
+        ctx.fillStyle = col;
+        wrapRect(x, y, bw * degW + 1, elY(-6) - y);
+        if (layer === 1) {
+          const cols = Math.max(1, (bw / 0.9) | 0), rows = Math.max(1, (bh / 0.75) | 0);
+          for (let ci = 0; ci < cols; ci++) for (let ri = 0; ri < rows; ri++) {
+            if (LF > 0 && rnd() < 0.3 * LF) {
+              const warm = rnd() < 0.82;
+              ctx.fillStyle = warm ? `rgba(255,${200 + (rnd() * 45 | 0)},130,${(0.55 + rnd() * 0.45) * LF})`
+                                   : `rgba(165,215,255,${(0.5 + rnd() * 0.4) * LF})`;
+            } else if (time === 'day' && rnd() < 0.2) {
+              ctx.fillStyle = 'rgba(200,220,235,0.5)';
+            } else continue;
             wrapRect(x + (ci + 0.18) * bw * degW / cols, y + (ri + 0.24) * (elY(0) - y) / rows,
                      bw * degW / cols * 0.52, (elY(0) - y) / rows * 0.5);
           }
+          if (bh > 10) { ctx.fillStyle = 'rgba(255,60,50,0.9)'; wrapRect(x + bw * degW / 2 - 1, y - 3, 3, 3); }
         }
-        /* red beacon on the tallest towers */
-        if (bh > 10) {
-          ctx.fillStyle = 'rgba(255,60,50,0.9)';
-          wrapRect(x + bw * degW / 2 - 1, y - 3, 3, 3);
-        }
+        az += bw + rnd() * 1.2;
       }
-      az += bw + rnd() * 1.2;
+    }
+    if (LF > 0.3) {
+      const neons = [[92, '255,60,140'], [128, '40,230,220'], [163, '160,120,255'], [186, '255,170,40']];
+      for (const [az, c] of neons) {
+        wrapGlow(azX(az + rnd() * 4), elY(0.8 + rnd() * 1.5), 9 * degW, 4.5 * degH, [
+          [0, `rgba(${c},${0.9 * LF})`], [0.35, `rgba(${c},${0.32 * LF})`], [1, `rgba(${c},0)`]]);
+      }
+      for (let i = 0; i < 30; i++) {
+        const az = 60 + i * 4.7 + rnd() * 2;
+        wrapGlow(azX(az), elY(-0.4), 3.2 * degW, 2.2 * degH, [
+          [0, `rgba(255,208,135,${0.72 * LF})`], [0.3, `rgba(255,185,110,${0.26 * LF})`], [1, 'rgba(255,185,110,0)']]);
+      }
+    }
+    let az2 = 208 + rnd() * 3;
+    while (az2 < 292) {
+      const bw = 3 + rnd() * 7, bh = 0.6 + rnd() * rnd() * 3;
+      ctx.fillStyle = P.silDark;
+      wrapRect(azX(az2), elY(bh), bw * degW + 1, elY(-6) - elY(bh));
+      if (LF > 0 && rnd() < 0.5) {
+        ctx.fillStyle = `rgba(255,205,135,${(0.5 + rnd() * 0.45) * LF})`;
+        wrapRect(azX(az2 + bw * 0.3), elY(bh * 0.45), 1.6, 1.6);
+      }
+      az2 += bw + rnd() * 3;
+    }
+    ctx.fillStyle = P.silDark;
+    for (let px = -w * 0.25; px < w * 1.25; px += 3) {
+      const azd = px / degW, azm = ((azd % 360) + 360) % 360;
+      if (azm > 55 && azm < 296) continue;
+      const ridge = 1.1 + Math.sin(azd * 0.09) * 0.7 + Math.sin(azd * 0.023 + 2) * 0.9;
+      ctx.fillRect(px, elY(ridge), 3.5, elY(-6) - elY(ridge));
+    }
+    if (LF > 0) for (const faz of [305, 318, 344, 12, 27, 38]) {
+      ctx.fillStyle = `rgba(255,220,155,${(0.55 + rnd() * 0.35) * LF})`;
+      wrapRect(azX(faz + rnd() * 2), elY(0.3 + rnd() * 0.6), 1.5, 1.5);
     }
   }
-  /* neon signs low in the city */
-  const neons = [[92, '255,60,140'], [128, '40,230,220'], [163, '160,120,255'], [186, '255,170,40']];
-  for (const [az, c] of neons) {
-    wrapGlow(azX(az + rnd() * 4), elY(0.8 + rnd() * 1.5), 9 * degW, 4.5 * degH, [
-      [0, `rgba(${c},0.9)`], [0.35, `rgba(${c},0.32)`], [1, `rgba(${c},0)`]]);
-    ctx.fillStyle = `rgba(${c},0.9)`;
-    wrapRect(azX(az) - 1.1 * degW, elY(0.9), 2.2 * degW, 0.35 * degH);
-  }
-  /* street-lamp glow row along the city base */
-  for (let i = 0; i < 30; i++) {
-    const az = 60 + i * 4.7 + rnd() * 2;
-    wrapGlow(azX(az), elY(-0.4), 3.2 * degW, 2.2 * degH, [
-      [0, 'rgba(255,208,135,0.72)'], [0.3, 'rgba(255,185,110,0.26)'], [1, 'rgba(255,185,110,0)']]);
-  }
-
-  /* --- SUBURB district, az 210..290: low rooftops, sparse lights --- */
-  let az = 208 + rnd() * 3;
-  while (az < 292) {
-    const bw = 3 + rnd() * 7, bh = 0.6 + rnd() * rnd() * 3;
-    ctx.fillStyle = '#0a0a13';
-    wrapRect(azX(az), elY(bh), bw * degW + 1, elY(-6) - elY(bh));
-    if (rnd() < 0.5) {
-      ctx.fillStyle = `rgba(255,205,135,${0.5 + rnd() * 0.45})`;
-      wrapRect(azX(az + bw * 0.3), elY(bh * 0.45), 1.6, 1.6);
+  else if (scene === 'prairie') {
+    /* distant ridge all around */
+    ctx.fillStyle = time === 'day' ? 'rgba(120,140,160,0.55)' : P.silDark;
+    for (let px = -w * 0.25; px < w * 1.25; px += 3) {
+      const azd = px / degW;
+      const ridge = 1.4 + Math.sin(azd * 0.05 + 1) * 0.9 + Math.sin(azd * 0.013) * 1.1;
+      ctx.fillRect(px, elY(ridge), 3.5, elY(0) - elY(ridge) + 2);
     }
-    az += bw + rnd() * 3;
+    /* rolling field band */
+    const fg = ctx.createLinearGradient(0, elY(0), 0, elY(-16));
+    if (time === 'day') { fg.addColorStop(0, '#7e9c58'); fg.addColorStop(1, '#55763f'); }
+    else if (time === 'dusk') { fg.addColorStop(0, '#4c4a34'); fg.addColorStop(1, '#2c2c1e'); }
+    else { fg.addColorStop(0, '#141812'); fg.addColorStop(1, '#0a0d09'); }
+    ctx.fillStyle = fg;
+    ctx.fillRect(0, elY(0), w, elY(-16) - elY(0));
+    /* hay bales + tree clumps + windmill + barn */
+    for (const [azb, sc] of [[30,1],[75,0.7],[205,1.2],[262,0.8],[332,1]]) {
+      ctx.fillStyle = time === 'day' ? '#b9a05c' : (time === 'dusk' ? '#4a4130' : '#15130c');
+      wrapPath(() => { ctx.beginPath();
+        ctx.ellipse(azX(azb), elY(-1.6 * sc), 1.4 * degW * sc, 1.1 * degH * sc, 0, 0, 7); ctx.fill(); });
+    }
+    for (const [azt, ht] of [[55, 3.2], [150, 2.4], [246, 3.8], [300, 2]]) {
+      ctx.fillStyle = time === 'day' ? '#3e5c34' : P.silDark;
+      wrapPath(() => {
+        ctx.fillRect(azX(azt) - 0.3 * degW, elY(0.6), 0.6 * degW, elY(-0.5) - elY(0.6));
+        ctx.beginPath();
+        ctx.ellipse(azX(azt), elY(ht * 0.55), 2.4 * degW * (ht / 3), 1.6 * degH * (ht / 3), 0, 0, 7);
+        ctx.fill();
+      });
+    }
+    /* barn + silo at az 120 */
+    wrapPath(() => {
+      const bx = azX(120);
+      ctx.fillStyle = time === 'day' ? '#8c3a2e' : P.silDark;
+      ctx.fillRect(bx - 4 * degW, elY(1.6), 8 * degW, elY(-1.4) - elY(1.6));
+      ctx.beginPath();
+      ctx.moveTo(bx - 4.6 * degW, elY(1.6)); ctx.lineTo(bx, elY(3.4)); ctx.lineTo(bx + 4.6 * degW, elY(1.6));
+      ctx.closePath();
+      ctx.fillStyle = time === 'day' ? '#6e2c22' : P.silDark;
+      ctx.fill();
+      ctx.fillStyle = time === 'day' ? '#b9bcc2' : P.silLight;
+      ctx.fillRect(bx + 5.4 * degW, elY(3.1), 1.6 * degW, elY(-1.2) - elY(3.1));
+      ctx.beginPath(); ctx.ellipse(bx + 6.2 * degW, elY(3.1), 0.8 * degW, 0.5 * degH, 0, Math.PI, 0); ctx.fill();
+      if (LF > 0) {
+        ctx.fillStyle = `rgba(255,214,150,${0.85 * LF})`;
+        ctx.fillRect(bx - 0.5 * degW, elY(0.4), 1.2, 1.2);
+        wrapGlow(bx, elY(0.3), 2.4 * degW, 1.8 * degH, [
+          [0, `rgba(255,200,120,${0.5 * LF})`], [1, 'rgba(255,200,120,0)']]);
+      }
+    });
+    /* windmill at az 240 */
+    wrapPath(() => {
+      const wx = azX(240);
+      ctx.strokeStyle = time === 'day' ? '#5c6470' : P.silLight;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(wx, elY(-0.6)); ctx.lineTo(wx, elY(3)); ctx.stroke();
+      for (let k = 0; k < 6; k++) {
+        const a = k / 6 * Math.PI * 2 + 0.4;
+        ctx.beginPath(); ctx.moveTo(wx, elY(3));
+        ctx.lineTo(wx + Math.cos(a) * 1.4 * degW, elY(3) - Math.sin(a) * 1.4 * degH);
+        ctx.stroke();
+      }
+    });
+    /* fence posts along the near field */
+    ctx.fillStyle = time === 'day' ? '#4a3c2c' : '#0c0a08';
+    for (let az3 = 0; az3 < 360; az3 += 4.5)
+      wrapRect(azX(az3 + rnd()), elY(-2.6), 1.5, 2.2 * degH * 0.5);
+    /* grass strokes near band bottom */
+    ctx.strokeStyle = time === 'day' ? 'rgba(60,84,40,0.5)' : 'rgba(10,14,8,0.6)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 500; i++) {
+      const x = rnd() * w, y2 = elY(-8 - rnd() * 18);
+      ctx.beginPath(); ctx.moveTo(x, y2); ctx.lineTo(x + (rnd() - 0.5) * 3, y2 - 3 - rnd() * 5); ctx.stroke();
+    }
   }
-  /* radio mast with beacons */
-  const mastX = azX(268);
-  ctx.fillStyle = '#05050a';
-  wrapRect(mastX, elY(7.5), 2, elY(0) - elY(7.5));
-  for (const mel of [7.4, 5.2, 3.0]) {
-    ctx.fillStyle = 'rgba(255,60,50,0.95)';
-    wrapRect(mastX - 1, elY(mel), 4, 3);
-    wrapGlow(mastX + 1, elY(mel), 1.6 * degW, 1.1 * degH, [
-      [0, 'rgba(255,60,50,0.4)'], [1, 'rgba(255,60,50,0)']]);
+  else if (scene === 'desert') {
+    /* mesas az 40..140 */
+    ctx.fillStyle = time === 'day' ? '#b0725a' : (time === 'dusk' ? '#5c3244' : '#171227');
+    for (const [azm, wm, hm] of [[60, 18, 5.5], [95, 10, 7], [128, 14, 4.5]]) {
+      wrapPath(() => {
+        const x = azX(azm);
+        ctx.beginPath();
+        ctx.moveTo(x - wm * degW / 2 - 3 * degW, elY(0));
+        ctx.lineTo(x - wm * degW / 2, elY(hm));
+        ctx.lineTo(x + wm * degW / 2, elY(hm));
+        ctx.lineTo(x + wm * degW / 2 + 3 * degW, elY(0));
+        ctx.closePath(); ctx.fill();
+      });
+    }
+    /* dune ridges */
+    const duneCols = time === 'day' ? ['#d9b077', '#c89a5f', '#b3854e']
+                   : time === 'dusk' ? ['#8a5c48', '#6e4438', '#54302a'] : ['#232032', '#1a1826', '#12101c'];
+    for (let dLayer = 0; dLayer < 3; dLayer++) {
+      ctx.fillStyle = duneCols[dLayer];
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.25, h);
+      for (let px = -w * 0.25; px < w * 1.25; px += 4) {
+        const azd = px / degW;
+        const el = -1 - dLayer * 4 + Math.sin(azd * (0.04 + dLayer * 0.013) + dLayer * 2) * (1.2 + dLayer * 0.8);
+        ctx.lineTo(px, elY(el));
+      }
+      ctx.lineTo(w * 1.25, h); ctx.closePath(); ctx.fill();
+    }
+    /* saguaros */
+    ctx.fillStyle = time === 'day' ? '#4c6840' : '#0d1410';
+    for (const [azc, sc] of [[168, 1], [196, 0.7], [225, 1.2], [258, 0.8], [292, 1], [322, 0.6]]) {
+      wrapPath(() => {
+        const x = azX(azc), yb = elY(-2.2 * sc), h2 = 3.4 * degH * sc;
+        ctx.fillRect(x - 0.9 * sc, yb - h2, 1.8 * sc, h2);
+        ctx.fillRect(x - 0.9 * sc - 2.6 * sc, yb - h2 * 0.55, 1.6 * sc, h2 * 0.3);
+        ctx.fillRect(x - 0.9 * sc - 2.6 * sc, yb - h2 * 0.55, 5.2 * sc, 1.6 * sc);
+        ctx.fillRect(x + 1.2 * sc, yb - h2 * 0.7, 1.6 * sc, h2 * 0.25);
+        ctx.fillRect(x - 0.9 * sc, yb - h2 * 0.7, 3.7 * sc, 1.6 * sc);
+      });
+    }
+    if (time === 'day') wrapGlow(azX(150), elY(14), 40 * degW, 30 * degH, [
+      [0, 'rgba(255,246,220,0.5)'], [0.4, 'rgba(255,240,200,0.14)'], [1, 'rgba(255,240,200,0)']]);
+  }
+  else if (scene === 'harbor') {
+    /* sea az 0..185, town az 195..345 */
+    const seaTop = elY(0);
+    const sg = ctx.createLinearGradient(0, seaTop, 0, elY(-20));
+    if (time === 'day') { sg.addColorStop(0, '#4a7fa6'); sg.addColorStop(1, '#2c5b80'); }
+    else if (time === 'dusk') { sg.addColorStop(0, '#5c4460'); sg.addColorStop(1, '#2a2440'); }
+    else { sg.addColorStop(0, '#0a1220'); sg.addColorStop(1, '#050a14'); }
+    ctx.fillStyle = sg;
+    /* draw sea only over its azimuths (with wrap) */
+    for (const [a0, a1] of [[-15, 190]]) {
+      wrapRect(azX(a0 < 0 ? a0 + 360 : a0), seaTop, (a1 - a0) * degW, elY(-24) - seaTop);
+      ctx.fillRect(azX(0) - (15) * degW, seaTop, 15 * degW, elY(-24) - seaTop);
+    }
+    /* wave streaks + glitter path */
+    for (let i = 0; i < 380; i++) {
+      const az3 = rnd() * 205 - 15, el = -0.4 - rnd() * rnd() * 20;
+      const bright = time === 'day' ? `rgba(210,230,240,${0.1 + rnd() * 0.2})`
+                    : time === 'dusk' ? `rgba(255,190,140,${0.08 + rnd() * 0.16})`
+                    : `rgba(170,190,230,${0.05 + rnd() * 0.12})`;
+      ctx.fillStyle = bright;
+      wrapRect(azX(az3), elY(el), (2 + rnd() * 9), 1.2);
+    }
+    if (time !== 'day') {
+      /* moon/sun glitter column at az 90 */
+      for (let i = 0; i < 90; i++) {
+        const el = -0.5 - rnd() * rnd() * 16;
+        ctx.fillStyle = `rgba(235,235,255,${0.14 + rnd() * 0.3})`;
+        wrapRect(azX(90 + (rnd() - 0.5) * 7 * (1 - el / -18)), elY(el), 2 + rnd() * 5, 1.3);
+      }
+    }
+    /* lighthouse on rocks az 150 */
+    wrapPath(() => {
+      const x = azX(150);
+      ctx.fillStyle = time === 'day' ? '#6a7078' : '#0e0e16';
+      ctx.beginPath(); ctx.ellipse(x, elY(-0.6), 5 * degW, 1.4 * degH, 0, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = time === 'day' ? '#e8e2d8' : '#1a1a24';
+      ctx.fillRect(x - 0.9 * degW, elY(4.6), 1.8 * degW, elY(-0.4) - elY(4.6));
+      ctx.fillStyle = time === 'day' ? '#b03028' : '#241418';
+      ctx.fillRect(x - 0.9 * degW, elY(2.4), 1.8 * degW, 1.4 * degH);
+      if (LF > 0) {
+        ctx.fillStyle = `rgba(255,240,180,${0.95 * LF})`;
+        ctx.fillRect(x - 0.5 * degW, elY(4.9), degW, 0.7 * degH);
+        wrapGlow(x, elY(4.7), 7 * degW, 3.2 * degH, [
+          [0, `rgba(255,236,170,${0.7 * LF})`], [0.3, `rgba(255,220,140,${0.2 * LF})`], [1, 'rgba(255,220,140,0)']]);
+      }
+    });
+    /* boats */
+    for (const [azb, sc] of [[45, 1], [78, 0.6], [118, 0.8]]) {
+      wrapPath(() => {
+        const x = azX(azb);
+        ctx.fillStyle = time === 'day' ? '#3a3f4a' : '#080a12';
+        ctx.beginPath();
+        ctx.moveTo(x - 2.4 * degW * sc, elY(-1.4 * sc));
+        ctx.lineTo(x + 2.4 * degW * sc, elY(-1.4 * sc));
+        ctx.lineTo(x + 1.6 * degW * sc, elY(-2.1 * sc));
+        ctx.lineTo(x - 1.7 * degW * sc, elY(-2.1 * sc));
+        ctx.closePath(); ctx.fill();
+        ctx.fillRect(x - 0.15 * degW, elY(1.3 * sc), 1.2, elY(-1.4 * sc) - elY(1.3 * sc));
+        if (LF > 0) { ctx.fillStyle = `rgba(255,220,150,${0.8 * LF})`; ctx.fillRect(x + degW, elY(-1.1 * sc), 1.4, 1.4); }
+      });
+    }
+    /* pier posts near az 90 */
+    ctx.fillStyle = time === 'day' ? '#3c342a' : '#060606';
+    for (let k = 0; k < 8; k++)
+      wrapRect(azX(72 + k * 4.5), elY(-6 - k * 0.4), 2.5, (4 + k * 0.6) * degH * 0.4);
+    /* town on the landward side */
+    let az4 = 196 + rnd() * 3;
+    while (az4 < 348) {
+      const bw = 3 + rnd() * 6, bh = 0.8 + rnd() * rnd() * 3.4;
+      ctx.fillStyle = P.silDark;
+      wrapRect(azX(az4), elY(bh), bw * degW + 1, elY(-6) - elY(bh));
+      if (LF > 0 && rnd() < 0.55) {
+        ctx.fillStyle = `rgba(255,205,135,${(0.5 + rnd() * 0.45) * LF})`;
+        wrapRect(azX(az4 + bw * 0.3), elY(bh * 0.45), 1.6, 1.6);
+      } else if (time === 'day' && rnd() < 0.4) {
+        ctx.fillStyle = 'rgba(225,232,240,0.6)';
+        wrapRect(azX(az4 + bw * 0.3), elY(bh * 0.45), 2, 2.4);
+      }
+      az4 += bw + rnd() * 2.4;
+    }
+    /* harbour cranes az ~330 */
+    ctx.strokeStyle = P.silLight; ctx.lineWidth = 2;
+    for (const azc of [326, 337]) wrapPath(() => {
+      const x = azX(azc);
+      ctx.beginPath(); ctx.moveTo(x, elY(-0.5)); ctx.lineTo(x, elY(4.4));
+      ctx.lineTo(x + 4 * degW, elY(3.2)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, elY(3)); ctx.lineTo(x + 2.4 * degW, elY(4.05)); ctx.stroke();
+    });
   }
 
-  /* --- OPEN COUNTRY, az 300..(360)..40: dark ridges across the seam --- */
-  ctx.fillStyle = '#07070d';
-  for (let px = -w * 0.25; px < w * 1.25; px += 3) {
-    const azd = px / degW;
-    if (((azd % 360) + 360) % 360 > 55 && ((azd % 360) + 360) % 360 < 296) continue;
-    const ridge = 1.1 + Math.sin(azd * 0.09) * 0.7 + Math.sin(azd * 0.023 + 2) * 0.9;
-    ctx.fillRect(px, elY(ridge), 3.5, elY(-6) - elY(ridge));
-  }
-  /* isolated farm lights */
-  for (const faz of [305, 318, 344, 12, 27, 38]) {
-    ctx.fillStyle = `rgba(255,220,155,${0.55 + rnd() * 0.35})`;
-    wrapRect(azX(faz + rnd() * 2), elY(0.3 + rnd() * 0.6), 1.5, 1.5);
-  }
-
-  /* --- the dark hilltop below the horizon (your unlit hill, no trees) --- */
-  const gnd = ctx.createLinearGradient(0, elY(-4), 0, h);
-  gnd.addColorStop(0, 'rgba(4,5,6,0)');
-  gnd.addColorStop(0.4, 'rgba(3,4,5,0.85)');
-  gnd.addColorStop(1, 'rgba(2,3,4,1)');
-  ctx.fillStyle = gnd;
-  ctx.fillRect(0, elY(-4), w, h - elY(-4));
-  /* faint grass mottling on the slope */
+  /* near-ground mottling on the slope below the horizon */
   for (let i = 0; i < 260; i++) {
     const el = -5 - rnd() * 22;
-    ctx.fillStyle = `rgba(${8 + (rnd() * 8 | 0)},${11 + (rnd() * 10 | 0)},${8 + (rnd() * 7 | 0)},0.5)`;
+    const gc = time === 'day' ? [80 + (rnd()*30|0), 100 + (rnd()*26|0), 60 + (rnd()*20|0), 0.35]
+             : time === 'dusk' ? [46 + (rnd()*16|0), 44 + (rnd()*14|0), 32 + (rnd()*10|0), 0.4]
+             : [8 + (rnd() * 8 | 0), 11 + (rnd() * 10 | 0), 8 + (rnd() * 7 | 0), 0.5];
+    ctx.fillStyle = `rgba(${gc[0]},${gc[1]},${gc[2]},${gc[3]})`;
     ctx.beginPath();
     ctx.ellipse(rnd() * w, elY(el), (2 + rnd() * 7) * degW * 0.3, (0.4 + rnd() * 0.8) * degH, 0, 0, 7);
     ctx.fill();
@@ -512,7 +751,7 @@ function simStep(dt, t) {
 
   // --- rain arrival ---
   // flux: a horizontal pane catches the most rain on its upper face
-  const flux = 0.55 + 0.9 * modeFlat;
+  const flux = (weather === 'rain' ? 1 : 0) * (0.55 + 0.9 * modeFlat);
   const area = simW * simH / (420 * 760);
   let expected = flux * area * dt * (8 + 14 * modeFlat);
   while (expected > 0) {
@@ -558,6 +797,8 @@ function simStep(dt, t) {
       if (!d.trail && rp < 4.4 && Math.random() < dt * 0.12) d.r += (0.05 + Math.random() * 0.1) * RS;
       // trail residue slowly evaporates so old tracks dissolve
       if (d.trail) d.r *= 1 - dt * 0.03;
+      // no rain falling → everything slowly dries
+      if (weather !== 'rain') d.r *= 1 - dt * 0.045;
       // break loose? weight vs stiction (probabilistic so releases spread out)
       const pull = gtMag * (rp * rp) / 9;        // r≈3 & full tilt ⇒ pull 1
       if (pull > d.stiction && runners < RUN_CAP && Math.random() < dt * 1.4) {
@@ -714,6 +955,12 @@ uniform float uTime;
 uniform mat3 uOrient;      // screen-ray → world (X east, Y north, Z up)
 uniform vec2 uTanF;        // tan(half-fov) x, y
 uniform vec3 uMoonDir;
+uniform sampler2D uRoam;   // beings overlay, same band mapping as the pano
+uniform sampler2D uGrime;  // dirt on the glass (screen space)
+uniform float uDayMix;     // 0 night … 1 day
+uniform float uStarGain;
+uniform float uWeather;    // 0 clear 1 rain 2 dust 3 snow 4 fog 5 embers
+uniform float uFireAz;     // radians
 
 const float EL0 = -0.5, EL1 = 1.05;      // pano band elevation range
 
@@ -754,33 +1001,87 @@ vec3 moonAdd(vec3 d, float halo){
   return vec3(0.9, 0.93, 1.0) * disc * 0.95 + vec3(0.55, 0.62, 0.8) * glow;
 }
 vec3 skyHigh(vec3 d){
-  return mix(vec3(0.030, 0.038, 0.066), vec3(0.010, 0.014, 0.028), smoothstep(0.0, 1.0, d.z));
+  vec3 night = mix(vec3(0.030, 0.038, 0.066), vec3(0.010, 0.014, 0.028), smoothstep(0.0, 1.0, d.z));
+  vec3 day = mix(vec3(0.62, 0.76, 0.9), vec3(0.34, 0.56, 0.86), smoothstep(0.0, 1.0, d.z));
+  return mix(night, day, uDayMix);
+}
+/* day sun disc + glow, fixed high to the south-east */
+vec3 sunAdd(vec3 d, float halo){
+  if (uDayMix < 0.03) return vec3(0.0);
+  vec3 sd = normalize(vec3(0.55, 0.45, 0.95));
+  float ang = acos(clamp(dot(d, sd), -1.0, 1.0));
+  float disc = smoothstep(0.05, 0.038, ang);
+  float glow = exp(-ang * ang / (halo * halo * 5.0)) * 0.5;
+  return (vec3(1.0, 0.97, 0.88) * disc * 2.0 + vec3(1.0, 0.95, 0.8) * glow) * uDayMix;
 }
 vec3 groundCol(vec3 d){
   vec2 p = octa(vec3(d.x, d.y, -d.z));
   float n = vn(p * 16.0) * 0.6 + vn(p * 52.0) * 0.4;
-  vec3 base = mix(vec3(0.042, 0.05, 0.042), vec3(0.016, 0.021, 0.024), smoothstep(0.05, 0.85, -d.z));
-  return base * (0.7 + n * 0.6);
+  vec3 baseN = mix(vec3(0.042, 0.05, 0.042), vec3(0.016, 0.021, 0.024), smoothstep(0.05, 0.85, -d.z));
+  vec3 baseD = mix(vec3(0.30, 0.38, 0.22), vec3(0.16, 0.22, 0.13), smoothstep(0.05, 0.85, -d.z));
+  return mix(baseN, baseD, uDayMix) * (0.7 + n * 0.6);
+}
+/* world-anchored falling snow / rising embers as az-el hash grids */
+float flakes(vec3 d, float fall, float cells, float size, float speed){
+  if (abs(d.z) > 0.995) return 0.0;
+  vec2 ae = vec2(atan(d.x, d.y) * 2.2, asin(clamp(d.z, -1.0, 1.0)) * 2.2 + uTime * speed * fall);
+  vec2 cp = ae * cells;
+  vec2 cell = floor(cp);
+  float h = h21(cell);
+  if (h < 0.7) return 0.0;
+  vec2 sp = cell + vec2(h21(cell + 4.7), h21(cell + 9.3)) * 0.8 + 0.1;
+  vec2 dv = cp - sp;
+  return pow(fract(h * 9.7), 2.0) * exp(-dot(dv, dv) / (size * size));
 }
 
 /* full world-space background: pano band + procedural ground & high sky */
 vec3 bgAt(vec3 d, int lvl){
   float el = asin(clamp(d.z, -1.0, 1.0));
+  float az = atan(d.x, d.y);
   float sz = lvl == 0 ? 0.1 : lvl == 1 ? 0.2 : 0.45;
-  float gn = lvl == 0 ? 1.0 : lvl == 1 ? 0.55 : 0.2;
+  float gn = (lvl == 0 ? 1.0 : lvl == 1 ? 0.55 : 0.2) * uStarGain;
   float hl = lvl == 0 ? 0.05 : lvl == 1 ? 0.1 : 0.26;
-  vec3 sky = skyHigh(d) + vec3(stars(d, sz, gn)) + moonAdd(d, hl);
+  vec3 sky = skyHigh(d) + vec3(stars(d, sz, gn)) + moonAdd(d, hl) * uStarGain + sunAdd(d, hl);
   vec3 gnd = groundCol(d);
-  if (el >= EL1) return sky;
-  if (el <= EL0) return gnd;
-  float u = atan(d.x, d.y) / 6.2831853;
-  float v = (EL1 - el) / (EL1 - EL0);
-  vec3 col = lvl == 0 ? texture(uPanoS, vec2(u, v)).rgb
-           : lvl == 1 ? texture(uPanoB, vec2(u, v)).rgb
-           : texture(uPanoF, vec2(u, v)).rgb;
-  col = mix(col, sky, smoothstep(EL1 - 0.08, EL1, el));
-  col = mix(col, gnd, 1.0 - smoothstep(EL0, EL0 + 0.06, el));
-  col += moonAdd(d, hl) * smoothstep(0.45, EL1, el);          // halo spills into the band
+  vec3 col;
+  if (el >= EL1) col = sky;
+  else if (el <= EL0) col = gnd;
+  else {
+    float u = az / 6.2831853;
+    float v = (EL1 - el) / (EL1 - EL0);
+    col = lvl == 0 ? texture(uPanoS, vec2(u, v)).rgb
+        : lvl == 1 ? texture(uPanoB, vec2(u, v)).rgb
+        : texture(uPanoF, vec2(u, v)).rgb;
+    /* roaming beings ride the same band mapping */
+    vec4 rm = texture(uRoam, vec2(fract(u), v));
+    if (lvl > 0) rm.a *= lvl == 1 ? 0.75 : 0.45;
+    col = mix(col, rm.rgb, rm.a);
+    col = mix(col, sky, smoothstep(EL1 - 0.08, EL1, el));
+    col = mix(col, gnd, 1.0 - smoothstep(EL0, EL0 + 0.06, el));
+    col += moonAdd(d, hl) * uStarGain * smoothstep(0.45, EL1, el);
+    col += sunAdd(d, hl) * smoothstep(0.45, EL1, el);
+  }
+  /* ---- weather on the world side of the glass ---- */
+  if (uWeather > 1.5 && uWeather < 2.5) {          // dust storm
+    float dens = clamp(0.55 - el * 0.9, 0.12, 0.7);
+    col = mix(col, mix(vec3(0.24, 0.18, 0.11), vec3(0.62, 0.5, 0.33), uDayMix), dens);
+  } else if (uWeather > 2.5 && uWeather < 3.5) {   // snow
+    float f = flakes(d, 1.0, 60.0, 0.34, 0.5) + flakes(d, 1.0, 26.0, 0.3, 0.9);
+    col = mix(col, mix(vec3(0.5, 0.55, 0.65), vec3(0.86, 0.9, 0.95), uDayMix), clamp(0.28 - el * 0.35, 0.05, 0.4));
+    col += vec3(f) * (0.5 + uDayMix * 0.4);
+  } else if (uWeather > 3.5 && uWeather < 4.5) {   // fog
+    float dens = clamp(0.8 - el * 1.6, 0.15, 0.92);
+    col = mix(col, mix(vec3(0.10, 0.11, 0.14), vec3(0.74, 0.78, 0.82), uDayMix), dens);
+  } else if (uWeather > 4.5) {                     // distant fire + embers + smoke
+    float da = abs(mod(az - uFireAz + 9.42477, 6.2831853) - 3.14159);
+    float flick = 0.8 + 0.2 * sin(uTime * 11.0 + sin(uTime * 27.0));
+    float glow = exp(-da * da / 0.5) * exp(-max(0.0, el) * 3.5) * flick;
+    col += vec3(1.0, 0.42, 0.1) * glow * 0.85;
+    float smoke = exp(-da * da / 1.1) * clamp(0.5 - el * 0.8, 0.0, 0.55);
+    col = mix(col, vec3(0.16, 0.13, 0.12), smoke * 0.6);
+    float em = flakes(d, -1.0, 42.0, 0.22, 0.7) * exp(-da * da / 0.7);
+    col += vec3(1.0, 0.5, 0.12) * em * flick;
+  }
   return col;
 }
 vec3 ray(vec2 uv, vec2 off){
@@ -805,6 +1106,9 @@ void main(){
   vec3 fogged = bgAt(rdBase, 2) * 0.94 + vec3(0.055, 0.062, 0.078);   // milky condensation lift
   vec3 wiped = bgAt(rdBase, 1) + 0.012;
   vec3 base = mix(fogged, wiped, clamp(wet, 0., 1.) * 0.8);
+  /* dirt stuck to the glass — wipe it with your finger */
+  vec4 grm = texture(uGrime, uv);
+  base = mix(base, grm.rgb, grm.a * 0.92);
 
   // inside drops: refract into the SHARP world (drops are little lenses)
   float mask = smoothstep(0.045, 0.3, h);
@@ -867,10 +1171,11 @@ function upload(tex, cnv) {
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cnv);
 }
 const U = {};
-for (const n of ['uH','uWet','uPanoS','uPanoB','uPanoF','uRes','uHRes','uTime','uOrient','uTanF','uMoonDir'])
+for (const n of ['uH','uWet','uPanoS','uPanoB','uPanoF','uRes','uHRes','uTime','uOrient','uTanF','uMoonDir','uRoam','uGrime','uDayMix','uStarGain','uWeather','uFireAz'])
   U[n] = gl.getUniformLocation(prog, n);
 gl.uniform1i(U.uH, 0); gl.uniform1i(U.uWet, 1); gl.uniform1i(U.uPanoS, 2);
 gl.uniform1i(U.uPanoB, 3); gl.uniform1i(U.uPanoF, 4);
+gl.uniform1i(U.uRoam, 5); gl.uniform1i(U.uGrime, 6);
 /* moon: az 35°, el 62° — just above the pano band, in the procedural sky */
 {
   const az = 35 * Math.PI / 180, el = 62 * Math.PI / 180;
@@ -898,6 +1203,8 @@ function resize() {
   wetC.width = simW; wetC.height = simH;
 
   paintMicro();
+  grimeC.width = simW; grimeC.height = simH;
+  upload(texGrime, grimeC);
   drops.length = 0; splashes.length = 0;
   // pre-seed some beads so the pane doesn't start empty
   for (let i = 0; i < 90; i++)
@@ -905,6 +1212,226 @@ function resize() {
               (0.8 + Math.random() * Math.random() * 3) * RS);
 }
 window.addEventListener('resize', () => { resize(); });
+
+/* ============================================================
+   WORLD STATE — scene / time / weather / beings
+   ============================================================ */
+const SCENE_LIST = { city: 'City', prairie: 'Prairie', desert: 'Desert', harbor: 'Harbor' };
+const TIME_LIST = { day: 'Day', dusk: 'Dusk', night: 'Night' };
+const WEATHER_LIST = { clear: 'Clear', rain: 'Rain', dust: 'Dust Storm', snow: 'Snow', fog: 'Fog', embers: 'Wildfire' };
+const BEINGS_LIST = { none: 'No Beings', people: 'People', deer: 'Deer', birds: 'Birds', monster: 'Monster', dragon: 'Dragon' };
+const WEATHER_ID = { clear: 0, rain: 1, dust: 2, snow: 3, fog: 4, embers: 5 };
+const FIRE_AZ = { city: 25, prairie: 205, desert: 95, harbor: 262 };
+function loadOpt(k, list, dflt) {
+  try { const v = localStorage.getItem('arv-' + k); if (v && list[v]) return v; } catch (e) {}
+  return dflt;
+}
+let scene = loadOpt('scene', SCENE_LIST, 'city');
+let timeOfDay = loadOpt('time', TIME_LIST, 'night');
+let weather = loadOpt('weather', WEATHER_LIST, 'rain');
+let beings = loadOpt('beings', BEINGS_LIST, 'none');
+
+const texRoam = makeTex(), texGrime = makeTex();
+const roamC = document.createElement('canvas');
+roamC.width = 1024; roamC.height = 448;
+const roamCtx = roamC.getContext('2d');
+const grimeC = document.createElement('canvas');
+const grimeCtx = grimeC.getContext('2d');
+
+function rebuildWorld() {
+  rngSeed = 20260815;
+  paintPano(bgSharpC.getContext('2d'), PANO_W, PANO_H, scene, timeOfDay);
+  blurInto(bgBlurC, bgSharpC, 2);
+  blurInto(bgFogC, bgSharpC, 4);
+  upload(texPanoS, bgSharpC);
+  upload(texPanoB, bgBlurC);
+  upload(texPanoF, bgFogC);
+  for (const t of [texPanoS, texPanoB, texPanoF]) {
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  }
+}
+
+/* ---- grime on the glass ---- */
+function grimeStep(dt) {
+  let n = 0, col = null;
+  if (weather === 'dust') { n = dt * 38; col = () => `rgba(${120+(Math.random()*50|0)},${95+(Math.random()*40|0)},${58+(Math.random()*28|0)},0.12)`; }
+  else if (weather === 'snow') { n = dt * 26; col = () => `rgba(${225+(Math.random()*25|0)},${230+(Math.random()*22|0)},245,0.15)`; }
+  else if (weather === 'embers') { n = dt * 12; col = () => `rgba(${105+(Math.random()*30|0)},${100+(Math.random()*26|0)},98,0.12)`; }
+  if (col) {
+    for (let i = 0; i < n || Math.random() < n; i++) {
+      if (i > n) break;
+      grimeCtx.fillStyle = col();
+      let gx = Math.random() * simW, gy = Math.random() * simH;
+      if (weather === 'snow') {
+        // frost creeps in from the edges and piles at the bottom
+        if (Math.random() < 0.55) gy = simH * (1 - Math.random() * Math.random() * 0.45);
+        else { const edge = Math.random() < 0.5; gx = edge ? Math.random() * simW * 0.14 : simW * (1 - Math.random() * 0.14); }
+      }
+      const r = 1 + Math.random() * Math.random() * 3.2;
+      grimeCtx.beginPath(); grimeCtx.arc(gx, gy, r * RS, 0, 7); grimeCtx.fill();
+    }
+  }
+  if (weather === 'rain') {           // rain slowly washes old dirt off
+    grimeCtx.globalCompositeOperation = 'destination-out';
+    grimeCtx.globalAlpha = Math.min(1, dt * 0.06);
+    grimeCtx.fillRect(0, 0, simW, simH);
+    grimeCtx.globalAlpha = 1;
+    grimeCtx.globalCompositeOperation = 'source-over';
+  }
+}
+
+/* ---- the wipe ---- */
+let wipeMode = false;
+function wipeAt(cx, cy) {
+  const sx = cx * simW / W, sy = cy * simH / H;
+  const r = 30 * RS;
+  wetCtx.globalCompositeOperation = 'source-over';
+  drawBlob(wetCtx, sx, sy, r, 0.55);
+  grimeCtx.globalCompositeOperation = 'destination-out';
+  grimeCtx.beginPath(); grimeCtx.arc(sx, sy, r * 0.9, 0, 7);
+  grimeCtx.globalAlpha = 0.85; grimeCtx.fill();
+  grimeCtx.globalAlpha = 1;
+  grimeCtx.globalCompositeOperation = 'source-over';
+  for (let i = drops.length - 1; i >= 0; i--) {
+    const d = drops[i];
+    const dx = d.x - sx, dy = d.y - sy;
+    if (dx * dx + dy * dy < r * r * 1.2) drops.splice(i, 1);
+  }
+}
+
+/* ============================================================
+   BEINGS — silhouettes roaming the band, drawn each frame into
+   an overlay canvas mapped like the panorama
+   ============================================================ */
+let roamers = [];
+function initRoamers() {
+  roamers = [];
+  const mk = (kind, n, elMin, elMax, sp) => {
+    for (let i = 0; i < n; i++) roamers.push({
+      kind, az: Math.random() * 360, el: elMin + Math.random() * (elMax - elMin),
+      dir: Math.random() < 0.5 ? 1 : -1, speed: sp * (0.7 + Math.random() * 0.6),
+      ph: Math.random() * 10, state: 0, stT: 0,
+    });
+  };
+  if (beings === 'people') mk('person', 3, -1.6, -0.6, 1.1);
+  else if (beings === 'deer') mk('deer', 3, -1.8, -0.7, 0.8);
+  else if (beings === 'birds') mk('bird', 12, 8, 26, 6);
+  else if (beings === 'monster') mk('monster', 1, -1.2, -1.2, 0.55);
+  else if (beings === 'dragon') mk('dragon', 1, 16, 24, 3.2);
+}
+const RE0 = EL0 * 180 / Math.PI, RE1 = EL1 * 180 / Math.PI;
+function roamY(el) { return (RE1 - el) / (RE1 - RE0) * roamC.height; }
+function roamX(az) { return ((az % 360) + 360) % 360 / 360 * roamC.width; }
+const DEGW = roamC.width / 360, DEGH = roamC.height / (RE1 - RE0);
+
+function drawRoamers(t, dt) {
+  const c = roamCtx;
+  c.clearRect(0, 0, roamC.width, roamC.height);
+  const dark = timeOfDay === 'day' ? '#2c3038' : timeOfDay === 'dusk' ? '#14141e' : '#020204';
+  for (const r of roamers) {
+    r.stT -= dt;
+    if (r.kind === 'monster' && r.stT <= 0) { r.state = r.state ? 0 : 1; r.stT = r.state ? 2 + Math.random() * 3 : 5 + Math.random() * 6; }
+    const moving = !(r.kind === 'monster' && r.state === 1);
+    if (moving) { r.az += r.dir * r.speed * dt; r.ph += dt * (r.kind === 'bird' ? 9 : 5); }
+    if (Math.random() < dt * 0.02) r.dir *= -1;
+    for (const off of [0, -roamC.width, roamC.width]) {
+      c.save();
+      c.translate(roamX(r.az) + off, roamY(r.el));
+      const s = r.kind === 'monster' ? 3.1 * DEGH : r.kind === 'dragon' ? 2.6 * DEGH
+              : r.kind === 'bird' ? 0.8 * DEGH : r.kind === 'deer' ? 1.5 * DEGH : 1.8 * DEGH;
+      c.fillStyle = dark; c.strokeStyle = dark; c.lineCap = 'round';
+      if (r.kind === 'person') {
+        const sw = Math.sin(r.ph) * 0.4;
+        c.lineWidth = s * 0.16;
+        c.beginPath(); c.arc(0, -s * 1.55, s * 0.21, 0, 7); c.fill();          // head
+        c.beginPath(); c.moveTo(0, -s * 1.34); c.lineTo(0, -s * 0.62); c.stroke();  // torso
+        c.beginPath(); c.moveTo(0, -s * 0.62); c.lineTo(Math.sin(r.ph) * s * 0.34 * r.dir, 0); c.stroke();
+        c.beginPath(); c.moveTo(0, -s * 0.62); c.lineTo(-Math.sin(r.ph) * s * 0.34 * r.dir, 0); c.stroke();
+        c.lineWidth = s * 0.12;
+        c.beginPath(); c.moveTo(0, -s * 1.2); c.lineTo(sw * s * 0.5 * r.dir, -s * 0.8); c.stroke();
+        c.beginPath(); c.moveTo(0, -s * 1.2); c.lineTo(-sw * s * 0.5 * r.dir, -s * 0.8); c.stroke();
+      } else if (r.kind === 'deer') {
+        const graze = Math.sin(t * 0.4 + r.ph) > 0.6;
+        c.beginPath(); c.ellipse(0, -s * 0.72, s * 0.62, s * 0.3, 0, 0, 7); c.fill();
+        c.lineWidth = s * 0.09;
+        for (let k = 0; k < 4; k++) {
+          const lx = (k < 2 ? -1 : 1) * s * 0.4 + (k % 2) * s * 0.14;
+          const st = Math.sin(r.ph + k * 1.7) * (moving ? 0.14 : 0) * s;
+          c.beginPath(); c.moveTo(lx, -s * 0.55); c.lineTo(lx + st, 0); c.stroke();
+        }
+        const hx = r.dir * s * 0.72, hy = graze ? -s * 0.2 : -s * 1.25;
+        c.lineWidth = s * 0.13;
+        c.beginPath(); c.moveTo(r.dir * s * 0.5, -s * 0.85); c.lineTo(hx, hy); c.stroke();
+        c.beginPath(); c.ellipse(hx + r.dir * s * 0.1, hy, s * 0.18, s * 0.1, 0, 0, 7); c.fill();
+        c.lineWidth = s * 0.05;
+        c.beginPath(); c.moveTo(hx, hy - s * 0.08); c.lineTo(hx - r.dir * s * 0.12, hy - s * 0.42); c.stroke();
+        c.beginPath(); c.moveTo(hx, hy - s * 0.08); c.lineTo(hx + r.dir * s * 0.1, hy - s * 0.4); c.stroke();
+      } else if (r.kind === 'bird') {
+        const fl = Math.sin(r.ph) * 0.55;
+        c.lineWidth = s * 0.12;
+        c.beginPath();
+        c.moveTo(-s * 0.6, -fl * s);
+        c.quadraticCurveTo(-s * 0.2, fl * s * 0.4, 0, 0);
+        c.quadraticCurveTo(s * 0.2, fl * s * 0.4, s * 0.6, -fl * s);
+        c.stroke();
+      } else if (r.kind === 'monster') {
+        const sw = moving ? Math.sin(r.ph) * 0.3 : 0;
+        c.lineWidth = s * 0.13;
+        c.beginPath(); c.ellipse(0, -s * 1.5, s * 0.26, s * 0.3, 0, 0, 7); c.fill();   // hunched head
+        c.beginPath(); c.moveTo(0, -s * 1.3); c.quadraticCurveTo(s * 0.12, -s * 0.9, 0, -s * 0.55); c.stroke();
+        c.beginPath(); c.moveTo(0, -s * 0.55); c.lineTo(sw * s * 0.4, 0); c.stroke();
+        c.beginPath(); c.moveTo(0, -s * 0.55); c.lineTo(-sw * s * 0.4, 0); c.stroke();
+        c.lineWidth = s * 0.09;
+        c.beginPath(); c.moveTo(0, -s * 1.15); c.lineTo(sw * s * 0.3 + s * 0.24, -s * 0.28); c.stroke();
+        c.beginPath(); c.moveTo(0, -s * 1.15); c.lineTo(-sw * s * 0.3 - s * 0.24, -s * 0.28); c.stroke();
+        // glowing eyes — brighter when it stops to look at you
+        const eb = r.state === 1 ? 1 : 0.55;
+        const eg = c.createRadialGradient(0, -s * 1.52, 0, 0, -s * 1.52, s * 0.3);
+        eg.addColorStop(0, `rgba(255,190,60,${0.5 * eb})`); eg.addColorStop(1, 'rgba(255,190,60,0)');
+        c.fillStyle = eg;
+        c.fillRect(-s * 0.3, -s * 1.82, s * 0.6, s * 0.6);
+        c.fillStyle = `rgba(255,214,90,${eb})`;
+        c.fillRect(-s * 0.11, -s * 1.56, s * 0.07, s * 0.05);
+        c.fillRect(s * 0.04, -s * 1.56, s * 0.07, s * 0.05);
+      } else if (r.kind === 'dragon') {
+        const fl = Math.sin(r.ph * 0.8) * 0.5;
+        c.lineWidth = s * 0.14;
+        // body + tail
+        c.beginPath();
+        c.moveTo(-r.dir * s * 1.4, s * 0.15);
+        c.quadraticCurveTo(0, -s * 0.1, r.dir * s * 0.7, 0);
+        c.stroke();
+        c.beginPath(); c.ellipse(r.dir * s * 0.7, 0, s * 0.34, s * 0.2, 0, 0, 7); c.fill();
+        c.beginPath(); c.arc(r.dir * s * 1.05, -s * 0.12, s * 0.14, 0, 7); c.fill();
+        // wings
+        for (const wside of [-1, 1]) {
+          c.beginPath();
+          c.moveTo(r.dir * s * 0.5, -s * 0.05);
+          c.quadraticCurveTo(0, -s * (0.9 + fl * wside * 0.7) * wside * 0 - s * (0.9 + fl * 0.8) * (wside > 0 ? 1 : 0.55),
+                             -r.dir * s * 0.5, -s * (0.35 + fl * 0.9) * (wside > 0 ? 1 : 0.6));
+          c.quadraticCurveTo(-r.dir * s * 0.15, -s * 0.2, r.dir * s * 0.3, s * 0.05);
+          c.closePath(); c.fill();
+        }
+        // occasional fire breath
+        if (Math.sin(t * 0.35 + r.ph * 3.7) > 0.93) {
+          const fg = c.createLinearGradient(r.dir * s * 1.15, 0, r.dir * s * 2.6, s * 0.7);
+          fg.addColorStop(0, 'rgba(255,190,60,0.9)');
+          fg.addColorStop(0.5, 'rgba(255,110,20,0.55)');
+          fg.addColorStop(1, 'rgba(255,60,10,0)');
+          c.fillStyle = fg;
+          c.beginPath();
+          c.moveTo(r.dir * s * 1.15, -s * 0.1);
+          c.lineTo(r.dir * s * 2.7, s * 0.35);
+          c.lineTo(r.dir * s * 2.2, s * 0.85);
+          c.lineTo(r.dir * s * 1.1, s * 0.1);
+          c.closePath(); c.fill();
+        }
+      }
+      c.restore();
+    }
+  }
+}
 
 /* ============================================================
    SENSORS — one orientation matrix drives BOTH the view through
@@ -977,16 +1504,25 @@ function requestMotion() {
   }
 }
 
-/* desktop / no-sensor fallback: drag turns and tilts a virtual phone */
+/* pressed finger: wipes the glass (always on sensor devices, or with the
+   wipe tool on) — otherwise drags a virtual phone to look around */
 let dragging = false, lastPX = 0, lastPY = 0;
+function wipeActive() { return wipeMode || haveSensor; }
 canvas.addEventListener('pointerdown', e => {
-  if (haveSensor) return;
   dragging = true; lastPX = e.clientX; lastPY = e.clientY;
+  if (wipeActive()) wipeAt(e.clientX, e.clientY);
 });
 canvas.addEventListener('pointermove', e => {
-  if (!dragging || haveSensor) return;
-  oAlpha += (e.clientX - lastPX) * 0.22;
-  oBeta = Math.max(2, Math.min(176, oBeta - (e.clientY - lastPY) * 0.22));
+  if (!dragging) return;
+  if (wipeActive()) {
+    // stamp along the stroke so fast swipes leave a continuous clean track
+    const dx = e.clientX - lastPX, dy = e.clientY - lastPY;
+    const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 14));
+    for (let i = 1; i <= steps; i++) wipeAt(lastPX + dx * i / steps, lastPY + dy * i / steps);
+  } else if (!haveSensor) {
+    oAlpha += (e.clientX - lastPX) * 0.22;
+    oBeta = Math.max(2, Math.min(176, oBeta - (e.clientY - lastPY) * 0.22));
+  }
   lastPX = e.clientX; lastPY = e.clientY;
 });
 window.addEventListener('pointerup', () => { dragging = false; });
@@ -1069,10 +1605,44 @@ const info = document.getElementById('info');
 document.getElementById('info-btn').addEventListener('click', () => info.classList.add('open'));
 document.getElementById('info-close').addEventListener('click', () => info.classList.remove('open'));
 
+/* selectors */
+function fillSel(id, list, cur) {
+  const el = document.getElementById(id);
+  for (const k of Object.keys(list)) {
+    const o = document.createElement('option');
+    o.value = k; o.textContent = list[k].toUpperCase();
+    el.appendChild(o);
+  }
+  el.value = cur;
+  return el;
+}
+const selScene = fillSel('sel-scene', SCENE_LIST, scene);
+const selTime = fillSel('sel-time', TIME_LIST, timeOfDay);
+const selWeather = fillSel('sel-weather', WEATHER_LIST, weather);
+const selBeings = fillSel('sel-beings', BEINGS_LIST, beings);
+function saveOpt(k, v) { try { localStorage.setItem('arv-' + k, v); } catch (e) {} }
+selScene.addEventListener('change', () => { scene = selScene.value; saveOpt('scene', scene); rebuildWorld(); });
+selTime.addEventListener('change', () => { timeOfDay = selTime.value; saveOpt('time', timeOfDay); rebuildWorld(); });
+selWeather.addEventListener('change', () => {
+  weather = selWeather.value; saveOpt('weather', weather);
+  grimeCtx.clearRect(0, 0, simW, simH);
+  splashes.length = 0;
+});
+selBeings.addEventListener('change', () => { beings = selBeings.value; saveOpt('beings', beings); initRoamers(); });
+
+/* wipe tool (desktop needs the toggle; on sensor devices any touch wipes) */
+const wipeBtn = document.getElementById('wipe-btn');
+wipeBtn.addEventListener('click', () => {
+  wipeMode = !wipeMode;
+  wipeBtn.classList.toggle('active', wipeMode);
+  showHint(wipeMode ? 'WIPE MODE — RUB THE GLASS CLEAN'
+         : haveSensor ? 'ANY TOUCH STILL WIPES (VIEW IS SENSOR-DRIVEN)' : 'DRAG LOOKS AROUND AGAIN');
+});
+
 /* ============================================================
    MAIN LOOP
    ============================================================ */
-let lastT = 0, wetFrame = 0;
+let lastT = 0, wetFrame = 0, roamFrame = 0;
 function frame(tms) {
   requestAnimationFrame(frame);
   const t = tms / 1000;
@@ -1081,7 +1651,15 @@ function frame(tms) {
 
   smoothOrient(dt);
   simStep(dt, t);
+  grimeStep(dt);
   paintHeightField();
+  if (beings !== 'none' || roamFrame === 0) {
+    if ((roamFrame++ & 1) === 0) {
+      drawRoamers(t, dt * 2);
+      gl.activeTexture(gl.TEXTURE5); upload(texRoam, roamC);
+    }
+  }
+  if ((wetFrame & 3) === 1) { gl.activeTexture(gl.TEXTURE6); upload(texGrime, grimeC); }
 
   gl.activeTexture(gl.TEXTURE0); upload(texH, dropC);
   // wet map changes slowly — upload every other frame
@@ -1091,10 +1669,16 @@ function frame(tms) {
   gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texPanoS);
   gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, texPanoB);
   gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, texPanoF);
+  gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, texRoam);
+  gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, texGrime);
 
   gl.uniform2f(U.uRes, canvas.width, canvas.height);
   gl.uniform2f(U.uHRes, simW, simH);
   gl.uniform1f(U.uTime, t);
+  gl.uniform1f(U.uDayMix, timeOfDay === 'day' ? 1 : timeOfDay === 'dusk' ? 0.22 : 0);
+  gl.uniform1f(U.uStarGain, timeOfDay === 'night' ? 1 : timeOfDay === 'dusk' ? 0.3 : 0);
+  gl.uniform1f(U.uWeather, WEATHER_ID[weather]);
+  gl.uniform1f(U.uFireAz, (FIRE_AZ[scene] || 90) * Math.PI / 180);
   /* window field of view: ~66° vertical */
   const tanY = Math.tan(0.58);
   gl.uniform2f(U.uTanF, tanY * W / H, tanY);
@@ -1103,25 +1687,23 @@ function frame(tms) {
     Rsm[0], Rsm[3], Rsm[6], Rsm[1], Rsm[4], Rsm[7], Rsm[2], Rsm[5], Rsm[8]]));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-  // rain bed follows mode: face-up = drummier
-  if (AC && audioOn && rainGain)
-    rainGain.gain.setTargetAtTime(0.09 + modeFlat * 0.07, AC.currentTime, 0.4);
+  // ambience follows the weather
+  if (AC && audioOn && rainGain) {
+    const bed = weather === 'rain' ? 0.09 + modeFlat * 0.07
+              : weather === 'dust' ? 0.1 : weather === 'embers' ? 0.05
+              : weather === 'fog' || weather === 'snow' ? 0.03 : 0.015;
+    rainGain.gain.setTargetAtTime(bed, AC.currentTime, 0.4);
+    if (weather === 'embers' && Math.random() < dt * 2.2) audioPatter(0.3);   // crackle
+  }
 }
 
-/* build the panorama once — it is the world, not the viewport */
+/* build the world (panorama variants are repainted on scene/time change) */
 bgSharpC.width = PANO_W; bgSharpC.height = PANO_H;
-rngSeed = 20260815;
-paintPano(bgSharpC.getContext('2d'), PANO_W, PANO_H);
-blurInto(bgBlurC, bgSharpC, 2);
-blurInto(bgFogC, bgSharpC, 4);
-upload(texPanoS, bgSharpC);
-upload(texPanoB, bgBlurC);
-upload(texPanoF, bgFogC);
-gl.uniform1i(U.uPanoS, 2); gl.uniform1i(U.uPanoB, 3); gl.uniform1i(U.uPanoF, 4);
-for (const t of [texPanoS, texPanoB, texPanoF]) {
-  gl.bindTexture(gl.TEXTURE_2D, t);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-}
+rebuildWorld();
+gl.bindTexture(gl.TEXTURE_2D, texRoam);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+upload(texRoam, roamC);
+initRoamers();
 
 resize();
 requestAnimationFrame(frame);
