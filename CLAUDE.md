@@ -19,6 +19,13 @@ It is fine to push directly to the `main` branch for this repository. No pull re
   `data/manifest.js`; **never edit `index.html` to add content.** Spoilers go in each
   entry's `spoiler` field so `role`/`detail` stay safe to read mid-book. Full field
   contract in `character-lists/README.md`
+- `experiments/` — **not games.** Interactive dioramas probing web rendering/sensor tech
+  (WebGL2, DeviceOrientation, instancing…), one self-contained single-file page per
+  experiment in its own subdirectory, listed on `experiments/index.html` (add a card there
+  for every new experiment). Each diorama has an ⓘ info button whose overlay documents how
+  the scene works — rendering passes, simulation model, approximations and limitations —
+  keep that panel accurate when changing a scene. Realism is the design goal; the neon
+  games aesthetic does not apply inside dioramas (the hub page keeps site styling).
 - `town-game-isometric/` — standalone isometric town-game project
 - `FFL1/` — **generated/published, do NOT edit by hand.** This directory is overwritten
   by `publish.sh` in the separate [`ZackHelms/FFL1`](https://github.com/ZackHelms/FFL1)
