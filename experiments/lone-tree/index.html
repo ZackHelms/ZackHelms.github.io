@@ -55,7 +55,7 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#556;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 05:51 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#556;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 12:24 UTC</div>
 
 <canvas id="view"></canvas>
 
@@ -86,19 +86,35 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
       <li>Each vertex carries wind metadata: a <em>flex</em> weight (how far out on the tree it is &mdash;
       trunk barely moves, twigs move a lot), a per-branch <em>phase</em> so branches don't sway in
       lockstep, and its normalized height for whole-tree lean.</li>
-      <li>Leaves attach where twigs end (plus along outer branches): ~3,000 of them, each a small
-      textured quad with a random size, orientation, colour tint and gloss. They render as
-      <em>one instanced draw call</em>; the leaf shape is an alpha-tested canvas texture (pointed oval
-      with a centre vein), so no per-frame sorting is needed.</li>
+      <li>Every leaf is <em>anchored by its stem to a point on a branch</em>: leaves are laid out along
+      the outer branches in a golden-angle (phyllotaxis) spiral plus a small fan at each twig
+      tip &mdash; several thousand in all, each with a random length, outward direction, tint, gloss
+      and curl. They render as <em>one instanced draw call</em> of a six-vertex strip, so each blade
+      can fold along its midrib and curl at the tip instead of being a flat card.</li>
+      <li><em>Nothing floats:</em> a leaf's geometry grows from its anchor point outward, its flutter is
+      a small rotation hinged at that anchor, and the anchor rides the same wind displacement
+      as the twig it sits on &mdash; so the canopy moves as attached foliage, not a particle cloud.</li>
     </ul>
 
-    <h3>WIND, PER VERTEX</h3>
+    <h3>SURFACE DETAIL: NORMAL MAPS FROM HEIGHT FIELDS</h3>
+    <p>Both materials follow the zmh-3d scenery pipeline's "texture recipe" idea &mdash; procedural
+    height fields turned into albedo + normal-map pairs at load (Sobel gradient &rarr; tangent-space
+    normals). The <em>bark</em> recipe builds wandering vertical ridges, crack bands and lenticel
+    speckle, seamless around the circumference; every branch tube carries UVs (girth-scaled so
+    ridge density stays even from trunk to twig) and a ring tangent, and the fragment shader
+    lights the mapped normal, so ridges catch the sun on one side and shade on the other. The
+    <em>leaf</em> recipe encodes a domed blade cross-section, a midrib groove and side-vein ripples;
+    combined with the geometric fold and curl, a "flat" quad shades like a curved living leaf,
+    and glints sweep across it per-pixel rather than flashing the whole card.</p>
+
+    <h3>WIND, PER VERTEX (DELIBERATELY SUBTLE)</h3>
     <p>Nothing about the sway is animated on the CPU &mdash; the meshes never change. A vertex shader
-    displaces everything per frame: a slow whole-tree lean (weighted by height&sup2;), a per-branch
-    sway (<code>sin(t&middot;f + phase) &times; flex</code>), and for leaves an extra high-frequency flutter that
-    rotates each leaf about its own axis. A JavaScript gust model (slow sine + a smoothed random
-    walk) feeds the shaders one wind-strength number; gusts visibly ripple the canopy because
-    flutter amplitude and lean both scale with it.</p>
+    displaces everything per frame: a very slow whole-tree lean (weighted by height&sup2;), a small
+    per-branch sway (<code>sin(t&middot;f + phase) &times; flex</code>), and for leaves a gentle rock about their own
+    stem, hinged at the anchor. A JavaScript gust model (slow sine + a smoothed random walk)
+    feeds the shaders one wind-strength number. The amplitudes are tuned low on purpose: the
+    scene should read as a calm day where the appearance carries the realism and the breeze is
+    just alive enough to notice.</p>
 
     <h3>LIGHT: SUN, CLOUDS, GLINTS</h3>
     <ul>
@@ -125,8 +141,11 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
       or the branches, and there's no dappled light on the ground.</li>
       <li>The wind is kinematic &mdash; sines and noise, not fluid dynamics or spring physics, so
       branches never load up and release the way heavy limbs do in strong gusts.</li>
-      <li>Leaves are flat quads with alpha-tested edges: crisp, but hard-edged against the sky
-      (no soft translucent silhouettes), and they pop rather than bend.</li>
+      <li>Leaves are six-vertex strips: they fold and curl, but still bend only at the stem when
+      they flutter &mdash; no mid-blade flexing &mdash; and their alpha-tested edges are hard against the
+      sky (no soft translucent silhouettes).</li>
+      <li>The normal maps change shading only &mdash; leaf and bark silhouettes stay polygonal, and
+      bark UV repeats can mismatch by one ridge where tube segments of different girth meet.</li>
       <li>Clouds are a flat 2D field on one altitude plane &mdash; no volume, no cloud bottoms
       catching light differently at the horizon.</li>
       <li>Branch normals aren't re-bent by the sway displacement, so bark lighting is slightly
@@ -240,56 +259,144 @@ const noiseTex = gl.createTexture();
 }
 
 /* ============================================================
-   LEAF SPRITE
+   LEAF + BARK TEXTURES — albedo plus normal maps derived from
+   procedural height fields (Sobel), the zmh-3d "texture recipe" way
    ============================================================ */
-function makeLeafCanvas(s) {
+function heightToNormalCanvas(hf, w, h, strength, wrapX) {
   const c = document.createElement('canvas');
-  c.width = c.height = s;
+  c.width = w; c.height = h;
   const ctx = c.getContext('2d');
-  ctx.clearRect(0, 0, s, s);
-  ctx.translate(s / 2, s / 2);
-  // pointed oval leaf along +y
-  ctx.beginPath();
-  ctx.moveTo(0, -s * 0.46);
-  ctx.bezierCurveTo(s * 0.3, -s * 0.28, s * 0.34, s * 0.12, 0, s * 0.46);
-  ctx.bezierCurveTo(-s * 0.34, s * 0.12, -s * 0.3, -s * 0.28, 0, -s * 0.46);
-  ctx.closePath();
-  const g = ctx.createLinearGradient(-s * 0.3, 0, s * 0.3, 0);
-  g.addColorStop(0, '#9fb857');
-  g.addColorStop(0.5, '#c8d96f');
-  g.addColorStop(1, '#8aa84b');
-  ctx.fillStyle = g; ctx.fill();
-  // centre vein + side veins
-  ctx.strokeStyle = 'rgba(90,120,40,0.8)';
-  ctx.lineWidth = s * 0.025;
-  ctx.beginPath(); ctx.moveTo(0, -s * 0.44); ctx.lineTo(0, s * 0.44); ctx.stroke();
-  ctx.lineWidth = s * 0.014;
-  for (let i = -3; i <= 3; i++) {
-    if (!i) continue;
-    const yy = i * s * 0.1;
-    ctx.beginPath(); ctx.moveTo(0, yy);
-    ctx.lineTo(Math.sign(i) === 1 ? s * 0.2 : -s * 0.2, yy + s * 0.12);
-    ctx.stroke();
+  const img = ctx.createImageData(w, h);
+  const d = img.data;
+  const at = (x, y) => {
+    x = wrapX ? ((x % w) + w) % w : Math.max(0, Math.min(w - 1, x));
+    y = Math.max(0, Math.min(h - 1, y));
+    return hf[y * w + x];
+  };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = (at(x + 1, y) - at(x - 1, y)) * strength;
+    const dy = (at(x, y + 1) - at(x, y - 1)) * strength;
+    const il = 1 / Math.hypot(dx, dy, 1);
+    const i = (y * w + x) * 4;
+    d[i]     = (-dx * il * 0.5 + 0.5) * 255;
+    d[i + 1] = (-dy * il * 0.5 + 0.5) * 255;
+    d[i + 2] = (il * 0.5 + 0.5) * 255;
+    d[i + 3] = 255;
   }
+  ctx.putImageData(img, 0, 0);
   return c;
 }
-const leafTex = gl.createTexture();
-gl.bindTexture(gl.TEXTURE_2D, leafTex);
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, makeLeafCanvas(128));
-gl.generateMipmap(gl.TEXTURE_2D);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+/* leaf blade: pointed oval, centre-vein groove, domed cross-section */
+const LEAF_TS = 128;
+function leafWidthAt(t) { return Math.sin(Math.min(1, Math.max(0.001, t)) * Math.PI) ** 0.72; }
+function makeLeafCanvas(sz) {
+  const c = document.createElement('canvas');
+  c.width = c.height = sz;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(sz, sz);
+  const d = img.data;
+  for (let y = 0; y < sz; y++) for (let x = 0; x < sz; x++) {
+    const t = 1 - y / (sz - 1);                    // t: 0 stem … 1 tip (v=0 bottom row? uv v=t, row y = (1-t))
+    const xs = (x / (sz - 1)) * 2 - 1;             // -1..1 across
+    const wAt = leafWidthAt(t) * 0.92;
+    const inBlade = Math.abs(xs) < wAt;
+    const i = (y * sz + x) * 4;
+    if (!inBlade) { d[i + 3] = 0; continue; }
+    const xn = xs / wAt;                           // -1..1 within blade
+    // colour: darker rim, lighter centre, subtle side-vein banding
+    const vein = Math.exp(-((xn / 0.08) ** 2));
+    const bands = 0.5 + 0.5 * Math.sin((Math.abs(xn) * 3.2 + t * 9) * Math.PI);
+    let r = 118 + 46 * (1 - Math.abs(xn)) - 18 * bands * Math.abs(xn);
+    let g = 158 + 44 * (1 - Math.abs(xn) * 0.6) - 14 * bands * Math.abs(xn);
+    let b = 62 + 22 * (1 - Math.abs(xn));
+    r += vein * 26; g += vein * 22; b += vein * 8;   // pale midrib
+    d[i] = r; d[i + 1] = g; d[i + 2] = b;
+    // crisp edge, soft antialias ramp
+    d[i + 3] = Math.max(0, Math.min(255, (wAt - Math.abs(xs)) * sz * 3));
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+function leafHeightField(sz) {
+  const hf = new Float32Array(sz * sz);
+  for (let y = 0; y < sz; y++) for (let x = 0; x < sz; x++) {
+    const t = 1 - y / (sz - 1);
+    const xs = (x / (sz - 1)) * 2 - 1;
+    const wAt = Math.max(0.02, leafWidthAt(t) * 0.92);
+    const xn = Math.max(-1, Math.min(1, xs / wAt));
+    let h = Math.pow(Math.max(0, 1 - xn * xn), 0.8) * 0.55;        // domed blade
+    h -= Math.exp(-((xn / 0.09) ** 2)) * 0.35;                        // midrib groove
+    h -= (0.5 + 0.5 * Math.sin((Math.abs(xn) * 3.2 + t * 9) * Math.PI)) * 0.06 * Math.abs(xn); // side veins
+    hf[y * sz + x] = h;
+  }
+  return hf;
+}
+
+/* bark: wavy vertical ridges + cracks + lenticels, seamless around x */
+function fbmB(x, y) {
+  return noiseAt(x * 0.13, y * 0.13) * 0.55
+       + noiseAt(x * 0.31 + 0.41, y * 0.31 + 0.73) * 0.3
+       + noiseAt(x * 0.73 + 0.17, y * 0.73 + 0.29) * 0.15;
+}
+const BARK_W = 256, BARK_H = 512;
+function barkFields(w, h) {
+  const hf = new Float32Array(w * h);
+  const alb = document.createElement('canvas');
+  alb.width = w; alb.height = h;
+  const ctx = alb.getContext('2d');
+  const img = ctx.createImageData(w, h);
+  const d = img.data;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const th = x / w * Math.PI * 2;
+    const cs = Math.cos(th), sn = Math.sin(th);
+    // periodic-in-x noise: sample 2D noise on a circle, drift with y
+    const wob = fbmB(cs * 1.6 + 7 + y / h * 0.9, sn * 1.6 + 13 + y / h * 5.5);
+    const wob2 = fbmB(cs * 4 + 21, sn * 4 + 3 + y / h * 11);
+    // vertical ridges, wandering with height
+    let hgt = 0.5 + 0.5 * Math.sin(th * 9 + (wob - 0.5) * 9 + y / h * 2.0);
+    hgt = Math.pow(hgt, 1.3);
+    // horizontal crack bands cut across ridges occasionally
+    const crack = Math.pow(Math.max(0, (wob2 - 0.62) / 0.38), 1.4);
+    hgt = hgt * (1 - crack * 0.85) + (wob - 0.5) * 0.25;
+    hf[y * w + x] = hgt;
+    const spk = fbmB(cs * 9 + 40, sn * 9 + y / h * 60) - 0.5;
+    let r = 78 + hgt * 66 + spk * 26;
+    let g = 62 + hgt * 52 + spk * 20;
+    let b = 48 + hgt * 38 + spk * 14;
+    if (crack > 0.25) { r *= 0.55; g *= 0.52; b *= 0.5; }           // dark crack floor
+    const i = (y * w + x) * 4;
+    d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return { alb, hf };
+}
+
+function texFrom(cnv, wrapX, mips) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cnv);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapX ? gl.REPEAT : gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapX ? gl.REPEAT : gl.CLAMP_TO_EDGE);
+  if (mips) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); }
+  else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  return t;
+}
+const leafTex  = texFrom(makeLeafCanvas(LEAF_TS), false, true);
+const leafNTex = texFrom(heightToNormalCanvas(leafHeightField(LEAF_TS), LEAF_TS, LEAF_TS, 6.0, false), false, true);
+const barkData = barkFields(BARK_W, BARK_H);
+const barkTex  = texFrom(barkData.alb, true, true);
+const barkNTex = texFrom(heightToNormalCanvas(barkData.hf, BARK_W, BARK_H, 3.0, true), true, true);
 
 /* ============================================================
    TREE SKELETON → branch mesh + leaf instances
    ============================================================ */
 const TREE_H = 4.6;
-const bPos = [], bNrm = [], bWind = [], bIdx = [];   // wind: flex, phase, heightNorm
+const bPos = [], bNrm = [], bWind = [], bUV = [], bTan = [], bIdx = [];
 const leaves = [];                                   // per-instance records
 
-function addTube(p0, p1, r0, r1, sides, flex0, flex1, phase) {
+function addTube(p0, p1, r0, r1, sides, flex0, flex1, phase, v0, v1) {
   const dx = p1[0]-p0[0], dy = p1[1]-p0[1], dz = p1[2]-p0[2];
   const len = Math.hypot(dx, dy, dz) || 1;
   const ax = dx/len, ay = dy/len, az = dz/len;
@@ -298,9 +405,11 @@ function addTube(p0, p1, r0, r1, sides, flex0, flex1, phase) {
   const ul = Math.hypot(ux, uy, uz);
   if (ul < 0.01) { ux = 1; uy = 0; uz = 0; } else { ux/=ul; uz/=ul; }
   const vx = ay*uz - az*uy, vy = az*ux - ax*uz, vz = ax*uy - ay*ux;
+  // bark texture repeats around the ring, scaled to girth so density is even
+  const uRep = Math.max(1, Math.round(r0 * 22));
   const base = bPos.length / 3;
   for (let e = 0; e < 2; e++) {
-    const P = e ? p1 : p0, R = e ? r1 : r0, F = e ? flex1 : flex0;
+    const P = e ? p1 : p0, R = e ? r1 : r0, F = e ? flex1 : flex0, V = e ? v1 : v0;
     for (let s = 0; s <= sides; s++) {
       const a = s / sides * Math.PI * 2;
       const cx = Math.cos(a), sx = Math.sin(a);
@@ -308,6 +417,9 @@ function addTube(p0, p1, r0, r1, sides, flex0, flex1, phase) {
       bPos.push(P[0] + nx*R, P[1] + ny*R, P[2] + nz*R);
       bNrm.push(nx, ny, nz);
       bWind.push(F, phase, P[1] / TREE_H);
+      bUV.push(s / sides * uRep, V);
+      // tangent: derivative around the ring (u direction of the bark texture)
+      bTan.push(-ux*sx + vx*cx, -uy*sx + vy*cx, -uz*sx + vz*cx);
     }
   }
   const w = sides + 1;
@@ -317,35 +429,74 @@ function addTube(p0, p1, r0, r1, sides, flex0, flex1, phase) {
   }
 }
 
+/* one leaf, anchored by its stem to a point ON a branch */
+function addLeaf(anchor, dir, flex, phase) {
+  const len = rr(0.17, 0.26);
+  const halfW = len * rr(0.28, 0.36);
+  const dl = Math.hypot(...dir) || 1;
+  const axis = dir.map(v => v / dl * len);
+  // width direction: perpendicular to the leaf axis, mostly horizontal
+  let up = [rr(-0.4, 0.4), 1, rr(-0.4, 0.4)];
+  let sd = [axis[1]*up[2] - axis[2]*up[1], axis[2]*up[0] - axis[0]*up[2], axis[0]*up[1] - axis[1]*up[0]];
+  const sl = Math.hypot(...sd) || 1;
+  sd = sd.map(v => v / sl * halfW);
+  const tint = rnd() * 0.999;
+  const gloss = (rnd() * 255) | 0;
+  const curlBit = rnd() < 0.5 ? 0 : 1;
+  leaves.push({
+    c: [anchor[0], anchor[1], anchor[2]], a: axis, b: sd,
+    phase: phase + rr(-1.5, 1.5), flex,
+    packed: tint + gloss + curlBit * 256,
+  });
+}
+
+let leafIdx = 0;
 function growBranch(pos, dir, len, rad, depth, phase, flex) {
   const MAXD = 4;
   const segs = 3;
   let p = pos.slice(), d = dir.slice();
   const sides = Math.max(3, 8 - depth * 2);
   const wander = depth === 0 ? 0.05 : 0.16;
+  let vAcc = rnd() * 3;                        // bark v-coordinate along this branch
   for (let s = 0; s < segs; s++) {
     const t0 = s / segs, t1 = (s + 1) / segs;
     // wander the direction a little, and droop/lift
     d[0] += rr(-wander, wander); d[2] += rr(-wander, wander);
     d[1] += depth < 2 ? 0.10 : rr(-0.06, 0.1);
     const dl = Math.hypot(...d); d = d.map(v => v / dl);
-    const q = [p[0] + d[0]*len/segs, p[1] + d[1]*len/segs, p[2] + d[2]*len/segs];
+    const segLen = len / segs;
+    const q = [p[0] + d[0]*segLen, p[1] + d[1]*segLen, p[2] + d[2]*segLen];
     const f0 = flex + (t0 * 0.5) * flexGain(depth), f1 = flex + (t1 * 0.5) * flexGain(depth);
-    addTube(p, q, rad * (1 - t0 * 0.35), rad * (1 - t1 * 0.35), sides, f0, f1, phase);
-    p = q;
+    const v1 = vAcc + segLen * 2.4;
+    addTube(p, q, rad * (1 - t0 * 0.35), rad * (1 - t1 * 0.35), sides, f0, f1, phase, vAcc, v1);
+    vAcc = v1;
     // a low limb partway up the trunk so the canopy doesn't start at one height
     if (depth === 0 && s === 1) {
       const rot2 = rr(0, Math.PI * 2);
-      growBranch(p, [Math.cos(rot2) * 0.85, 0.5, Math.sin(rot2) * 0.85], len * 0.62, rad * 0.5,
+      growBranch(q, [Math.cos(rot2) * 0.85, 0.5, Math.sin(rot2) * 0.85], len * 0.62, rad * 0.5,
                  1, rr(0, Math.PI * 2), f1);
     }
-    // leaves along the outer reaches (and a few filling the mid-canopy)
+    // leaves: stem-anchored along the outer branches, phyllotaxis-style —
+    // each sits ON the twig and grows outward, no floating clusters
     if (depth >= 3) {
-      const n = depth === 3 ? 3 : 4;
-      for (let i = 0; i < n; i++) addLeafCluster(p, f1 * 1.15, phase, depth === 3 ? 0.16 : 0.24, depth === 3 ? 2 : 4);
-    } else if (depth === 2 && s === 2) {
-      for (let i = 0; i < 2; i++) addLeafCluster(p, f1 * 1.1, phase, 0.22, 3);
+      // ring basis perpendicular to the segment
+      let ux = -d[2], uy = 0, uz = d[0];
+      const ul = Math.hypot(ux, uy, uz);
+      if (ul < 0.01) { ux = 1; uz = 0; } else { ux /= ul; uz /= ul; }
+      const vx = d[1]*uz - d[2]*uy, vy = d[2]*ux - d[0]*uz, vz = d[0]*uy - d[1]*ux;
+      const nL = Math.max(2, Math.round(segLen / 0.03));
+      for (let i = 0; i < nL; i++) {
+        const tL = (i + 0.5) / nL;
+        const ax2 = p[0] + (q[0]-p[0]) * tL, ay2 = p[1] + (q[1]-p[1]) * tL, az2 = p[2] + (q[2]-p[2]) * tL;
+        const ang = leafIdx++ * 2.39996 + rr(-0.3, 0.3);      // golden-angle spiral
+        const ca = Math.cos(ang), sa = Math.sin(ang);
+        const rx = ux*ca + vx*sa, ry = uy*ca + vy*sa, rz = uz*ca + vz*sa;
+        // outward + a touch along the twig + sun-seeking lift
+        const dirL = [rx + d[0]*0.4, ry + d[1]*0.4 + 0.2, rz + d[2]*0.4];
+        addLeaf([ax2, ay2, az2], dirL, (f0 + (f1-f0)*tL) * 1.1, phase);
+      }
     }
+    p = q;
   }
   const endFlex = flex + 0.5 * flexGain(depth);
   if (depth < MAXD) {
@@ -368,33 +519,15 @@ function growBranch(pos, dir, len, rad, depth, phase, flex) {
                  depth < 2 ? rr(0, Math.PI * 2) : phase + rr(-0.8, 0.8), endFlex);
     }
   } else {
-    for (let i = 0; i < 7; i++) addLeafCluster(p, endFlex * 1.2, phase, 0.3, 1);
+    // a small fan of leaves off the twig tip
+    for (let i = 0; i < 6; i++) {
+      const ang = rr(0, Math.PI * 2), spread = rr(0.3, 0.9);
+      const dirL = [d[0] + Math.cos(ang) * spread, d[1] + 0.3 + rr(-0.15, 0.25), d[2] + Math.sin(ang) * spread];
+      addLeaf(p, dirL, endFlex * 1.15, phase);
+    }
   }
 }
 function flexGain(depth) { return [0.02, 0.1, 0.28, 0.55, 0.85][Math.min(depth, 4)]; }
-
-function addLeafCluster(center, flex, phase, radius, count) {
-  for (let i = 0; i < count; i++) {
-    const cx = center[0] + rr(-radius, radius);
-    const cy = center[1] + rr(-radius * 0.7, radius * 0.9);
-    const cz = center[2] + rr(-radius, radius);
-    const size = rr(0.10, 0.17);
-    // random leaf plane basis
-    let a = [rr(-1,1), rr(-0.5,0.7), rr(-1,1)];
-    const al = Math.hypot(...a) || 1; a = a.map(v => v/al*size);
-    let b0 = [rr(-1,1), rr(-0.3,1), rr(-1,1)];
-    // make b orthogonal to a
-    const dot = (a[0]*b0[0]+a[1]*b0[1]+a[2]*b0[2]) / (size*size);
-    b0 = [b0[0]-a[0]*dot, b0[1]-a[1]*dot, b0[2]-a[2]*dot];
-    const bl = Math.hypot(...b0) || 1;
-    const b = b0.map(v => v/bl*size*1.35);
-    leaves.push({
-      c: [cx, cy, cz], a, b,
-      phase: phase + rr(-1.5, 1.5), flex,
-      tint: rnd(), gloss: rnd(),
-    });
-  }
-}
 
 growBranch([0, 0, 0], [0.02, 1, -0.02], 2.5, 0.17, 0, 0, 0);
 
@@ -408,7 +541,7 @@ function attach(loc, arr, size) {
   gl.enableVertexAttribArray(loc);
   gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
 }
-attach(0, bPos, 3); attach(1, bNrm, 3); attach(2, bWind, 3);
+attach(0, bPos, 3); attach(1, bNrm, 3); attach(2, bWind, 3); attach(3, bUV, 2); attach(4, bTan, 3);
 const bIB = gl.createBuffer();
 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bIB);
 gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(bIdx), gl.STATIC_DRAW);
@@ -419,9 +552,10 @@ const branchCount = bIdx.length;
 const leafVAO = gl.createVertexArray();
 gl.bindVertexArray(leafVAO);
 {
+  // 6-vertex strip: 2 columns so the blade can fold along its midrib
   const quad = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, quad);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,0, -1,1, 0,0, 0,1, 1,0, 1,1]), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);
   gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   const n = leaves.length;
@@ -430,7 +564,7 @@ gl.bindVertexArray(leafVAO);
     const L = leaves[i], o = i * 12;
     inst[o] = L.c[0]; inst[o+1] = L.c[1]; inst[o+2] = L.c[2]; inst[o+3] = L.phase;
     inst[o+4] = L.a[0]; inst[o+5] = L.a[1]; inst[o+6] = L.a[2]; inst[o+7] = L.flex;
-    inst[o+8] = L.b[0]; inst[o+9] = L.b[1]; inst[o+10] = L.b[2]; inst[o+11] = L.tint + L.gloss * 256;
+    inst[o+8] = L.b[0]; inst[o+9] = L.b[1]; inst[o+10] = L.b[2]; inst[o+11] = L.packed;
   }
   const ib = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, ib);
@@ -493,11 +627,11 @@ gl.bindVertexArray(null);
    ============================================================ */
 const WIND_GLSL = `
 vec3 windDisp(vec3 p, float flex, float phase, float hn, float t, float wind, vec2 wdir){
-  float lean = hn * hn * (0.12 + wind * 0.3) * (0.7 + 0.3 * sin(t * 0.53 + 1.0));
-  float sway = flex * (0.35 + wind) * 0.22 * sin(t * (1.1 + fract(phase) * 0.7) + phase);
-  float bob  = flex * (0.25 + wind) * 0.1  * sin(t * 1.9 + phase * 1.7);
+  float lean = hn * hn * (0.03 + wind * 0.06) * (0.7 + 0.3 * sin(t * 0.43 + 1.0));
+  float sway = flex * (0.35 + wind) * 0.065 * sin(t * (0.9 + fract(phase) * 0.5) + phase);
+  float bob  = flex * (0.25 + wind) * 0.03  * sin(t * 1.6 + phase * 1.7);
   vec3 d = vec3(wdir.x, 0.0, wdir.y) * (lean + sway);
-  d.y -= abs(sway) * 0.35;
+  d.y -= abs(sway) * 0.3;
   d += vec3(-wdir.y, 0.0, wdir.x) * bob;
   return d;
 }`;
@@ -597,87 +731,120 @@ const BRANCH_VS = `#version 300 es
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec3 aNrm;
 layout(location=2) in vec3 aWind;   // flex, phase, heightNorm
+layout(location=3) in vec2 aUV;
+layout(location=4) in vec3 aTan;    // around-the-ring bark tangent
 uniform mat4 uView, uProj;
 uniform float uTime, uWind;
 uniform vec2 uWindDir;
-out vec3 vNrm; out vec3 vPos; out float vShade;
+out vec3 vNrm; out vec3 vPos; out float vShade; out vec2 vUV; out vec3 vTan;
 ${WIND_GLSL}
 void main(){
   vec3 p = aPos + windDisp(aPos, aWind.x, aWind.y, aWind.z, uTime, uWind, uWindDir);
   vPos = p; vNrm = aNrm;
   vShade = aWind.z;
+  vUV = aUV; vTan = aTan;
   gl_Position = uProj * uView * vec4(p, 1.0);
 }`;
 
 const BRANCH_FS = `#version 300 es
 precision highp float;
-in vec3 vNrm; in vec3 vPos; in float vShade;
+in vec3 vNrm; in vec3 vPos; in float vShade; in vec2 vUV; in vec3 vTan;
 uniform vec3 uSunDir;
 uniform float uSunVis;
+uniform vec3 uEye;
+uniform sampler2D uBark, uBarkN;
 out vec4 frag;
 void main(){
-  vec3 N = normalize(vNrm);
+  vec3 Ng = normalize(vNrm);
+  vec3 T = normalize(vTan - Ng * dot(Ng, vTan));
+  vec3 B = cross(Ng, T);
+  vec3 nm = texture(uBarkN, vUV).rgb * 2.0 - 1.0;
+  vec3 N = normalize(T * nm.x + B * nm.y + Ng * nm.z);
+  vec3 alb = texture(uBark, vUV).rgb * (0.85 + vShade * 0.35);
   float nl = max(dot(N, uSunDir), 0.0);
-  vec3 bark = mix(vec3(0.23, 0.17, 0.12), vec3(0.35, 0.28, 0.21), vShade * 0.7);
-  vec3 col = bark * (vec3(0.35, 0.4, 0.48) * 0.9 + vec3(1.0, 0.94, 0.82) * nl * 1.05 * uSunVis);
+  vec3 V = normalize(uEye - vPos);
+  vec3 H = normalize(uSunDir + V);
+  float spec = pow(max(dot(N, H), 0.0), 14.0) * 0.08;    // faint damp-bark sheen
+  vec3 col = alb * (vec3(0.35, 0.4, 0.48) * 0.95 + vec3(1.0, 0.94, 0.82) * nl * 1.1 * uSunVis)
+           + spec * uSunVis;
   frag = vec4(col, 1.0);
 }`;
 
 const LEAF_VS = `#version 300 es
-layout(location=0) in vec2 aCorner;
-layout(location=1) in vec4 aC;      // center.xyz, phase
-layout(location=2) in vec4 aA;      // basisA.xyz, flex
-layout(location=3) in vec4 aB;      // basisB.xyz, tint+gloss*256
+layout(location=0) in vec2 aCorner;  // s ∈ {-1,0,1} across, t ∈ {0,1} stem→tip
+layout(location=1) in vec4 aC;       // stem anchor.xyz (ON the twig), phase
+layout(location=2) in vec4 aA;       // stem→tip axis (length baked in), flex
+layout(location=3) in vec4 aB;       // width dir × halfWidth, tint+gloss+curl packed
 uniform mat4 uView, uProj;
 uniform float uTime, uWind;
 uniform vec2 uWindDir;
-uniform vec3 uSunDir;
-uniform vec3 uEye;
-uniform float uSunVis;
 out vec2 vUV;
-out vec3 vLight;
+out vec3 vT; out vec3 vBt; out vec3 vN; out vec3 vWorld;
+out vec2 vTG;                        // tint, gloss
 ${WIND_GLSL}
 void main(){
   float phase = aC.w, flex = aA.w;
-  float tint = fract(aB.w), gloss = floor(aB.w) / 256.0;
-  vec3 center = aC.xyz + windDisp(aC.xyz, flex, phase, aC.y / 4.6, uTime, uWind, uWindDir);
+  float tint = fract(aB.w);
+  float packedI = floor(aB.w);
+  float gloss = mod(packedI, 256.0) / 255.0;
+  float curl = floor(packedI / 256.0) * 2.0 - 1.0;
 
-  /* flutter: rock the leaf plane around its long axis */
-  float fl = sin(uTime * (2.6 + fract(phase * 7.31) * 2.2) + phase * 3.0) * (0.25 + uWind * 0.85) * 0.5;
-  vec3 A = aA.xyz, B = aB.xyz;
-  vec3 N0 = normalize(cross(A, B));
-  vec3 Bf = B * cos(fl) + N0 * length(B) * sin(fl);      // rotate B toward N
-  vec3 N = normalize(cross(A, Bf));
+  /* the anchor rides its twig's wind displacement — the stem stays attached */
+  vec3 anchor = aC.xyz + windDisp(aC.xyz, flex, phase, aC.y / 4.6, uTime, uWind, uWindDir);
 
-  vec3 world = center + A * aCorner.x + Bf * aCorner.y;
-  vUV = aCorner * 0.5 + 0.5;
+  vec3 axis = aA.xyz;
+  vec3 side = aB.xyz;
+  vec3 axn = normalize(axis);
+  vec3 nrm = normalize(cross(side, axis));
 
-  /* per-leaf lighting, computed at the centre */
-  vec3 V = normalize(uEye - center);
-  vec3 Nl = faceforward(N, -V, N);        // orient toward the eye
-  float nl = max(dot(Nl, uSunDir), 0.0);
-  float trans = max(dot(-Nl, uSunDir), 0.0);
-  vec3 H = normalize(uSunDir + V);
-  float glint = pow(max(dot(Nl, H), 0.0), 90.0) * (0.45 + gloss * 2.2);
-  vec3 sunC = vec3(1.0, 0.96, 0.84);
-  vec3 amb = vec3(0.38, 0.47, 0.55);
-  vec3 tintC = mix(vec3(0.85, 1.0, 0.7), vec3(1.1, 1.05, 0.8), tint);
-  vLight = tintC * (amb * (0.55 + 0.45 * Nl.y)
-                    + sunC * nl * 1.15 * uSunVis
-                    + vec3(0.75, 0.9, 0.4) * trans * 0.55 * uSunVis)
-         + sunC * glint * uSunVis;
+  /* subtle flutter: a small rock about the stem axis, hinged at the anchor */
+  float ang = (0.05 + uWind * 0.11) * flex *
+              sin(uTime * (1.8 + fract(phase * 7.31)) + phase * 3.0);
+  float ca = cos(ang), sa = sin(ang);
+  vec3 sideR = side * ca + cross(axn, side) * sa;
+  vec3 nrmR  = nrm * ca + cross(axn, nrm) * sa;
+
+  float ss = aCorner.x, tt = aCorner.y;
+  float lenS = length(axis);
+  /* fold along the midrib + a gentle tip curl — the blade is not flat */
+  float cup = (1.0 - ss * ss) * 0.09 * lenS * sin(3.14159 * tt);
+  float curlAmt = curl * 0.14 * lenS * tt * tt;
+  vec3 world = anchor + axis * tt + sideR * ss + nrmR * (cup + curlAmt);
+
+  vUV = vec2(ss * 0.5 + 0.5, tt);
+  vT = normalize(sideR); vBt = axn; vN = normalize(nrmR);
+  vWorld = world;
+  vTG = vec2(tint, gloss);
   gl_Position = uProj * uView * vec4(world, 1.0);
 }`;
 
 const LEAF_FS = `#version 300 es
 precision highp float;
-in vec2 vUV; in vec3 vLight;
-uniform sampler2D uLeaf;
+in vec2 vUV; in vec3 vT; in vec3 vBt; in vec3 vN; in vec3 vWorld; in vec2 vTG;
+uniform sampler2D uLeaf, uLeafN;
+uniform vec3 uSunDir, uEye;
+uniform float uSunVis;
 out vec4 frag;
 void main(){
-  vec4 t = texture(uLeaf, vUV);
-  if (t.a < 0.5) discard;
-  frag = vec4(t.rgb * vLight, 1.0);
+  vec4 alb = texture(uLeaf, vUV);
+  if (alb.a < 0.5) discard;
+  /* tangent-space normal map: dome, midrib groove, side veins */
+  vec3 nm = texture(uLeafN, vUV).rgb * 2.0 - 1.0;
+  vec3 N = normalize(vT * nm.x + vBt * nm.y + vN * nm.z);
+  vec3 V = normalize(uEye - vWorld);
+  N = faceforward(N, -V, N);
+  float nl = max(dot(N, uSunDir), 0.0);
+  float trans = max(dot(-N, uSunDir), 0.0);
+  vec3 H = normalize(uSunDir + V);
+  float glint = pow(max(dot(N, H), 0.0), 70.0) * (0.35 + vTG.y * 1.9);
+  vec3 sunC = vec3(1.0, 0.96, 0.84);
+  vec3 amb = vec3(0.38, 0.47, 0.55);
+  vec3 tintC = mix(vec3(0.86, 1.0, 0.74), vec3(1.08, 1.02, 0.8), vTG.x);
+  vec3 col = alb.rgb * tintC * (amb * (0.55 + 0.45 * N.y)
+             + sunC * nl * 1.1 * uSunVis
+             + vec3(0.75, 0.9, 0.4) * trans * 0.5 * uSunVis)
+           + sunC * glint * uSunVis;
+  frag = vec4(col, 1.0);
 }`;
 
 const progSky = makeProgram(SKY_VS, SKY_FS);
@@ -686,8 +853,8 @@ const progBranch = makeProgram(BRANCH_VS, BRANCH_FS);
 const progLeaf = makeProgram(LEAF_VS, LEAF_FS);
 const uSky = uniforms(progSky, ['uCamRot','uTanFov','uSunDir','uNoise','uTime','uWindDir','uSunVis']);
 const uGround = uniforms(progGround, ['uView','uProj','uNoise','uSunDir','uSunVis','uEye']);
-const uBranch = uniforms(progBranch, ['uView','uProj','uTime','uWind','uWindDir','uSunDir','uSunVis']);
-const uLeaf = uniforms(progLeaf, ['uView','uProj','uTime','uWind','uWindDir','uSunDir','uEye','uSunVis','uLeaf']);
+const uBranch = uniforms(progBranch, ['uView','uProj','uTime','uWind','uWindDir','uSunDir','uSunVis','uEye','uBark','uBarkN']);
+const uLeaf = uniforms(progLeaf, ['uView','uProj','uTime','uWind','uWindDir','uSunDir','uEye','uSunVis','uLeaf','uLeafN']);
 
 /* ============================================================
    CAMERA + INPUT
@@ -769,8 +936,8 @@ let wind = 0.4, gustTarget = 0.4, nextGustAt = 0;
 const WDIR = [0.85, 0.53];   // xz, normalized-ish
 function updateWind(t, dt) {
   if (t > nextGustAt) {
-    gustTarget = 0.15 + Math.random() * Math.random() * 1.0;
-    nextGustAt = t + 2.5 + Math.random() * 5;
+    gustTarget = 0.08 + Math.random() * Math.random() * 0.55;
+    nextGustAt = t + 3 + Math.random() * 6;
   }
   wind += (gustTarget - wind) * Math.min(1, dt * 0.7);
   return wind * (0.85 + 0.15 * Math.sin(t * 0.9) * Math.sin(t * 0.53 + 1.7));
@@ -851,6 +1018,11 @@ function frame(tms) {
   gl.uniform2fv(uBranch.uWindDir, WDIR);
   gl.uniform3fv(uBranch.uSunDir, SUN);
   gl.uniform1f(uBranch.uSunVis, sunVisSm);
+  gl.uniform3fv(uBranch.uEye, eye);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, barkTex);
+  gl.uniform1i(uBranch.uBark, 2);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, barkNTex);
+  gl.uniform1i(uBranch.uBarkN, 3);
   gl.bindVertexArray(branchVAO);
   gl.drawElements(gl.TRIANGLES, branchCount, gl.UNSIGNED_INT, 0);
 
@@ -866,8 +1038,10 @@ function frame(tms) {
   gl.uniform1f(uLeaf.uSunVis, sunVisSm);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, leafTex);
   gl.uniform1i(uLeaf.uLeaf, 1);
+  gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, leafNTex);
+  gl.uniform1i(uLeaf.uLeafN, 4);
   gl.bindVertexArray(leafVAO);
-  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, leafCount);
+  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 6, leafCount);
 }
 requestAnimationFrame(frame);
 </script>
