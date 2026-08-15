@@ -52,14 +52,33 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
 
 #nogl { position:fixed; inset:0; z-index:95; display:none; align-items:center; justify-content:center;
   color:#1c2c14; font-size:0.75rem; letter-spacing:2px; text-align:center; padding:30px; line-height:2.2; }
+
+#species-wrap {
+  position:fixed; z-index:80; top:calc(env(safe-area-inset-top, 0px) + 10px);
+  left:50%; transform:translateX(-50%);
+}
+#species {
+  appearance:none; -webkit-appearance:none;
+  font-family:'Share Tech Mono', monospace; font-size:0.72rem; letter-spacing:2px;
+  color:#f2f7ee; background:rgba(20,32,20,0.42); border:1px solid rgba(255,255,255,0.35);
+  border-radius:20px; padding:9px 34px 9px 16px; cursor:pointer;
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  text-shadow:0 1px 3px rgba(0,0,0,0.5); text-align:center;
+}
+#species-wrap::after {
+  content:'\25BE'; position:absolute; right:14px; top:50%; transform:translateY(-50%);
+  color:#f2f7ee; pointer-events:none; font-size:0.7rem;
+}
+#species option { color:#122; background:#eef3ea; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#556;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 12:24 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#556;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 13:04 UTC</div>
 
 <canvas id="view"></canvas>
 
 <a id="back-btn" class="chrome-btn" href="../" aria-label="Back to experiments">&#8592;</a>
+<div id="species-wrap"><select id="species" aria-label="Tree species"></select></div>
 <button id="info-btn" class="chrome-btn" aria-label="About this scene">i</button>
 
 <div id="hint"></div>
@@ -71,12 +90,26 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
 
     <h3>WHAT YOU'RE LOOKING AT</h3>
     <p>A single procedurally grown tree on a grassy rise, under a late-morning sun with drifting
-    clouds. The breeze is always working: the trunk leans a little, branches sway on their own
+    clouds. The picker at the top switches between six species &mdash; English oak, silver birch,
+    weeping willow, Italian cypress, Japanese maple and Scots pine &mdash; each rebuilt from its own
+    parameter preset: skeleton proportions, branch angles, leaf shape and colour, bark recipe.
+    Zoom is unrestricted &mdash; pinch or scroll right up to the trunk axis and the bark holds up. The breeze is always working: the trunk leans a little, branches sway on their own
     rhythms, twigs flutter, and every leaf trembles individually. When a leaf's face swings
     through the mirror angle between the sun and your eye it fires a brief specular glint &mdash;
     watch the canopy sparkle when a gust passes. When a cloud slides across the sun the whole
     scene's direct light dims and the tree's shadow fades, leaving ambient sky light.
     Drag to walk around the tree, pinch or scroll to zoom.</p>
+
+    <h3>SIX SPECIES, ONE GENERATOR</h3>
+    <p>The species presets follow the tree knowledge base in the zmhstudio repo
+    (<code>templates/design/trees/</code>), researched and maintained by a dedicated
+    <em>tree-expert</em> agent: per-species articles on silhouette, branching architecture, bark
+    and foliage, each ending in a generator-parameters table this page's presets mirror. The
+    generator reads per-order branch counts, insertion angles, length ratios, droop, and habit
+    flags &mdash; branches along the trunk for the columnar cypress and the bare-trunked pine,
+    hanging curtain branches for the willow, a low limb for the oak. Leaf shapes are separate
+    texture recipes: lobed oval (oak), pointed oval (birch), lanceolate (willow), five-lobed
+    palmate (maple), a stroke-drawn scale spray (cypress) and a needle tuft card (pine).</p>
 
     <h3>GROWING THE TREE</h3>
     <ul>
@@ -150,8 +183,11 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
       catching light differently at the horizon.</li>
       <li>Branch normals aren't re-bent by the sway displacement, so bark lighting is slightly
       stale mid-gust (invisible in practice at these amplitudes).</li>
-      <li>One tree, one LOD: ~210 branch tubes + ~3,000 leaf instances every frame regardless
-      of distance.</li>
+      <li>One tree, one LOD: a few hundred branch tubes + up to ~14,000 leaf instances every
+      frame regardless of distance.</li>
+      <li>Species are stylised toward their recognisable adult forms; a real specimen varies far
+      more (age, wind exposure, soil), and the pine's two-tone trunk is one texture, not a
+      height-dependent material.</li>
     </ul>
 
     <h3>TOOLING</h3>
@@ -259,8 +295,9 @@ const noiseTex = gl.createTexture();
 }
 
 /* ============================================================
-   LEAF + BARK TEXTURES — albedo plus normal maps derived from
-   procedural height fields (Sobel), the zmh-3d "texture recipe" way
+   LEAF + BARK TEXTURES — per-species albedo + normal-map recipes
+   (procedural height fields → Sobel normals, zmh-3d recipe style;
+   species values follow templates/design/trees/ in the zmhstudio KB)
    ============================================================ */
 function heightToNormalCanvas(hf, w, h, strength, wrapX) {
   const c = document.createElement('canvas');
@@ -286,156 +323,338 @@ function heightToNormalCanvas(hf, w, h, strength, wrapX) {
   ctx.putImageData(img, 0, 0);
   return c;
 }
-
-/* leaf blade: pointed oval, centre-vein groove, domed cross-section */
-const LEAF_TS = 128;
-function leafWidthAt(t) { return Math.sin(Math.min(1, Math.max(0.001, t)) * Math.PI) ** 0.72; }
-function makeLeafCanvas(sz) {
-  const c = document.createElement('canvas');
-  c.width = c.height = sz;
-  const ctx = c.getContext('2d');
-  const img = ctx.createImageData(sz, sz);
-  const d = img.data;
-  for (let y = 0; y < sz; y++) for (let x = 0; x < sz; x++) {
-    const t = 1 - y / (sz - 1);                    // t: 0 stem … 1 tip (v=0 bottom row? uv v=t, row y = (1-t))
-    const xs = (x / (sz - 1)) * 2 - 1;             // -1..1 across
-    const wAt = leafWidthAt(t) * 0.92;
-    const inBlade = Math.abs(xs) < wAt;
-    const i = (y * sz + x) * 4;
-    if (!inBlade) { d[i + 3] = 0; continue; }
-    const xn = xs / wAt;                           // -1..1 within blade
-    // colour: darker rim, lighter centre, subtle side-vein banding
-    const vein = Math.exp(-((xn / 0.08) ** 2));
-    const bands = 0.5 + 0.5 * Math.sin((Math.abs(xn) * 3.2 + t * 9) * Math.PI);
-    let r = 118 + 46 * (1 - Math.abs(xn)) - 18 * bands * Math.abs(xn);
-    let g = 158 + 44 * (1 - Math.abs(xn) * 0.6) - 14 * bands * Math.abs(xn);
-    let b = 62 + 22 * (1 - Math.abs(xn));
-    r += vein * 26; g += vein * 22; b += vein * 8;   // pale midrib
-    d[i] = r; d[i + 1] = g; d[i + 2] = b;
-    // crisp edge, soft antialias ramp
-    d[i + 3] = Math.max(0, Math.min(255, (wAt - Math.abs(xs)) * sz * 3));
-  }
-  ctx.putImageData(img, 0, 0);
-  return c;
-}
-function leafHeightField(sz) {
-  const hf = new Float32Array(sz * sz);
-  for (let y = 0; y < sz; y++) for (let x = 0; x < sz; x++) {
-    const t = 1 - y / (sz - 1);
-    const xs = (x / (sz - 1)) * 2 - 1;
-    const wAt = Math.max(0.02, leafWidthAt(t) * 0.92);
-    const xn = Math.max(-1, Math.min(1, xs / wAt));
-    let h = Math.pow(Math.max(0, 1 - xn * xn), 0.8) * 0.55;        // domed blade
-    h -= Math.exp(-((xn / 0.09) ** 2)) * 0.35;                        // midrib groove
-    h -= (0.5 + 0.5 * Math.sin((Math.abs(xn) * 3.2 + t * 9) * Math.PI)) * 0.06 * Math.abs(xn); // side veins
-    hf[y * sz + x] = h;
-  }
-  return hf;
-}
-
-/* bark: wavy vertical ridges + cracks + lenticels, seamless around x */
 function fbmB(x, y) {
   return noiseAt(x * 0.13, y * 0.13) * 0.55
        + noiseAt(x * 0.31 + 0.41, y * 0.31 + 0.73) * 0.3
        + noiseAt(x * 0.73 + 0.17, y * 0.73 + 0.29) * 0.15;
 }
+
+/* ---------- leaf recipes ---------- */
+const LEAF_TS = 128;
+/* half-width profile along the blade, per shape keyword */
+function widthProfile(shape, t) {
+  const tc = Math.min(1, Math.max(0.001, t));
+  switch (shape) {
+    case 'lobed':      return Math.sin(tc * Math.PI) ** 0.6 * (0.72 + 0.28 * Math.sin(tc * Math.PI * 5.5 + 0.4));
+    case 'pointed':    return Math.sin(Math.min(1, tc * 1.3) * Math.PI) ** 1.1;      // widest low, drawn tip
+    case 'lanceolate': return Math.sin(tc * Math.PI) ** 0.5;
+    default:           return Math.sin(tc * Math.PI) ** 0.72;                        // oval
+  }
+}
+/* palmate (maple): 5 pointed lobes radiating from the stem end */
+function palmateR(theta) {
+  const lobe = Math.abs(Math.cos(theta * 2.5));
+  return 0.3 + 0.68 * Math.pow(lobe, 0.45);
+}
+function makeLeafRecipe(shape, colTop, colVar) {
+  const sz = LEAF_TS;
+  const alb = document.createElement('canvas');
+  alb.width = alb.height = sz;
+  const ctx = alb.getContext('2d');
+  const hf = new Float32Array(sz * sz);
+
+  if (shape === 'scale' || shape === 'needle') {
+    /* stroke-drawn cards: a cypress scale-spray / a pine needle tuft.
+       Height comes from the drawn alpha, so each strand is a ridge. */
+    ctx.clearRect(0, 0, sz, sz);
+    ctx.lineCap = 'round';
+    const col = `rgb(${colTop[0]},${colTop[1]},${colTop[2]})`;
+    const colL = `rgb(${colVar[0]},${colVar[1]},${colVar[2]})`;
+    if (shape === 'needle') {
+      /* fan of needles from the base midpoint */
+      for (let i = 0; i < 15; i++) {
+        const a = (-0.62 + i / 14 * 1.24) + (Math.random() - 0.5) * 0.1;
+        const L = sz * (0.68 + Math.random() * 0.28);
+        ctx.strokeStyle = Math.random() < 0.4 ? colL : col;
+        ctx.lineWidth = sz * 0.022;
+        ctx.beginPath();
+        ctx.moveTo(sz / 2, sz * 0.98);
+        ctx.quadraticCurveTo(sz / 2 + Math.sin(a) * L * 0.5, sz * 0.98 - Math.cos(a) * L * 0.55,
+                             sz / 2 + Math.sin(a) * L * 0.62, sz * 0.98 - Math.cos(a) * L);
+        ctx.stroke();
+      }
+    } else {
+      /* scale spray: central stem + alternating branchlets of beaded scales */
+      function branchlet(x0, y0, ang, L, w) {
+        const steps = Math.max(3, Math.round(L / (sz * 0.05)));
+        for (let k = 0; k <= steps; k++) {
+          const tt = k / steps;
+          const x = x0 + Math.sin(ang) * L * tt, y = y0 - Math.cos(ang) * L * tt;
+          ctx.fillStyle = (k % 2 === 0) ? col : colL;
+          ctx.beginPath();
+          ctx.ellipse(x, y, w * (1 - tt * 0.5), w * 1.25 * (1 - tt * 0.4), ang, 0, 7);
+          ctx.fill();
+        }
+      }
+      branchlet(sz / 2, sz * 0.98, 0, sz * 0.92, sz * 0.055);
+      for (let i = 0; i < 10; i++) {
+        const tt = 0.08 + i / 10 * 0.8;
+        const side = i % 2 ? 1 : -1;
+        branchlet(sz / 2, sz * 0.98 - sz * 0.92 * tt, side * (0.55 + Math.random() * 0.35),
+                  sz * 0.38 * (1 - tt * 0.45), sz * 0.05);
+      }
+    }
+    /* height from alpha */
+    const px = ctx.getImageData(0, 0, sz, sz).data;
+    for (let i = 0; i < sz * sz; i++) hf[i] = px[i * 4 + 3] / 255 * 0.55;
+    return { alb, hf };
+  }
+
+  /* per-pixel parametric blades (oval / pointed / lobed / lanceolate / palmate) */
+  const img = ctx.createImageData(sz, sz);
+  const d = img.data;
+  for (let y = 0; y < sz; y++) for (let x = 0; x < sz; x++) {
+    const t = 1 - y / (sz - 1);                  // 0 stem … 1 tip
+    const xs = (x / (sz - 1)) * 2 - 1;
+    const i = (y * sz + x) * 4;
+    let inB = false, xn = 0, edge = 0, veinW = 0;
+    if (shape === 'palmate') {
+      const rr2 = Math.hypot(xs, t * 1.05), th = Math.atan2(xs, Math.max(0.001, t));
+      const R = palmateR(th) * 0.95;
+      inB = Math.abs(th) < 1.35 && rr2 < R && rr2 > 0.02;
+      // cross-lobe coordinate: -1..1 across the nearest lobe, so the shared
+      // dome + midrib-groove shading below works per lobe
+      xn = ((((th / 0.628) % 1) + 1) % 1 - 0.5) * 2;
+      edge = (R - rr2) * sz * 12;
+      veinW = Math.exp(-((xn / 0.16) ** 2)) * (1 - rr2 / R * 0.5);
+    } else {
+      const wAt = widthProfile(shape, t) * 0.92;
+      inB = Math.abs(xs) < wAt;
+      xn = wAt > 0.02 ? xs / wAt : 0;
+      edge = (wAt - Math.abs(xs)) * sz * 3;
+      veinW = Math.exp(-((xn / 0.08) ** 2));
+    }
+    if (!inB) { d[i + 3] = 0; continue; }
+    const bands = 0.5 + 0.5 * Math.sin((Math.abs(xn) * 3.2 + t * 9) * Math.PI);
+    const k = (1 - Math.abs(xn));
+    const vk = veinW * Math.min(1, (colTop[0] + colTop[1]) / 260) * 16;
+    let r = colTop[0] + (colVar[0] - colTop[0]) * k - 14 * bands * Math.abs(xn) + vk;
+    let g = colTop[1] + (colVar[1] - colTop[1]) * k - 11 * bands * Math.abs(xn) + vk * 0.8;
+    let b = colTop[2] + (colVar[2] - colTop[2]) * k - 6 * bands * Math.abs(xn) + vk * 0.35;
+    d[i] = r; d[i + 1] = g; d[i + 2] = b;
+    d[i + 3] = Math.max(0, Math.min(255, edge));
+    let hh = Math.pow(Math.max(0, 1 - xn * xn), 0.8) * 0.55;
+    hh -= veinW * 0.35;
+    hh -= bands * 0.06 * Math.abs(xn);
+    hf[y * sz + x] = hh;
+  }
+  ctx.putImageData(img, 0, 0);
+  return { alb, hf };
+}
+
+/* ---------- bark recipes ---------- */
 const BARK_W = 256, BARK_H = 512;
-function barkFields(w, h) {
+function makeBarkRecipe(cfg) {
+  const w = BARK_W, h = BARK_H;
   const hf = new Float32Array(w * h);
   const alb = document.createElement('canvas');
   alb.width = w; alb.height = h;
   const ctx = alb.getContext('2d');
   const img = ctx.createImageData(w, h);
   const d = img.data;
+  const [dr, dg, db] = cfg.dark, [lr, lg, lb] = cfg.light;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const th = x / w * Math.PI * 2;
     const cs = Math.cos(th), sn = Math.sin(th);
-    // periodic-in-x noise: sample 2D noise on a circle, drift with y
     const wob = fbmB(cs * 1.6 + 7 + y / h * 0.9, sn * 1.6 + 13 + y / h * 5.5);
     const wob2 = fbmB(cs * 4 + 21, sn * 4 + 3 + y / h * 11);
-    // vertical ridges, wandering with height
-    let hgt = 0.5 + 0.5 * Math.sin(th * 9 + (wob - 0.5) * 9 + y / h * 2.0);
-    hgt = Math.pow(hgt, 1.3);
-    // horizontal crack bands cut across ridges occasionally
-    const crack = Math.pow(Math.max(0, (wob2 - 0.62) / 0.38), 1.4);
-    hgt = hgt * (1 - crack * 0.85) + (wob - 0.5) * 0.25;
+    let hgt, mixv, darken = 1;
+    if (cfg.style === 'birch') {
+      // papery near-white bark, horizontal lenticel dashes, dark blotches
+      hgt = 0.5 + (wob - 0.5) * 0.16;
+      const lent = Math.pow(Math.max(0, (fbmB(cs * 2 + 3, y / h * 55 + 9) - 0.58) / 0.42), 1.2);
+      const blotch = Math.pow(Math.max(0, (wob2 - 0.72) / 0.28), 1.5);
+      hgt -= lent * 0.25;
+      mixv = 0.85 - lent * 0.75 - blotch * 0.8 + (wob - 0.5) * 0.15;
+    } else if (cfg.style === 'plates') {
+      // flaky plates (scots pine): cellular patches, cracks between
+      const cell = fbmB(cs * 2.6 + 31, sn * 2.6 + y / h * 8 + 17);
+      const plate = smoothstepJS(0.42, 0.5, cell);
+      hgt = 0.25 + plate * 0.6 + (wob2 - 0.5) * 0.15;
+      mixv = plate * (0.65 + (wob - 0.5) * 0.5);
+      if (plate < 0.4) darken = 0.55;
+    } else if (cfg.style === 'smooth') {
+      hgt = 0.5 + (wob - 0.5) * 0.2 + Math.sin(th * 16 + wob * 3) * 0.03;
+      mixv = 0.5 + (wob2 - 0.5) * 0.5;
+    } else {
+      // ridged / coarse / stringy: wandering vertical ridges + crack bands
+      const freq = cfg.freq || 9;
+      hgt = 0.5 + 0.5 * Math.sin(th * freq + (wob - 0.5) * 9 + y / h * 2.0);
+      hgt = Math.pow(hgt, 1.3);
+      const crack = Math.pow(Math.max(0, (wob2 - 0.62) / 0.38), 1.4);
+      hgt = hgt * (1 - crack * 0.85) + (wob - 0.5) * 0.25;
+      mixv = hgt;
+      if (crack > 0.25) darken = 0.53;
+    }
     hf[y * w + x] = hgt;
     const spk = fbmB(cs * 9 + 40, sn * 9 + y / h * 60) - 0.5;
-    let r = 78 + hgt * 66 + spk * 26;
-    let g = 62 + hgt * 52 + spk * 20;
-    let b = 48 + hgt * 38 + spk * 14;
-    if (crack > 0.25) { r *= 0.55; g *= 0.52; b *= 0.5; }           // dark crack floor
     const i = (y * w + x) * 4;
-    d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = 255;
+    d[i]     = (dr + (lr - dr) * mixv) * darken + spk * 22;
+    d[i + 1] = (dg + (lg - dg) * mixv) * darken + spk * 18;
+    d[i + 2] = (db + (lb - db) * mixv) * darken + spk * 13;
+    d[i + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
   return { alb, hf };
 }
+function smoothstepJS(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
 
-function texFrom(cnv, wrapX, mips) {
+/* reusable texture objects — re-uploaded on species change */
+function makeTexObj(wrapX) {
   const t = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, t);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cnv);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapX ? gl.REPEAT : gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapX ? gl.REPEAT : gl.CLAMP_TO_EDGE);
-  if (mips) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); }
-  else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   return t;
 }
-const leafTex  = texFrom(makeLeafCanvas(LEAF_TS), false, true);
-const leafNTex = texFrom(heightToNormalCanvas(leafHeightField(LEAF_TS), LEAF_TS, LEAF_TS, 6.0, false), false, true);
-const barkData = barkFields(BARK_W, BARK_H);
-const barkTex  = texFrom(barkData.alb, true, true);
-const barkNTex = texFrom(heightToNormalCanvas(barkData.hf, BARK_W, BARK_H, 3.0, true), true, true);
+function uploadTex(t, cnv) {
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cnv);
+  gl.generateMipmap(gl.TEXTURE_2D);
+}
+const leafTex = makeTexObj(false), leafNTex = makeTexObj(false);
+const barkTex = makeTexObj(true),  barkNTex = makeTexObj(true);
 
 /* ============================================================
-   TREE SKELETON → branch mesh + leaf instances
+   SPECIES PRESETS — values follow the species articles in
+   zmhstudio templates/design/trees/ (tree-expert agent's KB)
    ============================================================ */
-const TREE_H = 4.6;
-const bPos = [], bNrm = [], bWind = [], bUV = [], bTan = [], bIdx = [];
-const leaves = [];                                   // per-instance records
+const SPECIES = {
+  oak: {
+    label: 'English Oak', seed: 101,
+    trunkLen: 1.9, trunkRad: 0.24, maxDepth: 4, segs: [3,3,3,3,3],
+    kids: [5,3,3,2],
+    spread: [[0.6,1.0],[0.55,0.95],[0.5,0.9],[0.45,0.85]],
+    lenRatio: [0.62,0.78], radRatio: [0.5,0.62],
+    lift: [0.1,0.1,0.04,-0.02,-0.04],
+    wander: [0.05,0.18,0.22,0.24,0.24],
+    lowLimb: true, alongTrunk: 0, upperOnly: 0, weepDepth: null,
+    leaf: { shape:'lobed', minDepth:3, spacing:0.022, len:[0.2,0.3], wr:[0.32,0.4],
+            tipFan:7, upBias:0.2, colTop:[92,132,50], colVar:[124,156,66] },
+    bark: { style:'ridged', freq:9, dark:[70,54,40], light:[150,118,88] },
+    treeH: 4.6, cy: 2.6, fitHalfH: 4.5, fitHalfW: 3.8, shadow:[2.9,2.4],
+  },
+  birch: {
+    label: 'Silver Birch', seed: 202,
+    trunkLen: 2.6, trunkRad: 0.14, maxDepth: 4, segs: [3,3,3,3,3],
+    kids: [4,3,2,2],
+    spread: [[0.35,0.7],[0.4,0.75],[0.45,0.8],[0.5,0.85]],
+    lenRatio: [0.6,0.74], radRatio: [0.5,0.6],
+    lift: [0.14,0.12,0.0,-0.2,-0.34],
+    wander: [0.04,0.12,0.16,0.2,0.22],
+    lowLimb: false, alongTrunk: 0, upperOnly: 0, weepDepth: null,
+    leaf: { shape:'pointed', minDepth:3, spacing:0.024, len:[0.13,0.19], wr:[0.42,0.52],
+            tipFan:6, upBias:0.0, colTop:[116,162,58], colVar:[152,188,82] },
+    bark: { style:'birch', dark:[40,38,36], light:[236,232,222] },
+    treeH: 5.1, cy: 2.8, fitHalfH: 4.8, fitHalfW: 3.2, shadow:[2.2,1.9],
+  },
+  willow: {
+    label: 'Weeping Willow', seed: 303,
+    trunkLen: 1.6, trunkRad: 0.22, maxDepth: 3, segs: [3,3,3,3],
+    kids: [5,3,3],
+    spread: [[0.5,0.9],[0.4,0.8],[0.35,0.7]],
+    lenRatio: [0.7,0.88], radRatio: [0.5,0.6],
+    lift: [0.26,0.3,0.08,0],
+    wander: [0.05,0.12,0.12,0.05],
+    lowLimb: false, alongTrunk: 0, upperOnly: 0,
+    weepDepth: 3, weepLen: [1.7,2.5], weepSegs: 7, weepPull: 0.5,
+    leaf: { shape:'lanceolate', minDepth:3, spacing:0.013, len:[0.15,0.22], wr:[0.16,0.22],
+            tipFan:4, upBias:-0.25, colTop:[124,158,66], colVar:[158,188,98] },
+    bark: { style:'ridged', freq:7, dark:[64,58,48], light:[130,120,100] },
+    treeH: 4.3, cy: 2.1, fitHalfH: 4.0, fitHalfW: 4.2, shadow:[3.4,2.9],
+  },
+  cypress: {
+    label: 'Italian Cypress', seed: 404,
+    trunkLen: 3.9, trunkRad: 0.13, maxDepth: 2, segs: [7,2,2],
+    kids: [0,3,0],
+    spread: [[0.2,0.45],[0.3,0.6]],
+    lenRatio: [0.2,0.3], radRatio: [0.32,0.42],
+    lift: [0.35,0.5,0.5],
+    wander: [0.02,0.1,0.12],
+    lowLimb: false, alongTrunk: 5, upperOnly: 0.06, weepDepth: null,
+    leaf: { shape:'scale', minDepth:1, spacing:0.014, len:[0.2,0.3], wr:[0.5,0.62],
+            tipFan:6, upBias:0.35, colTop:[52,84,44], colVar:[76,106,58] },
+    bark: { style:'ridged', freq:14, dark:[86,70,54], light:[148,126,100] },
+    treeH: 4.8, cy: 2.3, fitHalfH: 3.4, fitHalfW: 2.4, shadow:[1.0,0.85],
+  },
+  maple: {
+    label: 'Japanese Maple', seed: 505,
+    trunkLen: 1.35, trunkRad: 0.15, maxDepth: 4, segs: [3,3,3,3,3],
+    kids: [4,3,3,2],
+    spread: [[0.6,1.0],[0.55,0.95],[0.5,0.9],[0.45,0.85]],
+    lenRatio: [0.64,0.8], radRatio: [0.52,0.64],
+    lift: [0.06,0.0,-0.04,-0.06,-0.08],
+    wander: [0.05,0.16,0.18,0.2,0.2],
+    lowLimb: true, alongTrunk: 0, upperOnly: 0, weepDepth: null,
+    leaf: { shape:'palmate', minDepth:3, spacing:0.02, len:[0.13,0.19], wr:[0.8,0.95],
+            tipFan:6, upBias:0.05, colTop:[152,44,48], colVar:[198,86,52] },
+    bark: { style:'smooth', dark:[70,60,54], light:[104,92,82] },
+    treeH: 2.9, cy: 1.7, fitHalfH: 2.9, fitHalfW: 3.4, shadow:[2.6,2.2],
+  },
+  pine: {
+    label: 'Scots Pine', seed: 606,
+    trunkLen: 3.1, trunkRad: 0.2, maxDepth: 3, segs: [4,3,3,2],
+    kids: [3,3,2],
+    spread: [[1.05,1.4],[0.65,1.15],[0.5,1.0]],
+    lenRatio: [0.5,0.72], radRatio: [0.45,0.58],
+    lift: [0.16,0.04,0.22,0.3],
+    wander: [0.06,0.28,0.3,0.3],
+    lowLimb: false, alongTrunk: 2, upperOnly: 0.55, weepDepth: null,
+    leaf: { shape:'needle', minDepth:3, spacing:0.055, len:[0.24,0.34], wr:[0.6,0.75],
+            tipFan:12, upBias:0.3, colTop:[44,76,52], colVar:[70,100,66] },
+    bark: { style:'plates', dark:[74,52,40], light:[186,112,66] },
+    treeH: 4.8, cy: 2.7, fitHalfH: 4.4, fitHalfW: 3.6, shadow:[2.4,2.0],
+  },
+};
+let curSpecies = localStorage.getItem('lonetree-species') || 'oak';
+if (!SPECIES[curSpecies]) curSpecies = 'oak';
+let CFG = SPECIES[curSpecies];
+
+/* ============================================================
+   TREE BUILD — skeleton + stem-anchored leaves, rebuildable
+   ============================================================ */
+let bPos, bNrm, bWind, bUV, bTan, bIdx, leaves, leafIdx;
+const MAX_LEAVES = 14000;
 
 function addTube(p0, p1, r0, r1, sides, flex0, flex1, phase, v0, v1) {
   const dx = p1[0]-p0[0], dy = p1[1]-p0[1], dz = p1[2]-p0[2];
   const len = Math.hypot(dx, dy, dz) || 1;
   const ax = dx/len, ay = dy/len, az = dz/len;
-  // build a perpendicular basis
   let ux = -az, uy = 0, uz = ax;
   const ul = Math.hypot(ux, uy, uz);
   if (ul < 0.01) { ux = 1; uy = 0; uz = 0; } else { ux/=ul; uz/=ul; }
   const vx = ay*uz - az*uy, vy = az*ux - ax*uz, vz = ax*uy - ay*ux;
-  // bark texture repeats around the ring, scaled to girth so density is even
   const uRep = Math.max(1, Math.round(r0 * 22));
   const base = bPos.length / 3;
   for (let e = 0; e < 2; e++) {
     const P = e ? p1 : p0, R = e ? r1 : r0, F = e ? flex1 : flex0, V = e ? v1 : v0;
-    for (let s = 0; s <= sides; s++) {
-      const a = s / sides * Math.PI * 2;
+    for (let s2 = 0; s2 <= sides; s2++) {
+      const a = s2 / sides * Math.PI * 2;
       const cx = Math.cos(a), sx = Math.sin(a);
       const nx = ux*cx + vx*sx, ny = uy*cx + vy*sx, nz = uz*cx + vz*sx;
       bPos.push(P[0] + nx*R, P[1] + ny*R, P[2] + nz*R);
       bNrm.push(nx, ny, nz);
-      bWind.push(F, phase, P[1] / TREE_H);
-      bUV.push(s / sides * uRep, V);
-      // tangent: derivative around the ring (u direction of the bark texture)
+      bWind.push(F, phase, Math.max(0, P[1] - BASE_Y) / CFG.treeH);
+      bUV.push(s2 / sides * uRep, V);
       bTan.push(-ux*sx + vx*cx, -uy*sx + vy*cx, -uz*sx + vz*cx);
     }
   }
   const w = sides + 1;
-  for (let s = 0; s < sides; s++) {
-    const a = base + s, b = base + s + w;
+  for (let s2 = 0; s2 < sides; s2++) {
+    const a = base + s2, b = base + s2 + w;
     bIdx.push(a, b, a+1, a+1, b, b+1);
   }
 }
 
-/* one leaf, anchored by its stem to a point ON a branch */
 function addLeaf(anchor, dir, flex, phase) {
-  const len = rr(0.17, 0.26);
-  const halfW = len * rr(0.28, 0.36);
+  if (leaves.length >= MAX_LEAVES) return;
+  const L = CFG.leaf;
+  const len = rr(L.len[0], L.len[1]);
+  const halfW = len * rr(L.wr[0], L.wr[1]);
   const dl = Math.hypot(...dir) || 1;
   const axis = dir.map(v => v / dl * len);
-  // width direction: perpendicular to the leaf axis, mostly horizontal
   let up = [rr(-0.4, 0.4), 1, rr(-0.4, 0.4)];
   let sd = [axis[1]*up[2] - axis[2]*up[1], axis[2]*up[0] - axis[0]*up[2], axis[0]*up[1] - axis[1]*up[0]];
   const sl = Math.hypot(...sd) || 1;
@@ -449,62 +668,70 @@ function addLeaf(anchor, dir, flex, phase) {
     packed: tint + gloss + curlBit * 256,
   });
 }
+function leavesAlong(p, q, d, f0, f1, phase) {
+  let ux = -d[2], uy = 0, uz = d[0];
+  const ul = Math.hypot(ux, uy, uz);
+  if (ul < 0.01) { ux = 1; uz = 0; } else { ux /= ul; uz /= ul; }
+  const vx = d[1]*uz - d[2]*uy, vy = d[2]*ux - d[0]*uz, vz = d[0]*uy - d[1]*ux;
+  const segLen = Math.hypot(q[0]-p[0], q[1]-p[1], q[2]-p[2]);
+  const nL = Math.max(2, Math.round(segLen / CFG.leaf.spacing));
+  for (let i = 0; i < nL; i++) {
+    const tL = (i + 0.5) / nL;
+    const ax2 = p[0] + (q[0]-p[0]) * tL, ay2 = p[1] + (q[1]-p[1]) * tL, az2 = p[2] + (q[2]-p[2]) * tL;
+    const ang = leafIdx++ * 2.39996 + rr(-0.3, 0.3);
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const rx = ux*ca + vx*sa, ry = uy*ca + vy*sa, rz = uz*ca + vz*sa;
+    const dirL = [rx + d[0]*0.4, ry + d[1]*0.4 + CFG.leaf.upBias, rz + d[2]*0.4];
+    addLeaf([ax2, ay2, az2], dirL, (f0 + (f1-f0)*tL) * 1.1, phase);
+  }
+}
 
-let leafIdx = 0;
 function growBranch(pos, dir, len, rad, depth, phase, flex) {
-  const MAXD = 4;
-  const segs = 3;
+  const isWeep = CFG.weepDepth != null && depth >= CFG.weepDepth;
+  const segs = isWeep ? CFG.weepSegs : (CFG.segs[Math.min(depth, CFG.segs.length - 1)] || 3);
   let p = pos.slice(), d = dir.slice();
   const sides = Math.max(3, 8 - depth * 2);
-  const wander = depth === 0 ? 0.05 : 0.16;
-  let vAcc = rnd() * 3;                        // bark v-coordinate along this branch
+  const wander = CFG.wander[Math.min(depth, CFG.wander.length - 1)];
+  const lift = CFG.lift[Math.min(depth, CFG.lift.length - 1)];
+  let vAcc = rnd() * 3;
+  const trunkJointFrac = [];   // for alongTrunk spawns
   for (let s = 0; s < segs; s++) {
     const t0 = s / segs, t1 = (s + 1) / segs;
-    // wander the direction a little, and droop/lift
     d[0] += rr(-wander, wander); d[2] += rr(-wander, wander);
-    d[1] += depth < 2 ? 0.10 : rr(-0.06, 0.1);
+    if (isWeep) d[1] -= CFG.weepPull * (0.4 + t1);      // curtains fall harder as they go
+    else d[1] += lift;
     const dl = Math.hypot(...d); d = d.map(v => v / dl);
     const segLen = len / segs;
     const q = [p[0] + d[0]*segLen, p[1] + d[1]*segLen, p[2] + d[2]*segLen];
     const f0 = flex + (t0 * 0.5) * flexGain(depth), f1 = flex + (t1 * 0.5) * flexGain(depth);
     const v1 = vAcc + segLen * 2.4;
-    addTube(p, q, rad * (1 - t0 * 0.35), rad * (1 - t1 * 0.35), sides, f0, f1, phase, vAcc, v1);
+    addTube(p, q, rad * (1 - t0 * (isWeep ? 0.6 : 0.35)), rad * (1 - t1 * (isWeep ? 0.6 : 0.35)),
+            sides, f0, f1, phase, vAcc, v1);
     vAcc = v1;
-    // a low limb partway up the trunk so the canopy doesn't start at one height
-    if (depth === 0 && s === 1) {
+    if (depth === 0 && CFG.lowLimb && s === 1) {
       const rot2 = rr(0, Math.PI * 2);
       growBranch(q, [Math.cos(rot2) * 0.85, 0.5, Math.sin(rot2) * 0.85], len * 0.62, rad * 0.5,
                  1, rr(0, Math.PI * 2), f1);
     }
-    // leaves: stem-anchored along the outer branches, phyllotaxis-style —
-    // each sits ON the twig and grows outward, no floating clusters
-    if (depth >= 3) {
-      // ring basis perpendicular to the segment
-      let ux = -d[2], uy = 0, uz = d[0];
-      const ul = Math.hypot(ux, uy, uz);
-      if (ul < 0.01) { ux = 1; uz = 0; } else { ux /= ul; uz /= ul; }
-      const vx = d[1]*uz - d[2]*uy, vy = d[2]*ux - d[0]*uz, vz = d[0]*uy - d[1]*ux;
-      const nL = Math.max(2, Math.round(segLen / 0.03));
-      for (let i = 0; i < nL; i++) {
-        const tL = (i + 0.5) / nL;
-        const ax2 = p[0] + (q[0]-p[0]) * tL, ay2 = p[1] + (q[1]-p[1]) * tL, az2 = p[2] + (q[2]-p[2]) * tL;
-        const ang = leafIdx++ * 2.39996 + rr(-0.3, 0.3);      // golden-angle spiral
-        const ca = Math.cos(ang), sa = Math.sin(ang);
-        const rx = ux*ca + vx*sa, ry = uy*ca + vy*sa, rz = uz*ca + vz*sa;
-        // outward + a touch along the twig + sun-seeking lift
-        const dirL = [rx + d[0]*0.4, ry + d[1]*0.4 + 0.2, rz + d[2]*0.4];
-        addLeaf([ax2, ay2, az2], dirL, (f0 + (f1-f0)*tL) * 1.1, phase);
+    // columnar/conifer habit: branches sprout along the trunk, not just at its top
+    if (depth === 0 && CFG.alongTrunk > 0 && t1 >= CFG.upperOnly && s < segs - 1) {
+      for (let k = 0; k < CFG.alongTrunk; k++) {
+        const rot2 = rr(0, Math.PI * 2);
+        const sp = rr(CFG.spread[0][0], CFG.spread[0][1]);
+        const nd = [Math.cos(rot2) * Math.sin(sp), Math.cos(sp), Math.sin(rot2) * Math.sin(sp)];
+        growBranch(q, nd, len * rr(CFG.lenRatio[0], CFG.lenRatio[1]) * (1 - t1 * 0.35),
+                   rad * rr(CFG.radRatio[0], CFG.radRatio[1]), 1, rr(0, Math.PI * 2), f1);
       }
     }
+    if (depth >= CFG.leaf.minDepth) leavesAlong(p, q, d, f0, f1, phase);
     p = q;
   }
   const endFlex = flex + 0.5 * flexGain(depth);
-  if (depth < MAXD) {
-    const kids = depth === 0 ? 5 : depth === 1 ? 3 : depth === 2 ? 3 : 2;
+  const kids = depth < CFG.maxDepth ? (CFG.kids[Math.min(depth, CFG.kids.length - 1)] || 0) : 0;
+  if (kids > 0 && !isWeep) {
     for (let k = 0; k < kids; k++) {
-      // rotate dir by a spread angle around the branch axis
-      const ang = rr(0.45, 0.9), rot = k / kids * Math.PI * 2 + rr(-0.5, 0.5);
-      // perpendicular basis of d
+      const sprd = CFG.spread[Math.min(depth, CFG.spread.length - 1)];
+      const ang = rr(sprd[0], sprd[1]), rot = k / kids * Math.PI * 2 + rr(-0.5, 0.5);
       let ux = -d[2], uy = 0, uz = d[0];
       const ul = Math.hypot(ux, uy, uz);
       if (ul < 0.01) { ux = 1; uz = 0; } else { ux/=ul; uz/=ul; }
@@ -515,45 +742,74 @@ function growBranch(pos, dir, len, rad, depth, phase, flex) {
         d[1]*ca + (uy*Math.cos(rot) + vy*Math.sin(rot))*sa,
         d[2]*ca + (uz*Math.cos(rot) + vz*Math.sin(rot))*sa,
       ];
-      growBranch(p, nd, len * rr(0.56, 0.72), rad * rr(0.5, 0.62), depth + 1,
+      const nLen = (CFG.weepDepth != null && depth + 1 >= CFG.weepDepth)
+        ? rr(CFG.weepLen[0], CFG.weepLen[1])
+        : len * rr(CFG.lenRatio[0], CFG.lenRatio[1]);
+      growBranch(p, nd, nLen, rad * rr(CFG.radRatio[0], CFG.radRatio[1]), depth + 1,
                  depth < 2 ? rr(0, Math.PI * 2) : phase + rr(-0.8, 0.8), endFlex);
     }
-  } else {
-    // a small fan of leaves off the twig tip
-    for (let i = 0; i < 6; i++) {
-      const ang = rr(0, Math.PI * 2), spread = rr(0.3, 0.9);
-      const dirL = [d[0] + Math.cos(ang) * spread, d[1] + 0.3 + rr(-0.15, 0.25), d[2] + Math.sin(ang) * spread];
+  } else if (depth >= CFG.leaf.minDepth) {
+    for (let i = 0; i < CFG.leaf.tipFan; i++) {
+      const ang = rr(0, Math.PI * 2), sprd2 = rr(0.3, 0.9);
+      const dirL = [d[0] + Math.cos(ang) * sprd2, d[1] + 0.3 + CFG.leaf.upBias + rr(-0.15, 0.25),
+                    d[2] + Math.sin(ang) * sprd2];
       addLeaf(p, dirL, endFlex * 1.15, phase);
     }
   }
 }
 function flexGain(depth) { return [0.02, 0.1, 0.28, 0.55, 0.85][Math.min(depth, 4)]; }
 
-growBranch([0, 0, 0], [0.02, 1, -0.02], 2.5, 0.17, 0, 0, 0);
-
-/* branch VAO */
-const branchVAO = gl.createVertexArray();
-gl.bindVertexArray(branchVAO);
+/* ============================================================
+   GPU BUILD — VAOs + textures recreated on species change
+   ============================================================ */
+let branchVAO = null, leafVAO = null, branchCount = 0, leafCount = 0;
+let BASE_Y = 0;   // hilltop height at the trunk — set once groundH exists
+let treeBuffers = [];
 function attach(loc, arr, size) {
   const b = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, b);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(loc);
   gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
+  return b;
 }
-attach(0, bPos, 3); attach(1, bNrm, 3); attach(2, bWind, 3); attach(3, bUV, 2); attach(4, bTan, 3);
-const bIB = gl.createBuffer();
-gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bIB);
-gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(bIdx), gl.STATIC_DRAW);
-gl.bindVertexArray(null);
-const branchCount = bIdx.length;
+function buildTree(key) {
+  curSpecies = key; CFG = SPECIES[key];
+  try { localStorage.setItem('lonetree-species', key); } catch (e) {}
+  seed = (CFG.seed * 2654435761) >>> 0;         // deterministic per species
 
-/* leaf instanced VAO */
-const leafVAO = gl.createVertexArray();
-gl.bindVertexArray(leafVAO);
-{
-  // 6-vertex strip: 2 columns so the blade can fold along its midrib
-  const quad = gl.createBuffer();
+  const strokey = CFG.leaf.shape === 'scale' || CFG.leaf.shape === 'needle';
+  const lr = makeLeafRecipe(CFG.leaf.shape, CFG.leaf.colTop, CFG.leaf.colVar);
+  uploadTex(leafTex, lr.alb);
+  uploadTex(leafNTex, heightToNormalCanvas(lr.hf, LEAF_TS, LEAF_TS, strokey ? 3.5 : 6.0, false));
+  const br = makeBarkRecipe(CFG.bark);
+  uploadTex(barkTex, br.alb);
+  uploadTex(barkNTex, heightToNormalCanvas(br.hf, BARK_W, BARK_H, CFG.bark.style === 'smooth' ? 1.2 : 3.0, true));
+
+  bPos = []; bNrm = []; bWind = []; bUV = []; bTan = []; bIdx = [];
+  leaves = []; leafIdx = 0;
+  BASE_Y = groundH(0, 0) - 0.06;
+  growBranch([0, BASE_Y, 0], [0.02, 1, -0.02], CFG.trunkLen, CFG.trunkRad, 0, 0, 0);
+
+  if (branchVAO) {
+    gl.deleteVertexArray(branchVAO); gl.deleteVertexArray(leafVAO);
+    for (const b of treeBuffers) gl.deleteBuffer(b);
+  }
+  treeBuffers = [];
+
+  branchVAO = gl.createVertexArray();
+  gl.bindVertexArray(branchVAO);
+  treeBuffers.push(attach(0, bPos, 3), attach(1, bNrm, 3), attach(2, bWind, 3),
+                   attach(3, bUV, 2), attach(4, bTan, 3));
+  const bIB = gl.createBuffer(); treeBuffers.push(bIB);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bIB);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(bIdx), gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  branchCount = bIdx.length;
+
+  leafVAO = gl.createVertexArray();
+  gl.bindVertexArray(leafVAO);
+  const quad = gl.createBuffer(); treeBuffers.push(quad);
   gl.bindBuffer(gl.ARRAY_BUFFER, quad);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,0, -1,1, 0,0, 0,1, 1,0, 1,1]), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);
@@ -566,7 +822,7 @@ gl.bindVertexArray(leafVAO);
     inst[o+4] = L.a[0]; inst[o+5] = L.a[1]; inst[o+6] = L.a[2]; inst[o+7] = L.flex;
     inst[o+8] = L.b[0]; inst[o+9] = L.b[1]; inst[o+10] = L.b[2]; inst[o+11] = L.packed;
   }
-  const ib = gl.createBuffer();
+  const ib = gl.createBuffer(); treeBuffers.push(ib);
   gl.bindBuffer(gl.ARRAY_BUFFER, ib);
   gl.bufferData(gl.ARRAY_BUFFER, inst, gl.STATIC_DRAW);
   for (let k = 0; k < 3; k++) {
@@ -574,9 +830,10 @@ gl.bindVertexArray(leafVAO);
     gl.vertexAttribPointer(1 + k, 4, gl.FLOAT, false, 48, k * 16);
     gl.vertexAttribDivisor(1 + k, 1);
   }
+  gl.bindVertexArray(null);
+  leafCount = n;
+  if (typeof computeFit === 'function' && W) computeFit();
 }
-gl.bindVertexArray(null);
-const leafCount = leaves.length;
 
 /* ============================================================
    GROUND MESH — gentle hill
@@ -701,6 +958,7 @@ uniform sampler2D uNoise;
 uniform vec3 uSunDir;
 uniform float uSunVis;
 uniform vec3 uEye;
+uniform vec2 uShadowR;
 out vec4 frag;
 float fbm(vec2 p){ return texture(uNoise, p).r * 0.65 + texture(uNoise, p * 2.7 + vec2(0.31, 0.77)).r * 0.35; }
 void main(){
@@ -714,7 +972,7 @@ void main(){
   float nl = max(dot(N, uSunDir), 0.0);
   // canopy blob shadow (fades when clouds cover the sun)
   vec2 shC = vec2(-uSunDir.x, -uSunDir.z) * 2.2;
-  float shD = length((vPos.xz - shC) / vec2(2.9, 2.4));
+  float shD = length((vPos.xz - shC) / uShadowR);
   float shadow = (1.0 - smoothstep(0.45, 1.05, shD)) * 0.42 * uSunVis;
   vec3 sun = vec3(1.0, 0.96, 0.86) * 1.15 * nl * uSunVis;
   vec3 skyAmb = vec3(0.42, 0.5, 0.62) * (0.5 + 0.5 * N.y);
@@ -776,7 +1034,7 @@ layout(location=1) in vec4 aC;       // stem anchor.xyz (ON the twig), phase
 layout(location=2) in vec4 aA;       // stem→tip axis (length baked in), flex
 layout(location=3) in vec4 aB;       // width dir × halfWidth, tint+gloss+curl packed
 uniform mat4 uView, uProj;
-uniform float uTime, uWind;
+uniform float uTime, uWind, uInvH, uBaseY;
 uniform vec2 uWindDir;
 out vec2 vUV;
 out vec3 vT; out vec3 vBt; out vec3 vN; out vec3 vWorld;
@@ -790,7 +1048,7 @@ void main(){
   float curl = floor(packedI / 256.0) * 2.0 - 1.0;
 
   /* the anchor rides its twig's wind displacement — the stem stays attached */
-  vec3 anchor = aC.xyz + windDisp(aC.xyz, flex, phase, aC.y / 4.6, uTime, uWind, uWindDir);
+  vec3 anchor = aC.xyz + windDisp(aC.xyz, flex, phase, max(0.0, aC.y - uBaseY) * uInvH, uTime, uWind, uWindDir);
 
   vec3 axis = aA.xyz;
   vec3 side = aB.xyz;
@@ -836,13 +1094,13 @@ void main(){
   float nl = max(dot(N, uSunDir), 0.0);
   float trans = max(dot(-N, uSunDir), 0.0);
   vec3 H = normalize(uSunDir + V);
-  float glint = pow(max(dot(N, H), 0.0), 70.0) * (0.35 + vTG.y * 1.9);
+  float glint = pow(max(dot(N, H), 0.0), 70.0) * (0.22 + vTG.y * 1.1);
   vec3 sunC = vec3(1.0, 0.96, 0.84);
   vec3 amb = vec3(0.38, 0.47, 0.55);
   vec3 tintC = mix(vec3(0.86, 1.0, 0.74), vec3(1.08, 1.02, 0.8), vTG.x);
   vec3 col = alb.rgb * tintC * (amb * (0.55 + 0.45 * N.y)
-             + sunC * nl * 1.1 * uSunVis
-             + vec3(0.75, 0.9, 0.4) * trans * 0.5 * uSunVis)
+             + sunC * nl * 1.1 * uSunVis)
+           + alb.rgb * alb.rgb * 2.2 * trans * 0.55 * uSunVis
            + sunC * glint * uSunVis;
   frag = vec4(col, 1.0);
 }`;
@@ -852,9 +1110,9 @@ const progGround = makeProgram(GROUND_VS, GROUND_FS);
 const progBranch = makeProgram(BRANCH_VS, BRANCH_FS);
 const progLeaf = makeProgram(LEAF_VS, LEAF_FS);
 const uSky = uniforms(progSky, ['uCamRot','uTanFov','uSunDir','uNoise','uTime','uWindDir','uSunVis']);
-const uGround = uniforms(progGround, ['uView','uProj','uNoise','uSunDir','uSunVis','uEye']);
+const uGround = uniforms(progGround, ['uView','uProj','uNoise','uSunDir','uSunVis','uEye','uShadowR']);
 const uBranch = uniforms(progBranch, ['uView','uProj','uTime','uWind','uWindDir','uSunDir','uSunVis','uEye','uBark','uBarkN']);
-const uLeaf = uniforms(progLeaf, ['uView','uProj','uTime','uWind','uWindDir','uSunDir','uEye','uSunVis','uLeaf','uLeafN']);
+const uLeaf = uniforms(progLeaf, ['uView','uProj','uTime','uWind','uWindDir','uSunDir','uEye','uSunVis','uLeaf','uLeafN','uInvH','uBaseY']);
 
 /* ============================================================
    CAMERA + INPUT
@@ -865,11 +1123,12 @@ let camYaw = 0.5, camPitch = 0.12, camDist = 9.5, fitDist = 9.5;
 let userZoomed = false, lastInteract = -10;
 let W = 0, H = 0;
 
+const ZOOM_MIN = 0.45;    // zoom all the way in — right up to the trunk axis
 function computeFit() {
   const aspect = Math.max(0.2, W / H);
   const ty = Math.tan(FOVY / 2), tx = ty * aspect;
-  fitDist = Math.max(4.5 / ty, 3.8 / tx);
-  camDist = userZoomed ? Math.max(fitDist * 0.5, Math.min(fitDist * 1.6, camDist)) : fitDist;
+  fitDist = Math.max(CFG.fitHalfH / ty, CFG.fitHalfW / tx);
+  camDist = userZoomed ? Math.max(ZOOM_MIN, Math.min(fitDist * 1.6, camDist)) : fitDist;
 }
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
@@ -878,6 +1137,7 @@ function resize() {
   computeFit();
 }
 window.addEventListener('resize', resize);
+buildTree(curSpecies);
 resize();
 
 const pointers = new Map();
@@ -904,7 +1164,7 @@ canvas.addEventListener('pointermove', e => {
     const [a, b] = [...pointers.values()];
     const d = Math.hypot(a.x - b.x, a.y - b.y);
     if (pinchD0 > 0) {
-      camDist = Math.max(fitDist * 0.5, Math.min(fitDist * 1.6, pinchDist0 * pinchD0 / Math.max(40, d)));
+      camDist = Math.max(ZOOM_MIN, Math.min(fitDist * 1.6, pinchDist0 * pinchD0 / Math.max(40, d)));
       userZoomed = true;
     }
   }
@@ -914,7 +1174,7 @@ canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  camDist = Math.max(fitDist * 0.5, Math.min(fitDist * 1.6, camDist + e.deltaY * 0.006));
+  camDist = Math.max(ZOOM_MIN, Math.min(fitDist * 1.6, camDist + e.deltaY * 0.006));
   userZoomed = true; lastInteract = perfT;
 }, { passive: false });
 
@@ -928,6 +1188,21 @@ setTimeout(() => showHint('DRAG TO WALK AROUND THE TREE · PINCH TO ZOOM · WATC
 const info = document.getElementById('info');
 document.getElementById('info-btn').addEventListener('click', () => info.classList.add('open'));
 document.getElementById('info-close').addEventListener('click', () => info.classList.remove('open'));
+
+/* species picker */
+const speciesSel = document.getElementById('species');
+for (const key of Object.keys(SPECIES)) {
+  const o = document.createElement('option');
+  o.value = key; o.textContent = SPECIES[key].label.toUpperCase();
+  speciesSel.appendChild(o);
+}
+speciesSel.value = curSpecies;
+speciesSel.addEventListener('change', () => {
+  buildTree(speciesSel.value);
+  userZoomed = false;      // reframe for the new species' proportions
+  computeFit();
+  showHint(SPECIES[speciesSel.value].label.toUpperCase());
+});
 
 /* ============================================================
    WIND + SUN VISIBILITY
@@ -969,7 +1244,7 @@ function frame(tms) {
 
   const aspect = canvas.width / canvas.height;
   const proj = mat4Persp(FOVY, aspect, NEAR, FAR);
-  const cy = 2.6;
+  const cy = BASE_Y + CFG.cy;
   const eye = [Math.sin(camYaw) * Math.cos(camPitch) * camDist,
                cy + Math.sin(camPitch) * camDist,
                Math.cos(camYaw) * Math.cos(camPitch) * camDist];
@@ -1006,6 +1281,7 @@ function frame(tms) {
   gl.uniform3fv(uGround.uSunDir, SUN);
   gl.uniform1f(uGround.uSunVis, sunVisSm);
   gl.uniform3fv(uGround.uEye, eye);
+  gl.uniform2f(uGround.uShadowR, CFG.shadow[0], CFG.shadow[1]);
   gl.bindVertexArray(groundVAO);
   gl.drawElements(gl.TRIANGLES, groundCount, gl.UNSIGNED_INT, 0);
 
@@ -1040,6 +1316,8 @@ function frame(tms) {
   gl.uniform1i(uLeaf.uLeaf, 1);
   gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, leafNTex);
   gl.uniform1i(uLeaf.uLeafN, 4);
+  gl.uniform1f(uLeaf.uInvH, 1 / CFG.treeH);
+  gl.uniform1f(uLeaf.uBaseY, BASE_Y);
   gl.bindVertexArray(leafVAO);
   gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 6, leafCount);
 }
