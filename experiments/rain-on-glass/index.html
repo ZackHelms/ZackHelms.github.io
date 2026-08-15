@@ -90,7 +90,7 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 16:53 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 18:26 UTC</div>
 
 <canvas id="glass"></canvas>
 
@@ -139,7 +139,11 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
     rates, and wildfire puts a flickering orange glow, rising embers and a smoke pall over one
     quarter of the horizon. On the glass side, each weather deposits its own dirt into a
     <em>grime map</em>: brown dust film, creeping frost from the edges and bottom, gray ash flecks &mdash;
-    and rain gradually washes old grime away. A pressed finger wipes: it clears grime, clears
+    and rain gradually washes old grime away. The pane also lives its own life over time: it
+    starts freshly wiped, then steam re-condenses continuously (fastest in fog and rain, at
+    night on cold glass; slowly even on a clear day) and everyday dust keeps settling, so the
+    view gradually mists and dirties until you wipe it again &mdash; the page will nudge you if
+    you've let it fog over too long. A pressed finger wipes: it clears grime, clears
     the condensation fog, and sweeps droplets aside along the stroke. On a phone with motion
     sensors any touch wipes (the view is head-driven); on desktop the &#129529; button switches the
     drag between looking and wiping.</p>
@@ -886,9 +890,14 @@ function simStep(dt, t) {
     if (splashes[i].t > splashes[i].life) splashes.splice(i, 1);
   }
 
-  // wet map slowly fades → mist re-condenses
+  // steam re-condenses: the wiped map fades toward fogged, faster in wet
+  // weather and at night (cold glass), until you wipe again
+  const condRate = (weather === 'fog' ? 0.055 : weather === 'rain' ? 0.03
+                  : weather === 'snow' ? 0.034 : weather === 'embers' ? 0.02
+                  : weather === 'dust' ? 0.014 : 0.017)
+                 * (timeOfDay === 'night' ? 1.25 : timeOfDay === 'dusk' ? 1 : 0.7);
   wetCtx.globalCompositeOperation = 'destination-out';
-  wetCtx.globalAlpha = Math.min(1, dt * 0.035);
+  wetCtx.globalAlpha = Math.min(1, dt * condRate);
   wetCtx.fillStyle = '#fff';
   wetCtx.fillRect(0, 0, simW, simH);
   wetCtx.globalAlpha = 1;
@@ -1103,9 +1112,9 @@ void main(){
   vec3 rdBase = ray(uv, vec2(0.0));
 
   // base glass: fogged (heavy blur + milk) vs wiped (light blur)
-  vec3 fogged = bgAt(rdBase, 2) * 0.94 + vec3(0.055, 0.062, 0.078);   // milky condensation lift
-  vec3 wiped = bgAt(rdBase, 1) + 0.012;
-  vec3 base = mix(fogged, wiped, clamp(wet, 0., 1.) * 0.8);
+  vec3 fogged = bgAt(rdBase, 2) * 0.9 + vec3(0.085, 0.093, 0.112);   // milky condensation lift
+  vec3 wiped = mix(bgAt(rdBase, 1), bgAt(rdBase, 0), 0.55) + 0.006;   // clean glass ≈ sharp
+  vec3 base = mix(fogged, wiped, clamp(wet, 0., 1.));
   /* dirt stuck to the glass — wipe it with your finger */
   vec4 grm = texture(uGrime, uv);
   base = mix(base, grm.rgb, grm.a * 0.92);
@@ -1201,6 +1210,8 @@ function resize() {
   simH = Math.max(64, Math.round(H * SIM_SCALE));
   dropC.width = simW; dropC.height = simH;
   wetC.width = simW; wetC.height = simH;
+  wetCtx.fillStyle = '#fff';                 // start freshly wiped — steam builds from here
+  wetCtx.fillRect(0, 0, simW, simH);
 
   paintMicro();
   grimeC.width = simW; grimeC.height = simH;
@@ -1256,6 +1267,11 @@ function rebuildWorld() {
 function grimeStep(dt) {
   let n = 0, col = null;
   if (weather === 'dust') { n = dt * 38; col = () => `rgba(${120+(Math.random()*50|0)},${95+(Math.random()*40|0)},${58+(Math.random()*28|0)},0.12)`; }
+  else if (weather === 'clear' || weather === 'fog') {
+    // everyday dust slowly settles on the pane even in fair weather
+    n = dt * 3.2;
+    col = () => `rgba(${118+(Math.random()*40|0)},${100+(Math.random()*34|0)},${70+(Math.random()*24|0)},0.07)`;
+  }
   else if (weather === 'snow') { n = dt * 26; col = () => `rgba(${225+(Math.random()*25|0)},${230+(Math.random()*22|0)},245,0.15)`; }
   else if (weather === 'embers') { n = dt * 12; col = () => `rgba(${105+(Math.random()*30|0)},${100+(Math.random()*26|0)},98,0.12)`; }
   if (col) {
@@ -1507,10 +1523,12 @@ function requestMotion() {
 /* pressed finger: wipes the glass (always on sensor devices, or with the
    wipe tool on) — otherwise drags a virtual phone to look around */
 let dragging = false, lastPX = 0, lastPY = 0;
+let lastWipeT = 0;
 function wipeActive() { return wipeMode || haveSensor; }
+function noteWipe() { lastWipeT = perfT; }
 canvas.addEventListener('pointerdown', e => {
   dragging = true; lastPX = e.clientX; lastPY = e.clientY;
-  if (wipeActive()) wipeAt(e.clientX, e.clientY);
+  if (wipeActive()) { wipeAt(e.clientX, e.clientY); noteWipe(); }
 });
 canvas.addEventListener('pointermove', e => {
   if (!dragging) return;
@@ -1519,6 +1537,7 @@ canvas.addEventListener('pointermove', e => {
     const dx = e.clientX - lastPX, dy = e.clientY - lastPY;
     const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 14));
     for (let i = 1; i <= steps; i++) wipeAt(lastPX + dx * i / steps, lastPY + dy * i / steps);
+    noteWipe();
   } else if (!haveSensor) {
     oAlpha += (e.clientX - lastPX) * 0.22;
     oBeta = Math.max(2, Math.min(176, oBeta - (e.clientY - lastPY) * 0.22));
@@ -1642,12 +1661,17 @@ wipeBtn.addEventListener('click', () => {
 /* ============================================================
    MAIN LOOP
    ============================================================ */
-let lastT = 0, wetFrame = 0, roamFrame = 0;
+let lastT = 0, wetFrame = 0, roamFrame = 0, perfT = 0;
 function frame(tms) {
   requestAnimationFrame(frame);
   const t = tms / 1000;
   let dt = Math.min(0.1, t - lastT || 0.016);
-  lastT = t;
+  lastT = t; perfT = t;
+
+  if (t - lastWipeT > 90) {
+    showHint('THE GLASS IS FOGGING UP — WIPE IT WITH YOUR FINGER');
+    lastWipeT = t - 30;      // re-arm, but not too often
+  }
 
   smoothOrient(dt);
   simStep(dt, t);
