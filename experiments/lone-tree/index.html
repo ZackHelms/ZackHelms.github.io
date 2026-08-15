@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Lone Tree</title>
+<title>Tree Simulator</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -19,6 +19,9 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
   touch-action:manipulation; text-shadow:0 1px 3px rgba(0,0,0,0.5);
 }
 #back-btn { top:calc(env(safe-area-inset-top, 0px) + 10px); left:calc(env(safe-area-inset-left, 0px) + 10px); }
+#saw-btn { top:calc(env(safe-area-inset-top, 0px) + 58px); left:calc(env(safe-area-inset-left, 0px) + 10px); font-size:19px; }
+#saw-btn.active { border-color:#ffc300; box-shadow:0 0 12px #ffc30066; }
+#mute-btn { top:calc(env(safe-area-inset-top, 0px) + 106px); left:calc(env(safe-area-inset-left, 0px) + 10px); }
 #info-btn { top:calc(env(safe-area-inset-top, 0px) + 10px); right:calc(env(safe-area-inset-right, 0px) + 10px);
   font-family:Georgia, serif; font-style:italic; font-weight:bold; }
 
@@ -73,11 +76,13 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#556;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 15:44 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#556;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 16:41 UTC</div>
 
 <canvas id="view"></canvas>
 
 <a id="back-btn" class="chrome-btn" href="../" aria-label="Back to experiments">&#8592;</a>
+<button id="saw-btn" class="chrome-btn" aria-label="Saw tool">&#129691;</button>
+<button id="mute-btn" class="chrome-btn" aria-label="Toggle sound">&#128266;</button>
 <div id="species-wrap"><select id="species" aria-label="Tree species"></select></div>
 <button id="info-btn" class="chrome-btn" aria-label="About this scene">i</button>
 
@@ -86,7 +91,7 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
 
 <div id="info">
   <div class="info-inner">
-    <div class="info-head"><h2>LONE TREE &mdash; HOW IT WORKS</h2><button id="info-close">&#10005;</button></div>
+    <div class="info-head"><h2>TREE SIMULATOR &mdash; HOW IT WORKS</h2><button id="info-close">&#10005;</button></div>
 
     <h3>WHAT YOU'RE LOOKING AT</h3>
     <p>A single procedurally grown tree on a grassy rise, under a late-morning sun with drifting
@@ -168,6 +173,23 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
       the horizon colour.</li>
     </ul>
 
+    <h3>THE SAW</h3>
+    <p>Tap the &#129691; button, then scrub your finger back and forth across any branch (or the
+    trunk). The whole tree is recorded as a <em>skeleton registry</em> &mdash; branches, segments,
+    attachment points, every leaf's twig &mdash; so a pick ray finds the exact segment under your
+    finger, a dark kerf ring deepens as your stroke distance accumulates (thick wood takes
+    proportionally more strokes, ~r&sup2;), and sawdust streams off the cut into a pile on the
+    ground. At full depth the registry is partitioned: everything beyond the cut &mdash; that branch's
+    remainder, its child branches, their leaves &mdash; is re-emitted as a separate rigid body that
+    hinges over, falls under gravity, clatters on the hillside (a handful of recorded contact
+    points against the terrain, with restitution and tumble impulses), puffs the sawdust pile,
+    and settles. Both new end faces get an <em>end-grain recipe</em>: concentric growth rings warped by
+    noise in the species' own wood colours with a bark rim, drying checks, and a saw-scratch
+    height field turned into a normal map &mdash; oak rings differ from pine rings. Sounds are
+    synthesized WebAudio: band-passed stroke noise, a crack chord at give-way, pitch-dropping
+    thuds and a leaf rustle on impact. Cut as many branches as you like; switching species
+    plants a fresh tree.</p>
+
     <h3>APPROXIMATIONS &amp; LIMITATIONS</h3>
     <ul>
       <li>No real shadowing: the canopy shadow is a painted ellipse, leaves don't shade each other
@@ -188,6 +210,9 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
       <li>Species are stylised toward their recognisable adult forms; a real specimen varies far
       more (age, wind exposure, soil), and the pine's two-tone trunk is one texture, not a
       height-dependent material.</li>
+      <li>The fall is a toy rigid body: a few contact points, no branch-vs-branch collision or
+      breakage on impact, and pieces may interpenetrate the stump or each other. The kerf is a
+      dark ring, not a true wedge of removed material, until the moment of separation.</li>
       <li>The camera pitches a full &plusmn;90&deg; and may pass under the hill: nothing is occlusion-
       culled or capped, so from below you see through the ground's back faces and into open
       tube ends &mdash; a deliberate trade for free inspection angles.</li>
@@ -503,6 +528,59 @@ function makeBarkRecipe(cfg) {
 }
 function smoothstepJS(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
 
+/* end-grain growth rings: concentric warped rings in the species' wood
+   colours, a bark rim, radial checks; height field gives sawn relief */
+function makeRingsRecipe(wood, bark) {
+  const sz = 256;
+  const alb = document.createElement('canvas');
+  alb.width = alb.height = sz;
+  const ctx = alb.getContext('2d');
+  const img = ctx.createImageData(sz, sz);
+  const d = img.data;
+  const hf = new Float32Array(sz * sz);
+  const cracks = [];
+  for (let i = 0; i < 4; i++) cracks.push(rnd() * Math.PI * 2);
+  const [wl0, wl1, wl2] = wood.light, [wd0, wd1, wd2] = wood.dark;
+  for (let y = 0; y < sz; y++) for (let x = 0; x < sz; x++) {
+    const dx = (x / (sz - 1)) * 2 - 1, dy = (y / (sz - 1)) * 2 - 1;
+    const rrad = Math.hypot(dx, dy);                      // 0 centre … ~1 rim (uv r=0.48→0.96)
+    const th = Math.atan2(dy, dx);
+    const i4 = (y * sz + x) * 4;
+    if (rrad > 1.0) { d[i4+3] = 0; hf[y*sz+x] = 0.5; continue; }
+    const warp = noiseAt(Math.cos(th) * 0.22 + 0.5, Math.sin(th) * 0.22 + 0.5) - 0.5;
+    const rw = rrad + warp * 0.09;
+    let ring = 0.5 + 0.5 * Math.sin(rw * wood.freq + Math.sin(rw * wood.freq * 0.37) * 1.2);
+    ring = Math.pow(ring, 1.5);                            // sharp latewood lines
+    let cr = 0, cg = 0, cb = 0, hh;
+    if (rrad > 0.93) {                                     // bark rim
+      const bmix = (rrad - 0.93) / 0.07;
+      cr = wd0 * 0.7 * (1 - bmix) + bark.dark[0] * bmix;
+      cg = wd1 * 0.7 * (1 - bmix) + bark.dark[1] * bmix;
+      cb = wd2 * 0.7 * (1 - bmix) + bark.dark[2] * bmix;
+      hh = 0.45 - bmix * 0.1;
+    } else {
+      cr = wl0 + (wd0 - wl0) * ring; cg = wl1 + (wd1 - wl1) * ring; cb = wl2 + (wd2 - wl2) * ring;
+      // saw scratch noise + slight radial shading
+      const sn = noiseAt(x / sz * 3.1 + 0.2, y / sz * 0.35 + 0.6) - 0.5;
+      cr += sn * 26; cg += sn * 22; cb += sn * 18;
+      hh = 0.55 - ring * 0.12 + sn * 0.08;
+      // radial drying checks, deeper toward the rim
+      for (const ca2 of cracks) {
+        let da = Math.abs(((th - ca2 + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+        if (da < 0.035 && rrad > 0.25) {
+          const k = (0.035 - da) / 0.035 * Math.min(1, (rrad - 0.25) / 0.5);
+          cr *= 1 - k * 0.55; cg *= 1 - k * 0.55; cb *= 1 - k * 0.55;
+          hh -= k * 0.22;
+        }
+      }
+    }
+    d[i4] = cr; d[i4+1] = cg; d[i4+2] = cb; d[i4+3] = 255;
+    hf[y * sz + x] = hh;
+  }
+  ctx.putImageData(img, 0, 0);
+  return { alb, hf };
+}
+
 /* reusable texture objects — re-uploaded on species change */
 function makeTexObj(wrapX) {
   const t = gl.createTexture();
@@ -538,6 +616,7 @@ const SPECIES = {
     leaf: { shape:'lobed', minDepth:3, spacing:0.022, len:[0.2,0.3], wr:[0.32,0.4],
             tipFan:7, upBias:0.2, colTop:[92,132,50], colVar:[124,156,66] },
     bark: { style:'ridged', freq:9, dark:[70,54,40], light:[150,118,88] },
+    wood: { light:[196,166,120], dark:[124,90,56], freq: 30 },
     treeH: 4.6, cy: 2.6, fitHalfH: 4.5, fitHalfW: 3.8, shadow:[2.9,2.4],
   },
   birch: {
@@ -552,6 +631,7 @@ const SPECIES = {
     leaf: { shape:'pointed', minDepth:3, spacing:0.024, len:[0.13,0.19], wr:[0.42,0.52],
             tipFan:6, upBias:0.0, colTop:[116,162,58], colVar:[152,188,82] },
     bark: { style:'birch', dark:[40,38,36], light:[236,232,222] },
+    wood: { light:[224,206,172], dark:[172,144,108], freq: 36 },
     treeH: 5.1, cy: 2.8, fitHalfH: 4.8, fitHalfW: 3.2, shadow:[2.2,1.9],
   },
   willow: {
@@ -567,6 +647,7 @@ const SPECIES = {
     leaf: { shape:'lanceolate', minDepth:3, spacing:0.013, len:[0.15,0.22], wr:[0.16,0.22],
             tipFan:4, upBias:-0.25, colTop:[124,158,66], colVar:[158,188,98] },
     bark: { style:'ridged', freq:7, dark:[64,58,48], light:[130,120,100] },
+    wood: { light:[206,182,142], dark:[142,112,78], freq: 26 },
     treeH: 4.3, cy: 2.1, fitHalfH: 4.0, fitHalfW: 4.2, shadow:[3.4,2.9],
   },
   cypress: {
@@ -581,6 +662,7 @@ const SPECIES = {
     leaf: { shape:'scale', minDepth:1, spacing:0.014, len:[0.2,0.3], wr:[0.5,0.62],
             tipFan:6, upBias:0.35, colTop:[52,84,44], colVar:[76,106,58] },
     bark: { style:'ridged', freq:14, dark:[86,70,54], light:[148,126,100] },
+    wood: { light:[200,168,122], dark:[132,98,64], freq: 40 },
     treeH: 4.8, cy: 2.3, fitHalfH: 3.4, fitHalfW: 2.4, shadow:[1.0,0.85],
   },
   maple: {
@@ -595,6 +677,7 @@ const SPECIES = {
     leaf: { shape:'palmate', minDepth:3, spacing:0.02, len:[0.13,0.19], wr:[0.8,0.95],
             tipFan:6, upBias:0.05, colTop:[152,44,48], colVar:[198,86,52] },
     bark: { style:'smooth', dark:[70,60,54], light:[104,92,82] },
+    wood: { light:[228,198,152], dark:[170,126,86], freq: 28 },
     treeH: 2.9, cy: 1.7, fitHalfH: 2.9, fitHalfW: 3.4, shadow:[2.6,2.2],
   },
   pine: {
@@ -609,6 +692,7 @@ const SPECIES = {
     leaf: { shape:'needle', minDepth:3, spacing:0.055, len:[0.24,0.34], wr:[0.6,0.75],
             tipFan:12, upBias:0.3, colTop:[44,76,52], colVar:[70,100,66] },
     bark: { style:'plates', dark:[74,52,40], light:[186,112,66] },
+    wood: { light:[226,192,132], dark:[160,114,66], freq: 24 },
     treeH: 4.8, cy: 2.7, fitHalfH: 4.4, fitHalfW: 3.6, shadow:[2.4,2.0],
   },
 };
@@ -617,12 +701,16 @@ if (!SPECIES[curSpecies]) curSpecies = 'oak';
 let CFG = SPECIES[curSpecies];
 
 /* ============================================================
-   TREE BUILD — skeleton + stem-anchored leaves, rebuildable
+   TREE BUILD — skeleton recorded as data (branches / segments /
+   leaves with parent + attach links) so the saw can partition it,
+   then meshes are emitted from the records
    ============================================================ */
-let bPos, bNrm, bWind, bUV, bTan, bIdx, leaves, leafIdx;
+let bPos, bNrm, bWind, bUV, bTan, bIdx, leaves;
+let branches = [];          // {id,parentId,attachSeg,depth,phase,segs:[{p,q,r0,r1,f0,f1,v0,v1,sides}]}
+let leafIdx = 0;
 const MAX_LEAVES = 14000;
 
-function addTube(p0, p1, r0, r1, sides, flex0, flex1, phase, v0, v1) {
+function addTube(p0, p1, r0, r1, sides, flex0, flex1, phase, v0, v1, orig) {
   const dx = p1[0]-p0[0], dy = p1[1]-p0[1], dz = p1[2]-p0[2];
   const len = Math.hypot(dx, dy, dz) || 1;
   const ax = dx/len, ay = dy/len, az = dz/len;
@@ -632,13 +720,14 @@ function addTube(p0, p1, r0, r1, sides, flex0, flex1, phase, v0, v1) {
   const vx = ay*uz - az*uy, vy = az*ux - ax*uz, vz = ax*uy - ay*ux;
   const uRep = Math.max(1, Math.round(r0 * 22));
   const base = bPos.length / 3;
+  const ox = orig ? orig[0] : 0, oy = orig ? orig[1] : 0, oz = orig ? orig[2] : 0;
   for (let e = 0; e < 2; e++) {
     const P = e ? p1 : p0, R = e ? r1 : r0, F = e ? flex1 : flex0, V = e ? v1 : v0;
     for (let s2 = 0; s2 <= sides; s2++) {
       const a = s2 / sides * Math.PI * 2;
       const cx = Math.cos(a), sx = Math.sin(a);
       const nx = ux*cx + vx*sx, ny = uy*cx + vy*sx, nz = uz*cx + vz*sx;
-      bPos.push(P[0] + nx*R, P[1] + ny*R, P[2] + nz*R);
+      bPos.push(P[0] + nx*R - ox, P[1] + ny*R - oy, P[2] + nz*R - oz);
       bNrm.push(nx, ny, nz);
       bWind.push(F, phase, Math.max(0, P[1] - BASE_Y) / CFG.treeH);
       bUV.push(s2 / sides * uRep, V);
@@ -652,7 +741,7 @@ function addTube(p0, p1, r0, r1, sides, flex0, flex1, phase, v0, v1) {
   }
 }
 
-function addLeaf(anchor, dir, flex, phase) {
+function recordLeaf(bid, seg, anchor, dir, flex, phase) {
   if (leaves.length >= MAX_LEAVES) return;
   const L = CFG.leaf;
   const len = rr(L.len[0], L.len[1]);
@@ -663,16 +752,14 @@ function addLeaf(anchor, dir, flex, phase) {
   let sd = [axis[1]*up[2] - axis[2]*up[1], axis[2]*up[0] - axis[0]*up[2], axis[0]*up[1] - axis[1]*up[0]];
   const sl = Math.hypot(...sd) || 1;
   sd = sd.map(v => v / sl * halfW);
-  const tint = rnd() * 0.999;
-  const gloss = (rnd() * 255) | 0;
-  const curlBit = rnd() < 0.5 ? 0 : 1;
   leaves.push({
+    bid, seg,
     c: [anchor[0], anchor[1], anchor[2]], a: axis, b: sd,
     phase: phase + rr(-1.5, 1.5), flex,
-    packed: tint + gloss + curlBit * 256,
+    packed: rnd() * 0.999 + ((rnd() * 255) | 0) + (rnd() < 0.5 ? 0 : 256),
   });
 }
-function leavesAlong(p, q, d, f0, f1, phase) {
+function leavesAlong(bid, seg, p, q, d, f0, f1, phase) {
   let ux = -d[2], uy = 0, uz = d[0];
   const ul = Math.hypot(ux, uy, uz);
   if (ul < 0.01) { ux = 1; uz = 0; } else { ux /= ul; uz /= ul; }
@@ -686,11 +773,14 @@ function leavesAlong(p, q, d, f0, f1, phase) {
     const ca = Math.cos(ang), sa = Math.sin(ang);
     const rx = ux*ca + vx*sa, ry = uy*ca + vy*sa, rz = uz*ca + vz*sa;
     const dirL = [rx + d[0]*0.4, ry + d[1]*0.4 + CFG.leaf.upBias, rz + d[2]*0.4];
-    addLeaf([ax2, ay2, az2], dirL, (f0 + (f1-f0)*tL) * 1.1, phase);
+    recordLeaf(bid, seg, [ax2, ay2, az2], dirL, (f0 + (f1-f0)*tL) * 1.1, phase);
   }
 }
 
-function growBranch(pos, dir, len, rad, depth, phase, flex) {
+function growBranch(pos, dir, len, rad, depth, phase, flex, parentId, attachSeg) {
+  const id = branches.length;
+  const rec = { id, parentId, attachSeg, depth, phase, segs: [] };
+  branches.push(rec);
   const isWeep = CFG.weepDepth != null && depth >= CFG.weepDepth;
   const segs = isWeep ? CFG.weepSegs : (CFG.segs[Math.min(depth, CFG.segs.length - 1)] || 3);
   let p = pos.slice(), d = dir.slice();
@@ -698,36 +788,36 @@ function growBranch(pos, dir, len, rad, depth, phase, flex) {
   const wander = CFG.wander[Math.min(depth, CFG.wander.length - 1)];
   const lift = CFG.lift[Math.min(depth, CFG.lift.length - 1)];
   let vAcc = rnd() * 3;
-  const trunkJointFrac = [];   // for alongTrunk spawns
   for (let s = 0; s < segs; s++) {
     const t0 = s / segs, t1 = (s + 1) / segs;
     d[0] += rr(-wander, wander); d[2] += rr(-wander, wander);
-    if (isWeep) d[1] -= CFG.weepPull * (0.4 + t1);      // curtains fall harder as they go
+    if (isWeep) d[1] -= CFG.weepPull * (0.4 + t1);
     else d[1] += lift;
     const dl = Math.hypot(...d); d = d.map(v => v / dl);
     const segLen = len / segs;
     const q = [p[0] + d[0]*segLen, p[1] + d[1]*segLen, p[2] + d[2]*segLen];
     const f0 = flex + (t0 * 0.5) * flexGain(depth), f1 = flex + (t1 * 0.5) * flexGain(depth);
     const v1 = vAcc + segLen * 2.4;
-    addTube(p, q, rad * (1 - t0 * (isWeep ? 0.6 : 0.35)), rad * (1 - t1 * (isWeep ? 0.6 : 0.35)),
-            sides, f0, f1, phase, vAcc, v1);
+    rec.segs.push({ p: p.slice(), q: q.slice(),
+                    r0: rad * (1 - t0 * (isWeep ? 0.6 : 0.35)),
+                    r1: rad * (1 - t1 * (isWeep ? 0.6 : 0.35)),
+                    f0, f1, v0: vAcc, v1, sides });
     vAcc = v1;
     if (depth === 0 && CFG.lowLimb && s === 1) {
       const rot2 = rr(0, Math.PI * 2);
       growBranch(q, [Math.cos(rot2) * 0.85, 0.5, Math.sin(rot2) * 0.85], len * 0.62, rad * 0.5,
-                 1, rr(0, Math.PI * 2), f1);
+                 1, rr(0, Math.PI * 2), f1, id, s);
     }
-    // columnar/conifer habit: branches sprout along the trunk, not just at its top
     if (depth === 0 && CFG.alongTrunk > 0 && t1 >= CFG.upperOnly && s < segs - 1) {
       for (let k = 0; k < CFG.alongTrunk; k++) {
         const rot2 = rr(0, Math.PI * 2);
         const sp = rr(CFG.spread[0][0], CFG.spread[0][1]);
         const nd = [Math.cos(rot2) * Math.sin(sp), Math.cos(sp), Math.sin(rot2) * Math.sin(sp)];
         growBranch(q, nd, len * rr(CFG.lenRatio[0], CFG.lenRatio[1]) * (1 - t1 * 0.35),
-                   rad * rr(CFG.radRatio[0], CFG.radRatio[1]), 1, rr(0, Math.PI * 2), f1);
+                   rad * rr(CFG.radRatio[0], CFG.radRatio[1]), 1, rr(0, Math.PI * 2), f1, id, s);
       }
     }
-    if (depth >= CFG.leaf.minDepth) leavesAlong(p, q, d, f0, f1, phase);
+    if (depth >= CFG.leaf.minDepth) leavesAlong(id, s, p, q, d, f0, f1, phase);
     p = q;
   }
   const endFlex = flex + 0.5 * flexGain(depth);
@@ -750,25 +840,32 @@ function growBranch(pos, dir, len, rad, depth, phase, flex) {
         ? rr(CFG.weepLen[0], CFG.weepLen[1])
         : len * rr(CFG.lenRatio[0], CFG.lenRatio[1]);
       growBranch(p, nd, nLen, rad * rr(CFG.radRatio[0], CFG.radRatio[1]), depth + 1,
-                 depth < 2 ? rr(0, Math.PI * 2) : phase + rr(-0.8, 0.8), endFlex);
+                 depth < 2 ? rr(0, Math.PI * 2) : phase + rr(-0.8, 0.8), endFlex, id, segs - 1);
     }
   } else if (depth >= CFG.leaf.minDepth) {
     for (let i = 0; i < CFG.leaf.tipFan; i++) {
       const ang = rr(0, Math.PI * 2), sprd2 = rr(0.3, 0.9);
       const dirL = [d[0] + Math.cos(ang) * sprd2, d[1] + 0.3 + CFG.leaf.upBias + rr(-0.15, 0.25),
                     d[2] + Math.sin(ang) * sprd2];
-      addLeaf(p, dirL, endFlex * 1.15, phase);
+      recordLeaf(id, segs - 1, p, dirL, endFlex * 1.15, phase);
     }
   }
 }
 function flexGain(depth) { return [0.02, 0.1, 0.28, 0.55, 0.85][Math.min(depth, 4)]; }
 
 /* ============================================================
-   GPU BUILD — VAOs + textures recreated on species change
+   GPU BUILD + SAW STATE — meshes emitted from the registry;
+   a cut partitions it into the standing tree and a falling piece
    ============================================================ */
-let branchVAO = null, leafVAO = null, branchCount = 0, leafCount = 0;
-let BASE_Y = 0;   // hilltop height at the trunk — set once groundH exists
+let branchVAO = null, leafVAO = null, capVAO = null;
+let branchCount = 0, leafCount = 0, capCount = 0;
 let treeBuffers = [];
+let BASE_Y = 0;
+const cuts = new Map();        // bid -> {seg, t} truncation of a standing branch
+const detached = new Set();    // bids that have fallen
+const pieces = [];             // rigid bodies of fallen subtrees
+let ringTex = null, ringNTex = null;
+
 function attach(loc, arr, size) {
   const b = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, b);
@@ -777,10 +874,226 @@ function attach(loc, arr, size) {
   gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
   return b;
 }
+function lerp3(a, b, t) { return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
+function segDir(sg) {
+  const d = [sg.q[0]-sg.p[0], sg.q[1]-sg.p[1], sg.q[2]-sg.p[2]];
+  const l = Math.hypot(...d) || 1; return d.map(v => v/l);
+}
+
+/* cut-end disc: center + ring fan, bark-shader-compatible attributes
+   (pos, normal=axis, wind, uv=disc coords, tangent=disc u basis) */
+function addCap(center, axis, r, flex, phase, orig) {
+  const sides = 14;
+  let ux = -axis[2], uy = 0, uz = axis[0];
+  const ul = Math.hypot(ux, uy, uz);
+  if (ul < 0.01) { ux = 1; uy = 0; uz = 0; } else { ux/=ul; uz/=ul; }
+  const vx = axis[1]*uz - axis[2]*uy, vy = axis[2]*ux - axis[0]*uz, vz = axis[0]*uy - axis[1]*ux;
+  const ox = orig ? orig[0] : 0, oy = orig ? orig[1] : 0, oz = orig ? orig[2] : 0;
+  const hn = Math.max(0, center[1] - BASE_Y) / CFG.treeH;
+  const base = cPos.length / 3;
+  cPos.push(center[0]-ox, center[1]-oy, center[2]-oz);
+  cNrm.push(axis[0], axis[1], axis[2]);
+  cWind.push(flex, phase, hn);
+  cUV.push(0.5, 0.5);
+  cTan.push(ux, uy, uz);
+  for (let i = 0; i <= sides; i++) {
+    const a = i / sides * Math.PI * 2;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    cPos.push(center[0] + (ux*ca + vx*sa)*r - ox, center[1] + (uy*ca + vy*sa)*r - oy, center[2] + (uz*ca + vz*sa)*r - oz);
+    cNrm.push(axis[0], axis[1], axis[2]);
+    cWind.push(flex, phase, hn);
+    cUV.push(0.5 + ca*0.48, 0.5 + sa*0.48);
+    cTan.push(ux, uy, uz);
+  }
+  for (let i = 0; i < sides; i++) cIdx.push(base, base+1+i, base+2+i);
+}
+let cPos, cNrm, cWind, cUV, cTan, cIdx;
+
+function leafAttachedNow(lf) {
+  if (detached.has(lf.bid)) return false;
+  const c = cuts.get(lf.bid);
+  return !c || lf.seg < c.seg;     // leaves on the cut segment ride the piece
+}
+
+function buildVAOs(pos, nrm, wind, uv, tan, idx, lvs, bufList) {
+  const bv = gl.createVertexArray();
+  gl.bindVertexArray(bv);
+  bufList.push(attach(0, pos, 3), attach(1, nrm, 3), attach(2, wind, 3), attach(3, uv, 2), attach(4, tan, 3));
+  const ib = gl.createBuffer(); bufList.push(ib);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(idx), gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  let lv = null, n = 0;
+  if (lvs) {
+    n = lvs.length;
+    lv = gl.createVertexArray();
+    gl.bindVertexArray(lv);
+    const quad = gl.createBuffer(); bufList.push(quad);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,0, -1,1, 0,0, 0,1, 1,0, 1,1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    const inst = new Float32Array(n * 12);
+    for (let i = 0; i < n; i++) {
+      const L = lvs[i], o = i * 12;
+      inst[o] = L.c[0]; inst[o+1] = L.c[1]; inst[o+2] = L.c[2]; inst[o+3] = L.phase;
+      inst[o+4] = L.a[0]; inst[o+5] = L.a[1]; inst[o+6] = L.a[2]; inst[o+7] = L.flex;
+      inst[o+8] = L.b[0]; inst[o+9] = L.b[1]; inst[o+10] = L.b[2]; inst[o+11] = L.packed;
+    }
+    const ibuf = gl.createBuffer(); bufList.push(ibuf);
+    gl.bindBuffer(gl.ARRAY_BUFFER, ibuf);
+    gl.bufferData(gl.ARRAY_BUFFER, inst, gl.STATIC_DRAW);
+    for (let k = 0; k < 3; k++) {
+      gl.enableVertexAttribArray(1 + k);
+      gl.vertexAttribPointer(1 + k, 4, gl.FLOAT, false, 48, k * 16);
+      gl.vertexAttribDivisor(1 + k, 1);
+    }
+    gl.bindVertexArray(null);
+  }
+  return { bv, lv, n };
+}
+
+/* rebuild the standing tree (respecting cuts/detached) + its stump caps */
+function emitAttached() {
+  bPos=[];bNrm=[];bWind=[];bUV=[];bTan=[];bIdx=[];
+  cPos=[];cNrm=[];cWind=[];cUV=[];cTan=[];cIdx=[];
+  for (const rec of branches) {
+    if (detached.has(rec.id)) continue;
+    const cut = cuts.get(rec.id);
+    for (let si = 0; si < rec.segs.length; si++) {
+      const sg = rec.segs[si];
+      if (cut && si > cut.seg) break;
+      if (cut && si === cut.seg) {
+        const qq = lerp3(sg.p, sg.q, cut.t);
+        const r1 = sg.r0 + (sg.r1 - sg.r0) * cut.t;
+        const f1 = sg.f0 + (sg.f1 - sg.f0) * cut.t;
+        const v1 = sg.v0 + (sg.v1 - sg.v0) * cut.t;
+        addTube(sg.p, qq, sg.r0, r1, sg.sides, sg.f0, f1, rec.phase, sg.v0, v1, null);
+        addCap(qq, segDir(sg), r1, f1, rec.phase, null);
+        break;
+      }
+      addTube(sg.p, sg.q, sg.r0, sg.r1, sg.sides, sg.f0, sg.f1, rec.phase, sg.v0, sg.v1, null);
+    }
+  }
+  const lvs = leaves.filter(leafAttachedNow);
+  if (branchVAO) {
+    gl.deleteVertexArray(branchVAO); gl.deleteVertexArray(leafVAO);
+    if (capVAO) gl.deleteVertexArray(capVAO);
+    for (const b of treeBuffers) gl.deleteBuffer(b);
+  }
+  treeBuffers = [];
+  const bv = buildVAOs(bPos, bNrm, bWind, bUV, bTan, bIdx, lvs, treeBuffers);
+  branchVAO = bv.bv; leafVAO = bv.lv; leafCount = bv.n; branchCount = bIdx.length;
+  if (cIdx.length) {
+    const cv = buildVAOs(cPos, cNrm, cWind, cUV, cTan, cIdx, null, treeBuffers);
+    capVAO = cv.bv; capCount = cIdx.length;
+  } else { capVAO = null; capCount = 0; }
+}
+
+/* collect the subtree that a cut at (bid, seg) releases (bounded by a prior cut) */
+function collectPieceBranches(bid, seg, endSeg) {
+  const ids = new Set();
+  const kids = [];
+  for (const rec of branches)
+    if (rec.parentId === bid && !detached.has(rec.id) && rec.attachSeg >= seg && rec.attachSeg <= endSeg)
+      kids.push(rec.id);
+  const stack = [...kids];
+  while (stack.length) {
+    const id = stack.pop();
+    if (ids.has(id)) continue;
+    ids.add(id);
+    for (const rec of branches)
+      if (rec.parentId === id && !detached.has(rec.id)) stack.push(rec.id);
+  }
+  return ids;
+}
+
+function severBranch(bid, segIdx, t) {
+  const rec = branches[bid];
+  const sg = rec.segs[segIdx];
+  const cutPoint = lerp3(sg.p, sg.q, t);
+  const axis = segDir(sg);
+  const rCut = sg.r0 + (sg.r1 - sg.r0) * t;
+  const oldCut = cuts.get(bid);       // piece is bounded above by any prior cut
+  const endSeg = oldCut ? oldCut.seg : rec.segs.length - 1;
+  const descIds = collectPieceBranches(bid, segIdx, endSeg);
+
+  /* leaves that were attached before but not after */
+  const wasAttached = leaves.map(leafAttachedNow);
+  cuts.set(bid, { seg: segIdx, t });
+  for (const id of descIds) detached.add(id);
+  const pieceLeaves = [];
+  for (let i = 0; i < leaves.length; i++)
+    if (wasAttached[i] && !leafAttachedNow(leaves[i])) pieceLeaves.push(leaves[i]);
+
+  /* piece geometry in local coords (origin = cut point) */
+  bPos=[];bNrm=[];bWind=[];bUV=[];bTan=[];bIdx=[];
+  cPos=[];cNrm=[];cWind=[];cUV=[];cTan=[];cIdx=[];
+  const contacts = [[0,0,0]];
+  let com = [0,0,0], nCom = 0;
+  function noteJoint(w) {
+    const l = [w[0]-cutPoint[0], w[1]-cutPoint[1], w[2]-cutPoint[2]];
+    contacts.push(l);
+    com[0]+=l[0]; com[1]+=l[1]; com[2]+=l[2]; nCom++;
+  }
+  // truncated remainder of the cut branch
+  for (let si = segIdx; si <= endSeg; si++) {
+    const g = rec.segs[si];
+    let pA = g.p, r0 = g.r0, f0 = g.f0, v0 = g.v0;
+    let pB = g.q, r1 = g.r1, f1 = g.f1, v1 = g.v1;
+    if (si === segIdx) { pA = cutPoint; r0 = rCut; f0 = g.f0+(g.f1-g.f0)*t; v0 = g.v0+(g.v1-g.v0)*t; }
+    if (oldCut && si === oldCut.seg) {
+      pB = lerp3(g.p, g.q, oldCut.t); r1 = g.r0+(g.r1-g.r0)*oldCut.t;
+      f1 = g.f0+(g.f1-g.f0)*oldCut.t; v1 = g.v0+(g.v1-g.v0)*oldCut.t;
+    }
+    addTube(pA, pB, r0, r1, g.sides, f0, f1, rec.phase, v0, v1, cutPoint);
+    noteJoint(pB);
+    if (oldCut && si === oldCut.seg) { addCap(pB, segDir(g), r1, f1, rec.phase, cutPoint); break; }
+  }
+  addCap(cutPoint, axis.map(v => -v), rCut, 0, rec.phase, cutPoint);
+  for (const id of descIds) {
+    const dr = branches[id];
+    for (const g of dr.segs) {
+      addTube(g.p, g.q, g.r0, g.r1, g.sides, g.f0, g.f1, dr.phase, g.v0, g.v1, cutPoint);
+      noteJoint(g.q);
+    }
+  }
+  if (nCom) com = com.map(v => v / nCom);
+  // leaves in local coords
+  const lvsLocal = pieceLeaves.map(lf => ({ ...lf,
+    c: [lf.c[0]-cutPoint[0], lf.c[1]-cutPoint[1], lf.c[2]-cutPoint[2]] }));
+  const bufs = [];
+  const bv = buildVAOs(bPos, bNrm, bWind, bUV, bTan, bIdx, lvsLocal, bufs);
+  let cv = null;
+  if (cIdx.length) cv = buildVAOs(cPos, cNrm, cWind, cUV, cTan, cIdx, null, bufs);
+  // hinge: rotate about an axis perpendicular to gravity and the reach to com
+  let hx = -com[2], hz = com[0];
+  const hl = Math.hypot(hx, hz) || 1;
+  pieces.push({
+    bv: bv.bv, lv: bv.lv, leafN: bv.n, idxN: bIdx.length,
+    cv: cv ? cv.bv : null, cN: cv ? cIdx.length : 0, bufs,
+    pos: cutPoint.slice(), R: [1,0,0, 0,1,0, 0,0,1],
+    v: [axis[0]*0.15, 0.05, axis[2]*0.15],
+    w: [hx/hl * rr(1.0, 1.8), rr(-0.4, 0.4), hz/hl * rr(1.0, 1.8)],
+    contacts, com, resting: false, hits: 0, leafy: pieceLeaves.length > 20,
+  });
+  emitAttached();
+  return { cutPoint, rCut };
+}
+
+function disposePieces() {
+  for (const pc of pieces) {
+    gl.deleteVertexArray(pc.bv); if (pc.lv) gl.deleteVertexArray(pc.lv);
+    if (pc.cv) gl.deleteVertexArray(pc.cv);
+    for (const b of pc.bufs) gl.deleteBuffer(b);
+  }
+  pieces.length = 0;
+}
+
 function buildTree(key) {
   curSpecies = key; CFG = SPECIES[key];
   try { localStorage.setItem('lonetree-species', key); } catch (e) {}
-  seed = (CFG.seed * 2654435761) >>> 0;         // deterministic per species
+  seed = (CFG.seed * 2654435761) >>> 0;
 
   const strokey = CFG.leaf.shape === 'scale' || CFG.leaf.shape === 'needle';
   const lr = makeLeafRecipe(CFG.leaf.shape, CFG.leaf.colTop, CFG.leaf.colVar);
@@ -789,53 +1102,18 @@ function buildTree(key) {
   const br = makeBarkRecipe(CFG.bark);
   uploadTex(barkTex, br.alb);
   uploadTex(barkNTex, heightToNormalCanvas(br.hf, BARK_W, BARK_H, CFG.bark.style === 'smooth' ? 1.2 : 3.0, true));
+  const rg = makeRingsRecipe(CFG.wood, CFG.bark);
+  if (!ringTex) { ringTex = makeTexObj(false); ringNTex = makeTexObj(false); }
+  uploadTex(ringTex, rg.alb);
+  uploadTex(ringNTex, heightToNormalCanvas(rg.hf, 256, 256, 3.2, false));
 
-  bPos = []; bNrm = []; bWind = []; bUV = []; bTan = []; bIdx = [];
-  leaves = []; leafIdx = 0;
+  branches = []; leaves = []; leafIdx = 0;
+  cuts.clear(); detached.clear();
+  disposePieces();
+  clearSawFx();
   BASE_Y = groundH(0, 0) - 0.06;
-  growBranch([0, BASE_Y, 0], [0.02, 1, -0.02], CFG.trunkLen, CFG.trunkRad, 0, 0, 0);
-
-  if (branchVAO) {
-    gl.deleteVertexArray(branchVAO); gl.deleteVertexArray(leafVAO);
-    for (const b of treeBuffers) gl.deleteBuffer(b);
-  }
-  treeBuffers = [];
-
-  branchVAO = gl.createVertexArray();
-  gl.bindVertexArray(branchVAO);
-  treeBuffers.push(attach(0, bPos, 3), attach(1, bNrm, 3), attach(2, bWind, 3),
-                   attach(3, bUV, 2), attach(4, bTan, 3));
-  const bIB = gl.createBuffer(); treeBuffers.push(bIB);
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bIB);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(bIdx), gl.STATIC_DRAW);
-  gl.bindVertexArray(null);
-  branchCount = bIdx.length;
-
-  leafVAO = gl.createVertexArray();
-  gl.bindVertexArray(leafVAO);
-  const quad = gl.createBuffer(); treeBuffers.push(quad);
-  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,0, -1,1, 0,0, 0,1, 1,0, 1,1]), gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  const n = leaves.length;
-  const inst = new Float32Array(n * 12);
-  for (let i = 0; i < n; i++) {
-    const L = leaves[i], o = i * 12;
-    inst[o] = L.c[0]; inst[o+1] = L.c[1]; inst[o+2] = L.c[2]; inst[o+3] = L.phase;
-    inst[o+4] = L.a[0]; inst[o+5] = L.a[1]; inst[o+6] = L.a[2]; inst[o+7] = L.flex;
-    inst[o+8] = L.b[0]; inst[o+9] = L.b[1]; inst[o+10] = L.b[2]; inst[o+11] = L.packed;
-  }
-  const ib = gl.createBuffer(); treeBuffers.push(ib);
-  gl.bindBuffer(gl.ARRAY_BUFFER, ib);
-  gl.bufferData(gl.ARRAY_BUFFER, inst, gl.STATIC_DRAW);
-  for (let k = 0; k < 3; k++) {
-    gl.enableVertexAttribArray(1 + k);
-    gl.vertexAttribPointer(1 + k, 4, gl.FLOAT, false, 48, k * 16);
-    gl.vertexAttribDivisor(1 + k, 1);
-  }
-  gl.bindVertexArray(null);
-  leafCount = n;
+  growBranch([0, BASE_Y, 0], [0.02, 1, -0.02], CFG.trunkLen, CFG.trunkRad, 0, 0, 0, -1, -1);
+  emitAttached();
   if (typeof computeFit === 'function' && W) computeFit();
 }
 
@@ -995,17 +1273,19 @@ layout(location=1) in vec3 aNrm;
 layout(location=2) in vec3 aWind;   // flex, phase, heightNorm
 layout(location=3) in vec2 aUV;
 layout(location=4) in vec3 aTan;    // around-the-ring bark tangent
-uniform mat4 uView, uProj;
-uniform float uTime, uWind;
+uniform mat4 uView, uProj, uModel;
+uniform float uTime, uWind, uWindOn;
 uniform vec2 uWindDir;
 out vec3 vNrm; out vec3 vPos; out float vShade; out vec2 vUV; out vec3 vTan;
 ${WIND_GLSL}
 void main(){
-  vec3 p = aPos + windDisp(aPos, aWind.x, aWind.y, aWind.z, uTime, uWind, uWindDir);
-  vPos = p; vNrm = aNrm;
+  vec3 p = aPos + windDisp(aPos, aWind.x, aWind.y, aWind.z, uTime, uWind, uWindDir) * uWindOn;
+  vec4 wp = uModel * vec4(p, 1.0);
+  vPos = wp.xyz;
+  vNrm = mat3(uModel) * aNrm;
   vShade = aWind.z;
-  vUV = aUV; vTan = aTan;
-  gl_Position = uProj * uView * vec4(p, 1.0);
+  vUV = aUV; vTan = mat3(uModel) * aTan;
+  gl_Position = uProj * uView * wp;
 }`;
 
 const BRANCH_FS = `#version 300 es
@@ -1037,8 +1317,8 @@ layout(location=0) in vec2 aCorner;  // s ∈ {-1,0,1} across, t ∈ {0,1} stem�
 layout(location=1) in vec4 aC;       // stem anchor.xyz (ON the twig), phase
 layout(location=2) in vec4 aA;       // stem→tip axis (length baked in), flex
 layout(location=3) in vec4 aB;       // width dir × halfWidth, tint+gloss+curl packed
-uniform mat4 uView, uProj;
-uniform float uTime, uWind, uInvH, uBaseY;
+uniform mat4 uView, uProj, uModel;
+uniform float uTime, uWind, uInvH, uBaseY, uWindOn;
 uniform vec2 uWindDir;
 out vec2 vUV;
 out vec3 vT; out vec3 vBt; out vec3 vN; out vec3 vWorld;
@@ -1052,7 +1332,7 @@ void main(){
   float curl = floor(packedI / 256.0) * 2.0 - 1.0;
 
   /* the anchor rides its twig's wind displacement — the stem stays attached */
-  vec3 anchor = aC.xyz + windDisp(aC.xyz, flex, phase, max(0.0, aC.y - uBaseY) * uInvH, uTime, uWind, uWindDir);
+  vec3 anchor = aC.xyz + windDisp(aC.xyz, flex, phase, max(0.0, aC.y - uBaseY) * uInvH, uTime, uWind, uWindDir) * uWindOn;
 
   vec3 axis = aA.xyz;
   vec3 side = aB.xyz;
@@ -1071,10 +1351,11 @@ void main(){
   /* fold along the midrib + a gentle tip curl — the blade is not flat */
   float cup = (1.0 - ss * ss) * 0.09 * lenS * sin(3.14159 * tt);
   float curlAmt = curl * 0.14 * lenS * tt * tt;
-  vec3 world = anchor + axis * tt + sideR * ss + nrmR * (cup + curlAmt);
+  vec3 world = (uModel * vec4(anchor + axis * tt + sideR * ss + nrmR * (cup + curlAmt), 1.0)).xyz;
 
   vUV = vec2(ss * 0.5 + 0.5, tt);
-  vT = normalize(sideR); vBt = axn; vN = normalize(nrmR);
+  mat3 mr = mat3(uModel);
+  vT = normalize(mr * sideR); vBt = normalize(mr * axn); vN = normalize(mr * nrmR);
   vWorld = world;
   vTG = vec2(tint, gloss);
   gl_Position = uProj * uView * vec4(world, 1.0);
@@ -1109,14 +1390,307 @@ void main(){
   frag = vec4(col, 1.0);
 }`;
 
+/* point particles (sawdust / puffs) */
+const PART_VS = `#version 300 es
+layout(location=0) in vec4 aP;      // xyz + alpha
+uniform mat4 uView, uProj;
+out float vA;
+void main(){
+  vec4 vp = uView * vec4(aP.xyz, 1.0);
+  gl_Position = uProj * vp;
+  gl_PointSize = clamp(9.0 / max(0.4, -vp.z), 1.2, 7.0);
+  vA = aP.w;
+}`;
+const PART_FS = `#version 300 es
+precision highp float;
+in float vA; uniform vec3 uColor; out vec4 frag;
+void main(){
+  vec2 d = gl_PointCoord - 0.5;
+  if (dot(d, d) > 0.25) discard;
+  frag = vec4(uColor, vA);
+}`;
+
+/* small solid meshes (kerf ring, sawdust piles) */
+const SOLID_VS = `#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNrm;
+uniform mat4 uView, uProj, uModel;
+out vec3 vN;
+void main(){
+  vN = mat3(uModel) * aNrm;
+  gl_Position = uProj * uView * uModel * vec4(aPos, 1.0);
+}`;
+const SOLID_FS = `#version 300 es
+precision highp float;
+in vec3 vN;
+uniform vec3 uColor, uSunDir;
+uniform float uSunVis;
+out vec4 frag;
+void main(){
+  float nl = max(dot(normalize(vN), uSunDir), 0.0);
+  frag = vec4(uColor * (0.45 + nl * 0.85 * uSunVis), 1.0);
+}`;
+
 const progSky = makeProgram(SKY_VS, SKY_FS);
 const progGround = makeProgram(GROUND_VS, GROUND_FS);
 const progBranch = makeProgram(BRANCH_VS, BRANCH_FS);
 const progLeaf = makeProgram(LEAF_VS, LEAF_FS);
+const progPart = makeProgram(PART_VS, PART_FS);
+const progSolid = makeProgram(SOLID_VS, SOLID_FS);
+const uPart = uniforms(progPart, ['uView','uProj','uColor']);
+const uSolid = uniforms(progSolid, ['uView','uProj','uModel','uColor','uSunDir','uSunVis']);
 const uSky = uniforms(progSky, ['uCamRot','uTanFov','uSunDir','uNoise','uTime','uWindDir','uSunVis']);
 const uGround = uniforms(progGround, ['uView','uProj','uNoise','uSunDir','uSunVis','uEye','uShadowR']);
-const uBranch = uniforms(progBranch, ['uView','uProj','uTime','uWind','uWindDir','uSunDir','uSunVis','uEye','uBark','uBarkN']);
-const uLeaf = uniforms(progLeaf, ['uView','uProj','uTime','uWind','uWindDir','uSunDir','uEye','uSunVis','uLeaf','uLeafN','uInvH','uBaseY']);
+const uBranch = uniforms(progBranch, ['uView','uProj','uModel','uTime','uWind','uWindOn','uWindDir','uSunDir','uSunVis','uEye','uBark','uBarkN']);
+const uLeaf = uniforms(progLeaf, ['uView','uProj','uModel','uTime','uWind','uWindOn','uWindDir','uSunDir','uEye','uSunVis','uLeaf','uLeafN','uInvH','uBaseY']);
+
+/* ============================================================
+   SAW TOOL — picking, kerf, sawdust, piles, rigid-body falls, audio
+   ============================================================ */
+const M_ID = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+let sawMode = false, sawing = null, camBasis = null;
+const parts = [];              // {p,v,life,max}
+const piles = [];              // {x,z,amt}
+const MAXP = 500;
+
+/* unit meshes for kerf ring (cylinder, y axis) + pile mound (dome) */
+function unitCyl(sides) {
+  const pos = [], nrm = [], idx = [];
+  for (let e = 0; e < 2; e++) for (let i = 0; i <= sides; i++) {
+    const a = i / sides * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+    pos.push(ca, e - 0.5, sa); nrm.push(ca, 0, sa);
+  }
+  for (let i = 0; i < sides; i++) idx.push(i, i+sides+1, i+1, i+1, i+sides+1, i+sides+2);
+  return { pos, nrm, idx };
+}
+function unitDome(sides, rings) {
+  const pos = [0,1,0], nrm = [0,1,0], idx = [];
+  for (let r2 = 1; r2 <= rings; r2++) for (let i = 0; i <= sides; i++) {
+    const el = (1 - r2 / rings) * Math.PI / 2, a = i / sides * Math.PI * 2;
+    pos.push(Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el));
+    nrm.push(Math.cos(a) * Math.cos(el), Math.sin(el) + 0.6, Math.sin(a) * Math.cos(el));
+  }
+  for (let i = 0; i < sides; i++) idx.push(0, 1 + i, 2 + i);
+  for (let r2 = 0; r2 < rings - 1; r2++) for (let i = 0; i < sides; i++) {
+    const a = 1 + r2 * (sides + 1) + i, b = a + sides + 1;
+    idx.push(a, b, a+1, a+1, b, b+1);
+  }
+  return { pos, nrm, idx };
+}
+function solidVAO(m) {
+  const v = gl.createVertexArray();
+  gl.bindVertexArray(v);
+  attach(0, m.pos, 3); attach(1, m.nrm, 3);
+  const ib = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(m.idx), gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  return { v, n: m.idx.length };
+}
+const kerfMesh = solidVAO(unitCyl(12));
+const domeMesh = solidVAO(unitDome(10, 4));
+
+/* particle buffer */
+const partVAO = gl.createVertexArray();
+const partBuf = gl.createBuffer();
+gl.bindVertexArray(partVAO);
+gl.bindBuffer(gl.ARRAY_BUFFER, partBuf);
+gl.bufferData(gl.ARRAY_BUFFER, MAXP * 16, gl.DYNAMIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 0, 0);
+gl.bindVertexArray(null);
+const partArr = new Float32Array(MAXP * 4);
+
+function clearSawFx() { parts.length = 0; piles.length = 0; sawing = null; }
+
+function spawnDust(pt, n, spread, vy) {
+  for (let i = 0; i < n && parts.length < MAXP; i++) {
+    parts.push({
+      p: [pt[0] + (Math.random()-0.5)*0.04, pt[1] + (Math.random()-0.5)*0.04, pt[2] + (Math.random()-0.5)*0.04],
+      v: [(Math.random()-0.5)*spread, vy + Math.random()*0.15, (Math.random()-0.5)*spread],
+      life: 0, max: 1.6 + Math.random(),
+    });
+  }
+}
+function pileAt(x, z) {
+  for (const pl of piles) if (Math.hypot(pl.x - x, pl.z - z) < 0.4) return pl;
+  const pl = { x, z, amt: 0 };
+  piles.push(pl);
+  return pl;
+}
+function stepParts(dt) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const pt = parts[i];
+    pt.v[1] -= 2.6 * dt;
+    pt.p[0] += pt.v[0]*dt; pt.p[1] += pt.v[1]*dt; pt.p[2] += pt.v[2]*dt;
+    pt.life += dt;
+    const gy = groundH(pt.p[0], pt.p[2]);
+    if (pt.p[1] < gy + 0.015) { pileAt(pt.p[0], pt.p[2]).amt += 1; parts.splice(i, 1); continue; }
+    if (pt.life > pt.max) parts.splice(i, 1);
+  }
+}
+
+/* ---- rigid pieces ---- */
+function rotAdd(R, w, dt) {
+  // R += skew(w)·R·dt, then re-orthonormalise columns
+  const [wx, wy, wz] = w;
+  const N = new Array(9);
+  for (let c = 0; c < 3; c++) {
+    const x = R[c], y = R[3+c], z = R[6+c];
+    N[c]   = x + (wy*z - wz*y) * dt;
+    N[3+c] = y + (wz*x - wx*z) * dt;
+    N[6+c] = z + (wx*y - wy*x) * dt;
+  }
+  let c0 = [N[0],N[3],N[6]], c1 = [N[1],N[4],N[7]];
+  const n0 = Math.hypot(...c0) || 1; c0 = c0.map(v=>v/n0);
+  const d01 = c0[0]*c1[0]+c0[1]*c1[1]+c0[2]*c1[2];
+  c1 = [c1[0]-c0[0]*d01, c1[1]-c0[1]*d01, c1[2]-c0[2]*d01];
+  const n1 = Math.hypot(...c1) || 1; c1 = c1.map(v=>v/n1);
+  const c2 = [c0[1]*c1[2]-c0[2]*c1[1], c0[2]*c1[0]-c0[0]*c1[2], c0[0]*c1[1]-c0[1]*c1[0]];
+  return [c0[0],c1[0],c2[0], c0[1],c1[1],c2[1], c0[2],c1[2],c2[2]];
+}
+function pieceModel(pc) {
+  const R = pc.R, p = pc.pos;
+  return new Float32Array([R[0],R[3],R[6],0, R[1],R[4],R[7],0, R[2],R[5],R[8],0, p[0],p[1],p[2],1]);
+}
+function stepPieces(dt) {
+  for (const pc of pieces) {
+    if (pc.resting) continue;
+    pc.v[1] -= 3.8 * dt;
+    pc.pos[0] += pc.v[0]*dt; pc.pos[1] += pc.v[1]*dt; pc.pos[2] += pc.v[2]*dt;
+    pc.R = rotAdd(pc.R, pc.w, dt);
+    pc.w = pc.w.map(v => v * (1 - dt * 0.25));
+    // deepest contact vs ground
+    let worst = 0, wpt = null;
+    for (const c of pc.contacts) {
+      const wx = pc.pos[0] + pc.R[0]*c[0] + pc.R[1]*c[1] + pc.R[2]*c[2];
+      const wy = pc.pos[1] + pc.R[3]*c[0] + pc.R[4]*c[1] + pc.R[5]*c[2];
+      const wz = pc.pos[2] + pc.R[6]*c[0] + pc.R[7]*c[1] + pc.R[8]*c[2];
+      const pen = groundH(wx, wz) - wy;
+      if (pen > worst) { worst = pen; wpt = [wx, wy, wz]; }
+    }
+    if (worst > 0) {
+      pc.pos[1] += worst;
+      const vImp = -pc.v[1];
+      if (vImp > 0.4) {
+        pc.v[1] = vImp * 0.28;
+        pc.v[0] *= 0.7; pc.v[2] *= 0.7;
+        pc.w = [pc.w[0]*0.5 + rr(-0.5,0.5), pc.w[1]*0.5 + rr(-0.3,0.3), pc.w[2]*0.5 + rr(-0.5,0.5)];
+        pc.hits++;
+        const vol = Math.min(1, vImp * 0.35);
+        sndThud(vol);
+        if (pc.leafy) sndRustle(vol * 0.8);
+        if (wpt) {
+          spawnDust(wpt, 16, 0.7, 0.5);
+          for (const pl of piles) {
+            if (Math.hypot(pl.x - wpt[0], pl.z - wpt[2]) < 1.3 && pl.amt > 8) {
+              spawnDust([pl.x, groundH(pl.x, pl.z) + 0.05, pl.z], Math.min(40, pl.amt), 0.5, 0.8);
+              pl.amt *= 0.8;   // the pile puffs up and resettles
+            }
+          }
+        }
+      } else {
+        pc.v[1] = 0;
+        pc.v[0] *= 0.9; pc.v[2] *= 0.9;
+        pc.w = pc.w.map(v => v * 0.9);
+      }
+      const sp = Math.hypot(...pc.v) + Math.hypot(...pc.w);
+      if (pc.hits >= 2 && sp < 0.5) pc.resting = true;
+    }
+  }
+}
+
+/* ---- ray picking of branch segments ---- */
+function pickBranch(px, py, eye, fwd, right, upv, tanX, tanY) {
+  const ndx = px / W * 2 - 1, ndy = 1 - 2 * py / H;
+  const dir = [
+    fwd[0] + right[0]*ndx*tanX + upv[0]*ndy*tanY,
+    fwd[1] + right[1]*ndx*tanX + upv[1]*ndy*tanY,
+    fwd[2] + right[2]*ndx*tanX + upv[2]*ndy*tanY];
+  const dl = Math.hypot(...dir); dir[0]/=dl; dir[1]/=dl; dir[2]/=dl;
+  let best = null;
+  for (const rec of branches) {
+    if (detached.has(rec.id)) continue;
+    const cut = cuts.get(rec.id);
+    const nSegs = cut ? cut.seg + 1 : rec.segs.length;
+    for (let si = 0; si < nSegs; si++) {
+      const sg = rec.segs[si];
+      const sQ = (cut && si === cut.seg) ? lerp3(sg.p, sg.q, cut.t) : sg.q;
+      // closest points between ray (eye+s·dir) and segment (p+u·(q-p))
+      const u = [sQ[0]-sg.p[0], sQ[1]-sg.p[1], sQ[2]-sg.p[2]];
+      const w0 = [sg.p[0]-eye[0], sg.p[1]-eye[1], sg.p[2]-eye[2]];
+      // closest point on the segment to the pick ray (w0 = p − eye):
+      // u = (b·d0 − e0) / (c − b²), then clamp into the sawable span
+      const b = dir[0]*u[0]+dir[1]*u[1]+dir[2]*u[2];
+      const c = u[0]*u[0]+u[1]*u[1]+u[2]*u[2];
+      const d0 = dir[0]*w0[0]+dir[1]*w0[1]+dir[2]*w0[2];
+      const e0 = u[0]*w0[0]+u[1]*w0[1]+u[2]*w0[2];
+      const den = c - b*b;
+      if (den < 1e-8 || c < 1e-8) continue;
+      let tSeg = Math.max(0.08, Math.min(0.92, (b*d0 - e0) / den));
+      const cp = [sg.p[0]+u[0]*tSeg, sg.p[1]+u[1]*tSeg, sg.p[2]+u[2]*tSeg];
+      const tR2 = (cp[0]-eye[0])*dir[0] + (cp[1]-eye[1])*dir[1] + (cp[2]-eye[2])*dir[2];
+      if (tR2 < 0.3) continue;
+      const rp = [eye[0]+dir[0]*tR2, eye[1]+dir[1]*tR2, eye[2]+dir[2]*tR2];
+      const dist = Math.hypot(rp[0]-cp[0], rp[1]-cp[1], rp[2]-cp[2]);
+      const rHere = sg.r0 + (sg.r1 - sg.r0) * tSeg;
+      if (dist < Math.max(0.06, rHere * 2.6)) {
+        if (!best || tR2 < best.tRay)
+          best = { bid: rec.id, seg: si, t: tSeg, point: cp, axis: segDir(sg), r: rHere, tRay: tR2 };
+      }
+    }
+  }
+  return best;
+}
+
+/* ---- audio ---- */
+let AC = null, master = null, audioOn = true, noiseBuf = null;
+function audioInit() {
+  if (AC) return;
+  AC = new (window.AudioContext || window.webkitAudioContext)();
+  master = AC.createGain(); master.gain.value = audioOn ? 0.8 : 0;
+  master.connect(AC.destination);
+  const len = AC.sampleRate * 1;
+  noiseBuf = AC.createBuffer(1, len, AC.sampleRate);
+  const ch = noiseBuf.getChannelData(0);
+  for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+}
+function noiseHit(freq, q, dur, vol, delay) {
+  if (!AC) return;
+  const src = AC.createBufferSource(); src.buffer = noiseBuf;
+  const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+  const g = AC.createGain();
+  const t0 = AC.currentTime + (delay || 0);
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  src.connect(f).connect(g).connect(master);
+  src.start(t0); src.stop(t0 + dur + 0.05);
+}
+let lastSawSnd = 0;
+function sndSaw(speed) {
+  if (!AC || perfT - lastSawSnd < 0.09) return;
+  lastSawSnd = perfT;
+  noiseHit(520 + Math.random() * 380, 1.2, 0.1 + Math.random() * 0.05, Math.min(0.4, 0.1 + speed * 0.15), 0);
+}
+function sndCrack() {
+  if (!AC) return;
+  noiseHit(180, 2.5, 0.1, 0.7, 0);
+  noiseHit(120, 3, 0.14, 0.6, 0.05);
+  noiseHit(300, 1.5, 0.08, 0.4, 0.09);
+}
+function sndThud(vol) {
+  if (!AC) return;
+  const o = AC.createOscillator(); o.type = 'sine';
+  const t0 = AC.currentTime;
+  o.frequency.setValueAtTime(85, t0);
+  o.frequency.exponentialRampToValueAtTime(38, t0 + 0.18);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(vol * 0.9, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
+  o.connect(g).connect(master); o.start(t0); o.stop(t0 + 0.25);
+  noiseHit(160, 1, 0.12, vol * 0.5, 0);
+}
+function sndRustle(vol) { if (AC) noiseHit(2600, 0.7, 0.28, vol * 0.35, 0.01); }
 
 /* ============================================================
    CAMERA + INPUT
@@ -1152,6 +1726,13 @@ canvas.addEventListener('pointerdown', e => {
   if (pointers.size === 2) {
     const [a, b] = [...pointers.values()];
     pinchD0 = Math.hypot(a.x - b.x, a.y - b.y); pinchDist0 = camDist;
+    sawing = null;
+  } else if (sawMode && camBasis) {
+    audioInit();
+    if (AC && AC.state === 'suspended') AC.resume();
+    const hit = pickBranch(e.clientX, e.clientY, camBasis.eye, camBasis.fwd, camBasis.right, camBasis.up,
+                           camBasis.tanX, camBasis.tanY);
+    sawing = hit ? { ...hit, progress: 0, lastX: e.clientX, lastY: e.clientY } : null;
   }
   lastInteract = perfT;
 });
@@ -1161,7 +1742,22 @@ canvas.addEventListener('pointermove', e => {
   const dx = e.clientX - p.x, dy = e.clientY - p.y;
   p.x = e.clientX; p.y = e.clientY;
   lastInteract = perfT;
-  if (pointers.size === 1) {
+  if (pointers.size === 1 && sawMode && sawing) {
+    /* scrub back and forth across the branch to saw */
+    const dpix = Math.abs(dx) + Math.abs(dy);
+    sawing.progress += dpix / (1000 + 170000 * sawing.r * sawing.r);
+    if (dpix > 2) {
+      sndSaw(dpix / 16);
+      if (Math.random() < 0.6 && dpix > 3)
+        spawnDust([sawing.point[0], sawing.point[1] - sawing.r * 0.7, sawing.point[2]],
+                  1 + (dpix / 14 | 0), 0.15, -0.05);
+    }
+    if (sawing.progress >= 1) {
+      sndCrack();
+      severBranch(sawing.bid, sawing.seg, sawing.t);
+      sawing = null;
+    }
+  } else if (pointers.size === 1) {
     camYaw -= dx * 0.006;
     camPitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camPitch + dy * 0.003));
   } else if (pointers.size === 2) {
@@ -1173,7 +1769,7 @@ canvas.addEventListener('pointermove', e => {
     }
   }
 });
-function endPointer(e) { pointers.delete(e.pointerId); if (pointers.size < 2) pinchD0 = 0; }
+function endPointer(e) { pointers.delete(e.pointerId); if (pointers.size < 2) pinchD0 = 0; sawing = null; }
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('wheel', e => {
@@ -1192,6 +1788,23 @@ setTimeout(() => showHint('DRAG TO WALK AROUND THE TREE · PINCH TO ZOOM · WATC
 const info = document.getElementById('info');
 document.getElementById('info-btn').addEventListener('click', () => info.classList.add('open'));
 document.getElementById('info-close').addEventListener('click', () => info.classList.remove('open'));
+
+/* saw + sound buttons */
+const sawBtn = document.getElementById('saw-btn');
+sawBtn.addEventListener('click', () => {
+  sawMode = !sawMode;
+  sawBtn.classList.toggle('active', sawMode);
+  sawing = null;
+  showHint(sawMode ? 'SAW MODE — SCRUB YOUR FINGER ACROSS A BRANCH TO CUT IT'
+                   : 'SAW OFF — DRAG ORBITS AGAIN');
+});
+const muteBtn = document.getElementById('mute-btn');
+muteBtn.addEventListener('click', () => {
+  audioOn = !audioOn;
+  muteBtn.innerHTML = audioOn ? '&#128266;' : '&#128263;';
+  audioInit();
+  if (master) master.gain.value = audioOn ? 0.8 : 0;
+});
 
 /* species picker */
 const speciesSel = document.getElementById('species');
@@ -1259,6 +1872,18 @@ function frame(tms) {
               Math.cos(camPitch),
               -Math.cos(camYaw) * Math.sin(camPitch)];
   const view = mat4LookAt(eye, [0, cy, 0], up);
+  /* camera basis for saw picking */
+  {
+    let f = [-eye[0], cy - eye[1], -eye[2]];
+    const fl = Math.hypot(...f) || 1; f = f.map(v => v / fl);
+    let r2 = [f[1]*up[2]-f[2]*up[1], f[2]*up[0]-f[0]*up[2], f[0]*up[1]-f[1]*up[0]];
+    const rl = Math.hypot(...r2) || 1; r2 = r2.map(v => v / rl);
+    const u2 = [r2[1]*f[2]-r2[2]*f[1], r2[2]*f[0]-r2[0]*f[2], r2[0]*f[1]-r2[1]*f[0]];
+    camBasis = { eye, fwd: f, right: r2, up: u2,
+                 tanY: Math.tan(FOVY / 2), tanX: Math.tan(FOVY / 2) * aspect };
+  }
+  stepPieces(dt);
+  stepParts(dt);
   /* camera basis for the sky ray march: rows of view rotation transposed */
   const camRot = new Float32Array([view[0], view[4], view[8], view[1], view[5], view[9], view[2], view[6], view[10]]);
 
@@ -1298,7 +1923,7 @@ function frame(tms) {
   gl.drawElements(gl.TRIANGLES, groundCount, gl.UNSIGNED_INT, 0);
   gl.disable(gl.CULL_FACE);
 
-  /* branches */
+  /* branches (standing tree, then fallen pieces, then cut-end caps) */
   gl.useProgram(progBranch);
   gl.uniformMatrix4fv(uBranch.uView, false, view);
   gl.uniformMatrix4fv(uBranch.uProj, false, proj);
@@ -1308,12 +1933,36 @@ function frame(tms) {
   gl.uniform3fv(uBranch.uSunDir, SUN);
   gl.uniform1f(uBranch.uSunVis, sunVisSm);
   gl.uniform3fv(uBranch.uEye, eye);
-  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, barkTex);
   gl.uniform1i(uBranch.uBark, 2);
-  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, barkNTex);
   gl.uniform1i(uBranch.uBarkN, 3);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, barkTex);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, barkNTex);
+  gl.uniformMatrix4fv(uBranch.uModel, false, M_ID);
+  gl.uniform1f(uBranch.uWindOn, 1);
   gl.bindVertexArray(branchVAO);
   gl.drawElements(gl.TRIANGLES, branchCount, gl.UNSIGNED_INT, 0);
+  for (const pc of pieces) {
+    gl.uniformMatrix4fv(uBranch.uModel, false, pieceModel(pc));
+    gl.uniform1f(uBranch.uWindOn, 0);
+    gl.bindVertexArray(pc.bv);
+    gl.drawElements(gl.TRIANGLES, pc.idxN, gl.UNSIGNED_INT, 0);
+  }
+  /* end-grain caps: same shader, ring textures */
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, ringTex);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, ringNTex);
+  if (capVAO) {
+    gl.uniformMatrix4fv(uBranch.uModel, false, M_ID);
+    gl.uniform1f(uBranch.uWindOn, 1);
+    gl.bindVertexArray(capVAO);
+    gl.drawElements(gl.TRIANGLES, capCount, gl.UNSIGNED_INT, 0);
+  }
+  for (const pc of pieces) {
+    if (!pc.cv) continue;
+    gl.uniformMatrix4fv(uBranch.uModel, false, pieceModel(pc));
+    gl.uniform1f(uBranch.uWindOn, 0);
+    gl.bindVertexArray(pc.cv);
+    gl.drawElements(gl.TRIANGLES, pc.cN, gl.UNSIGNED_INT, 0);
+  }
 
   /* leaves */
   gl.useProgram(progLeaf);
@@ -1331,8 +1980,72 @@ function frame(tms) {
   gl.uniform1i(uLeaf.uLeafN, 4);
   gl.uniform1f(uLeaf.uInvH, 1 / CFG.treeH);
   gl.uniform1f(uLeaf.uBaseY, BASE_Y);
+  gl.uniformMatrix4fv(uLeaf.uModel, false, M_ID);
+  gl.uniform1f(uLeaf.uWindOn, 1);
   gl.bindVertexArray(leafVAO);
   gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 6, leafCount);
+  for (const pc of pieces) {
+    if (!pc.lv || !pc.leafN) continue;
+    gl.uniformMatrix4fv(uLeaf.uModel, false, pieceModel(pc));
+    gl.uniform1f(uLeaf.uWindOn, 0);
+    gl.bindVertexArray(pc.lv);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 6, pc.leafN);
+  }
+
+  /* kerf ring + sawdust piles */
+  gl.useProgram(progSolid);
+  gl.uniformMatrix4fv(uSolid.uView, false, view);
+  gl.uniformMatrix4fv(uSolid.uProj, false, proj);
+  gl.uniform3fv(uSolid.uSunDir, SUN);
+  gl.uniform1f(uSolid.uSunVis, sunVisSm);
+  if (sawing) {
+    const ax = sawing.axis;
+    let ux = -ax[2], uy = 0, uz = ax[0];
+    const ul = Math.hypot(ux, uy, uz);
+    if (ul < 0.01) { ux = 1; uy = 0; uz = 0; } else { ux/=ul; uz/=ul; }
+    const vx2 = ax[1]*uz - ax[2]*uy, vy2 = ax[2]*ux - ax[0]*uz, vz2 = ax[0]*uy - ax[1]*ux;
+    const rr2 = sawing.r * 1.04, hh = 0.012 + sawing.progress * 0.035;
+    gl.uniformMatrix4fv(uSolid.uModel, false, new Float32Array([
+      ux*rr2, uy*rr2, uz*rr2, 0,
+      ax[0]*hh, ax[1]*hh, ax[2]*hh, 0,
+      vx2*rr2, vy2*rr2, vz2*rr2, 0,
+      sawing.point[0], sawing.point[1], sawing.point[2], 1]));
+    gl.uniform3f(uSolid.uColor, 0.08, 0.055, 0.035);
+    gl.bindVertexArray(kerfMesh.v);
+    gl.drawElements(gl.TRIANGLES, kerfMesh.n, gl.UNSIGNED_INT, 0);
+  }
+  for (const pl of piles) {
+    if (pl.amt < 2) continue;
+    const rx = 0.07 + Math.min(0.22, pl.amt * 0.004);
+    const ry = 0.015 + Math.min(0.065, pl.amt * 0.0016);
+    gl.uniformMatrix4fv(uSolid.uModel, false, new Float32Array([
+      rx,0,0,0, 0,ry,0,0, 0,0,rx,0, pl.x, groundH(pl.x, pl.z) - 0.005, pl.z, 1]));
+    gl.uniform3f(uSolid.uColor, 0.6, 0.5, 0.34);
+    gl.bindVertexArray(domeMesh.v);
+    gl.drawElements(gl.TRIANGLES, domeMesh.n, gl.UNSIGNED_INT, 0);
+  }
+
+  /* sawdust particles */
+  if (parts.length) {
+    for (let i = 0; i < parts.length; i++) {
+      const pt = parts[i], o = i * 4;
+      partArr[o] = pt.p[0]; partArr[o+1] = pt.p[1]; partArr[o+2] = pt.p[2];
+      partArr[o+3] = Math.max(0, 1 - pt.life / pt.max) * 0.9;
+    }
+    gl.useProgram(progPart);
+    gl.uniformMatrix4fv(uPart.uView, false, view);
+    gl.uniformMatrix4fv(uPart.uProj, false, proj);
+    gl.uniform3f(uPart.uColor, 0.78, 0.66, 0.45);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(false);
+    gl.bindVertexArray(partVAO);
+    gl.bindBuffer(gl.ARRAY_BUFFER, partBuf);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, partArr.subarray(0, parts.length * 4));
+    gl.drawArrays(gl.POINTS, 0, parts.length);
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
+  }
 }
 requestAnimationFrame(frame);
 </script>
