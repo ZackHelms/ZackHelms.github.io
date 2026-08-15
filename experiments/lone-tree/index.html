@@ -73,7 +73,7 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#556;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 15:36 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#556;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 15:44 UTC</div>
 
 <canvas id="view"></canvas>
 
@@ -188,6 +188,9 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
       <li>Species are stylised toward their recognisable adult forms; a real specimen varies far
       more (age, wind exposure, soil), and the pine's two-tone trunk is one texture, not a
       height-dependent material.</li>
+      <li>The camera pitches a full &plusmn;90&deg; and may pass under the hill: nothing is occlusion-
+      culled or capped, so from below you see through the ground's back faces and into open
+      tube ends &mdash; a deliberate trade for free inspection angles.</li>
     </ul>
 
     <h3>TOOLING</h3>
@@ -1160,7 +1163,7 @@ canvas.addEventListener('pointermove', e => {
   lastInteract = perfT;
   if (pointers.size === 1) {
     camYaw -= dx * 0.006;
-    camPitch = Math.max(0.02, Math.min(0.5, camPitch + dy * 0.003));
+    camPitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camPitch + dy * 0.003));
   } else if (pointers.size === 2) {
     const [a, b] = [...pointers.values()];
     const d = Math.hypot(a.x - b.x, a.y - b.y);
@@ -1249,8 +1252,13 @@ function frame(tms) {
   const eye = [Math.sin(camYaw) * Math.cos(camPitch) * camDist,
                cy + Math.sin(camPitch) * camDist,
                Math.cos(camYaw) * Math.cos(camPitch) * camDist];
-  eye[1] = Math.max(eye[1], groundH(eye[0], eye[2]) + 0.4);
-  const view = mat4LookAt(eye, [0, cy, 0], [0, 1, 0]);
+  /* full ±90° pitch: a pitch-aware up vector keeps lookAt stable at the
+     poles (fixed world-up degenerates looking straight down/up). The eye
+     may go below the hill — inside/under views are intentionally allowed. */
+  const up = [-Math.sin(camYaw) * Math.sin(camPitch),
+              Math.cos(camPitch),
+              -Math.cos(camYaw) * Math.sin(camPitch)];
+  const view = mat4LookAt(eye, [0, cy, 0], up);
   /* camera basis for the sky ray march: rows of view rotation transposed */
   const camRot = new Float32Array([view[0], view[4], view[8], view[1], view[5], view[9], view[2], view[6], view[10]]);
 
@@ -1274,7 +1282,10 @@ function frame(tms) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.depthMask(true);
 
-  /* ground */
+  /* ground — back-face culled so under-the-hill views see through to the
+     tree instead of an opaque terrain underside */
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.BACK);
   gl.useProgram(progGround);
   gl.uniformMatrix4fv(uGround.uView, false, view);
   gl.uniformMatrix4fv(uGround.uProj, false, proj);
@@ -1285,6 +1296,7 @@ function frame(tms) {
   gl.uniform2f(uGround.uShadowR, CFG.shadow[0], CFG.shadow[1]);
   gl.bindVertexArray(groundVAO);
   gl.drawElements(gl.TRIANGLES, groundCount, gl.UNSIGNED_INT, 0);
+  gl.disable(gl.CULL_FACE);
 
   /* branches */
   gl.useProgram(progBranch);
