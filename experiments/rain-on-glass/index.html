@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Rain on Glass</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; overflow:hidden; background:#0a0d18; }
+body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-select:none; }
+#glass { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+
+/* chrome */
+.chrome-btn {
+  position:fixed; z-index:80; width:40px; height:40px; border-radius:50%;
+  background:rgba(10,14,26,0.45); border:1px solid rgba(160,180,220,0.22);
+  color:#cdd8ee; font-size:17px; line-height:38px; text-align:center;
+  cursor:pointer; text-decoration:none; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  touch-action:manipulation;
+}
+#back-btn { top:calc(env(safe-area-inset-top, 0px) + 10px); left:calc(env(safe-area-inset-left, 0px) + 10px); }
+#mute-btn { top:calc(env(safe-area-inset-top, 0px) + 10px); left:calc(env(safe-area-inset-left, 0px) + 58px); }
+#info-btn { top:calc(env(safe-area-inset-top, 0px) + 10px); right:calc(env(safe-area-inset-right, 0px) + 10px);
+  font-family:Georgia, serif; font-style:italic; font-weight:bold; }
+
+/* start splash */
+#splash {
+  position:fixed; inset:0; z-index:90; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:14px; text-align:center;
+  background:rgba(5,8,16,0.55); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  color:#dde6f8; cursor:pointer; padding:30px; transition:opacity 0.7s;
+}
+#splash.hidden { opacity:0; pointer-events:none; }
+#splash h1 { font-size:clamp(1.3rem,5vw,2rem); letter-spacing:6px; font-weight:normal; text-shadow:0 2px 18px #000; }
+#splash p { font-size:0.72rem; letter-spacing:2px; color:#9fb2d8; line-height:2; max-width:420px; text-shadow:0 1px 8px #000; }
+#splash .tap { margin-top:10px; font-size:0.8rem; letter-spacing:4px; color:#fff;
+  border:1px solid rgba(255,255,255,0.35); border-radius:24px; padding:10px 26px;
+  animation:pulse 2.2s infinite; }
+@keyframes pulse { 0%,100%{opacity:0.65} 50%{opacity:1} }
+
+/* hint toast */
+#hint {
+  position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom, 0px) + 22px);
+  transform:translateX(-50%); z-index:70; font-size:0.62rem; letter-spacing:2px;
+  color:#b8c6e4; background:rgba(10,14,26,0.5); border:1px solid rgba(160,180,220,0.18);
+  border-radius:16px; padding:7px 16px; pointer-events:none; opacity:0; transition:opacity 0.8s;
+  text-align:center; max-width:88vw;
+}
+#hint.show { opacity:1; }
+
+/* info overlay */
+#info {
+  position:fixed; inset:0; z-index:100; display:none; overflow-y:auto;
+  -webkit-overflow-scrolling:touch; background:rgba(6,9,17,0.92);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  padding:calc(env(safe-area-inset-top, 0px) + 20px) 20px 60px;
+}
+#info.open { display:block; }
+.info-inner { max-width:640px; margin:0 auto; color:#c7d3ea; }
+.info-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.info-head h2 { font-size:1.05rem; letter-spacing:4px; color:#eef3ff; font-weight:normal; }
+#info-close { width:38px; height:34px; border-radius:8px; background:rgba(255,255,255,0.06);
+  border:1px solid rgba(160,180,220,0.25); color:#fff; font-size:15px; cursor:pointer; touch-action:manipulation; }
+.info-inner h3 { font-size:0.78rem; letter-spacing:3px; color:#8fd0ff; margin:26px 0 8px; font-weight:normal; }
+.info-inner p, .info-inner li { font-size:0.7rem; line-height:1.9; letter-spacing:0.4px; }
+.info-inner ul { padding-left:18px; }
+.info-inner li { margin-bottom:6px; }
+.info-inner code { color:#ffd479; font-size:0.66rem; background:rgba(255,212,121,0.07); padding:1px 4px; border-radius:3px; }
+.info-inner em { color:#a8b8d8; }
+
+#nogl { position:fixed; inset:0; z-index:95; display:none; align-items:center; justify-content:center;
+  color:#c7d3ea; font-size:0.75rem; letter-spacing:2px; text-align:center; padding:30px; line-height:2.2; }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 05:25 UTC</div>
+
+<canvas id="glass"></canvas>
+
+<a id="back-btn" class="chrome-btn" href="../" aria-label="Back to experiments">&#8592;</a>
+<button id="mute-btn" class="chrome-btn" aria-label="Toggle rain sound">&#128263;</button>
+<button id="info-btn" class="chrome-btn" aria-label="About this scene">i</button>
+
+<div id="splash">
+  <h1>RAIN ON GLASS</h1>
+  <p>YOUR SCREEN IS A WINDOW ON A WET EVENING.<br>
+     TILT THE PHONE &mdash; THE RAIN ALWAYS RUNS WITH REAL GRAVITY.<br>
+     HOLD IT FLAT, FACE UP, AND THE RAIN SPATTERS STRAIGHT ONTO THE GLASS.</p>
+  <div class="tap">TAP TO BEGIN</div>
+</div>
+
+<div id="hint"></div>
+<div id="nogl">THIS EXPERIMENT NEEDS WEBGL2.<br>YOUR BROWSER OR DEVICE HAS IT DISABLED.</div>
+
+<div id="info">
+  <div class="info-inner">
+    <div class="info-head"><h2>RAIN ON GLASS &mdash; HOW IT WORKS</h2><button id="info-close">&#10005;</button></div>
+
+    <h3>WHAT YOU'RE LOOKING AT</h3>
+    <p>The screen pretends to be a pane of glass on a rainy evening, with a blurry
+    city dusk behind it. Every visible drop is an individual particle in a simulation:
+    drops land, bead up, grow, merge, and &mdash; once heavy enough for the current tilt
+    of your actual phone &mdash; break loose and run downhill in stuttering rivulets,
+    wiping the misted glass clean where they pass.</p>
+
+    <h3>THE RENDERING STACK (TWO LAYERS)</h3>
+    <ul>
+      <li><em>CPU layer:</em> a JavaScript particle simulation draws each drop as a soft
+      radial-gradient blob into a half-resolution offscreen 2D canvas. That canvas is a
+      <em>height field</em> &mdash; brightness means water thickness, not colour. Runner drops are
+      drawn as three overlapping blobs (head + two trailing) to make teardrop shapes.</li>
+      <li><em>GPU layer:</em> each frame the height field is uploaded as a texture to a WebGL2
+      fragment shader. The shader takes the height field's screen-space gradient to build a
+      surface normal per pixel, then uses that normal to <em>refract</em>: inside a drop it samples
+      the <em>sharp</em> background image offset along the normal (drops act as little lenses, so
+      they look crisper than the fogged glass around them), adds a specular glint from a fixed
+      key light, a Fresnel-ish rim, and an inner shadow on the far side.</li>
+    </ul>
+    <p>The background is drawn once per resize by procedural 2D-canvas painting (dusk gradient,
+    rooftop silhouettes, warm windows, neon signs, street-light halos), then box-blurred at two
+    strengths by repeated downscale/upscale passes. Fogged glass shows the heavy blur with a
+    milky lift; where drops have wiped the glass you see the lighter blur; inside drops you see
+    the sharp version. No image assets &mdash; every pixel is generated in the page.</p>
+
+    <h3>THE DROPLET SIMULATION</h3>
+    <ul>
+      <li><em>Condensation:</em> ~1,500 static micro-droplets are pre-rendered once; a persistent
+      "wet map" canvas erases them where runners have passed, and slowly fades so mist
+      re-condenses over a minute or so.</li>
+      <li><em>Stick-slip:</em> every beaded drop has a random stiction threshold. It breaks loose
+      when <code>|g_tangential| &times; r&sup2;</code> beats that threshold &mdash; so at a slight ~20&deg; tilt only the
+      heaviest drops creep, at steeper tilts everything runs. Runners also make random micro-pauses,
+      which is what real drops do (contact-line pinning).</li>
+      <li><em>Rivulets:</em> a runner sheds mass as it goes, depositing a trail of tiny beads and losing
+      radius until it re-pins. Runners are steered toward beads slightly ahead of them (a cheap
+      spatial-hash cone search), so later drops follow earlier tracks &mdash; that's why channels form.</li>
+      <li><em>Merging:</em> overlapping drops combine area (<code>r = &radic;(r&sup2;+r&#8217;&sup2;)</code>) and the merged drop
+      gets a speed kick, like real coalescence cascades.</li>
+      <li><em>Face-up splatter:</em> when the phone lies flat facing the sky, tangential gravity vanishes:
+      nothing can run. Instead the impact rate rises and each hit spawns a crown &mdash; an expanding
+      ring drawn briefly into the height field &mdash; plus a scatter of ejecta micro-drops around a
+      new bead. Face the screen at the ground and the rain can't reach the glass at all, so the
+      drops slowly drip away.</li>
+    </ul>
+
+    <h3>GRAVITY &amp; SENSORS</h3>
+    <p>Tilt comes from the <code>deviceorientation</code> event. The beta/gamma angles are converted to a
+    3D gravity vector in device coordinates (<code>g = (cos&beta;&middot;sin&gamma;, &minus;sin&beta;, &minus;cos&beta;&middot;cos&gamma;)</code>), rotated by
+    <code>screen.orientation.angle</code> so it stays correct in landscape, then split into an in-plane
+    component (drives trickle direction and speed) and an out-of-plane component (drives
+    splatter mode). iOS requires a permission prompt for motion data &mdash; that's what the first
+    tap is for. With no sensor (desktop), touching or dragging tilts a virtual phone instead:
+    drag away from centre to tilt that way; the centre is "flat, face up".</p>
+
+    <h3>APPROXIMATIONS &amp; LIMITATIONS</h3>
+    <ul>
+      <li>The refraction is <em>screen-space fakery</em>: a normal-driven UV offset into a flat background
+      photo of the scene. Real drops invert and compress the whole scene behind them; here the
+      lens look is approximated by a large offset against the normal, so you get the feel of it
+      without the true inverted image.</li>
+      <li>The water isn't fluid-simulated &mdash; no surface tension solver, no Navier&ndash;Stokes. Blob
+      sprites + stick-slip rules are a phenomenological imitation of drop behaviour. Drop shapes
+      are always round-ish; real crawling drops develop asymmetric contact lines.</li>
+      <li>Height is a painter's trick (gradient blobs), so two touching drops blend heights instead
+      of forming a real meniscus bridge before merging.</li>
+      <li>No caustics: real drops focus light into bright crescents on whatever is behind the glass.</li>
+      <li>The height-field texture is half resolution for performance, so very fine trails soften.</li>
+      <li>Orientation quirks: some browsers report slightly different beta/gamma conventions, and
+      when the phone is near-vertical, gamma becomes unstable (gimbal lock) &mdash; the gravity vector
+      is low-pass filtered to hide the jitter.</li>
+    </ul>
+
+    <h3>TOOLING</h3>
+    <p>Hand-written single-file HTML/JS/GLSL &mdash; no libraries, no build step, no image or audio
+    assets. Sound (tap &#128266;) is WebAudio: looping filtered brown-noise for the rain bed plus
+    randomly scheduled band-passed noise grains for patter, both shaped live by tilt mode.</p>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   RAIN ON GLASS — CPU droplet sim → height field → WebGL2 refraction
+   ============================================================ */
+
+const canvas = document.getElementById('glass');
+const gl = canvas.getContext('webgl2', { antialias:false, alpha:false, depth:false, stencil:false, preserveDrawingBuffer:false });
+if (!gl) {
+  document.getElementById('nogl').style.display = 'flex';
+  document.getElementById('splash').style.display = 'none';
+  throw new Error('webgl2 unavailable');
+}
+
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+let W = 0, H = 0;           // CSS px
+let simW = 0, simH = 0;     // droplet sim space (height-field px)
+let SIM_SCALE = 0.6;        // sim px per CSS px (capped below)
+let RS = 1.2;               // radius scale: keeps drop sizes constant in CSS px
+                            // whatever resolution the sim runs at (1 at scale 0.5)
+
+/* ---------- offscreen canvases ---------- */
+const bgSharpC = document.createElement('canvas');  // procedural scene, sharp
+const bgBlurC  = document.createElement('canvas');  // light blur (wiped glass)
+const bgFogC   = document.createElement('canvas');  // heavy blur (fogged glass)
+const dropC    = document.createElement('canvas');  // per-frame height field
+const wetC     = document.createElement('canvas');  // persistent wiped-track map
+const microC   = document.createElement('canvas');  // static condensation layer
+const dropCtx  = dropC.getContext('2d');
+const wetCtx   = wetC.getContext('2d');
+
+/* soft round blob sprite (white radial gradient) reused for every drop */
+const blob = document.createElement('canvas');
+blob.width = blob.height = 64;
+{
+  const c = blob.getContext('2d');
+  const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.55, 'rgba(255,255,255,0.82)');
+  g.addColorStop(0.85, 'rgba(255,255,255,0.28)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+}
+function drawBlob(ctx, x, y, r, a) {
+  ctx.globalAlpha = a;
+  ctx.drawImage(blob, x - r, y - r, r * 2, r * 2);
+}
+
+/* ============================================================
+   PROCEDURAL BACKGROUND — dusk city behind the window
+   ============================================================ */
+let rngSeed = 20260815;
+function rnd() { rngSeed = (rngSeed * 1664525 + 1013904223) >>> 0; return rngSeed / 4294967296; }
+
+function paintScene(ctx, w, h) {
+  // sky: deep dusk gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, '#0b1026');
+  sky.addColorStop(0.45, '#1c2447');
+  sky.addColorStop(0.62, '#3b3560');
+  sky.addColorStop(0.72, '#6b4a63');
+  sky.addColorStop(0.8, '#2a2038');
+  sky.addColorStop(1, '#0c0a14');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+
+  // faint moon glow
+  const mx = w * 0.72, my = h * 0.16;
+  let g = ctx.createRadialGradient(mx, my, 0, mx, my, h * 0.2);
+  g.addColorStop(0, 'rgba(200,215,255,0.5)');
+  g.addColorStop(0.12, 'rgba(180,200,250,0.16)');
+  g.addColorStop(1, 'rgba(180,200,250,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(225,232,255,0.9)';
+  ctx.beginPath(); ctx.arc(mx, my, h * 0.018, 0, 7); ctx.fill();
+
+  // distant skyline (two depths of rooftop silhouettes)
+  const horizon = h * 0.74;
+  for (let layer = 0; layer < 2; layer++) {
+    const base = horizon - layer * h * 0.045;
+    const col = layer === 0 ? '#141327' : '#0b0a18';
+    ctx.fillStyle = col;
+    let x = -20;
+    while (x < w + 20) {
+      const bw = (0.05 + rnd() * 0.09) * w;
+      const bh = (0.05 + rnd() * (layer === 0 ? 0.13 : 0.2)) * h;
+      ctx.fillRect(x, base - bh, bw + 2, bh + h * 0.3);
+      // lit windows on nearer layer
+      if (layer === 1) {
+        const cols = Math.max(1, (bw / (w * 0.02)) | 0), rows = Math.max(1, (bh / (h * 0.025)) | 0);
+        for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+          if (rnd() < 0.28) {
+            const warm = rnd() < 0.8;
+            ctx.fillStyle = warm ? `rgba(255,${190 + (rnd()*50|0)},120,${0.5 + rnd()*0.5})`
+                                 : `rgba(150,210,255,${0.4 + rnd()*0.4})`;
+            ctx.fillRect(x + (i + 0.25) * bw / cols, base - bh + (j + 0.25) * bh / rows,
+                         bw / cols * 0.45, bh / rows * 0.5);
+          }
+        }
+        ctx.fillStyle = col;
+      }
+      x += bw + rnd() * w * 0.015;
+    }
+  }
+
+  // a couple of neon signs
+  const signs = [
+    { x: w * 0.16, y: h * 0.62, c: '255,60,140', txt: true },
+    { x: w * 0.55, y: h * 0.665, c: '40,230,220', txt: false },
+    { x: w * 0.86, y: h * 0.6, c: '160,120,255', txt: false },
+  ];
+  for (const s of signs) {
+    g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, h * 0.06);
+    g.addColorStop(0, `rgba(${s.c},0.85)`);
+    g.addColorStop(0.3, `rgba(${s.c},0.3)`);
+    g.addColorStop(1, `rgba(${s.c},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(s.x - h * 0.06, s.y - h * 0.06, h * 0.12, h * 0.12);
+    ctx.fillStyle = `rgba(${s.c},0.95)`;
+    ctx.fillRect(s.x - w * 0.015, s.y - h * 0.002, w * 0.03, h * 0.004);
+  }
+
+  // street below: wet asphalt with light streaks
+  ctx.fillStyle = '#0a0912';
+  ctx.fillRect(0, horizon + h * 0.02, w, h);
+  const lamps = 5;
+  for (let i = 0; i < lamps; i++) {
+    const lx = (i + 0.5 + (rnd() - 0.5) * 0.4) * w / lamps, ly = horizon - h * 0.015;
+    // lamp halo
+    g = ctx.createRadialGradient(lx, ly, 0, lx, ly, h * 0.09);
+    g.addColorStop(0, 'rgba(255,205,130,0.95)');
+    g.addColorStop(0.15, 'rgba(255,185,110,0.4)');
+    g.addColorStop(1, 'rgba(255,185,110,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(lx - h * 0.09, ly - h * 0.09, h * 0.18, h * 0.18);
+    // reflection streak down the wet street
+    const sg = ctx.createLinearGradient(0, ly, 0, ly + h * 0.24);
+    sg.addColorStop(0, 'rgba(255,195,120,0.55)');
+    sg.addColorStop(1, 'rgba(255,195,120,0)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(lx - w * 0.006, ly, w * 0.012, h * 0.24);
+  }
+  // bokeh dots — passing cars / far lights
+  for (let i = 0; i < 26; i++) {
+    const bx = rnd() * w, by = horizon + h * 0.02 + rnd() * h * 0.14;
+    const warm = rnd() < 0.5;
+    const cc = warm ? '255,120,90' : '255,235,190';
+    const br = h * (0.004 + rnd() * 0.007);
+    g = ctx.createRadialGradient(bx, by, 0, bx, by, br * 3);
+    g.addColorStop(0, `rgba(${cc},0.9)`);
+    g.addColorStop(0.4, `rgba(${cc},0.25)`);
+    g.addColorStop(1, `rgba(${cc},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(bx - br * 3, by - br * 3, br * 6, br * 6);
+  }
+}
+
+/* box blur by progressive down- then up-scale (works everywhere, no ctx.filter).
+   Upscaling back through the same intermediate sizes avoids the blocky look a
+   direct small→big stretch produces. */
+function blurInto(dst, src, passes) {
+  const w = src.width, h = src.height;
+  dst.width = w; dst.height = h;
+  const dctx = dst.getContext('2d');
+  const chain = [];
+  let cur = src;
+  for (let i = 0; i < passes; i++) {
+    const t = document.createElement('canvas');
+    t.width = Math.max(4, Math.round(w / Math.pow(2, i + 1)));
+    t.height = Math.max(4, Math.round(h / Math.pow(2, i + 1)));
+    const tc = t.getContext('2d');
+    tc.imageSmoothingEnabled = true;
+    tc.drawImage(cur, 0, 0, t.width, t.height);
+    chain.push(t); cur = t;
+  }
+  for (let i = passes - 2; i >= 0; i--) {
+    const t = chain[i], tc = t.getContext('2d');
+    tc.imageSmoothingEnabled = true;
+    tc.drawImage(cur, 0, 0, t.width, t.height);
+    cur = t;
+  }
+  dctx.imageSmoothingEnabled = true;
+  dctx.drawImage(cur, 0, 0, w, h);
+}
+
+/* ============================================================
+   DROPLET SIMULATION
+   ============================================================ */
+const drops = [];        // stuck beads + runners  {x,y,r,vx,vy,stuck,stiction,age}
+const splashes = [];     // face-up crowns          {x,y,t,life,r0}
+const MAX_DROPS = 520;
+const R_MIN = 0.6;
+
+let grav = { x: 0, y: 1, z: 0 };      // screen-space gravity, unit-ish
+let gravSm = { x: 0, y: 1, z: 0 };    // low-pass filtered
+let haveSensor = false;
+let pointerTilt = null;               // desktop fallback {x,y}
+
+function spawnDrop(x, y, r, isTrail) {
+  if (drops.length >= MAX_DROPS) {
+    // recycle: drop the smallest stuck bead
+    let mi = -1, mr = 1e9;
+    for (let i = 0; i < drops.length; i++) if (drops[i].stuck && drops[i].r < mr) { mr = drops[i].r; mi = i; }
+    if (mi >= 0) drops.splice(mi, 1); else return null;
+  }
+  const d = { x, y, r, vx: 0, vy: 0, stuck: true, trail: !!isTrail,
+              stiction: 0.35 + Math.random() * 0.75, age: 0 };
+  drops.push(d);
+  return d;
+}
+
+function paintMicro() {
+  microC.width = simW; microC.height = simH;
+  const c = microC.getContext('2d');
+  c.clearRect(0, 0, simW, simH);
+  const n = Math.round(simW * simH / (260 * RS * RS));
+  for (let i = 0; i < n; i++) {
+    const r = (0.5 + Math.random() * Math.random() * 1.7) * RS;
+    drawBlob(c, Math.random() * simW, Math.random() * simH, r, 0.5 + Math.random() * 0.4);
+  }
+  c.globalAlpha = 1;
+}
+
+/* spatial hash of stuck beads for merging + channel steering */
+const CELL = 26;
+let hash = new Map();
+function hashKey(cx, cy) { return cx * 3001 + cy; }
+function rebuildHash() {
+  hash.clear();
+  for (const d of drops) {
+    if (!d.stuck) continue;
+    const k = hashKey((d.x / CELL) | 0, (d.y / CELL) | 0);
+    let arr = hash.get(k);
+    if (!arr) hash.set(k, arr = []);
+    arr.push(d);
+  }
+}
+function nearbyStuck(x, y, out) {
+  out.length = 0;
+  const cx = (x / CELL) | 0, cy = (y / CELL) | 0;
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+    const arr = hash.get(hashKey(cx + i, cy + j));
+    if (arr) for (const d of arr) out.push(d);
+  }
+  return out;
+}
+const scratch = [];
+
+let modeFaceUp = 0;   // 0 = vertical glass … 1 = flat, facing sky
+let modeFaceDown = 0; // 1 = screen aimed at the ground (no rain reaches it)
+
+function simStep(dt, t) {
+  // --- filter gravity ---
+  const k = 1 - Math.pow(0.0001, dt);     // smooth ~fast but jitter-free
+  gravSm.x += (grav.x - gravSm.x) * k;
+  gravSm.y += (grav.y - gravSm.y) * k;
+  gravSm.z += (grav.z - gravSm.z) * k;
+  const gtx = gravSm.x, gty = gravSm.y;
+  const gtMag = Math.min(1, Math.hypot(gtx, gty));
+  modeFaceUp = Math.max(0, Math.min(1, (-gravSm.z - 0.75) / 0.22));   // face-up beyond ~40°… full flat
+  modeFaceDown = Math.max(0, Math.min(1, (gravSm.z - 0.55) / 0.35));
+  const dirx = gtMag > 0.001 ? gtx / gtMag : 0, diry = gtMag > 0.001 ? gty / gtMag : 1;
+
+  // --- rain arrival ---
+  // flux: highest face-up (glass aimed at the sky), moderate vertical, zero face-down
+  const flux = (0.55 + 0.9 * modeFaceUp) * (1 - modeFaceDown);
+  const area = simW * simH / (420 * 760);
+  let expected = flux * area * dt * (8 + 14 * modeFaceUp);
+  while (expected > 0) {
+    if (Math.random() < expected) {
+      const x = Math.random() * simW, y = Math.random() * simH;
+      const r = (1 + Math.random() * Math.random() * 2.6) * RS;
+      if (modeFaceUp > 0.5) {
+        // splat: crown ring + ejecta + central bead
+        splashes.push({ x, y, t: 0, life: 0.16 + Math.random() * 0.1, r0: r * 2.2 });
+        const nEj = 3 + (Math.random() * 4) | 0;
+        for (let e = 0; e < nEj; e++) {
+          const a = Math.random() * Math.PI * 2, dd = r * (2 + Math.random() * 3.5);
+          spawnDrop(x + Math.cos(a) * dd, y + Math.sin(a) * dd, (R_MIN + Math.random() * 0.9) * RS);
+        }
+        spawnDrop(x, y, r * (0.8 + Math.random() * 0.3));
+        audioPatter(1);
+      } else {
+        const d = spawnDrop(x, y, r);
+        if (d && r > 2 * RS && gtMag > 0.25) { d.stuck = false; d.vx = dirx * 6; d.vy = diry * 6; }
+        if (r > 1.8 * RS) audioPatter(0.4);
+      }
+    }
+    expected -= 1;
+  }
+
+  rebuildHash();
+
+  // budget of simultaneous runners — a real pane has a few live rivulets, not fifty
+  let runners = 0;
+  for (const d of drops) if (!d.stuck) runners++;
+  const RUN_CAP = Math.max(4, Math.round(area * 6 * (0.4 + gtMag)));
+
+  // --- integrate ---
+  for (let i = drops.length - 1; i >= 0; i--) {
+    const d = drops[i];
+    d.age += dt;
+
+    const rp = d.r / RS;   // resolution-independent "physical" radius
+
+    if (d.stuck) {
+      // condensation growth for beads (trail deposits stay tiny — they are
+      // residue, not collectors; without this the tracks self-feed forever)
+      if (!d.trail && rp < 4.4 && Math.random() < dt * 0.12) d.r += (0.05 + Math.random() * 0.1) * RS;
+      // trail residue slowly evaporates so old tracks dissolve
+      if (d.trail) d.r *= 1 - dt * 0.03;
+      // face-down: water drips off the glass
+      if (modeFaceDown > 0.5 && Math.random() < dt * 0.25) { d.r *= 0.96; }
+      // break loose? weight vs stiction (probabilistic so releases spread out)
+      const pull = gtMag * (rp * rp) / 9;        // r≈3 & full tilt ⇒ pull 1
+      if (pull > d.stiction && runners < RUN_CAP && Math.random() < dt * 1.4) {
+        d.stuck = false; runners++;
+        d.vx = dirx * 2; d.vy = diry * 2;
+      }
+    } else {
+      // runner: accelerate along gravity, capped by r-dependent terminal speed
+      const term = (14 + rp * 26) * gtMag * RS;           // sim px/s
+      d.vx += dirx * 260 * RS * gtMag * dt;
+      d.vy += diry * 260 * RS * gtMag * dt;
+      const sp = Math.hypot(d.vx, d.vy) || 1;
+      if (sp > term) { d.vx *= term / sp; d.vy *= term / sp; }
+
+      // contact-line pinning: random micro-pauses, likelier at low tilt
+      if (Math.random() < dt * (2.2 - gtMag * 1.8)) { d.vx *= 0.1; d.vy *= 0.1; }
+
+      // channel steering: pull toward stuck beads slightly ahead (existing tracks)
+      nearbyStuck(d.x + dirx * CELL * 0.6, d.y + diry * CELL * 0.6, scratch);
+      let ax = 0, ay = 0;
+      for (const o of scratch) {
+        const ox = o.x - d.x, oy = o.y - d.y;
+        const ahead = ox * dirx + oy * diry;
+        if (ahead > 1 && ahead < 30 * RS) {
+          const latx = ox - dirx * ahead, laty = oy - diry * ahead;
+          const lat = Math.hypot(latx, laty);
+          if (lat > 0.5 && lat < 14 * RS) { ax += latx / lat; ay += laty / lat; }
+        }
+      }
+      d.vx += ax * 13 * RS * dt; d.vy += ay * 13 * RS * dt;
+
+      // lateral jitter (glass imperfections)
+      const jig = (Math.random() - 0.5) * 46 * RS * dt;
+      d.vx += -diry * jig; d.vy += dirx * jig;
+
+      d.x += d.vx * dt; d.y += d.vy * dt;
+
+      // continuous fog wipe along the track (soft, faint — it accumulates)
+      wetCtx.globalCompositeOperation = 'source-over';
+      drawBlob(wetCtx, d.x, d.y, d.r * 1.6, 0.1);
+
+      // running sheds water continuously — this is what makes runs die out
+      d.r -= Math.hypot(d.vx, d.vy) * dt * 0.0075;
+
+      // …and leaves an occasional tiny residue bead
+      d.trailAcc = (d.trailAcc || 0) + Math.hypot(d.vx, d.vy) * dt;
+      if (d.trailAcc > 7 * RS) {
+        d.trailAcc = 0;
+        if (rp > 1.7 && Math.random() < 0.45) {
+          spawnDrop(d.x - dirx * d.r * 1.5 + (Math.random() - 0.5) * 1.7 * RS,
+                    d.y - diry * d.r * 1.5 + (Math.random() - 0.5) * 1.7 * RS,
+                    (0.35 + Math.random() * 0.3) * RS, true);
+        }
+      }
+
+      // merge with stuck beads we touch
+      nearbyStuck(d.x, d.y, scratch);
+      for (const o of scratch) {
+        if (o === d || o.dead) continue;
+        const dx = o.x - d.x, dy = o.y - d.y;
+        const rr = (d.r + o.r) * 0.75;
+        if (dx * dx + dy * dy < rr * rr) {
+          // absorb only part of the bead's area — runs still thin out overall
+          d.r = Math.min(5.6 * RS, Math.sqrt(d.r * d.r + o.r * o.r * 0.55));
+          o.dead = true;
+          // coalescence kick
+          d.vx += dirx * 14 * RS; d.vy += diry * 14 * RS;
+        }
+      }
+
+      // slow to a bead if too small or tilt too shallow
+      if (rp < 1.6 || gtMag * rp * rp / 9 < d.stiction * 0.8) {
+        d.stuck = true; d.vx = d.vy = 0;
+      }
+      // off the pane
+      if (d.x < -8 || d.x > simW + 8 || d.y < -8 || d.y > simH + 8) { d.dead = true; }
+    }
+
+    if (d.dead || d.r < R_MIN * 0.7 * RS) drops.splice(i, 1);
+  }
+
+  // splashes age out
+  for (let i = splashes.length - 1; i >= 0; i--) {
+    splashes[i].t += dt;
+    if (splashes[i].t > splashes[i].life) splashes.splice(i, 1);
+  }
+
+  // wet map slowly fades → mist re-condenses
+  wetCtx.globalCompositeOperation = 'destination-out';
+  wetCtx.globalAlpha = Math.min(1, dt * 0.035);
+  wetCtx.fillStyle = '#fff';
+  wetCtx.fillRect(0, 0, simW, simH);
+  wetCtx.globalAlpha = 1;
+  wetCtx.globalCompositeOperation = 'source-over';
+}
+
+/* compose the height field for this frame */
+function paintHeightField() {
+  dropCtx.globalCompositeOperation = 'source-over';
+  dropCtx.globalAlpha = 1;
+  dropCtx.clearRect(0, 0, simW, simH);
+  // condensation micro-layer, erased where the glass has been wiped
+  dropCtx.drawImage(microC, 0, 0);
+  dropCtx.globalCompositeOperation = 'destination-out';
+  dropCtx.drawImage(wetC, 0, 0);
+  dropCtx.globalCompositeOperation = 'lighter';
+  // dynamic drops
+  for (const d of drops) {
+    if (d.stuck) {
+      drawBlob(dropCtx, d.x, d.y, d.r, 0.95);
+    } else {
+      // teardrop: head + two trailing blobs against velocity
+      const sp = Math.hypot(d.vx, d.vy) || 1;
+      const tx = -d.vx / sp, ty = -d.vy / sp;
+      const stretch = Math.min(1.5, 0.5 + sp / (70 * RS));
+      drawBlob(dropCtx, d.x, d.y, d.r, 0.95);
+      drawBlob(dropCtx, d.x + tx * d.r * stretch, d.y + ty * d.r * stretch, d.r * 0.6, 0.7);
+      drawBlob(dropCtx, d.x + tx * d.r * stretch * 2.0, d.y + ty * d.r * stretch * 2.0, d.r * 0.34, 0.45);
+    }
+  }
+  // splash crowns
+  for (const s of splashes) {
+    const p = s.t / s.life;
+    const r = s.r0 * (0.4 + p * 2.2);
+    dropCtx.globalAlpha = (1 - p) * 0.7;
+    dropCtx.strokeStyle = '#fff';
+    dropCtx.lineWidth = Math.max(1, s.r0 * 0.35 * (1 - p * 0.6));
+    dropCtx.beginPath(); dropCtx.arc(s.x, s.y, r, 0, 7); dropCtx.stroke();
+  }
+  dropCtx.globalAlpha = 1;
+  dropCtx.globalCompositeOperation = 'source-over';
+}
+
+/* ============================================================
+   WEBGL — refraction compositor
+   ============================================================ */
+const VS = `#version 300 es
+layout(location=0) in vec2 p;
+out vec2 vUV;
+void main(){ vUV = p * 0.5 + 0.5; vUV.y = 1.0 - vUV.y; gl_Position = vec4(p,0.,1.); }`;
+
+const FS = `#version 300 es
+precision highp float;
+in vec2 vUV;
+out vec4 frag;
+uniform sampler2D uH;      // height field
+uniform sampler2D uWet;    // wiped-track map
+uniform sampler2D uSharp;
+uniform sampler2D uBlur;
+uniform sampler2D uFog;
+uniform vec2 uRes;
+uniform vec2 uHRes;
+uniform float uTime;
+uniform float uFaceUp;
+
+float height(vec2 uv){ return texture(uH, uv).r; }
+
+void main(){
+  vec2 uv = vUV;
+  vec2 e = 1.5 / uHRes;
+  float h  = height(uv);
+  float hx = height(uv + vec2(e.x, 0.)) - height(uv - vec2(e.x, 0.));
+  float hy = height(uv + vec2(0., e.y)) - height(uv - vec2(0., e.y));
+  vec3 n = normalize(vec3(-hx * 2.6, -hy * 2.6, 1.0));
+
+  float wet = texture(uWet, uv).r;
+
+  // base glass: fogged (heavy blur + milk) vs wiped (light blur)
+  vec3 fogged = texture(uFog, uv).rgb;
+  fogged = fogged * 0.94 + vec3(0.055, 0.062, 0.078);          // milky condensation lift
+  vec3 wiped = texture(uBlur, uv).rgb + 0.012;
+  vec3 base = mix(fogged, wiped, clamp(wet, 0., 1.) * 0.8);
+
+  // inside drops: refract into the SHARP scene (drops are little lenses)
+  float mask = smoothstep(0.045, 0.3, h);
+  vec2 ro = -n.xy * 0.072;                                      // lens offset, against normal
+  vec2 duv = clamp(uv + ro, vec2(0.001), vec2(0.999));
+  vec3 dropCol = texture(uSharp, duv).rgb + 0.035;
+  dropCol *= 0.96 + 0.42 * clamp(-n.y, 0., 1.);                 // bottom-lit meniscus feel
+
+  // lighting on the water surface
+  vec3 L = normalize(vec3(-0.35, 0.55, 0.75));
+  float spec = pow(max(dot(reflect(-L, n), vec3(0., 0., 1.)), 0.), 110.0) * 1.35;
+  float rim  = pow(1.0 - n.z, 1.6);
+  vec3 col = mix(base, dropCol, mask);
+  col += spec * mask;
+  col += rim * vec3(0.10, 0.12, 0.16) * mask;                   // sky sheen on curved edges
+  col -= rim * 0.06 * (1.0 - mask);                             // hairline dark contact edge
+
+  // face-up: the sky above dims the scene slightly, cool cast
+  col = mix(col, col * vec3(0.9, 0.95, 1.05), uFaceUp * 0.5);
+
+  // vignette + faint grain
+  vec2 vc = uv - 0.5;
+  col *= 1.0 - dot(vc, vc) * 0.55;
+  float gr = fract(sin(dot(uv * uRes + uTime * 60.0, vec2(12.9898, 78.233))) * 43758.5453);
+  col += (gr - 0.5) * 0.012;
+
+  frag = vec4(col, 1.0);
+}`;
+
+function makeProgram(vsSrc, fsSrc) {
+  function sh(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const p = gl.createProgram();
+  gl.attachShader(p, sh(gl.VERTEX_SHADER, vsSrc));
+  gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fsSrc));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+const prog = makeProgram(VS, FS);
+gl.useProgram(prog);
+const quad = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+function makeTex() {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+const texH = makeTex(), texWet = makeTex(), texSharp = makeTex(), texBlur = makeTex(), texFog = makeTex();
+function upload(tex, cnv) {
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cnv);
+}
+const U = {};
+for (const n of ['uH','uWet','uSharp','uBlur','uFog','uRes','uHRes','uTime','uFaceUp'])
+  U[n] = gl.getUniformLocation(prog, n);
+gl.uniform1i(U.uH, 0); gl.uniform1i(U.uWet, 1); gl.uniform1i(U.uSharp, 2);
+gl.uniform1i(U.uBlur, 3); gl.uniform1i(U.uFog, 4);
+
+/* ============================================================
+   RESIZE / BOOT
+   ============================================================ */
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+
+  SIM_SCALE = Math.min(0.66, 1050 / Math.max(W, H));
+  RS = SIM_SCALE / 0.5;
+  simW = Math.max(64, Math.round(W * SIM_SCALE));
+  simH = Math.max(64, Math.round(H * SIM_SCALE));
+  dropC.width = simW; dropC.height = simH;
+  wetC.width = simW; wetC.height = simH;
+
+  const bw = Math.min(1100, Math.round(W * DPR * 0.8));
+  const bh = Math.round(bw * H / W);
+  bgSharpC.width = bw; bgSharpC.height = bh;
+  rngSeed = 20260815;
+  paintScene(bgSharpC.getContext('2d'), bw, bh);
+  blurInto(bgBlurC, bgSharpC, 2);
+  blurInto(bgFogC, bgSharpC, 4);
+  upload(texSharp, bgSharpC);
+  upload(texBlur, bgBlurC);
+  upload(texFog, bgFogC);
+
+  paintMicro();
+  drops.length = 0; splashes.length = 0;
+  // pre-seed some beads so the pane doesn't start empty
+  for (let i = 0; i < 90; i++)
+    spawnDrop(Math.random() * simW, Math.random() * simH,
+              (0.8 + Math.random() * Math.random() * 3) * RS);
+}
+window.addEventListener('resize', () => { resize(); });
+
+/* ============================================================
+   SENSORS — gravity from device orientation
+   ============================================================ */
+function screenAngle() {
+  if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+  return (typeof window.orientation === 'number') ? window.orientation : 0;
+}
+function onOrient(ev) {
+  if (ev.beta == null || ev.gamma == null) return;
+  haveSensor = true;
+  const b = ev.beta * Math.PI / 180, g = ev.gamma * Math.PI / 180;
+  // gravity in device coords (x right, y top-of-screen, z out of screen)
+  const gx = Math.cos(b) * Math.sin(g);
+  const gy = -Math.sin(b);
+  const gz = -Math.cos(b) * Math.cos(g);
+  // rotate into current screen coords
+  const a = screenAngle() * Math.PI / 180;
+  const sx = gx * Math.cos(a) + gy * Math.sin(a);
+  const syUp = -gx * Math.sin(a) + gy * Math.cos(a);
+  grav.x = sx;
+  grav.y = -syUp;   // CSS y grows downward
+  grav.z = gz;
+}
+window.addEventListener('deviceorientation', onOrient);
+
+function requestMotion() {
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then(state => {
+      if (state === 'granted') showHint('TILT YOUR PHONE — THE RAIN FOLLOWS REAL GRAVITY');
+      else showHint('MOTION DENIED — DRAG TO TILT INSTEAD');
+    }).catch(() => { showHint('DRAG TO TILT THE PANE'); });
+  } else {
+    setTimeout(() => {
+      if (!haveSensor) showHint('NO TILT SENSOR — DRAG TO TILT · CENTRE = FLAT FACE-UP');
+      else showHint('TILT YOUR PHONE — THE RAIN FOLLOWS REAL GRAVITY');
+    }, 900);
+  }
+}
+
+/* desktop / no-sensor fallback: drag = tilt a virtual phone */
+function pointerToTilt(cx, cy) {
+  const dx = (cx - W / 2) / (W / 2), dy = (cy - H / 2) / (H / 2);
+  const m = Math.min(1, Math.hypot(dx, dy) * 1.25);
+  const tiltAngle = m * Math.PI / 2;                  // centre = flat, edge = vertical
+  const s = Math.sin(tiltAngle);
+  const l = Math.hypot(dx, dy) || 1;
+  grav.x = (dx / l) * s;
+  grav.y = (dy / l) * s;
+  grav.z = -Math.cos(tiltAngle);
+}
+let dragging = false;
+canvas.addEventListener('pointerdown', e => {
+  if (haveSensor) return;
+  dragging = true; pointerToTilt(e.clientX, e.clientY);
+});
+canvas.addEventListener('pointermove', e => { if (dragging && !haveSensor) pointerToTilt(e.clientX, e.clientY); });
+window.addEventListener('pointerup', () => { dragging = false; });
+
+/* ============================================================
+   AUDIO — synthesized rain (muted until toggled)
+   ============================================================ */
+let AC = null, rainGain = null, patterBus = null, audioOn = false;
+const muteBtn = document.getElementById('mute-btn');
+function audioInit() {
+  if (AC) return;
+  AC = new (window.AudioContext || window.webkitAudioContext)();
+  // brown-noise bed
+  const len = AC.sampleRate * 2;
+  const buf = AC.createBuffer(1, len, AC.sampleRate);
+  const ch = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < len; i++) {
+    const w = Math.random() * 2 - 1;
+    last = (last + 0.02 * w) / 1.02;
+    ch[i] = last * 3.2;
+  }
+  const src = AC.createBufferSource();
+  src.buffer = buf; src.loop = true;
+  const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.4;
+  rainGain = AC.createGain(); rainGain.gain.value = 0;
+  src.connect(lp).connect(rainGain).connect(AC.destination);
+  src.start();
+  // patter bus
+  patterBus = AC.createGain(); patterBus.gain.value = 0.5;
+  patterBus.connect(AC.destination);
+  // short noise burst buffer for patter grains
+  const plen = Math.floor(AC.sampleRate * 0.09);
+  patterBuf = AC.createBuffer(1, plen, AC.sampleRate);
+  const pch = patterBuf.getChannelData(0);
+  for (let i = 0; i < plen; i++) pch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / plen, 2.4);
+}
+let patterBuf = null;
+function audioPatter(strength) {
+  if (!audioOn || !AC || !patterBuf) return;
+  if (Math.random() > 0.4) return;   // thin it out
+  const s = AC.createBufferSource(); s.buffer = patterBuf;
+  const bp = AC.createBiquadFilter(); bp.type = 'bandpass';
+  bp.frequency.value = 900 + Math.random() * 2600 + strength * 800; bp.Q.value = 1.1;
+  const g = AC.createGain(); g.gain.value = 0.05 + Math.random() * 0.12 * (0.5 + strength);
+  s.connect(bp).connect(g).connect(patterBus);
+  s.start();
+}
+muteBtn.addEventListener('click', () => {
+  audioInit();
+  if (AC.state === 'suspended') AC.resume();
+  audioOn = !audioOn;
+  muteBtn.innerHTML = audioOn ? '&#128266;' : '&#128263;';
+  if (rainGain) rainGain.gain.linearRampToValueAtTime(audioOn ? 0.12 : 0, AC.currentTime + 0.6);
+});
+document.addEventListener('visibilitychange', () => {
+  if (AC && document.hidden) AC.suspend(); else if (AC && audioOn) AC.resume();
+});
+
+/* ============================================================
+   CHROME — splash, hint, info
+   ============================================================ */
+const splash = document.getElementById('splash');
+const hintEl = document.getElementById('hint');
+let hintTimer = 0;
+function showHint(txt) {
+  hintEl.textContent = txt;
+  hintEl.classList.add('show');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => hintEl.classList.remove('show'), 5200);
+}
+let started = false;
+splash.addEventListener('click', () => {
+  if (started) return;
+  started = true;
+  splash.classList.add('hidden');
+  requestMotion();
+});
+const info = document.getElementById('info');
+document.getElementById('info-btn').addEventListener('click', () => info.classList.add('open'));
+document.getElementById('info-close').addEventListener('click', () => info.classList.remove('open'));
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+let lastT = 0, wetFrame = 0;
+function frame(tms) {
+  requestAnimationFrame(frame);
+  const t = tms / 1000;
+  let dt = Math.min(0.1, t - lastT || 0.016);
+  lastT = t;
+
+  simStep(dt, t);
+  paintHeightField();
+
+  gl.activeTexture(gl.TEXTURE0); upload(texH, dropC);
+  // wet map changes slowly — upload every other frame
+  if ((wetFrame++ & 1) === 0) { gl.activeTexture(gl.TEXTURE1); upload(texWet, wetC); }
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texH);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texWet);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texSharp);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, texBlur);
+  gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, texFog);
+
+  gl.uniform2f(U.uRes, canvas.width, canvas.height);
+  gl.uniform2f(U.uHRes, simW, simH);
+  gl.uniform1f(U.uTime, t);
+  gl.uniform1f(U.uFaceUp, modeFaceUp);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  // rain bed follows mode: face-up = drummier
+  if (AC && audioOn && rainGain)
+    rainGain.gain.setTargetAtTime(0.09 + modeFaceUp * 0.07 - modeFaceDown * 0.06, AC.currentTime, 0.4);
+}
+
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

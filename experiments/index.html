@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experiments</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg: #06060e;
+  --panel: #0b0b16;
+  --border: #1a1a30;
+  --cyan: #22d3ee;
+  --gold: #ffc300;
+  --white: #dde3ff;
+  --dim: #353555;
+  --dim2: #8899bb;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--white);
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 40px 20px;
+}
+h1 {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: clamp(1.6rem, 5vw, 2.8rem);
+  color: var(--cyan);
+  text-shadow: 0 0 20px #22d3ee66;
+  letter-spacing: 6px;
+  margin-bottom: 6px;
+}
+.sub { font-size: 0.62rem; color: var(--dim); letter-spacing: 4px; margin-bottom: 26px; text-align: center; }
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  max-width: 560px;
+  width: 100%;
+}
+.exp-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  text-decoration: none;
+  color: var(--white);
+  display: flex; flex-direction: row; align-items: center; gap: 14px; text-align: left;
+  transition: all 0.2s;
+}
+.exp-card:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 20px #22d3ee22;
+  transform: translateY(-2px);
+}
+.exp-icon { font-size: 2rem; flex-shrink: 0; width: 2.4rem; text-align: center; }
+.exp-info { display: flex; flex-direction: column; gap: 4px; }
+.exp-name {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 2px;
+  color: var(--cyan);
+}
+.exp-desc { font-size: 0.6rem; color: var(--dim2); line-height: 1.55; }
+.exp-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+.exp-tags span {
+  font-size: 0.5rem; letter-spacing: 1px; color: var(--gold);
+  border: 1px solid #3a3110; border-radius: 3px; padding: 1px 5px;
+  background: #ffc30008;
+}
+.foot { margin-top: 34px; font-size: 0.55rem; color: var(--dim); letter-spacing: 2px; text-align: center; line-height: 2; }
+.foot a { color: var(--dim2); text-decoration: none; }
+.foot a:hover { color: var(--cyan); }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 05:25 UTC</div>
+
+<h1>EXPERIMENTS</h1>
+<div class="sub">INTERACTIVE DIORAMAS &middot; WEB RENDERING &amp; SENSOR TECH<br>EACH SCENE HAS AN &#9432; BUTTON EXPLAINING HOW IT WAS BUILT</div>
+
+<div class="grid">
+  <a class="exp-card" href="rain-on-glass/">
+    <div class="exp-icon">&#127783;&#65039;</div>
+    <div class="exp-info">
+      <div class="exp-name">RAIN ON GLASS</div>
+      <div class="exp-desc">Your screen becomes a rain-streaked window. Drops bead, merge and
+        run in rivulets that always follow real gravity &mdash; tilt the phone and the trickle
+        direction follows; hold it flat overhead and the rain splatters straight onto the glass.</div>
+      <div class="exp-tags"><span>WEBGL2</span><span>DEVICEORIENTATION</span><span>PARTICLE SIM</span><span>REFRACTION SHADER</span></div>
+    </div>
+  </a>
+  <a class="exp-card" href="red-vase/">
+    <div class="exp-icon">&#127993;</div>
+    <div class="exp-info">
+      <div class="exp-name">THE DRAGON VASE</div>
+      <div class="exp-desc">A transparent ruby-glass vase with a gold dragon emblem winding around
+        it, standing on grained wood in soft ambient light. Drag to spin it and watch the room
+        bend through the glass &mdash; refraction, Fresnel reflection and colour absorption live.</div>
+      <div class="exp-tags"><span>WEBGL2</span><span>SCREEN-SPACE REFRACTION</span><span>PROCEDURAL TEXTURES</span><span>TOUCH GESTURES</span></div>
+    </div>
+  </a>
+  <a class="exp-card" href="lone-tree/">
+    <div class="exp-icon">&#127794;</div>
+    <div class="exp-info">
+      <div class="exp-name">LONE TREE</div>
+      <div class="exp-desc">A single tree on a quiet hill, branches and thousands of leaves swaying
+        in a gusting breeze. Clouds drift across the overhead sun, and leaves that catch the light
+        at just the right angle flash with specular glints.</div>
+      <div class="exp-tags"><span>WEBGL2</span><span>INSTANCED LEAVES</span><span>VERTEX WIND</span><span>PROCEDURAL SKY</span></div>
+    </div>
+  </a>
+</div>
+
+<div class="foot">
+  MORE COMING &mdash; ONE TECHNOLOGY PROBE AT A TIME<br>
+  <a href="../games/">&rarr; games</a>
+</div>
+</body>
+</html>
