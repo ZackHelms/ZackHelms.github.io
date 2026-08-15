@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>The Dragon Vase</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; overflow:hidden; background:#171008; }
+body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-select:none; }
+#view { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+
+.chrome-btn {
+  position:fixed; z-index:80; width:40px; height:40px; border-radius:50%;
+  background:rgba(20,14,8,0.45); border:1px solid rgba(220,190,150,0.22);
+  color:#e8d9c2; font-size:17px; line-height:38px; text-align:center;
+  cursor:pointer; text-decoration:none; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  touch-action:manipulation;
+}
+#back-btn { top:calc(env(safe-area-inset-top, 0px) + 10px); left:calc(env(safe-area-inset-left, 0px) + 10px); }
+#info-btn { top:calc(env(safe-area-inset-top, 0px) + 10px); right:calc(env(safe-area-inset-right, 0px) + 10px);
+  font-family:Georgia, serif; font-style:italic; font-weight:bold; }
+
+#hint {
+  position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom, 0px) + 22px);
+  transform:translateX(-50%); z-index:70; font-size:0.62rem; letter-spacing:2px;
+  color:#e2d2b8; background:rgba(20,14,8,0.5); border:1px solid rgba(220,190,150,0.18);
+  border-radius:16px; padding:7px 16px; pointer-events:none; opacity:0; transition:opacity 0.8s;
+  text-align:center; max-width:88vw;
+}
+#hint.show { opacity:1; }
+
+#info {
+  position:fixed; inset:0; z-index:100; display:none; overflow-y:auto;
+  -webkit-overflow-scrolling:touch; background:rgba(12,8,4,0.93);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  padding:calc(env(safe-area-inset-top, 0px) + 20px) 20px 60px;
+}
+#info.open { display:block; }
+.info-inner { max-width:640px; margin:0 auto; color:#e0d2ba; }
+.info-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.info-head h2 { font-size:1.02rem; letter-spacing:4px; color:#fff4e0; font-weight:normal; }
+#info-close { width:38px; height:34px; border-radius:8px; background:rgba(255,255,255,0.06);
+  border:1px solid rgba(220,190,150,0.25); color:#fff; font-size:15px; cursor:pointer; touch-action:manipulation; }
+.info-inner h3 { font-size:0.78rem; letter-spacing:3px; color:#ffb45e; margin:26px 0 8px; font-weight:normal; }
+.info-inner p, .info-inner li { font-size:0.7rem; line-height:1.9; letter-spacing:0.4px; }
+.info-inner ul { padding-left:18px; }
+.info-inner li { margin-bottom:6px; }
+.info-inner code { color:#ffd479; font-size:0.66rem; background:rgba(255,212,121,0.07); padding:1px 4px; border-radius:3px; }
+.info-inner em { color:#c9b797; }
+
+#nogl { position:fixed; inset:0; z-index:95; display:none; align-items:center; justify-content:center;
+  color:#e0d2ba; font-size:0.75rem; letter-spacing:2px; text-align:center; padding:30px; line-height:2.2; }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 05:40 UTC</div>
+
+<canvas id="view"></canvas>
+
+<a id="back-btn" class="chrome-btn" href="../" aria-label="Back to experiments">&#8592;</a>
+<button id="info-btn" class="chrome-btn" aria-label="About this scene">i</button>
+
+<div id="hint"></div>
+<div id="nogl">THIS EXPERIMENT NEEDS WEBGL2.<br>YOUR BROWSER OR DEVICE HAS IT DISABLED.</div>
+
+<div id="info">
+  <div class="info-inner">
+    <div class="info-head"><h2>THE DRAGON VASE &mdash; HOW IT WORKS</h2><button id="info-close">&#10005;</button></div>
+
+    <h3>WHAT YOU'RE LOOKING AT</h3>
+    <p>A transparent ruby-glass vase with a gold dragon emblem winding once around its belly,
+    standing on a grained wooden table in a softly lit room. Drag horizontally to spin the vase
+    (it keeps momentum), drag vertically to raise or lower your eye, pinch or scroll to move
+    closer. Leave it alone for a few seconds and it turns slowly on its own. The point of the
+    experiment is the glass: the room refracts through it, thick regions drink the light down
+    to deep ruby, and the rim catches mirror-like reflections at grazing angles.</p>
+
+    <h3>THE RENDER PASSES (WEBGL2, NO LIBRARIES)</h3>
+    <ul>
+      <li><em>Pass 1 &mdash; the room:</em> backdrop gradient, the wooden table, a soft contact shadow
+      and a faked red caustic pool are drawn into an offscreen framebuffer. This texture is what
+      the glass will later "look through".</li>
+      <li><em>Pass 2 &mdash; the far side of the vase:</em> the vase's <em>back faces</em> are rendered into a
+      second framebuffer storing their surface normal and texture coordinate per pixel, with a
+      depth texture alongside. This is how the front pass will know how thick the glass is and
+      what the exit surface looks like.</li>
+      <li><em>Pass 3 &mdash; composite:</em> the room is drawn to the screen, then the vase's front faces
+      are shaded with the full glass model (below) and composited on top.</li>
+    </ul>
+
+    <h3>THE GLASS MODEL</h3>
+    <ul>
+      <li><em>Refraction, twice:</em> each pixel's view ray is bent entering the glass
+      (<code>refract()</code>, IOR 1.5), marched to the stored back-face depth to find the exit point,
+      bent again at the stored back-face normal (total internal reflection falls back to a
+      reflected ray), and the resulting direction picks the pixel to sample from the Pass-1
+      room texture. This is <em>screen-space refraction</em> &mdash; the standard real-time approximation.</li>
+      <li><em>Colour:</em> Beer&ndash;Lambert absorption, <code>T = exp(&minus;&sigma;&middot;d)</code>, with &sigma; small in red and large
+      in green/blue, applied over the per-pixel glass thickness <code>d</code>. Thin rim = pale rose,
+      thick silhouette chords = deep ruby. This is why the edges of the vase look darker red.</li>
+      <li><em>Reflection:</em> Schlick's Fresnel approximation blends in a procedural environment map
+      (a painted equirectangular canvas of the room: warm lamp glow, cool window strip, dark
+      floor) so grazing angles go mirror-like while face-on glass stays transparent.</li>
+      <li><em>Highlights:</em> two analytic lights &mdash; a warm key and a cool fill &mdash; add tight specular
+      lobes on both the glass and the gold.</li>
+      <li><em>The dragon:</em> lives in a 2048&times;1024 texture wrapped around the vase (drawn
+      procedurally, see below). On the front surface it shades as embossed metal: the emblem's
+      alpha gradient perturbs the surface normal (screen-space derivatives) so the gold looks
+      raised, lit by the same environment and key lights. Where the <em>far side's</em> emblem shows
+      through the glass, it is shaded flat and tinted by the ruby absorption &mdash; you can watch
+      the dragon's back half swim behind the refraction as the vase turns.</li>
+    </ul>
+
+    <h3>PROCEDURAL EVERYTHING</h3>
+    <ul>
+      <li><em>Vase:</em> a lathe surface &mdash; a hand-tuned amphora profile (foot, belly, neck, flared lip)
+      swept 360&deg; into ~17k triangles, with per-vertex normals from the profile slope.</li>
+      <li><em>Wood:</em> a 1024&sup2; canvas painted per-pixel: long-grain sine bands warped by
+      fractal value noise, colour-mixed between dark and honey oak, plus fine speckle. A grain-
+      dependent gloss term in the table shader gives the sheen streaks.</li>
+      <li><em>Dragon:</em> painted with 2D canvas calls at load: a Catmull-Rom spine wound once around
+      the texture, a tapered ribbon body built from stamped circles, scale arcs, dorsal spikes,
+      belly scutes, clawed legs, horned head, whiskers, and a flaming pearl. Gold tones with
+      darker outlines so the emboss shading has gradients to bite on.</li>
+      <li><em>Environment:</em> a small equirectangular canvas (lamp pool, window strip, floor/ceiling
+      gradient) sampled by reflection vectors.</li>
+    </ul>
+
+    <h3>APPROXIMATIONS &amp; LIMITATIONS</h3>
+    <ul>
+      <li>Screen-space refraction can only sample what Pass 1 rendered: rays that exit toward
+      things outside the frame clamp to the texture edge, and the refracted image is of a flat
+      "photo" of the room, not a true light path.</li>
+      <li>The nearest back face stands in for the true exit surface; around the neck and lip,
+      where a ray really crosses the glass four times, this underestimates the path.</li>
+      <li>The red caustic on the table is a painted decal, not computed photon focusing; it
+      doesn't move when the vase spins (the lights don't either, so it holds up).</li>
+      <li>No reflection of the vase in the tabletop, and the glass casts no true shadow — the
+      contact shadow is baked.</li>
+      <li>The emblem texture seam (where the wrap meets) can flicker for a pixel column when
+      seen <em>through</em> the glass, because the interpolated texture coordinate crosses the wrap.</li>
+      <li>No chromatic dispersion &mdash; one IOR for all wavelengths (absorption, not refraction,
+      does the colouring).</li>
+    </ul>
+
+    <h3>TOOLING</h3>
+    <p>Hand-written single-file HTML/JS/GLSL. No 3D library, no image assets &mdash; geometry,
+    wood, dragon and environment are all generated in the page at load.</p>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   THE DRAGON VASE — multi-pass WebGL2 glass renderer
+   ============================================================ */
+const canvas = document.getElementById('view');
+const gl = canvas.getContext('webgl2', { antialias:true, alpha:false, depth:true });
+if (!gl) {
+  document.getElementById('nogl').style.display = 'flex';
+  throw new Error('webgl2 unavailable');
+}
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+/* ---------------- small matrix helpers ---------------- */
+function mat4Persp(fovY, aspect, n, f) {
+  const t = 1 / Math.tan(fovY / 2);
+  return new Float32Array([t / aspect,0,0,0, 0,t,0,0, 0,0,(f+n)/(n-f),-1, 0,0,2*f*n/(n-f),0]);
+}
+function mat4LookAt(eye, at, up) {
+  const zx = eye[0]-at[0], zy = eye[1]-at[1], zz = eye[2]-at[2];
+  let zl = Math.hypot(zx,zy,zz); const Z = [zx/zl, zy/zl, zz/zl];
+  const X = [up[1]*Z[2]-up[2]*Z[1], up[2]*Z[0]-up[0]*Z[2], up[0]*Z[1]-up[1]*Z[0]];
+  const xl = Math.hypot(...X); X[0]/=xl; X[1]/=xl; X[2]/=xl;
+  const Y = [Z[1]*X[2]-Z[2]*X[1], Z[2]*X[0]-Z[0]*X[2], Z[0]*X[1]-Z[1]*X[0]];
+  return new Float32Array([
+    X[0],Y[0],Z[0],0, X[1],Y[1],Z[1],0, X[2],Y[2],Z[2],0,
+    -(X[0]*eye[0]+X[1]*eye[1]+X[2]*eye[2]),
+    -(Y[0]*eye[0]+Y[1]*eye[1]+Y[2]*eye[2]),
+    -(Z[0]*eye[0]+Z[1]*eye[1]+Z[2]*eye[2]),1]);
+}
+function mat4RotY(a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]);
+}
+const IDENT = new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
+
+/* ---------------- shader utils ---------------- */
+function makeProgram(vs, fs) {
+  function sh(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+      throw new Error(gl.getShaderInfoLog(s) + '\n' + src.split('\n').map((l,i)=>(i+1)+': '+l).join('\n'));
+    return s;
+  }
+  const p = gl.createProgram();
+  gl.attachShader(p, sh(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+function uniforms(prog, names) {
+  const u = {};
+  for (const n of names) u[n] = gl.getUniformLocation(prog, n);
+  return u;
+}
+
+/* ============================================================
+   GEOMETRY — lathe vase
+   ============================================================ */
+/* profile: [y, radius] control points, Catmull-Rom smoothed */
+const PROFILE = [
+  [0.00, 0.50], [0.03, 0.55], [0.10, 0.52], [0.18, 0.46],
+  [0.32, 0.55], [0.55, 0.82], [0.85, 1.00], [1.15, 1.02],
+  [1.45, 0.90], [1.70, 0.68], [1.95, 0.46], [2.15, 0.36],
+  [2.32, 0.34], [2.45, 0.38], [2.55, 0.46], [2.60, 0.50],
+];
+function catmull(p0, p1, p2, p3, t) {
+  const t2 = t * t, t3 = t2 * t;
+  return 0.5 * ((2*p1) + (-p0+p2)*t + (2*p0-5*p1+4*p2-p3)*t2 + (-p0+3*p1-3*p2+p3)*t3);
+}
+function buildVase(segU, segV) {
+  // resample profile smoothly
+  const pts = [];
+  for (let i = 0; i < segV; i++) {
+    const ft = i / (segV - 1) * (PROFILE.length - 1);
+    const idx = Math.min(PROFILE.length - 2, Math.floor(ft));
+    const t = ft - idx;
+    const g = j => PROFILE[Math.max(0, Math.min(PROFILE.length - 1, j))];
+    const y = catmull(g(idx-1)[0], g(idx)[0], g(idx+1)[0], g(idx+2)[0], t);
+    const r = catmull(g(idx-1)[1], g(idx)[1], g(idx+1)[1], g(idx+2)[1], t);
+    pts.push([y, Math.max(0.02, r)]);
+  }
+  const pos = [], nrm = [], uv = [], idxArr = [];
+  for (let i = 0; i < segV; i++) {
+    const [y, r] = pts[i];
+    // profile slope → normal
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[Math.min(segV - 1, i + 1)];
+    const dy = p1[0] - p0[0], dr = p1[1] - p0[1];
+    let nx = dy, ny = -dr;       // 2D normal of profile (pointing outward)
+    const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+    for (let j = 0; j <= segU; j++) {
+      const a = j / segU * Math.PI * 2;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      pos.push(ca * r, y, sa * r);
+      nrm.push(ca * nx, ny, sa * nx);
+      uv.push(j / segU, i / (segV - 1));
+    }
+  }
+  const w = segU + 1;
+  for (let i = 0; i < segV - 1; i++)
+    for (let j = 0; j < segU; j++) {
+      const a = i * w + j, b = a + w;
+      idxArr.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  return { pos: new Float32Array(pos), nrm: new Float32Array(nrm),
+           uv: new Float32Array(uv), idx: new Uint16Array(idxArr) };
+}
+const vase = buildVase(96, 88);
+
+function makeVAO(mesh) {
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  function buf(loc, data, size) {
+    const b = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
+  }
+  buf(0, mesh.pos, 3); buf(1, mesh.nrm, 3); buf(2, mesh.uv, 2);
+  const ib = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.idx, gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  return { vao, count: mesh.idx.length };
+}
+const vaseVAO = makeVAO(vase);
+
+/* table: one big quad in xz at y=0, uv tiled */
+const tableMesh = {
+  pos: new Float32Array([-9,0,-7,  9,0,-7,  -9,0,5,  9,0,5]),
+  nrm: new Float32Array([0,1,0, 0,1,0, 0,1,0, 0,1,0]),
+  uv:  new Float32Array([0,0, 1,0, 0,1, 1,1]),   // one period → no repeat seam
+  idx: new Uint16Array([0,2,1, 1,2,3]),
+};
+const tableVAO = makeVAO(tableMesh);
+
+/* decal quad (unit, xz plane) reused for shadow + caustic */
+const decalMesh = {
+  pos: new Float32Array([-1,0,-1, 1,0,-1, -1,0,1, 1,0,1]),
+  nrm: new Float32Array([0,1,0, 0,1,0, 0,1,0, 0,1,0]),
+  uv:  new Float32Array([0,0, 1,0, 0,1, 1,1]),
+  idx: new Uint16Array([0,2,1, 1,2,3]),
+};
+const decalVAO = makeVAO(decalMesh);
+
+/* fullscreen triangle */
+const fsVAO = gl.createVertexArray();
+gl.bindVertexArray(fsVAO);
+{
+  const b = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, b);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+}
+gl.bindVertexArray(null);
+
+/* ============================================================
+   PROCEDURAL TEXTURES
+   ============================================================ */
+let seed = 977351;
+function rnd() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }
+/* value noise + fbm */
+const PERM = new Uint8Array(512);
+{ const p = [...Array(256).keys()]; for (let i = 255; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; [p[i], p[j]] = [p[j], p[i]]; } for (let i = 0; i < 512; i++) PERM[i] = p[i & 255]; }
+function vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  function h(a, b) { return PERM[(PERM[a & 255] + b) & 255] / 255; }
+  const a = h(xi, yi), b = h(xi + 1, yi), c = h(xi, yi + 1), d = h(xi + 1, yi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function fbm(x, y, oct) {
+  let s = 0, amp = 0.5, f = 1;
+  for (let i = 0; i < oct; i++) { s += vnoise(x * f, y * f) * amp; amp *= 0.5; f *= 2.03; }
+  return s;
+}
+
+/* ---- wood ---- */
+function makeWoodCanvas(size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const d = img.data;
+  const dark = [70, 46, 26], mid = [98, 66, 38], light = [124, 88, 52];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const nx = x / size, ny = y / size;
+      // long grain runs along x; gentle fbm warp keeps the lines wandering
+      const warp = fbm(nx * 2.2, ny * 6.5, 4);
+      let g = Math.sin((ny * 22 + warp * 2.4 + fbm(nx * 1.1, ny * 1.6, 3) * 1.6) * Math.PI);
+      g = 0.5 + 0.5 * g;
+      g = Math.pow(g, 1.25);
+      // occasional darker growth line
+      const line = Math.pow(0.5 + 0.5 * Math.sin((ny * 22 + warp * 2.4) * Math.PI * 2), 18);
+      // broad tonal patches so the slab isn't uniform
+      const patch = fbm(nx * 2.4, ny * 2.9, 3) * 0.24 - 0.12;
+      const speck = fbm(nx * 160, ny * 160, 2) * 0.06 - 0.03;
+      let r, gg, b;
+      if (g < 0.5) { const t = g * 2;
+        r = dark[0] + (mid[0] - dark[0]) * t; gg = dark[1] + (mid[1] - dark[1]) * t; b = dark[2] + (mid[2] - dark[2]) * t;
+      } else { const t = (g - 0.5) * 2;
+        r = mid[0] + (light[0] - mid[0]) * t; gg = mid[1] + (light[1] - mid[1]) * t; b = mid[2] + (light[2] - mid[2]) * t;
+      }
+      const tone = 1 + patch + speck;
+      r = r * tone * (1 - line * 0.2);
+      gg = gg * tone * (1 - line * 0.24);
+      b = b * tone * (1 - line * 0.24);
+      const i = (y * size + x) * 4;
+      d[i] = r; d[i + 1] = gg; d[i + 2] = b;
+      d[i + 3] = 255 * g;   // alpha carries grain gloss for the shader
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+/* ---- environment (equirect) ---- */
+function makeEnv(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#150d06');
+  g.addColorStop(0.40, '#382413');
+  g.addColorStop(0.52, '#57381d');
+  g.addColorStop(0.60, '#2e1d10');
+  g.addColorStop(1, '#0e0906');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  // warm lamp pool (matches the key light direction)
+  let rg = ctx.createRadialGradient(w * 0.30, h * 0.30, 0, w * 0.30, h * 0.30, h * 0.42);
+  rg.addColorStop(0, 'rgba(255,214,150,0.95)');
+  rg.addColorStop(0.25, 'rgba(255,180,110,0.4)');
+  rg.addColorStop(1, 'rgba(255,180,110,0)');
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, w, h);
+  // cool window strip on the other side
+  rg = ctx.createRadialGradient(w * 0.78, h * 0.42, 0, w * 0.78, h * 0.42, h * 0.5);
+  rg.addColorStop(0, 'rgba(150,180,230,0.5)');
+  rg.addColorStop(0.3, 'rgba(120,150,210,0.18)');
+  rg.addColorStop(1, 'rgba(120,150,210,0)');
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(170,200,245,0.55)';
+  ctx.fillRect(w * 0.75, h * 0.34, w * 0.055, h * 0.17);
+  // faint horizon shelf line
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(0, h * 0.585, w, 2);
+  return c;
+}
+
+/* ---- decals ---- */
+function makeShadowCanvas(s) {
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
+  g.addColorStop(0, 'rgba(0,0,0,0.62)');
+  g.addColorStop(0.5, 'rgba(0,0,0,0.4)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  return c;
+}
+function makeCausticCanvas(s) {
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  // one soft crescent of focused ruby light, brighter on its far edge
+  const cx = s * 0.42, cy = s * 0.5;
+  let g = ctx.createRadialGradient(cx, cy, s * 0.1, cx, cy, s * 0.46);
+  g.addColorStop(0, 'rgba(255,60,25,0)');
+  g.addColorStop(0.62, 'rgba(255,70,28,0.13)');
+  g.addColorStop(0.82, 'rgba(255,110,45,0.2)');
+  g.addColorStop(1, 'rgba(255,60,25,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  g = ctx.createRadialGradient(cx, cy, 0, cx, cy, s * 0.2);
+  g.addColorStop(0, 'rgba(255,90,40,0.12)');
+  g.addColorStop(1, 'rgba(255,60,25,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  return c;
+}
+
+/* ---- the dragon ---- */
+function makeDragonCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+
+  const GOLD_D = '#7a5210', GOLD = '#c9962d', GOLD_L = '#f2cf6b', GOLD_XL = '#fff0b8';
+
+  /* spine: winds once around the belly band of the texture (x wraps).
+     Texture is uploaded flipped, so canvas top = vase top; keep the body
+     inside the belly band y ∈ [0.36h, 0.70h]. */
+  const SP = [];
+  const N = 160;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const x = w * (0.02 + t * 1.05);                       // > w so it wraps past the seam
+    const y = h * (0.54 + 0.115 * Math.sin(t * Math.PI * 2.1 + 0.5)
+                        - 0.045 * Math.sin(t * Math.PI * 4.6 + 1.2)
+                        - t * 0.06);
+    SP.push([x, y]);
+  }
+  /* body half-width along the spine (tail → belly → neck) — slim, serpentine */
+  function bw(t) {
+    const taper = Math.sin(Math.min(1, t * 1.15) * Math.PI);
+    return h * (0.007 + 0.030 * Math.pow(taper, 0.85) * (1 - t * 0.2));
+  }
+  function drawAll(fn) { ctx.save(); fn(0); ctx.translate(-w, 0); fn(0); ctx.translate(2 * w, 0); fn(0); ctx.restore(); }
+
+  /* --- body ribbon: dark outline then gold fill then top highlight --- */
+  function ribbon(off, scale, col) {
+    ctx.fillStyle = col;
+    for (let i = 0; i < SP.length; i++) {
+      const t = i / (SP.length - 1);
+      const r = bw(t) * scale;
+      if (r < 0.5) continue;
+      ctx.beginPath();
+      ctx.arc(SP[i][0], SP[i][1] + off * bw(t), r, 0, 7);
+      ctx.fill();
+    }
+  }
+  drawAll(() => {
+    ribbon(0, 1.22, GOLD_D);          // outline
+    ribbon(0, 1.0, GOLD);             // body
+    ribbon(-0.35, 0.62, GOLD_L);      // dorsal sheen
+    ribbon(0.42, 0.5, '#a9781d');     // belly shade band
+  });
+
+  /* --- belly scutes: short light bands across the lower body --- */
+  drawAll(() => {
+    ctx.strokeStyle = GOLD_L;
+    ctx.lineWidth = h * 0.006;
+    for (let i = 6; i < SP.length - 12; i += 4) {
+      const t = i / (SP.length - 1);
+      const r = bw(t);
+      if (r < h * 0.014) continue;
+      const [x, y] = SP[i];
+      const [x2, y2] = SP[i + 2];
+      const dx = x2 - x, dy = y2 - y, dl = Math.hypot(dx, dy) || 1;
+      const px = -dy / dl, py = dx / dl;   // normal (roughly down when moving right)
+      ctx.beginPath();
+      ctx.arc(x + px * r * 0.55, y + py * r * 0.55, r * 0.5, Math.atan2(py, px) - 1.1, Math.atan2(py, px) + 1.1);
+      ctx.stroke();
+    }
+  });
+
+  /* --- scales: little arcs on the upper body --- */
+  drawAll(() => {
+    ctx.strokeStyle = 'rgba(122,82,16,0.8)';
+    ctx.lineWidth = h * 0.0035;
+    for (let i = 8; i < SP.length - 14; i += 2) {
+      const t = i / (SP.length - 1);
+      const r = bw(t);
+      if (r < h * 0.016) continue;
+      const [x, y] = SP[i];
+      for (let k = -1; k <= 1; k++) {
+        ctx.beginPath();
+        ctx.arc(x + (i % 4 - 1.5) * r * 0.3, y + k * r * 0.48, r * 0.34, Math.PI * 0.15, Math.PI * 0.85);
+        ctx.stroke();
+      }
+    }
+  });
+
+  /* --- dorsal spikes --- */
+  drawAll(() => {
+    ctx.fillStyle = GOLD;
+    ctx.strokeStyle = GOLD_D;
+    ctx.lineWidth = h * 0.003;
+    for (let i = 10; i < SP.length - 16; i += 5) {
+      const t = i / (SP.length - 1);
+      const r = bw(t);
+      if (r < h * 0.014) continue;
+      const [x, y] = SP[i];
+      const [x2, y2] = SP[Math.min(SP.length - 1, i + 3)];
+      const dx = x2 - x, dy = y2 - y, dl = Math.hypot(dx, dy) || 1;
+      let px = dy / dl, py = -dx / dl;              // "up" side
+      if (py > 0) { px = -px; py = -py; }
+      const bx = x + px * r * 0.9, by = y + py * r * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(bx - dx / dl * r * 0.55, by - dy / dl * r * 0.55);
+      ctx.lineTo(bx + px * r * 1.15 + dx / dl * r * 0.25, by + py * r * 1.15 + dy / dl * r * 0.25);
+      ctx.lineTo(bx + dx / dl * r * 0.6, by + dy / dl * r * 0.6);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+  });
+
+  /* --- legs: two pairs with 3-claw feet --- */
+  drawAll(() => {
+    const legAt = [0.30, 0.44, 0.72, 0.84];
+    ctx.strokeStyle = GOLD;
+    ctx.fillStyle = GOLD;
+    for (let li = 0; li < legAt.length; li++) {
+      const i = Math.round(legAt[li] * (SP.length - 1));
+      const t = i / (SP.length - 1);
+      const r = bw(t);
+      if (r < h * 0.011) continue;
+      const [x, y] = SP[i];
+      const side = li % 2 === 0 ? 1 : 1;           // legs hang below
+      const kx = x + r * (li % 2 ? 0.9 : -0.6), ky = y + r * 1.7 * side;
+      const fx = kx + r * 0.7, fy = ky + r * 1.1;
+      ctx.lineWidth = r * 0.62; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x, y + r * 0.4); ctx.quadraticCurveTo(kx - r * 0.5, ky - r * 0.4, kx, ky); ctx.stroke();
+      ctx.lineWidth = r * 0.5;
+      ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
+      // claws
+      ctx.lineWidth = r * 0.2;
+      ctx.strokeStyle = GOLD_L;
+      for (let cw = -1; cw <= 1; cw++) {
+        ctx.beginPath();
+        ctx.moveTo(fx, fy);
+        ctx.quadraticCurveTo(fx + r * 0.5 * cw + r * 0.2, fy + r * 0.35, fx + r * 0.75 * cw + r * 0.3, fy + r * 0.75);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = GOLD;
+    }
+  });
+
+  /* --- tail flame tip --- */
+  drawAll(() => {
+    const [x, y] = SP[0];
+    const [x1, y1] = SP[3];
+    const dx = x - x1, dy = y - y1, dl = Math.hypot(dx, dy) || 1;
+    ctx.fillStyle = GOLD_L;
+    ctx.beginPath();
+    ctx.moveTo(x - dy / dl * h * 0.012, y + dx / dl * h * 0.012);
+    ctx.quadraticCurveTo(x + dx / dl * h * 0.05, y + dy / dl * h * 0.05 - h * 0.014,
+                         x + dx / dl * h * 0.08, y + dy / dl * h * 0.08);
+    ctx.quadraticCurveTo(x + dx / dl * h * 0.036, y + dy / dl * h * 0.036 + h * 0.009,
+                         x + dy / dl * h * 0.012, y - dx / dl * h * 0.012);
+    ctx.closePath(); ctx.fill();
+  });
+
+  /* --- head at the spine's end --- */
+  drawAll(() => {
+    const i0 = SP.length - 1;
+    const [hx, hy] = SP[i0];
+    const [px, py] = SP[i0 - 4];
+    const dx = hx - px, dy = hy - py, dl = Math.hypot(dx, dy) || 1;
+    const fx = dx / dl, fy = dy / dl;              // forward
+    const ux = -fy, uy = fx;                       // up-ish
+    const S = h * 0.038;                           // head scale
+    ctx.save();
+    ctx.translate(hx, hy);
+    ctx.rotate(Math.atan2(fy, fx));
+    // skull + snout (open jaw)
+    ctx.fillStyle = GOLD; ctx.strokeStyle = GOLD_D; ctx.lineWidth = S * 0.1;
+    ctx.beginPath();
+    ctx.moveTo(-S * 0.9, -S * 0.55);
+    ctx.quadraticCurveTo(S * 0.3, -S * 0.95, S * 1.5, -S * 0.5);   // top of snout
+    ctx.quadraticCurveTo(S * 1.85, -S * 0.4, S * 1.8, -S * 0.18);  // nose
+    ctx.quadraticCurveTo(S * 1.1, -S * 0.05, S * 0.5, 0);          // upper lip
+    ctx.quadraticCurveTo(S * 0.9, S * 0.4, S * 1.45, S * 0.55);    // lower jaw open
+    ctx.quadraticCurveTo(S * 0.7, S * 0.72, S * 0.15, S * 0.5);
+    ctx.quadraticCurveTo(-S * 0.7, S * 0.6, -S * 0.9, S * 0.1);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // teeth
+    ctx.fillStyle = GOLD_XL;
+    for (let k = 0; k < 3; k++) {
+      ctx.beginPath();
+      ctx.moveTo(S * (0.55 + k * 0.3), S * 0.02 + k * S * 0.02);
+      ctx.lineTo(S * (0.65 + k * 0.3), S * 0.3);
+      ctx.lineTo(S * (0.75 + k * 0.3), S * 0.06 + k * S * 0.02);
+      ctx.closePath(); ctx.fill();
+    }
+    // eye
+    ctx.fillStyle = '#2a1704';
+    ctx.beginPath(); ctx.arc(S * 0.28, -S * 0.42, S * 0.16, 0, 7); ctx.fill();
+    ctx.fillStyle = GOLD_XL;
+    ctx.beginPath(); ctx.arc(S * 0.33, -S * 0.47, S * 0.05, 0, 7); ctx.fill();
+    ctx.strokeStyle = GOLD_L; ctx.lineWidth = S * 0.07;
+    ctx.beginPath(); ctx.arc(S * 0.28, -S * 0.42, S * 0.22, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    // swept horns
+    ctx.strokeStyle = GOLD_L; ctx.lineWidth = S * 0.16; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-S * 0.15, -S * 0.7);
+    ctx.quadraticCurveTo(-S * 0.9, -S * 1.5, -S * 1.7, -S * 1.35); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-S * 0.45, -S * 0.55);
+    ctx.quadraticCurveTo(-S * 1.2, -S * 1.1, -S * 1.9, -S * 0.95); ctx.stroke();
+    // whiskers
+    ctx.lineWidth = S * 0.06; ctx.strokeStyle = GOLD;
+    ctx.beginPath(); ctx.moveTo(S * 1.55, -S * 0.25);
+    ctx.quadraticCurveTo(S * 2.3, -S * 0.1, S * 2.6, S * 0.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(S * 1.5, -S * 0.15);
+    ctx.quadraticCurveTo(S * 2.1, S * 0.25, S * 2.2, S * 0.9); ctx.stroke();
+    // mane spikes behind the skull
+    ctx.fillStyle = GOLD;
+    for (let k = 0; k < 4; k++) {
+      const a = -0.5 - k * 0.42;
+      ctx.beginPath();
+      ctx.moveTo(-S * 0.65, -S * 0.2);
+      ctx.lineTo(-S * (1.25 + k * 0.14), -S * 0.2 + Math.sin(a) * S * 1.15);
+      ctx.lineTo(-S * 0.72, S * 0.15);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+
+    /* flaming pearl the dragon chases */
+    const bx2 = hx + fx * S * 3.4 - ux * S * 1.6, by2 = hy + fy * S * 3.4 - uy * S * 1.6;
+    const pg = ctx.createRadialGradient(bx2, by2, 0, bx2, by2, S * 0.65);
+    pg.addColorStop(0, GOLD_XL); pg.addColorStop(0.55, GOLD_L); pg.addColorStop(1, 'rgba(201,150,45,0)');
+    ctx.fillStyle = pg;
+    ctx.beginPath(); ctx.arc(bx2, by2, S * 0.65, 0, 7); ctx.fill();
+    ctx.strokeStyle = GOLD_L; ctx.lineWidth = S * 0.09;
+    ctx.beginPath(); ctx.arc(bx2, by2, S * 0.34, 0, 7); ctx.stroke();
+    // flame licks
+    ctx.lineWidth = S * 0.08;
+    for (let k = 0; k < 3; k++) {
+      const a = -1.2 + k * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(bx2 + Math.cos(a) * S * 0.35, by2 + Math.sin(a) * S * 0.35);
+      ctx.quadraticCurveTo(bx2 + Math.cos(a - 0.4) * S * 0.85, by2 + Math.sin(a - 0.4) * S * 0.85,
+                           bx2 + Math.cos(a - 0.15) * S * 1.15, by2 + Math.sin(a - 0.15) * S * 1.15);
+      ctx.stroke();
+    }
+  });
+
+  return c;
+}
+
+/* ---- texture upload helper ---- */
+function texFromCanvas(cnv, wrapRepeat, mips, flipY) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, !!flipY);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cnv);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapRepeat ? gl.REPEAT : gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  if (mips) {
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  } else {
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  }
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  return t;
+}
+const woodTex    = texFromCanvas(makeWoodCanvas(1024), true, true);
+const envTex     = texFromCanvas(makeEnv(1024, 512), true, false);
+const shadowTex  = texFromCanvas(makeShadowCanvas(256), false, false);
+const causticTex = texFromCanvas(makeCausticCanvas(256), false, false);
+const dragonTex  = texFromCanvas(makeDragonCanvas(2048, 1024), true, true, true);
+
+/* ============================================================
+   SHADERS
+   ============================================================ */
+const MESH_VS = `#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNrm;
+layout(location=2) in vec2 aUV;
+uniform mat4 uModel, uView, uProj;
+out vec3 vPosV;    // view space
+out vec3 vNrmV;
+out vec2 vUV;
+void main(){
+  vec4 pw = uModel * vec4(aPos, 1.0);
+  vec4 pv = uView * pw;
+  vPosV = pv.xyz;
+  vNrmV = mat3(uView) * mat3(uModel) * aNrm;
+  vUV = aUV;
+  gl_Position = uProj * pv;
+}`;
+
+/* backdrop */
+const BG_FS = `#version 300 es
+precision highp float;
+in vec2 vUV; out vec4 frag;
+void main(){
+  vec2 uv = vUV;
+  vec3 top = vec3(0.055, 0.038, 0.024);
+  vec3 midc = vec3(0.16, 0.105, 0.06);
+  vec3 bot = vec3(0.07, 0.045, 0.028);
+  vec3 col = mix(top, midc, smoothstep(0.0, 0.55, uv.y));
+  col = mix(col, bot, smoothstep(0.55, 1.0, uv.y));
+  // warm pool of lamp light upper-left
+  col += vec3(0.35, 0.24, 0.13) * exp(-dot(uv - vec2(0.24, 0.3), uv - vec2(0.24, 0.3)) * 5.5);
+  // cool spill right
+  col += vec3(0.05, 0.075, 0.12) * exp(-dot(uv - vec2(0.85, 0.42), uv - vec2(0.85, 0.42)) * 6.0);
+  // vignette
+  vec2 vc = uv - 0.5;
+  col *= 1.0 - dot(vc, vc) * 0.7;
+  frag = vec4(col, 1.0);
+}`;
+const BG_VS = `#version 300 es
+layout(location=0) in vec2 p;
+out vec2 vUV;
+void main(){ vUV = p * 0.5 + 0.5; vUV.y = 1.0 - vUV.y; gl_Position = vec4(p, 0.9999, 1.0); }`;
+
+/* table */
+const TABLE_FS = `#version 300 es
+precision highp float;
+in vec3 vPosV; in vec3 vNrmV; in vec2 vUV;
+uniform sampler2D uWood;
+uniform vec3 uLightV;    // key light dir, view space
+uniform vec3 uFillV;
+out vec4 frag;
+void main(){
+  vec4 wood = texture(uWood, vUV);
+  vec3 alb = wood.rgb;
+  vec3 N = normalize(vNrmV);
+  vec3 V = normalize(-vPosV);
+  float nl = max(dot(N, uLightV), 0.0);
+  float nf = max(dot(N, uFillV), 0.0);
+  vec3 col = alb * (0.34 + nl * vec3(1.0, 0.9, 0.75) * 0.75 + nf * vec3(0.4, 0.5, 0.7) * 0.18);
+  // grain-gated sheen
+  vec3 Hh = normalize(uLightV + V);
+  float spec = pow(max(dot(N, Hh), 0.0), 42.0) * (0.12 + wood.a * 0.3);
+  col += spec * vec3(1.0, 0.92, 0.8);
+  // distance fade + darken toward the near edge so the foreground stays calm
+  float fog = clamp((-vPosV.z - 6.0) / 9.0, 0.0, 0.75);
+  col = mix(col, vec3(0.05, 0.035, 0.022), fog);
+  float front = smoothstep(0.68, 0.97, vUV.y);
+  col *= 1.0 - front * 0.85;
+  frag = vec4(col, 1.0);
+}`;
+
+/* decal (shadow multiplies, caustic adds — controlled by uniforms + blend mode) */
+const DECAL_FS = `#version 300 es
+precision highp float;
+in vec3 vPosV; in vec3 vNrmV; in vec2 vUV;
+uniform sampler2D uTex;
+uniform vec4 uTint;
+out vec4 frag;
+void main(){
+  vec4 t = texture(uTex, vUV);
+  float a = t.a * uTint.a;
+  frag = vec4(uTint.rgb * t.rgb * a, a);   // premultiplied
+}`;
+
+/* vase back faces: store normal.xy + uv */
+const BACK_FS = `#version 300 es
+precision highp float;
+in vec3 vPosV; in vec3 vNrmV; in vec2 vUV;
+out vec4 frag;
+void main(){
+  vec3 N = normalize(vNrmV);
+  frag = vec4(N.xy * 0.5 + 0.5, vUV);
+}`;
+
+/* vase front faces: full glass */
+const GLASS_FS = `#version 300 es
+precision highp float;
+in vec3 vPosV; in vec3 vNrmV; in vec2 vUV;
+uniform sampler2D uScene;    // room color
+uniform sampler2D uBack;     // back normal.xy + uv
+uniform sampler2D uBackD;    // back depth (0..1)
+uniform sampler2D uEnv;
+uniform sampler2D uEmblem;
+uniform mat4 uProj;
+uniform mat3 uViewT;         // view→world rotation (transpose of view rot)
+uniform vec2 uViewport;
+uniform vec2 uNearFar;
+uniform vec3 uLightV, uFillV;
+out vec4 frag;
+
+vec3 envSample(vec3 dirW){
+  float u = atan(dirW.x, dirW.z) / 6.2831853 + 0.5;
+  float v = acos(clamp(dirW.y, -1.0, 1.0)) / 3.14159265;
+  return texture(uEnv, vec2(u, v)).rgb;
+}
+float linDepth(float d){
+  float zn = d * 2.0 - 1.0;
+  return 2.0 * uNearFar.x * uNearFar.y / (uNearFar.y + uNearFar.x - zn * (uNearFar.y - uNearFar.x));
+}
+vec2 clampUV(vec2 uv){ return clamp(uv, vec2(0.002), vec2(0.998)); }
+
+void main(){
+  vec3 N = normalize(vNrmV);
+  vec3 V = normalize(-vPosV);
+
+  /* embossed gold emblem: bump the normal with the emblem alpha gradient */
+  vec4 emb = texture(uEmblem, vUV);
+  float embA = emb.a;
+  float bx = dFdx(embA), by = dFdy(embA);
+  vec3 Nb = normalize(N + vec3(bx, by, 0.0) * 5.0);
+  vec3 Nuse = mix(N, Nb, step(0.01, embA));
+
+  float ndv = clamp(dot(Nuse, V), 0.0, 1.0);
+  float F = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
+
+  /* thickness from back-face depth at this screen pixel */
+  vec2 suv = gl_FragCoord.xy / uViewport;
+  float backZ = linDepth(texture(uBackD, suv).r);
+  float thick = max(0.0, backZ - (-vPosV.z));
+
+  /* first refraction */
+  vec3 r1 = refract(-V, N, 0.667);
+  vec3 exitP = vPosV + r1 * thick;
+
+  /* find the exit surface's data */
+  vec4 clipE = uProj * vec4(exitP, 1.0);
+  vec2 euv = clampUV(clipE.xy / clipE.w * 0.5 + 0.5);
+  vec4 back = texture(uBack, euv);
+  vec3 Nback;
+  Nback.xy = back.xy * 2.0 - 1.0;
+  Nback.z = sqrt(max(0.0, 1.0 - dot(Nback.xy, Nback.xy)));
+  Nback.z = -Nback.z;   // back faces point away from camera
+
+  /* second refraction (exit); TIR → internal reflection */
+  vec3 r2 = refract(r1, -Nback, 1.5);
+  if (dot(r2, r2) < 0.0001) r2 = reflect(r1, -Nback);
+
+  vec3 farP = exitP + r2 * (0.6 + thick * 0.5);
+  vec4 clipF = uProj * vec4(farP, 1.0);
+  vec2 fuv = clampUV(clipF.xy / clipF.w * 0.5 + 0.5);
+  vec3 bg = texture(uScene, fuv).rgb;
+
+  /* Beer–Lambert ruby absorption over the path length */
+  vec3 sigma = vec3(0.55, 4.6, 3.7);
+  vec3 T = exp(-sigma * (thick * 0.85 + 0.06));
+  vec3 refrCol = bg * T + vec3(0.06, 0.0, 0.008) * (1.0 - T.r) * 0.5;
+
+  /* the far side's dragon, seen through the glass */
+  vec4 embBack = texture(uEmblem, back.zw);
+  vec3 goldBack = embBack.rgb * (0.55 + 0.6 * max(dot(Nback, uLightV), 0.0));
+  refrCol = mix(refrCol, goldBack * T * 2.2, embBack.a * 0.85);
+
+  /* reflections + spec */
+  vec3 Rw = uViewT * reflect(-V, Nuse);
+  vec3 env = envSample(Rw);
+  vec3 H1 = normalize(uLightV + V);
+  vec3 H2 = normalize(uFillV + V);
+  float s1 = pow(max(dot(Nuse, H1), 0.0), 180.0) * 2.2;
+  float s2 = pow(max(dot(Nuse, H2), 0.0), 60.0) * 0.35;
+
+  vec3 glass = mix(refrCol, env * vec3(1.0, 0.85, 0.85), F) + (s1 + s2) * vec3(1.0, 0.95, 0.9);
+
+  /* front-surface gold — the painted texture is the albedo, so outlines,
+     scales and sheen bands survive into the metal shading */
+  vec3 goldAlb = emb.rgb * 1.15;
+  vec3 goldCol = goldAlb * (0.3 + env * 1.35)
+               + goldAlb * max(dot(Nuse, uLightV), 0.0) * vec3(1.0, 0.9, 0.7) * 0.6
+               + (pow(max(dot(Nuse, H1), 0.0), 90.0) * 1.3 + s2) * vec3(1.0, 0.95, 0.8);
+
+  vec3 col = mix(glass, goldCol, smoothstep(0.3, 0.7, embA));
+  frag = vec4(col, 1.0);
+}`;
+
+const progBG    = makeProgram(BG_VS, BG_FS);
+const progTable = makeProgram(MESH_VS, TABLE_FS);
+const progDecal = makeProgram(MESH_VS, DECAL_FS);
+const progBack  = makeProgram(MESH_VS, BACK_FS);
+const progGlass = makeProgram(MESH_VS, GLASS_FS);
+const uTable = uniforms(progTable, ['uModel','uView','uProj','uWood','uLightV','uFillV']);
+const uDecal = uniforms(progDecal, ['uModel','uView','uProj','uTex','uTint']);
+const uBack  = uniforms(progBack, ['uModel','uView','uProj']);
+const uGlass = uniforms(progGlass, ['uModel','uView','uProj','uScene','uBack','uBackD','uEnv','uEmblem','uViewT','uViewport','uNearFar','uLightV','uFillV']);
+
+/* ============================================================
+   FRAMEBUFFERS
+   ============================================================ */
+let sceneFBO = null, sceneTex = null, backFBO = null, backTex = null, backDepthTex = null;
+let fbW = 0, fbH = 0;
+function makeFBOs(w, h) {
+  if (sceneTex) { gl.deleteTexture(sceneTex); gl.deleteTexture(backTex); gl.deleteTexture(backDepthTex);
+    gl.deleteFramebuffer(sceneFBO); gl.deleteFramebuffer(backFBO); }
+  fbW = w; fbH = h;
+  function colorTex() {
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return t;
+  }
+  sceneTex = colorTex();
+  sceneFBO = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFBO);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, sceneTex, 0);
+
+  backTex = colorTex();
+  backDepthTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, backDepthTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, w, h, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  backFBO = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, backFBO);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, backTex, 0);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, backDepthTex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+/* ============================================================
+   CAMERA + INPUT
+   ============================================================ */
+const NEAR = 0.5, FAR = 40;
+const FOVY = 0.62;
+let yaw = 0.6, yawVel = 0;               // vase spin
+let camPitch = 0.20;                      // radians above horizon
+let camDist = 4.9, fitDist = 4.9;         // fitDist = "whole vase in frame" distance
+let userZoomed = false;
+let lastInteract = -10;
+function computeFit() {
+  const aspect = Math.max(0.2, W / H);
+  const halfH = 1.75, halfW = 1.4;        // vase extents + margin around centre
+  const ty = Math.tan(FOVY / 2), tx = ty * aspect;
+  fitDist = Math.max(halfH / ty, halfW / tx);
+  camDist = userZoomed
+    ? Math.max(fitDist * 0.6, Math.min(fitDist * 1.7, camDist))
+    : fitDist;
+}
+
+const hintEl = document.getElementById('hint');
+let hintTimer = 0;
+function showHint(t) {
+  hintEl.textContent = t; hintEl.classList.add('show');
+  clearTimeout(hintTimer); hintTimer = setTimeout(() => hintEl.classList.remove('show'), 5200);
+}
+setTimeout(() => showHint('DRAG TO SPIN THE VASE · DRAG UP/DOWN TO MOVE YOUR EYE · PINCH TO ZOOM'), 700);
+
+const pointers = new Map();
+let pinchD0 = 0, pinchDist0 = 0;
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinchD0 = Math.hypot(a.x - b.x, a.y - b.y); pinchDist0 = camDist;
+  }
+  lastInteract = perfT;
+});
+canvas.addEventListener('pointermove', e => {
+  const p = pointers.get(e.pointerId);
+  if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  p.x = e.clientX; p.y = e.clientY;
+  lastInteract = perfT;
+  if (pointers.size === 1) {
+    yawVel = dx * 0.012 / 0.016;                 // px → rad/s-ish
+    yaw += dx * 0.012;
+    camPitch = Math.max(0.03, Math.min(0.62, camPitch + dy * 0.004));
+  } else if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinchD0 > 0) {
+      camDist = Math.max(fitDist * 0.6, Math.min(fitDist * 1.7, pinchDist0 * pinchD0 / Math.max(40, d)));
+      userZoomed = true;
+    }
+  }
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinchD0 = 0;
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  camDist = Math.max(fitDist * 0.6, Math.min(fitDist * 1.7, camDist + e.deltaY * 0.004));
+  userZoomed = true;
+  lastInteract = perfT;
+}, { passive: false });
+
+const info = document.getElementById('info');
+document.getElementById('info-btn').addEventListener('click', () => info.classList.add('open'));
+document.getElementById('info-close').addEventListener('click', () => info.classList.remove('open'));
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+let W = 0, H = 0;
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  makeFBOs(canvas.width, canvas.height);
+  computeFit();
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* fixed lights in world space; converted per-frame to view space */
+const LIGHT_W = (() => { const v = [-0.55, 0.72, 0.42], l = Math.hypot(...v); return v.map(x => x / l); })();
+const FILL_W  = (() => { const v = [0.65, 0.25, -0.4], l = Math.hypot(...v); return v.map(x => x / l); })();
+
+function xformDir(m, v) {   // mat4 view * dir (rotation part only)
+  return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2], m[1]*v[0]+m[5]*v[1]+m[9]*v[2], m[2]*v[0]+m[6]*v[1]+m[10]*v[2]];
+}
+
+function drawMesh(prog, u, vaoObj, model, view, proj) {
+  gl.uniformMatrix4fv(u.uModel, false, model);
+  gl.uniformMatrix4fv(u.uView, false, view);
+  gl.uniformMatrix4fv(u.uProj, false, proj);
+  gl.bindVertexArray(vaoObj.vao);
+  gl.drawElements(gl.TRIANGLES, vaoObj.count, gl.UNSIGNED_SHORT, 0);
+}
+
+function decalModel(x, z, sx, sz) {
+  // scale/translate the unit xz quad; slight y lift to avoid z-fighting
+  return new Float32Array([sx,0,0,0, 0,1,0,0, 0,0,sz,0, x,0.012,z,1]);
+}
+
+function drawRoom(view, proj, lightV, fillV) {
+  /* backdrop */
+  gl.disable(gl.DEPTH_TEST);
+  gl.useProgram(progBG);
+  gl.bindVertexArray(fsVAO);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  /* table */
+  gl.enable(gl.DEPTH_TEST);
+  gl.useProgram(progTable);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, woodTex);
+  gl.uniform1i(uTable.uWood, 0);
+  gl.uniform3fv(uTable.uLightV, lightV);
+  gl.uniform3fv(uTable.uFillV, fillV);
+  drawMesh(progTable, uTable, tableVAO, IDENT, view, proj);
+  /* decals */
+  gl.useProgram(progDecal);
+  gl.depthMask(false);
+  gl.enable(gl.BLEND);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.uniform1i(uDecal.uTex, 0);
+  // contact shadow (premultiplied alpha blend, dark)
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  gl.bindTexture(gl.TEXTURE_2D, shadowTex);
+  gl.uniform4f(uDecal.uTint, 0.02, 0.012, 0.008, 0.9);
+  drawMesh(progDecal, uDecal, decalVAO, decalModel(0.3, 0.25, 1.45, 1.1), view, proj);
+  // ruby caustic (additive) — hugs the foot on the side away from the key light
+  gl.blendFunc(gl.ONE, gl.ONE);
+  gl.bindTexture(gl.TEXTURE_2D, causticTex);
+  gl.uniform4f(uDecal.uTint, 1.0, 1.0, 1.0, 1.0);
+  drawMesh(progDecal, uDecal, decalVAO, decalModel(1.0, -0.1, 1.05, 0.7), view, proj);
+  gl.disable(gl.BLEND);
+  gl.depthMask(true);
+}
+
+let perfT = 0, lastT = 0;
+function frame(tms) {
+  requestAnimationFrame(frame);
+  const t = tms / 1000;
+  const dt = Math.min(0.1, t - lastT || 0.016);
+  lastT = t; perfT = t;
+
+  /* vase spin: inertia + gentle idle turn */
+  if (pointers.size === 0) {
+    yaw += yawVel * dt;
+    yawVel *= Math.pow(0.12, dt);
+    if (t - lastInteract > 5) yaw += dt * 0.14;
+  }
+
+  const aspect = canvas.width / canvas.height;
+  const proj = mat4Persp(FOVY, aspect, NEAR, FAR);
+  const cy = 1.15;
+  const eye = [0, cy + Math.sin(camPitch) * camDist, Math.cos(camPitch) * camDist];
+  const view = mat4LookAt(eye, [0, cy, 0], [0, 1, 0]);
+  const model = mat4RotY(yaw);
+  const lightV = xformDir(view, LIGHT_W);
+  const fillV = xformDir(view, FILL_W);
+  /* view rotation transpose (view→world) as mat3, column-major */
+  const viewT = new Float32Array([view[0],view[4],view[8], view[1],view[5],view[9], view[2],view[6],view[10]]);
+
+  /* PASS 1 — room into sceneFBO */
+  gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFBO);
+  gl.viewport(0, 0, fbW, fbH);
+  gl.clearColor(0.03, 0.02, 0.015, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  drawRoom(view, proj, lightV, fillV);
+
+  /* PASS 2 — vase back faces into backFBO */
+  gl.bindFramebuffer(gl.FRAMEBUFFER, backFBO);
+  gl.viewport(0, 0, fbW, fbH);
+  gl.clearColor(0.5, 0.5, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.FRONT);
+  gl.useProgram(progBack);
+  drawMesh(progBack, uBack, vaseVAO, model, view, proj);
+
+  /* PASS 3 — screen: room again, then glass front */
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.clearColor(0.03, 0.02, 0.015, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.disable(gl.CULL_FACE);
+  drawRoom(view, proj, lightV, fillV);
+
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.BACK);
+  gl.useProgram(progGlass);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, sceneTex);   gl.uniform1i(uGlass.uScene, 0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, backTex);    gl.uniform1i(uGlass.uBack, 1);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, backDepthTex); gl.uniform1i(uGlass.uBackD, 2);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, envTex);     gl.uniform1i(uGlass.uEnv, 3);
+  gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, dragonTex);  gl.uniform1i(uGlass.uEmblem, 4);
+  gl.uniformMatrix3fv(uGlass.uViewT, false, viewT);
+  gl.uniform2f(uGlass.uViewport, canvas.width, canvas.height);
+  gl.uniform2f(uGlass.uNearFar, NEAR, FAR);
+  gl.uniform3fv(uGlass.uLightV, lightV);
+  gl.uniform3fv(uGlass.uFillV, fillV);
+  drawMesh(progGlass, uGlass, vaseVAO, model, view, proj);
+  gl.disable(gl.CULL_FACE);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
