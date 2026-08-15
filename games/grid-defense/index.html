@@ -200,7 +200,7 @@ input[type=range]::-moz-range-thumb { width:20px; height:20px; border:0; border-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 03:23 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 04:17 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
@@ -857,7 +857,7 @@ function restoreFrom(key) {
   waveT = L.waveT || 0; levelLeaks = L.levelLeaks || 0; levelKills = L.levelKills || 0;
   waveHpMul = L.hpMul || hpMulFor(globalWave()); waveSpdMul = L.spdMul || spdMulFor(globalWave());
   towers = (L.towers || []).map(t => ({ type:t.type, r:t.r, c:t.c, lvl:t.lvl||1, spent:t.spent||0, cd:0, mode:t.mode||'first', adj:0,
-    syn:{ dmg:1, rate:1, range:1, splash:0, slow:0, n:0 } }));
+    syn:{ dmg:1, rate:1, range:1, splash:0, slow:0, n:0, links:[] } }));
   recomputeAdjacency();
   creeps = (L.creeps || []).map(c => Object.assign({ dead:false, healT:0 }, c));
   spawnList = (L.spawnList || []).slice();
@@ -1079,7 +1079,7 @@ function recomputeAdjacency() {
       if (Math.abs(o.r - t.r) <= 1 && Math.abs(o.c - t.c) <= 1) n++;
     }
     t.adj = Math.min(4, n);
-    t.syn = { dmg: 1, rate: 1, range: 1, splash: 0, slow: 0, n: 0 };
+    t.syn = { dmg: 1, rate: 1, range: 1, splash: 0, slow: 0, n: 0, links: [] };
   }
   const rank = S ? S.synergy : 0;
   if (!rank) return;
@@ -1091,6 +1091,9 @@ function recomputeAdjacency() {
       .slice(0, Math.min(4, rank));
     t.syn.n = nb.length;
     for (const o of nb) {
+      // remember the side and the lender's colour so the board can show it
+      const dir = o.c === t.c + 1 ? 'r' : o.c === t.c - 1 ? 'l' : o.r === t.r + 1 ? 'd' : 'u';
+      t.syn.links.push({ dir, col: TOWERS[o.type].col, type: o.type });
       if (o.type === t.type) {
         t.syn.dmg *= 1 + SYN_SAME * mul;
         t.syn.rate *= 1 + SYN_SAME * mul;
@@ -1420,7 +1423,7 @@ function buildTower(type, r, c) {
   if (cash < cost || !canBuild(r, c)) { sfxDeny(); return false; }
   cash -= cost;
   towers.push({ type, r, c, lvl: 1, cd: 0, spent: cost, mode: 'first', adj: 0,
-                syn: { dmg:1, rate:1, range:1, splash:0, slow:0, n:0 } });
+                syn: { dmg:1, rate:1, range:1, splash:0, slow:0, n:0, links:[] } });
   recomputeAdjacency();
   sfxBuild();
   return true;
@@ -1596,11 +1599,11 @@ function poly(g, x, y, r, n, rot) {
 }
 /* Turret silhouettes — green triangle, red circle, blue snowflake outline,
    purple spike. Shared by the board and the armory icons.               */
-function drawTurretShape(g, type, x, y, s) {
+function drawTurretShape(g, type, x, y, s, lw) {
   const T = TOWERS[type];
   g.save();
   g.translate(x, y);
-  g.strokeStyle = T.col; g.fillStyle = T.col + '2e'; g.lineWidth = Math.max(1.6, s * 0.13);
+  g.strokeStyle = T.col; g.fillStyle = T.col + '2e'; g.lineWidth = lw || Math.max(1.6, s * 0.13);
   g.shadowColor = T.col; g.shadowBlur = s * 0.5;
   if (T.shape === 'tri') {
     g.beginPath();
@@ -1609,7 +1612,7 @@ function drawTurretShape(g, type, x, y, s) {
   } else if (T.shape === 'circ') {
     g.beginPath(); g.arc(0, 0, s * 0.85, 0, 7); g.fill(); g.stroke();
   } else if (T.shape === 'flake') {
-    g.lineWidth = Math.max(1.3, s * 0.1); g.lineCap = 'round';
+    g.lineWidth = (lw ? lw * 0.78 : Math.max(1.3, s * 0.1)); g.lineCap = 'round';
     for (let i = 0; i < 6; i++) {
       const a = i * Math.PI / 3;
       const ex = Math.cos(a) * s, ey = Math.sin(a) * s;
@@ -1632,26 +1635,67 @@ function drawTurretShape(g, type, x, y, s) {
   }
   g.restore();
 }
+/* A placed turret carries three readings, none of them text:
+     LEVEL (cash)  — the silhouette grows and its outline thickens
+     TIER  (cores) — a metal frame around the base plate: copper, then silver,
+                     then gold, 1-3px within each metal
+     SYNERGY       — a coloured bloom on the edge facing each neighbour that is
+                     lending it something, in THAT NEIGHBOUR'S colour, so a
+                     nova with a pulse on its right glows green on that side.
+   Exact numbers stay on the selection panel, where they are asked for.      */
+function tierFrame(tier) {
+  if (tier <= 0) return null;
+  const band = Math.min(2, Math.floor((tier - 1) / 3));   // copper -> silver -> gold
+  return { col: ['#b87333', '#c9d2dd', '#ffd24a'][band], w: ((tier - 1) % 3) + 1 };
+}
 function drawTower(t, x, y, ghost) {
   const T = TOWERS[t.type];
+  const lvl = t.lvl || 1;
   ctx.save();
   if (ghost) ctx.globalAlpha = 0.6;
-  // base plate keeps turrets reading as structures next to the moving horde
   const bs = cell * 0.82;
+  const px = x - bs / 2, py = y - bs / 2, rad = bs * 0.24;
+
+  // base plate
   ctx.fillStyle = '#0d0d1c'; ctx.strokeStyle = T.col + '44'; ctx.lineWidth = 1;
-  roundRect(x - bs / 2, y - bs / 2, bs, bs, bs * 0.24); ctx.fill(); ctx.stroke();
-  drawTurretShape(ctx, t.type, x, y - cell * 0.03, cell * 0.27);
+  roundRect(px, py, bs, bs, rad); ctx.fill(); ctx.stroke();
+
+  // synergy blooms, clipped inside the plate so they read as an inward bulge
+  if (!ghost && t.syn && t.syn.links && t.syn.links.length) {
+    ctx.save();
+    roundRect(px, py, bs, bs, rad); ctx.clip();
+    const depth = bs * 0.34;
+    for (const L of t.syn.links) {
+      let g;
+      if (L.dir === 'r')      g = ctx.createLinearGradient(px + bs, 0, px + bs - depth, 0);
+      else if (L.dir === 'l') g = ctx.createLinearGradient(px, 0, px + depth, 0);
+      else if (L.dir === 'd') g = ctx.createLinearGradient(0, py + bs, 0, py + bs - depth);
+      else                    g = ctx.createLinearGradient(0, py, 0, py + depth);
+      // light enough that the turret's own colour still owns the tile
+      g.addColorStop(0, L.col + '99');
+      g.addColorStop(0.5, L.col + '26');
+      g.addColorStop(1, L.col + '00');
+      ctx.fillStyle = g;
+      ctx.fillRect(px, py, bs, bs);
+    }
+    ctx.restore();
+  }
+
+  // tier frame
+  const frame = ghost ? null : tierFrame(run && run.armory[t.type] ? run.armory[t.type].tier : 0);
+  if (frame) {
+    ctx.strokeStyle = frame.col; ctx.lineWidth = frame.w;
+    ctx.shadowColor = frame.col; ctx.shadowBlur = 4;
+    const inset = frame.w / 2;
+    roundRect(px + inset, py + inset, bs - frame.w, bs - frame.w, rad); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // the turret: bigger and heavier as it levels
+  const size = cell * 0.225 * (1 + 0.135 * (lvl - 1));
+  const weight = Math.max(1.5, size * 0.13) * (1 + 0.40 * (lvl - 1));
+  drawTurretShape(ctx, t.type, x, y, size, weight);
   ctx.shadowBlur = 0;
-  const lvl = t.lvl || 1;
-  for (let i = 0; i < lvl; i++) {
-    ctx.fillStyle = T.col;
-    ctx.fillRect(x - bs / 2 + 3 + i * 6, y + bs / 2 - 6, 4, 3);
-  }
-  if (run && run.armory[t.type] && run.armory[t.type].tier > 0 && !ghost) {
-    ctx.fillStyle = '#ffc300';
-    ctx.font = "8px 'Black Ops One'"; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-    ctx.fillText('T' + run.armory[t.type].tier, x + bs / 2 - 3, y - bs / 2 + 2);
-  }
   ctx.restore();
 }
 function angleAt(d) {

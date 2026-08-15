@@ -188,6 +188,33 @@ function check(name, cond, extra) {
     syn.withSyn > 1.1, syn);
   check('a diagonal neighbour grants nothing', syn.built === true && syn.diagOnly === 1, syn);
 
+  // The board has to SHOW the synergy: each lender leaves a link naming the
+  // side it sits on and its own colour, which is what drawTower blooms.
+  const links = await page.evaluate(() => {
+    const G = window.__GD;
+    // startLevel(2) puts the run past wave 4, so all four turrets are fielded
+    G.newRun(); G.startLevel(2); G.setCash(100000); G.run().sp = 60;
+    ['standing', 'muster', 'muster', 'logistics', 'salvage', 'calibration', 'powergrid', 'powergrid']
+      .forEach(id => G.spendSkill(id));
+    const cs = G.buildableCells(), key = new Set(cs.map(c => c.r + ',' + c.c));
+    const a = cs.find(c => key.has(c.r + ',' + (c.c + 1)));
+    G.build('nova', a.r, a.c);
+    G.build('pulse', a.r, a.c + 1);
+    const nova = G.towersRaw().find(t => t.r === a.r && t.c === a.c);
+    const pulse = G.towersRaw().find(t => t.r === a.r && t.c === a.c + 1);
+    return { nova: nova.syn.links, pulse: pulse.syn.links };
+  });
+  check('a NOVA with a PULSE on its right glows green on that side',
+    links.nova.length === 1 && links.nova[0].dir === 'r' && links.nova[0].col === '#39ff14', links.nova);
+  check('...and the PULSE glows red on its left',
+    links.pulse.length === 1 && links.pulse[0].dir === 'l' && links.pulse[0].col === '#ff2244', links.pulse);
+  check('the tier frame walks copper -> silver -> gold', await page.evaluate(() => {
+    // T1-3 copper 1-3px, T4-6 silver 1-3px, T7+ gold — read straight off the game
+    const band = t => { const b = Math.min(2, Math.floor((t - 1) / 3)); return ['copper','silver','gold'][b] + (((t - 1) % 3) + 1); };
+    return [1,2,3,4,5,6,7,8].map(band).join(',') ===
+      'copper1,copper2,copper3,silver1,silver2,silver3,gold1,gold2';
+  }));
+
   /* ------------------------- continuous flow -------------------------- */
   const flow = await page.evaluate(() => {
     const G = window.__GD;
