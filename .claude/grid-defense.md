@@ -51,12 +51,41 @@ board ranks score and shows retries — retries are what separate players.
 **Endless (level 11+) has no retries**: a breach there ends the run and records
 it. That is what gives the scoreboard its teeth.
 
+## Deployment caps — the scarcity that makes placement a decision
+
+**One of each turret type on the field to start.** Every armory tier of that
+type buys exactly one more slot, and the COMMAND tree buys slots across the
+board (`MUSTER`, `MASS LEVY`, `GRAND ARMY`). `deployCap(type) = 1 + tier +
+S.deployAll`; `canDeploy()` gates building, the drag ghost, the armed-tile wash
+and whether a card will arm at all, and the build card always shows `have/cap`.
+
+This is the change that made the rest of the balance mean anything. With ~25
+turrets the board was a blanket and position barely mattered; with four to
+twenty, *which* turret and *where* is the whole game. It also re-pointed the
+economy: cash stopped being the constraint the moment turret COUNT became one,
+so cores (slots) and skill points (multipliers) carry the run.
+
+## Adjacency synergy (ENGINEERING · POWER GRID)
+
+Orthogonal neighbours only — **diagonals deliberately grant nothing**, so a
+layout is a decision rather than "clump everything". A turret can be lifted by
+at most four neighbours (all an orthogonal cell has) and the skill *rank* caps
+how many actually pay, first-placed first, so build order matters.
+
+- **Same type** — both gain +16% damage, fire rate and range (per neighbour).
+- **Different types trade traits** — a RAIL lends reach (+38%), a PULSE lends
+  cycle speed (+26%), a NOVA lends splash (45% of damage in a small bloom), a
+  FROST lends a brief chill. `SMART GRID` doubles every one of them.
+
+Computed in `recomputeAdjacency()` on build/sell/upgrade and whenever skills
+change — never per frame. Combat just reads `t.syn`.
+
 ## The three currencies (this is the design)
 
 | | earned | spent on | resets |
 |---|---|---|---|
 | `$` cash | `startCashFor(L)` + kill bounties | placing and upgrading towers **this level** | every level |
-| `◆` cores | `coresForWave(gw)` on each wave clear | ARMORY (from wave 5): permanent turret tiers, or RESEARCH into skill points | never (per run) |
+| `◆` cores | `coresForWave(gw)` on each wave clear | ARMORY (from wave 5): a permanent tier = **+1 deployable** of that type plus its stats, or RESEARCH into skill points | never (per run) |
 | `★` skill | `skillPtsForWave(gw)`, from wave 5 | the three trees | never (per run) |
 
 Rewards land **per wave**, and the ARMORY/SKILLS buttons open from the HUD at
@@ -72,7 +101,13 @@ tutorial and the meta-game opens halfway through it. The drive suite gates the
 schedule from the real flow: the build bar must gain exactly one card a wave
 through wave 4 and hold at four.
 
-Surplus cores late in a run convert 5◆→1★ (RESEARCH), so cores never go dead.
+Rewards are deliberately thin. At 2 cores and 1 point a wave the campaign paid
+out ~450 cores and ~116 points against ~290 cores and ~250 points of things to
+buy, so neither currency was ever a decision — the CD's words were "an over
+abundance … they don't feel like valuable rewards". A run now pays roughly
+**150 cores and 60 points**: about enough to fill one tree, which is what makes
+specialising a choice. Surplus cores still convert to points at an escalating
+price (`researchCost()`).
 
 ## Turrets (`TOWERS`)
 
@@ -111,37 +146,29 @@ roughly 40% is reachable. Specialisation is forced, not suggested.
 
 ## Difficulty curve — read before touching
 
-Every curve is a function of the **global wave index** `globalWave()` =
-`(level-1)*10 + wave`, 1..100 in the campaign. Because that index is monotonic
-and bosses land on every tenth wave, the pacing falls out for free: waves harden
-across a level, the boss is a spike, and the next level opens easier than that
-boss but harder than the level before it. Nothing special-cases "level start".
+Wave HP is a **sawtooth**, not one smooth ramp:
+`HP_LEVEL^(level-1) · HP_WAVE^(wave-1)`, with `HP_BOSS` on the tenth wave.
+Waves harden steeply across a level, the boss spikes, and the next level opens
+far easier than that boss but on a higher floor than the level before it —
+which is the pacing that was asked for. A single monotonic curve was measured
+doing the *opposite* of what it looked like: the board grows from empty inside
+a level, so gentle per-wave growth made a level's OPENING waves the dangerous
+ones (24 lives lost in the first four waves against 0 in the last four).
 
-`hpMulFor(gw)` uses an **accelerating exponent**: `exp(HP_A·x + HP_B·x²)`.
-A flat rate does not work here and this was measured, not guessed: waves spread
-over ~60s, so a defence that holds at level 20 holds at 100 with the same
-headroom. The quadratic term is what makes the back half a squeeze.
-
-`HP_A = 0.040, HP_B = 0.00027` was calibrated against the drive suite's
-auto-player (coverage-optimal placement, both build and upgrade levers, a fixed
-skill order, and **no use of the COMMAND abilities**): it starts leaking in the
-mid-70s and falls in the low-to-mid 80s. Re-tuned when unlocks became free —
-handing over all four turrets by level 4 and banking their cores made the same
-bot roughly ten levels stronger, which is the kind of drift only a harness
-catches. A player who actually spends abilities and builds coherently has the
-headroom to reach 100. `__GD.setCurve(a, b)` is the sweep hook; `.claude/tests/drive-grid-defense.cjs` holds the harness.
+`HP_LEVEL = 1.40, HP_WAVE = 1.16` was swept with the eval **after deploy caps
+landed**. A board of ~5-20 turrets instead of ~25 meant the previous 2.00 curve
+was unwinnable for every persona — a reminder that the curve is meaningless
+except relative to how much defence the rules permit.
 
 Elites are stamped **deterministically** per creep type and spread evenly
-through each group. Rolling them at random let one level land a heavy elite the
-next level missed, so total wave HP could dip level-to-level — an invisible
-difficulty wobble on an otherwise monotonic ramp. Boss waves (every 10th)
-shrink the ordinary mix to 72% and add WARDENs; the ramp is therefore monotonic
-*within* each class, not across the two.
+through each group; rolling them at random let one wave land a heavy elite the
+next one missed, an invisible wobble on an otherwise monotonic ramp.
 
-The WARDEN was retuned after the CD reported it as a wall: it carried 520 base
-HP **and 4 armour**, and the armour alone ate ~40% of an early PULSE shot, so it
-read as unkillable next to the creeps leading up to it. Now 300 HP, 2 armour,
-and a fatter bounty so killing it funds the next level.
+The WARDEN was retuned twice: first from a wall (520 HP **and** 4 armour, where
+the armour alone ate ~40% of an early PULSE shot), now 300 HP and 2 armour.
+NOVA was cut hard as well (10 → 6.5 damage, 1.3 → 0.95 blast, 2.2 → 1.85 range)
+after the CD cleared wave 6 with nothing but powered-up novas at the mouth.
+
 
 ## Maps
 
@@ -205,21 +232,30 @@ tweak never fights a mechanics regression:
   `--curve <levelGrowth>,<waveGrowth>` and `--json` are the knobs. Each run
   takes 1-3 seconds, so sweeping is cheap.
 
-Measured at `HP_LEVEL = 2.00` with a 3-retry cap and a **seeded RNG**
-(`--seed`, default 12345). These are the campaign's difficulty *claims*, and
-the eval fails if they stop being true:
+Measured at `HP_LEVEL = 1.40 / HP_WAVE = 1.16` with a 3-retry cap and a
+**seeded RNG**, stable across four seeds. These are the campaign's difficulty
+*claims*, and the eval fails if they stop being true:
 
 | persona | outcome |
 | --- | --- |
-| coherent build | reaches level 10; clears it on most seeds |
-| one-note PULSE, never upgrade | stalls at 7 |
-| crowd every turret at one spot | stalls at 6 |
-| never buy an armory tier | stalls at 6 |
-| poor skill selection | clears 4, cannot pass 5 |
-| no skills at all | clears 3, cannot pass 4 |
+| coherent build | clears all ten |
+| **OFFENSE tree alone** | **clears all ten** — few turrets, enormous hitters |
+| **ENGINEERING tree alone** | **clears all ten** — clustered synergy, deep upgrades |
+| **COMMAND tree alone** | **clears all ten** — a big army and abilities |
+| one-note PULSE, never upgrade | stalls at 8 |
+| crowd every turret at one spot | stalls at 7 |
+| poor skill selection | stalls at 6 |
+| no skills at all | stalls at 4-5 |
+| never buy an armory tier | stalls at 4 |
 
-Every lever is load-bearing, and the ladder is stable across seeds — only the
-final level is a coin flip for a good build, which is the intent.
+**Any one tree must be able to finish the campaign alone** — that is a design
+requirement, so it is an assertion. When COMMAND failed it (stalling at 9 on
+one seed) the fix was the TREE, not the curve: it could field the biggest army
+in the game with no way to turn size into power, so `COMBINED ARMS` now pays
+every turret +1.6%/rank damage per turret on the field. ENGINEERING failed the
+same way earlier — deploy caps had gutted its economy identity — and was
+re-pointed onto synergy and per-level damage.
+
 
 **Seed the RNG or the numbers lie.** Combat crit rolls alone swung a persona's
 verdict by two whole levels between otherwise identical runs; all in-game

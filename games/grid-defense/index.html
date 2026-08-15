@@ -200,7 +200,7 @@ input[type=range]::-moz-range-thumb { width:20px; height:20px; border:0; border-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 02:01 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 03:23 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
@@ -271,7 +271,10 @@ const MAPS = [
 const TOWERS = {
   pulse: { name:'PULSE', shape:'tri',   col:'#39ff14', cost:40,  dmg:7,  rate:0.50, range:2.5,
            kind:'single', desc:'Fast single-target fire. Cheap, reliable, always available.' },
-  nova:  { name:'NOVA',  shape:'circ',  col:'#ff2244', cost:70,  dmg:10, rate:1.05, range:2.2, aoe:1.3,
+  // NOVA was the whole game: a couple of powered-up ones at the mouth cleared
+  // waves on their own. Less damage, a tighter blast and shorter reach, so it
+  // wants support instead of replacing it.
+  nova:  { name:'NOVA',  shape:'circ',  col:'#ff2244', cost:70,  dmg:6.5, rate:1.15, range:1.85, aoe:0.95,
            kind:'splash', desc:'Splash rounds detonate on the lead target. Shreds packs.' },
   frost: { name:'FROST', shape:'flake', col:'#4488ff', cost:60,  dmg:3,  rate:0.80, range:2.3, slow:0.45, slowT:1.4,
            kind:'control', desc:'Chills targets to 55% speed. Multiplies every other tower.' },
@@ -317,13 +320,12 @@ const CREEPS = {
    opposite of what it looked like: the board grows from empty to ~20 towers
    inside a level while HP crept up ~4% a wave, so the FIRST waves of a level
    were the dangerous ones and the boss was a formality.               */
-let HP_LEVEL = 2.00;    // per-level floor growth   (>1: each level harder)
-// 2.00 was swept with .claude/tests/eval-grid-defense.cjs (3-retry cap):
-// no skills clears 3 and cannot pass 4; a poor skill selection clears 4 and
-// cannot pass 5; crowding every turret at one spot stalls at 4; one-note
-// PULSE stalls at 8; a coherent build clears all ten. Past ~2.3 the good
-// build stops clearing before the bad ones get meaningfully worse.
-let HP_WAVE  = 1.26;    // per-wave growth in-level (> HP_LEVEL: next level opens easier)
+let HP_LEVEL = 1.40;    // per-level floor growth   (>1: each level harder)
+// 1.40/1.16 was swept with .claude/tests/eval-grid-defense.cjs after deploy
+// caps landed: a board of ~5-20 turrets instead of ~25 meant the old 2.00
+// curve was unwinnable for every persona. Each of the three trees clears the
+// campaign ALONE at this setting, which is a design requirement, not a nicety.
+let HP_WAVE  = 1.16;    // per-wave growth in-level (> HP_LEVEL: next level opens easier)
 const HP_BOSS = 1.5;    // extra bump on the boss wave itself
 const SPD_GROWTH = 0.0032, SPD_CAP = 1.45;
 const CASH_BASE = 95, CASH_GROWTH = 1.028;
@@ -343,8 +345,16 @@ function isBossWave(gw) { return gw % WAVES_PER_LEVEL === 0; }
 function startCashFor(level) {
   return Math.round(CASH_BASE * Math.pow(CASH_GROWTH, (level - 1) * WAVES_PER_LEVEL));
 }
-function coresForWave(gw) { return 2 + Math.floor(gw / 15) + (isBossWave(gw) ? 1 : 0); }
-function skillPtsForWave(gw) { return gw < ARMORY_WAVE ? 0 : 1 + (isBossWave(gw) ? 2 : 0); }
+/* Rewards are deliberately thin. At 2 cores and 1 point a wave the campaign
+   handed out ~450 cores and ~116 points against ~290 cores and ~250 points of
+   things to buy — so neither currency was ever a decision. Now a full run pays
+   roughly 150 cores and 60 points: enough to fill about one tree, which is
+   what makes specialising a choice instead of a formality. */
+function coresForWave(gw) { return 1 + Math.floor(gw / 30) + (isBossWave(gw) ? 1 : 0); }
+function skillPtsForWave(gw) {
+  if (gw < ARMORY_WAVE) return 0;
+  return (gw % 2 === 0 ? 1 : 0) + (isBossWave(gw) ? 1 : 0);
+}
 function mapIndexFor(level) { return (level - 1) % MAPS.length; }
 /* Cores -> skill points, at an ESCALATING price. At a flat rate it was simply
    better to melt every core than to buy a permanent tier — a persona that
@@ -607,32 +617,37 @@ const TREES = [
     { id:'scavenge', name:'SCAVENGERS', ic:'🔧', tier:3, row:1, req:['contracts'], max:3,
       info:'+2 flat cash from every kill, per rank.', eff:(S,r)=>{ S.perKill += 2*r; } },
     { id:'calibration', name:'CALIBRATION', ic:'📐', tier:3, row:2, req:['salvage'], max:4,
-      info:'+5% range on every tower, per rank.', eff:(S,r)=>{ S.range *= 1 + 0.05*r; } },
+      info:'+7% range on every tower, per rank.', eff:(S,r)=>{ S.range *= 1 + 0.07*r; } },
     { id:'modular', name:'MODULAR FRAMES', ic:'🧱', tier:3, row:3, req:['prefab'], max:2,
       info:'+1 maximum tower level, per rank (3 base).', eff:(S,r)=>{ S.maxLvl += r; } },
     { id:'retrofit', name:'RETROFIT', ic:'🛠️', tier:3, row:4, req:['prefab'], max:4,
-      info:'-6% tower upgrade cost, per rank.', eff:(S,r)=>{ S.upCost *= 1 - 0.06*r; } },
+      info:'-10% tower upgrade cost, per rank.', eff:(S,r)=>{ S.upCost *= 1 - 0.10*r; } },
 
     { id:'market', name:'BLACK MARKET', ic:'📈', tier:4, row:0, req:['bonds'], max:3,
       info:'+8% cash from every kill, per rank.', eff:(S,r)=>{ S.bounty *= 1 + 0.08*r; } },
     { id:'targeting', name:'TARGETING SUITE', ic:'🎚️', tier:4, row:1, req:['scavenge'], max:1,
       info:'Unlocks per-tower targeting: FIRST, LAST, STRONGEST, CLOSEST.', eff:(S)=>{ S.targeting = true; } },
-    { id:'powergrid', name:'POWER GRID', ic:'🔌', tier:4, row:2, req:['calibration'], max:3,
-      info:'+8% fire rate per adjacent tower (max 4), per rank.', eff:(S,r)=>{ S.gridBonus += 0.08*r; } },
+    { id:'powergrid', name:'POWER GRID', ic:'🔌', tier:4, row:2, req:['calibration'], max:4,
+      info:'ADJACENCY. Each rank lets one more orthogonal neighbour boost a turret (max 4). ' +
+           'Same type: both gain +10% damage, fire rate and range. Different types trade traits — ' +
+           'a RAIL beside a NOVA lends the nova its reach and borrows the nova\'s splash; ' +
+           'FROST lends its chill; PULSE lends its cycle speed. Diagonals do not count.',
+      eff:(S,r)=>{ S.synergy = Math.max(S.synergy, r); } },
     { id:'reclaim', name:'FULL RECLAIM', ic:'↩️', tier:4, row:3, req:['modular'], max:1,
       info:'Selling during the build phase refunds 100%.', eff:(S)=>{ S.reclaim = true; } },
     { id:'foundry', name:'FOUNDRY', ic:'🏭', tier:4, row:4, req:['retrofit'], max:3,
-      info:'Each tower level grants +8% extra damage, per rank.', eff:(S,r)=>{ S.foundry += 0.08*r; } },
+      info:'Each tower level grants +18% extra damage, per rank.', eff:(S,r)=>{ S.foundry += 0.18*r; } },
 
     { id:'warEconomy', name:'WAR ECONOMY', ic:'★', tier:5, row:0, req:['market'], max:1, gate:12,
       info:'CAPSTONE — +25% bounty, +5% interest, +20% starting cash.',
       eff:(S)=>{ S.bounty *= 1.25; S.interest += 0.05; S.startCash *= 1.2; } },
     { id:'smartGrid', name:'SMART GRID', ic:'★', tier:5, row:2, req:['powergrid'], max:1, gate:12,
-      info:'CAPSTONE — every tower gains +15% fire rate and +10% range.',
-      eff:(S)=>{ S.rate *= 1.15; S.range *= 1.1; } },
+      info:'CAPSTONE — every adjacency bonus is twice as strong, and every tower gains ' +
+           '+15% fire rate and +10% range.',
+      eff:(S)=>{ S.rate *= 1.15; S.range *= 1.1; S.synergyMul = 2; } },
     { id:'massProduction', name:'MASS PRODUCTION', ic:'★', tier:5, row:4, req:['foundry'], max:1, gate:12,
-      info:'CAPSTONE — building and upgrading cost 20% less, +1 max tower level.',
-      eff:(S)=>{ S.buildCost *= 0.8; S.upCost *= 0.8; S.maxLvl += 1; } },
+      info:'CAPSTONE — building and upgrading cost 25% less, +1 max tower level, and every tower level grants a further +15% damage.',
+      eff:(S)=>{ S.buildCost *= 0.75; S.upCost *= 0.75; S.maxLvl += 1; S.foundry += 0.15; } },
   ]},
 
   { id:'command', name:'COMMAND', col:'#4488ff', blurb:'Active powers, cold control, and lives you can spend.', nodes:[
@@ -648,6 +663,15 @@ const TREES = [
 
     { id:'fortify', name:'FORTIFY', ic:'🏰', tier:3, row:0, req:['bulwark'], max:3,
       info:'+2 maximum lives, per rank.', eff:(S,r)=>{ S.maxLives += 2*r; } },
+    { id:'muster', name:'MUSTER', ic:'🚩', tier:2, row:1, req:['standing'], max:3,
+      info:'+1 of EVERY turret type may stand on the field, per rank.', eff:(S,r)=>{ S.deployAll += r; } },
+    { id:'levy', name:'MASS LEVY', ic:'🏗️', tier:3, row:5, req:['muster'], max:3,
+      info:'+1 of every turret type again, per rank, and turrets cost 6% less each rank.',
+      eff:(S,r)=>{ S.deployAll += r; S.buildCost *= 1 - 0.06*r; } },
+    { id:'banner', name:'COMBINED ARMS', ic:'🎌', tier:4, row:5, req:['levy'], max:3,
+      info:'Every turret on the field lends the others +1.6% damage per rank (up to +70%). ' +
+           'The bigger the army, the harder all of it hits.',
+      eff:(S,r)=>{ S.perTowerDmg += 0.016*r; } },
     { id:'strike', name:'PRECISION STRIKE', ic:'🚀', tier:3, row:1, req:['fieldcmd'], max:4,
       info:'+15% AIRSTRIKE damage, per rank.', eff:(S,r)=>{ S.strikePow += 0.15*r; } },
     { id:'cryo', name:'CRYO BURST', ic:'🧊', tier:3, row:2, req:['fieldcmd'], max:1,
@@ -669,6 +693,10 @@ const TREES = [
       info:'FROST chills everything in range, not just its target (+4% slow, per rank).',
       eff:(S,r)=>{ S.chillAura = true; S.slowStr += 0.04*r; } },
 
+    { id:'hostArmy', name:'GRAND ARMY', ic:'★', tier:5, row:5, req:['banner','levy'], max:1, gate:12,
+      info:'CAPSTONE — +4 of every turret type on the field, they build 15% cheaper, ' +
+           'and COMBINED ARMS counts double.',
+      eff:(S)=>{ S.deployAll += 4; S.buildCost *= 0.85; S.perTowerDmg *= 2; } },
     { id:'lastStand', name:'LAST STAND', ic:'★', tier:5, row:0, req:['repairbay','medevac'], max:1, gate:12,
       info:'CAPSTONE — at 5 lives or fewer, every tower gains +40% damage and fire rate.',
       eff:(S)=>{ S.lastStand = true; } },
@@ -714,6 +742,7 @@ function baseStats() {
     slowStr:0, slowDur:1, frozenDmg:0, chillAura:false,
     startCash:1, bounty:1, perKill:0, interest:0, buildCost:1, upCost:1, sellPct:0.7,
     maxLvl:3, foundry:0, gridBonus:0, targeting:false, reclaim:false,
+    deployAll:0, synergy:0, synergyMul:1, perTowerDmg:0,
     maxLives:0, leakGuard:0, lastStand:false,
     ab:{ airstrike:false, cryo:false, overdrive:false, repair:false },
     abPow:1, abCd:1, strikePow:1, repairPlus:0, orbital:false, absZero:false,
@@ -721,6 +750,7 @@ function baseStats() {
 }
 function computeStats() {
   const s = baseStats();
+  // (recomputeAdjacency is called at the end — synergy depends on S.synergy)
   for (const tree of TREES) for (const n of tree.nodes) {
     const r = run.skills[n.id] || 0;
     if (r > 0) n.eff(s, r);
@@ -728,6 +758,7 @@ function computeStats() {
   s.leakGuard = Math.min(0.6, s.leakGuard);
   s.crit = Math.min(0.75, s.crit);
   S = s;
+  if (typeof towers !== 'undefined' && towers.length) recomputeAdjacency();
   return s;
 }
 
@@ -754,6 +785,18 @@ function applyTurretUnlocks(gw) {
   return gained;
 }
 function armoryOpen() { return globalWave() >= ARMORY_WAVE; }
+/* How many of a turret type may stand on the board at once. One of each to
+   begin with — every armory tier of that type buys another slot, and the
+   COMMAND tree buys slots across the board. This is the scarcity that makes
+   a placement matter: with four turrets you cannot simply blanket the road. */
+const BASE_DEPLOY = 1;
+function deployCap(type) {
+  const a = run.armory[type];
+  if (!a || !a.owned) return 0;
+  return BASE_DEPLOY + a.tier + (S ? S.deployAll : 0);
+}
+function deployed(type) { return towers.reduce((n, t) => n + (t.type === type ? 1 : 0), 0); }
+function canDeploy(type) { return deployed(type) < deployCap(type); }
 function maxLives() { return BASE_LIVES + (S ? S.maxLives : 0); }
 function lastStandActive() { return S.lastStand && run.lives <= 5; }
 
@@ -813,7 +856,8 @@ function restoreFrom(key) {
   phase = L.phase || 'grace'; phaseT = L.phaseT || 0;
   waveT = L.waveT || 0; levelLeaks = L.levelLeaks || 0; levelKills = L.levelKills || 0;
   waveHpMul = L.hpMul || hpMulFor(globalWave()); waveSpdMul = L.spdMul || spdMulFor(globalWave());
-  towers = (L.towers || []).map(t => ({ type:t.type, r:t.r, c:t.c, lvl:t.lvl||1, spent:t.spent||0, cd:0, mode:t.mode||'first', adj:0 }));
+  towers = (L.towers || []).map(t => ({ type:t.type, r:t.r, c:t.c, lvl:t.lvl||1, spent:t.spent||0, cd:0, mode:t.mode||'first', adj:0,
+    syn:{ dmg:1, rate:1, range:1, splash:0, slow:0, n:0 } }));
   recomputeAdjacency();
   creeps = (L.creeps || []).map(c => Object.assign({ dead:false, healT:0 }, c));
   spawnList = (L.spawnList || []).slice();
@@ -1011,14 +1055,51 @@ function spawnCreep(type, elite, atD) {
 
 /* =============================== COMBAT =============================== */
 let overdriveT = 0, freezeT = 0;
+/* ADJACENCY SYNERGY (ENGINEERING · POWER GRID)
+   Orthogonal neighbours only — diagonals deliberately do not count, so a
+   layout is a real decision rather than "clump everything". A turret can be
+   lifted by at most four neighbours (that is all an orthogonal cell has), and
+   the skill rank caps how many of them actually pay: rank 1 means only the
+   FIRST-PLACED neighbour counts, which is why build order is worth thinking
+   about. Same type share their common stats; different types trade traits —
+   each lends a neighbour a taste of what it is good at.
+   Recomputed on build/sell/upgrade and whenever skills change, never per
+   frame: the combat loop just reads t.syn.                                */
+const SYN_SAME = 0.16;        // same-type: dmg, rate and range each
+const SYN_RANGE = 0.38;       // a RAIL lends reach
+const SYN_RATE = 0.26;        // a PULSE lends cycle speed
+const SYN_SPLASH = 0.60;      // a NOVA lends splash, as a fraction of damage
+const SYN_SLOW = 0.9;         // a FROST lends a brief chill (seconds)
 function recomputeAdjacency() {
   for (const t of towers) {
+    // legacy count kept for anything still reading it
     let n = 0;
     for (const o of towers) {
       if (o === t) continue;
       if (Math.abs(o.r - t.r) <= 1 && Math.abs(o.c - t.c) <= 1) n++;
     }
     t.adj = Math.min(4, n);
+    t.syn = { dmg: 1, rate: 1, range: 1, splash: 0, slow: 0, n: 0 };
+  }
+  const rank = S ? S.synergy : 0;
+  if (!rank) return;
+  const mul = (S && S.synergyMul) || 1;
+  for (const t of towers) {
+    const nb = towers
+      .filter(o => o !== t && Math.abs(o.r - t.r) + Math.abs(o.c - t.c) === 1)
+      .sort((a, b) => towers.indexOf(a) - towers.indexOf(b))   // first placed pays first
+      .slice(0, Math.min(4, rank));
+    t.syn.n = nb.length;
+    for (const o of nb) {
+      if (o.type === t.type) {
+        t.syn.dmg *= 1 + SYN_SAME * mul;
+        t.syn.rate *= 1 + SYN_SAME * mul;
+        t.syn.range *= 1 + SYN_SAME * mul;
+      } else if (o.type === 'rail')  t.syn.range *= 1 + SYN_RANGE * mul;
+      else if (o.type === 'pulse')   t.syn.rate  *= 1 + SYN_RATE * mul;
+      else if (o.type === 'nova')    t.syn.splash += SYN_SPLASH * mul;
+      else if (o.type === 'frost')   t.syn.slow = Math.max(t.syn.slow, SYN_SLOW * mul);
+    }
   }
 }
 function towerDamage(t) {
@@ -1029,18 +1110,21 @@ function towerDamage(t) {
   if (T.kind === 'splash') m *= S.dmgSplash;
   else if (T.kind === 'single') m *= S.dmgSingle;
   if (lastStandActive()) m *= 1.4;
-  return T.dmg * tierM * lvlM * m;
+  // COMBINED ARMS: a bigger army makes every turret in it hit harder
+  if (S.perTowerDmg > 0) m *= 1 + Math.min(0.70, S.perTowerDmg * towers.length);
+  return T.dmg * tierM * lvlM * m * (t.syn ? t.syn.dmg : 1);
 }
 function towerPeriod(t) {
   const T = TOWERS[t.type], a = run.armory[t.type];
-  let m = S.rate * (1 + TIER_RATE * a.tier) * (1 + S.gridBonus * t.adj);
+  let m = S.rate * (1 + TIER_RATE * a.tier) * (t.syn ? t.syn.rate : 1);
   if (overdriveT > 0) m *= 2;
   if (lastStandActive()) m *= 1.4;
   return T.rate / m;
 }
 function towerRange(t) {
   const T = TOWERS[t.type], a = run.armory[t.type];
-  return T.range * cell * (1 + 0.10 * (t.lvl - 1)) * (1 + TIER_RANGE * a.tier) * S.range;
+  return T.range * cell * (1 + 0.10 * (t.lvl - 1)) * (1 + TIER_RANGE * a.tier) * S.range
+         * (t.syn ? t.syn.range : 1);
 }
 function buildCostOf(type) { return Math.max(5, Math.round(TOWERS[type].cost * S.buildCost)); }
 function upCostOf(t) { return Math.max(5, Math.round(TOWERS[t.type].cost * 0.8 * t.lvl * S.upCost)); }
@@ -1126,14 +1210,14 @@ function fireTower(t) {
       if (c.dead) continue;
       const p = creepPos(c);
       if ((p.x - tp.x) * (p.x - tp.x) + (p.y - tp.y) * (p.y - tp.y) <= aoe * aoe) {
-        applyHit(c, dmg);
+        applyHit(c, dmg, t);
         if (S.splashSlow > 0) applySlow(c, 1.0, S.splashSlow);
       }
     }
     sfxNova();
   } else if (t.type === 'frost') {
     beams.push({ x0:tx, y0:ty, x1:tp.x, y1:tp.y, col:T.col, t:0, dur:0.12, crit });
-    applyHit(target, dmg);
+    applyHit(target, dmg, t);
     applySlow(target, T.slowT + 0.3 * (t.lvl - 1), 0);
     if (S.chillAura) {
       for (const c of inRange) { if (c !== target && !c.dead) applySlow(c, T.slowT * 0.8, 0); }
@@ -1147,16 +1231,30 @@ function fireTower(t) {
       for (const c of rest) hits.push(c);
     }
     beams.push({ x0:tx, y0:ty, x1:tp.x, y1:tp.y, col:T.col, t:0, dur:0.14, crit, wide:true });
-    for (const c of hits) applyHit(c, dmg);
+    for (const c of hits) applyHit(c, dmg, t);
     sfxRail();
   } else {
     beams.push({ x0:tx, y0:ty, x1:tp.x, y1:tp.y, col:T.col, t:0, dur:0.1, crit });
-    applyHit(target, dmg);
+    applyHit(target, dmg, t);
     sfxPulse();
   }
   return true;
 }
-function applyHit(c, dmg) {
+function applyHit(c, dmg, t) {
+  // traits borrowed from a neighbour: a splash bloom, a brief chill
+  if (t && t.syn) {
+    if (t.syn.splash > 0 && TOWERS[t.type].kind !== 'splash') {
+      const p = creepPos(c), rad = cell * 0.9;
+      for (const o of creeps) {
+        if (o.dead || o === c) continue;
+        const q = creepPos(o);
+        if ((q.x - p.x) * (q.x - p.x) + (q.y - p.y) * (q.y - p.y) <= rad * rad) {
+          dealDamage(o, dmg * t.syn.splash);
+        }
+      }
+    }
+    if (t.syn.slow > 0 && t.type !== 'frost') applySlow(c, t.syn.slow, 0);
+  }
   if (S.burn > 0) {
     c.burnDps = Math.max(c.burnDps || 0, dmg * S.burn);
     c.burnT = Math.max(c.burnT || 0, 2 + S.burnDur);
@@ -1317,10 +1415,12 @@ function cellFromPoint(x, y) {
 }
 function buildTower(type, r, c) {
   if (!run.armory[type] || !run.armory[type].owned) return false;
+  if (!canDeploy(type)) { sfxDeny(); return false; }
   const cost = buildCostOf(type);
   if (cash < cost || !canBuild(r, c)) { sfxDeny(); return false; }
   cash -= cost;
-  towers.push({ type, r, c, lvl: 1, cd: 0, spent: cost, mode: 'first', adj: 0 });
+  towers.push({ type, r, c, lvl: 1, cd: 0, spent: cost, mode: 'first', adj: 0,
+                syn: { dmg:1, rate:1, range:1, splash:0, slow:0, n:0 } });
   recomputeAdjacency();
   sfxBuild();
   return true;
@@ -1689,7 +1789,7 @@ function draw() {
     // Neutral wash, NOT the turret's colour: red is danger everywhere else in
     // this game, so tinting every open tile with a red turret's hue reads as
     // "you cannot build here" — the exact opposite of what it means.
-    const afford = cash >= buildCostOf(armedType);
+    const afford = cash >= buildCostOf(armedType) && canDeploy(armedType);
     const col = afford ? '#dde3ff' : '#ff2244';
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       if (!canBuild(r, c)) continue;
@@ -1735,7 +1835,7 @@ function draw() {
     const cl = cellFromPoint(dragPos.x, dragPos.y);
     const T = TOWERS[dragCard];
     if (cl) {
-      const ok = canBuild(cl.r, cl.c) && cash >= buildCostOf(dragCard);
+      const ok = canBuild(cl.r, cl.c) && cash >= buildCostOf(dragCard) && canDeploy(dragCard);
       const gx = cellCx(cl.c), gy = cellCy(cl.r);
       ctx.strokeStyle = ok ? T.col + '66' : '#ff224488'; ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -1748,8 +1848,10 @@ function draw() {
   }
   /* ---- armed prompt ---- */
   if (armedType && !dragCard) {
-    const afford = cash >= buildCostOf(armedType);
+    const full = !canDeploy(armedType);
+    const afford = cash >= buildCostOf(armedType) && !full;
     hudText(afford ? 'TAP A TILE TO PLACE  ·  ' + TOWERS[armedType].name
+                   : full ? TOWERS[armedType].name + ' AT DEPLOY LIMIT  ·  ' + deployed(armedType) + '/' + deployCap(armedType)
                    : 'NOT ENOUGH CASH  ·  ' + TOWERS[armedType].name + ' $' + buildCostOf(armedType),
       W / 2, boardY + ROWS * cell + 12,
       afford ? TOWERS[armedType].col : '#ff2244', "11px 'Black Ops One'", 'center');
@@ -1866,8 +1968,10 @@ function draw() {
     const cw = Math.min(84, (W - 20 - (n - 1) * 8) / n), ch = BAR_H - 6;
     let x = (W - (cw * n + 8 * (n - 1))) / 2;
     for (const type of owned) {
-      const T = TOWERS[type], cost = buildCostOf(type), afford = cash >= cost;
-      cardRects.push({ type, x, y: barY, w: cw, h: ch, afford });
+      const T = TOWERS[type], cost = buildCostOf(type);
+      const cap = deployCap(type), have = deployed(type), room = have < cap;
+      const afford = cash >= cost && room;
+      cardRects.push({ type, x, y: barY, w: cw, h: ch, afford, have, cap });
       const armed = armedType === type;
       ctx.strokeStyle = armed ? '#dde3ff' : (afford ? T.col : '#1a1a30');
       ctx.fillStyle = armed ? T.col + '33' : (afford ? T.col + '12' : '#0b0b16');
@@ -1882,7 +1986,11 @@ function draw() {
       ctx.shadowBlur = 0;
       ctx.fillStyle = afford ? T.col : '#4b5470';
       ctx.font = "10px 'Black Ops One'"; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillText('$' + cost, x + cw / 2, barY + ch - 15);
+      ctx.fillText(room ? '$' + cost : 'FULL', x + cw / 2, barY + ch - 15);
+      // deployment slots: the cap is the scarce resource, so it is always shown
+      ctx.fillStyle = room ? '#8899bb' : T.col;
+      ctx.font = "9px 'Share Tech Mono'";
+      ctx.fillText(have + '/' + cap, x + cw / 2, barY + 2);
       x += cw + 8;
     }
   }
@@ -2099,9 +2207,12 @@ function armoryRow(type) {
   const afford = !notYet && !maxed && open && run.cores >= cost;
   const pips = [];
   for (let i = 0; i < MAX_TIER; i++) pips.push(`<i class="${i < a.tier ? 'on' : ''}"></i>`);
-  const eff = (notYet || a.tier === 0)
+  const cap = notYet ? 0 : deployCap(type);
+  const eff = notYet
     ? T.desc
-    : `${T.desc}<br>TIER ${a.tier}: +${Math.round(TIER_DMG * a.tier * 100)}% dmg · +${Math.round(TIER_RATE * a.tier * 100)}% rate · +${Math.round(TIER_RANGE * a.tier * 100)}% range`;
+    : `${T.desc}<br><b style="color:var(--white)">DEPLOY ${deployed(type)}/${cap}</b>` +
+      (a.tier ? ` · TIER ${a.tier}: +${Math.round(TIER_DMG * a.tier * 100)}% dmg · +${Math.round(TIER_RATE * a.tier * 100)}% rate · +${Math.round(TIER_RANGE * a.tier * 100)}% range` : '') +
+      `<br><span style="color:var(--gold)">next tier: +1 deployable</span>`;
   const label = notYet ? 'ARRIVES<br>W' + TURRET_WAVE[type]
     : !open ? 'TIERS<br>W' + ARMORY_WAVE
     : maxed ? 'MAX'
@@ -2459,7 +2570,7 @@ window.__GD = {
     run.cores -= researchCost(); run.researched = (run.researched || 0) + 1;
     run.sp++; return true;
   },
-  TURRET_WAVE, ARMORY_WAVE,
+  TURRET_WAVE, ARMORY_WAVE, deployCap, deployed, canDeploy,
   spendSkill: id => {
     const e = NODE_BY_ID[id]; if (!e) return false;
     const n = e.node, c = nodeCost(n);

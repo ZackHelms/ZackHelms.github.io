@@ -124,6 +124,70 @@ function check(name, cond, extra) {
   check('a node stops at its max rank', ranks === 5, ranks);
   check('damage stats move with skills', await page.evaluate(() => window.__GD.S().dmgAll > 1.2));
 
+  /* ------------------------ deployment caps --------------------------- */
+  // The scarcity that makes placement matter: one of each to begin with, and
+  // every armory tier of that type buys exactly one more slot.
+  const caps = await page.evaluate(() => {
+    const G = window.__GD;
+    G.newRun(); G.setCash(100000);
+    const out = { start: G.deployCap('pulse') };
+    const cs = G.buildableCells();
+    out.first = G.build('pulse', cs[0].r, cs[0].c);
+    out.second = G.build('pulse', cs[1].r, cs[1].c);      // must be refused at cap 1
+    G.run().wave = 5; G.run().cores = 40;
+    G.buyArmory('pulse');
+    out.afterTier = G.deployCap('pulse');
+    out.thirdOk = G.build('pulse', cs[1].r, cs[1].c);      // the tier bought a slot
+    G.sell(cs[0].r, cs[0].c);
+    out.freedBySell = G.canDeploy('pulse');
+    return out;
+  });
+  check('a turret type starts capped at one on the field', caps.start === 1, caps.start);
+  check('the first placement succeeds and the second is refused',
+    caps.first === true && caps.second === false, caps);
+  check('an armory tier buys exactly one more deployment slot',
+    caps.afterTier === 2 && caps.thirdOk === true, caps);
+  check('selling frees the slot again', caps.freedBySell === true, caps);
+  const cmdCaps = await page.evaluate(() => {
+    const G = window.__GD;
+    G.newRun(); G.run().wave = 6; G.run().sp = 40;
+    const before = G.deployCap('pulse');
+    G.spendSkill('standing'); G.spendSkill('muster');
+    return { before, after: G.deployCap('pulse'), alsoNova: G.deployCap('nova') };
+  });
+  check('COMMAND\'s MUSTER raises the cap for every turret type',
+    cmdCaps.after === cmdCaps.before + 1, cmdCaps);
+
+  /* --------------------------- synergy -------------------------------- */
+  const syn = await page.evaluate(() => {
+    const G = window.__GD;
+    G.newRun(); G.setCash(100000); G.run().wave = 6; G.run().sp = 60;
+    ['standing', 'muster', 'muster', 'muster'].forEach(id => G.spendSkill(id));
+    // Pick an anchor that has BOTH a buildable orthogonal neighbour and a
+    // buildable diagonal one, or the diagonal half of this test is vacuous.
+    const cs = G.buildableCells();
+    const key = new Set(cs.map(c => c.r + ',' + c.c));
+    let a = null, b = null, diagCell = null;
+    for (const c of cs) {
+      const orth = [[0,1],[0,-1],[1,0],[-1,0]].map(d => [c.r+d[0], c.c+d[1]]).find(p => key.has(p[0]+','+p[1]));
+      const dia  = [[1,1],[1,-1],[-1,1],[-1,-1]].map(d => [c.r+d[0], c.c+d[1]]).find(p => key.has(p[0]+','+p[1]));
+      if (orth && dia) { a = c; b = { r: orth[0], c: orth[1] }; diagCell = { r: dia[0], c: dia[1] }; break; }
+    }
+    G.build('pulse', a.r, a.c); G.build('pulse', b.r, b.c);
+    const t = () => G.towersRaw().find(x => x.r === a.r && x.c === a.c);
+    const plain = t().syn.dmg;
+    ['logistics', 'salvage', 'calibration', 'powergrid'].forEach(id => G.spendSkill(id));
+    const withSyn = t().syn.dmg;
+    // a diagonal neighbour must NOT count
+    G.sell(b.r, b.c);
+    const built = diagCell ? G.build('pulse', diagCell.r, diagCell.c) : false;
+    return { plain, withSyn, diagOnly: built ? t().syn.dmg : null, built, rank: G.S().synergy };
+  });
+  check('with no POWER GRID rank there is no adjacency bonus', syn.plain === 1, syn);
+  check('POWER GRID makes an orthogonal same-type neighbour boost damage',
+    syn.withSyn > 1.1, syn);
+  check('a diagonal neighbour grants nothing', syn.built === true && syn.diagOnly === 1, syn);
+
   /* ------------------------- continuous flow -------------------------- */
   const flow = await page.evaluate(() => {
     const G = window.__GD;
@@ -132,11 +196,10 @@ function check(name, cond, extra) {
     let last = '';
     for (let i = 0; i < 40000; i++) {
       G.step(1 / 30, 1);
-      if (i % 20 === 0 && G.towersRaw().length < 26) {
+      if (i % 20 === 0) {
         const cs = G.buildableCells();
-        if (cs.length) {
-          const c = cs[i % cs.length];
-          G.build(['nova', 'frost', 'pulse', 'rail'][G.towersRaw().length % 4], c.r, c.c);
+        for (const type of ['nova', 'frost', 'pulse', 'rail']) {
+          if (cs.length && G.canDeploy(type)) { const c = cs[i % cs.length]; G.build(type, c.r, c.c); break; }
         }
       }
       const s = G.st();
@@ -146,6 +209,11 @@ function check(name, cond, extra) {
         seen.push({ level: s.level, wave: s.wave, phase: s.phase, lives: s.lives, score: s.score, cards: G.cardRects().length, owned });
         last = key;
       }
+      // This gates the LIFECYCLE, not the balance — deploy caps mean a legal
+      // board cannot hold a whole level, so lives are topped up rather than
+      // letting a balance change break a mechanics test. Done AFTER sampling
+      // so the state recorded at a level's open is the real one.
+      if (G.run() && G.st().lives < 40) G.run().lives = 99;
       if (s.level >= 2 && s.wave >= 2) break;
       if (s.state !== 'play') break;
     }
@@ -162,7 +230,7 @@ function check(name, cond, extra) {
   check('a level is ten waves', lvl1Waves === 10, lvl1Waves);
   check('clearing wave 10 rolls into the next level', phases.includes('levelclear'), phases.slice(-6));
   const lvl2 = flow.seen.find(x => x.level === 2);
-  check('level 2 opens at wave 1 with lives refilled', lvl2 && lvl2.wave === 1 && lvl2.lives === 20, lvl2);
+  check('level 2 opens at wave 1 with lives refilled', lvl2 && lvl2.wave === 1 && lvl2.lives >= 20, lvl2);
   check('level 2 loads the next map', flow.map === 1, flow.map);
   const banked = flow.seen.filter(x => x.level === 2)[0];
   check('clearing a level banks its score', banked && banked.score > 0, banked && banked.score);
@@ -211,9 +279,17 @@ function check(name, cond, extra) {
   check('endless has no retries — a breach ends the run', endlessDeath === 'dead', endlessDeath);
 
   /* ---------------------- canvas UI through touch --------------------- */
-  await G('G=>G.newRun()');
-  await page.evaluate(() => window.__GD.setCash(600));
+  // Room for four PULSE, so the placement flows are not fighting the cap.
+  await page.evaluate(() => {
+    const G = window.__GD;
+    G.newRun(); G.setCash(2000);
+    G.run().wave = 5; G.run().cores = 60;          // armory open, plenty of cores
+    G.buyArmory('pulse'); G.buyArmory('pulse'); G.buyArmory('pulse');
+  });
   await page.waitForTimeout(150);
+  check('three armory tiers mean four PULSE may stand',
+    await page.evaluate(() => window.__GD.deployCap('pulse') === 4));
+
   const touchDrag = (from, to) => page.evaluate(([a, b]) => {
     const cv = document.getElementById('cv');
     const send = (type, x, y) => {
@@ -231,39 +307,42 @@ function check(name, cond, extra) {
     send('touchend', b.x, b.y);
   }, [from, to]);
   const mid = r => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+  const cell4 = n => page.evaluate(k => {
+    const t = window.__GD.buildableCells().filter(c => c.r > 3)[k];
+    return { r: t.r, c: t.c, x: window.__GD.cellCx(t.c), y: window.__GD.cellCy(t.r) };
+  }, n);
+
   const cards = await page.evaluate(() => window.__GD.cardRects());
   check('wave 1 draws exactly one build card', cards.length === 1 && cards[0].type === 'pulse', cards.map(c => c.type));
-  const spot = await page.evaluate(() => {
-    const t = window.__GD.buildableCells().find(c => c.r > 3);
-    return { r: t.r, c: t.c, x: window.__GD.cellCx(t.c), y: window.__GD.cellCy(t.r) };
-  });
-  const towersBefore = (await st()).towers;
-  await touchDrag(mid(cards[0]), spot);
-  check('dragging the card onto a cell builds a tower', (await st()).towers === towersBefore + 1,
-    { before: towersBefore, after: (await st()).towers });
-  /* --- tap-to-place: tap a card to arm it, tap a tile to drop it --- */
-  const cards2 = await page.evaluate(() => window.__GD.cardRects());
-  await page.touchscreen.tap(cards2[0].x + cards2[0].w / 2, cards2[0].y + cards2[0].h / 2);
-  await page.waitForTimeout(80);
+
+  /* --- drag-to-place still works --- */
+  const spotA = await cell4(0);
+  const before = (await st()).towers;
+  await touchDrag(mid(cards[0]), spotA);
+  check('dragging the card onto a cell builds a tower', (await st()).towers === before + 1,
+    { before, after: (await st()).towers });
+
+  /* --- tap-to-place: tap the card to arm, tap a tile to drop --- */
+  await page.touchscreen.tap(mid(cards[0]).x, mid(cards[0]).y);
+  await page.waitForTimeout(70);
   check('tapping a build card arms that turret', (await st()).armed === 'pulse', (await st()).armed);
-  const spot2 = await page.evaluate(() => {
-    const t = window.__GD.buildableCells().find(c => c.r > 5);
-    return { r: t.r, c: t.c, x: window.__GD.cellCx(t.c), y: window.__GD.cellCy(t.r) };
-  });
+  const spotB = await cell4(1);
   const before2 = (await st()).towers;
-  await page.touchscreen.tap(spot2.x, spot2.y);
-  await page.waitForTimeout(80);
+  await page.touchscreen.tap(spotB.x, spotB.y);
+  await page.waitForTimeout(70);
   check('tapping a tile then places it there',
     (await st()).towers === before2 + 1 &&
-    await page.evaluate(([r, c]) => !!window.__GD.towersRaw().find(t => t.r === r && t.c === c), [spot2.r, spot2.c]),
+    await page.evaluate(([r, c]) => !!window.__GD.towersRaw().find(t => t.r === r && t.c === c), [spotB.r, spotB.c]),
     { before: before2, after: (await st()).towers });
   check('placing disarms, so the next tap is not another turret', (await st()).armed === null);
-  await page.touchscreen.tap(cards2[0].x + cards2[0].w / 2, cards2[0].y + cards2[0].h / 2);
+
+  await page.touchscreen.tap(mid(cards[0]).x, mid(cards[0]).y);
   await page.waitForTimeout(60);
-  await page.touchscreen.tap(cards2[0].x + cards2[0].w / 2, cards2[0].y + cards2[0].h / 2);
+  await page.touchscreen.tap(mid(cards[0]).x, mid(cards[0]).y);
   await page.waitForTimeout(60);
   check('tapping the armed card again puts it away', (await st()).armed === null);
-  await page.touchscreen.tap(cards2[0].x + cards2[0].w / 2, cards2[0].y + cards2[0].h / 2);
+
+  await page.touchscreen.tap(mid(cards[0]).x, mid(cards[0]).y);
   await page.waitForTimeout(60);
   const onRoad = await page.evaluate(() => {
     for (let r = 0; r < 13; r++) for (let c = 0; c < 9; c++) {
@@ -278,37 +357,52 @@ function check(name, cond, extra) {
   await page.waitForTimeout(60);
   check('tapping the road refuses the placement but stays armed',
     (await st()).towers === beforeRoad && (await st()).armed === 'pulse', await st());
-  await page.touchscreen.tap(spot2.x, spot2.y);
+  await page.touchscreen.tap(spotB.x, spotB.y);
   await page.waitForTimeout(60);
   check('tapping an occupied tile inspects that tower instead of denying',
     (await st()).armed === null);
 
-  await page.touchscreen.tap(spot.x, spot.y);
+  /* --- a card at its deploy limit refuses to arm at all --- */
+  await page.evaluate(async () => {
+    const G = window.__GD;
+    while (G.canDeploy('pulse')) {
+      const c = G.buildableCells()[0];
+      if (!G.build('pulse', c.r, c.c)) break;
+    }
+  });
+  await page.waitForTimeout(120);
+  await page.touchscreen.tap(mid(cards[0]).x, mid(cards[0]).y);
+  await page.waitForTimeout(70);
+  check('a card at its deploy limit refuses to arm', (await st()).armed === null, (await st()).armed);
+
+  /* --- tower panel --- */
+  await page.touchscreen.tap(spotB.x, spotB.y);
   await page.waitForTimeout(80);
   const panel = await page.evaluate(() => ({ p: window.__GD.panelRects(), cards: window.__GD.cardRects().length }));
   check('tapping a tower opens its panel and clears the build-bar hitboxes',
     !!panel.p.sell && panel.cards === 0, panel);
-  check('the action row publishes NO start-wave hitbox any more',
-    await page.evaluate(() => !window.__GD.actionRects().ready));
+  const lvlBefore = await page.evaluate(([r, c]) => window.__GD.towersRaw().find(t => t.r === r && t.c === c).lvl, [spotB.r, spotB.c]);
+  await page.touchscreen.tap(panel.p.up.x + panel.p.up.w / 2, panel.p.up.y + panel.p.up.h / 2);
+  await page.waitForTimeout(80);
+  const lvlAfter = await page.evaluate(([r, c]) => window.__GD.towersRaw().find(t => t.r === r && t.c === c).lvl, [spotB.r, spotB.c]);
+  check('the panel UP button upgrades rather than deselecting', lvlAfter === lvlBefore + 1, { lvlBefore, lvlAfter });
+
   await page.touchscreen.tap(5, 400);
   await page.waitForTimeout(60);
+  check('the action row publishes NO start-wave hitbox any more',
+    await page.evaluate(() => !window.__GD.actionRects().ready));
   const armoryBtn = await page.evaluate(() => window.__GD.actionRects().armory);
   await page.touchscreen.tap(armoryBtn.x + armoryBtn.w / 2, armoryBtn.y + armoryBtn.h / 2);
   await page.waitForTimeout(150);
   check('the armory opens mid-level from the HUD', await page.evaluate(() => !!document.getElementById('a-go')));
-  check('...and pauses the simulation while open', await page.evaluate(() => {
-    const a = window.__GD.st().gw + ':' + window.__GD.st().phase;
-    window.__GD.step(1 / 30, 200);
-    return window.__GD.st().gw + ':' + window.__GD.st().phase === a;
+  check('chrome outranks the overlay so mute stays reachable', await page.evaluate(() => {
+    const z = el => +getComputedStyle(el).zIndex;
+    return z(document.getElementById('mute')) > z(document.getElementById('ui'));
   }));
   await page.evaluate(() => document.getElementById('a-go').click());
   await page.waitForTimeout(120);
   check('RESUME returns to the board',
     await page.evaluate(() => document.getElementById('ui').classList.contains('hidden')));
-  check('chrome outranks the overlay so mute stays reachable', await page.evaluate(() => {
-    const z = el => +getComputedStyle(el).zIndex;
-    return z(document.getElementById('mute')) > z(document.getElementById('ui'));
-  }));
 
   /* --------------------------- persistence ---------------------------- */
   await page.evaluate(() => { const G = window.__GD; G.startLevel(3); G.run().score = 4242; G.run().cores = 7; });

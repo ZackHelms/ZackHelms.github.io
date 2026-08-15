@@ -273,16 +273,22 @@ persists across a level's waves, so upgrading a placed tower is worth doing.
 with transparent canvas toasts for feedback. Turrets place two ways — **drag** a card
 onto a tile, or **tap** the card to arm it and tap the tile — with spec'd
 silhouettes: green triangle PULSE, red circle NOVA, blue snowflake FROST,
-purple spike RAIL, introduced one per wave across waves 1-4. Three currencies:
+purple spike RAIL, introduced one per wave across waves 1-4. **One of each may
+stand on the field to begin with**; every armory tier buys one more slot and
+the COMMAND tree buys slots across the board, so which turret and where is the
+whole game. ENGINEERING's POWER GRID makes orthogonal neighbours (never
+diagonals) boost each other — same type share stats, different types trade
+traits. Three currencies:
 per-level cash for placing and upgrading, persistent **cores** for the armory
 (8 permanent tiers per turret), and persistent **skill points** for three
 branching trees (OFFENSE / ENGINEERING / COMMAND, the last granting active
 abilities); both open at wave 5 and are reachable from the HUD any time.
 Lives refill each level and running out replays the level as often as needed —
 but the failed attempt is rolled back whole and banks nothing, so the top-ten
-board ranks score and shows retries. Endless has no retries. Wave HP grows on
-an accelerating exponent keyed to the global wave index and calibrated against
-strategy personas. Detailed context: `.claude/grid-defense.md`. Suites:
+board ranks score and shows retries. Endless has no retries. Wave HP is a sawtooth (steep across a
+level, boss spike, next level opens easier on a higher floor) calibrated
+against strategy personas — including one per skill tree, since **any single
+tree must be able to clear the campaign alone**. Detailed context: `.claude/grid-defense.md`. Suites:
 `.claude/tests/drive-grid-defense.cjs` (rules) and
 `.claude/tests/eval-grid-defense.cjs` (balance).
 

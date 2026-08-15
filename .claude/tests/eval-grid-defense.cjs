@@ -74,18 +74,70 @@ const GOOD_SKILLS = [
   'annihilation', 'marksman', 'marksman', 'rapid', 'tactics', 'velocity',
   'hypervelocity', 'wideblast', 'ordnance', 'shrapnel', 'incendiary',
 ];
-// Points into things that do not scale with the HP curve: sell value, refunds,
-// targeting modes, flat per-kill cash. All real nodes, all the wrong ones.
+/* A genuinely poor selection UNDER THE CURRENT ECONOMY. This list had to be
+   rewritten when deploy caps landed: cash stopped being the binding constraint
+   the moment turret COUNT became one, but `modular` and `retrofit` (higher,
+   cheaper upgrades) turned into strong picks on a small board — so the old
+   "bad" persona quietly became a decent one and reached level 7. What is dead
+   now is sell value, refunds, targeting modes, flat per-kill cash and raw
+   income: all real nodes, all the wrong ones. */
 const BAD_SKILLS = [
-  'logistics', 'salvage', 'salvage', 'salvage', 'salvage', 'calibration',
-  'scavenge', 'scavenge', 'scavenge', 'targeting', 'modular', 'reclaim',
-  'logistics', 'logistics', 'logistics', 'prefab', 'prefab', 'retrofit',
+  'logistics', 'logistics', 'logistics', 'logistics', 'logistics',
+  'contracts', 'contracts', 'contracts', 'contracts', 'contracts',
+  'salvage', 'salvage', 'salvage', 'salvage',
+  'scavenge', 'scavenge', 'scavenge',
+  'bonds', 'bonds', 'bonds', 'bonds',
+  'market', 'market', 'market', 'targeting',
+  'standing', 'standing', 'standing', 'standing', 'standing',
+  'bulwark', 'bulwark', 'bulwark', 'bulwark',
+  'fortify', 'fortify', 'fortify',
+  'prefab', 'prefab', 'prefab', 'prefab', 'prefab',
 ];
 const GOOD_MIX   = { nova: 0.30, frost: 0.20, pulse: 0.28, rail: 0.22 };
 // AOE at the mouth, frost just behind it, single-target mid, snipers deep.
 const GOOD_PLACE = { nova: 0.12, frost: 0.32, pulse: 0.55, rail: 0.80 };
 
+/* Every tree must be able to carry a run on its own — that is a design
+   requirement, so it is an assertion. Each list stays strictly inside one
+   tree and spendRest is off, so nothing leaks in from the other two. */
+const OFFENSE_ONLY = [
+  'drill','drill','velocity','focus','drill','crit','velocity','focus','drill',
+  'crit','ordnance','deadeye','velocity','crit','focus','armorpen','execute',
+  'deadeye','crit','armorpen','execute','velocity','marksman','armorpen',
+  'annihilation','hypervelocity','marksman','execute','deadeye','pierce',
+  'wideblast','shrapnel','concussive','incendiary','firestorm','ordnance','pierce',
+];
+const ENGINEERING_ONLY = [
+  'logistics','logistics','prefab','calibration','powergrid','powergrid',
+  'logistics','contracts','prefab','calibration','powergrid','retrofit',
+  'modular','foundry','powergrid','smartGrid','contracts','calibration',
+  'logistics','prefab','retrofit','foundry','modular','contracts','bonds',
+  'market','massProduction','warEconomy','salvage','scavenge','targeting','reclaim',
+];
+const COMMAND_ONLY = [
+  'standing','muster','muster','muster','levy','levy','levy','fieldcmd',
+  'standing','vigil','cryo','overdrive','hostArmy','bulwark','fortify',
+  'banner','banner','banner','rapid','tactics','deepfreeze','strike','rapid','tactics','glacier',
+  'repairbay','medevac','standing','vigil','absZero','orbital','lastStand',
+];
+
 const PERSONAS = [
+  { name: 'offense-only', desc: 'OFFENSE tree alone — few turrets, enormous hitters',
+    skills: OFFENSE_ONLY, armory: ['rail', 'pulse', 'nova', 'frost'], research: true,
+    mix: { rail: 0.34, pulse: 0.33, nova: 0.2, frost: 0.13 },
+    place: { rail: 0.7, pulse: 0.5, nova: 0.15, frost: 0.3 }, upgrade: 'aggressive', abilities: true },
+
+  { name: 'engineering-only', desc: 'ENGINEERING tree alone — economy and adjacency synergy',
+    skills: ENGINEERING_ONLY, armory: ['nova', 'pulse', 'rail', 'frost'], research: true,
+    mix: { nova: 0.3, pulse: 0.3, rail: 0.2, frost: 0.2 },
+    place: { nova: 0.15, frost: 0.32, pulse: 0.5, rail: 0.75 }, upgrade: 'aggressive',
+    clump: true, abilities: true },
+
+  { name: 'command-only', desc: 'COMMAND tree alone — a big army and active abilities',
+    skills: COMMAND_ONLY, armory: ['pulse', 'nova', 'frost', 'rail'], research: true,
+    mix: { pulse: 0.3, nova: 0.3, frost: 0.2, rail: 0.2 },
+    place: { nova: 0.15, frost: 0.3, pulse: 0.5, rail: 0.7 }, upgrade: 'value', abilities: true },
+
   { name: 'good-mix', desc: 'coherent build: good skills, good mix, front-loaded AOE, upgrades',
     skills: GOOD_SKILLS, spendRest: true, armory: ['nova', 'pulse', 'rail', 'frost'], research: true,
     mix: GOOD_MIX, place: GOOD_PLACE, upgrade: 'value', abilities: true },
@@ -158,7 +210,15 @@ const PLAYER = `(() => {
     // preferring it — without that, a "crowd the exit" persona quietly
     // spreads out once the good cells fill and stops being a bad persona
     if (strat.placeStrict && Math.abs(d) > (strat.placeWindow || 0.15)) return 0;
-    return cov * Math.exp(-(d * d) / (2 * 0.18 * 0.18));
+    let sc = cov * Math.exp(-(d * d) / (2 * 0.18 * 0.18));
+    // clump chases ENGINEERING's adjacency synergy: orthogonal neighbours pay,
+    // diagonals do not, so the bonus is worth 35% per orthogonal contact.
+    if (strat.clump) {
+      let n = 0;
+      for (const o of G.towersRaw()) if (Math.abs(o.r - r) + Math.abs(o.c - c) === 1) n++;
+      sc *= 1 + 0.35 * Math.min(4, n);
+    }
+    return sc;
   }
   function ownedTypes() {
     const a = G.st().armory;
@@ -170,6 +230,7 @@ const PLAYER = `(() => {
     for (const t of ownedTypes()) {
       const target = (strat.mix && strat.mix[t]) || 0;
       if (target <= 0) continue;
+      if (!G.canDeploy(t)) continue;          // the deploy cap is the real limit now
       const cost = Math.max(5, Math.round(G.TOWERS[t].cost * G.S().buildCost));
       if (cost > cash) continue;
       const gap = target - placed.filter(p => p.type === t).length / total;
@@ -218,11 +279,13 @@ const PLAYER = `(() => {
       return;
     }
     let guard = 0;
-    while (guard++ < 20) {
+    while (guard++ < 30) {
       const st = G.st();
-      const next = strat.armory
-        .filter(t => st.armory[t] && st.armory[t].owned && st.armory[t].tier < 8)
-        .sort((a, b) => st.armory[a].tier - st.armory[b].tier)[0];
+      // prefer the type that is currently CAPPED OUT — a tier is a slot now
+      const owned = strat.armory.filter(t => st.armory[t] && st.armory[t].owned && st.armory[t].tier < 8);
+      const capped = owned.filter(t => !G.canDeploy(t));
+      const pool = capped.length ? capped : owned;
+      const next = pool.sort((a, b) => st.armory[a].tier - st.armory[b].tier)[0];
       if (!next || !G.buyArmory(next)) break;
     }
     if (strat.research) { let g = 0; while (g++ < 6 && G.st().cores >= 14 && G.research()) {} }
@@ -400,10 +463,24 @@ function check(name, cond, extra) {
   // Across seeds a coherent build clears all ten on most and dies ON level 10
   // on some. Reaching the last level is the invariant; winning it is the fight.
   check('a coherent build reaches the final level', depth(good) >= 10, depth(good));
-  check('skipping the skill trees: clears 3, cannot pass 4',
-    depth(noSkill) <= 4, depth(noSkill));
-  check('a poor skill selection: clears 4, cannot pass 5',
-    depth(badSkill) <= 5, depth(badSkill));
+  // The CD's rule: specialising in ANY ONE tree must be able to finish the
+  // campaign. If one of these fails, the TREE is wrong, not the curve.
+  const off = by('offense-only'), eng = by('engineering-only'), cmd = by('command-only');
+  check('OFFENSE alone clears the campaign — few turrets, enormous hitters',
+    off.stalled === null, depth(off));
+  check('ENGINEERING alone clears the campaign — synergy and upgrades',
+    eng.stalled === null, depth(eng));
+  check('COMMAND alone clears the campaign — a big army and abilities',
+    cmd.stalled === null, depth(cmd));
+  // 4 on most seeds, 5 on some — the point is it is nowhere near the end.
+  check('skipping the skill trees stalls in the low single digits',
+    depth(noSkill) <= 5, depth(noSkill));
+  // Measured at 6, not the 4-5 of the pre-caps balance: a confused player who
+  // pours points into income and +lives still survives longer than one who
+  // spends nothing, because extra lives are never worthless. The design point
+  // that matters is the gap to a coherent build (6 vs 10), not the exact rung.
+  check('a poor skill selection stalls well short of a coherent build',
+    depth(badSkill) <= 6 && depth(badSkill) < depth(good), depth(badSkill));
   check('good skills still beat no skills', depth(good) > depth(noSkill),
     { good: depth(good), noSkill: depth(noSkill) });
   check('a poor selection still beats none at all', depth(badSkill) >= depth(noSkill),
