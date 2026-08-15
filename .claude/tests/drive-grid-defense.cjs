@@ -241,6 +241,48 @@ function check(name, cond, extra) {
   await touchDrag(mid(cards[0]), spot);
   check('dragging the card onto a cell builds a tower', (await st()).towers === towersBefore + 1,
     { before: towersBefore, after: (await st()).towers });
+  /* --- tap-to-place: tap a card to arm it, tap a tile to drop it --- */
+  const cards2 = await page.evaluate(() => window.__GD.cardRects());
+  await page.touchscreen.tap(cards2[0].x + cards2[0].w / 2, cards2[0].y + cards2[0].h / 2);
+  await page.waitForTimeout(80);
+  check('tapping a build card arms that turret', (await st()).armed === 'pulse', (await st()).armed);
+  const spot2 = await page.evaluate(() => {
+    const t = window.__GD.buildableCells().find(c => c.r > 5);
+    return { r: t.r, c: t.c, x: window.__GD.cellCx(t.c), y: window.__GD.cellCy(t.r) };
+  });
+  const before2 = (await st()).towers;
+  await page.touchscreen.tap(spot2.x, spot2.y);
+  await page.waitForTimeout(80);
+  check('tapping a tile then places it there',
+    (await st()).towers === before2 + 1 &&
+    await page.evaluate(([r, c]) => !!window.__GD.towersRaw().find(t => t.r === r && t.c === c), [spot2.r, spot2.c]),
+    { before: before2, after: (await st()).towers });
+  check('placing disarms, so the next tap is not another turret', (await st()).armed === null);
+  await page.touchscreen.tap(cards2[0].x + cards2[0].w / 2, cards2[0].y + cards2[0].h / 2);
+  await page.waitForTimeout(60);
+  await page.touchscreen.tap(cards2[0].x + cards2[0].w / 2, cards2[0].y + cards2[0].h / 2);
+  await page.waitForTimeout(60);
+  check('tapping the armed card again puts it away', (await st()).armed === null);
+  await page.touchscreen.tap(cards2[0].x + cards2[0].w / 2, cards2[0].y + cards2[0].h / 2);
+  await page.waitForTimeout(60);
+  const onRoad = await page.evaluate(() => {
+    for (let r = 0; r < 13; r++) for (let c = 0; c < 9; c++) {
+      if (!window.__GD.canBuild(r, c) && !window.__GD.towersRaw().find(t => t.r === r && t.c === c)) {
+        return { x: window.__GD.cellCx(c), y: window.__GD.cellCy(r) };
+      }
+    }
+    return null;
+  });
+  const beforeRoad = (await st()).towers;
+  await page.touchscreen.tap(onRoad.x, onRoad.y);
+  await page.waitForTimeout(60);
+  check('tapping the road refuses the placement but stays armed',
+    (await st()).towers === beforeRoad && (await st()).armed === 'pulse', await st());
+  await page.touchscreen.tap(spot2.x, spot2.y);
+  await page.waitForTimeout(60);
+  check('tapping an occupied tile inspects that tower instead of denying',
+    (await st()).armed === null);
+
   await page.touchscreen.tap(spot.x, spot.y);
   await page.waitForTimeout(80);
   const panel = await page.evaluate(() => ({ p: window.__GD.panelRects(), cards: window.__GD.cardRects().length }));

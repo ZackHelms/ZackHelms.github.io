@@ -270,9 +270,10 @@ A **ten-level tower-defense campaign**, then endless. A level is one map and
 ten escalating waves ending in a WARDEN — 100 waves in all — and the board
 persists across a level's waves, so upgrading a placed tower is worth doing.
 **Nothing waits on a tap**: grace → wave → gap → level clear runs on timers,
-with transparent canvas toasts for feedback. Drag-placed turrets with spec'd
-silhouettes — green triangle PULSE, red circle NOVA, blue snowflake FROST,
-purple spike RAIL — introduced one per wave across waves 1-4. Three currencies:
+with transparent canvas toasts for feedback. Turrets place two ways — **drag** a card
+onto a tile, or **tap** the card to arm it and tap the tile — with spec'd
+silhouettes: green triangle PULSE, red circle NOVA, blue snowflake FROST,
+purple spike RAIL, introduced one per wave across waves 1-4. Three currencies:
 per-level cash for placing and upgrading, persistent **cores** for the armory
 (8 permanent tiers per turret), and persistent **skill points** for three
 branching trees (OFFENSE / ENGINEERING / COMMAND, the last granting active

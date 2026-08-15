@@ -18,6 +18,26 @@ wave clears and failures never stop play.
 
 Timings: `GRACE_T` 7s, `GAP_T` 2.5s, `LEVEL_T` 2s, `FAIL_T` 2.4s.
 
+## Placing turrets — two ways, both first-class
+
+**Drag** a build card onto a tile, or **tap** the card to arm it and **tap** a
+tile to drop it. A drag is awkward one-handed on a phone, so the tap path is
+not a fallback — it is the same operation with a different grammar.
+
+The two share one press: `onDown` records which card the press started on
+(`downCard`), and `onUp` decides. Released over the board → build (drag).
+Released still inside the card it started on → that was a *tap*, so arm it
+(`armedType`), toggling off if it was already armed. With a turret armed, the
+next board tap places it and disarms; a tap on the road denies but **stays**
+armed; a tap on an existing tower inspects that tower instead of denying; a tap
+off the board puts it away. `armedType` is cleared by `closeScreen()`,
+`startLevel()` and arming an ability, so it can never survive a context change.
+
+Because there is no cursor to hover on a touchscreen, arming washes every
+buildable tile in a **neutral** light tint — deliberately not the turret's own
+colour, since red is the danger colour everywhere else in this game and a red
+turret would wash the board in "you cannot build here".
+
 ## Lives, retries and what the board ranks
 
 Lives refill at every level start. Running out fails the **level**, not the run:

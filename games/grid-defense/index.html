@@ -200,7 +200,7 @@ input[type=range]::-moz-range-thumb { width:20px; height:20px; border:0; border-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-14 23:58 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 02:01 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
@@ -382,6 +382,9 @@ let cash = 0;
 let towers = [], creeps = [], spawnQueue = [], spawnList = [], beams = [], floats = [];
 let waveT = 0, phaseT = 0, levelLeaks = 0, levelKills = 0;
 let selTower = null, dragCard = null, dragPos = null;
+// Two ways to place, because a drag is awkward one-handed on a phone:
+// DRAG a card onto a tile, or TAP a card to arm it and TAP the tile.
+let armedType = null, downCard = null;
 let shake = 0, speed = 1, aimAbility = null;
 let pathCells = new Set(), blockedCells = new Set(), segs = [], totalLen = 0, mapIdx = 0;
 let abilities = [];
@@ -851,7 +854,7 @@ function startLevel(L) {
   loadMap(mapIndexFor(L));
   cash = Math.round(startCashFor(L) * S.startCash);
   towers = []; creeps = []; spawnList = []; beams = []; floats = []; spawnQueue = []; toasts = [];
-  selTower = null; dragCard = null; dragPos = null; aimAbility = null;
+  selTower = null; dragCard = null; dragPos = null; aimAbility = null; armedType = null;
   waveT = 0; levelLeaks = 0; levelKills = 0;
   phase = 'grace'; phaseT = GRACE_T; pendingStart = false;
   overdriveT = 0; freezeT = 0;
@@ -1348,10 +1351,13 @@ function onDown(e) {
   for (const cr of cardRects) {
     if (inRect(p, cr)) {
       if (!cr.afford) { sfxDeny(); return; }
-      dragCard = cr.type; dragPos = { x: p.x, y: p.y }; selTower = null; aimAbility = null;
+      dragCard = cr.type; dragPos = { x: p.x, y: p.y };
+      downCard = cr;                  // so a release still on the card reads as a tap
+      selTower = null; aimAbility = null;
       return;
     }
   }
+  downCard = null;
   dragPos = null;
 }
 function onMove(e) {
@@ -1364,9 +1370,34 @@ function onUp(e) {
   const p = pt(e);
   if (dragCard) {
     const cl = cellFromPoint(p.x, p.y);
-    const type = dragCard;
-    dragCard = null; dragPos = null;
-    if (cl) { buildTower(type, cl.r, cl.c); return; }
+    const type = dragCard, card = downCard;
+    dragCard = null; dragPos = null; downCard = null;
+    if (cl) { armedType = null; buildTower(type, cl.r, cl.c); return; }
+    // Released without reaching the board. If the finger never left the card
+    // it was a TAP, so arm that turret for a follow-up tap on a tile.
+    if (card && inRect(p, card)) {
+      armedType = (armedType === type) ? null : type;
+      if (armedType) sfxBuild(); 
+      return;
+    }
+    armedType = null;
+    return;
+  }
+  // armed by a card tap: the next tap on the board places it
+  if (armedType) {
+    const cl = cellFromPoint(p.x, p.y);
+    if (cl) {
+      const occupied = towerAt(cl.r, cl.c);
+      if (occupied) {                 // inspecting a tower disarms rather than denying
+        armedType = null;
+        selTower = towers.indexOf(occupied);
+        return;
+      }
+      if (buildTower(armedType, cl.r, cl.c)) armedType = null;
+      return;                         // a bad tile denies but stays armed
+    }
+    armedType = null;                 // tapped off the board: put it away
+    return;
   }
   // aiming an ability
   if (aimAbility) {
@@ -1380,6 +1411,7 @@ function onUp(e) {
     if (inRect(p, ar)) {
       const a = ar.ab;
       if (!abilityReady(a)) { sfxDeny(); return; }
+      armedType = null;
       if (ABILITY_DEFS[a.id].aim) aimAbility = a;
       else fireAbility(a);
       return;
@@ -1417,7 +1449,7 @@ function onUp(e) {
 cv.addEventListener('touchstart', onDown, { passive: false });
 cv.addEventListener('touchmove', onMove, { passive: false });
 cv.addEventListener('touchend', onUp, { passive: false });
-cv.addEventListener('touchcancel', e => { e.preventDefault(); dragCard = null; dragPos = null; }, { passive: false });
+cv.addEventListener('touchcancel', e => { e.preventDefault(); dragCard = null; dragPos = null; downCard = null; }, { passive: false });
 cv.addEventListener('mousedown', onDown);
 cv.addEventListener('mousemove', e => { if (dragCard) onMove(e); });
 cv.addEventListener('mouseup', onUp);
@@ -1650,6 +1682,25 @@ function draw() {
   ctx.strokeStyle = '#39ff1466';
   roundRect(spawnP.x - cell * 0.4, spawnP.y - cell * 0.4, cell * 0.8, cell * 0.8, 5); ctx.stroke();
 
+  /* ---- armed-placement affordance ---- */
+  // With a card armed there is no cursor to hover, so the board itself has to
+  // say where the turret may go.
+  if (armedType) {
+    // Neutral wash, NOT the turret's colour: red is danger everywhere else in
+    // this game, so tinting every open tile with a red turret's hue reads as
+    // "you cannot build here" — the exact opposite of what it means.
+    const afford = cash >= buildCostOf(armedType);
+    const col = afford ? '#dde3ff' : '#ff2244';
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      if (!canBuild(r, c)) continue;
+      const x = boardX + c * cell, y = boardY + r * cell;
+      ctx.fillStyle = col + '12';
+      ctx.fillRect(x + 2, y + 2, cell - 4, cell - 4);
+      ctx.strokeStyle = col + '44'; ctx.lineWidth = 1;
+      ctx.strokeRect(x + 2.5, y + 2.5, cell - 5, cell - 5);
+    }
+  }
+
   /* ---- towers ---- */
   towers.forEach((t, i) => {
     drawTower(t, cellCx(t.c), cellCy(t.r), false);
@@ -1695,6 +1746,15 @@ function draw() {
       drawTower({ type: dragCard, lvl: 1 }, gx, gy, true);
     } else drawTower({ type: dragCard, lvl: 1 }, dragPos.x, dragPos.y, true);
   }
+  /* ---- armed prompt ---- */
+  if (armedType && !dragCard) {
+    const afford = cash >= buildCostOf(armedType);
+    hudText(afford ? 'TAP A TILE TO PLACE  ·  ' + TOWERS[armedType].name
+                   : 'NOT ENOUGH CASH  ·  ' + TOWERS[armedType].name + ' $' + buildCostOf(armedType),
+      W / 2, boardY + ROWS * cell + 12,
+      afford ? TOWERS[armedType].col : '#ff2244', "11px 'Black Ops One'", 'center');
+  }
+
   /* ---- ability aim ---- */
   if (aimAbility && dragPos === null) {
     ctx.strokeStyle = '#ff224488'; ctx.setLineDash([5, 5]); ctx.lineWidth = 1.5;
@@ -1808,10 +1868,13 @@ function draw() {
     for (const type of owned) {
       const T = TOWERS[type], cost = buildCostOf(type), afford = cash >= cost;
       cardRects.push({ type, x, y: barY, w: cw, h: ch, afford });
-      ctx.strokeStyle = afford ? T.col : '#1a1a30';
-      ctx.fillStyle = afford ? T.col + '12' : '#0b0b16';
-      ctx.lineWidth = 1.5;
+      const armed = armedType === type;
+      ctx.strokeStyle = armed ? '#dde3ff' : (afford ? T.col : '#1a1a30');
+      ctx.fillStyle = armed ? T.col + '33' : (afford ? T.col + '12' : '#0b0b16');
+      ctx.lineWidth = armed ? 2.5 : 1.5;
+      if (armed) { ctx.shadowColor = T.col; ctx.shadowBlur = 12; }
       roundRect(x, barY, cw, ch, 8); ctx.fill(); ctx.stroke();
+      ctx.shadowBlur = 0;
       ctx.save();
       if (!afford) ctx.globalAlpha = 0.45;
       drawTurretShape(ctx, type, x + cw / 2, barY + 21, 12);
@@ -1860,6 +1923,7 @@ function openScreen(html) {
 }
 function closeScreen() {
   curScreen = null;
+  armedType = null;
   ui.classList.add('hidden');
   ui.innerHTML = '';
   paused = false;
@@ -2364,7 +2428,8 @@ window.__GD = {
     levelScore: run ? Math.round(run.levelScore) : 0,
     cores: run ? run.cores : 0, sp: run ? run.sp : 0,
     cash, towers: towers.length, creeps: creeps.length, queued: spawnList.length,
-    map: MAPS[mapIdx].name, mapIdx, paused, abilities: abilities.map(a => a.id),
+    map: MAPS[mapIdx].name, mapIdx, paused, armed: armedType,
+    abilities: abilities.map(a => a.id),
     armory: run ? JSON.parse(JSON.stringify(run.armory)) : null,
     skills: run ? Object.assign({}, run.skills) : null,
     maxLives: S ? maxLives() : 0, buildable: buildableCells().length,
