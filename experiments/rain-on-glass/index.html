@@ -74,7 +74,7 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 05:25 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-15 11:51 UTC</div>
 
 <canvas id="glass"></canvas>
 
@@ -84,9 +84,10 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
 
 <div id="splash">
   <h1>RAIN ON GLASS</h1>
-  <p>YOUR SCREEN IS A WINDOW ON A WET EVENING.<br>
-     TILT THE PHONE &mdash; THE RAIN ALWAYS RUNS WITH REAL GRAVITY.<br>
-     HOLD IT FLAT, FACE UP, AND THE RAIN SPATTERS STRAIGHT ONTO THE GLASS.</p>
+  <p>YOUR SCREEN IS A WINDOW ON A WET NIGHT, HELD ON A DARK HILLTOP.<br>
+     TURN AROUND AND THE CITY SKYLINE SLIDES PAST. TILT DOWN &mdash; DARK GROUND.<br>
+     TILT UP &mdash; STARS AND MOON. THE RAIN ALWAYS RUNS WITH REAL GRAVITY,<br>
+     AND A FLAT PANE CATCHES SPATTERING DROPS.</p>
   <div class="tap">TAP TO BEGIN</div>
 </div>
 
@@ -98,11 +99,14 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
     <div class="info-head"><h2>RAIN ON GLASS &mdash; HOW IT WORKS</h2><button id="info-close">&#10005;</button></div>
 
     <h3>WHAT YOU'RE LOOKING AT</h3>
-    <p>The screen pretends to be a pane of glass on a rainy evening, with a blurry
-    city dusk behind it. Every visible drop is an individual particle in a simulation:
-    drops land, bead up, grow, merge, and &mdash; once heavy enough for the current tilt
-    of your actual phone &mdash; break loose and run downhill in stuttering rivulets,
-    wiping the misted glass clean where they pass.</p>
+    <p>The screen pretends to be a pane of glass you are holding while standing on a dark,
+    unlit, treeless hilltop on a rainy night. The pane is a window into a full 360&deg;
+    world: turn on the spot and the city skyline slides past (a bright downtown, a dim
+    suburb, open country with a few farm lights); tilt down and there is only the dark
+    ground of your hill; tilt up and you get stars and the moon. Meanwhile every visible
+    drop is an individual particle in a simulation: drops land, bead up, grow, merge, and
+    &mdash; once heavy enough for the current tilt of your actual phone &mdash; break loose and run
+    downhill in stuttering rivulets, wiping the misted glass clean where they pass.</p>
 
     <h3>THE RENDERING STACK (TWO LAYERS)</h3>
     <ul>
@@ -111,17 +115,21 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
       <em>height field</em> &mdash; brightness means water thickness, not colour. Runner drops are
       drawn as three overlapping blobs (head + two trailing) to make teardrop shapes.</li>
       <li><em>GPU layer:</em> each frame the height field is uploaded as a texture to a WebGL2
-      fragment shader. The shader takes the height field's screen-space gradient to build a
-      surface normal per pixel, then uses that normal to <em>refract</em>: inside a drop it samples
-      the <em>sharp</em> background image offset along the normal (drops act as little lenses, so
-      they look crisper than the fogged glass around them), adds a specular glint from a fixed
-      key light, a Fresnel-ish rim, and an inner shadow on the far side.</li>
+      fragment shader. For every pixel the shader builds a <em>view ray</em> from the screen position
+      and the phone's orientation matrix, looks that ray up in the world (below), then uses the
+      height field's gradient as a surface normal to <em>refract</em>: inside a drop the ray is bent
+      against the normal and samples the <em>sharp</em> world (drops act as little lenses, so they
+      look crisper than the fogged glass around them), plus a specular glint from a fixed key
+      light, a Fresnel-ish rim, and an inner shadow on the far side.</li>
     </ul>
-    <p>The background is drawn once per resize by procedural 2D-canvas painting (dusk gradient,
-    rooftop silhouettes, warm windows, neon signs, street-light halos), then box-blurred at two
-    strengths by repeated downscale/upscale passes. Fogged glass shows the heavy blur with a
-    milky lift; where drops have wiped the glass you see the lighter blur; inside drops you see
-    the sharp version. No image assets &mdash; every pixel is generated in the page.</p>
+    <p>The world is a 360&deg; night panorama painted once at load into a 2048&times;896 canvas
+    band covering elevations &minus;29&deg;&hellip;+60&deg; (skyline silhouettes, lit windows, neon, street-lamp
+    and light-pollution glows, painted stars), box-blurred at two extra strengths for the fogged
+    and wiped glass looks. Outside the band the shader takes over procedurally: an octahedral-mapped
+    hash star field with twinkle plus an analytic moon disc and halo above, and noise-mottled
+    near-black ground below &mdash; so looking straight up or down never runs out of texture. Fogged
+    glass shows the heavy blur with a milky lift; wiped tracks show the lighter blur; drop lenses
+    sample sharp. No image assets &mdash; every pixel is generated in the page.</p>
 
     <h3>THE DROPLET SIMULATION</h3>
     <ul>
@@ -144,14 +152,16 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
       drops slowly drip away.</li>
     </ul>
 
-    <h3>GRAVITY &amp; SENSORS</h3>
-    <p>Tilt comes from the <code>deviceorientation</code> event. The beta/gamma angles are converted to a
-    3D gravity vector in device coordinates (<code>g = (cos&beta;&middot;sin&gamma;, &minus;sin&beta;, &minus;cos&beta;&middot;cos&gamma;)</code>), rotated by
-    <code>screen.orientation.angle</code> so it stays correct in landscape, then split into an in-plane
-    component (drives trickle direction and speed) and an out-of-plane component (drives
-    splatter mode). iOS requires a permission prompt for motion data &mdash; that's what the first
-    tap is for. With no sensor (desktop), touching or dragging tilts a virtual phone instead:
-    drag away from centre to tilt that way; the centre is "flat, face up".</p>
+    <h3>ORIENTATION: ONE MATRIX FOR VIEW AND GRAVITY</h3>
+    <p>The <code>deviceorientation</code> angles build one rotation matrix,
+    <code>R = R<sub>Z</sub>(&alpha;)&middot;R<sub>X</sub>(&beta;)&middot;R<sub>Y</sub>(&gamma;)&middot;R<sub>Z</sub>(screen angle)</code>, low-pass smoothed and
+    re-orthonormalised each frame. That single matrix does two jobs: it rotates each pixel's
+    view ray into the world (so the panorama, stars and ground track your real heading and
+    tilt), and its third row is the gravity vector in screen coordinates (so the drops run,
+    bead or splatter consistently with what you see &mdash; look down through a flat pane and the
+    same math that shows you the ground also makes the rain splatter instead of trickle).
+    iOS requires a permission prompt for motion data &mdash; that's what the first tap is for.
+    With no sensor (desktop), dragging turns and tilts a virtual phone instead.</p>
 
     <h3>APPROXIMATIONS &amp; LIMITATIONS</h3>
     <ul>
@@ -166,9 +176,13 @@ body { font-family:'Share Tech Mono', monospace; -webkit-user-select:none; user-
       of forming a real meniscus bridge before merging.</li>
       <li>No caustics: real drops focus light into bright crescents on whatever is behind the glass.</li>
       <li>The height-field texture is half resolution for performance, so very fine trails soften.</li>
-      <li>Orientation quirks: some browsers report slightly different beta/gamma conventions, and
-      when the phone is near-vertical, gamma becomes unstable (gimbal lock) &mdash; the gravity vector
-      is low-pass filtered to hide the jitter.</li>
+      <li>The world is an infinitely-distant panorama: no parallax &mdash; walking around your hill
+      changes nothing, only rotation does. The skyline band is one texture, so very tall thin
+      details soften; the azimuth seam is hidden in the darkest stretch of countryside.</li>
+      <li>On iOS, <code>alpha</code> is relative to where the phone pointed at page load, not true north
+      &mdash; the skyline's compass position is arbitrary (and can drift), but turning always pans it
+      believably. Near straight up/down the euler angles gimbal-flip; matrix smoothing hides
+      most of the wobble.</li>
     </ul>
 
     <h3>TOOLING</h3>
@@ -200,7 +214,7 @@ let RS = 1.2;               // radius scale: keeps drop sizes constant in CSS px
                             // whatever resolution the sim runs at (1 at scale 0.5)
 
 /* ---------- offscreen canvases ---------- */
-const bgSharpC = document.createElement('canvas');  // procedural scene, sharp
+const bgSharpC = document.createElement('canvas');  // panorama band, sharp
 const bgBlurC  = document.createElement('canvas');  // light blur (wiped glass)
 const bgFogC   = document.createElement('canvas');  // heavy blur (fogged glass)
 const dropC    = document.createElement('canvas');  // per-frame height field
@@ -227,110 +241,168 @@ function drawBlob(ctx, x, y, r, a) {
 }
 
 /* ============================================================
-   PROCEDURAL BACKGROUND — dusk city behind the window
+   PROCEDURAL BACKGROUND — a 360° night panorama band.
+   x = azimuth 0..360°, y = elevation EL1 (top) … EL0 (bottom).
+   Above/below the band the shader takes over procedurally
+   (stars + moon up, dark hilltop down).
    ============================================================ */
+const EL0 = -0.5, EL1 = 1.05;             // band elevation range, radians
+const PANO_W = 2048, PANO_H = 896;
 let rngSeed = 20260815;
 function rnd() { rngSeed = (rngSeed * 1664525 + 1013904223) >>> 0; return rngSeed / 4294967296; }
 
-function paintScene(ctx, w, h) {
-  // sky: deep dusk gradient
-  const sky = ctx.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0, '#0b1026');
-  sky.addColorStop(0.45, '#1c2447');
-  sky.addColorStop(0.62, '#3b3560');
-  sky.addColorStop(0.72, '#6b4a63');
-  sky.addColorStop(0.8, '#2a2038');
-  sky.addColorStop(1, '#0c0a14');
-  ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
-
-  // faint moon glow
-  const mx = w * 0.72, my = h * 0.16;
-  let g = ctx.createRadialGradient(mx, my, 0, mx, my, h * 0.2);
-  g.addColorStop(0, 'rgba(200,215,255,0.5)');
-  g.addColorStop(0.12, 'rgba(180,200,250,0.16)');
-  g.addColorStop(1, 'rgba(180,200,250,0)');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = 'rgba(225,232,255,0.9)';
-  ctx.beginPath(); ctx.arc(mx, my, h * 0.018, 0, 7); ctx.fill();
-
-  // distant skyline (two depths of rooftop silhouettes)
-  const horizon = h * 0.74;
-  for (let layer = 0; layer < 2; layer++) {
-    const base = horizon - layer * h * 0.045;
-    const col = layer === 0 ? '#141327' : '#0b0a18';
-    ctx.fillStyle = col;
-    let x = -20;
-    while (x < w + 20) {
-      const bw = (0.05 + rnd() * 0.09) * w;
-      const bh = (0.05 + rnd() * (layer === 0 ? 0.13 : 0.2)) * h;
-      ctx.fillRect(x, base - bh, bw + 2, bh + h * 0.3);
-      // lit windows on nearer layer
-      if (layer === 1) {
-        const cols = Math.max(1, (bw / (w * 0.02)) | 0), rows = Math.max(1, (bh / (h * 0.025)) | 0);
-        for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
-          if (rnd() < 0.28) {
-            const warm = rnd() < 0.8;
-            ctx.fillStyle = warm ? `rgba(255,${190 + (rnd()*50|0)},120,${0.5 + rnd()*0.5})`
-                                 : `rgba(150,210,255,${0.4 + rnd()*0.4})`;
-            ctx.fillRect(x + (i + 0.25) * bw / cols, base - bh + (j + 0.25) * bh / rows,
-                         bw / cols * 0.45, bh / rows * 0.5);
-          }
-        }
-        ctx.fillStyle = col;
-      }
-      x += bw + rnd() * w * 0.015;
+function paintPano(ctx, w, h) {
+  const E0 = EL0 * 180 / Math.PI, E1 = EL1 * 180 / Math.PI;   // ≈ -28.6°..60.2°
+  const elY = el => (E1 - el) / (E1 - E0) * h;
+  const azX = az => ((az % 360) + 360) % 360 / 360 * w;
+  const degW = w / 360;                                        // px per degree (az)
+  const degH = h / (E1 - E0);                                  // px per degree (el)
+  /* draw a rect at x and wrapped copies so the az seam is continuous */
+  function wrapRect(x, y, rw, rh) {
+    ctx.fillRect(x, y, rw, rh);
+    ctx.fillRect(x - w, y, rw, rh);
+    ctx.fillRect(x + w, y, rw, rh);
+  }
+  function wrapGlow(x, y, rx, ry, stops) {
+    for (const off of [0, -w, w]) {
+      const g = ctx.createRadialGradient(x + off, y, 0, x + off, y, rx);
+      for (const [t, c] of stops) g.addColorStop(t, c);
+      ctx.save();
+      ctx.translate(x + off, y); ctx.scale(1, ry / rx); ctx.translate(-(x + off), -y);
+      ctx.fillStyle = g;
+      ctx.fillRect(x + off - rx, y - rx, rx * 2, rx * 2);
+      ctx.restore();
     }
   }
 
-  // a couple of neon signs
-  const signs = [
-    { x: w * 0.16, y: h * 0.62, c: '255,60,140', txt: true },
-    { x: w * 0.55, y: h * 0.665, c: '40,230,220', txt: false },
-    { x: w * 0.86, y: h * 0.6, c: '160,120,255', txt: false },
-  ];
-  for (const s of signs) {
-    g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, h * 0.06);
-    g.addColorStop(0, `rgba(${s.c},0.85)`);
-    g.addColorStop(0.3, `rgba(${s.c},0.3)`);
-    g.addColorStop(1, `rgba(${s.c},0)`);
-    ctx.fillStyle = g;
-    ctx.fillRect(s.x - h * 0.06, s.y - h * 0.06, h * 0.12, h * 0.12);
-    ctx.fillStyle = `rgba(${s.c},0.95)`;
-    ctx.fillRect(s.x - w * 0.015, s.y - h * 0.002, w * 0.03, h * 0.004);
+  /* sky → horizon → ground base gradient */
+  const base = ctx.createLinearGradient(0, 0, 0, h);
+  const t = el => (E1 - el) / (E1 - E0);
+  base.addColorStop(0, '#04060e');
+  base.addColorStop(t(25), '#070a18');
+  base.addColorStop(t(8), '#101430');
+  base.addColorStop(t(1.5), '#262044');
+  base.addColorStop(t(0), '#161228');
+  base.addColorStop(t(-4), '#07080c');
+  base.addColorStop(1, '#040507');
+  ctx.fillStyle = base; ctx.fillRect(0, 0, w, h);
+
+  /* light pollution domes at the horizon (per district) */
+  wrapGlow(azX(130), elY(-1), 110 * degW, 19 * degH, [
+    [0, 'rgba(255,164,80,0.5)'], [0.35, 'rgba(230,124,70,0.24)'], [1, 'rgba(224,120,64,0)']]);
+  wrapGlow(azX(115), elY(2), 70 * degW, 26 * degH, [
+    [0, 'rgba(150,90,160,0.2)'], [0.5, 'rgba(110,70,140,0.1)'], [1, 'rgba(110,70,140,0)']]);
+  wrapGlow(azX(250), elY(-1), 45 * degW, 9 * degH, [
+    [0, 'rgba(255,170,100,0.14)'], [1, 'rgba(255,170,100,0)']]);
+  wrapGlow(azX(338), elY(-0.5), 22 * degW, 6 * degH, [
+    [0, 'rgba(150,180,230,0.1)'], [1, 'rgba(150,180,230,0)']]);
+
+  /* stars in the band sky (the shader draws the ones above the band) */
+  for (let i = 0; i < 620; i++) {
+    const el = 3 + rnd() * (E1 - 4);
+    const alpha = (0.15 + rnd() * 0.75) * Math.min(1, (el - 2) / 14);
+    ctx.fillStyle = `rgba(215,225,255,${alpha.toFixed(3)})`;
+    const sz = rnd() < 0.88 ? 1 : 2;
+    ctx.fillRect(rnd() * w, elY(el) + rnd(), sz, sz);
   }
 
-  // street below: wet asphalt with light streaks
-  ctx.fillStyle = '#0a0912';
-  ctx.fillRect(0, horizon + h * 0.02, w, h);
-  const lamps = 5;
-  for (let i = 0; i < lamps; i++) {
-    const lx = (i + 0.5 + (rnd() - 0.5) * 0.4) * w / lamps, ly = horizon - h * 0.015;
-    // lamp halo
-    g = ctx.createRadialGradient(lx, ly, 0, lx, ly, h * 0.09);
-    g.addColorStop(0, 'rgba(255,205,130,0.95)');
-    g.addColorStop(0.15, 'rgba(255,185,110,0.4)');
-    g.addColorStop(1, 'rgba(255,185,110,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(lx - h * 0.09, ly - h * 0.09, h * 0.18, h * 0.18);
-    // reflection streak down the wet street
-    const sg = ctx.createLinearGradient(0, ly, 0, ly + h * 0.24);
-    sg.addColorStop(0, 'rgba(255,195,120,0.55)');
-    sg.addColorStop(1, 'rgba(255,195,120,0)');
-    ctx.fillStyle = sg;
-    ctx.fillRect(lx - w * 0.006, ly, w * 0.012, h * 0.24);
+  /* --- CITY district, az 60..200 --- */
+  for (let layer = 0; layer < 2; layer++) {
+    const col = layer === 0 ? '#12122a' : '#0b0b18';
+    let az = 58 + rnd() * 4;
+    while (az < 202) {
+      const bw = 2.5 + rnd() * 6;                             // deg
+      const bh = layer === 0 ? 1.5 + rnd() * rnd() * 7 : 2.5 + rnd() * rnd() * 12;
+      const x = azX(az), y = elY(bh);
+      ctx.fillStyle = col;
+      wrapRect(x, y, bw * degW + 1, elY(-6) - y);
+      if (layer === 1) {
+        /* lit windows */
+        const cols = Math.max(1, (bw / 0.9) | 0), rows = Math.max(1, (bh / 0.75) | 0);
+        for (let ci = 0; ci < cols; ci++) for (let ri = 0; ri < rows; ri++) {
+          if (rnd() < 0.3) {
+            const warm = rnd() < 0.82;
+            ctx.fillStyle = warm ? `rgba(255,${200 + (rnd() * 45 | 0)},130,${0.55 + rnd() * 0.45})`
+                                 : `rgba(165,215,255,${0.5 + rnd() * 0.4})`;
+            wrapRect(x + (ci + 0.18) * bw * degW / cols, y + (ri + 0.24) * (elY(0) - y) / rows,
+                     bw * degW / cols * 0.52, (elY(0) - y) / rows * 0.5);
+          }
+        }
+        /* red beacon on the tallest towers */
+        if (bh > 10) {
+          ctx.fillStyle = 'rgba(255,60,50,0.9)';
+          wrapRect(x + bw * degW / 2 - 1, y - 3, 3, 3);
+        }
+      }
+      az += bw + rnd() * 1.2;
+    }
   }
-  // bokeh dots — passing cars / far lights
-  for (let i = 0; i < 26; i++) {
-    const bx = rnd() * w, by = horizon + h * 0.02 + rnd() * h * 0.14;
-    const warm = rnd() < 0.5;
-    const cc = warm ? '255,120,90' : '255,235,190';
-    const br = h * (0.004 + rnd() * 0.007);
-    g = ctx.createRadialGradient(bx, by, 0, bx, by, br * 3);
-    g.addColorStop(0, `rgba(${cc},0.9)`);
-    g.addColorStop(0.4, `rgba(${cc},0.25)`);
-    g.addColorStop(1, `rgba(${cc},0)`);
-    ctx.fillStyle = g;
-    ctx.fillRect(bx - br * 3, by - br * 3, br * 6, br * 6);
+  /* neon signs low in the city */
+  const neons = [[92, '255,60,140'], [128, '40,230,220'], [163, '160,120,255'], [186, '255,170,40']];
+  for (const [az, c] of neons) {
+    wrapGlow(azX(az + rnd() * 4), elY(0.8 + rnd() * 1.5), 9 * degW, 4.5 * degH, [
+      [0, `rgba(${c},0.9)`], [0.35, `rgba(${c},0.32)`], [1, `rgba(${c},0)`]]);
+    ctx.fillStyle = `rgba(${c},0.9)`;
+    wrapRect(azX(az) - 1.1 * degW, elY(0.9), 2.2 * degW, 0.35 * degH);
+  }
+  /* street-lamp glow row along the city base */
+  for (let i = 0; i < 30; i++) {
+    const az = 60 + i * 4.7 + rnd() * 2;
+    wrapGlow(azX(az), elY(-0.4), 3.2 * degW, 2.2 * degH, [
+      [0, 'rgba(255,208,135,0.72)'], [0.3, 'rgba(255,185,110,0.26)'], [1, 'rgba(255,185,110,0)']]);
+  }
+
+  /* --- SUBURB district, az 210..290: low rooftops, sparse lights --- */
+  let az = 208 + rnd() * 3;
+  while (az < 292) {
+    const bw = 3 + rnd() * 7, bh = 0.6 + rnd() * rnd() * 3;
+    ctx.fillStyle = '#0a0a13';
+    wrapRect(azX(az), elY(bh), bw * degW + 1, elY(-6) - elY(bh));
+    if (rnd() < 0.5) {
+      ctx.fillStyle = `rgba(255,205,135,${0.5 + rnd() * 0.45})`;
+      wrapRect(azX(az + bw * 0.3), elY(bh * 0.45), 1.6, 1.6);
+    }
+    az += bw + rnd() * 3;
+  }
+  /* radio mast with beacons */
+  const mastX = azX(268);
+  ctx.fillStyle = '#05050a';
+  wrapRect(mastX, elY(7.5), 2, elY(0) - elY(7.5));
+  for (const mel of [7.4, 5.2, 3.0]) {
+    ctx.fillStyle = 'rgba(255,60,50,0.95)';
+    wrapRect(mastX - 1, elY(mel), 4, 3);
+    wrapGlow(mastX + 1, elY(mel), 1.6 * degW, 1.1 * degH, [
+      [0, 'rgba(255,60,50,0.4)'], [1, 'rgba(255,60,50,0)']]);
+  }
+
+  /* --- OPEN COUNTRY, az 300..(360)..40: dark ridges across the seam --- */
+  ctx.fillStyle = '#07070d';
+  for (let px = -w * 0.25; px < w * 1.25; px += 3) {
+    const azd = px / degW;
+    if (((azd % 360) + 360) % 360 > 55 && ((azd % 360) + 360) % 360 < 296) continue;
+    const ridge = 1.1 + Math.sin(azd * 0.09) * 0.7 + Math.sin(azd * 0.023 + 2) * 0.9;
+    ctx.fillRect(px, elY(ridge), 3.5, elY(-6) - elY(ridge));
+  }
+  /* isolated farm lights */
+  for (const faz of [305, 318, 344, 12, 27, 38]) {
+    ctx.fillStyle = `rgba(255,220,155,${0.55 + rnd() * 0.35})`;
+    wrapRect(azX(faz + rnd() * 2), elY(0.3 + rnd() * 0.6), 1.5, 1.5);
+  }
+
+  /* --- the dark hilltop below the horizon (your unlit hill, no trees) --- */
+  const gnd = ctx.createLinearGradient(0, elY(-4), 0, h);
+  gnd.addColorStop(0, 'rgba(4,5,6,0)');
+  gnd.addColorStop(0.4, 'rgba(3,4,5,0.85)');
+  gnd.addColorStop(1, 'rgba(2,3,4,1)');
+  ctx.fillStyle = gnd;
+  ctx.fillRect(0, elY(-4), w, h - elY(-4));
+  /* faint grass mottling on the slope */
+  for (let i = 0; i < 260; i++) {
+    const el = -5 - rnd() * 22;
+    ctx.fillStyle = `rgba(${8 + (rnd() * 8 | 0)},${11 + (rnd() * 10 | 0)},${8 + (rnd() * 7 | 0)},0.5)`;
+    ctx.beginPath();
+    ctx.ellipse(rnd() * w, elY(el), (2 + rnd() * 7) * degW * 0.3, (0.4 + rnd() * 0.8) * degH, 0, 0, 7);
+    ctx.fill();
   }
 }
 
@@ -373,7 +445,6 @@ const R_MIN = 0.6;
 let grav = { x: 0, y: 1, z: 0 };      // screen-space gravity, unit-ish
 let gravSm = { x: 0, y: 1, z: 0 };    // low-pass filtered
 let haveSensor = false;
-let pointerTilt = null;               // desktop fallback {x,y}
 
 function spawnDrop(x, y, r, isTrail) {
   if (drops.length >= MAX_DROPS) {
@@ -425,8 +496,8 @@ function nearbyStuck(x, y, out) {
 }
 const scratch = [];
 
-let modeFaceUp = 0;   // 0 = vertical glass … 1 = flat, facing sky
-let modeFaceDown = 0; // 1 = screen aimed at the ground (no rain reaches it)
+let modeFlat = 0;     // 0 = vertical glass … 1 = horizontal pane (either side up):
+                      // looking down through it at the ground, or holding it overhead
 
 function simStep(dt, t) {
   // --- filter gravity ---
@@ -436,20 +507,19 @@ function simStep(dt, t) {
   gravSm.z += (grav.z - gravSm.z) * k;
   const gtx = gravSm.x, gty = gravSm.y;
   const gtMag = Math.min(1, Math.hypot(gtx, gty));
-  modeFaceUp = Math.max(0, Math.min(1, (-gravSm.z - 0.75) / 0.22));   // face-up beyond ~40°… full flat
-  modeFaceDown = Math.max(0, Math.min(1, (gravSm.z - 0.55) / 0.35));
+  modeFlat = Math.max(0, Math.min(1, (Math.abs(gravSm.z) - 0.75) / 0.22));  // near-horizontal pane
   const dirx = gtMag > 0.001 ? gtx / gtMag : 0, diry = gtMag > 0.001 ? gty / gtMag : 1;
 
   // --- rain arrival ---
-  // flux: highest face-up (glass aimed at the sky), moderate vertical, zero face-down
-  const flux = (0.55 + 0.9 * modeFaceUp) * (1 - modeFaceDown);
+  // flux: a horizontal pane catches the most rain on its upper face
+  const flux = 0.55 + 0.9 * modeFlat;
   const area = simW * simH / (420 * 760);
-  let expected = flux * area * dt * (8 + 14 * modeFaceUp);
+  let expected = flux * area * dt * (8 + 14 * modeFlat);
   while (expected > 0) {
     if (Math.random() < expected) {
       const x = Math.random() * simW, y = Math.random() * simH;
       const r = (1 + Math.random() * Math.random() * 2.6) * RS;
-      if (modeFaceUp > 0.5) {
+      if (modeFlat > 0.5) {
         // splat: crown ring + ejecta + central bead
         splashes.push({ x, y, t: 0, life: 0.16 + Math.random() * 0.1, r0: r * 2.2 });
         const nEj = 3 + (Math.random() * 4) | 0;
@@ -488,8 +558,6 @@ function simStep(dt, t) {
       if (!d.trail && rp < 4.4 && Math.random() < dt * 0.12) d.r += (0.05 + Math.random() * 0.1) * RS;
       // trail residue slowly evaporates so old tracks dissolve
       if (d.trail) d.r *= 1 - dt * 0.03;
-      // face-down: water drips off the glass
-      if (modeFaceDown > 0.5 && Math.random() < dt * 0.25) { d.r *= 0.96; }
       // break loose? weight vs stiction (probabilistic so releases spread out)
       const pull = gtMag * (rp * rp) / 9;        // r≈3 & full tilt ⇒ pull 1
       if (pull > d.stiction && runners < RUN_CAP && Math.random() < dt * 1.4) {
@@ -637,15 +705,89 @@ in vec2 vUV;
 out vec4 frag;
 uniform sampler2D uH;      // height field
 uniform sampler2D uWet;    // wiped-track map
-uniform sampler2D uSharp;
-uniform sampler2D uBlur;
-uniform sampler2D uFog;
+uniform sampler2D uPanoS;  // panorama band: sharp / light blur / heavy blur
+uniform sampler2D uPanoB;
+uniform sampler2D uPanoF;
 uniform vec2 uRes;
 uniform vec2 uHRes;
 uniform float uTime;
-uniform float uFaceUp;
+uniform mat3 uOrient;      // screen-ray → world (X east, Y north, Z up)
+uniform vec2 uTanF;        // tan(half-fov) x, y
+uniform vec3 uMoonDir;
+
+const float EL0 = -0.5, EL1 = 1.05;      // pano band elevation range
 
 float height(vec2 uv){ return texture(uH, uv).r; }
+
+float h21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vn(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3. - 2. * f);
+  float a = h21(i), b = h21(i + vec2(1, 0)), c = h21(i + vec2(0, 1)), d = h21(i + vec2(1, 1));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+/* octahedral-ish equal-area map of a hemisphere → stable star/ground coords */
+vec2 octa(vec3 d){ return d.xy / (abs(d.x) + abs(d.y) + abs(d.z)); }
+
+float stars(vec3 d, float size, float gain){
+  if (d.z <= 0.02) return 0.0;
+  vec2 cp = (octa(d) + 3.17) * 40.0;
+  vec2 cell = floor(cp);
+  float s = 0.0;
+  for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) {
+    vec2 c = cell + vec2(i, j);
+    float h = h21(c);
+    if (h < 0.55) continue;
+    vec2 sp = c + vec2(h21(c + 7.1), h21(c + 3.7)) * 0.8 + 0.1;
+    vec2 dv = cp - sp;
+    float tw = 0.78 + 0.22 * sin(uTime * (1.2 + h * 2.5) + h * 40.0);
+    float bright = pow(fract(h * 13.7), 4.0) * 1.6;    // many dim, a few bright
+    s += bright * tw * exp(-dot(dv, dv) / (size * size));
+  }
+  return s * gain;
+}
+vec3 moonAdd(vec3 d, float halo){
+  float ang = acos(clamp(dot(d, uMoonDir), -1.0, 1.0));
+  float R = 0.042;
+  float disc = smoothstep(R, R * 0.82, ang);
+  float glow = exp(-ang * ang / (halo * halo)) * 0.4;
+  return vec3(0.9, 0.93, 1.0) * disc * 0.95 + vec3(0.55, 0.62, 0.8) * glow;
+}
+vec3 skyHigh(vec3 d){
+  return mix(vec3(0.030, 0.038, 0.066), vec3(0.010, 0.014, 0.028), smoothstep(0.0, 1.0, d.z));
+}
+vec3 groundCol(vec3 d){
+  vec2 p = octa(vec3(d.x, d.y, -d.z));
+  float n = vn(p * 16.0) * 0.6 + vn(p * 52.0) * 0.4;
+  vec3 base = mix(vec3(0.042, 0.05, 0.042), vec3(0.016, 0.021, 0.024), smoothstep(0.05, 0.85, -d.z));
+  return base * (0.7 + n * 0.6);
+}
+
+/* full world-space background: pano band + procedural ground & high sky */
+vec3 bgAt(vec3 d, int lvl){
+  float el = asin(clamp(d.z, -1.0, 1.0));
+  float sz = lvl == 0 ? 0.1 : lvl == 1 ? 0.2 : 0.45;
+  float gn = lvl == 0 ? 1.0 : lvl == 1 ? 0.55 : 0.2;
+  float hl = lvl == 0 ? 0.05 : lvl == 1 ? 0.1 : 0.26;
+  vec3 sky = skyHigh(d) + vec3(stars(d, sz, gn)) + moonAdd(d, hl);
+  vec3 gnd = groundCol(d);
+  if (el >= EL1) return sky;
+  if (el <= EL0) return gnd;
+  float u = atan(d.x, d.y) / 6.2831853;
+  float v = (EL1 - el) / (EL1 - EL0);
+  vec3 col = lvl == 0 ? texture(uPanoS, vec2(u, v)).rgb
+           : lvl == 1 ? texture(uPanoB, vec2(u, v)).rgb
+           : texture(uPanoF, vec2(u, v)).rgb;
+  col = mix(col, sky, smoothstep(EL1 - 0.08, EL1, el));
+  col = mix(col, gnd, 1.0 - smoothstep(EL0, EL0 + 0.06, el));
+  col += moonAdd(d, hl) * smoothstep(0.45, EL1, el);          // halo spills into the band
+  return col;
+}
+vec3 ray(vec2 uv, vec2 off){
+  float nx = uv.x * 2.0 - 1.0;
+  float nyUp = 1.0 - 2.0 * uv.y;
+  return normalize(uOrient * vec3(nx * uTanF.x + off.x, nyUp * uTanF.y + off.y, -1.0));
+}
 
 void main(){
   vec2 uv = vUV;
@@ -657,18 +799,18 @@ void main(){
 
   float wet = texture(uWet, uv).r;
 
+  vec3 rdBase = ray(uv, vec2(0.0));
+
   // base glass: fogged (heavy blur + milk) vs wiped (light blur)
-  vec3 fogged = texture(uFog, uv).rgb;
-  fogged = fogged * 0.94 + vec3(0.055, 0.062, 0.078);          // milky condensation lift
-  vec3 wiped = texture(uBlur, uv).rgb + 0.012;
+  vec3 fogged = bgAt(rdBase, 2) * 0.94 + vec3(0.055, 0.062, 0.078);   // milky condensation lift
+  vec3 wiped = bgAt(rdBase, 1) + 0.012;
   vec3 base = mix(fogged, wiped, clamp(wet, 0., 1.) * 0.8);
 
-  // inside drops: refract into the SHARP scene (drops are little lenses)
+  // inside drops: refract into the SHARP world (drops are little lenses)
   float mask = smoothstep(0.045, 0.3, h);
-  vec2 ro = -n.xy * 0.072;                                      // lens offset, against normal
-  vec2 duv = clamp(uv + ro, vec2(0.001), vec2(0.999));
-  vec3 dropCol = texture(uSharp, duv).rgb + 0.035;
-  dropCol *= 0.96 + 0.42 * clamp(-n.y, 0., 1.);                 // bottom-lit meniscus feel
+  vec3 rdRefr = ray(uv, -n.xy * 0.115);                      // lens offset, against normal
+  vec3 dropCol = bgAt(rdRefr, 0) + 0.035;
+  dropCol *= 0.96 + 0.42 * clamp(-n.y, 0., 1.);              // bottom-lit meniscus feel
 
   // lighting on the water surface
   vec3 L = normalize(vec3(-0.35, 0.55, 0.75));
@@ -676,11 +818,8 @@ void main(){
   float rim  = pow(1.0 - n.z, 1.6);
   vec3 col = mix(base, dropCol, mask);
   col += spec * mask;
-  col += rim * vec3(0.10, 0.12, 0.16) * mask;                   // sky sheen on curved edges
-  col -= rim * 0.06 * (1.0 - mask);                             // hairline dark contact edge
-
-  // face-up: the sky above dims the scene slightly, cool cast
-  col = mix(col, col * vec3(0.9, 0.95, 1.05), uFaceUp * 0.5);
+  col += rim * vec3(0.10, 0.12, 0.16) * mask;                // sky sheen on curved edges
+  col -= rim * 0.06 * (1.0 - mask);                          // hairline dark contact edge
 
   // vignette + faint grain
   vec2 vc = uv - 0.5;
@@ -722,16 +861,26 @@ function makeTex() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   return t;
 }
-const texH = makeTex(), texWet = makeTex(), texSharp = makeTex(), texBlur = makeTex(), texFog = makeTex();
+const texH = makeTex(), texWet = makeTex(), texPanoS = makeTex(), texPanoB = makeTex(), texPanoF = makeTex();
 function upload(tex, cnv) {
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cnv);
 }
 const U = {};
-for (const n of ['uH','uWet','uSharp','uBlur','uFog','uRes','uHRes','uTime','uFaceUp'])
+for (const n of ['uH','uWet','uPanoS','uPanoB','uPanoF','uRes','uHRes','uTime','uOrient','uTanF','uMoonDir'])
   U[n] = gl.getUniformLocation(prog, n);
-gl.uniform1i(U.uH, 0); gl.uniform1i(U.uWet, 1); gl.uniform1i(U.uSharp, 2);
-gl.uniform1i(U.uBlur, 3); gl.uniform1i(U.uFog, 4);
+gl.uniform1i(U.uH, 0); gl.uniform1i(U.uWet, 1); gl.uniform1i(U.uPanoS, 2);
+gl.uniform1i(U.uPanoB, 3); gl.uniform1i(U.uPanoF, 4);
+/* moon: az 35°, el 62° — just above the pano band, in the procedural sky */
+{
+  const az = 35 * Math.PI / 180, el = 62 * Math.PI / 180;
+  gl.uniform3f(U.uMoonDir, Math.sin(az) * Math.cos(el), Math.cos(az) * Math.cos(el), Math.sin(el));
+}
+/* pano textures wrap in azimuth */
+for (const t of [texPanoS, texPanoB, texPanoF]) {
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+}
 
 /* ============================================================
    RESIZE / BOOT
@@ -748,17 +897,6 @@ function resize() {
   dropC.width = simW; dropC.height = simH;
   wetC.width = simW; wetC.height = simH;
 
-  const bw = Math.min(1100, Math.round(W * DPR * 0.8));
-  const bh = Math.round(bw * H / W);
-  bgSharpC.width = bw; bgSharpC.height = bh;
-  rngSeed = 20260815;
-  paintScene(bgSharpC.getContext('2d'), bw, bh);
-  blurInto(bgBlurC, bgSharpC, 2);
-  blurInto(bgFogC, bgSharpC, 4);
-  upload(texSharp, bgSharpC);
-  upload(texBlur, bgBlurC);
-  upload(texFog, bgFogC);
-
   paintMicro();
   drops.length = 0; splashes.length = 0;
   // pre-seed some beads so the pane doesn't start empty
@@ -769,62 +907,88 @@ function resize() {
 window.addEventListener('resize', () => { resize(); });
 
 /* ============================================================
-   SENSORS — gravity from device orientation
+   SENSORS — one orientation matrix drives BOTH the view through
+   the window and the gravity acting on the drops.
+   World frame: X east, Y north, Z up. R maps screen-frame vectors
+   (x right, y up, z toward the viewer) into the world.
    ============================================================ */
 function screenAngle() {
   if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
   return (typeof window.orientation === 'number') ? window.orientation : 0;
 }
+/* latest raw orientation (sensor or virtual) */
+let oAlpha = 290, oBeta = 78, oGamma = 0;      // virtual default: level-ish, city in view
 function onOrient(ev) {
   if (ev.beta == null || ev.gamma == null) return;
   haveSensor = true;
-  const b = ev.beta * Math.PI / 180, g = ev.gamma * Math.PI / 180;
-  // gravity in device coords (x right, y top-of-screen, z out of screen)
-  const gx = Math.cos(b) * Math.sin(g);
-  const gy = -Math.sin(b);
-  const gz = -Math.cos(b) * Math.cos(g);
-  // rotate into current screen coords
-  const a = screenAngle() * Math.PI / 180;
-  const sx = gx * Math.cos(a) + gy * Math.sin(a);
-  const syUp = -gx * Math.sin(a) + gy * Math.cos(a);
-  grav.x = sx;
-  grav.y = -syUp;   // CSS y grows downward
-  grav.z = gz;
+  oAlpha = ev.alpha != null ? ev.alpha : 0;
+  oBeta = ev.beta; oGamma = ev.gamma;
 }
 window.addEventListener('deviceorientation', onOrient);
+
+/* R = RZ(alpha)·RX(beta)·RY(gamma) · RZ(screenAngle)  (row-major 3×3) */
+function orientMatrix() {
+  const D = Math.PI / 180;
+  const a = oAlpha * D, b = oBeta * D, g = oGamma * D, sc = screenAngle() * D;
+  const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b),
+        cg = Math.cos(g), sg = Math.sin(g), cs = Math.cos(sc), ss = Math.sin(sc);
+  const r00 = ca * cg - sa * sb * sg, r01 = -sa * cb, r02 = ca * sg + sa * sb * cg;
+  const r10 = sa * cg + ca * sb * sg, r11 = ca * cb,  r12 = sa * sg - ca * sb * cg;
+  const r20 = -cb * sg,               r21 = sb,       r22 = cb * cg;
+  // fold the screen rotation in: R · RotZ(sc)
+  return [
+    r00 * cs + r01 * ss, -r00 * ss + r01 * cs, r02,
+    r10 * cs + r11 * ss, -r10 * ss + r11 * cs, r12,
+    r20 * cs + r21 * ss, -r20 * ss + r21 * cs, r22,
+  ];
+}
+/* smoothed matrix (entry-lerp + Gram-Schmidt re-orthonormalise) */
+let Rsm = orientMatrix();
+function smoothOrient(dt) {
+  const Rt = orientMatrix();
+  const k = 1 - Math.pow(0.00005, dt);
+  for (let i = 0; i < 9; i++) Rsm[i] += (Rt[i] - Rsm[i]) * k;
+  // columns
+  let c0 = [Rsm[0], Rsm[3], Rsm[6]], c1 = [Rsm[1], Rsm[4], Rsm[7]];
+  const n0 = Math.hypot(...c0) || 1; c0 = c0.map(v => v / n0);
+  const d01 = c0[0] * c1[0] + c0[1] * c1[1] + c0[2] * c1[2];
+  c1 = [c1[0] - c0[0] * d01, c1[1] - c0[1] * d01, c1[2] - c0[2] * d01];
+  const n1 = Math.hypot(...c1) || 1; c1 = c1.map(v => v / n1);
+  const c2 = [c0[1] * c1[2] - c0[2] * c1[1], c0[2] * c1[0] - c0[0] * c1[2], c0[0] * c1[1] - c0[1] * c1[0]];
+  Rsm = [c0[0], c1[0], c2[0], c0[1], c1[1], c2[1], c0[2], c1[2], c2[2]];
+  // gravity in the screen frame = −(third row of R)
+  grav.x = -Rsm[6];
+  grav.y = Rsm[7];      // CSS y grows downward = −(up component)·(−1)
+  grav.z = -Rsm[8];
+}
 
 function requestMotion() {
   if (typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function') {
     DeviceOrientationEvent.requestPermission().then(state => {
-      if (state === 'granted') showHint('TILT YOUR PHONE — THE RAIN FOLLOWS REAL GRAVITY');
-      else showHint('MOTION DENIED — DRAG TO TILT INSTEAD');
-    }).catch(() => { showHint('DRAG TO TILT THE PANE'); });
+      if (state === 'granted') showHint('TURN AROUND — THE CITY SLIDES PAST · TILT UP FOR THE MOON');
+      else showHint('MOTION DENIED — DRAG TO LOOK AROUND INSTEAD');
+    }).catch(() => { showHint('DRAG TO LOOK AROUND'); });
   } else {
     setTimeout(() => {
-      if (!haveSensor) showHint('NO TILT SENSOR — DRAG TO TILT · CENTRE = FLAT FACE-UP');
-      else showHint('TILT YOUR PHONE — THE RAIN FOLLOWS REAL GRAVITY');
+      if (!haveSensor) showHint('DRAG TO LOOK AROUND — DOWN TO THE DARK HILL, UP TO THE STARS');
+      else showHint('TURN AROUND — THE CITY SLIDES PAST · TILT UP FOR THE MOON');
     }, 900);
   }
 }
 
-/* desktop / no-sensor fallback: drag = tilt a virtual phone */
-function pointerToTilt(cx, cy) {
-  const dx = (cx - W / 2) / (W / 2), dy = (cy - H / 2) / (H / 2);
-  const m = Math.min(1, Math.hypot(dx, dy) * 1.25);
-  const tiltAngle = m * Math.PI / 2;                  // centre = flat, edge = vertical
-  const s = Math.sin(tiltAngle);
-  const l = Math.hypot(dx, dy) || 1;
-  grav.x = (dx / l) * s;
-  grav.y = (dy / l) * s;
-  grav.z = -Math.cos(tiltAngle);
-}
-let dragging = false;
+/* desktop / no-sensor fallback: drag turns and tilts a virtual phone */
+let dragging = false, lastPX = 0, lastPY = 0;
 canvas.addEventListener('pointerdown', e => {
   if (haveSensor) return;
-  dragging = true; pointerToTilt(e.clientX, e.clientY);
+  dragging = true; lastPX = e.clientX; lastPY = e.clientY;
 });
-canvas.addEventListener('pointermove', e => { if (dragging && !haveSensor) pointerToTilt(e.clientX, e.clientY); });
+canvas.addEventListener('pointermove', e => {
+  if (!dragging || haveSensor) return;
+  oAlpha += (e.clientX - lastPX) * 0.22;
+  oBeta = Math.max(2, Math.min(176, oBeta - (e.clientY - lastPY) * 0.22));
+  lastPX = e.clientX; lastPY = e.clientY;
+});
 window.addEventListener('pointerup', () => { dragging = false; });
 
 /* ============================================================
@@ -915,6 +1079,7 @@ function frame(tms) {
   let dt = Math.min(0.1, t - lastT || 0.016);
   lastT = t;
 
+  smoothOrient(dt);
   simStep(dt, t);
   paintHeightField();
 
@@ -923,19 +1088,39 @@ function frame(tms) {
   if ((wetFrame++ & 1) === 0) { gl.activeTexture(gl.TEXTURE1); upload(texWet, wetC); }
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texH);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texWet);
-  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texSharp);
-  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, texBlur);
-  gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, texFog);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texPanoS);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, texPanoB);
+  gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, texPanoF);
 
   gl.uniform2f(U.uRes, canvas.width, canvas.height);
   gl.uniform2f(U.uHRes, simW, simH);
   gl.uniform1f(U.uTime, t);
-  gl.uniform1f(U.uFaceUp, modeFaceUp);
+  /* window field of view: ~66° vertical */
+  const tanY = Math.tan(0.58);
+  gl.uniform2f(U.uTanF, tanY * W / H, tanY);
+  /* Rsm is row-major; uniformMatrix3fv wants column-major → transpose */
+  gl.uniformMatrix3fv(U.uOrient, false, new Float32Array([
+    Rsm[0], Rsm[3], Rsm[6], Rsm[1], Rsm[4], Rsm[7], Rsm[2], Rsm[5], Rsm[8]]));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   // rain bed follows mode: face-up = drummier
   if (AC && audioOn && rainGain)
-    rainGain.gain.setTargetAtTime(0.09 + modeFaceUp * 0.07 - modeFaceDown * 0.06, AC.currentTime, 0.4);
+    rainGain.gain.setTargetAtTime(0.09 + modeFlat * 0.07, AC.currentTime, 0.4);
+}
+
+/* build the panorama once — it is the world, not the viewport */
+bgSharpC.width = PANO_W; bgSharpC.height = PANO_H;
+rngSeed = 20260815;
+paintPano(bgSharpC.getContext('2d'), PANO_W, PANO_H);
+blurInto(bgBlurC, bgSharpC, 2);
+blurInto(bgFogC, bgSharpC, 4);
+upload(texPanoS, bgSharpC);
+upload(texPanoB, bgBlurC);
+upload(texPanoF, bgFogC);
+gl.uniform1i(U.uPanoS, 2); gl.uniform1i(U.uPanoB, 3); gl.uniform1i(U.uPanoF, 4);
+for (const t of [texPanoS, texPanoB, texPanoF]) {
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
 }
 
 resize();
