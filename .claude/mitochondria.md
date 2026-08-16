@@ -113,6 +113,21 @@ particle pass leaves `depthMask(false)`, so `render()` must call
 after frame 1 — geometry then vanishes and the membranes show black holes
 where stale depth rejects them.
 
+**Triangle winding (fixed 2026-08-16).** `grid()`, `prim('sphere')`,
+`prim('cyl')`'s side wall and `tube()` all originally emitted `tri(a,c,b);
+tri(b,c,d)`, which winds the face normal *inward*. `cullFace(BACK)` was
+therefore discarding the outward faces and leaving the far interior wall
+visible — every cylinder read as an open pipe and surfaces vanished when
+viewed from underneath. They now emit `tri(a,b,c); tri(b,d,c)`. `prim('box')`
+and the cylinder caps were always correct; don't "fix" those. If you add a new
+generator, check it against a lone cylinder viewed from outside.
+
+**Solids are drawn two-sided** (`gl.disable(gl.CULL_FACE)` for the protein
+pass, plus `if (dot(N,V) < 0.0) N = -N;` in `solF`). Correct winding alone is
+not enough: the camera can get inside a complex or under a crista, and a
+component must still have a lit surface there rather than a hole. The crista
+leaflet grids also start at `rho = 0` now so each sac is closed at its centre.
+
 **Membrane look** is glass, not milk: low body alpha (outer 0.09, inner 0.12,
 cristae 0.22) with a sharp fresnel (`pow(..., 4.5)`) carrying the rim. Five
 shells stack, so raising body alpha turns the whole organelle opaque fast.
@@ -147,6 +162,26 @@ plane across an enclosing phagophore sphere.
 - **16 layer toggles**, a cutaway clip plane, slow motion, auto-spin.
 - Tap-to-inspect any protein: `PROTEIN[]` carries the prose, the facts table
   and a live-flux readout per type.
+
+## Highlighting
+
+One slow breath — `0.5 + 0.5*sin(uTime*1.7)`, a ~3.7 s cycle — drives
+everything, so a marked structure reads as alive rather than as a static tint.
+Keep the two consumers on that same clock; two highlights breathing at
+different rates looks broken.
+
+`iMisc.z` (`vHi`) carries the mode: **0** plain, **1** lesson-highlighted (the
+type is in `hiSet`), **2** tapped-and-selected (`selSite`). `iMisc.w` carries
+dimming — anything not highlighted while a lesson is running falls to a
+desaturated silhouette at 0.22. The selected instance additionally gets a cool
+fresnel rim, a breathing ring of glow sprites in `packParticles`, and a 2D
+reticle plus name in `drawOverlay`.
+
+`selSite` is cleared by: tapping empty space, closing the inspector, turning
+off its layer, and starting or stepping a lesson (the lesson owns highlighting
+from then on). The inspector card flips to `.low` when the selection projects
+into the top half of the viewport, so the card never covers the structure it
+is describing.
 
 ## Watch out for
 
