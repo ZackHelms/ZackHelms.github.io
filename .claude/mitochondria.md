@@ -193,9 +193,64 @@ is describing.
 - Scenario changes reset chemistry only if the pore has opened, so a run is not
   silently rolled back mid-experiment.
 
+## Phase 2 — cell scale (shipped 2026-08-16)
+
+**One continuous coordinate space.** The cell is built at true relative scale, so
+a mitochondrion inside it is the same ~4.7 units as the hero organelle at the
+origin. Nothing is swapped when you zoom; you just travel. That is the whole
+point of the rung, so do not "optimise" it into two separate scenes.
+
+- `VIEW.blend = smoothstep(15, 46, CAM.dist)` — 0 is inside the organelle, 1 is
+  the whole cell. `CAM.maxDist` is 1400 and the near/far planes track the
+  distance (`near = dist*0.006`, `far = dist*40 + 240`); the depth buffer is
+  24-bit because 16 could not hold that range.
+- Cross-fade: `heroDetail = 1 - smoothstep(0.30, 0.72, blend)` fades and then
+  skips the proteins, particles and organelle membranes; `heroLow` (0.62→0.80)
+  brings in a low-poly instance at slot 0 so the hero never pops out of
+  existence. Cell content is skipped entirely below `blend > 0.02`.
+- **The hero IS mitochondrion #0.** `placeCellMitos` picks the most
+  axis-aligned slot, snaps it to +X, and shifts the whole cell so it sits at
+  the origin (`CELLGEO.origin` is that slot's cell-local position; world =
+  local − origin). `enterMito(i)` re-anchors onto any other one by translating
+  everything and rebuilding the shell and nuclear meshes.
+
+**Gotcha:** every piece of cell geometry has to get the origin shift. The
+plasma membrane originally did not, so it sat up to half a cell away from its
+own contents. `placeCellMitos` must therefore run **first** in
+`buildCellScene`, before the shell is built and translated.
+
+`CELLS[]` holds 9 types, each with `size`, `shape`, mitochondrion placement
+rule (`rows` / `scatter` / `axon` / `cortical` / `helix` / `none`), organelle
+counts, prose, a facts table and 1–4 activities. Neuron and sperm carry an
+`anchor` block (soma/head/midpiece/axon extents) because a single lathe over
+`size[0]` balloons them into blobs — their radius profile and their
+mitochondrion placement and their labels all read from that anchor.
+
+Counts on screen are a **representative subset**; the real figure is in
+`facts[0]` and is shown in the inspector. Do not "fix" the number to match
+biology — 5,000 instances would not render.
+
+`cellStep()` is the cell layer: it owns `P` only while `blend > 0.35` and never
+over a lesson step that sets parameters. It adds the beat (a contraction or a
+spike is a sharp ATP cost), tracks cell ATP charge, and runs network turnover —
+radicals damage individuals, damaged ones are tagged and eaten, biogenesis
+replaces them. A mitochondrion's colour at cell scale is its membrane
+potential, carried in `iMisc.w`.
+
+The **β-cell** is the one place the coupling runs the other way: the organelle's
+ATP/ADP ratio drives the K_ATP channel and therefore insulin. Its activities
+deliberately hold **demand constant** and vary only supply — with demand
+floating, "low glucose" and "low demand" produce the same ratio and the sensor
+reads backwards (it did, at first). The window is `smoothstep(0.66, 0.78)`,
+which is calibrated to the ratio range those four activities actually produce;
+retune both together.
+
+Lesson steps gained `scale` (`'cell'` / `'organelle'`), `cell` and `act`. The
+old `act:` field meaning "fire a dynamic" was renamed **`do:`** to free the
+name — four organelle steps use it.
+
 ## Roadmap
 
-Phase 2 zooms out to the cell (cell types, mitochondrial density, ER contacts,
-the network); phase 3 to organ systems. The background shader already fades in
-neighbouring organelles as you zoom out, and `CAM.home`/`LAY.cytosol` are the
-hooks. The ⓘ guide states this so the scope is visible to a player.
+Phase 3 adds a tissue / whole-body rung above the cell. The pieces that already
+generalise: the blend/fit camera, the "hero is instance zero" re-anchoring, and
+the pattern of a scale-owning step function that writes the rung below it.
