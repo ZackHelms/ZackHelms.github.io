@@ -25,7 +25,7 @@ local-2p.
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
 | Zed Shooter | `zed-shooter/` | shooter | virtual-joystick, kb-mouse | wave-survival | meta-progression | solo | external: zed-fps repo |
-| Mitochondria Simulator | `mitochondria/` | biology-sim | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox, guided-lessons | systems-simulation, skill-teaching, layer-filters, real-time-3d | solo | `.claude/mitochondria.md` |
+| Mitochondria Simulator | `mitochondria/` | biology-sim | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox, guided-lessons | systems-simulation, scale-ladder, skill-teaching, real-time-3d | solo | `.claude/mitochondria.md` |
 | Quantum Chemist | `qntmchmst/` | grid-puzzle | tap, drag-place | level-campaign | match-clear | solo | external: qntmchmst repo |
 | Stick Wars | `stick-wars.html` | brawler | tap | wave-survival | meta-progression, resource-economy | solo | — |
 | Town Builder | `town-game-1.html` | builder-sim | tap, drag-place | open-sandbox | resource-economy | solo | — |
@@ -134,14 +134,20 @@ local-2p.
   the in-game solver before it is served; earmarked as the first web-first
   prototype of a future iOS title).
 
-### Newly opened by the 2026-08-15 build
-- `biology-sim` genre + `systems-simulation` / `layer-filters` / `real-time-3d`
+### Newly opened by the 2026-08-15/16 build
+- `biology-sim` genre + `systems-simulation` / `scale-ladder` / `real-time-3d`
   mechanics + `guided-lessons` session + `orbit-drag` input (mitochondria — the
   first title that is explicitly **not scored**: an explorable instrument built
-  on a real OXPHOS flux model, with 30 scenarios, 9 step-through walkthroughs,
+  on a real OXPHOS flux model, with 30 scenarios, 13 step-through walkthroughs,
   layer toggles and a membrane cutaway. It is also the repo's second WebGL2
-  page after wayfinder, and the first designed to zoom **out** later: phase 2 is
-  cell level, phase 3 whole-body).
+  page after wayfinder).
+- **`scale-ladder`** is the genuinely new mechanic (phase 2, 2026-08-16): one
+  continuous coordinate space in which pinching out turns the organelle into one
+  of hundreds inside a living cell — 9 procedurally-built human cell types — and
+  tapping any mitochondrion up there drops you back into it at full detail.
+  Nothing is swapped; the cell is modelled at true relative scale. No other game
+  in the repo changes the *magnification* of its subject as a mechanic; phase 3
+  adds a tissue/whole-body rung.
 
 ### Absent — what's actually left
 Sensor inputs are now down to two: **`shake`** and **`camera`**. Everything

@@ -209,7 +209,7 @@ button.btn:disabled{opacity:.4;cursor:default;}
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-16 18:29 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-16 19:37 UTC</div>
 
 <canvas id="gl"></canvas>
 <canvas id="ui"></canvas>
@@ -249,10 +249,31 @@ button.btn:disabled{opacity:.4;cursor:default;}
   <div id="panes">
     <div class="pane on" id="pane-run">
       <div class="grp">
-        <div class="glab">SCENARIO — WHAT THE BODY IS DOING</div>
-        <select id="scenario"></select>
+        <div class="glab">SCALE</div>
+        <div class="btnrow">
+          <button class="btn" id="scale-mito">🔬 MITOCHONDRION</button>
+          <button class="btn" id="scale-cell">🧫 CELL</button>
+        </div>
       </div>
-      <div class="grp" id="scn-note-wrap"><div class="note" id="scn-note"></div></div>
+      <div id="blk-cell" style="display:none;">
+        <div class="grp">
+          <div class="glab">CELL TYPE</div>
+          <select id="celltype"></select>
+        </div>
+        <div class="grp">
+          <div class="glab">WHAT THIS CELL IS DOING</div>
+          <select id="cellact"></select>
+        </div>
+        <div class="grp"><div class="note" id="cell-note"></div></div>
+        <div class="grp"><div class="note" id="cell-facts"></div></div>
+      </div>
+      <div id="blk-mito">
+        <div class="grp">
+          <div class="glab">SCENARIO — WHAT THE BODY IS DOING</div>
+          <select id="scenario"></select>
+        </div>
+        <div class="grp" id="scn-note-wrap"><div class="note" id="scn-note"></div></div>
+      </div>
       <div class="grp">
         <div class="glab">DO SOMETHING TO IT</div>
         <div class="btnrow three" id="actions"></div>
@@ -502,6 +523,17 @@ class Mesh {
       this.tri(a, b, c); this.tri(b, d, c);
     }
     return this;
+  }
+  translate(t) {
+    for (let i = 0; i < this.v.length; i += 10) { this.v[i] += t[0]; this.v[i + 1] += t[1]; this.v[i + 2] += t[2]; }
+    return this;
+  }
+  bounds() {
+    const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    for (let i = 0; i < this.v.length; i += 10)
+      for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], this.v[i + k]); hi[k] = Math.max(hi[k], this.v[i + k]); }
+    const c = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
+    return { c, r: Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2, lo, hi };
   }
   buffers() { return { v: new Float32Array(this.v), i: new Uint32Array(this.i) }; }
 }
@@ -938,13 +970,14 @@ vec3 deform(vec3 p){
 
 SH.memV = `#version 300 es
 in vec3 aPos; in vec3 aNrm; in vec3 aCol; in float aFlag;
-uniform mat4 uVP; uniform float uTime; uniform float uBreath;
+uniform mat4 uVP; uniform float uTime; uniform float uBreath; uniform float uDeformOn;
 ` + SH.deform + `
 out vec3 vP; out vec3 vN; out vec3 vC;
 void main(){
-  // a slow organic breathing so the organelle never looks like a still model
+  // a slow organic breathing so nothing ever looks like a still model
   float w = sin(aPos.x*2.1 + uTime*0.55) * 0.5 + sin(aPos.y*3.3 - uTime*0.42) * 0.5;
-  vec3 p = deform(aPos + aNrm * w * uBreath);
+  vec3 base = aPos + aNrm * w * uBreath;
+  vec3 p = uDeformOn > 0.5 ? deform(base) : base;
   vP = p; vN = aNrm; vC = aCol;
   gl_Position = uVP * vec4(p,1.0);
 }`;
@@ -1261,7 +1294,7 @@ function makeFBO(w, h, ifmt, type) {
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
   const rb = gl.createRenderbuffer();
   gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
-  gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, w, h);
+  gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, w, h);
   gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, rb);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   return { f, tex, rb, w, h };
@@ -1501,6 +1534,532 @@ function DEFORM(p) {
   return [px, sy + ry, rz];
 }
 /* ==================================================================== */
+/*  PHASE 2 — CELL SCALE                                                */
+/* ==================================================================== */
+/* One continuous coordinate space: the cell is built at true relative
+   scale, so a mitochondrion inside it is the same ~4.7 units long as the
+   detailed hero organelle at the origin. Zooming out therefore does not
+   swap worlds, it just travels — which is the whole point of the scale
+   ladder. 1 world unit = 0.5 µm throughout.
+   Mitochondrion counts on screen are a representative subset; the real
+   figure is stated in each cell's facts panel. */
+
+const CELLS = [
+{
+  id: 'cardio', name: 'Cardiomyocyte', tissue: 'Heart muscle', icon: '🫀',
+  size: [200, 40, 40], shape: 'rod', fuel: 'fat',
+  mito: { n: 320, place: 'rows', len: 1.30 },
+  nucleus: { n: 1, r: 9 },
+  feat: { myofibril: 10, lipid: 6, lyso: 8 },
+  blurb: 'The most mitochondria-dense cell you have.',
+  txt: 'A heart muscle cell is roughly <b>35% mitochondria by volume</b> — they are packed in disciplined rows between the contractile myofibrils, so that ATP is made within a fraction of a micron of where it is spent. The heart never gets a rest day, so it is almost entirely aerobic and runs mostly on <b>fatty acids</b>.',
+  facts: [['Real count', '~5,000 per cell'], ['Volume fraction', '~35%'], ['Preferred fuel', 'Fatty acids (~70%)'], ['ATP turnover', 'the heart remakes ~6 kg of ATP a day']],
+  acts: [
+    { n: 'Resting beat · 60 bpm', beat: 1.0, p: { fuel: 'fat', supply: 0.72, demand: 0.60 },
+      note: 'Every beat is a spike in ATP demand — watch the gauges breathe with the contraction. Between beats the calcium that triggered contraction is also taken up by the mitochondria, which is how the organelle knows to make more fuel <i>before</i> the next beat arrives.' },
+    { n: 'Exercise · 160 bpm', beat: 2.7, p: { fuel: 'fat', supply: 1.15, demand: 1.10, caCyt: 0.45 },
+      note: 'Beating nearly three times a second. Calcium cycling is relentless, the dehydrogenases stay switched on, and oxygen consumption climbs to match. A trained heart answers this by growing <b>more</b> mitochondria, not by working each one harder.' },
+    { n: 'Ischaemia · blocked artery', beat: 0.5, p: { fuel: 'mixed', supply: 0.45, demand: 0.55, o2: 0.02 },
+      note: 'The artery is blocked. Oxygen runs out, the chain backs up, ATP collapses and the cell cannot even afford to pump out the calcium it let in. This is a heart attack, in the first minutes.' },
+    { n: 'Reperfusion · blood returns', beat: 0.9, p: { fuel: 'mixed', supply: 0.9, demand: 0.6, o2: 1, caCyt: 0.9, scav: 0.5 },
+      note: 'The clot clears and oxygen floods back into an over-reduced chain sitting on a calcium load. The result is a burst of radicals and mass opening of the <b>permeability transition pore</b>. A great deal of the damage from a heart attack happens in this minute — not the one before it.' },
+  ],
+},
+{
+  id: 'skeletal', name: 'Skeletal muscle fibre', tissue: 'Voluntary muscle', icon: '💪',
+  size: [200, 56, 56], shape: 'rod', fuel: 'mixed',
+  mito: { n: 300, place: 'rows', len: 1.05 },
+  nucleus: { n: 4, r: 7, cortical: true },
+  feat: { myofibril: 14, lipid: 10, lyso: 5 },
+  blurb: 'Two mitochondrial populations, and a huge dynamic range.',
+  txt: 'Muscle fibres are giant, multinucleate cells with two distinct mitochondrial pools: <b>subsarcolemmal</b> ones packed just under the membrane where oxygen arrives, and <b>intermyofibrillar</b> ones threaded between the contractile filaments. Between rest and all-out effort a fibre can change its ATP demand more than a hundredfold — far more than any other cell.',
+  facts: [['Real count', '~1,000–2,000 per fibre'], ['Nuclei', 'hundreds — it is a fused syncytium'], ['Demand range', 'up to ~100× between rest and sprint'], ['Trainability', 'endurance training roughly doubles mitochondrial content']],
+  acts: [
+    { n: 'At rest', beat: 0, p: { fuel: 'fat', supply: 0.40, demand: 0.16 },
+      note: 'Idling. Most of the ATP goes on ion pumps and protein turnover, and much of the gradient simply leaks. Resting muscle burns fat.' },
+    { n: 'Endurance · steady effort', beat: 0.9, p: { fuel: 'fat', supply: 0.95, demand: 0.85 },
+      note: 'Aerobic and sustainable: demand sits inside what the mitochondria can supply, so nothing accumulates. This is the intensity that <i>builds</i> mitochondria — the signal for biogenesis is the repeated mild energy stress, not the damage.' },
+    { n: 'All-out sprint', beat: 2.2, p: { fuel: 'pyruvate', supply: 1.5, demand: 1.55 },
+      note: 'Demand outruns the chain within seconds. Glycolysis opens wide, and the pyruvate it makes faster than the mitochondria can swallow leaves as <b>lactate</b>. The burn is the overflow — not the engine failing.' },
+    { n: 'Recovery · after the sprint', beat: 0.6, p: { fuel: 'mixed', supply: 1.0, demand: 0.5 },
+      note: 'Breathing hard while standing still. The oxygen you take in now is repaying the debt: restoring creatine phosphate, clearing lactate and refilling the gradient. Mitochondrial demand stays high long after the muscle has stopped.' },
+  ],
+},
+{
+  id: 'neuron', name: 'Neuron', tissue: 'Brain', icon: '🧠',
+  size: [300, 30, 30], shape: 'neuron', fuel: 'pyruvate',
+  anchor: { somaX: -105, somaR: 15, axon: [-93, 145], dend: 5 },
+  mito: { n: 170, place: 'axon', len: 0.8 },
+  nucleus: { n: 1, r: 8 },
+  feat: { microtubule: 16, lyso: 12, vesicle: 26 },
+  blurb: 'Mitochondria commute — and where they park matters.',
+  txt: 'A neuron cannot store energy and cannot afford to be short of it: restoring the ion gradients after every spike is enormously expensive. Because its axon can be a metre long, mitochondria are <b>trafficked along microtubules</b> by motor proteins and parked exactly where demand is — at synapses and nodes of Ranvier. Your brain is 2% of your mass and about <b>20% of your ATP budget</b>.',
+  facts: [['Real count', '~1,000–2,000, plus hundreds per synapse'], ['Transport speed', '~1 µm/s along microtubules'], ['Brain share of ATP', '~20% of the whole body'], ['Fuel', 'glucose, and ketones when fasting']],
+  acts: [
+    { n: 'Baseline firing', beat: 0.7, p: { fuel: 'pyruvate', supply: 0.62, demand: 0.48, caCyt: 0.22 },
+      note: 'Ticking over. Even "at rest" most of the cost is the Na⁺/K⁺ pump undoing what each spike did — the brain has no idle state.' },
+    { n: 'Burst firing', beat: 3.0, p: { fuel: 'pyruvate', supply: 0.95, demand: 0.95, caCyt: 0.5 },
+      note: 'Heavy signalling. Each spike lets calcium in, which both costs ATP to remove and switches on the Krebs dehydrogenases — the same signal that spends the energy orders more of it. Mitochondria are recruited to the active synapses.' },
+    { n: 'Excitotoxicity', beat: 3.4, p: { fuel: 'pyruvate', supply: 0.8, demand: 1.2, caCyt: 1.0, scav: 0.45 },
+      note: 'Glutamate floods the synapse and the calcium never stops arriving. The mitochondria buffer it until they cannot, the permeability pore opens, and the cell dies. This is the mechanism behind much of the damage in stroke and traumatic brain injury.' },
+    { n: 'Fasting · running on ketones', beat: 0.7, p: { fuel: 'ketone', supply: 0.7, demand: 0.5, caCyt: 0.2 },
+      note: 'Fatty acids cannot cross into the brain, so during a fast the liver converts them into <b>ketone bodies</b>, which can. The neuron turns them straight back into acetyl-CoA — the same fuel, delivered by a different courier.' },
+  ],
+},
+{
+  id: 'hepato', name: 'Hepatocyte', tissue: 'Liver', icon: '🫁',
+  size: [52, 48, 48], shape: 'poly', fuel: 'mixed',
+  mito: { n: 250, place: 'scatter', len: 0.85 },
+  nucleus: { n: 1, r: 11 },
+  feat: { er: 34, golgi: 1, lyso: 20, perox: 22, lipid: 12 },
+  blurb: 'The body\'s chemical plant — and its fuel switchboard.',
+  txt: 'The liver decides what the rest of you gets to burn. Fed, it stores glucose as glycogen; fasted, it makes glucose from scratch and converts fat into <b>ketone bodies</b> for the brain. Both jobs are paid for by mitochondria, which is why a hepatocyte holds so many — and why it is also crowded with smooth ER and peroxisomes.',
+  facts: [['Real count', '~1,000–2,000 per cell'], ['Volume fraction', '~20%'], ['Jobs', 'gluconeogenesis, ketogenesis, urea cycle, detox'], ['Urea cycle', 'starts inside the mitochondrion, finishes in the cytosol']],
+  acts: [
+    { n: 'Fed · storing', beat: 0, p: { fuel: 'pyruvate', supply: 1.25, demand: 0.30 },
+      note: 'Sugar is arriving faster than anything needs it. Fuel backs up, the gradient runs high and the chain sits reduced — the postprandial state, and the highest-ROS condition of ordinary life.' },
+    { n: 'Fasting · making glucose', beat: 0, p: { fuel: 'fat', supply: 0.85, demand: 0.62 },
+      note: 'Gluconeogenesis is expensive — building glucose costs about six ATP per molecule — and the liver pays for it by burning fat. It exports the glucose and keeps almost none.' },
+    { n: 'Ketogenesis', beat: 0, p: { fuel: 'fat', supply: 1.0, demand: 0.45 },
+      note: 'Acetyl-CoA is arriving faster than the Krebs cycle can take it, so the mitochondrion condenses the surplus into <b>ketone bodies</b> and ships them out. The liver makes them and cannot use them — they are for everyone else.' },
+    { n: 'Metabolising alcohol', beat: 0, p: { fuel: 'mixed', supply: 1.3, demand: 0.35, scav: 0.55 },
+      note: 'Ethanol is oxidised to acetaldehyde and then acetate, dumping a flood of NADH into a cell that did not ask for it. The NADH/NAD⁺ ratio jumps, fat oxidation stalls, and fat accumulates — the first step of fatty liver.' },
+  ],
+},
+{
+  id: 'brown', name: 'Brown adipocyte', tissue: 'Brown fat', icon: '🔥',
+  size: [60, 60, 60], shape: 'sphere', fuel: 'fat',
+  mito: { n: 300, place: 'scatter', len: 1.15 },
+  nucleus: { n: 1, r: 8, off: 0.45 },
+  feat: { lipid: 16, lyso: 6 },
+  blurb: 'A cell whose product is heat.',
+  txt: 'Brown fat exists to be inefficient. Its mitochondria are so densely packed with cristae that the tissue is visibly brown, and they carry <b>UCP1</b> — a channel that lets protons home without passing through the turbine. The gradient\'s whole energy comes out as heat. Unlike white fat, the lipid is stored in many small droplets so it can be mobilised fast.',
+  facts: [['Real count', 'thousands — packed'], ['Key protein', 'UCP1 (thermogenin)'], ['Switched on by', 'Noradrenaline, cold'], ['Why it matters', 'a newborn cannot shiver; this is how it stays warm']],
+  acts: [
+    { n: 'Warm · idling', beat: 0, p: { fuel: 'fat', supply: 0.45, demand: 0.18, ucp: 0.05 },
+      note: 'No cold signal, so UCP1 is mostly shut. The cell behaves like ordinary fat storage — the machinery is there, waiting.' },
+    { n: 'Cold · thermogenesis on', beat: 0, p: { fuel: 'fat', supply: 1.25, demand: 0.18, ucp: 0.88 },
+      note: 'Noradrenaline opens <b>UCP1</b>. Coupling collapses, oxygen consumption nearly triples, and essentially none of it becomes ATP. Watch the coupling gauge fall while the heat gauge climbs — this cell is a furnace by design.' },
+    { n: 'Newborn · first hour', beat: 0, p: { fuel: 'fat', supply: 1.35, demand: 0.22, ucp: 0.95 },
+      note: 'A newborn has no shivering reflex and a huge surface area for its mass. Brown fat around the shoulders and kidneys is what keeps it alive through the temperature drop of being born.' },
+  ],
+},
+{
+  id: 'beta', name: 'Pancreatic β-cell', tissue: 'Islet of Langerhans', icon: '🩸',
+  size: [26, 26, 26], shape: 'sphere', fuel: 'pyruvate',
+  mito: { n: 120, place: 'scatter', len: 0.8 },
+  nucleus: { n: 1, r: 6, off: 0.35 },
+  feat: { granule: 90, er: 14, golgi: 1, lyso: 5 },
+  blurb: 'Where the mitochondrion *is* the sensor.',
+  txt: 'This is the clearest case in the body of mitochondria doing something other than powering a cell: here they <b>measure</b>. Glucose enters, is oxidised, and the resulting <b>ATP/ADP ratio</b> closes an ATP-sensitive potassium channel. The cell depolarises, calcium rushes in, and insulin granules fuse with the membrane. The mitochondrion is the glucose sensor — and mutations in it cause a form of diabetes.',
+  facts: [['Real count', '~500 per cell'], ['Sensor', 'ATP/ADP ratio → K_ATP channel'], ['Granules', '~10,000 insulin granules per cell'], ['Disease', 'MIDD — maternally inherited diabetes and deafness']],
+  acts: [
+    { n: 'Low glucose · quiet', beat: 0, p: { fuel: 'pyruvate', supply: 0.18, demand: 0.62 },
+      note: 'Little fuel, so ATP stays modest, the K_ATP channel stays open, the cell stays polarised and no insulin leaves. Exactly what should happen between meals.' },
+    { n: 'Glucose spike · insulin release', beat: 0, p: { fuel: 'pyruvate', supply: 1.50, demand: 0.62, caCyt: 0.55 },
+      note: 'Glucose arrives. Oxidation drives the <b>ATP/ADP ratio</b> up, the K_ATP channel shuts, calcium floods in and granules fuse with the membrane. Watch the ATP/ADP gauge lead and the insulin readout follow — that lag is the sensor working.' },
+    { n: 'Sulfonylurea drug', beat: 0, p: { fuel: 'pyruvate', supply: 0.20, demand: 0.62, caCyt: 0.7 },
+      note: 'A diabetes drug that shuts the K_ATP channel directly, forcing insulin out regardless of what the mitochondria are reporting. Effective — and the reason it can push blood sugar too low.' },
+    { n: 'Mitochondrial diabetes', beat: 0, p: { fuel: 'pyruvate', supply: 1.50, demand: 0.62, ci: 0.16, civ: 0.26 },
+      note: 'A mutation in mtDNA thins out the respiratory chain. Glucose arrives and is oxidised, but the ATP signal never gets loud enough to close the channel — so insulin is not released. The sensor is broken, not the sugar.' },
+  ],
+},
+{
+  id: 'rbc', name: 'Red blood cell', tissue: 'Blood', icon: '🔴',
+  size: [16, 16, 5], shape: 'disc', fuel: 'pyruvate',
+  mito: { n: 0, place: 'none', len: 1 },
+  nucleus: { n: 0, r: 0 },
+  feat: {},
+  blurb: 'The cell that threw its mitochondria away.',
+  txt: 'A mature red blood cell has <b>no mitochondria at all</b> — and no nucleus either. Both were ejected as it matured, to make room for haemoglobin and to let the cell fold through capillaries narrower than itself. It carries the oxygen that every other cell in this simulator depends on, and <b>cannot use any of it</b>. It runs entirely on glycolysis, making just 2 ATP per glucose.',
+  facts: [['Real count', 'zero'], ['Also missing', 'nucleus, ribosomes, ER'], ['ATP source', 'glycolysis only — 2 per glucose'], ['Lifespan', '~120 days, then recycled in the spleen']],
+  acts: [
+    { n: 'Carrying oxygen', beat: 0, p: { fuel: 'pyruvate', supply: 0.3, demand: 0.25, o2: 1 },
+      note: 'Loading oxygen in the lung and dropping it off in tissue. If it burned any of that oxygen itself it would be stealing from its own cargo — so it does not. Everything this cell needs comes from glycolysis, and its lactate goes to the liver.' },
+  ],
+},
+{
+  id: 'oocyte', name: 'Oocyte', tissue: 'Ovary', icon: '🥚',
+  size: [200, 200, 200], shape: 'sphere', fuel: 'pyruvate',
+  mito: { n: 420, place: 'cortical', len: 0.7 },
+  nucleus: { n: 1, r: 24, off: 0.35 },
+  feat: { lyso: 14, vesicle: 40 },
+  blurb: 'Every mitochondrion you own came through here.',
+  txt: 'The largest human cell, and the origin of your entire mitochondrial population. An oocyte carries somewhere between <b>100,000 and 600,000 copies of mtDNA</b> — but only a small, random sample of them seeds the next generation. That <b>bottleneck</b> is why a mother with a low level of a mutation can have children with wildly different levels, and why mitochondrial disease is so unpredictable within one family.',
+  facts: [['mtDNA copies', '~100,000–600,000'], ['Bottleneck', 'only ~10–100 effectively seed the embryo'], ['Diameter', '~120 µm — visible to the naked eye'], ['Inheritance', 'strictly maternal']],
+  acts: [
+    { n: 'Maturing', beat: 0, p: { fuel: 'pyruvate', supply: 0.55, demand: 0.30 },
+      note: 'Quiet and enormous. Oocyte mitochondria are deliberately kept immature and low-output — running them hard would make radicals, and this genome has to last a lifetime and then be handed on.' },
+    { n: 'Fertilised', beat: 0, p: { fuel: 'pyruvate', supply: 0.85, demand: 0.55, caCyt: 0.5 },
+      note: 'Fertilisation triggers calcium waves that sweep the cell and wake the mitochondria. The sperm\'s own mitochondria entered too — and are being actively destroyed right now, which is why inheritance is maternal.' },
+  ],
+},
+{
+  id: 'sperm', name: 'Spermatozoon', tissue: 'Testis', icon: '🌀',
+  size: [130, 14, 14], shape: 'sperm', fuel: 'fat',
+  anchor: { headX: -54, headR: 7.0, mid: [-45, -24], midR: 4.4, tail: [-24, 60] },
+  mito: { n: 84, place: 'helix', len: 0.55 },
+  nucleus: { n: 1, r: 4.5, off: -0.92 },
+  feat: {},
+  blurb: 'A helix of mitochondria wrapped around a motor.',
+  txt: 'Everything not needed to swim has been discarded. What is left is a head of tightly packed DNA, a whip, and a <b>midpiece</b> where roughly 75–100 mitochondria are wound in a tight helix around the base of the tail — ATP made exactly where it is spent. These mitochondria do enter the egg at fertilisation, and are then <b>destroyed by ubiquitin tagging</b>, which is why you inherit none of them.',
+  facts: [['Real count', '~75–100, in a helix'], ['Location', 'midpiece only'], ['Fate after fertilisation', 'ubiquitinated and destroyed'], ['Consequence', 'mtDNA is inherited from your mother alone']],
+  acts: [
+    { n: 'Swimming', beat: 2.4, p: { fuel: 'fat', supply: 1.0, demand: 1.0 },
+      note: 'The flagellum beats several times a second and every stroke is paid for by the helix wrapped around its base. Sperm can also run glycolysis along the tail — which route dominates is still argued over.' },
+    { n: 'Hyperactivation', beat: 3.6, p: { fuel: 'fat', supply: 1.25, demand: 1.35, caCyt: 0.6 },
+      note: 'Near the egg, calcium entry switches the tail from a steady beat to a violent whip-like thrash — the power needed to break through the layers around the oocyte. Peak demand of this cell\'s life.' },
+  ],
+},
+];
+const CELL_BY_ID = {}; for (const c of CELLS) CELL_BY_ID[c.id] = c;
+
+/* ---------------------------------------------------------------------
+   Cell geometry. Everything is procedural and rebuilt when the cell type
+   changes. Meshes come in four kinds: the plasma membrane and nuclear
+   envelope (translucent, membrane program), one baked "static" solid mesh
+   holding ER / Golgi / myofibrils / microtubules, and instanced groups for
+   the things that need to move or change state. */
+const CELLGEO = { mito: [], labels: [], dots: {} };
+
+function cellRadiusAt(def, u) {          // u in [-1,1] along the long axis
+  const s = def.size;
+  switch (def.shape) {
+    case 'rod':    return Math.pow(Math.max(0, 1 - Math.pow(Math.abs(u), 8)), 0.30) * s[1] * 0.5;
+    case 'poly':   return Math.pow(Math.max(0, 1 - u * u), 0.34) * s[1] * 0.5;
+    case 'sphere': return Math.sqrt(Math.max(0, 1 - u * u)) * s[1] * 0.5;
+    case 'disc':   return Math.sqrt(Math.max(0, 1 - u * u)) * s[1] * 0.5;
+    case 'neuron': {
+      const A = def.anchor, half = s[0] * 0.5, x = u * half;
+      const k = (x - A.somaX) / A.somaR;
+      return Math.abs(k) < 1 ? Math.sqrt(1 - k * k) * A.somaR : 0.001;
+    }
+    case 'sperm': {
+      const A = def.anchor, half = s[0] * 0.5, x = u * half;
+      const k = (x - A.headX) / A.headR;
+      if (Math.abs(k) < 1) return Math.max(Math.sqrt(1 - k * k) * A.headR, x > A.headX ? A.midR : 0.001);
+      if (x >= A.mid[0] && x <= A.mid[1]) return A.midR;
+      return 0.001;
+    }
+    default:       return Math.sqrt(Math.max(0, 1 - u * u)) * s[1] * 0.5;
+  }
+}
+/* the plasma membrane, as a lathe around the long axis with organic wobble */
+function cellShellMesh(def, col) {
+  const m = new Mesh(), s = def.size, nz = GEO.nz;
+  const half = s[0] * 0.5;
+  const pt = (a, b) => {
+    const u = a * 2 - 1, ph = b * TAU;
+    let r = cellRadiusAt(def, u);
+    let x = u * half, yz = 1, zz = s[2] / s[1];
+    if (def.shape === 'disc') {
+      // biconcave: dimple both faces
+      const rr = Math.abs(u);
+      x = u * half * 0.0;
+      const rad = Math.sqrt(Math.max(0, 1 - u * u)) * s[0] * 0.5;
+      const th = (0.34 + 0.66 * Math.pow(Math.min(1, rad / (s[0] * 0.45)), 2.2)) * s[2] * 0.5;
+      return [rad * Math.cos(ph), th * Math.sign(Math.cos(a * Math.PI)) * Math.abs(Math.cos(a * Math.PI)) * 1.6,
+              rad * Math.sin(ph)];
+    }
+    if (def.shape === 'poly') r *= 1 + 0.16 * nz(u * 2.2, Math.cos(ph) * 1.6, Math.sin(ph) * 1.6);
+    else r *= 1 + 0.055 * nz(u * 3.0, Math.cos(ph) * 1.5, Math.sin(ph) * 1.5);
+    return [x, Math.cos(ph) * r * yz, Math.sin(ph) * r * zz];
+  };
+  m.grid(64, 48, (a, b) => {
+    const p = pt(clamp(a, 0.002, 0.998), b);
+    const pa = pt(clamp(a + 0.006, 0.002, 0.998), b), pb = pt(clamp(a, 0.002, 0.998), b + 0.02);
+    let n = V3.norm(V3.cross(V3.sub(pa, p), V3.sub(pb, p)));
+    if (!isFinite(n[0])) n = [0, 1, 0];
+    if (V3.dot(n, [0, p[1], p[2]]) < 0) n = V3.scale(n, -1);
+    return { p, n };
+  }, col, 0, true);
+
+  if (def.shape === 'neuron') {
+    const A = def.anchor, ax = [];
+    for (let i = 0; i <= 26; i++) {
+      const t = i / 26, x = lerp(A.axon[0], A.axon[1], t);
+      ax.push([x, Math.sin(t * 5) * 2.2, Math.cos(t * 4) * 1.6]);
+    }
+    m.tube(ax, 3.2, col, 0, false);
+    const rnd = mulberry(31);
+    for (let d = 0; d < A.dend; d++) {
+      const a0 = rnd() * TAU, pts = [];
+      const len = 38 + rnd() * 30;
+      for (let i = 0; i <= 10; i++) {
+        const t = i / 10;
+        pts.push([A.somaX - t * len * (0.55 + rnd() * 0.1),
+                  Math.cos(a0) * t * len * 0.55 + Math.sin(i * 0.6) * 1.4,
+                  Math.sin(a0) * t * len * 0.55]);
+      }
+      m.tube(pts, 2.8 - d * 0.3, col, 0, false);
+    }
+  }
+  if (def.shape === 'sperm') {
+    const A = def.anchor, tail = [];
+    for (let i = 0; i <= 34; i++) {
+      const t = i / 34, x = lerp(A.tail[0], A.tail[1], t);
+      tail.push([x, Math.sin(t * 9) * (0.8 + t * 5.5), Math.cos(t * 7) * (0.4 + t * 2.2)]);
+    }
+    m.tube(tail, 1.6 * (1 - 0) , col, 0, false);
+  }
+  return m;
+}
+function sphereMesh(r, col, res) {
+  const m = new Mesh();
+  m.prim('sphere', { o: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }, [r, r, r], col, 0);
+  return m;
+}
+/* a low-detail mitochondrion for the crowd — same silhouette, ~200 triangles */
+function mitoLowMesh(col) {
+  const m = new Mesh(), L = 2.35, R = 0.74;
+  m.grid(16, 12, (a, b) => {
+    const t = clamp(a, 0.002, 0.998), ph = b * TAU;
+    const cap = Math.pow(Math.sin(Math.PI * t), 0.34);
+    const r = R * cap;
+    const p = [(t - 0.5) * 2 * L, Math.cos(ph) * r, Math.sin(ph) * r];
+    const n = V3.norm([cap < 0.35 ? (t < 0.5 ? -1 : 1) * 0.9 : 0, Math.cos(ph), Math.sin(ph)]);
+    // banding hints at cristae without costing geometry
+    const band = 0.72 + 0.28 * Math.abs(Math.sin(t * 26));
+    return { p, n, c: [col[0] * band, col[1] * band, col[2] * band] };
+  }, col, 0, true);
+  return m;
+}
+/* ER tubules, Golgi stacks, myofibrils, microtubules — baked into one mesh */
+function cellStaticMesh(def) {
+  const m = new Mesh(), s = def.size, f = def.feat || {}, rnd = mulberry(4242);
+  const half = s[0] * 0.5, rad = s[1] * 0.5;
+  if (f.myofibril) {
+    const nCol = [0.62, 0.55, 0.70], zCol = [0.35, 0.42, 0.62];
+    for (let i = 0; i < f.myofibril; i++) {
+      const a = i / f.myofibril * TAU, rr = rad * (0.34 + 0.52 * ((i % 3) / 2));
+      const cy = Math.cos(a) * rr, cz = Math.sin(a) * rr;
+      const pts = [];
+      for (let k = 0; k <= 26; k++) pts.push([(-1 + k / 13) * half * 0.94, cy, cz]);
+      m.tube(pts, 1.65, nCol, 0, false);
+      for (let k = 0; k < 13; k++) {   // Z-discs: the sarcomere banding
+        const x = (-1 + k / 6.5) * half * 0.92;
+        m.prim('cyl', { o: [x, cy, cz], x: [0, 1, 0], y: [0, 0, 1], z: [1, 0, 0] }, [2.05, 2.05, 0.6], zCol, 0);
+      }
+    }
+  }
+  if (f.er) {
+    const erCol = [0.55, 0.72, 0.55];
+    for (let i = 0; i < f.er; i++) {
+      const pts = [], a0 = rnd() * TAU, e0 = (rnd() - 0.5) * 1.4, r0 = rad * (0.35 + rnd() * 0.5);
+      let p = [Math.cos(e0) * Math.cos(a0) * r0 * (s[0] / s[1]), Math.sin(e0) * r0, Math.cos(e0) * Math.sin(a0) * r0];
+      for (let k = 0; k <= 9; k++) {
+        pts.push(p.slice());
+        p = [p[0] + (rnd() - 0.5) * rad * 0.5, p[1] + (rnd() - 0.5) * rad * 0.42, p[2] + (rnd() - 0.5) * rad * 0.42];
+      }
+      m.tube(pts, 0.85, erCol, 0, false);
+    }
+  }
+  if (f.golgi) {
+    const gCol = [0.90, 0.62, 0.85];
+    for (let g = 0; g < f.golgi; g++) {
+      const bx = rad * 0.5, by = -rad * 0.32;
+      for (let k = 0; k < 5; k++) {
+        const pts = [];
+        for (let i = 0; i <= 12; i++) {
+          const t = (i / 12 - 0.5) * rad * 0.9;
+          pts.push([bx + t, by + k * 1.9 + t * t * 0.02, Math.sin(i * 0.4) * 0.6]);
+        }
+        m.tube(pts, 0.75 + k * 0.06, gCol, 0, false);
+      }
+    }
+  }
+  if (f.microtubule) {
+    const mtCol = [0.55, 0.60, 0.78];
+    for (let i = 0; i < f.microtubule; i++) {
+      const a = rnd() * TAU, off = (rnd() - 0.5) * rad * 0.7, pts = [];
+      for (let k = 0; k <= 14; k++) {
+        const t = k / 14;
+        pts.push([(-0.55 + t * 1.5) * half, Math.cos(a) * (2 + off * t) + Math.sin(t * 6) * 0.6,
+                  Math.sin(a) * (2 + off * t)]);
+      }
+      m.tube(pts, 0.42, mtCol, 0, false);
+    }
+  }
+  return m;
+}
+/* where every mitochondrion sits, per cell type */
+function placeCellMitos(def) {
+  const rnd = mulberry(8080), out = [], s = def.size;
+  const half = s[0] * 0.5, rad = s[1] * 0.5, n = def.mito.n;
+  const push = (p, dir, sc) => out.push({ p, dir: V3.norm(dir), s: sc, health: 1, phase: rnd() * TAU,
+                                          drift: (rnd() - 0.5) * 0.6, tag: 0 });
+  if (def.mito.place === 'rows') {
+    const rings = 5;
+    for (let i = 0; i < n; i++) {
+      const ring = i % rings, a = (i * 2.399) % TAU;
+      const rr = rad * (0.22 + 0.68 * (ring / (rings - 1))) * (0.9 + rnd() * 0.2);
+      const x = (rnd() * 2 - 1) * half * 0.92;
+      push([x, Math.cos(a) * rr, Math.sin(a) * rr], [1, (rnd() - 0.5) * 0.12, (rnd() - 0.5) * 0.12], def.mito.len);
+    }
+  } else if (def.mito.place === 'scatter') {
+    for (let i = 0; i < n; i++) {
+      let p, tries = 0;
+      do {
+        const u = rnd() * 2 - 1, r = cellRadiusAt(def, u) * 0.88 * Math.cbrt(rnd());
+        const a = rnd() * TAU, e = Math.acos(rnd() * 2 - 1);
+        p = [u * half, Math.cos(a) * Math.sin(e) * r, Math.sin(a) * Math.sin(e) * r];
+      } while (++tries < 4 && Math.hypot(p[0] / half, p[1] / rad, p[2] / rad) > 0.92);
+      push(p, [rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], def.mito.len * (0.8 + rnd() * 0.5));
+    }
+  } else if (def.mito.place === 'axon') {
+    const A = def.anchor;
+    for (let i = 0; i < n; i++) {
+      if (i % 4 === 0) {   // a quarter stay in the cell body
+        const r = A.somaR * 0.72 * Math.cbrt(rnd()), a = rnd() * TAU, e = Math.acos(rnd() * 2 - 1);
+        push([A.somaX + Math.cos(a) * Math.sin(e) * r, Math.sin(e) * Math.sin(a) * r, Math.cos(e) * r],
+             [rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], def.mito.len);
+      } else {            // the rest are commuting along the axon
+        const t = rnd(), x = lerp(A.axon[0], A.axon[1], t);
+        push([x, Math.sin(t * 5) * 2.2 + (rnd() - 0.5) * 2.6, Math.cos(t * 4) * 1.6 + (rnd() - 0.5) * 2.6],
+             [1, (rnd() - 0.5) * 0.08, (rnd() - 0.5) * 0.08], def.mito.len * 0.9);
+      }
+    }
+  } else if (def.mito.place === 'cortical') {
+    for (let i = 0; i < n; i++) {
+      const u = rnd() * 2 - 1, a = rnd() * TAU;
+      const r = cellRadiusAt(def, u) * (0.80 + rnd() * 0.14);
+      push([u * half, Math.cos(a) * r, Math.sin(a) * r], [rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], def.mito.len);
+    }
+  } else if (def.mito.place === 'helix') {
+    const A = def.anchor;
+    for (let i = 0; i < n; i++) {
+      const t = i / n, a = t * TAU * 10, r = A.midR * 0.72;
+      push([lerp(A.mid[0], A.mid[1], t), Math.cos(a) * r, Math.sin(a) * r],
+           [0.30, -Math.sin(a), Math.cos(a)], def.mito.len);
+    }
+  }
+  if (!out.length) return out;
+  // the hero organelle IS mitochondrion #0: pick the one already closest to
+  // axis-aligned, snap it, and shift the whole cell so it sits at the origin
+  let bi = 0, bd = -2;
+  for (let i = 0; i < out.length; i++) {
+    const d = Math.abs(out[i].dir[0]) - Math.hypot(out[i].p[1], out[i].p[2]) / (rad * 40);
+    if (d > bd) { bd = d; bi = i; }
+  }
+  const t0 = out[bi]; out[bi] = out[0]; out[0] = t0;
+  out[0].dir = [1, 0, 0]; out[0].s = 1;
+  const o = out[0].p.slice();
+  for (const mt of out) mt.p = [mt.p[0] - o[0], mt.p[1] - o[1], mt.p[2] - o[2]];
+  CELLGEO.origin = o;
+  return out;
+}
+/* small spherical bodies: lysosomes, peroxisomes, granules, lipid droplets */
+function placeCellDots(def) {
+  const rnd = mulberry(1717), f = def.feat || {}, s = def.size;
+  const half = s[0] * 0.5, rad = s[1] * 0.5, o = CELLGEO.origin || [0, 0, 0];
+  const inside = (frac) => {
+    const u = (rnd() * 2 - 1) * frac, r = cellRadiusAt(def, u) * frac * Math.cbrt(rnd());
+    const a = rnd() * TAU, e = Math.acos(rnd() * 2 - 1);
+    return [u * half - o[0], Math.cos(a) * Math.sin(e) * r - o[1], Math.sin(a) * Math.sin(e) * r - o[2]];
+  };
+  const out = {};
+  const kinds = [['lyso', f.lyso, 1.5], ['perox', f.perox, 1.1], ['granule', f.granule, 0.85],
+                 ['lipid', f.lipid, def.id === 'brown' ? 3.4 : 5.0], ['vesicle', f.vesicle, 0.7]];
+  for (const [k, count, size] of kinds) {
+    if (!count) continue;
+    const list = [];
+    for (let i = 0; i < count; i++)
+      list.push({ p: inside(0.86), s: size * (0.7 + rnd() * 0.7), a: rnd() * TAU, ph: rnd() * TAU, fired: 0 });
+    out[k] = list;
+  }
+  return out;
+}
+
+/* ---------------------------------------------------------------------
+   Cell-level state. The cell activity is the master when you are zoomed
+   out: it writes the organelle parameters, adds a rhythm (a heartbeat, a
+   burst of firing, a flagellar stroke), and reads the organelle's answer
+   back to drive whatever this cell type actually produces. */
+const CELL = {
+  type: 'cardio', act: 0, t: 0, beat: 0, beatRate: 1,
+  atp: 0.7, insulin: 0, force: 0, fire: 0, secreted: 0,
+  damaged: 0, mitophagy: 0, biogenesis: 0, apoptosis: 0,
+};
+function cellDef() { return CELL_BY_ID[CELL.type]; }
+function cellAct() { const d = cellDef(); return d.acts[Math.min(CELL.act, d.acts.length - 1)]; }
+
+function cellStep(dt) {
+  const d = cellDef(), a = cellAct();
+  CELL.t += dt;
+  CELL.beatRate = a.beat || 0;
+  CELL.beat = (CELL.beat + dt * CELL.beatRate) % 1;
+  // a contraction or a spike is a short, sharp ATP cost on top of baseline
+  const spike = CELL.beatRate > 0 ? Math.pow(Math.max(0, 1 - CELL.beat * 4), 2) : 0;
+  CELL.force = expApproach(CELL.force, spike, 12, dt);
+  CELL.fire = CELL.beatRate > 0 ? spike : 0;
+
+  // ATP charge of the whole cell: what the mitochondria and glycolysis
+  // deliver, against what this activity spends
+  const nMito = d.mito.n;
+  const supplyPer = Math.max(0, F.JATP || 0) * (1 - CELL.apoptosis * 0.95);
+  const supply = nMito ? supplyPer * 1.0 : 0;
+  const glyc = (F.Jgly || 0) * (nMito ? 1 : 3.2);          // an RBC lives on this alone
+  const spend = (a.p.demand || 0.3) * (0.55 + 1.6 * CELL.force);
+  CELL.atp = clamp(CELL.atp + (supply + glyc - spend) * dt * 0.55, 0, 1);
+
+  // beta cell: the mitochondrion is the glucose sensor. ATP/ADP closes the
+  // K_ATP channel, calcium enters, granules fuse.
+  if (d.id === 'beta') {
+    const atpAdp = 1 - S.adp;
+    const forced = a.n.indexOf('Sulfonylurea') === 0 ? 0.75 : 0;
+    const open = clamp(Math.max(smoothstep(0.66, 0.78, atpAdp), forced), 0, 1);
+    CELL.insulin = expApproach(CELL.insulin, open, 0.9, dt);
+    CELL.secreted += CELL.insulin * dt;
+  } else CELL.insulin = expApproach(CELL.insulin, 0, 1.2, dt);
+
+  // network turnover: radicals damage mitochondria, damaged ones get eaten,
+  // and biogenesis replaces them. Visible as colour across the whole cell.
+  const dmgRate = (S.ros * 0.10 + 0.004) * (1 - CELL.apoptosis);
+  const list = CELLGEO.mito;
+  if (list.length) {
+    CELL.damaged = 0;
+    for (const mt of list) {
+      if (mt === list[0]) { mt.health = 1 - CELL.apoptosis; continue; }
+      if (CELL.apoptosis > 0.02) mt.health = expApproach(mt.health, 1 - CELL.apoptosis, 1.2, dt);
+      else if (mt.tag > 0) {
+        mt.tag += dt * 0.5;
+        mt.health = Math.max(0, mt.health - dt * 0.55);
+        if (mt.tag > 2.2) { mt.tag = 0; mt.health = 0.25; }        // replaced by biogenesis
+      } else if (mt.health < 0.55) { mt.tag = 0.01; CELL.mitophagy += dt; }
+      else {
+        if (Math.random() < dmgRate * dt) mt.health = 0.4 + Math.random() * 0.1;
+        else mt.health = Math.min(1, mt.health + dt * 0.09);       // recovering
+      }
+      if (mt.health < 0.75) CELL.damaged++;
+    }
+  }
+  // apoptosis at cell scale follows the focused organelle's pore
+  CELL.apoptosis = expApproach(CELL.apoptosis, clamp((S.cytcRel - 0.05) * 1.4, 0, 1), 0.35, dt);
+
+  // the activity drives the organelle, with the beat modulating demand — but
+  // only while you are actually up at cell scale, and never over a lesson
+  // that is driving the parameters itself
+  const owns = VIEW.blend > 0.35 && !(typeof lesson !== 'undefined' && lesson && lesson.steps[lessonI] && lesson.steps[lessonI].set);
+  if (owns) {
+    const base = a.p;
+    for (const k in base) if (k !== 'demand') P[k] = base[k];
+    P.demand = (base.demand === undefined ? 0.3 : base.demand) * (1 + 0.85 * CELL.force);
+    if (!nMito) P.supply = 0;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   The zoom ladder. One camera distance spans both scales; `blend` says how
+   much of each you are looking at. */
+const VIEW = {
+  blend: 0,                 // 0 = inside the organelle, 1 = whole cell
+  ZO: 15, ZC: 46,           // cross-fade window, in camera distance
+  cellHome: 1,
+};
+function viewBlend() { return smoothstep(VIEW.ZO, VIEW.ZC, CAM.dist); }
+function atCellScale() { return VIEW.blend > 0.5; }
+
+/* ==================================================================== */
 /*  MOLECULAR TRAFFIC                                                   */
 /* ==================================================================== */
 /* Particles are spawned at rates taken straight from the flux bundle, so
@@ -1584,6 +2143,7 @@ const LAY = {                       // layer visibility, wired to the VIEW tab
   outer: true, inner: true, cristae: true, etc: true, synth: true, carriers: true,
   protons: true, electrons: true, energy: true, fuel: true, dna: true,
   krebs: false, ros: true, heat: true, labels: true, cytosol: true,
+  cellMem: true, cellNuc: true, cellMito: true, cellOrg: true,
 };
 
 function spawnTraffic(dt) {
@@ -1738,6 +2298,7 @@ const CAM = {
   yaw: 1.15, pitch: 0.55, dist: 6.0, tgt: [0, 0, 0],
   yawT: 1.15, pitchT: 0.55, distT: 6.0, tgtT: [0, 0, 0],
   spin: false, eye: [0, 0, 0], vp: new Float32Array(16), right: [1, 0, 0], up: [0, 1, 0],
+  maxDist: 1400,
   shift: 0, shiftX: 0, fit: 1, cov: { l: 0, r: 0, t: 74, b: 0 }, home: [1.15, 0.55, 6.0],
 };
 /* A mitochondrion is a 2.4:1 rod. On a portrait phone it only fits if we look
@@ -1747,7 +2308,20 @@ function camHome(asp) {
   CAM.home = asp < 0.85 ? [1.15, 0.55, 6.0] : [-0.62, 0.28, 5.2];
 }
 function camGoHome() {
+  if (typeof VIEW !== 'undefined' && VIEW.blend > 0.5) { camGoCell(); return; }
   CAM.yawT = CAM.home[0]; CAM.pitchT = CAM.home[1]; CAM.distT = CAM.home[2]; CAM.tgtT = [0, 0, 0];
+}
+function camGoMito() {
+  CAM.yawT = CAM.home[0]; CAM.pitchT = CAM.home[1]; CAM.distT = CAM.home[2]; CAM.tgtT = [0, 0, 0];
+}
+/* frame the whole cell in whatever rectangle the chrome leaves free */
+function camGoCell() {
+  const b = CELLGEO.bound;
+  if (!b) { CAM.distT = 120; CAM.tgtT = [0, 0, 0]; return; }
+  // frame the cell's real bounding sphere inside the rectangle the chrome leaves
+  CAM.distT = clamp(b.r * 1.12 / (0.4557 * clamp(CAM.fit, 0.3, 1)), 22, CAM.maxDist);
+  CAM.tgtT = b.c.slice();
+  CAM.yawT = CAM.home[0]; CAM.pitchT = CAM.home[1];
 }
 function camUpdate(dt, asp) {
   if (CAM.spin) CAM.yawT += dt * 0.14;
@@ -1761,7 +2335,9 @@ function camUpdate(dt, asp) {
              CAM.tgt[1] + sp * CAM.dist,
              CAM.tgt[2] + Math.cos(CAM.yaw) * cp * CAM.dist];
   const view = M4.lookAt(CAM.eye, CAM.tgt, [0, 1, 0]);
-  const proj = M4.persp(0.85, asp, 0.05, 60);
+  // the ladder spans ~1 to ~450 units, so the planes have to travel with it
+  const near = Math.max(0.02, CAM.dist * 0.006), far = CAM.dist * 40 + 240;
+  const proj = M4.persp(0.85, asp, near, far);
   // fit the render into the rectangle the chrome leaves free: shrink to that
   // box and shift the lens up by half the covered height
   const fit = clamp(CAM.fit, 0.22, 1);
@@ -1920,18 +2496,18 @@ const LESSONS = [
     b: 'Too much, though, and the <b>permeability transition pore</b> opens: an unselective hole that short-circuits the gradient outright. Voltage collapses, water floods in, the matrix swells and the cristae unfold. This is what kills heart muscle in the minutes <i>after</i> blood flow is restored.' },
   { f: 'whole',
     b: 'And as the cristae open, <b>cytochrome c</b> — the same small carrier that has been ferrying electrons all along — escapes into the cytosol. There it binds Apaf-1, builds the <i>apoptosome</i>, and activates the caspases that dismantle the cell. The organelle that powers the cell also holds the switch that ends it.' },
-  { f: 'whole', set: { caCyt: 0, scav: 1, supply: 0.6, demand: 0.5 }, act: 'resetChem',
+  { f: 'whole', set: { caCyt: 0, scav: 1, supply: 0.6, demand: 0.5 }, do: 'resetChem',
     b: 'Reset. In a real cell this point is past no return — the decision is made in seconds and cannot be taken back.' },
 ]},
 {
   id: 'dyn', title: 'DIVIDING, MERGING, INHERITED', icon: '🧬',
   blurb: 'Mitochondria are a network, and they come only from your mother.',
   steps: [
-  { f: 'whole', set: { supply: 0.6, demand: 0.5 }, act: 'fission',
+  { f: 'whole', set: { supply: 0.6, demand: 0.5 }, do: 'fission',
     b: 'They are not the beans in the textbook drawing. Mitochondria constantly divide and merge. <b>Fission</b> starts when the ER wraps a tubule and <i>DRP1</i> assembles a ring that constricts and severs it — happening right now.' },
-  { f: 'whole', act: 'fusion',
+  { f: 'whole', do: 'fusion',
     b: '<b>Fusion</b> runs the other way: mitofusins tether two outer membranes, OPA1 merges the inner ones, and the contents mix. A cell can pool its mtDNA and share components — one healthy mitochondrion can chemically complement a damaged one.' },
-  { f: 'whole', act: 'mitophagy',
+  { f: 'whole', do: 'mitophagy',
     b: 'When one is beyond saving, its voltage is gone — and voltage is exactly what protein import needs. <b>PINK1</b> can no longer be imported, so it accumulates on the surface, recruits <i>Parkin</i>, and tags the whole organelle for engulfment. Mutations in both genes cause early-onset Parkinson\'s.' },
   { f: 'whole', lay: { dna: 1 },
     b: 'That genome deserves a closer look: <b>16,569 base pairs</b>, circular, bacterial in style, with 37 genes — 13 proteins, 22 tRNAs, 2 rRNAs. Every one of those 13 is a subunit of the very complexes you have been watching. Each mitochondrion carries several copies.' },
@@ -1939,6 +2515,70 @@ const LESSONS = [
     b: 'Sperm mitochondria are destroyed after fertilisation, so mtDNA comes <b>only from your mother</b> — an unbroken maternal line back through every ancestor you have. It also mutates far faster than nuclear DNA, which is what makes it such a good clock for tracing human migration.' },
   { f: 'whole', lay: { dna: 1 },
     b: 'And when some copies are faulty — <b>heteroplasmy</b> — nothing happens until the bad fraction passes a threshold, often 60–90%. Below it you are fine. Above it, the tissues that need the most ATP go first: muscle, heart, retina, brain. That threshold is why mitochondrial disease is so unpredictable within one family.' },
+]},
+{
+  id: 'ladder', title: 'THE SCALE LADDER', icon: '🪜',
+  blurb: 'From one organelle out to the whole cell, and back.',
+  steps: [
+  { scale: 'organelle', cell: 'cardio', act: 0,
+    b: 'Start where you have been all along: inside <b>one</b> mitochondrion, about 2.5 µm long. Everything you have watched — the chain, the gradient, the turbine — is happening in this one object.' },
+  { scale: 'cell',
+    b: 'Now pull back. That organelle is one of hundreds in a single <b>heart muscle cell</b>, and this is the same 3D space — nothing was swapped out. The little green rods threaded between the pale myofibrils are all mitochondria, and one of them is the one you were just inside.<span class="eq">Pinch out and in to travel the ladder yourself</span>' },
+  { scale: 'cell',
+    b: 'Look at how they are arranged. They are not scattered — they sit in <b>disciplined rows between the contractile filaments</b>, so ATP is made within a fraction of a micron of where it is spent. Diffusion is slow at this scale; position is part of the design.' },
+  { scale: 'cell',
+    b: 'The proportions are real. A cardiomyocyte is roughly <b>35% mitochondria by volume</b>. Tap any one of them to see its state, or to drop into it at full detail — the detailed organelle simply moves to whichever one you choose.' },
+  { scale: 'organelle',
+    b: 'And back down. The gauges never stopped: the chemistry you were watching at cell scale is the same simulation, and every mitochondrion in that cell is running this. Scale is the only thing that changed.' },
+]},
+{
+  id: 'celltypes', title: 'WHY CELLS DIFFER', icon: '🧫',
+  blurb: 'Mitochondrial content is a statement about a cell\'s job.',
+  steps: [
+  { scale: 'cell', cell: 'cardio', act: 0,
+    b: 'How many mitochondria a cell keeps tells you what it does for a living. The <b>heart</b> is the extreme: never rests, never anaerobic, ~35% of its volume given over to them, and running mostly on fat.' },
+  { scale: 'cell', cell: 'hepato', act: 0,
+    b: 'A <b>hepatocyte</b> is the body\'s chemical plant — around 1,000–2,000 mitochondria, but also crowded with ER, peroxisomes and lysosomes, because most of its work is synthesis and detoxification rather than motion.' },
+  { scale: 'cell', cell: 'brown', act: 1,
+    b: '<b>Brown fat</b> is packed so densely with cristae that the tissue is visibly brown — and it makes almost no ATP with them. Watch the coupling gauge: this cell exists to waste the gradient as <b>heat</b>.' },
+  { scale: 'cell', cell: 'neuron', act: 1,
+    b: 'A <b>neuron</b> has a different problem: distance. Its axon can be a metre long, so mitochondria are trafficked along microtubules and parked where the demand is. Position, not just number.' },
+  { scale: 'cell', cell: 'rbc', act: 0,
+    b: 'And then there is the exception. A mature <b>red blood cell</b> has <b>none at all</b> — it ejected them, and its nucleus, to make room for haemoglobin. It carries the oxygen every other cell here depends on and cannot use a molecule of it. Two ATP per glucose, from glycolysis alone.' },
+  { scale: 'cell', cell: 'oocyte', act: 0,
+    b: 'The other extreme: an <b>oocyte</b>, the largest human cell, carrying 100,000–600,000 copies of mtDNA around its cortex. Only a small random sample of them seeds the next generation — the <b>bottleneck</b> that makes mitochondrial disease so unpredictable between siblings.' },
+  { scale: 'cell', cell: 'sperm', act: 0,
+    b: 'And its counterpart, where roughly 75–100 mitochondria are wound in a <b>helix around the midpiece</b> — ATP made exactly where the tail spends it. These do enter the egg, and are then destroyed. That is why the line is maternal.' },
+]},
+{
+  id: 'network', title: 'THE NETWORK', icon: '🕸️',
+  blurb: 'A population that is constantly being culled and rebuilt.',
+  steps: [
+  { scale: 'cell', cell: 'hepato', act: 0,
+    b: 'Mitochondria are not fixed objects. Colour here is <b>membrane potential</b>: bright means polarised and working, dim means failing. Watch long enough and you will see individuals fade, get tagged, and be replaced.' },
+  { scale: 'cell',
+    b: 'Damage arrives from radicals. A mitochondrion that loses its voltage can no longer import proteins — <b>PINK1</b> piles up on its surface, recruits <b>Parkin</b>, and the whole organelle is tagged for disposal. That is <i>mitophagy</i>, and you are watching it happen across the population.' },
+  { scale: 'cell', cell: 'hepato', act: 3,
+    b: 'Push the stress up — this is the cell metabolising alcohol, with antioxidant defences stretched. More individuals fail, more get eaten. The network health gauge is the fraction still polarised.' },
+  { scale: 'cell', cell: 'hepato', act: 0,
+    b: 'Replacement is the other half. <b>Biogenesis</b> — driven by PGC-1α — builds new ones, and because mtDNA encodes only 13 proteins, the nucleus supplies the other ~1,100. Fusion lets a healthy genome cover for a damaged one; fission separates the parts worth discarding.' },
+  { scale: 'cell', cell: 'cardio', act: 3,
+    b: 'And when the damage wins: reperfusion after a heart attack. The pore opens across the whole population at once, every mitochondrion depolarises together, and cytochrome c leaves. A cell dies when its network does.' },
+]},
+{
+  id: 'betacell', title: 'THE GLUCOSE SENSOR', icon: '🩸',
+  blurb: 'The one place mitochondria measure rather than power.',
+  steps: [
+  { scale: 'cell', cell: 'beta', act: 0,
+    b: 'A pancreatic <b>β-cell</b>. The blue dots are insulin granules — about 10,000 of them, waiting. Right now blood glucose is low and none are leaving.' },
+  { scale: 'cell', cell: 'beta', act: 0,
+    b: 'Here the mitochondrion is not the power supply. It is the <b>instrument</b>. Glucose comes in, is oxidised, and the resulting <b>ATP/ADP ratio</b> is the signal the cell reads. Nothing else measures the sugar.' },
+  { scale: 'cell', cell: 'beta', act: 1,
+    b: 'Glucose arrives. Watch the order: fuel supply rises, then the ATP/ADP ratio climbs, and only then does the insulin readout follow. That lag <i>is</i> the sensor — a high ratio shuts the K_ATP channel, the cell depolarises, calcium enters, and granules fuse with the membrane.' },
+  { scale: 'cell', cell: 'beta', act: 3,
+    b: 'Now break it. This is a mutation in mtDNA thinning out Complexes I and IV. Glucose is arriving and being oxidised — but the ATP signal never gets loud enough to close the channel, so insulin is not released. This is a real, inherited form of diabetes, and the fault is in the sensor, not the sugar.' },
+  { scale: 'organelle', cell: 'beta', act: 1,
+    b: 'Drop back inside one of them while the glucose spike runs, and you can watch the ratio that the whole cell is reading being generated — one turbine at a time.' },
 ]},
 ];
 
@@ -1958,10 +2598,17 @@ poke it, and watch the chemistry respond.</p>
 <li><b>Tap a protein</b> — inspect it</li>
 <li><b>Mouse</b> — drag to orbit, wheel to zoom, right-drag or shift-drag to pan</li>
 </ul>
+<h4>TWO SCALES, ONE SPACE</h4>
+<p>Pinch out far enough and the organelle becomes one of hundreds inside a
+living <b>cell</b> — the same 3D space, not a different screen. Nine cell types,
+each with its own shape, organelles and mitochondrial arrangement, from a heart
+muscle cell that is 35% mitochondria to a red blood cell that has none at all.
+Tap any mitochondrion up there to inspect it, or drop into it at full detail.
+The <b>SCALE</b> buttons on the RUN tab travel the ladder for you.</p>
 <h4>THE FOUR TABS</h4>
 <ul>
-<li><b>RUN</b> — choose what the body is doing, then interfere with it</li>
-<li><b>LEARN</b> — nine step-through walkthroughs; the camera and the chemistry follow along</li>
+<li><b>RUN</b> — scale, then what the body (or the cell) is doing, then interfere with it</li>
+<li><b>LEARN</b> — thirteen step-through walkthroughs across both scales</li>
 <li><b>VIEW</b> — hide layers, slice the membranes open, slow time down</li>
 <li><b>DATA</b> — the live numbers and a rolling trace</li>
 </ul>
@@ -1976,10 +2623,14 @@ emerge from those equations.</p>
 tellable apart, complexes are far sparser than the real crowding, and the oxygen dial
 is more sensitive than a real Complex IV so that hypoxia is visible in seconds. Fluxes
 are normalised units, not molar rates.</p>
+<p class="dim">At cell scale, a mitochondrion's colour is its membrane potential:
+bright means polarised and working, dim means failing. Damaged ones are tagged and
+eaten, and biogenesis replaces them, so the network you are watching turns over
+continuously. Counts on screen are a representative subset — the real figure for
+each cell type is in its facts panel.</p>
 <h4>WHAT'S NEXT</h4>
-<p class="dim">Phase 2 zooms out to whole cells — different cell types, different
-mitochondrial densities, ER contacts and the network. Phase 3 zooms out again to
-organ systems. Zoom right out now and you can already see neighbours in the cytosol.</p>
+<p class="dim">Phase 3 adds another rung: out from the cell to tissues and whole-body
+systems, so the same chemistry can be followed from a proton to a heartbeat.</p>
 <button class="btn acc" id="ov-close">START EXPLORING</button>`;
 /* ==================================================================== */
 /*  AUDIO — synthesised, no files                                       */
@@ -2107,10 +2758,201 @@ function buildScene() {
   SCENE.node = uploadInstanced(mp.nodeMesh, 12);
   SCENE.parts = uploadParticles(MAXP + 200);
   SCENE.parts.stride = 9;
+
+  /* --- cell scale --- */
+  SCENE.cellMito = uploadInstanced(mitoLowMesh([0.42, 0.86, 0.72]), 460);
+  SCENE.dot = {};
+  const dotCol = {
+    lyso:    [0.95, 0.45, 0.30], perox: [0.55, 0.85, 0.95],
+    granule: [0.55, 0.95, 1.00], lipid: [1.00, 0.86, 0.42], vesicle: [0.80, 0.70, 1.00],
+  };
+  for (const k in dotCol) SCENE.dot[k] = uploadInstanced(sphereMesh(1, dotCol[k]), 280);
+  SCENE.nucleolus = uploadInstanced(sphereMesh(1, [0.85, 0.62, 0.72]), 8);
+  buildCellScene();
+}
+
+function freeUpload(g) {
+  if (!g) return;
+  if (g.vao) gl.deleteVertexArray(g.vao);
+}
+/* Rebuilt whenever the cell type changes: the plasma membrane, the nuclear
+   envelope, the baked static organelles, and the placement lists. */
+function buildCellScene() {
+  const def = cellDef();
+  freeUpload(SCENE.cellShell); freeUpload(SCENE.cellNucGeo); freeUpload(SCENE.cellStatic);
+  // placement decides the origin (the hero slot), so it has to come first —
+  // every other piece of cell geometry is then shifted onto it
+  CELLGEO.mito = placeCellMitos(def);
+  const o = CELLGEO.origin || [0, 0, 0];
+  const shell = cellShellMesh(def, [0.42, 0.70, 0.92]).translate([-o[0], -o[1], -o[2]]);
+  CELLGEO.bound = shell.bounds();
+  SCENE.cellShell = uploadMesh(shell);
+  SCENE.cellStatic = uploadInstanced(cellStaticMesh(def), 2);
+  CELLGEO.dots = placeCellDots(def);
+  // nuclei, positioned after the origin shift so they land with everything else
+  CELLGEO.nuclei = [];
+  if (def.nucleus.n) {
+    const rnd = mulberry(606), half = def.size[0] * 0.5;
+    for (let i = 0; i < def.nucleus.n; i++) {
+      const off = def.nucleus.off === undefined ? 0 : def.nucleus.off;
+      let p;
+      if (def.nucleus.cortical) {
+        const a = i / def.nucleus.n * TAU, r = def.size[1] * 0.5 * 0.72;
+        p = [(rnd() * 1.5 - 0.75) * half, Math.cos(a) * r, Math.sin(a) * r];
+      } else if (def.anchor && def.anchor.somaX !== undefined) p = [def.anchor.somaX, 0, 0];
+      else if (def.anchor && def.anchor.headX !== undefined) p = [def.anchor.headX, 0, 0];
+      else p = [off * half, 0, 0];
+      CELLGEO.nuclei.push({ p: [p[0] - o[0], p[1] - o[1], p[2] - o[2]], r: def.nucleus.r });
+    }
+    const nm = new Mesh();
+    for (const nu of CELLGEO.nuclei) {
+      nm.grid(28, 34, (a, b) => {
+        const th = a * Math.PI, ph = b * TAU;
+        const n = [Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)];
+        const wob = 1 + 0.055 * GEO.nz(n[0] * 2 + nu.p[0], n[1] * 2, n[2] * 2);
+        return { p: [nu.p[0] + n[0] * nu.r * wob, nu.p[1] + n[1] * nu.r * wob, nu.p[2] + n[2] * nu.r * wob], n };
+      }, [0.62, 0.72, 1.0], 0, true);
+    }
+    SCENE.cellNucGeo = uploadMesh(nm);
+  } else SCENE.cellNucGeo = null;
+  cellLabels(def);
+}
+
+/* Any mitochondrion in the cell can become the detailed one: shift the whole
+   cell so the chosen slot sits at the origin, where the full-detail organelle
+   lives, and snap it to the hero's axis as you descend. */
+function enterMito(i) {
+  const list = CELLGEO.mito;
+  if (!list.length || i < 0 || i >= list.length) return;
+  if (i > 0) {
+    const w = list[i].p.slice();
+    CELLGEO.origin = V3.add(CELLGEO.origin || [0, 0, 0], w);
+    for (const mt of list) mt.p = V3.sub(mt.p, w);
+    for (const k in CELLGEO.dots) for (const it of CELLGEO.dots[k]) it.p = V3.sub(it.p, w);
+    for (const nu of (CELLGEO.nuclei || [])) nu.p = V3.sub(nu.p, w);
+    const t = list[i]; list[i] = list[0]; list[0] = t;
+    list[0].dir = [1, 0, 0]; list[0].s = 1; list[0].p = [0, 0, 0];
+    rebuildNucleusMesh();
+    freeUpload(SCENE.cellShell);
+    const sh = cellShellMesh(cellDef(), [0.42, 0.70, 0.92])
+      .translate([-CELLGEO.origin[0], -CELLGEO.origin[1], -CELLGEO.origin[2]]);
+    CELLGEO.bound = sh.bounds();
+    SCENE.cellShell = uploadMesh(sh);
+    cellLabels(cellDef());
+  }
+  selMito = -1;
+  document.getElementById('inspect').classList.remove('on');
+  CAM.tgtT = [0, 0, 0];
+  CAM.distT = CAM.home[2];
+  whoosh(0.14);
+}
+function rebuildNucleusMesh() {
+  freeUpload(SCENE.cellNucGeo);
+  if (!CELLGEO.nuclei || !CELLGEO.nuclei.length) { SCENE.cellNucGeo = null; return; }
+  const nm = new Mesh();
+  for (const nu of CELLGEO.nuclei) {
+    nm.grid(28, 34, (a, b) => {
+      const th = a * Math.PI, ph = b * TAU;
+      const n = [Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)];
+      const wob = 1 + 0.055 * GEO.nz(n[0] * 2 + nu.p[0], n[1] * 2, n[2] * 2);
+      return { p: [nu.p[0] + n[0] * nu.r * wob, nu.p[1] + n[1] * nu.r * wob, nu.p[2] + n[2] * nu.r * wob], n };
+    }, [0.62, 0.72, 1.0], 0, true);
+  }
+  SCENE.cellNucGeo = uploadMesh(nm);
+}
+
+/* anatomical labels for the current cell type */
+function cellLabels(def) {
+  const L = [], o = CELLGEO.origin || [0, 0, 0], s = def.size;
+  const shift = (p) => [p[0] - o[0], p[1] - o[1], p[2] - o[2]];
+  const half = s[0] * 0.5, rad = s[1] * 0.5;
+  L.push({ p: shift([0, rad * 0.98, 0]), txt: 'PLASMA MEMBRANE', col: '#7fc4ff', key: 'cellMem' });
+  if (CELLGEO.nuclei && CELLGEO.nuclei.length)
+    L.push({ p: V3.add(CELLGEO.nuclei[0].p, [0, CELLGEO.nuclei[0].r * 0.9, 0]), txt: 'NUCLEUS', col: '#a9bcff', key: 'cellNuc' });
+  if (CELLGEO.mito.length > 3)
+    L.push({ p: CELLGEO.mito[Math.floor(CELLGEO.mito.length * 0.35)].p, txt: 'MITOCHONDRION', col: '#5cf0b0', key: 'cellMito' });
+  const f = def.feat || {};
+  const dot = (k, txt, col) => {
+    const list = CELLGEO.dots[k];
+    if (list && list.length) L.push({ p: list[Math.floor(list.length * 0.4)].p, txt, col, key: 'cellOrg' });
+  };
+  dot('lyso', 'LYSOSOME', '#ff9a6b'); dot('perox', 'PEROXISOME', '#8fd9ff');
+  dot('lipid', 'LIPID DROPLET', '#ffd96b'); dot('granule', 'INSULIN GRANULE', '#8ff0ff');
+  if (f.myofibril) L.push({ p: shift([half * 0.35, rad * 0.55, 0]), txt: 'MYOFIBRIL', col: '#b6a8d8', key: 'cellOrg' });
+  if (f.er) L.push({ p: shift([-rad * 0.6, rad * 0.35, rad * 0.4]), txt: 'ER', col: '#96d296', key: 'cellOrg' });
+  if (f.golgi) L.push({ p: shift([rad * 0.5, -rad * 0.28, 0]), txt: 'GOLGI', col: '#f0a2e0', key: 'cellOrg' });
+  if (def.shape === 'neuron') { const A = def.anchor;
+    L.push({ p: shift([lerp(A.axon[0], A.axon[1], 0.55), 4, 0]), txt: 'AXON', col: '#7fc4ff', key: 'cellMem' });
+    L.push({ p: shift([A.somaX, A.somaR * 0.95, 0]), txt: 'CELL BODY', col: '#7fc4ff', key: 'cellMem' }); }
+  if (def.shape === 'sperm') { const A = def.anchor;
+    L.push({ p: shift([(A.mid[0] + A.mid[1]) / 2, A.midR + 1, 0]), txt: 'MIDPIECE', col: '#5cf0b0', key: 'cellMito' });
+    L.push({ p: shift([A.headX, A.headR * 0.9, 0]), txt: 'HEAD', col: '#7fc4ff', key: 'cellMem' }); }
+  CELLGEO.labels = L;
+}
+
+/* per-frame packing for the cell crowd */
+function packCell() {
+  const g = SCENE.cellMito; g.n = 0;
+  const list = CELLGEO.mito, heroLow = smoothstep(0.62, 0.80, VIEW.blend);
+  for (let i = 0; i < list.length && g.n < g.max; i++) {
+    if (i === 0 && heroLow < 0.5) continue;             // the hero is drawn in full detail
+    const mt = list[i];
+    const dir = mt.dir, z = basis(dir)[0];
+    const d = g.data, o = g.n * 13;
+    // gentle drift; in an axon they really do commute along the microtubules
+    const wob = Math.sin(TIME * 0.25 + mt.phase) * mt.drift;
+    d[o] = mt.p[0] + dir[0] * wob; d[o + 1] = mt.p[1] + dir[1] * wob; d[o + 2] = mt.p[2] + dir[2] * wob;
+    d[o + 3] = z[0]; d[o + 4] = z[1]; d[o + 5] = z[2];
+    d[o + 6] = dir[0]; d[o + 7] = dir[1]; d[o + 8] = dir[2];
+    d[o + 9] = 0; d[o + 10] = mt.s * (mt.tag > 0 ? Math.max(0.35, 1 - mt.tag * 0.3) : 1);
+    d[o + 11] = (selMito === i) ? 2 : 0;
+    d[o + 12] = 0.20 + 0.80 * mt.health;
+    g.n++;
+  }
+  for (const k in SCENE.dot) {
+    const gg = SCENE.dot[k]; gg.n = 0;
+    const src = CELLGEO.dots[k]; if (!src || !LAY.cellOrg) continue;
+    const isGran = k === 'granule';
+    for (const it of src) {
+      if (gg.n >= gg.max) break;
+      const d = gg.data, o = gg.n * 13;
+      // insulin granules drift to the membrane and fuse when secretion runs
+      let p = it.p;
+      if (isGran && CELL.insulin > 0.05) {
+        const k2 = clamp((Math.sin(TIME * 0.8 + it.ph) * 0.5 + 0.5) * CELL.insulin, 0, 1);
+        p = [it.p[0] * (1 + k2 * 0.5), it.p[1] * (1 + k2 * 0.5), it.p[2] * (1 + k2 * 0.5)];
+      }
+      d[o] = p[0]; d[o + 1] = p[1]; d[o + 2] = p[2];
+      d[o + 3] = 0; d[o + 4] = 0; d[o + 5] = 1;
+      d[o + 6] = Math.cos(it.a); d[o + 7] = Math.sin(it.a); d[o + 8] = 0;
+      d[o + 9] = 0; d[o + 10] = it.s; d[o + 11] = 0;
+      d[o + 12] = isGran ? 0.45 + 0.55 * CELL.insulin : 1;
+      gg.n++;
+    }
+  }
+  const gn = SCENE.nucleolus; gn.n = 0;
+  if (LAY.cellNuc) for (const nu of (CELLGEO.nuclei || [])) {
+    if (gn.n >= gn.max) break;
+    const d = gn.data, o = gn.n * 13;
+    d[o] = nu.p[0] + nu.r * 0.25; d[o + 1] = nu.p[1] - nu.r * 0.2; d[o + 2] = nu.p[2] + nu.r * 0.1;
+    d[o + 3] = 0; d[o + 4] = 0; d[o + 5] = 1; d[o + 6] = 1; d[o + 7] = 0; d[o + 8] = 0;
+    d[o + 9] = 0; d[o + 10] = nu.r * 0.34; d[o + 11] = 0; d[o + 12] = 1;
+    gn.n++;
+  }
+  const gs = SCENE.cellStatic; gs.n = 0;
+  if (LAY.cellOrg) {
+    const d = gs.data;
+    d[0] = 0; d[1] = 0; d[2] = 0; d[3] = 0; d[4] = 0; d[5] = 1;
+    d[6] = 1; d[7] = 0; d[8] = 0; d[9] = 0; d[10] = 1; d[11] = 0; d[12] = 1;
+    gs.n = 1;
+    // the baked mesh is in cell coordinates; shift it onto the hero origin
+    const o = CELLGEO.origin || [0, 0, 0];
+    d[0] = -o[0]; d[1] = -o[1]; d[2] = -o[2];
+  }
 }
 
 /* per-frame instance packing ------------------------------------------ */
-let synthAngle = 0, hiSet = null, selSite = null;
+let synthAngle = 0, hiSet = null, selSite = null, selMito = -1;
 function packProteins() {
   for (const k in SCENE.prot) SCENE.prot[k].n = 0;
   const showETC = LAY.etc, showSynth = LAY.synth, showCar = LAY.carriers;
@@ -2252,9 +3094,18 @@ function render() {
   gl.uniform1f(ps.u.uTime, TIME);
   gl.uniform1f(ps.u.uClipSolid, 0);
   gl.uniform4f(ps.u.uClip, 0, 0, 1, clipD);
-  for (const k in SCENE.prot) drawSolidGroup(SCENE.prot[k]);
-  if (LAY.dna) { drawSolidGroup(SCENE.nuc); drawSolidGroup(SCENE.ribo); }
-  if (LAY.krebs) drawSolidGroup(SCENE.node);
+  const heroDetail = 1 - smoothstep(0.30, 0.72, VIEW.blend);
+  if (heroDetail > 0.02) {
+    for (const k in SCENE.prot) drawSolidGroup(SCENE.prot[k]);
+    if (LAY.dna) { drawSolidGroup(SCENE.nuc); drawSolidGroup(SCENE.ribo); }
+    if (LAY.krebs) drawSolidGroup(SCENE.node);
+  }
+  /* the cell around it */
+  if (VIEW.blend > 0.02) {
+    if (LAY.cellMito) drawSolidGroup(SCENE.cellMito);
+    if (LAY.cellOrg) { drawSolidGroup(SCENE.cellStatic); for (const k in SCENE.dot) drawSolidGroup(SCENE.dot[k]); }
+    if (LAY.cellNuc) drawSolidGroup(SCENE.nucleolus);
+  }
 
   /* glowing molecular traffic — additive, depth-tested but not writing */
   gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false); gl.disable(gl.CULL_FACE);
@@ -2278,16 +3129,31 @@ function render() {
   gl.uniform3fv(pmg.u.uCam, new Float32Array(CAM.eye));
   gl.uniform1f(pmg.u.uTime, TIME);
   gl.uniform1f(pmg.u.uBreath, 0.006);
+  gl.uniform1f(pmg.u.uDeformOn, 1);
   gl.uniform4f(pmg.u.uDeform, DYN.waistX, DYN.waistW, DYN.pinch, DYN.sep);
   gl.uniform1f(pmg.u.uSwell, S.swell);
+  const hd = heroDetail;
   const cAlpha = 0.22 * (1 - S.swell * 0.45);
-  if (LAY.cristae) drawMembrane(SCENE.cristae, cAlpha * LAY.cristaeA, [1, 1, 1], 0.55, 0.75, 1);
-  if (LAY.inner) drawMembrane(SCENE.inner, 0.12 * LAY.innerA, [1, 1, 1], 0.8, 1.5, 1);
-  if (LAY.outer) drawMembrane(SCENE.outer, 0.09 * LAY.outerA, [0.85, 1, 1.15], 1.0, 1.9, 0.7);
+  if (hd > 0.02) {
+    if (LAY.cristae) drawMembrane(SCENE.cristae, cAlpha * LAY.cristaeA * hd, [1, 1, 1], 0.55, 0.75, 1);
+    if (LAY.inner) drawMembrane(SCENE.inner, 0.12 * LAY.innerA * hd, [1, 1, 1], 0.8, 1.5, 1);
+    if (LAY.outer) drawMembrane(SCENE.outer, 0.09 * LAY.outerA * hd, [0.85, 1, 1.15], 1.0, 1.9, 0.7);
+  }
   if (DYN.engulf > 0.01) {
     gl.uniform1f(pmg.u.uBreath, 0.02);
     gl.uniform4f(pmg.u.uDeform, 0, 1, 0, 0);
-    drawMembrane(SCENE.phago, 0.26, [0.7, 0.85, 1.2], 0.6, 1.2, 0.5, -3.4 + DYN.engulf * 7.2);
+    drawMembrane(SCENE.phago, 0.26 * hd, [0.7, 0.85, 1.2], 0.6, 1.2, 0.5, -3.4 + DYN.engulf * 7.2);
+  }
+  /* nuclear envelope then plasma membrane — outermost last */
+  if (VIEW.blend > 0.02) {
+    const cb = smoothstep(0.04, 0.45, VIEW.blend);
+    gl.uniform1f(pmg.u.uDeformOn, 0);
+    gl.uniform1f(pmg.u.uSwell, 0);
+    gl.uniform1f(pmg.u.uBreath, 0.05);
+    if (SCENE.cellNucGeo && LAY.cellNuc)
+      drawMembrane(SCENE.cellNucGeo, 0.16 * cb, [0.85, 0.92, 1.25], 0.7, 1.2, 0.8, 99);
+    if (LAY.cellMem)
+      drawMembrane(SCENE.cellShell, 0.115 * cb, [0.75, 0.95, 1.30], 1.0, 2.9, 0.55, 99);
   }
 
   /* post: bright pass, separable blur, composite */
@@ -2352,16 +3218,17 @@ function drawOverlay(w, h) {
     uix.font = '9px "Share Tech Mono", monospace';
     uix.textBaseline = 'middle';
     const placed = [];
-    const roL = viewW - CAM.cov.r - 162, roT = 80, roB = 264;
+    const roL = viewW - CAM.cov.r - 162, roT = 80, roB = VIEW.blend > 0.35 ? 358 : 264;
     let drawn = 0;
-    for (const l of LABELS) {
+    const SET = VIEW.blend > 0.5 ? (CELLGEO.labels || []) : LABELS;
+    for (const l of SET) {
       if (drawn >= 5) break;
       if (selSite && l.site && l.key === selSite.type) continue;   // reticle names it
       let anchor = l.p;
       if (l.nuc !== undefined) { const n = SCENE.nucList && SCENE.nucList[l.nuc]; if (!n) continue; anchor = n.p; }
-      const keyOn = l.key === 'always' || l.key === 'dna' ? (l.key === 'dna' ? LAY.dna : true)
-        : (l.key === 'outer' ? LAY.outer : l.key === 'inner' ? LAY.inner : l.key === 'cristae' ? LAY.cristae
-          : (l.key === 'cv' ? LAY.synth : (l.key === 'ci' || l.key === 'ciii' || l.key === 'civ') ? LAY.etc : LAY.carriers));
+      const keyOn = l.key in LAY ? LAY[l.key]
+        : l.key === 'always' ? true
+        : (l.key === 'cv' ? LAY.synth : (l.key === 'ci' || l.key === 'ciii' || l.key === 'civ') ? LAY.etc : LAY.carriers);
       if (!keyOn) continue;
       const q = project(DEFORM(anchor), w, h); if (!q) continue;
       const cv = CAM.cov;
@@ -2456,13 +3323,46 @@ const GAUGES = [
   { k: 'ros', lab: 'ROS', col: '#ff2244', max: 0.9, v: () => S.ros, fmt: (v) => v < 0.12 ? 'low' : v < 0.30 ? 'raised' : v < 0.55 ? 'HIGH' : 'SEVERE' },
   { k: 'heat', lab: 'HEAT', col: '#ff7a2a', max: 0.9, v: () => S.heatInt, fmt: (v) => fmt(v / REST_REF.heat, 1) + '× rest' },
 ];
+const CELL_GAUGES = [
+  { k: 'catp', lab: 'CELL ATP', col: '#ffc300', max: 1, v: () => CELL.atp, fmt: (v) => fmt(v * 100, 0) + '%' },
+  { k: 'cnet', lab: 'NETWORK', col: '#39ff14', max: 1,
+    v: () => CELLGEO.mito.length ? 1 - CELL.damaged / CELLGEO.mito.length : 1,
+    fmt: (v) => CELLGEO.mito.length ? fmt(v * 100, 0) + '% healthy' : 'none' },
+  { k: 'cout', lab: 'OUTPUT', col: '#31e0ff', max: 1, v: () => cellOutput().v, fmt: () => cellOutput().t },
+];
+/* the third cell gauge shows whatever this cell type actually produces */
+function cellOutput() {
+  const d = cellDef();
+  switch (d.id) {
+    case 'beta':   return { v: CELL.insulin, t: fmt(CELL.insulin * 100, 0) + '% secreting', lab: 'INSULIN' };
+    case 'brown':  return { v: clamp(S.heatInt / 0.9, 0, 1), t: fmt(S.heatInt / REST_REF.heat, 1) + '× rest', lab: 'HEAT' };
+    case 'neuron': return { v: CELL.fire, t: CELL.beatRate > 0 ? fmt(CELL.beatRate * 12, 0) + ' Hz' : 'silent', lab: 'FIRING' };
+    case 'rbc':    return { v: clamp((F.Jgly || 0) * 2.5, 0, 1), t: 'glycolysis only', lab: 'ATP SOURCE' };
+    case 'oocyte': return { v: 1, t: '~10⁵ mtDNA', lab: 'GENOMES' };
+    default:       return { v: CELL.force, t: CELL.beatRate > 0 ? fmt(CELL.beatRate * 60, 0) + ' /min' : 'still', lab: 'CONTRACTION' };
+  }
+}
 function buildHUD() {
   const el = document.getElementById('readouts');
-  el.innerHTML = GAUGES.map(g => `<div class="ro"><div class="ro-top"><span class="ro-lab">${g.lab}</span>
+  el.innerHTML = CELL_GAUGES.map(g => `<div class="ro cellro" style="display:none"><div class="ro-top"><span class="ro-lab" id="rl-${g.k}">${g.lab}</span>
+    <span class="ro-val" id="ro-${g.k}">–</span></div>
+    <div class="ro-bar"><div class="ro-fill" id="rf-${g.k}" style="background:${g.col};box-shadow:0 0 6px ${g.col}"></div></div></div>`).join('') +
+    GAUGES.map(g => `<div class="ro"><div class="ro-top"><span class="ro-lab">${g.lab}</span>
     <span class="ro-val" id="ro-${g.k}">–</span></div>
     <div class="ro-bar"><div class="ro-fill" id="rf-${g.k}" style="background:${g.col};box-shadow:0 0 6px ${g.col}"></div></div></div>`).join('');
 }
 function updateHUD() {
+  const cellScale = VIEW.blend > 0.35;
+  document.querySelectorAll('#readouts .cellro').forEach(e => { e.style.display = cellScale ? '' : 'none'; });
+  if (cellScale) {
+    document.getElementById('rl-cout').textContent = cellOutput().lab;
+    for (const g of CELL_GAUGES) {
+      const v = g.v();
+      const e = document.getElementById('ro-' + g.k), f = document.getElementById('rf-' + g.k);
+      if (e) e.textContent = g.fmt(v);
+      if (f) f.style.width = clamp(v / g.max, 0, 1) * 100 + '%';
+    }
+  }
   for (const g of GAUGES) {
     const v = g.v();
     const e = document.getElementById('ro-' + g.k), f = document.getElementById('rf-' + g.k);
@@ -2552,15 +3452,52 @@ function drawTrace() {
 /*  UI WIRING                                                           */
 /* ==================================================================== */
 let dockTab = 'run', curScenario = 'rest', lesson = null, lessonI = 0, dynT = 0, slowMo = false;
+let drivenBy = 'scenario';   // whose parameters are currently in P
 const dockH = () => document.getElementById('dock').offsetHeight;
 
 function resetChem() {
   Object.assign(S, { nadh: 0.25, fadh2: 0.2, qh2: 0.2, cytc: 0.22, dp: 226, adp: 0.08,
     caM: 0.03, ros: 0.05, mptp: 0, cytcRel: 0, swell: 0 });
 }
+function setCellType(id, quiet) {
+  if (!CELL_BY_ID[id]) return;
+  CELL.type = id; CELL.act = 0; CELL.apoptosis = 0; CELL.secreted = 0;
+  selMito = -1;
+  document.getElementById('inspect').classList.remove('on');
+  if (GLOK && R.ready) buildCellScene();
+  resetChem();
+  syncCellUI();
+  setCellAct(0, true);
+  if (VIEW.blend > 0.35) camGoCell();
+  if (!quiet) blip(360, 0.18, 'sine', 0.16);
+}
+function setCellAct(i, quiet) {
+  const d = cellDef();
+  CELL.act = clamp(i, 0, d.acts.length - 1);
+  const a = cellAct();
+  drivenBy = 'cell';
+  Object.assign(P, { fuel: d.fuel, supply: 0.5, demand: 0.35, o2: 1,
+    ci: 1, cii: 1, ciii: 1, civ: 1, cv: 1, leak: 1, ucp: 0, caCyt: 0, scav: 1, glyMul: 1 });
+  Object.assign(P, a.p);
+  document.getElementById('cellact').value = String(CELL.act);
+  document.getElementById('cell-note').innerHTML = a.note;
+  document.getElementById('scn-name').textContent = (d.name + ' · ' + a.n).toUpperCase();
+  TRACE.mark.push({ i: TRACE.dp.length });
+  if (TRACE.mark.length > 6) TRACE.mark.shift();
+  if (!quiet) blip(520, 0.14, 'sine', 0.16);
+}
+function syncCellUI() {
+  const d = cellDef();
+  document.getElementById('celltype').value = d.id;
+  document.getElementById('cellact').innerHTML =
+    d.acts.map((a, i) => `<option value="${i}">${a.n}</option>`).join('');
+  document.getElementById('cell-facts').innerHTML =
+    `<b>${d.name}</b> — ${d.txt}` +
+    d.facts.map(f => `<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;border-top:1px solid #14142a;margin-top:2px;"><span>${f[0]}</span><span style="color:var(--white)">${f[1]}</span></div>`).join('');
+}
 function applyScenario(id, quiet) {
   const s = SCN_BY_ID[id]; if (!s) return;
-  curScenario = id; dynT = 0;
+  curScenario = id; dynT = 0; drivenBy = 'scenario';
   Object.assign(P, { fuel: 'mixed', supply: 0.38, demand: 0.14, o2: 1,
     ci: 1, cii: 1, ciii: 1, civ: 1, cv: 1, leak: 1, ucp: 0, caCyt: 0, scav: 1, glyMul: 1 });
   Object.assign(P, s.p);
@@ -2631,7 +3568,7 @@ function applyLay(o) {
 }
 function focusOn(f) {
   if (!f) return;
-  if (f === 'whole') { camGoHome(); return; }
+  if (f === 'whole') { camGoMito(); return; }
   if (f === 'krebs') { CAM.distT = 3.2; CAM.tgtT = GEO.spine(0.5).slice(); return; }
   if (typeof f === 'string') {
     const list = SITES_BY_TYPE[f];
@@ -2664,13 +3601,17 @@ function applyLesson() {
   const focused = st.hi && st.hi.length;
   applyLay(focused ? { outer: 0.3, inner: 0.4, cristae: 0.55 } : { outer: 1, inner: 1, cristae: 1 });
   applyLay(st.lay);
+  if (st.cell) setCellType(st.cell, true);
+  if (st.act !== undefined) setCellAct(st.act, true);
   if (st.set) Object.assign(P, st.set);
   hiSet = st.hi && st.hi.length ? new Set(st.hi) : null;
   selSite = null;
   document.getElementById('inspect').classList.remove('on');
-  focusOn(st.f);
-  if (st.act === 'resetChem') resetChem();
-  else if (st.act) startDynamic(st.act);
+  if (st.scale === 'cell') camGoCell();
+  else if (st.scale === 'organelle') camGoMito();
+  else focusOn(st.f);
+  if (st.do === 'resetChem') resetChem();
+  else if (st.do) startDynamic(st.do);
   showNarr(lesson.title, st.b, (lessonI + 1) + ' / ' + lesson.steps.length, true);
   document.getElementById('narr-prev').disabled = lessonI === 0;
   document.getElementById('narr-next').textContent = lessonI === lesson.steps.length - 1 ? 'FINISH' : 'NEXT ▶';
@@ -2746,6 +3687,22 @@ function buildUI() {
   sel.innerHTML = html;
   sel.addEventListener('change', () => { audioInit(); applyScenario(sel.value); });
 
+  /* cell scale */
+  const ct = document.getElementById('celltype');
+  ct.innerHTML = CELLS.map(c => `<option value="${c.id}">${c.icon} ${c.name} — ${c.tissue}</option>`).join('');
+  ct.addEventListener('change', () => { audioInit(); setCellType(ct.value); });
+  document.getElementById('cellact').addEventListener('change', (e) => {
+    audioInit(); setCellAct(+e.target.value);
+  });
+  document.getElementById('scale-mito').addEventListener('click', () => {
+    audioInit();
+    if (!cellDef().mito.n) { toast('NO MITOCHONDRIA', CELL_BY_ID.rbc.txt, 9000); return; }
+    camGoMito(); blip(430, 0.16, 'sine', 0.15);
+  });
+  document.getElementById('scale-cell').addEventListener('click', () => {
+    audioInit(); camGoCell(); blip(300, 0.2, 'sine', 0.15);
+  });
+
   /* actions */
   const act = document.getElementById('actions');
   act.innerHTML = ACTIONS.map((a, i) => `<button class="btn ${a.c}" data-a="${i}">${a.n}</button>`).join('');
@@ -2792,6 +3749,8 @@ function buildUI() {
     ['protons', 'Protons'], ['electrons', 'Electrons & carriers'], ['energy', 'ATP / ADP'],
     ['fuel', 'Fuel, O₂, CO₂'], ['dna', 'mtDNA & ribosomes'], ['krebs', 'Krebs ring'],
     ['ros', 'Radicals'], ['heat', 'Heat'], ['labels', 'Labels'], ['cytosol', 'Cytosol'],
+    ['cellMem', 'Cell membrane'], ['cellNuc', 'Nucleus'],
+    ['cellMito', 'Mito network'], ['cellOrg', 'Other organelles'],
   ];
   document.getElementById('layers').innerHTML = LAYER_UI.map(([k, n]) =>
     `<div class="tg${LAY[k] ? ' on' : ''}" data-k="${k}"><div class="box"></div>${n}</div>`).join('');
@@ -2860,7 +3819,37 @@ function openHelp() {
 }
 
 /* --- inspector --- */
+function inspectCellAt(sx, sy, w, h) {
+  const box = document.getElementById('inspect');
+  let bi = -1, bd = 44 * 44;
+  if (LAY.cellMito) for (let i = 0; i < CELLGEO.mito.length; i++) {
+    const q = project(CELLGEO.mito[i].p, w, h); if (!q) continue;
+    const d = (q[0] - sx) ** 2 + (q[1] - sy) ** 2;
+    if (d < bd) { bd = d; bi = i; }
+  }
+  selMito = bi;
+  if (bi < 0) { box.classList.remove('on'); return; }
+  const mt = CELLGEO.mito[bi], d = cellDef();
+  const state = mt.tag > 0 ? 'being recycled (mitophagy)'
+    : mt.health > 0.85 ? 'polarised and working'
+    : mt.health > 0.55 ? 'partly depolarised' : 'damaged — tagged for disposal';
+  document.getElementById('inspect-body').innerHTML =
+    `<h3 style="color:#5cf0b0">MITOCHONDRION</h3>
+     <div class="sub">one of ${CELLGEO.mito.length} shown · ${d.name}</div>
+     <p>${bi === 0 ? 'This is the one you drop into at full detail. ' : ''}Membrane potential is what the colour is showing you: a healthy organelle is bright, a depolarised one fades. Damaged ones are tagged and eaten, and biogenesis replaces them — the network turns over continuously.</p>
+     <div class="kv"><span>State</span><span>${state}</span></div>
+     <div class="kv"><span>Health</span><span style="color:var(--gold)">${fmt(mt.health * 100, 0)}%</span></div>
+     <div class="kv"><span>Real count here</span><span>${d.facts[0][1]}</span></div>
+     <button class="btn acc" id="enter-mito" style="margin-top:8px;">↓ ENTER THIS MITOCHONDRION</button>`;
+  box.classList.toggle('low', project(mt.p, w, h)[1] < h * 0.52);
+  box.style.setProperty('--dockH', (dockH() || 58) + 'px');
+  box.classList.add('on');
+  document.getElementById('enter-mito').onclick = () => { audioInit(); enterMito(bi); };
+  blip(760, 0.08, 'triangle', 0.12);
+}
 function inspectAt(sx, sy, w, h) {
+  if (VIEW.blend > 0.5) { selSite = null; return inspectCellAt(sx, sy, w, h); }
+  selMito = -1;
   let best = null, bd = 46 * 46;
   for (const s of SITES) {
     const isETC = ['ci', 'cii', 'ciii', 'civ'].includes(s.type);
@@ -2925,7 +3914,7 @@ glc.addEventListener('pointermove', (e) => {
   } else if (PT.size >= 2) {
     const d = Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]);
     const mid = [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2];
-    if (lastDist > 0) CAM.distT = clamp(CAM.distT * (lastDist / Math.max(d, 1)), 0.55, 26);
+    if (lastDist > 0) CAM.distT = clamp(CAM.distT * (lastDist / Math.max(d, 1)), 0.55, CAM.maxDist);
     if (lastMid) panBy(mid[0] - lastMid[0], mid[1] - lastMid[1]);
     lastDist = d; lastMid = mid; moved += 50;
   }
@@ -2946,7 +3935,7 @@ glc.addEventListener('pointerup', endPointer);
 glc.addEventListener('pointercancel', (e) => { PT.delete(e.pointerId); lastDist = 0; lastMid = null; });
 glc.addEventListener('wheel', (e) => {
   e.preventDefault();
-  CAM.distT = clamp(CAM.distT * Math.exp(e.deltaY * 0.0011), 0.55, 26);
+  CAM.distT = clamp(CAM.distT * Math.exp(e.deltaY * 0.0011), 0.55, CAM.maxDist);
 }, { passive: false });
 glc.addEventListener('contextmenu', (e) => e.preventDefault());
 window.addEventListener('keydown', (e) => {
@@ -2958,7 +3947,7 @@ window.addEventListener('keydown', (e) => {
 /* ==================================================================== */
 /*  MAIN LOOP                                                           */
 /* ==================================================================== */
-let last = performance.now(), hudAcc = 0, dpr = 1;
+let last = performance.now(), hudAcc = 0, dpr = 1, lastScaleUI = null;
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 2);
   const w = Math.max(2, Math.round(glc.clientWidth * dpr));
@@ -2979,7 +3968,9 @@ function frame(now) {
   const simDt = dt * (slowMo ? 0.2 : 1);
 
   resize();
-  scenarioDyn(simDt);
+  VIEW.blend = viewBlend();
+  if (atCellScale() || VIEW.blend > 0.02) cellStep(simDt);
+  if (!atCellScale()) scenarioDyn(simDt);
   // stiff system: fixed substeps keep the gradient integration stable
   let acc2 = simDt, n = 0;
   while (acc2 > 0 && n < 40) { const h = Math.min(0.005, acc2); simStep(h); acc2 -= h; n++; }
@@ -3007,7 +3998,8 @@ function frame(now) {
   camUpdate(dt, Math.max(0.2, viewW / Math.max(1, viewH)));
 
   if (GLOK && R.ready) {
-    packProteins();
+    const heroDetail = 1 - smoothstep(0.30, 0.72, VIEW.blend);
+    if (heroDetail > 0.02) packProteins(); else for (const k in SCENE.prot) SCENE.prot[k].n = 0;
     packSimpleList(SCENE.nuc, LAY.dna ? SCENE.nucList : [], 1);
     packSimpleList(SCENE.ribo, LAY.dna ? SCENE.riboList : [], 1);
     if (LAY.krebs) {
@@ -3015,10 +4007,32 @@ function frame(now) {
       KREBS.forEach((k, i) => { k.a = 0; k.s = 1; k.hi = Math.max(0, 1 - Math.abs(((i - ph + 8) % 8) - 0)) * 1.0; });
       packSimpleList(SCENE.node, KREBS.map((k, i) => ({ p: k.p, a: 0, s: 1, hi: k.hi })), 1);
     } else SCENE.node.n = 0;
-    packParticles();
+    if (heroDetail > 0.02) packParticles(); else SCENE.parts.n = 0;
+    if (VIEW.blend > 0.02) packCell();
+    else { SCENE.cellMito.n = 0; SCENE.cellStatic.n = 0; SCENE.nucleolus.n = 0;
+           for (const k in SCENE.dot) SCENE.dot[k].n = 0; }
     render();
   }
   drawOverlay(viewW, viewH);
+
+  // the RUN pane follows you up and down the ladder
+  const cs = VIEW.blend > 0.35;
+  if (cs !== lastScaleUI) {
+    lastScaleUI = cs;
+    document.getElementById('blk-cell').style.display = cs ? '' : 'none';
+    document.getElementById('blk-mito').style.display = cs ? 'none' : '';
+    document.getElementById('scale-mito').classList.toggle('on', !cs);
+    document.getElementById('scale-cell').classList.toggle('on', cs);
+    if (cs) { syncCellUI(); setCellAct(CELL.act, true); }
+    else if (drivenBy === 'cell') {
+      const d = cellDef(), a = cellAct();
+      document.getElementById('scn-name').textContent =
+        ('inside a ' + d.name + ' · ' + a.n).toUpperCase();
+    } else {
+      const sc = SCN_BY_ID[curScenario];
+      if (sc) document.getElementById('scn-name').textContent = sc.n.toUpperCase();
+    }
+  }
 
   hudAcc += dt;
   if (hudAcc > 0.12) {
@@ -3037,6 +4051,7 @@ function frame(now) {
 function boot() {
   buildHUD(); buildUI();
   applyScenario('rest', true);
+  syncCellUI();
   setDockOpen(window.innerWidth / Math.max(1, window.innerHeight) >= 0.85);
   if (GLOK) {
     try { initGL(); buildScene(); resize(); }
