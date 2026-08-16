@@ -336,6 +336,11 @@ let filter = 'all';      // active season/part filter id
 let query = '';          // search box text
 let openedInApp = false; // true when the dialog was opened by a tap, not a deep link
 
+/* What the previous render was, so closing a dialog knows whether walking
+   history back lands on this title's list (a tap) or somewhere unrelated
+   (a deep link, or a jump straight from one dialog URL to another). */
+let lastRoute = { slug: null, dialog: false };
+
 const spoilersOn = () => localStorage.getItem('cl-spoilers') === '1';
 
 function parseHash() {
@@ -350,6 +355,7 @@ function route() {
     closeDialog(true);
     if (curSlug !== null) { curSlug = null; renderHub(); window.scrollTo(0, 0); }
     else if (!app.dataset.rendered) renderHub();
+    lastRoute = { slug: null, dialog: false };
     return;
   }
 
@@ -362,8 +368,13 @@ function route() {
   }
 
   const entry = (kind === 'c' || kind === 'p') ? findEntry(CL.bySlug[slug], kind, id) : null;
-  if (entry) openDialog(CL.bySlug[slug], entry, kind);
-  else closeDialog(true);
+  if (entry) {
+    openedInApp = (lastRoute.slug === slug && !lastRoute.dialog);
+    openDialog(CL.bySlug[slug], entry, kind);
+  } else {
+    closeDialog(true);
+  }
+  lastRoute = { slug: slug, dialog: !!entry };
 }
 
 function findEntry(title, kind, id) {
@@ -486,8 +497,6 @@ function paintList(host, entries, kind) {
       <span class="rname">${esc(e.name)}</span>
       <span class="chev">›</span>
     </a>`).join('');
-  host.querySelectorAll('.row').forEach(r =>
-    r.addEventListener('click', () => { openedInApp = true; }));
 }
 
 /* ---------- dialog ---------- */
@@ -557,7 +566,13 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !shade.h
   slugs.forEach(slug => {
     const s = document.createElement('script');
     s.src = 'data/' + slug + '.js';
-    s.onload = s.onerror = () => { if (--left === 0) route(); };
+    s.onload = s.onerror = () => {
+      if (--left) return;
+      /* They load in parallel and register in whatever order they finish,
+         so re-impose the manifest order the hub is documented to follow. */
+      CL.items.sort((a, b) => slugs.indexOf(a.slug) - slugs.indexOf(b.slug));
+      route();
+    };
     document.head.appendChild(s);
   });
 })();
