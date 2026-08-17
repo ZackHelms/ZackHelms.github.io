@@ -107,7 +107,7 @@ table.sc td.n { color:var(--gold); font-family:'Black Ops One', sans-serif; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-17 05:54 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-17 15:32 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
@@ -138,6 +138,7 @@ let GRACE_T = 25, GAP_T = 9, LEVEL_T = 4, FAIL_T = 3;
 const VER = 'turretBuilder.v1';
 const SET_KEY = VER + '.settings', SCORE_KEY = VER + '.scores';
 const AUTO_KEY = VER + '.auto', SLOT_KEY = i => VER + '.slot' + i;
+const CODEX_KEY = VER + '.codex';   // combos discovered, ACROSS runs
 
 /* --------------------------- THE BASE TURRET -------------------------
    Spec, verbatim, and the drive suite asserts every number here:
@@ -147,38 +148,160 @@ const TURRET_LVL_DMG = 1.28;      // per cash level
 const TURRET_LVL_RATE = 1.04;
 function turretUpCost(lvl) { return Math.round(34 * lvl); }
 
-/* ------------------------------ MODULES -------------------------------
-   Every coefficient is a fraction of D — the turret's own kinetic hit —
-   so a module is worth exactly as much as the turret it is bolted to.
-   A turret has four orthogonal sides, so "up to 4 of a kind" is
-   STRUCTURAL: there is nowhere to put a fifth.                        */
-const FIRE_DOT   = 0.10;   // per module: 10% of D delivered over FIRE_T seconds
+/* ============================ THE PAYLOAD =============================
+   A shot builds ONE payload and then propagates it. Every module either
+   shapes the payload or copies it somewhere else, which is what makes the
+   combinations compose instead of just adding up:
+
+     AMP    multiplies the payload's kinetic damage
+     FIRE   adds a burn — elemental damage over FIRE_T seconds
+     ICE    adds chill — slows movement AND attack speed, no damage at all
+     ELEC   copies the payload onto the next enemy at ELEC_XFER
+     BLAST  copies the payload onto everything in a radius at BLAST_XFER
+
+   DAMAGE decays as it is copied; EFFECTS (chill) transfer at FULL potency.
+   That split is the one judgement call in the spec: the CD's note says ELEC
+   transfers "50% of any dmg or effects like chill", but also that ICE+BLAST
+   should chill *all* enemies in the blast radius — at a 25% transfer a chill
+   would be quarter-strength and that second sentence could not be true.
+   Full-potency effects satisfy both, and they are what makes ICE worth a
+   slot now that it deals no damage: its whole product is an effect, and
+   effects propagate for free while damage falls off.
+
+   Worked example from the spec — ELEC + BLAST + FIRE + ICE, one per side,
+   base 10 — reproduced exactly by drive-turret-builder.cjs:
+     main target   10 kinetic + 7.5 burn over 5 s + full chill
+     blast at 25%  +2.5 kinetic + 1.875 burn to it and everything near it
+     arc at 50%    5 kinetic + 3.75 burn + full chill on the next enemy
+     that arc's own blast, 50% x 25%   1.25 kinetic + 0.9375 burn
+
+   STACK CURVES ARE SUPER-LINEAR, and that is where "all-in on one type
+   gives increasing returns" lives. There is deliberately NO variety
+   penalty: one would contradict the spec's own worked example, which shows
+   an unpenalised 10 kinetic and an unpenalised 25% blast on a turret
+   carrying four different types. Diminishing returns for variety is
+   emergent instead — spreading across four types leaves every one of them
+   on its weakest tier, so variety buys COVERAGE (chill + multi-target +
+   splash) rather than throughput. Index these by module count, 0..4.     */
+const AMP_DMG    = [0, 0.50, 1.10, 1.80, 2.60];   // + fraction of base kinetic
+const FIRE_DOT   = [0, 0.75, 2.00, 4.00, 7.00];   // x base kinetic, total over FIRE_T
 const FIRE_T     = 5.0;
-const ICE_DIR    = 0.025;  // per module: +2.5% of D as direct elemental
-const ICE_SLOW   = 0.10;   // per module: 10% slow ...
-const ICE_T      = 1.0;    // ... for 1 second
-const ARC_DIR    = 0.05;   // per module: +5% of D elemental, to every link in the chain
-const ARC_JUMP_R = 2.3;    // cells a bolt can reach for its next target
-const BLAST_KIN  = 0.05;   // per module: +5% of D kinetic (concussive), AoE
-const BLAST_FIRE = 0.025;  // per module: +2.5% of D elemental (fire), AoE
-const BLAST_R0   = 0.62, BLAST_RSTEP = 0.14;   // cells
-const SLOW_CAP   = 0.70;
+const ICE_CHILL  = [0, 0.25, 0.42, 0.58, 0.75];   // slows movement AND attack speed
+const ICE_T      = [0, 2.0, 2.5, 3.0, 3.5];       // seconds
+const ELEC_HOPS  = [0, 1, 2, 3, 4];
+const ELEC_XFER  = [0, 0.50, 0.58, 0.66, 0.75];
+const ELEC_R     = 2.3;                            // cells a hop can reach
+const BLAST_XFER = [0, 0.25, 0.50, 0.78, 1.10];
+const BLAST_R    = [0, 0.85, 1.05, 1.25, 1.45];   // cells
+const CHILL_CAP  = 0.80;
+const XFER_CAP   = 1.60;    // after boosters and combos
+const GROUND_T   = 5.0;     // burning ground left by the grenade-launcher combo
 
 const MODULES = {
-  fire:  { name:'FIRE',  glyph:'▲', col:'#ff7a1e', cost:20, tag:'DOT',
-           desc:'+10% of the turret’s hit as a 5 s burn (elemental). Four sides → +40%.' },
-  ice:   { name:'ICE',   glyph:'❄', col:'#4fd8ff', cost:20, tag:'SLOW',
-           desc:'+2.5% direct elemental and a 10% slow for 1 s. Four sides → +10% and 40%.' },
-  arc:   { name:'ARC',   glyph:'⚡', col:'#ffe23f', cost:20, tag:'CHAIN',
-           desc:'+5% direct elemental that jumps to the nearest untouched enemy. Four sides → +20% to each of 5 targets.' },
-  blast: { name:'BLAST', glyph:'✸', col:'#ff4a5e', cost:20, tag:'AOE',
-           desc:'+5% kinetic (concussive) and +2.5% fire, splashed over everything near the target.' },
+  amp:   { name:'AMP',   glyph:'◆', col:'#dde3ff', cost:28, tag:'DAMAGE',
+           desc:'+50% kinetic damage, and everything downstream scales with it. Four sides → +260%.' },
+  fire:  { name:'FIRE',  glyph:'▲', col:'#ff7a1e', cost:22, tag:'BURN',
+           desc:'adds a burn worth 75% of the hit over 5 s, as elemental. Four sides → 700%.' },
+  ice:   { name:'ICE',   glyph:'❄', col:'#4fd8ff', cost:18, tag:'CHILL',
+           desc:'no damage — chills, slowing movement and attack speed by 25% for 2 s. Four sides → 75%.' },
+  elec:  { name:'ELEC',  glyph:'⚡', col:'#ffe23f', cost:22, tag:'ARC',
+           desc:'arcs to 1 more enemy carrying 50% of the damage and the full chill. Four sides → 4 hops at 75%.' },
+  blast: { name:'BLAST', glyph:'✸', col:'#ff4a5e', cost:24, tag:'SPLASH',
+           desc:'splashes 25% of the damage and the full chill over everything in the blast. Four sides → 110%.' },
   armor: { name:'ARMOR', glyph:'▣', col:'#9fb3d9', cost:18, tag:'WALL',
            desc:'WALLS ONLY — +35% wall HP and 2 flat damage reduction.' },
   regen: { name:'REGEN', glyph:'✚', col:'#2ee6a8', cost:18, tag:'WALL',
            desc:'WALLS ONLY — the wall repairs 4% of its maximum HP every second.' },
 };
-const MOD_KEYS = ['fire', 'ice', 'arc', 'blast', 'armor', 'regen'];
+const MOD_KEYS = ['amp', 'fire', 'ice', 'elec', 'blast', 'armor', 'regen'];
+const COMBAT_MODS = ['amp', 'fire', 'ice', 'elec', 'blast'];
+const WALL_ONLY_MODS = ['armor', 'regen'];
+
+/* ===================== DIAGONAL SYNERGY BOOSTERS ======================
+   Boosters go on a turret's DIAGONALS, which were deliberately inert until
+   now — that is what keeps them a separate decision from the four sides
+   rather than just four more module slots. A booster lifts every turret it
+   touches diagonally, so the sharing rule holds here too.               */
+const BOOST_CAP = 3.5;      // ceiling on the module-output multiplier
+const BOOSTERS = {
+  twin:  { name:'TWIN',  glyph:'⊕', col:'#39ff14', cost:40,
+           desc:'x2 module output — but only while every module on the turret is the SAME type.' },
+  prism: { name:'PRISM', glyph:'◈', col:'#b44fff', cost:40,
+           desc:'+30% module output for every distinct module type beyond the first.' },
+  relay: { name:'RELAY', glyph:'⇄', col:'#4488ff', cost:40,
+           desc:'+22% module output for every turret orthogonally touching this one.' },
+  clock: { name:'CLOCK', glyph:'»', col:'#ffc300', cost:40,
+           desc:'+40% fire rate. Does nothing for the modules, everything for the tempo.' },
+};
+const BOOST_KEYS = ['twin', 'prism', 'relay', 'clock'];
+
+/* ============================ NAMED COMBOS ============================
+   Specific side patterns that do something no amount of stacking will.
+   Signatures are ROTATION-INVARIANT so a player who builds the mirror of a
+   combo still finds it: four of a kind is 'quad:<type>', and two opposite
+   pairs is 'pair:<a>+<b>' with the pair names sorted. Anything else has no
+   combo. Each entry sets flags that combat reads directly.              */
+const COMBOS = {
+  'pair:blast+fire': { id:'grenade', name:'INCENDIARY GRENADE LAUNCHER', col:'#ff3a1e',
+    blurb:'blast radius +60%, and every impact leaves the ground burning for 5 s',
+    eff:{ blastRMul:1.6, groundFire:true } },
+  'pair:blast+ice': { id:'cryoshell', name:'CRYO SHELL', col:'#4fd8ff',
+    blurb:'chill in the blast hits the cap and lasts twice as long',
+    eff:{ chillCapped:true, chillTMul:2.0 } },
+  'pair:blast+elec': { id:'chainreaction', name:'CHAIN REACTION', col:'#ff4a5e',
+    blurb:'every arc hop detonates a full-strength explosion of its own',
+    eff:{ hopDetonate:true } },
+  'pair:amp+blast': { id:'demolition', name:'DEMOLITION CHARGE', col:'#ff8a1e',
+    blurb:'blast radius +40%, and the splash ignores half of armour',
+    eff:{ blastRMul:1.4, pierce:0.5 } },
+  'pair:amp+fire': { id:'lance', name:'THERMAL LANCE', col:'#ff7a1e',
+    blurb:'the burn ignores resistance entirely',
+    eff:{ dotIgnoreResist:true } },
+  'pair:amp+ice': { id:'frostbite', name:'FROSTBITE', col:'#a8e6ff',
+    blurb:'chilled enemies take 30% more damage from everything',
+    eff:{ chillAmp:0.30 } },
+  'pair:amp+elec': { id:'railgun', name:'RAILGUN', col:'#dde3ff',
+    blurb:'one hop only, but it carries the payload at full strength',
+    eff:{ hopsOverride:1, xferOverride:1.0 } },
+  'pair:elec+fire': { id:'wildfire', name:'WILDFIRE', col:'#ffb03f',
+    blurb:'arcs carry the burn at full strength, however far they travel',
+    eff:{ dotNoDecay:true } },
+  'pair:elec+ice': { id:'blizzard', name:'BLIZZARD', col:'#7fe6ff',
+    blurb:'+2 hops, and a hop can reach half again as far',
+    eff:{ hopBonus:2, hopRMul:1.5 } },
+  'pair:fire+ice': { id:'thermalshock', name:'THERMAL SHOCK', col:'#ff5cf0',
+    blurb:'a chilled enemy takes double burn damage',
+    eff:{ dotChillDouble:true } },
+  'quad:amp': { id:'siege', name:'SIEGE BATTERY', col:'#dde3ff',
+    blurb:'+30% range, and shots ignore half of armour',
+    eff:{ rangeMul:1.3, pierce:0.5 } },
+  'quad:fire': { id:'firestorm', name:'FIRESTORM', col:'#ff7a1e',
+    blurb:'the burn spreads on its own to anything within 1.2 cells',
+    eff:{ dotSpread:1.2 } },
+  'quad:ice': { id:'hailstorm', name:'HAILSTORM', col:'#a8e6ff',
+    blurb:'chilled enemies lose 40% of their armour',
+    eff:{ chillShred:0.4 } },
+  'quad:elec': { id:'tesla', name:'TESLA COIL', col:'#ffe23f',
+    blurb:'+2 hops, and no hop ever transfers below 60%',
+    eff:{ hopBonus:2, xferFloor:0.6 } },
+  'quad:blast': { id:'mortar', name:'MORTAR BATTERY', col:'#ff4a5e',
+    blurb:'blast radius +50%',
+    eff:{ blastRMul:1.5 } },
+};
+/* The side map a turret's modules form, reduced to a rotation-invariant key.
+   ORTHO order is [up, down, left, right], so up/down and left/right are the
+   two opposite pairs. */
+const COMBOS_BY_ID = {};
+for (const k of Object.keys(COMBOS)) COMBOS_BY_ID[COMBOS[k].id] = COMBOS[k];
+const COMBO_TOTAL = Object.keys(COMBOS).length;
+function comboKeyOf(sides) {
+  const [U, D, L, R] = sides;
+  if (!U || !D || !L || !R) return null;
+  if (U === D && D === L && L === R) return 'quad:' + U;
+  const a = (U === D) ? U : null, b = (L === R) ? L : null;
+  if (a && b && a !== b) return 'pair:' + [a, b].sort().join('+');
+  return null;
+}
 
 /* -------------------------------- WALLS -------------------------------
    Walls sit ON the road. A creep that reaches one stops and hits it; the
@@ -210,18 +333,20 @@ const LAB = [
     desc:'+1 turret slot per tier.' },
   { id:'chassis', name:'CHASSIS', tiers:5, c0:5, step:3, icon:'turret',
     desc:'+20% turret damage per tier — and every module is a % of that.' },
+  { id:'amp',     name:'AMP',     tiers:4, c0:4, step:2, icon:'amp',
+    desc:'+14% AMP output per tier.' },
   { id:'servo',   name:'SERVO',   tiers:4, c0:5, step:3, icon:'servo',
     desc:'+9% turret fire rate per tier.' },
   { id:'optics',  name:'OPTICS',  tiers:4, c0:4, step:2, icon:'optics',
     desc:'+8% turret range per tier.' },
   { id:'fire',    name:'FIRE',    tiers:4, c0:4, step:2, icon:'fire',
-    desc:'+30% FIRE module output per tier — the burn climbs fast.' },
+    desc:'+26% FIRE burn per tier — the single-target modules climb fastest.' },
   { id:'ice',     name:'ICE',     tiers:4, c0:4, step:2, icon:'ice',
-    desc:'+30% ICE module output per tier — damage and the slow together.' },
-  { id:'arc',     name:'ARC',     tiers:4, c0:4, step:2, icon:'arc',
-    desc:'+12% ARC output per tier; the last tier adds a chain jump.' },
+    desc:'+26% ICE chill per tier.' },
+  { id:'elec',    name:'ELEC',    tiers:4, c0:4, step:2, icon:'elec',
+    desc:'+14% ELEC transfer per tier.' },
   { id:'blast',   name:'BLAST',   tiers:4, c0:4, step:2, icon:'blast',
-    desc:'+12% BLAST output and radius per tier.' },
+    desc:'+14% BLAST splash and radius per tier.' },
   { id:'bulwark', name:'BULWARK', tiers:4, c0:5, step:3, icon:'wall',
     desc:'+30% wall HP and +1 wall slot per tier.' },
 ];
@@ -238,7 +363,7 @@ function labCost(id, tier) { const t = LAB_BY_ID[id]; return t.c0 + t.step * tie
    The lab is the one lever that is mine rather than the spec's, so the
    single-target modules climb roughly two and a half times faster per tier
    than the crowd modules. See .claude/turret-builder.md § Module power. */
-const MOD_LAB_STEP = { fire: 0.30, ice: 0.30, arc: 0.12, blast: 0.12 };
+const MOD_LAB_STEP = { amp: 0.14, fire: 0.26, ice: 0.26, elec: 0.14, blast: 0.14 };
 
 const TURRET_CAP_BASE = 6, WALL_CAP_BASE = 2;
 
@@ -266,14 +391,22 @@ const KIN_FLOOR = 0.15;      // armour can never eat more than 85% of a kinetic 
    level's OPENING waves the dangerous ones. Waves harden steeply across a
    level, the BREAKER spikes, and the next level opens easier than that
    boss but on a higher floor.                                          */
-let HP_LEVEL = 1.22;
+let HP_LEVEL = 1.30;
 let HP_WAVE  = 1.15;
 const HP_BOSS = 1.35;
 const SPD_GROWTH = 0.0035, SPD_CAP = 1.40;
 const CASH_BASE = 300, CASH_GROWTH = 1.36;
 const ELITE_LEVEL = 3, ELITE_HP = 1.6, ELITE_BOUNTY = 1.3, ELITE_EVERY = 4;
 
-/* Pacing: a level is meant to run about eight minutes. The window is the
+/* 1.30/1.15 was swept with the eval AFTER the payload redesign. The old
+   1.22 left almost every build clearing the campaign — the new module
+   numbers are far stronger than the percentages they replaced. The band is
+   NARROW: at 1.30 a coherent grid clears all eight and the marginal builds
+   fall one to five levels short; by 1.40 the coherent grid itself stalls at
+   5. Re-sweep after any module change, and expect the useful range to be
+   about ten percent wide.
+
+   Pacing: a level is meant to run about eight minutes. The window is the
    time a wave takes to finish spawning; the wave itself ends when the
    board is clear, so a strong grid shortens it and a struggling one does
    not. eval-turret-builder.cjs asserts the measured minutes. */
@@ -305,9 +438,24 @@ function coresForWave(gw) { return 1 + Math.floor(gw / 20) + (isBossWave(gw) ? 2
 
 /* The introduction is measured in WAVES: level 1 IS the tutorial, one new
    tile per wave, and the LAB opens halfway through it. */
-const UNLOCK = { turret:1, fire:2, ice:3, wall:4, arc:5, blast:6, armor:7, regen:8 };
+/* The introduction is still measured in WAVES, but there are more things to
+   introduce now, so it runs into level 2: level 1 teaches the five combat
+   modules, level 2 opens walls and the diagonal boosters. */
+const UNLOCK = {
+  turret:1, fire:2, amp:3, ice:4, elec:5, blast:6,
+  wall:7, armor:8, regen:9, twin:10, prism:11, relay:12, clock:13,
+};
 const LAB_WAVE = 5;
-const BUILD_ORDER = ['turret', 'wall', 'fire', 'ice', 'arc', 'blast', 'armor', 'regen'];
+/* Thirteen placeable kinds will not fit one thumb-height bar, so the bar has
+   three tabs. BUILD_ORDER stays the canonical list (unlock schedule, test
+   hooks, cap checks); BAR_TABS is only how it is laid out. */
+const BUILD_ORDER = ['turret', 'wall', 'amp', 'fire', 'ice', 'elec', 'blast',
+                     'armor', 'regen', 'twin', 'prism', 'relay', 'clock'];
+const BAR_TABS = [
+  { id:'build', label:'BUILD', keys:['turret', 'wall', 'armor', 'regen'] },
+  { id:'mods',  label:'MODULES', keys:['amp', 'fire', 'ice', 'elec', 'blast'] },
+  { id:'syn',   label:'SYNERGY', keys:['twin', 'prism', 'relay', 'clock'] },
+];
 
 /* --------------------------- WAVE COMPOSITION -------------------------
    One counter introduced per wave, so a player meets ARMOR before they
@@ -368,12 +516,12 @@ let run = null;
 let cash = 0;
 let tiles = [];              // every placed thing: turrets, modules, walls
 let cellIndex = new Map();   // r*COLS+c -> tile
-let creeps = [], spawnList = [], beams = [], floats = [], sparks = [];
+let creeps = [], spawnList = [], beams = [], floats = [], sparks = [], grounds = [];
 let phaseT = 0, waveT = 0, levelLeaks = 0, levelKills = 0;
 let sel = null, dragCard = null, dragPos = null, armedKind = null, downCard = null;
 let shake = 0, speed = 1;
 let pathCells = new Set(), rockCells = new Set(), segs = [], totalLen = 0, mapIdx = 0;
-let cardRects = [], panelBtns = {}, hudBtns = {};
+let cardRects = [], tabRects = [], panelBtns = {}, hudBtns = {}, barTab = 'build';
 let toasts = [];
 let creepSeq = 0;
 let dmgLog = null;           // test hook: a ledger of every damage instance
@@ -390,6 +538,15 @@ function writeJSON(key, val) {
 const settings = Object.assign({ music:45, sfx:70, muted:false, speed:1 }, readJSON(SET_KEY, {}));
 function saveSettings() { writeJSON(SET_KEY, settings); }
 function getScores() { const s = readJSON(SCORE_KEY, []); return Array.isArray(s) ? s : []; }
+/* Discoveries persist across runs on purpose. The CD's ask was combos the
+   player "must learn and remember"; a codex that reset every run would make
+   remembering pointless, and a codex that listed the undiscovered ones would
+   make learning pointless. So it accumulates, and it only ever shows what has
+   actually been built. */
+let codex = readJSON(CODEX_KEY, {});
+if (!codex || typeof codex !== 'object') codex = {};
+function recordCombo(id) { if (!codex[id]) { codex[id] = Date.now(); writeJSON(CODEX_KEY, codex); } }
+function codexCount() { return Object.keys(codex).filter(k => COMBOS_BY_ID[k]).length; }
 function addScore(e) {
   const list = getScores(); list.push(e);
   list.sort((a, b) => b.score - a.score);
@@ -461,6 +618,7 @@ function sfxHorn()  { if (!AC) return; [247, 311, 370].forEach((f, i) => tone(f,
 function sfxWin()   { if (!AC) return; [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.24, 'square', 0.13, AC.currentTime + i * 0.11)); }
 function sfxLose()  { if (!AC) return; [330, 262, 196, 147].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.15, AC.currentTime + i * 0.15)); }
 function sfxUnlock(){ if (!AC) return; [392, 523, 659].forEach((f, i) => tone(f, 0.17, 'triangle', 0.15, AC.currentTime + i * 0.08)); }
+function sfxCombo(){ if (!AC) return; [523, 784, 1047, 1568].forEach((f, i) => tone(f, 0.3, 'square', 0.15, AC.currentTime + i * 0.09)); noise(0.5, 0.07, 3000); }
 const BASSLINE = [41.2, 0, 41.2, 0, 49, 0, 36.7, 0];
 function scheduleMusic() {
   if (!AC || state !== 'play') return;
@@ -570,27 +728,72 @@ function boardPoint(p) {
    powers EVERY orthogonally adjacent turret and wall, so one tile can pay
    two or three structures; combat and rendering only ever read the cached
    result.                                                              */
-const ORTHO = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+const ORTHO = [[-1, 0], [1, 0], [0, -1], [0, 1]];        // up, down, left, right
+const DIAG  = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
 function tileAt(r, c) { return cellIndex.get(key(r, c)) || null; }
-function emptyMods() { return { fire:0, ice:0, arc:0, blast:0, armor:0, regen:0 }; }
+function emptyMods() { const o = {}; for (const k of MOD_KEYS) o[k] = 0; return o; }
+function emptyBoost() { const o = {}; for (const k of BOOST_KEYS) o[k] = 0; return o; }
+
+/* Announcing a combo is a side effect, so it is deliberately NOT inside
+   recomputeTurret — that runs on level load, save restore and every lab
+   purchase, and a banner on each of those would be noise. Placement calls
+   recomputeGrid through announceCombos() instead, which diffs the ids. */
+function comboSnapshot() {
+  const o = {};
+  for (const t of tiles) if (t.kind === 'turret') o[key(t.r, t.c)] = t.combo ? t.combo.id : '';
+  return o;
+}
+function announceCombos(before) {
+  for (const t of tiles) {
+    if (t.kind !== 'turret' || !t.combo) continue;
+    const was = before[key(t.r, t.c)];
+    if (was === t.combo.id) continue;
+    t.pulse = 0;
+    toast('★ ' + t.combo.name, t.combo.col);
+    toast(t.combo.blurb, '#8899bb');
+    sfxCombo();
+    if (run && !run.combosFound[t.combo.id]) run.combosFound[t.combo.id] = true;
+    const isNew = !codex[t.combo.id];
+    recordCombo(t.combo.id);
+    if (isNew) toast('NEW DISCOVERY · ' + codexCount() + '/' + COMBO_TOTAL, '#ffc300');
+  }
+}
 
 function recomputeGrid() {
   cellIndex = new Map();
   for (const t of tiles) cellIndex.set(key(t.r, t.c), t);
-  for (const t of tiles) { t.mods = emptyMods(); t.links = []; t.fed = 0; }
+  for (const t of tiles) {
+    t.mods = emptyMods(); t.boost = emptyBoost();
+    t.links = []; t.fed = 0; t.sides = [null, null, null, null];
+  }
+  /* modules feed the four orthogonal sides */
   for (const m of tiles) {
     if (m.kind !== 'module') continue;
-    for (const [dr, dc] of ORTHO) {
+    for (let d = 0; d < 4; d++) {
+      const [dr, dc] = ORTHO[d];
       const n = tileAt(m.r + dr, m.c + dc);
-      if (!n || n.kind === 'module') continue;
-      // ARMOR and REGEN are wall hardware; they do nothing bolted to a turret
-      if ((m.mod === 'armor' || m.mod === 'regen') && n.kind !== 'wall') continue;
+      if (!n || n.kind === 'module' || n.kind === 'booster') continue;
+      if (WALL_ONLY_MODS.includes(m.mod) && n.kind !== 'wall') continue;
       n.mods[m.mod]++;
-      // the structure records the direction of the LENDER, so drawTile can
-      // bloom the edge facing it (dr/dc point module-ward from the structure)
+      // record which SIDE of n this module sits on, from n's point of view:
+      // n is at m+(dr,dc), so the module is at n-(dr,dc) — the opposite side
+      const side = d ^ 1;                    // 0<->1 (up/down), 2<->3 (left/right)
+      n.sides[side] = m.mod;
       n.links.push({ from:m, dr:-dr, dc:-dc });
       m.fed++;
       m.links.push({ to:n, dr, dc });
+    }
+  }
+  /* boosters lift the four diagonals — inert for everything except turrets */
+  for (const b of tiles) {
+    if (b.kind !== 'booster') continue;
+    for (const [dr, dc] of DIAG) {
+      const n = tileAt(b.r + dr, b.c + dc);
+      if (!n || n.kind !== 'turret') continue;
+      n.boost[b.boostKind]++;
+      n.links.push({ from:b, dr:-dr, dc:-dc, diag:true });
+      b.fed++;
+      b.links.push({ to:n, dr, dc, diag:true });
     }
   }
   for (const t of tiles) {
@@ -602,25 +805,61 @@ function labTier(id) { return (run && run.lab[id]) || 0; }
 function modScale(id) { return 1 + (MOD_LAB_STEP[id] || 0) * labTier(id); }
 
 function turretDamage(t) {
+  const amp = AMP_DMG[Math.min(4, t.mods.amp)] * modScale('amp');
   return TURRET.dmg
     * Math.pow(TURRET_LVL_DMG, t.lvl - 1)
-    * (1 + 0.20 * labTier('chassis'));
+    * (1 + 0.20 * labTier('chassis'))
+    * (1 + amp);
+}
+/* How many orthogonal turrets touch this one — RELAY's payoff. */
+function turretNeighbours(t) {
+  let n = 0;
+  for (const [dr, dc] of ORTHO) { const o = tileAt(t.r + dr, t.c + dc); if (o && o.kind === 'turret') n++; }
+  return n;
 }
 function recomputeTurret(t) {
-  const D = turretDamage(t), m = t.mods;
-  t.D = D;
-  t.rate = TURRET.rate * Math.pow(TURRET_LVL_RATE, t.lvl - 1) * (1 + 0.09 * labTier('servo'));
-  t.rangePx = TURRET.range * (1 + 0.08 * labTier('optics')) * cell;
-  t.fireDot   = m.fire  ? D * FIRE_DOT * m.fire * modScale('fire') : 0;
-  t.iceDir    = m.ice   ? D * ICE_DIR  * m.ice  * modScale('ice') : 0;
-  t.iceSlow   = m.ice   ? Math.min(SLOW_CAP, ICE_SLOW * m.ice * modScale('ice')) : 0;
-  t.arcDir    = m.arc   ? D * ARC_DIR  * m.arc  * modScale('arc') : 0;
-  t.arcJumps  = m.arc   ? m.arc + (labTier('arc') >= 4 ? 1 : 0) : 0;
-  t.blastKin  = m.blast ? D * BLAST_KIN  * m.blast * modScale('blast') : 0;
-  t.blastFire = m.blast ? D * BLAST_FIRE * m.blast * modScale('blast') : 0;
-  t.blastR    = m.blast ? (BLAST_R0 + BLAST_RSTEP * m.blast) * (1 + 0.12 * labTier('blast')) * cell : 0;
-  // headline DPS, for the selection panel only
-  t.dps = (D + t.iceDir + t.arcDir * (1 + t.arcJumps) + (t.blastKin + t.blastFire)) * t.rate + t.fireDot * t.rate;
+  const m = t.mods, b = t.boost;
+  const nAmp = Math.min(4, m.amp), nFire = Math.min(4, m.fire);
+  const nIce = Math.min(4, m.ice), nElec = Math.min(4, m.elec), nBlast = Math.min(4, m.blast);
+  const distinct = COMBAT_MODS.filter(k => m[k] > 0);
+  t.combo = COMBOS[comboKeyOf(t.sides)] || null;
+  const E = (t.combo && t.combo.eff) || {};
+  t.eff = E;
+
+  /* the booster multiplier on module output */
+  let mul = 1;
+  if (b.twin > 0 && distinct.length === 1 && m[distinct[0]] >= 2) mul *= Math.pow(2, Math.min(2, b.twin));
+  if (b.prism > 0 && distinct.length >= 2) mul *= 1 + 0.30 * (distinct.length - 1) * Math.min(2, b.prism);
+  if (b.relay > 0) mul *= 1 + 0.22 * turretNeighbours(t) * Math.min(2, b.relay);
+  t.boostMul = Math.min(BOOST_CAP, mul);
+
+  t.D = turretDamage(t);
+  t.rate = TURRET.rate * Math.pow(TURRET_LVL_RATE, t.lvl - 1)
+         * (1 + 0.09 * labTier('servo'))
+         * (1 + 0.40 * Math.min(2, b.clock));
+  t.rangePx = TURRET.range * (1 + 0.08 * labTier('optics')) * (E.rangeMul || 1) * cell;
+
+  /* the payload this turret produces */
+  t.dot     = nFire ? t.D * FIRE_DOT[nFire] * modScale('fire') * t.boostMul : 0;
+  t.chill   = nIce ? Math.min(CHILL_CAP, ICE_CHILL[nIce] * modScale('ice') * t.boostMul) : 0;
+  t.chillT  = nIce ? ICE_T[nIce] * (E.chillTMul || 1) : 0;
+  t.hops    = nElec ? (E.hopsOverride !== undefined ? E.hopsOverride
+                       : ELEC_HOPS[nElec] + (E.hopBonus || 0)) : 0;
+  t.xfer    = nElec ? (E.xferOverride !== undefined ? E.xferOverride
+                       : Math.min(XFER_CAP, Math.max(E.xferFloor || 0,
+                           ELEC_XFER[nElec] * modScale('elec') * t.boostMul))) : 0;
+  t.hopR    = ELEC_R * (E.hopRMul || 1) * cell;
+  t.blast   = nBlast ? Math.min(XFER_CAP, BLAST_XFER[nBlast] * modScale('blast') * t.boostMul) : 0;
+  t.blastR  = nBlast ? BLAST_R[nBlast] * (1 + 0.12 * labTier('blast')) * (E.blastRMul || 1) * cell : 0;
+
+  /* headline numbers for the selection panel only — the real damage is
+     whatever propagate() actually delivers */
+  const spread = 1 + t.blast * 2.5;                     // ~2.5 bodies in a blast
+  let chainMul = 1, s = 1;
+  for (let i = 0; i < t.hops; i++) { s *= t.xfer; chainMul += s; }
+  // burn refreshes rather than stacks, so its sustained rate is total/duration
+  t.dps = (t.D + t.dot / FIRE_T) * t.rate * spread * chainMul;
+  t.targets = Math.round(chainMul * spread * 10) / 10;
 }
 function wallMaxHp(t) {
   return Math.round(WALL.hp
@@ -634,10 +873,12 @@ function recomputeWall(t) {
   t.dr = WALL_ARMOR_DR * t.mods.armor;
   const m = t.mods, M = t.maxHp;
   t.wFire  = m.fire  ? M * WALL_FIRE  * m.fire  * modScale('fire') : 0;
-  t.wIce   = m.ice   ? Math.min(SLOW_CAP, WALL_ICE * m.ice * modScale('ice')) : 0;
-  t.wArc   = m.arc   ? M * WALL_ARC   * m.arc   * modScale('arc') : 0;
+  t.wChill = m.ice   ? Math.min(CHILL_CAP, WALL_ICE * m.ice * modScale('ice')) : 0;
+  t.wArc   = m.elec  ? M * WALL_ARC   * m.elec  * modScale('elec') : 0;
   t.wThorn = m.blast ? M * WALL_THORN * m.blast * modScale('blast') : 0;
+  t.wAmp   = m.amp   ? M * WALL_THORN * m.amp   * modScale('amp') : 0;   // straight kinetic back
   t.wRegen = m.regen ? M * WALL_REGEN * m.regen : 0;
+  t.eff = {};
 }
 
 /* ---------------------------- CAPS AND COSTS -------------------------- */
@@ -647,7 +888,12 @@ function countKind(k) { let n = 0; for (const t of tiles) if (t.kind === k) n++;
 function costOf(kind) {
   if (kind === 'turret') return TURRET.cost;
   if (kind === 'wall') return WALL.cost;
+  if (BOOSTERS[kind]) return BOOSTERS[kind].cost;
   return MODULES[kind].cost;
+}
+function kindOf(k) {
+  if (k === 'turret' || k === 'wall') return k;
+  return BOOSTERS[k] ? 'booster' : 'module';
 }
 function unlocked(kind) { return run ? globalWave() >= UNLOCK[kind] || run.unlocked[kind] : false; }
 function labOpen() { return run ? globalWave() >= LAB_WAVE || run.labSeen : false; }
@@ -665,7 +911,7 @@ function canPlace(kind, r, c) {
   }
   if (pathCells.has(key(r, c))) return false;
   if (kind === 'turret') return countKind('turret') < turretCap();
-  return true;   // modules are limited by cash and by the four sides, nothing else
+  return true;   // modules and boosters are limited by cash and by geometry
 }
 function anyPlacement(kind) {
   if (cash < costOf(kind)) return false;
@@ -678,11 +924,15 @@ function place(kind, r, c, free) {
   if (!free && cash < cost) return false;
   if (!free) cash -= cost;
   let t;
-  if (kind === 'turret') t = { kind:'turret', r, c, lvl:1, cd:0, spent:cost, mods:emptyMods(), links:[] };
-  else if (kind === 'wall') t = { kind:'wall', r, c, lvl:1, spent:cost, hp:0, maxHp:0, d:pathDistOfCell(r, c), mods:emptyMods(), links:[] };
-  else t = { kind:'module', mod:kind, r, c, spent:cost, mods:emptyMods(), links:[] };
+  const base = { r, c, spent:cost, mods:emptyMods(), boost:emptyBoost(), links:[], sides:[null,null,null,null] };
+  if (kind === 'turret') t = Object.assign(base, { kind:'turret', lvl:1, cd:0, tid:0 });
+  else if (kind === 'wall') t = Object.assign(base, { kind:'wall', lvl:1, hp:0, maxHp:0, d:pathDistOfCell(r, c) });
+  else if (BOOSTERS[kind]) t = Object.assign(base, { kind:'booster', boostKind:kind });
+  else t = Object.assign(base, { kind:'module', mod:kind });
   tiles.push(t);
+  const before = comboSnapshot();
   recomputeGrid();
+  announceCombos(before);
   if (kind === 'wall') { t.hp = t.maxHp; }
   if (t.kind === 'module' && t.fed > 0) sfxLink(); else sfxBuild();
   return true;
@@ -736,7 +986,7 @@ function newRunObj() {
   for (const t of LAB) lab[t.id] = 0;
   return {
     level:1, wave:1, lives:LIVES_BASE, cores:0, score:0, levelScore:0,
-    retries:0, lab, unlocked:{}, labSeen:false, recorded:false,
+    retries:0, lab, unlocked:{}, labSeen:false, recorded:false, combosFound:{},
     elapsed:0, levelElapsed:0, levelTimes:[], won:false,
   };
 }
@@ -757,7 +1007,7 @@ function startLevel(L) {
   // reverts, so a level can never be farmed for cores by dying on purpose.
   run.snapshot = { cores:run.cores, score:run.score, lab:Object.assign({}, run.lab) };
   buildPath(mapIndexFor(L));
-  tiles = []; cellIndex = new Map(); creeps = []; spawnList = []; beams = []; floats = []; sparks = [];
+  tiles = []; cellIndex = new Map(); creeps = []; spawnList = []; beams = []; floats = []; sparks = []; grounds = [];
   sel = null; armedKind = null; dragCard = null;
   cash = startCashFor(L);
   levelLeaks = 0; levelKills = 0;
@@ -887,7 +1137,8 @@ function spawnCreep(e) {
   creeps.push({
     id: ++creepSeq, type:e.type, def, elite:e.elite,
     hp:e.hp, maxHp:e.hp, spd:e.spd, bounty:e.bounty, arm:e.arm,
-    d:0, x:0, y:0, dots:[], slow:0, slowT:0, atkCd:0, dead:false, hitFlash:0,
+    d:0, x:0, y:0, burn:null, chill:0, chillT:0, chillAmp:0, chillShred:0,
+    atkCd:0, dead:false, hitFlash:0,
   });
 }
 
@@ -897,13 +1148,22 @@ function spawnCreep(e) {
      ELEMENTAL is reduced by a PERCENTAGE resist
    That is the whole reason a one-note grid loses. HULK's armour eats a
    bare turret; WARD's resist eats a wall of fire; the BREAKER has both. */
-function dealDamage(c, amount, type, tag) {
+function dealDamage(c, amount, type, tag, opts) {
   if (!c || c.dead || amount <= 0) return 0;
+  const o = opts || {};
+  const chilled = c.chillT > 0;
   let dmg;
-  if (type === 'kin') dmg = Math.max(amount * KIN_FLOOR, amount - (c.arm !== undefined ? c.arm : c.def.arm));
-  else dmg = amount * (1 - c.def.res);
+  if (type === 'kin') {
+    let arm = (c.arm !== undefined ? c.arm : c.def.arm);
+    if (chilled && c.chillShred) arm *= 1 - c.chillShred;    // HAILSTORM cracks it
+    if (o.pierce) arm *= 1 - o.pierce;                        // SIEGE / DEMOLITION
+    dmg = Math.max(amount * KIN_FLOOR, amount - arm);
+  } else {
+    dmg = o.ignoreResist ? amount : amount * (1 - c.def.res); // THERMAL LANCE
+  }
+  if (chilled && c.chillAmp) dmg *= 1 + c.chillAmp;           // FROSTBITE
   c.hp -= dmg; c.hitFlash = 0.12;
-  if (dmgLog) dmgLog.push({ id:c.id, amt:dmg, raw:amount, type, tag:tag || '' });
+  if (dmgLog) dmgLog.push({ id:c.id, amt:dmg, raw:amount, type, tag:tag || '', parts:o.parts ? Object.assign({}, o.parts) : null });
   if (c.hp <= 0 && !c.dead) killCreep(c);
   return dmg;
 }
@@ -915,15 +1175,27 @@ function killCreep(c) {
   for (let i = 0; i < 5; i++)
     sparks.push({ x:c.x, y:c.y, vx:(RNG() - 0.5) * 130, vy:(RNG() - 0.5) * 130, t:0.35, col:c.def.col });
 }
-function applyDot(c, total, dur, tag) {
+/* The burn REFRESHES rather than stacks: one burn per creep, and a stronger
+   application replaces a weaker one. Stacking made a 1/s turret with a 5 s
+   burn reach five concurrent copies, which turned FIRE's headline number
+   into five times itself and made it impossible to reason about. */
+function applyDot(c, total, dur, opts) {
   if (!c || c.dead || total <= 0) return;
-  c.dots.push({ dps: total / dur, t: dur, tag: tag || 'fire' });
-  if (c.dots.length > 24) c.dots.shift();
+  const o = opts || {};
+  const dps = total / dur;
+  if (!c.burn || dps >= c.burn.dps) {
+    c.burn = { dps, t: dur, ignoreResist: !!o.ignoreResist,
+               chillDouble: !!o.chillDouble, spread: o.spread || 0 };
+  } else {
+    c.burn.t = Math.max(c.burn.t, dur);
+  }
 }
-function applySlow(c, mul, dur) {
-  if (!c || c.dead || mul <= 0) return;
-  if (mul >= c.slow || c.slowT <= 0) c.slow = Math.min(SLOW_CAP, mul);
-  c.slowT = Math.max(c.slowT, dur);
+function applyChill(c, potency, dur, opts) {
+  if (!c || c.dead || potency <= 0) return;
+  const o = opts || {};
+  const p = Math.min(CHILL_CAP, o.capped ? CHILL_CAP : potency);
+  if (p >= c.chill || c.chillT <= 0) { c.chill = p; c.chillAmp = o.amp || 0; c.chillShred = o.shred || 0; }
+  c.chillT = Math.max(c.chillT, dur);
 }
 function nearestCreep(from, radiusPx, exclude) {
   let best = null, bd = radiusPx * radiusPx;
@@ -934,55 +1206,101 @@ function nearestCreep(from, radiusPx, exclude) {
   }
   return best;
 }
-/* Chain lightning: the primary target takes the arc damage too, then the
-   bolt jumps to the nearest enemy it has not already touched. Each bolt
-   can only hit a target once — that is what stops a two-creep board
-   ping-ponging forever. */
-function arcChain(origin, dmg, jumps, srcX, srcY) {
-  const hit = new Set([origin.id]);
-  dealDamage(origin, dmg, 'ele', 'arc');
-  let prev = origin, px = srcX, py = srcY;
-  beams.push({ x1:px, y1:py, x2:origin.x, y2:origin.y, t:0.12, col:MODULES.arc.col, w:2 });
-  for (let i = 0; i < jumps; i++) {
-    const nx = nearestCreep(prev, ARC_JUMP_R * cell, hit);
-    if (!nx) break;
-    beams.push({ x1:prev.x, y1:prev.y, x2:nx.x, y2:nx.y, t:0.12, col:MODULES.arc.col, w:2 });
-    dealDamage(nx, dmg, 'ele', 'arc');
-    hit.add(nx.id); prev = nx;
-  }
-  sfxArc();
+
+/* ======================== PAYLOAD PROPAGATION =========================
+   One payload, copied outwards. DAMAGE is multiplied by `scale` at every
+   copy; EFFECTS land at full potency wherever the payload reaches. This
+   single recursion is what reproduces the spec's worked example to the
+   decimal, and what makes every module combination compose.            */
+/* One shot ACCUMULATES per enemy and commits once. That matters because the
+   burn refreshes rather than stacks: applied piecemeal, an enemy standing in
+   its own blast would keep only the larger of the direct burn and the splash
+   burn (7.5, discarding 1.875) instead of the spec's 9.375. Accumulating
+   inside the shot and refreshing only BETWEEN shots gives both — the spec's
+   arithmetic exactly, and a burn that cannot be stacked into absurdity by a
+   fast turret. It also means one damage application per enemy per shot. */
+function addTo(acc, c, P, scale, E) {
+  let a = acc.get(c.id);
+  if (!a) { a = { c, kin:0, dot:0, chill:0, chillT:0, parts:{ hit:0, blast:0, arc:0 } }; acc.set(c.id, a); }
+  a.kin += P.kin * scale;
+  a.dot += P.dot * (E.dotNoDecay ? 1 : scale);
+  if (P.chill > 0) { a.chill = Math.max(a.chill, P.chill); a.chillT = Math.max(a.chillT, P.chillT); }
+  return a;
 }
-function blastAt(cx, cy, radius, kin, ele) {
+function commitShot(t, acc) {
+  const E = t.eff || {};
+  for (const a of acc.values()) {
+    if (a.c.dead) continue;
+    if (a.kin > 0) dealDamage(a.c, a.kin, 'kin', 'shot', { pierce: E.pierce || 0, parts: a.parts });
+    if (a.dot > 0) applyDot(a.c, a.dot, FIRE_T, {
+      ignoreResist: E.dotIgnoreResist, chillDouble: E.dotChillDouble, spread: E.dotSpread });
+    if (a.chill > 0) applyChill(a.c, a.chill, a.chillT, {
+      capped: E.chillCapped, amp: E.chillAmp || 0, shred: E.chillShred || 0 });
+  }
+}
+function detonate(t, P, scale, cx, cy, radius, acc) {
   for (const c of creeps) {
     if (c.dead) continue;
     if (Math.hypot(c.x - cx, c.y - cy) > radius) continue;
-    if (kin > 0) dealDamage(c, kin, 'kin', 'blast');
-    if (ele > 0) dealDamage(c, ele, 'ele', 'blast');
+    addTo(acc, c, P, scale, t.eff || {}).parts.blast += P.kin * scale;
   }
   sparks.push({ x:cx, y:cy, vx:0, vy:0, t:0.22, col:MODULES.blast.col, ring:radius });
+  if ((t.eff || {}).groundFire && P.dot > 0) {
+    grounds.push({ x:cx, y:cy, r:radius, t:GROUND_T, dps:P.dot * scale / FIRE_T, tick:0 });
+  }
   sfxBlast();
 }
-function turretTarget(t) {
-  const x = cellCx(t.c), y = cellCy(t.r), R = t.rangePx;
+function propagate(t, target, P, scale, hopsLeft, hit, acc, part) {
+  addTo(acc, target, P, scale, t.eff || {}).parts[part || 'hit'] += P.kin * scale;
+  if (t.blast > 0) detonate(t, P, scale * t.blast, target.x, target.y, t.blastR, acc);
+  if (hopsLeft <= 0 || t.xfer <= 0) return;
+  const next = nearestCreep(target, t.hopR, hit);
+  if (!next) return;
+  hit.add(next.id);
+  beams.push({ x1:target.x, y1:target.y, x2:next.x, y2:next.y, t:0.12, col:MODULES.elec.col, w:2 });
+  // CHAIN REACTION detonates every hop at its own full local strength rather
+  // than at the transferred fraction
+  const detonScale = (t.eff || {}).hopDetonate ? scale * t.xfer : null;
+  propagate(t, next, P, scale * t.xfer, hopsLeft - 1, hit, acc, 'arc');
+  if (detonScale !== null && t.blast > 0) detonate(t, P, detonScale, next.x, next.y, t.blastR, acc);
+}
+/* ------------------------- CONTINUOUS TRACKING ------------------------
+   A turret HOLDS its target frame to frame and only lets go when the
+   target dies or leaves range — then it snaps to the next one in the same
+   frame, with no cooldown penalty for the switch. The barrel keeps turning
+   to follow whether or not it is ready to fire, which is what makes the
+   board read as a set of machines watching the road. */
+function creepById(id) {
+  for (const c of creeps) if (c.id === id && !c.dead) return c;
+  return null;
+}
+function pickTarget(t, x, y) {
   let best = null;
   for (const c of creeps) {
     if (c.dead) continue;
-    if (Math.hypot(c.x - x, c.y - y) > R) continue;
+    if (Math.hypot(c.x - x, c.y - y) > t.rangePx) continue;
     if (!best || c.d > best.d) best = c;     // furthest along the road
   }
   return best;
 }
+function trackTarget(t) {
+  const x = cellCx(t.c), y = cellCy(t.r);
+  let cur = t.tid ? creepById(t.tid) : null;
+  if (cur && Math.hypot(cur.x - x, cur.y - y) > t.rangePx) cur = null;   // walked out
+  if (!cur) { cur = pickTarget(t, x, y); t.tid = cur ? cur.id : 0; }     // snap, instantly
+  if (cur) t.aim = Math.atan2(cur.y - y, cur.x - x);
+  return cur;
+}
 function turretFire(t, target) {
   const x = cellCx(t.c), y = cellCy(t.r);
-  t.aim = Math.atan2(target.y - y, target.x - x);
+  const P = { kin: t.D, dot: t.dot, chill: t.chill, chillT: t.chillT };
   beams.push({ x1:x, y1:y, x2:target.x, y2:target.y, t:0.07, col:'#e8eeff', w:1.6 });
-  dealDamage(target, t.D, 'kin', 'turret');
-  if (t.iceDir > 0) dealDamage(target, t.iceDir, 'ele', 'ice');
-  if (t.iceSlow > 0) applySlow(target, t.iceSlow, ICE_T);
-  if (t.fireDot > 0) { applyDot(target, t.fireDot, FIRE_T, 'fire'); sfxBurn(); }
-  if (t.blastKin > 0 || t.blastFire > 0) blastAt(target.x, target.y, t.blastR, t.blastKin, t.blastFire);
-  if (t.arcDir > 0) arcChain(target, t.arcDir, t.arcJumps, x, y);
-  else sfxShot();
+  const acc = new Map();
+  propagate(t, target, P, 1, t.hops, new Set([target.id]), acc, 'hit');
+  commitShot(t, acc);
+  if (t.hops > 0) sfxArc();
+  else if (t.blast <= 0) sfxShot();
+  if (t.dot > 0) sfxBurn();
 }
 
 /* ------------------------------- WALLS -------------------------------- */
@@ -996,18 +1314,39 @@ function wallAhead(d) {
   return best;
 }
 function creepHitsWall(c, wall, dt) {
-  const rate = 1 * (1 - (c.slowT > 0 ? c.slow : 0));
+  const rate = 1 * (1 - (c.chillT > 0 ? c.chill : 0));   // chill slows attack speed too
   c.atkCd -= dt * rate;
   if (c.atkCd > 0) return;
   c.atkCd = 1;
   const raw = c.def.wall * (c.elite ? 1.3 : 1);
   wall.hp -= Math.max(raw * 0.2, raw - wall.dr);
   sfxWallHit();
-  // the wall answers with whatever is bolted to its two free sides
-  if (wall.wFire > 0) applyDot(c, wall.wFire, WALL_FIRE_T, 'fire');
-  if (wall.wIce > 0) applySlow(c, wall.wIce, WALL_ICE_T);
-  if (wall.wThorn > 0) blastAt(c.x, c.y, WALL_THORN_R * cell, wall.wThorn, 0);
-  if (wall.wArc > 0) arcChain(c, wall.wArc, WALL_ARC_JUMPS, cellCx(wall.c), cellCy(wall.r));
+  /* The wall answers with whatever is bolted to its two free sides. It uses
+     the same primitives as a turret, so ICE on a wall chills exactly as ICE
+     on a turret does — the module means one thing everywhere. */
+  if (wall.wFire > 0) applyDot(c, wall.wFire, WALL_FIRE_T, {});
+  if (wall.wChill > 0) applyChill(c, wall.wChill, WALL_ICE_T, {});
+  if (wall.wThorn > 0) {
+    for (const o of creeps) {
+      if (o.dead || Math.hypot(o.x - c.x, o.y - c.y) > WALL_THORN_R * cell) continue;
+      dealDamage(o, wall.wThorn, 'kin', 'thorn');
+    }
+    sparks.push({ x:c.x, y:c.y, vx:0, vy:0, t:0.2, col:MODULES.blast.col, ring:WALL_THORN_R * cell });
+  }
+  if (wall.wAmp > 0) dealDamage(c, wall.wAmp, 'kin', 'thorn');
+  if (wall.wArc > 0) {
+    const hit = new Set([c.id]);
+    dealDamage(c, wall.wArc, 'ele', 'arc');
+    let prev = c;
+    for (let k = 0; k < WALL_ARC_JUMPS; k++) {
+      const nx = nearestCreep(prev, ELEC_R * cell, hit);
+      if (!nx) break;
+      beams.push({ x1:prev.x, y1:prev.y, x2:nx.x, y2:nx.y, t:0.12, col:MODULES.elec.col, w:2 });
+      dealDamage(nx, wall.wArc * 0.6, 'ele', 'arc');
+      hit.add(nx.id); prev = nx;
+    }
+    sfxArc();
+  }
   if (wall.hp <= 0) {
     wall.hp = 0;
     sfxWallDie();
@@ -1050,13 +1389,23 @@ function update(dt) {
   for (const c of creeps) {
     if (c.dead) continue;
     c.hitFlash = Math.max(0, c.hitFlash - dt);
-    if (c.slowT > 0) { c.slowT -= dt; if (c.slowT <= 0) c.slow = 0; }
-    for (let i = c.dots.length - 1; i >= 0; i--) {
-      const d = c.dots[i];
-      const step = Math.min(dt, d.t);
-      dealDamage(c, d.dps * step, 'ele', 'dot');
-      d.t -= dt;
-      if (d.t <= 0) c.dots.splice(i, 1);
+    if (c.chillT > 0) { c.chillT -= dt; if (c.chillT <= 0) { c.chill = 0; c.chillAmp = 0; c.chillShred = 0; } }
+    if (c.burn) {
+      const b = c.burn, step = Math.min(dt, b.t);
+      let amt = b.dps * step;
+      if (b.chillDouble && c.chillT > 0) amt *= 2;            // THERMAL SHOCK
+      dealDamage(c, amt, 'ele', 'dot', { ignoreResist: b.ignoreResist });
+      b.t -= dt;
+      // FIRESTORM: a burn that finds its own neighbours
+      if (b.spread > 0) {
+        for (const o of creeps) {
+          if (o.dead || o === c || o.burn) continue;
+          if (Math.hypot(o.x - c.x, o.y - c.y) <= b.spread * cell)
+            o.burn = { dps:b.dps * 0.6, t:b.t, ignoreResist:b.ignoreResist,
+                       chillDouble:b.chillDouble, spread:0 };
+        }
+      }
+      if (b.t <= 0) c.burn = null;
     }
     if (c.dead) continue;
     if (c.def.heal) {
@@ -1067,7 +1416,7 @@ function update(dt) {
       }
     }
     if (c.pinned) continue;      // test dummies hold their exact position
-    const v = c.spd * cell * (1 - c.slow);
+    const v = c.spd * cell * (1 - (c.chillT > 0 ? c.chill : 0));
     const wall = wallAhead(c.d);
     const stop = wall ? wall.d - cell * 0.55 : Infinity;
     const nd = Math.min(c.d + v * dt, stop);
@@ -1090,14 +1439,29 @@ function update(dt) {
   }
 
   /* ---- turrets ---- */
+  /* Turrets track every frame — the barrel follows its target whether or not
+     it is ready to fire, and the instant that target dies or leaves range it
+     snaps to the next one without paying a cooldown for the switch. */
   for (const t of tiles) {
     if (t.kind !== 'turret') continue;
+    const target = trackTarget(t);
     t.cd -= dt;
-    if (t.cd > 0) continue;
-    const target = turretTarget(t);
-    if (!target) continue;
+    if (t.cd > 0 || !target) continue;
     t.cd = 1 / t.rate;
     turretFire(t, target);
+  }
+  /* burning ground left by the grenade launcher */
+  for (let i = grounds.length - 1; i >= 0; i--) {
+    const g = grounds[i];
+    g.t -= dt; g.tick += dt;
+    if (g.tick >= 0.25) {
+      const step = g.tick; g.tick = 0;
+      for (const c of creeps) {
+        if (c.dead) continue;
+        if (Math.hypot(c.x - g.x, c.y - g.y) <= g.r) dealDamage(c, g.dps * step, 'ele', 'ground');
+      }
+    }
+    if (g.t <= 0) grounds.splice(i, 1);
   }
 
   creeps = creeps.filter(c => !c.dead);
@@ -1107,6 +1471,7 @@ function update(dt) {
     const s = sparks[i]; s.t -= dt; s.x += s.vx * dt; s.y += s.vy * dt;
     if (s.t <= 0) sparks.splice(i, 1);
   }
+  for (const t of tiles) if (t.kind === 'turret' && t.combo) t.pulse = (t.pulse || 0) + dt;
   for (let i = toasts.length - 1; i >= 0; i--) { toasts[i].t -= dt; if (toasts[i].t <= 0) toasts.splice(i, 1); }
 
   /* ---- lifecycle ---- */
@@ -1120,7 +1485,7 @@ function update(dt) {
     applyUnlocks();
     phase = 'gap'; phaseT = GAP_T;
     const nk = BUILD_ORDER.find(k => UNLOCK[k] === globalWave());
-    if (nk) { toast('UNLOCKED · ' + (nk === 'turret' ? 'TURRET' : nk === 'wall' ? 'WALL' : MODULES[nk].name), '#39ff14'); sfxUnlock(); }
+    if (nk) { toast('UNLOCKED · ' + (nk === 'turret' ? 'TURRET' : nk === 'wall' ? 'WALL' : BOOSTERS[nk] ? BOOSTERS[nk].name + ' BOOSTER' : MODULES[nk].name), '#39ff14'); sfxUnlock(); }
     if (globalWave() === LAB_WAVE) { toast('THE LAB IS OPEN · SPEND CORES', '#ffc300'); sfxUnlock(); }
     autoSave();
   }
@@ -1155,6 +1520,13 @@ window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 120));
 if (window.visualViewport) window.visualViewport.addEventListener('resize', () => setTimeout(resize, 60));
 
+/* The colour a link is drawn in, whichever kind of tile is lending it. */
+function linkColour(from) {
+  if (!from) return null;
+  if (from.kind === 'module') return MODULES[from.mod] ? MODULES[from.mod].col : null;
+  if (from.kind === 'booster') return BOOSTERS[from.boostKind] ? BOOSTERS[from.boostKind].col : null;
+  return null;
+}
 function roundRect(x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -1195,6 +1567,21 @@ function drawModuleShape(x, y, s, mod) {
   ctx.font = Math.round(s * 0.42) + 'px "Share Tech Mono", monospace';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(M.glyph, 0, s * 0.02);
+  ctx.restore();
+}
+function drawBoosterShape(x, y, s, kindKey) {
+  const B = BOOSTERS[kindKey];
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.PI / 4);
+  roundRect(-s * 0.27, -s * 0.27, s * 0.54, s * 0.54, s * 0.09);
+  ctx.fillStyle = B.col + '2e'; ctx.fill();
+  ctx.strokeStyle = B.col; ctx.lineWidth = 1.2; ctx.stroke();
+  ctx.rotate(-Math.PI / 4);
+  ctx.fillStyle = B.col;
+  ctx.font = Math.round(s * 0.40) + 'px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(B.glyph, 0, s * 0.02);
   ctx.restore();
 }
 function drawWallShape(x, y, s, frac) {
@@ -1245,11 +1632,11 @@ function drawCreepShape(c, x, y, r) {
     ctx.rect(-t, -r, t * 2, r * 2); ctx.rect(-r, -t, r * 2, t * 2);
   }
   ctx.fill(); ctx.stroke();
-  if (c.dots.length) {
+  if (c.burn) {
     ctx.strokeStyle = MODULES.fire.col; ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.arc(0, 0, r + 3, 0, Math.PI * 2); ctx.stroke();
   }
-  if (c.slowT > 0) {
+  if (c.chillT > 0) {
     ctx.strokeStyle = MODULES.ice.col; ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.arc(0, 0, r + 6, 0, Math.PI * 1.4); ctx.stroke();
   }
@@ -1327,18 +1714,29 @@ function draw() {
   ctx.save();
   ctx.lineCap = 'round';
   for (const m of tiles) {
-    if (m.kind !== 'module' || !m.links.length) continue;
+    if ((m.kind !== 'module' && m.kind !== 'booster') || !m.links.length) continue;
+    const lcol = linkColour(m);
+    if (!lcol) continue;
     const mx = cellCx(m.c), my = cellCy(m.r);
     for (const l of m.links) {
       const tx = cellCx(l.to.c), ty = cellCy(l.to.r);
-      /* Two adjacent tiles are one cell apart and each plate is 0.88 of a
-         cell, so only ~12% of this line is ever visible — it has to be fat
-         and bright to read as a conduit rather than a seam. */
-      ctx.strokeStyle = MODULES[m.mod].col;
-      ctx.globalAlpha = 0.22; ctx.lineWidth = cell * 0.42;
-      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke();
-      ctx.globalAlpha = 1; ctx.lineWidth = cell * 0.20;
-      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke();
+      ctx.strokeStyle = lcol;
+      if (l.diag) {
+        /* a booster's conduit runs corner to corner, so it draws thin and
+           dashed to read as a different KIND of connection than a side feed */
+        ctx.setLineDash([5, 4]);
+        ctx.globalAlpha = 0.9; ctx.lineWidth = cell * 0.09;
+        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke();
+        ctx.setLineDash([]);
+      } else {
+        /* Two adjacent tiles are one cell apart and each plate is 0.88 of a
+           cell, so only ~12% of this line is ever visible — it has to be fat
+           and bright to read as a conduit rather than a seam. */
+        ctx.globalAlpha = 0.22; ctx.lineWidth = cell * 0.42;
+        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.lineWidth = cell * 0.20;
+        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke();
+      }
     }
   }
   ctx.globalAlpha = 1;
@@ -1356,6 +1754,15 @@ function draw() {
       ctx.lineWidth = 1; ctx.stroke();
       drawModuleShape(x, y, cell, t.mod);
       ctx.globalAlpha = 1;
+    } else if (t.kind === 'booster') {
+      if (t.fed === 0) ctx.globalAlpha = 0.42;
+      ctx.fillStyle = '#0d0d1c';
+      roundRect(x - cell * 0.42, y - cell * 0.42, cell * 0.84, cell * 0.84, 9);
+      ctx.fill();
+      ctx.strokeStyle = t.fed ? BOOSTERS[t.boostKind].col + '99' : '#22223c';
+      ctx.lineWidth = 1; ctx.stroke();
+      drawBoosterShape(x, y, cell, t.boostKind);
+      ctx.globalAlpha = 1;
     } else if (t.kind === 'turret') {
       ctx.fillStyle = '#0d0d1c';
       roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5);
@@ -1365,26 +1772,40 @@ function draw() {
       roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5);
       ctx.clip();
       for (const l of t.links) {
-        const M = MODULES[l.from.mod];
+        // links come from modules (sides) AND boosters (diagonals) now
+        const col = linkColour(l.from);
+        if (!col) continue;
         const gx = x + l.dc * cell * 0.44, gy = y + l.dr * cell * 0.44;
         const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, cell * 0.55);
-        g.addColorStop(0, M.col + 'aa'); g.addColorStop(1, M.col + '00');
+        g.addColorStop(0, col + 'aa'); g.addColorStop(1, col + '00');
         ctx.fillStyle = g;
         ctx.fillRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88);
       }
       ctx.restore();
       ctx.strokeStyle = '#66708c'; ctx.lineWidth = 1;
       roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5); ctx.stroke();
+      /* A named combo gets a pulsing outline in its own colour — the one
+         piece of state on this board that says "you made something". */
+      if (t.combo) {
+        const pu = 0.55 + 0.45 * Math.sin((t.pulse || 0) * 3.4);
+        ctx.strokeStyle = t.combo.col;
+        ctx.globalAlpha = pu; ctx.lineWidth = 2.4;
+        roundRect(x - cell * 0.47, y - cell * 0.47, cell * 0.94, cell * 0.94, 6); ctx.stroke();
+        ctx.globalAlpha = pu * 0.35; ctx.lineWidth = 6;
+        roundRect(x - cell * 0.47, y - cell * 0.47, cell * 0.94, cell * 0.94, 6); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
       drawTurretShape(x, y, cell, t.lvl, t.aim);
     } else if (t.kind === 'wall') {
       ctx.save();
       roundRect(x - cell * 0.46, y - cell * 0.46, cell * 0.92, cell * 0.92, 4);
       ctx.clip();
       for (const l of t.links) {
-        const M = MODULES[l.from.mod];
+        const col = linkColour(l.from);
+        if (!col) continue;
         const gx = x + l.dc * cell * 0.46, gy = y + l.dr * cell * 0.46;
         const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, cell * 0.6);
-        g.addColorStop(0, M.col + 'aa'); g.addColorStop(1, M.col + '00');
+        g.addColorStop(0, col + 'aa'); g.addColorStop(1, col + '00');
         ctx.fillStyle = g;
         ctx.fillRect(x - cell * 0.46, y - cell * 0.46, cell * 0.92, cell * 0.92);
       }
@@ -1405,6 +1826,14 @@ function draw() {
   /* creeps, beams, sparks — clipped to the board so nothing walks into the HUD */
   ctx.save();
   ctx.beginPath(); ctx.rect(boardX, boardY, boardW, boardH); ctx.clip();
+  for (const g of grounds) {
+    const a = clamp(g.t / GROUND_T, 0, 1);
+    const gr = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, g.r);
+    gr.addColorStop(0, 'rgba(255,120,30,' + (0.34 * a).toFixed(3) + ')');
+    gr.addColorStop(1, 'rgba(255,60,10,0)');
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2); ctx.fill();
+  }
   for (const b of beams) {
     ctx.strokeStyle = b.col; ctx.globalAlpha = clamp(b.t * 9, 0, 1); ctx.lineWidth = b.w;
     ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
@@ -1521,23 +1950,40 @@ function drawBar() {
   ctx.fillRect(0, barY, W, H - barY);
   ctx.strokeStyle = '#1a1a30'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, barY); ctx.lineTo(W, barY); ctx.stroke();
-  cardRects = [];
+  cardRects = []; tabRects = [];
   panelBtns = {};
   if (!run) return;
-
   if (sel) { drawPanel(); return; }
 
+  /* tab row */
+  const tw = (W - 8 * (BAR_TABS.length + 1)) / BAR_TABS.length, th = 20;
+  BAR_TABS.forEach((tb, i) => {
+    const x = 8 + i * (tw + 8), y = barY + 5;
+    const on = barTab === tb.id;
+    const any = tb.keys.some(unlocked);
+    ctx.fillStyle = on ? '#1a1a34' : '#0d0d1c';
+    roundRect(x, y, tw, th, 5); ctx.fill();
+    ctx.strokeStyle = on ? '#ffc300' : '#23233d'; ctx.lineWidth = on ? 1.6 : 1; ctx.stroke();
+    ctx.fillStyle = on ? '#ffc300' : (any ? '#8899bb' : '#4b5470');
+    ctx.font = '9px "Black Ops One", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(tb.label, x + tw / 2, y + th / 2 + 1);
+    tabRects.push({ id:tb.id, x, y, w:tw, h:th });
+  });
+
+  const keys = (BAR_TABS.find(t => t.id === barTab) || BAR_TABS[0]).keys;
   const pad = 6, cols = 4;
-  const cw = (W - pad * (cols + 1)) / cols, ch = 46;
-  BUILD_ORDER.forEach((k, i) => {
+  const cw = (W - pad * (cols + 1)) / cols, ch = 42;
+  keys.forEach((k, i) => {
     const col = i % cols, row = Math.floor(i / cols);
-    const x = pad + col * (cw + pad), y = barY + 6 + row * (ch + 6);
+    const x = pad + col * (cw + pad), y = barY + 30 + row * (ch + 5);
     const un = unlocked(k);
     const cost = costOf(k);
     const afford = cash >= cost;
     const capped = k === 'turret' ? countKind('turret') >= turretCap()
                  : k === 'wall' ? countKind('wall') >= wallCap() : false;
-    const col2 = k === 'turret' ? '#c9d2e6' : k === 'wall' ? '#98a4bf' : MODULES[k].col;
+    const col2 = k === 'turret' ? '#c9d2e6' : k === 'wall' ? '#98a4bf'
+               : BOOSTERS[k] ? BOOSTERS[k].col : MODULES[k].col;
     const live = un && afford && !capped;
     ctx.fillStyle = armedKind === k ? '#1a1a34' : '#0d0d1c';
     roundRect(x, y, cw, ch, 7); ctx.fill();
@@ -1545,60 +1991,75 @@ function drawBar() {
     ctx.lineWidth = armedKind === k ? 2 : 1; ctx.stroke();
     ctx.save();
     ctx.globalAlpha = un ? (live ? 1 : 0.42) : 0.22;
-    if (k === 'turret') drawTurretShape(x + 17, y + ch / 2 - 3, cell * 0.82, 1);
-    else if (k === 'wall') drawWallShape(x + 17, y + ch / 2 - 3, cell * 0.72, 1);
-    else drawModuleShape(x + 17, y + ch / 2 - 3, cell * 0.9, k);
+    if (k === 'turret') drawTurretShape(x + 16, y + ch / 2 - 2, cell * 0.74, 1);
+    else if (k === 'wall') drawWallShape(x + 16, y + ch / 2 - 2, cell * 0.64, 1);
+    else if (BOOSTERS[k]) drawBoosterShape(x + 16, y + ch / 2 - 2, cell * 0.82, k);
+    else drawModuleShape(x + 16, y + ch / 2 - 2, cell * 0.82, k);
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.font = '9px "Black Ops One", sans-serif';
+    ctx.font = '8.5px "Black Ops One", sans-serif';
     ctx.fillStyle = un ? col2 : '#4b5470';
-    const nm = k === 'turret' ? 'TURRET' : k === 'wall' ? 'WALL' : MODULES[k].name;
-    ctx.fillText(nm, x + 32, y + 14);
+    const nm = k === 'turret' ? 'TURRET' : k === 'wall' ? 'WALL'
+             : BOOSTERS[k] ? BOOSTERS[k].name : MODULES[k].name;
+    ctx.fillText(nm, x + 30, y + 13);
     ctx.font = '10px "Share Tech Mono", monospace';
     if (!un) {
       ctx.fillStyle = '#4b5470';
-      ctx.fillText('W' + UNLOCK[k], x + 32, y + 30);
+      ctx.fillText('W' + UNLOCK[k], x + 30, y + 29);
     } else {
       ctx.fillStyle = afford ? '#39ff14' : '#ff2244';
-      ctx.fillText('$' + cost, x + 32, y + 30);
+      ctx.fillText('$' + cost, x + 30, y + 29);
       if (k === 'turret' || k === 'wall') {
         ctx.fillStyle = capped ? '#ff2244' : '#8899bb';
         ctx.textAlign = 'right';
         const have = countKind(k), cap = k === 'turret' ? turretCap() : wallCap();
-        ctx.fillText(have + '/' + cap, x + cw - 7, y + 30);
+        ctx.fillText(have + '/' + cap, x + cw - 7, y + 29);
       }
     }
     ctx.restore();
     cardRects.push({ kind:k, x, y, w:cw, h:ch, un, afford, capped });
   });
 }
-
 function drawPanel() {
   const t = sel;
   const pad = 8;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
-  const nm = t.kind === 'turret' ? 'TURRET · LVL ' + t.lvl
-           : t.kind === 'wall' ? 'WALL' : MODULES[t.mod].name + ' MODULE';
-  ctx.font = '12px "Black Ops One", sans-serif'; ctx.fillStyle = '#ffc300';
+  const nm = t.kind === 'turret' ? (t.combo ? '★ ' + t.combo.name : 'TURRET · LVL ' + t.lvl)
+           : t.kind === 'wall' ? 'WALL'
+           : t.kind === 'booster' ? BOOSTERS[t.boostKind].name + ' BOOSTER'
+           : MODULES[t.mod].name + ' MODULE';
+  ctx.font = (nm.length > 22 ? '9.5px' : '12px') + ' "Black Ops One", sans-serif';
+  ctx.fillStyle = t.kind === 'turret' && t.combo ? t.combo.col : '#ffc300';
   ctx.fillText(nm, pad + 2, barY + 16);
 
   ctx.font = '10px "Share Tech Mono", monospace';
   ctx.fillStyle = '#8899bb';
   let line2 = '', line3 = '';
   if (t.kind === 'turret') {
-    const m = t.mods;
-    const parts = MOD_KEYS.filter(k => m[k] > 0).map(k => MODULES[k].name[0] + m[k]);
-    line2 = 'DMG ' + t.D.toFixed(1) + ' KIN  ·  ' + t.rate.toFixed(2) + '/s  ·  RNG ' + (t.rangePx / cell).toFixed(1);
-    line3 = 'DPS ~' + t.dps.toFixed(0) + (parts.length ? '   MODS ' + parts.join(' ') : '   NO MODULES');
+    const m = t.mods, b = t.boost;
+    const parts = COMBAT_MODS.filter(k => m[k] > 0).map(k => MODULES[k].name[0] + m[k]);
+    const bs = BOOST_KEYS.filter(k => b[k] > 0).map(k => BOOSTERS[k].glyph + b[k]);
+    line2 = 'KIN ' + t.D.toFixed(1) + '  ' + t.rate.toFixed(2) + '/s'
+          + (t.dot ? '  BURN ' + t.dot.toFixed(1) + '/5s' : '')
+          + (t.chill ? '  CHILL ' + Math.round(t.chill * 100) + '%' : '');
+    line3 = (t.hops ? 'ARC x' + t.hops + '@' + Math.round(t.xfer * 100) + '%  ' : '')
+          + (t.blast ? 'SPLASH ' + Math.round(t.blast * 100) + '% r' + (t.blastR / cell).toFixed(1) + '  ' : '')
+          + (parts.length ? parts.join(' ') : 'NO MODULES')
+          + (bs.length ? '  ' + bs.join(' ') : '')
+          + (t.boostMul > 1.001 ? '  x' + t.boostMul.toFixed(2) : '');
   } else if (t.kind === 'wall') {
     line2 = 'HP ' + Math.round(t.hp) + '/' + t.maxHp + '  ·  DR ' + t.dr;
     const bits = [];
     if (t.wFire) bits.push('BURN ' + t.wFire.toFixed(0));
-    if (t.wIce) bits.push('SLOW ' + Math.round(t.wIce * 100) + '%');
+    if (t.wChill) bits.push('CHILL ' + Math.round(t.wChill * 100) + '%');
     if (t.wArc) bits.push('ARC ' + t.wArc.toFixed(0));
     if (t.wThorn) bits.push('THORN ' + t.wThorn.toFixed(0));
+    if (t.wAmp) bits.push('SLAM ' + t.wAmp.toFixed(0));
     if (t.wRegen) bits.push('REGEN ' + t.wRegen.toFixed(1) + '/s');
     line3 = bits.length ? bits.join('  ') : 'NO MODULES';
+  } else if (t.kind === 'booster') {
+    line2 = 'BOOSTING ' + t.fed + (t.fed === 1 ? ' TURRET' : ' TURRETS') + ' DIAGONALLY';
+    line3 = BOOSTERS[t.boostKind].desc;
   } else {
     line2 = MODULES[t.mod].tag + '  ·  POWERING ' + t.fed + (t.fed === 1 ? ' STRUCTURE' : ' STRUCTURES');
     line3 = t.fed ? 'shared by every neighbour it touches' : 'not touching anything — dead weight';
@@ -1659,6 +2120,9 @@ function onDown(e) {
   initAudio();
   const p = evtPos(e);
   downCard = null;
+  for (const tb of tabRects) {
+    if (hit(tb, p.x, p.y)) { barTab = tb.id; armedKind = null; return; }
+  }
   for (const c of cardRects) {
     if (hit(c, p.x, p.y)) {
       downCard = c;
@@ -1733,7 +2197,7 @@ function snapshotSave() {
   return {
     v:1, pending:pendingStart, run:JSON.parse(JSON.stringify(Object.assign({}, run, { snapshot:null }))),
     cash, phase, phaseT, waveT,
-    tiles: tiles.map(t => ({ kind:t.kind, mod:t.mod, r:t.r, c:t.c, lvl:t.lvl, spent:t.spent, hp:t.hp })),
+    tiles: tiles.map(t => ({ kind:t.kind, mod:t.mod, boostKind:t.boostKind, r:t.r, c:t.c, lvl:t.lvl, spent:t.spent, hp:t.hp })),
   };
 }
 function autoSave() { const s = snapshotSave(); if (s) writeJSON(AUTO_KEY, s); }
@@ -1751,11 +2215,11 @@ function restoreFrom(k) {
   buildPath(mapIndexFor(run.level));
   cash = s.cash;
   tiles = (s.tiles || []).map(t => Object.assign({}, t, {
-    cd:0, mods:emptyMods(), links:[],
+    cd:0, tid:0, mods:emptyMods(), boost:emptyBoost(), links:[], sides:[null,null,null,null],
     d: t.kind === 'wall' ? pathDistOfCell(t.r, t.c) : 0,
     maxHp: t.kind === 'wall' ? 0 : undefined,
   }));
-  creeps = []; spawnList = []; beams = []; floats = []; sparks = []; sel = null; armedKind = null;
+  creeps = []; spawnList = []; beams = []; floats = []; sparks = []; grounds = []; sel = null; armedKind = null;
   recomputeGrid();
   for (const t of tiles) {
     if (t.kind !== 'wall') continue;
@@ -1803,22 +2267,34 @@ function showMenu() {
           <button class="btn ghost small" id="b-scores">SCORES</button>
           <button class="btn ghost small" id="b-set">SETTINGS</button>
         </div>
+        <button class="btn gold small" id="b-codex">★ DISCOVERIES · ${codexCount()}/${COMBO_TOTAL}</button>
         <div class="rules">
           A turret is a <b>gray triangle</b>: 10 kinetic damage, once a second,
-          never misses. Everything that makes it dangerous is a <b>module</b> you
-          bolt to one of its four sides.<br><br>
-          <i>FIRE</i> +10% of the hit as a 5 s burn &nbsp;
-          <i>ICE</i> +2.5% and a 10% slow &nbsp;
-          <i>ARC</i> +5% that chains to the next enemy &nbsp;
-          <i>BLAST</i> +5% kinetic and +2.5% fire, splashed.<br><br>
-          A module feeds <b>every turret and wall it touches</b>, so one tile
-          wedged between two turrets pays both. That sharing is the whole game.<br><br>
+          never misses, never changes. It locks onto whatever is furthest along
+          and snaps to the next the moment that one drops.<br><br>
+          Every shot builds one <b>payload</b>, and the tiles you bolt around
+          the turret shape it or copy it:<br>
+          <i>AMP</i> multiplies the damage &nbsp;
+          <i>FIRE</i> adds a 5-second burn &nbsp;
+          <i>ICE</i> chills — slower movement <b>and</b> slower attacks, no damage of its own &nbsp;
+          <i>ELEC</i> arcs the whole payload to the next enemy &nbsp;
+          <i>BLAST</i> splashes it over everything nearby.<br><br>
+          Copies lose <b>damage</b> as they travel. They never lose the
+          <b>chill</b>.<br><br>
+          Four sides, so four modules. Going all in on one type gets you more
+          than four times as much; mixing buys you reach instead. A module feeds
+          <b>every turret and wall it touches</b>, so one wedged between two
+          turrets pays both.<br><br>
+          The <b>diagonals</b> take boosters — same-type doubling, variety
+          bonuses, neighbour bonuses, fire rate.<br><br>
+          Fill all four sides with two <b>opposite</b> pairs, or four of a kind,
+          and you may have built something with a name. <b>Fifteen exist.</b>
+          One is an INCENDIARY GRENADE LAUNCHER. The rest are yours to find, and
+          the game keeps a list of the ones you have.<br><br>
           <b>Walls</b> go on the road. Enemies stop and hit them, and a wall's
-          two free sides take modules too &mdash; burn, chill, shock, thorns,
-          <i>ARMOR</i> and <i>REGEN</i>.<br><br>
-          <b>HULK</b> has flat armour — and it grows every level, so a bare
-          triangle stops mattering. Only elemental gets through.
-          <b>WARD</b> resists elemental: only kinetic gets through.
+          two free sides take modules too, plus <i>ARMOR</i> and <i>REGEN</i>.<br><br>
+          <b>HULK</b> has flat armour that grows every level: only elemental
+          gets through. <b>WARD</b> resists elemental: only kinetic does.
           <b>No single module answers both.</b><br><br>
           ${CAMPAIGN_LEVELS} levels &middot; ${WAVES_PER_LEVEL} waves each &middot; about 8 minutes a level,
           then endless. A lost level replays; endless does not.
@@ -1828,6 +2304,7 @@ function showMenu() {
   bindTap(document.getElementById('b-new'), () => { closeScreen(); startRun(); });
   if (cont) bindTap(document.getElementById('b-cont'), () => { if (restoreFrom(AUTO_KEY)) closeScreen(); });
   bindTap(document.getElementById('b-slots'), showSlots);
+  bindTap(document.getElementById('b-codex'), () => showCodex(showMenu));
   bindTap(document.getElementById('b-scores'), () => showScoreboard(showMenu));
   bindTap(document.getElementById('b-set'), () => showSettings(showMenu));
 }
@@ -1886,6 +2363,33 @@ function showLab() {
   bindTap(document.getElementById('b-close'), closeScreen);
 }
 
+function showCodex(back) {
+  const found = Object.keys(codex).filter(k => COMBOS_BY_ID[k]);
+  const rows = found.length ? found.map(id => {
+    const c = COMBOS_BY_ID[id];
+    const patt = Object.keys(COMBOS).find(k => COMBOS[k].id === id) || '';
+    const pretty = patt.startsWith('quad:') ? 'four ' + patt.slice(5).toUpperCase()
+      : patt.replace('pair:', '').split('+').map(x => x.toUpperCase()).join(' + ') + ' on opposite sides';
+    return `<div class="card">
+      <div class="lab-name" style="color:${c.col}">★ ${c.name}</div>
+      <div class="lab-desc" style="margin-top:3px">${pretty}</div>
+      <div class="lab-desc" style="color:#667799">${c.blurb}</div>
+    </div>`;
+  }).join('') : '<div class="rules">Nothing yet. Fill all four sides of a turret with two matching opposite pairs — or four of one kind — and see what happens.</div>';
+  openScreen(`
+    <div class="scr">
+      <div class="scr-head"><h2 class="head">DISCOVERIES</h2>
+        <div class="sub">${codexCount()} OF ${COMBO_TOTAL} FOUND</div></div>
+      <div class="scr-body">${rows}
+        <div class="rules">Only what you have actually built is listed. The rest
+        are yours to find: two <b>opposite</b> sides of one module and the other
+        two of another, or four of a kind. A turret carrying one glows and keeps
+        its name.</div>
+      </div>
+      <div class="scr-foot"><button class="btn ghost" id="b-back">BACK</button></div>
+    </div>`);
+  bindTap(document.getElementById('b-back'), back || showMenu);
+}
 function showScoreboard(back) {
   const list = getScores();
   const rows = list.length ? list.map((s, i) => `<tr>
@@ -1919,7 +2423,8 @@ function showSettings(back) {
   rm.addEventListener('input', () => { settings.music = +rm.value; document.getElementById('v-m').textContent = rm.value; applyVolumes(); saveSettings(); });
   rs.addEventListener('input', () => { settings.sfx = +rs.value; document.getElementById('v-s').textContent = rs.value; applyVolumes(); saveSettings(); });
   bindTap(document.getElementById('b-wipe'), () => {
-    [AUTO_KEY, SCORE_KEY, SLOT_KEY(1), SLOT_KEY(2), SLOT_KEY(3)].forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+    [AUTO_KEY, SCORE_KEY, CODEX_KEY, SLOT_KEY(1), SLOT_KEY(2), SLOT_KEY(3)].forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+    codex = {};
     showSettings(back);
   });
   bindTap(document.getElementById('b-back'), back || showMenu);
@@ -1957,6 +2462,7 @@ function showPause() {
       <div class="scr-body">
         <button class="btn" id="b-resume">RESUME</button>
         ${labOpen() ? '<button class="btn gold" id="b-lab">THE LAB</button>' : ''}
+        <button class="btn gold small" id="b-codex">★ DISCOVERIES · ${codexCount()}/${COMBO_TOTAL}</button>
         <div class="row2">
           <button class="btn ghost small" id="b-slots">SAVES</button>
           <button class="btn ghost small" id="b-set">SETTINGS</button>
@@ -1966,6 +2472,7 @@ function showPause() {
     </div>`);
   bindTap(document.getElementById('b-resume'), closeScreen);
   if (labOpen()) bindTap(document.getElementById('b-lab'), showLab);
+  bindTap(document.getElementById('b-codex'), () => showCodex(showPause));
   bindTap(document.getElementById('b-slots'), showSlots);
   bindTap(document.getElementById('b-set'), () => showSettings(showPause));
   bindTap(document.getElementById('b-quit'), () => { endRun(false); });
@@ -2035,12 +2542,18 @@ window.__TB = {
     map: MAPS[mapIdx].name, mapIdx, armed: armedKind,
     lab: run ? Object.assign({}, run.lab) : null, labOpen: labOpen(),
     unlocked: BUILD_ORDER.filter(unlocked), won: run ? run.won : false,
+    boosters: countKind('booster'), barTab,
+    combos: tiles.filter(t => t.kind === 'turret' && t.combo).map(t => t.combo.id),
+    combosFound: run ? Object.keys(run.combosFound) : [],
+    grounds: grounds.length,
   }),
   run: () => run, tilesRaw: () => tiles, creepsRaw: () => creeps,
-  MODULES, TURRET, WALL, CREEPS, LAB, MAPS, BUILD_ORDER, UNLOCK,
+  MODULES, BOOSTERS, COMBOS, TURRET, WALL, CREEPS, LAB, MAPS, BUILD_ORDER, BAR_TABS, UNLOCK,
+  MOD_KEYS, COMBAT_MODS, BOOST_KEYS, comboKeyOf,
   WAVES_PER_LEVEL, CAMPAIGN_LEVELS, TOTAL_WAVES, LAB_WAVE,
-  consts: () => ({ FIRE_DOT, FIRE_T, ICE_DIR, ICE_SLOW, ICE_T, ARC_DIR, ARC_JUMP_R, MOD_LAB_STEP,
-                   BLAST_KIN, BLAST_FIRE, SLOW_CAP, KIN_FLOOR, GRACE_T, GAP_T,
+  consts: () => ({ AMP_DMG, FIRE_DOT, FIRE_T, ICE_CHILL, ICE_T, ELEC_HOPS, ELEC_XFER, ELEC_R,
+                   BLAST_XFER, BLAST_R, CHILL_CAP, XFER_CAP, GROUND_T, BOOST_CAP,
+                   MOD_LAB_STEP, KIN_FLOOR, GRACE_T, GAP_T,
                    WALL_FIRE, WALL_ARC, WALL_THORN, WALL_ICE, WALL_REGEN,
                    TURRET_CAP_BASE, WALL_CAP_BASE }),
   /* drive */
@@ -2067,9 +2580,15 @@ window.__TB = {
     const t = tileAt(r, c);
     if (!t || t.kind !== 'turret') return null;
     return { D:t.D, rate:t.rate, rangeCells:t.rangePx / cell, dps:t.dps, lvl:t.lvl,
-             fireDot:t.fireDot, iceDir:t.iceDir, iceSlow:t.iceSlow, arcDir:t.arcDir,
-             arcJumps:t.arcJumps, blastKin:t.blastKin, blastFire:t.blastFire,
-             blastR:t.blastR / cell, mods:Object.assign({}, t.mods) };
+             dot:t.dot, dotDur:FIRE_T, chill:t.chill, chillT:t.chillT,
+             hops:t.hops, xfer:t.xfer, hopR:t.hopR / cell,
+             blast:t.blast, blastR:t.blastR / cell,
+             boostMul:t.boostMul, targets:t.targets, tid:t.tid || 0,
+             combo: t.combo ? t.combo.id : null,
+             comboName: t.combo ? t.combo.name : null,
+             eff: Object.assign({}, t.eff || {}),
+             sides: t.sides.slice(),
+             mods:Object.assign({}, t.mods), boost:Object.assign({}, t.boost) };
   },
   wallStats: (r, c) => {
     const t = tileAt(r, c);
@@ -2088,7 +2607,8 @@ window.__TB = {
     const o = opts || {};
     const def = Object.assign({}, CREEPS.grub, { arm:o.arm || 0, res:o.res || 0, spd:0, heal:0 });
     const c = { id:++creepSeq, type:'dummy', def, elite:false, hp:o.hp || 1e9, maxHp:o.hp || 1e9,
-                spd:o.spd || 0, bounty:0, d:o.d || 0, x:0, y:0, dots:[], slow:0, slowT:0, atkCd:0,
+                spd:o.spd || 0, bounty:0, d:o.d || 0, x:0, y:0, burn:null, chill:0, chillT:0,
+                chillAmp:0, chillShred:0, atkCd:0,
                 dead:false, hitFlash:0, arm:o.arm || 0, pinned: o.pinned !== false };
     const p = posAt(c.d); c.x = o.x !== undefined ? o.x : p.x; c.y = o.y !== undefined ? o.y : p.y;
     creeps.push(c);
@@ -2098,8 +2618,14 @@ window.__TB = {
      by the next wave spawning halfway through it */
   setPhase: (p, t) => { phase = p; phaseT = t === undefined ? 9999 : t; },
   creepById: id => { const c = creeps.find(z => z.id === id); return c ? { id:c.id, hp:c.hp, maxHp:c.maxHp,
-      slow:c.slow, slowT:c.slowT, dots:c.dots.map(d => ({ dps:d.dps, t:d.t, tag:d.tag })), dead:c.dead, d:c.d, x:c.x, y:c.y } : null; },
+      chill:c.chill, chillT:c.chillT, chillAmp:c.chillAmp, chillShred:c.chillShred,
+      burn: c.burn ? { dps:c.burn.dps, t:c.burn.t, ignoreResist:!!c.burn.ignoreResist,
+                       chillDouble:!!c.burn.chillDouble, spread:c.burn.spread || 0 } : null,
+      dead:c.dead, d:c.d, x:c.x, y:c.y, arm:c.arm } : null; },
   clearCreeps: () => { creeps = []; },
+  /* teleport a pinned dummy — the only honest way to test "walked out of
+     range" without also testing the pathing */
+  moveCreep: (id, x, y) => { const c = creeps.find(z => z.id === id); if (c) { c.x = x; c.y = y; } return !!c; },
   /* damage ledger */
   setLog: on => { dmgLog = on ? [] : null; },
   log: () => (dmgLog || []).slice(),
@@ -2117,14 +2643,24 @@ window.__TB = {
   globalWave, isBossWave, levelOfWave, waveInLevel, spawnWindowFor, labCost, turretUpCost,
   /* canvas hitboxes */
   cardRects: () => cardRects.map(r => ({ kind:r.kind, x:r.x, y:r.y, w:r.w, h:r.h, un:r.un, afford:r.afford, capped:r.capped })),
+  tabRects: () => tabRects.map(r => ({ id:r.id, x:r.x, y:r.y, w:r.w, h:r.h })),
+  setTab: id => { barTab = id; },
+  comboAt: (r, c) => { const t = tileAt(r, c); return t && t.combo ? t.combo.id : null; },
+  groundsRaw: () => grounds.map(g => ({ x:g.x, y:g.y, r:g.r, t:g.t, dps:g.dps })),
   panelRects: () => panelBtns,
   hudRects: () => hudBtns,
   selected: () => (sel ? { kind:sel.kind, mod:sel.mod, r:sel.r, c:sel.c } : null),
   /* persistence + screens */
   save: i => saveTo(SLOT_KEY(i)), load: i => restoreFrom(SLOT_KEY(i)),
   autoSave, hasAuto: () => hasSave(AUTO_KEY),
-  scores: getScores, clearStorage: () => { try { localStorage.clear(); } catch (e) {} },
-  showMenu, showLab, showPause, closeScreen,
+  scores: getScores,
+  /* clearStorage has to drop the IN-MEMORY codex too, or it diverges from
+     disk: a wipe left the discoveries still listed but no longer stored, and
+     recordCombo then declined to re-write them because it thought they were
+     already known. */
+  clearStorage: () => { try { localStorage.clear(); } catch (e) {} codex = {}; },
+  showMenu, showLab, showPause, showCodex, closeScreen,
+  codex: () => Object.keys(codex), COMBO_TOTAL, COMBOS_BY_ID,
   endRun,
 };
 </script>

@@ -2,64 +2,165 @@
 
 A tower defense in which **the turret is the smallest part of the game**. A
 turret is a plain gray triangle: 10 kinetic damage, once a second, 100% hit
-chance, and it never changes. Everything that makes it dangerous is a
-**module tile** bolted to one of its four orthogonal sides — and a module
-feeds *every* turret and wall it touches, so the board stops being a scatter
-of towers and becomes a circuit. Eight levels of eight waves, about eight
-minutes each, then endless.
+chance, and it never changes. Everything that makes it dangerous is a tile
+you bolt around it — five **modules** on its four orthogonal sides, and
+**synergy boosters** on its diagonals — and a module feeds *every* turret and
+wall it touches, so the board stops being a scatter of towers and becomes a
+circuit. Eight levels of eight waves, about eight minutes each, then endless.
 
-It is the second tower defense in the repo after `grid-defense/`, and it is
-deliberately the inverse of it: grid-defense is four distinct turret types
-with a 100-wave meta-game bolted on; this is *one* turret type and all the
-depth in the adjacency layout. It grew out of grid-defense's ENGINEERING
-`POWER GRID` skill — the CD's ask was to build a whole game around that one
-node.
+It grew out of grid-defense's ENGINEERING `POWER GRID` skill: the CD's ask
+was a whole game built around that one node. The **2026-08-17 redesign**
+(second CD pass) replaced the original additive-percentage modules with the
+payload model below, added AMP, boosters, named combos and continuous target
+tracking.
 
-## The spec is the contract
+## The payload model — read this before touching combat
 
-These numbers came from the CD verbatim and `drive-turret-builder.cjs`
-asserts every one of them **by measuring the game**, off a damage ledger
-fired at a pinned dummy with known armour and resist. Do not change them
-without the CD saying so; if a balance problem seems to need it, the answer
-is almost always somewhere else (see § Module power).
+A shot builds **one payload** and copies it outwards. Every module either
+shapes the payload or copies it somewhere else, which is why the
+combinations compose instead of merely adding up.
 
-| | per module | four sides |
+| module | what it does to the payload |
+| --- | --- |
+| **AMP** | multiplies its kinetic damage (+50% for one, +260% for four) |
+| **FIRE** | adds a burn — elemental, over 5 s (75% of the hit for one, 700% for four) |
+| **ICE** | adds chill — slows movement **and attack speed**. **No damage at all** |
+| **ELEC** | copies the payload onto the next enemy (1 hop at 50%, up to 4 at 75%) |
+| **BLAST** | copies the payload over a radius (25% for one, 110% for four) |
+
+**DAMAGE decays as it is copied. EFFECTS land at full potency.** That split
+is the one judgement call in the spec and it is load-bearing — see § The two
+conflicts below.
+
+`propagate()` is the recursion; `addTo()`/`commitShot()` accumulate per enemy
+and apply **once per shot**. The accumulation matters: the burn *refreshes*
+rather than stacks, so applied piecemeal an enemy standing in its own blast
+would keep only the larger of its direct burn and its splash burn (7.5,
+discarding 1.875) instead of the spec's 9.375. Accumulating inside a shot and
+refreshing only *between* shots gives both the spec's arithmetic and a burn a
+fast turret cannot stack into absurdity.
+
+### The worked example, which is a test
+
+The CD's own example — ELEC + BLAST + FIRE + ICE, one per side, base 10 —
+comes out exactly, and `drive-turret-builder.cjs` asserts every figure:
+
+| | kinetic | burn over 5 s | chill |
+| --- | --- | --- | --- |
+| main target | **12.5** (10 direct + 2.5 own splash) | **9.375** (7.5 + 1.875) | full |
+| arc target | **6.25** (5 transferred + 1.25 own splash) | **4.6875** | full |
+| bystander in the arc's blast | **1.25** | **0.9375** | full |
+
+## Increasing returns, and why there is no variety penalty
+
+The CD asked for "all in on one type yields increasing returns" and "variety
+yields diminishing returns". The first is implemented directly: every stack
+curve is **super-linear** (`FIRE_DOT`, `ICE_CHILL`, `ELEC_XFER`,
+`BLAST_XFER`, `AMP_DMG` — all indexed 0..4).
+
+The second is **emergent, and deliberately not a penalty.** A variety penalty
+would contradict the CD's own worked example, which shows an *unpenalised* 10
+kinetic and an *unpenalised* 25% splash on a turret carrying four different
+types. Instead, spreading across four types leaves every one of them on its
+weakest tier, so variety buys **coverage** (chill + multi-target + splash)
+rather than throughput. Measured: all-in on FIRE, ELEC or BLAST clears the
+campaign; an even five-way mix also clears but scores no better.
+
+## The two conflicts in the rough spec, and how they were resolved
+
+Recorded because both are judgement calls a future session could reasonably
+want to revisit:
+
+1. **"elec + arc + fire + ice"** — ELEC *is* the arc module, so this was read
+   as ELEC + BLAST + FIRE + ICE (one per side). That reading is the one that
+   makes every number in the worked example come out.
+
+2. **ELEC transfers "50% of any dmg or effects like chill"**, but ICE + BLAST
+   is also supposed to leave "all enemies in blast radius being chilled".
+   Those disagree: at a 25% splash transfer a chill would be quarter-strength
+   and the second sentence could not be true. **Damage scales with the
+   transfer; effects transfer at full potency.** That satisfies both, and it
+   is what makes ICE worth a slot now that it deals no damage — its whole
+   product is an effect, and effects propagate for free while damage falls off.
+
+## Diagonal synergy boosters
+
+Boosters go on a turret's **diagonals**, which were inert until this pass —
+that is what keeps them a separate decision rather than four more module
+slots. A booster lifts every turret it touches diagonally, so the sharing
+rule holds there too. Output multiplier capped at `BOOST_CAP` (3.5).
+
+| booster | effect |
+| --- | --- |
+| **TWIN** ⊕ | ×2 module output, but only while every module on the turret is one type |
+| **PRISM** ◈ | +30% module output per distinct type beyond the first |
+| **RELAY** ⇄ | +22% module output per turret orthogonally touching this one |
+| **CLOCK** » | +40% fire rate; does nothing for the modules |
+
+TWIN is the CD's "same" booster and its worked claim is a test: **two BLAST
+modules splash 50%, and a TWIN takes that to a full 100%.**
+
+## Named combos — the discovery layer
+
+Specific side patterns do things no amount of stacking will. Signatures are
+**rotation-invariant** so a player who builds the mirror of a combo still
+finds it: four of a kind is `quad:<type>`, two opposite pairs is
+`pair:<a>+<b>` with the names sorted, and anything else has no combo — an
+*adjacent* pair is deliberately nothing.
+
+Fifteen exist. The CD specified the first; the rest were invented here and
+the CD has more coming.
+
+| pattern | combo | effect |
 | --- | --- | --- |
-| base turret | 10 kinetic, 1.0/s, 100% hit, 2.6 cells | — |
-| **FIRE** | +10% of the hit as a 5 s burn (elemental) | +40% |
-| **ICE** | +2.5% direct elemental, 10% slow for 1 s | +10%, 40% slow |
-| **ARC** | +5% direct elemental, chains to +1 nearest untouched enemy | +20% to **five** targets |
-| **BLAST** | +5% kinetic (concussive) + 2.5% fire, as AoE | +20% / +10% splashed |
-| **ARMOR** | walls only: +35% wall HP, +2 flat DR | +70%, DR 4 |
-| **REGEN** | walls only: +4% of max HP a second | +8%/s |
+| BLAST + FIRE | **INCENDIARY GRENADE LAUNCHER** | +60% radius, impacts leave burning ground 5 s |
+| BLAST + ICE | **CRYO SHELL** | chill in the blast hits the cap and lasts twice as long |
+| BLAST + ELEC | **CHAIN REACTION** | every arc hop detonates a full-strength explosion |
+| AMP + BLAST | **DEMOLITION CHARGE** | +40% radius, splash ignores half of armour |
+| AMP + FIRE | **THERMAL LANCE** | the burn ignores resistance entirely |
+| AMP + ICE | **FROSTBITE** | chilled enemies take 30% more from everything |
+| AMP + ELEC | **RAILGUN** | one hop only, at full strength |
+| ELEC + FIRE | **WILDFIRE** | arcs carry the burn at full strength, however far |
+| ELEC + ICE | **BLIZZARD** | +2 hops and half again the reach |
+| FIRE + ICE | **THERMAL SHOCK** | a chilled enemy takes double burn damage |
+| four AMP | **SIEGE BATTERY** | +30% range, shots ignore half of armour |
+| four FIRE | **FIRESTORM** | the burn spreads to anything within 1.2 cells |
+| four ICE | **HAILSTORM** | chilled enemies lose 40% of their armour |
+| four ELEC | **TESLA COIL** | +2 hops, no hop transfers below 60% |
+| four BLAST | **MORTAR BATTERY** | +50% radius |
 
-"Up to four of a kind" is **structural, not a rule**: a turret has four
-orthogonal sides and there is nowhere to put a fifth. Diagonals grant
-nothing, which is what makes a layout a decision instead of "clump
-everything" — and is why the CD's "diagonal tiles, later" is a genuinely
-new axis rather than more of the same.
+A combo turret gets a **pulsing outline in the combo's colour** and its name
+on the selection panel. On completion a banner names it and its effect.
 
-## The one rule that is actually new
+**Adding a combo** is one entry in `COMBOS` plus, if it needs a new lever,
+one flag read in combat. `comboKeyOf()` and the effect flags are the whole
+contract. Announcing is deliberately *not* inside `recomputeTurret` — that
+runs on level load, save restore and every lab purchase, and a banner on each
+would be noise; `place()` diffs a `comboSnapshot()` through
+`announceCombos()` instead.
 
-**A module powers every turret AND wall it orthogonally touches.** One tile
-wedged between two turrets pays both of them. That single line is the game:
-it turns the board into a packing problem where the best answer is a
-checkerboard near the road, and it is why `recomputeGrid()` records links in
-both directions (the module knows who it feeds, the structure knows who is
-feeding it and from which side).
+**Combos cost board space**, which is the real tension: four filled sides
+means a plus-shape per turret, so a combo board fields ~8 turrets where a
+packed mixed board fields 11. The eval learned this the hard way — see
+§ Traps.
 
-`recomputeGrid()` runs on every place/sell/upgrade and every lab purchase —
-**never per frame**. Combat and rendering only ever read the cached `t.mods`,
-`t.D`, `t.arcJumps`, `t.blastR` and friends.
+## The discoveries codex
 
-Reading the board without text: a turret **blooms on the edge facing each
-feeding module, in that module's colour**, and a bright conduit is drawn from
-every module to everything it powers. An unpowered module renders dim. The
-numbers live on the selection panel, where they are asked for.
+Discoveries **persist across runs** (`turretBuilder.v1.codex`), reachable
+from the menu and the pause screen. It only ever lists what has actually been
+built: a codex that reset each run would make remembering pointless, and one
+that listed the undiscovered entries would make learning pointless. `★
+DISCOVERIES n/15`.
 
-## Damage types — the reason a one-note grid loses
+## Continuous target tracking
 
-Two channels, one rule each:
+A turret **holds** its target frame to frame and only lets go when the target
+dies or leaves range — then it snaps to the next in the same frame, with no
+cooldown penalty for the switch. `trackTarget()` runs every frame regardless
+of cooldown, so the barrel keeps turning to follow, which is what makes the
+board read as machines watching the road.
+
+## Damage types — the reason a one-note grid can still lose
 
 - **KINETIC** is reduced **flat** by armour, never below 15% of the hit.
 - **ELEMENTAL** is reduced by a **percentage** resist.
@@ -68,192 +169,148 @@ Two channels, one rule each:
 and no armour (answer: kinetic). The `BREAKER` has both.
 
 **Armour scales with the level floor (`armMulFor`), resist does not** — and
-this is load-bearing, not tuning. A turret's kinetic damage grows all
-campaign through levels and CHASSIS tiers, so a flat armour of 7 that never
-moves is a real tax at level 1 and a rounding error at level 8. Before armour
-scaled, a board of **bare gray triangles measured its way to level 6**, which
-made the entire module layer a 40% garnish. With it, no-modules stalls at 4.
-Resist is already a fraction, so it needs no equivalent.
+this is load-bearing, not tuning. A turret's kinetic grows all campaign, so a
+flat armour of 7 that never moves is a real tax at level 1 and a rounding
+error at level 8. Before armour scaled, **bare gray triangles measured their
+way to level 6**, which made the whole module layer a garnish.
 
-## Module power — the measured ordering (read before rebalancing)
-
-The eval measures, and the eval asserts, this ordering:
-
-| build | stalls at |
-| --- | --- |
-| ARC-only · BLAST-only | **clears all 8** (and outscores an evenly-mixed grid) |
-| coherent mixed grid | **clears all 8** |
-| exit-camp | 7 |
-| unshared · no-walls · FIRE-only | 5 |
-| no-modules · no-lab | 4 |
-| ICE-only | 3 |
-| orphaned modules | 2 |
-
-**ARC and BLAST are the strongest modules, and that follows directly from
-the CD's percentages, not from anything this build chose.** Four ARC modules
-put 20% of the hit on *five* targets — up to a whole extra turret's worth of
-damage against a pack — while four FIRE modules put 40% on *one*. BLAST is
-the only module that deals both damage types, so it is the only one that
-answers armour and resist at once. Against wave compositions that are mostly
-crowds, the crowd modules win, and an evenly-weighted mix measurably
-*dilutes* into the weaker two.
-
-Two things were tried and did **not** close the gap: raising WARD's share of
-the late waves (ARC is 100% elemental, so resist ought to be its counter),
-and making the FIRE/ICE lab tracks climb 30% a tier against ARC/BLAST's 12%.
-The lab lever fails for an economy reason — a run pays ~155 cores against a
-~320-core lab, GRID and CHASSIS are close to mandatory, and the module tracks
-never reach a tier high enough to matter.
-
-The uneven lab steps were kept anyway (they are directionally right and cost
-nothing), but **the honest state of play is that FIRE and ICE are support
-modules, not damage modules**: ICE's real product is the 40% slow, which is
-continuously refreshed while a turret is firing and therefore multiplies
-*every other* structure's time-on-target, and FIRE's is sustained
-single-target damage for the BREAKER. A player who reads them as damage will
-be disappointed.
-
-**This is a live design question for the CD, not a settled balance.** The
-levers, if it should change: raise the ICE slow's duration or cap (its
-1-second window is the spec's, and it is what keeps ICE marginal), give
-FIRE's burn a stacking rule, cap ARC's jumps below the module count, or
-simply accept ARC/BLAST as the damage modules and FIRE/ICE as the control
-pair and say so in the game's own copy. **Do not "fix" it by editing the four
-percentages** — those are the CD's spec, and `drive-turret-builder.cjs`
-fails the moment they move.
-
-## Walls
-
-Walls go **on the road**. A creep that reaches one stops and hits it; the
-pile-up that creates is what BLAST and ARC want, which is the intended
-synergy rather than a happy accident. A road cell has two road neighbours and
-two free sides, so **a wall takes exactly two modules — that is the geometry,
-not a rule**, and it is what the CD's "the 2 adjacent sides" describes.
-
-Wall module output is expressed as a **fraction of the wall's own max HP**,
-so BULWARK tiers and ARMOR modules scale a wall's teeth along with its body
-instead of leaving it a wet paper bag by level 6. `SAPPER` exists to stop
-walls being free: it does ~6× a grub's structure damage.
-
-Walls never reroute anything — there is no mazing and no pathfinding, so a
-wall cannot make a level unwinnable. `wallCap` and finite HP are what keep
-them from being a blanket.
-
-## Economy — two currencies, on purpose
+## Economy — two currencies
 
 | | earned | spent on | resets |
 | --- | --- | --- | --- |
-| `$` cash | `startCashFor(L)` + kill bounties | turrets, modules, walls, upgrades, repairs **this level** | every level |
-| `◆` cores | `coresForWave(gw)` on every wave clear | the LAB (9 permanent tracks) | never (per run) |
+| `$` cash | `startCashFor(L)` + bounties | turrets, modules, boosters, walls, upgrades | every level |
+| `◆` cores | `coresForWave(gw)` per wave clear | the LAB (10 tracks) | never (per run) |
 
-There are no skill trees. grid-defense puts its depth in a between-levels
-meta-game; here the depth is the *layout*, and a third currency would only
-compete with it for the player's attention.
+No skill trees: the depth is the *layout*, and a third currency would compete
+with it for attention. `GRID` (+1 turret slot a tier) matters most, because
+**turret slots and board space, not cash, are the scarce things**.
 
-`GRID` (+1 turret slot a tier) is the track that matters most, because
-**turret slots, not cash, are the scarce thing** — the same lesson deploy
-caps taught grid-defense. A run pays roughly 155 cores against ~320 cores of
-lab, so about half is reachable and specialising is forced.
+A run pays roughly 155 cores against ~340 of lab, so about half is reachable.
+The single-target module tracks (FIRE/ICE) climb 26% a tier against the crowd
+modules' 14% — a hedge kept from the previous balance pass, though the lab
+lever is weak because module tracks rarely reach a high tier.
 
-Losing a level rolls the attempt back **whole** via `run.snapshot` — cores,
-score and every lab tier revert to how they stood when the level opened.
-Without that, a patient player farms a level for cores, dies on purpose, and
-keeps them. **Endless (level 9+) has no retries.**
+Losing a level rolls the attempt back **whole** via `run.snapshot`. **Endless
+(level 9+) has no retries.**
 
-## Flow, and the introduction
+## Flow and the introduction
 
-`update()` is a timer state machine: `grace` (25 s) → `wave` → `gap` (9 s) →
-… → `levelclear` (4 s) → next level, with `failed` (3 s) looping back to a
-retry. **Nothing waits on a tap.** Feedback is a transparent canvas `toast()`
-over the running board.
+`grace` (25 s) → `wave` → `gap` (9 s) → … → `levelclear` (4 s) → next level,
+`failed` (3 s) → retry. **Nothing waits on a tap.**
 
-**The introduction is measured in waves, not levels**, so level 1 *is* the
-tutorial: TURRET, FIRE, ICE, WALL, ARC, BLAST, ARMOR, REGEN on waves 1-8, and
-the LAB opens on wave 5. The drive suite gates that schedule off the real
-flow — the build bar must gain exactly one card a wave.
+The introduction is measured in **waves**, and there are thirteen placeable
+kinds now, so it runs into level 2: TURRET, FIRE, AMP, ICE, ELEC, BLAST on
+waves 1-6, WALL/ARMOR/REGEN on 7-9, the four boosters on 10-13. The LAB opens
+on wave 5.
 
-Placement has two first-class grammars, as in grid-defense: **drag** a card
-onto a tile, or **tap** the card to arm it and tap the tile. One difference
-worth knowing: **arming here does not end on a successful drop.** You ring a
-turret with four modules in four taps, and re-arming between each was the
-single most annoying thing about the first build; arming ends only when the
-kind has nowhere left to go or nothing left to pay with.
+Placement keeps both grammars — **drag** a card onto a tile, or **tap** the
+card to arm and tap the tile — and **arming does not end on a successful
+drop**, because you ring a turret with four modules in four taps.
+
+The build bar has **three tabs** (BUILD / MODULES / SYNERGY); thirteen kinds
+will not fit one thumb-height bar. Both `cardRects` *and* `tabRects` must
+clear when the selection panel opens — this repo's documented failure mode is
+a hidden widget leaving stale hitboxes, and there are now two such tables.
 
 ## Difficulty curve
 
-`hpMulFor(gw) = HP_LEVEL^(L-1) · HP_WAVE^(w-1)`, with `HP_BOSS` on the eighth
-wave — the same **sawtooth** grid-defense arrived at, for the same reason:
-the board grows from near-empty inside a level, so one smooth ramp makes a
-level's *opening* waves the dangerous ones.
+`hpMulFor(gw) = HP_LEVEL^(L-1) · HP_WAVE^(w-1)`, `HP_BOSS` on the eighth
+wave — a **sawtooth**, because the board grows from near-empty inside a level
+and one smooth ramp makes a level's *opening* waves the dangerous ones.
 
-`HP_LEVEL = 1.22, HP_WAVE = 1.15` was swept with the eval. A warning from
-that sweep, because it will save the next session an hour: **for a long time
-no value of `HP_LEVEL` changed any outcome at all** — every persona stalled
-at level 3 whether the curve was 1.16 or 1.54. That is the signature of
-something structural, not a curve problem. It was two things: the eval's own
-core-spending fell through to the cheapest affordable tier instead of saving
-for its priority (so the reference build reached level 3 with GRID still on
-tier 1), and the power budget was simply too small for a grid to exist.
-**If a curve sweep does nothing, stop sweeping the curve.**
+`HP_LEVEL = 1.30, HP_WAVE = 1.15`, swept after the redesign. **The useful
+band is about ten percent wide**: at 1.30 a coherent grid clears all eight
+and the marginal builds fall one to five levels short; by 1.40 the coherent
+grid itself stalls at 5. The pre-redesign 1.22 left almost every build
+clearing, because the new module numbers are far stronger than the
+percentages they replaced. **Re-sweep after any module change.**
+
+## Measured strategy ladder
+
+| build | stalls at |
+| --- | --- |
+| coherent mixed · all-FIRE · all-ELEC · all-BLAST · GRENADIERS · CHAIN REACTIONs | **clears all 8** |
+| no boosters · all-AMP | 7 |
+| unshared · CRYO SHELL · no walls | 6 |
+| no lab | 4 |
+| bare turrets · all-ICE · exit-camping | 3 |
+| orphaned modules | 2 |
+
+Two of those are design statements worth keeping: **all-ICE cannot carry a
+run** because it is a multiplier with nothing to multiply, and **not every
+combo is good** — CRYO SHELL chills beautifully and kills slowly.
+
+**Chill stretches a level.** A wave ends when the board is clear, so slowing
+everything without killing it faster lengthens the tail: CRYO SHELL runs
+~11 min a level against the coherent build's 7.8. That is a measured cost of
+a chill-heavy build, not a bug, and the eval caps it at 12 so it cannot
+quietly get worse.
 
 ## Determinism
 
-**The simulation carries no gameplay randomness at all.** Wave composition,
-elite stamping, targeting and damage are all deterministic functions of the
-global wave index; `RNG` drives only sparks and screen shake. Runs are
-therefore byte-identical across `--seed` values.
+**The simulation carries no gameplay randomness.** Wave composition, elite
+stamping, targeting and damage are all deterministic functions of the global
+wave index; `RNG` drives only sparks and screen shake. Runs are byte-identical
+across `--seed` values.
 
-That makes the eval exactly reproducible, and it makes a level a knowable
-puzzle rather than a dice roll — but it also means **agreement across seeds
-is not evidence of a robust balance**, and a report should never present it
-as such. Vary the persona, not the seed. `__TB.seedRandom` exists to pin the
-cosmetic RNG and to keep the hook honest if a gameplay roll is ever added.
+That makes the eval exactly reproducible — but **agreement across seeds is
+not evidence of a robust balance**, and a report must not present it as such.
+Vary the persona, not the seed.
 
 ## Test hooks (`window.__TB`)
 
-`st()` state summary · `run()`, `tilesRaw()`, `creepsRaw()` ·
-`newRun/startLevel/ready/skipGap/advance/step(dt,n)` ·
-`place/sell/upgrade/buyLab` · `turretStats(r,c)`, `wallStats(r,c)`,
-`modsAt(r,c)`, `tileAt(r,c)` · `canPlace`, `buildableCells(kind)`,
-`pathCellList`, `pathDistOfCell`, `pathSamples(n)` · `wave(gw)`, `hpMulFor`,
-`armMulFor`, `spdMulFor`, `startCashFor`, `coresForWave` ·
-`setCurve(a,b)`, `setPacing(...)`, `seedRandom` · `save(i)/load(i)` ·
-**`cardRects()/panelRects()/hudRects()`** publish the live canvas hitboxes so
-a drive test can press the drawn UI the way a thumb does.
+`st()` · `run()`, `tilesRaw()`, `creepsRaw()`, `groundsRaw()` ·
+`newRun/startLevel/ready/skipGap/advance/step` · `place/sell/upgrade/buyLab` ·
+`turretStats(r,c)` (payload, boosters, combo, **sides**), `wallStats`,
+`modsAt`, `tileAt`, `comboAt` · `canPlace`, `buildableCells(kind)` ·
+`setCurve/setPacing/seedRandom` · `cardRects/tabRects/panelRects/hudRects` ·
+`codex()`, `COMBO_TOTAL`.
 
-Three hooks exist specifically to make the spec measurable rather than
-inferred, and they are the reason the module numbers are asserted to the
-decimal instead of "some damage happened":
+Four hooks exist to make the spec *measurable* rather than inferred:
 
-- **`setLog(on)` / `log()`** — a ledger of every damage instance
-  (`{id, amt, raw, type, tag}`), so "four FIRE modules deliver 40% of the hit
-  over five seconds" is a sum, not a guess.
+- **`setLog(on)` / `log()`** — every damage instance (`{id, amt, raw, type,
+  tag, parts}`), so the worked example is a sum rather than a guess.
 - **`spawnDummy({hp, arm, res, x, y, d, spd, pinned})`** — a bare target with
-  exactly the stats you ask for. `pinned` (default true) holds its position
-  so chain-lightning geometry can be laid out by hand.
-- **`setPhase(p, t)`** — parks the flow state machine so a measurement is
-  never gatecrashed by the next wave spawning halfway through it.
+  exactly the stats you ask for; `pinned` holds position so chain geometry can
+  be laid out by hand.
+- **`moveCreep(id, x, y)`** — teleport a dummy, the only honest way to test
+  "walked out of range" without also testing the pathing.
+- **`setPhase(p, t)`** — parks the flow machine so a measurement is never
+  gatecrashed by the next wave.
 
-Suites — **rules and balance are deliberately separate files**, so a balance
-tweak never fights a mechanics regression:
+Suites — **rules and balance are separate files**, so a rebalance never fights
+a mechanics regression:
 
-- `.claude/tests/drive-turret-builder.cjs` (95 checks) — the spec verbatim,
-  the grid's sharing and four-side geometry, damage types and armour scaling,
-  walls, economy, the timer-driven flow, level retry with a whole-attempt
-  rollback, the wave-by-wave intro schedule, the sawtooth's shape, the
-  canvas-drawn UI pressed through real touch events, and persistence.
-- `.claude/tests/eval-turret-builder.cjs` (15 claims) — balance and pacing,
-  via strategy personas played over the real campaign. Personas are **data**
-  (`.claude/tests/strategies-turret-builder/`, schema in that folder's
-  README), so a subagent can author them and hunt for exploits.
-  `--strategy f.json`, `--only NAME`, `--curve a,b`, `--seed` and `--json`.
-  Each persona takes about a second, so sweeping is cheap.
+- `.claude/tests/drive-turret-builder.cjs` (146 checks) — the spec verbatim
+  including the worked example, each module in isolation and stacked, the
+  effects-vs-damage split, tracking and snap, all four boosters, all fifteen
+  combos with their effects, the codex, walls, economy, flow, the sawtooth,
+  and the canvas UI pressed through real touch events.
+- `.claude/tests/eval-turret-builder.cjs` (21 claims) — balance and pacing via
+  personas. `--strategy f.json`, `--only NAME`, `--curve a,b`, `--seed`,
+  `--json`. About a second each.
 
-## Ideas the CD has already parked
+## Traps this codebase has already fallen into
 
-- **Diagonal tiles on a turret** — synergy boosts for neighbouring modules,
-  boosts with neighbouring turrets, or fire-rate. `ORTHO` is a table and
-  `recomputeGrid()` reads it, so a `DIAG` set with its own weight is a small
-  change; the *balance* is not, since it doubles a turret's attachable
-  surface from four to eight.
-- More module types beyond the six here.
+- **A curve sweep that changes nothing means the curve is not the problem.**
+  Before the redesign, every persona stalled at level 3 whether `HP_LEVEL`
+  was 1.16 or 1.54; the causes were the eval's core-spending settling for the
+  cheapest affordable tier and a power budget too small for a grid to exist.
+- **A turret's `links` now come from modules *and* boosters**, so anything
+  reading `l.from.mod` crashes on a booster link. Use `linkColour()`.
+- **`clearStorage` must drop the in-memory codex too**, or it diverges from
+  disk and `recordCombo` declines to re-write entries it thinks are known.
+- **A pairs persona must refuse cells it cannot finish.** The first version
+  packed eleven turrets into the highest-coverage cells, left them with no
+  free sides, and built seven modules and ZERO combos while reporting a full
+  board. Check the printed `board:` line before believing a verdict.
+- **Print page errors as they happen.** A crash inside `draw()` stops the
+  canvas updating and then surfaces as a baffling stale-hitbox failure fifty
+  checks later.
+
+## Parked for the CD
+
+- More combos — the CD has a list coming. One entry in `COMBOS` each.
+- Boosters beyond the four here; `BOOSTERS` and `DIAG` are both tables.
+- Whether CRYO SHELL's level-stretching should be compensated, and whether
+  all-ICE deserves a way to convert chill into damage on its own.

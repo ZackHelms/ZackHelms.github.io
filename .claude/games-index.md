@@ -55,7 +55,7 @@ local-2p.
 | Word Circuit | `word-circuit/` | word | drag-connect | daily-challenge, timed-round | word-building, seeded-determinism | solo | `.claude/word-circuit.md` |
 | Neon Tactics | `neon-tactics/` | turn-based-tactics | tap | match-vs-ai, local-2p | grid-combat, line-of-sight, ai-opponent | vs-ai, local-2p | `.claude/neon-tactics.md` |
 | Star Surge | `star-surge/` | shmup | drag-steer | level-campaign | bullet-dodging, boss-fights, meta-progression | solo | `.claude/star-surge.md` |
-| Turret Builder | `turret-builder/` | tower-defense-classic | drag-place, tap | level-campaign, wave-survival, endless-highscore, save-campaign | wave-defense, adjacency-synergy, damage-typing, meta-progression | solo | `.claude/turret-builder.md` |
+| Turret Builder | `turret-builder/` | tower-defense-classic | drag-place, tap | level-campaign, wave-survival, endless-highscore, save-campaign | wave-defense, adjacency-synergy, damage-typing, combo-discovery | solo | `.claude/turret-builder.md` |
 | Grid Defense | `grid-defense/` | tower-defense-classic | drag-place, tap | level-campaign, wave-survival, endless-highscore, save-campaign | wave-defense, resource-economy, tower-upgrades, meta-progression | solo | `.claude/grid-defense.md` |
 | Neon Tripeaks | `tri-peaks/` | card-deck | tap | quick-round, daily-challenge | card-chain, combo-multiplier, seeded-determinism | solo | `.claude/tri-peaks.md` |
 | Shadow Circuit | `shadow-circuit/` | stealth, maze | tap-to-move | level-campaign | vision-cones, line-of-sight, procedural-generation | solo | `.claude/shadow-circuit.md` |
@@ -152,8 +152,14 @@ local-2p.
   adds a tissue/whole-body rung.
 
 ### Newly opened by the 2026-08-17 build
-- **`adjacency-synergy`** and **`damage-typing`** (turret-builder) are the two
-  new mechanic values, and they are the whole game rather than a garnish. It
+- **`adjacency-synergy`**, **`damage-typing`** and **`combo-discovery`**
+  (turret-builder) are the three new mechanic values, and they are the whole
+  game rather than a garnish. `combo-discovery` is the rarest of them: fifteen
+  named turret patterns (two opposite module pairs, or four of a kind) with
+  effects nothing else in the game does, announced when built, kept in a codex
+  that persists across runs, and never listed before you find them. No other
+  game in the repo has hidden content the player is expected to learn and
+  remember rather than unlock on a schedule. It
   has exactly ONE turret — a gray triangle, 10 kinetic damage a second,
   unchanging — and all of its depth in the tiles you bolt around it: a module
   powers *every* turret and wall it orthogonally touches, so one tile wedged

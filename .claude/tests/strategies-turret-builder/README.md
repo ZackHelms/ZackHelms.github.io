@@ -18,22 +18,24 @@ cap (`TB_RETRY_CAP`, default 3).
 
 | key | meaning |
 | --- | --- |
-| `mods` | target share of each module type among placed modules — `{fire, ice, arc, blast}`. Shares are relative, so `{fire:1}` is a mono-fire grid |
+| `mods` | target share of each module type — `{amp, fire, ice, elec, blast}`. `{blast:1}` is an all-in board |
+| `pairs` | `[a, b]` — build NAMED COMBOS instead of chasing a share: fills two opposite sides with `a` and the other two with `b`. A pairs persona only places turrets on cells with all four sides free, because a combo it cannot finish is worth nothing |
+| `boosters` | diagonal boosters to place, cycled — e.g. `["twin"]` for an all-in board, `["prism","clock"]` for a mixed one. `[]` never touches the diagonals |
 | `noMods` | never place a module at all — the bare-triangle player |
-| `gridSmart` | prefer the cell that feeds the MOST structures (the shared cell) over the first free side. This is the knob the whole game is about |
-| `noShare` | refuse any cell that would feed more than one structure — the same modules, the same spend, deliberately un-shared |
-| `scatter` | drop modules on cells that touch nothing, to price what adjacency is actually worth |
+| `gridSmart` | prefer the cell that feeds the MOST structures (the shared cell) over the first free side |
+| `noShare` | refuse any cell that would feed more than one structure |
+| `scatter` | drop modules where they touch nothing, to price what adjacency is worth |
 | `walls` | how many walls to keep standing (`0` never builds one) |
 | `wallMods` | priority list of module types for a wall's two free sides |
-| `lab` | **positional** plan of lab track ids. Repeating an id means "buy another tier of it at that point in the order", so `['grid','chassis','grid']` is grid-1 → chassis-1 → grid-2 |
+| `lab` | **positional** plan of lab track ids. Repeating an id means "another tier at that point", so `['grid','chassis','grid']` is grid-1 -> chassis-1 -> grid-2 |
 | `upgrade` | `never` \| `value` (level 3) \| `aggressive` (level 4) |
 | `place` | where along the road turrets want to sit — `0.0` entry, `1.0` exit |
-| `placeStrict` | refuse cells outside that window rather than merely preferring it — without it a "camp the exit" persona quietly spreads out once the good cells fill, and stops being a bad persona |
+| `placeStrict` | refuse cells outside that window rather than merely preferring it |
 
 Valid lab ids come from the `LAB` table in the game:
 
 ```
-grep -o "id:'[a-z]*'" games/turret-builder/index.html | sort -u
+grep -o "{ id:'[a-z]*'" games/turret-builder/index.html | sort -u
 ```
 
 ## Having an agent play
@@ -49,25 +51,28 @@ the exercise can produce.
 
 Cheap enough to run wide: each strategy takes about a second.
 
-## Three traps that make a persona lie
+## Four traps that make a persona lie
 
 1. **A `lab` list that is not walked positionally strands cores.** The first
-   version of the interpreter fell through to the next id whenever it could
-   not afford the current one, which quietly turned every persona into "buy
-   whatever is cheapest the moment you can afford it". The coherent build
-   reached level 3 with GRID still on tier 1, and — the tell — *no value of
-   `HP_LEVEL` changed the outcome at all*. If a curve sweep does nothing, the
-   curve is not what is stopping the persona.
+   interpreter fell through to the next id whenever it could not afford the
+   current one, which turned every persona into "buy whatever is cheapest".
+   The reference build reached level 3 with GRID still on tier 1 — and the
+   tell was that *no value of `HP_LEVEL` changed the outcome at all*. **If a
+   curve sweep does nothing, the curve is not what is stopping the persona.**
 
-2. **A persona that never gets the board it is meant to have proves nothing.**
-   Check the printed `board:` line (turrets · modules · walls · live links)
-   before believing a verdict. `orphan-mods` is *supposed* to show 0 links;
-   `coherent` showing 15 links means it was cash-starved, not out-designed.
+2. **A pairs persona that packs its turrets builds no combos.** A combo needs
+   all four sides, so a turret wedged between two others can never carry one.
+   The first version placed eleven turrets on the best-coverage cells and
+   reported a full board with **zero combos**. `turretScore` now refuses any
+   cell with fewer than four free sides in pairs mode.
 
-3. **Do not read seeds as robustness.** The simulation carries no gameplay
-   randomness — wave composition, elite stamping, targeting and damage are
-   all deterministic, and `RNG` only drives sparks and screen shake. Runs are
-   therefore byte-identical across `--seed` values. That makes the eval exactly
-   reproducible, but it means agreement across seeds is **not** evidence of a
-   robust balance; vary the persona, not the seed. `--seed` exists to pin the
-   cosmetic RNG and to keep the hook honest if a gameplay roll is ever added.
+3. **Always read the printed `board:` line before believing a verdict.**
+   `orphan-mods` is *supposed* to show 0 links; `coherent` showing 15 links
+   means it was cash-starved, not out-designed. `0 combos` on a pairs persona
+   means the persona is broken, not that combos are weak.
+
+4. **Do not read seeds as robustness.** The simulation carries no gameplay
+   randomness — waves, elites, targeting and damage are all deterministic, and
+   `RNG` only drives sparks and screen shake. Runs are byte-identical across
+   `--seed` values. That makes the eval exactly reproducible, but agreement
+   across seeds is **not** evidence of a robust balance. Vary the persona.
