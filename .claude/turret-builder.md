@@ -298,6 +298,27 @@ a mechanics regression:
   cheapest affordable tier and a power budget too small for a grid to exist.
 - **A turret's `links` now come from modules *and* boosters**, so anything
   reading `l.from.mod` crashes on a booster link. Use `linkColour()`.
+- **Anything that maps a build-card kind to a silhouette must go through
+  `drawKindShape()`.** The drag ghost used to fall through to
+  `drawModuleShape` for any kind that was not a turret or a wall, so holding a
+  BOOSTER card looked up `MODULES['twin']`, found undefined, and threw inside
+  `draw()` — which ended the requestAnimationFrame chain and froze the game
+  with no HUD and no build bar. Shipped and CD-reported, because **the drive
+  test could not see it**: `T.drag()` dispatches touchstart/move/end
+  synchronously inside one `page.evaluate`, so no frame ever renders while
+  `dragCard` is set. The regression test now holds each card down across REAL
+  animation frames (`setTimeout` between touchstart and touchend) for all
+  thirteen kinds, in both the drag and the arm gesture. Verified by
+  reintroducing the bug and watching it fail.
+- **The loop now survives a throw.** `loop()` wraps update+draw in a try and
+  always re-arms `requestAnimationFrame`, logging each distinct error once. A
+  rendering mistake should cost a frame, not brick the session until reload.
+  The error still reaches the console, which the drive suite watches, so this
+  cannot hide a regression.
+- **The drive suite's `P()` helper must forward its argument.**
+  `page.evaluate(fn)` with no second argument silently passes `undefined`,
+  which made the first version of the frozen-board test throw on
+  `BAR_TABS.find(...).id` instead of testing anything.
 - **`clearStorage` must drop the in-memory codex too**, or it diverges from
   disk and `recordCombo` declines to re-write entries it thinks are known.
 - **A pairs persona must refuse cells it cannot finish.** The first version

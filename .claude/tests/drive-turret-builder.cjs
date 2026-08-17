@@ -209,7 +209,10 @@ const TOUCH = `(() => {
   await page.waitForTimeout(250);
   await page.evaluate('window.__H = ' + HELPERS);
   await page.evaluate('window.__T = ' + TOUCH);
-  const P = async fn => page.evaluate(fn);
+  // forwards an optional argument — page.evaluate(fn) alone silently passes
+  // undefined, which is how the first version of the frozen-board regression
+  // test threw on `BAR_TABS.find(...).id` instead of testing anything
+  const P = async (fn, arg) => (arg === undefined ? page.evaluate(fn) : page.evaluate(fn, arg));
 
   /* =================================================================== */
   group('the base turret — unchanged by the redesign');
@@ -1328,6 +1331,79 @@ const TOUCH = `(() => {
     });
     check('the SELL button works when pressed as a thumb would',
       sold.boosters === 0 && sold.sel === null, sold);
+
+    /* THE FROZEN-BOARD REGRESSION. Tapping a SYNERGY card froze the game and
+       wiped the HUD and build bar: the drag ghost fell through to
+       drawModuleShape for any non-turret/wall kind, so a booster looked up
+       MODULES['twin'], got undefined, and threw inside draw() — which ended
+       the requestAnimationFrame chain.
+
+       The original drag test could never catch it, because T.drag() dispatches
+       touchstart/move/end synchronously inside ONE evaluate and no frame ever
+       renders while dragCard is set. This holds each kind mid-drag across REAL
+       animation frames, and separately arms each kind, then checks the loop is
+       still running and the chrome still draws. */
+    for (const kind of await P(() => window.__TB.BUILD_ORDER)) {
+      await P(k => {
+        const G = window.__TB;
+        G.closeScreen();
+        const tab = G.BAR_TABS.find(t => t.keys.includes(k));
+        G.setTab(tab.id);
+        G.setCash(100000);
+      }, kind);
+      await page.waitForFunction(k => window.__TB.cardRects().some(c => c.kind === k),
+        kind, { timeout: 4000 }).catch(() => {});
+      // hold the card down (touchstart only) so a frame renders mid-drag
+      const held = await P(k => {
+        const G = window.__TB;
+        const card = G.cardRects().find(c => c.kind === k);
+        if (!card) return false;
+        const el = document.getElementById('cv');
+        const x = card.x + card.w / 2, y = card.y + card.h / 2;
+        const t = new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+        el.dispatchEvent(new TouchEvent('touchstart', { bubbles:true, cancelable:true,
+          touches:[t], targetTouches:[t], changedTouches:[t] }));
+        const b = G.buildableCells('turret')[0];
+        const t2 = new Touch({ identifier: 1, target: el, clientX: G.cellCx(b.c), clientY: G.cellCy(b.r) });
+        el.dispatchEvent(new TouchEvent('touchmove', { bubbles:true, cancelable:true,
+          touches:[t2], targetTouches:[t2], changedTouches:[t2] }));
+        return true;
+      }, kind);
+      if (!held) continue;
+      // let real frames render with the ghost on screen
+      await new Promise(r => setTimeout(r, 120));
+      const alive = await P(() => {
+        const G = window.__TB;
+        const el = document.getElementById('cv');
+        const t = new Touch({ identifier: 1, target: el, clientX: 5, clientY: 5 });
+        el.dispatchEvent(new TouchEvent('touchend', { bubbles:true, cancelable:true,
+          touches:[], targetTouches:[], changedTouches:[t] }));
+        return { bar: G.cardRects().length, tabs: G.tabRects().length };
+      });
+      check('dragging a ' + kind.toUpperCase() + ' card renders without killing the loop',
+        alive.bar > 0 && alive.tabs === 3 && errs.length === 0,
+        { kind, bar: alive.bar, tabs: alive.tabs, errors: errs.slice(0, 1) });
+    }
+    /* and the same for ARMING, which is the gesture the CD actually reported */
+    for (const kind of await P(() => window.__TB.BUILD_ORDER)) {
+      await P(k => {
+        const G = window.__TB, T = window.__T;
+        G.setTab(G.BAR_TABS.find(t => t.keys.includes(k)).id);
+        G.setCash(100000);
+      }, kind);
+      await page.waitForFunction(k => window.__TB.cardRects().some(c => c.kind === k),
+        kind, { timeout: 4000 }).catch(() => {});
+      await P(k => {
+        const G = window.__TB, T = window.__T;
+        const card = G.cardRects().find(c => c.kind === k);
+        if (card) T.tap(card.x + card.w / 2, card.y + card.h / 2);
+      }, kind);
+      await new Promise(r => setTimeout(r, 90));
+      const armedOk = await P(() => ({ bar: window.__TB.cardRects().length, armed: window.__TB.st().armed }));
+      check('arming a ' + kind.toUpperCase() + ' card keeps the board and chrome alive',
+        armedOk.bar > 0 && errs.length === 0, { kind, ...armedOk, errors: errs.slice(0, 1) });
+      await P(() => { const G = window.__TB; if (G.st().armed) { const c = G.cardRects().find(x => x.kind === G.st().armed); if (c) window.__T.tap(c.x + c.w / 2, c.y + c.h / 2); } });
+    }
 
     const z = await P(() => ({
       mute:getComputedStyle(document.getElementById('mute')).zIndex,
