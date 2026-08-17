@@ -1,0 +1,45 @@
+[
+  {
+    "name": "checkerboard",
+    "desc": "chases the shared cell above all else — every module wedged between two turrets",
+    "mods": { "fire": 0.25, "ice": 0.25, "arc": 0.25, "blast": 0.25 },
+    "gridSmart": true,
+    "walls": 3,
+    "wallMods": ["ice", "armor"],
+    "lab": [
+      "grid", "grid", "chassis", "grid", "arc", "chassis", "grid", "blast",
+      "grid", "chassis", "fire", "servo", "ice", "bulwark", "optics", "chassis",
+      "arc", "blast", "fire", "ice", "servo", "optics", "bulwark", "servo"
+    ],
+    "upgrade": "value",
+    "place": 0.4
+  },
+  {
+    "name": "arc-swarm",
+    "desc": "all ARC — bets the whole grid on chain lightning and the pile-up behind a wall",
+    "mods": { "arc": 1 },
+    "gridSmart": true,
+    "walls": 3,
+    "wallMods": ["ice", "regen"],
+    "lab": [
+      "grid", "arc", "chassis", "grid", "arc", "grid", "arc", "chassis",
+      "arc", "grid", "bulwark", "servo", "chassis", "grid", "servo", "optics"
+    ],
+    "upgrade": "value",
+    "place": 0.5
+  },
+  {
+    "name": "wall-fortress",
+    "desc": "maximum walls, armoured and regenerating, guns clustered on the choke",
+    "mods": { "blast": 0.4, "arc": 0.3, "fire": 0.3 },
+    "gridSmart": true,
+    "walls": 6,
+    "wallMods": ["armor", "regen"],
+    "lab": [
+      "bulwark", "grid", "bulwark", "chassis", "bulwark", "grid", "blast",
+      "bulwark", "grid", "chassis", "arc", "servo", "grid", "fire", "optics"
+    ],
+    "upgrade": "value",
+    "place": 0.45
+  }
+]

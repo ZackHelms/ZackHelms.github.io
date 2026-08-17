@@ -55,6 +55,7 @@ local-2p.
 | Word Circuit | `word-circuit/` | word | drag-connect | daily-challenge, timed-round | word-building, seeded-determinism | solo | `.claude/word-circuit.md` |
 | Neon Tactics | `neon-tactics/` | turn-based-tactics | tap | match-vs-ai, local-2p | grid-combat, line-of-sight, ai-opponent | vs-ai, local-2p | `.claude/neon-tactics.md` |
 | Star Surge | `star-surge/` | shmup | drag-steer | level-campaign | bullet-dodging, boss-fights, meta-progression | solo | `.claude/star-surge.md` |
+| Turret Builder | `turret-builder/` | tower-defense-classic | drag-place, tap | level-campaign, wave-survival, endless-highscore, save-campaign | wave-defense, adjacency-synergy, damage-typing, meta-progression | solo | `.claude/turret-builder.md` |
 | Grid Defense | `grid-defense/` | tower-defense-classic | drag-place, tap | level-campaign, wave-survival, endless-highscore, save-campaign | wave-defense, resource-economy, tower-upgrades, meta-progression | solo | `.claude/grid-defense.md` |
 | Neon Tripeaks | `tri-peaks/` | card-deck | tap | quick-round, daily-challenge | card-chain, combo-multiplier, seeded-determinism | solo | `.claude/tri-peaks.md` |
 | Shadow Circuit | `shadow-circuit/` | stealth, maze | tap-to-move | level-campaign | vision-cones, line-of-sight, procedural-generation | solo | `.claude/shadow-circuit.md` |
@@ -73,7 +74,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-47 games (45 in-repo + 2 external builds).
+48 games (46 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -125,7 +126,8 @@ local-2p.
   between-levels economy: an armory of permanent turret tiers plus three
   branching skill trees, with `save-campaign` slots and a top-ten board.
   Sorcery is the other tower defense but is spell-cast, single-run and has
-  no persistent build).
+  no persistent build). **turret-builder** is the third and shares the
+  shelf without repeating it: see the new mechanics below.
 
 - `phase-puzzle` genre + `phase-change` / `soft-body-physics` /
   `point-gravity` mechanics + `endless-levels` session (phasic — the only
@@ -148,6 +150,20 @@ local-2p.
   Nothing is swapped; the cell is modelled at true relative scale. No other game
   in the repo changes the *magnification* of its subject as a mechanic; phase 3
   adds a tissue/whole-body rung.
+
+### Newly opened by the 2026-08-17 build
+- **`adjacency-synergy`** and **`damage-typing`** (turret-builder) are the two
+  new mechanic values, and they are the whole game rather than a garnish. It
+  has exactly ONE turret — a gray triangle, 10 kinetic damage a second,
+  unchanging — and all of its depth in the tiles you bolt around it: a module
+  powers *every* turret and wall it orthogonally touches, so one tile wedged
+  between two turrets pays both and a board becomes a packing problem rather
+  than a scatter of towers. `damage-typing` is the counter-play half: flat
+  armour eats kinetic and scales with the campaign, percentage resist eats
+  elemental and does not, so no single module answers everything. Where
+  grid-defense puts its depth in a between-levels meta-game of four turret
+  types, this puts it in the layout — the two are deliberate inverses, and a
+  third tower defense on the same shelf would now need a different axis again.
 
 ### Absent — what's actually left
 Sensor inputs are now down to two: **`shake`** and **`camera`**. Everything

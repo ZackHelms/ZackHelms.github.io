@@ -265,6 +265,30 @@ Top-HUD toggle for local 2-player mode (multi-touch, second finger owns the
 top mallet; AI + records off). Synth SFX + arena music loop. Detailed
 context: `.claude/air-hockey.md`.
 
+### TURRET BUILDER (`turret-builder/index.html`, ~1750 lines)
+A tower defense in which **the turret is the smallest part**. A turret is a
+plain gray triangle — 10 kinetic damage, once a second, 100% hit chance, and
+it never changes. Everything dangerous is a **module tile** bolted to one of
+its four orthogonal sides: FIRE (+10% of the hit as a 5 s burn), ICE (+2.5%
+and a 10% slow), ARC (+5% chaining to the nearest untouched enemy), BLAST
+(+5% kinetic and +2.5% fire, splashed) — four sides, so "up to four of a
+kind" is geometry rather than a rule, and diagonals grant nothing. The one
+genuinely new rule: **a module powers every turret AND wall it touches**, so
+one tile wedged between two turrets pays both and the board becomes a
+packing problem. **Walls** go on the road; creeps stop and hit them, and a
+road cell's two free sides take modules too, including wall-only ARMOR and
+REGEN. Counter-play is the second axis: flat armour eats kinetic and
+**scales with the campaign floor**, percentage resist eats elemental and
+does not, so HULK, WARD and the BREAKER each demand a different answer.
+Two currencies — per-level cash, persistent cores for a nine-track LAB whose
+GRID tiers buy turret slots (the real scarcity). Eight levels of eight waves
+at ~8 minutes each, then endless; a lost level replays with the attempt
+rolled back whole, endless does not. The simulation carries **no gameplay
+randomness at all**. Detailed context: `.claude/turret-builder.md`. Suites:
+`.claude/tests/drive-turret-builder.cjs` (95 rules checks, the CD's spec
+asserted to the decimal off a damage ledger) and
+`.claude/tests/eval-turret-builder.cjs` (15 balance claims via personas).
+
 ### GRID DEFENSE (`grid-defense/index.html`, ~2300 lines)
 A **ten-level tower-defense campaign**, then endless. A level is one map and
 ten escalating waves ending in a WARDEN — 100 waves in all — and the board

@@ -1,0 +1,2132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Turret Builder</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+:root {
+  --bg:#06060e; --panel:#0b0b16; --panel2:#12122a; --border:#1a1a30;
+  --green:#39ff14; --gold:#ffc300; --blue:#4488ff; --red:#ff2244;
+  --white:#dde3ff; --dim:#8899bb; --purple:#b44fff;
+  --steel:#b9c2d6;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; }
+body {
+  background:var(--bg); color:var(--white);
+  font-family:'Share Tech Mono', monospace;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  position:fixed; inset:0;
+}
+#cv { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+.chrome {
+  position:absolute; top:calc(var(--sat) + 6px); z-index:90;
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  color:var(--white); font-size:15px; width:36px; height:32px; line-height:30px;
+  text-align:center; text-decoration:none; padding:0; touch-action:manipulation;
+  -webkit-user-select:none; user-select:none; font-family:'Share Tech Mono', monospace;
+}
+#back-btn { left:8px; }
+#mute { left:50px; }
+#menu-btn { left:92px; }
+
+/* ============================ SCREEN OVERLAY =========================== */
+#ui {
+  position:absolute; inset:0; z-index:70; display:flex; flex-direction:column;
+  background:#06060e; overflow:hidden;
+}
+#ui.hidden { display:none; }
+.scr { display:flex; flex-direction:column; height:100%; width:100%; }
+.scr-head { flex:0 0 auto; padding:calc(var(--sat) + 44px) 14px 8px; text-align:center; }
+.scr-body { flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 14px 10px; }
+.scr-foot {
+  flex:0 0 auto; padding:8px 14px calc(var(--sab) + 10px);
+  border-top:1px solid var(--border); background:var(--panel);
+}
+h1.title {
+  font-family:'Black Ops One', sans-serif; color:var(--gold);
+  font-size:clamp(1.5rem, 7.4vw, 2.3rem); letter-spacing:3px;
+  text-shadow:0 0 24px #ffc30055;
+}
+h2.head { font-family:'Black Ops One', sans-serif; color:var(--gold); font-size:1.1rem; letter-spacing:3px; }
+.sub { color:var(--dim); font-size:0.64rem; letter-spacing:3px; margin-top:4px; }
+.btn {
+  display:block; width:100%; font-family:'Black Ops One', sans-serif; letter-spacing:2px;
+  background:var(--panel); color:var(--green); border:1px solid var(--green); border-radius:8px;
+  font-size:0.92rem; padding:13px 10px; margin:8px 0;
+  box-shadow:0 0 18px #39ff1422; touch-action:manipulation;
+}
+.btn.alt  { color:var(--blue);   border-color:var(--blue);   box-shadow:0 0 18px #4488ff22; }
+.btn.gold { color:var(--gold);   border-color:var(--gold);   box-shadow:0 0 18px #ffc30022; }
+.btn.warn { color:var(--red);    border-color:var(--red);    box-shadow:0 0 18px #ff224422; }
+.btn.ghost{ color:var(--dim);    border-color:var(--border); box-shadow:none; }
+.btn.small { font-size:0.75rem; padding:10px 8px; }
+.btn:disabled { color:#4b5470; border-color:#23233d; box-shadow:none; }
+.btn:active { transform:scale(0.98); }
+.row2 { display:flex; gap:8px; } .row2 .btn { margin:8px 0; }
+.rules { color:var(--dim); font-size:0.66rem; line-height:1.75; margin:10px auto 0; max-width:350px; text-align:left; }
+.rules b { color:var(--white); } .rules i { color:var(--gold); font-style:normal; }
+.card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin:8px 0; }
+.kv { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.k { color:var(--dim); font-size:0.7rem; letter-spacing:1px; }
+.v { color:var(--white); font-size:0.8rem; }
+.v.gold { color:var(--gold); } .v.green { color:var(--green); } .v.red { color:var(--red); }
+.big { font-family:'Black Ops One', sans-serif; color:var(--white); font-size:2.2rem; text-shadow:0 0 24px #dde3ff44; margin:2px 0; }
+.pill { display:inline-block; border:1px solid var(--border); border-radius:20px; padding:4px 11px; margin:0 3px 4px; font-size:0.68rem; color:var(--dim); }
+.pill b { font-family:'Black Ops One', sans-serif; }
+.pill.cores b { color:var(--gold); } .pill.cash b { color:var(--green); }
+
+/* ================================ LAB ================================= */
+.lab-row { display:flex; align-items:center; gap:10px; }
+.licon { width:42px; height:42px; flex:0 0 42px; }
+.lab-mid { flex:1 1 auto; min-width:0; }
+.lab-name { font-family:'Black Ops One', sans-serif; font-size:0.78rem; letter-spacing:2px; }
+.lab-desc { color:var(--dim); font-size:0.62rem; margin-top:2px; line-height:1.5; }
+.tierbar { display:flex; gap:3px; margin-top:5px; }
+.tierbar i { display:block; width:12px; height:5px; border-radius:2px; background:#1c1c34; }
+.tierbar i.on { background:var(--gold); box-shadow:0 0 6px #ffc30088; }
+.buybtn {
+  flex:0 0 auto; font-family:'Black Ops One', sans-serif; font-size:0.64rem; letter-spacing:1px;
+  background:transparent; border:1px solid var(--gold); color:var(--gold);
+  border-radius:7px; padding:9px 8px; min-width:74px; touch-action:manipulation;
+}
+.buybtn:disabled { border-color:#23233d; color:#4b5470; }
+
+/* ============================== TABLES ================================ */
+table.sc { width:100%; border-collapse:collapse; font-size:0.68rem; }
+table.sc th { color:var(--dim); text-align:left; font-weight:normal; letter-spacing:1px; padding:5px 4px; border-bottom:1px solid var(--border); }
+table.sc td { padding:6px 4px; border-bottom:1px solid #12121f; }
+table.sc td.n { color:var(--gold); font-family:'Black Ops One', sans-serif; }
+.rng { width:100%; margin:8px 0 2px; accent-color:var(--gold); }
+.slot { display:flex; gap:8px; align-items:center; }
+.slot .btn { flex:1 1 0; }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-17 05:54 UTC</div>
+<canvas id="cv"></canvas>
+<a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute" class="chrome" aria-label="Mute">🔊</button>
+<button id="menu-btn" class="chrome" aria-label="Menu">☰</button>
+<div id="ui"></div>
+<script>
+'use strict';
+/* ======================================================================
+   TURRET BUILDER — a tower defense where the TURRET is the smallest part.
+   A turret is a plain gray triangle: 10 kinetic damage, once a second,
+   never misses. Everything else you build is a MODULE tile, and a module
+   powers EVERY turret and wall it orthogonally touches. That sharing is
+   the game: a module wedged between two turrets pays both of them, so the
+   board stops being a scatter of towers and becomes a circuit.
+   Full design notes: .claude/turret-builder.md
+   ====================================================================== */
+
+/* ============================== CONSTANTS ============================= */
+const COLS = 9, ROWS = 14;
+const WAVES_PER_LEVEL = 8;
+const CAMPAIGN_LEVELS = 8;
+const TOTAL_WAVES = WAVES_PER_LEVEL * CAMPAIGN_LEVELS;
+const LIVES_BASE = 20;
+
+/* Continuous flow — nothing waits on a tap (the grid-defense lesson). */
+let GRACE_T = 25, GAP_T = 9, LEVEL_T = 4, FAIL_T = 3;
+
+const VER = 'turretBuilder.v1';
+const SET_KEY = VER + '.settings', SCORE_KEY = VER + '.scores';
+const AUTO_KEY = VER + '.auto', SLOT_KEY = i => VER + '.slot' + i;
+
+/* --------------------------- THE BASE TURRET -------------------------
+   Spec, verbatim, and the drive suite asserts every number here:
+   gray triangle · single target · kinetic · 10 damage · 100% hit · 1/s. */
+const TURRET = { dmg: 10, rate: 1.0, range: 2.6, cost: 45, hit: 1.0, maxLvl: 4 };
+const TURRET_LVL_DMG = 1.28;      // per cash level
+const TURRET_LVL_RATE = 1.04;
+function turretUpCost(lvl) { return Math.round(34 * lvl); }
+
+/* ------------------------------ MODULES -------------------------------
+   Every coefficient is a fraction of D — the turret's own kinetic hit —
+   so a module is worth exactly as much as the turret it is bolted to.
+   A turret has four orthogonal sides, so "up to 4 of a kind" is
+   STRUCTURAL: there is nowhere to put a fifth.                        */
+const FIRE_DOT   = 0.10;   // per module: 10% of D delivered over FIRE_T seconds
+const FIRE_T     = 5.0;
+const ICE_DIR    = 0.025;  // per module: +2.5% of D as direct elemental
+const ICE_SLOW   = 0.10;   // per module: 10% slow ...
+const ICE_T      = 1.0;    // ... for 1 second
+const ARC_DIR    = 0.05;   // per module: +5% of D elemental, to every link in the chain
+const ARC_JUMP_R = 2.3;    // cells a bolt can reach for its next target
+const BLAST_KIN  = 0.05;   // per module: +5% of D kinetic (concussive), AoE
+const BLAST_FIRE = 0.025;  // per module: +2.5% of D elemental (fire), AoE
+const BLAST_R0   = 0.62, BLAST_RSTEP = 0.14;   // cells
+const SLOW_CAP   = 0.70;
+
+const MODULES = {
+  fire:  { name:'FIRE',  glyph:'▲', col:'#ff7a1e', cost:20, tag:'DOT',
+           desc:'+10% of the turret’s hit as a 5 s burn (elemental). Four sides → +40%.' },
+  ice:   { name:'ICE',   glyph:'❄', col:'#4fd8ff', cost:20, tag:'SLOW',
+           desc:'+2.5% direct elemental and a 10% slow for 1 s. Four sides → +10% and 40%.' },
+  arc:   { name:'ARC',   glyph:'⚡', col:'#ffe23f', cost:20, tag:'CHAIN',
+           desc:'+5% direct elemental that jumps to the nearest untouched enemy. Four sides → +20% to each of 5 targets.' },
+  blast: { name:'BLAST', glyph:'✸', col:'#ff4a5e', cost:20, tag:'AOE',
+           desc:'+5% kinetic (concussive) and +2.5% fire, splashed over everything near the target.' },
+  armor: { name:'ARMOR', glyph:'▣', col:'#9fb3d9', cost:18, tag:'WALL',
+           desc:'WALLS ONLY — +35% wall HP and 2 flat damage reduction.' },
+  regen: { name:'REGEN', glyph:'✚', col:'#2ee6a8', cost:18, tag:'WALL',
+           desc:'WALLS ONLY — the wall repairs 4% of its maximum HP every second.' },
+};
+const MOD_KEYS = ['fire', 'ice', 'arc', 'blast', 'armor', 'regen'];
+
+/* -------------------------------- WALLS -------------------------------
+   Walls sit ON the road. A creep that reaches one stops and hits it; the
+   wall is buying you seconds, and the pile-up it creates is what BLAST and
+   ARC want. A road cell has two road neighbours and two free sides, so a
+   wall takes exactly two modules — which is the spec, and also just the
+   geometry.  Wall module output is a FRACTION OF THE WALL'S MAX HP, so
+   BULWARK tiers and ARMOR modules scale the wall's teeth along with its
+   body instead of leaving it a wet paper bag by level 6.               */
+const WALL = { hp: 100, cost: 45 };
+const WALL_FIRE  = 0.035;  // of maxHP, as a 4 s burn on the attacker
+const WALL_FIRE_T = 4.0;
+const WALL_ICE   = 0.25;   // attack speed AND move speed slow, per module
+const WALL_ICE_T = 1.5;
+const WALL_ARC   = 0.06;   // of maxHP, elemental, to the attacker + 2 jumps
+const WALL_ARC_JUMPS = 2;
+const WALL_THORN = 0.07;   // of maxHP, kinetic, splashed round the attacker
+const WALL_THORN_R = 0.85;
+const WALL_ARMOR_HP = 0.35, WALL_ARMOR_DR = 2;
+const WALL_REGEN = 0.04;   // of maxHP per second
+const WALL_REPAIR_COST = 0.35;  // of build cost, to repair to full
+
+/* ------------------------------ THE LAB -------------------------------
+   Cores are persistent for a run. GRID buys turret slots, which is the
+   real currency of this game: cash is never the binding constraint for
+   long, board space and slots are.                                     */
+const LAB = [
+  { id:'grid',    name:'GRID',    tiers:5, c0:5, step:3, icon:'grid',
+    desc:'+1 turret slot per tier.' },
+  { id:'chassis', name:'CHASSIS', tiers:5, c0:5, step:3, icon:'turret',
+    desc:'+20% turret damage per tier — and every module is a % of that.' },
+  { id:'servo',   name:'SERVO',   tiers:4, c0:5, step:3, icon:'servo',
+    desc:'+9% turret fire rate per tier.' },
+  { id:'optics',  name:'OPTICS',  tiers:4, c0:4, step:2, icon:'optics',
+    desc:'+8% turret range per tier.' },
+  { id:'fire',    name:'FIRE',    tiers:4, c0:4, step:2, icon:'fire',
+    desc:'+30% FIRE module output per tier — the burn climbs fast.' },
+  { id:'ice',     name:'ICE',     tiers:4, c0:4, step:2, icon:'ice',
+    desc:'+30% ICE module output per tier — damage and the slow together.' },
+  { id:'arc',     name:'ARC',     tiers:4, c0:4, step:2, icon:'arc',
+    desc:'+12% ARC output per tier; the last tier adds a chain jump.' },
+  { id:'blast',   name:'BLAST',   tiers:4, c0:4, step:2, icon:'blast',
+    desc:'+12% BLAST output and radius per tier.' },
+  { id:'bulwark', name:'BULWARK', tiers:4, c0:5, step:3, icon:'wall',
+    desc:'+30% wall HP and +1 wall slot per tier.' },
+];
+const LAB_BY_ID = {};
+for (const t of LAB) LAB_BY_ID[t.id] = t;
+function labCost(id, tier) { const t = LAB_BY_ID[id]; return t.c0 + t.step * tier; }
+/* Per-tier lab growth, and it is DELIBERATELY UNEVEN. The four module
+   percentages are the CD's spec and are not negotiable — but they hand ARC
+   and BLAST a structural advantage that no tuning of the curve can undo:
+   four ARC modules put 20% of the hit on FIVE targets (up to a full extra
+   turret's worth of damage against a pack) while four FIRE modules put 40%
+   on ONE. Measured, mono-ARC and mono-BLAST clear the campaign and outscore
+   an evenly-mixed grid; mono-FIRE and mono-ICE stall at 5 and 3.
+   The lab is the one lever that is mine rather than the spec's, so the
+   single-target modules climb roughly two and a half times faster per tier
+   than the crowd modules. See .claude/turret-builder.md § Module power. */
+const MOD_LAB_STEP = { fire: 0.30, ice: 0.30, arc: 0.12, blast: 0.12 };
+
+const TURRET_CAP_BASE = 6, WALL_CAP_BASE = 2;
+
+/* ------------------------------- CREEPS -------------------------------
+   ARMOR is flat and only bites KINETIC; RESIST is a fraction and only
+   bites ELEMENTAL. That single split is the whole reason a mono-element
+   grid loses: HULK laughs at bare turrets, WARD laughs at a wall of fire,
+   and the BREAKER has both. Speeds are cells/second so the board can be
+   any size.                                                            */
+const CREEPS = {
+  grub:   { name:'GRUB',    hp:20,  spd:1.25, arm:1,   res:0,    bounty:5,  r:0.30, col:'#ff8a1e', shape:'hex',  wall:6 },
+  dash:   { name:'DASH',    hp:14,  spd:2.15, arm:0,   res:0,    bounty:6,  r:0.26, col:'#ffd23f', shape:'chev', wall:4 },
+  mite:   { name:'MITE',    hp:9,   spd:1.55, arm:0,   res:0,    bounty:3,  r:0.20, col:'#dde3ff', shape:'sq',   wall:3 },
+  hulk:   { name:'HULK',    hp:70,  spd:0.85, arm:7,   res:0,    bounty:14, r:0.40, col:'#9fb3d9', shape:'oct',  wall:14 },
+  ward:   { name:'WARD',    hp:52,  spd:1.15, arm:0,   res:0.60, bounty:13, r:0.36, col:'#b44fff', shape:'dia',  wall:8 },
+  sapper: { name:'SAPPER',  hp:40,  spd:1.35, arm:2,   res:0.20, bounty:12, r:0.33, col:'#ff5cf0', shape:'tri',  wall:34 },
+  mender: { name:'MENDER',  hp:60,  spd:1.05, arm:0,   res:0.30, bounty:18, r:0.35, col:'#2ee6a8', shape:'cross',wall:6, heal:0.035 },
+  boss:   { name:'BREAKER', hp:420, spd:0.70, arm:5,   res:0.35, bounty:90, r:0.52, col:'#ff2244', shape:'star', wall:46, leak:4 },
+};
+const KIN_FLOOR = 0.15;      // armour can never eat more than 85% of a kinetic hit
+
+/* ------------------------- DIFFICULTY CURVE ---------------------------
+   A sawtooth, for the reason grid-defense learned the hard way: the board
+   grows from near-empty inside a level, so one smooth ramp makes a
+   level's OPENING waves the dangerous ones. Waves harden steeply across a
+   level, the BREAKER spikes, and the next level opens easier than that
+   boss but on a higher floor.                                          */
+let HP_LEVEL = 1.22;
+let HP_WAVE  = 1.15;
+const HP_BOSS = 1.35;
+const SPD_GROWTH = 0.0035, SPD_CAP = 1.40;
+const CASH_BASE = 300, CASH_GROWTH = 1.36;
+const ELITE_LEVEL = 3, ELITE_HP = 1.6, ELITE_BOUNTY = 1.3, ELITE_EVERY = 4;
+
+/* Pacing: a level is meant to run about eight minutes. The window is the
+   time a wave takes to finish spawning; the wave itself ends when the
+   board is clear, so a strong grid shortens it and a struggling one does
+   not. eval-turret-builder.cjs asserts the measured minutes. */
+let SPAWN_W0 = 33, SPAWN_WSTEP = 2.2, SPAWN_WBOSS = 34;
+function spawnWindowFor(w) { return w === WAVES_PER_LEVEL ? SPAWN_WBOSS : SPAWN_W0 + SPAWN_WSTEP * (w - 1); }
+
+function levelOfWave(gw) { return Math.floor((gw - 1) / WAVES_PER_LEVEL) + 1; }
+function waveInLevel(gw) { return ((gw - 1) % WAVES_PER_LEVEL) + 1; }
+function isBossWave(gw) { return gw % WAVES_PER_LEVEL === 0; }
+function hpMulFor(gw) {
+  const L = levelOfWave(gw), w = waveInLevel(gw);
+  let m = Math.pow(HP_LEVEL, L - 1) * Math.pow(HP_WAVE, w - 1);
+  if (w === WAVES_PER_LEVEL) m *= HP_BOSS;
+  return m;
+}
+function spdMulFor(gw) { return Math.min(SPD_CAP, 1 + SPD_GROWTH * (gw - 1)); }
+/* ARMOUR SCALES WITH THE LEVEL FLOOR — and this is the single rule that makes
+   the modules the game rather than a 40% garnish. A turret's kinetic damage
+   grows all campaign (levels, CHASSIS tiers), so a flat armour of 7 that
+   never moves is a real tax at level 1 and a rounding error at level 8: a
+   board of bare gray triangles measured its way to level 6 before this
+   landed. Scaling armour on the same floor as HP keeps the flat cut biting,
+   and since armour touches ONLY kinetic, the answer is always elemental —
+   which is to say, always a module. Resist is a fraction, so it needs no
+   equivalent; WARD stays the mirror answer that punishes all-elemental. */
+function armMulFor(gw) { return Math.pow(HP_LEVEL, levelOfWave(gw) - 1); }
+function startCashFor(level) { return Math.round(CASH_BASE * Math.pow(CASH_GROWTH, level - 1)); }
+function coresForWave(gw) { return 1 + Math.floor(gw / 20) + (isBossWave(gw) ? 2 : 0); }
+
+/* The introduction is measured in WAVES: level 1 IS the tutorial, one new
+   tile per wave, and the LAB opens halfway through it. */
+const UNLOCK = { turret:1, fire:2, ice:3, wall:4, arc:5, blast:6, armor:7, regen:8 };
+const LAB_WAVE = 5;
+const BUILD_ORDER = ['turret', 'wall', 'fire', 'ice', 'arc', 'blast', 'armor', 'regen'];
+
+/* --------------------------- WAVE COMPOSITION -------------------------
+   One counter introduced per wave, so a player meets ARMOR before they
+   meet RESIST and learns which module answers which. */
+const WAVE_MIX = [
+  { grub:10 },
+  { grub:9,  dash:5 },
+  { grub:8,  dash:4, mite:15 },
+  { grub:7,  dash:4, hulk:3 },
+  { grub:6,  dash:5, hulk:3, ward:3 },
+  { grub:6,  mite:15, ward:5, sapper:3 },
+  { grub:6,  dash:6, hulk:3, ward:4, mender:2 },
+  { boss:1,  hulk:4, ward:5, mite:14, sapper:2 },
+];
+const MIX_GROWTH = 0.15;
+
+/* -------------------------------- MAPS --------------------------------
+   Waypoints in cell coordinates; the first and last sit off-grid so
+   creeps walk on and off the board. Paths keep to columns 1-7 where they
+   can: a road hugging the edge halves the adjacency you can build round
+   it, and adjacency is the game. */
+const MAPS = [
+  { name:'SUBSTATION', pts:[[-1,2],[6,2],[6,6],[2,6],[2,10],[9,10]], rocks:[[4,4],[5,12]] },
+  { name:'RELAY',      pts:[[4,-1],[4,3],[7,3],[7,7],[2,7],[2,11],[9,11]], rocks:[[0,5],[6,12]] },
+  { name:'JUNCTION',   pts:[[-1,11],[3,11],[3,7],[7,7],[7,3],[1,3],[1,-1]], rocks:[[5,10],[6,1]] },
+  { name:'CASCADE',    pts:[[-1,1],[7,1],[7,5],[1,5],[1,9],[7,9],[7,12],[9,12]], rocks:[[3,3],[4,11]] },
+  { name:'LOOM',       pts:[[4,-1],[4,2],[1,2],[1,6],[6,6],[6,10],[2,10],[2,12],[9,12]], rocks:[[7,1],[0,9]] },
+  { name:'TRUNK',      pts:[[-1,7],[2,7],[2,2],[6,2],[6,11],[9,11]], rocks:[[8,4],[0,12],[4,9]] },
+  { name:'WEAVE',      pts:[[-1,3],[5,3],[5,6],[1,6],[1,9],[7,9],[7,5],[9,5]], rocks:[[3,0],[3,12]] },
+  { name:'GRIDLOCK',   pts:[[4,-1],[4,4],[7,4],[7,8],[2,8],[2,11],[9,11]], rocks:[[0,2],[8,1],[5,12]] },
+];
+function mapIndexFor(level) { return (level - 1) % MAPS.length; }
+
+/* -------------------------------- RNG ---------------------------------
+   Every roll in the game goes through RNG so a balance run is repeatable.
+   (grid-defense measured crit noise swinging a persona two whole levels.) */
+let RNG = Math.random;
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ================================ STATE =============================== */
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const ui = document.getElementById('ui');
+let W = 0, H = 0, dpr = 1, safeTop = 0, safeBot = 0;
+let boardX = 0, boardY = 0, cell = 40, boardW = 0, boardH = 0;
+let hudY = 0, hudH = 62, barY = 0, barH = 108;
+
+let state = 'menu';          // menu | play | dead
+let phase = 'grace';         // grace | wave | gap | levelclear | failed
+let paused = false;
+let run = null;
+let cash = 0;
+let tiles = [];              // every placed thing: turrets, modules, walls
+let cellIndex = new Map();   // r*COLS+c -> tile
+let creeps = [], spawnList = [], beams = [], floats = [], sparks = [];
+let phaseT = 0, waveT = 0, levelLeaks = 0, levelKills = 0;
+let sel = null, dragCard = null, dragPos = null, armedKind = null, downCard = null;
+let shake = 0, speed = 1;
+let pathCells = new Set(), rockCells = new Set(), segs = [], totalLen = 0, mapIdx = 0;
+let cardRects = [], panelBtns = {}, hudBtns = {};
+let toasts = [];
+let creepSeq = 0;
+let dmgLog = null;           // test hook: a ledger of every damage instance
+let overTimer = null, pendingStart = false;
+
+/* ---------------------------- PERSISTENCE ----------------------------- */
+function readJSON(key, dflt) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : dflt; }
+  catch (e) { return dflt; }
+}
+function writeJSON(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; }
+}
+const settings = Object.assign({ music:45, sfx:70, muted:false, speed:1 }, readJSON(SET_KEY, {}));
+function saveSettings() { writeJSON(SET_KEY, settings); }
+function getScores() { const s = readJSON(SCORE_KEY, []); return Array.isArray(s) ? s : []; }
+function addScore(e) {
+  const list = getScores(); list.push(e);
+  list.sort((a, b) => b.score - a.score);
+  writeJSON(SCORE_KEY, list.slice(0, 10));
+}
+function fmtWhen(ts) {
+  const d = new Date(ts); if (isNaN(d.getTime())) return '--';
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function fmtNum(n) { return Math.round(n).toLocaleString('en-US'); }
+function fmtClock(s) { const m = Math.floor(s / 60); return m + ':' + String(Math.floor(s % 60)).padStart(2, '0'); }
+
+/* ================================ AUDIO =============================== */
+let AC = null, sfxGain = null, musicGain = null, musicTimer = null, musicStep = 0, musicNext = 0, noiseBuf = null;
+const muteBtn = document.getElementById('mute');
+function initAudio() {
+  if (AC) return;
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    sfxGain = AC.createGain(); sfxGain.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.connect(AC.destination);
+    // shared buffers are built here, never lazily inside one SFX
+    noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.4, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    applyVolumes();
+    musicNext = AC.currentTime + 0.1;
+    musicTimer = setInterval(scheduleMusic, 25);
+  } catch (e) { AC = null; }
+}
+function applyVolumes() {
+  muteBtn.textContent = settings.muted ? '🔇' : '🔊';
+  if (sfxGain) sfxGain.gain.value = settings.muted ? 0 : 0.5 * (settings.sfx / 100);
+  if (musicGain) musicGain.gain.value = settings.muted ? 0 : 0.3 * (settings.music / 100);
+}
+function tone(freq, dur, type, vol, when, dest) {
+  if (!AC || !isFinite(freq)) return;
+  const t = when || AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || 'triangle'; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol || 0.3, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(dest || sfxGain);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, vol, filterHz) {
+  if (!AC || !noiseBuf) return;
+  const s = AC.createBufferSource(); s.buffer = noiseBuf;
+  const g = AC.createGain(), f = AC.createBiquadFilter();
+  f.type = 'lowpass'; f.frequency.value = filterHz || 1200;
+  g.gain.setValueAtTime(vol || 0.2, AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+  s.connect(f); f.connect(g); g.connect(sfxGain);
+  s.start(); s.stop(AC.currentTime + dur);
+}
+function sfxShot()  { tone(660, 0.04, 'square', 0.045); }
+function sfxArc()   { tone(1500, 0.05, 'sawtooth', 0.07); tone(2200, 0.04, 'square', 0.04, AC && AC.currentTime + 0.03); }
+function sfxBlast() { noise(0.18, 0.16, 900); tone(90, 0.2, 'square', 0.08); }
+function sfxBurn()  { noise(0.1, 0.05, 2400); }
+function sfxBuild() { tone(330, 0.07, 'triangle', 0.2); tone(494, 0.09, 'triangle', 0.16, AC && AC.currentTime + 0.06); }
+function sfxSell()  { tone(587, 0.07, 'triangle', 0.16); tone(392, 0.11, 'triangle', 0.13, AC && AC.currentTime + 0.05); }
+function sfxDeny()  { tone(120, 0.11, 'square', 0.15); }
+function sfxLink()  { tone(880, 0.05, 'sine', 0.1); tone(1320, 0.07, 'sine', 0.08, AC && AC.currentTime + 0.04); }
+function sfxLeak()  { tone(140, 0.28, 'sawtooth', 0.28); shake = 0.3; }
+function sfxWallHit(){ noise(0.05, 0.08, 500); }
+function sfxWallDie(){ noise(0.3, 0.24, 700); tone(70, 0.3, 'square', 0.14); }
+function sfxHorn()  { if (!AC) return; [247, 311, 370].forEach((f, i) => tone(f, 0.2, 'square', 0.12, AC.currentTime + i * 0.1)); }
+function sfxWin()   { if (!AC) return; [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.24, 'square', 0.13, AC.currentTime + i * 0.11)); }
+function sfxLose()  { if (!AC) return; [330, 262, 196, 147].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.15, AC.currentTime + i * 0.15)); }
+function sfxUnlock(){ if (!AC) return; [392, 523, 659].forEach((f, i) => tone(f, 0.17, 'triangle', 0.15, AC.currentTime + i * 0.08)); }
+const BASSLINE = [41.2, 0, 41.2, 0, 49, 0, 36.7, 0];
+function scheduleMusic() {
+  if (!AC || state !== 'play') return;
+  const stepDur = 60 / 96 / 2;
+  while (musicNext < AC.currentTime + 0.12) {
+    const s = musicStep % 8;
+    if (BASSLINE[s]) tone(BASSLINE[s] * 2, stepDur * 1.6, 'triangle', 0.5, musicNext, musicGain);
+    if (phase === 'wave' && s % 2 === 1) tone(1760, 0.014, 'square', 0.035, musicNext, musicGain);
+    if (phase === 'wave' && s === 4) tone(110, 0.06, 'sine', 0.16, musicNext, musicGain);
+    musicNext += stepDur; musicStep++;
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) return;
+  if (document.hidden) AC.suspend(); else AC.resume();
+});
+
+/* =============================== HELPERS ============================== */
+function bindTap(el, fn) {
+  if (!el) return;
+  let last = 0;
+  const h = e => {
+    e.preventDefault();
+    const now = Date.now();
+    if (now - last < 350) return;
+    last = now;
+    initAudio();
+    fn(e);
+  };
+  el.addEventListener('touchend', h, { passive:false });
+  el.addEventListener('click', h);
+}
+function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+function key(r, c) { return r * COLS + c; }
+function inBoard(r, c) { return r >= 0 && r < ROWS && c >= 0 && c < COLS; }
+function cellCx(c) { return boardX + (c + 0.5) * cell; }
+function cellCy(r) { return boardY + (r + 0.5) * cell; }
+function cellAtPx(x, y) {
+  const c = Math.floor((x - boardX) / cell), r = Math.floor((y - boardY) / cell);
+  return inBoard(r, c) ? { r, c } : null;
+}
+function toast(text, col) { toasts.push({ text, col: col || '#dde3ff', t: 2.4 }); }
+
+/* ============================ PATH BUILDING =========================== */
+function buildPath(idx) {
+  const m = MAPS[idx];
+  pathCells = new Set(); rockCells = new Set(); segs = []; totalLen = 0; distMemo = new Map();
+  const pts = m.pts.map(p => ({ x: cellCx(p[0]), y: cellCy(p[1]) }));
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    segs.push({ a, b, len, at: totalLen });
+    totalLen += len;
+  }
+  // mark every cell the polyline passes through
+  for (let i = 0; i < m.pts.length - 1; i++) {
+    const [c0, r0] = m.pts[i], [c1, r1] = m.pts[i + 1];
+    const steps = Math.max(Math.abs(c1 - c0), Math.abs(r1 - r0));
+    for (let s = 0; s <= steps; s++) {
+      const c = Math.round(c0 + (c1 - c0) * s / steps);
+      const r = Math.round(r0 + (r1 - r0) * s / steps);
+      if (inBoard(r, c)) pathCells.add(key(r, c));
+    }
+  }
+  for (const [c, r] of (m.rocks || [])) if (inBoard(r, c) && !pathCells.has(key(r, c))) rockCells.add(key(r, c));
+  mapIdx = idx;
+}
+function posAt(d) {
+  d = clamp(d, 0, totalLen);
+  for (const s of segs) {
+    if (d <= s.at + s.len) {
+      const t = s.len > 0 ? (d - s.at) / s.len : 0;
+      return { x: s.a.x + (s.b.x - s.a.x) * t, y: s.a.y + (s.b.y - s.a.y) * t };
+    }
+  }
+  const l = segs[segs.length - 1];
+  return { x: l.b.x, y: l.b.y };
+}
+/* Distance along the path at which a given road cell's centre sits. Memoised
+   per map+cell-size: canPlace('wall', ...) sweeps the whole board on every
+   armed drop, and an un-memoised 400-sample scan per road cell showed up. */
+let distMemo = new Map();
+function pathDistOfCell(r, c) {
+  const k = key(r, c);
+  const hitv = distMemo.get(k);
+  if (hitv !== undefined) return hitv;
+  const x = cellCx(c), y = cellCy(r);
+  let best = 0, bd = Infinity;
+  const N = 400;
+  for (let i = 0; i <= N; i++) {
+    const d = totalLen * i / N, p = posAt(d);
+    const dd = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
+    if (dd < bd) { bd = dd; best = d; }
+  }
+  distMemo.set(k, best);
+  return best;
+}
+/* Keep anything drawn AT an off-grid path point inside the board, so exit
+   markers and leak floats never paint over the HUD or the build bar. */
+function boardPoint(p) {
+  return { x: clamp(p.x, boardX + 6, boardX + boardW - 6), y: clamp(p.y, boardY + 6, boardY + boardH - 6) };
+}
+
+/* ============================== THE GRID ==============================
+   recomputeGrid() is the heart of the game and runs on every place/sell,
+   every lab purchase and every level start — never per frame. A module
+   powers EVERY orthogonally adjacent turret and wall, so one tile can pay
+   two or three structures; combat and rendering only ever read the cached
+   result.                                                              */
+const ORTHO = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+function tileAt(r, c) { return cellIndex.get(key(r, c)) || null; }
+function emptyMods() { return { fire:0, ice:0, arc:0, blast:0, armor:0, regen:0 }; }
+
+function recomputeGrid() {
+  cellIndex = new Map();
+  for (const t of tiles) cellIndex.set(key(t.r, t.c), t);
+  for (const t of tiles) { t.mods = emptyMods(); t.links = []; t.fed = 0; }
+  for (const m of tiles) {
+    if (m.kind !== 'module') continue;
+    for (const [dr, dc] of ORTHO) {
+      const n = tileAt(m.r + dr, m.c + dc);
+      if (!n || n.kind === 'module') continue;
+      // ARMOR and REGEN are wall hardware; they do nothing bolted to a turret
+      if ((m.mod === 'armor' || m.mod === 'regen') && n.kind !== 'wall') continue;
+      n.mods[m.mod]++;
+      // the structure records the direction of the LENDER, so drawTile can
+      // bloom the edge facing it (dr/dc point module-ward from the structure)
+      n.links.push({ from:m, dr:-dr, dc:-dc });
+      m.fed++;
+      m.links.push({ to:n, dr, dc });
+    }
+  }
+  for (const t of tiles) {
+    if (t.kind === 'turret') recomputeTurret(t);
+    else if (t.kind === 'wall') recomputeWall(t);
+  }
+}
+function labTier(id) { return (run && run.lab[id]) || 0; }
+function modScale(id) { return 1 + (MOD_LAB_STEP[id] || 0) * labTier(id); }
+
+function turretDamage(t) {
+  return TURRET.dmg
+    * Math.pow(TURRET_LVL_DMG, t.lvl - 1)
+    * (1 + 0.20 * labTier('chassis'));
+}
+function recomputeTurret(t) {
+  const D = turretDamage(t), m = t.mods;
+  t.D = D;
+  t.rate = TURRET.rate * Math.pow(TURRET_LVL_RATE, t.lvl - 1) * (1 + 0.09 * labTier('servo'));
+  t.rangePx = TURRET.range * (1 + 0.08 * labTier('optics')) * cell;
+  t.fireDot   = m.fire  ? D * FIRE_DOT * m.fire * modScale('fire') : 0;
+  t.iceDir    = m.ice   ? D * ICE_DIR  * m.ice  * modScale('ice') : 0;
+  t.iceSlow   = m.ice   ? Math.min(SLOW_CAP, ICE_SLOW * m.ice * modScale('ice')) : 0;
+  t.arcDir    = m.arc   ? D * ARC_DIR  * m.arc  * modScale('arc') : 0;
+  t.arcJumps  = m.arc   ? m.arc + (labTier('arc') >= 4 ? 1 : 0) : 0;
+  t.blastKin  = m.blast ? D * BLAST_KIN  * m.blast * modScale('blast') : 0;
+  t.blastFire = m.blast ? D * BLAST_FIRE * m.blast * modScale('blast') : 0;
+  t.blastR    = m.blast ? (BLAST_R0 + BLAST_RSTEP * m.blast) * (1 + 0.12 * labTier('blast')) * cell : 0;
+  // headline DPS, for the selection panel only
+  t.dps = (D + t.iceDir + t.arcDir * (1 + t.arcJumps) + (t.blastKin + t.blastFire)) * t.rate + t.fireDot * t.rate;
+}
+function wallMaxHp(t) {
+  return Math.round(WALL.hp
+    * (1 + 0.30 * labTier('bulwark'))
+    * (1 + WALL_ARMOR_HP * t.mods.armor));
+}
+function recomputeWall(t) {
+  const was = t.maxHp || 0;
+  t.maxHp = wallMaxHp(t);
+  t.hp = was > 0 ? Math.min(t.maxHp, t.hp * (t.maxHp / was)) : t.maxHp;
+  t.dr = WALL_ARMOR_DR * t.mods.armor;
+  const m = t.mods, M = t.maxHp;
+  t.wFire  = m.fire  ? M * WALL_FIRE  * m.fire  * modScale('fire') : 0;
+  t.wIce   = m.ice   ? Math.min(SLOW_CAP, WALL_ICE * m.ice * modScale('ice')) : 0;
+  t.wArc   = m.arc   ? M * WALL_ARC   * m.arc   * modScale('arc') : 0;
+  t.wThorn = m.blast ? M * WALL_THORN * m.blast * modScale('blast') : 0;
+  t.wRegen = m.regen ? M * WALL_REGEN * m.regen : 0;
+}
+
+/* ---------------------------- CAPS AND COSTS -------------------------- */
+function turretCap() { return TURRET_CAP_BASE + labTier('grid'); }
+function wallCap() { return WALL_CAP_BASE + labTier('bulwark'); }
+function countKind(k) { let n = 0; for (const t of tiles) if (t.kind === k) n++; return n; }
+function costOf(kind) {
+  if (kind === 'turret') return TURRET.cost;
+  if (kind === 'wall') return WALL.cost;
+  return MODULES[kind].cost;
+}
+function unlocked(kind) { return run ? globalWave() >= UNLOCK[kind] || run.unlocked[kind] : false; }
+function labOpen() { return run ? globalWave() >= LAB_WAVE || run.labSeen : false; }
+
+function canPlace(kind, r, c) {
+  if (!inBoard(r, c) || tileAt(r, c)) return false;
+  if (rockCells.has(key(r, c))) return false;
+  if (!unlocked(kind)) return false;
+  if (kind === 'wall') {
+    if (!pathCells.has(key(r, c))) return false;
+    // never right at the mouth or the exit, or creeps would stall off-board
+    const d = pathDistOfCell(r, c);
+    if (d < cell * 1.2 || d > totalLen - cell * 1.2) return false;
+    return countKind('wall') < wallCap();
+  }
+  if (pathCells.has(key(r, c))) return false;
+  if (kind === 'turret') return countKind('turret') < turretCap();
+  return true;   // modules are limited by cash and by the four sides, nothing else
+}
+function anyPlacement(kind) {
+  if (cash < costOf(kind)) return false;
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (canPlace(kind, r, c)) return true;
+  return false;
+}
+function place(kind, r, c, free) {
+  if (!canPlace(kind, r, c)) return false;
+  const cost = costOf(kind);
+  if (!free && cash < cost) return false;
+  if (!free) cash -= cost;
+  let t;
+  if (kind === 'turret') t = { kind:'turret', r, c, lvl:1, cd:0, spent:cost, mods:emptyMods(), links:[] };
+  else if (kind === 'wall') t = { kind:'wall', r, c, lvl:1, spent:cost, hp:0, maxHp:0, d:pathDistOfCell(r, c), mods:emptyMods(), links:[] };
+  else t = { kind:'module', mod:kind, r, c, spent:cost, mods:emptyMods(), links:[] };
+  tiles.push(t);
+  recomputeGrid();
+  if (kind === 'wall') { t.hp = t.maxHp; }
+  if (t.kind === 'module' && t.fed > 0) sfxLink(); else sfxBuild();
+  return true;
+}
+function sellAt(r, c) {
+  const i = tiles.findIndex(t => t.r === r && t.c === c);
+  if (i < 0) return false;
+  const t = tiles[i];
+  cash += Math.floor(t.spent * 0.5);
+  tiles.splice(i, 1);
+  if (sel === t) sel = null;
+  recomputeGrid();
+  sfxSell();
+  return true;
+}
+function upgradeAt(r, c) {
+  const t = tileAt(r, c);
+  if (!t) return false;
+  if (t.kind === 'turret') {
+    if (t.lvl >= TURRET.maxLvl) return false;
+    const cost = turretUpCost(t.lvl);
+    if (cash < cost) return false;
+    cash -= cost; t.spent += cost; t.lvl++;
+    recomputeGrid(); sfxBuild(); return true;
+  }
+  if (t.kind === 'wall') {          // walls "upgrade" by being repaired
+    if (t.hp >= t.maxHp - 0.01) return false;
+    const cost = Math.max(4, Math.round(WALL.cost * WALL_REPAIR_COST * (1 - t.hp / t.maxHp)));
+    if (cash < cost) return false;
+    cash -= cost; t.hp = t.maxHp; sfxBuild(); return true;
+  }
+  return false;
+}
+function buyLab(id) {
+  const tr = LAB_BY_ID[id];
+  if (!tr || !run || !labOpen()) return false;
+  const cur = run.lab[id] || 0;
+  if (cur >= tr.tiers) return false;
+  const c = labCost(id, cur);
+  if (run.cores < c) return false;
+  run.cores -= c; run.lab[id] = cur + 1;
+  recomputeGrid();
+  sfxUnlock();
+  return true;
+}
+
+/* =============================== THE RUN ============================== */
+function globalWave() { return run ? (run.level - 1) * WAVES_PER_LEVEL + run.wave : 0; }
+function newRunObj() {
+  const lab = {};
+  for (const t of LAB) lab[t.id] = 0;
+  return {
+    level:1, wave:1, lives:LIVES_BASE, cores:0, score:0, levelScore:0,
+    retries:0, lab, unlocked:{}, labSeen:false, recorded:false,
+    elapsed:0, levelElapsed:0, levelTimes:[], won:false,
+  };
+}
+function applyUnlocks() {
+  const gw = globalWave();
+  for (const k of BUILD_ORDER) if (gw >= UNLOCK[k] && !run.unlocked[k]) run.unlocked[k] = true;
+  if (gw >= LAB_WAVE) run.labSeen = true;
+}
+function startRun() {
+  run = newRunObj();
+  state = 'play';
+  if (overTimer) { clearTimeout(overTimer); overTimer = null; }
+  startLevel(1);
+}
+function startLevel(L) {
+  run.level = L; run.wave = 1; run.lives = LIVES_BASE; run.levelScore = 0; run.levelElapsed = 0;
+  // Roll the whole attempt back if it is a retry: everything a level earned
+  // reverts, so a level can never be farmed for cores by dying on purpose.
+  run.snapshot = { cores:run.cores, score:run.score, lab:Object.assign({}, run.lab) };
+  buildPath(mapIndexFor(L));
+  tiles = []; cellIndex = new Map(); creeps = []; spawnList = []; beams = []; floats = []; sparks = [];
+  sel = null; armedKind = null; dragCard = null;
+  cash = startCashFor(L);
+  levelLeaks = 0; levelKills = 0;
+  applyUnlocks();
+  recomputeGrid();
+  phase = 'grace'; phaseT = GRACE_T; waveT = 0;
+  pendingStart = false;
+  autoSave();
+  toast('LEVEL ' + L + ' · ' + MAPS[mapIdx].name, '#ffc300');
+  sfxHorn();
+}
+/* Endless has no retries — a breach there ends the run and records it, which
+   is what gives the scoreboard its teeth. Inside the campaign the attempt is
+   rolled back WHOLE: score, cores and every lab tier revert to how they stood
+   when the level opened. Without that rollback a patient player farms a level
+   for cores, dies on purpose, and keeps them. */
+function failLevel() {
+  if (run.level > CAMPAIGN_LEVELS) { sfxLose(); endRun(false); return; }
+  const s = run.snapshot;
+  run.cores = s.cores; run.score = s.score; run.lab = Object.assign({}, s.lab);
+  run.retries++;
+  phase = 'failed'; phaseT = FAIL_T;
+  toast('BREACHED · REBUILDING LEVEL ' + run.level, '#ff2244');
+  sfxLose();
+}
+function completeLevel() {
+  // latch the phase FIRST: without it the "board is clear" check re-fires
+  // every frame and farms the level bonus forever
+  phase = 'levelclear'; phaseT = LEVEL_T;
+  const bonus = 120 * run.level + run.lives * 12;
+  run.levelScore += bonus;
+  run.score += run.levelScore;
+  run.levelTimes.push(run.levelElapsed);
+  applyUnlocks();
+  toast('LEVEL ' + run.level + ' CLEAR · +' + fmtNum(bonus), '#39ff14');
+  sfxWin();
+  if (run.level >= CAMPAIGN_LEVELS && !run.won) {
+    run.won = true;
+    toast('CAMPAIGN COMPLETE · ENDLESS BEGINS', '#ffc300');
+  }
+}
+/* The between-levels auto-save must name the level to OPEN, not the one just
+   finished, and must carry no board — otherwise CONTINUE reopens the next
+   level number holding the previous level's tiles and cash. */
+function advanceLevel() {
+  const next = run.level + 1;
+  run.level = next; run.wave = 1;
+  pendingStart = true;
+  autoSave();
+  startLevel(next);
+}
+function endRun(won) {
+  if (!run.recorded) {
+    run.recorded = true;
+    addScore({ ts:Date.now(), level:run.level, wave:run.wave, score:Math.round(run.score),
+               retries:run.retries, won:!!won, mins:Math.round(run.elapsed / 60) });
+  }
+  state = 'dead';
+  if (overTimer) clearTimeout(overTimer);
+  overTimer = setTimeout(() => { overTimer = null; showGameOver(); }, 700);
+}
+
+/* ============================ WAVE BUILDING ===========================
+   Deterministic composition AND deterministic elites. grid-defense found
+   that rolling elites at random let one wave land a heavy the next one
+   missed — an invisible wobble on a curve that was supposed to be
+   monotonic. Here every count and every elite stamp is a function of the
+   global wave index alone. */
+function buildWave(gw) {
+  const L = levelOfWave(gw), w = waveInLevel(gw);
+  const mix = WAVE_MIX[w - 1];
+  const grow = 1 + MIX_GROWTH * (L - 1);
+  const groups = [];
+  for (const type of Object.keys(mix)) {
+    let n = mix[type];
+    n = type === 'boss' ? n + Math.floor((L - 1) / 4) : Math.max(1, Math.round(n * grow));
+    groups.push({ type, n });
+  }
+  // from level 2, every previously-seen type shows up even off its own wave
+  if (L >= 2 && w < WAVES_PER_LEVEL) {
+    /* WARD leans heavier than the rest on purpose. It is the ONLY answer to
+       an all-elemental grid, and at parity with hulk/sapper a mono-ARC build
+       cleared the whole campaign — arc spreads 20% of the hit across five
+       targets, so against an unresistant crowd it simply out-throughputs a
+       mixed grid. Resist is the tax that makes mixing worth it. */
+    const FILL = { hulk: 0.5, ward: 1.0, sapper: 0.5 };
+    for (const type of ['hulk', 'ward', 'sapper']) {
+      if (!mix[type] && UNLOCK_SEEN[type] <= w + 2) groups.push({ type, n: Math.max(1, Math.round((L - 1) * FILL[type])) });
+    }
+  }
+  // round-robin interleave so a wave arrives mixed, not in blocks
+  const out = [];
+  let more = true, i = 0;
+  while (more) {
+    more = false;
+    for (const g of groups) { if (i < g.n) { out.push(g.type); more = true; } }
+    i++;
+  }
+  const hp = hpMulFor(gw), spd = spdMulFor(gw);
+  const win = spawnWindowFor(w);
+  const list = [];
+  for (let k = 0; k < out.length; k++) {
+    const elite = L >= ELITE_LEVEL && out[k] !== 'boss' && (k % ELITE_EVERY === ELITE_EVERY - 1);
+    list.push({
+      type: out[k], elite,
+      at: out.length > 1 ? win * k / (out.length - 1) : 0,
+      hp: CREEPS[out[k]].hp * hp * (elite ? ELITE_HP : 1),
+      arm: CREEPS[out[k]].arm * armMulFor(gw),
+      spd: CREEPS[out[k]].spd * spd,
+      bounty: Math.round(CREEPS[out[k]].bounty * (elite ? ELITE_BOUNTY : 1)),
+    });
+  }
+  return list;
+}
+// which wave each type is first met on, so the "always present" filler above
+// never introduces something early
+const UNLOCK_SEEN = { grub:1, dash:2, mite:3, hulk:4, ward:5, sapper:6, mender:7, boss:8 };
+
+function startWave() {
+  phase = 'wave'; waveT = 0;
+  spawnList = buildWave(globalWave());
+  toast('WAVE ' + run.wave + '/' + WAVES_PER_LEVEL, '#4488ff');
+  sfxHorn();
+}
+function spawnCreep(e) {
+  const def = CREEPS[e.type];
+  creeps.push({
+    id: ++creepSeq, type:e.type, def, elite:e.elite,
+    hp:e.hp, maxHp:e.hp, spd:e.spd, bounty:e.bounty, arm:e.arm,
+    d:0, x:0, y:0, dots:[], slow:0, slowT:0, atkCd:0, dead:false, hitFlash:0,
+  });
+}
+
+/* =============================== COMBAT ===============================
+   Two damage channels and one rule each:
+     KINETIC   is reduced FLAT by armour (never below 15% of the hit)
+     ELEMENTAL is reduced by a PERCENTAGE resist
+   That is the whole reason a one-note grid loses. HULK's armour eats a
+   bare turret; WARD's resist eats a wall of fire; the BREAKER has both. */
+function dealDamage(c, amount, type, tag) {
+  if (!c || c.dead || amount <= 0) return 0;
+  let dmg;
+  if (type === 'kin') dmg = Math.max(amount * KIN_FLOOR, amount - (c.arm !== undefined ? c.arm : c.def.arm));
+  else dmg = amount * (1 - c.def.res);
+  c.hp -= dmg; c.hitFlash = 0.12;
+  if (dmgLog) dmgLog.push({ id:c.id, amt:dmg, raw:amount, type, tag:tag || '' });
+  if (c.hp <= 0 && !c.dead) killCreep(c);
+  return dmg;
+}
+function killCreep(c) {
+  c.dead = true;
+  cash += c.bounty;
+  levelKills++;
+  run.levelScore += c.bounty * 2;
+  for (let i = 0; i < 5; i++)
+    sparks.push({ x:c.x, y:c.y, vx:(RNG() - 0.5) * 130, vy:(RNG() - 0.5) * 130, t:0.35, col:c.def.col });
+}
+function applyDot(c, total, dur, tag) {
+  if (!c || c.dead || total <= 0) return;
+  c.dots.push({ dps: total / dur, t: dur, tag: tag || 'fire' });
+  if (c.dots.length > 24) c.dots.shift();
+}
+function applySlow(c, mul, dur) {
+  if (!c || c.dead || mul <= 0) return;
+  if (mul >= c.slow || c.slowT <= 0) c.slow = Math.min(SLOW_CAP, mul);
+  c.slowT = Math.max(c.slowT, dur);
+}
+function nearestCreep(from, radiusPx, exclude) {
+  let best = null, bd = radiusPx * radiusPx;
+  for (const c of creeps) {
+    if (c.dead || exclude.has(c.id)) continue;
+    const dx = c.x - from.x, dy = c.y - from.y, dd = dx * dx + dy * dy;
+    if (dd <= bd) { bd = dd; best = c; }
+  }
+  return best;
+}
+/* Chain lightning: the primary target takes the arc damage too, then the
+   bolt jumps to the nearest enemy it has not already touched. Each bolt
+   can only hit a target once — that is what stops a two-creep board
+   ping-ponging forever. */
+function arcChain(origin, dmg, jumps, srcX, srcY) {
+  const hit = new Set([origin.id]);
+  dealDamage(origin, dmg, 'ele', 'arc');
+  let prev = origin, px = srcX, py = srcY;
+  beams.push({ x1:px, y1:py, x2:origin.x, y2:origin.y, t:0.12, col:MODULES.arc.col, w:2 });
+  for (let i = 0; i < jumps; i++) {
+    const nx = nearestCreep(prev, ARC_JUMP_R * cell, hit);
+    if (!nx) break;
+    beams.push({ x1:prev.x, y1:prev.y, x2:nx.x, y2:nx.y, t:0.12, col:MODULES.arc.col, w:2 });
+    dealDamage(nx, dmg, 'ele', 'arc');
+    hit.add(nx.id); prev = nx;
+  }
+  sfxArc();
+}
+function blastAt(cx, cy, radius, kin, ele) {
+  for (const c of creeps) {
+    if (c.dead) continue;
+    if (Math.hypot(c.x - cx, c.y - cy) > radius) continue;
+    if (kin > 0) dealDamage(c, kin, 'kin', 'blast');
+    if (ele > 0) dealDamage(c, ele, 'ele', 'blast');
+  }
+  sparks.push({ x:cx, y:cy, vx:0, vy:0, t:0.22, col:MODULES.blast.col, ring:radius });
+  sfxBlast();
+}
+function turretTarget(t) {
+  const x = cellCx(t.c), y = cellCy(t.r), R = t.rangePx;
+  let best = null;
+  for (const c of creeps) {
+    if (c.dead) continue;
+    if (Math.hypot(c.x - x, c.y - y) > R) continue;
+    if (!best || c.d > best.d) best = c;     // furthest along the road
+  }
+  return best;
+}
+function turretFire(t, target) {
+  const x = cellCx(t.c), y = cellCy(t.r);
+  t.aim = Math.atan2(target.y - y, target.x - x);
+  beams.push({ x1:x, y1:y, x2:target.x, y2:target.y, t:0.07, col:'#e8eeff', w:1.6 });
+  dealDamage(target, t.D, 'kin', 'turret');
+  if (t.iceDir > 0) dealDamage(target, t.iceDir, 'ele', 'ice');
+  if (t.iceSlow > 0) applySlow(target, t.iceSlow, ICE_T);
+  if (t.fireDot > 0) { applyDot(target, t.fireDot, FIRE_T, 'fire'); sfxBurn(); }
+  if (t.blastKin > 0 || t.blastFire > 0) blastAt(target.x, target.y, t.blastR, t.blastKin, t.blastFire);
+  if (t.arcDir > 0) arcChain(target, t.arcDir, t.arcJumps, x, y);
+  else sfxShot();
+}
+
+/* ------------------------------- WALLS -------------------------------- */
+function wallAhead(d) {
+  let best = null;
+  for (const t of tiles) {
+    if (t.kind !== 'wall' || t.hp <= 0) continue;
+    if (t.d <= d - 0.5) continue;
+    if (!best || t.d < best.d) best = t;
+  }
+  return best;
+}
+function creepHitsWall(c, wall, dt) {
+  const rate = 1 * (1 - (c.slowT > 0 ? c.slow : 0));
+  c.atkCd -= dt * rate;
+  if (c.atkCd > 0) return;
+  c.atkCd = 1;
+  const raw = c.def.wall * (c.elite ? 1.3 : 1);
+  wall.hp -= Math.max(raw * 0.2, raw - wall.dr);
+  sfxWallHit();
+  // the wall answers with whatever is bolted to its two free sides
+  if (wall.wFire > 0) applyDot(c, wall.wFire, WALL_FIRE_T, 'fire');
+  if (wall.wIce > 0) applySlow(c, wall.wIce, WALL_ICE_T);
+  if (wall.wThorn > 0) blastAt(c.x, c.y, WALL_THORN_R * cell, wall.wThorn, 0);
+  if (wall.wArc > 0) arcChain(c, wall.wArc, WALL_ARC_JUMPS, cellCx(wall.c), cellCy(wall.r));
+  if (wall.hp <= 0) {
+    wall.hp = 0;
+    sfxWallDie();
+    toast('WALL DOWN', '#ff8a1e');
+    for (let i = 0; i < 8; i++)
+      sparks.push({ x:cellCx(wall.c), y:cellCy(wall.r), vx:(RNG() - 0.5) * 220, vy:(RNG() - 0.5) * 220, t:0.4, col:'#9fb3d9' });
+  }
+}
+
+/* ================================ UPDATE ==============================
+   A timer state machine, exactly like grid-defense: grace -> wave -> gap
+   -> ... -> levelclear -> next level, with failed looping back to a
+   retry. Nothing in this game waits on a tap. */
+function update(dt) {
+  if (state !== 'play' || paused) return;
+  dt = Math.min(dt, 0.1);
+  run.elapsed += dt;
+  run.levelElapsed += dt;
+  shake = Math.max(0, shake - dt);
+
+  if (phase === 'grace' || phase === 'gap') {
+    phaseT -= dt;
+    if (phaseT <= 0) startWave();
+  } else if (phase === 'levelclear') {
+    phaseT -= dt;
+    if (phaseT <= 0) advanceLevel();
+    return;
+  } else if (phase === 'failed') {
+    phaseT -= dt;
+    if (phaseT <= 0) startLevel(run.level);
+    return;
+  }
+
+  if (phase === 'wave') {
+    waveT += dt;
+    while (spawnList.length && spawnList[0].at <= waveT) spawnCreep(spawnList.shift());
+  }
+
+  /* ---- creeps ---- */
+  for (const c of creeps) {
+    if (c.dead) continue;
+    c.hitFlash = Math.max(0, c.hitFlash - dt);
+    if (c.slowT > 0) { c.slowT -= dt; if (c.slowT <= 0) c.slow = 0; }
+    for (let i = c.dots.length - 1; i >= 0; i--) {
+      const d = c.dots[i];
+      const step = Math.min(dt, d.t);
+      dealDamage(c, d.dps * step, 'ele', 'dot');
+      d.t -= dt;
+      if (d.t <= 0) c.dots.splice(i, 1);
+    }
+    if (c.dead) continue;
+    if (c.def.heal) {
+      for (const o of creeps) {
+        if (o.dead || o === c) continue;
+        if (Math.hypot(o.x - c.x, o.y - c.y) < cell * 2.2)
+          o.hp = Math.min(o.maxHp, o.hp + o.maxHp * c.def.heal * dt);
+      }
+    }
+    if (c.pinned) continue;      // test dummies hold their exact position
+    const v = c.spd * cell * (1 - c.slow);
+    const wall = wallAhead(c.d);
+    const stop = wall ? wall.d - cell * 0.55 : Infinity;
+    const nd = Math.min(c.d + v * dt, stop);
+    c.d = nd;
+    const p = posAt(c.d);
+    c.x = p.x; c.y = p.y;
+    if (wall && c.d >= stop - 0.6) creepHitsWall(c, wall, dt);
+    if (c.d >= totalLen - 0.5) {
+      c.dead = true;
+      const cost = c.def.leak || 1;
+      run.lives -= cost;
+      levelLeaks += cost;
+      const bp = boardPoint({ x:c.x, y:c.y });
+      floats.push({ x:bp.x, y:bp.y, text:'-' + cost, col:'#ff2244', t:1 });
+      sfxLeak();
+    }
+  }
+  for (const t of tiles) {
+    if (t.kind === 'wall' && t.wRegen > 0 && t.hp > 0) t.hp = Math.min(t.maxHp, t.hp + t.wRegen * dt);
+  }
+
+  /* ---- turrets ---- */
+  for (const t of tiles) {
+    if (t.kind !== 'turret') continue;
+    t.cd -= dt;
+    if (t.cd > 0) continue;
+    const target = turretTarget(t);
+    if (!target) continue;
+    t.cd = 1 / t.rate;
+    turretFire(t, target);
+  }
+
+  creeps = creeps.filter(c => !c.dead);
+  for (let i = beams.length - 1; i >= 0; i--) { beams[i].t -= dt; if (beams[i].t <= 0) beams.splice(i, 1); }
+  for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; f.t -= dt; f.y -= 26 * dt; if (f.t <= 0) floats.splice(i, 1); }
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i]; s.t -= dt; s.x += s.vx * dt; s.y += s.vy * dt;
+    if (s.t <= 0) sparks.splice(i, 1);
+  }
+  for (let i = toasts.length - 1; i >= 0; i--) { toasts[i].t -= dt; if (toasts[i].t <= 0) toasts.splice(i, 1); }
+
+  /* ---- lifecycle ---- */
+  if (run.lives <= 0 && phase !== 'failed' && phase !== 'levelclear') { failLevel(); return; }
+  if (phase === 'wave' && !spawnList.length && !creeps.length) {
+    const gw = globalWave();
+    run.cores += coresForWave(gw);
+    run.levelScore += 40 * run.level;
+    if (run.wave >= WAVES_PER_LEVEL) { completeLevel(); return; }
+    run.wave++;
+    applyUnlocks();
+    phase = 'gap'; phaseT = GAP_T;
+    const nk = BUILD_ORDER.find(k => UNLOCK[k] === globalWave());
+    if (nk) { toast('UNLOCKED · ' + (nk === 'turret' ? 'TURRET' : nk === 'wall' ? 'WALL' : MODULES[nk].name), '#39ff14'); sfxUnlock(); }
+    if (globalWave() === LAB_WAVE) { toast('THE LAB IS OPEN · SPEND CORES', '#ffc300'); sfxUnlock(); }
+    autoSave();
+  }
+}
+
+/* =============================== DRAWING ============================== */
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cs = getComputedStyle(document.documentElement);
+  safeTop = parseFloat(cs.getPropertyValue('--sat')) || 0;
+  safeBot = parseFloat(cs.getPropertyValue('--sab')) || 0;
+  hudY = safeTop + 44;
+  barH = 108;
+  barY = H - safeBot - barH;
+  const availW = W - 12, availH = barY - (hudY + hudH) - 12;
+  const old = cell;
+  cell = Math.max(1, Math.floor(Math.min(availW / COLS, availH / ROWS)));
+  boardW = cell * COLS; boardH = cell * ROWS;
+  boardX = Math.round((W - boardW) / 2);
+  boardY = Math.round(hudY + hudH + 6 + Math.max(0, (availH - boardH) / 2));
+  if (run && segs.length && cell !== old) {
+    buildPath(mapIdx);
+    for (const t of tiles) if (t.kind === 'wall') t.d = pathDistOfCell(t.r, t.c);
+    recomputeGrid();
+  }
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', () => setTimeout(resize, 60));
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+/* The gray triangle of the spec. Level thickens the outline and grows it;
+   the COLOUR on the plate comes from the modules feeding it, never from
+   the turret itself. */
+function drawTurretShape(x, y, s, lvl, aim) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (aim !== undefined) ctx.rotate(aim + Math.PI / 2);
+  const g = s * (0.52 + 0.05 * (lvl - 1));
+  ctx.beginPath();
+  ctx.moveTo(0, -g);
+  ctx.lineTo(g * 0.86, g * 0.66);
+  ctx.lineTo(-g * 0.86, g * 0.66);
+  ctx.closePath();
+  ctx.fillStyle = '#78829a';
+  ctx.fill();
+  ctx.lineWidth = 1 + 0.55 * (lvl - 1);
+  ctx.strokeStyle = '#c9d2e6';
+  ctx.stroke();
+  ctx.restore();
+}
+function drawModuleShape(x, y, s, mod) {
+  const M = MODULES[mod];
+  ctx.save();
+  ctx.translate(x, y);
+  roundRect(-s * 0.34, -s * 0.34, s * 0.68, s * 0.68, s * 0.14);
+  ctx.fillStyle = M.col + '33'; ctx.fill();
+  ctx.strokeStyle = M.col; ctx.lineWidth = 1.2; ctx.stroke();
+  ctx.fillStyle = M.col;
+  ctx.font = Math.round(s * 0.42) + 'px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(M.glyph, 0, s * 0.02);
+  ctx.restore();
+}
+function drawWallShape(x, y, s, frac) {
+  ctx.save();
+  ctx.translate(x, y);
+  roundRect(-s * 0.40, -s * 0.34, s * 0.80, s * 0.68, s * 0.08);
+  ctx.fillStyle = '#39415a'; ctx.fill();
+  ctx.strokeStyle = '#98a4bf'; ctx.lineWidth = 1.4; ctx.stroke();
+  ctx.strokeStyle = '#20263a'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.40, 0); ctx.lineTo(s * 0.40, 0);
+  ctx.moveTo(0, -s * 0.34); ctx.lineTo(0, 0);
+  ctx.moveTo(-s * 0.2, 0); ctx.lineTo(-s * 0.2, s * 0.34);
+  ctx.moveTo(s * 0.2, 0); ctx.lineTo(s * 0.2, s * 0.34);
+  ctx.stroke();
+  // HP bar
+  const bw = s * 0.76;
+  ctx.fillStyle = '#11162a'; ctx.fillRect(-bw / 2, s * 0.40, bw, 3);
+  ctx.fillStyle = frac > 0.5 ? '#39ff14' : frac > 0.22 ? '#ffc300' : '#ff2244';
+  ctx.fillRect(-bw / 2, s * 0.40, bw * clamp(frac, 0, 1), 3);
+  ctx.restore();
+}
+function drawCreepShape(c, x, y, r) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = c.hitFlash > 0 ? '#ffffff' : c.def.col;
+  ctx.strokeStyle = c.elite ? '#ffc300' : '#0a0a14';
+  ctx.lineWidth = c.elite ? 2 : 1;
+  const s = c.def.shape;
+  ctx.beginPath();
+  if (s === 'hex' || s === 'oct' || s === 'dia' || s === 'star') {
+    const n = s === 'hex' ? 6 : s === 'oct' ? 8 : s === 'dia' ? 4 : 10;
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + i * 2 * Math.PI / n;
+      const rr = (s === 'star' && i % 2) ? r * 0.5 : r;
+      const px = Math.cos(a) * rr, py = Math.sin(a) * rr;
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+  } else if (s === 'sq') {
+    ctx.rect(-r * 0.8, -r * 0.8, r * 1.6, r * 1.6);
+  } else if (s === 'tri') {
+    ctx.moveTo(0, -r); ctx.lineTo(r * 0.9, r * 0.7); ctx.lineTo(-r * 0.9, r * 0.7); ctx.closePath();
+  } else if (s === 'chev') {
+    ctx.moveTo(r, 0); ctx.lineTo(-r * 0.5, -r * 0.85); ctx.lineTo(-r * 0.1, 0); ctx.lineTo(-r * 0.5, r * 0.85); ctx.closePath();
+  } else {
+    const t = r * 0.42;
+    ctx.rect(-t, -r, t * 2, r * 2); ctx.rect(-r, -t, r * 2, t * 2);
+  }
+  ctx.fill(); ctx.stroke();
+  if (c.dots.length) {
+    ctx.strokeStyle = MODULES.fire.col; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0, 0, r + 3, 0, Math.PI * 2); ctx.stroke();
+  }
+  if (c.slowT > 0) {
+    ctx.strokeStyle = MODULES.ice.col; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0, 0, r + 6, 0, Math.PI * 1.4); ctx.stroke();
+  }
+  ctx.restore();
+  if (c.hp < c.maxHp) {
+    const bw = r * 2.2;
+    ctx.fillStyle = '#11162a'; ctx.fillRect(x - bw / 2, y - r - 8, bw, 2.5);
+    ctx.fillStyle = '#39ff14'; ctx.fillRect(x - bw / 2, y - r - 8, bw * clamp(c.hp / c.maxHp, 0, 1), 2.5);
+  }
+}
+
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#06060e'; ctx.fillRect(0, 0, W, H);
+  if (state === 'menu' && !run) return;
+  ctx.save();
+  if (shake > 0) ctx.translate((RNG() - 0.5) * shake * 12, (RNG() - 0.5) * shake * 12);
+
+  /* board */
+  ctx.fillStyle = '#080814';
+  ctx.fillRect(boardX, boardY, boardW, boardH);
+  ctx.strokeStyle = '#12122a'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let c = 0; c <= COLS; c++) { ctx.moveTo(boardX + c * cell, boardY); ctx.lineTo(boardX + c * cell, boardY + boardH); }
+  for (let r = 0; r <= ROWS; r++) { ctx.moveTo(boardX, boardY + r * cell); ctx.lineTo(boardX + boardW, boardY + r * cell); }
+  ctx.stroke();
+
+  /* road */
+  ctx.save();
+  ctx.beginPath(); ctx.rect(boardX, boardY, boardW, boardH); ctx.clip();
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.strokeStyle = '#171a2e'; ctx.lineWidth = cell * 0.86;
+  ctx.beginPath();
+  for (let i = 0; i < segs.length; i++) {
+    if (i === 0) ctx.moveTo(segs[i].a.x, segs[i].a.y);
+    ctx.lineTo(segs[i].b.x, segs[i].b.y);
+  }
+  ctx.stroke();
+  ctx.strokeStyle = '#242a45'; ctx.lineWidth = cell * 0.86; ctx.setLineDash([]);
+  ctx.stroke();
+  ctx.strokeStyle = '#3a4468'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 8]);
+  ctx.beginPath();
+  for (let i = 0; i < segs.length; i++) {
+    if (i === 0) ctx.moveTo(segs[i].a.x, segs[i].a.y);
+    ctx.lineTo(segs[i].b.x, segs[i].b.y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  /* rocks */
+  for (const k of rockCells) {
+    const r = Math.floor(k / COLS), c = k % COLS;
+    ctx.fillStyle = '#141426';
+    roundRect(boardX + c * cell + 3, boardY + r * cell + 3, cell - 6, cell - 6, 4);
+    ctx.fill();
+    ctx.strokeStyle = '#20203a'; ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  /* the arming wash — neutral, never the module's own colour: red means
+     danger everywhere else in this game */
+  if (armedKind || dragCard) {
+    const k = armedKind || dragCard;
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      if (!canPlace(k, r, c)) continue;
+      ctx.fillStyle = 'rgba(160,180,230,0.09)';
+      ctx.fillRect(boardX + c * cell + 1, boardY + r * cell + 1, cell - 2, cell - 2);
+    }
+  }
+
+  /* POWER LINKS — the picture of the grid. A module draws a conduit into
+     every turret and wall it feeds, so the board reads as a circuit
+     rather than a scatter of towers. */
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const m of tiles) {
+    if (m.kind !== 'module' || !m.links.length) continue;
+    const mx = cellCx(m.c), my = cellCy(m.r);
+    for (const l of m.links) {
+      const tx = cellCx(l.to.c), ty = cellCy(l.to.r);
+      /* Two adjacent tiles are one cell apart and each plate is 0.88 of a
+         cell, so only ~12% of this line is ever visible — it has to be fat
+         and bright to read as a conduit rather than a seam. */
+      ctx.strokeStyle = MODULES[m.mod].col;
+      ctx.globalAlpha = 0.22; ctx.lineWidth = cell * 0.42;
+      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.lineWidth = cell * 0.20;
+      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  /* tiles */
+  for (const t of tiles) {
+    const x = cellCx(t.c), y = cellCy(t.r);
+    if (t.kind === 'module') {
+      if (t.fed === 0) ctx.globalAlpha = 0.42;    // an unpowered module reads dim
+      ctx.fillStyle = '#0d0d1c';
+      roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5);
+      ctx.fill();
+      ctx.strokeStyle = t.fed ? MODULES[t.mod].col + '99' : '#22223c';
+      ctx.lineWidth = 1; ctx.stroke();
+      drawModuleShape(x, y, cell, t.mod);
+      ctx.globalAlpha = 1;
+    } else if (t.kind === 'turret') {
+      ctx.fillStyle = '#0d0d1c';
+      roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5);
+      ctx.fill();
+      // each feeding module blooms on the edge it comes from, in its colour
+      ctx.save();
+      roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5);
+      ctx.clip();
+      for (const l of t.links) {
+        const M = MODULES[l.from.mod];
+        const gx = x + l.dc * cell * 0.44, gy = y + l.dr * cell * 0.44;
+        const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, cell * 0.55);
+        g.addColorStop(0, M.col + 'aa'); g.addColorStop(1, M.col + '00');
+        ctx.fillStyle = g;
+        ctx.fillRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88);
+      }
+      ctx.restore();
+      ctx.strokeStyle = '#66708c'; ctx.lineWidth = 1;
+      roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5); ctx.stroke();
+      drawTurretShape(x, y, cell, t.lvl, t.aim);
+    } else if (t.kind === 'wall') {
+      ctx.save();
+      roundRect(x - cell * 0.46, y - cell * 0.46, cell * 0.92, cell * 0.92, 4);
+      ctx.clip();
+      for (const l of t.links) {
+        const M = MODULES[l.from.mod];
+        const gx = x + l.dc * cell * 0.46, gy = y + l.dr * cell * 0.46;
+        const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, cell * 0.6);
+        g.addColorStop(0, M.col + 'aa'); g.addColorStop(1, M.col + '00');
+        ctx.fillStyle = g;
+        ctx.fillRect(x - cell * 0.46, y - cell * 0.46, cell * 0.92, cell * 0.92);
+      }
+      ctx.restore();
+      drawWallShape(x, y, cell, t.maxHp ? t.hp / t.maxHp : 0);
+    }
+  }
+  if (sel) {
+    const x = cellCx(sel.c), y = cellCy(sel.r);
+    ctx.strokeStyle = '#ffc300'; ctx.lineWidth = 2;
+    roundRect(x - cell * 0.48, y - cell * 0.48, cell * 0.96, cell * 0.96, 6); ctx.stroke();
+    if (sel.kind === 'turret') {
+      ctx.strokeStyle = 'rgba(255,195,0,0.35)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(x, y, sel.rangePx, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+
+  /* creeps, beams, sparks — clipped to the board so nothing walks into the HUD */
+  ctx.save();
+  ctx.beginPath(); ctx.rect(boardX, boardY, boardW, boardH); ctx.clip();
+  for (const b of beams) {
+    ctx.strokeStyle = b.col; ctx.globalAlpha = clamp(b.t * 9, 0, 1); ctx.lineWidth = b.w;
+    ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  for (const c of creeps) drawCreepShape(c, c.x, c.y, c.def.r * cell * (c.elite ? 1.18 : 1));
+  for (const s of sparks) {
+    ctx.globalAlpha = clamp(s.t * 3, 0, 1);
+    if (s.ring) {
+      ctx.strokeStyle = s.col; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.ring * (1.2 - s.t * 2), 0, Math.PI * 2); ctx.stroke();
+    } else {
+      ctx.fillStyle = s.col; ctx.fillRect(s.x - 1.5, s.y - 1.5, 3, 3);
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  for (const f of floats) {
+    ctx.globalAlpha = clamp(f.t, 0, 1);
+    ctx.fillStyle = f.col;
+    ctx.font = 'bold 13px "Share Tech Mono", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+
+  /* drag ghost */
+  if (dragCard && dragPos) {
+    const cc = cellAtPx(dragPos.x, dragPos.y);
+    const ok = cc && canPlace(dragCard, cc.r, cc.c) && cash >= costOf(dragCard);
+    const gx = cc ? cellCx(cc.c) : dragPos.x, gy = cc ? cellCy(cc.r) : dragPos.y;
+    ctx.globalAlpha = 0.85;
+    if (cc) {
+      ctx.fillStyle = ok ? 'rgba(57,255,20,0.12)' : 'rgba(255,34,68,0.14)';
+      ctx.fillRect(boardX + cc.c * cell, boardY + cc.r * cell, cell, cell);
+    }
+    if (dragCard === 'turret') drawTurretShape(gx, gy, cell, 1);
+    else if (dragCard === 'wall') drawWallShape(gx, gy, cell, 1);
+    else drawModuleShape(gx, gy, cell, dragCard);
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+  drawHud();
+  drawBar();
+  drawToasts();
+}
+
+function drawHud() {
+  ctx.fillStyle = '#0b0b16';
+  ctx.fillRect(0, 0, W, hudY + hudH);
+  ctx.strokeStyle = '#1a1a30'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, hudY + hudH); ctx.lineTo(W, hudY + hudH); ctx.stroke();
+  if (!run) return;
+  const y0 = hudY + 4;
+  ctx.textBaseline = 'middle';
+
+  ctx.textAlign = 'left';
+  ctx.font = '10px "Share Tech Mono", monospace'; ctx.fillStyle = '#8899bb';
+  ctx.fillText('LIVES', 10, y0 + 8);
+  ctx.fillText('CASH', 74, y0 + 8);
+  ctx.fillText('CORES', 146, y0 + 8);
+  ctx.font = '15px "Black Ops One", sans-serif';
+  ctx.fillStyle = run.lives > 6 ? '#dde3ff' : '#ff2244';
+  ctx.fillText(String(run.lives), 10, y0 + 24);
+  ctx.fillStyle = '#39ff14'; ctx.fillText(fmtNum(cash), 74, y0 + 24);
+  ctx.fillStyle = '#ffc300'; ctx.fillText(String(run.cores), 146, y0 + 24);
+
+  ctx.textAlign = 'right';
+  ctx.font = '10px "Share Tech Mono", monospace'; ctx.fillStyle = '#8899bb';
+  const lbl = run.level > CAMPAIGN_LEVELS ? 'ENDLESS ' + (run.level - CAMPAIGN_LEVELS) : 'LEVEL ' + run.level + '/' + CAMPAIGN_LEVELS;
+  ctx.fillText(lbl + '  ·  ' + MAPS[mapIdx].name, W - 10, y0 + 8);
+  ctx.font = '15px "Black Ops One", sans-serif'; ctx.fillStyle = '#dde3ff';
+  ctx.fillText('WAVE ' + run.wave + '/' + WAVES_PER_LEVEL, W - 10, y0 + 24);
+
+  /* phase readout + the two HUD buttons */
+  const by = y0 + 38, bh = 20;
+  hudBtns = {};
+  let txt = '', col = '#8899bb';
+  if (phase === 'grace') { txt = 'BUILD · ' + Math.ceil(phaseT) + 's'; col = '#39ff14'; }
+  else if (phase === 'gap') { txt = 'NEXT WAVE · ' + Math.ceil(phaseT) + 's'; col = '#4488ff'; }
+  else if (phase === 'wave') { txt = 'INCOMING · ' + (creeps.length + spawnList.length); col = '#ff8a1e'; }
+  else if (phase === 'levelclear') { txt = 'LEVEL CLEAR'; col = '#39ff14'; }
+  else if (phase === 'failed') { txt = 'REBUILDING'; col = '#ff2244'; }
+  ctx.textAlign = 'left';
+  ctx.font = '11px "Share Tech Mono", monospace'; ctx.fillStyle = col;
+  ctx.fillText(txt, 10, by + bh / 2);
+
+  const links = tiles.reduce((n, t) => n + (t.kind === 'module' ? t.fed : 0), 0);
+  ctx.font = '10px "Share Tech Mono", monospace'; ctx.fillStyle = '#8899bb';
+  ctx.fillText('GRID ' + countKind('turret') + '/' + turretCap() + ' · ' + links + ' LINKS', 128, by + bh / 2);
+
+  // speed + lab
+  const bw = 44;
+  const sx = W - 10 - bw, lx = sx - bw - 6;
+  hudBtns.speed = { x:sx, y:by, w:bw, h:bh };
+  hudBtns.lab = { x:lx, y:by, w:bw, h:bh };
+  for (const [k, b] of Object.entries(hudBtns)) {
+    const on = k === 'lab' ? labOpen() : true;
+    ctx.strokeStyle = on ? (k === 'lab' ? '#ffc300' : '#4488ff') : '#23233d';
+    ctx.fillStyle = '#0d0d1c';
+    roundRect(b.x, b.y, b.w, b.h, 5); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = on ? (k === 'lab' ? '#ffc300' : '#4488ff') : '#4b5470';
+    ctx.font = '10px "Black Ops One", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(k === 'lab' ? 'LAB' : (speed === 1 ? '▶ 1x' : '▶▶ 2x'), b.x + b.w / 2, b.y + b.h / 2 + 1);
+  }
+  if (!labOpen()) hudBtns.lab = null;
+}
+
+function drawBar() {
+  ctx.fillStyle = '#0b0b16';
+  ctx.fillRect(0, barY, W, H - barY);
+  ctx.strokeStyle = '#1a1a30'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, barY); ctx.lineTo(W, barY); ctx.stroke();
+  cardRects = [];
+  panelBtns = {};
+  if (!run) return;
+
+  if (sel) { drawPanel(); return; }
+
+  const pad = 6, cols = 4;
+  const cw = (W - pad * (cols + 1)) / cols, ch = 46;
+  BUILD_ORDER.forEach((k, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const x = pad + col * (cw + pad), y = barY + 6 + row * (ch + 6);
+    const un = unlocked(k);
+    const cost = costOf(k);
+    const afford = cash >= cost;
+    const capped = k === 'turret' ? countKind('turret') >= turretCap()
+                 : k === 'wall' ? countKind('wall') >= wallCap() : false;
+    const col2 = k === 'turret' ? '#c9d2e6' : k === 'wall' ? '#98a4bf' : MODULES[k].col;
+    const live = un && afford && !capped;
+    ctx.fillStyle = armedKind === k ? '#1a1a34' : '#0d0d1c';
+    roundRect(x, y, cw, ch, 7); ctx.fill();
+    ctx.strokeStyle = armedKind === k ? '#ffc300' : (live ? col2 + '88' : '#23233d');
+    ctx.lineWidth = armedKind === k ? 2 : 1; ctx.stroke();
+    ctx.save();
+    ctx.globalAlpha = un ? (live ? 1 : 0.42) : 0.22;
+    if (k === 'turret') drawTurretShape(x + 17, y + ch / 2 - 3, cell * 0.82, 1);
+    else if (k === 'wall') drawWallShape(x + 17, y + ch / 2 - 3, cell * 0.72, 1);
+    else drawModuleShape(x + 17, y + ch / 2 - 3, cell * 0.9, k);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = '9px "Black Ops One", sans-serif';
+    ctx.fillStyle = un ? col2 : '#4b5470';
+    const nm = k === 'turret' ? 'TURRET' : k === 'wall' ? 'WALL' : MODULES[k].name;
+    ctx.fillText(nm, x + 32, y + 14);
+    ctx.font = '10px "Share Tech Mono", monospace';
+    if (!un) {
+      ctx.fillStyle = '#4b5470';
+      ctx.fillText('W' + UNLOCK[k], x + 32, y + 30);
+    } else {
+      ctx.fillStyle = afford ? '#39ff14' : '#ff2244';
+      ctx.fillText('$' + cost, x + 32, y + 30);
+      if (k === 'turret' || k === 'wall') {
+        ctx.fillStyle = capped ? '#ff2244' : '#8899bb';
+        ctx.textAlign = 'right';
+        const have = countKind(k), cap = k === 'turret' ? turretCap() : wallCap();
+        ctx.fillText(have + '/' + cap, x + cw - 7, y + 30);
+      }
+    }
+    ctx.restore();
+    cardRects.push({ kind:k, x, y, w:cw, h:ch, un, afford, capped });
+  });
+}
+
+function drawPanel() {
+  const t = sel;
+  const pad = 8;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  const nm = t.kind === 'turret' ? 'TURRET · LVL ' + t.lvl
+           : t.kind === 'wall' ? 'WALL' : MODULES[t.mod].name + ' MODULE';
+  ctx.font = '12px "Black Ops One", sans-serif'; ctx.fillStyle = '#ffc300';
+  ctx.fillText(nm, pad + 2, barY + 16);
+
+  ctx.font = '10px "Share Tech Mono", monospace';
+  ctx.fillStyle = '#8899bb';
+  let line2 = '', line3 = '';
+  if (t.kind === 'turret') {
+    const m = t.mods;
+    const parts = MOD_KEYS.filter(k => m[k] > 0).map(k => MODULES[k].name[0] + m[k]);
+    line2 = 'DMG ' + t.D.toFixed(1) + ' KIN  ·  ' + t.rate.toFixed(2) + '/s  ·  RNG ' + (t.rangePx / cell).toFixed(1);
+    line3 = 'DPS ~' + t.dps.toFixed(0) + (parts.length ? '   MODS ' + parts.join(' ') : '   NO MODULES');
+  } else if (t.kind === 'wall') {
+    line2 = 'HP ' + Math.round(t.hp) + '/' + t.maxHp + '  ·  DR ' + t.dr;
+    const bits = [];
+    if (t.wFire) bits.push('BURN ' + t.wFire.toFixed(0));
+    if (t.wIce) bits.push('SLOW ' + Math.round(t.wIce * 100) + '%');
+    if (t.wArc) bits.push('ARC ' + t.wArc.toFixed(0));
+    if (t.wThorn) bits.push('THORN ' + t.wThorn.toFixed(0));
+    if (t.wRegen) bits.push('REGEN ' + t.wRegen.toFixed(1) + '/s');
+    line3 = bits.length ? bits.join('  ') : 'NO MODULES';
+  } else {
+    line2 = MODULES[t.mod].tag + '  ·  POWERING ' + t.fed + (t.fed === 1 ? ' STRUCTURE' : ' STRUCTURES');
+    line3 = t.fed ? 'shared by every neighbour it touches' : 'not touching anything — dead weight';
+  }
+  ctx.fillText(line2, pad + 2, barY + 34);
+  ctx.fillStyle = '#667799';
+  ctx.fillText(line3, pad + 2, barY + 50);
+
+  const bw = (W - pad * 3) / 2, by = barY + 62, bh = 34;
+  const canUp = (t.kind === 'turret' && t.lvl < TURRET.maxLvl) || (t.kind === 'wall' && t.hp < t.maxHp - 0.01);
+  const upCost = t.kind === 'turret' ? turretUpCost(t.lvl)
+    : t.kind === 'wall' ? Math.max(4, Math.round(WALL.cost * WALL_REPAIR_COST * (1 - t.hp / Math.max(1, t.maxHp)))) : 0;
+  const upLbl = t.kind === 'wall' ? 'REPAIR $' + upCost : canUp ? 'UPGRADE $' + upCost : 'MAX LEVEL';
+  const upOk = canUp && cash >= upCost;
+  ctx.fillStyle = '#0d0d1c'; roundRect(pad, by, bw, bh, 7); ctx.fill();
+  ctx.strokeStyle = upOk ? '#39ff14' : '#23233d'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = upOk ? '#39ff14' : '#4b5470';
+  ctx.font = '10px "Black Ops One", sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(t.kind === 'module' ? '—' : upLbl, pad + bw / 2, by + bh / 2);
+  panelBtns.up = canUp && t.kind !== 'module' ? { x:pad, y:by, w:bw, h:bh } : null;
+
+  const sx = pad * 2 + bw;
+  ctx.fillStyle = '#0d0d1c'; roundRect(sx, by, bw, bh, 7); ctx.fill();
+  ctx.strokeStyle = '#ff2244'; ctx.stroke();
+  ctx.fillStyle = '#ff2244';
+  ctx.fillText('SELL +$' + Math.floor(t.spent * 0.5), sx + bw / 2, by + bh / 2);
+  panelBtns.sell = { x:sx, y:by, w:bw, h:bh };
+  panelBtns.close = { x:W - 30, y:barY + 4, w:26, h:22 };
+  ctx.fillStyle = '#8899bb'; ctx.font = '13px "Share Tech Mono", monospace';
+  ctx.fillText('✕', W - 17, barY + 15);
+}
+
+function drawToasts() {
+  let y = boardY + 26;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const t of toasts) {
+    ctx.globalAlpha = clamp(t.t * 1.4, 0, 1);
+    ctx.font = '13px "Black Ops One", sans-serif';
+    ctx.fillStyle = '#06060ecc';
+    const w = ctx.measureText(t.text).width + 22;
+    roundRect(W / 2 - w / 2, y - 13, w, 24, 6); ctx.fill();
+    ctx.fillStyle = t.col;
+    ctx.fillText(t.text, W / 2, y);
+    y += 28;
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ================================ INPUT =============================== */
+function hit(b, x, y) { return b && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h; }
+function evtPos(e) {
+  const r = cv.getBoundingClientRect();
+  const p = e.touches && e.touches[0] ? e.touches[0] : (e.changedTouches && e.changedTouches[0]) || e;
+  return { x: p.clientX - r.left, y: p.clientY - r.top };
+}
+function onDown(e) {
+  if (state !== 'play' || paused) return;
+  initAudio();
+  const p = evtPos(e);
+  downCard = null;
+  for (const c of cardRects) {
+    if (hit(c, p.x, p.y)) {
+      downCard = c;
+      if (c.un && c.afford && !c.capped) { dragCard = c.kind; dragPos = p; }
+      else sfxDeny();
+      return;
+    }
+  }
+  if (sel) {
+    if (hit(panelBtns.close, p.x, p.y)) { sel = null; return; }
+    if (hit(panelBtns.sell, p.x, p.y)) { sellAt(sel.r, sel.c); sel = null; return; }
+    if (hit(panelBtns.up, p.x, p.y)) { if (!upgradeAt(sel.r, sel.c)) sfxDeny(); return; }
+  }
+  if (hit(hudBtns.speed, p.x, p.y)) { speed = speed === 1 ? 2 : 1; settings.speed = speed; saveSettings(); return; }
+  if (hit(hudBtns.lab, p.x, p.y)) { showLab(); return; }
+}
+function onMove(e) {
+  if (!dragCard) return;
+  e.preventDefault();
+  dragPos = evtPos(e);
+}
+/* onDown records which card the press started on; onUp decides what it was.
+   Released over the board -> build (a drag). Released still inside the card
+   -> that was a TAP, so arm it. Both grammars are first-class: a drag is
+   awkward one-handed on a phone. */
+function onUp(e) {
+  if (state !== 'play' || paused) { dragCard = null; downCard = null; return; }
+  const p = evtPos(e);
+  if (dragCard) {
+    const startedIn = downCard && hit(downCard, p.x, p.y) && downCard.kind === dragCard;
+    const kind = dragCard;
+    dragCard = null; dragPos = null;
+    if (startedIn) {
+      armedKind = armedKind === kind ? null : kind;
+      sel = null;
+      downCard = null;
+      return;
+    }
+    const cc = cellAtPx(p.x, p.y);
+    if (cc) { if (!place(kind, cc.r, cc.c)) sfxDeny(); }
+    downCard = null;
+    return;
+  }
+  downCard = null;
+  const cc = cellAtPx(p.x, p.y);
+  if (!cc) { if (armedKind && p.y < barY) armedKind = null; return; }
+  const existing = tileAt(cc.r, cc.c);
+  if (armedKind) {
+    if (existing) { sel = existing; armedKind = null; return; }   // inspect rather than deny
+    const kind = armedKind;
+    if (!place(kind, cc.r, cc.c)) { sfxDeny(); return; }          // denied, but STAY armed
+    /* Stay armed after a successful drop. Grid Defense disarms because a
+       turret is a once-per-minute decision; here you ring one turret with
+       four modules in four taps, and re-arming between each was the single
+       most annoying thing about the first build. Arming ends only when the
+       kind has nowhere left to go or nothing left to pay with. */
+    if (!anyPlacement(kind)) armedKind = null;
+    return;
+  }
+  sel = existing || null;
+}
+cv.addEventListener('touchstart', e => { e.preventDefault(); onDown(e); }, { passive:false });
+cv.addEventListener('touchmove', onMove, { passive:false });
+cv.addEventListener('touchend', e => { e.preventDefault(); onUp(e); }, { passive:false });
+cv.addEventListener('mousedown', onDown);
+cv.addEventListener('mousemove', e => { if (dragCard) onMove(e); });
+cv.addEventListener('mouseup', onUp);
+
+/* ============================ PERSISTENCE ============================= */
+function snapshotSave() {
+  if (!run) return null;
+  return {
+    v:1, pending:pendingStart, run:JSON.parse(JSON.stringify(Object.assign({}, run, { snapshot:null }))),
+    cash, phase, phaseT, waveT,
+    tiles: tiles.map(t => ({ kind:t.kind, mod:t.mod, r:t.r, c:t.c, lvl:t.lvl, spent:t.spent, hp:t.hp })),
+  };
+}
+function autoSave() { const s = snapshotSave(); if (s) writeJSON(AUTO_KEY, s); }
+function saveTo(k) { const s = snapshotSave(); return s ? writeJSON(k, s) : false; }
+function restoreFrom(k) {
+  const s = readJSON(k, null);
+  if (!s || !s.run) return false;
+  run = Object.assign(newRunObj(), s.run);
+  run.snapshot = { cores:run.cores, score:run.score, lab:Object.assign({}, run.lab) };
+  state = 'play';
+  /* A between-levels save holds no board. Restoring one must OPEN the level
+     fresh, or CONTINUE reopens the next level number holding the previous
+     level's towers and cash. */
+  if (s.pending) { startLevel(run.level); return true; }
+  buildPath(mapIndexFor(run.level));
+  cash = s.cash;
+  tiles = (s.tiles || []).map(t => Object.assign({}, t, {
+    cd:0, mods:emptyMods(), links:[],
+    d: t.kind === 'wall' ? pathDistOfCell(t.r, t.c) : 0,
+    maxHp: t.kind === 'wall' ? 0 : undefined,
+  }));
+  creeps = []; spawnList = []; beams = []; floats = []; sparks = []; sel = null; armedKind = null;
+  recomputeGrid();
+  for (const t of tiles) {
+    if (t.kind !== 'wall') continue;
+    const saved = (s.tiles || []).find(x => x.r === t.r && x.c === t.c);
+    t.hp = clamp(saved && saved.hp > 0 ? saved.hp : t.maxHp, 1, t.maxHp);
+  }
+  phase = 'grace'; phaseT = Math.max(4, s.phaseT || GRACE_T); waveT = 0;
+  pendingStart = false;
+  if (overTimer) { clearTimeout(overTimer); overTimer = null; }
+  return true;
+}
+function hasSave(k) { const s = readJSON(k, null); return !!(s && s.run); }
+
+/* ================================ SCREENS =============================
+   Canvas renders the board and the bars; every MENU is DOM under #ui.
+   openScreen sets paused, which is what stops update(). */
+function openScreen(html) {
+  paused = true;
+  ui.className = '';
+  ui.innerHTML = html;
+}
+function closeScreen() {
+  paused = false;
+  armedKind = null;          // arming can never survive a context change
+  ui.className = 'hidden';
+  ui.innerHTML = '';
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c])); }
+
+function showMenu() {
+  state = 'menu';
+  if (overTimer) { clearTimeout(overTimer); overTimer = null; }
+  const cont = hasSave(AUTO_KEY);
+  openScreen(`
+    <div class="scr">
+      <div class="scr-head">
+        <h1 class="title">TURRET BUILDER</h1>
+        <div class="sub">-- BUILD THE GRID, NOT THE TOWER --</div>
+      </div>
+      <div class="scr-body">
+        <button class="btn" id="b-new">NEW RUN</button>
+        ${cont ? '<button class="btn alt" id="b-cont">CONTINUE</button>' : ''}
+        <div class="row2">
+          <button class="btn ghost small" id="b-slots">SAVES</button>
+          <button class="btn ghost small" id="b-scores">SCORES</button>
+          <button class="btn ghost small" id="b-set">SETTINGS</button>
+        </div>
+        <div class="rules">
+          A turret is a <b>gray triangle</b>: 10 kinetic damage, once a second,
+          never misses. Everything that makes it dangerous is a <b>module</b> you
+          bolt to one of its four sides.<br><br>
+          <i>FIRE</i> +10% of the hit as a 5 s burn &nbsp;
+          <i>ICE</i> +2.5% and a 10% slow &nbsp;
+          <i>ARC</i> +5% that chains to the next enemy &nbsp;
+          <i>BLAST</i> +5% kinetic and +2.5% fire, splashed.<br><br>
+          A module feeds <b>every turret and wall it touches</b>, so one tile
+          wedged between two turrets pays both. That sharing is the whole game.<br><br>
+          <b>Walls</b> go on the road. Enemies stop and hit them, and a wall's
+          two free sides take modules too &mdash; burn, chill, shock, thorns,
+          <i>ARMOR</i> and <i>REGEN</i>.<br><br>
+          <b>HULK</b> has flat armour — and it grows every level, so a bare
+          triangle stops mattering. Only elemental gets through.
+          <b>WARD</b> resists elemental: only kinetic gets through.
+          <b>No single module answers both.</b><br><br>
+          ${CAMPAIGN_LEVELS} levels &middot; ${WAVES_PER_LEVEL} waves each &middot; about 8 minutes a level,
+          then endless. A lost level replays; endless does not.
+        </div>
+      </div>
+    </div>`);
+  bindTap(document.getElementById('b-new'), () => { closeScreen(); startRun(); });
+  if (cont) bindTap(document.getElementById('b-cont'), () => { if (restoreFrom(AUTO_KEY)) closeScreen(); });
+  bindTap(document.getElementById('b-slots'), showSlots);
+  bindTap(document.getElementById('b-scores'), () => showScoreboard(showMenu));
+  bindTap(document.getElementById('b-set'), () => showSettings(showMenu));
+}
+
+function labIconSvg(icon, col) {
+  const c = col || '#ffc300';
+  if (icon === 'turret' || icon === 'grid')
+    return `<svg class="licon" viewBox="0 0 40 40"><polygon points="20,8 31,30 9,30" fill="#78829a" stroke="#c9d2e6" stroke-width="2"/>${icon === 'grid' ? '<rect x="2" y="16" width="8" height="8" fill="none" stroke="#ffc300" stroke-width="2"/><rect x="30" y="16" width="8" height="8" fill="none" stroke="#ffc300" stroke-width="2"/>' : ''}</svg>`;
+  if (icon === 'wall')
+    return `<svg class="licon" viewBox="0 0 40 40"><rect x="6" y="12" width="28" height="18" fill="#39415a" stroke="#98a4bf" stroke-width="2"/><line x1="6" y1="21" x2="34" y2="21" stroke="#20263a" stroke-width="2"/><line x1="20" y1="12" x2="20" y2="21" stroke="#20263a" stroke-width="2"/></svg>`;
+  if (icon === 'servo')
+    return `<svg class="licon" viewBox="0 0 40 40"><circle cx="20" cy="20" r="10" fill="none" stroke="${c}" stroke-width="2"/><path d="M20 10 L20 4 M30 20 L36 20 M20 30 L20 36 M10 20 L4 20" stroke="${c}" stroke-width="2"/></svg>`;
+  if (icon === 'optics')
+    return `<svg class="licon" viewBox="0 0 40 40"><circle cx="20" cy="20" r="12" fill="none" stroke="${c}" stroke-width="2"/><circle cx="20" cy="20" r="3" fill="${c}"/><path d="M20 4 L20 12 M20 28 L20 36 M4 20 L12 20 M28 20 L36 20" stroke="${c}" stroke-width="1.6"/></svg>`;
+  const M = MODULES[icon];
+  if (M) return `<svg class="licon" viewBox="0 0 40 40"><rect x="8" y="8" width="24" height="24" rx="5" fill="${M.col}33" stroke="${M.col}" stroke-width="2"/><text x="20" y="26" font-size="16" text-anchor="middle" fill="${M.col}" font-family="monospace">${M.glyph}</text></svg>`;
+  return `<svg class="licon" viewBox="0 0 40 40"><rect x="8" y="8" width="24" height="24" rx="5" fill="none" stroke="${c}" stroke-width="2"/></svg>`;
+}
+function showLab() {
+  if (!run) return;
+  const rows = LAB.map(t => {
+    const cur = run.lab[t.id] || 0;
+    const maxed = cur >= t.tiers;
+    const c = labCost(t.id, cur);
+    const can = !maxed && run.cores >= c;
+    return `<div class="card">
+      <div class="lab-row">
+        ${labIconSvg(t.icon)}
+        <div class="lab-mid">
+          <div class="lab-name" style="color:${t.icon in MODULES ? MODULES[t.icon].col : '#dde3ff'}">${t.name}</div>
+          <div class="lab-desc">${t.desc}</div>
+          <div class="tierbar">${Array.from({ length:t.tiers }, (_, i) => `<i class="${i < cur ? 'on' : ''}"></i>`).join('')}</div>
+        </div>
+        <button class="buybtn" data-lab="${t.id}" ${can ? '' : 'disabled'}>${maxed ? 'MAX' : '◆ ' + c}</button>
+      </div>
+    </div>`;
+  }).join('');
+  openScreen(`
+    <div class="scr">
+      <div class="scr-head">
+        <h2 class="head">THE LAB</h2>
+        <div class="sub">PERMANENT FOR THIS RUN</div>
+        <div style="margin-top:8px"><span class="pill cores">CORES <b>${run.cores}</b></span>
+        <span class="pill">TURRET SLOTS <b>${turretCap()}</b></span>
+        <span class="pill">WALL SLOTS <b>${wallCap()}</b></span></div>
+      </div>
+      <div class="scr-body">${rows}
+        <div class="rules">Cores land on every wave clear and never reset inside a run
+        &mdash; but a run pays out far less than the lab costs, so you are choosing
+        a specialism, not filling a checklist. Losing a level rolls back everything
+        that level earned, spent cores included.</div>
+      </div>
+      <div class="scr-foot"><button class="btn gold" id="b-close">BACK TO THE BOARD</button></div>
+    </div>`);
+  ui.querySelectorAll('[data-lab]').forEach(b => bindTap(b, () => { if (buyLab(b.dataset.lab)) showLab(); }));
+  bindTap(document.getElementById('b-close'), closeScreen);
+}
+
+function showScoreboard(back) {
+  const list = getScores();
+  const rows = list.length ? list.map((s, i) => `<tr>
+      <td class="n">${i + 1}</td><td>${fmtNum(s.score)}</td>
+      <td>${s.won ? 'WON' : 'L' + s.level}</td><td>${s.retries}</td>
+      <td style="color:#8899bb">${fmtWhen(s.ts)}</td></tr>`).join('')
+    : '<tr><td colspan="5" style="color:#8899bb;padding:14px 0">no runs recorded yet</td></tr>';
+  openScreen(`
+    <div class="scr">
+      <div class="scr-head"><h2 class="head">TOP TEN</h2><div class="sub">SCORE &middot; RETRIES</div></div>
+      <div class="scr-body"><table class="sc">
+        <tr><th>#</th><th>SCORE</th><th>DEPTH</th><th>RETRIES</th><th>WHEN</th></tr>${rows}</table></div>
+      <div class="scr-foot"><button class="btn ghost" id="b-back">BACK</button></div>
+    </div>`);
+  bindTap(document.getElementById('b-back'), back || showMenu);
+}
+function showSettings(back) {
+  openScreen(`
+    <div class="scr">
+      <div class="scr-head"><h2 class="head">SETTINGS</h2></div>
+      <div class="scr-body">
+        <div class="card"><div class="kv"><span class="k">MUSIC</span><span class="v" id="v-m">${settings.music}</span></div>
+          <input class="rng" type="range" min="0" max="100" value="${settings.music}" id="r-m"></div>
+        <div class="card"><div class="kv"><span class="k">SFX</span><span class="v" id="v-s">${settings.sfx}</span></div>
+          <input class="rng" type="range" min="0" max="100" value="${settings.sfx}" id="r-s"></div>
+        <button class="btn ghost small" id="b-wipe">CLEAR SAVES &amp; SCORES</button>
+      </div>
+      <div class="scr-foot"><button class="btn ghost" id="b-back">BACK</button></div>
+    </div>`);
+  const rm = document.getElementById('r-m'), rs = document.getElementById('r-s');
+  rm.addEventListener('input', () => { settings.music = +rm.value; document.getElementById('v-m').textContent = rm.value; applyVolumes(); saveSettings(); });
+  rs.addEventListener('input', () => { settings.sfx = +rs.value; document.getElementById('v-s').textContent = rs.value; applyVolumes(); saveSettings(); });
+  bindTap(document.getElementById('b-wipe'), () => {
+    [AUTO_KEY, SCORE_KEY, SLOT_KEY(1), SLOT_KEY(2), SLOT_KEY(3)].forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+    showSettings(back);
+  });
+  bindTap(document.getElementById('b-back'), back || showMenu);
+}
+function showSlots() {
+  const rows = [1, 2, 3].map(i => {
+    const s = readJSON(SLOT_KEY(i), null);
+    const label = s && s.run ? 'L' + s.run.level + ' W' + s.run.wave + ' · ' + fmtNum(s.run.score) : 'empty';
+    return `<div class="card"><div class="kv"><span class="k">SLOT ${i}</span><span class="v">${label}</span></div>
+      <div class="slot" style="margin-top:8px">
+        <button class="btn small ghost" data-load="${i}" ${s ? '' : 'disabled'}>LOAD</button>
+        <button class="btn small gold" data-save="${i}" ${run ? '' : 'disabled'}>SAVE</button>
+      </div></div>`;
+  }).join('');
+  openScreen(`
+    <div class="scr">
+      <div class="scr-head"><h2 class="head">SAVES</h2></div>
+      <div class="scr-body">${rows}</div>
+      <div class="scr-foot"><button class="btn ghost" id="b-back">BACK</button></div>
+    </div>`);
+  ui.querySelectorAll('[data-save]').forEach(b => bindTap(b, () => { saveTo(SLOT_KEY(+b.dataset.save)); showSlots(); }));
+  ui.querySelectorAll('[data-load]').forEach(b => bindTap(b, () => { if (restoreFrom(SLOT_KEY(+b.dataset.load))) closeScreen(); }));
+  bindTap(document.getElementById('b-back'), showMenu);
+}
+function showPause() {
+  if (!run || state !== 'play') { showMenu(); return; }
+  openScreen(`
+    <div class="scr">
+      <div class="scr-head"><h2 class="head">PAUSED</h2>
+        <div class="sub">LEVEL ${run.level} &middot; WAVE ${run.wave}</div>
+        <div style="margin-top:8px"><span class="pill cash">CASH <b>${fmtNum(cash)}</b></span>
+        <span class="pill cores">CORES <b>${run.cores}</b></span>
+        <span class="pill">SCORE <b>${fmtNum(run.score + run.levelScore)}</b></span></div>
+      </div>
+      <div class="scr-body">
+        <button class="btn" id="b-resume">RESUME</button>
+        ${labOpen() ? '<button class="btn gold" id="b-lab">THE LAB</button>' : ''}
+        <div class="row2">
+          <button class="btn ghost small" id="b-slots">SAVES</button>
+          <button class="btn ghost small" id="b-set">SETTINGS</button>
+        </div>
+        <button class="btn warn small" id="b-quit">RETIRE THIS RUN</button>
+      </div>
+    </div>`);
+  bindTap(document.getElementById('b-resume'), closeScreen);
+  if (labOpen()) bindTap(document.getElementById('b-lab'), showLab);
+  bindTap(document.getElementById('b-slots'), showSlots);
+  bindTap(document.getElementById('b-set'), () => showSettings(showPause));
+  bindTap(document.getElementById('b-quit'), () => { endRun(false); });
+}
+function showGameOver() {
+  const r = run || newRunObj();
+  openScreen(`
+    <div class="scr">
+      <div class="scr-head">
+        <h2 class="head" style="color:${r.won ? '#39ff14' : '#ff2244'}">${r.won ? 'CAMPAIGN COMPLETE' : 'GRID DOWN'}</h2>
+        <div class="big">${fmtNum(r.score)}</div>
+        <div class="sub">LEVEL ${r.level} &middot; ${r.retries} RETRIES &middot; ${fmtClock(r.elapsed)}</div>
+      </div>
+      <div class="scr-body">
+        <button class="btn" id="b-again">NEW RUN</button>
+        <button class="btn ghost small" id="b-scores">SCOREBOARD</button>
+        <button class="btn ghost small" id="b-menu">MAIN MENU</button>
+      </div>
+    </div>`);
+  bindTap(document.getElementById('b-again'), () => { closeScreen(); startRun(); });
+  bindTap(document.getElementById('b-scores'), () => showScoreboard(showGameOver));
+  bindTap(document.getElementById('b-menu'), showMenu);
+}
+
+bindTap(document.getElementById('menu-btn'), () => { if (ui.className === 'hidden' || !ui.innerHTML) showPause(); else closeScreen(); });
+bindTap(muteBtn, () => { settings.muted = !settings.muted; applyVolumes(); saveSettings(); });
+
+/* ================================= LOOP =============================== */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  for (let i = 0; i < speed; i++) update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+speed = settings.speed || 1;
+resize();
+applyVolumes();
+showMenu();
+requestAnimationFrame(loop);
+
+/* ============================== TEST HOOKS ============================
+   The drive suite asserts the SPEC numbers against these; the eval plays
+   whole campaigns through them. cardRects/panelRects publish the live
+   canvas hitboxes so a test can press the drawn UI the way a thumb does —
+   this repo's documented failure mode is a hidden widget leaving stale
+   hitboxes behind. */
+function buildableCells(kind) {
+  const out = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+    if (canPlace(kind || 'turret', r, c)) out.push({ r, c });
+  return out;
+}
+window.__TB = {
+  st: () => ({
+    state, phase, phaseT, paused, speed,
+    level: run ? run.level : 0, wave: run ? run.wave : 0, gw: globalWave(),
+    lives: run ? run.lives : 0, cores: run ? run.cores : 0, cash,
+    score: run ? Math.round(run.score) : 0, levelScore: run ? Math.round(run.levelScore) : 0,
+    retries: run ? run.retries : 0, elapsed: run ? run.elapsed : 0,
+    levelElapsed: run ? run.levelElapsed : 0, levelTimes: run ? run.levelTimes.slice() : [],
+    turrets: countKind('turret'), walls: countKind('wall'), modules: countKind('module'),
+    turretCap: turretCap(), wallCap: wallCap(),
+    links: tiles.reduce((n, t) => n + (t.kind === 'module' ? t.fed : 0), 0),
+    creeps: creeps.length, queued: spawnList.length,
+    map: MAPS[mapIdx].name, mapIdx, armed: armedKind,
+    lab: run ? Object.assign({}, run.lab) : null, labOpen: labOpen(),
+    unlocked: BUILD_ORDER.filter(unlocked), won: run ? run.won : false,
+  }),
+  run: () => run, tilesRaw: () => tiles, creepsRaw: () => creeps,
+  MODULES, TURRET, WALL, CREEPS, LAB, MAPS, BUILD_ORDER, UNLOCK,
+  WAVES_PER_LEVEL, CAMPAIGN_LEVELS, TOTAL_WAVES, LAB_WAVE,
+  consts: () => ({ FIRE_DOT, FIRE_T, ICE_DIR, ICE_SLOW, ICE_T, ARC_DIR, ARC_JUMP_R, MOD_LAB_STEP,
+                   BLAST_KIN, BLAST_FIRE, SLOW_CAP, KIN_FLOOR, GRACE_T, GAP_T,
+                   WALL_FIRE, WALL_ARC, WALL_THORN, WALL_ICE, WALL_REGEN,
+                   TURRET_CAP_BASE, WALL_CAP_BASE }),
+  /* drive */
+  newRun: () => { closeScreen(); startRun(); },
+  startLevel: L => { closeScreen(); startLevel(L); },
+  ready: () => { closeScreen(); if (phase === 'grace' || phase === 'gap') { phaseT = 0; startWave(); } },
+  skipGap: () => { if (phase !== 'wave') phaseT = 0; },
+  advance: () => { if (phase === 'levelclear') { advanceLevel(); return true; }
+                   if (phase === 'failed') { startLevel(run.level); return true; } return false; },
+  step: (dt, n) => { const k = n || 1; for (let i = 0; i < k; i++) update(dt); },
+  place: (kind, r, c, free) => place(kind, r, c, free),
+  sell: (r, c) => sellAt(r, c),
+  upgrade: (r, c) => upgradeAt(r, c),
+  buyLab,
+  unlockAll: () => { for (const k of BUILD_ORDER) run.unlocked[k] = true; run.labSeen = true; },
+  addCash: n => { cash += n; }, setCash: n => { cash = n; },
+  addCores: n => { run.cores += n; },
+  setLives: n => { run.lives = n; },
+  /* read the grid the way the game does */
+  tileAt: (r, c) => { const t = tileAt(r, c); return t ? JSON.parse(JSON.stringify(Object.assign({}, t,
+      { links: t.links.map(l => ({ dr:l.dr, dc:l.dc, mod: l.from ? l.from.mod : undefined })) }))) : null; },
+  modsAt: (r, c) => { const t = tileAt(r, c); return t ? Object.assign({}, t.mods) : null; },
+  turretStats: (r, c) => {
+    const t = tileAt(r, c);
+    if (!t || t.kind !== 'turret') return null;
+    return { D:t.D, rate:t.rate, rangeCells:t.rangePx / cell, dps:t.dps, lvl:t.lvl,
+             fireDot:t.fireDot, iceDir:t.iceDir, iceSlow:t.iceSlow, arcDir:t.arcDir,
+             arcJumps:t.arcJumps, blastKin:t.blastKin, blastFire:t.blastFire,
+             blastR:t.blastR / cell, mods:Object.assign({}, t.mods) };
+  },
+  wallStats: (r, c) => {
+    const t = tileAt(r, c);
+    if (!t || t.kind !== 'wall') return null;
+    return { hp:t.hp, maxHp:t.maxHp, dr:t.dr, d:t.d, wFire:t.wFire, wIce:t.wIce,
+             wArc:t.wArc, wThorn:t.wThorn, wRegen:t.wRegen, mods:Object.assign({}, t.mods) };
+  },
+  canPlace, buildableCells, cellCx, cellCy, cellSize: () => cell,
+  totalLen: () => totalLen, pathSamples: n => { const o = []; for (let i = 0; i <= n; i++) o.push(posAt(totalLen * i / n)); return o; },
+  pathCellList: () => [...pathCells].map(k => ({ r:Math.floor(k / COLS), c:k % COLS })),
+  pathDistOfCell,
+  /* a bare target with exactly the stats you ask for — this is what makes
+     the module maths testable to the decimal instead of inferred from a
+     live wave */
+  spawnDummy: (opts) => {
+    const o = opts || {};
+    const def = Object.assign({}, CREEPS.grub, { arm:o.arm || 0, res:o.res || 0, spd:0, heal:0 });
+    const c = { id:++creepSeq, type:'dummy', def, elite:false, hp:o.hp || 1e9, maxHp:o.hp || 1e9,
+                spd:o.spd || 0, bounty:0, d:o.d || 0, x:0, y:0, dots:[], slow:0, slowT:0, atkCd:0,
+                dead:false, hitFlash:0, arm:o.arm || 0, pinned: o.pinned !== false };
+    const p = posAt(c.d); c.x = o.x !== undefined ? o.x : p.x; c.y = o.y !== undefined ? o.y : p.y;
+    creeps.push(c);
+    return c.id;
+  },
+  /* park the flow state machine so a damage measurement is never gatecrashed
+     by the next wave spawning halfway through it */
+  setPhase: (p, t) => { phase = p; phaseT = t === undefined ? 9999 : t; },
+  creepById: id => { const c = creeps.find(z => z.id === id); return c ? { id:c.id, hp:c.hp, maxHp:c.maxHp,
+      slow:c.slow, slowT:c.slowT, dots:c.dots.map(d => ({ dps:d.dps, t:d.t, tag:d.tag })), dead:c.dead, d:c.d, x:c.x, y:c.y } : null; },
+  clearCreeps: () => { creeps = []; },
+  /* damage ledger */
+  setLog: on => { dmgLog = on ? [] : null; },
+  log: () => (dmgLog || []).slice(),
+  clearLog: () => { if (dmgLog) dmgLog.length = 0; },
+  /* balance knobs */
+  seedRandom: s => { RNG = mulberry32(s >>> 0); },
+  setCurve: (lvl, wav) => { HP_LEVEL = lvl; HP_WAVE = wav; },
+  curve: () => ({ HP_LEVEL, HP_WAVE, HP_BOSS }),
+  setPacing: (w0, step, boss, grace, gap) => {
+    if (w0) SPAWN_W0 = w0; if (step !== undefined) SPAWN_WSTEP = step; if (boss) SPAWN_WBOSS = boss;
+    if (grace) GRACE_T = grace; if (gap) GAP_T = gap;
+  },
+  pacing: () => ({ SPAWN_W0, SPAWN_WSTEP, SPAWN_WBOSS, GRACE_T, GAP_T, LEVEL_T, FAIL_T }),
+  wave: gw => buildWave(gw), hpMulFor, spdMulFor, armMulFor, startCashFor, coresForWave,
+  globalWave, isBossWave, levelOfWave, waveInLevel, spawnWindowFor, labCost, turretUpCost,
+  /* canvas hitboxes */
+  cardRects: () => cardRects.map(r => ({ kind:r.kind, x:r.x, y:r.y, w:r.w, h:r.h, un:r.un, afford:r.afford, capped:r.capped })),
+  panelRects: () => panelBtns,
+  hudRects: () => hudBtns,
+  selected: () => (sel ? { kind:sel.kind, mod:sel.mod, r:sel.r, c:sel.c } : null),
+  /* persistence + screens */
+  save: i => saveTo(SLOT_KEY(i)), load: i => restoreFrom(SLOT_KEY(i)),
+  autoSave, hasAuto: () => hasSave(AUTO_KEY),
+  scores: getScores, clearStorage: () => { try { localStorage.clear(); } catch (e) {} },
+  showMenu, showLab, showPause, closeScreen,
+  endRun,
+};
+</script>
+</body>
+</html>
