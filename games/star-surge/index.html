@@ -72,14 +72,20 @@ body {
 .stat { color:var(--dim); font-size:0.78rem; letter-spacing:1px; margin:3px 0; }
 .stat b { color:var(--gold); }
 .newbest { color:var(--gold); font-family:'Black Ops One',sans-serif; letter-spacing:2px; font-size:0.95rem; text-shadow:0 0 16px #ffc30066; margin:6px 0; }
+#track-label {
+  position:absolute; left:0; right:0; bottom:calc(var(--sab) + 4px); z-index:75;
+  text-align:center; font-family:'Share Tech Mono', monospace; font-size:9px;
+  color:var(--dim); opacity:0.6; letter-spacing:1px; pointer-events:none; user-select:none;
+}
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-24 20:50 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-21 23:51 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
 <div id="overlay"></div>
+<div id="track-label"></div>
 <script>
 'use strict';
 /* =============================== CONSTANTS ============================== */
@@ -125,7 +131,7 @@ let best = +(localStorage.getItem('starSurge.best') || 0);
 let maxStage = Math.min(MAX_STAGE, +(localStorage.getItem('starSurge.stage') || 1));
 
 /* =============================== AUDIO ================================== */
-let AC = null, sfxGain = null, musicGain = null, musicTimer = null, musicStep = 0, musicNext = 0;
+let AC = null, sfxGain = null, musicGain = null, musicTimer = null;
 let muted = localStorage.getItem('starSurge-mute') === '1';
 const muteBtn = document.getElementById('mute');
 function initAudio() {
@@ -134,7 +140,7 @@ function initAudio() {
     AC = new (window.AudioContext || window.webkitAudioContext)();
     sfxGain = AC.createGain(); sfxGain.gain.value = muted ? 0 : 0.4; sfxGain.connect(AC.destination);
     musicGain = AC.createGain(); musicGain.gain.value = muted ? 0 : 0.18; musicGain.connect(AC.destination);
-    musicNext = AC.currentTime + 0.1;
+    initMusicEngine();
     musicTimer = setInterval(scheduleMusic, 25);
   } catch (e) { AC = null; }
 }
@@ -166,29 +172,368 @@ function noise(dur, vol, when) {
   s.connect(g); g.connect(sfxGain);
   s.start(t);
 }
-let pewAlt = false;
-function sfxPew() { pewAlt = !pewAlt; tone(pewAlt ? 880 : 830, 0.05, 'square', 0.06); }
+function sfxKill() { noise(0.036, 0.075); tone(140, 0.03, 'sawtooth', 0.06); }
 function sfxBoom() { noise(0.18, 0.25); tone(140, 0.15, 'sawtooth', 0.2); }
 function sfxBigBoom() { noise(0.5, 0.4); tone(70, 0.5, 'sawtooth', 0.35); shake = 0.5; }
 function sfxPower() { if (!AC) return; [523, 784, 1047].forEach((f, i) => tone(f, 0.1, 'triangle', 0.2, AC.currentTime + i * 0.05)); }
 function sfxSurge() { if (!AC) return; noise(0.4, 0.3); [220, 330, 440, 660].forEach((f, i) => tone(f, 0.2, 'sawtooth', 0.15, AC.currentTime + i * 0.04)); }
 function sfxAlarm() { if (!AC) return; [660, 660, 660].forEach((f, i) => tone(f, 0.18, 'square', 0.2, AC.currentTime + i * 0.25)); }
 function sfxClear() { if (!AC) return; [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.22, 'square', 0.16, AC.currentTime + i * 0.1)); }
-const ARP = [110, 165, 220, 165, 138.6, 207.7, 277.2, 207.7];
-function scheduleMusic() {
-  if (!AC || state !== 'play') return;
-  const stepDur = 60 / 132 / 2;
-  while (musicNext < AC.currentTime + 0.12) {
-    const s = musicStep % 8;
-    tone(ARP[s] * (boss ? 1.5 : 1), stepDur * 0.9, 'sawtooth', 0.3, musicNext, musicGain);
-    if (s % 4 === 0) tone(55, stepDur * 3, 'triangle', 0.5, musicNext, musicGain);
-    musicNext += stepDur; musicStep++;
-  }
-}
 document.addEventListener('visibilitychange', () => {
   if (!AC) return;
   if (document.hidden) AC.suspend(); else AC.resume();
 });
+
+const MUSIC_TRACKS = [
+  {"id":"menu-signal-drift","name":"SIGNAL DRIFT","context":"menu","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":68,"tracks":[{"inst":"drone","gain":0.4,"stepsPerBeat":1,"patterns":{"d":"A1 - - -"},"sequence":["d","d","d","d","d","d","d","d"]},{"inst":"sub-sine","gain":0.3,"patterns":{"p":"A0 . . . . . . . A0 . . . . . . ."},"sequence":["p","p","p","p","p","p","p","p"]},{"inst":"bell","gain":0.28,"patterns":{"b":". . E5 . . . . . . C5 . . . . . .","r":". . . . . . . . . . . . . . . ."},"sequence":["r","b","r","r","r","b","r","r"]}]},
+  {"id":"calm-quiet-vector","name":"QUIET VECTOR","context":"calm","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":86,"tracks":[{"inst":"kick","gain":0.14,"patterns":{"k":"X.......x......."},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"hat-closed","gain":0.08,"patterns":{"h":"..x...x...x...x."},"sequence":["h","h","h","h","h","h","h","h"]},{"inst":"sub-bass","gain":0.3,"patterns":{"b0":"D1 - - - - - - - - - - - - - - -","b5":"A#1 - - - - - - - - - - - - - - -","b6":"C2 - - - - - - - - - - - - - - -"},"sequence":["b0","b5","b6","b0","b0","b5","b6","b0"]},{"inst":"pad","gain":0.22,"stepsPerBeat":1,"patterns":{"c0":"D2+F2+A2 - - -","c5":"A#2+D3+F3 - - -","c6":"C3+E3+G3 - - -"},"sequence":["c0","c5","c6","c0","c0","c5","c6","c0"]},{"inst":"soft-pluck","gain":0.24,"patterns":{"m":". D4 . . . F4 . . . A4 . . F4 . . .","r":". . . . . . . . . . . . . . . ."},"sequence":["r","m","r","r","r","m","r","r"]}]},
+  {"id":"calm-dead-reckoning","name":"DEAD RECKONING","context":"calm","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":90,"tracks":[{"inst":"breath-noise-wash","gain":0.16,"patterns":{"w":"x...","r":"...."},"stepsPerBeat":1,"sequence":["w","r","w","r","w","r","w","r"]},{"inst":"sub-bass","gain":0.3,"patterns":{"b0":"E1 - - - - - - - - - - - - - - -","b5":"C2 - - - - - - - - - - - - - - -","b6":"D2 - - - - - - - - - - - - - - -"},"sequence":["b0","b5","b6","b0","b0","b5","b6","b0"]},{"inst":"warm-pad","gain":0.22,"stepsPerBeat":1,"patterns":{"c0":"E2+G2+B2 - - -","c5":"C3+E3+G3 - - -","c6":"D3+F#3+A3 - - -"},"sequence":["c0","c5","c6","c0","c0","c5","c6","c0"]},{"inst":"soft-pluck","gain":0.24,"patterns":{"m":". E4 . . . G4 . . . B4 . . G4 . . .","r":". . . . . . . . . . . . . . . ."},"sequence":["r","m","r","r","r","m","r","r"]},{"inst":"sub-sine","gain":0.18,"patterns":{"p":"E0 - - - - - - - - - - - - - - -"},"sequence":["p","p","p","p","p","p","p","p"]}]},
+  {"id":"calm-low-orbit","name":"LOW ORBIT","context":"calm","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":92,"tracks":[{"inst":"kick","gain":0.2,"patterns":{"k":"X.........x....."},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"snare","gain":0.12,"patterns":{"s":"........X......."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"sub-bass","gain":0.3,"patterns":{"b0":"C1 - - - - - - - - - - - - - - -","b5":"G#1 - - - - - - - - - - - - - - -","b6":"A#1 - - - - - - - - - - - - - - -"},"sequence":["b0","b5","b6","b0","b0","b5","b6","b0"]},{"inst":"pad","gain":0.22,"stepsPerBeat":1,"patterns":{"c0":"C2+D#2+G2 - - -","c5":"G#2+C3+D#3 - - -","c6":"A#2+D3+F3 - - -"},"sequence":["c0","c5","c6","c0","c0","c5","c6","c0"]},{"inst":"soft-pluck","gain":0.24,"patterns":{"m":". C4 . . . D#4 . . . G4 . . D#4 . . .","r":". . . . . . . . . . . . . . . ."},"sequence":["r","m","r","r","r","m","r","r"]}]},
+  {"id":"calm-static-horizon","name":"STATIC HORIZON","context":"calm","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":82,"tracks":[{"inst":"sub-bass","gain":0.3,"patterns":{"b0":"G1 - - - - - - - - - - - - - - -","b5":"D#2 - - - - - - - - - - - - - - -","b6":"F2 - - - - - - - - - - - - - - -"},"sequence":["b0","b5","b6","b0","b0","b5","b6","b0"]},{"inst":"warm-pad","gain":0.22,"stepsPerBeat":1,"patterns":{"c0":"G2+A#2+D3 - - -","c5":"D#3+G3+A#3 - - -","c6":"F3+A3+C4 - - -"},"sequence":["c0","c5","c6","c0","c0","c5","c6","c0"]},{"inst":"soft-pluck","gain":0.24,"patterns":{"m":". G4 . . . A#4 . . . D5 . . A#4 . . .","r":". . . . . . . . . . . . . . . ."},"sequence":["r","m","r","r","r","m","r","r"]},{"inst":"sub-sine","gain":0.18,"patterns":{"p":"G0 - - - - - - - - - - - - - - -"},"sequence":["p","p","p","p","p","p","p","p"]}]},
+  {"id":"combat-s1a-ignition-line","name":"IGNITION LINE","context":"combat","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":124,"tracks":[{"inst":"kick","gain":0.34,"patterns":{"k":"X...x...x...x..."},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"hat-open","gain":0.16,"patterns":{"h":"..x...x...x...x."},"sequence":["h","h","h","h","h","h","h","h"]},{"inst":"clap","gain":0.22,"patterns":{"c":"....x.......x..."},"sequence":["c","c","c","c","c","c","c","c"]},{"inst":"acid-bass","gain":0.3,"patterns":{"a":"A1 . A1 . D2 . C2 . A1 . A1 . F2 . E2 ."},"sequence":["a","a","a","a","a","a","a","a"]},{"inst":"stab","gain":0.24,"patterns":{"s":"A3+C4+E4 . . . . . E4+G4+B4 . . . A3+C4+E4 . . . . ."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"lead","gain":0.18,"patterns":{"l":". . . . . . . . . C5 . . . E5 . ."},"sequence":["l","l","l","l","l","l","l","l"]}]},
+  {"id":"combat-s1b-first-contact","name":"FIRST CONTACT","context":"combat","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":126,"tracks":[{"inst":"kick","gain":0.34,"patterns":{"k":"X...x...x...x.x."},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"hat-open","gain":0.16,"patterns":{"h":"..x...x...x...x."},"sequence":["h","h","h","h","h","h","h","h"]},{"inst":"clap","gain":0.22,"patterns":{"c":"....x.......x..."},"sequence":["c","c","c","c","c","c","c","c"]},{"inst":"acid-bass","gain":0.3,"patterns":{"a":"E1 . E1 . A1 . G1 . E1 . E1 . C2 . B1 ."},"sequence":["a","a","a","a","a","a","a","a"]},{"inst":"stab","gain":0.24,"patterns":{"s":"E3+G3+B3 . . . . . B3+D4+F#4 . . . E3+G3+B3 . . . . ."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"bell","gain":0.16,"patterns":{"b":". . . B5 . . . . . . . . . . . ."},"sequence":["b","b","b","b","b","b","b","b"]}]},
+  {"id":"combat-s2a-chrome-salvo","name":"CHROME SALVO","context":"combat","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":128,"tracks":[{"inst":"kick","gain":0.34,"patterns":{"k":"X...x...x...x..."},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"hat-open","gain":0.16,"patterns":{"h":"..x...x...x...x."},"sequence":["h","h","h","h","h","h","h","h"]},{"inst":"clap","gain":0.22,"patterns":{"c":"....x.......x..."},"sequence":["c","c","c","c","c","c","c","c"]},{"inst":"acid-bass","gain":0.3,"patterns":{"a":"D1 . D1 . G1 . F1 . D1 . D1 . A#1 . A1 ."},"sequence":["a","a","a","a","a","a","a","a"]},{"inst":"stab","gain":0.24,"patterns":{"s":"D3+F3+A3 . . . . . A3+C4+E4 . . . D3+F3+A3 . . . . ."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"lead","gain":0.18,"patterns":{"l":". . . . . . . . . F4 . . . A4 . ."},"sequence":["l","l","l","l","l","l","l","l"]}]},
+  {"id":"combat-s2b-vector-storm","name":"VECTOR STORM","context":"combat","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":104,"swing":0.22,"tracks":[{"inst":"kick","gain":0.32,"patterns":{"k":"X.....x..x......"},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"snare","gain":0.26,"patterns":{"s":"......x.X......."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"glitch-tick","gain":0.2,"stepsPerBeat":8,"patterns":{"a":"................x.x.x.x.........","b":"........x.x.............x.x.x...","r":"................................"},"sequence":["r","a","r","b","r","a","r","b"]},{"inst":"wobble-bass","gain":0.32,"patterns":{"w":"F#1 - - - - - - - - - - - - - - -"},"sequence":["w","w","w","w","w","w","w","w"]},{"inst":"lead","gain":0.2,"patterns":{"l":". . . . . A4 . . . . . C#5 . . . .","r":". . . . . . . . . . . . . . . ."},"sequence":["r","l","r","l","r","l","r","l"]}]},
+  {"id":"combat-s3a-red-shift","name":"RED SHIFT PROTOCOL","context":"combat","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":130,"tracks":[{"inst":"kick","gain":0.34,"patterns":{"k":"X...x...x...x.x."},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"hat-open","gain":0.16,"patterns":{"h":"..x...x...x...x."},"sequence":["h","h","h","h","h","h","h","h"]},{"inst":"clap","gain":0.22,"patterns":{"c":"....x.......x..."},"sequence":["c","c","c","c","c","c","c","c"]},{"inst":"acid-bass","gain":0.3,"patterns":{"a":"C1 . C1 . F1 . D#1 . C1 . C1 . G#1 . G1 ."},"sequence":["a","a","a","a","a","a","a","a"]},{"inst":"stab","gain":0.24,"patterns":{"s":"C3+D#3+G3 . . . . . G3+A#3+D4 . . . C3+D#3+G3 . . . . ."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"bell","gain":0.16,"patterns":{"b":". . . G5 . . . . . . . . . . . ."},"sequence":["b","b","b","b","b","b","b","b"]}]},
+  {"id":"combat-s3b-fracture-field","name":"FRACTURE FIELD","context":"combat","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":108,"swing":0.26,"tracks":[{"inst":"kick","gain":0.32,"patterns":{"k":"X.x......x..x..."},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"snare","gain":0.26,"patterns":{"s":"......x.X......."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"glitch-tick","gain":0.2,"stepsPerBeat":8,"patterns":{"a":"................x.x.x.x.........","b":"........x.x.............x.x.x...","r":"................................"},"sequence":["r","a","r","b","r","a","r","b"]},{"inst":"wobble-bass","gain":0.32,"patterns":{"w":"B1 - - - - - - - - - - - - - - -"},"sequence":["w","w","w","w","w","w","w","w"]},{"inst":"lead","gain":0.2,"patterns":{"l":". . . . . D5 . . . . . F#5 . . . .","r":". . . . . . . . . . . . . . . ."},"sequence":["r","l","r","l","r","l","r","l"]}]},
+  {"id":"combat-s4a-siege-pattern","name":"SIEGE PATTERN","context":"combat","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":150,"tracks":[{"inst":"kick","gain":0.36,"patterns":{"k":"X...X...X...X...","f":"X...X...X.x.X.x."},"sequence":["k","k","k","f","k","k","k","f"]},{"inst":"hat-closed","gain":0.14,"patterns":{"r":"xXxXxXxXxXxXxXxX"},"sequence":["r","r","r","r","r","r","r","r"]},{"inst":"tom","gain":0.22,"patterns":{"t":"........x.x.xxXX","s":"................"},"sequence":["s","s","s","t","s","s","s","t"]},{"inst":"crash","gain":0.18,"patterns":{"c":"X...............","s":"................"},"sequence":["c","s","s","s","c","s","s","s"]},{"inst":"acid-bass","gain":0.3,"patterns":{"a":"A1 . A1 . D2 . A1 . F2 . A1 . E2 . A1 ."},"sequence":["a","a","a","a","a","a","a","a"]},{"inst":"stab","gain":0.26,"patterns":{"s":". . A3+C4+E4 . . . E4+G4+B4 . . . A3+C4+E4 . . . E4+G4+B4 ."},"sequence":["s","s","s","s","s","s","s","s"]}]},
+  {"id":"combat-s4b-null-gravity","name":"NULL GRAVITY BREACH","context":"combat","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":110,"swing":0.28,"tracks":[{"inst":"kick","gain":0.32,"patterns":{"k":"X..x..x..x..x..."},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"snare","gain":0.26,"patterns":{"s":"......x.X......."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"glitch-tick","gain":0.2,"stepsPerBeat":8,"patterns":{"a":"................x.x.x.x.........","b":"........x.x.............x.x.x...","r":"................................"},"sequence":["r","a","r","b","r","a","r","b"]},{"inst":"wobble-bass","gain":0.32,"patterns":{"w":"D1 - - - - - - - - - - - - - - -"},"sequence":["w","w","w","w","w","w","w","w"]},{"inst":"lead","gain":0.2,"patterns":{"l":". . . . . F4 . . . . . A4 . . . .","r":". . . . . . . . . . . . . . . ."},"sequence":["r","l","r","l","r","l","r","l"]}]},
+  {"id":"combat-s5a-terminal-velocity","name":"TERMINAL VELOCITY","context":"combat","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":156,"tracks":[{"inst":"kick","gain":0.36,"patterns":{"k":"X...X...X...X...","f":"X...X...X.x.X.x."},"sequence":["k","k","k","f","k","k","k","f"]},{"inst":"hat-closed","gain":0.14,"patterns":{"r":"xXxXxXxXxXxXxXxX"},"sequence":["r","r","r","r","r","r","r","r"]},{"inst":"tom","gain":0.22,"patterns":{"t":"........x.x.xxXX","s":"................"},"sequence":["s","s","s","t","s","s","s","t"]},{"inst":"crash","gain":0.18,"patterns":{"c":"X...............","s":"................"},"sequence":["c","s","s","s","c","s","s","s"]},{"inst":"acid-bass","gain":0.3,"patterns":{"a":"E1 . E1 . A1 . E1 . C2 . E1 . B1 . E1 ."},"sequence":["a","a","a","a","a","a","a","a"]},{"inst":"stab","gain":0.26,"patterns":{"s":". . E3+G3+B3 . . . B3+D4+F#4 . . . E3+G3+B3 . . . B3+D4+F#4 ."},"sequence":["s","s","s","s","s","s","s","s"]}]},
+  {"id":"combat-s5b-last-bastion","name":"LAST BASTION","context":"combat","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":152,"tracks":[{"inst":"kick","gain":0.36,"patterns":{"k":"X...X...X...X...","f":"X...X...X.x.X.x."},"sequence":["k","k","k","f","k","k","k","f"]},{"inst":"hat-closed","gain":0.14,"patterns":{"r":"xXxXxXxXxXxXxXxX"},"sequence":["r","r","r","r","r","r","r","r"]},{"inst":"tom","gain":0.22,"patterns":{"t":"........x.x.xxXX","s":"................"},"sequence":["s","s","s","t","s","s","s","t"]},{"inst":"crash","gain":0.18,"patterns":{"c":"X...............","s":"................"},"sequence":["c","s","s","s","c","s","s","s"]},{"inst":"acid-bass","gain":0.3,"patterns":{"a":"F#1 . F#1 . B1 . F#1 . D2 . F#1 . C#2 . F#1 ."},"sequence":["a","a","a","a","a","a","a","a"]},{"inst":"stab","gain":0.26,"patterns":{"s":". . F#3+A3+C#4 . . . C#4+E4+G4 . . . F#3+A3+C#4 . . . C#4+E4+G4 ."},"sequence":["s","s","s","s","s","s","s","s"]}]},
+  {"id":"boss-1-iron-sentinel","name":"IRON SENTINEL","context":"boss","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":140,"tracks":[{"inst":"kick","gain":0.4,"patterns":{"k":"X..............."},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"snare","gain":0.3,"patterns":{"s":"........X......."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"hat-closed","gain":0.1,"patterns":{"h":"....x.......x..."},"sequence":["h","h","h","h","h","h","h","h"]},{"inst":"wobble-bass","gain":0.4,"patterns":{"w":"D1 - - - - - - - - - - - - - - -"},"sequence":["w","w","w","w","w","w","w","w"]},{"inst":"crash","gain":0.22,"patterns":{"c":"X...............","s":"................"},"sequence":["s","s","s","c","s","s","s","c"]},{"inst":"stab","gain":0.24,"patterns":{"s":"D3+F3+A3 . . . . . . . A3+C4+E4 . . . . . . ."},"sequence":["s","s","s","s","s","s","s","s"]}]},
+  {"id":"boss-2-hollow-warden","name":"HOLLOW WARDEN","context":"boss","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":138,"tracks":[{"inst":"kick","gain":0.4,"patterns":{"k":"X.............x."},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"snare","gain":0.3,"patterns":{"s":"........X......."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"hat-closed","gain":0.1,"patterns":{"h":"....x.......x..."},"sequence":["h","h","h","h","h","h","h","h"]},{"inst":"wobble-bass","gain":0.4,"patterns":{"w":"A1 - - - - - - - - - - - - - - -"},"sequence":["w","w","w","w","w","w","w","w"]},{"inst":"crash","gain":0.22,"patterns":{"c":"X...............","s":"................"},"sequence":["s","s","s","c","s","s","s","c"]},{"inst":"bell","gain":0.2,"patterns":{"b":". . . . . . A#5 . . . . . . . . ."},"sequence":["b","b","b","b","b","b","b","b"]}]},
+  {"id":"boss-3-crimson-bulwark","name":"CRIMSON BULWARK","context":"boss","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":154,"tracks":[{"inst":"kick","gain":0.4,"patterns":{"k":"X...X...X...X..."},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"hat-closed","gain":0.16,"patterns":{"r":"xXxXxXxXxXxXxXxX"},"sequence":["r","r","r","r","r","r","r","r"]},{"inst":"tom","gain":0.26,"patterns":{"t":"........x.x.xxXX","s":"................"},"sequence":["s","t","s","t","s","t","s","t"]},{"inst":"acid-bass","gain":0.34,"patterns":{"a":"C1 . C1 . F1 . C1 . G#1 . C1 . C#1 . C1 ."},"sequence":["a","a","a","a","a","a","a","a"]},{"inst":"stab","gain":0.28,"patterns":{"s":". . C3+D#3+G3 . . . G3+A#3+C#4 . . . C3+D#3+G3 . . . G3+A#3+C#4 ."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"crash","gain":0.22,"patterns":{"c":"X...............","s":"................"},"sequence":["s","s","s","c","s","s","s","c"]}]},
+  {"id":"boss-4-the-unmaking","name":"THE UNMAKING","context":"boss","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":142,"tracks":[{"inst":"kick","gain":0.4,"patterns":{"k":"X.........x....."},"sequence":["k","k","k","k","k","k","k","k"]},{"inst":"snare","gain":0.3,"patterns":{"s":"........X......."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"hat-closed","gain":0.1,"patterns":{"h":"....x.......x..."},"sequence":["h","h","h","h","h","h","h","h"]},{"inst":"wobble-bass","gain":0.4,"patterns":{"w":"F1 - - - - - - - - - - - - - - -"},"sequence":["w","w","w","w","w","w","w","w"]},{"inst":"crash","gain":0.22,"patterns":{"c":"X...............","s":"................"},"sequence":["s","s","s","c","s","s","s","c"]},{"inst":"lead","gain":0.2,"patterns":{"l":". . . . . . . . . G#4 . . . C5 . ."},"sequence":["l","l","l","l","l","l","l","l"]},{"inst":"bell","gain":0.2,"patterns":{"b":". . . F#5 . . . . . . . . . . . ."},"sequence":["b","b","b","b","b","b","b","b"]}]},
+  {"id":"boss-5-apex-annihilator","name":"APEX ANNIHILATOR","context":"boss","bars":8,"beatsPerBar":4,"stepsPerBeat":4,"bpm":160,"tracks":[{"inst":"kick","gain":0.42,"patterns":{"k":"X...X...X...X...","f":"X...X...X.x.X.x."},"sequence":["k","k","k","f","k","k","k","f"]},{"inst":"hat-closed","gain":0.16,"patterns":{"r":"xXxXxXxXxXxXxXxX"},"sequence":["r","r","r","r","r","r","r","r"]},{"inst":"tom","gain":0.26,"patterns":{"t":"........x.x.xxXX","s":"................"},"sequence":["s","t","s","t","s","t","s","t"]},{"inst":"glitch-tick","gain":0.18,"stepsPerBeat":8,"patterns":{"g":"........................x.x.x.x.","r":"................................"},"sequence":["r","g","r","g","r","g","r","g"]},{"inst":"acid-bass","gain":0.34,"patterns":{"a":"E1 - E2 - E1 - E2 - E1 - E2 - E1 - E2 -"},"sequence":["a","a","a","a","a","a","a","a"]},{"inst":"stab","gain":0.3,"patterns":{"s":". . E3+G3+B3 . . . B3+D4+F4 . . . E3+G3+B3 . . . B3+D4+F4 ."},"sequence":["s","s","s","s","s","s","s","s"]},{"inst":"crash","gain":0.24,"patterns":{"c":"X...............","s":"................"},"sequence":["s","s","s","c","s","s","s","c"]}]}
+];
+
+/* =========================== MUSIC ENGINE ================================
+   webaudio-score/v1 compiler + instrument synthesis + look-ahead scheduler
+   (headless-compile / host-schedule split; see zmhstudio's zmh-synth
+   score-authoring skill for the format and instrument recipes).
+=========================================================================== */
+const PERC_IDS = new Set(['kick', 'snare', 'clap', 'hat-closed', 'hat-open', 'tom', 'crash', 'glitch-tick', 'breath-noise-wash']);
+const NOTE_BASE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+function noteToFreq(name) {
+  const m = /^([A-Ga-g])([#b]?)(-?\d+)$/.exec(name);
+  let semi = NOTE_BASE[m[1].toUpperCase()];
+  if (m[2] === '#') semi += 1; else if (m[2] === 'b') semi -= 1;
+  const midi = (parseInt(m[3], 10) + 1) * 12 + semi;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+function compileScore(score) {
+  const { bars, beatsPerBar, stepsPerBeat: defaultSpb, swing = 0, tracks } = score;
+  const events = [];
+  for (const tr of tracks) {
+    const isDrum = PERC_IDS.has(tr.inst);
+    const spb = tr.stepsPerBeat || defaultSpb;
+    const stepsPerBar = beatsPerBar * spb;
+    const totalSteps = stepsPerBar * bars;
+    const stepDurBeats = 1 / spb;
+    const flat = [];
+    for (const name of tr.sequence) {
+      if (name === '.') { for (let i = 0; i < stepsPerBar; i++) flat.push('.'); continue; }
+      const toks = isDrum ? tr.patterns[name].replace(/\s+/g, '').split('') : tr.patterns[name].trim().split(/\s+/);
+      flat.push(...toks);
+    }
+    if (isDrum) {
+      for (let i = 0; i < totalSteps; i++) {
+        const tok = flat[i];
+        if (tok === '.') continue;
+        let timeBeats = i * stepDurBeats;
+        if (swing && (i % spb) % 2 === 1) timeBeats += swing * stepDurBeats;
+        events.push({ timeBeats, durationBeats: stepDurBeats, frequencyHz: 0, velocity: tok === 'X' ? 1.0 : 0.72, instrument: tr.inst, gain: tr.gain });
+      }
+    } else {
+      let cur = null;
+      const closeCur = (endIdx) => {
+        if (!cur) return;
+        const durSteps = endIdx - cur.startIdx;
+        if (durSteps > 0) {
+          let timeBeats = cur.startIdx * stepDurBeats;
+          if (swing && (cur.startIdx % spb) % 2 === 1) timeBeats += swing * stepDurBeats;
+          const durationBeats = durSteps * stepDurBeats;
+          for (const f of cur.freqs) events.push({ timeBeats, durationBeats, frequencyHz: f, velocity: 0.85, instrument: tr.inst, gain: tr.gain });
+        }
+        cur = null;
+      };
+      for (let i = 0; i < totalSteps; i++) {
+        const tok = flat[i];
+        if (tok === '.') { closeCur(i); continue; }
+        if (tok === '-') continue;
+        closeCur(i);
+        cur = { startIdx: i, freqs: tok.split('+').map(noteToFreq) };
+      }
+      closeCur(totalSteps);
+    }
+  }
+  events.sort((a, b) => a.timeBeats - b.timeBeats);
+  const loopBeats = beatsPerBar * bars;
+  const secondsPerBeat = 60 / score.bpm;
+  return { events, loopBeats, secondsPerBeat, loopSeconds: loopBeats * secondsPerBeat };
+}
+const MUSIC_BY_ID = {};
+MUSIC_TRACKS.forEach(t => { MUSIC_BY_ID[t.id] = t; });
+const compiledCache = new Map();
+function getCompiled(track) {
+  if (!compiledCache.has(track.id)) compiledCache.set(track.id, compileScore(track));
+  return compiledCache.get(track.id);
+}
+
+/* ---- instrument synthesis: percussion = shared seeded-noise buffer sliced
+   through per-voice filter chains; melodic = live oscillator+filter+ADSR ---- */
+let noiseBuf = null;
+function makeFilter(type, freq, Q) { const f = AC.createBiquadFilter(); f.type = type; f.frequency.value = freq; if (Q) f.Q.value = Q; return f; }
+function initMusicEngine() {
+  if (noiseBuf) return;
+  const sr = AC.sampleRate, dur = 4.0, n = Math.floor(sr * dur);
+  noiseBuf = AC.createBuffer(1, n, sr);
+  const d = noiseBuf.getChannelData(0);
+  let seed = 0x9e3779b9;
+  const rng = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  for (let i = 0; i < n; i++) d[i] = rng() * 2 - 1;
+  musicSlots[0].gain = AC.createGain(); musicSlots[0].gain.gain.value = 0; musicSlots[0].gain.connect(musicGain);
+  musicSlots[1].gain = AC.createGain(); musicSlots[1].gain.gain.value = 0; musicSlots[1].gain.connect(musicGain);
+}
+function playNoise(offset, dur, time, dest, vel, tau, filters) {
+  const s = AC.createBufferSource(); s.buffer = noiseBuf;
+  const g = AC.createGain(); g.gain.setValueAtTime(vel, time); g.gain.setTargetAtTime(0.0001, time, tau);
+  let last = s;
+  for (const mk of filters || []) { const f = mk(); last.connect(f); last = f; }
+  last.connect(g); g.connect(dest);
+  s.start(time, offset, dur); s.stop(time + dur + tau * 4 + 0.05);
+}
+function playKick(time, vel, dest) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine'; o.frequency.setValueAtTime(160, time); o.frequency.setTargetAtTime(45, time, 0.045);
+  g.gain.setValueAtTime(vel, time); g.gain.setTargetAtTime(0.0001, time, 0.11);
+  o.connect(g); g.connect(dest); o.start(time); o.stop(time + 0.4);
+  playNoise(0.0, 0.02, time, dest, vel * 0.5, 0.008, []);
+}
+function playSnare(time, vel, dest) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine'; o.frequency.value = 190;
+  g.gain.setValueAtTime(vel * 0.7, time); g.gain.setTargetAtTime(0.0001, time, 0.045);
+  o.connect(g); g.connect(dest); o.start(time); o.stop(time + 0.25);
+  playNoise(0.2, 0.3, time, dest, vel, 0.075, [() => makeFilter('highpass', 1800)]);
+}
+function playClap(time, vel, dest) {
+  [0, 0.012, 0.024].forEach(dt => playNoise(1.3, 0.02, time + dt, dest, vel, 0.01, [() => makeFilter('bandpass', 1750, 1.5)]));
+  playNoise(1.3, 0.15, time + 0.03, dest, vel * 0.7, 0.09, [() => makeFilter('bandpass', 1750, 1.5)]);
+}
+function playHat(time, vel, dest, open) {
+  playNoise(0.7, open ? 0.45 : 0.1, time, dest, vel * 0.55, open ? 0.09 : 0.016, [() => makeFilter('highpass', 6000)]);
+}
+function playTom(time, vel, dest) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine'; o.frequency.setValueAtTime(140, time); o.frequency.setTargetAtTime(85, time, 0.05);
+  g.gain.setValueAtTime(vel, time); g.gain.setTargetAtTime(0.0001, time, 0.15);
+  o.connect(g); g.connect(dest); o.start(time); o.stop(time + 0.4);
+  playNoise(1.8, 0.15, time, dest, vel * 0.2, 0.06, [() => makeFilter('lowpass', 900)]);
+}
+function playCrash(time, vel, dest) { playNoise(2.2, 0.75, time, dest, vel * 0.8, 0.35, [() => makeFilter('highpass', 3000)]); }
+function playGlitchTick(time, vel, dest) { playNoise(3.6, 0.045, time, dest, vel * 0.7, 0.012, [() => makeFilter('bandpass', 2260, 1.4)]); }
+function playBreathWash(time, vel, dest) {
+  const s = AC.createBufferSource(); s.buffer = noiseBuf;
+  const hp = makeFilter('highpass', 200), lp = makeFilter('lowpass', 1200);
+  const g = AC.createGain(); g.gain.setValueAtTime(0.0001, time);
+  g.gain.linearRampToValueAtTime(vel, time + 0.15);
+  g.gain.setTargetAtTime(0.0001, time + 0.15, 0.8);
+  s.connect(hp); hp.connect(lp); lp.connect(g); g.connect(dest);
+  s.start(time, 0.0, 2.0); s.stop(time + 2.1);
+}
+function playSubBass(freq, time, dur, vel, dest) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine'; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(vel, time + 0.008);
+  g.gain.setValueAtTime(vel * 0.9, time + Math.max(0.01, dur - 0.06));
+  g.gain.setTargetAtTime(0.0001, time + dur, 0.06);
+  o.connect(g); g.connect(dest); o.start(time); o.stop(time + dur + 0.3);
+}
+function playSubSine(freq, time, dur, vel, dest) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine'; o.frequency.value = freq / 2;
+  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(vel, time + 0.05);
+  g.gain.setValueAtTime(vel * 0.85, time + Math.max(0.06, dur - 0.08));
+  g.gain.setTargetAtTime(0.0001, time + dur, 0.08);
+  o.connect(g); g.connect(dest); o.start(time); o.stop(time + dur + 0.3);
+}
+function playAcidBass(freq, time, dur, vel, dest) {
+  const o = AC.createOscillator(), f = makeFilter('lowpass', freq + 2200, 8), g = AC.createGain();
+  o.type = 'sawtooth'; o.frequency.value = freq;
+  f.frequency.setValueAtTime(freq + 2200, time);
+  f.frequency.linearRampToValueAtTime(Math.max(140, freq * 0.6), time + 0.12);
+  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(vel, time + 0.005);
+  g.gain.setTargetAtTime(0.0001, time + Math.min(dur, 0.3), 0.05);
+  o.connect(f); f.connect(g); g.connect(dest); o.start(time); o.stop(time + dur + 0.3);
+}
+function playWobbleBass(freq, time, dur, vel, dest, secondsPerBeat) {
+  const o1 = AC.createOscillator(), o2 = AC.createOscillator(), f = makeFilter('lowpass', 1160, 4), g = AC.createGain();
+  o1.type = 'sawtooth'; o1.frequency.value = freq;
+  o2.type = 'sine'; o2.frequency.value = freq / 2;
+  const g2 = AC.createGain(); g2.gain.value = 0.4;
+  o2.connect(g2); g2.connect(f); o1.connect(f);
+  const half = Math.max(0.05, dur / 2);
+  const lfo1 = AC.createOscillator(), lfo1Amp = AC.createGain();
+  lfo1.frequency.value = 2 / secondsPerBeat; lfo1Amp.gain.setValueAtTime(1040, time); lfo1Amp.gain.setValueAtTime(0, time + half);
+  lfo1.connect(lfo1Amp); lfo1Amp.connect(f.frequency);
+  const lfo2 = AC.createOscillator(), lfo2Amp = AC.createGain();
+  lfo2.frequency.value = 3 / secondsPerBeat; lfo2Amp.gain.setValueAtTime(0, time); lfo2Amp.gain.setValueAtTime(1040, time + half);
+  lfo2.connect(lfo2Amp); lfo2Amp.connect(f.frequency);
+  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(vel, time + 0.02);
+  g.gain.setValueAtTime(vel, time + Math.max(0.03, dur - 0.05));
+  g.gain.setTargetAtTime(0.0001, time + dur, 0.05);
+  f.connect(g); g.connect(dest);
+  o1.start(time); o1.stop(time + dur + 0.1); o2.start(time); o2.stop(time + dur + 0.1);
+  lfo1.start(time); lfo1.stop(time + dur + 0.1); lfo2.start(time); lfo2.stop(time + dur + 0.1);
+}
+function playPadVoice(freq, time, dur, vel, dest, attack, lpFreq) {
+  const o1 = AC.createOscillator(), o2 = AC.createOscillator(), f = makeFilter('lowpass', lpFreq), g = AC.createGain();
+  o1.type = 'sawtooth'; o1.detune.value = 10; o1.frequency.value = freq;
+  o2.type = 'sawtooth'; o2.detune.value = -10; o2.frequency.value = freq;
+  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(vel, time + attack);
+  g.gain.setValueAtTime(vel, time + Math.max(attack + 0.05, dur - 0.3));
+  g.gain.setTargetAtTime(0.0001, time + dur, 0.3);
+  o1.connect(f); o2.connect(f); f.connect(g); g.connect(dest);
+  o1.start(time); o1.stop(time + dur + 0.5); o2.start(time); o2.stop(time + dur + 0.5);
+}
+function playWarmPad(freq, time, dur, vel, dest) {
+  const o1 = AC.createOscillator(), o2 = AC.createOscillator(), g2 = AC.createGain(), f = makeFilter('lowpass', 900), g = AC.createGain();
+  o1.type = 'triangle'; o1.detune.value = 8; o1.frequency.value = freq;
+  o2.type = 'sawtooth'; o2.detune.value = -8; o2.frequency.value = freq; g2.gain.value = 0.5;
+  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(vel, time + 0.9);
+  g.gain.setValueAtTime(vel, time + Math.max(0.95, dur - 0.4));
+  g.gain.setTargetAtTime(0.0001, time + dur, 0.4);
+  o1.connect(f); o2.connect(g2); g2.connect(f); f.connect(g); g.connect(dest);
+  o1.start(time); o1.stop(time + dur + 0.6); o2.start(time); o2.stop(time + dur + 0.6);
+}
+function playSoftPluck(freq, time, vel, dest) {
+  const o = AC.createOscillator(), f = makeFilter('lowpass', 2200), g = AC.createGain();
+  o.type = 'triangle'; o.frequency.value = freq;
+  f.frequency.setValueAtTime(2200, time); f.frequency.setTargetAtTime(700, time, 0.05);
+  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(vel, time + 0.006);
+  g.gain.setTargetAtTime(0.0001, time + 0.02, 0.04);
+  o.connect(f); f.connect(g); g.connect(dest); o.start(time); o.stop(time + 0.2);
+}
+function playLead(freq, time, dur, vel, dest) {
+  const o = AC.createOscillator(), f = makeFilter('lowpass', freq + 1500, 2), g = AC.createGain();
+  o.type = 'sawtooth'; o.frequency.value = freq;
+  f.frequency.setValueAtTime(freq + 1500, time); f.frequency.setTargetAtTime(freq + 300, time, 0.15);
+  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(vel, time + 0.02);
+  g.gain.setValueAtTime(vel, time + Math.max(0.05, dur - 0.08));
+  g.gain.setTargetAtTime(0.0001, time + dur, 0.08);
+  o.connect(f); f.connect(g); g.connect(dest); o.start(time); o.stop(time + dur + 0.3);
+}
+function playBell(freq, time, vel, dest) {
+  const o1 = AC.createOscillator(), o2 = AC.createOscillator(), g1 = AC.createGain(), g2 = AC.createGain(), g = AC.createGain();
+  o1.type = 'sine'; o1.frequency.value = freq; g1.gain.value = 1;
+  o2.type = 'sine'; o2.frequency.value = freq * 2.76; g2.gain.value = 0.35;
+  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(vel, time + 0.005);
+  g.gain.setTargetAtTime(0.0001, time + 0.02, 0.45);
+  o1.connect(g1); g1.connect(g); o2.connect(g2); g2.connect(g); g.connect(dest);
+  o1.start(time); o1.stop(time + 1.6); o2.start(time); o2.stop(time + 1.6);
+}
+function playStab(freq, time, vel, dest) {
+  const o1 = AC.createOscillator(), o2 = AC.createOscillator(), g = AC.createGain();
+  o1.type = 'sawtooth'; o1.detune.value = 6; o1.frequency.value = freq;
+  o2.type = 'sawtooth'; o2.detune.value = -6; o2.frequency.value = freq;
+  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(vel, time + 0.005);
+  g.gain.setTargetAtTime(0.0001, time + 0.02, 0.07);
+  o1.connect(g); o2.connect(g); g.connect(dest); o1.start(time); o1.stop(time + 0.3); o2.start(time); o2.stop(time + 0.3);
+}
+function playNote(ev, time, dest, secondsPerBeat) {
+  const vel = ev.velocity * ev.gain, dur = ev.durationBeats * secondsPerBeat;
+  switch (ev.instrument) {
+    case 'kick': playKick(time, vel, dest); break;
+    case 'snare': playSnare(time, vel, dest); break;
+    case 'clap': playClap(time, vel, dest); break;
+    case 'hat-closed': playHat(time, vel, dest, false); break;
+    case 'hat-open': playHat(time, vel, dest, true); break;
+    case 'tom': playTom(time, vel, dest); break;
+    case 'crash': playCrash(time, vel, dest); break;
+    case 'glitch-tick': playGlitchTick(time, vel, dest); break;
+    case 'breath-noise-wash': playBreathWash(time, vel, dest); break;
+    case 'sub-bass': playSubBass(ev.frequencyHz, time, dur, vel, dest); break;
+    case 'sub-sine': playSubSine(ev.frequencyHz, time, dur, vel, dest); break;
+    case 'acid-bass': playAcidBass(ev.frequencyHz, time, dur, vel, dest); break;
+    case 'wobble-bass': playWobbleBass(ev.frequencyHz, time, dur, vel, dest, secondsPerBeat); break;
+    case 'pad': playPadVoice(ev.frequencyHz, time, dur, vel, dest, 0.6, 700); break;
+    case 'drone': playPadVoice(ev.frequencyHz, time, dur, vel, dest, 1.5, 500); break;
+    case 'warm-pad': playWarmPad(ev.frequencyHz, time, dur, vel, dest); break;
+    case 'soft-pluck': playSoftPluck(ev.frequencyHz, time, vel, dest); break;
+    case 'lead': playLead(ev.frequencyHz, time, dur, vel, dest); break;
+    case 'bell': playBell(ev.frequencyHz, time, vel, dest); break;
+    case 'stab': playStab(ev.frequencyHz, time, vel, dest); break;
+  }
+}
+
+/* ---- selection director: pure function of game state -> track id ---- */
+const MENU_TRACK_ID = 'menu-signal-drift';
+const CALM_TRACK_IDS = ['calm-quiet-vector', 'calm-low-orbit', 'calm-dead-reckoning', 'calm-static-horizon'];
+const COMBAT_TRACK_IDS = [
+  ['combat-s1a-ignition-line', 'combat-s1b-first-contact'],
+  ['combat-s2a-chrome-salvo', 'combat-s2b-vector-storm'],
+  ['combat-s3a-red-shift', 'combat-s3b-fracture-field'],
+  ['combat-s4a-siege-pattern', 'combat-s4b-null-gravity'],
+  ['combat-s5a-terminal-velocity', 'combat-s5b-last-bastion'],
+];
+const BOSS_TRACK_IDS = ['boss-1-iron-sentinel', 'boss-2-hollow-warden', 'boss-3-crimson-bulwark', 'boss-4-the-unmaking', 'boss-5-apex-annihilator'];
+function selectTrackId() {
+  if (state !== 'play') return MENU_TRACK_ID;
+  if (boss) return BOSS_TRACK_IDS[stage - 1];
+  if (wave <= 1) return CALM_TRACK_IDS[(stage - 1) % CALM_TRACK_IDS.length];
+  return COMBAT_TRACK_IDS[stage - 1][(wave - 2) % COMBAT_TRACK_IDS[stage - 1].length];
+}
+
+/* ---- look-ahead scheduler: two crossfading gain "slots", each with its
+   own loop anchor + event cursor (drops, never replays, stale events) ---- */
+const trackLabel = document.getElementById('track-label');
+const musicSlots = [
+  { gain: null, id: null, track: null, compiled: null, loopStart: 0, loopIndex: 0, nextEventIdx: 0, fadeUntil: 0 },
+  { gain: null, id: null, track: null, compiled: null, loopStart: 0, loopIndex: 0, nextEventIdx: 0, fadeUntil: 0 },
+];
+let curMusicSlot = 0;
+function scheduleSlot(slot) {
+  const c = slot.compiled;
+  const horizon = AC.currentTime + 0.35;
+  let guard = 0;
+  while (guard++ < 200) {
+    if (slot.nextEventIdx >= c.events.length) { slot.nextEventIdx = 0; slot.loopIndex++; }
+    const ev = c.events[slot.nextEventIdx];
+    const t = slot.loopStart + slot.loopIndex * c.loopSeconds + ev.timeBeats * c.secondsPerBeat;
+    if (t > horizon) break;
+    if (t >= AC.currentTime - 0.1) playNote(ev, t, slot.gain, c.secondsPerBeat);
+    slot.nextEventIdx++;
+  }
+}
+function scheduleMusic() {
+  if (!AC || !noiseBuf) return;
+  const wantId = selectTrackId();
+  if (musicSlots[curMusicSlot].id !== wantId) {
+    const other = 1 - curMusicSlot;
+    if (musicSlots[other].id !== wantId) {
+      const track = MUSIC_BY_ID[wantId];
+      const slot = musicSlots[other];
+      slot.id = wantId; slot.track = track; slot.compiled = getCompiled(track);
+      slot.loopStart = AC.currentTime + 0.05; slot.loopIndex = 0; slot.nextEventIdx = 0; slot.fadeUntil = 0;
+      slot.gain.gain.cancelScheduledValues(AC.currentTime);
+      slot.gain.gain.setValueAtTime(slot.gain.gain.value, AC.currentTime);
+      slot.gain.gain.linearRampToValueAtTime(1, AC.currentTime + 1.0);
+      trackLabel.textContent = '♪ ' + String(MUSIC_TRACKS.indexOf(track) + 1).padStart(2, '0') + ' · ' + track.name;
+    }
+    const old = musicSlots[curMusicSlot];
+    old.gain.gain.cancelScheduledValues(AC.currentTime);
+    old.gain.gain.setValueAtTime(old.gain.gain.value, AC.currentTime);
+    old.gain.gain.linearRampToValueAtTime(0, AC.currentTime + 1.0);
+    old.fadeUntil = AC.currentTime + 1.0;
+    curMusicSlot = other;
+  }
+  for (const slot of musicSlots) {
+    if (!slot.id) continue;
+    if (slot.fadeUntil && AC.currentTime > slot.fadeUntil) { slot.id = null; continue; }
+    scheduleSlot(slot);
+  }
+}
 
 /* =============================== HELPERS ================================ */
 function bindTap(el, fn) {
@@ -264,8 +609,7 @@ function startGame(startStage) {
   bullets = []; ebullets = []; enemies = []; powerups = []; particles = []; floats = [];
   boss = null; pendingStage = false;
   ship = { x: W / 2, y: H - safeBot - 130, r: 13, invuln: 1, shield: false };
-  fireT = 0; musicStep = 0;
-  if (AC) musicNext = AC.currentTime + 0.1;
+  fireT = 0;
   state = 'play';
   overlay.classList.add('hidden');
   startWave();
@@ -278,7 +622,6 @@ function fireWeapon() {
   if (weapon === 1) bullets.push({ x, y, vx: 0, vy: v });
   else if (weapon === 2) { bullets.push({ x: x - 7, y, vx: 0, vy: v }, { x: x + 7, y, vx: 0, vy: v }); }
   else { bullets.push({ x, y, vx: 0, vy: v }, { x: x - 9, y: y + 4, vx: -75, vy: v }, { x: x + 9, y: y + 4, vx: 75, vy: v }); }
-  sfxPew();
 }
 function eShoot(x, y, tx, ty, speed) {
   if (ebullets.length >= EBULLET_CAP) return;
@@ -295,7 +638,7 @@ function killEnemy(e) {
   score += e.pts;
   floats.push({ x: e.x, y: e.y, txt: '+' + e.pts, color: '#dde3ff', t: 0 });
   boomAt(e.x, e.y, hue(100, 60), 12);
-  sfxBoom();
+  sfxKill();
   if (e.type === 'tanker' || Math.random() < 0.11) {
     const roll = Math.random();
     const kind = roll < 0.5 ? 'P' : roll < 0.8 ? 'S' : 'G';
@@ -371,9 +714,11 @@ function update(dt) {
     else wave++;
     startWave();
   }
-  // player fire
-  fireT -= dt;
-  if (fireT <= 0) { fireWeapon(); fireT = weapon >= 4 ? 0.12 : 0.16; }
+  // player fire — only while the finger/mouse is down
+  if (drag) {
+    fireT -= dt;
+    if (fireT <= 0) { fireWeapon(); fireT = weapon >= 4 ? 0.12 : 0.16; }
+  }
   ship.invuln = Math.max(0, ship.invuln - dt);
   // player bullets
   for (const b of bullets) { b.x += b.vx * dt; b.y += b.vy * dt; }
@@ -490,6 +835,7 @@ function onDown(e) {
   if (state !== 'play') return;
   const p = pt(e);
   drag = { fx: p.x, fy: p.y, sx: ship.x, sy: ship.y };
+  fireT = 0;
 }
 function onMove(e) {
   e.preventDefault();
@@ -515,7 +861,7 @@ function showMenu() {
     '<div class="sub">-- WEAVE THE BULLET STORM --</div>' +
     '<button class="btn" id="b-new">NEW RUN · STAGE 1</button>' +
     (maxStage > 1 ? '<button class="btn alt" id="b-cont">CONTINUE · STAGE ' + maxStage + '</button>' : '') +
-    '<div class="rules">Drag anywhere to steer — your ship <b>fires by itself</b>.<br>' +
+    '<div class="rules">Drag anywhere to steer — <b>hold to fire</b>.<br>' +
     'Dodge the storm. Grab <b>P</b> weapon · <b>S</b> shield · <b>G</b> surge-bomb.<br>' +
     '<b>' + MAX_STAGE + ' stages</b>, each capped by a boss. Bosses are checkpoints.' +
     (best ? '<br>BEST <b>' + best + '</b>' : '') + '</div>';

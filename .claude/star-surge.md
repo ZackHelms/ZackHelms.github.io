@@ -1,9 +1,44 @@
 # Star Surge (`games/star-surge/index.html`) — architecture notes
 
 Vertical shmup: drag-steer (relative 1.2× finger delta, clamped to lower
-65% of screen), constant auto-fire, 5 stages × (3 waves + boss). Bosses
-are **checkpoints** (`starSurge.stage` = max stage reached; menu offers
+65% of screen), fires only while the finger/mouse is down (`fireT` only
+decrements inside `if (drag)`; `onDown` zeroes `fireT` so the first shot on
+a fresh press is instant), 5 stages × (3 waves + boss). Bosses are
+**checkpoints** (`starSurge.stage` = max stage reached; menu offers
 CONTINUE). Score best at `starSurge.best`.
+
+## Music
+
+20 hand-composed **webaudio-score/v1** tracks (see zmhstudio's `zmh-synth`
+score-authoring skill) drive an adaptive soundtrack: `MUSIC_TRACKS[]` holds
+the score data, a pure `compileScore()` turns each into a flat time-sorted
+note-event list, and a two-slot crossfading look-ahead scheduler
+(`scheduleMusic`, 25 ms tick, ~0.35 s horizon) plays them through ~20
+synthesized instrument recipes (`playKick`/`playAcidBass`/`playWobbleBass`/
+etc. — percussion is a shared seeded-noise buffer sliced through per-voice
+filter chains, melodic voices are live oscillator+filter+ADSR). `NN ·
+TITLE` now-playing label lives in `#track-label` (a persistent DOM element,
+not canvas-drawn, so it survives under the menu/end-screen overlay too).
+
+`selectTrackId()` is a **pure function of game state** — no randomness —
+so the escalation is fully deterministic: `wave <= 1` → one of 4 calm/
+patrol tracks (keyed by stage), `wave` 2–3 → one of 2 combat tracks per
+stage (10 total, techno/glitch-hop), `boss` → 1 of 5 escalating boss
+tracks (dubstep/hard-techno), any non-`'play'` state → the ambient menu
+track. This is *not* enemies-on-screen-driven — see the code comment
+history: that heuristic thrashed the crossfade every time `spawnQueue`
+briefly drained between bursts. Wave-boundary switching instead lines the
+1 s crossfade up with the existing `stageBanner` display, so the handoff
+reads as intentional. Sub-track sequences reference bar-pattern names;
+percussion patterns are `x`/`X`/`.` per step, melodic patterns are
+space-separated note/`+`chord/`-`tie/`.`rest tokens — see the skill doc for
+the full grammar before hand-editing a track's `patterns`/`sequence`.
+
+To refine a track (change its genre/key/instrumentation) don't hand-edit
+raw pattern strings — use `.claude/scripts/star-surge-music/` (procedural
+drum-grid + scale-walk generator, seeded, validated against the same
+`compileScore` before output; see that folder's README) and re-embed the
+regenerated track's JSON.
 
 ## Wave director
 

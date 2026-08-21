@@ -322,11 +322,15 @@ tree must be able to clear the campaign alone**. Detailed context: `.claude/grid
 `.claude/tests/drive-grid-defense.cjs` (rules) and
 `.claude/tests/eval-grid-defense.cjs` (balance).
 
-### STAR SURGE (`star-surge/index.html`, ~750 lines)
-Vertical shmup: drag-steer, auto-fire, 5 stages × 3 waves + boss (bosses
+### STAR SURGE (`star-surge/index.html`, ~1060 lines)
+Vertical shmup: drag-steer, hold-to-fire, 5 stages × 3 waves + boss (bosses
 are persisted checkpoints). Drones/shooters/spinners/tankers, aimed and
 ring bullet patterns under a 90-bullet cap, P/S/G powerups (weapon tiers,
-shield, surge bomb), stage-hued enemies. Detailed context: `.claude/star-surge.md`.
+shield, surge bomb), stage-hued enemies. 20-track adaptive soundtrack
+(webaudio-score/v1 data + compiler + look-ahead scheduler, escalating
+calm → combat → boss per wave, `NN · TITLE` now-playing label) — see
+`.claude/scripts/star-surge-music/` to refine a track. Detailed context:
+`.claude/star-surge.md`.
 
 ### NEON TACTICS (`neon-tactics/index.html`, ~700 lines)
 Turn-based squad tactics, 7×9 grid: 2 strikers, sniper (Bresenham LOS,
