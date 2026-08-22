@@ -552,6 +552,26 @@ checksummed code carries seed + score, so a friend replays your exact grid and
 the game reports the head-to-head. LABELS assist stamps a unique letter per
 colour for a colour-free hunt. Detailed context: `.claude/signal-hunt.md`.
 
+### NEON CLASH (`neon-clash/index.html`, ~1350 lines)
+The repo's first **real-time card battler**, and its first **simultaneous**
+local-2p game. One board split into halves; energy refills at 1/sec up to 20
+on both sides; drag a tank (4), archer (3), fighter (3) or bunker (8) out of
+your tray onto your own half and it walks at the enemy goalpost on its own.
+A bunker is a building holding two units — they stop moving, become
+untargetable (the building eats the damage), fire through the slits at a
+minimum range of 15, and are **ejected alive** when it falls.
+
+The distinctive part is the second player: lay the phone flat on a table and
+the far tray is drawn rotated 180° (`trayFlipped()`), so the player opposite
+reads their own hand the right way up and deploys **at the same time you do** —
+touches are routed by the tray they started in, so both drags run
+independently. In vs-AI mode that tray deliberately stays upright, as the
+opponent's readable roster. Three AI grades differ in think interval, an idle
+chance, how reliably they counter, whether they build and man bunkers, and an
+energy reserve they hold back. Drive suite (33 checks, incl. the garrison
+protection invariant and the two-finger duel):
+`.claude/tests/drive-neon-clash.cjs`. Detailed context: `.claude/neon-clash.md`.
+
 ---
 
 ## Adding a New Game

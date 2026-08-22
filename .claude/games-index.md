@@ -24,6 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
+| Neon Clash | `neon-clash/` | card-battler | drag-place, tap | match-vs-ai, local-2p | card-deck, resource-economy, ai-opponent, rotated-2p-ui | vs-ai, local-2p | `.claude/neon-clash.md` |
 | Zed Shooter | `zed-shooter/` | shooter | virtual-joystick, kb-mouse | wave-survival | meta-progression | solo | external: zed-fps repo |
 | Mitochondria Simulator | `mitochondria/` | biology-sim | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox, guided-lessons | systems-simulation, scale-ladder, skill-teaching, real-time-3d | solo | `.claude/mitochondria.md` |
 | Quantum Chemist | `qntmchmst/` | grid-puzzle | tap, drag-place | level-campaign | match-clear | solo | external: qntmchmst repo |
@@ -74,7 +75,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-48 games (46 in-repo + 2 external builds).
+49 games (47 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -183,9 +184,23 @@ from **inventing a new facet value**, not filling a hole. Open directions:
 - **Sessions:** `guided-lessons` now exists (mitochondria) alongside
   wayfinder's `skill-campaign`; a third non-scored explorable would want a
   different subject, not a different shape.
-- **Players:** local-2p has three flavours — real-time (air hockey),
-  turn-based tactics (neon-tactics), memory duel (neon-recall) — and
-  `async-2p` now has one (signal-hunt). A `co-op` value has nothing at all.
+- **Players:** local-2p has four flavours — real-time shared-board (air
+  hockey), turn-based tactics (neon-tactics), memory duel (neon-recall) and
+  simultaneous rotated-UI (neon-clash) — and `async-2p` now has one
+  (signal-hunt). A `co-op` value has nothing at all.
+
+### Newly opened by the 2026-08-22 build
+- **`card-battler`** genre + **`rotated-2p-ui`** mechanic (neon-clash) are the
+  two new values. The genre is the repo's first real-time deck-in-hand
+  skirmish: a shared board split into halves, energy that refills on a clock
+  rather than on kills, and units that walk and fight without further input
+  once dropped. `rotated-2p-ui` is the rarer of the two — the phone lies flat
+  on a table and the *far* card tray is drawn upside down, so two players
+  facing each other across it each read their own hand the right way up and
+  deploy **simultaneously**, multi-touch, with no turns. The three older
+  local-2p games all share one orientation: air hockey's board is
+  orientation-neutral, and neon-tactics/neon-recall pass the phone between
+  turns. A fifth local-2p title would now want `co-op`, which is still empty.
 
 ### Example picks this table would suggest next
 A `shake` game (one of the two untouched sensors), an `async-versus` retrofit
