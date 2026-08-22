@@ -107,7 +107,7 @@ html, body {
   font-size:0.62rem; color:var(--dim); line-height:1.6; margin-bottom:9px;
   width:min(84vw, 340px); }
 #ov-help .hk { font-family:'Black Ops One',sans-serif; letter-spacing:2px; font-size:0.66rem;
-  min-width:74px; }
+  min-width:86px; }
 </style>
 </head>
 <body>
@@ -131,7 +131,7 @@ html, body {
   <div class="ov-title">NEON<br>CLASH</div>
   <div class="ov-sub">
     ENERGY FILLS <b>1/SEC</b> UP TO <b>20</b><br>
-    DRAG A CARD ONTO <b>YOUR HALF</b> TO DEPLOY<br>
+    DRAG A CARD ONTO <b>YOUR HALF</b> TO DEPLOY OR CAST<br>
     SMASH THE ENEMY BASE TO WIN
   </div>
   <div class="btn-col">
@@ -139,16 +139,17 @@ html, body {
     <div class="diff-btn" id="db-PRO" style="--c:var(--gold)">PRO<div class="rec" id="rec-PRO">0W - 0L</div></div>
     <div class="diff-btn" id="db-LEGEND" style="--c:var(--red)">LEGEND<div class="rec" id="rec-LEGEND">0W - 0L</div></div>
     <div class="ov-btn p2" id="btn-2p">&#128101; 2 PLAYERS &mdash; PASS THE PHONE FLAT</div>
-    <div class="ov-btn" id="btn-help">&#8505; HOW UNITS WORK</div>
+    <div class="ov-btn" id="btn-help">&#8505; HOW CARDS WORK</div>
   </div>
 </div>
 
 <div class="overlay hidden" id="ov-help">
   <div class="ov-title" style="font-size:1.2rem;letter-spacing:3px;">FIELD MANUAL</div>
-  <div class="helprow"><div class="hk" style="color:var(--gold)">TANK 4</div><div>High HP, low damage, average speed. A wall that soaks hits while the rest of your push works.</div></div>
-  <div class="helprow"><div class="hk" style="color:var(--blue)">ARCHER 3</div><div>Low HP, average damage, average speed &mdash; but shoots from far back. Melts anything that cannot reach it.</div></div>
-  <div class="helprow"><div class="hk" style="color:var(--red)">FIGHTER 3</div><div>Average HP and damage, fast attacks, fast legs. Runs down archers before they can whittle you.</div></div>
-  <div class="helprow"><div class="hk" style="color:var(--purple)">BUNKER 8</div><div>Stationary building, holds two units. Garrisoned units stop moving, fire through the slits, and take no damage &mdash; the bunker eats it. Two per side; blow one up and it can be rebuilt.</div></div>
+  <div class="helprow"><div class="hk" style="color:var(--gold)">TANK 4</div><div><i>Unit.</i> High HP, low damage, average speed. A wall that soaks hits while the rest of your push works.</div></div>
+  <div class="helprow"><div class="hk" style="color:var(--red)">FIGHTER 3</div><div><i>Unit.</i> Average HP and damage, fast attacks, fast legs. Runs down archers before they can whittle you.</div></div>
+  <div class="helprow"><div class="hk" style="color:var(--blue)">ARCHER 3</div><div><i>Unit.</i> Low HP, average damage, average speed &mdash; but shoots from far back. Melts anything that cannot reach it.</div></div>
+  <div class="helprow"><div class="hk" style="color:var(--purple)">BUNKER 8</div><div><i>Building.</i> Stationary, holds two units. Garrisoned units stop moving, fire through the slits, and take no damage &mdash; the bunker eats it. Two per side; blow one up and it can be rebuilt.</div></div>
+  <div class="helprow"><div class="hk" style="color:#ff7a1a">FIREBALL 5</div><div><i>Spell.</i> An airburst on your own half. Damage and knockback are hardest at the centre and halve at the rim, so it pays against a <b>crowd</b> and barely dents one unit &mdash; the card to hold when a big push is coming. Scatters what it hits; bases are immune, and a garrison inside a bunker is shielded from it.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--green)">BASE</div><div>The goalpost at the back of each half. Reduce the enemy base to zero and the match is yours.</div></div>
   <div class="btn-col" style="margin-top:6px;"><div class="ov-btn primary" id="btn-help-back">BACK</div></div>
 </div>
@@ -170,7 +171,9 @@ html, body {
 // =====================================================================
 // NEON CLASH — lane-free real-time card skirmish.
 // Two symmetric halves of one board; energy trickles in at 1/sec (cap 20);
-// you drag unit cards onto your own half. First base to fall loses.
+// you drag cards onto your own half. Cards come in three types — units,
+// buildings and spells — and every rule branches on that type, not on a name.
+// First base to fall loses.
 // Side 0 = bottom half (P1 / "you", green). Side 1 = top half (AI or P2, red).
 // The top tray is drawn rotated 180 deg so a second player sitting opposite
 // the phone reads their own cards the right way up.
@@ -190,13 +193,25 @@ const SUDDEN_AT = 180;                  // seconds — then regen and base damag
 const MATCH_LIMIT = 300;                // hard stop; most base HP wins
 const DRAG_OFF = 9;                     // ghost sits this far ahead of the finger
 
+// Every card carries a `type`. That is the axis the deck grows along later —
+// more units, more buildings, more spells — so every rule below branches on
+// `type`, never on a card's name.
+//   unit     — walks, fights, can be garrisoned
+//   building — stationary, occupies ground, capped per side
+//   spell    — no entity at all: it resolves the instant it lands
 const KINDS = {
-  tank:    { key:'tank',    name:'TANK',    cost:4, hp:260, dmg:12, rate:1.0, range:6.5, speed:8.5, r:5.4, ranged:false, col:'#ffc300' },
-  archer:  { key:'archer',  name:'ARCHER',  cost:3, hp:70,  dmg:20, rate:1.0, range:26,  speed:9,   r:4.0, ranged:true,  col:'#4488ff' },
-  fighter: { key:'fighter', name:'FIGHTER', cost:3, hp:130, dmg:16, rate:2.0, range:6,   speed:13,  r:4.4, ranged:false, col:'#ff2244' },
-  bunker:  { key:'bunker',  name:'BUNKER',  cost:8, hp:600, building:true, r:7.6, col:'#b44fff' },
+  tank:     { key:'tank',     name:'TANK',     type:'unit', cost:4, hp:260, dmg:12, rate:1.0, range:6.5, speed:8.5, r:5.4, ranged:false, col:'#ffc300' },
+  fighter:  { key:'fighter',  name:'FIGHTER',  type:'unit', cost:3, hp:130, dmg:16, rate:2.0, range:6,   speed:13,  r:4.4, ranged:false, col:'#ff2244' },
+  archer:   { key:'archer',   name:'ARCHER',   type:'unit', cost:3, hp:70,  dmg:20, rate:1.0, range:26,  speed:9,   r:4.0, ranged:true,  col:'#4488ff' },
+  bunker:   { key:'bunker',   name:'BUNKER',   type:'building', cost:8, hp:600, r:7.6, col:'#b44fff' },
+  // The comeback card. Priced so it only pays against a CLUSTER: 90 at the
+  // centre kills an archer outright, guts a fighter (130) and chips a tank
+  // (260) — a fine trade against four massed units, a bad one against one.
+  fireball: { key:'fireball', name:'FIREBALL', type:'spell', cost:5, r:2.6,
+              blast:14, dmg:90, falloff:0.5, kb:34, stun:0.45, col:'#ff7a1a' },
 };
-const DECK = ['tank', 'archer', 'fighter', 'bunker'];
+const DECK = ['tank', 'fighter', 'archer', 'bunker', 'fireball'];
+const KB_DECAY = 6.5;                   // knockback velocity shed per second
 const MAX_BUNKERS = 2, GARRISON = 2;
 const GARRISON_MIN_RANGE = 15;          // melee units firing through the slits
 const AGGRO_PAD = 20;                   // how far past its range a unit will chase
@@ -206,9 +221,9 @@ const SIDE_DIM = ['rgba(57,255,20,0.16)', 'rgba(255,34,68,0.16)'];
 const SIDE_NAME = ['GREEN', 'RED'];
 
 const AIS = {
-  ROOKIE: { think: 2.3, idle: 0.42, counter: 0.35, bunker: 0.0, garrison: 0.0, reserve: 0, label: 'ROOKIE' },
-  PRO:    { think: 1.3, idle: 0.14, counter: 0.70, bunker: 0.45, garrison: 0.6, reserve: 2, label: 'PRO' },
-  LEGEND: { think: 0.75, idle: 0.0, counter: 0.95, bunker: 0.85, garrison: 0.9, reserve: 3, label: 'LEGEND' },
+  ROOKIE: { think: 2.3, idle: 0.42, counter: 0.35, bunker: 0.0, garrison: 0.0, reserve: 0, spell: 0.0, spellMin: 9, label: 'ROOKIE' },
+  PRO:    { think: 1.3, idle: 0.14, counter: 0.70, bunker: 0.45, garrison: 0.6, reserve: 2, spell: 0.65, spellMin: 3, label: 'PRO' },
+  LEGEND: { think: 0.75, idle: 0.0, counter: 0.95, bunker: 0.85, garrison: 0.9, reserve: 3, spell: 0.95, spellMin: 2, label: 'LEGEND' },
 };
 
 // ------------------------------------------------------------- state
@@ -227,6 +242,7 @@ let matchT = 0, aiTimer = 0, uid = 1;
 let drags = {};                         // pointerId -> {side, kind, x, y, ok}
 let cardRects = [];                     // {side, kind, x, y, w, h} — screen space
 let flash = {};                         // 'side:kind' -> seconds of red flash left
+let casts = [0, 0];                     // spells cast this match, per side
 let shake = 0, banner = '', bannerT = 0, bannerCol = '#39ff14', suddenAnnounced = false;
 let winner = -1, renderT = 0;
 
@@ -318,6 +334,12 @@ function sndSting() {
   beep(233, 0.3, 'sawtooth', 0.1, 150, 0.2);
   beep(147, 0.6, 'sawtooth', 0.11, 78, 0.44);
 }
+const sndFireball = () => {
+  beep(330, 0.5, 'sawtooth', 0.12, 55);
+  beep(150, 0.62, 'square', 0.1, 38, 0.02);
+  nburst(0.5, 0.14, 220);
+  nburst(0.26, 0.075, 1400, 0.05);
+};
 function sndSudden() { [440, 0, 440, 0, 587].forEach((f, i) => f && beep(f, 0.14, 'square', 0.09, null, i * 0.13)); }
 
 // ------------------------------------------------------------- music
@@ -484,7 +506,7 @@ function spawnUnit(side, key, x, y) {
   units.push({
     id: uid++, side, key, k, x, y, hp: k.hp, maxHp: k.hp, r: k.r,
     cd: 0.35, target: null, retarget: 0, hurt: 0, swing: 0, home: null, slot: 0,
-    vx: 0, vy: 0, kind: 'unit',
+    vx: 0, vy: 0, kbx: 0, kby: 0, stun: 0, kind: 'unit',
   });
 }
 function spawnBunker(side, x, y) {
@@ -510,18 +532,25 @@ function clampToHalf(side, x, y, r) {
   const ny = side === 0 ? clamp(y, CENTER + r, UH - r - 1) : clamp(y, r + 1, CENTER - r);
   return { x: nx, y: ny };
 }
+const dropOff = k => k.type === 'spell' ? 0 : DRAG_OFF;
 // A drop is legal when the finger itself is on that player's half; the ghost
 // is then clamped into the half so dragging to the line still deploys there.
 function dropInfo(side, key, fx_, fy) {
   const k = KINDS[key];
   const inHalf = ownHalf(side, fy) && fy >= 0 && fy <= UH && fx_ >= 0 && fx_ <= UW;
   const dir = side === 0 ? -1 : 1;
-  const p = clampToHalf(side, fx_, fy + dir * DRAG_OFF, k.r);
+  // A unit's ghost sits DRAG_OFF ahead of the finger so your thumb does not
+  // cover it. A spell lands exactly under the finger instead — you are aiming
+  // a circle, not placing a body, and the ring is wide enough to sight down.
+  const p = clampToHalf(side, fx_, fy + dir * dropOff(k), k.r);
   const afford = energy[side] >= k.cost;
   let reason = '';
   if (!inHalf) reason = 'half';
   else if (!afford) reason = 'energy';
-  else if (key === 'bunker') {
+  else if (k.type === 'spell') {
+    // Nothing else can refuse a spell: no footprint to block, no cap to hit,
+    // and it must never garrison a bunker it is dropped on.
+  } else if (k.type === 'building') {
     if (bunkersOf(side).length >= MAX_BUNKERS) reason = 'max';
     else if (!clearSpot(side, p.x, p.y, k.r)) reason = 'blocked';
   } else {
@@ -553,6 +582,7 @@ function tryDeploy(side, key, fx_, fy) {
     return false;
   }
   energy[side] -= k.cost;
+  if (k.type === 'spell') { castSpell(side, key, info.x, info.y); return true; }
   if (info.garrison) {
     const b = info.garrison;
     const slot = b.garrison.length;
@@ -561,15 +591,63 @@ function tryDeploy(side, key, fx_, fy) {
     const u = units[units.length - 1];
     u.home = b; u.slot = slot;
     b.garrison.push(u);
-  } else if (key === 'bunker') {
+  } else if (k.type === 'building') {
     spawnBunker(side, info.x, info.y);
   } else {
     if (liveUnits(side).length >= UNIT_CAP) { energy[side] += k.cost; flash[side + ':' + key] = 0.45; sndDeny(); return false; }
     spawnUnit(side, key, info.x, info.y);
   }
-  ring(info.x, info.y, SIDE_COL[side], key === 'bunker' ? 14 : 8);
+  ring(info.x, info.y, SIDE_COL[side], k.type === 'building' ? 14 : 8);
   sndDeploy(key);
   return true;
+}
+
+// ------------------------------------------------------------- spells
+// A spell is not an entity — it resolves the instant it lands, so there is no
+// projectile to dodge and no unit to kill. Fireball is the comeback card, and
+// three rules keep it honest:
+//   1. Damage and knockback both FALL OFF with distance, so it pays against a
+//      cluster and barely dents a lone unit. That is the whole design intent.
+//   2. It cannot touch a base. Only units win the game; a spell that chipped
+//      the goalpost would turn saved energy into a win condition of its own.
+//   3. A garrisoned unit is untouched — the bunker eats the blast, exactly as
+//      it eats every other source of damage.
+function castSpell(side, key, x, y) {
+  const k = KINDS[key];
+  const foe = 1 - side;
+  // 1 at the centre, k.falloff at the rim; a unit only partly inside the
+  // circle is clamped to the rim value rather than missed entirely.
+  const fade = d => 1 - Math.min(1, d / k.blast) * (1 - k.falloff);
+  blastFx(x, y, k.blast, k.col);
+  ring(x, y, k.col, k.blast);
+  puff(x, y, k.col, 40, 54);
+  shake = Math.max(shake, 0.3);
+  sndFireball();
+  casts[side]++;
+  let hits = 0;
+  for (const u of units) {
+    if (u.side !== foe || u.dead || u.home) continue;
+    const d = Math.hypot(u.x - x, u.y - y);
+    if (d > k.blast + u.r) continue;
+    const f = fade(d);
+    hits++;
+    // knock first, damage second, so a unit the blast kills still flies apart
+    const a = d > 0.001 ? Math.atan2(u.y - y, u.x - x) : rnd(0, Math.PI * 2);
+    u.kbx = Math.cos(a) * k.kb * f;
+    u.kby = Math.sin(a) * k.kb * f;
+    u.stun = Math.max(u.stun, k.stun * f);
+    u.target = null; u.retarget = 0;
+    damage(u, k.dmg * f, side);
+  }
+  for (const b of buildings) {                 // buildings burn but never move
+    if (b.side !== foe || b.dead) continue;
+    const d = Math.hypot(b.x - x, b.y - y);
+    if (d > k.blast + b.r) continue;
+    hits++;
+    damage(b, k.dmg * fade(d), side);
+  }
+  if (!hits) floatTxt(x, y, 'WHIFF', '#8899bb');
+  return hits;
 }
 
 // ------------------------------------------------------------- effects
@@ -581,6 +659,7 @@ function puff(x, y, col, n, spd) {
     particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(0.25, 0.7), col, r: rnd(0.7, 2.1) });
   }
 }
+function blastFx(x, y, r, col) { fx.push({ t: 'blast', x, y, r, col, life: 0.5, max: 0.5 }); }
 function floatTxt(x, y, txt, col) { fx.push({ t: 'txt', x, y, txt, col, life: 0.7, max: 0.7 }); }
 
 // ------------------------------------------------------------- simulation
@@ -658,6 +737,15 @@ function reslot(b) {
 function stepUnit(u, dt) {
   u.hurt = Math.max(0, u.hurt - dt);
   u.swing = Math.max(0, u.swing - dt);
+  // blast knockback: a decaying shove that overrides the unit's own legs, plus
+  // a stun so it cannot attack or re-aim while it is still tumbling.
+  if (u.kbx || u.kby) {
+    u.x += u.kbx * dt; u.y += u.kby * dt;
+    const f = Math.max(0, 1 - KB_DECAY * dt);
+    u.kbx *= f; u.kby *= f;
+    if (Math.abs(u.kbx) + Math.abs(u.kby) < 0.6) u.kbx = u.kby = 0;
+  }
+  if (u.stun > 0) { u.stun = Math.max(0, u.stun - dt); u.vx = u.vy = 0; return; }
   u.cd -= dt;
   u.retarget -= dt;
   if (!aliveT(u.target) || u.retarget <= 0) {
@@ -774,15 +862,38 @@ function step(dt) {
 }
 
 // ------------------------------------------------------------- AI
-// The AI deploys with the same rules the player does: aiDeploy backs the
-// point out by DRAG_OFF so tryDeploy's ghost offset lands it exactly here.
-function aiDeploy(key, x, y) { return tryDeploy(1, key, x, y - DRAG_OFF); }
+// The AI deploys with the same rules the player does: aiDeploy backs the point
+// out by that card's own drop offset so tryDeploy lands it exactly here.
+function aiDeploy(key, x, y) { return tryDeploy(1, key, x, y - dropOff(KINDS[key])); }
+
+// Where would a fireball hurt most? Aim at each enemy unit in turn, pull the
+// aim point into our own half (the same rule the player plays under), and keep
+// whichever point catches the most of them.
+function bestBlast(side) {
+  const k = KINDS.fireball;
+  const foe = 1 - side;
+  const cand = units.filter(u => u.side === foe && !u.dead && !u.home);
+  let best = null, bn = 0;
+  for (const c of cand) {
+    const p = clampToHalf(side, c.x, c.y, k.r);
+    let n = 0;
+    for (const e of cand) if (Math.hypot(e.x - p.x, e.y - p.y) <= k.blast + e.r) n++;
+    if (n > bn) { bn = n; best = p; }
+  }
+  return best ? { x: best.x, y: best.y, n: bn } : null;
+}
 
 function aiThink() {
   const me = 1, foe = 0;
   const th = units.filter(u => u.side === foe && !u.dead && !u.home && u.y <= CENTER + 28);
   const threat = th.reduce((s, u) => s + u.k.dmg * u.k.rate, 0);
   if (Math.random() < aiP.idle) return;
+
+  // 0 — burn a massed push before it arrives (ROOKIE never does this)
+  if (energy[me] >= KINDS.fireball.cost && Math.random() < aiP.spell) {
+    const b = bestBlast(me);
+    if (b && b.n >= aiP.spellMin && aiDeploy('fireball', b.x, b.y)) return;
+  }
 
   // 1 — answer whatever is walking at us
   if (th.length && Math.random() < aiP.counter) {
@@ -864,6 +975,29 @@ function drawUnitShape(key, r, col, accent, t) {
     const sw = t || 0;
     ctx.beginPath(); ctx.moveTo(r * 0.15, -r * 0.5 - sw); ctx.lineTo(r * 1.5 + sw, -r * 0.15); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(r * 0.15, r * 0.5 + sw); ctx.lineTo(r * 1.5 + sw, r * 0.15); ctx.stroke();
+  } else if (key === 'fireball') {
+    // A spell has no facing, so this reads the same at any rotation: a lobed
+    // flame ball with a hot core and four sparks.
+    ctx.beginPath();
+    for (let i = 0; i <= 16; i++) {
+      const a = i / 16 * Math.PI * 2;
+      const rad = r * (i % 2 ? 0.68 : 1.0);
+      const px = Math.cos(a) * rad, py = Math.sin(a) * rad;
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(30,10,4,0.9)'; ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = Math.max(1, r * 0.26); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.46, 0, Math.PI * 2);
+    ctx.fillStyle = accent; ctx.fill();
+    ctx.strokeStyle = accent; ctx.lineWidth = Math.max(0.8, r * 0.16);
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI / 4 + i * Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 1.12, Math.sin(a) * r * 1.12);
+      ctx.lineTo(Math.cos(a) * r * 1.55, Math.sin(a) * r * 1.55);
+      ctx.stroke();
+    }
   } else if (key === 'bunker') {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
@@ -1028,6 +1162,22 @@ function drawFx() {
       ctx.beginPath();
       ctx.arc(sx(f.x), sy(f.y), 3.2 * scale, f.ang - 0.9, f.ang + 0.9);
       ctx.stroke();
+    } else if (f.t === 'blast') {
+      // expanding fireball: hot core inside a cooling shell, then a shock ring
+      const g = 1 - k;                                  // 0 -> 1 over its life
+      const rad = f.r * (0.35 + 0.75 * g) * scale;
+      const cx = sx(f.x), cy = sy(f.y);
+      const grad = ctx.createRadialGradient(cx, cy, rad * 0.05, cx, cy, rad);
+      grad.addColorStop(0, 'rgba(255,246,214,' + (0.95 * k).toFixed(3) + ')');
+      grad.addColorStop(0.42, 'rgba(255,168,40,' + (0.72 * k).toFixed(3) + ')');
+      grad.addColorStop(1, 'rgba(255,60,10,0)');
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = k * 0.8;
+      ctx.strokeStyle = f.col; ctx.lineWidth = Math.max(1.2, scale * 0.55);
+      glow(f.col, 14);
+      ctx.beginPath(); ctx.arc(cx, cy, f.r * scale * (0.5 + 0.6 * g), 0, Math.PI * 2); ctx.stroke();
     } else if (f.t === 'txt') {
       ctx.fillStyle = f.col;
       ctx.font = "bold " + Math.max(8, Math.round(2.6 * scale)) + "px 'Share Tech Mono', monospace";
@@ -1094,7 +1244,7 @@ function drawCard(c, inactive) {
   const k = KINDS[c.kind];
   const afford = energy[c.side] >= k.cost && !inactive;
   const fl = flash[c.side + ':' + c.kind] || 0;
-  const used = c.kind === 'bunker' ? bunkersOf(c.side).length : 0;
+  const used = k.type === 'building' ? bunkersOf(c.side).length : 0;
   const nf = clamp(c.w / 7.4, 7, 9.5);    // name font — everything else lays out around it
   ctx.save();
   ctx.translate(c.x + c.w / 2, c.y + c.h / 2);
@@ -1132,11 +1282,16 @@ function drawCard(c, inactive) {
   ctx.fillStyle = afford ? '#dde3ff' : '#7a83a8';
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
   ctx.fillText(k.name, c.w / 2, c.h - 3);
-  if (c.kind === 'bunker') {
+  if (k.type === 'building') {
     ctx.font = (nf * 0.88).toFixed(1) + "px 'Share Tech Mono', monospace";
     ctx.fillStyle = used >= MAX_BUNKERS ? '#ff2244' : '#8899bb';
     ctx.textAlign = 'right'; ctx.textBaseline = 'top';
     ctx.fillText(used + '/' + MAX_BUNKERS, c.w - 4, 3);
+  } else if (k.type === 'spell') {
+    ctx.font = (nf * 0.82).toFixed(1) + "px 'Share Tech Mono', monospace";
+    ctx.fillStyle = afford ? k.col : '#7a83a8';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    ctx.fillText('AoE', c.w - 4, 3);
   }
   ctx.restore();
 }
@@ -1153,17 +1308,25 @@ function drawDrags() {
     ctx.setLineDash([4, 4]); ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(d.px, d.py); ctx.lineTo(sx(info.x), sy(info.y)); ctx.stroke();
     ctx.setLineDash([]);
-    // footprint
-    ctx.beginPath(); ctx.arc(sx(info.x), sy(info.y), k.r * scale, 0, Math.PI * 2);
-    ctx.fillStyle = info.ok ? 'rgba(255,255,255,0.08)' : 'rgba(255,34,68,0.14)';
+    // footprint — for a spell this is the blast circle, so what you see under
+    // your finger is exactly what the cast will cover.
+    const spell = k.type === 'spell';
+    const fr = spell ? k.blast : k.r;
+    ctx.beginPath(); ctx.arc(sx(info.x), sy(info.y), fr * scale, 0, Math.PI * 2);
+    ctx.fillStyle = !info.ok ? 'rgba(255,34,68,0.14)'
+                  : spell ? 'rgba(255,122,26,0.15)' : 'rgba(255,255,255,0.08)';
     ctx.fill();
-    ctx.strokeStyle = info.ok ? SIDE_COL[d.side] : '#ff2244'; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.strokeStyle = info.ok ? (spell ? k.col : SIDE_COL[d.side]) : '#ff2244';
+    ctx.lineWidth = 1.4;
+    if (spell) ctx.setLineDash([5, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
     ctx.save();
     ctx.translate(sx(info.x), sy(info.y));
     ctx.scale(scale, scale);
     ctx.rotate(d.side === 0 ? -Math.PI / 2 : Math.PI / 2);
     ctx.globalAlpha = info.ok ? 0.85 : 0.4;
-    drawUnitShape(d.kind, k.r, info.ok ? SIDE_COL[d.side] : '#ff2244', k.col, 0);
+    drawUnitShape(d.kind, spell ? 4.2 : k.r, info.ok ? (spell ? k.col : SIDE_COL[d.side]) : '#ff2244', k.col, 0);
     ctx.restore();
     if (info.garrison) {
       ctx.globalAlpha = 1;
@@ -1285,6 +1448,7 @@ function resetField() {
   energy = [START_ENERGY, START_ENERGY];
   drags = {}; flash = {};
   matchT = 0; aiTimer = 1.2; suddenAnnounced = false; winner = -1;
+  casts = [0, 0];
   shake = 0; banner = ''; bannerT = 0;
 }
 function startMatch(newMode, d) {
@@ -1417,6 +1581,11 @@ window.__NC = {
   deploy: (side, key, x, y) => tryDeploy(side, key, x, y),
   start: (m, d) => startMatch(m, d),
   setEnergy: (s, v) => { energy[s] = v; },
+  get fx() { return fx; }, get casts() { return casts; },
+  get deck() { return DECK.slice(); }, kindOf: k => KINDS[k],
+  // scenario setup only — drops a unit at an exact spot with no rules applied,
+  // so a test can arrange a cluster and then cast at it through the real path.
+  place: (side, key, x, y) => { spawnUnit(side, key, x, y); return units[units.length - 1]; },
   setTime: v => { matchT = v; suddenAnnounced = v < SUDDEN_AT ? false : suddenAnnounced; },
   get viewRot() { return viewRot; },
 };

@@ -1,6 +1,6 @@
 # Neon Clash — Context
 
-`games/neon-clash/index.html` (single self-contained file, ~1350 lines).
+`games/neon-clash/index.html` (single self-contained file, ~1520 lines).
 Real-time card skirmish on one shared board. Vs AI at three grades, or two
 players on one phone lying flat between them.
 
@@ -67,42 +67,107 @@ Bases sit at `(50, 150)` and `(50, 10)` — drawn as an endzone goalpost
 (pedestal + two uprights + crossbar), 1500 HP, no attack of their own. They
 are the only win condition.
 
+## Card types — the axis the deck grows along
+
+Every entry in `KINDS` carries a **`type`**, and this is the one thing to get
+right when adding a card. The deck is explicitly meant to grow (more units,
+more buildings, more spells, eventually a deck-builder that picks five of
+them), so **every rule branches on `type`, never on a card's name.**
+
+| `type` | means | in the code |
+|---|---|---|
+| `unit` | walks, fights, can be garrisoned | `spawnUnit`, `stepUnit`, `pickTarget` |
+| `building` | stationary, occupies ground, capped per side | `spawnBunker`, `clearSpot`, `MAX_BUNKERS` |
+| `spell` | **no entity at all** — resolves the instant it lands | `castSpell` |
+
+The three places that used to say `key === 'bunker'` now say
+`k.type === 'building'`; if you find a name comparison creeping back in,
+that is the bug. `DECK` is the left-to-right tray order and nothing else
+depends on it — `layoutCards` and the flip mirror read `DECK.length`.
+
 ## Economy and the deck
 
 Energy refills at **1/sec, cap 20**, both sides, starting at 5. At
 `SUDDEN_AT` (180 s) regen doubles and damage dealt *to bases* doubles;
 `MATCH_LIMIT` (300 s) awards the match on remaining base HP.
 
-| Card | Cost | HP | Dmg | Rate | Range | Speed |
-|---|---|---|---|---|---|---|
-| Tank | 4 | 260 | 12 | 1.0/s | 6.5 | 8.5 |
-| Archer | 3 | 70 | 20 | 1.0/s | 26 | 9 |
-| Fighter | 3 | 130 | 16 | 2.0/s | 6 | 13 |
-| Bunker | 8 | 600 | — | — | — | stationary |
+| Card | Type | Cost | HP | Dmg | Rate | Range | Speed |
+|---|---|---|---|---|---|---|---|
+| Tank | unit | 4 | 260 | 12 | 1.0/s | 6.5 | 8.5 |
+| Fighter | unit | 3 | 130 | 16 | 2.0/s | 6 | 13 |
+| Archer | unit | 3 | 70 | 20 | 1.0/s | 26 | 9 |
+| Bunker | building | 8 | 600 | — | — | — | stationary |
+| Fireball | spell | 5 | — | 90 | once | blast 14 | — |
 
 Read as the spec's shape: tank = high HP / low damage / average everything
 else; archer = low HP / average damage / long reach; fighter = average HP and
 damage but double attack rate and the fastest legs; bunker = a building.
+Tray order is fixed by `DECK`: **tank, fighter, archer, bunker, fireball.**
+
+## Fireball — the comeback card
+
+The brief was explicit about what this card is *for*: you have fallen behind,
+the opponent has massed an army, and this is the card that buys the swing
+back. Everything about it follows from that.
+
+- **Cost 5, own half only** — the same `ownHalf` check every card obeys. It is
+  not a base-sniping tool and cannot reach one (see below).
+- **Damage falls off**: `90` at the centre, halving to `45` at the rim
+  (`falloff: 0.5`, radius `blast: 14`). That is the whole balance. 90 kills an
+  archer outright, guts a fighter (130 → 40) and chips a tank (260 → 170) — an
+  excellent trade against four massed units and a *bad* one against a single
+  unit, which is exactly the incentive the brief asked for. If it ever needs
+  toning, move `falloff` before you move `dmg`: shrinking the rim value keeps
+  the anti-crowd payoff while cutting the value of a lazy centre-of-board cast.
+- **Knockback is radial**, out from the impact point, scaled by the same
+  falloff, plus a short stun (`kb: 34`, `stun: 0.45`, shed at `KB_DECAY`).
+  Scattering the deathball is half the value of the card — a knocked unit
+  loses its target and has to walk back in.
+- **It cannot damage a base, either side's.** Only units win the game. A
+  spell that chipped the goalpost would turn hoarded energy into a second win
+  condition and quietly undo the whole design. Geometry already makes it
+  unreachable; `castSpell` simply never looks at `bases`.
+- **A garrison is shielded from it**, like every other damage source — the
+  bunker takes the blast. Same rule as the rest of § Bunkers.
+- **Friendly fire is off.** The card exists to rescue the losing player;
+  making it hurt your own line would punish exactly the person holding it.
+
+### The one input rule that differs
+
+`dropOff(k)` is `0` for a spell and `DRAG_OFF` for everything else. A unit's
+ghost sits ahead of the finger so your thumb does not cover the thing you are
+placing; a **spell lands exactly where you tap**, because you are aiming a
+circle wide enough to sight down and the brief says the blast is centred on
+the tap. The dashed blast ring in `drawDrags` is drawn at `k.blast`, so the
+preview is the cast. `aiDeploy` backs its aim point out by `dropOff(KINDS[key])`
+rather than a constant, which is what keeps the AI on the player's rules.
 
 ## Deployment rules (`dropInfo` / `tryDeploy`)
 
-A drop is legal when the **finger** is on that player's own half. The ghost
-sits `DRAG_OFF` (9 world units) ahead of the finger toward the opponent and is
-then *clamped* into the half — so dragging to the halfway line deploys at the
-line rather than failing. Refusals set `flash[side + ':' + kind]` (a 0.45 s red
-card pulse) and, except for the "wrong half" case, play the deny sting:
+A drop is legal when the **finger** is on that player's own half — one rule for
+every card type. The ghost sits `dropOff(k)` ahead of the finger toward the
+opponent (`DRAG_OFF` = 9 world units for units and buildings, **0 for spells**)
+and is then *clamped* into the half — so dragging to the halfway line deploys at
+the line rather than failing. Refusals set `flash[side + ':' + kind]` (a 0.45 s
+red card pulse) and, except for the "wrong half" case, play the deny sting:
 
-| reason | when |
-|---|---|
-| `half` | finger is on the opponent's side |
-| `energy` | cost exceeds current energy |
-| `max` | already two bunkers on that side |
-| `blocked` | bunker would overlap a base (`BASE_CLR`) or another bunker |
-| `full` | dropping a unit on a bunker that already holds two |
+| reason | when | applies to |
+|---|---|---|
+| `half` | finger is on the opponent's side | every card |
+| `energy` | cost exceeds current energy | every card |
+| `max` | already two bunkers on that side | buildings |
+| `blocked` | bunker would overlap a base (`BASE_CLR`) or another bunker | buildings |
+| `full` | dropping a unit on a bunker that already holds two | units |
 
-`aiDeploy(key, x, y)` backs the point out by `DRAG_OFF` and goes through
-`tryDeploy` — the AI obeys exactly the rules the player does, including cost
-and half checks. There is no AI-only placement path.
+A **spell can only ever be refused for `half` or `energy`** — it has no
+footprint to block, no cap to hit, and it must not garrison a bunker it is
+dropped on. That last one is the easy bug: the garrison branch lives in the
+`else` of the type test, so any new spell gets it right for free, but a card
+that forgets its `type` will silently try to walk into a building.
+
+`aiDeploy(key, x, y)` backs the point out by `dropOff(KINDS[key])` and goes
+through `tryDeploy` — the AI obeys exactly the rules the player does, including
+cost and half checks. There is no AI-only placement path.
 
 ## Bunkers
 
@@ -136,13 +201,18 @@ and base footprints. `UNIT_CAP = 16` per side bounds it.
 `AIS[ROOKIE|PRO|LEGEND]` tunes think interval, an idle/skip chance, how often
 it answers a threat, whether it builds and mans bunkers, and an energy
 `reserve` it will not spend on pushes. `aiThink()` runs in priority order:
-**counter** whatever is walking at it (fighter against ranged, archer against
-tanks, placed between the lead threat and its base) → **fortify** while quiet
-→ **man the slits** → **push** at the halfway line, following its own spearhead
-60% of the time.
+**fireball** a cluster (`bestBlast` aims at each enemy unit in turn, pulls the
+point into its own half and keeps whichever catches the most; it fires at
+`aiP.spellMin` targets or more) → **counter** whatever is walking at it
+(fighter against ranged, archer against tanks, placed between the lead threat
+and its base) → **fortify** while quiet → **man the slits** → **push** at the
+halfway line, following its own spearhead 60% of the time.
 
-ROOKIE keeps `reserve: 0`, so it dribbles units out one at a time and never
-masses — that, plus its idle chance, is what makes it beatable. An
+ROOKIE has `spell: 0` and never casts — massing units against it is meant to
+work. PRO needs 3 in the circle, LEGEND only 2.
+
+ROOKIE keeps `reserve: 0` and `spell: 0`, so it dribbles units out one at a
+time, never masses, and never punishes you for massing — that, plus its idle chance, is what makes it beatable. An
 **undefended** base falls to LEGEND in roughly 25–30 s; that is intended, and
 1500 base HP is the knob if it ever needs to be gentler.
 
@@ -157,16 +227,24 @@ never drift from the thing it deploys.
 
 - `node .claude/scripts/smoke-mobile.cjs games/neon-clash/index.html`
 - `node .claude/scripts/check-games-sync.cjs`
-- `.claude/tests/neon-clash-drive.cjs` — drives a real touch drag from the
-  tray to the board, then asserts the refusal rules, the bunker/garrison caps,
-  garrison ejection, a base kill ending the match, that the AI actually plays,
-  and that the rotated top tray deploys for P2 — plus the portrait lock, where
-  a landscape viewport must keep the portrait layout and a touch pushed through
-  the view transform must still hit the card it covers.
+- `.claude/tests/drive-neon-clash.cjs` (59 checks) — drives a real touch drag
+  from the tray to the board, then asserts the refusal rules, the card types
+  and deck order, the bunker/garrison caps, garrison ejection, a base kill
+  ending the match, that the AI actually plays, and that the rotated top tray
+  deploys for P2 — plus the portrait lock, where a landscape viewport must keep
+  the portrait layout and a touch pushed through the view transform must still
+  hit the card it covers. The fireball block pins every rule above to a number:
+  90 at the centre, 45 at the rim, nothing outside the circle, nothing friendly,
+  neither base, a garrison untouched while its bunker burns, knockback that
+  actually shoves a unit backwards against its own march, and LEGEND answering
+  a massed push with a cast of its own.
 
 ## Test hook
 
 `window.__NC` exposes `state / energy / units / buildings / bases / matchT`
-plus `deploy(side, key, fingerX, fingerY)`, `start(mode, diff)` and
-`setEnergy(side, v)` — note `deploy` takes **finger** world coordinates, not
-the final spawn point, so it exercises the same `DRAG_OFF` path a real drag does.
+plus `deploy(side, key, fingerX, fingerY)`, `start(mode, diff)`,
+`setEnergy(side, v)`, `casts`, `deck`, `kindOf(key)` and `place(side, key, x, y)`
+— note `deploy` takes **finger** world coordinates, not the final spawn point,
+so it exercises the same `dropOff` path a real drag does. `place` is the one
+hook that bypasses the rules: it exists so a test can *arrange* a cluster and
+then cast at it through the real path, never to assert placement behaviour.

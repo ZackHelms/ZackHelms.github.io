@@ -553,14 +553,21 @@ checksummed code carries seed + score, so a friend replays your exact grid and
 the game reports the head-to-head. LABELS assist stamps a unique letter per
 colour for a colour-free hunt. Detailed context: `.claude/signal-hunt.md`.
 
-### NEON CLASH (`neon-clash/index.html`, ~1350 lines)
+### NEON CLASH (`neon-clash/index.html`, ~1520 lines)
 The repo's first **real-time card battler**, and its first **simultaneous**
 local-2p game. One board split into halves; energy refills at 1/sec up to 20
-on both sides; drag a tank (4), archer (3), fighter (3) or bunker (8) out of
+on both sides; drag a tank (4), fighter (3), archer (3) or bunker (8) out of
 your tray onto your own half and it walks at the enemy goalpost on its own.
 A bunker is a building holding two units — they stop moving, become
 untargetable (the building eats the damage), fire through the slits at a
 minimum range of 15, and are **ejected alive** when it falls.
+
+Cards are **typed** — `unit`, `building`, `spell` — and every rule branches on
+the type, never on a card's name, because the deck is meant to grow. The fifth
+card is the first spell: **fireball** (5), an airburst on your own half whose
+damage and knockback both halve from centre to rim, so it pays against a massed
+push and barely dents a lone unit. It cannot touch a base, cannot hurt your own
+line, and cannot reach a garrison through the bunker sheltering it.
 
 The distinctive part is the second player: lay the phone flat on a table and
 the far tray is drawn rotated 180° (`trayFlipped()`), so the player opposite

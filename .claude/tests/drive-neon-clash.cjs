@@ -8,6 +8,9 @@
  *   - "the bunker protects its garrison" — untargetable inside, EJECTED ALIVE
  *     when the building dies (the spec's whole reason for the card)
  *   - the stat shape the design asks for (tank walls, fighter rushes, archer reaches)
+ *   - the card TYPES (unit / building / spell) and the deck's left-to-right order
+ *   - fireball: own half only, distance falloff, radial knockback, no base damage,
+ *     and a garrison inside a bunker shielded from the blast
  *   - energy: 1/sec, cap 20, doubled in sudden death
  *   - the portrait lock: a sideways phone keeps the portrait layout, and a
  *     touch pushed through the view transform still hits the card it covers
@@ -57,16 +60,17 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   const barH = 13;
   const cardH = Math.max(38, trayH - barH - 12);
   const gap = Math.max(5, Math.round(geo.w * 0.016));
-  const cardW = Math.min(Math.round((geo.w - gap * 5) / 4), Math.round(cardH * 0.92));
-  const x0 = geo.left + (geo.w - (cardW * 4 + gap * 3)) / 2;
+  const DECK = ['tank', 'fighter', 'archer', 'bunker', 'fireball'];
+  const N = DECK.length;
+  const cardW = Math.max(50, Math.min(Math.round((geo.w - gap * (N + 1)) / N), Math.round(cardH * 0.92)));
+  const x0 = geo.left + (geo.w - (cardW * N + gap * (N - 1))) / 2;
   const slotX = i => x0 + i * (cardW + gap) + cardW / 2;
   const botCardY = geo.top + geo.h - trayH + barH + 6 + cardH / 2;
   const topCardY = geo.top + trayH - barH - 6 - cardH / 2;
   const boardY = f => geo.top + trayH + (geo.h - 2 * trayH) * f;
-  const DECK = ['tank', 'archer', 'fighter', 'bunker'];
   // side 0 tray is in deck order; side 1 is mirrored only when it is flipped
   const botSlot = k => slotX(DECK.indexOf(k));
-  const topSlot = (k, flipped) => slotX(flipped ? 3 - DECK.indexOf(k) : DECK.indexOf(k));
+  const topSlot = (k, flipped) => slotX(flipped ? N - 1 - DECK.indexOf(k) : DECK.indexOf(k));
 
   const drag = (moves) => page.evaluate(ms => {
     const cv = document.getElementById('game');
@@ -147,6 +151,137 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
      stats.fighter.speed > stats.tank.speed && stats.fighter.speed > stats.archer.speed, JSON.stringify(stats));
   ok('archer out-ranges everything by a wide margin',
      stats.archer.range > stats.tank.range * 3 && stats.archer.range > stats.fighter.range * 3, JSON.stringify(stats));
+
+  // ================================================= card types + deck order
+  const deck = await page.evaluate(() => ({
+    order: __NC.deck,
+    types: __NC.deck.map(k => __NC.kindOf(k).type),
+    fb: __NC.kindOf('fireball'),
+  }));
+  ok('the deck reads tank, fighter, archer, bunker, fireball left to right',
+     deck.order.join(',') === 'tank,fighter,archer,bunker,fireball', deck.order.join(','));
+  ok('cards are typed unit / building / spell',
+     deck.types.join(',') === 'unit,unit,unit,building,spell', deck.types.join(','));
+  ok('fireball is a 5-energy spell', deck.fb.cost === 5 && deck.fb.type === 'spell', JSON.stringify(deck.fb));
+
+  // =================================================== fireball: cast contract
+  const cast = await page.evaluate(() => {
+    __NC.start('2p');
+    const out = {};
+    __NC.setEnergy(0, 20); out.enemyHalf = __NC.deploy(0, 'fireball', 50, 30);
+    __NC.setEnergy(0, 4);  out.broke = __NC.deploy(0, 'fireball', 50, 120);
+    __NC.setEnergy(0, 20);
+    const n = __NC.units.length;
+    out.legal = __NC.deploy(0, 'fireball', 50, 120);
+    out.spent = 20 - __NC.energy[0];
+    out.spawned = __NC.units.length - n;
+    out.counted = __NC.casts[0];
+    return out;
+  });
+  ok('fireball cannot be cast on the enemy half', cast.enemyHalf === false);
+  ok('fireball you cannot afford is refused', cast.broke === false);
+  ok('fireball casts on your own half', cast.legal === true && cast.counted === 1, JSON.stringify(cast));
+  ok('casting fireball costs 5 energy', near(cast.spent, 5, 0.35), 'spent=' + cast.spent);
+  ok('a spell puts nothing on the board', cast.spawned === 0, 'spawned=' + cast.spawned);
+
+  // ============================== units drop ahead of the finger, spells under it
+  const aim = await page.evaluate(() => {
+    __NC.start('2p');
+    __NC.setEnergy(0, 20); __NC.deploy(0, 'tank', 50, 120);
+    const u = __NC.units.filter(x => x.side === 0).pop();
+    const mark = __NC.place(1, 'tank', 50, 120);          // right under the finger
+    __NC.setEnergy(0, 20); __NC.deploy(0, 'fireball', 50, 120);
+    return { unitY: u.y, dealt: mark.maxHp - mark.hp };
+  });
+  ok('a unit still lands DRAG_OFF ahead of the finger', near(aim.unitY, 111, 0.6), 'y=' + aim.unitY);
+  ok('a spell lands exactly under the finger', near(aim.dealt, 90, 1), 'dealt=' + aim.dealt);
+
+  // ============================================ fireball: damage falls off
+  const blast = await page.evaluate(() => {
+    __NC.start('2p');
+    const mid = __NC.place(1, 'tank', 50, 100);        // dead centre
+    const rim = __NC.place(1, 'tank', 50, 114);        // exactly one blast radius out
+    const out_ = __NC.place(1, 'tank', 50, 130);       // clear of the circle
+    const mine = __NC.place(0, 'tank', 42, 100);       // my own tank, in the fire
+    __NC.setEnergy(0, 20);
+    __NC.deploy(0, 'fireball', 50, 100);               // a spell lands under the finger
+    return {
+      mid: mid.hp, rim: rim.hp, out: out_.hp, mine: mine.hp, max: mid.maxHp,
+      kbMid: [mid.kbx, mid.kby], kbRim: [rim.kbx, rim.kby], stun: mid.stun,
+      base0: __NC.bases[0].hp, base1: __NC.bases[1].hp, baseMax: __NC.bases[1].maxHp,
+    };
+  });
+  ok('fireball hits hardest at the centre', near(blast.max - blast.mid, 90, 1), 'dealt=' + (blast.max - blast.mid));
+  ok('fireball damage halves at the rim', near(blast.max - blast.rim, 45, 1), 'dealt=' + (blast.max - blast.rim));
+  ok('fireball spares anything outside the circle', blast.out === blast.max, 'hp=' + blast.out);
+  ok('fireball never touches your own units', blast.mine === blast.max, 'hp=' + blast.mine);
+  ok('fireball cannot damage either base',
+     blast.base0 === blast.baseMax && blast.base1 === blast.baseMax, JSON.stringify([blast.base0, blast.base1]));
+  ok('fireball stuns what it hits', blast.stun > 0, 'stun=' + blast.stun);
+  ok('knockback points away from the tap, and weakens with distance',
+     blast.kbRim[1] > 0 && Math.abs(blast.kbRim[0]) < 0.01 &&
+     Math.hypot(...blast.kbRim) < Math.hypot(...blast.kbMid), JSON.stringify([blast.kbMid, blast.kbRim]));
+
+  // ======================================= fireball: knockback actually moves
+  const kb = await page.evaluate(() => {
+    __NC.start('2p');
+    // above the impact point, so the shove opposes the way it wants to walk
+    const u = __NC.place(1, 'tank', 50, 92);
+    __NC.setEnergy(0, 20);
+    __NC.deploy(0, 'fireball', 50, 100);
+    return { before: u.y, id: u.id };
+  });
+  await page.waitForTimeout(140);
+  const kbAfter = await page.evaluate(id => {
+    const u = __NC.units.find(x => x.id === id);
+    return u ? u.y : null;
+  }, kb.id);
+  ok('a knocked unit is thrown backwards, against its own march',
+     kbAfter !== null && kbAfter < kb.before - 1, 'y ' + kb.before + ' -> ' + kbAfter);
+
+  // ================================ fireball: the bunker still shelters its garrison
+  const shield = await page.evaluate(() => {
+    __NC.start('2p');
+    __NC.setEnergy(0, 20); __NC.deploy(0, 'bunker', 50, 97);      // impact y = 88
+    const b = __NC.buildings.find(x => x.side === 0);
+    // finger inside the bunker's grab radius AND still on our own half
+    __NC.setEnergy(0, 20); __NC.deploy(0, 'archer', b.x, b.y - 4);
+    const g = b.garrison[0];
+    __NC.setEnergy(1, 20);
+    // side 1's finger sits on its own half; the impact clamps to the halfway
+    // line, which is still inside the bunker's blast reach.
+    const fired = __NC.deploy(1, 'fireball', 50, b.y - 9);
+    return { fired, bunker: b.hp, bunkerMax: b.maxHp, garrison: g.hp, garrisonMax: g.maxHp, held: b.garrison.length };
+  });
+  ok('an enemy fireball burns the bunker', shield.fired === true && shield.bunker < shield.bunkerMax,
+     JSON.stringify(shield));
+  ok('the garrison inside is shielded from the blast', shield.garrison === shield.garrisonMax, JSON.stringify(shield));
+
+  // ==================================== a spell dropped on your bunker is cast, not garrisoned
+  const noGarrison = await page.evaluate(() => {
+    __NC.start('2p');
+    __NC.setEnergy(0, 20); __NC.deploy(0, 'bunker', 50, 118);
+    const b = __NC.buildings.find(x => x.side === 0);
+    __NC.setEnergy(0, 20);
+    const fired = __NC.deploy(0, 'fireball', b.x, b.y - 9);
+    return { fired, held: b.garrison.length, casts: __NC.casts[0], hp: b.hp, max: b.maxHp };
+  });
+  ok('a spell dropped on your own bunker casts instead of garrisoning',
+     noGarrison.fired === true && noGarrison.held === 0 && noGarrison.casts === 1, JSON.stringify(noGarrison));
+  ok('your own fireball does not burn your own bunker', noGarrison.hp === noGarrison.max, JSON.stringify(noGarrison));
+
+  // ================================================ the AI plays the spell too
+  await page.evaluate(() => {
+    __NC.start('ai', 'LEGEND');
+    for (let i = 0; i < 4; i++) __NC.place(0, 'fighter', 44 + i * 5, 56 + (i % 2) * 6);
+    __NC.setEnergy(1, 20);
+  });
+  let aiCast = 0;
+  for (let i = 0; i < 24 && !aiCast; i++) {
+    await page.waitForTimeout(250);
+    aiCast = await page.evaluate(() => __NC.casts[1]);
+  }
+  ok('LEGEND answers a massed push with a fireball', aiCast > 0, 'casts=' + aiCast);
 
   // ============================================================ the bunker
   const caps = await page.evaluate(() => {
@@ -336,15 +471,16 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   const lTray = Math.min(96, Math.max(62, Math.round(lgeo.ch * 0.125)));
   const lCardH = Math.max(32, lTray - 13 - 12);
   const lGap = Math.max(5, Math.round(lgeo.cw * 0.016));
-  const lCardW = Math.max(50, Math.min(110, Math.min(Math.round((lgeo.cw - lGap * 5) / 4), Math.round(lCardH * 0.92))));
-  const lX0 = (lgeo.cw - (lCardW * 4 + lGap * 3)) / 2;
+  const lCardW = Math.max(50, Math.min(110, Math.min(Math.round((lgeo.cw - lGap * (N + 1)) / N), Math.round(lCardH * 0.92))));
+  const lX0 = (lgeo.cw - (lCardW * N + lGap * (N - 1))) / 2;
   const toClient = (px, py) => lp.evaluate(([px, py]) => {
     const cv = document.getElementById('game'), r = cv.getBoundingClientRect();
     const rot = __NC.viewRot, c = Math.cos(rot), s = Math.sin(rot);
     const dx = px - cv.clientWidth / 2, dy = py - cv.clientHeight / 2;
     return { x: r.left + r.width / 2 + (dx * c - dy * s), y: r.top + r.height / 2 + (dx * s + dy * c) };
   }, [px, py]);
-  const lFrom = await toClient(lX0 + 2 * (lCardW + lGap) + lCardW / 2, lgeo.ch - lTray + 13 + 6 + lCardH / 2);
+  const lFrom = await toClient(lX0 + DECK.indexOf('fighter') * (lCardW + lGap) + lCardW / 2,
+                               lgeo.ch - lTray + 13 + 6 + lCardH / 2);
   const lTo = await toClient(lgeo.cw / 2, lTray + (lgeo.ch - 2 * lTray) * 0.78);
   await lp.evaluate(([a, b]) => {
     const cv = document.getElementById('game');

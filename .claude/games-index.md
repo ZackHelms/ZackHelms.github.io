@@ -24,7 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
-| Neon Clash | `neon-clash/` | card-battler | drag-place, tap | match-vs-ai, local-2p | card-deck, resource-economy, ai-opponent, rotated-2p-ui | vs-ai, local-2p | `.claude/neon-clash.md` |
+| Neon Clash | `neon-clash/` | card-battler | drag-place, tap | match-vs-ai, local-2p | card-deck, resource-economy, ai-opponent, rotated-2p-ui, area-of-effect | vs-ai, local-2p | `.claude/neon-clash.md` |
 | Zed Shooter | `zed-shooter/` | shooter | virtual-joystick, kb-mouse | wave-survival | meta-progression | solo | external: zed-fps repo |
 | Mitochondria Simulator | `mitochondria/` | biology-sim | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox, guided-lessons | systems-simulation, scale-ladder, skill-teaching, real-time-3d | solo | `.claude/mitochondria.md` |
 | Quantum Chemist | `qntmchmst/` | grid-puzzle | tap, drag-place | level-campaign | match-clear | solo | external: qntmchmst repo |
@@ -201,6 +201,12 @@ from **inventing a new facet value**, not filling a hole. Open directions:
   local-2p games all share one orientation: air hockey's board is
   orientation-neutral, and neon-tactics/neon-recall pass the phone between
   turns. A fifth local-2p title would now want `co-op`, which is still empty.
+- **`area-of-effect`** (neon-clash, added later the same day with the fireball
+  card) is also new. Plenty of games here blow several things up at once, but
+  this is the first where the *player aims the blast* — a placed circle whose
+  damage and knockback both fall off from the centre, so the skill is reading
+  a crowd rather than hitting a target. Anything with a grenade, a bomb, a
+  shockwave or a cleared radius should reuse this value rather than mint one.
 
 ### Example picks this table would suggest next
 A `shake` game (one of the two untouched sensors), an `async-versus` retrofit
