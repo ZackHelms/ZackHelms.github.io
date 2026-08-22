@@ -125,3 +125,20 @@ This repo carries a zmh-producer config at `.claude/zmh/producer.md`
 the `/zmh-producer:*` commands). The gates it names live in `.claude/scripts/`;
 gameplay drive suites worth keeping live in `.claude/tests/`; session learnings
 go to `.claude/notes/`.
+
+**Plugin bootstrap.** Remote containers never fetch the marketplace a repo
+declares, so the plugin arrives via `.claude/hooks/session-start.sh`
+(registered under `hooks.SessionStart` in `.claude/settings.json`, which also
+names the marketplace and `enabledPlugins`). It is a no-op locally. If
+`/zmh-producer:*` still fails to resolve — always the case in **multi-repo**
+sessions, where the harness never fires a repo-local hook — run
+`/load-plugins` once per fresh container.
+
+`.claude/hooks/session-start.sh` (above its `repo-specific` marker) and
+`.claude/commands/load-plugins.md` are **verbatim copies** from
+`zmhstudio/plugins/zmh-producer/templates/`. Update them by re-copying, never
+by hand-editing this repo's copy; only the section below the hook's marker is
+this repo's to edit (currently a deliberate no-op — nothing to install).
+Adopting another plugin needs no hook change, just another
+`"<plugin>@zmhstudio": true` in `enabledPlugins`. Gotchas and the four
+verified bootstrap paths: `.claude/notes/20260822-zmh-plugin-bootstrap.md`.
