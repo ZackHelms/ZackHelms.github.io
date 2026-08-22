@@ -77,10 +77,16 @@ body {
   text-align:center; font-family:'Share Tech Mono', monospace; font-size:9px;
   color:var(--dim); opacity:0.6; letter-spacing:1px; pointer-events:none; user-select:none;
 }
+.shop-header { width:100%; max-width:340px; text-align:left; color:var(--dim); font-size:0.68rem; letter-spacing:1px; margin:10px 0 4px; }
+.shop-row { width:100%; max-width:340px; text-align:left; border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:5px 0; background:var(--panel); }
+.shop-name { font-family:'Black Ops One',sans-serif; font-size:0.8rem; letter-spacing:1px; }
+.shop-sub { color:var(--dim); font-size:0.62rem; line-height:1.5; margin:3px 0 6px; }
+.shop-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.shop-actions .btn { margin:0; min-width:0; padding:7px 12px; font-size:0.7rem; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-22 01:32 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-22 02:44 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
@@ -90,36 +96,78 @@ body {
 'use strict';
 /* =============================== CONSTANTS ============================== */
 const MAX_STAGE = 5;
-const MAX_SECTOR = 1;          // raised alongside the XP/weapon system (more sectors need real power growth to stay fair)
+const MAX_SECTOR = 11;         // 1 original + 10 more, difficulty scaled by campaignDifficulty()
 const WAVES_PER_STAGE = 3;
-const START_LIVES = 3;
 const INVULN_TIME = 2.0;
 const EBULLET_CAP = 90;
 const STAGE_HUES = [140, 200, 280, 40, 0];   // enemy hue per stage (deg)
 const ENEMY_DEFS = {
-  drone:   { hp: 1, r: 12, pts: 50 },
-  shooter: { hp: 2, r: 13, pts: 120 },
-  spinner: { hp: 2, r: 13, pts: 150 },
-  tanker:  { hp: 6, r: 18, pts: 300 },
+  drone:   { hp: 1, r: 12, pts: 50,  xp: 2 },
+  shooter: { hp: 2, r: 13, pts: 120, xp: 4 },
+  spinner: { hp: 2, r: 13, pts: 150, xp: 5 },
+  tanker:  { hp: 6, r: 18, pts: 300, xp: 10 },
 };
+const MAX_TIER = 5;
+const HP_TIER_COST = [0, 60, 100, 160, 240, 340];   // index = tier reached (0..5)
+function shipMaxHp(tier) { return 100 + tier * 20; }
+const WEAPON_DEFS = {
+  blaster:  { name: 'BLASTER',         color: '#dde3ff', unlockCost: 0,   tierCost: [0, 60, 120, 200, 300], desc: 'Balanced kinetic bolts. No weaknesses, no fireworks.' },
+  beam:     { name: 'BEAM',            color: '#4488ff', unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'Continuous piercing laser. Melts a line, can’t cover a spread.' },
+  flame:    { name: 'FLAMETHROWER',    color: '#ff6a1a', unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'Short cone, huge close-range dps. Deadly up close, useless at range.' },
+  bombs:    { name: 'BOMBS',           color: '#ffc300', unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'Lobbed rounds explode in an AoE. Great vs groups & tankers, slow fire rate.' },
+  missiles: { name: 'MISSILES',        color: '#b44fff', unlockCost: 180, tierCost: [0, 90, 150, 230, 330], desc: 'Homing rockets track the nearest target. Reliable, moderate rate of fire.' },
+  bolas:    { name: 'BOLAS',           color: '#39ff14', unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'Tangles on hit, slowing an enemy and its fire rate. Low damage, high survivability.' },
+  chain:    { name: 'CHAIN LIGHTNING', color: '#4de8ff', unlockCost: 180, tierCost: [0, 90, 150, 230, 330], desc: 'Arcs between nearby enemies. Shreds clusters, weak on one tough target.' },
+  emp:      { name: 'EMP',             color: '#ff2244', unlockCost: 200, tierCost: [0, 100, 160, 240, 340], desc: 'Periodic pulse damages and wipes nearby enemy bullets. Safety over dps.' },
+};
+const ARMOR_DEFS = {
+  regen:   { name: 'REGENERATIVE', unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'Slowly heals hp once you’ve gone a few seconds unhit.' },
+  shield:  { name: 'SHIELD',       unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'A recharging personal shield absorbs hits before hp is touched.' },
+  plating: { name: 'PLATING',      unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'Flat damage reduction on every hit that lands.' },
+};
+
+/* =========================== SAVE / PILOTS =============================== */
+const SAVE_SLOTS = 3;
+function loadSaves() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('starSurge.saves') || 'null');
+    if (Array.isArray(raw) && raw.length === SAVE_SLOTS) return raw;
+  } catch (e) { /* corrupt/missing save data falls through to a fresh set */ }
+  return [null, null, null];
+}
+function writeSaves() { localStorage.setItem('starSurge.saves', JSON.stringify(saves)); }
+function newCharacter(name) {
+  return {
+    name, xp: 0, sector: 1, best: 0,
+    weapons: { blaster: 1 }, equippedWeapon: 'blaster',
+    armors: {}, equippedArmor: null,
+    hpTier: 0,
+  };
+}
+let saves = loadSaves();
+let activeSlot = -1;
+let save = null;   // active character; alias into saves[activeSlot]
+function persistSave() { if (activeSlot >= 0) { saves[activeSlot] = save; writeSaves(); } }
 
 /* =============================== STATE ================================== */
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 const overlay = document.getElementById('overlay');
 let W = 0, H = 0, dpr = 1, safeTop = 0, safeBot = 0;
-let state = 'menu';            // menu | play | over | victory
-let ship = { x: 195, y: 700, r: 13, invuln: 0, shield: false };
-let lives = START_LIVES;
-let weapon = 1;                // 1..4
+let state = 'pilots';          // pilots | menu | shipyard | play | over | victory
+let ship = { x: 195, y: 700, r: 13, invuln: 0, hp: 100, maxHp: 100, shieldCharges: 0, shieldRegenT: 0, lastHitT: 999 };
+let weapon = 1;                // 1..4, in-run P-powerup tier (works with any equipped weapon type)
 let score = 0;
+let runXpEarned = 0;
 let sector = 1, stage = 1, wave = 1;   // wave 1..3 then 4=mini-boss; stage MAX_STAGE's mini-boss unlocks the sector boss
-let bullets = [];              // player {x,y,vx,vy}
+let bullets = [];              // player {x,y,vx,vy,wtype,dmg,...}
 let ebullets = [];             // enemy {x,y,vx,vy}
-let enemies = [];              // {type,x,y,hp,r,t,...}
+let enemies = [];              // {type,x,y,hp,r,t,slowT,...}
 let boss = null;               // {..., sector: false} mini-boss | {..., sector: true} sector boss
 let powerups = [];             // {x,y,kind}
 let particles = [];
 let floats = [];
+let lightningBolts = [];       // {points:[{x,y},...], t} — chain-lightning visuals
+let empPulses = [];            // {x,y,r,maxR,t} — EMP ring visuals
 let spawnQueue = [];           // [{t,type,xf}]
 let waveT = 0;
 let pendingStage = false;      // mini-boss just fell; next stage starts after banner
@@ -129,9 +177,6 @@ let shake = 0;
 let stageBanner = 0;           // seconds left showing banner
 let bannerText = '';
 let stars = [];
-let best = +(localStorage.getItem('starSurge.best') || 0);
-let maxStage = Math.min(MAX_STAGE, +(localStorage.getItem('starSurge.stage') || 1));
-let sectorBossReady = localStorage.getItem('starSurge.sectorBossReady') === '1';
 
 /* =============================== AUDIO ================================== */
 let AC = null, sfxGain = null, musicGain = null, musicTimer = null;
@@ -559,12 +604,13 @@ function bindTap(el, fn) {
 bindTap(muteBtn, () => { muted = !muted; applyMute(); });
 applyMute();
 function hue(sat, l, a) { return 'hsla(' + STAGE_HUES[stage - 1] + ',' + sat + '%,' + l + '%,' + (a === undefined ? 1 : a) + ')'; }
+function campaignDifficulty() { return (sector - 1) + (stage - 1) / MAX_STAGE; }   // 0 at sector1 stage1, ~+1 per sector cleared
 
 /* =============================== WAVES ================================== */
 function buildWave(st, wv) {
-  // deterministic spawn scripts; counts scale with stage
+  // deterministic spawn scripts; counts scale with stage, then with campaign difficulty across sectors
   const q = [];
-  const n = 4 + st;                        // base count
+  const n = 4 + st + Math.floor(campaignDifficulty() * 0.8);   // base count
   if (wv === 1) {
     for (let i = 0; i < n + 2; i++) q.push({ t: i * 0.55, type: 'drone', xf: 0.15 + 0.7 * ((i * 37) % 100) / 100 });
     for (let i = 0; i < Math.floor(st / 2); i++) q.push({ t: 2 + i * 1.2, type: 'shooter', xf: 0.3 + 0.4 * i });
@@ -581,7 +627,7 @@ function buildWave(st, wv) {
 }
 function spawnEnemy(type, x, y) {
   const d = ENEMY_DEFS[type];
-  const e = { type, x, y: y === undefined ? -24 : y, hp: d.hp, r: d.r, pts: d.pts, t: 0, fireT: 1 + Math.random() };
+  const e = { type, x, y: y === undefined ? -24 : y, hp: d.hp, r: d.r, pts: d.pts, xp: d.xp, t: 0, fireT: 1 + Math.random(), slowT: 0 };
   if (type === 'drone') { e.vy = 95 + Math.random() * 30; e.amp = 30 + Math.random() * 30; e.x0 = x; }
   else if (type === 'shooter') { e.vy = 75; e.holdY = 90 + Math.random() * 130; }
   else if (type === 'spinner') { e.vx = x < W / 2 ? 65 : -65; e.y = 100 + Math.random() * 110; e.ang = 0; }
@@ -589,10 +635,12 @@ function spawnEnemy(type, x, y) {
   enemies.push(e);
   return e;
 }
+function miniBossHp() { return Math.round(26 + stage * 14 + campaignDifficulty() * 22); }
 function spawnBoss() {
+  const hp = miniBossHp();
   boss = {
     x: W / 2, y: -60, targetY: 110, r: 34,
-    hp: 26 + stage * 14, maxHp: 26 + stage * 14,
+    hp, maxHp: hp,
     t: 0, fireT: 1.5, ringT: 2.5, dir: 1, sector: false,
   };
   bannerText = 'STAGE ' + stage + ' BOSS';
@@ -600,7 +648,7 @@ function spawnBoss() {
   sfxAlarm();
 }
 function spawnSectorBoss() {
-  const hp = Math.round((26 + MAX_STAGE * 14) * 2.6);   // harder AND longer than the toughest mini-boss
+  const hp = Math.round((26 + MAX_STAGE * 14 + campaignDifficulty() * 22) * 2.6);   // harder AND longer than the toughest mini-boss
   boss = {
     x: W / 2, y: -70, targetY: 120, r: 46,
     hp, maxHp: hp,
@@ -621,26 +669,96 @@ function startWave() {
     spawnBoss();
   }
 }
-function startGame(startStage, atSectorBoss) {
-  sector = 1;
-  stage = Math.max(1, Math.min(MAX_STAGE, startStage || 1));
-  wave = 1; lives = START_LIVES; weapon = 1; score = 0;
+function startGame(startSector) {
+  sector = Math.max(1, Math.min(MAX_SECTOR, startSector || 1));
+  stage = 1; wave = 1; weapon = 1; score = 0; runXpEarned = 0;
   bullets = []; ebullets = []; enemies = []; powerups = []; particles = []; floats = [];
+  lightningBolts = []; empPulses = [];
   boss = null; pendingStage = false; pendingSectorBoss = false;
-  ship = { x: W / 2, y: H - safeBot - 130, r: 13, invuln: 1, shield: false };
+  const maxHp = shipMaxHp(save.hpTier);
+  ship = { x: W / 2, y: H - safeBot - 130, r: 13, invuln: 1, hp: maxHp, maxHp, shieldCharges: 0, shieldRegenT: 0, lastHitT: 999 };
   fireT = 0;
   state = 'play';
   overlay.classList.add('hidden');
-  if (atSectorBoss) spawnSectorBoss(); else startWave();
+  startWave();
 }
 
 /* =============================== COMBAT ================================= */
+function awardXp(n) { save.xp += n; runXpEarned += n; }
+function weaponCooldown() {
+  const base = { blaster: weapon >= 4 ? 0.12 : 0.16, bombs: 0.55, missiles: 0.42, bolas: 0.22, chain: 0.4, emp: 1.3 }[save.equippedWeapon];
+  return Math.max(0.08, base - (weapon - 1) * 0.02);   // in-run P-powerup mildly speeds any weapon
+}
 function fireWeapon() {
-  const x = ship.x, y = ship.y - 16;
-  const v = -540;
-  if (weapon === 1) bullets.push({ x, y, vx: 0, vy: v });
-  else if (weapon === 2) { bullets.push({ x: x - 7, y, vx: 0, vy: v }, { x: x + 7, y, vx: 0, vy: v }); }
-  else { bullets.push({ x, y, vx: 0, vy: v }, { x: x - 9, y: y + 4, vx: -75, vy: v }, { x: x + 9, y: y + 4, vx: 75, vy: v }); }
+  const x = ship.x, y = ship.y - 16, v = -540, wt = save.equippedWeapon;
+  if (wt === 'blaster') {
+    const dmg = save.weapons.blaster;
+    if (weapon === 1) bullets.push({ x, y, vx: 0, vy: v, wtype: 'blaster', dmg });
+    else if (weapon === 2) bullets.push({ x: x - 7, y, vx: 0, vy: v, wtype: 'blaster', dmg }, { x: x + 7, y, vx: 0, vy: v, wtype: 'blaster', dmg });
+    else bullets.push({ x, y, vx: 0, vy: v, wtype: 'blaster', dmg }, { x: x - 9, y: y + 4, vx: -75, vy: v, wtype: 'blaster', dmg }, { x: x + 9, y: y + 4, vx: 75, vy: v, wtype: 'blaster', dmg });
+  } else if (wt === 'bombs') {
+    const tier = save.weapons.bombs;
+    bullets.push({ x, y, vx: 0, vy: v * 0.75, wtype: 'bombs', dmg: 3 + tier * 2, radius: 55 + tier * 10, splash: 2 + tier });
+  } else if (wt === 'missiles') {
+    const tier = save.weapons.missiles;
+    bullets.push({ x, y, vx: 0, vy: v * 0.8, wtype: 'missiles', dmg: 2 + tier, turnRate: 3 + tier * 0.6 });
+  } else if (wt === 'bolas') {
+    const tier = save.weapons.bolas;
+    bullets.push({ x, y, vx: 0, vy: v, wtype: 'bolas', dmg: 1, slowDur: 1.5 + tier * 0.3 });
+  }
+}
+function damageInBeam(dps, dt, width) {
+  for (const e of enemies.slice()) {
+    if (Math.abs(e.x - ship.x) < width && e.y < ship.y) { e.hp -= dps * dt; if (e.hp <= 0) killEnemy(e); }
+  }
+  if (boss && Math.abs(boss.x - ship.x) < width + boss.r && boss.y < ship.y) { boss.hp -= dps * dt; if (boss.hp <= 0) bossDown(); }
+}
+function tickBeam(dt) {
+  const tier = save.weapons.beam;
+  damageInBeam(8 + tier * 6 + (weapon - 1) * 5, dt, 10 + tier * 3);
+}
+function tickFlame(dt) {
+  const tier = save.weapons.flame;
+  const dps = 14 + tier * 8 + (weapon - 1) * 6, range = 90 + tier * 15, halfAngle = 0.55;
+  const targets = boss ? enemies.concat([boss]) : enemies.slice();
+  for (const e of targets) {
+    const dx = e.x - ship.x, dy = e.y - ship.y, dist = Math.hypot(dx, dy), rad = e === boss ? boss.r : e.r;
+    if (dist > range + rad) continue;
+    if (Math.abs(Math.atan2(dx, -dy)) > halfAngle) continue;
+    e.hp -= dps * dt;
+    if (e === boss) { if (boss.hp <= 0) bossDown(); } else if (e.hp <= 0) killEnemy(e);
+  }
+}
+function fireChain() {
+  const tier = save.weapons.chain;
+  let dmg = 3 + tier * 1.5 + (weapon - 1);
+  const count = 2 + Math.floor(tier / 2), radius = 140;
+  const hitSet = new Set();
+  const allTargets = boss ? enemies.concat([boss]) : enemies.slice();
+  const points = [{ x: ship.x, y: ship.y - 16 }];
+  let curX = ship.x, curY = ship.y - 16;
+  for (let i = 0; i <= count; i++) {
+    let best = null, bestD = i === 0 ? 520 * 520 : radius * radius;
+    for (const t of allTargets) {
+      if (hitSet.has(t)) continue;
+      const d = (t.x - curX) * (t.x - curX) + (t.y - curY) * (t.y - curY);
+      if (d < bestD) { bestD = d; best = t; }
+    }
+    if (!best) break;
+    hitSet.add(best); best.hp -= dmg; points.push({ x: best.x, y: best.y });
+    curX = best.x; curY = best.y; dmg *= 0.75;
+  }
+  if (points.length > 1) { lightningBolts.push({ points, t: 0 }); sfxKill(); }
+  for (const t of hitSet) { if (t === boss) { if (boss.hp <= 0) bossDown(); } else if (t.hp <= 0) killEnemy(t); }
+}
+function fireEmp() {
+  const tier = save.weapons.emp;
+  const dmg = 4 + tier * 2 + (weapon - 1) * 1.5, radius = 100 + tier * 20;
+  empPulses.push({ x: ship.x, y: ship.y, r: 0, maxR: radius, t: 0 });
+  for (const e of enemies.slice()) { if (Math.hypot(e.x - ship.x, e.y - ship.y) < radius) { e.hp -= dmg; if (e.hp <= 0) killEnemy(e); } }
+  if (boss && Math.hypot(boss.x - ship.x, boss.y - ship.y) < radius + boss.r) { boss.hp -= dmg; if (boss.hp <= 0) bossDown(); }
+  ebullets = ebullets.filter(b => Math.hypot(b.x - ship.x, b.y - ship.y) >= radius);
+  sfxSurge();
 }
 function eShoot(x, y, tx, ty, speed) {
   if (ebullets.length >= EBULLET_CAP) return;
@@ -653,8 +771,26 @@ function boomAt(x, y, col, n) {
     particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, t: 0, dur: 0.35 + Math.random() * 0.3, col });
   }
 }
+function applyBulletHit(b, target) {
+  const isBoss = target === boss;
+  target.hp -= b.dmg;
+  if (b.wtype === 'bolas' && !isBoss) target.slowT = Math.max(target.slowT || 0, b.slowDur);
+  if (b.wtype === 'bombs') {
+    boomAt(b.x, b.y, '#ffc300', 14);
+    for (const e2 of enemies.slice()) {
+      if (e2 !== target && Math.hypot(e2.x - b.x, e2.y - b.y) < b.radius) { e2.hp -= b.splash; if (e2.hp <= 0) killEnemy(e2); }
+    }
+    if (boss && !isBoss && Math.hypot(boss.x - b.x, boss.y - b.y) < b.radius) boss.hp -= b.splash;
+  } else {
+    boomAt(b.x, b.y, '#8899bb', isBoss ? 2 : 3);
+  }
+  if (isBoss) { if (target.hp <= 0) bossDown(); }
+  else if (target.hp <= 0) killEnemy(target);
+  if (boss && boss.hp <= 0) bossDown();   // covers bomb splash killing the boss when target wasn't the boss
+}
 function killEnemy(e) {
   score += e.pts;
+  awardXp(e.xp);
   floats.push({ x: e.x, y: e.y, txt: '+' + e.pts, color: '#dde3ff', t: 0 });
   boomAt(e.x, e.y, hue(100, 60), 12);
   sfxKill();
@@ -663,22 +799,25 @@ function killEnemy(e) {
     const kind = roll < 0.5 ? 'P' : roll < 0.8 ? 'S' : 'G';
     powerups.push({ x: e.x, y: e.y, kind });
   }
-  enemies.splice(enemies.indexOf(e), 1);
+  const idx = enemies.indexOf(e);
+  if (idx >= 0) enemies.splice(idx, 1);
 }
-function hitShip() {
+function hitShip(dmg) {
   if (ship.invuln > 0) return;
-  if (ship.shield) {
-    ship.shield = false;
+  if (ship.shieldCharges > 0) {
+    ship.shieldCharges--;
     boomAt(ship.x, ship.y, '#4488ff', 10);
     ship.invuln = 1.0;
     sfxBoom();
     return;
   }
-  lives--;
+  const plateTier = save.equippedArmor === 'plating' ? (save.armors.plating || 0) : 0;
+  ship.hp -= dmg * (1 - plateTier * 0.08);
+  ship.lastHitT = 0;
   sfxBigBoom();
   boomAt(ship.x, ship.y, '#39ff14', 24);
   weapon = Math.max(1, weapon - 1);
-  if (lives <= 0) { endRun(false); return; }
+  if (ship.hp <= 0) { ship.hp = 0; endRun(false); return; }
   ship.x = W / 2; ship.y = H - safeBot - 130;
   ship.invuln = INVULN_TIME;
 }
@@ -698,14 +837,15 @@ function bossDown() {
   if (wasSectorBoss) {
     const pts = 4000 + sector * 1000;
     score += pts;
+    awardXp(150 + sector * 25);
     floats.push({ x: boss.x, y: boss.y, txt: '+' + pts, color: '#ffc300', t: 0 });
     boomAt(boss.x, boss.y, hue(100, 60), 64);
     sfxBigBoom();
     boss = null;
     ebullets = [];
-    if (sector >= MAX_SECTOR) { endRun(true); return; }
+    if (sector >= MAX_SECTOR) { save.sector = sector; persistSave(); endRun(true); return; }
     sector++; stage = 1;
-    sectorBossReady = false; localStorage.setItem('starSurge.sectorBossReady', '0');
+    save.sector = sector; persistSave();
     sfxClear();
     bannerText = 'SECTOR ' + (sector - 1) + ' CLEAR';
     stageBanner = 2.0;
@@ -715,13 +855,13 @@ function bossDown() {
   }
   const pts = 1500 + stage * 500;
   score += pts;
+  awardXp(50);
   floats.push({ x: boss.x, y: boss.y, txt: '+' + pts, color: '#ffc300', t: 0 });
   boomAt(boss.x, boss.y, hue(100, 60), 40);
   sfxBigBoom();
   boss = null;
   ebullets = [];
   if (stage >= MAX_STAGE) {
-    sectorBossReady = true; localStorage.setItem('starSurge.sectorBossReady', '1');
     sfxClear();
     bannerText = 'STAGE ' + stage + ' CLEAR';
     stageBanner = 1.8;
@@ -730,7 +870,6 @@ function bossDown() {
     return;
   }
   stage++;
-  if (stage > maxStage) { maxStage = stage; localStorage.setItem('starSurge.stage', String(maxStage)); }
   sfxClear();
   bannerText = 'STAGE ' + (stage - 1) + ' CLEAR';
   stageBanner = 1.8;
@@ -740,7 +879,8 @@ function bossDown() {
 function endRun(won) {
   state = won ? 'victory' : 'over';
   let isNewBest = false;
-  if (score > best) { best = score; localStorage.setItem('starSurge.best', String(best)); isNewBest = true; }
+  if (score > save.best) { save.best = score; isNewBest = true; }
+  persistSave();
   setTimeout(() => showEndScreen(won, isNewBest), 800);
 }
 
@@ -763,24 +903,61 @@ function update(dt) {
       startWave();
     }
   }
-  // player fire — only while the finger/mouse is down
+  // player fire — only while the finger/mouse is down; dispatch by equipped weapon
   if (drag) {
-    fireT -= dt;
-    if (fireT <= 0) { fireWeapon(); fireT = weapon >= 4 ? 0.12 : 0.16; }
+    const wt = save.equippedWeapon;
+    if (wt === 'beam') tickBeam(dt);
+    else if (wt === 'flame') tickFlame(dt);
+    else {
+      fireT -= dt;
+      if (fireT <= 0) {
+        if (wt === 'chain') fireChain(); else if (wt === 'emp') fireEmp(); else fireWeapon();
+        fireT = weaponCooldown();
+      }
+    }
   }
   ship.invuln = Math.max(0, ship.invuln - dt);
-  // player bullets
-  for (const b of bullets) { b.x += b.vx * dt; b.y += b.vy * dt; }
+  ship.lastHitT += dt;
+  if (save.equippedArmor === 'regen' && ship.hp > 0 && ship.hp < ship.maxHp && ship.lastHitT > 3) {
+    ship.hp = Math.min(ship.maxHp, ship.hp + (1 + (save.armors.regen || 0) * 1.5) * dt);
+  }
+  if (save.equippedArmor === 'shield') {
+    const tier = save.armors.shield || 0;
+    ship.shieldRegenT -= dt;
+    if (ship.shieldCharges < tier && ship.shieldRegenT <= 0) { ship.shieldCharges++; ship.shieldRegenT = Math.max(3, 10 - tier); }
+  }
+  // player bullets (missiles home in on the nearest live target)
+  for (const b of bullets) {
+    if (b.wtype === 'missiles') {
+      let target = null, bestD = Infinity;
+      for (const e of enemies) { const d = (e.x - b.x) * (e.x - b.x) + (e.y - b.y) * (e.y - b.y); if (d < bestD) { bestD = d; target = e; } }
+      if (boss) { const d = (boss.x - b.x) * (boss.x - b.x) + (boss.y - b.y) * (boss.y - b.y); if (d < bestD) { bestD = d; target = boss; } }
+      if (target) {
+        const desired = Math.atan2(target.y - b.y, target.x - b.x), cur = Math.atan2(b.vy, b.vx);
+        let diff = desired - cur; while (diff > Math.PI) diff -= 6.283; while (diff < -Math.PI) diff += 6.283;
+        const maxTurn = b.turnRate * dt, newAng = cur + Math.max(-maxTurn, Math.min(maxTurn, diff)), spd = Math.hypot(b.vx, b.vy);
+        b.vx = Math.cos(newAng) * spd; b.vy = Math.sin(newAng) * spd;
+      }
+    }
+    b.x += b.vx * dt; b.y += b.vy * dt;
+  }
   bullets = bullets.filter(b => b.y > -30 && b.x > -30 && b.x < W + 30);
+  // transient weapon visuals
+  for (const lb of lightningBolts) lb.t += dt;
+  lightningBolts = lightningBolts.filter(lb => lb.t < 0.25);
+  for (const ep of empPulses) { ep.t += dt; ep.r = ep.maxR * Math.min(1, ep.t / 0.4); }
+  empPulses = empPulses.filter(ep => ep.t < 0.5);
   // enemies
   for (const e of enemies.slice()) {
-    e.t += dt; e.fireT -= dt;
-    if (e.type === 'drone') { e.y += e.vy * dt; e.x = e.x0 + Math.sin(e.t * 2.2) * e.amp; }
+    const slowMul = e.slowT > 0 ? 0.4 : 1;
+    e.t += dt * slowMul; e.fireT -= dt * slowMul;
+    if (e.slowT > 0) e.slowT = Math.max(0, e.slowT - dt);
+    if (e.type === 'drone') { e.y += e.vy * dt * slowMul; e.x = e.x0 + Math.sin(e.t * 2.2) * e.amp; }
     else if (e.type === 'shooter') {
-      if (e.y < e.holdY) e.y += e.vy * dt;
-      if (e.fireT <= 0 && e.y >= e.holdY - 40) { eShoot(e.x, e.y + 10, ship.x, ship.y, 150 + stage * 12); e.fireT = 1.7 - stage * 0.1; }
+      if (e.y < e.holdY) e.y += e.vy * dt * slowMul;
+      if (e.fireT <= 0 && e.y >= e.holdY - 40) { eShoot(e.x, e.y + 10, ship.x, ship.y, 150 + stage * 12 + campaignDifficulty() * 8); e.fireT = Math.max(0.5, 1.7 - stage * 0.1 - campaignDifficulty() * 0.05); }
     } else if (e.type === 'spinner') {
-      e.x += e.vx * dt; e.y += Math.sin(e.t * 3) * 18 * dt; e.ang += dt * 2.4;
+      e.x += e.vx * dt * slowMul; e.y += Math.sin(e.t * 3) * 18 * dt * slowMul; e.ang += dt * 2.4 * slowMul;
       if (e.fireT <= 0) {
         for (let k = 0; k < 4; k++) {
           const a = e.ang + k * Math.PI / 2;
@@ -788,7 +965,7 @@ function update(dt) {
         }
         e.fireT = 1.5;
       }
-    } else if (e.type === 'tanker') { e.y += e.vy * dt; }
+    } else if (e.type === 'tanker') { e.y += e.vy * dt * slowMul; }
     if (e.y > H + 40 || e.x < -60 || e.x > W + 60) enemies.splice(enemies.indexOf(e), 1);
   }
   // boss
@@ -804,7 +981,7 @@ function update(dt) {
     const frac = boss.hp / boss.maxHp;
     const arms = boss.sector ? 2 : 1;   // sector boss fires a wider aimed spread
     if (boss.fireT <= 0) {
-      for (let k = -arms; k <= arms; k++) eShoot(boss.x + k * 18, boss.y + 24, ship.x + k * 40, ship.y, 170 + stage * 10 + (boss.sector ? 30 : 0));
+      for (let k = -arms; k <= arms; k++) eShoot(boss.x + k * 18, boss.y + 24, ship.x + k * 40, ship.y, 170 + stage * 10 + campaignDifficulty() * 10 + (boss.sector ? 30 : 0));
       boss.fireT = (boss.sector ? 0.8 : 1) * (frac > 0.5 ? 1.3 : 0.95);
     }
     if (frac <= 0.65 && boss.ringT <= 0) {
@@ -828,18 +1005,14 @@ function update(dt) {
     for (const e of enemies.slice()) {
       const rr = e.r + 4;
       if ((b.x - e.x) * (b.x - e.x) + (b.y - e.y) * (b.y - e.y) < rr * rr) {
-        e.hp--; hit = true;
-        if (e.hp <= 0) killEnemy(e);
-        else boomAt(b.x, b.y, '#8899bb', 3);
+        applyBulletHit(b, e); hit = true;
         break;
       }
     }
     if (!hit && boss) {
       const rr = boss.r + 5;
       if ((b.x - boss.x) * (b.x - boss.x) + (b.y - boss.y) * (b.y - boss.y) < rr * rr) {
-        boss.hp--; hit = true;
-        boomAt(b.x, b.y, '#8899bb', 2);
-        if (boss.hp <= 0) bossDown();
+        applyBulletHit(b, boss); hit = true;
       }
     }
     if (hit) bullets.splice(bullets.indexOf(b), 1);
@@ -849,14 +1022,14 @@ function update(dt) {
   for (const b of ebullets.slice()) {
     if ((b.x - ship.x) * (b.x - ship.x) + (b.y - ship.y) * (b.y - ship.y) < (sr + 4) * (sr + 4)) {
       ebullets.splice(ebullets.indexOf(b), 1);
-      hitShip();
+      hitShip(18);
       if (state !== 'play') return;
     }
   }
   for (const e of enemies.slice()) {
     if ((e.x - ship.x) * (e.x - ship.x) + (e.y - ship.y) * (e.y - ship.y) < (sr + e.r) * (sr + e.r)) {
       killEnemy(e);
-      hitShip();
+      hitShip(26);
       if (state !== 'play') return;
     }
   }
@@ -864,7 +1037,7 @@ function update(dt) {
     if ((p.x - ship.x) * (p.x - ship.x) + (p.y - ship.y) * (p.y - ship.y) < (sr + 14) * (sr + 14)) {
       powerups.splice(powerups.indexOf(p), 1);
       if (p.kind === 'P') { weapon = Math.min(4, weapon + 1); sfxPower(); floats.push({ x: p.x, y: p.y, txt: 'POWER', color: '#39ff14', t: 0 }); }
-      else if (p.kind === 'S') { ship.shield = true; sfxPower(); floats.push({ x: p.x, y: p.y, txt: 'SHIELD', color: '#4488ff', t: 0 }); }
+      else if (p.kind === 'S') { ship.shieldCharges++; sfxPower(); floats.push({ x: p.x, y: p.y, txt: 'SHIELD', color: '#4488ff', t: 0 }); }
       else { floats.push({ x: p.x, y: p.y, txt: 'SURGE!', color: '#ffc300', t: 0 }); surgeBlast(); }
     }
   }
@@ -904,35 +1077,136 @@ cv.addEventListener('mousemove', e => { if (drag) onMove(e); });
 cv.addEventListener('mouseup', onUp);
 
 /* =============================== SCREENS ================================ */
+function showPilotSelect() {
+  state = 'pilots';
+  let html = '<h1>STAR SURGE</h1><div class="sub">-- SELECT YOUR PILOT --</div>';
+  for (let i = 0; i < SAVE_SLOTS; i++) {
+    const s = saves[i];
+    html += '<div style="display:flex;align-items:center;gap:6px;margin:7px 0;width:100%;max-width:280px;">' +
+      '<button class="btn' + (s ? ' alt' : '') + '" style="margin:0;flex:1;min-width:0" id="b-slot' + i + '">' +
+      (s ? s.name + '<br><span style="font-size:0.6em">SECTOR ' + s.sector + ' · BEST ' + s.best + '</span>' : '+ NEW PILOT ' + (i + 1)) +
+      '</button>' +
+      (s ? '<button class="btn small" style="margin:0;min-width:0;padding:10px 12px" id="b-reset' + i + '">↺</button>' : '') +
+      '</div>';
+  }
+  html += '<div class="rules">Each pilot keeps its own XP, unlocked weapons/armor, and sector checkpoint — pick a slot to experiment with a different build.</div>';
+  overlay.innerHTML = html;
+  overlay.classList.remove('hidden');
+  for (let i = 0; i < SAVE_SLOTS; i++) {
+    bindTap(document.getElementById('b-slot' + i), () => {
+      if (!saves[i]) { saves[i] = newCharacter('PILOT ' + (i + 1)); writeSaves(); }
+      activeSlot = i; save = saves[i];
+      showMenu();
+    });
+    const resetBtn = document.getElementById('b-reset' + i);
+    if (resetBtn) bindTap(resetBtn, () => {
+      if (confirm('Reset ' + saves[i].name + '? This erases its XP and unlocks.')) { saves[i] = null; writeSaves(); showPilotSelect(); }
+    });
+  }
+}
 function showMenu() {
   state = 'menu';
-  const contLabel = sectorBossReady ? 'CONTINUE · SECTOR BOSS' : 'CONTINUE · STAGE ' + maxStage;
   overlay.innerHTML =
     '<h1>STAR SURGE</h1>' +
-    '<div class="sub">-- WEAVE THE BULLET STORM --</div>' +
-    '<button class="btn" id="b-new">NEW RUN · STAGE 1</button>' +
-    ((sectorBossReady || maxStage > 1) ? '<button class="btn alt" id="b-cont">' + contLabel + '</button>' : '') +
+    '<div class="sub">' + save.name + ' — SECTOR ' + save.sector + '</div>' +
+    '<button class="btn" id="b-new">NEW RUN · SECTOR ' + save.sector + '</button>' +
+    '<button class="btn alt" id="b-shipyard">SHIPYARD · ' + save.xp + ' XP</button>' +
     '<div class="rules">Drag anywhere to steer — <b>hold to fire</b>.<br>' +
-    'Dodge the storm. Grab <b>P</b> weapon · <b>S</b> shield · <b>G</b> surge-bomb.<br>' +
-    '<b>' + MAX_STAGE + ' stages</b>, each with its own mini-boss, then a tougher <b>sector boss</b>. Both are checkpoints.' +
-    (best ? '<br>BEST <b>' + best + '</b>' : '') + '</div>';
+    'Weapon: <b>' + WEAPON_DEFS[save.equippedWeapon].name + '</b>' + (save.equippedArmor ? ' · Armor: <b>' + ARMOR_DEFS[save.equippedArmor].name + '</b>' : '') + '<br>' +
+    '<b>' + MAX_STAGE + ' stages</b> per sector, each with its own mini-boss, then a tougher <b>sector boss</b>. Dying restarts the current sector — XP and upgrades are always kept.' +
+    (save.best ? '<br>BEST <b>' + save.best + '</b>' : '') + '</div>' +
+    '<button class="btn small alt" id="b-pilots" style="margin-top:10px">← PILOTS</button>';
   overlay.classList.remove('hidden');
-  bindTap(document.getElementById('b-new'), () => startGame(1));
-  if (sectorBossReady || maxStage > 1) bindTap(document.getElementById('b-cont'), () => startGame(maxStage, sectorBossReady));
+  bindTap(document.getElementById('b-new'), () => startGame(save.sector));
+  bindTap(document.getElementById('b-shipyard'), showShipyard);
+  bindTap(document.getElementById('b-pilots'), showPilotSelect);
+}
+function weaponRowHtml(id) {
+  const def = WEAPON_DEFS[id];
+  const owned = save.weapons[id] != null, tier = save.weapons[id] || 0, equipped = save.equippedWeapon === id;
+  let action = '';
+  if (!owned) action = '<button class="btn small" id="wpn-' + id + '"' + (save.xp < def.unlockCost ? ' disabled' : '') + '>UNLOCK ' + def.unlockCost + 'xp</button>';
+  else if (tier < MAX_TIER) action = '<button class="btn small" id="wpn-' + id + '"' + (save.xp < def.tierCost[tier] ? ' disabled' : '') + '>+TIER ' + def.tierCost[tier] + 'xp</button>';
+  const eqBtn = owned && !equipped ? '<button class="btn small alt" id="eq-' + id + '">EQUIP</button>' : '';
+  return '<div class="shop-row"><div class="shop-name" style="color:' + def.color + '">' + def.name + (equipped ? ' ★' : '') + '</div>' +
+    '<div class="shop-sub">' + (owned ? 'tier ' + tier + '/' + MAX_TIER : 'locked') + ' — ' + def.desc + '</div>' +
+    '<div class="shop-actions">' + action + eqBtn + '</div></div>';
+}
+function armorRowHtml(id) {
+  const def = ARMOR_DEFS[id];
+  const owned = save.armors[id] != null, tier = save.armors[id] || 0, equipped = save.equippedArmor === id;
+  let action = '';
+  if (!owned) action = '<button class="btn small" id="arm-' + id + '"' + (save.xp < def.unlockCost ? ' disabled' : '') + '>UNLOCK ' + def.unlockCost + 'xp</button>';
+  else if (tier < MAX_TIER) action = '<button class="btn small" id="arm-' + id + '"' + (save.xp < def.tierCost[tier] ? ' disabled' : '') + '>+TIER ' + def.tierCost[tier] + 'xp</button>';
+  const eqBtn = owned ? '<button class="btn small alt" id="eqa-' + id + '">' + (equipped ? 'UNEQUIP' : 'EQUIP') + '</button>' : '';
+  return '<div class="shop-row"><div class="shop-name">' + def.name + (equipped ? ' ★' : '') + '</div>' +
+    '<div class="shop-sub">' + (owned ? 'tier ' + tier + '/' + MAX_TIER : 'locked') + ' — ' + def.desc + '</div>' +
+    '<div class="shop-actions">' + action + eqBtn + '</div></div>';
+}
+function hullRowHtml() {
+  const tier = save.hpTier;
+  const action = tier < MAX_TIER ? '<button class="btn small" id="hp-tier"' + (save.xp < HP_TIER_COST[tier + 1] ? ' disabled' : '') + '>+TIER ' + HP_TIER_COST[tier + 1] + 'xp</button>' : '';
+  return '<div class="shop-row"><div class="shop-name">HULL PLATING</div>' +
+    '<div class="shop-sub">tier ' + tier + '/' + MAX_TIER + ' — max hp ' + shipMaxHp(tier) + '</div>' +
+    '<div class="shop-actions">' + action + '</div></div>';
+}
+function showShipyard() {
+  state = 'shipyard';
+  const weaponIds = Object.keys(WEAPON_DEFS), armorIds = Object.keys(ARMOR_DEFS);
+  overlay.innerHTML =
+    '<h1 style="font-size:1.6rem">SHIPYARD</h1>' +
+    '<div class="sub">XP <b style="color:var(--gold)">' + save.xp + '</b></div>' +
+    '<div class="shop-header">WEAPON — pick one build</div>' + weaponIds.map(weaponRowHtml).join('') +
+    '<div class="shop-header">ARMOR — pick one</div>' + armorIds.map(armorRowHtml).join('') +
+    '<div class="shop-header">HULL</div>' + hullRowHtml() +
+    '<button class="btn small alt" id="b-back" style="margin-top:14px">BACK</button>';
+  overlay.classList.remove('hidden');
+  weaponIds.forEach(id => {
+    const def = WEAPON_DEFS[id];
+    const btn = document.getElementById('wpn-' + id);
+    if (btn) bindTap(btn, () => {
+      const owned = save.weapons[id] != null;
+      if (!owned) { if (save.xp < def.unlockCost) return; save.xp -= def.unlockCost; save.weapons[id] = 1; }
+      else { const tier = save.weapons[id]; if (tier >= MAX_TIER || save.xp < def.tierCost[tier]) return; save.xp -= def.tierCost[tier]; save.weapons[id] = tier + 1; }
+      persistSave(); showShipyard();
+    });
+    const eqBtn = document.getElementById('eq-' + id);
+    if (eqBtn) bindTap(eqBtn, () => { save.equippedWeapon = id; persistSave(); showShipyard(); });
+  });
+  armorIds.forEach(id => {
+    const def = ARMOR_DEFS[id];
+    const btn = document.getElementById('arm-' + id);
+    if (btn) bindTap(btn, () => {
+      const owned = save.armors[id] != null;
+      if (!owned) { if (save.xp < def.unlockCost) return; save.xp -= def.unlockCost; save.armors[id] = 1; }
+      else { const tier = save.armors[id]; if (tier >= MAX_TIER || save.xp < def.tierCost[tier]) return; save.xp -= def.tierCost[tier]; save.armors[id] = tier + 1; }
+      persistSave(); showShipyard();
+    });
+    const eqBtn = document.getElementById('eqa-' + id);
+    if (eqBtn) bindTap(eqBtn, () => { save.equippedArmor = (save.equippedArmor === id ? null : id); persistSave(); showShipyard(); });
+  });
+  const hpBtn = document.getElementById('hp-tier');
+  if (hpBtn) bindTap(hpBtn, () => {
+    if (save.hpTier >= MAX_TIER || save.xp < HP_TIER_COST[save.hpTier + 1]) return;
+    save.xp -= HP_TIER_COST[save.hpTier + 1]; save.hpTier++;
+    persistSave(); showShipyard();
+  });
+  bindTap(document.getElementById('b-back'), showMenu);
 }
 function showEndScreen(won, isNewBest) {
   const atSectorBoss = boss && boss.sector;
   overlay.innerHTML =
     '<h2 style="color:' + (won ? 'var(--gold)' : 'var(--red)') + '">' + (won ? 'SECTOR CLEARED' : 'SHIP DOWN') + '</h2>' +
-    '<div class="sub">' + (won ? 'all ' + MAX_STAGE + ' stages + sector boss complete' : (atSectorBoss ? 'sector boss' : 'stage ' + stage + ' · wave ' + Math.min(wave, WAVES_PER_STAGE + 1))) + '</div>' +
+    '<div class="sub">' + (won ? 'sector ' + sector + ' + boss complete' : (atSectorBoss ? 'sector boss' : 'stage ' + stage + ' · wave ' + Math.min(wave, WAVES_PER_STAGE + 1))) + '</div>' +
     '<div class="score-big">' + score + '</div>' +
-    (isNewBest && score > 0 ? '<div class="newbest">★ NEW BEST ★</div>' : '<div class="stat">BEST <b>' + best + '</b></div>') +
-    (!won && (sectorBossReady || maxStage > 1) ? '<div class="stat">checkpoint: ' + (sectorBossReady ? 'SECTOR BOSS' : 'stage <b>' + maxStage + '</b>') + '</div>' : '') +
+    (isNewBest && score > 0 ? '<div class="newbest">★ NEW BEST ★</div>' : '<div class="stat">BEST <b>' + save.best + '</b></div>') +
+    '<div class="stat">+' + runXpEarned + ' XP banked</div>' +
+    (!won ? '<div class="stat">checkpoint: sector <b>' + save.sector + '</b> (restart)</div>' : '') +
     '<div style="margin-top:16px">' +
-    (!won ? '<button class="btn small" id="b-retry">' + (sectorBossReady ? 'RETRY · SECTOR BOSS' : 'RETRY STAGE ' + maxStage) + '</button><br>' : '') +
-    '<button class="btn small' + (won ? '' : ' alt') + '" id="b-menu">' + (won ? 'MENU' : 'MENU') + '</button></div>';
+    (!won ? '<button class="btn small" id="b-retry">RETRY · SECTOR ' + save.sector + '</button><br>' : '') +
+    '<button class="btn small' + (won ? '' : ' alt') + '" id="b-menu">MENU</button></div>';
   overlay.classList.remove('hidden');
-  if (!won) bindTap(document.getElementById('b-retry'), () => startGame(maxStage, sectorBossReady));
+  if (!won) bindTap(document.getElementById('b-retry'), () => startGame(save.sector));
   bindTap(document.getElementById('b-menu'), showMenu);
 }
 
@@ -967,11 +1241,11 @@ function drawShip(x, y) {
   ctx.fillStyle = '#ffc300';
   ctx.globalAlpha *= 0.5 + Math.random() * 0.5;
   ctx.beginPath(); ctx.moveTo(-4, 12); ctx.lineTo(0, 20 + Math.random() * 6); ctx.lineTo(4, 12); ctx.closePath(); ctx.fill();
-  if (ship.shield) {
+  if (ship.shieldCharges > 0) {
     ctx.globalAlpha = 0.8;
     ctx.strokeStyle = '#4488ff'; ctx.lineWidth = 2;
     ctx.shadowColor = '#4488ff'; ctx.shadowBlur = 10;
-    ctx.beginPath(); ctx.arc(0, 0, 22, 0, 7); ctx.stroke();
+    for (let i = 0; i < ship.shieldCharges; i++) { ctx.beginPath(); ctx.arc(0, 0, 22 + i * 4, 0, 7); ctx.stroke(); }
     ctx.shadowBlur = 0;
   }
   ctx.restore();
@@ -990,6 +1264,10 @@ function drawEnemy(e) {
   if (e.type === 'tanker') {
     ctx.beginPath(); ctx.arc(0, 0, e.r * 0.55, 0, 7); ctx.stroke();
   }
+  if (e.slowT > 0) {
+    ctx.strokeStyle = WEAPON_DEFS.bolas.color; ctx.lineWidth = 1.5; ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.arc(0, 0, e.r * 1.35, 0, 7); ctx.stroke();
+  }
   ctx.restore();
 }
 function draw() {
@@ -1003,7 +1281,7 @@ function draw() {
     ctx.fillStyle = s.s === 2 ? '#8899bb' : '#353555';
     ctx.fillRect(s.x, s.y, s.s, s.s + 2);
   }
-  if (state === 'menu') { ctx.restore(); return; }
+  if (state === 'menu' || state === 'pilots' || state === 'shipyard') { ctx.restore(); return; }
   // powerups
   for (const p of powerups) {
     const col = p.kind === 'P' ? '#39ff14' : p.kind === 'S' ? '#4488ff' : '#ffc300';
@@ -1016,8 +1294,12 @@ function draw() {
     ctx.fillText(p.kind, p.x, p.y + 1);
   }
   // bullets
-  ctx.fillStyle = '#dde3ff';
-  for (const b of bullets) { ctx.fillRect(b.x - 2, b.y - 7, 4, 11); }
+  for (const b of bullets) {
+    ctx.fillStyle = WEAPON_DEFS[b.wtype] ? WEAPON_DEFS[b.wtype].color : '#dde3ff';
+    if (b.wtype === 'bombs') { ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, 7); ctx.fill(); }
+    else if (b.wtype === 'missiles') { ctx.fillRect(b.x - 2, b.y - 8, 4, 13); }
+    else { ctx.fillRect(b.x - 2, b.y - 7, 4, 11); }
+  }
   for (const e of enemies) drawEnemy(e);
   if (boss) {
     ctx.save(); ctx.translate(boss.x, boss.y);
@@ -1052,6 +1334,40 @@ function draw() {
     ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, 7); ctx.fill();
     ctx.shadowBlur = 0;
   }
+  // continuous weapon visuals (beam / flamethrower) while held
+  if (drag && save.equippedWeapon === 'beam') {
+    const width = 10 + save.weapons.beam * 3;
+    ctx.globalAlpha = 0.5 + Math.random() * 0.2;
+    ctx.fillStyle = WEAPON_DEFS.beam.color;
+    ctx.fillRect(ship.x - width, 0, width * 2, ship.y - 10);
+    ctx.globalAlpha = 1;
+  }
+  if (drag && save.equippedWeapon === 'flame') {
+    const range = 90 + save.weapons.flame * 15;
+    ctx.save(); ctx.translate(ship.x, ship.y - 10);
+    ctx.globalAlpha = 0.45 + Math.random() * 0.2;
+    ctx.fillStyle = WEAPON_DEFS.flame.color;
+    ctx.beginPath(); ctx.moveTo(0, 0);
+    ctx.arc(0, 0, range, -Math.PI / 2 - 0.55, -Math.PI / 2 + 0.55);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1; ctx.restore();
+  }
+  // chain-lightning bolts / EMP pulses
+  for (const lb of lightningBolts) {
+    ctx.globalAlpha = Math.max(0, 1 - lb.t / 0.25);
+    ctx.strokeStyle = WEAPON_DEFS.chain.color; ctx.lineWidth = 2;
+    ctx.shadowColor = WEAPON_DEFS.chain.color; ctx.shadowBlur = 10;
+    ctx.beginPath();
+    lb.points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.stroke(); ctx.shadowBlur = 0;
+  }
+  ctx.globalAlpha = 1;
+  for (const ep of empPulses) {
+    ctx.globalAlpha = Math.max(0, 1 - ep.t / 0.5);
+    ctx.strokeStyle = WEAPON_DEFS.emp.color; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(ep.x, ep.y, ep.r, 0, 7); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
   drawShip(ship.x, ship.y);
   // particles
   for (const p of particles) {
@@ -1071,22 +1387,22 @@ function draw() {
   // HUD
   ctx.textAlign = 'left';
   ctx.font = "11px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
-  ctx.fillText('STAGE ' + stage + (boss ? (boss.sector ? ' · SECTOR BOSS' : ' · BOSS') : ' · W' + Math.min(wave, WAVES_PER_STAGE)), 56, safeTop + 14);
-  for (let i = 0; i < lives; i++) {
-    ctx.fillStyle = '#39ff14';
-    ctx.beginPath();
-    const lx = 60 + i * 18, ly = safeTop + 38;
-    ctx.moveTo(lx, ly - 6); ctx.lineTo(lx + 5, ly + 5); ctx.lineTo(lx - 5, ly + 5);
-    ctx.closePath(); ctx.fill();
-  }
+  ctx.fillText('SECTOR ' + sector + ' · STAGE ' + stage + (boss ? (boss.sector ? ' · SECTOR BOSS' : ' · BOSS') : ' · W' + Math.min(wave, WAVES_PER_STAGE)), 56, safeTop + 14);
+  const hpw = 90, hpFrac = ship.hp / ship.maxHp;
+  ctx.fillStyle = '#1a1a30'; ctx.fillRect(56, safeTop + 26, hpw, 6);
+  ctx.fillStyle = hpFrac > 0.3 ? '#39ff14' : '#ff2244';
+  ctx.fillRect(56, safeTop + 26, hpw * Math.max(0, hpFrac), 6);
+  ctx.font = "8px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
+  ctx.fillText('HP ' + Math.ceil(ship.hp) + '/' + ship.maxHp, 56, safeTop + 38);
   ctx.textAlign = 'right';
   ctx.font = "20px 'Black Ops One'"; ctx.fillStyle = '#dde3ff';
   ctx.fillText(String(score), W - 12, safeTop + 24);
   ctx.font = "10px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
   ctx.fillText('SCORE', W - 12, safeTop + 12);
-  // weapon pips
+  // weapon pips (in-run P-powerup tier), tinted by the equipped weapon
+  const pipCol = WEAPON_DEFS[save.equippedWeapon].color;
   for (let i = 0; i < 4; i++) {
-    ctx.fillStyle = i < weapon ? '#ffc300' : '#1a1a30';
+    ctx.fillStyle = i < weapon ? pipCol : '#1a1a30';
     ctx.fillRect(W - 12 - (3 - i) * 14, safeTop + 50, 10, 4);
   }
   // banner
@@ -1110,7 +1426,7 @@ function loop(now) {
   draw();
   requestAnimationFrame(loop);
 }
-showMenu();
+showPilotSelect();
 requestAnimationFrame(loop);
 </script>
 </body>

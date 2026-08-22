@@ -322,20 +322,29 @@ tree must be able to clear the campaign alone**. Detailed context: `.claude/grid
 `.claude/tests/drive-grid-defense.cjs` (rules) and
 `.claude/tests/eval-grid-defense.cjs` (balance).
 
-### STAR SURGE (`star-surge/index.html`, ~1120 lines)
-Vertical shmup: drag-steer, hold-to-fire. A sector is 5 stages × 3 waves,
-each stage ending in a mini-boss, the whole sector capped by one harder,
-longer sector boss (2.6× the toughest mini-boss's hp, wider spread, denser
-rings) — both are persisted checkpoints. `MAX_SECTOR` is currently 1; more
-sectors wait on the XP/weapon/armor progression system so difficulty has
-matching power growth to scale against. Drones/shooters/spinners/tankers,
-aimed and ring bullet patterns under a 90-bullet cap, P/S/G powerups
-(weapon tiers, shield, surge bomb), stage-hued enemies. 20-track adaptive
-soundtrack (webaudio-score/v1 data + compiler + look-ahead scheduler): one
-track plays per whole stage (through its mini-boss), the sector boss gets
-its own more-intense track, both pools round-robin across sectors, `NN ·
-TITLE` now-playing label — see `.claude/scripts/star-surge-music/` to
-refine a track. Detailed context: `.claude/star-surge.md`.
+### STAR SURGE (`star-surge/index.html`, ~1430 lines)
+Vertical shmup with a full build-your-ship progression layer. 3 save-slot
+**pilots** (`starSurge.saves`, create/select/reset), each with its own XP
+bank, unlocked weapon/armor, and sector checkpoint — pick a slot to try a
+different build. A **sector** is 5 stages × 3 waves, each stage ending in a
+mini-boss, the whole sector capped by one harder, longer **sector boss**
+(2.6× the toughest mini-boss's hp, wider spread, denser rings); 11 sectors,
+difficulty-scaled by `campaignDifficulty()`. Dying always restarts the
+*current* sector from stage 1 — XP and shipyard purchases are never lost,
+only run progress. Ship has hp (no more lives) plus one equipped **armor**
+(regenerative / recharging shield / flat damage-reduction plating) and one
+equipped **weapon build** — blaster (free), beam, flamethrower, bombs,
+missiles, bolas, chain lightning, or EMP, each a genuinely different
+playstyle (piercing line, close-range cone, AoE splash, homing, slow-on-hit,
+multi-target arcs, anti-bullet pulse) — unlocked and tiered up via XP
+earned from kills/bosses in the in-game **Shipyard**. Drones/shooters/
+spinners/tankers, P/S/G powerups (in-run weapon-tier boost, shield charge,
+surge bomb), stage-hued enemies. 20-track adaptive soundtrack
+(webaudio-score/v1 data + compiler + look-ahead scheduler): one track plays
+per whole stage (through its mini-boss), the sector boss gets its own
+more-intense track, both pools round-robin across sectors, `NN · TITLE`
+now-playing label — see `.claude/scripts/star-surge-music/` to refine a
+track. Detailed context: `.claude/star-surge.md`.
 
 ### NEON TACTICS (`neon-tactics/index.html`, ~700 lines)
 Turn-based squad tactics, 7×9 grid: 2 strikers, sniper (Bresenham LOS,
