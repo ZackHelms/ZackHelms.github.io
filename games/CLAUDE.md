@@ -565,11 +565,19 @@ checksummed code carries seed + score, so a friend replays your exact grid and
 the game reports the head-to-head. LABELS assist stamps a unique letter per
 colour for a colour-free hunt. Detailed context: `.claude/signal-hunt.md`.
 
-### NEON CLASH (`neon-clash/index.html`, ~1520 lines)
+### NEON CLASH (`neon-clash/index.html`, ~1700 lines)
 The repo's first **real-time card battler**, and its first **simultaneous**
 local-2p game. One board split into halves; energy refills at 1/sec up to 20
 on both sides; drag a tank (4), fighter (3), archer (3) or bunker (8) out of
-your tray onto your own half and it walks at the enemy goalpost on its own.
+your tray onto your own half — **or tap the card to arm it and tap the board**
+— and it walks at the enemy base on its own. Aiming past the halfway line does
+not refuse the card: it lands on your own side of the line at the same x, so a
+bad aim costs position and never the card (only a release off the board
+cancels). Each base mounts a **turret**: two archers' damage a shot, on an
+archer's clock and at an archer's reach, measured from the base's rim so an
+archer sieging it cannot sit outside the answer. A lone unit walked up to a
+base now loses to the base — which is the counterweight to the siege lock
+below, otherwise purely defender-favourable.
 A bunker is a building holding two units — they stop moving, become
 untargetable (the building eats the damage), fire through the slits at a
 minimum range of 15, and are **ejected alive** when it falls.

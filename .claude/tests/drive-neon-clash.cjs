@@ -4,7 +4,11 @@
  *
  * The checks that matter here are the ones a refactor would quietly break:
  *   - the rotated top tray, and TWO fingers deploying at the same time
- *   - the deploy contract (own half only, pay or fail, caps)
+ *   - the deploy contract (pay or fail, caps) and the BORDER RULE: aiming at
+ *     the enemy half lands the card on your own side of the line at the same x
+ *   - both deploy idioms: drag a card onto the board, or tap to arm then tap
+ *   - the BASE TURRET: two archers' damage on an archer's clock, and an
+ *     envelope that an archer sieging the base cannot sit outside of
  *   - "the bunker protects its garrison" — untargetable inside, EJECTED ALIVE
  *     when the building dies (the spec's whole reason for the card)
  *   - the stat shape the design asks for (tank walls, fighter rushes, archer reaches)
@@ -105,13 +109,64 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   ok('touch drag from the tray deploys that card', drop.n === n0 + 1 && drop.keys.includes('fighter'), JSON.stringify(drop));
   ok('deploying charges the card cost', near(drop.e, 17, 0.6), 'e=' + drop.e.toFixed(2));
 
+  // ======================================= tap a card to arm it, tap to place
+  // The second deploy idiom. Both run through the same drag record, so the
+  // checks that matter are: a stationary card touch does NOT deploy, it arms;
+  // a board touch afterwards deploys and disarms; and tapping the armed card
+  // again puts it back down without spending anything.
+  const tapAt = (x, y, id) => drag([
+    { type: 'touchstart', pts: [{ id: id || 21, x, y }] },
+    { type: 'touchend', pts: [{ id: id || 21, x, y }] },
+  ]);
+  await page.evaluate(() => { __NC.start('2p'); __NC.setEnergy(0, 20); });
+  await page.waitForTimeout(60);
+  await tapAt(botSlot('archer'), botCardY);
+  await page.waitForTimeout(60);
+  const armed1 = await page.evaluate(() => ({ sel: __NC.sel[0], n: __NC.units.length, e: __NC.energy[0] }));
+  ok('tapping a card arms it instead of deploying it',
+     armed1.sel === 'archer' && armed1.n === 0, JSON.stringify(armed1));
+  ok('arming a card spends nothing', near(armed1.e, 20, 0.4), 'e=' + armed1.e.toFixed(2));
+  await tapAt(geo.left + geo.w * 0.35, boardY(0.72));
+  await page.waitForTimeout(60);
+  const placed = await page.evaluate(() => ({
+    sel: __NC.sel[0], keys: __NC.units.map(u => u.key), e: __NC.energy[0],
+    y: __NC.units.length ? __NC.units[0].y : null,
+  }));
+  ok('tapping the board then places the armed card',
+     placed.keys.join() === 'archer' && near(placed.e, 17, 0.6), JSON.stringify(placed));
+  ok('placing disarms the card', placed.sel === null, JSON.stringify(placed));
+  // tap-arm, tap the SAME card again -> disarmed, still nothing spent
+  await tapAt(botSlot('tank'), botCardY, 22);
+  await page.waitForTimeout(50);
+  const armed2 = await page.evaluate(() => __NC.sel[0]);
+  await tapAt(botSlot('tank'), botCardY, 23);
+  await page.waitForTimeout(50);
+  const armed3 = await page.evaluate(() => ({ sel: __NC.sel[0], n: __NC.units.length }));
+  ok('tapping the armed card again disarms it',
+     armed2 === 'tank' && armed3.sel === null && armed3.n === 1, JSON.stringify([armed2, armed3]));
+  // An armed card tapped down on the ENEMY half still lands on your border.
+  // Deliberately a BUNKER: a unit starts marching the instant it lands, so its
+  // y drifts off the border inside the round-trip and the check would be
+  // measuring latency rather than the rule. A building never moves.
+  await page.evaluate(() => __NC.setEnergy(0, 20));
+  await tapAt(botSlot('bunker'), botCardY, 24);
+  await page.waitForTimeout(50);
+  await tapAt(geo.left + geo.w * 0.6, boardY(0.2), 25);
+  await page.waitForTimeout(60);
+  const tapAcross = await page.evaluate(() => {
+    const b = __NC.buildings.filter(x => x.side === 0).pop();
+    return b ? { y: b.y, r: b.r, sel: __NC.sel[0] } : null;
+  });
+  ok('an armed card tapped onto the enemy half lands on your border',
+     tapAcross && near(tapAcross.y, 80 + tapAcross.r, 0.01), JSON.stringify(tapAcross));
+  ok('...and placing it disarmed the card', tapAcross && tapAcross.sel === null, JSON.stringify(tapAcross));
+
   // ==================================================== the deploy contract
   const contract = await page.evaluate(() => {
     const out = {};
     __NC.setEnergy(0, 2); out.broke = __NC.deploy(0, 'tank', 50, 130);
-    __NC.setEnergy(0, 20); out.enemyHalf = __NC.deploy(0, 'tank', 50, 30);
+    __NC.setEnergy(0, 20); out.offBoard = __NC.deploy(0, 'tank', 50, 190);   // released over the tray
     __NC.setEnergy(0, 20); out.legal = __NC.deploy(0, 'tank', 50, 130);
-    __NC.setEnergy(1, 20); out.p2EnemyHalf = __NC.deploy(1, 'tank', 50, 130);
     __NC.setEnergy(1, 20); out.p2Legal = __NC.deploy(1, 'tank', 50, 30);
     __NC.setEnergy(0, 3); const before = __NC.energy[0];
     __NC.deploy(0, 'tank', 50, 130);                 // refused: costs 4
@@ -120,9 +175,8 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   });
   ok('a deploy you cannot afford is refused', contract.broke === false);
   ok('a refused deploy costs nothing', contract.noCharge === true);
-  ok('deploying on the enemy half is refused', contract.enemyHalf === false);
+  ok('a release off the board cancels the card', contract.offBoard === false);
   ok('a legal deploy succeeds', contract.legal === true);
-  ok('the rule is symmetric — side 1 cannot deploy on side 0', contract.p2EnemyHalf === false);
   ok('side 1 can deploy on its own half', contract.p2Legal === true);
   const clampCheck = await page.evaluate(() => {
     __NC.start('2p'); __NC.setEnergy(0, 20);
@@ -131,6 +185,37 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     return u ? u.y : null;
   });
   ok('a drop at the halfway line clamps into your own half', clampCheck !== null && clampCheck >= 80, 'y=' + clampCheck);
+
+  // ===================================================== the border rule
+  // Aiming past the line never eats the card: it lands on YOUR side of the
+  // border at the same across-the-board coordinate. Pinned both ways, because
+  // the symmetry is the whole reason the rule is safe to have.
+  const border = await page.evaluate(() => {
+    __NC.start('2p');
+    const out = { r: __NC.kindOf('tank').r, fbr: __NC.kindOf('fireball').r };
+    __NC.setEnergy(0, 20);
+    out.ok0 = __NC.deploy(0, 'tank', 22, 20);          // aimed deep in the ENEMY half
+    const u = __NC.units.filter(x => x.side === 0).pop();
+    out.x = u && u.x; out.y = u && u.y;
+    __NC.setEnergy(1, 20);
+    out.ok1 = __NC.deploy(1, 'tank', 77, 145);
+    const v = __NC.units.filter(x => x.side === 1).pop();
+    out.x1 = v && v.x; out.y1 = v && v.y;
+    // and a spell, which has no drop offset to hide a bug behind
+    const mark = __NC.place(1, 'tank', 61, 74);        // just over the line, in reach of a border blast
+    __NC.setEnergy(0, 20);
+    out.okFb = __NC.deploy(0, 'fireball', 61, 40);     // aimed deep in the enemy half
+    out.marked = mark.maxHp - mark.hp;
+    return out;
+  });
+  ok('a card aimed at the enemy half is deployed, not refused',
+     border.ok0 === true && border.ok1 === true, JSON.stringify(border));
+  ok('...it lands on your own side of the border', near(border.y, 80 + border.r, 0.01), 'y=' + border.y);
+  ok('...at the same horizontal coordinate', near(border.x, 22, 0.01), 'x=' + border.x);
+  ok('the border rule is symmetric for side 1',
+     near(border.y1, 80 - border.r, 0.01) && near(border.x1, 77, 0.01), JSON.stringify(border));
+  ok('a spell aimed at the enemy half bursts on the border, still on your x',
+     border.okFb === true && border.marked > 0, JSON.stringify(border));
 
   // ================================================== the stat shape spec'd
   const stats = await page.evaluate(() => {
@@ -170,7 +255,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   const cast = await page.evaluate(() => {
     __NC.start('2p');
     const out = {};
-    __NC.setEnergy(0, 20); out.enemyHalf = __NC.deploy(0, 'fireball', 50, 30);
+    __NC.setEnergy(0, 20); out.offBoard = __NC.deploy(0, 'fireball', 50, -20);
     __NC.setEnergy(0, 4);  out.broke = __NC.deploy(0, 'fireball', 50, 120);
     __NC.setEnergy(0, 20);
     const n = __NC.units.length;
@@ -180,7 +265,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     out.counted = __NC.casts[0];
     return out;
   });
-  ok('fireball cannot be cast on the enemy half', cast.enemyHalf === false);
+  ok('a fireball released off the board is not spent', cast.offBoard === false);
   ok('fireball you cannot afford is refused', cast.broke === false);
   ok('fireball casts on your own half', cast.legal === true && cast.counted === 1, JSON.stringify(cast));
   ok('casting fireball costs 5 energy', near(cast.spent, 5, 0.35), 'spent=' + cast.spent);
@@ -356,6 +441,60 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
      freed.n > 0 && freed.stillLocked === 0, JSON.stringify(freed));
   ok('released attackers pick a new target and march on', freed.onBase > 0, JSON.stringify(freed));
 
+  // ========================================================= the base turret
+  // Spec: one turret on each base, an archer's range and cadence, two archers'
+  // damage a shot. The stat check is cheap; the envelope check is the one that
+  // matters, because measuring reach from the wrong rim leaves an archer able
+  // to siege the base from outside the turret's answer.
+  const gun = await page.evaluate(() => ({
+    gun: __NC.gun, archer: __NC.kindOf('archer'),
+  }));
+  ok('the base turret hits for two archers a shot',
+     gun.gun.dmg === gun.archer.dmg * 2, JSON.stringify(gun.gun));
+  ok('...on an archer\'s clock and at an archer\'s reach',
+     gun.gun.rate === gun.archer.rate && gun.gun.range === gun.archer.range, JSON.stringify(gun.gun));
+
+  const siegeGun = await page.evaluate(() => {
+    __NC.start('2p');
+    // an archer at the very edge of its own reach on side 0's base:
+    // hypot to the base centre = 36.8, and its range + base.r = 37.
+    const a = __NC.place(1, 'archer', 50, 150 - 36.8);
+    return { id: a.id, hp: a.hp, baseHp: __NC.bases[0].hp };
+  });
+  await page.waitForTimeout(1600);
+  const siegeGunAfter = await page.evaluate(id => {
+    const a = __NC.units.find(u => u.id === id);
+    return { hp: a ? a.hp : 0, gone: !a, baseHp: __NC.bases[0].hp, target: __NC.bases[0].target ? 'unit' : null };
+  }, siegeGun.id);
+  ok('an archer that can reach the base is inside the turret\'s answer',
+     siegeGunAfter.hp < siegeGun.hp, JSON.stringify({ siegeGun, siegeGunAfter }));
+  ok('the archer is still chipping the base while it happens',
+     siegeGunAfter.baseHp < siegeGun.baseHp, JSON.stringify(siegeGunAfter));
+  await page.waitForTimeout(1600);
+  const lone = await page.evaluate(id => ({
+    dead: !__NC.units.find(u => u.id === id),
+    baseFrac: __NC.bases[0].hp / __NC.bases[0].maxHp,
+  }), siegeGun.id);
+  ok('a lone attacker loses to the base it walked up to',
+     lone.dead === true && lone.baseFrac > 0.9, JSON.stringify(lone));
+
+  // the turret does not reach past its envelope. The subject MARCHES into that
+  // envelope, so the window is deliberately short and the margin is the check:
+  // a tank at y=104 needs 8 world units to reach y=112 and covers 2.6 in 300ms.
+  const gunLimits = await page.evaluate(() => {
+    __NC.start('2p');
+    const far = __NC.place(1, 'tank', 50, 104);           // 46 out — past the 37 envelope
+    return { farId: far.id, farHp: far.hp };
+  });
+  await page.waitForTimeout(300);
+  const gunLimitsAfter = await page.evaluate(o => {
+    const f = __NC.units.find(u => u.id === o.farId);
+    return { farHp: f ? f.hp : null, y: f ? f.y : null, aiming: !!__NC.bases[0].target };
+  }, gunLimits);
+  ok('the turret does not reach past its envelope',
+     gunLimitsAfter.farHp === gunLimits.farHp && gunLimitsAfter.aiming === false && gunLimitsAfter.y < 112,
+     JSON.stringify({ gunLimits, gunLimitsAfter }));
+
   // ============================================================ the bunker
   const caps = await page.evaluate(() => {
     __NC.start('2p');
@@ -363,7 +502,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     __NC.setEnergy(0, 20); out.b1 = __NC.deploy(0, 'bunker', 28, 118);
     __NC.setEnergy(0, 20); out.b2 = __NC.deploy(0, 'bunker', 72, 118);
     __NC.setEnergy(0, 20); out.b3 = __NC.deploy(0, 'bunker', 50, 100);
-    __NC.setEnergy(0, 20); out.onBase = __NC.deploy(0, 'bunker', 50, 158);   // over the goalpost
+    __NC.setEnergy(0, 20); out.onBase = __NC.deploy(0, 'bunker', 50, 158);   // over the emplacement
     out.count = __NC.buildings.filter(b => b.side === 0).length;
     const b = __NC.buildings[0];
     __NC.setEnergy(0, 20); out.g1 = __NC.deploy(0, 'archer', b.x, b.y - 9);
@@ -447,8 +586,10 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   await page.evaluate(() => {
     __NC.start('2p');
     __NC.bases[1].hp = 30;
-    __NC.setEnergy(0, 20);
-    __NC.deploy(0, 'fighter', 50, 84);
+    // two, not one: the enemy base now shoots back, and it focuses one target
+    // at a time — a single fighter is a coin-flip against 40 damage a second.
+    __NC.setEnergy(0, 20); __NC.deploy(0, 'fighter', 42, 84);
+    __NC.setEnergy(0, 20); __NC.deploy(0, 'fighter', 58, 84);
   });
   await page.waitForTimeout(12000);
   const over = await page.evaluate(() => ({

@@ -63,9 +63,11 @@ board is in world units — both card trays are drawn in screen pixels.
 `resize()` splits the canvas into `trayH` (top) / board / `trayH` (bottom) and
 letterboxes the board into the middle.
 
-Bases sit at `(50, 150)` and `(50, 10)` — drawn as an endzone goalpost
-(pedestal + two uprights + crossbar), 1500 HP, no attack of their own. They
-are the only win condition.
+Bases sit at `(50, 150)` and `(50, 10)` — an armoured pedestal with a **turret**
+whose barrel tracks its target, 1500 HP. They are still the only win condition,
+but they are no longer passive: see *The base turret*. (Until 2026-08-22 they
+were drawn as an endzone goalpost with no attack; the goalpost read as scenery,
+which stopped being true the moment the base fought back.)
 
 ## Card types — the axis the deck grows along
 
@@ -133,6 +135,24 @@ back. Everything about it follows from that.
 - **Friendly fire is off.** The card exists to rescue the losing player;
   making it hurt your own line would punish exactly the person holding it.
 
+### Two ways to deploy
+
+Both idioms run through **one** drag record, so there is no mode to get stuck
+in and no second code path to keep in sync:
+
+- **Drag** a card from the tray onto the board and release.
+- **Tap** a card to *arm* it (`sel[side] = kind`, white border + pulsing dashed
+  ring), then tap the board to place it. Tapping the armed card again disarms.
+
+`pointDown` starts a drag for any card touch and marks it `tap: true`;
+`pointMove` clears that flag once the finger travels past `TAP_SLOP` (10 px);
+`pointUp` reads the flag — still a tap → arm/disarm, otherwise → deploy. A
+touch that starts on the **board** belongs to whichever player has a card
+armed (`armedFor`), preferring the player whose own half the finger is over;
+in 2p that fallback is what lets an armed card be tapped down across the line.
+A successful deploy clears `sel[side]`; a refused one keeps it, so a card you
+could not afford yet is still armed a second later.
+
 ### The one input rule that differs
 
 `dropOff(k)` is `0` for a spell and `DRAG_OFF` for everything else. A unit's
@@ -145,22 +165,30 @@ rather than a constant, which is what keeps the AI on the player's rules.
 
 ## Deployment rules (`dropInfo` / `tryDeploy`)
 
-A drop is legal when the **finger** is on that player's own half — one rule for
-every card type. The ghost sits `dropOff(k)` ahead of the finger toward the
-opponent (`DRAG_OFF` = 9 world units for units and buildings, **0 for spells**)
-and is then *clamped* into the half — so dragging to the halfway line deploys at
-the line rather than failing. Refusals set `flash[side + ':' + kind]` (a 0.45 s
-red card pulse) and, except for the "wrong half" case, play the deny sting:
+A drop is legal **anywhere on the board** — one rule for every card type. The
+ghost sits `dropOff(k)` ahead of the finger toward the opponent (`DRAG_OFF` = 9
+world units for units and buildings, **0 for spells**) and is then *clamped*
+into that player's own half by `clampToHalf`.
 
-| reason | when | applies to |
-|---|---|---|
-| `half` | finger is on the opponent's side | every card |
-| `energy` | cost exceeds current energy | every card |
-| `max` | already two bunkers on that side | buildings |
-| `blocked` | bunker would overlap a base (`BASE_CLR`) or another bunker | buildings |
-| `full` | dropping a unit on a bunker that already holds two | units |
+**The border rule.** Aiming past the halfway line does not refuse the card: it
+lands on **your** side of the line at the **same x**. A bad aim costs you
+position, never the card — which is what makes tap-to-place safe to offer on a
+phone, where the finger covers the target. Only a release that is off the board
+entirely (over a tray, outside the frame) cancels, and that silent cancel is
+the deliberate "change my mind" gesture — it is the reason `off` is the one
+refusal that does **not** play the deny sting.
 
-A **spell can only ever be refused for `half` or `energy`** — it has no
+Refusals set `flash[side + ':' + kind]` (a 0.45 s red card pulse):
+
+| reason | when | applies to | deny sting |
+|---|---|---|---|
+| `off` | released off the board (tray, outside the frame) | every card | no — silent cancel |
+| `energy` | cost exceeds current energy | every card | yes |
+| `max` | already two bunkers on that side | buildings | yes |
+| `blocked` | bunker would overlap a base (`BASE_CLR`) or another bunker | buildings | yes |
+| `full` | dropping a unit on a bunker that already holds two | units | yes |
+
+A **spell can only ever be refused for `off` or `energy`** — it has no
 footprint to block, no cap to hit, and it must not garrison a bunker it is
 dropped on. That last one is the easy bug: the garrison branch lives in the
 `else` of the type test, so any new spell gets it right for free, but a card
@@ -168,7 +196,7 @@ that forgets its `type` will silently try to walk into a building.
 
 `aiDeploy(key, x, y)` backs the point out by `dropOff(KINDS[key])` and goes
 through `tryDeploy` — the AI obeys exactly the rules the player does, including
-cost and half checks. There is no AI-only placement path.
+cost and the border clamp. There is no AI-only placement path.
 
 ## Bunkers
 
@@ -219,6 +247,38 @@ carry that intent and should not drift:
   range and it has to walk back, but it walks back to the same building.
   "Until it is destroyed" means what it says.
 
+### The base turret
+
+Each base mounts one turret: **two archers' damage a shot** (`BASE_GUN.dmg =
+KINDS.archer.dmg * 2`), on an archer's cadence, at an archer's range. It is
+written in *archer units* on purpose — the spec was "two archers per shot at an
+archer's speed and range", and a later archer rebalance should carry the base
+with it rather than silently decoupling.
+
+Three rules, each load-bearing:
+
+- **Reach is measured from the base's rim** (`gunReach = edgeDist(u, bs)`, i.e.
+  `hypot - bs.r`), which is exactly how an archer measures its own shot *at*
+  the base. Measure it the other way (`edgeDist(bs, u)`, from the unit's rim)
+  and the envelope shrinks by `bs.r` — 7 world units short of an archer
+  besieging it, so the one unit the turret exists to answer would sit safely
+  outside it. Same envelope both ways is the only playable reading. The reach
+  ring in `drawBaseReach` is drawn at `range + bs.r` for the same reason.
+- **It shoots units only.** A bunker can never be built inside an enemy base's
+  reach (the halves do not come close enough), and a base that could shoot a
+  besieger's *building* would be answering the siege lock with a rule of its
+  own.
+- **A garrison is shielded from it**, as from everything else — the `u.home`
+  skip is shared with `pickTarget`, not re-implemented.
+
+Balance intent: a **lone** unit that walks up to a base now loses to the base.
+40 damage a second kills an archer in two shots and a fighter in four, so
+trickle attacks stop working entirely, while a massed push still gets through
+(the turret focuses one target at a time). This is also the counterweight to
+the siege lock, which is otherwise purely defender-favourable. Knobs, in the
+order to reach for them: `BASE_GUN.dmg`'s archer multiplier, then `rate`, then
+`range` — the multiplier is the one the spec named, so change it consciously.
+
 `drawLocks()` draws a faint pulsing dashed tether from each committed unit to
 its target, under the units. That readout is load-bearing — the defender has to
 be able to tell at a glance which attackers are busy and which are still free.
@@ -259,7 +319,7 @@ never drift from the thing it deploys.
 
 - `node .claude/scripts/smoke-mobile.cjs games/neon-clash/index.html`
 - `node .claude/scripts/check-games-sync.cjs`
-- `.claude/tests/drive-neon-clash.cjs` (67 checks) — drives a real touch drag
+- `.claude/tests/drive-neon-clash.cjs` (84 checks) — drives a real touch drag
   from the tray to the board, then asserts the refusal rules, the card types
   and deck order, the bunker/garrison caps, garrison ejection, a base kill
   ending the match, that the AI actually plays, and that the rotated top tray
@@ -273,13 +333,22 @@ never drift from the thing it deploys.
   90 at the centre, 45 at the rim, nothing outside the circle, nothing friendly,
   neither base, a garrison untouched while its bunker burns, knockback that
   actually shoves a unit backwards against its own march, and LEGEND answering
-  a massed push with a cast of its own.
+  a massed push with a cast of its own. The border block pins the clamp both
+  ways (own x kept, own side of the line, symmetric for side 1, and a spell too),
+  and the tap block drives real `TouchEvent`s to prove a stationary card touch
+  arms rather than deploys. The turret block asserts the archer-derived stats
+  and then the envelope: an archer placed at the exact edge of *its* reach on a
+  base must take fire. Note the two blocks that measure a **moving** subject —
+  the border check uses a bunker (a unit drifts off the border inside the
+  round-trip) and the envelope check uses a slow tank and a 300 ms window,
+  because the subject marches into the envelope on its own.
 
 ## Test hook
 
 `window.__NC` exposes `state / energy / units / buildings / bases / matchT`
 plus `deploy(side, key, fingerX, fingerY)`, `start(mode, diff)`,
-`setEnergy(side, v)`, `casts`, `deck`, `kindOf(key)` and `place(side, key, x, y)`
+`setEnergy(side, v)`, `casts`, `deck`, `kindOf(key)`, `sel`, `gun`, `shots`
+and `place(side, key, x, y)`
 — note `deploy` takes **finger** world coordinates, not the final spawn point,
 so it exercises the same `dropOff` path a real drag does. `place` is the one
 hook that bypasses the rules: it exists so a test can *arrange* a cluster and

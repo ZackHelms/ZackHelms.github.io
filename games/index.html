@@ -150,7 +150,7 @@ h1 {
       <div class="game-icon">🎴</div>
       <div class="game-info">
         <div class="game-name">NEON CLASH</div>
-        <div class="game-desc">Both halves of the board are live at once. Energy trickles in a point a second up to twenty; drag a tank, fighter, archer or bunker out of your hand onto your own half and it marches on the enemy goalpost &mdash; or spend five on a fireball, an airburst that scatters a massed push and hits hardest dead centre. Play the computer at three grades, or lay the phone flat between you and a friend &mdash; the far tray flips round so the player opposite reads their own cards the right way up and deploys at the same time you do.</div>
+        <div class="game-desc">Both halves of the board are live at once. Energy trickles in a point a second up to twenty; drag a tank, fighter, archer or bunker out of your hand onto your own half &mdash; or tap the card, then tap where you want it &mdash; and it marches on the enemy base, which shoots back with a turret worth two archers a shot. Spend five on a fireball instead and the airburst scatters a massed push, hardest dead centre. Aim past the halfway line and the card simply lands on your side of it, so a clumsy thumb never eats a card. Play the computer at three grades, or lay the phone flat between you and a friend &mdash; the far tray flips round so the player opposite reads their own cards the right way up and deploys at the same time you do.</div>
       </div>
     </a>
 
@@ -556,7 +556,7 @@ h1 {
 // Facet catalog — mirrors .claude/games-index.md. MAINTENANCE: every new game
 // adds its entry here in the same commit as its hub card (and index row).
 const GAMES = [
-  { n: 'NEON CLASH', i: '🎴', h: 'neon-clash/', genre: ['card-battler'], input: ['drag-place', 'tap'], session: ['match-vs-ai', 'local-2p'], mech: ['card-deck', 'resource-economy', 'ai-opponent', 'rotated-2p-ui', 'area-of-effect'], players: ['vs-ai', 'local-2p'] },
+  { n: 'NEON CLASH', i: '🎴', h: 'neon-clash/', genre: ['card-battler'], input: ['drag-place', 'tap', 'tap-select'], session: ['match-vs-ai', 'local-2p'], mech: ['card-deck', 'resource-economy', 'ai-opponent', 'rotated-2p-ui', 'area-of-effect'], players: ['vs-ai', 'local-2p'] },
   { n: 'TURRET BUILDER', i: '🔌', h: 'turret-builder/', genre: ['tower-defense-classic'], input: ['drag-place', 'tap'], session: ['level-campaign', 'wave-survival', 'endless-highscore', 'save-campaign'], mech: ['wave-defense', 'adjacency-synergy', 'damage-typing', 'combo-discovery'], players: ['solo'] },
   { n: 'GRID DEFENSE', i: '🗼', h: 'grid-defense/', genre: ['tower-defense-classic'], input: ['drag-place', 'tap'], session: ['level-campaign', 'wave-survival', 'endless-highscore', 'save-campaign'], mech: ['wave-defense', 'resource-economy', 'tower-upgrades', 'meta-progression'], players: ['solo'] },
   { n: 'ZED SHOOTER', i: '🧟', h: 'zed-shooter/', genre: ['shooter'], input: ['virtual-joystick', 'kb-mouse'], session: ['wave-survival'], mech: ['meta-progression'], players: ['solo'] },

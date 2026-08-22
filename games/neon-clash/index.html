@@ -111,7 +111,7 @@ html, body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-22 20:40 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-22 22:43 UTC</div>
 <div id="app">
   <div id="hud">
     <div id="hud-left">
@@ -150,8 +150,9 @@ html, body {
   <div class="helprow"><div class="hk" style="color:var(--blue)">ARCHER 3</div><div><i>Unit.</i> Low HP, average damage, average speed &mdash; but shoots from far back. Melts anything that cannot reach it.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--purple)">BUNKER 8</div><div><i>Building.</i> Stationary, holds two units. Garrisoned units stop moving, fire through the slits, and take no damage &mdash; the bunker eats it. Two per side; blow one up and it can be rebuilt.</div></div>
   <div class="helprow"><div class="hk" style="color:#ff7a1a">FIREBALL 5</div><div><i>Spell.</i> An airburst on your own half. Damage and knockback are hardest at the centre and halve at the rim, so it pays against a <b>crowd</b> and barely dents one unit &mdash; the card to hold when a big push is coming. Scatters what it hits; bases are immune, and a garrison inside a bunker is shielded from it.</div></div>
-  <div class="helprow"><div class="hk" style="color:var(--green)">BASE</div><div>The goalpost at the back of each half. Reduce the enemy base to zero and the match is yours.</div></div>
+  <div class="helprow"><div class="hk" style="color:var(--green)">BASE</div><div>The emplacement at the back of each half. Reduce the enemy base to zero and the match is yours &mdash; but it is not a sitting target: its <b>turret</b> has an archer's reach and cadence and hits for two archers a shot, so a lone unit that walks in alone dies to the base itself.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--white)">SIEGE</div><div>The moment a unit lands its first hit on a <b>building</b> &mdash; a bunker or a base &mdash; it commits to that target until the building falls, and a dashed tether marks it. A committed unit <b>will not turn on your defenders</b> while it grinds, so answering a push that has already reached your base is the cheapest fighting you will ever do. Units still only <i>marching</i> at you can be pulled off.</div></div>
+  <div class="helprow"><div class="hk" style="color:var(--blue)">DEPLOY</div><div>Two ways, both fine: <b>drag</b> a card onto the board, or <b>tap</b> a card to arm it and then tap where you want it. Aim at the enemy half and it simply lands on your side of the halfway line at the same across-the-board spot &mdash; you never lose the card to a bad aim. Release over the tray to think again.</div></div>
   <div class="btn-col" style="margin-top:6px;"><div class="ov-btn primary" id="btn-help-back">BACK</div></div>
 </div>
 
@@ -194,6 +195,7 @@ const UNIT_CAP = 16;                    // per side, keeps the sim bounded
 const SUDDEN_AT = 180;                  // seconds — then regen and base damage x2
 const MATCH_LIMIT = 300;                // hard stop; most base HP wins
 const DRAG_OFF = 9;                     // ghost sits this far ahead of the finger
+const TAP_SLOP = 10;                    // px of travel that turns a tap into a drag
 
 // Every card carries a `type`. That is the axis the deck grows along later —
 // more units, more buildings, more spells — so every rule below branches on
@@ -214,6 +216,12 @@ const KINDS = {
 };
 const DECK = ['tank', 'fighter', 'archer', 'bunker', 'fireball'];
 const KB_DECAY = 6.5;                   // knockback velocity shed per second
+// The base defends itself. Deliberately specified in ARCHER units rather than
+// raw numbers: one archer's reach, one archer's clock, two archers' damage.
+const BASE_GUN = {
+  dmg: KINDS.archer.dmg * 2, rate: KINDS.archer.rate, range: KINDS.archer.range,
+  hub: 3, barrel: 8.5, sp: 92,
+};
 const MAX_BUNKERS = 2, GARRISON = 2;
 const GARRISON_MIN_RANGE = 15;          // melee units firing through the slits
 const AGGRO_PAD = 20;                   // how far past its range a unit will chase
@@ -243,6 +251,7 @@ let bases = [];
 let matchT = 0, aiTimer = 0, uid = 1;
 let drags = {};                         // pointerId -> {side, kind, x, y, ok}
 let cardRects = [];                     // {side, kind, x, y, w, h} — screen space
+let sel = [null, null];                 // per side: card armed by tap, awaiting a board tap
 let flash = {};                         // 'side:kind' -> seconds of red flash left
 let casts = [0, 0];                     // spells cast this match, per side
 let shake = 0, banner = '', bannerT = 0, bannerCol = '#39ff14', suddenAnnounced = false;
@@ -322,6 +331,9 @@ function nburst(dur, gain, hp, delay) {
 const sndDeploy = k => { beep(220, 0.09, 'square', 0.07, 440); nburst(0.09, 0.05, 1600); };
 const sndDeny   = () => { beep(180, 0.09, 'sawtooth', 0.09, 90); beep(140, 0.1, 'square', 0.05, 70, 0.07); };
 const sndBow    = () => beep(760, 0.05, 'triangle', 0.045, 1300);
+const sndTurret = () => { beep(430, 0.08, 'square', 0.055, 210); nburst(0.05, 0.035, 1500); };
+const sndArm    = () => beep(520, 0.05, 'triangle', 0.05, 780);
+const sndDisarm = () => beep(420, 0.05, 'triangle', 0.04, 280);
 const sndHit    = () => nburst(0.04, 0.035, 2400);
 const sndMelee  = () => { beep(330, 0.035, 'square', 0.04, 190); nburst(0.03, 0.03, 3000); };
 const sndDie    = () => { beep(180, 0.16, 'sawtooth', 0.07, 60); nburst(0.14, 0.05, 700); };
@@ -501,7 +513,11 @@ function cardAt(px, py) {
 
 // ------------------------------------------------------------- entities
 function makeBase(side) {
-  return { side, x: UW / 2, y: BASE_Y[side], hp: BASE_HP, maxHp: BASE_HP, kind: 'base', r: 11, hurt: 0 };
+  return {
+    side, x: UW / 2, y: BASE_Y[side], hp: BASE_HP, maxHp: BASE_HP, kind: 'base', r: 11, hurt: 0,
+    cd: 0, flash: 0, target: null,
+    face: (side === 0 ? -1 : 1) * Math.PI / 2,   // barrel rests pointing downfield
+  };
 }
 function spawnUnit(side, key, x, y) {
   const k = KINDS[key];
@@ -535,11 +551,14 @@ function clampToHalf(side, x, y, r) {
   return { x: nx, y: ny };
 }
 const dropOff = k => k.type === 'spell' ? 0 : DRAG_OFF;
-// A drop is legal when the finger itself is on that player's half; the ghost
-// is then clamped into the half so dragging to the line still deploys there.
+// A drop is legal anywhere ON THE BOARD. Aiming past the halfway line does not
+// refuse the card — clampToHalf pulls it back to your own side of the line at
+// the same x, so a bad aim costs you position, never the card. Only a release
+// that is off the board entirely (over a tray, or outside the frame) cancels,
+// which is what keeps "change my mind" a gesture rather than a wasted card.
 function dropInfo(side, key, fx_, fy) {
   const k = KINDS[key];
-  const inHalf = ownHalf(side, fy) && fy >= 0 && fy <= UH && fx_ >= 0 && fx_ <= UW;
+  const onBoard = fy >= 0 && fy <= UH && fx_ >= 0 && fx_ <= UW;
   const dir = side === 0 ? -1 : 1;
   // A unit's ghost sits DRAG_OFF ahead of the finger so your thumb does not
   // cover it. A spell lands exactly under the finger instead — you are aiming
@@ -547,7 +566,7 @@ function dropInfo(side, key, fx_, fy) {
   const p = clampToHalf(side, fx_, fy + dir * dropOff(k), k.r);
   const afford = energy[side] >= k.cost;
   let reason = '';
-  if (!inHalf) reason = 'half';
+  if (!onBoard) reason = 'off';
   else if (!afford) reason = 'energy';
   else if (k.type === 'spell') {
     // Nothing else can refuse a spell: no footprint to block, no cap to hit,
@@ -580,7 +599,7 @@ function tryDeploy(side, key, fx_, fy) {
   const info = dropInfo(side, key, fx_, fy);
   if (!info.ok) {
     flash[side + ':' + key] = 0.45;
-    if (info.reason !== 'half') sndDeny();
+    if (info.reason !== 'off') sndDeny();
     return false;
   }
   energy[side] -= k.cost;
@@ -611,7 +630,7 @@ function tryDeploy(side, key, fx_, fy) {
 //   1. Damage and knockback both FALL OFF with distance, so it pays against a
 //      cluster and barely dents a lone unit. That is the whole design intent.
 //   2. It cannot touch a base. Only units win the game; a spell that chipped
-//      the goalpost would turn saved energy into a win condition of its own.
+//      the emplacement would turn saved energy into a win condition of its own.
 //   3. A garrisoned unit is untouched — the bunker eats the blast, exactly as
 //      it eats every other source of damage.
 function castSpell(side, key, x, y) {
@@ -737,6 +756,50 @@ function reslot(b) {
   });
 }
 
+// The base mounts one turret. It shoots UNITS only: a bunker can never be built
+// inside an enemy base's reach anyway, and a base that could shoot a besieging
+// unit's building would be answering the siege lock with a rule of its own.
+// Garrisoned units are shielded here exactly as they are everywhere else.
+//
+// Reach is measured `edgeDist(u, bs)` — from the base's RIM, the same way an
+// archer measures its own shot at the base. Measured the other way (from the
+// unit's rim) the turret would fall 7 units short of an archer sieging it, so
+// the one unit the turret exists to answer would out-range it. Same envelope
+// both ways is the only reading of "an archer's range" that is playable.
+const gunReach = (bs, u) => edgeDist(u, bs);
+function baseGunTarget(bs) {
+  const foe = 1 - bs.side;
+  let best = null, bd = BASE_GUN.range;
+  for (const u of units) {
+    if (u.side !== foe || u.dead || u.home) continue;
+    const d = gunReach(bs, u);
+    if (d <= bd) { bd = d; best = u; }
+  }
+  return best;
+}
+function stepBase(bs, dt) {
+  bs.hurt = Math.max(0, bs.hurt - dt);
+  bs.flash = Math.max(0, bs.flash - dt);
+  if (!aliveT(bs)) return;
+  bs.cd -= dt;
+  const t = bs.target;
+  if (!aliveT(t) || t.home || gunReach(bs, t) > BASE_GUN.range) bs.target = baseGunTarget(bs);
+  if (!bs.target) return;
+  bs.face = Math.atan2(bs.target.y - bs.y, bs.target.x - bs.x);
+  if (bs.cd <= 0) {
+    bs.cd = 1 / BASE_GUN.rate;
+    bs.flash = 0.11;
+    const dir = bs.side === 0 ? -1 : 1;
+    const hx = bs.x, hy = bs.y + dir * BASE_GUN.hub;
+    shots.push({
+      x: hx + Math.cos(bs.face) * BASE_GUN.barrel,
+      y: hy + Math.sin(bs.face) * BASE_GUN.barrel,
+      target: bs.target, dmg: BASE_GUN.dmg, side: bs.side, sp: BASE_GUN.sp, col: SIDE_COL[bs.side],
+    });
+    sndTurret();
+  }
+}
+
 function stepUnit(u, dt) {
   u.hurt = Math.max(0, u.hurt - dt);
   u.swing = Math.max(0, u.swing - dt);
@@ -816,7 +879,7 @@ function separate() {
       const min = bd.r + a.r;
       if (d < min && d > 0.0001) { a.x = bd.x + dx / d * min; a.y = bd.y + dy / d * min; }
     }
-    for (const bs of bases) {                        // nor inside a goalpost
+    for (const bs of bases) {                        // nor inside an emplacement
       const ox_ = BASE_HW + a.r, oy_ = BASE_HH + a.r;
       const dx = a.x - bs.x, dy = a.y - bs.y;
       if (Math.abs(dx) < ox_ && Math.abs(dy) < oy_) {
@@ -862,7 +925,7 @@ function step(dt) {
   separate();
   stepShots(dt);
   for (const b of buildings) if (!b.dead) b.hurt = Math.max(0, b.hurt - dt);
-  for (const b of bases) b.hurt = Math.max(0, b.hurt - dt);
+  for (const b of bases) stepBase(b, dt);
   units = units.filter(u => !u.dead);
   buildings = buildings.filter(b => !b.dead);
   if (mode === 'ai' && state === 'play') {
@@ -1091,7 +1154,9 @@ function drawBunker(b) {
   }
   hpBar(b.x, b.y - b.r - 3, b.r * 2, b.hp / b.maxHp, KINDS.bunker.col);
 }
-// The base is an endzone goalpost: pedestal + two uprights + crossbar.
+// The base is a gun emplacement: armoured pedestal, then a turret hub whose
+// barrel tracks whatever it is shooting. The old goalpost read as scenery,
+// which was wrong the moment the base started fighting back.
 function drawBase(bs) {
   const col = SIDE_COL[bs.side];
   const dir = bs.side === 0 ? -1 : 1;                 // toward the field
@@ -1105,18 +1170,36 @@ function drawBase(bs) {
   ctx.fillStyle = 'rgba(8,8,20,0.9)';
   rr(sx(bs.x - BASE_HW), sy(py - ph), BASE_HW * 2 * scale, ph * 2 * scale, 3 * scale);
   ctx.fill(); ctx.stroke();
-  const topY = py + dir * ph;
-  const upH = 9;
-  for (const s of [-1, 1]) {
+  // armour ribs, so the pedestal does not read as an empty box
+  ctx.lineWidth = Math.max(1, 0.8 * scale);
+  for (const o of [-6.5, 6.5]) {
     ctx.beginPath();
-    ctx.moveTo(sx(bs.x + s * 8.5), sy(topY));
-    ctx.lineTo(sx(bs.x + s * 8.5), sy(topY + dir * upH));
+    ctx.moveTo(sx(bs.x + o), sy(py - ph + 1.2));
+    ctx.lineTo(sx(bs.x + o), sy(py + ph - 1.2));
     ctx.stroke();
   }
+  // turret
+  const hx = sx(bs.x), hy = sy(bs.y + dir * BASE_GUN.hub), a = bs.face;
+  ctx.lineWidth = Math.max(2, 2.1 * scale);
   ctx.beginPath();
-  ctx.moveTo(sx(bs.x - 8.5), sy(topY + dir * upH * 0.62));
-  ctx.lineTo(sx(bs.x + 8.5), sy(topY + dir * upH * 0.62));
+  ctx.moveTo(hx + Math.cos(a) * BASE_GUN.hub * 0.6 * scale, hy + Math.sin(a) * BASE_GUN.hub * 0.6 * scale);
+  ctx.lineTo(hx + Math.cos(a) * BASE_GUN.barrel * scale, hy + Math.sin(a) * BASE_GUN.barrel * scale);
   ctx.stroke();
+  ctx.lineWidth = Math.max(1.5, 1.6 * scale);
+  ctx.beginPath();
+  ctx.arc(hx, hy, BASE_GUN.hub * scale, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(10,12,26,0.95)';
+  ctx.fill(); ctx.stroke();
+  if (bs.flash > 0 && !dead) {                        // muzzle flash
+    const f = bs.flash / 0.11;
+    ctx.globalAlpha = f;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(hx + Math.cos(a) * BASE_GUN.barrel * scale, hy + Math.sin(a) * BASE_GUN.barrel * scale,
+            (1 + 1.6 * f) * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
   noGlow();
   ctx.restore();
   hpBar(bs.x, bs.y - dir * (ph + 4.5) - 1.2, BASE_HW * 2, bs.hp / bs.maxHp, col);
@@ -1124,7 +1207,23 @@ function drawBase(bs) {
   ctx.font = 'bold ' + Math.max(7, Math.round(2.4 * scale)) + "px 'Share Tech Mono', monospace";
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = dead ? '#667' : col;
-  ctx.fillText(Math.ceil(bs.hp), sx(bs.x), sy(bs.y));
+  ctx.fillText(Math.ceil(bs.hp), sx(bs.x), sy(bs.y - dir * 2.4));
+  ctx.restore();
+}
+// Reach ring — only while that player is holding a card, so it teaches the
+// turret's range exactly when the answer matters and never clutters a fight.
+// Radius is range + bs.r because that is the envelope the sim actually uses
+// (gunReach measures from the base's rim); drawing the bare range would
+// under-promise by the base's own radius and teach the wrong distance.
+function drawBaseReach(bs) {
+  if (bs.hp <= 0) return;
+  ctx.save();
+  ctx.setLineDash([3, 6]);
+  ctx.strokeStyle = 'rgba(180,200,255,0.30)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(sx(bs.x), sy(bs.y), (BASE_GUN.range + bs.r) * scale, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -1133,6 +1232,7 @@ function activeDragSide(side) {
   for (const k in drags) if (drags[k].side === side) return drags[k];
   return null;
 }
+const armed = side => state === 'play' && controls(side) && !!sel[side];
 function drawBoard() {
   const bx = sx(0), by = sy(0), bw = UW * scale, bh = UH * scale;
   const g = ctx.createLinearGradient(0, by, 0, by + bh);
@@ -1145,15 +1245,17 @@ function drawBoard() {
   ctx.strokeStyle = 'rgba(90,110,170,0.09)'; ctx.lineWidth = 1;
   for (let x = 10; x < UW; x += 10) { ctx.beginPath(); ctx.moveTo(sx(x), by); ctx.lineTo(sx(x), by + bh); ctx.stroke(); }
   for (let y = 10; y < UH; y += 10) { ctx.beginPath(); ctx.moveTo(bx, sy(y)); ctx.lineTo(bx + bw, sy(y)); ctx.stroke(); }
-  // deploy-zone highlight while a card is in the air
+  // deploy-zone highlight while a card is in the air OR armed by tap
   for (let s = 0; s < 2; s++) {
     const d = activeDragSide(s);
-    if (!d) continue;
-    ctx.fillStyle = d.info && d.info.ok ? SIDE_DIM[s] : 'rgba(255,34,68,0.14)';
+    if (!d && !armed(s)) continue;
+    ctx.fillStyle = !d ? SIDE_DIM[s]
+                  : d.info && d.info.ok ? SIDE_DIM[s] : 'rgba(255,34,68,0.14)';
     const y0 = s === 0 ? sy(CENTER) : by;
     ctx.fillRect(bx, y0, bw, bh / 2);
   }
   ctx.restore();
+  for (let s = 0; s < 2; s++) if (activeDragSide(s) || armed(s)) drawBaseReach(bases[1 - s]);
   // halfway line
   ctx.save();
   ctx.setLineDash([7, 7]);
@@ -1274,6 +1376,7 @@ function drawEnergy(side) {
 function drawCard(c, inactive) {
   const k = KINDS[c.kind];
   const afford = energy[c.side] >= k.cost && !inactive;
+  const armedCard = !inactive && sel[c.side] === c.kind;
   const fl = flash[c.side + ':' + c.kind] || 0;
   const used = k.type === 'building' ? bunkersOf(c.side).length : 0;
   const nf = clamp(c.w / 7.4, 7, 9.5);    // name font — everything else lays out around it
@@ -1281,14 +1384,24 @@ function drawCard(c, inactive) {
   ctx.translate(c.x + c.w / 2, c.y + c.h / 2);
   if (trayFlipped(c.side)) ctx.rotate(Math.PI);
   ctx.translate(-c.w / 2, -c.h / 2);
-  const border = fl > 0 ? '#ff2244' : (afford ? k.col : 'rgba(120,130,170,0.4)');
-  ctx.fillStyle = fl > 0 ? 'rgba(60,10,20,0.9)' : (afford ? 'rgba(16,16,32,0.95)' : 'rgba(12,12,22,0.95)');
+  const border = fl > 0 ? '#ff2244' : (armedCard ? '#ffffff' : afford ? k.col : 'rgba(120,130,170,0.4)');
+  ctx.fillStyle = fl > 0 ? 'rgba(60,10,20,0.9)'
+                : armedCard ? 'rgba(30,34,58,0.98)'
+                : afford ? 'rgba(16,16,32,0.95)' : 'rgba(12,12,22,0.95)';
   rr(0, 0, c.w, c.h, 7); ctx.fill();
-  ctx.lineWidth = fl > 0 ? 2.4 : 1.4;
+  ctx.lineWidth = fl > 0 || armedCard ? 2.4 : 1.4;
   ctx.strokeStyle = border;
-  if (afford || fl > 0) glow(border, fl > 0 ? 16 : 8);
+  if (afford || fl > 0 || armedCard) glow(border, fl > 0 || armedCard ? 16 : 8);
   rr(0, 0, c.w, c.h, 7); ctx.stroke();
   noGlow();
+  if (armedCard) {                       // outer ring: this card is waiting on a board tap
+    ctx.save();
+    ctx.strokeStyle = k.col; ctx.lineWidth = 1.2;
+    ctx.setLineDash([4, 3]);
+    ctx.lineDashOffset = -renderT * 14;
+    rr(-3, -3, c.w + 6, c.h + 6, 9); ctx.stroke();
+    ctx.restore();
+  }
   // sprite
   ctx.save();
   ctx.globalAlpha = afford ? 1 : 0.4;
@@ -1326,7 +1439,7 @@ function drawCard(c, inactive) {
   }
   ctx.restore();
 }
-const DENY_TXT = { half: 'YOUR HALF ONLY', energy: 'NOT ENOUGH ENERGY', max: 'BUNKER LIMIT', blocked: 'NO ROOM', full: 'BUNKER FULL' };
+const DENY_TXT = { off: 'DROP ON THE BOARD', energy: 'NOT ENOUGH ENERGY', max: 'BUNKER LIMIT', blocked: 'NO ROOM', full: 'BUNKER FULL' };
 function drawDrags() {
   for (const id in drags) {
     const d = drags[id];
@@ -1431,23 +1544,48 @@ const controls = side => side === 0 || mode === '2p';
 function refreshDrag(d) {
   d.info = dropInfo(d.side, d.kind, wx(d.px), wy(d.py));
 }
+// A touch that starts on the BOARD belongs to whichever player has a card
+// armed. In 2p both trays are live, so prefer the player whose own half the
+// finger is over and fall back to the other — the fallback is what lets an
+// armed card be tapped down across the line and clamped back to the border.
+function armedFor(px, py) {
+  const near = ownHalf(0, wy(py)) ? 0 : 1;
+  for (const s of [near, 1 - near]) if (armed(s)) return s;
+  return -1;
+}
 function pointDown(id, px, py) {
   if (state !== 'play') return;
   const c = cardAt(px, py);
-  if (!c || !controls(c.side)) return;
-  drags[id] = { side: c.side, kind: c.kind, px, py, info: null };
+  if (c) {
+    if (!controls(c.side)) return;
+    // Every card touch starts a drag. If it turns out not to have travelled,
+    // pointUp reads it as a tap and arms the card instead of deploying it —
+    // one gesture handler, two idioms, no mode to get stuck in.
+    drags[id] = { side: c.side, kind: c.kind, px, py, x0: px, y0: py, tap: true, info: null };
+    refreshDrag(drags[id]);
+    return;
+  }
+  const s = armedFor(px, py);
+  if (s < 0) return;
+  drags[id] = { side: s, kind: sel[s], px, py, x0: px, y0: py, tap: false, info: null };
   refreshDrag(drags[id]);
 }
 function pointMove(id, px, py) {
   const d = drags[id]; if (!d) return;
   d.px = px; d.py = py;
+  if (d.tap && Math.hypot(px - d.x0, py - d.y0) > TAP_SLOP) d.tap = false;
   refreshDrag(d);
 }
 function pointUp(id) {
   const d = drags[id]; if (!d) return;
   delete drags[id];
   if (state !== 'play') return;
-  tryDeploy(d.side, d.kind, wx(d.px), wy(d.py));
+  if (d.tap) {                                  // tap on a card: arm / disarm it
+    sel[d.side] = sel[d.side] === d.kind ? null : d.kind;
+    if (sel[d.side]) sndArm(); else sndDisarm();
+    return;
+  }
+  if (tryDeploy(d.side, d.kind, wx(d.px), wy(d.py))) sel[d.side] = null;
 }
 canvas.addEventListener('touchstart', e => {
   e.preventDefault(); audio();
@@ -1478,7 +1616,7 @@ function resetField() {
   units = []; buildings = []; shots = []; fx = []; particles = [];
   bases = [makeBase(0), makeBase(1)];
   energy = [START_ENERGY, START_ENERGY];
-  drags = {}; flash = {};
+  drags = {}; flash = {}; sel = [null, null];
   matchT = 0; aiTimer = 1.2; suddenAnnounced = false; winner = -1;
   casts = [0, 0];
   shake = 0; banner = ''; bannerT = 0;
@@ -1501,7 +1639,7 @@ function endMatch(w) {
   if (state === 'over') return;
   state = 'over';
   winner = w;
-  drags = {};
+  drags = {}; sel = [null, null];
   stopMusic();
   const youWon = w === 0;
   if (mode === 'ai' && w >= 0) {
@@ -1527,7 +1665,7 @@ function endMatch(w) {
 function showStart() {
   state = 'title';
   stopMusic();
-  drags = {};
+  drags = {}; sel = [null, null];
   $('ov-over').classList.add('hidden');
   $('ov-help').classList.add('hidden');
   $('ov-start').classList.remove('hidden');
@@ -1620,6 +1758,9 @@ window.__NC = {
   place: (side, key, x, y) => { spawnUnit(side, key, x, y); return units[units.length - 1]; },
   setTime: v => { matchT = v; suddenAnnounced = v < SUDDEN_AT ? false : suddenAnnounced; },
   get viewRot() { return viewRot; },
+  get sel() { return sel.slice(); },
+  get gun() { return { dmg: BASE_GUN.dmg, rate: BASE_GUN.rate, range: BASE_GUN.range }; },
+  get shots() { return shots; },
 };
 </script>
 </body>
