@@ -11,6 +11,8 @@
  *   - the card TYPES (unit / building / spell) and the deck's left-to-right order
  *   - fireball: own half only, distance falloff, radial knockback, no base damage,
  *     and a garrison inside a bunker shielded from the blast
+ *   - the SIEGE LOCK: a unit that has started hitting a building commits to it
+ *     until it falls (and one merely marching at a base does not)
  *   - energy: 1/sec, cap 20, doubled in sudden death
  *   - the portrait lock: a sideways phone keeps the portrait layout, and a
  *     touch pushed through the view transform still hits the card it covers
@@ -282,6 +284,77 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     aiCast = await page.evaluate(() => __NC.casts[1]);
   }
   ok('LEGEND answers a massed push with a fireball', aiCast > 0, 'casts=' + aiCast);
+
+  // ============================================ the siege lock (focus fire)
+  // Once a unit lands a blow on a building it commits until that building dies.
+  // This is the rule that makes a push answerable, so it is pinned from both
+  // directions: a committed unit must NOT divert, and an uncommitted one must.
+  const siegeId = await page.evaluate(() => {
+    __NC.start('2p');
+    return __NC.place(1, 'fighter', 50, 138).id;      // parked on side 0's base
+  });
+  await page.waitForTimeout(420);                      // long enough to land a blow
+  const siege0 = await page.evaluate(id => {
+    const u = __NC.units.find(x => x.id === id);
+    return { lock: u.lock && u.lock.kind, defId: __NC.place(0, 'fighter', 50, 131).id };
+  }, siegeId);
+  ok('hitting a base commits the attacker to it', siege0.lock === 'base', 'lock=' + siege0.lock);
+  await page.waitForTimeout(700);
+  const siege1 = await page.evaluate(ids => {
+    const a = __NC.units.find(x => x.id === ids[0]), d = __NC.units.find(x => x.id === ids[1]);
+    return {
+      atkLock: a && a.lock && a.lock.kind, atkTarget: a && a.target && a.target.kind,
+      defHp: d && d.hp, defMax: d && d.maxHp, baseHurt: __NC.bases[0].maxHp - __NC.bases[0].hp,
+    };
+  }, [siegeId, siege0.defId]);
+  ok('a committed attacker will not turn on a defender that walks up',
+     siege1.atkLock === 'base' && siege1.atkTarget === 'base' && siege1.defHp === siege1.defMax,
+     JSON.stringify(siege1));
+  ok('and it keeps chewing the building while it ignores them', siege1.baseHurt > 0,
+     'dealt=' + siege1.baseHurt);
+
+  // ------- but merely WALKING at a base commits nothing
+  const walkIds = await page.evaluate(() => {
+    __NC.start('2p');
+    const w = __NC.place(1, 'fighter', 50, 100);       // marching at side 0's base, far from it
+    return { w: w.id, target: w.target && w.target.kind, d: __NC.place(0, 'archer', 50, 112).id };
+  });
+  await page.waitForTimeout(700);
+  const walk = await page.evaluate(id => {
+    const u = __NC.units.find(x => x.id === id);
+    return { lock: u && u.lock, target: u && u.target && u.target.kind };
+  }, walkIds.w);
+  ok('a unit only marching at a base is still free to divert onto a defender',
+     walk.lock === null && walk.target === 'unit', JSON.stringify(walk));
+
+  // ------- the lock releases the moment the building falls
+  await page.evaluate(() => {
+    __NC.start('2p');
+    __NC.setEnergy(0, 20); __NC.deploy(0, 'bunker', 50, 127);
+    const b = __NC.buildings[0];
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * Math.PI * 2;
+      __NC.place(1, 'fighter', b.x + Math.cos(a) * 11, b.y + Math.sin(a) * 11);
+    }
+  });
+  await page.waitForTimeout(500);
+  const onBunker = await page.evaluate(() =>
+    __NC.units.filter(u => u.side === 1).filter(u => u.lock && u.lock.kind === 'bunker').length);
+  ok('hitting a bunker commits attackers to it as well', onBunker >= 4, 'locked=' + onBunker);
+  let gone = false;
+  for (let i = 0; i < 30 && !gone; i++) {
+    await page.waitForTimeout(250);
+    gone = await page.evaluate(() => __NC.buildings.length === 0);
+  }
+  ok('the besieged bunker does fall', gone);
+  const freed = await page.evaluate(() => {
+    const mine = __NC.units.filter(u => u.side === 1 && !u.dead);
+    return { n: mine.length, stillLocked: mine.filter(u => u.lock).length,
+             onBase: mine.filter(u => u.target && u.target.kind === 'base').length };
+  });
+  ok('killing the building releases every attacker it held',
+     freed.n > 0 && freed.stillLocked === 0, JSON.stringify(freed));
+  ok('released attackers pick a new target and march on', freed.onBase > 0, JSON.stringify(freed));
 
   // ============================================================ the bunker
   const caps = await page.evaluate(() => {

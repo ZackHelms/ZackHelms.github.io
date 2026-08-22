@@ -562,6 +562,12 @@ A bunker is a building holding two units — they stop moving, become
 untargetable (the building eats the damage), fire through the slits at a
 minimum range of 15, and are **ejected alive** when it falls.
 
+A unit that lands its first blow on a **building** commits to it until the
+building falls (`u.lock`, shown as a dashed tether) and will not turn on
+defenders meanwhile — that siege lock is what makes an arrived push answerable
+at all. A unit merely *marching* at a base has committed to nothing and still
+diverts.
+
 Cards are **typed** — `unit`, `building`, `spell` — and every rule branches on
 the type, never on a card's name, because the deck is meant to grow. The fifth
 card is the first spell: **fireball** (5), an airburst on your own half whose

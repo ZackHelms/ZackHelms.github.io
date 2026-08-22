@@ -121,8 +121,9 @@ back. Everything about it follows from that.
   the anti-crowd payoff while cutting the value of a lazy centre-of-board cast.
 - **Knockback is radial**, out from the impact point, scaled by the same
   falloff, plus a short stun (`kb: 34`, `stun: 0.45`, shed at `KB_DECAY`).
-  Scattering the deathball is half the value of the card — a knocked unit
-  loses its target and has to walk back in.
+  Scattering the deathball is half the value of the card — a knocked unit is
+  shoved out of range and has to walk back in. Note it does **not** break a
+  siege lock: a committed unit comes back to the same building.
 - **It cannot damage a base, either side's.** Only units win the game. A
   spell that chipped the goalpost would turn hoarded energy into a second win
   condition and quietly undo the whole design. Geometry already makes it
@@ -191,6 +192,37 @@ that is farther than `range + AGGRO_PAD` (20) the unit walks at the enemy base
 instead. Garrisoned units cannot chase — they take what is inside their range
 or nothing. Retarget every 0.35–0.55 s.
 
+### The siege lock
+
+**Once a unit lands its first blow on a building it commits to that building
+until the building dies.** `u.lock` holds the target; while it is set,
+`stepUnit` skips `pickTarget` entirely, and it clears the instant `aliveT` says
+the building is gone (with `retarget` already expired, so the freed unit
+re-picks on the same frame).
+
+This is a *balance* rule, not a targeting convenience, and it is the reason a
+push is answerable at all. Without it, attackers that reach your base delete
+each defender the moment it lands — the defender can never get a body on the
+board. With it, a committed attacker keeps its back turned, so answering a push
+that has already arrived is the cheapest fighting in the game. Three details
+carry that intent and should not drift:
+
+- **It engages on the first blow, not on targeting.** A unit merely *marching*
+  at a base (the `pickTarget` fallthrough) has no lock and is still free to
+  divert onto a defender that steps into its path. Moving the assignment up
+  into `pickTarget` would quietly commit every unit that ever wandered
+  base-ward, and the counterplay would vanish.
+- **It covers every building** (`isBuilding`) — bunkers as well as bases. A
+  bunker parked near the halfway line is therefore a deliberate tarpit: it eats
+  attention as well as damage.
+- **A fireball does not break it.** The blast shoves a committed unit out of
+  range and it has to walk back, but it walks back to the same building.
+  "Until it is destroyed" means what it says.
+
+`drawLocks()` draws a faint pulsing dashed tether from each committed unit to
+its target, under the units. That readout is load-bearing — the defender has to
+be able to tell at a glance which attackers are busy and which are still free.
+
 Melee applies damage instantly plus a `slash` arc; ranged pushes a homing
 `shot` that resolves on arrival (and fizzles if its target dies first).
 `separate()` is an O(n²) soft push that also shoves units out of bunker radii
@@ -227,13 +259,17 @@ never drift from the thing it deploys.
 
 - `node .claude/scripts/smoke-mobile.cjs games/neon-clash/index.html`
 - `node .claude/scripts/check-games-sync.cjs`
-- `.claude/tests/drive-neon-clash.cjs` (59 checks) — drives a real touch drag
+- `.claude/tests/drive-neon-clash.cjs` (67 checks) — drives a real touch drag
   from the tray to the board, then asserts the refusal rules, the card types
   and deck order, the bunker/garrison caps, garrison ejection, a base kill
   ending the match, that the AI actually plays, and that the rotated top tray
   deploys for P2 — plus the portrait lock, where a landscape viewport must keep
   the portrait layout and a touch pushed through the view transform must still
-  hit the card it covers. The fireball block pins every rule above to a number:
+  hit the card it covers. The siege-lock block pins the rule from both
+  directions — a unit that has hit a building must not divert onto a defender
+  that walks up, one merely marching at a base must, and killing the building
+  must free every attacker it held. The fireball block pins every rule above to
+  a number:
   90 at the centre, 45 at the rim, nothing outside the circle, nothing friendly,
   neither base, a garrison untouched while its bunker burns, knockback that
   actually shoves a unit backwards against its own march, and LEGEND answering

@@ -111,7 +111,7 @@ html, body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build PENDING</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-22 20:40 UTC</div>
 <div id="app">
   <div id="hud">
     <div id="hud-left">
@@ -151,6 +151,7 @@ html, body {
   <div class="helprow"><div class="hk" style="color:var(--purple)">BUNKER 8</div><div><i>Building.</i> Stationary, holds two units. Garrisoned units stop moving, fire through the slits, and take no damage &mdash; the bunker eats it. Two per side; blow one up and it can be rebuilt.</div></div>
   <div class="helprow"><div class="hk" style="color:#ff7a1a">FIREBALL 5</div><div><i>Spell.</i> An airburst on your own half. Damage and knockback are hardest at the centre and halve at the rim, so it pays against a <b>crowd</b> and barely dents one unit &mdash; the card to hold when a big push is coming. Scatters what it hits; bases are immune, and a garrison inside a bunker is shielded from it.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--green)">BASE</div><div>The goalpost at the back of each half. Reduce the enemy base to zero and the match is yours.</div></div>
+  <div class="helprow"><div class="hk" style="color:var(--white)">SIEGE</div><div>The moment a unit lands its first hit on a <b>building</b> &mdash; a bunker or a base &mdash; it commits to that target until the building falls, and a dashed tether marks it. A committed unit <b>will not turn on your defenders</b> while it grinds, so answering a push that has already reached your base is the cheapest fighting you will ever do. Units still only <i>marching</i> at you can be pulled off.</div></div>
   <div class="btn-col" style="margin-top:6px;"><div class="ov-btn primary" id="btn-help-back">BACK</div></div>
 </div>
 
@@ -173,7 +174,8 @@ html, body {
 // Two symmetric halves of one board; energy trickles in at 1/sec (cap 20);
 // you drag cards onto your own half. Cards come in three types — units,
 // buildings and spells — and every rule branches on that type, not on a name.
-// First base to fall loses.
+// First base to fall loses — but a unit that has started hitting a building
+// commits to it until it falls, which is what gives the defender a window.
 // Side 0 = bottom half (P1 / "you", green). Side 1 = top half (AI or P2, red).
 // The top tray is drawn rotated 180 deg so a second player sitting opposite
 // the phone reads their own cards the right way up.
@@ -506,7 +508,7 @@ function spawnUnit(side, key, x, y) {
   units.push({
     id: uid++, side, key, k, x, y, hp: k.hp, maxHp: k.hp, r: k.r,
     cd: 0.35, target: null, retarget: 0, hurt: 0, swing: 0, home: null, slot: 0,
-    vx: 0, vy: 0, kbx: 0, kby: 0, stun: 0, kind: 'unit',
+    vx: 0, vy: 0, kbx: 0, kby: 0, stun: 0, lock: null, kind: 'unit',
   });
 }
 function spawnBunker(side, x, y) {
@@ -665,6 +667,7 @@ function floatTxt(x, y, txt, col) { fx.push({ t: 'txt', x, y, txt, col, life: 0.
 // ------------------------------------------------------------- simulation
 const effRange = u => u.home ? Math.max(u.k.range, GARRISON_MIN_RANGE) : u.k.range;
 const aliveT = e => e && !e.dead && e.hp > 0;
+const isBuilding = t => t.kind === 'bunker' || t.kind === 'base';
 const edgeDist = (u, t) => Math.hypot(u.x - t.x, u.y - t.y) - (t.r || 0);
 
 function pickTarget(u) {
@@ -748,7 +751,14 @@ function stepUnit(u, dt) {
   if (u.stun > 0) { u.stun = Math.max(0, u.stun - dt); u.vx = u.vy = 0; return; }
   u.cd -= dt;
   u.retarget -= dt;
-  if (!aliveT(u.target) || u.retarget <= 0) {
+  // SIEGE LOCK: once a unit lands its first blow on a building it commits to
+  // that building until the building dies. Being locked is what makes a push
+  // beatable — attackers grinding a base cannot turn and delete the defenders
+  // the moment they arrive, so the defender gets a window to answer.
+  if (u.lock && !aliveT(u.lock)) u.lock = null;
+  if (u.lock) {
+    u.target = u.lock;
+  } else if (!aliveT(u.target) || u.retarget <= 0) {
     u.target = pickTarget(u);
     u.retarget = rnd(0.35, 0.55);
   }
@@ -769,6 +779,9 @@ function stepUnit(u, dt) {
     if (u.cd <= 0) {
       u.cd = 1 / u.k.rate;
       u.swing = Math.min(0.18, 1 / u.k.rate * 0.5);
+      // committing happens on the first blow — a unit merely WALKING at a base
+      // is still free to divert onto a defender that steps into its path.
+      if (isBuilding(t)) u.lock = t;
       if (u.k.ranged) {
         shots.push({ x: u.x, y: u.y, target: t, dmg: u.k.dmg, side: u.side, sp: 78, col: u.k.col });
         sndBow();
@@ -1013,6 +1026,24 @@ function drawUnitShape(key, r, col, accent, t) {
     ctx.strokeStyle = accent; ctx.lineWidth = Math.max(0.8, r * 0.14);
     ctx.beginPath(); ctx.arc(0, 0, r * 0.42, 0, Math.PI * 2); ctx.stroke();
   }
+}
+// A committed unit is drawn tethered to the building it is grinding, so the
+// defender can see at a glance which attackers are busy and which are still
+// free to turn on whatever they answer with.
+function drawLocks() {
+  ctx.save();
+  ctx.setLineDash([3, 4]);
+  ctx.lineWidth = 1;
+  for (const u of units) {
+    if (u.dead || !u.lock || !aliveT(u.lock)) continue;
+    ctx.globalAlpha = 0.26 + 0.08 * Math.sin(matchT * 5 + u.id);
+    ctx.strokeStyle = SIDE_COL[u.side];
+    ctx.beginPath();
+    ctx.moveTo(sx(u.x), sy(u.y));
+    ctx.lineTo(sx(u.lock.x), sy(u.lock.y));
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 function drawUnit(u) {
   const col = SIDE_COL[u.side];
@@ -1374,6 +1405,7 @@ function render() {
   drawBoard();
   for (const b of bases) drawBase(b);
   for (const b of buildings) drawBunker(b);
+  drawLocks();
   for (const u of units) if (!u.home) drawUnit(u);
   drawShots();
   drawFx();
