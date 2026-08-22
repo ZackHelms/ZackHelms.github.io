@@ -261,3 +261,78 @@ minimum to skip straight past it. Assert persisted progress against
 `JSON.parse(localStorage['starSurge.saves'])[slot]`, not a bare key — the
 old single-character `starSurge.stage`/`starSurge.best`/
 `starSurge.sectorBossReady` keys are gone.
+
+## Lessons learned (2026-08-22 build session)
+
+Distilled from the session that took Star Surge from a 5-stage arcade
+shooter to the sector/pilot/progression game described above, for whoever
+touches this file next.
+
+- **Never ship harder content ahead of the power-growth that's meant to
+  offset it.** `MAX_SECTOR` was deliberately held at `1` for a full session
+  turn (structural sector/mini-boss/sector-boss code shipped, but no
+  *additional* sectors) until the XP/weapon/armor system existed to give
+  the player something to spend on. Raising sector count first would have
+  made the later sectors literally unbeatable against a fixed weapon-tier
+  ceiling. If a future ask is "add more sectors/waves/enemy types," check
+  whether the player's power curve can actually track it *before* touching
+  the difficulty knobs — don't assume balance will sort itself out.
+- **Balance numbers here are a first pass, not a spec.** `miniBossHp`,
+  `spawnSectorBoss`'s ×2.6, `campaignDifficulty()`'s coefficients, and
+  every weapon's `dmg`/cooldown formula were sized by rough hp-vs-estimated-
+  dps arithmetic, not by playing all 11 sectors. Treat the *shape* (harder
+  sectors, sector boss > mini-boss, XP funds power) as the durable part and
+  the *constants* as disposable — a user report of "sector 6 is a wall" or
+  "chain lightning does nothing to bosses" should freely override them
+  without needing to justify why the old number was wrong.
+- **Checkpoint granularity was tried finer, then deliberately simplified —
+  don't re-add the finer version without a new explicit request.** An
+  earlier pass in this same session persisted a mid-sector checkpoint
+  (`starSurge.sectorBossReady` + `startGame(stage, atSectorBoss)`, letting
+  CONTINUE resume exactly at a pending sector-boss fight). Once the user
+  clarified failure should mean "restart the *current sector* from stage
+  1," that whole mechanism was removed in favor of one `save.sector` int —
+  simpler, and it directly matches the answered design question. If sector
+  boss checkpointing seems desirable again later, that's a new decision to
+  confirm, not a bug to fix.
+- **Single-equip weapon *and* armor (one build at a time, no multi-slot
+  loadouts) is a confirmed answer, not a placeholder.** It came from an
+  explicit `AskUserQuestion` ("single build weapon" over multi-slot or
+  base+support) precisely because it changes how much combat code exists
+  per weapon. Don't refactor toward multiple simultaneous weapons/armors
+  without checking first — it's a deliberate build-identity choice, and it
+  roughly doubles the collision/rendering surface per weapon if reversed.
+- **Adaptive music needs a coarse switching granularity, and the natural
+  trigger is rarely the intuitive one.** Two heuristics were tried and
+  rejected before landing on "one track per whole stage": per-wave
+  switching (too fast to judge a track, the original complaint) and
+  enemies-on-screen-driven switching (thrashed the crossfade every time
+  `spawnQueue` briefly drained between spawn bursts — sounds obviously
+  reactive but is actually noisy). The fix that stuck was tying the switch
+  to a boundary that's already a deliberate pause in the game (the
+  stage-clear `stageBanner`), so the 1 s crossfade has somewhere calm to
+  land. If a future track-selection change is requested, look for an
+  existing "beat" in the game flow to hang it on before inventing a new
+  one.
+- **Testing technique that paid off: drive the game via direct
+  `page.evaluate()` state mutation, not simulated real-time play.** Calling
+  `spawnBoss(); bossDown();` or setting `sector = 5; stage = 4;` directly
+  from a headless-Chromium script reached deep game states (sector-boss
+  transitions, checkpoint persistence, every weapon's collision path) in
+  milliseconds instead of playing through minutes of real combat. Combined
+  with a real (unmocked) `AudioContext` in headless Chromium, this was
+  enough to prove the whole music engine schedules and crossfades for
+  several in-game minutes with zero console errors — no need to mock
+  WebAudio for an integration-level check like that; save mocking
+  (`mock-run.cjs`-style, a fake `AC` object) for pure-logic unit checks
+  like the score compiler, where you want to assert on the exact node
+  graph built rather than "did it throw."
+- **Author data-heavy content offline, validate, then hand-embed — don't
+  write large generated blobs by hand or trust them unvalidated.** All 20
+  music tracks were built by a throwaway Node generator
+  (`.claude/scripts/star-surge-music/gen.cjs`) that runs every track
+  through the same `compileScore`/`validateScore` the game uses, catching
+  malformed patterns before they ever reached the shipped file. That
+  generator is kept (not deleted after use) specifically so a future "redo
+  track N" request has a starting point instead of hand-editing pattern
+  strings from scratch.
