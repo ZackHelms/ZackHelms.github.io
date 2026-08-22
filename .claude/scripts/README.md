@@ -48,6 +48,24 @@ Deterministic helpers for working on this repo.
     w=900 h=700 wait=2500 select=#species:pine
   ```
 
+- `gates.sh` — runs the whole validation set in one command: the smoke gate on
+  each changed page, `check-games-sync.cjs` (always — it is free), and any kept
+  `.claude/tests/drive-<slug>.cjs` for the games those pages belong to. Resolves
+  `NODE_PATH` itself, so there is nothing to remember. One parseable line per
+  gate, final `GATES: GREEN`/`RED`, exit 0/1.
+
+  ```
+  .claude/scripts/gates.sh                     # derive pages from git
+  .claude/scripts/gates.sh games/<slug>/index.html   # explicit
+  .claude/scripts/gates.sh --no-drive          # smoke + sync only
+  ```
+
+  With no arguments it takes the changed `.html` from the working tree, the
+  index, and `origin/main...HEAD` — the common mid-session case. It reports
+  `SMOKE skipped (no playwright-core)` **and fails**, rather than passing
+  quietly, because a silently-skipped gate is the failure mode
+  `.claude/zmh/producer.md` § Validation explicitly forbids.
+
 - `check-games-sync.cjs` — three-way catalog gate. A new game has to land in
   the hub card, the hub's `GAMES[]` facet dataset, **and** the
   `.claude/games-index.md` row, and those drift independently. Checks card ↔
@@ -68,11 +86,22 @@ Deterministic helpers for working on this repo.
 
 - `stamp-badge.sh` — sets each given page's `#build-badge` to the current
   UTC time (badge SOP: `games/CLAUDE.md` § Build Timestamp Badge). Replaces
-  whatever timestamp/placeholder the badge holds — no need to know the old
-  string. One invocation = one identical timestamp across all files. Prints
-  `STAMPED <file> <ts>` per file; exits 1 (`NO-BADGE`/`NO-FILE`) so gates
-  fail loudly. Run it as the last step before commit on every changed page:
+  whatever the badge holds — timestamp or placeholder of any shape — because
+  it rewrites the div's whole text, then **greps the file back** to confirm the
+  substitution landed. One invocation = one identical timestamp across all
+  files. Prints `STAMPED <file> <ts>` per file; exits 1
+  (`NO-BADGE`/`NO-FILE`/`NO-STAMP`) so gates fail loudly. Run it as the last
+  step before commit on every changed page:
 
   ```
   .claude/scripts/stamp-badge.sh games/index.html games/<slug>/index.html
   ```
+
+  **The self-check is the point** (added 2026-08-22 after it bit). The sed used
+  to match only `build [0-9]{4}-…-…  ..:.. UTC`, so on a badge reading
+  `build PENDING` it matched nothing, changed nothing — and still printed
+  `STAMPED`. Neon Clash shipped twice with an unstamped badge, and two session
+  reports quoted timestamps that had never been written. Root cause was not the
+  regex, it was a tool asserting an outcome it had not verified; the class to
+  watch for is any helper whose success line is computed from *intent* rather
+  than from re-reading the artifact.

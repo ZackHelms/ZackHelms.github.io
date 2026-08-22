@@ -4,6 +4,25 @@
 
 It is fine to push directly to the `main` branch for this repository. No pull request is required.
 
+**Concurrent sessions are normal here** — the CD often has two games in flight
+in the same repo at once, and each one pushes to `main`. So never push a merge
+you have not just re-checked:
+
+1. `git fetch origin main` and re-check `git rev-list --count HEAD..origin/main`
+   **immediately before** every push. It can go non-zero between your gate run
+   and your push.
+2. If it is non-zero, merge `origin/main` **into your branch**, resolve there,
+   re-run the gates, and only then fast-forward `main`. Never author a merge
+   commit on `main` itself — a fast-forward cannot silently drop the other
+   session's work.
+3. Sanity-check the other session's files survived (`git show`/`ls` the paths
+   its commits touched) before reporting done. Shared files that both sessions
+   append to — `.claude/tests/README.md`, `.claude/games-index.md`,
+   `games/index.html`'s `GAMES[]` — are where a bad merge actually bites.
+
+The one file that is genuinely single-writer is `.claude/last-refine-sha`; see
+`.claude/zmh/producer.md` § Plans for what that means for `/zmh-producer:refine-context`.
+
 ## Project structure
 
 - `games/` — self-contained single-file HTML games (CSS + JS inline, no shared libs)
@@ -109,7 +128,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Sky Lantern (`games/sky-lantern/`) | `.claude/sky-lantern.md` | Any work on the breath-flight game — mic RMS→breath mapping, burner/heat model, level generator + its three fairness gates |
 | Signal Hunt (`games/signal-hunt/`) | `.claude/signal-hunt.md` | Any work on the hidden-object hunt — world/decoy generation, pan-pinch input, share codes and duel flow, colourblind labels |
 | Turret Builder (`games/turret-builder/`) | `.claude/turret-builder.md` | Any work on the module-grid tower defense — the payload model and the CD's worked example (asserted to the decimal), the damage-decays/effects-don't rule, super-linear stack curves, diagonal boosters, the fifteen named combos and the discoveries codex, orthogonal sharing between turrets and walls, kinetic-vs-elemental typing and the scaling-armour rule, the narrow HP_LEVEL band, and the two test suites |
-| Neon Clash (`games/neon-clash/`) | `.claude/neon-clash.md` | Any work on the real-time card skirmish — the rotated two-player tray, the deploy contract, bunker/garrison rules, unit stats, the AI ladder |
+| Neon Clash (`games/neon-clash/`) | `.claude/neon-clash.md` | Any work on the real-time card skirmish — the rotated two-player tray, the unit/building/**spell** card-type contract every rule branches on, the deploy contract, bunker/garrison rules, the fireball falloff, the siege lock, unit stats, the AI ladder |
 | Phasic (`games/phasic/`) | `.claude/phasic.md` | Any work on the phase-change block sort — soft-body particle physics, symmetric phase/base rules, gas guidance field, gravity-well bucket, curriculum blocks + complexity metric, generator/solver (three board templates, in-path obstacle weaving), STUCK ghost-replay, in-game wiki + tactics registry, resting-freeze fairness rule, chrome/layout (landscape column, rotation self-heal), proprietary-license carve-out, iOS-port notes |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.

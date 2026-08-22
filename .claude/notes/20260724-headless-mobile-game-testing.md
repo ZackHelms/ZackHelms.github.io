@@ -86,6 +86,41 @@ the fuller gameplay-driving pattern and the traps hit.
   bug at a glance; `@@` is clearer). Generalised: when a check fails
   *uniformly across every case*, suspect the harness before the subject.
 
+Fifth batch (2026-08-22, neon-clash) added three more test-was-wrong classes,
+all of them the same shape — **the scenario, not the rule, was what broke**:
+
+- **The subject must outlive the measurement window.** Two garrison checks
+  failed claiming the bunker never fired and never died. It fired fine: the
+  garrison's combined 52 dps killed the 130-HP test fighter well before the
+  3.2 s sample, so the sampled frame showed an idle bunker and a dead target.
+  Fixed by parking a 260-HP tank instead and **polling for the outcome** rather
+  than reading one frame at a fixed delay. Generalised: when staging a fight to
+  observe something, size the victim so it survives the whole window, and prefer
+  `while (!done && tries--) { wait; recheck }` over a single `waitForTimeout`
+  tuned by hand. A fixed sleep encodes a dps number that a rebalance will
+  silently invalidate.
+- **A magic input offset is only legal at the position you first tried it.**
+  A helper deployed into a bunker with `deploy(side,'archer', b.x, b.y - 9)` —
+  9 being the game's drag offset. That works for a bunker deep in your half and
+  becomes an illegal drop the moment the bunker sits near the halfway line,
+  because the *finger* lands on the opponent's side. The check then fails for a
+  reason with nothing to do with garrisons. Derive the offset from the rule
+  under test, or assert the setup step succeeded before asserting anything
+  about its effect.
+- **In vs-AI mode the AI is a live NPC in every test.** A lone scripted attacker
+  never reached the base because the ROOKIE AI intercepted it — the same family
+  as the patrol-guard and air-hockey cases above, but easy to miss because the
+  interference comes from the *mode*, not from an actor array you can clear.
+  Any rule that is not about the AI should be driven in a two-player/no-AI mode.
+
+Also from that batch, a pattern worth copying: **give the test hook a separate,
+clearly-labelled scenario-setup entry point.** `__NC.place(side, key, x, y)`
+spawns a unit at an exact spot with no rules applied, so a check can *arrange* a
+cluster and then act on it through the real `tryDeploy` path. Keeping the
+bypass and the real path as different functions is what stops setup convenience
+from quietly becoming the thing under test — the hook's own comment says it is
+never to be used to assert placement behaviour.
+
 ## Real bug classes the drives caught (2026-07-24 four-game batch)
 
 Unlike the traps above, these were genuine game bugs — the drive was right.

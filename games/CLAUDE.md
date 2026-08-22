@@ -45,9 +45,21 @@ committing:**
 1. Get the current UTC timestamp: `date -u '+%Y-%m-%d %H:%M UTC'`.
 2. Update that file's `#build-badge` text to the new timestamp (add the badge
    if the file doesn't have one yet).
-3. State that exact timestamp string in your reply when you report the
-   update as complete, so the user can compare it against what renders live
-   once deployed.
+3. **Read the badge back out of the file** and quote *that* string in your
+   reply, so the user can compare it against what renders live once deployed.
+   Read the artifact, never the stamper's own stdout: `stamp-badge.sh` printed
+   `STAMPED` for two months while silently doing nothing to any badge whose
+   text was not already timestamp-shaped, and Neon Clash shipped twice reading
+   `build PENDING` behind that false green (2026-08-22, now fixed and
+   self-verifying). A tool that reports success without checking its own effect
+   is not evidence.
+
+   ```
+   grep -o 'id="build-badge"[^>]*>[^<]*' <file> | sed 's/.*>//'
+   ```
+
+   Corollary for **new** games: write the badge with a real timestamp from the
+   start rather than a `PENDING`-style placeholder.
 
 Excluded: frozen checkpoint files (e.g. `stick-commander-3d.v001.html`) —
 they're intentionally never modified, so they don't get a badge.

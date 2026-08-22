@@ -29,6 +29,16 @@
   plans use it)
 - Task-scoping skill: none
 - Metrics ledger: none
+- **Note:** `.claude/last-refine-sha` is a **single repo-wide pointer**, but this
+  repo routinely has two game sessions in flight at once (CLAUDE.md § Git
+  workflow). Whichever refines first moves the pointer for both, so
+  `git log <sha>..HEAD` can hand a session a scope that is mostly another
+  session's already-refined work — and can hide its own earlier commits behind
+  the other session's refine commit. Read the commit *subjects* in that range
+  and refine only what this session actually did; a `docs(claude): refine …`
+  commit in the range is the other session's pass and is skippable. (Hit
+  2026-08-22: the star-surge pass set the pointer to `ca7891a`, so the
+  neon-clash session's own `9410b86`/`312f002` sat below it, unrefined.)
 
 ## Validation
 - Procedure: headless mobile smoke-load of every changed page (the games
