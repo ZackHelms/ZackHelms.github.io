@@ -1,9 +1,14 @@
 # Star Surge (`games/star-surge/index.html`) — architecture notes
 
-Vertical shmup: drag-steer (relative 1.2× finger delta, clamped to lower
-65% of screen), fires only while the finger/mouse is down (`fireT` only
-decrements inside `if (drag)`; `onDown` zeroes `fireT` so the first shot on
-a fresh press is instant). A **sector** is `MAX_STAGE` (5) stages, each with
+Vertical shmup: drag-steer (relative 1.2× finger delta, clamped vertically
+to `[safeTop+55, H-safeBot-30]` — the ship can fly almost to the top of the
+screen, not just the lower 65%, so short-range weapons (flame/EMP) can
+actually reach shooters/spinners that hold high up), fires only while the
+finger/mouse is down (`fireT` only decrements inside `if (drag)`; `onDown`
+zeroes `fireT` so the first shot on a fresh press is instant — this is also
+the game's core skill knob: tapping fast fires faster than holding
+(cooldown-gated), while holding auto-fires at a steady pace, so the player
+trades "stay put and tap" against "dodge and hold"). A **sector** is `MAX_STAGE` (5) stages, each with
 its own mini-boss, capped by one extra, harder/longer **sector boss**.
 `MAX_SECTOR` is `11`, difficulty-scaled by `campaignDifficulty()` (below) —
 raised from the original single sector once the save/XP/weapon/armor
@@ -79,13 +84,22 @@ HUD, and music to distinguish them — there is no separate state variable.
 sector 1 stage 1, `+1` per full sector, so it's a smooth ramp inside a
 sector (matches "starts easy, gets harder" per sector) layered under an
 overall campaign trend. It feeds: `buildWave`'s enemy count (`n = 4 + st +
-floor(diff*0.8)`), mini/sector-boss hp (above), shooter-enemy and boss
-bullet speed, and shooter fire-rate. It does **not** touch `STAGE_HUES` —
-enemy color still cycles by `stage` (1‑5) only, repeating every sector, to
-avoid needing 55 colors. Only sanity-checked numerically (rough
-hp-vs-estimated-player-dps ratios at sector 1/6/11), not simulated or
-played end-to-end — treat the constants in `miniBossHp`/`spawnSectorBoss`/
-`buildWave` as a tuning starting point.
+floor(diff*0.8)`), **each individual enemy's hp** (`enemyHp(type) =
+round(ENEMY_DEFS[type].hp * (1 + diff*0.35))`, called from `spawnEnemy` —
+`ENEMY_DEFS[type].hp` is the sector-1 base, not a static value used
+directly), mini/sector-boss hp (above), shooter-enemy and boss bullet
+speed, shooter fire-rate, and **incoming damage to the ship**
+(`incomingBulletDmg()`/`incomingRamDmg()` = base 18/26 ×
+`(1 + diff*0.12)`, so mistakes cost more as sectors climb). It does **not**
+touch `STAGE_HUES` — enemy color still cycles by `stage` (1‑5) only,
+repeating every sector, to avoid needing 55 colors. Only sanity-checked
+numerically (rough hp-vs-estimated-player-dps ratios at sector 1/6/11 plus
+a headless Playwright timing check that a fresh tier-1 pilot needs several
+seconds and multiple hits per enemy, not an instant wipe), not played
+end-to-end by a human across all 11 sectors — treat the constants in
+`miniBossHp`/`spawnSectorBoss`/`buildWave`/`enemyHp` as a tuning starting
+point that will likely need a further pass once someone's actually played
+it.
 
 ## XP economy + Shipyard
 
@@ -111,45 +125,52 @@ entirely, weapon cannot since `blaster` is always owned and free).
 `WEAPON_DEFS[id]` carries `name/color/unlockCost/tierCost[]/desc`; ids:
 `blaster` (free starter), `beam`, `flame`, `bombs`, `missiles`, `bolas`,
 `chain`, `emp`. `save.weapons[id]` is the **permanent** XP-purchased tier
-(1‑5) that scales a weapon's fundamentals; the in-run `weapon` variable
-(1‑4, the pre-existing P-powerup pickup) is a **temporary** per-run boost
-layered on top of whichever weapon is equipped — same name, two different
-axes, don't confuse them when reading combat code. Dispatch lives in
-`update()`'s player-fire block, keyed on `save.equippedWeapon`:
+(1‑5) that scales a weapon's *quality* (dmg/dps/radius/turnRate — never
+count); the in-run `weapon` variable (1‑4, the P-powerup pickup) is a
+**temporary** per-run *quantity + speed* multiplier — more barrels/beams/
+lobes/jumps, and faster cooldowns via `atkSpeedMul()` — layered on top of
+whichever weapon is equipped. Same name (`weapon`/`tier`), two deliberately
+separate axes: keeping them apart is what makes a P pickup feel like a
+real spike instead of just compounding the permanent-tier numbers, and
+it's why "in-stage power-ups don't feel special" was fixable without
+touching the XP economy at all. Dispatch lives in `update()`'s player-fire
+block, keyed on `save.equippedWeapon`:
 
-- **blaster**: unchanged discrete-bullet pattern (pips 1‑4 = single → twin
-  → triple spread → triple fast); permanent tier just adds flat `dmg`
-  per bullet.
+- **blaster / bombs / missiles / bolas**: all four discrete-bullet weapons
+  share `spreadOffsets(weapon, gap)` (centered offsets, one bullet per
+  pip — pip 1 = single shot, pip 4 = four-way spread) in `fireWeapon()`;
+  only the per-bullet `gap` differs per weapon. Permanent tier still sets
+  `dmg`/`radius`/`splash`/`turnRate` per bullet, unchanged by pip.
 - **beam** / **flame**: continuous, not cooldown-gated — `tickBeam`/
   `tickFlame` run every frame while `drag` is truthy and apply `dps*dt`
-  directly (no `bullets` entries). Beam = vertical band (`|dx|<width`,
-  pierces everything in the band); flame = short cone (`range` +
-  `±0.55 rad` from straight up). Both add the in-run pip as a flat dps
-  bonus (there's no discrete shot to make bigger).
-- **bombs**: `wtype:'bombs'` bullets carry `dmg/radius/splash`;
-  `applyBulletHit` explodes on the FIRST thing hit — full `dmg` to it,
-  `splash` to every other enemy/boss within `radius` (own separate
-  `boomAt`, checks for a second kill/bossDown from splash).
-- **missiles**: `wtype:'missiles'` bullets steer toward the nearest live
-  enemy/boss by up to `turnRate*dt` radians per frame (nearest-target
-  search re-run every frame — no locked target memory, so a missile can
-  switch targets mid-flight if a closer one appears).
-- **bolas**: low flat `dmg`; on hit sets `target.slowT =
-  max(target.slowT, slowDur)` (refresh, not stack). Enemy update loop
-  multiplies all movement/timer deltas by `slowMul = e.slowT>0 ? 0.4 : 1`
-  — slows movement AND fire-rate together. Rendered as a thin ring
-  overlay on `drawEnemy` while `slowT>0`.
+  directly (no `bullets` entries), so their "attack speed" *is* their pip
+  effect already covered — instead pip adds parallel instances. Beam:
+  `beamOffsets()` (`spreadOffsets(weapon, 20)`) fires one parallel
+  vertical band per pip, `damageInBeam(x, dps, dt, width)` now takes an
+  explicit x so each offset band can be checked independently (draw loop
+  mirrors the same offsets). Flame: `FLAME_LOBES[weapon]` (1/2/3/4 angle
+  offsets from straight up, `±0.32 rad` half-angle each) — pip 1 is one
+  cone, pip 4 is four overlapping-but-distinct cones; `tickFlame` checks
+  membership in *any* lobe so a target isn't double-hit if two lobes
+  overlap it. Base range bumped `90→100` alongside the ship's wider
+  vertical range (below) so it can actually reach high-holding enemies.
+  Permanent tier scales `dps`/`range` only — pip no longer adds a flat dps
+  bonus on either (that's now entirely the lobe/beam count's job).
 - **chain**: hitscan, no `bullets` entry — `fireChain()` runs on the
   normal cooldown, finds the nearest target within 520px of the ship,
-  then up to `count` more within 140px of the *previous* hit (never
-  re-hitting the same target), damage decaying ×0.75 per jump. Draws one
+  then up to `count = 2 + floor(tier/2) + (weapon-1)` more within 140px of
+  the *previous* hit (never re-hitting the same target), damage decaying
+  ×0.75 per jump. Pip now adds extra jumps directly (the chain-lightning
+  analog of "more turrets") instead of a flat dmg bonus. Draws one
   `lightningBolts` entry (a point-path, faded over 0.25s) connecting every
   hit in order.
 - **emp**: also hitscan-on-cooldown — `fireEmp()` damages everything
   within `radius` of the ship AND deletes every `ebullets` entry in that
   same radius (`ebullets.filter(... >= radius)`), the one weapon that's
-  explicitly defensive utility over dps. Pushes an `empPulses` ring
-  (expands to `maxR` over 0.4s, fades over 0.5s).
+  explicitly defensive utility over dps. Pip has no natural "count" analog
+  for a single burst pulse, so it's the one exception that still grows
+  `radius`/`dmg` directly instead of a projectile/beam/lobe count. Pushes
+  an `empPulses` ring (expands to `maxR` over 0.4s, fades over 0.5s).
 
 `applyBulletHit(b, target)` is the single collision-damage entry point for
 every discrete-bullet weapon (blaster/bombs/missiles/bolas) — it replaced
@@ -327,6 +348,19 @@ touches this file next.
   (`mock-run.cjs`-style, a fake `AC` object) for pure-logic unit checks
   like the score compiler, where you want to assert on the exact node
   graph built rather than "did it throw."
+- **"In-run power-up doesn't feel special" was a symptom of enemies being
+  paper-thin, not of the power-up itself.** The 2026-08-22 balance pass
+  (drone/shooter/spinner/tanker hp roughly doubled at sector 1 and scaled
+  further by `campaignDifficulty()`, ship's vertical range widened to
+  reach high-holding enemies) came from realizing every enemy died in 1-2
+  hits even at the *lowest* weapon tier, so a P pickup's only visible
+  effect was making an already-instant kill marginally faster. The actual
+  fix was two-pronged: make baseline combat take real hits-to-kill (enemy
+  hp), *then* make the pickup change something qualitatively different
+  (projectile/beam/lobe/jump **count**, not just more dps) so picking one
+  up reads as a build change, not a dps tick. A future "X doesn't feel
+  impactful" complaint is often the neighboring system being too weak/too
+  strong, not the thing itself.
 - **Author data-heavy content offline, validate, then hand-embed — don't
   write large generated blobs by hand or trust them unvalidated.** All 20
   music tracks were built by a throwaway Node generator

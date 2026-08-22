@@ -331,15 +331,22 @@ mini-boss, the whole sector capped by one harder, longer **sector boss**
 (2.6× the toughest mini-boss's hp, wider spread, denser rings); 11 sectors,
 difficulty-scaled by `campaignDifficulty()`. Dying always restarts the
 *current* sector from stage 1 — XP and shipyard purchases are never lost,
-only run progress. Ship has hp (no more lives) plus one equipped **armor**
-(regenerative / recharging shield / flat damage-reduction plating) and one
-equipped **weapon build** — blaster (free), beam, flamethrower, bombs,
-missiles, bolas, chain lightning, or EMP, each a genuinely different
-playstyle (piercing line, close-range cone, AoE splash, homing, slow-on-hit,
+only run progress. Ship has hp (no more lives, enemy hp/incoming damage both scale with
+`campaignDifficulty()`) plus one equipped **armor** (regenerative /
+recharging shield / flat damage-reduction plating) and one equipped
+**weapon build** — blaster (free), beam, flamethrower, bombs, missiles,
+bolas, chain lightning, or EMP, each a genuinely different playstyle
+(piercing line, close-range cone, AoE splash, homing, slow-on-hit,
 multi-target arcs, anti-bullet pulse) — unlocked and tiered up via XP
-earned from kills/bosses in the in-game **Shipyard**. Drones/shooters/
-spinners/tankers, P/S/G powerups (in-run weapon-tier boost, shield charge,
-surge bomb), stage-hued enemies. 20-track adaptive soundtrack
+earned from kills/bosses in the in-game **Shipyard**. The permanent XP tier
+sets a weapon's quality (dmg/dps/radius); the in-run P powerup is a
+separate quantity+speed axis — more barrels/beams/cones/chain-jumps plus
+faster cooldowns — so picking one up mid-run is a build-shaped spike, not
+just a bigger number. Ship can fly almost to the top of the screen (not
+just the lower 65%), so short-range weapons can reach high-holding
+enemies. Drones/shooters/spinners/tankers, P/S/G powerups (in-run
+weapon-tier boost, shield charge, surge bomb), stage-hued enemies.
+20-track adaptive soundtrack
 (webaudio-score/v1 data + compiler + look-ahead scheduler): one track plays
 per whole stage (through its mini-boss), the sector boss gets its own
 more-intense track, both pools round-robin across sectors, `NN · TITLE`
