@@ -92,14 +92,24 @@ speed, shooter fire-rate, and **incoming damage to the ship**
 (`incomingBulletDmg()`/`incomingRamDmg()` = base 18/26 ×
 `(1 + diff*0.12)`, so mistakes cost more as sectors climb). It does **not**
 touch `STAGE_HUES` — enemy color still cycles by `stage` (1‑5) only,
-repeating every sector, to avoid needing 55 colors. Only sanity-checked
-numerically (rough hp-vs-estimated-player-dps ratios at sector 1/6/11 plus
-a headless Playwright timing check that a fresh tier-1 pilot needs several
-seconds and multiple hits per enemy, not an instant wipe), not played
-end-to-end by a human across all 11 sectors — treat the constants in
+repeating every sector, to avoid needing 55 colors. Sanity-checked
+numerically (rough hp-vs-estimated-player-dps ratios at sector 1/6/11, a
+headless Playwright timing check that a fresh tier-1 pilot needs several
+seconds and multiple hits per enemy rather than an instant wipe, and the
+formula-level regression gate below), not played end-to-end by a human
+across all 11 sectors — treat the constants in
 `miniBossHp`/`spawnSectorBoss`/`buildWave`/`enemyHp` as a tuning starting
 point that will likely need a further pass once someone's actually played
 it.
+
+**Regression gate:** `.claude/tests/drive-star-surge.cjs` (29 checks) pins
+every weapon's pip-vs-tier formula (fire rate is pip-invariant; discrete
+weapon counts, bomb turret/radius alternation, beam/flame band/lobe counts,
+chain jump count, EMP radius-only growth, and the missile min-turn-radius
+floor all match their formulas exactly) plus the enemy-hp/incoming-damage
+difficulty ramp — run it after touching any weapon or difficulty formula in
+this file's § Weapons or this section, the same way as the smoke gate (see
+`.claude/tests/README.md`).
 
 ## XP economy + Shipyard
 

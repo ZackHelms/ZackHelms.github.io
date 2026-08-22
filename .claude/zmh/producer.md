@@ -18,16 +18,15 @@
 - Icebox bucket: Icebox
 - In-progress SOP: no
 - Done log: DONE.md
-- **Note:** `TODO.md`/`DONE.md` do not exist yet — this repo has never had a
-  backlog file. The first `/zmh-producer:backlog-refine` run creates them
-  with the bucket layout above; until then, commands that read the backlog
-  treat it as empty rather than failing.
+- **Note:** `TODO.md`/`DONE.md` exist but are scoped to **Phasic** only
+  (created 2026-07-31/08-01) — other games' work is tracked per-game in
+  `.claude/<game>.md` until it earns a CD-facing backlog entry here (see
+  `TODO.md`'s own header note).
 
 ## Plans
 - Plans dir: `.claude/plans/` (archive: `.claude/plans/DONE/`)
-- Plan template: `.claude/templates/plan.md` — not yet present; the first
-  `/zmh-producer:backlog-plan-gen` run copies the plugin's plan template
-  here before writing its first plan
+- Plan template: `.claude/templates/plan.md` (present; Phasic's oversee
+  plans use it)
 - Task-scoping skill: none
 - Metrics ledger: none
 
