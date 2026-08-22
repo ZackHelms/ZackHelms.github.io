@@ -125,52 +125,81 @@ entirely, weapon cannot since `blaster` is always owned and free).
 `WEAPON_DEFS[id]` carries `name/color/unlockCost/tierCost[]/desc`; ids:
 `blaster` (free starter), `beam`, `flame`, `bombs`, `missiles`, `bolas`,
 `chain`, `emp`. `save.weapons[id]` is the **permanent** XP-purchased tier
-(1‑5) that scales a weapon's *quality* (dmg/dps/radius/turnRate — never
-count); the in-run `weapon` variable (1‑4, the P-powerup pickup) is a
-**temporary** per-run *quantity + speed* multiplier — more barrels/beams/
-lobes/jumps, and faster cooldowns via `atkSpeedMul()` — layered on top of
-whichever weapon is equipped. Same name (`weapon`/`tier`), two deliberately
-separate axes: keeping them apart is what makes a P pickup feel like a
-real spike instead of just compounding the permanent-tier numbers, and
-it's why "in-stage power-ups don't feel special" was fixable without
-touching the XP economy at all. Dispatch lives in `update()`'s player-fire
-block, keyed on `save.equippedWeapon`:
+(1‑5) that scales a weapon's *quality* (dmg/dps/radius/turn-agility —
+never count, never fire rate); the in-run `weapon` variable (1‑4, the
+P-powerup pickup) is a **temporary** per-run *quantity/area* multiplier —
+more barrels/beams/lobes/jumps, or (EMP only) a bigger blast radius —
+layered on top of whichever weapon is equipped. Fire rate (`weaponCooldown()`)
+is a flat per-weapon constant now, untouched by both axes — the player's
+own tap-fast-vs-hold-steady cadence is the only thing that controls attack
+speed, which is deliberate: a pickup that also sped up firing would erode
+that skill knob. Same name (`weapon`/`tier`), two deliberately separate
+axes: keeping them apart is what makes a P pickup feel like a real spike
+instead of just compounding the permanent-tier numbers, and it's why
+"in-stage power-ups don't feel special" was fixable without touching the
+XP economy at all. Dispatch lives in `update()`'s player-fire block, keyed
+on `save.equippedWeapon`:
 
-- **blaster / bombs / missiles / bolas**: all four discrete-bullet weapons
-  share `spreadOffsets(weapon, gap)` (centered offsets, one bullet per
-  pip — pip 1 = single shot, pip 4 = four-way spread) in `fireWeapon()`;
-  only the per-bullet `gap` differs per weapon. Permanent tier still sets
-  `dmg`/`radius`/`splash`/`turnRate` per bullet, unchanged by pip.
+- **blaster / missiles / bolas**: share `spreadOffsets(weapon, gap)`
+  (centered offsets, one bullet per pip — pip 1 = single shot, pip 4 =
+  four-way spread) in `fireWeapon()`; only the per-bullet `gap` differs per
+  weapon. Permanent tier still sets `dmg`/`slowDur` per bullet, unchanged
+  by pip.
+- **bombs**: pip alternates between "more turrets" and a bigger blast via
+  `BOMB_UPGRADES[weapon]` = `{count, radiusMul}` — `1:{1,1}` `2:{2,1}`
+  `3:{2,1.35}` `4:{3,1.35}` (pip 2 adds a second bomb, pip 3 grows the
+  blast 35%, pip 4 adds a third bomb) — `spreadOffsets(up.count, 20)` fires
+  `up.count` bombs, each `radius: (55 + tier*10) * up.radiusMul`. Permanent
+  tier still sets `dmg`/`splash` per bomb. The liked "firework" impact
+  effect (`applyBulletHit`'s bombs branch) now layers three `boomAt` bursts
+  — amber `#ffc300`, then orange `#ff5500` and red `#ff2200` "molten
+  debris" — all three counts scaled by `b.radius/65` so a bigger blast
+  (from a radius pip) throws visibly more debris, not just a bigger
+  invisible hitbox.
 - **beam** / **flame**: continuous, not cooldown-gated — `tickBeam`/
   `tickFlame` run every frame while `drag` is truthy and apply `dps*dt`
-  directly (no `bullets` entries), so their "attack speed" *is* their pip
-  effect already covered — instead pip adds parallel instances. Beam:
-  `beamOffsets()` (`spreadOffsets(weapon, 20)`) fires one parallel
-  vertical band per pip, `damageInBeam(x, dps, dt, width)` now takes an
-  explicit x so each offset band can be checked independently (draw loop
-  mirrors the same offsets). Flame: `FLAME_LOBES[weapon]` (1/2/3/4 angle
-  offsets from straight up, `±0.32 rad` half-angle each) — pip 1 is one
-  cone, pip 4 is four overlapping-but-distinct cones; `tickFlame` checks
-  membership in *any* lobe so a target isn't double-hit if two lobes
-  overlap it. Base range bumped `90→100` alongside the ship's wider
-  vertical range (below) so it can actually reach high-holding enemies.
-  Permanent tier scales `dps`/`range` only — pip no longer adds a flat dps
-  bonus on either (that's now entirely the lobe/beam count's job).
+  directly (no `bullets` entries) — pip adds parallel instances, never
+  touches dps. Beam: `beamOffsets()` (`spreadOffsets(weapon, 20)`) fires
+  one parallel vertical band per pip, `damageInBeam(x, dps, dt, width)`
+  takes an explicit x so each offset band can be checked independently
+  (draw loop mirrors the same offsets). Flame: `FLAME_LOBES[weapon]`
+  (1/2/3/4 angle offsets from straight up, `±0.32 rad` half-angle each) —
+  pip 1 is one cone, pip 4 is four overlapping-but-distinct cones;
+  `tickFlame` checks membership in *any* lobe so a target isn't double-hit
+  if two lobes overlap it. Base range bumped `90→100` alongside the ship's
+  wider vertical range (below) so it can actually reach high-holding
+  enemies. Permanent tier scales `dps`/`range` only.
 - **chain**: hitscan, no `bullets` entry — `fireChain()` runs on the
-  normal cooldown, finds the nearest target within 520px of the ship,
-  then up to `count = 2 + floor(tier/2) + (weapon-1)` more within 140px of
-  the *previous* hit (never re-hitting the same target), damage decaying
-  ×0.75 per jump. Pip now adds extra jumps directly (the chain-lightning
-  analog of "more turrets") instead of a flat dmg bonus. Draws one
-  `lightningBolts` entry (a point-path, faded over 0.25s) connecting every
-  hit in order.
+  normal cooldown, finds the nearest target within 520px of the ship, then
+  up to `count = (weapon-1)*2` more within 140px of the *previous* hit
+  (never re-hitting the same target), damage decaying ×0.75 per jump. Pip
+  1 is **zero jumps** (a single hit, no chain at all); each pip after that
+  adds two more jumps (so up to 1/3/5/7 total enemies hit at pip 1/2/3/4,
+  capped by how many targets are actually in range) — the chain-lightning
+  analog of "more turrets." Draws one `lightningBolts` entry (a point-path,
+  faded over 0.25s) connecting every hit in order.
 - **emp**: also hitscan-on-cooldown — `fireEmp()` damages everything
   within `radius` of the ship AND deletes every `ebullets` entry in that
   same radius (`ebullets.filter(... >= radius)`), the one weapon that's
   explicitly defensive utility over dps. Pip has no natural "count" analog
-  for a single burst pulse, so it's the one exception that still grows
-  `radius`/`dmg` directly instead of a projectile/beam/lobe count. Pushes
-  an `empPulses` ring (expands to `maxR` over 0.4s, fades over 0.5s).
+  for a single burst pulse, so it's the one weapon where the pip grows
+  `radius` directly (`100 + tier*20 + (weapon-1)*18`) instead of a
+  projectile/beam/lobe count — `dmg = 4 + tier*2` is a pure quality-tier
+  stat now, untouched by pip. Pushes an `empPulses` ring (expands to
+  `maxR` over 0.4s, fades over 0.5s).
+- **missiles** also carry a **minimum turn radius** so they can't just
+  loop back onto anything on screen: `MISSILE_MIN_TURN_RADIUS[tier]`
+  (240/220/200/180/160px for tier 1‑5) caps the effective `turnRate` at
+  fire time (`turnRate: Math.min(3 + tier*0.6, spd/minRadius)`) — higher
+  permanent tier buys a tighter (smaller) floor, i.e. more agile homing,
+  but every tier still has a hard floor so a missile fired away from a
+  target can't reliably curl a full U-turn onto it. Previously the raw
+  `3 + tier*0.6` turnRate implied only a ~72‑120px radius at typical
+  missile speed (~432px/s) — tight enough that, combined with a fairly
+  long on-screen flight time, missiles could home onto nearly anything on
+  a 390px-wide screen regardless of aim ("fill the screen with missiles
+  and eventually they hit something"). The floor is deliberately close to
+  half the screen width so aiming still matters.
 
 `applyBulletHit(b, target)` is the single collision-damage entry point for
 every discrete-bullet weapon (blaster/bombs/missiles/bolas) — it replaced
@@ -370,3 +399,28 @@ touches this file next.
   generator is kept (not deleted after use) specifically so a future "redo
   track N" request has a starting point instead of hand-editing pattern
   strings from scratch.
+- **A pickup that changes fire rate competes with a player-driven skill
+  knob — don't let it.** The first balance pass (above) gave the pip an
+  `atkSpeedMul()` that sped up cooldowns, which quietly worked against the
+  tap-fast-vs-hold-steady mechanic (the whole point of which is that
+  *player input*, not a pickup, controls attack speed). The very next
+  request removed it: `weaponCooldown()` is now a flat per-weapon constant,
+  and every pip effect is purely quantity/area (bullet/beam/lobe/jump
+  count, or EMP's radius). When a pickup and an existing player-skill
+  mechanic both want to control the same stat, the mechanic wins — cut the
+  pickup's claim on it instead of trying to balance the two together.
+- **A generous "auto-aim" stat needs an explicit floor, not just a
+  tier-scaled coefficient.** Missile `turnRate` used to be a flat
+  `3 + tier*0.6` with no cap — small enough per-frame that it looked
+  reasonable, but combined with a multi-second on-screen flight time it
+  implied only a ~72‑120px turning radius, letting missiles home onto
+  nearly any target on a 390px-wide screen regardless of where they were
+  aimed ("fill the screen with missiles and eventually they hit
+  something"). The fix wasn't lowering the coefficient (that just delays
+  the same problem) but converting it to a radius-based floor
+  (`MISSILE_MIN_TURN_RADIUS[tier]`, ~half the screen width) and deriving
+  the actual per-fire `turnRate` from `spd/minRadius` — a floor on the
+  *geometry* the stat implies, not just a number that felt small enough in
+  isolation. Any future homing/auto-aim stat should be sanity-checked the
+  same way: what real-world radius/cone/duration does this coefficient
+  imply at the actual speeds/lifetimes in play?

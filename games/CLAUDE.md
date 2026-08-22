@@ -339,11 +339,16 @@ bolas, chain lightning, or EMP, each a genuinely different playstyle
 (piercing line, close-range cone, AoE splash, homing, slow-on-hit,
 multi-target arcs, anti-bullet pulse) — unlocked and tiered up via XP
 earned from kills/bosses in the in-game **Shipyard**. The permanent XP tier
-sets a weapon's quality (dmg/dps/radius); the in-run P powerup is a
-separate quantity+speed axis — more barrels/beams/cones/chain-jumps plus
-faster cooldowns — so picking one up mid-run is a build-shaped spike, not
-just a bigger number. Ship can fly almost to the top of the screen (not
-just the lower 65%), so short-range weapons can reach high-holding
+sets a weapon's quality (dmg/dps/radius/turn-agility); the in-run P powerup
+is a separate quantity/area axis — more barrels/beams/cones/chain-jumps, or
+EMP's blast radius — with fire rate held constant so the player's own
+tap-fast-vs-hold-steady cadence stays the only attack-speed knob. Bombs
+alternate the pip bonus between an extra bomb and a bigger blast (with a
+layered amber/orange/red "molten debris" particle burst that scales with
+blast radius); chain lightning starts at zero jumps and gains two more per
+pip; missiles have a per-tier minimum turn radius so they can't loop onto
+any target regardless of aim. Ship can fly almost to the top of the screen
+(not just the lower 65%), so short-range weapons can reach high-holding
 enemies. Drones/shooters/spinners/tankers, P/S/G powerups (in-run
 weapon-tier boost, shield charge, surge bomb), stage-hued enemies.
 20-track adaptive soundtrack
