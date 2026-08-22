@@ -24,6 +24,38 @@ In **vs-AI** mode the top tray is deliberately *not* flipped: nobody is
 sitting there, and the player wants to read the AI's roster and energy.
 `startMatch()` calls `layoutCards()` because the ordering depends on `mode`.
 
+## Portrait lock
+
+The game is **portrait-only**. `applyView()` (called on `resize`,
+`orientationchange` and `screen.orientation` change) decides the shell's shape:
+
+- **Touch device in landscape** — `#app` is pinned to the viewport centre, sized
+  `innerHeight × innerWidth`, and given `rotate(-angle)` where `angle` is
+  `screen.orientation.angle` (falling back to `window.orientation`, then 90).
+  That is exactly what an OS portrait lock does: the layout never reflows, it
+  just turns with the device. `#app.rotated` also re-derives the HUD's safe-area
+  padding, since the notch is now on a side edge.
+- **Anything else** (portrait phone, or a desktop window) — no rotation, and
+  the width is clamped to `innerHeight * PORTRAIT_AR` so a wide window gets a
+  centred portrait column instead of a stretched strip.
+
+Two consequences to keep in mind when editing:
+
+1. **The overlays live inside `#app`.** A transform makes an element the
+   containing block for its `position:fixed` descendants, so the menu / help /
+   result overlays only rotate with the game because they are nested there.
+   Moving one back out to `<body>` would leave it landscape while the game
+   turns. (`#build-badge` is deliberately left outside — it is a watermark and
+   is more useful pinned to the physical corner.)
+2. **`localPt()` un-rotates every pointer.** A ±90° rotation leaves the bounding
+   box centred on the element's true centre, so the centre is a fixed point and
+   `Rot(-viewRot)` around it recovers canvas-local coordinates. Anything new
+   that reads `clientX/clientY` must go through `localPt`, never
+   `getBoundingClientRect().left` directly.
+
+`resize()` is unaffected — it reads `clientWidth/clientHeight`, which are layout
+sizes and ignore the transform.
+
 ## Board and coordinates
 
 World space is `UW 100 × UH 160`; `CENTER = 80` is the halfway line. Only the
@@ -128,7 +160,9 @@ never drift from the thing it deploys.
 - `.claude/tests/neon-clash-drive.cjs` — drives a real touch drag from the
   tray to the board, then asserts the refusal rules, the bunker/garrison caps,
   garrison ejection, a base kill ending the match, that the AI actually plays,
-  and that the rotated top tray deploys for P2.
+  and that the rotated top tray deploys for P2 — plus the portrait lock, where
+  a landscape viewport must keep the portrait layout and a touch pushed through
+  the view transform must still hit the card it covers.
 
 ## Test hook
 

@@ -22,8 +22,21 @@ html, body {
   touch-action:manipulation;
   overscroll-behavior:none;
 }
-#app { display:flex; flex-direction:column; height:100dvh;
+/* The game is PORTRAIT-ONLY. applyView() sizes #app to a portrait box and,
+   on a touch device turned sideways, rotates the whole shell by -(orientation
+   angle) so the portrait layout stays live instead of reflowing into a strip —
+   the software equivalent of an orientation lock. Pointer coordinates are
+   un-rotated in localPt(). On a wide desktop window there is no rotation, just
+   a centred portrait column. */
+#app { display:flex; flex-direction:column; height:100dvh; margin:0 auto;
   padding-bottom:env(safe-area-inset-bottom, 0px); }
+#app.rotated {
+  padding-bottom:max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+}
+#app.rotated #hud {
+  padding:max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px), 8px)
+          12px 3px 12px;
+}
 #hud {
   display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px;
   padding:calc(env(safe-area-inset-top, 0px) + 4px)
@@ -113,7 +126,6 @@ html, body {
     <div id="hud-right"></div>
   </div>
   <canvas id="game"></canvas>
-</div>
 
 <div class="overlay" id="ov-start">
   <div class="ov-title">NEON<br>CLASH</div>
@@ -150,6 +162,8 @@ html, body {
     <div class="ov-btn" id="btn-menu">MENU</div>
   </div>
 </div>
+</div>
+
 
 <script>
 'use strict';
@@ -388,6 +402,46 @@ function resize() {
   oy = boardTop + (bh - UH * scale) / 2;
   layoutCards();
 }
+// ------------------------------------------------------------- portrait lock
+// The layout is designed for a portrait phone lying flat between two players.
+// Rather than reflow into a landscape strip, a touch device turned sideways
+// gets the whole shell counter-rotated by -(orientation angle), which is what
+// an OS-level portrait lock does. viewRot then feeds localPt() so every touch
+// still resolves to the right card and the right patch of board.
+const appEl = $('app');
+let viewRot = 0;
+const isTouch = (window.matchMedia && matchMedia('(pointer: coarse)').matches) ||
+                ('ontouchstart' in window);
+const PORTRAIT_AR = 0.62;               // widest w/h the trays still look right at
+function applyView() {
+  const iw = window.innerWidth, ih = window.innerHeight;
+  if (iw > ih && isTouch) {
+    let ang = 90;
+    try {
+      if (window.screen && screen.orientation && typeof screen.orientation.angle === 'number')
+        ang = screen.orientation.angle;
+      else if (typeof window.orientation === 'number') ang = (window.orientation + 360) % 360;
+    } catch (e) {}
+    const deg = ang === 270 ? 90 : -90;               // rotate(-angle)
+    viewRot = deg * Math.PI / 180;
+    appEl.classList.add('rotated');
+    appEl.style.position = 'fixed';
+    appEl.style.top = '50%'; appEl.style.left = '50%';
+    appEl.style.margin = '0';
+    appEl.style.width = ih + 'px';
+    appEl.style.height = iw + 'px';
+    appEl.style.transform = 'translate(-50%, -50%) rotate(' + deg + 'deg)';
+  } else {
+    viewRot = 0;
+    appEl.classList.remove('rotated');
+    appEl.style.position = ''; appEl.style.top = ''; appEl.style.left = '';
+    appEl.style.height = ''; appEl.style.transform = ''; appEl.style.margin = '';
+    // a wide desktop window gets a centred portrait column, not a strip
+    appEl.style.width = Math.min(iw, Math.round(ih * PORTRAIT_AR)) + 'px';
+  }
+  resize();
+}
+
 const sx = wx => ox + wx * scale;
 const sy = wy => oy + wy * scale;
 const wx = px => (px - ox) / scale;
@@ -1168,9 +1222,15 @@ function render() {
 }
 
 // ------------------------------------------------------------- input
+// A +-90 deg rotation leaves the bounding box centred on the element's true
+// centre, so the centre is a fixed point we can rotate back around.
 function localPt(t) {
   const r = canvas.getBoundingClientRect();
-  return [t.clientX - r.left, t.clientY - r.top];
+  const dx = t.clientX - (r.left + r.width / 2);
+  const dy = t.clientY - (r.top + r.height / 2);
+  if (!viewRot) return [dx + cw / 2, dy + ch / 2];
+  const c = Math.cos(viewRot), s2 = Math.sin(viewRot);
+  return [dx * c + dy * s2 + cw / 2, -dx * s2 + dy * c + ch / 2];
 }
 const controls = side => side === 0 || mode === '2p';
 function refreshDrag(d) {
@@ -1338,10 +1398,12 @@ function frame(now) {
   if (hudT > 0.25) { hudT = 0; updateHud(); }
   render();
 }
-window.addEventListener('resize', resize);
-window.addEventListener('orientationchange', () => setTimeout(resize, 60));
+window.addEventListener('resize', applyView);
+window.addEventListener('orientationchange', () => setTimeout(applyView, 60));
+if (window.screen && screen.orientation && screen.orientation.addEventListener)
+  screen.orientation.addEventListener('change', () => setTimeout(applyView, 60));
 resetField();
-resize();
+applyView();
 updateHud();
 updateRecUI();
 applyMute();
@@ -1356,6 +1418,7 @@ window.__NC = {
   start: (m, d) => startMatch(m, d),
   setEnergy: (s, v) => { energy[s] = v; },
   setTime: v => { matchT = v; suddenAnnounced = v < SUDDEN_AT ? false : suddenAnnounced; },
+  get viewRot() { return viewRot; },
 };
 </script>
 </body>

@@ -9,6 +9,8 @@
  *     when the building dies (the spec's whole reason for the card)
  *   - the stat shape the design asks for (tank walls, fighter rushes, archer reaches)
  *   - energy: 1/sec, cap 20, doubled in sudden death
+ *   - the portrait lock: a sideways phone keeps the portrait layout, and a
+ *     touch pushed through the view transform still hits the card it covers
  *
  * Usage: NODE_PATH=<playwright-core dir> node .claude/tests/drive-neon-clash.cjs
  * Output: one PASS/FAIL line per check, then `... DRIVE: N passed, M failed`.
@@ -302,6 +304,63 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   ok('the AI actually plays cards', ai.units + ai.builds > 0 || ai.state === 'over', JSON.stringify(ai));
   ok('the AI never spends energy it does not have', !negEnergy && !overCap);
   ok('an undefended base loses to LEGEND', ai.myBase < 1500 || ai.state === 'over', JSON.stringify(ai));
+
+  // ============================================ portrait lock (landscape view)
+  // The game is portrait-only: a touch device turned sideways must keep the
+  // portrait layout and stay playable, not reflow into a landscape strip.
+  const land = await browser.newContext({
+    viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true,
+  });
+  const lp = await land.newPage();
+  const lerrs = [];
+  lp.on('pageerror', e => lerrs.push('PAGEERROR ' + e.message));
+  lp.on('console', m => { if (m.type() === 'error' && !/font|net::/i.test(m.text())) lerrs.push('CONSOLE ' + m.text()); });
+  await lp.goto(URL);
+  await lp.waitForTimeout(450);
+  await lp.click('#db-PRO');
+  await lp.waitForTimeout(250);
+  const view = await lp.evaluate(() => {
+    const a = document.getElementById('app'), cv = document.getElementById('game');
+    return { rot: __NC.viewRot, rotated: a.classList.contains('rotated'),
+             aw: a.clientWidth, ah: a.clientHeight, cw: cv.clientWidth, cvh: cv.clientHeight };
+  });
+  ok('a sideways phone keeps the portrait layout',
+     view.rotated && Math.abs(Math.abs(view.rot) - Math.PI / 2) < 1e-6 &&
+     view.ah > view.aw && view.cvh > view.cw, JSON.stringify(view));
+  // a real touch drag, its screen coords pushed THROUGH the view transform,
+  // must still land on the card it visually covers
+  const lgeo = await lp.evaluate(() => {
+    const cv = document.getElementById('game');
+    return { cw: cv.clientWidth, ch: cv.clientHeight };
+  });
+  const lTray = Math.min(96, Math.max(62, Math.round(lgeo.ch * 0.125)));
+  const lCardH = Math.max(32, lTray - 13 - 12);
+  const lGap = Math.max(5, Math.round(lgeo.cw * 0.016));
+  const lCardW = Math.max(50, Math.min(110, Math.min(Math.round((lgeo.cw - lGap * 5) / 4), Math.round(lCardH * 0.92))));
+  const lX0 = (lgeo.cw - (lCardW * 4 + lGap * 3)) / 2;
+  const toClient = (px, py) => lp.evaluate(([px, py]) => {
+    const cv = document.getElementById('game'), r = cv.getBoundingClientRect();
+    const rot = __NC.viewRot, c = Math.cos(rot), s = Math.sin(rot);
+    const dx = px - cv.clientWidth / 2, dy = py - cv.clientHeight / 2;
+    return { x: r.left + r.width / 2 + (dx * c - dy * s), y: r.top + r.height / 2 + (dx * s + dy * c) };
+  }, [px, py]);
+  const lFrom = await toClient(lX0 + 2 * (lCardW + lGap) + lCardW / 2, lgeo.ch - lTray + 13 + 6 + lCardH / 2);
+  const lTo = await toClient(lgeo.cw / 2, lTray + (lgeo.ch - 2 * lTray) * 0.78);
+  await lp.evaluate(([a, b]) => {
+    const cv = document.getElementById('game');
+    const mk = (type, x, y) => {
+      const t = new Touch({ identifier: 3, target: cv, clientX: x, clientY: y });
+      cv.dispatchEvent(new TouchEvent(type, { touches: type === 'touchend' ? [] : [t],
+        targetTouches: type === 'touchend' ? [] : [t], changedTouches: [t], bubbles: true, cancelable: true }));
+    };
+    mk('touchstart', a.x, a.y); mk('touchmove', b.x, b.y); mk('touchend', b.x, b.y);
+  }, [lFrom, lTo]);
+  await lp.waitForTimeout(120);
+  const lDrop = await lp.evaluate(() => __NC.units.filter(u => u.side === 0).map(u => ({ k: u.key, y: Math.round(u.y) })));
+  ok('touch still resolves through the rotated view',
+     lDrop.length === 1 && lDrop[0].k === 'fighter' && lDrop[0].y > 100, JSON.stringify(lDrop));
+  ok('no errors in the rotated view', lerrs.length === 0, lerrs.join(' | '));
+  await land.close();
 
   ok('no page or console errors throughout', errs.length === 0, errs.join(' | '));
 
