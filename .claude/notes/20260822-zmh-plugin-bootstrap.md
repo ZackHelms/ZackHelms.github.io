@@ -75,5 +75,8 @@ In all four the repo's `settings.json` stayed byte-identical.
   straight from the marketplace clone and follow it as the instruction source
   (`/load-plugins` step 3).
 - Producer commands additionally require `.claude/zmh/producer.md` at the repo
-  root. This repo has one; it notes that `TODO.md`/`DONE.md` do not exist yet
-  and the first `backlog-refine` run creates them.
+  root. This repo has one. Read it fresh rather than from memory — it drifts:
+  the same day this note was written, a parallel session corrected its
+  §Backlog/§Plans, which had still claimed `TODO.md`, `DONE.md` and
+  `.claude/templates/plan.md` did not exist. All three do, and `TODO.md` is
+  currently scoped to Phasic only.
