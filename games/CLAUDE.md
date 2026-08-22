@@ -21,6 +21,7 @@ Detailed context for individual games lives in `.claude/<game>.md` at the repo r
 | Audio | WebAudio-synthesized only (no audio files): lazy AudioContext on first gesture (iOS), `sfxGain`/`musicGain` masters, oscillator/noise SFX + lookahead-sequencer music loop, persisted 🔊/🔇 mute top-left, suspend on `visibilitychange` (SFX+music standard for **every** game — retrofitted repo-wide 2026-07-24). Shared buffers (noise etc.) are created in `audioInit`, never lazily inside one SFX (another consumer stays silent); overlay/menu tap handlers call `audioInit()` too — the first iOS gesture is usually a DOM button, not the canvas |
 | Back button | Every game has a top-left ← link back to the games hub, left-most control, mute button immediately to its right — see § Hub Back Button |
 | Chrome above overlays | The ← and 🔊 buttons must sit at a **higher z-index than any full-screen overlay** (menu / game-over / win). Give the chrome `z-index:80` and overlays `70`. Otherwise the overlay swallows both, and since music is usually playing *behind* a menu or win screen, the player cannot mute exactly when they most want to (2026-07-25: shipped that way in locksport, caught by a drive test that could not tap `#mute-btn` after a reload) |
+| Portrait lock (optional) | A game whose layout only works in portrait can lock itself in software rather than reflowing: size the app shell to `innerHeight x innerWidth` and `transform: rotate(-screen.orientation.angle)` when a **touch** device goes landscape (leave a desktop window alone — clamp it to a centred portrait column instead). Two gotchas: `position:fixed` overlays must be nested *inside* the transformed shell or they stay landscape, and every pointer handler must un-rotate `clientX/clientY` about the element centre (a +-90 deg rotation keeps the bounding box centred on it) — `getBoundingClientRect().left` alone is wrong under a transform. `clientWidth/clientHeight` are layout sizes and stay correct. Reference: `neon-clash/` `applyView()` + `localPt()` |
 | Build badge | Every game has a `<div id="build-badge">` right after `<body>` — see below |
 
 ---
@@ -568,8 +569,16 @@ touches are routed by the tray they started in, so both drags run
 independently. In vs-AI mode that tray deliberately stays upright, as the
 opponent's readable roster. Three AI grades differ in think interval, an idle
 chance, how reliably they counter, whether they build and man bunkers, and an
-energy reserve they hold back. Drive suite (33 checks, incl. the garrison
-protection invariant and the two-finger duel):
+energy reserve they hold back.
+
+It is **portrait-locked in software**: on a touch device turned sideways
+`applyView()` counter-rotates the whole `#app` shell by `-screen.orientation.angle`
+rather than letting the layout reflow, and `localPt()` un-rotates every pointer
+so touch still lands correctly (a wide desktop window instead gets a centred
+portrait column). The overlays sit *inside* `#app` on purpose — a transformed
+ancestor is the containing block for `position:fixed` children, which is the
+only reason they turn with the game. Drive suite (36 checks, incl. the garrison
+protection invariant, the two-finger duel and the rotated-view touch map):
 `.claude/tests/drive-neon-clash.cjs`. Detailed context: `.claude/neon-clash.md`.
 
 ---
