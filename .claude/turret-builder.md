@@ -246,6 +246,54 @@ everything without killing it faster lengthens the tail: CRYO SHELL runs
 a chill-heavy build, not a bug, and the eval caps it at 12 so it cannot
 quietly get worse.
 
+## Placement rules, and the overlay that teaches them
+
+`canPlace(kind, r, c)` is the single authority on where a thing may go, and
+since 2026-08-23 it is the *same walk* `recomputeGrid()` uses to wire the
+board — `hostFor(kind, r, c)`:
+
+| kind | where |
+| --- | --- |
+| turret | any open ground off the road |
+| wall | on the road only, never within 1.2 cells of the mouth or the exit |
+| module (`amp/fire/ice/elec/blast`) | orthogonally adjacent to a **turret or wall** |
+| `armor` / `regen` (`WALL_ONLY_MODS`) | orthogonally adjacent to a **wall** |
+| booster (`twin/prism/relay/clock`) | diagonally adjacent to a **turret** |
+
+Before that, a module or booster could be dropped on any empty non-road cell
+and simply fed nothing — the board took the money for hardware that was
+inert by construction. **What you may build and what actually connects are
+now one rule.** If they ever diverge again, the bug is that someone edited
+one walk and not the other; `hostFor()` exists so there is only one to edit.
+
+`openCell(r, c)` is the geometry question on its own — on the board, empty,
+not a boulder, not the road — and it is what a *test* wants when it looks for
+"a turret cell with four free sides", because `canPlace('fire', …)` around a
+turret that does not exist yet correctly answers no.
+
+**The overlay.** While a kind is armed (tap) or in hand (drag),
+`drawPlaceOverlay()` scrims every illegal cell and strikes it with a red X,
+and captions the board with the rule in five words (`placeHint(kind)`). It
+draws **above the tiles**: an occupied cell is an illegal cell, and the
+arming wash it replaced tinted only the legal ones, which left "can I put a
+module on my turret?" answered by an absence. It reads `placeMask(kind)` —
+every cell partitioned good/bad, cached against `gridVer` (bumped by
+`recomputeGrid()`) plus the wave, so eight build cards can ask the same
+question every frame for free.
+
+Two judgement calls worth keeping:
+
+- **The legal marking is gated on scarcity** (`good.length <= 22%` of the
+  board). A module has eight legal cells and they need to glow; a turret has
+  a hundred, and washing those green turns the whole map into a highlight and
+  buries the terrain. Above the threshold, clear ground is simply left alone
+  — the absence of an X is the message.
+- **A card with nowhere to go still picks up.** It is dimmed and reads
+  `NO SPOT`, but unlike an unaffordable card it does not deny the press:
+  lifting it is how a player learns *why*, because the overlay reds out the
+  whole board and names the rule. Denying the press would withhold the
+  explanation at the exact moment it is wanted.
+
 ## Graphics styles — TOON (default) and NEON
 
 A ⚙ gear in the top-left chrome (right of ☰) opens a dropdown listing every
@@ -303,7 +351,9 @@ Vary the persona, not the seed.
 `st()` · `run()`, `tilesRaw()`, `creepsRaw()`, `groundsRaw()` ·
 `newRun/startLevel/ready/skipGap/advance/step` · `place/sell/upgrade/buyLab` ·
 `turretStats(r,c)` (payload, boosters, combo, **sides**), `wallStats`,
-`modsAt`, `tileAt`, `comboAt` · `canPlace`, `buildableCells(kind)` ·
+`modsAt`, `tileAt`, `comboAt` · `canPlace`, `openCell`, `buildableCells(kind)`,
+`placeMask(kind)`, `placeHint(kind)`, `overlayKind()`, `arm(kind)`,
+`forceDraw()` ·
 `setCurve/setPacing/seedRandom` · `cardRects/tabRects/panelRects/hudRects` ·
 `codex()`, `COMBO_TOTAL` · `gfx()`, `setGfx(id)`, `GFX_STYLES`,
 `gfxMenuOpen/openGfxMenu/closeGfxMenu`.
@@ -323,15 +373,16 @@ Four hooks exist to make the spec *measurable* rather than inferred:
 Suites — **rules and balance are separate files**, so a rebalance never fights
 a mechanics regression:
 
-- `.claude/tests/drive-turret-builder.cjs` (180 checks) — the spec verbatim
+- `.claude/tests/drive-turret-builder.cjs` (194 checks) — the spec verbatim
   including the worked example, each module in isolation and stacked, the
   effects-vs-damage split, tracking and snap, all four boosters, all fifteen
   combos with their effects, the codex, walls, economy, flow, the sawtooth,
-  the canvas UI pressed through real touch events, and both graphics styles
+  the canvas UI pressed through real touch events, the placement rules and
+  the overlay mask, and both graphics styles
   (default, dropdown, persistence, and **each renderer driven through real
   frames on a populated board** — a per-style throw fails only that style's
   check, verified by breaking `drawGroundNeon` and watching TOON stay green).
-- `.claude/tests/eval-turret-builder.cjs` (21 claims) — balance and pacing via
+- `.claude/tests/eval-turret-builder.cjs` (22 claims) — balance and pacing via
   personas. `--strategy f.json`, `--only NAME`, `--curve a,b`, `--seed`,
   `--json`. About a second each.
 
@@ -343,6 +394,13 @@ a mechanics regression:
   cheapest affordable tier and a power budget too small for a grid to exist.
 - **A turret's `links` now come from modules *and* boosters**, so anything
   reading `l.from.mod` crashes on a booster link. Use `linkColour()`.
+- **`canPlace('fire', …)` is not "is this cell open".** Since modules must
+  touch a host, it answers *no* for every side of a turret that has not been
+  built yet — which is exactly what a test helper hunting for "a cell with
+  four free sides" asks. Six drive-suite helpers were quietly written that
+  way; they use `openCell()` now. When a rule tightens, audit the tests that
+  used the old rule as a *proxy* for something else, not just the ones that
+  assert it.
 - **Anything that maps a build-card kind to a silhouette must go through
   `drawKindShape()`.** The drag ghost used to fall through to
   `drawModuleShape` for any kind that was not a turret or a wall, so holding a

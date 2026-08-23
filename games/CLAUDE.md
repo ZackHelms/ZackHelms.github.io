@@ -309,11 +309,15 @@ thirteen placeable kinds, eight levels of eight waves at ~8 minutes each, then
 endless. **No gameplay randomness at all.** A ⚙ in the top-left chrome picks
 the **graphics style**: TOON (the default — cel-shaded, paved road with kerbs,
 dirt-and-grass terrain, boulders on the cells you cannot build on) or NEON
-(the original wireframe board). Detailed context:
+(the original wireframe board). **Placement is taught, not guessed**: a
+module must sit orthogonally beside a turret or wall and a booster diagonally
+beside a turret — the board refuses anything that would feed nothing — and
+while a card is armed or dragged, every illegal cell is scrimmed and struck
+with a red X under a caption naming the rule. Detailed context:
 `.claude/turret-builder.md`. Suites: `.claude/tests/drive-turret-builder.cjs`
-(180 rules checks, the spec asserted to the decimal off a damage ledger, both
+(194 rules checks, the spec asserted to the decimal off a damage ledger, both
 renderers driven through real frames) and
-`.claude/tests/eval-turret-builder.cjs` (21 balance claims via personas).
+`.claude/tests/eval-turret-builder.cjs` (22 balance claims via personas).
 
 ### GRID DEFENSE (`grid-defense/index.html`, ~2300 lines)
 A **ten-level tower-defense campaign**, then endless. A level is one map and
