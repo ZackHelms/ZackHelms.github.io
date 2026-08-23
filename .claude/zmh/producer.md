@@ -77,9 +77,12 @@
   workflow run for the pushed SHA concludes `success` (remote sessions:
   `mcp__github__actions_list`), because `git push` ≠ live — a failed or
   stuck Pages build silently keeps serving the last-good deploy. Read that
-  run's **jobs**, not the run object: the run can still report
-  `in_progress` after build/deploy/report-build-status have all concluded
-  `success` (2026-08-23). Spotting the badge on the live page is **not**
+  run's **jobs**, not the run object — and read the stuck job's **log**
+  before concluding anything: on 2026-08-23 the run reported `in_progress`
+  after all three jobs had concluded `success`, and an hour later the
+  deploy *job* reported `in_progress` for nine minutes after its log said
+  `Reported success!`. A hung-looking deploy is usually a stale status, not
+  a wedge. Spotting the badge on the live page is **not**
   available from a remote session — the agent proxy 403s `tythos.com` on
   CONNECT — so the workflow conclusion is the whole verification. Full
   procedure incl. parsing the oversized run listing:

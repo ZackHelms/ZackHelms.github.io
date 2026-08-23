@@ -87,11 +87,30 @@ for r in (d.get('workflow_runs') or [])[:3]:
 and a small `tail_lines` is compact enough to read directly, and is how the
 503 above was identified.
 
-**Read the JOBS, not the run.** `actions_get` on a run ID can keep reporting
-`status: in_progress` after every one of its jobs has finished — seen
-2026-08-23 on run `32652317671`, where the run object said `in_progress` while
-`list_workflow_jobs` showed build, deploy and report-build-status all
-`completed` / `success` on attempt 1. `list_workflow_jobs` with the run ID is
-also small enough to come back in a tool result, unlike the repo-wide run
-listing. So: find the run for your SHA by parsing the saved listing, then read
-its jobs — a stale-looking run status is not a reason to wait.
+**Status lags — at BOTH levels. The job log is the ground truth.**
+Two stale readings on 2026-08-23, an hour apart:
+
+- `actions_get` on run `32652317671` kept reporting `status: in_progress`
+  while `list_workflow_jobs` showed all three jobs `completed` / `success`.
+  So far so good: read the jobs, not the run.
+- Then run `32653410491` showed its **deploy job** as `in_progress` for about
+  **nine minutes after it had actually finished**. Its log ended
+  `17:01:39 Reported success!` / `Evaluated environment url: https://tythos.com/`
+  and `list_workflow_jobs` was still saying `in_progress` at ~17:11. A deploy
+  that normally takes 21 seconds appearing to hang for nine minutes looks
+  exactly like the 503 wedge above — and the note's own advice for a wedge is
+  "push again", which here would have been a pointless commit chasing a
+  reporting lag.
+
+So the escalation order is: parse the saved run listing → find the run for
+your SHA → `list_workflow_jobs` → **and the moment a job looks stuck, read
+that job's log before concluding anything.**
+
+```
+mcp__github__get_job_logs  job_id=<deploy job>  return_content=true  tail_lines=25
+```
+
+is ~1 KB and ends with `Reported success!` when the deploy is genuinely done.
+Never diagnose a wedge, and never re-push, off a status field alone.
+`list_workflow_jobs` with a run ID is small enough to come back in a tool
+result, unlike the repo-wide run listing.
