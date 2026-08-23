@@ -136,7 +136,7 @@ table.sc td.n { color:var(--gold); font-family:'Black Ops One', sans-serif; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 13:09 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 16:36 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
@@ -814,6 +814,7 @@ function announceCombos(before) {
 }
 
 function recomputeGrid() {
+  gridVer++;
   cellIndex = new Map();
   for (const t of tiles) cellIndex.set(key(t.r, t.c), t);
   for (const t of tiles) {
@@ -949,9 +950,51 @@ function kindOf(k) {
   if (k === 'turret' || k === 'wall') return k;
   return BOOSTERS[k] ? 'booster' : 'module';
 }
+function nameOf(k) {
+  if (k === 'turret') return 'TURRET';
+  if (k === 'wall') return 'WALL';
+  return BOOSTERS[k] ? BOOSTERS[k].name : MODULES[k].name;
+}
+/* The rule in five words, printed while you hold the piece. The overlay
+   shows you WHERE; this says WHY, which is the part that stops a player
+   concluding the board is broken. */
+function placeHint(k) {
+  if (k === 'turret') return 'ANY OPEN GROUND OFF THE ROAD';
+  if (k === 'wall') return 'ON THE ROAD ONLY';
+  if (BOOSTERS[k]) return 'ON A TURRET DIAGONAL';
+  if (WALL_ONLY_MODS.includes(k)) return 'BESIDE A WALL';
+  return 'BESIDE A TURRET OR WALL';
+}
 function unlocked(kind) { return run ? globalWave() >= UNLOCK[kind] || run.unlocked[kind] : false; }
 function labOpen() { return run ? globalWave() >= LAB_WAVE || run.labSeen : false; }
 
+/* open ground: on the board, empty, not a boulder, not the road. The
+   geometry question ONLY — "could anything stand here", not "may this
+   particular kind". Placement rules are built on top of it. */
+function openCell(r, c) {
+  return inBoard(r, c) && !tileAt(r, c) && !rockCells.has(key(r, c)) && !pathCells.has(key(r, c));
+}
+/* The structure a module or booster at (r,c) would actually feed, or null.
+   This is deliberately the SAME walk recomputeGrid() does when it wires the
+   grid: what you are allowed to build and what ends up connected have to be
+   one rule, or the board sells you hardware that does nothing. */
+function hostFor(kind, r, c) {
+  if (BOOSTERS[kind]) {
+    for (const [dr, dc] of DIAG) {
+      const n = tileAt(r + dr, c + dc);
+      if (n && n.kind === 'turret') return n;      // boosters lift turrets only
+    }
+    return null;
+  }
+  const wallOnly = WALL_ONLY_MODS.includes(kind);
+  for (const [dr, dc] of ORTHO) {
+    const n = tileAt(r + dr, c + dc);
+    if (!n || n.kind === 'module' || n.kind === 'booster') continue;
+    if (wallOnly && n.kind !== 'wall') continue;   // armour/regen are wall hardware
+    return n;
+  }
+  return null;
+}
 function canPlace(kind, r, c) {
   if (!inBoard(r, c) || tileAt(r, c)) return false;
   if (rockCells.has(key(r, c))) return false;
@@ -965,7 +1008,28 @@ function canPlace(kind, r, c) {
   }
   if (pathCells.has(key(r, c))) return false;
   if (kind === 'turret') return countKind('turret') < turretCap();
-  return true;   // modules and boosters are limited by cash and by geometry
+  /* Modules sit on a side, boosters on a diagonal. Before this rule you
+     could drop either on any empty cell and it simply did nothing — the
+     game happily took the money for a tile that fed no one. */
+  return !!hostFor(kind, r, c);
+}
+/* ------------------------- the placement mask -------------------------
+   Every cell, split into "you may build the armed kind here" and "you may
+   not", cached against a version stamp so arming a card does not re-sweep
+   126 cells eight times a frame. gridVer moves on anything that can change
+   the answer: a tile placed or sold, a lab tier bought, a new level. */
+let gridVer = 0;
+const maskCache = new Map();
+function placeMask(kind) {
+  const stamp = gridVer + ':' + (run ? globalWave() : 0);
+  const hit = maskCache.get(kind);
+  if (hit && hit.stamp === stamp) return hit;
+  const good = [], bad = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+    (canPlace(kind, r, c) ? good : bad).push([r, c]);
+  const m = { stamp, good, bad };
+  maskCache.set(kind, m);
+  return m;
 }
 function anyPlacement(kind) {
   if (cash < costOf(kind)) return false;
@@ -2110,6 +2174,75 @@ function drawBoulder(r, c) {
   ctx.globalAlpha = 1;
   ctx.restore();
 }
+/* ------------------------- PLACEMENT OVERLAY -------------------------
+   Armed, or mid-drag: every cell the held kind cannot go into is scrimmed
+   and struck through with a red X, so the legal cells read as the gaps in
+   the pattern rather than as a wash you have to hunt for.
+
+   It draws ABOVE the tiles on purpose. An occupied cell is an illegal cell,
+   and the arming wash this replaces tinted only the legal ones — which left
+   the two commonest questions ("can I put a module HERE, on my turret?" and
+   "why is nothing happening?") answered by an absence. */
+function drawPlaceOverlay() {
+  const k = dragCard || armedKind;
+  if (!k || !run || state !== 'play') return;
+  const m = placeMask(k);
+  ctx.save();
+  /* Marking the LEGAL cells only pays when they are scarce. A module has
+     maybe eight of them and they need to glow; a turret has a hundred, and
+     washing those green turns the whole map into a highlight and hides the
+     terrain under it. Above the threshold the scrim and the Xs are the
+     whole message and clear ground is simply left alone. */
+  const scarce = m.good.length <= ROWS * COLS * 0.22;
+  if (scarce) {
+    ctx.fillStyle = 'rgba(57,255,20,0.13)';
+    for (const g of m.good) ctx.fillRect(boardX + g[1] * cell + 1, boardY + g[0] * cell + 1, cell - 2, cell - 2);
+  }
+  ctx.fillStyle = 'rgba(6,6,14,0.60)';
+  for (const b of m.bad) ctx.fillRect(boardX + b[1] * cell, boardY + b[0] * cell, cell, cell);
+  /* one path for every X and one for every bracket — 126 cells a frame is
+     nothing, 126 stroke() calls a frame is not */
+  const q = cell * 0.24;
+  ctx.strokeStyle = 'rgba(255,42,74,0.62)';
+  ctx.lineWidth = Math.max(1.4, cell * 0.05);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const b of m.bad) {
+    const x = boardX + b[1] * cell + cell / 2, y = boardY + b[0] * cell + cell / 2;
+    ctx.moveTo(x - q, y - q); ctx.lineTo(x + q, y + q);
+    ctx.moveTo(x + q, y - q); ctx.lineTo(x - q, y + q);
+  }
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(57,255,20,0.85)';
+  ctx.lineWidth = Math.max(1.2, cell * 0.045);
+  ctx.lineCap = 'butt';
+  const br = cell * 0.24;
+  ctx.beginPath();
+  for (const g of (scarce ? m.good : [])) {
+    const x0 = boardX + g[1] * cell + 2, y0 = boardY + g[0] * cell + 2;
+    const x1 = x0 + cell - 4, y1 = y0 + cell - 4;
+    ctx.moveTo(x0, y0 + br); ctx.lineTo(x0, y0); ctx.lineTo(x0 + br, y0);
+    ctx.moveTo(x1 - br, y0); ctx.lineTo(x1, y0); ctx.lineTo(x1, y0 + br);
+    ctx.moveTo(x1, y1 - br); ctx.lineTo(x1, y1); ctx.lineTo(x1 - br, y1);
+    ctx.moveTo(x0 + br, y1); ctx.lineTo(x0, y1); ctx.lineTo(x0, y1 - br);
+  }
+  ctx.stroke();
+
+  /* the rule, spelled out, for as long as the piece is in your hand */
+  const none = m.good.length === 0;
+  const label = nameOf(k) + '  ·  ' + (none ? 'NO ROOM — ' + placeHint(k) : placeHint(k));
+  ctx.font = '10px "Black Ops One", sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const tw = ctx.measureText(label).width + 22;
+  const cx = boardX + boardW / 2, cy = Math.min(boardY + boardH + 14, barY - 13);
+  ctx.fillStyle = 'rgba(6,6,14,0.88)';
+  roundRect(cx - tw / 2, cy - 11, tw, 22, 11); ctx.fill();
+  ctx.strokeStyle = none ? '#ff2244' : '#39ff14'; ctx.lineWidth = 1.2;
+  roundRect(cx - tw / 2, cy - 11, tw, 22, 11); ctx.stroke();
+  ctx.fillStyle = none ? '#ff6680' : '#dde3ff';
+  ctx.fillText(label, cx, cy + 1);
+  ctx.restore();
+}
 function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = '#06060e'; ctx.fillRect(0, 0, W, H);
@@ -2136,17 +2269,6 @@ function draw() {
       roundRect(boardX + c * cell + 3, boardY + r * cell + 3, cell - 6, cell - 6, 4);
       ctx.fill();
       ctx.strokeStyle = '#20203a'; ctx.lineWidth = 1; ctx.stroke();
-    }
-  }
-
-  /* the arming wash — neutral, never the module's own colour: red means
-     danger everywhere else in this game */
-  if (armedKind || dragCard) {
-    const k = armedKind || dragCard;
-    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-      if (!canPlace(k, r, c)) continue;
-      ctx.fillStyle = 'rgba(160,180,230,0.09)';
-      ctx.fillRect(boardX + c * cell + 1, boardY + r * cell + 1, cell - 2, cell - 2);
     }
   }
 
@@ -2273,6 +2395,8 @@ function draw() {
     }
   }
 
+  drawPlaceOverlay();
+
   /* creeps, beams, sparks — clipped to the board so nothing walks into the HUD */
   ctx.save();
   ctx.beginPath(); ctx.rect(boardX, boardY, boardW, boardH); ctx.clip();
@@ -2339,8 +2463,11 @@ function draw() {
     const gx = cc ? cellCx(cc.c) : dragPos.x, gy = cc ? cellCy(cc.r) : dragPos.y;
     ctx.globalAlpha = 0.85;
     if (cc) {
-      ctx.fillStyle = ok ? 'rgba(57,255,20,0.12)' : 'rgba(255,34,68,0.14)';
+      ctx.fillStyle = ok ? 'rgba(57,255,20,0.22)' : 'rgba(255,34,68,0.20)';
       ctx.fillRect(boardX + cc.c * cell, boardY + cc.r * cell, cell, cell);
+      ctx.strokeStyle = ok ? '#39ff14' : '#ff2244';
+      ctx.lineWidth = 2.4;
+      ctx.strokeRect(boardX + cc.c * cell + 1.2, boardY + cc.r * cell + 1.2, cell - 2.4, cell - 2.4);
     }
     drawKindShape(dragCard, gx, gy, cell);
     ctx.globalAlpha = 1;
@@ -2451,9 +2578,12 @@ function drawBar() {
     const afford = cash >= cost;
     const capped = k === 'turret' ? countKind('turret') >= turretCap()
                  : k === 'wall' ? countKind('wall') >= wallCap() : false;
+    /* a module with no turret to sit beside is not buyable, and the card
+       has to say so before the tap, not after it */
+    const spot = un && placeMask(k).good.length > 0;
     const col2 = k === 'turret' ? '#c9d2e6' : k === 'wall' ? '#98a4bf'
                : BOOSTERS[k] ? BOOSTERS[k].col : MODULES[k].col;
-    const live = un && afford && !capped;
+    const live = un && afford && !capped && spot;
     ctx.fillStyle = armedKind === k ? '#1a1a34' : '#0d0d1c';
     roundRect(x, y, cw, ch, 7); ctx.fill();
     ctx.strokeStyle = armedKind === k ? '#ffc300' : (live ? col2 + '88' : '#23233d');
@@ -2479,10 +2609,15 @@ function drawBar() {
         ctx.textAlign = 'right';
         const have = countKind(k), cap = k === 'turret' ? turretCap() : wallCap();
         ctx.fillText(have + '/' + cap, x + cw - 7, y + 29);
+      } else if (!spot) {
+        ctx.fillStyle = '#ff2244';
+        ctx.textAlign = 'right';
+        ctx.font = '8px "Share Tech Mono", monospace';
+        ctx.fillText('NO SPOT', x + cw - 7, y + 29);
       }
     }
     ctx.restore();
-    cardRects.push({ kind:k, x, y, w:cw, h:ch, un, afford, capped });
+    cardRects.push({ kind:k, x, y, w:cw, h:ch, un, afford, capped, spot });
   });
 }
 function drawPanel() {
@@ -2592,6 +2727,11 @@ function onDown(e) {
   for (const c of cardRects) {
     if (hit(c, p.x, p.y)) {
       downCard = c;
+      /* A card with nowhere to go is dimmed but still PICKS UP, unlike one
+         you cannot afford. Lifting it is how you find out why: the overlay
+         reds out the whole board and names the rule. Denying the press
+         would take that explanation away at exactly the moment it is
+         wanted. */
       if (c.un && c.afford && !c.capped) { dragCard = c.kind; dragPos = p; }
       else sfxDeny();
       return;
@@ -3072,7 +3212,7 @@ window.__TB = {
                    BLAST_XFER, BLAST_R, CHILL_CAP, XFER_CAP, GROUND_T, BOOST_CAP,
                    MOD_LAB_STEP, KIN_FLOOR, GRACE_T, GAP_T,
                    WALL_FIRE, WALL_ARC, WALL_THORN, WALL_ICE, WALL_REGEN,
-                   TURRET_CAP_BASE, WALL_CAP_BASE }),
+                   TURRET_CAP_BASE, WALL_CAP_BASE, ROWS, COLS }),
   /* drive */
   newRun: () => { closeScreen(); startRun(); },
   startLevel: L => { closeScreen(); startLevel(L); },
@@ -3085,7 +3225,7 @@ window.__TB = {
   sell: (r, c) => sellAt(r, c),
   upgrade: (r, c) => upgradeAt(r, c),
   buyLab,
-  unlockAll: () => { for (const k of BUILD_ORDER) run.unlocked[k] = true; run.labSeen = true; },
+  unlockAll: () => { for (const k of BUILD_ORDER) run.unlocked[k] = true; run.labSeen = true; gridVer++; },
   addCash: n => { cash += n; }, setCash: n => { cash = n; },
   addCores: n => { run.cores += n; },
   setLives: n => { run.lives = n; },
@@ -3113,7 +3253,10 @@ window.__TB = {
     return { hp:t.hp, maxHp:t.maxHp, dr:t.dr, d:t.d, wFire:t.wFire, wIce:t.wIce,
              wArc:t.wArc, wThorn:t.wThorn, wRegen:t.wRegen, mods:Object.assign({}, t.mods) };
   },
-  canPlace, buildableCells, cellCx, cellCy, cellSize: () => cell,
+  canPlace, buildableCells, openCell, placeHint,
+  placeMask: k => { const m = placeMask(k); return { good:m.good.map(g => ({ r:g[0], c:g[1] })),
+                                                    bad:m.bad.map(b => ({ r:b[0], c:b[1] })) }; },
+  cellCx, cellCy, cellSize: () => cell,
   totalLen: () => totalLen, pathSamples: n => { const o = []; for (let i = 0; i <= n; i++) o.push(posAt(totalLen * i / n)); return o; },
   pathCellList: () => [...pathCells].map(k => ({ r:Math.floor(k / COLS), c:k % COLS })),
   pathDistOfCell,
@@ -3159,9 +3302,13 @@ window.__TB = {
   wave: gw => buildWave(gw), hpMulFor, spdMulFor, armMulFor, startCashFor, coresForWave,
   globalWave, isBossWave, levelOfWave, waveInLevel, spawnWindowFor, labCost, turretUpCost,
   /* canvas hitboxes */
-  cardRects: () => cardRects.map(r => ({ kind:r.kind, x:r.x, y:r.y, w:r.w, h:r.h, un:r.un, afford:r.afford, capped:r.capped })),
+  cardRects: () => cardRects.map(r => ({ kind:r.kind, x:r.x, y:r.y, w:r.w, h:r.h, un:r.un, afford:r.afford, capped:r.capped, spot:r.spot })),
   tabRects: () => tabRects.map(r => ({ id:r.id, x:r.x, y:r.y, w:r.w, h:r.h })),
   setTab: id => { barTab = id; },
+  /* arm a kind without going through a card hitbox, and force one
+     synchronous frame so cardRects/panelRects are fresh to read */
+  arm: k => { armedKind = k; if (k) sel = null; },
+  forceDraw: () => { draw(); },
   comboAt: (r, c) => { const t = tileAt(r, c); return t && t.combo ? t.combo.id : null; },
   groundsRaw: () => grounds.map(g => ({ x:g.x, y:g.y, r:g.r, t:g.t, dps:g.dps })),
   panelRects: () => panelBtns,
@@ -3177,6 +3324,9 @@ window.__TB = {
      already known. */
   clearStorage: () => { try { localStorage.clear(); } catch (e) {} codex = {}; },
   showMenu, showLab, showPause, showCodex, closeScreen,
+  /* exactly the condition drawPlaceOverlay() draws under, so a test can
+     assert the overlay is up mid-drag without reading pixels */
+  overlayKind: () => ((run && state === 'play') ? (dragCard || armedKind || null) : null),
   gfx: () => GFX, setGfx, GFX_STYLES,
   gfxMenuOpen: () => gfxMenuOpen(), openGfxMenu, closeGfxMenu,
   codex: () => Object.keys(codex), COMBO_TOTAL, COMBOS_BY_ID,

@@ -66,17 +66,20 @@ const HELPERS = `(() => {
     G.setPhase('grace');          // park the flow machine: no wave gatecrashes
     return G;
   }
-  /* a turret cell with all four SIDES free (for modules) */
+  /* a turret cell with all four SIDES free (for modules).
+     openCell, NOT canPlace('fire') — since modules must touch a turret, and
+     the turret does not exist yet, canPlace answers "no" for every side of
+     every candidate. The question here is only "is that cell open ground". */
   function plusSpot() {
     for (const c of G.buildableCells('turret'))
-      if (ORTHO.every(([dr,dc]) => G.canPlace('fire', c.r+dr, c.c+dc))) return c;
+      if (ORTHO.every(([dr,dc]) => G.openCell(c.r+dr, c.c+dc))) return c;
     return null;
   }
   /* ... and all four DIAGONALS free too (for boosters) */
   function bigSpot() {
     for (const c of G.buildableCells('turret')) {
-      if (!ORTHO.every(([dr,dc]) => G.canPlace('fire', c.r+dr, c.c+dc))) continue;
-      if (!DIAG.every(([dr,dc]) => G.canPlace('twin', c.r+dr, c.c+dc))) continue;
+      if (!ORTHO.every(([dr,dc]) => G.openCell(c.r+dr, c.c+dc))) continue;
+      if (!DIAG.every(([dr,dc]) => G.openCell(c.r+dr, c.c+dc))) continue;
       return c;
     }
     return null;
@@ -152,7 +155,7 @@ const HELPERS = `(() => {
     for (const p of G.pathCellList()) {
       if (!G.canPlace('wall', p.r, p.c)) continue;
       const free = ORTHO.map(([dr,dc]) => ({ r:p.r+dr, c:p.c+dc }))
-        .filter(q => G.canPlace('fire', q.r, q.c));
+        .filter(q => G.openCell(q.r, q.c));
       if (free.length >= 2) return { cell:p, free };
     }
     return null;
@@ -162,7 +165,7 @@ const HELPERS = `(() => {
     for (const p of G.pathCellList()) {
       if (!G.canPlace('wall', p.r, p.c)) continue;
       out.push(ORTHO.map(([dr,dc]) => ({ r:p.r+dr, c:p.c+dc }))
-        .filter(q => G.canPlace('fire', q.r, q.c)).length);
+        .filter(q => G.openCell(q.r, q.c)).length);
     }
     return out;
   }
@@ -385,7 +388,7 @@ const TOUCH = `(() => {
           // only the EARLY path counts: the walker gets 15 s, so a turret
           // covering the far end of a 26-cell road would never see it
           const cov = samples.slice(0, 40).filter(s => Math.hypot(s.x - x, s.y - y) <= rng).length;
-          const sidesFree = H.ORTHO.every(([dr, dc]) => G.canPlace('fire', c.r + dr, c.c + dc));
+          const sidesFree = H.ORTHO.every(([dr, dc]) => G.openCell(c.r + dr, c.c + dc));
           if (cov > bestCov && sidesFree) { bestCov = cov; spot = c; }
         }
         if (withIce) { G.place('turret', spot.r, spot.c); H.ring(spot, ['ice','ice','ice','ice']); }
@@ -674,14 +677,18 @@ const TOUCH = `(() => {
       G.place('turret', sp.r, sp.c);
       G.place('fire', sp.r, sp.c - 1);
       const base = G.turretStats(sp.r, sp.c).rate;
-      G.place('clock', sp.r - 1, sp.c);          // ORTHOGONAL — must be inert
+      // ORTHOGONAL — the board must refuse it outright, not sell an inert tile
+      const orthoLegal = G.canPlace('clock', sp.r - 1, sp.c);
+      const orthoBuilt = G.place('clock', sp.r - 1, sp.c);
       const ortho = G.turretStats(sp.r, sp.c).rate;
       G.place('clock', sp.r + 1, sp.c + 1);      // DIAGONAL — must apply
       const dg = G.turretStats(sp.r, sp.c).rate;
-      return { base:+base.toFixed(4), ortho:+ortho.toFixed(4), diag:+dg.toFixed(4) };
+      return { base:+base.toFixed(4), ortho:+ortho.toFixed(4), diag:+dg.toFixed(4),
+               orthoLegal, orthoBuilt };
     });
-    check('a booster on a SIDE does nothing — boosters are diagonal-only',
-      near(diag.base, diag.ortho, 1e-6) && diag.diag > diag.ortho, diag);
+    check('a booster cannot go on a SIDE at all — boosters are diagonal-only',
+      diag.orthoLegal === false && diag.orthoBuilt === false
+      && near(diag.base, diag.ortho, 1e-6) && diag.diag > diag.ortho, diag);
 
     const shared = await P(() => {
       const G = window.__TB, H = window.__H;
@@ -689,7 +696,7 @@ const TOUCH = `(() => {
       // one booster diagonally between two turrets pays both
       let a = null;
       for (const c of G.buildableCells('turret')) {
-        if (G.canPlace('turret', c.r + 2, c.c + 2) && G.canPlace('clock', c.r + 1, c.c + 1)) { a = c; break; }
+        if (G.canPlace('turret', c.r + 2, c.c + 2) && G.openCell(c.r + 1, c.c + 1)) { a = c; break; }
       }
       G.place('turret', a.r, a.c);
       G.place('turret', a.r + 2, a.c + 2);
@@ -892,22 +899,24 @@ const TOUCH = `(() => {
       const mods = G.modsAt(spot.r, spot.c);
       const total = G.COMBAT_MODS.reduce((a, k) => a + mods[k], 0);
       const sidesFull = H.ORTHO.every(([dr, dc]) => G.tileAt(spot.r + dr, spot.c + dc) !== null);
+      // the diagonal is the boosters' space: a module may not even go there
+      const diagLegal = G.canPlace('fire', spot.r - 1, spot.c - 1);
       const diag = G.place('fire', spot.r - 1, spot.c - 1);
       const after = G.modsAt(spot.r, spot.c);
-      return { mods, total, sidesFull, diagPlaced: diag,
+      return { mods, total, sidesFull, diagLegal, diagPlaced: diag,
                afterTotal: G.COMBAT_MODS.reduce((a, k) => a + after[k], 0) };
     });
     check('a turret takes four modules and there is nowhere to put a fifth',
       r.total === 4 && r.sidesFull, r);
-    check('a MODULE on a diagonal still grants nothing — that space is the boosters’',
-      r.diagPlaced === true && r.afterTotal === 4, r);
+    check('a MODULE cannot be dropped on a diagonal — that space is the boosters’',
+      r.diagLegal === false && r.diagPlaced === false && r.afterTotal === 4, r);
 
     const shared = await P(() => {
       const G = window.__TB, H = window.__H;
       H.fresh();
       let a = null;
       for (const c of G.buildableCells('turret'))
-        if (G.canPlace('turret', c.r, c.c + 2) && G.canPlace('fire', c.r, c.c + 1)) { a = c; break; }
+        if (G.canPlace('turret', c.r, c.c + 2) && G.openCell(c.r, c.c + 1)) { a = c; break; }
       G.place('turret', a.r, a.c);
       G.place('turret', a.r, a.c + 2);
       G.place('fire', a.r, a.c + 1);
@@ -922,12 +931,18 @@ const TOUCH = `(() => {
       H.fresh();
       const spot = H.plusSpot();
       G.place('turret', spot.r, spot.c);
+      /* wall hardware beside a turret used to be buyable and inert; it is
+         now refused, because the placement rule is the wiring rule */
+      const legal = H.ORTHO.some(([dr, dc]) => G.canPlace('armor', spot.r + dr, spot.c + dc)
+                                            || G.canPlace('regen', spot.r + dr, spot.c + dc));
       H.ring(spot, ['armor', 'regen']);
       const m = G.modsAt(spot.r, spot.c);
-      return { armor:m.armor, regen:m.regen, fed:G.tileAt(spot.r - 1, spot.c).fed };
+      return { legal, armor:m.armor, regen:m.regen,
+               built: H.ORTHO.filter(([dr, dc]) => G.tileAt(spot.r + dr, spot.c + dc)).length };
     });
-    check('ARMOR and REGEN are still wall hardware only',
-      wallOnly.armor === 0 && wallOnly.regen === 0 && wallOnly.fed === 0, wallOnly);
+    check('ARMOR and REGEN are wall hardware only — a turret will not take them',
+      wallOnly.legal === false && wallOnly.built === 0
+      && wallOnly.armor === 0 && wallOnly.regen === 0, wallOnly);
 
     const cap = await P(() => {
       const G = window.__TB, H = window.__H;
@@ -942,6 +957,148 @@ const TOUCH = `(() => {
     check('the turret cap is enforced to the tile',
       cap.before === cap.base && cap.capped === cap.base && cap.placed === cap.base, cap);
     check('a GRID lab tier buys exactly one more turret slot', cap.after === cap.before + 1, cap);
+  }
+
+  /* =================================================================== */
+  group('placement rules — the board only sells hardware that connects');
+  {
+    const rules = await P(() => {
+      const G = window.__TB, H = window.__H;
+      H.fresh();
+      const spot = H.bigSpot();
+      // an empty board: a module has nothing to feed anywhere on it
+      const orphanBefore = G.buildableCells('fire').length;
+      const boostBefore = G.buildableCells('clock').length;
+      G.place('turret', spot.r, spot.c);
+      const sides = H.ORTHO.map(([dr, dc]) => G.canPlace('fire', spot.r + dr, spot.c + dc));
+      const diags = H.DIAG.map(([dr, dc]) => G.canPlace('clock', spot.r + dr, spot.c + dc));
+      const modOnDiag = H.DIAG.map(([dr, dc]) => G.canPlace('fire', spot.r + dr, spot.c + dc));
+      const boostOnSide = H.ORTHO.map(([dr, dc]) => G.canPlace('clock', spot.r + dr, spot.c + dc));
+      // two cells away from anything is still nothing
+      const far = G.buildableCells('turret').find(c =>
+        Math.abs(c.r - spot.r) + Math.abs(c.c - spot.c) > 3);
+      return { orphanBefore, boostBefore, sides, diags, modOnDiag, boostOnSide,
+               farMod: G.canPlace('fire', far.r, far.c), farBoost: G.canPlace('clock', far.r, far.c) };
+    });
+    check('on an empty board a module has nowhere legal to go at all',
+      rules.orphanBefore === 0 && rules.boostBefore === 0, rules);
+    check('a module goes on any of a turret’s four SIDES',
+      rules.sides.every(Boolean), rules.sides);
+    check('a booster goes on any of its four DIAGONALS',
+      rules.diags.every(Boolean), rules.diags);
+    check('and neither may take the other’s cells',
+      rules.modOnDiag.every(v => v === false) && rules.boostOnSide.every(v => v === false),
+      { modOnDiag:rules.modOnDiag, boostOnSide:rules.boostOnSide });
+    check('open ground away from any structure is refused for both',
+      rules.farMod === false && rules.farBoost === false, rules);
+
+    const wallSide = await P(() => {
+      const G = window.__TB, H = window.__H;
+      H.fresh();
+      const w = H.wallSpot();
+      const before = G.canPlace('fire', w.free[0].r, w.free[0].c);
+      const armorBefore = G.canPlace('armor', w.free[0].r, w.free[0].c);
+      G.place('wall', w.cell.r, w.cell.c);
+      return { before, armorBefore,
+               after: G.canPlace('fire', w.free[0].r, w.free[0].c),
+               armorAfter: G.canPlace('armor', w.free[0].r, w.free[0].c) };
+    });
+    check('a wall hosts modules too — the same cell flips legal the moment the wall lands',
+      wallSide.before === false && wallSide.after === true, wallSide);
+    check('and ARMOR, which no turret will take, is legal beside a wall',
+      wallSide.armorBefore === false && wallSide.armorAfter === true, wallSide);
+
+    /* THE OVERLAY. It is only ever as honest as the mask behind it, so the
+       mask is what gets asserted: every cell classified, and the legal set
+       identical to what place() will actually accept. */
+    const mask = await P(() => {
+      const G = window.__TB, H = window.__H;
+      H.fresh();
+      const spot = H.bigSpot();
+      G.place('turret', spot.r, spot.c);
+      const k = key => key.r + ':' + key.c;
+      const m = G.placeMask('fire');
+      const allowed = new Set(G.buildableCells('fire').map(k));
+      const good = new Set(m.good.map(k)), bad = new Set(m.bad.map(k));
+      let overlap = 0;
+      for (const g of good) if (bad.has(g)) overlap++;
+      const mb = G.placeMask('clock');
+      const sides = H.ORTHO.map(([dr, dc]) => ({ r:spot.r + dr, c:spot.c + dc })).map(k);
+      const diags = H.DIAG.map(([dr, dc]) => ({ r:spot.r + dr, c:spot.c + dc })).map(k);
+      const cells = G.consts().ROWS * G.consts().COLS;
+      return { cells, total: m.good.length + m.bad.length, overlap,
+               matches: good.size === allowed.size && [...good].every(g => allowed.has(g)),
+               modGood: m.good.map(k).sort(), sides: sides.sort(),
+               boostGood: mb.good.map(k).sort(), diags: diags.sort() };
+    });
+    check('the mask classifies every cell on the board exactly once',
+      mask.total === mask.cells && mask.overlap === 0, mask);
+    check('the legal set the overlay draws IS the set place() accepts',
+      mask.matches === true, { good:mask.modGood.length });
+    check('with one turret up, the module overlay shows exactly its four sides',
+      JSON.stringify(mask.modGood) === JSON.stringify(mask.sides), mask);
+    check('and the booster overlay exactly its four diagonals',
+      JSON.stringify(mask.boostGood) === JSON.stringify(mask.diags), mask);
+
+    /* The overlay draws from inside draw(); a throw there kills the rAF
+       chain and freezes the board, which is this game's documented failure
+       mode. So: hold each kind and run REAL frames. */
+    const before = errs.length;
+    await P(() => {
+      const G = window.__TB;
+      G.clearStorage(); G.seedRandom(5); G.newRun(); G.unlockAll(); G.setCash(100000); G.setPhase('grace');
+      const t = G.buildableCells('turret')[0];
+      G.place('turret', t.r, t.c);
+      const w = G.pathCellList().find(p => G.canPlace('wall', p.r, p.c));
+      G.place('wall', w.r, w.c);
+    });
+    const held = [];
+    for (const kind of ['turret', 'wall', 'fire', 'armor', 'clock']) {
+      await P(k => window.__TB.arm(k), kind);
+      await page.waitForTimeout(120);           // ~7 real frames of the overlay
+      held.push(await P(() => window.__TB.overlayKind()));
+    }
+    await P(() => window.__TB.arm(null));
+    check('the overlay renders for every kind without throwing — armed frames are real frames',
+      errs.length === before && held.every((h, i) => h === ['turret','wall','fire','armor','clock'][i]),
+      { held, newErrors: errs.slice(before) });
+
+    const drag = await P(() => {
+      const G = window.__TB;
+      const el = document.getElementById('cv');
+      const send = (kind, x, y) => {
+        const t = new Touch({ identifier:1, target:el, clientX:x, clientY:y });
+        el.dispatchEvent(new TouchEvent(kind, { bubbles:true, cancelable:true,
+          touches: kind === 'touchend' ? [] : [t],
+          targetTouches: kind === 'touchend' ? [] : [t], changedTouches:[t] }));
+      };
+      G.setTab('mods');
+      G.forceDraw();
+      const card = G.cardRects().find(c => c.kind === 'fire');
+      send('touchstart', card.x + card.w / 2, card.y + card.h / 2);
+      send('touchmove', G.cellCx(1), G.cellCy(1));
+      const mid = G.overlayKind();
+      send('touchend', G.cellCx(1), G.cellCy(1));
+      return { mid, after: G.overlayKind() };
+    });
+    check('and it is up MID-DRAG too, not only when a card is armed by tap',
+      drag.mid === 'fire' && drag.after === null, drag);
+
+    const card = await P(() => {
+      const G = window.__TB, H = window.__H;
+      H.fresh();
+      G.setTab('mods'); G.forceDraw();
+      const dead = G.cardRects().find(c => c.kind === 'fire').spot;
+      const t = G.buildableCells('turret')[0];
+      G.place('turret', t.r, t.c);
+      G.forceDraw();
+      return { dead, live: G.cardRects().find(c => c.kind === 'fire').spot };
+    });
+    check('the module card itself says NO SPOT until a turret exists to host it',
+      card.dead === false && card.live === true, card);
+    // leave the bar as we found it — barTab survives newRun(), and a group
+    // that changes it silently retunes every card check after this one
+    await P(() => { window.__TB.setTab('build'); window.__TB.arm(null); });
   }
 
   /* =================================================================== */
@@ -1281,6 +1438,9 @@ const TOUCH = `(() => {
 
     const placed = await P(() => {
       const G = window.__TB, T = window.__T;
+      // a module needs a host to sit beside now, so give the board one
+      const t = G.buildableCells('turret')[0];
+      G.place('turret', t.r, t.c);
       const c = G.buildableCells('fire')[0];
       T.tap(G.cellCx(c.c), G.cellCy(c.r));
       return { modules:G.st().modules, stillArmed:G.st().armed };

@@ -68,7 +68,7 @@ const PERSONAS = [
   { name: 'no-modules', desc: 'bare gray triangles — the turret alone, upgraded hard',
     noMods: true, walls: 2, wallMods: [], lab: LAB_ALL, upgrade: 'aggressive', place: 0.45 },
 
-  { name: 'orphan-mods', desc: 'buys modules but drops them where nothing touches a turret',
+  { name: 'orphan-mods', desc: 'tries to drop modules where nothing touches a turret — the board refuses every one',
     mods: MIXED, scatter: true, walls: 2, wallMods: [], lab: LAB_ALL, upgrade: 'value', place: 0.45 },
 
   { name: 'unshared', desc: 'same modules, same spend, but never shares one between two turrets',
@@ -159,7 +159,7 @@ const PLAYER = `(() => {
     if (strat.placeStrict && Math.abs(d) > 0.16) return 0;
     let sc = cov * Math.exp(-(d * d) / (2 * 0.20 * 0.20));
     let free = 0;
-    for (const [dr, dc] of ORTHO) if (G.canPlace('fire', r + dr, c + dc)) free++;
+    for (const [dr, dc] of ORTHO) if (G.openCell(r + dr, c + dc)) free++;
     /* A named combo needs all FOUR sides, so a pairs persona must refuse any
        cell it cannot finish. This is a real constraint on the player too: the
        first version packed eleven turrets into the highest-coverage cells,
@@ -253,12 +253,16 @@ const PLAYER = `(() => {
     out.sort((a, b) => strat.gridSmart ? b.feeds - a.feeds : a.feeds - b.feeds);
     return out;
   }
+  /* Deliberately orphaned: a cell that touches nothing. The board now
+     REFUSES this, so the persona built on it buys no modules at all — which
+     is the point of keeping it. It measures the rule end-to-end across a
+     whole campaign rather than in a unit check. */
   function scatterSpot() {
     for (const cc of cells) {
       if (G.tileAt(cc.r, cc.c) || !G.canPlace('fire', cc.r, cc.c)) continue;
       let touches = 0;
       for (const [dr, dc] of ORTHO) { const n = G.tileAt(cc.r + dr, cc.c + dc); if (n && n.kind !== 'module') touches++; }
-      if (touches === 0) return cc;              // deliberately orphaned
+      if (touches === 0) return cc;
     }
     return null;
   }
@@ -521,9 +525,13 @@ function check(name, cond, extra) {
     depth(noMods) <= 4 && depth(noMods) < depth(coherent),
     { noModules: depth(noMods), coherent: depth(coherent) });
 
-  /* And it is about ADJACENCY, so buying the same modules and dropping them
-     where they touch nothing must be worth close to nothing. */
-  check('a module that touches nothing is wasted money',
+  /* And it is about ADJACENCY. A module that touches nothing used to be
+     buyable and worth nothing; the board now refuses it outright, so this
+     persona ends a whole campaign having wired NOTHING — and plays like the
+     bare-turret one, because that is what it is. */
+  check('the board refuses an orphaned module — a campaign spent trying wires nothing',
+    orphan.links === 0, { links: orphan.links });
+  check('so a player who never learns adjacency plays like bare turrets',
     depth(orphan) <= depth(noMods) + 1 && depth(orphan) < depth(coherent),
     { orphaned: depth(orphan), noModules: depth(noMods), coherent: depth(coherent) });
 
