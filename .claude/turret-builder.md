@@ -246,6 +246,39 @@ everything without killing it faster lengthens the tail: CRYO SHELL runs
 a chill-heavy build, not a bug, and the eval caps it at 12 so it cannot
 quietly get worse.
 
+## Graphics styles — TOON (default) and NEON
+
+A ⚙ gear in the top-left chrome (right of ☰) opens a dropdown listing every
+entry in `GFX_STYLES`; the pick is stored in `settings.gfx`, mirrored to the
+module-level `GFX`, and read everywhere through `toon()`. Two styles ship:
+
+| id | what it is |
+| --- | --- |
+| `toon` | **the default.** Cel-shaded: paved road with kerbs, dirt-and-grass terrain, boulders on unbuildable cells, flat-fill hardware with a hard ink outline |
+| `neon` | the original wireframe look — dark board, glowing edges, dashed road |
+
+The cel recipe is one helper: `celShape(path, fill, ink, hi, s)` — flat fill,
+one hard ink outline, one rim-light facet — plus `contactShadow()` under
+anything that stands on the ground. Every drawable has a `…Toon` twin
+(`drawGroundToon`, `drawRoadToon`, `drawBoulder`, `drawTurretToon`,
+`drawModuleToon`, `drawBoosterToon`, `drawWallToon`, `creepPath` +
+`drawCreepShape`); `draw()` branches once per layer, never per object.
+
+Two rules the terrain earned the hard way:
+
+- **Scatter comes from a stable per-cell hash (`h2(a, b)`), never from the
+  seeded `RNG`.** Gameplay RNG is reserved for sparks and shake, and drawing
+  from it would make the ground move every frame *and* silently couple the
+  art to the simulation's determinism.
+- **Ground is decided per MAP, not per cell.** The first version picked
+  dirt-or-grass per grid cell and painted hard-edged squares — it read as a
+  checkerboard, not as ground. `buildTerrain()` now caches (keyed
+  `mapIdx:cell:boardX:boardY`, invalidated by `buildPath()`) a dirt **verge
+  stroked along the path** plus a few multi-lobe worn patches, with grass
+  tufts baked out with per-tuft lean, length and blade count so the grass is
+  not one glyph rubber-stamped across the field. Perfect circles and
+  identical tufts both read as stamps.
+
 ## Determinism
 
 **The simulation carries no gameplay randomness.** Wave composition, elite
@@ -264,7 +297,8 @@ Vary the persona, not the seed.
 `turretStats(r,c)` (payload, boosters, combo, **sides**), `wallStats`,
 `modsAt`, `tileAt`, `comboAt` · `canPlace`, `buildableCells(kind)` ·
 `setCurve/setPacing/seedRandom` · `cardRects/tabRects/panelRects/hudRects` ·
-`codex()`, `COMBO_TOTAL`.
+`codex()`, `COMBO_TOTAL` · `gfx()`, `setGfx(id)`, `GFX_STYLES`,
+`gfxMenuOpen/openGfxMenu/closeGfxMenu`.
 
 Four hooks exist to make the spec *measurable* rather than inferred:
 
@@ -281,11 +315,14 @@ Four hooks exist to make the spec *measurable* rather than inferred:
 Suites — **rules and balance are separate files**, so a rebalance never fights
 a mechanics regression:
 
-- `.claude/tests/drive-turret-builder.cjs` (146 checks) — the spec verbatim
+- `.claude/tests/drive-turret-builder.cjs` (180 checks) — the spec verbatim
   including the worked example, each module in isolation and stacked, the
   effects-vs-damage split, tracking and snap, all four boosters, all fifteen
   combos with their effects, the codex, walls, economy, flow, the sawtooth,
-  and the canvas UI pressed through real touch events.
+  the canvas UI pressed through real touch events, and both graphics styles
+  (default, dropdown, persistence, and **each renderer driven through real
+  frames on a populated board** — a per-style throw fails only that style's
+  check, verified by breaking `drawGroundNeon` and watching TOON stay green).
 - `.claude/tests/eval-turret-builder.cjs` (21 claims) — balance and pacing via
   personas. `--strategy f.json`, `--only NAME`, `--curve a,b`, `--seed`,
   `--json`. About a second each.
@@ -325,6 +362,12 @@ a mechanics regression:
   packed eleven turrets into the highest-coverage cells, left them with no
   free sides, and built seven modules and ZERO combos while reporting a full
   board. Check the printed `board:` line before believing a verdict.
+- **Ground decided per cell reads as a checkerboard.** The first TOON terrain
+  chose dirt-or-grass per grid cell and filled squares; on screen it was a
+  chequered field, not ground. Terrain is now a cached verge + blobs shape
+  that ignores the grid entirely. Same class of mistake, twice more: perfect
+  circles for worn patches, and one identical grass tuft repeated, both read
+  as stamps until they were given per-instance variation.
 - **Print page errors as they happen.** A crash inside `draw()` stops the
   canvas updating and then surfaces as a baffling stale-hitbox failure fifty
   checks later.

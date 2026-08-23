@@ -33,6 +33,35 @@ body {
 #back-btn { left:8px; }
 #mute { left:50px; }
 #menu-btn { left:92px; }
+#gfx-btn { left:134px; }
+/* The graphics dropdown hangs off the gear. It sits ABOVE the chrome (90) so
+   it is never clipped by the button row, and above any overlay for the same
+   reason the chrome is. */
+#gfx-menu {
+  position:absolute; top:calc(var(--sat) + 44px); left:8px; z-index:95;
+  background:var(--panel); border:1px solid var(--border); border-radius:10px;
+  padding:8px; min-width:216px; box-shadow:0 10px 34px #000a;
+}
+#gfx-menu.hidden { display:none; }
+#gfx-menu h4 {
+  font-family:'Black Ops One', sans-serif; font-size:0.6rem; letter-spacing:2px;
+  color:var(--dim); font-weight:normal; padding:2px 6px 7px;
+}
+.gfx-opt {
+  display:block; width:100%; text-align:left; background:transparent;
+  border:1px solid transparent; border-radius:7px; padding:8px 9px; margin-top:2px;
+  color:var(--white); font-family:'Share Tech Mono', monospace;
+  touch-action:manipulation; cursor:pointer;
+}
+.gfx-opt:hover { background:#12122a; }
+.gfx-opt.on { border-color:var(--gold); background:#15152c; }
+.gfx-opt .gname {
+  font-family:'Black Ops One', sans-serif; font-size:0.72rem; letter-spacing:2px;
+  color:var(--white);
+}
+.gfx-opt.on .gname { color:var(--gold); }
+.gfx-opt .gdesc { display:block; font-size:0.6rem; color:var(--dim); margin-top:3px; line-height:1.45; }
+.gfx-opt .gtick { float:right; color:var(--gold); font-size:0.8rem; }
 
 /* ============================ SCREEN OVERLAY =========================== */
 #ui {
@@ -107,11 +136,13 @@ table.sc td.n { color:var(--gold); font-family:'Black Ops One', sans-serif; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-17 19:30 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 13:09 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
 <button id="menu-btn" class="chrome" aria-label="Menu">☰</button>
+<button id="gfx-btn" class="chrome" aria-label="Graphics settings">⚙</button>
+<div id="gfx-menu" class="hidden"></div>
 <div id="ui"></div>
 <script>
 'use strict';
@@ -535,7 +566,29 @@ function readJSON(key, dflt) {
 function writeJSON(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; }
 }
-const settings = Object.assign({ music:45, sfx:70, muted:false, speed:1 }, readJSON(SET_KEY, {}));
+/* ============================ GRAPHICS STYLE ==========================
+   TOON is the default and the reason the board reads as a place rather than
+   a diagram: paved road, dirt-and-grass ground, boulders on the cells you
+   cannot build on, and cel-shaded hardware — flat fills, one hard ink
+   outline, one rim-light facet, one shadow. NEON is the original look, kept
+   because the whole rest of the site is neon and some people will want it.
+   Everything reads GFX at draw time; no geometry or hitbox depends on it. */
+const GFX_STYLES = [
+  { id:'toon', name:'TOON', desc:'Cel-shaded. Paved road, dirt and grass, boulders, stylised hardware.' },
+  { id:'neon', name:'NEON', desc:'The original wireframe look — dark board, glowing edges.' },
+];
+const settings = Object.assign({ music:45, sfx:70, muted:false, speed:1, gfx:'toon' }, readJSON(SET_KEY, {}));
+if (!GFX_STYLES.some(g => g.id === settings.gfx)) settings.gfx = 'toon';
+let GFX = settings.gfx;
+const toon = () => GFX === 'toon';
+/* A stable per-cell hash. Terrain scatter must not use RNG: that is seeded
+   for the balance harness and consumed by gameplay, so drawing from it would
+   make the ground crawl between frames and desync a replay. */
+function h2(a, b) {
+  let n = (a * 374761393 + b * 668265263) | 0;
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+}
 function saveSettings() { writeJSON(SET_KEY, settings); }
 function getScores() { const s = readJSON(SCORE_KEY, []); return Array.isArray(s) ? s : []; }
 /* Discoveries persist across runs on purpose. The CD's ask was combos the
@@ -666,6 +719,7 @@ function toast(text, col) { toasts.push({ text, col: col || '#dde3ff', t: 2.4 })
 function buildPath(idx) {
   const m = MAPS[idx];
   pathCells = new Set(); rockCells = new Set(); segs = []; totalLen = 0; distMemo = new Map();
+  terrain = { key:'', tufts:[], blobs:[], tone:[] };
   const pts = m.pts.map(p => ({ x: cellCx(p[0]), y: cellCy(p[1]) }));
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i], b = pts[i + 1];
@@ -1527,6 +1581,44 @@ function linkColour(from) {
   if (from.kind === 'booster') return BOOSTERS[from.boostKind] ? BOOSTERS[from.boostKind].col : null;
   return null;
 }
+/* --------------------------- the toon palette -------------------------- */
+const TOON = {
+  grass:['#5b9b46','#559241','#63a44c','#4f8b3d'],
+  dirt:['#8a6a44','#7d5f3c','#94734b'],
+  grassInk:'#33632a', dirtInk:'#5d4529',
+  pave:'#9aa0a8', paveLo:'#7d848d', paveInk:'#4a5058', paveSlab:'#8a9199',
+  kerb:'#6d747d', kerbInk:'#464c54',
+  rock:'#8d9299', rockLo:'#6d7278', rockHi:'#b3b8be', rockInk:'#3d4147',
+  steel:'#9aa4bb', steelLo:'#6f7a90', steelHi:'#c6cddd', ink:'#191c24',
+  wall:'#a99880', wallLo:'#8a7a64', wallHi:'#c8b89e', wallInk:'#3a3128',
+  shadow:'rgba(15,20,14,0.30)',
+};
+/* The cel recipe, in one place: flat fill, one hard ink outline, one
+   rim-light facet clipped to the shape, one contact shadow. Every toon
+   silhouette goes through this so the whole board shades the same way. */
+function celShape(path, fill, ink, hi, s) {
+  ctx.save();
+  path();
+  ctx.fillStyle = fill; ctx.fill();
+  if (hi) {
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = hi;
+    ctx.beginPath();
+    ctx.moveTo(-s, -s); ctx.lineTo(s, -s); ctx.lineTo(-s, s); ctx.closePath();
+    ctx.globalAlpha = 0.55; ctx.fill();
+    ctx.restore();
+  }
+  path();
+  ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1.4, s * 0.10);
+  ctx.lineJoin = 'round'; ctx.stroke();
+  ctx.restore();
+}
+function contactShadow(x, y, rx, ry) {
+  ctx.save();
+  ctx.fillStyle = TOON.shadow;
+  ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
 function roundRect(x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -1540,6 +1632,7 @@ function roundRect(x, y, w, h, r) {
    the COLOUR on the plate comes from the modules feeding it, never from
    the turret itself. */
 function drawTurretShape(x, y, s, lvl, aim) {
+  if (toon()) return drawTurretToon(x, y, s, lvl, aim);
   ctx.save();
   ctx.translate(x, y);
   if (aim !== undefined) ctx.rotate(aim + Math.PI / 2);
@@ -1556,8 +1649,49 @@ function drawTurretShape(x, y, s, lvl, aim) {
   ctx.stroke();
   ctx.restore();
 }
+/* The toon turret keeps the spec's triangle as its silhouette — that shape is
+   the game's signature — but sits it on a plated emplacement and gives it a
+   barrel that points where it is aiming, so the board reads as machines
+   rather than markers. */
+function drawTurretToon(x, y, s, lvl, aim) {
+  const g = s * (0.34 + 0.035 * (lvl - 1));
+  contactShadow(x, y + s * 0.30, s * 0.40, s * 0.16);
+  ctx.save();
+  ctx.translate(x, y);
+  /* the pad it is bolted to */
+  const pad = () => { roundRect(-s * 0.38, -s * 0.30, s * 0.76, s * 0.62, s * 0.12); };
+  celShape(pad, TOON.steelLo, TOON.ink, TOON.steelHi, s * 0.4);
+  ctx.save();
+  if (aim !== undefined) ctx.rotate(aim + Math.PI / 2);
+  /* barrel first, so the hull overlaps its root */
+  const bl = s * (0.40 + 0.03 * lvl);
+  const barrel = () => { roundRect(-s * 0.075, -bl, s * 0.15, bl * 0.86, s * 0.04); };
+  celShape(barrel, TOON.steelLo, TOON.ink, TOON.steelHi, s * 0.2);
+  /* the hull: the triangle, chamfered */
+  const hull = () => {
+    ctx.beginPath();
+    ctx.moveTo(0, -g * 1.05);
+    ctx.lineTo(g * 0.62, -g * 0.05);
+    ctx.lineTo(g * 0.9, g * 0.72);
+    ctx.lineTo(-g * 0.9, g * 0.72);
+    ctx.lineTo(-g * 0.62, -g * 0.05);
+    ctx.closePath();
+  };
+  celShape(hull, TOON.steel, TOON.ink, TOON.steelHi, g);
+  /* a level pip row, so LEVEL still reads without text */
+  ctx.fillStyle = TOON.ink;
+  for (let i = 0; i < lvl; i++) {
+    ctx.beginPath();
+    ctx.arc(-g * 0.42 + i * g * 0.28, g * 0.44, Math.max(1, g * 0.09), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.restore();
+}
 function drawModuleShape(x, y, s, mod) {
   const M = MODULES[mod];
+  if (!M) return;
+  if (toon()) return drawModuleToon(x, y, s, mod, M);
   ctx.save();
   ctx.translate(x, y);
   roundRect(-s * 0.34, -s * 0.34, s * 0.68, s * 0.68, s * 0.14);
@@ -1569,8 +1703,36 @@ function drawModuleShape(x, y, s, mod) {
   ctx.fillText(M.glyph, 0, s * 0.02);
   ctx.restore();
 }
+/* A module is a bolted-on pod: flat housing in the module's colour, ink
+   outline, a lit top-left facet, and the glyph punched into a dark plate so
+   it survives against every hull colour. */
+function drawModuleToon(x, y, s, mod, M) {
+  contactShadow(x, y + s * 0.32, s * 0.34, s * 0.13);
+  ctx.save();
+  ctx.translate(x, y);
+  const body = () => { roundRect(-s * 0.35, -s * 0.35, s * 0.70, s * 0.70, s * 0.15); };
+  celShape(body, M.col, TOON.ink, '#ffffff', s * 0.36);
+  /* corner bolts */
+  ctx.fillStyle = TOON.ink; ctx.globalAlpha = 0.55;
+  for (const [bx, by] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+    ctx.beginPath();
+    ctx.arc(bx * s * 0.26, by * s * 0.26, Math.max(0.8, s * 0.035), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  /* glyph plate */
+  ctx.fillStyle = 'rgba(18,20,26,0.72)';
+  roundRect(-s * 0.20, -s * 0.20, s * 0.40, s * 0.40, s * 0.08); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = Math.round(s * 0.30) + 'px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(M.glyph, 0, s * 0.015);
+  ctx.restore();
+}
 function drawBoosterShape(x, y, s, kindKey) {
   const B = BOOSTERS[kindKey];
+  if (!B) return;
+  if (toon()) return drawBoosterToon(x, y, s, kindKey, B);
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(Math.PI / 4);
@@ -1582,6 +1744,25 @@ function drawBoosterShape(x, y, s, kindKey) {
   ctx.font = Math.round(s * 0.40) + 'px "Share Tech Mono", monospace';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(B.glyph, 0, s * 0.02);
+  ctx.restore();
+}
+/* A booster is a pylon standing on the diagonal — deliberately a different
+   FORM from a module, not just a different colour, because it plugs into a
+   different set of cells. */
+function drawBoosterToon(x, y, s, kindKey, B) {
+  contactShadow(x, y + s * 0.30, s * 0.30, s * 0.12);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.PI / 4);
+  const body = () => { roundRect(-s * 0.27, -s * 0.27, s * 0.54, s * 0.54, s * 0.10); };
+  celShape(body, B.col, TOON.ink, '#ffffff', s * 0.28);
+  ctx.rotate(-Math.PI / 4);
+  ctx.fillStyle = 'rgba(18,20,26,0.70)';
+  ctx.beginPath(); ctx.arc(0, 0, s * 0.19, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = Math.round(s * 0.28) + 'px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(B.glyph, 0, s * 0.015);
   ctx.restore();
 }
 /* ONE place that maps a build-card kind to its silhouette. The drag ghost
@@ -1597,6 +1778,7 @@ function drawKindShape(kind, x, y, s) {
   else if (MODULES[kind]) drawModuleShape(x, y, s, kind);
 }
 function drawWallShape(x, y, s, frac) {
+  if (toon()) return drawWallToon(x, y, s, frac);
   ctx.save();
   ctx.translate(x, y);
   roundRect(-s * 0.40, -s * 0.34, s * 0.80, s * 0.68, s * 0.08);
@@ -1609,65 +1791,125 @@ function drawWallShape(x, y, s, frac) {
   ctx.moveTo(-s * 0.2, 0); ctx.lineTo(-s * 0.2, s * 0.34);
   ctx.moveTo(s * 0.2, 0); ctx.lineTo(s * 0.2, s * 0.34);
   ctx.stroke();
-  // HP bar
   const bw = s * 0.76;
   ctx.fillStyle = '#11162a'; ctx.fillRect(-bw / 2, s * 0.40, bw, 3);
   ctx.fillStyle = frac > 0.5 ? '#39ff14' : frac > 0.22 ? '#ffc300' : '#ff2244';
   ctx.fillRect(-bw / 2, s * 0.40, bw * clamp(frac, 0, 1), 3);
   ctx.restore();
 }
-function drawCreepShape(c, x, y, r) {
+/* A toon wall is masonry: courses of blocks with a lit top course and struck
+   joints, so a damaged one reads as chipped rather than dimmed. */
+function drawWallToon(x, y, s, frac) {
+  contactShadow(x, y + s * 0.36, s * 0.44, s * 0.14);
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = c.hitFlash > 0 ? '#ffffff' : c.def.col;
-  ctx.strokeStyle = c.elite ? '#ffc300' : '#0a0a14';
-  ctx.lineWidth = c.elite ? 2 : 1;
-  const s = c.def.shape;
+  const body = () => { roundRect(-s * 0.42, -s * 0.36, s * 0.84, s * 0.72, s * 0.07); };
+  celShape(body, TOON.wall, TOON.wallInk, TOON.wallHi, s * 0.44);
+  ctx.save();
+  body(); ctx.clip();
+  ctx.strokeStyle = TOON.wallInk; ctx.globalAlpha = 0.65;
+  ctx.lineWidth = Math.max(1, s * 0.035);
   ctx.beginPath();
-  if (s === 'hex' || s === 'oct' || s === 'dia' || s === 'star') {
-    const n = s === 'hex' ? 6 : s === 'oct' ? 8 : s === 'dia' ? 4 : 10;
+  ctx.moveTo(-s * 0.42, -s * 0.12); ctx.lineTo(s * 0.42, -s * 0.12);
+  ctx.moveTo(-s * 0.42, s * 0.14); ctx.lineTo(s * 0.42, s * 0.14);
+  ctx.moveTo(-s * 0.12, -s * 0.36); ctx.lineTo(-s * 0.12, -s * 0.12);
+  ctx.moveTo(s * 0.18, -s * 0.36); ctx.lineTo(s * 0.18, -s * 0.12);
+  ctx.moveTo(s * 0.04, -s * 0.12); ctx.lineTo(s * 0.04, s * 0.14);
+  ctx.moveTo(-s * 0.24, s * 0.14); ctx.lineTo(-s * 0.24, s * 0.36);
+  ctx.moveTo(s * 0.16, s * 0.14); ctx.lineTo(s * 0.16, s * 0.36);
+  ctx.stroke();
+  /* damage: knock the top course out as the wall loses HP */
+  if (frac < 0.99) {
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = TOON.dirt[1];
+    const gone = (1 - clamp(frac, 0, 1));
+    ctx.fillRect(-s * 0.42, -s * 0.36, s * 0.84, s * 0.30 * gone);
+    ctx.strokeStyle = TOON.wallInk; ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.42, -s * 0.36 + s * 0.30 * gone);
+    ctx.lineTo(s * 0.42, -s * 0.36 + s * 0.30 * gone);
+    ctx.stroke();
+  }
+  ctx.restore();
+  const bw = s * 0.76;
+  ctx.fillStyle = 'rgba(20,18,14,0.75)'; ctx.fillRect(-bw / 2, s * 0.42, bw, 3.4);
+  ctx.fillStyle = frac > 0.5 ? '#5ad04a' : frac > 0.22 ? '#e8b13a' : '#d8483f';
+  ctx.fillRect(-bw / 2, s * 0.42, bw * clamp(frac, 0, 1), 3.4);
+  ctx.restore();
+}
+/* The per-type silhouette is the same in both styles — it is how a player
+   tells a HULK from a WARD at a glance, and the balance depends on reading
+   that fast. Only the shading changes. */
+function creepPath(shape, r) {
+  ctx.beginPath();
+  if (shape === 'hex' || shape === 'oct' || shape === 'dia' || shape === 'star') {
+    const n = shape === 'hex' ? 6 : shape === 'oct' ? 8 : shape === 'dia' ? 4 : 10;
     for (let i = 0; i < n; i++) {
       const a = -Math.PI / 2 + i * 2 * Math.PI / n;
-      const rr = (s === 'star' && i % 2) ? r * 0.5 : r;
+      const rr = (shape === 'star' && i % 2) ? r * 0.5 : r;
       const px = Math.cos(a) * rr, py = Math.sin(a) * rr;
       i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
     }
     ctx.closePath();
-  } else if (s === 'sq') {
+  } else if (shape === 'sq') {
     ctx.rect(-r * 0.8, -r * 0.8, r * 1.6, r * 1.6);
-  } else if (s === 'tri') {
+  } else if (shape === 'tri') {
     ctx.moveTo(0, -r); ctx.lineTo(r * 0.9, r * 0.7); ctx.lineTo(-r * 0.9, r * 0.7); ctx.closePath();
-  } else if (s === 'chev') {
+  } else if (shape === 'chev') {
     ctx.moveTo(r, 0); ctx.lineTo(-r * 0.5, -r * 0.85); ctx.lineTo(-r * 0.1, 0); ctx.lineTo(-r * 0.5, r * 0.85); ctx.closePath();
   } else {
     const t = r * 0.42;
     ctx.rect(-t, -r, t * 2, r * 2); ctx.rect(-r, -t, r * 2, t * 2);
   }
-  ctx.fill(); ctx.stroke();
+}
+function drawCreepShape(c, x, y, r) {
+  const T = toon();
+  if (T) contactShadow(x, y + r * 0.85, r * 0.95, r * 0.34);
+  ctx.save();
+  ctx.translate(x, y);
+  const flash = c.hitFlash > 0;
+  if (T) {
+    const path = () => creepPath(c.def.shape, r);
+    celShape(path, flash ? '#ffffff' : c.def.col, c.elite ? '#f0c040' : TOON.ink, '#ffffff', r);
+    if (c.elite) {
+      ctx.strokeStyle = '#f0c040'; ctx.lineWidth = Math.max(1.4, r * 0.10);
+      creepPath(c.def.shape, r * 1.16); ctx.stroke();
+    }
+    /* one dark eye-slit band, which is what turns a polygon into a thing */
+    ctx.save();
+    creepPath(c.def.shape, r); ctx.clip();
+    ctx.fillStyle = 'rgba(20,22,28,0.55)';
+    ctx.fillRect(-r, -r * 0.22, r * 2, r * 0.30);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = flash ? '#ffffff' : c.def.col;
+    ctx.strokeStyle = c.elite ? '#ffc300' : '#0a0a14';
+    ctx.lineWidth = c.elite ? 2 : 1;
+    creepPath(c.def.shape, r);
+    ctx.fill(); ctx.stroke();
+  }
   if (c.burn) {
-    ctx.strokeStyle = MODULES.fire.col; ctx.lineWidth = 1.4;
+    ctx.strokeStyle = MODULES.fire.col; ctx.lineWidth = T ? 2 : 1.4;
     ctx.beginPath(); ctx.arc(0, 0, r + 3, 0, Math.PI * 2); ctx.stroke();
   }
   if (c.chillT > 0) {
-    ctx.strokeStyle = MODULES.ice.col; ctx.lineWidth = 1.4;
+    ctx.strokeStyle = MODULES.ice.col; ctx.lineWidth = T ? 2 : 1.4;
     ctx.beginPath(); ctx.arc(0, 0, r + 6, 0, Math.PI * 1.4); ctx.stroke();
   }
   ctx.restore();
   if (c.hp < c.maxHp) {
     const bw = r * 2.2;
-    ctx.fillStyle = '#11162a'; ctx.fillRect(x - bw / 2, y - r - 8, bw, 2.5);
-    ctx.fillStyle = '#39ff14'; ctx.fillRect(x - bw / 2, y - r - 8, bw * clamp(c.hp / c.maxHp, 0, 1), 2.5);
+    ctx.fillStyle = T ? 'rgba(20,18,14,0.75)' : '#11162a';
+    ctx.fillRect(x - bw / 2, y - r - 8, bw, T ? 3 : 2.5);
+    ctx.fillStyle = T ? '#5ad04a' : '#39ff14';
+    ctx.fillRect(x - bw / 2, y - r - 8, bw * clamp(c.hp / c.maxHp, 0, 1), T ? 3 : 2.5);
   }
 }
-
-function draw() {
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = '#06060e'; ctx.fillRect(0, 0, W, H);
-  if (state === 'menu' && !run) return;
-  ctx.save();
-  if (shake > 0) ctx.translate((RNG() - 0.5) * shake * 12, (RNG() - 0.5) * shake * 12);
-
-  /* board */
+/* ======================== TERRAIN AND ROAD ============================
+   Neon draws a dark board with a faint lattice; TOON draws a place. The
+   scatter is all driven by h2(r, c) so the ground is identical every frame
+   and every reload — using RNG here would make the grass crawl. */
+function drawGroundNeon() {
   ctx.fillStyle = '#080814';
   ctx.fillRect(boardX, boardY, boardW, boardH);
   ctx.strokeStyle = '#12122a'; ctx.lineWidth = 1;
@@ -1675,38 +1917,226 @@ function draw() {
   for (let c = 0; c <= COLS; c++) { ctx.moveTo(boardX + c * cell, boardY); ctx.lineTo(boardX + c * cell, boardY + boardH); }
   for (let r = 0; r <= ROWS; r++) { ctx.moveTo(boardX, boardY + r * cell); ctx.lineTo(boardX + boardW, boardY + r * cell); }
   ctx.stroke();
-
-  /* road */
+}
+/* TERRAIN CACHE. The ground is expensive to decide and cheap to draw, so it
+   is worked out once per map + cell size and then just painted. Deciding it
+   per CELL at all was the first version's mistake — hard-edged squares of
+   green and brown read as a checkerboard, not as ground. The dirt is now a
+   VERGE that hugs the road plus a few worn blobs, so its edges curve. */
+let terrain = { key:'', tufts:[], blobs:[], tone:[] };
+function buildTerrain() {
+  const k = mapIdx + ':' + cell + ':' + boardX + ':' + boardY;
+  if (terrain.key === k) return;
+  terrain = { key:k, tufts:[], blobs:[], tone:[] };
+  if (!segs.length) return;
+  const samples = [];
+  for (let i = 0; i <= 160; i++) samples.push(posAt(totalLen * i / 160));
+  const nearPath = (x, y) => {
+    let m = Infinity;
+    for (const p of samples) { const d = Math.hypot(p.x - x, p.y - y); if (d < m) m = d; }
+    return m;
+  };
+  for (let n = 0; n < 7; n++) {
+    const hx = h2(mapIdx * 91 + n, n * 17), hy = h2(n * 29, mapIdx * 13 + n);
+    const x = boardX + hx * boardW, y = boardY + hy * boardH;
+    if (nearPath(x, y) < cell * 2.2) continue;
+    /* a worn patch is three overlapping lobes, not a disc — a perfect circle
+       of brown on grass reads as a stamp rather than as bare ground */
+    const r = cell * (0.62 + 1.0 * h2(n * 7, mapIdx));
+    const lobes = [{ dx: 0, dy: 0, r }];
+    for (let j = 1; j <= 2; j++) {
+      const a = h2(n * 31 + j, mapIdx * 3 + j) * Math.PI * 2;
+      const d = r * (0.45 + 0.4 * h2(j * 11, n * 5));
+      lobes.push({ dx: Math.cos(a) * d, dy: Math.sin(a) * d * 0.75,
+                   r: r * (0.5 + 0.35 * h2(n + j, j * 23)) });
+    }
+    terrain.blobs.push({ x, y, r, lobes });
+  }
+  for (let n = 0; n < 9; n++) {
+    terrain.tone.push({
+      x: boardX + h2(n * 13 + 2, mapIdx) * boardW,
+      y: boardY + h2(mapIdx * 5, n * 19 + 3) * boardH,
+      r: cell * (1.1 + 1.6 * h2(n, n + mapIdx)),
+      c: TOON.grass[(h2(n * 3, mapIdx * 7) * TOON.grass.length) | 0],
+    });
+  }
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const n = h2(r * 17 + 5, c * 23 + 11);
+    if (n < 0.52) continue;
+    const x = boardX + c * cell + cell * (0.22 + 0.56 * h2(c, r));
+    const y = boardY + r * cell + cell * (0.3 + 0.5 * n);
+    if (nearPath(x, y) < cell * 1.05) continue;
+    if (terrain.blobs.some(b => Math.hypot(b.x - x, b.y - y) < b.r)) continue;
+    /* blades are baked out here with a per-tuft lean and blade count, so the
+       grass does not read as one glyph rubber-stamped across the field */
+    const q = cell * (0.10 + 0.07 * h2(c * 7 + 1, r * 5 + 3));
+    const lean = (h2(r * 3 + c, c * 41) - 0.5) * 0.9;
+    const blades = 2 + ((h2(c * 13, r * 9) * 2.4) | 0);
+    const seg = [];
+    for (let b = 0; b < blades; b++) {
+      const spread = blades === 1 ? 0 : (b / (blades - 1) - 0.5) * 1.7;
+      const a = -Math.PI / 2 + spread + lean;
+      const len = q * (0.75 + 0.55 * h2(b * 17 + c, r * 11 + b));
+      seg.push([x + spread * q * 0.5, y, x + spread * q * 0.5 + Math.cos(a) * len,
+                y + Math.sin(a) * len]);
+    }
+    terrain.tufts.push({ seg });
+  }
+}
+function drawGroundToon() {
+  buildTerrain();
   ctx.save();
   ctx.beginPath(); ctx.rect(boardX, boardY, boardW, boardH); ctx.clip();
+  ctx.fillStyle = TOON.grass[0];
+  ctx.fillRect(boardX, boardY, boardW, boardH);
+  ctx.globalAlpha = 0.55;
+  for (const t of terrain.tone) {
+    ctx.fillStyle = t.c;
+    ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  /* the dirt verge, drawn as an outline pass then fill passes so it keeps a
+     cel edge without having to trace a blob outline */
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  ctx.strokeStyle = '#171a2e'; ctx.lineWidth = cell * 0.86;
+  ctx.strokeStyle = TOON.dirtInk; ctx.lineWidth = cell * 2.02;
+  tracePath(); ctx.stroke();
+  ctx.strokeStyle = TOON.dirt[0]; ctx.lineWidth = cell * 1.92;
+  tracePath(); ctx.stroke();
+  ctx.strokeStyle = TOON.dirt[2]; ctx.lineWidth = cell * 1.42;
+  tracePath(); ctx.stroke();
+  for (const b of terrain.blobs) {
+    const lobes = (x) => {
+      ctx.beginPath();
+      for (const l of b.lobes) { ctx.moveTo(b.x + l.dx + l.r + x, b.y + l.dy);
+        ctx.arc(b.x + l.dx, b.y + l.dy, l.r + x, 0, Math.PI * 2); }
+      ctx.fill();
+    };
+    ctx.fillStyle = TOON.dirtInk; lobes(Math.max(1.5, cell * 0.05));
+    ctx.fillStyle = TOON.dirt[1];  lobes(0);
+    ctx.fillStyle = TOON.dirt[2]; ctx.globalAlpha = 0.6;
+    ctx.beginPath(); ctx.arc(b.x - b.r * 0.2, b.y - b.r * 0.2, b.r * 0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.strokeStyle = TOON.grassInk; ctx.lineWidth = Math.max(1, cell * 0.045); ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const t of terrain.tufts)
+    for (const b of t.seg) { ctx.moveTo(b[0], b[1]); ctx.lineTo(b[2], b[3]); }
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(20,32,16,0.15)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let c = 0; c <= COLS; c++) { ctx.moveTo(boardX + c * cell, boardY); ctx.lineTo(boardX + c * cell, boardY + boardH); }
+  for (let r = 0; r <= ROWS; r++) { ctx.moveTo(boardX, boardY + r * cell); ctx.lineTo(boardX + boardW, boardY + r * cell); }
+  ctx.stroke();
+  ctx.restore();
+}
+function tracePath() {
   ctx.beginPath();
   for (let i = 0; i < segs.length; i++) {
     if (i === 0) ctx.moveTo(segs[i].a.x, segs[i].a.y);
     ctx.lineTo(segs[i].b.x, segs[i].b.y);
   }
-  ctx.stroke();
+}
+function drawRoadNeon() {
+  ctx.strokeStyle = '#171a2e'; ctx.lineWidth = cell * 0.86;
+  tracePath(); ctx.stroke();
   ctx.strokeStyle = '#242a45'; ctx.lineWidth = cell * 0.86; ctx.setLineDash([]);
   ctx.stroke();
   ctx.strokeStyle = '#3a4468'; ctx.lineWidth = 1.5;
   ctx.setLineDash([6, 8]);
-  ctx.beginPath();
-  for (let i = 0; i < segs.length; i++) {
-    if (i === 0) ctx.moveTo(segs[i].a.x, segs[i].a.y);
-    ctx.lineTo(segs[i].b.x, segs[i].b.y);
-  }
+  tracePath(); ctx.stroke();
+  ctx.setLineDash([]);
+}
+/* A paved road: kerb, stone surface, then slab joints struck perpendicular
+   to the path so the paving follows the corners instead of sliding across
+   them. */
+function drawRoadToon() {
+  ctx.strokeStyle = TOON.kerbInk; ctx.lineWidth = cell * 0.94;
+  tracePath(); ctx.stroke();
+  ctx.strokeStyle = TOON.kerb; ctx.lineWidth = cell * 0.88;
+  tracePath(); ctx.stroke();
+  ctx.strokeStyle = TOON.pave; ctx.lineWidth = cell * 0.76;
+  tracePath(); ctx.stroke();
+
+  ctx.save();
+  ctx.lineWidth = cell * 0.76;
+  ctx.strokeStyle = TOON.paveLo;
+  ctx.globalAlpha = 0.5;
+  tracePath();
+  ctx.setLineDash([cell * 0.10, cell * 0.62]);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
 
-  /* rocks */
+  const step = cell * 0.72;
+  ctx.strokeStyle = TOON.paveInk; ctx.lineWidth = Math.max(1, cell * 0.035);
+  ctx.globalAlpha = 0.55;
+  for (let d = step * 0.5; d < totalLen; d += step) {
+    const p = posAt(d), q = posAt(Math.min(totalLen, d + 1.2));
+    const dx = q.x - p.x, dy = q.y - p.y, L = Math.hypot(dx, dy) || 1;
+    const nx = -dy / L, ny = dx / L, half = cell * 0.36;
+    ctx.beginPath();
+    ctx.moveTo(p.x + nx * half, p.y + ny * half);
+    ctx.lineTo(p.x - nx * half, p.y - ny * half);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+/* A boulder on every cell you cannot build on — the toon way of saying
+   "blocked" without a legend. */
+function drawBoulder(r, c) {
+  const x = cellCx(c), y = cellCy(r), s = cell * 0.42;
+  contactShadow(x, y + s * 0.62, s * 0.98, s * 0.34);
+  const n = 7, seed = r * 41 + c * 7;
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / n;
+    const rr = s * (0.76 + 0.34 * h2(seed + i, seed - i));
+    pts.push([Math.cos(a) * rr, Math.sin(a) * rr * 0.86]);
+  }
+  ctx.save();
+  ctx.translate(x, y);
+  const path = () => {
+    ctx.beginPath();
+    pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+    ctx.closePath();
+  };
+  celShape(path, TOON.rock, TOON.rockInk, TOON.rockHi, s);
+  /* one struck crack, so two boulders never read as the same stamp */
+  ctx.strokeStyle = TOON.rockInk; ctx.globalAlpha = 0.5;
+  ctx.lineWidth = Math.max(1, s * 0.09);
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.28, -s * 0.1); ctx.lineTo(-s * 0.02, s * 0.16); ctx.lineTo(s * 0.3, s * 0.02);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#06060e'; ctx.fillRect(0, 0, W, H);
+  if (state === 'menu' && !run) return;
+  ctx.save();
+  if (shake > 0) ctx.translate((RNG() - 0.5) * shake * 12, (RNG() - 0.5) * shake * 12);
+
+  /* ---------------- ground ---------------- */
+  if (toon()) drawGroundToon(); else drawGroundNeon();
+
+  /* ---------------- road ---------------- */
+  ctx.save();
+  ctx.beginPath(); ctx.rect(boardX, boardY, boardW, boardH); ctx.clip();
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  if (toon()) drawRoadToon(); else drawRoadNeon();
+  ctx.restore();
+
+  /* ---------------- rocks / boulders ---------------- */
   for (const k of rockCells) {
     const r = Math.floor(k / COLS), c = k % COLS;
-    ctx.fillStyle = '#141426';
-    roundRect(boardX + c * cell + 3, boardY + r * cell + 3, cell - 6, cell - 6, 4);
-    ctx.fill();
-    ctx.strokeStyle = '#20203a'; ctx.lineWidth = 1; ctx.stroke();
+    if (toon()) drawBoulder(r, c);
+    else {
+      ctx.fillStyle = '#141426';
+      roundRect(boardX + c * cell + 3, boardY + r * cell + 3, cell - 6, cell - 6, 4);
+      ctx.fill();
+      ctx.strokeStyle = '#20203a'; ctx.lineWidth = 1; ctx.stroke();
+    }
   }
 
   /* the arming wash — neutral, never the module's own colour: red means
@@ -1759,26 +2189,32 @@ function draw() {
     const x = cellCx(t.c), y = cellCy(t.r);
     if (t.kind === 'module') {
       if (t.fed === 0) ctx.globalAlpha = 0.42;    // an unpowered module reads dim
-      ctx.fillStyle = '#0d0d1c';
-      roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5);
-      ctx.fill();
-      ctx.strokeStyle = t.fed ? MODULES[t.mod].col + '99' : '#22223c';
-      ctx.lineWidth = 1; ctx.stroke();
+      if (!toon()) {
+        ctx.fillStyle = '#0d0d1c';
+        roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5);
+        ctx.fill();
+        ctx.strokeStyle = t.fed ? MODULES[t.mod].col + '99' : '#22223c';
+        ctx.lineWidth = 1; ctx.stroke();
+      }
       drawModuleShape(x, y, cell, t.mod);
       ctx.globalAlpha = 1;
     } else if (t.kind === 'booster') {
       if (t.fed === 0) ctx.globalAlpha = 0.42;
-      ctx.fillStyle = '#0d0d1c';
-      roundRect(x - cell * 0.42, y - cell * 0.42, cell * 0.84, cell * 0.84, 9);
-      ctx.fill();
-      ctx.strokeStyle = t.fed ? BOOSTERS[t.boostKind].col + '99' : '#22223c';
-      ctx.lineWidth = 1; ctx.stroke();
+      if (!toon()) {
+        ctx.fillStyle = '#0d0d1c';
+        roundRect(x - cell * 0.42, y - cell * 0.42, cell * 0.84, cell * 0.84, 9);
+        ctx.fill();
+        ctx.strokeStyle = t.fed ? BOOSTERS[t.boostKind].col + '99' : '#22223c';
+        ctx.lineWidth = 1; ctx.stroke();
+      }
       drawBoosterShape(x, y, cell, t.boostKind);
       ctx.globalAlpha = 1;
     } else if (t.kind === 'turret') {
-      ctx.fillStyle = '#0d0d1c';
-      roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5);
-      ctx.fill();
+      if (!toon()) {
+        ctx.fillStyle = '#0d0d1c';
+        roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5);
+        ctx.fill();
+      }
       // each feeding module blooms on the edge it comes from, in its colour
       ctx.save();
       roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5);
@@ -1794,8 +2230,10 @@ function draw() {
         ctx.fillRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88);
       }
       ctx.restore();
-      ctx.strokeStyle = '#66708c'; ctx.lineWidth = 1;
-      roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5); ctx.stroke();
+      if (!toon()) {
+        ctx.strokeStyle = '#66708c'; ctx.lineWidth = 1;
+        roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5); ctx.stroke();
+      }
       /* A named combo gets a pulsing outline in its own colour — the one
          piece of state on this board that says "you made something". */
       if (t.combo) {
@@ -1846,9 +2284,30 @@ function draw() {
     ctx.fillStyle = gr;
     ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2); ctx.fill();
   }
+  /* Projectiles. Neon draws a hairline; TOON draws a tracer with an ink
+     casing and a bright core, plus a muzzle flash at the firing end, so a
+     shot reads as a solid object travelling rather than a glow. */
   for (const b of beams) {
-    ctx.strokeStyle = b.col; ctx.globalAlpha = clamp(b.t * 9, 0, 1); ctx.lineWidth = b.w;
-    ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+    const a = clamp(b.t * 9, 0, 1);
+    if (toon()) {
+      ctx.globalAlpha = a;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = TOON.ink; ctx.lineWidth = b.w * 3.1;
+      ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+      ctx.strokeStyle = b.col; ctx.lineWidth = b.w * 1.9;
+      ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1, b.w * 0.7);
+      ctx.globalAlpha = a * 0.85;
+      ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#fff3c4';
+      ctx.beginPath(); ctx.arc(b.x1, b.y1, b.w * 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = TOON.ink; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(b.x1, b.y1, b.w * 1.5, 0, Math.PI * 2); ctx.stroke();
+    } else {
+      ctx.strokeStyle = b.col; ctx.globalAlpha = a; ctx.lineWidth = b.w;
+      ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+    }
   }
   ctx.globalAlpha = 1;
   for (const c of creeps) drawCreepShape(c, c.x, c.y, c.def.r * cell * (c.elite ? 1.18 : 1));
@@ -2422,6 +2881,11 @@ function showSettings(back) {
           <input class="rng" type="range" min="0" max="100" value="${settings.music}" id="r-m"></div>
         <div class="card"><div class="kv"><span class="k">SFX</span><span class="v" id="v-s">${settings.sfx}</span></div>
           <input class="rng" type="range" min="0" max="100" value="${settings.sfx}" id="r-s"></div>
+        <div class="card"><div class="kv"><span class="k">GRAPHICS</span>
+          <span class="v gold" id="v-g">${(GFX_STYLES.find(g => g.id === GFX) || {}).name}</span></div>
+          <div class="row2" style="margin-top:6px">${GFX_STYLES.map(g =>
+            `<button class="btn small ${g.id === GFX ? 'gold' : 'ghost'}" data-gfxset="${g.id}">${g.name}</button>`).join('')}</div>
+        </div>
         <button class="btn ghost small" id="b-wipe">CLEAR SAVES &amp; SCORES</button>
       </div>
       <div class="scr-foot"><button class="btn ghost" id="b-back">BACK</button></div>
@@ -2429,6 +2893,7 @@ function showSettings(back) {
   const rm = document.getElementById('r-m'), rs = document.getElementById('r-s');
   rm.addEventListener('input', () => { settings.music = +rm.value; document.getElementById('v-m').textContent = rm.value; applyVolumes(); saveSettings(); });
   rs.addEventListener('input', () => { settings.sfx = +rs.value; document.getElementById('v-s').textContent = rs.value; applyVolumes(); saveSettings(); });
+  ui.querySelectorAll('[data-gfxset]').forEach(b => bindTap(b, () => { setGfx(b.dataset.gfxset); showSettings(back); }));
   bindTap(document.getElementById('b-wipe'), () => {
     [AUTO_KEY, SCORE_KEY, CODEX_KEY, SLOT_KEY(1), SLOT_KEY(2), SLOT_KEY(3)].forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
     codex = {};
@@ -2505,6 +2970,38 @@ function showGameOver() {
 }
 
 bindTap(document.getElementById('menu-btn'), () => { if (ui.className === 'hidden' || !ui.innerHTML) showPause(); else closeScreen(); });
+
+/* ------------------------- the graphics dropdown ----------------------- */
+const gfxBtn = document.getElementById('gfx-btn'), gfxMenu = document.getElementById('gfx-menu');
+function renderGfxMenu() {
+  gfxMenu.innerHTML = '<h4>GRAPHICS STYLE</h4>' + GFX_STYLES.map(g =>
+    `<button class="gfx-opt ${g.id === GFX ? 'on' : ''}" data-gfx="${g.id}">` +
+    `${g.id === GFX ? '<span class="gtick">✓</span>' : ''}` +
+    `<span class="gname">${g.name}</span>` +
+    `<span class="gdesc">${g.desc}</span></button>`).join('');
+  gfxMenu.querySelectorAll('[data-gfx]').forEach(b => bindTap(b, () => setGfx(b.dataset.gfx)));
+}
+function setGfx(id) {
+  if (!GFX_STYLES.some(g => g.id === id)) return false;
+  GFX = settings.gfx = id;
+  saveSettings();
+  renderGfxMenu();
+  closeGfxMenu();
+  toast('GRAPHICS · ' + (GFX_STYLES.find(g => g.id === id) || {}).name, '#ffc300');
+  return true;
+}
+function openGfxMenu() { renderGfxMenu(); gfxMenu.className = ''; }
+function closeGfxMenu() { gfxMenu.className = 'hidden'; }
+function gfxMenuOpen() { return gfxMenu.className !== 'hidden'; }
+bindTap(gfxBtn, () => { gfxMenuOpen() ? closeGfxMenu() : openGfxMenu(); });
+/* Any press that is not on the menu or the gear puts it away. Registered in
+   the CAPTURE phase so it fires before the canvas handlers, and it never
+   swallows that press — the board still gets it. */
+['touchstart', 'mousedown'].forEach(ev => document.addEventListener(ev, e => {
+  if (!gfxMenuOpen()) return;
+  if (gfxMenu.contains(e.target) || gfxBtn.contains(e.target)) return;
+  closeGfxMenu();
+}, true));
 bindTap(muteBtn, () => { settings.muted = !settings.muted; applyVolumes(); saveSettings(); });
 
 /* ================================= LOOP =============================== */
@@ -2561,6 +3058,7 @@ window.__TB = {
     map: MAPS[mapIdx].name, mapIdx, armed: armedKind,
     lab: run ? Object.assign({}, run.lab) : null, labOpen: labOpen(),
     unlocked: BUILD_ORDER.filter(unlocked), won: run ? run.won : false,
+    gfx: GFX,
     boosters: countKind('booster'), barTab,
     combos: tiles.filter(t => t.kind === 'turret' && t.combo).map(t => t.combo.id),
     combosFound: run ? Object.keys(run.combosFound) : [],
@@ -2679,6 +3177,8 @@ window.__TB = {
      already known. */
   clearStorage: () => { try { localStorage.clear(); } catch (e) {} codex = {}; },
   showMenu, showLab, showPause, showCodex, closeScreen,
+  gfx: () => GFX, setGfx, GFX_STYLES,
+  gfxMenuOpen: () => gfxMenuOpen(), openGfxMenu, closeGfxMenu,
   codex: () => Object.keys(codex), COMBO_TOTAL, COMBOS_BY_ID,
   endRun,
 };

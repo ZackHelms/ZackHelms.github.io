@@ -1415,6 +1415,86 @@ const TOUCH = `(() => {
   }
 
   /* =================================================================== */
+  group('graphics styles — TOON by default, NEON still there');
+  {
+    const styles = await P(() => ({
+      ids: window.__TB.GFX_STYLES.map(g => g.id),
+      names: window.__TB.GFX_STYLES.map(g => g.name),
+      current: window.__TB.gfx(),
+    }));
+    check('both styles are offered and NEON is named as the old look',
+      styles.ids.length === 2 && styles.ids.includes('toon') && styles.ids.includes('neon')
+        && styles.names.includes('NEON'), styles);
+
+    /* the default has to be proven on a page that booted with NO stored
+       setting — reading the live value after the suite has been setting it
+       all along would prove nothing */
+    await P(() => { try { localStorage.clear(); } catch (e) {} });
+    await page.reload({ waitUntil: 'load' });
+    await page.evaluate('window.__H = ' + HELPERS);
+    await page.evaluate('window.__T = ' + TOUCH);
+    const fresh = await P(() => ({ gfx: window.__TB.gfx(), stored: localStorage.getItem('turretBuilder.v1.settings') }));
+    check('a first-time visitor gets TOON', fresh.gfx === 'toon', fresh);
+
+    const gear = await P(() => {
+      const b = document.getElementById('gfx-btn');
+      if (!b) return { missing: true };
+      const r = b.getBoundingClientRect();
+      return { z: +getComputedStyle(b).zIndex, overlay: +getComputedStyle(document.getElementById('ui')).zIndex,
+               top: Math.round(r.top), left: Math.round(r.left), open: window.__TB.gfxMenuOpen() };
+    });
+    check('the settings gear sits in the top-left chrome, above any overlay',
+      !gear.missing && gear.left < 200 && gear.top < 120 && gear.z > gear.overlay && !gear.open, gear);
+
+    await page.tap('#gfx-btn');
+    const opened = await P(() => ({
+      open: window.__TB.gfxMenuOpen(),
+      rows: [...document.querySelectorAll('#gfx-menu [data-gfx]')].map(e => e.dataset.gfx),
+      ticked: [...document.querySelectorAll('#gfx-menu [data-gfx]')].filter(e => e.classList.contains('on')).map(e => e.dataset.gfx),
+    }));
+    check('tapping it opens a dropdown listing every style, the current one ticked',
+      opened.open && opened.rows.length === 2 && JSON.stringify(opened.ticked) === '["toon"]', opened);
+
+    await page.tap('#gfx-menu [data-gfx="neon"]');
+    const picked = await P(() => ({
+      gfx: window.__TB.gfx(), open: window.__TB.gfxMenuOpen(),
+      stored: (JSON.parse(localStorage.getItem('turretBuilder.v1.settings') || '{}')).gfx,
+    }));
+    check('picking NEON switches the style, closes the menu and persists the choice',
+      picked.gfx === 'neon' && !picked.open && picked.stored === 'neon', picked);
+
+    await page.reload({ waitUntil: 'load' });
+    await page.evaluate('window.__H = ' + HELPERS);
+    await page.evaluate('window.__T = ' + TOUCH);
+    const kept = await P(() => window.__TB.gfx());
+    check('and it survives a reload', kept === 'neon', kept);
+
+    /* the real risk with two renderers is that one of them throws mid-frame
+       and takes the rAF chain with it — the exact shape of the freeze bug.
+       So run REAL frames of a populated board in each style and read the
+       page-error log, not just a return value. */
+    for (const style of ['neon', 'toon']) {
+      const before = errs.length;
+      await P((st) => {
+        const G = window.__TB, H = window.__H;
+        G.setGfx(st);
+        H.fresh();
+        const sp = H.bigSpot();
+        G.place('turret', sp.r, sp.c);
+        G.place('blast', sp.r - 1, sp.c); G.place('blast', sp.r + 1, sp.c);
+        G.place('fire', sp.r, sp.c - 1);  G.place('fire', sp.r, sp.c + 1);
+        G.place('clock', sp.r + 1, sp.c + 1); G.place('twin', sp.r - 1, sp.c - 1);
+        for (const q of G.pathCellList()) { if (G.place('wall', q.r, q.c)) break; }
+        G.ready();
+      }, style);
+      await new Promise(r => setTimeout(r, 500));
+      const live = await P(() => ({ gfx: window.__TB.gfx(), creeps: window.__TB.st().creeps, turrets: window.__TB.st().turrets, walls: window.__TB.st().walls }));
+      check('the ' + style.toUpperCase() + ' renderer draws a live board with turrets, walls and creeps without throwing',
+        live.gfx === style && errs.length === before, { style, live, errors: errs.slice(before, before + 1) });
+    }
+  }
+
+  /* =================================================================== */
   group('persistence');
   {
     const r = await P(() => {

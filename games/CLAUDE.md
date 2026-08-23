@@ -305,9 +305,13 @@ kinetic and **scales with the campaign floor**, percentage resist eats
 elemental and does not. Two currencies (per-level cash, persistent cores for a
 ten-track LAB whose GRID tiers buy turret slots), a three-tab build bar for
 thirteen placeable kinds, eight levels of eight waves at ~8 minutes each, then
-endless. **No gameplay randomness at all.** Detailed context:
+endless. **No gameplay randomness at all.** A ⚙ in the top-left chrome picks
+the **graphics style**: TOON (the default — cel-shaded, paved road with kerbs,
+dirt-and-grass terrain, boulders on the cells you cannot build on) or NEON
+(the original wireframe board). Detailed context:
 `.claude/turret-builder.md`. Suites: `.claude/tests/drive-turret-builder.cjs`
-(146 rules checks, the spec asserted to the decimal off a damage ledger) and
+(180 rules checks, the spec asserted to the decimal off a damage ledger, both
+renderers driven through real frames) and
 `.claude/tests/eval-turret-builder.cjs` (21 balance claims via personas).
 
 ### GRID DEFENSE (`grid-defense/index.html`, ~2300 lines)
