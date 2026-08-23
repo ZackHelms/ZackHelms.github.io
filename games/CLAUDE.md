@@ -356,7 +356,7 @@ tree must be able to clear the campaign alone**. Detailed context: `.claude/grid
 `.claude/tests/drive-grid-defense.cjs` (rules) and
 `.claude/tests/eval-grid-defense.cjs` (balance).
 
-### STAR SURGE (`star-surge/index.html`, ~1430 lines)
+### STAR SURGE (`star-surge/index.html`, ~2320 lines)
 Vertical shmup with a full build-your-ship progression layer. 3 save-slot
 **pilots** (`starSurge.saves`, create/select/reset), each with its own XP
 bank, unlocked weapon/armor, and sector checkpoint — pick a slot to try a
@@ -365,7 +365,14 @@ mini-boss, the whole sector capped by one harder, longer **sector boss**
 (2.6× the toughest mini-boss's hp, wider spread, denser rings); 11 sectors,
 difficulty-scaled by `campaignDifficulty()`. Dying always restarts the
 *current* sector from stage 1 — XP and shipyard purchases are never lost,
-only run progress. Ship has hp (no more lives, enemy hp/incoming damage both scale with
+only run progress. Clearing a sector does **not** roll straight into the
+next: it stops for a **combat report** (grade, kills, accuracy, hits taken,
+streak, time, XP, salvage, sector and total score), a tap-to-dock **launch**
+animation, and an **allied station** — a canvas scene with four callout
+buttons wired by line to the thing they do (UPGRADES→garage, COMBAT→the
+hostile sector in the distance, REST→barracks, REPAIR→drydock). The station
+is where a new player is first shown the shipyard, and it carries the game's
+second currency: **credits** buy hull repair, **XP** buys permanent build. Ship has hp (no more lives, enemy hp/incoming damage both scale with
 `campaignDifficulty()`) plus one equipped **armor** (regenerative /
 recharging shield / flat damage-reduction plating) and one equipped
 **weapon build** — blaster (free), beam, flamethrower, bombs, missiles,

@@ -294,6 +294,96 @@ and the first word was already drawn underneath the mute button; a third
 and the score is right-aligned), so the block moved down instead. Don't
 move it back up without re-checking against all three buttons.
 
+## Sector report + allied station (2026-08-23)
+
+Clearing a sector used to set a `SECTOR n CLEAR` banner and roll on. It now
+stops: **report → tap → launch → crossfade → station**, four states
+(`report`, `launch`, `station` join `play`/`menu`/`shipyard`/…). The point is
+pacing — eleven sectors that run together read as one endless corridor — and
+onboarding: the station is the only place the player is idle *and* safe, so
+it is the right place to put the shipyard in front of someone who has never
+opened it. `UPGRADES` is wired by a drawn line to a garage they can see.
+
+### The run continues through the station
+
+`COMBAT` calls `resumeIntoSector()`, **not** `startGame()`. Score, XP,
+credits, the weapon pip and the hull all carry; only the per-sector counters
+reset. Reaching for `startGame()` here is the easy refactor that silently
+zeroes a player's score mid-campaign, which is why the drive suite pins it.
+One deliberate exception: hull plating bought at the station is added to
+current hp on the way out, so a tier you just paid for is hp you fly with.
+
+### Two currencies, deliberately unconvertible
+
+| | earns | spends on |
+|---|---|---|
+| **XP** | kills, bosses | permanent build — weapons, armor, hull tiers (shipyard) |
+| **CREDITS** | the same kills (`pts / CREDIT_DIVISOR`), bosses | hull repair at the station |
+
+Both drop from the same kills, so the live choice is "bank the salvage or fly
+the next sector dented", never "grind one into the other". Repair is priced
+per hp (`CREDITS_PER_HP`) and **buys as much as the balance covers** rather
+than being all-or-nothing, so a thin wallet still gets a patch. A sector nets
+roughly 600–700 CR against a ~300 CR full repair: affordable, not free.
+`loadSaves()` back-fills `credits: 0` on pilots saved before the currency
+existed — without it every repair quote reads `NaN CR`.
+
+### Per-sector stats
+
+`sec` (`newSectorStats()`) counts kills, shots fired/hit, hits taken, shields
+burned, best streak, XP, credits, score and elapsed time. **Nothing in the
+simulation reads a counter** — they are report-only, so they cannot change an
+outcome. Two subtleties worth keeping:
+
+- **Accuracy is per PROJECTILE**, counted at the one `fireWeapon()` call site
+  in `update()` (a pip-4 spread is four shots), and per connect in
+  `applyBulletHit()` — which runs exactly once per bullet before it is
+  spliced. That makes accuracy measure aim, and makes spread weapons honestly
+  wasteful.
+- **Beam/flame/chain/emp spawn no projectiles at all.** They leave
+  `shotsFired` at 0, so the report swaps the ACCURACY row for the weapon name
+  and `gradeFor()` drops the accuracy term and re-normalises the rest.
+  Without that, every projectile-less build is graded as if it missed
+  everything and can never exceed B.
+- A burnt shield is counted but does **not** break the streak — no damage was
+  taken, and rewarding the shield build is the point of running it.
+
+### Station scene
+
+`stationLayout()` derives every feature and every button from `W`/`H`, so the
+callout lines can never drift from the art they point at, in any viewport.
+`R` (hub radius) is capped at `W*0.20` because the solar array reaches
+`cx ± R*1.78` — go wider and the hangar and drydock clip off the edges (they
+did, on the first pass). **Left-column buttons point at left-hand features
+and right at right-hand ones**, on two parallel lanes per side: that pairing
+is the entire reason no line crosses the station or another line, and it is
+asserted rather than eyeballed.
+
+Both styles share one geometry through `sPanel`/`sDisc`/`sRing`/`sStrut` —
+toon lays a flat plate with an ink outline, neon strokes the same outline as
+a glowing wireframe over a dark fill. A structural difference would deserve a
+separate routine (see the shared cel-shading note); the station is scenery,
+so a treatment swap is right and keeps the silhouette single-source. The
+docked ship reuses `drawShipToon`/`drawShipNeon` with a new `cold` flag that
+suppresses the exhaust: a parked ship still burning its engines is the tell
+that a station is a menu rather than a place.
+
+### Things that bit
+
+- **`enterStation()` must only crossfade on ARRIVAL.** Bound as the
+  shipyard's return path it replayed the veil every time, and since
+  `stationTap()` ignores input while the veil is up, a returning player found
+  a dead screen for ~0.3 s. Caught by driving the flow, not by reading it.
+- **The play HUD draws under the report** (the report sits over a frozen play
+  scene). Left up, it captioned the sector-3 report `SECTOR 4 · STAGE 1 · W1`.
+  The HUD block is now `state === 'play'` only.
+- **The overlay tap is bound ONCE**, at init, scoped by a `state === 'report'`
+  check. `#overlay` is a persistent element, so binding inside the report
+  builder would stack one handler per sector cleared. The state check doubles
+  as the debounce — `beginLaunch()` moves the state on, so the trailing click
+  after a touchend is a no-op — and a >14 px finger travel is treated as a
+  scroll rather than a dock.
+
 ## Armor + HP
 
 Ship no longer has lives — `ship.hp`/`ship.maxHp` (`shipMaxHp(tier) = 100 +

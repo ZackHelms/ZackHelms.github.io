@@ -55,7 +55,7 @@ local-2p.
 | Meteor Defense | `meteor-defense/` | defense | tap | wave-survival | wave-defense, resource-economy, combo-multiplier | solo | `.claude/meteor-defense.md` |
 | Word Circuit | `word-circuit/` | word | drag-connect | daily-challenge, timed-round | word-building, seeded-determinism | solo | `.claude/word-circuit.md` |
 | Neon Tactics | `neon-tactics/` | turn-based-tactics | tap | match-vs-ai, local-2p | grid-combat, line-of-sight, ai-opponent | vs-ai, local-2p | `.claude/neon-tactics.md` |
-| Star Surge | `star-surge/` | shmup | drag-steer | level-campaign | bullet-dodging, boss-fights, meta-progression, art-styles | solo | `.claude/star-surge.md` |
+| Star Surge | `star-surge/` | shmup | drag-steer | level-campaign | bullet-dodging, boss-fights, meta-progression, resource-economy, art-styles | solo | `.claude/star-surge.md` |
 | Turret Builder | `turret-builder/` | tower-defense-classic | drag-place, tap | level-campaign, wave-survival, endless-highscore, save-campaign | wave-defense, adjacency-synergy, damage-typing, combo-discovery, art-styles | solo | `.claude/turret-builder.md` |
 | Grid Defense | `grid-defense/` | tower-defense-classic | drag-place, tap | level-campaign, wave-survival, endless-highscore, save-campaign | wave-defense, resource-economy, tower-upgrades, meta-progression | solo | `.claude/grid-defense.md` |
 | Neon Tripeaks | `tri-peaks/` | card-deck | tap | quick-round, daily-challenge | card-chain, combo-multiplier, seeded-determinism | solo | `.claude/tri-peaks.md` |

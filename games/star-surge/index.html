@@ -92,6 +92,26 @@ body {
 .stat { color:var(--dim); font-size:0.78rem; letter-spacing:1px; margin:3px 0; }
 .stat b { color:var(--gold); }
 .newbest { color:var(--gold); font-family:'Black Ops One',sans-serif; letter-spacing:2px; font-size:0.95rem; text-shadow:0 0 16px #ffc30066; margin:6px 0; }
+/* --- sector combat report (the tally shown on clearing a sector) --------
+   Overlay chrome is style-agnostic on purpose: the graphics-style switch
+   repaints the CANVAS world, not the HTML furniture, so this keeps the
+   same neon-console look the menus have always had in both styles. */
+.tally { width:100%; max-width:290px; margin-top:2px; }
+.tally-row { display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+  font-size:0.7rem; letter-spacing:1px; color:var(--dim); padding:2.5px 0; }
+.tally-row b { color:var(--white); font-weight:normal; }
+.tally-sep { height:1px; background:var(--border); margin:7px 0; }
+.grade { font-family:'Black Ops One',sans-serif; font-size:2.7rem; line-height:1; margin:2px 0 6px; }
+.grade-cap { color:var(--dim); font-size:0.55rem; letter-spacing:3px; }
+.dock-hint {
+  margin-top:20px; color:var(--green); font-family:'Black Ops One',sans-serif;
+  letter-spacing:2px; font-size:0.72rem; line-height:1.6; max-width:280px;
+  animation:dockpulse 1.15s ease-in-out infinite;
+}
+@keyframes dockpulse {
+  0%,100% { opacity:0.34; text-shadow:none; }
+  50%     { opacity:1;    text-shadow:0 0 15px #39ff1499; }
+}
 #track-label {
   position:absolute; left:0; right:0; bottom:calc(var(--sab) + 4px); z-index:75;
   text-align:center; font-family:'Share Tech Mono', monospace; font-size:9px;
@@ -106,7 +126,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 13:41 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 20:17 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
@@ -139,6 +159,18 @@ const ENEMY_DEFS = {
 const MAX_TIER = 5;
 const HP_TIER_COST = [0, 60, 100, 160, 240, 340];   // index = tier reached (0..5)
 function shipMaxHp(tier) { return 100 + tier * 20; }
+/* Two currencies that deliberately do NOT convert into each other:
+     XP      -> permanent build (weapons / armor / hull) at the SHIPYARD
+     CREDITS -> consumable services (hull repair) at the STATION
+   Both drop from the same kills, so the choice a player actually makes is
+   "bank the salvage or fly the next sector on a dented hull", never
+   "grind one currency into the other". */
+const CREDITS_PER_HP = 3;      // hull repair price at an allied station
+const CREDIT_DIVISOR = 40;     // salvage per kill = pts / this (drone 2 .. tanker 9)
+const MINIBOSS_CREDITS = 40;
+const LAUNCH_DUR = 1.45;       // ship accelerates off-screen, then the veil takes over
+const VEIL_FADE = 0.45;        // seconds of black between the launch and the station
+const GRADE_COL = { S: '#ffc300', A: '#39ff14', B: '#4488ff', C: '#dde3ff', D: '#ff2244' };
 const WEAPON_DEFS = {
   blaster:  { name: 'BLASTER',         color: '#dde3ff', unlockCost: 0,   tierCost: [0, 60, 120, 200, 300], desc: 'Balanced kinetic bolts. No weaknesses, no fireworks.' },
   beam:     { name: 'BEAM',            color: '#4488ff', unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'Continuous piercing laser. Melts a line, can’t cover a spread.' },
@@ -160,14 +192,19 @@ const SAVE_SLOTS = 3;
 function loadSaves() {
   try {
     const raw = JSON.parse(localStorage.getItem('starSurge.saves') || 'null');
-    if (Array.isArray(raw) && raw.length === SAVE_SLOTS) return raw;
+    if (Array.isArray(raw) && raw.length === SAVE_SLOTS) {
+      // pilots saved before credits existed get a zero balance, not undefined
+      // (which would turn every repair quote into NaN CR)
+      for (const s of raw) if (s && typeof s.credits !== 'number') s.credits = 0;
+      return raw;
+    }
   } catch (e) { /* corrupt/missing save data falls through to a fresh set */ }
   return [null, null, null];
 }
 function writeSaves() { localStorage.setItem('starSurge.saves', JSON.stringify(saves)); }
 function newCharacter(name) {
   return {
-    name, xp: 0, sector: 1, best: 0,
+    name, xp: 0, credits: 0, sector: 1, best: 0,
     weapons: { blaster: 1 }, equippedWeapon: 'blaster',
     armors: {}, equippedArmor: null,
     hpTier: 0,
@@ -204,6 +241,20 @@ let pendingSectorBoss = false; // stage MAX_STAGE's mini-boss just fell; sector 
 let fireT = 0;
 let shake = 0;
 let stageBanner = 0;           // seconds left showing banner
+// Per-SECTOR counters, reset at every sector boundary. Only the combat
+// report reads them -- nothing in the simulation branches on a counter, so
+// they can never change an outcome.
+function newSectorStats() {
+  return { kills: 0, shotsFired: 0, shotsHit: 0, hits: 0, shields: 0,
+           streak: 0, bestStreak: 0, xp: 0, credits: 0, score: 0, t: 0 };
+}
+let sec = newSectorStats();
+let runCredits = 0;
+let clearedSector = 1;         // the sector the current report is about
+let campaignDone = false;
+let launchT = 0, launchV = 0;  // ship-departure animation
+let veil = 0;                  // 0..1 black crossfade between launch and station
+let stationT = 0;
 let bannerText = '';
 let stars = [];
 
@@ -633,6 +684,23 @@ function bindTap(el, fn) {
 bindTap(muteBtn, () => { muted = !muted; applyMute(); });
 applyMute();
 
+/* The combat report is dismissed by tapping anywhere on it. Bound ONCE here
+   rather than inside the report builder: #overlay is a persistent element, so
+   re-binding per sector would stack a handler per clear. The state check is
+   what scopes it, and it doubles as the debounce -- beginLaunch() moves the
+   state on, so the trailing click after a touchend is a no-op. */
+let overlayTouchY = null;
+overlay.addEventListener('touchstart', e => {
+  overlayTouchY = e.changedTouches[0].clientY;
+}, { passive: true });
+overlay.addEventListener('touchend', e => {
+  if (state !== 'report') return;
+  const y = e.changedTouches[0].clientY;
+  if (overlayTouchY !== null && Math.abs(y - overlayTouchY) > 14) return;   // a scroll, not a tap
+  e.preventDefault(); initAudio(); beginLaunch();
+}, { passive: false });
+overlay.addEventListener('click', () => { if (state === 'report') { initAudio(); beginLaunch(); } });
+
 /* ---- settings: graphics style ('toon' cel-shaded default, 'neon' original) ---- */
 const GFX_STYLES = ['toon', 'neon'];
 let gfx = localStorage.getItem('starSurge.gfx');
@@ -720,7 +788,9 @@ function startWave() {
 }
 function startGame(startSector) {
   sector = Math.max(1, Math.min(MAX_SECTOR, startSector || 1));
-  stage = 1; wave = 1; weapon = 1; score = 0; runXpEarned = 0;
+  stage = 1; wave = 1; weapon = 1; score = 0; runXpEarned = 0; runCredits = 0;
+  sec = newSectorStats();
+  veil = 0;
   bullets = []; ebullets = []; enemies = []; powerups = []; particles = []; floats = [];
   lightningBolts = []; empPulses = [];
   boss = null; pendingStage = false; pendingSectorBoss = false;
@@ -733,7 +803,9 @@ function startGame(startSector) {
 }
 
 /* =============================== COMBAT ================================= */
-function awardXp(n) { save.xp += n; runXpEarned += n; }
+function awardXp(n) { save.xp += n; runXpEarned += n; sec.xp += n; }
+function awardCredits(n) { save.credits += n; runCredits += n; sec.credits += n; }
+function addScore(n) { score += n; sec.score += n; }
 // in-run P-powerup (1..4): purely a QUANTITY/AREA axis — more barrels/beams/lobes/
 // jumps, or (EMP only) a bigger blast radius — layered on top of the permanent
 // XP-purchased tier's QUALITY (dmg/dps/radius/agility). Fire rate is NOT touched by
@@ -845,6 +917,7 @@ function boomAt(x, y, col, n) {
 }
 function applyBulletHit(b, target) {
   const isBoss = target === boss;
+  sec.shotsHit++;   // one call per projectile, which is then spliced away
   target.hp -= b.dmg;
   if (b.wtype === 'bolas' && !isBoss) target.slowT = Math.max(target.slowT || 0, b.slowDur);
   if (b.wtype === 'bombs') {
@@ -864,8 +937,12 @@ function applyBulletHit(b, target) {
   if (boss && boss.hp <= 0) bossDown();   // covers bomb splash killing the boss when target wasn't the boss
 }
 function killEnemy(e) {
-  score += e.pts;
+  addScore(e.pts);
   awardXp(e.xp);
+  awardCredits(Math.max(1, Math.round(e.pts / CREDIT_DIVISOR)));
+  sec.kills++;
+  sec.streak++;
+  if (sec.streak > sec.bestStreak) sec.bestStreak = sec.streak;
   floats.push({ x: e.x, y: e.y, txt: '+' + e.pts, color: '#dde3ff', t: 0 });
   boomAt(e.x, e.y, hue(100, 60), 12);
   sfxKill();
@@ -881,6 +958,7 @@ function hitShip(dmg) {
   if (ship.invuln > 0) return;
   if (ship.shieldCharges > 0) {
     ship.shieldCharges--;
+    sec.shields++;   // a burnt shield is counted but does NOT break the streak: no damage was taken
     boomAt(ship.x, ship.y, '#4488ff', 10);
     ship.invuln = 1.0;
     sfxBoom();
@@ -888,6 +966,8 @@ function hitShip(dmg) {
   }
   const plateTier = save.equippedArmor === 'plating' ? (save.armors.plating || 0) : 0;
   ship.hp -= dmg * (1 - plateTier * 0.08);
+  sec.hits++;
+  sec.streak = 0;
   ship.lastHitT = 0;
   sfxBigBoom();
   boomAt(ship.x, ship.y, '#39ff14', 24);
@@ -911,26 +991,27 @@ function bossDown() {
   const wasSectorBoss = boss.sector;
   if (wasSectorBoss) {
     const pts = 4000 + sector * 1000;
-    score += pts;
+    addScore(pts);
     awardXp(150 + sector * 25);
+    awardCredits(150 + sector * 20);
     floats.push({ x: boss.x, y: boss.y, txt: '+' + pts, color: '#ffc300', t: 0 });
     boomAt(boss.x, boss.y, hue(100, 60), 64);
     sfxBigBoom();
     boss = null;
     ebullets = [];
-    if (sector >= MAX_SECTOR) { save.sector = sector; persistSave(); endRun(true); return; }
-    sector++; stage = 1;
+    // A cleared sector no longer rolls straight into the next one -- it stops
+    // for a combat report, a launch, and a station. That break is what stops
+    // eleven sectors reading as one endless corridor.
+    const cleared = sector;
+    if (sector < MAX_SECTOR) sector++;
     save.sector = sector; persistSave();
-    sfxClear();
-    bannerText = 'SECTOR ' + (sector - 1) + ' CLEAR';
-    stageBanner = 2.0;
-    spawnQueue = [];
-    pendingStage = true;   // wave director starts wave 1 of the new sector once the banner fades
+    beginSectorReport(cleared);
     return;
   }
   const pts = 1500 + stage * 500;
-  score += pts;
+  addScore(pts);
   awardXp(50);
+  awardCredits(MINIBOSS_CREDITS);
   floats.push({ x: boss.x, y: boss.y, txt: '+' + pts, color: '#ffc300', t: 0 });
   boomAt(boss.x, boss.y, hue(100, 60), 40);
   sfxBigBoom();
@@ -960,8 +1041,39 @@ function endRun(won) {
 }
 
 /* =============================== UPDATE ================================= */
+// Starfield, particles and floats keep running on the non-play screens so the
+// boss explosion finishes behind the report and the station feels alive.
+function tickFx(dt, starMul) {
+  const m = starMul || 1;
+  for (const s of stars) { s.y += s.v * dt * m; if (s.y > H) { s.y = -2; s.x = Math.random() * W; } }
+  for (const p of particles) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; }
+  particles = particles.filter(p => p.t < p.dur);
+  for (const f of floats) f.t += dt;
+  floats = floats.filter(f => f.t < 0.9);
+  shake = Math.max(0, shake - dt * 2);
+}
+function updateLaunch(dt) {
+  launchT += dt;
+  launchV += 1250 * dt;
+  ship.y -= launchV * dt;
+  if (launchT < 1.0) {
+    for (let i = 0; i < 2; i++) {
+      particles.push({ x: ship.x + (Math.random() - 0.5) * 9, y: ship.y + 15,
+        vx: (Math.random() - 0.5) * 40, vy: 130 + Math.random() * 170,
+        t: 0, dur: 0.3 + Math.random() * 0.3, col: Math.random() < 0.5 ? '#ffc300' : '#ff7700' });
+    }
+  }
+  tickFx(dt, 1 + launchV / 70);   // starfield stretches to sell the acceleration
+  const fadeAt = LAUNCH_DUR - VEIL_FADE;
+  veil = launchT <= fadeAt ? 0 : Math.min(1, (launchT - fadeAt) / VEIL_FADE);
+  if (launchT >= LAUNCH_DUR) enterStation(true);
+}
 function update(dt) {
+  if (state === 'launch') { updateLaunch(dt); return; }
+  if (state === 'station') { stationT += dt; veil = Math.max(0, veil - dt / VEIL_FADE); tickFx(dt); return; }
+  if (state === 'report') { tickFx(dt); return; }
   if (state !== 'play') return;
+  sec.t += dt;
   // stars
   for (const s of stars) { s.y += s.v * dt; if (s.y > H) { s.y = -2; s.x = Math.random() * W; } }
   // spawn queue
@@ -986,7 +1098,13 @@ function update(dt) {
     else {
       fireT -= dt;
       if (fireT <= 0) {
-        if (wt === 'chain') fireChain(); else if (wt === 'emp') fireEmp(); else fireWeapon();
+        // Shots are counted per PROJECTILE (a 4-way spread is four shots), which
+        // is what makes accuracy measure aim. Beam/flame/chain/emp spawn no
+        // projectiles at all, so they leave shotsFired at 0 and the report
+        // shows the equipped weapon instead of a meaningless 0%.
+        if (wt === 'chain') fireChain();
+        else if (wt === 'emp') fireEmp();
+        else { const n0 = bullets.length; fireWeapon(); sec.shotsFired += bullets.length - n0; }
         fireT = weaponCooldown();
       }
     }
@@ -1117,12 +1235,8 @@ function update(dt) {
     }
   }
   // particles/floats
-  for (const p of particles) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; }
-  particles = particles.filter(p => p.t < p.dur);
-  for (const f of floats) f.t += dt;
-  floats = floats.filter(f => f.t < 0.9);
+  tickFx(dt);
   stageBanner = Math.max(0, stageBanner - dt);
-  shake = Math.max(0, shake - dt * 2);
 }
 
 /* =============================== INPUT ================================== */
@@ -1130,6 +1244,7 @@ let drag = null;
 function pt(e) { const t = e.changedTouches ? e.changedTouches[0] : e; return { x: t.clientX, y: t.clientY }; }
 function onDown(e) {
   e.preventDefault(); initAudio(); closeSettings();
+  if (state === 'station') { const sp = pt(e); stationTap(sp.x, sp.y); return; }
   if (state !== 'play') return;
   const p = pt(e);
   drag = { fx: p.x, fy: p.y, sx: ship.x, sy: ship.y };
@@ -1193,7 +1308,7 @@ function showMenu() {
     '<button class="btn small alt" id="b-pilots" style="margin-top:10px">← PILOTS</button>';
   overlay.classList.remove('hidden');
   bindTap(document.getElementById('b-new'), () => startGame(save.sector));
-  bindTap(document.getElementById('b-shipyard'), showShipyard);
+  bindTap(document.getElementById('b-shipyard'), () => { shipyardBack = showMenu; showShipyard(); });
   bindTap(document.getElementById('b-pilots'), showPilotSelect);
 }
 function weaponRowHtml(id) {
@@ -1230,7 +1345,7 @@ function showShipyard() {
   const weaponIds = Object.keys(WEAPON_DEFS), armorIds = Object.keys(ARMOR_DEFS);
   overlay.innerHTML =
     '<h1 style="font-size:1.6rem">SHIPYARD</h1>' +
-    '<div class="sub">XP <b style="color:var(--gold)">' + save.xp + '</b></div>' +
+    '<div class="sub">XP <b style="color:var(--gold)">' + save.xp + '</b> &nbsp;·&nbsp; <b style="color:var(--gold)">' + save.credits + '</b> CR</div>' +
     '<div class="shop-header">WEAPON — pick one build</div>' + weaponIds.map(weaponRowHtml).join('') +
     '<div class="shop-header">ARMOR — pick one</div>' + armorIds.map(armorRowHtml).join('') +
     '<div class="shop-header">HULL</div>' + hullRowHtml() +
@@ -1266,7 +1381,7 @@ function showShipyard() {
     save.xp -= HP_TIER_COST[save.hpTier + 1]; save.hpTier++;
     persistSave(); showShipyard();
   });
-  bindTap(document.getElementById('b-back'), showMenu);
+  bindTap(document.getElementById('b-back'), () => shipyardBack());
 }
 function showEndScreen(won, isNewBest) {
   const atSectorBoss = boss && boss.sector;
@@ -1275,7 +1390,7 @@ function showEndScreen(won, isNewBest) {
     '<div class="sub">' + (won ? 'sector ' + sector + ' + boss complete' : (atSectorBoss ? 'sector boss' : 'stage ' + stage + ' · wave ' + Math.min(wave, WAVES_PER_STAGE + 1))) + '</div>' +
     '<div class="score-big">' + score + '</div>' +
     (isNewBest && score > 0 ? '<div class="newbest">★ NEW BEST ★</div>' : '<div class="stat">BEST <b>' + save.best + '</b></div>') +
-    '<div class="stat">+' + runXpEarned + ' XP banked</div>' +
+    '<div class="stat">+' + runXpEarned + ' XP &middot; +' + runCredits + ' CR banked</div>' +
     (!won ? '<div class="stat">checkpoint: sector <b>' + save.sector + '</b> (restart)</div>' : '') +
     '<div style="margin-top:16px">' +
     (!won ? '<button class="btn small" id="b-retry">RETRY · SECTOR ' + save.sector + '</button><br>' : '') +
@@ -1283,6 +1398,487 @@ function showEndScreen(won, isNewBest) {
   overlay.classList.remove('hidden');
   if (!won) bindTap(document.getElementById('b-retry'), () => startGame(save.sector));
   bindTap(document.getElementById('b-menu'), showMenu);
+}
+
+
+/* ================= SECTOR REPORT | LAUNCH | ALLIED STATION ==============
+   The loop between sectors: report -> tap -> ship flies off -> crossfade ->
+   station. The station is the only place the player is ever idle AND safe,
+   which is what makes it the right place to put the shipyard in front of a
+   new player -- the UPGRADES button is wired to a garage they can see.
+
+   Everything here is painted, never simulated: no rule below reads `gfx`
+   to decide an outcome, only to decide a treatment. */
+
+let shipyardBack = showMenu;   // where the shipyard's BACK returns to
+
+function repairQuote() {
+  const missing = Math.max(0, Math.ceil(ship.maxHp - ship.hp));
+  if (missing <= 0) return { hp: 0, cost: 0, full: true };
+  // Buys as much hull as the balance covers, so a thin wallet still gets a
+  // patch rather than an unaffordable all-or-nothing price.
+  const hp = Math.min(missing, Math.floor(save.credits / CREDITS_PER_HP));
+  return { hp, cost: hp * CREDITS_PER_HP, full: false, missing };
+}
+
+/* Grade weights the three things a pilot actually controls. Builds that fire
+   no projectiles (beam/flame/chain/emp) drop the accuracy term and the rest
+   is re-normalised, so they are graded on what they can be graded on rather
+   than capped at B forever. */
+function gradeFor(s) {
+  const terms = [{ w: 45, v: s.hits === 0 ? 1 : Math.max(0, 1 - s.hits / 8) }];
+  if (s.shotsFired > 0) terms.push({ w: 35, v: Math.min(1, (s.shotsHit / s.shotsFired) / 0.7) });
+  terms.push({ w: 20, v: Math.min(1, s.bestStreak / 40) });
+  let sw = 0, sv = 0;
+  for (const t of terms) { sw += t.w; sv += t.w * t.v; }
+  const p = sw ? sv / sw * 100 : 0;
+  return p >= 85 ? 'S' : p >= 70 ? 'A' : p >= 55 ? 'B' : p >= 38 ? 'C' : 'D';
+}
+
+function beginSectorReport(cleared) {
+  clearedSector = cleared;
+  campaignDone = cleared >= MAX_SECTOR;
+  state = 'report';
+  stageBanner = 0; veil = 0;
+  bullets = []; ebullets = []; enemies = []; powerups = []; spawnQueue = [];
+  lightningBolts = []; empPulses = [];
+  pendingStage = false; pendingSectorBoss = false;
+  drag = null;
+  let isNewBest = false;
+  if (score > save.best) { save.best = score; isNewBest = true; }
+  persistSave();
+  sfxClear();
+  // let the boss explosion finish before the report covers it
+  setTimeout(() => { if (state === 'report') showSectorReport(isNewBest); }, 750);
+}
+
+function showSectorReport(isNewBest) {
+  const acc = sec.shotsFired > 0 ? Math.round(sec.shotsHit / sec.shotsFired * 100) : null;
+  const g = gradeFor(sec);
+  const mm = Math.floor(sec.t / 60), ss = Math.floor(sec.t % 60);
+  const row = (k, v) => '<div class="tally-row"><span>' + k + '</span><b>' + v + '</b></div>';
+  overlay.innerHTML =
+    '<h2>' + (campaignDone ? 'CAMPAIGN COMPLETE' : 'SECTOR ' + clearedSector + ' CLEARED') + '</h2>' +
+    '<div class="sub">-- COMBAT REPORT --</div>' +
+    '<div class="grade" style="color:' + GRADE_COL[g] + '">' + g + '</div>' +
+    '<div class="grade-cap">SECTOR RATING</div>' +
+    '<div class="tally">' +
+      row('KILLS', sec.kills) +
+      (acc !== null ? row('ACCURACY', acc + '%')
+                    : row('WEAPON', WEAPON_DEFS[save.equippedWeapon].name)) +
+      row('TIMES HIT', sec.hits) +
+      (sec.shields ? row('SHIELDS BURNED', sec.shields) : '') +
+      row('BEST STREAK', sec.bestStreak + ' kills') +
+      row('SECTOR TIME', mm + ':' + String(ss).padStart(2, '0')) +
+      '<div class="tally-sep"></div>' +
+      row('XP EARNED', '+' + sec.xp) +
+      row('SALVAGE', '+' + sec.credits + ' CR') +
+      row('SECTOR SCORE', sec.score.toLocaleString()) +
+    '</div>' +
+    '<div class="stat" style="margin-top:12px">TOTAL SCORE</div>' +
+    '<div class="score-big">' + score.toLocaleString() + '</div>' +
+    (isNewBest && score > 0 ? '<div class="newbest">★ NEW BEST ★</div>' : '') +
+    '<div class="dock-hint">TAP TO DOCK AT NEAREST ALLIED STATION</div>';
+  overlay.classList.remove('hidden');
+}
+
+function beginLaunch() {
+  overlay.classList.add('hidden');
+  state = 'launch';
+  launchT = 0; launchV = 260; veil = 0;
+  ship.invuln = 0;
+  sfxSurge();
+}
+// `fade` is the ARRIVAL only. Coming back from the shipyard must not replay
+// the crossfade -- that black half-second also swallows taps (see the veil
+// guard in stationTap), so a returning player would find a dead screen.
+function enterStation(fade) {
+  state = 'station';
+  if (fade) { stationT = 0; veil = 1; }
+  overlay.classList.add('hidden');
+}
+
+/* Resumes the RUN into the next sector -- deliberately not startGame(), which
+   would zero the score and the hull. Score, XP, salvage, the weapon pip and
+   any shields all carry through the station; only the sector counters reset. */
+function resumeIntoSector() {
+  stage = 1; wave = 1;
+  bullets = []; ebullets = []; enemies = []; powerups = []; particles = []; floats = [];
+  lightningBolts = []; empPulses = []; spawnQueue = [];
+  boss = null; pendingStage = false; pendingSectorBoss = false;
+  const nm = shipMaxHp(save.hpTier);
+  if (nm > ship.maxHp) ship.hp += nm - ship.maxHp;   // plating bought here is hull you get now
+  ship.maxHp = nm;
+  ship.hp = Math.max(1, Math.min(ship.hp, nm));
+  ship.x = W / 2; ship.y = H - safeBot - 130; ship.invuln = 1; ship.lastHitT = 999;
+  fireT = 0; drag = null; veil = 0;
+  sec = newSectorStats();
+  state = 'play';
+  overlay.classList.add('hidden');
+  startWave();
+}
+
+function stationTap(x, y) {
+  if (veil > 0.35) return;   // ignore taps landing during the crossfade
+  for (const b of stationLayout().B) {
+    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) {
+      if (b.id === 'upgrades') { shipyardBack = () => enterStation(); showShipyard(); }
+      else if (b.id === 'combat') resumeIntoSector();
+      else if (b.id === 'rest') { persistSave(); showMenu(); }
+      else if (b.id === 'repair') {
+        const q = repairQuote();
+        if (q.hp <= 0) return;
+        ship.hp = Math.min(ship.maxHp, ship.hp + q.hp);
+        save.credits -= q.cost;
+        persistSave(); sfxPower();
+        const d = stationLayout().f.drydock;
+        floats.push({ x: d.x, y: d.y - d.r, txt: '+' + q.hp + ' HP', color: '#39ff14', t: 0 });
+      }
+      return;
+    }
+  }
+}
+
+/* ---- station geometry -------------------------------------------------
+   Every feature and every button is derived from W/H here, so the callout
+   lines can never drift from the art they point at, in any viewport. */
+function stationLayout() {
+  // R is the hub radius and every module is a multiple of it. The widest
+  // thing on screen is the solar array at cx +/- R*1.78, so R must stay under
+  // W*0.21 or the hangar and drydock get clipped off the edges.
+  const cx = W / 2, cy = H * 0.42, R = Math.min(W * 0.20, H * 0.105);
+  const bob = Math.sin(stationT * 0.55) * 3;
+  const y0 = cy + bob;
+  const f = {
+    hub:     { x: cx,             y: y0,            r: R },
+    hangar:  { x: cx - R * 1.55,  y: y0 + R * 0.10, r: R * 0.50 },
+    drydock: { x: cx + R * 1.45,  y: y0 + R * 0.34, r: R * 0.50 },
+    barrack: { x: cx - R * 0.60,  y: y0 + R * 1.40, r: R * 0.40 },
+    enemy:   { x: W * 0.78,       y: H * 0.135,     r: Math.min(W, H) * 0.075 },
+  };
+  const pad = 12, gap = 9, bh = 54;
+  const bw = (W - pad * 2 - gap) / 2;
+  const y2 = H - safeBot - 14 - bh, y1 = y2 - bh - gap;
+  // Left-column buttons point at left-hand features and right at right-hand
+  // ones, on two parallel lanes per side. That pairing is the whole reason no
+  // callout ever crosses the station or another callout.
+  const B = [
+    { id: 'upgrades', label: 'UPGRADES', x: pad,            y: y1, w: bw, h: bh, at: f.hangar,  lane: 0, side: -1, col: '#4488ff' },
+    { id: 'combat',   label: 'COMBAT',   x: pad + bw + gap, y: y1, w: bw, h: bh, at: f.enemy,   lane: 0, side:  1, col: '#ff2244' },
+    { id: 'rest',     label: 'REST',     x: pad,            y: y2, w: bw, h: bh, at: f.barrack, lane: 1, side: -1, col: '#39ff14' },
+    { id: 'repair',   label: 'REPAIR',   x: pad + bw + gap, y: y2, w: bw, h: bh, at: f.drydock, lane: 1, side:  1, col: '#ffc300' },
+  ];
+  const q = repairQuote();
+  for (const b of B) {
+    if (b.id === 'upgrades') b.sub = save.xp + ' XP';
+    else if (b.id === 'combat') b.sub = 'SECTOR ' + sector + (campaignDone ? ' AGAIN' : '');
+    else if (b.id === 'rest') b.sub = 'SAVE & EXIT';
+    else {
+      b.sub = q.full ? 'HULL INTACT' : q.hp > 0 ? '+' + q.hp + ' HP · ' + q.cost + ' CR' : 'NEED ' + CREDITS_PER_HP + ' CR';
+      b.off = q.hp <= 0;
+    }
+  }
+  return { f, B, R };
+}
+
+/* ---- style primitives -------------------------------------------------
+   One geometry, two treatments: toon lays a flat plate with an ink outline,
+   neon strokes the same outline as a glowing wireframe over a dark fill.
+   Keeping the silhouette single-source is why the station cannot drift
+   between the two styles as it grows. */
+const STN = '#8f9bb4', STN_LIT = '#dbe6f6', STN_DK = '#59637a', STN_NEON = '#4488ff';
+function sPanel(pts, base, lit, neon, lw) {
+  if (gfx === 'toon') { celPoly(pts, base, lit, lw || 2.2); return; }
+  poly(pts); ctx.fillStyle = '#0a0a18e6'; ctx.fill();
+  ctx.strokeStyle = neon; ctx.lineWidth = 1.8; glow(neon, 9); ctx.stroke(); noGlow();
+}
+function sDisc(x, y, r, base, lit, neon, lw) {
+  if (gfx === 'toon') { celCircle(x, y, r, base, lit, lw || 2.2); return; }
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = '#0a0a18e6'; ctx.fill();
+  ctx.strokeStyle = neon; ctx.lineWidth = 1.8; glow(neon, 9); ctx.stroke(); noGlow();
+}
+function sRing(x, y, r, neon, lw) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
+  ctx.strokeStyle = gfx === 'toon' ? INK : neon;
+  ctx.lineWidth = lw || 2;
+  if (gfx !== 'toon') glow(neon, 10);
+  ctx.stroke(); noGlow();
+}
+function sStrut(x1, y1, x2, y2, w) {
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+  const nx = -dy / L * w, ny = dx / L * w;
+  sPanel([x1 + nx, y1 + ny, x2 + nx, y2 + ny, x2 - nx, y2 - ny, x1 - nx, y1 - ny], STN_DK, STN, STN_NEON, 2);
+}
+function sWindow(x, y, w, h, col) {
+  const c = col || '#ffb84d';
+  ctx.beginPath(); ctx.rect(x, y, w, h);
+  ctx.fillStyle = c;
+  if (gfx !== 'toon') glow(c, 8);
+  ctx.fill(); noGlow();
+  if (gfx === 'toon') { ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.stroke(); }
+}
+function rrPath(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function octaPts(cx, cy, r) {
+  const p = [];
+  for (let i = 0; i < 8; i++) { const a = i / 8 * 6.2832 + 0.3927; p.push(cx + Math.cos(a) * r, cy + Math.sin(a) * r); }
+  return p;
+}
+
+function drawHostileSector(a) {
+  const pulse = 0.72 + Math.sin(stationT * 1.7) * 0.28;
+  if (gfx === 'toon') {
+    celCircle(a.x, a.y, a.r, '#5e1526', '#9d2440', 2);
+    celCircle(a.x - a.r * 0.20, a.y - a.r * 0.14, a.r * 0.56, '#a32540', '#ff4a68', 1.8);
+    celCircle(a.x + a.r * 0.24, a.y + a.r * 0.22, a.r * 0.28, '#ff4a68', '#ffd2da', 1.4);
+  } else {
+    for (let i = 3; i >= 1; i--) sRing(a.x, a.y, a.r * (i / 3) * pulse, '#ff2244', 2);
+  }
+  // hostiles wheeling in the distance -- the sector is alive and waiting
+  for (let i = 0; i < 5; i++) {
+    const t = stationT * 0.3 + i * 1.7;
+    const px = a.x + Math.cos(t) * a.r * 1.2, py = a.y + Math.sin(t * 1.3) * a.r * 0.6;
+    ctx.fillStyle = gfx === 'toon' ? '#ff5a74' : '#ff2244';
+    if (gfx !== 'toon') glow('#ff2244', 6);
+    ctx.beginPath(); ctx.moveTo(px, py - 2.8); ctx.lineTo(px + 2.8, py + 2.3); ctx.lineTo(px - 2.8, py + 2.3);
+    ctx.closePath(); ctx.fill(); noGlow();
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = "9px 'Share Tech Mono'"; ctx.fillStyle = '#ff6680';
+  ctx.fillText('HOSTILE SECTOR ' + sector, a.x, a.y + a.r + 14);
+}
+
+function drawStation(L) {
+  const f = L.f, R = L.R, cx = f.hub.x, cy = f.hub.y;
+  // solar wings, three segments each so the panelling reads in both styles
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const a0 = 0.62 + i * 0.30, a1 = a0 + 0.28;
+      sPanel([cx + s * R * (0.30 + a0 * 0.55), cy - R * (0.50 + a0 * 0.72),
+              cx + s * R * (0.30 + a1 * 0.55), cy - R * (0.50 + a1 * 0.72),
+              cx + s * R * (0.95 + a1 * 0.55), cy - R * (0.34 + a1 * 0.72),
+              cx + s * R * (0.95 + a0 * 0.55), cy - R * (0.34 + a0 * 0.72)],
+             '#2b3a63', '#4d67ad', '#b44fff', 1.8);
+    }
+    sStrut(cx + s * R * 0.22, cy - R * 0.38, cx + s * R * 0.62, cy - R * 0.92, R * 0.045);
+  }
+  // struts out to the three modules
+  sStrut(cx, cy, f.hangar.x, f.hangar.y, R * 0.09);
+  sStrut(cx, cy, f.drydock.x, f.drydock.y, R * 0.09);
+  sStrut(cx, cy, f.barrack.x, f.barrack.y, R * 0.075);
+
+  // ---- HANGAR (the garage the UPGRADES callout points at)
+  const hg = f.hangar, hr = hg.r;
+  sPanel([hg.x - hr, hg.y - hr * 0.85, hg.x + hr * 0.75, hg.y - hr * 1.0,
+          hg.x + hr * 0.75, hg.y + hr * 1.0, hg.x - hr, hg.y + hr * 0.85], STN, STN_LIT, STN_NEON, 2.2);
+  // open bay mouth with a lit interior and a ship being worked on
+  ctx.beginPath(); ctx.rect(hg.x - hr * 0.86, hg.y - hr * 0.52, hr * 1.32, hr * 1.04);
+  ctx.fillStyle = gfx === 'toon' ? '#20160c' : '#160e06'; ctx.fill();
+  if (gfx === 'toon') { ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke(); }
+  else { ctx.strokeStyle = '#ffc300'; ctx.lineWidth = 1.4; glow('#ffc300', 8); ctx.stroke(); noGlow(); }
+  ctx.save();
+  ctx.beginPath(); ctx.rect(hg.x - hr * 0.86, hg.y - hr * 0.52, hr * 1.32, hr * 1.04); ctx.clip();
+  sWindow(hg.x - hr * 0.80, hg.y + hr * 0.18, hr * 1.2, hr * 0.32, '#ffb84d');
+  // a hull in for work, plus the sparks of somebody working on it
+  sPanel([hg.x - hr * 0.42, hg.y + hr * 0.12, hg.x, hg.y - hr * 0.34,
+          hg.x + hr * 0.42, hg.y + hr * 0.12, hg.x, hg.y + hr * 0.02], '#6f7c94', '#aebbd2', '#39ff14', 1.6);
+  for (let i = 0; i < 3; i++) {
+    const sx = hg.x + Math.sin(stationT * 6 + i * 2.1) * hr * 0.3;
+    ctx.fillStyle = '#fff3b0';
+    ctx.fillRect(sx, hg.y - hr * 0.12 + Math.cos(stationT * 7 + i) * 2, 1.6, 1.6);
+  }
+  ctx.restore();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = "8px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
+  ctx.fillText('GARAGE', hg.x, hg.y + hr * 1.28);
+
+  // ---- DRYDOCK (the REPAIR callout) -- an open cradle holding your ship
+  const dd = f.drydock, dr = dd.r;
+  for (const s of [-1, 1]) {
+    sPanel([dd.x - dr * 1.05, dd.y + s * dr * 0.78, dd.x + dr * 1.05, dd.y + s * dr * 0.78,
+            dd.x + dr * 1.05, dd.y + s * dr * 1.10, dd.x - dr * 1.05, dd.y + s * dr * 1.10],
+           STN_DK, STN, STN_NEON, 1.8);
+  }
+  sPanel([dd.x + dr * 0.86, dd.y - dr * 1.10, dd.x + dr * 1.18, dd.y - dr * 1.10,
+          dd.x + dr * 1.18, dd.y + dr * 1.10, dd.x + dr * 0.86, dd.y + dr * 1.10], STN, STN_LIT, STN_NEON, 1.8);
+  // repair arms reaching in
+  for (const s of [-1, 1]) {
+    sStrut(dd.x + dr * 0.92, dd.y + s * dr * 0.72, dd.x + dr * 0.30, dd.y + s * dr * 0.85, dr * 0.09);
+    ctx.beginPath(); ctx.arc(dd.x + dr * 0.30, dd.y + s * dr * 0.85, dr * 0.12, 0, 7);
+    ctx.fillStyle = '#ffc300'; if (gfx !== 'toon') glow('#ffc300', 7);
+    ctx.fill(); noGlow();
+    if (gfx === 'toon') { ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.stroke(); }
+  }
+  ctx.textAlign = 'center';
+  ctx.font = "8px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
+  ctx.fillText('DRYDOCK', dd.x, dd.y + dr * 1.78);   // clear of the parked ship's lower wing
+
+  // ---- BARRACKS (the REST callout) -- a warm window with a bed in it
+  const bk = f.barrack, br = bk.r;
+  sDisc(bk.x, bk.y, br, STN, STN_LIT, STN_NEON, 2.2);
+  sRing(bk.x, bk.y, br * 0.98, STN_NEON, 1.4);
+  const wr = br * 0.56;
+  ctx.beginPath(); ctx.arc(bk.x, bk.y, wr, 0, 7);
+  ctx.fillStyle = '#ffb84d';
+  if (gfx !== 'toon') { glow('#ffc300', 12); ctx.fill(); noGlow(); ctx.strokeStyle = '#ffc300'; ctx.lineWidth = 1.4; ctx.stroke(); }
+  else { ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 1.8; ctx.stroke(); }
+  ctx.save();
+  ctx.beginPath(); ctx.arc(bk.x, bk.y, wr, 0, 7); ctx.clip();
+  // the cozy bed: mattress, blanket, pillow
+  ctx.fillStyle = gfx === 'toon' ? '#5a4326' : '#6b4a1e';
+  ctx.fillRect(bk.x - wr * 0.72, bk.y + wr * 0.10, wr * 1.44, wr * 0.46);
+  ctx.fillStyle = '#c8543f';
+  ctx.fillRect(bk.x - wr * 0.30, bk.y + wr * 0.10, wr * 1.02, wr * 0.30);
+  ctx.fillStyle = '#f4ecd8';
+  ctx.fillRect(bk.x - wr * 0.68, bk.y + wr * 0.04, wr * 0.36, wr * 0.22);
+  if (gfx === 'toon') {
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.1;
+    ctx.strokeRect(bk.x - wr * 0.72, bk.y + wr * 0.10, wr * 1.44, wr * 0.46);
+  }
+  // a slow "asleep" wisp
+  ctx.globalAlpha = 0.5 + Math.sin(stationT * 1.3) * 0.3;
+  ctx.fillStyle = '#f4ecd8';
+  ctx.fillRect(bk.x + wr * 0.30, bk.y - wr * 0.42 - (stationT * 6 % (wr * 0.6)), 2, 2);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  ctx.textAlign = 'center';
+  ctx.font = "8px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
+  ctx.fillText('BARRACKS', bk.x, bk.y + br * 1.5);
+
+  // ---- HUB
+  sPanel(octaPts(cx, cy, R), STN, STN_LIT, STN_NEON, 2.6);
+  sRing(cx, cy, R * 0.66, STN_NEON, 1.6);
+  sDisc(cx, cy, R * 0.30, STN_DK, STN, STN_NEON, 2);
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * 6.2832 + stationT * 0.10;
+    sWindow(cx + Math.cos(a) * R * 0.48 - 2.6, cy + Math.sin(a) * R * 0.48 - 2.6, 5.2, 5.2);
+  }
+  // comms mast + a nav light that blinks
+  sStrut(cx, cy - R * 0.94, cx, cy - R * 1.34, R * 0.03);
+  const blink = (stationT % 1.6) < 0.5;
+  ctx.beginPath(); ctx.arc(cx, cy - R * 1.38, 3, 0, 7);
+  ctx.fillStyle = blink ? '#ff2244' : '#3a1520';
+  if (gfx !== 'toon' && blink) glow('#ff2244', 10);
+  ctx.fill(); noGlow();
+  if (gfx === 'toon') { ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.stroke(); }
+}
+
+function drawDockedShip(L) {
+  const d = L.f.drydock;
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  ctx.rotate(-0.26);
+  ctx.scale(1.5, 1.5);
+  if (gfx === 'toon') drawShipToon(true); else drawShipNeon(true);   // engines cold: it is parked
+  ctx.restore();
+}
+
+function drawCallout(b) {
+  const laneX = b.side < 0 ? 14 + b.lane * 11 : W - 14 - b.lane * 11;
+  const a = b.at;
+  const ax = a.x + b.side * a.r * 0.85;   // stop at the feature's near edge, not its middle
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.strokeStyle = b.col; ctx.lineWidth = 1.4;
+  ctx.lineJoin = 'round';
+  if (gfx !== 'toon') glow(b.col, 6);
+  ctx.beginPath();
+  ctx.moveTo(laneX, b.y);
+  ctx.lineTo(laneX, a.y);
+  ctx.lineTo(ax, a.y);
+  ctx.stroke();
+  noGlow();
+  ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(ax, a.y, 3.4, 0, 7);
+  ctx.fillStyle = b.col; ctx.fill();
+  if (gfx === 'toon') { ctx.strokeStyle = INK; ctx.lineWidth = 1.3; ctx.stroke(); }
+  ctx.restore();
+}
+
+function drawStationBtn(b) {
+  const col = b.off ? '#4d5468' : b.col;
+  rrPath(b.x, b.y, b.w, b.h, 9);
+  if (gfx === 'toon') {
+    ctx.fillStyle = '#151529'; ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.stroke();
+    rrPath(b.x + 3, b.y + 3, b.w - 6, b.h - 6, 7);
+    ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.stroke();
+  } else {
+    ctx.fillStyle = '#0b0b16'; ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 2; glow(col, 12); ctx.stroke(); noGlow();
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = "15px 'Black Ops One'"; ctx.fillStyle = col;
+  ctx.fillText(b.label, b.x + b.w / 2, b.y + 25);
+  ctx.font = "9px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
+  ctx.fillText(b.sub, b.x + b.w / 2, b.y + 41);
+}
+
+function drawStationHeader() {
+  // Sits BELOW the chrome row for the same reason the play HUD does -- the
+  // back/mute/settings buttons own everything above safeTop+42.
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = "15px 'Black Ops One'"; ctx.fillStyle = '#dde3ff';
+  glow(STN_NEON, 12);
+  ctx.fillText('ALLIED STATION', W / 2, safeTop + 62);
+  noGlow();
+  ctx.font = "10px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
+  ctx.fillText(save.name + ' · ' + save.xp + ' XP · ' + save.credits + ' CR', W / 2, safeTop + 78);
+  const bw = 120, bx = W / 2 - bw / 2, by = safeTop + 86;
+  ctx.fillStyle = '#1a1a30'; ctx.fillRect(bx, by, bw, 6);
+  const fr = Math.max(0, Math.min(1, ship.hp / ship.maxHp));
+  ctx.fillStyle = fr > 0.3 ? '#39ff14' : '#ff2244';
+  ctx.fillRect(bx, by, bw * fr, 6);
+  if (gfx === 'toon') { ctx.strokeStyle = INK; ctx.lineWidth = 1.3; ctx.strokeRect(bx, by, bw, 6); }
+  ctx.font = "8px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
+  ctx.fillText('HULL ' + Math.ceil(ship.hp) + '/' + ship.maxHp, W / 2, by + 18);
+}
+
+// The band between the barracks and the buttons is otherwise dead screen.
+// A planet limb fills it and gives the scene a floor to sit above.
+function drawPlanetLimb() {
+  const m = Math.min(W, H);
+  const px = W * 0.12, py = H + m * 0.28, pr = m * 0.75;
+  if (gfx === 'toon') {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(px, py, pr, 0, 7);
+    ctx.fillStyle = '#151a33'; ctx.fill();
+    ctx.clip();
+    ctx.beginPath(); ctx.arc(px - pr * 0.20, py - pr * 0.12, pr * 0.97, 0, 7);
+    ctx.fillStyle = '#1f2749'; ctx.fill();
+    ctx.fillStyle = '#28325e';
+    ctx.beginPath(); ctx.ellipse(px + pr * 0.12, py - pr * 0.74, pr * 0.52, pr * 0.055, -0.14, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(px - pr * 0.26, py - pr * 0.56, pr * 0.40, pr * 0.045, -0.09, 0, 7); ctx.fill();
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(px, py, pr, 0, 7);
+    ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(px, py, pr, 0, 7);
+    ctx.fillStyle = '#0a0c1c'; ctx.fill();
+    ctx.strokeStyle = '#4488ff'; ctx.lineWidth = 1.6; glow('#4488ff', 14); ctx.stroke(); noGlow();
+    ctx.globalAlpha = 0.4;
+    ctx.beginPath(); ctx.arc(px, py, pr * 0.94, 0, 7);
+    ctx.strokeStyle = '#2b4a8f'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+function drawStationScene() {
+  const L = stationLayout();
+  drawPlanetLimb();
+  drawHostileSector(L.f.enemy);
+  drawStation(L);
+  drawDockedShip(L);
+  for (const b of L.B) drawCallout(b);
+  for (const b of L.B) drawStationBtn(b);
+  drawStationHeader();
+  drawFloats();
 }
 
 /* =============================== LAYOUT ================================= */
@@ -1376,11 +1972,15 @@ function inkStroke(w) {
 const HULL = '#a9bbd2', HULL_LIT = '#e9f2ff', HULL_DK = '#68788f';
 const ACC = '#2f9c28', ACC_LIT = '#5ce048';
 
-function drawShipToon() {
+// `cold` parks the ship: nacelles drawn, exhaust suppressed. A docked ship
+// still burning its engines is the tell that a station is a menu, not a place.
+function drawShipToon(cold) {
   // engine nacelles + exhaust (behind everything)
   for (const s of [-1, 1]) {
-    const flick = 6 + Math.random() * 6;
-    celPoly([s * 6.5, 13.5, s * 10.5, 13.5, s * 9, 14 + flick, s * 8, 14 + flick], '#ffc300', '#fff3b0', 1.4);
+    if (!cold) {
+      const flick = 6 + Math.random() * 6;
+      celPoly([s * 6.5, 13.5, s * 10.5, 13.5, s * 9, 14 + flick, s * 8, 14 + flick], '#ffc300', '#fff3b0', 1.4);
+    }
     celPoly([s * 5.5, -1, s * 11.5, 3, s * 11, 14, s * 5, 12.5], HULL_DK, HULL, 2);
   }
   // swept wings
@@ -1394,13 +1994,14 @@ function drawShipToon() {
   celEllipse(0, -8.5, 2.9, 5.4, '#1d6f9c', '#7fe0ff', 1.8);
   ctx.beginPath(); ctx.ellipse(-1, -10, 0.9, 2, 0.3, 0, 7); ctx.fillStyle = '#ffffff'; ctx.fill();
 }
-function drawShipNeon() {
+function drawShipNeon(cold) {
   ctx.strokeStyle = '#39ff14'; ctx.fillStyle = '#39ff1433'; ctx.lineWidth = 2;
   glow('#39ff14', 12);
   ctx.beginPath();
   ctx.moveTo(0, -16); ctx.lineTo(11, 12); ctx.lineTo(0, 6); ctx.lineTo(-11, 12);
   ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.shadowBlur = 0;
+  if (cold) return;
   // thruster
   ctx.fillStyle = '#ffc300';
   ctx.globalAlpha *= 0.5 + Math.random() * 0.5;
@@ -1530,6 +2131,7 @@ function draw() {
     ctx.fillStyle = s.s === 2 ? '#8899bb' : '#353555';
     ctx.fillRect(s.x, s.y, s.s, s.s + 2);
   }
+  if (state === 'station') { drawStationScene(); ctx.restore(); drawVeil(); return; }
   if (state === 'menu' || state === 'pilots' || state === 'shipyard') { ctx.restore(); return; }
   // powerups
   for (const p of powerups) {
@@ -1642,15 +2244,10 @@ function draw() {
   }
   ctx.globalAlpha = 1;
   // floats
-  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  for (const f of floats) {
-    ctx.globalAlpha = Math.max(0, 1 - f.t / 0.9);
-    ctx.fillStyle = f.color; ctx.font = "14px 'Black Ops One'";
-    ctx.fillText(f.txt, f.x, f.y - f.t * 44);
-    ctx.globalAlpha = 1;
-  }
+  drawFloats();
   // HUD — the left block sits BELOW the chrome row (← / 🔊 / ⚙ run to x=140),
   // which is why it starts at safeTop+48 rather than tucking in beside them
+  if (state === 'play') {
   ctx.textAlign = 'left';
   ctx.font = "11px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
   ctx.fillText('SECTOR ' + sector + ' · STAGE ' + stage + (boss ? (boss.sector ? ' · SECTOR BOSS' : ' · BOSS') : ' · W' + Math.min(wave, WAVES_PER_STAGE)), 12, safeTop + 48);
@@ -1671,6 +2268,7 @@ function draw() {
     ctx.fillStyle = i < weapon ? pipCol : '#1a1a30';
     ctx.fillRect(W - 12 - (3 - i) * 14, safeTop + 50, 10, 4);
   }
+  }
   // banner
   if (stageBanner > 0) {
     ctx.globalAlpha = Math.min(1, stageBanner * 2);
@@ -1681,6 +2279,25 @@ function draw() {
     ctx.shadowBlur = 0; ctx.globalAlpha = 1;
   }
   ctx.restore();
+  drawVeil();
+}
+function drawFloats() {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (const f of floats) {
+    ctx.globalAlpha = Math.max(0, 1 - f.t / 0.9);
+    ctx.fillStyle = f.color; ctx.font = "14px 'Black Ops One'";
+    ctx.fillText(f.txt, f.x, f.y - f.t * 44);
+    ctx.globalAlpha = 1;
+  }
+  ctx.globalAlpha = 1;
+}
+// Drawn OUTSIDE the shake transform so the crossfade covers the whole screen.
+function drawVeil() {
+  if (veil <= 0) return;
+  ctx.globalAlpha = Math.min(1, veil);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 1;
 }
 
 /* =============================== LOOP =================================== */

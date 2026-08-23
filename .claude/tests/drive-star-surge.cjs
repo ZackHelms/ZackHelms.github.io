@@ -290,6 +290,243 @@ const allEqual = arr => arr.every(v => v === arr[0]);
   check('the cog sits in the top-left chrome row, clear of ← and 🔊', chromeRow.cog.l >= chromeRow.mute.r && chromeRow.mute.l >= chromeRow.back.r, chromeRow);
   check('tapping the cog opens the panel and touching the canvas closes it', chromeRow.openedByTap && chromeRow.closedByCanvas, chromeRow);
 
+
+  /* ---- sector combat report -> launch -> allied station ------------------
+     The station is what turns eleven sectors from one corridor into eleven
+     stops, and it is where a new player is first shown the shipyard. The
+     checks below pin the things that would silently rot it: the run must
+     CONTINUE through the station (score/xp/salvage/pip/hull all carry), the
+     two currencies must stay unconvertible, and no callout may point at a
+     feature that has drifted off-screen or onto the wrong side. */
+  const arriveAtReport = (sectorNo, stats) => page.evaluate(({ n, st }) => {
+    saves[0] = newCharacter('DRIVE'); activeSlot = 0; save = saves[0];
+    startGame(n);
+    Object.assign(sec, st || {});
+    boss = { x: 195, y: 120, r: 46, hp: 0, maxHp: 100, sector: true, t: 0, fireT: 1, ringT: 1, dir: 1 };
+    bossDown();
+    return { state, sector, clearedSector, campaignDone };
+  }, { n: sectorNo, st: stats });
+
+  const cleared = await arriveAtReport(3, { kills: 120, shotsFired: 400, shotsHit: 250, hits: 2, shields: 1, bestStreak: 55, t: 251 });
+  check('clearing a sector stops at a combat report instead of rolling straight into the next',
+        cleared.state === 'report' && cleared.clearedSector === 3 && cleared.sector === 4, cleared);
+  const banked = await page.evaluate(() => JSON.parse(localStorage.getItem('starSurge.saves'))[0].sector);
+  check('the cleared sector is banked to the save checkpoint before the report shows', banked === 4, banked);
+
+  await page.waitForTimeout(950);
+  const report = await page.evaluate(() => ({ shown: !overlay.classList.contains('hidden'), txt: overlay.innerText }));
+  const REPORT_ROWS = ['KILLS', 'ACCURACY', 'TIMES HIT', 'BEST STREAK', 'SECTOR TIME',
+                       'XP EARNED', 'SALVAGE', 'SECTOR SCORE', 'TOTAL SCORE',
+                       'TAP TO DOCK AT NEAREST ALLIED STATION'];
+  check('the report shows hits taken, accuracy, xp, salvage, totals and the dock prompt',
+        report.shown && REPORT_ROWS.every(r => report.txt.includes(r)),
+        REPORT_ROWS.filter(r => !report.txt.includes(r)));
+
+  const acc = await page.evaluate(() => {
+    startGame(1); save.equippedWeapon = 'blaster'; weapon = 4; sec = newSectorStats();
+    drag = { fx: 0, fy: 0, sx: ship.x, sy: ship.y }; fireT = 0;
+    update(0.016);                       // drives the REAL fire path, not fireWeapon() directly
+    const fired = sec.shotsFired, made = bullets.length;
+    const b = bullets[0];
+    const e = { type: 'drone', x: b.x, y: b.y, hp: 99, r: 12, pts: 60, xp: 3, t: 0, slowT: 0 };
+    enemies = [e]; applyBulletHit(b, e);
+    drag = null;
+    return { fired, made, hit: sec.shotsHit };
+  });
+  check('accuracy counts projectiles: a pip-4 spread is 4 shots and one connect is 1 hit',
+        acc.fired === acc.made && acc.made === 4 && acc.hit === 1, acc);
+
+  // A beam/flame/chain/emp build spawns no projectiles at all. Reporting 0%
+  // and grading it as if it had missed everything would punish the build for
+  // its own physics, so the accuracy term is dropped and the rest re-weighted.
+  const beam = await page.evaluate(async () => {
+    startGame(2); save.weapons.beam = 3; save.equippedWeapon = 'beam';
+    sec = newSectorStats();
+    Object.assign(sec, { kills: 90, hits: 0, bestStreak: 60, t: 200 });
+    const grade = gradeFor(sec);
+    boss = { x: 195, y: 120, r: 46, hp: 0, maxHp: 100, sector: true, t: 0, fireT: 1, ringT: 1, dir: 1 };
+    bossDown();
+    await new Promise(r => setTimeout(r, 950));
+    return { grade, txt: overlay.innerText };
+  });
+  check('a projectile-less build is graded on what it can be, not capped at 0% accuracy',
+        beam.grade === 'S' && !beam.txt.includes('ACCURACY') && beam.txt.includes('WEAPON'), beam);
+
+  const chain = await page.evaluate(async () => {
+    startGame(4); sec = newSectorStats();
+    boss = { x: 195, y: 120, r: 46, hp: 0, maxHp: 100, sector: true, t: 0, fireT: 1, ringT: 1, dir: 1 };
+    bossDown();
+    await new Promise(r => setTimeout(r, 950));
+    const atReport = state, y0 = ship.y;
+    overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const afterTap = state;
+    let minY = y0;
+    for (let i = 0; i < 200 && state === 'launch'; i++) { update(0.016); minY = Math.min(minY, ship.y); }
+    return { atReport, afterTap, shipLeft: minY < -20, atStation: state };
+  });
+  check('tapping the report launches the ship off-screen and lands at the station',
+        chain.atReport === 'report' && chain.afterTap === 'launch' && chain.shipLeft && chain.atStation === 'station', chain);
+
+  const btns = await page.evaluate(() => ({
+    B: stationLayout().B.map(b => ({ id: b.id, side: b.side, x: b.x, y: b.y, w: b.w, h: b.h,
+                                     ax: b.at.x, ay: b.at.y, ar: b.at.r })), W, H }));
+  const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  let anyOverlap = false;
+  for (let i = 0; i < btns.B.length; i++) for (let j = i + 1; j < btns.B.length; j++) if (overlaps(btns.B[i], btns.B[j])) anyOverlap = true;
+  const onScreen = btns.B.every(b => b.x >= 0 && b.y >= 0 && b.x + b.w <= btns.W && b.y + b.h <= btns.H);
+  check('the station offers four buttons, all on-screen and non-overlapping',
+        btns.B.length === 4 && onScreen && !anyOverlap, btns.B.map(b => b.id));
+  // Left-column buttons point at left-hand features and right at right-hand
+  // ones. That pairing is the entire reason no callout line crosses the
+  // station or another callout, so it is the thing worth asserting.
+  const sideOk = btns.B.every(b => b.side < 0 ? b.ax < btns.W / 2 : b.ax > btns.W / 2);
+  const featuresInView = btns.B.every(b => b.ax - b.ar > 0 && b.ax + b.ar < btns.W && b.ay - b.ar > 0 && b.ay < btns.H * 0.8);
+  check('each callout points at a feature on its own side of the station, fully on-screen',
+        sideOk && featuresInView, btns.B.map(b => ({ id: b.id, side: b.side, ax: Math.round(b.ax), ay: Math.round(b.ay) })));
+
+  const tapStation = (id) => page.evaluate(i => {
+    veil = 0;
+    const b = stationLayout().B.find(x => x.id === i);
+    stationTap(b.x + b.w / 2, b.y + b.h / 2);
+  }, id);
+
+  const repair = await page.evaluate(() => {
+    state = 'station'; veil = 0;
+    ship.maxHp = 100; ship.hp = 40; save.credits = 500; save.xp = 777;
+    const q = repairQuote();
+    const b = stationLayout().B.find(x => x.id === 'repair');
+    stationTap(b.x + b.w / 2, b.y + b.h / 2);
+    return { q, hp: ship.hp, cr: save.credits, xp: save.xp };
+  });
+  check('repair buys hull with CREDITS at the posted price and never touches XP',
+        repair.q.hp === 60 && repair.q.cost === 60 * 3 && repair.hp === 100 && repair.cr === 320 && repair.xp === 777, repair);
+
+  const wallet = await page.evaluate(() => {
+    state = 'station'; veil = 0;
+    ship.maxHp = 100; ship.hp = 20; save.credits = 60;
+    const b = stationLayout().B.find(x => x.id === 'repair');
+    stationTap(b.x + b.w / 2, b.y + b.h / 2);
+    const patched = { hp: ship.hp, cr: save.credits };
+    save.credits = 2;                     // less than the price of a single HP
+    const q2 = repairQuote();
+    stationTap(b.x + b.w / 2, b.y + b.h / 2);
+    return { patched, q2, hp2: ship.hp, cr2: save.credits, off: !!stationLayout().B.find(x => x.id === 'repair').off };
+  });
+  check('a thin wallet buys a partial patch; a broke pilot is refused and the button greys out',
+        wallet.patched.hp === 40 && wallet.patched.cr === 0 &&
+        wallet.q2.hp === 0 && wallet.hp2 === 40 && wallet.cr2 === 2 && wallet.off, wallet);
+
+  const spend = await page.evaluate(() => {
+    save.xp = 5000; save.credits = 500;
+    delete save.weapons.bombs;
+    showShipyard();
+    document.getElementById('wpn-bombs').click();
+    return { xp: save.xp, credits: save.credits, owns: save.weapons.bombs };
+  });
+  check('shipyard unlocks spend XP only -- salvage credits are a separate purse',
+        spend.credits === 500 && spend.xp < 5000 && spend.owns === 1, spend);
+
+  const resume = await page.evaluate(() => {
+    state = 'station'; veil = 0;
+    ship.maxHp = 100; ship.hp = 55; score = 12345; save.xp = 900; save.credits = 400; weapon = 3;
+    save.hpTier = 0;
+    Object.assign(sec, { kills: 99, t: 42 });
+    const b = stationLayout().B.find(x => x.id === 'combat');
+    stationTap(b.x + b.w / 2, b.y + b.h / 2);
+    return { state, score, xp: save.xp, credits: save.credits, weapon, hp: ship.hp,
+             stage, wave, secKills: sec.kills, secT: sec.t };
+  });
+  check('COMBAT resumes the SAME run: score, xp, salvage, pip and hull all carry through the station',
+        resume.state === 'play' && resume.score === 12345 && resume.xp === 900 && resume.credits === 400 &&
+        resume.weapon === 3 && resume.hp === 55 && resume.stage === 1 && resume.wave === 1 &&
+        resume.secKills === 0 && resume.secT === 0, resume);
+
+  const plating = await page.evaluate(() => {
+    state = 'station'; veil = 0;
+    ship.maxHp = 100; ship.hp = 60; save.hpTier = 1;   // as if just bought in the shipyard
+    const b = stationLayout().B.find(x => x.id === 'combat');
+    stationTap(b.x + b.w / 2, b.y + b.h / 2);
+    return { hp: ship.hp, maxHp: ship.maxHp };
+  });
+  check('hull plating bought at the station is hull you fly out with', plating.maxHp === 120 && plating.hp === 80, plating);
+
+  const backFromShipyard = await page.evaluate(() => {
+    state = 'station'; veil = 0; stationT = 5;
+    const b = stationLayout().B.find(x => x.id === 'upgrades');
+    stationTap(b.x + b.w / 2, b.y + b.h / 2);
+    const inShipyard = state;
+    document.getElementById('b-back').click();
+    return { inShipyard, back: state, veil };
+  });
+  // A second crossfade here would also swallow taps (stationTap ignores input
+  // while the veil is up), so a returning player would find a dead screen.
+  check('the shipyard returns to the station it was opened from, with no second crossfade',
+        backFromShipyard.inShipyard === 'shipyard' && backFromShipyard.back === 'station' && backFromShipyard.veil === 0, backFromShipyard);
+
+  const rest = await page.evaluate(() => {
+    state = 'station'; veil = 0; save.credits = 123; save.xp = 456;
+    const b = stationLayout().B.find(x => x.id === 'rest');
+    stationTap(b.x + b.w / 2, b.y + b.h / 2);
+    const stored = JSON.parse(localStorage.getItem('starSurge.saves'))[0];
+    return { state, storedCr: stored.credits, storedXp: stored.xp };
+  });
+  check('REST banks the pilot and returns to the Star Surge title screen',
+        rest.state === 'menu' && rest.storedCr === 123 && rest.storedXp === 456, rest);
+
+  const migrated = await page.evaluate(() => {
+    const legacy = [{ name: 'OLD', xp: 10, sector: 2, best: 5, weapons: { blaster: 1 },
+                      equippedWeapon: 'blaster', armors: {}, equippedArmor: null, hpTier: 0 }, null, null];
+    localStorage.setItem('starSurge.saves', JSON.stringify(legacy));
+    const loaded = loadSaves();
+    return { credits: loaded[0].credits, xp: loaded[0].xp };
+  });
+  check('a pilot saved before credits existed loads with a zero balance, not undefined',
+        migrated.credits === 0 && migrated.xp === 10, migrated);
+
+  const stationPaint = await page.evaluate(() => {
+    const fp = () => {
+      const d = ctx.getImageData(0, 0, W, H).data;
+      let h = 0, lit = 0;
+      for (let i = 0; i < d.length; i += 4 * 37) {
+        h = (h * 31 + d[i] + d[i + 1] * 3 + d[i + 2] * 7) >>> 0;
+        if (d[i] + d[i + 1] + d[i + 2] > 90) lit++;
+      }
+      return { h, lit };
+    };
+    saves[0] = newCharacter('DRIVE'); activeSlot = 0; save = saves[0];
+    startGame(3);
+    state = 'station'; stationT = 3; veil = 0; shake = 0;
+    const layoutSig = s => {
+      gfx = s;
+      const L = stationLayout();
+      return L.B.map(b => [b.id, Math.round(b.x), Math.round(b.y), Math.round(b.at.x), Math.round(b.at.y)].join(':')).join('|') + '#' + Math.round(L.R);
+    };
+    const sigToon = layoutSig('toon'), sigNeon = layoutSig('neon');
+    gfx = 'toon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const t = fp();
+    gfx = 'neon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const n = fp();
+    gfx = 'toon';
+    return { sigToon, sigNeon, t, n };
+  });
+  check('the station paints a substantial scene in both styles, and they differ',
+        stationPaint.t.h !== stationPaint.n.h && stationPaint.t.lit > 300 && stationPaint.n.lit > 300, stationPaint);
+  check('a skin is paint: the station layout is identical in both styles',
+        stationPaint.sigToon === stationPaint.sigNeon, stationPaint);
+
+  const finale = await page.evaluate(async () => {
+    saves[0] = newCharacter('DRIVE'); activeSlot = 0; save = saves[0];
+    startGame(MAX_SECTOR);
+    boss = { x: 195, y: 120, r: 46, hp: 0, maxHp: 100, sector: true, t: 0, fireT: 1, ringT: 1, dir: 1 };
+    bossDown();
+    const snap = { state, sector, clearedSector, campaignDone };
+    await new Promise(r => setTimeout(r, 950));
+    return Object.assign(snap, { txt: overlay.innerText });
+  });
+  check('clearing the last sector reads CAMPAIGN COMPLETE and never advances past it',
+        finale.campaignDone && finale.sector === 11 && finale.state === 'report' &&
+        finale.txt.includes('CAMPAIGN COMPLETE'), { s: finale.sector, done: finale.campaignDone });
+
+  await page.evaluate(() => { state = 'play'; overlay.classList.add('hidden'); });
+
   check('no console/page errors across the whole drive', errors.length === 0, errors);
 
   console.log(`STAR-SURGE DRIVE: ${pass} passed, ${fail} failed`);
