@@ -38,14 +38,25 @@ Deterministic helpers for working on this repo.
   iteration** (WebGL2 renders via SwiftShader). Same Chromium/`NODE_PATH`
   requirements as the smoke gate. Options: `w=/h=/dpr=` viewport,
   `wait=` ms, `click=x,y` (dismiss a splash), repeatable `select=#id:value`
-  (drive pickers). Exits 1 on any PAGEERROR — a parse error kills a page's
-  whole script while the canvas still "renders", so check this even when the
-  PNG looks plausible (added 2026-08-15 after exactly that bit twice).
+  (drive pickers), repeatable `eval=<js>`. Exits 1 on any PAGEERROR — a parse
+  error kills a page's whole script while the canvas still "renders", so check
+  this even when the PNG looks plausible (added 2026-08-15 after exactly that
+  bit twice).
+
+  `eval=` runs JS in the page before the wait, so a scene can be **arranged**
+  through the game's own test hook rather than screenshotting whatever the game
+  happened to be doing. Added 2026-08-23, after a session hand-rolled four
+  throwaway screenshot drivers to pose Neon Clash scenes — a spell mid-arc, the
+  finale mid-explosion — that no combination of `click=`/`select=` could reach.
+  Reach for it whenever the interesting frame is a *transient* one.
 
   ```
   NODE_PATH=/opt/node22/lib/node_modules/playwright/node_modules \
     node .claude/scripts/shot-page.cjs experiments/lone-tree/index.html /tmp/t.png \
     w=900 h=700 wait=2500 select=#species:pine
+
+  node .claude/scripts/shot-page.cjs games/neon-clash/index.html /tmp/a.png \
+    wait=950 eval="__NC.setSkin('toon'); __NC.start('2p'); __NC.setEnergy(0,20); __NC.deploy(0,'fireball',50,104)"
   ```
 
 - `gates.sh` — runs the whole validation set in one command: the smoke gate on

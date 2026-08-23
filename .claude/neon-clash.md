@@ -416,6 +416,12 @@ never drift from the thing it deploys.
 
 ## Graphics styles (added 2026-08-23)
 
+> The reusable half of this — the skin-is-paint invariant, the `glow()` no-op,
+> the `cel()`/`frameRot()`/`inkStroke()` recipe, seeded scenery, and the four
+> legibility findings that each cost a screenshot round — is written up for the
+> next game in `.claude/notes/20260823-canvas-skins-and-cel-shading.md`.
+
+
 Two art directions over **one** simulation, chosen from the cogwheel in the
 top-left HUD cluster (`#cog-btn`, sitting alongside back / mute / new — all
 four were narrowed to 34 px together so the row would not push the title out

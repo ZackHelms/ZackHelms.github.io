@@ -13,6 +13,9 @@
 //   wait=3000            ms to wait before the shot
 //   click=x,y            click once after load (e.g. dismiss a splash)
 //   select=#id:value     set a <select> (repeatable)
+//   eval=<js>            run JS in the page before the wait (repeatable) —
+//                        arrange a scene through the game's own test hook,
+//                        e.g. eval="__NC.start('2p'); __NC.place(0,'tank',40,100)"
 //   dpr=2                deviceScaleFactor
 //
 // Requirements: playwright-core resolvable (remote sessions:
@@ -28,11 +31,12 @@ if (!page_ || !out) {
   console.error('usage: shot-page.cjs <page.html> <out.png> [w= h= wait= click=x,y select=#id:val dpr=]');
   process.exit(1);
 }
-const opt = { w: 390, h: 844, wait: 3000, dpr: 2, click: null, select: [] };
+const opt = { w: 390, h: 844, wait: 3000, dpr: 2, click: null, select: [], eval: [] };
 for (const a of rest) {
   const i = a.indexOf('=');
   const k = a.slice(0, i), v = a.slice(i + 1);
   if (k === 'select') opt.select.push(v);
+  else if (k === 'eval') opt.eval.push(v);
   else if (k === 'click') opt.click = v.split(',').map(Number);
   else opt[k] = Number(v);
 }
@@ -60,6 +64,14 @@ const executablePath = candidates.find(p => { try { return fs.existsSync(p); } c
   for (const s of opt.select) {
     const i = s.indexOf(':');
     try { await page.selectOption(s.slice(0, i), s.slice(i + 1)); } catch (e) { errors.push('select failed: ' + s); }
+  }
+  // Arrange the scene through the page's own test hook before shooting. Most
+  // games expose one (window.__NC, __PH, ...); this is the difference between
+  // a repeatable scene and whatever the game happened to be doing 3s in.
+  // Wrapped in an IIFE so multi-statement snippets work, not just expressions.
+  for (const src of opt.eval) {
+    try { await page.evaluate('(() => {' + src + '})()'); }
+    catch (e) { errors.push('eval failed: ' + e.message); }
   }
   await page.waitForTimeout(opt.wait);
   await page.screenshot({ path: out });

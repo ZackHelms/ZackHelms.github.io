@@ -331,6 +331,50 @@ the served bytes were not confirmed** and hand the CD the exact badge string to
 eyeball. Claiming "verified live" from a green Actions run alone is precisely
 the stale-deploy failure the SOP exists to catch.
 
+## Three more test-design traps (2026-08-22/23, Neon Clash)
+
+- **A moving subject outruns your measurement window.** A check that asserts a
+  *position* has to use a subject that holds still for the round trip. Asserting
+  a deployed unit lands on the halfway border failed at 83.54 vs 84.4 — the unit
+  had marched during the `evaluate` round trip. The game was right; the test was
+  measuring latency. Fixes, in order of preference: pick a **building** (they
+  never move); or pick the slowest unit, use the shortest window that still
+  proves the point, and **state the margin in a comment** so the next person
+  knows it was computed rather than guessed. A drafted check that placed a
+  fighter where it would march into the measured envelope inside a 900 ms window
+  was caught this way before it ever ran — it would have passed for the wrong
+  reason.
+- **When a mechanic gains a delay, every rule check breaks at once.** Giving
+  spells a two-second flight broke eight fireball checks that cast and read
+  damage in the same `evaluate`. The wrong fix is to sprinkle two-second waits
+  through the suite (16 s of wall clock, and the checks stop being about rules).
+  The right one is a **`settle()` test hook** that resolves everything in flight
+  *through the real resolution path*, so rule checks stay synchronous — plus
+  **one** dedicated block that waits real time and pins the delay itself:
+  spends immediately, nothing damaged mid-air, lands after the flight, and a
+  shell in the air when the match ends is cancelled rather than resolved.
+  Separate "what the rule is" from "when it happens" and each stays cheap.
+- **Don't test an edge case that is really a different rule.** A check for
+  "a building aimed at the board's corner slides back on" aimed at `(-20, 178)`
+  — *off* the board, where the deliberate behaviour is to cancel the card. It
+  crashed on a missing building. Aim at `(1, 159)`: on the board, in the corner.
+  Re-read the rule you are not testing before you pick coordinates.
+
+## Asserting layout the CD asked for in words
+
+When a request is spatial ("a cogwheel in the top left that doesn't overlap the
+other items"), it is assertable directly and cheaply — collect every element's
+real `getBoundingClientRect()` and check the set pairwise:
+
+```js
+const hits = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+```
+
+Include the neighbours the new control could squeeze, not just the control
+(here `#hud-mid`, the title it might have pushed out). This is far better than
+eyeballing a screenshot, because it keeps holding on the next viewport and the
+next control added to that row.
+
 ## Solver-validated generation (2026-07-31, Phasic)
 
 For endless/procedural content, validate at GENERATION time: constructive

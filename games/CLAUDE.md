@@ -22,6 +22,8 @@ Detailed context for individual games lives in `.claude/<game>.md` at the repo r
 | Back button | Every game has a top-left ← link back to the games hub, left-most control, mute button immediately to its right — see § Hub Back Button |
 | Chrome above overlays | The ← and 🔊 buttons must sit at a **higher z-index than any full-screen overlay** (menu / game-over / win). Give the chrome `z-index:80` and overlays `70`. Otherwise the overlay swallows both, and since music is usually playing *behind* a menu or win screen, the player cannot mute exactly when they most want to (2026-07-25: shipped that way in locksport, caught by a drive test that could not tap `#mute-btn` after a reload) |
 | Portrait lock (optional) | A game whose layout only works in portrait can lock itself in software rather than reflowing: size the app shell to `innerHeight x innerWidth` and `transform: rotate(-screen.orientation.angle)` when a **touch** device goes landscape (leave a desktop window alone — clamp it to a centred portrait column instead). Two gotchas: `position:fixed` overlays must be nested *inside* the transformed shell or they stay landscape, and every pointer handler must un-rotate `clientX/clientY` about the element centre (a +-90 deg rotation keeps the bounding box centred on it) — `getBoundingClientRect().left` alone is wrong under a transform. `clientWidth/clientHeight` are layout sizes and stay correct. Reference: `neon-clash/` `applyView()` + `localPt()` |
+| Native form controls | A `<select>` (or any native picker) must **not** be wired through a `bindTap`-style helper. Those helpers bind `touchend` with `preventDefault()` to stop iOS double-firing, and that stops the native picker ever opening. Listen for `change` and leave the tap helper off it (2026-08-23, neon-clash's style dropdown) |
+| Graphics styles (optional) | A game may offer more than one art direction. The invariant is **a skin is paint**: nothing in the sim knows a skin exists, so a mid-match switch cannot change an outcome — assert that directly (same stats, costs, ranges and a real deploy's landing coordinates, byte-identical under both). Two mechanics carry most of it: make `glow()` a **no-op** under a skin with no bloom rather than branching at its thirty-odd call sites (an effect written later in the neon idiom is then automatically right in both), and dispatch at the one shared sprite entry point so cards and drag ghosts can never drift from the thing they deploy. Chrome differs only by palette → a `THEME[skin]` table; the world differs structurally → alternate draw routines. Scenery gets baked once from a seeded PRNG, never re-rolled per frame. Full recipe incl. cel shading: `.claude/notes/20260823-canvas-skins-and-cel-shading.md`. Reference: `neon-clash/` |
 | Build badge | Every game has a `<div id="build-badge">` right after `<body>` — see below |
 
 ---
@@ -565,7 +567,7 @@ checksummed code carries seed + score, so a friend replays your exact grid and
 the game reports the head-to-head. LABELS assist stamps a unique letter per
 colour for a colour-free hunt. Detailed context: `.claude/signal-hunt.md`.
 
-### NEON CLASH (`neon-clash/index.html`, ~2400 lines)
+### NEON CLASH (`neon-clash/index.html`, ~2700 lines)
 The repo's first **real-time card battler**, and its first **simultaneous**
 local-2p game. One board split into halves; energy refills at 1/sec up to 20
 on both sides; drag a tank (4), fighter (3), archer (3) or bunker (8) out of
