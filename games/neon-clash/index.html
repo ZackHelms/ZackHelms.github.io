@@ -130,7 +130,7 @@ html, body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 01:32 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 01:51 UTC</div>
 <div id="app">
   <div id="hud">
     <div id="hud-left">
@@ -169,10 +169,11 @@ html, body {
   <div class="helprow"><div class="hk" style="color:var(--red)">FIGHTER 3</div><div><i>Unit.</i> Average HP and damage, fast attacks, fast legs. Runs down archers before they can whittle you.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--blue)">ARCHER 3</div><div><i>Unit.</i> Low HP, average damage, average speed &mdash; but shoots from far back. Melts anything that cannot reach it.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--purple)">BUNKER 8</div><div><i>Building.</i> Stationary, holds two units. Aim it at your emplacement, an edge, or a bunker already standing there and it <b>slides to the nearest ground it fits</b> rather than being refused. Garrisoned units stop moving, fire through the slits, and take no damage &mdash; the bunker eats it. Two per side; blow one up and it can be rebuilt.</div></div>
-  <div class="helprow"><div class="hk" style="color:#ff7a1a">FIREBALL 5</div><div><i>Spell.</i> An airburst on your own half. Damage and knockback are hardest at the centre and halve at the rim, so it pays against a <b>crowd</b> and barely dents one unit &mdash; the card to hold when a big push is coming. Scatters what it hits; bases are immune, and a garrison inside a bunker is shielded from it.</div></div>
+  <div class="helprow"><div class="hk" style="color:#ff7a1a">FIREBALL 5</div><div><i>Spell.</i> Lobbed from your base and <b>two seconds in the air</b> &mdash; so lead a moving target, or drop it on a push that has already committed and stopped to grind. An airburst on your own half. Damage and knockback are hardest at the centre and halve at the rim, so it pays against a <b>crowd</b> and barely dents one unit &mdash; the card to hold when a big push is coming. Scatters what it hits; bases are immune, and a garrison inside a bunker is shielded from it.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--green)">BASE</div><div>The emplacement at the back of each half. Reduce the enemy base to zero and the match is yours &mdash; but it is not a sitting target: its <b>turret</b> has an archer's reach and cadence and hits for two archers a shot, so a lone unit that walks in alone dies to the base itself.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--white)">SIEGE</div><div>The moment a unit lands its first hit on a <b>building</b> &mdash; a bunker or a base &mdash; it commits to that target until the building falls, and a dashed tether marks it. A committed unit <b>will not turn on your defenders</b> while it grinds, so answering a push that has already reached your base is the cheapest fighting you will ever do. Units still only <i>marching</i> at you can be pulled off.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--blue)">DEPLOY</div><div>Two ways, both fine: <b>drag</b> a card onto the board, or <b>tap</b> a card to arm it and then tap where you want it. Aim at the enemy half and it simply lands on your side of the halfway line at the same across-the-board spot; aim a <b>building</b> somewhere it cannot stand and it slides to the nearest spot it can. Either way you never lose the card to a bad aim. Release over the tray to think again.</div></div>
+  <div class="helprow"><div class="hk" style="color:var(--gold)">SUDDEN&nbsp;DEATH</div><div>At <b>3:00</b> both sides start earning <b>+1 extra energy a second</b>, and another +1 every minute after &mdash; up to 8/sec, where a full bar refills in under three seconds. The music picks up with it. Nobody gets to sit on a lead; at <b>10:00</b> the match is called on remaining base HP.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--gold)">STYLE</div><div>The cogwheel in the top left has a dropdown that switches the whole arena between <b>TOON</b> (the default) and <b>NEON</b> at any time, mid-match included. It is paint only &mdash; every stat, range and rule is identical in both.</div></div>
   <div class="btn-col" style="margin-top:6px;"><div class="ov-btn primary" id="btn-help-back">BACK</div></div>
 </div>
@@ -226,8 +227,18 @@ const BASE_CLR = 18;                    // buildings keep this clear of a base, 
 const ENERGY_MAX = 20, ENERGY_REGEN = 1;
 const START_ENERGY = 5;
 const UNIT_CAP = 16;                    // per side, keeps the sim bounded
-const SUDDEN_AT = 180;                  // seconds — then regen and base damage x2
-const MATCH_LIMIT = 300;                // hard stop; most base HP wins
+// SUDDEN DEATH is a ramp, not a switch. At 3:00 both sides gain +1 energy a
+// second, and another +1 every minute after — so a stalemate gets faster and
+// faster until it cannot be held, and the 10:00 wall is the backstop rather
+// than the plan. Base damage doubles once at 3:00 and does not keep doubling;
+// energy is the escalating pressure, not raw damage.
+const SUDDEN_AT = 180;                  // 3:00 — sudden death begins
+const SUDDEN_STEP = 60;                 // and energy gains another +1/sec each minute after
+const MATCH_LIMIT = 600;                // 10:00 hard stop; most base HP wins
+const SUDDEN_TIERS = Math.floor((MATCH_LIMIT - SUDDEN_AT) / SUDDEN_STEP);
+// Tier 0 = before sudden death. Tier n>=1 = n-th step of the ramp.
+const suddenTier = t => t < SUDDEN_AT ? 0 : Math.min(SUDDEN_TIERS, 1 + Math.floor((t - SUDDEN_AT) / SUDDEN_STEP));
+const regenRate = t => ENERGY_REGEN + suddenTier(t);
 const DRAG_OFF = 9;                     // ghost sits this far ahead of the finger
 const TAP_SLOP = 10;                    // px of travel that turns a tap into a drag
 
@@ -332,7 +343,7 @@ let state = 'title';                    // title | play | over
 let mode = 'ai';                        // 'ai' | '2p'
 let diff = 'PRO', aiP = AIS.PRO;
 let energy = [START_ENERGY, START_ENERGY];
-let units = [], buildings = [], shots = [], fx = [], particles = [];
+let units = [], buildings = [], shots = [], fx = [], particles = [], spells = [];
 let bases = [];
 let matchT = 0, aiTimer = 0, uid = 1;
 let drags = {};                         // pointerId -> {side, kind, x, y, ok}
@@ -341,8 +352,16 @@ let sel = [null, null];                 // per side: card armed by tap, awaiting
 let flash = {};                         // 'side:kind' -> seconds of red flash left
 let casts = [0, 0];                     // spells cast this match, per side
 let shake = 0, banner = '', bannerT = 0, bannerCol = '#39ff14', suddenAnnounced = false;
+let suddenTier0 = 0;                    // highest ramp tier already announced
 let winner = -1, renderT = 0;
 let paused = false;                     // settings open over a live match
+// The match is decided the moment a base falls, but the RESULT SCREEN waits:
+// 'finale' is three seconds in which the losing base is razed and the winners
+// celebrate on a board that is otherwise frozen. Nothing is decided during it
+// — winner and the reported HP are both captured on entry — so it is safe to
+// skip, and a tap does exactly that.
+const FINALE_T = 3.0;
+let finaleT = 0, finalHp = [0, 0];
 
 let rec = { ROOKIE: { w: 0, l: 0 }, PRO: { w: 0, l: 0 }, LEGEND: { w: 0, l: 0 } };
 try {
@@ -435,6 +454,13 @@ function sndSting() {
   beep(233, 0.3, 'sawtooth', 0.1, 150, 0.2);
   beep(147, 0.6, 'sawtooth', 0.11, 78, 0.44);
 }
+// Launch, apex, fall — the pitch traces the arc, so the two seconds sound
+// like a thing in the air rather than a pause with a bang on the end.
+const sndLob = () => {
+  nburst(0.12, 0.05, 1200);
+  beep(260, 0.98, 'sine', 0.03, 720);
+  beep(720, 0.95, 'sine', 0.03, 300, 1.0);
+};
 const sndFireball = () => {
   beep(330, 0.5, 'sawtooth', 0.12, 55);
   beep(150, 0.62, 'square', 0.1, 38, 0.02);
@@ -445,12 +471,66 @@ function sndSudden() { [440, 0, 440, 0, 587].forEach((f, i) => f && beep(f, 0.14
 
 // ------------------------------------------------------------- music
 // tense march, ~100 BPM: pulsing saw bass, sparse minor lead, kick + hats.
-const STEP_D = 60 / 100 / 4;
-const BASS = [55, 0, 55, 55, 0, 55, 0, 55, 61.74, 0, 61.74, 0, 55, 0, 49, 0,
-              43.65, 0, 43.65, 43.65, 0, 43.65, 0, 49, 55, 0, 55, 0, 61.74, 0, 65.41, 0];
-const LEAD = [0, 0, 0, 0, 220, 0, 261.63, 0, 0, 0, 329.63, 0, 293.66, 0, 0, 0,
-              0, 0, 0, 0, 174.61, 0, 220, 0, 0, 261.63, 0, 0, 329.63, 0, 392, 0];
-let musicTimer = null, musicStep = 0, nextNoteT = 0;
+// Five tracks, one per match, none twice running. Written as note names and
+// 16-step drum strings rather than arrays of decimals, because a pattern you
+// cannot read is a pattern nobody will ever edit. Two bars (32 sixteenths) of
+// bass and lead; drums repeat every bar.
+const SEMI = { C: -9, 'C#': -8, D: -7, 'D#': -6, E: -5, F: -4, 'F#': -3, G: -2, 'G#': -1, A: 0, 'A#': 1, B: 2 };
+const nt = n => {
+  const m = /^([A-G]#?)(-?\d)$/.exec(n);
+  return m ? 440 * Math.pow(2, (SEMI[m[1]] + (+m[2] - 4) * 12) / 12) : 0;
+};
+const seq = str => str.trim().split(/\s+/).map(n => (n === '.' ? 0 : nt(n)));
+const TRACKS = [
+  { name: 'PROTOCOL', bpm: 100, bassT: 'sawtooth', leadT: 'square',
+    bassG: 0.05, leadG: 0.028, bassD: 0.13, leadD: 0.2,
+    kick: 'x.......x.......', snare: '....x.......x...', hat: 'x.x.o.x.x.x.o.x.',
+    bass: seq(`A1 .  A1 A1 .  A1 .  A1   B1 .  B1 .  A1 .  G1 .
+               F1 .  F1 F1 .  F1 .  G1   A1 .  A1 .  B1 .  C2 .`),
+    lead: seq(`.  .  .  .  A3 .  C4 .    .  .  E4 .  D4 .  .  .
+               .  .  .  .  F3 .  A3 .    .  C4 .  .  E4 .  G4 .`) },
+  { name: 'OVERCLOCK', bpm: 126, bassT: 'sawtooth', leadT: 'square',
+    bassG: 0.048, leadG: 0.026, bassD: 0.1, leadD: 0.16,
+    kick: 'x...x...x...x...', snare: '....x.......x...', hat: 'x.xxx.xxx.xxx.xx',
+    bass: seq(`D2 D2 .  D2 D2 .  D2 .    D2 D2 .  D2 F2 .  A2 .
+               C3 C3 .  C3 A2 .  A2 .    G2 .  G2 .  F2 .  E2 .`),
+    lead: seq(`A4 .  .  .  D5 .  .  .    F5 .  E5 .  D5 .  A4 .
+               .  .  C5 .  .  .  E5 .    D5 .  .  .  A4 .  F4 .`) },
+  { name: 'IRONWORKS', bpm: 92, bassT: 'square', leadT: 'triangle',
+    bassG: 0.055, leadG: 0.032, bassD: 0.22, leadD: 0.4,
+    kick: 'x.....x.x.......', snare: '........x.......', hat: '....x.......x...',
+    bass: seq(`E2 .  .  .  E2 .  E2 .    .  .  E2 .  G2 .  .  .
+               D2 .  .  .  D2 .  D2 .    .  .  C3 .  B2 .  .  .`),
+    lead: seq(`.  .  .  .  .  .  .  .    E4 .  .  .  .  .  D4 .
+               .  .  .  .  .  .  .  .    G4 .  .  .  F#4 . .  .`) },
+  { name: 'NIGHTRUN', bpm: 116, bassT: 'sawtooth', leadT: 'square',
+    bassG: 0.045, leadG: 0.022, bassD: 0.11, leadD: 0.11,
+    kick: 'x...x...x...x...', snare: '....x.......x..x', hat: '..x...x...x...x.',
+    bass: seq(`C2 .  C3 .  C2 .  C3 .    C2 .  C3 .  A#1 . A#2 .
+               G#1 . G#2 . G#1 . G#2 .   A#1 . A#2 . C2 .  D#2 .`),
+    lead: seq(`C4 D#4 G4 C5 G4 D#4 C4 D#4   G4 C5 D#5 C5 G4 D#4 C4 .
+               A#3 D4 F4 A#4 F4 D4 A#3 D4   G#3 C4 D#4 G#4 D#4 C4 G#3 .`) },
+  { name: 'LAST STAND', bpm: 138, bassT: 'sawtooth', leadT: 'square',
+    bassG: 0.05, leadG: 0.026, bassD: 0.09, leadD: 0.14,
+    kick: 'x.x.x.x.x.x.x.x.', snare: '....x.......x...', hat: 'x.xxx.xxx.xxx.xx',
+    bass: seq(`E2 E2 E2 .  F2 .  E2 .    E2 E2 E2 .  G2 .  F2 .
+               E2 E2 E2 .  B2 .  A2 .    G2 .  F2 .  E2 .  E2 E2`),
+    lead: seq(`E5 .  F5 .  E5 .  B4 .    .  .  C5 .  B4 .  A4 .
+               E5 .  F5 .  G5 .  F5 .    E5 .  B4 .  E5 .  .  .`) },
+];
+// Tempo tracks the ENERGY RATE, so the music accelerates exactly when the match
+// does — once at sudden death and again at every step of the ramp. The cap is
+// there because past about 1.6x the sixteenths stop reading as a groove and
+// start reading as a buzz, and because a phone has to schedule all of it.
+const TEMPO_CAP = 1.6;
+const tempoMul = () => Math.min(TEMPO_CAP, 1 + 0.1 * (regenRate(matchT) - ENERGY_REGEN));
+const stepDur = T => 60 / (T.bpm * tempoMul()) / 4;
+let musicTimer = null, musicStep = 0, nextNoteT = 0, trackIx = 0;
+function pickTrack() {
+  let n = trackIx;
+  while (n === trackIx) n = (Math.random() * TRACKS.length) | 0;
+  trackIx = n;
+}
 function mnote(t, freq, dur, type, gain) {
   if (muted || !AC) return;
   const o = AC.createOscillator(), g = AC.createGain();
@@ -483,16 +563,39 @@ function mkick(t) {
   o.connect(g).connect(musicGain);
   o.start(t); o.stop(t + 0.15);
 }
+function msnare(t) {
+  if (muted || !AC || !noiseBuf) return;
+  const src = AC.createBufferSource(); src.buffer = noiseBuf;
+  const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1900; f.Q.value = 0.8;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.05, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+  src.connect(f); f.connect(g); g.connect(musicGain);
+  src.start(t); src.stop(t + 0.14);
+  const o = AC.createOscillator(), og = AC.createGain();
+  o.type = 'triangle'; o.frequency.setValueAtTime(180, t);
+  og.gain.setValueAtTime(0.028, t);
+  og.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+  o.connect(og).connect(musicGain);
+  o.start(t); o.stop(t + 0.09);
+}
 function musicSchedule() {
   if (!AC) return;
+  const T = TRACKS[trackIx];
+  // Read the tempo fresh every step rather than caching it: the ramp can raise
+  // it mid-bar, and scheduling only runs 0.3s ahead, so the change lands within
+  // a breath of the banner announcing it.
   while (nextNoteT < AC.currentTime + 0.3) {
-    const b = BASS[musicStep]; if (b) mnote(nextNoteT, b, 0.13, 'sawtooth', 0.05);
-    const l = LEAD[musicStep]; if (l) mnote(nextNoteT, l, 0.2, 'square', 0.028);
-    if (musicStep % 8 === 0) mkick(nextNoteT);
-    if (musicStep % 2 === 0) mhat(nextNoteT, 0.03, 0.026);
-    if (musicStep % 8 === 4) mhat(nextNoteT, 0.09, 0.042);
+    const b = T.bass[musicStep]; if (b) mnote(nextNoteT, b, T.bassD, T.bassT, T.bassG);
+    const l = T.lead[musicStep]; if (l) mnote(nextNoteT, l, T.leadD, T.leadT, T.leadG);
+    const d = musicStep % 16;
+    if (T.kick[d] === 'x') mkick(nextNoteT);
+    if (T.snare[d] === 'x') msnare(nextNoteT);
+    const h = T.hat[d];
+    if (h === 'x') mhat(nextNoteT, 0.03, 0.026);
+    else if (h === 'o') mhat(nextNoteT, 0.09, 0.042);
     musicStep = (musicStep + 1) % 32;
-    nextNoteT += STEP_D;
+    nextNoteT += stepDur(T);
   }
 }
 function startMusic() {
@@ -723,7 +826,7 @@ function tryDeploy(side, key, fx_, fy) {
     return false;
   }
   energy[side] -= k.cost;
-  if (k.type === 'spell') { castSpell(side, key, info.x, info.y); return true; }
+  if (k.type === 'spell') { launchSpell(side, key, info.x, info.y); return true; }
   if (info.garrison) {
     const b = info.garrison;
     const slot = b.garrison.length;
@@ -743,8 +846,49 @@ function tryDeploy(side, key, fx_, fy) {
   return true;
 }
 
-// ------------------------------------------------------------- spells
-// A spell is not an entity — it resolves the instant it lands, so there is no
+// ------------------------------------------------------------- spells in flight
+// EVERY spell is LOBBED, never teleported: it leaves your own base, arcs up out
+// of the screen, and lands SPELL_FLIGHT seconds later. That delay is the
+// contract for every spell added from here on, not a fireball quirk — which is
+// why it lives beside the type check and not inside castSpell.
+//
+// The gameplay consequence is deliberate and worth stating plainly: a fighter
+// covers ~26 world units in two seconds, nearly twice the fireball's blast
+// radius, so a spell no longer lands on a mover unless you lead it. What it
+// does still land on is anything standing still — and the SIEGE LOCK is
+// precisely what makes attackers stand still. Fireball stops being a panic
+// button and becomes the answer to a push that has already committed.
+const SPELL_FLIGHT = 2.0;
+const SPELL_LIFT = 23;                  // apex, in world units of screen rise
+const SPELL_GROW = 1.0;                 // and how much nearer the camera that reads as
+const arcH = u => 4 * u * (1 - u) * SPELL_LIFT;
+function launchSpell(side, key, x, y) {
+  const k = KINDS[key];
+  spells.push({ side, key, k, x0: UW / 2, y0: BASE_Y[side], x, y, t: 0 });
+  casts[side]++;                        // a cast is the ACT, not the landing
+  puff(UW / 2, BASE_Y[side] + (side === 0 ? -7 : 7), k.col, 10, 26);
+  sndLob();
+}
+function stepSpells(dt) {
+  for (const sp of spells) {
+    sp.t += dt;
+    if (sp.t < SPELL_FLIGHT) {
+      const u = sp.t / SPELL_FLIGHT;
+      if (Math.random() < dt * 30) {    // a thin smoke trail along the arc
+        const px = sp.x0 + (sp.x - sp.x0) * u, py = sp.y0 + (sp.y - sp.y0) * u - arcH(u);
+        particles.push({ x: px, y: py, vx: rnd(-4, 4), vy: rnd(-2, 5), r: rnd(0.5, 1.4),
+                         col: sp.k.col, life: rnd(0.2, 0.5) });
+      }
+      continue;
+    }
+    sp.done = true;
+    castSpell(sp.side, sp.key, sp.x, sp.y);
+  }
+  if (spells.some(sp => sp.done)) spells = spells.filter(sp => !sp.done);
+}
+
+// ------------------------------------------------------------- spell resolution
+// A spell is not an entity — once it lands it resolves at once, so there is no
 // projectile to dodge and no unit to kill. Fireball is the comeback card, and
 // three rules keep it honest:
 //   1. Damage and knockback both FALL OFF with distance, so it pays against a
@@ -764,7 +908,6 @@ function castSpell(side, key, x, y) {
   puff(x, y, k.col, 40, 54);
   shake = Math.max(shake, 0.3);
   sndFireball();
-  casts[side]++;
   let hits = 0;
   for (const u of units) {
     if (u.side !== foe || u.dead || u.home) continue;
@@ -1034,16 +1177,20 @@ function stepShots(dt) {
 
 function step(dt) {
   matchT += dt;
-  const regen = matchT >= SUDDEN_AT ? ENERGY_REGEN * 2 : ENERGY_REGEN;
+  const regen = regenRate(matchT);
   for (let s = 0; s < 2; s++) energy[s] = Math.min(ENERGY_MAX, energy[s] + regen * dt);
-  if (matchT >= SUDDEN_AT && !suddenAnnounced) {
+  const tier = suddenTier(matchT);
+  if (tier > suddenTier0) {             // every step of the ramp announces itself
+    suddenTier0 = tier;
     suddenAnnounced = true;
-    banner = 'SUDDEN DEATH'; bannerT = 2.4; bannerCol = '#ffc300';
+    banner = tier === 1 ? 'SUDDEN DEATH' : '+' + regen + ' ENERGY/SEC';
+    bannerT = 2.4; bannerCol = '#ffc300';
     sndSudden(); duckMusic();
   }
   for (const u of units) if (!u.dead) stepUnit(u, dt);
   separate();
   stepShots(dt);
+  stepSpells(dt);
   for (const b of buildings) if (!b.dead) b.hurt = Math.max(0, b.hurt - dt);
   for (const b of bases) stepBase(b, dt);
   units = units.filter(u => !u.dead);
@@ -1714,6 +1861,10 @@ function drawUnit(u) {
   ctx.save();
   ctx.translate(sx(u.x), sy(u.y));
   ctx.scale(scale, scale);
+  if (state === 'finale' && u.side === winner) {      // the winners jump about
+    const b = Math.abs(Math.sin(renderT * 7 + u.id)) * 2.4 * scale;
+    ctx.translate(0, -b);
+  }
   ctx.rotate(u.face === undefined ? (u.side === 0 ? -Math.PI / 2 : Math.PI / 2) : u.face);
   const hot = u.hurt > 0;
   glow(hot ? '#ffffff' : col, hot ? 14 : 8);
@@ -1966,6 +2117,44 @@ function drawFx() {
   ctx.globalAlpha = 1;
 }
 
+// A spell in flight is drawn three ways at once, and it needs all three: a
+// dashed LANDING RING that says where, a closing inner ring that says how soon,
+// and a GROUND SHADOW under the shell so the arc cannot lie about where the
+// thing actually is. Without the shadow, a shell lifted up the screen reads as
+// a shell that is going to land further up the screen.
+function drawSpells() {
+  for (const sp of spells) {
+    const u = clamp(sp.t / SPELL_FLIGHT, 0, 1);
+    const gx = sp.x0 + (sp.x - sp.x0) * u, gy = sp.y0 + (sp.y - sp.y0) * u;
+    const h = arcH(u);
+    ctx.save();
+    ctx.strokeStyle = sp.k.col; ctx.lineWidth = Math.max(1.4, scale * 0.5);
+    ctx.globalAlpha = 0.45 + 0.3 * Math.sin(renderT * 9);
+    ctx.setLineDash([5, 5]); ctx.lineDashOffset = -renderT * 20;
+    ctx.beginPath(); ctx.arc(sx(sp.x), sy(sp.y), sp.k.blast * scale, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath(); ctx.arc(sx(sp.x), sy(sp.y), sp.k.blast * scale * (1 - u) + 0.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = 0.42 - 0.16 * (h / SPELL_LIFT);
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(sx(gx), sy(gy), sp.k.r * scale * 1.15, sp.k.r * scale * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.translate(sx(gx), sy(gy) - h * scale);
+    const g = scale * (1 + SPELL_GROW * (h / SPELL_LIFT));
+    ctx.scale(g, g);
+    ctx.rotate(renderT * 3.2);
+    glow(sp.k.col, 16);
+    drawUnitShape(sp.key, sp.k.r * 1.15, sp.k.col, sp.k.col, 0);
+    noGlow();
+    ctx.restore();
+  }
+}
+
 // ------------------------------------------------------------- trays
 function drawTray(side) {
   const top = side === 0 ? boardBot : 0;
@@ -2167,6 +2356,7 @@ function render() {
   for (const u of units) if (!u.home) drawUnit(u);
   drawShots();
   drawFx();
+  drawSpells();
   ctx.restore();
   drawTray(1);
   drawTray(0);
@@ -2199,6 +2389,7 @@ function armedFor(px, py) {
   return -1;
 }
 function pointDown(id, px, py) {
+  if (state === 'finale') { finishMatch(); return; }
   if (state !== 'play') return;
   const c = cardAt(px, py);
   if (c) {
@@ -2258,11 +2449,12 @@ window.addEventListener('mouseup', () => pointUp('mouse'));
 
 // ------------------------------------------------------------- match flow
 function resetField() {
-  units = []; buildings = []; shots = []; fx = []; particles = [];
+  units = []; buildings = []; shots = []; fx = []; particles = []; spells = [];
   bases = [makeBase(0), makeBase(1)];
   energy = [START_ENERGY, START_ENERGY];
   drags = {}; flash = {}; sel = [null, null];
-  matchT = 0; aiTimer = 1.2; suddenAnnounced = false; winner = -1;
+  matchT = 0; aiTimer = 1.2; suddenAnnounced = false; suddenTier0 = 0; winner = -1;
+  finaleT = 0; finalHp = [BASE_HP, BASE_HP];
   casts = [0, 0];
   shake = 0; banner = ''; bannerT = 0;
 }
@@ -2279,12 +2471,55 @@ function startMatch(newMode, d) {
   banner = 'CLASH';
   bannerT = 1.2; bannerCol = '#39ff14';
   updateHud();
-  audio(); startMusic();
+  audio(); pickTrack(); startMusic();
 }
+// The decision point. Everything that DECIDES the match happens here, on entry;
+// the three seconds after it are pure theatre over a frozen board.
 function endMatch(w) {
+  if (state === 'over' || state === 'finale') return;
+  winner = w;
+  finalHp = [bases[0].hp, bases[1].hp];   // snapshot: the loser's base is about
+                                          // to be razed for the camera, and a
+                                          // time-limit win must still report
+                                          // the HP that actually won it
+  drags = {}; sel = [null, null]; spells = [];
+  stopMusic();
+  if (w < 0) { finishMatch(); return; }   // a dead-level draw has nothing to raze
+  state = 'finale';
+  finaleT = 0;
+  banner = SIDE_NAME[w] + ' WINS'; bannerT = FINALE_T;
+  bannerCol = SIDE_COL[w];
+  shake = Math.max(shake, 0.5);
+}
+// Razing the loser, cheering the winner. Explosions accelerate across the three
+// seconds so it builds rather than rattles, and the base is only greyed out at
+// the very end — going dead on the first hit would waste the whole animation.
+let finaleTick = 0;
+function stepFinale(dt) {
+  finaleT += dt;
+  const lose = 1 - winner, bs = bases[lose], k = finaleT / FINALE_T;
+  shake = Math.max(shake, 0.18 + 0.5 * k);
+  finaleTick -= dt;
+  if (finaleTick <= 0) {
+    finaleTick = 0.26 - 0.16 * k;                       // faster as it goes
+    const bx = bs.x + rnd(-BASE_HW, BASE_HW), by = bs.y + rnd(-5, 5);
+    blastFx(bx, by, 7 + 12 * k, k > 0.55 ? '#ffd24d' : SIDE_COL[lose]);
+    puff(bx, by, '#ffb347', 16, 40 + 40 * k);
+    puff(bx, by, '#6b6660', 10, 26);
+    sndBoom();
+    // and a firework over the winner's half
+    const wx_ = rnd(14, UW - 14), wy_ = winner === 0 ? rnd(96, 150) : rnd(10, 64);
+    ring(wx_, wy_, SIDE_COL[winner], 12 + rnd(0, 8));
+    puff(wx_, wy_, SIDE_COL[winner], 12, 34);
+  }
+  if (k >= 0.8) bs.hp = 0;                              // now it is rubble
+  for (const b of bases) { b.hurt = Math.max(0, b.hurt - dt); b.flash = Math.max(0, b.flash - dt); }
+  if (finaleT >= FINALE_T) finishMatch();
+}
+function finishMatch() {
   if (state === 'over') return;
   state = 'over';
-  winner = w;
+  const w = winner;
   drags = {}; sel = [null, null];
   stopMusic();
   const youWon = w === 0;
@@ -2304,7 +2539,7 @@ function endMatch(w) {
   const mm = Math.floor(matchT / 60), ss = Math.floor(matchT % 60);
   sub.innerHTML = mm + ':' + String(ss).padStart(2, '0') + ' &middot; ' +
     (mode === '2p' ? 'PASS-AND-PLAY' : diff) + '<br>' +
-    'GREEN BASE ' + Math.ceil(bases[0].hp) + ' &middot; RED BASE ' + Math.ceil(bases[1].hp);
+    'GREEN BASE ' + Math.max(0, Math.ceil(finalHp[0])) + ' &middot; RED BASE ' + Math.max(0, Math.ceil(finalHp[1]));
   $('ov-over').classList.remove('hidden');
   setTimeout(() => { (w === 0 || mode === '2p') ? sndFanfare() : sndSting(); }, 260);
 }
@@ -2321,7 +2556,8 @@ function updateHud() {
   $('v-mode').textContent = state === 'title' ? 'NEON CLASH'
     : (mode === '2p' ? 'GREEN vs RED' : 'YOU vs ' + diff);
   const mm = Math.floor(matchT / 60), ss = Math.floor(matchT % 60);
-  $('v-clock').textContent = (state === 'play' && matchT >= SUDDEN_AT ? 'SUDDEN DEATH ' : '') +
+  const hot = state !== 'title' && matchT >= SUDDEN_AT;
+  $('v-clock').textContent = (hot ? 'SUDDEN DEATH +' + regenRate(matchT) + '/S ' : '') +
     mm + ':' + String(ss).padStart(2, '0');
 }
 function updateRecUI() {
@@ -2399,6 +2635,7 @@ function frame(now) {
   if (dt > 0.1) dt = 0.1;
   renderT += dt;
   if (dt > 0 && state === 'play' && !paused) step(dt);
+  else if (dt > 0 && state === 'finale' && !paused) stepFinale(dt);
   shake = Math.max(0, shake - dt);
   bannerT = Math.max(0, bannerT - dt);
   for (const key in flash) { flash[key] -= dt; if (flash[key] <= 0) delete flash[key]; }
@@ -2436,13 +2673,25 @@ window.__NC = {
   // scenario setup only — drops a unit at an exact spot with no rules applied,
   // so a test can arrange a cluster and then cast at it through the real path.
   place: (side, key, x, y) => { spawnUnit(side, key, x, y); return units[units.length - 1]; },
-  setTime: v => { matchT = v; suddenAnnounced = v < SUDDEN_AT ? false : suddenAnnounced; },
+  setTime: v => { matchT = v; suddenTier0 = suddenTier(v); suddenAnnounced = v >= SUDDEN_AT; },
+  get regen() { return regenRate(matchT); }, get tier() { return suddenTier(matchT); },
   get viewRot() { return viewRot; },
   get sel() { return sel.slice(); },
   get skin() { return skin; }, setSkin: s => setSkin(s),
   get paused() { return paused; }, get scene() { return TOON_SCENE; },
+  get finaleT() { return finaleT; }, get finaleLen() { return FINALE_T; },
+  get winner() { return winner; },
+  get tracks() { return TRACKS.map(t => ({ name: t.name, bpm: t.bpm, bass: t.bass.length,
+    lead: t.lead.length, kick: t.kick.length, snare: t.snare.length, hat: t.hat.length })); },
+  get track() { return TRACKS[trackIx].name; },
+  get tempo() { return tempoMul(); },
   get gun() { return { dmg: BASE_GUN.dmg, rate: BASE_GUN.rate, range: BASE_GUN.range }; },
   get shots() { return shots; },
+  get spells() { return spells; }, get flight() { return SPELL_FLIGHT; },
+  // resolve every shell in the air right now, through the real castSpell path.
+  // Rule checks use this so they are not each paying two seconds of wall clock;
+  // the flight itself has its own checks.
+  settle: () => { for (const sp of spells) castSpell(sp.side, sp.key, sp.x, sp.y); spells = []; },
 };
 </script>
 </body>

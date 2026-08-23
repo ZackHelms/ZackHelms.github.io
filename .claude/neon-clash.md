@@ -89,9 +89,20 @@ depends on it — `layoutCards` and the flip mirror read `DECK.length`.
 
 ## Economy and the deck
 
-Energy refills at **1/sec, cap 20**, both sides, starting at 5. At
-`SUDDEN_AT` (180 s) regen doubles and damage dealt *to bases* doubles;
-`MATCH_LIMIT` (300 s) awards the match on remaining base HP.
+Energy refills at **1/sec, cap 20**, both sides, starting at 5.
+
+**Sudden death is a ramp, not a switch** (2026-08-23). At `SUDDEN_AT` (180 s)
+both sides gain **+1 energy/sec**, and another +1 every `SUDDEN_STEP` (60 s)
+after — 2/s at 3:00, 3/s at 4:00, up to the ceiling of **8/s at 9:00**, where
+a full bar of 20 refills in two and a half seconds. `MATCH_LIMIT` is **600 s**
+and awards the match on remaining base HP. Damage dealt *to bases* still
+doubles once at 3:00 and does not keep doubling: energy is the escalating
+pressure, not raw damage, because a damage ramp just ends matches early
+whereas an energy ramp makes both players do more.
+
+`suddenTier(t)` is capped at `SUDDEN_TIERS` on purpose. `matchT` keeps ticking
+for a frame or two past the wall while the finale starts, and an uncapped tier
+printed `+9/S` on a game whose top rate is 8.
 
 | Card | Type | Cost | HP | Dmg | Rate | Range | Speed |
 |---|---|---|---|---|---|---|---|
@@ -221,6 +232,70 @@ a corner case at `(1, 159)` rather than `(-20, 178)`), and the two-bunker cap
 still refuses outright — `max` is checked before the slide, since sliding a card
 you are not allowed to play would be nonsense. `blocked` now means the whole
 half has no room, which is why its caption reads NO ROOM ON YOUR HALF.
+
+## Spells are lobbed (added 2026-08-23)
+
+**Every spell** leaves the caster's own base, arcs up out of the screen, and
+lands `SPELL_FLIGHT` (**2 s**) later. That is the contract for every spell
+added from here on, which is why it lives next to the `type === 'spell'` branch
+in `tryDeploy` and not inside `castSpell`: `launchSpell()` puts a shell in
+`spells[]`, `stepSpells()` flies it, and `castSpell()` — untouched — is what
+resolves on landing. A cast counts in `casts[]` at **launch**, because a cast
+is the act, not the landing.
+
+The gameplay consequence is deliberate and is the thing to weigh if this is
+ever tuned. A fighter covers ~26 world units in two seconds, nearly **twice**
+the fireball's 14-unit blast, so a spell no longer lands on a mover unless you
+lead it. What it does still land on is anything standing still — and the
+**siege lock** is precisely what makes attackers stand still. Fireball stops
+being a panic button and becomes the answer to a push that has already
+committed. The AI aims at where units are *now*, not where they will be; that
+is the same naive aim a player starts with, so it degrades symmetrically.
+
+A shell in the air when the match ends is **cancelled, not resolved**
+(`endMatch` clears `spells`), so a match cannot be decided after it is over.
+
+Drawing it takes three marks and needs all three: a dashed **landing ring**
+that says where, a closing inner ring that says how soon, and a **ground
+shadow** under the shell. Without the shadow a shell lifted up the screen reads
+as a shell that will land further up the screen. The first draft also scaled
+the shell so hard at apex that it covered the very landing zone it was
+telegraphing — hence `SPELL_GROW` 1.0 against `SPELL_LIFT` 23, the rise doing
+the "coming at you" work rather than the size.
+
+## The finale (added 2026-08-23)
+
+A razed base decides the match instantly, but the result screen waits
+`FINALE_T` (**3 s**). `state` becomes `'finale'`: the board is frozen, the
+losing base is blown apart on an accelerating cadence, fireworks go off over
+the winner's half, and the winning units bob on the spot.
+
+Everything that **decides** happens on entry to the finale — `winner`, and a
+`finalHp` snapshot. That snapshot is load-bearing: the loser's base is zeroed
+at 80% through the animation so it renders as rubble, and without the snapshot
+a *time-limit* win would report `RED BASE 0` for a base that finished with
+hundreds of HP. Because nothing is decided during it, the whole thing is safe
+to skip, and a tap does exactly that (`pointDown` → `finishMatch`).
+
+A dead-level draw skips the finale entirely — there is nothing to raze.
+
+## Music (5 tracks, added 2026-08-23)
+
+`TRACKS[]` holds five: PROTOCOL (100 bpm), OVERCLOCK (126), IRONWORKS (92),
+NIGHTRUN (116), LAST STAND (138). Each is two bars of bass and lead
+(32 sixteenths) plus one bar of drums as 16-character strings, written as
+**note names** through `seq()`/`nt()` rather than arrays of decimals — a
+pattern nobody can read is a pattern nobody will ever edit. `pickTrack()` runs
+per match and never repeats the track just played.
+
+**Tempo tracks the energy rate**, so the music accelerates exactly when the
+game does: `tempoMul()` is `1 + 0.1 * (regenRate(matchT) - 1)`, capped at
+`TEMPO_CAP` 1.6. The cap is not cosmetic — past ~1.6x the sixteenths stop
+reading as a groove and start reading as a buzz, and a phone still has to
+schedule every node. `musicSchedule()` reads the tempo **fresh each step**
+rather than caching it, so a ramp step lands within a breath of the banner
+announcing it; the 0.3 s scheduling horizon is what makes that automatic and
+is why there is no explicit "retune" call anywhere.
 
 ## Bunkers
 
@@ -418,7 +493,7 @@ to restore.
 
 - `node .claude/scripts/smoke-mobile.cjs games/neon-clash/index.html`
 - `node .claude/scripts/check-games-sync.cjs`
-- `.claude/tests/drive-neon-clash.cjs` (100 checks) — drives a real touch drag
+- `.claude/tests/drive-neon-clash.cjs` (116 checks) — drives a real touch drag
   from the tray to the board, then asserts the refusal rules, the card types
   and deck order, the bunker/garrison caps, garrison ejection, a base kill
   ending the match, that the AI actually plays, and that the rotated top tray
@@ -454,8 +529,12 @@ to restore.
 `window.__NC` exposes `state / energy / units / buildings / bases / matchT`
 plus `deploy(side, key, fingerX, fingerY)`, `start(mode, diff)`,
 `setEnergy(side, v)`, `casts`, `deck`, `kindOf(key)`, `sel`, `gun`, `shots`,
-`skin`, `setSkin(name)`, `paused`, `scene`
+`skin`, `setSkin(name)`, `paused`, `scene`, `spells`, `flight`, `settle()`,
+`regen`, `tier`, `finaleT`, `finaleLen`, `winner`, `tracks`, `track`, `tempo`
 and `place(side, key, x, y)`
+— `settle()` lands every shell in the air through the real `castSpell` path, so
+the fireball *rule* checks are not each paying two seconds of wall clock; the
+flight itself is pinned by its own block.
 — note `deploy` takes **finger** world coordinates, not the final spawn point,
 so it exercises the same `dropOff` path a real drag does. `place` is the one
 hook that bypasses the rules: it exists so a test can *arrange* a cluster and

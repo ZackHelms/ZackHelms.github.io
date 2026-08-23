@@ -592,7 +592,21 @@ at all. A unit merely *marching* at a base has committed to nothing and still
 diverts.
 
 Cards are **typed** — `unit`, `building`, `spell` — and every rule branches on
-the type, never on a card's name, because the deck is meant to grow. The fifth
+the type, never on a card's name, because the deck is meant to grow. **Every spell is lobbed**: it leaves your own base, arcs up out of the screen
+and lands **two seconds later** (`SPELL_FLIGHT`, the contract for every spell
+added later, which is why it sits in `tryDeploy` and not in `castSpell`). That
+delay is a real balance lever — a fighter covers nearly two blast radii in two
+seconds, so a spell only lands on a mover if you lead it, and what it reliably
+catches is a push the **siege lock** has already frozen in place.
+
+Sudden death is a **ramp**: +1 energy/sec at 3:00 and another +1 every minute
+after, topping out at 8/sec, with a 10:00 wall that awards the match on base
+HP. A decided match plays a 3-second **finale** — losing base razed, winners
+bobbing, fireworks — before the result screen; winner and reported HP are both
+snapshotted on entry, so it is safe to skip with a tap. Five music tracks, one
+per match, and the tempo scales with the energy rate.
+
+The fifth
 card is the first spell: **fireball** (5), an airburst on your own half whose
 damage and knockback both halve from centre to rim, so it pays against a massed
 push and barely dents a lone unit. It cannot touch a base, cannot hurt your own
@@ -629,7 +643,7 @@ rather than letting the layout reflow, and `localPt()` un-rotates every pointer
 so touch still lands correctly (a wide desktop window instead gets a centred
 portrait column). The overlays sit *inside* `#app` on purpose — a transformed
 ancestor is the containing block for `position:fixed` children, which is the
-only reason they turn with the game. Drive suite (100 checks, incl. the garrison
+only reason they turn with the game. Drive suite (116 checks, incl. the garrison
 protection invariant, the two-finger duel, the rotated-view touch map and the
 skin-is-paint invariant):
 `.claude/tests/drive-neon-clash.cjs`. Detailed context: `.claude/neon-clash.md`.

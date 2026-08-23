@@ -24,6 +24,12 @@
  *     overlapping it, settings pauses a live match, the dropdown persists the
  *     choice, and above all a skin is PAINT — same stats, costs, ranges, deploys
  *   - a BUILDING slides to the nearest ground it fits rather than being refused
+ *   - spells are LOBBED: two seconds of flight from your own base, during which
+ *     nothing is damaged, and a shell still in the air when the match ends dies
+ *   - SUDDEN DEATH is a ramp (+1/sec at 3:00, +1 more each minute) to a 10:00 wall
+ *   - the FINALE: a decided match holds the result screen for three seconds,
+ *     reports the HP that won it, and can be skipped with a tap
+ *   - the five music TRACKS and their tempo scaling
  *
  * Usage: NODE_PATH=<playwright-core dir> node .claude/tests/drive-neon-clash.cjs
  * Output: one PASS/FAIL line per check, then `... DRIVE: N passed, M failed`.
@@ -209,6 +215,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     const mark = __NC.place(1, 'tank', 61, 74);        // just over the line, in reach of a border blast
     __NC.setEnergy(0, 20);
     out.okFb = __NC.deploy(0, 'fireball', 61, 40);     // aimed deep in the enemy half
+    __NC.settle();                                     // land it: the 2s lob has its own block
     out.marked = mark.maxHp - mark.hp;
     return out;
   });
@@ -281,7 +288,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     __NC.setEnergy(0, 20); __NC.deploy(0, 'tank', 50, 120);
     const u = __NC.units.filter(x => x.side === 0).pop();
     const mark = __NC.place(1, 'tank', 50, 120);          // right under the finger
-    __NC.setEnergy(0, 20); __NC.deploy(0, 'fireball', 50, 120);
+    __NC.setEnergy(0, 20); __NC.deploy(0, 'fireball', 50, 120); __NC.settle();
     return { unitY: u.y, dealt: mark.maxHp - mark.hp };
   });
   ok('a unit still lands DRAG_OFF ahead of the finger', near(aim.unitY, 111, 0.6), 'y=' + aim.unitY);
@@ -296,6 +303,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     const mine = __NC.place(0, 'tank', 42, 100);       // my own tank, in the fire
     __NC.setEnergy(0, 20);
     __NC.deploy(0, 'fireball', 50, 100);               // a spell lands under the finger
+    __NC.settle();
     return {
       mid: mid.hp, rim: rim.hp, out: out_.hp, mine: mine.hp, max: mid.maxHp,
       kbMid: [mid.kbx, mid.kby], kbRim: [rim.kbx, rim.kby], stun: mid.stun,
@@ -319,7 +327,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     // above the impact point, so the shove opposes the way it wants to walk
     const u = __NC.place(1, 'tank', 50, 92);
     __NC.setEnergy(0, 20);
-    __NC.deploy(0, 'fireball', 50, 100);
+    __NC.deploy(0, 'fireball', 50, 100); __NC.settle();
     return { before: u.y, id: u.id };
   });
   await page.waitForTimeout(140);
@@ -341,7 +349,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     __NC.setEnergy(1, 20);
     // side 1's finger sits on its own half; the impact clamps to the halfway
     // line, which is still inside the bunker's blast reach.
-    const fired = __NC.deploy(1, 'fireball', 50, b.y - 9);
+    const fired = __NC.deploy(1, 'fireball', 50, b.y - 9); __NC.settle();
     return { fired, bunker: b.hp, bunkerMax: b.maxHp, garrison: g.hp, garrisonMax: g.maxHp, held: b.garrison.length };
   });
   ok('an enemy fireball burns the bunker', shield.fired === true && shield.bunker < shield.bunkerMax,
@@ -354,7 +362,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     __NC.setEnergy(0, 20); __NC.deploy(0, 'bunker', 50, 118);
     const b = __NC.buildings.find(x => x.side === 0);
     __NC.setEnergy(0, 20);
-    const fired = __NC.deploy(0, 'fireball', b.x, b.y - 9);
+    const fired = __NC.deploy(0, 'fireball', b.x, b.y - 9); __NC.settle();
     return { fired, held: b.garrison.length, casts: __NC.casts[0], hp: b.hp, max: b.maxHp };
   });
   ok('a spell dropped on your own bunker casts instead of garrisoning',
@@ -614,6 +622,9 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   });
   ok('energy accrues at 1 per second', near(eco.rate, 1, 0.12), 'rate=' + eco.rate.toFixed(3));
   ok('energy is capped at 20', eco.cap === 20, 'cap=' + eco.cap);
+  // Sudden death is a RAMP: +1/sec at 3:00 and another +1 every minute after,
+  // so a stalemate gets faster until it cannot be held. The measured check is
+  // the one that matters — the table only proves the arithmetic.
   const sudden = await page.evaluate(async () => {
     __NC.setEnergy(0, 4);
     __NC.setTime(181);
@@ -621,7 +632,25 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     await new Promise(r => setTimeout(r, 1800));
     return (__NC.energy[0] - e0) / ((performance.now() - t0) / 1000);
   });
-  ok('sudden death doubles the energy rate', near(sudden, 2, 0.25), 'rate=' + sudden.toFixed(3));
+  ok('sudden death lifts the energy rate to 2/sec', near(sudden, 2, 0.25), 'rate=' + sudden.toFixed(3));
+  const ramp = await page.evaluate(() => {
+    const out = {};
+    __NC.start('2p');
+    for (const t of [0, 179, 180, 240, 300, 540, 599]) { __NC.setTime(t); out[t] = __NC.regen; }
+    return out;
+  });
+  ok('...and gains another +1/sec every minute after',
+     ramp[0] === 1 && ramp[179] === 1 && ramp[180] === 2 && ramp[240] === 3 &&
+     ramp[300] === 4 && ramp[540] === 8 && ramp[599] === 8, JSON.stringify(ramp));
+  const wall = await page.evaluate(async () => {
+    __NC.start('2p');
+    __NC.bases[1].hp = 700;              // green ahead on HP when the clock runs out
+    __NC.setTime(599.9);
+    await new Promise(r => setTimeout(r, 400));
+    return { state: __NC.state, winner: __NC.winner };
+  });
+  ok('the 10:00 wall ends it and the higher base wins',
+     (wall.state === 'finale' || wall.state === 'over') && wall.winner === 0, JSON.stringify(wall));
 
   // ============================================= win condition ends the match
   await page.evaluate(() => {
@@ -837,6 +866,119 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
   await page.evaluate(() => { __NC.setSkin('toon'); __NC.start('ai', 'PRO'); });
   await page.waitForTimeout(80);
+
+  // ====================================================== spells are LOBBED
+  // Every spell leaves your own base and lands SPELL_FLIGHT seconds later —
+  // the contract for every spell added from here, not a fireball quirk. The
+  // rule checks above settle() the shell so they are not each paying two
+  // seconds of wall clock; the two seconds themselves are pinned here.
+  ok('a spell takes two seconds to arrive', await page.evaluate(() => __NC.flight === 2));
+  const flight = await page.evaluate(async () => {
+    const out = {};
+    __NC.start('2p');
+    __NC.setEnergy(0, 20);
+    // A tank walking our way, and an aim point where it WILL be at impact.
+    // At t=1s it is still outside the base turret's reach, so "no damage yet"
+    // means the spell, not luck.
+    const mark = __NC.place(1, 'tank', 50, 96);
+    out.maxHp = mark.maxHp;
+    out.cast = __NC.deploy(0, 'fireball', 50, 113);
+    out.spentAt = +__NC.energy[0].toFixed(2);
+    out.inAir = __NC.spells.length;
+    out.aim = __NC.spells[0] ? { x: __NC.spells[0].x, y: __NC.spells[0].y } : null;
+    out.from = __NC.spells[0] ? { x: __NC.spells[0].x0, y: __NC.spells[0].y0 } : null;
+    out.castsCounted = __NC.casts[0];
+    await new Promise(r => setTimeout(r, 1000));
+    out.midAir = __NC.spells.length;
+    out.hpMid = mark.hp;
+    await new Promise(r => setTimeout(r, 1350));
+    out.landed = __NC.spells.length;
+    out.hpAfter = mark.hp;
+    return out;
+  });
+  ok('casting spends the energy and puts a shell in the air at once',
+     flight.cast === true && near(flight.spentAt, 15, 0.4) && flight.inAir === 1 &&
+     flight.castsCounted === 1, JSON.stringify(flight));
+  ok('the shell leaves YOUR base and is aimed where you tapped',
+     flight.from && flight.from.x === 50 && flight.from.y === 150 &&
+     flight.aim.x === 50 && flight.aim.y === 113, JSON.stringify({ from: flight.from, aim: flight.aim }));
+  ok('nothing is damaged while it is still in the air',
+     flight.midAir === 1 && flight.hpMid === flight.maxHp,
+     JSON.stringify({ midAir: flight.midAir, hpMid: flight.hpMid, maxHp: flight.maxHp }));
+  ok('it lands after the flight and hits what walked into it',
+     flight.landed === 0 && flight.maxHp - flight.hpAfter > 60,
+     JSON.stringify({ landed: flight.landed, dealt: flight.maxHp - flight.hpAfter }));
+
+  // ========================================== the finale, then the result card
+  // Razing a base decides the match at once but holds the result screen back
+  // for three seconds of theatre. Everything that DECIDES is captured on entry,
+  // which is why the reported HP survives the loser's base being razed for the
+  // camera, and why a tap may skip the whole thing.
+  const fin = await page.evaluate(async () => {
+    const out = {};
+    __NC.start('2p');
+    __NC.setEnergy(0, 20);
+    __NC.deploy(0, 'fireball', 50, 120);      // a shell still in the air when it ends
+    __NC.bases[1].hp = 640;
+    __NC.setTime(599.9);
+    await new Promise(r => setTimeout(r, 500));
+    out.duringState = __NC.state;
+    out.duringShown = !document.getElementById('ov-over').classList.contains('hidden');
+    out.spellsCancelled = __NC.spells.length;
+    out.loserHp = __NC.bases[1].hp;
+    await new Promise(r => setTimeout(r, 3200));
+    out.afterState = __NC.state;
+    out.afterShown = !document.getElementById('ov-over').classList.contains('hidden');
+    out.sub = document.getElementById('res-sub').textContent;
+    return out;
+  });
+  ok('a decided match plays a finale before the result screen',
+     fin.duringState === 'finale' && fin.duringShown === false, JSON.stringify(fin));
+  ok('a shell still in the air when it ends is cancelled, not resolved',
+     fin.spellsCancelled === 0, String(fin.spellsCancelled));
+  ok('the finale ends on the result screen',
+     fin.afterState === 'over' && fin.afterShown === true, JSON.stringify(fin));
+  ok('the result reports the HP that WON it, not the razed base',
+     /RED BASE 640/.test(fin.sub), fin.sub);
+
+  const skip = await page.evaluate(async () => {
+    __NC.start('2p');
+    __NC.bases[1].hp = 900;
+    __NC.setTime(599.9);
+    await new Promise(r => setTimeout(r, 400));
+    const mid = __NC.state;
+    const cv = document.getElementById('game');
+    const t = new Touch({ identifier: 91, target: cv, clientX: 190, clientY: 400 });
+    cv.dispatchEvent(new TouchEvent('touchstart', { touches: [t], targetTouches: [t],
+      changedTouches: [t], bubbles: true, cancelable: true }));
+    await new Promise(r => setTimeout(r, 120));
+    return { mid, after: __NC.state };
+  });
+  ok('a tap skips the finale straight to the result',
+     skip.mid === 'finale' && skip.after === 'over', JSON.stringify(skip));
+
+  // ============================================================== the music
+  const music = await page.evaluate(() => {
+    const out = { tracks: __NC.tracks, tempo: {} };
+    __NC.start('2p');
+    for (const t of [0, 180, 300, 599]) { __NC.setTime(t); out.tempo[t] = +__NC.tempo.toFixed(3); }
+    out.names = [];
+    for (let i = 0; i < 6; i++) { __NC.start('2p'); out.names.push(__NC.track); }
+    return out;
+  });
+  ok('there are five tracks, each a full two bars with one bar of drums',
+     music.tracks.length === 5 &&
+     music.tracks.every(t => t.bass === 32 && t.lead === 32 &&
+                             t.kick === 16 && t.snare === 16 && t.hat === 16),
+     JSON.stringify(music.tracks));
+  ok('every track has its own tempo',
+     new Set(music.tracks.map(t => t.bpm)).size === 5, music.tracks.map(t => t.bpm).join(','));
+  ok('the music speeds up with each step of the energy ramp, and then stops',
+     music.tempo[0] === 1 && music.tempo[180] > 1 && music.tempo[300] > music.tempo[180] &&
+     music.tempo[599] > music.tempo[300] && music.tempo[599] <= 1.6, JSON.stringify(music.tempo));
+  ok('a match picks a track, and never the one just played',
+     new Set(music.names).size > 1 && music.names.every((n, i) => i === 0 || n !== music.names[i - 1]),
+     music.names.join(' -> '));
 
   // ============================================ portrait lock (landscape view)
   // The game is portrait-only: a touch device turned sideways must keep the
