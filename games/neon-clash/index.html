@@ -113,28 +113,24 @@ html, body {
 #ov-settings { z-index:78; }
 .set-lbl { font-family:'Black Ops One', sans-serif; font-size:0.62rem; letter-spacing:3px;
   color:var(--dim); margin:2px 0 8px; }
-.skin-btn {
-  display:flex; align-items:center; gap:11px; width:100%; text-align:left;
-  border:1px solid var(--border); background:var(--panel); border-radius:10px;
-  padding:9px 11px; touch-action:manipulation; cursor:pointer;
+.set-sel {
+  -webkit-appearance:none; appearance:none;
+  font-family:'Share Tech Mono', monospace; font-size:0.72rem; letter-spacing:1.5px;
+  color:var(--gold); background:var(--panel); border:1px solid var(--gold);
+  border-radius:10px; padding:11px 34px 11px 13px; width:100%;
+  touch-action:manipulation; cursor:pointer;
+  /* the caret, drawn rather than fetched — no asset host is reachable here */
+  background-image:linear-gradient(45deg, transparent 50%, var(--gold) 50%),
+                   linear-gradient(135deg, var(--gold) 50%, transparent 50%);
+  background-position:calc(100% - 18px) calc(50% - 2px), calc(100% - 13px) calc(50% - 2px);
+  background-size:5px 5px, 5px 5px;
+  background-repeat:no-repeat;
 }
-.skin-btn .sw { width:42px; height:42px; border-radius:7px; flex:none;
-  border:1px solid rgba(255,255,255,0.18); }
-.skin-btn .nm { font-family:'Black Ops One', sans-serif; font-size:0.86rem;
-  letter-spacing:3px; color:var(--white); }
-.skin-btn .ds { font-size:0.55rem; color:var(--dim); letter-spacing:1px; line-height:1.5; margin-top:2px; }
-.skin-btn.on { border-color:var(--gold); }
-.skin-btn.on .nm { color:var(--gold); }
-.sw-neon { background:
-  radial-gradient(circle at 30% 34%, rgba(57,255,20,0.85) 0 12%, rgba(57,255,20,0) 42%),
-  radial-gradient(circle at 70% 68%, rgba(255,34,68,0.85) 0 12%, rgba(255,34,68,0) 42%),
-  linear-gradient(#120a14, #0a1410); }
-.sw-toon { background:
-  linear-gradient(#5aa03a 0 22%, #a9784a 22% 78%, #5aa03a 78% 100%); }
+.set-sel option { background:var(--panel); color:var(--white); }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 01:04 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 01:32 UTC</div>
 <div id="app">
   <div id="hud">
     <div id="hud-left">
@@ -172,12 +168,12 @@ html, body {
   <div class="helprow"><div class="hk" style="color:var(--gold)">TANK 4</div><div><i>Unit.</i> High HP, low damage, average speed. A wall that soaks hits while the rest of your push works.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--red)">FIGHTER 3</div><div><i>Unit.</i> Average HP and damage, fast attacks, fast legs. Runs down archers before they can whittle you.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--blue)">ARCHER 3</div><div><i>Unit.</i> Low HP, average damage, average speed &mdash; but shoots from far back. Melts anything that cannot reach it.</div></div>
-  <div class="helprow"><div class="hk" style="color:var(--purple)">BUNKER 8</div><div><i>Building.</i> Stationary, holds two units. Garrisoned units stop moving, fire through the slits, and take no damage &mdash; the bunker eats it. Two per side; blow one up and it can be rebuilt.</div></div>
+  <div class="helprow"><div class="hk" style="color:var(--purple)">BUNKER 8</div><div><i>Building.</i> Stationary, holds two units. Aim it at your emplacement, an edge, or a bunker already standing there and it <b>slides to the nearest ground it fits</b> rather than being refused. Garrisoned units stop moving, fire through the slits, and take no damage &mdash; the bunker eats it. Two per side; blow one up and it can be rebuilt.</div></div>
   <div class="helprow"><div class="hk" style="color:#ff7a1a">FIREBALL 5</div><div><i>Spell.</i> An airburst on your own half. Damage and knockback are hardest at the centre and halve at the rim, so it pays against a <b>crowd</b> and barely dents one unit &mdash; the card to hold when a big push is coming. Scatters what it hits; bases are immune, and a garrison inside a bunker is shielded from it.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--green)">BASE</div><div>The emplacement at the back of each half. Reduce the enemy base to zero and the match is yours &mdash; but it is not a sitting target: its <b>turret</b> has an archer's reach and cadence and hits for two archers a shot, so a lone unit that walks in alone dies to the base itself.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--white)">SIEGE</div><div>The moment a unit lands its first hit on a <b>building</b> &mdash; a bunker or a base &mdash; it commits to that target until the building falls, and a dashed tether marks it. A committed unit <b>will not turn on your defenders</b> while it grinds, so answering a push that has already reached your base is the cheapest fighting you will ever do. Units still only <i>marching</i> at you can be pulled off.</div></div>
-  <div class="helprow"><div class="hk" style="color:var(--blue)">DEPLOY</div><div>Two ways, both fine: <b>drag</b> a card onto the board, or <b>tap</b> a card to arm it and then tap where you want it. Aim at the enemy half and it simply lands on your side of the halfway line at the same across-the-board spot &mdash; you never lose the card to a bad aim. Release over the tray to think again.</div></div>
-  <div class="helprow"><div class="hk" style="color:var(--gold)">STYLE</div><div>The cogwheel in the top left switches the whole arena between <b>NEON</b> and <b>TOON</b> at any time, mid-match included. It is paint only &mdash; every stat, range and rule is identical in both.</div></div>
+  <div class="helprow"><div class="hk" style="color:var(--blue)">DEPLOY</div><div>Two ways, both fine: <b>drag</b> a card onto the board, or <b>tap</b> a card to arm it and then tap where you want it. Aim at the enemy half and it simply lands on your side of the halfway line at the same across-the-board spot; aim a <b>building</b> somewhere it cannot stand and it slides to the nearest spot it can. Either way you never lose the card to a bad aim. Release over the tray to think again.</div></div>
+  <div class="helprow"><div class="hk" style="color:var(--gold)">STYLE</div><div>The cogwheel in the top left has a dropdown that switches the whole arena between <b>TOON</b> (the default) and <b>NEON</b> at any time, mid-match included. It is paint only &mdash; every stat, range and rule is identical in both.</div></div>
   <div class="btn-col" style="margin-top:6px;"><div class="ov-btn primary" id="btn-help-back">BACK</div></div>
 </div>
 
@@ -186,14 +182,10 @@ html, body {
   <div class="ov-sub" id="set-note" style="margin-bottom:10px;">MATCH PAUSED</div>
   <div class="btn-col">
     <div class="set-lbl">GRAPHICS STYLE</div>
-    <div class="skin-btn" id="sk-neon">
-      <div class="sw sw-neon"></div>
-      <div><div class="nm">NEON</div><div class="ds">GLOWING WIREFRAME ARENA</div></div>
-    </div>
-    <div class="skin-btn" id="sk-toon">
-      <div class="sw sw-toon"></div>
-      <div><div class="nm">TOON</div><div class="ds">CEL-SHADED DIRT ARENA</div></div>
-    </div>
+    <select id="skin-sel" class="set-sel" aria-label="Graphics style">
+      <option value="toon">TOON &mdash; CEL-SHADED DIRT ARENA</option>
+      <option value="neon">NEON &mdash; GLOWING WIREFRAME</option>
+    </select>
     <div class="ov-btn primary" id="btn-set-back" style="margin-top:6px;">RESUME</div>
   </div>
 </div>
@@ -282,7 +274,7 @@ const SIDE_NAME = ['GREEN', 'RED'];
 //          things and nothing else: FLAT colour steps (never a gradient) and
 //          ONE heavy ink outline per shape. The bloom is off, not dimmed.
 const SKIN_LIST = ['neon', 'toon'];
-let skin = 'neon';
+let skin = 'toon';                      // the default since 2026-08-23
 try { const s0 = localStorage.getItem('neon-clash-skin'); if (SKIN_LIST.indexOf(s0) >= 0) skin = s0; } catch (e) {}
 const toon = () => skin === 'toon';
 
@@ -667,8 +659,13 @@ function dropInfo(side, key, fx_, fy) {
     // Nothing else can refuse a spell: no footprint to block, no cap to hit,
     // and it must never garrison a bunker it is dropped on.
   } else if (k.type === 'building') {
+    // 'blocked' now means the whole half has no room for it, not "not here".
     if (bunkersOf(side).length >= MAX_BUNKERS) reason = 'max';
-    else if (!clearSpot(side, p.x, p.y, k.r)) reason = 'blocked';
+    else {
+      const q = nearestSpot(side, p.x, p.y, k.r);
+      if (!q) reason = 'blocked';
+      else { p.x = q.x; p.y = q.y; }
+    }
   } else {
     const b = bunkerUnder(side, fx_, fy) || bunkerUnder(side, p.x, p.y);
     if (b) {
@@ -682,6 +679,34 @@ function bunkerUnder(side, x, y) {
   for (const b of buildings)
     if (b.side === side && Math.hypot(b.x - x, b.y - y) <= b.r + 1.5) return b;
   return null;
+}
+// A building aimed somewhere it cannot stand SLIDES to the nearest place it
+// can — off the emplacement, off another bunker, in off an edge — exactly the
+// way a cross-line aim slides to the border. Same principle as that rule: a
+// bad aim costs you position, never the card, and an 8-cost card is the worst
+// one to lose to a thumb. Rings outward from the wanted spot so the answer is
+// always the closest legal ground and never a jump across the board.
+//
+// Approximate, deliberately: candidates that fall outside the half are clamped
+// back onto it, so a clamped point can land nearer than the ring it came from.
+// The error is a couple of world units on a 100x160 board — far below what a
+// thumb aims to — and the alternative is a real distance transform for a case
+// the player experiences as "it went where I meant".
+function nearestSpot(side, x, y, r) {
+  const p = clampToHalf(side, x, y, r);
+  if (clearSpot(side, p.x, p.y, r)) return p;
+  for (let rad = 2; rad <= 70; rad += 2) {
+    let best = null, bd = Infinity;
+    for (let i = 0; i < 24; i++) {
+      const a = i / 24 * Math.PI * 2;
+      const q = clampToHalf(side, x + Math.cos(a) * rad, y + Math.sin(a) * rad, r);
+      if (!clearSpot(side, q.x, q.y, r)) continue;
+      const d = Math.hypot(q.x - x, q.y - y);
+      if (d < bd) { bd = d; best = q; }
+    }
+    if (best) return best;
+  }
+  return null;                        // genuinely nowhere: the half is full
 }
 function clearSpot(side, x, y, r) {
   const base = bases[side];
@@ -2055,7 +2080,7 @@ function drawCard(c, inactive) {
   }
   ctx.restore();
 }
-const DENY_TXT = { off: 'DROP ON THE BOARD', energy: 'NOT ENOUGH ENERGY', max: 'BUNKER LIMIT', blocked: 'NO ROOM', full: 'BUNKER FULL' };
+const DENY_TXT = { off: 'DROP ON THE BOARD', energy: 'NOT ENOUGH ENERGY', max: 'BUNKER LIMIT', blocked: 'NO ROOM ON YOUR HALF', full: 'BUNKER FULL' };
 function drawDrags() {
   for (const id in drags) {
     const d = drags[id];
@@ -2345,9 +2370,7 @@ function setSkin(s) {
   try { localStorage.setItem('neon-clash-skin', s); } catch (e) {}
   updateSkinUI();
 }
-function updateSkinUI() {
-  for (const s of SKIN_LIST) $('sk-' + s).classList.toggle('on', skin === s);
-}
+function updateSkinUI() { $('skin-sel').value = skin; }
 const settingsOpen = () => !$('ov-settings').classList.contains('hidden');
 function openSettings() {
   drags = {};                           // a half-made drag cannot survive the overlay
@@ -2364,8 +2387,9 @@ function closeSettings() {
 }
 bindTap($('cog-btn'), () => (settingsOpen() ? closeSettings() : openSettings()));
 bindTap($('btn-set-back'), closeSettings);
-bindTap($('sk-neon'), () => setSkin('neon'));
-bindTap($('sk-toon'), () => setSkin('toon'));
+// A native <select>: bindTap's touchend handler would swallow the picker, so
+// the dropdown is left alone and only its change event is read.
+$('skin-sel').addEventListener('change', e => setSkin(e.target.value));
 
 // ------------------------------------------------------------- main loop
 let last = performance.now(), hudT = 0;

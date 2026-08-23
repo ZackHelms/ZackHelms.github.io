@@ -573,7 +573,10 @@ your tray onto your own half — **or tap the card to arm it and tap the board**
 — and it walks at the enemy base on its own. Aiming past the halfway line does
 not refuse the card: it lands on your own side of the line at the same x, so a
 bad aim costs position and never the card (only a release off the board
-cancels). Each base mounts a **turret**: two archers' damage a shot, on an
+cancels). The same principle covers **footprint**: a building aimed where it
+cannot stand — over the emplacement, onto another bunker, into an edge — slides
+to the nearest legal ground rather than being refused, which matters most for
+the 8-cost card in the deck. Each base mounts a **turret**: two archers' damage a shot, on an
 archer's clock and at an archer's reach, measured from the base's rim so an
 archer sieging it cannot sit outside the answer. A lone unit walked up to a
 base now loses to the base — which is the counterweight to the siege lock
@@ -604,8 +607,9 @@ opponent's readable roster. Three AI grades differ in think interval, an idle
 chance, how reliably they counter, whether they build and man bunkers, and an
 energy reserve they hold back.
 
-It ships **two graphics styles**, picked from a cogwheel in the top-left HUD
-cluster: `neon` (the original glowing wireframe board) and `toon` — a
+It ships **two graphics styles**, picked from a dropdown behind a cogwheel in
+the top-left HUD cluster: `neon` (the original glowing wireframe board) and the
+default `toon` — a
 cel-shaded cartoon arena of dirt and grass inside a poorly maintained plank
 fence, with actual characters (a shield-and-sword knight, a green-hatted
 archer, a twin-dagger rogue in dark red, a log-walled fort). The rule that
@@ -625,7 +629,7 @@ rather than letting the layout reflow, and `localPt()` un-rotates every pointer
 so touch still lands correctly (a wide desktop window instead gets a centred
 portrait column). The overlays sit *inside* `#app` on purpose — a transformed
 ancestor is the containing block for `position:fixed` children, which is the
-only reason they turn with the game. Drive suite (95 checks, incl. the garrison
+only reason they turn with the game. Drive suite (100 checks, incl. the garrison
 protection invariant, the two-finger duel, the rotated-view touch map and the
 skin-is-paint invariant):
 `.claude/tests/drive-neon-clash.cjs`. Detailed context: `.claude/neon-clash.md`.

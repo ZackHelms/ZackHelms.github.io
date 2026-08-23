@@ -198,6 +198,30 @@ that forgets its `type` will silently try to walk into a building.
 through `tryDeploy` — the AI obeys exactly the rules the player does, including
 cost and the border clamp. There is no AI-only placement path.
 
+### Buildings slide, they do not get refused (added 2026-08-23)
+
+The border rule applied to **footprint** instead of side. A building aimed
+where it cannot stand — over the emplacement (`BASE_CLR` = 18 plus both radii),
+onto a bunker already there, or into an edge — slides to the nearest legal
+ground via `nearestSpot()` instead of being refused. Same reasoning as the
+border rule, with more at stake: a bunker costs 8, and losing the most
+expensive card in the deck to a thumb is the worst version of that mistake.
+
+`nearestSpot()` rings outward in 2-unit steps and takes the closest legal
+candidate on the first ring that has one, so the answer is always near the aim
+and never a jump across the board. It is **approximate on purpose**: candidates
+outside the half are clamped back onto it, so a clamped point can land nearer
+than the ring it came from. The error is a couple of world units on a 100x160
+board, well under what a thumb aims to, and the alternative is a real distance
+transform for a case the player just experiences as "it went where I meant".
+
+Two things this deliberately does **not** change: releasing off the board still
+cancels (that is the change-my-mind gesture, and it is why the drive suite aims
+a corner case at `(1, 159)` rather than `(-20, 178)`), and the two-bunker cap
+still refuses outright — `max` is checked before the slide, since sliding a card
+you are not allowed to play would be nonsense. `blocked` now means the whole
+half has no room, which is why its caption reads NO ROOM ON YOUR HALF.
+
 ## Bunkers
 
 Cost 8, 600 HP, **two per side**, holds **two units**. Dropping a unit card on
@@ -324,8 +348,12 @@ of `#hud-mid`).
 
 | | |
 |---|---|
+| `toon` | **the default.** Cel-shaded cartoon: dirt arena, grass verge, plank fence, characters |
 | `neon` | the original: dark board, grid, glowing wireframe silhouettes |
-| `toon` | cel-shaded cartoon: dirt arena, grass verge, plank fence, characters |
+
+The picker is a native `<select>` (`#skin-sel`), not a pair of buttons — which
+is why it is wired to its `change` event and deliberately **not** through
+`bindTap()`: that helper's `touchend` handler swallows the native picker.
 
 **The invariant that makes this safe:** *a skin is paint.* Nothing in `step()`
 knows a skin exists, so switching mid-match cannot change an outcome — the
@@ -390,7 +418,7 @@ to restore.
 
 - `node .claude/scripts/smoke-mobile.cjs games/neon-clash/index.html`
 - `node .claude/scripts/check-games-sync.cjs`
-- `.claude/tests/drive-neon-clash.cjs` (95 checks) — drives a real touch drag
+- `.claude/tests/drive-neon-clash.cjs` (100 checks) — drives a real touch drag
   from the tray to the board, then asserts the refusal rules, the card types
   and deck order, the bunker/garrison caps, garrison ejection, a base kill
   ending the match, that the AI actually plays, and that the rotated top tray

@@ -21,8 +21,9 @@
  *   - the portrait lock: a sideways phone keeps the portrait layout, and a
  *     touch pushed through the view transform still hits the card it covers
  *   - the two GRAPHICS STYLES: the cog fits the top-left cluster without
- *     overlapping it, settings pauses a live match, the choice persists, and
- *     above all a skin is PAINT — same stats, costs, ranges and deploys
+ *     overlapping it, settings pauses a live match, the dropdown persists the
+ *     choice, and above all a skin is PAINT — same stats, costs, ranges, deploys
+ *   - a BUILDING slides to the nearest ground it fits rather than being refused
  *
  * Usage: NODE_PATH=<playwright-core dir> node .claude/tests/drive-neon-clash.cjs
  * Output: one PASS/FAIL line per check, then `... DRIVE: N passed, M failed`.
@@ -498,6 +499,45 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
      gunLimitsAfter.farHp === gunLimits.farHp && gunLimitsAfter.aiming === false && gunLimitsAfter.y < 112,
      JSON.stringify({ gunLimits, gunLimitsAfter }));
 
+  // ============================ a building slides to the nearest ground it fits
+  // The border rule applied to FOOTPRINT instead of side: an 8-cost card must
+  // never be lost to a thumb. Aimed at the emplacement, at an edge, or at a
+  // bunker already standing there, it slides to the closest legal spot instead
+  // of being refused. Each case starts from a fresh match so the two-bunker cap
+  // can never be what refuses it.
+  const R = 7.6, HW = 13, CLR = 18;
+  const clearOfBase = (b) => Math.abs(b.x - 50) >= HW + R || Math.abs(b.y - 150) >= CLR + R;
+  const slid = await page.evaluate(() => {
+    const out = {};
+    const grab = () => { const b = __NC.buildings[0]; return { x: +b.x.toFixed(2), y: +b.y.toFixed(2), r: b.r }; };
+    __NC.start('2p'); __NC.setEnergy(0, 20);
+    out.baseOk = __NC.deploy(0, 'bunker', 50, 158);            // straight at the emplacement
+    out.base = grab();
+    __NC.start('2p'); __NC.setEnergy(0, 20);
+    out.cornerOk = __NC.deploy(0, 'bunker', 1, 159);           // into the bottom-left corner
+                                                               // (past the board it still cancels)
+    out.corner = grab();
+    __NC.start('2p');
+    __NC.setEnergy(0, 20); __NC.deploy(0, 'bunker', 30, 120);
+    const first = __NC.buildings[0];
+    __NC.setEnergy(0, 20); out.stackOk = __NC.deploy(0, 'bunker', 30, 129);   // onto that bunker
+    const second = __NC.buildings[1];
+    out.first = { x: +first.x.toFixed(2), y: +first.y.toFixed(2) };
+    out.second = second ? { x: +second.x.toFixed(2), y: +second.y.toFixed(2) } : null;
+    out.gap = second ? +Math.hypot(second.x - first.x, second.y - first.y).toFixed(2) : 0;
+    return out;
+  });
+  ok('a bunker aimed at the emplacement slides clear instead of being refused',
+     slid.baseOk === true && clearOfBase(slid.base) && slid.base.y >= 80, JSON.stringify(slid.base));
+  ok('...and lands near where it was aimed, not across the board',
+     Math.hypot(slid.base.x - 50, slid.base.y - 149) < 30, JSON.stringify(slid.base));
+  ok('a bunker aimed into the bottom-left corner comes back fully onto the board',
+     slid.cornerOk === true && slid.corner.x >= R && slid.corner.x <= 100 - R &&
+     slid.corner.y >= 80 && slid.corner.y <= 160 - R, JSON.stringify(slid.corner));
+  ok('a bunker aimed onto another bunker slides off it, keeping both',
+     slid.stackOk === true && slid.second !== null && slid.gap >= R * 2 + 2,
+     JSON.stringify({ first: slid.first, second: slid.second, gap: slid.gap }));
+
   // ============================================================ the bunker
   const caps = await page.evaluate(() => {
     __NC.start('2p');
@@ -505,7 +545,6 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     __NC.setEnergy(0, 20); out.b1 = __NC.deploy(0, 'bunker', 28, 118);
     __NC.setEnergy(0, 20); out.b2 = __NC.deploy(0, 'bunker', 72, 118);
     __NC.setEnergy(0, 20); out.b3 = __NC.deploy(0, 'bunker', 50, 100);
-    __NC.setEnergy(0, 20); out.onBase = __NC.deploy(0, 'bunker', 50, 158);   // over the emplacement
     out.count = __NC.buildings.filter(b => b.side === 0).length;
     const b = __NC.buildings[0];
     __NC.setEnergy(0, 20); out.g1 = __NC.deploy(0, 'archer', b.x, b.y - 9);
@@ -517,7 +556,6 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     return out;
   });
   ok('two bunkers place, a third is refused', caps.b1 && caps.b2 && !caps.b3 && caps.count === 2, JSON.stringify(caps));
-  ok('a bunker cannot be dropped on top of a base', caps.onBase === false);
   ok('a bunker garrisons exactly two units', caps.g1 && caps.g2 && !caps.g3 && caps.garrison === 2, JSON.stringify(caps));
   ok('garrisoned units become stationary', caps.stationary === true);
 
@@ -680,8 +718,9 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   ok('the cog sits in the top left without overlapping anything already there',
      hudBox['cog-btn'].w >= 24 && hudBox['cog-btn'].h >= 24 && !hudClash,
      hudClash || JSON.stringify(hudBox['cog-btn']));
-  ok('nothing has set a style yet, so the game is in neon',
-     await page.evaluate(() => __NC.skin === 'neon'));
+  ok('nothing has set a style yet, so the game is in toon',
+     await page.evaluate(() => __NC.skin === 'toon'),
+     await page.evaluate(() => __NC.skin));
 
   await page.evaluate(() => __NC.start('ai', 'PRO'));
   await page.waitForTimeout(430);
@@ -697,15 +736,24 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
      pauseT1.shown && pauseT1.paused && near(pauseT1.t, pauseT0, 0.02),
      JSON.stringify(pauseT1) + ' from t=' + pauseT0.toFixed(2));
 
-  await page.click('#sk-toon');
+  const opts = await page.evaluate(() =>
+    Array.from(document.getElementById('skin-sel').options).map(o => o.value));
+  ok('the style is a dropdown carrying both styles, showing the live one',
+     opts.join(',') === 'toon,neon' &&
+     await page.evaluate(() => document.getElementById('skin-sel').value === __NC.skin),
+     opts.join(','));
+  await page.selectOption('#skin-sel', 'neon');
   await page.waitForTimeout(130);
   const picked = await page.evaluate(() => ({
     skin: __NC.skin, stored: localStorage.getItem('neon-clash-skin'),
-    on: document.getElementById('sk-toon').classList.contains('on'),
-    off: !document.getElementById('sk-neon').classList.contains('on'),
+    shown: document.getElementById('skin-sel').value,
   }));
-  ok('picking TOON switches the style, marks it, and remembers it',
-     picked.skin === 'toon' && picked.stored === 'toon' && picked.on && picked.off, JSON.stringify(picked));
+  ok('choosing from the dropdown switches the style and remembers it',
+     picked.skin === 'neon' && picked.stored === 'neon' && picked.shown === 'neon', JSON.stringify(picked));
+  await page.selectOption('#skin-sel', 'toon');
+  await page.waitForTimeout(130);
+  ok('...and switches back the same way',
+     await page.evaluate(() => __NC.skin === 'toon' && localStorage.getItem('neon-clash-skin') === 'toon'));
 
   await page.waitForTimeout(300);
   await page.click('#btn-set-back');
@@ -787,7 +835,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
      scn.tallGone > 0 && scn.tallGone < scn.tallPlanks * 0.4, JSON.stringify(scn));
   ok('the back fence leaves a gateway where the base stands', scn.gate, JSON.stringify(scn));
 
-  await page.evaluate(() => { __NC.setSkin('neon'); __NC.start('ai', 'PRO'); });
+  await page.evaluate(() => { __NC.setSkin('toon'); __NC.start('ai', 'PRO'); });
   await page.waitForTimeout(80);
 
   // ============================================ portrait lock (landscape view)
