@@ -264,6 +264,14 @@ anything that stands on the ground. Every drawable has a `…Toon` twin
 `drawModuleToon`, `drawBoosterToon`, `drawWallToon`, `creepPath` +
 `drawCreepShape`); `draw()` branches once per layer, never per object.
 
+**A style is paint.** Nothing in `update()` or the payload maths knows a
+style exists — every `toon()` call site is inside a draw function, and a
+grep proving that is the cheapest regression test there is. Neon Clash
+reached the same shape independently on the same day (`.claude/neon-clash.md`
+calls it "a skin is paint"), so treat the cogwheel-plus-dropdown, TOON-default
+arrangement as a repo convention now rather than one game's idea; the two
+games share no code, only the pattern.
+
 Two rules the terrain earned the hard way:
 
 - **Scatter comes from a stable per-cell hash (`h2(a, b)`), never from the
