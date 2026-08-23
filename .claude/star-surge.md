@@ -102,14 +102,16 @@ across all 11 sectors — treat the constants in
 point that will likely need a further pass once someone's actually played
 it.
 
-**Regression gate:** `.claude/tests/drive-star-surge.cjs` (29 checks) pins
+**Regression gate:** `.claude/tests/drive-star-surge.cjs` (36 checks) pins
 every weapon's pip-vs-tier formula (fire rate is pip-invariant; discrete
 weapon counts, bomb turret/radius alternation, beam/flame band/lobe counts,
 chain jump count, EMP radius-only growth, and the missile min-turn-radius
 floor all match their formulas exactly) plus the enemy-hp/incoming-damage
-difficulty ramp — run it after touching any weapon or difficulty formula in
-this file's § Weapons or this section, the same way as the smoke gate (see
-`.claude/tests/README.md`).
+difficulty ramp and the graphics-style setting (cel/toon is the default, both
+styles paint every hull, the pick persists, the cog opens/closes) — run it
+after touching any weapon or difficulty formula in this file's § Weapons or
+this section, or any renderer branch in § Graphics styles, the same way as
+the smoke gate (see `.claude/tests/README.md`).
 
 ## XP economy + Shipyard
 
@@ -216,6 +218,81 @@ every discrete-bullet weapon (blaster/bombs/missiles/bolas) — it replaced
 the old inline `e.hp--`/`boss.hp--` so bomb splash and bola slow-on-hit
 didn't need duplicating between the enemy-loop and boss-loop collision
 checks that used to be separate.
+
+## Graphics styles (settings ⚙)
+
+A ⚙ button is the third control in the top-left chrome row (`←` `🔊` `⚙`,
+at `left:10/56/102px`); it toggles `#settings-panel`, a small DOM panel
+holding a `<select id="gfx-select">`. The choice lives in the module-level
+`gfx` string, persisted to `localStorage['starSurge.gfx']`, validated
+against `GFX_STYLES` on load (an unknown/absent value falls back to
+`'toon'`). `closeSettings()` is called from `onDown`, so the first touch on
+the canvas dismisses the panel rather than steering blind under it.
+
+- **`toon`** (**default**) — cel/flat shading. Every hull is laid down in a
+  base tone, banded on the lit side with one flat lighter tone, then inked
+  with a dark outline (`INK`). No `shadowBlur` anywhere.
+- **`neon`** — the original glowing wireframes, kept byte-for-byte in
+  `drawShipNeon`/`drawEnemyNeon`/`drawBossNeon`.
+
+Adding a style means adding an id to `GFX_STYLES`, an `<option>`, and a
+branch in the four dispatchers (`drawShip`, `drawEnemy`, the boss block,
+the bullet/ebullet/powerup loops in `draw()`) — the branch points are
+deliberately few and all inside `draw()`'s call tree. **A skin is paint:**
+no simulation code reads `gfx`, so switching mid-run can never change an
+outcome. The `<select>` is wired to its `change` event and deliberately
+*not* through `bindTap` — that helper `preventDefault()`s `touchend` to
+stop iOS double-firing, which also stops a native picker ever opening.
+
+**The cel kit** follows the repo recipe in
+`.claude/notes/20260823-canvas-skins-and-cel-shading.md` (written by the
+neon-clash session that did this first) — read that before changing any of
+it. What's specific here:
+- `glow(col, blur)`/`noGlow()` wrap every `shadowColor`/`shadowBlur` pair in
+  the shared draw paths. `glow()` is a **no-op under toon**, so one line
+  kills every bloom and an effect written later in the neon idiom is right
+  in both styles automatically. Don't reintroduce a `gfx` branch at a call
+  site.
+- `cel(base, lit, lw, cx, cy)` acts on the *current path* — fill, clip,
+  step one flat shade, ink the outline. The current path survives
+  `save()`/`clip()`/`restore()` (it is not part of the canvas drawing
+  state), which is why the outline strokes after the clipped band without
+  rebuilding the path.
+- **Each part is lit about its own centre.** `celPoly` derives `(cx, cy)`
+  as the centroid of its own points, and `celCircle`/`celEllipse` translate
+  first, so an offset part (wing, nacelle, engine block, blade) is sculpted
+  rather than falling wholly inside or wholly outside one wedge. An earlier
+  pass here shaded every part about the sprite origin and each wing came out
+  uniformly lit or uniformly dark — flat.
+- **`frameRot()` keeps the sun fixed in screen space.** The spinner draws
+  inside `ctx.rotate(e.ang)` and the boss's gun-barrel rim inside its own
+  rotation; `cel()` reads the live transform back (`atan2(m.b, m.a)`) and
+  counter-rotates the shade wedge out of it. Without this the sprite drags
+  its shading round as it spins. The drive suite measures this directly
+  (brightest bearing on a ring inside the spinner's dome must not move as
+  `e.ang` does — 0° spread with the fix, ~170° without).
+- Line-like art (chain bolts, EMP rings) has no interior to clip a shade
+  into, so it gets `inkStroke(w)` — the same path stroked fatter in ink
+  underneath — instead of `cel()`.
+
+**The hulls** (`drawShipToon`, `drawEnemyToon`, `drawBossToon`) — each is
+meant to be nameable at a glance at ~24 px: player = steel interceptor with
+a cyan canopy, green swept wings and twin exhausts; drone = bladed scout
+pod with a red eye; shooter = arrowhead gunship with two underslung
+barrels, pointing *down* at the player; spinner = four-blade rotorcraft
+(keeps `e.ang`); tanker = armoured freighter with three rear engine blocks;
+boss = a solid inked hull with a bridge dome (gold + heavier pods for a
+sector boss) under a rotating rim of gun barrels, which preserves the neon
+version's spinning-spikes silhouette. Enemy tones all derive from the same
+stage `hue()` as before, so `STAGE_HUES` still recolors every sector.
+
+**HUD note:** the left HUD block (`SECTOR/STAGE`, hp bar, hp label) starts
+at `safeTop+48`, *below* the chrome row, and the boss hp bar sits at
+`safeTop+84`. Before the ⚙ existed the block started at `x=56, safeTop+14`
+and the first word was already drawn underneath the mute button; a third
+38 px button made that unfixable sideways (the stage line is ~150 px wide
+and the score is right-aligned), so the block moved down instead. Don't
+move it back up without re-checking against all three buttons.
 
 ## Armor + HP
 

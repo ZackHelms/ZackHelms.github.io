@@ -368,7 +368,14 @@ blast radius); chain lightning starts at zero jumps and gains two more per
 pip; missiles have a per-tier minimum turn radius so they can't loop onto
 any target regardless of aim. Ship can fly almost to the top of the screen
 (not just the lower 65%), so short-range weapons can reach high-holding
-enemies. Drones/shooters/spinners/tankers, P/S/G powerups (in-run
+enemies. A ⚙ settings button (third in the top-left chrome row) holds a
+**graphics style** dropdown: **CEL / TOON** (the default) flat-shades every
+hull in a base tone, bands the lit side in one flat lighter tone and inks a
+dark outline, giving each craft a nameable silhouette — steel interceptor,
+bladed scout drone, arrowhead gunship, four-blade rotorcraft, armoured
+freighter, and a capital-ship boss whose rotating rim of gun barrels keeps
+the original spinning-spikes read; **NEON** is the original glowing
+wireframe look, kept intact. The choice persists per browser. Drones/shooters/spinners/tankers, P/S/G powerups (in-run
 weapon-tier boost, shield charge, surge bomb), stage-hued enemies.
 20-track adaptive soundtrack
 (webaudio-score/v1 data + compiler + look-ahead scheduler): one track plays

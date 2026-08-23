@@ -55,8 +55,8 @@ local-2p.
 | Meteor Defense | `meteor-defense/` | defense | tap | wave-survival | wave-defense, resource-economy, combo-multiplier | solo | `.claude/meteor-defense.md` |
 | Word Circuit | `word-circuit/` | word | drag-connect | daily-challenge, timed-round | word-building, seeded-determinism | solo | `.claude/word-circuit.md` |
 | Neon Tactics | `neon-tactics/` | turn-based-tactics | tap | match-vs-ai, local-2p | grid-combat, line-of-sight, ai-opponent | vs-ai, local-2p | `.claude/neon-tactics.md` |
-| Star Surge | `star-surge/` | shmup | drag-steer | level-campaign | bullet-dodging, boss-fights, meta-progression | solo | `.claude/star-surge.md` |
-| Turret Builder | `turret-builder/` | tower-defense-classic | drag-place, tap | level-campaign, wave-survival, endless-highscore, save-campaign | wave-defense, adjacency-synergy, damage-typing, combo-discovery | solo | `.claude/turret-builder.md` |
+| Star Surge | `star-surge/` | shmup | drag-steer | level-campaign | bullet-dodging, boss-fights, meta-progression, art-styles | solo | `.claude/star-surge.md` |
+| Turret Builder | `turret-builder/` | tower-defense-classic | drag-place, tap | level-campaign, wave-survival, endless-highscore, save-campaign | wave-defense, adjacency-synergy, damage-typing, combo-discovery, art-styles | solo | `.claude/turret-builder.md` |
 | Grid Defense | `grid-defense/` | tower-defense-classic | drag-place, tap | level-campaign, wave-survival, endless-highscore, save-campaign | wave-defense, resource-economy, tower-upgrades, meta-progression | solo | `.claude/grid-defense.md` |
 | Neon Tripeaks | `tri-peaks/` | card-deck | tap | quick-round, daily-challenge | card-chain, combo-multiplier, seeded-determinism | solo | `.claude/tri-peaks.md` |
 | Shadow Circuit | `shadow-circuit/` | stealth, maze | tap-to-move | level-campaign | vision-cones, line-of-sight, procedural-generation | solo | `.claude/shadow-circuit.md` |
@@ -201,12 +201,15 @@ from **inventing a new facet value**, not filling a hole. Open directions:
   local-2p games all share one orientation: air hockey's board is
   orientation-neutral, and neon-tactics/neon-recall pass the phone between
   turns. A fifth local-2p title would now want `co-op`, which is still empty.
-- **`art-styles`** (neon-clash, 2026-08-23) is the first player-selectable art
-  direction in the repo — a second cel-shaded skin over the same simulation,
-  behind a settings cogwheel. Everything else here paints exactly one way. If a
-  second game ever wants a skin picker, the pattern to copy is in
-  `.claude/neon-clash.md` § Graphics styles: a skin is paint, `glow()` goes
-  no-op rather than branching at every call site, and scenery is seeded once.
+- **`art-styles`** (neon-clash first, then turret-builder and star-surge, all
+  2026-08-23) is a player-selectable art direction — a second cel-shaded skin
+  over the same simulation, behind a settings cogwheel, `toon` defaulting on in
+  all three. Everything else here paints exactly one way. The pattern to copy is
+  `.claude/notes/20260823-canvas-skins-and-cel-shading.md`: a skin is paint (the
+  sim never reads it), `glow()` goes no-op rather than branching at every call
+  site, each part is shaded about its OWN centre, the shade wedge counter-rotates
+  out of the live transform so the sun stays fixed in screen space, and scenery
+  is seeded once rather than re-rolled per frame.
 - **`area-of-effect`** (neon-clash, added later the same day with the fireball
   card) is also new. Plenty of games here blow several things up at once, but
   this is the first where the *player aims the blast* — a placed circle whose

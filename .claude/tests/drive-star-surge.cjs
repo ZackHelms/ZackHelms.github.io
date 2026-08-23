@@ -208,6 +208,88 @@ const allEqual = arr => arr.every(v => v === arr[0]);
   });
   const weaponCount = await page.evaluate(() => Object.keys(WEAPON_DEFS).length);
   check('every weapon runs 5s of real update() ticks with no crash', smoke.length === weaponCount, smoke);
+
+  /* ------------------------- graphics style setting ------------------------ */
+  // Both styles must paint every hull. A per-style branch that only throws
+  // when one enemy type is on screen is invisible until that wave arrives,
+  // so each style paints a frame holding all four enemy types + both boss
+  // kinds + every projectile shape at once.
+  const gfxDefault = await page.evaluate(() => {
+    const stored = localStorage.getItem('starSurge.gfx');
+    return { stored, active: gfx, options: Array.from(document.querySelectorAll('#gfx-select option')).map(o => o.value) };
+  });
+  check('cel/toon is the default graphics style with nothing stored', gfxDefault.active === 'toon' && !gfxDefault.stored, gfxDefault);
+  check('settings dropdown offers exactly the two known styles', JSON.stringify(gfxDefault.options) === JSON.stringify(['toon', 'neon']), gfxDefault.options);
+
+  const painted = await page.evaluate(() => {
+    const out = {};
+    for (const style of ['toon', 'neon']) {
+      gfx = style;
+      startGame(1);
+      enemies.length = 0; spawnQueue.length = 0;
+      for (const t of ['drone', 'shooter', 'spinner', 'tanker']) spawnEnemy(t, 60 + Math.random() * 260, 300);
+      for (const wt of ['blaster', 'bombs', 'missiles', 'bolas']) bullets.push({ x: 150, y: 500, vx: 0, vy: -500, wtype: wt, dmg: 3, r: 4, radius: 70, turnRate: 2 });
+      ebullets.push({ x: 120, y: 400, vx: 0, vy: 160 });
+      powerups.push({ x: 90, y: 450, vy: 0, kind: 'P' });
+      ship.shieldCharges = 2;
+      let frames = 0;
+      spawnBoss(); for (let i = 0; i < 30; i++) { draw(); frames++; }        // mini-boss
+      spawnSectorBoss(); for (let i = 0; i < 30; i++) { draw(); frames++; }  // sector boss
+      boss = null; for (let i = 0; i < 10; i++) { draw(); frames++; }        // no boss
+      out[style] = frames;
+    }
+    return out;
+  });
+  check('every entity type paints in both graphics styles without throwing', painted.toon === 70 && painted.neon === 70, painted);
+
+  // The sun must be fixed in SCREEN space: the spinner draws its blades and
+  // dome inside ctx.rotate(e.ang), so without cel()'s frameRot() counter-
+  // rotation the whole sprite drags its shading round as it spins — the tell
+  // that reads as flat shapes rather than lit shapes. Measured by walking a
+  // ring inside the dome and reporting the brightest bearing: it must not
+  // move as e.ang does. This discriminates — stubbing frameRot() to 0 takes
+  // the spread from 0deg to ~170deg.
+  const sun = await page.evaluate(() => {
+    gfx = 'toon';
+    const out = [];
+    for (const ang of [0, 0.8, 1.6, 2.4, 3.9]) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+      ctx.save(); ctx.translate(200, 400); ctx.scale(4, 4);
+      drawEnemyToon({ type: 'spinner', r: 13, slowT: 0, ang });
+      ctx.restore();
+      let best = -1, bestA = 0;
+      for (let i = 0; i < 72; i++) {
+        const a = i / 72 * Math.PI * 2;
+        const d = ctx.getImageData(Math.round(200 + Math.cos(a) * 15), Math.round(400 + Math.sin(a) * 15), 1, 1).data;
+        const l = 0.299 * d[0] + 0.587 * d[1] + 0.114 * d[2];
+        if (l > best) { best = l; bestA = Math.round(a * 180 / Math.PI); }
+      }
+      out.push(bestA);
+    }
+    return out;
+  });
+  check('cel shading keeps the sun fixed in screen space while a sprite spins', Math.max(...sun) - Math.min(...sun) <= 10, sun);
+
+  const gfxPersist = await page.evaluate(() => {
+    const sel = document.getElementById('gfx-select');
+    sel.value = 'neon'; sel.dispatchEvent(new Event('change'));
+    const afterNeon = { active: gfx, stored: localStorage.getItem('starSurge.gfx') };
+    sel.value = 'toon'; sel.dispatchEvent(new Event('change'));
+    return { afterNeon, afterToon: { active: gfx, stored: localStorage.getItem('starSurge.gfx') } };
+  });
+  check('picking a style updates the live renderer and persists it', gfxPersist.afterNeon.active === 'neon' && gfxPersist.afterNeon.stored === 'neon' && gfxPersist.afterToon.stored === 'toon', gfxPersist);
+
+  const chromeRow = await page.evaluate(() => {
+    const r = id => { const b = document.getElementById(id).getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right) }; };
+    const panel = document.getElementById('settings-panel');
+    const openedByTap = (() => { document.getElementById('settings').dispatchEvent(new MouseEvent('click', { bubbles: true })); return !panel.classList.contains('hidden'); })();
+    onDown({ preventDefault() {}, clientX: 200, clientY: 600 });
+    return { back: r('back-btn'), mute: r('mute'), cog: r('settings'), openedByTap, closedByCanvas: panel.classList.contains('hidden') };
+  });
+  check('the cog sits in the top-left chrome row, clear of ← and 🔊', chromeRow.cog.l >= chromeRow.mute.r && chromeRow.mute.l >= chromeRow.back.r, chromeRow);
+  check('tapping the cog opens the panel and touching the canvas closes it', chromeRow.openedByTap && chromeRow.closedByCanvas, chromeRow);
+
   check('no console/page errors across the whole drive', errors.length === 0, errors);
 
   console.log(`STAR-SURGE DRIVE: ${pass} passed, ${fail} failed`);

@@ -35,6 +35,26 @@ body {
   color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
   text-align:center; padding:0; touch-action:manipulation;
 }
+#settings {
+  position:absolute; top:calc(var(--sat) + 8px); left:102px; z-index:30;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:15px; width:38px; height:34px; line-height:30px;
+  text-align:center; padding:0; touch-action:manipulation;
+}
+#settings-panel {
+  position:absolute; top:calc(var(--sat) + 48px); left:10px; z-index:31;
+  background:var(--panel); border:1px solid var(--border); border-radius:8px;
+  padding:10px 12px; min-width:190px; box-shadow:0 8px 22px #000000aa;
+}
+#settings-panel.hidden { display:none; }
+#settings-panel label { display:block; color:var(--dim); font-size:0.58rem; letter-spacing:2px; margin-bottom:6px; }
+#settings-panel select {
+  width:100%; background:var(--bg); color:var(--green);
+  border:1px solid var(--green); border-radius:6px;
+  font-family:'Share Tech Mono', monospace; font-size:0.76rem;
+  letter-spacing:1px; padding:7px 8px; touch-action:manipulation;
+}
+#settings-panel .hint { color:var(--dim); font-size:0.56rem; line-height:1.6; margin-top:8px; }
 #overlay {
   position:absolute; inset:0; z-index:20; display:flex;
   flex-direction:column; align-items:center; justify-content:center;
@@ -86,10 +106,19 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-22 14:57 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 13:41 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
+<button id="settings" aria-label="Settings">⚙</button>
+<div id="settings-panel" class="hidden">
+  <label for="gfx-select">GRAPHICS STYLE</label>
+  <select id="gfx-select">
+    <option value="toon">CEL / TOON</option>
+    <option value="neon">NEON</option>
+  </select>
+  <div class="hint">CEL / TOON — inked, flat-shaded starfighters.<br>NEON — the original glowing wireframes.</div>
+</div>
 <div id="overlay"></div>
 <div id="track-label"></div>
 <script>
@@ -603,6 +632,21 @@ function bindTap(el, fn) {
 }
 bindTap(muteBtn, () => { muted = !muted; applyMute(); });
 applyMute();
+
+/* ---- settings: graphics style ('toon' cel-shaded default, 'neon' original) ---- */
+const GFX_STYLES = ['toon', 'neon'];
+let gfx = localStorage.getItem('starSurge.gfx');
+if (GFX_STYLES.indexOf(gfx) < 0) gfx = 'toon';
+const settingsBtn = document.getElementById('settings');
+const settingsPanel = document.getElementById('settings-panel');
+const gfxSelect = document.getElementById('gfx-select');
+gfxSelect.value = gfx;
+bindTap(settingsBtn, () => settingsPanel.classList.toggle('hidden'));
+gfxSelect.addEventListener('change', () => {
+  gfx = GFX_STYLES.indexOf(gfxSelect.value) >= 0 ? gfxSelect.value : 'toon';
+  localStorage.setItem('starSurge.gfx', gfx);
+});
+function closeSettings() { settingsPanel.classList.add('hidden'); }
 function hue(sat, l, a) { return 'hsla(' + STAGE_HUES[stage - 1] + ',' + sat + '%,' + l + '%,' + (a === undefined ? 1 : a) + ')'; }
 function campaignDifficulty() { return (sector - 1) + (stage - 1) / MAX_STAGE; }   // 0 at sector1 stage1, ~+1 per sector cleared
 function incomingBulletDmg() { return 18 * (1 + campaignDifficulty() * 0.12); }
@@ -1085,7 +1129,7 @@ function update(dt) {
 let drag = null;
 function pt(e) { const t = e.changedTouches ? e.changedTouches[0] : e; return { x: t.clientX, y: t.clientY }; }
 function onDown(e) {
-  e.preventDefault(); initAudio();
+  e.preventDefault(); initAudio(); closeSettings();
   if (state !== 'play') return;
   const p = pt(e);
   drag = { fx: p.x, fy: p.y, sx: ship.x, sy: ship.y };
@@ -1258,12 +1302,101 @@ window.addEventListener('resize', resize);
 resize();
 
 /* =============================== RENDER ================================= */
-function drawShip(x, y) {
-  ctx.save();
-  ctx.translate(x, y);
-  if (ship.invuln > 0 && Math.floor(ship.invuln * 10) % 2 === 0) ctx.globalAlpha = 0.35;
+/* ---- cel / toon shading kit -------------------------------------------
+   Recipe + rationale: .claude/notes/20260823-canvas-skins-and-cel-shading.md
+   (neon-clash wrote it first; this game follows it). Cel shading here is
+   exactly two things: flat colour steps, never a gradient, and one heavy
+   ink outline per shape. `cel()` acts on the CURRENT path, so shapes can be
+   composed from any path calls — the path survives the save/clip/restore
+   because the current path is not part of the canvas drawing state. */
+const INK = '#0a0a14';
+// One no-op kills every bloom in the game at once, and an effect written
+// later in the neon idiom is then automatically right in both styles —
+// branching at each of the ~15 call sites would be 15 chances to leak a
+// halo into a cel-shaded scene, forever.
+function glow(col, blur) { if (gfx === 'toon') return; ctx.shadowColor = col; ctx.shadowBlur = blur; }
+function noGlow() { ctx.shadowBlur = 0; }
+// The sun is fixed in SCREEN space. Sprites draw inside their own rotated
+// frames (spinner blades, the boss's gun-barrel rim), so the shade wedge
+// counter-rotates out of whatever transform is live — a part that drags its
+// shadow round as it spins is the one tell that reads as flat shapes rather
+// than lit shapes. getTransform is iOS Safari 15.4+, hence the guard.
+function frameRot() {
+  if (!ctx.getTransform) return 0;
+  const m = ctx.getTransform();
+  return Math.atan2(m.b, m.a);   // uniform scale and dpr cancel out
+}
+function poly(pts) {
+  ctx.beginPath(); ctx.moveTo(pts[0], pts[1]);
+  for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+  ctx.closePath();
+}
+// (cx, cy) is the PART's own centre, so a wing or a nacelle offset from the
+// hull is lit about itself. Shade every part about the sprite origin instead
+// and an offset part falls wholly inside or wholly outside the one wedge —
+// flat, not sculpted.
+function cel(base, lit, lw, cx, cy) {
+  ctx.fillStyle = base; ctx.fill();
+  if (lit) {
+    ctx.save(); ctx.clip();
+    ctx.translate(cx || 0, cy || 0);
+    ctx.rotate(-frameRot() - 0.38);
+    ctx.fillStyle = lit; ctx.fillRect(-400, -400, 400, 800);
+    ctx.restore();
+  }
+  if (lw !== 0) { ctx.lineJoin = 'round'; ctx.lineWidth = lw || 2.2; ctx.strokeStyle = INK; ctx.stroke(); }
+}
+// centroid of the points is a good enough part centre, and deriving it here
+// means no call site has to hand-thread one
+function celPoly(pts, base, lit, lw) {
+  let cx = 0, cy = 0;
+  for (let i = 0; i < pts.length; i += 2) { cx += pts[i]; cy += pts[i + 1]; }
+  const n = pts.length / 2;
+  poly(pts); cel(base, lit, lw, cx / n, cy / n);
+}
+// round shapes translate first, so their part centre is the new origin
+function celCircle(x, y, r, base, lit, lw) {
+  ctx.save(); ctx.translate(x, y); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); cel(base, lit, lw); ctx.restore();
+}
+function celEllipse(x, y, rx, ry, base, lit, lw) {
+  ctx.save(); ctx.translate(x, y); ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, 7); cel(base, lit, lw); ctx.restore();
+}
+function panelLine(x1, y1, x2, y2, w) {
+  ctx.globalAlpha *= 0.32; ctx.strokeStyle = INK; ctx.lineWidth = w || 1.6;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.globalAlpha /= 0.32;
+}
+// A stroked line has no interior to clip a shade into, so line-like art gets
+// its outline the cheap way: the same path stroked fatter in ink underneath.
+function inkStroke(w) {
+  if (gfx !== 'toon') return;
+  ctx.strokeStyle = INK; ctx.lineWidth = w; ctx.stroke();
+}
+// player palette: steel airframe, green accents, cyan canopy
+const HULL = '#a9bbd2', HULL_LIT = '#e9f2ff', HULL_DK = '#68788f';
+const ACC = '#2f9c28', ACC_LIT = '#5ce048';
+
+function drawShipToon() {
+  // engine nacelles + exhaust (behind everything)
+  for (const s of [-1, 1]) {
+    const flick = 6 + Math.random() * 6;
+    celPoly([s * 6.5, 13.5, s * 10.5, 13.5, s * 9, 14 + flick, s * 8, 14 + flick], '#ffc300', '#fff3b0', 1.4);
+    celPoly([s * 5.5, -1, s * 11.5, 3, s * 11, 14, s * 5, 12.5], HULL_DK, HULL, 2);
+  }
+  // swept wings
+  for (const s of [-1, 1]) celPoly([s * 3, -5, s * 16, 8, s * 13.5, 13, s * 3.5, 7], ACC, ACC_LIT, 2);
+  // fuselage
+  celPoly([0, -19, 4, -8, 5, 4, 3.5, 13, -3.5, 13, -5, 4, -4, -8], HULL, HULL_LIT, 2.2);
+  panelLine(-3.6, 2, 3.6, 2);
+  // accent chevron
+  celPoly([0, -3, 3.6, 4, 0, 2, -3.6, 4], ACC, ACC_LIT, 1.4);
+  // canopy + specular
+  celEllipse(0, -8.5, 2.9, 5.4, '#1d6f9c', '#7fe0ff', 1.8);
+  ctx.beginPath(); ctx.ellipse(-1, -10, 0.9, 2, 0.3, 0, 7); ctx.fillStyle = '#ffffff'; ctx.fill();
+}
+function drawShipNeon() {
   ctx.strokeStyle = '#39ff14'; ctx.fillStyle = '#39ff1433'; ctx.lineWidth = 2;
-  ctx.shadowColor = '#39ff14'; ctx.shadowBlur = 12;
+  glow('#39ff14', 12);
   ctx.beginPath();
   ctx.moveTo(0, -16); ctx.lineTo(11, 12); ctx.lineTo(0, 6); ctx.lineTo(-11, 12);
   ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -1272,34 +1405,119 @@ function drawShip(x, y) {
   ctx.fillStyle = '#ffc300';
   ctx.globalAlpha *= 0.5 + Math.random() * 0.5;
   ctx.beginPath(); ctx.moveTo(-4, 12); ctx.lineTo(0, 20 + Math.random() * 6); ctx.lineTo(4, 12); ctx.closePath(); ctx.fill();
+}
+function drawShip(x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (ship.invuln > 0 && Math.floor(ship.invuln * 10) % 2 === 0) ctx.globalAlpha = 0.35;
+  if (gfx === 'toon') drawShipToon(); else drawShipNeon();
   if (ship.shieldCharges > 0) {
     ctx.globalAlpha = 0.8;
-    ctx.strokeStyle = '#4488ff'; ctx.lineWidth = 2;
-    ctx.shadowColor = '#4488ff'; ctx.shadowBlur = 10;
+    ctx.strokeStyle = gfx === 'toon' ? '#7fbcff' : '#4488ff';
+    ctx.lineWidth = gfx === 'toon' ? 2.5 : 2;
+    glow('#4488ff', 10);
     for (let i = 0; i < ship.shieldCharges; i++) { ctx.beginPath(); ctx.arc(0, 0, 22 + i * 4, 0, 7); ctx.stroke(); }
-    ctx.shadowBlur = 0;
+    noGlow();
   }
   ctx.restore();
 }
-function drawEnemy(e) {
-  ctx.save(); ctx.translate(e.x, e.y);
+
+/* Toon enemy hulls — each type gets a silhouette you can name at a glance:
+   drone = bladed scout pod, shooter = arrowhead gunship with two barrels,
+   spinner = four-blade rotorcraft, tanker = armoured freighter. */
+function drawEnemyToon(e) {
+  const r = e.r, base = hue(50, 44), lit = hue(44, 64), dk = hue(56, 27);
+  if (e.type === 'drone') {
+    for (const s of [-1, 1]) celPoly([s * r * 0.42, -r * 0.5, s * r * 1.25, -r * 0.78, s * r * 1.2, r * 0.58, s * r * 0.42, r * 0.5], dk, base, 1.8);
+    celEllipse(0, 0, r * 0.62, r * 0.82, base, lit, 2.2);
+    celCircle(0, r * 0.28, r * 0.24, '#ff2244', '#ff97a6', 1.5);
+  } else if (e.type === 'shooter') {
+    for (const s of [-1, 1]) celPoly([s * r * 0.46, r * 0.1, s * r * 0.82, r * 0.16, s * r * 0.76, r * 1.02, s * r * 0.48, r * 0.94], dk, base, 1.6);
+    celPoly([0, r * 1.18, r * 0.86, r * 0.12, r * 0.62, -r * 0.88, -r * 0.62, -r * 0.88, -r * 0.86, r * 0.12], base, lit, 2.2);
+    panelLine(-r * 0.5, -r * 0.2, r * 0.5, -r * 0.2);
+    celEllipse(0, -r * 0.24, r * 0.3, r * 0.42, '#12313f', '#5fd6ff', 1.7);
+  } else if (e.type === 'spinner') {
+    ctx.rotate(e.ang);
+    for (let i = 0; i < 4; i++) {
+      ctx.save(); ctx.rotate(i * Math.PI / 2);
+      celPoly([-r * 0.26, -r * 0.28, r * 0.26, -r * 0.28, r * 0.15, -r * 1.18, -r * 0.15, -r * 1.18], dk, base, 1.9);
+      ctx.restore();
+    }
+    celCircle(0, 0, r * 0.45, base, lit, 2.2);
+    celCircle(0, 0, r * 0.2, '#ffc300', '#fff0a8', 1.5);
+  } else {
+    // tanker: engine block first, then the armoured hull over it
+    for (const s of [-1, 0, 1]) celPoly([s * r * 0.5 - r * 0.16, -r * 0.94, s * r * 0.5 + r * 0.16, -r * 0.94, s * r * 0.5 + r * 0.2, -r * 0.5, s * r * 0.5 - r * 0.2, -r * 0.5], dk, base, 1.7);
+    celPoly([-r * 0.8, -r * 0.6, r * 0.8, -r * 0.6, r * 1.0, r * 0.22, r * 0.55, r * 0.86, -r * 0.55, r * 0.86, -r * 1.0, r * 0.22], base, lit, 2.6);
+    panelLine(-r * 0.86, -r * 0.12, r * 0.86, -r * 0.12, 2);
+    panelLine(-r * 0.72, r * 0.4, r * 0.72, r * 0.4, 2);
+    celCircle(0, r * 0.12, r * 0.3, dk, base, 2);
+  }
+}
+function drawEnemyNeon(e) {
   const col = hue(100, 62);
   ctx.strokeStyle = col; ctx.fillStyle = hue(100, 62, 0.2); ctx.lineWidth = 2;
-  ctx.shadowColor = col; ctx.shadowBlur = 8;
+  glow(col, 8);
   ctx.beginPath();
   if (e.type === 'drone') { ctx.arc(0, 0, e.r * 0.8, 0, 7); }
   else if (e.type === 'shooter') { ctx.moveTo(0, e.r); ctx.lineTo(e.r, -e.r * 0.7); ctx.lineTo(-e.r, -e.r * 0.7); ctx.closePath(); }
   else if (e.type === 'spinner') { ctx.rotate(e.ang); ctx.rect(-e.r * 0.75, -e.r * 0.75, e.r * 1.5, e.r * 1.5); }
   else { ctx.arc(0, 0, e.r, 0, 7); }
   ctx.fill(); ctx.stroke();
-  if (e.type === 'tanker') {
-    ctx.beginPath(); ctx.arc(0, 0, e.r * 0.55, 0, 7); ctx.stroke();
-  }
+  if (e.type === 'tanker') { ctx.beginPath(); ctx.arc(0, 0, e.r * 0.55, 0, 7); ctx.stroke(); }
+  ctx.shadowBlur = 0;
+}
+function drawEnemy(e) {
+  ctx.save(); ctx.translate(e.x, e.y);
+  if (gfx === 'toon') drawEnemyToon(e); else drawEnemyNeon(e);
   if (e.slowT > 0) {
     ctx.strokeStyle = WEAPON_DEFS.bolas.color; ctx.lineWidth = 1.5; ctx.shadowBlur = 0;
     ctx.beginPath(); ctx.arc(0, 0, e.r * 1.35, 0, 7); ctx.stroke();
   }
   ctx.restore();
+}
+
+/* Boss: a capital ship. The rotating rim of gun barrels keeps the neon
+   version's spinning-spikes silhouette, over a solid inked hull with a
+   bridge dome (gold + heavy pods for a sector boss, cyan for a mini). */
+function drawBossToon() {
+  const R = boss.r, n = boss.sector ? 10 : 7;
+  const base = hue(50, 42), lit = hue(44, 62), dk = hue(56, 26);
+  ctx.save(); ctx.rotate(boss.t * (boss.sector ? 0.55 : 0.4));
+  for (let i = 0; i < n; i++) {
+    ctx.save(); ctx.rotate(Math.PI * 2 / n * i);
+    celPoly([-R * 0.15, -R * 0.72, R * 0.15, -R * 0.72, R * 0.09, -R * 1.16, -R * 0.09, -R * 1.16], dk, base, 2);
+    celCircle(0, -R * 1.16, R * 0.09, '#ff2244', '#ff97a6', 1.4);
+    ctx.restore();
+  }
+  ctx.restore();
+  celCircle(0, 0, R * 0.8, base, lit, 3);
+  ctx.globalAlpha *= 0.3; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, R * 0.6, 0, 7); ctx.stroke();
+  ctx.globalAlpha /= 0.3;
+  for (const s of [-1, 1]) celEllipse(s * R * 0.64, 0, R * 0.19, R * 0.36, dk, base, 2);
+  celCircle(0, 0, R * 0.31, boss.sector ? '#b8820f' : '#1d6f9c', boss.sector ? '#ffd85e' : '#7fe0ff', 2.4);
+  ctx.beginPath(); ctx.ellipse(-R * 0.1, -R * 0.11, R * 0.07, R * 0.12, 0.4, 0, 7);
+  ctx.fillStyle = '#ffffff'; ctx.fill();
+}
+function drawBossNeon() {
+  const col = hue(100, 65);
+  const spikes = boss.sector ? 14 : 8;
+  ctx.strokeStyle = col; ctx.fillStyle = hue(100, 62, 0.18); ctx.lineWidth = boss.sector ? 4 : 3;
+  glow(col, boss.sector ? 26 : 18);
+  ctx.beginPath();
+  for (let i = 0; i < spikes; i++) {
+    const a = Math.PI * 2 / spikes * i + boss.t * (boss.sector ? 0.55 : 0.4);
+    const rr = boss.r * (i % 2 ? 0.72 : 1);
+    const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  if (boss.sector) {
+    ctx.beginPath(); ctx.arc(0, 0, boss.r * 0.45, 0, 7);
+    ctx.strokeStyle = '#ffc300'; ctx.lineWidth = 2; ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
 }
 function draw() {
   ctx.clearRect(0, 0, W, H);
@@ -1316,55 +1534,67 @@ function draw() {
   // powerups
   for (const p of powerups) {
     const col = p.kind === 'P' ? '#39ff14' : p.kind === 'S' ? '#4488ff' : '#ffc300';
-    ctx.strokeStyle = col; ctx.lineWidth = 2;
-    ctx.shadowColor = col; ctx.shadowBlur = 10;
-    ctx.strokeRect(p.x - 11, p.y - 11, 22, 22);
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = col; ctx.font = "13px 'Black Ops One'";
+    if (gfx === 'toon') {
+      ctx.fillStyle = col; ctx.fillRect(p.x - 11, p.y - 11, 22, 22);
+      ctx.strokeStyle = INK; ctx.lineWidth = 2.2; ctx.strokeRect(p.x - 11, p.y - 11, 22, 22);
+      ctx.fillStyle = '#ffffff55'; ctx.fillRect(p.x - 10, p.y - 10, 20, 6);
+      ctx.fillStyle = INK;
+    } else {
+      ctx.strokeStyle = col; ctx.lineWidth = 2;
+      glow(col, 10);
+      ctx.strokeRect(p.x - 11, p.y - 11, 22, 22);
+      noGlow();
+      ctx.fillStyle = col;
+    }
+    ctx.font = "13px 'Black Ops One'";
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(p.kind, p.x, p.y + 1);
   }
   // bullets
+  ctx.save();
   for (const b of bullets) {
-    ctx.fillStyle = WEAPON_DEFS[b.wtype] ? WEAPON_DEFS[b.wtype].color : '#dde3ff';
-    if (b.wtype === 'bombs') { ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, 7); ctx.fill(); }
-    else if (b.wtype === 'missiles') { ctx.fillRect(b.x - 2, b.y - 8, 4, 13); }
-    else { ctx.fillRect(b.x - 2, b.y - 7, 4, 11); }
+    const bc = WEAPON_DEFS[b.wtype] ? WEAPON_DEFS[b.wtype].color : '#dde3ff';
+    if (gfx === 'toon') {
+      ctx.save(); ctx.translate(b.x, b.y);
+      if (b.wtype === 'bombs') { celCircle(0, 0, 5.5, bc, '#ffffffcc', 1.6); }
+      else if (b.wtype === 'missiles') {
+        celPoly([0, -9, 2.6, -3, 2.6, 6, -2.6, 6, -2.6, -3], bc, '#ffffffaa', 1.5);
+        celPoly([-2.4, 2, -5, 7, -2.4, 7], INK, null, 0);
+        celPoly([2.4, 2, 5, 7, 2.4, 7], INK, null, 0);
+      } else { celPoly([-2.4, -7.5, 2.4, -7.5, 2.4, 4, 0, 6.5, -2.4, 4], bc, '#ffffffaa', 1.4); }
+      ctx.restore();
+    } else {
+      ctx.fillStyle = bc;
+      if (b.wtype === 'bombs') { ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, 7); ctx.fill(); }
+      else if (b.wtype === 'missiles') { ctx.fillRect(b.x - 2, b.y - 8, 4, 13); }
+      else { ctx.fillRect(b.x - 2, b.y - 7, 4, 11); }
+    }
   }
+  ctx.restore();
   for (const e of enemies) drawEnemy(e);
   if (boss) {
     ctx.save(); ctx.translate(boss.x, boss.y);
-    const col = hue(100, 65);
-    const spikes = boss.sector ? 14 : 8;
-    ctx.strokeStyle = col; ctx.fillStyle = hue(100, 62, 0.18); ctx.lineWidth = boss.sector ? 4 : 3;
-    ctx.shadowColor = col; ctx.shadowBlur = boss.sector ? 26 : 18;
-    ctx.beginPath();
-    for (let i = 0; i < spikes; i++) {
-      const a = Math.PI * 2 / spikes * i + boss.t * (boss.sector ? 0.55 : 0.4);
-      const rr = boss.r * (i % 2 ? 0.72 : 1);
-      const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    }
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    if (boss.sector) {
-      ctx.beginPath(); ctx.arc(0, 0, boss.r * 0.45, 0, 7);
-      ctx.strokeStyle = '#ffc300'; ctx.lineWidth = 2; ctx.stroke();
-    }
-    ctx.shadowBlur = 0;
+    if (gfx === 'toon') drawBossToon(); else drawBossNeon();
     ctx.restore();
     // boss hp bar
     const bw = W - 80, frac = boss.hp / boss.maxHp;
-    ctx.fillStyle = '#1a1a30'; ctx.fillRect(40, safeTop + 44, bw, 7);
+    ctx.fillStyle = '#1a1a30'; ctx.fillRect(40, safeTop + 84, bw, 7);
     ctx.fillStyle = frac > 0.3 ? hue(100, 60) : '#ff2244';
-    ctx.fillRect(40, safeTop + 44, bw * Math.max(0, frac), 7);
+    ctx.fillRect(40, safeTop + 84, bw * Math.max(0, frac), 7);
   }
   // enemy bullets
+  ctx.save();
   for (const b of ebullets) {
-    ctx.fillStyle = '#ff2244';
-    ctx.shadowColor = '#ff2244'; ctx.shadowBlur = 7;
-    ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, 7); ctx.fill();
-    ctx.shadowBlur = 0;
+    if (gfx === 'toon') {
+      celCircle(b.x, b.y, 4.5, '#ff2244', '#ff9aa8', 1.5);
+    } else {
+      ctx.fillStyle = '#ff2244';
+      glow('#ff2244', 7);
+      ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, 7); ctx.fill();
+      noGlow();
+    }
   }
+  ctx.restore();
   // continuous weapon visuals (beam / flamethrower) while held
   if (drag && save.equippedWeapon === 'beam') {
     const width = 10 + save.weapons.beam * 3;
@@ -1388,17 +1618,19 @@ function draw() {
   // chain-lightning bolts / EMP pulses
   for (const lb of lightningBolts) {
     ctx.globalAlpha = Math.max(0, 1 - lb.t / 0.25);
-    ctx.strokeStyle = WEAPON_DEFS.chain.color; ctx.lineWidth = 2;
-    ctx.shadowColor = WEAPON_DEFS.chain.color; ctx.shadowBlur = 10;
+    glow(WEAPON_DEFS.chain.color, 10);
     ctx.beginPath();
     lb.points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-    ctx.stroke(); ctx.shadowBlur = 0;
+    inkStroke(5.5);
+    ctx.strokeStyle = WEAPON_DEFS.chain.color; ctx.lineWidth = 2; ctx.stroke();
+    noGlow();
   }
   ctx.globalAlpha = 1;
   for (const ep of empPulses) {
     ctx.globalAlpha = Math.max(0, 1 - ep.t / 0.5);
-    ctx.strokeStyle = WEAPON_DEFS.emp.color; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(ep.x, ep.y, ep.r, 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ep.x, ep.y, ep.r, 0, 7);
+    inkStroke(6.5);
+    ctx.strokeStyle = WEAPON_DEFS.emp.color; ctx.lineWidth = 3; ctx.stroke();
   }
   ctx.globalAlpha = 1;
   drawShip(ship.x, ship.y);
@@ -1417,16 +1649,17 @@ function draw() {
     ctx.fillText(f.txt, f.x, f.y - f.t * 44);
     ctx.globalAlpha = 1;
   }
-  // HUD
+  // HUD — the left block sits BELOW the chrome row (← / 🔊 / ⚙ run to x=140),
+  // which is why it starts at safeTop+48 rather than tucking in beside them
   ctx.textAlign = 'left';
   ctx.font = "11px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
-  ctx.fillText('SECTOR ' + sector + ' · STAGE ' + stage + (boss ? (boss.sector ? ' · SECTOR BOSS' : ' · BOSS') : ' · W' + Math.min(wave, WAVES_PER_STAGE)), 56, safeTop + 14);
+  ctx.fillText('SECTOR ' + sector + ' · STAGE ' + stage + (boss ? (boss.sector ? ' · SECTOR BOSS' : ' · BOSS') : ' · W' + Math.min(wave, WAVES_PER_STAGE)), 12, safeTop + 48);
   const hpw = 90, hpFrac = ship.hp / ship.maxHp;
-  ctx.fillStyle = '#1a1a30'; ctx.fillRect(56, safeTop + 26, hpw, 6);
+  ctx.fillStyle = '#1a1a30'; ctx.fillRect(12, safeTop + 61, hpw, 6);
   ctx.fillStyle = hpFrac > 0.3 ? '#39ff14' : '#ff2244';
-  ctx.fillRect(56, safeTop + 26, hpw * Math.max(0, hpFrac), 6);
+  ctx.fillRect(12, safeTop + 61, hpw * Math.max(0, hpFrac), 6);
   ctx.font = "8px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
-  ctx.fillText('HP ' + Math.ceil(ship.hp) + '/' + ship.maxHp, 56, safeTop + 38);
+  ctx.fillText('HP ' + Math.ceil(ship.hp) + '/' + ship.maxHp, 12, safeTop + 70);
   ctx.textAlign = 'right';
   ctx.font = "20px 'Black Ops One'"; ctx.fillStyle = '#dde3ff';
   ctx.fillText(String(score), W - 12, safeTop + 24);
@@ -1443,7 +1676,7 @@ function draw() {
     ctx.globalAlpha = Math.min(1, stageBanner * 2);
     ctx.textAlign = 'center';
     ctx.font = "26px 'Black Ops One'"; ctx.fillStyle = '#ffc300';
-    ctx.shadowColor = '#ffc300'; ctx.shadowBlur = 18;
+    glow('#ffc300', 18);
     ctx.fillText(bannerText, W / 2, H * 0.38);
     ctx.shadowBlur = 0; ctx.globalAlpha = 1;
   }
