@@ -315,11 +315,82 @@ side colour for the outline and the kind colour for the accent, and the same
 function draws the card art, the board unit and the drag ghost, so a card can
 never drift from the thing it deploys.
 
+## Graphics styles (added 2026-08-23)
+
+Two art directions over **one** simulation, chosen from the cogwheel in the
+top-left HUD cluster (`#cog-btn`, sitting alongside back / mute / new — all
+four were narrowed to 34 px together so the row would not push the title out
+of `#hud-mid`).
+
+| | |
+|---|---|
+| `neon` | the original: dark board, grid, glowing wireframe silhouettes |
+| `toon` | cel-shaded cartoon: dirt arena, grass verge, plank fence, characters |
+
+**The invariant that makes this safe:** *a skin is paint.* Nothing in `step()`
+knows a skin exists, so switching mid-match cannot change an outcome — the
+drive suite asserts stats, costs, ranges, energy and an actual deploy come out
+byte-identical under both. Keep it that way: if a skin ever needs to know a
+number, that number belongs in the sim, not in the painter.
+
+**Cel shading here means exactly two things and nothing else:** flat colour
+steps (never a gradient) and one heavy ink outline per shape. `cel(path, fill,
+shade, lw, cx, cy)` is that rule made callable — it fills, clips one hard-edged
+shade half-plane through `(cx, cy)`, and inks the outline. `inkStroke()` is the
+same idea for line-like parts (a bow limb, an arrow shaft) which have no
+interior to clip into. Two details worth not undoing:
+
+- **The shade is counter-rotated out of the sprite's frame** (`frameRot()`
+  reads the rotation back off the live transform). A sprite that drags its own
+  shadow round as it turns to face a target is the single tell that reads as
+  flat shapes rather than lit shapes.
+- **`glow()` is a no-op when the skin has no bloom.** One switch kills every
+  halo in the game rather than a branch at thirty-odd call sites, so a new
+  effect written in the neon idiom is automatically right in both skins.
+
+**Team identity moves under the feet.** Under toon a silhouette says *what* and
+no longer says *whose* — a knight is a knight in both colours, and the rogue's
+cloak is dark red (`#7c1a2a`, deliberately far from the red team's `#ff2244`)
+even on the green team. So each unit stands on a thin team-coloured ground
+ring: the one mark that survives every facing, the white hit flash, and being
+read at arm's length. It is sized to read as a base ring and not a halo —
+thicker and a knot of four units becomes one puddle of team colour with limbs.
+Tray cards pass `plain` to suppress it, since a card already carries its side
+in its border and its tray.
+
+**Scenery is baked once from a fixed seed** (`buildScene()`, mulberry32) and
+never touched again: dirt patches, pebbles, the ragged grass boundary, the
+grass blades, and every fence plank with its tilt, its knot and whether it is
+missing or broken. Re-rolling per frame would make the arena boil, and nothing
+about it could ever be asserted. Two properties the generator owes the game:
+the fence leaves a **gateway** where each base stands (planks within
+`BASE_HW + 2.5` of centre on the horizontal edges are dropped, so a fort does
+not grow out through solid timber), and the vertical edges keep *some* missing
+planks — "poorly maintained" is a property of the place, not an effect.
+
+The toon base is a **fort**: team-coloured battlements behind a masonry wall,
+timber corner towers flying pennants, and the same turret geometry the neon
+base draws (hub at `dir * BASE_GUN.hub`, barrel out to `BASE_GUN.barrel`), so
+the turret's reach reads off the picture identically in both skins. It went
+through a rounded-box-plus-seams draft that read unmistakably as a metal drum;
+the crenellations are what fixed it. The team colour lives on the battlements
+rather than as a band on the back wall, because a coloured bar there sat
+exactly where `hpBar()` draws and read as a second health bar.
+
+Chrome (tray, cards, page background) differs only by palette, so it reads from
+`THEME[skin]` instead of growing a second copy of the layout code.
+
+Opening settings sets `paused`, which gates `step()`. This is a real-time game:
+a menu you have to read while your base is being hit is not a menu. The panel
+stacks *above* the other overlays (`z-index: 78`) rather than replacing them,
+so closing it reveals the title, the field manual or the result with no state
+to restore.
+
 ## Gates
 
 - `node .claude/scripts/smoke-mobile.cjs games/neon-clash/index.html`
 - `node .claude/scripts/check-games-sync.cjs`
-- `.claude/tests/drive-neon-clash.cjs` (84 checks) — drives a real touch drag
+- `.claude/tests/drive-neon-clash.cjs` (95 checks) — drives a real touch drag
   from the tray to the board, then asserts the refusal rules, the card types
   and deck order, the bunker/garrison caps, garrison ejection, a base kill
   ending the match, that the AI actually plays, and that the rotated top tray
@@ -342,12 +413,20 @@ never drift from the thing it deploys.
   the border check uses a bunker (a unit drifts off the border inside the
   round-trip) and the envelope check uses a slow tank and a 300 ms window,
   because the subject marches into the envelope on its own.
+  The skins block asserts the cog's box against every other top-left box
+  (pairwise, from real `getBoundingClientRect()`s — the brief was that it must
+  not overlap what is already there), that opening settings stops the clock and
+  closing it restarts it, that the choice reaches `localStorage`, that scenery
+  is the same object frame to frame, and the load-bearing one: a full board of
+  every card type renders in **both** skins, sampled off the canvas to prove
+  toon paints dirt where neon paints void.
 
 ## Test hook
 
 `window.__NC` exposes `state / energy / units / buildings / bases / matchT`
 plus `deploy(side, key, fingerX, fingerY)`, `start(mode, diff)`,
-`setEnergy(side, v)`, `casts`, `deck`, `kindOf(key)`, `sel`, `gun`, `shots`
+`setEnergy(side, v)`, `casts`, `deck`, `kindOf(key)`, `sel`, `gun`, `shots`,
+`skin`, `setSkin(name)`, `paused`, `scene`
 and `place(side, key, x, y)`
 — note `deploy` takes **finger** world coordinates, not the final spawn point,
 so it exercises the same `dropOff` path a real drag does. `place` is the one

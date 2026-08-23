@@ -44,18 +44,17 @@ html, body {
           3px
           calc(env(safe-area-inset-left, 0px) + 8px);
 }
-#hud-left { display:flex; gap:6px; position:relative; z-index:80; }
-#back-btn {
-  display:block; width:36px; height:30px; font-size:16px; line-height:28px;
+/* Four buttons share the left cluster, so they are sized as one set: adding
+   the cog by widening the row would have squeezed the title out of #hud-mid. */
+#hud-left { display:flex; gap:5px; position:relative; z-index:80; }
+#back-btn, #mute-btn, #new-btn, #cog-btn {
+  display:block; width:34px; height:30px; font-size:15px; line-height:28px;
   text-align:center; background:var(--panel); border:1px solid var(--border);
   border-radius:8px; color:var(--white); text-decoration:none;
-  touch-action:manipulation; user-select:none;
+  touch-action:manipulation; user-select:none; cursor:pointer;
 }
-#mute-btn, #new-btn {
-  width:38px; height:30px; font-size:15px; line-height:28px; text-align:center;
-  background:var(--panel); border:1px solid var(--border); border-radius:8px;
-  color:var(--white); touch-action:manipulation; cursor:pointer;
-}
+#back-btn { font-size:16px; }
+#cog-btn.on { border-color:var(--gold); color:var(--gold); }
 #hud-mid { text-align:center; min-width:0; }
 #v-mode { font-family:'Black Ops One', sans-serif; font-size:0.68rem; letter-spacing:2px; color:var(--white); }
 #v-clock { font-size:0.55rem; letter-spacing:2px; color:var(--dim); }
@@ -108,16 +107,41 @@ html, body {
   width:min(84vw, 340px); }
 #ov-help .hk { font-family:'Black Ops One',sans-serif; letter-spacing:2px; font-size:0.66rem;
   min-width:86px; }
+/* Settings sits ABOVE the other overlays rather than replacing them, so closing
+   it reveals whatever was underneath — title, field manual or result — with no
+   state to restore. */
+#ov-settings { z-index:78; }
+.set-lbl { font-family:'Black Ops One', sans-serif; font-size:0.62rem; letter-spacing:3px;
+  color:var(--dim); margin:2px 0 8px; }
+.skin-btn {
+  display:flex; align-items:center; gap:11px; width:100%; text-align:left;
+  border:1px solid var(--border); background:var(--panel); border-radius:10px;
+  padding:9px 11px; touch-action:manipulation; cursor:pointer;
+}
+.skin-btn .sw { width:42px; height:42px; border-radius:7px; flex:none;
+  border:1px solid rgba(255,255,255,0.18); }
+.skin-btn .nm { font-family:'Black Ops One', sans-serif; font-size:0.86rem;
+  letter-spacing:3px; color:var(--white); }
+.skin-btn .ds { font-size:0.55rem; color:var(--dim); letter-spacing:1px; line-height:1.5; margin-top:2px; }
+.skin-btn.on { border-color:var(--gold); }
+.skin-btn.on .nm { color:var(--gold); }
+.sw-neon { background:
+  radial-gradient(circle at 30% 34%, rgba(57,255,20,0.85) 0 12%, rgba(57,255,20,0) 42%),
+  radial-gradient(circle at 70% 68%, rgba(255,34,68,0.85) 0 12%, rgba(255,34,68,0) 42%),
+  linear-gradient(#120a14, #0a1410); }
+.sw-toon { background:
+  linear-gradient(#5aa03a 0 22%, #a9784a 22% 78%, #5aa03a 78% 100%); }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-22 22:43 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 01:04 UTC</div>
 <div id="app">
   <div id="hud">
     <div id="hud-left">
       <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
       <div id="mute-btn" role="button" aria-label="Mute">&#128266;</div>
       <div id="new-btn" role="button" aria-label="New match">&#8635;</div>
+      <div id="cog-btn" role="button" aria-label="Settings">&#9881;</div>
     </div>
     <div id="hud-mid">
       <div id="v-mode">NEON CLASH</div>
@@ -153,7 +177,25 @@ html, body {
   <div class="helprow"><div class="hk" style="color:var(--green)">BASE</div><div>The emplacement at the back of each half. Reduce the enemy base to zero and the match is yours &mdash; but it is not a sitting target: its <b>turret</b> has an archer's reach and cadence and hits for two archers a shot, so a lone unit that walks in alone dies to the base itself.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--white)">SIEGE</div><div>The moment a unit lands its first hit on a <b>building</b> &mdash; a bunker or a base &mdash; it commits to that target until the building falls, and a dashed tether marks it. A committed unit <b>will not turn on your defenders</b> while it grinds, so answering a push that has already reached your base is the cheapest fighting you will ever do. Units still only <i>marching</i> at you can be pulled off.</div></div>
   <div class="helprow"><div class="hk" style="color:var(--blue)">DEPLOY</div><div>Two ways, both fine: <b>drag</b> a card onto the board, or <b>tap</b> a card to arm it and then tap where you want it. Aim at the enemy half and it simply lands on your side of the halfway line at the same across-the-board spot &mdash; you never lose the card to a bad aim. Release over the tray to think again.</div></div>
+  <div class="helprow"><div class="hk" style="color:var(--gold)">STYLE</div><div>The cogwheel in the top left switches the whole arena between <b>NEON</b> and <b>TOON</b> at any time, mid-match included. It is paint only &mdash; every stat, range and rule is identical in both.</div></div>
   <div class="btn-col" style="margin-top:6px;"><div class="ov-btn primary" id="btn-help-back">BACK</div></div>
+</div>
+
+<div class="overlay hidden" id="ov-settings">
+  <div class="ov-title" style="font-size:1.2rem;letter-spacing:3px;">SETTINGS</div>
+  <div class="ov-sub" id="set-note" style="margin-bottom:10px;">MATCH PAUSED</div>
+  <div class="btn-col">
+    <div class="set-lbl">GRAPHICS STYLE</div>
+    <div class="skin-btn" id="sk-neon">
+      <div class="sw sw-neon"></div>
+      <div><div class="nm">NEON</div><div class="ds">GLOWING WIREFRAME ARENA</div></div>
+    </div>
+    <div class="skin-btn" id="sk-toon">
+      <div class="sw sw-toon"></div>
+      <div><div class="nm">TOON</div><div class="ds">CEL-SHADED DIRT ARENA</div></div>
+    </div>
+    <div class="ov-btn primary" id="btn-set-back" style="margin-top:6px;">RESUME</div>
+  </div>
 </div>
 
 <div class="overlay hidden" id="ov-over">
@@ -230,6 +272,58 @@ const SIDE_COL = ['#39ff14', '#ff2244'];
 const SIDE_DIM = ['rgba(57,255,20,0.16)', 'rgba(255,34,68,0.16)'];
 const SIDE_NAME = ['GREEN', 'RED'];
 
+// ------------------------------------------------------------- skins
+// TWO ART DIRECTIONS OVER ONE SIMULATION. Nothing in step() knows a skin
+// exists — a skin only ever decides how an entity is painted — which is why
+// switching mid-match is safe, instant, and can never change a match's outcome.
+//   neon — the original: dark board, glowing wireframe silhouettes.
+//   toon — cel-shaded cartoon: a dirt arena fenced in weathered planks, and
+//          characters instead of glyphs. Cel shading here means exactly two
+//          things and nothing else: FLAT colour steps (never a gradient) and
+//          ONE heavy ink outline per shape. The bloom is off, not dimmed.
+const SKIN_LIST = ['neon', 'toon'];
+let skin = 'neon';
+try { const s0 = localStorage.getItem('neon-clash-skin'); if (SKIN_LIST.indexOf(s0) >= 0) skin = s0; } catch (e) {}
+const toon = () => skin === 'toon';
+
+// Cartoon palette. Every entry is a flat colour and most come in a lit/shade
+// pair — the shade is the SAME hue stepped down, never a black overlay, which
+// is what keeps the look painted rather than dimmed.
+const TOON = {
+  ink:      '#241812',
+  dirt:     '#a9784a', dirtDk:'#8f6238', dirtLt:'#bf8f5d', dust:'#e8cfa4',
+  grass:    '#5aa03a', grassDk:'#3f7527', grassLt:'#79bd4d',
+  wood:     '#b4834e', woodSh:'#8b6034', woodDk:'#684325', woodGrey:'#9d8a72', woodGreySh:'#7a6a57',
+  stone:    '#9aa2ab', stoneSh:'#727b86', stoneDk:'#545c66',
+  steel:    '#ccd6e4', steelSh:'#94a2b7',
+  flesh:    '#f0c199', fleshSh:'#cf9a6f',
+  cloak:    '#7c1a2a', cloakSh:'#57101d',   // the rogue's dark red — kept far from #ff2244
+  hat:      '#2f7a35', hatSh:'#215a26',
+  iron:     '#5b6470', ironSh:'#434b55',
+  fire:     ['#8c2206', '#e2521a', '#ff9a1f', '#ffd24d', '#fff3c4'],
+};
+
+// Per-skin CHROME colours. The world drawing branches on functions; the tray
+// and cards only ever differ by palette, so they read their colours from here
+// instead of growing a second copy of the layout code.
+const THEME = {
+  neon: {
+    pageBg:'#06060e', tray:'#0b0b16', trayEdge:'rgba(120,140,200,0.2)',
+    cardFill:'rgba(16,16,32,0.95)', cardDim:'rgba(12,12,22,0.95)', cardArmed:'rgba(30,34,58,0.98)',
+    cardOff:'rgba(120,130,170,0.4)', cardTxt:'#dde3ff', cardTxtDim:'#7a83a8',
+    costOn:'#4488ff', costOff:'rgba(70,80,120,0.85)', costTxt:'#06060e', costTxtOff:'#99a',
+    armedBorder:'#ffffff', glow:true,
+  },
+  toon: {
+    pageBg:'#25331d', tray:'#3d2b1d', trayEdge:'rgba(255,224,168,0.24)',
+    cardFill:'#f0e3c6', cardDim:'#b6a68b', cardArmed:'#fff8e2',
+    cardOff:'#7c6549', cardTxt:'#33210f', cardTxtDim:'#6d5a42',
+    costOn:'#e8b64c', costOff:'#8d7a5c', costTxt:'#33210f', costTxtOff:'#3a2f22',
+    armedBorder:'#ffdf7a', glow:false,
+  },
+};
+const TH = () => THEME[skin];
+
 const AIS = {
   ROOKIE: { think: 2.3, idle: 0.42, counter: 0.35, bunker: 0.0, garrison: 0.0, reserve: 0, spell: 0.0, spellMin: 9, label: 'ROOKIE' },
   PRO:    { think: 1.3, idle: 0.14, counter: 0.70, bunker: 0.45, garrison: 0.6, reserve: 2, spell: 0.65, spellMin: 3, label: 'PRO' },
@@ -256,6 +350,7 @@ let flash = {};                         // 'side:kind' -> seconds of red flash l
 let casts = [0, 0];                     // spells cast this match, per side
 let shake = 0, banner = '', bannerT = 0, bannerCol = '#39ff14', suddenAnnounced = false;
 let winner = -1, renderT = 0;
+let paused = false;                     // settings open over a live match
 
 let rec = { ROOKIE: { w: 0, l: 0 }, PRO: { w: 0, l: 0 }, LEGEND: { w: 0, l: 0 } };
 try {
@@ -1009,9 +1104,11 @@ function aiThink() {
 }
 
 // ------------------------------------------------------------- draw helpers
-function rr(x, y, w, h, r) {
+function rr(x, y, w, h, r) { ctx.beginPath(); rrSub(x, y, w, h, r); }
+// Same rounded rect WITHOUT the beginPath, so it can be one subpath of a
+// compound path — the grass ring is the board rect with a ragged hole in it.
+function rrSub(x, y, w, h, r) {
   const rad = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
   ctx.moveTo(x + rad, y);
   ctx.arcTo(x + w, y, x + w, y + h, rad);
   ctx.arcTo(x + w, y + h, x, y + h, rad);
@@ -1019,12 +1116,491 @@ function rr(x, y, w, h, r) {
   ctx.arcTo(x, y, x + w, y, rad);
   ctx.closePath();
 }
-function glow(col, blur) { ctx.shadowColor = col; ctx.shadowBlur = blur; }
+// One switch kills every bloom in the game. Rather than branch at each of the
+// thirty-odd call sites, the skin that has no glow makes glow() a no-op, so a
+// cel-shaded arena cannot pick up a stray halo from code that has not been
+// touched — and a new effect written in the neon idiom is automatically right
+// in both skins.
+function glow(col, blur) { if (!TH().glow) return; ctx.shadowColor = col; ctx.shadowBlur = blur; }
 function noGlow() { ctx.shadowBlur = 0; }
+
+// ==================================================== toon: cel shading core
+// The cartoon look is exactly two rules, and everything below is those two
+// rules applied: every surface is FLAT colour with at most one hard-edged
+// shade step, and every surface carries one heavy ink outline. No gradient
+// ever appears in the toon path, and glow() is dead there (see above), so the
+// two skins cannot bleed into each other by accident.
+function frameRot() {
+  if (!ctx.getTransform) return 0;
+  const m = ctx.getTransform();
+  return Math.atan2(m.b, m.a);
+}
+// The sun is fixed in SCREEN space. A sprite draws inside its own rotated
+// frame, so the shade wedge is counter-rotated back out of it — otherwise a
+// unit turning to face a target drags its shadow round with it, which is the
+// one tell that reads as "flat shapes" rather than "lit shapes". (cx, cy) is
+// the part's own centre, so each part is lit about itself, not about the
+// sprite origin — a raised shield still catches light on its top half.
+function cel(path, fill, shade, lw, cx, cy) {
+  ctx.beginPath(); path();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (shade) {
+    ctx.save();
+    ctx.clip();
+    ctx.translate(cx || 0, cy || 0);
+    ctx.rotate(-frameRot());
+    ctx.fillStyle = shade;
+    ctx.fillRect(-400, 0, 800, 800);
+    ctx.restore();
+  }
+  if (lw) {
+    ctx.beginPath(); path();
+    ctx.strokeStyle = TOON.ink; ctx.lineWidth = lw;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+}
+// Line-like parts — a bow limb, a bowstring, an arrow shaft — get their
+// outline the cheap way: the same stroke laid down fatter in ink underneath.
+// A stroke has no interior to clip a shade step into, so cel() cannot help.
+function inkStroke(path, col, w) {
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); path();
+  ctx.strokeStyle = TOON.ink; ctx.lineWidth = w + Math.max(0.28, w * 0.9); ctx.stroke();
+  ctx.beginPath(); path();
+  ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke();
+}
+
+// ==================================================== toon: arena scenery
+// Scenery is generated ONCE from a fixed seed and then never touched again.
+// A cartoon arena that re-scatters its pebbles every frame reads as static
+// noise rather than ground, and no two screenshots of it could ever be
+// compared; baking it also makes the fence's missing planks a property of the
+// place instead of a flicker.
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const FENCE_AT = 1.1;          // planks stand this far in from the board rim
+const FENCE_IN = 6.4;          // and reach this much further inward
+const GRASS_IN = 12;           // nominal grass/dirt boundary, before the jitter
+function buildScene() {
+  const R = mulberry32(0x9E3779B9);
+  const S = { patches: [], pebbles: [], blades: [], grass: [], fences: [] };
+  for (let i = 0; i < 30; i++)
+    S.patches.push({ x: R() * UW, y: R() * UH, rx: 5 + R() * 15, ry: 3 + R() * 9,
+                     a: R() * Math.PI, lt: R() < 0.45 });
+  for (let i = 0; i < 95; i++)
+    S.pebbles.push({ x: R() * UW, y: R() * UH, r: 0.3 + R() * 0.6, lt: R() < 0.5 });
+  // Ragged grass boundary: a ring walked round an inset rect with every vertex
+  // pushed along its own normal, so grass bites into the dirt and back out
+  // instead of ending on a drawn-with-a-ruler line.
+  const n = 104, x0 = GRASS_IN, y0 = GRASS_IN, x1 = UW - GRASS_IN, y1 = UH - GRASS_IN;
+  const w = x1 - x0, h = y1 - y0, per = 2 * (w + h);
+  for (let i = 0; i < n; i++) {
+    let d = per * i / n, x, y, nx, ny;
+    if (d < w) { x = x0 + d; y = y0; nx = 0; ny = -1; }
+    else if ((d -= w) < h) { x = x1; y = y0 + d; nx = 1; ny = 0; }
+    else if ((d -= h) < w) { x = x1 - d; y = y1; nx = 0; ny = 1; }
+    else { d -= h; x = x0; y = y1 - d; nx = -1; ny = 0; }
+    const j = R() < 0.18 ? -3.2 - R() * 2.8 : -1.0 + R() * 2.8;
+    S.grass.push({ x: x + nx * j, y: y + ny * j });
+  }
+  // Blades: rejection-sampled so they crowd the grass band and thin onto dirt.
+  for (let i = 0; i < 420 && S.blades.length < 150; i++) {
+    const x = R() * UW, y = R() * UH;
+    const dEdge = Math.min(x, UW - x, y, UH - y);
+    if (dEdge > GRASS_IN + 3) continue;
+    if (dEdge > GRASS_IN - 2 && R() < 0.55) continue;
+    S.blades.push({ x, y, s: 0.9 + R() * 1.2, a: (R() - 0.5) * 0.8 });
+  }
+  // The fence. One frame per edge: origin at a corner, local +x running along
+  // the edge, local +y pointing INTO the arena — so planks, rails and their
+  // tilts are all authored once and reused on all four sides.
+  const EDGES = [
+    { x: 0,  y: 0,  rot: 0,             len: UW, horiz: true },
+    { x: UW, y: UH, rot: Math.PI,       len: UW, horiz: true },
+    { x: 0,  y: UH, rot: -Math.PI / 2,  len: UH, horiz: false },
+    { x: UW, y: 0,  rot: Math.PI / 2,   len: UH, horiz: false },
+  ];
+  for (const e of EDGES) {
+    const f = { x: e.x, y: e.y, rot: e.rot, len: e.len, planks: [], rails: [] };
+    let d = 2.2;
+    while (d < e.len - 2.2) {
+      const pw = 2.5 + R() * 1.5;
+      // The base sits mid-way along the back fence, so leave it a gateway
+      // rather than letting a fort grow out through solid planks.
+      const gate = e.horiz && Math.abs(d - UW / 2) < BASE_HW + 2.5;
+      f.planks.push({
+        d: d + pw / 2, w: pw, len: FENCE_IN * (0.8 + R() * 0.36),
+        tilt: (R() - 0.5) * 0.17, tone: (R() * 3) | 0,
+        gone: gate || R() < 0.09, jag: R() < 0.16,
+        knot: R() < 0.45 ? { u: (R() - 0.5) * 0.42, v: 0.28 + R() * 0.46, r: 0.22 + R() * 0.2 } : null,
+      });
+      d += pw + 0.9 + R() * 1.1;
+    }
+    for (const off of [FENCE_AT + 1.4, FENCE_AT + 4.5])
+      f.rails.push({ off, th: 1.15 + R() * 0.35, d0: (R() - 0.5) * 1.1, d1: (R() - 0.5) * 1.1,
+                     tone: (R() * 3) | 0 });
+    S.fences.push(f);
+  }
+  return S;
+}
+const TOON_SCENE = buildScene();
+const WOOD_TONE = [
+  { f: TOON.wood,     s: TOON.woodSh },
+  { f: TOON.woodGrey, s: TOON.woodGreySh },
+  { f: TOON.woodSh,   s: TOON.woodDk },
+];
+
+function drawFenceEdge(f) {
+  ctx.save();
+  ctx.translate(sx(f.x), sy(f.y));
+  ctx.scale(scale, scale);
+  ctx.rotate(f.rot);
+  const lw = 0.42;
+  for (const pk of f.planks) {
+    if (pk.gone) continue;
+    const tone = WOOD_TONE[pk.tone];
+    ctx.save();
+    ctx.translate(pk.d, FENCE_AT);
+    ctx.rotate(pk.tilt);
+    const w2 = pk.w / 2, L = pk.jag ? pk.len * 0.62 : pk.len;
+    const path = () => {
+      ctx.moveTo(-w2, 0); ctx.lineTo(w2, 0);
+      if (pk.jag) { ctx.lineTo(w2, L * 0.78); ctx.lineTo(pk.w * 0.14, L);
+                    ctx.lineTo(-pk.w * 0.18, L * 0.7); ctx.lineTo(-w2, L * 0.92); }
+      else { ctx.lineTo(w2, L); ctx.lineTo(-w2, L); }
+      ctx.closePath();
+    };
+    cel(path, tone.f, tone.s, lw, 0, L / 2);
+    ctx.save();                                   // grain, clipped to the plank
+    ctx.beginPath(); path(); ctx.clip();
+    ctx.strokeStyle = 'rgba(60,38,18,0.34)'; ctx.lineWidth = 0.22;
+    for (const u of [-0.26, 0.1, 0.3]) {
+      ctx.beginPath(); ctx.moveTo(pk.w * u, 0.3); ctx.lineTo(pk.w * u * 0.7, L - 0.3); ctx.stroke();
+    }
+    ctx.restore();
+    if (pk.knot)
+      cel(() => ctx.ellipse(pk.w * pk.knot.u, L * pk.knot.v, pk.knot.r, pk.knot.r * 0.72, 0.4, 0, Math.PI * 2),
+          'rgba(74,46,22,0.85)', null, 0.2, 0, 0);
+    ctx.restore();
+  }
+  for (const rl of f.rails) {
+    const tone = WOOD_TONE[rl.tone];
+    cel(() => {
+      ctx.moveTo(0, rl.off + rl.d0); ctx.lineTo(f.len, rl.off + rl.d1);
+      ctx.lineTo(f.len, rl.off + rl.d1 + rl.th); ctx.lineTo(0, rl.off + rl.d0 + rl.th);
+      ctx.closePath();
+    }, tone.f, tone.s, 0.34, f.len / 2, rl.off + rl.th / 2);
+  }
+  ctx.restore();
+}
+function drawArenaToon(bx, by, bw, bh) {
+  ctx.save();
+  rr(bx, by, bw, bh, 8); ctx.clip();
+  ctx.fillStyle = TOON.dirt;
+  ctx.fillRect(bx, by, bw, bh);
+  for (const p of TOON_SCENE.patches) {           // trodden dirt, flat steps only
+    ctx.fillStyle = p.lt ? 'rgba(191,143,93,0.34)' : 'rgba(143,98,56,0.34)';
+    ctx.beginPath();
+    ctx.ellipse(sx(p.x), sy(p.y), p.rx * scale, p.ry * scale, p.a, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (const p of TOON_SCENE.pebbles) {
+    ctx.fillStyle = p.lt ? 'rgba(226,196,150,0.55)' : 'rgba(104,68,37,0.55)';
+    ctx.beginPath(); ctx.arc(sx(p.x), sy(p.y), Math.max(0.7, p.r * scale), 0, Math.PI * 2); ctx.fill();
+  }
+  // Grass ring: the board rect with the ragged polygon punched out of it.
+  const g = TOON_SCENE.grass;
+  ctx.beginPath();
+  rrSub(bx, by, bw, bh, 8);
+  ctx.moveTo(sx(g[0].x), sy(g[0].y));
+  for (let i = 1; i < g.length; i++) ctx.lineTo(sx(g[i].x), sy(g[i].y));
+  ctx.closePath();
+  ctx.fillStyle = TOON.grass;
+  ctx.fill('evenodd');
+  ctx.beginPath();
+  ctx.moveTo(sx(g[0].x), sy(g[0].y));
+  for (let i = 1; i < g.length; i++) ctx.lineTo(sx(g[i].x), sy(g[i].y));
+  ctx.closePath();
+  ctx.strokeStyle = TOON.grassDk; ctx.lineWidth = Math.max(1, 0.5 * scale); ctx.stroke();
+  ctx.strokeStyle = TOON.grassDk; ctx.lineWidth = Math.max(0.9, 0.28 * scale); ctx.lineCap = 'round';
+  for (const b of TOON_SCENE.blades) {            // tufts, three strokes each
+    const px = sx(b.x), py = sy(b.y), h = b.s * scale * 1.5;
+    for (const k of [-0.45, 0, 0.45]) {
+      ctx.beginPath();
+      ctx.moveTo(px + k * scale * 0.8, py);
+      ctx.lineTo(px + (k + b.a) * scale * 1.5, py - h);
+      ctx.stroke();
+    }
+  }
+  for (const f of TOON_SCENE.fences) drawFenceEdge(f);
+  // Corner posts, last, so they cap the two plank runs that meet under them.
+  for (const c of [[0, 0], [UW, 0], [0, UH], [UW, UH]]) {
+    const px = c[0] + (c[0] ? -3.4 : 3.4), py = c[1] + (c[1] ? -3.4 : 3.4);
+    ctx.save();
+    ctx.translate(sx(px), sy(py)); ctx.scale(scale, scale);
+    cel(() => ctx.arc(0, 0, 2.5, 0, Math.PI * 2), TOON.woodGrey, TOON.woodGreySh, 0.5, 0, 0);
+    cel(() => ctx.arc(0, 0, 1.35, 0, Math.PI * 2), null, null, 0.3, 0, 0);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// ==================================================== toon: sprites
+// Local space: +x is the way the unit faces, and 1 unit = 1 world unit, so a
+// sprite is authored against its own collision radius and stays in proportion
+// at any board scale. Detail is deliberately coarse — a unit is roughly 30px
+// across on a phone, so anything finer than a couple of pixels is frame time
+// spent on mud.
+function toonTank(r, team) {
+  const lw = r * 0.15;
+  cel(() => ctx.ellipse(-r * 0.12, 0, r * 0.72, r * 0.6, 0, 0, Math.PI * 2),
+      TOON.steel, TOON.steelSh, lw, -r * 0.12, 0);
+  cel(() => rr(-r * 0.8, -r * 0.26, r * 1.2, r * 0.52, r * 0.2), team, null, lw * 0.7, -r * 0.2, 0);
+  ctx.save(); ctx.translate(r * 0.26, r * 0.66); ctx.rotate(-0.2);   // sword arm
+  cel(() => { ctx.moveTo(0, -r * 0.17); ctx.lineTo(r * 1.12, -r * 0.12); ctx.lineTo(r * 1.42, 0);
+              ctx.lineTo(r * 1.12, r * 0.12); ctx.lineTo(0, r * 0.17); ctx.closePath(); },
+      TOON.steel, TOON.steelSh, lw * 0.8, r * 0.6, 0);
+  cel(() => rr(-r * 0.34, -r * 0.3, r * 0.22, r * 0.6, r * 0.08), TOON.iron, TOON.ironSh, lw * 0.6, -r * 0.23, 0);
+  ctx.restore();
+  cel(() => ctx.arc(r * 0.34, -r * 0.78, r * 0.62, 0, Math.PI * 2),   // shield
+      TOON.wood, TOON.woodSh, lw, r * 0.34, -r * 0.78);
+  cel(() => ctx.arc(r * 0.34, -r * 0.78, r * 0.24, 0, Math.PI * 2),
+      TOON.iron, TOON.ironSh, lw * 0.7, r * 0.34, -r * 0.78);
+  cel(() => ctx.arc(r * 0.4, 0, r * 0.33, 0, Math.PI * 2), TOON.flesh, TOON.fleshSh, lw * 0.8, r * 0.4, 0);
+  cel(() => { ctx.arc(r * 0.38, 0, r * 0.37, Math.PI * 0.4, Math.PI * 1.6); ctx.closePath(); },
+      TOON.steel, TOON.steelSh, lw * 0.7, r * 0.38, 0);                // helmet, open at the face
+}
+function toonArcher(r, team) {
+  const lw = r * 0.16;
+  ctx.save(); ctx.translate(-r * 0.5, r * 0.34); ctx.rotate(0.55);     // quiver
+  cel(() => rr(-r * 0.17, -r * 0.46, r * 0.34, r * 0.86, r * 0.1), TOON.woodDk, null, lw * 0.7, 0, 0);
+  for (let i = -1; i <= 1; i++)
+    inkStroke(() => { ctx.moveTo(i * r * 0.1, -r * 0.42); ctx.lineTo(i * r * 0.15, -r * 0.95); },
+              '#f2ead6', lw * 0.5);
+  ctx.restore();
+  cel(() => ctx.ellipse(-r * 0.1, 0, r * 0.62, r * 0.52, 0, 0, Math.PI * 2),
+      TOON.hat, TOON.hatSh, lw, -r * 0.1, 0);                          // tunic
+  cel(() => rr(-r * 0.7, -r * 0.2, r * 1.0, r * 0.4, r * 0.15), team, null, lw * 0.6, -r * 0.2, 0);
+  inkStroke(() => ctx.arc(r * 0.1, 0, r * 1.02, -1.14, 1.14), TOON.wood, lw * 1.05);   // bow limb
+  inkStroke(() => { ctx.moveTo(r * 0.52, -r * 0.92); ctx.lineTo(r * 0.72, 0); ctx.lineTo(r * 0.52, r * 0.92); },
+            '#efe6cd', lw * 0.36);                                     // string, drawn back
+  inkStroke(() => { ctx.moveTo(r * 0.1, 0); ctx.lineTo(r * 1.45, 0); }, '#d9b483', lw * 0.42);
+  cel(() => { ctx.moveTo(r * 1.68, 0); ctx.lineTo(r * 1.34, -r * 0.2); ctx.lineTo(r * 1.34, r * 0.2); ctx.closePath(); },
+      TOON.iron, TOON.ironSh, lw * 0.5, r * 1.45, 0);                  // arrowhead
+  cel(() => ctx.arc(r * 0.34, 0, r * 0.32, 0, Math.PI * 2), TOON.flesh, TOON.fleshSh, lw * 0.8, r * 0.34, 0);
+  // the green hat: brim, then a peak sweeping back, then the feather
+  cel(() => ctx.ellipse(r * 0.3, 0, r * 0.42, r * 0.37, 0, 0, Math.PI * 2), TOON.hat, TOON.hatSh, lw * 0.8, r * 0.3, 0);
+  cel(() => { ctx.moveTo(r * 0.44, -r * 0.2); ctx.lineTo(-r * 0.24, -r * 0.44);
+              ctx.lineTo(r * 0.36, r * 0.22); ctx.closePath(); }, TOON.hatSh, null, lw * 0.7, r * 0.2, -r * 0.1);
+  inkStroke(() => { ctx.moveTo(r * 0.1, -r * 0.34); ctx.lineTo(-r * 0.5, -r * 0.72); }, '#e8452f', lw * 0.5);
+}
+function toonFighter(r, team, sw) {
+  const lw = r * 0.15;
+  cel(() => { ctx.moveTo(r * 0.22, -r * 0.52);                          // cloak, swept back
+              ctx.quadraticCurveTo(-r * 1.3, -r * 1.0, -r * 1.06, 0);
+              ctx.quadraticCurveTo(-r * 1.3, r * 1.0, r * 0.22, r * 0.52); ctx.closePath(); },
+      TOON.cloak, TOON.cloakSh, lw, -r * 0.35, 0);
+  cel(() => ctx.ellipse(0, 0, r * 0.6, r * 0.5, 0, 0, Math.PI * 2), TOON.cloak, TOON.cloakSh, lw, 0, 0);
+  cel(() => rr(-r * 0.62, -r * 0.17, r * 0.92, r * 0.34, r * 0.13), team, null, lw * 0.6, -r * 0.2, 0);
+  for (const s of [-1, 1]) {                                            // twin daggers
+    ctx.save(); ctx.translate(r * 0.28, s * r * 0.6); ctx.rotate(s * 0.24);
+    const L = r * 0.82 + sw * 0.9;
+    cel(() => { ctx.moveTo(0, -r * 0.12); ctx.lineTo(L, -r * 0.09); ctx.lineTo(L + r * 0.26, 0);
+                ctx.lineTo(L, r * 0.09); ctx.lineTo(0, r * 0.12); ctx.closePath(); },
+        TOON.steel, TOON.steelSh, lw * 0.7, L * 0.5, 0);
+    cel(() => rr(-r * 0.24, -r * 0.22, r * 0.18, r * 0.44, r * 0.06), TOON.woodDk, null, lw * 0.5, -r * 0.15, 0);
+    ctx.restore();
+  }
+  cel(() => ctx.arc(r * 0.34, 0, r * 0.35, 0, Math.PI * 2), TOON.cloak, TOON.cloakSh, lw * 0.8, r * 0.34, 0);
+  cel(() => ctx.arc(r * 0.47, 0, r * 0.2, 0, Math.PI * 2), '#2a1018', null, lw * 0.5, r * 0.47, 0);
+}
+function toonBunker(r, team) {
+  const lw = r * 0.11;
+  const hex = rad => () => {
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 6 + i * Math.PI / 3;
+      const x = Math.cos(a) * rad, y = Math.sin(a) * rad;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+  };
+  cel(hex(r), TOON.woodDk, '#4d3019', lw * 1.2, 0, 0);                  // palisade wall
+  cel(hex(r * 0.7), TOON.wood, TOON.woodSh, lw, 0, 0);                  // decking
+  ctx.save();
+  ctx.beginPath(); hex(r * 0.7)(); ctx.clip();
+  ctx.strokeStyle = 'rgba(84,54,26,0.5)'; ctx.lineWidth = lw * 0.8;
+  for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(-r, i * r * 0.28); ctx.lineTo(r, i * r * 0.28); ctx.stroke(); }
+  ctx.restore();
+  for (let i = 0; i < 6; i++) {                                         // log ends
+    const a = Math.PI / 6 + i * Math.PI / 3;
+    const x = Math.cos(a) * r * 0.85, y = Math.sin(a) * r * 0.85;
+    cel(() => ctx.arc(x, y, r * 0.19, 0, Math.PI * 2), TOON.woodGrey, TOON.woodGreySh, lw * 0.8, x, y);
+  }
+  for (const s of [-1, 1])                                              // firing slits
+    cel(() => rr(r * 0.24, s * r * 0.44 - r * 0.13, r * 0.44, r * 0.26, r * 0.06), '#2a1a0e', null, lw * 0.7, r * 0.46, s * r * 0.44);
+  inkStroke(() => { ctx.moveTo(r * 0.52, 0); ctx.lineTo(r * 1.12, 0); }, TOON.woodGrey, lw * 0.9);
+  cel(() => { ctx.moveTo(r * 1.1, -r * 0.06); ctx.lineTo(r * 0.66, -r * 0.3);
+              ctx.lineTo(r * 0.66, r * 0.18); ctx.closePath(); }, team, null, lw * 0.7, r * 0.85, -r * 0.06);
+}
+function toonFire(r) {
+  const lobe = (rad, wob, ph) => {
+    ctx.beginPath();
+    for (let i = 0; i <= 22; i++) {
+      const a = i / 22 * Math.PI * 2;
+      const rd = rad * (1 + wob * Math.sin(a * 5 + ph));
+      const x = Math.cos(a) * rd, y = Math.sin(a) * rd;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+  };
+  for (let i = 0; i < 5; i++) {                                         // detached sparks
+    const a = 0.6 + i * Math.PI * 2 / 5;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * r * 1.28, Math.sin(a) * r * 1.28, r * (0.15 + 0.07 * (i % 2)), 0, Math.PI * 2);
+    ctx.fillStyle = TOON.fire[2]; ctx.fill();
+    ctx.strokeStyle = '#4a1103'; ctx.lineWidth = r * 0.09; ctx.stroke();
+  }
+  lobe(r, 0.14, 0);
+  ctx.fillStyle = TOON.fire[0]; ctx.fill();
+  ctx.strokeStyle = '#4a1103'; ctx.lineWidth = r * 0.17; ctx.lineJoin = 'round'; ctx.stroke();
+  lobe(r * 0.8, 0.13, 1.4); ctx.fillStyle = TOON.fire[1]; ctx.fill();
+  lobe(r * 0.57, 0.12, 2.9); ctx.fillStyle = TOON.fire[2]; ctx.fill();
+  lobe(r * 0.35, 0.1, 4.1);  ctx.fillStyle = TOON.fire[3]; ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.17, 0, Math.PI * 2);
+  ctx.fillStyle = TOON.fire[4]; ctx.fill();
+}
+// Under toon a silhouette says WHAT a unit is, not whose it is — a knight is a
+// knight in both colours, and the rogue's cloak is red on the green team too.
+// So team identity moves to a thick ringed disc under the feet: the one mark
+// that survives every facing, every hit flash, and being read at arm's length.
+function drawToonShape(key, r, team, accent, t, flash, plain) {
+  const lw = Math.max(0.4, r * 0.14);
+  // Sized and weighted to read as a base ring, not a halo: any thicker and a
+  // knot of four units becomes one puddle of team colour with limbs.
+  if (key !== 'fireball' && !plain) {
+    ctx.save();
+    ctx.rotate(-frameRot());                       // the disc lies on the ground, not on the sprite
+    ctx.beginPath(); ctx.ellipse(0, r * 0.18, r * 1.0, r * 0.84, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(48,30,16,0.26)'; ctx.fill();
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = team; ctx.lineWidth = lw * 0.85; ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+  if (key === 'tank') toonTank(r, team);
+  else if (key === 'archer') toonArcher(r, team);
+  else if (key === 'fighter') toonFighter(r, team, t || 0);
+  else if (key === 'bunker') toonBunker(r, team);
+  else if (key === 'fireball') toonFire(r);
+  if (flash) {
+    ctx.save();
+    ctx.globalAlpha = 0.55 * flash;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.02, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+// The base as a timber-and-stone gatehouse with a wooden cannon on top. Same
+// geometry the neon base draws — pedestal, hub, barrel, muzzle flash — so the
+// turret's reach still reads off the picture identically in both skins.
+function drawBaseToon(bs) {
+  const dir = bs.side === 0 ? -1 : 1;
+  const dead = bs.hp <= 0;
+  const team = SIDE_COL[bs.side];
+  const ph = 5;
+  ctx.save();
+  ctx.translate(sx(bs.x), sy(bs.y));
+  ctx.scale(scale, scale);
+  const lw = 0.62;
+  const stone = dead ? '#6e6a66' : TOON.stone, stoneSh = dead ? null : TOON.stoneSh;
+  // Crenellations first, behind the wall, so the merlons read as the top of a
+  // rampart rather than blocks stuck on the front. Without them the pedestal
+  // is a rounded box and the whole emplacement reads as a metal drum.
+  for (let i = -2; i <= 2; i++)
+    cel(() => rr(i * 5 - 1.8, dir > 0 ? ph - 1 : -ph - 1.4, 3.6, 2.4, 0.5),
+        dead ? '#6e6a66' : team, null, lw * 0.8, i * 5, dir * ph);
+  cel(() => rr(-BASE_HW, -ph, BASE_HW * 2, ph * 2, 1.1), stone, stoneSh, lw, 0, 0);
+  ctx.save();                                        // masonry courses
+  ctx.beginPath(); rrSub(-BASE_HW, -ph, BASE_HW * 2, ph * 2, 1.1); ctx.clip();
+  ctx.strokeStyle = 'rgba(62,68,76,0.38)'; ctx.lineWidth = 0.28;
+  for (const yy of [-ph / 3, ph / 3]) { ctx.beginPath(); ctx.moveTo(-BASE_HW, yy); ctx.lineTo(BASE_HW, yy); ctx.stroke(); }
+  for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * 5 + 2.5, -ph / 3); ctx.lineTo(i * 5 + 2.5, ph / 3); ctx.stroke(); }
+  ctx.restore();
+  for (const o of [-1, 1]) {                         // timber corner towers, each with a pennant
+    cel(() => rr(o * (BASE_HW - 2.4) - 1.5, -ph - 1.1, 3.0, ph * 2 + 2.2, 0.6),
+        TOON.woodDk, '#4d3019', lw * 0.8, o * (BASE_HW - 2.4), 0);
+    if (!dead)
+      cel(() => { ctx.moveTo(o * (BASE_HW - 2.4), -ph - 1.1); ctx.lineTo(o * (BASE_HW + 3.4), -ph + 0.4);
+                  ctx.lineTo(o * (BASE_HW - 2.4), -ph + 1.9); ctx.closePath(); },
+          team, null, lw * 0.6, o * BASE_HW, -ph + 0.4);
+  }
+  const hy = dir * BASE_GUN.hub, a = bs.face;        // turret
+  ctx.save();
+  ctx.translate(0, hy);
+  const ca = Math.cos(a), sa = Math.sin(a);
+  const bar = (u, v) => [ca * u - sa * v, sa * u + ca * v];   // along-barrel, across-barrel
+  cel(() => {
+    const p0 = bar(BASE_GUN.hub * 0.3, 2.2), p1 = bar(BASE_GUN.barrel, 1.35);
+    const p2 = bar(BASE_GUN.barrel, -1.35), p3 = bar(BASE_GUN.hub * 0.3, -2.2);
+    ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]);
+    ctx.closePath();
+  }, dead ? '#6b6660' : TOON.wood, dead ? null : TOON.woodSh, lw,
+     ca * BASE_GUN.barrel * 0.6, sa * BASE_GUN.barrel * 0.6);
+  for (const u of [BASE_GUN.barrel - 1.1, BASE_GUN.barrel * 0.55]) {   // iron bands
+    const w = 1.4 + (BASE_GUN.barrel - u) * 0.12;
+    cel(() => {
+      const q0 = bar(u - 0.5, w), q1 = bar(u + 0.5, w), q2 = bar(u + 0.5, -w), q3 = bar(u - 0.5, -w);
+      ctx.moveTo(q0[0], q0[1]); ctx.lineTo(q1[0], q1[1]); ctx.lineTo(q2[0], q2[1]); ctx.lineTo(q3[0], q3[1]);
+      ctx.closePath();
+    }, dead ? '#57534e' : TOON.iron, dead ? null : TOON.ironSh, lw * 0.5, ca * u, sa * u);
+  }
+  cel(() => ctx.arc(0, 0, BASE_GUN.hub, 0, Math.PI * 2),
+      dead ? '#6b6660' : TOON.woodDk, dead ? null : '#4d3019', lw, 0, 0);
+  cel(() => ctx.arc(0, 0, BASE_GUN.hub * 0.45, 0, Math.PI * 2),
+      dead ? '#57534e' : TOON.iron, dead ? null : TOON.ironSh, lw * 0.7, 0, 0);
+  if (bs.flash > 0 && !dead) {                       // muzzle flash: a flat starburst
+    const k = bs.flash / 0.11;
+    const mx = Math.cos(a) * (BASE_GUN.barrel + 1.2), my = Math.sin(a) * (BASE_GUN.barrel + 1.2);
+    ctx.save();
+    ctx.globalAlpha = k;
+    ctx.beginPath();
+    for (let i = 0; i < 12; i++) {
+      const ang = a + i * Math.PI / 6, rd = (i % 2 ? 1.1 : 2.6) * (0.6 + 0.6 * k);
+      const px = mx + Math.cos(ang) * rd, py = my + Math.sin(ang) * rd;
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = TOON.fire[3]; ctx.fill();
+    ctx.strokeStyle = TOON.fire[1]; ctx.lineWidth = 0.4; ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+  ctx.restore();
+  hpBar(bs.x, bs.y - dir * (ph + 4.5) - 1.2, BASE_HW * 2, bs.hp / bs.maxHp, team);
+  ctx.save();
+  ctx.font = 'bold ' + Math.max(7, Math.round(2.4 * scale)) + "px 'Share Tech Mono', monospace";
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = Math.max(2, 0.9 * scale); ctx.lineJoin = 'round';
+  ctx.strokeStyle = TOON.ink;
+  ctx.strokeText(Math.ceil(bs.hp), sx(bs.x), sy(bs.y - dir * 2.4));
+  ctx.fillStyle = dead ? '#b9b4ae' : '#fff6e2';
+  ctx.fillText(Math.ceil(bs.hp), sx(bs.x), sy(bs.y - dir * 2.4));
+  ctx.restore();
+}
+
 
 // Unit silhouettes: shape says WHAT it is, colour says WHOSE it is.
 // Drawn in a local space where +x is the facing direction and 1 unit = 1 world unit.
-function drawUnitShape(key, r, col, accent, t) {
+function drawUnitShape(key, r, col, accent, t, flash, plain) {
+  if (toon()) { drawToonShape(key, r, col, accent, t, flash || 0, plain); return; }
+  if (flash) col = '#ffffff';           // neon says "hit" by going white all over
   ctx.lineWidth = Math.max(1, r * 0.32);
   ctx.strokeStyle = col; ctx.fillStyle = 'rgba(6,6,14,0.85)';
   if (key === 'tank') {
@@ -1116,7 +1692,7 @@ function drawUnit(u) {
   ctx.rotate(u.face === undefined ? (u.side === 0 ? -Math.PI / 2 : Math.PI / 2) : u.face);
   const hot = u.hurt > 0;
   glow(hot ? '#ffffff' : col, hot ? 14 : 8);
-  drawUnitShape(u.key, u.r, hot ? '#ffffff' : col, u.k.col, u.swing * 6);
+  drawUnitShape(u.key, u.r, col, u.k.col, u.swing * 6, hot ? 1 : 0);
   noGlow();
   ctx.restore();
   if (u.hp < u.maxHp) hpBar(u.x, u.y - u.r - 2.6, u.r * 2, u.hp / u.maxHp, col);
@@ -1136,7 +1712,7 @@ function drawBunker(b) {
   ctx.rotate(b.side === 0 ? -Math.PI / 2 : Math.PI / 2);
   const hot = b.hurt > 0;
   glow(hot ? '#ffffff' : KINDS.bunker.col, hot ? 18 : 12);
-  drawUnitShape('bunker', b.r, hot ? '#ffffff' : col, KINDS.bunker.col, 0);
+  drawUnitShape('bunker', b.r, col, KINDS.bunker.col, 0, hot ? 1 : 0);
   noGlow();
   ctx.restore();
   // garrison pips
@@ -1158,6 +1734,7 @@ function drawBunker(b) {
 // barrel tracks whatever it is shooting. The old goalpost read as scenery,
 // which was wrong the moment the base started fighting back.
 function drawBase(bs) {
+  if (toon()) { drawBaseToon(bs); return; }
   const col = SIDE_COL[bs.side];
   const dir = bs.side === 0 ? -1 : 1;                 // toward the field
   const dead = bs.hp <= 0;
@@ -1235,16 +1812,22 @@ function activeDragSide(side) {
 const armed = side => state === 'play' && controls(side) && !!sel[side];
 function drawBoard() {
   const bx = sx(0), by = sy(0), bw = UW * scale, bh = UH * scale;
-  const g = ctx.createLinearGradient(0, by, 0, by + bh);
-  g.addColorStop(0, '#120a14'); g.addColorStop(0.5, '#080a14'); g.addColorStop(1, '#0a1410');
-  ctx.fillStyle = g;
-  rr(bx, by, bw, bh, 8); ctx.fill();
+  if (toon()) {
+    drawArenaToon(bx, by, bw, bh);
+  } else {
+    const g = ctx.createLinearGradient(0, by, 0, by + bh);
+    g.addColorStop(0, '#120a14'); g.addColorStop(0.5, '#080a14'); g.addColorStop(1, '#0a1410');
+    ctx.fillStyle = g;
+    rr(bx, by, bw, bh, 8); ctx.fill();
+    ctx.save();
+    rr(bx, by, bw, bh, 8); ctx.clip();
+    ctx.strokeStyle = 'rgba(90,110,170,0.09)'; ctx.lineWidth = 1;
+    for (let x = 10; x < UW; x += 10) { ctx.beginPath(); ctx.moveTo(sx(x), by); ctx.lineTo(sx(x), by + bh); ctx.stroke(); }
+    for (let y = 10; y < UH; y += 10) { ctx.beginPath(); ctx.moveTo(bx, sy(y)); ctx.lineTo(bx + bw, sy(y)); ctx.stroke(); }
+    ctx.restore();
+  }
   ctx.save();
   rr(bx, by, bw, bh, 8); ctx.clip();
-  // grid
-  ctx.strokeStyle = 'rgba(90,110,170,0.09)'; ctx.lineWidth = 1;
-  for (let x = 10; x < UW; x += 10) { ctx.beginPath(); ctx.moveTo(sx(x), by); ctx.lineTo(sx(x), by + bh); ctx.stroke(); }
-  for (let y = 10; y < UH; y += 10) { ctx.beginPath(); ctx.moveTo(bx, sy(y)); ctx.lineTo(bx + bw, sy(y)); ctx.stroke(); }
   // deploy-zone highlight while a card is in the air OR armed by tap
   for (let s = 0; s < 2; s++) {
     const d = activeDragSide(s);
@@ -1256,20 +1839,36 @@ function drawBoard() {
   }
   ctx.restore();
   for (let s = 0; s < 2; s++) if (activeDragSide(s) || armed(s)) drawBaseReach(bases[1 - s]);
-  // halfway line
+  // halfway line — under toon it is scuffed into the dirt rather than lit
   ctx.save();
-  ctx.setLineDash([7, 7]);
-  ctx.strokeStyle = 'rgba(180,200,255,0.35)'; ctx.lineWidth = Math.max(1.4, scale * 0.5);
+  ctx.setLineDash(toon() ? [5, 4] : [7, 7]);
+  ctx.strokeStyle = toon() ? 'rgba(232,207,164,0.7)' : 'rgba(180,200,255,0.35)';
+  ctx.lineWidth = Math.max(1.4, scale * (toon() ? 0.75 : 0.5));
+  ctx.lineCap = toon() ? 'round' : 'butt';
   glow('#4488ff', 8);
   ctx.beginPath(); ctx.moveTo(bx, sy(CENTER)); ctx.lineTo(bx + bw, sy(CENTER)); ctx.stroke();
   noGlow(); ctx.restore();
-  // frame
-  ctx.strokeStyle = 'rgba(120,140,200,0.28)'; ctx.lineWidth = 1.5;
-  rr(bx, by, bw, bh, 8); ctx.stroke();
+  // frame — the toon arena is framed by its own fence, so it wants none
+  if (!toon()) {
+    ctx.strokeStyle = 'rgba(120,140,200,0.28)'; ctx.lineWidth = 1.5;
+    rr(bx, by, bw, bh, 8); ctx.stroke();
+  }
 }
 function drawShots() {
   for (const s of shots) {
     const a = s.ang || 0, L = 3.4;
+    if (toon()) {                       // a real arrow: shaft, head, fletching
+      ctx.save();
+      ctx.translate(sx(s.x), sy(s.y)); ctx.scale(scale, scale); ctx.rotate(a);
+      inkStroke(() => { ctx.moveTo(-L, 0); ctx.lineTo(0.2, 0); }, '#dcb887', 0.5);
+      cel(() => { ctx.moveTo(1.1, 0); ctx.lineTo(-0.4, -0.55); ctx.lineTo(-0.4, 0.55); ctx.closePath(); },
+          TOON.iron, TOON.ironSh, 0.3, 0.2, 0);
+      cel(() => { ctx.moveTo(-L, 0); ctx.lineTo(-L - 1.0, -0.75); ctx.lineTo(-L + 0.7, 0);
+                  ctx.lineTo(-L - 1.0, 0.75); ctx.closePath(); },
+          '#f4ecd8', null, 0.26, -L, 0);
+      ctx.restore();
+      continue;
+    }
     ctx.save();
     ctx.strokeStyle = s.col; ctx.lineWidth = Math.max(1.4, scale * 0.55);
     glow(s.col, 8);
@@ -1295,6 +1894,17 @@ function drawFx() {
       ctx.beginPath();
       ctx.arc(sx(f.x), sy(f.y), 3.2 * scale, f.ang - 0.9, f.ang + 0.9);
       ctx.stroke();
+    } else if (f.t === 'blast' && toon()) {
+      // Same expansion, cel rules: four hard bands instead of a radial ramp.
+      const g = 1 - k, rad = f.r * (0.35 + 0.75 * g);
+      ctx.globalAlpha = Math.min(1, k * 1.35);
+      ctx.save();
+      ctx.translate(sx(f.x), sy(f.y)); ctx.scale(scale, scale);
+      const bands = [[1.0, TOON.fire[0]], [0.76, TOON.fire[1]], [0.52, TOON.fire[2]], [0.28, TOON.fire[3]]];
+      for (const b of bands) { ctx.beginPath(); ctx.arc(0, 0, rad * b[0], 0, Math.PI * 2); ctx.fillStyle = b[1]; ctx.fill(); }
+      ctx.beginPath(); ctx.arc(0, 0, f.r * (0.5 + 0.6 * g), 0, Math.PI * 2);
+      ctx.strokeStyle = '#4a1103'; ctx.lineWidth = 0.55; ctx.stroke();
+      ctx.restore();
     } else if (f.t === 'blast') {
       // expanding fireball: hot core inside a cooling shell, then a shock ring
       const g = 1 - k;                                  // 0 -> 1 over its life
@@ -1312,9 +1922,13 @@ function drawFx() {
       glow(f.col, 14);
       ctx.beginPath(); ctx.arc(cx, cy, f.r * scale * (0.5 + 0.6 * g), 0, Math.PI * 2); ctx.stroke();
     } else if (f.t === 'txt') {
-      ctx.fillStyle = f.col;
       ctx.font = "bold " + Math.max(8, Math.round(2.6 * scale)) + "px 'Share Tech Mono', monospace";
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (toon()) {                     // light dirt eats thin text — ink it first
+        ctx.strokeStyle = TOON.ink; ctx.lineWidth = Math.max(2, 0.8 * scale); ctx.lineJoin = 'round';
+        ctx.strokeText(f.txt, sx(f.x), sy(f.y - (1 - k) * 6));
+      }
+      ctx.fillStyle = f.col;
       ctx.fillText(f.txt, sx(f.x), sy(f.y - (1 - k) * 6));
     }
     noGlow(); ctx.restore();
@@ -1331,9 +1945,9 @@ function drawFx() {
 function drawTray(side) {
   const top = side === 0 ? boardBot : 0;
   const h = trayH;
-  ctx.fillStyle = '#0b0b16';
+  ctx.fillStyle = TH().tray;
   ctx.fillRect(0, top, cw, h);
-  ctx.strokeStyle = 'rgba(120,140,200,0.2)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = TH().trayEdge; ctx.lineWidth = 1;
   ctx.beginPath();
   const edge = side === 0 ? top + 0.5 : top + h - 0.5;
   ctx.moveTo(0, edge); ctx.lineTo(cw, edge); ctx.stroke();
@@ -1384,10 +1998,11 @@ function drawCard(c, inactive) {
   ctx.translate(c.x + c.w / 2, c.y + c.h / 2);
   if (trayFlipped(c.side)) ctx.rotate(Math.PI);
   ctx.translate(-c.w / 2, -c.h / 2);
-  const border = fl > 0 ? '#ff2244' : (armedCard ? '#ffffff' : afford ? k.col : 'rgba(120,130,170,0.4)');
-  ctx.fillStyle = fl > 0 ? 'rgba(60,10,20,0.9)'
-                : armedCard ? 'rgba(30,34,58,0.98)'
-                : afford ? 'rgba(16,16,32,0.95)' : 'rgba(12,12,22,0.95)';
+  const T = TH();
+  const border = fl > 0 ? '#ff2244' : (armedCard ? T.armedBorder : afford ? k.col : T.cardOff);
+  ctx.fillStyle = fl > 0 ? (toon() ? '#d98b8b' : 'rgba(60,10,20,0.9)')
+                : armedCard ? T.cardArmed
+                : afford ? T.cardFill : T.cardDim;
   rr(0, 0, c.w, c.h, 7); ctx.fill();
   ctx.lineWidth = fl > 0 || armedCard ? 2.4 : 1.4;
   ctx.strokeStyle = border;
@@ -1409,31 +2024,32 @@ function drawCard(c, inactive) {
   const spr = Math.min(c.w * 0.30, (c.h - nf - 8) * 0.33);  // tank's barrel reaches 1.5r — keep it inside the card
   ctx.scale(spr / 5.5, spr / 5.5);
   ctx.rotate(-Math.PI / 2);
-  drawUnitShape(c.kind, 5.5, SIDE_COL[c.side], k.col, 0);
+  drawUnitShape(c.kind, 5.5, SIDE_COL[c.side], k.col, 0, 0, true);
   ctx.restore();
   // cost badge (top-left of the card, in that player's own orientation)
   const br = clamp(c.w * 0.15, 6.5, 9.5);
   ctx.beginPath();
   ctx.arc(br + 2, br + 2, br, 0, Math.PI * 2);
-  ctx.fillStyle = afford ? '#4488ff' : 'rgba(70,80,120,0.85)';
+  ctx.fillStyle = afford ? T.costOn : T.costOff;
   ctx.fill();
+  if (toon()) { ctx.strokeStyle = TOON.ink; ctx.lineWidth = 1.2; ctx.stroke(); }
   ctx.font = 'bold ' + (br * 1.24).toFixed(1) + "px 'Share Tech Mono', monospace";
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillStyle = afford ? '#06060e' : '#99a';
+  ctx.fillStyle = afford ? T.costTxt : T.costTxtOff;
   ctx.fillText(String(k.cost), br + 2, br + 2.5);
   // name
   ctx.font = nf.toFixed(1) + "px 'Share Tech Mono', monospace";
-  ctx.fillStyle = afford ? '#dde3ff' : '#7a83a8';
+  ctx.fillStyle = afford ? T.cardTxt : T.cardTxtDim;
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
   ctx.fillText(k.name, c.w / 2, c.h - 3);
   if (k.type === 'building') {
     ctx.font = (nf * 0.88).toFixed(1) + "px 'Share Tech Mono', monospace";
-    ctx.fillStyle = used >= MAX_BUNKERS ? '#ff2244' : '#8899bb';
+    ctx.fillStyle = used >= MAX_BUNKERS ? '#ff2244' : T.cardTxtDim;
     ctx.textAlign = 'right'; ctx.textBaseline = 'top';
     ctx.fillText(used + '/' + MAX_BUNKERS, c.w - 4, 3);
   } else if (k.type === 'spell') {
     ctx.font = (nf * 0.82).toFixed(1) + "px 'Share Tech Mono', monospace";
-    ctx.fillStyle = afford ? k.col : '#7a83a8';
+    ctx.fillStyle = afford ? k.col : T.cardTxtDim;
     ctx.textAlign = 'right'; ctx.textBaseline = 'top';
     ctx.fillText('AoE', c.w - 4, 3);
   }
@@ -1470,7 +2086,11 @@ function drawDrags() {
     ctx.scale(scale, scale);
     ctx.rotate(d.side === 0 ? -Math.PI / 2 : Math.PI / 2);
     ctx.globalAlpha = info.ok ? 0.85 : 0.4;
-    drawUnitShape(d.kind, spell ? 4.2 : k.r, info.ok ? (spell ? k.col : SIDE_COL[d.side]) : '#ff2244', k.col, 0);
+    // A toon ghost stays in its own colours even when the drop is illegal —
+    // the red footprint and the DENY text already say so, and a red-washed
+    // knight would read as the other player's unit.
+    const gcol = (!info.ok && !toon()) ? '#ff2244' : (spell ? k.col : SIDE_COL[d.side]);
+    drawUnitShape(d.kind, spell ? 4.2 : k.r, gcol, k.col, 0);
     ctx.restore();
     if (info.garrison) {
       ctx.globalAlpha = 1;
@@ -1511,7 +2131,7 @@ function drawBanner() {
 // ------------------------------------------------------------- render
 function render() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = '#06060e';
+  ctx.fillStyle = TH().pageBg;
   ctx.fillRect(0, 0, cw, ch);
   ctx.save();
   if (shake > 0) ctx.translate(rnd(-1, 1) * shake * 9, rnd(-1, 1) * shake * 9);
@@ -1630,6 +2250,7 @@ function startMatch(newMode, d) {
   $('ov-start').classList.add('hidden');
   $('ov-help').classList.add('hidden');
   $('ov-over').classList.add('hidden');
+  closeSettings();
   banner = 'CLASH';
   bannerT = 1.2; bannerCol = '#39ff14';
   updateHud();
@@ -1712,6 +2333,40 @@ bindTap($('mute-btn'), () => {
   applyMute();
 });
 
+// ------------------------------------------------------------- settings
+// The panel stacks ABOVE whatever overlay is showing rather than replacing it,
+// so closing it simply reveals the title, the field manual or the result again
+// with no state to remember. Over a live match it pauses the sim: this is a
+// real-time game, and a menu you have to read while your base is being hit is
+// not a menu.
+function setSkin(s) {
+  if (SKIN_LIST.indexOf(s) < 0) return;
+  skin = s;
+  try { localStorage.setItem('neon-clash-skin', s); } catch (e) {}
+  updateSkinUI();
+}
+function updateSkinUI() {
+  for (const s of SKIN_LIST) $('sk-' + s).classList.toggle('on', skin === s);
+}
+const settingsOpen = () => !$('ov-settings').classList.contains('hidden');
+function openSettings() {
+  drags = {};                           // a half-made drag cannot survive the overlay
+  paused = true;
+  $('set-note').textContent = state === 'play' ? 'MATCH PAUSED' : 'PICK HOW THE ARENA LOOKS';
+  $('ov-settings').classList.remove('hidden');
+  $('cog-btn').classList.add('on');
+  updateSkinUI();
+}
+function closeSettings() {
+  $('ov-settings').classList.add('hidden');
+  $('cog-btn').classList.remove('on');
+  paused = false;
+}
+bindTap($('cog-btn'), () => (settingsOpen() ? closeSettings() : openSettings()));
+bindTap($('btn-set-back'), closeSettings);
+bindTap($('sk-neon'), () => setSkin('neon'));
+bindTap($('sk-toon'), () => setSkin('toon'));
+
 // ------------------------------------------------------------- main loop
 let last = performance.now(), hudT = 0;
 function frame(now) {
@@ -1719,7 +2374,7 @@ function frame(now) {
   let dt = (now - last) / 1000; last = now;
   if (dt > 0.1) dt = 0.1;
   renderT += dt;
-  if (dt > 0 && state === 'play') step(dt);
+  if (dt > 0 && state === 'play' && !paused) step(dt);
   shake = Math.max(0, shake - dt);
   bannerT = Math.max(0, bannerT - dt);
   for (const key in flash) { flash[key] -= dt; if (flash[key] <= 0) delete flash[key]; }
@@ -1740,6 +2395,7 @@ resetField();
 applyView();
 updateHud();
 updateRecUI();
+updateSkinUI();
 applyMute();
 requestAnimationFrame(frame);
 
@@ -1759,6 +2415,8 @@ window.__NC = {
   setTime: v => { matchT = v; suddenAnnounced = v < SUDDEN_AT ? false : suddenAnnounced; },
   get viewRot() { return viewRot; },
   get sel() { return sel.slice(); },
+  get skin() { return skin; }, setSkin: s => setSkin(s),
+  get paused() { return paused; }, get scene() { return TOON_SCENE; },
   get gun() { return { dmg: BASE_GUN.dmg, rate: BASE_GUN.rate, range: BASE_GUN.range }; },
   get shots() { return shots; },
 };

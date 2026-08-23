@@ -565,7 +565,7 @@ checksummed code carries seed + score, so a friend replays your exact grid and
 the game reports the head-to-head. LABELS assist stamps a unique letter per
 colour for a colour-free hunt. Detailed context: `.claude/signal-hunt.md`.
 
-### NEON CLASH (`neon-clash/index.html`, ~1700 lines)
+### NEON CLASH (`neon-clash/index.html`, ~2400 lines)
 The repo's first **real-time card battler**, and its first **simultaneous**
 local-2p game. One board split into halves; energy refills at 1/sec up to 20
 on both sides; drag a tank (4), fighter (3), archer (3) or bunker (8) out of
@@ -604,14 +604,30 @@ opponent's readable roster. Three AI grades differ in think interval, an idle
 chance, how reliably they counter, whether they build and man bunkers, and an
 energy reserve they hold back.
 
+It ships **two graphics styles**, picked from a cogwheel in the top-left HUD
+cluster: `neon` (the original glowing wireframe board) and `toon` — a
+cel-shaded cartoon arena of dirt and grass inside a poorly maintained plank
+fence, with actual characters (a shield-and-sword knight, a green-hatted
+archer, a twin-dagger rogue in dark red, a log-walled fort). The rule that
+keeps it cheap is that **a skin is paint**: nothing in `step()` knows one
+exists, so switching mid-match cannot change an outcome, and the suite asserts
+stats, costs, ranges and a real deploy come out identical under both. Cel
+shading is enforced as two rules — flat colour steps and one ink outline,
+via `cel()` — and `glow()` simply becomes a no-op under a skin with no bloom,
+which is what stops a stray halo leaking in from untouched code. Under toon a
+silhouette no longer says whose it is, so team colour moves to a thin ground
+ring under each unit. Scenery is baked once from a seeded PRNG rather than
+re-rolled per frame, or the arena boils. Opening the panel pauses the sim.
+
 It is **portrait-locked in software**: on a touch device turned sideways
 `applyView()` counter-rotates the whole `#app` shell by `-screen.orientation.angle`
 rather than letting the layout reflow, and `localPt()` un-rotates every pointer
 so touch still lands correctly (a wide desktop window instead gets a centred
 portrait column). The overlays sit *inside* `#app` on purpose — a transformed
 ancestor is the containing block for `position:fixed` children, which is the
-only reason they turn with the game. Drive suite (36 checks, incl. the garrison
-protection invariant, the two-finger duel and the rotated-view touch map):
+only reason they turn with the game. Drive suite (95 checks, incl. the garrison
+protection invariant, the two-finger duel, the rotated-view touch map and the
+skin-is-paint invariant):
 `.claude/tests/drive-neon-clash.cjs`. Detailed context: `.claude/neon-clash.md`.
 
 ---

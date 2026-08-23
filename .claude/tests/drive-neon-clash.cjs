@@ -20,6 +20,9 @@
  *   - energy: 1/sec, cap 20, doubled in sudden death
  *   - the portrait lock: a sideways phone keeps the portrait layout, and a
  *     touch pushed through the view transform still hits the card it covers
+ *   - the two GRAPHICS STYLES: the cog fits the top-left cluster without
+ *     overlapping it, settings pauses a live match, the choice persists, and
+ *     above all a skin is PAINT — same stats, costs, ranges and deploys
  *
  * Usage: NODE_PATH=<playwright-core dir> node .claude/tests/drive-neon-clash.cjs
  * Output: one PASS/FAIL line per check, then `... DRIVE: N passed, M failed`.
@@ -653,6 +656,139 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   ok('the AI actually plays cards', ai.units + ai.builds > 0 || ai.state === 'over', JSON.stringify(ai));
   ok('the AI never spends energy it does not have', !negEnergy && !overCap);
   ok('an undefended base loses to LEGEND', ai.myBase < 1500 || ai.state === 'over', JSON.stringify(ai));
+
+  // ============================================================ skins
+  // Two art directions over ONE simulation. The load-bearing claim is that a
+  // skin is PAINT: it may not move a stat, a cost, a deploy or the clock. The
+  // rest is chrome — the cog has to sit in the top-left cluster without
+  // landing on the buttons already there, and opening it has to STOP a
+  // real-time match rather than let it run on under the panel.
+  const HUD_IDS = ['back-btn', 'mute-btn', 'new-btn', 'cog-btn', 'hud-mid'];
+  const hudBox = await page.evaluate(ids => {
+    const o = {};
+    for (const id of ids) {
+      const r = document.getElementById(id).getBoundingClientRect();
+      o[id] = { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height };
+    }
+    return o;
+  }, HUD_IDS);
+  const hits = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+  let hudClash = '';
+  for (let i = 0; i < HUD_IDS.length; i++)
+    for (let j = i + 1; j < HUD_IDS.length; j++)
+      if (hits(hudBox[HUD_IDS[i]], hudBox[HUD_IDS[j]])) hudClash = HUD_IDS[i] + ' over ' + HUD_IDS[j];
+  ok('the cog sits in the top left without overlapping anything already there',
+     hudBox['cog-btn'].w >= 24 && hudBox['cog-btn'].h >= 24 && !hudClash,
+     hudClash || JSON.stringify(hudBox['cog-btn']));
+  ok('nothing has set a style yet, so the game is in neon',
+     await page.evaluate(() => __NC.skin === 'neon'));
+
+  await page.evaluate(() => __NC.start('ai', 'PRO'));
+  await page.waitForTimeout(430);
+  await page.click('#cog-btn');
+  await page.waitForTimeout(90);
+  const pauseT0 = await page.evaluate(() => __NC.matchT);
+  await page.waitForTimeout(340);
+  const pauseT1 = await page.evaluate(() => ({
+    t: __NC.matchT, paused: __NC.paused,
+    shown: !document.getElementById('ov-settings').classList.contains('hidden'),
+  }));
+  ok('the cog opens settings and pauses the live match',
+     pauseT1.shown && pauseT1.paused && near(pauseT1.t, pauseT0, 0.02),
+     JSON.stringify(pauseT1) + ' from t=' + pauseT0.toFixed(2));
+
+  await page.click('#sk-toon');
+  await page.waitForTimeout(130);
+  const picked = await page.evaluate(() => ({
+    skin: __NC.skin, stored: localStorage.getItem('neon-clash-skin'),
+    on: document.getElementById('sk-toon').classList.contains('on'),
+    off: !document.getElementById('sk-neon').classList.contains('on'),
+  }));
+  ok('picking TOON switches the style, marks it, and remembers it',
+     picked.skin === 'toon' && picked.stored === 'toon' && picked.on && picked.off, JSON.stringify(picked));
+
+  await page.waitForTimeout(300);
+  await page.click('#btn-set-back');
+  await page.waitForTimeout(140);
+  const backT0 = await page.evaluate(() => __NC.matchT);
+  await page.waitForTimeout(320);
+  const resumed = await page.evaluate(() => ({
+    t: __NC.matchT, paused: __NC.paused,
+    hidden: document.getElementById('ov-settings').classList.contains('hidden'),
+  }));
+  ok('closing settings resumes the match',
+     resumed.hidden && !resumed.paused && resumed.t > backT0 + 0.1,
+     JSON.stringify(resumed) + ' from t=' + backT0.toFixed(2));
+
+  // The claim that makes the whole feature safe to ship mid-match.
+  const paint = await page.evaluate(() => {
+    const out = {};
+    for (const s of ['neon', 'toon']) {
+      __NC.setSkin(s);
+      __NC.start('ai', 'PRO');
+      __NC.setEnergy(0, 20);
+      __NC.deploy(0, 'archer', 40, 120);
+      const u = __NC.units[__NC.units.length - 1];
+      out[s] = {
+        x: +u.x.toFixed(4), y: +u.y.toFixed(4), hp: u.hp, r: u.r, e: +__NC.energy[0].toFixed(2),
+        gun: __NC.gun, tankHp: __NC.kindOf('tank').hp, archRange: __NC.kindOf('archer').range,
+        deck: __NC.deck,
+      };
+    }
+    return out;
+  });
+  ok('a skin is paint only — stats, costs, ranges and deploys are identical',
+     JSON.stringify(paint.neon) === JSON.stringify(paint.toon), JSON.stringify(paint));
+
+  // Both skins draw a full board — every card type at once, plus a live blast.
+  // A throw inside requestAnimationFrame lands in `errs` and trips the final
+  // check, so this exercises the renderers as much as it samples them.
+  const ground = {};
+  for (const s of ['neon', 'toon']) {
+    ground[s] = await page.evaluate(async sk => {
+      __NC.setSkin(sk);
+      __NC.start('ai', 'PRO');
+      __NC.setEnergy(0, 20); __NC.setEnergy(1, 20);
+      __NC.place(0, 'tank', 40, 100); __NC.place(0, 'archer', 56, 108); __NC.place(0, 'fighter', 30, 116);
+      __NC.place(1, 'tank', 62, 60); __NC.place(1, 'fighter', 44, 68); __NC.place(1, 'archer', 70, 50);
+      __NC.deploy(0, 'bunker', 66, 130);
+      __NC.deploy(0, 'fireball', 45, 108);
+      await new Promise(r => setTimeout(r, 240));
+      return new Promise(res => requestAnimationFrame(() => requestAnimationFrame(() => {
+        const cv = document.getElementById('game'), g = cv.getContext('2d');
+        const d = g.getImageData(Math.round(cv.width * 0.5), Math.round(cv.height * 0.36), 1, 1).data;
+        res([d[0], d[1], d[2]]);
+      })));
+    }, s);
+  }
+  ok('the toon arena paints dirt where neon paints void',
+     ground.toon[0] > 120 && ground.toon[0] > ground.toon[1] && ground.toon[1] > ground.toon[2],
+     JSON.stringify(ground.toon));
+  ok('the neon board is still the dark board it was',
+     ground.neon[0] + ground.neon[1] + ground.neon[2] < 130, JSON.stringify(ground.neon));
+
+  // Scenery is generated once from a fixed seed. If it were re-rolled per
+  // frame the arena would boil, and nothing about it could ever be asserted.
+  const scn = await page.evaluate(() => {
+    const a = __NC.scene, b = __NC.scene;
+    const wide = a.fences.filter(f => f.planks.length && f.len === 100);
+    const tall = a.fences.filter(f => f.len === 160);
+    const tallPlanks = tall.reduce((n, f) => n + f.planks.length, 0);
+    return {
+      same: a === b, fences: a.fences.length, grass: a.grass.length,
+      planks: a.fences.reduce((n, f) => n + f.planks.length, 0),
+      tallPlanks, tallGone: tall.reduce((n, f) => n + f.planks.filter(p => p.gone).length, 0),
+      gate: wide.every(f => f.planks.every(p => !(Math.abs(p.d - 50) < 12) || p.gone)),
+    };
+  });
+  ok('arena scenery is baked once from a fixed seed, not re-rolled per frame',
+     scn.same && scn.fences === 4 && scn.grass === 104 && scn.planks > 60, JSON.stringify(scn));
+  ok('the fence is poorly maintained — planks are missing, but not most of them',
+     scn.tallGone > 0 && scn.tallGone < scn.tallPlanks * 0.4, JSON.stringify(scn));
+  ok('the back fence leaves a gateway where the base stands', scn.gate, JSON.stringify(scn));
+
+  await page.evaluate(() => { __NC.setSkin('neon'); __NC.start('ai', 'PRO'); });
+  await page.waitForTimeout(80);
 
   // ============================================ portrait lock (landscape view)
   // The game is portrait-only: a touch device turned sideways must keep the
