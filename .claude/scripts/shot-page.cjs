@@ -31,14 +31,32 @@ if (!page_ || !out) {
   console.error('usage: shot-page.cjs <page.html> <out.png> [w= h= wait= click=x,y select=#id:val dpr=]');
   process.exit(1);
 }
+// <out.png> is POSITIONAL. Passing it opt-style ("out=shot.png") used to be
+// accepted in silence: it became the out path verbatim, so the shot landed in
+// a junk directory literally named "out=" and the script still printed a
+// cheerful SHOT= line (2026-08-23). Both that and a typo'd opt key (which fell
+// through to opt[k]=NaN and was ignored) now fail loudly.
+if (out.includes('=')) {
+  console.error('shot-page.cjs: <out.png> is positional, not "key=value" — got: ' + out);
+  process.exit(1);
+}
 const opt = { w: 390, h: 844, wait: 3000, dpr: 2, click: null, select: [], eval: [] };
+const NUMERIC = ['w', 'h', 'wait', 'dpr'];
 for (const a of rest) {
   const i = a.indexOf('=');
+  if (i < 0) { console.error('shot-page.cjs: expected key=value, got: ' + a); process.exit(1); }
   const k = a.slice(0, i), v = a.slice(i + 1);
   if (k === 'select') opt.select.push(v);
   else if (k === 'eval') opt.eval.push(v);
   else if (k === 'click') opt.click = v.split(',').map(Number);
-  else opt[k] = Number(v);
+  else if (NUMERIC.includes(k)) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) { console.error('shot-page.cjs: ' + k + '= expects a number, got: ' + v); process.exit(1); }
+    opt[k] = n;
+  } else {
+    console.error('shot-page.cjs: unknown option "' + k + '" (known: w h wait dpr click select eval)');
+    process.exit(1);
+  }
 }
 const candidates = [process.env.SMOKE_CHROMIUM, '/opt/pw-browsers/chromium'].filter(Boolean);
 const executablePath = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });

@@ -43,6 +43,12 @@ Deterministic helpers for working on this repo.
   this even when the PNG looks plausible (added 2026-08-15 after exactly that
   bit twice).
 
+  **`<out.png>` is positional, and the options are a closed set.** Writing it
+  opt-style (`out=shot.png`) used to be taken verbatim as the path, so the shot
+  landed in a junk directory literally named `out=` while the script printed a
+  cheerful `SHOT=` line — and a typo'd key (`widht=390`) fell through to
+  `NaN` and was ignored. Both exit 1 with a usage message now (2026-08-23).
+
   `eval=` runs JS in the page before the wait, so a scene can be **arranged**
   through the game's own test hook rather than screenshotting whatever the game
   happened to be doing. Added 2026-08-23, after a session hand-rolled four
@@ -84,8 +90,13 @@ Deterministic helpers for working on this repo.
   agreement, facet-column agreement on all five axes, that every row points at
   a game that exists on disk with the context file it claims, that the
   "N games (M in-repo + K external)" line adds up, and that the dashboard's
-  `AXES` still covers every facet axis. Pure node — no Chromium, no deps, so
-  it costs nothing to run. Final line `GAMES-SYNC: GREEN`/`RED`, exit 0/1.
+  `AXES` still covers every facet axis. Since 2026-08-23 it also gates **card
+  copy**: every hub card carries a description and none runs past **two
+  sentences** (the CD's rule — the hub is a scan-and-pick list, and card text
+  grows a clause at a time as a game gains features; three cards had reached
+  five sentences and one seven before anyone noticed). Pure node — no Chromium,
+  no deps, so it costs nothing to run. Final line `GAMES-SYNC: GREEN`/`RED`,
+  exit 0/1.
 
   ```
   node .claude/scripts/check-games-sync.cjs     # from the repo root

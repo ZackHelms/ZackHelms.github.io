@@ -39,6 +39,14 @@
   commit in the range is the other session's pass and is skippable. (Hit
   2026-08-22: the star-surge pass set the pointer to `ca7891a`, so the
   neon-clash session's own `9410b86`/`312f002` sat below it, unrefined.)
+- **Say what you left behind.** Because moving the pointer hides everything
+  below it, a pass that deliberately refines only its own commits should name
+  the other session's SHAs in its report *and* leave them listed here, so the
+  work is recoverable rather than silently skipped. Currently outstanding:
+  **`acb50c1` + `e9ea508`** (turret-builder's cel-shaded graphics style,
+  2026-08-23) — below the pointer as of the star-surge pass at `7b7161d`, never
+  refined by their own session. Whoever picks turret-builder up next should
+  refine those two before doing anything else; delete this line when they have.
 
 ## Validation
 - Procedure: headless mobile smoke-load of every changed page (the games

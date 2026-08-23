@@ -20,6 +20,7 @@ Detailed context for individual games lives in `.claude/<game>.md` at the repo r
 | Canvas-drawn UI | Buttons/cards drawn on the canvas keep their hitbox arrays (`cardRects`-style) in JS — any branch that hides the widgets MUST clear the arrays too, or invisible stale hitboxes swallow taps (2026-07-24 grid-defense bug) |
 | Audio | WebAudio-synthesized only (no audio files): lazy AudioContext on first gesture (iOS), `sfxGain`/`musicGain` masters, oscillator/noise SFX + lookahead-sequencer music loop, persisted 🔊/🔇 mute top-left, suspend on `visibilitychange` (SFX+music standard for **every** game — retrofitted repo-wide 2026-07-24). Shared buffers (noise etc.) are created in `audioInit`, never lazily inside one SFX (another consumer stays silent); overlay/menu tap handlers call `audioInit()` too — the first iOS gesture is usually a DOM button, not the canvas |
 | Back button | Every game has a top-left ← link back to the games hub, left-most control, mute button immediately to its right — see § Hub Back Button |
+| Third chrome button | A game adding a **third** top-left control (a ⚙ settings cogwheel, typically) pushes the row out to ~x=140. Any canvas-drawn HUD sitting at x<140 in the top ~42 px is then *behind* it — opaque `var(--panel)` buttons, so the text simply disappears. Moving the HUD sideways rarely works on a 390 px screen (a stage/score line is ~150 px wide and the score is right-aligned), so move that block **below** the chrome row instead. Star Surge had been drawing "SECTOR" under the mute button since before the cogwheel existed, unnoticed — check the collision when you add the button, not after a report |
 | Chrome above overlays | The ← and 🔊 buttons must sit at a **higher z-index than any full-screen overlay** (menu / game-over / win). Give the chrome `z-index:80` and overlays `70`. Otherwise the overlay swallows both, and since music is usually playing *behind* a menu or win screen, the player cannot mute exactly when they most want to (2026-07-25: shipped that way in locksport, caught by a drive test that could not tap `#mute-btn` after a reload) |
 | Portrait lock (optional) | A game whose layout only works in portrait can lock itself in software rather than reflowing: size the app shell to `innerHeight x innerWidth` and `transform: rotate(-screen.orientation.angle)` when a **touch** device goes landscape (leave a desktop window alone — clamp it to a centred portrait column instead). Two gotchas: `position:fixed` overlays must be nested *inside* the transformed shell or they stay landscape, and every pointer handler must un-rotate `clientX/clientY` about the element centre (a +-90 deg rotation keeps the bounding box centred on it) — `getBoundingClientRect().left` alone is wrong under a transform. `clientWidth/clientHeight` are layout sizes and stay correct. Reference: `neon-clash/` `applyView()` + `localPt()` |
 | Native form controls | A `<select>` (or any native picker) must **not** be wired through a `bindTap`-style helper. Those helpers bind `touchend` with `preventDefault()` to stop iOS double-firing, and that stops the native picker ever opening. Listen for `change` and leave the tap helper off it (2026-08-23, neon-clash's style dropdown) |
@@ -670,8 +671,11 @@ skin-is-paint invariant):
    self-contained file either way
 2. Add a card to `games/index.html` (copy an existing card, update
    icon/name/desc/href) — pick an icon emoji **not already used** by another
-   card (e.g. Sorcery already owns 🔮) — **and add the game's entry to the
-   hub's `GAMES` facet dataset** (same file, § coverage heuristics script;
+   card (e.g. Sorcery already owns 🔮), keep the description to **two
+   sentences at most** (the hub is a scan-and-pick list; `check-games-sync.cjs`
+   fails the build over a third, and the same cap applies when a game gains a
+   feature worth boasting about — rewrite, don't append) — **and add the
+   game's entry to the hub's `GAMES` facet dataset** (same file, § coverage heuristics script;
    it mirrors the games-index row and feeds the 📊 COVERAGE HEURISTICS
    dashboard — a drive test asserts cards ↔ dataset stay in sync)
 3. Add the standard hub back button (see § Hub Back Button) — ← top-left,

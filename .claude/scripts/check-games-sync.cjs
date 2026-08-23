@@ -132,6 +132,31 @@ else {
   if (inrepo + ext !== tot) fail('count line does not add up: ' + inrepo + ' + ' + ext + ' != ' + tot);
 }
 
+/* ---------- card copy ---------- */
+// The hub is a scan-and-pick list, so a card gets at most TWO sentences (CD
+// rule, 2026-08-23). Descriptions grow one clause at a time as a game gains
+// features and nobody notices until a single card fills a phone screen: three
+// had reached five, and Neon Clash seven. Enforced here rather than left as
+// prose in games/CLAUDE.md because a prose rule about length is exactly the
+// kind that decays silently.
+const MAX_CARD_SENTENCES = 2;
+const descRe = /<div class="game-name">([^<]+)<\/div>\s*<div class="game-desc">([\s\S]*?)<\/div>/g;
+let dm, descCount = 0;
+while ((dm = descRe.exec(hub))) {
+  const name = dm[1].trim();
+  const text = dm[2].replace(/&mdash;|&times;|&amp;/g, ' ').replace(/<[^>]+>/g, '').trim();
+  descCount++;
+  if (!text) { fail('hub card has an empty description: ' + name); continue; }
+  // a terminator followed by whitespace then a capital/digit/quote starts a new
+  // sentence; the trailing one counts too
+  const n = text.split(/(?<=[.!?])\s+(?=[A-Z0-9"'“])/).filter(s => s.trim()).length;
+  if (n > MAX_CARD_SENTENCES)
+    fail('hub card "' + name + '" description is ' + n + ' sentences (max ' + MAX_CARD_SENTENCES + ')');
+}
+console.log('CARDS_WITH_DESC=' + descCount);
+if (descCount !== cards.length)
+  fail('found ' + descCount + ' card descriptions but ' + cards.length + ' cards — a card is missing its .game-desc');
+
 /* ---------- dashboard facets ---------- */
 // every facet value in the dataset should be reachable by the dashboard's AXES
 const axesRe = /\{\s*key:\s*'(\w+)'/g;

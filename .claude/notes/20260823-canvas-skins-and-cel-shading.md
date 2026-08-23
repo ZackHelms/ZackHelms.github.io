@@ -164,4 +164,67 @@ through solid timber.
   `change` event and leave `bindTap` off it.
 - Screenshot review found three of the four legibility bugs above. None would
   have failed a test. Budget a round of `shot-page.cjs eval=…` per visual
-  feature, not per session.
+  feature, not per session. (One class of them *can* now fail a test — see the
+  fixed-sun assertion below.)
+
+## Validated by a second adopter (star-surge, same day)
+
+Star Surge added its own `toon` skin from scratch **without** this note (the
+sessions were concurrent), then rebased onto it. Comparing the independent
+implementation against the recipe is a useful signal about which parts are
+obvious and which are not: the silhouette work, the flat-step-plus-ink
+shading, the `<select>`/`bindTap` trap and "a skin is paint" were all arrived
+at independently. **The two mechanisms that were missed are exactly the two
+this note ranks highest**, and both were live defects:
+
+1. **No `glow()` indirection** — the skin branched at each draw entry point
+   instead, so chain lightning, EMP rings and the stage banner kept their
+   bloom under the cel skin. Precisely the "thirty chances to leak a halo"
+   failure, at ~15 call sites.
+2. **No `frameRot()`** — the spinner enemy draws inside `ctx.rotate(e.ang)`,
+   so its whole sprite dragged its shading round as it spun.
+
+If you are reviewing a skin someone re-derived, check those two first.
+
+### The fixed sun IS assertable — don't leave it to a screenshot
+
+`frameRot()`'s effect looks like a subjective "reads as lit, not flat", but it
+measures cleanly. Draw a rotating sprite at several rotation angles, walk a
+ring of pixels inside its body, and record the **bearing of the brightest
+sample**. With the counter-rotation the bearing does not move; without it, it
+tracks the sprite:
+
+```js
+// spread across e.ang of [0, 0.8, 1.6, 2.4, 3.9]
+// with frameRot():     [75, 75, 75, 75, 75]  -> 0 deg
+// with frameRot()->0:  [75,125,170,  0,  0]  -> ~170 deg
+check('sun stays fixed in screen space while a sprite spins',
+      Math.max(...bearings) - Math.min(...bearings) <= 10);
+```
+
+Sample a ring *inside a solid part* (star-surge uses the spinner's central
+dome at r*0.45), not at the sprite's bounding radius — a diagonal sample
+between two blades reads background and the measurement goes to zero for
+every angle, which looks like a pass. Reference:
+`.claude/tests/drive-star-surge.cjs`.
+
+### Derive the part centre rather than passing it
+
+The `cel(..., cx, cy)` signature above wants each part lit about its own
+centre. Rather than hand-thread a centre through every call site (which is a
+chance to forget, and forgetting is silent), have the polygon helper compute
+the centroid of its own points:
+
+```js
+function celPoly(pts, base, lit, lw) {
+  let cx = 0, cy = 0;
+  for (let i = 0; i < pts.length; i += 2) { cx += pts[i]; cy += pts[i + 1]; }
+  const n = pts.length / 2;
+  poly(pts); cel(base, lit, lw, cx / n, cy / n);
+}
+```
+
+Circle/ellipse helpers translate to their centre first, so theirs is free.
+Star Surge's first pass shaded every part about the sprite origin and each
+wing came out uniformly lit or uniformly dark — the exact failure this note
+predicts, visible in a screenshot the moment the two are compared.

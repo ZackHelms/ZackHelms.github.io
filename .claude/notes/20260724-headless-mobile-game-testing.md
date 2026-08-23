@@ -375,6 +375,40 @@ Include the neighbours the new control could squeeze, not just the control
 eyeballing a screenshot, because it keeps holding on the next viewport and the
 next control added to that row.
 
+## Rendering an art sheet to judge sprite work (2026-08-23, Star Surge)
+
+To review sprite art you need it drawn **big and side by side**, not at 24 px
+scattered through a live scene. The obvious approach — `page.evaluate` a few
+scaled `drawX()` calls onto the canvas, then screenshot — does not survive,
+and the reason is worth knowing:
+
+- **Your drawing loses to the next animation frame.** The game's rAF loop
+  clears and repaints over your sheet before the screenshot lands.
+- **Overriding `requestAnimationFrame` is not enough.** A frame was already
+  scheduled when you overrode it, so one more `loop()` still runs.
+- **What works: replace the game's own `draw`/`update`.** In a non-module
+  inline `<script>`, a top-level `function draw() {}` *is* a property of
+  `window`, so it can be reassigned from `page.evaluate`. Assign your sheet
+  renderer to `window.draw` and a no-op to `window.update`, and every
+  subsequent frame paints the sheet for you — no fighting the loop.
+
+```js
+await page.evaluate(() => {
+  window.update = () => {};
+  window.draw = () => { /* clear, then draw each sprite at scale with a label */ };
+});
+```
+
+**The trap that follows immediately:** `let`/`const` top-level bindings are
+**not** window properties, so the same trick silently fails for state. Star
+Surge's `boss` is `let boss = null`, so `window.boss = {r: 26, ...}` created an
+unrelated property, the real `boss` stayed null, and the boss panels of the
+sheet came out blank — with no error visible in the screenshot. If a value you
+poke this way appears to have no effect, check how it was declared before
+assuming your draw code is wrong: `function` yes, `var` yes, `let`/`const` no.
+(For `let` state, mutate through a function the game exposes, or set fields on
+the existing object rather than replacing the binding.)
+
 ## Solver-validated generation (2026-07-31, Phasic)
 
 For endless/procedural content, validate at GENERATION time: constructive
