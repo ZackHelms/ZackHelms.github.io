@@ -43,10 +43,10 @@
   below it, a pass that deliberately refines only its own commits should name
   the other session's SHAs in its report *and* leave them listed here, so the
   work is recoverable rather than silently skipped. Currently outstanding:
-  **`acb50c1` + `e9ea508`** (turret-builder's cel-shaded graphics style,
-  2026-08-23) — below the pointer as of the star-surge pass at `7b7161d`, never
-  refined by their own session. Whoever picks turret-builder up next should
-  refine those two before doing anything else; delete this line when they have.
+  **none** — turret-builder's `acb50c1` + `e9ea508` were the last entry and the
+  2026-08-23 turret-builder pass refined them (it also found and fixed a live
+  cel-shading defect that had shipped in `acb50c1`, which is the argument for
+  keeping this list rather than letting a skipped range disappear).
 
 ## Validation
 - Procedure: headless mobile smoke-load of every changed page (the games
@@ -76,8 +76,14 @@
   Verification is mandatory: confirm the "pages build and deployment"
   workflow run for the pushed SHA concludes `success` (remote sessions:
   `mcp__github__actions_list`), because `git push` ≠ live — a failed or
-  stuck Pages build silently keeps serving the last-good deploy. Then spot
-  the badge timestamp on the live page when possible.
+  stuck Pages build silently keeps serving the last-good deploy. Read that
+  run's **jobs**, not the run object: the run can still report
+  `in_progress` after build/deploy/report-build-status have all concluded
+  `success` (2026-08-23). Spotting the badge on the live page is **not**
+  available from a remote session — the agent proxy 403s `tythos.com` on
+  CONNECT — so the workflow conclusion is the whole verification. Full
+  procedure incl. parsing the oversized run listing:
+  `.claude/notes/20260817-pages-deploy-wedged-after-503.md`.
 - Authorization: pushing to `main` is standing authorization (CLAUDE.md §
   Git workflow); no separate publish sign-off needed.
 

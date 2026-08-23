@@ -418,3 +418,38 @@ seeds → store the winning verb script. The suite then replays every
 generated level's script as its fairness gate, and an auto-solve/skip
 button falls out of the same machinery. Full trace:
 `20260731-phasic-softbody-solver-validated-generation.md`.
+
+
+## Two more test-design traps (2026-08-23, Turret Builder)
+
+### A truncated run exits 0 and looks exactly like a pass
+
+The balance eval was launched as `node eval.cjs > eval.log 2>&1 &` from
+*inside* an already-backgrounded shell. The outer shell returned immediately —
+reported "completed (exit code 0)" — and took the inner job with it. The log
+held 2 of 19 personas, no `--- design claims ---` section, and no summary line.
+`tail -35` of it showed two tidy persona blocks and read like a healthy run.
+
+Two defences, and the second is the one that generalises:
+
+1. **Never background twice.** Use the harness's background flag on the command
+   itself; an extra `&` inside it is what orphans the job.
+2. **Only the suite's own final line means the suite finished.** Every drive and
+   eval in this repo ends with `<NAME>: N passed, M failed`. Read *that* — not
+   `tail`, not a grep for `ok`, not the exit code, which a killed pipeline
+   reports as 0 anyway. A run without its final line did not run.
+
+### When a rule tightens, audit the tests that used the old rule as a PROXY
+
+Turret Builder's module placement was tightened to require an adjacent turret
+or wall. The checks that *assert* placement were the easy part. What broke were
+six helpers using `canPlace('fire', r, c)` to mean "is this cell open ground"
+while hunting for a turret site with four free sides — a reading that was true
+only while a module could go anywhere. After the change it answers "no" for
+every side of a turret that does not exist yet, so `plusSpot()` returned null
+and dozens of unrelated checks would have died on it.
+
+The fix was to give the geometry question its own name (`openCell()`) and leave
+`canPlace()` meaning what it says. The habit: after tightening a rule, grep for
+every *use* of the old predicate, not just every assertion about it — the uses
+that were never about that rule are the ones that bite.

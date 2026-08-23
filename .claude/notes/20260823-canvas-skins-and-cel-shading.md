@@ -228,3 +228,41 @@ Circle/ellipse helpers translate to their centre first, so theirs is free.
 Star Surge's first pass shaded every part about the sprite origin and each
 wing came out uniformly lit or uniformly dark — the exact failure this note
 predicts, visible in a screenshot the moment the two are compared.
+
+## A third adopter (turret-builder, same day) — and what it says about the ranking
+
+Turret Builder added its own `toon` skin from scratch the same day, also
+without this note (three concurrent sessions). Its independent re-derivation
+narrows the earlier reading:
+
+- **Mechanism 1 (`glow()` indirection) did not apply.** Turret Builder's neon
+  look never used canvas bloom at all — zero `shadowBlur` in the file; its
+  "neon" is bright strokes and alpha over a dark board. So the lesson is
+  sharper than "always add a `glow()` indirection": *if the neon style leans on
+  `ctx.shadowBlur`, funnel it through one helper before adding a second skin.*
+  If it doesn't, there is nothing to funnel.
+- **Mechanism 2 (`frameRot()`) was missed again, and again it was a live
+  defect.** `celShape()` painted its rim-light wedge in the current transform,
+  and a turret's hull and barrel are drawn inside `ctx.rotate(aim)` because a
+  turret turns to face what it is shooting. Measured bearing of the brightest
+  sample across five aim angles: `[0, 0, 0, 5, 90]` — 90 deg of drift. With the
+  counter-rotation: `[140, 140, 140, 140, 140]`, spread 0.
+
+**Two for two.** Every re-derivation so far has produced the fixed-sun bug, and
+neither author noticed it by eye — both times it took the measurement. Treat
+`frameRot()` as the single thing to check first on any cel skin in this repo,
+and add the assertion at the same time as the skin, not after someone reads
+this note.
+
+Two implementation details specific to a wedge (rather than star-surge's
+half-plane fill):
+
+- The snug triangle `(-s,-s) (s,-s) (-s,s)` that covers a shape at rotation 0
+  does **not** cover it once counter-rotated. Scale the same triangle up
+  (turret-builder uses `s * 6`) so the hypotenuse is the same line and the
+  visual is unchanged at rotation 0, but the fill still reaches the clip at
+  any angle.
+- `ctx.rotate(-frameRot())` turns about the *current local origin*, which is
+  fine where every part's path is drawn about that origin (turret-builder's
+  pad, hull and barrel all are). Where parts are offset, derive the centroid —
+  see "Derive the part centre rather than passing it" above.

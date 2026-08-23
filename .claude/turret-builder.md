@@ -307,7 +307,24 @@ module-level `GFX`, and read everywhere through `toon()`. Two styles ship:
 
 The cel recipe is one helper: `celShape(path, fill, ink, hi, s)` — flat fill,
 one hard ink outline, one rim-light facet — plus `contactShadow()` under
-anything that stands on the ground. Every drawable has a `…Toon` twin
+anything that stands on the ground.
+
+**The sun is fixed in SCREEN space.** A turret's hull and barrel are painted
+inside `ctx.rotate(aim)` because a turret turns to face what it is shooting,
+so `celShape()` counter-rotates its rim-light wedge by `frameRot()` — the
+rotation read back off the live transform (`getTransform()`, iOS Safari 15.4+,
+guarded). Without it the light source swings round with the barrel and the
+turret reads as a flat shape rather than a lit one; it shipped that way on
+2026-08-23 and was caught by measurement, not by eye — bearing of the
+brightest sample across five aim angles went `[0, 0, 0, 5, 90]`, and is
+`[140 × 5]` with the fix. The drive suite asserts it. Note the wedge is
+`s * 6`, not the snug `±s` triangle: once counter-rotated a snug wedge no
+longer covers the clipped shape. This is the second mechanism in
+`.claude/notes/20260823-canvas-skins-and-cel-shading.md`, and turret-builder
+is the *second* independent re-derivation to miss it — check it first on any
+new cel skin. The note's *first* mechanism (funnel `glow()` so it can go
+no-op) does not apply here: this game's neon style uses no `shadowBlur` at
+all. Every drawable has a `…Toon` twin
 (`drawGroundToon`, `drawRoadToon`, `drawBoulder`, `drawTurretToon`,
 `drawModuleToon`, `drawBoosterToon`, `drawWallToon`, `creepPath` +
 `drawCreepShape`); `draw()` branches once per layer, never per object.
@@ -353,7 +370,7 @@ Vary the persona, not the seed.
 `turretStats(r,c)` (payload, boosters, combo, **sides**), `wallStats`,
 `modsAt`, `tileAt`, `comboAt` · `canPlace`, `openCell`, `buildableCells(kind)`,
 `placeMask(kind)`, `placeHint(kind)`, `overlayKind()`, `arm(kind)`,
-`forceDraw()` ·
+`forceDraw()`, `paintTurret(aim, s)`, `pixelAt(x, y)` ·
 `setCurve/setPacing/seedRandom` · `cardRects/tabRects/panelRects/hudRects` ·
 `codex()`, `COMBO_TOTAL` · `gfx()`, `setGfx(id)`, `GFX_STYLES`,
 `gfxMenuOpen/openGfxMenu/closeGfxMenu`.
@@ -373,15 +390,16 @@ Four hooks exist to make the spec *measurable* rather than inferred:
 Suites — **rules and balance are separate files**, so a rebalance never fights
 a mechanics regression:
 
-- `.claude/tests/drive-turret-builder.cjs` (194 checks) — the spec verbatim
+- `.claude/tests/drive-turret-builder.cjs` (195 checks) — the spec verbatim
   including the worked example, each module in isolation and stacked, the
   effects-vs-damage split, tracking and snap, all four boosters, all fifteen
   combos with their effects, the codex, walls, economy, flow, the sawtooth,
   the canvas UI pressed through real touch events, the placement rules and
   the overlay mask, and both graphics styles
-  (default, dropdown, persistence, and **each renderer driven through real
-  frames on a populated board** — a per-style throw fails only that style's
-  check, verified by breaking `drawGroundNeon` and watching TOON stay green).
+  (default, dropdown, persistence, **each renderer driven through real frames
+  on a populated board** — a per-style throw fails only that style's check,
+  verified by breaking `drawGroundNeon` and watching TOON stay green — and the
+  **fixed sun**, measured off pixels as a turret tracks).
 - `.claude/tests/eval-turret-builder.cjs` (22 claims) — balance and pacing via
   personas. `--strategy f.json`, `--only NAME`, `--curve a,b`, `--seed`,
   `--json`. About a second each.

@@ -86,3 +86,12 @@ for r in (d.get('workflow_runs') or [])[:3]:
 `mcp__github__get_job_logs` with `failed_only: true`, `return_content: true`
 and a small `tail_lines` is compact enough to read directly, and is how the
 503 above was identified.
+
+**Read the JOBS, not the run.** `actions_get` on a run ID can keep reporting
+`status: in_progress` after every one of its jobs has finished — seen
+2026-08-23 on run `32652317671`, where the run object said `in_progress` while
+`list_workflow_jobs` showed build, deploy and report-build-status all
+`completed` / `success` on attempt 1. `list_workflow_jobs` with the run ID is
+also small enough to come back in a tool result, unlike the repo-wide run
+listing. So: find the run for your SHA by parsing the saved listing, then read
+its jobs — a stale-looking run status is not a reason to wait.

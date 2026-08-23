@@ -136,7 +136,7 @@ table.sc td.n { color:var(--gold); font-family:'Black Ops One', sans-serif; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 16:36 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 16:57 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
@@ -1660,15 +1660,31 @@ const TOON = {
 /* The cel recipe, in one place: flat fill, one hard ink outline, one
    rim-light facet clipped to the shape, one contact shadow. Every toon
    silhouette goes through this so the whole board shades the same way. */
+/* The sun is fixed in SCREEN space. Sprites are painted inside their own
+   rotated frames — a turret rotates to face what it is shooting — so the
+   rim-light wedge has to be counter-rotated back out, or the light source
+   swings round with the barrel and the shape reads as flat rather than lit.
+   Reading the rotation back off the live transform beats threading it
+   through every call site: celShape() is called from the board, the build
+   cards and the drag ghost, each under a different transform. */
+function frameRot() {
+  if (!ctx.getTransform) return 0;                 // iOS Safari < 15.4
+  const m = ctx.getTransform();
+  return Math.atan2(m.b, m.a);                     // uniform scale + dpr cancel
+}
 function celShape(path, fill, ink, hi, s) {
   ctx.save();
   path();
   ctx.fillStyle = fill; ctx.fill();
   if (hi) {
     ctx.save(); ctx.clip();
+    ctx.rotate(-frameRot());
     ctx.fillStyle = hi;
+    /* a half-plane, not a snug triangle: once counter-rotated it has to
+       still cover the clipped shape from any angle */
+    const R = s * 6;
     ctx.beginPath();
-    ctx.moveTo(-s, -s); ctx.lineTo(s, -s); ctx.lineTo(-s, s); ctx.closePath();
+    ctx.moveTo(-R, -R); ctx.lineTo(R, -R); ctx.lineTo(-R, R); ctx.closePath();
     ctx.globalAlpha = 0.55; ctx.fill();
     ctx.restore();
   }
@@ -3305,6 +3321,17 @@ window.__TB = {
   cardRects: () => cardRects.map(r => ({ kind:r.kind, x:r.x, y:r.y, w:r.w, h:r.h, un:r.un, afford:r.afford, capped:r.capped, spot:r.spot })),
   tabRects: () => tabRects.map(r => ({ id:r.id, x:r.x, y:r.y, w:r.w, h:r.h })),
   setTab: id => { barTab = id; },
+  /* paint ONE turret, big, at a chosen aim on a cleared canvas. The
+     fixed-sun measurement needs a sprite it can walk a pixel ring inside;
+     a 40px board tile is too small to sample honestly. */
+  paintTurret: (aim, s) => {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate(W / 2, H / 2);
+    drawTurretToon(0, 0, s || 160, 1, aim);
+    ctx.restore();
+  },
+  pixelAt: (x, y) => Array.from(ctx.getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data),
   /* arm a kind without going through a card hitbox, and force one
      synchronous frame so cardRects/panelRects are fresh to read */
   arm: k => { armedKind = k; if (k) sel = null; },

@@ -1652,6 +1652,33 @@ const TOUCH = `(() => {
       check('the ' + style.toUpperCase() + ' renderer draws a live board with turrets, walls and creeps without throwing',
         live.gfx === style && errs.length === before, { style, live, errors: errs.slice(before, before + 1) });
     }
+
+    /* THE SUN IS FIXED IN SCREEN SPACE. A turret's hull and barrel are drawn
+       inside ctx.rotate(aim), so without celShape()'s frameRot() counter-
+       rotation the rim light swings round with the barrel and the turret
+       reads as a flat shape rather than a lit one. It measures: paint the
+       sprite big at several aims, walk a pixel ring inside the hull, and
+       report the bearing of the brightest sample. It must not move.
+       Discriminates — stubbing frameRot() to 0 takes the spread to 90deg. */
+    await P(() => window.__TB.setGfx('toon'));
+    const sun = await P(() => {
+      const G = window.__TB, out = [];
+      const cx = innerWidth / 2, cy = innerHeight / 2;
+      for (const aim of [0, 0.8, 1.6, 2.4, 3.9]) {
+        G.paintTurret(aim, 160);
+        let best = -1, bestA = 0;
+        for (let i = 0; i < 72; i++) {
+          const a = i / 72 * Math.PI * 2;
+          const d = G.pixelAt(cx + Math.cos(a) * 22, cy + Math.sin(a) * 22);
+          const l = 0.299 * d[0] + 0.587 * d[1] + 0.114 * d[2];
+          if (l > best) { best = l; bestA = Math.round(a * 180 / Math.PI); }
+        }
+        out.push(bestA);
+      }
+      return out;
+    });
+    check('cel shading keeps the sun fixed in screen space while a turret tracks',
+      Math.max(...sun) - Math.min(...sun) <= 10, sun);
   }
 
   /* =================================================================== */
