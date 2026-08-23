@@ -43,6 +43,9 @@ body {
   padding:8px; min-width:216px; box-shadow:0 10px 34px #000a;
 }
 #gfx-menu.hidden { display:none; }
+/* five styles now, so the list has to be able to scroll on a short screen
+   rather than run off the bottom of it */
+#gfx-menu { max-height:calc(100vh - var(--sat) - 96px); overflow-y:auto; -webkit-overflow-scrolling:touch; }
 #gfx-menu h4 {
   font-family:'Black Ops One', sans-serif; font-size:0.6rem; letter-spacing:2px;
   color:var(--dim); font-weight:normal; padding:2px 6px 7px;
@@ -97,6 +100,8 @@ h2.head { font-family:'Black Ops One', sans-serif; color:var(--gold); font-size:
 .btn:disabled { color:#4b5470; border-color:#23233d; box-shadow:none; }
 .btn:active { transform:scale(0.98); }
 .row2 { display:flex; gap:8px; } .row2 .btn { margin:8px 0; }
+.gfxgrid { display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; margin-top:6px; }
+.gfxgrid .btn { margin:0; }
 .rules { color:var(--dim); font-size:0.66rem; line-height:1.75; margin:10px auto 0; max-width:350px; text-align:left; }
 .rules b { color:var(--white); } .rules i { color:var(--gold); font-style:normal; }
 .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin:8px 0; }
@@ -136,7 +141,7 @@ table.sc td.n { color:var(--gold); font-family:'Black Ops One', sans-serif; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 16:57 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 19:22 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute" class="chrome" aria-label="Mute">🔊</button>
@@ -551,7 +556,7 @@ let creeps = [], spawnList = [], beams = [], floats = [], sparks = [], grounds =
 let phaseT = 0, waveT = 0, levelLeaks = 0, levelKills = 0;
 let sel = null, dragCard = null, dragPos = null, armedKind = null, downCard = null;
 let shake = 0, speed = 1;
-let pathCells = new Set(), rockCells = new Set(), segs = [], totalLen = 0, mapIdx = 0;
+let pathCells = new Set(), pathOrder = [], rockCells = new Set(), segs = [], totalLen = 0, mapIdx = 0;
 let cardRects = [], tabRects = [], panelBtns = {}, hudBtns = {}, barTab = 'build';
 let toasts = [];
 let creepSeq = 0;
@@ -567,20 +572,26 @@ function writeJSON(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; }
 }
 /* ============================ GRAPHICS STYLE ==========================
-   TOON is the default and the reason the board reads as a place rather than
-   a diagram: paved road, dirt-and-grass ground, boulders on the cells you
-   cannot build on, and cel-shaded hardware — flat fills, one hard ink
-   outline, one rim-light facet, one shadow. NEON is the original look, kept
-   because the whole rest of the site is neon and some people will want it.
-   Everything reads GFX at draw time; no geometry or hitbox depends on it. */
+   Five styles. Four of them are CEL styles — flat fills, one hard ink
+   outline, one rim-light facet, one contact shadow — differing in palette
+   and in the silhouettes of the hardware and the enemies. NEON is the
+   original wireframe look, kept because the rest of the site is neon.
+
+   cel() is the family test, NOT "is the style TOON": every skin except
+   neon goes down the cel path and then reads SK for its own paint and its
+   own shapes. Everything reads GFX at draw time; no geometry, hitbox or
+   payload number depends on it. */
 const GFX_STYLES = [
-  { id:'toon', name:'TOON', desc:'Cel-shaded. Paved road, dirt and grass, boulders, stylised hardware.' },
-  { id:'neon', name:'NEON', desc:'The original wireframe look — dark board, glowing edges.' },
+  { id:'toon',      name:'TOON',      desc:'Cel-shaded. Grass, paved road, boulders, stylised hardware.' },
+  { id:'mech',      name:'MECH',      desc:'Military hardware. Autocannons on tracks, armoured vehicles and walkers.' },
+  { id:'steampunk', name:'STEAMPUNK', desc:'Brass and rivets. Boiler cannons, cogwork boosters, clanking automata.' },
+  { id:'stoneage',  name:'STONE AGE', desc:'Cavemen hurling rocks dipped in cauldrons of fire, ice and lightning.' },
+  { id:'neon',      name:'NEON',      desc:'The original wireframe look — dark board, glowing edges.' },
 ];
 const settings = Object.assign({ music:45, sfx:70, muted:false, speed:1, gfx:'toon' }, readJSON(SET_KEY, {}));
 if (!GFX_STYLES.some(g => g.id === settings.gfx)) settings.gfx = 'toon';
 let GFX = settings.gfx;
-const toon = () => GFX === 'toon';
+const cel = () => GFX !== 'neon';
 /* A stable per-cell hash. Terrain scatter must not use RNG: that is seeded
    for the balance harness and consumed by gameplay, so drawing from it would
    make the ground crawl between frames and desync a replay. */
@@ -718,8 +729,8 @@ function toast(text, col) { toasts.push({ text, col: col || '#dde3ff', t: 2.4 })
 /* ============================ PATH BUILDING =========================== */
 function buildPath(idx) {
   const m = MAPS[idx];
-  pathCells = new Set(); rockCells = new Set(); segs = []; totalLen = 0; distMemo = new Map();
-  terrain = { key:'', tufts:[], blobs:[], tone:[] };
+  pathCells = new Set(); pathOrder = []; rockCells = new Set(); segs = []; totalLen = 0; distMemo = new Map();
+  terrain = { key:'', tufts:[], tone:[] };
   const pts = m.pts.map(p => ({ x: cellCx(p[0]), y: cellCy(p[1]) }));
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i], b = pts[i + 1];
@@ -734,7 +745,13 @@ function buildPath(idx) {
     for (let s = 0; s <= steps; s++) {
       const c = Math.round(c0 + (c1 - c0) * s / steps);
       const r = Math.round(r0 + (r1 - r0) * s / steps);
-      if (inBoard(r, c)) pathCells.add(key(r, c));
+      if (!inBoard(r, c)) continue;
+      pathCells.add(key(r, c));
+      /* the same cells again, IN WALK ORDER and deduped against the last
+         one pushed — a corner cell is the end of one leg and the start of
+         the next. The road's paving joints and the entrance/exit arrows are
+         both drawn off this, so both land on real grid lines. */
+      if (pathOrder[pathOrder.length - 1] !== key(r, c)) pathOrder.push(key(r, c));
     }
   }
   for (const [c, r] of (m.rocks || [])) if (inBoard(r, c) && !pathCells.has(key(r, c))) rockCells.add(key(r, c));
@@ -1412,7 +1429,10 @@ function trackTarget(t) {
 function turretFire(t, target) {
   const x = cellCx(t.c), y = cellCy(t.r);
   const P = { kin: t.D, dot: t.dot, chill: t.chill, chillT: t.chillT };
-  beams.push({ x1:x, y1:y, x2:target.x, y2:target.y, t:0.07, col:'#e8eeff', w:1.6 });
+  /* mcol is the colour of the module this turret carries most of. Nothing in
+     combat reads it — it rides along so a skin can paint the shot in it. */
+  beams.push({ x1:x, y1:y, x2:target.x, y2:target.y, t:0.07, life:0.07,
+               col:'#e8eeff', w:1.6, kind:'shot', mcol:dominantModCol(t) });
   const acc = new Map();
   propagate(t, target, P, 1, t.hops, new Set([target.id]), acc, 'hit');
   commitShot(t, acc);
@@ -1645,18 +1665,71 @@ function linkColour(from) {
   if (from.kind === 'booster') return BOOSTERS[from.boostKind] ? BOOSTERS[from.boostKind].col : null;
   return null;
 }
-/* --------------------------- the toon palette -------------------------- */
-const TOON = {
+/* ------------------------------ THE SKINS ------------------------------
+   One palette per cel style plus, where a style needs a different FORM and
+   not just a different colour, a draw override. A skin is paint: nothing
+   below is reachable from update() or from the payload maths, and every
+   override is a pure drawing function that gets the same arguments the
+   default would have got.
+
+   TOON's palette is the base; each other skin states only what it changes,
+   so a new palette key added here reaches every style at once. */
+const PAL_TOON = {
   grass:['#5b9b46','#559241','#63a44c','#4f8b3d'],
-  dirt:['#8a6a44','#7d5f3c','#94734b'],
-  grassInk:'#33632a', dirtInk:'#5d4529',
-  pave:'#9aa0a8', paveLo:'#7d848d', paveInk:'#4a5058', paveSlab:'#8a9199',
+  grassInk:'#33632a', rubble:'#7d5f3c',
+  pave:'#9aa0a8', paveLo:'#7d848d', paveInk:'#4a5058',
   kerb:'#6d747d', kerbInk:'#464c54',
-  rock:'#8d9299', rockLo:'#6d7278', rockHi:'#b3b8be', rockInk:'#3d4147',
+  rock:'#8d9299', rockHi:'#b3b8be', rockInk:'#3d4147',
   steel:'#9aa4bb', steelLo:'#6f7a90', steelHi:'#c6cddd', ink:'#191c24',
-  wall:'#a99880', wallLo:'#8a7a64', wallHi:'#c8b89e', wallInk:'#3a3128',
+  wall:'#a99880', wallHi:'#c8b89e', wallInk:'#3a3128',
   shadow:'rgba(15,20,14,0.30)',
 };
+const SKINS = {
+  toon: { pal: PAL_TOON },
+  mech: {
+    pal: Object.assign({}, PAL_TOON, {
+      grass:['#5d7a4e','#577448','#668355','#4f6a43'], grassInk:'#33482c',
+      pave:'#5c6068', paveLo:'#44474e', paveInk:'#26282e', kerb:'#8a8f79', kerbInk:'#43462f',
+      rock:'#7c828a', rockHi:'#a7adb6', rockInk:'#33373d',
+      steel:'#78838f', steelLo:'#565f6a', steelHi:'#b6c1cd', ink:'#12161c',
+      wall:'#6f7a72', wallHi:'#a3ada4', wallInk:'#252d28', rubble:'#4a5148',
+    }),
+    turret: drawTurretMech, creep: drawCreepMech, module: drawModuleMech,
+    booster: drawBoosterMech, wall: drawWallMech,
+  },
+  steampunk: {
+    pal: Object.assign({}, PAL_TOON, {
+      grass:['#6c7f49','#657745','#758a51','#5d6f3f'], grassInk:'#414d29',
+      pave:'#8e8579', paveLo:'#6f6860', paveInk:'#403a33', kerb:'#8d6a33', kerbInk:'#402d12',
+      rock:'#8a8072', rockHi:'#b5aa9a', rockInk:'#3c352c',
+      steel:'#c08e3e', steelLo:'#8d6427', steelHi:'#f2d79c', ink:'#2a1c0e',
+      wall:'#9a6f3e', wallHi:'#d9b271', wallInk:'#33210e', rubble:'#6a4c28',
+    }),
+    turret: drawTurretSteam, creep: drawCreepSteam, module: drawModuleSteam,
+    booster: drawBoosterSteam, wall: drawWallSteam, shot: drawShotSteam,
+  },
+  stoneage: {
+    pal: Object.assign({}, PAL_TOON, {
+      grass:['#6aa84f','#63a049','#75b45a','#5d9744'], grassInk:'#3a6b2c',
+      pave:'#a4967f', paveLo:'#87795f', paveInk:'#4f4432', kerb:'#7c6a4e', kerbInk:'#453923',
+      rock:'#93897c', rockHi:'#bbb2a4', rockInk:'#3f382e',
+      steel:'#c9a06a', steelLo:'#9c7647', steelHi:'#efd6ac', ink:'#2b1f14',
+      wall:'#7a5334', wallHi:'#b08351', wallInk:'#2e1d0d', rubble:'#5d411f',
+    }),
+    turret: drawTurretStone, creep: drawCreepStone, module: drawModuleStone,
+    booster: drawBoosterStone, wall: drawWallStone, shot: drawShotStone,
+  },
+};
+/* SK is the live skin and TOON the live palette. They are reassigned by
+   applySkin() rather than looked up per call: celShape() alone runs a few
+   hundred times a frame. TOON keeps its name because every call site reads
+   it as "the cel palette", which is exactly what it still is. */
+let SK = SKINS.toon, TOON = SK.pal;
+function applySkin() {
+  SK = SKINS[GFX] || SKINS.toon;
+  TOON = SK.pal;
+}
+applySkin();                   // a stored style has to take effect before the first frame
 /* The cel recipe, in one place: flat fill, one hard ink outline, one
    rim-light facet clipped to the shape, one contact shadow. Every toon
    silhouette goes through this so the whole board shades the same way. */
@@ -1712,7 +1785,7 @@ function roundRect(x, y, w, h, r) {
    the COLOUR on the plate comes from the modules feeding it, never from
    the turret itself. */
 function drawTurretShape(x, y, s, lvl, aim) {
-  if (toon()) return drawTurretToon(x, y, s, lvl, aim);
+  if (cel()) return drawTurretCel(x, y, s, lvl, aim);
   ctx.save();
   ctx.translate(x, y);
   if (aim !== undefined) ctx.rotate(aim + Math.PI / 2);
@@ -1733,11 +1806,15 @@ function drawTurretShape(x, y, s, lvl, aim) {
    the game's signature — but sits it on a plated emplacement and gives it a
    barrel that points where it is aiming, so the board reads as machines
    rather than markers. */
-function drawTurretToon(x, y, s, lvl, aim) {
-  const g = s * (0.34 + 0.035 * (lvl - 1));
+function drawTurretCel(x, y, s, lvl, aim) {
   contactShadow(x, y + s * 0.30, s * 0.40, s * 0.16);
   ctx.save();
   ctx.translate(x, y);
+  (SK.turret || turretBodyToon)(s, lvl, aim);
+  ctx.restore();
+}
+function turretBodyToon(s, lvl, aim) {
+  const g = s * (0.34 + 0.035 * (lvl - 1));
   /* the pad it is bolted to */
   const pad = () => { roundRect(-s * 0.38, -s * 0.30, s * 0.76, s * 0.62, s * 0.12); };
   celShape(pad, TOON.steelLo, TOON.ink, TOON.steelHi, s * 0.4);
@@ -1766,12 +1843,11 @@ function drawTurretToon(x, y, s, lvl, aim) {
     ctx.fill();
   }
   ctx.restore();
-  ctx.restore();
 }
 function drawModuleShape(x, y, s, mod) {
   const M = MODULES[mod];
   if (!M) return;
-  if (toon()) return drawModuleToon(x, y, s, mod, M);
+  if (cel()) return drawModuleCel(x, y, s, mod, M);
   ctx.save();
   ctx.translate(x, y);
   roundRect(-s * 0.34, -s * 0.34, s * 0.68, s * 0.68, s * 0.14);
@@ -1786,10 +1862,14 @@ function drawModuleShape(x, y, s, mod) {
 /* A module is a bolted-on pod: flat housing in the module's colour, ink
    outline, a lit top-left facet, and the glyph punched into a dark plate so
    it survives against every hull colour. */
-function drawModuleToon(x, y, s, mod, M) {
+function drawModuleCel(x, y, s, mod, M) {
   contactShadow(x, y + s * 0.32, s * 0.34, s * 0.13);
   ctx.save();
   ctx.translate(x, y);
+  (SK.module || moduleBodyToon)(s, M);
+  ctx.restore();
+}
+function moduleBodyToon(s, M) {
   const body = () => { roundRect(-s * 0.35, -s * 0.35, s * 0.70, s * 0.70, s * 0.15); };
   celShape(body, M.col, TOON.ink, '#ffffff', s * 0.36);
   /* corner bolts */
@@ -1807,12 +1887,11 @@ function drawModuleToon(x, y, s, mod, M) {
   ctx.font = Math.round(s * 0.30) + 'px "Share Tech Mono", monospace';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(M.glyph, 0, s * 0.015);
-  ctx.restore();
 }
 function drawBoosterShape(x, y, s, kindKey) {
   const B = BOOSTERS[kindKey];
   if (!B) return;
-  if (toon()) return drawBoosterToon(x, y, s, kindKey, B);
+  if (cel()) return drawBoosterCel(x, y, s, kindKey, B);
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(Math.PI / 4);
@@ -1829,10 +1908,15 @@ function drawBoosterShape(x, y, s, kindKey) {
 /* A booster is a pylon standing on the diagonal — deliberately a different
    FORM from a module, not just a different colour, because it plugs into a
    different set of cells. */
-function drawBoosterToon(x, y, s, kindKey, B) {
+function drawBoosterCel(x, y, s, kindKey, B) {
   contactShadow(x, y + s * 0.30, s * 0.30, s * 0.12);
   ctx.save();
   ctx.translate(x, y);
+  (SK.booster || boosterBodyToon)(s, B);
+  ctx.restore();
+}
+function boosterBodyToon(s, B) {
+  ctx.save();
   ctx.rotate(Math.PI / 4);
   const body = () => { roundRect(-s * 0.27, -s * 0.27, s * 0.54, s * 0.54, s * 0.10); };
   celShape(body, B.col, TOON.ink, '#ffffff', s * 0.28);
@@ -1858,7 +1942,7 @@ function drawKindShape(kind, x, y, s) {
   else if (MODULES[kind]) drawModuleShape(x, y, s, kind);
 }
 function drawWallShape(x, y, s, frac) {
-  if (toon()) return drawWallToon(x, y, s, frac);
+  if (cel()) return drawWallCel(x, y, s, frac);
   ctx.save();
   ctx.translate(x, y);
   roundRect(-s * 0.40, -s * 0.34, s * 0.80, s * 0.68, s * 0.08);
@@ -1879,10 +1963,20 @@ function drawWallShape(x, y, s, frac) {
 }
 /* A toon wall is masonry: courses of blocks with a lit top course and struck
    joints, so a damaged one reads as chipped rather than dimmed. */
-function drawWallToon(x, y, s, frac) {
+function drawWallCel(x, y, s, frac) {
   contactShadow(x, y + s * 0.36, s * 0.44, s * 0.14);
   ctx.save();
   ctx.translate(x, y);
+  (SK.wall || wallBodyToon)(s, frac);
+  /* the HP bar belongs to the WRAPPER, not to any skin: it is a rules
+     readout and every style has to report it identically */
+  const bw = s * 0.76;
+  ctx.fillStyle = 'rgba(20,18,14,0.75)'; ctx.fillRect(-bw / 2, s * 0.42, bw, 3.4);
+  ctx.fillStyle = frac > 0.5 ? '#5ad04a' : frac > 0.22 ? '#e8b13a' : '#d8483f';
+  ctx.fillRect(-bw / 2, s * 0.42, bw * clamp(frac, 0, 1), 3.4);
+  ctx.restore();
+}
+function wallBodyToon(s, frac) {
   const body = () => { roundRect(-s * 0.42, -s * 0.36, s * 0.84, s * 0.72, s * 0.07); };
   celShape(body, TOON.wall, TOON.wallInk, TOON.wallHi, s * 0.44);
   ctx.save();
@@ -1901,7 +1995,7 @@ function drawWallToon(x, y, s, frac) {
   /* damage: knock the top course out as the wall loses HP */
   if (frac < 0.99) {
     ctx.globalAlpha = 1;
-    ctx.fillStyle = TOON.dirt[1];
+    ctx.fillStyle = TOON.rubble;
     const gone = (1 - clamp(frac, 0, 1));
     ctx.fillRect(-s * 0.42, -s * 0.36, s * 0.84, s * 0.30 * gone);
     ctx.strokeStyle = TOON.wallInk; ctx.globalAlpha = 0.7;
@@ -1910,11 +2004,6 @@ function drawWallToon(x, y, s, frac) {
     ctx.lineTo(s * 0.42, -s * 0.36 + s * 0.30 * gone);
     ctx.stroke();
   }
-  ctx.restore();
-  const bw = s * 0.76;
-  ctx.fillStyle = 'rgba(20,18,14,0.75)'; ctx.fillRect(-bw / 2, s * 0.42, bw, 3.4);
-  ctx.fillStyle = frac > 0.5 ? '#5ad04a' : frac > 0.22 ? '#e8b13a' : '#d8483f';
-  ctx.fillRect(-bw / 2, s * 0.42, bw * clamp(frac, 0, 1), 3.4);
   ctx.restore();
 }
 /* The per-type silhouette is the same in both styles — it is how a player
@@ -1943,24 +2032,20 @@ function creepPath(shape, r) {
   }
 }
 function drawCreepShape(c, x, y, r) {
-  const T = toon();
+  const T = cel();
   if (T) contactShadow(x, y + r * 0.85, r * 0.95, r * 0.34);
   ctx.save();
   ctx.translate(x, y);
   const flash = c.hitFlash > 0;
   if (T) {
-    const path = () => creepPath(c.def.shape, r);
-    celShape(path, flash ? '#ffffff' : c.def.col, c.elite ? '#f0c040' : TOON.ink, '#ffffff', r);
+    const col = flash ? '#ffffff' : c.def.col;
+    (SK.creep || drawCreepCel)(c, r, col);
+    /* the elite ring is style-independent: it is a RULE readout, and a skin
+       that quietly restyled it would be a skin changing what the board says */
     if (c.elite) {
       ctx.strokeStyle = '#f0c040'; ctx.lineWidth = Math.max(1.4, r * 0.10);
       creepPath(c.def.shape, r * 1.16); ctx.stroke();
     }
-    /* one dark eye-slit band, which is what turns a polygon into a thing */
-    ctx.save();
-    creepPath(c.def.shape, r); ctx.clip();
-    ctx.fillStyle = 'rgba(20,22,28,0.55)';
-    ctx.fillRect(-r, -r * 0.22, r * 2, r * 0.30);
-    ctx.restore();
   } else {
     ctx.fillStyle = flash ? '#ffffff' : c.def.col;
     ctx.strokeStyle = c.elite ? '#ffc300' : '#0a0a14';
@@ -1985,6 +2070,538 @@ function drawCreepShape(c, x, y, r) {
     ctx.fillRect(x - bw / 2, y - r - 8, bw * clamp(c.hp / c.maxHp, 0, 1), T ? 3 : 2.5);
   }
 }
+/* The default cel creep: the type polygon, flat-filled, with one dark band
+   across it — which is what turns a polygon into a thing. */
+function drawCreepCel(c, r, col) {
+  celShape(() => creepPath(c.def.shape, r), col, c.elite ? '#f0c040' : TOON.ink, '#ffffff', r);
+  ctx.save();
+  creepPath(c.def.shape, r); ctx.clip();
+  ctx.fillStyle = 'rgba(20,22,28,0.55)';
+  ctx.fillRect(-r, -r * 0.22, r * 2, r * 0.30);
+  ctx.restore();
+}
+/* Which way a creep is walking. Skins hang directional furniture — treads,
+   chimneys, horns — off this; the type polygon itself stays unrotated so a
+   HULK reads as a HULK at the same angle in every style. */
+function creepHeading(c) {
+  const a = posAt(c.d), b = posAt(Math.min(totalLen, c.d + Math.max(2, cell * 0.25)));
+  const dx = b.x - a.x, dy = b.y - a.y;
+  return (dx || dy) ? Math.atan2(dy, dx) : 0;
+}
+/* The colour of the module a turret carries most of — the "bucket" the
+   STONE AGE skin dips its rocks in, and null on a bare turret. */
+function dominantModCol(t) {
+  let best = null, n = 0;
+  for (const k of COMBAT_MODS) if (t.mods[k] > n) { n = t.mods[k]; best = k; }
+  return best ? MODULES[best].col : null;
+}
+
+/* ============================== THE SKINS =============================
+   Everything below is paint. Each function draws in the LOCAL space its
+   wrapper set up — origin at the tile centre, contact shadow already laid
+   down, HP bar still the wrapper's job — so a skin can only ever change
+   how a thing looks, never where it is or what it reports.
+
+   Three rules hold across all four cel skins:
+     · the type COLOUR is never overridden. A module is drawn in M.col and
+       a creep in c.def.col in every style, because that colour is how the
+       board answers "what is that" and a skin does not get a vote.
+     · the type SILHOUETTE survives. Creeps keep creepPath(); skins hang
+       furniture around it rather than replacing it, so a HULK still reads
+       as a HULK at a glance in STONE AGE.
+     · directional furniture rotates, the identity does not. */
+
+/* one hard-edged polygon from a list of [x, y] pairs */
+function polyPath(pts) {
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+  ctx.closePath();
+}
+/* a ring of rivets/bolts just inside a radius — the cheapest way to say
+   "this thing was assembled out of plate" */
+function studs(n, rad, r, col) {
+  ctx.fillStyle = col;
+  for (let i = 0; i < n; i++) {
+    const a = i * Math.PI * 2 / n - Math.PI / 2;
+    ctx.beginPath(); ctx.arc(Math.cos(a) * rad, Math.sin(a) * rad, r, 0, Math.PI * 2); ctx.fill();
+  }
+}
+function glyphOn(g, s, size, col, dy) {
+  ctx.fillStyle = col;
+  ctx.font = Math.round(s * size) + 'px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(g, 0, dy || 0);
+}
+/* the default cel tracer: ink casing, coloured body, white core, muzzle
+   flash — a shot that reads as a solid object travelling, not a glow */
+function drawShotCel(b, a) {
+  const line = () => { ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke(); };
+  ctx.globalAlpha = a;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = TOON.ink; ctx.lineWidth = b.w * 3.1; line();
+  ctx.strokeStyle = b.col; ctx.lineWidth = b.w * 1.9; line();
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1, b.w * 0.7);
+  ctx.globalAlpha = a * 0.85; line();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = '#fff3c4';
+  ctx.beginPath(); ctx.arc(b.x1, b.y1, b.w * 1.5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = TOON.ink; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(b.x1, b.y1, b.w * 1.5, 0, Math.PI * 2); ctx.stroke();
+}
+/* how far a projectile has flown, 0 at the muzzle and 1 at the target */
+function shotProg(b) { return clamp(1 - b.t / (b.life || 0.07), 0, 1); }
+
+/* ------------------------------- MECH --------------------------------
+   Military hardware. The turret stops being a stylised triangle and
+   becomes an autocannon on a track base; the creeps become the column it
+   is shooting at — tracked hulls, wheeled scouts, walkers. */
+function drawTurretMech(s, lvl, aim) {
+  /* the track base does NOT turn — that is the whole point of a turret */
+  const deck = () => polyPath([[-s*0.40,-s*0.16],[-s*0.28,-s*0.32],[s*0.28,-s*0.32],
+                              [s*0.40,-s*0.16],[s*0.40,s*0.18],[s*0.28,s*0.34],
+                              [-s*0.28,s*0.34],[-s*0.40,s*0.18]]);
+  celShape(deck, TOON.steelLo, TOON.ink, TOON.steelHi, s * 0.4);
+  ctx.fillStyle = TOON.ink; ctx.globalAlpha = 0.5;
+  for (const sgn of [-1, 1]) ctx.fillRect(-s * 0.34, sgn * s * 0.26 - s * 0.035, s * 0.68, s * 0.07);
+  ctx.globalAlpha = 1;
+  ctx.save();
+  ctx.rotate(aim === undefined ? -Math.PI / 2 : aim);
+  const bl = s * (0.44 + 0.03 * lvl);
+  /* barrel, then muzzle brake — two ported rings, which is the detail that
+     makes a tube read as a gun */
+  celShape(() => roundRect(s * 0.04, -s * 0.065, bl, s * 0.13, s * 0.03),
+           TOON.steelLo, TOON.ink, TOON.steelHi, s * 0.16);
+  ctx.fillStyle = TOON.ink;
+  for (const d of [0.74, 0.86]) ctx.fillRect(s * 0.04 + bl * d, -s * 0.095, s * 0.035, s * 0.19);
+  celShape(() => roundRect(s * 0.04 + bl * 0.94, -s * 0.10, s * 0.08, s * 0.20, s * 0.03),
+           TOON.steel, TOON.ink, TOON.steelHi, s * 0.16);
+  /* receiver and ammo drum */
+  celShape(() => roundRect(-s * 0.26, -s * 0.19, s * 0.46, s * 0.38, s * 0.06),
+           TOON.steel, TOON.ink, TOON.steelHi, s * 0.3);
+  celShape(() => { ctx.beginPath(); ctx.arc(-s * 0.10, -s * 0.24, s * 0.13, 0, Math.PI * 2); },
+           TOON.steelLo, TOON.ink, TOON.steelHi, s * 0.2);
+  /* level as painted service chevrons on the receiver */
+  ctx.strokeStyle = '#e8c04a'; ctx.lineWidth = Math.max(1, s * 0.035); ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = 0; i < lvl; i++) {
+    const bx = -s * 0.20 + i * s * 0.09;
+    ctx.moveTo(bx, s * 0.11); ctx.lineTo(bx + s * 0.045, s * 0.02); ctx.lineTo(bx, -s * 0.07);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+function drawModuleMech(s, M) {
+  celShape(() => roundRect(-s * 0.35, -s * 0.35, s * 0.70, s * 0.70, s * 0.06),
+           M.col, TOON.ink, '#ffffff', s * 0.36);
+  /* steel corner brackets: an ordnance crate, not a pod */
+  ctx.strokeStyle = TOON.steelLo; ctx.lineWidth = Math.max(1.2, s * 0.055);
+  ctx.lineCap = 'butt';
+  ctx.beginPath();
+  for (const [cx, cy] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+    ctx.moveTo(cx * s * 0.33, cy * s * 0.14); ctx.lineTo(cx * s * 0.33, cy * s * 0.33);
+    ctx.lineTo(cx * s * 0.14, cy * s * 0.33);
+  }
+  ctx.stroke();
+  /* hazard stripe along the foot */
+  ctx.save();
+  roundRect(-s * 0.35, -s * 0.35, s * 0.70, s * 0.70, s * 0.06); ctx.clip();
+  ctx.fillStyle = TOON.ink; ctx.globalAlpha = 0.75;
+  for (let i = -3; i < 5; i++) {
+    polyPath([[i * s * 0.16, s * 0.35], [i * s * 0.16 + s * 0.08, s * 0.35],
+              [i * s * 0.16 + s * 0.16, s * 0.22], [i * s * 0.16 + s * 0.08, s * 0.22]]);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  ctx.fillStyle = 'rgba(14,17,21,0.80)';
+  roundRect(-s * 0.20, -s * 0.24, s * 0.40, s * 0.36, s * 0.04); ctx.fill();
+  glyphOn(M.glyph, s, 0.28, '#ffffff', -s * 0.055);
+}
+function drawBoosterMech(s, B) {
+  celShape(() => roundRect(-s * 0.30, -s * 0.12, s * 0.60, s * 0.34, s * 0.05),
+           TOON.steelLo, TOON.ink, TOON.steelHi, s * 0.3);
+  /* a sensor dish on a short mast — a booster is a different FORM from a
+     module in every skin, because it plugs into a different set of cells */
+  ctx.fillStyle = TOON.ink;
+  ctx.fillRect(-s * 0.03, -s * 0.24, s * 0.06, s * 0.18);
+  celShape(() => { ctx.beginPath(); ctx.arc(0, -s * 0.17, s * 0.25, Math.PI * 0.08, Math.PI * 0.92, true); ctx.closePath(); },
+           B.col, TOON.ink, '#ffffff', s * 0.26);
+  ctx.strokeStyle = TOON.ink; ctx.lineWidth = Math.max(1, s * 0.03); ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.30, -s * 0.30); ctx.lineTo(-s * 0.22, -s * 0.15);
+  ctx.moveTo(s * 0.30, -s * 0.30); ctx.lineTo(s * 0.22, -s * 0.15);
+  ctx.stroke();
+  glyphOn(B.glyph, s, 0.22, TOON.ink, -s * 0.14);
+}
+function drawWallMech(s, frac) {
+  const body = () => roundRect(-s * 0.42, -s * 0.30, s * 0.84, s * 0.62, s * 0.05);
+  celShape(body, TOON.wall, TOON.wallInk, TOON.wallHi, s * 0.4);
+  ctx.save();
+  body(); ctx.clip();
+  /* jersey-barrier hazard chevrons, then bolts along the seam */
+  ctx.fillStyle = '#e8c04a'; ctx.globalAlpha = 0.55;
+  for (let i = -3; i < 5; i++) {
+    polyPath([[i * s * 0.22 - s * 0.42, s * 0.32], [i * s * 0.22 - s * 0.30, s * 0.32],
+              [i * s * 0.22 - s * 0.10, -s * 0.30], [i * s * 0.22 - s * 0.22, -s * 0.30]]);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  if (frac < 0.99) {
+    ctx.fillStyle = TOON.rubble;
+    ctx.fillRect(-s * 0.42, -s * 0.30, s * 0.84, s * 0.26 * (1 - clamp(frac, 0, 1)));
+  }
+  ctx.restore();
+  ctx.fillStyle = TOON.wallInk; ctx.globalAlpha = 0.7;
+  for (const bx of [-0.30, -0.10, 0.10, 0.30]) {
+    ctx.beginPath(); ctx.arc(bx * s, 0, Math.max(1, s * 0.032), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawCreepMech(c, r, col) {
+  const h = creepHeading(c);
+  ctx.save();
+  ctx.rotate(h);
+  /* running gear, laid down before the hull so the hull sits on it */
+  ctx.fillStyle = '#20262d';
+  for (const sgn of [-1, 1]) { roundRect(-r * 0.86, sgn * r * 0.74 - r * 0.20, r * 1.72, r * 0.40, r * 0.14); ctx.fill(); }
+  ctx.strokeStyle = TOON.ink; ctx.lineWidth = Math.max(1, r * 0.10);
+  for (const sgn of [-1, 1]) { roundRect(-r * 0.86, sgn * r * 0.74 - r * 0.20, r * 1.72, r * 0.40, r * 0.14); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(200,210,220,0.35)'; ctx.lineWidth = Math.max(0.8, r * 0.06);
+  ctx.beginPath();
+  for (const sgn of [-1, 1]) for (let i = -2; i <= 2; i++) {
+    ctx.moveTo(i * r * 0.34, sgn * r * 0.74 - r * 0.18); ctx.lineTo(i * r * 0.34, sgn * r * 0.74 + r * 0.18);
+  }
+  ctx.stroke();
+  ctx.restore();
+  drawCreepCel(c, r, col);
+  /* plating and an optic, both turned to face the way it is going */
+  ctx.save();
+  ctx.rotate(h);
+  ctx.save();
+  creepPath(c.def.shape, r); ctx.clip();
+  ctx.strokeStyle = TOON.ink; ctx.globalAlpha = 0.42; ctx.lineWidth = Math.max(1, r * 0.09);
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.15, -r); ctx.lineTo(-r * 0.15, r);
+  ctx.moveTo(r * 0.32, -r); ctx.lineTo(r * 0.32, r);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  ctx.fillStyle = '#ff4436';
+  ctx.beginPath(); ctx.arc(r * 0.44, 0, Math.max(1.2, r * 0.17), 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = TOON.ink; ctx.lineWidth = Math.max(1, r * 0.08); ctx.stroke();
+  ctx.strokeStyle = TOON.ink; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(1, r * 0.09);
+  ctx.beginPath(); ctx.moveTo(-r * 0.5, -r * 0.35); ctx.lineTo(-r * 0.95, -r * 0.85); ctx.stroke();
+  ctx.restore();
+}
+
+/* ----------------------------- STEAMPUNK -----------------------------
+   Brass, rivets and pressure. Everything is a machine that runs on steam,
+   which means every silhouette gets a boiler, a gauge or a cog. */
+function steamPuff(x, y, s, seed) {
+  ctx.fillStyle = 'rgba(236,238,242,0.55)';
+  ctx.strokeStyle = 'rgba(90,84,72,0.45)'; ctx.lineWidth = Math.max(0.8, s * 0.02);
+  /* three small puffs, deliberately kept inside the tile: a plume that
+     escapes its cell looks fine on the board and like floating debris on a
+     40px build card, and the same function draws both */
+  for (let i = 0; i < 3; i++) {
+    const rr = s * (0.05 + i * 0.028), dy = -i * s * 0.085;
+    const dx = (h2(seed + i, i * 13) - 0.5) * s * 0.14;
+    ctx.beginPath(); ctx.arc(x + dx, y + dy, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+}
+function drawTurretSteam(s, lvl, aim) {
+  /* the boiler stands still and the gun swings on it */
+  celShape(() => { ctx.beginPath(); ctx.arc(0, 0, s * 0.33, 0, Math.PI * 2); },
+           TOON.steelLo, TOON.ink, TOON.steelHi, s * 0.34);
+  ctx.strokeStyle = TOON.ink; ctx.globalAlpha = 0.45; ctx.lineWidth = Math.max(1, s * 0.035);
+  for (const rr of [0.24, 0.15]) { ctx.beginPath(); ctx.arc(0, 0, s * rr, 0, Math.PI * 2); ctx.stroke(); }
+  ctx.globalAlpha = 1;
+  studs(8, s * 0.28, Math.max(0.9, s * 0.028), TOON.ink);
+  ctx.save();
+  ctx.rotate(aim === undefined ? -Math.PI / 2 : aim);
+  /* a cannon: a tapering tube that flares at the muzzle */
+  const bl = s * (0.46 + 0.03 * lvl);
+  celShape(() => polyPath([[s * 0.02, -s * 0.10], [bl, -s * 0.075], [bl, s * 0.075], [s * 0.02, s * 0.10]]),
+           TOON.steel, TOON.ink, TOON.steelHi, s * 0.2);
+  celShape(() => roundRect(bl - s * 0.05, -s * 0.115, s * 0.11, s * 0.23, s * 0.03),
+           TOON.steelLo, TOON.ink, TOON.steelHi, s * 0.16);
+  celShape(() => roundRect(-s * 0.16, -s * 0.15, s * 0.26, s * 0.30, s * 0.05),
+           TOON.steelLo, TOON.ink, TOON.steelHi, s * 0.24);
+  ctx.restore();
+  /* pressure gauge — the dial reads LEVEL, so the needle actually says
+     something instead of being decoration */
+  celShape(() => { ctx.beginPath(); ctx.arc(0, 0, s * 0.115, 0, Math.PI * 2); },
+           '#f4ead2', TOON.ink, '#ffffff', s * 0.12);
+  ctx.strokeStyle = '#b03a26'; ctx.lineWidth = Math.max(1, s * 0.03); ctx.lineCap = 'round';
+  const na = -Math.PI * 0.75 + Math.min(1, (lvl - 1) / 4) * Math.PI * 1.5;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(na) * s * 0.085, Math.sin(na) * s * 0.085); ctx.stroke();
+  /* chimney, up and to the left, puffing */
+  celShape(() => roundRect(-s * 0.36, -s * 0.32, s * 0.12, s * 0.20, s * 0.03),
+           TOON.steelLo, TOON.ink, TOON.steelHi, s * 0.14);
+  steamPuff(-s * 0.30, -s * 0.36, s, 3);
+}
+function drawModuleSteam(s, M) {
+  /* a pressure canister: hoops, a gauge, and a pipe elbow off the side */
+  celShape(() => roundRect(-s * 0.26, -s * 0.33, s * 0.52, s * 0.66, s * 0.16),
+           M.col, TOON.ink, '#ffffff', s * 0.3);
+  ctx.strokeStyle = TOON.steelLo; ctx.lineWidth = Math.max(1.2, s * 0.05);
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.26, -s * 0.14); ctx.lineTo(s * 0.26, -s * 0.14);
+  ctx.moveTo(-s * 0.26, s * 0.14);  ctx.lineTo(s * 0.26, s * 0.14);
+  ctx.stroke();
+  ctx.strokeStyle = TOON.ink; ctx.lineWidth = Math.max(1, s * 0.03);
+  ctx.beginPath();
+  ctx.moveTo(s * 0.26, s * 0.22); ctx.lineTo(s * 0.36, s * 0.22); ctx.lineTo(s * 0.36, s * 0.34);
+  ctx.stroke();
+  celShape(() => { ctx.beginPath(); ctx.arc(0, 0, s * 0.155, 0, Math.PI * 2); },
+           '#f4ead2', TOON.ink, '#ffffff', s * 0.16);
+  studs(6, s * 0.20, Math.max(0.8, s * 0.025), TOON.steelLo);
+  glyphOn(M.glyph, s, 0.20, '#2a1c0e', s * 0.005);
+}
+function drawBoosterSteam(s, B) {
+  /* a cog. Nothing else in the game is round-with-teeth, so a booster is
+     still findable at a glance on a busy board. */
+  const teeth = 10, R = s * 0.30, ri = s * 0.235;
+  const pts = [];
+  for (let i = 0; i < teeth * 2; i++) {
+    const a = i * Math.PI / teeth - Math.PI / 2;
+    const rr = i % 2 ? ri : R;
+    pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+  }
+  celShape(() => polyPath(pts), B.col, TOON.ink, '#ffffff', s * 0.3);
+  celShape(() => { ctx.beginPath(); ctx.arc(0, 0, s * 0.155, 0, Math.PI * 2); },
+           TOON.steelLo, TOON.ink, TOON.steelHi, s * 0.16);
+  glyphOn(B.glyph, s, 0.22, '#f2d79c', s * 0.005);
+}
+function drawWallSteam(s, frac) {
+  const body = () => roundRect(-s * 0.42, -s * 0.34, s * 0.84, s * 0.68, s * 0.05);
+  celShape(body, TOON.wall, TOON.wallInk, TOON.wallHi, s * 0.4);
+  ctx.save();
+  body(); ctx.clip();
+  ctx.strokeStyle = TOON.wallInk; ctx.globalAlpha = 0.6; ctx.lineWidth = Math.max(1, s * 0.04);
+  ctx.beginPath(); ctx.moveTo(-s * 0.42, 0); ctx.lineTo(s * 0.42, 0); ctx.stroke();
+  ctx.globalAlpha = 1;
+  if (frac < 0.99) {
+    ctx.fillStyle = TOON.rubble;
+    ctx.fillRect(-s * 0.42, -s * 0.34, s * 0.84, s * 0.30 * (1 - clamp(frac, 0, 1)));
+  }
+  ctx.restore();
+  /* riveted plate: two courses of bolts is the whole vocabulary */
+  ctx.fillStyle = TOON.steelHi; ctx.globalAlpha = 0.85;
+  for (const by of [-0.20, 0.20]) for (const bx of [-0.30, -0.10, 0.10, 0.30]) {
+    ctx.beginPath(); ctx.arc(bx * s, by * s, Math.max(1, s * 0.033), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawCreepSteam(c, r, col) {
+  const h = creepHeading(c);
+  drawCreepCel(c, r, col);
+  studs(8, r * 0.74, Math.max(0.9, r * 0.075), 'rgba(240,215,156,0.9)');
+  ctx.save();
+  ctx.rotate(h);
+  /* boiler dome and a chimney trailing steam behind it */
+  celShape(() => { ctx.beginPath(); ctx.arc(-r * 0.10, 0, r * 0.34, 0, Math.PI * 2); },
+           TOON.steelLo, TOON.ink, TOON.steelHi, r * 0.34);
+  ctx.strokeStyle = TOON.ink; ctx.globalAlpha = 0.5; ctx.lineWidth = Math.max(1, r * 0.08);
+  ctx.beginPath(); ctx.arc(-r * 0.10, 0, r * 0.20, 0, Math.PI * 2); ctx.stroke();
+  ctx.globalAlpha = 1;
+  celShape(() => roundRect(-r * 0.82, -r * 0.16, r * 0.22, r * 0.32, r * 0.05),
+           TOON.steel, TOON.ink, TOON.steelHi, r * 0.2);
+  ctx.restore();
+  steamPuff(-Math.cos(h) * r * 1.0, -Math.sin(h) * r * 1.0 - r * 0.2, r * 1.6, c.id % 97);
+}
+function drawShotSteam(b, a) {
+  if (b.kind !== 'shot') return false;
+  const p = shotProg(b);
+  const x = b.x1 + (b.x2 - b.x1) * p, y = b.y1 + (b.y2 - b.y1) * p;
+  ctx.globalAlpha = a;
+  steamPuff(b.x1, b.y1, cell * 0.9, 11);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.atan2(b.y2 - b.y1, b.x2 - b.x1));
+  celShape(() => roundRect(-cell * 0.09, -cell * 0.05, cell * 0.18, cell * 0.10, cell * 0.04),
+           TOON.steelHi, TOON.ink, '#ffffff', cell * 0.1);
+  ctx.restore();
+  ctx.globalAlpha = 1;
+  return true;
+}
+
+/* ------------------------------ STONE AGE ----------------------------
+   The CD's brief, literally: turrets are cavemen, modules are cauldrons,
+   and the rock a caveman throws takes the colour of the cauldron he dipped
+   it in — so the board's colour language survives being made of people. */
+function drawTurretStone(s, lvl, aim) {
+  /* the rock he stands on */
+  celShape(() => { ctx.beginPath(); ctx.ellipse(0, s * 0.20, s * 0.34, s * 0.17, 0, 0, Math.PI * 2); },
+           TOON.rock, TOON.rockInk, TOON.rockHi, s * 0.3);
+  /* tally scratches for level — a caveman does not have pips */
+  ctx.strokeStyle = TOON.rockInk; ctx.lineWidth = Math.max(1, s * 0.03); ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = 0; i < lvl; i++) {
+    const bx = -s * 0.13 + i * s * 0.07;
+    ctx.moveTo(bx, s * 0.15); ctx.lineTo(bx + s * 0.02, s * 0.26);
+  }
+  ctx.stroke();
+  /* the throwing arm swings; the man does not */
+  ctx.save();
+  ctx.rotate(aim === undefined ? -Math.PI / 2 : aim);
+  ctx.strokeStyle = TOON.steelLo; ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(2, s * 0.10);
+  ctx.beginPath(); ctx.moveTo(0, -s * 0.06); ctx.lineTo(s * 0.30, -s * 0.16); ctx.stroke();
+  ctx.strokeStyle = TOON.ink; ctx.lineWidth = Math.max(1, s * 0.028);
+  ctx.beginPath(); ctx.moveTo(0, -s * 0.06); ctx.lineTo(s * 0.30, -s * 0.16); ctx.stroke();
+  celShape(() => { ctx.beginPath(); ctx.arc(s * 0.36, -s * 0.19, s * 0.10, 0, Math.PI * 2); },
+           TOON.rock, TOON.rockInk, TOON.rockHi, s * 0.12);
+  ctx.restore();
+  /* hide-clad body, then the head */
+  celShape(() => polyPath([[-s * 0.17, s * 0.16], [-s * 0.12, -s * 0.10], [s * 0.12, -s * 0.10],
+                           [s * 0.17, s * 0.16]]),
+           TOON.steel, TOON.ink, TOON.steelHi, s * 0.24);
+  ctx.strokeStyle = TOON.ink; ctx.globalAlpha = 0.45; ctx.lineWidth = Math.max(1, s * 0.028);
+  ctx.beginPath(); ctx.moveTo(-s * 0.15, s * 0.04); ctx.lineTo(s * 0.15, s * 0.02); ctx.stroke();
+  ctx.globalAlpha = 1;
+  celShape(() => { ctx.beginPath(); ctx.arc(0, -s * 0.20, s * 0.13, 0, Math.PI * 2); },
+           TOON.steelHi, TOON.ink, '#ffffff', s * 0.14);
+  /* hair, drawn as spikes off the crown */
+  ctx.strokeStyle = TOON.ink; ctx.lineWidth = Math.max(1, s * 0.035); ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI * 0.95 + i * Math.PI * 0.22;
+    ctx.moveTo(Math.cos(a) * s * 0.12, -s * 0.20 + Math.sin(a) * s * 0.12);
+    ctx.lineTo(Math.cos(a) * s * 0.19, -s * 0.20 + Math.sin(a) * s * 0.19);
+  }
+  ctx.stroke();
+  ctx.fillStyle = TOON.ink;
+  for (const ex of [-0.045, 0.045]) {
+    ctx.beginPath(); ctx.arc(ex * s, -s * 0.21, Math.max(0.9, s * 0.022), 0, Math.PI * 2); ctx.fill();
+  }
+}
+function drawModuleStone(s, M) {
+  /* three legs, then the pot, then what is bubbling in it — and THAT is
+     the module colour, because the contents are the whole point */
+  ctx.strokeStyle = TOON.ink; ctx.lineWidth = Math.max(1.4, s * 0.05); ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const lx of [-0.20, 0, 0.20]) { ctx.moveTo(lx * s, s * 0.14); ctx.lineTo(lx * s * 1.25, s * 0.34); }
+  ctx.stroke();
+  celShape(() => { ctx.beginPath();
+                   ctx.moveTo(-s * 0.30, -s * 0.12);
+                   ctx.quadraticCurveTo(-s * 0.30, s * 0.24, 0, s * 0.24);
+                   ctx.quadraticCurveTo(s * 0.30, s * 0.24, s * 0.30, -s * 0.12);
+                   ctx.closePath(); },
+           '#3b3630', TOON.ink, '#6b645a', s * 0.3);
+  ctx.fillStyle = M.col;
+  ctx.beginPath(); ctx.ellipse(0, -s * 0.12, s * 0.30, s * 0.10, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = TOON.ink; ctx.lineWidth = Math.max(1.2, s * 0.04); ctx.stroke();
+  ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.5;
+  ctx.beginPath(); ctx.arc(-s * 0.09, -s * 0.14, s * 0.045, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(s * 0.07, -s * 0.10, s * 0.03, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+  /* the glyph rises off the pot, so the type still reads from above */
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0)';
+  glyphOn(M.glyph, s, 0.26, M.col, -s * 0.30);
+  ctx.lineWidth = Math.max(1, s * 0.035); ctx.strokeStyle = TOON.ink;
+  ctx.font = Math.round(s * 0.26) + 'px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.strokeText(M.glyph, 0, -s * 0.30);
+  ctx.fillText(M.glyph, 0, -s * 0.30);
+  ctx.restore();
+}
+function drawBoosterStone(s, B) {
+  /* a totem: three stacked stones, painted with the booster's colour */
+  const stones = [[0, 0.20, 0.26, 0.11], [0, 0.01, 0.21, 0.10], [0, -0.18, 0.16, 0.09]];
+  for (const [sx, sy, rx, ry] of stones)
+    celShape(() => { ctx.beginPath(); ctx.ellipse(sx * s, sy * s, rx * s, ry * s * 1.5, 0, 0, Math.PI * 2); },
+             TOON.rock, TOON.rockInk, TOON.rockHi, s * 0.22);
+  ctx.strokeStyle = B.col; ctx.lineWidth = Math.max(1.4, s * 0.05); ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.19, s * 0.02); ctx.lineTo(s * 0.19, s * 0.02);
+  ctx.moveTo(-s * 0.22, s * 0.22); ctx.lineTo(s * 0.22, s * 0.22);
+  ctx.stroke();
+  glyphOn(B.glyph, s, 0.20, B.col, -s * 0.19);
+}
+function drawWallStone(s, frac) {
+  /* a log palisade — pointed stakes lashed together. Distinct from a
+     boulder on purpose: one is a thing you built, one is a thing in the way. */
+  const gone = 1 - clamp(frac, 0, 1);
+  const top = -s * 0.34 + s * 0.26 * gone;
+  for (let i = 0; i < 4; i++) {
+    const lx = -s * 0.30 + i * s * 0.20;
+    celShape(() => polyPath([[lx - s * 0.085, top + s * 0.10], [lx, top],
+                             [lx + s * 0.085, top + s * 0.10],
+                             [lx + s * 0.085, s * 0.34], [lx - s * 0.085, s * 0.34]]),
+             i % 2 ? TOON.wall : TOON.wallHi, TOON.wallInk, '#ffffff', s * 0.2);
+  }
+  ctx.strokeStyle = TOON.wallInk; ctx.lineWidth = Math.max(1.4, s * 0.05); ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.40, s * 0.06); ctx.lineTo(s * 0.40, s * 0.02);
+  ctx.moveTo(-s * 0.40, s * 0.26); ctx.lineTo(s * 0.40, s * 0.22);
+  ctx.stroke();
+}
+function drawCreepStone(c, r, col) {
+  const h = creepHeading(c);
+  /* a shaggy ruff behind the body, so a beast reads as fur and not plate */
+  ctx.save();
+  ctx.rotate(h);
+  const spikes = 11, pts = [];
+  for (let i = 0; i < spikes * 2; i++) {
+    const a = i * Math.PI / spikes;
+    const rr = r * (i % 2 ? 1.05 : 1.34);
+    pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+  }
+  celShape(() => polyPath(pts), '#6d5236', TOON.ink, '#9a7a52', r * 0.6);
+  /* horns, forward */
+  ctx.restore();
+  drawCreepCel(c, r, col);
+  ctx.save();
+  ctx.rotate(h);
+  for (const sgn of [-1, 1])
+    celShape(() => polyPath([[r * 0.30, sgn * r * 0.42], [r * 1.05, sgn * r * 0.72],
+                             [r * 0.42, sgn * r * 0.20]]),
+             '#e8ddc4', TOON.ink, '#ffffff', r * 0.3);
+  ctx.fillStyle = '#ffe9b0';
+  for (const sgn of [-1, 1]) {
+    ctx.beginPath(); ctx.arc(r * 0.34, sgn * r * 0.24, Math.max(1.2, r * 0.15), 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = TOON.ink; ctx.lineWidth = Math.max(1, r * 0.07); ctx.stroke();
+  }
+  ctx.fillStyle = TOON.ink;
+  for (const sgn of [-1, 1]) {
+    ctx.beginPath(); ctx.arc(r * 0.40, sgn * r * 0.24, Math.max(0.8, r * 0.06), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawShotStone(b, a) {
+  if (b.kind !== 'shot') return false;
+  /* THE HURLED ROCK, AND ITS COLOUR. mcol is the module the turret carries
+     most of — the cauldron the rock was dipped in — so an all-FIRE grid
+     throws orange and an all-ICE grid throws blue, which is the same thing
+     the module pods say in TOON, said with rocks instead. */
+  const p = shotProg(b);
+  const x = b.x1 + (b.x2 - b.x1) * p, y = b.y1 + (b.y2 - b.y1) * p;
+  const rr = cell * 0.11;
+  ctx.globalAlpha = a;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(p * 7.2);
+  const n = 6, pts = [];
+  for (let i = 0; i < n; i++) {
+    const ang = i * Math.PI * 2 / n;
+    const q = rr * (0.78 + 0.4 * h2(i * 13, 7));
+    pts.push([Math.cos(ang) * q, Math.sin(ang) * q]);
+  }
+  celShape(() => polyPath(pts), b.mcol || TOON.rock, TOON.ink, '#ffffff', rr);
+  ctx.restore();
+  /* a short smear behind it, in the same colour, so a fast rock still
+     reads as travelling rather than teleporting */
+  ctx.strokeStyle = b.mcol || TOON.rockHi;
+  ctx.globalAlpha = a * 0.35; ctx.lineCap = 'round'; ctx.lineWidth = rr * 0.9;
+  const bx = b.x1 + (b.x2 - b.x1) * Math.max(0, p - 0.28);
+  const by = b.y1 + (b.y2 - b.y1) * Math.max(0, p - 0.28);
+  ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(x, y); ctx.stroke();
+  ctx.globalAlpha = 1;
+  return true;
+}
+
 /* ======================== TERRAIN AND ROAD ============================
    Neon draws a dark board with a faint lattice; TOON draws a place. The
    scatter is all driven by h2(r, c) so the ground is identical every frame
@@ -1999,15 +2616,15 @@ function drawGroundNeon() {
   ctx.stroke();
 }
 /* TERRAIN CACHE. The ground is expensive to decide and cheap to draw, so it
-   is worked out once per map + cell size and then just painted. Deciding it
-   per CELL at all was the first version's mistake — hard-edged squares of
-   green and brown read as a checkerboard, not as ground. The dirt is now a
-   VERGE that hugs the road plus a few worn blobs, so its edges curve. */
-let terrain = { key:'', tufts:[], blobs:[], tone:[] };
+   is worked out once per style + map + cell size and then just painted.
+   Deciding it per CELL at all was the first version's mistake — hard-edged
+   squares of colour read as a checkerboard, not as ground. What survives is
+   broad tone blobs that ignore the grid entirely plus per-tuft grass. */
+let terrain = { key:'', tufts:[], tone:[] };
 function buildTerrain() {
-  const k = mapIdx + ':' + cell + ':' + boardX + ':' + boardY;
+  const k = GFX + ':' + mapIdx + ':' + cell + ':' + boardX + ':' + boardY;
   if (terrain.key === k) return;
-  terrain = { key:k, tufts:[], blobs:[], tone:[] };
+  terrain = { key:k, tufts:[], tone:[] };
   if (!segs.length) return;
   const samples = [];
   for (let i = 0; i <= 160; i++) samples.push(posAt(totalLen * i / 160));
@@ -2016,37 +2633,36 @@ function buildTerrain() {
     for (const p of samples) { const d = Math.hypot(p.x - x, p.y - y); if (d < m) m = d; }
     return m;
   };
-  for (let n = 0; n < 7; n++) {
-    const hx = h2(mapIdx * 91 + n, n * 17), hy = h2(n * 29, mapIdx * 13 + n);
-    const x = boardX + hx * boardW, y = boardY + hy * boardH;
-    if (nearPath(x, y) < cell * 2.2) continue;
-    /* a worn patch is three overlapping lobes, not a disc — a perfect circle
-       of brown on grass reads as a stamp rather than as bare ground */
-    const r = cell * (0.62 + 1.0 * h2(n * 7, mapIdx));
+  /* The ground is GRASS and nothing else. It used to carry a dirt verge
+     hugging the road plus worn brown patches; the CD's read was that the
+     brown fought the road for attention and made the buildable field look
+     like it had rules in it that it does not. Terrain now varies only in
+     SHADE, and the one thing that is not grass — a boulder — is the one
+     thing you genuinely cannot build on. */
+  for (let n = 0; n < 10; n++) {
+    /* a patch of a different green is three overlapping lobes, never a disc.
+       A perfect circle reads as a stamp — the same mistake the dirt blobs
+       made before them, and more visible now that shade is the ONLY
+       variation the ground has left. */
+    const x = boardX + h2(n * 13 + 2, mapIdx) * boardW;
+    const y = boardY + h2(mapIdx * 5, n * 19 + 3) * boardH;
+    const r = cell * (1.0 + 1.5 * h2(n, n + mapIdx));
     const lobes = [{ dx: 0, dy: 0, r }];
     for (let j = 1; j <= 2; j++) {
       const a = h2(n * 31 + j, mapIdx * 3 + j) * Math.PI * 2;
       const d = r * (0.45 + 0.4 * h2(j * 11, n * 5));
-      lobes.push({ dx: Math.cos(a) * d, dy: Math.sin(a) * d * 0.75,
-                   r: r * (0.5 + 0.35 * h2(n + j, j * 23)) });
+      lobes.push({ dx: Math.cos(a) * d, dy: Math.sin(a) * d * 0.8,
+                   r: r * (0.55 + 0.35 * h2(n + j, j * 23)) });
     }
-    terrain.blobs.push({ x, y, r, lobes });
-  }
-  for (let n = 0; n < 9; n++) {
-    terrain.tone.push({
-      x: boardX + h2(n * 13 + 2, mapIdx) * boardW,
-      y: boardY + h2(mapIdx * 5, n * 19 + 3) * boardH,
-      r: cell * (1.1 + 1.6 * h2(n, n + mapIdx)),
-      c: TOON.grass[(h2(n * 3, mapIdx * 7) * TOON.grass.length) | 0],
-    });
+    terrain.tone.push({ x, y, lobes,
+                        c: TOON.grass[(h2(n * 3, mapIdx * 7) * TOON.grass.length) | 0] });
   }
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     const n = h2(r * 17 + 5, c * 23 + 11);
-    if (n < 0.52) continue;
+    if (n < 0.30) continue;
     const x = boardX + c * cell + cell * (0.22 + 0.56 * h2(c, r));
     const y = boardY + r * cell + cell * (0.3 + 0.5 * n);
-    if (nearPath(x, y) < cell * 1.05) continue;
-    if (terrain.blobs.some(b => Math.hypot(b.x - x, b.y - y) < b.r)) continue;
+    if (nearPath(x, y) < cell * 0.72) continue;
     /* blades are baked out here with a per-tuft lean and blade count, so the
        grass does not read as one glyph rubber-stamped across the field */
     const q = cell * (0.10 + 0.07 * h2(c * 7 + 1, r * 5 + 3));
@@ -2063,40 +2679,24 @@ function buildTerrain() {
     terrain.tufts.push({ seg });
   }
 }
-function drawGroundToon() {
+function drawGroundCel() {
   buildTerrain();
   ctx.save();
   ctx.beginPath(); ctx.rect(boardX, boardY, boardW, boardH); ctx.clip();
   ctx.fillStyle = TOON.grass[0];
   ctx.fillRect(boardX, boardY, boardW, boardH);
-  ctx.globalAlpha = 0.55;
+  ctx.globalAlpha = 0.5;
   for (const t of terrain.tone) {
     ctx.fillStyle = t.c;
-    ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    for (const l of t.lobes) {
+      ctx.moveTo(t.x + l.dx + l.r, t.y + l.dy);
+      ctx.arc(t.x + l.dx, t.y + l.dy, l.r, 0, Math.PI * 2);
+    }
+    ctx.fill();
   }
   ctx.globalAlpha = 1;
-  /* the dirt verge, drawn as an outline pass then fill passes so it keeps a
-     cel edge without having to trace a blob outline */
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  ctx.strokeStyle = TOON.dirtInk; ctx.lineWidth = cell * 2.02;
-  tracePath(); ctx.stroke();
-  ctx.strokeStyle = TOON.dirt[0]; ctx.lineWidth = cell * 1.92;
-  tracePath(); ctx.stroke();
-  ctx.strokeStyle = TOON.dirt[2]; ctx.lineWidth = cell * 1.42;
-  tracePath(); ctx.stroke();
-  for (const b of terrain.blobs) {
-    const lobes = (x) => {
-      ctx.beginPath();
-      for (const l of b.lobes) { ctx.moveTo(b.x + l.dx + l.r + x, b.y + l.dy);
-        ctx.arc(b.x + l.dx, b.y + l.dy, l.r + x, 0, Math.PI * 2); }
-      ctx.fill();
-    };
-    ctx.fillStyle = TOON.dirtInk; lobes(Math.max(1.5, cell * 0.05));
-    ctx.fillStyle = TOON.dirt[1];  lobes(0);
-    ctx.fillStyle = TOON.dirt[2]; ctx.globalAlpha = 0.6;
-    ctx.beginPath(); ctx.arc(b.x - b.r * 0.2, b.y - b.r * 0.2, b.r * 0.5, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
-  }
   ctx.strokeStyle = TOON.grassInk; ctx.lineWidth = Math.max(1, cell * 0.045); ctx.lineCap = 'round';
   ctx.beginPath();
   for (const t of terrain.tufts)
@@ -2129,7 +2729,7 @@ function drawRoadNeon() {
 /* A paved road: kerb, stone surface, then slab joints struck perpendicular
    to the path so the paving follows the corners instead of sliding across
    them. */
-function drawRoadToon() {
+function drawRoadCel() {
   ctx.strokeStyle = TOON.kerbInk; ctx.lineWidth = cell * 0.94;
   tracePath(); ctx.stroke();
   ctx.strokeStyle = TOON.kerb; ctx.lineWidth = cell * 0.88;
@@ -2137,29 +2737,80 @@ function drawRoadToon() {
   ctx.strokeStyle = TOON.pave; ctx.lineWidth = cell * 0.76;
   tracePath(); ctx.stroke();
 
-  ctx.save();
-  ctx.lineWidth = cell * 0.76;
-  ctx.strokeStyle = TOON.paveLo;
-  ctx.globalAlpha = 0.5;
-  tracePath();
-  ctx.setLineDash([cell * 0.10, cell * 0.62]);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.restore();
+  /* the old wear-dashes along the centreline are gone: they were spaced by
+     distance along the path, which put a second rhythm on the road that was
+     permanently out of phase with the grid the joints below now draw */
 
-  const step = cell * 0.72;
-  ctx.strokeStyle = TOON.paveInk; ctx.lineWidth = Math.max(1, cell * 0.035);
-  ctx.globalAlpha = 0.55;
-  for (let d = step * 0.5; d < totalLen; d += step) {
-    const p = posAt(d), q = posAt(Math.min(totalLen, d + 1.2));
-    const dx = q.x - p.x, dy = q.y - p.y, L = Math.hypot(dx, dy) || 1;
-    const nx = -dy / L, ny = dx / L, half = cell * 0.36;
-    ctx.beginPath();
-    ctx.moveTo(p.x + nx * half, p.y + ny * half);
-    ctx.lineTo(p.x - nx * half, p.y - ny * half);
-    ctx.stroke();
+  /* THE PAVING JOINTS SIT ON GRID LINES. They used to be struck every
+     0.72 of a cell measured along the path, which is a fine-looking road
+     and a useless one: a wall occupies a whole grid cell, and joints that
+     drift out of phase with the grid gave the player no way to see where
+     one slab — one wall slot — ends and the next begins. Each joint is now
+     the shared EDGE between two consecutive road cells, so the road reads
+     as exactly the squares you can build a wall on. */
+  ctx.strokeStyle = TOON.paveInk; ctx.lineWidth = Math.max(1.2, cell * 0.045);
+  ctx.globalAlpha = 0.6;
+  ctx.lineCap = 'butt';
+  ctx.beginPath();
+  const half = cell * 0.38;
+  for (let i = 1; i < pathOrder.length; i++) {
+    const a = pathOrder[i - 1], b = pathOrder[i];
+    const ax = cellCx(a % COLS), ay = cellCy(Math.floor(a / COLS));
+    const bx = cellCx(b % COLS), by = cellCy(Math.floor(b / COLS));
+    const mx = (ax + bx) / 2, my = (ay + by) / 2;
+    if (ay === by) { ctx.moveTo(mx, my - half); ctx.lineTo(mx, my + half); }
+    else           { ctx.moveTo(mx - half, my); ctx.lineTo(mx + half, my); }
   }
+  ctx.stroke();
   ctx.globalAlpha = 1;
+  ctx.lineCap = 'round';
+}
+/* ENTRANCE AND EXIT. Two arrows, on the first and last road cell, pointing
+   the way the creeps walk — the board never said out loud which end of the
+   road they come in at, and on a map whose road leaves the board at the top
+   the answer is not guessable. Painted from the ROAD palette on purpose:
+   they are part of the road, not a HUD element floating over it. */
+function drawPathEnds() {
+  if (pathOrder.length < 2 || !segs.length) return;
+  const dirAt = (d0, d1) => {
+    const a = posAt(d0), b = posAt(d1);
+    const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
+    return { x: dx / L, y: dy / L };
+  };
+  const eps = Math.min(totalLen * 0.02, cell * 0.5);
+  const first = pathOrder[0], last = pathOrder[pathOrder.length - 1];
+  const ends = [
+    { k: first, dir: dirAt(0, eps) },
+    { k: last,  dir: dirAt(totalLen - eps, totalLen) },
+  ];
+  for (const e of ends) {
+    const x = cellCx(e.k % COLS), y = cellCy(Math.floor(e.k / COLS));
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.atan2(e.dir.y, e.dir.x));
+    const s = cell * 0.30, dark = cel() ? TOON.paveInk : '#0b0e1c';
+    const arrow = () => {
+      ctx.beginPath();
+      ctx.moveTo(s * 1.05, 0);
+      ctx.lineTo(s * 0.05, -s * 0.92);
+      ctx.lineTo(s * 0.05, -s * 0.38);
+      ctx.lineTo(-s * 1.0, -s * 0.38);
+      ctx.lineTo(-s * 1.0, s * 0.38);
+      ctx.lineTo(s * 0.05, s * 0.38);
+      ctx.lineTo(s * 0.05, s * 0.92);
+      ctx.closePath();
+    };
+    if (cel()) {
+      ctx.globalAlpha = 0.92;
+      celShape(arrow, TOON.kerb, dark, TOON.pave, s);
+    } else {
+      ctx.globalAlpha = 0.85;
+      arrow(); ctx.fillStyle = '#242a45'; ctx.fill();
+      ctx.strokeStyle = '#5a68a0'; ctx.lineWidth = 1.4; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
 }
 /* A boulder on every cell you cannot build on — the toon way of saying
    "blocked" without a legend. */
@@ -2267,19 +2918,20 @@ function draw() {
   if (shake > 0) ctx.translate((RNG() - 0.5) * shake * 12, (RNG() - 0.5) * shake * 12);
 
   /* ---------------- ground ---------------- */
-  if (toon()) drawGroundToon(); else drawGroundNeon();
+  if (cel()) drawGroundCel(); else drawGroundNeon();
 
   /* ---------------- road ---------------- */
   ctx.save();
   ctx.beginPath(); ctx.rect(boardX, boardY, boardW, boardH); ctx.clip();
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  if (toon()) drawRoadToon(); else drawRoadNeon();
+  if (cel()) drawRoadCel(); else drawRoadNeon();
+  drawPathEnds();
   ctx.restore();
 
   /* ---------------- rocks / boulders ---------------- */
   for (const k of rockCells) {
     const r = Math.floor(k / COLS), c = k % COLS;
-    if (toon()) drawBoulder(r, c);
+    if (cel()) drawBoulder(r, c);
     else {
       ctx.fillStyle = '#141426';
       roundRect(boardX + c * cell + 3, boardY + r * cell + 3, cell - 6, cell - 6, 4);
@@ -2327,7 +2979,7 @@ function draw() {
     const x = cellCx(t.c), y = cellCy(t.r);
     if (t.kind === 'module') {
       if (t.fed === 0) ctx.globalAlpha = 0.42;    // an unpowered module reads dim
-      if (!toon()) {
+      if (!cel()) {
         ctx.fillStyle = '#0d0d1c';
         roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5);
         ctx.fill();
@@ -2338,7 +2990,7 @@ function draw() {
       ctx.globalAlpha = 1;
     } else if (t.kind === 'booster') {
       if (t.fed === 0) ctx.globalAlpha = 0.42;
-      if (!toon()) {
+      if (!cel()) {
         ctx.fillStyle = '#0d0d1c';
         roundRect(x - cell * 0.42, y - cell * 0.42, cell * 0.84, cell * 0.84, 9);
         ctx.fill();
@@ -2348,7 +3000,7 @@ function draw() {
       drawBoosterShape(x, y, cell, t.boostKind);
       ctx.globalAlpha = 1;
     } else if (t.kind === 'turret') {
-      if (!toon()) {
+      if (!cel()) {
         ctx.fillStyle = '#0d0d1c';
         roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5);
         ctx.fill();
@@ -2368,7 +3020,7 @@ function draw() {
         ctx.fillRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88);
       }
       ctx.restore();
-      if (!toon()) {
+      if (!cel()) {
         ctx.strokeStyle = '#66708c'; ctx.lineWidth = 1;
         roundRect(x - cell * 0.44, y - cell * 0.44, cell * 0.88, cell * 0.88, 5); ctx.stroke();
       }
@@ -2429,25 +3081,17 @@ function draw() {
      shot reads as a solid object travelling rather than a glow. */
   for (const b of beams) {
     const a = clamp(b.t * 9, 0, 1);
-    if (toon()) {
-      ctx.globalAlpha = a;
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = TOON.ink; ctx.lineWidth = b.w * 3.1;
-      ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
-      ctx.strokeStyle = b.col; ctx.lineWidth = b.w * 1.9;
-      ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1, b.w * 0.7);
-      ctx.globalAlpha = a * 0.85;
-      ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
-      ctx.globalAlpha = a;
-      ctx.fillStyle = '#fff3c4';
-      ctx.beginPath(); ctx.arc(b.x1, b.y1, b.w * 1.5, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = TOON.ink; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(b.x1, b.y1, b.w * 1.5, 0, Math.PI * 2); ctx.stroke();
-    } else {
+    if (!cel()) {
       ctx.strokeStyle = b.col; ctx.globalAlpha = a; ctx.lineWidth = b.w;
       ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+      continue;
     }
+    /* a skin may take the shot over entirely — a hurled rock is not a
+       tracer — and says so by returning true. An ARC is never a projectile
+       in any style, so a skin that only replaces the muzzle shot lets the
+       arcs fall through here. */
+    if (SK.shot && SK.shot(b, a)) continue;
+    drawShotCel(b, a);
   }
   ctx.globalAlpha = 1;
   for (const c of creeps) drawCreepShape(c, c.x, c.y, c.def.r * cell * (c.elite ? 1.18 : 1));
@@ -3039,7 +3683,7 @@ function showSettings(back) {
           <input class="rng" type="range" min="0" max="100" value="${settings.sfx}" id="r-s"></div>
         <div class="card"><div class="kv"><span class="k">GRAPHICS</span>
           <span class="v gold" id="v-g">${(GFX_STYLES.find(g => g.id === GFX) || {}).name}</span></div>
-          <div class="row2" style="margin-top:6px">${GFX_STYLES.map(g =>
+          <div class="gfxgrid">${GFX_STYLES.map(g =>
             `<button class="btn small ${g.id === GFX ? 'gold' : 'ghost'}" data-gfxset="${g.id}">${g.name}</button>`).join('')}</div>
         </div>
         <button class="btn ghost small" id="b-wipe">CLEAR SAVES &amp; SCORES</button>
@@ -3140,6 +3784,7 @@ function renderGfxMenu() {
 function setGfx(id) {
   if (!GFX_STYLES.some(g => g.id === id)) return false;
   GFX = settings.gfx = id;
+  applySkin();
   saveSettings();
   renderGfxMenu();
   closeGfxMenu();
@@ -3275,6 +3920,13 @@ window.__TB = {
   cellCx, cellCy, cellSize: () => cell,
   totalLen: () => totalLen, pathSamples: n => { const o = []; for (let i = 0; i <= n; i++) o.push(posAt(totalLen * i / n)); return o; },
   pathCellList: () => [...pathCells].map(k => ({ r:Math.floor(k / COLS), c:k % COLS })),
+  /* the road IN WALK ORDER — what the paving joints and the entrance/exit
+     arrows are drawn off, so a test can assert both against the same list */
+  pathOrderList: () => pathOrder.map(k => ({ r:Math.floor(k / COLS), c:k % COLS })),
+  pathEnds: () => (pathOrder.length < 2 ? null : {
+    entry: { r:Math.floor(pathOrder[0] / COLS), c:pathOrder[0] % COLS },
+    exit:  { r:Math.floor(pathOrder[pathOrder.length - 1] / COLS), c:pathOrder[pathOrder.length - 1] % COLS },
+  }),
   pathDistOfCell,
   /* a bare target with exactly the stats you ask for — this is what makes
      the module maths testable to the decimal instead of inferred from a
@@ -3328,14 +3980,31 @@ window.__TB = {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
     ctx.save(); ctx.translate(W / 2, H / 2);
-    drawTurretToon(0, 0, s || 160, 1, aim);
+    drawTurretCel(0, 0, s || 160, 1, aim);
     ctx.restore();
   },
   pixelAt: (x, y) => Array.from(ctx.getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data),
+  /* paint ONE cel disc through celShape() inside a rotated frame. A disc is
+     rotation-invariant, so the only thing that can move the bright bearing
+     is the rim light itself — which makes this the clean test of the
+     fixed-sun MECHANISM every skin depends on, with none of the shape noise
+     a real sprite's rotating barrel introduces. */
+  paintCelProbe: (rot, s) => {
+    const q = s || 120;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(rot || 0);
+    celShape(() => { ctx.beginPath(); ctx.arc(0, 0, q / 2, 0, Math.PI * 2); },
+             '#6e6e6e', '#101014', '#ffffff', q);
+    ctx.restore();
+  },
   /* arm a kind without going through a card hitbox, and force one
      synchronous frame so cardRects/panelRects are fresh to read */
   arm: k => { armedKind = k; if (k) sel = null; },
   forceDraw: () => { draw(); },
+  /* toasts are chrome and they sit OVER the board, so any measurement of
+     what the board itself painted has to be able to get them out of the way */
+  clearToasts: () => { toasts.length = 0; },
   comboAt: (r, c) => { const t = tileAt(r, c); return t && t.combo ? t.combo.id : null; },
   groundsRaw: () => grounds.map(g => ({ x:g.x, y:g.y, r:g.r, t:g.t, dps:g.dps })),
   panelRects: () => panelBtns,

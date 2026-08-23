@@ -266,3 +266,67 @@ half-plane fill):
   fine where every part's path is drawn about that origin (turret-builder's
   pad, hull and barrel all are). Where parts are offset, derive the centroid —
   see "Derive the part centre rather than passing it" above.
+
+## Scaling past two styles (turret-builder, four cel skins, 2026-08-23)
+
+The CD then asked for three more skins — MECH, STEAMPUNK, STONE AGE — on top
+of TOON, all sharing the cel recipe. Going from a boolean to a family is where
+the shape of the thing has to change, and three decisions carried it.
+
+**1. `cel()` is the family test, not `toon()`.** The old predicate was
+`GFX === 'toon'`; it becomes `GFX !== 'neon'`, and every cel style then goes
+down the same path and reads its skin from there. Renaming it was worth the
+mechanical churn: `if (toon())` guarding STONE AGE's caveman would have been
+a lie in the source that a later reader would eventually act on.
+
+**2. The skin is a TABLE, and the wrapper keeps the parts a skin must not
+touch.** `SKINS[id] = {pal, turret?, creep?, module?, booster?, wall?, shot?}`,
+with one base palette (`PAL_TOON`) that the others override key-by-key so a
+new palette key reaches every style at once, and a live `SK`/palette pair
+**reassigned on switch** rather than looked up per call — `celShape()` alone
+runs a few hundred times a frame. Each part's public entry point stayed put
+and became a wrapper: it lays the contact shadow, translates to the tile
+centre, calls `SK.part || partBodyToon`, and then draws anything that is a
+**rules readout** — the wall HP bar, the elite ring. A skin that could restyle
+those would be a skin changing what the board *says*, which is a different
+thing from changing how it looks.
+
+**3. Two things are never a skin's to change.** The **type colour** (a module
+is drawn in `M.col`, a creep in `c.def.col`, in every style) because that
+colour is how the board answers "what is that"; and the **type silhouette** —
+creeps keep the shared `creepPath()` and skins hang furniture *around* it.
+The furniture rotates to the creep's heading, the identity polygon does not.
+That is what lets STONE AGE draw a horned beast and still let you pick the
+HULK out of a wave at a glance.
+
+The one place paint reaches into the sim is deliberately one-way and
+one-field: `dominantModCol(t)` rides along on the shot as `mcol` so STONE AGE
+can paint the hurled rock in the colour of the cauldron it was dipped in.
+Combat never reads it.
+
+### Testing four skins found two ways the obvious test lies
+
+- **A distinctness test needs a DISTANCE, not an inequality.** "All four skins
+  fingerprint differently" passed with one skin's `turret:` override
+  deliberately deleted — the palette still went through, so the same shape in
+  a different colour hashed differently. Fingerprinting the **silhouette**
+  instead, it then passed on a *single* antialiased sample. What works is a
+  minimum pairwise Hamming distance: the closest honest pair was 7.9%, a
+  fallen-through skin 0.1%, bar set at 3%.
+- **The fixed-sun sprite measurement only bites where the skin swings a large
+  lit body.** TOON and MECH rotate whole hulls; STEAMPUNK swings a thin cannon
+  past a fixed boiler and STONE AGE a thin arm past a fixed man, so a ring
+  through *their* cores samples geometry that never rotates and passes
+  whatever `frameRot()` returns — measured, not assumed: with `frameRot()`
+  stubbed to 0 those two skins' spreads stayed at 0. The fix is to test the
+  **mechanism** rather than the sprite: a hook that paints one **disc**
+  through `celShape()` inside a rotated frame. A disc is rotation-invariant,
+  so its bright bearing can only move if the light moves — spread 0 with the
+  counter-rotation, ~200 deg without. Keep the sprite check too (it proves the
+  real turret routes through the helper); add the probe so the other skins are
+  not silently unasserted.
+- **Any pixel measurement of the BOARD has to clear the chrome first.** Three
+  new checks — grass, paving joints, arrows — all failed on their first run,
+  and none of them failed for the reason they were testing: they were reading
+  a `LEVEL 1 · SUBSTATION` toast painted over the board. A `clearToasts()`
+  hook is the cheapest fix and it belongs next to `forceDraw()`.

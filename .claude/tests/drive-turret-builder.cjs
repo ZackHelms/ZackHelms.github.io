@@ -1575,16 +1575,17 @@ const TOUCH = `(() => {
   }
 
   /* =================================================================== */
-  group('graphics styles — TOON by default, NEON still there');
+  group('graphics styles — five of them, TOON by default, NEON still there');
   {
     const styles = await P(() => ({
       ids: window.__TB.GFX_STYLES.map(g => g.id),
       names: window.__TB.GFX_STYLES.map(g => g.name),
       current: window.__TB.gfx(),
     }));
-    check('both styles are offered and NEON is named as the old look',
-      styles.ids.length === 2 && styles.ids.includes('toon') && styles.ids.includes('neon')
-        && styles.names.includes('NEON'), styles);
+    check('all five styles are offered, TOON first and NEON last',
+      styles.ids.length === 5
+        && JSON.stringify(styles.ids) === JSON.stringify(['toon','mech','steampunk','stoneage','neon'])
+        && styles.names.includes('NEON') && styles.names.includes('STONE AGE'), styles);
 
     /* the default has to be proven on a page that booted with NO stored
        setting — reading the live value after the suite has been setting it
@@ -1613,7 +1614,7 @@ const TOUCH = `(() => {
       ticked: [...document.querySelectorAll('#gfx-menu [data-gfx]')].filter(e => e.classList.contains('on')).map(e => e.dataset.gfx),
     }));
     check('tapping it opens a dropdown listing every style, the current one ticked',
-      opened.open && opened.rows.length === 2 && JSON.stringify(opened.ticked) === '["toon"]', opened);
+      opened.open && opened.rows.length === 5 && JSON.stringify(opened.ticked) === '["toon"]', opened);
 
     await page.tap('#gfx-menu [data-gfx="neon"]');
     const picked = await P(() => ({
@@ -1633,7 +1634,7 @@ const TOUCH = `(() => {
        and takes the rAF chain with it — the exact shape of the freeze bug.
        So run REAL frames of a populated board in each style and read the
        page-error log, not just a return value. */
-    for (const style of ['neon', 'toon']) {
+    for (const style of ['neon', 'toon', 'mech', 'steampunk', 'stoneage']) {
       const before = errs.length;
       await P((st) => {
         const G = window.__TB, H = window.__H;
@@ -1679,6 +1680,188 @@ const TOUCH = `(() => {
     });
     check('cel shading keeps the sun fixed in screen space while a turret tracks',
       Math.max(...sun) - Math.min(...sun) <= 10, sun);
+
+    /* The same mechanism, tested without the sprite. celShape() is shared by
+       all four cel skins, but only TOON and MECH paint a rotating body big
+       enough for the ring above to land on — STEAMPUNK swings a thin cannon
+       past a fixed boiler and STONE AGE a thin arm past a fixed man, so a
+       ring through their cores samples geometry that never rotates and would
+       pass whatever frameRot() returned. paintCelProbe() removes the sprite
+       from the question: one DISC, drawn through celShape() inside a rotated
+       frame. A disc is rotation-invariant, so the bright bearing can only
+       move if the rim light moves. Discriminates hard — stubbing frameRot()
+       to 0 takes this spread from 0 to ~200deg. */
+    const probe = await P(() => {
+      const G = window.__TB, out = [];
+      const cx = innerWidth / 2, cy = innerHeight / 2;
+      for (const rot of [0, 0.9, 1.9, 3.0, 4.4, 5.6]) {
+        G.paintCelProbe(rot, 120);
+        let best = -1, bestA = 0;
+        for (let i = 0; i < 72; i++) {
+          const a = i / 72 * Math.PI * 2;
+          const d = G.pixelAt(cx + Math.cos(a) * 40, cy + Math.sin(a) * 40);
+          const l = 0.299 * d[0] + 0.587 * d[1] + 0.114 * d[2];
+          if (l > best) { best = l; bestA = Math.round(a * 180 / Math.PI); }
+        }
+        out.push(bestA);
+      }
+      return out;
+    });
+    check('and the mechanism itself is fixed under any frame rotation, sprite aside',
+      Math.max(...probe) - Math.min(...probe) <= 10, probe);
+
+    /* Each cel skin must actually REPLACE the hardware, not just retint it.
+       A skin whose override was never wired into SKINS falls through to the
+       TOON body and still looks like a new style, because its palette went
+       through. So the fingerprint is the SILHOUETTE — which sample points
+       are painted at all, ignoring what colour they came out — and a skin
+       that only changed the paint fingerprints identically to TOON.
+       The bar is a MINIMUM DISTANCE, not mere inequality: dropping
+       `turret: drawTurretMech` from SKINS leaves MECH one antialiased sample
+       away from TOON, which "all four are distinct" happily accepted. The
+       closest honest pair is toon/mech at 7.9%; a fallen-through skin is
+       0.1%, so 3% separates them with room either side. */
+    const prints = await P(() => {
+      const G = window.__TB, out = {};
+      const cx = innerWidth / 2, cy = innerHeight / 2;
+      for (const st of ['toon', 'mech', 'steampunk', 'stoneage']) {
+        G.setGfx(st);
+        G.paintTurret(0.6, 150);
+        let mask = '';
+        for (let gx = -66; gx <= 66; gx += 4) for (let gy = -66; gy <= 66; gy += 4) {
+          const d = G.pixelAt(cx + gx, cy + gy);
+          mask += (0.299 * d[0] + 0.587 * d[1] + 0.114 * d[2]) > 12 ? '1' : '0';
+        }
+        out[st] = mask;
+      }
+      return out;
+    });
+    const names = Object.keys(prints), dists = [];
+    for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) {
+      const a = prints[names[i]], b = prints[names[j]];
+      let d = 0;
+      for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) d++;
+      dists.push({ pair: names[i] + '/' + names[j], pct: +(100 * d / a.length).toFixed(1) });
+    }
+    check('every cel skin paints its own turret SHAPE, not just its own paint',
+      dists.every(d => d.pct >= 3), dists);
+  }
+
+  /* =================================================================== */
+  group('the road reads as the cells you can wall, and says where they come in');
+  {
+    await P(() => { const G = window.__TB; G.setGfx('toon'); window.__H.fresh(); G.clearToasts(); });
+    const road = await P(() => ({
+      order: window.__TB.pathOrderList(),
+      cells: window.__TB.pathCellList(),
+      ends: window.__TB.pathEnds(),
+    }));
+    /* the ordered walk is what the joints and the arrows are drawn off, so
+       if it is not a one-cell-at-a-time chain neither of them lands right */
+    let chained = road.order.length > 4, seen = new Set();
+    for (let i = 0; i < road.order.length; i++) {
+      const k = road.order[i].r + ',' + road.order[i].c;
+      if (seen.has(k)) chained = false;
+      seen.add(k);
+      if (i === 0) continue;
+      const dr = Math.abs(road.order[i].r - road.order[i - 1].r);
+      const dc = Math.abs(road.order[i].c - road.order[i - 1].c);
+      if (dr + dc !== 1) chained = false;
+    }
+    check('the road walks the board one cell at a time, never repeating one',
+      chained && road.order.length === road.cells.length,
+      { steps: road.order.length, cells: road.cells.length });
+
+    check('the entrance and the exit are the two ends of that walk',
+      road.ends && road.ends.entry.r === road.order[0].r && road.ends.entry.c === road.order[0].c
+        && road.ends.exit.r === road.order[road.order.length - 1].r
+        && road.ends.exit.c === road.order[road.order.length - 1].c, road.ends);
+
+    /* the arrows sit exactly where a wall is refused, which is why they can
+       be drawn as part of the road without lying about what is buildable */
+    const endsWall = await P(() => {
+      const G = window.__TB, e = G.pathEnds();
+      return { entry: G.canPlace('wall', e.entry.r, e.entry.c),
+               exit: G.canPlace('wall', e.exit.r, e.exit.c) };
+    });
+    check('neither end cell takes a wall — the mouth and the exit are protected',
+      endsWall.entry === false && endsWall.exit === false, endsWall);
+
+    /* MEASURED: a paving joint on every grid line the road crosses. Sample
+       the boundary between each pair of road cells and the middle of the
+       cell after it; the boundary has to be the darker of the two, in every
+       style that paves. This is the CD's ask stated as a measurement — the
+       joints used to be struck every 0.72 cell along the path, which looks
+       like a road and tells you nothing about where a wall goes. */
+    const joints = await P(() => {
+      const G = window.__TB, o = G.pathOrderList(), out = [];
+      G.clearToasts(); G.forceDraw();
+      const lum = (x, y) => { const d = G.pixelAt(x, y); return 0.299 * d[0] + 0.587 * d[1] + 0.114 * d[2]; };
+      for (let i = 1; i < o.length; i++) {
+        const ax = G.cellCx(o[i - 1].c), ay = G.cellCy(o[i - 1].r);
+        const bx = G.cellCx(o[i].c), by = G.cellCy(o[i].r);
+        let edge = 999;
+        for (const d of [-1, 0, 1]) edge = Math.min(edge, lum((ax + bx) / 2 + d * (ay === by ? 1 : 0),
+                                                             (ay + by) / 2 + d * (ay === by ? 0 : 1)));
+        out.push({ edge: Math.round(edge), mid: Math.round(lum(bx, by)) });
+      }
+      return out;
+    });
+    const jointed = joints.filter(j => j.edge < j.mid - 6).length;
+    check('every road-cell boundary is struck with a joint, so a road cell reads as one slab',
+      joints.length > 8 && jointed === joints.length,
+      { boundaries: joints.length, jointed, sample: joints.slice(0, 3) });
+
+    /* MEASURED: something is painted on the end cells that is not painted on
+       the road between them. */
+    const arrows = await P(() => {
+      const G = window.__TB, o = G.pathOrderList(), e = G.pathEnds();
+      G.clearToasts(); G.forceDraw();
+      const box = (r, c) => {
+        const x0 = G.cellCx(c), y0 = G.cellCy(r), s = G.cellSize(), out = [];
+        for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) {
+          const d = G.pixelAt(x0 + dx * s * 0.09, y0 + dy * s * 0.09);
+          out.push(Math.round(0.299 * d[0] + 0.587 * d[1] + 0.114 * d[2]));
+        }
+        return out;
+      };
+      const spread = a => Math.max(...a) - Math.min(...a);
+      const mid = o[Math.floor(o.length / 2)];
+      return { entry: spread(box(e.entry.r, e.entry.c)), exit: spread(box(e.exit.r, e.exit.c)),
+               plain: spread(box(mid.r, mid.c)) };
+    });
+    check('both end cells carry an arrow the plain road does not',
+      arrows.entry > arrows.plain + 20 && arrows.exit > arrows.plain + 20, arrows);
+
+    /* GRASS, AND ONLY GRASS. The CD's ask was that the ground stop carrying
+       dirt: every buildable cell is grass and the only thing that is not is
+       a boulder, which is also the only thing you cannot build on. Sampled
+       as green dominance at cell centres, in every cel style. */
+    const green = await P(() => {
+      const G = window.__TB, out = {};
+      const C = G.consts();
+      for (const st of ['toon', 'mech', 'steampunk', 'stoneage']) {
+        G.setGfx(st); G.clearToasts(); G.forceDraw();
+        let n = 0, bad = 0, worst = null;
+        const sz = G.cellSize();
+        for (let r = 0; r < C.ROWS; r++) for (let c = 0; c < C.COLS; c++) {
+          if (!G.openCell(r, c)) continue;
+          /* five points, not just the centre: a dirt VERGE hugging the road
+             misses every cell centre and still browns the quarter of each
+             neighbouring cell nearest the road, which is exactly the look
+             the CD asked to be rid of */
+          for (const [ox, oy] of [[0,0],[-0.25,0],[0.25,0],[0,-0.25],[0,0.25]]) {
+            const d = G.pixelAt(G.cellCx(c) + ox * sz, G.cellCy(r) + oy * sz);
+            n++;
+            if (!(d[1] > d[0] + 8 && d[1] > d[2] + 8)) { bad++; if (!worst) worst = { r, c, ox, oy, d }; }
+          }
+        }
+        out[st] = { n, bad, worst };
+      }
+      return out;
+    });
+    check('the ground is grass in every cel style — no dirt left anywhere on the field',
+      Object.values(green).every(v => v.n > 200 && v.bad === 0), green);
   }
 
   /* =================================================================== */

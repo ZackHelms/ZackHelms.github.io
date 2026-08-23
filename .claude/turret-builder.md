@@ -294,20 +294,55 @@ Two judgement calls worth keeping:
   whole board and names the rule. Denying the press would withhold the
   explanation at the exact moment it is wanted.
 
-## Graphics styles — TOON (default) and NEON
+## Graphics styles — four cel skins and NEON
 
 A ⚙ gear in the top-left chrome (right of ☰) opens a dropdown listing every
 entry in `GFX_STYLES`; the pick is stored in `settings.gfx`, mirrored to the
-module-level `GFX`, and read everywhere through `toon()`. Two styles ship:
+module-level `GFX`, and read everywhere through `cel()`. **`cel()` is the
+FAMILY test — `GFX !== 'neon'` — not "is the style TOON".** Five ship:
 
 | id | what it is |
 | --- | --- |
-| `toon` | **the default.** Cel-shaded: paved road with kerbs, dirt-and-grass terrain, boulders on unbuildable cells, flat-fill hardware with a hard ink outline |
+| `toon` | **the default.** Cel-shaded: grass, a paved road, boulders, flat-fill steel hardware with a hard ink outline |
+| `mech` | military hardware — autocannon on a track deck, ordnance crates, sensor pylons, jersey barriers; the creeps become the column it is shooting at (treads, optics, plating) |
+| `steampunk` | brass and rivets — a boiler turret with a working pressure gauge, canister modules, cog boosters, riveted iron walls, clanking automata trailing steam |
+| `stoneage` | the CD's brief, literally: cavemen turrets, cauldron modules, totem boosters, a log palisade, horned beasts — and the thrown rock takes the colour of the cauldron it was dipped in |
 | `neon` | the original wireframe look — dark board, glowing edges, dashed road |
 
 The cel recipe is one helper: `celShape(path, fill, ink, hi, s)` — flat fill,
 one hard ink outline, one rim-light facet — plus `contactShadow()` under
 anything that stands on the ground.
+
+### How a skin is defined
+
+`SKINS[id] = { pal, turret?, creep?, module?, booster?, wall?, shot? }`.
+`PAL_TOON` is the base palette and every other skin states only what it
+changes, so a new palette key reaches all four at once. `applySkin()`
+reassigns the live `SK` and `TOON` (the palette keeps its name because every
+call site reads it as "the cel palette", which is what it still is) — they
+are *reassigned*, not looked up per call, because `celShape()` alone runs a
+few hundred times a frame.
+
+The overrides draw in the **local space their wrapper set up**: origin at the
+tile centre, contact shadow already laid, and — for a wall — the HP bar still
+the wrapper's job. That split is deliberate: a skin can change how a thing
+looks and cannot change where it is or what it reports. Three invariants hold
+across all four cel skins, and each is worth defending:
+
+- **The type COLOUR is never overridden.** A module is drawn in `M.col` and a
+  creep in `c.def.col` in every style, because that colour is how the board
+  answers "what is that".
+- **The type SILHOUETTE survives.** Creeps keep `creepPath()` and skins hang
+  furniture *around* it, so a HULK still reads as a HULK in STONE AGE.
+  `creepHeading()` (read off `posAt`, not stored) turns the furniture —
+  treads, chimneys, horns — while the identity polygon stays put.
+- **Rules readouts are the wrapper's.** The wall HP bar and the elite ring are
+  drawn outside the skin hook. A skin quietly restyling those would be a skin
+  changing what the board *says*.
+
+`dominantModCol(t)` is the one piece of paint that reaches into a tile: the
+module a turret carries most of, ridden along on the beam as `mcol` so
+STONE AGE can paint the hurled rock in it. Combat never reads it.
 
 **The sun is fixed in SCREEN space.** A turret's hull and barrel are painted
 inside `ctx.rotate(aim)` because a turret turns to face what it is shooting,
@@ -317,27 +352,67 @@ guarded). Without it the light source swings round with the barrel and the
 turret reads as a flat shape rather than a lit one; it shipped that way on
 2026-08-23 and was caught by measurement, not by eye — bearing of the
 brightest sample across five aim angles went `[0, 0, 0, 5, 90]`, and is
-`[140 × 5]` with the fix. The drive suite asserts it. Note the wedge is
-`s * 6`, not the snug `±s` triangle: once counter-rotated a snug wedge no
-longer covers the clipped shape. This is the second mechanism in
+`[140 × 5]` with the fix. Note the wedge is `s * 6`, not the snug `±s`
+triangle: once counter-rotated a snug wedge no longer covers the clipped
+shape. This is the second mechanism in
 `.claude/notes/20260823-canvas-skins-and-cel-shading.md`, and turret-builder
 is the *second* independent re-derivation to miss it — check it first on any
 new cel skin. The note's *first* mechanism (funnel `glow()` so it can go
 no-op) does not apply here: this game's neon style uses no `shadowBlur` at
-all. Every drawable has a `…Toon` twin
-(`drawGroundToon`, `drawRoadToon`, `drawBoulder`, `drawTurretToon`,
-`drawModuleToon`, `drawBoosterToon`, `drawWallToon`, `creepPath` +
-`drawCreepShape`); `draw()` branches once per layer, never per object.
+all.
 
-**A style is paint.** Nothing in `update()` or the payload maths knows a
-style exists — every `toon()` call site is inside a draw function, and a
-grep proving that is the cheapest regression test there is. Neon Clash
-reached the same shape independently on the same day (`.claude/neon-clash.md`
-calls it "a skin is paint"), so treat the cogwheel-plus-dropdown, TOON-default
+**Testing the sun needs both halves.** The turret measurement only bites on a
+skin that swings a large lit body: TOON and MECH pass a ring through their
+rotating hulls, but STEAMPUNK swings a thin cannon past a fixed boiler and
+STONE AGE a thin arm past a fixed man, so a ring through *their* cores
+samples geometry that never rotates and would pass whatever `frameRot()`
+returned. `paintCelProbe(rot, s)` closes that: one **disc** drawn through
+`celShape()` inside a rotated frame. A disc is rotation-invariant, so the
+bright bearing can only move if the rim light moves — the mechanism every
+skin shares, tested with the sprite taken out of the question.
+
+**A style is paint.** Nothing in `update()` or the payload maths knows a style
+exists — every `cel()` and `SK` call site is inside a draw function, and a
+grep proving that is the cheapest regression test there is. Neon Clash reached
+the same shape independently on the same day (`.claude/neon-clash.md` calls it
+"a skin is paint"), so treat the cogwheel-plus-dropdown, TOON-default
 arrangement as a repo convention now rather than one game's idea; the two
-games share no code, only the pattern.
+games share no code, only the pattern. Every drawable has a cel twin
+(`drawGroundCel`, `drawRoadCel`, `drawBoulder`, `drawTurretCel`,
+`drawModuleCel`, `drawBoosterCel`, `drawWallCel`, `creepPath` +
+`drawCreepShape`); `draw()` branches once per layer, never per object, and
+each cel twin then dispatches to `SK.<part> || <part>BodyToon`.
 
-Two rules the terrain earned the hard way:
+## The road, the ends of it, and the grass
+
+Three CD asks from 2026-08-23, all of them about the board saying out loud
+what the rules already were:
+
+- **The paving joints sit on GRID LINES.** They used to be struck every 0.72
+  of a cell measured *along the path*, which is a fine-looking road and a
+  useless one: a wall occupies a whole grid cell, so joints drifting out of
+  phase with the grid gave the player no way to see where one wall slot ends
+  and the next begins. Each joint is now the shared **edge between two
+  consecutive road cells**, taken off `pathOrder` — the road cells in walk
+  order, deduped against the last one pushed, built in `buildPath()` beside
+  `pathCells`. The old centre-line wear dashes went with them: spaced by
+  distance, they put a second rhythm on the road permanently out of phase
+  with the first.
+- **An arrow on the first and last road cell**, pointing the way the creeps
+  walk, painted from the ROAD palette because they are part of the road and
+  not a HUD element floating over it. `drawPathEnds()` reads the direction
+  off `posAt` at each end rather than off the cells, so a map whose road
+  leaves the board sideways still gets it right. They land exactly on the two
+  cells `canPlace('wall', …)` refuses (within 1.2 cells of the mouth or the
+  exit), which is why they can be drawn *as road* without lying about what is
+  buildable.
+- **The ground is grass, and only grass.** The dirt verge hugging the road and
+  the worn brown patches are gone: the brown fought the road for attention and
+  made the buildable field look like it had rules in it that it does not.
+  Terrain now varies only in **shade**, and the one thing on the field that is
+  not grass — a boulder — is the one thing you genuinely cannot build on.
+
+Two rules the terrain earned the hard way, both still in force:
 
 - **Scatter comes from a stable per-cell hash (`h2(a, b)`), never from the
   seeded `RNG`.** Gameplay RNG is reserved for sparks and shake, and drawing
@@ -345,12 +420,14 @@ Two rules the terrain earned the hard way:
   art to the simulation's determinism.
 - **Ground is decided per MAP, not per cell.** The first version picked
   dirt-or-grass per grid cell and painted hard-edged squares — it read as a
-  checkerboard, not as ground. `buildTerrain()` now caches (keyed
-  `mapIdx:cell:boardX:boardY`, invalidated by `buildPath()`) a dirt **verge
-  stroked along the path** plus a few multi-lobe worn patches, with grass
-  tufts baked out with per-tuft lean, length and blade count so the grass is
-  not one glyph rubber-stamped across the field. Perfect circles and
-  identical tufts both read as stamps.
+  checkerboard, not as ground. `buildTerrain()` caches (keyed
+  `GFX:mapIdx:cell:boardX:boardY` — the style is in the key because the grass
+  colour is baked in — and invalidated by `buildPath()`) a set of multi-lobe
+  tone patches plus grass tufts with per-tuft lean, length and blade count.
+  **Perfect circles and identical tufts both read as stamps**, which is why
+  the tone patches are three overlapping lobes and not discs: that mistake
+  was made once with the dirt blobs and again, the same day, with the tone
+  patches that outlived them.
 
 ## Determinism
 
@@ -369,11 +446,19 @@ Vary the persona, not the seed.
 `newRun/startLevel/ready/skipGap/advance/step` · `place/sell/upgrade/buyLab` ·
 `turretStats(r,c)` (payload, boosters, combo, **sides**), `wallStats`,
 `modsAt`, `tileAt`, `comboAt` · `canPlace`, `openCell`, `buildableCells(kind)`,
-`placeMask(kind)`, `placeHint(kind)`, `overlayKind()`, `arm(kind)`,
-`forceDraw()`, `paintTurret(aim, s)`, `pixelAt(x, y)` ·
+`placeMask(kind)`, `placeHint(kind)`, `overlayKind()`, `arm(kind)` ·
+`pathCellList()`, `pathOrderList()` (the road in WALK order), `pathEnds()` ·
+`forceDraw()`, `clearToasts()`, `paintTurret(aim, s)`,
+`paintCelProbe(rot, s)`, `pixelAt(x, y)` ·
 `setCurve/setPacing/seedRandom` · `cardRects/tabRects/panelRects/hudRects` ·
 `codex()`, `COMBO_TOTAL` · `gfx()`, `setGfx(id)`, `GFX_STYLES`,
 `gfxMenuOpen/openGfxMenu/closeGfxMenu`.
+
+`clearToasts()` is not a convenience. Toasts draw **over the board**, so every
+pixel measurement of what the board itself painted — grass, joints, arrows —
+read the tail of a `LEVEL 1 · SUBSTATION` banner instead until it existed; all
+three of those checks failed on their first run for that reason and none of
+them failed for the reason they were testing.
 
 Four hooks exist to make the spec *measurable* rather than inferred:
 
@@ -390,16 +475,24 @@ Four hooks exist to make the spec *measurable* rather than inferred:
 Suites — **rules and balance are separate files**, so a rebalance never fights
 a mechanics regression:
 
-- `.claude/tests/drive-turret-builder.cjs` (195 checks) — the spec verbatim
+- `.claude/tests/drive-turret-builder.cjs` (206 checks) — the spec verbatim
   including the worked example, each module in isolation and stacked, the
   effects-vs-damage split, tracking and snap, all four boosters, all fifteen
   combos with their effects, the codex, walls, economy, flow, the sawtooth,
   the canvas UI pressed through real touch events, the placement rules and
-  the overlay mask, and both graphics styles
+  the overlay mask, all **five graphics styles**
   (default, dropdown, persistence, **each renderer driven through real frames
   on a populated board** — a per-style throw fails only that style's check,
-  verified by breaking `drawGroundNeon` and watching TOON stay green — and the
-  **fixed sun**, measured off pixels as a turret tracks).
+  verified by breaking `drawGroundNeon` and watching TOON stay green — the
+  **fixed sun** both on a tracking turret and on the bare `paintCelProbe`
+  disc, and a **silhouette fingerprint** proving each cel skin replaces the
+  shape and not merely the paint), and the **road group** (the walk order is
+  a one-cell chain, the ends of it are where the arrows go and where a wall
+  is refused, a joint on every road-cell boundary, an arrow on both end
+  cells, and green at five points in every buildable cell in every cel
+  style). All five of those last checks were verified by breaking the thing
+  they assert — see § Traps for the one that first passed against a
+  regression.
 - `.claude/tests/eval-turret-builder.cjs` (22 claims) — balance and pacing via
   personas. `--strategy f.json`, `--only NAME`, `--curve a,b`, `--seed`,
   `--json`. About a second each.
@@ -446,11 +539,35 @@ a mechanics regression:
   packed eleven turrets into the highest-coverage cells, left them with no
   free sides, and built seven modules and ZERO combos while reporting a full
   board. Check the printed `board:` line before believing a verdict.
+- **"All four are distinct" is not "all four are different".** The check that
+  each cel skin paints its own turret first compared whole-sprite pixel
+  hashes, and passed with `turret: drawTurretMech` deliberately deleted from
+  `SKINS` — because the palette still went through, so a MECH turret with a
+  TOON *shape* hashed differently. Rewritten to hash the SILHOUETTE it then
+  passed on a **one-sample** antialiasing difference. The check that works
+  asserts a minimum pairwise distance: the closest honest pair is toon/mech at
+  7.9%, a fallen-through skin is 0.1%, and the bar is 3%. **A distinctness
+  test needs a distance, not an inequality.**
+- **A pixel measurement of the board must clear the chrome first.** Grass,
+  joints and arrows were all first measured through a `LEVEL 1 · SUBSTATION`
+  toast — three failures, none of them about the thing under test.
+  `clearToasts()` exists for that.
+- **Every one of these is proved by breaking it.** Stub `frameRot()` (both sun
+  checks fail), drop one skin's `turret:` entry (the fingerprint fails), push
+  the joints 0.34 cell out of phase (the joint check fails), comment out
+  `drawPathEnds()` (the arrow check fails), stroke a dirt verge back along the
+  road (the grass check fails) — and that last one only fails once the grass
+  check samples FIVE points per cell, because a verge hugging the road misses
+  every cell centre while browning the quarter of each neighbour nearest it.
+  The first version of that check sampled centres only and stayed green
+  against the very thing it was written to catch.
 - **Ground decided per cell reads as a checkerboard.** The first TOON terrain
   chose dirt-or-grass per grid cell and filled squares; on screen it was a
-  chequered field, not ground. Terrain is now a cached verge + blobs shape
-  that ignores the grid entirely. Same class of mistake, twice more: perfect
-  circles for worn patches, and one identical grass tuft repeated, both read
+  chequered field, not ground. Terrain ignores the grid entirely. Same class
+  of mistake, three times more: perfect circles for worn patches, one
+  identical grass tuft repeated, and then — after the dirt was removed
+  altogether — perfect circles *again* for the grass **tone** patches, which
+  had quietly inherited the shape the dirt blobs were fixed out of. All read
   as stamps until they were given per-instance variation.
 - **Print page errors as they happen.** A crash inside `draw()` stops the
   canvas updating and then surfaces as a baffling stale-hitbox failure fifty
