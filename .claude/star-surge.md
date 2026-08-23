@@ -18,8 +18,9 @@ requests once someone's actually run all 11.
 
 ## Save / pilots (`starSurge.saves`, 3 slots)
 
-The game opens on `showPilotSelect()` (`state='pilots'`), not the title
-menu — `saves` is a 3-element array (`null` or a character) loaded from
+The game opens on `showPilotSelect()` (`state='pilots'`) and picking a slot
+goes **straight to that pilot's station** — there is no menu screen at all
+(see § Routing). `saves` is a 3-element array (`null` or a character) loaded from
 `localStorage['starSurge.saves']`. Picking an empty slot calls
 `newCharacter(name)` and writes it; picking a filled one loads it into the
 module-level `save` alias (`activeSlot` tracks which index). **Every run
@@ -48,10 +49,10 @@ with different weapon/armor builds, per the feature's whole point.
 immediately after `persistSave()` — i.e. **only a fully-cleared sector**
 (all `MAX_STAGE` mini-bosses *and* the sector boss) moves the checkpoint.
 Dying anywhere in a sector — wave 1 or mid-sector-boss-fight — ends the run
-via `endRun(false)` with **no** checkpoint write; `save.sector` still
+via `endRun()` with **no** checkpoint write; `save.sector` still
 points at that sector's start. `startGame(save.sector)` is therefore the
-entire "continue" story: menu's `NEW RUN · SECTOR N` and end-screen's
-`RETRY · SECTOR N` both just call it. XP earned during a failed run is
+entire "continue" story: the end-screen's
+`RETRY · SECTOR N` calls it. XP earned during a failed run is
 NOT rolled back, though — `awardXp()` writes into `save.xp` immediately
 (persisted at natural boundaries: stage clear, sector clear, `endRun`),
 so a death costs run progress but never costs the character's build.
@@ -120,7 +121,8 @@ the smoke gate (see `.claude/tests/README.md`).
 each enemy's `ENEMY_DEFS[type].xp` (2/4/5/10 for drone/shooter/spinner/
 tanker); mini-boss down = flat 50; sector boss down = `150 + sector*25`.
 
-`showShipyard()` (`state='shipyard'`, reached from the main menu) is a
+`showShipyard()` (`state='shipyard'`, reached only from the station's
+UPGRADES callout, and returning there) is a
 scrollable list built from `WEAPON_DEFS`/`ARMOR_DEFS` + a hull row
 (`hullRowHtml`), each row rendered by `weaponRowHtml`/`armorRowHtml`:
 locked → `UNLOCK <cost>xp` button; owned & under `MAX_TIER` (5) →
@@ -294,6 +296,46 @@ and the first word was already drawn underneath the mute button; a third
 and the score is right-aligned), so the block moved down instead. Don't
 move it back up without re-checking against all three buttons.
 
+## Routing (2026-08-23)
+
+```
+pilots ──pick──▶ station ──UPGRADES──▶ shipyard ──BACK──▶ station
+                    │  ▲                                     
+                    │  └──────── report ◀── play ◀──COMBAT───┘
+                    └──REST──▶ pilots        (tap ▶ launch ▶ station)
+                       play ──died──▶ over ──▶ RETRY (play) | PILOTS
+```
+
+**There is no menu screen.** `showMenu()` is gone, and with it `NEW RUN` and
+the standalone `SHIPYARD` button. The station is the single hub: everything
+leaves from it and comes back to it, which is what puts the shipyard in
+front of a new player before their first fight rather than behind a button
+they have no reason to press.
+
+`endRun()` is now only reachable by **dying** — a cleared sector routes to
+the combat report, and clearing the last sector reports too, so there is no
+"win" end screen and no `victory` state.
+
+### A run survives being put down
+
+REST is a real save point. `snapshotRun()` writes
+`save.run = {score, xp, cr, weapon, hp, shields}` and runs at every station
+arrival (`enterStation()`), after a repair, and on REST — the station being
+the only point where the player is idle *and* safe. `restoreRun()` reads it
+back on pilot select; `save.run === null` means the last run **ended**, and
+only `endRun()` sets that. That asymmetry is the whole design: resting
+resumes, dying does not, so "resume" can never become "undo my death".
+
+Because the snapshot is taken at the station and not cleared on launch,
+closing the tab mid-sector rewinds you to that station with your score
+intact. That is deliberate leniency, not an oversight — the alternative
+punishes a dropped connection exactly like a death.
+
+`save.campaignDone` persists the "cleared sector 11" flag, because
+`save.sector === MAX_SECTOR` alone cannot distinguish *reached* the last
+sector from *beat* it — the COMBAT button reads `SECTOR 11 AGAIN` only for
+the latter.
+
 ## Sector report + allied station (2026-08-23)
 
 Clearing a sector used to set a `SECTOR n CLEAR` banner and roll on. It now
@@ -425,8 +467,9 @@ continuously across sectors rather than resetting each one, so a longer
 campaign keeps surfacing different tracks. Only `boss.sector` (the sector
 boss, not the mini-boss) switches to `SECTOR_BOSS_TRACK_IDS` (5, dubstep/
 hard-techno), indexed by `sector-1` — also round-robin, not reset.
-Non-`'play'` state (menu, pilots, shipyard, over, victory) → the ambient
-menu track. This is also *not* enemies-on-screen-driven — see the code
+Non-`'play'` state (pilots, station, shipyard, report, launch, over) → the
+ambient menu track — which is why the station gets calm drift music for
+free. This is also *not* enemies-on-screen-driven — see the code
 comment history: that heuristic thrashed the crossfade every time
 `spawnQueue` briefly drained between bursts. Stage-boundary switching
 instead lines the 1 s crossfade up with the existing `stageBanner` display,
@@ -482,7 +525,7 @@ empPulses, spawnQueue, pendingStage, pendingSectorBoss, saves, activeSlot,
 save`, plus `startGame(sector)`, `spawnEnemy(type,x,y)`, `spawnBoss()`,
 `spawnSectorBoss()`, `awardXp(n)`, `persistSave()`. Steering = TouchEvent
 drag on `#cv`. A driven test must pick a pilot first (`showPilotSelect()`
-is the boot state) before any menu/shipyard/run function is reachable —
+is the boot state) before any station/shipyard/run function is reachable —
 `saves[i] = newCharacter(...); activeSlot = i; save = saves[i];` is the
 minimum to skip straight past it. Assert persisted progress against
 `JSON.parse(localStorage['starSurge.saves'])[slot]`, not a bare key — the

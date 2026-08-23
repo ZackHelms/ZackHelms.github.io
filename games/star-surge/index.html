@@ -126,7 +126,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 20:17 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 22:19 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
@@ -204,7 +204,7 @@ function loadSaves() {
 function writeSaves() { localStorage.setItem('starSurge.saves', JSON.stringify(saves)); }
 function newCharacter(name) {
   return {
-    name, xp: 0, credits: 0, sector: 1, best: 0,
+    name, xp: 0, credits: 0, sector: 1, best: 0, campaignDone: false, run: null,
     weapons: { blaster: 1 }, equippedWeapon: 'blaster',
     armors: {}, equippedArmor: null,
     hpTier: 0,
@@ -219,7 +219,7 @@ function persistSave() { if (activeSlot >= 0) { saves[activeSlot] = save; writeS
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 const overlay = document.getElementById('overlay');
 let W = 0, H = 0, dpr = 1, safeTop = 0, safeBot = 0;
-let state = 'pilots';          // pilots | menu | shipyard | play | over | victory
+let state = 'pilots';          // pilots | station | shipyard | report | launch | play | over
 let ship = { x: 195, y: 700, r: 13, invuln: 0, hp: 100, maxHp: 100, shieldCharges: 0, shieldRegenT: 0, lastHitT: 999 };
 let weapon = 1;                // 1..4, in-run P-powerup tier (works with any equipped weapon type)
 let score = 0;
@@ -972,7 +972,7 @@ function hitShip(dmg) {
   sfxBigBoom();
   boomAt(ship.x, ship.y, '#39ff14', 24);
   weapon = Math.max(1, weapon - 1);
-  if (ship.hp <= 0) { ship.hp = 0; endRun(false); return; }
+  if (ship.hp <= 0) { ship.hp = 0; endRun(); return; }
   ship.x = W / 2; ship.y = H - safeBot - 130;
   ship.invuln = INVULN_TIME;
 }
@@ -1032,12 +1032,15 @@ function bossDown() {
   spawnQueue = [];
   pendingStage = true;   // wave director starts wave 1 of the new stage once the banner fades
 }
-function endRun(won) {
-  state = won ? 'victory' : 'over';
+// Only reachable by DYING. A cleared sector routes to the combat report, and
+// clearing the last sector reports too, so there is no "win" end screen left.
+function endRun() {
+  state = 'over';
   let isNewBest = false;
   if (score > save.best) { save.best = score; isNewBest = true; }
+  save.run = null;   // the run is over -- picking this pilot again starts a fresh one
   persistSave();
-  setTimeout(() => showEndScreen(won, isNewBest), 800);
+  setTimeout(() => showEndScreen(isNewBest), 800);
 }
 
 /* =============================== UPDATE ================================= */
@@ -1274,7 +1277,9 @@ function showPilotSelect() {
     const s = saves[i];
     html += '<div style="display:flex;align-items:center;gap:6px;margin:7px 0;width:100%;max-width:280px;">' +
       '<button class="btn' + (s ? ' alt' : '') + '" style="margin:0;flex:1;min-width:0" id="b-slot' + i + '">' +
-      (s ? s.name + '<br><span style="font-size:0.6em">SECTOR ' + s.sector + ' · BEST ' + s.best + '</span>' : '+ NEW PILOT ' + (i + 1)) +
+      (s ? s.name + '<br><span style="font-size:0.6em">SECTOR ' + s.sector +
+            (s.run && s.run.score > 0 ? ' · RUN ' + s.run.score : ' · BEST ' + s.best) + '</span>'
+         : '+ NEW PILOT ' + (i + 1)) +
       '</button>' +
       (s ? '<button class="btn small" style="margin:0;min-width:0;padding:10px 12px" id="b-reset' + i + '">↺</button>' : '') +
       '</div>';
@@ -1283,33 +1288,50 @@ function showPilotSelect() {
   overlay.innerHTML = html;
   overlay.classList.remove('hidden');
   for (let i = 0; i < SAVE_SLOTS; i++) {
-    bindTap(document.getElementById('b-slot' + i), () => {
-      if (!saves[i]) { saves[i] = newCharacter('PILOT ' + (i + 1)); writeSaves(); }
-      activeSlot = i; save = saves[i];
-      showMenu();
-    });
+    bindTap(document.getElementById('b-slot' + i), () => enterPilot(i));
     const resetBtn = document.getElementById('b-reset' + i);
     if (resetBtn) bindTap(resetBtn, () => {
       if (confirm('Reset ' + saves[i].name + '? This erases its XP and unlocks.')) { saves[i] = null; writeSaves(); showPilotSelect(); }
     });
   }
 }
-function showMenu() {
-  state = 'menu';
-  overlay.innerHTML =
-    '<h1>STAR SURGE</h1>' +
-    '<div class="sub">' + save.name + ' — SECTOR ' + save.sector + '</div>' +
-    '<button class="btn" id="b-new">NEW RUN · SECTOR ' + save.sector + '</button>' +
-    '<button class="btn alt" id="b-shipyard">SHIPYARD · ' + save.xp + ' XP</button>' +
-    '<div class="rules">Drag anywhere to steer — <b>hold to fire</b>.<br>' +
-    'Weapon: <b>' + WEAPON_DEFS[save.equippedWeapon].name + '</b>' + (save.equippedArmor ? ' · Armor: <b>' + ARMOR_DEFS[save.equippedArmor].name + '</b>' : '') + '<br>' +
-    '<b>' + MAX_STAGE + ' stages</b> per sector, each with its own mini-boss, then a tougher <b>sector boss</b>. Dying restarts the current sector — XP and upgrades are always kept.' +
-    (save.best ? '<br>BEST <b>' + save.best + '</b>' : '') + '</div>' +
-    '<button class="btn small alt" id="b-pilots" style="margin-top:10px">← PILOTS</button>';
-  overlay.classList.remove('hidden');
-  bindTap(document.getElementById('b-new'), () => startGame(save.sector));
-  bindTap(document.getElementById('b-shipyard'), () => { shipyardBack = showMenu; showShipyard(); });
-  bindTap(document.getElementById('b-pilots'), showPilotSelect);
+/* Picking a pilot goes straight to its station -- there is no menu screen.
+   The station is the hub: UPGRADES, COMBAT and REST all leave from it and
+   all come back to it, so the shipyard is in front of a new player before
+   their first fight instead of behind a "NEW RUN" button. */
+function enterPilot(i) {
+  if (!saves[i]) { saves[i] = newCharacter('PILOT ' + (i + 1)); writeSaves(); }
+  activeSlot = i; save = saves[i];
+  restoreRun();
+  enterStation(true);
+}
+// REST is a real save point, so a run survives being put down: score, hull,
+// pip, shields and the banked totals all come back exactly as they were.
+// `run` is null only when the last one ENDED (a death), which is what makes
+// the next pick start fresh at the checkpoint sector.
+function restoreRun() {
+  const r = save.run, maxHp = shipMaxHp(save.hpTier);
+  sector = Math.max(1, Math.min(MAX_SECTOR, save.sector || 1));
+  campaignDone = !!save.campaignDone;
+  stage = 1; wave = 1;
+  bullets = []; ebullets = []; enemies = []; powerups = []; particles = []; floats = [];
+  lightningBolts = []; empPulses = []; spawnQueue = [];
+  boss = null; pendingStage = false; pendingSectorBoss = false;
+  sec = newSectorStats();
+  score = r ? (r.score || 0) : 0;
+  runXpEarned = r ? (r.xp || 0) : 0;
+  runCredits = r ? (r.cr || 0) : 0;
+  weapon = r ? Math.max(1, Math.min(4, r.weapon || 1)) : 1;
+  const hp = r ? Math.max(1, Math.min(r.hp || maxHp, maxHp)) : maxHp;
+  ship = { x: W / 2, y: H - safeBot - 130, r: 13, invuln: 0, hp, maxHp,
+           shieldCharges: r ? (r.shields || 0) : 0, shieldRegenT: 0, lastHitT: 999 };
+  fireT = 0; drag = null;
+}
+function snapshotRun() {
+  if (activeSlot < 0) return;
+  save.run = { score, xp: runXpEarned, cr: runCredits, weapon,
+               hp: ship.hp, shields: ship.shieldCharges };
+  persistSave();
 }
 function weaponRowHtml(id) {
   const def = WEAPON_DEFS[id];
@@ -1381,23 +1403,23 @@ function showShipyard() {
     save.xp -= HP_TIER_COST[save.hpTier + 1]; save.hpTier++;
     persistSave(); showShipyard();
   });
-  bindTap(document.getElementById('b-back'), () => shipyardBack());
+  bindTap(document.getElementById('b-back'), () => enterStation());
 }
-function showEndScreen(won, isNewBest) {
+function showEndScreen(isNewBest) {
   const atSectorBoss = boss && boss.sector;
   overlay.innerHTML =
-    '<h2 style="color:' + (won ? 'var(--gold)' : 'var(--red)') + '">' + (won ? 'SECTOR CLEARED' : 'SHIP DOWN') + '</h2>' +
-    '<div class="sub">' + (won ? 'sector ' + sector + ' + boss complete' : (atSectorBoss ? 'sector boss' : 'stage ' + stage + ' · wave ' + Math.min(wave, WAVES_PER_STAGE + 1))) + '</div>' +
-    '<div class="score-big">' + score + '</div>' +
-    (isNewBest && score > 0 ? '<div class="newbest">★ NEW BEST ★</div>' : '<div class="stat">BEST <b>' + save.best + '</b></div>') +
+    '<h2 style="color:var(--red)">SHIP DOWN</h2>' +
+    '<div class="sub">' + (atSectorBoss ? 'sector boss' : 'stage ' + stage + ' · wave ' + Math.min(wave, WAVES_PER_STAGE + 1)) + '</div>' +
+    '<div class="score-big">' + score.toLocaleString() + '</div>' +
+    (isNewBest && score > 0 ? '<div class="newbest">★ NEW BEST ★</div>' : '<div class="stat">BEST <b>' + save.best.toLocaleString() + '</b></div>') +
     '<div class="stat">+' + runXpEarned + ' XP &middot; +' + runCredits + ' CR banked</div>' +
-    (!won ? '<div class="stat">checkpoint: sector <b>' + save.sector + '</b> (restart)</div>' : '') +
+    '<div class="stat">checkpoint: sector <b>' + save.sector + '</b> (restart)</div>' +
     '<div style="margin-top:16px">' +
-    (!won ? '<button class="btn small" id="b-retry">RETRY · SECTOR ' + save.sector + '</button><br>' : '') +
-    '<button class="btn small' + (won ? '' : ' alt') + '" id="b-menu">MENU</button></div>';
+    '<button class="btn small" id="b-retry">RETRY · SECTOR ' + save.sector + '</button><br>' +
+    '<button class="btn small alt" id="b-pilots">← PILOTS</button></div>';
   overlay.classList.remove('hidden');
-  if (!won) bindTap(document.getElementById('b-retry'), () => startGame(save.sector));
-  bindTap(document.getElementById('b-menu'), showMenu);
+  bindTap(document.getElementById('b-retry'), () => startGame(save.sector));
+  bindTap(document.getElementById('b-pilots'), showPilotSelect);
 }
 
 
@@ -1409,8 +1431,6 @@ function showEndScreen(won, isNewBest) {
 
    Everything here is painted, never simulated: no rule below reads `gfx`
    to decide an outcome, only to decide a treatment. */
-
-let shipyardBack = showMenu;   // where the shipyard's BACK returns to
 
 function repairQuote() {
   const missing = Math.max(0, Math.ceil(ship.maxHp - ship.hp));
@@ -1438,6 +1458,7 @@ function gradeFor(s) {
 function beginSectorReport(cleared) {
   clearedSector = cleared;
   campaignDone = cleared >= MAX_SECTOR;
+  if (campaignDone) save.campaignDone = true;
   state = 'report';
   stageBanner = 0; veil = 0;
   bullets = []; ebullets = []; enemies = []; powerups = []; spawnQueue = [];
@@ -1496,6 +1517,7 @@ function enterStation(fade) {
   state = 'station';
   if (fade) { stationT = 0; veil = 1; }
   overlay.classList.add('hidden');
+  snapshotRun();   // the station is the only idle-and-safe point, so it is where a run banks
 }
 
 /* Resumes the RUN into the next sector -- deliberately not startGame(), which
@@ -1522,15 +1544,15 @@ function stationTap(x, y) {
   if (veil > 0.35) return;   // ignore taps landing during the crossfade
   for (const b of stationLayout().B) {
     if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) {
-      if (b.id === 'upgrades') { shipyardBack = () => enterStation(); showShipyard(); }
+      if (b.id === 'upgrades') showShipyard();
       else if (b.id === 'combat') resumeIntoSector();
-      else if (b.id === 'rest') { persistSave(); showMenu(); }
+      else if (b.id === 'rest') { snapshotRun(); showPilotSelect(); }
       else if (b.id === 'repair') {
         const q = repairQuote();
         if (q.hp <= 0) return;
         ship.hp = Math.min(ship.maxHp, ship.hp + q.hp);
         save.credits -= q.cost;
-        persistSave(); sfxPower();
+        snapshotRun(); sfxPower();
         const d = stationLayout().f.drydock;
         floats.push({ x: d.x, y: d.y - d.r, txt: '+' + q.hp + ' HP', color: '#39ff14', t: 0 });
       }
@@ -1572,7 +1594,7 @@ function stationLayout() {
   for (const b of B) {
     if (b.id === 'upgrades') b.sub = save.xp + ' XP';
     else if (b.id === 'combat') b.sub = 'SECTOR ' + sector + (campaignDone ? ' AGAIN' : '');
-    else if (b.id === 'rest') b.sub = 'SAVE & EXIT';
+    else if (b.id === 'rest') b.sub = 'SAVE & SWITCH PILOT';
     else {
       b.sub = q.full ? 'HULL INTACT' : q.hp > 0 ? '+' + q.hp + ' HP · ' + q.cost + ' CR' : 'NEED ' + CREDITS_PER_HP + ' CR';
       b.off = q.hp <= 0;
@@ -1839,6 +1861,8 @@ function drawStationHeader() {
   if (gfx === 'toon') { ctx.strokeStyle = INK; ctx.lineWidth = 1.3; ctx.strokeRect(bx, by, bw, 6); }
   ctx.font = "8px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
   ctx.fillText('HULL ' + Math.ceil(ship.hp) + '/' + ship.maxHp, W / 2, by + 18);
+  ctx.font = "9px 'Share Tech Mono'"; ctx.fillStyle = '#5f6a85';
+  ctx.fillText('RUN ' + score.toLocaleString() + '  ·  BEST ' + save.best.toLocaleString(), W / 2, by + 32);
 }
 
 // The band between the barracks and the buttons is otherwise dead screen.
@@ -2132,7 +2156,7 @@ function draw() {
     ctx.fillRect(s.x, s.y, s.s, s.s + 2);
   }
   if (state === 'station') { drawStationScene(); ctx.restore(); drawVeil(); return; }
-  if (state === 'menu' || state === 'pilots' || state === 'shipyard') { ctx.restore(); return; }
+  if (state === 'pilots' || state === 'shipyard') { ctx.restore(); return; }
   // powerups
   for (const p of powerups) {
     const col = p.kind === 'P' ? '#39ff14' : p.kind === 'S' ? '#4488ff' : '#ffc300';
@@ -2269,8 +2293,9 @@ function draw() {
     ctx.fillRect(W - 12 - (3 - i) * 14, safeTop + 50, 10, 4);
   }
   }
-  // banner
-  if (stageBanner > 0) {
+  // banner (play only: it stops ticking down off-play, so it would otherwise
+  // freeze on screen behind the report and the death overlay)
+  if (stageBanner > 0 && state === 'play') {
     ctx.globalAlpha = Math.min(1, stageBanner * 2);
     ctx.textAlign = 'center';
     ctx.font = "26px 'Black Ops One'"; ctx.fillStyle = '#ffc300';

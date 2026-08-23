@@ -360,7 +360,10 @@ tree must be able to clear the campaign alone**. Detailed context: `.claude/grid
 Vertical shmup with a full build-your-ship progression layer. 3 save-slot
 **pilots** (`starSurge.saves`, create/select/reset), each with its own XP
 bank, unlocked weapon/armor, and sector checkpoint — pick a slot to try a
-different build. A **sector** is 5 stages × 3 waves, each stage ending in a
+different build. **There is no menu screen**: picking a pilot opens its
+station, and UPGRADES / COMBAT / REST all leave from and return to it
+(REST goes back to pilot select and banks the run, which resumes exactly
+where it was left; only dying ends a run). A **sector** is 5 stages × 3 waves, each stage ending in a
 mini-boss, the whole sector capped by one harder, longer **sector boss**
 (2.6× the toughest mini-boss's hp, wider spread, denser rings); 11 sectors,
 difficulty-scaled by `campaignDifficulty()`. Dying always restarts the

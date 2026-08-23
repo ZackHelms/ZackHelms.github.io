@@ -470,8 +470,77 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     const stored = JSON.parse(localStorage.getItem('starSurge.saves'))[0];
     return { state, storedCr: stored.credits, storedXp: stored.xp };
   });
-  check('REST banks the pilot and returns to the Star Surge title screen',
-        rest.state === 'menu' && rest.storedCr === 123 && rest.storedXp === 456, rest);
+  check('REST banks the pilot and returns to pilot select',
+        rest.state === 'pilots' && rest.storedCr === 123 && rest.storedXp === 456, rest);
+
+  /* ---- routing: pilots -> station -> (upgrades | combat | rest) ----------
+     There is no menu screen. Picking a pilot opens its station, which is the
+     only hub: the shipyard, the next sector and pilot select all leave from
+     it and come back to it. These pin the shape of that graph, because a
+     stray `showMenu()` reintroduced anywhere would strand the player on a
+     screen the rest of the flow no longer returns to. */
+  const opening = await page.evaluate(() => {
+    showPilotSelect();
+    const atPilots = state;
+    const menuStillExists = typeof showMenu !== 'undefined';
+    document.getElementById('b-slot1').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return { atPilots, menuStillExists, after: state, slot: activeSlot };
+  });
+  check('the game opens on pilot select and a pilot goes straight to its station -- no menu screen',
+        opening.atPilots === 'pilots' && !opening.menuStillExists &&
+        opening.after === 'station' && opening.slot === 1, opening);
+
+  // REST is a real save point now, so a run has to survive being put down.
+  const putDown = await page.evaluate(() => {
+    saves[0] = newCharacter('ROUTE'); activeSlot = 0; save = saves[0];
+    save.sector = 4; save.hpTier = 0;
+    restoreRun();
+    const fresh = { score, hp: ship.hp, weapon };
+    score = 8888; runXpEarned = 120; runCredits = 340; weapon = 3;
+    ship.hp = 44; ship.shieldCharges = 2;
+    enterStation(true);                       // banks the run
+    veil = 0;
+    const b = stationLayout().B.find(x => x.id === 'rest');
+    stationTap(b.x + b.w / 2, b.y + b.h / 2);
+    const afterRest = state;
+    activeSlot = -1; save = null; score = 0; weapon = 1;   // wander off
+    enterPilot(0);                                          // and come back
+    return { fresh, afterRest, back: state, score, hp: ship.hp, weapon,
+             shields: ship.shieldCharges, xp: runXpEarned, cr: runCredits, sector };
+  });
+  check('a fresh pilot starts a fresh run (score 0, full hull, pip 1)',
+        putDown.fresh.score === 0 && putDown.fresh.hp === 100 && putDown.fresh.weapon === 1, putDown.fresh);
+  check('REST banks the run and picking the pilot again resumes it exactly',
+        putDown.afterRest === 'pilots' && putDown.back === 'station' &&
+        putDown.score === 8888 && putDown.hp === 44 && putDown.weapon === 3 &&
+        putDown.shields === 2 && putDown.xp === 120 && putDown.cr === 340 &&
+        putDown.sector === 4, putDown);
+
+  // ...but a run that ENDED must not resume. Death is the one thing that
+  // clears it, which is what keeps "resume" from becoming "undo my death".
+  const died = await page.evaluate(async () => {
+    saves[0] = newCharacter('ROUTE2'); activeSlot = 0; save = saves[0];
+    save.sector = 3;
+    restoreRun();
+    score = 5000;
+    enterStation(true);
+    const banked = !!save.run;
+    resumeIntoSector();
+    ship.invuln = 0; ship.hp = 1;
+    hitShip(999);
+    const overState = state, runAfterDeath = save.run;
+    await new Promise(r => setTimeout(r, 950));
+    const ids = { retry: !!document.getElementById('b-retry'),
+                  pilots: !!document.getElementById('b-pilots'),
+                  menu: !!document.getElementById('b-menu') };
+    enterPilot(0);
+    return { banked, overState, runAfterDeath, ids, score, sector, back: state };
+  });
+  check('the death screen offers RETRY and PILOTS, and no route to a menu',
+        died.overState === 'over' && died.ids.retry && died.ids.pilots && !died.ids.menu, died.ids);
+  check('dying ends the run: picking the pilot again starts fresh at the checkpoint sector',
+        died.banked && died.runAfterDeath === null && died.back === 'station' &&
+        died.score === 0 && died.sector === 3, died);
 
   const migrated = await page.evaluate(() => {
     const legacy = [{ name: 'OLD', xp: 10, sector: 2, best: 5, weapons: { blaster: 1 },
@@ -526,6 +595,31 @@ const allEqual = arr => arr.every(v => v === arr[0]);
         finale.txt.includes('CAMPAIGN COMPLETE'), { s: finale.sector, done: finale.campaignDone });
 
   await page.evaluate(() => { state = 'play'; overlay.classList.add('hidden'); });
+
+  // stageBanner only ticks down inside the play branch of update(), so on any
+  // non-play screen the last banner freezes and keeps painting. It sat behind
+  // the SHIP DOWN overlay reading "STAGE 1 - WAVE 1" for a whole session.
+  const bannerGuard = await page.evaluate(() => {
+    startGame(2);
+    enemies = []; bullets = []; ebullets = []; particles = []; floats = []; boss = null;
+    bannerText = 'STAGE 1 · WAVE 1'; stageBanner = 5; shake = 0;
+    // count GOLD pixels in the banner band -- stars and the ship are blue/green,
+    // so hue alone separates the banner from the scene behind it
+    const goldInBand = () => {
+      ctx.setTransform(1, 0, 0, 1, 0, 0); draw();
+      const d = ctx.getImageData(0, Math.round(H * 0.33), W, 60).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] > 140 && d[i + 2] < 120) n++;
+      return n;
+    };
+    const inPlay = goldInBand();
+    state = 'over';
+    const offPlay = goldInBand();
+    state = 'play';
+    return { inPlay, offPlay };
+  });
+  check('the stage banner stops painting off the play screen',
+        bannerGuard.inPlay > 150 && bannerGuard.offPlay === 0, bannerGuard);
 
   check('no console/page errors across the whole drive', errors.length === 0, errors);
 
