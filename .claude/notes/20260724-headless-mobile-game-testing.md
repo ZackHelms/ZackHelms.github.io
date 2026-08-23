@@ -453,3 +453,70 @@ The fix was to give the geometry question its own name (`openCell()`) and leave
 `canPlace()` meaning what it says. The habit: after tightening a rule, grep for
 every *use* of the old predicate, not just every assertion about it — the uses
 that were never about that rule are the ones that bite.
+
+## Four traps from the negative-testing pass (2026-08-23, Turret Builder skins)
+
+Adding four cel skins to one game produced five new renderer checks, and
+proving each one by breaking what it asserts surfaced four traps that are
+general, not skin-specific.
+
+### A distinctness assertion needs a DISTANCE, not an inequality
+
+"All four skins fingerprint differently" passed with one skin's shape override
+deliberately unregistered — its palette still went through, so the same shape
+in a different colour hashed differently. Hashing the **silhouette** instead
+(is this sample painted at all, ignoring colour), it then passed on a *single*
+antialiased sample. What works is a minimum pairwise Hamming distance with the
+honest range measured first: closest real pair 7.9%, fallen-through skin 0.1%,
+bar at 3%.
+
+**The general form: any check phrased as "these N things differ" will pass on
+noise.** Measure how far apart they are when correct, how far when broken, and
+put the bar in the gap.
+
+### Keep identity counters out of a cross-run snapshot
+
+The "a skin is paint" check plays one deterministic scenario per style and
+requires identical gameplay state. Its first version failed on four of five
+styles for a reason with nothing to do with skins: the snapshot contained the
+id of the creep each turret was tracking, and that id comes from a
+**page-lifetime** counter that no run reset touches — so the fifth style's run
+was numbering creeps far above the first's. Record *whether* a target is held,
+not which one. Anything id-shaped in a cross-run comparison deserves that
+suspicion before the code under test does.
+
+### A liveness guard, or identical nothing passes forever
+
+The same check compares five snapshots for equality — which an empty board
+satisfies perfectly. It also asserts the scenario actually happened: the
+expected link count, three turrets, one wall, and at least one turret holding
+a target. **Every equality-shaped check needs a second assertion that there
+was something to compare.**
+
+### Restore from a known-good COPY, and verify the restore
+
+Negative tests mean deliberately breaking the shipping file. Twice in one
+session a restore silently did not happen — once because the working directory
+had drifted between Bash calls, so `cp` wrote nowhere useful and the stubbed
+`frameRot()` stayed in the tree. The failure mode is not a red gate; it is a
+**green** gate on a stubbed renderer, which is how a stub reaches production.
+
+This is now tooling rather than discipline — `.claude/scripts/negtest.sh`:
+
+```
+.claude/scripts/negtest.sh save    games/<game>/index.html   # BEFORE breaking it
+#   … break it, run the suite, confirm the right check went red …
+.claude/scripts/negtest.sh restore games/<game>/index.html   # cmp-verified
+```
+
+`save` snapshots into `.git/negtest/` (inside `.git`, so it can never be
+committed and never shows in `git status`); `restore` copies back and then
+`cmp`s, because `cp` is perfectly happy to succeed against a path that is not
+the one you meant. Mark the break itself with the token `@negtest` in a
+comment: `gates.sh` runs `negtest.sh scan` on every invocation and refuses to
+go green while that marker survives in a changed shipping file.
+
+One wrinkle worth keeping: the scan skips all of `.claude/`. The first version
+did not, and `gates.sh` flagged its own explanatory comment — a scanner that
+matches the documentation of its own convention is a scanner that gets
+disabled. Scan what ships.

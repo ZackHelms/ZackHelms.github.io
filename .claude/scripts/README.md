@@ -66,7 +66,8 @@ Deterministic helpers for working on this repo.
   ```
 
 - `gates.sh` — runs the whole validation set in one command: the smoke gate on
-  each changed page, `check-games-sync.cjs` (always — it is free), and any kept
+  each changed page, `check-games-sync.cjs` (always — it is free),
+  `negtest.sh scan` (also always, also free), and any kept
   `.claude/tests/drive-<slug>.cjs` for the games those pages belong to. Resolves
   `NODE_PATH` itself, so there is nothing to remember. One parseable line per
   gate, final `GATES: GREEN`/`RED`, exit 0/1.
@@ -105,6 +106,29 @@ Deterministic helpers for working on this repo.
   Batches kept hand-rolling a throwaway Playwright script that covered only
   card ↔ dataset; nothing ever checked the index rows, which is the file every
   session is told to read *first* when choosing a game to build.
+
+- `negtest.sh` — scaffolding for **negative tests**, the practice of breaking a
+  shipping file on purpose to prove a check discriminates. The hazard is not a
+  red gate; it is a **green** one on a stub that never got restored, which is
+  how a stubbed renderer reaches production (2026-08-23: a restoring `cp` ran
+  from a drifted working directory, succeeded against the wrong path, and left
+  a stubbed `frameRot()` in the tree).
+
+  ```
+  .claude/scripts/negtest.sh save    games/<slug>/index.html   # BEFORE breaking it
+  #   … break it — marking the break with @negtest — run the suite, confirm
+  #     the RIGHT check went red …
+  .claude/scripts/negtest.sh restore games/<slug>/index.html   # cmp-verified
+  .claude/scripts/negtest.sh scan                              # anything left behind?
+  ```
+
+  `save` snapshots into `.git/negtest/`, which cannot be committed and never
+  shows up in `git status`. `restore` copies back and then `cmp`s the result,
+  because `cp` reports success against a path that is not the one you meant.
+  `scan` greps the changed **shipping** files for the `@negtest` marker and
+  exits 1 if one survives — `gates.sh` runs it on every invocation. It skips
+  all of `.claude/`: the first version did not, and `gates.sh` flagged its own
+  explanatory comment. Prints `SAVED=`/`RESTORED=`/`NEGTEST-SCAN: GREEN|RED`.
 
 - `stamp-badge.sh` — sets each given page's `#build-badge` to the current
   UTC time (badge SOP: `games/CLAUDE.md` § Build Timestamp Badge). Replaces

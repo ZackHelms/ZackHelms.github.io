@@ -147,6 +147,22 @@ through solid timber.
 - **A projectile that scales toward the camera will cover its own landing
   zone.** Let the *rise* carry the "coming at you" read (lift 23 world units)
   and keep the growth modest (1.0×), not the other way round.
+- **A perfect circle reads as a stamp.** Three times now in one game's terrain,
+  and the third is the instructive one: turret-builder's ground had dirt blobs
+  fixed into three overlapping lobes for exactly this reason, and when the dirt
+  was later deleted altogether the *grass tone* patches — which had quietly
+  inherited the disc shape all along — became the most visible thing on the
+  board. **Removing the loud element promotes whatever was hiding behind it**,
+  so re-look at what is left rather than assuming the fix carried over.
+- **An art rhythm that competes with the game's grid actively teaches the wrong
+  rule.** Turret-builder paved its road with joints struck every 0.72 cell
+  measured *along the path*: handsome, and it told the player nothing about
+  where a wall — which occupies one whole cell — could go. If the rules are
+  per-cell, every repeating mark on the board must be per-cell, and any second
+  rhythm spaced by distance (centre-line dashes, wear marks) should go. On a
+  skinned board this is a *shared* fix, not a per-skin one: it belongs in the
+  geometry every skin draws through, or three skins will disagree about where
+  the grid is.
 
 ## Traps
 
@@ -303,6 +319,30 @@ The one place paint reaches into the sim is deliberately one-way and
 one-field: `dominantModCol(t)` rides along on the shot as `mcol` so STONE AGE
 can paint the hurled rock in the colour of the cauldron it was dipped in.
 Combat never reads it.
+
+### "A skin is paint" is assertable — stop writing it as a claim
+
+Three games in this repo now state the invariant in their docs and, until
+turret-builder's four-skin pass, none of them asserted it. In a game with no
+gameplay randomness the strong form is cheap: run **one deterministic scenario
+per style, drawing real frames between the ticks**, and require every gameplay
+number to come out byte-identical.
+
+Drawing between the ticks is the whole point. A check that only stepped the
+simulation could not see a draw function that writes to an entity, caches onto
+a tile, or moves the board geometry — which is precisely what a large skin
+system invites, because each skin author is writing per-entity code in a place
+that used to be read-only. Turret-builder's version compares creep distance,
+HP and chill, turret aim to six places, wall HP, cash, lives and link count
+across five styles; `c.d += 0.001` inside one skin's creep painter fails it and
+names the drifted style.
+
+Two traps it hit on the way, both general (fuller write-up in
+`.claude/notes/20260724-headless-mobile-game-testing.md`): keep **identity
+counters** out of the snapshot — a page-lifetime entity id differs between
+styles for bookkeeping reasons alone — and pair the equality with a
+**liveness** assertion, because five snapshots of an empty board are also
+identical.
 
 ### Testing four skins found two ways the obvious test lies
 

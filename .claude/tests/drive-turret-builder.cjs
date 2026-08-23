@@ -1745,6 +1745,69 @@ const TOUCH = `(() => {
     }
     check('every cel skin paints its own turret SHAPE, not just its own paint',
       dists.every(d => d.pct >= 3), dists);
+
+    /* A SKIN IS PAINT. Three games in this repo now claim that in their docs
+       and none of them asserted it, so: run the identical deterministic
+       scenario under all five styles, DRAWING REAL FRAMES between ticks, and
+       require the gameplay state to come out byte-identical. Drawing matters
+       — a check that only steps the sim could not see a draw function that
+       writes to a creep, caches onto a tile or moves the board geometry,
+       which is the actual failure shape a big skin system invites.
+       Discriminates: `c.d += 0.001` inside drawCreepMech fails it. */
+    const neutral = await P(() => {
+      const G = window.__TB, H = window.__H, out = {};
+      for (const st of ['toon', 'mech', 'steampunk', 'stoneage', 'neon']) {
+        G.setGfx(st);
+        G.seedRandom(20260823);
+        H.fresh();
+        const used = [];
+        const far = (r, c) => used.every(u => Math.abs(u[0] - r) > 2 || Math.abs(u[1] - c) > 2);
+        let n = 0;
+        for (const sp of G.buildableCells('turret')) {
+          if (n >= 3) break;
+          if (!far(sp.r, sp.c)) continue;
+          if (!G.openCell(sp.r - 1, sp.c) || !G.openCell(sp.r + 1, sp.c)) continue;
+          if (!G.openCell(sp.r, sp.c - 1) || !G.openCell(sp.r, sp.c + 1)) continue;
+          if (!G.place('turret', sp.r, sp.c)) continue;
+          used.push([sp.r, sp.c]); n++;
+          G.place('fire', sp.r - 1, sp.c); G.place('blast', sp.r + 1, sp.c);
+          G.place('elec', sp.r, sp.c - 1); G.place('ice', sp.r, sp.c + 1);
+        }
+        for (const q of G.pathCellList()) if (G.place('wall', q.r, q.c)) break;
+        G.ready();
+        for (let i = 0; i < 520; i++) { G.step(0.05, 1); G.forceDraw(); }
+        const s = G.st();
+        out[st] = JSON.stringify({
+          /* everything the simulation decided — but NOT st().gfx, which is
+             the one field that is supposed to differ */
+          phase: s.phase, wave: s.wave, lives: s.lives, cash: s.cash,
+          score: s.score, creeps: s.creeps, queued: s.queued, links: s.links,
+          bodies: G.creepsRaw().map(c => [c.type, +c.d.toFixed(6), +c.hp.toFixed(6),
+                                           +(c.chillT || 0).toFixed(6)]),
+          /* WHETHER a target is held, not WHICH one: creep ids come from a
+             page-lifetime counter that no reset touches, so the fifth style's
+             run is numbering creeps in the hundreds while the first style's
+             was in the tens. That is bookkeeping, not behaviour, and putting
+             the raw id in the snapshot made this check fail on all four
+             non-first styles the first time it ran. */
+          aims: G.tilesRaw().filter(t => t.kind === 'turret')
+                  .map(t => [t.r, t.c, +(t.aim || 0).toFixed(6), t.tid ? 1 : 0]),
+          walls: G.tilesRaw().filter(t => t.kind === 'wall').map(t => +t.hp.toFixed(6)),
+        });
+      }
+      return out;
+    });
+    const base = neutral.toon, parsed = JSON.parse(base);
+    const drifted = Object.keys(neutral).filter(k => neutral[k] !== base);
+    /* the scenario has to have actually HAPPENED, or identical snapshots of
+       an empty board would pass this every time */
+    const real = parsed.links >= 12 && parsed.aims.length === 3 && parsed.walls.length === 1
+      && parsed.aims.some(a => a[3] === 1) && parsed.bodies.length > 0
+      && Object.keys(neutral).length === 5;
+    check('a skin is PAINT — the same scenario plays out identically in all five styles',
+      drifted.length === 0 && real,
+      drifted.length ? { drifted, toon: base.slice(0, 260), other: neutral[drifted[0]].slice(0, 260) }
+                     : { real, snapshot: parsed });
   }
 
   /* =================================================================== */

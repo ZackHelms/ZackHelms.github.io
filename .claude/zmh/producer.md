@@ -46,7 +46,10 @@
   **none** — turret-builder's `acb50c1` + `e9ea508` were the last entry and the
   2026-08-23 turret-builder pass refined them (it also found and fixed a live
   cel-shading defect that had shipped in `acb50c1`, which is the argument for
-  keeping this list rather than letting a skipped range disappear).
+  keeping this list rather than letting a skipped range disappear). The second
+  2026-08-23 turret-builder pass (`6827c5f`, five graphics styles) ran alone in
+  the range too — every commit between the pointer and HEAD was that session's
+  own, including its own earlier refine commit, so nothing was left behind.
 
 ## Validation
 - Procedure: headless mobile smoke-load of every changed page (the games

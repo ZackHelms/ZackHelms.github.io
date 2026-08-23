@@ -84,6 +84,13 @@ fi
 # --- gate 2: the catalog three-way sync (free, always) ----------------------
 run SYNC node .claude/scripts/check-games-sync.cjs
 
+# --- gate 3: no deliberate break left behind (free, always) -----------------
+# A negative test breaks a shipping file on purpose. The dangerous outcome is
+# not a red gate, it is a GREEN one on a stub that never got restored — which
+# happened on 2026-08-23. Mark every deliberate break with @negtest and this
+# refuses to go green while one is still in a changed file.
+run NEGTEST bash .claude/scripts/negtest.sh scan
+
 # --- gate 3: kept drive suites for the games touched ------------------------
 if [ "$DRIVE" = 1 ] && [ "$HAVE_PW" = 1 ]; then
   suites=()

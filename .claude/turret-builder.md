@@ -371,9 +371,18 @@ returned. `paintCelProbe(rot, s)` closes that: one **disc** drawn through
 bright bearing can only move if the rim light moves — the mechanism every
 skin shares, tested with the sprite taken out of the question.
 
-**A style is paint.** Nothing in `update()` or the payload maths knows a style
-exists — every `cel()` and `SK` call site is inside a draw function, and a
-grep proving that is the cheapest regression test there is. Neon Clash reached
+**A style is paint — and it is asserted, not asserted-in-prose.** Nothing in
+`update()` or the payload maths knows a style exists; every `cel()` and `SK`
+call site is inside a draw function. The drive suite proves it the honest way:
+the same deterministic scenario — three module-ringed turrets, a wall, 26
+seconds of a live wave — is played out under all five styles with **real
+frames drawn between ticks**, and every gameplay number (creep distance, HP,
+chill, turret aim to six places, wall HP, cash, lives, link count) must come
+out byte-identical. Drawing between ticks is the point: a check that only
+stepped the sim could not see a draw function that writes to a creep, caches
+onto a tile, or moves the board geometry, which is the failure a large skin
+system actually invites. It discriminates — `c.d += 0.001` inside
+`drawCreepMech` fails it and names MECH as the drifted style. Neon Clash reached
 the same shape independently on the same day (`.claude/neon-clash.md` calls it
 "a skin is paint"), so treat the cogwheel-plus-dropdown, TOON-default
 arrangement as a repo convention now rather than one game's idea; the two
@@ -475,7 +484,7 @@ Four hooks exist to make the spec *measurable* rather than inferred:
 Suites — **rules and balance are separate files**, so a rebalance never fights
 a mechanics regression:
 
-- `.claude/tests/drive-turret-builder.cjs` (206 checks) — the spec verbatim
+- `.claude/tests/drive-turret-builder.cjs` (207 checks) — the spec verbatim
   including the worked example, each module in isolation and stacked, the
   effects-vs-damage split, tracking and snap, all four boosters, all fifteen
   combos with their effects, the codex, walls, economy, flow, the sawtooth,
@@ -490,9 +499,9 @@ a mechanics regression:
   a one-cell chain, the ends of it are where the arrows go and where a wall
   is refused, a joint on every road-cell boundary, an arrow on both end
   cells, and green at five points in every buildable cell in every cel
-  style). All five of those last checks were verified by breaking the thing
-  they assert — see § Traps for the one that first passed against a
-  regression.
+  style), and the **skin-neutrality** check above. Every one of those was
+  verified by breaking the thing it asserts — see § Traps for the two that
+  first passed against the very regression they were written to catch.
 - `.claude/tests/eval-turret-builder.cjs` (22 claims) — balance and pacing via
   personas. `--strategy f.json`, `--only NAME`, `--curve a,b`, `--seed`,
   `--json`. About a second each.
@@ -548,6 +557,14 @@ a mechanics regression:
   asserts a minimum pairwise distance: the closest honest pair is toon/mech at
   7.9%, a fallen-through skin is 0.1%, and the bar is 3%. **A distinctness
   test needs a distance, not an inequality.**
+- **A neutrality snapshot must not contain identity counters.** The
+  skin-is-paint check first put `t.tid` — the id of the creep a turret is
+  holding — in its per-style snapshot, and failed on all four non-TOON styles
+  for a reason that had nothing to do with skins: `creepSeq` is a
+  **page-lifetime** counter that no run reset touches, so the fifth style's
+  run numbers its creeps far above the first's. The snapshot records *whether*
+  a target is held, not which one. Anything id-shaped in a cross-run
+  comparison deserves that suspicion first.
 - **A pixel measurement of the board must clear the chrome first.** Grass,
   joints and arrows were all first measured through a `LEVEL 1 · SUBSTATION`
   toast — three failures, none of them about the thing under test.
