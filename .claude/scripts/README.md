@@ -2,6 +2,24 @@
 
 Deterministic helpers for working on this repo.
 
+- `pages-status.cjs` — read the Pages deploy verdict out of an oversized
+  `mcp__github__actions_list` result. That call always blows the tool-result
+  limit, and the file the harness saves it to has lines too long for `Read`'s
+  chunking, so the mandatory publish check (`.claude/zmh/producer.md`
+  § Publish) ends in a hand-written parse every time. With a SHA it prints a
+  `PAGES=success|pending|failed|absent` verdict and exits non-zero unless the
+  deploy actually succeeded — `pending` and `absent` are not evidence the site
+  is live, so neither exits 0.
+
+  ```
+  node .claude/scripts/pages-status.cjs <saved-result.txt>          # newest 5 runs
+  node .claude/scripts/pages-status.cjs <saved-result.txt> 430b647  # verdict + exit code
+  ```
+
+  Written after the parse was re-derived four times in one session (2026-08-23)
+  and the first attempt threw `KeyError: 'conclusion'` — a run still in flight
+  has no `conclusion` key at all, which is exactly the case the check exists for.
+
 - `smoke-mobile.cjs` — headless mobile smoke gate. Loads each given page in
   Chromium at an iPhone 13 viewport and fails on any console/page error
   (external-font/network noise ignored). Final line `SMOKE: GREEN`/`SMOKE:

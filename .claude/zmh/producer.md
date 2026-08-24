@@ -50,6 +50,9 @@
   2026-08-23 turret-builder pass (`6827c5f`, five graphics styles) ran alone in
   the range too — every commit between the pointer and HEAD was that session's
   own, including its own earlier refine commit, so nothing was left behind.
+  The 2026-08-23 star-surge station pass (`992a7bd`, `430b647`) likewise left
+  nothing behind: the only other commit in its range was `1e8a778`, the
+  turret-builder session's own refine commit, already accounted for above.
 
 ## Validation
 - Procedure: headless mobile smoke-load of every changed page (the games
@@ -85,10 +88,14 @@
   after all three jobs had concluded `success`, and an hour later the
   deploy *job* reported `in_progress` for nine minutes after its log said
   `Reported success!`. A hung-looking deploy is usually a stale status, not
-  a wedge. Spotting the badge on the live page is **not**
-  available from a remote session — the agent proxy 403s `tythos.com` on
-  CONNECT — so the workflow conclusion is the whole verification. Full
-  procedure incl. parsing the oversized run listing:
+  a wedge. Spotting the badge on the live page is **not** available from a
+  remote session — the agent proxy 403s **both** hostnames on CONNECT
+  (`tythos.com`, the site's custom domain per the repo-root `CNAME`, and
+  `zackhelms.github.io`; re-verified 2026-08-23) — so the workflow conclusion
+  is the whole verification.
+  Parse the oversized run listing with
+  `node .claude/scripts/pages-status.cjs <saved-result> <sha>`, which prints a
+  `PAGES=` verdict and exits non-zero unless it is `success`. Full procedure:
   `.claude/notes/20260817-pages-deploy-wedged-after-503.md`.
 - Authorization: pushing to `main` is standing authorization (CLAUDE.md §
   Git workflow); no separate publish sign-off needed.

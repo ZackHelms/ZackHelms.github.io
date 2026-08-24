@@ -23,6 +23,13 @@ you have not just re-checked:
 The one file that is genuinely single-writer is `.claude/last-refine-sha`; see
 `.claude/zmh/producer.md` § Plans for what that means for `/zmh-producer:refine-context`.
 
+**Published at [tythos.com](https://tythos.com)** — a custom domain, set by the
+repo-root `CNAME`. GitHub Pages deploy logs and environment URLs therefore say
+`tythos.com`, not `zackhelms.github.io`; both resolve to this repo, and the
+agent proxy 403s both from remote sessions (so a live-page check is never
+available there — verify the Pages run instead, per `.claude/zmh/producer.md`
+§ Publish).
+
 ## Project structure
 
 - `games/` — self-contained single-file HTML games (CSS + JS inline, no shared libs)
