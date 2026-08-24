@@ -63,11 +63,6 @@ body {
   overflow-y:auto;
 }
 #overlay.hidden { display:none; }
-#overlay h1 {
-  font-family:'Black Ops One', sans-serif; color:var(--green);
-  font-size:clamp(1.7rem, 8vw, 2.6rem); letter-spacing:4px;
-  text-shadow:0 0 24px #39ff1466; margin-bottom:4px;
-}
 #overlay h2 {
   font-family:'Black Ops One', sans-serif; color:var(--gold);
   font-size:1.5rem; letter-spacing:3px; margin-bottom:8px;
@@ -83,8 +78,6 @@ body {
 .btn.alt { color:var(--blue); border-color:var(--blue); box-shadow:0 0 18px #4488ff22; }
 .btn.small { font-size:0.8rem; padding:10px 20px; min-width:180px; }
 .btn:active { transform:scale(0.96); }
-.rules { color:var(--dim); font-size:0.68rem; line-height:1.9; margin-top:14px; max-width:340px; }
-.rules b { color:var(--white); }
 .score-big {
   font-family:'Black Ops One', sans-serif; color:var(--white);
   font-size:2.6rem; text-shadow:0 0 24px #dde3ff44; margin:4px 0;
@@ -126,7 +119,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-23 22:19 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-24 23:06 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
@@ -171,6 +164,48 @@ const MINIBOSS_CREDITS = 40;
 const LAUNCH_DUR = 1.45;       // ship accelerates off-screen, then the veil takes over
 const VEIL_FADE = 0.45;        // seconds of black between the launch and the station
 const GRADE_COL = { S: '#ffc300', A: '#39ff14', B: '#4488ff', C: '#dde3ff', D: '#ff2244' };
+/* ---- title screen ------------------------------------------------------
+   The title screen is CANVAS, not overlay HTML, because everything on it is
+   made of the game's own sprites: the word is a swarm of enemy hulls and the
+   backdrop is a live dogfight. Painting it through the same painters is what
+   makes it follow the graphics style for free -- there is no second set of
+   title art to keep in sync. */
+const DF_FOES = 4;             // hostiles in the title dogfight (+1 ally)
+const DF_FL = 700;             // camera focal length: a sprite at z = FL is 1:1
+const DF_ZUI = 520;            // ships nearer than this draw IN FRONT of the UI
+const DF_ZMIN = 260, DF_ZMAX = 1400;
+const DF_ZMID = 700;           // the depth the arena springs back toward
+const DF_HIT = 85;             // world units -- tracer/hull hit radius. Generous
+                               // on purpose: a title-screen dogfight where nobody
+                               // ever dies is just four ships doing laps.
+// Caps, not budgets: natural fire (bursts of 4, five hulls, 0.6s of life)
+// settles around 20 tracers. These are headroom, and they are here because
+// a neon tracer carries a glow -- 70 of them is the one load that pushes
+// this screen off 60fps.
+const DF_TRACER_CAP = 40, DF_BIT_CAP = 130;
+const DF_TYPES = ['drone', 'shooter', 'spinner', 'tanker'];
+const DELETE_HOLD = 0.85;      // seconds of hold that erase a pilot
+const TITLE_HUE = 132;         // one hue for the whole word, so it reads AS a word
+// Per-type radius as a fraction of the cell. One shared radius does NOT
+// work: a drone is a small pod with long blades and a tanker is a solid
+// block, so at equal r they cover wildly different areas and the letters
+// come out blotchy. These are tuned so all four fill about 1.3 cells --
+// enough overlap that a stroke reads solid, not enough to close a counter.
+const TITLE_R = { drone: 0.62, shooter: 0.72, spinner: 0.62, tanker: 0.58 };
+// 5x9 cell: rows 0-6 are cap height, 2-6 x-height, 7-8 the descender. The
+// case is the point -- "Star Surge", not "STAR SURGE" -- so the lowercase
+// glyphs really are short and 'g' really does hang below the baseline.
+const GLYPH_ROWS = 9;
+const GLYPHS = {
+  S: { top: 0, rows: ['.###.', '#...#', '#....', '.###.', '....#', '#...#', '.###.'] },
+  t: { top: 0, rows: ['.#...', '.#...', '###..', '.#...', '.#...', '.#...', '..##.'] },
+  a: { top: 2, rows: ['.###.', '....#', '.####', '#...#', '.####'] },
+  r: { top: 2, rows: ['#.##.', '##..#', '#....', '#....', '#....'] },
+  u: { top: 2, rows: ['#...#', '#...#', '#...#', '#...#', '.####'] },
+  g: { top: 2, rows: ['.####', '#...#', '#...#', '.####', '....#', '#...#', '.###.'] },
+  e: { top: 2, rows: ['.###.', '#...#', '#####', '#....', '.###.'] },
+};
+const TITLE_LINES = ['Star', 'Surge'];
 const WEAPON_DEFS = {
   blaster:  { name: 'BLASTER',         color: '#dde3ff', unlockCost: 0,   tierCost: [0, 60, 120, 200, 300], desc: 'Balanced kinetic bolts. No weaknesses, no fireworks.' },
   beam:     { name: 'BEAM',            color: '#4488ff', unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'Continuous piercing laser. Melts a line, can’t cover a spread.' },
@@ -216,7 +251,12 @@ let save = null;   // active character; alias into saves[activeSlot]
 function persistSave() { if (activeSlot >= 0) { saves[activeSlot] = save; writeSaves(); } }
 
 /* =============================== STATE ================================== */
-const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const cv = document.getElementById('cv');
+// `ctx` is a LET, not a const, on purpose: buildTitleWord renders the
+// game's own enemy painters into an offscreen canvas by swapping this out
+// and back, which is what keeps the title swarm on one set of art. Nothing
+// else in the file reassigns it.
+let ctx = cv.getContext('2d');
 const overlay = document.getElementById('overlay');
 let W = 0, H = 0, dpr = 1, safeTop = 0, safeBot = 0;
 let state = 'pilots';          // pilots | station | shipyard | report | launch | play | over
@@ -257,6 +297,10 @@ let veil = 0;                  // 0..1 black crossfade between launch and statio
 let stationT = 0;
 let bannerText = '';
 let stars = [];
+let titleT = 0;                // title-screen clock (dogfight + swarm drift)
+let dfShips = [], dfTracers = [], dfBits = [];
+let holdSlot = null;           // {i, t, down} -- the hold-to-erase gesture
+let titleCache = null;         // the word, baked once per style + size
 
 /* =============================== AUDIO ================================== */
 let AC = null, sfxGain = null, musicGain = null, musicTimer = null;
@@ -715,7 +759,14 @@ gfxSelect.addEventListener('change', () => {
   localStorage.setItem('starSurge.gfx', gfx);
 });
 function closeSettings() { settingsPanel.classList.add('hidden'); }
-function hue(sat, l, a) { return 'hsla(' + STAGE_HUES[stage - 1] + ',' + sat + '%,' + l + '%,' + (a === undefined ? 1 : a) + ')'; }
+// Set only by title-screen painters, always restored in the same function.
+// The simulation never reads or writes it, so enemy colour stays a property
+// of the stage everywhere that matters.
+let hueOverride = null;
+function hue(sat, l, a) {
+  const h = hueOverride === null ? STAGE_HUES[stage - 1] : hueOverride;
+  return 'hsla(' + h + ',' + sat + '%,' + l + '%,' + (a === undefined ? 1 : a) + ')';
+}
 function campaignDifficulty() { return (sector - 1) + (stage - 1) / MAX_STAGE; }   // 0 at sector1 stage1, ~+1 per sector cleared
 function incomingBulletDmg() { return 18 * (1 + campaignDifficulty() * 0.12); }
 function incomingRamDmg() { return 26 * (1 + campaignDifficulty() * 0.12); }
@@ -1072,6 +1123,7 @@ function updateLaunch(dt) {
   if (launchT >= LAUNCH_DUR) enterStation(true);
 }
 function update(dt) {
+  if (state === 'pilots') { titleT += dt; dfUpdate(dt); tickHold(dt); tickFx(dt); return; }
   if (state === 'launch') { updateLaunch(dt); return; }
   if (state === 'station') { stationT += dt; veil = Math.max(0, veil - dt / VEIL_FADE); tickFx(dt); return; }
   if (state === 'report') { tickFx(dt); return; }
@@ -1248,6 +1300,7 @@ function pt(e) { const t = e.changedTouches ? e.changedTouches[0] : e; return { 
 function onDown(e) {
   e.preventDefault(); initAudio(); closeSettings();
   if (state === 'station') { const sp = pt(e); stationTap(sp.x, sp.y); return; }
+  if (state === 'pilots') { const sp = pt(e); pilotsDown(sp.x, sp.y); return; }
   if (state !== 'play') return;
   const p = pt(e);
   drag = { fx: p.x, fy: p.y, sx: ship.x, sy: ship.y };
@@ -1255,12 +1308,13 @@ function onDown(e) {
 }
 function onMove(e) {
   e.preventDefault();
+  if (state === 'pilots') { const sp = pt(e); pilotsMove(sp.x, sp.y); return; }
   if (!drag || state !== 'play') return;
   const p = pt(e);
   ship.x = Math.max(14, Math.min(W - 14, drag.sx + (p.x - drag.fx) * 1.2));
   ship.y = Math.max(safeTop + 55, Math.min(H - safeBot - 30, drag.sy + (p.y - drag.fy) * 1.2));
 }
-function onUp(e) { e.preventDefault(); drag = null; }
+function onUp(e) { e.preventDefault(); drag = null; if (holdSlot) holdSlot.down = false; }
 cv.addEventListener('touchstart', onDown, { passive: false });
 cv.addEventListener('touchmove', onMove, { passive: false });
 cv.addEventListener('touchend', onUp, { passive: false });
@@ -1270,30 +1324,15 @@ cv.addEventListener('mousemove', e => { if (drag) onMove(e); });
 cv.addEventListener('mouseup', onUp);
 
 /* =============================== SCREENS ================================ */
+// The title screen is drawn on the canvas (see TITLE SCREEN above), so this
+// only has to tear the overlay down and hand the screen over.
 function showPilotSelect() {
   state = 'pilots';
-  let html = '<h1>STAR SURGE</h1><div class="sub">-- SELECT YOUR PILOT --</div>';
-  for (let i = 0; i < SAVE_SLOTS; i++) {
-    const s = saves[i];
-    html += '<div style="display:flex;align-items:center;gap:6px;margin:7px 0;width:100%;max-width:280px;">' +
-      '<button class="btn' + (s ? ' alt' : '') + '" style="margin:0;flex:1;min-width:0" id="b-slot' + i + '">' +
-      (s ? s.name + '<br><span style="font-size:0.6em">SECTOR ' + s.sector +
-            (s.run && s.run.score > 0 ? ' · RUN ' + s.run.score : ' · BEST ' + s.best) + '</span>'
-         : '+ NEW PILOT ' + (i + 1)) +
-      '</button>' +
-      (s ? '<button class="btn small" style="margin:0;min-width:0;padding:10px 12px" id="b-reset' + i + '">↺</button>' : '') +
-      '</div>';
-  }
-  html += '<div class="rules">Each pilot keeps its own XP, unlocked weapons/armor, and sector checkpoint — pick a slot to experiment with a different build.</div>';
-  overlay.innerHTML = html;
-  overlay.classList.remove('hidden');
-  for (let i = 0; i < SAVE_SLOTS; i++) {
-    bindTap(document.getElementById('b-slot' + i), () => enterPilot(i));
-    const resetBtn = document.getElementById('b-reset' + i);
-    if (resetBtn) bindTap(resetBtn, () => {
-      if (confirm('Reset ' + saves[i].name + '? This erases its XP and unlocks.')) { saves[i] = null; writeSaves(); showPilotSelect(); }
-    });
-  }
+  stage = 1;        // the swarm paints in stage-1 green, not the last sector's hue
+  holdSlot = null;
+  overlay.innerHTML = '';
+  overlay.classList.add('hidden');
+  if (dfShips.length === 0) dfInit();
 }
 /* Picking a pilot goes straight to its station -- there is no menu screen.
    The station is the hub: UPGRADES, COMBAT and REST all leave from it and
@@ -2144,6 +2183,469 @@ function drawBossNeon() {
   }
   ctx.shadowBlur = 0;
 }
+/* ============================ TITLE SCREEN ==============================
+   Three layers around ONE plane. Everything in the dogfight carries a z, the
+   UI sits at DF_ZUI, and the scene paints far -> UI -> near. That single
+   split is what lets a fighter dive between the camera and the logo without
+   any special case: it is in front because it is closer, and it goes back
+   behind the moment it pulls away.
+
+   The fight itself is generated, never scripted -- steering toward a target,
+   a break-off radius so nobody welds to a tail, and three incommensurate
+   sinusoids per ship for wander. No two runs of the title screen are the
+   same, and there is no path to keep in sync with anything. */
+function dfCy() { return H * 0.54; }   // the arena's centre: below the logo, above the bays
+// Screen image of a world DIRECTION at p: the local Jacobian of the
+// perspective divide. This is the whole 3D trick -- a direction pointing
+// away from the camera projects SHORT, so a sprite scaled along it
+// foreshortens exactly as a real hull would.
+function dfDir(p, d, k) {
+  return { x: (d.x - p.x * d.z / p.z) * k, y: (d.y - p.y * d.z / p.z) * k };
+}
+// `far` puts a fresh hull in from depth (a respawn); without it the ship is
+// placed anywhere in the arena, which is what the opening fill wants.
+// Position is chosen in SCREEN units and divided back through the
+// projection, so a spawn is on-screen at every depth and every viewport.
+function dfMake(side, far) {
+  const a = Math.random() * 6.283;
+  const z = far ? DF_ZMAX * (0.8 + Math.random() * 0.2)
+                : DF_ZMIN + Math.random() * (DF_ZMAX - DF_ZMIN);
+  const rad = (0.15 + Math.random() * 0.55) * W / (DF_FL / z);
+  const cruise = side === 'ally' ? 430 : 330 + Math.random() * 150;
+  return {
+    side,
+    type: DF_TYPES[(Math.random() * DF_TYPES.length) | 0],
+    r: 18 + Math.random() * 8,
+    hueDeg: STAGE_HUES[(Math.random() * STAGE_HUES.length) | 0],
+    p: { x: Math.cos(a) * rad, y: Math.sin(a) * rad * 0.9, z },
+    v: { x: 0, y: 0, z: -cruise },
+    cruise,
+    scale: side === 'ally' ? 1.7 : 1,   // the hero hull reads bigger than the mob
+    hp: side === 'ally' ? 14 : 3,
+    hurt: 0, roll: 0, ang: Math.random() * 6.283, cool: 0.4 + Math.random(), burst: 0,
+    w:  [Math.random() * 6.283, Math.random() * 6.283, Math.random() * 6.283],
+    ws: [0.53 + Math.random() * 0.5, 0.61 + Math.random() * 0.5, 0.44 + Math.random() * 0.45],
+    // projection cache, refilled every update so the painters stay pure
+    k: 1, sx: W / 2, sy: H / 2, sd: { x: 0, y: -1 }, fs: 1,
+  };
+}
+function dfInit() {
+  dfShips = [dfMake('ally')];
+  for (let i = 0; i < DF_FOES; i++) dfShips.push(dfMake('foe'));
+  dfTracers = []; dfBits = [];
+}
+function dfRespawn(o) { const n = dfMake(o.side, true); for (const k in n) o[k] = n[k]; }
+function dfBurst(p, col, n, sp) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 6.283, b = Math.acos(2 * Math.random() - 1);
+    const m = sp * (0.35 + Math.random() * 0.65);
+    dfBits.push({ p: { x: p.x, y: p.y, z: p.z },
+      v: { x: Math.sin(b) * Math.cos(a) * m, y: Math.sin(b) * Math.sin(a) * m, z: Math.cos(b) * m },
+      t: 0, dur: 0.5 + Math.random() * 0.7, col });
+  }
+  while (dfBits.length > DF_BIT_CAP) dfBits.shift();
+}
+// `aim` is the LEAD direction to the target, not the nose direction. Firing
+// down the nose is what a real gun does and it is also why nothing ever
+// died: the cone that gates the shot is 23 degrees wide, which is a 300-unit
+// miss at typical range. The cone still decides WHETHER to shoot, so the
+// tracer always leaves roughly forward; the lead decides where it goes.
+function dfFire(s, aim) {
+  const spread = s.side === 'ally' ? 0.08 : 0.14;
+  const dx = aim.x + (Math.random() - 0.5) * spread * 2;
+  const dy = aim.y + (Math.random() - 0.5) * spread * 2;
+  const dz = aim.z + (Math.random() - 0.5) * spread * 2;
+  const l = Math.hypot(dx, dy, dz) || 1, sp = 2400;
+  dfTracers.push({ p: { x: s.p.x, y: s.p.y, z: s.p.z },
+    v: { x: dx / l * sp, y: dy / l * sp, z: dz / l * sp },
+    t: 0, side: s.side, col: s.side === 'ally' ? '#39ff14' : '#ff2244' });
+  if (dfTracers.length > DF_TRACER_CAP) dfTracers.shift();
+  // burst, then a long enough pause that the guns punctuate the fight
+  // instead of being a continuous hose
+  if (++s.burst >= 5) { s.burst = 0; s.cool = 0.55 + Math.random() * 0.9; }
+  else s.cool = 0.085;
+}
+// Tracers and debris resolve BEFORE the ships, so a hull that dies this
+// frame respawns in time to be projected with everything else and never
+// paints one frame at the position it just exploded at.
+function dfUpdate(dt) {
+  for (const t of dfTracers) {
+    t.t += dt;
+    t.p.x += t.v.x * dt; t.p.y += t.v.y * dt; t.p.z += t.v.z * dt;
+    for (const o of dfShips) {
+      if (o.side === t.side) continue;
+      const dx = o.p.x - t.p.x, dy = o.p.y - t.p.y, dz = o.p.z - t.p.z;
+      if (dx * dx + dy * dy + dz * dz > DF_HIT * DF_HIT) continue;
+      t.dead = true; o.hurt = 0.14; o.hp--;
+      dfBurst(o.p, o.side === 'ally' ? '#7fe0ff' : '#ffc300', 5, 190);
+      if (o.hp <= 0) { dfBurst(o.p, '#ffc300', 20, 470); dfBurst(o.p, '#ff2244', 12, 300); dfRespawn(o); }
+      break;
+    }
+  }
+  dfTracers = dfTracers.filter(t => !t.dead && t.t < 0.6 && t.p.z > 70);
+  for (const b of dfBits) {
+    b.t += dt;
+    b.p.x += b.v.x * dt; b.p.y += b.v.y * dt; b.p.z += b.v.z * dt;
+    const dr = Math.max(0, 1 - dt * 1.1);
+    b.v.x *= dr; b.v.y *= dr; b.v.z *= dr;
+  }
+  dfBits = dfBits.filter(b => b.t < b.dur && b.p.z > 70);
+
+  const cy = dfCy();
+  for (const s of dfShips) {
+    let tgt = null, bd = Infinity, tdist = 0, tux = 0, tuy = 0, tuz = 0;
+    for (const o of dfShips) {
+      if (o.side === s.side) continue;
+      const dx = o.p.x - s.p.x, dy = o.p.y - s.p.y, dz = o.p.z - s.p.z;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < bd) { bd = d2; tgt = o; }
+    }
+    let ax = 0, ay = 0, az = 0;
+    if (tgt) {
+      const lead = 0.5;
+      const dx = tgt.p.x + tgt.v.x * lead - s.p.x;
+      const dy = tgt.p.y + tgt.v.y * lead - s.p.y;
+      const dz = tgt.p.z + tgt.v.z * lead - s.p.z;
+      tdist = Math.hypot(dx, dy, dz) || 1;
+      tux = dx / tdist; tuy = dy / tdist; tuz = dz / tdist;
+      // close in, then break off. Without the sign flip two ships settle
+      // into a conga line and the "fight" stops being one.
+      const m = tdist < (s.side === 'ally' ? 420 : 330) ? -1.15 : 1;
+      ax += tux * 760 * m; ay += tuy * 760 * m; az += tuz * 760 * m;
+    }
+    ax += Math.sin(titleT * s.ws[0] + s.w[0]) * 520;
+    ay += Math.sin(titleT * s.ws[1] + s.w[1]) * 380;
+    az += Math.sin(titleT * s.ws[2] + s.w[2]) * 520;
+    // Containment is a SPRING measured in SCREEN space and converted back
+    // through the projection (hence the /kk), because the arena has a fixed
+    // size in PIXELS: a world-space box would be a postage stamp at the far
+    // plane and the size of a room at the near one. A gentle gain inside the
+    // frame and a firm one outside keeps the fight roaming without letting
+    // it wander off to sulk in a corner.
+    // The outer gain RISES with the overshoot. A flat one loses: pursuit
+    // (760) plus wander (520) beat a constant 5x pull at about 0.6 W, and
+    // hulls spent 2% of a minute's flight outside the frame entirely.
+    const kk = DF_FL / Math.max(90, s.p.z);
+    const mx = s.p.x * kk, my = s.p.y * kk;
+    const ox = Math.abs(mx) / W - 0.32, oy = Math.abs(my) / H - 0.24;
+    ax -= mx / kk * (ox > 0 ? 5 + ox * 120 : 0.5);
+    ay -= my / kk * (oy > 0 ? 5 + oy * 120 : 0.5);
+    // Depth gets the same treatment. Without a restoring term the fight
+    // drifts out to the far plane and plays as specks behind the logo -- a
+    // wall at DF_ZMAX stops it leaving, it never brings it back.
+    az += (DF_ZMID - s.p.z) * 0.9;
+    // Same shape at the depth walls, and for the same reason -- a hull that
+    // dived the camera used to bottom out on the hard z floor, where the
+    // projection blows a sprite up past six times its size.
+    if (s.p.z < DF_ZMIN) az += 2400 + (DF_ZMIN - s.p.z) * 40;
+    else if (s.p.z > DF_ZMAX) az -= 2400 + (s.p.z - DF_ZMAX) * 40;
+    // Acceleration TURNS; it never speeds up. Rescaling to a fixed cruise
+    // each frame is what keeps the fight readable instead of a slingshot.
+    s.v.x += ax * dt; s.v.y += ay * dt; s.v.z += az * dt;
+    const f = s.cruise / (Math.hypot(s.v.x, s.v.y, s.v.z) || 1);
+    s.v.x *= f; s.v.y *= f; s.v.z *= f;
+    s.p.x += s.v.x * dt; s.p.y += s.v.y * dt; s.p.z += s.v.z * dt;
+    // Hard arena walls. The springs above do all the flying; these exist
+    // only so "a hull never leaves the arena" is an INVARIANT and not a
+    // probability. A soft-only bound leaked a couple of samples in every
+    // ten thousand, which is exactly the shape of gate that goes red one
+    // run in five and gets ignored. Out here a hull is long out of sight.
+    s.p.z = Math.max(DF_ZMIN * 0.7, Math.min(DF_ZMAX * 1.25, s.p.z));
+    const kc = DF_FL / s.p.z, hx = W * 0.95 / kc, hy = H * 0.80 / kc;
+    s.p.x = Math.max(-hx, Math.min(hx, s.p.x));
+    s.p.y = Math.max(-hy, Math.min(hy, s.p.y));
+
+    const k = DF_FL / s.p.z;
+    s.k = k; s.sx = W / 2 + s.p.x * k; s.sy = cy + s.p.y * k;
+    const jf = dfDir(s.p, s.v, k);
+    const lf = Math.hypot(jf.x, jf.y);
+    const prev = s.sd;
+    // A ship heading straight at the lens has no screen direction at all,
+    // so the last good one is kept rather than snapping to a default.
+    if (lf > 1e-3) s.sd = { x: jf.x / lf, y: jf.y / lf };
+    s.fs = Math.max(0.24, Math.min(1, lf / (k * s.cruise)));
+    const turn = prev ? prev.x * s.sd.y - prev.y * s.sd.x : 0;
+    const rt = Math.max(-1.2, Math.min(1.2, turn / Math.max(dt, 1e-3) * 0.45));
+    s.roll += (rt - s.roll) * Math.min(1, dt * 4.5);
+    s.ang += dt * 3.4;
+    s.hurt = Math.max(0, s.hurt - dt);
+    s.cool -= dt;
+    // The cone has to be generous: these hulls are always turning, so a
+    // 10-degree gate lines up roughly never and the fight plays out silent.
+    // At 0.955 it fired 98 shots a minute and killed nobody.
+    if (tgt && s.cool <= 0 && tdist < 1500) {
+      const fu = { x: s.v.x / s.cruise, y: s.v.y / s.cruise, z: s.v.z / s.cruise };
+      if (fu.x * tux + fu.y * tuy + fu.z * tuz > 0.92) dfFire(s, { x: tux, y: tuy, z: tuz });
+    }
+  }
+}
+/* The sprite is a billboard whose long axis follows the projected velocity
+   and whose length is scaled by the foreshortening -- so "flying away" is a
+   short hull pointing off-centre and "flying across" is a full-length hull
+   lying sideways, from one flat top-down sprite. `fs` has a floor because a
+   perfectly nose-on plate has zero area, and a hull that blinks out at the
+   exact moment it lines up with the camera reads as a bug, not as physics. */
+function dfDrawShip(s) {
+  if (s.p.z < 95) return;
+  if (s.sx < -300 || s.sx > W + 300 || s.sy < -300 || s.sy > H + 300) return;
+  const d = s.sd, S = s.k * s.scale;
+  const sxs = S * Math.cos(s.roll), sys = S * s.fs;   // roll banks the wings
+  ctx.save();
+  ctx.transform(-d.y * sxs, d.x * sxs, -d.x * sys, -d.y * sys, s.sx, s.sy);
+  ctx.globalAlpha = (0.32 + 0.68 * Math.min(1, 1200 / s.p.z)) *
+                    (s.hurt > 0 && Math.random() < 0.5 ? 0.4 : 1);
+  if (s.side === 'ally') { if (gfx === 'toon') drawShipToon(false); else drawShipNeon(false); }
+  else {
+    const prev = hueOverride; hueOverride = s.hueDeg;
+    if (gfx === 'toon') drawEnemyToon(s); else drawEnemyNeon(s);
+    hueOverride = prev;
+  }
+  ctx.restore();
+}
+function dfDrawTracer(t) {
+  const z2 = t.p.z - t.v.z * 0.05;
+  if (t.p.z < 90 || z2 < 90) return;
+  const k = DF_FL / t.p.z, k2 = DF_FL / z2, cy = dfCy();
+  ctx.strokeStyle = t.col; ctx.lineWidth = Math.max(1.2, 3.2 * k);
+  if (gfx !== 'toon') glow(t.col, 8);
+  ctx.beginPath();
+  ctx.moveTo(W / 2 + (t.p.x - t.v.x * 0.05) * k2, cy + (t.p.y - t.v.y * 0.05) * k2);
+  ctx.lineTo(W / 2 + t.p.x * k, cy + t.p.y * k);
+  ctx.stroke();
+  noGlow();
+}
+function dfDrawBit(b) {
+  if (b.p.z < 90) return;
+  const k = DF_FL / b.p.z, sz = Math.max(1, 3.4 * k);
+  ctx.globalAlpha = Math.max(0, 1 - b.t / b.dur);
+  ctx.fillStyle = b.col;
+  ctx.fillRect(W / 2 + b.p.x * k - sz / 2, dfCy() + b.p.y * k - sz / 2, sz, sz);
+  ctx.globalAlpha = 1;
+}
+function dfDrawLayer(near) {
+  for (const b of dfBits) if ((b.p.z < DF_ZUI) === near) dfDrawBit(b);
+  for (const t of dfTracers) if ((t.p.z < DF_ZUI) === near) dfDrawTracer(t);
+  const list = dfShips.filter(s => (s.p.z < DF_ZUI) === near).sort((a, b) => b.p.z - a.p.z);
+  for (const s of list) dfDrawShip(s);
+}
+
+/* ---- the word, spelled in enemy hulls ---------------------------------
+   Every lit cell of the 5x9 font is one enemy sprite. At arm's length it
+   reads as a word; up close it is a formation. It is baked ONCE into an
+   offscreen bitmap, because ~120 cel-shaded hulls -- each several clip()s
+   deep, each carrying a glow in the neon style -- is the one thing on this
+   screen that will not hold 60fps repainted every frame. */
+function hash32(n) {
+  let h = Math.imul(n ^ 0x9e3779b9, 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 3266489917);
+  return (h ^ (h >>> 16)) >>> 0;
+}
+function titleLayout() {
+  const cols = TITLE_LINES.map(t => t.length * 6 - 1);   // 5 wide + 1 gutter
+  let maxCols = 0;
+  for (const c of cols) if (c > maxCols) maxCols = c;
+  const rows = GLYPH_ROWS * TITLE_LINES.length + 2 * (TITLE_LINES.length - 1);
+  const top = safeTop + 52;
+  const avail = Math.max(60, pilotsLayout().sqTop - 14 - top);
+  // The margin is generous because a sprite overflows its cell by design --
+  // sized to the raw column count the outermost hulls hang off the screen.
+  const u = Math.max(3, Math.min((W - 34) / maxCols, avail / rows, 20));
+  return { u, cols, maxCols, rows, y0: top + Math.max(0, (avail - rows * u) * 0.34) };
+}
+function buildTitleWord() {
+  const L = titleLayout(), u = L.u;
+  const key = gfx + '|' + Math.round(u * 8) + '|' + Math.round(dpr * 8);
+  if (titleCache && titleCache.key === key) return titleCache;
+  const pad = Math.ceil(u * 1.8);          // hulls overflow their cells; neon glow overflows further
+  const wCss = L.maxCols * u + pad * 2, hCss = L.rows * u + pad * 2;
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(wCss * dpr); c.height = Math.ceil(hCss * dpr);
+  const g = c.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.translate(pad, pad);
+  const prevCtx = ctx, prevHue = hueOverride;
+  ctx = g; hueOverride = TITLE_HUE;
+  try {
+    for (let li = 0; li < TITLE_LINES.length; li++) {
+      const txt = TITLE_LINES[li];
+      const lineX = (L.maxCols - L.cols[li]) * u / 2;
+      const lineY = li * (GLYPH_ROWS + 2) * u;
+      for (let ci = 0; ci < txt.length; ci++) {
+        const gl = GLYPHS[txt[ci]];
+        if (!gl) continue;
+        for (let ri = 0; ri < gl.rows.length; ri++) {
+          const row = gl.rows[ri];
+          for (let cc = 0; cc < 5; cc++) {
+            if (row[cc] !== '#') continue;
+            // Stable hash, not RNG: the formation comes out the same every
+            // time the word is rebuilt, so a resize or a style switch does
+            // not reshuffle which hull sits in which cell.
+            const h = hash32(((li * 23 + ci) * 11 + ri) * 7 + cc);
+            const type = DF_TYPES[(h >>> 3) & 3];
+            ctx.save();
+            ctx.translate(lineX + ci * 6 * u + (cc + 0.5) * u, lineY + (gl.top + ri + 0.5) * u);
+            // Tilt stays small: it is what stops the swarm reading as a grid,
+            // and a big one starts eating the letters' counters.
+            ctx.rotate((((h >>> 19) % 440) - 220) / 1000);
+            const e = { type, r: u * TITLE_R[type], ang: ((h >>> 11) % 628) / 100, slowT: 0 };
+            if (gfx === 'toon') drawEnemyToon(e); else drawEnemyNeon(e);
+            ctx.restore();
+          }
+        }
+      }
+    }
+    // The enemy palette is a STAGE colour -- three shades too dark to spell a
+    // logo with. A wash laid source-atop lifts every hull to the brand green
+    // in one pass and leaves the ink outlines doing their job.
+    g.globalCompositeOperation = 'source-atop';
+    g.fillStyle = 'rgba(57,255,20,0.30)';
+    g.fillRect(-pad, -pad, wCss, hCss);
+    g.globalCompositeOperation = 'source-over';
+  } finally { ctx = prevCtx; hueOverride = prevHue; }
+  titleCache = { key, c, wCss, hCss, pad };
+  return titleCache;
+}
+function drawTitle() {
+  const L = titleLayout(), T = buildTitleWord();
+  // The whole word drifts as one. Per-hull bob was tried and cost the neon
+  // title screen half its frame rate -- 116 glow-padded blits a frame took
+  // the median from 16.7ms to 33.3ms -- to animate a wobble of one pixel.
+  ctx.drawImage(T.c, (W - L.maxCols * L.u) / 2 - T.pad,
+                L.y0 - T.pad + Math.sin(titleT * 0.6) * 3, T.wCss, T.hCss);
+}
+
+/* ---- pilot bays -------------------------------------------------------
+   Three squares on the bottom edge with an erase control under each. No
+   caption, no rules paragraph: a bay either holds a ship or shows a plus,
+   and the ring that fills under your thumb IS the instruction for erasing. */
+function pilotsLayout() {
+  const pad = 14, gap = 10, iconR = 13;
+  const sq = Math.min((W - pad * 2 - gap * 2) / 3, Math.min(H * 0.15, 116));
+  const icy = H - safeBot - 22 - iconR;      // clears the track label below it
+  const sqTop = icy - iconR - 8 - sq;
+  const x0 = (W - (sq * 3 + gap * 2)) / 2;
+  const S = [];
+  for (let i = 0; i < SAVE_SLOTS; i++) {
+    const x = x0 + i * (sq + gap);
+    S.push({ i, x, y: sqTop, w: sq, h: sq, dx: x + sq / 2, dy: icy, dr: iconR });
+  }
+  return { S, sq, iconR, sqTop };
+}
+function holdFrac(i) {
+  return holdSlot && holdSlot.i === i ? Math.min(1, holdSlot.t / DELETE_HOLD) : 0;
+}
+function drawPilotSlot(s) {
+  const c = saves[s.i], f = holdFrac(s.i);
+  const col = f > 0 ? '#ff2244' : c ? '#4488ff' : '#39ff14';
+  const rad = Math.max(8, s.w * 0.14);
+  rrPath(s.x, s.y, s.w, s.h, rad);
+  if (gfx === 'toon') {
+    ctx.fillStyle = '#101026'; ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 3.4; ctx.stroke();
+    rrPath(s.x + 3.5, s.y + 3.5, s.w - 7, s.h - 7, rad - 2.5);
+    ctx.strokeStyle = col; ctx.lineWidth = 1.8 + f * 1.6; ctx.stroke();
+  } else {
+    ctx.fillStyle = '#0b0b16'; ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 2 + f * 1.6;
+    glow(col, 12 + f * 14); ctx.stroke(); noGlow();
+  }
+  if (!c) {
+    const cx = s.x + s.w / 2, cy = s.y + s.h / 2, a = s.w * 0.19;
+    ctx.strokeStyle = col; ctx.lineWidth = Math.max(3, s.w * 0.055); ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - a, cy); ctx.lineTo(cx + a, cy);
+    ctx.moveTo(cx, cy - a); ctx.lineTo(cx, cy + a);
+    glow(col, 10); ctx.stroke(); noGlow();
+    ctx.lineCap = 'butt';
+    return;
+  }
+  ctx.save();
+  ctx.translate(s.x + s.w / 2, s.y + s.h * 0.40);
+  const k = s.w / 62;
+  ctx.scale(k, k);
+  if (gfx === 'toon') drawShipToon(true); else drawShipNeon(true);   // parked: engines cold
+  ctx.restore();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = Math.round(s.w * 0.135) + "px 'Black Ops One'"; ctx.fillStyle = '#dde3ff';
+  ctx.fillText(c.name, s.x + s.w / 2, s.y + s.h - 19, s.w - 12);
+  ctx.font = Math.round(s.w * 0.108) + "px 'Share Tech Mono'"; ctx.fillStyle = '#8899bb';
+  const n = c.run && c.run.score > 0 ? c.run.score : c.best;
+  ctx.fillText('SEC ' + c.sector + ' · ' + n.toLocaleString(), s.x + s.w / 2, s.y + s.h - 7, s.w - 12);
+}
+function drawDeleteIcon(s) {
+  const f = holdFrac(s.i), r = s.dr;
+  ctx.save();
+  ctx.translate(s.dx + (Math.random() - 0.5) * f * 3.5, s.dy);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, 7);
+  ctx.strokeStyle = gfx === 'toon' ? INK : '#1a1a30'; ctx.lineWidth = 2.6; ctx.stroke();
+  if (f > 0) {
+    ctx.beginPath(); ctx.arc(0, 0, r, -Math.PI / 2, -Math.PI / 2 + 6.2832 * f);
+    ctx.strokeStyle = '#ff2244'; ctx.lineWidth = 3;
+    glow('#ff2244', 10); ctx.stroke(); noGlow();
+  }
+  const w = r * 0.60, h = r * 0.70;
+  ctx.strokeStyle = f > 0 ? '#ff2244' : '#5f6a85'; ctx.lineWidth = 1.7; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-w, -h * 0.55); ctx.lineTo(w, -h * 0.55);
+  ctx.moveTo(-w * 0.44, -h * 0.55); ctx.lineTo(-w * 0.44, -h * 0.95);
+  ctx.lineTo(w * 0.44, -h * 0.95); ctx.lineTo(w * 0.44, -h * 0.55);
+  ctx.moveTo(-w * 0.76, -h * 0.34); ctx.lineTo(-w * 0.58, h * 0.86);
+  ctx.lineTo(w * 0.58, h * 0.86); ctx.lineTo(w * 0.76, -h * 0.34);
+  ctx.moveTo(-w * 0.22, -h * 0.14); ctx.lineTo(-w * 0.18, h * 0.56);
+  ctx.moveTo(w * 0.22, -h * 0.14); ctx.lineTo(w * 0.18, h * 0.56);
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+  ctx.restore();
+}
+function drawTitleScene() {
+  dfDrawLayer(false);          // everything beyond the UI plane
+  drawTitle();
+  const L = pilotsLayout();
+  for (const s of L.S) drawPilotSlot(s);
+  for (const s of L.S) if (saves[s.i]) drawDeleteIcon(s);
+  dfDrawLayer(true);           // ...and the close passes, over the top
+  for (const p of particles) {  // the erase puff, always on top of its bay
+    ctx.globalAlpha = Math.max(0, 1 - p.t / p.dur);
+    ctx.fillStyle = p.col;
+    ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---- erase ------------------------------------------------------------
+   Hold, don't tap. A pilot is the only thing on this screen that cannot be
+   undone, and a hold is the one gesture that cannot happen by accident --
+   while still teaching itself, because a stray tap starts the ring and then
+   visibly drains it back. */
+function tickHold(dt) {
+  if (!holdSlot) return;
+  holdSlot.t += holdSlot.down ? dt : -dt * 3.4;
+  if (holdSlot.t >= DELETE_HOLD) { erasePilot(holdSlot.i); holdSlot = null; }
+  else if (holdSlot.t <= 0) holdSlot = null;
+}
+function erasePilot(i) {
+  const s = pilotsLayout().S[i];
+  saves[i] = null; writeSaves();
+  if (activeSlot === i) { activeSlot = -1; save = null; }
+  boomAt(s.x + s.w / 2, s.y + s.h / 2, '#ff2244', 24);
+  sfxBoom();
+}
+function pilotsDown(x, y) {
+  const L = pilotsLayout();
+  for (const s of L.S) {
+    if (!saves[s.i]) continue;
+    if (Math.hypot(x - s.dx, y - s.dy) <= s.dr + 11) { holdSlot = { i: s.i, t: 0, down: true }; return; }
+  }
+  for (const s of L.S) {
+    if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) { enterPilot(s.i); return; }
+  }
+}
+function pilotsMove(x, y) {
+  if (!holdSlot || !holdSlot.down) return;
+  const s = pilotsLayout().S[holdSlot.i];
+  if (Math.hypot(x - s.dx, y - s.dy) > s.dr + 24) holdSlot.down = false;   // slid off: cancel
+}
+
 function draw() {
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#06060e'; ctx.fillRect(0, 0, W, H);
@@ -2156,7 +2658,8 @@ function draw() {
     ctx.fillRect(s.x, s.y, s.s, s.s + 2);
   }
   if (state === 'station') { drawStationScene(); ctx.restore(); drawVeil(); return; }
-  if (state === 'pilots' || state === 'shipyard') { ctx.restore(); return; }
+  if (state === 'pilots') { drawTitleScene(); ctx.restore(); return; }
+  if (state === 'shipyard') { ctx.restore(); return; }
   // powerups
   for (const p of powerups) {
     const col = p.kind === 'P' ? '#39ff14' : p.kind === 'S' ? '#4488ff' : '#ffc300';

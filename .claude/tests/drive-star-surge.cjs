@@ -480,15 +480,25 @@ const allEqual = arr => arr.every(v => v === arr[0]);
      stray `showMenu()` reintroduced anywhere would strand the player on a
      screen the rest of the flow no longer returns to. */
   const opening = await page.evaluate(() => {
+    saves = [null, null, null]; writeSaves();
     showPilotSelect();
     const atPilots = state;
     const menuStillExists = typeof showMenu !== 'undefined';
-    document.getElementById('b-slot1').dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    return { atPilots, menuStillExists, after: state, slot: activeSlot };
+    // the title screen is canvas: no overlay chrome, no HTML slot buttons
+    const overlayLive = !overlay.classList.contains('hidden') || overlay.innerHTML !== '';
+    const htmlSlots = !!document.getElementById('b-slot1');
+    const b = pilotsLayout().S[1];
+    pilotsDown(b.x + b.w / 2, b.y + b.h / 2);
+    return { atPilots, menuStillExists, overlayLive, htmlSlots,
+             created: !!saves[1], after: state, slot: activeSlot };
   });
   check('the game opens on pilot select and a pilot goes straight to its station -- no menu screen',
         opening.atPilots === 'pilots' && !opening.menuStillExists &&
         opening.after === 'station' && opening.slot === 1, opening);
+  check('the title screen carries no overlay chrome and no HTML slot buttons',
+        !opening.overlayLive && !opening.htmlSlots, opening);
+  check('an empty bay creates its pilot on the way through',
+        opening.created, opening);
 
   // REST is a real save point now, so a run has to survive being put down.
   const putDown = await page.evaluate(() => {
@@ -580,6 +590,237 @@ const allEqual = arr => arr.every(v => v === arr[0]);
         stationPaint.t.h !== stationPaint.n.h && stationPaint.t.lit > 300 && stationPaint.n.lit > 300, stationPaint);
   check('a skin is paint: the station layout is identical in both styles',
         stationPaint.sigToon === stationPaint.sigNeon, stationPaint);
+
+  /* ---- title screen ------------------------------------------------------
+     The pilots screen is CANVAS: the word, the three bays and the erase
+     controls are all drawn, so nothing about their geometry is checked by a
+     browser. Everything under this heading is an assertion a layout engine
+     would otherwise have made for free -- plus the two things a screenshot
+     cannot see, which are that the fight stays in its arena over time and
+     that a cached bitmap actually re-bakes when the style changes.  */
+  const bays = await page.evaluate(() => {
+    showPilotSelect();
+    const L = pilotsLayout(), out = { W, H, sq: L.sq, n: L.S.length,
+      offscreen: 0, overlaps: 0, iconAbove: 0, iconOverlap: 0, notSquare: 0 };
+    for (const s of L.S) {
+      if (s.x < 0 || s.y < 0 || s.x + s.w > W || s.y + s.h > H) out.offscreen++;
+      if (s.dx - s.dr < 0 || s.dx + s.dr > W || s.dy + s.dr > H) out.offscreen++;
+      if (s.dy - s.dr < s.y + s.h) out.iconAbove++;      // the icon belongs BELOW its bay
+      if (Math.abs(s.w - s.h) > 0.5) out.notSquare++;    // "3 squares", not 3 rectangles
+    }
+    for (let i = 0; i < L.S.length; i++) for (let j = i + 1; j < L.S.length; j++) {
+      const a = L.S[i], b = L.S[j];
+      if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) out.overlaps++;
+      if (Math.hypot(a.dx - b.dx, a.dy - b.dy) < a.dr + b.dr) out.iconOverlap++;
+    }
+    return out;
+  });
+  check('three square bays sit on the bottom edge: on-screen, apart, each with its icon below it',
+        bays.n === 3 && bays.offscreen === 0 && bays.overlaps === 0 && bays.notSquare === 0 &&
+        bays.iconAbove === 0 && bays.iconOverlap === 0 && bays.sq >= 60, bays);
+
+  // ...and it has to hold at sizes the rest of the suite never visits. Canvas
+  // layout has no reflow: a title sized off a column count and bays sized off
+  // a viewport fraction can collide at one aspect ratio and be fine at every
+  // other, and nothing in the browser will say so.
+  const viewports = [[320, 568], [430, 932], [768, 1024], [844, 390], [1024, 600], [280, 650]];
+  const sweep = [];
+  for (const [w, h] of viewports) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(120);
+    sweep.push(await page.evaluate(([w, h]) => {
+      showPilotSelect();
+      const L = pilotsLayout(), T = titleLayout();
+      const bad = [];
+      for (const s of L.S) {
+        if (s.x < 0 || s.y < 0 || s.x + s.w > W || s.y + s.h > H) bad.push('bay-offscreen');
+        if (s.dy + s.dr > H || s.dx - s.dr < 0 || s.dx + s.dr > W) bad.push('icon-offscreen');
+        if (s.dy - s.dr < s.y + s.h) bad.push('icon-above-bay');
+        if (Math.abs(s.w - s.h) > 0.5) bad.push('bay-not-square');
+      }
+      if (T.y0 + T.rows * T.u > L.sqTop) bad.push('title-overlaps-bays');
+      if ((W - T.maxCols * T.u) / 2 < 4) bad.push('title-too-wide');
+      if (T.y0 < safeTop + 20) bad.push('title-under-chrome');
+      ctx.setTransform(1, 0, 0, 1, 0, 0); draw();       // and it must still paint
+      return { vp: w + 'x' + h, bad: [...new Set(bad)] };
+    }, [w, h]));
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(120);
+  check('the title and the bays survive every viewport, portrait and landscape',
+        sweep.every(r => r.bad.length === 0), sweep.filter(r => r.bad.length));
+
+  const titleBox = await page.evaluate(() => {
+    const L = titleLayout(), P = pilotsLayout(), T = buildTitleWord();
+    return { u: L.u, inkL: (W - L.maxCols * L.u) / 2, inkTop: L.y0,
+             inkBot: L.y0 + L.rows * L.u, blockTop: L.y0 - T.pad,
+             sqTop: P.sqTop, safeTop, W, H };
+  });
+  check('the word clears the chrome row above it and the bays below it, with margin either side',
+        titleBox.blockTop >= titleBox.safeTop + 30 &&
+        titleBox.inkBot <= titleBox.sqTop &&
+        titleBox.inkL >= 6 && titleBox.inkL * 2 + 6 < titleBox.W, titleBox);
+
+  // "case sensitive and stylized" was the ask: the word is Star Surge, so the
+  // font has to have a real cap height, a real x-height and a real descender.
+  const glyphs = await page.evaluate(() => {
+    const bot = t => GLYPHS[t].top + GLYPHS[t].rows.length - 1;
+    return { word: TITLE_LINES.join(' '),
+             missing: TITLE_LINES.join('').split('').filter(ch => !GLYPHS[ch]),
+             capTop: GLYPHS.S.top, xTop: GLYPHS.a.top,
+             capBot: bot('S'), xBot: bot('a'), gBot: bot('g'), rows: GLYPH_ROWS };
+  });
+  check('the title is case-sensitive: caps start higher, x-height sits lower, g descends',
+        glyphs.word === 'Star Surge' && glyphs.missing.length === 0 &&
+        glyphs.xTop > glyphs.capTop && glyphs.xBot === glyphs.capBot &&
+        glyphs.gBot > glyphs.capBot && glyphs.gBot < glyphs.rows, glyphs);
+
+  const swarm = await page.evaluate(() => {
+    const seen = {}; let dots = 0;
+    for (let li = 0; li < TITLE_LINES.length; li++)
+      for (let ci = 0; ci < TITLE_LINES[li].length; ci++) {
+        const gl = GLYPHS[TITLE_LINES[li][ci]];
+        if (!gl) continue;
+        for (let ri = 0; ri < gl.rows.length; ri++)
+          for (let cc = 0; cc < 5; cc++) {
+            if (gl.rows[ri][cc] !== '#') continue;
+            dots++;
+            seen[DF_TYPES[(hash32(((li * 23 + ci) * 11 + ri) * 7 + cc) >>> 3) & 3]] = true;
+          }
+      }
+    return { dots, kinds: Object.keys(seen).sort() };
+  });
+  check('every lit cell of the word is an enemy hull, and all four kinds turn up',
+        swarm.dots > 90 && swarm.kinds.length === 4, swarm);
+
+  const titlePaint = await page.evaluate(() => {
+    const fp = () => {
+      const d = ctx.getImageData(0, 0, W, H).data;
+      let h = 0, lit = 0;
+      for (let i = 0; i < d.length; i += 4 * 37) {
+        h = (h * 31 + d[i] + d[i + 1] * 3 + d[i + 2] * 7) >>> 0;
+        if (d[i] + d[i + 1] + d[i + 2] > 90) lit++;
+      }
+      return { h, lit };
+    };
+    saves = [newCharacter('AAA'), null, null];
+    showPilotSelect(); titleT = 4; shake = 0; veil = 0;
+    const sig = s => {
+      gfx = s;
+      const L = titleLayout(), P = pilotsLayout();
+      return [Math.round(L.u), Math.round(L.y0), L.maxCols].join(':') + '#' +
+             P.S.map(b => [b.x, b.y, b.w, b.dy, b.dr].map(Math.round).join(',')).join('|');
+    };
+    const sigToon = sig('toon'), sigNeon = sig('neon');
+    // The word is baked once and kept. If its key does not move with the
+    // style, a style switch leaves the OLD bitmap on screen forever.
+    gfx = 'toon'; const keyToon = buildTitleWord().key;
+    gfx = 'neon'; const keyNeon = buildTitleWord().key;
+    gfx = 'toon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const t = fp();
+    gfx = 'neon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const n = fp();
+    gfx = 'toon';
+    return { sigToon, sigNeon, keyToon, keyNeon, t, n };
+  });
+  check('the title screen paints a substantial scene in both styles, and they differ',
+        titlePaint.t.h !== titlePaint.n.h && titlePaint.t.lit > 300 && titlePaint.n.lit > 300, titlePaint);
+  check('a skin is paint: the title and bay layout is identical in both styles',
+        titlePaint.sigToon === titlePaint.sigNeon, titlePaint);
+  check('the baked word re-bakes on a style switch instead of serving the old bitmap',
+        titlePaint.keyToon !== titlePaint.keyNeon, titlePaint);
+
+  // A pilot is the only thing on this screen that cannot be undone, and there
+  // is no confirm dialog left to catch a misfire -- so the gesture has to.
+  // Each stage RE-SEEDS. Sharing one pilot across all three reads fine until
+  // stage 1 regresses: the bay is then empty, stage 2's press lands on the
+  // square instead of the icon, and the suite dies on a null holdSlot rather
+  // than reporting the failure it was there to catch.
+  const erase = await page.evaluate(() => {
+    const noop = { preventDefault() {} };
+    const seed = () => {
+      saves = [newCharacter('DOOMED'), newCharacter('KEEP'), null];
+      writeSaves(); showPilotSelect();
+      return pilotsLayout().S[0];
+    };
+    const spin = n => { for (let i = 0; i < n; i++) tickHold(1 / 60); };
+    let s = seed();                                  // press, then release
+    pilotsDown(s.dx, s.dy);
+    const armed = !!holdSlot;
+    onUp(noop); spin(120);
+    const afterTap = !!saves[0], drained = holdSlot === null;
+    s = seed();                                      // press, then slide off
+    pilotsDown(s.dx, s.dy); pilotsMove(s.dx + 60, s.dy);
+    const slideCancels = !!holdSlot && !holdSlot.down;
+    spin(120);
+    const afterSlide = !!saves[0];
+    s = seed();                                      // press, and hold it out
+    pilotsDown(s.dx, s.dy); spin(120);
+    return { armed, afterTap, drained, slideCancels, afterSlide,
+             gone: saves[0] === null, kept: !!saves[1] && saves[1].name === 'KEEP',
+             persisted: JSON.parse(localStorage.getItem('starSurge.saves'))[0] === null };
+  });
+  check('erasing a pilot takes a deliberate hold -- a tap drains, a slide-off cancels',
+        erase.armed && erase.afterTap && erase.drained && erase.slideCancels && erase.afterSlide, erase);
+  check('a completed hold erases exactly that pilot, on disk as well as in memory',
+        erase.gone && erase.kept && erase.persisted, erase);
+
+  const erasedActive = await page.evaluate(() => {
+    saves = [newCharacter('ACTIVE'), null, null];
+    activeSlot = 0; save = saves[0];
+    showPilotSelect();
+    erasePilot(0);
+    // erasing the pilot you were flying must not leave the save handle dangling: the
+    // very next paint reads save.name for the bay caption
+    let painted = true;
+    try { ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); } catch (e) { painted = e.message; }
+    return { slot: activeSlot, save, painted };
+  });
+  check('erasing the pilot you were flying clears the active handle instead of dangling it',
+        erasedActive.slot === -1 && erasedActive.save === null && erasedActive.painted === true, erasedActive);
+
+  /* The dogfight is the one part of this screen a screenshot cannot judge:
+     every single frame of a fight that has drifted off to the far corner
+     looks perfectly correct. These drive a minute of it. */
+  const arena = await page.evaluate(() => {
+    showPilotSelect(); dfInit();
+    let fired = 0, respawns = 0;
+    const realFire = dfFire, realRespawn = dfRespawn;
+    window.dfFire = function (s, fu) { fired++; return realFire(s, fu); };
+    window.dfRespawn = function (o) { respawns++; return realRespawn(o); };
+    const out = { samples: 0, offX: 0, offY: 0, offZ: 0, front: 0, minFs: 1, maxFs: 0,
+                  minK: 99, maxK: 0 };
+    try {
+      for (let i = 0; i < 3600; i++) {              // one minute at 60fps
+        titleT += 1 / 60; dfUpdate(1 / 60);
+        for (const s of dfShips) {
+          out.samples++;
+          if (s.sx < -W * 0.6 || s.sx > W * 1.6) out.offX++;
+          if (s.sy < -H * 0.5 || s.sy > H * 1.5) out.offY++;
+          if (s.p.z < DF_ZMIN * 0.6 || s.p.z > DF_ZMAX * 1.4) out.offZ++;
+          if (s.p.z < DF_ZUI) out.front++;
+          if (s.fs < out.minFs) out.minFs = s.fs;
+          if (s.fs > out.maxFs) out.maxFs = s.fs;
+          if (s.k < out.minK) out.minK = s.k;
+          if (s.k > out.maxK) out.maxK = s.k;
+        }
+      }
+    } finally { window.dfFire = realFire; window.dfRespawn = realRespawn; }
+    out.fired = fired; out.respawns = respawns;
+    out.minFs = +out.minFs.toFixed(2); out.maxFs = +out.maxFs.toFixed(2);
+    out.minK = +out.minK.toFixed(2); out.maxK = +out.maxK.toFixed(2);
+    out.frontPct = +(out.front / out.samples * 100).toFixed(1);
+    return out;
+  });
+  check('the dogfight stays in its arena across a minute of flight',
+        arena.offX === 0 && arena.offY === 0 && arena.offZ === 0, arena);
+  check('it reads as three dimensions: hulls foreshorten, and depth swings the size several-fold',
+        arena.minFs <= 0.4 && arena.maxFs > 0.9 && arena.maxK / arena.minK > 3, arena);
+  check('some passes come in front of the UI plane, so ships cross the logo and the bays',
+        arena.frontPct > 1 && arena.frontPct < 60, arena);
+  // 4-8 kills a minute across six sampled runs. The floor is 2 so this stays
+  // a real check: `> 0` passed even when the guns fired down the nose and hit
+  // roughly nothing, which is the regression it is here to catch.
+  check('the fight keeps fighting: hulls shoot, hit, and a downed hull comes back',
+        arena.fired > 40 && arena.respawns >= 2, arena);
 
   const finale = await page.evaluate(async () => {
     saves[0] = newCharacter('DRIVE'); activeSlot = 0; save = saves[0];

@@ -39,9 +39,14 @@ ownership**, so `save.weapons[id] != null` is the owned-check everywhere
 § Checkpoint semantics) — there is no finer-grained mid-sector resume
 point anymore, unlike the pre-progression-system version of this file.
 
-Pilot-select's reset button (`↺`, `confirm()`-gated) nulls one slot without
-touching the others — slots are fully independent saves for experimenting
-with different weapon/armor builds, per the feature's whole point.
+Erasing a slot (`erasePilot(i)`) nulls one without touching the others —
+slots are fully independent saves for experimenting with different
+weapon/armor builds, per the feature's whole point. It is reached by
+**holding** the bin under a bay for `DELETE_HOLD` seconds, not by a tap and
+a `confirm()`; see § Title screen. `erasePilot` also clears `activeSlot` /
+`save` when you erase the pilot you were flying — the very next paint reads
+`saves[i].name` for the bay caption, so a dangling handle is a crash, not a
+cosmetic bug.
 
 ## Checkpoint semantics
 
@@ -295,6 +300,102 @@ and the first word was already drawn underneath the mute button; a third
 38 px button made that unfixable sideways (the stage line is ~150 px wide
 and the score is right-aligned), so the block moved down instead. Don't
 move it back up without re-checking against all three buttons.
+
+## Title screen (2026-08-24)
+
+`state='pilots'` is drawn on the **canvas**, not the overlay. `showPilotSelect()`
+now only empties and hides `#overlay`; `drawTitleScene()` paints the whole
+screen and `pilotsDown/pilotsMove/onUp` handle its input. There is no help
+text anywhere on it: a bay either holds a ship or shows a plus, and the bin
+under a bay fills a ring while you hold it.
+
+Three layers around **one plane**. Everything in the dogfight carries a `z`,
+the UI sits at `DF_ZUI`, and `drawTitleScene` paints
+`dfDrawLayer(false)` → word → bays → `dfDrawLayer(true)`. That single split is
+the whole reason a fighter can dive between the camera and the logo: it is in
+front because it is nearer, and it drops behind the moment it pulls away. No
+special case, no z-index.
+
+### The word is a swarm
+
+`GLYPHS` is a 5×9 bitmap font (rows 0–6 cap height, 2–6 x-height, 7–8
+descender) and every lit cell is one enemy hull painted by the game's own
+`drawEnemyToon`/`drawEnemyNeon`. The case is the point — **Star Surge**, not
+STAR SURGE — so the lowercase glyphs really are short and `g` really does hang
+below the baseline. Which hull lands in which cell comes from `hash32` of
+(line, char, row, col), so the formation is identical every time it is rebuilt;
+a resize or a style switch must not reshuffle it.
+
+`TITLE_R` is a **per-type** radius fraction. One shared radius does not work:
+a drone is a small pod with long blades and a tanker is a solid block, so at
+equal `r` they cover wildly different areas and the letters come out blotchy.
+The values are tuned so all four fill about 1.3 cells — enough overlap that a
+stroke reads solid, not enough to close a counter. The brand-green wash is laid
+`source-atop` at the end: the enemy palette is a *stage* colour, three shades
+too dark to spell a logo with, and a wash lifts every hull in one pass while
+leaving the ink outlines doing their job.
+
+The word is **baked once** into an offscreen bitmap (`buildTitleWord`, cached on
+`gfx|u|dpr`). `ctx` is a `let` for exactly this: the bake swaps the module
+context for the offscreen one and back, so there is one set of art. Repainting
+~120 cel-shaded hulls per frame — each several `clip()`s deep, each carrying a
+glow in the neon style — took the neon title screen's median frame from 16.7 ms
+to 33.3 ms, to animate a per-hull wobble of about one pixel. The whole word
+drifts as one instead.
+
+### The dogfight is generated, not scripted
+
+`dfUpdate` is a steering model: seek the nearest hull of the other side (with
+0.5 s of lead), **flip the sign inside a break-off radius** so nobody welds to
+a tail, plus three incommensurate sinusoids per ship for wander. Acceleration
+only *turns* — `v` is rescaled to a fixed `cruise` every frame — which is what
+keeps the fight readable instead of a slingshot.
+
+Containment is a **spring measured in screen space** and divided back through
+the projection (`/kk`), because the arena has a fixed size in *pixels*: a
+world-space box would be a postage stamp at the far plane and the size of a
+room at the near one. The outer gain *rises* with the overshoot; a flat one
+loses, because pursuit (760) plus wander (520) beat a constant 5× pull at about
+0.6 W. Depth gets the same treatment plus a spring toward `DF_ZMID`, without
+which the fight drifts out to the far plane and plays as specks behind the
+logo — the wall at `DF_ZMAX` stops it leaving, it never brings it back.
+Underneath all of that are **hard walls**, so "a hull never leaves the arena"
+is an invariant and not a probability; the springs do all the flying and the
+clamps only catch the ~1-in-10 000 sample that leaks.
+
+Guns: the nose cone (`dot > 0.92`) decides **whether** to shoot, and the lead
+vector decides **where** the tracer goes. Firing down the nose is what a real
+gun does and it is also why nothing ever died — a 23° gate is a 300-unit miss
+at typical range, and a minute of flight produced 98 shots and zero kills. With
+lead-aim it settles at 4–8 kills a minute, which is what makes the screen feel
+like a fight.
+
+### The 3D read, from one flat top-down sprite
+
+`dfDir()` is the local Jacobian of the perspective divide: the screen image of
+a world *direction* at a point. A direction pointing away from the camera
+projects short, so a sprite scaled along it foreshortens exactly as a real hull
+would. `dfDrawShip` builds a billboard whose long axis follows the projected
+velocity (`s.sd`) and whose length is scaled by that foreshortening (`s.fs`),
+with `cos(roll)` banking the wings — so "flying away" is a short hull pointing
+off-centre and "flying across" is a full-length hull lying sideways.
+
+`s.fs` has a **floor**. A perfectly nose-on plate has zero area, and a hull that
+blinks out at the exact moment it lines up with the camera reads as a bug, not
+as physics. `s.sd` is likewise *kept* rather than reset when a ship heads
+straight at the lens, because at that instant it has no screen direction at all.
+
+Everything is projected once, in `dfUpdate`, and cached on the ship (`k`, `sx`,
+`sy`, `sd`, `fs`) so the painters stay pure.
+
+### Bays
+
+`pilotsLayout()` derives three squares and their bins from `W`/`H` — one
+function, used by both the painter and the hit-tester, because two copies of
+the geometry is how a button stops matching the thing it draws. Erasing is
+**hold, not tap**: a pilot is the only thing on this screen that cannot be
+undone, and there is no `confirm()` left to catch a misfire. The gesture teaches
+itself, because a stray tap starts the ring and then visibly drains it back.
 
 ## Routing (2026-08-23)
 
