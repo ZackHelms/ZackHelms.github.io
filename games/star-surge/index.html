@@ -119,7 +119,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-25 15:57 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-25 17:27 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
@@ -220,7 +220,7 @@ const WEAPON_DEFS = {
 };
 const ARMOR_DEFS = {
   regen:   { name: 'REGENERATIVE', unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'Slowly heals hp once you’ve gone a few seconds unhit.' },
-  shield:  { name: 'SHIELD',       unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'A recharging personal shield absorbs hits before hp is touched.' },
+  shield:  { name: 'SHIELD',       unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'A recharging personal shield absorbs hits before hp is touched. Holds 2 charges; higher tiers recharge faster.' },
   plating: { name: 'PLATING',      unlockCost: 150, tierCost: [0, 80, 140, 220, 320], desc: 'Flat damage reduction on every hit that lands.' },
 };
 
@@ -262,6 +262,12 @@ let ctx = cv.getContext('2d');
 const overlay = document.getElementById('overlay');
 let W = 0, H = 0, dpr = 1, safeTop = 0, safeBot = 0;
 let state = 'pilots';          // pilots | station | shipyard | report | launch | play | over
+// Shields stack to TWO, whatever the source (armor regen, the S pickup, a
+// restored run). Raised difficulty is the point: a deep stack let a careless
+// run absorb its way through a whole sector. Higher SHIELD armor tiers still
+// buy something real -- they recharge faster (see update()) -- they just no
+// longer buy a bigger bank.
+const MAX_SHIELDS = 2;
 let ship = { x: 195, y: 700, r: 13, invuln: 0, hp: 100, maxHp: 100, shieldCharges: 0, shieldRegenT: 0, lastHitT: 999 };
 let weapon = 1;                // 1..4, in-run P-powerup tier (works with any equipped weapon type)
 let score = 0;
@@ -747,7 +753,7 @@ overlay.addEventListener('touchend', e => {
 }, { passive: false });
 overlay.addEventListener('click', () => { if (state === 'report') { initAudio(); beginLaunch(); } });
 
-/* ---- settings: graphics style ('toon' cel-shaded default, 'neon' original) ---- */
+/* ---- settings: graphics style ('anim' 3D animlight default) ---- */
 const GFX_STYLES = ['toon', 'neon', 'model', 'anim'];
 // 'model' and 'anim' share the whole mesh renderer and the station's lit-metal
 // treatment; they differ only in palette, hull scale and the light rigs. Every
@@ -755,14 +761,14 @@ const GFX_STYLES = ['toon', 'neon', 'model', 'anim'];
 // mesh-family style would need no scenery edits at all.
 function meshGfx() { return gfx === 'model' || gfx === 'anim'; }
 let gfx = localStorage.getItem('starSurge.gfx');
-if (GFX_STYLES.indexOf(gfx) < 0) gfx = 'toon';
+if (GFX_STYLES.indexOf(gfx) < 0) gfx = 'anim';   // animlight is the default look
 const settingsBtn = document.getElementById('settings');
 const settingsPanel = document.getElementById('settings-panel');
 const gfxSelect = document.getElementById('gfx-select');
 gfxSelect.value = gfx;
 bindTap(settingsBtn, () => settingsPanel.classList.toggle('hidden'));
 gfxSelect.addEventListener('change', () => {
-  gfx = GFX_STYLES.indexOf(gfxSelect.value) >= 0 ? gfxSelect.value : 'toon';
+  gfx = GFX_STYLES.indexOf(gfxSelect.value) >= 0 ? gfxSelect.value : 'anim';
   localStorage.setItem('starSurge.gfx', gfx);
 });
 function closeSettings() { settingsPanel.classList.add('hidden'); }
@@ -1181,7 +1187,7 @@ function update(dt) {
   if (save.equippedArmor === 'shield') {
     const tier = save.armors.shield || 0;
     ship.shieldRegenT -= dt;
-    if (ship.shieldCharges < tier && ship.shieldRegenT <= 0) { ship.shieldCharges++; ship.shieldRegenT = Math.max(3, 10 - tier); }
+    if (ship.shieldCharges < Math.min(tier, MAX_SHIELDS) && ship.shieldRegenT <= 0) { ship.shieldCharges++; ship.shieldRegenT = Math.max(3, 10 - tier); }
   }
   // player bullets (missiles home in on the nearest live target)
   for (const b of bullets) {
@@ -1294,7 +1300,7 @@ function update(dt) {
     if ((p.x - ship.x) * (p.x - ship.x) + (p.y - ship.y) * (p.y - ship.y) < (sr + 14) * (sr + 14)) {
       powerups.splice(powerups.indexOf(p), 1);
       if (p.kind === 'P') { weapon = Math.min(4, weapon + 1); sfxPower(); floats.push({ x: p.x, y: p.y, txt: 'POWER', color: '#39ff14', t: 0 }); }
-      else if (p.kind === 'S') { ship.shieldCharges++; sfxPower(); floats.push({ x: p.x, y: p.y, txt: 'SHIELD', color: '#4488ff', t: 0 }); }
+      else if (p.kind === 'S') { ship.shieldCharges = Math.min(MAX_SHIELDS, ship.shieldCharges + 1); sfxPower(); floats.push({ x: p.x, y: p.y, txt: 'SHIELD', color: '#4488ff', t: 0 }); }
       else { floats.push({ x: p.x, y: p.y, txt: 'SURGE!', color: '#ffc300', t: 0 }); surgeBlast(); }
     }
   }
@@ -1372,7 +1378,7 @@ function restoreRun() {
   weapon = r ? Math.max(1, Math.min(4, r.weapon || 1)) : 1;
   const hp = r ? Math.max(1, Math.min(r.hp || maxHp, maxHp)) : maxHp;
   ship = { x: W / 2, y: H - safeBot - 130, r: 13, invuln: 0, hp, maxHp,
-           shieldCharges: r ? (r.shields || 0) : 0, shieldRegenT: 0, lastHitT: 999 };
+           shieldCharges: r ? Math.min(MAX_SHIELDS, r.shields || 0) : 0, shieldRegenT: 0, lastHitT: 999 };
   fireT = 0; drag = null;
 }
 function snapshotRun() {
@@ -2138,20 +2144,159 @@ function drawShipNeon(cold) {
   ctx.globalAlpha *= 0.5 + Math.random() * 0.5;
   ctx.beginPath(); ctx.moveTo(-4, 12); ctx.lineTo(0, 20 + Math.random() * 6); ctx.lineTo(4, 12); ctx.closePath(); ctx.fill();
 }
+/* The shield is skinned per style, because "how many charges are left" has to
+   stay legible in whatever idiom the rest of the screen is speaking. NEON is
+   the baseline and keeps its original rings, at half opacity. TOON gets flat
+   inked bubbles with one cel highlight on the lit shoulder. The mesh family
+   gets a real spherical SHELL: nearly clear looking straight through the
+   middle and bold at the rim, because a thin shell is exactly where it
+   presents its thickness edge-on to the viewer -- with a plane of light
+   crossing it every few seconds. */
+const SHIELD_SWEEP = 3.4, SHIELD_SWEEP_DUR = 1.15;   // period, and how long one crossing takes
+function shieldR(i, hs) { return (25 + i * 5) * hs; }
+/* The shells never change between frames -- only the sweep crossing them does
+   -- so they are baked once into an offscreen sprite and blitted. Painting two
+   big radial-gradient discs live cost 13 frames in 169 over budget on a
+   saturated field; baked, it is back to the no-shield baseline. The cache key
+   carries everything the bake reads (style, charge count, radius, dpr), which
+   is the rule that stops a style switch serving the old bitmap forever. */
+let shieldBake = null;
+function shieldSprite(n, hs, vivid) {
+  const outer = shieldR(n - 1, hs), pad = 3, css = (outer + pad) * 2;
+  const key = gfx + '|' + n + '|' + outer.toFixed(2) + '|' + dpr.toFixed(2);
+  if (shieldBake && shieldBake.key === key) return shieldBake;
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(css * dpr); c.height = Math.ceil(css * dpr);
+  const g = c.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.translate(outer + pad, outer + pad);
+  for (let i = n - 1; i >= 0; i--) {
+    const R = shieldR(i, hs);
+    // stops approximate the 1/sqrt(1 - t^2) path length through a thin shell:
+    // almost nothing head-on, piling up steeply at the limb
+    const gr = g.createRadialGradient(0, 0, R * 0.2, 0, 0, R);
+    gr.addColorStop(0,    vivid ? 'rgba(64,170,255,0.016)' : 'rgba(74,140,215,0.014)');
+    gr.addColorStop(0.62, vivid ? 'rgba(72,180,255,0.044)' : 'rgba(80,150,220,0.036)');
+    gr.addColorStop(0.85, vivid ? 'rgba(110,205,255,0.130)' : 'rgba(110,175,230,0.100)');
+    gr.addColorStop(0.96, vivid ? 'rgba(180,235,255,0.52)' : 'rgba(165,205,245,0.40)');
+    gr.addColorStop(1,    vivid ? 'rgba(120,205,255,0.30)' : 'rgba(120,175,230,0.22)');
+    g.beginPath(); g.arc(0, 0, R, 0, 7);
+    g.fillStyle = gr; g.fill();
+    g.strokeStyle = vivid ? 'rgba(190,240,255,0.55)' : 'rgba(170,210,250,0.42)';
+    g.lineWidth = 1.2; g.stroke();
+  }
+  shieldBake = { key, c, css, outer, pad };
+  return shieldBake;
+}
+/* The shield is skinned per style, because "how many charges are left" has to
+   stay legible in whatever idiom the rest of the screen is speaking. NEON is
+   the baseline and keeps its original rings, at half opacity. TOON gets flat
+   inked bubbles with one cel highlight on the lit shoulder. The mesh family
+   gets a real spherical SHELL: nearly clear looking straight through the
+   middle and bold at the rim, because a thin shell is exactly where it
+   presents its thickness edge-on to the viewer -- with a plane of light
+   crossing it every few seconds. */
+function drawShield(hs) {
+  const n = ship.shieldCharges;
+  if (n <= 0) return;
+  if (gfx === 'neon') {
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = '#4488ff'; ctx.lineWidth = 2;
+    glow('#4488ff', 10);
+    for (let i = 0; i < n; i++) { ctx.beginPath(); ctx.arc(0, 0, 22 + i * 4, 0, 7); ctx.stroke(); }
+    noGlow();
+    ctx.globalAlpha = 1;
+    return;
+  }
+  if (gfx === 'toon') {
+    for (let i = n - 1; i >= 0; i--) {
+      const R = 23 + i * 5;
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, 7);
+      ctx.fillStyle = 'rgba(96,168,255,0.14)'; ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, 7);
+      ctx.strokeStyle = '#7fbcff'; ctx.lineWidth = 1.5; ctx.stroke();
+      // one flat highlight arc on the upper-left, the same lamp the hulls use
+      ctx.beginPath(); ctx.arc(0, 0, R - 3.2, Math.PI * 1.06, Math.PI * 1.44);
+      ctx.strokeStyle = '#dbeaff'; ctx.lineWidth = 3; ctx.stroke();
+    }
+    return;
+  }
+  const vivid = gfx === 'anim';
+  const sp = shieldSprite(n, hs, vivid), o = sp.outer + sp.pad;
+  ctx.drawImage(sp.c, -o, -o, sp.css, sp.css);
+  // A band at a fixed x on a sphere projects to exactly a vertical strip, so
+  // the sweep is a soft strip clipped to the disc. Travelling as -cos eases it
+  // at both limbs, which is what a point crossing at constant angular speed
+  // does seen head-on. Only the strip's own width is filled, not the whole
+  // bounding square -- it is the one part that cannot be baked.
+  const ph = (animT % SHIELD_SWEEP) / SHIELD_SWEEP_DUR;
+  if (ph >= 1) return;
+  const outer = sp.outer;
+  const cx = -Math.cos(ph * Math.PI) * outer, a = Math.sin(ph * Math.PI), w = outer * 0.45;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(0, 0, outer, 0, 7); ctx.clip();
+  const g2 = ctx.createLinearGradient(cx - w, 0, cx + w, 0);
+  g2.addColorStop(0, 'rgba(140,210,255,0)');
+  g2.addColorStop(0.5, 'rgba(195,238,255,' + ((vivid ? 0.32 : 0.24) * a).toFixed(3) + ')');
+  g2.addColorStop(1, 'rgba(140,210,255,0)');
+  ctx.fillStyle = g2; ctx.fillRect(cx - w, -outer, w * 2, outer * 2);
+  ctx.restore();
+}
+/* Same rule as the shield: NEON is the untouched baseline, TOON keeps a flat
+   inked crate, and the mesh family turns the pickup into a tumbling box
+   painted through the hull renderer -- lit by the same lamp, plated with the
+   same panel-gap strokes, and (under animlight) carrying a light of its own.
+   Each branch sets its OWN letter style: keying the font and the outline on
+   meshGfx() outside the branch left a mesh-styled letter behind when the
+   branch was dead, which was enough to slip a negative control through. */
+function drawPowerup(p) {
+  const col = p.kind === 'P' ? '#39ff14' : p.kind === 'S' ? '#4488ff' : '#ffc300';
+  let letter = col, lx = 0, ly = 1, fsz = 13, halo = false;
+  if (meshGfx()) {
+    const prev = hueOverride;
+    hueOverride = POWERUP_HUE[p.kind] || 111;
+    ctx.save(); ctx.translate(p.x, p.y);
+    // a steady tilt plus an in-plane spin reads as a crate tumbling end over
+    // end; the pickup radius is unchanged, so the art stays close to its old
+    // 22px footprint rather than following the hulls' scale-up
+    drawMeshTop(MESH_POWERUP, gfx === 'anim' ? 1.5 : 1, 0.52, animT * 1.1, 41);
+    ctx.restore();
+    hueOverride = prev;
+    letter = gfx === 'anim' ? '#ffffff' : '#f2f6ff';
+    fsz = gfx === 'anim' ? 16 : 13; halo = true;
+  } else if (gfx === 'toon') {
+    // a cel crate: three flat faces off one tone, each inked -- the toon
+    // idiom's answer to the mesh family's lit box
+    ctx.save(); ctx.translate(p.x, p.y);
+    const face = (pts, tint) => {
+      poly(pts); ctx.fillStyle = col; ctx.fill();
+      if (tint) { ctx.fillStyle = tint; ctx.fill(); }
+      ctx.strokeStyle = INK; ctx.lineWidth = 2.2; ctx.stroke();
+    };
+    face([7,-4, 13,-11, 13,4, 7,11], 'rgba(0,0,0,0.34)');            // shaded side
+    face([-13,-4, -7,-11, 13,-11, 7,-4], 'rgba(255,255,255,0.36)');  // lit lid
+    face([-13,-4, 7,-4, 7,11, -13,11], null);                        // face
+    ctx.restore();
+    letter = INK; lx = -3; ly = 4;
+  } else {
+    ctx.strokeStyle = col; ctx.lineWidth = 2;
+    glow(col, 10);
+    ctx.strokeRect(p.x - 11, p.y - 11, 22, 22);
+    noGlow();
+  }
+  ctx.font = fsz + "px 'Black Ops One'";
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (halo) { ctx.strokeStyle = 'rgba(6,8,16,0.75)'; ctx.lineWidth = 3; ctx.strokeText(p.kind, p.x + lx, p.y + ly); }
+  ctx.fillStyle = letter;
+  ctx.fillText(p.kind, p.x + lx, p.y + ly);
+}
 function drawShip(x, y) {
   ctx.save();
   ctx.translate(x, y);
   if (ship.invuln > 0 && Math.floor(ship.invuln * 10) % 2 === 0) ctx.globalAlpha = 0.35;
   paintShip(false);
-  if (ship.shieldCharges > 0) {
-    ctx.globalAlpha = 0.8;
-    ctx.strokeStyle = gfx === 'toon' ? '#7fbcff' : '#4488ff';
-    ctx.lineWidth = gfx === 'toon' ? 2.5 : 2;
-    glow('#4488ff', 10);
-    const hs = shipArtScale();
-    for (let i = 0; i < ship.shieldCharges; i++) { ctx.beginPath(); ctx.arc(0, 0, (22 + i * 4) * hs, 0, 7); ctx.stroke(); }
-    noGlow();
-  }
+  drawShield(shipArtScale());
   ctx.restore();
 }
 
@@ -2642,6 +2787,23 @@ for (const [hull, dome] of [[MESH_BOSS_M, { h: 196, s: 100, l: 64 }], [MESH_BOSS
     { k: 'dot', r: 0.11, c: dome, m: 'blink', T: 1.9, ph: 0.75, lo: 0.08, hi: 1, pts: [[0.57,-0.57,0.08]] },
   ]);
 }
+/* Powerups get a mesh too. One crate serves all three kinds: every face is
+   `hue:1`, so painting it under the kind's own hue is the same mechanism stage
+   colour already uses -- no second mesh, no per-kind palette. */
+const POWERUP_HUE = { P: 111, S: 217, G: 46 };
+const MESH_POWERUP = {
+  p: [{ hue: 1, s: 72, l: 60 },     // lid
+      { hue: 1, s: 66, l: 44 },     // walls
+      { hue: 1, s: 58, l: 30 }],    // underside
+  v: [-10,-10,6,  10,-10,6,  10,10,6,  -10,10,6,
+      -10,-10,-6,  10,-10,-6,  10,10,-6,  -10,10,-6],
+  f: [[0, 0,1,2,3], [2, 4,7,6,5],
+      [1, 0,4,5,1], [1, 1,5,6,2], [1, 2,6,7,3], [1, 3,7,4,0]],
+  nose: 1,
+};
+attachLights(MESH_POWERUP, [
+  { k: 'dot', r: 3.4, c: { hue: 1, s: 100, l: 62 }, m: 'pulse', T: 1.5, lo: 0.30, hi: 1, pts: [[0,0,7.5]] },
+]);
 for (const rim of [MESH_RIM_M, MESH_RIM_S]) {
   // one muzzle glow per barrel, staggered round the ring — the rim already
   // spins, so the chase and the rotation compound into a real gun battery
@@ -3306,24 +3468,7 @@ function draw() {
   if (state === 'pilots') { drawTitleScene(); ctx.restore(); return; }
   if (state === 'shipyard') { ctx.restore(); return; }
   // powerups
-  for (const p of powerups) {
-    const col = p.kind === 'P' ? '#39ff14' : p.kind === 'S' ? '#4488ff' : '#ffc300';
-    if (gfx === 'toon') {
-      ctx.fillStyle = col; ctx.fillRect(p.x - 11, p.y - 11, 22, 22);
-      ctx.strokeStyle = INK; ctx.lineWidth = 2.2; ctx.strokeRect(p.x - 11, p.y - 11, 22, 22);
-      ctx.fillStyle = '#ffffff55'; ctx.fillRect(p.x - 10, p.y - 10, 20, 6);
-      ctx.fillStyle = INK;
-    } else {
-      ctx.strokeStyle = col; ctx.lineWidth = 2;
-      glow(col, 10);
-      ctx.strokeRect(p.x - 11, p.y - 11, 22, 22);
-      noGlow();
-      ctx.fillStyle = col;
-    }
-    ctx.font = "13px 'Black Ops One'";
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(p.kind, p.x, p.y + 1);
-  }
+  for (const p of powerups) drawPowerup(p);
   // bullets
   ctx.save();
   for (const b of bullets) {

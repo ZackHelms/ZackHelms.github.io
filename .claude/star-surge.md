@@ -108,12 +108,12 @@ across all 11 sectors — treat the constants in
 point that will likely need a further pass once someone's actually played
 it.
 
-**Regression gate:** `.claude/tests/drive-star-surge.cjs` (89 checks) pins
+**Regression gate:** `.claude/tests/drive-star-surge.cjs` (95 checks) pins
 every weapon's pip-vs-tier formula (fire rate is pip-invariant; discrete
 weapon counts, bomb turret/radius alternation, beam/flame band/lobe counts,
 chain jump count, EMP radius-only growth, and the missile min-turn-radius
 floor all match their formulas exactly) plus the enemy-hp/incoming-damage
-difficulty ramp and the graphics-style setting (cel/toon is the default, all
+difficulty ramp and the graphics-style setting (3D animlight is the default, all
 four styles paint every hull, the pick persists, the cog opens/closes, and
 under `anim` the scale-up is field-only and the light rigs really animate) — run it
 after touching any weapon or difficulty formula in this file's § Weapons or
@@ -234,10 +234,11 @@ at `left:10/56/102px`); it toggles `#settings-panel`, a small DOM panel
 holding a `<select id="gfx-select">`. The choice lives in the module-level
 `gfx` string, persisted to `localStorage['starSurge.gfx']`, validated
 against `GFX_STYLES` on load (an unknown/absent value falls back to
-`'toon'`). `closeSettings()` is called from `onDown`, so the first touch on
+`'anim'` — animlight became the default 2026-08-25; the three older styles
+are all still one pick away). `closeSettings()` is called from `onDown`, so the first touch on
 the canvas dismisses the panel rather than steering blind under it.
 
-- **`toon`** (**default**) — cel/flat shading. Every hull is laid down in a
+- **`toon`** — cel/flat shading. Every hull is laid down in a
   base tone, banded on the lit side with one flat lighter tone, then inked
   with a dark outline (`INK`). No `shadowBlur` anywhere.
 - **`neon`** — the original glowing wireframes, kept byte-for-byte in
@@ -248,7 +249,7 @@ the canvas dismisses the panel rather than steering blind under it.
   not attempt; a future style may try real texture/normal maps. The stored
   id stays `model` so persisted picks survive.) See § The 3D model kit
   below.
-- **`anim`** — "3D ANIMLIGHT": the same meshes, flown **oversized** (player
+- **`anim`** (**default** since 2026-08-25) — "3D ANIMLIGHT": the same meshes, flown **oversized** (player
   3x, ordinary enemies 2x, bosses unchanged) in a **vivid** palette, each
   hull running a rig of **animated lights**. See § The animlight kit below.
 
@@ -429,6 +430,42 @@ more intricate and slow for my ship".
   station. The station shows 14/169 frames over against `model`'s 5/169 —
   the drydock ship's rig on top of the same gradients; it is a static menu
   screen, and the median is 60fps in both.
+
+### Effects are skinned too (2026-08-25)
+
+Hulls were the first thing to get four treatments; the **shield** and the
+**powerups** followed, on the CD's rule that *neon is the baseline every other
+style departs from* — so neon keeps its original art and the other three each
+get their own.
+
+- **Shield** (`drawShield(hs)`, one branch per style). Neon: the original
+  rings, now at `globalAlpha 0.5`. Toon: flat translucent bubbles, inked, with
+  one cel highlight arc on the lit shoulder. Mesh family: a real **spherical
+  shell** — a radial gradient whose stops approximate the `1/sqrt(1 - t^2)`
+  path length through a thin shell, so it is nearly clear head-on and piles up
+  boldly at the limb, which is the CD's "thicker there from my perspective".
+  Every `SHIELD_SWEEP` seconds a **plane of light crosses it**: a soft vertical
+  strip clipped to the disc, travelling as `-cos` (the eased motion a point
+  circling at constant angular speed shows head-on). A band at fixed x on a
+  sphere projects to exactly a vertical strip, which is why the strip is the
+  honest primitive here rather than an ellipse.
+- **The shells are BAKED.** Two large radial-gradient discs per frame cost
+  13 frames in 169 over budget on a saturated field; baked once to an offscreen
+  sprite and blitted, it is 0/169 — better than the no-shield baseline. Only
+  the sweep is live, and it fills its own strip rather than the whole bounding
+  square. `shieldSprite`'s key carries **everything the bake reads** (style,
+  charge count, radius, dpr); a style-blind key serves the old bitmap forever
+  with no error anywhere, so the suite pins the key directly.
+- **Powerups** (`drawPowerup`). Neon: the original glowing wireframe square.
+  Toon: a cel crate — three flat faces off one tone, each inked. Mesh family: a
+  real tumbling box through `drawMeshTop`, one `MESH_POWERUP` serving all three
+  kinds because every face is `hue:1` and the painter runs under
+  `hueOverride = POWERUP_HUE[kind]` — the same mechanism stage colour already
+  uses. The letter stays on top in every style: it is what the pickup actually
+  communicates. **Each branch sets its own letter style**; keying the font and
+  the outline on `meshGfx()` *outside* the branch left a mesh-styled letter
+  behind when the branch was dead, which was enough to slip a negative control
+  through.
 
 **HUD note:** the left HUD block (`SECTOR/STAGE`, hp bar, hp label) starts
 at `safeTop+48`, *below* the chrome row, and the boss hp bar sits at
@@ -693,9 +730,14 @@ philosophy as weapons:
   — the only armor with no extra state, just a multiplier in `hitShip`.
 - **shield**: `ship.shieldCharges` (shared counter — the old one-shot `S`
   powerup pickup ALSO just increments this, regardless of equipped armor)
-  recharges toward `tier` max charges via `ship.shieldRegenT` counting
-  down (`max(3, 10-tier)` seconds per charge) in `update()`. A charge
+  recharges toward `min(tier, MAX_SHIELDS)` charges via `ship.shieldRegenT`
+  counting down (`max(3, 10-tier)` seconds per charge) in `update()`. A charge
   fully blocks one hit (no hp loss at all) before hp is ever touched.
+  **`MAX_SHIELDS` is 2** (2026-08-25, CD: "the game is already too easy") and
+  it is enforced at *every* source — armor regen, the `S` pickup, and
+  `restoreRun()` clamping a run banked before the cap existed. Tiers 3-5 no
+  longer buy a bigger bank; they buy a **faster recharge**, and the shipyard
+  copy says so rather than promising charges it will not grant.
 - **regen**: heals `(1 + tier*1.5)*dt` hp/sec once `ship.lastHitT > 3`
   (reset to 0 on every hit in `hitShip`) — passive sustain, not a burst.
 
@@ -763,8 +805,8 @@ regenerated track's JSON.
   scaling above.
 - Powerups (11% drop, tanker 100%): **P** in-run weapon tier +1 (max 4,
   works with any equipped weapon — see § Weapons; ship hit drops a tier),
-  **S** +1 `shieldCharges` (stacks with the `shield` armor's own regen,
-  same counter), **G** SURGE (clears all enemy bullets, 3 dmg to all
+  **S** +1 `shieldCharges` up to `MAX_SHIELDS` (stacks with the `shield`
+  armor's own regen, same counter and same cap), **G** SURGE (clears all enemy bullets, 3 dmg to all
   enemies, 4 to boss).
 - `EBULLET_CAP` 90 bounds the bullet storm (readability + perf); `eShoot`
   and ring spawns respect it.

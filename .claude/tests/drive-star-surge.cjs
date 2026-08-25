@@ -218,7 +218,7 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     const stored = localStorage.getItem('starSurge.gfx');
     return { stored, active: gfx, options: Array.from(document.querySelectorAll('#gfx-select option')).map(o => o.value) };
   });
-  check('cel/toon is the default graphics style with nothing stored', gfxDefault.active === 'toon' && !gfxDefault.stored, gfxDefault);
+  check('3D animlight is the default graphics style with nothing stored', gfxDefault.active === 'anim' && !gfxDefault.stored, gfxDefault);
   check('settings dropdown offers exactly the four known styles', JSON.stringify(gfxDefault.options) === JSON.stringify(['toon', 'neon', 'model', 'anim']), gfxDefault.options);
 
   const painted = await page.evaluate(() => {
@@ -1090,6 +1090,185 @@ const allEqual = arr => arr.every(v => v === arr[0]);
   check('the veins flow: a wavefront runs the length of one, lighting its ends at different times',
         animLights.noseSwing > 10 && animLights.tailSwing > 10 &&
         animLights.phaseGap >= animLights.N / 5, animLights);
+
+  /* ---- shield cap + per-style shield & powerup skins -------------------- */
+  const shieldCap = await page.evaluate(() => {
+    saves[0] = newCharacter('CAP'); activeSlot = 0; save = saves[0];
+    save.armors = { shield: 5 }; save.equippedArmor = 'shield';   // the deepest tier there is
+    startGame(1);
+    enemies.length = 0; spawnQueue.length = 0; ebullets.length = 0; boss = null;
+    // 1. armor regen must stop at the cap even at tier 5, which used to bank 5
+    ship.shieldCharges = 0; ship.shieldRegenT = 0;
+    for (let i = 0; i < 60 * 90; i++) { ship.shieldRegenT = -1; update(1 / 60); }
+    const fromRegen = ship.shieldCharges;
+    // 2. the S pickup must not push past it either
+    ship.shieldCharges = 0;
+    let fromPickups = 0;
+    for (let i = 0; i < 6; i++) {
+      powerups.length = 0;
+      powerups.push({ x: ship.x, y: ship.y, vy: 0, kind: 'S' });
+      update(1 / 60);
+      fromPickups = ship.shieldCharges;
+    }
+    // 3. and a run banked before the cap existed must be clamped on restore
+    save.run = { score: 0, xp: 0, cr: 0, weapon: 1, hp: 100, shields: 9 };
+    restoreRun();
+    const fromRestore = ship.shieldCharges;
+    return { fromRegen, fromPickups, fromRestore, cap: MAX_SHIELDS };
+  });
+  check('shields cap at 2 from every source that can grant one: armor regen, the S pickup, a restored run',
+        shieldCap.cap === 2 && shieldCap.fromRegen === 2 && shieldCap.fromPickups === 2 &&
+        shieldCap.fromRestore === 2, shieldCap);
+
+  const skinFxRaw = await page.evaluate(() => {
+    saves[0] = newCharacter('FX'); activeSlot = 0; save = saves[0];
+    startGame(1);
+    enemies.length = 0; spawnQueue.length = 0; ebullets.length = 0; boss = null;
+    powerups.length = 0; particles.length = 0; floats.length = 0; stageBanner = 0;
+    ship.x = 195; ship.y = 500; ship.shieldCharges = 2; ship.invuln = 0;
+    const P = { x: 195, y: 250, vy: 0, kind: 'P' };
+    const box = (x, y, w, h) => {
+      const d = ctx.getImageData(Math.round(x * dpr), Math.round(y * dpr),
+                                 Math.round(w * dpr), Math.round(h * dpr)).data;
+      let lit = 0, sum = 0, hsh = 5381;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = d[i] + d[i + 1] + d[i + 2];
+        sum += v; if (v > 60) lit++;
+        hsh = ((hsh * 33) ^ (d[i] >> 3) ^ (d[i + 1] >> 2) ^ (d[i + 2] >> 3)) >>> 0;
+      }
+      return { lit, mean: sum / (d.length / 4), hsh };
+    };
+    const out = {};
+    // ---- powerups, painted in the live scene ----
+    const shot = t => {
+      animT = t;
+      powerups.length = 0; powerups.push(P);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); draw();
+    };
+    for (const style of ['toon', 'neon', 'model', 'anim']) {
+      gfx = style;
+      shot(0.2);
+      out[style] = { pu: box(P.x - 18, P.y - 18, 36, 36) };
+      shot(0.55);            // ~0.35s later: a tumbling crate has turned
+      out[style].puMoved = box(P.x - 18, P.y - 18, 36, 36).hsh;
+    }
+    powerups.length = 0;
+
+    /* ---- shields, painted ALONE on a cleared canvas ----------------------
+       The first version of this measured the shield inside the live scene at
+       a radius that differs per style, so the sample box moved between styles
+       and could land on the hull. It then passed with every branch collapsed
+       into one. Calling the painter directly on a blank canvas removes both
+       confounds: nothing else is on screen, and a radial profile can be taken
+       wherever the style actually puts its shield. */
+    const ringMean = (R, f) => {
+      let s = 0, n = 0;
+      for (let a = 0; a < 6.2; a += 0.22) {
+        const x = 195 + Math.cos(a) * R * f, y = 500 + Math.sin(a) * R * f;
+        s += box(x - 2, y - 2, 4, 4).mean; n++;
+      }
+      return s / n;
+    };
+    // The background fill is load-bearing, not tidiness: getImageData returns
+    // UNpremultiplied RGB, so a 1.6%-alpha shell over a transparent canvas
+    // reads as its full colour and the profile comes out flat and bright.
+    // Composited over the real backdrop it reports what an eye would see.
+    const shieldOnly = (style, charges, t) => {
+      gfx = style; animT = t; ship.shieldCharges = charges;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#06060e'; ctx.fillRect(0, 0, W, H);
+      ctx.save(); ctx.translate(195, 500);
+      drawShield(shipArtScale());
+      ctx.restore();
+    };
+    const OUTER = { toon: 28, neon: 26, model: 30, anim: 30 * A_SHIP_SCALE };
+    for (const style of ['toon', 'neon', 'model', 'anim']) {
+      const R = OUTER[style];
+      shieldOnly(style, 2, 2.0);        // 2.0s sits in the gap between sweeps
+      out[style].sh = { r30: ringMean(R, 0.30), r60: ringMean(R, 0.60), rim: ringMean(R, 0.99) };
+      shieldOnly(style, 0, 2.0);
+      out[style].sh.none = ringMean(R, 0.99);
+    }
+    // every distinct (style, charges) the bake can be asked for
+    const keys = [];
+    for (const style of ['model', 'anim']) for (const n of [1, 2]) {
+      gfx = style; ship.shieldCharges = n;
+      keys.push(shieldSprite(n, shipArtScale(), style === 'anim').key);
+    }
+    gfx = 'toon'; ship.shieldCharges = 0; animT = 0;
+    return { out, keys };
+  });
+  const shieldKeys = skinFxRaw.keys, skinFx = skinFxRaw.out;
+  const STYLES4 = ['toon', 'neon', 'model', 'anim'];
+  // Distinctness alone is too weak here, and proved it: with the mesh branch
+  // dead the four hashes still differed, because the LETTER was styled per
+  // style outside the branch. So assert the behaviour instead - a mesh-family
+  // pickup is a crate that TUMBLES, and the flat ones hold still.
+  check('the powerup is reskinned per style: the mesh styles tumble a crate, the flat ones hold still',
+        STYLES4.every(k => skinFx[k].pu.lit > 60) &&
+        skinFx.toon.pu.hsh !== skinFx.neon.pu.hsh &&
+        skinFx.model.pu.hsh !== skinFx.model.puMoved &&
+        skinFx.anim.pu.hsh !== skinFx.anim.puMoved &&
+        skinFx.toon.pu.hsh === skinFx.toon.puMoved &&
+        skinFx.neon.pu.hsh === skinFx.neon.puMoved,
+        { lit: STYLES4.map(k => skinFx[k].pu.lit), moved: STYLES4.map(k => skinFx[k].pu.hsh !== skinFx[k].puMoved) });
+  check('every style actually paints a shield, and none paints one with no charges',
+        STYLES4.every(k => skinFx[k].sh.rim - skinFx[k].sh.none > 25 && skinFx[k].sh.none < 40),
+        STYLES4.map(k => [k, Math.round(skinFx[k].sh.rim), Math.round(skinFx[k].sh.none)]));
+  // The CD's spec for the 3D shell, stated as a measurement: a thin spherical
+  // shell presents its thickness edge-on at the limb and almost none of it
+  // head-on, so brightness must climb monotonically outward and pile up at the
+  // rim. Neon and toon draw rings, not shells, and are deliberately exempt.
+  // The shells are baked to an offscreen sprite, so they inherit the cache trap
+  // the title word has: a key that does not move with everything the bake read
+  // serves the old bitmap forever, with no error anywhere.
+  check('the baked shield sprite re-bakes on a style or charge change instead of serving the old bitmap',
+        new Set(shieldKeys).size === shieldKeys.length, shieldKeys);
+  check('the 3D shield is a spherical SHELL: nearly clear head-on, climbing to a bold limb',
+        ['model', 'anim'].every(k => {
+          const p = skinFx[k].sh;
+          return p.r60 > p.r30 && p.rim > p.r60 * 2 && p.rim > p.r30 * 3;
+        }),
+        ['model', 'anim'].map(k => [k, ['r30', 'r60', 'rim'].map(q => Math.round(skinFx[k].sh[q]))]));
+
+  const shellSweep = await page.evaluate(() => {
+    saves[0] = newCharacter('SW'); activeSlot = 0; save = saves[0];
+    startGame(1);
+    enemies.length = 0; spawnQueue.length = 0; ebullets.length = 0; boss = null;
+    powerups.length = 0; stageBanner = 0;
+    gfx = 'anim'; ship.shieldCharges = 2;
+    const R = 30 * shipArtScale();
+    const lum = (x, y) => {
+      const d = ctx.getImageData(Math.round((x - 6) * dpr), Math.round((y - 6) * dpr),
+                                 Math.round(12 * dpr), Math.round(12 * dpr)).data;
+      let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2];
+      return s / (d.length / 4);
+    };
+    // painted alone over the real backdrop, same reasoning as the profile above
+    const N = 20, left = [], right = [];
+    for (let i = 0; i < N; i++) {
+      animT = i * (SHIELD_SWEEP / N);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#06060e'; ctx.fillRect(0, 0, W, H);
+      ctx.save(); ctx.translate(195, 500);
+      drawShield(shipArtScale());
+      ctx.restore();
+      left.push(lum(195 - R * 0.55, 500));
+      right.push(lum(195 + R * 0.55, 500));
+    }
+    const argmax = a => a.indexOf(Math.max(...a));
+    const rng = a => Math.max(...a) - Math.min(...a);
+    gfx = 'toon'; animT = 0; ship.shieldCharges = 0;
+    return { lSwing: rng(left), rSwing: rng(right), lPeak: argmax(left), rPeak: argmax(right), N };
+  });
+  // Same shape as the vein-flow check, and for the same reason: a shell that
+  // simply pulsed all over would brighten both patches together. Only a plane
+  // of light CROSSING it lights one side before the other.
+  check('the 3D shield sweeps: a plane of light crosses it, lighting one side before the other',
+        shellSweep.lSwing > 5 && shellSweep.rSwing > 5 &&
+        shellSweep.rPeak - shellSweep.lPeak >= 2, shellSweep);
 
   const finale = await page.evaluate(async () => {
     saves[0] = newCharacter('DRIVE'); activeSlot = 0; save = saves[0];
