@@ -36,6 +36,27 @@ worthless**, which is the only really dangerous kind.
   a null. A failure became a crash, which hid the other 76 results and the
   failing check's own name. Re-seed per stage; the cost is three lines.
 
+Two more were learned on 2026-08-25, writing the star-surge 3D-models group —
+both are ways a **pixel check** goes green for the wrong reason:
+
+- **The bar must clear what the scene can mimic.** "The dogfight projects
+  real hulls" passed with the painter completely dead, because a flat
+  4-lit-pixels bar was cleared by stray starfield pixels behind the sample
+  box. If the subject sits over a scene, ask what that scene alone scores in
+  the box and put the bar well above it — as a *fraction of the box* (5% of
+  samples there), never a flat count, so it survives a resize.
+- **Negative controls go stale when the art moves — re-fire them after any
+  visual retune.** "Banking changes the lighting" measured left-flank vs
+  right-flank, and its control (kill the lighting) legitimately failed the
+  check when written. A brightness retune *hours later* widened the per-face
+  grime spread's visible effect, and the re-fired control passed the check —
+  the grime difference between the two flanks now supplied the asymmetry the
+  light was supposed to. The fix was structural, not a threshold: compare the
+  SAME faces under mirrored poses, so the confound is constant and only the
+  guarded mechanism can move the number. A control run once at birth proves
+  the check discriminated *then*; after the visuals it measures change, that
+  proof has expired.
+
 And one older rule that keeps earning its place: **break it to believe it.**
 Every check above was verified by deliberately breaking the thing it guards and
 confirming that check — and only that check — went red. `.claude/scripts/negtest.sh`

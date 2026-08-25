@@ -55,7 +55,9 @@
   turret-builder session's own refine commit, already accounted for above.
   The 2026-08-24 star-surge title-screen pass (`21301b6`) ran alone: the only
   other commit between the pointer and HEAD was `cf8ac9d`, its own session's
-  earlier refine commit.
+  earlier refine commit. The 2026-08-25 star-surge 3D-models pass (`2e89f88`,
+  `1193863`, `088011f`) ran alone too — the only other commits in range were
+  `ba0a205`/`2fe476c`, the same session's earlier refine pass.
 
 ## Validation
 - Procedure: headless mobile smoke-load of every changed page (the games

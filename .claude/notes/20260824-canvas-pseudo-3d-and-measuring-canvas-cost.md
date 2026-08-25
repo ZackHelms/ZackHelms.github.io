@@ -56,6 +56,14 @@ is seen exactly edge-on and disappears. Real games solve that with a model.
 With one flat sprite, the billboard is not a cheat you settle for; it is the
 right answer.
 
+> **2026-08-25 scope correction:** that verdict is about FLAT SPRITES only.
+> Star Surge's "3D MODELS" style later gave every hull a real low-poly mesh,
+> and there the orthonormal frame is exactly right — a mesh seen nose-on is
+> just its nose, so this section's two degeneracy patches (the foreshortening
+> floor, the kept-last direction) don't exist on that path. Do not read this
+> section as "never use the full frame"; read it as "never use it on a
+> plate". The mesh recipe: `20260825-low-poly-meshes-in-canvas-2d.md`.
+
 ### Two degenerate cases, both of which must be handled explicitly
 
 - **Nose-on has zero area.** When a hull lines up with the view ray the
