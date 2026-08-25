@@ -219,11 +219,11 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     return { stored, active: gfx, options: Array.from(document.querySelectorAll('#gfx-select option')).map(o => o.value) };
   });
   check('cel/toon is the default graphics style with nothing stored', gfxDefault.active === 'toon' && !gfxDefault.stored, gfxDefault);
-  check('settings dropdown offers exactly the two known styles', JSON.stringify(gfxDefault.options) === JSON.stringify(['toon', 'neon']), gfxDefault.options);
+  check('settings dropdown offers exactly the three known styles', JSON.stringify(gfxDefault.options) === JSON.stringify(['toon', 'neon', 'model']), gfxDefault.options);
 
   const painted = await page.evaluate(() => {
     const out = {};
-    for (const style of ['toon', 'neon']) {
+    for (const style of ['toon', 'neon', 'model']) {
       gfx = style;
       startGame(1);
       enemies.length = 0; spawnQueue.length = 0;
@@ -240,7 +240,7 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     }
     return out;
   });
-  check('every entity type paints in both graphics styles without throwing', painted.toon === 70 && painted.neon === 70, painted);
+  check('every entity type paints in every graphics style without throwing', painted.toon === 70 && painted.neon === 70 && painted.model === 70, painted);
 
   // The sun must be fixed in SCREEN space: the spinner draws its blades and
   // dome inside ctx.rotate(e.ang), so without cel()'s frameRot() counter-
@@ -580,16 +580,18 @@ const allEqual = arr => arr.every(v => v === arr[0]);
       const L = stationLayout();
       return L.B.map(b => [b.id, Math.round(b.x), Math.round(b.y), Math.round(b.at.x), Math.round(b.at.y)].join(':')).join('|') + '#' + Math.round(L.R);
     };
-    const sigToon = layoutSig('toon'), sigNeon = layoutSig('neon');
+    const sigToon = layoutSig('toon'), sigNeon = layoutSig('neon'), sigModel = layoutSig('model');
     gfx = 'toon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const t = fp();
     gfx = 'neon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const n = fp();
+    gfx = 'model'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const m = fp();
     gfx = 'toon';
-    return { sigToon, sigNeon, t, n };
+    return { sigToon, sigNeon, sigModel, t, n, m };
   });
-  check('the station paints a substantial scene in both styles, and they differ',
-        stationPaint.t.h !== stationPaint.n.h && stationPaint.t.lit > 300 && stationPaint.n.lit > 300, stationPaint);
-  check('a skin is paint: the station layout is identical in both styles',
-        stationPaint.sigToon === stationPaint.sigNeon, stationPaint);
+  check('the station paints a substantial scene in every style, and all three differ',
+        stationPaint.t.h !== stationPaint.n.h && stationPaint.n.h !== stationPaint.m.h && stationPaint.t.h !== stationPaint.m.h &&
+        stationPaint.t.lit > 300 && stationPaint.n.lit > 300 && stationPaint.m.lit > 300, stationPaint);
+  check('a skin is paint: the station layout is identical in every style',
+        stationPaint.sigToon === stationPaint.sigNeon && stationPaint.sigToon === stationPaint.sigModel, stationPaint);
 
   /* ---- title screen ------------------------------------------------------
      The pilots screen is CANVAS: the word, the three bays and the erase
@@ -711,22 +713,26 @@ const allEqual = arr => arr.every(v => v === arr[0]);
       return [Math.round(L.u), Math.round(L.y0), L.maxCols].join(':') + '#' +
              P.S.map(b => [b.x, b.y, b.w, b.dy, b.dr].map(Math.round).join(',')).join('|');
     };
-    const sigToon = sig('toon'), sigNeon = sig('neon');
+    const sigToon = sig('toon'), sigNeon = sig('neon'), sigModel = sig('model');
     // The word is baked once and kept. If its key does not move with the
     // style, a style switch leaves the OLD bitmap on screen forever.
     gfx = 'toon'; const keyToon = buildTitleWord().key;
     gfx = 'neon'; const keyNeon = buildTitleWord().key;
+    gfx = 'model'; const keyModel = buildTitleWord().key;
     gfx = 'toon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const t = fp();
     gfx = 'neon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const n = fp();
+    gfx = 'model'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const m = fp();
     gfx = 'toon';
-    return { sigToon, sigNeon, keyToon, keyNeon, t, n };
+    return { sigToon, sigNeon, sigModel, keyToon, keyNeon, keyModel, t, n, m };
   });
-  check('the title screen paints a substantial scene in both styles, and they differ',
-        titlePaint.t.h !== titlePaint.n.h && titlePaint.t.lit > 300 && titlePaint.n.lit > 300, titlePaint);
-  check('a skin is paint: the title and bay layout is identical in both styles',
-        titlePaint.sigToon === titlePaint.sigNeon, titlePaint);
+  check('the title screen paints a substantial scene in every style, and all three differ',
+        titlePaint.t.h !== titlePaint.n.h && titlePaint.n.h !== titlePaint.m.h && titlePaint.t.h !== titlePaint.m.h &&
+        titlePaint.t.lit > 300 && titlePaint.n.lit > 300 && titlePaint.m.lit > 300, titlePaint);
+  check('a skin is paint: the title and bay layout is identical in every style',
+        titlePaint.sigToon === titlePaint.sigNeon && titlePaint.sigToon === titlePaint.sigModel, titlePaint);
   check('the baked word re-bakes on a style switch instead of serving the old bitmap',
-        titlePaint.keyToon !== titlePaint.keyNeon, titlePaint);
+        titlePaint.keyToon !== titlePaint.keyNeon && titlePaint.keyNeon !== titlePaint.keyModel &&
+        titlePaint.keyToon !== titlePaint.keyModel, titlePaint);
 
   // A pilot is the only thing on this screen that cannot be undone, and there
   // is no confirm dialog left to catch a misfire -- so the gesture has to.
@@ -821,6 +827,131 @@ const allEqual = arr => arr.every(v => v === arr[0]);
   // roughly nothing, which is the regression it is here to catch.
   check('the fight keeps fighting: hulls shoot, hit, and a downed hull comes back',
         arena.fired > 40 && arena.respawns >= 2, arena);
+
+  /* ---- 3D weathered ('model') style --------------------------------------
+     The third style is the one whose look depends on DERIVED motion (bank)
+     and a real per-face light, so the things to pin are: the sim stays
+     byte-identical across all three styles while real frames are drawn
+     between the ticks; the painters leave no fingerprint on sim objects
+     (bank state lives in a WeakMap, never on the entity); banking follows
+     each hull's own movement and only the spec'd hulls bank; the bank
+     changes the LIGHTING, not just the outline; and the dogfight's
+     perspective path projects hulls where the sim says they are. */
+  const modelSim = await page.evaluate(() => {
+    // A deterministic 90-frame scenario: every randomly-rolled field is
+    // pinned after spawn, fire timers are parked out of reach, and the ship
+    // is swept side to side so its bank derivation has something to chew on.
+    const scenario = style => {
+      gfx = style;
+      saves[0] = newCharacter('SKIN'); activeSlot = 0; save = saves[0];
+      startGame(2);
+      state = 'play'; overlay.classList.add('hidden');
+      enemies.length = 0; spawnQueue.length = 0; bullets.length = 0; ebullets.length = 0;
+      powerups.length = 0; particles.length = 0; boss = null; stageBanner = 0;
+      const d = spawnEnemy('drone', 120, 150); d.vy = 100; d.amp = 40; d.fireT = 99; d.t = 0;
+      const sh = spawnEnemy('shooter', 260, 160); sh.vy = 75; sh.holdY = 150; sh.fireT = 99;
+      const sp = spawnEnemy('spinner', 90); sp.y = 200; sp.fireT = 99;
+      const tk = spawnEnemy('tanker', 200, 240); tk.fireT = 99;
+      const keys0 = enemies.map(e => Object.keys(e).sort().join(',')).join('|');
+      for (let i = 0; i < 90; i++) {
+        ship.x = 195 + Math.sin(i / 9) * 80;
+        update(1 / 60);
+        ctx.setTransform(1, 0, 0, 1, 0, 0); draw();
+      }
+      return {
+        sim: enemies.map(e => [e.type, e.x.toFixed(3), e.y.toFixed(3), (e.ang || 0).toFixed(3), e.hp].join('~')).join('|'),
+        keys: enemies.map(e => Object.keys(e).sort().join(',')).join('|'),
+        keys0,
+        banks: { drone: VIS.get(d) || null, shooter: VIS.get(sh) || null,
+                 spinner: VIS.get(sp) || null, tanker: VIS.get(tk) || null,
+                 boss: boss ? VIS.get(boss) || null : null },
+      };
+    };
+    const t = scenario('toon'), n = scenario('neon'), m = scenario('model');
+    gfx = 'toon';
+    return { t: t.sim, n: n.sim, m: m.sim, keys: m.keys, keys0: m.keys0, banks: m.banks };
+  });
+  check('a skin is paint: 90 driven frames leave the sim byte-identical across all three styles',
+        modelSim.t === modelSim.n && modelSim.n === modelSim.m, modelSim);
+  check('the model painters leave no fingerprint on sim objects (bank lives off-entity)',
+        modelSim.keys === modelSim.keys0, { keys: modelSim.keys, keys0: modelSim.keys0 });
+  check('who banks is the spec: the swaying drone does, straight-line hulls hold level, the spinner spins instead',
+        modelSim.banks.drone !== null && Math.abs(modelSim.banks.drone.bank) > 0.03 &&
+        modelSim.banks.shooter !== null && Math.abs(modelSim.banks.shooter.bank) < 0.02 &&
+        modelSim.banks.tanker !== null && Math.abs(modelSim.banks.tanker.bank) < 0.02 &&
+        modelSim.banks.spinner === null, modelSim.banks);
+
+  const shipBank = await page.evaluate(() => {
+    gfx = 'model';
+    state = 'play';
+    VIS.delete(ship);
+    ship.x = 60;
+    // (VIS.get || NaN): if the derivation is dead this must FAIL, not throw
+    const bk = () => (VIS.get(ship) || { bank: NaN }).bank;
+    for (let i = 0; i < 45; i++) { ship.x += 5; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); }
+    const right = bk();
+    for (let i = 0; i < 60; i++) { ship.x -= 5; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); }
+    const left = bk();
+    for (let i = 0; i < 60; i++) { ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); }
+    const settled = bk();
+    gfx = 'toon';
+    return { right: +right.toFixed(3), left: +left.toFixed(3), settled: +settled.toFixed(3) };
+  });
+  check('the ship banks with its own motion: right when flying right, left when left, level at rest',
+        shipBank.right > 0.3 && shipBank.left < -0.3 && Math.abs(shipBank.settled) < 0.05, shipBank);
+
+  const bankLight = await page.evaluate(() => {
+    gfx = 'model';
+    const probe = bankVal => {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+      ctx.save(); ctx.translate(180, 300);
+      drawMeshTop(MESH_ENEMY.tanker, 60, bankVal, 0, 26);
+      ctx.restore();
+      const half = x0 => {
+        const d = ctx.getImageData(x0, 250, 58, 100).data;
+        let s = 0, c = 0;
+        for (let i = 0; i < d.length; i += 4) { const l = d[i] + d[i + 1] + d[i + 2]; if (l > 30) { s += l; c++; } }
+        return c ? s / c : 0;
+      };
+      return half(120) - half(182);   // left-half brightness minus right-half
+    };
+    const pos = Math.round(probe(0.5)), neg = Math.round(probe(-0.5));
+    gfx = 'toon';
+    return { pos, neg };
+  });
+  check('banking changes the lighting, not just the outline: the lit flank flips with the bank sign',
+        bankLight.pos * bankLight.neg < 0 && Math.abs(bankLight.pos) > 8 && Math.abs(bankLight.neg) > 8, bankLight);
+
+  const dfModel = await page.evaluate(() => {
+    gfx = 'model';
+    showPilotSelect(); dfInit(); titleT = 2;
+    const bayTop = pilotsLayout().sqTop - 20;
+    let checked = 0, visible = 0, frames = 0;
+    // Only hulls in front of the UI plane are guaranteed unoccluded (the
+    // word paints over the far layer), so collect those moments as they come.
+    while (checked < 4 && frames < 3000) {
+      dfUpdate(1 / 60); titleT += 1 / 60; frames++;
+      const near = dfShips.filter(s => s.p.z > 150 && s.p.z < DF_ZUI - 30 && s.hurt <= 0 &&
+        s.sx > 50 && s.sx < W - 50 && s.sy > 60 && s.sy < bayTop);
+      if (!near.length) continue;
+      ctx.setTransform(1, 0, 0, 1, 0, 0); draw();
+      for (const s of near) {
+        checked++;
+        const box = Math.max(12, Math.round(26 * s.k));
+        const d = ctx.getImageData(Math.round(s.sx - box / 2), Math.round(s.sy - box / 2), box, box).data;
+        let lit = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 60) lit++;
+        // a hull FILLS its box; a few stray starfield pixels must not pass
+        // for one (they did, when this threshold was a flat 4 pixels)
+        if (lit > box * box * 0.05) visible++;
+      }
+    }
+    gfx = 'toon';
+    return { checked, visible, frames };
+  });
+  check('the model dogfight projects real hulls where the sim says they are',
+        dfModel.checked >= 4 && dfModel.visible === dfModel.checked, dfModel);
 
   const finale = await page.evaluate(async () => {
     saves[0] = newCharacter('DRIVE'); activeSlot = 0; save = saves[0];

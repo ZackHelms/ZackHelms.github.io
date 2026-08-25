@@ -407,7 +407,12 @@ dark outline, giving each craft a nameable silhouette — steel interceptor,
 bladed scout drone, arrowhead gunship, four-blade rotorcraft, armoured
 freighter, and a capital-ship boss whose rotating rim of gun barrels keeps
 the original spinning-spikes read; **NEON** is the original glowing
-wireframe look, kept intact. The choice persists per browser. Drones/shooters/spinners/tankers, P/S/G powerups (in-run
+wireframe look, kept intact; **3D WEATHERED** renders every hull as a real
+low-poly mesh in worn metal, flat-shaded per face, banking into its turns
+(bank derived painter-side from each hull's own motion, stored in a WeakMap
+so the sim stays byte-identical) — only hulls change, effects stay on the
+neon side of every binary branch, and the title dogfight swaps its billboard
+for true per-vertex perspective under it. The choice persists per browser. Drones/shooters/spinners/tankers, P/S/G powerups (in-run
 weapon-tier boost, shield charge, surge bomb), stage-hued enemies.
 20-track adaptive soundtrack
 (webaudio-score/v1 data + compiler + look-ahead scheduler): one track plays

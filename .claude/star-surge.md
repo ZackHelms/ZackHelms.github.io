@@ -113,8 +113,8 @@ every weapon's pip-vs-tier formula (fire rate is pip-invariant; discrete
 weapon counts, bomb turret/radius alternation, beam/flame band/lobe counts,
 chain jump count, EMP radius-only growth, and the missile min-turn-radius
 floor all match their formulas exactly) plus the enemy-hp/incoming-damage
-difficulty ramp and the graphics-style setting (cel/toon is the default, both
-styles paint every hull, the pick persists, the cog opens/closes) — run it
+difficulty ramp and the graphics-style setting (cel/toon is the default, all
+three styles paint every hull, the pick persists, the cog opens/closes) — run it
 after touching any weapon or difficulty formula in this file's § Weapons or
 this section, or any renderer branch in § Graphics styles, the same way as
 the smoke gate (see `.claude/tests/README.md`).
@@ -241,15 +241,26 @@ the canvas dismisses the panel rather than steering blind under it.
   with a dark outline (`INK`). No `shadowBlur` anywhere.
 - **`neon`** — the original glowing wireframes, kept byte-for-byte in
   `drawShipNeon`/`drawEnemyNeon`/`drawBossNeon`.
+- **`model`** — "3D WEATHERED": real low-poly meshes in worn metal,
+  flat-shaded per face, that **bank into their turns**. See § The 3D
+  weathered kit below.
 
-Adding a style means adding an id to `GFX_STYLES`, an `<option>`, and a
-branch in the four dispatchers (`drawShip`, `drawEnemy`, the boss block,
-the bullet/ebullet/powerup loops in `draw()`) — the branch points are
-deliberately few and all inside `draw()`'s call tree. **A skin is paint:**
-no simulation code reads `gfx`, so switching mid-run can never change an
-outcome. The `<select>` is wired to its `change` event and deliberately
-*not* through `bindTap` — that helper `preventDefault()`s `touchend` to
-stop iOS double-firing, which also stops a native picker ever opening.
+**Every hull is painted through the three dispatchers** `paintShip(cold)` /
+`paintEnemy(e)` / `paintBoss()` — the field, the pilot bays, the station
+drydock, the title word bake and the dogfight all go through them, so a
+style cannot drift between screens. Adding a style means adding an id to
+`GFX_STYLES`, an `<option>`, and a branch in those three functions.
+Everything that is NOT a hull (bullets, ebullets, powerups, chrome,
+station scenery, effects) stays a `gfx === 'toon' ? A : B` binary on
+purpose: `model` deliberately lands on the neon side of all of them
+(weapons fire is emissive whatever the hull is made of), which is why
+three styles did **not** force the repo's past-two-styles SKINS-table
+refactor — the table is for styles that restyle everything, and this one
+restyles only hulls. **A skin is paint:** no simulation code reads `gfx`,
+so switching mid-run can never change an outcome. The `<select>` is wired
+to its `change` event and deliberately *not* through `bindTap` — that
+helper `preventDefault()`s `touchend` to stop iOS double-firing, which
+also stops a native picker ever opening.
 
 **The cel kit** follows the repo recipe in
 `.claude/notes/20260823-canvas-skins-and-cel-shading.md` (written by the
@@ -292,6 +303,53 @@ boss = a solid inked hull with a bridge dome (gold + heavier pods for a
 sector boss) under a rotating rim of gun barrels, which preserves the neon
 version's spinning-spikes silhouette. Enemy tones all derive from the same
 stage `hue()` as before, so `STAGE_HUES` still recolors every sector.
+
+### The 3D weathered kit (`model`, 2026-08-25)
+
+Real low-poly meshes rendered with Canvas 2D — no WebGL. A mesh is
+`{ p, v, f, nose }`: `p` a palette of `{h,s,l}` face colours (`hue:1` swaps
+h for the live stage hue via `hueDegNow()`, so stage identity and the title
+wash keep working; `e:1` marks an emissive part — full-bright, unweathered,
+unstroked), `v` a flat vertex array in sprite-local units (player in px,
+enemies in units of `e.r`, boss in `boss.r`), `f` faces as
+`[palIdx, v0, v1, ...]`, and `nose` which way the hull points along its own
+y (−1 player, +1 everything that dives). Meshes: `MESH_SHIP`,
+`MESH_ENEMY.{drone,shooter,spinner,tanker}`, `MESH_BOSS_M/S` +
+`MESH_RIM_M/S` (the gun rim is its own mesh so only it spins).
+
+- **`drawMeshTop(mesh, scale, bank, spin, seed)`** is the top-view
+  (gameplay) painter: spin about z, bank about y, orthographic project,
+  painter-sort faces by mean depth, two-sided normals flipped to face the
+  camera. **A flipped face is an underside and undersides are in shadow**
+  (`lum *= 0.3`) — without that dim a banked hull's falling edge lights up
+  like its rising one and the bank stops reading. The drive suite's
+  lit-flank check discriminates exactly this.
+- **Shading is a metal's**: `mFaceCol` runs lum through a dark-falloff
+  curve with a hot specular pop past 0.93, then weathers per face off
+  `hash32(seed*131 + faceIndex)` — a grime factor 0.80–1.18 and the odd
+  plate turned to rust (never a `hue:1` face: identity colour is not the
+  weathering's to corrode). Every non-emissive face also gets a thin dark
+  panel-gap stroke, which is most of what reads as riveted plating.
+- **Banking is DERIVED, off-entity.** `visBank(o, x, max)` measures the
+  entity's own lateral speed between paints (`frameDt` is written at the
+  top of `update()`), smooths toward a clamped target, and stores its
+  state in the module `VIS` **WeakMap** — never on the entity, so the sim
+  objects stay byte-identical across styles (the suite asserts both the
+  90-frame sim snapshot and the object keys). A >2600 px/s jump is treated
+  as a respawn/resize, not a turn. Who banks is per-hull: the player
+  (max 0.85 rad) and the swaying drone bank; shooter/tanker fly straight so
+  their measured lateral speed keeps them level for free; the spinner spins
+  (`e.ang`) instead; bosses stay flat with only the rim turning.
+- **The title dogfight skips the billboard entirely** (`dfDrawShipModel`,
+  dispatched at the top of `dfDrawShip`): the sim is already fully 3D, so
+  the mesh is oriented along its velocity (orthonormal frame + the same
+  `s.roll`), and projected vertex-by-vertex through the same `DF_FL`
+  divide. The flat-sprite degeneracies (foreshortening floor, kept-last
+  screen direction) don't exist here — nose-on is just the model's nose.
+  `DF_LIGHT` is `M_LIGHT` with z negated (dogfight −z faces the camera).
+- Perf: measured 16.7 ms median on the title screen and on a saturated
+  16-enemy + boss combat scene (frame-budget.cjs, 2026-08-25) — same as
+  toon/neon.
 
 **HUD note:** the left HUD block (`SECTOR/STAGE`, hp bar, hp label) starts
 at `safeTop+48`, *below* the chrome row, and the boss hp bar sits at

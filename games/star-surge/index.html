@@ -119,7 +119,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-24 23:06 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-25 03:23 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
@@ -129,8 +129,9 @@ body {
   <select id="gfx-select">
     <option value="toon">CEL / TOON</option>
     <option value="neon">NEON</option>
+    <option value="model">3D WEATHERED</option>
   </select>
-  <div class="hint">CEL / TOON — inked, flat-shaded starfighters.<br>NEON — the original glowing wireframes.</div>
+  <div class="hint">CEL / TOON — inked, flat-shaded starfighters.<br>NEON — the original glowing wireframes.<br>3D WEATHERED — worn-metal hulls that bank into their turns.</div>
 </div>
 <div id="overlay"></div>
 <div id="track-label"></div>
@@ -746,7 +747,7 @@ overlay.addEventListener('touchend', e => {
 overlay.addEventListener('click', () => { if (state === 'report') { initAudio(); beginLaunch(); } });
 
 /* ---- settings: graphics style ('toon' cel-shaded default, 'neon' original) ---- */
-const GFX_STYLES = ['toon', 'neon'];
+const GFX_STYLES = ['toon', 'neon', 'model'];
 let gfx = localStorage.getItem('starSurge.gfx');
 if (GFX_STYLES.indexOf(gfx) < 0) gfx = 'toon';
 const settingsBtn = document.getElementById('settings');
@@ -763,9 +764,9 @@ function closeSettings() { settingsPanel.classList.add('hidden'); }
 // The simulation never reads or writes it, so enemy colour stays a property
 // of the stage everywhere that matters.
 let hueOverride = null;
+function hueDegNow() { return hueOverride === null ? STAGE_HUES[stage - 1] : hueOverride; }
 function hue(sat, l, a) {
-  const h = hueOverride === null ? STAGE_HUES[stage - 1] : hueOverride;
-  return 'hsla(' + h + ',' + sat + '%,' + l + '%,' + (a === undefined ? 1 : a) + ')';
+  return 'hsla(' + hueDegNow() + ',' + sat + '%,' + l + '%,' + (a === undefined ? 1 : a) + ')';
 }
 function campaignDifficulty() { return (sector - 1) + (stage - 1) / MAX_STAGE; }   // 0 at sector1 stage1, ~+1 per sector cleared
 function incomingBulletDmg() { return 18 * (1 + campaignDifficulty() * 0.12); }
@@ -1123,6 +1124,7 @@ function updateLaunch(dt) {
   if (launchT >= LAUNCH_DUR) enterStation(true);
 }
 function update(dt) {
+  frameDt = dt;    // the model painters' bank derivation reads this; nothing else does
   if (state === 'pilots') { titleT += dt; dfUpdate(dt); tickHold(dt); tickFx(dt); return; }
   if (state === 'launch') { updateLaunch(dt); return; }
   if (state === 'station') { stationT += dt; veil = Math.max(0, veil - dt / VEIL_FADE); tickFx(dt); return; }
@@ -1837,7 +1839,7 @@ function drawDockedShip(L) {
   ctx.translate(d.x, d.y);
   ctx.rotate(-0.26);
   ctx.scale(1.5, 1.5);
-  if (gfx === 'toon') drawShipToon(true); else drawShipNeon(true);   // engines cold: it is parked
+  paintShip(true);   // engines cold: it is parked
   ctx.restore();
 }
 
@@ -2074,7 +2076,7 @@ function drawShip(x, y) {
   ctx.save();
   ctx.translate(x, y);
   if (ship.invuln > 0 && Math.floor(ship.invuln * 10) % 2 === 0) ctx.globalAlpha = 0.35;
-  if (gfx === 'toon') drawShipToon(); else drawShipNeon();
+  paintShip(false);
   if (ship.shieldCharges > 0) {
     ctx.globalAlpha = 0.8;
     ctx.strokeStyle = gfx === 'toon' ? '#7fbcff' : '#4488ff';
@@ -2133,7 +2135,7 @@ function drawEnemyNeon(e) {
 }
 function drawEnemy(e) {
   ctx.save(); ctx.translate(e.x, e.y);
-  if (gfx === 'toon') drawEnemyToon(e); else drawEnemyNeon(e);
+  paintEnemy(e);
   if (e.slowT > 0) {
     ctx.strokeStyle = WEAPON_DEFS.bolas.color; ctx.lineWidth = 1.5; ctx.shadowBlur = 0;
     ctx.beginPath(); ctx.arc(0, 0, e.r * 1.35, 0, 7); ctx.stroke();
@@ -2183,6 +2185,319 @@ function drawBossNeon() {
   }
   ctx.shadowBlur = 0;
 }
+
+/* ========================== 3D WEATHERED STYLE ==========================
+   The third graphics style ('model') gives every hull a real low-poly mesh,
+   flat-shaded per face against a screen-fixed light, so a ship that banks
+   into a turn genuinely shows its flank and its shading moves across the
+   plating. Only HULLS change: bullets, glows, chrome and every effect keep
+   the neon idiom (weapons fire is emissive whatever the hull is made of),
+   which is why every `gfx === 'toon' ? A : B` branch in the file stays a
+   valid binary -- 'model' deliberately lands on the neon side of all of
+   them. The only three-way dispatch is paintShip / paintEnemy / paintBoss.
+
+   A skin is still paint. The banking these painters show is DERIVED from
+   positions the sim already produced, and the derivation's own state lives
+   in a WeakMap keyed by entity -- never written onto the entity -- so a
+   style switch leaves the sim objects byte-identical.
+
+   Who banks is a per-hull statement, not a rule: the player and the
+   swaying drone bank because they move sideways; the shooter and tanker
+   fly straight lines so their measured lateral speed keeps them level; the
+   spinner spins instead (its e.ang, same as the sprites); the bosses stay
+   flat and imposing with only their gun rim turning. */
+const M_LIGHT  = { x: -0.42, y: -0.58, z: 0.70 };   // upper-left, out of the screen (top view)
+const DF_LIGHT = { x: -0.42, y: -0.58, z: -0.70 };  // the same lamp in dogfight space, where -z faces the camera
+let frameDt = 1 / 60;    // written at the top of update(); painters only read it
+const VIS = new WeakMap();
+// Bank follows the entity's own measured lateral speed, smoothed. A jump of
+// screen-widths in one frame is a respawn or a resize, not a turn.
+function visBank(o, x, max) {
+  if (!Number.isFinite(x)) return 0;
+  let st = VIS.get(o);
+  if (!st) { st = { x, bank: 0 }; VIS.set(o, st); }
+  const vx = (x - st.x) / Math.max(frameDt, 1e-3);
+  st.x = x;
+  if (Math.abs(vx) < 2600) {
+    const tgt = Math.max(-max, Math.min(max, vx * 0.0042));
+    st.bank += (tgt - st.bank) * Math.min(1, frameDt * 7);
+  }
+  return st.bank;
+}
+/* A face colour is {h,s,l}; `hue:1` swaps h for the live stage hue (so the
+   stage identity colour and the title wash keep working), `e:1` marks an
+   emissive part -- full-bright, unweathered, unstroked. Everything else is
+   worn metal: a stable per-face hash dims some plates into grime and turns
+   the odd one to rust, and the shading curve is a metal's -- dark falloff,
+   a hot specular pop past lum 0.93. */
+function mFaceCol(pal, lum, hs) {
+  const h0 = pal.hue ? hueDegNow() : pal.h;
+  if (pal.e) return 'hsl(' + h0 + ',' + pal.s + '%,' + pal.l + '%)';
+  const w = hash32(hs);
+  const wf = 0.80 + (w % 1000) / 1000 * 0.38;
+  const rust = !pal.hue && (w >>> 10) % 7 === 0;   // never corrode the identity colour
+  const shade = 0.30 + 0.90 * Math.pow(lum, 1.55) + (lum > 0.93 ? 0.4 : 0);
+  const l = Math.max(4, Math.min(93, pal.l * shade * (rust ? wf * 0.8 : wf)));
+  return 'hsl(' + (rust ? 24 : h0) + ',' + (rust ? Math.min(58, pal.s + 26) : pal.s) + '%,' + l + '%)';
+}
+/* Meshes live in sprite-local units (the player in px, enemies in units of
+   e.r, bosses in units of boss.r) so every silhouette lands where its
+   sprite did. `nose` says which way the hull points along its own y axis:
+   -1 for the player (nose up-screen), +1 for everything that dives. */
+const MESH_SHIP = {
+  p: [{ h: 214, s: 12, l: 60 },        // steel deck
+      { h: 216, s: 14, l: 40 },        // dark plating
+      { h: 112, s: 40, l: 40 },        // squadron green, long since faded
+      { h: 194, s: 85, l: 62, e: 1 },  // canopy glass
+      { h: 220, s: 10, l: 27 }],       // keel
+  v: [0,-19,0,  0,-6.5,4.4,  0,12.5,2.2,
+      -4.8,-3,0.8,  4.8,-3,0.8,  -4.4,12.5,-0.2,  4.4,12.5,-0.2,
+      0,-3,-2.8,  0,10,-2.2,
+      -3,-4.5,0.5,  -16,7.5,-1.2,  -13.2,13,-1.4,  -4.2,9,0.2,
+      3,-4.5,0.5,  16,7.5,-1.2,  13.2,13,-1.4,  4.2,9,0.2,
+      -6,-0.5,1.5,  -10.8,3.5,0.3,  -10.2,13.5,0.3,  -5.6,13,1.5,
+      6,-0.5,1.5,  10.8,3.5,0.3,  10.2,13.5,0.3,  5.6,13,1.5,
+      0,-13,2.0,  -1.9,-7,3.6,  1.9,-7,3.6,  0,-2.5,3.4],
+  f: [[0, 0,4,1], [0, 0,1,3], [0, 1,4,6,2], [0, 1,2,5,3],
+      [4, 0,7,3], [4, 0,4,7], [4, 7,3,5,8], [4, 7,8,6,4],
+      [2, 9,10,11,12], [2, 13,16,15,14],
+      [1, 17,18,19,20], [1, 21,24,23,22],
+      [3, 25,26,28,27]],
+  nose: -1,
+};
+const MESH_ENEMY = {
+  drone: {
+    p: [{ hue: 1, s: 26, l: 46 }, { h: 216, s: 12, l: 30 }, { h: 352, s: 92, l: 58, e: 1 }],
+    v: [0,0,0.55,  0,0,-0.5,  0,-0.85,0.02,  0,0.8,0.02,  -0.6,0,0,  0.6,0,0,
+        -0.42,-0.55,0.12,  -1.28,-0.72,-0.18,  -1.22,0.6,-0.18,  -0.42,0.5,0.12,
+        0.42,-0.55,0.12,  1.28,-0.72,-0.18,  1.22,0.6,-0.18,  0.42,0.5,0.12,
+        0,0.16,0.44,  -0.15,0.42,0.3,  0.15,0.42,0.3],
+    f: [[0, 0,3,5], [0, 0,5,2], [0, 0,2,4], [0, 0,4,3],
+        [1, 1,3,5], [1, 1,5,2], [1, 1,2,4], [1, 1,4,3],
+        [1, 6,7,8,9], [1, 10,13,12,11], [2, 14,15,16]],
+    nose: 1,
+  },
+  shooter: {
+    p: [{ hue: 1, s: 30, l: 44 }, { h: 218, s: 10, l: 30 }, { h: 196, s: 80, l: 56, e: 1 }],
+    v: [0,1.15,0,  0,-0.15,0.45,  -0.85,-0.85,0,  0.85,-0.85,0,  0,-0.9,0.18,  0,-0.2,-0.4,
+        -0.68,0.15,0.08,  -0.48,0.15,0.08,  -0.48,1.0,0.02,  -0.68,1.0,0.02,
+        0.68,0.15,0.08,  0.48,0.15,0.08,  0.48,1.0,0.02,  0.68,1.0,0.02,
+        0,0.3,0.34,  -0.22,-0.2,0.44,  0.22,-0.2,0.44],
+    f: [[0, 0,3,1], [0, 0,1,2], [0, 1,3,4], [0, 1,4,2],
+        [1, 0,5,3], [1, 0,2,5], [1, 5,4,3], [1, 5,2,4],
+        [1, 6,7,8,9], [1, 10,11,12,13], [2, 14,15,16]],
+    nose: 1,
+  },
+  spinner: (() => {
+    const v = [0,0,0.4,  0,0,-0.35,  0.45,0,0,  0,0.45,0,  -0.45,0,0,  0,-0.45,0];
+    const f = [[1, 0,2,3], [1, 0,3,4], [1, 0,4,5], [1, 0,5,2],
+               [1, 1,2,3], [1, 1,3,4], [1, 1,4,5], [1, 1,5,2]];
+    // four blades with real propeller pitch (z twists across the width), so
+    // the light rakes each one differently as the rotor turns
+    const blade = [-0.24,-0.3,0.09,  0.24,-0.3,-0.09,  0.15,-1.18,-0.09,  -0.15,-1.18,0.09];
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a), i0 = v.length / 3;
+      for (let j = 0; j < 4; j++) { const x = blade[j*3], y = blade[j*3+1]; v.push(x*ca - y*sa, x*sa + y*ca, blade[j*3+2]); }
+      f.push([0, i0, i0+1, i0+2, i0+3]);
+    }
+    const i0 = v.length / 3;
+    v.push(-0.15,-0.15,0.41,  0.15,-0.15,0.41,  0.15,0.15,0.41,  -0.15,0.15,0.41);
+    f.push([2, i0, i0+1, i0+2, i0+3]);
+    return { p: [{ hue: 1, s: 28, l: 42 }, { h: 215, s: 10, l: 40 }, { h: 45, s: 95, l: 60, e: 1 }], v, f, nose: 1 };
+  })(),
+  tanker: (() => {
+    const v = [-0.8,-0.6,0.34,  0.8,-0.6,0.34,  1.0,0.22,0.30,  0.55,0.86,0.30,  -0.55,0.86,0.30,  -1.0,0.22,0.30];
+    for (let i = 0; i < 6; i++) v.push(v[i*3], v[i*3+1], -0.28);
+    const f = [[0, 0,1,2,3,4,5]];
+    for (let i = 0; i < 6; i++) { const j = (i + 1) % 6; f.push([1, i, j, j+6, i+6]); }
+    let i0 = v.length / 3;
+    v.push(-0.85,-0.05,0.365,  0.85,-0.05,0.365,  0.8,0.3,0.365,  -0.8,0.3,0.365);
+    f.push([2, i0, i0+1, i0+2, i0+3]);
+    for (const px of [-0.5, 0, 0.5]) {
+      i0 = v.length / 3;
+      v.push(px-0.16,-0.95,0.42,  px+0.16,-0.95,0.42,  px+0.19,-0.52,0.40,  px-0.19,-0.52,0.40,
+             px-0.13,-0.96,0.40,  px+0.13,-0.96,0.40,  px+0.13,-0.96,0.04,  px-0.13,-0.96,0.04);
+      f.push([1, i0, i0+1, i0+2, i0+3], [3, i0+4, i0+5, i0+6, i0+7]);
+    }
+    return { p: [{ h: 214, s: 9, l: 48 }, { h: 216, s: 11, l: 32 }, { hue: 1, s: 34, l: 42 }, { h: 28, s: 95, l: 58, e: 1 }], v, f, nose: 1 };
+  })(),
+};
+function buildBossHull(domePal) {
+  const v = [0,0,0.30,  0,0,-0.20];
+  const f = [];
+  for (let i = 0; i < 8; i++) { const a = i / 8 * 6.2832 + 0.3927; v.push(Math.cos(a) * 0.8, Math.sin(a) * 0.8, 0.06); }
+  for (let i = 0; i < 8; i++) { const j = 2 + i, k = 2 + (i + 1) % 8; f.push([0, 0, j, k], [1, 1, j, k]); }
+  for (const s of [-1, 1]) {
+    const i0 = v.length / 3;
+    v.push(s*0.5,-0.34,0.22,  s*0.82,-0.30,0.16,  s*0.82,0.30,0.16,  s*0.5,0.34,0.22,
+           s*0.86,-0.26,-0.10,  s*0.86,0.26,-0.10);
+    f.push([1, i0, i0+1, i0+2, i0+3], [1, i0+1, i0+4, i0+5, i0+2]);
+  }
+  const i0 = v.length / 3;
+  v.push(0,0,0.48,  0.31,0,0.30,  0,0.31,0.30,  -0.31,0,0.30,  0,-0.31,0.30);
+  f.push([2, i0, i0+1, i0+2], [2, i0, i0+2, i0+3], [2, i0, i0+3, i0+4], [2, i0, i0+4, i0+1]);
+  return { p: [{ hue: 1, s: 24, l: 44 }, { hue: 1, s: 18, l: 28 }, domePal], v, f, nose: 1 };
+}
+const MESH_BOSS_M = buildBossHull({ h: 196, s: 60, l: 52 });   // mini: cyan bridge
+const MESH_BOSS_S = buildBossHull({ h: 44, s: 70, l: 52 });    // sector: gold bridge
+function buildBossRim(n) {
+  const v = [], f = [];
+  for (let i = 0; i < n; i++) {
+    const a = i / n * 6.2832, ca = Math.cos(a), sa = Math.sin(a), i0 = v.length / 3;
+    // barrels slope root->tip so each one meets the light at its own angle
+    // and the rim shimmers as it turns
+    const pts = [-0.15,-0.72,0.14,  0.15,-0.72,0.14,  0.09,-1.16,0.04,  -0.09,-1.16,0.04,
+                 -0.07,-1.16,0.04,  0.07,-1.16,0.04,  0.07,-1.30,0.04,  -0.07,-1.30,0.04];
+    for (let j = 0; j < 8; j++) { const x = pts[j*3], y = pts[j*3+1]; v.push(x*ca - y*sa, x*sa + y*ca, pts[j*3+2]); }
+    f.push([0, i0, i0+1, i0+2, i0+3], [1, i0+4, i0+5, i0+6, i0+7]);
+  }
+  return { p: [{ h: 218, s: 12, l: 34 }, { h: 352, s: 92, l: 56, e: 1 }], v, f, nose: 1 };
+}
+const MESH_RIM_M = buildBossRim(7), MESH_RIM_S = buildBossRim(10);
+/* Transform + paint. Verts land in module scratch arrays; faces are
+   painter-sorted by mean depth, normals are two-sided (flipped to face the
+   camera), and each face gets its shaded fill plus a thin dark panel-gap
+   stroke -- which is most of what makes the plating read as riveted metal
+   rather than plastic. */
+const MV_X = new Float32Array(160), MV_Y = new Float32Array(160), MV_Z = new Float32Array(160);
+const MD = new Float32Array(64);
+function drawMeshTop(m, s, bank, spin, seed) {
+  const V = m.v, n = V.length / 3;
+  const cb = Math.cos(bank), sb = Math.sin(bank), cs = Math.cos(spin), ss = Math.sin(spin);
+  for (let i = 0; i < n; i++) {
+    let x = V[i*3] * s, y = V[i*3+1] * s, z = V[i*3+2] * s;
+    if (spin) { const t = x * cs - y * ss; y = x * ss + y * cs; x = t; }
+    if (bank) { const t = x * cb + z * sb; z = z * cb - x * sb; x = t; }
+    MV_X[i] = x; MV_Y[i] = y; MV_Z[i] = z;
+  }
+  paintMeshFaces(m, seed, false);
+}
+function paintMeshFaces(m, seed, persp) {
+  const F = m.f, idx = [];
+  for (let i = 0; i < F.length; i++) {
+    const f = F[i]; let d = 0;
+    for (let j = 1; j < f.length; j++) d += MV_Z[f[j]];
+    MD[i] = d / (f.length - 1);
+    idx.push(i);
+  }
+  // top view: low z is far from the camera; dogfight: HIGH z is far
+  idx.sort(persp ? (a, b) => MD[b] - MD[a] : (a, b) => MD[a] - MD[b]);
+  const L = persp ? DF_LIGHT : M_LIGHT;
+  for (const fi of idx) {
+    const f = F[fi], pal = m.p[f[0]], a = f[1], b = f[2], c = f[3];
+    if (persp) {
+      let clip = false;
+      for (let j = 1; j < f.length; j++) if (MV_Z[f[j]] < 90) { clip = true; break; }
+      if (clip) continue;
+    }
+    const e1x = MV_X[b] - MV_X[a], e1y = MV_Y[b] - MV_Y[a], e1z = MV_Z[b] - MV_Z[a];
+    const e2x = MV_X[c] - MV_X[a], e2y = MV_Y[c] - MV_Y[a], e2z = MV_Z[c] - MV_Z[a];
+    let nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+    // two-sided: flip the normal to face the camera, wherever the camera is —
+    // but a face seen from its back is an underside, and an underside is in
+    // shadow. Without the dim, a banked hull's falling edge lights up as
+    // brightly as its rising one and the bank stops reading.
+    let flipped = false;
+    if (persp ? (nx * MV_X[a] + ny * MV_Y[a] + nz * MV_Z[a] > 0) : nz < 0) { nx = -nx; ny = -ny; nz = -nz; flipped = true; }
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    let lum = Math.max(0, (nx * L.x + ny * L.y + nz * L.z) / nl);
+    if (flipped) lum *= 0.3;
+    ctx.beginPath();
+    for (let j = 1; j < f.length; j++) {
+      const vi = f[j];
+      let X = MV_X[vi], Y = MV_Y[vi];
+      if (persp) { const k = DF_FL / MV_Z[vi]; X = W / 2 + MV_X[vi] * k; Y = dfCy() + MV_Y[vi] * k; }
+      j === 1 ? ctx.moveTo(X, Y) : ctx.lineTo(X, Y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = mFaceCol(pal, lum, seed * 131 + fi);
+    ctx.fill();
+    if (!pal.e) { ctx.strokeStyle = 'rgba(8,10,16,0.55)'; ctx.lineWidth = 0.6; ctx.stroke(); }
+  }
+}
+function drawShipModel(cold) {
+  drawMeshTop(MESH_SHIP, 1, cold ? 0 : visBank(ship, ship.x, 0.85), 0, 11);
+  if (cold) return;
+  for (const sd of [-1, 1]) {
+    const fl = 5 + Math.random() * 6;
+    ctx.fillStyle = 'hsl(40,100%,64%)'; glow('#ffc300', 8);
+    poly([sd * 6.2, 13.5, sd * 9.6, 13.5, sd * 7.9, 14.5 + fl]); ctx.fill(); noGlow();
+  }
+}
+function drawEnemyModel(e) {
+  const seed = 23 + DF_TYPES.indexOf(e.type);
+  if (e.type === 'spinner') { drawMeshTop(MESH_ENEMY.spinner, e.r, 0, e.ang, seed); return; }
+  // e.x is undefined for the title word's formation dots: they fly nothing
+  drawMeshTop(MESH_ENEMY[e.type], e.r, visBank(e, e.x, 0.6), 0, seed);
+}
+function drawBossModel() {
+  const R = boss.r, sec = boss.sector;
+  drawMeshTop(sec ? MESH_RIM_S : MESH_RIM_M, R, 0, boss.t * (sec ? 0.55 : 0.4), 31);
+  drawMeshTop(sec ? MESH_BOSS_S : MESH_BOSS_M, R, 0, 0, 32);
+}
+/* The dogfight path skips the billboard entirely: the sim is already fully
+   3D, so under this style the mesh is simply oriented along its velocity
+   (rolled by the same s.roll the billboard banks with) and projected vertex
+   by vertex. The flat-sprite degeneracies -- the foreshortening floor, the
+   kept-last screen direction -- do not exist here: nose-on is just the
+   actual nose of the model. */
+function dfDrawShipModel(s) {
+  if (s.p.z < 95) return;
+  if (s.sx < -300 || s.sx > W + 300 || s.sy < -300 || s.sy > H + 300) return;
+  const foe = s.side !== 'ally';
+  const m = foe ? MESH_ENEMY[s.type] : MESH_SHIP;
+  const sc = (foe ? s.r : 1) * s.scale;
+  let fx = s.v.x, fy = s.v.y, fz = s.v.z;
+  const fl = Math.hypot(fx, fy, fz) || 1; fx /= fl; fy /= fl; fz /= fl;
+  let ux = 0, uy = -1, uz = 0;
+  if (Math.abs(fy) > 0.92) { uy = 0; uz = 1; }   // diving straight up/down: any up will do
+  let rx = uy * fz - uz * fy, ry = uz * fx - ux * fz, rz = ux * fy - uy * fx;
+  const rl = Math.hypot(rx, ry, rz) || 1; rx /= rl; ry /= rl; rz /= rl;
+  const px = fy * rz - fz * ry, py = fz * rx - fx * rz, pz = fx * ry - fy * rx;
+  const cr = Math.cos(s.roll), sr = Math.sin(s.roll);
+  const Rx = rx * cr + px * sr, Ry = ry * cr + py * sr, Rz = rz * cr + pz * sr;
+  const Ux = px * cr - rx * sr, Uy = py * cr - ry * sr, Uz = pz * cr - rz * sr;
+  const ns = m.nose;
+  const spin = foe && s.type === 'spinner' ? s.ang : 0;
+  const cs = Math.cos(spin), ss = Math.sin(spin);
+  const V = m.v, n = V.length / 3;
+  for (let i = 0; i < n; i++) {
+    let x = V[i*3] * sc, y = V[i*3+1] * sc;
+    const z = V[i*3+2] * sc;
+    if (spin) { const t = x * cs - y * ss; y = x * ss + y * cs; x = t; }
+    const my = y * ns;
+    MV_X[i] = s.p.x + x * Rx + my * fx + z * Ux;
+    MV_Y[i] = s.p.y + x * Ry + my * fy + z * Uy;
+    MV_Z[i] = s.p.z + x * Rz + my * fz + z * Uz;
+  }
+  ctx.save();
+  ctx.globalAlpha = (0.32 + 0.68 * Math.min(1, 1200 / s.p.z)) *
+                    (s.hurt > 0 && Math.random() < 0.5 ? 0.4 : 1);
+  const prev = hueOverride;
+  if (foe) hueOverride = s.hueDeg;
+  paintMeshFaces(m, foe ? 23 + DF_TYPES.indexOf(s.type) : 11, true);
+  hueOverride = prev;
+  ctx.restore();
+}
+/* The one three-way dispatch: every hull in the game is painted through
+   these, so a style cannot drift between the field, the bays, the station,
+   the title word and the dogfight. */
+function paintShip(cold) {
+  if (gfx === 'model') drawShipModel(cold);
+  else if (gfx === 'toon') drawShipToon(cold);
+  else drawShipNeon(cold);
+}
+function paintEnemy(e) {
+  if (gfx === 'model') drawEnemyModel(e);
+  else if (gfx === 'toon') drawEnemyToon(e);
+  else drawEnemyNeon(e);
+}
+function paintBoss() {
+  if (gfx === 'model') drawBossModel();
+  else if (gfx === 'toon') drawBossToon();
+  else drawBossNeon();
+}
+
 /* ============================ TITLE SCREEN ==============================
    Three layers around ONE plane. Everything in the dogfight carries a z, the
    UI sits at DF_ZUI, and the scene paints far -> UI -> near. That single
@@ -2386,6 +2701,7 @@ function dfUpdate(dt) {
    perfectly nose-on plate has zero area, and a hull that blinks out at the
    exact moment it lines up with the camera reads as a bug, not as physics. */
 function dfDrawShip(s) {
+  if (gfx === 'model') { dfDrawShipModel(s); return; }   // real meshes need no billboard
   if (s.p.z < 95) return;
   if (s.sx < -300 || s.sx > W + 300 || s.sy < -300 || s.sy > H + 300) return;
   const d = s.sd, S = s.k * s.scale;
@@ -2488,7 +2804,7 @@ function buildTitleWord() {
             // and a big one starts eating the letters' counters.
             ctx.rotate((((h >>> 19) % 440) - 220) / 1000);
             const e = { type, r: u * TITLE_R[type], ang: ((h >>> 11) % 628) / 100, slowT: 0 };
-            if (gfx === 'toon') drawEnemyToon(e); else drawEnemyNeon(e);
+            paintEnemy(e);
             ctx.restore();
           }
         }
@@ -2563,7 +2879,7 @@ function drawPilotSlot(s) {
   ctx.translate(s.x + s.w / 2, s.y + s.h * 0.40);
   const k = s.w / 62;
   ctx.scale(k, k);
-  if (gfx === 'toon') drawShipToon(true); else drawShipNeon(true);   // parked: engines cold
+  paintShip(true);   // parked: engines cold
   ctx.restore();
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
   ctx.font = Math.round(s.w * 0.135) + "px 'Black Ops One'"; ctx.fillStyle = '#dde3ff';
@@ -2703,7 +3019,7 @@ function draw() {
   for (const e of enemies) drawEnemy(e);
   if (boss) {
     ctx.save(); ctx.translate(boss.x, boss.y);
-    if (gfx === 'toon') drawBossToon(); else drawBossNeon();
+    paintBoss();
     ctx.restore();
     // boss hp bar
     const bw = W - 80, frac = boss.hp / boss.maxHp;
