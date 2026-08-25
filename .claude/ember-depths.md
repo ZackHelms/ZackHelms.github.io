@@ -56,6 +56,43 @@ realistic light-map rendering. Single self-contained file.
   bone archer, tusked brute, translucent wraith), y-sorted, elliptical
   ground shadows, animated flame (layered radial gradients).
 
+## Camera / zoom
+
+`tile`, `ox`, `oy` remain the **only** things the renderer and the tap
+hit-test read, so zoom is entirely a question of what `applyView()` writes
+into them. Everything else follows:
+
+- `baseTile` is the whole-board fit `resize()` computes (`floor(min(W/COLS,
+  availH/ROWS))`), and is also **`MIN_ZOOM`** — pinching out returns you to
+  "everything visible" and no further, because below the fit there is nothing
+  to see but margin. `MAX_ZOOM` 3.2. `tile = baseTile * zoom`.
+- `camX`/`camY` are the world (tile-space) point held at the centre of the
+  **board viewport** (`viewX/viewY/viewW/viewH` = the board area between the HUD
+  row and the bottom margin). `applyView()` clamps them so the board can never
+  be dragged off that viewport, and **centres an axis outright** when the
+  board is smaller than the viewport on it. Zoom 1 is exactly that case on
+  both axes, so it reproduces the original layout.
+- `zoomAt(sx, sy, factor)` pins the world point under `(sx,sy)` — that is the
+  pinch anchor. `panBy(dx, dy)` is a no-op at zoom 1 (the clamp re-centres).
+- `centerCam()` runs at the end of `genFloor`, so a zoomed run opens each new
+  floor on the player rather than last floor's corner. Zoom itself persists.
+- `followCam(dt)` is a **correction, not a lock**: it does nothing until the
+  player nears the edge of a dead zone, then eases just enough to bring them
+  back, so a deliberate pan survives. It runs only while zoom > 1 and no
+  gesture is live.
+- A zoomed board is bigger than its viewport, so `drawScene` masks the strips
+  outside `view*` back to background **before** the vignette — otherwise the
+  dungeon renders up behind the HUD text.
+
+Gestures share the canvas and must never be confused (`TAP_SLOP` 14 px):
+1 finger under slop → tap; 1 finger over slop → drag-pan (only at zoom > 1);
+2 fingers → pinch zoom + pan at the midpoint. `gestured` latches for the whole
+touch sequence once a pinch or drag happens, so the final lift never fires a
+stray tap. Every canvas touch handler `preventDefault()`s, and document-level
+`gesture*` + multi-touch `touchmove` guards kill Safari's own page zoom, so a
+pinch only ever scales the board. `wheel` (plain and ctrl+wheel) zooms on
+desktop.
+
 ## Audio
 
 Standard stack: lazy `audioInit` (also called by every `bindTap` handler),
@@ -63,6 +100,26 @@ shared `noiseBuf` created in `audioInit`, `sfxGain`/`musicGain`, mute key
 `ember-depths-mute`, `visibilitychange` suspend. Music: continuous detuned
 saw drone through a lowpass + 32-step sequencer (minor triangle plucks, deep
 toms, echoing bandpass "drips" — 3 scheduled repeats fake the cavern echo).
+
+## Settings
+
+Cogwheel `#cog` is the third button in the top-left row (← / 🔊 / ⚙), at
+`z-index:45` — **above its own scrim** (`#settings`, z 40), which is what makes
+it a toggle rather than a one-way door. The scrim layers over whatever is
+underneath (title, relic choice, live floor) rather than replacing it, so
+closing restores the view with no state to keep; it also swallows a stray tap
+that would otherwise reach the board. Tapping the scrim itself closes.
+
+Two sliders, music and SFX, 0–100% in steps of 5. They **scale** the mix
+headroom the game was tuned at (`SFX_BASE` 0.4, `MUSIC_BASE` 0.14), so 100% is
+exactly the old behaviour; `applyVolumes()` is the single place both gains are
+written, and mute still wins over both. Persisted as
+`ember-depths-sfxvol` / `ember-depths-musicvol` (floats 0–1; anything out of
+range falls back to 1). Raising a slider above 0 while muted **un-mutes** —
+otherwise the panel is dead and the player has no idea why. A slider drag also
+calls `audioInit()`, since it is a valid iOS unlock gesture.
+
+The HUD's `DEPTH`/gold text starts at x=148 to clear the third button.
 
 ## Test hooks / traps
 
@@ -74,6 +131,19 @@ toms, echoing bandpass "drips" — 3 scheduled repeats fake the cavern echo).
   on every `playerAct` (established trap class).
 - Chest/stairs transitions skip the enemy turn — don't assert enemy
   movement across them.
+- **Camera state is eased every frame.** `followCam` runs on the next rAF
+  after any camera change, so a drive check that does `evaluate(panBy(...))`
+  and then reads `ox`/`oy` in a *second* `evaluate` measures the follow, not
+  the pan. Act and read in **one** `page.evaluate`. (Cost three false
+  failures on 2026-08-25 — the clamp and pinch-anchor checks were right and
+  the test was wrong.)
 - Drive: `scratchpad/drive-ember.cjs` (34 checks: gen invariants ×30
   floors, combat math, relic effects, path walk, 250-turn fuzz, death
-  persistence, mute reload).
+  persistence, mute reload). Camera + settings were driven separately
+  (2026-08-25, 61 checks over three scratchpad scripts): slider → gain math,
+  mute precedence, reload persistence; zoom clamps, pinch anchor, pan clamped
+  at all four edges, zoom-1 layout identity, screen→tile round-trip at zoom,
+  camera follow, re-centre on descend, 120-turn fuzz at zoom 2; and a real
+  multi-touch pass through CDP `Input.dispatchTouchEvent` asserting a pinch
+  and a drag each issue **no** move while a short tap still does, and that
+  `visualViewport.scale` stays 1 throughout.
