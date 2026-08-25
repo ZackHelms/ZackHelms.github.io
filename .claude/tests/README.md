@@ -8,6 +8,40 @@ fine for a game whose rules fit in your head. A suite earns a place here when
 **re-deriving it would cost more than reading it**: when it encodes fairness or
 design invariants rather than just poking the UI.
 
+## Rules a check has to clear
+
+Three of these were learned the hard way on 2026-08-24, writing the
+star-surge title-screen group. All three describe checks that were **green and
+worthless**, which is the only really dangerous kind.
+
+- **A flaky gate is worse than no gate.** A containment check on a procedural
+  dogfight passed, then failed on a re-run — 2 escaped samples in 18 000,
+  because the spawn is random. The fix is never to loosen the threshold until
+  it stops going red: it is to make the property a **hard invariant**. There,
+  soft steering springs were doing the flying and the check was measuring luck;
+  adding a hard clamp at a limit no player can see turned "never leaves the
+  arena" from a probability into something the code guarantees. A gate that
+  goes red one run in five is a gate that gets ignored.
+- **`> 0` is not a check.** "The fight resolves — a downed hull comes back" was
+  written as `respawns > 0`, and it passed while the guns fired down the nose
+  and hit essentially nothing (98 shots and zero kills over a simulated
+  minute). Sample the real behaviour across a handful of runs, then put the
+  threshold **near the observed floor with margin** — `respawns >= 2` against
+  an observed 4–8. A bound at the vacuous end of the range asserts that the
+  feature exists, not that it works.
+- **Stages inside one check must not share mutable state.** An erase-gesture
+  check ran three stages — tap, slide-off, full hold — against one seeded
+  pilot. When stage 1 regressed, that pilot was already gone, so stage 2's
+  press landed on an empty slot instead of the bin and the whole suite died on
+  a null. A failure became a crash, which hid the other 76 results and the
+  failing check's own name. Re-seed per stage; the cost is three lines.
+
+And one older rule that keeps earning its place: **break it to believe it.**
+Every check above was verified by deliberately breaking the thing it guards and
+confirming that check — and only that check — went red. `.claude/scripts/negtest.sh`
+exists so the break always gets restored (`save` before, `restore` after, and
+note that `restore` consumes the snapshot, so re-`save` before the next break).
+
 | Suite | Game | Why it lives here |
 | --- | --- | --- |
 | `drive-wayfinder.cjs` | `games/wayfinder/` | 82 checks including a BFS walkability gate, a final-leg gate (every route the lessons instruct is walkable), and a cheat gate (each lesson refuses to complete without its technique). These caught an objective placed behind a 74° face and another placed inside a stream channel. |

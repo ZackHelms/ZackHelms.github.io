@@ -67,6 +67,14 @@ Deterministic helpers for working on this repo.
   cheerful `SHOT=` line — and a typo'd key (`widht=390`) fell through to
   `NaN` and was ignored. Both exit 1 with a usage message now (2026-08-23).
 
+  `select=` sets the value directly and dispatches `input`/`change` rather than
+  going through `page.selectOption`. A settings picker normally lives in a panel
+  that starts `display:none`, and selectOption's actionability check waits for a
+  visibility that never arrives — so `select=` silently did nothing on exactly
+  the pickers it was added for. A failed `select=`/`eval=` now **exits 1**: a
+  shot of the wrong scene is worse than no shot, and reporting it while exiting
+  0 is the same class of bug `stamp-badge.sh` already had (both fixed 2026-08-24).
+
   `eval=` runs JS in the page before the wait, so a scene can be **arranged**
   through the game's own test hook rather than screenshotting whatever the game
   happened to be doing. Added 2026-08-23, after a session hand-rolled four
@@ -81,6 +89,52 @@ Deterministic helpers for working on this repo.
 
   node .claude/scripts/shot-page.cjs games/neon-clash/index.html /tmp/a.png \
     wait=950 eval="__NC.setSkin('toon'); __NC.start('2p'); __NC.setEnergy(0,20); __NC.deploy(0,'fireball',50,104)"
+  ```
+
+- `shot-strip.cjs` — **contact sheet**: N frames of a page, spaced in time,
+  tiled into one PNG. Same options as `shot-page.cjs` plus `frames=`/`gap=`.
+
+  `shot-page.cjs` answers "does this look right?"; it cannot answer "does this
+  *scene* look right?" when the scene moves on its own — a procedural
+  background, a physics sim, an AI that is only interesting when it does
+  something. One frame of an animation is a sample of size one, and the frame
+  you catch is routinely the boring one: on 2026-08-24 a title-screen dogfight
+  read as "completely broken, no ships visible" from a single shot, and the
+  ships were fine — the shot had landed in a lull. It also costs one image to
+  review instead of N, which matters when the whole point is comparing frames
+  against each other.
+
+  ```
+  node .claude/scripts/shot-strip.cjs games/star-surge/index.html /tmp/s.png \
+    frames=4 gap=1000 select=#gfx-select:neon
+  ```
+
+- `frame-budget.cjs` — **is this page holding 60fps?** Measures rAF deltas on a
+  live, presenting page and prints `FRAME median= p95= max= over=` plus
+  `BUDGET=ok|over`; exits 1 if the median is over budget (default 16.9 ms).
+  Same `w=/h=/dpr=/select=/eval=` options as the shot tools, plus `frames=`,
+  `budget=` and `swiftshader=1`.
+
+  It exists because **Canvas 2D calls are queued**, so the obvious measurement
+  is wrong: timing a loop of `update()`/`draw()` reported 1.43 ms/frame for a
+  scene that was really at 33.3, and adding a `getImageData` to "force a flush"
+  produced a different confident wrong number (the empty-loop baseline came
+  back at 0.01 ms, which is the tell). Three measurement rounds went that way
+  on 2026-08-24 before rAF deltas found the real regression.
+
+  Two things about the output. It is **quantized to vsync** — 16.7 means inside
+  budget, 33.3 means missing every second frame — so it says whether you are
+  over, never how much headroom you have; bisect by stubbing pieces out
+  (`eval="window.drawFoo = () => {}"`) to find what costs. And it deliberately
+  does **not** pass the screenshot tools' `--use-angle=swiftshader` flags:
+  those let a WebGL page render at all, and they also drag the 2D canvas onto
+  software rasterization, which took the same page from 16.7 ms to 50.0 ms.
+  Use `swiftshader=1` for a WebGL page, and do not compare that number against
+  a run without it.
+
+  ```
+  node .claude/scripts/frame-budget.cjs games/star-surge/index.html
+  node .claude/scripts/frame-budget.cjs games/star-surge/index.html select=#gfx-select:neon
   ```
 
 - `gates.sh` — runs the whole validation set in one command: the smoke gate on

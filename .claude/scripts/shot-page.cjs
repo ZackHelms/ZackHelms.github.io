@@ -79,9 +79,23 @@ const executablePath = candidates.find(p => { try { return fs.existsSync(p); } c
   await page.goto('file://' + path.resolve(page_), { waitUntil: 'load' });
   await page.waitForTimeout(600);
   if (opt.click) { try { await page.mouse.click(opt.click[0], opt.click[1]); } catch {} }
+  // Set the value directly rather than through page.selectOption. A settings
+  // picker usually lives in a panel that starts `display:none` (star-surge's
+  // and neon-clash's both do), and selectOption's actionability check waits
+  // for a visibility that never arrives, so `select=` silently did nothing on
+  // exactly the pickers it was added for (2026-08-24). Dispatch the events
+  // too — the value alone changes nothing.
   for (const s of opt.select) {
     const i = s.indexOf(':');
-    try { await page.selectOption(s.slice(0, i), s.slice(i + 1)); } catch (e) { errors.push('select failed: ' + s); }
+    const ok = await page.evaluate(([sel, val]) => {
+      const el = document.querySelector(sel);
+      if (!el) return false;
+      el.value = val;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return el.value === val;
+    }, [s.slice(0, i), s.slice(i + 1)]);
+    if (!ok) errors.push('select failed (no such element, or value rejected): ' + s);
   }
   // Arrange the scene through the page's own test hook before shooting. Most
   // games expose one (window.__NC, __PH, ...); this is the difference between
@@ -96,5 +110,9 @@ const executablePath = candidates.find(p => { try { return fs.existsSync(p); } c
   console.log('SHOT=' + out);
   console.log(errors.length ? 'ERRORS:\n' + [...new Set(errors)].slice(0, 8).join('\n') : 'ERRORS=none');
   await browser.close();
-  process.exit(errors.some(e => e.startsWith('PAGEERROR')) ? 1 : 0);
+  // A failed select= or eval= means the scene under the camera is not the
+  // one that was asked for, so it fails like a page error does. Reporting it
+  // and exiting 0 is the same class of bug stamp-badge.sh already had: a
+  // success line computed from intent rather than from the artifact.
+  process.exit(errors.length ? 1 : 0);
 })().catch(e => { console.error('FATAL', e.message); process.exit(1); });

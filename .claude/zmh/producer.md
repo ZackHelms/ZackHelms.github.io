@@ -53,6 +53,9 @@
   The 2026-08-23 star-surge station pass (`992a7bd`, `430b647`) likewise left
   nothing behind: the only other commit in its range was `1e8a778`, the
   turret-builder session's own refine commit, already accounted for above.
+  The 2026-08-24 star-surge title-screen pass (`21301b6`) ran alone: the only
+  other commit between the pointer and HEAD was `cf8ac9d`, its own session's
+  earlier refine commit.
 
 ## Validation
 - Procedure: headless mobile smoke-load of every changed page (the games

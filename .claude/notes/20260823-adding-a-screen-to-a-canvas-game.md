@@ -24,6 +24,13 @@ Six defects, all self-caught before shipping:
 | Shipyard return replayed the arrival crossfade, deadening taps for ~0.3 s | driving the flow headlessly |
 | `endRun(true)` unreachable once a cleared sector routed to the report | reading, during the rewire |
 
+A second pass on the same game (2026-08-24, the title screen) found the split
+again and sharpened it: a screenshot of an *animating* scene is a sample of
+size one, and the frame you catch is routinely the boring one — a dogfight read
+as "completely broken, no ships visible" from a single shot when the ships were
+fine and the shot had landed in a lull. Use `.claude/scripts/shot-strip.cjs`
+(N frames, spaced, tiled into one image) for anything that moves on its own.
+
 **Screenshots caught four of six.** Not one of those four would have failed any
 test that existed. Budget a screenshot round per visual feature — but note
 what the screenshots did *not* catch, below.
@@ -91,6 +98,25 @@ existing. Nothing failed; the dead branch sat there looking maintained.
 > harmless — the next reader will maintain it, and a test written against it
 > passes forever without proving anything.
 
+## Trap 4 — a cached bitmap that never re-bakes
+
+Added 2026-08-24, from the title screen. A screen that bakes something
+expensive into an offscreen bitmap (there: a logo spelled out of ~116
+cel-shaded hulls) must key that cache on **everything the bake read**. Miss the
+graphics style and a style switch repaints the whole screen around a logo that
+is still in the old style, forever, with no error anywhere.
+
+> **Rule.** Key a baked bitmap on `gfx` + derived size + `dpr`, and assert the
+> key *differs* between styles. Two lines, and it catches the whole class:
+>
+> ```js
+> gfx = 'toon'; const kT = buildTitleWord().key;
+> gfx = 'neon'; const kN = buildTitleWord().key;   // kT !== kN
+> ```
+
+Bake-vs-paint-live, and how to measure which you need:
+`.claude/notes/20260824-canvas-pseudo-3d-and-measuring-canvas-cost.md`.
+
 ## Canvas UI has no layout engine — so assert what a layout engine would
 
 Buttons and callout lines drawn on canvas get no clipping, no overflow, no
@@ -111,6 +137,25 @@ Cheap assertions that would have caught it, all derived from `W`/`H`:
 Derive every position from `W`/`H` in one layout function that both the
 renderer and the hit-tester call. Two copies of the geometry is how a button
 stops matching the thing it draws.
+
+**Sweep viewports, don't assert one.** All of the above is cheap enough to run
+at six or seven sizes — and it has to be, because there is no reflow: a title
+sized off a column count and a row of bays sized off a viewport fraction can
+collide at one aspect ratio and be perfectly fine at every other. Include at
+least one landscape and one very narrow viewport, and **draw a real frame at
+each** (a layout that computes fine can still throw in a painter):
+
+```js
+for (const [w, h] of [[320,568],[430,932],[768,1024],[844,390],[1024,600],[280,650]]) {
+  await page.setViewportSize({ width: w, height: h });
+  // ...recompute the layout, collect violations by name, then draw()
+}
+await page.setViewportSize({ width: 390, height: 844 });   // put it back
+```
+
+Collect violations as **named strings** (`'icon-above-bay'`, `'title-too-wide'`)
+rather than a boolean per viewport: when it goes red you want to know which rule
+broke at which size, not that something did.
 
 ## Save points: resume must not become undo-my-death
 
