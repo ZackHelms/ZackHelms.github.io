@@ -103,6 +103,58 @@ when the art moves** — the grime-asymmetry hole was *opened by the
 brightness retune hours after the control had legitimately passed*. Re-fire
 the controls after any visual retune of the thing they guard.
 
+## The second style on the same kit (animlight, same day)
+
+`3D ANIMLIGHT` reused the whole renderer and changed three things. What
+transfers:
+
+- **Give a style FAMILY a predicate, not a name.** The moment a second style
+  shared the mesh renderer, every `gfx === 'model'` test in scenery became a
+  lie waiting to happen. `meshGfx()` replaced them, and the fourth style then
+  needed *no* scenery edits at all — the station, the planet limb and the
+  dogfight path all came along free.
+- **Animated lights belong in the mesh's OWN local space.** Author a rig of
+  points, flatten it into one array at attach time, and transform it in the
+  *same loop* that transforms vertices (appended after them in the scratch
+  arrays). A light then rides the bank, the rotor spin and the dogfight's full
+  3D frame for free, and cannot drift off its hull. Dim each light by how
+  squarely it faces the camera (the mesh's own bounding radius is the
+  yardstick) so one that rotates to the far side does not shine through.
+- **Glow with three stacked passes under `globalCompositeOperation =
+  'lighter'`** — wide faint halo, mid body, hot core — never `shadowBlur`.
+  Two calibrations were load-bearing and neither was guessable: the hot core
+  must keep the light's **own hue** (at near-white the three passes stack and
+  every light comes out the same colour), and a conduit must be **thin** (at
+  double the width two parallel veins' halos merged into one blown-out stripe
+  down the fuselage).
+- **Vivid means SATURATED, not lighter.** Pushing lightness instead turned the
+  player's steel fuselage near-white, which left the blue veins nothing to
+  shine against — the exact thing the style existed for. Cap lightness, push
+  saturation, and the lights have a surface again.
+- **A style may legitimately resize the art, and it is still paint** (no hitbox
+  moved). Two consequences: make the scale **context-aware** via a `portrait`
+  flag through the sprite dispatchers, because fixed art boxes — a
+  character-select bay, a drydock, a logo baked out of hulls — overflow or lose
+  legibility at 3x while the field is exactly where the oversize belongs; and
+  grow the **chrome that rings a hull** (shield bubbles, status halos) by the
+  same factor or it vanishes inside the art.
+- **Effects are skinned last and are worth skinning.** Hulls got four
+  treatments before the shield and the pickups did, and the screen read
+  half-converted until they followed. Pick one style as the **baseline the
+  others depart from** (here: neon keeps its original art) so the work is
+  bounded.
+
+### A transparent shell, honestly
+
+For a shield bubble that should read as a 3D spherical shell: a thin shell
+presents its thickness edge-on at the limb and almost none of it head-on, so
+the alpha profile is `1/sqrt(1 - t^2)` — approximate it with radial-gradient
+stops and it reads as a real bubble rather than a disc. For a band of light
+crossing it, the honest primitive is a **vertical strip**, because a band at
+fixed x on a sphere projects to exactly that; travel it as `-cos` so it eases
+at both limbs, which is what a point circling at constant angular speed looks
+like head-on.
+
 ## Numbers worth keeping
 
 - Frame cost (frame-budget.cjs, 390×844 dpr3): 16.7 ms median everywhere —
@@ -112,3 +164,8 @@ the controls after any visual retune of the thing they guard.
 - Pre-existing finding, recorded while comparing: the **neon** station sits
   at a hard 33.3 ms (its per-frame `shadowBlur` strokes), untouched by this
   work — see `.claude/star-surge.md` § station frame cost before touching it.
+- The animlight rigs are free at that resolution: a 16-enemy + boss + 60-bullet
+  field, the title screen and the station all held 16.7 ms median with every
+  hull running lights. What was *not* free was the shield's two live
+  radial-gradient discs at 3x scale — 13 frames in 169 over budget, fixed by
+  baking (below).

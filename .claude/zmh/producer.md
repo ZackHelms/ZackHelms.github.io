@@ -57,7 +57,10 @@
   other commit between the pointer and HEAD was `cf8ac9d`, its own session's
   earlier refine commit. The 2026-08-25 star-surge 3D-models pass (`2e89f88`,
   `1193863`, `088011f`) ran alone too — the only other commits in range were
-  `ba0a205`/`2fe476c`, the same session's earlier refine pass.
+  `ba0a205`/`2fe476c`, the same session's earlier refine pass. The 2026-08-25
+  star-surge animlight pass (`d38bf1d`, `f2c3cb1`) likewise ran alone: the only
+  other commit between the pointer and HEAD was `f367a52`, that same session's
+  3D-models refine commit.
 
 ## Validation
 - Procedure: headless mobile smoke-load of every changed page (the games

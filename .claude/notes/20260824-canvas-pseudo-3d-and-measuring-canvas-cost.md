@@ -143,6 +143,18 @@ the guess.
 Reach for **bake the whole thing** when the content is static between
 parameter changes, and pay for per-element animation only when it is visible.
 
+**It is not only screens.** On 2026-08-25 the same call came up for a single
+*effect*: a shield drawn as two large radial-gradient discs, at 3x art scale,
+cost 13 frames in 169 over budget on a saturated field. The shells never change
+between frames — only the band of light crossing them does — so the shells bake
+to one offscreen sprite and only the sweep stays live, which took it to 0/169,
+*better than the same scene with no shield at all*. The generalisable split is
+**static geometry baked, the one moving part live**, and the moving part should
+fill only its own rectangle rather than the whole bounding box it is clipped
+into. Any per-frame `createRadialGradient` over a large area is a candidate;
+measure it with `frame-budget.cjs` and bisect by stubbing the painter
+(`window.drawShield = () => {}`) to confirm it is the cost before rewriting.
+
 ### A baked bitmap needs a cache key that moves
 
 The failure a cache invites is silent: bake once, never re-bake, and a graphics

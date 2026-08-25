@@ -45,6 +45,13 @@ both are ways a **pixel check** goes green for the wrong reason:
   box. If the subject sits over a scene, ask what that scene alone scores in
   the box and put the bar well above it — as a *fraction of the box* (5% of
   samples there), never a flat count, so it survives a resize.
+- **Cap a resource at every source that can grant it, and assert them in ONE
+  check.** Star-surge's shield cap had three grant sites — armor regen, the
+  pickup, and a run restored from a save written before the cap existed — and a
+  cap added at only one of them is the entire failure mode. One check that
+  drives all three fails loudly (5 / 7 / 9 against a cap of 2) where three
+  separate checks invite one to be quietly forgotten when a fourth source
+  appears.
 - **A pixel check should paint its subject ALONE, over the real backdrop.**
   Two of star-surge's shield checks were green with every style's branch
   collapsed into one, because the sample box's radius differed per style — so
