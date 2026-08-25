@@ -119,7 +119,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-25 03:53 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-25 04:02 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
@@ -1645,23 +1645,60 @@ function stationLayout() {
 }
 
 /* ---- style primitives -------------------------------------------------
-   One geometry, two treatments: toon lays a flat plate with an ink outline,
-   neon strokes the same outline as a glowing wireframe over a dark fill.
-   Keeping the silhouette single-source is why the station cannot drift
-   between the two styles as it grows. */
+   One geometry, three treatments: toon lays a flat plate with an ink
+   outline, neon strokes the same outline as a glowing wireframe over a dark
+   fill, and model fills it as lit metal — a gradient running away from the
+   3D kit's upper-left lamp, a radial gradient turning every disc into a
+   dome. Keeping the silhouette single-source is why the station cannot
+   drift between the styles as it grows. (Windows, callouts and buttons stay
+   emissive in every style — a lit thing is lit whatever the hull is made
+   of, which is the same rule the ships follow.) */
 const STN = '#8f9bb4', STN_LIT = '#dbe6f6', STN_DK = '#59637a', STN_NEON = '#4488ff';
+function dkHex(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  return 'rgb(' + Math.round(((n >> 16) & 255) * f) + ',' +
+                  Math.round(((n >> 8) & 255) * f) + ',' +
+                  Math.round((n & 255) * f) + ')';
+}
 function sPanel(pts, base, lit, neon, lw) {
   if (gfx === 'toon') { celPoly(pts, base, lit, lw || 2.2); return; }
+  if (gfx === 'model') {
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (let i = 0; i < pts.length; i += 2) {
+      if (pts[i] < x0) x0 = pts[i]; if (pts[i] > x1) x1 = pts[i];
+      if (pts[i + 1] < y0) y0 = pts[i + 1]; if (pts[i + 1] > y1) y1 = pts[i + 1];
+    }
+    poly(pts);
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);   // toward the lamp at top-left
+    g.addColorStop(0, lit); g.addColorStop(1, dkHex(base, 0.55));
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(8,10,16,0.55)'; ctx.lineWidth = 1; ctx.stroke();
+    return;
+  }
   poly(pts); ctx.fillStyle = '#0a0a18e6'; ctx.fill();
   ctx.strokeStyle = neon; ctx.lineWidth = 1.8; glow(neon, 9); ctx.stroke(); noGlow();
 }
 function sDisc(x, y, r, base, lit, neon, lw) {
   if (gfx === 'toon') { celCircle(x, y, r, base, lit, lw || 2.2); return; }
+  if (gfx === 'model') {
+    const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
+    g.addColorStop(0, lit); g.addColorStop(0.55, base); g.addColorStop(1, dkHex(base, 0.42));
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(8,10,16,0.55)'; ctx.lineWidth = 1; ctx.stroke();
+    return;
+  }
   ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = '#0a0a18e6'; ctx.fill();
   ctx.strokeStyle = neon; ctx.lineWidth = 1.8; glow(neon, 9); ctx.stroke(); noGlow();
 }
 function sRing(x, y, r, neon, lw) {
   ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
+  if (gfx === 'model') {
+    const g = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+    g.addColorStop(0, STN_LIT); g.addColorStop(1, STN_DK);
+    ctx.strokeStyle = g; ctx.lineWidth = lw || 2; ctx.stroke();
+    return;
+  }
   ctx.strokeStyle = gfx === 'toon' ? INK : neon;
   ctx.lineWidth = lw || 2;
   if (gfx !== 'toon') glow(neon, 10);
@@ -1701,6 +1738,15 @@ function drawHostileSector(a) {
     celCircle(a.x, a.y, a.r, '#5e1526', '#9d2440', 2);
     celCircle(a.x - a.r * 0.20, a.y - a.r * 0.14, a.r * 0.56, '#a32540', '#ff4a68', 1.8);
     celCircle(a.x + a.r * 0.24, a.y + a.r * 0.22, a.r * 0.28, '#ff4a68', '#ffd2da', 1.4);
+  } else if (gfx === 'model') {
+    // a molten orb, breathing with the toon rings' pulse in its core glow
+    const g = ctx.createRadialGradient(a.x - a.r * 0.28, a.y - a.r * 0.32, a.r * 0.1, a.x, a.y, a.r);
+    g.addColorStop(0, 'hsl(348,85%,' + Math.round(52 + pulse * 14) + '%)');
+    g.addColorStop(0.55, '#9d2440');
+    g.addColorStop(1, '#320b15');
+    ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, 7);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(8,10,16,0.55)'; ctx.lineWidth = 1; ctx.stroke();
   } else {
     for (let i = 3; i >= 1; i--) sRing(a.x, a.y, a.r * (i / 3) * pulse, '#ff2244', 2);
   }
@@ -1924,6 +1970,19 @@ function drawPlanetLimb() {
     ctx.restore();
     ctx.beginPath(); ctx.arc(px, py, pr, 0, 7);
     ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke();
+  } else if (gfx === 'model') {
+    // a lit sphere with the toon's cloud bands, plus a thin atmosphere rim
+    ctx.beginPath(); ctx.arc(px, py, pr, 0, 7);
+    const g = ctx.createRadialGradient(px - pr * 0.30, py - pr * 0.45, pr * 0.1, px, py, pr);
+    g.addColorStop(0, '#2e3d72'); g.addColorStop(0.55, '#1c2547'); g.addColorStop(1, '#0b0e20');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(96,144,255,0.35)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.save();
+    ctx.beginPath(); ctx.arc(px, py, pr, 0, 7); ctx.clip();
+    ctx.fillStyle = 'rgba(72,94,168,0.32)';
+    ctx.beginPath(); ctx.ellipse(px + pr * 0.12, py - pr * 0.74, pr * 0.52, pr * 0.055, -0.14, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(px - pr * 0.26, py - pr * 0.56, pr * 0.40, pr * 0.045, -0.09, 0, 7); ctx.fill();
+    ctx.restore();
   } else {
     ctx.beginPath(); ctx.arc(px, py, pr, 0, 7);
     ctx.fillStyle = '#0a0c1c'; ctx.fill();

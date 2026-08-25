@@ -565,14 +565,28 @@ and right at right-hand ones**, on two parallel lanes per side: that pairing
 is the entire reason no line crosses the station or another line, and it is
 asserted rather than eyeballed.
 
-Both styles share one geometry through `sPanel`/`sDisc`/`sRing`/`sStrut` —
+All three styles share one geometry through `sPanel`/`sDisc`/`sRing`/`sStrut` —
 toon lays a flat plate with an ink outline, neon strokes the same outline as
-a glowing wireframe over a dark fill. A structural difference would deserve a
+a glowing wireframe over a dark fill, and model (added 2026-08-25, after the
+CD flagged that the station still read as neon under it) fills the same
+shapes as **lit metal**: a linear gradient running away from the 3D kit's
+upper-left lamp on every plate, a radial gradient turning every disc into a
+dome, plus a shaded planet limb and a molten hostile-sector orb in place of
+the neon rings. Windows, callouts and buttons stay emissive in every style —
+a lit thing is lit whatever the hull is made of, the same rule the ships
+follow. A structural difference would deserve a
 separate routine (see the shared cel-shading note); the station is scenery,
 so a treatment swap is right and keeps the silhouette single-source. The
-docked ship reuses `drawShipToon`/`drawShipNeon` with a new `cold` flag that
+docked ship goes through `paintShip(true)` — the `cold` flag
 suppresses the exhaust: a parked ship still burning its engines is the tell
 that a station is a menu rather than a place.
+
+**Station frame cost** (frame-budget.cjs, 2026-08-25): toon 16.7 ms clean;
+model 16.7 median with 22/149 frames over (the gradients are fine); **neon
+33.3 median — a hard 30fps, pre-existing** and unrelated to the model pass
+(its per-frame `shadowBlur` strokes are the likely cost). It is a static
+menu screen so nothing stutters visibly, but if the neon station is ever
+touched, measure before and after.
 
 ### Things that bit
 

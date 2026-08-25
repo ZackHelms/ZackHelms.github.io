@@ -581,17 +581,32 @@ const allEqual = arr => arr.every(v => v === arr[0]);
       return L.B.map(b => [b.id, Math.round(b.x), Math.round(b.y), Math.round(b.at.x), Math.round(b.at.y)].join(':')).join('|') + '#' + Math.round(L.R);
     };
     const sigToon = layoutSig('toon'), sigNeon = layoutSig('neon'), sigModel = layoutSig('model');
+    // one 8x8 box inside a hub panel, clear of the ring, windows and dome —
+    // metal under model, near-black fill under neon
+    const hub = () => {
+      const L = stationLayout();
+      const x = Math.round(L.f.hub.x - L.R * 0.55), y = Math.round(L.f.hub.y - L.R * 0.55);
+      const d = ctx.getImageData(x, y, 8, 8).data;
+      let s = 0;
+      for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2];
+      return Math.round(s / (d.length / 4));
+    };
     gfx = 'toon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const t = fp();
-    gfx = 'neon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const n = fp();
-    gfx = 'model'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const m = fp();
+    gfx = 'neon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const n = fp(); const hubNeon = hub();
+    gfx = 'model'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const m = fp(); const hubModel = hub();
     gfx = 'toon';
-    return { sigToon, sigNeon, sigModel, t, n, m };
+    return { sigToon, sigNeon, sigModel, t, n, m, hubNeon, hubModel };
   });
   check('the station paints a substantial scene in every style, and all three differ',
         stationPaint.t.h !== stationPaint.n.h && stationPaint.n.h !== stationPaint.m.h && stationPaint.t.h !== stationPaint.m.h &&
         stationPaint.t.lit > 300 && stationPaint.n.lit > 300 && stationPaint.m.lit > 300, stationPaint);
   check('a skin is paint: the station layout is identical in every style',
         stationPaint.sigToon === stationPaint.sigNeon && stationPaint.sigToon === stationPaint.sigModel, stationPaint);
+  // bars sit mid-gap: measured 601 under model, 123 under neon (ring-glow
+  // bleed keeps neon's floor well above black), 111 with the branch dead
+  check('the model station is plated metal, not wireframe: the hub interior is lit where neon leaves it dark',
+        stationPaint.hubModel > 350 && stationPaint.hubNeon < 200,
+        { hubModel: stationPaint.hubModel, hubNeon: stationPaint.hubNeon });
 
   /* ---- title screen ------------------------------------------------------
      The pilots screen is CANVAS: the word, the three bays and the erase
