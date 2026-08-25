@@ -828,7 +828,7 @@ const allEqual = arr => arr.every(v => v === arr[0]);
   check('the fight keeps fighting: hulls shoot, hit, and a downed hull comes back',
         arena.fired > 40 && arena.respawns >= 2, arena);
 
-  /* ---- 3D weathered ('model') style --------------------------------------
+  /* ---- 3D MODELS ('model') style ------------------------------------------
      The third style is the one whose look depends on DERIVED motion (bank)
      and a real per-face light, so the things to pin are: the sim stays
      byte-identical across all three styles while real frames are drawn
@@ -900,28 +900,32 @@ const allEqual = arr => arr.every(v => v === arr[0]);
   check('the ship banks with its own motion: right when flying right, left when left, level at rest',
         shipBank.right > 0.3 && shipBank.left < -0.3 && Math.abs(shipBank.settled) < 0.05, shipBank);
 
+  // The SAME half of the hull at opposite bank signs — same faces, same
+  // per-face grime, so only the light can move the number. What dominates it
+  // is the deck (the biggest face): banked toward the upper-left lamp it
+  // catches the light, banked away it falls off it. Two earlier forms of
+  // this check were wrong: left-vs-right in one frame passed on the grime
+  // difference between the two side skirts with the lighting broken, and a
+  // "rising flank is lit" reading had the geometry backwards.
   const bankLight = await page.evaluate(() => {
     gfx = 'model';
-    const probe = bankVal => {
+    const leftHalf = bankVal => {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
       ctx.save(); ctx.translate(180, 300);
       drawMeshTop(MESH_ENEMY.tanker, 60, bankVal, 0, 26);
       ctx.restore();
-      const half = x0 => {
-        const d = ctx.getImageData(x0, 250, 58, 100).data;
-        let s = 0, c = 0;
-        for (let i = 0; i < d.length; i += 4) { const l = d[i] + d[i + 1] + d[i + 2]; if (l > 30) { s += l; c++; } }
-        return c ? s / c : 0;
-      };
-      return half(120) - half(182);   // left-half brightness minus right-half
+      const d = ctx.getImageData(120, 250, 58, 100).data;
+      let s = 0, c = 0;
+      for (let i = 0; i < d.length; i += 4) { const l = d[i] + d[i + 1] + d[i + 2]; if (l > 30) { s += l; c++; } }
+      return c ? s / c : 0;
     };
-    const pos = Math.round(probe(0.5)), neg = Math.round(probe(-0.5));
+    const towardLamp = Math.round(leftHalf(-0.5)), awayFromLamp = Math.round(leftHalf(0.5));
     gfx = 'toon';
-    return { pos, neg };
+    return { towardLamp, awayFromLamp };
   });
-  check('banking changes the lighting, not just the outline: the lit flank flips with the bank sign',
-        bankLight.pos * bankLight.neg < 0 && Math.abs(bankLight.pos) > 8 && Math.abs(bankLight.neg) > 8, bankLight);
+  check('banking changes the lighting, not just the outline: the deck swings dark-to-lit through the lamp',
+        bankLight.towardLamp - bankLight.awayFromLamp > 40, bankLight);
 
   const dfModel = await page.evaluate(() => {
     gfx = 'model';

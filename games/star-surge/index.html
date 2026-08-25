@@ -119,7 +119,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-25 03:23 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-25 03:53 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
@@ -129,9 +129,9 @@ body {
   <select id="gfx-select">
     <option value="toon">CEL / TOON</option>
     <option value="neon">NEON</option>
-    <option value="model">3D WEATHERED</option>
+    <option value="model">3D MODELS</option>
   </select>
-  <div class="hint">CEL / TOON — inked, flat-shaded starfighters.<br>NEON — the original glowing wireframes.<br>3D WEATHERED — worn-metal hulls that bank into their turns.</div>
+  <div class="hint">CEL / TOON — inked, flat-shaded starfighters.<br>NEON — the original glowing wireframes.<br>3D MODELS — low-poly hulls that bank into their turns.</div>
 </div>
 <div id="overlay"></div>
 <div id="track-label"></div>
@@ -2186,7 +2186,7 @@ function drawBossNeon() {
   ctx.shadowBlur = 0;
 }
 
-/* ========================== 3D WEATHERED STYLE ==========================
+/* =========================== 3D MODELS STYLE ============================
    The third graphics style ('model') gives every hull a real low-poly mesh,
    flat-shaded per face against a screen-fixed light, so a ship that banks
    into a turn genuinely shows its flank and its shading moves across the
@@ -2234,10 +2234,15 @@ function mFaceCol(pal, lum, hs) {
   const h0 = pal.hue ? hueDegNow() : pal.h;
   if (pal.e) return 'hsl(' + h0 + ',' + pal.s + '%,' + pal.l + '%)';
   const w = hash32(hs);
-  const wf = 0.80 + (w % 1000) / 1000 * 0.38;
+  // Weathering is a TINT, not a darkening: a narrow grime band plus the odd
+  // plate re-hued toward rust at full brightness. The first cut ran the band
+  // down to 0.8x and dimmed rust plates further, and hulls just read "dark".
+  const wf = 0.90 + (w % 1000) / 1000 * 0.22;
   const rust = !pal.hue && (w >>> 10) % 7 === 0;   // never corrode the identity colour
-  const shade = 0.30 + 0.90 * Math.pow(lum, 1.55) + (lum > 0.93 ? 0.4 : 0);
-  const l = Math.max(4, Math.min(93, pal.l * shade * (rust ? wf * 0.8 : wf)));
+  // High ambient floor: on a phone over a near-black field, a face that goes
+  // to 30% of base vanishes — and with it the banking it was showing.
+  const shade = 0.52 + 0.75 * Math.pow(lum, 1.35) + (lum > 0.93 ? 0.35 : 0);
+  const l = Math.max(6, Math.min(94, pal.l * shade * wf));
   return 'hsl(' + (rust ? 24 : h0) + ',' + (rust ? Math.min(58, pal.s + 26) : pal.s) + '%,' + l + '%)';
 }
 /* Meshes live in sprite-local units (the player in px, enemies in units of
@@ -2245,11 +2250,11 @@ function mFaceCol(pal, lum, hs) {
    sprite did. `nose` says which way the hull points along its own y axis:
    -1 for the player (nose up-screen), +1 for everything that dives. */
 const MESH_SHIP = {
-  p: [{ h: 214, s: 12, l: 60 },        // steel deck
-      { h: 216, s: 14, l: 40 },        // dark plating
-      { h: 112, s: 40, l: 40 },        // squadron green, long since faded
+  p: [{ h: 214, s: 14, l: 66 },        // steel deck
+      { h: 216, s: 14, l: 48 },        // dark plating
+      { h: 112, s: 52, l: 50 },        // squadron green
       { h: 194, s: 85, l: 62, e: 1 },  // canopy glass
-      { h: 220, s: 10, l: 27 }],       // keel
+      { h: 220, s: 11, l: 36 }],       // keel
   v: [0,-19,0,  0,-6.5,4.4,  0,12.5,2.2,
       -4.8,-3,0.8,  4.8,-3,0.8,  -4.4,12.5,-0.2,  4.4,12.5,-0.2,
       0,-3,-2.8,  0,10,-2.2,
@@ -2267,7 +2272,7 @@ const MESH_SHIP = {
 };
 const MESH_ENEMY = {
   drone: {
-    p: [{ hue: 1, s: 26, l: 46 }, { h: 216, s: 12, l: 30 }, { h: 352, s: 92, l: 58, e: 1 }],
+    p: [{ hue: 1, s: 45, l: 56 }, { h: 216, s: 12, l: 40 }, { h: 352, s: 92, l: 58, e: 1 }],
     v: [0,0,0.55,  0,0,-0.5,  0,-0.85,0.02,  0,0.8,0.02,  -0.6,0,0,  0.6,0,0,
         -0.42,-0.55,0.12,  -1.28,-0.72,-0.18,  -1.22,0.6,-0.18,  -0.42,0.5,0.12,
         0.42,-0.55,0.12,  1.28,-0.72,-0.18,  1.22,0.6,-0.18,  0.42,0.5,0.12,
@@ -2278,7 +2283,7 @@ const MESH_ENEMY = {
     nose: 1,
   },
   shooter: {
-    p: [{ hue: 1, s: 30, l: 44 }, { h: 218, s: 10, l: 30 }, { h: 196, s: 80, l: 56, e: 1 }],
+    p: [{ hue: 1, s: 46, l: 54 }, { h: 218, s: 10, l: 40 }, { h: 196, s: 80, l: 56, e: 1 }],
     v: [0,1.15,0,  0,-0.15,0.45,  -0.85,-0.85,0,  0.85,-0.85,0,  0,-0.9,0.18,  0,-0.2,-0.4,
         -0.68,0.15,0.08,  -0.48,0.15,0.08,  -0.48,1.0,0.02,  -0.68,1.0,0.02,
         0.68,0.15,0.08,  0.48,0.15,0.08,  0.48,1.0,0.02,  0.68,1.0,0.02,
@@ -2303,7 +2308,7 @@ const MESH_ENEMY = {
     const i0 = v.length / 3;
     v.push(-0.15,-0.15,0.41,  0.15,-0.15,0.41,  0.15,0.15,0.41,  -0.15,0.15,0.41);
     f.push([2, i0, i0+1, i0+2, i0+3]);
-    return { p: [{ hue: 1, s: 28, l: 42 }, { h: 215, s: 10, l: 40 }, { h: 45, s: 95, l: 60, e: 1 }], v, f, nose: 1 };
+    return { p: [{ hue: 1, s: 44, l: 52 }, { h: 215, s: 10, l: 50 }, { h: 45, s: 95, l: 60, e: 1 }], v, f, nose: 1 };
   })(),
   tanker: (() => {
     const v = [-0.8,-0.6,0.34,  0.8,-0.6,0.34,  1.0,0.22,0.30,  0.55,0.86,0.30,  -0.55,0.86,0.30,  -1.0,0.22,0.30];
@@ -2319,7 +2324,7 @@ const MESH_ENEMY = {
              px-0.13,-0.96,0.40,  px+0.13,-0.96,0.40,  px+0.13,-0.96,0.04,  px-0.13,-0.96,0.04);
       f.push([1, i0, i0+1, i0+2, i0+3], [3, i0+4, i0+5, i0+6, i0+7]);
     }
-    return { p: [{ h: 214, s: 9, l: 48 }, { h: 216, s: 11, l: 32 }, { hue: 1, s: 34, l: 42 }, { h: 28, s: 95, l: 58, e: 1 }], v, f, nose: 1 };
+    return { p: [{ h: 214, s: 10, l: 58 }, { h: 216, s: 11, l: 42 }, { hue: 1, s: 48, l: 52 }, { h: 28, s: 95, l: 58, e: 1 }], v, f, nose: 1 };
   })(),
 };
 function buildBossHull(domePal) {
@@ -2336,10 +2341,10 @@ function buildBossHull(domePal) {
   const i0 = v.length / 3;
   v.push(0,0,0.48,  0.31,0,0.30,  0,0.31,0.30,  -0.31,0,0.30,  0,-0.31,0.30);
   f.push([2, i0, i0+1, i0+2], [2, i0, i0+2, i0+3], [2, i0, i0+3, i0+4], [2, i0, i0+4, i0+1]);
-  return { p: [{ hue: 1, s: 24, l: 44 }, { hue: 1, s: 18, l: 28 }, domePal], v, f, nose: 1 };
+  return { p: [{ hue: 1, s: 34, l: 52 }, { hue: 1, s: 26, l: 36 }, domePal], v, f, nose: 1 };
 }
-const MESH_BOSS_M = buildBossHull({ h: 196, s: 60, l: 52 });   // mini: cyan bridge
-const MESH_BOSS_S = buildBossHull({ h: 44, s: 70, l: 52 });    // sector: gold bridge
+const MESH_BOSS_M = buildBossHull({ h: 196, s: 65, l: 58 });   // mini: cyan bridge
+const MESH_BOSS_S = buildBossHull({ h: 44, s: 75, l: 56 });    // sector: gold bridge
 function buildBossRim(n) {
   const v = [], f = [];
   for (let i = 0; i < n; i++) {
@@ -2351,7 +2356,7 @@ function buildBossRim(n) {
     for (let j = 0; j < 8; j++) { const x = pts[j*3], y = pts[j*3+1]; v.push(x*ca - y*sa, x*sa + y*ca, pts[j*3+2]); }
     f.push([0, i0, i0+1, i0+2, i0+3], [1, i0+4, i0+5, i0+6, i0+7]);
   }
-  return { p: [{ h: 218, s: 12, l: 34 }, { h: 352, s: 92, l: 56, e: 1 }], v, f, nose: 1 };
+  return { p: [{ h: 218, s: 12, l: 44 }, { h: 352, s: 92, l: 56, e: 1 }], v, f, nose: 1 };
 }
 const MESH_RIM_M = buildBossRim(7), MESH_RIM_S = buildBossRim(10);
 /* Transform + paint. Verts land in module scratch arrays; faces are
@@ -2401,7 +2406,7 @@ function paintMeshFaces(m, seed, persp) {
     if (persp ? (nx * MV_X[a] + ny * MV_Y[a] + nz * MV_Z[a] > 0) : nz < 0) { nx = -nx; ny = -ny; nz = -nz; flipped = true; }
     const nl = Math.hypot(nx, ny, nz) || 1;
     let lum = Math.max(0, (nx * L.x + ny * L.y + nz * L.z) / nl);
-    if (flipped) lum *= 0.3;
+    if (flipped) lum *= 0.45;
     ctx.beginPath();
     for (let j = 1; j < f.length; j++) {
       const vi = f[j];

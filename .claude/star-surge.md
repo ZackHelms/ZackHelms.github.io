@@ -241,9 +241,12 @@ the canvas dismisses the panel rather than steering blind under it.
   with a dark outline (`INK`). No `shadowBlur` anywhere.
 - **`neon`** — the original glowing wireframes, kept byte-for-byte in
   `drawShipNeon`/`drawEnemyNeon`/`drawBossNeon`.
-- **`model`** — "3D WEATHERED": real low-poly meshes in worn metal,
-  flat-shaded per face, that **bank into their turns**. See § The 3D
-  weathered kit below.
+- **`model`** — "3D MODELS": real low-poly meshes, flat-shaded per face,
+  that **bank into their turns**. (Label renamed from "3D WEATHERED"
+  2026-08-25 — the CD's "weathered" meant *texture*, which this style does
+  not attempt; a future style may try real texture/normal maps. The stored
+  id stays `model` so persisted picks survive.) See § The 3D model kit
+  below.
 
 **Every hull is painted through the three dispatchers** `paintShip(cold)` /
 `paintEnemy(e)` / `paintBoss()` — the field, the pilot bays, the station
@@ -304,7 +307,7 @@ sector boss) under a rotating rim of gun barrels, which preserves the neon
 version's spinning-spikes silhouette. Enemy tones all derive from the same
 stage `hue()` as before, so `STAGE_HUES` still recolors every sector.
 
-### The 3D weathered kit (`model`, 2026-08-25)
+### The 3D model kit (`model`, 2026-08-25)
 
 Real low-poly meshes rendered with Canvas 2D — no WebGL. A mesh is
 `{ p, v, f, nose }`: `p` a palette of `{h,s,l}` face colours (`hue:1` swaps
@@ -321,15 +324,17 @@ y (−1 player, +1 everything that dives). Meshes: `MESH_SHIP`,
   (gameplay) painter: spin about z, bank about y, orthographic project,
   painter-sort faces by mean depth, two-sided normals flipped to face the
   camera. **A flipped face is an underside and undersides are in shadow**
-  (`lum *= 0.3`) — without that dim a banked hull's falling edge lights up
-  like its rising one and the bank stops reading. The drive suite's
-  lit-flank check discriminates exactly this.
-- **Shading is a metal's**: `mFaceCol` runs lum through a dark-falloff
-  curve with a hot specular pop past 0.93, then weathers per face off
-  `hash32(seed*131 + faceIndex)` — a grime factor 0.80–1.18 and the odd
-  plate turned to rust (never a `hue:1` face: identity colour is not the
-  weathering's to corrode). Every non-emissive face also gets a thin dark
-  panel-gap stroke, which is most of what reads as riveted plating.
+  (`lum *= 0.45`).
+- **Shading is a metal's, on a HIGH ambient floor**: `mFaceCol` runs lum
+  through `0.52 + 0.75·lum^1.35` with a hot specular pop past 0.93. The
+  first cut floored at 0.30 and the CD's verdict was "too dark — the 3D
+  and the banking don't pop": on a phone over a near-black field, a face
+  at 30% of base vanishes, and with it the banking it was showing. Then
+  per-face variation off `hash32(seed*131 + faceIndex)` — **a tint, not a
+  darkening**: a narrow grime band (0.90–1.12) and the odd plate re-hued
+  toward rust at full brightness (never a `hue:1` face: identity colour is
+  not the grime's to corrode). Every non-emissive face also gets a thin
+  dark panel-gap stroke, which is most of what reads as riveted plating.
 - **Banking is DERIVED, off-entity.** `visBank(o, x, max)` measures the
   entity's own lateral speed between paints (`frameDt` is written at the
   top of `update()`), smooths toward a clamped target, and stores its
