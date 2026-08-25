@@ -19,7 +19,7 @@
 // non-zero unless the verdict is `success` — so the publish check is one
 // command that fails loudly rather than a snippet whose output you must read.
 //
-//   RUN sha=430b6472 status=completed conclusion=success updated=2026-08-23T22:22:44Z
+//   RUN sha=430b6472 status=completed conclusion=success updated=2026-08-23T22:22:44Z run=32787908031
 //   PAGES=success SHA=430b6472
 //
 // Verdicts: success | pending (queued/in_progress, or conclusion not yet set)
@@ -28,6 +28,13 @@
 // Status lags at both the run and the job level — a `pending` here is worth
 // re-reading a minute later before concluding anything is wrong. See
 // .claude/notes/20260817-pages-deploy-wedged-after-503.md.
+//
+// The `run=` field is the workflow run id, printed because the procedure for a
+// run that looks stuck is to read its JOBS (the run object lags behind them),
+// and that call needs the id. Without it here, every such check ends in a
+// hand-rolled parse of the same file — which is the thing this script exists
+// to stop (2026-08-25):
+//   mcp__github__actions_list list_workflow_jobs resource_id=<run>
 'use strict';
 const fs = require('fs');
 
@@ -54,6 +61,7 @@ const line = r => 'RUN sha=' + String(r.head_sha || '').slice(0, 8) +
   ' status=' + (r.status || '?') +
   ' conclusion=' + (r.conclusion == null ? '-' : r.conclusion) +
   ' updated=' + (r.updated_at || '?') +
+  ' run=' + (r.id == null ? '?' : r.id) +
   (r.name && !/pages build and deployment/i.test(r.name) ? ' name=' + JSON.stringify(r.name) : '');
 
 if (!sha) {
