@@ -219,11 +219,11 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     return { stored, active: gfx, options: Array.from(document.querySelectorAll('#gfx-select option')).map(o => o.value) };
   });
   check('cel/toon is the default graphics style with nothing stored', gfxDefault.active === 'toon' && !gfxDefault.stored, gfxDefault);
-  check('settings dropdown offers exactly the three known styles', JSON.stringify(gfxDefault.options) === JSON.stringify(['toon', 'neon', 'model']), gfxDefault.options);
+  check('settings dropdown offers exactly the four known styles', JSON.stringify(gfxDefault.options) === JSON.stringify(['toon', 'neon', 'model', 'anim']), gfxDefault.options);
 
   const painted = await page.evaluate(() => {
     const out = {};
-    for (const style of ['toon', 'neon', 'model']) {
+    for (const style of ['toon', 'neon', 'model', 'anim']) {
       gfx = style;
       startGame(1);
       enemies.length = 0; spawnQueue.length = 0;
@@ -240,7 +240,8 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     }
     return out;
   });
-  check('every entity type paints in every graphics style without throwing', painted.toon === 70 && painted.neon === 70 && painted.model === 70, painted);
+  check('every entity type paints in every graphics style without throwing',
+        painted.toon === 70 && painted.neon === 70 && painted.model === 70 && painted.anim === 70, painted);
 
   // The sun must be fixed in SCREEN space: the spinner draws its blades and
   // dome inside ctx.rotate(e.ang), so without cel()'s frameRot() counter-
@@ -580,7 +581,7 @@ const allEqual = arr => arr.every(v => v === arr[0]);
       const L = stationLayout();
       return L.B.map(b => [b.id, Math.round(b.x), Math.round(b.y), Math.round(b.at.x), Math.round(b.at.y)].join(':')).join('|') + '#' + Math.round(L.R);
     };
-    const sigToon = layoutSig('toon'), sigNeon = layoutSig('neon'), sigModel = layoutSig('model');
+    const sigToon = layoutSig('toon'), sigNeon = layoutSig('neon'), sigModel = layoutSig('model'), sigAnim = layoutSig('anim');
     // one 8x8 box inside a hub panel, clear of the ring, windows and dome —
     // metal under model, near-black fill under neon
     const hub = () => {
@@ -594,19 +595,21 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     gfx = 'toon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const t = fp();
     gfx = 'neon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const n = fp(); const hubNeon = hub();
     gfx = 'model'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const m = fp(); const hubModel = hub();
+    gfx = 'anim'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const a = fp(); const hubAnim = hub();
     gfx = 'toon';
-    return { sigToon, sigNeon, sigModel, t, n, m, hubNeon, hubModel };
+    return { sigToon, sigNeon, sigModel, sigAnim, t, n, m, a, hubNeon, hubModel, hubAnim };
   });
   check('the station paints a substantial scene in every style, and all three differ',
         stationPaint.t.h !== stationPaint.n.h && stationPaint.n.h !== stationPaint.m.h && stationPaint.t.h !== stationPaint.m.h &&
         stationPaint.t.lit > 300 && stationPaint.n.lit > 300 && stationPaint.m.lit > 300, stationPaint);
   check('a skin is paint: the station layout is identical in every style',
-        stationPaint.sigToon === stationPaint.sigNeon && stationPaint.sigToon === stationPaint.sigModel, stationPaint);
+        stationPaint.sigToon === stationPaint.sigNeon && stationPaint.sigToon === stationPaint.sigModel &&
+        stationPaint.sigToon === stationPaint.sigAnim, stationPaint);
   // bars sit mid-gap: measured 601 under model, 123 under neon (ring-glow
   // bleed keeps neon's floor well above black), 111 with the branch dead
-  check('the model station is plated metal, not wireframe: the hub interior is lit where neon leaves it dark',
-        stationPaint.hubModel > 350 && stationPaint.hubNeon < 200,
-        { hubModel: stationPaint.hubModel, hubNeon: stationPaint.hubNeon });
+  check('the mesh-family stations are plated metal, not wireframe: the hub interior is lit where neon leaves it dark',
+        stationPaint.hubModel > 350 && stationPaint.hubAnim > 350 && stationPaint.hubNeon < 200,
+        { hubModel: stationPaint.hubModel, hubAnim: stationPaint.hubAnim, hubNeon: stationPaint.hubNeon });
 
   /* ---- title screen ------------------------------------------------------
      The pilots screen is CANVAS: the word, the three bays and the erase
@@ -728,26 +731,28 @@ const allEqual = arr => arr.every(v => v === arr[0]);
       return [Math.round(L.u), Math.round(L.y0), L.maxCols].join(':') + '#' +
              P.S.map(b => [b.x, b.y, b.w, b.dy, b.dr].map(Math.round).join(',')).join('|');
     };
-    const sigToon = sig('toon'), sigNeon = sig('neon'), sigModel = sig('model');
+    const sigToon = sig('toon'), sigNeon = sig('neon'), sigModel = sig('model'), sigAnim = sig('anim');
     // The word is baked once and kept. If its key does not move with the
     // style, a style switch leaves the OLD bitmap on screen forever.
     gfx = 'toon'; const keyToon = buildTitleWord().key;
     gfx = 'neon'; const keyNeon = buildTitleWord().key;
     gfx = 'model'; const keyModel = buildTitleWord().key;
+    gfx = 'anim'; const keyAnim = buildTitleWord().key;
     gfx = 'toon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const t = fp();
     gfx = 'neon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const n = fp();
     gfx = 'model'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const m = fp();
+    gfx = 'anim'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const a = fp();
     gfx = 'toon';
-    return { sigToon, sigNeon, sigModel, keyToon, keyNeon, keyModel, t, n, m };
+    return { sigToon, sigNeon, sigModel, sigAnim, keyToon, keyNeon, keyModel, keyAnim, t, n, m, a };
   });
-  check('the title screen paints a substantial scene in every style, and all three differ',
-        titlePaint.t.h !== titlePaint.n.h && titlePaint.n.h !== titlePaint.m.h && titlePaint.t.h !== titlePaint.m.h &&
-        titlePaint.t.lit > 300 && titlePaint.n.lit > 300 && titlePaint.m.lit > 300, titlePaint);
+  check('the title screen paints a substantial scene in every style, and all four differ',
+        new Set([titlePaint.t.h, titlePaint.n.h, titlePaint.m.h, titlePaint.a.h]).size === 4 &&
+        titlePaint.t.lit > 300 && titlePaint.n.lit > 300 && titlePaint.m.lit > 300 && titlePaint.a.lit > 300, titlePaint);
   check('a skin is paint: the title and bay layout is identical in every style',
-        titlePaint.sigToon === titlePaint.sigNeon && titlePaint.sigToon === titlePaint.sigModel, titlePaint);
+        titlePaint.sigToon === titlePaint.sigNeon && titlePaint.sigToon === titlePaint.sigModel &&
+        titlePaint.sigToon === titlePaint.sigAnim, titlePaint);
   check('the baked word re-bakes on a style switch instead of serving the old bitmap',
-        titlePaint.keyToon !== titlePaint.keyNeon && titlePaint.keyNeon !== titlePaint.keyModel &&
-        titlePaint.keyToon !== titlePaint.keyModel, titlePaint);
+        new Set([titlePaint.keyToon, titlePaint.keyNeon, titlePaint.keyModel, titlePaint.keyAnim]).size === 4, titlePaint);
 
   // A pilot is the only thing on this screen that cannot be undone, and there
   // is no confirm dialog left to catch a misfire -- so the gesture has to.
@@ -882,12 +887,12 @@ const allEqual = arr => arr.every(v => v === arr[0]);
                  boss: boss ? VIS.get(boss) || null : null },
       };
     };
-    const t = scenario('toon'), n = scenario('neon'), m = scenario('model');
+    const t = scenario('toon'), n = scenario('neon'), m = scenario('model'), a = scenario('anim');
     gfx = 'toon';
-    return { t: t.sim, n: n.sim, m: m.sim, keys: m.keys, keys0: m.keys0, banks: m.banks };
+    return { t: t.sim, n: n.sim, m: m.sim, a: a.sim, keys: a.keys, keys0: a.keys0, banks: m.banks };
   });
-  check('a skin is paint: 90 driven frames leave the sim byte-identical across all three styles',
-        modelSim.t === modelSim.n && modelSim.n === modelSim.m, modelSim);
+  check('a skin is paint: 90 driven frames leave the sim byte-identical across all four styles',
+        modelSim.t === modelSim.n && modelSim.n === modelSim.m && modelSim.m === modelSim.a, modelSim);
   check('the model painters leave no fingerprint on sim objects (bank lives off-entity)',
         modelSim.keys === modelSim.keys0, { keys: modelSim.keys, keys0: modelSim.keys0 });
   check('who banks is the spec: the swaying drone does, straight-line hulls hold level, the spinner spins instead',
@@ -971,6 +976,120 @@ const allEqual = arr => arr.every(v => v === arr[0]);
   });
   check('the model dogfight projects real hulls where the sim says they are',
         dfModel.checked >= 4 && dfModel.visible === dfModel.checked, dfModel);
+
+  /* ---- 3D ANIMLIGHT ('anim') style ----------------------------------------
+     Same mesh renderer, three things of its own: hulls fly deliberately
+     oversized on the FIELD ONLY, the palette is vivid rather than worn, and
+     every hull runs a rig of animated lights. What is worth pinning is what a
+     refactor would quietly break: the scale factors themselves, the fact that
+     framed contexts (a pilot bay, the baked logo) are exempt from them, and
+     that the rigs genuinely animate -- in the place and on the schedule the
+     spec claims, not merely "some pixels changed". */
+  const animScale = await page.evaluate(() => {
+    // Paint one hull alone on a cleared canvas and measure the box it covers.
+    // animT is parked where every blinker sits at its dim ebb, so a strobe's
+    // halo cannot inflate the measurement.
+    animT = 0.5;
+    saves[0] = newCharacter('BIG'); activeSlot = 0; save = saves[0];
+    startGame(1);
+    enemies.length = 0; spawnQueue.length = 0; bullets.length = 0; ebullets.length = 0;
+    const span = fn => {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.save(); ctx.translate(W / 2, H / 2); fn(); ctx.restore();
+      const s = 180, px = Math.round(s * 2 * dpr);
+      const d = ctx.getImageData(Math.round((W / 2 - s) * dpr), Math.round((H / 2 - s) * dpr), px, px).data;
+      let lo = 1e9, hi = -1e9, n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 40 || d[i] + d[i + 1] + d[i + 2] < 90) continue;
+        const x = (i / 4) % px;
+        if (x < lo) lo = x; if (x > hi) hi = x; n++;
+      }
+      return n ? (hi - lo + 1) / dpr : 0;
+    };
+    const drone = { type: 'drone', r: 12, ang: 0, slowT: 0, x: 195, y: 300 };
+    const out = {};
+    for (const style of ['model', 'anim']) {
+      gfx = style;
+      out[style] = {
+        ship: span(() => paintShip(true, false)),
+        drone: span(() => paintEnemy(drone, false)),
+        bay: span(() => paintShip(true, true)),          // a framed portrait
+        word: span(() => paintEnemy(drone, true)),       // a letter's cell
+      };
+    }
+    spawnBoss();
+    for (const style of ['model', 'anim']) { gfx = style; out[style].boss = span(() => paintBoss()); }
+    boss = null; gfx = 'toon'; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return out;
+  });
+  const aRatio = k => animScale.anim[k] / animScale.model[k];
+  // The boss's ceiling is 1.15, not 1.03: its gun rim always has a muzzle
+  // glow or two lit (seven barrels at a 15% duty means ~1 is alight at any
+  // moment) and that glow legitimately reaches past the barrel tips —
+  // measured 1.07. The bar still cannot be cleared by an enemy-scale 2x,
+  // which is the mistake it exists to catch.
+  check('animlight flies oversized hulls: the player at 3x, an ordinary enemy at 2x, the boss untouched',
+        animScale.model.ship > 20 && aRatio('ship') > 2.85 && aRatio('ship') < 3.15 &&
+        aRatio('drone') > 1.88 && aRatio('drone') < 2.12 &&
+        aRatio('boss') > 0.97 && aRatio('boss') < 1.15,
+        { ship: aRatio('ship'), drone: aRatio('drone'), boss: aRatio('boss'), raw: animScale });
+  // A framed hull is art in a box: 3x would spill a pilot bay over its
+  // neighbour and 2x would close the counters of the letters the logo is
+  // spelled from. Both contexts pass portrait=true and must stay 1:1.
+  check('framed hulls are exempt from the scale-up: the pilot bay and the baked logo stay 1:1',
+        Math.abs(aRatio('bay') - 1) < 0.05 && Math.abs(aRatio('word') - 1) < 0.05,
+        { bay: aRatio('bay'), word: aRatio('word') });
+
+  const animLights = await page.evaluate(() => {
+    gfx = 'anim';
+    saves[0] = newCharacter('LIT'); activeSlot = 0; save = saves[0];
+    startGame(1);
+    enemies.length = 0; spawnQueue.length = 0; ebullets.length = 0; bullets.length = 0;
+    boss = null; stageBanner = 0;
+    ship.x = 195; ship.y = 500; ship.shieldCharges = 0;
+    // Sample boxes in SHIP-LOCAL coordinates scaled by 3, so each one sits on
+    // the rig element it is named for rather than on a guessed pixel.
+    const at = (lx, ly, box) => {
+      const x = Math.round(195 + lx * 3 - box / 2), y = Math.round(500 + ly * 3 - box / 2);
+      return () => ctx.getImageData(Math.round(x * dpr), Math.round(y * dpr),
+                                    Math.round(box * dpr), Math.round(box * dpr)).data;
+    };
+    const tipL = at(-16.6, 7.2, 16);                 // left wingtip strobe
+    const veinNose = at(-1.85, -11.9, 9);            // the vein's first segment
+    const veinTail = at(-3.15, 8.85, 9);             // and its last
+    const red = d => { let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 110 && d[i] > d[i + 1] + 45 && d[i] > d[i + 2] + 45) n++; return n; };
+    const lum = d => { let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2]; return Math.round(s / (d.length / 4)); };
+    const N = 24, strobe = [], nose = [], tail = [];
+    for (let i = 0; i < N; i++) {
+      animT = i * (2.9 / N);          // one full vein period
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); draw();
+      strobe.push(red(tipL()));
+      nose.push(lum(veinNose()));
+      tail.push(lum(veinTail()));
+    }
+    const argmax = a => a.indexOf(Math.max(...a));
+    const circDist = (i, j) => Math.min(Math.abs(i - j), N - Math.abs(i - j));
+    gfx = 'toon'; animT = 0;
+    return {
+      strobeMax: Math.max(...strobe), strobeMin: Math.min(...strobe),
+      strobeLit: strobe.filter(v => v > 4).length,
+      noseSwing: Math.max(...nose) - Math.min(...nose),
+      tailSwing: Math.max(...tail) - Math.min(...tail),
+      phaseGap: circDist(argmax(nose), argmax(tail)), N,
+    };
+  });
+  // Mostly dark with a short sharp swell is the whole point of a nav strobe:
+  // a light that is simply ON would pass a bare "is it bright" bar.
+  check('the wingtip sensors really strobe: dark most of the cycle, a sharp flash in it',
+        animLights.strobeMax > 8 && animLights.strobeMin === 0 &&
+        animLights.strobeLit > 0 && animLights.strobeLit < animLights.N * 0.4, animLights);
+  // Both ends of a vein brighten, but NOT together — that is what separates a
+  // wave travelling down a conduit from the whole conduit breathing, and it is
+  // the only form of this check a breathing-vein bug would fail.
+  check('the veins flow: a wavefront runs the length of one, lighting its ends at different times',
+        animLights.noseSwing > 10 && animLights.tailSwing > 10 &&
+        animLights.phaseGap >= animLights.N / 5, animLights);
 
   const finale = await page.evaluate(async () => {
     saves[0] = newCharacter('DRIVE'); activeSlot = 0; save = saves[0];

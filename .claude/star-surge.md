@@ -108,13 +108,14 @@ across all 11 sectors — treat the constants in
 point that will likely need a further pass once someone's actually played
 it.
 
-**Regression gate:** `.claude/tests/drive-star-surge.cjs` (36 checks) pins
+**Regression gate:** `.claude/tests/drive-star-surge.cjs` (89 checks) pins
 every weapon's pip-vs-tier formula (fire rate is pip-invariant; discrete
 weapon counts, bomb turret/radius alternation, beam/flame band/lobe counts,
 chain jump count, EMP radius-only growth, and the missile min-turn-radius
 floor all match their formulas exactly) plus the enemy-hp/incoming-damage
 difficulty ramp and the graphics-style setting (cel/toon is the default, all
-three styles paint every hull, the pick persists, the cog opens/closes) — run it
+four styles paint every hull, the pick persists, the cog opens/closes, and
+under `anim` the scale-up is field-only and the light rigs really animate) — run it
 after touching any weapon or difficulty formula in this file's § Weapons or
 this section, or any renderer branch in § Graphics styles, the same way as
 the smoke gate (see `.claude/tests/README.md`).
@@ -247,11 +248,22 @@ the canvas dismisses the panel rather than steering blind under it.
   not attempt; a future style may try real texture/normal maps. The stored
   id stays `model` so persisted picks survive.) See § The 3D model kit
   below.
+- **`anim`** — "3D ANIMLIGHT": the same meshes, flown **oversized** (player
+  3x, ordinary enemies 2x, bosses unchanged) in a **vivid** palette, each
+  hull running a rig of **animated lights**. See § The animlight kit below.
 
-**Every hull is painted through the three dispatchers** `paintShip(cold)` /
-`paintEnemy(e)` / `paintBoss()` — the field, the pilot bays, the station
-drydock, the title word bake and the dogfight all go through them, so a
-style cannot drift between screens. Adding a style means adding an id to
+`model` and `anim` are one family: `meshGfx()` is the test every piece of
+non-hull scenery asks, so the station's lit-metal treatment, the planet limb,
+the hostile orb and the dogfight's mesh path are shared and a further
+mesh-family style would need no scenery edits at all. Only the palette
+(`mFaceCol`), the hull scale and the light rigs branch between them.
+
+**Every hull is painted through the three dispatchers**
+`paintShip(cold, portrait)` / `paintEnemy(e, portrait)` / `paintBoss()` — the
+field, the pilot bays, the station drydock, the title word bake and the
+dogfight all go through them, so a style cannot drift between screens, and
+`portrait` is how a call site says "this is a framed hull, not a flying one"
+(see § The animlight kit). Adding a style means adding an id to
 `GFX_STYLES`, an `<option>`, and a branch in those three functions.
 Everything that is NOT a hull (bullets, ebullets, powerups, chrome,
 station scenery, effects) stays a `gfx === 'toon' ? A : B` binary on
@@ -355,6 +367,68 @@ y (−1 player, +1 everything that dives). Meshes: `MESH_SHIP`,
 - Perf: measured 16.7 ms median on the title screen and on a saturated
   16-enemy + boss combat scene (frame-budget.cjs, 2026-08-25) — same as
   toon/neon.
+
+### The animlight kit (`anim`, 2026-08-25)
+
+Everything `model` does, plus three things of its own. Requested as "3d model
+ships, bright vibrant colors, my ship 3x bigger, non-boss enemy ships 2x
+bigger, animated lighting on all ships — simple but varied for enemy ships,
+more intricate and slow for my ship".
+
+- **Vivid is SATURATION, not lightness.** `mFaceCol`'s `anim` branch drops
+  the weathering entirely (no grime band, no rust — a showroom finish) and
+  runs the same palette through `s * 2.6 + 30` capped at 98 with lightness
+  *capped at 70*. The first cut pushed lightness to 78 instead and the
+  player's steel fuselage came out near-white, which left the blue veins
+  nothing to shine against — the exact thing the style exists for. One mesh
+  table still serves both styles; only the resolver differs.
+- **The hulls fly oversized, and that is PAINT ONLY.** `A_SHIP_SCALE = 3`,
+  `A_ENEMY_SCALE = 2`; no hitbox moves, so the style still cannot change an
+  outcome and a ship under it genuinely overhangs the box it is hit on. The
+  scale is **field-only**: `paintShip`/`paintEnemy` take a `portrait` flag,
+  and the pilot bays, the station drydock and the baked title word all pass
+  it, because a 3x hull spills out of a bay and a 2x enemy closes the
+  counters of the letters the logo is spelled from. Chrome that rings a hull
+  (shield bubbles, the bolas halo) asks `shipArtScale()`/`enemyArtScale()`
+  so it grows with the art instead of vanishing inside it.
+- **The light rigs** are authored in the *same sprite-local space as the
+  mesh* and flattened into `m.lp` at `attachLights` time, so the transform
+  loops move a light with the identical code that moves a vertex — a light
+  cannot drift off its hull, through the bank, the rotor spin or the
+  dogfight's full 3D frame. Three kinds: `dot`, `strip` (two points), `vein`
+  (a polyline whose brightness is a **wavefront travelling along it** —
+  `lFlowAmp`, which is what reads as charge flowing rather than the conduit
+  breathing). Two modes: `pulse` (sine) and `blink` (mostly dark, a short
+  sharp swell — a chase is just N blinks on staggered phases). A light dims
+  by how squarely it faces the camera (`m.rad` is the yardstick) so one that
+  rotates to the far side of a banking hull does not shine through it.
+  `animT` is the phase clock, written next to `frameDt` at the top of
+  `update()` and read only by painters.
+- **Who carries what** is the design, and the CD's brief: the player is the
+  only ship with a whole electrical system — two blue veins down the deck
+  half a period apart, warm strips along both wings, red wingtip strobes,
+  a slow canopy breathe, all on long periods. Every enemy gets one or two
+  fast, terse elements instead (drone: a red eye blink; shooter: alternating
+  muzzle strobes + a cockpit pulse; spinner: four blade-tip strobes chasing
+  round the rotor + a hub pulse; tanker: three engines firing in sequence +
+  a stage-hue deck strip; boss: a dome beacon + corner strobes, and one
+  muzzle glow per gun on the rim, which spins as well).
+- **Glow without `shadowBlur`.** Three stacked passes under
+  `globalCompositeOperation = 'lighter'` — wide faint halo, mid body, hot
+  core — because `shadowBlur` is what puts the neon station at a hard 30fps.
+  Two calibrations were needed and both are load-bearing: the hot core keeps
+  the light's **own hue** at 74% lightness (at near-white every light came
+  out the same colour once the passes stacked), and a vein is a **thin**
+  filament (`w: 0.45`) because at 0.8 the two veins' halos merged into one
+  blown-out stripe covering the whole fuselage.
+- **The baked logo suppresses lights** (`bakingTitle`, set and cleared in
+  `buildTitleWord`'s existing try/finally): the word is baked once, so a
+  light frozen mid-blink into it is worse than no light.
+- Perf (frame-budget.cjs, 390x844 dpr3, 2026-08-25): 16.7 ms median on a
+  16-enemy + boss + 60-bullet field, on the title screen, and on the
+  station. The station shows 14/169 frames over against `model`'s 5/169 —
+  the drydock ship's rig on top of the same gradients; it is a static menu
+  screen, and the median is 60fps in both.
 
 **HUD note:** the left HUD block (`SECTOR/STAGE`, hp bar, hp label) starts
 at `safeTop+48`, *below* the chrome row, and the boss hp bar sits at
@@ -565,11 +639,12 @@ and right at right-hand ones**, on two parallel lanes per side: that pairing
 is the entire reason no line crosses the station or another line, and it is
 asserted rather than eyeballed.
 
-All three styles share one geometry through `sPanel`/`sDisc`/`sRing`/`sStrut` —
+All four styles share one geometry through `sPanel`/`sDisc`/`sRing`/`sStrut` —
 toon lays a flat plate with an ink outline, neon strokes the same outline as
-a glowing wireframe over a dark fill, and model (added 2026-08-25, after the
-CD flagged that the station still read as neon under it) fills the same
-shapes as **lit metal**: a linear gradient running away from the 3D kit's
+a glowing wireframe over a dark fill, and the **mesh family** (`meshGfx()` —
+`model` and `anim` both, added 2026-08-25 after the CD flagged that the
+station still read as neon under `model`) fills the same shapes as **lit
+metal**: a linear gradient running away from the 3D kit's
 upper-left lamp on every plate, a radial gradient turning every disc into a
 dome, plus a shaded planet limb and a molten hostile-sector orb in place of
 the neon rings. Windows, callouts and buttons stay emissive in every style —
@@ -582,8 +657,8 @@ suppresses the exhaust: a parked ship still burning its engines is the tell
 that a station is a menu rather than a place.
 
 **Station frame cost** (frame-budget.cjs, 2026-08-25): toon 16.7 ms clean;
-model 16.7 median with 22/149 frames over (the gradients are fine); **neon
-33.3 median — a hard 30fps, pre-existing** and unrelated to the model pass
+model 16.7 median with 22/149 frames over (the gradients are fine); anim
+16.7 median, 14/169 over; **neon 33.3 median — a hard 30fps, pre-existing** and unrelated to the model pass
 (its per-frame `shadowBlur` strokes are the likely cost). It is a static
 menu screen so nothing stutters visibly, but if the neon station is ever
 touched, measure before and after.
