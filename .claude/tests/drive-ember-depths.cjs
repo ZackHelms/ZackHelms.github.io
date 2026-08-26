@@ -40,6 +40,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const URL = 'file://' + path.join(ROOT, 'games', 'ember-depths', 'index.html');
 
 const GEAR_MAX = 3;   // tiers per gear track, minus the free starting kit
+const CURVE_HP = 20;  // CURVE.playerHp — a delver's HP before any kit
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra) => {
@@ -357,7 +358,7 @@ const ok = (name, cond, extra) => {
     localStorage.setItem('emberDepths.slots.v1', JSON.stringify([{
       name: 'CHEAT', gold: -50, sp: 999.9,
       gear: { weapon: 99, armor: -3, lantern: 'x', charm: 1 },
-      skills: { 'might.edge': 99, 'nope.nope': 5 },
+      skills: { edge: 99, 'might.edge': 99, 'nope.nope': 5 },
       supplies: { draught: 99, ghost: 4 },
       stats: { bestDepth: -2 },
     }, null, null]));
@@ -366,17 +367,22 @@ const ok = (name, cond, extra) => {
     const c = chr();
     return {
       gold: c.gold, sp: c.sp, weapon: c.gear.weapon, armor: c.gear.armor, lantern: c.gear.lantern,
-      edge: rank('might', 'edge'), junkSkill: c.skills['nope.nope'],
+      edge: rank('edge'), junkSkill: c.skills['nope.nope'],
       draught: c.supplies.draught, junkSupply: c.supplies.ghost,
       best: c.stats.bestDepth, atk: metaAtk(),
     };
   });
   ok('a hand-edited save is clamped, not trusted',
-     clamped.gold === 0 && clamped.sp === 999 && clamped.weapon === GEAR_MAX &&
-     clamped.armor === 0 && clamped.lantern === 0 && clamped.edge === 3 &&
+     clamped.gold === 0 && clamped.weapon === GEAR_MAX &&
+     clamped.armor === 0 && clamped.lantern === 0 && clamped.edge === 2 &&
      clamped.junkSkill === undefined && clamped.draught === 3 &&
      clamped.junkSupply === undefined && clamped.best === 0, clamped);
-  ok('and the clamped kit still computes a real bonus', clamped.atk === 3 + 3, clamped);
+  // The legacy refund is the one path that turns a stored number into
+  // currency, so it is clamped twice and asserted on its own.
+  // Two dotted keys in that blob, each clamped to rank 3 = 6 points apiece.
+  ok('a legacy skill blob cannot mint skill points',
+     clamped.sp === 999 + 12, clamped);
+  ok('and the clamped kit still computes a real bonus', clamped.atk === 3 + 2, clamped);
 
   // ---- the forge ----
   const forge = await page.evaluate(() => {
@@ -414,104 +420,342 @@ const ok = (name, cond, extra) => {
     };
   });
   ok('gear reaches the delve: attack', kitted.atk === 3 + 3, kitted);
-  ok('gear reaches the delve: max HP, and you start full', kitted.maxHp === 12 + 8 && kitted.hp === kitted.maxHp, kitted);
+  ok('gear reaches the delve: max HP, and you start full',
+     kitted.maxHp === CURVE_HP + 8 && kitted.hp === kitted.maxHp, kitted);
   ok('gear reaches the delve: light', Math.abs(kitted.light - (kitted.light0 + 2.6)) < 1e-6, kitted);
   ok('gear reaches the delve: gold multiplier', Math.abs(kitted.goldMult - 1.5) < 1e-9, kitted);
   ok('the Deepseeker Idol marks the stairs on arrival', kitted.marks && kitted.stairsSeen, kitted);
 
-  // ---- skills: the gate, the rising cost, and the effects ----
+  // ---- skills: ONE tree, and the prerequisite rule that shapes it ----
+  console.log('\n[skill tree]');
   const gate = await page.evaluate(() => {
     const c = chr();
-    c.skills = {}; c.sp = 30;
-    campAction('rank', 'might', 'vengeance');   // needs 4 spent in MIGHT
-    const locked = { rank: rank('might', 'vengeance'), sp: c.sp };
-    campAction('rank', 'might', 'edge');        // 1
-    campAction('rank', 'might', 'edge');        // 2
-    campAction('rank', 'might', 'edge');        // 3  -> 6 spent
-    const afterEdge = { rank: rank('might', 'edge'), sp: c.sp, spent: treeSpent('might') };
-    campAction('rank', 'might', 'edge');        // already max
-    const capped = rank('might', 'edge');
-    campAction('rank', 'might', 'vengeance');   // now open
-    return { locked, afterEdge, capped, vengeance: rank('might', 'vengeance'), sp: c.sp };
+    c.skills = {}; c.sp = 40;
+    campAction('rank', 'lantern');          // needs BOTH roots
+    const bothRoots = rank('lantern');
+    campAction('rank', 'edge');             // one root only
+    const oneRoot = rank('lantern') === 0 && (campAction('rank', 'lantern'), rank('lantern') === 0);
+    campAction('rank', 'hide');             // now both
+    campAction('rank', 'lantern');
+    const opened = rank('lantern');
+    const sp1 = c.sp;
+    campAction('rank', 'lantern');          // rank 2 costs 2
+    const rank2 = { r: rank('lantern'), spent: sp1 - c.sp };
+    campAction('rank', 'lantern');          // max 2
+    return { bothRoots, oneRoot, opened, rank2, capped: rank('lantern'), sp: c.sp };
   });
-  ok('a locked node refuses the point', gate.locked.rank === 0 && gate.locked.sp === 30, gate);
-  ok('rank r costs r (1+2+3 for three ranks)',
-     gate.afterEdge.rank === 3 && gate.afterEdge.sp === 24 && gate.afterEdge.spent === 6, gate);
-  ok('a maxed node takes no more points', gate.capped === 3, gate);
-  ok('spending in the tree opens its deeper nodes', gate.vengeance === 1, gate);
+  ok('a node with two inputs refuses until BOTH are taken',
+     gate.bothRoots === 0 && gate.oneRoot === true, gate);
+  ok('taking both inputs opens it', gate.opened === 1, gate);
+  ok('rank r costs r', gate.rank2.r === 2 && gate.rank2.spent === 2, gate);
+  ok('a maxed node takes no more points', gate.capped === 2, gate);
 
-  // Every skill effect below is measured through the GAME's own function, not
-  // recomputed here — the same rule the relic stacking check earned.
+  // The capstone is the rule at full size: two complete paths, one down each
+  // side. Walking only one side must not open it, however many points are in.
+  const capstone = await page.evaluate(() => {
+    const c = chr();
+    c.skills = {}; c.sp = 99;
+    const left = ['edge', 'hide', 'lantern', 'heavy', 'vengeance', 'execution', 'trapwise', 'carto', 'bloodletter'];
+    left.forEach((k) => campAction('rank', k));
+    const halfWay = { blood: rank('bloodletter'), unbroken: rank('unbroken'), sovereign: rank('sovereign') };
+    campAction('rank', 'sovereign');
+    const refusedOnOneSide = rank('sovereign') === 0;
+    ['bones', 'wind', 'stand', 'prospect', 'fortune', 'unbroken'].forEach((k) => campAction('rank', k));
+    campAction('rank', 'sovereign');
+    return { halfWay, refusedOnOneSide, sovereign: rank('sovereign'), spent: skillsSpent(), sp: c.sp };
+  });
+  ok('one full side reaches its own capstone', capstone.halfWay.blood === 1, capstone);
+  ok('but the final capstone refuses one side alone', capstone.refusedOnOneSide === true, capstone);
+  ok('both sides open it', capstone.sovereign === 1, capstone);
+  ok('and the whole route costs 16 points', capstone.spent === 16, capstone);
+
+  // Every declared edge has to point at a real node, or the picture and the
+  // rule disagree and a node becomes unreachable with no way to tell.
+  const wiring = await page.evaluate(() => {
+    const keys = SKILLS.map((n) => n.key);
+    const bad = [];
+    const roots = SKILLS.filter((n) => n.in.length === 0).map((n) => n.key);
+    for (const n of SKILLS) for (const k of n.in) if (keys.indexOf(k) === -1) bad.push(n.key + '<-' + k);
+    // every node reachable from a root by following edges forward
+    const reached = new Set(roots);
+    for (let pass = 0; pass < SKILLS.length; pass++) {
+      for (const n of SKILLS) if (!reached.has(n.key) && n.in.every((k) => reached.has(k))) reached.add(n.key);
+    }
+    return { bad, roots, unreachable: keys.filter((k) => !reached.has(k)), total: keys.length };
+  });
+  ok('every edge names a real node', wiring.bad.length === 0, wiring);
+  ok('the tree has exactly two roots', wiring.roots.length === 2, wiring);
+  ok('and every node is reachable from them', wiring.unreachable.length === 0, wiring);
+
+  const respec = await page.evaluate(() => {
+    const c = chr();
+    c.skills = {}; c.sp = 10; c.gold = 0;
+    ['edge', 'edge', 'hide'].forEach((k) => campAction('rank', k));   // 1+2+1 = 4 points
+    const spent = skillsSpent(), price = respecCost();
+    campAction('respec');                                             // no gold
+    const broke = { skills: Object.keys(c.skills).length, gold: c.gold };
+    c.gold = price;
+    campAction('respec');
+    return { spent, price, broke, after: { skills: Object.keys(c.skills).length, sp: c.sp, gold: c.gold } };
+  });
+  ok('forgetting needs the gold', respec.broke.skills === 2, respec);
+  ok('and refunds every point for it',
+     respec.after.skills === 0 && respec.after.sp === 6 + respec.spent && respec.after.gold === 0, respec);
+
+  // Effects, every one measured through the game's own functions.
   const skills = await page.evaluate(() => {
     const c = chr();
-    c.gear = { weapon: 0, armor: 0, lantern: 0, charm: 0 };   // isolate the skills
-    c.skills = {}; c.sp = 60;
-    ['hide', 'hide', 'hide'].forEach(() => campAction('rank', 'vigor', 'hide'));
-    ['bones', 'bones'].forEach(() => campAction('rank', 'vigor', 'bones'));
-    campAction('rank', 'vigor', 'wind');
-    campAction('rank', 'vigor', 'stand');
-    ['lamp', 'lamp', 'lamp'].forEach(() => campAction('rank', 'cunning', 'lamp'));
-    ['prospect', 'prospect'].forEach(() => campAction('rank', 'cunning', 'prospect'));
-    // MIGHT's deeper nodes gate on points spent in MIGHT, so the order here
-    // is load-bearing: three ranks of KEEN EDGE (1+2+3) is what opens them.
-    ['edge', 'edge', 'edge'].forEach(() => campAction('rank', 'might', 'edge'));
-    campAction('rank', 'might', 'heavy');
-    campAction('rank', 'might', 'vengeance');
-    campAction('rank', 'might', 'execution');
+    c.gear = { weapon: 0, armor: 0, lantern: 0, charm: 0 };
+    c.skills = {}; c.sp = 99;
+    ['edge', 'edge', 'hide', 'hide', 'lantern', 'lantern', 'bones', 'heavy', 'vengeance',
+     'execution', 'trapwise', 'prospect', 'prospect', 'wind', 'carto', 'fortune', 'stand',
+     'bloodletter', 'unbroken', 'sovereign'].forEach((k) => campAction('rank', k));
     startRun();
-    enemies = [];
-    const out = { maxHp: player.maxHp, atk: player.atk, light: lightRadius() };
+    enemies = []; clearStatuses();
+    const out = { maxHp: player.maxHp, atk: player.atk, light: lightRadius(), cap: damageCap() };
 
-    // THICK HIDE + STONE BONES through a real hit
+    // STONE BONES through a real hit
     player.hp = player.maxHp;
-    const before = player.hp;
-    hurtPlayer(6, player.x, player.y);
-    out.dealt = before - player.hp;
+    let before = player.hp;
+    hurtPlayer(3, player.x, player.y);
+    out.smallHit = before - player.hp;
 
-    // VENGEANCE reads the CURRENT hp, so it can only be measured in situ
+    // UNBROKEN caps a big one
     player.hp = player.maxHp;
-    out.dmgHealthy = playerDamage();
-    player.hp = Math.floor(player.maxHp / 2);
-    out.dmgWounded = playerDamage();
+    before = player.hp;
+    hurtPlayer(40, player.x, player.y);
+    out.bigHit = before - player.hp;
 
-    // EXECUTION through a real kill
-    player.hp = 5;
-    const victim = { id: 8888, x: player.x, y: player.y, vx: player.x, vy: player.y, hp: 0, maxHp: 3, atk: 1, type: 'slime', aggro: true, seed: 2 };
-    enemies.push(victim);
-    killEnemy(victim);
-    out.execHeal = player.hp - 5;
+    // BLOODLETTER stacks per kill and resets on the stairs
+    killStreak = 0;
+    player.hp = player.maxHp;
+    const flat = playerDamage();
+    for (let i = 0; i < 3; i++) {
+      const v = { id: 6000 + i, x: player.x, y: player.y, vx: player.x, vy: player.y, hp: 0, maxHp: 1, atk: 1, type: 'slime', aggro: true, seed: 1 };
+      enemies.push(v); killEnemy(v);
+    }
+    out.stacked = playerDamage() - flat;
+    completeDescend();
+    out.afterStairs = killStreak;
 
-    // LAST STAND: the first killing blow, and only the first
-    player.hp = 4;
-    hurtPlayer(99, player.x, player.y);
-    out.stood = player.hp;
-    hurtPlayer(99, player.x, player.y);
-    out.thenDies = player.hp <= 0;
+    // SOVEREIGN puts LAST STAND back on every descent
+    lastStandUsed = true;
+    completeDescend();
+    out.standBack = lastStandUsed === false;
 
     // PROSPECTOR through a real pickup
+    enemies = []; clearStatuses();
     const d = DIRS.find(([dx, dy]) => grid[IDX(player.x + dx, player.y + dy)] === 0);
     items = [{ x: player.x + d[0], y: player.y + d[1], type: 'gold', amt: 10 }];
-    gold = 0; player.hp = player.maxHp;
+    traps = []; gold = 0; player.hp = player.maxHp;
     playerAct({ move: d });
     out.picked = gold;
-
-    // SECOND WIND through a real descent
-    player.hp = 1;
-    completeDescend();
-    out.rested = player.hp;
     return out;
   });
-  ok('THICK HIDE reaches the delve', skills.maxHp === 12 + 6, skills);
-  ok('KEEN EDGE ×3 reaches the delve', skills.atk === 3 + 3, skills);
-  ok('LAMPLIGHT widens a real light radius', Math.abs(skills.light - (3.6 + 1.8)) < 1e-6, skills);
-  ok('STONE BONES ×2 shaves two off a real 6-damage hit', skills.dealt === 4, skills);
-  ok('VENGEANCE only bites at or below half HP',
-     skills.dmgHealthy === 6 && skills.dmgWounded === 8, skills);
-  ok('EXECUTION heals on a real kill', skills.execHeal === 1, skills);
-  ok('LAST STAND catches the first killing blow and only the first',
-     skills.stood === 1 && skills.thenDies === true, skills);
+  ok('KEEN EDGE ×2 and SOVEREIGN reach the delve', skills.atk === 3 + 2 + 2, skills);
+  ok('THICK HIDE ×2 and SOVEREIGN reach the delve', skills.maxHp === 20 + 4 + 6, skills);
+  ok('LAMPLIGHT ×2 and SOVEREIGN widen the light',
+     Math.abs(skills.light - (3.6 + 1.4 + 1)) < 1e-6, skills);
+  ok('STONE BONES shaves a small hit', skills.smallHit === 2, skills);
+  ok('UNBROKEN caps a huge one at 4', skills.cap === 4 && skills.bigHit === 4, skills);
+  ok('BLOODLETTER stacks with kills and resets on the stairs',
+     skills.stacked === 3 && skills.afterStairs === 0, skills);
+  ok('SOVEREIGN recharges LAST STAND on a descent', skills.standBack === true, skills);
   ok('PROSPECTOR ×2 turns a 10 pile into 15', skills.picked === 15, skills);
-  ok('SECOND WIND heals on a real descent', skills.rested === 3, skills);
+
+  // ---- traps and the statuses they leave ----
+  console.log('\n[traps]');
+  const trapKinds = await page.evaluate(() => {
+    const c = chr();
+    c.skills = {}; c.gear = { weapon: 0, armor: 0, lantern: 0, charm: 0 };
+    startRun();
+    enemies = []; items = [];
+    const out = {};
+    const put = (type) => {
+      clearStatuses();
+      traps = [];
+      const d = DIRS.find(([dx, dy]) => grid[IDX(player.x + dx, player.y + dy)] === 0 &&
+                                        !(player.x + dx === stairs.x && player.y + dy === stairs.y) &&
+                                        !(player.x + dx === chest.x && player.y + dy === chest.y));
+      const t = { x: player.x + d[0], y: player.y + d[1], type, sprung: false };
+      traps.push(t);
+      player.hp = player.maxHp;
+      const hp0 = player.hp;
+      playerAct({ move: d });
+      return { hp0, hp: player.hp, st: JSON.parse(JSON.stringify(statuses)), sprung: t.sprung };
+    };
+    out.spike = put('spike');
+    out.snare = put('snare');
+    out.venom = put('venom');
+    out.tar = put('tar');
+    out.gloom = put('gloom');
+    out.frail = put('frail');
+    return out;
+  });
+  ok('a SPIKE PIT bites and leaves no status',
+     trapKinds.spike.hp < trapKinds.spike.hp0 && trapKinds.spike.st.stun === 0, trapKinds.spike);
+  ok('an IRON SNARE stuns', trapKinds.snare.st.stun > 0, trapKinds.snare);
+  ok('a VENOM VENT poisons', trapKinds.venom.st.venom > 0, trapKinds.venom);
+  ok('a TAR SEEP slows', trapKinds.tar.st.slow > 0, trapKinds.tar);
+  ok('a GLOOM GLYPH blinds', trapKinds.gloom.st.gloom > 0, trapKinds.gloom);
+  ok('a WITHER RUNE withers', trapKinds.frail.st.frail > 0, trapKinds.frail);
+  ok('and every one of them springs exactly once',
+     Object.keys(trapKinds).every((k) => trapKinds[k].sprung === true), trapKinds);
+
+  const trapEffects = await page.evaluate(() => {
+    startRun();
+    enemies = []; items = []; traps = [];
+    const out = {};
+    clearStatuses();
+    out.lightClear = lightRadius();
+    statuses.gloom = 5;
+    out.lightBlind = lightRadius();
+    clearStatuses();
+    player.hp = player.maxHp;
+    out.dmgClear = playerDamage();
+    statuses.frail = 5;
+    out.dmgWither = playerDamage();
+    clearStatuses();
+
+    // Poison drains on YOUR clock, one per turn, and runs out.
+    player.hp = player.maxHp;
+    statuses.venom = 3;
+    const hp0 = player.hp;
+    for (let i = 0; i < 3; i++) playerAct({ wait: true });
+    out.venomDrain = hp0 - player.hp;
+    const midHp = player.hp;
+    for (let i = 0; i < 3; i++) playerAct({ wait: true });
+    out.venomStops = midHp - player.hp === 0 && statuses.venom === 0;
+
+    // Mired: the dark gets two goes for your one. Measured as SWINGS, not
+    // steps — an enemy walking toward you can be blocked by the layout, but
+    // one already beside you attacks every time enemiesAct runs, so the
+    // reading cannot depend on which floor generated.
+    clearStatuses();
+    const beside = DIRS.find(([dx, dy]) => grid[IDX(player.x + dx, player.y + dy)] === 0);
+    const swing = () => {
+      enemies = [];
+      spawnEnemy('slime', player.x + beside[0], player.y + beside[1], 1);
+      enemies[0].aggro = true;
+      player.hp = player.maxHp;
+      const hp0 = player.hp;
+      playerAct({ wait: true });
+      return hp0 - player.hp;
+    };
+    out.normalHits = swing();
+    statuses.slow = 5;
+    out.miredHits = swing();
+    clearStatuses();
+    enemies = [];
+    return out;
+  });
+  ok('a GLOOM GLYPH halves your light',
+     trapEffects.lightBlind < trapEffects.lightClear * 0.6, trapEffects);
+  ok('a WITHER RUNE halves your damage',
+     trapEffects.dmgWither === Math.ceil(trapEffects.dmgClear / 2), trapEffects);
+  ok('venom drains one per turn and then stops',
+     trapEffects.venomDrain === 3 && trapEffects.venomStops === true, trapEffects);
+  ok('mired, the dark swings twice for your one',
+     trapEffects.normalHits > 0 && trapEffects.miredHits === trapEffects.normalHits * 2, trapEffects);
+
+  const trapSkill = await page.evaluate(() => {
+    const c = chr();
+    c.skills = {}; c.sp = 99;
+    startRun();
+    enemies = []; items = [];
+    const spring = (type) => {
+      clearStatuses(); traps = [];
+      const d = DIRS.find(([dx, dy]) => grid[IDX(player.x + dx, player.y + dy)] === 0 &&
+                                        !(player.x + dx === stairs.x && player.y + dy === stairs.y) &&
+                                        !(player.x + dx === chest.x && player.y + dy === chest.y));
+      traps.push({ x: player.x + d[0], y: player.y + d[1], type, sprung: false });
+      player.hp = player.maxHp;
+      const hp0 = player.hp;
+      playerAct({ move: d });
+      return { dmg: hp0 - player.hp, gloom: statuses.gloom };
+    };
+    const bare = { spike: spring('spike').dmg, gloom: spring('gloom').gloom };
+    ['edge', 'hide', 'lantern', 'trapwise'].forEach((k) => campAction('rank', k));
+    startRun(); enemies = []; items = [];
+    const wise = { spike: spring('spike').dmg, gloom: spring('gloom').gloom, has: rank('trapwise') };
+    return { bare, wise };
+  });
+  ok('TRAPWISE halves the spike and the hold',
+     trapSkill.wise.has === 1 && trapSkill.wise.spike < trapSkill.bare.spike &&
+     trapSkill.wise.gloom < trapSkill.bare.gloom, trapSkill);
+
+  // The auto-path treats a trap you can see as a wall — tapping a far tile
+  // must never walk you over a hazard that is drawn on the board.
+  //
+  // The setup has to be searched for, not assumed. An earlier version put the
+  // trap on the middle of any two-step line, which on one floor in four is the
+  // ONLY route to the target — and there the code's documented fallback (walk
+  // it rather than refuse to move) is correct, so the check failed for being
+  // wrong about the board. Find a trap cell that is not a cut vertex, and
+  // assert the detour; then assert the fallback on a cell that IS one.
+  const trapPath = await page.evaluate(() => {
+    const reachWithout = (bx, by, tx, ty) => {
+      const d = bfsMap(tx, ty, (x, y) => grid[IDX(x, y)] === 0 && !(x === bx && y === by));
+      return d[IDX(player.x, player.y)] >= 0;
+    };
+    let detour = null, chokepoint = null;
+    for (let floor = 0; floor < 14 && (!detour || !chokepoint); floor++) {
+      startRun();
+      enemies = []; items = []; traps = [];
+      seen.fill(1);
+      const near = bfsMap(player.x, player.y, (x, y) => grid[IDX(x, y)] === 0);
+      for (let ty = 1; ty < ROWS - 1 && (!detour || !chokepoint); ty++) {
+        for (let tx = 1; tx < COLS - 1; tx++) {
+          if (grid[IDX(tx, ty)] !== 0) continue;
+          const dt = near[IDX(tx, ty)];
+          if (dt < 2 || dt > 7) continue;
+          // The candidate has to sit ON the route the game would take with no
+          // trap there at all — otherwise "the path avoided it" is true of a
+          // cell the path was never going to touch, and the check passes with
+          // trap-avoidance ripped out entirely. (It did.)
+          traps = [];
+          buildPathTo(tx, ty, false);
+          if (!pathQueue.length) continue;
+          const onRoute = pathQueue.slice(0, -1);
+          for (const [cx, cy] of onRoute) {
+            const detours = reachWithout(cx, cy, tx, ty);
+            if (detours && !detour) { detour = { trap: [cx, cy], target: [tx, ty] }; break; }
+            if (!detours && !chokepoint) { chokepoint = { trap: [cx, cy], target: [tx, ty] }; break; }
+          }
+        }
+      }
+    }
+    const out = { found: !!detour, foundChoke: !!chokepoint };
+    if (detour) {
+      traps = [{ x: detour.trap[0], y: detour.trap[1], type: 'spike', sprung: false }];
+      buildPathTo(detour.target[0], detour.target[1], false);
+      out.overIt = pathQueue.some(([x, y]) => x === detour.trap[0] && y === detour.trap[1]);
+      out.routed = pathQueue.length > 0;
+      // ...unless the trap IS the target, which is how you deliberately spring one
+      buildPathTo(detour.trap[0], detour.trap[1], false);
+      out.onto = pathQueue.length >= 1 &&
+                 pathQueue[pathQueue.length - 1][0] === detour.trap[0] &&
+                 pathQueue[pathQueue.length - 1][1] === detour.trap[1];
+      // a SPRUNG trap is a scar, not an obstacle
+      traps[0].sprung = true;
+      buildPathTo(detour.target[0], detour.target[1], false);
+      out.sprungIgnored = pathQueue.some(([x, y]) => x === detour.trap[0] && y === detour.trap[1]);
+    }
+    if (chokepoint) {
+      traps = [{ x: chokepoint.trap[0], y: chokepoint.trap[1], type: 'spike', sprung: false }];
+      buildPathTo(chokepoint.target[0], chokepoint.target[1], false);
+      out.chokeRouted = pathQueue.length > 0;
+    }
+    return out;
+  });
+  ok('found a floor with a trap that has a way round it', trapPath.found === true, trapPath);
+  ok('the auto-path routes around a trap you can see',
+     trapPath.overIt === false && trapPath.routed === true, trapPath);
+  ok('but tapping the trap itself still walks onto it', trapPath.onto === true, trapPath);
+  ok('a sprung trap stops blocking the path — it is a scar, not an obstacle',
+     trapPath.sprungIgnored === true, trapPath);
+  ok('a trap with no way round is walked, not refused',
+     !trapPath.foundChoke || trapPath.chokeRouted === true, trapPath);
 
   // ---- supplies: bought in camp, used in the delve, lost with the body ----
   const supply = await page.evaluate(() => {
@@ -582,8 +826,8 @@ const ok = (name, cond, extra) => {
   });
   ok('the delve banks carried gold plus a depth bonus',
      banked.gold === 33 + 40 && banked.bank.depthBonus === 40, banked);
-  ok('and pays skill points for the depth, with a new-deepest bonus',
-     banked.sp === 2 + 2 && banked.best === 5 && banked.bank.newBest === true, banked);
+  ok('dying pays gold and NEVER skill points',
+     banked.sp === 0 && banked.best === 5 && banked.bank.newBest === true, banked);
   ok('unused supplies go down with the body',
      Object.keys(banked.supplies).length === 0, banked);
   ok('the run is recorded once', banked.runs === 1 && banked.kills === 4, banked);
@@ -595,6 +839,84 @@ const ok = (name, cond, extra) => {
     return { before, after: chr().gold };
   });
   ok('death cannot bank the same delve twice', twice.before === twice.after, twice);
+
+  // ---- skill points are earned by DEPTH, once each ----
+  console.log('\n[milestones]');
+  const miles = await page.evaluate(() => {
+    const c = chr();
+    c.sp = 0; c.skills = {}; c.stats.deepest = 0; c.stats.spAwarded = 0; c.stats.bestDepth = 0;
+    c.startFloor = 1;
+    startRun();
+    const log = [];
+    for (let i = 0; i < 11; i++) {       // finish floors 1..11
+      const before = c.sp;
+      completeDescend();
+      log.push({ finished: floorNum - 1, gained: c.sp - before });
+    }
+    return { log, sp: c.sp, deepest: c.stats.deepest, awarded: c.stats.spAwarded };
+  });
+  ok('a point lands on every fifth floor and nowhere else',
+     miles.log.filter((l) => l.gained > 0).map((l) => l.finished).join(',') === '5,10', miles);
+  ok('eleven floors is two points', miles.sp === 2 && miles.awarded === 2, miles);
+
+  const refarm = await page.evaluate(() => {
+    const c = chr();
+    const spBefore = c.sp;
+    c.startFloor = 1;
+    startRun();
+    for (let i = 0; i < 8; i++) completeDescend();   // floors 1..8, all already done
+    return { spBefore, sp: c.sp, deepest: c.stats.deepest };
+  });
+  ok('re-finishing a floor pays nothing — farming is for gold only',
+     refarm.sp === refarm.spBefore && refarm.deepest === 11, refarm);
+
+  // ---- the starting depth ----
+  console.log('\n[starting depth]');
+  const depthPick = await page.evaluate(() => {
+    const c = chr();
+    c.stats.bestDepth = 12; c.startFloor = 1;
+    campAction('depth', '5');
+    const up = c.startFloor;
+    campAction('depth', '-1');
+    const down = c.startFloor;
+    campAction('depth', 'max');
+    const max = c.startFloor;
+    campAction('depth', '5');
+    const clamped = c.startFloor;
+    campAction('depth', '-99');
+    const floor = c.startFloor;
+    return { up, down, max, clamped, floor };
+  });
+  ok('the depth picker steps by 1 and 5', depthPick.up === 6 && depthPick.down === 5, depthPick);
+  ok('and clamps to the deepest floor reached',
+     depthPick.max === 12 && depthPick.clamped === 12 && depthPick.floor === 1, depthPick);
+
+  await page.reload();
+  await page.waitForTimeout(350);
+  const sticky = await page.evaluate(() => {
+    activeSlot = 0;
+    const c = chr();
+    c.stats.bestDepth = 12; c.startFloor = 9; saveSlots();
+    return { stored: JSON.parse(localStorage.getItem('emberDepths.slots.v1'))[0].startFloor };
+  });
+  ok('the chosen depth is stored on the character', sticky.stored === 9, sticky);
+  await page.reload();
+  await page.waitForTimeout(350);
+  const started = await page.evaluate(() => {
+    activeSlot = 0;
+    const c = chr();
+    const picked = startFloorOf();
+    startRun();
+    const opened = floorNum;
+    // A dive that goes nowhere pays nothing: the depth bonus counts floors
+    // below where you STARTED, not below floor 1.
+    gold = 0; player.hp = 0;
+    checkDeath();
+    return { picked, opened, bonus: lastBank.depthBonus, earned: lastBank.earned, best: c.stats.bestDepth };
+  });
+  ok('a delve opens on the chosen depth', started.picked === 9 && started.opened === 9, started);
+  ok('and diving deep to die on arrival pays nothing',
+     started.bonus === 0 && started.earned === 0, started);
 
   ok('no page or console errors throughout', errs.length === 0, errs.join(' | '));
 

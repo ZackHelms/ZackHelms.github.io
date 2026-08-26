@@ -171,8 +171,34 @@ body {
 }
 .price.no { border-color:var(--border); color:var(--dim); }
 .price.owned { border-color:#39ff14; color:#39ff14; }
+.tree { width:100%; height:auto; display:block; margin:6px 0 2px; touch-action:manipulation; }
+.tree .sk { cursor:pointer; }
+.sk-card {
+  background:linear-gradient(160deg, #171219, #0b0a10); border:1px solid #ff9a3c;
+  border-radius:9px; padding:11px 12px; margin-top:4px;
+}
+.sk-card b { display:block; font-family:'Black Ops One', sans-serif; font-size:0.76rem; letter-spacing:1px; color:var(--gold); }
+.sk-card span { display:block; color:var(--dim); font-size:0.68rem; line-height:1.5; margin-top:3px; }
+.sk-card .now { color:#6fd8a0; }
+.sk-card .no { color:#ff7a88; }
+.btn[disabled] { opacity:0.38; border-color:var(--border); color:var(--dim); }
 .pips { color:#ff9a3c; letter-spacing:3px; font-size:0.72rem; }
 .pips i { color:#3a3040; font-style:normal; }
+.depth-pick { display:flex; gap:5px; align-items:stretch; margin-top:14px; }
+.dbtn {
+  flex:0 0 auto; width:40px; border-radius:7px; background:var(--panel);
+  border:1px solid var(--border); color:#ff9a3c; font-size:0.75rem;
+  touch-action:manipulation; cursor:pointer;
+}
+.dbtn[disabled] { opacity:0.3; color:var(--dim); }
+.dnum {
+  flex:1 1 auto; min-width:0; border-radius:7px; padding:8px 4px;
+  background:var(--panel); border:1px solid #ff9a3c; color:var(--white);
+  font-family:'Share Tech Mono', monospace; font-size:0.66rem; letter-spacing:1px;
+  touch-action:manipulation; cursor:pointer;
+}
+.dnum b { color:var(--gold); font-size:0.9rem; }
+.dnum i { display:block; color:var(--dim); font-size:0.58rem; font-style:normal; margin-top:2px; }
 .camp-foot { display:flex; gap:8px; margin-top:14px; }
 .camp-foot .btn { flex:1 1 0; min-width:0; margin:0; padding:13px 4px; font-size:0.82rem; }
 .name-input {
@@ -184,7 +210,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-26 06:20 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-26 09:10 UTC</div>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
 <button id="cog" aria-label="Settings">&#9881;</button>
@@ -234,6 +260,9 @@ let items = [];            // {x,y,type:'gold'|'heart', amt}
 let torches = [];          // {x,y,seed}
 let stairs = { x: 0, y: 0 };
 let chest = { x: -1, y: -1, opened: true };
+let traps = [];            // {x,y,type,sprung} — hazards, visible once lit
+let statuses = { stun: 0, venom: 0, gloom: 0, frail: 0, slow: 0 };  // turns remaining
+let killStreak = 0;        // BLOODLETTER's per-floor attack stack
 let relics = [];           // relic keys owned
 let wardTimer = 0;         // ember-ward recharge countdown (0 = ready)
 // Stacked wards recharge faster rather than stacking shields, so a second
@@ -247,10 +276,104 @@ let descendT = -1;         // descend fade animation
 let introT = 0;            // "DEPTH n" banner timer
 let shakeT = 0;
 let enemyIdSeq = 1;
+let seedSalt = 0;          // test hook: non-zero makes floor generation reproducible
 let buffPanel = false;     // relic detail panel open? (a pure overlay: no turn passes)
 let buffRect = null;       // HUD hotspot for the relic row, in screen px (null = no relics)
 let recenterBtn = null;    // ⌖ button circle, in screen px (null = not shown)
 let useBtns = [];          // consumable buttons, in screen px (rebuilt each frame)
+
+/* ============ Difficulty curve ============
+   Every number the dungeon gets harder by lives here, unbounded on purpose:
+   the CD's spec is "no ceiling", so HP and attack are MULTIPLIERS on depth
+   rather than a table that runs out. A fresh delver averages ~depth 8; a
+   fully geared and skilled one goes far deeper but still, eventually, dies.
+   Tuned against .claude/tests/eval-ember-depths.cjs — change a number here
+   and re-run it rather than guessing. */
+const CURVE = {
+  playerHp: 20, playerAtk: 3,     // what a delver starts with, before any kit
+  base: {                          // enemy stats at depth 1
+    slime: { hp: 4, atk: 2 }, bat: { hp: 2, atk: 1 }, archer: { hp: 4, atk: 2 },
+    brute: { hp: 9, atk: 4 }, wraith: { hp: 6, atk: 3 },
+  },
+  hearts: 2, heartsVar: 1, heartAmt: 5,   // ri(hearts, hearts+heartsVar) hearts, worth heartAmt
+  // Enemy stats bend upward: the linear term sets how fast the early floors
+  // tighten, the quadratic one is what makes the deep dark eventually beat any
+  // build. Keep the linear term gentle and let the square do the killing —
+  // that is the difference between "hard at 3" and "hard at 30".
+  hpMul: 0.11, hpQuad: 0.006,    // enemy HP  = base * (1 + (n-1)*hpMul + (n-1)^2*hpQuad)
+  atkMul: 0.07, atkQuad: 0.004,  // enemy atk likewise
+  countBase: 2,
+  count: 0.4,         // enemies   = countBase + n*count
+  countCap: 13,
+  eliteFrom: 4,       // depth the first elites appear
+  eliteMul: 0.055,    // elite chance per enemy = (n - eliteFrom) * eliteMul
+  eliteCap: 0.4,
+  trapFrom: 2,
+  trapPer: 0.55,      // traps = (n - trapFrom + 1) * trapPer
+  trapCap: 9,
+  goldPer: 0.9,       // gold pile bonus per depth — deep farming has to pay
+};
+function depthHp(base, n) {
+  const k = n - 1;
+  return Math.max(1, Math.round(base * (1 + k * CURVE.hpMul + k * k * CURVE.hpQuad)));
+}
+function depthAtk(base, n) {
+  const k = n - 1;
+  return Math.max(1, Math.round(base * (1 + k * CURVE.atkMul + k * k * CURVE.atkQuad)));
+}
+
+/* ============ Traps ============
+   A trap is a one-shot hazard: it springs when you step on it and then stays
+   on the board, sprung and harmless, as a scar. Everything but SPIKE PIT
+   works by putting turns on `statuses`, which is the only status system in
+   the game — see tickStatuses(). */
+const TRAPS = {
+  spike: { name: 'SPIKE PIT',   icon: '▲', col: '#ff5566', from: 2, verb: 'SPIKES' },
+  snare: { name: 'IRON SNARE',  icon: '✖', col: '#88ccff', from: 3, verb: 'SNARED' },
+  venom: { name: 'VENOM VENT',  icon: '≈', col: '#6fd8a0', from: 4, verb: 'POISONED' },
+  tar:   { name: 'TAR SEEP',    icon: '≋', col: '#c98a3c', from: 5, verb: 'MIRED' },
+  gloom: { name: 'GLOOM GLYPH', icon: '◍', col: '#b44fff', from: 6, verb: 'BLINDED' },
+  frail: { name: 'WITHER RUNE', icon: '⌇', col: '#ffc300', from: 7, verb: 'WITHERED' },
+};
+const STATUS_META = {
+  stun:  { icon: '✖', col: '#88ccff', name: 'STUNNED' },
+  venom: { icon: '≈', col: '#6fd8a0', name: 'POISONED' },
+  tarry: { icon: '≋', col: '#c98a3c', name: 'MIRED' },
+  gloom: { icon: '◍', col: '#b44fff', name: 'BLINDED' },
+  frail: { icon: '⌇', col: '#ffc300', name: 'WITHERED' },
+};
+function trapAt(x, y) { return traps.find((t) => t.x === x && t.y === y) || null; }
+function clearStatuses() { statuses = { stun: 0, venom: 0, gloom: 0, frail: 0, slow: 0 }; }
+// TRAPWISE halves every duration and every spike, which is the one skill that
+// answers a whole mechanic rather than a number.
+function trapSoften(v) { return rank('trapwise') ? Math.max(1, Math.floor(v / 2)) : v; }
+function springTrap(t) {
+  if (t.sprung) return;
+  t.sprung = true;
+  const meta = TRAPS[t.type];
+  addFloat(t.x, t.y, meta.verb, meta.col);
+  shakeT = Math.max(shakeT, 0.25);
+  if (t.type === 'spike') {
+    hurtPlayer(trapSoften(Math.max(2, Math.round(2 + floorNum * 0.45))), t.x, t.y);
+  } else if (t.type === 'snare') { statuses.stun += trapSoften(2); sfxBlock(); }
+  else if (t.type === 'venom') { statuses.venom += trapSoften(6); sfxHurt(); }
+  else if (t.type === 'tar')   { statuses.slow  += trapSoften(6); sfxChest(); }
+  else if (t.type === 'gloom') { statuses.gloom += trapSoften(10); sfxArrow(); }
+  else if (t.type === 'frail') { statuses.frail += trapSoften(8); sfxArrow(); }
+}
+// Ticked once per player turn, AFTER the turn is counted and BEFORE the
+// enemies move — so a poisoned delver bleeds on their own clock, not theirs.
+function tickStatuses() {
+  if (statuses.venom > 0) {
+    statuses.venom--;
+    player.hp -= 1;
+    addFloat(player.x, player.y, '-1', '#6fd8a0');
+  }
+  if (statuses.stun > 0) statuses.stun--;
+  if (statuses.gloom > 0) statuses.gloom--;
+  if (statuses.frail > 0) statuses.frail--;
+  if (statuses.slow > 0) statuses.slow--;
+}
 
 const RELICS = {
   blade:   { name: 'SEARING BLADE',  icon: '⚔', desc: '+2 attack. The edge still remembers the forge.' },
@@ -297,10 +420,11 @@ function persistBests() {
    is read back through `migrate()`, never trusted field-by-field. */
 const SLOT_KEY = 'emberDepths.slots.v1';
 const SLOT_COUNT = 3;
-const BASE_HP = 12, BASE_ATK = 3;
+
 let slots = [null, null, null];
 let activeSlot = -1;       // -1 = no character chosen (title / slot screen)
 let campTab = 'forge';
+let campSkill = 'edge';    // which node the skill tree's detail card is showing
 let consumables = {};      // in-run stock, copied from the character at DESCEND
 let lastStandUsed = false;
 
@@ -333,30 +457,54 @@ const GEAR = {
   ] },
 };
 
-/* Skills: three trees, four nodes each. A node opens once you have spent
-   `req` points in ITS OWN tree, and rank r costs r points — so going deep in
-   one tree costs more than going wide, and a character cannot quietly max
-   everything. */
-const TREES = [
-  { key: 'might', name: 'MIGHT', icon: '⚔', nodes: [
-    { key: 'edge',      name: 'KEEN EDGE',    max: 3, req: 0, desc: (r) => '+' + r + ' attack.' },
-    { key: 'heavy',     name: 'HEAVY BLOWS',  max: 3, req: 2, desc: (r) => (r * 10) + '% of your strikes land for +3.' },
-    { key: 'vengeance', name: 'VENGEANCE',    max: 1, req: 4, desc: () => '+2 attack while at or below half HP.' },
-    { key: 'execution', name: 'EXECUTION',    max: 2, req: 6, desc: (r) => 'Every kill restores ' + r + ' HP.' },
-  ] },
-  { key: 'vigor', name: 'VIGOR', icon: '⛨', nodes: [
-    { key: 'hide',  name: 'THICK HIDE',  max: 3, req: 0, desc: (r) => '+' + (r * 2) + ' max HP.' },
-    { key: 'bones', name: 'STONE BONES', max: 2, req: 2, desc: (r) => '−' + r + ' damage from every hit (never below 1).' },
-    { key: 'wind',  name: 'SECOND WIND', max: 2, req: 4, desc: (r) => 'Heal ' + (r * 2) + ' HP on every descent.' },
-    { key: 'stand', name: 'LAST STAND',  max: 1, req: 6, desc: () => 'Once per delve, a killing blow leaves you on 1 HP instead.' },
-  ] },
-  { key: 'cunning', name: 'CUNNING', icon: '❖', nodes: [
-    { key: 'lamp',     name: 'LAMPLIGHT',    max: 3, req: 0, desc: (r) => 'Your light reaches ' + (r * 0.6).toFixed(1) + ' tiles further.' },
-    { key: 'prospect', name: 'PROSPECTOR',   max: 2, req: 2, desc: (r) => '+' + (r * 25) + '% gold found.' },
-    { key: 'carto',    name: 'CARTOGRAPHER', max: 1, req: 4, desc: () => 'The stairs are marked the moment you arrive on a floor.' },
-    { key: 'fortune',  name: 'FORTUNE',      max: 1, req: 6, desc: () => 'Chests offer a third relic to choose from.' },
-  ] },
+/* Skills: ONE tree, two roots, one DAG.
+   The rule the CD set, and the only rule: a node accepts a point once EVERY
+   node with an arrow into it has at least one point. That is what makes the
+   two capstones and the final one expensive — SOVEREIGN sits under two
+   complete paths, one down each side of the tree, so reaching it is 16
+   points and a deliberate route rather than a shopping list.
+   `col`/`row` are the SVG layout grid; the edges in `in` are drawn from it,
+   so the picture and the rule can never disagree. */
+const SKILLS = [
+  { key: 'edge',    name: 'KEEN EDGE',    icon: '⚔', max: 2, in: [],               col: 1, row: 0,
+    desc: (r) => '+' + r + ' attack.' },
+  { key: 'hide',    name: 'THICK HIDE',   icon: '⛨', max: 2, in: [],               col: 3, row: 0,
+    desc: (r) => '+' + (r * 2) + ' max HP.' },
+
+  { key: 'heavy',   name: 'HEAVY BLOWS',  icon: '✦', max: 1, in: ['edge'],         col: 0, row: 1,
+    desc: () => '15% of your strikes land for +3.' },
+  { key: 'lantern', name: 'LAMPLIGHT',    icon: '☀', max: 2, in: ['edge', 'hide'], col: 2, row: 1,
+    desc: (r) => 'Your light reaches ' + (r * 0.7).toFixed(1) + ' tiles further.' },
+  { key: 'bones',   name: 'STONE BONES',  icon: '◆', max: 1, in: ['hide'],         col: 4, row: 1,
+    desc: () => '−1 damage from every hit (never below 1).' },
+
+  { key: 'vengeance', name: 'VENGEANCE',   icon: '☩', max: 1, in: ['heavy'],   col: 0,   row: 2,
+    desc: () => '+2 attack while at or below half HP.' },
+  { key: 'trapwise',  name: 'TRAPWISE',    icon: '⌖', max: 1, in: ['lantern'], col: 1.5, row: 2,
+    desc: () => 'Traps hit for half, and hold you half as long.' },
+  { key: 'prospect',  name: 'PROSPECTOR',  icon: '◈', max: 2, in: ['lantern'], col: 2.5, row: 2,
+    desc: (r) => '+' + (r * 25) + '% gold found.' },
+  { key: 'wind',      name: 'SECOND WIND', icon: '♥', max: 1, in: ['bones'],   col: 4,   row: 2,
+    desc: () => 'Heal 3 HP on every descent.' },
+
+  { key: 'execution', name: 'EXECUTION',    icon: '☠', max: 1, in: ['vengeance'], col: 0,   row: 3,
+    desc: () => 'Every kill restores 1 HP.' },
+  { key: 'carto',     name: 'CARTOGRAPHER', icon: '✧', max: 1, in: ['trapwise'],  col: 1.5, row: 3,
+    desc: () => 'The stairs are marked the moment you arrive.' },
+  { key: 'fortune',   name: 'FORTUNE',      icon: '❖', max: 1, in: ['prospect'],  col: 2.5, row: 3,
+    desc: () => 'Chests offer a third relic to choose from.' },
+  { key: 'stand',     name: 'LAST STAND',   icon: '⛊', max: 1, in: ['wind'],      col: 4,   row: 3,
+    desc: () => 'Once per delve, a killing blow leaves you on 1 HP instead.' },
+
+  { key: 'bloodletter', name: 'BLOODLETTER', icon: '⚑', max: 1, in: ['execution', 'carto'], col: 0.75, row: 4,
+    desc: () => 'Each kill grants +1 attack until you descend, up to +5.' },
+  { key: 'unbroken',    name: 'UNBROKEN',    icon: '⬢', max: 1, in: ['fortune', 'stand'],   col: 3.25, row: 4,
+    desc: () => 'No single hit can take more than 4 HP from you.' },
+
+  { key: 'sovereign', name: 'EMBER SOVEREIGN', icon: '♛', max: 1, in: ['bloodletter', 'unbroken'], col: 2, row: 5,
+    desc: () => '+2 attack, +6 max HP, +1 light, and LAST STAND recharges on every descent.' },
 ];
+const SKILL_ROWS = 6, SKILL_COLS = 5;
 
 /* Consumables are the recurring sink: bought in camp, carried in, and lost
    with the body whether or not they were used. */
@@ -377,10 +525,13 @@ function rollName() {
 function newCharacter(name) {
   return {
     name: (name || rollName()).toUpperCase().slice(0, 14),
-    gold: 0, sp: 0,
+    gold: 0, sp: 0, startFloor: 1,
     gear: { weapon: 0, armor: 0, lantern: 0, charm: 0 },
     skills: {}, supplies: {},
-    stats: { bestDepth: 0, runs: 0, kills: 0, gold: 0 },
+    // `deepest` is the deepest floor ever FINISHED, which is what pays skill
+    // points; `bestDepth` is the deepest ever stood on, which is what unlocks
+    // the starting depth. They differ by one on the floor that kills you.
+    stats: { bestDepth: 0, deepest: 0, spAwarded: 0, runs: 0, kills: 0, gold: 0 },
   };
 }
 // Never trust a stored blob field-by-field: rebuild a valid character and
@@ -392,11 +543,28 @@ function migrate(raw) {
   c.sp = Math.max(0, Math.floor(+raw.sp || 0));
   const g = raw.gear || {};
   for (const k in c.gear) c.gear[k] = Math.max(0, Math.min(GEAR[k].tiers.length - 1, Math.floor(+g[k] || 0)));
+  // Skills moved from three trees to one DAG on 2026-08-26; an old blob's
+  // 'tree.node' keys simply do not match and are dropped, which is why the
+  // character keeps its points as `sp` refunded below rather than losing them.
   const sk = raw.skills || {};
-  for (const t of TREES) for (const n of t.nodes) {
-    const v = Math.max(0, Math.min(n.max, Math.floor(+sk[t.key + '.' + n.key] || 0)));
-    if (v) c.skills[t.key + '.' + n.key] = v;
+  let known = 0;
+  for (const node of SKILLS) {
+    const v = Math.max(0, Math.min(node.max, Math.floor(+sk[node.key] || 0)));
+    if (v) { c.skills[node.key] = v; known += v * (v + 1) / 2; }
   }
+  // Points from the pre-2026-08-26 three-tree schema come back as unspent SP.
+  // CLAMPED, twice: a stored rank is capped before it is triangulated and the
+  // whole refund is capped again, because this is the one path that turns an
+  // untrusted number straight into currency — `{"might.edge": 99}` in a
+  // hand-edited save would otherwise be 4950 skill points.
+  const LEGACY_RANK_CAP = 3, LEGACY_REFUND_CAP = 40;
+  let legacy = 0;
+  for (const k in sk) {
+    if (k.indexOf('.') <= 0) continue;
+    const v = Math.max(0, Math.min(LEGACY_RANK_CAP, Math.floor(+sk[k] || 0)));
+    legacy += v * (v + 1) / 2;
+  }
+  if (legacy) c.sp += Math.min(LEGACY_REFUND_CAP, legacy);
   const sup = raw.supplies || {};
   for (const k of CONSUMABLE_KEYS) {
     const v = Math.max(0, Math.min(CONSUMABLES[k].max, Math.floor(+sup[k] || 0)));
@@ -405,10 +573,13 @@ function migrate(raw) {
   const st = raw.stats || {};
   c.stats = {
     bestDepth: Math.max(0, Math.floor(+st.bestDepth || 0)),
+    deepest: Math.max(0, Math.floor(+st.deepest || 0)),
+    spAwarded: Math.max(0, Math.floor(+st.spAwarded || 0)),
     runs: Math.max(0, Math.floor(+st.runs || 0)),
     kills: Math.max(0, Math.floor(+st.kills || 0)),
     gold: Math.max(0, Math.floor(+st.gold || 0)),
   };
+  c.startFloor = Math.max(1, Math.min(Math.max(1, c.stats.bestDepth), Math.floor(+raw.startFloor || 1)));
   return c;
 }
 function loadSlots() {
@@ -428,50 +599,83 @@ function saveSlots() { try { localStorage.setItem(SLOT_KEY, JSON.stringify(slots
 function chr() { return activeSlot >= 0 ? slots[activeSlot] : null; }
 function gearTier(k) { const c = chr(); return c ? c.gear[k] : 0; }
 function gearStat(k, field) { const t = GEAR[k].tiers[gearTier(k)]; return (t && t[field]) || 0; }
-function rank(treeKey, nodeKey) { const c = chr(); return c ? (c.skills[treeKey + '.' + nodeKey] || 0) : 0; }
-function treeOf(key) { return TREES.find((t) => t.key === key); }
-// Points already sunk into a tree = the triangular number of each node's rank,
-// because rank r cost r. This is what gates the tree's deeper nodes.
-function treeSpent(treeKey) {
+function rank(key) { const c = chr(); return c ? (c.skills[key] || 0) : 0; }
+function skillNode(key) { return SKILLS.find((n) => n.key === key); }
+// THE prerequisite rule: every node with an arrow into this one needs at
+// least one point. A root has no inputs, so it is open from the first point.
+function skillOpen(key) { return skillNode(key).in.every((k) => rank(k) > 0); }
+function skillCost(key) { return rank(key) + 1; }   // rank r costs r
+function skillsSpent() {
   let n = 0;
-  for (const node of treeOf(treeKey).nodes) { const r = rank(treeKey, node.key); n += r * (r + 1) / 2; }
+  for (const node of SKILLS) { const r = rank(node.key); n += r * (r + 1) / 2; }
   return n;
 }
-function nextRankCost(treeKey, nodeKey) { return rank(treeKey, nodeKey) + 1; }
+// Forgetting is priced off what is invested, so an early rethink is cheap and
+// unpicking a finished build is a real decision.
+function respecCost() { return 40 + 30 * skillsSpent(); }
 
-function metaAtk() { return gearStat('weapon', 'atk') + rank('might', 'edge'); }
-function metaMaxHp() { return gearStat('armor', 'hp') + rank('vigor', 'hide') * 2; }
-function metaDR() { return gearStat('armor', 'dr') + rank('vigor', 'bones'); }
-function metaLight() { return gearStat('lantern', 'light') + rank('cunning', 'lamp') * 0.6; }
-function goldMult() { return 1 + gearStat('charm', 'gold') + rank('cunning', 'prospect') * 0.25; }
-function descendHeal() { return gearStat('charm', 'heal') + rank('vigor', 'wind') * 2; }
-function marksStairs() { return gearStat('charm', 'reveal') > 0 || rank('cunning', 'carto') > 0; }
+function metaAtk() { return gearStat('weapon', 'atk') + rank('edge') + rank('sovereign') * 2; }
+function metaMaxHp() { return gearStat('armor', 'hp') + rank('hide') * 2 + rank('sovereign') * 6; }
+function metaDR() { return gearStat('armor', 'dr') + rank('bones'); }
+function metaLight() { return gearStat('lantern', 'light') + rank('lantern') * 0.7 + rank('sovereign'); }
+function goldMult() { return 1 + gearStat('charm', 'gold') + rank('prospect') * 0.25; }
+function descendHeal() { return gearStat('charm', 'heal') + rank('wind') * 3; }
+function marksStairs() { return gearStat('charm', 'reveal') > 0 || rank('carto') > 0; }
+function damageCap() { return rank('unbroken') ? 4 : Infinity; }
 
-/* What the delve pays out. Depth is worth more than the coins on the floor —
-   otherwise the safe play is to farm floor 1 forever. */
+/* Skill points are the scarce currency: ONE for every fifth floor, the first
+   time that floor is finished. Farming pays gold, never points — which is
+   what lets the starting depth be generous without cheapening the tree.
+   Idempotent by construction: the award is (deepest/5) minus what has already
+   been paid, so re-finishing a floor pays nothing. */
+const SP_EVERY = 5;
+function awardMilestones() {
+  const c = chr();
+  if (!c) return 0;
+  const owed = Math.floor(c.stats.deepest / SP_EVERY) - c.stats.spAwarded;
+  if (owed <= 0) return 0;
+  c.sp += owed;
+  c.stats.spAwarded += owed;
+  saveSlots();
+  return owed;
+}
+// You may start at any depth you have ever stood on. Sticky per character.
+function maxStartFloor() { const c = chr(); return c ? Math.max(1, c.stats.bestDepth) : 1; }
+function startFloorOf() {
+  const c = chr();
+  if (!c) return 1;
+  return Math.max(1, Math.min(maxStartFloor(), c.startFloor || 1));
+}
+
+/* What the delve pays out — gold only. The depth bonus counts floors below
+   where you STARTED, so diving in at depth 30 and dying on arrival pays what
+   it deserves: nothing. */
+let runStartFloor = 1;
 function bankRun() {
   const c = chr();
   if (!c) return null;
-  const depthBonus = Math.max(0, floorNum - 1) * 10;
-  const earned = Math.round(gold * 1) + depthBonus;
+  const depthBonus = Math.max(0, floorNum - runStartFloor) * 10;
+  const earned = gold + depthBonus;
   const newBest = floorNum > c.stats.bestDepth;
-  const sp = Math.max(1, Math.floor((floorNum - 1) / 2)) + (newBest ? 2 : 0);
   c.gold += earned;
-  c.sp += sp;
   c.stats.bestDepth = Math.max(c.stats.bestDepth, floorNum);
   c.stats.runs++;
   c.stats.kills += kills;
   c.stats.gold += earned;
   c.supplies = {};      // what you carried in went down with you
   saveSlots();
-  return { earned, depthBonus, sp, newBest };
+  return { earned, depthBonus, newBest };
 }
 
 /* ============ Floor generation (drunkard-walk carve: always connected) ============ */
 function genFloor(n) {
   grid.fill(1); seen.fill(0); lit.fill(0);
-  items = []; torches = []; enemies = []; pathQueue = []; attackTargetId = -1;
-  rngS = (n * 7919 + Date.now()) & 0x7fffffff;
+  items = []; torches = []; enemies = []; traps = []; pathQueue = []; attackTargetId = -1;
+  clearStatuses(); killStreak = 0;
+  // `seedSalt` is a test hook: with it set, a floor is reproducible, which is
+  // what lets the balance eval compare curves rather than luck. Zero (the
+  // shipping value) falls back to the clock.
+  rngS = (n * 7919 + (seedSalt || Date.now())) & 0x7fffffff;
   let cx = ri(3, COLS - 4), cy = ri(4, ROWS - 5);
   const target = Math.floor(COLS * ROWS * 0.42);
   let carved = 0;
@@ -519,16 +723,17 @@ function genFloor(n) {
     return null;
   };
   const nGold = ri(4, 6);
-  for (let i = 0; i < nGold; i++) { const c = free(); if (c) items.push({ x: c.x, y: c.y, type: 'gold', amt: ri(3, 8) }); }
-  const nHeart = ri(1, 2);
-  for (let i = 0; i < nHeart; i++) { const c = free(); if (c) items.push({ x: c.x, y: c.y, type: 'heart', amt: 4 }); }
+  const goldBonus = Math.floor(n * CURVE.goldPer);
+  for (let i = 0; i < nGold; i++) { const c = free(); if (c) items.push({ x: c.x, y: c.y, type: 'gold', amt: ri(3, 8) + goldBonus }); }
+  const nHeart = ri(CURVE.hearts, CURVE.hearts + CURVE.heartsVar);
+  for (let i = 0; i < nHeart; i++) { const c = free(); if (c) items.push({ x: c.x, y: c.y, type: 'heart', amt: CURVE.heartAmt }); }
   // enemies (spawn at distance >= 5 from player)
   const types = ['slime', 'slime', 'bat'];
   if (n >= 2) types.push('archer');
   if (n >= 3) types.push('archer', 'bat');
   if (n >= 4) types.push('brute');
   if (n >= 6) types.push('wraith');
-  const count = Math.min(10, 3 + Math.floor(n * 0.9));
+  const count = Math.min(CURVE.countCap, CURVE.countBase + Math.floor(n * CURVE.count));
   let tries = 400;
   while (enemies.length < count && tries-- > 0) {
     const c = floorCells[ri(1, floorCells.length - 1)];
@@ -536,6 +741,21 @@ function genFloor(n) {
     if (enemies.some(e => e.x === c.x && e.y === c.y)) continue;
     if ((c.x === stairs.x && c.y === stairs.y) || (c.x === chest.x && c.y === chest.y)) continue;
     spawnEnemy(types[ri(0, types.length - 1)], c.x, c.y, n);
+  }
+  // traps — never under the player, the chest or the stairs, and never on the
+  // player's own cell, so a floor can't open by killing you.
+  const trapPool = Object.keys(TRAPS).filter((k) => n >= TRAPS[k].from);
+  if (trapPool.length) {
+    const nTrap = Math.min(CURVE.trapCap, Math.floor((n - CURVE.trapFrom + 1) * CURVE.trapPer));
+    let tt = 300;
+    while (traps.length < nTrap && tt-- > 0) {
+      const c = floorCells[ri(1, floorCells.length - 1)];
+      if (c.d < 3) continue;
+      if ((c.x === stairs.x && c.y === stairs.y) || (c.x === chest.x && c.y === chest.y)) continue;
+      if (traps.some((t) => t.x === c.x && t.y === c.y)) continue;
+      if (items.some((it) => it.x === c.x && it.y === c.y)) continue;
+      traps.push({ x: c.x, y: c.y, type: trapPool[ri(0, trapPool.length - 1)], sprung: false });
+    }
   }
   recomputeVision();
   buffPanel = false;
@@ -546,14 +766,16 @@ function genFloor(n) {
   introT = 1.6;
 }
 function spawnEnemy(type, x, y, n) {
-  const hpB = Math.floor((n - 1) / 2), atkB = Math.floor((n - 1) / 3);
-  const base = {
-    slime:  { hp: 5, atk: 2 }, bat: { hp: 2, atk: 1 }, archer: { hp: 4, atk: 2 },
-    brute:  { hp: 10, atk: 4 }, wraith: { hp: 6, atk: 3 },
-  }[type];
+  const base = CURVE.base[type];
+  let hp = depthHp(base.hp, n), atk = depthAtk(base.atk, n);
+  // An elite is the same silhouette wearing more of the depth: it keeps the
+  // type's behaviour, so it never surprises you with a rule you don't know.
+  const eliteChance = Math.min(CURVE.eliteCap, Math.max(0, (n - CURVE.eliteFrom) * CURVE.eliteMul));
+  const elite = rnd() < eliteChance;
+  if (elite) { hp = Math.round(hp * 1.6); atk += 1; }
   enemies.push({
     id: enemyIdSeq++, x, y, vx: x, vy: y, type, aggro: false, seed: rnd() * 100,
-    hp: base.hp + hpB, maxHp: base.hp + hpB, atk: base.atk + atkB, hurtT: 0,
+    hp, maxHp: hp, atk, hurtT: 0, elite,
   });
 }
 
@@ -588,7 +810,10 @@ function losClear(x0, y0, x1, y1) {
   return true;
 }
 function enemyAt(x, y) { return enemies.find(e => e.x === x && e.y === y) || null; }
-function lightRadius() { return Math.min(9, 3.6 + 1.6 * relicCount('lantern') + metaLight()); }
+function lightRadius() {
+  const r = Math.min(9, 3.6 + 1.6 * relicCount('lantern') + metaLight());
+  return statuses.gloom > 0 ? Math.max(1.6, r * 0.5) : r;   // GLOOM GLYPH
+}
 
 /* ============ Vision ============ */
 function recomputeVision() {
@@ -614,7 +839,7 @@ function playerAct(action) {
   let tookTurn = false;
   if (action.attack) {
     const e = action.attack;
-    const heavy = rank('might', 'heavy') && rnd() < 0.10 * rank('might', 'heavy');
+    const heavy = rank('heavy') && rnd() < 0.15;
     const dmg = playerDamage() + (heavy ? 3 : 0);
     e.hp -= dmg; e.hurtT = 0.25; e.aggro = true;
     addFloat(e.x, e.y, '-' + dmg, heavy ? '#ffee88' : '#ffcc88');
@@ -641,6 +866,8 @@ function playerAct(action) {
       else { player.hp = Math.min(player.maxHp, player.hp + it.amt); addFloat(nx, ny, '+' + it.amt + '♥', '#ff5566'); sfxHeart(); }
       items.splice(i, 1);
     }
+    const tr = trapAt(nx, ny);
+    if (tr && !tr.sprung) springTrap(tr);
     if (!chest.opened && chest.x === nx && chest.y === ny) { openChest(); return true; }
     if (stairs.x === nx && stairs.y === ny) { beginDescend(); return true; }
     tookTurn = true;
@@ -648,7 +875,10 @@ function playerAct(action) {
   if (!tookTurn) return false;
   turnCount++;
   if (wardTimer > 0) wardTimer--;
+  tickStatuses();
+  // TAR SEEP: while mired, the dark moves twice for every step you take.
   enemiesAct();
+  if (statuses.slow > 0) enemiesAct();
   recomputeVision();
   checkDeath();
   return true;
@@ -656,14 +886,16 @@ function playerAct(action) {
 // Attack power with the situational skills folded in. HEAVY BLOWS is rolled
 // at the call site instead, so the crit can colour its own damage float.
 function playerDamage() {
-  let d = player.atk;
-  if (rank('might', 'vengeance') && player.hp * 2 <= player.maxHp) d += 2;
+  let d = player.atk + killStreak;
+  if (rank('vengeance') && player.hp * 2 <= player.maxHp) d += 2;
+  if (statuses.frail > 0) d = Math.max(1, Math.ceil(d * 0.5));   // WITHER RUNE
   return d;
 }
 function killEnemy(e) {
   enemies = enemies.filter(x => x !== e);
   kills++;
-  const exec = rank('might', 'execution');
+  if (rank('bloodletter')) killStreak = Math.min(5, killStreak + 1);
+  const exec = rank('execution');
   if (exec && player.hp < player.maxHp) {
     player.hp = Math.min(player.maxHp, player.hp + exec);
     addFloat(player.x, player.y, '+' + exec + '♥', '#ff9a3c');
@@ -678,12 +910,13 @@ function hurtPlayer(dmg, srcX, srcY) {
   if (state !== 'play') return;
   let d = dmg;
   d = Math.max(1, d - relicCount('skin') - metaDR());
+  d = Math.min(d, damageCap());   // UNBROKEN
   if (relicCount('ward') && wardTimer === 0) {
     wardTimer = wardRecharge(); addFloat(player.x, player.y, 'BLOCK', '#88ccff'); sfxBlock(); return;
   }
   // LAST STAND is checked after the ward, so a shield is never wasted on a
   // hit the skill would have survived anyway.
-  if (d >= player.hp && rank('vigor', 'stand') && !lastStandUsed) {
+  if (d >= player.hp && rank('stand') && !lastStandUsed) {
     lastStandUsed = true;
     player.hp = 1; shakeT = 0.5;
     addFloat(player.x, player.y, 'LAST STAND', '#ffee88');
@@ -784,7 +1017,7 @@ function openChest() {
   rest = rest.filter(k => k !== b);
   // FORTUNE widens the offer rather than improving it — a third door, not a
   // better one, so the skill never inflates the relics themselves.
-  const c3 = (rank('cunning', 'fortune') && rest.length) ? rest[ri(0, rest.length - 1)] : null;
+  const c3 = (rank('fortune') && rest.length) ? rest[ri(0, rest.length - 1)] : null;
   state = 'relic';
   showRelicChoice(a, b, c3);
 }
@@ -812,6 +1045,17 @@ function completeDescend() {
     addFloat(player.x, player.y, '+' + rest + '♥', '#6fd8a0');
   }
   genFloor(floorNum);
+  // SOVEREIGN's shield comes back with every stair you take.
+  if (rank('sovereign')) lastStandUsed = false;
+  const c = chr();
+  if (c) {
+    const finished = floorNum - 1;
+    if (finished > c.stats.deepest) c.stats.deepest = finished;
+    if (floorNum > c.stats.bestDepth) c.stats.bestDepth = floorNum;
+    const got = awardMilestones();
+    if (got) addFloat(player.x, player.y, '+' + got + ' SKILL POINT' + (got === 1 ? '' : 'S'), '#b44fff');
+    saveSlots();
+  }
   state = 'play';
 }
 
@@ -823,6 +1067,7 @@ function visibleEnemySet() {
 }
 function tapTile(tx, ty) {
   if (state !== 'play') return;
+  if (statuses.stun > 0) return;   // snared: the board does not answer
   if (tx < 0 || tx >= COLS || ty < 0 || ty >= ROWS) return;
   if (!seen[IDX(tx, ty)]) return;
   const e = enemyAt(tx, ty);
@@ -838,8 +1083,23 @@ function tapTile(tx, ty) {
   attackTargetId = -1;
   buildPathTo(tx, ty, false);
 }
+// A known trap is treated as a wall by the auto-path: tapping a far tile
+// should never walk you through a hazard you can see. Tapping the trap
+// itself still works — that is the deliberate way onto one.
+function trapBlocked(x, y) {
+  if (x === player.x && y === player.y) return false;
+  const t = trapAt(x, y);
+  return !!t && !t.sprung && seen[IDX(x, y)] === 1;
+}
 function buildPathTo(tx, ty, stopAdjacent) {
-  const dist = bfsMap(tx, ty, (x, y) => grid[IDX(x, y)] === 0 && (!enemyAt(x, y) || (x === tx && y === ty)));
+  const pass = (x, y) => grid[IDX(x, y)] === 0 && (!enemyAt(x, y) || (x === tx && y === ty)) &&
+                         (!trapBlocked(x, y) || (x === tx && y === ty));
+  let dist = bfsMap(tx, ty, pass);
+  // If avoiding traps makes the target unreachable, take the honest route
+  // rather than refusing to move at all.
+  if (dist[IDX(player.x, player.y)] === -1) {
+    dist = bfsMap(tx, ty, (x, y) => grid[IDX(x, y)] === 0 && (!enemyAt(x, y) || (x === tx && y === ty)));
+  }
   if (dist[IDX(player.x, player.y)] === -1) return;
   const path = [];
   let cx = player.x, cy = player.y;
@@ -861,6 +1121,19 @@ function buildPathTo(tx, ty, stopAdjacent) {
   pathQueue = path;
   visibleEnemiesAtPathStart = visibleEnemySet();
   pathT = 0; // step immediately on next frame
+}
+/* A stun is not an input lock — the turns still have to PASS, or the player
+   sits on a frozen board wondering what broke. The clock ticks them off at
+   the same cadence a walked path uses, so being snared reads as the dark
+   getting free moves. */
+let stunT = 0;
+function stunStep(dt) {
+  if (statuses.stun <= 0) return;
+  pathQueue = []; attackTargetId = -1;
+  stunT -= dt;
+  if (stunT > 0) return;
+  stunT = 0.22;
+  playerAct({ wait: true });
 }
 function pathStep(dt) {
   if (state !== 'play' || !pathQueue.length) return;
@@ -887,18 +1160,21 @@ function pathStep(dt) {
 
 /* ============ Run lifecycle ============ */
 function startRun() {
-  floorNum = 1; gold = 0; kills = 0; turnCount = 0;
+  gold = 0; kills = 0; turnCount = 0;
   relics = []; wardTimer = 0; buffPanel = false; lastStandUsed = false;
+  clearStatuses(); killStreak = 0;
   // The character's kit and skills are folded into the base stats ONCE, here,
   // so everything downstream keeps reading plain `player.atk` / `player.maxHp`
   // and relics keep stacking on top exactly as they did.
   consumables = {};
   const c = chr();
   if (c) for (const k of CONSUMABLE_KEYS) if (c.supplies[k]) consumables[k] = c.supplies[k];
-  player.maxHp = BASE_HP + metaMaxHp();
+  player.maxHp = CURVE.playerHp + metaMaxHp();
   player.hp = player.maxHp;
-  player.atk = BASE_ATK + metaAtk();
-  genFloor(1);
+  player.atk = CURVE.playerAtk + metaAtk();
+  floorNum = startFloorOf();
+  runStartFloor = floorNum;
+  genFloor(floorNum);
   state = 'play';
   overlayEl.classList.add('hidden');
 }
@@ -1214,10 +1490,11 @@ function showMenu() {
       <em>Tap</em> a lit tile to walk there — every step you take, the dark takes one too.
       <em>Tap an enemy</em> to close and strike. Gold is score, hearts heal,
       chests hold <em>relics</em> that stack into a build. Find the stairs, go deeper.
-      Death is forever — but your <em>gold, gear and skills</em> are not: they
-      wait for you in camp between delves. <em>Pinch</em> to zoom, <em>drag</em> to
-      look anywhere on the map (⌖ recentres), and <em>tap your relics</em> for
-      what they do.
+      Watch for <em>traps</em> — the auto-path walks around any you can see.
+      Death is forever, but your <em>gold, gear and skills</em> are not: they wait
+      for you in camp, and every fifth floor you finish pays a <em>skill point</em>.
+      <em>Pinch</em> to zoom, <em>drag</em> to look anywhere on the map (⌖ recentres),
+      and <em>tap your relics</em> for what they do.
     </div>`;
   bindTap(document.getElementById('go'), showSlots);
 }
@@ -1267,7 +1544,8 @@ function showNewCharacter(i) {
     '<input class="name-input" id="new-name" maxlength="14" value="' + esc(rollName()) + '" ' +
     'autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Delver name">' +
     '<div class="empty-note">They start with a chipped dirk, travel rags and a guttering ' +
-    'stub of tallow. Everything after that is bought with what they bring back.</div>' +
+    'stub of tallow. Everything after that is bought with what they bring back — ' +
+    'gold from every delve, and a skill point for every fifth floor they finish.</div>' +
     '<div class="camp-foot"><button class="btn" data-act="slots">◂ BACK</button>' +
     '<button class="btn gold" data-act="create" data-arg="' + i + '">BEGIN</button></div></div>';
   bindCamp();
@@ -1293,6 +1571,17 @@ function showCamp(tab) {
   if (campTab === 'forge') html += forgeHtml(c);
   else if (campTab === 'skills') html += skillsHtml(c);
   else html += supplyHtml(c);
+  // Depth picker: thousands of floors is the plan, so it steps by 5 as well
+  // as by 1, and the number itself jumps to the deepest you have reached.
+  const sf = startFloorOf(), maxSf = maxStartFloor();
+  html += '<div class="depth-pick">' +
+    '<button class="dbtn" data-act="depth" data-arg="-5"' + (sf > 1 ? '' : ' disabled') + '>◂◂</button>' +
+    '<button class="dbtn" data-act="depth" data-arg="-1"' + (sf > 1 ? '' : ' disabled') + '>◂</button>' +
+    '<button class="dnum" data-act="depth" data-arg="max">START AT DEPTH <b>' + sf + '</b>' +
+      '<i>' + (maxSf > 1 ? 'deepest reached ' + maxSf + ' · tap to jump' : 'reach depth 2 to unlock') + '</i></button>' +
+    '<button class="dbtn" data-act="depth" data-arg="1"' + (sf < maxSf ? '' : ' disabled') + '>▸</button>' +
+    '<button class="dbtn" data-act="depth" data-arg="5"' + (sf < maxSf ? '' : ' disabled') + '>▸▸</button>' +
+    '</div>';
   html += '<div class="camp-foot">' +
     '<button class="btn" data-act="slots">◂ DELVERS</button>' +
     '<button class="btn gold" data-act="delve">⛏ DELVE</button></div></div>';
@@ -1322,35 +1611,78 @@ function forgeHtml(c) {
   }
   return html;
 }
+/* The tree is drawn as SVG rather than a list of rows, because the shape IS
+   the rule: which node feeds which is the only thing a player needs to read,
+   and a list cannot show it. Edges come from the same `in` arrays the
+   allocation check uses, so the picture cannot drift from the rule. */
+const SK_X = (col) => 34 + col * 68;
+const SK_Y = (row) => 32 + row * 70;
+function skillState(key) {
+  const node = skillNode(key);
+  const r = rank(key);
+  if (r >= node.max) return 'maxed';
+  if (!skillOpen(key)) return 'locked';
+  return r > 0 ? 'partial' : 'open';
+}
 function skillsHtml(c) {
-  let html = '<div class="empty-note">' + c.sp + ' skill point' + (c.sp === 1 ? '' : 's') +
-             ' to spend. A node opens once you have spent enough in its own tree, ' +
-             'and each rank costs its own number — rank 3 costs 3.</div>';
-  for (const tree of TREES) {
-    const spent = treeSpent(tree.key);
-    html += '<div class="camp-sub" style="margin:12px 0 2px">' + tree.icon + ' ' + tree.name +
-            ' · ' + spent + ' SPENT</div>';
-    for (const node of tree.nodes) {
-      const r = rank(tree.key, node.key);
-      const open = spent >= node.req;
-      const maxed = r >= node.max;
-      const cost = nextRankCost(tree.key, node.key);
-      const afford = open && !maxed && c.sp >= cost;
-      let pips = '';
-      for (let i = 0; i < node.max; i++) pips += i < r ? '◆' : '<i>◇</i>';
-      html += '<button class="row' + (open ? (maxed ? ' maxed' : '') : ' locked') + '"' +
-        (afford ? ' data-act="rank" data-arg="' + tree.key + '" data-arg2="' + node.key + '"' : '') + '>' +
-        '<span class="row-ico pips" style="width:44px">' + pips + '</span><span class="row-txt">' +
-        '<b>' + node.name + '</b><span>' + node.desc(Math.min(node.max, r + 1)) + '</span>' +
-        (open ? (r ? '<span class="now">NOW: ' + node.desc(r) + '</span>' : '')
-              : '<span>Locked — needs ' + node.req + ' points in ' + tree.name + '.</span>') +
-        '</span>' +
-        (maxed ? '<span class="price owned">MAX</span>'
-               : '<span class="price' + (afford ? '' : ' no') + '">' + cost + ' SP</span>') +
-        '</button>';
+  const spent = skillsSpent();
+  let svg = '<svg class="tree" viewBox="0 0 340 ' + (SK_Y(SKILL_ROWS - 1) + 46) + '" ' +
+            'preserveAspectRatio="xMidYMin meet" role="img" aria-label="Skill tree">';
+  // edges first, so nodes sit on top of them
+  for (const node of SKILLS) {
+    for (const from of node.in) {
+      const a = skillNode(from);
+      const live = rank(from) > 0;
+      svg += '<line x1="' + SK_X(a.col) + '" y1="' + (SK_Y(a.row) + 20) + '" ' +
+             'x2="' + SK_X(node.col) + '" y2="' + (SK_Y(node.row) - 20) + '" ' +
+             'stroke="' + (live ? '#ff9a3c' : '#2f2740') + '" stroke-width="' + (live ? 2 : 1.5) + '" />';
     }
   }
-  return html;
+  for (const node of SKILLS) {
+    const st = skillState(node.key), r = rank(node.key);
+    const x = SK_X(node.col), y = SK_Y(node.row);
+    const fill = (st === 'maxed' || st === 'partial') ? '#20351f' : '#100d18';
+    const stroke = st === 'locked' ? '#2f2740' : (st === 'open' ? '#ffc300' : '#6fd8a0');
+    const glyph = st === 'locked' ? '#4a4250' : (st === 'open' ? '#ffc300' : '#6fd8a0');
+    const sel = node.key === campSkill;
+    svg += '<g data-act="skill" data-arg="' + node.key + '" class="sk">';
+    svg += '<circle cx="' + x + '" cy="' + y + '" r="26" fill="transparent" />';   // touch target
+    if (sel) svg += '<circle cx="' + x + '" cy="' + y + '" r="24" fill="none" stroke="#ff9a3c" stroke-width="1.5" />';
+    svg += '<circle cx="' + x + '" cy="' + y + '" r="19" fill="' + fill + '" stroke="' + stroke + '" stroke-width="2" />';
+    svg += '<text x="' + x + '" y="' + (y + 6) + '" text-anchor="middle" font-size="17" fill="' + glyph + '">' + node.icon + '</text>';
+    if (node.max > 1) {
+      let pips = '';
+      for (let i = 0; i < node.max; i++) pips += i < r ? '◆' : '◇';
+      svg += '<text x="' + x + '" y="' + (y + 30) + '" text-anchor="middle" font-size="8" fill="' + glyph + '">' + pips + '</text>';
+    }
+    svg += '</g>';
+  }
+  svg += '</svg>';
+
+  const node = skillNode(campSkill) || SKILLS[0];
+  const st = skillState(node.key), r = rank(node.key), cost = skillCost(node.key);
+  const missing = node.in.filter((k) => rank(k) === 0).map((k) => skillNode(k).name);
+  let card = '<div class="sk-card"><b>' + node.icon + ' ' + node.name +
+             (node.max > 1 ? ' · ' + r + '/' + node.max : '') + '</b>';
+  card += '<span>' + node.desc(Math.min(node.max, r + 1)) + '</span>';
+  if (r > 0 && node.max > 1) card += '<span class="now">NOW: ' + node.desc(r) + '</span>';
+  else if (r > 0) card += '<span class="now">TAKEN.</span>';
+  if (missing.length) card += '<span class="no">Needs a point in ' + missing.join(' and ') + '.</span>';
+  card += '</div>';
+  const canBuy = st !== 'maxed' && st !== 'locked' && c.sp >= cost;
+  card += '<div class="camp-foot" style="margin-top:8px">' +
+    '<button class="btn" data-act="respec"' + (c.gold >= respecCost() && spent > 0 ? '' : ' disabled') + '>' +
+      '↺ FORGET · ' + respecCost() + '◈</button>' +
+    (st === 'maxed'
+      ? '<button class="btn" disabled>MAXED</button>'
+      : '<button class="btn gold" data-act="rank" data-arg="' + node.key + '"' + (canBuy ? '' : ' disabled') + '>' +
+        (st === 'locked' ? 'LOCKED' : 'SPEND ' + cost + ' SP') + '</button>') +
+    '</div>';
+
+  return '<div class="empty-note"><b style="color:#b44fff">' + c.sp + ' SP</b> unspent · ' + spent +
+         ' spent. One point every five depths, the first time you finish that floor. ' +
+         'A node opens once <em>every</em> node feeding it has a point.</div>' +
+         svg + card;
 }
 function supplyHtml(c) {
   let html = '<div class="empty-note">Carried into the delve and lost with the body, ' +
@@ -1399,6 +1731,14 @@ function campAction(act, arg, arg2) {
   if (act === 'pick') { activeSlot = +arg; campTab = 'forge'; showCamp(); return; }
   if (act === 'tab') { showCamp(arg); return; }
   if (act === 'delve') { startRun(); return; }
+  if (act === 'depth') {
+    if (!c) return;
+    const maxSf = maxStartFloor();
+    c.startFloor = arg === 'max' ? maxSf
+      : Math.max(1, Math.min(maxSf, startFloorOf() + parseInt(arg, 10)));
+    saveSlots(); showCamp();
+    return;
+  }
   if (!c) return;
   if (act === 'buy-gear') {
     const next = GEAR[arg].tiers[c.gear[arg] + 1];
@@ -1415,13 +1755,22 @@ function campAction(act, arg, arg2) {
     saveSlots(); sfxCoin(); showCamp();
     return;
   }
+  if (act === 'skill') { campSkill = arg; showCamp(); return; }
   if (act === 'rank') {
-    const tree = treeOf(arg), node = tree && tree.nodes.find((n) => n.key === arg2);
+    const node = skillNode(arg);
     if (!node) return;
-    const r = rank(arg, arg2), cost = r + 1;
-    if (r >= node.max || treeSpent(arg) < node.req || c.sp < cost) return;
-    c.sp -= cost; c.skills[arg + '.' + arg2] = r + 1;
+    const r = rank(arg), cost = r + 1;
+    if (r >= node.max || !skillOpen(arg) || c.sp < cost) return;
+    c.sp -= cost; c.skills[arg] = r + 1;
+    campSkill = arg;
     saveSlots(); sfxRelic(); showCamp();
+    return;
+  }
+  if (act === 'respec') {
+    const cost = respecCost(), spent = skillsSpent();
+    if (!spent || c.gold < cost) return;
+    c.gold -= cost; c.sp += spent; c.skills = {};
+    saveSlots(); sfxStairs(); showCamp();
   }
 }
 function showDeath() {
@@ -1433,7 +1782,7 @@ function showDeath() {
     banked = `
     <div class="stat" style="margin-top:10px">CARRIED <b>${gold}◈</b> + DEPTH <b>${lastBank.depthBonus}◈</b>
       = BANKED <b>${lastBank.earned}◈</b></div>
-    <div class="stat">SKILL POINTS EARNED <b>${lastBank.sp}</b>${lastBank.newBest ? ' · <b>NEW DEEPEST</b>' : ''}</div>
+    ${lastBank.newBest ? '<div class="stat"><b>NEW DEEPEST</b></div>' : ''}
     <div class="stat" style="color:#8899bb">${esc(c.name)} now holds ${c.gold}◈ and ${c.sp} SP</div>`;
   }
   overlayEl.innerHTML = `
@@ -1449,11 +1798,13 @@ function showDeath() {
     bindTap(el, () => (el.dataset.act === 'delve' ? startRun() : showCamp()));
   });
 }
+let relicOffer = [];   // the keys currently on the table (test hook)
 function showRelicChoice(a, b, c) {
   overlayEl.classList.remove('hidden');
   overlayEl.classList.remove('top');
   let html = `<h2>THE CHEST CREAKS OPEN</h2><div class="sub">CHOOSE ONE RELIC</div>`;
   const offer = [a, b, c].filter(Boolean);
+  relicOffer = offer.slice();
   offer.forEach((k, i) => {
     html += `<button class="relic-card" id="rl-${i}"><b>${RELICS[k].icon} ${RELICS[k].name}</b><span>${RELICS[k].desc}</span></button>`;
   });
@@ -1677,6 +2028,30 @@ function drawScene(dt) {
     }
     ctx.globalAlpha = 1;
   }
+  // ---- traps: a rune on the flagstones, dark and inert once sprung
+  for (const t of traps) {
+    if (!seen[IDX(t.x, t.y)]) continue;
+    const [px, py] = cellPx(t.x, t.y);
+    const cx2 = px + tile / 2, cy2 = py + tile / 2;
+    const meta = TRAPS[t.type];
+    ctx.save();
+    if (t.sprung) { ctx.globalAlpha = 0.3; }
+    ctx.strokeStyle = t.sprung ? '#4a4250' : meta.col;
+    ctx.lineWidth = Math.max(1, tile * 0.045);
+    ctx.beginPath(); ctx.arc(cx2, cy2, tile * 0.3, 0, 7); ctx.stroke();
+    if (!t.sprung) {
+      ctx.globalAlpha = 0.18 + flick(t.x * 5 + t.y, 4) * 0.22;
+      ctx.fillStyle = meta.col;
+      ctx.beginPath(); ctx.arc(cx2, cy2, tile * 0.3, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = t.sprung ? '#4a4250' : meta.col;
+    ctx.font = `${Math.round(tile * 0.42)}px 'Share Tech Mono', monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(meta.icon, cx2, cy2 + tile * 0.15);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
   // ---- items
   for (const it of items) {
     if (!seen[IDX(it.x, it.y)]) continue;
@@ -1894,6 +2269,14 @@ function drawPlayer() {
   }
 }
 function drawEnemy(e) {
+  if (e.elite) {
+    const [epx, epy] = cellPx(e.vx, e.vy);
+    ctx.strokeStyle = 'rgba(180,79,255,0.75)';
+    ctx.lineWidth = Math.max(1, tile * 0.05);
+    ctx.beginPath();
+    ctx.ellipse(epx + tile / 2, epy + tile * 0.55, tile * 0.36, tile * 0.42, 0, 0, 7);
+    ctx.stroke();
+  }
   if (!lit[IDX(e.x, e.y)] && !(seen[IDX(e.x, e.y)] && e.type === 'wraith')) return;
   const [px, py] = cellPx(e.vx, e.vy);
   const cx2 = px + tile / 2;
@@ -2043,6 +2426,36 @@ function drawHUD(dt) {
   }
   drawRecenter();
   drawConsumables();
+  drawStatuses();
+}
+
+/* Active trap effects, centred at the foot of the board between the two
+   button stacks. Anything that is silently draining you needs a number on
+   screen, or the death reads as unfair rather than earned. */
+function drawStatuses() {
+  if (state !== 'play') return;
+  const live = [];
+  if (statuses.stun > 0) live.push(['stun', statuses.stun]);
+  if (statuses.venom > 0) live.push(['venom', statuses.venom]);
+  if (statuses.slow > 0) live.push(['tarry', statuses.slow]);
+  if (statuses.gloom > 0) live.push(['gloom', statuses.gloom]);
+  if (statuses.frail > 0) live.push(['frail', statuses.frail]);
+  if (!live.length) return;
+  const pw = 40, gap = 5, y = viewY + viewH - 26;
+  let x = viewX + viewW / 2 - (live.length * pw + (live.length - 1) * gap) / 2;
+  ctx.textAlign = 'center';
+  for (const [key, turns] of live) {
+    const meta = STATUS_META[key];
+    ctx.fillStyle = 'rgba(10,8,14,0.78)';
+    ctx.fillRect(x, y, pw, 22);
+    ctx.strokeStyle = meta.col; ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, pw - 1, 21);
+    ctx.font = `12px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = meta.col;
+    ctx.fillText(meta.icon + ' ' + turns, x + pw / 2, y + 15);
+    x += pw + gap;
+  }
+  ctx.textAlign = 'left';
 }
 
 /* The ⌖ handle. Free-look means the camera stops chasing the player, so the
@@ -2270,7 +2683,7 @@ function frame(ts) {
     e.vy += (e.y - e.vy) * ease;
     if (e.hurtT > 0) e.hurtT -= dt;
   }
-  if (state === 'play') { pathStep(dt); spawnAmbient(dt); }
+  if (state === 'play') { stunStep(dt); pathStep(dt); spawnAmbient(dt); }
   if (!pinch && !dragging) followCam(dt);
   drawScene(dt);
   requestAnimationFrame(frame);

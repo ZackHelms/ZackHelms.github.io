@@ -20,8 +20,7 @@ realistic light-map rendering. Single self-contained file.
   dist ≥ 4, torches on walls adjacent to floor (≤9), gold/hearts on free
   floor, enemies at dist ≥ 5. Types unlock by depth: slime/bat → archer(2)
   → brute(4, acts odd turns only) → wraith(6, walks through walls).
-  Scaling: `hp += floor((n-1)/2)`, `atk += floor((n-1)/3)`, count
-  `3 + 0.9n` cap 10.
+  Scaling: see **## The difficulty curve** below — every number is in `CURVE`.
 - **Vision:** `lit`/`seen` Uint8Arrays. Light sources = player
   (r 3.6, lantern 5.2) + torches (r 2.4); Bresenham `losClear` gates both
   visibility and archer shots. Enemies aggro when their tile is lit and
@@ -50,6 +49,58 @@ realistic light-map rendering. Single self-contained file.
 - **Death:** `checkDeath` is state-guarded (idempotent — which is also what
   stops a delve being **banked twice**); persists
   `emberDepths.bestDepth`/`bestGold`, calls `bankRun()`, overlay 900 ms later.
+
+## The difficulty curve
+
+Every number the dungeon gets harder by lives in **one object, `CURVE`**, and
+is **tuned against `.claude/tests/eval-ember-depths.cjs`, not chosen**. Change a
+constant here and re-run the eval; do not guess, because the interactions
+(enemy count × HP × the player's own kit) are not readable off the table.
+
+- Enemy HP and attack are **multiplicative and unbounded**, with a quadratic
+  term: `base * (1 + k·mul + k²·quad)` where `k = depth − 1`. The CD's spec is
+  "no ceiling", so there is no table to run out. The split matters: the
+  **linear** term decides how fast the early floors tighten, the **quadratic**
+  one is what eventually beats any build. Keep the linear term gentle and let
+  the square do the killing — that is the difference between "hard at 3" and
+  "hard at 30".
+- **Elites** from depth 4, chance rising with depth to a 40% cap: same
+  silhouette, same behaviour, ×1.6 HP and +1 attack, purple rim. Stronger
+  monsters without a new rule for the player to learn.
+- Measured 2026-08-26 (persona, 20 runs, seed 90210): **fresh 6.9 / kitted
+  11.6 / maxed 23.8**, deepest single run 43. The CD's target for a fresh
+  delver is ~8, and the persona plays worse than a person — see the eval's
+  header for why its average is a floor on what the CD will see, not a
+  prediction of it.
+
+## Traps and statuses
+
+Traps are one-shot: they spring when you step on them, then stay on the board
+sprung and inert, as a scar. SPIKE PIT deals damage; everything else puts
+turns on **`statuses`**, the game's only status system, ticked once per player
+turn in `tickStatuses()` — after the turn is counted, before the enemies move,
+so poison bleeds you on **your** clock rather than theirs.
+
+| Trap | From depth | Effect |
+| --- | --- | --- |
+| SPIKE PIT | 2 | `2 + depth*0.45` damage |
+| IRON SNARE | 3 | `stun` 2 |
+| VENOM VENT | 4 | `venom` 6 — 1 HP per turn |
+| TAR SEEP | 5 | `slow` 6 — `enemiesAct()` runs **twice** per turn |
+| GLOOM GLYPH | 6 | `gloom` 10 — `lightRadius()` halved |
+| WITHER RUNE | 7 | `frail` 8 — `playerDamage()` halved |
+
+- **A stun is not an input lock.** `stunStep(dt)` auto-passes the turns at the
+  same cadence a walked path uses, because a frozen board with no explanation
+  reads as a bug. `tapTile` ignores taps while `statuses.stun > 0`.
+- **The auto-path treats a seen, unsprung trap as a wall** (`trapBlocked`), so
+  tapping a far tile never walks you over a hazard that is drawn on screen —
+  but tapping the trap *itself* still works, which is the deliberate way onto
+  one. If avoiding it makes the target unreachable, `buildPathTo` falls back to
+  the honest route rather than refusing to move.
+- Active statuses are drawn as pills at the foot of the board
+  (`drawStatuses`). Anything silently draining you needs a number on screen or
+  the death reads as unfair rather than earned.
 
 ## Meta progression (characters, gear, skills, supplies)
 
@@ -80,10 +131,22 @@ so (`meta-progression` + `save-campaign` alongside `permadeath`).
 - **Gear** (`GEAR`): four tracks × four tiers. Tier 0 is the free starting kit,
   which is what lets "upgrade" be a single verb everywhere — there is no
   unowned state to special-case. Full kit ≈ 1675◈.
-- **Skills** (`TREES`): three trees × four nodes. A node opens at `req` points
-  spent **in its own tree**, and rank *r* costs *r* points, so `treeSpent()` is
-  a triangular number, not a count. Going deep costs more than going wide,
-  which is the only thing stopping a character maxing all three.
+- **Skills** (`SKILLS`): **one DAG, two roots, sixteen nodes.** The whole rule
+  is `skillOpen()`: a node accepts a point once **every** node with an arrow
+  into it has at least one. Rank *r* costs *r*, so multi-rank nodes get
+  expensive; most nodes are a single unlock. LAMPLIGHT is the bridge (both
+  roots), BLOODLETTER and UNBROKEN are one per side, and **EMBER SOVEREIGN sits
+  under both** — 16 points and a deliberate route, which at one point per five
+  depths is a very long game. See **## The skill tree** below.
+- **Skill points** are earned by depth, never by dying: **one for every fifth
+  floor, the first time that floor is finished** (`awardMilestones`, driven
+  from `completeDescend`). Idempotent by construction — the award is
+  `floor(deepest / 5) − spAwarded` — so re-finishing a floor pays nothing and
+  farming is for gold only.
+- **The starting depth** is sticky per character (`startFloor`), selectable up
+  to `stats.bestDepth`, because with no ceiling a player should not replay
+  floor 1 to reach floor 30. The delve's depth bonus counts floors below
+  **where you started**, so diving in deep and dying on arrival pays nothing.
 - **Supplies** (`CONSUMABLES`): bought in camp into `chr().supplies`, copied
   into the in-run `consumables` at `startRun()`, and **cleared by `bankRun()`
   whether or not they were used** — that is the recurring sink, and the reason
@@ -91,9 +154,36 @@ so (`meta-progression` + `save-campaign` alongside `permadeath`).
   buttons up the left edge of the board (`drawConsumables` / `useBtns`),
   hit-tested in `handleTap` ahead of `tapTile`. Using one **takes your turn**
   (`playerAct({wait:true})`); it is not a free action.
-- **The payout** (`bankRun`): carried gold **+ 10 per floor below the first**,
-  and `max(1, floor((depth-1)/2))` skill points, +2 for a new deepest. The
-  depth bonus is what stops farming floor 1 being the optimal play.
+- **The payout** (`bankRun`): **gold only** — carried gold plus 10 per floor
+  below the one you started on.
+
+### The skill tree
+
+`SKILLS` carries each node's `in` edges **and** its `col`/`row` layout slot, and
+the SVG in `skillsHtml` draws its lines from the same `in` arrays that
+`skillOpen()` checks — so the picture and the rule cannot drift apart. A list
+of rows was the obvious cheap option and is the wrong one: in a DAG the
+**shape is the rule**, and a list cannot show it.
+
+```
+        KEEN EDGE(2)              THICK HIDE(2)
+         /        \              /         \
+   HEAVY BLOWS   LAMPLIGHT(2) [needs BOTH]  STONE BONES
+        |          /        \                   |
+   VENGEANCE   TRAPWISE   PROSPECTOR(2)    SECOND WIND
+        |          |          |                 |
+   EXECUTION  CARTOGRAPHER  FORTUNE        LAST STAND
+         \        /            \             /
+        BLOODLETTER              UNBROKEN
+                 \              /
+                EMBER SOVEREIGN   (needs both sides)
+```
+
+Node colour is the state: green taken, gold available, dim locked. Tapping a
+node selects it (`campSkill`) and fills the detail card below — selecting is
+free, spending is the button. **Respec** (`respecCost()`, 40 + 30 per point
+sunk) refunds every point for gold, which is also what gives late-game gold a
+second sink once the gear is bought.
 
 ### The camp UI
 
@@ -302,11 +392,26 @@ intro banner and descend fade.
   resolve *immediately* rather than queueing — witness a move with
   `player.x/y` **and** `turnCount`, not `pathQueue.length` alone, which reads 0
   both when nothing happened and when the hero already walked.
+- **The `seedSalt` hook** makes floor generation reproducible (non-zero
+  replaces `Date.now()` in `genFloor`'s seed). The balance eval needs it or it
+  measures luck; leave it at 0 in shipping code.
 - **A meta check that does not reload has not checked persistence.** Slot
   state lives in memory as well as in localStorage, so asserting `slots[0].gold`
   after a purchase measures the copy that was never written. `page.reload()`
   between the write and the read is the only honest form.
-- Drive: **`.claude/tests/drive-ember-depths.cjs` (75 checks)** — kept, and
+- **A trap-avoidance check must put the trap ON the route.** The first version
+  picked any cell near the player, and "the path avoided it" was trivially true
+  of a cell the path was never going to touch: it stayed green with
+  trap-avoidance ripped out of the game entirely. It now builds the path with
+  no trap first, plants the trap on a cell that route actually uses, and only
+  then asserts the detour — and separately asserts the fallback on a cell with
+  no way round.
+- **Measure a rule by the thing it changes, not by a proxy the layout can
+  move.** "Mired: the dark moves twice" was written as how far a tracked enemy
+  closed in one turn, which is 0 whenever the layout blocks it — flaky on a
+  procedural floor. Counting SWINGS from an enemy already beside you is
+  layout-independent and is what the rule actually says.
+- Drive: **`.claude/tests/drive-ember-depths.cjs` (109 checks)** — kept, and
   picked up automatically by `gates.sh` for any change under
   `games/ember-depths/`. Covers the zoom range and clamps, zoom-1 layout
   identity, free look (tethered before a drag, never re-tethering after one,
@@ -316,6 +421,9 @@ intro banner and descend fade.
   `hurtPlayer` / `killEnemy` / `lightRadius`. That last point was learned the
   hard way: the first version re-derived `damage - relicCount('skin')` inside
   the check and passed with the shipping site reverted to `.includes()`.
+  Balance is NOT here — it lives in **`.claude/tests/eval-ember-depths.cjs`**,
+  which plays scripted personas through real runs and is the only honest way to
+  tune `CURVE`. Read its header before trusting a number from it.
   A second group covers the meta layer: three independent slots surviving a
   reload, a hand-edited save clamped by `migrate()`, the forge refusing what
   you cannot afford, the kit **reaching the delve** (atk / max HP / light /
@@ -328,7 +436,16 @@ intro banner and descend fade.
   `followCam`, a falling-through dismiss tap, skin/leech/ward reverted to
   non-stacking, `bankRun` keeping the supplies, the skill gate removed, the
   kit never folded into `player`, and `migrate` trusting the blob — each
-  fails exactly its own check.
+  fails exactly its own check. A third group covers the 2026-08-26 curve pass:
+  the tree's wiring (every edge names a real node, exactly two roots, every
+  node reachable), the prerequisite rule at full size (one full side reaches
+  its own capstone but not SOVEREIGN; both sides cost exactly 16), respec,
+  every trap kind and the status it leaves, TRAPWISE, trap-aware pathing, the
+  milestone ledger (a point on floors 5 and 10 and nowhere else; re-finishing
+  pays nothing), and the sticky starting depth including that a deep dive that
+  dies on arrival banks zero. Negative-controlled too — an ANY-input
+  prerequisite, a milestone that pays every time, a depth bonus counted from
+  floor 1, traps that never block the path, and venom that never expires.
 - Older scratchpad suites (2026-08-25, 70 checks: slider → gain math, mute
   precedence, reload persistence, pinch anchor, screen→tile round-trip, fuzz
   runs, the chrome-reachability sweep) are gone with their container. The
