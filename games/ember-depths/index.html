@@ -126,7 +126,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-26 00:01 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-26 03:40 UTC</div>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
 <button id="cog" aria-label="Settings">&#9881;</button>
@@ -145,7 +145,7 @@ body {
       <input type="range" id="vol-sfx" min="0" max="100" step="5" value="100" aria-label="Sound effects volume">
       <span class="val" id="vol-sfx-val">100%</span>
     </div>
-    <div class="set-note"><em>Pinch</em> the board to zoom; <em>drag</em> to look around.</div>
+    <div class="set-note"><em>Pinch</em> the board to zoom; <em>drag</em> to look anywhere on the map, then <em>&#8982;</em> to snap back to your hero. <em>Tap the relic row</em> for what each one does.</div>
     <button class="btn" id="set-close">CLOSE</button>
   </div>
 </div>
@@ -178,6 +178,9 @@ let stairs = { x: 0, y: 0 };
 let chest = { x: -1, y: -1, opened: true };
 let relics = [];           // relic keys owned
 let wardTimer = 0;         // ember-ward recharge countdown (0 = ready)
+// Stacked wards recharge faster rather than stacking shields, so a second
+// copy is a real upgrade without letting a build eat three hits a turn.
+function wardRecharge() { return Math.max(2, 8 - 2 * relicCount('ward')); }
 let pathQueue = [];        // queued [x,y] steps from a tap
 let attackTargetId = -1;
 let pathT = 0;
@@ -186,6 +189,9 @@ let descendT = -1;         // descend fade animation
 let introT = 0;            // "DEPTH n" banner timer
 let shakeT = 0;
 let enemyIdSeq = 1;
+let buffPanel = false;     // relic detail panel open? (a pure overlay: no turn passes)
+let buffRect = null;       // HUD hotspot for the relic row, in screen px (null = no relics)
+let recenterBtn = null;    // ⌖ button circle, in screen px (null = not shown)
 
 const RELICS = {
   blade:   { name: 'SEARING BLADE',  icon: '⚔', desc: '+2 attack. The edge still remembers the forge.' },
@@ -195,6 +201,19 @@ const RELICS = {
   lantern: { name: "MINER'S LANTERN", icon: '☀', desc: 'Your light reaches half again as far.' },
   crown:   { name: 'VAMPIRIC CROWN', icon: '♛', desc: '+2 max HP and heal 2 each time you descend.' },
 };
+
+/* Relics are a list, not a set, so the same relic taken twice counts twice.
+   Everything player-facing aggregates through here: one row per relic kind,
+   with the number of copies. */
+function relicCount(key) { let n = 0; for (const k of relics) if (k === key) n++; return n; }
+function relicCounts() {
+  const out = [];
+  for (const k of relics) {
+    const hit = out.find((o) => o.key === k);
+    if (hit) hit.n++; else out.push({ key: k, n: 1 });
+  }
+  return out;
+}
 
 /* ============ RNG ============ */
 let rngS = 1234567;
@@ -282,6 +301,7 @@ function genFloor(n) {
     spawnEnemy(types[ri(0, types.length - 1)], c.x, c.y, n);
   }
   recomputeVision();
+  buffPanel = false;
   centerCam();   // a zoomed-in view should open on the player, not last floor's corner
   introT = 1.6;
 }
@@ -328,7 +348,7 @@ function losClear(x0, y0, x1, y1) {
   return true;
 }
 function enemyAt(x, y) { return enemies.find(e => e.x === x && e.y === y) || null; }
-function lightRadius() { return relics.includes('lantern') ? 5.2 : 3.6; }
+function lightRadius() { return Math.min(9, 3.6 + 1.6 * relicCount('lantern')); }
 
 /* ============ Vision ============ */
 function recomputeVision() {
@@ -392,16 +412,17 @@ function killEnemy(e) {
   enemies = enemies.filter(x => x !== e);
   kills++;
   addPuff(e.x, e.y, e.type === 'wraith' ? '#b0c8ff' : '#ff8844');
-  if (relics.includes('leech')) { player.hp = Math.min(player.maxHp, player.hp + 1); addFloat(player.x, player.y, '+1♥', '#ff5566'); }
+  const leech = relicCount('leech');
+  if (leech) { player.hp = Math.min(player.maxHp, player.hp + leech); addFloat(player.x, player.y, '+' + leech + '♥', '#ff5566'); }
   if (rnd() < 0.45) items.push({ x: e.x, y: e.y, type: 'gold', amt: ri(1, 3) });
   sfxKill();
 }
 function hurtPlayer(dmg, srcX, srcY) {
   if (state !== 'play') return;
   let d = dmg;
-  if (relics.includes('skin')) d = Math.max(1, d - 1);
-  if (relics.includes('ward') && wardTimer === 0) {
-    wardTimer = 6; addFloat(player.x, player.y, 'BLOCK', '#88ccff'); sfxBlock(); return;
+  d = Math.max(1, d - relicCount('skin'));
+  if (relicCount('ward') && wardTimer === 0) {
+    wardTimer = wardRecharge(); addFloat(player.x, player.y, 'BLOCK', '#88ccff'); sfxBlock(); return;
   }
   player.hp -= d; shakeT = 0.3;
   addFloat(player.x, player.y, '-' + d, '#ff4444');
@@ -484,8 +505,10 @@ function checkDeath() {
 function openChest() {
   chest.opened = true;
   sfxChest();
-  const pool = Object.keys(RELICS).filter(k => !relics.includes(k));
-  if (pool.length === 0) { gold += 25; addFloat(chest.x, chest.y, '+25◈', '#ffc300'); return; }
+  // Unseen relics first; once the set is exhausted a chest starts offering
+  // second copies, which stack (see relicCount() at each effect site).
+  let pool = Object.keys(RELICS).filter(k => !relics.includes(k));
+  if (pool.length === 0) pool = Object.keys(RELICS);
   const a = pool[ri(0, pool.length - 1)];
   const rest = pool.filter(k => k !== a);
   const b = rest.length ? rest[ri(0, rest.length - 1)] : null;
@@ -508,7 +531,8 @@ function beginDescend() {
 function completeDescend() {
   floorNum++;
   persistBests();
-  if (relics.includes('crown')) { player.maxHp += 2; player.hp = Math.min(player.maxHp, player.hp + 2); }
+  const crowns = relicCount('crown') * 2;
+  if (crowns) { player.maxHp += crowns; player.hp = Math.min(player.maxHp, player.hp + crowns); }
   genFloor(floorNum);
   state = 'play';
 }
@@ -586,7 +610,7 @@ function pathStep(dt) {
 /* ============ Run lifecycle ============ */
 function startRun() {
   floorNum = 1; gold = 0; kills = 0; turnCount = 0;
-  relics = []; wardTimer = 0;
+  relics = []; wardTimer = 0; buffPanel = false;
   player.hp = 12; player.maxHp = 12; player.atk = 3;
   genFloor(1);
   state = 'play';
@@ -625,7 +649,18 @@ let darkCv = null, darkCtx = null;
    zoom 1 reproduces the original layout). */
 let baseTile = 34, zoom = 1, camX = COLS / 2, camY = ROWS / 2;
 let viewX = 0, viewY = 60, viewW = 390, viewH = 700;
-const MIN_ZOOM = 1, MAX_ZOOM = 3.2;
+/* Zoom 1 is the whole-board fit. Below it the board shrinks inside the
+   viewport (a wider look at where you have been); above it you are reading
+   a few tiles at a time. */
+const MIN_ZOOM = 0.5, MAX_ZOOM = 6;
+/* `camFree` latches the moment the player drags or pinches, and only
+   centerCam() clears it. While it is set the camera is theirs: it does not
+   ease back toward the player, so a drag can look anywhere on the map and
+   stay there. The ⌖ button (drawn only while it is set) hands the camera
+   back. */
+let camFree = false;
+// Panning is meaningful only while the board is bigger than its viewport.
+function canPan() { return tile * COLS > viewW + 1 || tile * ROWS > viewH + 1; }
 function applyView() {
   zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
   tile = baseTile * zoom;
@@ -642,6 +677,7 @@ function zoomAt(sx, sy, factor) {
   const nz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
   if (nz === zoom) return;
   const wx = (sx - ox) / tile, wy = (sy - oy) / tile;
+  camFree = true;
   zoom = nz;
   tile = baseTile * zoom;
   camX = wx + (viewX + viewW / 2 - sx) / tile;
@@ -650,10 +686,11 @@ function zoomAt(sx, sy, factor) {
 }
 function panBy(dx, dy) {
   if (!dx && !dy) return;
+  camFree = true;
   camX -= dx / tile; camY -= dy / tile;
   applyView();
 }
-function centerCam() { camX = player.x + 0.5; camY = player.y + 0.5; applyView(); }
+function centerCam() { camFree = false; camX = player.x + 0.5; camY = player.y + 0.5; applyView(); }
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 3);
   W = window.innerWidth; H = window.innerHeight;
@@ -799,8 +836,9 @@ cv.addEventListener('touchmove', (ev) => {
   const t = ev.touches[0];
   if (!dragging && Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) >= TAP_SLOP) {
     // Panning only makes sense once the board is bigger than the viewport;
-    // at zoom 1 a long drag stays a (cancelled) tap and moves nothing.
-    dragging = zoom > MIN_ZOOM;
+    // zoomed out to the fit or past it, a long drag stays a (cancelled) tap
+    // and moves nothing.
+    dragging = canPan();
     if (dragging) gestured = true;
   }
   if (dragging) panBy(t.clientX - lastPan.x, t.clientY - lastPan.y);
@@ -822,7 +860,7 @@ cv.addEventListener('touchend', (ev) => {
     const t = ev.touches[0];
     touchStart = { x: t.clientX, y: t.clientY };
     lastPan = { x: t.clientX, y: t.clientY };
-    dragging = zoom > MIN_ZOOM;
+    dragging = canPan();
   }
 }, { passive: false });
 cv.addEventListener('touchcancel', (ev) => { ev.preventDefault(); resetGesture(); }, { passive: false });
@@ -843,6 +881,19 @@ document.addEventListener('touchmove', (ev) => {
   if (ev.touches.length > 1) ev.preventDefault();
 }, { passive: false });
 function handleTap(px, py) {
+  // Order matters: the open panel swallows the tap that closes it, so no
+  // step is queued and no enemy turn is taken by dismissing it.
+  if (buffPanel) { buffPanel = false; return; }
+  if (state !== 'play') return;
+  if (recenterBtn && Math.hypot(px - recenterBtn.x, py - recenterBtn.y) <= recenterBtn.r) {
+    centerCam();
+    return;
+  }
+  if (buffRect && px >= buffRect.x && px <= buffRect.x + buffRect.w &&
+      py >= buffRect.y && py <= buffRect.y + buffRect.h) {
+    buffPanel = true;
+    return;
+  }
   const tx = Math.floor((px - ox) / tile), ty = Math.floor((py - oy) / tile);
   tapTile(tx, ty);
 }
@@ -873,7 +924,8 @@ function showMenu() {
       <em>Tap</em> a lit tile to walk there — every step you take, the dark takes one too.
       <em>Tap an enemy</em> to close and strike. Gold is score, hearts heal,
       chests hold <em>relics</em> that stack into a build. Find the stairs, go deeper.
-      Death is forever. <em>Pinch</em> to zoom the board, <em>drag</em> to look around.
+      Death is forever. <em>Pinch</em> to zoom, <em>drag</em> to look anywhere on the map
+      (⌖ recentres), and <em>tap your relics</em> for what they do.
     </div>`;
   bindTap(document.getElementById('go'), startRun);
 }
@@ -1259,13 +1311,11 @@ function drawScene(dt) {
   // up behind the HUD row and down past the bottom margin. Mask those strips
   // back to background *before* the vignette, so they darken exactly as the
   // (already-empty) strips do at zoom 1.
-  if (zoom > MIN_ZOOM) {
-    ctx.fillStyle = '#050409';
-    if (viewY > 0) ctx.fillRect(0, 0, W, viewY);
-    if (viewY + viewH < H) ctx.fillRect(0, viewY + viewH, W, H - viewY - viewH);
-    if (viewX > 0) ctx.fillRect(0, viewY, viewX, viewH);
-    if (viewX + viewW < W) ctx.fillRect(viewX + viewW, viewY, W - viewX - viewW, viewH);
-  }
+  ctx.fillStyle = '#050409';
+  if (viewY > 0) ctx.fillRect(0, 0, W, viewY);
+  if (viewY + viewH < H) ctx.fillRect(0, viewY + viewH, W, H - viewY - viewH);
+  if (viewX > 0) ctx.fillRect(0, viewY, viewX, viewH);
+  if (viewX + viewW < W) ctx.fillRect(viewX + viewW, viewY, W - viewX - viewW, viewH);
   // vignette
   const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
   vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)');
@@ -1291,6 +1341,7 @@ function drawScene(dt) {
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
   }
+  drawBuffPanel();
 }
 function drawPlayer() {
   const [px, py] = cellPx(player.vx, player.vy);
@@ -1439,14 +1490,148 @@ function drawHUD(dt) {
   ctx.fillStyle = '#dde3ff';
   ctx.textAlign = 'right';
   ctx.fillText(player.hp + '/' + player.maxHp + ' HP', bx + bw, y + 30);
-  // relic icons
+  // Relic icons — one per kind, ×N when stacked. The whole row is a tap
+  // target that opens the detail panel, so it gets a faint plate behind it:
+  // an icon strip with no affordance reads as decoration.
+  const list = relicCounts();
+  const rowY = y + 48;
   ctx.textAlign = 'left';
-  ctx.font = `12px 'Share Tech Mono', monospace`;
-  let rx = bx;
-  for (const k of relics) {
-    ctx.fillStyle = (k === 'ward' && wardTimer > 0) ? '#555a70' : '#ffc300';
-    ctx.fillText(RELICS[k].icon, rx, y + 44);
-    rx += 16;
+  // Measure first, then place: six relics with ×N badges are wider than the
+  // gap between the gold line and the right edge, so the row slides left to
+  // fit rather than running off screen.
+  let rowW = 0;
+  for (const r of list) {
+    rowW += 14 + 4;
+    if (r.n > 1) { ctx.font = `9px 'Share Tech Mono', monospace`; rowW += ctx.measureText('\u00d7' + r.n).width + 1; }
+  }
+  let rx = Math.max(196, Math.min(bx, W - 12 - rowW));
+  const rowLeft = rx;
+  for (const r of list) {
+    ctx.font = `12px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = (r.key === 'ward' && wardTimer > 0) ? '#555a70' : '#ffc300';
+    ctx.fillText(RELICS[r.key].icon, rx, rowY);
+    rx += 14;
+    if (r.n > 1) {
+      ctx.font = `9px 'Share Tech Mono', monospace`;
+      ctx.fillStyle = '#ff9a3c';
+      ctx.fillText('\u00d7' + r.n, rx, rowY);
+      rx += ctx.measureText('\u00d7' + r.n).width + 1;
+    }
+    rx += 4;
+  }
+  if (list.length) {
+    buffRect = { x: rowLeft - 8, y: rowY - 14, w: Math.min(W - rowLeft + 4, Math.max(54, rx - rowLeft + 14)), h: 28 };
+    ctx.fillStyle = 'rgba(255,154,60,0.07)';
+    ctx.fillRect(buffRect.x, buffRect.y, buffRect.w, buffRect.h);
+    ctx.strokeStyle = 'rgba(255,154,60,0.28)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(buffRect.x + 0.5, buffRect.y + 0.5, buffRect.w - 1, buffRect.h - 1);
+  } else {
+    buffRect = null;
+  }
+  drawRecenter();
+}
+
+/* The ⌖ handle. Free-look means the camera stops chasing the player, so the
+   route back cannot be another gesture (a drag is what got you here) and it
+   cannot be a board tap (that walks). A button in the corner of the viewport
+   is the only thing that is unambiguous — and it doubles as the signal that
+   the camera is currently yours. */
+function drawRecenter() {
+  if (state !== 'play' || !camFree) { recenterBtn = null; return; }
+  const r = 21, cx2 = viewX + viewW - r - 12, cy2 = viewY + viewH - r - 12;
+  recenterBtn = { x: cx2, y: cy2, r: r + 8 };
+  ctx.fillStyle = 'rgba(10,8,14,0.72)';
+  ctx.beginPath(); ctx.arc(cx2, cy2, r, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#ff9a3c'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(cx2, cy2, r, 0, 7); ctx.stroke();
+  ctx.strokeStyle = '#ffc300'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(cx2, cy2, 6.5, 0, 7); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx2 - 12, cy2); ctx.lineTo(cx2 - 8, cy2);
+  ctx.moveTo(cx2 + 8, cy2); ctx.lineTo(cx2 + 12, cy2);
+  ctx.moveTo(cx2, cy2 - 12); ctx.lineTo(cx2, cy2 - 8);
+  ctx.moveTo(cx2, cy2 + 8); ctx.lineTo(cx2, cy2 + 12);
+  ctx.stroke();
+}
+
+/* ============ Relic detail panel ============
+   Opened by tapping the HUD relic row, closed by tapping anywhere. It is a
+   read of state, never a mutation of it: handleTap returns before tapTile,
+   so no step is queued and no enemy turn is taken while it is up. */
+function wrapLines(text, maxW) {
+  const out = [];
+  let cur = '';
+  for (const word of text.split(' ')) {
+    const next = cur ? cur + ' ' + word : word;
+    if (cur && ctx.measureText(next).width > maxW) { out.push(cur); cur = word; }
+    else cur = next;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+function relicStatus(key, n) {
+  if (key === 'ward') {
+    const now = wardTimer > 0
+      ? 'Recharging \u2014 ready in ' + wardTimer + ' turn' + (wardTimer === 1 ? '' : 's') + '.'
+      : 'Shield ready.';
+    // The card text quotes the single-copy recharge, so a stack has to say
+    // what it actually is rather than leave the two numbers contradicting.
+    return n > 1 ? now + ' Recharge now every ' + wardRecharge() + ' turns.' : now;
+  }
+  if (key === 'blade') return 'Attack now ' + player.atk + '.';
+  if (key === 'crown') return 'Max HP now ' + player.maxHp + '.';
+  if (key === 'lantern') return 'Light radius ' + lightRadius().toFixed(1) + ' tiles.';
+  if (key === 'skin') return 'Incoming damage reduced by ' + n + ' (never below 1).';
+  if (key === 'leech') return 'Heals ' + n + ' HP per kill.';
+  return '';
+}
+function drawBuffPanel() {
+  if (!buffPanel) return;
+  const list = relicCounts();
+  if (!list.length) { buffPanel = false; return; }
+  const pw = Math.min(W - 32, 344), pad = 15, wrapW = pw - pad * 2 - 4;
+  const bodyFont = `11px 'Share Tech Mono', monospace`;
+  const blocks = [];
+  let hh = pad + 24;
+  for (const r of list) {
+    ctx.font = bodyFont;
+    const desc = wrapLines(RELICS[r.key].desc, wrapW);
+    const stat = wrapLines(relicStatus(r.key, r.n), wrapW);
+    blocks.push({ r, desc, stat });
+    hh += 17 + desc.length * 14 + stat.length * 14 + 12;
+  }
+  hh += pad - 8;
+  const px0 = Math.round((W - pw) / 2);
+  const py0 = Math.round(Math.max(hudTop + 8, Math.min(H - hh - 20, (H - hh) / 2)));
+  ctx.fillStyle = 'rgba(4,3,6,0.86)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(14,11,18,0.98)';
+  ctx.fillRect(px0, py0, pw, hh);
+  ctx.strokeStyle = '#ff9a3c'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(px0 + 0.5, py0 + 0.5, pw - 1, hh - 1);
+  ctx.textAlign = 'left';
+  ctx.font = `13px 'Black Ops One', sans-serif`;
+  ctx.fillStyle = '#ff9a3c';
+  ctx.fillText('RELICS', px0 + pad, py0 + pad + 12);
+  ctx.textAlign = 'right';
+  ctx.font = `9px 'Share Tech Mono', monospace`;
+  ctx.fillStyle = '#7a7286';
+  ctx.fillText('TAP ANYWHERE TO CLOSE', px0 + pw - pad, py0 + pad + 11);
+  ctx.textAlign = 'left';
+  let ty = py0 + pad + 30;
+  for (const b of blocks) {
+    ctx.font = `12px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = '#ffc300';
+    const head = RELICS[b.r.key].icon + '  ' + RELICS[b.r.key].name + (b.r.n > 1 ? '  \u00d7' + b.r.n : '');
+    ctx.fillText(head, px0 + pad, ty);
+    ty += 17;
+    ctx.font = bodyFont;
+    ctx.fillStyle = '#a89fb4';
+    for (const ln of b.desc) { ctx.fillText(ln, px0 + pad + 4, ty); ty += 14; }
+    ctx.fillStyle = '#6fd8a0';
+    for (const ln of b.stat) { ctx.fillText(ln, px0 + pad + 4, ty); ty += 14; }
+    ty += 12;
   }
 }
 
@@ -1474,12 +1659,14 @@ function spawnAmbient(dt) {
 }
 
 /* ============ Camera follow ============
-   Only while zoomed in, and only as a correction: the camera holds still
-   until the player nears the edge of the viewport, then eases just enough to
-   put them back inside the dead zone. That keeps a deliberate pan intact
-   while making sure walking can never lose you off-screen. */
+   Runs only while the camera is still the game's (see `camFree`): until the
+   player drags or pinches, walking can never lose you off-screen, because
+   the camera eases just enough to put the player back inside a dead zone.
+   The first drag hands the camera over for good, and only the ⌖ button (or
+   descending a floor) takes it back — that is what "look anywhere" means
+   here, and why the button has to exist. */
 function followCam(dt) {
-  if (zoom <= MIN_ZOOM) return;
+  if (camFree || !canPan()) return;
   const [px, py] = cellPx(player.vx + 0.5, player.vy + 0.5);
   const mx = Math.min(viewW * 0.32, tile * 2.2), my = Math.min(viewH * 0.32, tile * 2.2);
   let dx = 0, dy = 0;

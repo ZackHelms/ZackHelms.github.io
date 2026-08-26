@@ -52,8 +52,18 @@ Zoom 1 is the smaller-than case on both axes by construction (`baseTile` is the
 fit), so **zoom 1 reproduces the original layout for free** — worth asserting,
 because it means the whole feature is provably invisible until used.
 
-Set `MIN_ZOOM = 1` (the fit). Below the fit there is nothing to reveal but
-margin, and a board that can shrink to a postage stamp reads as a bug.
+`MIN_ZOOM = 1` (the fit) is the tidy floor, and it was Ember Depths' first
+answer. It did not survive contact: the CD asked to zoom out further the day
+after, because on an explored floor a smaller board is a *map*, not wasted
+margin. The floor is now 0.5, and the clamp needed no change at all — below the
+fit is just the smaller-than case again.
+
+**Do not encode "zoomed in" as `zoom > MIN_ZOOM`.** It reads as the same thing
+only while `MIN_ZOOM` is the fit; the moment the floor drops it silently
+becomes "not fully zoomed out", and every drag gate written that way starts
+letting the player pan a board that is entirely on screen. The durable test is
+geometric — `canPan()`, board pixel size vs viewport — and it is correct at
+every floor you might later choose.
 
 Anchor a pinch by pinning the world point under the midpoint:
 
@@ -70,8 +80,8 @@ first is a pinch or a drag ending in a **stray tap** — on this game that means
 the player walks somewhere they never asked to go.
 
 - 1 finger under `TAP_SLOP` (14 px) → tap
-- 1 finger over slop → pan, **only while zoomed in** (at the fit there is
-  nothing to pan, so a long drag stays a cancelled tap)
+- 1 finger over slop → pan, **only while `canPan()`** (with the whole board on
+  screen there is nothing to pan, so a long drag stays a cancelled tap)
 - 2 fingers → zoom + pan at the midpoint
 
 The fix is a **latch, not a check**: `gestured` is set the moment a pinch or a
@@ -135,6 +145,14 @@ The assertions that earn their place are the **negative** ones: after a pinch,
 and after a drag, the player must not have moved and `pathQueue` must be empty
 — while a short tap in the same run still moves them.
 
+Watch the witness there. `pathQueue.length === 0` reads the same when nothing
+happened and when a tap on an *adjacent* tile already resolved into a step, so
+a "this gesture did not move me" check wants the position and the turn counter
+too. And aim the positive control at a neighbour of the player rather than at
+the first walkable-looking tile on the board: on a procedural floor a distant
+`seen` tile can be unreachable, and the control then fails for a reason that
+has nothing to do with gestures.
+
 ## 5. Two traps this session actually hit
 
 ### The camera eases every frame, so act and read in ONE `page.evaluate`
@@ -166,7 +184,28 @@ are down but before the vignette, so those strips darken exactly as the
 (already-empty) strips do at zoom 1. One rect per side, no interaction with
 shake, and it covers every layer by construction.
 
-## 6. Chrome z-index: the *whole* row, not just the new button
+## 6. Free look, and the button it forces you to add
+
+Auto-follow and free look are not two settings of one camera; they are two
+cameras, and the choice belongs to the player. Ember Depths ended up with a
+latch — `camFree`, set by the first pan or pinch, cleared only by an explicit
+re-centre — because "follow, but not while they are looking around" is the only
+version that is not annoying in one direction or the other.
+
+The part worth writing down is the consequence: **once the camera stops
+chasing, you owe the player a way back, and it cannot be a gesture.** A drag is
+what got them there, and on a tap-to-move game a board tap walks the hero. So
+it has to be a button, and a button that only appears while the camera is free
+also tells them which of the two cameras they are holding. Budget for it when
+you scope "let me look around" — it is not the two-line change it looks like.
+
+The regression to guard is subtle enough to be worth a kept check: a later
+refactor that "fixes" the camera by making it follow again looks like a
+bugfix, because that was the original design. Assert the durable direction —
+after a drag, walk the hero to the far corner and require `ox`/`oy` not to
+move at all.
+
+## 7. Chrome z-index: the *whole* row, not just the new button
 
 `games/CLAUDE.md` § Chrome above overlays requires ← and 🔊 to outrank every
 full-screen overlay. A settings **scrim** is a full-screen overlay, and it is

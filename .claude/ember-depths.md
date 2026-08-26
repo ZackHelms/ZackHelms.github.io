@@ -31,12 +31,22 @@ realistic light-map rendering. Single self-contained file.
   visible enemy, adjacent aggro enemy, blocker on next cell, or taking
   damage. Tapping a lit enemy paths to adjacent then auto-attacks
   (`attackTargetId`).
-- **Relics** (`RELICS`, chest offers 2, all-owned → +25 gold): blade +2 atk,
-  leech +1 HP/kill, skin −1 dmg (min 1), ward blocks 1 hit/6 turns
-  (`wardTimer`), lantern +light, crown +2 maxHP & +2 heal per descend.
-  Effects live in `takeRelic` (stat relics) / `hurtPlayer` (skin+ward
-  order: skin first, ward consumes the hit) / `killEnemy` (leech) /
-  `completeDescend` (crown).
+- **Relics** (`RELICS`, chest offers 2): blade +2 atk, leech HP/kill, skin
+  −dmg (min 1), ward blocks 1 hit per `wardRecharge()` turns (`wardTimer`),
+  lantern +light, crown +2 maxHP & +2 heal per descend. Effects live in
+  `takeRelic` (stat relics) / `hurtPlayer` (skin+ward order: skin first, ward
+  consumes the hit) / `killEnemy` (leech) / `completeDescend` (crown).
+  **`relics` is a list, not a set, and every effect stacks per copy.** Chests
+  offer unseen relics first and start offering *second copies* once the set is
+  exhausted (they used to pay +25 gold, which made a deep run stop building).
+  So every effect site reads **`relicCount(key)`, never `relics.includes(key)`**
+  — that is one rule with six enforcement points, and a site left on
+  `.includes()` is the whole failure mode. Scaling per copy: blade/crown are
+  additive through `takeRelic` for free; skin subtracts N; leech heals N;
+  lantern `min(9, 3.6 + 1.6N)`; ward recharges in `max(2, 8 - 2N)` turns
+  (copies shorten the cooldown rather than stacking shields, so a build cannot
+  eat three hits a turn). `relicCounts()` is the aggregated view — one row per
+  kind with `n` — and everything player-facing goes through it.
 - **Death:** `checkDeath` is state-guarded (idempotent); persists
   `emberDepths.bestDepth`/`bestGold`; overlay 900 ms later.
 
@@ -63,9 +73,13 @@ hit-test read, so zoom is entirely a question of what `applyView()` writes
 into them. Everything else follows:
 
 - `baseTile` is the whole-board fit `resize()` computes (`floor(min(W/COLS,
-  availH/ROWS))`), and is also **`MIN_ZOOM`** — pinching out returns you to
-  "everything visible" and no further, because below the fit there is nothing
-  to see but margin. `MAX_ZOOM` 3.2. `tile = baseTile * zoom`.
+  availH/ROWS))`), i.e. **zoom 1 == the fit**. `MIN_ZOOM` 0.5 (the board
+  shrinks inside the viewport — a wider look at where you have been),
+  `MAX_ZOOM` 6. `tile = baseTile * zoom`. Zoom 1 was `MIN_ZOOM` until
+  2026-08-26; if you reintroduce a `zoom > MIN_ZOOM` test anywhere it now means
+  "not fully zoomed out", **not** "zoomed in past the fit" — the honest test
+  for "is there anything to pan" is `canPan()`, which compares the board's
+  pixel size against the viewport.
 - `camX`/`camY` are the world (tile-space) point held at the centre of the
   **board viewport** (`viewX/viewY/viewW/viewH` = the board area between the HUD
   row and the bottom margin). `applyView()` clamps them so the board can never
@@ -76,10 +90,23 @@ into them. Everything else follows:
   pinch anchor. `panBy(dx, dy)` is a no-op at zoom 1 (the clamp re-centres).
 - `centerCam()` runs at the end of `genFloor`, so a zoomed run opens each new
   floor on the player rather than last floor's corner. Zoom itself persists.
-- `followCam(dt)` is a **correction, not a lock**: it does nothing until the
-  player nears the edge of a dead zone, then eases just enough to bring them
-  back, so a deliberate pan survives. It runs only while zoom > 1 and no
-  gesture is live.
+- **Free look (`camFree`) is the rule the rest of the camera bends to.** It
+  latches the moment the player pans or pinches, and **only `centerCam()`
+  clears it** (the ⌖ button, or a new floor). While it is set `followCam` does
+  nothing at all: the camera stays exactly where it was put, however far the
+  hero walks, so a drag can look anywhere on the map and *stay* there. Before
+  it is set, `followCam(dt)` is the old correction — nothing happens until the
+  player nears a dead-zone edge, then it eases just enough to bring them back.
+  The dangerous regression is the camera quietly re-tethering after a drag,
+  because that is what this game did *by design* until 2026-08-26: a refactor
+  that "restores" `followCam` looks like a fix and silently deletes the
+  feature. `drive-ember-depths.cjs` pins it.
+- **The ⌖ button has to exist.** With no tether, the route back to the hero
+  cannot be another gesture (a drag is what got you here) and cannot be a
+  board tap (that walks). `drawRecenter()` paints it in the bottom-right of the
+  viewport **only while `camFree`**, so it doubles as the signal that the
+  camera is currently the player's; `handleTap` hit-tests it before `tapTile`,
+  so re-centring costs no turn.
 - A zoomed board is bigger than its viewport, so `drawScene` masks the strips
   outside `view*` back to background **before** the vignette (so they darken
   exactly as the already-empty strips do at zoom 1) — otherwise the dungeon
@@ -96,7 +123,8 @@ into them. Everything else follows:
   no error.
 
 Gestures share the canvas and must never be confused (`TAP_SLOP` 14 px):
-1 finger under slop → tap; 1 finger over slop → drag-pan (only at zoom > 1);
+1 finger under slop → tap; 1 finger over slop → drag-pan (only when
+`canPan()`);
 2 fingers → pinch zoom + pan at the midpoint. `gestured` latches for the whole
 touch sequence once a pinch or drag happens, so the final lift never fires a
 stray tap. Every canvas touch handler `preventDefault()`s, and document-level
@@ -148,6 +176,33 @@ left-aligned lines (~75 px) and the right block starts at
 button count: a fourth chrome button needs it moved again, or moved below the
 row as that convention prescribes.
 
+## Relic panel (the buff tooltip)
+
+Tapping the HUD relic row opens a canvas-drawn panel listing every relic with
+its card text and a **live** status line (`relicStatus`) — current attack, max
+HP, light radius, ward readiness. It is drawn last in `drawScene`, over the
+intro banner and descend fade.
+
+- **It is a read, never a turn.** Open and close both go through `handleTap`,
+  the same entry point that walks the hero, so the ordering there is the whole
+  contract: `if (buffPanel) { buffPanel = false; return; }` comes *first*, and
+  the dismissing tap therefore never reaches `tapTile`. Let it fall through and
+  the tap that closes the panel walks you into a room you cannot see and every
+  enemy takes a step — invisible in a screenshot, obvious in `turnCount`.
+- Duplicates **aggregate to one row** with `×N` (`relicCounts()`), in the panel
+  and in the HUD row. The card text quotes single-copy numbers, so the live
+  status line carries the stacked truth (ward spells its shortened recharge out
+  explicitly, since its card names a number).
+- The HUD row **measures before it places**: six relics with `×N` badges are
+  wider than the gap between the gold line and the right edge, so the row
+  slides left (floor x=196, to clear the gold text) instead of running off
+  screen. `buffRect` is published from `drawHUD` each frame — hit-testing reads
+  what was actually drawn rather than recomputing the layout.
+- A faint plate is drawn behind the row on purpose: an icon strip with no
+  affordance reads as decoration, and nothing else on this HUD is tappable.
+- `genFloor` and `startRun` both clear `buffPanel`, so no panel survives into a
+  floor or run that did not open it.
+
 ## Test hooks / traps
 
 - Top-level lets (`state`, `grid`, `player`, `enemies`, `items`, `relics`,
@@ -169,17 +224,33 @@ row as that convention prescribes.
   raise (title, relic choice, death, settings scrim), walk ← / 🔊 / ⚙ and
   assert `document.elementFromPoint(centre)` returns that button's own id.
   Nine such checks caught the z-index defect above.
-- Drive: `scratchpad/drive-ember.cjs` (34 checks: gen invariants ×30
-  floors, combat math, relic effects, path walk, 250-turn fuzz, death
-  persistence, mute reload). Camera + settings were driven separately
-  (2026-08-25, 70 checks over four scratchpad scripts): slider → gain math,
-  mute precedence, reload persistence; zoom clamps, pinch anchor, pan clamped
-  at all four edges, zoom-1 layout identity, screen→tile round-trip at zoom,
-  camera follow, re-centre on descend, 120-turn fuzz at zoom 2; and a real
-  multi-touch pass through CDP `Input.dispatchTouchEvent` asserting a pinch
-  and a drag each issue **no** move while a short tap still does, and that
-  `visualViewport.scale` stays 1 throughout; plus the chrome-reachability
-  sweep above. All four are scratchpad-only — `.claude/tests/README.md` sets
-  a design-invariant bar these mostly do not clear, and the parts that do
-  (the clamp, zoom-1 identity, pinch-never-taps, chrome over every overlay)
-  are written down here instead. Promote them if that trade stops paying.
+- **Camera checks teleport the hero, and can leave them inside a wall.**
+  Driving `followCam` means writing `player.x/y` to arbitrary cells; a later
+  stage that then looks for a walkable neighbour finds none, or paths from a
+  wall. Call `genFloor(floorNum)` between stages. This is the repo-wide
+  "stages must not share mutable state" rule wearing a camera costume — it made
+  the panel group flaky (~50%) before it was found, which is worse than red.
+- **Aim a "does this tap walk?" control at an orthogonal neighbour**, not at
+  "the first `seen` floor tile on the board": a distant seen tile can be
+  unreachable on a given procedural floor, so the control fails for a reason
+  that has nothing to do with the thing under test. And an adjacent tap can
+  resolve *immediately* rather than queueing — witness a move with
+  `player.x/y` **and** `turnCount`, not `pathQueue.length` alone, which reads 0
+  both when nothing happened and when the hero already walked.
+- Drive: **`.claude/tests/drive-ember-depths.cjs` (37 checks)** — kept, and
+  picked up automatically by `gates.sh` for any change under
+  `games/ember-depths/`. Covers the zoom range and clamps, zoom-1 layout
+  identity, free look (tethered before a drag, never re-tethering after one,
+  handed back by ⌖), a real CDP pinch that zooms without firing a tap or
+  scaling the page, the panel-is-not-a-turn contract with its positive control,
+  and one check that drives **all six** stacking sites through the game's own
+  `hurtPlayer` / `killEnemy` / `lightRadius`. That last point was learned the
+  hard way: the first version re-derived `damage - relicCount('skin')` inside
+  the check and passed with the shipping site reverted to `.includes()`.
+  Negative-controlled through `negtest.sh` (a `camFree`-blind `followCam`, a
+  falling-through dismiss tap, and each of skin/leech/ward reverted to
+  non-stacking) — each fails exactly its own check.
+- Older scratchpad suites (2026-08-25, 70 checks: slider → gain math, mute
+  precedence, reload persistence, pinch anchor, screen→tile round-trip, fuzz
+  runs, the chrome-reachability sweep) are gone with their container. The
+  invariants worth keeping from them are written down above.
