@@ -23,17 +23,67 @@ body {
 }
 #cv { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
 #back-btn {
-  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:30;
+  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:45;
   background:var(--panel); border:1px solid var(--border); border-radius:6px;
   color:var(--white); font-size:16px; width:38px; height:34px; line-height:32px;
   text-align:center; text-decoration:none; touch-action:manipulation;
 }
 #mute {
-  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:30;
+  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:45;
   background:var(--panel); border:1px solid var(--border); border-radius:6px;
   color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
   text-align:center; padding:0; touch-action:manipulation;
 }
+/* The WHOLE chrome row sits above the settings scrim (z 45 vs 40), not just
+   the cogwheel: the cog needs it to stay a toggle, and games/CLAUDE.md
+   § Chrome above overlays requires ← and the mute button to outrank every
+   full-screen overlay — a player must always be one tap from leaving or
+   silencing the game, which an opened panel would otherwise cost them. */
+#cog {
+  position:absolute; top:calc(var(--sat) + 8px); left:102px; z-index:45;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
+  text-align:center; padding:0; touch-action:manipulation;
+}
+#cog.on { border-color:#ff9a3c; color:#ff9a3c; }
+/* Settings layers over whatever is underneath (title, relic choice, live floor)
+   rather than replacing it — closing restores the view with no state to keep.
+   The full-bleed scrim also stops a stray tap reaching the board behind it. */
+#settings {
+  position:absolute; inset:0; z-index:40; display:flex;
+  align-items:center; justify-content:center;
+  background:rgba(4,3,6,0.88); padding:20px;
+  padding-top:calc(var(--sat) + 20px); padding-bottom:calc(var(--sab) + 20px);
+}
+#settings.hidden { display:none; }
+.set-panel {
+  background:linear-gradient(160deg, #191412, #0b0a10);
+  border:1px solid #6b4a2a; border-radius:12px;
+  padding:18px 20px 14px; width:min(88vw, 330px);
+}
+.set-panel h2 {
+  font-family:'Black Ops One', sans-serif; color:#ff9a3c;
+  font-size:1.05rem; letter-spacing:3px; text-align:center; margin-bottom:14px;
+}
+.setrow { display:flex; align-items:center; gap:10px; margin:14px 0; }
+.setrow .lbl {
+  font-family:'Black Ops One', sans-serif; font-size:0.58rem; letter-spacing:2px;
+  color:var(--dim); width:84px; flex:0 0 84px;
+}
+.setrow input[type=range] {
+  flex:1 1 auto; min-width:0; height:26px;
+  accent-color:#ff9a3c; touch-action:pan-y;
+}
+.setrow .val {
+  font-family:'Share Tech Mono', monospace; font-size:0.68rem; color:var(--gold);
+  width:38px; flex:0 0 38px; text-align:right;
+}
+.set-note {
+  color:var(--dim); font-size:0.6rem; line-height:1.6; text-align:center;
+  margin:10px 2px 4px;
+}
+.set-note em { color:#ff9a3c; font-style:normal; }
+#settings .btn { min-width:0; width:100%; margin:8px 0 0; font-size:0.85rem; padding:11px 0; }
 #overlay {
   position:absolute; inset:0; z-index:20; display:flex;
   flex-direction:column; align-items:center; justify-content:center;
@@ -76,11 +126,29 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 02:03 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-26 00:01 UTC</div>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
+<button id="cog" aria-label="Settings">&#9881;</button>
 <canvas id="cv"></canvas>
 <div id="overlay"></div>
+<div id="settings" class="hidden">
+  <div class="set-panel">
+    <h2>SETTINGS</h2>
+    <div class="setrow">
+      <span class="lbl">MUSIC</span>
+      <input type="range" id="vol-music" min="0" max="100" step="5" value="100" aria-label="Music volume">
+      <span class="val" id="vol-music-val">100%</span>
+    </div>
+    <div class="setrow">
+      <span class="lbl">SFX</span>
+      <input type="range" id="vol-sfx" min="0" max="100" step="5" value="100" aria-label="Sound effects volume">
+      <span class="val" id="vol-sfx-val">100%</span>
+    </div>
+    <div class="set-note"><em>Pinch</em> the board to zoom; <em>drag</em> to look around.</div>
+    <button class="btn" id="set-close">CLOSE</button>
+  </div>
+</div>
 <script>
 'use strict';
 /* =====================================================================
@@ -214,6 +282,7 @@ function genFloor(n) {
     spawnEnemy(types[ri(0, types.length - 1)], c.x, c.y, n);
   }
   recomputeVision();
+  centerCam();   // a zoomed-in view should open on the player, not last floor's corner
   introT = 1.6;
 }
 function spawnEnemy(type, x, y, n) {
@@ -543,6 +612,48 @@ const ctx = cv.getContext('2d');
 const overlayEl = document.getElementById('overlay');
 let W = 390, H = 844, dpr = 1, tile = 34, ox = 0, oy = 0, hudTop = 60;
 let darkCv = null, darkCtx = null;
+/* ---- Camera -----------------------------------------------------------
+   `tile`/`ox`/`oy` stay the only things the renderer and hit-testing read,
+   so zoom is purely a matter of what applyView() writes into them:
+     tile = baseTile * zoom, and the offsets fall out of the focus point.
+   `baseTile` is the whole-board fit computed by resize(), which is also the
+   minimum zoom — pinching out returns you to "everything visible" and no
+   further. camX/camY are the world (tile-space) point held at the centre of
+   the board viewport; applyView clamps them so the board can never be
+   dragged off the play area, and centres an axis outright when the board is
+   smaller than the viewport on it (which is exactly the zoom-1 case, so
+   zoom 1 reproduces the original layout). */
+let baseTile = 34, zoom = 1, camX = COLS / 2, camY = ROWS / 2;
+let viewX = 0, viewY = 60, viewW = 390, viewH = 700;
+const MIN_ZOOM = 1, MAX_ZOOM = 3.2;
+function applyView() {
+  zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+  tile = baseTile * zoom;
+  const bw = tile * COLS, bh = tile * ROWS;
+  if (bw <= viewW) camX = COLS / 2;
+  else camX = Math.max(viewW / 2 / tile, Math.min(COLS - viewW / 2 / tile, camX));
+  if (bh <= viewH) camY = ROWS / 2;
+  else camY = Math.max(viewH / 2 / tile, Math.min(ROWS - viewH / 2 / tile, camY));
+  ox = Math.round(viewX + viewW / 2 - camX * tile);
+  oy = Math.round(viewY + viewH / 2 - camY * tile);
+}
+// Zoom by `factor`, keeping the world point under (sx,sy) pinned to (sx,sy).
+function zoomAt(sx, sy, factor) {
+  const nz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
+  if (nz === zoom) return;
+  const wx = (sx - ox) / tile, wy = (sy - oy) / tile;
+  zoom = nz;
+  tile = baseTile * zoom;
+  camX = wx + (viewX + viewW / 2 - sx) / tile;
+  camY = wy + (viewY + viewH / 2 - sy) / tile;
+  applyView();
+}
+function panBy(dx, dy) {
+  if (!dx && !dy) return;
+  camX -= dx / tile; camY -= dy / tile;
+  applyView();
+}
+function centerCam() { camX = player.x + 0.5; camY = player.y + 0.5; applyView(); }
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 3);
   W = window.innerWidth; H = window.innerHeight;
@@ -551,9 +662,9 @@ function resize() {
   const sat = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
   hudTop = sat + 50;
   const availH = H - hudTop - 14;
-  tile = Math.floor(Math.min(W / COLS, availH / ROWS));
-  ox = Math.floor((W - tile * COLS) / 2);
-  oy = Math.floor(hudTop + (availH - tile * ROWS) / 2);
+  viewX = 0; viewY = hudTop; viewW = W; viewH = availH;
+  baseTile = Math.floor(Math.min(W / COLS, availH / ROWS));
+  applyView();
   darkCv = document.createElement('canvas');
   darkCv.width = Math.max(1, Math.round(W / 2)); darkCv.height = Math.max(1, Math.round(H / 2));
   darkCtx = darkCv.getContext('2d');
@@ -640,22 +751,97 @@ const wallFrontTile = makeTileCanvas(g => {
   speckle(g, 30, '#8a7a68', 0.04, 0.1, 1, 2);
 });
 
-/* ============ Input ============ */
-let touchStart = null, usedTouch = false;
+/* ============ Input ============ =========================================
+   Three gestures share the canvas and must never be confused for each other:
+     1 finger, moved < TAP_SLOP  -> tap (move / attack), as before
+     1 finger, moved >= TAP_SLOP -> drag the board (only while zoomed in)
+     2 fingers                   -> pinch zoom + pan, anchored at the midpoint
+   `gestured` latches for the whole touch sequence once a pinch or a drag has
+   happened, so lifting the last finger after one never fires a stray tap.
+   Every canvas touch handler preventDefault()s, and the document-level
+   guards below kill Safari's own page pinch-zoom, so the gesture only ever
+   scales the board — never the page. */
+const TAP_SLOP = 14;
+let touchStart = null, lastPan = null, usedTouch = false;
+let pinch = null, dragging = false, gestured = false;
+function resetGesture() { touchStart = null; lastPan = null; pinch = null; dragging = false; gestured = false; }
+function pinchState(ev) {
+  const a = ev.touches[0], b = ev.touches[1];
+  return {
+    d: Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY),
+    mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2,
+  };
+}
 cv.addEventListener('touchstart', (ev) => {
   usedTouch = true;
   audioInit();
-  const t = ev.changedTouches[0];
-  touchStart = { x: t.clientX, y: t.clientY };
+  if (ev.touches.length >= 2) {
+    pinch = pinchState(ev);
+    gestured = true; dragging = false; touchStart = null; lastPan = null;
+  } else {
+    const t = ev.touches[0];
+    touchStart = { x: t.clientX, y: t.clientY };
+    lastPan = { x: t.clientX, y: t.clientY };
+    dragging = false;
+  }
   ev.preventDefault();
+}, { passive: false });
+cv.addEventListener('touchmove', (ev) => {
+  ev.preventDefault();
+  if (pinch && ev.touches.length >= 2) {
+    const n = pinchState(ev);
+    if (pinch.d > 0 && n.d > 0) zoomAt(n.mx, n.my, n.d / pinch.d);
+    panBy(n.mx - pinch.mx, n.my - pinch.my);
+    pinch = n;
+    return;
+  }
+  if (!touchStart || ev.touches.length !== 1) return;
+  const t = ev.touches[0];
+  if (!dragging && Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) >= TAP_SLOP) {
+    // Panning only makes sense once the board is bigger than the viewport;
+    // at zoom 1 a long drag stays a (cancelled) tap and moves nothing.
+    dragging = zoom > MIN_ZOOM;
+    if (dragging) gestured = true;
+  }
+  if (dragging) panBy(t.clientX - lastPan.x, t.clientY - lastPan.y);
+  lastPan = { x: t.clientX, y: t.clientY };
 }, { passive: false });
 cv.addEventListener('touchend', (ev) => {
-  const t = ev.changedTouches[0];
-  if (touchStart && Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) < 14) handleTap(t.clientX, t.clientY);
-  touchStart = null;
   ev.preventDefault();
+  if (ev.touches.length === 0) {
+    const t = ev.changedTouches[0];
+    if (!gestured && !dragging && touchStart &&
+        Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) < TAP_SLOP) {
+      handleTap(t.clientX, t.clientY);
+    }
+    resetGesture();
+  } else if (ev.touches.length === 1) {
+    // Dropped from two fingers to one: hand the drag over to the survivor,
+    // keeping `gestured` latched so its eventual lift is not a tap.
+    pinch = null;
+    const t = ev.touches[0];
+    touchStart = { x: t.clientX, y: t.clientY };
+    lastPan = { x: t.clientX, y: t.clientY };
+    dragging = zoom > MIN_ZOOM;
+  }
 }, { passive: false });
+cv.addEventListener('touchcancel', (ev) => { ev.preventDefault(); resetGesture(); }, { passive: false });
 cv.addEventListener('mousedown', (ev) => { if (!usedTouch) { audioInit(); handleTap(ev.clientX, ev.clientY); } });
+// Desktop / trackpad: ctrl+wheel is a trackpad pinch, plain wheel is a scroll —
+// both zoom the board here, and neither reaches the page.
+cv.addEventListener('wheel', (ev) => {
+  ev.preventDefault();
+  zoomAt(ev.clientX, ev.clientY, Math.exp(-ev.deltaY * (ev.ctrlKey ? 0.01 : 0.0018)));
+}, { passive: false });
+// Safari honours `user-scalable=no` unevenly; these are the belt to that
+// brace. Multi-touch anywhere on the page, and Safari's own gesture events,
+// are swallowed so a pinch can never scale the document.
+['gesturestart', 'gesturechange', 'gestureend'].forEach((n) => {
+  document.addEventListener(n, (ev) => ev.preventDefault(), { passive: false });
+});
+document.addEventListener('touchmove', (ev) => {
+  if (ev.touches.length > 1) ev.preventDefault();
+}, { passive: false });
 function handleTap(px, py) {
   const tx = Math.floor((px - ox) / tile), ty = Math.floor((py - oy) / tile);
   tapTile(tx, ty);
@@ -687,7 +873,7 @@ function showMenu() {
       <em>Tap</em> a lit tile to walk there — every step you take, the dark takes one too.
       <em>Tap an enemy</em> to close and strike. Gold is score, hearts heal,
       chests hold <em>relics</em> that stack into a build. Find the stairs, go deeper.
-      Death is forever.
+      Death is forever. <em>Pinch</em> to zoom the board, <em>drag</em> to look around.
     </div>`;
   bindTap(document.getElementById('go'), startRun);
 }
@@ -717,12 +903,26 @@ let noiseBuf = null;
 let muted = localStorage.getItem('ember-depths-mute') === '1';
 const muteBtn = document.getElementById('mute');
 muteBtn.textContent = muted ? '🔇' : '🔊';
+/* Mix headroom the game was tuned at; the settings sliders scale these, so
+   100% is exactly the old behaviour and mute still wins over both. */
+const SFX_BASE = 0.4, MUSIC_BASE = 0.14;
+function loadVol(key) {
+  const v = parseFloat(localStorage.getItem(key));
+  return (isFinite(v) && v >= 0 && v <= 1) ? v : 1;
+}
+let sfxVol = loadVol('ember-depths-sfxvol');
+let musicVol = loadVol('ember-depths-musicvol');
+function applyVolumes() {
+  if (sfxGain) sfxGain.gain.value = muted ? 0 : SFX_BASE * sfxVol;
+  if (musicGain) musicGain.gain.value = muted ? 0 : MUSIC_BASE * musicVol;
+}
 function audioInit() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)();
-    sfxGain = AC.createGain(); sfxGain.gain.value = muted ? 0 : 0.4; sfxGain.connect(AC.destination);
-    musicGain = AC.createGain(); musicGain.gain.value = muted ? 0 : 0.14; musicGain.connect(AC.destination);
+    sfxGain = AC.createGain(); sfxGain.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.connect(AC.destination);
+    applyVolumes();
     // shared noise buffer (SFX + music drips)
     noiseBuf = AC.createBuffer(1, AC.sampleRate * 1, AC.sampleRate);
     const d = noiseBuf.getChannelData(0);
@@ -730,13 +930,54 @@ function audioInit() {
     startMusic();
   } catch (err) { AC = null; }
 }
-bindTap(muteBtn, () => {
-  muted = !muted;
+function setMuted(v) {
+  muted = v;
   muteBtn.textContent = muted ? '🔇' : '🔊';
   try { localStorage.setItem('ember-depths-mute', muted ? '1' : '0'); } catch (err) {}
-  if (sfxGain) sfxGain.gain.value = muted ? 0 : 0.4;
-  if (musicGain) musicGain.gain.value = muted ? 0 : 0.14;
-});
+  applyVolumes();
+}
+bindTap(muteBtn, () => setMuted(!muted));
+
+/* ============ Settings panel ============ */
+const settingsEl = document.getElementById('settings');
+const cogBtn = document.getElementById('cog');
+const musicSlider = document.getElementById('vol-music');
+const sfxSlider = document.getElementById('vol-sfx');
+const musicVal = document.getElementById('vol-music-val');
+const sfxVal = document.getElementById('vol-sfx-val');
+function settingsOpen() { return !settingsEl.classList.contains('hidden'); }
+function openSettings() {
+  syncSettings();
+  settingsEl.classList.remove('hidden');
+  cogBtn.classList.add('on');
+}
+function closeSettings() {
+  settingsEl.classList.add('hidden');
+  cogBtn.classList.remove('on');
+}
+function syncSettings() {
+  musicSlider.value = String(Math.round(musicVol * 100));
+  sfxSlider.value = String(Math.round(sfxVol * 100));
+  musicVal.textContent = Math.round(musicVol * 100) + '%';
+  sfxVal.textContent = Math.round(sfxVol * 100) + '%';
+}
+function onVolInput(which, el) {
+  const v = Math.max(0, Math.min(1, (parseFloat(el.value) || 0) / 100));
+  if (which === 'music') musicVol = v; else sfxVol = v;
+  try { localStorage.setItem('ember-depths-' + which + 'vol', String(v)); } catch (err) {}
+  // Dragging a slider up is a deliberate "let me hear this" — honour it over a
+  // stale mute rather than leaving the panel dead.
+  if (muted && v > 0) setMuted(false);
+  audioInit();   // a slider drag is a valid iOS unlock gesture
+  applyVolumes();
+  syncSettings();
+}
+musicSlider.addEventListener('input', () => onVolInput('music', musicSlider));
+sfxSlider.addEventListener('input', () => onVolInput('sfx', sfxSlider));
+bindTap(cogBtn, () => (settingsOpen() ? closeSettings() : openSettings()));
+bindTap(document.getElementById('set-close'), closeSettings);
+settingsEl.addEventListener('pointerdown', (ev) => { if (ev.target === settingsEl) closeSettings(); });
+syncSettings();
 function tone(freq, dur, type, vol, when, dest) {
   if (!AC) return;
   const o = AC.createOscillator(), g = AC.createGain();
@@ -1014,6 +1255,17 @@ function drawScene(dt) {
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.75, 0, 7); ctx.fill();
   }
   ctx.globalCompositeOperation = 'source-over';
+  // A zoomed board is larger than its viewport, so it would otherwise render
+  // up behind the HUD row and down past the bottom margin. Mask those strips
+  // back to background *before* the vignette, so they darken exactly as the
+  // (already-empty) strips do at zoom 1.
+  if (zoom > MIN_ZOOM) {
+    ctx.fillStyle = '#050409';
+    if (viewY > 0) ctx.fillRect(0, 0, W, viewY);
+    if (viewY + viewH < H) ctx.fillRect(0, viewY + viewH, W, H - viewY - viewH);
+    if (viewX > 0) ctx.fillRect(0, viewY, viewX, viewH);
+    if (viewX + viewW < W) ctx.fillRect(viewX + viewW, viewY, W - viewX - viewW, viewH);
+  }
   // vignette
   const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
   vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)');
@@ -1170,9 +1422,9 @@ function drawHUD(dt) {
   ctx.textAlign = 'left';
   ctx.font = `13px 'Black Ops One', sans-serif`;
   ctx.fillStyle = '#ff9a3c';
-  ctx.fillText('DEPTH ' + floorNum, 104, y + 14);
+  ctx.fillText('DEPTH ' + floorNum, 148, y + 14);
   ctx.fillStyle = '#ffc300';
-  ctx.fillText('◈ ' + gold, 104, y + 32);
+  ctx.fillText('◈ ' + gold, 148, y + 32);
   // HP bar
   const bw = Math.min(150, W - 250), bx = W - bw - 12;
   ctx.fillStyle = 'rgba(10,8,12,0.8)';
@@ -1221,6 +1473,26 @@ function spawnAmbient(dt) {
   }
 }
 
+/* ============ Camera follow ============
+   Only while zoomed in, and only as a correction: the camera holds still
+   until the player nears the edge of the viewport, then eases just enough to
+   put them back inside the dead zone. That keeps a deliberate pan intact
+   while making sure walking can never lose you off-screen. */
+function followCam(dt) {
+  if (zoom <= MIN_ZOOM) return;
+  const [px, py] = cellPx(player.vx + 0.5, player.vy + 0.5);
+  const mx = Math.min(viewW * 0.32, tile * 2.2), my = Math.min(viewH * 0.32, tile * 2.2);
+  let dx = 0, dy = 0;
+  if (px < viewX + mx) dx = px - (viewX + mx);
+  else if (px > viewX + viewW - mx) dx = px - (viewX + viewW - mx);
+  if (py < viewY + my) dy = py - (viewY + my);
+  else if (py > viewY + viewH - my) dy = py - (viewY + viewH - my);
+  if (!dx && !dy) return;
+  const e = Math.min(1, dt * 7);
+  camX += (dx / tile) * e; camY += (dy / tile) * e;
+  applyView();
+}
+
 /* ============ Main loop ============ */
 function frame(ts) {
   const dt = Math.min(0.1, (ts - lastT) / 1000 || 0.016);
@@ -1235,6 +1507,7 @@ function frame(ts) {
     if (e.hurtT > 0) e.hurtT -= dt;
   }
   if (state === 'play') { pathStep(dt); spawnAmbient(dt); }
+  if (!pinch && !dragging) followCam(dt);
   drawScene(dt);
   requestAnimationFrame(frame);
 }
