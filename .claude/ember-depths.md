@@ -47,8 +47,73 @@ realistic light-map rendering. Single self-contained file.
   (copies shorten the cooldown rather than stacking shields, so a build cannot
   eat three hits a turn). `relicCounts()` is the aggregated view — one row per
   kind with `n` — and everything player-facing goes through it.
-- **Death:** `checkDeath` is state-guarded (idempotent); persists
-  `emberDepths.bestDepth`/`bestGold`; overlay 900 ms later.
+- **Death:** `checkDeath` is state-guarded (idempotent — which is also what
+  stops a delve being **banked twice**); persists
+  `emberDepths.bestDepth`/`bestGold`, calls `bankRun()`, overlay 900 ms later.
+
+## Meta progression (characters, gear, skills, supplies)
+
+Added 2026-08-26 because gold had no sink. The run is still permadeath; what
+survives the body is the **character** — its purse, its kit and its skills.
+That makes this a roguelite, and the facet row in `.claude/games-index.md` says
+so (`meta-progression` + `save-campaign` alongside `permadeath`).
+
+- **Three characters**, `slots[0..2]`, one localStorage blob under
+  `emberDepths.slots.v1`. `activeSlot` is −1 outside a character (title screen,
+  slot picker) and **every derived helper returns a harmless zero there**, so
+  the menu's background dungeon runs on the base kit with no special-casing.
+- **Never trust the blob.** `loadSlots()` runs every stored character through
+  `migrate()`, which builds a fresh valid character and copies across only
+  in-range values: a gear tier is clamped to its track, a skill rank to its
+  node's max, unknown skill and supply keys are dropped. A save is
+  player-editable and version-drifting; an out-of-range gear tier would index
+  off the end of `GEAR[k].tiers` and throw mid-delve. A corrupt blob starts
+  three empty slots rather than crashing the page.
+- **The kit is folded into `player` ONCE, in `startRun()`** — `player.atk =
+  BASE_ATK + metaAtk()`, `player.maxHp = BASE_HP + metaMaxHp()`. Nothing
+  downstream re-reads gear, so relics keep stacking on top exactly as before.
+  The situational effects are the exceptions and have to be read live:
+  `playerDamage()` (VENGEANCE reads current HP), `hurtPlayer` (`metaDR()`,
+  LAST STAND), `killEnemy` (EXECUTION), `lightRadius()`, the gold pickup
+  (`goldMult()`), `completeDescend` (`descendHeal()`), `genFloor`
+  (`marksStairs()`), `openChest` (FORTUNE's third door).
+- **Gear** (`GEAR`): four tracks × four tiers. Tier 0 is the free starting kit,
+  which is what lets "upgrade" be a single verb everywhere — there is no
+  unowned state to special-case. Full kit ≈ 1675◈.
+- **Skills** (`TREES`): three trees × four nodes. A node opens at `req` points
+  spent **in its own tree**, and rank *r* costs *r* points, so `treeSpent()` is
+  a triangular number, not a count. Going deep costs more than going wide,
+  which is the only thing stopping a character maxing all three.
+- **Supplies** (`CONSUMABLES`): bought in camp into `chr().supplies`, copied
+  into the in-run `consumables` at `startRun()`, and **cleared by `bankRun()`
+  whether or not they were used** — that is the recurring sink, and the reason
+  gold does not just plateau once the gear is bought. Used from a stack of
+  buttons up the left edge of the board (`drawConsumables` / `useBtns`),
+  hit-tested in `handleTap` ahead of `tapTile`. Using one **takes your turn**
+  (`playerAct({wait:true})`); it is not a free action.
+- **The payout** (`bankRun`): carried gold **+ 10 per floor below the first**,
+  and `max(1, floor((depth-1)/2))` skill points, +2 for a new deepest. The
+  depth bonus is what stops farming floor 1 being the optimal play.
+
+### The camp UI
+
+DOM overlays like every other screen, in `#overlay`: `showSlots` /
+`showNewCharacter` / `showCamp(tab)`. Rows **are** `<button data-act>`, and
+`bindCamp()` re-binds them in one sweep after every render — `innerHTML`
+dropped the old listeners, so there is nothing stale to clean up.
+`campAction(act, arg, arg2)` is the single switch, which is also the whole
+test surface: the drive suite buys, ranks and erases through it rather than
+through synthetic taps.
+
+**The overflow trap, worth knowing before you add a tab.** `#overlay` is a
+centred flex column that also scrolls, and `justify-content:center` on a
+scroll container **clips its own overflow at the top**: the first rows go above
+the scroll origin and cannot be reached at any scroll position. The skills tab
+is taller than a phone, so the camp screens add `#overlay.top`
+(`justify-content:flex-start`), which the centred screens (title, death, relic
+choice) explicitly remove. `.top` also carries the padding that clears the
+chrome row — the ← / 🔊 / ⚙ buttons are at z 45 and would otherwise sit on top
+of the character's name.
 
 ## Rendering (the realistic-graphics stack)
 
@@ -237,7 +302,11 @@ intro banner and descend fade.
   resolve *immediately* rather than queueing — witness a move with
   `player.x/y` **and** `turnCount`, not `pathQueue.length` alone, which reads 0
   both when nothing happened and when the hero already walked.
-- Drive: **`.claude/tests/drive-ember-depths.cjs` (37 checks)** — kept, and
+- **A meta check that does not reload has not checked persistence.** Slot
+  state lives in memory as well as in localStorage, so asserting `slots[0].gold`
+  after a purchase measures the copy that was never written. `page.reload()`
+  between the write and the read is the only honest form.
+- Drive: **`.claude/tests/drive-ember-depths.cjs` (75 checks)** — kept, and
   picked up automatically by `gates.sh` for any change under
   `games/ember-depths/`. Covers the zoom range and clamps, zoom-1 layout
   identity, free look (tethered before a drag, never re-tethering after one,
@@ -247,9 +316,19 @@ intro banner and descend fade.
   `hurtPlayer` / `killEnemy` / `lightRadius`. That last point was learned the
   hard way: the first version re-derived `damage - relicCount('skin')` inside
   the check and passed with the shipping site reverted to `.includes()`.
-  Negative-controlled through `negtest.sh` (a `camFree`-blind `followCam`, a
-  falling-through dismiss tap, and each of skin/leech/ward reverted to
-  non-stacking) — each fails exactly its own check.
+  A second group covers the meta layer: three independent slots surviving a
+  reload, a hand-edited save clamped by `migrate()`, the forge refusing what
+  you cannot afford, the kit **reaching the delve** (atk / max HP / light /
+  gold multiplier / marked stairs, read off `startRun`'s output), the skill
+  gate and the rank-r-costs-r ladder, every skill effect measured through the
+  game's own `hurtPlayer` / `killEnemy` / `playerAct` / `completeDescend`, the
+  supply round trip (bought → carried → used → a turn passes → lost with the
+  body), and the payout arithmetic including that a delve cannot be banked
+  twice. Negative-controlled through `negtest.sh` — a `camFree`-blind
+  `followCam`, a falling-through dismiss tap, skin/leech/ward reverted to
+  non-stacking, `bankRun` keeping the supplies, the skill gate removed, the
+  kit never folded into `player`, and `migrate` trusting the blob — each
+  fails exactly its own check.
 - Older scratchpad suites (2026-08-25, 70 checks: slider → gain math, mute
   precedence, reload persistence, pinch anchor, screen→tile round-trip, fuzz
   runs, the chrome-reachability sweep) are gone with their container. The

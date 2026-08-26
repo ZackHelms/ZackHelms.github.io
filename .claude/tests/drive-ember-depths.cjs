@@ -39,6 +39,8 @@ const EXE = process.env.SMOKE_CHROMIUM ||
 const ROOT = path.resolve(__dirname, '..', '..');
 const URL = 'file://' + path.join(ROOT, 'games', 'ember-depths', 'index.html');
 
+const GEAR_MAX = 3;   // tiers per gear track, minus the free starting kit
+
 let pass = 0, fail = 0;
 const ok = (name, cond, extra) => {
   if (cond) { pass++; console.log('PASS ' + name); }
@@ -306,6 +308,293 @@ const ok = (name, cond, extra) => {
     return { open: buffPanel, camFree };
   });
   ok('a new floor closes the panel and recentres', descended.open === false && descended.camFree === false, descended);
+
+  // ---------- meta progression: characters, gear, skills, supplies ----------
+  // Clean slate: this group is about persistence, so it must not inherit the
+  // slots any earlier stage happened to write.
+  console.log('\n[meta]');
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.waitForTimeout(400);
+
+  const three = await page.evaluate(() => {
+    campAction('new', '0'); campAction('create', '0');
+    const a = chr().name;
+    chr().gold = 100;
+    campAction('slots');
+    campAction('new', '1'); campAction('create', '1');
+    const b = chr().name;
+    chr().gold = 7;
+    campAction('slots');
+    campAction('new', '2'); campAction('create', '2');
+    saveSlots();
+    return { a, b, golds: slots.map((c) => c && c.gold), filled: slots.filter(Boolean).length };
+  });
+  ok('three characters fill three slots', three.filled === 3, three);
+  ok('each slot keeps its own purse', three.golds[0] === 100 && three.golds[1] === 7 && three.golds[2] === 0, three);
+
+  // A reload is the only honest persistence check — everything else measures
+  // the in-memory copy that was never written.
+  await page.reload();
+  await page.waitForTimeout(400);
+  const reloaded = await page.evaluate(() => ({
+    golds: slots.map((c) => c && c.gold),
+    names: slots.map((c) => c && c.name),
+  }));
+  ok('characters survive a reload', reloaded.golds[0] === 100 && reloaded.golds[1] === 7, reloaded);
+
+  const erased = await page.evaluate(() => {
+    campAction('erase', '1');
+    return { slots: slots.map((c) => (c ? c.gold : null)) };
+  });
+  ok('erasing one delver leaves the others whole',
+     erased.slots[0] === 100 && erased.slots[1] === null && erased.slots[2] === 0, erased);
+
+  // A save blob is player-editable and version-drifting. migrate() must clamp
+  // rather than trust — an out-of-range gear tier would index off the end of
+  // its track and throw mid-delve.
+  const clamped = await page.evaluate(() => {
+    localStorage.setItem('emberDepths.slots.v1', JSON.stringify([{
+      name: 'CHEAT', gold: -50, sp: 999.9,
+      gear: { weapon: 99, armor: -3, lantern: 'x', charm: 1 },
+      skills: { 'might.edge': 99, 'nope.nope': 5 },
+      supplies: { draught: 99, ghost: 4 },
+      stats: { bestDepth: -2 },
+    }, null, null]));
+    loadSlots();
+    activeSlot = 0;
+    const c = chr();
+    return {
+      gold: c.gold, sp: c.sp, weapon: c.gear.weapon, armor: c.gear.armor, lantern: c.gear.lantern,
+      edge: rank('might', 'edge'), junkSkill: c.skills['nope.nope'],
+      draught: c.supplies.draught, junkSupply: c.supplies.ghost,
+      best: c.stats.bestDepth, atk: metaAtk(),
+    };
+  });
+  ok('a hand-edited save is clamped, not trusted',
+     clamped.gold === 0 && clamped.sp === 999 && clamped.weapon === GEAR_MAX &&
+     clamped.armor === 0 && clamped.lantern === 0 && clamped.edge === 3 &&
+     clamped.junkSkill === undefined && clamped.draught === 3 &&
+     clamped.junkSupply === undefined && clamped.best === 0, clamped);
+  ok('and the clamped kit still computes a real bonus', clamped.atk === 3 + 3, clamped);
+
+  // ---- the forge ----
+  const forge = await page.evaluate(() => {
+    localStorage.clear(); loadSlots();
+    campAction('new', '0'); campAction('create', '0');
+    const c = chr();
+    c.gold = 20;
+    campAction('buy-gear', 'weapon');           // 40g — cannot afford
+    const poor = { gold: c.gold, tier: c.gear.weapon };
+    c.gold = 200;
+    campAction('buy-gear', 'weapon');
+    campAction('buy-gear', 'armor');
+    return { poor, gold: c.gold, weapon: c.gear.weapon, armor: c.gear.armor };
+  });
+  ok('a purchase you cannot afford is a no-op',
+     forge.poor.gold === 20 && forge.poor.tier === 0, forge);
+  ok('buying debits exactly the price and raises one tier',
+     forge.gold === 200 - 40 - 40 && forge.weapon === 1 && forge.armor === 1, forge);
+
+  // The kit has to REACH the delve: startRun folds it into player stats once,
+  // and nothing downstream re-reads it.
+  const kitted = await page.evaluate(() => {
+    const c = chr();
+    c.gold = 5000;
+    campAction('buy-gear', 'weapon'); campAction('buy-gear', 'weapon');   // -> ASHSTEEL RUIN, +3
+    campAction('buy-gear', 'armor'); campAction('buy-gear', 'armor');     // -> EMBERPLATE, +8 hp, -1 dr
+    campAction('buy-gear', 'lantern'); campAction('buy-gear', 'lantern'); campAction('buy-gear', 'lantern');
+    campAction('buy-gear', 'charm'); campAction('buy-gear', 'charm'); campAction('buy-gear', 'charm');
+    const light0 = 3.6;
+    startRun();
+    return {
+      atk: player.atk, maxHp: player.maxHp, hp: player.hp,
+      light: lightRadius(), light0, goldMult: goldMult(), marks: marksStairs(),
+      stairsSeen: seen[IDX(stairs.x, stairs.y)] === 1,
+    };
+  });
+  ok('gear reaches the delve: attack', kitted.atk === 3 + 3, kitted);
+  ok('gear reaches the delve: max HP, and you start full', kitted.maxHp === 12 + 8 && kitted.hp === kitted.maxHp, kitted);
+  ok('gear reaches the delve: light', Math.abs(kitted.light - (kitted.light0 + 2.6)) < 1e-6, kitted);
+  ok('gear reaches the delve: gold multiplier', Math.abs(kitted.goldMult - 1.5) < 1e-9, kitted);
+  ok('the Deepseeker Idol marks the stairs on arrival', kitted.marks && kitted.stairsSeen, kitted);
+
+  // ---- skills: the gate, the rising cost, and the effects ----
+  const gate = await page.evaluate(() => {
+    const c = chr();
+    c.skills = {}; c.sp = 30;
+    campAction('rank', 'might', 'vengeance');   // needs 4 spent in MIGHT
+    const locked = { rank: rank('might', 'vengeance'), sp: c.sp };
+    campAction('rank', 'might', 'edge');        // 1
+    campAction('rank', 'might', 'edge');        // 2
+    campAction('rank', 'might', 'edge');        // 3  -> 6 spent
+    const afterEdge = { rank: rank('might', 'edge'), sp: c.sp, spent: treeSpent('might') };
+    campAction('rank', 'might', 'edge');        // already max
+    const capped = rank('might', 'edge');
+    campAction('rank', 'might', 'vengeance');   // now open
+    return { locked, afterEdge, capped, vengeance: rank('might', 'vengeance'), sp: c.sp };
+  });
+  ok('a locked node refuses the point', gate.locked.rank === 0 && gate.locked.sp === 30, gate);
+  ok('rank r costs r (1+2+3 for three ranks)',
+     gate.afterEdge.rank === 3 && gate.afterEdge.sp === 24 && gate.afterEdge.spent === 6, gate);
+  ok('a maxed node takes no more points', gate.capped === 3, gate);
+  ok('spending in the tree opens its deeper nodes', gate.vengeance === 1, gate);
+
+  // Every skill effect below is measured through the GAME's own function, not
+  // recomputed here — the same rule the relic stacking check earned.
+  const skills = await page.evaluate(() => {
+    const c = chr();
+    c.gear = { weapon: 0, armor: 0, lantern: 0, charm: 0 };   // isolate the skills
+    c.skills = {}; c.sp = 60;
+    ['hide', 'hide', 'hide'].forEach(() => campAction('rank', 'vigor', 'hide'));
+    ['bones', 'bones'].forEach(() => campAction('rank', 'vigor', 'bones'));
+    campAction('rank', 'vigor', 'wind');
+    campAction('rank', 'vigor', 'stand');
+    ['lamp', 'lamp', 'lamp'].forEach(() => campAction('rank', 'cunning', 'lamp'));
+    ['prospect', 'prospect'].forEach(() => campAction('rank', 'cunning', 'prospect'));
+    // MIGHT's deeper nodes gate on points spent in MIGHT, so the order here
+    // is load-bearing: three ranks of KEEN EDGE (1+2+3) is what opens them.
+    ['edge', 'edge', 'edge'].forEach(() => campAction('rank', 'might', 'edge'));
+    campAction('rank', 'might', 'heavy');
+    campAction('rank', 'might', 'vengeance');
+    campAction('rank', 'might', 'execution');
+    startRun();
+    enemies = [];
+    const out = { maxHp: player.maxHp, atk: player.atk, light: lightRadius() };
+
+    // THICK HIDE + STONE BONES through a real hit
+    player.hp = player.maxHp;
+    const before = player.hp;
+    hurtPlayer(6, player.x, player.y);
+    out.dealt = before - player.hp;
+
+    // VENGEANCE reads the CURRENT hp, so it can only be measured in situ
+    player.hp = player.maxHp;
+    out.dmgHealthy = playerDamage();
+    player.hp = Math.floor(player.maxHp / 2);
+    out.dmgWounded = playerDamage();
+
+    // EXECUTION through a real kill
+    player.hp = 5;
+    const victim = { id: 8888, x: player.x, y: player.y, vx: player.x, vy: player.y, hp: 0, maxHp: 3, atk: 1, type: 'slime', aggro: true, seed: 2 };
+    enemies.push(victim);
+    killEnemy(victim);
+    out.execHeal = player.hp - 5;
+
+    // LAST STAND: the first killing blow, and only the first
+    player.hp = 4;
+    hurtPlayer(99, player.x, player.y);
+    out.stood = player.hp;
+    hurtPlayer(99, player.x, player.y);
+    out.thenDies = player.hp <= 0;
+
+    // PROSPECTOR through a real pickup
+    const d = DIRS.find(([dx, dy]) => grid[IDX(player.x + dx, player.y + dy)] === 0);
+    items = [{ x: player.x + d[0], y: player.y + d[1], type: 'gold', amt: 10 }];
+    gold = 0; player.hp = player.maxHp;
+    playerAct({ move: d });
+    out.picked = gold;
+
+    // SECOND WIND through a real descent
+    player.hp = 1;
+    completeDescend();
+    out.rested = player.hp;
+    return out;
+  });
+  ok('THICK HIDE reaches the delve', skills.maxHp === 12 + 6, skills);
+  ok('KEEN EDGE ×3 reaches the delve', skills.atk === 3 + 3, skills);
+  ok('LAMPLIGHT widens a real light radius', Math.abs(skills.light - (3.6 + 1.8)) < 1e-6, skills);
+  ok('STONE BONES ×2 shaves two off a real 6-damage hit', skills.dealt === 4, skills);
+  ok('VENGEANCE only bites at or below half HP',
+     skills.dmgHealthy === 6 && skills.dmgWounded === 8, skills);
+  ok('EXECUTION heals on a real kill', skills.execHeal === 1, skills);
+  ok('LAST STAND catches the first killing blow and only the first',
+     skills.stood === 1 && skills.thenDies === true, skills);
+  ok('PROSPECTOR ×2 turns a 10 pile into 15', skills.picked === 15, skills);
+  ok('SECOND WIND heals on a real descent', skills.rested === 3, skills);
+
+  // ---- supplies: bought in camp, used in the delve, lost with the body ----
+  const supply = await page.evaluate(() => {
+    const c = chr();
+    c.gold = 500; c.supplies = {};
+    campAction('buy-supply', 'draught');
+    campAction('buy-supply', 'draught');
+    campAction('buy-supply', 'bomb');
+    campAction('buy-supply', 'dust');
+    const bought = { held: JSON.parse(JSON.stringify(c.supplies)), gold: c.gold };
+    for (let i = 0; i < 5; i++) campAction('buy-supply', 'bomb');   // max 3
+    const capped = c.supplies.bomb;
+    startRun();
+    const carried = JSON.parse(JSON.stringify(consumables));
+    return { bought, capped, carried };
+  });
+  ok('supplies are bought at their price',
+     supply.bought.gold === 500 - 30 - 30 - 45 - 35 && supply.bought.held.draught === 2, supply);
+  ok('a supply caps at its stack size', supply.capped === 3, supply);
+  ok('what you bought is what you carry in',
+     supply.carried.draught === 2 && supply.carried.bomb === 3 && supply.carried.dust === 1, supply);
+
+  const used = await page.evaluate(() => {
+    enemies = [];
+    player.hp = 1;
+    const t0 = turnCount, n0 = consumables.draught;
+    useConsumable('draught');
+    const draught = { healed: player.hp, spent: n0 - consumables.draught, turns: turnCount - t0 };
+
+    // FIREBOMB: one enemy inside the blast, one outside, both real
+    const near = { id: 7001, x: player.x + 1, y: player.y, vx: player.x + 1, vy: player.y, hp: 30, maxHp: 30, atk: 1, type: 'slime', aggro: false, seed: 3 };
+    const far = { id: 7002, x: player.x, y: player.y, vx: player.x, vy: player.y, hp: 30, maxHp: 30, atk: 1, type: 'slime', aggro: false, seed: 4 };
+    far.x = player.x; far.y = player.y;      // placed, then moved out of range below
+    near.x = Math.max(0, Math.min(COLS - 1, player.x + 1));
+    far.x = Math.max(0, Math.min(COLS - 1, player.x));
+    far.y = Math.max(0, Math.min(ROWS - 1, player.y + 5));
+    enemies = [near, far];
+    useConsumable('bomb');
+    const bomb = { near: near.hp, far: far.hp };
+
+    seen.fill(0);
+    useConsumable('dust');
+    let unseen = 0;
+    for (let i = 0; i < seen.length; i++) if (!seen[i]) unseen++;
+    return { draught, bomb, dust: { unseen, left: consumables.dust } };
+  });
+  ok('a draught heals and is spent',
+     used.draught.healed === 9 && used.draught.spent === 1, used);
+  ok('using an item costs your turn', used.draught.turns === 1, used);
+  ok('a firebomb burns what is in range and nothing outside it',
+     used.bomb.near === 25 && used.bomb.far === 30, used);
+  ok('farsight dust maps the whole floor', used.dust.unseen === 0 && used.dust.left === 0, used);
+
+  // ---- the payout ----
+  const banked = await page.evaluate(() => {
+    const c = chr();
+    c.gold = 0; c.sp = 0; c.stats.bestDepth = 0; c.stats.runs = 0;
+    c.supplies = { draught: 2 };
+    startRun();
+    floorNum = 5; gold = 33; kills = 4;
+    player.hp = 0;
+    checkDeath();
+    return {
+      state, gold: c.gold, sp: c.sp, best: c.stats.bestDepth,
+      runs: c.stats.runs, kills: c.stats.kills, supplies: JSON.parse(JSON.stringify(c.supplies)),
+      bank: lastBank,
+    };
+  });
+  ok('the delve banks carried gold plus a depth bonus',
+     banked.gold === 33 + 40 && banked.bank.depthBonus === 40, banked);
+  ok('and pays skill points for the depth, with a new-deepest bonus',
+     banked.sp === 2 + 2 && banked.best === 5 && banked.bank.newBest === true, banked);
+  ok('unused supplies go down with the body',
+     Object.keys(banked.supplies).length === 0, banked);
+  ok('the run is recorded once', banked.runs === 1 && banked.kills === 4, banked);
+
+  // checkDeath is state-guarded; a second call must not pay twice.
+  const twice = await page.evaluate(() => {
+    const before = chr().gold;
+    checkDeath(); checkDeath();
+    return { before, after: chr().gold };
+  });
+  ok('death cannot bank the same delve twice', twice.before === twice.after, twice);
 
   ok('no page or console errors throughout', errs.length === 0, errs.join(' | '));
 
