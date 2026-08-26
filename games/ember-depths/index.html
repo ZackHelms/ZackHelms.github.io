@@ -23,19 +23,22 @@ body {
 }
 #cv { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
 #back-btn {
-  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:30;
+  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:45;
   background:var(--panel); border:1px solid var(--border); border-radius:6px;
   color:var(--white); font-size:16px; width:38px; height:34px; line-height:32px;
   text-align:center; text-decoration:none; touch-action:manipulation;
 }
 #mute {
-  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:30;
+  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:45;
   background:var(--panel); border:1px solid var(--border); border-radius:6px;
   color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
   text-align:center; padding:0; touch-action:manipulation;
 }
-/* The cogwheel sits ABOVE its own scrim (z 45 vs 40) so it stays a toggle:
-   tap to open, tap again to close, from the menu or mid-run alike. */
+/* The WHOLE chrome row sits above the settings scrim (z 45 vs 40), not just
+   the cogwheel: the cog needs it to stay a toggle, and games/CLAUDE.md
+   § Chrome above overlays requires ← and the mute button to outrank every
+   full-screen overlay — a player must always be one tap from leaving or
+   silencing the game, which an opened panel would otherwise cost them. */
 #cog {
   position:absolute; top:calc(var(--sat) + 8px); left:102px; z-index:45;
   background:var(--panel); border:1px solid var(--border); border-radius:6px;
@@ -123,7 +126,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-25 23:31 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-26 00:01 UTC</div>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
 <button id="cog" aria-label="Settings">&#9881;</button>

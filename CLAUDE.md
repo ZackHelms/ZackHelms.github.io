@@ -124,7 +124,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Shadow Circuit (`games/shadow-circuit/`) | `.claude/shadow-circuit.md` | Any work on the stealth maze — maze/patrol generation, vision-cone detection, chase state machine |
 | Neon Recall (`games/neon-recall/`) | `.claude/neon-recall.md` | Any work on the memory board — flip rules, scan budget, power pairs, versus turn logic |
 | Neon Drift (`games/neon-drift/`) | `.claude/neon-drift.md` | Any work on the drift racer — track splines, drift physics, lap/anti-cut tracking, ghost replay |
-| Ember Depths (`games/ember-depths/`) | `.claude/ember-depths.md` | Any work on the roguelike — turn engine, floor generation, vision/light map, relic effects |
+| Ember Depths (`games/ember-depths/`) | `.claude/ember-depths.md` | Any work on the roguelike — turn engine, floor generation, vision/light map, relic effects, the pinch-zoom board camera (`applyView`/`followCam`, and the gesture latch that keeps a pinch from firing a tap) and the settings panel |
 | Alpine Ascent (`games/alpine-ascent/`) | `.claude/alpine-ascent.md` | Any work on the charge-jump climber — jump envelope, mountain generator, ground types, wind, altitude-graded rendering |
 | Golden Reel (`games/golden-reel/`) | `.claude/golden-reel.md` | Any work on the fishing game — cast/bite/fight state machine, species zones, gear effects, dusk-water rendering |
 | Vault Breaker (`games/vault-breaker/`) | `.claude/vault-breaker.md` | Any work on the safecracker — rotation input, pin/ring/handle phases, vault generator, brushed-metal rendering |
