@@ -20,9 +20,12 @@
  *   - energy: 1/sec, cap 20, doubled in sudden death
  *   - the portrait lock: a sideways phone keeps the portrait layout, and a
  *     touch pushed through the view transform still hits the card it covers
- *   - the two GRAPHICS STYLES: the cog fits the top-left cluster without
+ *   - the three GRAPHICS STYLES: the cog fits the top-left cluster without
  *     overlapping it, settings pauses a live match, the dropdown persists the
  *     choice, and above all a skin is PAINT — same stats, costs, ranges, deploys
+ *   - the SPRITE skin's pre-rendered atlas: the inlined manifest matches the
+ *     generated file byte for byte, every rect lies inside the image, every
+ *     deck card has art, and the skin falls back to toon until the image loads
  *   - a BUILDING slides to the nearest ground it fits rather than being refused
  *   - spells are LOBBED: two seconds of flight from your own base, during which
  *     nothing is damaged, and a shell still in the air when the match ends dies
@@ -767,8 +770,8 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
   const opts = await page.evaluate(() =>
     Array.from(document.getElementById('skin-sel').options).map(o => o.value));
-  ok('the style is a dropdown carrying both styles, showing the live one',
-     opts.join(',') === 'toon,neon' &&
+  ok('the style is a dropdown carrying every style, showing the live one',
+     opts.join(',') === 'toon,sprite,neon' &&
      await page.evaluate(() => document.getElementById('skin-sel').value === __NC.skin),
      opts.join(','));
   await page.selectOption('#skin-sel', 'neon');
@@ -800,7 +803,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   // The claim that makes the whole feature safe to ship mid-match.
   const paint = await page.evaluate(() => {
     const out = {};
-    for (const s of ['neon', 'toon']) {
+    for (const s of ['neon', 'toon', 'sprite']) {
       __NC.setSkin(s);
       __NC.start('ai', 'PRO');
       __NC.setEnergy(0, 20);
@@ -815,13 +818,14 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     return out;
   });
   ok('a skin is paint only — stats, costs, ranges and deploys are identical',
-     JSON.stringify(paint.neon) === JSON.stringify(paint.toon), JSON.stringify(paint));
+     JSON.stringify(paint.neon) === JSON.stringify(paint.toon) &&
+     JSON.stringify(paint.neon) === JSON.stringify(paint.sprite), JSON.stringify(paint));
 
   // Both skins draw a full board — every card type at once, plus a live blast.
   // A throw inside requestAnimationFrame lands in `errs` and trips the final
   // check, so this exercises the renderers as much as it samples them.
   const ground = {};
-  for (const s of ['neon', 'toon']) {
+  for (const s of ['neon', 'toon', 'sprite']) {
     ground[s] = await page.evaluate(async sk => {
       __NC.setSkin(sk);
       __NC.start('ai', 'PRO');
@@ -833,16 +837,166 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
       await new Promise(r => setTimeout(r, 240));
       return new Promise(res => requestAnimationFrame(() => requestAnimationFrame(() => {
         const cv = document.getElementById('game'), g = cv.getContext('2d');
-        const d = g.getImageData(Math.round(cv.width * 0.5), Math.round(cv.height * 0.36), 1, 1).data;
-        res([d[0], d[1], d[2]]);
+        // Under file:// the atlas image taints the canvas, so reading a pixel
+        // throws for the sprite skin only. That is a test-harness artefact of
+        // the origin, not a bug in the page -- over http the atlas is
+        // same-origin and this reads fine. Fall back to null and let the
+        // sprite skin be judged by its draw counter instead.
+        let px = null;
+        try {
+          const d = g.getImageData(Math.round(cv.width * 0.5), Math.round(cv.height * 0.36), 1, 1).data;
+          px = [d[0], d[1], d[2]];
+        } catch (e) { px = null; }
+        res(px);
       })));
     }, s);
   }
   ok('the toon arena paints dirt where neon paints void',
-     ground.toon[0] > 120 && ground.toon[0] > ground.toon[1] && ground.toon[1] > ground.toon[2],
+     !!ground.toon && ground.toon[0] > 120 && ground.toon[0] > ground.toon[1] && ground.toon[1] > ground.toon[2],
      JSON.stringify(ground.toon));
   ok('the neon board is still the dark board it was',
-     ground.neon[0] + ground.neon[1] + ground.neon[2] < 130, JSON.stringify(ground.neon));
+     !!ground.neon && ground.neon[0] + ground.neon[1] + ground.neon[2] < 130, JSON.stringify(ground.neon));
+  // The sprite skin is judged by whether the atlas is actually being BLITTED,
+  // which is a stronger claim than any one pixel: it proves the ground, the
+  // fence, both bases, the gun and every unit came out of the sheet.
+  const blit = await page.evaluate(async () => {
+    __NC.setSkin('toon');
+    await new Promise(r => setTimeout(r, 160));
+    const a0 = __NC.atlasDraws;
+    await new Promise(r => setTimeout(r, 200));
+    const a1 = __NC.atlasDraws;
+    __NC.setSkin('sprite');
+    await new Promise(r => setTimeout(r, 200));
+    const a2 = __NC.atlasDraws;
+    await new Promise(r => setTimeout(r, 200));
+    return { toonDelta: a1 - a0, spriteDelta: __NC.atlasDraws - a2 };
+  });
+  ok('the sprite skin blits the atlas, and no other skin touches it',
+     blit.toonDelta === 0 && blit.spriteDelta > 40, JSON.stringify(blit));
+
+  // ==================================================== the sprite atlas
+  // The one skin with an external asset. Everything here guards a way it can
+  // go wrong quietly: art that never loads, a manifest that has drifted from
+  // the image it describes, or a card with no sprite that silently draws
+  // nothing at all.
+  const atl = await page.evaluate(async () => {
+    __NC.loadAtlas();
+    for (let i = 0; i < 120 && __NC.atlasState !== 'ready' && __NC.atlasState !== 'failed'; i++)
+      await new Promise(r => setTimeout(r, 50));
+    return { state: __NC.atlasState, a: __NC.atlas };
+  });
+  ok('the sprite atlas loads', atl.state === 'ready', atl.state);
+  const A = atl.a || { groups: {}, size: [0, 0] };
+  ok('the manifest describes a real image and a sane world scale',
+     !!atl.a && A.ppu > 3 && A.ppu < 40 && A.lean > 0.2 && A.lean < 1.5 &&
+     A.size[0] > 0 && A.size[1] > 0 && A.rects > 100,
+     JSON.stringify({ ppu: A.ppu, lean: A.lean, size: A.size, rects: A.rects }));
+  const badCount = Object.entries(A.groups)
+    .filter(([, g]) => g.count !== g.yaws * g.frames).map(([n]) => n);
+  ok('every group holds exactly yaws x frames sprites', badCount.length === 0, badCount.join(','));
+  const deckArt = await page.evaluate(() =>
+    __NC.deck.filter(k => !__NC.atlas.groups[k]));
+  ok('every card in the deck has pre-rendered art', deckArt.length === 0, deckArt.join(','));
+  ok('the base and its tracking gun are separate sprite sets',
+     !!A.groups.base && !!A.groups.gun && A.groups.gun.yaws > 4,
+     JSON.stringify({ base: A.groups.base, gun: A.groups.gun }));
+  ok('both ground textures are present', (A.ground || []).sort().join(',') === 'dirt,grass',
+     (A.ground || []).join(','));
+
+  ok('with the atlas ready the sprite skin paints as sprite',
+     await page.evaluate(() => { __NC.setSkin('sprite'); return __NC.look === 'sprite'; }),
+     await page.evaluate(() => __NC.look + '/' + __NC.atlasState));
+
+  // Sprites stand up off the ground, so whichever is painted last wins the
+  // overlap. Under a 3/4 skin that has to be back-to-front or a unit at the far
+  // end of the board paints over one standing in front of it.
+  const order = await page.evaluate(async () => {
+    __NC.setSkin('sprite');
+    __NC.start('ai', 'PRO');
+    __NC.place(0, 'tank', 40, 140); __NC.place(0, 'archer', 44, 96);
+    __NC.place(1, 'fighter', 42, 60); __NC.place(1, 'tank', 46, 118);
+    await new Promise(r => setTimeout(r, 220));
+    const o = __NC.drawOrder;
+    return { o, sorted: o.every((v, i) => i === 0 || v >= o[i - 1]), n: o.length };
+  });
+  ok('the sprite skin draws back to front, so nothing paints over what is in front of it',
+     order.sorted && order.n >= 6, JSON.stringify(order));
+  const flatOrder = await page.evaluate(async () => {
+    __NC.setSkin('toon');
+    await new Promise(r => setTimeout(r, 200));
+    return __NC.drawOrder.length;
+  });
+  ok('a flat skin does no depth sorting at all', flatOrder === 0, String(flatOrder));
+  await page.evaluate(() => __NC.setSkin('sprite'));
+  await page.waitForTimeout(120);
+
+  // The manifest is inlined into the game AND written beside the image. If the
+  // two ever diverge the game draws one atlas while describing another, and
+  // every sprite lands a few pixels off with nothing to show for it in a test
+  // that only looks at the running page. So compare the shipped bytes.
+  const diskManifest = JSON.parse(fs.readFileSync(
+    path.join(ROOT, 'games', 'neon-clash', 'sprites', 'atlas.json'), 'utf8'));
+  const gameHtml = fs.readFileSync(path.join(ROOT, 'games', 'neon-clash', 'index.html'), 'utf8');
+  const inlineM = gameHtml.match(/ATLAS-MANIFEST-BEGIN \*\/\s*const ATLAS_MANIFEST = ([\s\S]*?);\s*\/\* ATLAS-MANIFEST-END/);
+  let inlined = null;
+  try { inlined = JSON.parse(inlineM[1]); } catch (e) { inlined = null; }
+  ok('the manifest inlined in the game is the one generated beside the image',
+     !!inlined && JSON.stringify(inlined) === JSON.stringify(diskManifest),
+     inlined ? 'differs' : 'no inline manifest found');
+  ok('the atlas image the manifest names is actually shipped',
+     !!inlined && fs.existsSync(path.join(ROOT, 'games', 'neon-clash', 'sprites', inlined.image)),
+     inlined && inlined.image);
+
+  // A rect that runs off the image draws garbage, and a neighbouring tile that
+  // happens to look plausible hides it from any screenshot.
+  const badRect = (inlined ? inlined.rects : []).filter(r =>
+    r[0] < 0 || r[1] < 0 || r[0] + r[2] > inlined.size[0] || r[1] + r[3] > inlined.size[1] ||
+    r[2] < 1 || r[3] < 1 || r[4] < 0 || r[5] < 0 || r[4] > r[2] || r[5] > r[3]);
+  ok('every sprite rect lies inside the image with its pivot inside the rect',
+     !!inlined && badRect.length === 0, badRect.length + ' bad');
+
+  // Groups index as frame * yaws + yaw, so the last index of every group must
+  // still be inside that group. An off-by-one here silently draws a knight
+  // where an archer should be.
+  const idxBad = (inlined ? Object.entries(inlined.groups) : []).filter(([, g]) =>
+    g.first + g.count > inlined.rects.length || g.first < 0).map(([n]) => n);
+  ok('every group indexes inside the rect table', idxBad.length === 0, idxBad.join(','));
+
+  // The whole reason `look()` exists: a cold page whose stored style is sprite
+  // must be playable on the first frame, painting as toon until the image
+  // arrives -- and permanently if it never does.
+  const cold = await context.newPage();
+  const coldErrs = [];
+  cold.on('pageerror', e => coldErrs.push('PAGEERROR ' + e.message));
+  cold.on('console', m => { if (m.type() === 'error' && !/font|net::/i.test(m.text())) coldErrs.push('CONSOLE ' + m.text()); });
+  await cold.addInitScript(() => {
+    try { localStorage.setItem('neon-clash-skin', 'sprite'); } catch (e) {}
+    // Stop the atlas image ever loading, so the failure path is the one under
+    // test. It is redirected to a deliberately malformed data: URL rather than
+    // an empty src: an empty src re-requests the document and logs a real
+    // network error, which would then fail the no-console-errors check with
+    // noise the harness itself created.
+    const D = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+    Object.defineProperty(HTMLImageElement.prototype, 'src', {
+      set(v) { D.set.call(this, 'data:image/png;base64,QQ=='); },
+      get() { return D.get.call(this); }, configurable: true,
+    });
+  });
+  await cold.goto(URL);
+  await cold.waitForFunction(() => window.__NC, null, { timeout: 8000 });
+  const coldState = await cold.evaluate(async () => {
+    for (let i = 0; i < 60 && __NC.atlasState !== 'failed'; i++) await new Promise(r => setTimeout(r, 25));
+    __NC.start('ai', 'PRO');
+    __NC.setEnergy(0, 20);
+    __NC.deploy(0, 'tank', 40, 120);
+    await new Promise(r => setTimeout(r, 260));
+    return { skin: __NC.skin, look: __NC.look, state: __NC.atlasState, units: __NC.units.length };
+  });
+  ok('an atlas that never loads falls back to toon instead of an empty board',
+     coldState.skin === 'sprite' && coldState.look === 'toon' &&
+     coldState.state === 'failed' && coldState.units === 1, JSON.stringify(coldState));
+  ok('no errors on the fallback path', coldErrs.length === 0, coldErrs.join(' | '));
+  await cold.close();
 
   // Scenery is generated once from a fixed seed. If it were re-rolled per
   // frame the arena would boil, and nothing about it could ever be asserted.

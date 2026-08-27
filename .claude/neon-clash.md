@@ -414,15 +414,18 @@ side colour for the outline and the kind colour for the accent, and the same
 function draws the card art, the board unit and the drag ghost, so a card can
 never drift from the thing it deploys.
 
-## Graphics styles (added 2026-08-23)
+## Graphics styles (added 2026-08-23, third style 2026-08-27)
 
 > The reusable half of this — the skin-is-paint invariant, the `glow()` no-op,
 > the `cel()`/`frameRot()`/`inkStroke()` recipe, seeded scenery, and the four
 > legibility findings that each cost a screenshot round — is written up for the
-> next game in `.claude/notes/20260823-canvas-skins-and-cel-shading.md`.
+> next game in `.claude/notes/20260823-canvas-skins-and-cel-shading.md`. The
+> pre-rendered pipeline has its own write-up in
+> `.claude/notes/20260827-offline-prerender-pipeline.md`, and its operating
+> manual lives beside the source at `games/neon-clash/models/README.md`.
 
 
-Two art directions over **one** simulation, chosen from the cogwheel in the
+Three art directions over **one** simulation, chosen from the cogwheel in the
 top-left HUD cluster (`#cog-btn`, sitting alongside back / mute / new — all
 four were narrowed to 34 px together so the row would not push the title out
 of `#hud-mid`).
@@ -430,6 +433,7 @@ of `#hud-mid`).
 | | |
 |---|---|
 | `toon` | **the default.** Cel-shaded cartoon: dirt arena, grass verge, plank fence, characters |
+| `sprite` | pre-rendered 3D: the same cast modelled, textured, lit and baked offline into one atlas |
 | `neon` | the original: dark board, grid, glowing wireframe silhouettes |
 
 The picker is a native `<select>` (`#skin-sel`), not a pair of buttons — which
@@ -494,6 +498,48 @@ a menu you have to read while your base is being hit is not a menu. The panel
 stacks *above* the other overlays (`z-index: 78`) rather than replacing them,
 so closing it reveals the title, the field manual or the result with no state
 to restore.
+
+
+### The `sprite` style — pre-rendered 3D (added 2026-08-27)
+
+The same cast, but **modelled, textured, normal-mapped, lit and baked offline**
+into one sprite atlas, then blitted at runtime. Source lives in
+`games/neon-clash/models/`; output in `games/neon-clash/sprites/`. Re-render
+with `cd games/neon-clash/models && node build.mjs` (~45 s). **Never hand-edit
+`sprites/`** — and `models/README.md` is the tuning manual, not this file.
+
+It is the **only** part of the game with an external asset, which drives three
+decisions:
+
+- **It loads lazily.** Nothing is fetched until the style is actually selected
+  (or restored from `localStorage`), so a toon or neon player never pays the
+  1.5 MB.
+- **It falls back.** `look()` returns `'toon'` while the atlas is loading and
+  permanently if it fails, so the board is never blank and never half-painted.
+  `toon()` therefore means *the representational idiom* — sprite answers yes to
+  it and then overrides, one draw call at a time, only what it has art for.
+- **The manifest is inlined into `index.html`, the image is not.** A `fetch` for
+  the manifest fails CORS on `file://`, which is how the page is debugged and
+  how the drive suite loads it — the style could never have been tested. An
+  `<img>` has no such restriction. `build.mjs` writes the manifest between
+  `ATLAS-MANIFEST` markers and the suite asserts it still matches
+  `sprites/atlas.json`.
+
+**What changes versus a flat skin, and why:**
+
+| | |
+|---|---|
+| **Depth order** | Sprites stand up off the ground with their feet on the entity position, so whichever is drawn last wins the overlap. Under `spr()` bases, bunkers and units go into one list sorted by `y` ascending — the camera sits *south* of the board, so smaller `y` is further away. The flat skins keep their original order, where the base is scenery painted under the fight. |
+| **Facing** | Tiles are pre-rotated at 12 yaws. `drawSpriteShape` reads the rotation back off the live transform (`frameRot()`), counter-rotates so the tile draws screen-aligned, and picks the nearest yaw. That is why cards and drag ghosts get the skin for free. |
+| **Animation** | Three frames per unit: two walk, one strike. A swing (`t > 0.35`) picks the strike; otherwise the walk alternates on a phase offset by `u.id`, so a crowd does not march in lockstep. `drawUnitShape` grew an eighth argument for that phase; the other skins ignore it. |
+| **Scale** | The humanoids are modelled at true human proportions, which leaves a knight ~5 world units across inside a 10.8-unit collision circle. A per-group `scale` in the manifest (1.5) corrects that. Buildings are modelled at their real footprint and need none. |
+| **The base gun** | Its own 12-yaw sprite set, drawn separately and lifted by `groups.base.deck`, because the barrel tracks. Baking it into the fortification would freeze the only part of the base that moves. |
+| **Team identity** | Same answer as toon — a ring on the ground — for the same reason. A knight is a knight in both colours. |
+| **The arena** | Two tileable 256² ground textures as canvas patterns, plus a fence section repeated along each edge. It reuses **`TOON_SCENE.grass`**, the same ragged polygon the toon skin punches, so both skins agree where the dirt ends. The scene is shared data; only the paint differs. |
+
+**Test hooks:** `atlasState`, `atlas` (summary), `atlasDraws` (monotonic blit
+counter — the suite watches it climb under sprite and stay put under toon),
+`drawOrder` (this frame's depth-sorted y values), `look`, `loadAtlas()`.
 
 ## Gates
 

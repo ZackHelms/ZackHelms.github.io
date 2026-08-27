@@ -4,6 +4,18 @@ Each game is a **single self-contained HTML file** (inline CSS + JS, no external
 libraries). Work on each game happens in a **dedicated Claude Code session**.
 Detailed context for individual games lives in `.claude/<game>.md` at the repo root.
 
+**Documented exception — baked assets.** A game in its own subdirectory may ship
+*generated* binary assets beside its HTML when the alternative is worse: Neon
+Clash's `sprite` graphics style is a 1.5 MB pre-rendered atlas
+(`games/neon-clash/sprites/`, built from 3D source in
+`games/neon-clash/models/`), which base64-inlining would bloat the HTML by ~2 MB
+for every visitor including the ones who never pick that style. The bar for
+doing this: the asset is **generated from source that lives in the repo** by a
+committed, dependency-free build script; it loads **lazily**, only when the
+feature that needs it is selected; and the game **degrades to a working style**
+if it never arrives. Piano Tiles' `.mp3` files are the older, hand-authored
+precedent.
+
 ---
 
 ## Shared Conventions
@@ -23,7 +35,7 @@ Detailed context for individual games lives in `.claude/<game>.md` at the repo r
 | Chrome above overlays | The ← and 🔊 buttons must sit at a **higher z-index than any full-screen overlay** (menu / game-over / win). Give the chrome `z-index:80` and overlays `70`. Otherwise the overlay swallows both, and since music is usually playing *behind* a menu or win screen, the player cannot mute exactly when they most want to (2026-07-25: shipped that way in locksport, caught by a drive test that could not tap `#mute-btn` after a reload) |
 | Portrait lock (optional) | A game whose layout only works in portrait can lock itself in software rather than reflowing: size the app shell to `innerHeight x innerWidth` and `transform: rotate(-screen.orientation.angle)` when a **touch** device goes landscape (leave a desktop window alone — clamp it to a centred portrait column instead). Two gotchas: `position:fixed` overlays must be nested *inside* the transformed shell or they stay landscape, and every pointer handler must un-rotate `clientX/clientY` about the element centre (a +-90 deg rotation keeps the bounding box centred on it) — `getBoundingClientRect().left` alone is wrong under a transform. `clientWidth/clientHeight` are layout sizes and stay correct. Reference: `neon-clash/` `applyView()` + `localPt()` |
 | Native form controls | A `<select>` (or any native picker) must **not** be wired through a `bindTap`-style helper. Those helpers bind `touchend` with `preventDefault()` to stop iOS double-firing, and that stops the native picker ever opening. Listen for `change` and leave the tap helper off it (2026-08-23, neon-clash's style dropdown) |
-| Graphics styles (optional) | A game may offer more than one art direction. The invariant is **a skin is paint**: nothing in the sim knows a skin exists, so a mid-match switch cannot change an outcome — assert that directly (same stats, costs, ranges and a real deploy's landing coordinates, byte-identical under both). Two mechanics carry most of it: make `glow()` a **no-op** under a skin with no bloom rather than branching at its thirty-odd call sites (an effect written later in the neon idiom is then automatically right in both), and dispatch at the one shared sprite entry point so cards and drag ghosts can never drift from the thing they deploy. Chrome differs only by palette → a `THEME[skin]` table; the world differs structurally → alternate draw routines. Scenery gets baked once from a seeded PRNG, never re-rolled per frame. Full recipe incl. cel shading: `.claude/notes/20260823-canvas-skins-and-cel-shading.md`. Reference: `neon-clash/` |
+| Graphics styles (optional) | A game may offer more than one art direction. The invariant is **a skin is paint**: nothing in the sim knows a skin exists, so a mid-match switch cannot change an outcome — assert that directly (same stats, costs, ranges and a real deploy's landing coordinates, byte-identical under every style). Two mechanics carry most of it: make `glow()` a **no-op** under a skin with no bloom rather than branching at its thirty-odd call sites (an effect written later in the neon idiom is then automatically right in all of them), and dispatch at the one shared sprite entry point so cards and drag ghosts can never drift from the thing they deploy. Chrome differs only by palette → a `THEME[skin]` table; the world differs structurally → alternate draw routines. Scenery gets baked once from a seeded PRNG, never re-rolled per frame. A style with a **loadable asset** adds one more rule: separate the style that is *selected* from the style being *painted* (`look()`), so it can fall back to a complete style while loading and permanently on failure — and let the fallback style's predicate stay true for everything the new style has not overridden, so a half-ported skin still draws. A **3/4** style also needs depth sorting (back to front by board y) that flat top-down styles must not pay for. Full recipes: `.claude/notes/20260823-canvas-skins-and-cel-shading.md` (cel shading) and `.claude/notes/20260827-offline-prerender-pipeline.md` (baking 3D to sprites). Reference: `neon-clash/` |
 | Build badge | Every game has a `<div id="build-badge">` right after `<body>` — see below |
 
 ---
@@ -567,7 +579,7 @@ checksummed code carries seed + score, so a friend replays your exact grid and
 the game reports the head-to-head. LABELS assist stamps a unique letter per
 colour for a colour-free hunt. Detailed context: `.claude/signal-hunt.md`.
 
-### NEON CLASH (`neon-clash/index.html`, ~2700 lines)
+### NEON CLASH (`neon-clash/index.html`, ~2950 lines + `models/` + `sprites/`)
 The repo's first **real-time card battler**, and its first **simultaneous**
 local-2p game. One board split into halves; energy refills at 1/sec up to 20
 on both sides; drag a tank (4), fighter (3), archer (3) or bunker (8) out of
@@ -623,21 +635,30 @@ opponent's readable roster. Three AI grades differ in think interval, an idle
 chance, how reliably they counter, whether they build and man bunkers, and an
 energy reserve they hold back.
 
-It ships **two graphics styles**, picked from a dropdown behind a cogwheel in
-the top-left HUD cluster: `neon` (the original glowing wireframe board) and the
-default `toon` — a
-cel-shaded cartoon arena of dirt and grass inside a poorly maintained plank
-fence, with actual characters (a shield-and-sword knight, a green-hatted
-archer, a twin-dagger rogue in dark red, a log-walled fort). The rule that
-keeps it cheap is that **a skin is paint**: nothing in `step()` knows one
+It ships **three graphics styles**, picked from a dropdown behind a cogwheel in
+the top-left HUD cluster: `neon` (the original glowing wireframe board), the
+default `toon` — a cel-shaded cartoon arena of dirt and grass inside a poorly
+maintained plank fence, with actual characters (a shield-and-sword knight, a
+green-hatted archer, a twin-dagger rogue in dark red, a log-walled fort) — and
+`sprite`, the same cast **modelled, textured, normal-mapped, lit and baked
+offline** into one atlas by a dependency-free software renderer that lives in
+the repo (`games/neon-clash/models/`, `node build.mjs`, ~45 s; output in
+`sprites/`, generated, never hand-edited). The rule that
+keeps all this cheap is that **a skin is paint**: nothing in `step()` knows one
 exists, so switching mid-match cannot change an outcome, and the suite asserts
-stats, costs, ranges and a real deploy come out identical under both. Cel
+stats, costs, ranges and a real deploy come out identical under all three. Cel
 shading is enforced as two rules — flat colour steps and one ink outline,
 via `cel()` — and `glow()` simply becomes a no-op under a skin with no bloom,
-which is what stops a stray halo leaking in from untouched code. Under toon a
+which is what stops a stray halo leaking in from untouched code. The sprite
+style is the only one with an external asset, so it loads **lazily** and paints
+as toon until the atlas arrives (and permanently if it never does); it is also
+the only one that **depth-sorts**, back to front by board y, because its
+figures stand up off the ground. Under both representational styles a
 silhouette no longer says whose it is, so team colour moves to a thin ground
 ring under each unit. Scenery is baked once from a seeded PRNG rather than
-re-rolled per frame, or the arena boils. Opening the panel pauses the sim.
+re-rolled per frame, or the arena boils — and both styles paint the *same*
+baked scene, so they can never disagree about where the dirt ends. Opening the
+panel pauses the sim.
 
 It is **portrait-locked in software**: on a touch device turned sideways
 `applyView()` counter-rotates the whole `#app` shell by `-screen.orientation.angle`
@@ -645,10 +666,14 @@ rather than letting the layout reflow, and `localPt()` un-rotates every pointer
 so touch still lands correctly (a wide desktop window instead gets a centred
 portrait column). The overlays sit *inside* `#app` on purpose — a transformed
 ancestor is the containing block for `position:fixed` children, which is the
-only reason they turn with the game. Drive suite (116 checks, incl. the garrison
-protection invariant, the two-finger duel, the rotated-view touch map and the
-skin-is-paint invariant):
-`.claude/tests/drive-neon-clash.cjs`. Detailed context: `.claude/neon-clash.md`.
+only reason they turn with the game. Drive suite (132 checks, incl. the garrison
+protection invariant, the two-finger duel, the rotated-view touch map, the
+skin-is-paint invariant across all three styles, and the atlas guards — inline
+manifest matches the generated file, every rect lies inside the image, and an
+atlas that never loads falls back to toon instead of an empty board):
+`.claude/tests/drive-neon-clash.cjs` (132 checks). Detailed context:
+`.claude/neon-clash.md`; the pre-render pipeline has its own manual at
+`games/neon-clash/models/README.md`.
 
 ---
 
