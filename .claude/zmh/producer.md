@@ -54,7 +54,22 @@
   (`a0c8504..fc27bf1`) sat entirely above them: that range held three
   ember-depths feature commits plus `7ff3392` (its own earlier refine commit)
   and `8b6ca0a` (the CD's PR merge of that work) — both skippable, neither
-  hiding anything. Earlier entries, all since cleared:
+  hiding anything. **Still outstanding after the second 2026-08-27
+  ember-depths pass** (the economy/persona one, pointer `8dd459f`, refine
+  commit `5f6063b`), which left nothing NEW behind and is worth reading as the
+  benign case: a concurrent star-surge session pushed `14fb540` + its merge
+  `f66af0b`, and the CD pushed `1d67ef4` (a settings chore), but all three
+  landed on `main` *after* the pointer was written and were merged in
+  afterwards — so they are still inside `git log 8dd459f..HEAD` rather than
+  buried under it. **The pointer only hides what was already an ancestor when
+  it was written**, which is checkable in one line and worth checking rather
+  than assuming: `git merge-base --is-ancestor <their-sha>
+  $(cat .claude/last-refine-sha)`. That pass also hit the shared-file merge
+  CLAUDE.md § Git workflow warns about — both sessions edited adjacent rows of
+  `.claude/tests/README.md`'s suite table, resolved by taking their
+  star-surge row (98 checks) and this session's ember-depths rows, then
+  verifying their five files were byte-identical to `origin/main` with
+  `git diff --stat origin/main -- <paths>` before reporting done. Earlier entries, all since cleared:
   turret-builder's `acb50c1` + `e9ea508` were an entry and the
   2026-08-23 turret-builder pass refined them (it also found and fixed a live
   cel-shading defect that had shipped in `acb50c1`, which is the argument for
