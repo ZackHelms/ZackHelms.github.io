@@ -62,7 +62,7 @@ local-2p.
 | Shadow Circuit | `shadow-circuit/` | stealth, maze | tap-to-move | level-campaign | vision-cones, line-of-sight, procedural-generation | solo | `.claude/shadow-circuit.md` |
 | Neon Recall | `neon-recall/` | memory-board | tap | level-campaign, local-2p | memory-match, resource-economy, combo-multiplier | solo, local-2p | `.claude/neon-recall.md` |
 | Neon Drift | `neon-drift/` | driver-racing | two-thumb | time-trial | physics-sim, ghost-replay, timing-precision | solo | `.claude/neon-drift.md` |
-| Ember Depths | `ember-depths/` | roguelike | tap-to-move | run-based | permadeath, relic-builds, procedural-generation, grid-combat | solo | `.claude/ember-depths.md` |
+| Ember Depths | `ember-depths/` | roguelike | tap-to-move | run-based, save-campaign | permadeath, relic-builds, procedural-generation, grid-combat, meta-progression, resource-economy | solo | `.claude/ember-depths.md` |
 | Alpine Ascent | `alpine-ascent/` | platformer | hold-charge, drag-aim-release | level-campaign | physics-sim, timing-precision, checkpoint-climb | solo | `.claude/alpine-ascent.md` |
 | Golden Reel | `golden-reel/` | fishing | hold-charge, tap | save-campaign | collection, resource-economy, timing-precision | solo | `.claude/golden-reel.md` |
 | Vault Breaker | `vault-breaker/` | dexterity-puzzle | pinch-rotate | level-campaign | timing-precision, seeded-determinism, star-rating | solo | `.claude/vault-breaker.md` |
@@ -100,7 +100,10 @@ local-2p.
   ballpark, signal-hunt, phasic — an established house pattern now) ·
   `stealth`/`maze` + `vision-cones` (shadow-circuit) · `tap-to-move`
   (shadow-circuit, ember-depths) · `roguelike` + `run-based` +
-  `permadeath` + `relic-builds` (ember-depths) ·
+  `permadeath` + `relic-builds` (ember-depths — permadeath *and*
+  `meta-progression`/`save-campaign` since 2026-08-26: the run dies, the
+  character banks it, which is the roguelite shape grid-defense reaches by a
+  different road) ·
   `seeded-determinism` (blade-spin, word-circuit, tri-peaks, ballpark,
   signal-hunt — an established house pattern now).
 - `lockpicking-sim` genre + `drag-probe`/`tension-hold` feel input +
