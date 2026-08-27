@@ -46,6 +46,17 @@
  *                                              [--seed 1234] [--report]
  *   --report prints the tables and skips the assertions (use while tuning).
  *   --depth / --campaign run only that half.
+ *
+ *   --override '<json>' applies candidate constants BEFORE playing, so a sweep
+ *   is a shell loop rather than a fresh scratchpad harness every time. Two keys:
+ *     {"curve": {"goldPer": 0.4},                    // merged into CURVE
+ *      "gear":  {"weapon": [70,260,520,1000,1900,3600]}}  // rung costs, tier 1..6
+ *   `curve` is merged ONE LEVEL DEEP on purpose: a plain Object.assign replaces
+ *   a nested object wholesale, so {"base":{"slime":{...}}} would wipe every
+ *   other enemy's stats and the sweep would silently measure a different game.
+ *   Example — sweep a cost ladder for the ~1-purchase-per-delve target:
+ *     for m in 3 4 6; do node .claude/tests/eval-ember-depths.cjs --campaign \
+ *       --report --override "{\"gear\":{...}}"; done
  */
 const path = require('path');
 const fs = require('fs');
@@ -66,6 +77,15 @@ const RUNS = argOf('runs', 20);
 const DELVES = argOf('delves', 14);
 const SEED = argOf('seed', 90210);
 const REPORT_ONLY = argv.includes('--report');
+const strOf = (name) => { const i = argv.indexOf('--' + name); return i >= 0 ? argv[i + 1] : null; };
+let OVERRIDE = null;
+{
+  const raw = strOf('override');
+  if (raw) {
+    try { OVERRIDE = JSON.parse(raw); }
+    catch (e) { console.error('--override is not valid JSON: ' + e.message); process.exit(1); }
+  }
+}
 const ONLY_DEPTH = argv.includes('--depth');
 const ONLY_CAMPAIGN = argv.includes('--campaign');
 const DO_DEPTH = !ONLY_CAMPAIGN;
@@ -481,6 +501,35 @@ const fmt = (n, w) => String(n).padStart(w);
   await page.addScriptTag({ content: PERSONA_SRC });
   await page.evaluate(() => { localStorage.clear(); loadSlots(); });
 
+  // Candidate constants, applied once before any run. Reported back so a sweep
+  // log says what it was measuring — a table of numbers with no candidate
+  // beside it is the fastest way to tune against the wrong thing.
+  if (OVERRIDE) {
+    const applied = await page.evaluate((ov) => {
+      if (ov.curve) for (const k in ov.curve) {
+        // One level deep, deliberately: a whole-object assign of `base` would
+        // drop every enemy the candidate did not mention.
+        if (CURVE[k] && typeof CURVE[k] === 'object' && !Array.isArray(CURVE[k]) &&
+            ov.curve[k] && typeof ov.curve[k] === 'object') Object.assign(CURVE[k], ov.curve[k]);
+        else CURVE[k] = ov.curve[k];
+      }
+      if (ov.gear) for (const k in ov.gear) {
+        if (!GEAR[k]) throw new Error('--override names an unknown gear track: ' + k);
+        const rungs = ov.gear[k];
+        if (rungs.length !== GEAR[k].tiers.length - 1) {
+          throw new Error('--override gear.' + k + ' needs ' + (GEAR[k].tiers.length - 1) +
+                          ' rung costs, got ' + rungs.length);
+        }
+        rungs.forEach((cost, i) => { GEAR[k].tiers[i + 1].cost = cost; });
+      }
+      const out = { gear: {} };
+      for (const k in GEAR) out.gear[k] = GEAR[k].tiers.map((t) => t.cost);
+      out.goldPer = CURVE.goldPer;
+      return out;
+    }, OVERRIDE);
+    console.log('\n  OVERRIDE applied: ' + JSON.stringify(applied));
+  }
+
   /* The three skill bands. Everything that separates them is a decision a
      person makes at the board, not a stat: whether you look where you are
      walking, whether you pick your ground, and whether you buy on purpose. */
@@ -613,7 +662,12 @@ const fmt = (n, w) => String(n).padStart(w);
   }
   console.log('');
 
-  if (!REPORT_ONLY) {
+  if (OVERRIDE && !REPORT_ONLY) {
+    // The bands below are calibrated to the SHIPPING constants. Asserting them
+    // against a candidate would report the sweep as a regression.
+    console.log('  (assertions skipped: --override is set — sweeping, not gating)');
+  }
+  if (!REPORT_ONLY && !OVERRIDE) {
     if (DO_DEPTH) {
       const fresh = results['FRESH/steady'], novice = results['FRESH/novice'];
       const vet = results['FRESH/veteran'];
