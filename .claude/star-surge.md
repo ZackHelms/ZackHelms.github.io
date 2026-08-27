@@ -108,14 +108,16 @@ across all 11 sectors — treat the constants in
 point that will likely need a further pass once someone's actually played
 it.
 
-**Regression gate:** `.claude/tests/drive-star-surge.cjs` (95 checks) pins
+**Regression gate:** `.claude/tests/drive-star-surge.cjs` (98 checks) pins
 every weapon's pip-vs-tier formula (fire rate is pip-invariant; discrete
 weapon counts, bomb turret/radius alternation, beam/flame band/lobe counts,
 chain jump count, EMP radius-only growth, and the missile min-turn-radius
 floor all match their formulas exactly) plus the enemy-hp/incoming-damage
 difficulty ramp and the graphics-style setting (3D animlight is the default, all
-four styles paint every hull, the pick persists, the cog opens/closes, and
-under `anim` the scale-up is field-only and the light rigs really animate) — run it
+five styles paint every hull, the pick persists, the cog opens/closes,
+under `anim` the scale-up is field-only and the light rigs really animate, and
+under `sprite` the hull cache actually fills, its keys carry the stage hue, and
+the title dogfight records its full flattened loop) — run it
 after touching any weapon or difficulty formula in this file's § Weapons or
 this section, or any renderer branch in § Graphics styles, the same way as
 the smoke gate (see `.claude/tests/README.md`).
@@ -252,12 +254,17 @@ the canvas dismisses the panel rather than steering blind under it.
 - **`anim`** (**default** since 2026-08-25) — "3D ANIMLIGHT": the same meshes, flown **oversized** (player
   3x, ordinary enemies 2x, bosses unchanged) in a **vivid** palette, each
   hull running a rig of **animated lights**. See § The animlight kit below.
+- **`sprite`** (2026-08-27) — "SPRITESHEETS": the `model` art **pre-rendered
+  to sprite frames** at first use and blitted — the Clash Royale technique —
+  with the title dogfight flattened into a recorded loop. See § The
+  spritesheet kit below.
 
-`model` and `anim` are one family: `meshGfx()` is the test every piece of
-non-hull scenery asks, so the station's lit-metal treatment, the planet limb,
-the hostile orb and the dogfight's mesh path are shared and a further
-mesh-family style would need no scenery edits at all. Only the palette
-(`mFaceCol`), the hull scale and the light rigs branch between them.
+`model`, `anim` and `sprite` are one family: `meshGfx()` is the test every
+piece of non-hull scenery asks, so the station's lit-metal treatment, the
+planet limb, the hostile orb and the dogfight's mesh path are shared and a
+further mesh-family style would need no scenery edits at all (`sprite` needed
+none). Only the palette (`mFaceCol`), the hull scale, the light rigs and —
+for `sprite` — WHEN the mesh is painted branch between them.
 
 **Every hull is painted through the three dispatchers**
 `paintShip(cold, portrait)` / `paintEnemy(e, portrait)` / `paintBoss()` — the
@@ -430,6 +437,62 @@ more intricate and slow for my ship".
   station. The station shows 14/169 frames over against `model`'s 5/169 —
   the drydock ship's rig on top of the same gradients; it is a static menu
   screen, and the median is 60fps in both.
+
+### The spritesheet kit (`sprite`, 2026-08-27)
+
+The Clash Royale pipeline, run in the browser: hulls are authored as the 3D
+`model` meshes, rendered ONCE into offscreen sprite frames through the very
+same `drawMeshTop`, and the field then blits bitmaps. All the mesh cost is
+paid at bake time; the visible snap between quantized facings as a hull turns
+is the technique's signature, not a bug. The reusable pipeline doc lives in
+zmhstudio's `zmh-3d` plugin (`skills/sprite-prerender/SKILL.md`) — this game
+is its reference implementation.
+
+- **Frame quantization**: player 13 bank steps over ±0.85 rad
+  (`SHIP_BANK_FRAMES`), banking enemies 9 over ±0.6, the spinner 24 rotor
+  steps over a **quarter turn** (`SPIN_FRAMES` — the rotor is 4-fold
+  symmetric, so 90° of frames covers 360° of spin, and the spin is baked
+  through `drawMeshTop`'s own spin so the lamp stays fixed in screen space).
+  Shooter/tanker fly level and only ever request their centre frame.
+- **The cache** (`SPR`, `bakeSprite`) is a Map whose insertion order doubles
+  as LRU, under a `SPR_BUDGET` byte budget (24MB decoded RGBA). Keys carry
+  **everything the bake reads** — type, hue, frame index, radius, dpr — the
+  shieldSprite rule; the suite proves a hue-blind key red. Baking is lazy, so
+  a stage-hue change re-bakes four small sheets on first paint, never a
+  library up front. `bakeSprite` swaps the module `ctx` for the offscreen one
+  (the `buildTitleWord` trick), so there is one set of art.
+- **Bake what repeats, draw what varies**: the ship's exhaust flicker
+  (`drawShipExhaust`, refactored out of `drawShipModel` for this), the boss's
+  continuously-turning gun rim (14–20 faces live is cheaper than a smooth
+  ring of baked frames is big) and the powerup's tumble stay live mesh.
+  Animated light rigs are the one thing a bake cannot carry (a light frozen
+  mid-blink is worse than none — the `buildTitleWord` rule), which is why the
+  style pre-renders the `model` look, not `anim`.
+- **The title dogfight is FLATTENED** (`dfrRecord`/`dfrDrawLayer`): the real
+  sim runs once off-screen (2.5s warm-up, then 22s at 60Hz) and every
+  drawable it produces — each hull's billboard transform, tracer segment and
+  debris speck — is recorded into ~2MB of per-frame Float32 arrays, replayed
+  as sprite blits with no steering maths, no projection, no mesh painting.
+  This is the motion half of the pipeline: bake the ART as frames, bake the
+  MOTION as a transform track (the Flash "movie clip" model) — a full-screen
+  pixel flipbook would cost ~12MB **per frame** at phone resolution. The loop
+  seam is a jump cut hidden by a 0.5s warp-out/warp-in fade of the whole
+  layer. The track key is `W|H|dpr` (it is recorded in screen space; a resize
+  re-records, ~84ms measured), `update()` advances `dfrT` instead of calling
+  `dfUpdate` under this style, and the live sim's state is saved and restored
+  around the recording so a mid-title style switch resumes it untouched.
+  During the recording foes' spinner rotation and hue ride along in the
+  ship record (10 floats each: transform 4, position 2, alpha, packed meta,
+  radius, rotor angle).
+- **`paintShip`/`paintEnemy` check `sprite` before `meshGfx()` and fall
+  through to the live mesh painter during the title-word bake** — the word is
+  baked once anyway, so pre-rendering its ~120 cells would only mint
+  throwaway cache entries at title-cell radii.
+- Perf (frame-budget.cjs, 390x844 dpr3, 2026-08-27): 16.7ms median with
+  **0/149 frames over** on both the title (replayed dogfight) and a
+  16-enemy + boss + 60-bullet field — the only style with a clean sheet on
+  the saturated field; station 21/149 over, same as `model`'s 22 (the
+  pre-existing scenery gradients, a static menu screen).
 
 ### Effects are skinned too (2026-08-25)
 

@@ -204,8 +204,9 @@ from **inventing a new facet value**, not filling a hole. Open directions:
 - **`art-styles`** (neon-clash first, then turret-builder and star-surge, all
   2026-08-23) is a player-selectable art direction — a second cel-shaded skin
   over the same simulation, behind a settings cogwheel (`toon` defaults in
-  neon-clash and turret-builder; star-surge grew to four styles and now defaults
-  to its 3D `anim` one). Everything else here paints exactly one way. The pattern to copy is
+  neon-clash and turret-builder; star-surge grew to five styles — including a
+  pre-rendered `sprite` mode that bakes the 3D art into sprite frames — and now
+  defaults to its 3D `anim` one). Everything else here paints exactly one way. The pattern to copy is
   `.claude/notes/20260823-canvas-skins-and-cel-shading.md`: a skin is paint (the
   sim never reads it), `glow()` goes no-op rather than branching at every call
   site, each part is shaded about its OWN centre, the shade wedge counter-rotates
