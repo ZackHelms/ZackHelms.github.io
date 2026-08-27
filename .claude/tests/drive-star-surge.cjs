@@ -1017,14 +1017,16 @@ const allEqual = arr => arr.every(v => v === arr[0]);
   check('the model dogfight projects real hulls where the sim says they are',
         dfModel.checked >= 4 && dfModel.visible === dfModel.checked, dfModel);
 
-  /* ---- 3D ANIMLIGHT ('anim') style ----------------------------------------
-     Same mesh renderer, three things of its own: hulls fly deliberately
-     oversized on the FIELD ONLY, the palette is vivid rather than worn, and
-     every hull runs a rig of animated lights. What is worth pinning is what a
-     refactor would quietly break: the scale factors themselves, the fact that
-     framed contexts (a pilot bay, the baked logo) are exempt from them, and
-     that the rigs genuinely animate -- in the place and on the schedule the
-     spec claims, not merely "some pixels changed". */
+  /* ---- oversized hulls, in EVERY style -------------------------------------
+     The 3x player / 2x ordinary enemy / untouched boss scale-up started as an
+     'anim'-only trait and went universal on 2026-08-27, so the discriminating
+     axis is no longer anim-vs-model (that comparison now reads 1.00 and would
+     pass with the scale-up deleted from the file). It is FIELD vs FRAMED,
+     measured inside each style: a flying hull is scaled, a hull in a fixed art
+     box (pilot bay, baked logo cell) is not. Every style is measured, because
+     each takes the factor by a different mechanism -- a mesh scale, a canvas
+     transform, or a bake size -- so there is no one line to protect them all.
+     'anim' keeps its own two checks below: the vivid palette and the rigs. */
   const animScale = await page.evaluate(() => {
     // Paint one hull alone on a cleared canvas and measure the box it covers.
     // animT is parked where every blinker sits at its dim ebb, so a strobe's
@@ -1049,7 +1051,7 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     };
     const drone = { type: 'drone', r: 12, ang: 0, slowT: 0, x: 195, y: 300 };
     const out = {};
-    for (const style of ['model', 'anim']) {
+    for (const style of ['toon', 'neon', 'model', 'anim', 'sprite']) {
       gfx = style;
       out[style] = {
         ship: span(() => paintShip(true, false)),
@@ -1059,27 +1061,45 @@ const allEqual = arr => arr.every(v => v === arr[0]);
       };
     }
     spawnBoss();
-    for (const style of ['model', 'anim']) { gfx = style; out[style].boss = span(() => paintBoss()); }
+    for (const style of ['toon', 'neon', 'model', 'anim', 'sprite']) {
+      gfx = style; out[style].boss = span(() => paintBoss());
+    }
     boss = null; gfx = 'toon'; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     return out;
   });
-  const aRatio = k => animScale.anim[k] / animScale.model[k];
-  // The boss's ceiling is 1.15, not 1.03: its gun rim always has a muzzle
-  // glow or two lit (seven barrels at a 15% duty means ~1 is alight at any
-  // moment) and that glow legitimately reaches past the barrel tips —
-  // measured 1.07. The bar still cannot be cleared by an enemy-scale 2x,
-  // which is the mistake it exists to catch.
-  check('animlight flies oversized hulls: the player at 3x, an ordinary enemy at 2x, the boss untouched',
-        animScale.model.ship > 20 && aRatio('ship') > 2.85 && aRatio('ship') < 3.15 &&
-        aRatio('drone') > 1.88 && aRatio('drone') < 2.12 &&
-        aRatio('boss') > 0.97 && aRatio('boss') < 1.15,
-        { ship: aRatio('ship'), drone: aRatio('drone'), boss: aRatio('boss'), raw: animScale });
+  // field / framed, inside one style: the scale-up and nothing else.
+  const SC_STYLES = ['toon', 'neon', 'model', 'anim', 'sprite'];
+  const upShip = k => animScale[k].ship / animScale[k].bay;
+  const upDrone = k => animScale[k].drone / animScale[k].word;
+  // Measured 2026-08-27: player 2.95-3.00 and drone 1.89-2.01 across all five
+  // styles. The spread is the flat styles' glow — shadowBlur is not touched by
+  // a transform, so a constant halo pads the framed hull proportionally more
+  // than the flying one and drags the ratio a hair under the factor. Bands are
+  // tight enough that neither can be cleared by the mistake it exists to
+  // catch: a hull left at 1:1, or one scaled by the other hull's factor.
+  check('every style flies oversized hulls on the FIELD: the player ~3x, an ordinary enemy ~2x',
+        SC_STYLES.every(k => animScale[k].bay > 12 && upShip(k) > 2.85 && upShip(k) < 3.15) &&
+        SC_STYLES.every(k => animScale[k].word > 8 && upDrone(k) > 1.85 && upDrone(k) < 2.15),
+        { ship: SC_STYLES.map(k => [k, +upShip(k).toFixed(2)]),
+          drone: SC_STYLES.map(k => [k, +upDrone(k).toFixed(2)]) });
   // A framed hull is art in a box: 3x would spill a pilot bay over its
   // neighbour and 2x would close the counters of the letters the logo is
-  // spelled from. Both contexts pass portrait=true and must stay 1:1.
+  // spelled from. Both contexts pass portrait=true and must stay 1:1 — pinned
+  // here as "the same size the flat styles have always drawn them", since
+  // those two branches were never touched by any scale.
   check('framed hulls are exempt from the scale-up: the pilot bay and the baked logo stay 1:1',
-        Math.abs(aRatio('bay') - 1) < 0.05 && Math.abs(aRatio('word') - 1) < 0.05,
-        { bay: aRatio('bay'), word: aRatio('word') });
+        SC_STYLES.every(k => Math.abs(animScale[k].bay / animScale.toon.bay - 1) < 0.35 &&
+                          Math.abs(animScale[k].word / animScale.toon.word - 1) < 0.35),
+        { bay: SC_STYLES.map(k => [k, Math.round(animScale[k].bay)]),
+          word: SC_STYLES.map(k => [k, Math.round(animScale[k].word)]) });
+  // The boss is the control: it is the one hull NO style scales, so its span
+  // must stay in the same neighbourhood in all five. The ceiling is 1.15 — the
+  // mesh rim always has a muzzle glow or two lit past the barrel tips — and it
+  // still cannot be cleared by an enemy-scale 2x, which is the point.
+  check('the boss is exempt in every style: no scale-up ever reaches a capital ship',
+        SC_STYLES.every(k => animScale[k].boss / animScale.model.boss > 0.85 &&
+                          animScale[k].boss / animScale.model.boss < 1.15),
+        SC_STYLES.map(k => [k, Math.round(animScale[k].boss)]));
 
   const animLights = await page.evaluate(() => {
     gfx = 'anim';
@@ -1222,7 +1242,10 @@ const allEqual = arr => arr.every(v => v === arr[0]);
       drawShield(shipArtScale());
       ctx.restore();
     };
-    const OUTER = { toon: 28, neon: 26, model: 30, anim: 30 * A_SHIP_SCALE, sprite: 30 };
+    // Every style now rings a 3x hull, so every outer radius carries the hull
+    // scale — the flat styles by transform, the mesh family through shieldR().
+    const OUTER = { toon: 28, neon: 26, model: 30, anim: 30, sprite: 30 };
+    for (const k in OUTER) OUTER[k] *= A_SHIP_SCALE;
     for (const style of ['toon', 'neon', 'model', 'anim', 'sprite']) {
       const R = OUTER[style];
       shieldOnly(style, 2, 2.0);        // 2.0s sits in the gap between sweeps

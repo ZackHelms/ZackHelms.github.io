@@ -108,14 +108,16 @@ across all 11 sectors — treat the constants in
 point that will likely need a further pass once someone's actually played
 it.
 
-**Regression gate:** `.claude/tests/drive-star-surge.cjs` (98 checks) pins
+**Regression gate:** `.claude/tests/drive-star-surge.cjs` (99 checks) pins
 every weapon's pip-vs-tier formula (fire rate is pip-invariant; discrete
 weapon counts, bomb turret/radius alternation, beam/flame band/lobe counts,
 chain jump count, EMP radius-only growth, and the missile min-turn-radius
 floor all match their formulas exactly) plus the enemy-hp/incoming-damage
 difficulty ramp and the graphics-style setting (3D animlight is the default, all
 five styles paint every hull, the pick persists, the cog opens/closes,
-under `anim` the scale-up is field-only and the light rigs really animate, and
+EVERY style flies the field hulls oversized while framed hulls and the boss
+stay 1:1 — measured field-vs-framed inside each style, since anim-vs-model no
+longer discriminates — under `anim` the light rigs really animate, and
 under `sprite` the hull cache actually fills, its keys carry the stage hue, and
 the title dogfight records its full flattened loop) — run it
 after touching any weapon or difficulty formula in this file's § Weapons or
@@ -251,9 +253,10 @@ the canvas dismisses the panel rather than steering blind under it.
   not attempt; a future style may try real texture/normal maps. The stored
   id stays `model` so persisted picks survive.) See § The 3D model kit
   below.
-- **`anim`** (**default** since 2026-08-25) — "3D ANIMLIGHT": the same meshes, flown **oversized** (player
-  3x, ordinary enemies 2x, bosses unchanged) in a **vivid** palette, each
-  hull running a rig of **animated lights**. See § The animlight kit below.
+- **`anim`** (**default** since 2026-08-25) — "3D ANIMLIGHT": the same meshes
+  in a **vivid** palette, each hull running a rig of **animated lights**. See
+  § The animlight kit below. (It also *introduced* the oversized hulls; those
+  went universal 2026-08-27 — see § Oversized hulls.)
 - **`sprite`** (2026-08-27) — "SPRITESHEETS": the `model` art **pre-rendered
   to sprite frames** at first use and blitted — the Clash Royale technique —
   with the title dogfight flattened into a recorded loop. See § The
@@ -263,15 +266,62 @@ the canvas dismisses the panel rather than steering blind under it.
 piece of non-hull scenery asks, so the station's lit-metal treatment, the
 planet limb, the hostile orb and the dogfight's mesh path are shared and a
 further mesh-family style would need no scenery edits at all (`sprite` needed
-none). Only the palette (`mFaceCol`), the hull scale, the light rigs and —
-for `sprite` — WHEN the mesh is painted branch between them.
+none). Only the palette (`mFaceCol`), the light rigs and — for `sprite` —
+WHEN the mesh is painted branch between them.
+
+### Oversized hulls (ALL styles, 2026-08-27)
+
+`A_SHIP_SCALE = 3`, `A_ENEMY_SCALE = 2`, bosses untouched. This shipped as an
+`anim`-only trait on 2026-08-25 and the CD made it universal on 2026-08-27
+("increase the size of my ship and other ships for all graphics modes so that
+they match the sizes used in animlight mode") — at true mesh scale the player
+is a 26 px sliver on a phone. `shipArtScale()`/`enemyArtScale()` are now
+constants rather than style tests.
+
+- **It is PAINT ONLY.** No hitbox moves, so a ship genuinely overhangs the box
+  it is hit on — and now *identically in all five styles*, which is the
+  skin-is-paint invariant held one notch tighter than before: a style switch
+  can no longer change how big the fight reads either.
+- **Field only.** `paintShip`/`paintEnemy` take a `portrait` flag; the pilot
+  bays, the station drydock and the baked title word all pass it, because a 3x
+  hull spills out of a bay and a 2x enemy closes the counters of the letters
+  the logo is spelled from.
+- **Three mechanisms, one factor**, because each style family carries scale
+  differently and there is no single line that protects them all:
+  - mesh family — passed as the mesh scale (`drawMeshTop(..., sc, ...)`), so
+    the thin panel-gap strokes stay hairlines;
+  - flat styles (`toon`/`neon`) — a `ctx.scale(sc, sc)` around the painter,
+    so an inked outline still reads as an outline at 3x. Their `glow()`
+    radius does NOT scale (`shadowBlur` ignores the CTM), which is why the
+    measured ratios come out 2.95 rather than 3.00;
+  - `sprite` — baked at the final size and keyed on `sc`. Upscaling a 52 px
+    bake by 3 at blit time would ship a blurry hull; bytes go as the SQUARE
+    of the scale, which is why `SPR_BUDGET` went 24 → 48 MB (the 3x player
+    sheet alone is 11.4 MB at dpr 3).
+- **Chrome that rings a hull** (shield bubbles, the bolas halo) asks
+  `shipArtScale()`/`enemyArtScale()` so it grows with the art instead of
+  vanishing inside it. `drawShield`'s flat branches take it on the transform
+  for the same reason their hulls do; the mesh branch has always folded it
+  into `shieldR()`.
+- **The title dogfight is deliberately untouched** — it has its own depth
+  projection and `DF_BK` scale, and under `sprite` a recorded track calibrated
+  to them. It is a different camera, not a scaled-down field.
+- Assert it as **field vs framed inside one style**, never anim-vs-model: that
+  old comparison now reads 1.00 and would pass with the scale-up deleted.
+- Perf after the change (frame-budget.cjs, 390x844 dpr3, 2026-08-27, a
+  16-enemy + boss + 60-bullet field): **16.7 ms median in all five styles**,
+  0/149 frames over in toon/model/anim/sprite and 4/149 in neon (its
+  pre-existing per-frame `shadowBlur` strokes). Tripling a hull triples the
+  fill area but not the draw-call count, and none of the styles was
+  fill-bound. Note the earlier per-style figures in the sections below were
+  taken on a differently posed scene and are not directly comparable.
 
 **Every hull is painted through the three dispatchers**
 `paintShip(cold, portrait)` / `paintEnemy(e, portrait)` / `paintBoss()` — the
 field, the pilot bays, the station drydock, the title word bake and the
 dogfight all go through them, so a style cannot drift between screens, and
 `portrait` is how a call site says "this is a framed hull, not a flying one"
-(see § The animlight kit). Adding a style means adding an id to
+(see § Oversized hulls). Adding a style means adding an id to
 `GFX_STYLES`, an `<option>`, and a branch in those three functions.
 Everything that is NOT a hull (bullets, ebullets, powerups, chrome,
 station scenery, effects) stays a `gfx === 'toon' ? A : B` binary on
@@ -390,15 +440,8 @@ more intricate and slow for my ship".
   player's steel fuselage came out near-white, which left the blue veins
   nothing to shine against — the exact thing the style exists for. One mesh
   table still serves both styles; only the resolver differs.
-- **The hulls fly oversized, and that is PAINT ONLY.** `A_SHIP_SCALE = 3`,
-  `A_ENEMY_SCALE = 2`; no hitbox moves, so the style still cannot change an
-  outcome and a ship under it genuinely overhangs the box it is hit on. The
-  scale is **field-only**: `paintShip`/`paintEnemy` take a `portrait` flag,
-  and the pilot bays, the station drydock and the baked title word all pass
-  it, because a 3x hull spills out of a bay and a 2x enemy closes the
-  counters of the letters the logo is spelled from. Chrome that rings a hull
-  (shield bubbles, the bolas halo) asks `shipArtScale()`/`enemyArtScale()`
-  so it grows with the art instead of vanishing inside it.
+- **The hulls fly oversized** — introduced here, now shared by every style.
+  See § Oversized hulls (all styles) below.
 - **The light rigs** are authored in the *same sprite-local space as the
   mesh* and flattened into `m.lp` at `attachLights` time, so the transform
   loops move a light with the identical code that moves a vertex — a light
