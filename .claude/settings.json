@@ -4,7 +4,7 @@
       "source": { "source": "github", "repo": "ZackHelms/zmhstudio" }
     }
   },
-  "enabledPlugins": { "zmh-producer@zmhstudio": true },
+  "enabledPlugins": { "zmh-producer@zmhstudio": true, "zmh-3d@zmhstudio": true },
   "hooks": {
     "SessionStart": [
       {
