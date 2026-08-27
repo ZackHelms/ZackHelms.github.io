@@ -93,14 +93,21 @@ body {
 }
 #overlay.hidden { display:none; }
 /* A centred flex column that also scrolls CLIPS its own overflow at the top:
-   with justify-content:center the first rows go above the scroll origin and
-   cannot be reached at all. The camp screens are lists that outgrow the
-   phone, so they pin to the top instead of centring. */
-#overlay.top {
-  justify-content:flex-start;
-  /* clear the ← / 🔊 / ⚙ chrome row, which outranks every overlay */
-  padding-top:calc(var(--sat) + 54px);
-}
+   with justify-content:center the first rows sit ABOVE the scroll origin and
+   cannot be reached at any scroll position. This is not a camp-screen problem
+   — it bit the TITLE screen in landscape, where the heading was 9-24px out of
+   reach on every phone tested — so the fix is structural rather than a class
+   somebody has to remember: flex-start plus auto margins on the end children.
+   Short content still centres (the autos absorb the slack); tall content pins
+   to the top with every row reachable, because auto margins collapse to zero
+   once there is no slack left. */
+#overlay { justify-content:flex-start; }
+#overlay > :first-child { margin-top:auto; }
+#overlay > :last-child { margin-bottom:auto; }
+/* Camp screens are lists to read down, so they always start at the top — and
+   clear the ← / 🔊 / ⚙ chrome row, which outranks every overlay. */
+#overlay.top { padding-top:calc(var(--sat) + 54px); }
+#overlay.top > :first-child { margin-top:0; }
 #overlay h1 {
   font-family:'Black Ops One', sans-serif; color:#ff9a3c;
   font-size:clamp(1.7rem, 8vw, 2.5rem); letter-spacing:4px;
@@ -210,7 +217,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-26 09:10 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-27 00:20 UTC</div>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
 <button id="cog" aria-label="Settings">&#9881;</button>

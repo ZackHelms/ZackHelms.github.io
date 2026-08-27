@@ -49,7 +49,12 @@
   commit `4d0f869`. The 2026-08-25 ember-depths pass ran alongside it, was
   scoped by the CD to Ember Depths only, and moved the pointer past all three;
   `4d0f869` is that session's own refine commit and is skippable, but those two
-  hub commits are not. Earlier entries, all since cleared:
+  hub commits are not. **Still outstanding after the 2026-08-27 ember-depths
+  pass**, which was scoped to Ember Depths again and whose range
+  (`a0c8504..fc27bf1`) sat entirely above them: that range held three
+  ember-depths feature commits plus `7ff3392` (its own earlier refine commit)
+  and `8b6ca0a` (the CD's PR merge of that work) — both skippable, neither
+  hiding anything. Earlier entries, all since cleared:
   turret-builder's `acb50c1` + `e9ea508` were an entry and the
   2026-08-23 turret-builder pass refined them (it also found and fixed a live
   cel-shading defect that had shipped in `acb50c1`, which is the argument for

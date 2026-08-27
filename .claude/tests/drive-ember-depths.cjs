@@ -698,14 +698,20 @@ const ok = (name, cond, extra) => {
       const d = bfsMap(tx, ty, (x, y) => grid[IDX(x, y)] === 0 && !(x === bx && y === by));
       return d[IDX(player.x, player.y)] >= 0;
     };
+    // Both candidates must come from the SAME generated floor. The first
+    // version kept regenerating until it had found each of them, so a detour
+    // found on floor 0 was asserted against floor 3's layout — coordinates
+    // that no longer meant anything. Flaky one run in five, and the flake
+    // looked like a pathing bug rather than a test bug.
     let detour = null, chokepoint = null;
-    for (let floor = 0; floor < 14 && (!detour || !chokepoint); floor++) {
+    for (let floor = 0; floor < 14 && !detour; floor++) {
       startRun();
       enemies = []; items = []; traps = [];
       seen.fill(1);
+      chokepoint = null;
       const near = bfsMap(player.x, player.y, (x, y) => grid[IDX(x, y)] === 0);
-      for (let ty = 1; ty < ROWS - 1 && (!detour || !chokepoint); ty++) {
-        for (let tx = 1; tx < COLS - 1; tx++) {
+      for (let ty = 1; ty < ROWS - 1 && !detour; ty++) {
+        for (let tx = 1; tx < COLS - 1 && !detour; tx++) {
           if (grid[IDX(tx, ty)] !== 0) continue;
           const dt = near[IDX(tx, ty)];
           if (dt < 2 || dt > 7) continue;
@@ -917,6 +923,52 @@ const ok = (name, cond, extra) => {
   ok('a delve opens on the chosen depth', started.picked === 9 && started.opened === 9, started);
   ok('and diving deep to die on arrival pays nothing',
      started.bonus === 0 && started.earned === 0, started);
+
+  // ---- no overlay may hide its own first row ----
+  // #overlay is a flex column that scrolls, and a CENTRED one puts the first
+  // rows above the scroll origin where no gesture can reach them. It is not a
+  // long-screen problem: this shipped with the TITLE heading 9-24px out of
+  // reach in landscape on every phone size, which is the first thing a player
+  // sees. Swept across portrait AND landscape because the two fail on
+  // different screens — camp overflows in portrait, the short ones only in
+  // landscape.
+  console.log('\n[overlay reach]');
+  const unreachable = [];
+  for (const [w, h] of [[390, 844], [375, 667], [320, 568], [844, 390], [740, 360]]) {
+    const probe = await context.newPage();
+    await probe.goto(URL);
+    await probe.waitForTimeout(300);
+    await probe.setViewportSize({ width: w, height: h });
+    await probe.waitForTimeout(150);
+    const rows = await probe.evaluate(() => {
+      localStorage.clear(); loadSlots();
+      const ov = document.getElementById('overlay');
+      const top = (label) => {
+        ov.scrollTop = -9999;                       // scroll as far up as it goes
+        const first = ov.firstElementChild;
+        if (!first) return { label, top: 0 };
+        return { label, top: Math.round(first.getBoundingClientRect().top - ov.getBoundingClientRect().top) };
+      };
+      const out = [];
+      showMenu(); out.push(top('title'));
+      showSlots(); out.push(top('slots'));
+      campAction('new', '0'); campAction('create', '0');
+      const c = chr();
+      c.gold = 900; c.sp = 9; c.stats.bestDepth = 14;
+      c.skills = { edge: 1, hide: 1, lantern: 1, prospect: 1, fortune: 1 };
+      campAction('tab', 'forge'); out.push(top('camp/forge'));
+      campAction('tab', 'skills'); out.push(top('camp/skills'));
+      campAction('tab', 'supply'); out.push(top('camp/supply'));
+      startRun(); relics = []; openChest(); out.push(top('relic x' + relicOffer.length));
+      startRun(); floorNum = 12; gold = 180; kills = 31; relics = ['blade', 'ward', 'skin'];
+      player.hp = 0; checkDeath(); showDeath(); out.push(top('death'));
+      return out;
+    });
+    for (const r of rows) if (r.top < 0) unreachable.push(w + 'x' + h + ' ' + r.label + ' ' + r.top);
+    await probe.close();
+  }
+  ok('every overlay screen can be scrolled to its own first row',
+     unreachable.length === 0, unreachable);
 
   ok('no page or console errors throughout', errs.length === 0, errs.join(' | '));
 

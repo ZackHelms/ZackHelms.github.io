@@ -52,6 +52,10 @@ realistic light-map rendering. Single self-contained file.
 
 ## The difficulty curve
 
+Method, and the traps in it, are in
+`.claude/notes/20260827-tuning-a-difficulty-curve-with-a-persona-eval.md` —
+read that before touching a constant.
+
 Every number the dungeon gets harder by lives in **one object, `CURVE`**, and
 is **tuned against `.claude/tests/eval-ember-depths.cjs`, not chosen**. Change a
 constant here and re-run the eval; do not guess, because the interactions
@@ -195,15 +199,33 @@ dropped the old listeners, so there is nothing stale to clean up.
 test surface: the drive suite buys, ranks and erases through it rather than
 through synthetic taps.
 
-**The overflow trap, worth knowing before you add a tab.** `#overlay` is a
-centred flex column that also scrolls, and `justify-content:center` on a
-scroll container **clips its own overflow at the top**: the first rows go above
-the scroll origin and cannot be reached at any scroll position. The skills tab
-is taller than a phone, so the camp screens add `#overlay.top`
-(`justify-content:flex-start`), which the centred screens (title, death, relic
-choice) explicitly remove. `.top` also carries the padding that clears the
-chrome row — the ← / 🔊 / ⚙ buttons are at z 45 and would otherwise sit on top
-of the character's name.
+**The overflow trap, and why the fix is structural.** `#overlay` is a flex
+column that also scrolls, and `justify-content:center` on a scroll container
+**clips its own overflow at the top**: the first rows sit above the scroll
+origin and cannot be reached at *any* scroll position.
+
+The first fix was a `.top` class the camp screens opted into. That was wrong,
+and the 2026-08-27 refine pass caught it: the trap is not a camp-screen
+problem, it is a **short-viewport** problem, and the screen it was actually
+biting was the **title screen in landscape** — `EMBER DEPTHS` sat 9–24 px out
+of reach on every phone size tested. A rule somebody has to remember to apply
+is not a fix. The shipping version needs no opt-in:
+
+```css
+#overlay { justify-content:flex-start; }
+#overlay > :first-child { margin-top:auto; }
+#overlay > :last-child  { margin-bottom:auto; }
+```
+
+Auto margins absorb the slack, so short content still centres exactly as
+before; once there is no slack they collapse to zero and tall content pins to
+the top with every row reachable. `.top` survives only for what is genuinely
+camp-specific — always start at the top (`margin-top:0` on the first child)
+and the padding that clears the chrome row, since ← / 🔊 / ⚙ are at z 45 and
+would otherwise sit on the character's name. `drive-ember-depths.cjs` sweeps
+every overlay screen across five viewports, **portrait and landscape**,
+because the two clip on different screens: the camp overflows in portrait, the
+short ones only in landscape.
 
 ## Rendering (the realistic-graphics stack)
 
@@ -399,6 +421,13 @@ intro banner and descend fade.
   state lives in memory as well as in localStorage, so asserting `slots[0].gold`
   after a purchase measures the copy that was never written. `page.reload()`
   between the write and the read is the only honest form.
+- **Both halves of a generated-board fixture must come from the SAME floor.**
+  The trap-path check searched for two candidate cells and regenerated the
+  floor until it had found each of them — so a detour found on floor 0 was
+  asserted against floor 3's layout, coordinates that no longer meant
+  anything. Flaky one run in five, and the flake read as a pathing bug rather
+  than a test bug. Search within one generated floor and reset the partial
+  finds at the top of each attempt.
 - **A trap-avoidance check must put the trap ON the route.** The first version
   picked any cell near the player, and "the path avoided it" was trivially true
   of a cell the path was never going to touch: it stayed green with
@@ -411,7 +440,7 @@ intro banner and descend fade.
   closed in one turn, which is 0 whenever the layout blocks it — flaky on a
   procedural floor. Counting SWINGS from an enemy already beside you is
   layout-independent and is what the rule actually says.
-- Drive: **`.claude/tests/drive-ember-depths.cjs` (109 checks)** — kept, and
+- Drive: **`.claude/tests/drive-ember-depths.cjs` (110 checks)** — kept, and
   picked up automatically by `gates.sh` for any change under
   `games/ember-depths/`. Covers the zoom range and clamps, zoom-1 layout
   identity, free look (tethered before a drag, never re-tethering after one,
@@ -436,7 +465,9 @@ intro banner and descend fade.
   `followCam`, a falling-through dismiss tap, skin/leech/ward reverted to
   non-stacking, `bankRun` keeping the supplies, the skill gate removed, the
   kit never folded into `player`, and `migrate` trusting the blob — each
-  fails exactly its own check. A third group covers the 2026-08-26 curve pass:
+  fails exactly its own check. A fourth is the overlay-reach sweep above
+  (restoring `justify-content:center` fails it on 11 screen/viewport pairs).
+  A third group covers the 2026-08-26 curve pass:
   the tree's wiring (every edge names a real node, exactly two roots, every
   node reachable), the prerequisite rule at full size (one full side reaches
   its own capstone but not SOVEREIGN; both sides cost exactly 16), respec,
