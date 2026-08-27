@@ -1159,7 +1159,15 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     enemies.length = 0; spawnQueue.length = 0; ebullets.length = 0; boss = null;
     // 1. armor regen must stop at the cap even at tier 5, which used to bank 5
     ship.shieldCharges = 0; ship.shieldRegenT = 0;
-    for (let i = 0; i < 60 * 90; i++) { ship.shieldRegenT = -1; update(1 / 60); }
+    // Ninety seconds of real sim is ninety seconds of waves arriving, and a
+    // hit SPENDS a charge — so clearing the hostiles once, before the loop,
+    // left this reading 1 instead of 2 on a minority of runs (seen 2026-08-27).
+    // Re-clear every tick: the regen path stays real, the only thing removed
+    // is the randomness that could take a charge back off it.
+    for (let i = 0; i < 60 * 90; i++) {
+      enemies.length = 0; spawnQueue.length = 0; ebullets.length = 0;
+      ship.shieldRegenT = -1; update(1 / 60);
+    }
     const fromRegen = ship.shieldCharges;
     // 2. the S pickup must not push past it either
     ship.shieldCharges = 0;
@@ -1205,10 +1213,30 @@ const allEqual = arr => arr.every(v => v === arr[0]);
       powerups.length = 0; powerups.push(P);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0); draw();
     };
+    // The crate's SIZE is read off a canvas holding nothing else — painted
+    // alone over the real backdrop, same reasoning as the shield profiles
+    // below. In the live scene the starfield sits inside any box wide enough
+    // to hold a 1.5x crate, and it would pad the span in every style equally.
+    const puSpan = () => {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#06060e'; ctx.fillRect(0, 0, W, H);
+      drawPowerup(P);
+      const s = 60, px = Math.round(s * 2 * dpr);
+      const d = ctx.getImageData(Math.round((P.x - s) * dpr), Math.round((P.y - s) * dpr), px, px).data;
+      let lo = 1e9, hi = -1e9, n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i] + d[i + 1] + d[i + 2] < 90) continue;
+        const x = (i / 4) % px;
+        if (x < lo) lo = x; if (x > hi) hi = x; n++;
+      }
+      return n ? (hi - lo + 1) / dpr : 0;
+    };
     for (const style of ['toon', 'neon', 'model', 'anim', 'sprite']) {
       gfx = style;
       shot(0.2);
       out[style] = { pu: box(P.x - 18, P.y - 18, 36, 36) };
+      animT = 0.2; out[style].puW = puSpan();
       shot(0.55);            // ~0.35s later: a tumbling crate has turned
       out[style].puMoved = box(P.x - 18, P.y - 18, 36, 36).hsh;
     }
@@ -1262,6 +1290,23 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     gfx = 'toon'; ship.shieldCharges = 0; animT = 0;
     return { out, keys };
   });
+  const puReach = await page.evaluate(() => {
+    saves[0] = newCharacter('PUR'); activeSlot = 0; save = saves[0];
+    startGame(1);
+    enemies.length = 0; spawnQueue.length = 0; ebullets.length = 0; bullets.length = 0;
+    boss = null; particles.length = 0; floats.length = 0;
+    ship.x = 195; ship.y = 500; ship.invuln = 0;
+    const at = d => {
+      powerups.length = 0;
+      powerups.push({ x: 195, y: 500 - d, vy: 0, kind: 'S' });
+      ship.shieldCharges = 0;
+      update(1 / 60);
+      const got = powerups.length === 0;
+      powerups.length = 0;
+      return got;
+    };
+    return { near: at(25), far: at(30), reach: ship.r + 14 };
+  });
   const shieldKeys = skinFxRaw.keys, skinFx = skinFxRaw.out;
   const STYLES5 = ['toon', 'neon', 'model', 'anim', 'sprite'];
   // Distinctness alone is too weak here, and proved it: with the mesh branch
@@ -1277,6 +1322,18 @@ const allEqual = arr => arr.every(v => v === arr[0]);
         skinFx.toon.pu.hsh === skinFx.toon.puMoved &&
         skinFx.neon.pu.hsh === skinFx.neon.puMoved,
         { lit: STYLES5.map(k => skinFx[k].pu.lit), moved: STYLES5.map(k => skinFx[k].pu.hsh !== skinFx[k].puMoved) });
+  // The crates grew 1.5x alongside the hulls (2026-08-27), in every style.
+  // There is no framed context to measure a pickup against the way there is
+  // for a hull, so this pins the ABSOLUTE span — measured 2026-08-27 at 36
+  // (toon), 37 (neon) and 40 (mesh family), against roughly 24-27 at 1:1, so
+  // the floor at 30 cannot be cleared by an unscaled crate. The second
+  // half is the paint-only half — the art overhangs the reach, and the reach
+  // is where it always was (centres within ship.r + 14), so a crate whose
+  // picture is already touching the ship is still not collected.
+  check('the dropped crates grew too: 1.5x art in every style, over an unchanged pickup reach',
+        STYLES5.every(k => skinFx[k].puW > 30 && skinFx[k].puW < 46) &&
+        puReach.reach === 27 && puReach.near && !puReach.far,
+        { span: STYLES5.map(k => [k, Math.round(skinFx[k].puW)]), reach: puReach });
   check('every style actually paints a shield, and none paints one with no charges',
         STYLES5.every(k => skinFx[k].sh.rim - skinFx[k].sh.none > 25 && skinFx[k].sh.none < 40),
         STYLES5.map(k => [k, Math.round(skinFx[k].sh.rim), Math.round(skinFx[k].sh.none)]));

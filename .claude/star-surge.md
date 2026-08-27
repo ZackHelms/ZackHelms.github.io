@@ -108,15 +108,15 @@ across all 11 sectors — treat the constants in
 point that will likely need a further pass once someone's actually played
 it.
 
-**Regression gate:** `.claude/tests/drive-star-surge.cjs` (99 checks) pins
+**Regression gate:** `.claude/tests/drive-star-surge.cjs` (100 checks) pins
 every weapon's pip-vs-tier formula (fire rate is pip-invariant; discrete
 weapon counts, bomb turret/radius alternation, beam/flame band/lobe counts,
 chain jump count, EMP radius-only growth, and the missile min-turn-radius
 floor all match their formulas exactly) plus the enemy-hp/incoming-damage
 difficulty ramp and the graphics-style setting (3D animlight is the default, all
 five styles paint every hull, the pick persists, the cog opens/closes,
-EVERY style flies the field hulls oversized while framed hulls and the boss
-stay 1:1 — measured field-vs-framed inside each style, since anim-vs-model no
+EVERY style flies the field hulls oversized (and the dropped crates at 1.5x
+over an unchanged pickup reach) while framed hulls and the boss stay 1:1 — measured field-vs-framed inside each style, since anim-vs-model no
 longer discriminates — under `anim` the light rigs really animate, and
 under `sprite` the hull cache actually fills, its keys carry the stage hue, and
 the title dogfight records its full flattened loop) — run it
@@ -308,6 +308,14 @@ constants rather than style tests.
   to them. It is a different camera, not a scaled-down field.
 - Assert it as **field vs framed inside one style**, never anim-vs-model: that
   old comparison now reads 1.00 and would pass with the scale-up deleted.
+- **The dropped crates grew too** — `A_POWERUP_SCALE = 1.5`, same day, same
+  rule, and deliberately *smaller* than the hulls: a crate at ship size sells
+  itself as a threat. Every style scales (mesh via `drawMeshTop`, toon via a
+  `ctx.scale`, neon by arithmetic on its world-space rect), the letter is 16px
+  in all of them, and the toon letter offset scales with its crate. Collection
+  still tests centres within `ship.r + 14`, so the art overhangs the reach —
+  pinned by a check that measures the painted span in every style AND drives a
+  real pickup at 25 px (collected) and 30 px (not).
 - Perf after the change (frame-budget.cjs, 390x844 dpr3, 2026-08-27, a
   16-enemy + boss + 60-bullet field): **16.7 ms median in all five styles**,
   0/149 frames over in toon/model/anim/sprite and 4/149 in neon (its

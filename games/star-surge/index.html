@@ -119,7 +119,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-27 22:37 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-27 22:54 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
@@ -2268,23 +2268,25 @@ function drawShield(hs) {
    branch was dead, which was enough to slip a negative control through. */
 function drawPowerup(p) {
   const col = p.kind === 'P' ? '#39ff14' : p.kind === 'S' ? '#4488ff' : '#ffc300';
-  let letter = col, lx = 0, ly = 1, fsz = 13, halo = false;
+  const ps = A_POWERUP_SCALE;
+  let letter = col, lx = 0, ly = 1, fsz = 16, halo = false;
   if (meshGfx()) {
     const prev = hueOverride;
     hueOverride = POWERUP_HUE[p.kind] || 111;
     ctx.save(); ctx.translate(p.x, p.y);
     // a steady tilt plus an in-plane spin reads as a crate tumbling end over
-    // end; the pickup radius is unchanged, so the art stays close to its old
-    // 22px footprint rather than following the hulls' scale-up
-    drawMeshTop(MESH_POWERUP, gfx === 'anim' ? 1.5 : 1, 0.52, animT * 1.1, 41);
+    // end. Like the hulls, the crate now outgrows its own pickup reach (the
+    // test is still centres within ship.r + 14) -- paint only, so the art
+    // overhangs what you can actually collect and nothing about the rule moved.
+    drawMeshTop(MESH_POWERUP, ps, 0.52, animT * 1.1, 41);
     ctx.restore();
     hueOverride = prev;
     letter = gfx === 'anim' ? '#ffffff' : '#f2f6ff';
-    fsz = gfx === 'anim' ? 16 : 13; halo = true;
+    halo = true;
   } else if (gfx === 'toon') {
     // a cel crate: three flat faces off one tone, each inked -- the toon
     // idiom's answer to the mesh family's lit box
-    ctx.save(); ctx.translate(p.x, p.y);
+    ctx.save(); ctx.translate(p.x, p.y); ctx.scale(ps, ps);
     const face = (pts, tint) => {
       poly(pts); ctx.fillStyle = col; ctx.fill();
       if (tint) { ctx.fillStyle = tint; ctx.fill(); }
@@ -2294,11 +2296,11 @@ function drawPowerup(p) {
     face([-13,-4, -7,-11, 13,-11, 7,-4], 'rgba(255,255,255,0.36)');  // lit lid
     face([-13,-4, 7,-4, 7,11, -13,11], null);                        // face
     ctx.restore();
-    letter = INK; lx = -3; ly = 4;
+    letter = INK; lx = -3 * ps; ly = 4 * ps;
   } else {
     ctx.strokeStyle = col; ctx.lineWidth = 2;
     glow(col, 10);
-    ctx.strokeRect(p.x - 11, p.y - 11, 22, 22);
+    ctx.strokeRect(p.x - 11 * ps, p.y - 11 * ps, 22 * ps, 22 * ps);
     noGlow();
   }
   ctx.font = fsz + "px 'Black Ops One'";
@@ -3092,6 +3094,14 @@ function drawBossSprite() {
    the counters of the letters the title word is spelled from. `portrait` is
    how a call site says "this is a framed hull, not a flying one". */
 const A_SHIP_SCALE = 3, A_ENEMY_SCALE = 2;
+// The dropped pickups grew with them (CD, 2026-08-27): 1.5x, again in every
+// style, again from an animlight-only start. Smaller than the hulls on
+// purpose -- a crate that read at ship size would sell itself as a threat.
+// Same paint-only rule: collection still tests centres within ship.r + 14, so
+// the art overhangs the reach exactly as the hulls overhang their hitboxes.
+// Declared here rather than in drawPowerup because it belongs to the same CD
+// decision as the two above.
+const A_POWERUP_SCALE = 1.5;
 // Chrome that has to fit the hull it rings (shield bubbles, the bolas halo)
 // asks for the same factor, so it grows with the art instead of vanishing
 // inside it. Nothing else in the file needs to know the hulls fly big.

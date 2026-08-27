@@ -375,7 +375,8 @@ behind the ⚙: 3D ANIMLIGHT (**the default** — meshes in a vivid
 palette, every hull running a rig of animated lights), 3D MODELS (the same
 meshes, worn metal, no lights), SPRITESHEETS (that art pre-rendered to sprite
 frames), cel/toon, and neon. **Every** style flies the field hulls oversized —
-player 3x, ordinary enemies 2x, bosses and framed hulls untouched. The shield and the
+player 3x, ordinary enemies 2x, dropped crates 1.5x, bosses and framed hulls
+untouched, and no hitbox or pickup reach moved with any of it. The shield and the
 powerups are skinned per style too, with neon as the baseline the other three
 depart from; shields cap at 2 charges. **There is no menu screen**:
 picking a pilot opens its station, and UPGRADES / COMBAT / REST all leave from
