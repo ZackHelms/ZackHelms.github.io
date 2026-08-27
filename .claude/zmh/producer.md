@@ -39,6 +39,55 @@
   commit in the range is the other session's pass and is skippable. (Hit
   2026-08-22: the star-surge pass set the pointer to `ca7891a`, so the
   neon-clash session's own `9410b86`/`312f002` sat below it, unrefined.)
+- **Say what you left behind.** Because moving the pointer hides everything
+  below it, a pass that deliberately refines only its own commits should name
+  the other session's SHAs in its report *and* leave them listed here, so the
+  work is recoverable rather than silently skipped. Currently outstanding:
+  **`dd6e9c1` + `60ae87c`** — the two Games-hub commits (Star Surge first and
+  every card description trimmed to 24 words; Ember Depths second in the grid)
+  that the concurrent hub/star-surge session pushed *after* its own refine
+  commit `4d0f869`. The 2026-08-25 ember-depths pass ran alongside it, was
+  scoped by the CD to Ember Depths only, and moved the pointer past all three;
+  `4d0f869` is that session's own refine commit and is skippable, but those two
+  hub commits are not. **Still outstanding after the 2026-08-27 ember-depths
+  pass**, which was scoped to Ember Depths again and whose range
+  (`a0c8504..fc27bf1`) sat entirely above them: that range held three
+  ember-depths feature commits plus `7ff3392` (its own earlier refine commit)
+  and `8b6ca0a` (the CD's PR merge of that work) — both skippable, neither
+  hiding anything. **Still outstanding after the second 2026-08-27
+  ember-depths pass** (the economy/persona one, pointer `8dd459f`, refine
+  commit `5f6063b`), which left nothing NEW behind and is worth reading as the
+  benign case: a concurrent star-surge session pushed `14fb540` + its merge
+  `f66af0b`, and the CD pushed `1d67ef4` (a settings chore), but all three
+  landed on `main` *after* the pointer was written and were merged in
+  afterwards — so they are still inside `git log 8dd459f..HEAD` rather than
+  buried under it. **The pointer only hides what was already an ancestor when
+  it was written**, which is checkable in one line and worth checking rather
+  than assuming: `git merge-base --is-ancestor <their-sha>
+  $(cat .claude/last-refine-sha)`. That pass also hit the shared-file merge
+  CLAUDE.md § Git workflow warns about — both sessions edited adjacent rows of
+  `.claude/tests/README.md`'s suite table, resolved by taking their
+  star-surge row (98 checks) and this session's ember-depths rows, then
+  verifying their five files were byte-identical to `origin/main` with
+  `git diff --stat origin/main -- <paths>` before reporting done. Earlier entries, all since cleared:
+  turret-builder's `acb50c1` + `e9ea508` were an entry and the
+  2026-08-23 turret-builder pass refined them (it also found and fixed a live
+  cel-shading defect that had shipped in `acb50c1`, which is the argument for
+  keeping this list rather than letting a skipped range disappear). The second
+  2026-08-23 turret-builder pass (`6827c5f`, five graphics styles) ran alone in
+  the range too — every commit between the pointer and HEAD was that session's
+  own, including its own earlier refine commit, so nothing was left behind.
+  The 2026-08-23 star-surge station pass (`992a7bd`, `430b647`) likewise left
+  nothing behind: the only other commit in its range was `1e8a778`, the
+  turret-builder session's own refine commit, already accounted for above.
+  The 2026-08-24 star-surge title-screen pass (`21301b6`) ran alone: the only
+  other commit between the pointer and HEAD was `cf8ac9d`, its own session's
+  earlier refine commit. The 2026-08-25 star-surge 3D-models pass (`2e89f88`,
+  `1193863`, `088011f`) ran alone too — the only other commits in range were
+  `ba0a205`/`2fe476c`, the same session's earlier refine pass. The 2026-08-25
+  star-surge animlight pass (`d38bf1d`, `f2c3cb1`) likewise ran alone: the only
+  other commit between the pointer and HEAD was `f367a52`, that same session's
+  3D-models refine commit.
 
 ## Validation
 - Procedure: headless mobile smoke-load of every changed page (the games
@@ -68,8 +117,21 @@
   Verification is mandatory: confirm the "pages build and deployment"
   workflow run for the pushed SHA concludes `success` (remote sessions:
   `mcp__github__actions_list`), because `git push` ≠ live — a failed or
-  stuck Pages build silently keeps serving the last-good deploy. Then spot
-  the badge timestamp on the live page when possible.
+  stuck Pages build silently keeps serving the last-good deploy. Read that
+  run's **jobs**, not the run object — and read the stuck job's **log**
+  before concluding anything: on 2026-08-23 the run reported `in_progress`
+  after all three jobs had concluded `success`, and an hour later the
+  deploy *job* reported `in_progress` for nine minutes after its log said
+  `Reported success!`. A hung-looking deploy is usually a stale status, not
+  a wedge. Spotting the badge on the live page is **not** available from a
+  remote session — the agent proxy 403s **both** hostnames on CONNECT
+  (`tythos.com`, the site's custom domain per the repo-root `CNAME`, and
+  `zackhelms.github.io`; re-verified 2026-08-23) — so the workflow conclusion
+  is the whole verification.
+  Parse the oversized run listing with
+  `node .claude/scripts/pages-status.cjs <saved-result> <sha>`, which prints a
+  `PAGES=` verdict and exits non-zero unless it is `success`. Full procedure:
+  `.claude/notes/20260817-pages-deploy-wedged-after-503.md`.
 - Authorization: pushing to `main` is standing authorization (CLAUDE.md §
   Git workflow); no separate publish sign-off needed.
 

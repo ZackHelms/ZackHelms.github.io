@@ -80,3 +80,43 @@ In all four the repo's `settings.json` stayed byte-identical.
   §Backlog/§Plans, which had still claimed `TODO.md`, `DONE.md` and
   `.claude/templates/plan.md` did not exist. All three do, and `TODO.md` is
   currently scoped to Phasic only.
+
+## 2026-08-27 — an installed plugin is PINNED to a marketplace SHA
+
+Reported as "the sprite-prerender skill isn't in zmhstudio remote main". It
+was: `git ls-tree origin/main plugins/zmh-3d/skills/` on the sibling clone
+lists `sprite-prerender`, in commit `0f26807`, pushed 21:32 UTC. Nothing was
+wrong with the push at all.
+
+What was actually wrong is the **cache layout**:
+
+```
+~/.claude/plugins/cache/zmhstudio/zmh-3d/0f26807400c6/skills/sprite-prerender/
+                                         ^^^^^^^^^^^^ the marketplace commit
+```
+
+A plugin is unpacked under the marketplace commit it was installed from, and
+`claude plugin install` — which is what `session-start.sh` runs for every
+enabled plugin — **exits fast when the plugin is already present**. Nothing in
+the bootstrap path ever re-resolves an installed plugin against a newer
+upstream. So a container that installed `zmh-3d` before 21:32 keeps the older
+tree for its entire life, `/load-plugins` included, and anything added
+upstream afterwards is invisible in it. This session's own container installed
+at 21:33 — one minute after the push — which is the only reason the skill
+showed up here and made the report look like a push failure.
+
+Recovery, in the stale container:
+
+```bash
+claude plugin marketplace update zmhstudio
+claude plugin update zmh-3d@zmhstudio     # restart required to apply
+```
+
+Both the diagnosis and those two commands are now step 5 of the canonical
+`load-plugins` template in zmhstudio, re-copied into this repo's
+`.claude/commands/load-plugins.md` (never hand-edit that copy — see CLAUDE.md).
+
+**The rule this leaves behind:** before reporting anything missing from a
+remote, check the remote, not the local install — `git ls-tree origin/main
+<path>`. A pinned cache and a failed push look identical from inside a
+session, and only one of them is a real problem.

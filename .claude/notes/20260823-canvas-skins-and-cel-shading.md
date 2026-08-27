@@ -147,6 +147,22 @@ through solid timber.
 - **A projectile that scales toward the camera will cover its own landing
   zone.** Let the *rise* carry the "coming at you" read (lift 23 world units)
   and keep the growth modest (1.0×), not the other way round.
+- **A perfect circle reads as a stamp.** Three times now in one game's terrain,
+  and the third is the instructive one: turret-builder's ground had dirt blobs
+  fixed into three overlapping lobes for exactly this reason, and when the dirt
+  was later deleted altogether the *grass tone* patches — which had quietly
+  inherited the disc shape all along — became the most visible thing on the
+  board. **Removing the loud element promotes whatever was hiding behind it**,
+  so re-look at what is left rather than assuming the fix carried over.
+- **An art rhythm that competes with the game's grid actively teaches the wrong
+  rule.** Turret-builder paved its road with joints struck every 0.72 cell
+  measured *along the path*: handsome, and it told the player nothing about
+  where a wall — which occupies one whole cell — could go. If the rules are
+  per-cell, every repeating mark on the board must be per-cell, and any second
+  rhythm spaced by distance (centre-line dashes, wear marks) should go. On a
+  skinned board this is a *shared* fix, not a per-skin one: it belongs in the
+  geometry every skin draws through, or three skins will disagree about where
+  the grid is.
 
 ## Traps
 
@@ -164,4 +180,193 @@ through solid timber.
   `change` event and leave `bindTap` off it.
 - Screenshot review found three of the four legibility bugs above. None would
   have failed a test. Budget a round of `shot-page.cjs eval=…` per visual
-  feature, not per session.
+  feature, not per session. (One class of them *can* now fail a test — see the
+  fixed-sun assertion below.)
+
+## Validated by a second adopter (star-surge, same day)
+
+Star Surge added its own `toon` skin from scratch **without** this note (the
+sessions were concurrent), then rebased onto it. Comparing the independent
+implementation against the recipe is a useful signal about which parts are
+obvious and which are not: the silhouette work, the flat-step-plus-ink
+shading, the `<select>`/`bindTap` trap and "a skin is paint" were all arrived
+at independently. **The two mechanisms that were missed are exactly the two
+this note ranks highest**, and both were live defects:
+
+1. **No `glow()` indirection** — the skin branched at each draw entry point
+   instead, so chain lightning, EMP rings and the stage banner kept their
+   bloom under the cel skin. Precisely the "thirty chances to leak a halo"
+   failure, at ~15 call sites.
+2. **No `frameRot()`** — the spinner enemy draws inside `ctx.rotate(e.ang)`,
+   so its whole sprite dragged its shading round as it spun.
+
+If you are reviewing a skin someone re-derived, check those two first.
+
+### The fixed sun IS assertable — don't leave it to a screenshot
+
+`frameRot()`'s effect looks like a subjective "reads as lit, not flat", but it
+measures cleanly. Draw a rotating sprite at several rotation angles, walk a
+ring of pixels inside its body, and record the **bearing of the brightest
+sample**. With the counter-rotation the bearing does not move; without it, it
+tracks the sprite:
+
+```js
+// spread across e.ang of [0, 0.8, 1.6, 2.4, 3.9]
+// with frameRot():     [75, 75, 75, 75, 75]  -> 0 deg
+// with frameRot()->0:  [75,125,170,  0,  0]  -> ~170 deg
+check('sun stays fixed in screen space while a sprite spins',
+      Math.max(...bearings) - Math.min(...bearings) <= 10);
+```
+
+Sample a ring *inside a solid part* (star-surge uses the spinner's central
+dome at r*0.45), not at the sprite's bounding radius — a diagonal sample
+between two blades reads background and the measurement goes to zero for
+every angle, which looks like a pass. Reference:
+`.claude/tests/drive-star-surge.cjs`.
+
+### Derive the part centre rather than passing it
+
+The `cel(..., cx, cy)` signature above wants each part lit about its own
+centre. Rather than hand-thread a centre through every call site (which is a
+chance to forget, and forgetting is silent), have the polygon helper compute
+the centroid of its own points:
+
+```js
+function celPoly(pts, base, lit, lw) {
+  let cx = 0, cy = 0;
+  for (let i = 0; i < pts.length; i += 2) { cx += pts[i]; cy += pts[i + 1]; }
+  const n = pts.length / 2;
+  poly(pts); cel(base, lit, lw, cx / n, cy / n);
+}
+```
+
+Circle/ellipse helpers translate to their centre first, so theirs is free.
+Star Surge's first pass shaded every part about the sprite origin and each
+wing came out uniformly lit or uniformly dark — the exact failure this note
+predicts, visible in a screenshot the moment the two are compared.
+
+## A third adopter (turret-builder, same day) — and what it says about the ranking
+
+Turret Builder added its own `toon` skin from scratch the same day, also
+without this note (three concurrent sessions). Its independent re-derivation
+narrows the earlier reading:
+
+- **Mechanism 1 (`glow()` indirection) did not apply.** Turret Builder's neon
+  look never used canvas bloom at all — zero `shadowBlur` in the file; its
+  "neon" is bright strokes and alpha over a dark board. So the lesson is
+  sharper than "always add a `glow()` indirection": *if the neon style leans on
+  `ctx.shadowBlur`, funnel it through one helper before adding a second skin.*
+  If it doesn't, there is nothing to funnel.
+- **Mechanism 2 (`frameRot()`) was missed again, and again it was a live
+  defect.** `celShape()` painted its rim-light wedge in the current transform,
+  and a turret's hull and barrel are drawn inside `ctx.rotate(aim)` because a
+  turret turns to face what it is shooting. Measured bearing of the brightest
+  sample across five aim angles: `[0, 0, 0, 5, 90]` — 90 deg of drift. With the
+  counter-rotation: `[140, 140, 140, 140, 140]`, spread 0.
+
+**Two for two.** Every re-derivation so far has produced the fixed-sun bug, and
+neither author noticed it by eye — both times it took the measurement. Treat
+`frameRot()` as the single thing to check first on any cel skin in this repo,
+and add the assertion at the same time as the skin, not after someone reads
+this note.
+
+Two implementation details specific to a wedge (rather than star-surge's
+half-plane fill):
+
+- The snug triangle `(-s,-s) (s,-s) (-s,s)` that covers a shape at rotation 0
+  does **not** cover it once counter-rotated. Scale the same triangle up
+  (turret-builder uses `s * 6`) so the hypotenuse is the same line and the
+  visual is unchanged at rotation 0, but the fill still reaches the clip at
+  any angle.
+- `ctx.rotate(-frameRot())` turns about the *current local origin*, which is
+  fine where every part's path is drawn about that origin (turret-builder's
+  pad, hull and barrel all are). Where parts are offset, derive the centroid —
+  see "Derive the part centre rather than passing it" above.
+
+## Scaling past two styles (turret-builder, four cel skins, 2026-08-23)
+
+The CD then asked for three more skins — MECH, STEAMPUNK, STONE AGE — on top
+of TOON, all sharing the cel recipe. Going from a boolean to a family is where
+the shape of the thing has to change, and three decisions carried it.
+
+**1. `cel()` is the family test, not `toon()`.** The old predicate was
+`GFX === 'toon'`; it becomes `GFX !== 'neon'`, and every cel style then goes
+down the same path and reads its skin from there. Renaming it was worth the
+mechanical churn: `if (toon())` guarding STONE AGE's caveman would have been
+a lie in the source that a later reader would eventually act on.
+
+**2. The skin is a TABLE, and the wrapper keeps the parts a skin must not
+touch.** `SKINS[id] = {pal, turret?, creep?, module?, booster?, wall?, shot?}`,
+with one base palette (`PAL_TOON`) that the others override key-by-key so a
+new palette key reaches every style at once, and a live `SK`/palette pair
+**reassigned on switch** rather than looked up per call — `celShape()` alone
+runs a few hundred times a frame. Each part's public entry point stayed put
+and became a wrapper: it lays the contact shadow, translates to the tile
+centre, calls `SK.part || partBodyToon`, and then draws anything that is a
+**rules readout** — the wall HP bar, the elite ring. A skin that could restyle
+those would be a skin changing what the board *says*, which is a different
+thing from changing how it looks.
+
+**3. Two things are never a skin's to change.** The **type colour** (a module
+is drawn in `M.col`, a creep in `c.def.col`, in every style) because that
+colour is how the board answers "what is that"; and the **type silhouette** —
+creeps keep the shared `creepPath()` and skins hang furniture *around* it.
+The furniture rotates to the creep's heading, the identity polygon does not.
+That is what lets STONE AGE draw a horned beast and still let you pick the
+HULK out of a wave at a glance.
+
+The one place paint reaches into the sim is deliberately one-way and
+one-field: `dominantModCol(t)` rides along on the shot as `mcol` so STONE AGE
+can paint the hurled rock in the colour of the cauldron it was dipped in.
+Combat never reads it.
+
+### "A skin is paint" is assertable — stop writing it as a claim
+
+Three games in this repo now state the invariant in their docs and, until
+turret-builder's four-skin pass, none of them asserted it. In a game with no
+gameplay randomness the strong form is cheap: run **one deterministic scenario
+per style, drawing real frames between the ticks**, and require every gameplay
+number to come out byte-identical.
+
+Drawing between the ticks is the whole point. A check that only stepped the
+simulation could not see a draw function that writes to an entity, caches onto
+a tile, or moves the board geometry — which is precisely what a large skin
+system invites, because each skin author is writing per-entity code in a place
+that used to be read-only. Turret-builder's version compares creep distance,
+HP and chill, turret aim to six places, wall HP, cash, lives and link count
+across five styles; `c.d += 0.001` inside one skin's creep painter fails it and
+names the drifted style.
+
+Two traps it hit on the way, both general (fuller write-up in
+`.claude/notes/20260724-headless-mobile-game-testing.md`): keep **identity
+counters** out of the snapshot — a page-lifetime entity id differs between
+styles for bookkeeping reasons alone — and pair the equality with a
+**liveness** assertion, because five snapshots of an empty board are also
+identical.
+
+### Testing four skins found two ways the obvious test lies
+
+- **A distinctness test needs a DISTANCE, not an inequality.** "All four skins
+  fingerprint differently" passed with one skin's `turret:` override
+  deliberately deleted — the palette still went through, so the same shape in
+  a different colour hashed differently. Fingerprinting the **silhouette**
+  instead, it then passed on a *single* antialiased sample. What works is a
+  minimum pairwise Hamming distance: the closest honest pair was 7.9%, a
+  fallen-through skin 0.1%, bar set at 3%.
+- **The fixed-sun sprite measurement only bites where the skin swings a large
+  lit body.** TOON and MECH rotate whole hulls; STEAMPUNK swings a thin cannon
+  past a fixed boiler and STONE AGE a thin arm past a fixed man, so a ring
+  through *their* cores samples geometry that never rotates and passes
+  whatever `frameRot()` returns — measured, not assumed: with `frameRot()`
+  stubbed to 0 those two skins' spreads stayed at 0. The fix is to test the
+  **mechanism** rather than the sprite: a hook that paints one **disc**
+  through `celShape()` inside a rotated frame. A disc is rotation-invariant,
+  so its bright bearing can only move if the light moves — spread 0 with the
+  counter-rotation, ~200 deg without. Keep the sprite check too (it proves the
+  real turret routes through the helper); add the probe so the other skins are
+  not silently unasserted.
+- **Any pixel measurement of the BOARD has to clear the chrome first.** Three
+  new checks — grass, paving joints, arrows — all failed on their first run,
+  and none of them failed for the reason they were testing: they were reading
+  a `LEVEL 1 · SUBSTATION` toast painted over the board. A `clearToasts()`
+  hook is the cheapest fix and it belongs next to `forceDraw()`.

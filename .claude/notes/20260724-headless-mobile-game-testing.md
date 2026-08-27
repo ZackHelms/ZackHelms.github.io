@@ -375,6 +375,40 @@ Include the neighbours the new control could squeeze, not just the control
 eyeballing a screenshot, because it keeps holding on the next viewport and the
 next control added to that row.
 
+## Rendering an art sheet to judge sprite work (2026-08-23, Star Surge)
+
+To review sprite art you need it drawn **big and side by side**, not at 24 px
+scattered through a live scene. The obvious approach — `page.evaluate` a few
+scaled `drawX()` calls onto the canvas, then screenshot — does not survive,
+and the reason is worth knowing:
+
+- **Your drawing loses to the next animation frame.** The game's rAF loop
+  clears and repaints over your sheet before the screenshot lands.
+- **Overriding `requestAnimationFrame` is not enough.** A frame was already
+  scheduled when you overrode it, so one more `loop()` still runs.
+- **What works: replace the game's own `draw`/`update`.** In a non-module
+  inline `<script>`, a top-level `function draw() {}` *is* a property of
+  `window`, so it can be reassigned from `page.evaluate`. Assign your sheet
+  renderer to `window.draw` and a no-op to `window.update`, and every
+  subsequent frame paints the sheet for you — no fighting the loop.
+
+```js
+await page.evaluate(() => {
+  window.update = () => {};
+  window.draw = () => { /* clear, then draw each sprite at scale with a label */ };
+});
+```
+
+**The trap that follows immediately:** `let`/`const` top-level bindings are
+**not** window properties, so the same trick silently fails for state. Star
+Surge's `boss` is `let boss = null`, so `window.boss = {r: 26, ...}` created an
+unrelated property, the real `boss` stayed null, and the boss panels of the
+sheet came out blank — with no error visible in the screenshot. If a value you
+poke this way appears to have no effect, check how it was declared before
+assuming your draw code is wrong: `function` yes, `var` yes, `let`/`const` no.
+(For `let` state, mutate through a function the game exposes, or set fields on
+the existing object rather than replacing the binding.)
+
 ## Solver-validated generation (2026-07-31, Phasic)
 
 For endless/procedural content, validate at GENERATION time: constructive
@@ -384,3 +418,105 @@ seeds → store the winning verb script. The suite then replays every
 generated level's script as its fairness gate, and an auto-solve/skip
 button falls out of the same machinery. Full trace:
 `20260731-phasic-softbody-solver-validated-generation.md`.
+
+
+## Two more test-design traps (2026-08-23, Turret Builder)
+
+### A truncated run exits 0 and looks exactly like a pass
+
+The balance eval was launched as `node eval.cjs > eval.log 2>&1 &` from
+*inside* an already-backgrounded shell. The outer shell returned immediately —
+reported "completed (exit code 0)" — and took the inner job with it. The log
+held 2 of 19 personas, no `--- design claims ---` section, and no summary line.
+`tail -35` of it showed two tidy persona blocks and read like a healthy run.
+
+Two defences, and the second is the one that generalises:
+
+1. **Never background twice.** Use the harness's background flag on the command
+   itself; an extra `&` inside it is what orphans the job.
+2. **Only the suite's own final line means the suite finished.** Every drive and
+   eval in this repo ends with `<NAME>: N passed, M failed`. Read *that* — not
+   `tail`, not a grep for `ok`, not the exit code, which a killed pipeline
+   reports as 0 anyway. A run without its final line did not run.
+
+### When a rule tightens, audit the tests that used the old rule as a PROXY
+
+Turret Builder's module placement was tightened to require an adjacent turret
+or wall. The checks that *assert* placement were the easy part. What broke were
+six helpers using `canPlace('fire', r, c)` to mean "is this cell open ground"
+while hunting for a turret site with four free sides — a reading that was true
+only while a module could go anywhere. After the change it answers "no" for
+every side of a turret that does not exist yet, so `plusSpot()` returned null
+and dozens of unrelated checks would have died on it.
+
+The fix was to give the geometry question its own name (`openCell()`) and leave
+`canPlace()` meaning what it says. The habit: after tightening a rule, grep for
+every *use* of the old predicate, not just every assertion about it — the uses
+that were never about that rule are the ones that bite.
+
+## Four traps from the negative-testing pass (2026-08-23, Turret Builder skins)
+
+Adding four cel skins to one game produced five new renderer checks, and
+proving each one by breaking what it asserts surfaced four traps that are
+general, not skin-specific.
+
+### A distinctness assertion needs a DISTANCE, not an inequality
+
+"All four skins fingerprint differently" passed with one skin's shape override
+deliberately unregistered — its palette still went through, so the same shape
+in a different colour hashed differently. Hashing the **silhouette** instead
+(is this sample painted at all, ignoring colour), it then passed on a *single*
+antialiased sample. What works is a minimum pairwise Hamming distance with the
+honest range measured first: closest real pair 7.9%, fallen-through skin 0.1%,
+bar at 3%.
+
+**The general form: any check phrased as "these N things differ" will pass on
+noise.** Measure how far apart they are when correct, how far when broken, and
+put the bar in the gap.
+
+### Keep identity counters out of a cross-run snapshot
+
+The "a skin is paint" check plays one deterministic scenario per style and
+requires identical gameplay state. Its first version failed on four of five
+styles for a reason with nothing to do with skins: the snapshot contained the
+id of the creep each turret was tracking, and that id comes from a
+**page-lifetime** counter that no run reset touches — so the fifth style's run
+was numbering creeps far above the first's. Record *whether* a target is held,
+not which one. Anything id-shaped in a cross-run comparison deserves that
+suspicion before the code under test does.
+
+### A liveness guard, or identical nothing passes forever
+
+The same check compares five snapshots for equality — which an empty board
+satisfies perfectly. It also asserts the scenario actually happened: the
+expected link count, three turrets, one wall, and at least one turret holding
+a target. **Every equality-shaped check needs a second assertion that there
+was something to compare.**
+
+### Restore from a known-good COPY, and verify the restore
+
+Negative tests mean deliberately breaking the shipping file. Twice in one
+session a restore silently did not happen — once because the working directory
+had drifted between Bash calls, so `cp` wrote nowhere useful and the stubbed
+`frameRot()` stayed in the tree. The failure mode is not a red gate; it is a
+**green** gate on a stubbed renderer, which is how a stub reaches production.
+
+This is now tooling rather than discipline — `.claude/scripts/negtest.sh`:
+
+```
+.claude/scripts/negtest.sh save    games/<game>/index.html   # BEFORE breaking it
+#   … break it, run the suite, confirm the right check went red …
+.claude/scripts/negtest.sh restore games/<game>/index.html   # cmp-verified
+```
+
+`save` snapshots into `.git/negtest/` (inside `.git`, so it can never be
+committed and never shows in `git status`); `restore` copies back and then
+`cmp`s, because `cp` is perfectly happy to succeed against a path that is not
+the one you meant. Mark the break itself with the token `@negtest` in a
+comment: `gates.sh` runs `negtest.sh scan` on every invocation and refuses to
+go green while that marker survives in a changed shipping file.
+
+One wrinkle worth keeping: the scan skips all of `.claude/`. The first version
+did not, and `gates.sh` flagged its own explanatory comment — a scanner that
+matches the documentation of its own convention is a scanner that gets
+disabled. Scan what ships.

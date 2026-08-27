@@ -23,17 +23,67 @@ body {
 }
 #cv { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
 #back-btn {
-  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:30;
+  position:absolute; top:calc(var(--sat) + 8px); left:10px; z-index:45;
   background:var(--panel); border:1px solid var(--border); border-radius:6px;
   color:var(--white); font-size:16px; width:38px; height:34px; line-height:32px;
   text-align:center; text-decoration:none; touch-action:manipulation;
 }
 #mute {
-  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:30;
+  position:absolute; top:calc(var(--sat) + 8px); left:56px; z-index:45;
   background:var(--panel); border:1px solid var(--border); border-radius:6px;
   color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
   text-align:center; padding:0; touch-action:manipulation;
 }
+/* The WHOLE chrome row sits above the settings scrim (z 45 vs 40), not just
+   the cogwheel: the cog needs it to stay a toggle, and games/CLAUDE.md
+   § Chrome above overlays requires ← and the mute button to outrank every
+   full-screen overlay — a player must always be one tap from leaving or
+   silencing the game, which an opened panel would otherwise cost them. */
+#cog {
+  position:absolute; top:calc(var(--sat) + 8px); left:102px; z-index:45;
+  background:var(--panel); border:1px solid var(--border); border-radius:6px;
+  color:var(--white); font-size:16px; width:38px; height:34px; line-height:30px;
+  text-align:center; padding:0; touch-action:manipulation;
+}
+#cog.on { border-color:#ff9a3c; color:#ff9a3c; }
+/* Settings layers over whatever is underneath (title, relic choice, live floor)
+   rather than replacing it — closing restores the view with no state to keep.
+   The full-bleed scrim also stops a stray tap reaching the board behind it. */
+#settings {
+  position:absolute; inset:0; z-index:40; display:flex;
+  align-items:center; justify-content:center;
+  background:rgba(4,3,6,0.88); padding:20px;
+  padding-top:calc(var(--sat) + 20px); padding-bottom:calc(var(--sab) + 20px);
+}
+#settings.hidden { display:none; }
+.set-panel {
+  background:linear-gradient(160deg, #191412, #0b0a10);
+  border:1px solid #6b4a2a; border-radius:12px;
+  padding:18px 20px 14px; width:min(88vw, 330px);
+}
+.set-panel h2 {
+  font-family:'Black Ops One', sans-serif; color:#ff9a3c;
+  font-size:1.05rem; letter-spacing:3px; text-align:center; margin-bottom:14px;
+}
+.setrow { display:flex; align-items:center; gap:10px; margin:14px 0; }
+.setrow .lbl {
+  font-family:'Black Ops One', sans-serif; font-size:0.58rem; letter-spacing:2px;
+  color:var(--dim); width:84px; flex:0 0 84px;
+}
+.setrow input[type=range] {
+  flex:1 1 auto; min-width:0; height:26px;
+  accent-color:#ff9a3c; touch-action:pan-y;
+}
+.setrow .val {
+  font-family:'Share Tech Mono', monospace; font-size:0.68rem; color:var(--gold);
+  width:38px; flex:0 0 38px; text-align:right;
+}
+.set-note {
+  color:var(--dim); font-size:0.6rem; line-height:1.6; text-align:center;
+  margin:10px 2px 4px;
+}
+.set-note em { color:#ff9a3c; font-style:normal; }
+#settings .btn { min-width:0; width:100%; margin:8px 0 0; font-size:0.85rem; padding:11px 0; }
 #overlay {
   position:absolute; inset:0; z-index:20; display:flex;
   flex-direction:column; align-items:center; justify-content:center;
@@ -42,6 +92,22 @@ body {
   overflow-y:auto;
 }
 #overlay.hidden { display:none; }
+/* A centred flex column that also scrolls CLIPS its own overflow at the top:
+   with justify-content:center the first rows sit ABOVE the scroll origin and
+   cannot be reached at any scroll position. This is not a camp-screen problem
+   — it bit the TITLE screen in landscape, where the heading was 9-24px out of
+   reach on every phone tested — so the fix is structural rather than a class
+   somebody has to remember: flex-start plus auto margins on the end children.
+   Short content still centres (the autos absorb the slack); tall content pins
+   to the top with every row reachable, because auto margins collapse to zero
+   once there is no slack left. */
+#overlay { justify-content:flex-start; }
+#overlay > :first-child { margin-top:auto; }
+#overlay > :last-child { margin-bottom:auto; }
+/* Camp screens are lists to read down, so they always start at the top — and
+   clear the ← / 🔊 / ⚙ chrome row, which outranks every overlay. */
+#overlay.top { padding-top:calc(var(--sat) + 54px); }
+#overlay.top > :first-child { margin-top:0; }
 #overlay h1 {
   font-family:'Black Ops One', sans-serif; color:#ff9a3c;
   font-size:clamp(1.7rem, 8vw, 2.5rem); letter-spacing:4px;
@@ -73,14 +139,121 @@ body {
 .stat b { color:var(--gold); }
 .howto { color:var(--dim); font-size:0.7rem; max-width:320px; line-height:1.7; margin-top:16px; }
 .howto em { color:#ff9a3c; font-style:normal; }
+/* ---- Camp (between-delve hub) + character slots -------------------------
+   All left-aligned inside the centred #overlay column: these are lists to
+   read down, not a title screen. Rows are plain buttons carrying data-act,
+   bound in one sweep after every render (see bindCamp). */
+.camp { width:100%; max-width:370px; text-align:left; }
+.camp-head { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:2px; }
+.camp-name { font-family:'Black Ops One', sans-serif; color:#ff9a3c; letter-spacing:2px; font-size:1.0rem; }
+.camp-res { color:var(--gold); font-size:0.78rem; white-space:nowrap; }
+.camp-res .sp { color:var(--purple); margin-left:8px; }
+.camp-sub { color:var(--dim); font-size:0.62rem; letter-spacing:2px; margin-bottom:10px; }
+.tabs { display:flex; gap:6px; margin:10px 0 4px; }
+.tab {
+  flex:1 1 0; min-width:0; padding:10px 2px; text-align:center; border-radius:7px;
+  font-family:'Black Ops One', sans-serif; font-size:0.66rem; letter-spacing:1px;
+  background:var(--panel); border:1px solid var(--border); color:var(--dim);
+  touch-action:manipulation; cursor:pointer;
+}
+.tab.on { color:#ff9a3c; border-color:#ff9a3c; }
+.row {
+  display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+  background:linear-gradient(160deg, #171219, #0b0a10);
+  border:1px solid #2a2233; border-radius:9px; padding:10px 11px; margin:7px 0;
+  font-family:'Share Tech Mono', monospace; color:var(--white);
+  touch-action:manipulation; cursor:pointer;
+}
+.row.locked { opacity:0.45; }
+    .row-txt b i.tier { font-style:normal; color:#8899bb; font-size:0.78em; letter-spacing:0; }
+/* A character row and its delete button share one line: the ✖ is deliberately
+   small and off to the left, well clear of the ENTER target, and it only opens
+   a confirm screen — erasing a delver is never one tap. */
+.slot-line { display:flex; align-items:center; gap:7px; }
+.slot-line .row { flex:1 1 auto; min-width:0; }
+.del-gap { flex:0 0 auto; width:34px; }
+.del {
+  flex:0 0 auto; width:34px; height:38px; padding:0;
+  background:#140b10; border:1px solid #6a2230; border-radius:9px;
+  color:#ff5566; font-family:'Share Tech Mono', monospace; font-size:0.8rem; line-height:1;
+  touch-action:manipulation; cursor:pointer;
+}
+.btn.danger { color:#ff5566; border-color:#ff5566; }
+.row.maxed { border-color:#2f5a33; }
+.row-ico { font-size:1.15rem; color:var(--gold); width:20px; text-align:center; flex:0 0 auto; }
+.row-txt { flex:1 1 auto; min-width:0; }
+.row-txt b { display:block; font-family:'Black Ops One', sans-serif; font-size:0.72rem; letter-spacing:1px; color:var(--white); }
+.row-txt span { display:block; color:var(--dim); font-size:0.66rem; line-height:1.5; margin-top:2px; }
+.row-txt .now { color:#6fd8a0; }
+.price {
+  flex:0 0 auto; min-width:70px; text-align:center; padding:9px 8px; border-radius:7px;
+  font-family:'Black Ops One', sans-serif; font-size:0.66rem; letter-spacing:1px;
+  background:#0d0b12; border:1px solid var(--gold); color:var(--gold);
+}
+.price.no { border-color:var(--border); color:var(--dim); }
+.price.owned { border-color:#39ff14; color:#39ff14; }
+.tree { width:100%; height:auto; display:block; margin:6px 0 2px; touch-action:manipulation; }
+.tree .sk { cursor:pointer; }
+.sk-card {
+  background:linear-gradient(160deg, #171219, #0b0a10); border:1px solid #ff9a3c;
+  border-radius:9px; padding:11px 12px; margin-top:4px;
+}
+.sk-card b { display:block; font-family:'Black Ops One', sans-serif; font-size:0.76rem; letter-spacing:1px; color:var(--gold); }
+.sk-card span { display:block; color:var(--dim); font-size:0.68rem; line-height:1.5; margin-top:3px; }
+.sk-card .now { color:#6fd8a0; }
+.sk-card .no { color:#ff7a88; }
+.btn[disabled] { opacity:0.38; border-color:var(--border); color:var(--dim); }
+.pips { color:#ff9a3c; letter-spacing:3px; font-size:0.72rem; }
+.pips i { color:#3a3040; font-style:normal; }
+.depth-pick { display:flex; gap:5px; align-items:stretch; margin-top:14px; }
+.dbtn {
+  flex:0 0 auto; width:40px; border-radius:7px; background:var(--panel);
+  border:1px solid var(--border); color:#ff9a3c; font-size:0.75rem;
+  touch-action:manipulation; cursor:pointer;
+}
+.dbtn[disabled] { opacity:0.3; color:var(--dim); }
+.dnum {
+  flex:1 1 auto; min-width:0; border-radius:7px; padding:8px 4px;
+  background:var(--panel); border:1px solid #ff9a3c; color:var(--white);
+  font-family:'Share Tech Mono', monospace; font-size:0.66rem; letter-spacing:1px;
+  touch-action:manipulation; cursor:pointer;
+}
+.dnum b { color:var(--gold); font-size:0.9rem; }
+.dnum i { display:block; color:var(--dim); font-size:0.58rem; font-style:normal; margin-top:2px; }
+.camp-foot { display:flex; gap:8px; margin-top:14px; }
+.camp-foot .btn { flex:1 1 0; min-width:0; margin:0; padding:13px 4px; font-size:0.82rem; }
+.name-input {
+  width:100%; background:#0d0b12; border:1px solid #ff9a3c; border-radius:7px; color:var(--white);
+  font-family:'Black Ops One', sans-serif; letter-spacing:2px; font-size:0.9rem;
+  padding:11px 12px; margin:8px 0; text-align:center; text-transform:uppercase;
+}
+.empty-note { color:var(--dim); font-size:0.66rem; line-height:1.6; margin:6px 0 2px; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-07-25 02:03 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-27 21:12 UTC</div>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
+<button id="cog" aria-label="Settings">&#9881;</button>
 <canvas id="cv"></canvas>
 <div id="overlay"></div>
+<div id="settings" class="hidden">
+  <div class="set-panel">
+    <h2>SETTINGS</h2>
+    <div class="setrow">
+      <span class="lbl">MUSIC</span>
+      <input type="range" id="vol-music" min="0" max="100" step="5" value="100" aria-label="Music volume">
+      <span class="val" id="vol-music-val">100%</span>
+    </div>
+    <div class="setrow">
+      <span class="lbl">SFX</span>
+      <input type="range" id="vol-sfx" min="0" max="100" step="5" value="100" aria-label="Sound effects volume">
+      <span class="val" id="vol-sfx-val">100%</span>
+    </div>
+    <div class="set-note"><em>Pinch</em> the board to zoom; <em>drag</em> to look anywhere on the map, then <em>&#8982;</em> to snap back to your hero. <em>Tap the relic row</em> for what each one does, or a <em>supply</em> on the left to use it.</div>
+    <button class="btn" id="set-close">CLOSE</button>
+  </div>
+</div>
 <script>
 'use strict';
 /* =====================================================================
@@ -108,8 +281,14 @@ let items = [];            // {x,y,type:'gold'|'heart', amt}
 let torches = [];          // {x,y,seed}
 let stairs = { x: 0, y: 0 };
 let chest = { x: -1, y: -1, opened: true };
+let traps = [];            // {x,y,type,sprung} — hazards, visible once lit
+let statuses = { stun: 0, venom: 0, gloom: 0, frail: 0, slow: 0 };  // turns remaining
+let killStreak = 0;        // BLOODLETTER's per-floor attack stack
 let relics = [];           // relic keys owned
 let wardTimer = 0;         // ember-ward recharge countdown (0 = ready)
+// Stacked wards recharge faster rather than stacking shields, so a second
+// copy is a real upgrade without letting a build eat three hits a turn.
+function wardRecharge() { return Math.max(2, 8 - 2 * relicCount('ward')); }
 let pathQueue = [];        // queued [x,y] steps from a tap
 let attackTargetId = -1;
 let pathT = 0;
@@ -118,6 +297,108 @@ let descendT = -1;         // descend fade animation
 let introT = 0;            // "DEPTH n" banner timer
 let shakeT = 0;
 let enemyIdSeq = 1;
+let seedSalt = 0;          // test hook: non-zero makes floor generation reproducible
+let buffPanel = false;     // relic detail panel open? (a pure overlay: no turn passes)
+let buffRect = null;       // HUD hotspot for the relic row, in screen px (null = no relics)
+let recenterBtn = null;    // ⌖ button circle, in screen px (null = not shown)
+let useBtns = [];          // consumable buttons, in screen px (rebuilt each frame)
+
+/* ============ Difficulty curve ============
+   Every number the dungeon gets harder by lives here, unbounded on purpose:
+   the CD's spec is "no ceiling", so HP and attack are MULTIPLIERS on depth
+   rather than a table that runs out. A fresh delver averages ~depth 8; a
+   fully geared and skilled one goes far deeper but still, eventually, dies.
+   Tuned against .claude/tests/eval-ember-depths.cjs — change a number here
+   and re-run it rather than guessing. */
+const CURVE = {
+  playerHp: 20, playerAtk: 3,     // what a delver starts with, before any kit
+  base: {                          // enemy stats at depth 1
+    slime: { hp: 4, atk: 2 }, bat: { hp: 2, atk: 1 }, archer: { hp: 4, atk: 2 },
+    brute: { hp: 9, atk: 4 }, wraith: { hp: 6, atk: 3 },
+  },
+  hearts: 2, heartsVar: 1, heartAmt: 5,   // ri(hearts, hearts+heartsVar) hearts, worth heartAmt
+  // Enemy stats bend upward: the linear term sets how fast the early floors
+  // tighten, the quadratic one is what makes the deep dark eventually beat any
+  // build. Keep the linear term gentle and let the square do the killing —
+  // that is the difference between "hard at 3" and "hard at 30".
+  hpMul: 0.11, hpQuad: 0.006,    // enemy HP  = base * (1 + (n-1)*hpMul + (n-1)^2*hpQuad)
+  atkMul: 0.07, atkQuad: 0.004,  // enemy atk likewise
+  countBase: 2,
+  count: 0.4,         // enemies   = countBase + n*count
+  countCap: 13,
+  eliteFrom: 4,       // depth the first elites appear
+  eliteMul: 0.055,    // elite chance per enemy = (n - eliteFrom) * eliteMul
+  eliteCap: 0.4,
+  trapFrom: 2,
+  trapPer: 0.55,      // traps = (n - trapFrom + 1) * trapPer
+  trapCap: 9,
+  goldPer: 0.9,       // gold pile bonus per depth — deep farming has to pay
+};
+function depthHp(base, n) {
+  const k = n - 1;
+  return Math.max(1, Math.round(base * (1 + k * CURVE.hpMul + k * k * CURVE.hpQuad)));
+}
+function depthAtk(base, n) {
+  const k = n - 1;
+  return Math.max(1, Math.round(base * (1 + k * CURVE.atkMul + k * k * CURVE.atkQuad)));
+}
+
+/* ============ Traps ============
+   A trap is a one-shot hazard: it springs when you step on it and then stays
+   on the board, sprung and harmless, as a scar. Everything but SPIKE PIT
+   works by putting turns on `statuses`, which is the only status system in
+   the game — see tickStatuses(). */
+const TRAPS = {
+  spike: { name: 'SPIKE PIT',   icon: '▲', col: '#ff5566', from: 2, verb: 'SPIKES' },
+  snare: { name: 'IRON SNARE',  icon: '✖', col: '#88ccff', from: 3, verb: 'SNARED' },
+  venom: { name: 'VENOM VENT',  icon: '≈', col: '#6fd8a0', from: 4, verb: 'POISONED' },
+  tar:   { name: 'TAR SEEP',    icon: '≋', col: '#c98a3c', from: 5, verb: 'MIRED' },
+  gloom: { name: 'GLOOM GLYPH', icon: '◍', col: '#b44fff', from: 6, verb: 'BLINDED' },
+  frail: { name: 'WITHER RUNE', icon: '⌇', col: '#ffc300', from: 7, verb: 'WITHERED' },
+};
+const STATUS_META = {
+  stun:  { icon: '✖', col: '#88ccff', name: 'STUNNED' },
+  venom: { icon: '≈', col: '#6fd8a0', name: 'POISONED' },
+  tarry: { icon: '≋', col: '#c98a3c', name: 'MIRED' },
+  gloom: { icon: '◍', col: '#b44fff', name: 'BLINDED' },
+  frail: { icon: '⌇', col: '#ffc300', name: 'WITHERED' },
+};
+function trapAt(x, y) { return traps.find((t) => t.x === x && t.y === y) || null; }
+function clearStatuses() { statuses = { stun: 0, venom: 0, gloom: 0, frail: 0, slow: 0 }; }
+// TRAPWISE halves every duration and every spike, which is the one skill that
+// answers a whole mechanic rather than a number.
+function trapSoften(v) { return rank('trapwise') ? Math.max(1, Math.floor(v / 2)) : v; }
+function springTrap(t) {
+  if (t.sprung) return;
+  t.sprung = true;
+  const meta = TRAPS[t.type];
+  addFloat(t.x, t.y, meta.verb, meta.col);
+  shakeT = Math.max(shakeT, 0.25);
+  // Springing one always stops the walk. The path no longer routes around
+  // traps, so this is the moment the player is handed the board back — and
+  // most traps do no damage, which is the interrupt everything else uses.
+  pathQueue = []; attackTargetId = -1;
+  if (t.type === 'spike') {
+    hurtPlayer(trapSoften(Math.max(2, Math.round(2 + floorNum * 0.45))), t.x, t.y);
+  } else if (t.type === 'snare') { statuses.stun += trapSoften(2); sfxBlock(); }
+  else if (t.type === 'venom') { statuses.venom += trapSoften(6); sfxHurt(); }
+  else if (t.type === 'tar')   { statuses.slow  += trapSoften(6); sfxChest(); }
+  else if (t.type === 'gloom') { statuses.gloom += trapSoften(10); sfxArrow(); }
+  else if (t.type === 'frail') { statuses.frail += trapSoften(8); sfxArrow(); }
+}
+// Ticked once per player turn, AFTER the turn is counted and BEFORE the
+// enemies move — so a poisoned delver bleeds on their own clock, not theirs.
+function tickStatuses() {
+  if (statuses.venom > 0) {
+    statuses.venom--;
+    player.hp -= 1;
+    addFloat(player.x, player.y, '-1', '#6fd8a0');
+  }
+  if (statuses.stun > 0) statuses.stun--;
+  if (statuses.gloom > 0) statuses.gloom--;
+  if (statuses.frail > 0) statuses.frail--;
+  if (statuses.slow > 0) statuses.slow--;
+}
 
 const RELICS = {
   blade:   { name: 'SEARING BLADE',  icon: '⚔', desc: '+2 attack. The edge still remembers the forge.' },
@@ -127,6 +408,19 @@ const RELICS = {
   lantern: { name: "MINER'S LANTERN", icon: '☀', desc: 'Your light reaches half again as far.' },
   crown:   { name: 'VAMPIRIC CROWN', icon: '♛', desc: '+2 max HP and heal 2 each time you descend.' },
 };
+
+/* Relics are a list, not a set, so the same relic taken twice counts twice.
+   Everything player-facing aggregates through here: one row per relic kind,
+   with the number of copies. */
+function relicCount(key) { let n = 0; for (const k of relics) if (k === key) n++; return n; }
+function relicCounts() {
+  const out = [];
+  for (const k of relics) {
+    const hit = out.find((o) => o.key === k);
+    if (hit) hit.n++; else out.push({ key: k, n: 1 });
+  }
+  return out;
+}
 
 /* ============ RNG ============ */
 let rngS = 1234567;
@@ -143,11 +437,289 @@ function persistBests() {
   } catch (err) {}
 }
 
+/* ============ Meta progression =========================================
+   Three independent characters, each banking gold and skill points between
+   delves. A run is still permadeath — what survives the body is the
+   character's purse, gear and skills, which is the whole point of the sink.
+   Everything a character owns lives in one localStorage blob (SLOT_KEY) and
+   is read back through `migrate()`, never trusted field-by-field. */
+const SLOT_KEY = 'emberDepths.slots.v1';
+const SLOT_COUNT = 3;
+
+let slots = [null, null, null];
+let activeSlot = -1;       // -1 = no character chosen (title / slot screen)
+let campTab = 'forge';
+let campSkill = 'edge';    // which node the skill tree's detail card is showing
+let consumables = {};      // in-run stock, copied from the character at DESCEND
+let lastStandUsed = false;
+
+/* Gear: four tracks, SEVEN tiers each. Tier 0 is the starting kit and costs
+   nothing — owning it is what makes "upgrade" a single verb everywhere.
+   The ladder above it is geometric (roughly x2.2 a rung, 40 -> 3400) on
+   purpose: a delve's takings grow with the depth it reaches, so a flat ladder
+   is bought out in two runs and a geometric one keeps the next rung about a
+   delve away for the whole campaign. Twenty-four purchases is the campaign,
+   and .claude/tests/eval-ember-depths.cjs is what says whether it lands at
+   about one per delve — change a cost here and re-run it. */
+const GEAR = {
+  weapon: { name: 'WEAPON', icon: '⚔', tiers: [
+    { name: 'CHIPPED DIRK',     cost: 0,   atk: 0,  desc: 'Blunt, notched, yours.' },
+    { name: 'IRON CLEAVER',     cost: 70,  atk: 1,  desc: '+1 attack.' },
+    { name: 'EMBER BRAND',      cost: 260, atk: 2,  desc: '+2 attack.' },
+    { name: 'ASHSTEEL RUIN',    cost: 520, atk: 3,  desc: '+3 attack.' },
+    { name: 'CINDERFANG',       cost: 1000, atk: 5,  desc: '+5 attack.' },
+    { name: 'MOLTEN GREATAXE',  cost: 1900, atk: 7,  desc: '+7 attack.' },
+    { name: 'THE SUNDERER',     cost: 3600, atk: 10, desc: '+10 attack.' },
+  ] },
+  armor: { name: 'ARMOR', icon: '⛨', tiers: [
+    { name: 'TRAVEL RAGS',      cost: 0,   hp: 0,  dr: 0, desc: 'Cloth, and optimism.' },
+    { name: 'PADDED COAT',      cost: 70,  hp: 3,  dr: 0, desc: '+3 max HP.' },
+    { name: 'SCALE HAUBERK',    cost: 260, hp: 5,  dr: 1, desc: '+5 max HP, −1 damage from every hit.' },
+    { name: 'EMBERPLATE',       cost: 520, hp: 8,  dr: 1, desc: '+8 max HP, −1 damage from every hit.' },
+    { name: 'OBSIDIAN MAIL',    cost: 1000, hp: 13, dr: 2, desc: '+13 max HP, −2 damage from every hit.' },
+    { name: "WARDEN'S CARAPACE", cost: 1900, hp: 19, dr: 2, desc: '+19 max HP, −2 damage from every hit.' },
+    { name: 'ADAMANT SHELL',    cost: 3600, hp: 26, dr: 3, desc: '+26 max HP, −3 damage from every hit.' },
+  ] },
+  lantern: { name: 'LANTERN', icon: '☀', tiers: [
+    { name: 'TALLOW STUB',      cost: 0,   light: 0,   desc: 'A guttering nub of fat.' },
+    { name: 'BRASS LAMP',       cost: 60,  light: 0.8, desc: 'Light reaches 0.8 tiles further.' },
+    { name: 'MIRRORED LANTERN', cost: 230, light: 1.6, desc: 'Light reaches 1.6 tiles further.' },
+    { name: 'SUNSTONE LANTERN', cost: 460, light: 2.4, desc: 'Light reaches 2.4 tiles further.' },
+    { name: 'PYRE LANTERN',     cost: 880, light: 3.2, desc: 'Light reaches 3.2 tiles further.' },
+    { name: 'DAYSTAR LAMP',     cost: 1670, light: 4.0, desc: 'Light reaches 4.0 tiles further.' },
+    { name: 'THE HELIOGRAPH',   cost: 3150, light: 5.0, desc: 'Light reaches 5.0 tiles further.' },
+  ] },
+  charm: { name: 'CHARM', icon: '❖', tiers: [
+    { name: 'BONE TRINKET',     cost: 0,   gold: 0,    desc: 'It rattles. That is all it does.' },
+    { name: 'COIN FETISH',      cost: 80,  gold: 0.2,  desc: '+20% gold found.' },
+    { name: 'EMBERHEART',       cost: 290, gold: 0.2,  heal: 3, desc: '+20% gold, and heal 3 HP on every descent.' },
+    { name: 'DEEPSEEKER IDOL',  cost: 580, gold: 0.35, heal: 3, reveal: 1, desc: '+35% gold, heal 3 HP on every descent, and the stairs are marked the moment you arrive.' },
+    { name: 'GILDED SCARAB',    cost: 1100, gold: 0.5,  heal: 5, reveal: 1, desc: '+50% gold, heal 5 HP on every descent, stairs marked on arrival.' },
+    { name: "HOARDER'S EYE",    cost: 2100, gold: 0.65, heal: 7, reveal: 1, desc: '+65% gold, heal 7 HP on every descent, stairs marked on arrival.' },
+    { name: 'AVARICE CROWN',    cost: 4000, gold: 0.8,  heal: 10, reveal: 1, desc: '+80% gold, heal 10 HP on every descent, stairs marked on arrival.' },
+  ] },
+};
+
+/* Skills: ONE tree, two roots, one DAG.
+   The rule the CD set, and the only rule: a node accepts a point once EVERY
+   node with an arrow into it has at least one point. That is what makes the
+   two capstones and the final one expensive — SOVEREIGN sits under two
+   complete paths, one down each side of the tree, so reaching it is 16
+   points and a deliberate route rather than a shopping list.
+   `col`/`row` are the SVG layout grid; the edges in `in` are drawn from it,
+   so the picture and the rule can never disagree. */
+const SKILLS = [
+  { key: 'edge',    name: 'KEEN EDGE',    icon: '⚔', max: 2, in: [],               col: 1, row: 0,
+    desc: (r) => '+' + r + ' attack.' },
+  { key: 'hide',    name: 'THICK HIDE',   icon: '⛨', max: 2, in: [],               col: 3, row: 0,
+    desc: (r) => '+' + (r * 2) + ' max HP.' },
+
+  { key: 'heavy',   name: 'HEAVY BLOWS',  icon: '✦', max: 1, in: ['edge'],         col: 0, row: 1,
+    desc: () => '15% of your strikes land for +3.' },
+  { key: 'lantern', name: 'LAMPLIGHT',    icon: '☀', max: 2, in: ['edge', 'hide'], col: 2, row: 1,
+    desc: (r) => 'Your light reaches ' + (r * 0.7).toFixed(1) + ' tiles further.' },
+  { key: 'bones',   name: 'STONE BONES',  icon: '◆', max: 1, in: ['hide'],         col: 4, row: 1,
+    desc: () => '−1 damage from every hit (never below 1).' },
+
+  { key: 'vengeance', name: 'VENGEANCE',   icon: '☩', max: 1, in: ['heavy'],   col: 0,   row: 2,
+    desc: () => '+2 attack while at or below half HP.' },
+  { key: 'trapwise',  name: 'TRAPWISE',    icon: '⌖', max: 1, in: ['lantern'], col: 1.5, row: 2,
+    desc: () => 'Traps hit for half, and hold you half as long.' },
+  { key: 'prospect',  name: 'PROSPECTOR',  icon: '◈', max: 2, in: ['lantern'], col: 2.5, row: 2,
+    desc: (r) => '+' + (r * 25) + '% gold found.' },
+  { key: 'wind',      name: 'SECOND WIND', icon: '♥', max: 1, in: ['bones'],   col: 4,   row: 2,
+    desc: () => 'Heal 3 HP on every descent.' },
+
+  { key: 'execution', name: 'EXECUTION',    icon: '☠', max: 1, in: ['vengeance'], col: 0,   row: 3,
+    desc: () => 'Every kill restores 1 HP.' },
+  { key: 'carto',     name: 'CARTOGRAPHER', icon: '✧', max: 1, in: ['trapwise'],  col: 1.5, row: 3,
+    desc: () => 'The stairs are marked the moment you arrive.' },
+  { key: 'fortune',   name: 'FORTUNE',      icon: '❖', max: 1, in: ['prospect'],  col: 2.5, row: 3,
+    desc: () => 'Chests offer a third relic to choose from.' },
+  { key: 'stand',     name: 'LAST STAND',   icon: '⛊', max: 1, in: ['wind'],      col: 4,   row: 3,
+    desc: () => 'Once per delve, a killing blow leaves you on 1 HP instead.' },
+
+  { key: 'bloodletter', name: 'BLOODLETTER', icon: '⚑', max: 1, in: ['execution', 'carto'], col: 0.75, row: 4,
+    desc: () => 'Each kill grants +1 attack until you descend, up to +5.' },
+  { key: 'unbroken',    name: 'UNBROKEN',    icon: '⬢', max: 1, in: ['fortune', 'stand'],   col: 3.25, row: 4,
+    desc: () => 'No single hit can take more than 4 HP from you.' },
+
+  { key: 'sovereign', name: 'EMBER SOVEREIGN', icon: '♛', max: 1, in: ['bloodletter', 'unbroken'], col: 2, row: 5,
+    desc: () => '+2 attack, +6 max HP, +1 light, and LAST STAND recharges on every descent.' },
+];
+const SKILL_ROWS = 6, SKILL_COLS = 5;
+
+/* Supplies live in the CHARACTER's pack, not in the delve. Buying one puts it
+   there and USING one takes it out; dying with it does neither, so a firebomb
+   you never threw is still yours next time. `short` is the caption under the
+   in-run button — a bare glyph told nobody what it did. */
+const CONSUMABLES = {
+  draught: { name: 'HEALING DRAUGHT', short: 'HEAL', icon: '✚', cost: 50, max: 3, desc: 'Restores 8 HP.' },
+  bomb:    { name: 'FIREBOMB',        short: 'BOMB', icon: '✷', cost: 80, max: 3, desc: 'Burns every enemy within 2 tiles for 5.' },
+  dust:    { name: 'FARSIGHT DUST',   short: 'MAP',  icon: '✧', cost: 60, max: 3, desc: 'Maps the whole floor, stairs and all.' },
+};
+const CONSUMABLE_KEYS = Object.keys(CONSUMABLES);
+
+const NAME_A = ['ASH', 'EMBER', 'SOOT', 'CINDER', 'DUSK', 'GRIM', 'HOLLOW', 'IRON', 'PALE', 'RUST'];
+const NAME_B = ['WARDEN', 'DELVER', 'VEIN', 'LANTERN', 'MARROW', 'THORN', 'CROW', 'KETTLE', 'FLINT', 'WICK'];
+function rollName() {
+  return NAME_A[Math.floor(Math.random() * NAME_A.length)] + ' ' +
+         NAME_B[Math.floor(Math.random() * NAME_B.length)];
+}
+
+function newCharacter(name) {
+  return {
+    name: (name || rollName()).toUpperCase().slice(0, 14),
+    gold: 0, sp: 0, startFloor: 1,
+    gear: { weapon: 0, armor: 0, lantern: 0, charm: 0 },
+    skills: {}, supplies: {},
+    // `deepest` is the deepest floor ever FINISHED, which is what pays skill
+    // points; `bestDepth` is the deepest ever stood on, which is what unlocks
+    // the starting depth. They differ by one on the floor that kills you.
+    stats: { bestDepth: 0, deepest: 0, spAwarded: 0, runs: 0, kills: 0, gold: 0 },
+  };
+}
+// Never trust a stored blob field-by-field: rebuild a valid character and
+// copy across only what is in range. A save edited by hand, or written by an
+// older build, then costs a clamp rather than a crash mid-delve.
+function migrate(raw) {
+  const c = newCharacter(typeof raw.name === 'string' ? raw.name : '');
+  c.gold = Math.max(0, Math.floor(+raw.gold || 0));
+  c.sp = Math.max(0, Math.floor(+raw.sp || 0));
+  const g = raw.gear || {};
+  for (const k in c.gear) c.gear[k] = Math.max(0, Math.min(GEAR[k].tiers.length - 1, Math.floor(+g[k] || 0)));
+  // Skills moved from three trees to one DAG on 2026-08-26; an old blob's
+  // 'tree.node' keys simply do not match and are dropped, which is why the
+  // character keeps its points as `sp` refunded below rather than losing them.
+  const sk = raw.skills || {};
+  let known = 0;
+  for (const node of SKILLS) {
+    const v = Math.max(0, Math.min(node.max, Math.floor(+sk[node.key] || 0)));
+    if (v) { c.skills[node.key] = v; known += v * (v + 1) / 2; }
+  }
+  // Points from the pre-2026-08-26 three-tree schema come back as unspent SP.
+  // CLAMPED, twice: a stored rank is capped before it is triangulated and the
+  // whole refund is capped again, because this is the one path that turns an
+  // untrusted number straight into currency — `{"might.edge": 99}` in a
+  // hand-edited save would otherwise be 4950 skill points.
+  const LEGACY_RANK_CAP = 3, LEGACY_REFUND_CAP = 40;
+  let legacy = 0;
+  for (const k in sk) {
+    if (k.indexOf('.') <= 0) continue;
+    const v = Math.max(0, Math.min(LEGACY_RANK_CAP, Math.floor(+sk[k] || 0)));
+    legacy += v * (v + 1) / 2;
+  }
+  if (legacy) c.sp += Math.min(LEGACY_REFUND_CAP, legacy);
+  const sup = raw.supplies || {};
+  for (const k of CONSUMABLE_KEYS) {
+    const v = Math.max(0, Math.min(CONSUMABLES[k].max, Math.floor(+sup[k] || 0)));
+    if (v) c.supplies[k] = v;
+  }
+  const st = raw.stats || {};
+  c.stats = {
+    bestDepth: Math.max(0, Math.floor(+st.bestDepth || 0)),
+    deepest: Math.max(0, Math.floor(+st.deepest || 0)),
+    spAwarded: Math.max(0, Math.floor(+st.spAwarded || 0)),
+    runs: Math.max(0, Math.floor(+st.runs || 0)),
+    kills: Math.max(0, Math.floor(+st.kills || 0)),
+    gold: Math.max(0, Math.floor(+st.gold || 0)),
+  };
+  c.startFloor = Math.max(1, Math.min(Math.max(1, c.stats.bestDepth), Math.floor(+raw.startFloor || 1)));
+  return c;
+}
+function loadSlots() {
+  slots = [null, null, null];
+  try {
+    const raw = JSON.parse(localStorage.getItem(SLOT_KEY) || 'null');
+    if (Array.isArray(raw)) {
+      for (let i = 0; i < SLOT_COUNT; i++) if (raw[i] && typeof raw[i] === 'object') slots[i] = migrate(raw[i]);
+    }
+  } catch (err) { /* a corrupt blob starts three empty slots, never a crash */ }
+}
+function saveSlots() { try { localStorage.setItem(SLOT_KEY, JSON.stringify(slots)); } catch (err) {} }
+
+/* ---- the active character, and everything derived from it --------------
+   Every one of these returns a harmless zero with no character selected, so
+   the title screen's background dungeon runs on the base kit. */
+function chr() { return activeSlot >= 0 ? slots[activeSlot] : null; }
+function gearTier(k) { const c = chr(); return c ? c.gear[k] : 0; }
+function gearStat(k, field) { const t = GEAR[k].tiers[gearTier(k)]; return (t && t[field]) || 0; }
+function rank(key) { const c = chr(); return c ? (c.skills[key] || 0) : 0; }
+function skillNode(key) { return SKILLS.find((n) => n.key === key); }
+// THE prerequisite rule: every node with an arrow into this one needs at
+// least one point. A root has no inputs, so it is open from the first point.
+function skillOpen(key) { return skillNode(key).in.every((k) => rank(k) > 0); }
+function skillCost(key) { return rank(key) + 1; }   // rank r costs r
+function skillsSpent() {
+  let n = 0;
+  for (const node of SKILLS) { const r = rank(node.key); n += r * (r + 1) / 2; }
+  return n;
+}
+// Forgetting is priced off what is invested, so an early rethink is cheap and
+// unpicking a finished build is a real decision.
+function respecCost() { return 40 + 30 * skillsSpent(); }
+
+function metaAtk() { return gearStat('weapon', 'atk') + rank('edge') + rank('sovereign') * 2; }
+function metaMaxHp() { return gearStat('armor', 'hp') + rank('hide') * 2 + rank('sovereign') * 6; }
+function metaDR() { return gearStat('armor', 'dr') + rank('bones'); }
+function metaLight() { return gearStat('lantern', 'light') + rank('lantern') * 0.7 + rank('sovereign'); }
+function goldMult() { return 1 + gearStat('charm', 'gold') + rank('prospect') * 0.25; }
+function descendHeal() { return gearStat('charm', 'heal') + rank('wind') * 3; }
+function marksStairs() { return gearStat('charm', 'reveal') > 0 || rank('carto') > 0; }
+function damageCap() { return rank('unbroken') ? 4 : Infinity; }
+
+/* Skill points are the scarce currency: ONE for every fifth floor, the first
+   time that floor is finished. Farming pays gold, never points — which is
+   what lets the starting depth be generous without cheapening the tree.
+   Idempotent by construction: the award is (deepest/5) minus what has already
+   been paid, so re-finishing a floor pays nothing. */
+const SP_EVERY = 5;
+function awardMilestones() {
+  const c = chr();
+  if (!c) return 0;
+  const owed = Math.floor(c.stats.deepest / SP_EVERY) - c.stats.spAwarded;
+  if (owed <= 0) return 0;
+  c.sp += owed;
+  c.stats.spAwarded += owed;
+  saveSlots();
+  return owed;
+}
+// You may start at any depth you have ever stood on. Sticky per character.
+function maxStartFloor() { const c = chr(); return c ? Math.max(1, c.stats.bestDepth) : 1; }
+function startFloorOf() {
+  const c = chr();
+  if (!c) return 1;
+  return Math.max(1, Math.min(maxStartFloor(), c.startFloor || 1));
+}
+
+/* What the delve pays out — gold only. The depth bonus counts floors below
+   where you STARTED, so diving in at depth 30 and dying on arrival pays what
+   it deserves: nothing. */
+let runStartFloor = 1;
+function bankRun() {
+  const c = chr();
+  if (!c) return null;
+  const depthBonus = Math.max(0, floorNum - runStartFloor) * 10;
+  const earned = gold + depthBonus;
+  const newBest = floorNum > c.stats.bestDepth;
+  c.gold += earned;
+  c.stats.bestDepth = Math.max(c.stats.bestDepth, floorNum);
+  c.stats.runs++;
+  c.stats.kills += kills;
+  c.stats.gold += earned;
+  saveSlots();
+  return { earned, depthBonus, newBest };
+}
+
 /* ============ Floor generation (drunkard-walk carve: always connected) ============ */
 function genFloor(n) {
   grid.fill(1); seen.fill(0); lit.fill(0);
-  items = []; torches = []; enemies = []; pathQueue = []; attackTargetId = -1;
-  rngS = (n * 7919 + Date.now()) & 0x7fffffff;
+  items = []; torches = []; enemies = []; traps = []; pathQueue = []; attackTargetId = -1;
+  clearStatuses(); killStreak = 0;
+  // `seedSalt` is a test hook: with it set, a floor is reproducible, which is
+  // what lets the balance eval compare curves rather than luck. Zero (the
+  // shipping value) falls back to the clock.
+  rngS = (n * 7919 + (seedSalt || Date.now())) & 0x7fffffff;
   let cx = ri(3, COLS - 4), cy = ri(4, ROWS - 5);
   const target = Math.floor(COLS * ROWS * 0.42);
   let carved = 0;
@@ -195,16 +767,17 @@ function genFloor(n) {
     return null;
   };
   const nGold = ri(4, 6);
-  for (let i = 0; i < nGold; i++) { const c = free(); if (c) items.push({ x: c.x, y: c.y, type: 'gold', amt: ri(3, 8) }); }
-  const nHeart = ri(1, 2);
-  for (let i = 0; i < nHeart; i++) { const c = free(); if (c) items.push({ x: c.x, y: c.y, type: 'heart', amt: 4 }); }
+  const goldBonus = Math.floor(n * CURVE.goldPer);
+  for (let i = 0; i < nGold; i++) { const c = free(); if (c) items.push({ x: c.x, y: c.y, type: 'gold', amt: ri(3, 8) + goldBonus }); }
+  const nHeart = ri(CURVE.hearts, CURVE.hearts + CURVE.heartsVar);
+  for (let i = 0; i < nHeart; i++) { const c = free(); if (c) items.push({ x: c.x, y: c.y, type: 'heart', amt: CURVE.heartAmt }); }
   // enemies (spawn at distance >= 5 from player)
   const types = ['slime', 'slime', 'bat'];
   if (n >= 2) types.push('archer');
   if (n >= 3) types.push('archer', 'bat');
   if (n >= 4) types.push('brute');
   if (n >= 6) types.push('wraith');
-  const count = Math.min(10, 3 + Math.floor(n * 0.9));
+  const count = Math.min(CURVE.countCap, CURVE.countBase + Math.floor(n * CURVE.count));
   let tries = 400;
   while (enemies.length < count && tries-- > 0) {
     const c = floorCells[ri(1, floorCells.length - 1)];
@@ -213,18 +786,40 @@ function genFloor(n) {
     if ((c.x === stairs.x && c.y === stairs.y) || (c.x === chest.x && c.y === chest.y)) continue;
     spawnEnemy(types[ri(0, types.length - 1)], c.x, c.y, n);
   }
+  // traps — never under the player, the chest or the stairs, and never on the
+  // player's own cell, so a floor can't open by killing you.
+  const trapPool = Object.keys(TRAPS).filter((k) => n >= TRAPS[k].from);
+  if (trapPool.length) {
+    const nTrap = Math.min(CURVE.trapCap, Math.floor((n - CURVE.trapFrom + 1) * CURVE.trapPer));
+    let tt = 300;
+    while (traps.length < nTrap && tt-- > 0) {
+      const c = floorCells[ri(1, floorCells.length - 1)];
+      if (c.d < 3) continue;
+      if ((c.x === stairs.x && c.y === stairs.y) || (c.x === chest.x && c.y === chest.y)) continue;
+      if (traps.some((t) => t.x === c.x && t.y === c.y)) continue;
+      if (items.some((it) => it.x === c.x && it.y === c.y)) continue;
+      traps.push({ x: c.x, y: c.y, type: trapPool[ri(0, trapPool.length - 1)], sprung: false });
+    }
+  }
   recomputeVision();
+  buffPanel = false;
+  // CARTOGRAPHER / the Deepseeker Idol mark the stairs on arrival: `seen`
+  // is the map layer, so one cell of it is the whole feature.
+  if (marksStairs()) seen[IDX(stairs.x, stairs.y)] = 1;
+  centerCam();   // a zoomed-in view should open on the player, not last floor's corner
   introT = 1.6;
 }
 function spawnEnemy(type, x, y, n) {
-  const hpB = Math.floor((n - 1) / 2), atkB = Math.floor((n - 1) / 3);
-  const base = {
-    slime:  { hp: 5, atk: 2 }, bat: { hp: 2, atk: 1 }, archer: { hp: 4, atk: 2 },
-    brute:  { hp: 10, atk: 4 }, wraith: { hp: 6, atk: 3 },
-  }[type];
+  const base = CURVE.base[type];
+  let hp = depthHp(base.hp, n), atk = depthAtk(base.atk, n);
+  // An elite is the same silhouette wearing more of the depth: it keeps the
+  // type's behaviour, so it never surprises you with a rule you don't know.
+  const eliteChance = Math.min(CURVE.eliteCap, Math.max(0, (n - CURVE.eliteFrom) * CURVE.eliteMul));
+  const elite = rnd() < eliteChance;
+  if (elite) { hp = Math.round(hp * 1.6); atk += 1; }
   enemies.push({
     id: enemyIdSeq++, x, y, vx: x, vy: y, type, aggro: false, seed: rnd() * 100,
-    hp: base.hp + hpB, maxHp: base.hp + hpB, atk: base.atk + atkB, hurtT: 0,
+    hp, maxHp: hp, atk, hurtT: 0, elite,
   });
 }
 
@@ -259,7 +854,10 @@ function losClear(x0, y0, x1, y1) {
   return true;
 }
 function enemyAt(x, y) { return enemies.find(e => e.x === x && e.y === y) || null; }
-function lightRadius() { return relics.includes('lantern') ? 5.2 : 3.6; }
+function lightRadius() {
+  const r = Math.min(9, 3.6 + 1.6 * relicCount('lantern') + metaLight());
+  return statuses.gloom > 0 ? Math.max(1.6, r * 0.5) : r;   // GLOOM GLYPH
+}
 
 /* ============ Vision ============ */
 function recomputeVision() {
@@ -285,8 +883,10 @@ function playerAct(action) {
   let tookTurn = false;
   if (action.attack) {
     const e = action.attack;
-    e.hp -= player.atk; e.hurtT = 0.25; e.aggro = true;
-    addFloat(e.x, e.y, '-' + player.atk, '#ffcc88');
+    const heavy = rank('heavy') && rnd() < 0.15;
+    const dmg = playerDamage() + (heavy ? 3 : 0);
+    e.hp -= dmg; e.hurtT = 0.25; e.aggro = true;
+    addFloat(e.x, e.y, '-' + dmg, heavy ? '#ffee88' : '#ffcc88');
     sfxHit();
     player.face = e.x >= player.x ? 1 : -1;
     if (e.hp <= 0) killEnemy(e);
@@ -303,10 +903,15 @@ function playerAct(action) {
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
       if (it.x !== nx || it.y !== ny) continue;
-      if (it.type === 'gold') { gold += it.amt; addFloat(nx, ny, '+' + it.amt + '◈', '#ffc300'); sfxCoin(); }
+      if (it.type === 'gold') {
+        const amt = Math.max(1, Math.round(it.amt * goldMult()));
+        gold += amt; addFloat(nx, ny, '+' + amt + '◈', '#ffc300'); sfxCoin();
+      }
       else { player.hp = Math.min(player.maxHp, player.hp + it.amt); addFloat(nx, ny, '+' + it.amt + '♥', '#ff5566'); sfxHeart(); }
       items.splice(i, 1);
     }
+    const tr = trapAt(nx, ny);
+    if (tr && !tr.sprung) springTrap(tr);
     if (!chest.opened && chest.x === nx && chest.y === ny) { openChest(); return true; }
     if (stairs.x === nx && stairs.y === ny) { beginDescend(); return true; }
     tookTurn = true;
@@ -314,25 +919,54 @@ function playerAct(action) {
   if (!tookTurn) return false;
   turnCount++;
   if (wardTimer > 0) wardTimer--;
+  tickStatuses();
+  // TAR SEEP: while mired, the dark moves twice for every step you take.
   enemiesAct();
+  if (statuses.slow > 0) enemiesAct();
   recomputeVision();
   checkDeath();
   return true;
 }
+// Attack power with the situational skills folded in. HEAVY BLOWS is rolled
+// at the call site instead, so the crit can colour its own damage float.
+function playerDamage() {
+  let d = player.atk + killStreak;
+  if (rank('vengeance') && player.hp * 2 <= player.maxHp) d += 2;
+  if (statuses.frail > 0) d = Math.max(1, Math.ceil(d * 0.5));   // WITHER RUNE
+  return d;
+}
 function killEnemy(e) {
   enemies = enemies.filter(x => x !== e);
   kills++;
+  if (rank('bloodletter')) killStreak = Math.min(5, killStreak + 1);
+  const exec = rank('execution');
+  if (exec && player.hp < player.maxHp) {
+    player.hp = Math.min(player.maxHp, player.hp + exec);
+    addFloat(player.x, player.y, '+' + exec + '♥', '#ff9a3c');
+  }
   addPuff(e.x, e.y, e.type === 'wraith' ? '#b0c8ff' : '#ff8844');
-  if (relics.includes('leech')) { player.hp = Math.min(player.maxHp, player.hp + 1); addFloat(player.x, player.y, '+1♥', '#ff5566'); }
+  const leech = relicCount('leech');
+  if (leech) { player.hp = Math.min(player.maxHp, player.hp + leech); addFloat(player.x, player.y, '+' + leech + '♥', '#ff5566'); }
   if (rnd() < 0.45) items.push({ x: e.x, y: e.y, type: 'gold', amt: ri(1, 3) });
   sfxKill();
 }
 function hurtPlayer(dmg, srcX, srcY) {
   if (state !== 'play') return;
   let d = dmg;
-  if (relics.includes('skin')) d = Math.max(1, d - 1);
-  if (relics.includes('ward') && wardTimer === 0) {
-    wardTimer = 6; addFloat(player.x, player.y, 'BLOCK', '#88ccff'); sfxBlock(); return;
+  d = Math.max(1, d - relicCount('skin') - metaDR());
+  d = Math.min(d, damageCap());   // UNBROKEN
+  if (relicCount('ward') && wardTimer === 0) {
+    wardTimer = wardRecharge(); addFloat(player.x, player.y, 'BLOCK', '#88ccff'); sfxBlock(); return;
+  }
+  // LAST STAND is checked after the ward, so a shield is never wasted on a
+  // hit the skill would have survived anyway.
+  if (d >= player.hp && rank('stand') && !lastStandUsed) {
+    lastStandUsed = true;
+    player.hp = 1; shakeT = 0.5;
+    addFloat(player.x, player.y, 'LAST STAND', '#ffee88');
+    sfxBlock(); sfxHurt();
+    pathQueue = []; attackTargetId = -1;
+    return;
   }
   player.hp -= d; shakeT = 0.3;
   addFloat(player.x, player.y, '-' + d, '#ff4444');
@@ -402,11 +1036,13 @@ function stepEnemy(e, dm) {
   } else pick = cands[ri(0, cands.length - 1)];
   e.x = pick.nx; e.y = pick.ny;
 }
+let lastBank = null;    // what the delve just paid, for the death screen
 function checkDeath() {
   if (state !== 'play') return;
   if (player.hp > 0) return;
   state = 'dead';
   persistBests();
+  lastBank = bankRun();
   sfxDeath();
   setTimeout(showDeath, 900);
 }
@@ -415,13 +1051,19 @@ function checkDeath() {
 function openChest() {
   chest.opened = true;
   sfxChest();
-  const pool = Object.keys(RELICS).filter(k => !relics.includes(k));
-  if (pool.length === 0) { gold += 25; addFloat(chest.x, chest.y, '+25◈', '#ffc300'); return; }
+  // Unseen relics first; once the set is exhausted a chest starts offering
+  // second copies, which stack (see relicCount() at each effect site).
+  let pool = Object.keys(RELICS).filter(k => !relics.includes(k));
+  if (pool.length === 0) pool = Object.keys(RELICS);
   const a = pool[ri(0, pool.length - 1)];
-  const rest = pool.filter(k => k !== a);
+  let rest = pool.filter(k => k !== a);
   const b = rest.length ? rest[ri(0, rest.length - 1)] : null;
+  rest = rest.filter(k => k !== b);
+  // FORTUNE widens the offer rather than improving it — a third door, not a
+  // better one, so the skill never inflates the relics themselves.
+  const c3 = (rank('fortune') && rest.length) ? rest[ri(0, rest.length - 1)] : null;
   state = 'relic';
-  showRelicChoice(a, b);
+  showRelicChoice(a, b, c3);
 }
 function takeRelic(key) {
   relics.push(key);
@@ -439,8 +1081,25 @@ function beginDescend() {
 function completeDescend() {
   floorNum++;
   persistBests();
-  if (relics.includes('crown')) { player.maxHp += 2; player.hp = Math.min(player.maxHp, player.hp + 2); }
+  const crowns = relicCount('crown') * 2;
+  if (crowns) { player.maxHp += crowns; player.hp = Math.min(player.maxHp, player.hp + crowns); }
+  const rest = descendHeal();
+  if (rest && player.hp < player.maxHp) {
+    player.hp = Math.min(player.maxHp, player.hp + rest);
+    addFloat(player.x, player.y, '+' + rest + '♥', '#6fd8a0');
+  }
   genFloor(floorNum);
+  // SOVEREIGN's shield comes back with every stair you take.
+  if (rank('sovereign')) lastStandUsed = false;
+  const c = chr();
+  if (c) {
+    const finished = floorNum - 1;
+    if (finished > c.stats.deepest) c.stats.deepest = finished;
+    if (floorNum > c.stats.bestDepth) c.stats.bestDepth = floorNum;
+    const got = awardMilestones();
+    if (got) addFloat(player.x, player.y, '+' + got + ' SKILL POINT' + (got === 1 ? '' : 'S'), '#b44fff');
+    saveSlots();
+  }
   state = 'play';
 }
 
@@ -452,6 +1111,7 @@ function visibleEnemySet() {
 }
 function tapTile(tx, ty) {
   if (state !== 'play') return;
+  if (statuses.stun > 0) return;   // snared: the board does not answer
   if (tx < 0 || tx >= COLS || ty < 0 || ty >= ROWS) return;
   if (!seen[IDX(tx, ty)]) return;
   const e = enemyAt(tx, ty);
@@ -467,8 +1127,17 @@ function tapTile(tx, ty) {
   attackTargetId = -1;
   buildPathTo(tx, ty, false);
 }
+/* THE AUTO-PATH IS BLIND TO TRAPS, deliberately. It used to treat a seen,
+   unsprung trap as a wall, and that quietly played the game for you: every
+   hazard on the board was routed around for free, so a trap only ever caught
+   a player who walked onto it on purpose and the whole system cost nothing to
+   ignore. Avoiding a trap is now the PLAYER's job — tap short of it and go
+   round by hand — which is what makes noticing one worth anything. Do not
+   reintroduce a trap term in `pass`; TRAPWISE is the skill that answers traps,
+   not the pathfinder. */
 function buildPathTo(tx, ty, stopAdjacent) {
-  const dist = bfsMap(tx, ty, (x, y) => grid[IDX(x, y)] === 0 && (!enemyAt(x, y) || (x === tx && y === ty)));
+  const pass = (x, y) => grid[IDX(x, y)] === 0 && (!enemyAt(x, y) || (x === tx && y === ty));
+  const dist = bfsMap(tx, ty, pass);
   if (dist[IDX(player.x, player.y)] === -1) return;
   const path = [];
   let cx = player.x, cy = player.y;
@@ -490,6 +1159,19 @@ function buildPathTo(tx, ty, stopAdjacent) {
   pathQueue = path;
   visibleEnemiesAtPathStart = visibleEnemySet();
   pathT = 0; // step immediately on next frame
+}
+/* A stun is not an input lock — the turns still have to PASS, or the player
+   sits on a frozen board wondering what broke. The clock ticks them off at
+   the same cadence a walked path uses, so being snared reads as the dark
+   getting free moves. */
+let stunT = 0;
+function stunStep(dt) {
+  if (statuses.stun <= 0) return;
+  pathQueue = []; attackTargetId = -1;
+  stunT -= dt;
+  if (stunT > 0) return;
+  stunT = 0.22;
+  playerAct({ wait: true });
 }
 function pathStep(dt) {
   if (state !== 'play' || !pathQueue.length) return;
@@ -516,10 +1198,21 @@ function pathStep(dt) {
 
 /* ============ Run lifecycle ============ */
 function startRun() {
-  floorNum = 1; gold = 0; kills = 0; turnCount = 0;
-  relics = []; wardTimer = 0;
-  player.hp = 12; player.maxHp = 12; player.atk = 3;
-  genFloor(1);
+  gold = 0; kills = 0; turnCount = 0;
+  relics = []; wardTimer = 0; buffPanel = false; lastStandUsed = false;
+  clearStatuses(); killStreak = 0;
+  // The character's kit and skills are folded into the base stats ONCE, here,
+  // so everything downstream keeps reading plain `player.atk` / `player.maxHp`
+  // and relics keep stacking on top exactly as they did.
+  consumables = {};
+  const c = chr();
+  if (c) for (const k of CONSUMABLE_KEYS) if (c.supplies[k]) consumables[k] = c.supplies[k];
+  player.maxHp = CURVE.playerHp + metaMaxHp();
+  player.hp = player.maxHp;
+  player.atk = CURVE.playerAtk + metaAtk();
+  floorNum = startFloorOf();
+  runStartFloor = floorNum;
+  genFloor(floorNum);
   state = 'play';
   overlayEl.classList.add('hidden');
 }
@@ -543,6 +1236,61 @@ const ctx = cv.getContext('2d');
 const overlayEl = document.getElementById('overlay');
 let W = 390, H = 844, dpr = 1, tile = 34, ox = 0, oy = 0, hudTop = 60;
 let darkCv = null, darkCtx = null;
+/* ---- Camera -----------------------------------------------------------
+   `tile`/`ox`/`oy` stay the only things the renderer and hit-testing read,
+   so zoom is purely a matter of what applyView() writes into them:
+     tile = baseTile * zoom, and the offsets fall out of the focus point.
+   `baseTile` is the whole-board fit computed by resize(), which is also the
+   minimum zoom — pinching out returns you to "everything visible" and no
+   further. camX/camY are the world (tile-space) point held at the centre of
+   the board viewport; applyView clamps them so the board can never be
+   dragged off the play area, and centres an axis outright when the board is
+   smaller than the viewport on it (which is exactly the zoom-1 case, so
+   zoom 1 reproduces the original layout). */
+let baseTile = 34, zoom = 1, camX = COLS / 2, camY = ROWS / 2;
+let viewX = 0, viewY = 60, viewW = 390, viewH = 700;
+/* Zoom 1 is the whole-board fit. Below it the board shrinks inside the
+   viewport (a wider look at where you have been); above it you are reading
+   a few tiles at a time. */
+const MIN_ZOOM = 0.5, MAX_ZOOM = 6;
+/* `camFree` latches the moment the player drags or pinches, and only
+   centerCam() clears it. While it is set the camera is theirs: it does not
+   ease back toward the player, so a drag can look anywhere on the map and
+   stay there. The ⌖ button (drawn only while it is set) hands the camera
+   back. */
+let camFree = false;
+// Panning is meaningful only while the board is bigger than its viewport.
+function canPan() { return tile * COLS > viewW + 1 || tile * ROWS > viewH + 1; }
+function applyView() {
+  zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+  tile = baseTile * zoom;
+  const bw = tile * COLS, bh = tile * ROWS;
+  if (bw <= viewW) camX = COLS / 2;
+  else camX = Math.max(viewW / 2 / tile, Math.min(COLS - viewW / 2 / tile, camX));
+  if (bh <= viewH) camY = ROWS / 2;
+  else camY = Math.max(viewH / 2 / tile, Math.min(ROWS - viewH / 2 / tile, camY));
+  ox = Math.round(viewX + viewW / 2 - camX * tile);
+  oy = Math.round(viewY + viewH / 2 - camY * tile);
+}
+// Zoom by `factor`, keeping the world point under (sx,sy) pinned to (sx,sy).
+function zoomAt(sx, sy, factor) {
+  const nz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
+  if (nz === zoom) return;
+  const wx = (sx - ox) / tile, wy = (sy - oy) / tile;
+  camFree = true;
+  zoom = nz;
+  tile = baseTile * zoom;
+  camX = wx + (viewX + viewW / 2 - sx) / tile;
+  camY = wy + (viewY + viewH / 2 - sy) / tile;
+  applyView();
+}
+function panBy(dx, dy) {
+  if (!dx && !dy) return;
+  camFree = true;
+  camX -= dx / tile; camY -= dy / tile;
+  applyView();
+}
+function centerCam() { camFree = false; camX = player.x + 0.5; camY = player.y + 0.5; applyView(); }
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 3);
   W = window.innerWidth; H = window.innerHeight;
@@ -551,9 +1299,9 @@ function resize() {
   const sat = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
   hudTop = sat + 50;
   const availH = H - hudTop - 14;
-  tile = Math.floor(Math.min(W / COLS, availH / ROWS));
-  ox = Math.floor((W - tile * COLS) / 2);
-  oy = Math.floor(hudTop + (availH - tile * ROWS) / 2);
+  viewX = 0; viewY = hudTop; viewW = W; viewH = availH;
+  baseTile = Math.floor(Math.min(W / COLS, availH / ROWS));
+  applyView();
   darkCv = document.createElement('canvas');
   darkCv.width = Math.max(1, Math.round(W / 2)); darkCv.height = Math.max(1, Math.round(H / 2));
   darkCtx = darkCv.getContext('2d');
@@ -640,23 +1388,115 @@ const wallFrontTile = makeTileCanvas(g => {
   speckle(g, 30, '#8a7a68', 0.04, 0.1, 1, 2);
 });
 
-/* ============ Input ============ */
-let touchStart = null, usedTouch = false;
+/* ============ Input ============ =========================================
+   Three gestures share the canvas and must never be confused for each other:
+     1 finger, moved < TAP_SLOP  -> tap (move / attack), as before
+     1 finger, moved >= TAP_SLOP -> drag the board (only while zoomed in)
+     2 fingers                   -> pinch zoom + pan, anchored at the midpoint
+   `gestured` latches for the whole touch sequence once a pinch or a drag has
+   happened, so lifting the last finger after one never fires a stray tap.
+   Every canvas touch handler preventDefault()s, and the document-level
+   guards below kill Safari's own page pinch-zoom, so the gesture only ever
+   scales the board — never the page. */
+const TAP_SLOP = 14;
+let touchStart = null, lastPan = null, usedTouch = false;
+let pinch = null, dragging = false, gestured = false;
+function resetGesture() { touchStart = null; lastPan = null; pinch = null; dragging = false; gestured = false; }
+function pinchState(ev) {
+  const a = ev.touches[0], b = ev.touches[1];
+  return {
+    d: Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY),
+    mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2,
+  };
+}
 cv.addEventListener('touchstart', (ev) => {
   usedTouch = true;
   audioInit();
-  const t = ev.changedTouches[0];
-  touchStart = { x: t.clientX, y: t.clientY };
+  if (ev.touches.length >= 2) {
+    pinch = pinchState(ev);
+    gestured = true; dragging = false; touchStart = null; lastPan = null;
+  } else {
+    const t = ev.touches[0];
+    touchStart = { x: t.clientX, y: t.clientY };
+    lastPan = { x: t.clientX, y: t.clientY };
+    dragging = false;
+  }
   ev.preventDefault();
+}, { passive: false });
+cv.addEventListener('touchmove', (ev) => {
+  ev.preventDefault();
+  if (pinch && ev.touches.length >= 2) {
+    const n = pinchState(ev);
+    if (pinch.d > 0 && n.d > 0) zoomAt(n.mx, n.my, n.d / pinch.d);
+    panBy(n.mx - pinch.mx, n.my - pinch.my);
+    pinch = n;
+    return;
+  }
+  if (!touchStart || ev.touches.length !== 1) return;
+  const t = ev.touches[0];
+  if (!dragging && Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) >= TAP_SLOP) {
+    // Panning only makes sense once the board is bigger than the viewport;
+    // zoomed out to the fit or past it, a long drag stays a (cancelled) tap
+    // and moves nothing.
+    dragging = canPan();
+    if (dragging) gestured = true;
+  }
+  if (dragging) panBy(t.clientX - lastPan.x, t.clientY - lastPan.y);
+  lastPan = { x: t.clientX, y: t.clientY };
 }, { passive: false });
 cv.addEventListener('touchend', (ev) => {
-  const t = ev.changedTouches[0];
-  if (touchStart && Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) < 14) handleTap(t.clientX, t.clientY);
-  touchStart = null;
   ev.preventDefault();
+  if (ev.touches.length === 0) {
+    const t = ev.changedTouches[0];
+    if (!gestured && !dragging && touchStart &&
+        Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) < TAP_SLOP) {
+      handleTap(t.clientX, t.clientY);
+    }
+    resetGesture();
+  } else if (ev.touches.length === 1) {
+    // Dropped from two fingers to one: hand the drag over to the survivor,
+    // keeping `gestured` latched so its eventual lift is not a tap.
+    pinch = null;
+    const t = ev.touches[0];
+    touchStart = { x: t.clientX, y: t.clientY };
+    lastPan = { x: t.clientX, y: t.clientY };
+    dragging = canPan();
+  }
 }, { passive: false });
+cv.addEventListener('touchcancel', (ev) => { ev.preventDefault(); resetGesture(); }, { passive: false });
 cv.addEventListener('mousedown', (ev) => { if (!usedTouch) { audioInit(); handleTap(ev.clientX, ev.clientY); } });
+// Desktop / trackpad: ctrl+wheel is a trackpad pinch, plain wheel is a scroll —
+// both zoom the board here, and neither reaches the page.
+cv.addEventListener('wheel', (ev) => {
+  ev.preventDefault();
+  zoomAt(ev.clientX, ev.clientY, Math.exp(-ev.deltaY * (ev.ctrlKey ? 0.01 : 0.0018)));
+}, { passive: false });
+// Safari honours `user-scalable=no` unevenly; these are the belt to that
+// brace. Multi-touch anywhere on the page, and Safari's own gesture events,
+// are swallowed so a pinch can never scale the document.
+['gesturestart', 'gesturechange', 'gestureend'].forEach((n) => {
+  document.addEventListener(n, (ev) => ev.preventDefault(), { passive: false });
+});
+document.addEventListener('touchmove', (ev) => {
+  if (ev.touches.length > 1) ev.preventDefault();
+}, { passive: false });
 function handleTap(px, py) {
+  // Order matters: the open panel swallows the tap that closes it, so no
+  // step is queued and no enemy turn is taken by dismissing it.
+  if (buffPanel) { buffPanel = false; return; }
+  if (state !== 'play') return;
+  if (recenterBtn && Math.hypot(px - recenterBtn.x, py - recenterBtn.y) <= recenterBtn.r) {
+    centerCam();
+    return;
+  }
+  for (const b of useBtns) {
+    if (Math.hypot(px - b.x, py - b.y) <= b.r) { useConsumable(b.key); return; }
+  }
+  if (buffRect && px >= buffRect.x && px <= buffRect.x + buffRect.w &&
+      py >= buffRect.y && py <= buffRect.y + buffRect.h) {
+    buffPanel = true;
+    return;
+  }
   const tx = Math.floor((px - ox) / tile), ty = Math.floor((py - oy) / tile);
   tapTile(tx, ty);
 }
@@ -678,37 +1518,365 @@ function bindTap(el, fn) {
 function showMenu() {
   state = 'menu';
   overlayEl.classList.remove('hidden');
+  overlayEl.classList.remove('top');
   overlayEl.innerHTML = `
     <h1>EMBER DEPTHS</h1>
     <div class="sub">A TORCHLIT ROGUELIKE</div>
     <div class="stat">BEST DEPTH <b>${bestDepth() || '—'}</b> · MOST GOLD <b>${bestGold() || '—'}</b></div>
-    <button class="btn" id="go">⛏ DESCEND</button>
+    <button class="btn" id="go">⛏ ENTER CAMP</button>
     <div class="howto">
       <em>Tap</em> a lit tile to walk there — every step you take, the dark takes one too.
       <em>Tap an enemy</em> to close and strike. Gold is score, hearts heal,
       chests hold <em>relics</em> that stack into a build. Find the stairs, go deeper.
-      Death is forever.
+      Watch for <em>traps</em> — the auto-path walks around any you can see.
+      Death is forever, but your <em>gold, gear and skills</em> are not: they wait
+      for you in camp, and every fifth floor you finish pays a <em>skill point</em>.
+      <em>Pinch</em> to zoom, <em>drag</em> to look anywhere on the map (⌖ recentres),
+      and <em>tap your relics</em> for what they do.
     </div>`;
-  bindTap(document.getElementById('go'), startRun);
+  bindTap(document.getElementById('go'), showSlots);
+}
+
+/* ============ Character slots ============
+   Three independent characters so a build can be tried without unpicking the
+   one that works. Everything about a character is in its own blob; nothing
+   is shared but the audio settings. */
+function showSlots() {
+  state = 'slots';
+  activeSlot = -1;
+  overlayEl.classList.remove('hidden');
+  overlayEl.classList.add('top');
+  overlayEl.scrollTop = 0;
+  let html = '<div class="camp"><div class="camp-head"><span class="camp-name">DELVERS</span></div>' +
+             '<div class="camp-sub">THREE LIVES, THREE LEDGERS</div>';
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    const c = slots[i];
+    if (c) {
+      html += '<div class="slot-line">' +
+        '<button class="del" data-act="erase-ask" data-arg="' + i + '" ' +
+        'aria-label="Delete ' + esc(c.name) + '" title="Delete ' + esc(c.name) + '">✖</button>' +
+        '<button class="row" data-act="pick" data-arg="' + i + '">' +
+        '<span class="row-ico">⛏</span><span class="row-txt"><b>' + esc(c.name) + '</b>' +
+        '<span>DEPTH ' + c.stats.bestDepth + ' · ' + c.stats.runs + ' delve' + (c.stats.runs === 1 ? '' : 's') +
+        ' · ' + c.gold + '◈' + (c.sp ? ' · ' + c.sp + ' SP unspent' : '') + '</span></span>' +
+        '<span class="price">ENTER</span></button></div>';
+    } else {
+      html += '<div class="slot-line"><span class="del-gap"></span>' +
+        '<button class="row" data-act="new" data-arg="' + i + '">' +
+        '<span class="row-ico">＋</span><span class="row-txt"><b>EMPTY</b>' +
+        '<span>Start a new delver in this slot.</span></span>' +
+        '<span class="price">NEW</span></button></div>';
+    }
+  }
+  html += '<div class="camp-foot"><button class="btn" data-act="title">◂ TITLE</button></div></div>';
+  overlayEl.innerHTML = html;
+  bindCamp();
+}
+/* Deleting a delver is destructive and unrecoverable, so the ✖ on the slot row
+   only gets you here; nothing is written until DELETE is tapped on this screen.
+   KEEP is first and styled normally, DELETE is the red one on the right. */
+function showEraseConfirm(i) {
+  const c = slots[i];
+  if (!c) { showSlots(); return; }
+  state = 'slots';
+  overlayEl.classList.remove('hidden');
+  overlayEl.classList.add('top');
+  overlayEl.scrollTop = 0;
+  overlayEl.innerHTML = '<div class="camp">' +
+    '<div class="camp-head"><span class="camp-name">DELETE ' + esc(c.name) + '?</span></div>' +
+    '<div class="camp-sub">SLOT ' + (i + 1) + ' · THIS CANNOT BE UNDONE</div>' +
+    '<div class="empty-note">' + esc(c.name) + ' has reached <b>depth ' + c.stats.bestDepth + '</b> in ' +
+    c.stats.runs + ' delve' + (c.stats.runs === 1 ? '' : 's') + ', and is holding ' + c.gold + '◈' +
+    (c.sp ? ' and ' + c.sp + ' unspent skill point' + (c.sp === 1 ? '' : 's') : '') + '. ' +
+    'Deleting them frees the slot and takes the gold, the gear and the skills with them. ' +
+    'There is no way to get any of it back.</div>' +
+    '<div class="camp-foot"><button class="btn" data-act="slots">◂ KEEP</button>' +
+    '<button class="btn danger" data-act="erase" data-arg="' + i + '">DELETE</button></div></div>';
+  bindCamp();
+}
+function showNewCharacter(i) {
+  state = 'slots';
+  overlayEl.classList.remove('hidden');
+  overlayEl.classList.add('top');
+  overlayEl.scrollTop = 0;
+  overlayEl.innerHTML = '<div class="camp">' +
+    '<div class="camp-head"><span class="camp-name">A NEW DELVER</span></div>' +
+    '<div class="camp-sub">SLOT ' + (i + 1) + '</div>' +
+    '<input class="name-input" id="new-name" maxlength="14" value="' + esc(rollName()) + '" ' +
+    'autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Delver name">' +
+    '<div class="empty-note">They start with a chipped dirk, travel rags and a guttering ' +
+    'stub of tallow. Everything after that is bought with what they bring back — ' +
+    'gold from every delve, and a skill point for every fifth floor they finish.</div>' +
+    '<div class="camp-foot"><button class="btn" data-act="slots">◂ BACK</button>' +
+    '<button class="btn gold" data-act="create" data-arg="' + i + '">BEGIN</button></div></div>';
+  bindCamp();
+}
+
+/* ============ Camp (the between-delve hub) ============ */
+function showCamp(tab) {
+  const c = chr();
+  if (!c) { showSlots(); return; }
+  state = 'camp';
+  if (tab) campTab = tab;
+  overlayEl.classList.remove('hidden');
+  overlayEl.classList.add('top');
+  overlayEl.scrollTop = 0;
+  let html = '<div class="camp"><div class="camp-head">' +
+    '<span class="camp-name">' + esc(c.name) + '</span>' +
+    '<span class="camp-res">' + c.gold + '◈<span class="sp">' + c.sp + ' SP</span></span></div>' +
+    '<div class="camp-sub">DEPTH ' + c.stats.bestDepth + ' · ' + c.stats.runs +
+    ' DELVES · ' + c.stats.kills + ' KILLS</div>' +
+    '<div class="tabs">' +
+      tabBtn('forge', 'FORGE') + tabBtn('skills', 'SKILLS') + tabBtn('supply', 'SUPPLIES') +
+    '</div>';
+  if (campTab === 'forge') html += forgeHtml(c);
+  else if (campTab === 'skills') html += skillsHtml(c);
+  else html += supplyHtml(c);
+  // Depth picker: thousands of floors is the plan, so it steps by 5 as well
+  // as by 1, and the number itself jumps to the deepest you have reached.
+  const sf = startFloorOf(), maxSf = maxStartFloor();
+  html += '<div class="depth-pick">' +
+    '<button class="dbtn" data-act="depth" data-arg="-5"' + (sf > 1 ? '' : ' disabled') + '>◂◂</button>' +
+    '<button class="dbtn" data-act="depth" data-arg="-1"' + (sf > 1 ? '' : ' disabled') + '>◂</button>' +
+    '<button class="dnum" data-act="depth" data-arg="max">START AT DEPTH <b>' + sf + '</b>' +
+      '<i>' + (maxSf > 1 ? 'deepest reached ' + maxSf + ' · tap to jump' : 'reach depth 2 to unlock') + '</i></button>' +
+    '<button class="dbtn" data-act="depth" data-arg="1"' + (sf < maxSf ? '' : ' disabled') + '>▸</button>' +
+    '<button class="dbtn" data-act="depth" data-arg="5"' + (sf < maxSf ? '' : ' disabled') + '>▸▸</button>' +
+    '</div>';
+  html += '<div class="camp-foot">' +
+    '<button class="btn" data-act="slots">◂ DELVERS</button>' +
+    '<button class="btn gold" data-act="delve">⛏ DELVE</button></div></div>';
+  overlayEl.innerHTML = html;
+  bindCamp();
+}
+function tabBtn(key, label) {
+  return '<button class="tab' + (campTab === key ? ' on' : '') + '" data-act="tab" data-arg="' + key + '">' + label + '</button>';
+}
+function forgeHtml(c) {
+  let html = '<div class="empty-note">Your kit carries from delve to delve. ' +
+             'Six upgrades on every track, each one dearer than the last — ' +
+             'current effect in green, the next tier replaces it.</div>';
+  for (const key in GEAR) {
+    const track = GEAR[key], t = c.gear[key], cur = track.tiers[t], next = track.tiers[t + 1];
+    const top = track.tiers.length - 1;
+    const cost = next ? next.cost : 0;
+    const afford = next && c.gold >= cost;
+    html += '<button class="row' + (next ? '' : ' maxed') + '"' +
+      (next && afford ? ' data-act="buy-gear" data-arg="' + key + '"' : '') + '>' +
+      '<span class="row-ico">' + track.icon + '</span><span class="row-txt">' +
+      '<b>' + track.name + ' <i class="tier">' + t + '/' + top + '</i> · ' +
+        esc(next ? next.name : cur.name) + '</b>' +
+      '<span>' + esc(next ? next.desc : cur.desc) + '</span>' +
+      '<span class="now">NOW: ' + esc(cur.name) + ' — ' + esc(cur.desc) + '</span></span>' +
+      (next
+        ? '<span class="price' + (afford ? '' : ' no') + '">' + cost + '◈</span>'
+        : '<span class="price owned">BEST</span>') +
+      '</button>';
+  }
+  return html;
+}
+/* The tree is drawn as SVG rather than a list of rows, because the shape IS
+   the rule: which node feeds which is the only thing a player needs to read,
+   and a list cannot show it. Edges come from the same `in` arrays the
+   allocation check uses, so the picture cannot drift from the rule. */
+const SK_X = (col) => 34 + col * 68;
+const SK_Y = (row) => 32 + row * 70;
+function skillState(key) {
+  const node = skillNode(key);
+  const r = rank(key);
+  if (r >= node.max) return 'maxed';
+  if (!skillOpen(key)) return 'locked';
+  return r > 0 ? 'partial' : 'open';
+}
+function skillsHtml(c) {
+  const spent = skillsSpent();
+  let svg = '<svg class="tree" viewBox="0 0 340 ' + (SK_Y(SKILL_ROWS - 1) + 46) + '" ' +
+            'preserveAspectRatio="xMidYMin meet" role="img" aria-label="Skill tree">';
+  // edges first, so nodes sit on top of them
+  for (const node of SKILLS) {
+    for (const from of node.in) {
+      const a = skillNode(from);
+      const live = rank(from) > 0;
+      svg += '<line x1="' + SK_X(a.col) + '" y1="' + (SK_Y(a.row) + 20) + '" ' +
+             'x2="' + SK_X(node.col) + '" y2="' + (SK_Y(node.row) - 20) + '" ' +
+             'stroke="' + (live ? '#ff9a3c' : '#2f2740') + '" stroke-width="' + (live ? 2 : 1.5) + '" />';
+    }
+  }
+  for (const node of SKILLS) {
+    const st = skillState(node.key), r = rank(node.key);
+    const x = SK_X(node.col), y = SK_Y(node.row);
+    const fill = (st === 'maxed' || st === 'partial') ? '#20351f' : '#100d18';
+    const stroke = st === 'locked' ? '#2f2740' : (st === 'open' ? '#ffc300' : '#6fd8a0');
+    const glyph = st === 'locked' ? '#4a4250' : (st === 'open' ? '#ffc300' : '#6fd8a0');
+    const sel = node.key === campSkill;
+    svg += '<g data-act="skill" data-arg="' + node.key + '" class="sk">';
+    svg += '<circle cx="' + x + '" cy="' + y + '" r="26" fill="transparent" />';   // touch target
+    if (sel) svg += '<circle cx="' + x + '" cy="' + y + '" r="24" fill="none" stroke="#ff9a3c" stroke-width="1.5" />';
+    svg += '<circle cx="' + x + '" cy="' + y + '" r="19" fill="' + fill + '" stroke="' + stroke + '" stroke-width="2" />';
+    svg += '<text x="' + x + '" y="' + (y + 6) + '" text-anchor="middle" font-size="17" fill="' + glyph + '">' + node.icon + '</text>';
+    if (node.max > 1) {
+      let pips = '';
+      for (let i = 0; i < node.max; i++) pips += i < r ? '◆' : '◇';
+      svg += '<text x="' + x + '" y="' + (y + 30) + '" text-anchor="middle" font-size="8" fill="' + glyph + '">' + pips + '</text>';
+    }
+    svg += '</g>';
+  }
+  svg += '</svg>';
+
+  const node = skillNode(campSkill) || SKILLS[0];
+  const st = skillState(node.key), r = rank(node.key), cost = skillCost(node.key);
+  const missing = node.in.filter((k) => rank(k) === 0).map((k) => skillNode(k).name);
+  let card = '<div class="sk-card"><b>' + node.icon + ' ' + node.name +
+             (node.max > 1 ? ' · ' + r + '/' + node.max : '') + '</b>';
+  card += '<span>' + node.desc(Math.min(node.max, r + 1)) + '</span>';
+  if (r > 0 && node.max > 1) card += '<span class="now">NOW: ' + node.desc(r) + '</span>';
+  else if (r > 0) card += '<span class="now">TAKEN.</span>';
+  if (missing.length) card += '<span class="no">Needs a point in ' + missing.join(' and ') + '.</span>';
+  card += '</div>';
+  const canBuy = st !== 'maxed' && st !== 'locked' && c.sp >= cost;
+  card += '<div class="camp-foot" style="margin-top:8px">' +
+    '<button class="btn" data-act="respec"' + (c.gold >= respecCost() && spent > 0 ? '' : ' disabled') + '>' +
+      '↺ FORGET · ' + respecCost() + '◈</button>' +
+    (st === 'maxed'
+      ? '<button class="btn" disabled>MAXED</button>'
+      : '<button class="btn gold" data-act="rank" data-arg="' + node.key + '"' + (canBuy ? '' : ' disabled') + '>' +
+        (st === 'locked' ? 'LOCKED' : 'SPEND ' + cost + ' SP') + '</button>') +
+    '</div>';
+
+  return '<div class="empty-note"><b style="color:#b44fff">' + c.sp + ' SP</b> unspent · ' + spent +
+         ' spent. One point every five depths, the first time you finish that floor. ' +
+         'A node opens once <em>every</em> node feeding it has a point.</div>' +
+         svg + card;
+}
+function supplyHtml(c) {
+  let html = '<div class="empty-note">Supplies live in your pack. They ride down with you and ' +
+             'stay there until you <em>use</em> one — dying does not take them. ' +
+             'In the delve they are the round buttons up the <b>left edge of the board</b>: ' +
+             'tap one to use it, which costs you a turn.</div>';
+  for (const key of CONSUMABLE_KEYS) {
+    const item = CONSUMABLES[key], held = c.supplies[key] || 0;
+    const full = held >= item.max;
+    const afford = !full && c.gold >= item.cost;
+    html += '<button class="row' + (full ? ' maxed' : '') + '"' +
+      (afford ? ' data-act="buy-supply" data-arg="' + key + '"' : '') + '>' +
+      '<span class="row-ico">' + item.icon + '</span><span class="row-txt">' +
+      '<b>' + item.name + ' · ' + held + '/' + item.max + '</b>' +
+      '<span>' + esc(item.desc) + '</span></span>' +
+      (full ? '<span class="price owned">FULL</span>'
+            : '<span class="price' + (afford ? '' : ' no') + '">' + item.cost + '◈</span>') +
+      '</button>';
+  }
+  return html;
+}
+function esc(t) {
+  return String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+}
+// One sweep after every render: rows ARE buttons carrying data-act, so a
+// re-render never leaves a stale listener behind (innerHTML dropped them).
+function bindCamp() {
+  overlayEl.querySelectorAll('[data-act]').forEach((el) => {
+    bindTap(el, () => campAction(el.dataset.act, el.dataset.arg, el.dataset.arg2));
+  });
+}
+function campAction(act, arg, arg2) {
+  const c = chr();
+  if (act === 'title') { showMenu(); return; }
+  if (act === 'slots') { showSlots(); return; }
+  if (act === 'new') { showNewCharacter(+arg); return; }
+  if (act === 'create') {
+    const el = document.getElementById('new-name');
+    slots[+arg] = newCharacter(el ? el.value.trim() : '');
+    saveSlots();
+    activeSlot = +arg;
+    campTab = 'forge';
+    sfxRelic();
+    showCamp();
+    return;
+  }
+  if (act === 'erase-ask') { showEraseConfirm(+arg); return; }
+  if (act === 'erase') { slots[+arg] = null; saveSlots(); sfxStairs(); showSlots(); return; }
+  if (act === 'pick') { activeSlot = +arg; campTab = 'forge'; showCamp(); return; }
+  if (act === 'tab') { showCamp(arg); return; }
+  if (act === 'delve') { startRun(); return; }
+  if (act === 'depth') {
+    if (!c) return;
+    const maxSf = maxStartFloor();
+    c.startFloor = arg === 'max' ? maxSf
+      : Math.max(1, Math.min(maxSf, startFloorOf() + parseInt(arg, 10)));
+    saveSlots(); showCamp();
+    return;
+  }
+  if (!c) return;
+  if (act === 'buy-gear') {
+    const next = GEAR[arg].tiers[c.gear[arg] + 1];
+    if (!next || c.gold < next.cost) return;
+    c.gold -= next.cost; c.gear[arg]++;
+    saveSlots(); sfxRelic(); showCamp();
+    return;
+  }
+  if (act === 'buy-supply') {
+    const item = CONSUMABLES[arg];
+    const held = c.supplies[arg] || 0;
+    if (held >= item.max || c.gold < item.cost) return;
+    c.gold -= item.cost; c.supplies[arg] = held + 1;
+    saveSlots(); sfxCoin(); showCamp();
+    return;
+  }
+  if (act === 'skill') { campSkill = arg; showCamp(); return; }
+  if (act === 'rank') {
+    const node = skillNode(arg);
+    if (!node) return;
+    const r = rank(arg), cost = r + 1;
+    if (r >= node.max || !skillOpen(arg) || c.sp < cost) return;
+    c.sp -= cost; c.skills[arg] = r + 1;
+    campSkill = arg;
+    saveSlots(); sfxRelic(); showCamp();
+    return;
+  }
+  if (act === 'respec') {
+    const cost = respecCost(), spent = skillsSpent();
+    if (!spent || c.gold < cost) return;
+    c.gold -= cost; c.sp += spent; c.skills = {};
+    saveSlots(); sfxStairs(); showCamp();
+  }
 }
 function showDeath() {
+  const c = chr();
   overlayEl.classList.remove('hidden');
+  overlayEl.classList.remove('top');
+  let banked = '';
+  if (c && lastBank) {
+    banked = `
+    <div class="stat" style="margin-top:10px">CARRIED <b>${gold}◈</b> + DEPTH <b>${lastBank.depthBonus}◈</b>
+      = BANKED <b>${lastBank.earned}◈</b></div>
+    ${lastBank.newBest ? '<div class="stat"><b>NEW DEEPEST</b></div>' : ''}
+    <div class="stat" style="color:#8899bb">${esc(c.name)} now holds ${c.gold}◈ and ${c.sp} SP</div>`;
+  }
   overlayEl.innerHTML = `
     <h1 style="color:#ff2244;text-shadow:0 0 30px #ff224466">THE DARK TAKES YOU</h1>
     <div class="sub">DEPTH ${floorNum} · TURN ${turnCount}</div>
     <div class="stat">GOLD <b>${gold}◈</b> · KILLS <b>${kills}</b> · RELICS <b>${relics.length}</b></div>
-    <div class="stat">BEST DEPTH <b>${bestDepth()}</b> · MOST GOLD <b>${bestGold()}</b></div>
-    <button class="btn" id="again">⛏ DESCEND AGAIN</button>`;
-  bindTap(document.getElementById('again'), startRun);
+    ${banked}
+    <div style="display:flex;gap:8px;margin-top:16px;width:100%;max-width:370px">
+      <button class="btn" data-act="camp" style="flex:1 1 0;min-width:0;margin:0">⌂ CAMP</button>
+      <button class="btn gold" data-act="delve" style="flex:1 1 0;min-width:0;margin:0">⛏ DELVE AGAIN</button>
+    </div>`;
+  overlayEl.querySelectorAll('[data-act]').forEach((el) => {
+    bindTap(el, () => (el.dataset.act === 'delve' ? startRun() : showCamp()));
+  });
 }
-function showRelicChoice(a, b) {
+let relicOffer = [];   // the keys currently on the table (test hook)
+function showRelicChoice(a, b, c) {
   overlayEl.classList.remove('hidden');
+  overlayEl.classList.remove('top');
   let html = `<h2>THE CHEST CREAKS OPEN</h2><div class="sub">CHOOSE ONE RELIC</div>`;
-  html += `<button class="relic-card" id="rl-a"><b>${RELICS[a].icon} ${RELICS[a].name}</b><span>${RELICS[a].desc}</span></button>`;
-  if (b) html += `<button class="relic-card" id="rl-b"><b>${RELICS[b].icon} ${RELICS[b].name}</b><span>${RELICS[b].desc}</span></button>`;
+  const offer = [a, b, c].filter(Boolean);
+  relicOffer = offer.slice();
+  offer.forEach((k, i) => {
+    html += `<button class="relic-card" id="rl-${i}"><b>${RELICS[k].icon} ${RELICS[k].name}</b><span>${RELICS[k].desc}</span></button>`;
+  });
   overlayEl.innerHTML = html;
-  bindTap(document.getElementById('rl-a'), () => takeRelic(a));
-  if (b) bindTap(document.getElementById('rl-b'), () => takeRelic(b));
+  offer.forEach((k, i) => bindTap(document.getElementById('rl-' + i), () => takeRelic(k)));
 }
 
 /* ============ Audio ============ */
@@ -717,12 +1885,26 @@ let noiseBuf = null;
 let muted = localStorage.getItem('ember-depths-mute') === '1';
 const muteBtn = document.getElementById('mute');
 muteBtn.textContent = muted ? '🔇' : '🔊';
+/* Mix headroom the game was tuned at; the settings sliders scale these, so
+   100% is exactly the old behaviour and mute still wins over both. */
+const SFX_BASE = 0.4, MUSIC_BASE = 0.14;
+function loadVol(key) {
+  const v = parseFloat(localStorage.getItem(key));
+  return (isFinite(v) && v >= 0 && v <= 1) ? v : 1;
+}
+let sfxVol = loadVol('ember-depths-sfxvol');
+let musicVol = loadVol('ember-depths-musicvol');
+function applyVolumes() {
+  if (sfxGain) sfxGain.gain.value = muted ? 0 : SFX_BASE * sfxVol;
+  if (musicGain) musicGain.gain.value = muted ? 0 : MUSIC_BASE * musicVol;
+}
 function audioInit() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)();
-    sfxGain = AC.createGain(); sfxGain.gain.value = muted ? 0 : 0.4; sfxGain.connect(AC.destination);
-    musicGain = AC.createGain(); musicGain.gain.value = muted ? 0 : 0.14; musicGain.connect(AC.destination);
+    sfxGain = AC.createGain(); sfxGain.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.connect(AC.destination);
+    applyVolumes();
     // shared noise buffer (SFX + music drips)
     noiseBuf = AC.createBuffer(1, AC.sampleRate * 1, AC.sampleRate);
     const d = noiseBuf.getChannelData(0);
@@ -730,13 +1912,54 @@ function audioInit() {
     startMusic();
   } catch (err) { AC = null; }
 }
-bindTap(muteBtn, () => {
-  muted = !muted;
+function setMuted(v) {
+  muted = v;
   muteBtn.textContent = muted ? '🔇' : '🔊';
   try { localStorage.setItem('ember-depths-mute', muted ? '1' : '0'); } catch (err) {}
-  if (sfxGain) sfxGain.gain.value = muted ? 0 : 0.4;
-  if (musicGain) musicGain.gain.value = muted ? 0 : 0.14;
-});
+  applyVolumes();
+}
+bindTap(muteBtn, () => setMuted(!muted));
+
+/* ============ Settings panel ============ */
+const settingsEl = document.getElementById('settings');
+const cogBtn = document.getElementById('cog');
+const musicSlider = document.getElementById('vol-music');
+const sfxSlider = document.getElementById('vol-sfx');
+const musicVal = document.getElementById('vol-music-val');
+const sfxVal = document.getElementById('vol-sfx-val');
+function settingsOpen() { return !settingsEl.classList.contains('hidden'); }
+function openSettings() {
+  syncSettings();
+  settingsEl.classList.remove('hidden');
+  cogBtn.classList.add('on');
+}
+function closeSettings() {
+  settingsEl.classList.add('hidden');
+  cogBtn.classList.remove('on');
+}
+function syncSettings() {
+  musicSlider.value = String(Math.round(musicVol * 100));
+  sfxSlider.value = String(Math.round(sfxVol * 100));
+  musicVal.textContent = Math.round(musicVol * 100) + '%';
+  sfxVal.textContent = Math.round(sfxVol * 100) + '%';
+}
+function onVolInput(which, el) {
+  const v = Math.max(0, Math.min(1, (parseFloat(el.value) || 0) / 100));
+  if (which === 'music') musicVol = v; else sfxVol = v;
+  try { localStorage.setItem('ember-depths-' + which + 'vol', String(v)); } catch (err) {}
+  // Dragging a slider up is a deliberate "let me hear this" — honour it over a
+  // stale mute rather than leaving the panel dead.
+  if (muted && v > 0) setMuted(false);
+  audioInit();   // a slider drag is a valid iOS unlock gesture
+  applyVolumes();
+  syncSettings();
+}
+musicSlider.addEventListener('input', () => onVolInput('music', musicSlider));
+sfxSlider.addEventListener('input', () => onVolInput('sfx', sfxSlider));
+bindTap(cogBtn, () => (settingsOpen() ? closeSettings() : openSettings()));
+bindTap(document.getElementById('set-close'), closeSettings);
+settingsEl.addEventListener('pointerdown', (ev) => { if (ev.target === settingsEl) closeSettings(); });
+syncSettings();
 function tone(freq, dur, type, vol, when, dest) {
   if (!AC) return;
   const o = AC.createOscillator(), g = AC.createGain();
@@ -871,6 +2094,30 @@ function drawScene(dt) {
       ctx.fillRect(px + tile * inset, py + tile * inset, tile * (1 - inset * 2), tile * 0.08);
     }
     ctx.globalAlpha = 1;
+  }
+  // ---- traps: a rune on the flagstones, dark and inert once sprung
+  for (const t of traps) {
+    if (!seen[IDX(t.x, t.y)]) continue;
+    const [px, py] = cellPx(t.x, t.y);
+    const cx2 = px + tile / 2, cy2 = py + tile / 2;
+    const meta = TRAPS[t.type];
+    ctx.save();
+    if (t.sprung) { ctx.globalAlpha = 0.3; }
+    ctx.strokeStyle = t.sprung ? '#4a4250' : meta.col;
+    ctx.lineWidth = Math.max(1, tile * 0.045);
+    ctx.beginPath(); ctx.arc(cx2, cy2, tile * 0.3, 0, 7); ctx.stroke();
+    if (!t.sprung) {
+      ctx.globalAlpha = 0.18 + flick(t.x * 5 + t.y, 4) * 0.22;
+      ctx.fillStyle = meta.col;
+      ctx.beginPath(); ctx.arc(cx2, cy2, tile * 0.3, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = t.sprung ? '#4a4250' : meta.col;
+    ctx.font = `${Math.round(tile * 0.42)}px 'Share Tech Mono', monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(meta.icon, cx2, cy2 + tile * 0.15);
+    ctx.textAlign = 'left';
+    ctx.restore();
   }
   // ---- items
   for (const it of items) {
@@ -1014,6 +2261,15 @@ function drawScene(dt) {
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.75, 0, 7); ctx.fill();
   }
   ctx.globalCompositeOperation = 'source-over';
+  // A zoomed board is larger than its viewport, so it would otherwise render
+  // up behind the HUD row and down past the bottom margin. Mask those strips
+  // back to background *before* the vignette, so they darken exactly as the
+  // (already-empty) strips do at zoom 1.
+  ctx.fillStyle = '#050409';
+  if (viewY > 0) ctx.fillRect(0, 0, W, viewY);
+  if (viewY + viewH < H) ctx.fillRect(0, viewY + viewH, W, H - viewY - viewH);
+  if (viewX > 0) ctx.fillRect(0, viewY, viewX, viewH);
+  if (viewX + viewW < W) ctx.fillRect(viewX + viewW, viewY, W - viewX - viewW, viewH);
   // vignette
   const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
   vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)');
@@ -1039,6 +2295,7 @@ function drawScene(dt) {
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
   }
+  drawBuffPanel();
 }
 function drawPlayer() {
   const [px, py] = cellPx(player.vx, player.vy);
@@ -1079,6 +2336,14 @@ function drawPlayer() {
   }
 }
 function drawEnemy(e) {
+  if (e.elite) {
+    const [epx, epy] = cellPx(e.vx, e.vy);
+    ctx.strokeStyle = 'rgba(180,79,255,0.75)';
+    ctx.lineWidth = Math.max(1, tile * 0.05);
+    ctx.beginPath();
+    ctx.ellipse(epx + tile / 2, epy + tile * 0.55, tile * 0.36, tile * 0.42, 0, 0, 7);
+    ctx.stroke();
+  }
   if (!lit[IDX(e.x, e.y)] && !(seen[IDX(e.x, e.y)] && e.type === 'wraith')) return;
   const [px, py] = cellPx(e.vx, e.vy);
   const cx2 = px + tile / 2;
@@ -1170,9 +2435,9 @@ function drawHUD(dt) {
   ctx.textAlign = 'left';
   ctx.font = `13px 'Black Ops One', sans-serif`;
   ctx.fillStyle = '#ff9a3c';
-  ctx.fillText('DEPTH ' + floorNum, 104, y + 14);
+  ctx.fillText('DEPTH ' + floorNum, 148, y + 14);
   ctx.fillStyle = '#ffc300';
-  ctx.fillText('◈ ' + gold, 104, y + 32);
+  ctx.fillText('◈ ' + gold, 148, y + 32);
   // HP bar
   const bw = Math.min(150, W - 250), bx = W - bw - 12;
   ctx.fillStyle = 'rgba(10,8,12,0.8)';
@@ -1187,14 +2452,261 @@ function drawHUD(dt) {
   ctx.fillStyle = '#dde3ff';
   ctx.textAlign = 'right';
   ctx.fillText(player.hp + '/' + player.maxHp + ' HP', bx + bw, y + 30);
-  // relic icons
+  // Relic icons — one per kind, ×N when stacked. The whole row is a tap
+  // target that opens the detail panel, so it gets a faint plate behind it:
+  // an icon strip with no affordance reads as decoration.
+  const list = relicCounts();
+  const rowY = y + 48;
   ctx.textAlign = 'left';
-  ctx.font = `12px 'Share Tech Mono', monospace`;
-  let rx = bx;
-  for (const k of relics) {
-    ctx.fillStyle = (k === 'ward' && wardTimer > 0) ? '#555a70' : '#ffc300';
-    ctx.fillText(RELICS[k].icon, rx, y + 44);
-    rx += 16;
+  // Measure first, then place: six relics with ×N badges are wider than the
+  // gap between the gold line and the right edge, so the row slides left to
+  // fit rather than running off screen.
+  let rowW = 0;
+  for (const r of list) {
+    rowW += 14 + 4;
+    if (r.n > 1) { ctx.font = `9px 'Share Tech Mono', monospace`; rowW += ctx.measureText('\u00d7' + r.n).width + 1; }
+  }
+  let rx = Math.max(196, Math.min(bx, W - 12 - rowW));
+  const rowLeft = rx;
+  for (const r of list) {
+    ctx.font = `12px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = (r.key === 'ward' && wardTimer > 0) ? '#555a70' : '#ffc300';
+    ctx.fillText(RELICS[r.key].icon, rx, rowY);
+    rx += 14;
+    if (r.n > 1) {
+      ctx.font = `9px 'Share Tech Mono', monospace`;
+      ctx.fillStyle = '#ff9a3c';
+      ctx.fillText('\u00d7' + r.n, rx, rowY);
+      rx += ctx.measureText('\u00d7' + r.n).width + 1;
+    }
+    rx += 4;
+  }
+  if (list.length) {
+    buffRect = { x: rowLeft - 8, y: rowY - 14, w: Math.min(W - rowLeft + 4, Math.max(54, rx - rowLeft + 14)), h: 28 };
+    ctx.fillStyle = 'rgba(255,154,60,0.07)';
+    ctx.fillRect(buffRect.x, buffRect.y, buffRect.w, buffRect.h);
+    ctx.strokeStyle = 'rgba(255,154,60,0.28)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(buffRect.x + 0.5, buffRect.y + 0.5, buffRect.w - 1, buffRect.h - 1);
+  } else {
+    buffRect = null;
+  }
+  drawRecenter();
+  drawConsumables();
+  drawStatuses();
+}
+
+/* Active trap effects, centred at the foot of the board between the two
+   button stacks. Anything that is silently draining you needs a number on
+   screen, or the death reads as unfair rather than earned. */
+function drawStatuses() {
+  if (state !== 'play') return;
+  const live = [];
+  if (statuses.stun > 0) live.push(['stun', statuses.stun]);
+  if (statuses.venom > 0) live.push(['venom', statuses.venom]);
+  if (statuses.slow > 0) live.push(['tarry', statuses.slow]);
+  if (statuses.gloom > 0) live.push(['gloom', statuses.gloom]);
+  if (statuses.frail > 0) live.push(['frail', statuses.frail]);
+  if (!live.length) return;
+  const pw = 40, gap = 5, y = viewY + viewH - 26;
+  let x = viewX + viewW / 2 - (live.length * pw + (live.length - 1) * gap) / 2;
+  ctx.textAlign = 'center';
+  for (const [key, turns] of live) {
+    const meta = STATUS_META[key];
+    ctx.fillStyle = 'rgba(10,8,14,0.78)';
+    ctx.fillRect(x, y, pw, 22);
+    ctx.strokeStyle = meta.col; ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, pw - 1, 21);
+    ctx.font = `12px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = meta.col;
+    ctx.fillText(meta.icon + ' ' + turns, x + pw / 2, y + 15);
+    x += pw + gap;
+  }
+  ctx.textAlign = 'left';
+}
+
+/* The ⌖ handle. Free-look means the camera stops chasing the player, so the
+   route back cannot be another gesture (a drag is what got you here) and it
+   cannot be a board tap (that walks). A button in the corner of the viewport
+   is the only thing that is unambiguous — and it doubles as the signal that
+   the camera is currently yours. */
+function drawRecenter() {
+  if (state !== 'play' || !camFree) { recenterBtn = null; return; }
+  const r = 21, cx2 = viewX + viewW - r - 12, cy2 = viewY + viewH - r - 12;
+  recenterBtn = { x: cx2, y: cy2, r: r + 8 };
+  ctx.fillStyle = 'rgba(10,8,14,0.72)';
+  ctx.beginPath(); ctx.arc(cx2, cy2, r, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#ff9a3c'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(cx2, cy2, r, 0, 7); ctx.stroke();
+  ctx.strokeStyle = '#ffc300'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(cx2, cy2, 6.5, 0, 7); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx2 - 12, cy2); ctx.lineTo(cx2 - 8, cy2);
+  ctx.moveTo(cx2 + 8, cy2); ctx.lineTo(cx2 + 12, cy2);
+  ctx.moveTo(cx2, cy2 - 12); ctx.lineTo(cx2, cy2 - 8);
+  ctx.moveTo(cx2, cy2 + 8); ctx.lineTo(cx2, cy2 + 12);
+  ctx.stroke();
+}
+
+/* ============ Consumables (the in-run half of SUPPLIES) ============
+   Drawn as a stack of buttons up the left edge of the board viewport,
+   opposite ⌖ — deliberate targets, hit-tested in handleTap ahead of
+   tapTile so one can never be triggered by a tap meant for the floor. */
+function drawConsumables() {
+  useBtns = [];
+  if (state !== 'play') return;
+  const keys = CONSUMABLE_KEYS.filter((k) => (consumables[k] || 0) > 0);
+  if (!keys.length) return;
+  const r = 21;
+  let cy2 = viewY + viewH - r - 20;
+  for (const k of keys) {
+    const cx2 = viewX + r + 12;
+    useBtns.push({ x: cx2, y: cy2, r: r + 7, key: k });
+    ctx.fillStyle = 'rgba(10,8,14,0.72)';
+    ctx.beginPath(); ctx.arc(cx2, cy2, r, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#6fd8a0'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx2, cy2, r, 0, 7); ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.font = `16px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = '#6fd8a0';
+    ctx.fillText(CONSUMABLES[k].icon, cx2, cy2 + 5);
+    const bx2 = cx2 + r * 0.72, by2 = cy2 + r * 0.72;
+    ctx.fillStyle = '#0b0910';
+    ctx.beginPath(); ctx.arc(bx2, by2, 8.5, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#6fd8a0'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(bx2, by2, 8.5, 0, 7); ctx.stroke();
+    ctx.font = `10px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = '#ffc300';
+    ctx.fillText(String(consumables[k]), bx2, by2 + 3.5);
+    // A glyph in a circle is not an instruction. The name goes underneath so
+    // the button says what it does without anything to open or hover.
+    ctx.font = `9px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = 'rgba(111,216,160,0.85)';
+    ctx.fillText(CONSUMABLES[k].short, cx2, cy2 + r + 11);
+    ctx.textAlign = 'left';
+    cy2 -= r * 2 + 24;
+  }
+  // …and for the first few turns of a delve, say so outright. A player who
+  // bought supplies and never found them has been sold nothing.
+  if (turnCount < 8) {
+    ctx.textAlign = 'left';
+    ctx.font = `10px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = 'rgba(111,216,160,0.75)';
+    ctx.fillText('◂ TAP TO USE', viewX + r * 2 + 20, viewY + viewH - r - 16);
+  }
+}
+function useConsumable(key) {
+  if (state !== 'play') return;
+  const n = consumables[key] || 0;
+  if (!n) return;
+  consumables[key] = n - 1;
+  // USING an item is what spends it — not dying with it. The backpack is the
+  // character's, so the in-run stock and the stored one come down together and
+  // anything you carried out is still there next delve.
+  const owner = chr();
+  if (owner) { owner.supplies[key] = Math.max(0, (owner.supplies[key] || 0) - 1); saveSlots(); }
+  if (key === 'draught') {
+    const before = player.hp;
+    player.hp = Math.min(player.maxHp, player.hp + 8);
+    addFloat(player.x, player.y, '+' + (player.hp - before) + '♥', '#6fd8a0');
+    sfxHeart();
+  } else if (key === 'bomb') {
+    // Iterate a copy: killEnemy rebuilds `enemies` under us.
+    for (const e of enemies.slice()) {
+      if (Math.abs(e.x - player.x) + Math.abs(e.y - player.y) > 2) continue;
+      e.hp -= 5; e.hurtT = 0.25; e.aggro = true;
+      addFloat(e.x, e.y, '-5', '#ff9a3c');
+      addPuff(e.x, e.y, '#ff7a30');
+      if (e.hp <= 0) killEnemy(e);
+    }
+    shakeT = 0.35;
+    sfxChest();
+  } else if (key === 'dust') {
+    seen.fill(1);
+    addFloat(player.x, player.y, 'THE FLOOR OPENS', '#88ccff');
+    sfxRelic();
+  }
+  // Using an item is your turn: the dark still gets its step.
+  playerAct({ wait: true });
+}
+
+/* ============ Relic detail panel ============
+   Opened by tapping the HUD relic row, closed by tapping anywhere. It is a
+   read of state, never a mutation of it: handleTap returns before tapTile,
+   so no step is queued and no enemy turn is taken while it is up. */
+function wrapLines(text, maxW) {
+  const out = [];
+  let cur = '';
+  for (const word of text.split(' ')) {
+    const next = cur ? cur + ' ' + word : word;
+    if (cur && ctx.measureText(next).width > maxW) { out.push(cur); cur = word; }
+    else cur = next;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+function relicStatus(key, n) {
+  if (key === 'ward') {
+    const now = wardTimer > 0
+      ? 'Recharging \u2014 ready in ' + wardTimer + ' turn' + (wardTimer === 1 ? '' : 's') + '.'
+      : 'Shield ready.';
+    // The card text quotes the single-copy recharge, so a stack has to say
+    // what it actually is rather than leave the two numbers contradicting.
+    return n > 1 ? now + ' Recharge now every ' + wardRecharge() + ' turns.' : now;
+  }
+  if (key === 'blade') return 'Attack now ' + player.atk + '.';
+  if (key === 'crown') return 'Max HP now ' + player.maxHp + '.';
+  if (key === 'lantern') return 'Light radius ' + lightRadius().toFixed(1) + ' tiles.';
+  if (key === 'skin') return 'Incoming damage reduced by ' + n + ' (never below 1).';
+  if (key === 'leech') return 'Heals ' + n + ' HP per kill.';
+  return '';
+}
+function drawBuffPanel() {
+  if (!buffPanel) return;
+  const list = relicCounts();
+  if (!list.length) { buffPanel = false; return; }
+  const pw = Math.min(W - 32, 344), pad = 15, wrapW = pw - pad * 2 - 4;
+  const bodyFont = `11px 'Share Tech Mono', monospace`;
+  const blocks = [];
+  let hh = pad + 24;
+  for (const r of list) {
+    ctx.font = bodyFont;
+    const desc = wrapLines(RELICS[r.key].desc, wrapW);
+    const stat = wrapLines(relicStatus(r.key, r.n), wrapW);
+    blocks.push({ r, desc, stat });
+    hh += 17 + desc.length * 14 + stat.length * 14 + 12;
+  }
+  hh += pad - 8;
+  const px0 = Math.round((W - pw) / 2);
+  const py0 = Math.round(Math.max(hudTop + 8, Math.min(H - hh - 20, (H - hh) / 2)));
+  ctx.fillStyle = 'rgba(4,3,6,0.86)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(14,11,18,0.98)';
+  ctx.fillRect(px0, py0, pw, hh);
+  ctx.strokeStyle = '#ff9a3c'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(px0 + 0.5, py0 + 0.5, pw - 1, hh - 1);
+  ctx.textAlign = 'left';
+  ctx.font = `13px 'Black Ops One', sans-serif`;
+  ctx.fillStyle = '#ff9a3c';
+  ctx.fillText('RELICS', px0 + pad, py0 + pad + 12);
+  ctx.textAlign = 'right';
+  ctx.font = `9px 'Share Tech Mono', monospace`;
+  ctx.fillStyle = '#7a7286';
+  ctx.fillText('TAP ANYWHERE TO CLOSE', px0 + pw - pad, py0 + pad + 11);
+  ctx.textAlign = 'left';
+  let ty = py0 + pad + 30;
+  for (const b of blocks) {
+    ctx.font = `12px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = '#ffc300';
+    const head = RELICS[b.r.key].icon + '  ' + RELICS[b.r.key].name + (b.r.n > 1 ? '  \u00d7' + b.r.n : '');
+    ctx.fillText(head, px0 + pad, ty);
+    ty += 17;
+    ctx.font = bodyFont;
+    ctx.fillStyle = '#a89fb4';
+    for (const ln of b.desc) { ctx.fillText(ln, px0 + pad + 4, ty); ty += 14; }
+    ctx.fillStyle = '#6fd8a0';
+    for (const ln of b.stat) { ctx.fillText(ln, px0 + pad + 4, ty); ty += 14; }
+    ty += 12;
   }
 }
 
@@ -1221,6 +2733,28 @@ function spawnAmbient(dt) {
   }
 }
 
+/* ============ Camera follow ============
+   Runs only while the camera is still the game's (see `camFree`): until the
+   player drags or pinches, walking can never lose you off-screen, because
+   the camera eases just enough to put the player back inside a dead zone.
+   The first drag hands the camera over for good, and only the ⌖ button (or
+   descending a floor) takes it back — that is what "look anywhere" means
+   here, and why the button has to exist. */
+function followCam(dt) {
+  if (camFree || !canPan()) return;
+  const [px, py] = cellPx(player.vx + 0.5, player.vy + 0.5);
+  const mx = Math.min(viewW * 0.32, tile * 2.2), my = Math.min(viewH * 0.32, tile * 2.2);
+  let dx = 0, dy = 0;
+  if (px < viewX + mx) dx = px - (viewX + mx);
+  else if (px > viewX + viewW - mx) dx = px - (viewX + viewW - mx);
+  if (py < viewY + my) dy = py - (viewY + my);
+  else if (py > viewY + viewH - my) dy = py - (viewY + viewH - my);
+  if (!dx && !dy) return;
+  const e = Math.min(1, dt * 7);
+  camX += (dx / tile) * e; camY += (dy / tile) * e;
+  applyView();
+}
+
 /* ============ Main loop ============ */
 function frame(ts) {
   const dt = Math.min(0.1, (ts - lastT) / 1000 || 0.016);
@@ -1234,10 +2768,12 @@ function frame(ts) {
     e.vy += (e.y - e.vy) * ease;
     if (e.hurtT > 0) e.hurtT -= dt;
   }
-  if (state === 'play') { pathStep(dt); spawnAmbient(dt); }
+  if (state === 'play') { stunStep(dt); pathStep(dt); spawnAmbient(dt); }
+  if (!pinch && !dragging) followCam(dt);
   drawScene(dt);
   requestAnimationFrame(frame);
 }
+loadSlots();   // characters exist before any meta helper is read
 genFloor(1);   // background dungeon behind the menu
 showMenu();
 requestAnimationFrame(frame);

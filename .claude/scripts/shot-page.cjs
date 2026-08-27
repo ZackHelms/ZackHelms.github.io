@@ -31,14 +31,32 @@ if (!page_ || !out) {
   console.error('usage: shot-page.cjs <page.html> <out.png> [w= h= wait= click=x,y select=#id:val dpr=]');
   process.exit(1);
 }
+// <out.png> is POSITIONAL. Passing it opt-style ("out=shot.png") used to be
+// accepted in silence: it became the out path verbatim, so the shot landed in
+// a junk directory literally named "out=" and the script still printed a
+// cheerful SHOT= line (2026-08-23). Both that and a typo'd opt key (which fell
+// through to opt[k]=NaN and was ignored) now fail loudly.
+if (out.includes('=')) {
+  console.error('shot-page.cjs: <out.png> is positional, not "key=value" — got: ' + out);
+  process.exit(1);
+}
 const opt = { w: 390, h: 844, wait: 3000, dpr: 2, click: null, select: [], eval: [] };
+const NUMERIC = ['w', 'h', 'wait', 'dpr'];
 for (const a of rest) {
   const i = a.indexOf('=');
+  if (i < 0) { console.error('shot-page.cjs: expected key=value, got: ' + a); process.exit(1); }
   const k = a.slice(0, i), v = a.slice(i + 1);
   if (k === 'select') opt.select.push(v);
   else if (k === 'eval') opt.eval.push(v);
   else if (k === 'click') opt.click = v.split(',').map(Number);
-  else opt[k] = Number(v);
+  else if (NUMERIC.includes(k)) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) { console.error('shot-page.cjs: ' + k + '= expects a number, got: ' + v); process.exit(1); }
+    opt[k] = n;
+  } else {
+    console.error('shot-page.cjs: unknown option "' + k + '" (known: w h wait dpr click select eval)');
+    process.exit(1);
+  }
 }
 const candidates = [process.env.SMOKE_CHROMIUM, '/opt/pw-browsers/chromium'].filter(Boolean);
 const executablePath = candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } });
@@ -61,9 +79,23 @@ const executablePath = candidates.find(p => { try { return fs.existsSync(p); } c
   await page.goto('file://' + path.resolve(page_), { waitUntil: 'load' });
   await page.waitForTimeout(600);
   if (opt.click) { try { await page.mouse.click(opt.click[0], opt.click[1]); } catch {} }
+  // Set the value directly rather than through page.selectOption. A settings
+  // picker usually lives in a panel that starts `display:none` (star-surge's
+  // and neon-clash's both do), and selectOption's actionability check waits
+  // for a visibility that never arrives, so `select=` silently did nothing on
+  // exactly the pickers it was added for (2026-08-24). Dispatch the events
+  // too — the value alone changes nothing.
   for (const s of opt.select) {
     const i = s.indexOf(':');
-    try { await page.selectOption(s.slice(0, i), s.slice(i + 1)); } catch (e) { errors.push('select failed: ' + s); }
+    const ok = await page.evaluate(([sel, val]) => {
+      const el = document.querySelector(sel);
+      if (!el) return false;
+      el.value = val;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return el.value === val;
+    }, [s.slice(0, i), s.slice(i + 1)]);
+    if (!ok) errors.push('select failed (no such element, or value rejected): ' + s);
   }
   // Arrange the scene through the page's own test hook before shooting. Most
   // games expose one (window.__NC, __PH, ...); this is the difference between
@@ -78,5 +110,9 @@ const executablePath = candidates.find(p => { try { return fs.existsSync(p); } c
   console.log('SHOT=' + out);
   console.log(errors.length ? 'ERRORS:\n' + [...new Set(errors)].slice(0, 8).join('\n') : 'ERRORS=none');
   await browser.close();
-  process.exit(errors.some(e => e.startsWith('PAGEERROR')) ? 1 : 0);
+  // A failed select= or eval= means the scene under the camera is not the
+  // one that was asked for, so it fails like a page error does. Reporting it
+  // and exiting 0 is the same class of bug stamp-badge.sh already had: a
+  // success line computed from intent rather than from the artifact.
+  process.exit(errors.length ? 1 : 0);
 })().catch(e => { console.error('FATAL', e.message); process.exit(1); });
