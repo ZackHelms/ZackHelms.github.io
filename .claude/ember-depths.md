@@ -27,9 +27,10 @@ realistic light-map rendering. Single self-contained file.
   BFS dist ≤ 8.
 - **Pathing:** `tapTile` → `buildPathTo` (BFS backtrack) → `pathQueue`
   consumed at 0.19 s/step in the rAF loop (`pathStep`). Interrupts: newly
-  visible enemy, adjacent aggro enemy, blocker on next cell, or taking
-  damage. Tapping a lit enemy paths to adjacent then auto-attacks
-  (`attackTargetId`).
+  visible enemy, adjacent aggro enemy, blocker on next cell, taking damage, or
+  **springing a trap**. Tapping a lit enemy paths to adjacent then auto-attacks
+  (`attackTargetId`). **`buildPathTo` is blind to traps** — see
+  **## Traps and statuses**.
 - **Relics** (`RELICS`, chest offers 2): blade +2 atk, leech HP/kill, skin
   −dmg (min 1), ward blocks 1 hit per `wardRecharge()` turns (`wardTimer`),
   lantern +light, crown +2 maxHP & +2 heal per descend. Effects live in
@@ -71,11 +72,52 @@ constant here and re-run the eval; do not guess, because the interactions
 - **Elites** from depth 4, chance rising with depth to a 40% cap: same
   silhouette, same behaviour, ×1.6 HP and +1 attack, purple rim. Stronger
   monsters without a new rule for the player to learn.
-- Measured 2026-08-26 (persona, 20 runs, seed 90210): **fresh 6.9 / kitted
-  11.6 / maxed 23.8**, deepest single run 43. The CD's target for a fresh
-  delver is ~8, and the persona plays worse than a person — see the eval's
-  header for why its average is a floor on what the CD will see, not a
-  prediction of it.
+- Measured 2026-08-27 (12 runs, seed 90210, the STEADY persona): **fresh 7.2 /
+  kitted 16.5 / maxed 35.0**, and 44.6 for the VETERAN persona at max with a
+  deepest single run of 75. The CD's target for a fresh delver is ~8, and every
+  persona plays worse than a person — see the eval's header for why its average
+  is a floor on what the CD will see, not a prediction of it.
+
+### The three personas
+
+`eval-ember-depths.cjs` plays **NOVICE / STEADY / VETERAN**, and the whole
+difference between them is decisions a person makes at the board, never a stat:
+
+| | NOVICE | STEADY | VETERAN |
+| --- | --- | --- | --- |
+| traps | walks over them | goes round when it can | never crosses one it can go round |
+| unavoidable trap | — | crosses it | stands and fights first, crosses on a quiet board |
+| outnumbered | swings where it stands | swings where it stands | backs into a corridor or dead end, one foe at a time |
+| archers | ignores | ignores | **charges** — a corner is no answer to something with a line on you |
+| relics / gear / skills | whatever is offered, whatever is cheapest | short preference list | priority order, coherent skill route |
+
+They rank correctly at every build tier (fresh 5.9 / 7.2 / 7.5; kitted 14.5 /
+16.5 / 17.7; maxed 34.7 / 35.0 / 44.6), which is the eval's own control: if
+skill stops buying depth, either the tactics have stopped working or the
+persona has stopped playing them.
+
+**Four ways a scripted persona measures itself instead of the game**, all four
+found while writing these and all four now fixed in the file — read them before
+adding a fourth persona or a new tactic:
+
+1. **Attractor flip-flop.** Re-picking the nearest goal every time a path runs
+   out walks the delver between two equidistant unexplored corners forever —
+   200 consecutive moves, no enemies on the board, no progress, and the run
+   truncates instead of ending. The goal is now **sticky**: the previous one
+   wins while it is still on the candidate list. This single fix took
+   truncation from 21 runs in 108 to 3 and put the personas in the right order.
+2. **Chasing is not clearing.** "Clear the enemies before crossing a trap"
+   implemented as *hunt the pack* made VETERAN the worst persona of the three —
+   a fully maxed build dying on depth 7 having spent 352 turns not descending.
+   Every extra turn near an enemy is an extra enemy turn. Waiting one step from
+   the thing that is coming anyway costs nothing; going to find it costs the floor.
+3. **A corner beats a crowd, not a bow.** Retreating from two archers and
+   holding put the delver in a shooting gallery, pacing between two cells for a
+   hundred turns. Shooters are charged; the retreat is for melee.
+4. **Commit to the ground.** Re-choosing the chokepoint every turn makes the
+   retreat a shuffle, because the pack keeps moving and the "best" cell keeps
+   changing. Pick one, walk to it, and put a **per-floor budget** on the whole
+   tactic so a standoff cannot eat the floor.
 
 ## Traps and statuses
 
@@ -97,11 +139,20 @@ so poison bleeds you on **your** clock rather than theirs.
 - **A stun is not an input lock.** `stunStep(dt)` auto-passes the turns at the
   same cadence a walked path uses, because a frozen board with no explanation
   reads as a bug. `tapTile` ignores taps while `statuses.stun > 0`.
-- **The auto-path treats a seen, unsprung trap as a wall** (`trapBlocked`), so
-  tapping a far tile never walks you over a hazard that is drawn on screen —
-  but tapping the trap *itself* still works, which is the deliberate way onto
-  one. If avoiding it makes the target unreachable, `buildPathTo` falls back to
-  the honest route rather than refusing to move.
+- **The auto-path is BLIND to traps, deliberately** (changed 2026-08-27).
+  `buildPathTo` used to treat a seen, unsprung trap as a wall (`trapBlocked`,
+  now deleted), and that quietly played the game for the player: every hazard
+  drawn on the board was routed around for free, so a trap could only ever
+  catch someone who walked onto it on purpose, and the whole system cost
+  nothing to ignore. **Avoiding a trap is the player's own work** — tap short
+  of it and go round by hand — which is what makes noticing one worth
+  anything, and what makes a lazy tap across a lit room a real risk. Do not
+  reintroduce a trap term in `buildPathTo`'s `pass`: TRAPWISE is the skill that
+  answers traps, not the pathfinder.
+- **Springing one clears `pathQueue`** (in `springTrap`). Only SPIKE PIT deals
+  damage, so the "took a hit" interrupt every other hazard gets for free never
+  fires for the other five — without this the walk carries straight on through
+  the snare that just went off.
 - Active statuses are drawn as pills at the foot of the board
   (`drawStatuses`). Anything silently draining you needs a number on screen or
   the death reads as unfair rather than earned.
@@ -132,9 +183,11 @@ so (`meta-progression` + `save-campaign` alongside `permadeath`).
   LAST STAND), `killEnemy` (EXECUTION), `lightRadius()`, the gold pickup
   (`goldMult()`), `completeDescend` (`descendHeal()`), `genFloor`
   (`marksStairs()`), `openChest` (FORTUNE's third door).
-- **Gear** (`GEAR`): four tracks × four tiers. Tier 0 is the free starting kit,
-  which is what lets "upgrade" be a single verb everywhere — there is no
-  unowned state to special-case. Full kit ≈ 1675◈.
+- **Gear** (`GEAR`): four tracks × **seven** tiers (2026-08-27; it was four).
+  Tier 0 is the free starting kit, which is what lets "upgrade" be a single
+  verb everywhere — there is no unowned state to special-case. Full kit ≈
+  **31,000◈**, twenty-four purchases. See **### The gear ladder** below: the
+  costs are geometric and they are *tuned*, not chosen.
 - **Skills** (`SKILLS`): **one DAG, two roots, sixteen nodes.** The whole rule
   is `skillOpen()`: a node accepts a point once **every** node with an arrow
   into it has at least one. Rank *r* costs *r*, so multi-rank nodes get
@@ -152,14 +205,51 @@ so (`meta-progression` + `save-campaign` alongside `permadeath`).
   floor 1 to reach floor 30. The delve's depth bonus counts floors below
   **where you started**, so diving in deep and dying on arrival pays nothing.
 - **Supplies** (`CONSUMABLES`): bought in camp into `chr().supplies`, copied
-  into the in-run `consumables` at `startRun()`, and **cleared by `bankRun()`
-  whether or not they were used** — that is the recurring sink, and the reason
-  gold does not just plateau once the gear is bought. Used from a stack of
-  buttons up the left edge of the board (`drawConsumables` / `useBtns`),
-  hit-tested in `handleTap` ahead of `tapTile`. Using one **takes your turn**
-  (`playerAct({wait:true})`); it is not a free action.
+  into the in-run `consumables` at `startRun()`. **USING one is what spends it,
+  not dying with it** (changed 2026-08-27 — they used to be cleared by
+  `bankRun()` used or not, as a recurring sink, and a player who bought three
+  firebombs and never found the button lost them for nothing). `useConsumable`
+  decrements the in-run stock *and* `chr().supplies`, then saves; `bankRun`
+  does not touch supplies at all. That double write is the contract — it is
+  what makes the pack survive a death **and** stops an abandoned run refunding
+  a potion that was already drunk. Used from a stack of buttons up the left
+  edge of the board (`drawConsumables` / `useBtns`), hit-tested in `handleTap`
+  ahead of `tapTile`. Using one **takes your turn** (`playerAct({wait:true})`);
+  it is not a free action.
+- **A glyph in a circle is not an instruction.** The CD bought supplies and
+  could not work out how to use them, so each button now carries its `short`
+  name underneath (HEAL / BOMB / MAP), the camp's SUPPLIES tab says where they
+  are and that using one costs a turn, and for the first eight turns of a delve
+  the board draws a `◂ TAP TO USE` label beside the stack. A bought item the
+  player never finds has sold them nothing.
 - **The payout** (`bankRun`): **gold only** — carried gold plus 10 per floor
   below the one you started on.
+
+### The gear ladder
+
+Four tracks, six purchasable rungs each, **geometric at roughly ×1.9 a rung**
+(70 → 3600 on weapon and armor; lantern a shade cheaper, charm a shade dearer).
+The shape is the point, and it is a fix for a real complaint: with four tiers
+and a flat ladder the CD **maxed the whole kit in about two delves**, because a
+delve's takings grow roughly with the square of the depth it reaches while a
+flat ladder does not grow at all. A geometric ladder tracks that growth, so the
+next rung stays about one delve away for the entire campaign.
+
+The ratio is not free either. Income grows ~quadratically in the number of
+purchases (each rung buys depth, and depth pays); costs grow exponentially. Pick
+the ratio too high and the late game stalls, too low and it collapses again —
+×1.9 is what makes the two curves run roughly parallel across all 24 purchases.
+
+**Tuned against `.claude/tests/eval-ember-depths.cjs --campaign`, not chosen.**
+The number that decides it is **purchases per delve**, and the CD's spec is
+about one. Measured 2026-08-27 over a 25-delve campaign, seed 90210: **0.96 for
+all three personas**, novice maxing the kit on delve 25, veteran around delve
+18. A sweep of `M × ratio` is in that eval's history — flat ladders scored 1.7
+with the kit maxed by delve 12.
+
+Supplies were re-priced with it (50 / 80 / 60). They are no longer a recurring
+sink now that the pack persists, so their price has to be a real decision on
+its own rather than pocket change beside a 3600◈ axe.
 
 ### The skill tree
 
@@ -458,7 +548,7 @@ intro banner and descend fade.
   closed in one turn, which is 0 whenever the layout blocks it — flaky on a
   procedural floor. Counting SWINGS from an enemy already beside you is
   layout-independent and is what the rule actually says.
-- Drive: **`.claude/tests/drive-ember-depths.cjs` (113 checks)** — kept, and
+- Drive: **`.claude/tests/drive-ember-depths.cjs` (115 checks)** — kept, and
   picked up automatically by `gates.sh` for any change under
   `games/ember-depths/`. Covers the zoom range and clamps, zoom-1 layout
   identity, free look (tethered before a drag, never re-tethering after one,
@@ -469,20 +559,31 @@ intro banner and descend fade.
   hard way: the first version re-derived `damage - relicCount('skin')` inside
   the check and passed with the shipping site reverted to `.includes()`.
   Balance is NOT here — it lives in **`.claude/tests/eval-ember-depths.cjs`**,
-  which plays scripted personas through real runs and is the only honest way to
-  tune `CURVE`. Read its header before trusting a number from it.
+  which plays three scripted personas through real runs and is the only honest
+  way to tune `CURVE` **or `GEAR`**. Read its header before trusting a number
+  from it. It has two halves answering different questions: `--depth` (fixed
+  builds × personas) is what the difficulty curve is tuned against, and
+  `--campaign` (one character, N delves, **shopping between them through the
+  camp's own `campAction`**) is what the economy is tuned against — the number
+  the economy is judged on is **purchases per delve**.
   A second group covers the meta layer: three independent slots surviving a
   reload, the delete-confirm split (the ✖ measured as a small button *left* of
   the row, `erase-ask` leaving the character and its stored blob untouched,
   KEEP backing out, `erase` still erasing), a hand-edited save clamped by
   `migrate()`, the forge refusing what
-  you cannot afford, the kit **reaching the delve** (atk / max HP / light /
-  gold multiplier / marked stairs, read off `startRun`'s output), the skill
-  gate and the rank-r-costs-r ladder, every skill effect measured through the
-  game's own `hurtPlayer` / `killEnemy` / `playerAct` / `completeDescend`, the
-  supply round trip (bought → carried → used → a turn passes → lost with the
-  body), and the payout arithmetic including that a delve cannot be banked
-  twice. Negative-controlled through `negtest.sh` — a `camFree`-blind
+  you cannot afford, **the ladder's shape** (six rungs above a free kit on every
+  track, each dearer than the last), the kit **reaching the delve** (atk / max
+  HP / light / gold multiplier / marked stairs, read off `startRun`'s output),
+  the skill gate and the rank-r-costs-r ladder, every skill effect measured
+  through the game's own `hurtPlayer` / `killEnemy` / `playerAct` /
+  `completeDescend`, the supply round trip (bought → carried → used → a turn
+  passes → **still in the pack after the body is banked**, because using one is
+  what spends it, not dying with it), and the payout arithmetic including that a
+  delve cannot be banked twice.
+  **Every gear and supply price in this suite is READ from `GEAR` /
+  `CONSUMABLES`, never restated.** The ladder is tuned against the eval and
+  moves whenever the economy does; a check that hard-codes 40◈ goes red on the
+  next tuning pass for a reason that has nothing to do with the forge. Negative-controlled through `negtest.sh` — a `camFree`-blind
   `followCam`, a falling-through dismiss tap, skin/leech/ward reverted to
   non-stacking, `bankRun` keeping the supplies, the skill gate removed, the
   kit never folded into `player`, `migrate` trusting the blob, and an
@@ -495,9 +596,16 @@ intro banner and descend fade.
   every trap kind and the status it leaves, TRAPWISE, trap-aware pathing, the
   milestone ledger (a point on floors 5 and 10 and nowhere else; re-finishing
   pays nothing), and the sticky starting depth including that a deep dive that
-  dies on arrival banks zero. Negative-controlled too — an ANY-input
-  prerequisite, a milestone that pays every time, a depth bonus counted from
-  floor 1, traps that never block the path, and venom that never expires.
+  dies on arrival banks zero. **Trap pathing is now asserted the other way up**:
+  a trap planted on a cell the route uses *and with a way round it* leaves the
+  route byte-identical, and springing one clears `pathQueue`. The
+  has-a-way-round part is the whole discriminator — a cell with no detour is
+  crossed by any pathfinder, trap-aware or not, so a version of the check
+  without it stays green with trap-blindness reverted. Negative-controlled too —
+  an ANY-input prerequisite, a milestone that pays every time, a depth bonus
+  counted from floor 1, venom that never expires, `trapBlocked` put back,
+  `springTrap` no longer clearing the queue, a `bankRun` that empties the pack,
+  a `useConsumable` that does not debit it, and a flat rung in the gear ladder.
 - Older scratchpad suites (2026-08-25, 70 checks: slider → gain math, mute
   precedence, reload persistence, pinch anchor, screen→tile round-trip, fuzz
   runs, the chrome-reachability sweep) are gone with their container. The

@@ -39,7 +39,7 @@ const EXE = process.env.SMOKE_CHROMIUM ||
 const ROOT = path.resolve(__dirname, '..', '..');
 const URL = 'file://' + path.join(ROOT, 'games', 'ember-depths', 'index.html');
 
-const GEAR_MAX = 3;   // tiers per gear track, minus the free starting kit
+const GEAR_MAX = 6;   // tiers per gear track, minus the free starting kit
 const CURVE_HP = 20;  // CURVE.playerHp — a delver's HP before any kit
 
 let pass = 0, fail = 0;
@@ -402,7 +402,7 @@ const ok = (name, cond, extra) => {
       gold: c.gold, sp: c.sp, weapon: c.gear.weapon, armor: c.gear.armor, lantern: c.gear.lantern,
       edge: rank('edge'), junkSkill: c.skills['nope.nope'],
       draught: c.supplies.draught, junkSupply: c.supplies.ghost,
-      best: c.stats.bestDepth, atk: metaAtk(),
+      best: c.stats.bestDepth, atk: metaAtk(), topAtk: GEAR.weapon.tiers[GEAR.weapon.tiers.length - 1].atk,
     };
   });
   ok('a hand-edited save is clamped, not trusted',
@@ -415,48 +415,81 @@ const ok = (name, cond, extra) => {
   // Two dotted keys in that blob, each clamped to rank 3 = 6 points apiece.
   ok('a legacy skill blob cannot mint skill points',
      clamped.sp === 999 + 12, clamped);
-  ok('and the clamped kit still computes a real bonus', clamped.atk === 3 + 2, clamped);
+  ok('and the clamped kit still computes a real bonus',
+     clamped.atk === clamped.topAtk + 2, clamped);
 
   // ---- the forge ----
   const forge = await page.evaluate(() => {
     localStorage.clear(); loadSlots();
     campAction('new', '0'); campAction('create', '0');
     const c = chr();
-    c.gold = 20;
-    campAction('buy-gear', 'weapon');           // 40g — cannot afford
-    const poor = { gold: c.gold, tier: c.gear.weapon };
-    c.gold = 200;
+    // Prices are READ, never restated. The ladder is tuned against the eval and
+    // moves when the economy does; a check that hard-codes 40 fails the next
+    // tuning pass for a reason that has nothing to do with the forge.
+    const price = (k, t) => GEAR[k].tiers[t].cost;
+    const short = price('weapon', 1) - 1;
+    c.gold = short;
+    campAction('buy-gear', 'weapon');           // one short — cannot afford
+    const poor = { gold: c.gold, was: short, tier: c.gear.weapon };
+    const purse = price('weapon', 1) + price('armor', 1) + 500;
+    c.gold = purse;
     campAction('buy-gear', 'weapon');
     campAction('buy-gear', 'armor');
-    return { poor, gold: c.gold, weapon: c.gear.weapon, armor: c.gear.armor };
+    // The ladder itself: six rungs above the free kit on every track, each one
+    // dearer than the last. A flat or non-monotonic rung is an economy bug the
+    // eval would only catch as a number drifting.
+    const ladder = {};
+    for (const k in GEAR) {
+      const t = GEAR[k].tiers;
+      ladder[k] = { n: t.length - 1, free: t[0].cost === 0,
+                    rising: t.every((x, i) => i === 0 || x.cost > t[i - 1].cost) };
+    }
+    return { poor, gold: c.gold, purse, spent: price('weapon', 1) + price('armor', 1),
+             weapon: c.gear.weapon, armor: c.gear.armor, ladder };
   });
   ok('a purchase you cannot afford is a no-op',
-     forge.poor.gold === 20 && forge.poor.tier === 0, forge);
+     forge.poor.tier === 0 && forge.poor.gold === forge.poor.was, forge);
   ok('buying debits exactly the price and raises one tier',
-     forge.gold === 200 - 40 - 40 && forge.weapon === 1 && forge.armor === 1, forge);
+     forge.gold === forge.purse - forge.spent && forge.weapon === 1 && forge.armor === 1, forge);
+  ok('every gear track is a free kit plus six rungs, each dearer than the last',
+     Object.values(forge.ladder).every((l) => l.n === GEAR_MAX && l.free && l.rising),
+     forge.ladder);
 
   // The kit has to REACH the delve: startRun folds it into player stats once,
   // and nothing downstream re-reads it.
   const kitted = await page.evaluate(() => {
     const c = chr();
-    c.gold = 5000;
-    campAction('buy-gear', 'weapon'); campAction('buy-gear', 'weapon');   // -> ASHSTEEL RUIN, +3
-    campAction('buy-gear', 'armor'); campAction('buy-gear', 'armor');     // -> EMBERPLATE, +8 hp, -1 dr
-    campAction('buy-gear', 'lantern'); campAction('buy-gear', 'lantern'); campAction('buy-gear', 'lantern');
-    campAction('buy-gear', 'charm'); campAction('buy-gear', 'charm'); campAction('buy-gear', 'charm');
+    c.gold = 999999;
+    // Start from the free kit: the forge block above already bought a rung on
+    // two tracks, and inheriting that put weapon and armor a tier ahead of the
+    // table this check reads its expectations out of.
+    c.gear = { weapon: 0, armor: 0, lantern: 0, charm: 0 };
+    const T = 3;                       // the same rung on all four tracks
+    for (const k in GEAR) for (let i = 0; i < T; i++) campAction('buy-gear', k);
+    // Expected values come out of the table, so a retuned tier moves the check
+    // with it and the check still measures what it is for: that the kit is
+    // folded into `player` at all.
+    const want = {
+      atk: GEAR.weapon.tiers[T].atk, hp: GEAR.armor.tiers[T].hp,
+      light: GEAR.lantern.tiers[T].light, gold: GEAR.charm.tiers[T].gold,
+    };
     const light0 = 3.6;
     startRun();
     return {
+      want, tiers: Object.values(c.gear),
       atk: player.atk, maxHp: player.maxHp, hp: player.hp,
       light: lightRadius(), light0, goldMult: goldMult(), marks: marksStairs(),
       stairsSeen: seen[IDX(stairs.x, stairs.y)] === 1,
     };
   });
-  ok('gear reaches the delve: attack', kitted.atk === 3 + 3, kitted);
+  ok('four tracks bought to the same rung', kitted.tiers.every((t) => t === 3), kitted);
+  ok('gear reaches the delve: attack', kitted.atk === 3 + kitted.want.atk, kitted);
   ok('gear reaches the delve: max HP, and you start full',
-     kitted.maxHp === CURVE_HP + 8 && kitted.hp === kitted.maxHp, kitted);
-  ok('gear reaches the delve: light', Math.abs(kitted.light - (kitted.light0 + 2.6)) < 1e-6, kitted);
-  ok('gear reaches the delve: gold multiplier', Math.abs(kitted.goldMult - 1.5) < 1e-9, kitted);
+     kitted.maxHp === CURVE_HP + kitted.want.hp && kitted.hp === kitted.maxHp, kitted);
+  ok('gear reaches the delve: light',
+     Math.abs(kitted.light - (kitted.light0 + kitted.want.light)) < 1e-6, kitted);
+  ok('gear reaches the delve: gold multiplier',
+     Math.abs(kitted.goldMult - (1 + kitted.want.gold)) < 1e-9, kitted);
   ok('the Deepseeker Idol marks the stairs on arrival', kitted.marks && kitted.stairsSeen, kitted);
 
   // ---- skills: ONE tree, and the prerequisite rule that shapes it ----
@@ -717,15 +750,17 @@ const ok = (name, cond, extra) => {
      trapSkill.wise.has === 1 && trapSkill.wise.spike < trapSkill.bare.spike &&
      trapSkill.wise.gloom < trapSkill.bare.gloom, trapSkill);
 
-  // The auto-path treats a trap you can see as a wall — tapping a far tile
-  // must never walk you over a hazard that is drawn on the board.
-  //
-  // The setup has to be searched for, not assumed. An earlier version put the
-  // trap on the middle of any two-step line, which on one floor in four is the
-  // ONLY route to the target — and there the code's documented fallback (walk
-  // it rather than refuse to move) is correct, so the check failed for being
-  // wrong about the board. Find a trap cell that is not a cut vertex, and
-  // assert the detour; then assert the fallback on a cell that IS one.
+  /* THE AUTO-PATH IS BLIND TO TRAPS. It used to treat one you could see as a
+     wall, which quietly played the game for you — every hazard on the board
+     routed around for free. Avoiding a trap is the player's own work now, so
+     what is asserted is the opposite of what used to be: a trap dropped onto
+     the route changes nothing about the route.
+     The setup still has to be SEARCHED for rather than assumed, and for the
+     same reason the old version did: the trap has to sit on a cell the path
+     would take anyway, and one that HAS a way round it. A cell with no detour
+     would be crossed by any pathfinder, trap-aware or not, so the check would
+     stay green with trap-blindness reverted. The cell with a detour is the
+     only one that discriminates. */
   const trapPath = await page.evaluate(() => {
     const reachWithout = (bx, by, tx, ty) => {
       const d = bfsMap(tx, ty, (x, y) => grid[IDX(x, y)] === 0 && !(x === bx && y === by));
@@ -736,12 +771,11 @@ const ok = (name, cond, extra) => {
     // found on floor 0 was asserted against floor 3's layout — coordinates
     // that no longer meant anything. Flaky one run in five, and the flake
     // looked like a pathing bug rather than a test bug.
-    let detour = null, chokepoint = null;
+    let detour = null;
     for (let floor = 0; floor < 14 && !detour; floor++) {
       startRun();
       enemies = []; items = []; traps = [];
       seen.fill(1);
-      chokepoint = null;
       const near = bfsMap(player.x, player.y, (x, y) => grid[IDX(x, y)] === 0);
       for (let ty = 1; ty < ROWS - 1 && !detour; ty++) {
         for (let tx = 1; tx < COLS - 1 && !detour; tx++) {
@@ -757,46 +791,61 @@ const ok = (name, cond, extra) => {
           if (!pathQueue.length) continue;
           const onRoute = pathQueue.slice(0, -1);
           for (const [cx, cy] of onRoute) {
-            const detours = reachWithout(cx, cy, tx, ty);
-            if (detours && !detour) { detour = { trap: [cx, cy], target: [tx, ty] }; break; }
-            if (!detours && !chokepoint) { chokepoint = { trap: [cx, cy], target: [tx, ty] }; break; }
+            if (reachWithout(cx, cy, tx, ty)) { detour = { trap: [cx, cy], target: [tx, ty] }; break; }
           }
         }
       }
     }
-    const out = { found: !!detour, foundChoke: !!chokepoint };
+    const out = { found: !!detour };
     if (detour) {
+      traps = [];
+      buildPathTo(detour.target[0], detour.target[1], false);
+      const clean = pathQueue.map(([x, y]) => x + ',' + y).join(' ');
       traps = [{ x: detour.trap[0], y: detour.trap[1], type: 'spike', sprung: false }];
       buildPathTo(detour.target[0], detour.target[1], false);
       out.overIt = pathQueue.some(([x, y]) => x === detour.trap[0] && y === detour.trap[1]);
-      out.routed = pathQueue.length > 0;
-      // ...unless the trap IS the target, which is how you deliberately spring one
-      buildPathTo(detour.trap[0], detour.trap[1], false);
-      out.onto = pathQueue.length >= 1 &&
-                 pathQueue[pathQueue.length - 1][0] === detour.trap[0] &&
-                 pathQueue[pathQueue.length - 1][1] === detour.trap[1];
-      // a SPRUNG trap is a scar, not an obstacle
-      traps[0].sprung = true;
-      buildPathTo(detour.target[0], detour.target[1], false);
-      out.sprungIgnored = pathQueue.some(([x, y]) => x === detour.trap[0] && y === detour.trap[1]);
-    }
-    if (chokepoint) {
-      traps = [{ x: chokepoint.trap[0], y: chokepoint.trap[1], type: 'spike', sprung: false }];
-      buildPathTo(chokepoint.target[0], chokepoint.target[1], false);
-      out.chokeRouted = pathQueue.length > 0;
+      out.identical = pathQueue.map(([x, y]) => x + ',' + y).join(' ') === clean;
+      // the detour the old behaviour would have taken really does exist
+      out.hadAWayRound = reachWithout(detour.trap[0], detour.trap[1],
+                                      detour.target[0], detour.target[1]);
     }
     return out;
   });
-  ok('found a floor with a trap that has a way round it', trapPath.found === true, trapPath);
-  ok('the auto-path routes around a trap you can see',
-     trapPath.overIt === false && trapPath.routed === true, trapPath);
-  ok('but tapping the trap itself still walks onto it', trapPath.onto === true, trapPath);
-  ok('a sprung trap stops blocking the path — it is a scar, not an obstacle',
-     trapPath.sprungIgnored === true, trapPath);
-  ok('a trap with no way round is walked, not refused',
-     !trapPath.foundChoke || trapPath.chokeRouted === true, trapPath);
+  ok('found a floor with a trap ON the route that has a way round it',
+     trapPath.found === true && trapPath.hadAWayRound === true, trapPath);
+  ok('the auto-path walks you straight over a trap you can see',
+     trapPath.overIt === true, trapPath);
+  ok('and the route is the one it would have taken with no trap at all',
+     trapPath.identical === true, trapPath);
 
-  // ---- supplies: bought in camp, used in the delve, lost with the body ----
+  /* Springing one hands the board back. Most traps do no damage — a snare or a
+     gloom glyph leaves only a status — so the interrupt every other hazard
+     gets for free (taking a hit) never fires for them, and without this the
+     walk would carry straight on through the thing that just went off. */
+  const trapStops = await page.evaluate(() => {
+    startRun();
+    enemies = []; items = []; seen.fill(1);
+    const d = bfsMap(player.x, player.y, (x, y) => grid[IDX(x, y)] === 0);
+    let far = null;
+    for (let y = 0; y < ROWS && !far; y++) for (let x = 0; x < COLS; x++) {
+      if (d[IDX(x, y)] >= 5 && d[IDX(x, y)] <= 8) { far = [x, y]; break; }
+    }
+    if (!far) return { skip: true };
+    traps = [];
+    buildPathTo(far[0], far[1], false);
+    const planned = pathQueue.length;
+    const step = pathQueue[0];
+    traps = [{ x: step[0], y: step[1], type: 'snare', sprung: false }];
+    buildPathTo(far[0], far[1], false);
+    const queued = pathQueue.length;
+    playerAct({ move: [step[0] - player.x, step[1] - player.y] });
+    return { planned, queued, left: pathQueue.length, stun: statuses.stun, sprung: traps[0].sprung };
+  });
+  ok('springing a trap stops the walk, even one that does no damage',
+     trapStops.skip || (trapStops.queued > 1 && trapStops.sprung === true &&
+                        trapStops.left === 0), trapStops);
+
+  // ---- supplies: bought in camp, used in the delve, KEPT until used ----
   const supply = await page.evaluate(() => {
     const c = chr();
     c.gold = 500; c.supplies = {};
@@ -805,14 +854,18 @@ const ok = (name, cond, extra) => {
     campAction('buy-supply', 'bomb');
     campAction('buy-supply', 'dust');
     const bought = { held: JSON.parse(JSON.stringify(c.supplies)), gold: c.gold };
+
     for (let i = 0; i < 5; i++) campAction('buy-supply', 'bomb');   // max 3
     const capped = c.supplies.bomb;
     startRun();
     const carried = JSON.parse(JSON.stringify(consumables));
-    return { bought, capped, carried };
+    const price = {};
+    for (const k of CONSUMABLE_KEYS) price[k] = CONSUMABLES[k].cost;
+    return { bought, capped, carried, price };
   });
   ok('supplies are bought at their price',
-     supply.bought.gold === 500 - 30 - 30 - 45 - 35 && supply.bought.held.draught === 2, supply);
+     supply.bought.gold === 500 - supply.price.draught * 2 - supply.price.bomb -
+       supply.price.dust && supply.bought.held.draught === 2, supply);
   ok('a supply caps at its stack size', supply.capped === 3, supply);
   ok('what you bought is what you carry in',
      supply.carried.draught === 2 && supply.carried.bomb === 3 && supply.carried.dust === 1, supply);
@@ -820,9 +873,13 @@ const ok = (name, cond, extra) => {
   const used = await page.evaluate(() => {
     enemies = [];
     player.hp = 1;
-    const t0 = turnCount, n0 = consumables.draught;
+    const t0 = turnCount, n0 = consumables.draught, p0 = chr().supplies.draught || 0;
     useConsumable('draught');
-    const draught = { healed: player.hp, spent: n0 - consumables.draught, turns: turnCount - t0 };
+    // The pack belongs to the CHARACTER, so using one has to come off both the
+    // in-run stock and the stored one — that is what makes "kept until used"
+    // survive a death, and what stops an abandoned run refunding the potion.
+    const draught = { healed: player.hp, spent: n0 - consumables.draught, turns: turnCount - t0,
+                      packBefore: p0, packAfter: chr().supplies.draught || 0 };
 
     // FIREBOMB: one enemy inside the blast, one outside, both real
     const near = { id: 7001, x: player.x + 1, y: player.y, vx: player.x + 1, vy: player.y, hp: 30, maxHp: 30, atk: 1, type: 'slime', aggro: false, seed: 3 };
@@ -843,6 +900,8 @@ const ok = (name, cond, extra) => {
   });
   ok('a draught heals and is spent',
      used.draught.healed === 9 && used.draught.spent === 1, used);
+  ok('spending one takes it out of the pack too, not just the delve',
+     used.draught.packBefore - used.draught.packAfter === 1, used);
   ok('using an item costs your turn', used.draught.turns === 1, used);
   ok('a firebomb burns what is in range and nothing outside it',
      used.bomb.near === 25 && used.bomb.far === 30, used);
@@ -867,8 +926,8 @@ const ok = (name, cond, extra) => {
      banked.gold === 33 + 40 && banked.bank.depthBonus === 40, banked);
   ok('dying pays gold and NEVER skill points',
      banked.sp === 0 && banked.best === 5 && banked.bank.newBest === true, banked);
-  ok('unused supplies go down with the body',
-     Object.keys(banked.supplies).length === 0, banked);
+  ok('unused supplies do NOT go down with the body — the pack is kept',
+     banked.supplies.draught === 2, banked);
   ok('the run is recorded once', banked.runs === 1 && banked.kills === 4, banked);
 
   // checkDeath is state-guarded; a second call must not pay twice.

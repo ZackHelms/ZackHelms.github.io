@@ -165,6 +165,7 @@ body {
   touch-action:manipulation; cursor:pointer;
 }
 .row.locked { opacity:0.45; }
+    .row-txt b i.tier { font-style:normal; color:#8899bb; font-size:0.78em; letter-spacing:0; }
 /* A character row and its delete button share one line: the ✖ is deliberately
    small and off to the left, well clear of the ENTER target, and it only opens
    a confirm screen — erasing a delver is never one tap. */
@@ -230,7 +231,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-27 04:24 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-27 21:12 UTC</div>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
 <button id="cog" aria-label="Settings">&#9881;</button>
@@ -373,6 +374,10 @@ function springTrap(t) {
   const meta = TRAPS[t.type];
   addFloat(t.x, t.y, meta.verb, meta.col);
   shakeT = Math.max(shakeT, 0.25);
+  // Springing one always stops the walk. The path no longer routes around
+  // traps, so this is the moment the player is handed the board back — and
+  // most traps do no damage, which is the interrupt everything else uses.
+  pathQueue = []; attackTargetId = -1;
   if (t.type === 'spike') {
     hurtPlayer(trapSoften(Math.max(2, Math.round(2 + floorNum * 0.45))), t.x, t.y);
   } else if (t.type === 'snare') { statuses.stun += trapSoften(2); sfxBlock(); }
@@ -448,32 +453,50 @@ let campSkill = 'edge';    // which node the skill tree's detail card is showing
 let consumables = {};      // in-run stock, copied from the character at DESCEND
 let lastStandUsed = false;
 
-/* Gear: four tracks, four tiers each. Tier 0 is the starting kit and costs
-   nothing — owning it is what makes "upgrade" a single verb everywhere. */
+/* Gear: four tracks, SEVEN tiers each. Tier 0 is the starting kit and costs
+   nothing — owning it is what makes "upgrade" a single verb everywhere.
+   The ladder above it is geometric (roughly x2.2 a rung, 40 -> 3400) on
+   purpose: a delve's takings grow with the depth it reaches, so a flat ladder
+   is bought out in two runs and a geometric one keeps the next rung about a
+   delve away for the whole campaign. Twenty-four purchases is the campaign,
+   and .claude/tests/eval-ember-depths.cjs is what says whether it lands at
+   about one per delve — change a cost here and re-run it. */
 const GEAR = {
   weapon: { name: 'WEAPON', icon: '⚔', tiers: [
-    { name: 'CHIPPED DIRK',     cost: 0,   atk: 0, desc: 'Blunt, notched, yours.' },
-    { name: 'IRON CLEAVER',     cost: 40,  atk: 1, desc: '+1 attack.' },
-    { name: 'EMBER BRAND',      cost: 120, atk: 2, desc: '+2 attack.' },
-    { name: 'ASHSTEEL RUIN',    cost: 280, atk: 3, desc: '+3 attack.' },
+    { name: 'CHIPPED DIRK',     cost: 0,   atk: 0,  desc: 'Blunt, notched, yours.' },
+    { name: 'IRON CLEAVER',     cost: 70,  atk: 1,  desc: '+1 attack.' },
+    { name: 'EMBER BRAND',      cost: 260, atk: 2,  desc: '+2 attack.' },
+    { name: 'ASHSTEEL RUIN',    cost: 520, atk: 3,  desc: '+3 attack.' },
+    { name: 'CINDERFANG',       cost: 1000, atk: 5,  desc: '+5 attack.' },
+    { name: 'MOLTEN GREATAXE',  cost: 1900, atk: 7,  desc: '+7 attack.' },
+    { name: 'THE SUNDERER',     cost: 3600, atk: 10, desc: '+10 attack.' },
   ] },
   armor: { name: 'ARMOR', icon: '⛨', tiers: [
-    { name: 'TRAVEL RAGS',      cost: 0,   hp: 0, dr: 0, desc: 'Cloth, and optimism.' },
-    { name: 'PADDED COAT',      cost: 40,  hp: 3, dr: 0, desc: '+3 max HP.' },
-    { name: 'SCALE HAUBERK',    cost: 130, hp: 5, dr: 1, desc: '+5 max HP, −1 damage from every hit.' },
-    { name: 'EMBERPLATE',       cost: 300, hp: 8, dr: 1, desc: '+8 max HP, −1 damage from every hit.' },
+    { name: 'TRAVEL RAGS',      cost: 0,   hp: 0,  dr: 0, desc: 'Cloth, and optimism.' },
+    { name: 'PADDED COAT',      cost: 70,  hp: 3,  dr: 0, desc: '+3 max HP.' },
+    { name: 'SCALE HAUBERK',    cost: 260, hp: 5,  dr: 1, desc: '+5 max HP, −1 damage from every hit.' },
+    { name: 'EMBERPLATE',       cost: 520, hp: 8,  dr: 1, desc: '+8 max HP, −1 damage from every hit.' },
+    { name: 'OBSIDIAN MAIL',    cost: 1000, hp: 13, dr: 2, desc: '+13 max HP, −2 damage from every hit.' },
+    { name: "WARDEN'S CARAPACE", cost: 1900, hp: 19, dr: 2, desc: '+19 max HP, −2 damage from every hit.' },
+    { name: 'ADAMANT SHELL',    cost: 3600, hp: 26, dr: 3, desc: '+26 max HP, −3 damage from every hit.' },
   ] },
   lantern: { name: 'LANTERN', icon: '☀', tiers: [
     { name: 'TALLOW STUB',      cost: 0,   light: 0,   desc: 'A guttering nub of fat.' },
-    { name: 'BRASS LAMP',       cost: 35,  light: 0.8, desc: 'Light reaches 0.8 tiles further.' },
-    { name: 'MIRRORED LANTERN', cost: 110, light: 1.6, desc: 'Light reaches 1.6 tiles further.' },
-    { name: 'SUNSTONE LANTERN', cost: 260, light: 2.6, desc: 'Light reaches 2.6 tiles further.' },
+    { name: 'BRASS LAMP',       cost: 60,  light: 0.8, desc: 'Light reaches 0.8 tiles further.' },
+    { name: 'MIRRORED LANTERN', cost: 230, light: 1.6, desc: 'Light reaches 1.6 tiles further.' },
+    { name: 'SUNSTONE LANTERN', cost: 460, light: 2.4, desc: 'Light reaches 2.4 tiles further.' },
+    { name: 'PYRE LANTERN',     cost: 880, light: 3.2, desc: 'Light reaches 3.2 tiles further.' },
+    { name: 'DAYSTAR LAMP',     cost: 1670, light: 4.0, desc: 'Light reaches 4.0 tiles further.' },
+    { name: 'THE HELIOGRAPH',   cost: 3150, light: 5.0, desc: 'Light reaches 5.0 tiles further.' },
   ] },
   charm: { name: 'CHARM', icon: '❖', tiers: [
     { name: 'BONE TRINKET',     cost: 0,   gold: 0,    desc: 'It rattles. That is all it does.' },
-    { name: 'COIN FETISH',      cost: 45,  gold: 0.25, desc: '+25% gold found.' },
-    { name: 'EMBERHEART',       cost: 125, gold: 0.25, heal: 3, desc: '+25% gold, and heal 3 HP on every descent.' },
-    { name: 'DEEPSEEKER IDOL',  cost: 290, gold: 0.5,  heal: 3, reveal: 1, desc: '+50% gold, heal 3 HP on every descent, and the stairs are marked the moment you arrive.' },
+    { name: 'COIN FETISH',      cost: 80,  gold: 0.2,  desc: '+20% gold found.' },
+    { name: 'EMBERHEART',       cost: 290, gold: 0.2,  heal: 3, desc: '+20% gold, and heal 3 HP on every descent.' },
+    { name: 'DEEPSEEKER IDOL',  cost: 580, gold: 0.35, heal: 3, reveal: 1, desc: '+35% gold, heal 3 HP on every descent, and the stairs are marked the moment you arrive.' },
+    { name: 'GILDED SCARAB',    cost: 1100, gold: 0.5,  heal: 5, reveal: 1, desc: '+50% gold, heal 5 HP on every descent, stairs marked on arrival.' },
+    { name: "HOARDER'S EYE",    cost: 2100, gold: 0.65, heal: 7, reveal: 1, desc: '+65% gold, heal 7 HP on every descent, stairs marked on arrival.' },
+    { name: 'AVARICE CROWN',    cost: 4000, gold: 0.8,  heal: 10, reveal: 1, desc: '+80% gold, heal 10 HP on every descent, stairs marked on arrival.' },
   ] },
 };
 
@@ -526,12 +549,14 @@ const SKILLS = [
 ];
 const SKILL_ROWS = 6, SKILL_COLS = 5;
 
-/* Consumables are the recurring sink: bought in camp, carried in, and lost
-   with the body whether or not they were used. */
+/* Supplies live in the CHARACTER's pack, not in the delve. Buying one puts it
+   there and USING one takes it out; dying with it does neither, so a firebomb
+   you never threw is still yours next time. `short` is the caption under the
+   in-run button — a bare glyph told nobody what it did. */
 const CONSUMABLES = {
-  draught: { name: 'HEALING DRAUGHT', icon: '✚', cost: 30, max: 3, desc: 'Restores 8 HP.' },
-  bomb:    { name: 'FIREBOMB',        icon: '✷', cost: 45, max: 3, desc: 'Burns every enemy within 2 tiles for 5.' },
-  dust:    { name: 'FARSIGHT DUST',   icon: '✧', cost: 35, max: 3, desc: 'Maps the whole floor, stairs and all.' },
+  draught: { name: 'HEALING DRAUGHT', short: 'HEAL', icon: '✚', cost: 50, max: 3, desc: 'Restores 8 HP.' },
+  bomb:    { name: 'FIREBOMB',        short: 'BOMB', icon: '✷', cost: 80, max: 3, desc: 'Burns every enemy within 2 tiles for 5.' },
+  dust:    { name: 'FARSIGHT DUST',   short: 'MAP',  icon: '✧', cost: 60, max: 3, desc: 'Maps the whole floor, stairs and all.' },
 };
 const CONSUMABLE_KEYS = Object.keys(CONSUMABLES);
 
@@ -682,7 +707,6 @@ function bankRun() {
   c.stats.runs++;
   c.stats.kills += kills;
   c.stats.gold += earned;
-  c.supplies = {};      // what you carried in went down with you
   saveSlots();
   return { earned, depthBonus, newBest };
 }
@@ -1103,23 +1127,17 @@ function tapTile(tx, ty) {
   attackTargetId = -1;
   buildPathTo(tx, ty, false);
 }
-// A known trap is treated as a wall by the auto-path: tapping a far tile
-// should never walk you through a hazard you can see. Tapping the trap
-// itself still works — that is the deliberate way onto one.
-function trapBlocked(x, y) {
-  if (x === player.x && y === player.y) return false;
-  const t = trapAt(x, y);
-  return !!t && !t.sprung && seen[IDX(x, y)] === 1;
-}
+/* THE AUTO-PATH IS BLIND TO TRAPS, deliberately. It used to treat a seen,
+   unsprung trap as a wall, and that quietly played the game for you: every
+   hazard on the board was routed around for free, so a trap only ever caught
+   a player who walked onto it on purpose and the whole system cost nothing to
+   ignore. Avoiding a trap is now the PLAYER's job — tap short of it and go
+   round by hand — which is what makes noticing one worth anything. Do not
+   reintroduce a trap term in `pass`; TRAPWISE is the skill that answers traps,
+   not the pathfinder. */
 function buildPathTo(tx, ty, stopAdjacent) {
-  const pass = (x, y) => grid[IDX(x, y)] === 0 && (!enemyAt(x, y) || (x === tx && y === ty)) &&
-                         (!trapBlocked(x, y) || (x === tx && y === ty));
-  let dist = bfsMap(tx, ty, pass);
-  // If avoiding traps makes the target unreachable, take the honest route
-  // rather than refusing to move at all.
-  if (dist[IDX(player.x, player.y)] === -1) {
-    dist = bfsMap(tx, ty, (x, y) => grid[IDX(x, y)] === 0 && (!enemyAt(x, y) || (x === tx && y === ty)));
-  }
+  const pass = (x, y) => grid[IDX(x, y)] === 0 && (!enemyAt(x, y) || (x === tx && y === ty));
+  const dist = bfsMap(tx, ty, pass);
   if (dist[IDX(player.x, player.y)] === -1) return;
   const path = [];
   let cx = player.x, cy = player.y;
@@ -1636,15 +1654,18 @@ function tabBtn(key, label) {
 }
 function forgeHtml(c) {
   let html = '<div class="empty-note">Your kit carries from delve to delve. ' +
-             'Current effect in green; the next tier replaces it.</div>';
+             'Six upgrades on every track, each one dearer than the last — ' +
+             'current effect in green, the next tier replaces it.</div>';
   for (const key in GEAR) {
     const track = GEAR[key], t = c.gear[key], cur = track.tiers[t], next = track.tiers[t + 1];
+    const top = track.tiers.length - 1;
     const cost = next ? next.cost : 0;
     const afford = next && c.gold >= cost;
     html += '<button class="row' + (next ? '' : ' maxed') + '"' +
       (next && afford ? ' data-act="buy-gear" data-arg="' + key + '"' : '') + '>' +
       '<span class="row-ico">' + track.icon + '</span><span class="row-txt">' +
-      '<b>' + track.name + ' · ' + esc(next ? next.name : cur.name) + '</b>' +
+      '<b>' + track.name + ' <i class="tier">' + t + '/' + top + '</i> · ' +
+        esc(next ? next.name : cur.name) + '</b>' +
       '<span>' + esc(next ? next.desc : cur.desc) + '</span>' +
       '<span class="now">NOW: ' + esc(cur.name) + ' — ' + esc(cur.desc) + '</span></span>' +
       (next
@@ -1728,8 +1749,10 @@ function skillsHtml(c) {
          svg + card;
 }
 function supplyHtml(c) {
-  let html = '<div class="empty-note">Carried into the delve and lost with the body, ' +
-             'used or not. Tap them on the left of the board to use one.</div>';
+  let html = '<div class="empty-note">Supplies live in your pack. They ride down with you and ' +
+             'stay there until you <em>use</em> one — dying does not take them. ' +
+             'In the delve they are the round buttons up the <b>left edge of the board</b>: ' +
+             'tap one to use it, which costs you a turn.</div>';
   for (const key of CONSUMABLE_KEYS) {
     const item = CONSUMABLES[key], held = c.supplies[key] || 0;
     const full = held >= item.max;
@@ -2535,7 +2558,7 @@ function drawConsumables() {
   const keys = CONSUMABLE_KEYS.filter((k) => (consumables[k] || 0) > 0);
   if (!keys.length) return;
   const r = 21;
-  let cy2 = viewY + viewH - r - 12;
+  let cy2 = viewY + viewH - r - 20;
   for (const k of keys) {
     const cx2 = viewX + r + 12;
     useBtns.push({ x: cx2, y: cy2, r: r + 7, key: k });
@@ -2555,8 +2578,21 @@ function drawConsumables() {
     ctx.font = `10px 'Share Tech Mono', monospace`;
     ctx.fillStyle = '#ffc300';
     ctx.fillText(String(consumables[k]), bx2, by2 + 3.5);
+    // A glyph in a circle is not an instruction. The name goes underneath so
+    // the button says what it does without anything to open or hover.
+    ctx.font = `9px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = 'rgba(111,216,160,0.85)';
+    ctx.fillText(CONSUMABLES[k].short, cx2, cy2 + r + 11);
     ctx.textAlign = 'left';
-    cy2 -= r * 2 + 10;
+    cy2 -= r * 2 + 24;
+  }
+  // …and for the first few turns of a delve, say so outright. A player who
+  // bought supplies and never found them has been sold nothing.
+  if (turnCount < 8) {
+    ctx.textAlign = 'left';
+    ctx.font = `10px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = 'rgba(111,216,160,0.75)';
+    ctx.fillText('◂ TAP TO USE', viewX + r * 2 + 20, viewY + viewH - r - 16);
   }
 }
 function useConsumable(key) {
@@ -2564,6 +2600,11 @@ function useConsumable(key) {
   const n = consumables[key] || 0;
   if (!n) return;
   consumables[key] = n - 1;
+  // USING an item is what spends it — not dying with it. The backpack is the
+  // character's, so the in-run stock and the stored one come down together and
+  // anything you carried out is still there next delve.
+  const owner = chr();
+  if (owner) { owner.supplies[key] = Math.max(0, (owner.supplies[key] || 0) - 1); saveSlots(); }
   if (key === 'draught') {
     const before = player.hp;
     player.hp = Math.min(player.maxHp, player.hp + 8);
