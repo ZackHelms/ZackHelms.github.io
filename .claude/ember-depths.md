@@ -204,6 +204,22 @@ so (`meta-progression` + `save-campaign` alongside `permadeath`).
   to `stats.bestDepth`, because with no ceiling a player should not replay
   floor 1 to reach floor 30. The delve's depth bonus counts floors below
   **where you started**, so diving in deep and dying on arrival pays nothing.
+- **OPEN DESIGN QUESTION (raised 2026-08-27, CD's call, nothing changed):
+  starting deep is a progression trap.** The campaign eval found it rather than
+  a reading of the code, because the feature works exactly as specified: open at
+  your deepest floor and you skip every shallow floor's loot *and* the depth
+  bonus counts from where you started, so a delve that dies near its own best
+  banks almost nothing. Measured over 12 delves, personas taking the option
+  froze at **7–8 gear tiers with nine consecutive delves of nothing to buy**;
+  the same persona starting from floor 1 reached **20**. The button that says
+  "tap to jump to your deepest" is therefore an invitation to stop progressing,
+  and it ratchets: `bestDepth` is the deepest ever *stood on*, so jumping to it
+  means arriving at a floor you have never survived. The economy is tuned
+  against floor-1 runs (the gold-optimal line) — see **### The gear ladder**.
+  Possible answers if the CD wants one: pay the depth bonus from floor 1
+  regardless of start, scale the start-floor loot, or cap the jump a few floors
+  below `bestDepth`. Do not pick one silently; each changes what the sticky
+  depth is *for*.
 - **Supplies** (`CONSUMABLES`): bought in camp into `chr().supplies`, copied
   into the in-run `consumables` at `startRun()`. **USING one is what spends it,
   not dying with it** (changed 2026-08-27 — they used to be cleared by
