@@ -55,3 +55,23 @@ Steps:
 
 4. If step 1 failed, report the exact error and hand the CD the verbatim
    command to run themselves; do not silently continue.
+
+5. **A plugin already installed is PINNED, and step 1 will not refresh it.**
+   `claude plugin install` exits fast when the plugin is present, and the
+   cache stores it under the marketplace commit it came from
+   (`~/.claude/plugins/cache/<marketplace>/<plugin>/<sha>/`). So a container
+   that installed before a new skill or command landed upstream keeps the old
+   copy for its whole life, and the new one looks *missing from remote main*
+   when it is really sitting in the remote perfectly well. This is the answer
+   whenever a `/zmh-*` command or plugin skill exists upstream but not here —
+   check the pinned sha against the repo before doubting the push:
+
+   ```bash
+   claude plugin marketplace update zmhstudio
+   claude plugin update <plugin>@zmhstudio      # restart required to apply
+   ```
+
+   Report honestly that the update lands on the next session/restart in this
+   container. The upstream repo is the source of truth: confirm the file is
+   in `origin/main` (`git ls-tree origin/main <path>`) before telling the CD
+   anything is missing from it.
