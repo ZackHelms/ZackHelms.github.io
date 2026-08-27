@@ -225,7 +225,10 @@ and the padding that clears the chrome row, since ← / 🔊 / ⚙ are at z 45 a
 would otherwise sit on the character's name. `drive-ember-depths.cjs` sweeps
 every overlay screen across five viewports, **portrait and landscape**,
 because the two clip on different screens: the camp overflows in portrait, the
-short ones only in landscape.
+short ones only in landscape. The trap itself is not ember-depths': every
+game here builds its overlays the same way, so it now lives in `games/CLAUDE.md`
+§ Scrolling overlays — keep this section for the `.top` detail and let the
+shared row own the rule.
 
 ## Rendering (the realistic-graphics stack)
 
