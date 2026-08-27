@@ -119,7 +119,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-25 17:27 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-27 21:26 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
@@ -131,8 +131,9 @@ body {
     <option value="neon">NEON</option>
     <option value="model">3D MODELS</option>
     <option value="anim">3D ANIMLIGHT</option>
+    <option value="sprite">SPRITESHEETS</option>
   </select>
-  <div class="hint">CEL / TOON — inked, flat-shaded starfighters.<br>NEON — the original glowing wireframes.<br>3D MODELS — low-poly hulls that bank into their turns.<br>3D ANIMLIGHT — the same hulls, big and vivid, running live light rigs.</div>
+  <div class="hint">CEL / TOON — inked, flat-shaded starfighters.<br>NEON — the original glowing wireframes.<br>3D MODELS — low-poly hulls that bank into their turns.<br>3D ANIMLIGHT — the same hulls, big and vivid, running live light rigs.<br>SPRITESHEETS — the 3D art pre-rendered to sprite frames, Clash-style; the dogfight replays a baked loop.</div>
 </div>
 <div id="overlay"></div>
 <div id="track-label"></div>
@@ -754,12 +755,14 @@ overlay.addEventListener('touchend', e => {
 overlay.addEventListener('click', () => { if (state === 'report') { initAudio(); beginLaunch(); } });
 
 /* ---- settings: graphics style ('anim' 3D animlight default) ---- */
-const GFX_STYLES = ['toon', 'neon', 'model', 'anim'];
-// 'model' and 'anim' share the whole mesh renderer and the station's lit-metal
-// treatment; they differ only in palette, hull scale and the light rigs. Every
-// scenery branch asks this rather than naming one of them, so a third
-// mesh-family style would need no scenery edits at all.
-function meshGfx() { return gfx === 'model' || gfx === 'anim'; }
+const GFX_STYLES = ['toon', 'neon', 'model', 'anim', 'sprite'];
+// The mesh family shares the whole mesh renderer and the station's lit-metal
+// treatment; its styles differ only in palette, hull scale, the light rigs —
+// and, under 'sprite', in WHEN the mesh is painted: 'sprite' pre-renders the
+// 'model' art into offscreen frames at first use and blits them (see the
+// SPRITESHEETS section). Every scenery branch asks this predicate rather than
+// naming a style, which is why 'sprite' needed no scenery edits at all.
+function meshGfx() { return gfx === 'model' || gfx === 'anim' || gfx === 'sprite'; }
 let gfx = localStorage.getItem('starSurge.gfx');
 if (GFX_STYLES.indexOf(gfx) < 0) gfx = 'anim';   // animlight is the default look
 const settingsBtn = document.getElementById('settings');
@@ -1138,7 +1141,13 @@ function updateLaunch(dt) {
 function update(dt) {
   frameDt = dt;    // the model painters' bank derivation reads this; nothing else does
   animT += dt;     // ditto: the animlight rigs' phase clock, painter-only
-  if (state === 'pilots') { titleT += dt; dfUpdate(dt); tickHold(dt); tickFx(dt); return; }
+  if (state === 'pilots') {
+    titleT += dt;
+    // under SPRITESHEETS the dogfight is a recorded loop: advance its clock
+    // instead of the sim (the live sim resumes untouched on a style switch)
+    if (gfx === 'sprite') dfrT += dt; else dfUpdate(dt);
+    tickHold(dt); tickFx(dt); return;
+  }
   if (state === 'launch') { updateLaunch(dt); return; }
   if (state === 'station') { stationT += dt; veil = Math.max(0, veil - dt / VEIL_FADE); tickFx(dt); return; }
   if (state === 'report') { tickFx(dt); return; }
@@ -2882,15 +2891,19 @@ function paintMeshFaces(m, seed, persp) {
     if (!pal.e) { ctx.strokeStyle = 'rgba(8,10,16,0.55)'; ctx.lineWidth = 0.6; ctx.stroke(); }
   }
 }
-function drawShipModel(cold, sc) {
-  drawMeshTop(MESH_SHIP, sc, cold ? 0 : visBank(ship, ship.x, 0.85), 0, 11);
-  if (cold) return;
+// The exhaust is its own routine because the sprite style blits a BAKED hull
+// and still wants the live flicker: bake what repeats, draw what varies.
+function drawShipExhaust(sc) {
   for (const sd of [-1, 1]) {
     const fl = 5 + Math.random() * 6;
     ctx.fillStyle = 'hsl(40,100%,64%)'; glow('#ffc300', 8);
     poly([sd * 6.2 * sc, 13.5 * sc, sd * 9.6 * sc, 13.5 * sc, sd * 7.9 * sc, (14.5 + fl) * sc]);
     ctx.fill(); noGlow();
   }
+}
+function drawShipModel(cold, sc) {
+  drawMeshTop(MESH_SHIP, sc, cold ? 0 : visBank(ship, ship.x, 0.85), 0, 11);
+  if (!cold) drawShipExhaust(sc);
 }
 function drawEnemyModel(e, sc) {
   const seed = 23 + DF_TYPES.indexOf(e.type);
@@ -2955,6 +2968,97 @@ function dfDrawShipModel(s) {
   hueOverride = prev;
   ctx.restore();
 }
+
+/* ================= SPRITESHEETS: pre-rendered hull frames ================
+   The Clash Royale technique, done in-browser: the 3D MODELS art is rendered
+   ONCE into offscreen sprite frames — a few quantized bank angles per hull, a
+   ring of rotor steps for the spinner — and the field then just blits
+   bitmaps. All the mesh cost (transform, painter-sort, shade and stroke ~30
+   faces per hull) is paid at bake time; a saturated wave costs drawImage
+   calls. The slight snap between facings as a hull turns is the technique's
+   visible signature, not a bug.
+
+   Rules that keep it honest:
+   - A frame is baked through the SAME drawMeshTop the model style flies, so
+     the two looks cannot drift. Under 'sprite', mFaceCol takes the weathered
+     'model' path and drawMeshTop attaches no light rig — animated lights are
+     the one thing a bake cannot carry (a light frozen mid-blink is worse
+     than none, the buildTitleWord rule).
+   - A cache key carries EVERYTHING the bake reads (type, hue, frame index,
+     radius, dpr) — the shieldSprite rule. A hue-blind key would serve stage
+     1's green drones in the red sector forever, with no error anywhere.
+   - Baking is LAZY (first paint of a frame) under an LRU byte budget, so a
+     stage-hue change re-bakes four small sheets, never a library up front.
+   - Dynamic bits stay LIVE where they are cheap and would explode the baked
+     frame count: the ship's exhaust flicker, the boss's turning gun rim, the
+     powerup's tumble. Bake what repeats, draw what varies. */
+const SPR = new Map();          // key -> { c, css }; insertion order doubles as LRU
+let sprBytes = 0;
+const SPR_BUDGET = 24 << 20;    // decoded RGBA bytes across all baked frames
+const SHIP_BANK_FRAMES = 13, ENEMY_BANK_FRAMES = 9, SPIN_FRAMES = 24;
+// sprite box half-size per type, in units of e.r (mesh extents + stroke pad)
+const SPR_EXT = { drone: 1.4, shooter: 1.3, spinner: 1.3, tanker: 1.2 };
+function bakeSprite(key, half, paint) {
+  let s = SPR.get(key);
+  if (s) { SPR.delete(key); SPR.set(key, s); return s; }   // touch: back of the LRU
+  const css = Math.ceil(half) * 2;
+  const c = document.createElement('canvas');
+  c.width = c.height = Math.max(1, Math.ceil(css * dpr));
+  const g = c.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.translate(css / 2, css / 2);
+  const prevCtx = ctx;              // ctx is a `let` for exactly this — the
+  ctx = g;                          // buildTitleWord trick: one set of art
+  try { paint(); } finally { ctx = prevCtx; }
+  s = { c, css };
+  SPR.set(key, s);
+  sprBytes += c.width * c.width * 4;
+  for (const [k, v] of SPR) {
+    if (sprBytes <= SPR_BUDGET || k === key) break;
+    SPR.delete(k); sprBytes -= v.c.width * v.c.width * 4;
+  }
+  return s;
+}
+function blitSprite(s, f) {
+  const d = s.css * (f || 1);
+  ctx.drawImage(s.c, -d / 2, -d / 2, d, d);
+}
+// bank -> nearest baked frame index, and back to the angle that frame holds
+function sprBankFrame(bank, max, n) {
+  return Math.max(0, Math.min(n - 1, Math.round((bank / max + 1) / 2 * (n - 1))));
+}
+function sprBankAngle(q, max, n) { return (q / (n - 1) * 2 - 1) * max; }
+function drawShipSprite(cold) {
+  const q = cold ? (SHIP_BANK_FRAMES - 1) / 2
+                 : sprBankFrame(visBank(ship, ship.x, 0.85), 0.85, SHIP_BANK_FRAMES);
+  blitSprite(bakeSprite('S|' + q + '|' + dpr, 26,
+    () => drawMeshTop(MESH_SHIP, 1, sprBankAngle(q, 0.85, SHIP_BANK_FRAMES), 0, 11)));
+  if (!cold) drawShipExhaust(1);
+}
+function drawEnemySprite(e) {
+  const hue = hueDegNow(), half = e.r * SPR_EXT[e.type] + 2;
+  const seed = 23 + DF_TYPES.indexOf(e.type);
+  if (e.type === 'spinner') {
+    // the rotor is 4-fold symmetric, so a quarter turn of frames covers it
+    const HP = Math.PI / 2;
+    const si = Math.floor((((e.ang % HP) + HP) % HP) / HP * SPIN_FRAMES) % SPIN_FRAMES;
+    blitSprite(bakeSprite('E|spinner|' + hue + '|' + si + '|' + e.r + '|' + dpr, half,
+      () => drawMeshTop(MESH_ENEMY.spinner, e.r, 0, si / SPIN_FRAMES * HP, seed)));
+    return;
+  }
+  const q = sprBankFrame(visBank(e, e.x, 0.6), 0.6, ENEMY_BANK_FRAMES);
+  blitSprite(bakeSprite('E|' + e.type + '|' + hue + '|' + q + '|' + e.r + '|' + dpr, half,
+    () => drawMeshTop(MESH_ENEMY[e.type], e.r, sprBankAngle(q, 0.6, ENEMY_BANK_FRAMES), 0, seed)));
+}
+function drawBossSprite() {
+  const R = boss.r, sec = boss.sector;
+  // the gun rim stays a live mesh: it never stops turning, and 14-20 faces
+  // is cheaper than the ring of frames a smooth baked rotation would need
+  drawMeshTop(sec ? MESH_RIM_S : MESH_RIM_M, R, 0, boss.t * (sec ? 0.55 : 0.4), 31);
+  blitSprite(bakeSprite('B|' + (sec ? 1 : 0) + '|' + hueDegNow() + '|' + R + '|' + dpr, R * 1.1 + 4,
+    () => drawMeshTop(sec ? MESH_BOSS_S : MESH_BOSS_M, R, 0, 0, 32)));
+}
+
 /* The one three-way dispatch: every hull in the game is painted through
    these, so a style cannot drift between the field, the bays, the station,
    the title word and the dogfight. */
@@ -2972,18 +3076,24 @@ const A_SHIP_SCALE = 3, A_ENEMY_SCALE = 2;
 // inside it. Nothing else in the file needs to know the style flies big.
 function shipArtScale() { return gfx === 'anim' ? A_SHIP_SCALE : 1; }
 function enemyArtScale() { return gfx === 'anim' ? A_ENEMY_SCALE : 1; }
+/* 'sprite' checks first and falls through to the live mesh painter during the
+   title-word bake (the word is baked once anyway, so pre-rendering its cells
+   would only add a hundred throwaway cache entries at title-cell radii). */
 function paintShip(cold, portrait) {
-  if (meshGfx()) drawShipModel(cold, gfx === 'anim' && !portrait ? A_SHIP_SCALE : 1);
+  if (gfx === 'sprite' && !bakingTitle) drawShipSprite(cold);
+  else if (meshGfx()) drawShipModel(cold, gfx === 'anim' && !portrait ? A_SHIP_SCALE : 1);
   else if (gfx === 'toon') drawShipToon(cold);
   else drawShipNeon(cold);
 }
 function paintEnemy(e, portrait) {
-  if (meshGfx()) drawEnemyModel(e, gfx === 'anim' && !portrait ? A_ENEMY_SCALE : 1);
+  if (gfx === 'sprite' && !bakingTitle) drawEnemySprite(e);
+  else if (meshGfx()) drawEnemyModel(e, gfx === 'anim' && !portrait ? A_ENEMY_SCALE : 1);
   else if (gfx === 'toon') drawEnemyToon(e);
   else drawEnemyNeon(e);
 }
 function paintBoss() {
-  if (meshGfx()) drawBossModel();
+  if (gfx === 'sprite') drawBossSprite();
+  else if (meshGfx()) drawBossModel();
   else if (gfx === 'toon') drawBossToon();
   else drawBossNeon();
 }
@@ -3235,6 +3345,138 @@ function dfDrawLayer(near) {
   for (const s of list) dfDrawShip(s);
 }
 
+/* ---- SPRITESHEETS: the dogfight is FLATTENED ---------------------------
+   Under 'sprite' the title dogfight is not simulated live. The real sim is
+   run once, off-screen, and every drawable it produces — each hull's
+   billboard transform, every tracer segment, every debris speck — is
+   recorded into a compact Float32 track (DFR_SECONDS at 60Hz, ~2MB).
+   Replay is a loop of drawImage calls over pre-rendered top-view sprites:
+   no steering maths, no projection, no mesh painting.
+
+   This is the second half of the pre-render pipeline: bake the ART as
+   sprite frames, bake the MOTION as a track of transforms — the Flash /
+   Clash "movie clip" model. The naive alternative, a full-screen pixel
+   flipbook, costs ~12MB PER FRAME at phone resolution; a transform track
+   is what makes a flattened loop affordable.
+
+   The loop seam is a jump cut hidden by fading the whole layer out and
+   back in over DFR_FADE — the squadron warps out, a fresh one warps in.
+   The track key carries W|H|dpr because the track is recorded in SCREEN
+   space: a resize re-records (a few ms of sim), same rule as every other
+   bake key in this file. */
+const DFR_SECONDS = 22, DFR_HZ = 60, DFR_WARM = 2.5, DFR_FADE = 0.5;
+const DFR_BK = 3.2;        // mesh px units the ally sheet is baked at
+const DFR_FOE_SC = 50;     // mesh scale the foe sheets are baked at (~r26 close up)
+const DFR_BCOLS = ['#7fe0ff', '#ffc300', '#ff2244'];   // the only dfBurst colours
+let dfrTrack = null, dfrT = 0;
+function dfrShipSprite() {
+  return bakeSprite('D|ship|' + dpr, 21 * DFR_BK + 4,
+    () => drawMeshTop(MESH_SHIP, DFR_BK, 0, 0, 11));
+}
+function dfrFoeSprite(type, hue) {
+  const prev = hueOverride; hueOverride = hue;
+  try {
+    return bakeSprite('D|' + type + '|' + hue + '|' + dpr, DFR_FOE_SC * SPR_EXT[type] + 4,
+      () => drawMeshTop(MESH_ENEMY[type], DFR_FOE_SC, 0, 0, 23 + DF_TYPES.indexOf(type)));
+  } finally { hueOverride = prev; }
+}
+function dfrRecord() {
+  const key = W + '|' + H + '|' + dpr;
+  if (dfrTrack && dfrTrack.key === key) return dfrTrack;
+  // borrow the real sim wholesale, then hand the live one back untouched
+  const sShips = dfShips, sTracers = dfTracers, sBits = dfBits, sT = titleT;
+  dfInit();
+  titleT = 1000;   // an arbitrary wander-phase origin, clear of the live clock
+  const dt = 1 / DFR_HZ, frames = [];
+  for (let i = 0; i < DFR_WARM * DFR_HZ; i++) { titleT += dt; dfUpdate(dt); }
+  const nF = Math.round(DFR_SECONDS * DFR_HZ);
+  for (let i = 0; i < nF; i++) {
+    titleT += dt; dfUpdate(dt);
+    const S = [];
+    // pre-sorted far-to-near, so replay preserves paint order by walking it
+    for (const s of dfShips.slice().sort((a, b) => b.p.z - a.p.z)) {
+      if (s.p.z < 95 || s.sx < -300 || s.sx > W + 300 || s.sy < -300 || s.sy > H + 300) continue;
+      const d = s.sd, sc = s.k * s.scale, sxs = sc * Math.cos(s.roll), sys = sc * s.fs;
+      const foe = s.side !== 'ally';
+      const meta = (foe ? DF_TYPES.indexOf(s.type) : 7) +
+                   (foe ? Math.max(0, STAGE_HUES.indexOf(s.hueDeg)) : 0) * 8 +
+                   (s.p.z < DF_ZUI ? 64 : 0) + (s.hurt > 0 ? 128 : 0);
+      S.push(-d.y * sxs, d.x * sxs, -d.x * sys, -d.y * sys, s.sx, s.sy,
+             0.32 + 0.68 * Math.min(1, 1200 / s.p.z), meta, s.r, s.ang);
+    }
+    const T = [];
+    for (const t of dfTracers) {
+      const z2 = t.p.z - t.v.z * 0.05;
+      if (t.p.z < 90 || z2 < 90) continue;
+      const k = DF_FL / t.p.z, k2 = DF_FL / z2, cy = dfCy();
+      T.push(W / 2 + (t.p.x - t.v.x * 0.05) * k2, cy + (t.p.y - t.v.y * 0.05) * k2,
+             W / 2 + t.p.x * k, cy + t.p.y * k, Math.max(1.2, 3.2 * k),
+             (t.side === 'ally' ? 0 : 1) + (t.p.z < DF_ZUI ? 2 : 0));
+    }
+    const B = [];
+    for (const b of dfBits) {
+      if (b.p.z < 90) continue;
+      const k = DF_FL / b.p.z;
+      B.push(W / 2 + b.p.x * k, dfCy() + b.p.y * k, Math.max(1, 3.4 * k),
+             Math.max(0, 1 - b.t / b.dur),
+             Math.max(0, DFR_BCOLS.indexOf(b.col)) + (b.p.z < DF_ZUI ? 4 : 0));
+    }
+    frames.push({ s: new Float32Array(S), t: new Float32Array(T), b: new Float32Array(B) });
+  }
+  dfShips = sShips; dfTracers = sTracers; dfBits = sBits; titleT = sT;
+  dfrTrack = { key, frames };
+  dfrT = 0;
+  return dfrTrack;
+}
+function dfrDrawLayer(track, near) {
+  const nF = track.frames.length, loopS = nF / DFR_HZ;
+  const tSec = ((dfrT % loopS) + loopS) % loopS;
+  const fi = Math.min(nF - 1, Math.floor(tSec * DFR_HZ));
+  // the seam envelope: warp out over the last DFR_FADE, warp in over the first
+  const env = Math.max(0, Math.min(1, tSec / DFR_FADE, (loopS - tSec) / DFR_FADE));
+  if (env <= 0) return;
+  const F = track.frames[fi];
+  const B = F.b;
+  for (let i = 0; i < B.length; i += 5) {
+    const m = B[i + 4] | 0;
+    if (((m & 4) !== 0) !== near) continue;
+    ctx.globalAlpha = B[i + 3] * env;
+    ctx.fillStyle = DFR_BCOLS[m & 3];
+    const sz = B[i + 2];
+    ctx.fillRect(B[i] - sz / 2, B[i + 1] - sz / 2, sz, sz);
+  }
+  ctx.globalAlpha = 1;
+  const T = F.t;
+  for (let i = 0; i < T.length; i += 6) {
+    const m = T[i + 5] | 0;
+    if (((m & 2) !== 0) !== near) continue;
+    // glow without shadowBlur: a fat faint pass under a thin core
+    ctx.strokeStyle = (m & 1) ? '#ff2244' : '#39ff14';
+    ctx.lineWidth = T[i + 4] * 2.6; ctx.globalAlpha = 0.22 * env;
+    ctx.beginPath(); ctx.moveTo(T[i], T[i + 1]); ctx.lineTo(T[i + 2], T[i + 3]); ctx.stroke();
+    ctx.lineWidth = T[i + 4]; ctx.globalAlpha = env;
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  const S = F.s;
+  for (let i = 0; i < S.length; i += 10) {
+    const m = S[i + 7] | 0;
+    if (((m & 64) !== 0) !== near) continue;
+    const typeIdx = m & 7;
+    ctx.save();
+    ctx.transform(S[i], S[i + 1], S[i + 2], S[i + 3], S[i + 4], S[i + 5]);
+    ctx.globalAlpha = S[i + 6] * env * ((m & 128) && Math.random() < 0.5 ? 0.4 : 1);
+    if (typeIdx === 7) blitSprite(dfrShipSprite(), 1 / DFR_BK);
+    else {
+      const type = DF_TYPES[typeIdx];
+      if (type === 'spinner') ctx.rotate(S[i + 9]);
+      blitSprite(dfrFoeSprite(type, STAGE_HUES[(m >> 3) & 7]), S[i + 8] / DFR_FOE_SC);
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
 /* ---- the word, spelled in enemy hulls ---------------------------------
    Every lit cell of the 5x9 font is one enemy sprite. At arm's length it
    reads as a word; up close it is a formation. It is baked ONCE into an
@@ -3405,12 +3647,13 @@ function drawDeleteIcon(s) {
   ctx.restore();
 }
 function drawTitleScene() {
-  dfDrawLayer(false);          // everything beyond the UI plane
+  const rec = gfx === 'sprite' ? dfrRecord() : null;   // records once, lazily
+  rec ? dfrDrawLayer(rec, false) : dfDrawLayer(false); // everything beyond the UI plane
   drawTitle();
   const L = pilotsLayout();
   for (const s of L.S) drawPilotSlot(s);
   for (const s of L.S) if (saves[s.i]) drawDeleteIcon(s);
-  dfDrawLayer(true);           // ...and the close passes, over the top
+  rec ? dfrDrawLayer(rec, true) : dfDrawLayer(true);   // ...and the close passes, over the top
   for (const p of particles) {  // the erase puff, always on top of its bay
     ctx.globalAlpha = Math.max(0, 1 - p.t / p.dur);
     ctx.fillStyle = p.col;

@@ -219,11 +219,11 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     return { stored, active: gfx, options: Array.from(document.querySelectorAll('#gfx-select option')).map(o => o.value) };
   });
   check('3D animlight is the default graphics style with nothing stored', gfxDefault.active === 'anim' && !gfxDefault.stored, gfxDefault);
-  check('settings dropdown offers exactly the four known styles', JSON.stringify(gfxDefault.options) === JSON.stringify(['toon', 'neon', 'model', 'anim']), gfxDefault.options);
+  check('settings dropdown offers exactly the five known styles', JSON.stringify(gfxDefault.options) === JSON.stringify(['toon', 'neon', 'model', 'anim', 'sprite']), gfxDefault.options);
 
   const painted = await page.evaluate(() => {
     const out = {};
-    for (const style of ['toon', 'neon', 'model', 'anim']) {
+    for (const style of ['toon', 'neon', 'model', 'anim', 'sprite']) {
       gfx = style;
       startGame(1);
       enemies.length = 0; spawnQueue.length = 0;
@@ -241,7 +241,39 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     return out;
   });
   check('every entity type paints in every graphics style without throwing',
-        painted.toon === 70 && painted.neon === 70 && painted.model === 70 && painted.anim === 70, painted);
+        painted.toon === 70 && painted.neon === 70 && painted.model === 70 && painted.anim === 70 && painted.sprite === 70, painted);
+
+  /* ---- SPRITESHEETS: the pre-render cache ------------------------------
+     The style's whole promise is that hulls become blits of lazily-baked
+     frames. Three things rot silently if unpinned: the cache must actually
+     fill (a dead branch quietly falls back to live mesh painting and looks
+     identical), every key must carry the hue (a hue-blind key serves stage
+     1's green drones in the red sector forever), and a stage change must
+     mint NEW entries rather than repaint old ones. */
+  const sprCache = await page.evaluate(() => {
+    gfx = 'sprite';
+    startGame(1);
+    enemies.length = 0; spawnQueue.length = 0; boss = null;
+    for (const t of ['drone', 'shooter', 'spinner', 'tanker']) spawnEnemy(t, 100 + Math.random() * 160, 300);
+    SPR.clear(); sprBytes = 0;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); draw();
+    const stage1Keys = Array.from(SPR.keys());
+    stage = 2;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); draw();
+    const stage2New = Array.from(SPR.keys()).filter(k => !stage1Keys.includes(k));
+    gfx = 'toon'; stage = 1;
+    return {
+      filled: stage1Keys.length,
+      shipFrames: stage1Keys.filter(k => k.startsWith('S|')).length,
+      enemyKeysCarryHue: stage1Keys.filter(k => k.startsWith('E|')).every(k => k.split('|')[2] === '140'),
+      stage2MintsNew: stage2New.filter(k => k.startsWith('E|')).every(k => k.split('|')[2] === '200') && stage2New.length >= 4,
+      budgetTracked: sprBytes > 0,
+    };
+  });
+  check('SPRITESHEETS actually blits from a lazily-filled cache (ship + all four enemy types baked)',
+        sprCache.filled >= 5 && sprCache.shipFrames >= 1 && sprCache.budgetTracked, sprCache);
+  check('sprite cache keys carry the stage hue, and a stage change mints new frames instead of serving stale ones',
+        sprCache.enemyKeysCarryHue && sprCache.stage2MintsNew, sprCache);
 
   // The sun must be fixed in SCREEN space: the spinner draws its blades and
   // dome inside ctx.rotate(e.ang), so without cel()'s frameRot() counter-
@@ -581,7 +613,7 @@ const allEqual = arr => arr.every(v => v === arr[0]);
       const L = stationLayout();
       return L.B.map(b => [b.id, Math.round(b.x), Math.round(b.y), Math.round(b.at.x), Math.round(b.at.y)].join(':')).join('|') + '#' + Math.round(L.R);
     };
-    const sigToon = layoutSig('toon'), sigNeon = layoutSig('neon'), sigModel = layoutSig('model'), sigAnim = layoutSig('anim');
+    const sigToon = layoutSig('toon'), sigNeon = layoutSig('neon'), sigModel = layoutSig('model'), sigAnim = layoutSig('anim'), sigSprite = layoutSig('sprite');
     // one 8x8 box inside a hub panel, clear of the ring, windows and dome —
     // metal under model, near-black fill under neon
     const hub = () => {
@@ -596,20 +628,21 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     gfx = 'neon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const n = fp(); const hubNeon = hub();
     gfx = 'model'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const m = fp(); const hubModel = hub();
     gfx = 'anim'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const a = fp(); const hubAnim = hub();
+    gfx = 'sprite'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const sp = fp(); const hubSprite = hub();
     gfx = 'toon';
-    return { sigToon, sigNeon, sigModel, sigAnim, t, n, m, a, hubNeon, hubModel, hubAnim };
+    return { sigToon, sigNeon, sigModel, sigAnim, sigSprite, t, n, m, a, sp, hubNeon, hubModel, hubAnim, hubSprite };
   });
   check('the station paints a substantial scene in every style, and all three differ',
         stationPaint.t.h !== stationPaint.n.h && stationPaint.n.h !== stationPaint.m.h && stationPaint.t.h !== stationPaint.m.h &&
         stationPaint.t.lit > 300 && stationPaint.n.lit > 300 && stationPaint.m.lit > 300, stationPaint);
   check('a skin is paint: the station layout is identical in every style',
         stationPaint.sigToon === stationPaint.sigNeon && stationPaint.sigToon === stationPaint.sigModel &&
-        stationPaint.sigToon === stationPaint.sigAnim, stationPaint);
+        stationPaint.sigToon === stationPaint.sigAnim && stationPaint.sigToon === stationPaint.sigSprite, stationPaint);
   // bars sit mid-gap: measured 601 under model, 123 under neon (ring-glow
   // bleed keeps neon's floor well above black), 111 with the branch dead
   check('the mesh-family stations are plated metal, not wireframe: the hub interior is lit where neon leaves it dark',
-        stationPaint.hubModel > 350 && stationPaint.hubAnim > 350 && stationPaint.hubNeon < 200,
-        { hubModel: stationPaint.hubModel, hubAnim: stationPaint.hubAnim, hubNeon: stationPaint.hubNeon });
+        stationPaint.hubModel > 350 && stationPaint.hubAnim > 350 && stationPaint.hubSprite > 350 && stationPaint.hubNeon < 200,
+        { hubModel: stationPaint.hubModel, hubAnim: stationPaint.hubAnim, hubSprite: stationPaint.hubSprite, hubNeon: stationPaint.hubNeon });
 
   /* ---- title screen ------------------------------------------------------
      The pilots screen is CANVAS: the word, the three bays and the erase
@@ -731,28 +764,35 @@ const allEqual = arr => arr.every(v => v === arr[0]);
       return [Math.round(L.u), Math.round(L.y0), L.maxCols].join(':') + '#' +
              P.S.map(b => [b.x, b.y, b.w, b.dy, b.dr].map(Math.round).join(',')).join('|');
     };
-    const sigToon = sig('toon'), sigNeon = sig('neon'), sigModel = sig('model'), sigAnim = sig('anim');
+    const sigToon = sig('toon'), sigNeon = sig('neon'), sigModel = sig('model'), sigAnim = sig('anim'), sigSprite = sig('sprite');
     // The word is baked once and kept. If its key does not move with the
     // style, a style switch leaves the OLD bitmap on screen forever.
     gfx = 'toon'; const keyToon = buildTitleWord().key;
     gfx = 'neon'; const keyNeon = buildTitleWord().key;
     gfx = 'model'; const keyModel = buildTitleWord().key;
     gfx = 'anim'; const keyAnim = buildTitleWord().key;
+    gfx = 'sprite'; const keySprite = buildTitleWord().key;
     gfx = 'toon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const t = fp();
     gfx = 'neon'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const n = fp();
     gfx = 'model'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const m = fp();
     gfx = 'anim'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const a = fp();
+    gfx = 'sprite'; ctx.setTransform(1, 0, 0, 1, 0, 0); draw(); const sp = fp();
+    const dfr = dfrTrack ? { key: dfrTrack.key, frames: dfrTrack.frames.length, liveKey: W + '|' + H + '|' + dpr } : null;
     gfx = 'toon';
-    return { sigToon, sigNeon, sigModel, sigAnim, keyToon, keyNeon, keyModel, keyAnim, t, n, m, a };
+    return { sigToon, sigNeon, sigModel, sigAnim, sigSprite, keyToon, keyNeon, keyModel, keyAnim, keySprite, t, n, m, a, sp, dfr };
   });
-  check('the title screen paints a substantial scene in every style, and all four differ',
-        new Set([titlePaint.t.h, titlePaint.n.h, titlePaint.m.h, titlePaint.a.h]).size === 4 &&
-        titlePaint.t.lit > 300 && titlePaint.n.lit > 300 && titlePaint.m.lit > 300 && titlePaint.a.lit > 300, titlePaint);
+  check('the title screen paints a substantial scene in every style, and all five differ',
+        new Set([titlePaint.t.h, titlePaint.n.h, titlePaint.m.h, titlePaint.a.h, titlePaint.sp.h]).size === 5 &&
+        titlePaint.t.lit > 300 && titlePaint.n.lit > 300 && titlePaint.m.lit > 300 && titlePaint.a.lit > 300 && titlePaint.sp.lit > 300, titlePaint);
   check('a skin is paint: the title and bay layout is identical in every style',
         titlePaint.sigToon === titlePaint.sigNeon && titlePaint.sigToon === titlePaint.sigModel &&
-        titlePaint.sigToon === titlePaint.sigAnim, titlePaint);
+        titlePaint.sigToon === titlePaint.sigAnim && titlePaint.sigToon === titlePaint.sigSprite, titlePaint);
   check('the baked word re-bakes on a style switch instead of serving the old bitmap',
-        new Set([titlePaint.keyToon, titlePaint.keyNeon, titlePaint.keyModel, titlePaint.keyAnim]).size === 4, titlePaint);
+        new Set([titlePaint.keyToon, titlePaint.keyNeon, titlePaint.keyModel, titlePaint.keyAnim, titlePaint.keySprite]).size === 5, titlePaint);
+  // The flattened dogfight: drawing the title under 'sprite' must have recorded
+  // a screen-space track — full length, keyed on W|H|dpr so a resize re-records.
+  check('under SPRITESHEETS the title dogfight records a full flattened loop, keyed on the viewport',
+        titlePaint.dfr && titlePaint.dfr.frames === 22 * 60 && titlePaint.dfr.key === titlePaint.dfr.liveKey, titlePaint.dfr);
 
   // A pilot is the only thing on this screen that cannot be undone, and there
   // is no confirm dialog left to catch a misfire -- so the gesture has to.
@@ -887,12 +927,12 @@ const allEqual = arr => arr.every(v => v === arr[0]);
                  boss: boss ? VIS.get(boss) || null : null },
       };
     };
-    const t = scenario('toon'), n = scenario('neon'), m = scenario('model'), a = scenario('anim');
+    const t = scenario('toon'), n = scenario('neon'), m = scenario('model'), a = scenario('anim'), sp = scenario('sprite');
     gfx = 'toon';
-    return { t: t.sim, n: n.sim, m: m.sim, a: a.sim, keys: a.keys, keys0: a.keys0, banks: m.banks };
+    return { t: t.sim, n: n.sim, m: m.sim, a: a.sim, sp: sp.sim, keys: a.keys, keys0: a.keys0, banks: m.banks };
   });
-  check('a skin is paint: 90 driven frames leave the sim byte-identical across all four styles',
-        modelSim.t === modelSim.n && modelSim.n === modelSim.m && modelSim.m === modelSim.a, modelSim);
+  check('a skin is paint: 90 driven frames leave the sim byte-identical across all five styles',
+        modelSim.t === modelSim.n && modelSim.n === modelSim.m && modelSim.m === modelSim.a && modelSim.a === modelSim.sp, modelSim);
   check('the model painters leave no fingerprint on sim objects (bank lives off-entity)',
         modelSim.keys === modelSim.keys0, { keys: modelSim.keys, keys0: modelSim.keys0 });
   check('who banks is the spec: the swaying drone does, straight-line hulls hold level, the spinner spins instead',
@@ -1145,7 +1185,7 @@ const allEqual = arr => arr.every(v => v === arr[0]);
       powerups.length = 0; powerups.push(P);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0); draw();
     };
-    for (const style of ['toon', 'neon', 'model', 'anim']) {
+    for (const style of ['toon', 'neon', 'model', 'anim', 'sprite']) {
       gfx = style;
       shot(0.2);
       out[style] = { pu: box(P.x - 18, P.y - 18, 36, 36) };
@@ -1182,8 +1222,8 @@ const allEqual = arr => arr.every(v => v === arr[0]);
       drawShield(shipArtScale());
       ctx.restore();
     };
-    const OUTER = { toon: 28, neon: 26, model: 30, anim: 30 * A_SHIP_SCALE };
-    for (const style of ['toon', 'neon', 'model', 'anim']) {
+    const OUTER = { toon: 28, neon: 26, model: 30, anim: 30 * A_SHIP_SCALE, sprite: 30 };
+    for (const style of ['toon', 'neon', 'model', 'anim', 'sprite']) {
       const R = OUTER[style];
       shieldOnly(style, 2, 2.0);        // 2.0s sits in the gap between sweeps
       out[style].sh = { r30: ringMean(R, 0.30), r60: ringMean(R, 0.60), rim: ringMean(R, 0.99) };
@@ -1192,7 +1232,7 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     }
     // every distinct (style, charges) the bake can be asked for
     const keys = [];
-    for (const style of ['model', 'anim']) for (const n of [1, 2]) {
+    for (const style of ['model', 'anim', 'sprite']) for (const n of [1, 2]) {
       gfx = style; ship.shieldCharges = n;
       keys.push(shieldSprite(n, shipArtScale(), style === 'anim').key);
     }
@@ -1200,22 +1240,23 @@ const allEqual = arr => arr.every(v => v === arr[0]);
     return { out, keys };
   });
   const shieldKeys = skinFxRaw.keys, skinFx = skinFxRaw.out;
-  const STYLES4 = ['toon', 'neon', 'model', 'anim'];
+  const STYLES5 = ['toon', 'neon', 'model', 'anim', 'sprite'];
   // Distinctness alone is too weak here, and proved it: with the mesh branch
   // dead the four hashes still differed, because the LETTER was styled per
   // style outside the branch. So assert the behaviour instead - a mesh-family
   // pickup is a crate that TUMBLES, and the flat ones hold still.
   check('the powerup is reskinned per style: the mesh styles tumble a crate, the flat ones hold still',
-        STYLES4.every(k => skinFx[k].pu.lit > 60) &&
+        STYLES5.every(k => skinFx[k].pu.lit > 60) &&
         skinFx.toon.pu.hsh !== skinFx.neon.pu.hsh &&
         skinFx.model.pu.hsh !== skinFx.model.puMoved &&
         skinFx.anim.pu.hsh !== skinFx.anim.puMoved &&
+        skinFx.sprite.pu.hsh !== skinFx.sprite.puMoved &&
         skinFx.toon.pu.hsh === skinFx.toon.puMoved &&
         skinFx.neon.pu.hsh === skinFx.neon.puMoved,
-        { lit: STYLES4.map(k => skinFx[k].pu.lit), moved: STYLES4.map(k => skinFx[k].pu.hsh !== skinFx[k].puMoved) });
+        { lit: STYLES5.map(k => skinFx[k].pu.lit), moved: STYLES5.map(k => skinFx[k].pu.hsh !== skinFx[k].puMoved) });
   check('every style actually paints a shield, and none paints one with no charges',
-        STYLES4.every(k => skinFx[k].sh.rim - skinFx[k].sh.none > 25 && skinFx[k].sh.none < 40),
-        STYLES4.map(k => [k, Math.round(skinFx[k].sh.rim), Math.round(skinFx[k].sh.none)]));
+        STYLES5.every(k => skinFx[k].sh.rim - skinFx[k].sh.none > 25 && skinFx[k].sh.none < 40),
+        STYLES5.map(k => [k, Math.round(skinFx[k].sh.rim), Math.round(skinFx[k].sh.none)]));
   // The CD's spec for the 3D shell, stated as a measurement: a thin spherical
   // shell presents its thickness edge-on at the limb and almost none of it
   // head-on, so brightness must climb monotonically outward and pile up at the
@@ -1226,7 +1267,7 @@ const allEqual = arr => arr.every(v => v === arr[0]);
   check('the baked shield sprite re-bakes on a style or charge change instead of serving the old bitmap',
         new Set(shieldKeys).size === shieldKeys.length, shieldKeys);
   check('the 3D shield is a spherical SHELL: nearly clear head-on, climbing to a bold limb',
-        ['model', 'anim'].every(k => {
+        ['model', 'anim', 'sprite'].every(k => {
           const p = skinFx[k].sh;
           return p.r60 > p.r30 && p.rim > p.r60 * 2 && p.rim > p.r30 * 3;
         }),
