@@ -165,6 +165,19 @@ body {
   touch-action:manipulation; cursor:pointer;
 }
 .row.locked { opacity:0.45; }
+/* A character row and its delete button share one line: the ✖ is deliberately
+   small and off to the left, well clear of the ENTER target, and it only opens
+   a confirm screen — erasing a delver is never one tap. */
+.slot-line { display:flex; align-items:center; gap:7px; }
+.slot-line .row { flex:1 1 auto; min-width:0; }
+.del-gap { flex:0 0 auto; width:34px; }
+.del {
+  flex:0 0 auto; width:34px; height:38px; padding:0;
+  background:#140b10; border:1px solid #6a2230; border-radius:9px;
+  color:#ff5566; font-family:'Share Tech Mono', monospace; font-size:0.8rem; line-height:1;
+  touch-action:manipulation; cursor:pointer;
+}
+.btn.danger { color:#ff5566; border-color:#ff5566; }
 .row.maxed { border-color:#2f5a33; }
 .row-ico { font-size:1.15rem; color:var(--gold); width:20px; text-align:center; flex:0 0 auto; }
 .row-txt { flex:1 1 auto; min-width:0; }
@@ -217,7 +230,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-27 00:20 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-27 04:24 UTC</div>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute">🔊</button>
 <button id="cog" aria-label="Settings">&#9881;</button>
@@ -1521,23 +1534,46 @@ function showSlots() {
   for (let i = 0; i < SLOT_COUNT; i++) {
     const c = slots[i];
     if (c) {
-      html += '<button class="row" data-act="pick" data-arg="' + i + '">' +
+      html += '<div class="slot-line">' +
+        '<button class="del" data-act="erase-ask" data-arg="' + i + '" ' +
+        'aria-label="Delete ' + esc(c.name) + '" title="Delete ' + esc(c.name) + '">✖</button>' +
+        '<button class="row" data-act="pick" data-arg="' + i + '">' +
         '<span class="row-ico">⛏</span><span class="row-txt"><b>' + esc(c.name) + '</b>' +
         '<span>DEPTH ' + c.stats.bestDepth + ' · ' + c.stats.runs + ' delve' + (c.stats.runs === 1 ? '' : 's') +
         ' · ' + c.gold + '◈' + (c.sp ? ' · ' + c.sp + ' SP unspent' : '') + '</span></span>' +
-        '<span class="price">ENTER</span></button>' +
-        '<button class="row" data-act="erase" data-arg="' + i + '" style="margin-top:-3px;border-color:#3a2028">' +
-        '<span class="row-ico" style="color:#ff5566">✖</span><span class="row-txt">' +
-        '<span>Erase ' + esc(c.name) + ' — gold, gear and skills all of it.</span></span></button>';
+        '<span class="price">ENTER</span></button></div>';
     } else {
-      html += '<button class="row" data-act="new" data-arg="' + i + '">' +
+      html += '<div class="slot-line"><span class="del-gap"></span>' +
+        '<button class="row" data-act="new" data-arg="' + i + '">' +
         '<span class="row-ico">＋</span><span class="row-txt"><b>EMPTY</b>' +
         '<span>Start a new delver in this slot.</span></span>' +
-        '<span class="price">NEW</span></button>';
+        '<span class="price">NEW</span></button></div>';
     }
   }
   html += '<div class="camp-foot"><button class="btn" data-act="title">◂ TITLE</button></div></div>';
   overlayEl.innerHTML = html;
+  bindCamp();
+}
+/* Deleting a delver is destructive and unrecoverable, so the ✖ on the slot row
+   only gets you here; nothing is written until DELETE is tapped on this screen.
+   KEEP is first and styled normally, DELETE is the red one on the right. */
+function showEraseConfirm(i) {
+  const c = slots[i];
+  if (!c) { showSlots(); return; }
+  state = 'slots';
+  overlayEl.classList.remove('hidden');
+  overlayEl.classList.add('top');
+  overlayEl.scrollTop = 0;
+  overlayEl.innerHTML = '<div class="camp">' +
+    '<div class="camp-head"><span class="camp-name">DELETE ' + esc(c.name) + '?</span></div>' +
+    '<div class="camp-sub">SLOT ' + (i + 1) + ' · THIS CANNOT BE UNDONE</div>' +
+    '<div class="empty-note">' + esc(c.name) + ' has reached <b>depth ' + c.stats.bestDepth + '</b> in ' +
+    c.stats.runs + ' delve' + (c.stats.runs === 1 ? '' : 's') + ', and is holding ' + c.gold + '◈' +
+    (c.sp ? ' and ' + c.sp + ' unspent skill point' + (c.sp === 1 ? '' : 's') : '') + '. ' +
+    'Deleting them frees the slot and takes the gold, the gear and the skills with them. ' +
+    'There is no way to get any of it back.</div>' +
+    '<div class="camp-foot"><button class="btn" data-act="slots">◂ KEEP</button>' +
+    '<button class="btn danger" data-act="erase" data-arg="' + i + '">DELETE</button></div></div>';
   bindCamp();
 }
 function showNewCharacter(i) {
@@ -1734,6 +1770,7 @@ function campAction(act, arg, arg2) {
     showCamp();
     return;
   }
+  if (act === 'erase-ask') { showEraseConfirm(+arg); return; }
   if (act === 'erase') { slots[+arg] = null; saveSlots(); sfxStairs(); showSlots(); return; }
   if (act === 'pick') { activeSlot = +arg; campTab = 'forge'; showCamp(); return; }
   if (act === 'tab') { showCamp(arg); return; }

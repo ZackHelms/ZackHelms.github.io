@@ -199,6 +199,21 @@ dropped the old listeners, so there is nothing stale to clean up.
 test surface: the drive suite buys, ranks and erases through it rather than
 through synthetic taps.
 
+**Deleting a delver is two acts, not one.** The slot row used to carry a
+full-width *Erase* row directly under its ENTER row — one mis-tap and a
+fourteen-floor character, its purse, its gear and its skills were gone with
+nothing to undo it. The shape now is a `.slot-line` flex row: a **small red ✖
+(`.del`, 34×38) on the left**, well clear of the ENTER target on the right, and
+it dispatches `erase-ask` — which only renders `showEraseConfirm(i)`. Nothing is
+written until DELETE is tapped there, so `erase` (the act that actually nulls
+the slot and saves) is reachable from exactly one screen. Keep that split when
+touching either: **`erase` must stay a pure destructive act with no confirm of
+its own**, because the drive suite and any future caller rely on calling it
+directly. The empty-slot row carries a `.del-gap` spacer of the same width so
+the three rows line up. The confirm screen names what is being lost (depth,
+delves, gold, unspent SP) rather than asking abstractly — the numbers are the
+warning.
+
 **The overflow trap, and why the fix is structural.** `#overlay` is a flex
 column that also scrolls, and `justify-content:center` on a scroll container
 **clips its own overflow at the top**: the first rows sit above the scroll
@@ -443,7 +458,7 @@ intro banner and descend fade.
   closed in one turn, which is 0 whenever the layout blocks it — flaky on a
   procedural floor. Counting SWINGS from an enemy already beside you is
   layout-independent and is what the rule actually says.
-- Drive: **`.claude/tests/drive-ember-depths.cjs` (110 checks)** — kept, and
+- Drive: **`.claude/tests/drive-ember-depths.cjs` (113 checks)** — kept, and
   picked up automatically by `gates.sh` for any change under
   `games/ember-depths/`. Covers the zoom range and clamps, zoom-1 layout
   identity, free look (tethered before a drag, never re-tethering after one,
@@ -457,7 +472,10 @@ intro banner and descend fade.
   which plays scripted personas through real runs and is the only honest way to
   tune `CURVE`. Read its header before trusting a number from it.
   A second group covers the meta layer: three independent slots surviving a
-  reload, a hand-edited save clamped by `migrate()`, the forge refusing what
+  reload, the delete-confirm split (the ✖ measured as a small button *left* of
+  the row, `erase-ask` leaving the character and its stored blob untouched,
+  KEEP backing out, `erase` still erasing), a hand-edited save clamped by
+  `migrate()`, the forge refusing what
   you cannot afford, the kit **reaching the delve** (atk / max HP / light /
   gold multiplier / marked stairs, read off `startRun`'s output), the skill
   gate and the rank-r-costs-r ladder, every skill effect measured through the
@@ -467,8 +485,8 @@ intro banner and descend fade.
   twice. Negative-controlled through `negtest.sh` — a `camFree`-blind
   `followCam`, a falling-through dismiss tap, skin/leech/ward reverted to
   non-stacking, `bankRun` keeping the supplies, the skill gate removed, the
-  kit never folded into `player`, and `migrate` trusting the blob — each
-  fails exactly its own check. A fourth is the overlay-reach sweep above
+  kit never folded into `player`, `migrate` trusting the blob, and an
+  `erase-ask` that erases in one tap — each fails exactly its own check. A fourth is the overlay-reach sweep above
   (restoring `justify-content:center` fails it on 11 screen/viewport pairs).
   A third group covers the 2026-08-26 curve pass:
   the tree's wiring (every edge names a real node, exactly two roots, every

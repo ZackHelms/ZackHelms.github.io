@@ -344,7 +344,40 @@ const ok = (name, cond, extra) => {
   }));
   ok('characters survive a reload', reloaded.golds[0] === 100 && reloaded.golds[1] === 7, reloaded);
 
+  // The ✖ on a slot row must not delete anything by itself — it opens a confirm
+  // screen, and only DELETE on that screen writes. A one-tap erase is the whole
+  // bug this guards: the slot row and the ✖ sit on the same line.
+  const asked = await page.evaluate(() => {
+    showSlots();
+    const line = document.querySelector('.slot-line');
+    const del = line && line.querySelector('.del');
+    const pick = line && line.querySelector('.row');
+    const gap = del && pick ? Math.round(pick.getBoundingClientRect().left - del.getBoundingClientRect().right) : -1;
+    const delLeft = del && pick ? del.getBoundingClientRect().left < pick.getBoundingClientRect().left : false;
+    const w = del ? Math.round(del.getBoundingClientRect().width) : 0;
+    campAction('erase-ask', '1');
+    return {
+      delLeft, gap, w,
+      still: slots.map((c) => (c ? c.gold : null)),
+      confirming: /DELETE/.test(document.getElementById('overlay').textContent),
+      keeps: !!document.querySelector('[data-act="slots"]'),
+      arms: !!document.querySelector('[data-act="erase"]'),
+    };
+  });
+  ok('the delete button is a small icon left of the character row',
+     asked.delLeft && asked.gap > 0 && asked.w > 0 && asked.w <= 40, asked);
+  ok('tapping delete only asks — nothing is erased yet',
+     asked.still[1] === 7 && asked.confirming && asked.keeps && asked.arms, asked);
+  const kept = await page.evaluate(() => {
+    campAction('slots');
+    return { golds: slots.map((c) => (c ? c.gold : null)),
+             stored: JSON.parse(localStorage.getItem('emberDepths.slots.v1')).map((c) => c && c.gold) };
+  });
+  ok('KEEP backs out with every delver intact',
+     kept.golds[1] === 7 && kept.stored[1] === 7, kept);
+
   const erased = await page.evaluate(() => {
+    campAction('erase-ask', '1');
     campAction('erase', '1');
     return { slots: slots.map((c) => (c ? c.gold : null)) };
   });
@@ -953,6 +986,9 @@ const ok = (name, cond, extra) => {
       showMenu(); out.push(top('title'));
       showSlots(); out.push(top('slots'));
       campAction('new', '0'); campAction('create', '0');
+      campAction('erase-ask', '0'); out.push(top('slots/confirm-delete'));
+      campAction('slots');
+      campAction('pick', '0');
       const c = chr();
       c.gold = 900; c.sp = 9; c.stats.bestDepth = 14;
       c.skills = { edge: 1, hide: 1, lantern: 1, prospect: 1, fortune: 1 };
