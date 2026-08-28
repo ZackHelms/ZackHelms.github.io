@@ -632,14 +632,22 @@ settled-freeze regressions):
 `.claude/tests/drive-phasic.cjs`. Detailed context: `.claude/phasic.md`
 (includes the maintained tactics registry).
 
-### FIRE CLICKER (`fire-clicker/index.html`, ~640 lines)
-Idle clicker — the repo's third, a direct CD commission (2026-08-28). Tap a
-canvas-rendered particle fire for embers **and heat**: heat decays but
-multiplies ALL income (up to ×3), so active stoking boosts the idle engine.
-10 buildings, ~39 upgrades, fire stages SPARK→SOLAR FLARE by lifetime embers,
-rekindle prestige (+10%/ash), 8 h half-rate offline earnings. **Proprietary —
-no permissive license in this directory** (one of the five protected games).
-Detailed context: `.claude/fire-clicker.md`.
+### FIRE CLICKER (`fire-clicker/index.html`, ~900 lines)
+A snowy-village fire-keeping sim, CD-commissioned 2026-08-28 and explicitly
+NOT built on the croissant/basketball shop-list template. One rendered scene:
+stylized-cartoon snowfield, two straw houses, an unlit central campfire ringed
+by log seats. Tapping the fire raises a mote of light from the tap point and
+banks burn seconds (1 s/tap, 5 s cap, both upgradable) that count down from
+the moment they land. Villagers are simulated agents — while the fire burns
+they haul wood/stone/food from work sites to the stockpile; cold, they huddle
+on the seats (shivering, breath puffs) or hide indoors (windows glow, chimney
+smoke). A 5-minute day/night cycle drives keyframed sky palettes and a
+punch-hole darkness layer, so the fire realistically lights its surroundings
+at night. Upgrades (fire pit, tinder, windbreak, tools, bunkhouse, firekeeper
+auto-stoker that spends stockpiled wood) are paid in gathered resources.
+Village→town→city stages and an ascension prestige are designed but not yet
+built. **Proprietary — no permissive license in this directory** (one of the
+five protected games). Detailed context: `.claude/fire-clicker.md`.
 
 ### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)
 The repo's first **async-versus** game. Eight rogue signals hide among ~350
