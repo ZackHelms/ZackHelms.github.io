@@ -25,6 +25,7 @@ local-2p.
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
 | Neon Clash | `neon-clash/` | card-battler | drag-place, tap, tap-select | match-vs-ai, local-2p | card-deck, resource-economy, ai-opponent, rotated-2p-ui, area-of-effect, art-styles | vs-ai, local-2p | `.claude/neon-clash.md` |
+| Fire Clicker | `fire-clicker/` | idle-clicker | tap | idle-persistent | resource-economy, meta-progression, combo-multiplier | solo | `.claude/fire-clicker.md` |
 | Zed Shooter | `zed-shooter/` | shooter | virtual-joystick, kb-mouse | wave-survival | meta-progression | solo | external: zed-fps repo |
 | Mitochondria Simulator | `mitochondria/` | biology-sim | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox, guided-lessons | systems-simulation, scale-ladder, skill-teaching, real-time-3d | solo | `.claude/mitochondria.md` |
 | Quantum Chemist | `qntmchmst/` | grid-puzzle | tap, drag-place | level-campaign | match-clear | solo | external: qntmchmst repo |
@@ -75,15 +76,17 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-49 games (47 in-repo + 2 external builds).
+50 games (48 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
 ### Saturated — avoid without a named twist
 - **Input `tap`-only:** 14 games. **`endless-highscore`:** 12 games.
-- **Genre `arcade-classic`:** 5. `idle-clicker`: 2 (both very deep — don't
-  add a third). One-thumb neon arcade in general is the house specialty and
-  the most crowded shelf.
+- **Genre `arcade-classic`:** 5. `idle-clicker`: 3 — croissant and basketball
+  (both very deep) plus fire-clicker (2026-08-28, a direct CD commission: a
+  lighter third whose twist is a decaying tap-built heat multiplier over all
+  income). The shelf is now full — do not add a fourth. One-thumb neon arcade
+  in general is the house specialty and the most crowded shelf.
 
 ### Rare — one game each; a second with a different spin is fair game
 - `hold-charge` (pinball plunger, alpine-ascent leap, golden-reel cast —

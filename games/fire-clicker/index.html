@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fire Clicker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+:root {
+  --bg: #06060e;
+  --panel: #0b0b16;
+  --border: #1a1a30;
+  --green: #39ff14;
+  --gold: #ffc300;
+  --blue: #4488ff;
+  --red: #ff2244;
+  --white: #dde3ff;
+  --dim: #8899bb;
+  --purple: #b44fff;
+  --flame: #ff8c1a;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; }
+body {
+  background: var(--bg);
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--white);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+#app { height:100dvh; display:flex; flex-direction:column; }
+#main-col { display:flex; flex-direction:column; flex:1; min-height:0; }
+
+/* --- top chrome --- */
+#back-btn, #mute-btn {
+  position: fixed; top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 80;
+  width: 38px; height: 30px; line-height: 28px; text-align: center;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--white); font-size: 15px; text-decoration: none; cursor: pointer;
+  font-family: 'Share Tech Mono', monospace; padding: 0;
+}
+#back-btn { left: calc(env(safe-area-inset-left, 0px) + 8px); }
+#mute-btn { left: calc(env(safe-area-inset-left, 0px) + 52px); }
+
+/* --- header readouts --- */
+#head {
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 6px;
+  text-align: center; flex-shrink: 0;
+}
+#stage-name {
+  font-family: 'Black Ops One', sans-serif; font-size: 0.72rem;
+  color: var(--gold); letter-spacing: 4px; text-shadow: 0 0 14px #ffc30055;
+}
+#ember-count {
+  font-family: 'Black Ops One', sans-serif; font-size: 1.5rem;
+  color: var(--flame); letter-spacing: 2px; text-shadow: 0 0 18px #ff8c1a66;
+  line-height: 1.25;
+}
+#eps-line { font-size: 0.6rem; color: var(--dim); letter-spacing: 1px; }
+#heat-wrap {
+  max-width: 260px; margin: 5px auto 0; height: 14px; position: relative;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 7px;
+  overflow: hidden;
+}
+#heat-fill {
+  position:absolute; left:0; top:0; bottom:0; width:0%;
+  background: linear-gradient(90deg, #ff8c1a, #ff2244); border-radius: 7px;
+  transition: width 0.12s linear;
+}
+#heat-label {
+  position:absolute; inset:0; text-align:center; line-height:12px;
+  font-size: 0.55rem; letter-spacing: 1px; color: var(--white); z-index: 1;
+}
+
+/* --- fire canvas --- */
+#fire { flex: 1; min-height: 0; width: 100%; display: block; cursor: pointer; }
+
+/* --- shop --- */
+#shop {
+  flex-shrink: 0; height: 42dvh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--panel); border-top: 1px solid var(--border);
+  padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 14px);
+}
+.shop-h {
+  font-family: 'Black Ops One', sans-serif; font-size: 0.62rem; letter-spacing: 3px;
+  color: var(--dim); margin: 8px 2px 5px;
+}
+#upgrades { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.upg {
+  flex-shrink: 0; width: 150px; text-align: left;
+  background: #12122a; border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 9px; cursor: pointer; color: var(--white);
+  font-family: 'Share Tech Mono', monospace;
+}
+.upg .un { font-size: 0.62rem; color: var(--purple); letter-spacing: 1px; }
+.upg .ud { font-size: 0.55rem; color: var(--dim); line-height: 1.4; margin: 2px 0; }
+.upg .uc { font-size: 0.6rem; color: var(--gold); }
+.upg.afford { border-color: var(--purple); box-shadow: 0 0 10px #b44fff22; }
+.upg:active { transform: scale(0.97); }
+#no-upg { font-size: 0.55rem; color: var(--dim); padding: 4px 2px; }
+.bld {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: #0e0e1e; border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px; margin-bottom: 6px; cursor: pointer; color: var(--white);
+  font-family: 'Share Tech Mono', monospace;
+}
+.bld.afford { border-color: var(--green); }
+.bld.afford .bc { color: var(--green); }
+.bld:active { transform: scale(0.99); }
+.bld .bi { font-size: 1.3rem; flex-shrink: 0; width: 30px; text-align: center; }
+.bld .bmid { flex: 1; min-width: 0; }
+.bld .bn { font-family: 'Black Ops One', sans-serif; font-size: 0.62rem; letter-spacing: 1px; color: var(--white); }
+.bld .bd { font-size: 0.52rem; color: var(--dim); line-height: 1.4; }
+.bld .bc { font-size: 0.6rem; color: var(--dim); }
+.bld .bright { text-align: right; flex-shrink: 0; }
+.bld .bo { font-family: 'Black Ops One', sans-serif; font-size: 0.95rem; color: var(--flame); }
+.bld .be { font-size: 0.5rem; color: var(--dim); }
+.bld.locked { opacity: 0.35; pointer-events: none; }
+#rek-box {
+  margin-top: 10px; border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px; background: #100a14; text-align: center;
+}
+#rek-btn {
+  font-family: 'Black Ops One', sans-serif; letter-spacing: 2px; font-size: 0.7rem;
+  background: #1a0f22; color: var(--purple); border: 1px solid var(--purple);
+  border-radius: 8px; padding: 9px 18px; cursor: pointer; margin-top: 6px;
+}
+#rek-btn:disabled { color: var(--dim); border-color: var(--border); background: transparent; cursor: default; }
+#rek-info { font-size: 0.55rem; color: var(--dim); line-height: 1.6; }
+#ash-line { font-size: 0.6rem; color: var(--purple); letter-spacing: 1px; margin-bottom: 2px; }
+
+/* --- modal --- */
+#modal {
+  position: fixed; inset: 0; z-index: 70; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(6,6,14,0.8); padding: 24px;
+}
+#modal.open { display: flex; }
+#modal .mp {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  max-width: 340px; width: 100%; padding: 18px; text-align: center;
+  box-shadow: 0 0 50px #000;
+}
+#modal h3 { font-family: 'Black Ops One', sans-serif; color: var(--purple); letter-spacing: 2px; font-size: 0.85rem; margin-bottom: 8px; }
+#modal p { font-size: 0.62rem; color: var(--dim); line-height: 1.7; margin-bottom: 12px; }
+#modal .mrow { display: flex; gap: 8px; justify-content: center; }
+#modal button {
+  font-family: 'Black Ops One', sans-serif; letter-spacing: 1px; font-size: 0.65rem;
+  border-radius: 8px; padding: 9px 16px; cursor: pointer;
+}
+#m-yes { background: #1a0f22; color: var(--purple); border: 1px solid var(--purple); }
+#m-no { background: var(--panel); color: var(--white); border: 1px solid var(--border); }
+
+/* --- toast --- */
+#toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top, 0px) + 46px); z-index: 60;
+  background: var(--panel); border: 1px solid var(--gold); border-radius: 8px;
+  color: var(--gold); font-size: 0.6rem; letter-spacing: 1px; padding: 8px 14px;
+  opacity: 0; pointer-events: none; transition: opacity 0.4s; max-width: 86vw; text-align: center;
+}
+#toast.show { opacity: 1; }
+
+@media (orientation: landscape) {
+  #app { flex-direction: row; }
+  #main-col { min-width: 0; }
+  #shop { height: auto; width: 320px; border-top: none; border-left: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 03:36 UTC</div>
+<div id="app">
+  <div id="main-col">
+    <div id="head">
+      <div id="stage-name">SPARK</div>
+      <div id="ember-count">0 EMBERS</div>
+      <div id="eps-line">0/sec &middot; tap +1</div>
+      <div id="heat-wrap"><div id="heat-fill"></div><div id="heat-label">HEAT x1.00</div></div>
+    </div>
+    <canvas id="fire"></canvas>
+  </div>
+  <div id="shop">
+    <div class="shop-h">UPGRADES</div>
+    <div id="upgrades"></div>
+    <div id="no-upg">Keep stoking &mdash; upgrades unlock as the fire grows.</div>
+    <div class="shop-h">FUEL &amp; MACHINERY</div>
+    <div id="buildings"></div>
+    <div id="rek-box">
+      <div id="ash-line"></div>
+      <div id="rek-info"></div>
+      <button id="rek-btn">REKINDLE</button>
+    </div>
+  </div>
+</div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
+<button id="mute-btn" aria-label="Mute">&#128266;</button>
+<div id="modal"><div class="mp">
+  <h3>REKINDLE?</h3>
+  <p id="m-text"></p>
+  <div class="mrow"><button id="m-yes">BURN IT DOWN</button><button id="m-no">NOT YET</button></div>
+</div></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ============================== data ============================== */
+const BDEFS = [
+  { n:'TINDER PINCH',   i:'\u{1FAB6}', d:'Dry moss and shavings. It barely counts, but it burns.', c:15,    e:0.1 },
+  { n:'KINDLING BUNDLE',i:'\u{1F343}', d:'Snapped twigs stacked in a lattice.',                    c:100,   e:1 },
+  { n:'SEASONED LOG',   i:'\u{1FAB5}', d:'Two years drying in the woodshed. Catches beautifully.', c:600,   e:6 },
+  { n:'BELLOWS RIG',    i:'\u{1F4A8}', d:'A treadle-driven bellows that never tires.',             c:3500,  e:30 },
+  { n:'CHARCOAL KILN',  i:'\u{26AB}',  d:'Slow-baked charcoal, twice the heat of wood.',           c:2e4,   e:140 },
+  { n:'OIL DRUM',       i:'\u{1F6E2}', d:'Drip-fed lamp oil. The flames turn serious.',            c:1.2e5, e:700 },
+  { n:'WILDFIRE SEED',  i:'\u{1F332}', d:'A grove planted just to burn, forever regrowing.',       c:7.5e5, e:3600 },
+  { n:'MAGMA TAP',      i:'\u{1F30B}', d:'A borehole straight down to the mantle.',                c:5e6,   e:2e4 },
+  { n:'PHOENIX ROOST',  i:'\u{1F985}', d:'The birds nest here and combust on schedule.',           c:4e7,   e:1.2e5 },
+  { n:'SOLAR MIRROR',   i:'\u{1F506}', d:'An orbital array focusing noon onto your firepit.',      c:3e8,   e:8e5 },
+];
+const STAGES = [
+  { t:0,     n:'SPARK',       size:0.34, hot:52, cool:14 },
+  { t:1e3,   n:'CAMPFIRE',    size:0.48, hot:50, cool:12 },
+  { t:5e4,   n:'BONFIRE',     size:0.62, hot:48, cool:10 },
+  { t:1e6,   n:'BLAZE',       size:0.76, hot:46, cool:8  },
+  { t:2.5e7, n:'INFERNO',     size:0.9,  hot:44, cool:4  },
+  { t:5e8,   n:'FIRESTORM',   size:1.02, hot:40, cool:0  },
+  { t:1e10,  n:'SOLAR FLARE', size:1.12, hot:210, cool:36 },
+];
+// upgrades: per-building x2 tiers + click + heat specials
+const UDEFS = [];
+BDEFS.forEach((b, bi) => {
+  [[10, 12], [25, 120], [50, 1500]].forEach(([need, mult], ti) => {
+    UDEFS.push({
+      id: 'b' + bi + 't' + ti, n: b.n + ' x2',
+      d: b.n.toLowerCase() + 's burn twice as bright',
+      cost: b.c * mult,
+      avail: (s) => s.b[bi] >= need,
+      kind: 'bld', bi,
+    });
+  });
+});
+[[100, 'STOKING IRON'], [5e3, 'FIRE POKER +'], [2.5e5, 'DRAGONHIDE GLOVES'], [1e7, 'SALAMANDER PACT'], [1e9, 'HANDS OF THE SUN']]
+  .forEach(([t, name], ci) => {
+    UDEFS.push({
+      id: 'c' + ci, n: name, d: 'taps are twice as powerful',
+      cost: t * 2.5, avail: (s) => s.total >= t, kind: 'click',
+    });
+  });
+UDEFS.push({ id: 'hgain', n: 'HEAVY BELLOWS', d: 'each tap builds 50% more heat',  cost: 5e4,  avail: (s) => s.total >= 2e4,  kind: 'heat' });
+UDEFS.push({ id: 'hkeep', n: 'FIREBRICK LINING', d: 'heat drains half as fast',    cost: 5e5,  avail: (s) => s.total >= 2e5,  kind: 'heat' });
+UDEFS.push({ id: 'hmax',  n: 'WHITE HEAT', d: 'full heat: x3 everything (was x2)', cost: 2e7,  avail: (s) => s.total >= 5e6,  kind: 'heat' });
+UDEFS.push({ id: 'cinder', n: 'CINDER SIPHON', d: 'taps also gain +2% of embers/sec', cost: 5e6, avail: (s) => s.total >= 1e6, kind: 'click' });
+const REKINDLE_MIN = 1e6;
+const SAVE_KEY = 'fireClicker.v1';
+const OFFLINE_CAP = 8 * 3600, OFFLINE_RATE = 0.5;
+
+/* ============================== state ============================== */
+function freshState() {
+  return {
+    embers: 0, total: 0, totalAll: 0,
+    b: BDEFS.map(() => 0), up: {},
+    ash: 0, rekindles: 0,
+    heat: 0, muted: false, lastSave: Date.now(),
+  };
+}
+let S = freshState();
+function save() { S.lastSave = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(SAVE_KEY); } catch (e) {}
+  if (!raw) return 0;
+  let d;
+  try { d = JSON.parse(raw); } catch (e) { return 0; }
+  if (!d || typeof d !== 'object') return 0;
+  const f = freshState();
+  S = {
+    embers: +d.embers || 0, total: +d.total || 0, totalAll: +d.totalAll || 0,
+    b: BDEFS.map((_, i) => (Array.isArray(d.b) && +d.b[i] > 0) ? Math.floor(+d.b[i]) : 0),
+    up: (d.up && typeof d.up === 'object') ? d.up : {},
+    ash: +d.ash || 0, rekindles: +d.rekindles || 0,
+    heat: 0, muted: !!d.muted, lastSave: +d.lastSave || Date.now(),
+  };
+  const away = Math.min(OFFLINE_CAP, Math.max(0, (Date.now() - S.lastSave) / 1000));
+  const gained = epsOf(S) * away * OFFLINE_RATE;
+  if (away > 60 && gained >= 1) {
+    S.embers += gained; S.total += gained; S.totalAll += gained;
+    return gained;
+  }
+  return 0;
+}
+
+/* ============================== math ============================== */
+function has(id) { return !!S.up[id]; }
+function bldMult(s, bi) {
+  let m = 1;
+  for (let t = 0; t < 3; t++) if (s.up['b' + bi + 't' + t]) m *= 2;
+  return m;
+}
+function ashMult(s) { return 1 + s.ash * 0.1; }
+function heatSpan(s) { return s.up.hmax ? 2 : 1; }
+function heatMult(s) { return 1 + (s.heat / 100) * heatSpan(s); }
+function epsOf(s) {
+  let e = 0;
+  for (let i = 0; i < BDEFS.length; i++) e += BDEFS[i].e * s.b[i] * bldMult(s, i);
+  return e * ashMult(s) * heatMult(s);
+}
+function clickPow(s) {
+  let p = 1;
+  for (let c = 0; c < 5; c++) if (s.up['c' + c]) p *= 2;
+  p *= ashMult(s) * heatMult(s);
+  if (s.up.cinder) p += epsOf(s) * 0.02;
+  return p;
+}
+function bldCost(bi) { return BDEFS[bi].c * Math.pow(1.15, S.b[bi]); }
+function stageOf(s) {
+  let st = STAGES[0];
+  for (const x of STAGES) if (s.totalAll >= x.t) st = x;
+  return st;
+}
+function ashGain(s) { return s.total >= REKINDLE_MIN ? Math.floor(Math.sqrt(s.total / REKINDLE_MIN)) : 0; }
+const SUF = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No'];
+function fmt(n) {
+  if (!isFinite(n)) return '∞';
+  if (n < 0) return '-' + fmt(-n);
+  if (n < 1000) return (n < 10 && n % 1 !== 0) ? n.toFixed(1) : String(Math.floor(n));
+  let tier = Math.floor(Math.log10(n) / 3);
+  if (tier >= SUF.length) tier = SUF.length - 1;
+  const v = n / Math.pow(10, tier * 3);
+  return (v >= 100 ? v.toFixed(0) : v.toFixed(1)) + SUF[tier];
+}
+
+/* ============================== audio ============================== */
+let AC = null, sfxGain = null, musicGain = null, noiseBuf = null, crackleSrc = null, musicTimer = 0;
+function audioInit() {
+  if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+  try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+  sfxGain = AC.createGain(); sfxGain.gain.value = S.muted ? 0 : 0.5; sfxGain.connect(AC.destination);
+  musicGain = AC.createGain(); musicGain.gain.value = S.muted ? 0 : 0.3; musicGain.connect(AC.destination);
+  const len = AC.sampleRate * 2;
+  noiseBuf = AC.createBuffer(1, len, AC.sampleRate);
+  const ch = noiseBuf.getChannelData(0);
+  for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+  startCrackle(); scheduleMusic();
+}
+function startCrackle() {
+  crackleSrc = AC.createBufferSource();
+  crackleSrc.buffer = noiseBuf; crackleSrc.loop = true;
+  const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+  const g = AC.createGain(); g.gain.value = 0.05;
+  crackleSrc.connect(lp); lp.connect(g); g.connect(musicGain);
+  crackleSrc.start();
+  (function wobble() {
+    if (!AC) return;
+    g.gain.linearRampToValueAtTime(0.03 + Math.random() * 0.06, AC.currentTime + 0.35);
+    setTimeout(wobble, 300 + Math.random() * 300);
+  })();
+}
+const SCALE = [0, 3, 5, 7, 10, 12, 15];
+function scheduleMusic() {
+  // lookahead sequencer: sparse warm plucks over a low drone
+  const LOOK = 0.2;
+  let next = AC.currentTime + 0.1, step = 0;
+  const drone = AC.createOscillator(), dg = AC.createGain();
+  drone.type = 'triangle'; drone.frequency.value = 55; dg.gain.value = 0.05;
+  drone.connect(dg); dg.connect(musicGain); drone.start();
+  musicTimer = setInterval(() => {
+    if (!AC) return;
+    while (next < AC.currentTime + LOOK) {
+      if (Math.random() < 0.45) {
+        const semi = SCALE[Math.floor(Math.random() * SCALE.length)];
+        const f = 220 * Math.pow(2, semi / 12) * (Math.random() < 0.3 ? 2 : 1);
+        pluck(f, next);
+      }
+      next += 0.6; step++;
+    }
+  }, 100);
+}
+function pluck(freq, t) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine'; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.11, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+  o.connect(g); g.connect(musicGain); o.start(t); o.stop(t + 1.2);
+}
+function sfxTap() {
+  if (!AC) return;
+  const t = AC.currentTime;
+  const src = AC.createBufferSource(); src.buffer = noiseBuf;
+  src.playbackRate.value = 0.8 + Math.random() * 0.6;
+  const bp = AC.createBiquadFilter(); bp.type = 'bandpass';
+  bp.frequency.value = 900 + Math.random() * 1800; bp.Q.value = 1.2;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.35, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+  src.connect(bp); bp.connect(g); g.connect(sfxGain);
+  src.start(t); src.stop(t + 0.1);
+}
+function sfxBlip(f0, f1, dur, vol) {
+  if (!AC) return;
+  const t = AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'square'; o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + dur + 0.02);
+}
+function sfxBuy() { sfxBlip(300, 620, 0.12, 0.18); }
+function sfxUpg() { sfxBlip(440, 880, 0.1, 0.16); setTimeout(() => sfxBlip(660, 1320, 0.12, 0.14), 90); }
+function sfxStage() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => sfxBlip(f, f, 0.16, 0.16), i * 90)); }
+function sfxRekindle() {
+  if (!AC) return;
+  const t = AC.currentTime;
+  const src = AC.createBufferSource(); src.buffer = noiseBuf;
+  const lp = AC.createBiquadFilter(); lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(4000, t); lp.frequency.exponentialRampToValueAtTime(120, t + 1.1);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.4, t); g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+  src.connect(lp); lp.connect(g); g.connect(sfxGain); src.start(t); src.stop(t + 1.25);
+  setTimeout(sfxStage, 900);
+}
+function setMuted(m) {
+  S.muted = m;
+  muteBtn.textContent = m ? '\u{1F507}' : '\u{1F50A}';
+  if (sfxGain) sfxGain.gain.value = m ? 0 : 0.5;
+  if (musicGain) musicGain.gain.value = m ? 0 : 0.3;
+  save();
+}
+document.addEventListener('visibilitychange', () => {
+  if (!AC) { if (document.hidden) save(); return; }
+  if (document.hidden) { AC.suspend(); save(); } else if (!S.muted) AC.resume();
+});
+
+/* ============================== canvas fire ============================== */
+const cv = document.getElementById('fire');
+const cx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  const r = cv.getBoundingClientRect();
+  W = Math.max(1, r.width); H = Math.max(1, r.height);
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', () => setTimeout(resize, 60));
+const parts = [], sparks = [], floats = [];
+const MAXP = 260;
+function spawnFlame(stage, heatFrac) {
+  const base = fireBase();
+  const spread = base.r * (0.55 + heatFrac * 0.25);
+  parts.push({
+    x: base.x + (Math.random() * 2 - 1) * spread,
+    y: base.y + Math.random() * 8,
+    vy: -(38 + Math.random() * 60) * (0.7 + stage.size),
+    vx: (Math.random() * 2 - 1) * 9,
+    r: (7 + Math.random() * 12) * (0.5 + stage.size * 0.8),
+    life: 0, max: 0.9 + Math.random() * 0.9,
+    ph: Math.random() * Math.PI * 2,
+  });
+}
+function fireBase() {
+  const stage = stageOf(S);
+  return { x: W / 2, y: H * 0.82, r: Math.min(W * 0.32, 60 + 90 * stage.size) };
+}
+function drawFire(dt) {
+  const stage = stageOf(S);
+  const hf = S.heat / 100;
+  cx.clearRect(0, 0, W, H);
+  const base = fireBase();
+  // ambient glow
+  const glowR = base.r * (2.2 + hf * 0.8);
+  const grd = cx.createRadialGradient(base.x, base.y, 0, base.x, base.y, glowR);
+  grd.addColorStop(0, 'hsla(' + stage.hot + ',100%,55%,' + (0.16 + hf * 0.1) + ')');
+  grd.addColorStop(1, 'hsla(' + stage.hot + ',100%,45%,0)');
+  cx.fillStyle = grd;
+  cx.fillRect(base.x - glowR, base.y - glowR, glowR * 2, glowR * 2);
+  // logs
+  cx.save();
+  cx.translate(base.x, base.y + 10);
+  cx.fillStyle = '#3a2416';
+  cx.strokeStyle = '#241408'; cx.lineWidth = 2;
+  [[-0.32, 1], [0.32, -1]].forEach(([rot, s]) => {
+    cx.save(); cx.rotate(rot);
+    const lw = base.r * 1.5, lh = Math.max(10, base.r * 0.22);
+    cx.beginPath();
+    if (cx.roundRect) cx.roundRect(-lw / 2, -lh / 2, lw, lh, lh / 2); else cx.rect(-lw / 2, -lh / 2, lw, lh);
+    cx.fill(); cx.stroke();
+    cx.restore();
+  });
+  cx.restore();
+  // particles (additive)
+  const want = Math.round((14 + 60 * stage.size) * (1 + hf * 0.8) * dt);
+  for (let i = 0; i < want && parts.length < MAXP; i++) spawnFlame(stage, hf);
+  cx.globalCompositeOperation = 'lighter';
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.life += dt;
+    if (p.life >= p.max) { parts.splice(i, 1); continue; }
+    const k = p.life / p.max;
+    p.x += (p.vx + Math.sin(p.ph + p.life * 6) * 16) * dt;
+    p.y += p.vy * dt;
+    const r = p.r * (1 - k * 0.75);
+    const hue = stage.hot + (stage.cool - stage.hot) * k;
+    cx.fillStyle = 'hsla(' + hue + ',100%,' + Math.round(62 - k * 26) + '%,' + (0.5 * (1 - k)) + ')';
+    cx.beginPath(); cx.arc(p.x, p.y, Math.max(0.5, r), 0, Math.PI * 2); cx.fill();
+  }
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i];
+    s.life += dt;
+    if (s.life >= s.max) { sparks.splice(i, 1); continue; }
+    s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 60 * dt;
+    const k = 1 - s.life / s.max;
+    cx.fillStyle = 'hsla(' + stage.hot + ',100%,70%,' + (0.9 * k) + ')';
+    cx.beginPath(); cx.arc(s.x, s.y, 1.6 + k, 0, Math.PI * 2); cx.fill();
+  }
+  cx.globalCompositeOperation = 'source-over';
+  // floating +N text
+  cx.font = '14px "Share Tech Mono", monospace';
+  cx.textAlign = 'center';
+  for (let i = floats.length - 1; i >= 0; i--) {
+    const f = floats[i];
+    f.life += dt;
+    if (f.life >= 1) { floats.splice(i, 1); continue; }
+    cx.fillStyle = 'rgba(255,195,0,' + (1 - f.life) + ')';
+    cx.fillText(f.txt, f.x, f.y - f.life * 46);
+  }
+}
+
+/* ============================== game logic ============================== */
+let heatIdle = 0;
+function stoke(px, py) {
+  audioInit();
+  const gain = clickPow(S);
+  S.embers += gain; S.total += gain; S.totalAll += gain;
+  const hg = 2.4 * (has('hgain') ? 1.5 : 1);
+  S.heat = Math.min(100, S.heat + hg);
+  heatIdle = 0;
+  sfxTap();
+  const base = fireBase();
+  const x = (px !== undefined) ? px : base.x, y = (py !== undefined) ? py : base.y - base.r;
+  floats.push({ txt: '+' + fmt(gain), x, y: Math.min(y, H - 10), life: 0 });
+  for (let i = 0; i < 6; i++) {
+    sparks.push({
+      x: base.x + (Math.random() * 2 - 1) * base.r * 0.5, y: base.y - 4,
+      vx: (Math.random() * 2 - 1) * 90, vy: -(90 + Math.random() * 160),
+      life: 0, max: 0.5 + Math.random() * 0.5,
+    });
+  }
+  dirtyShop = true;
+}
+cv.addEventListener('pointerdown', (e) => { e.preventDefault(); stoke(e.clientX - cv.getBoundingClientRect().left, e.clientY - cv.getBoundingClientRect().top); });
+
+function buyBld(bi) {
+  const cost = bldCost(bi);
+  if (S.embers < cost) return;
+  S.embers -= cost; S.b[bi]++;
+  audioInit(); sfxBuy(); dirtyShop = true; rebuildShop(); save();
+}
+function buyUpg(id) {
+  const u = UDEFS.find(x => x.id === id);
+  if (!u || has(id) || S.embers < u.cost) return;
+  S.embers -= u.cost; S.up[id] = 1;
+  audioInit(); sfxUpg(); dirtyShop = true; rebuildShop(); save();
+}
+function doRekindle() {
+  const gain = ashGain(S);
+  if (gain <= 0) return;
+  const keep = { totalAll: S.totalAll, ash: S.ash + gain, rekindles: S.rekindles + 1, muted: S.muted };
+  S = Object.assign(freshState(), keep);
+  parts.length = 0; sparks.length = 0; floats.length = 0;
+  sfxRekindle(); rebuildShop(); save();
+  toast('REKINDLED &mdash; +' + gain + ' ash. The fire remembers.');
+}
+
+/* ============================== DOM shop ============================== */
+const $ = (id) => document.getElementById(id);
+const emberEl = $('ember-count'), epsEl = $('eps-line'), stageEl = $('stage-name');
+const heatFill = $('heat-fill'), heatLabel = $('heat-label');
+const bldsEl = $('buildings'), upgsEl = $('upgrades'), noUpgEl = $('no-upg');
+const rekBtn = $('rek-btn'), rekInfo = $('rek-info'), ashLine = $('ash-line');
+const muteBtn = $('mute-btn');
+let dirtyShop = true, lastStageName = '';
+const bldRows = [], upgBtns = {};
+
+BDEFS.forEach((b, bi) => {
+  const el = document.createElement('button');
+  el.className = 'bld';
+  el.innerHTML =
+    '<div class="bi">' + b.i + '</div>' +
+    '<div class="bmid"><div class="bn">' + b.n + '</div>' +
+    '<div class="bd">' + b.d + ' +' + fmt(b.e) + '/sec</div>' +
+    '<div class="bc"></div></div>' +
+    '<div class="bright"><div class="bo">0</div><div class="be"></div></div>';
+  el.addEventListener('click', () => buyBld(bi));
+  bldsEl.appendChild(el);
+  bldRows.push({ el, cost: el.querySelector('.bc'), owned: el.querySelector('.bo'), each: el.querySelector('.be') });
+});
+function rebuildShop() {
+  // upgrade chips: available + unpurchased only, cheapest first, max 6
+  upgsEl.innerHTML = '';
+  const av = UDEFS.filter(u => !has(u.id) && u.avail(S)).sort((a, b) => a.cost - b.cost).slice(0, 6);
+  noUpgEl.style.display = av.length ? 'none' : 'block';
+  av.forEach(u => {
+    const el = document.createElement('button');
+    el.className = 'upg';
+    el.innerHTML = '<div class="un">' + u.n + '</div><div class="ud">' + u.d + '</div><div class="uc">' + fmt(u.cost) + ' embers</div>';
+    el.addEventListener('click', () => buyUpg(u.id));
+    upgsEl.appendChild(el);
+    el.dataset.cost = u.cost;
+  });
+}
+function refreshShop() {
+  const stage = stageOf(S);
+  emberEl.textContent = fmt(S.embers) + ' EMBERS';
+  epsEl.textContent = fmt(epsOf(S)) + '/sec · tap +' + fmt(clickPow(S));
+  if (stage.n !== lastStageName) {
+    if (lastStageName) { sfxStage(); toast('THE FIRE GROWS: ' + stage.n); }
+    lastStageName = stage.n;
+    stageEl.textContent = stage.n;
+  }
+  heatFill.style.width = S.heat.toFixed(1) + '%';
+  heatLabel.textContent = 'HEAT x' + heatMult(S).toFixed(2);
+  bldRows.forEach((r, bi) => {
+    const cost = bldCost(bi), can = S.embers >= cost;
+    const locked = S.b[bi] === 0 && S.total < BDEFS[bi].c * 0.5;
+    r.el.classList.toggle('afford', can && !locked);
+    r.el.classList.toggle('locked', locked);
+    r.cost.textContent = fmt(cost) + ' embers';
+    r.owned.textContent = S.b[bi];
+    r.each.textContent = S.b[bi] ? fmt(BDEFS[bi].e * S.b[bi] * bldMult(S, bi) * ashMult(S) * heatMult(S)) + '/s' : '';
+  });
+  for (const el of upgsEl.children) el.classList.toggle('afford', S.embers >= +el.dataset.cost);
+  ashLine.textContent = '\u{1F30B} ASH: ' + S.ash + (S.ash ? ' (+' + (S.ash * 10) + '% everything, forever)' : '');
+  const gain = ashGain(S);
+  if (gain > 0) {
+    rekBtn.disabled = false;
+    rekInfo.innerHTML = 'Burn it all down. Start from a spark with <b style="color:var(--purple)">+' + gain + ' ash</b>.';
+  } else {
+    rekBtn.disabled = true;
+    rekInfo.textContent = 'Reach ' + fmt(REKINDLE_MIN) + ' embers this fire to rekindle for permanent ash.';
+  }
+}
+rekBtn.addEventListener('click', () => {
+  audioInit();
+  const gain = ashGain(S);
+  if (gain <= 0) return;
+  $('m-text').innerHTML = 'The fire returns to a single spark. Buildings and upgrades burn away.<br>You keep <b style="color:var(--purple)">+' + gain + ' ash</b> (+' + (gain * 10) + '% to everything, forever).';
+  $('modal').classList.add('open');
+});
+$('m-no').addEventListener('click', () => $('modal').classList.remove('open'));
+$('m-yes').addEventListener('click', () => { $('modal').classList.remove('open'); doRekindle(); });
+$('modal').addEventListener('click', (e) => { if (e.target === $('modal')) $('modal').classList.remove('open'); });
+muteBtn.addEventListener('click', () => { audioInit(); setMuted(!S.muted); });
+
+let toastTimer = 0;
+function toast(html) {
+  const t = $('toast');
+  t.innerHTML = html;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+/* ============================== main loop ============================== */
+let last = performance.now(), shopAcc = 0, saveAcc = 0;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  // passive income
+  const eps = epsOf(S);
+  if (eps > 0) {
+    const gain = eps * dt;
+    S.embers += gain; S.total += gain; S.totalAll += gain;
+  }
+  // heat decay after a short idle grace
+  heatIdle += dt;
+  if (heatIdle > 0.9 && S.heat > 0) {
+    S.heat = Math.max(0, S.heat - (has('hkeep') ? 2.4 : 4.8) * dt);
+  }
+  drawFire(dt);
+  shopAcc += dt;
+  if (shopAcc > 0.25) { shopAcc = 0; refreshShop(); if (dirtyShop) { dirtyShop = false; rebuildShop(); } }
+  saveAcc += dt;
+  if (saveAcc > 5) { saveAcc = 0; save(); }
+  requestAnimationFrame(frame);
+}
+
+/* ============================== boot ============================== */
+const offlineGain = load();
+setMuted(S.muted);
+resize();
+setTimeout(resize, 120);
+rebuildShop();
+refreshShop();
+lastStageName = stageOf(S).n;
+stageEl.textContent = lastStageName;
+if (offlineGain >= 1) toast('While you were away the coals earned ' + fmt(offlineGain) + ' embers.');
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

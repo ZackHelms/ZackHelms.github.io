@@ -140,7 +140,7 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 00:04 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 03:36 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
@@ -167,6 +167,14 @@ h1 {
       <div class="game-info">
         <div class="game-name">NEON CLASH</div>
         <div class="game-desc">Deploy tanks, archers and fireballs as energy trickles in. Beat three AI grades, flip the tray for a friend &mdash; three art styles.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="fire-clicker/">
+      <div class="game-icon">🪵</div>
+      <div class="game-info">
+        <div class="game-name">FIRE CLICKER</div>
+        <div class="game-desc">Stoke a living flame from spark to solar flare. Tap for embers and heat, buy burners, rekindle into ash for permanent bonuses.</div>
       </div>
     </a>
 
@@ -557,6 +565,7 @@ h1 {
 // adds its entry here in the same commit as its hub card (and index row).
 const GAMES = [
   { n: 'NEON CLASH', i: '🎴', h: 'neon-clash/', genre: ['card-battler'], input: ['drag-place', 'tap', 'tap-select'], session: ['match-vs-ai', 'local-2p'], mech: ['card-deck', 'resource-economy', 'ai-opponent', 'rotated-2p-ui', 'area-of-effect', 'art-styles'], players: ['vs-ai', 'local-2p'] },
+  { n: 'FIRE CLICKER', i: '🪵', h: 'fire-clicker/', genre: ['idle-clicker'], input: ['tap'], session: ['idle-persistent'], mech: ['resource-economy', 'meta-progression', 'combo-multiplier'], players: ['solo'] },
   { n: 'TURRET BUILDER', i: '🔌', h: 'turret-builder/', genre: ['tower-defense-classic'], input: ['drag-place', 'tap'], session: ['level-campaign', 'wave-survival', 'endless-highscore', 'save-campaign'], mech: ['wave-defense', 'adjacency-synergy', 'damage-typing', 'combo-discovery', 'art-styles'], players: ['solo'] },
   { n: 'GRID DEFENSE', i: '🗼', h: 'grid-defense/', genre: ['tower-defense-classic'], input: ['drag-place', 'tap'], session: ['level-campaign', 'wave-survival', 'endless-highscore', 'save-campaign'], mech: ['wave-defense', 'resource-economy', 'tower-upgrades', 'meta-progression'], players: ['solo'] },
   { n: 'ZED SHOOTER', i: '🧟', h: 'zed-shooter/', genre: ['shooter'], input: ['virtual-joystick', 'kb-mouse'], session: ['wave-survival'], mech: ['meta-progression'], players: ['solo'] },
