@@ -22,12 +22,14 @@ Copyright (c) 2026 Zack Helms. All rights reserved.
    for personal, non-commercial use. This is not a license to the
    underlying Software.
 
-5. RELATIONSHIP TO THE REPOSITORY LICENSE
-   This directory is EXCLUDED from the repository's Apache License
-   2.0 (see the repository's LICENSE.txt). This exception applies
-   from 2026-07-31 forward. It does not affect copies of earlier
-   versions of this directory already distributed under the Apache
-   License 2.0 — those copies remain under that license.
+5. RELATIONSHIP TO EARLIER REPOSITORY LICENSING
+   Until 2026-08-28 the repository carried a blanket Apache License
+   2.0 in its root LICENSE.txt, from which this directory was
+   excluded from 2026-07-31 forward. That root license has since
+   been removed; licensing is now per-directory, and this directory
+   remains proprietary. The exclusion does not affect copies of
+   versions of this directory distributed under the Apache License
+   2.0 before 2026-07-31 — those copies remain under that license.
 
 6. PERMISSIONS AND CONTACT
    For permission requests, contact the copyright holder via the

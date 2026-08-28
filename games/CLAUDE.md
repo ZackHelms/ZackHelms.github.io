@@ -623,13 +623,23 @@ refused every settled 3-tall gem); layout self-heals against
 degenerate-viewport squish (CELL≥1 floor + relayout on rotation/
 visualViewport events); landscape puts the buckets in a right-side column;
 buckets ride half a height above the iOS swipe-up edge. **games/phasic/ is
-proprietary** — its own LICENSE + a scope-exception preamble in the root
-LICENSE.txt (settings-cogwheel link, wiki footer). Drive suite (289 checks
+proprietary** — its own LICENSE (settings-cogwheel link, wiki footer); the
+root-LICENSE scope-exception era ended 2026-08-28 when licensing went
+per-directory (root CLAUDE.md § Licensing). Drive suite (289 checks
 incl. the generated-content replay gate, the in-path weave gates, the
 complexity-ramp assert, rotation/landscape geometry checks and the
 settled-freeze regressions):
 `.claude/tests/drive-phasic.cjs`. Detailed context: `.claude/phasic.md`
 (includes the maintained tactics registry).
+
+### FIRE CLICKER (`fire-clicker/index.html`, ~640 lines)
+Idle clicker — the repo's third, a direct CD commission (2026-08-28). Tap a
+canvas-rendered particle fire for embers **and heat**: heat decays but
+multiplies ALL income (up to ×3), so active stoking boosts the idle engine.
+10 buildings, ~39 upgrades, fire stages SPARK→SOLAR FLARE by lifetime embers,
+rekindle prestige (+10%/ash), 8 h half-rate offline earnings. **Proprietary —
+no permissive license in this directory** (one of the five protected games).
+Detailed context: `.claude/fire-clicker.md`.
 
 ### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)
 The repo's first **async-versus** game. Eight rogue signals hide among ~350
@@ -762,17 +772,20 @@ atlas that never loads falls back to toon instead of an empty board):
    Audio convention row
 4. Add the build-timestamp badge (see above) with the current UTC timestamp
 5. Create `.claude/<slug>.md` with architecture notes before the session gets long
-6. Add the game's row to `.claude/games-index.md` **and refresh its coverage
+6. Copy the standard MIT `LICENSE` from any open game directory into the new
+   game's directory — unless the CD marks the game protected/proprietary
+   (root `CLAUDE.md` § Licensing lists the five protected games)
+7. Add the game's row to `.claude/games-index.md` **and refresh its coverage
    summary** (facet vocabulary: `templates/design/game-facets.md` in the
    zmhstudio repo) — when *choosing* what game to build, read that index's
    coverage summary first
-7. Run both gates:
+8. Run both gates:
    - `node .claude/scripts/smoke-mobile.cjs <pages...>` — every changed page
    - `node .claude/scripts/check-games-sync.cjs` — proves the hub card, the
      hub `GAMES[]` entry and the games-index row you just wrote actually agree
      (and that the count line adds up). No Chromium needed.
    (see `.claude/scripts/README.md`)
-8. Commit and push to `main`, stating the badge timestamp in your reply
-9. Verify the "pages build and deployment" workflow for the pushed SHA goes
+9. Commit and push to `main`, stating the badge timestamp in your reply
+10. Verify the "pages build and deployment" workflow for the pushed SHA goes
    green — `git push` ≠ live; a failed Pages build silently keeps serving
    the previous deploy

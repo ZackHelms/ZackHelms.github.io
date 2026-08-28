@@ -78,6 +78,28 @@ available there — verify the Pages run instead, per `.claude/zmh/producer.md`
   `50-publish.sh` in the separate [`ZackHelms/qntmchmst`](https://github.com/ZackHelms/qntmchmst)
   repo with that repo's Vite build output (the script also maintains this game's card in
   `games/index.html`). Make changes in qntmchmst, then publish from there.
+## Licensing (per-directory since 2026-08-28)
+
+There is **no repo-root license file** — do not recreate one, and do not link
+one from the root `index.html`. Licensing is per-directory:
+
+- **Open games** carry a standard MIT `LICENSE` (Copyright (c) 2026 Zack
+  Helms) in their own `games/<slug>/` directory. The root-level single-file
+  games (plus `games/adventure-icons/`) are covered by `games/LICENSE.txt`,
+  whose scope preamble explicitly stops at subdirectories.
+- **Protected games — NEVER add a permissive license to these five:**
+  `games/fire-clicker/`, `games/phasic/`, `games/mitochondria/`,
+  `games/qntmchmst/`, `games/turret-builder/`. The CD may develop these into
+  real apps; all except qntmchmst carry an explicit proprietary LICENSE
+  (all rights reserved, play-only). qntmchmst has no license file here
+  because its directory is overwritten by its source repo's publish script —
+  default copyright protects it; a license file for it belongs in the
+  `ZackHelms/qntmchmst` repo.
+- `games/zed-shooter/`'s MIT LICENSE will be wiped whenever zed-fps
+  republishes — its publish script should carry the license from that repo.
+- **New game default:** copy the MIT `LICENSE` from any open game directory
+  into the new game's directory, unless the CD marks the game protected.
+
 ## Adding a new game
 
 `/create-new-games <N>` runs the whole batch commission (concept picks from
@@ -143,6 +165,8 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Turret Builder (`games/turret-builder/`) | `.claude/turret-builder.md` | Any work on the module-grid tower defense — the payload model and the CD's worked example (asserted to the decimal), the damage-decays/effects-don't rule, super-linear stack curves, diagonal boosters, the fifteen named combos and the discoveries codex, orthogonal sharing between turrets and walls, the **placement rules** (a module must touch a turret or wall, a booster a turret diagonal — `hostFor()` is the same walk that wires the grid) and the red-X overlay that teaches them, kinetic-vs-elemental typing and the scaling-armour rule, the narrow HP_LEVEL band, the **five graphics styles** behind the ⚙ dropdown (four cel skins — `toon` by default, plus `mech`, `steampunk` and `stoneage` — and the original `neon`), where a skin supplies a palette plus optional per-part shape overrides, the type colour and the creep silhouette are never a skin's to change, terrain is decided per MAP rather than per cell, and scatter comes from a stable hash rather than the seeded RNG; the **grid-aligned road** (a paving joint on every road-cell boundary, so a road cell reads as the one wall slot it is) with **entrance/exit arrows** on its two end cells; and the two test suites |
 | Neon Clash (`games/neon-clash/`) | `.claude/neon-clash.md` | Any work on the real-time card skirmish — the rotated two-player tray, the unit/building/**spell** card-type contract every rule branches on, the deploy contract (drag **or** tap-to-arm, and the border rule that clamps a cross-line aim onto your own side), bunker/garrison rules, the fireball falloff, the siege lock, the base turret and its rim-measured envelope, the **two-second spell lob** that is the contract for every future spell, the **sudden-death energy ramp** to a 10:00 wall, the 3-second **finale**, the five music tracks and their tempo scaling, unit stats, the AI ladder, and the **three graphics styles** (`neon` / cel-shaded `toon` / pre-rendered 3D `sprite`) behind the settings cogwheel — where "a skin is paint" is the invariant, `glow()` goes no-op instead of branching, arena scenery is seeded once and shared between styles, and the sprite atlas loads lazily with a toon fallback (its 3D source and build script live in `games/neon-clash/models/`) |
 | Phasic (`games/phasic/`) | `.claude/phasic.md` | Any work on the phase-change block sort — soft-body particle physics, symmetric phase/base rules, gas guidance field, gravity-well bucket, curriculum blocks + complexity metric, generator/solver (three board templates, in-path obstacle weaving), STUCK ghost-replay, in-game wiki + tactics registry, resting-freeze fairness rule, chrome/layout (landscape column, rotation self-heal), proprietary-license carve-out, iOS-port notes |
+
+| Fire Clicker (`games/fire-clicker/`) | `.claude/fire-clicker.md` | Any work on the fire idle clicker — the heat multiplier, buildings/upgrades, rekindle/ash prestige, fire-stage particle rendering, and its **proprietary-license** status (one of the five protected games) |
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 
