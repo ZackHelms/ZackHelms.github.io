@@ -134,7 +134,7 @@ function ok(name, cond, extra) {
    is the shipped game's own top-level scope. */
 async function inPage(cfg) {
   const R = { seed: cfg.seed, persona: cfg.persona, milestones: {}, stalled: null,
-    trips: 0, tapCount: 0, workerSecs: 0, burnSecs: 0, baseTrips: 0, baseWorkerSecs: 0 };
+    trips: 0, tapCount: 0, workerSecs: 0, burnSecs: 0, baseTrips: 0, baseWorkerSecs: 0, roarSecs: 0 };
 
   // --- deterministic RNG for the whole run -------------------------------
   const realRandom = Math.random;
@@ -172,7 +172,10 @@ async function inPage(cfg) {
       const pop = popCap(), yld = tripYield();
       const speed = CYCLE_SPEED * (up.tavern ? 1.15 : 1);
       const work = up.sawbones ? 2.4 : 3.2;
-      const cycle = CYCLE_WAIT + 2 * meanDist / speed + work;
+      // ROARING FIRE scales the whole cycle, and only a persona that actually
+      // tends the fire gets it — the firekeeper never crosses the 75% line.
+      const boost = cfg.roars ? 1 + 0.1 + 0.1 * (up.bellows || 0) : 1;
+      const cycle = (CYCLE_WAIT + 2 * meanDist / speed + work) / boost;
       S.up = saved;
       return pop * yld / cycle;               // resource units per second, all pools
     }
@@ -203,6 +206,10 @@ async function inPage(cfg) {
     }
 
     const STAGE_IDS = ['village', 'town', 'city', 'metropolis'];
+    /* MICROMANAGEMENT raises no rate, so the marginal-value greedy would never
+       buy it. It is a capability — it removes the tax of gathering into pools
+       the next purchase does not need — so a skilled player takes it on sight. */
+    const CAPABILITY_IDS = ['micro'];
     const buyable = () => UPG.filter(u => showU(u) && (S.up[u.id] || 0) < maxOf(u));
     const afford  = (u) => canAfford(u.cost(S.up[u.id] || 0));
 
@@ -213,6 +220,8 @@ async function inPage(cfg) {
       let bought = true;
       while (bought) {
         bought = false;
+        const cap = buyable().find(u => CAPABILITY_IDS.includes(u.id) && afford(u));
+        if (cap && buyUpg(cap.id)) { bought = true; continue; }
         if (goal && afford(goal)) { if (buyUpg(goal.id)) { bought = true; continue; } }
         const rate = rateWith(S.up) || 1e-6;
         let waitToGoal = Infinity;
@@ -223,7 +232,7 @@ async function inPage(cfg) {
         }
         let best = null;
         for (const u of buyable()) {
-          if (u === goal || STAGE_IDS.includes(u.id)) continue;
+          if (u === goal || STAGE_IDS.includes(u.id) || CAPABILITY_IDS.includes(u.id)) continue;
           if (u.id === 'keeper') continue;     // a continuous tapper never needs one
           if (!afford(u)) continue;
           const v = value(u.id);
@@ -234,6 +243,33 @@ async function inPage(cfg) {
         }
         if (best && buyUpg(best.u.id)) bought = true;
       }
+    }
+
+    /* The skill expression MICROMANAGEMENT buys: aim the whole camp at the
+       resource the next intended purchase is furthest short of, and release
+       them once it is covered. A naive player owns the same button and never
+       touches it. */
+    function directWork() {
+      if (!S.up.micro) return;
+      const goal = buyable().find(u => STAGE_IDS.includes(u.id));
+      let target = goal;
+      if (!target) {
+        let best = null;
+        for (const u of buyable()) {
+          if (CAPABILITY_IDS.includes(u.id) || u.id === 'keeper') continue;
+          const v = value(u.id);
+          if (v.gain > 0 && (!best || v.ratio > best.v.ratio)) best = { u, v };
+        }
+        target = best && best.u;
+      }
+      if (!target) { S.focus = null; return; }
+      const c = target.cost(S.up[target.id] || 0);
+      let worst = null, need = 0;
+      for (const k of Object.keys(c)) {
+        const short = c[k] - S.res[k];
+        if (short > need) { need = short; worst = k; }
+      }
+      S.focus = worst;               // null once every pool covers the cost
     }
 
     function shopCasual() {
@@ -256,7 +292,7 @@ async function inPage(cfg) {
        never touches them and 'ALL MAXED' is unreachable for that persona by
        design. This is the marker that means "nothing left that changes the
        economy". */
-    const THRU = ['tools', 'house', 'village', 'tavern', 'shop', 'sawbones'];
+    const THRU = ['tools', 'village', 'tavern', 'shop', 'sawbones', 'bellows', 'micro'];
     MS.push({ k: 'ECONOMY MAXED', f: () => THRU.every(id => { const u = UPG.find(x => x.id === id); return (S.up[id] || 0) >= maxOf(u); }) });
     MS.push({ k: 'ALL MAXED', f: () => UPG.every(u => !showU(u) || (S.up[u.id] || 0) >= maxOf(u)) });
     const left = MS.slice();
@@ -271,9 +307,16 @@ async function inPage(cfg) {
     while (S.day <= cfg.maxDays) {
       // ---- persona input
       if (cfg.persona === 'casual' && (S.up.keeper || 0) >= 1) {
-        if (tapping) { tapping = false; R.stoppedTappingAt = t; }
-        if (!FIRE.burning) { cold += dt; } else cold = 0;
-        if (!cfg.strict && cold > 20) { tapping = true; }   // a person notices a dead fire
+        /* Hands off the moment the auto-stoker is hired. A person still notices
+           a dead fire, though, and when they step in they top the bank back up
+           rather than poking it once — tapping once and walking away leaves the
+           camp livelocked at one second of fire per twenty, which is a bug in
+           the persona, not a finding about the game. --casual-strict removes
+           the noticing entirely and measures the true never-taps-again case. */
+        if (!R.handedOver) { R.handedOver = true; tapping = false; R.stoppedTappingAt = t; }
+        if (!FIRE.burning) cold += dt; else cold = 0;
+        if (!cfg.strict && cold > 20) tapping = true;
+        if (tapping && S.bank >= maxBank() * 0.8) { tapping = false; cold = 0; }
       }
       if (tapping) {
         // Capacity-limited, not mash-limited: a tap that overflows the bank is
@@ -284,11 +327,14 @@ async function inPage(cfg) {
         tapAcc += hz * dt;
         while (tapAcc >= 1) {
           tapAcc -= 1;
-          if (S.bank <= maxBank() - tapPower()) { stoke(G.fire.x, G.fire.y - 8, tapPower()); R.tapCount++; }
+          // Tap when a full tapPower() fits (no waste), or — for a persona
+          // that wants the ROARING bonus — when the bank is about to fall
+          // through the 75% line before the next tap could land. tapCount is
+          // therefore the true effort the game asks of this player.
+          const fits = S.bank <= maxBank() - tapPower();
+          const losingRoar = cfg.roars && S.bank < maxBank() * ROAR_AT + drainRate() / hz;
+          if (fits || losingRoar) { stoke(G.fire.x, G.fire.y - 8, tapPower()); R.tapCount++; }
           else break;
-        }
-        if (cfg.persona === 'casual' && !cfg.strict && FIRE.burning && (S.up.keeper || 0) >= 1 && S.bank > maxBank() * 0.8) {
-          tapping = false; cold = 0;                        // relit; hands off again
         }
       }
 
@@ -302,19 +348,24 @@ async function inPage(cfg) {
         const was = v.state;
         villagerStep(v, dt);
         if (!v.keeper) {
-          const base = !S.up.tavern && !S.up.sawbones;   // no walk/work modifiers yet
+          // Calibrate against the model's UN-boosted cycle by charging worker
+          // time at the heat multiplier: a roaring second is worth `heatBoost()`
+          // ordinary seconds of work, so the ratio stays comparable for a
+          // persona that is roaring the whole run.
+          const base = !S.up.tavern && !S.up.sawbones;
           if (was === 'toStock' && v.state === 'idle') { R.trips++; if (base) R.baseTrips++; }
-          if (FIRE.burning) { R.workerSecs += dt; if (base) R.baseWorkerSecs += dt; }
+          if (FIRE.burning) { R.workerSecs += dt; if (base) R.baseWorkerSecs += dt * heatBoost(); }
         }
       }
       if (FIRE.burning) R.burnSecs += dt;
+      if (roaring()) R.roarSecs += dt;
       floats.length = 0; chips.length = 0; motes.length = 0; sparks.length = 0;
 
       t += dt;
       actAcc += dt;
       if (actAcc >= 0.5) {
         actAcc = 0;
-        if (cfg.persona === 'speedrun') shopSpeedrun(); else shopCasual();
+        if (cfg.persona === 'speedrun') { shopSpeedrun(); directWork(); } else shopCasual();
         for (let i = left.length - 1; i >= 0; i--) {
           if (left[i].f()) {
             R.milestones[left[i].k] = { day: S.day - 1 + S.dayT, sec: gameT() };
@@ -361,6 +412,7 @@ async function inPage(cfg) {
     R.modelRate = rateWith(S.up);
     R.meanDist = meanDist;
     R.uptime = t > 0 ? R.burnSecs / t : 0;
+    R.roarUptime = t > 0 ? R.roarSecs / t : 0;
     R.obsCycle = R.trips > 0 ? R.workerSecs / R.trips : null;          // measured seconds per trip, whole run
     R.baseCycle = R.baseTrips > 0 ? R.baseWorkerSecs / R.baseTrips : null; // ... before tavern/sawbones
     R.modelCycle = CYCLE_WAIT + 2 * meanDist / CYCLE_SPEED + 3.2;      // the model's un-upgraded prediction
@@ -378,6 +430,7 @@ async function inPage(cfg) {
    answers instantly. It is only trustworthy while the MODEL vs SIM table below
    shows a small error, which is why the two always print together. */
 function modelRun(spec, persona, maxDays, strict) {
+  const roars = persona === 'speedrun';   // only a hand-tended fire crosses 75%
   const { UPGS, levels: up, meanDist } = spec;
   for (const u of UPGS) up[u.id] = 0;
   const res = { wood: 0, stone: 0, food: 0 };
@@ -393,7 +446,8 @@ function modelRun(spec, persona, maxDays, strict) {
   function rateAt(over) {
     const sv = {}; for (const k of Object.keys(over || {})) { sv[k] = up[k]; up[k] = over[k]; }
     const speed = CYCLE_SPEED * (up.tavern ? 1.15 : 1);
-    const cycle = CYCLE_WAIT + 2 * meanDist / speed + (up.sawbones ? 2.4 : 3.2);
+    const boost = roars ? 1 + 0.1 + 0.1 * (up.bellows || 0) : 1;
+    const cycle = (CYCLE_WAIT + 2 * meanDist / speed + (up.sawbones ? 2.4 : 3.2)) / boost;
     const r = popCap() * tripYield() / cycle;
     for (const k of Object.keys(sv)) up[k] = sv[k];
     return r;
@@ -401,6 +455,7 @@ function modelRun(spec, persona, maxDays, strict) {
   const canAfford = (c) => Object.keys(c).every(k => res[k] >= c[k]);
   const costSum = (c) => Object.keys(c).reduce((a, k) => a + c[k], 0);
   const STAGE_IDS = ['village', 'town', 'city', 'metropolis'];
+  const CAPABILITY_IDS = ['micro'];   // raises no rate; a skilled player takes it on sight
   const buyable = () => UPGS.filter(u => showU(u) && up[u.id] < maxOf(u));
   const buy = (u) => { const c = u.cost(up[u.id]); for (const k of Object.keys(c)) res[k] -= c[k]; up[u.id]++; };
 
@@ -408,10 +463,34 @@ function modelRun(spec, persona, maxDays, strict) {
   for (const u of UPGS) MS.push({ k: u.n + ' Lv1', f: () => up[u.id] >= 1 });
   for (let h = 3; h <= 10; h++) MS.push({ k: 'HOUSE #' + h, f: () => houses() >= h });
   for (const p of [10, 15, 20, 25, 50]) MS.push({ k: 'POP ' + p, f: () => popCap() >= p });
-  const THRU = ['tools', 'house', 'village', 'tavern', 'shop', 'sawbones'];
+  const THRU = ['tools', 'village', 'tavern', 'shop', 'sawbones', 'bellows', 'micro'];
   MS.push({ k: 'ECONOMY MAXED', f: () => THRU.every(id => up[id] >= maxOf(UPGS.find(x => x.id === id))) });
   MS.push({ k: 'ALL MAXED', f: () => UPGS.every(u => !showU(u) || up[u.id] >= maxOf(u)) });
   const left = MS.slice(), out = {};
+
+  /* The resource the next intended purchase is furthest short of — what a
+     player with MICROMANAGEMENT aims the camp at. */
+  function directed() {
+    const goal = buyable().find(u => STAGE_IDS.includes(u.id));
+    let target = goal;
+    if (!target) {
+      let best = null;
+      for (const u of buyable()) {
+        if (CAPABILITY_IDS.includes(u.id) || u.id === 'keeper') continue;
+        const base = rateAt();
+        const gain = rateAt({ [u.id]: up[u.id] + 1 }) - base;
+        if (gain <= 0) continue;
+        const ratio = gain / costSum(u.cost(up[u.id]));
+        if (!best || ratio > best.ratio) best = { u, ratio };
+      }
+      target = best && best.u;
+    }
+    if (!target) return null;
+    const c = target.cost(up[target.id]);
+    let worst = null, need = 0;
+    for (const k of Object.keys(c)) { const short = c[k] - res[k]; if (short > need) { need = short; worst = k; } }
+    return worst;
+  }
 
   const dt = MODEL_DT, DAY = 300;
   let t = 0, uptime = 1;
@@ -422,8 +501,13 @@ function modelRun(spec, persona, maxDays, strict) {
        camp recovers so fast from a lopsided purchase — a model that split the
        income three ways ran ~30% pessimistic against the sim. */
     const total = rateAt() * uptime * dt;
-    const pools = ['wood', 'stone', 'food'].sort((a, b) => res[a] - res[b]);
-    res[pools[0]] += total * 0.8; res[pools[1]] += total * 0.1; res[pools[2]] += total * 0.1;
+    const focus = (roars && up.micro) ? directed() : null;
+    if (focus) {
+      res[focus] += total;          // MICROMANAGEMENT: every trip goes where it is told
+    } else {
+      const pools = ['wood', 'stone', 'food'].sort((a, b) => res[a] - res[b]);
+      res[pools[0]] += total * 0.8; res[pools[1]] += total * 0.1; res[pools[2]] += total * 0.1;
+    }
     if (persona === 'casual' && up.keeper) {
       /* The auto-stoker throws one log (1 wood) for +4 s of bank, so the wood
          it eats tracks the DRAIN, not the number of keepers — extra keepers
@@ -443,6 +527,8 @@ function modelRun(spec, persona, maxDays, strict) {
       const aff = buyable().filter(u => canAfford(u.cost(up[u.id])));
       if (!aff.length) break;
       if (persona === 'casual') { buy(aff[0]); bought = true; continue; }
+      const cap = aff.find(u => CAPABILITY_IDS.includes(u.id));
+      if (cap) { buy(cap); bought = true; continue; }
       const goal = buyable().find(u => STAGE_IDS.includes(u.id));
       if (goal && canAfford(goal.cost(up[goal.id]))) { buy(goal); bought = true; continue; }
       let waitToGoal = Infinity;
@@ -453,7 +539,7 @@ function modelRun(spec, persona, maxDays, strict) {
       }
       let best = null;
       for (const u of aff) {
-        if (STAGE_IDS.includes(u.id) || u.id === 'keeper') continue;
+        if (STAGE_IDS.includes(u.id) || CAPABILITY_IDS.includes(u.id) || u.id === 'keeper') continue;
         const c = u.cost(up[u.id]);
         const base = rateAt();
         let gain = rateAt({ [u.id]: up[u.id] + 1 }) - base, cost = costSum(c);
@@ -534,6 +620,7 @@ function modelRun(spec, persona, maxDays, strict) {
       const r = await page.evaluate(inPage, {
         persona, seed: 1000 + i * 7919, dt: DT, maxDays: DAYS, strict: STRICT,
         cycleWait: CYCLE_WAIT, cycleSpeed: CYCLE_SPEED,
+        roars: persona === 'speedrun',   // only a hand-tended fire crosses 75%
       });
       wall += Date.now() - t0; simSec += r.simSeconds;
       runs[persona].push(r);
@@ -611,7 +698,9 @@ function modelRun(spec, persona, maxDays, strict) {
       '  levels ' + JSON.stringify(r.finalUp).replace(/"/g, ''));
     if (r.wall) console.log('    next purchase when the cap hit: ' + r.wall.n + ' Lv' + r.wall.lvl +
       ' — ' + r.wall.days.toFixed(1) + ' more days (' + hhmm(r.wall.days) + ' of play) at the ending rate');
-    console.log('    calibration: fire uptime ' + (r.uptime * 100).toFixed(1) + '%   trips ' + r.trips +
+    console.log('    calibration: fire uptime ' + (r.uptime * 100).toFixed(1) + '%' +
+      '   ROARING ' + (r.roarUptime * 100).toFixed(1) + '% of the run' +
+      '   trips ' + r.trips +
       '   cycle measured ' + (r.baseCycle ? r.baseCycle.toFixed(2) : '—') + 's (pre-tavern/sawbones)' +
       ' / model ' + r.modelCycle.toFixed(2) + 's' +
       (r.baseCycle ? '   -> model ' + ((r.modelCycle / r.baseCycle - 1) * 100).toFixed(1) + '% off' : ''));
@@ -629,6 +718,22 @@ function modelRun(spec, persona, maxDays, strict) {
   if (personas.includes('casual')) {
     ok('casual reaches VILLAGE (day ' + num(cv, 1) + ')', cv !== null, cv);
     ok('casual is slower than speedrun', cv !== null && sv !== null && cv > sv, { cv, sv });
+    /* The 2026-08-28 balance pass exists to make effort and skill pay. Before
+       it, optimal play beat naive play by only 1.06x at POP 20 — the personas
+       converged, which is the shape of a game where nothing you do matters.
+       These guard the separation at both ends of the run. */
+    const s15 = dayOf('speedrun', 'POP 15'), c15 = dayOf('casual', 'POP 15');
+    const s20 = dayOf('speedrun', 'POP 20'), c20 = dayOf('casual', 'POP 20');
+    if (s15 !== null && c15 !== null)
+      ok('skill pays at POP 15 (' + (c15 / s15).toFixed(2) + 'x)', c15 / s15 >= 1.6, { s15, c15 });
+    if (s20 !== null && c20 !== null)
+      ok('skill still pays at POP 20 (' + (c20 / s20).toFixed(2) + 'x)', c20 / s20 >= 1.6, { s20, c20 });
+    // the roar is the reward for tending the fire yourself; the keeper must not earn it
+    const sr = runs.speedrun ? runs.speedrun[0].roarUptime : null;
+    const cr = runs.casual[0].roarUptime;
+    if (sr !== null)
+      ok('only the hand-tended fire ROARS (' + (sr * 100).toFixed(0) + '% vs ' + (cr * 100).toFixed(0) + '%)',
+        sr > 0.9 && cr < 0.2, { sr, cr });
   }
   ok('no persona hard-stalled', personas.every(p => runs[p].every(r => !r.stalled)),
     personas.map(p => runs[p].filter(r => r.stalled).length));

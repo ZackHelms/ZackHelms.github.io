@@ -1,6 +1,6 @@
 # Fire Clicker — context
 
-`games/fire-clicker/index.html` (~1500 lines, single file). **A village
+`games/fire-clicker/index.html` (~1600 lines, single file). **A village
 fire-keeping sim, NOT a shop-list clicker** — the CD explicitly redesigned it
 away from the croissant/basketball template on 2026-08-28 (the first shipped
 version was that template; it was fully replaced the same day). The whole game
@@ -51,13 +51,34 @@ Apache/MIT. The CD may develop it into a real app.
   clamps to the screen, draws ABOVE the lighting layer, and ends early if the
   speaker goes indoors. New lines: append to the right pool; keep the voice —
   short, earnest, slightly self-aware, never snarky at the player.
+- **ROARING FIRE** (`ROAR_AT` 0.75, `heat()`/`roaring()`/`heatBoost()`): while
+  the bank sits above **75% of `maxBank()`** the whole camp works faster — one
+  multiplier applied at three sites in `villagerStep` (the idle-wait decrement,
+  `move()`'s speed, and `v.w`, the heat-scaled work clock that exists precisely
+  so a roaring fire shortens the job itself). Base +10%, +10% per **BELLOWS**
+  level to +70% at max. It is the reward for tending the fire *yourself*: the
+  FIREKEEPER only stokes below 35% of the bank, so **an auto-tended fire can
+  never cross the threshold**, and the eval measures exactly that split
+  (speedrun roaring 100% of the run, casual 0.4%). The bank ring goes bright
+  and glowing above the line, carries a tick mark at 75% so the target is
+  visible, and the label reads `⚡ ROARING +N%`.
+- **MICROMANAGEMENT** (`S.up.micro`, `S.focus`, `siteAt()`, `drawFocus()`): the
+  skill lever. Once bought, tapping the trees / rocks / fishing hole sends
+  **every** villager after that resource (`villagerStep`'s idle branch skips the
+  scarcest-first pick entirely); tapping it again releases them. `S.focus` is
+  saved, cleared on load if `micro` is not owned, and marked by a pulsing dashed
+  ring at the site plus a ▸ against that resource in the HUD. Site hit tests
+  run AFTER the villager test (a villager tap is still a bubble) and before the
+  fire.
 - **Upgrades** (`UPG[]`, DOM panel toggled by the bottom-right 🔨 button —
   same button opens AND closes it, label flips to ✕ CLOSE; the card list
   lives in its own `#upg-scroll` container so the button never moves):
   FIRE PIT (+5 s max bank), DRY TINDER (+0.5 s per tap), WINDBREAK (slower
   drain), SHARP TOOLS (+1 per trip), RECRUIT VILLAGER (+1, capped by
-  houses×5), FIREKEEPER (auto-tapper: red-hatted villager, −1 wood → +4 s via
-  the same `stoke()` when bank < 35%), BUILD HOUSE, FOUND VILLAGE, and the
+  houses×5), BELLOWS (the ROARING bonus above), MICROMANAGEMENT (shown at 3
+  houses, priced to land just before FOUND VILLAGE), FIREKEEPER (auto-tapper: red-hatted villager, −1 wood → +4 s via
+  the same `stoke()` when bank < 35%, **capped at one** — a second would feed
+  the same bank and buy nothing), BUILD HOUSE, FOUND VILLAGE, and the
   village businesses. `max` may be a function (`maxOf()`), `show()` gates
   stage-locked cards; cards carry `dataset.uid` so `refreshHUD()` updates
   affordability without rebuilding mid-press.
@@ -111,34 +132,39 @@ Apache/MIT. The CD may develop it into a real app.
 `DAY_LEN` is 300 s, so **1 in-game day = 5 real minutes** — 12 days is an hour
 of play. `.claude/tests/eval-fire-clicker.cjs` plays the real game headless with
 two scripted personas and reports every milestone in both units. Current numbers
-(390x844, 3 seeds, 2026-08-28):
+(390x844, 3 seeds, after the 2026-08-28 skill-reward pass):
 
-| Milestone | SPEEDRUN | CASUAL |
-|---|---|---|
-| first upgrade | day 0.7 (3 min) | day 0.4 (2 min) |
-| 5 houses | day 2.7 (14 min) | day 6.0 (30 min) |
-| **FOUND VILLAGE** | day 4.1 (**20 min**) | day 9.8 (**49 min**) |
-| all three businesses | day 5.1 (25 min) | day 10.4 (52 min) |
-| 10 houses / economy maxed | day 10.3 (51 min) | day 15.0 (1 h 15) |
-| POP 15 | day 19.3 (1 h 37) | day 24.4 (2 h 02) |
-| POP 20 | day 149 (12 h 28) | day 158 (13 h 12) |
+| Milestone | SPEEDRUN | CASUAL | skill pays |
+|---|---|---|---|
+| MICROMANAGEMENT | day 2.6 (13 min) | day 5.4 (27 min) | 2.1x |
+| **FOUND VILLAGE** | day 4.1 (**20 min**) | day 10.9 (**55 min**) | 2.7x |
+| economy maxed (no multipliers left) | day 6.6 (33 min) | day 14.1 (1 h 11) | 2.1x |
+| POP 15 | day 11.3 (57 min) | day 25.9 (2 h 10) | **2.3x** |
+| POP 20 | day 71.7 (5 h 59) | day 160 (13 h 20) | **2.2x** |
 
-Three things to keep in mind when tuning:
+**The pass that produced these.** The first baseline (same file, before ROARING
+FIRE / MICROMANAGEMENT) had the two personas converging: 1.26x at POP 15 and
+**1.06x at POP 20** — optimal play and naive play arriving within 6% of each
+other, which is the shape of a game where nothing the player does matters. The
+gap now holds above 2.2x all the way out, and two assertions guard it. If a
+future change collapses it, the eval fails rather than the CD noticing months
+later.
 
-- **The persona spread is narrow.** Optimal play beats naive play by 2.4x to the
-  village and only 1.45x to a maxed economy. If the CD wants mastery to matter,
-  it needs a lever the speedrunner can pull that the casual cannot — right now
-  the only difference is buy order.
-- **Content ends at about day 15 (1h15).** After the economy maxes, the only
-  purchase left is RECRUIT VILLAGER, whose `1.75^n` cost outruns linear income
-  almost immediately: POP 20 costs another 11 hours and POP 50 would need
-  ~2e12 wood. The wall between POP 15 and POP 20 is where the game currently
-  stops being a game. This is the strongest argument for the TOWN stage.
-- **Tapping demand is 1 tap/second, flat.** Drain is 1 s/s and a tap banks 1 s,
-  so a speedrunner taps ~3,100 times to reach a maxed economy. FIRE PIT, DRY
-  TINDER and WINDBREAK buy **zero** throughput — they only reduce that tapping —
-  so a value-driven player never buys any of them, and the eval's speedrunner
-  correctly never does.
+Still true, and still the strongest argument for the TOWN stage: **the
+multipliers run out around day 7-14 (33 min to 1 h 11)**, after which the only
+card left is RECRUIT VILLAGER on a `24 * 1.75^n` curve that linear income cannot
+chase — POP 20 alone costs the speedrunner another five hours.
+
+Two things the eval taught that are not obvious from the tables:
+
+- **A value-driven player stops building houses.** BUILD HOUSE raises no rate of
+  its own; it only lifts the RECRUIT cap. Once `bunk` is below that cap a house
+  is worth nothing, so the speedrun persona correctly leaves houses at 8 while
+  the casual (buying in panel order) reaches 10. "Economy maxed" therefore
+  excludes `house` — houses are a means to population, not an end.
+- **Tapping demand is ~1 tap/second, flat**, and FIRE PIT / DRY TINDER /
+  WINDBREAK still buy no throughput for a player willing to sustain that. They
+  reduce *effort*, not time. Ideas for fixing that: `games/fire-clicker/TODO.md`.
 
 ## Gotchas
 - **A villager whose keeper flag changes must be reset to `idle`** (2026-08-28).
@@ -180,12 +206,12 @@ Three things to keep in mind when tuning:
 - Flame spawn per frame must be probabilistic (`floor + rand<frac`) — a bare
   `for (i < fractionalWant)` loop always runs once and a dying fire smokes
   like a bonfire.
-- **Drive suite: `.claude/tests/drive-fire-clicker.cjs`** (39 checks — see
+- **Drive suite: `.claude/tests/drive-fire-clicker.cjs`** (52 checks — see
   its row in `.claude/tests/README.md`). Run it after any change to the fire
   model, villager states, houses/stages, bubbles or lighting:
   `NODE_PATH=<playwright-core dir>/node_modules node .claude/tests/drive-fire-clicker.cjs`
   (optionally `SHOTDIR=<dir>` for screenshots).
-- **Pacing eval: `.claude/tests/eval-fire-clicker.cjs`** (8 checks) — the two
+- **Pacing eval: `.claude/tests/eval-fire-clicker.cjs`** (11 checks) — the two
   personas above, plus a calibrated analytic estimator. Run it after any change
   to a cost curve, `tripYield`, walk speed, work time or the villager loop:
   `node .claude/tests/eval-fire-clicker.cjs --days 400 --seeds 3 --model`

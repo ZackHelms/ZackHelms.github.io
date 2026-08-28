@@ -47,25 +47,44 @@ trodden paths). Everything below is not built yet.
 - [ ] Stockpile art that visibly grows with stored resources.
 - [ ] Mishap events + toasts to give constable/fire marshal something real.
 
-## Balance findings from the persona eval (2026-08-28) — CD decisions
+## Balance findings from the persona eval
 
 Measured by `.claude/tests/eval-fire-clicker.cjs`. A day is 5 real minutes.
 
-- [ ] **The game runs out at ~1 h 15 of play.** The economy maxes at day 15
-      (casual) / day 10 (optimal), after which the only card left is RECRUIT
-      VILLAGER at `24 * 1.75^n` — POP 20 costs another ~11 hours and POP 50
-      would need ~2e12 wood. Either the recruit curve wants flattening, or the
-      TOWN stage needs to land before that wall. Needs-Zack: which.
-- [ ] **Skill barely pays.** Optimal play beats naive play 2.4x to the village
-      and only 1.45x to a maxed economy, because the only difference the game
-      allows is buy order. If mastery should matter, there has to be a lever a
-      good player can pull that a naive one cannot.
-- [ ] **Three upgrades buy zero throughput.** FIRE PIT, DRY TINDER and
-      WINDBREAK only reduce tapping (which is a flat 1 tap/second at every
-      stage) — a value-driven player correctly never buys any of them. They
-      need a second effect, or the tapping loop needs to be something a player
-      would want to buy out of.
-- [ ] **FIREKEEPER makes the game play itself.** One keeper sustains the fire
-      indefinitely on 0.17 wood/s; the casual persona taps 366 times in 400
-      days and never has to touch the screen again. That is either the
-      idle-game promise or the moment the game stops being one — CD call.
+### Addressed 2026-08-28 (skill-reward pass)
+- [x] **Skill barely paid** — optimal play beat naive play by only 1.26x at
+      POP 15 and **1.06x at POP 20**. Fixed by ROARING FIRE (a camp-wide speed
+      bonus while the bank is above 75%, which the firekeeper structurally
+      cannot earn) plus MICROMANAGEMENT (tap a work site to aim every villager
+      at one resource). The gap now holds at **2.3x / 2.2x**, guarded by
+      assertions.
+- [x] **A second and third FIREKEEPER bought nothing** — capped at one.
+
+### Open
+- [ ] **The game still runs out at ~1 h 11 of play.** Every multiplier is bought
+      by day 14 (casual) / day 7 (optimal), after which the only card left is
+      RECRUIT VILLAGER at `24 * 1.75^n` — POP 20 costs the speedrunner another
+      five hours and POP 50 would need ~2e12 wood. Either the recruit curve
+      flattens or the TOWN stage lands before that wall. Needs-Zack: which.
+- [ ] **FIRE PIT / DRY TINDER / WINDBREAK still buy zero throughput.** Tapping
+      demand is a flat ~1 tap/second at every stage, so all three reduce effort
+      rather than time and a value-driven player skips them. Three ways to fix,
+      cheapest first:
+      1. **Ramp the roar bonus with heat** — full bonus at 100% of the bank,
+         half at 75%. Then a bigger bank (PIT), a stronger tap (TINDER) and a
+         slower drain (WINDBREAK) all buy *time spent near the top*, which is
+         throughput. One-line change to `heatBoost()`; the eval would price it
+         in about a minute.
+      2. **Make the roar bonus need an absolute bank**, not just a fraction —
+         e.g. the top 25% *and* at least 10 s banked, so FIRE PIT is a gate.
+      3. Give WINDBREAK a second effect (villagers work through the night?).
+- [ ] **A naive player can buy BELLOWS and feel nothing.** The casual persona
+      buys it at day 2.3 and roars 0.4% of the run. The card and the FIREKEEPER
+      card both say so in as many words, but it is still a trap card for
+      someone who does not read. Consider hiding BELLOWS until the player has
+      roared once.
+- [ ] **The firekeeper can strand a hands-off player.** If wood hits 0 while the
+      fire is out, nothing gathers and nothing recovers until the player taps.
+      A human notices; the literal never-taps-again persona hard-stalls at day
+      6 (`--casual-strict`). Options: keep one wood in reserve for the keeper,
+      or a louder "THE FIRE IS OUT" state.

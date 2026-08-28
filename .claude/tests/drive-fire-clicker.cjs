@@ -234,6 +234,88 @@ const shot = (page, name) => DIR ? page.screenshot({ path: DIR + '/' + name }) :
   ok('back-btn present', await page.locator('#back-btn').count() === 1);
   ok('mute-btn present', await page.locator('#mute-btn').count() === 1);
 
+  /* ---- ROARING FIRE: the reward for tending the fire yourself (2026-08-28) ---- */
+  // The bonus is a threshold on the BANK FRACTION, not on the raw bank, so it
+  // has to survive a FIRE PIT upgrade moving the denominator.
+  st = await page.evaluate(() => {
+    S.up.bellows = 0; S.up.pit = 0;
+    const out = {};
+    S.bank = maxBank() * 0.5; FIRE.burning = true; out.half = heatBoost();
+    S.bank = maxBank() * 0.80;                     out.roar = heatBoost();
+    S.up.bellows = 6;                              out.maxed = heatBoost();
+    S.up.pit = 8; out.bigBank = maxBank();
+    S.bank = maxBank() * 0.80;                     out.roarBig = heatBoost();
+    S.bank = maxBank() * 0.60;                     out.coldBig = heatBoost();
+    FIRE.burning = false;                          out.dead = heatBoost();
+    S.up.bellows = 0; S.up.pit = 0; S.bank = 0; FIRE.burning = false;
+    return out;
+  });
+  ok('no heat bonus below the 75% line (' + st.half + ')', st.half === 1);
+  ok('roaring pays the base bonus (' + st.roar.toFixed(2) + ')', Math.abs(st.roar - 1.1) < 1e-9);
+  ok('BELLOWS raises the bonus (' + st.maxed.toFixed(2) + ')', Math.abs(st.maxed - 1.7) < 1e-9);
+  ok('the threshold is a FRACTION of a bigger bank (' + st.bigBank + 's)',
+    st.bigBank === 45 && st.roarBig > 1 && st.coldBig === 1);
+  ok('a dead fire never roars', st.dead === 1);
+
+  // The boost is what makes the work faster, so it must reach the work clock —
+  // v.w, not v.t, or a roaring fire would look hot and change nothing.
+  st = await page.evaluate(() => {
+    const v = villagers.find(x => !x.keeper);
+    v.state = 'working'; v.t = 0; v.w = 0; v.job = JOBS[0];
+    S.up.bellows = 6; S.up.pit = 0; S.bank = maxBank(); FIRE.burning = true;
+    for (let i = 0; i < 30; i++) villagerStep(v, 1 / 30);
+    const out = { t: v.t, w: v.w };
+    S.up.bellows = 0; S.bank = 0; FIRE.burning = false;
+    return out;
+  });
+  ok('a roaring fire speeds the work clock (' + st.w.toFixed(2) + 's of work in ' + st.t.toFixed(2) + 's)',
+    st.w > st.t * 1.6);
+
+  /* ---- FIREKEEPER is a one-off: a second one feeds the same bank ---- */
+  ok('FIREKEEPER caps at one', await page.evaluate(() =>
+    UPG.find(u => u.id === 'keeper').max) === 1);
+
+  /* ---- MICROMANAGEMENT: tapping a work site directs the whole camp ---- */
+  st = await page.evaluate(() => {
+    S.up.micro = 0; S.focus = null;
+    const trees = JOBS[0].site();
+    return { locked: siteAt(trees.x, trees.y) };   // no upgrade, no control
+  });
+  ok('work sites are inert until MICROMANAGEMENT is bought', st.locked === null);
+
+  st = await page.evaluate(() => {
+    S.up.micro = 1; S.focus = null;
+    const rocks = JOBS[1].site(), r = cv.getBoundingClientRect();
+    const fire0 = S.bank;
+    const send = (p) => cv.dispatchEvent(new PointerEvent('pointerdown', {
+      clientX: r.left + p.x, clientY: r.top + p.y, bubbles: true, pointerId: 1 }));
+    send(rocks); const first = S.focus;
+    send(rocks); const second = S.focus;                 // same site again releases them
+    send(JOBS[2].site()); const third = S.focus;
+    return { first, second, third, stoked: S.bank - fire0 };
+  });
+  ok('tapping a site directs the camp (' + st.first + ')', st.first === 'stone');
+  ok('tapping it again releases them (' + st.second + ')', st.second === null);
+  ok('tapping another site switches focus (' + st.third + ')', st.third === 'food');
+  ok('a site tap is not a stoke', st.stoked === 0);
+
+  // and the direction has to actually reach the job picker
+  st = await page.evaluate(() => {
+    S.up.micro = 1; S.focus = 'stone';
+    S.res.wood = 0; S.res.stone = 999; S.res.food = 0;   // stone is the LAST thing they would choose
+    FIRE.burning = true; S.bank = 5;
+    const picks = {};
+    for (const v of villagers.filter(x => !x.keeper).slice(0, 6)) {
+      v.state = 'idle'; v.wait = 0; v.job = null; v.seat = -1;
+      villagerStep(v, 1 / 30);
+      if (v.job) picks[v.job.res] = (picks[v.job.res] || 0) + 1;
+    }
+    S.focus = null; S.up.micro = 0; S.bank = 0; FIRE.burning = false;
+    return picks;
+  });
+  ok('directed villagers ignore scarcity and go where told (' + JSON.stringify(st) + ')',
+    st.stone > 0 && !st.wood && !st.food);
+
   // rotation self-heal: iOS can hand resize() a stale box — corrupt the
   // layout globals and the per-frame guard must relayout within a few frames
   await page.evaluate(() => { W = 111; H = 222; G.fire = { x: 55, y: 111 }; });

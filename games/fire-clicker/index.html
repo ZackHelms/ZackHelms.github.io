@@ -120,7 +120,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 20:12 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 21:15 UTC</div>
 <canvas id="scene"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
 <button id="mute-btn" aria-label="Mute">&#128266;</button>
@@ -156,15 +156,21 @@ const UPG = [
   { id:'wind',   i:'\u{1F6A7}', n:'WINDBREAK',    max:5,
     d:(l)=>'Snow fencing shelters the flames. Fire burns ' + Math.round((1-drainRate())*100) + '% → ' + Math.round((1-(1/(1+(l+1)*0.09)))*100) + '% slower.',
     cost:(l)=>({ wood: Math.round(14 * Math.pow(1.9, l)), stone: Math.round(8 * Math.pow(1.9, l)) }) },
+  { id:'bellows', i:'\u{1F4A8}', n:'BELLOWS',      max:6,
+    d:(l)=>'Leather bellows feed the blaze. While the bank stays above 75% the fire ROARS and villagers work +' + Math.round(roarBonus()*100) + '% \u2192 +' + Math.round(roarBonus(l+1)*100) + '% faster.',
+    cost:(l)=>({ wood: Math.round(30 * Math.pow(1.9, l)), stone: Math.round(20 * Math.pow(1.9, l)) }) },
   { id:'tools',  i:'\u{26CF}',  n:'SHARP TOOLS',  max:6,
     d:(l)=>'Better axes, picks and hooks. Villagers haul +' + (l+1) + ' extra per trip.',
     cost:(l)=>({ stone: Math.round(16 * Math.pow(1.9, l)), wood: Math.round(8 * Math.pow(1.9, l)) }) },
   { id:'bunk',   i:'\u{1F9E3}', n:'RECRUIT VILLAGER', max:()=>houses()*5 - 4,
     d:(l)=>'Another pair of mittens moves in (' + (4+l) + ' → ' + (4+l+1) + '). Each house sleeps 5.',
     cost:(l)=>({ wood: Math.round(24 * Math.pow(1.75, l)), food: Math.round(14 * Math.pow(1.75, l)) }) },
-  { id:'keeper', i:'\u{1F9E4}', n:'FIREKEEPER',   max:3,
-    d:(l)=>'Hire a villager to feed the fire for you: throws a log (−' + 1 + ' wood) for +4s whenever the bank runs low.',
-    cost:(l)=>({ food: Math.round(30 * Math.pow(2.2, l)), wood: Math.round(15 * Math.pow(2.2, l)) }) },
+  { id:'keeper', i:'\u{1F9E4}', n:'FIREKEEPER',   max:1,
+    d:()=>'Hire a villager to feed the fire for you: throws a log (\u22121 wood) for +4s whenever the bank runs low. Keeps the camp alive while you are away \u2014 but a tended fire only ever smoulders, so the ROARING bonus stays yours to earn.',
+    cost:()=>({ food: 30, wood: 15 }) },
+  { id:'micro',  i:'\u{1F449}', n:'MICROMANAGEMENT', max:1, show:()=>houses() >= 3,
+    d:()=>'Stand over the work. Tap the trees, the rocks or the fishing hole and every villager goes after that resource instead of picking for themselves; tap it again to let them choose.',
+    cost:()=>({ wood: 100, stone: 80, food: 80 }) },
   { id:'house',  i:'\u{1F3E0}', n:'BUILD HOUSE',  max:()=>stageMaxHouses() - 2,
     d:(l)=>'Raise house #' + (3+l) + ' — beds for 5 more villagers (' + houses() + ' → ' + (houses()+1) + ' of ' + stageMaxHouses() + ').',
     cost:(l)=>({ wood: Math.round(45 * Math.pow(1.6, l)), stone: Math.round(25 * Math.pow(1.6, l)) }) },
@@ -212,6 +218,7 @@ function freshState() {
     res: { wood: 0, stone: 0, food: 0 },
     up: Object.fromEntries(UPG.map(u => [u.id, 0])),
     bank: 0,             // seconds of burn banked
+    focus: null,         // MICROMANAGEMENT: 'wood'|'stone'|'food', or null for the villagers' own choice
     day: 1, dayT: 0.16,  // start mid-morning
     lifeWarm: 0,         // lifetime warm-seconds (for later stages/ascension)
     muted: false, lastSave: Date.now(),
@@ -232,6 +239,7 @@ function load() {
   if (d.up && typeof d.up === 'object') for (const u of UPG) S.up[u.id] = Math.max(0, Math.floor(+d.up[u.id] || 0));
   for (const u of UPG) S.up[u.id] = Math.min(maxOf(u), S.up[u.id] || 0); // clamp after ALL load (maxes depend on stage/houses)
   S.bank = Math.max(0, Math.min(200, +d.bank || 0));
+  S.focus = (S.up.micro && ['wood','stone','food'].includes(d.focus)) ? d.focus : null;
   S.day = Math.max(1, Math.floor(+d.day || 1));
   S.dayT = (+d.dayT >= 0 && +d.dayT < 1) ? +d.dayT : 0.16;
   S.lifeWarm = Math.max(0, +d.lifeWarm || 0);
@@ -241,6 +249,19 @@ function maxBank()  { return 5 + S.up.pit * 5; }
 function tapPower() { return 1 + S.up.tinder * 0.5; }
 function drainRate(){ return 1 / (1 + S.up.wind * 0.09); }
 function tripYield(){ return 1 + S.up.tools + (S.up.shop ? 1 : 0); }
+/* ROARING FIRE — the reward for tending the fire yourself. Above ROAR_AT of a
+   full bank the extra heat energises the camp: villagers dawdle less, walk
+   faster and work faster, all through ONE multiplier so the effect stays a
+   clean scale on the gather cycle (and so the analytic model in
+   .claude/tests/eval-fire-clicker.cjs can express it as one term). The
+   FIREKEEPER deliberately cannot produce it: it only stokes below 35% of the
+   bank, so an auto-tended fire never reaches the threshold. Effort is what
+   makes the fire roar. */
+const ROAR_AT = 0.75;
+function heat()      { return S.bank / Math.max(1e-6, maxBank()); }
+function roaring()   { return FIRE.burning && heat() >= ROAR_AT; }
+function roarBonus(l){ return 0.1 + 0.1 * (l === undefined ? S.up.bellows : l); }
+function heatBoost() { return roaring() ? 1 + roarBonus() : 1; }
 function popCap()   { return Math.min(4 + S.up.bunk, houses() * 5); }
 function houses()   { return Math.min(2 + (S.up.house || 0), stageMaxHouses()); }
 function stageMaxHouses() { return S.up.village ? 10 : 5; }
@@ -470,6 +491,7 @@ function bakeGround() {
 
 /* =============================== fire model =============================== */
 const FIRE = { burning: false, intensity: 0, ember: 0, flick: 0 };
+let roaredOnce = false;
 function stoke(px, py, power) {
   const wasCold = S.bank <= 0;
   S.bank = Math.min(maxBank(), S.bank + power);
@@ -487,6 +509,10 @@ function fireStep(dt) {
     FIRE.burning = false;
     FIRE.ember = 1;
     hint('The fire went out. The cold creeps back in…');
+  }
+  if (!roaredOnce && roaring()) {
+    roaredOnce = true;
+    hint('The fire ROARS. Keep the bank above 75% and the whole camp works +' + Math.round(roarBonus() * 100) + '% faster.');
   }
   FIRE.ember = Math.max(0, FIRE.ember - dt * 0.12);
   FIRE.flick += dt * (6 + Math.random() * 6);
@@ -853,19 +879,63 @@ function drawBankRing() {
   cx.save(); cx.translate(f.x, f.y); cx.scale(1, 0.55);
   cx.strokeStyle = 'rgba(20,26,44,0.35)'; cx.lineWidth = 5;
   cx.beginPath(); cx.arc(0, 0, r, 0, TAU); cx.stroke();
+  // the 75% mark, so the target you are tapping towards is visible on the dial
+  cx.strokeStyle = 'rgba(255,238,170,0.5)'; cx.lineWidth = 2;
+  const ta = -Math.PI/2 + ROAR_AT * TAU;
+  cx.beginPath(); cx.arc(0, 0, r + 5, ta - 0.05, ta + 0.05); cx.stroke();
+  const roar = roaring();
   if (frac > 0.001) {
-    cx.strokeStyle = FIRE.burning ? 'rgba(255,170,60,0.95)' : 'rgba(255,170,60,0.5)';
+    cx.strokeStyle = roar ? 'rgba(255,240,190,0.98)' : (FIRE.burning ? 'rgba(255,170,60,0.95)' : 'rgba(255,170,60,0.5)');
+    cx.lineWidth = roar ? 7 : 5;
     cx.lineCap = 'round';
+    if (roar) { cx.shadowColor = 'rgba(255,190,90,0.9)'; cx.shadowBlur = 14; }
     cx.beginPath(); cx.arc(0, 0, r, -Math.PI/2, -Math.PI/2 + frac * TAU); cx.stroke();
+    cx.shadowBlur = 0;
   }
   cx.restore();
   cx.font = '11px "Share Tech Mono", monospace';
   cx.textAlign = 'center';
   cx.fillStyle = 'rgba(255,235,200,0.9)';
   cx.strokeStyle = 'rgba(10,12,24,0.6)'; cx.lineWidth = 3;
-  const label = S.bank > 0 ? (fmtS(S.bank) + ' / ' + fmtS(maxBank())) : 'COLD';
+  const label = S.bank > 0
+    ? (fmtS(S.bank) + ' / ' + fmtS(maxBank()) + (roaring() ? '  \u26A1 ROARING +' + Math.round(roarBonus() * 100) + '%' : ''))
+    : 'COLD';
+  if (roaring()) cx.fillStyle = 'rgba(255,244,205,1)';
   cx.strokeText(label, f.x, f.y + G.hitR * 0.72 + 16);
   cx.fillText(label, f.x, f.y + G.hitR * 0.72 + 16);
+}
+
+/* The MICROMANAGEMENT marker: a pulsing ring and icon over the site the player
+   has directed the camp at. Drawn AFTER the lighting layer with the bank ring,
+   because it is a control readout, not scenery — it has to stay readable at
+   midnight. */
+function focusR() { return Math.max(44, G.hitR * 0.8); }
+function siteAt(x, y) {
+  if (!S.up.micro) return null;
+  for (const j of JOBS) {
+    const st = j.site();
+    if (Math.hypot(x - st.x, (y - st.y) * 1.2) <= focusR()) return j.res;
+  }
+  return null;
+}
+function drawFocus() {
+  if (!S.up.micro || !S.focus) return;
+  const j = JOBS.find(k => k.res === S.focus); if (!j) return;
+  const st = j.site(), r = focusR(), pulse = 0.75 + 0.25 * Math.sin(performance.now() / 260);
+  cx.save(); cx.translate(st.x, st.y); cx.scale(1, 0.8);
+  cx.fillStyle = 'rgba(255,226,140,' + (0.10 * pulse).toFixed(3) + ')';
+  cx.beginPath(); cx.arc(0, 0, r, 0, TAU); cx.fill();
+  cx.strokeStyle = 'rgba(255,236,160,' + (0.85 * pulse).toFixed(3) + ')';
+  cx.lineWidth = 3.5; cx.setLineDash([10, 8]);
+  cx.beginPath(); cx.arc(0, 0, r, 0, TAU); cx.stroke();
+  cx.setLineDash([]);
+  cx.restore();
+  cx.font = '20px "Share Tech Mono", monospace';
+  cx.textAlign = 'center';
+  cx.fillStyle = 'rgba(20,24,40,0.55)';
+  cx.beginPath(); cx.arc(st.x, st.y - r * 0.8 - 2, 13, 0, TAU); cx.fill();
+  cx.fillStyle = '#fff';
+  cx.fillText(RES_ICON[S.focus], st.x, st.y - r * 0.8 + 5);
 }
 
 /* =============================== villagers =============================== */
@@ -884,7 +954,7 @@ function makeVillager(i, keeper) {
     tx: 0, ty: 0, speed: 46 + Math.random() * 14,
     coat: COATS[i % COATS.length], home,
     state: 'idle', t: 0, wait: Math.random() * 2,
-    job: null, carry: null, seat: -1, flip: 1,
+    job: null, carry: null, seat: -1, flip: 1, w: 0,
     shiver: Math.random() * TAU,
   };
 }
@@ -918,20 +988,25 @@ function villagerStep(v, dt) {
   const move = () => {
     const dx = v.tx - v.x, dy = v.ty - v.y, d = Math.hypot(dx, dy);
     if (d > 1) {
-      const sp = v.speed * (S.up.tavern ? 1.15 : 1) * dt;
+      const sp = v.speed * (S.up.tavern ? 1.15 : 1) * heatBoost() * dt;
       v.x += dx / d * Math.min(sp, d); v.y += dy / d * Math.min(sp, d);
       v.flip = dx < 0 ? -1 : 1;
     }
   };
   switch (v.state) {
     case 'idle': {
-      v.wait -= dt;
+      v.wait -= dt * heatBoost();
       if (v.wait > 0) break;
       if (v.keeper) { v.state = 'keeperGo'; vSetTarget(v, G.fire.x + G.hitR * 0.55, G.fire.y + G.hitR * 0.5); break; }
       if (warm) {
-        // pick the scarcest resource, slight randomness
-        const order = JOBS.slice().sort((a, b) => S.res[a.res] - S.res[b.res]);
-        v.job = Math.random() < 0.7 ? order[0] : order[Math.floor(Math.random() * 3)];
+        if (S.up.micro && S.focus) {
+          // MICROMANAGEMENT: the player is directing the work, so no guessing
+          v.job = JOBS.find(j => j.res === S.focus) || JOBS[0];
+        } else {
+          // pick the scarcest resource, slight randomness
+          const order = JOBS.slice().sort((a, b) => S.res[a.res] - S.res[b.res]);
+          v.job = Math.random() < 0.7 ? order[0] : order[Math.floor(Math.random() * 3)];
+        }
         const s = v.job.site();
         v.state = 'toWork'; vSetTarget(v, s.x + (Math.random()-0.5)*14, s.y + (Math.random()-0.5)*8);
       } else {
@@ -950,11 +1025,12 @@ function villagerStep(v, dt) {
     case 'toWork':
       if (!warm) { vRelease(v); v.state = 'idle'; v.wait = 0; break; }
       move();
-      if (vArrived(v)) { v.state = 'working'; v.t = 0; }
+      if (vArrived(v)) { v.state = 'working'; v.t = 0; v.w = 0; }
       break;
     case 'working':
       if (!warm) { v.state = 'idle'; v.wait = 0; break; }
-      if (v.t > (S.up.sawbones ? 2.4 : 3.2)) {
+      v.w += dt * heatBoost();   // heat-scaled work clock: a roaring fire shortens the job itself
+      if (v.w > (S.up.sawbones ? 2.4 : 3.2)) {
         v.carry = v.job.res;
         v.state = 'toStock'; vSetTarget(v, G.stock.x + (Math.random()-0.5)*10, G.stock.y + 6);
       } else if (v.job.res !== 'food' && Math.random() < dt * 2.2) {
@@ -1339,6 +1415,13 @@ cv.addEventListener('pointerdown', (e) => {
   const x = e.clientX - r.left, y = e.clientY - r.top;
   const vt = villagerAt(x, y);
   if (vt) { speak(vt); return; }           // villager taps never stoke; one bubble at a time
+  const site = siteAt(x, y);               // MICROMANAGEMENT: direct the camp, or release it
+  if (site) {
+    S.focus = S.focus === site ? null : site;
+    sfxPuff(); save();
+    toast(S.focus ? 'EVERYONE ON ' + RES_ICON[site] + ' ' + S.focus.toUpperCase() : 'VILLAGERS CHOOSE FOR THEMSELVES');
+    return;
+  }
   const d = Math.hypot(x - G.fire.x, (y - G.fire.y) * 1.4);
   if (d <= G.hitR) { stoke(x, y, tapPower()); sfxTap(); }
   else { // a puff of kicked-up snow
@@ -1389,6 +1472,8 @@ function buyUpg(id) {
     layoutBuildings(); bakeGround();
   }
   if (u.id === 'keeper') toast('A FIREKEEPER TENDS THE FLAMES');
+  if (u.id === 'micro') hint('Tap the trees, the rocks or the fishing hole to send everyone there. Tap it again to release them.');
+  if (u.id === 'bellows') toast('THE BELLOWS BREATHE');
   if (u.id === 'village') toast('THE CAMP IS NOW A VILLAGE');
   if (u.id === 'tavern') toast('THE THIRSTY YETI IS OPEN');
   if (u.id === 'shop') toast('THE GENERAL STORE IS OPEN');
@@ -1436,7 +1521,8 @@ $('upg-close').addEventListener('click', () => setPanelOpen(false));
 muteBtn.addEventListener('click', () => { audioInit(); setMuted(!S.muted); });
 let hudAcc = 0;
 function refreshHUD() {
-  resEl.innerHTML = RES_ICON.wood + ' ' + Math.floor(S.res.wood) + ' &nbsp;' + RES_ICON.stone + ' ' + Math.floor(S.res.stone) + ' &nbsp;' + RES_ICON.food + ' ' + Math.floor(S.res.food);
+  const mark = (k) => (S.focus === k ? '\u25B8' : '') + RES_ICON[k] + ' ' + Math.floor(S.res[k]);
+  resEl.innerHTML = mark('wood') + ' &nbsp;' + mark('stone') + ' &nbsp;' + mark('food');
   clockEl.textContent = stageName() + ' · DAY ' + S.day + ' · ' + phaseName(S.dayT);
   const any = UPG.some(u => showU(u) && S.up[u.id] < maxOf(u) && canAfford(u.cost(S.up[u.id])));
   upgBtn.classList.toggle('pulse', any && !upgPanel.classList.contains('open'));
@@ -1492,6 +1578,7 @@ function frame(now) {
   fireParticles(dt);
   weatherStep(dt);
   drawLighting();
+  drawFocus();
   drawBankRing();
   drawBubble(dt);
 
