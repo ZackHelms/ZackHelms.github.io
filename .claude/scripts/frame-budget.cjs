@@ -50,6 +50,11 @@
 //     select=#id:value       set a <select> first (repeatable)
 //     eval=<js>              run JS first (repeatable) — pose the scene through
 //                            the game's own hook, or saturate a cap
+//     evalFile=<path>        same, read from a file (repeatable). Poses worth
+//                            re-measuring live in .claude/scripts/poses/ — a
+//                            perf number means nothing without the scene it was
+//                            taken on, and a pose retyped from a prose
+//                            description is a different scene.
 //
 // Prints `FRAME median=… p95=… max=… over=N/T` and `BUDGET=ok|over`, exit 0/1.
 // Requirements: playwright-core resolvable (remote sessions:
@@ -62,7 +67,7 @@ const { chromium } = require('playwright-core');
 
 const [page_, ...rest] = process.argv.slice(2);
 if (!page_ || page_.includes('=')) {
-  console.error('usage: frame-budget.cjs <page.html> [w= h= dpr= wait= frames= budget= select= eval=]');
+  console.error('usage: frame-budget.cjs <page.html> [w= h= dpr= wait= frames= budget= select= eval= evalFile=]');
   process.exit(1);
 }
 const opt = { w: 390, h: 844, dpr: 3, wait: 1500, frames: 150, budget: 16.9, swiftshader: 0, select: [], eval: [] };
@@ -73,12 +78,16 @@ for (const a of rest) {
   const k = a.slice(0, i), v = a.slice(i + 1);
   if (k === 'select') opt.select.push(v);
   else if (k === 'eval') opt.eval.push(v);
+  else if (k === 'evalFile') {
+    try { opt.eval.push(fs.readFileSync(v, 'utf8')); }
+    catch (e) { console.error('frame-budget.cjs: evalFile= cannot read ' + v + ': ' + e.message); process.exit(1); }
+  }
   else if (NUMERIC.includes(k)) {
     const n = Number(v);
     if (!Number.isFinite(n)) { console.error('frame-budget.cjs: ' + k + '= expects a number, got: ' + v); process.exit(1); }
     opt[k] = n;
   } else {
-    console.error('frame-budget.cjs: unknown option "' + k + '" (known: ' + NUMERIC.join(' ') + ' select eval)');
+    console.error('frame-budget.cjs: unknown option "' + k + '" (known: ' + NUMERIC.join(' ') + ' select eval evalFile)');
     process.exit(1);
   }
 }

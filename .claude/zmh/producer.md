@@ -42,11 +42,13 @@
 - **Say what you left behind.** Because moving the pointer hides everything
   below it, a pass that deliberately refines only its own commits should name
   the other session's SHAs in its report *and* leave them listed here, so the
-  work is recoverable rather than silently skipped. Currently outstanding:
-  **`dd6e9c1` + `60ae87c`** — the two Games-hub commits (Star Surge first and
-  every card description trimmed to 24 words; Ember Depths second in the grid)
-  that the concurrent hub/star-surge session pushed *after* its own refine
-  commit `4d0f869`. The 2026-08-25 ember-depths pass ran alongside it, was
+  work is recoverable rather than silently skipped. Currently outstanding: **nothing** — the long-running
+  entry was cleared by the 2026-08-27/28 star-surge scale pass, see below.
+
+  **CLEARED 2026-08-28: `dd6e9c1` + `60ae87c`** — the two Games-hub commits
+  (Star Surge first and every card description trimmed to 24 words; Ember
+  Depths second in the grid) that the concurrent hub/star-surge session pushed
+  *after* its own refine commit `4d0f869`. The 2026-08-25 ember-depths pass ran alongside it, was
   scoped by the CD to Ember Depths only, and moved the pointer past all three;
   `4d0f869` is that session's own refine commit and is skippable, but those two
   hub commits are not. **Still outstanding after the 2026-08-27 ember-depths
@@ -69,7 +71,22 @@
   `.claude/tests/README.md`'s suite table, resolved by taking their
   star-surge row (98 checks) and this session's ember-depths rows, then
   verifying their five files were byte-identical to `origin/main` with
-  `git diff --stat origin/main -- <paths>` before reporting done. Earlier entries, all since cleared:
+  `git diff --stat origin/main -- <paths>` before reporting done.
+  **The 2026-08-27/28 star-surge scale pass** (pointer `bd1fca5`) closed the
+  two-day-old hub entry, and the way it closed is the argument for this list
+  existing at all: `dd6e9c1`'s rule — every hub card at 24 words or fewer —
+  had been applied to all 49 cards and then written down **nowhere**, while
+  `check-games-sync.cjs` enforced only a two-sentence cap that two long
+  sentences clear easily. Reading the skipped commit's own message was what
+  surfaced it; adding the word cap to the gate immediately caught two cards
+  (Ember Depths at 28, Block Fit at 25) that had already drifted back over it
+  in three days. A skipped commit is not just unrefined work — it can be a
+  rule the repo is silently no longer keeping. That pass otherwise ran with
+  the concurrent ember-depths session and left nothing new behind: the other
+  commits in `8dd459f..bd1fca5` were `5f6063b` (their refine commit),
+  `b82f09d`/`c27f126` (their merges of this session's work) and `8a261e7`
+  (their own note into this file) — all theirs and all already recorded.
+  Earlier entries, all since cleared:
   turret-builder's `acb50c1` + `e9ea508` were an entry and the
   2026-08-23 turret-builder pass refined them (it also found and fixed a live
   cel-shading defect that had shipped in `acb50c1`, which is the argument for

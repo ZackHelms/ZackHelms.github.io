@@ -140,6 +140,13 @@ else {
 // prose in games/CLAUDE.md because a prose rule about length is exactly the
 // kind that decays silently.
 const MAX_CARD_SENTENCES = 2;
+// And at most 24 WORDS, the cap all 49 cards were rewritten to on 2026-08-25
+// (dd6e9c1) after the same decay reached 68 words on Neon Clash and 40 on
+// Signal Hunt. The sentence cap alone does not hold that line — two long
+// sentences pass it comfortably — so the rule that was actually applied to
+// every card went unenforced for three days and lived only in a commit
+// message. Same reasoning as above: a prose rule about length decays silently.
+const MAX_CARD_WORDS = 24;
 const descRe = /<div class="game-name">([^<]+)<\/div>\s*<div class="game-desc">([\s\S]*?)<\/div>/g;
 let dm, descCount = 0;
 while ((dm = descRe.exec(hub))) {
@@ -152,6 +159,9 @@ while ((dm = descRe.exec(hub))) {
   const n = text.split(/(?<=[.!?])\s+(?=[A-Z0-9"'“])/).filter(s => s.trim()).length;
   if (n > MAX_CARD_SENTENCES)
     fail('hub card "' + name + '" description is ' + n + ' sentences (max ' + MAX_CARD_SENTENCES + ')');
+  const w = text.split(/\s+/).filter(Boolean).length;
+  if (w > MAX_CARD_WORDS)
+    fail('hub card "' + name + '" description is ' + w + ' words (max ' + MAX_CARD_WORDS + ') — rewrite, do not append');
 }
 console.log('CARDS_WITH_DESC=' + descCount);
 if (descCount !== cards.length)

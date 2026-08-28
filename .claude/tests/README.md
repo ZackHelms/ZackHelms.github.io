@@ -77,6 +77,43 @@ both are ways a **pixel check** goes green for the wrong reason:
   the check discriminated *then*; after the visuals it measures change, that
   proof has expired.
 
+Two more from 2026-08-27, scaling star-surge's hulls across every graphics
+style — both are checks that were **honest when written and quietly stopped
+testing anything**, without a line of the check itself changing:
+
+- **A check whose axis is a DIFFERENCE between two configurations dies the day
+  that difference goes away — silently, and still green.** Star-surge's
+  scale-up was measured as anim-vs-model: paint the same hull under both
+  styles, require the ratio to be 3. When the CD asked for the oversize in
+  *all five* styles, that ratio became 1.00 — so the check had to be rewritten
+  anyway, and the thing worth noticing is what would have happened if the
+  factors had merely been made equal some other way: it would have passed with
+  the scale-up deleted from the file entirely. A comparison between two
+  configurations asserts that they differ, never that either one is right. The
+  fix is to find an axis *inside* one configuration: field-vs-framed within
+  each style, swept over all five, which cannot be satisfied by making the
+  styles agree. Ask of any A-vs-B check: if A and B became identical
+  tomorrow — a perfectly plausible product decision — does this go red, or
+  green and vacuous?
+- **Sweep every implementation when one rule has several mechanisms.** The same
+  factor reached the five styles three different ways (a mesh scale, a
+  `ctx.scale` around a hand-drawn painter, a re-bake at the final size), so
+  there was no single line to protect — and two negative controls landed on
+  disjoint styles, which is the proof the sweep was not redundancy. Cheap rule:
+  count the code paths that implement the rule, not the rule.
+
+And one about a long-running driven loop, from the same session:
+
+- **A driven loop long enough to be interesting re-populates the world.**
+  Star-surge's shield-cap check cleared the hostiles, then ran 90 simulated
+  seconds — during which the wave director spawned, and a late hit SPENT a
+  charge, so "regen stops at the cap" read 1 instead of 2 on a minority of
+  runs. It surfaced as collateral in an unrelated negative control, which is
+  the worst way to find a flake: it looks like your break caused it. Clearing
+  the world **once, before** a loop that runs the real `update()` is not
+  clearing it; re-clear inside the loop, and the guarded path stays real while
+  the only thing removed is what could undo it.
+
 Two more from 2026-08-27, re-tuning Ember Depths' economy — both are about a
 check that is **correct today and becomes noise tomorrow**:
 

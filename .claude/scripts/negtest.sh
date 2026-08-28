@@ -19,6 +19,14 @@
 # Convention: mark every deliberate break with the token @negtest in a comment,
 # so `scan` can find one that outlived its test. gates.sh runs `scan` over the
 # changed files on every invocation.
+#
+# ONE SNAPSHOT PER BREAK: `restore` CONSUMES the snapshot (it is deleted once
+# the bytes are verified), so a second break needs a second `save`. Running two
+# controls back to back without re-saving is how a break survives its test:
+# the second restore reports NEGTEST=no-snapshot, which reads like a usage
+# error rather than "your file is still broken" (2026-08-27, a hue-blind cache
+# key left in the working tree that way). `scan` and gates.sh are the backstop,
+# but only for a break you remembered to mark.
 set -u
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "NEGTEST=not-a-git-repo"; exit 1; }
 cd "$ROOT" || exit 1
@@ -40,7 +48,7 @@ save)
 restore)
   f=${1:-}; [ -n "$f" ] || { echo "NEGTEST=usage: restore <file>"; exit 1; }
   s=$(slot "$f")
-  [ -f "$s" ] || { echo "NEGTEST=no-snapshot FILE=$f (run 'save' BEFORE breaking it)"; exit 1; }
+  [ -f "$s" ] || { echo "NEGTEST=no-snapshot FILE=$f — NOT RESTORED, the break (if any) is STILL LIVE. A previous restore consumed the snapshot: 'save' again before each break. Revert by hand, then run: $0 scan $f"; exit 1; }
   cp "$s" "$(abs "$f")" || { echo "NEGTEST=restore-failed FILE=$f"; exit 1; }
   # the restore is not believed until the bytes match — `cp` is happy to
   # succeed against a path that is not the one you meant

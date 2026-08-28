@@ -135,7 +135,17 @@ Deterministic helpers for working on this repo.
   ```
   node .claude/scripts/frame-budget.cjs games/star-surge/index.html
   node .claude/scripts/frame-budget.cjs games/star-surge/index.html select=#gfx-select:neon
+  node .claude/scripts/frame-budget.cjs games/star-surge/index.html \
+    select=#gfx-select:sprite evalFile=.claude/scripts/poses/star-surge-field.js
   ```
+
+  **`poses/` — the scene a number was measured on.** A frame-cost figure is
+  only comparable against the scene that produced it, and a scene described in
+  prose ("a 16-enemy + boss + 60-bullet field") is re-typed differently by the
+  next session — which is exactly what happened on 2026-08-27. So a pose worth
+  re-measuring goes in `.claude/scripts/poses/<game>-<scene>.js` and is passed
+  with `evalFile=` (repeatable, and it fails loudly if the file is missing).
+  Cite the pose file, not the prose, wherever a perf number is recorded.
 
 - `gates.sh` — runs the whole validation set in one command: the smoke gate on
   each changed page, `check-games-sync.cjs` (always — it is free),

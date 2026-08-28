@@ -316,8 +316,11 @@ constants rather than style tests.
   still tests centres within `ship.r + 14`, so the art overhangs the reach —
   pinned by a check that measures the painted span in every style AND drives a
   real pickup at 25 px (collected) and 30 px (not).
-- Perf after the change (frame-budget.cjs, 390x844 dpr3, 2026-08-27, a
-  16-enemy + boss + 60-bullet field): **16.7 ms median in all five styles**,
+- Perf after the change (frame-budget.cjs, 390x844 dpr3, 2026-08-27, the
+  saturated field pose — now stored as
+  `.claude/scripts/poses/star-surge-field.js`, so re-measure with
+  `evalFile=.claude/scripts/poses/star-surge-field.js` rather than retyping a
+  scene from this sentence): **16.7 ms median in all five styles**,
   0/149 frames over in toon/model/anim/sprite and 4/149 in neon (its
   pre-existing per-frame `shadowBlur` strokes). Tripling a hull triples the
   fill area but not the draw-call count, and none of the styles was
