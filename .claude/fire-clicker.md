@@ -36,6 +36,20 @@ Apache/MIT. The CD may develop it into a real app.
   radial gradients — fire scaled by intensity+flicker, motes, lit windows),
   then warm additive tints go on top. The drive suite pixel-asserts fireside
   ground brighter than far snow at night.
+- **Chat bubbles** (`SAY`, `speak()`, `drawBubble()`): tapping a villager
+  (20 px hit circle, checked BEFORE the fire hit test — a villager tap never
+  stokes) shows a canvas speech bubble above their head for 5 s
+  (`BUBBLE_DUR`), and **only one bubble can exist at a time** — `speak()`
+  early-returns while `bubble` is set, by CD spec. Lines are drawn from
+  weighted pools: carry lines per resource (log/rock/fish, incl. the
+  heavier/lighter pair), time-of-day pools keyed off `phaseName()`
+  (night/dawn/day/dusk), cold lines when the fire is out, warm lines when
+  huddling by a lit fire, keeper lines, and a generic pool (fourth-wall-ish
+  cozy deadpan — "Why do my legs move like this?"). `lastLine` blocks
+  immediate repeats. The bubble follows its villager, word-wraps at 150 px,
+  clamps to the screen, draws ABOVE the lighting layer, and ends early if the
+  speaker goes indoors. New lines: append to the right pool; keep the voice —
+  short, earnest, slightly self-aware, never snarky at the player.
 - **Upgrades** (`UPG[]`, DOM panel behind 🔨): FIRE PIT (+5 s max bank),
   DRY TINDER (+0.5 s per tap), WINDBREAK (slower drain), SHARP TOOLS (+1 per
   trip), BUNKHOUSE (+1 villager, base 4), FIREKEEPER (auto-tapper: a

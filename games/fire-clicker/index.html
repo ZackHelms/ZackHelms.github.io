@@ -115,7 +115,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 04:18 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 12:12 UTC</div>
 <canvas id="scene"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
 <button id="mute-btn" aria-label="Mute">&#128266;</button>
@@ -887,6 +887,177 @@ function drawVillager(v) {
     smoke.push({ x: x + v.flip * 4, y: y - bh - 8, vx: v.flip * 6, vy: -6, r: 1.5, life: 0, max: 1.1 });
 }
 
+/* =============================== chat bubbles =============================== */
+/* One bubble at a time, 5 seconds, tap a villager to hear them. */
+const SAY = {
+  carry: {
+    wood: [
+      'This log seems heavier than the others.',
+      'This log seems lighter than the others.',
+      'Sap. Sap everywhere.',
+      'A fine log. The fire will love this one.',
+      'Straight to the pile. Then one more. Then a nap.',
+      'I named this one. Bad idea. Goodbye, Gerald.',
+    ],
+    stone: [
+      'This rock seems heavier than the others.',
+      'This rock seems lighter than the others.',
+      "It's shaped like a slightly rounder rock.",
+      'I found this one myself. The ground was hiding it.',
+      'Why do we need rocks? ...Oh. Right. Everything.',
+    ],
+    food: [
+      'This fish seems heavier than the others.',
+      'This fish seems lighter than the others.',
+      'It was still flopping a minute ago.',
+      "Don't tell the others, but I licked it.",
+      "Dinner! Assuming I don't trip.",
+    ],
+  },
+  night: [
+    'It sure is dark out tonight.',
+    'The stars are extra pointy tonight.',
+    'I heard something in the dark. It was me.',
+    'The moon is following me again.',
+    'Night shift. Nobody asked me.',
+  ],
+  dawn: [
+    "Morning's here!",
+    "The sky's doing the pretty thing again.",
+    'New day, same snow.',
+    'I was up before the day star. Someone write that down.',
+  ],
+  day: [
+    'I like our day star.',
+    'The day star is doing great work today.',
+    'Snow again. Bold choice.',
+    'A fine day to carry things back and forth.',
+  ],
+  dusk: [
+    'The day star is leaving. Typical.',
+    'Getting dark. Someone should mind the fire.',
+    'The mountains eat the sun every night. Nobody panics.',
+  ],
+  cold: [
+    'C-c-cold. Very c-c-cold.',
+    "I can't feel my mittens. Or the hands inside them.",
+    'Somebody should really tap that fire.',
+    'My breath is making clouds. Little tiny clouds.',
+    'I miss the fire. Tell the fire I said that.',
+    'Huddling is just teamwork against the weather.',
+  ],
+  warm: [
+    'Toasty.',
+    'The fire crackles in a friendly way.',
+    'My front is warm and my back is cold. Life is balance.',
+    'Five more minutes. Then work. Probably.',
+  ],
+  keeper: [
+    'The fire hungers. I provide.',
+    "Log goes in, warm comes out. I don't make the rules.",
+    'Best job in the village. Also the warmest.',
+    "I watch the flames so you don't have to. Keep tapping anyway.",
+  ],
+  generic: [
+    'Why do my legs move like this?',
+    'I should probably get some sleep one of these days.',
+    'Have we invented a laundry machine yet…',
+    'My clothes are starting to smell funny.',
+    'I had a dream we lived in a city. Weird.',
+    "One day I'll sit on the BIG log.",
+    "I've counted the snowflakes twice. Different both times.",
+    'My hood is my whole personality.',
+    "I'm not lost. The village is just small.",
+    'Wave back if you can see me.',
+    'Sometimes I walk in a straight line for no reason.',
+    "We should name the fire. I vote 'Fire'.",
+    'Do you ever feel like someone is tapping us?',
+    'Snow is just very slow rain. Think about it.',
+    "I'm saving up for a chair.",
+    'I blinked earlier. You missed it.',
+  ],
+};
+let bubble = null, lastLine = '';
+const BUBBLE_DUR = 5;
+function pickLine(v) {
+  const pools = [];
+  const add = (arr, w) => { if (arr && arr.length) for (let i = 0; i < w; i++) pools.push(arr); };
+  if (v.carry) add(SAY.carry[v.carry], 5);
+  if (v.keeper) add(SAY.keeper, 4);
+  add(SAY[phaseName(S.dayT).toLowerCase()], 2);
+  if (!FIRE.burning) add(SAY.cold, 3);
+  else if (v.state === 'huddle') add(SAY.warm, 2);
+  add(SAY.generic, 4);
+  let line = SAY.generic[0];
+  for (let tries = 0; tries < 8; tries++) {
+    const pool = pools[Math.floor(Math.random() * pools.length)];
+    line = pool[Math.floor(Math.random() * pool.length)];
+    if (line !== lastLine) break;
+  }
+  lastLine = line;
+  return line;
+}
+function wrapLine(text, maxW) {
+  cx.font = '11px "Share Tech Mono", monospace';
+  const words = text.split(' '), lines = [];
+  let cur = '';
+  for (const w of words) {
+    const test = cur ? cur + ' ' + w : w;
+    if (cx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
+    else cur = test;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+function speak(v) {
+  if (bubble) return;                       // only one bubble at a time
+  bubble = { v, lines: wrapLine(pickLine(v), 150), t: 0 };
+  sfxPuff();
+}
+function villagerAt(x, y) {
+  let best = null, bd = 1e9;
+  for (const v of villagers) {
+    if (v.state === 'inside') continue;
+    const dx = x - v.x, dy = y - (v.y - 12);
+    const d = Math.hypot(dx, dy);
+    if (d < 20 && d < bd) { best = v; bd = d; }
+  }
+  return best;
+}
+function drawBubble(dt) {
+  if (!bubble) return;
+  bubble.t += dt;
+  if (bubble.t >= BUBBLE_DUR || bubble.v.state === 'inside') { bubble = null; return; }
+  const a = Math.min(1, bubble.t / 0.15) * Math.min(1, (BUBBLE_DUR - bubble.t) / 0.35);
+  const v = bubble.v, lines = bubble.lines;
+  cx.font = '11px "Share Tech Mono", monospace';
+  let tw = 0;
+  for (const l of lines) tw = Math.max(tw, cx.measureText(l).width);
+  const pad = 7, lh = 13;
+  const bw = tw + pad * 2, bh = lines.length * lh + pad * 2 - 3;
+  const bx = Math.max(6, Math.min(W - 6 - bw, v.x - bw / 2));
+  const by = v.y - 30 - bh;
+  cx.globalAlpha = a;
+  cx.fillStyle = 'rgba(250,252,255,0.96)';
+  cx.strokeStyle = 'rgba(40,52,84,0.65)'; cx.lineWidth = 1.5;
+  cx.beginPath();
+  if (cx.roundRect) cx.roundRect(bx, by, bw, bh, 7); else cx.rect(bx, by, bw, bh);
+  cx.fill(); cx.stroke();
+  const tailX = Math.max(bx + 8, Math.min(bx + bw - 8, v.x));
+  cx.beginPath();
+  cx.moveTo(tailX - 5, by + bh - 0.5);
+  cx.lineTo(tailX + 5, by + bh - 0.5);
+  cx.lineTo(v.x, v.y - 24);
+  cx.closePath();
+  cx.fillStyle = 'rgba(250,252,255,0.96)'; cx.fill();
+  cx.strokeStyle = 'rgba(40,52,84,0.65)';
+  cx.beginPath(); cx.moveTo(tailX - 5, by + bh); cx.lineTo(v.x, v.y - 24); cx.lineTo(tailX + 5, by + bh); cx.stroke();
+  cx.fillStyle = '#1c2540'; cx.textAlign = 'left';
+  lines.forEach((l, i) => cx.fillText(l, bx + pad, by + pad + 9 + i * lh));
+  cx.globalAlpha = 1;
+  cx.textAlign = 'center';
+}
+
 /* =============================== weather & fx =============================== */
 function weatherStep(dt) {
   if (snow.length < 90 && Math.random() < 0.5)
@@ -983,6 +1154,8 @@ cv.addEventListener('pointerdown', (e) => {
   audioInit();
   const r = cv.getBoundingClientRect();
   const x = e.clientX - r.left, y = e.clientY - r.top;
+  const vt = villagerAt(x, y);
+  if (vt) { speak(vt); return; }           // villager taps never stoke; one bubble at a time
   const d = Math.hypot(x - G.fire.x, (y - G.fire.y) * 1.4);
   if (d <= G.hitR) { stoke(x, y, tapPower()); sfxTap(); }
   else { // a puff of kicked-up snow
@@ -1099,6 +1272,7 @@ function frame(now) {
   weatherStep(dt);
   drawLighting();
   drawBankRing();
+  drawBubble(dt);
 
   hudAcc += dt;
   if (hudAcc > 0.25) { hudAcc = 0; refreshHUD(); }
