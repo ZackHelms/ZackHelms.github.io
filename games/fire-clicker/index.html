@@ -120,7 +120,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 17:19 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 20:12 UTC</div>
 <canvas id="scene"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
 <button id="mute-btn" aria-label="Mute">&#128266;</button>
@@ -894,8 +894,16 @@ function syncVillagers() {
     const i = villagers.length;
     villagers.push(makeVillager(i, i >= popCap()));
   }
-  // re-flag keepers (last N are keepers)
-  villagers.forEach((v, i) => { v.keeper = i >= popCap(); });
+  /* Re-flag keepers (the last N are keepers) — and a villager whose ROLE just
+     changed has to be kicked back to idle. RECRUIT VILLAGER raises popCap, which
+     demotes the villager at the old boundary from keeper to worker; if it is
+     left standing in `keeperGo`/`keeperWait` nothing in the state machine ever
+     moves it again and it stops gathering for the rest of the run. Buying a
+     firekeeper and then recruiting used to cost one worker per recruit. */
+  villagers.forEach((v, i) => {
+    const k = i >= popCap();
+    if (k !== v.keeper) { v.keeper = k; vRelease(v); v.state = 'idle'; v.wait = 0; v.carry = null; }
+  });
 }
 const seatTaken = [false, false, false, false];
 function vSetTarget(v, x, y) { v.tx = x; v.ty = y; }
@@ -1364,6 +1372,30 @@ function costStr(cost) {
   ).join(' &nbsp;');
 }
 function canAfford(cost) { return Object.keys(cost).every(k => S.res[k] >= cost[k]); }
+/* The ONE purchase path. The upgrade card calls it and so does the persona
+   playtest harness (.claude/tests/eval-fire-clicker.cjs), so a headless run of
+   the economy can never drift from what a real tap actually does. Returns
+   whether the buy happened. Sound + panel rebuild stay with the card — they
+   belong to the gesture, not to the transaction. */
+function buyUpg(id) {
+  const u = UPG.find(x => x.id === id);
+  if (!u || !showU(u)) return false;
+  const lvl = S.up[u.id] || 0, c = u.cost(lvl);
+  if (lvl >= maxOf(u) || !canAfford(c)) return false;
+  for (const k of Object.keys(c)) S.res[k] -= c[k];
+  S.up[u.id] = lvl + 1;
+  if (u.id === 'bunk' || u.id === 'keeper') syncVillagers();
+  if (u.id === 'house' || u.id === 'village' || u.id === 'tavern' || u.id === 'shop' || u.id === 'sawbones') {
+    layoutBuildings(); bakeGround();
+  }
+  if (u.id === 'keeper') toast('A FIREKEEPER TENDS THE FLAMES');
+  if (u.id === 'village') toast('THE CAMP IS NOW A VILLAGE');
+  if (u.id === 'tavern') toast('THE THIRSTY YETI IS OPEN');
+  if (u.id === 'shop') toast('THE GENERAL STORE IS OPEN');
+  if (u.id === 'sawbones') toast('THE SAWBONES WILL SEE YOU NOW');
+  save();
+  return true;
+}
 function buildUpgPanel() {
   upgList.innerHTML = '';
   upgSub.textContent = stageName() + ' · ' + villagers.filter(v => !v.keeper).length + '/' + (houses() * 5) +
@@ -1386,21 +1418,8 @@ function buildUpgPanel() {
     if (!maxed) {
       if (canAfford(cost)) el.classList.add('afford');
       el.addEventListener('click', () => {
-        const c = u.cost(S.up[u.id]);
-        if (S.up[u.id] >= maxOf(u) || !canAfford(c)) return;
-        for (const k of Object.keys(c)) S.res[k] -= c[k];
-        S.up[u.id]++;
+        if (!buyUpg(u.id)) return;
         audioInit(); sfxBuy();
-        if (u.id === 'bunk' || u.id === 'keeper') syncVillagers();
-        if (u.id === 'keeper') toast('A FIREKEEPER TENDS THE FLAMES');
-        if (u.id === 'house' || u.id === 'village' || u.id === 'tavern' || u.id === 'shop' || u.id === 'sawbones') {
-          layoutBuildings(); bakeGround();
-        }
-        if (u.id === 'village') toast('THE CAMP IS NOW A VILLAGE');
-        if (u.id === 'tavern') toast('THE THIRSTY YETI IS OPEN');
-        if (u.id === 'shop') toast('THE GENERAL STORE IS OPEN');
-        if (u.id === 'sawbones') toast('THE SAWBONES WILL SEE YOU NOW');
-        save();
         buildUpgPanel();
       });
     }

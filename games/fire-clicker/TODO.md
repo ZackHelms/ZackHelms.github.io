@@ -46,3 +46,26 @@ trodden paths). Everything below is not built yet.
 - [ ] More log seats / bigger fire ring as population grows.
 - [ ] Stockpile art that visibly grows with stored resources.
 - [ ] Mishap events + toasts to give constable/fire marshal something real.
+
+## Balance findings from the persona eval (2026-08-28) — CD decisions
+
+Measured by `.claude/tests/eval-fire-clicker.cjs`. A day is 5 real minutes.
+
+- [ ] **The game runs out at ~1 h 15 of play.** The economy maxes at day 15
+      (casual) / day 10 (optimal), after which the only card left is RECRUIT
+      VILLAGER at `24 * 1.75^n` — POP 20 costs another ~11 hours and POP 50
+      would need ~2e12 wood. Either the recruit curve wants flattening, or the
+      TOWN stage needs to land before that wall. Needs-Zack: which.
+- [ ] **Skill barely pays.** Optimal play beats naive play 2.4x to the village
+      and only 1.45x to a maxed economy, because the only difference the game
+      allows is buy order. If mastery should matter, there has to be a lever a
+      good player can pull that a naive one cannot.
+- [ ] **Three upgrades buy zero throughput.** FIRE PIT, DRY TINDER and
+      WINDBREAK only reduce tapping (which is a flat 1 tap/second at every
+      stage) — a value-driven player correctly never buys any of them. They
+      need a second effect, or the tapping loop needs to be something a player
+      would want to buy out of.
+- [ ] **FIREKEEPER makes the game play itself.** One keeper sustains the fire
+      indefinitely on 0.17 wood/s; the casual persona taps 366 times in 400
+      days and never has to touch the screen again. That is either the
+      idle-game promise or the moment the game stops being one — CD call.

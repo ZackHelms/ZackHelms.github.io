@@ -632,13 +632,16 @@ settled-freeze regressions):
 `.claude/tests/drive-phasic.cjs`. Detailed context: `.claude/phasic.md`
 (includes the maintained tactics registry).
 
-### FIRE CLICKER (`fire-clicker/index.html`, ~1500 lines)
+### FIRE CLICKER (`fire-clicker/index.html`, ~1515 lines)
 A snowy-village fire-keeping sim, CD-commissioned 2026-08-28 and explicitly
 NOT built on the croissant/basketball shop-list template. One rendered scene:
 stylized-cartoon snowfield, two straw houses, an unlit central campfire ringed
 by log seats. Tapping the fire raises a mote of light from the tap point and
 banks burn seconds (1 s/tap, 5 s cap, both upgradable) that count down from
-the moment they land. Villagers are simulated agents — while the fire burns
+the moment they land. Pacing is measured rather than guessed — a day is 5 real
+minutes, and `.claude/tests/eval-fire-clicker.cjs` plays two scripted personas
+through the shipped simulation to price every milestone in hours (village at 20 min
+optimal / 49 min naive; the current content runs out around 1 h 15). Villagers are simulated agents — while the fire burns
 they haul wood/stone/food from work sites to the stockpile; cold, they huddle
 on the seats (shivering, breath puffs) or hide indoors (windows glow, chimney
 smoke). A 5-minute day/night cycle drives keyframed sky palettes and a

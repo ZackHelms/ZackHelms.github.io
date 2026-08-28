@@ -106,7 +106,52 @@ Apache/MIT. The CD may develop it into a real app.
 - Keep the scene the hero: any new mechanic should be visible in the world
   (new buildings, busier villagers), not a bigger menu.
 
+## Pacing (measured, not guessed)
+
+`DAY_LEN` is 300 s, so **1 in-game day = 5 real minutes** — 12 days is an hour
+of play. `.claude/tests/eval-fire-clicker.cjs` plays the real game headless with
+two scripted personas and reports every milestone in both units. Current numbers
+(390x844, 3 seeds, 2026-08-28):
+
+| Milestone | SPEEDRUN | CASUAL |
+|---|---|---|
+| first upgrade | day 0.7 (3 min) | day 0.4 (2 min) |
+| 5 houses | day 2.7 (14 min) | day 6.0 (30 min) |
+| **FOUND VILLAGE** | day 4.1 (**20 min**) | day 9.8 (**49 min**) |
+| all three businesses | day 5.1 (25 min) | day 10.4 (52 min) |
+| 10 houses / economy maxed | day 10.3 (51 min) | day 15.0 (1 h 15) |
+| POP 15 | day 19.3 (1 h 37) | day 24.4 (2 h 02) |
+| POP 20 | day 149 (12 h 28) | day 158 (13 h 12) |
+
+Three things to keep in mind when tuning:
+
+- **The persona spread is narrow.** Optimal play beats naive play by 2.4x to the
+  village and only 1.45x to a maxed economy. If the CD wants mastery to matter,
+  it needs a lever the speedrunner can pull that the casual cannot — right now
+  the only difference is buy order.
+- **Content ends at about day 15 (1h15).** After the economy maxes, the only
+  purchase left is RECRUIT VILLAGER, whose `1.75^n` cost outruns linear income
+  almost immediately: POP 20 costs another 11 hours and POP 50 would need
+  ~2e12 wood. The wall between POP 15 and POP 20 is where the game currently
+  stops being a game. This is the strongest argument for the TOWN stage.
+- **Tapping demand is 1 tap/second, flat.** Drain is 1 s/s and a tap banks 1 s,
+  so a speedrunner taps ~3,100 times to reach a maxed economy. FIRE PIT, DRY
+  TINDER and WINDBREAK buy **zero** throughput — they only reduce that tapping —
+  so a value-driven player never buys any of them, and the eval's speedrunner
+  correctly never does.
+
 ## Gotchas
+- **A villager whose keeper flag changes must be reset to `idle`** (2026-08-28).
+  `syncVillagers()` re-flags `v.keeper = i >= popCap()`, so buying RECRUIT
+  VILLAGER demotes the villager sitting at the old boundary from keeper to
+  worker — and if it is standing in `keeperGo`/`keeperWait`, **nothing in the
+  state machine ever moves it again**. Every recruit bought after a firekeeper
+  silently retired one villager for the rest of the run (8 of 13 idle by day 30
+  in the casual persona). Nothing looked wrong on screen: the villagers stood by
+  the fire, which is where a keeper belongs. The tell was numeric — a measured
+  gather cycle 32% longer than the analytic model's — and it is now an
+  assertion (`no villager stranded in a keeper state`). Any future role flag
+  needs the same release.
 - **Lay out in the canvas's own box, never `window.inner*`** (2026-08-28,
   the landscape tap bug). Pointer coords are resolved against
   `cv.getBoundingClientRect()`; on iOS that box is *shorter* than
@@ -140,3 +185,12 @@ Apache/MIT. The CD may develop it into a real app.
   model, villager states, houses/stages, bubbles or lighting:
   `NODE_PATH=<playwright-core dir>/node_modules node .claude/tests/drive-fire-clicker.cjs`
   (optionally `SHOTDIR=<dir>` for screenshots).
+- **Pacing eval: `.claude/tests/eval-fire-clicker.cjs`** (8 checks) — the two
+  personas above, plus a calibrated analytic estimator. Run it after any change
+  to a cost curve, `tripYield`, walk speed, work time or the villager loop:
+  `node .claude/tests/eval-fire-clicker.cjs --days 400 --seeds 3 --model`
+  (~55 s). For a balance sweep with no browser at all,
+  `node .claude/tests/eval-fire-clicker.cjs --model-only --days 400` answers in
+  ~0.3 s — but only trust it while the run's `MODEL vs SIM` MAE stays low and
+  the `cycle measured / model` line stays within a few percent. Both of those
+  print on every full run for exactly that reason.
