@@ -235,26 +235,43 @@ const shot = (page, name) => DIR ? page.screenshot({ path: DIR + '/' + name }) :
   ok('mute-btn present', await page.locator('#mute-btn').count() === 1);
 
   /* ---- ROARING FIRE: the reward for tending the fire yourself (2026-08-28) ---- */
-  // The bonus is a threshold on the BANK FRACTION, not on the raw bank, so it
-  // has to survive a FIRE PIT upgrade moving the denominator.
+  // Two properties. The bonus is a threshold on the BANK FRACTION, not on the
+  // raw bank, so it survives a FIRE PIT moving the denominator. And above the
+  // line it RAMPS — half at ROAR_AT, all of it at a brimming bank — which is
+  // what gives FIRE PIT a throughput price instead of only a comfort one.
   st = await page.evaluate(() => {
     S.up.bellows = 0; S.up.pit = 0;
     const out = {};
-    S.bank = maxBank() * 0.5; FIRE.burning = true; out.half = heatBoost();
-    S.bank = maxBank() * 0.80;                     out.roar = heatBoost();
-    S.up.bellows = 6;                              out.maxed = heatBoost();
+    S.bank = maxBank() * 0.5;      FIRE.burning = true; out.half   = heatBoost();
+    S.bank = maxBank() * ROAR_AT;                       out.atLine = heatBoost();
+    S.bank = maxBank() * 0.875;                         out.mid    = heatBoost();
+    S.bank = maxBank();                                 out.full   = heatBoost();
+    S.up.bellows = 6; S.bank = maxBank() * ROAR_AT;     out.maxedAtLine = heatBoost();
+    S.bank = maxBank();                                 out.maxed  = heatBoost();
+    // one second of drain after a tap: a deeper pit is a shallower dip
+    S.up.bellows = 0; S.bank = maxBank() - 1;           out.shallow = heatBoost();
     S.up.pit = 8; out.bigBank = maxBank();
-    S.bank = maxBank() * 0.80;                     out.roarBig = heatBoost();
-    S.bank = maxBank() * 0.60;                     out.coldBig = heatBoost();
-    FIRE.burning = false;                          out.dead = heatBoost();
+    S.bank = maxBank() - 1;                             out.deep   = heatBoost();
+    S.bank = maxBank() * 0.60;                          out.coldBig = heatBoost();
+    FIRE.burning = false;                               out.dead   = heatBoost();
     S.up.bellows = 0; S.up.pit = 0; S.bank = 0; FIRE.burning = false;
     return out;
   });
   ok('no heat bonus below the 75% line (' + st.half + ')', st.half === 1);
-  ok('roaring pays the base bonus (' + st.roar.toFixed(2) + ')', Math.abs(st.roar - 1.1) < 1e-9);
-  ok('BELLOWS raises the bonus (' + st.maxed.toFixed(2) + ')', Math.abs(st.maxed - 1.7) < 1e-9);
+  ok('half the bonus AT the 75% line (' + st.atLine.toFixed(3) + ')',
+    Math.abs(st.atLine - 1.05) < 1e-9);
+  ok('the bonus RAMPS across the top quarter (' +
+    [st.atLine, st.mid, st.full].map(v => v.toFixed(3)).join(' < ') + ')',
+    st.atLine < st.mid && st.mid < st.full);
+  ok('full bonus only at a brimming bank (' + st.full.toFixed(2) + ')',
+    Math.abs(st.full - 1.1) < 1e-9);
+  ok('BELLOWS raises both ends of the ramp (' + st.maxedAtLine.toFixed(2) + ' / ' +
+    st.maxed.toFixed(2) + ')',
+    Math.abs(st.maxedAtLine - 1.35) < 1e-9 && Math.abs(st.maxed - 1.7) < 1e-9);
+  ok('a DEEPER pit pays more one second after a tap (' + st.shallow.toFixed(3) +
+    ' -> ' + st.deep.toFixed(3) + ')', st.bigBank === 45 && st.deep > st.shallow);
   ok('the threshold is a FRACTION of a bigger bank (' + st.bigBank + 's)',
-    st.bigBank === 45 && st.roarBig > 1 && st.coldBig === 1);
+    st.coldBig === 1);
   ok('a dead fire never roars', st.dead === 1);
 
   // The boost is what makes the work faster, so it must reach the work clock —

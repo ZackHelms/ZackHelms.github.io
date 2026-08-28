@@ -59,6 +59,16 @@ Measured by `.claude/tests/eval-fire-clicker.cjs`. A day is 5 real minutes.
       at one resource). The gap now holds at **2.3x / 2.2x**, guarded by
       assertions.
 - [x] **A second and third FIREKEEPER bought nothing** — capped at one.
+- [x] **FIRE PIT bought zero throughput** — an optimal player never bought it
+      at all. Fixed by ramping the roar bonus with heat (half at the 75% line,
+      full at a brimming bank) rather than snapping it on at 75%. A hand-tapped
+      fire sawtooths between `maxBank() - tapPower()` and `maxBank()`, so a
+      deeper pit is a *shallower sawtooth in fractional terms* and holds a
+      higher mean bonus between taps. Measured: FIRE PIT went from **never
+      bought** to the **first purchase in the game** (day 0.2) and maxed to
+      Lv8. It costs the speedrunner a little early tempo — POP 15 parity 2.29x
+      -> 2.10x, POP 20 2.18x — because the ceiling now has to be earned instead
+      of arriving free at 75.1% of the bank.
 
 ### Open
 - [ ] **The game still runs out at ~1 h 11 of play.** Every multiplier is bought
@@ -66,18 +76,23 @@ Measured by `.claude/tests/eval-fire-clicker.cjs`. A day is 5 real minutes.
       RECRUIT VILLAGER at `24 * 1.75^n` — POP 20 costs the speedrunner another
       five hours and POP 50 would need ~2e12 wood. Either the recruit curve
       flattens or the TOWN stage lands before that wall. Needs-Zack: which.
-- [ ] **FIRE PIT / DRY TINDER / WINDBREAK still buy zero throughput.** Tapping
-      demand is a flat ~1 tap/second at every stage, so all three reduce effort
-      rather than time and a value-driven player skips them. Three ways to fix,
-      cheapest first:
-      1. **Ramp the roar bonus with heat** — full bonus at 100% of the bank,
-         half at 75%. Then a bigger bank (PIT), a stronger tap (TINDER) and a
-         slower drain (WINDBREAK) all buy *time spent near the top*, which is
-         throughput. One-line change to `heatBoost()`; the eval would price it
-         in about a minute.
-      2. **Make the roar bonus need an absolute bank**, not just a fraction —
-         e.g. the top 25% *and* at least 10 s banked, so FIRE PIT is a gate.
-      3. Give WINDBREAK a second effect (villagers work through the night?).
+- [ ] **DRY TINDER and WINDBREAK still buy zero throughput.** (FIRE PIT is
+      fixed — see below.) The reason is that *tapping is not scarce*: the bank
+      drains 1 s per second and a tap banks 1 s, so holding a brimming fire
+      costs exactly **1 tap/second** against a hand that can manage eight. A
+      stronger tap and a slower drain both cut a tap budget that was never
+      binding, so they remain comfort cards and the optimal persona still never
+      buys either (`tinder:0, wind:0` at day 200). Needs-Zack, because the fix
+      is a real balance change rather than a formula tweak:
+      1. **Let the fire's appetite grow with the camp** — `drainRate()` scales
+         with population or stage ("a bigger camp needs a bigger fire"). Tap
+         demand then climbs toward the limit of a human hand and both cards
+         become throughput. Costs: the FIREKEEPER burns more wood, and the
+         casual persona's 3 Hz eventually stops holding the fire — which may be
+         the point, or may be too harsh. The eval can price both in a minute.
+      2. Give WINDBREAK a second effect (villagers work through the night?) and
+         DRY TINDER a role in relighting a dead fire.
+
 - [ ] **A naive player can buy BELLOWS and feel nothing.** The casual persona
       buys it at day 2.3 and roars 0.4% of the run. The card and the FIREKEEPER
       card both say so in as many words, but it is still a trap card for

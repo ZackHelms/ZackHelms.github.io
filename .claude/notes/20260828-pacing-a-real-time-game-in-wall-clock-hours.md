@@ -123,7 +123,7 @@ camp-wide speed bonus while the fuel bank is above 75%; the auto-stoker only
 tops up below 35%, so *an auto-tended fire can never cross the threshold*. It is
 not a rule that says "no bonus for idlers" — it falls out of two numbers that
 cannot both be satisfied. Measured result: speedrun roaring 100% of the run,
-casual 0.4%; the gap now holds above 2.2x to the end of the content.
+casual 0.4%; the gap now holds above 2.1x to the end of the content.
 
 **Then assert the gap.** `skill pays at POP 15 (2.29x)` and `only the
 hand-tended fire ROARS (100% vs 0%)` are now checks. A balance property nobody
@@ -191,3 +191,41 @@ Sound and the panel rebuild stay with the card, because they belong to the
 This is the same rule as ember-depths' "shop through the game's own action
 dispatcher", arrived at from the other direction: if there is no dispatcher yet,
 **make one before writing the eval, not a copy of one inside it.**
+
+---
+
+## 7. The persona's SHOPPING LIST is a verdict on the upgrade table
+
+The milestone table is what you build the eval for. The other output — which
+cards the value-driven persona bought, and which it never touched in 200 days —
+turned out to be worth as much, and it costs nothing extra to print.
+
+Fire Clicker shipped with three fire-tending upgrades (a bigger bank, a stronger
+tap, a slower drain) that the optimal persona **never bought at all**. Not
+"bought late": `—` in the milestone column at day 200. A card no rational player
+takes is dead weight in the panel, and no amount of playing the game yourself
+tells you that as flatly as an empty cell does.
+
+It also tells you *why*, if you read the model. All three reduce **taps needed
+per second**, and tapping was never scarce: the bank drains 1 s per second and a
+tap banks 1 s, so a brimming fire costs one tap per second against a hand that
+can manage eight. Cutting a budget that is not binding buys nothing.
+
+Which is what made the fix findable. Ramping the roar bonus with heat — half the
+bonus at the 75% line, all of it at a brimming bank — does not touch the tap
+budget at all. It changes what the *shape* of the bank is worth: a hand-tapped
+fire sawtooths between `maxBank() - tapPower()` and `maxBank()`, so a deeper pit
+is a shallower sawtooth in fractional terms and holds a higher mean bonus
+between taps. FIRE PIT went from never bought to the first purchase in the game,
+maxed. The other two stayed unbought, correctly — the ramp does not make a
+cheaper refill valuable, and pretending otherwise would have been the easy
+mistake.
+
+Two habits fall out:
+
+- **Print the final levels dict and the never-bought cells.** `{pit:8, tinder:0,
+  wind:0, ...}` is a design review in one line.
+- **Run the counterfactual before claiming a fix.** `git stash` + the analytic
+  model is a few hundred milliseconds and turns "this should help FIRE PIT" into
+  "FIRE PIT moved from never to first". Same discipline as printing the model's
+  error: a balance claim nobody measured is a balance claim nobody should trust.

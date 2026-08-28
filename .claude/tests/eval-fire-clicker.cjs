@@ -120,6 +120,9 @@ const MODEL_DT    = +opt('--model-dt', 2);
    Only used by --model-only, which never opens a browser; every run that does
    open one reads the live geometry instead. */
 const DEFAULT_GEOM = { dist: [267.5, 154.5, 261.7] };
+/* The fraction of a full bank at which the fire starts to ROAR. Mirrors the
+   game's own const; the in-page half reads the real one off the page. */
+const ROAR_AT = 0.75;
 
 const DAY_MIN = 5;                       // DAY_LEN 300 s => 5 real minutes/day
 const hhmm = (days) => {
@@ -174,6 +177,15 @@ async function inPage(cfg) {
     // --- analytic throughput model (also drives the SPEEDRUN policy) ------
     const meanDist = R.geom.dist.reduce((a, b) => a + b, 0) / R.geom.dist.length;
     const CYCLE_WAIT = cfg.cycleWait, CYCLE_SPEED = cfg.cycleSpeed;
+    /* Mean ROARING-FIRE scale over one tap sawtooth. A tapper who never wastes
+       fuel lets the bank fall to maxBank - tapPower before topping it up, and
+       holds the ROAR_AT line below that, so heat sweeps [hLow, 1] linearly in
+       time. A DEEPER pit is a shallower sawtooth in FRACTIONAL terms, which is
+       exactly why FIRE PIT now buys throughput rather than only comfort. */
+    function roarScaleMean(maxB, tapP) {
+      const hLow = Math.max(ROAR_AT, 1 - tapP / maxB);
+      return 0.5 + 0.5 * Math.min(1, Math.max(0, ((hLow + 1) / 2 - ROAR_AT) / (1 - ROAR_AT)));
+    }
     function rateWith(up) {
       const saved = S.up; S.up = up;
       const pop = popCap(), yld = tripYield();
@@ -181,7 +193,9 @@ async function inPage(cfg) {
       const work = up.sawbones ? 2.4 : 3.2;
       // ROARING FIRE scales the whole cycle, and only a persona that actually
       // tends the fire gets it — the firekeeper never crosses the 75% line.
-      const boost = cfg.roars ? 1 + 0.1 + 0.1 * (up.bellows || 0) : 1;
+      // The bonus RAMPS with heat, so what matters is the MEAN scale over the
+      // tap sawtooth, not the peak: see roarScaleMean() in the harness header.
+      const boost = cfg.roars ? 1 + (0.1 + 0.1 * (up.bellows || 0)) * roarScaleMean(maxBank(), tapPower()) : 1;
       const cycle = (CYCLE_WAIT + 2 * meanDist / speed + work) / boost;
       S.up = saved;
       return pop * yld / cycle;               // resource units per second, all pools
@@ -447,13 +461,21 @@ function modelRun(spec, persona, maxDays, strict) {
   const popCap = () => Math.min(4 + up.bunk, houses() * 5);
   const tripYield = () => 1 + up.tools + (up.shop ? 1 : 0);
 
+  /* Mean ROARING-FIRE scale over one tap sawtooth — mirror of the in-page
+     helper. Kept as a formula on (maxBank, tapPower) so a change to FIRE PIT
+     or DRY TINDER reprices itself here without a second edit. */
+  function roarScaleMean(maxB, tapP) {
+    const hLow = Math.max(ROAR_AT, 1 - tapP / maxB);
+    return 0.5 + 0.5 * Math.min(1, Math.max(0, ((hLow + 1) / 2 - ROAR_AT) / (1 - ROAR_AT)));
+  }
+
   /* rate = workers x yield / cycle, cycle = idle + round trip + work.
      Constants are the game's own: idle wait 0.4-1.2 s (mean 0.8), villager
      speed 46-60 px/s (mean 53) x tavern, work 3.2 s (2.4 with sawbones). */
   function rateAt(over) {
     const sv = {}; for (const k of Object.keys(over || {})) { sv[k] = up[k]; up[k] = over[k]; }
     const speed = CYCLE_SPEED * (up.tavern ? 1.15 : 1);
-    const boost = roars ? 1 + 0.1 + 0.1 * (up.bellows || 0) : 1;
+    const boost = roars ? 1 + (0.1 + 0.1 * (up.bellows || 0)) * roarScaleMean(5 + up.pit * 5, 1 + up.tinder * 0.5) : 1;
     const cycle = (CYCLE_WAIT + 2 * meanDist / speed + (up.sawbones ? 2.4 : 3.2)) / boost;
     const r = popCap() * tripYield() / cycle;
     for (const k of Object.keys(sv)) up[k] = sv[k];

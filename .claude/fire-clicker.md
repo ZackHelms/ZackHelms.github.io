@@ -51,17 +51,31 @@ Apache/MIT. The CD may develop it into a real app.
   clamps to the screen, draws ABOVE the lighting layer, and ends early if the
   speaker goes indoors. New lines: append to the right pool; keep the voice —
   short, earnest, slightly self-aware, never snarky at the player.
-- **ROARING FIRE** (`ROAR_AT` 0.75, `heat()`/`roaring()`/`heatBoost()`): while
-  the bank sits above **75% of `maxBank()`** the whole camp works faster — one
-  multiplier applied at three sites in `villagerStep` (the idle-wait decrement,
-  `move()`'s speed, and `v.w`, the heat-scaled work clock that exists precisely
-  so a roaring fire shortens the job itself). Base +10%, +10% per **BELLOWS**
-  level to +70% at max. It is the reward for tending the fire *yourself*: the
-  FIREKEEPER only stokes below 35% of the bank, so **an auto-tended fire can
-  never cross the threshold**, and the eval measures exactly that split
-  (speedrun roaring 100% of the run, casual 0.4%). The bank ring goes bright
-  and glowing above the line, carries a tick mark at 75% so the target is
-  visible, and the label reads `⚡ ROARING +N%`.
+- **ROARING FIRE** (`ROAR_AT` 0.75, `heat()`/`roaring()`/`roarScale()`/
+  `roarNow()`/`heatBoost()`): while the bank sits above **75% of `maxBank()`**
+  the whole camp works faster — one multiplier applied at three sites in
+  `villagerStep` (the idle-wait decrement, `move()`'s speed, and `v.w`, the
+  heat-scaled work clock that exists precisely so a roaring fire shortens the
+  job itself). Base +10%, +10% per **BELLOWS** level to +70% at max. It is the
+  reward for tending the fire *yourself*: the FIREKEEPER only stokes below 35%
+  of the bank, so **an auto-tended fire can never cross the threshold**, and
+  the eval measures exactly that split (speedrun roaring 100% of the run,
+  casual ~0.5%). The bank ring goes bright and glowing above the line, carries
+  a tick mark at 75% so the target is visible, and the label reads
+  `⚡ ROARING +N%` with the *live* ramped value.
+  **The bonus ramps** (`roarScale()`, 2026-08-28): half of `roarBonus()` at the
+  ROAR_AT line, all of it at a brimming bank, linear between. Do not flatten
+  this back into a cliff. It does two jobs. It removes a knife-edge — 74.9%
+  and 75.1% of the bank were a whole multiplier apart, so the dial had one
+  meaningful pixel. And it is the **only** reason FIRE PIT buys throughput: a
+  hand-tapped fire sawtooths between `maxBank() - tapPower()` and `maxBank()`,
+  so a deeper pit is a shallower sawtooth *in fractional terms* and holds a
+  higher mean bonus between taps. Measured, FIRE PIT went from never bought by
+  the optimal persona to its first purchase, maxed to Lv8. Note what the ramp
+  does **not** fix: DRY TINDER and WINDBREAK stay dead, because tapping is not
+  scarce — the bank drains 1 s/s and a tap banks 1 s, so a brimming fire
+  costs 1 tap/second against a hand that can do eight, and neither card cuts a
+  budget that was ever binding. See `games/fire-clicker/TODO.md`.
 - **MICROMANAGEMENT** (`S.up.micro`, `S.focus`, `siteAt()`, `drawFocus()`): the
   skill lever. Once bought, tapping the trees / rocks / fishing hole sends
   **every** villager after that resource (`villagerStep`'s idle branch skips the
@@ -206,7 +220,7 @@ Two things the eval taught that are not obvious from the tables:
 - Flame spawn per frame must be probabilistic (`floor + rand<frac`) — a bare
   `for (i < fractionalWant)` loop always runs once and a dying fire smokes
   like a bonfire.
-- **Drive suite: `.claude/tests/drive-fire-clicker.cjs`** (52 checks — see
+- **Drive suite: `.claude/tests/drive-fire-clicker.cjs`** (55 checks — see
   its row in `.claude/tests/README.md`). Run it after any change to the fire
   model, villager states, houses/stages, bubbles or lighting:
   `NODE_PATH=<playwright-core dir>/node_modules node .claude/tests/drive-fire-clicker.cjs`

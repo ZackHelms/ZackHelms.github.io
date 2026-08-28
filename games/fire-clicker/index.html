@@ -120,7 +120,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 21:15 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 22:21 UTC</div>
 <canvas id="scene"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
 <button id="mute-btn" aria-label="Mute">&#128266;</button>
@@ -148,7 +148,7 @@ const TAU = Math.PI * 2;
    a function; `show()` gates stage-locked entries out of the panel. */
 const UPG = [
   { id:'pit',    i:'\u{1F525}', n:'FIRE PIT',     max:8,
-    d:(l)=>'Deeper stone pit banks more burn time. Max bank: ' + fmtS(maxBank()) + ' → ' + fmtS(5 + (l+1)*5) + '.',
+    d:(l)=>'Deeper stone pit banks more burn time, and holds a ROARING fire nearer the top between taps. Max bank: ' + fmtS(maxBank()) + ' → ' + fmtS(5 + (l+1)*5) + '.',
     cost:(l)=>({ stone: Math.round(8 * Math.pow(1.8, l)) }) },
   { id:'tinder', i:'\u{1FAB5}', n:'DRY TINDER',   max:8,
     d:(l)=>'Seasoned wood catches better. Each tap banks ' + fmtS(tapPower()) + ' → ' + fmtS(1 + (l+1)*0.5) + '.',
@@ -157,7 +157,7 @@ const UPG = [
     d:(l)=>'Snow fencing shelters the flames. Fire burns ' + Math.round((1-drainRate())*100) + '% → ' + Math.round((1-(1/(1+(l+1)*0.09)))*100) + '% slower.',
     cost:(l)=>({ wood: Math.round(14 * Math.pow(1.9, l)), stone: Math.round(8 * Math.pow(1.9, l)) }) },
   { id:'bellows', i:'\u{1F4A8}', n:'BELLOWS',      max:6,
-    d:(l)=>'Leather bellows feed the blaze. While the bank stays above 75% the fire ROARS and villagers work +' + Math.round(roarBonus()*100) + '% \u2192 +' + Math.round(roarBonus(l+1)*100) + '% faster.',
+    d:(l)=>'Leather bellows feed the blaze. Above 75% the fire ROARS and villagers work up to +' + Math.round(roarBonus()*100) + '% \u2192 +' + Math.round(roarBonus(l+1)*100) + '% faster \u2014 half that at the 75% line, all of it at a full bank.',
     cost:(l)=>({ wood: Math.round(30 * Math.pow(1.9, l)), stone: Math.round(20 * Math.pow(1.9, l)) }) },
   { id:'tools',  i:'\u{26CF}',  n:'SHARP TOOLS',  max:6,
     d:(l)=>'Better axes, picks and hooks. Villagers haul +' + (l+1) + ' extra per trip.',
@@ -261,7 +261,16 @@ const ROAR_AT = 0.75;
 function heat()      { return S.bank / Math.max(1e-6, maxBank()); }
 function roaring()   { return FIRE.burning && heat() >= ROAR_AT; }
 function roarBonus(l){ return 0.1 + 0.1 * (l === undefined ? S.up.bellows : l); }
-function heatBoost() { return roaring() ? 1 + roarBonus() : 1; }
+/* The bonus RAMPS across the top quarter of the bank rather than snapping on:
+   half of roarBonus() at the ROAR_AT line, all of it at a brimming bank. Two
+   reasons. It kills a knife-edge — under a cliff, 74.9% and 75.1% of the bank
+   were a whole multiplier apart, so the dial had one meaningful pixel. And it
+   gives FIRE PIT a throughput price: a hand-tapped fire sawtooths between
+   maxBank() - tapPower() and maxBank(), so a DEEPER pit is a SHALLOWER sawtooth
+   in fractional terms, which lifts the mean scale toward 1. */
+function roarScale() { return 0.5 + 0.5 * Math.min(1, Math.max(0, (heat() - ROAR_AT) / (1 - ROAR_AT))); }
+function roarNow()   { return roaring() ? roarBonus() * roarScale() : 0; }
+function heatBoost() { return 1 + roarNow(); }
 function popCap()   { return Math.min(4 + S.up.bunk, houses() * 5); }
 function houses()   { return Math.min(2 + (S.up.house || 0), stageMaxHouses()); }
 function stageMaxHouses() { return S.up.village ? 10 : 5; }
@@ -512,7 +521,7 @@ function fireStep(dt) {
   }
   if (!roaredOnce && roaring()) {
     roaredOnce = true;
-    hint('The fire ROARS. Keep the bank above 75% and the whole camp works +' + Math.round(roarBonus() * 100) + '% faster.');
+    hint('The fire ROARS. The fuller the bank above 75%, the harder the camp works \u2014 up to +' + Math.round(roarBonus() * 100) + '% at a brimming fire.');
   }
   FIRE.ember = Math.max(0, FIRE.ember - dt * 0.12);
   FIRE.flick += dt * (6 + Math.random() * 6);
@@ -898,7 +907,7 @@ function drawBankRing() {
   cx.fillStyle = 'rgba(255,235,200,0.9)';
   cx.strokeStyle = 'rgba(10,12,24,0.6)'; cx.lineWidth = 3;
   const label = S.bank > 0
-    ? (fmtS(S.bank) + ' / ' + fmtS(maxBank()) + (roaring() ? '  \u26A1 ROARING +' + Math.round(roarBonus() * 100) + '%' : ''))
+    ? (fmtS(S.bank) + ' / ' + fmtS(maxBank()) + (roaring() ? '  \u26A1 ROARING +' + Math.round(roarNow() * 100) + '%' : ''))
     : 'COLD';
   if (roaring()) cx.fillStyle = 'rgba(255,244,205,1)';
   cx.strokeText(label, f.x, f.y + G.hitR * 0.72 + 16);
