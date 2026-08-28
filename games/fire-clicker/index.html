@@ -120,7 +120,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 16:47 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 17:19 UTC</div>
 <canvas id="scene"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
 <button id="mute-btn" aria-label="Mute">&#128266;</button>
@@ -337,9 +337,19 @@ const light = document.createElement('canvas');   // low-res darkness layer
 const lx = light.getContext('2d');
 const LSCALE = 0.34;
 let G = {}; // scene geometry anchors
+/* Lay out in the canvas's OWN box, never window.inner*. Pointer coords are
+   resolved against that box, and on iOS the two disagree after a rotation
+   (Safari's chrome): sizing the scene from innerHeight while the box is
+   shorter squashes the drawing upward while the hit tests stay put — that
+   was the "fire tap area has moved down in landscape" bug. */
+function viewBox() {
+  const r = cv.getBoundingClientRect();
+  return { w: r.width || window.innerWidth, h: r.height || window.innerHeight };
+}
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
-  W = window.innerWidth; H = window.innerHeight;
+  const vb = viewBox();
+  W = vb.w; H = vb.h;
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   cx.setTransform(DPR, 0, 0, DPR, 0, 0);
   light.width = Math.max(1, Math.round(W * LSCALE));
@@ -371,7 +381,19 @@ function resize() {
   layoutBuildings();
   bakeGround();
 }
-window.addEventListener('resize', () => setTimeout(resize, 60));
+/* Rotation lifecycle: iOS delivers the geometry change inconsistently across
+   these three events, and the box can settle a beat after the event fires —
+   so each source runs three passes. resize() is idempotent for a given box,
+   so the extra passes are strict no-ops once settled. */
+let reflowT = 0;
+function reflow() {
+  resize();
+  requestAnimationFrame(resize);
+  clearTimeout(reflowT); reflowT = setTimeout(resize, 300);
+}
+window.addEventListener('resize', reflow);
+window.addEventListener('orientationchange', reflow);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', reflow);
 
 /* --- buildings: houses fill slots in order; businesses have fixed spots ---
    HOMES/BIZ entries are persistent objects (villagers hold `home` refs and
@@ -1415,14 +1437,19 @@ function refreshHUD() {
 }
 
 /* =============================== main loop =============================== */
-let last = performance.now(), saveAcc = 0;
+let last = performance.now(), saveAcc = 0, healAcc = 0;
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  // self-heal: iOS can hand the resize listener stale dimensions during a
-  // rotation and never fire again — if the viewport disagrees with our
-  // layout, redo it (strict no-op once settled)
-  if (window.innerWidth !== W || window.innerHeight !== H) resize();
+  // self-heal: iOS can hand every rotation event a stale box and then never
+  // fire again — re-measure a few times a second and relayout on any
+  // disagreement (a strict no-op once settled)
+  healAcc += dt;
+  if (healAcc > 0.2) {
+    healAcc = 0;
+    const vb = viewBox();
+    if (Math.abs(vb.w - W) > 1 || Math.abs(vb.h - H) > 1) resize();
+  }
   dayStep(dt);
   fireStep(dt);
   syncVillagers();

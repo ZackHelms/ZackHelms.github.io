@@ -107,12 +107,23 @@ Apache/MIT. The CD may develop it into a real app.
   (new buildings, busier villagers), not a bigger menu.
 
 ## Gotchas
-- **Rotation self-heal**: iOS can hand the `resize` listener stale
-  `innerWidth/innerHeight` during a rotation and never fire again — the scene
-  then draws stretched and the fire hit test misses ("tap area misaligned in
-  landscape", 2026-08-28). `frame()` opens with a per-frame guard that calls
-  `resize()` whenever the viewport disagrees with `W`/`H` (a strict no-op once
-  settled — same cure as phasic's). Don't remove it in favour of the listener.
+- **Lay out in the canvas's own box, never `window.inner*`** (2026-08-28,
+  the landscape tap bug). Pointer coords are resolved against
+  `cv.getBoundingClientRect()`; on iOS that box is *shorter* than
+  `innerHeight` after rotating into landscape (Safari's chrome). Size the
+  scene from `innerHeight` and CSS squashes the taller backing store into the
+  shorter box: everything is drawn **higher** than where it is hit-tested, so
+  the campfire only answered taps at the bottom of the drawn circle and below.
+  `viewBox()` is the single measurement point — keep every layout number
+  downstream of it. Note the symptom is silent: nothing looks obviously wrong,
+  the scene just stops agreeing with the finger, and a headless tap at
+  `G.fire` "passes" because it tests the hit test against itself. To catch it
+  you must tap where the fire is **drawn** (`G.fire.y * boxH / H`).
+- **Rotation self-heal**: iOS can also hand every rotation event a stale box
+  and then never fire again, so `reflow()` runs three passes per event across
+  `resize`/`orientationchange`/`visualViewport` (phasic's pattern) *and*
+  `frame()` re-measures the box 5×/s and relayouts on disagreement. `resize()`
+  is idempotent for a given box, so all of that is a no-op once settled.
 - The camp hut's snow cap must **hug the roof's outer quadratic** (underside
   control tucked inside the straw arc): the original free-floating crescent
   read fine on the pale portrait sky but showed as a detached white arc over

@@ -2,7 +2,7 @@
 /**
  * drive-fire-clicker.cjs — rules drive for the Fire Clicker village sim.
  *
- * 37 checks: cold start (villagers hide/huddle), tap-to-bank (1s/tap, cap,
+ * 39 checks: cold start (villagers hide/huddle), tap-to-bank (1s/tap, cap,
  * drain-from-the-moment-it-lands, off-fire taps bank nothing), warm villagers
  * gather / fire-out retreat, the toggleable upgrade panel + its scroll
  * container, houses (5 villagers each, BUILD HOUSE slots, recruit cap =
@@ -10,8 +10,11 @@
  * effects, the firekeeper feeding the fire from stockpiled wood, chat bubbles
  * (real-tap summon, never stokes, ONE at a time, 5s expiry, contextual
  * pools), a night-lighting pixel assert (fireside snow brighter than far
- * snow), save/reload persistence, and the rotation self-heal (stale W/H
- * relayouts within a frame — iOS rotation hands resize() stale dimensions).
+ * snow), save/reload persistence, and the rotation/orientation geometry:
+ * a stale layout self-heals, and — the landscape bug — the layout follows the
+ * canvas's own box rather than window.innerHeight, so the DRAWN fire circle
+ * is tappable top to bottom even when the two disagree (iOS after rotating
+ * into landscape).
  *
  * Run from the repo root (same harness as the smoke gate):
  *   NODE_PATH=<dir-with-playwright-core>/node_modules \
@@ -231,12 +234,43 @@ const shot = (page, name) => DIR ? page.screenshot({ path: DIR + '/' + name }) :
   ok('back-btn present', await page.locator('#back-btn').count() === 1);
   ok('mute-btn present', await page.locator('#mute-btn').count() === 1);
 
-  // rotation self-heal: iOS can hand resize() stale dimensions — corrupt the
+  // rotation self-heal: iOS can hand resize() a stale box — corrupt the
   // layout globals and the per-frame guard must relayout within a few frames
   await page.evaluate(() => { W = 111; H = 222; G.fire = { x: 55, y: 111 }; });
-  await page.waitForTimeout(150);
-  st = await page.evaluate(() => ({ W, H, fx: G.fire.x, iw: window.innerWidth, ih: window.innerHeight }));
-  ok('stale layout self-heals (' + st.W + 'x' + st.H + ')', st.W === st.iw && st.H === st.ih && st.fx === st.iw * 0.5);
+  await page.waitForTimeout(500);
+  st = await page.evaluate(() => {
+    const r = cv.getBoundingClientRect();
+    return { W, H, fx: G.fire.x, bw: r.width, bh: r.height };
+  });
+  ok('stale layout self-heals (' + st.W + 'x' + st.H + ')',
+    st.W === st.bw && st.H === st.bh && st.fx === st.bw * 0.5);
+
+  // THE landscape bug: on iOS the canvas box can be shorter than
+  // window.innerHeight, so a scene laid out from innerHeight is squashed
+  // upward on screen while the hit tests stay put — the fire then only
+  // answers taps at the bottom of the drawn circle and below. Layout must
+  // come from the canvas's OWN box, which is the space taps resolve in.
+  await page.addStyleTag({ content: '#scene{height:calc(100% - 60px)!important}' });
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  await page.waitForTimeout(600);
+  st = await page.evaluate(() => {
+    const r = cv.getBoundingClientRect();
+    return { W, H, bw: r.width, bh: r.height, fx: G.fire.x, fy: G.fire.y, hitR: G.hitR };
+  });
+  ok('layout follows the canvas box, not innerHeight (' + st.H.toFixed(0) + ' vs box ' + st.bh.toFixed(0) + ')',
+    Math.abs(st.H - st.bh) <= 1 && Math.abs(st.W - st.bw) <= 1);
+  // tap where the fire is DRAWN (backing store stretched into the box), at the
+  // top / centre / bottom of the visible circle — all three must stoke
+  const sy = st.bh / st.H, sx = st.bw / st.W;
+  const drawnX = st.fx * sx, drawnY = st.fy * sy, rad = (st.hitR / 1.4) * sy * 0.8;
+  const hits = [];
+  for (const y of [drawnY - rad, drawnY, drawnY + rad]) {
+    await page.evaluate(() => { S.bank = 0; });
+    await page.touchscreen.tap(drawnX, y);
+    await page.waitForTimeout(120);
+    hits.push(await page.evaluate(() => S.bank > 0));
+  }
+  ok('drawn fire circle is tappable top-to-bottom (' + hits.join(',') + ')', hits.every(Boolean));
 
   console.log(checks.join('\n'));
   console.log('ERRORS=' + errors.length);
