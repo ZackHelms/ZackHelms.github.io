@@ -74,10 +74,15 @@ body {
 #upg-btn.pulse { border-color: var(--gold); box-shadow: 0 0 14px #ffc30044; }
 #upg-panel {
   position: fixed; inset: 0; z-index: 70; display: none;
-  background: rgba(6,6,14,0.82); overflow-y: auto; -webkit-overflow-scrolling: touch;
-  padding: calc(env(safe-area-inset-top, 0px) + 48px) 12px calc(env(safe-area-inset-bottom, 0px) + 70px);
+  background: rgba(6,6,14,0.82);
+  padding: calc(env(safe-area-inset-top, 0px) + 48px) 12px 0;
+  flex-direction: column;
 }
-#upg-panel.open { display: block; }
+#upg-panel.open { display: flex; }
+#upg-scroll {
+  flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+}
 .up-head {
   max-width: 460px; margin: 0 auto 4px; display: flex; align-items: center; justify-content: space-between;
 }
@@ -115,7 +120,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 12:12 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 13:21 UTC</div>
 <canvas id="scene"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
 <button id="mute-btn" aria-label="Mute">&#128266;</button>
@@ -128,7 +133,7 @@ body {
 <div id="upg-panel">
   <div class="up-head"><h2>UPGRADES</h2><button id="upg-close" aria-label="Close">&#10005;</button></div>
   <div class="up-sub" id="upg-sub"></div>
-  <div id="upg-list"></div>
+  <div id="upg-scroll"><div id="upg-list"></div></div>
 </div>
 <div id="toast"></div>
 
@@ -139,7 +144,8 @@ const DAY_LEN = 300;               // one full in-game day, seconds
 const SAVE_KEY = 'fireClicker.v2';
 const TAU = Math.PI * 2;
 
-/* upgrades: cost = base * growth^lvl, per-resource */
+/* upgrades: cost = base * growth^lvl, per-resource. `max` may be a number or
+   a function; `show()` gates stage-locked entries out of the panel. */
 const UPG = [
   { id:'pit',    i:'\u{1F525}', n:'FIRE PIT',     max:8,
     d:(l)=>'Deeper stone pit banks more burn time. Max bank: ' + fmtS(maxBank()) + ' → ' + fmtS(5 + (l+1)*5) + '.',
@@ -153,13 +159,31 @@ const UPG = [
   { id:'tools',  i:'\u{26CF}',  n:'SHARP TOOLS',  max:6,
     d:(l)=>'Better axes, picks and hooks. Villagers haul +' + (l+1) + ' extra per trip.',
     cost:(l)=>({ stone: Math.round(16 * Math.pow(1.9, l)), wood: Math.round(8 * Math.pow(1.9, l)) }) },
-  { id:'bunk',   i:'\u{1F6CF}', n:'BUNKHOUSE',    max:6,
-    d:(l)=>'Room for one more villager (' + (4+l) + ' → ' + (4+l+1) + ').',
-    cost:(l)=>({ wood: Math.round(24 * Math.pow(1.75, l)), stone: Math.round(14 * Math.pow(1.75, l)), food: Math.round(14 * Math.pow(1.75, l)) }) },
+  { id:'bunk',   i:'\u{1F9E3}', n:'RECRUIT VILLAGER', max:()=>houses()*5 - 4,
+    d:(l)=>'Another pair of mittens moves in (' + (4+l) + ' → ' + (4+l+1) + '). Each house sleeps 5.',
+    cost:(l)=>({ wood: Math.round(24 * Math.pow(1.75, l)), food: Math.round(14 * Math.pow(1.75, l)) }) },
   { id:'keeper', i:'\u{1F9E4}', n:'FIREKEEPER',   max:3,
     d:(l)=>'Hire a villager to feed the fire for you: throws a log (−' + 1 + ' wood) for +4s whenever the bank runs low.',
     cost:(l)=>({ food: Math.round(30 * Math.pow(2.2, l)), wood: Math.round(15 * Math.pow(2.2, l)) }) },
+  { id:'house',  i:'\u{1F3E0}', n:'BUILD HOUSE',  max:()=>stageMaxHouses() - 2,
+    d:(l)=>'Raise house #' + (3+l) + ' — beds for 5 more villagers (' + houses() + ' → ' + (houses()+1) + ' of ' + stageMaxHouses() + ').',
+    cost:(l)=>({ wood: Math.round(45 * Math.pow(1.6, l)), stone: Math.round(25 * Math.pow(1.6, l)) }) },
+  { id:'village', i:'\u{1F3D8}', n:'FOUND VILLAGE', max:1,
+    show:()=>S.up.village >= 1 ? false : houses() >= 5,
+    d:()=>'Five houses make a VILLAGE: sturdier timber homes (up to 10 of them), trodden paths, and room for businesses.',
+    cost:()=>({ wood: 400, stone: 300, food: 300 }) },
+  { id:'tavern', i:'\u{1F37A}', n:'TAVERN', max:1, show:()=>S.up.village >= 1,
+    d:()=>'THE THIRSTY YETI opens its doors. A warm mug after every haul — villagers walk 15% faster.',
+    cost:()=>({ wood: 150, stone: 60, food: 120 }) },
+  { id:'shop', i:'\u{1F6D2}', n:'GENERAL STORE', max:1, show:()=>S.up.village >= 1,
+    d:()=>'Sacks, sleds and sensible prices. Villagers haul +1 resource per trip.',
+    cost:()=>({ wood: 180, stone: 100, food: 80 }) },
+  { id:'sawbones', i:'\u{1FA79}', n:'SAWBONES HUT', max:1, show:()=>S.up.village >= 1,
+    d:()=>'Splinters out while you wait. Healthier villagers work 25% faster.',
+    cost:()=>({ wood: 120, stone: 140, food: 100 }) },
 ];
+const maxOf = (u) => typeof u.max === 'function' ? u.max() : u.max;
+const showU = (u) => !u.show || u.show();
 const RES_ICON = { wood:'\u{1FAB5}', stone:'\u{1FAA8}', food:'\u{1F356}' };
 
 /* day-cycle palette keyframes: t, skyTop, skyBot, ambient darkness 0..1, sun/star */
@@ -186,7 +210,7 @@ function phaseName(t) {
 function freshState() {
   return {
     res: { wood: 0, stone: 0, food: 0 },
-    up: { pit:0, tinder:0, wind:0, tools:0, bunk:0, keeper:0 },
+    up: Object.fromEntries(UPG.map(u => [u.id, 0])),
     bank: 0,             // seconds of burn banked
     day: 1, dayT: 0.16,  // start mid-morning
     lifeWarm: 0,         // lifetime warm-seconds (for later stages/ascension)
@@ -205,7 +229,8 @@ function load() {
   const f = freshState();
   S = f;
   if (d.res && typeof d.res === 'object') for (const k of ['wood','stone','food']) S.res[k] = Math.max(0, +d.res[k] || 0);
-  if (d.up && typeof d.up === 'object') for (const u of UPG) S.up[u.id] = Math.min(u.max, Math.max(0, Math.floor(+d.up[u.id] || 0)));
+  if (d.up && typeof d.up === 'object') for (const u of UPG) S.up[u.id] = Math.max(0, Math.floor(+d.up[u.id] || 0));
+  for (const u of UPG) S.up[u.id] = Math.min(maxOf(u), S.up[u.id] || 0); // clamp after ALL load (maxes depend on stage/houses)
   S.bank = Math.max(0, Math.min(200, +d.bank || 0));
   S.day = Math.max(1, Math.floor(+d.day || 1));
   S.dayT = (+d.dayT >= 0 && +d.dayT < 1) ? +d.dayT : 0.16;
@@ -215,8 +240,11 @@ function load() {
 function maxBank()  { return 5 + S.up.pit * 5; }
 function tapPower() { return 1 + S.up.tinder * 0.5; }
 function drainRate(){ return 1 / (1 + S.up.wind * 0.09); }
-function tripYield(){ return 1 + S.up.tools; }
-function popCap()   { return 4 + S.up.bunk; }
+function tripYield(){ return 1 + S.up.tools + (S.up.shop ? 1 : 0); }
+function popCap()   { return Math.min(4 + S.up.bunk, houses() * 5); }
+function houses()   { return Math.min(2 + (S.up.house || 0), stageMaxHouses()); }
+function stageMaxHouses() { return S.up.village ? 10 : 5; }
+function stageName(){ return S.up.village ? 'VILLAGE' : 'CAMP'; }
 function fmtS(v)    { return (Math.round(v * 10) / 10) + 's'; }
 
 /* =============================== audio =============================== */
@@ -320,11 +348,6 @@ function resize() {
   G.horizon = H * (land ? 0.30 : 0.22);
   G.fire = { x: W * 0.5, y: H * (land ? 0.62 : 0.58) };
   G.hitR = Math.max(56, Math.min(W, H) * 0.14);
-  const hy = G.horizon + H * (land ? 0.16 : 0.12);
-  // houses are persistent objects (villagers hold references, `inside` must survive resize)
-  if (!G.houseL) { G.houseL = { inside: 0 }; G.houseR = { inside: 0 }; }
-  Object.assign(G.houseL, { x: W * (land ? 0.20 : 0.17), y: hy, w: Math.min(150, W * 0.24) });
-  Object.assign(G.houseR, { x: W * (land ? 0.80 : 0.83), y: hy, w: Math.min(150, W * 0.24) });
   G.trees = { x: W * 0.09, y: H * 0.80 };
   G.rocks = { x: W * 0.91, y: H * 0.80 };
   G.hole  = { x: W * 0.38, y: H * 0.92 };
@@ -336,9 +359,50 @@ function resize() {
     { x: G.fire.x - s * 0.7, y: G.fire.y - s * 0.75, rot: -0.15 },
     { x: G.fire.x + s * 0.7, y: G.fire.y - s * 0.75, rot: 0.15 },
   ];
+  // scenery items precomputed for the y-sorted painter
+  let r = prng(99);
+  G.treeItems = [];
+  for (let i = 0; i < 4; i++)
+    G.treeItems.push({ x: G.trees.x + (r()-0.3) * 60, y: G.trees.y + (r()-0.5) * 60, s: 20 + r() * 14 });
+  r = prng(41);
+  G.rockItems = [];
+  for (let i = 0; i < 3; i++)
+    G.rockItems.push({ x: G.rocks.x + (r()-0.7) * 50, y: G.rocks.y + (r()-0.5) * 46, s: 10 + r() * 12 });
+  layoutBuildings();
   bakeGround();
 }
 window.addEventListener('resize', () => setTimeout(resize, 60));
+
+/* --- buildings: houses fill slots in order; businesses have fixed spots ---
+   HOMES/BIZ entries are persistent objects (villagers hold `home` refs and
+   `inside` counts must survive resize/relayout). */
+const HOMES = [], BIZ = {};
+const HOUSE_SLOTS = [
+  [0.17, 0.115], [0.83, 0.115], [0.50, 0.090], [0.32, 0.135], [0.68, 0.135],
+  [0.10, 0.225], [0.90, 0.225], [0.30, 0.245], [0.70, 0.245], [0.50, 0.255],
+];
+const BIZ_DEFS = [
+  { id: 'tavern',   fx: 0.14, fy: 0.56 },
+  { id: 'shop',     fx: 0.86, fy: 0.56 },
+  { id: 'sawbones', fx: 0.50, fy: 0.80 },
+];
+function houseW() {
+  if (S.up.village) return Math.min(88, W * 0.14);
+  return houses() > 2 ? Math.min(112, W * 0.18) : Math.min(150, W * 0.24);
+}
+function layoutBuildings() {
+  const w = houseW();
+  for (let i = 0; i < houses(); i++) {
+    if (!HOMES[i]) HOMES[i] = { inside: 0 };
+    Object.assign(HOMES[i], { x: W * HOUSE_SLOTS[i][0], y: G.horizon + H * HOUSE_SLOTS[i][1], w });
+  }
+  for (const b of BIZ_DEFS) {
+    if (!BIZ[b.id]) BIZ[b.id] = { inside: 0, type: b.id };
+    Object.assign(BIZ[b.id], { x: W * b.fx, y: H * b.fy, w: Math.min(94, W * 0.155) });
+  }
+}
+function activeHomes() { return HOMES.slice(0, houses()); }
+function activeBiz()   { return BIZ_DEFS.filter(b => S.up[b.id]).map(b => BIZ[b.id]); }
 
 /* seeded PRNG for stable scatter */
 function prng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
@@ -370,6 +434,16 @@ function bakeGround() {
   // packed path ring around fire
   g.strokeStyle = 'rgba(196,206,224,0.55)'; g.lineWidth = 10;
   g.beginPath(); g.arc(G.fire.x, G.fire.y, G.hitR * 0.72, 0, TAU); g.stroke();
+  // a village has trodden paths from every doorstep to the fire
+  if (S.up.village) {
+    g.strokeStyle = 'rgba(190,201,222,0.6)'; g.lineWidth = 7; g.lineCap = 'round';
+    for (const b of activeHomes().concat(activeBiz())) {
+      g.beginPath();
+      g.moveTo(b.x, b.y + 6);
+      g.quadraticCurveTo((b.x + G.fire.x) / 2, (b.y + G.fire.y) / 2 + 14, G.fire.x, G.fire.y - 2);
+      g.stroke();
+    }
+  }
 }
 
 /* =============================== fire model =============================== */
@@ -487,82 +561,153 @@ function mountainPath(seed, base, hf) {
   }
   cx.lineTo(W, base); cx.closePath();
 }
-function drawHouse(h, flip) {
-  const w = h.w, x = h.x, y = h.y;
+const INK = '#151823';               // cel ink — every solid thing gets an outline
+function inkStroke(w) { cx.strokeStyle = INK; cx.lineWidth = w; }
+function drawHouse(h) {
+  const w = h.w, x = h.x, y = h.y, flip = x > W * 0.5;
+  const wh = S.up.village ? w * 0.44 : w * 0.34;
   cx.save(); cx.translate(x, y); if (flip) cx.scale(-1, 1);
-  // wall
-  cx.fillStyle = '#8a6b4a';
-  cx.fillRect(-w/2, -w*0.34, w, w*0.34);
-  cx.fillStyle = 'rgba(0,0,0,0.12)';
-  for (let i = 1; i < 4; i++) cx.fillRect(-w/2, -w*0.34 + i*w*0.085, w, 1.5);
-  // straw roof (two sag layers) + snow cap
-  cx.fillStyle = '#c9a24f';
-  cx.beginPath();
-  cx.moveTo(-w*0.60, -w*0.30);
-  cx.quadraticCurveTo(0, -w*0.86, w*0.60, -w*0.30);
-  cx.lineTo(w*0.48, -w*0.24); cx.quadraticCurveTo(0, -w*0.72, -w*0.48, -w*0.24);
-  cx.closePath(); cx.fill();
-  cx.fillStyle = '#b08a3e';
-  cx.beginPath();
-  cx.moveTo(-w*0.52, -w*0.27);
-  cx.quadraticCurveTo(0, -w*0.78, w*0.52, -w*0.27);
-  cx.lineTo(w*0.44, -w*0.22); cx.quadraticCurveTo(0, -w*0.66, -w*0.44, -w*0.22);
-  cx.closePath(); cx.fill();
-  cx.strokeStyle = 'rgba(90,66,26,0.5)'; cx.lineWidth = 1;
-  for (let i = -3; i <= 3; i++) {
-    cx.beginPath(); cx.moveTo(i*w*0.08, -w*0.80 + Math.abs(i)*w*0.045);
-    cx.lineTo(i*w*0.13, -w*0.30); cx.stroke();
+  if (!S.up.village) {
+    // CAMP: straw hut
+    cx.fillStyle = '#8a6b4a';
+    cx.fillRect(-w/2, -wh, w, wh);
+    cx.fillStyle = 'rgba(0,0,0,0.16)';                 // flat side-shade band
+    cx.fillRect(-w/2, -wh, w * 0.28, wh);
+    cx.fillStyle = 'rgba(0,0,0,0.12)';
+    for (let i = 1; i < 4; i++) cx.fillRect(-w/2, -wh + i*w*0.085, w, 1.5);
+    inkStroke(2.2); cx.strokeRect(-w/2, -wh, w, wh);
+    cx.fillStyle = '#c9a24f';                          // straw roof
+    cx.beginPath();
+    cx.moveTo(-w*0.60, -w*0.30);
+    cx.quadraticCurveTo(0, -w*0.86, w*0.60, -w*0.30);
+    cx.lineTo(w*0.48, -w*0.24); cx.quadraticCurveTo(0, -w*0.72, -w*0.48, -w*0.24);
+    cx.closePath(); cx.fill();
+    inkStroke(2.2); cx.stroke();
+    cx.fillStyle = '#b08a3e';
+    cx.beginPath();
+    cx.moveTo(-w*0.52, -w*0.27);
+    cx.quadraticCurveTo(0, -w*0.78, w*0.52, -w*0.27);
+    cx.lineTo(w*0.44, -w*0.22); cx.quadraticCurveTo(0, -w*0.66, -w*0.44, -w*0.22);
+    cx.closePath(); cx.fill();
+    cx.fillStyle = '#f2f7fd';                          // snow on the ridge
+    cx.beginPath();
+    cx.moveTo(-w*0.45, -w*0.55);
+    cx.quadraticCurveTo(0, -w*0.90, w*0.45, -w*0.55);
+    cx.quadraticCurveTo(0, -w*0.74, -w*0.45, -w*0.55);
+    cx.closePath(); cx.fill();
+  } else {
+    // VILLAGE: timber cabin, smaller and sturdier
+    cx.fillStyle = '#a8825a';
+    cx.fillRect(-w/2, -wh, w, wh);
+    cx.fillStyle = 'rgba(0,0,0,0.16)';
+    cx.fillRect(-w/2, -wh, w * 0.28, wh);
+    cx.fillStyle = 'rgba(0,0,0,0.14)';
+    for (let i = 1; i < 4; i++) cx.fillRect(-w/2, -wh + i*wh*0.25, w, 1.4);
+    inkStroke(2.2); cx.strokeRect(-w/2, -wh, w, wh);
+    cx.fillStyle = '#6e4f33';                          // gable roof
+    cx.beginPath();
+    cx.moveTo(-w*0.60, -wh); cx.lineTo(0, -w*0.82); cx.lineTo(w*0.60, -wh);
+    cx.closePath(); cx.fill();
+    cx.strokeStyle = '#f2f7fd'; cx.lineWidth = w*0.07; cx.lineCap = 'round';
+    cx.beginPath(); cx.moveTo(-w*0.52, -wh - 2); cx.lineTo(0, -w*0.79); cx.lineTo(w*0.52, -wh - 2); cx.stroke();
+    inkStroke(2.2);
+    cx.beginPath();
+    cx.moveTo(-w*0.60, -wh); cx.lineTo(0, -w*0.82); cx.lineTo(w*0.60, -wh);
+    cx.closePath(); cx.stroke();
+    cx.fillStyle = '#8b97ab';                          // stone chimney
+    cx.fillRect(w*0.22, -w*0.72, w*0.11, w*0.22);
+    inkStroke(1.6); cx.strokeRect(w*0.22, -w*0.72, w*0.11, w*0.22);
   }
-  cx.fillStyle = '#f2f7fd';       // snow on the ridge
-  cx.beginPath();
-  cx.moveTo(-w*0.45, -w*0.55);
-  cx.quadraticCurveTo(0, -w*0.90, w*0.45, -w*0.55);
-  cx.quadraticCurveTo(0, -w*0.74, -w*0.45, -w*0.55);
-  cx.closePath(); cx.fill();
-  // door + window
+  // door + window (shared)
+  const doorH = wh * 0.62;
   cx.fillStyle = '#4c3722';
-  cx.fillRect(w*0.08, -w*0.26, w*0.18, w*0.26);
+  cx.fillRect(w*0.09, -doorH, w*0.17, doorH);
+  inkStroke(1.6); cx.strokeRect(w*0.09, -doorH, w*0.17, doorH);
   const occ = h.inside > 0;
   const winLit = occ && ambient() > 0.18;
   cx.fillStyle = winLit ? '#ffca66' : '#2c3a52';
-  cx.fillRect(-w*0.30, -w*0.24, w*0.14, w*0.12);
-  cx.strokeStyle = '#3a2b18'; cx.lineWidth = 2;
-  cx.strokeRect(-w*0.30, -w*0.24, w*0.14, w*0.12);
+  cx.fillRect(-w*0.31, -wh*0.72, w*0.15, wh*0.32);
+  inkStroke(1.6); cx.strokeRect(-w*0.31, -wh*0.72, w*0.15, wh*0.32);
   cx.restore();
-  h.winX = flip ? x + w*0.23 : x - w*0.23;
-  h.winY = y - w*0.18;
+  h.winX = flip ? x + w*0.235 : x - w*0.235;
+  h.winY = y - wh*0.56;
   h.lit = winLit;
-  // smoke from the smoke-hole when occupied
   if (occ && Math.random() < 0.12) {
-    smoke.push({ x: x + (flip? -1:1)* w*0.02, y: y - w*0.8, vx: (Math.random()-0.5)*4 + 6, vy: -12 - Math.random()*8, r: 3, life: 0, max: 2.6 });
+    const sx = (S.up.village ? w*0.27 : w*0.02) * (flip ? -1 : 1);
+    smoke.push({ x: x + sx, y: y - w*0.76, vx: (Math.random()-0.5)*4 + 6, vy: -12 - Math.random()*8, r: 3, life: 0, max: 2.6 });
   }
 }
-function drawTrees() {
-  const r = prng(99);
-  for (let i = 0; i < 4; i++) {
-    const x = G.trees.x + (r()-0.3) * 60, y = G.trees.y + (r()-0.5) * 60, s = 20 + r() * 14;
-    cx.fillStyle = '#4c3722';
-    cx.fillRect(x - 2, y - 4, 4, 6);
-    for (let l = 0; l < 3; l++) {
-      const ly = y - 4 - l * s * 0.34, lw = s * (1 - l * 0.26);
-      cx.fillStyle = '#3f5d52';
-      cx.beginPath(); cx.moveTo(x - lw/2, ly); cx.lineTo(x, ly - s*0.45); cx.lineTo(x + lw/2, ly); cx.fill();
-      cx.fillStyle = 'rgba(240,246,252,0.9)';
-      cx.beginPath(); cx.moveTo(x - lw/2, ly); cx.lineTo(x, ly - s*0.45); cx.lineTo(x + lw*0.1, ly - s*0.30); cx.lineTo(x - lw*0.16, ly - s*0.08); cx.fill();
+function drawBiz(b) {
+  const w = b.w, x = b.x, y = b.y, flip = x > W * 0.5;
+  const wall = { tavern: '#8a5a3a', shop: '#5f7d96', sawbones: '#cfd6de' }[b.type];
+  const wh = w * 0.46;
+  cx.save(); cx.translate(x, y); if (flip) cx.scale(-1, 1);
+  cx.fillStyle = wall;
+  cx.fillRect(-w/2, -wh, w, wh);
+  cx.fillStyle = 'rgba(0,0,0,0.16)';
+  cx.fillRect(-w/2, -wh, w*0.28, wh);
+  inkStroke(2.2); cx.strokeRect(-w/2, -wh, w, wh);
+  cx.fillStyle = '#55402a';
+  cx.beginPath(); cx.moveTo(-w*0.58, -wh); cx.lineTo(0, -w*0.78); cx.lineTo(w*0.58, -wh); cx.closePath(); cx.fill();
+  cx.strokeStyle = '#f2f7fd'; cx.lineWidth = w*0.06; cx.lineCap = 'round';
+  cx.beginPath(); cx.moveTo(-w*0.50, -wh - 1); cx.lineTo(0, -w*0.76); cx.lineTo(w*0.50, -wh - 1); cx.stroke();
+  inkStroke(2.2);
+  cx.beginPath(); cx.moveTo(-w*0.58, -wh); cx.lineTo(0, -w*0.78); cx.lineTo(w*0.58, -wh); cx.closePath(); cx.stroke();
+  const doorH = wh * 0.6;
+  cx.fillStyle = '#3c2c1c';
+  cx.fillRect(-w*0.09, -doorH, w*0.18, doorH);
+  inkStroke(1.6); cx.strokeRect(-w*0.09, -doorH, w*0.18, doorH);
+  const winLit = ambient() > 0.18;                     // businesses keep the lamps on
+  cx.fillStyle = winLit ? '#ffca66' : '#2c3a52';
+  cx.fillRect(w*0.18, -wh*0.72, w*0.16, wh*0.30);
+  inkStroke(1.6); cx.strokeRect(w*0.18, -wh*0.72, w*0.16, wh*0.30);
+  if (b.type === 'tavern') {                           // hanging mug sign + barrel
+    inkStroke(2); cx.beginPath(); cx.moveTo(-w*0.5, -wh*0.95); cx.lineTo(-w*0.68, -wh*0.95); cx.stroke();
+    cx.fillStyle = '#6b4e2f'; cx.fillRect(-w*0.74, -wh*0.92, w*0.20, wh*0.28);
+    inkStroke(1.5); cx.strokeRect(-w*0.74, -wh*0.92, w*0.20, wh*0.28);
+    cx.fillStyle = '#ffc300'; cx.beginPath(); cx.arc(-w*0.64, -wh*0.78, w*0.055, 0, TAU); cx.fill();
+    cx.fillStyle = '#7a5836'; cx.fillRect(-w*0.42, -wh*0.30, w*0.14, wh*0.30);
+    inkStroke(1.4); cx.strokeRect(-w*0.42, -wh*0.30, w*0.14, wh*0.30);
+  } else if (b.type === 'shop') {                      // striped awning
+    for (let i = 0; i < 5; i++) {
+      cx.fillStyle = i % 2 ? '#e8ecf2' : '#c04438';
+      cx.fillRect(-w*0.34 + i*w*0.15, -wh*0.86, w*0.15, wh*0.15);
     }
+    inkStroke(1.6); cx.strokeRect(-w*0.34, -wh*0.86, w*0.75, wh*0.15);
+  } else {                                             // sawbones: red-cross board
+    cx.fillStyle = '#f2f6fb'; cx.fillRect(-w*0.34, -wh*0.92, w*0.22, wh*0.30);
+    inkStroke(1.5); cx.strokeRect(-w*0.34, -wh*0.92, w*0.22, wh*0.30);
+    cx.fillStyle = '#d0342c';
+    cx.fillRect(-w*0.265, -wh*0.87, w*0.07, wh*0.20);
+    cx.fillRect(-w*0.30, -wh*0.815, w*0.14, wh*0.07);
+  }
+  cx.restore();
+  b.winX = flip ? x - w*0.26 : x + w*0.26;
+  b.winY = y - wh*0.57;
+  b.lit = winLit;
+}
+function drawTree(t) {
+  const x = t.x, y = t.y, s = t.s;
+  cx.fillStyle = '#4c3722';
+  cx.fillRect(x - 2, y - 4, 4, 6);
+  for (let l = 0; l < 3; l++) {
+    const ly = y - 4 - l * s * 0.34, lw = s * (1 - l * 0.26);
+    cx.fillStyle = '#3f5d52';
+    cx.beginPath(); cx.moveTo(x - lw/2, ly); cx.lineTo(x, ly - s*0.45); cx.lineTo(x + lw/2, ly); cx.closePath(); cx.fill();
+    inkStroke(1.4); cx.stroke();
+    cx.fillStyle = 'rgba(240,246,252,0.9)';
+    cx.beginPath(); cx.moveTo(x - lw/2, ly); cx.lineTo(x, ly - s*0.45); cx.lineTo(x + lw*0.1, ly - s*0.30); cx.lineTo(x - lw*0.16, ly - s*0.08); cx.closePath(); cx.fill();
   }
 }
-function drawRocks() {
-  const r = prng(41);
-  for (let i = 0; i < 3; i++) {
-    const x = G.rocks.x + (r()-0.7) * 50, y = G.rocks.y + (r()-0.5) * 46, s = 10 + r() * 12;
-    cx.fillStyle = '#7d8aa0';
-    cx.beginPath();
-    cx.moveTo(x - s, y); cx.lineTo(x - s*0.5, y - s*0.9); cx.lineTo(x + s*0.4, y - s*0.75); cx.lineTo(x + s, y);
-    cx.closePath(); cx.fill();
-    cx.fillStyle = 'rgba(240,246,252,0.9)';
-    cx.beginPath(); cx.moveTo(x - s*0.5, y - s*0.9); cx.lineTo(x + s*0.4, y - s*0.75); cx.lineTo(x - s*0.1, y - s*0.6); cx.closePath(); cx.fill();
-  }
+function drawRock(r) {
+  const x = r.x, y = r.y, s = r.s;
+  cx.fillStyle = '#7d8aa0';
+  cx.beginPath();
+  cx.moveTo(x - s, y); cx.lineTo(x - s*0.5, y - s*0.9); cx.lineTo(x + s*0.4, y - s*0.75); cx.lineTo(x + s, y);
+  cx.closePath(); cx.fill();
+  inkStroke(1.6); cx.stroke();
+  cx.fillStyle = 'rgba(240,246,252,0.9)';
+  cx.beginPath(); cx.moveTo(x - s*0.5, y - s*0.9); cx.lineTo(x + s*0.4, y - s*0.75); cx.lineTo(x - s*0.1, y - s*0.6); cx.closePath(); cx.fill();
 }
 function drawHole() {
   cx.save(); cx.translate(G.hole.x, G.hole.y); cx.scale(1, 0.4);
@@ -574,9 +719,10 @@ function drawHole() {
 function drawSeat(s) {
   cx.save(); cx.translate(s.x, s.y); cx.rotate(s.rot);
   cx.fillStyle = '#6b4e2f';
-  if (cx.roundRect) { cx.beginPath(); cx.roundRect(-16, -5, 32, 10, 5); cx.fill(); }
-  else cx.fillRect(-16, -5, 32, 10);
+  if (cx.roundRect) { cx.beginPath(); cx.roundRect(-16, -5, 32, 10, 5); cx.fill(); inkStroke(1.5); cx.stroke(); }
+  else { cx.fillRect(-16, -5, 32, 10); inkStroke(1.5); cx.strokeRect(-16, -5, 32, 10); }
   cx.fillStyle = '#584022'; cx.beginPath(); cx.arc(-16, 0, 5, 0, TAU); cx.fill();
+  inkStroke(1.3); cx.stroke();
   cx.fillStyle = 'rgba(240,246,252,0.85)';
   if (cx.roundRect) { cx.beginPath(); cx.roundRect(-14, -5, 28, 4, 2); cx.fill(); }
   cx.restore();
@@ -584,9 +730,10 @@ function drawSeat(s) {
 function drawStock() {
   const x = G.stock.x, y = G.stock.y;
   cx.fillStyle = '#6b4e2f';
-  for (let i = 0; i < 3; i++) { cx.beginPath(); cx.arc(x - 8 + i * 8, y, 4, 0, TAU); cx.fill(); }
-  cx.beginPath(); cx.arc(x - 4, y - 6, 4, 0, TAU); cx.fill();
-  cx.beginPath(); cx.arc(x + 4, y - 6, 4, 0, TAU); cx.fill();
+  inkStroke(1.2);
+  for (let i = 0; i < 3; i++) { cx.beginPath(); cx.arc(x - 8 + i * 8, y, 4, 0, TAU); cx.fill(); cx.stroke(); }
+  cx.beginPath(); cx.arc(x - 4, y - 6, 4, 0, TAU); cx.fill(); cx.stroke();
+  cx.beginPath(); cx.arc(x + 4, y - 6, 4, 0, TAU); cx.fill(); cx.stroke();
   cx.fillStyle = 'rgba(240,246,252,0.8)'; cx.beginPath(); cx.arc(x, y - 9, 4, 0, Math.PI, true); cx.fill();
 }
 
@@ -605,6 +752,7 @@ function drawFirePit() {
     const rx = f.x + Math.cos(a) * 22, ry = f.y + Math.sin(a) * 13;
     cx.fillStyle = i % 2 ? '#8b97ab' : '#77839a';
     cx.beginPath(); cx.arc(rx, ry, 4.6, 0, TAU); cx.fill();
+    inkStroke(1.2); cx.stroke();
   }
   cx.save(); cx.translate(f.x, f.y); cx.scale(1, 0.55);
   cx.fillStyle = '#241a12';
@@ -706,7 +854,7 @@ const JOBS = [
 const COATS = ['#b4552f', '#3f6d8e', '#7a5f9c', '#4f7a4a', '#a8763e', '#8e3f55', '#54728c', '#6e5a3e', '#9c4f2f', '#3e6e64'];
 const villagers = [];
 function makeVillager(i, keeper) {
-  const home = (i % 2 === 0) ? G.houseL : G.houseR;
+  const home = HOMES[i % houses()];
   return {
     id: i, keeper: !!keeper,
     x: home.x + (Math.random()-0.5) * 30, y: home.y + 14 + Math.random() * 10,
@@ -739,7 +887,7 @@ function villagerStep(v, dt) {
   const move = () => {
     const dx = v.tx - v.x, dy = v.ty - v.y, d = Math.hypot(dx, dy);
     if (d > 1) {
-      const sp = v.speed * dt;
+      const sp = v.speed * (S.up.tavern ? 1.15 : 1) * dt;
       v.x += dx / d * Math.min(sp, d); v.y += dy / d * Math.min(sp, d);
       v.flip = dx < 0 ? -1 : 1;
     }
@@ -775,7 +923,7 @@ function villagerStep(v, dt) {
       break;
     case 'working':
       if (!warm) { v.state = 'idle'; v.wait = 0; break; }
-      if (v.t > 3.2) {
+      if (v.t > (S.up.sawbones ? 2.4 : 3.2)) {
         v.carry = v.job.res;
         v.state = 'toStock'; vSetTarget(v, G.stock.x + (Math.random()-0.5)*10, G.stock.y + 6);
       } else if (v.job.res !== 'food' && Math.random() < dt * 2.2) {
@@ -848,11 +996,12 @@ function drawVillager(v) {
     cx.beginPath(); cx.moveTo(-2, -bh + 8); cx.lineTo(-2 + sw, 0); cx.stroke();
     cx.beginPath(); cx.moveTo(2, -bh + 8); cx.lineTo(2 - sw, 0); cx.stroke();
   }
-  // coat body
+  // coat body (cel: flat fill + ink outline)
   cx.fillStyle = v.coat;
   cx.beginPath();
   if (cx.roundRect) cx.roundRect(-5, -bh - 4, 10, bh + (seated ? 4 : 5), 4); else cx.rect(-5, -bh - 4, 10, bh + 5);
   cx.fill();
+  inkStroke(1.1); cx.stroke();
   cx.fillStyle = 'rgba(255,255,255,0.85)'; // fur trim
   cx.fillRect(-5, -bh - 4, 10, 2);
   // arms
@@ -873,6 +1022,7 @@ function drawVillager(v) {
   // head + hood
   cx.fillStyle = '#e8b98f';
   cx.beginPath(); cx.arc(0, -bh - 8, 4.4, 0, TAU); cx.fill();
+  inkStroke(1); cx.stroke();
   cx.fillStyle = v.keeper ? '#d0342c' : v.coat;
   cx.beginPath(); cx.arc(0, -bh - 8.6, 4.6, Math.PI * 1.05, Math.PI * 1.95); cx.fill();
   if (v.keeper) { cx.fillRect(-4.6, -bh - 9.4, 9.2, 2); }
@@ -1132,7 +1282,8 @@ function drawLighting() {
   if (I > 0.02) punch(G.fire.x, G.fire.y - 6, (85 + 120 * I) * flick, Math.min(0.85, I));
   else if (FIRE.ember > 0.01) punch(G.fire.x, G.fire.y, 40 * FIRE.ember, FIRE.ember * 0.5);
   for (const m of motes) punch(m.x, m.y, 55 * (1 - m.life / m.max) + 18, 0.9 * (1 - m.life / m.max));
-  for (const h of [G.houseL, G.houseR]) if (h.lit) punch(h.winX, h.winY, 46, 0.75);
+  for (const h of activeHomes()) if (h.lit) punch(h.winX, h.winY, 46, 0.75);
+  for (const b of activeBiz()) if (b.lit) punch(b.winX, b.winY, 40, 0.7);
   cx.drawImage(light, 0, 0, W, H);
   // warm additive tint at the light sources
   cx.globalCompositeOperation = 'lighter';
@@ -1144,7 +1295,8 @@ function drawLighting() {
   };
   if (I > 0.02) tint(G.fire.x, G.fire.y - 6, (70 + 90 * I) * flick, 0.3 * I * (0.25 + amb));
   for (const m of motes) tint(m.x, m.y, 55, 0.14 * (1 - m.life / m.max) * (0.3 + amb));
-  for (const h of [G.houseL, G.houseR]) if (h.lit) tint(h.winX, h.winY, 30, 0.08);
+  for (const h of activeHomes()) if (h.lit) tint(h.winX, h.winY, 30, 0.08);
+  for (const b of activeBiz()) if (b.lit) tint(b.winX, b.winY, 26, 0.07);
   cx.globalCompositeOperation = 'source-over';
 }
 
@@ -1191,13 +1343,16 @@ function costStr(cost) {
 function canAfford(cost) { return Object.keys(cost).every(k => S.res[k] >= cost[k]); }
 function buildUpgPanel() {
   upgList.innerHTML = '';
-  upgSub.textContent = villagers.filter(v => !v.keeper).length + ' villagers' +
+  upgSub.textContent = stageName() + ' · ' + villagers.filter(v => !v.keeper).length + '/' + (houses() * 5) +
+    ' villagers in ' + houses() + ' house' + (houses() > 1 ? 's' : '') +
     (S.up.keeper ? ' + ' + S.up.keeper + ' firekeeper' + (S.up.keeper > 1 ? 's' : '') : '') +
     ' · they only work while the fire burns';
   for (const u of UPG) {
-    const lvl = S.up[u.id], maxed = lvl >= u.max;
+    if (!showU(u)) continue;
+    const lvl = S.up[u.id], maxed = lvl >= maxOf(u);
     const el = document.createElement('button');
     el.className = 'up-card' + (maxed ? ' maxed' : '');
+    el.dataset.uid = u.id;
     const cost = maxed ? null : u.cost(lvl);
     el.innerHTML =
       '<div class="ui">' + u.i + '</div>' +
@@ -1209,40 +1364,52 @@ function buildUpgPanel() {
       if (canAfford(cost)) el.classList.add('afford');
       el.addEventListener('click', () => {
         const c = u.cost(S.up[u.id]);
-        if (S.up[u.id] >= u.max || !canAfford(c)) return;
+        if (S.up[u.id] >= maxOf(u) || !canAfford(c)) return;
         for (const k of Object.keys(c)) S.res[k] -= c[k];
         S.up[u.id]++;
-        audioInit(); sfxBuy(); save();
+        audioInit(); sfxBuy();
         if (u.id === 'bunk' || u.id === 'keeper') syncVillagers();
         if (u.id === 'keeper') toast('A FIREKEEPER TENDS THE FLAMES');
+        if (u.id === 'house' || u.id === 'village' || u.id === 'tavern' || u.id === 'shop' || u.id === 'sawbones') {
+          layoutBuildings(); bakeGround();
+        }
+        if (u.id === 'village') toast('THE CAMP IS NOW A VILLAGE');
+        if (u.id === 'tavern') toast('THE THIRSTY YETI IS OPEN');
+        if (u.id === 'shop') toast('THE GENERAL STORE IS OPEN');
+        if (u.id === 'sawbones') toast('THE SAWBONES WILL SEE YOU NOW');
+        save();
         buildUpgPanel();
       });
     }
     upgList.appendChild(el);
   }
 }
-upgBtn.addEventListener('click', () => { audioInit(); buildUpgPanel(); upgPanel.classList.add('open'); });
-$('upg-close').addEventListener('click', () => upgPanel.classList.remove('open'));
+function setPanelOpen(open) {
+  upgPanel.classList.toggle('open', open);
+  upgBtn.innerHTML = open ? '&#10005; CLOSE' : '&#128296; UPGRADES';
+  if (open) buildUpgPanel();
+}
+upgBtn.addEventListener('click', () => { audioInit(); setPanelOpen(!upgPanel.classList.contains('open')); });
+$('upg-close').addEventListener('click', () => setPanelOpen(false));
 muteBtn.addEventListener('click', () => { audioInit(); setMuted(!S.muted); });
 let hudAcc = 0;
 function refreshHUD() {
   resEl.innerHTML = RES_ICON.wood + ' ' + Math.floor(S.res.wood) + ' &nbsp;' + RES_ICON.stone + ' ' + Math.floor(S.res.stone) + ' &nbsp;' + RES_ICON.food + ' ' + Math.floor(S.res.food);
-  clockEl.textContent = 'DAY ' + S.day + ' · ' + phaseName(S.dayT);
-  const any = UPG.some(u => S.up[u.id] < u.max && canAfford(u.cost(S.up[u.id])));
-  upgBtn.classList.toggle('pulse', any);
+  clockEl.textContent = stageName() + ' · DAY ' + S.day + ' · ' + phaseName(S.dayT);
+  const any = UPG.some(u => showU(u) && S.up[u.id] < maxOf(u) && canAfford(u.cost(S.up[u.id])));
+  upgBtn.classList.toggle('pulse', any && !upgPanel.classList.contains('open'));
   if (upgPanel.classList.contains('open')) {
     // keep affordability states live without rebuilding buttons mid-press
-    const cards = upgList.children;
-    UPG.forEach((u, i) => {
-      const el = cards[i]; if (!el) return;
+    for (const el of upgList.children) {
+      const u = UPG.find(x => x.id === el.dataset.uid); if (!u) continue;
       const lvl = S.up[u.id];
-      if (lvl < u.max) {
+      if (lvl < maxOf(u)) {
         const cost = u.cost(lvl);
         el.classList.toggle('afford', canAfford(cost));
         const uc = el.querySelector('.uc');
         if (uc) uc.innerHTML = costStr(cost);
       }
-    });
+    }
   }
 }
 
@@ -1258,16 +1425,19 @@ function frame(now) {
 
   drawSky();
   drawBackdrop();
-  drawHouse(G.houseL, false);
-  drawHouse(G.houseR, true);
-  drawTrees();
-  drawRocks();
   drawHole();
-  drawStock();
-  for (const s of G.seats) drawSeat(s);
-  drawFirePit();
-  const sorted = villagers.slice().sort((a, b) => a.y - b.y);
-  for (const v of sorted) drawVillager(v);
+  // one y-sorted painter list so villagers pass in front of and behind buildings
+  const items = [];
+  for (const h of activeHomes()) items.push({ y: h.y, d: () => drawHouse(h) });
+  for (const b of activeBiz()) items.push({ y: b.y, d: () => drawBiz(b) });
+  for (const t of G.treeItems) items.push({ y: t.y + 2, d: () => drawTree(t) });
+  for (const r of G.rockItems) items.push({ y: r.y, d: () => drawRock(r) });
+  items.push({ y: G.stock.y + 2, d: drawStock });
+  items.push({ y: G.fire.y + 2, d: drawFirePit });
+  for (const s of G.seats) items.push({ y: s.y + 4, d: () => drawSeat(s) });
+  for (const v of villagers) if (v.state !== 'inside') items.push({ y: v.y, d: () => drawVillager(v) });
+  items.sort((a, b) => a.y - b.y);
+  for (const it of items) it.d();
   fireParticles(dt);
   weatherStep(dt);
   drawLighting();

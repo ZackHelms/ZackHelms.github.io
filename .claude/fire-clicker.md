@@ -50,12 +50,35 @@ Apache/MIT. The CD may develop it into a real app.
   clamps to the screen, draws ABOVE the lighting layer, and ends early if the
   speaker goes indoors. New lines: append to the right pool; keep the voice —
   short, earnest, slightly self-aware, never snarky at the player.
-- **Upgrades** (`UPG[]`, DOM panel behind 🔨): FIRE PIT (+5 s max bank),
-  DRY TINDER (+0.5 s per tap), WINDBREAK (slower drain), SHARP TOOLS (+1 per
-  trip), BUNKHOUSE (+1 villager, base 4), FIREKEEPER (auto-tapper: a
-  red-hatted villager who stands by the fire and throws a log — −1 wood,
-  +4 s via the same `stoke()` — whenever bank < 35%). Costs are resource
-  bundles (`u.cost(lvl)`, ~×1.8/lvl), paid from what the villagers gathered.
+- **Upgrades** (`UPG[]`, DOM panel toggled by the bottom-right 🔨 button —
+  same button opens AND closes it, label flips to ✕ CLOSE; the card list
+  lives in its own `#upg-scroll` container so the button never moves):
+  FIRE PIT (+5 s max bank), DRY TINDER (+0.5 s per tap), WINDBREAK (slower
+  drain), SHARP TOOLS (+1 per trip), RECRUIT VILLAGER (+1, capped by
+  houses×5), FIREKEEPER (auto-tapper: red-hatted villager, −1 wood → +4 s via
+  the same `stoke()` when bank < 35%), BUILD HOUSE, FOUND VILLAGE, and the
+  village businesses. `max` may be a function (`maxOf()`), `show()` gates
+  stage-locked cards; cards carry `dataset.uid` so `refreshHUD()` updates
+  affordability without rebuilding mid-press.
+- **Houses & stages** (`HOMES[]`/`HOUSE_SLOTS`, `BIZ`/`BIZ_DEFS`,
+  `layoutBuildings()`): every house sleeps **5 villagers**
+  (`popCap = min(4+recruits, houses×5)`); BUILD HOUSE fills slots in order —
+  cap 5 at CAMP, 10 at VILLAGE. **FOUND VILLAGE** (shown at 5 houses) is the
+  first stage upgrade (`S.up.village`): houses shrink (`houseW()`), swap from
+  straw huts to timber cabins with chimneys, trodden paths bake into the
+  ground from every doorstep to the fire, and businesses unlock — **TAVERN**
+  (+15% walk speed), **GENERAL STORE** (+1 trip yield), **SAWBONES HUT**
+  (work 3.2 s → 2.4 s). Business windows stay lit at night and join the
+  lighting punch list. Stage ladder from here (town/city/metropolis,
+  building upgrades, schools, ascension): `games/fire-clicker/TODO.md` —
+  the game-specific backlog the CD asked for; repo-root TODO.md stays
+  Phasic-only.
+- **Cel shading**: everything solid gets a flat side-shade band and an INK
+  (`#151823`) outline via `inkStroke()` — houses, businesses, trees, rocks,
+  seats, fire stones, stockpile, villagers (coat + head). Painters draw
+  through one **y-sorted item list** in `frame()` (buildings, scenery,
+  villagers together), so villagers correctly pass behind and in front of
+  buildings as the scene densifies.
 
 ## Architecture
 - Save `fireClicker.v2` (v1 key is deleted on load), field-by-field `load()`,

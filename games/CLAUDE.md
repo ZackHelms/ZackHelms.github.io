@@ -643,10 +643,15 @@ they haul wood/stone/food from work sites to the stockpile; cold, they huddle
 on the seats (shivering, breath puffs) or hide indoors (windows glow, chimney
 smoke). A 5-minute day/night cycle drives keyframed sky palettes and a
 punch-hole darkness layer, so the fire realistically lights its surroundings
-at night. Upgrades (fire pit, tinder, windbreak, tools, bunkhouse, firekeeper
-auto-stoker that spends stockpiled wood) are paid in gathered resources.
-Village→town→city stages and an ascension prestige are designed but not yet
-built. **Proprietary — no permissive license in this directory** (one of the
+at night. Cel-shaded: flat colour bands + ink outlines on every building,
+prop and villager. Upgrades (fire pit, tinder, windbreak, tools, recruits,
+firekeeper auto-stoker that spends stockpiled wood) are paid in gathered
+resources, from a toggleable bottom-right panel with its own scroll
+container. Houses sleep 5 villagers each; BUILD HOUSE fills slots (5 at
+CAMP), then FOUND VILLAGE shrinks the architecture to timber cabins (up to
+10) with trodden paths and unlocks the tavern (+walk speed), general store
+(+yield) and sawbones hut (+work speed). Town/city/metropolis, building
+upgrade chains and ascension: `games/fire-clicker/TODO.md`. **Proprietary — no permissive license in this directory** (one of the
 five protected games). Detailed context: `.claude/fire-clicker.md`.
 
 ### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)
