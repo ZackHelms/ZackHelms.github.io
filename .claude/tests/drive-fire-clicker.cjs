@@ -2,7 +2,7 @@
 /**
  * drive-fire-clicker.cjs — rules drive for the Fire Clicker village sim.
  *
- * 36 checks: cold start (villagers hide/huddle), tap-to-bank (1s/tap, cap,
+ * 37 checks: cold start (villagers hide/huddle), tap-to-bank (1s/tap, cap,
  * drain-from-the-moment-it-lands, off-fire taps bank nothing), warm villagers
  * gather / fire-out retreat, the toggleable upgrade panel + its scroll
  * container, houses (5 villagers each, BUILD HOUSE slots, recruit cap =
@@ -10,7 +10,8 @@
  * effects, the firekeeper feeding the fire from stockpiled wood, chat bubbles
  * (real-tap summon, never stokes, ONE at a time, 5s expiry, contextual
  * pools), a night-lighting pixel assert (fireside snow brighter than far
- * snow), and save/reload persistence.
+ * snow), save/reload persistence, and the rotation self-heal (stale W/H
+ * relayouts within a frame — iOS rotation hands resize() stale dimensions).
  *
  * Run from the repo root (same harness as the smoke gate):
  *   NODE_PATH=<dir-with-playwright-core>/node_modules \
@@ -229,6 +230,13 @@ const shot = (page, name) => DIR ? page.screenshot({ path: DIR + '/' + name }) :
 
   ok('back-btn present', await page.locator('#back-btn').count() === 1);
   ok('mute-btn present', await page.locator('#mute-btn').count() === 1);
+
+  // rotation self-heal: iOS can hand resize() stale dimensions — corrupt the
+  // layout globals and the per-frame guard must relayout within a few frames
+  await page.evaluate(() => { W = 111; H = 222; G.fire = { x: 55, y: 111 }; });
+  await page.waitForTimeout(150);
+  st = await page.evaluate(() => ({ W, H, fx: G.fire.x, iw: window.innerWidth, ih: window.innerHeight }));
+  ok('stale layout self-heals (' + st.W + 'x' + st.H + ')', st.W === st.iw && st.H === st.ih && st.fx === st.iw * 0.5);
 
   console.log(checks.join('\n'));
   console.log('ERRORS=' + errors.length);

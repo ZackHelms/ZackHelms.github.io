@@ -107,6 +107,16 @@ Apache/MIT. The CD may develop it into a real app.
   (new buildings, busier villagers), not a bigger menu.
 
 ## Gotchas
+- **Rotation self-heal**: iOS can hand the `resize` listener stale
+  `innerWidth/innerHeight` during a rotation and never fire again — the scene
+  then draws stretched and the fire hit test misses ("tap area misaligned in
+  landscape", 2026-08-28). `frame()` opens with a per-frame guard that calls
+  `resize()` whenever the viewport disagrees with `W`/`H` (a strict no-op once
+  settled — same cure as phasic's). Don't remove it in favour of the listener.
+- The camp hut's snow cap must **hug the roof's outer quadratic** (underside
+  control tucked inside the straw arc): the original free-floating crescent
+  read fine on the pale portrait sky but showed as a detached white arc over
+  the dark treeline in landscape.
 - Villager walk speed matters: at <35 px/s a first gather trip takes 20-30 s
   and the game feels dead (and the drive suite times out) — it's 46-60 px/s.
 - The keeper feeds through `stoke()` so the cap/mote/float rules stay in one

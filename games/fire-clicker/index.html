@@ -120,7 +120,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 13:21 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 16:47 UTC</div>
 <canvas id="scene"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
 <button id="mute-btn" aria-label="Mute">&#128266;</button>
@@ -589,11 +589,12 @@ function drawHouse(h) {
     cx.quadraticCurveTo(0, -w*0.78, w*0.52, -w*0.27);
     cx.lineTo(w*0.44, -w*0.22); cx.quadraticCurveTo(0, -w*0.66, -w*0.44, -w*0.22);
     cx.closePath(); cx.fill();
-    cx.fillStyle = '#f2f7fd';                          // snow on the ridge
+    cx.fillStyle = '#f2f7fd';                          // snow blanket hugging the roof arc
     cx.beginPath();
-    cx.moveTo(-w*0.45, -w*0.55);
-    cx.quadraticCurveTo(0, -w*0.90, w*0.45, -w*0.55);
-    cx.quadraticCurveTo(0, -w*0.74, -w*0.45, -w*0.55);
+    cx.moveTo(-w*0.52, -w*0.335);
+    cx.quadraticCurveTo(0, -w*0.97, w*0.52, -w*0.335); // crown a touch above the straw
+    cx.lineTo(w*0.46, -w*0.30);
+    cx.quadraticCurveTo(0, -w*0.80, -w*0.46, -w*0.30); // underside tucked into the straw
     cx.closePath(); cx.fill();
   } else {
     // VILLAGE: timber cabin, smaller and sturdier
@@ -1418,6 +1419,10 @@ let last = performance.now(), saveAcc = 0;
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  // self-heal: iOS can hand the resize listener stale dimensions during a
+  // rotation and never fire again — if the viewport disagrees with our
+  // layout, redo it (strict no-op once settled)
+  if (window.innerWidth !== W || window.innerHeight !== H) resize();
   dayStep(dt);
   fireStep(dt);
   syncVillagers();
