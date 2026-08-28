@@ -71,27 +71,34 @@ const groups = {};
 const sprites = [];
 const t0 = Date.now();
 
+// A group carries TWO resolutions and they are not the same number:
+//   ppu   -- atlas pixels per DRAWN world unit. The game divides by this, and
+//            it is the same for every group, because every group is drawn into
+//            the same board at the same scale.
+//   bake  -- atlas pixels per MODEL world unit, i.e. what it was rendered at.
+//            Groups drawn larger than life are baked larger by the same factor
+//            so they land 1:1. Only the builder cares.
 function group(name, meta, make) {
   const first = sprites.length;
   make();
-  groups[name] = { ...meta, ppu: meta.ppu || PPU, first, count: sprites.length - first };
+  groups[name] = { ...meta, ppu: PPU, first, count: sprites.length - first };
   process.stdout.write(`  ${name}: ${sprites.length - first} sprites (${((Date.now() - t0) / 1000).toFixed(1)}s)\n`);
 }
 
 console.log('rendering');
-// `scale` is how far a group's tile is blown up at draw time. The humanoids are
-// modelled at true human proportions, which leaves a knight about 5 world units
-// across inside a collision circle 10.8 across -- correct, and far too small
-// beside the toon skin's units, which fill their radius. Buildings are modelled
-// at their real footprint and need no correction.
+// Units are drawn 1.5x larger than life (see ART_SCALE in config.mjs) and are
+// therefore BAKED 1.5x larger, at 1:1 with the pixels they land on. Buildings
+// are modelled at their real footprint and bake at plain PPU.
+const ART_PPU = PPU * C.ART_SCALE;
 for (const [name, fn] of [['tank', knight], ['archer', archer], ['fighter', rogue]])
-  group(name, { yaws: YAWS, frames: C.FRAMES, scale: 1.5 }, () => {
+  group(name, { yaws: YAWS, frames: C.FRAMES, bake: ART_PPU, art: C.ART_SCALE }, () => {
     // index = frame * yaws + yaw, so the game can pick a facing without a table
     const poses = [{ walk: 0.25 }, { walk: 0.75 }, { attack: 1, walk: 0.2, stride: 0.25 }];
     for (const pose of poses) {
       const model = fn(pose);
       for (let k = 0; k < YAWS; k++)
-        sprites.push(shot(model, { tile: C.RENDER_CANVAS, pivotY: C.UNIT_PIVOT_Y, yaw: k / YAWS * Math.PI * 2 }));
+        sprites.push(shot(model, { tile: Math.round(C.RENDER_CANVAS * C.ART_SCALE), ppu: ART_PPU,
+                                   pivotY: C.UNIT_PIVOT_Y, yaw: k / YAWS * Math.PI * 2 }));
     }
   });
 

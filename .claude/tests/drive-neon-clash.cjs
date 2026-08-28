@@ -962,6 +962,17 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     g.first + g.count > inlined.rects.length || g.first < 0).map(([n]) => n);
   ok('every group indexes inside the rect table', idxBad.length === 0, idxBad.join(','));
 
+  // BAKE AT THE SIZE YOU BLIT (zmh-3d:sprite-prerender). A group drawn larger
+  // than life must have been RENDERED larger by the same factor, or it is
+  // upscaled at draw time and ships visibly soft -- which is the entire point
+  // of a pre-rendered style thrown away, silently, with nothing failing.
+  const soft = (inlined ? Object.entries(inlined.groups) : []).filter(([, g]) => {
+    const perDrawnUnit = (g.bake || inlined.ppu) / (g.art || 1);
+    return Math.abs(perDrawnUnit - inlined.ppu) > 0.01;
+  }).map(([n, g]) => n + ' bake=' + g.bake + ' art=' + g.art);
+  ok('no group is blitted above the resolution it was baked at',
+     !!inlined && soft.length === 0, soft.join(', '));
+
   // The whole reason `look()` exists: a cold page whose stored style is sprite
   // must be playable on the first frame, painting as toon until the image
   // arrives -- and permanently if it never does.

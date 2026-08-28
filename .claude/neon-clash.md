@@ -423,6 +423,8 @@ never drift from the thing it deploys.
 > pre-rendered pipeline has its own write-up in
 > `.claude/notes/20260827-offline-prerender-pipeline.md`, and its operating
 > manual lives beside the source at `games/neon-clash/models/README.md`.
+> Both defer to the studio skill **`zmh-3d:sprite-prerender`**, which is the
+> authority on the runtime half of any pre-rendered sprite style.
 
 
 Three art directions over **one** simulation, chosen from the cogwheel in the
@@ -532,7 +534,7 @@ decisions:
 | **Depth order** | Sprites stand up off the ground with their feet on the entity position, so whichever is drawn last wins the overlap. Under `spr()` bases, bunkers and units go into one list sorted by `y` ascending — the camera sits *south* of the board, so smaller `y` is further away. The flat skins keep their original order, where the base is scenery painted under the fight. |
 | **Facing** | Tiles are pre-rotated at 12 yaws. `drawSpriteShape` reads the rotation back off the live transform (`frameRot()`), counter-rotates so the tile draws screen-aligned, and picks the nearest yaw. That is why cards and drag ghosts get the skin for free. |
 | **Animation** | Three frames per unit: two walk, one strike. A swing (`t > 0.35`) picks the strike; otherwise the walk alternates on a phase offset by `u.id`, so a crowd does not march in lockstep. `drawUnitShape` grew an eighth argument for that phase; the other skins ignore it. |
-| **Scale** | The humanoids are modelled at true human proportions, which leaves a knight ~5 world units across inside a 10.8-unit collision circle. A per-group `scale` in the manifest (1.5) corrects that. Buildings are modelled at their real footprint and need none. |
+| **Scale** | The humanoids are modelled at true human proportions, which leaves a knight ~5 world units across inside a 10.8-unit collision circle, so they are drawn 1.5x larger (`ART_SCALE`). That factor lives in the **bake**, not in a draw-time multiplier: a group carries `ppu` (atlas px per *drawn* world unit, the same for all) and `bake` (per *model* world unit), and the suite asserts `bake / art === ppu`. Blitting above the baked size ships a soft sprite and nothing fails — see `zmh-3d:sprite-prerender`, "bake at the size you blit". Buildings are modelled at their real footprint and need no correction. |
 | **The base gun** | Its own 12-yaw sprite set, drawn separately and lifted by `groups.base.deck`, because the barrel tracks. Baking it into the fortification would freeze the only part of the base that moves. |
 | **Team identity** | Same answer as toon — a ring on the ground — for the same reason. A knight is a knight in both colours. |
 | **The arena** | Two tileable 256² ground textures as canvas patterns, plus a fence section repeated along each edge. It reuses **`TOON_SCENE.grass`**, the same ragged polygon the toon skin punches, so both skins agree where the dirt ends. The scene is shared data; only the paint differs. |
