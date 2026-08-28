@@ -251,3 +251,24 @@ Deterministic helpers for working on this repo.
   regex, it was a tool asserting an outcome it had not verified; the class to
   watch for is any helper whose success line is computed from *intent* rather
   than from re-reading the artifact.
+
+- **`check-canvas-space.cjs`** — diagnostic: does a page lay out in the same
+  coordinate space its taps arrive in? Simulates the iOS rotation quirk (the
+  canvas box ends up shorter than `window.innerHeight`), then compares each
+  visible canvas's backing-store aspect against its CSS box aspect.
+  `SQUASH=1.000` means they agree. Written 2026-08-28 after fire-clicker
+  shipped the mismatch — the scene was drawn higher than it was hit-tested, so
+  the campfire only answered taps at the bottom of its drawn circle and below.
+
+  ```
+  NODE_PATH=<playwright-core dir>/node_modules \
+    node .claude/scripts/check-canvas-space.cjs games/<slug>/index.html
+  ```
+
+  **A diagnostic, not a gate** — deliberately not wired into `smoke-mobile`.
+  A squash on a canvas the page never hit-tests is a stretched picture, not a
+  dead tap, and the caller has to know which. It exempts three cases that each
+  false-positived on the first run (`pinned=inline-css`, `uninit`,
+  `skip-rotated`) — see the script header. Current standing result: every game
+  clean except `wayfinder`'s `gl`/`ui` canvases (render-only; its one
+  hit-tested canvas already measures its own rect).

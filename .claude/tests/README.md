@@ -114,6 +114,25 @@ And one about a long-running driven loop, from the same session:
   clearing it; re-clear inside the loop, and the guarded path stays real while
   the only thing removed is what could undo it.
 
+And one from 2026-08-28, chasing fire-clicker's landscape misalignment — a
+check that was **green at every viewport while the game was unplayable**:
+
+- **Never source a tap's coordinate from the thing that tap is meant to
+  verify.** The bug was a disagreement between two coordinate spaces: the
+  scene was laid out from `window.innerHeight` but hit-tested against the
+  canvas's own box, so on iOS it drew higher than it answered. The check
+  tapped at `G.fire` — the hit test's *own* anchor — so both sides of the
+  comparison moved together and it could only ever pass. The fix is to derive
+  the tap from the **rendered** position (`G.fire.y * boxHeight / H`), the
+  number a player's eye actually uses, so the check spans the two spaces the
+  bug lives between. Generalise it: **when a bug is a disagreement between two
+  representations, a check that reads only one of them cannot see it**, no
+  matter how thoroughly it exercises the feature. Ask what your assertion's
+  coordinates, ids or sizes are *read from*, and whether the bug you fear
+  would move that source too. The same session also shipped a guard written as
+  `innerWidth !== W` — both sides the wrong space — which is the identical
+  mistake in production code rather than in a check.
+
 Two more from 2026-08-27, re-tuning Ember Depths' economy — both are about a
 check that is **correct today and becomes noise tomorrow**:
 

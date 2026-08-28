@@ -137,6 +137,23 @@ a MAP ROTATION slider (orienting the map), and two armed modes — THUMB (tap to
 place your claimed position) and BEARING (tap a target; the bearing is taken
 from the thumb, as it would be from your thumb on a real map).
 
+## Known: the gl/ui canvases size from `window.inner*`
+
+`resize()` sets `W = window.innerWidth; H = window.innerHeight` and sizes both
+`glcv` and `uicv` from that, while their CSS box is `width:100%;height:100%`.
+On iOS those two disagree after a rotation (games/CLAUDE.md § Canvas sizing),
+so the 3D view and its HUD would render **vertically squashed** until the box
+settles. Flagged by `.claude/scripts/check-canvas-space.cjs`
+(`SQUASH=0.846`), 2026-08-28 — not fixed, and deliberately not urgent:
+
+- It is **render-only here.** The one canvas wayfinder hit-tests is `mapcv`,
+  and `sizeMapCanvas()` already measures its own `getBoundingClientRect()`, so
+  no tap, thumb-marker drag or pencil mark can land wrong.
+- The fix, if the CD wants it, is the same one-line cure fire-clicker uses:
+  take `W`/`H` from `glcv.getBoundingClientRect()` rather than `window`. The
+  bearing/pace maths reads `W`/`H` only through the projection, so nothing
+  downstream needs to change.
+
 ## Graceful degradation
 
 If `webgl2` is unavailable the game does not throw: `gfxOk` stays false, the HUD

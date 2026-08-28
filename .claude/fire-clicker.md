@@ -1,6 +1,6 @@
 # Fire Clicker — context
 
-`games/fire-clicker/index.html` (~1470 lines, single file). **A village
+`games/fire-clicker/index.html` (~1500 lines, single file). **A village
 fire-keeping sim, NOT a shop-list clicker** — the CD explicitly redesigned it
 away from the croissant/basketball template on 2026-08-28 (the first shipped
 version was that template; it was fully replaced the same day). The whole game
@@ -135,7 +135,7 @@ Apache/MIT. The CD may develop it into a real app.
 - Flame spawn per frame must be probabilistic (`floor + rand<frac`) — a bare
   `for (i < fractionalWant)` loop always runs once and a dying fire smokes
   like a bonfire.
-- **Drive suite: `.claude/tests/drive-fire-clicker.cjs`** (36 checks — see
+- **Drive suite: `.claude/tests/drive-fire-clicker.cjs`** (39 checks — see
   its row in `.claude/tests/README.md`). Run it after any change to the fire
   model, villager states, houses/stages, bubbles or lighting:
   `NODE_PATH=<playwright-core dir>/node_modules node .claude/tests/drive-fire-clicker.cjs`
