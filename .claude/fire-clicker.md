@@ -214,9 +214,11 @@ Two things the eval taught that are not obvious from the tables:
 - **Pacing eval: `.claude/tests/eval-fire-clicker.cjs`** (11 checks) — the two
   personas above, plus a calibrated analytic estimator. Run it after any change
   to a cost curve, `tripYield`, walk speed, work time or the villager loop:
-  `node .claude/tests/eval-fire-clicker.cjs --days 400 --seeds 3 --model`
+  `node .claude/tests/eval-fire-clicker.cjs --days 400 --seeds 3`
   (~55 s). For a balance sweep with no browser at all,
   `node .claude/tests/eval-fire-clicker.cjs --model-only --days 400` answers in
   ~0.3 s — but only trust it while the run's `MODEL vs SIM` MAE stays low and
   the `cycle measured / model` line stays within a few percent. Both of those
   print on every full run for exactly that reason.
+  Method + the two calibration surprises:
+  `.claude/notes/20260828-pacing-a-real-time-game-in-wall-clock-hours.md`.

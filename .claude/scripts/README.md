@@ -176,7 +176,17 @@ Deterministic helpers for working on this repo.
   .claude/scripts/gates.sh                     # derive pages from git
   .claude/scripts/gates.sh games/<slug>/index.html   # explicit
   .claude/scripts/gates.sh --no-drive          # smoke + sync only
+  .claude/scripts/gates.sh --eval              # ALSO run the pacing evals
   ```
+
+  **`--eval` is the one you have to remember.** A drive suite proves the rules;
+  an `eval-<slug>.cjs` proves the **pacing**, and the two fail on different
+  changes — a cost curve, a yield, a walk speed or a work timer can move a
+  milestone by hours while every rule still holds, which is exactly what a
+  rules-only gate is blind to. Evals cost ~a minute, so they are opt-in, but the
+  script never stays quiet about one it did not run: when a changed game has an
+  eval it prints `EVAL available, NOT run: <file>`. Added 2026-08-28, after a
+  fire-clicker balance pass that had to be re-run by hand every time.
 
   With no arguments it takes the changed `.html` from the working tree, the
   index, and `origin/main...HEAD` — the common mid-session case. It reports

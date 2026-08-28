@@ -5,10 +5,18 @@
 #   .claude/scripts/gates.sh                    # derive targets from git
 #   .claude/scripts/gates.sh <page.html> [...]  # explicit pages
 #   .claude/scripts/gates.sh --no-drive [...]   # skip the drive suites
+#   .claude/scripts/gates.sh --eval [...]       # ALSO run the pacing evals
 #
 # With no arguments it reads the working tree + the commits since origin/main
 # for changed pages, smokes those, and runs any `.claude/tests/drive-<slug>.cjs`
 # whose game those pages belong to. That is the common case mid-session.
+#
+# A drive suite proves the rules; an `eval-<slug>.cjs` proves the PACING, and
+# the two fail on different changes — a cost curve or a walk speed can move a
+# milestone by hours while every rule still holds. Evals cost ~a minute, so
+# they are opt-in via --eval, but this script always SAYS when one exists and
+# was not run: the failure mode worth designing against is a balance change
+# shipping with only the rules checked.
 #
 # Always runs check-games-sync.cjs — it is pure node, costs nothing, and the
 # three files it compares drift independently.
@@ -22,10 +30,12 @@ set -u
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" || exit 1
 
 DRIVE=1
+EVAL=0
 PAGES=()
 for a in "$@"; do
   case "$a" in
     --no-drive) DRIVE=0 ;;
+    --eval)     EVAL=1 ;;
     -*) echo "unknown flag: $a" >&2; exit 1 ;;
     *) PAGES+=("$a") ;;
   esac
@@ -110,6 +120,27 @@ if [ "$DRIVE" = 1 ] && [ "$HAVE_PW" = 1 ]; then
   fi
 elif [ "$DRIVE" = 1 ]; then
   echo "DRIVE skipped (no playwright-core)"
+fi
+
+# --- gate 5: pacing evals for the games touched (opt-in, but never silent) ---
+if [ "$HAVE_PW" = 1 ]; then
+  evals=()
+  for p in ${PAGES[*]+"${PAGES[@]}"}; do
+    case "$p" in
+      games/*/index.html) slug=$(basename "$(dirname "$p")") ;;
+      games/*.html)       slug=$(basename "$p" .html) ;;
+      *) continue ;;
+    esac
+    e=".claude/tests/eval-$slug.cjs"
+    [ -f "$e" ] && case " ${evals[*]-} " in *" $e "*) ;; *) evals+=("$e") ;; esac
+  done
+  if [ ${#evals[@]} -eq 0 ]; then
+    :
+  elif [ "$EVAL" = 1 ]; then
+    for e in "${evals[@]}"; do run "EVAL $(basename "$e")" node "$e"; done
+  else
+    echo "EVAL available, NOT run: ${evals[*]} — re-run with --eval after any change to a cost curve, a yield, a speed or a timer"
+  fi
 fi
 
 [ $rc -eq 0 ] && echo "GATES: GREEN" || echo "GATES: RED"

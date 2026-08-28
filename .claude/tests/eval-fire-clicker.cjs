@@ -62,9 +62,11 @@
  * Run: NODE_PATH=/opt/node22/lib/node_modules/playwright/node_modules \
  *      node .claude/tests/eval-fire-clicker.cjs [--days 200] [--seeds 3]
  *                       [--dt 0.0333] [--persona speedrun|casual|both]
- *                       [--casual-strict] [--model] [--report]
+ *                       [--casual-strict] [--no-model] [--report]
  *   --report      prints the tables and skips the assertions (use while tuning).
- *   --model       also runs the analytic estimator and prints its error vs the sim.
+ *   --no-model    skips the analytic estimator. It runs by default, printing its
+ *                 error against the sim and asserting the MAE, because that
+ *                 printout is the only thing that stops it silently rotting.
  *   --model-only  skips the browser entirely — the estimator alone, in
  *                 milliseconds. This is the mode for sweeping a balance
  *                 constant; the full run's MODEL vs SIM table is what licenses
@@ -94,7 +96,12 @@ const DT      = +opt('--dt', 1/30);
 const WHO     = opt('--persona', 'both');
 const STRICT  = flag('--casual-strict');
 const REPORT  = flag('--report');
-const WANT_MODEL = flag('--model') || REPORT;
+/* The estimator runs BY DEFAULT. It costs ~0.2 s, and the only thing keeping it
+   honest is its error being printed and asserted on every run — an estimator
+   nobody checks becomes fiction within two commits. --no-model is the escape
+   hatch, not --model the opt-in, so a bare `gates.sh --eval` still catches
+   drift. (`--model` is kept as a no-op alias; it appears in older notes.) */
+const WANT_MODEL = !flag('--no-model');
 const VW = +opt('--vw', 390), VH = +opt('--vh', 844);
 /* Throughput-model constants, CALIBRATED against the browser sim (see the
    `cycle measured / model` line the run prints). They are the game's own
