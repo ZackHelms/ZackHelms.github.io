@@ -632,7 +632,7 @@ settled-freeze regressions):
 `.claude/tests/drive-phasic.cjs`. Detailed context: `.claude/phasic.md`
 (includes the maintained tactics registry).
 
-### FIRE CLICKER (`fire-clicker/index.html`, ~900 lines)
+### FIRE CLICKER (`fire-clicker/index.html`, ~1470 lines)
 A snowy-village fire-keeping sim, CD-commissioned 2026-08-28 and explicitly
 NOT built on the croissant/basketball shop-list template. One rendered scene:
 stylized-cartoon snowfield, two straw houses, an unlit central campfire ringed
@@ -651,7 +651,9 @@ container. Houses sleep 5 villagers each; BUILD HOUSE fills slots (5 at
 CAMP), then FOUND VILLAGE shrinks the architecture to timber cabins (up to
 10) with trodden paths and unlocks the tavern (+walk speed), general store
 (+yield) and sawbones hut (+work speed). Town/city/metropolis, building
-upgrade chains and ascension: `games/fire-clicker/TODO.md`. **Proprietary — no permissive license in this directory** (one of the
+upgrade chains and ascension: `games/fire-clicker/TODO.md`. Drive suite:
+`.claude/tests/drive-fire-clicker.cjs` (36 checks). Detailed context:
+`.claude/fire-clicker.md`. **Proprietary — no permissive license in this directory** (one of the
 five protected games). Detailed context: `.claude/fire-clicker.md`.
 
 ### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)

@@ -46,4 +46,3 @@ trodden paths). Everything below is not built yet.
 - [ ] More log seats / bigger fire ring as population grows.
 - [ ] Stockpile art that visibly grows with stored resources.
 - [ ] Mishap events + toasts to give constable/fire marshal something real.
-- [ ] Promote the scratchpad drive suite into `.claude/tests/`.
