@@ -1,5 +1,20 @@
 # Baking 3D to sprites, with no 3D tools at all
 
+> **The studio already has a skill for this: `zmh-3d:sprite-prerender`.** It is
+> the knowledge layer for pre-rendered sprites in Canvas 2D games — the runtime
+> cache, cache-key rules, LRU byte budgets, symmetry-aware frame counts, what
+> must stay live, the recorded-motion-track half, and the checks that keep a
+> bake honest — distilled from star-surge's `SPRITESHEETS` style. **Read it
+> first.** This note is deliberately only what that skill does not cover: the
+> *offline 3D* half, where the thing being baked is a mesh rather than the
+> game's own live painter. Where the two overlap ("bake at the size you blit"),
+> the skill is the authority and this note just records that Neon Clash got it
+> wrong the same way star-surge did.
+>
+> (I initially reported that skill did not exist. It did — my marketplace
+> checkout was a container-start snapshot that had never been fetched. Fetch
+> before concluding a skill is missing.)
+
 From the 2026-08-27 Neon Clash session, which added a third graphics style:
 the same cast **modelled, textured, normal-mapped, lit and rendered offline**
 into one atlas, then blitted at runtime. Source: `games/neon-clash/models/`
@@ -117,6 +132,19 @@ Zero front-facing triangles on a shape that "renders" is the tell.
 Related: **an open lathe is a shell**, and under this projection you look
 straight down into it. Cap profile ends by default.
 
+## Bake at the size you blit
+
+The units are drawn 1.5x larger than life (true human proportions inside a
+generous collision radius). Baking at 1x and passing a 1.5 multiplier at draw
+time is the obvious implementation and it is wrong: the sprite is then upscaled
+66% on a dpr-2 phone and ships visibly soft — the entire point of a
+pre-rendered style thrown away, with nothing failing anywhere. Put the factor
+in the **bake** and draw 1:1. Keep two named resolutions per group (`ppu` per
+drawn world unit, `bake` per model world unit) so the relationship is
+assertable, and assert it. Cost is the **square** of the factor: this atlas
+went 1.5 MB -> 2.3 MB. This is the skill's rule, and star-surge hit it the same
+way when it tripled its hulls.
+
 ## Ship it as a fallback, not a dependency
 
 A style with a downloadable asset is the first thing in a
@@ -155,6 +183,7 @@ Pixels are hard to test; structure is not. The checks that earned their place:
 - the atlas is blitted under the new style and **not touched** under any other
 - the draw order is monotonic in y under the 3/4 style, and empty under flat ones
 - an atlas that never loads still yields a playable board
+- no group is blitted above the resolution it was baked at
 - the sim is byte-identical under every style (the skin-is-paint invariant)
 
 And one that is not an assertion: `build.mjs` reports any sprite that touched

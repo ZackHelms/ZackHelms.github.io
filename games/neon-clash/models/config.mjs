@@ -15,6 +15,17 @@ export const SS = 3;                    // supersample factor
 export const UNIT_TILE = 152;
 export const UNIT_SPAN = 22;            // world units across a unit tile
 export const PPU = UNIT_TILE / UNIT_SPAN;   // 6.91
+// BAKE AT THE SIZE YOU BLIT. The humanoids are modelled at true human
+// proportions, which leaves a knight ~5 world units across inside a 10.8-unit
+// collision circle; the units are therefore drawn 1.5x larger than life. Baking
+// at 1x and scaling up at draw time is the obvious way to do that and it is
+// wrong -- a sprite blitted above its baked size is visibly soft, which is the
+// whole point of the technique thrown away. So the factor goes into the BAKE:
+// unit groups render at PPU * ART_SCALE and are drawn at 1:1.
+// (zmh-3d:sprite-prerender, "Bake at the size you BLIT"; star-surge hit the
+// same thing when it tripled its hulls.)
+// Cost is the SQUARE of this: 1.5 costs 2.25x the pixels for those groups.
+export const ART_SCALE = 1.5;
 export const RENDER_CANVAS = 280;       // generous; every sprite is cropped after
 export const UNIT_PIVOT_Y = 0.800;      // where the ground plane sits in that canvas
 export const YAWS = 12;                 // 30-degree steps around the compass

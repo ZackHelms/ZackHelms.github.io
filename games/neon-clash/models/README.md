@@ -1,5 +1,16 @@
 # Neon Clash — the pre-render pipeline
 
+> **Read `zmh-3d:sprite-prerender` first.** That skill is the studio's
+> knowledge layer for pre-rendered sprites in Canvas 2D games, distilled from
+> star-surge's `SPRITESHEETS` style. It covers the runtime half — the sprite
+> cache, cache-key rules, LRU byte budgets, symmetry-aware frame counts, what
+> must stay live, and the checks that keep a bake honest. **This pipeline is
+> the other half**: star-surge bakes its own live 2D painter into offscreen
+> canvases at load time; Neon Clash renders actual 3D models offline into a
+> shipped atlas. The skill's rules that are about *baking* apply here in full —
+> notably "bake at the size you blit", which this pipeline got wrong on its
+> first pass and now enforces with a test.
+
 The **source** for the game's `sprite` graphics style. Everything the sprite
 skin draws is baked here, offline, into one atlas:
 
@@ -67,7 +78,17 @@ rather than a texture. Every frequency in `materials.mjs` is chosen to land
 between those bounds; `freq ~= 1 / feature-size-in-world-units`. This file has
 been wrong in **both** directions during its first build.
 
-**4. Timber runs along local +Z.**
+**4. Bake at the size you blit.**
+A group carries two resolutions and they are not the same number: `ppu` is
+atlas pixels per **drawn** world unit (identical for every group, because they
+all land on the same board at the same scale), and `bake` is atlas pixels per
+**model** world unit. Units are drawn 1.5x larger than life, so they are
+*rendered* 1.5x larger and land 1:1. Baking at 1x and multiplying at draw time
+is the obvious way to do it and it ships a visibly soft sprite — the whole
+point of the technique thrown away, with nothing failing anywhere. The drive
+suite asserts `bake / art === ppu` for every group.
+
+**5. Timber runs along local +Z.**
 Every plank is a box authored as (width, depth, height) and every tube is built
 along +Z before transforming, so wood grain rings about Z. Ringing about another
 axis wraps concentric arcs around a fence plank and turns sawn board into bark.
@@ -76,7 +97,7 @@ axis wraps concentric arcs around a fence plank and turns sawn board into bark.
 
 | You want | Change |
 |---|---|
-| A unit bigger/smaller on the board | `scale` on its group in `build.mjs` (1.5 today). The models are at true human proportions; this is the correction to the game's collision radius |
+| A unit bigger/smaller on the board | `ART_SCALE` in `config.mjs` (1.5 today). The models are at true human proportions; this is the correction to the game's collision radius. It changes the BAKE resolution, not a draw-time multiplier — see below — and costs its **square** in atlas pixels |
 | A different pose or a new frame | the `poses` array in `build.mjs`, and the pose parameters the model's function accepts (`walk`, `attack`, `stride`, `crouch`, `lean`, `twist`, `armL/armR`) |
 | Smoother turning | `YAWS` in `config.mjs` (12 = 30-degree steps). Cost is linear in atlas size |
 | Crisper sprites | `UNIT_TILE` up (PPU rises). Beyond ~7.6 px/unit is wasted — that is the game's own scale on a phone |
