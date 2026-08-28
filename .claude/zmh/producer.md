@@ -86,6 +86,18 @@
   commits in `8dd459f..bd1fca5` were `5f6063b` (their refine commit),
   `b82f09d`/`c27f126` (their merges of this session's work) and `8a261e7`
   (their own note into this file) — all theirs and all already recorded.
+  While that pass was committing, a **neon-clash** session landed `21da535`,
+  `e9ae2bd`, `44bbb67` and `bc77f20` (a third graphics style pre-rendered from
+  3D — the first outside consumer of the `zmh-3d:sprite-prerender` skill).
+  Those are visible in `git log bd1fca5..HEAD`, not hidden: the pointer was
+  written before they landed, per the ancestor rule above. They are that
+  session's to refine. Two of their pushes conflicted on `games/CLAUDE.md`'s
+  Graphics-styles row, both times because they appended to the same row this
+  session had edited — resolved by taking their row (which already contained
+  this session's edits, merged in) and re-adding this session's separate
+  Pre-rendered-art row, then re-running the gates. Their `games/neon-clash/`
+  and `.claude/neon-clash.md` were verified byte-identical to `origin/main`
+  afterwards.
   Earlier entries, all since cleared:
   turret-builder's `acb50c1` + `e9ea508` were an entry and the
   2026-08-23 turret-builder pass refined them (it also found and fixed a live
