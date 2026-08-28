@@ -24,7 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
-| Neon Clash | `neon-clash/` | card-battler | drag-place, tap, tap-select | match-vs-ai, local-2p | card-deck, resource-economy, ai-opponent, rotated-2p-ui, area-of-effect, art-styles, prerendered-sprites | vs-ai, local-2p | `.claude/neon-clash.md` |
+| Neon Clash | `neon-clash/` | card-battler | drag-place, tap, tap-select | match-vs-ai, local-2p | card-deck, resource-economy, ai-opponent, rotated-2p-ui, area-of-effect, art-styles | vs-ai, local-2p | `.claude/neon-clash.md` |
 | Zed Shooter | `zed-shooter/` | shooter | virtual-joystick, kb-mouse | wave-survival | meta-progression | solo | external: zed-fps repo |
 | Mitochondria Simulator | `mitochondria/` | biology-sim | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox, guided-lessons | systems-simulation, scale-ladder, skill-teaching, real-time-3d | solo | `.claude/mitochondria.md` |
 | Quantum Chemist | `qntmchmst/` | grid-puzzle | tap, drag-place | level-campaign | match-clear | solo | external: qntmchmst repo |
@@ -209,7 +209,16 @@ from **inventing a new facet value**, not filling a hole. Open directions:
   over the same simulation, behind a settings cogwheel (`toon` defaults in
   neon-clash and turret-builder; star-surge grew to five styles — including a
   pre-rendered `sprite` mode that bakes the 3D art into sprite frames — and now
-  defaults to its 3D `anim` one). Everything else here paints exactly one way. The pattern to copy is
+  defaults to its 3D `anim` one). Within that one facet the *implementations* now
+  differ in a way worth knowing before copying one: star-surge and neon-clash
+  both ship a pre-rendered style, but star-surge bakes its own live painter
+  into offscreen canvases at load time while neon-clash renders 3D models
+  **offline** into a committed PNG atlas — the only binary art asset in
+  `games/`, and the only style that can fail to load and must fall back. That
+  is an implementation axis, not a design one, so it stays prose here rather
+  than becoming a facet value (`game-facets.md`: reuse an existing value
+  whenever honest, and a new value must be added to the shared vocabulary in
+  zmhstudio, not just to an index). Everything else here paints exactly one way. The pattern to copy is
   `.claude/notes/20260823-canvas-skins-and-cel-shading.md`: a skin is paint (the
   sim never reads it), `glow()` goes no-op rather than branching at every call
   site, each part is shaded about its OWN centre, the shade wedge counter-rotates

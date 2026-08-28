@@ -52,6 +52,24 @@ Deterministic helpers for working on this repo.
   Drive suites worth keeping across sessions live in `.claude/tests/` — see
   that folder's README for when a suite earns a place there.
 
+- `marketplace-status.sh` — **is the plugin marketplace clone current, and does
+  a skill actually exist?** Fetches the directory-source marketplace this repo
+  declares and reads its skill list off `origin/main`, never off the working
+  tree. Prints `MARKETPLACE=` `LOCAL=` `REMOTE=` `BEHIND=` and either
+  `SKILLS=<all>` or, given a name, `SKILL_FOUND=<plugin:skill>`; exits 1 when
+  the clone is behind or the named skill is absent from the remote.
+
+  ```bash
+  .claude/scripts/marketplace-status.sh                    # freshness + full list
+  .claude/scripts/marketplace-status.sh sprite-prerender   # does this one exist?
+  ```
+
+  Exists because the clone at `/home/user/zmhstudio` is made when the container
+  is built and **never fetched by anything**, so `ls` of its skills directory
+  says only what existed that day. Reported-missing-but-actually-present cost a
+  session on 2026-08-27/28 (`.claude/notes/20260822-zmh-plugin-bootstrap.md`).
+  Run it before telling the CD a skill does not exist.
+
 - `shot-page.cjs` — headless screenshot of any repo page for **visual
   iteration** (WebGL2 renders via SwiftShader). Same Chromium/`NODE_PATH`
   requirements as the smoke gate. Options: `w=/h=/dpr=` viewport,
