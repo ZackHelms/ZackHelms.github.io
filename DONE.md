@@ -1,5 +1,11 @@
 # DONE — done log
 
+- 2026-08-29 [phasic] Launch-block audition PASSED — the CD signed off on
+  the block-8 playtest and the `Launch` / `The Flue` name+hint wording
+  (backlog-refine interview). Closes phasacro's "Blocked — needs you"
+  items; its deferred endless-launch-weighting question is unblocked and
+  now sits in TODO `## Next`.
+
 - 2026-08-02 [phasic] phasport oversee run: the Phasic iOS app —
   imported into `rn-ios-flightdeck` as a GameShell WKWebView app
   (`games/phasic`: 5-file www payload incl. wiki + license, 8 flattened
@@ -28,8 +34,8 @@
   flame-heated commits. 139/140 salt wins, all serve salt 0; blocks 0–7 +
   endless byte-identical (pinned hashes held). Block-8 curriculum excluded
   from gravmazes/weaves; endless keeps everything. Suite 374→399; wiki
-  tactic #11 now names the block. CD audition pending: name/hint +
-  block-8 playtest. (2878020..cd2cdb9 + wrap-up docs; plan archived to
+  tactic #11 now names the block. CD audition passed 2026-08-29
+  (name/hint + block-8 playtest signed off at backlog-refine). (2878020..cd2cdb9 + wrap-up docs; plan archived to
   .claude/plans/DONE/)
 
 - 2026-08-01 [phasic] phasmazes oversee run: obstacle-era gravmazes — the

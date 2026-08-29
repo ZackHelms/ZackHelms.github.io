@@ -2,6 +2,9 @@
 
 ## Blocked — needs you
 
+*(Resolved 2026-08-29: audition + block-8 playtest PASSED at the
+backlog-refine interview; name/hint kept as drafted.)*
+
 - **Audition the tutorial (L65 "The Flue")**: play it cold — does the launch
   read as discoverable? Verdict on the block word `Launch`, the name
   `The Flue`, and the hint ("No pour ever climbs a wall — melt the ruby
@@ -43,5 +46,5 @@
 
 - Endless weighting for launch boards (plan's own follow-up — endless 72+
   currently never draws the launch template; decide after the block
-  auditions well).
+  auditions well). *(Moved to TODO `## Next` 2026-08-29 — audition passed.)*
 - Tutorial name/hint one-liners if the CD renames at audition.
