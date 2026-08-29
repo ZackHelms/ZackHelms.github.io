@@ -188,6 +188,81 @@ Apache/MIT. The CD may develop it into a real app.
   content it was meant to extend. The evolve control is a **banner, not a
   card** — it is the only irreversible action in the game, and a row that looks
   like every other row is one someone taps by reflex — and it takes two taps.
+- **MISHAPS** (`MISHAPS[]`, `MISHAP_FAM`, `mishapStep`, `THIEF`, 2026-08-29) —
+  accidents, crime and fire, and the thing that turned the three service
+  buildings from flat multipliers into **insurance**. Four rules:
+  1. **ONE incident model, three skins.** Every mishap is a work bar: `work`
+     response-seconds, closed at `mishapRate(k, lvl)` per second by whichever
+     civic building answers the family, and a player tap closes `MISHAP_TAP`
+     (10%) of it. The CD's brief — "tapping the disaster expedites recovery,
+     improved buildings improve recovery speed" — is therefore written once.
+     A fourth family later is a row in the table plus one painter.
+  2. **The LADDER escalates it**, exactly as `BIZ_DEFS[].at` does: each family
+     lists one row per rung and the highest row the settlement has reached is
+     the one that fires. `need` — the RANK of building the incident demands —
+     escalates with it. Under-equipped is slow-but-possible for medicine and
+     fire; for **crime it is a hard gate by CD spec**, so a tap on a thief you
+     cannot catch produces a villager explaining why.
+  3. **Mishaps start at VILLAGE.** A four-hut camp has nothing worth stealing,
+     no business to burn and no slack to absorb an idle villager — and gating
+     on `stageIx() >= 1` leaves the measured pacing to FOUND VILLAGE, the first
+     number the eval reports, untouched by the whole system. The clock also
+     only runs on a **burning** camp: a cold camp has nobody out to hurt, and
+     kicking a player whose fire just died is piling on.
+  4. **Nothing is saved but the scoreboard.** An in-flight incident is a
+     moment, not progress. `S.stolen`/`S.caught` persist; `MISH`/`THIEF` do
+     not, and a damaged building is a property of the live blaze (put the fire
+     out and it is whole), which is why there is no repair state to migrate.
+  - **`bizLvl(id)` is the ONE read** of a civic building's level. A building on
+    fire is not doing its job, so `drainRate`/`tripYield`/`walkMul`/`workTime`
+    all read `bizLvl()` and never `S.up[id]` for anything `BIZ_DEFS` owns. A
+    blaze therefore costs the settlement the EFFECT and not just an animation.
+  - **THE THIEF** is the one mishap that is an AGENT rather than a bar, because
+    the CD asked for exactly that. He enters from offscreen, works between
+    cover points (buildings, trees, rocks), dips into the stockpile `grabs`
+    times, and leaves with a visibly growing sack. His announcement toast is
+    **vague on purpose** ("something moved between the buildings…") — a precise
+    callout deletes the game of spotting him, no callout robs a player who is
+    in the upgrade panel. A catch returns the **whole** bag. A constable takes
+    one unaided about one time in seven, a station one in four (0.25%/s per
+    rank), which is the CD's "most of the time the thief will get away".
+  - **THE GRAB CEILING** (`THIEF_GRAB`, `thiefGrabCap`) is the one number here
+    that came out of a measurement rather than a guess, and it is the whole
+    reason this system does not wreck the game. A share of the STOCKPILE is the
+    right feel — an early sack is a tenth of everything you own — but a share
+    of a hoard is an **unbounded tax on saving**, and saving is exactly what an
+    expensive FOUND card demands. Measured, uncapped: a hands-off player's TOWN
+    slipped 16% and CITY went from 8 h to unreachable in 33 h, because a thief
+    every couple of minutes compounds against a pile being held rather than
+    spent. A grab is now `min(cut × pile, THIEF_GRAB armfuls per villager)`, so
+    the cut binds while the pile is small and the ceiling binds once it is not.
+  - **Theft never touches `S.gathered`.** Reach is what the camp HAULED and a
+    thief cannot un-haul it; he costs you the purchase, not the run. Pinned.
+  - **`mishapDrag(tended, pop)` lives inside the LADDER-SPEC span** with the
+    cost curves, because it is the one function the pacing model reads. A
+    mishap tax the model did not know about would silently rot every milestone
+    it reports. `MISHAP_CYCLE`/`MISHAP_HOLD`/`MISHAP_BIZ_WORTH` are its three
+    estimates and MODEL vs SIM is what checks them.
+  - **`'hurt'` is a DEAD-END villager state**: nothing but `mishapStep()` leaves
+    it, so an injury costs real throughput rather than a slower walk. The price
+    of a dead end is that **every role flip has to release it** —
+    `syncVillagers` calls `dropMishap(v.hurt)` alongside `vRelease`, the same
+    shape as the keeper-flag bug below. The firekeeper is never injured: it is
+    the camp's recovery valve, and idling it turns an unlucky roll into an
+    unrecoverable run.
+  - **Tap order** in `pointerdown` is the contract: thief → incident →
+    villager → work site → fire. A hurt villager is the one villager whose tap
+    is help rather than a chat bubble.
+  - **The badge glyphs are DRAWN, not emoji.** The badge is the read-out for
+    the whole layer and has to survive a device with no glyph for U+1FA79, a
+    webfont that has not loaded, and a canvas falling back to tofu — all three
+    of which this game has already met. Blaze flames go in the y-sorted item
+    list (a villager can pass in front); the badge and arc are drawn AFTER the
+    lighting pass, because a read-out that dims at night is one you lose
+    exactly when you need it. A burning roof also punches a light hole.
+  - Measured: a hands-off player loses ~5% of throughput at VILLAGE rising to
+    ~21% at METROPOLIS, a tending one under 3% throughout, and the stage-ladder
+    skill gap widened from 2.11×/1.98×/2.94× to **2.16×/2.05×/3.17×**.
 - **The skill gap is measured on the STAGE LADDER, not on population.** POP was
   the proxy until 2026-08-29 and stopped being a valid one the moment the
   recruit curve flattened (1.75 → 1.45): recruits became cheap for everyone, so
@@ -268,12 +343,22 @@ Apache/MIT. The CD may develop it into a real app.
   hidden.
 - Chrome z-80 (back/mute/upgrade btn) above the upgrade overlay z-70.
 
-## Design intent going forward (CD, 2026-08-28 — details TBD)
-- Resources → **stage progression**: village → town → … → futuristic city.
-- Endgame: **ascend** (reset with a productivity boost scaled by progress).
-  `S.lifeWarm`/`S.day` are the obvious inputs; nothing is wired yet.
+## Design intent going forward (CD)
+Both 2026-08-28 items are **built**: the five-rung stage ladder, and EVOLUTION
+(which is the "ascend" idea, on the reach metric rather than on `lifeWarm`).
+What is left is the long road, scoped 2026-08-29:
+- **The KARDASHEV ladder.** The CD's endgame is a **Type III** civilization,
+  taken one type at a time, with **Type I** the next arc after METROPOLIS.
+  Two things fit the game unusually well and are worth using: Sagan's
+  continuous `K = (log₁₀P − 6)/10` is a live progress index across a scale that
+  is otherwise three discrete names (the same lesson the evolution reach metric
+  taught), and **the hearth ladder already IS the Kardashev axis** — solar
+  sails and ambient capture are simply its next rungs, under the rule that has
+  held for five: the flame never changes, only its housing. The open fork is
+  what a resource MEANS at planetary scale; full write-up and the Needs-Zack
+  list: `games/fire-clicker/TODO.md` § The long road.
 - Keep the scene the hero: any new mechanic should be visible in the world
-  (new buildings, busier villagers), not a bigger menu.
+  (new buildings, busier villagers, a thief behind a rock), not a bigger menu.
 
 ## Pacing (measured, not guessed)
 

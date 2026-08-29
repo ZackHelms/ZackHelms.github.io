@@ -133,7 +133,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-29 15:21 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-29 23:24 UTC</div>
 <canvas id="scene"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
 <button id="mute-btn" aria-label="Mute">&#128266;</button>
@@ -240,6 +240,129 @@ function bizShown(id) { return stageIx() >= bizDef(id).at[0]; }
    allows — the second half of a FOUND card's gate. */
 function bizReady(k)  { return BIZ_DEFS.every(b => (S.up[b.id] || 0) >= b.at.filter(a => a <= k).length); }
 
+/* ============================== MISHAPS ==============================
+   Accidents, crimes and fires — the layer that turns every service building
+   from a flat multiplier into INSURANCE. What can go wrong is decided by what
+   you have BUILT, which is the CD's "dramatically appropriate" rule: a village
+   with a sawbones hut gets gashes; a metropolis with a containment core gets
+   plasma burns and drone heists.
+
+   Three rules hold the system together, and all three are why this is a table
+   rather than three hand-written events:
+
+   1. ONE incident model, three skins. Every mishap is a work bar — `work`
+      response-seconds, closed at mishapRate() per second by whichever civic
+      building answers it, and a player tap closes MISHAP_TAP of it. That is
+      "tapping the disaster expedites recovery, better buildings recover
+      faster" stated once instead of three times, and it is why adding a
+      fourth family later is a row here plus one painter.
+   2. The LADDER escalates it. Each family lists one row per rung and the
+      HIGHEST row the settlement has reached is the one that fires — the same
+      shape as BIZ_DEFS[].at. A town gets a burglar where a village got a kid
+      with a sack, and the rank of law it takes to catch him rises with him.
+   3. Mishaps start at VILLAGE. A four-hut camp has nothing worth stealing, no
+      business to burn, and no slack to absorb an idle villager. Gating on
+      stageIx() >= 1 also leaves the measured pacing to FOUND VILLAGE — the
+      first milestone the eval reports — untouched by this whole system.
+
+   `need` is the LEVEL of the answering building the incident demands.
+   Under-equipped is slow-but-possible for medicine and fire (villagers
+   improvise with snow, a splint and a bucket line). For CRIME it is a hard
+   gate, by CD spec: without a constable of the right rank the thief cannot be
+   caught at all, and a tap on him produces a villager explaining why. */
+const MISHAP_FAM = {
+  med:   { svc:'sawbones',  icon:'\u{1FA79}', n:'INJURY' },
+  crime: { svc:'constable', icon:'\u{1F977}', n:'THEFT'  },
+  fire:  { svc:'marshal',   icon:'\u{1F525}', n:'BLAZE'  },
+};
+/* `at` is the stage index at which a row becomes its family's incident.
+   `work` is response-seconds. Crime has none — a thief is a chase, not a bar —
+   and carries `grabs`/`cut` instead: how many times he dips into the
+   stockpile and what share of it he lifts each time. */
+const MISHAPS = [
+  { id:'gash',    fam:'med',   at:1, need:0, n:'DEEP GASH',        work:14 },
+  { id:'fever',   fam:'med',   at:2, need:1, n:'WINTER FEVER',     work:22 },
+  { id:'crush',   fam:'med',   at:3, need:1, n:'CRUSH INJURY',     work:30 },
+  { id:'burns',   fam:'med',   at:4, need:2, n:'PLASMA BURNS',     work:40 },
+  { id:'sneak',   fam:'crime', at:1, need:0, n:'SNOW SNEAK',       grabs:3, cut:0.035 },
+  { id:'burglar', fam:'crime', at:2, need:1, n:'BURGLAR',          grabs:4, cut:0.040 },
+  { id:'runner',  fam:'crime', at:3, need:1, n:'SYNDICATE RUNNER', grabs:5, cut:0.045 },
+  { id:'heist',   fam:'crime', at:4, need:2, n:'DRONE HEIST',      grabs:6, cut:0.050 },
+  { id:'cinder',  fam:'fire',  at:1, need:0, n:'ROOF CINDER',      work:16 },
+  { id:'blaze',   fam:'fire',  at:2, need:1, n:'ROOF BLAZE',       work:26 },
+  { id:'boiler',  fam:'fire',  at:3, need:1, n:'BOILER FLASH',     work:34 },
+  { id:'flare',   fam:'fire',  at:4, need:2, n:'CORE FLARE',       work:44 },
+];
+const MISHAP_W   = { med:3, crime:2, fire:2 };  // relative frequency of each family
+const MISHAP_TAP = 0.10;                        // a player tap closes this much of a work bar
+/* THE GRAB CEILING, and the one number in this file that came out of a
+   measurement rather than a guess. A thief takes `cut` of the STOCKPILE, which
+   is the right feel — an early sack is a tenth of everything you own — but a
+   share of a hoard is an UNBOUNDED tax on saving, and saving is exactly what
+   an expensive FOUND card demands. Measured, uncapped: a hands-off player's
+   TOWN slipped 16% and CITY went from eight hours to unreachable, because a
+   thief every couple of minutes compounds against a pile that is being held
+   rather than spent. So a grab is also capped at THIEF_GRAB armfuls per
+   villager — a fraction of ONE gather cycle of the settlement's own output —
+   which keeps the early thief dramatic (the cut binds while the pile is small)
+   and the late one survivable (the cap binds once it is not). */
+const THIEF_GRAB = 0.7;
+function thiefGrabCap(pop, yld) { return Math.max(1, THIEF_GRAB * pop * yld / 3); }   // per resource
+/* Three constants the analytic model needs and the running game cannot hand
+   it: the measured gather cycle (the eval prints `cycle measured / model` on
+   every browser run — keep this next to it), roughly how many seconds of
+   production sit in the stockpile at any moment, and what share of throughput
+   one burning business costs while its effect is off. All three are estimates,
+   and all three are checked the only way estimates can be: MODEL vs SIM. */
+const MISHAP_CYCLE = 12, MISHAP_HOLD = 200, MISHAP_BIZ_WORTH = 0.12;
+function mishapFor(fam) { let m = null; for (const k of MISHAPS) if (k.fam === fam && k.at <= stageIx()) m = k; return m; }
+/* Mean seconds between incidents. It tightens as the settlement grows — more
+   going on, more to go wrong — but gently, because SEVERITY is what really
+   escalates and a metropolis should feel busy, not besieged. */
+function mishapMTBF() { return 105 / (1 + stageIx() * 0.45); }
+/* Work-seconds closed per second by the responding building. A better
+   building recovers faster (the CD's rule, and the reason the doctor's office
+   is worth its price); under-equipped is a 2.5x penalty rather than a wall. */
+function mishapRate(k, lvl) { return lvl >= k.need ? 1 + 0.6 * (lvl - k.need) : 0.4; }
+/* The expected throughput multiplier under mishaps, for a player who taps them
+   down (`tended`) and one who never does. This is the ONE function the pacing
+   model in .claude/tests/eval-fire-clicker.cjs reads, which is exactly why it
+   lives inside the spec span next to the cost curves: a mishap tax the model
+   did not know about would silently rot every milestone it reports. */
+function mishapDrag(tended, pop) {
+  if (stageIx() < 1) return 1;
+  const T = mishapMTBF(), wTot = MISHAP_W.med + MISHAP_W.crime + MISHAP_W.fire;
+  const lvl = (id) => S.up[id] || 0;
+  /* A player watching an incident lands roughly six taps into it before the
+     crew would have finished on their own, which is most of a short bar and a
+     useful dent in a long one. */
+  const quick = 1 / Math.max(0.25, 1 - MISHAP_TAP * 6);
+  let loss = 0;
+  const med = mishapFor('med');
+  if (med) {   // one villager idle for the length of the bar
+    const dur = med.work / mishapRate(med, lvl('sawbones')) / (tended ? quick : 1);
+    loss += (MISHAP_W.med / wTot) * (dur / Math.max(1, pop)) / T;
+  }
+  const cr = mishapFor('crime');
+  if (cr) {
+    /* A caught thief hands everything back, so the loss is the chance of NOT
+       catching him: certain for a tending player who has the rank, and only
+       the constable's own slim detection odds for anyone else. */
+    const caught = (tended && lvl('constable') >= cr.need) ? 1 : Math.min(0.3, 0.12 * lvl('constable'));
+    /* The same min() the grab itself takes, in seconds-of-production: the
+       share of a typical hoard, or the ceiling, whichever is smaller. */
+    const take = Math.min((1 - Math.pow(1 - cr.cut, cr.grabs)) * MISHAP_HOLD,
+                          cr.grabs * THIEF_GRAB * MISHAP_CYCLE);
+    loss += (MISHAP_W.crime / wTot) * (1 - caught) * take / T;
+  }
+  const fi = mishapFor('fire');
+  if (fi) {   // one business's effect off for the length of the bar
+    const dur = fi.work / mishapRate(fi, lvl('marshal')) / (tended ? quick : 1);
+    loss += (MISHAP_W.fire / wTot) * MISHAP_BIZ_WORTH * dur / T;
+  }
+  return 1 - Math.min(0.45, loss);
+}
+
 const UPG = [
   { id:'pit',    i:'\u{1F525}', n:'FIRE PIT',     max:8,
     d:(l)=>'Deeper stone pit banks more burn time, and holds a ROARING fire nearer the top between taps. Max bank: ' + fmtS(maxBank()) + ' → ' + fmtS(5 + (l+1)*5) + '.',
@@ -301,8 +424,8 @@ const UPG = [
   { id:'sawbones', i:'\u{1FA79}', n:()=>S.up.sawbones >= 1 ? "DOCTOR'S OFFICE" : 'SAWBONES HUT',
     max:()=>bizMax('sawbones'), show:()=>bizShown('sawbones'),
     d:(l)=>l === 0
-      ? 'Splinters out while you wait. Healthier villagers work 25% faster.'
-      : 'The sawbones hut becomes a proper surgery — same corner, real medicine. Work speed 25% → 38%.',
+      ? 'Splinters out while you wait. Healthier villagers work 25% faster \u2014 and when someone is hurt, there is finally someone to send for.'
+      : 'The sawbones hut becomes a proper surgery \u2014 same corner, real medicine. Work speed 25% \u2192 38%, recoveries are faster still, and the FEVERS a town catches become treatable.',
     cost:(l)=>l === 0 ? ({ wood: 120, stone: 140, food: 100 }) : ({ wood: 2600, stone: 3000, food: 2200 }) },
   { id:'school', i:'\u{1F3EB}', n:()=>['SMALL SCHOOL','HIGH SCHOOL','COLLEGE'][Math.min(2, S.up.school)],
     max:()=>bizMax('school'), show:()=>bizShown('school'),
@@ -313,14 +436,14 @@ const UPG = [
   { id:'constable', i:'\u{1F694}', n:()=>S.up.constable >= 1 ? 'POLICE STATION' : 'CONSTABLE HUT',
     max:()=>bizMax('constable'), show:()=>bizShown('constable'),
     d:(l)=>l === 0
-      ? 'A constable keeps the lanes clear and the sleds honest. Villagers walk 10% faster.'
-      : 'The hut becomes a station with a yard and a patrol. Walking bonus 10% → 22%.',
+      ? 'A constable keeps the lanes clear and the sleds honest. Villagers walk 10% faster \u2014 and a THIEF in the lanes can finally be collared: spot him and tap him.'
+      : 'The hut becomes a station with a yard and a patrol. Walking bonus 10% \u2192 22%, and the professionals a city attracts are within its reach.',
     cost:(l)=>scaleBiz({ wood: 280, stone: 340, food: 220 }, l) },
   { id:'marshal', i:'\u{1F692}', n:()=>S.up.marshal >= 1 ? 'FIRE STATION' : 'FIRE MARSHAL HUT',
     max:()=>bizMax('marshal'), show:()=>bizShown('marshal'),
     d:(l)=>l === 0
-      ? 'Someone whose whole job is the fire. Banked burn time drains 15% slower.'
-      : 'A real fire station: pumps, a bell, a crew. Drain 15% → 27% slower.',
+      ? 'Someone whose whole job is the fire. Banked burn time drains 15% slower \u2014 and a cinder on a roof gets a bucket instead of a shrug.'
+      : 'A real fire station: pumps, a bell, a crew. Drain 15% \u2192 27% slower, blazes are put out faster, and a BOILER FLASH is something they train for.',
     cost:(l)=>scaleBiz({ wood: 300, stone: 300, food: 260 }, l) },
 ];
 /* One FOUND card per rung, generated from STAGES so a sixth stage is one row
@@ -386,6 +509,7 @@ function freshState() {
     lifeWarm: 0,         // lifetime warm-seconds
     roared: false,       // has the fire ever ROARED? gates the BELLOWS card
     gathered: 0,         // THIS RUN's total resources hauled — the reach metric
+    stolen: 0, caught: 0,// mishap scoreboard: what thieves took this run, and how many were caught
     /* These three survive an evolution; freshState() only supplies the floor
        for a save that predates them. evolve() carries them across by hand. */
     bestReach: 0, embers: 0, evolutions: 0,
@@ -413,6 +537,8 @@ function load() {
   S.lifeWarm = Math.max(0, +d.lifeWarm || 0);
   S.roared = !!d.roared || S.up.bellows > 0;
   S.gathered = Math.max(0, +d.gathered || 0);
+  S.stolen = Math.max(0, +d.stolen || 0);
+  S.caught = Math.max(0, Math.floor(+d.caught || 0));
   S.bestReach = Math.max(0, +d.bestReach || 0);
   S.evolutions = Math.max(0, Math.floor(+d.evolutions || 0));
   /* Embers are RECOMPUTED from the stored high-water mark rather than loaded.
@@ -428,16 +554,22 @@ function tapPower() { return 1 + S.up.tinder * 0.5; }
    rather than a multiplier on it, so the two stack the way a player reads
    them ("15% slower") instead of compounding into something neither card
    claims. */
-function drainRate(){ return 1 / (1 + S.up.wind * 0.09 + (S.up.marshal || 0) * 0.18); }
+/* THE ONE READ of a civic building's level. A building that is on fire is not
+   doing its job, so a blaze costs the settlement the EFFECT and not just a
+   pretty animation — and routing every rate through here is what keeps that
+   true for a building added later. Everything below reads bizLvl(), never
+   S.up[id], for anything BIZ_DEFS owns. */
+function bizLvl(id)  { const b = BIZ[id]; return (b && b.dmg) ? 0 : (S.up[id] || 0); }
+function drainRate(){ return 1 / (1 + S.up.wind * 0.09 + bizLvl('marshal') * 0.18); }
 /* Embers multiply YIELD rather than speed. Speed was the obvious place — it
    is where the roaring bonus lives — but at +900% the villagers sprint, and a
    camp of blurring dots is a worse read than a camp hauling bigger armfuls.
    Yield is also the lever both halves of the pacing eval already understand. */
-function tripYield(){ return (1 + S.up.tools + (S.up.shop ? 1 : 0) + (S.up.school || 0)) * emberMul(); }
+function tripYield(){ return (1 + S.up.tools + (bizLvl('shop') ? 1 : 0) + bizLvl('school')) * emberMul(); }
 /* Walk and work speed, named once so the villager loop, the card copy and the
    pacing eval can never disagree about what a building is worth. */
-function walkMul()  { return (S.up.tavern ? 1.15 : 1) * (1 + (S.up.constable || 0) * 0.10); }
-function workTime() { return [3.2, 2.4, 2.0][S.up.sawbones || 0]; }
+function walkMul()  { return (bizLvl('tavern') ? 1.15 : 1) * (1 + bizLvl('constable') * 0.10); }
+function workTime() { return [3.2, 2.4, 2.0][bizLvl('sawbones')]; }
 /* ROARING FIRE — the reward for tending the fire yourself. Above ROAR_AT of a
    full bank the extra heat energises the camp: villagers dawdle less, walk
    faster and work faster, all through ONE multiplier so the effect stays a
@@ -1584,7 +1716,11 @@ function syncVillagers() {
      firekeeper and then recruiting used to cost one worker per recruit. */
   villagers.forEach((v, i) => {
     const k = i >= popCap();
-    if (k !== v.keeper) { v.keeper = k; vRelease(v); v.state = 'idle'; v.wait = 0; v.carry = null; v.forage = false; }
+    if (k !== v.keeper) {
+      v.keeper = k; vRelease(v);
+      if (v.hurt) dropMishap(v.hurt);   // 'hurt' is a dead end — a role flip has to release it too
+      v.state = 'idle'; v.wait = 0; v.carry = null; v.forage = false;
+    }
   });
 }
 const seatTaken = [false, false, false, false];
@@ -1660,6 +1796,13 @@ function villagerStep(v, dt) {
         v.state = 'idle'; v.wait = 0.4 + Math.random() * 1.2;
       }
       break;
+    /* HURT — sits down where they fell until the response bar closes. It is a
+       DEAD-END state on purpose: nothing but mishapStep() moves them out of
+       it, so an injury costs real throughput rather than a slower walk. The
+       price of a dead end is that every role flip has to release it, which is
+       why syncVillagers drops the incident as well as the seat. */
+    case 'hurt':
+      break;
     case 'toSeat':
       move();
       if (vArrived(v)) { v.state = 'huddle'; v.t = 0; }
@@ -1719,7 +1862,7 @@ function villagerStep(v, dt) {
 function drawVillager(v) {
   if (v.state === 'inside') return;
   const warm = FIRE.burning;
-  const seated = v.state === 'huddle';
+  const seated = v.state === 'huddle' || v.state === 'hurt';
   const working = v.state === 'working';
   const walking = !seated && !working && Math.hypot(v.tx - v.x, v.ty - v.y) > 3;
   const cold = !warm;
@@ -1950,6 +2093,387 @@ function drawBubble(dt) {
   cx.textAlign = 'center';
 }
 
+/* =============================== mishaps: runtime =============================== */
+/* NOTHING here is saved. An in-flight incident is a moment, not progress:
+   restoring a half-extinguished roof fire or a thief frozen mid-tiptoe out of
+   a save would be fiddly to write and unfair to a player who closed the tab
+   with one on screen. Only the RUN TOTALS (S.stolen, S.caught) persist, and
+   they are scoreboard, not state. A damaged building is likewise a property of
+   the live blaze — put the fire out and the building is whole — which is why
+   there is no repair layer to migrate. */
+const MISH = [];
+let mishT = 40, THIEF = null;
+
+let taughtMishap = false;
+function mishapToast(k, tail) {
+  toast(MISHAP_FAM[k.fam].icon + ' ' + k.n + (tail ? ' — ' + tail : ''));
+  /* Taught once per session, not per save: the rule is short, and a player
+     coming back after a week has forgotten it as surely as a new one. */
+  if (!taughtMishap) {
+    taughtMishap = true;
+    hint('Things go wrong in a settlement. TAP an accident to help it along — and build the sawbones, the constable and the fire marshal, because they are who answers when you cannot.');
+  }
+}
+function mishPos(m) {
+  return m.fam === 'med' ? { x: m.v.x, y: m.v.y - 12 }
+                         : { x: m.b.x, y: m.b.y - m.b.w * 0.55 };
+}
+function famActive(f) { return f === 'crime' ? !!THIEF : MISH.some(m => m.fam === f); }
+
+/* One incident per family at a time. Two overlapping blazes would be a worse
+   read, not a harder game: the player cannot tell which arc belongs to which
+   roof, and the whole point of drawing these in the scene is that they are
+   legible without a menu. */
+function spawnMishap() {
+  const opts = [];
+  for (const f of ['med', 'crime', 'fire']) {
+    if (famActive(f)) continue;
+    const k = mishapFor(f);
+    if (k) for (let i = 0; i < MISHAP_W[f]; i++) opts.push(k);
+  }
+  if (!opts.length) return;
+  const k = opts[Math.floor(Math.random() * opts.length)];
+  if (k.fam === 'med') spawnInjury(k);
+  else if (k.fam === 'fire') spawnBlaze(k);
+  else spawnThief(k);
+}
+function spawnInjury(k) {
+  /* Never the firekeeper. It is the camp's recovery valve — the one villager
+     that can restart a dead fire — and idling it is how an unlucky roll turns
+     into an unrecoverable run. */
+  const pool = villagers.filter(v => !v.keeper && !v.hurt && v.state !== 'inside');
+  if (!pool.length) return;
+  const v = pool[Math.floor(Math.random() * pool.length)];
+  vRelease(v);
+  v.carry = null; v.forage = false; v.job = null;
+  v.state = 'hurt'; v.t = 0;
+  const m = { k, fam: 'med', v, prog: 0, t: 0 };
+  v.hurt = m; MISH.push(m);
+  mishapToast(k, 'tap them to help');
+}
+function spawnBlaze(k) {
+  /* A business first, because a business has an EFFECT to lose — a blaze that
+     costs nothing but a pretty animation is not an incident. Houses are the
+     fallback so a village that has not opened a shop yet still burns. */
+  const biz = activeBiz().filter(b => !b.dmg);
+  const pool = biz.length ? biz : activeHomes().filter(h => !h.dmg);
+  if (!pool.length) return;
+  const b = pool[Math.floor(Math.random() * pool.length)];
+  b.dmg = true;
+  MISH.push({ k, fam: 'fire', b, prog: 0, t: 0 });
+  mishapToast(k, 'tap the building to fight it');
+  sfxLog();
+}
+function dropMishap(m) {
+  const i = MISH.indexOf(m);
+  if (i >= 0) MISH.splice(i, 1);
+  if (m.fam === 'med') { m.v.hurt = null; if (m.v.state === 'hurt') { m.v.state = 'idle'; m.v.wait = 0; } }
+  else m.b.dmg = false;
+}
+function mishapStep(dt) {
+  for (let i = MISH.length - 1; i >= 0; i--) {
+    const m = MISH[i];
+    m.t += dt;
+    m.prog += dt * mishapRate(m.k, S.up[MISHAP_FAM[m.fam].svc] || 0);
+    if (m.fam === 'fire' && Math.random() < dt * 6)
+      smoke.push({ x: m.b.x + (Math.random()-0.5) * m.b.w * 0.5, y: m.b.y - m.b.w * 0.6,
+                   vx: (Math.random()-0.5) * 12, vy: -26 - Math.random() * 14, r: 3, life: 0, max: 1.6 });
+    if (m.prog >= m.k.work) {
+      dropMishap(m);
+      toast(m.fam === 'med' ? '\u{1FA79} BACK ON THEIR FEET' : '\u{1F4A7} THE FIRE IS OUT');
+    }
+  }
+  if (THIEF) thiefStep(dt);
+  /* The clock only runs on a WORKING camp. A cold camp has nobody out to hurt
+     and nothing being hauled to steal, and kicking a player whose fire has
+     just died is piling on. */
+  if (stageIx() < 1 || !FIRE.burning) return;
+  mishT -= dt;
+  if (mishT <= 0) { mishT = mishapMTBF() * (0.55 + Math.random() * 0.9); spawnMishap(); }
+}
+/* A tap on an incident closes MISHAP_TAP of its bar. Hit-tested BEFORE
+   villagerAt in the pointer handler, so helping the injured beats hearing them
+   — a hurt villager is the one villager whose tap is not a chat bubble. */
+function tapMishap(x, y) {
+  for (const m of MISH) {
+    const p = mishPos(m);
+    const r = m.fam === 'med' ? 26 : Math.max(30, m.b.w * 0.55);
+    if (Math.hypot(x - p.x, y - p.y) > r) continue;
+    m.prog += m.k.work * MISHAP_TAP;
+    sfxTap();
+    for (let i = 0; i < 5; i++)
+      sparks.push({ x: p.x, y: p.y, vx: (Math.random()-0.5)*70, vy: -30 - Math.random()*50, life: 0, max: 0.4 });
+    return true;
+  }
+  return false;
+}
+
+/* ------------------------------- THE THIEF -------------------------------
+   The one mishap that is an AGENT rather than a bar, because the CD asked for
+   exactly that: a figure an attentive player spots sneaking between the huts
+   with a bag that visibly grows, who gets clean away most of the time unless
+   you notice him and have the law to back the catch up.
+   Two rules give it its shape:
+   - Announcing him is VAGUE on purpose ("something moved between the huts"),
+     never a location. A precise callout would delete the game of spotting
+     him; no callout at all would rob a player who happens to be in the
+     upgrade panel. A hint that costs a glance is the fair middle.
+   - Catching him RETURNS the whole bag. Theft has to be recoverable to be
+     worth watching for, and it makes the constable read as insurance you
+     can cash rather than a tax you already paid.
+   Note what theft does NOT touch: S.gathered, the evolution reach. Reach is
+   what the camp HAULED, and a thief cannot un-haul it. He costs you the
+   purchase, not the run. */
+function thiefCover() {
+  const pts = [];
+  for (const h of activeHomes()) pts.push({ x: h.x + h.w * 0.55, y: h.y + 4 });
+  for (const b of activeBiz())   pts.push({ x: b.x - b.w * 0.55, y: b.y + 4 });
+  for (const t of G.treeItems)   pts.push({ x: t.x + 12, y: t.y + 4 });
+  for (const r of G.rockItems)   pts.push({ x: r.x - 12, y: r.y + 3 });
+  return pts;
+}
+function thiefPickCover() {
+  const pts = thiefCover();
+  if (!pts.length) { THIEF.tx = W * (0.2 + Math.random() * 0.6); THIEF.ty = G.zone.buildBot + 14; return; }
+  const p = pts[Math.floor(Math.random() * pts.length)];
+  THIEF.tx = Math.max(14, Math.min(W - 14, p.x)); THIEF.ty = p.y;
+}
+function spawnThief(k) {
+  if (THIEF) return;
+  const left = Math.random() < 0.5;
+  THIEF = {
+    k, bag: { wood: 0, stone: 0, food: 0 }, loot: 0, grabs: 0,
+    x: left ? -26 : W + 26, y: (G.zone.buildBot + G.zone.workTop) / 2,
+    tx: 0, ty: 0, flip: left ? 1 : -1, state: 'cover', t: 0, wait: 0, spooked: 0, caughtT: 0,
+  };
+  thiefPickCover();
+  mishapToast(k, 'something moved between the buildings…');
+}
+function thiefGrab() {
+  const T = THIEF;
+  let took = 0;
+  const cap = thiefGrabCap(popCap(), tripYield());
+  for (const r of ['wood', 'stone', 'food']) {
+    const n = Math.min(Math.floor(S.res[r] * T.k.cut), Math.ceil(cap));
+    if (n > 0) { S.res[r] -= n; T.bag[r] += n; took += n; }
+  }
+  T.loot += took; T.grabs++;
+  if (took > 0) floats.push({ txt: '−' + took, x: G.stock.x, y: G.stock.y - 14, life: 0, bad: true });
+  sfxPuff();
+}
+function catchThief() {
+  const T = THIEF;
+  if (!T || T.state === 'caught') return;
+  for (const r of ['wood', 'stone', 'food']) S.res[r] += T.bag[r];
+  S.caught = (S.caught || 0) + 1;
+  T.state = 'caught'; T.caughtT = 0;
+  toast('\u{1F694} ' + T.k.n + ' CAUGHT' + (T.loot > 0 ? ' — ' + T.loot + ' RECOVERED' : ''));
+  sfxBuy();
+}
+function thiefEscape() {
+  const T = THIEF;
+  S.stolen = (S.stolen || 0) + T.loot;
+  if (T.loot > 0) toast('\u{1F977} THE ' + T.k.n + ' GOT AWAY WITH ' + T.loot);
+  THIEF = null;
+}
+/* The villagers say why the catch failed, in their own words, because the CD
+   asked for a chat bubble and because "nothing happened" is the worst possible
+   answer to a deliberate tap. This is the ONE place a bubble pre-empts
+   another: the one-bubble rule is about flavour chatter not stacking up, and
+   this is a reply to something the player just did. The toast goes out
+   regardless, so the answer survives even with every villager indoors. */
+function lawComplaint() {
+  const lvl = S.up.constable || 0;
+  const line = lvl === 0
+    ? 'We have no constable! All we can do is watch him go.'
+    : 'Our constable cannot chase that one — we need a proper station.';
+  toast('\u{1F977} ' + line);
+  const pool = villagers.filter(v => v.state !== 'inside');
+  if (!pool.length) return;
+  const near = pool.reduce((a, b) =>
+    Math.hypot(b.x - THIEF.x, b.y - THIEF.y) < Math.hypot(a.x - THIEF.x, a.y - THIEF.y) ? b : a);
+  bubble = { v: near, lines: wrapLine(line, 150), t: 0 };
+}
+function tapThief(x, y) {
+  const T = THIEF;
+  if (!T || T.state === 'caught') return false;
+  if (Math.hypot(x - T.x, y - (T.y - 12)) > 30) return false;
+  if ((S.up.constable || 0) >= T.k.need) { catchThief(); return true; }
+  T.spooked = 1.8;
+  if (T.state === 'lurk' || T.state === 'grab') T.state = 'cover';
+  thiefPickCover();
+  lawComplaint();
+  sfxPuff();
+  return true;
+}
+function thiefStep(dt) {
+  const T = THIEF;
+  T.t += dt;
+  if (T.spooked > 0) T.spooked -= dt;
+  const sp = (T.state === 'flee' ? 96 : T.spooked > 0 ? 64 : 34) * dt;
+  const go = () => {
+    const dx = T.tx - T.x, dy = T.ty - T.y, d = Math.hypot(dx, dy);
+    if (d > 1) { T.x += dx / d * Math.min(sp, d); T.y += dy / d * Math.min(sp, d); T.flip = dx < 0 ? -1 : 1; }
+    return d <= 2;
+  };
+  switch (T.state) {
+    case 'cover':   if (go()) { T.state = 'lurk'; T.wait = 0.7 + Math.random() * 1.6; } break;
+    case 'lurk':
+      T.wait -= dt;
+      if (T.wait <= 0) { T.state = 'toStock'; T.tx = G.stock.x + (Math.random()-0.5) * 16; T.ty = G.stock.y + 9; }
+      break;
+    case 'toStock': if (go()) { T.state = 'grab'; T.wait = 0.6; } break;
+    case 'grab':
+      T.wait -= dt;
+      if (T.wait <= 0) {
+        thiefGrab();
+        if (T.grabs >= T.k.grabs) { T.state = 'flee'; T.tx = T.x < W / 2 ? -60 : W + 60; T.ty = T.y + 12; }
+        else { thiefPickCover(); T.state = 'cover'; }
+      }
+      break;
+    case 'flee':
+      go();
+      if (T.x < -50 || T.x > W + 50) { thiefEscape(); return; }
+      break;
+    case 'caught':
+      T.caughtT += dt;
+      if (T.caughtT > 1.1) { THIEF = null; return; }
+      break;
+  }
+  /* The constable's own odds. Deliberately slim — the CD's brief is that the
+     law "might eventually detect them on their own, but most of the time the
+     thief will get away with it". At ~0.25%/s per rank a full heist is caught
+     unaided about one time in seven with a hut, one in four with a station. */
+  const lvl = S.up.constable || 0;
+  if (T.state !== 'caught' && lvl >= T.k.need && Math.random() < dt * 0.0025 * lvl) catchThief();
+}
+function drawThief() {
+  const T = THIEF;
+  if (!T) return;
+  const fade = T.state === 'caught' ? Math.max(0, 1 - T.caughtT / 1.1) : 1;
+  const fleeing = T.state === 'flee';
+  const walking = Math.hypot(T.tx - T.x, T.ty - T.y) > 3;
+  const bob = walking ? Math.abs(Math.sin(T.t * (fleeing ? 17 : 8))) * (fleeing ? 2.6 : 1.2) : 0;
+  const bh = fleeing ? 13 : 10;      // hunched low while sneaking, upright in flight
+  const hunch = fleeing ? 0 : 2.2;   // the upper body leans out over the toes
+  cx.save();
+  cx.globalAlpha = fade;
+  cx.translate(T.x, T.y - bob);
+  cx.scale(T.flip, 1);
+  cx.fillStyle = 'rgba(70,86,120,0.30)';
+  cx.beginPath(); cx.ellipse(0, 1.5, 7, 2.6, 0, 0, TAU); cx.fill();
+  cx.strokeStyle = '#232b40'; cx.lineWidth = 2.4; cx.lineCap = 'round';
+  const sw = walking ? Math.sin(T.t * (fleeing ? 20 : 10)) * (fleeing ? 4.5 : 3) : 0;
+  cx.beginPath(); cx.moveTo(-2, -bh + 7); cx.lineTo(-2 + sw, 0); cx.stroke();
+  cx.beginPath(); cx.moveTo(2, -bh + 7); cx.lineTo(2 - sw, 0); cx.stroke();
+  /* THE SACK — the whole read, and the reason this is not just another
+     villager. Drawn BEHIND the body, because a bag that grows in FRONT of the
+     figure swallows it: at a full heist the sack is wider than the thief, and
+     the first draft turned him into an unidentifiable brown boulder. It is
+     also the palest thing on him on purpose. He has to be findable at night
+     without being obvious, and a straw-coloured sack over a navy coat is what
+     the eye actually catches in the dark between two buildings. */
+  const sr = 3.2 + Math.min(8.5, Math.sqrt(Math.max(0, T.loot)) * 0.5);
+  const sx = -6 - sr * 0.8, sy = -bh + hunch * 0.4 - sr * 0.15;
+  cx.beginPath();                                  // LUMPY, not a ball: three overlapping arcs
+  cx.arc(sx, sy, sr, 0, TAU);
+  cx.arc(sx + sr * 0.45, sy + sr * 0.3, sr * 0.72, 0, TAU);
+  cx.arc(sx - sr * 0.3, sy + sr * 0.45, sr * 0.6, 0, TAU);
+  cx.fillStyle = '#c9a463'; cx.fill();
+  inkStroke(1.2); cx.stroke();
+  cx.save(); cx.clip();                            // cel side-shade, same trick as every other solid
+  cx.fillStyle = 'rgba(90,66,32,0.30)';
+  cx.fillRect(sx - sr * 1.6, sy + sr * 0.15, sr * 3.2, sr * 2);
+  cx.restore();
+  cx.strokeStyle = '#6f5330'; cx.lineWidth = 2;    // the cinched neck, then the knot above it
+  cx.beginPath(); cx.moveTo(sx + sr * 0.35, sy - sr * 0.78); cx.lineTo(sx + sr * 0.1, sy - sr * 1.28); cx.stroke();
+  cx.beginPath(); cx.arc(sx + sr * 0.1, sy - sr * 1.35, 1.7, 0, TAU); cx.fillStyle = '#6f5330'; cx.fill();
+  cx.strokeStyle = '#39445f'; cx.lineWidth = 2.2;  // the arm holding it over the shoulder
+  cx.beginPath(); cx.moveTo(-3, -bh + 2); cx.lineTo(sx + sr * 0.45, sy - sr * 0.85); cx.stroke();
+  cx.fillStyle = '#39445f';
+  cx.beginPath();
+  if (cx.roundRect) cx.roundRect(-5 + hunch * 0.4, -bh - 4, 10, bh + 5, 4); else cx.rect(-5, -bh - 4, 10, bh + 5);
+  cx.fill(); inkStroke(1.1); cx.stroke();
+  cx.fillStyle = '#e8b98f';
+  cx.beginPath(); cx.arc(1.5 + hunch, -bh - 8, 4.2, 0, TAU); cx.fill();
+  inkStroke(1); cx.stroke();
+  cx.fillStyle = '#161c2c';                        // mask band, then a flat cap with a peak
+  cx.fillRect(-2.4 + hunch, -bh - 9.6, 8, 2.6);
+  cx.beginPath(); cx.arc(1.5 + hunch, -bh - 8.6, 4.5, Math.PI * 1.02, Math.PI * 1.98); cx.fill();
+  cx.beginPath();
+  cx.moveTo(5 + hunch, -bh - 10.6); cx.lineTo(10 + hunch, -bh - 9.5); cx.lineTo(5 + hunch, -bh - 8.7);
+  cx.closePath(); cx.fill();
+  cx.restore();
+  if (T.spooked > 0) {                             // startled by a grab that missed
+    cx.globalAlpha = fade * Math.min(1, T.spooked);
+    cx.font = 'bold 14px "Share Tech Mono", monospace'; cx.textAlign = 'center';
+    cx.fillStyle = '#ffd98a';
+    cx.strokeStyle = 'rgba(10,12,24,0.6)'; cx.lineWidth = 3;
+    cx.strokeText('!', T.x + T.flip * 9, T.y - bh - 18);
+    cx.fillText('!', T.x + T.flip * 9, T.y - bh - 18);
+    cx.globalAlpha = 1;
+  }
+}
+/* Flames on a burning building, drawn INSIDE the y-sorted item list so a
+   villager can pass in front of the blaze. The badge and the recovery arc are
+   drawn after the lighting pass instead — they are read-outs, and a read-out
+   that dims at night is a read-out you lose exactly when you need it. */
+function drawBlazeFx(m) {
+  const b = m.b, w = b.w;
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const p = (i / n) * TAU + m.t * 3.1;
+    const fx = b.x + Math.sin(p) * w * 0.34;
+    const h = (10 + Math.sin(m.t * 9 + i) * 5) * (1 - m.prog / m.k.work * 0.55);
+    const fy = b.y - w * 0.62 + Math.cos(p * 1.7) * 4;
+    cx.fillStyle = i % 3 === 0 ? 'rgba(255,226,120,0.95)' : 'rgba(255,132,44,0.92)';
+    cx.beginPath();
+    cx.moveTo(fx - 4, fy); cx.quadraticCurveTo(fx - 2, fy - h * 0.6, fx, fy - h);
+    cx.quadraticCurveTo(fx + 2, fy - h * 0.6, fx + 4, fy);
+    cx.closePath(); cx.fill();
+  }
+}
+function drawMishapMarks() {
+  for (const m of MISH) {
+    const p = mishPos(m), frac = Math.min(1, m.prog / m.k.work);
+    const r = 11, cy = p.y - 20;
+    const short = (S.up[MISHAP_FAM[m.fam].svc] || 0) < m.k.need;
+    const hue = m.fam === 'med' ? '#7ee0a8' : '#ff9a3c';
+    cx.beginPath(); cx.arc(p.x, cy, r + 3, 0, TAU);
+    cx.fillStyle = 'rgba(11,11,22,0.78)'; cx.fill();
+    cx.strokeStyle = 'rgba(255,255,255,0.18)'; cx.lineWidth = 2.5;
+    cx.beginPath(); cx.arc(p.x, cy, r, 0, TAU); cx.stroke();
+    cx.strokeStyle = hue; cx.lineWidth = 2.5;
+    cx.beginPath(); cx.arc(p.x, cy, r, -Math.PI / 2, -Math.PI / 2 + TAU * frac); cx.stroke();
+    /* The glyph is DRAWN, not an emoji in a font. The badge is the read-out
+       for the whole layer and it has to survive a device with no emoji for
+       U+1FA79, a webfont that has not loaded yet, and a canvas that falls back
+       to a tofu box — all three of which this game has already met. */
+    cx.fillStyle = hue;
+    if (m.fam === 'med') {                       // a cross
+      cx.fillRect(p.x - 4.5, cy - 1.5, 9, 3);
+      cx.fillRect(p.x - 1.5, cy - 4.5, 3, 9);
+    } else {                                     // a flame
+      cx.beginPath();
+      cx.moveTo(p.x, cy - 6);
+      cx.quadraticCurveTo(p.x + 5, cy - 1, p.x + 3.2, cy + 3);
+      cx.quadraticCurveTo(p.x + 1.6, cy + 5.6, p.x - 1, cy + 5.6);
+      cx.quadraticCurveTo(p.x - 4.6, cy + 4.4, p.x - 3.6, cy);
+      cx.quadraticCurveTo(p.x - 2.6, cy - 3, p.x, cy - 6);
+      cx.fill();
+    }
+    /* Under-equipped says so, every frame it is true. Being told the crew is
+       out of its depth is the whole reason to buy the next rank of building. */
+    if (short) {
+      cx.font = '9px "Share Tech Mono", monospace'; cx.textAlign = 'center';
+      cx.fillStyle = '#ff8f9c';
+      cx.strokeStyle = 'rgba(10,12,24,0.65)'; cx.lineWidth = 3;
+      const t = m.fam === 'med' ? 'NO DOCTOR' : 'NO CREW';
+      cx.strokeText(t, p.x, cy - 17); cx.fillText(t, p.x, cy - 17);
+    }
+  }
+}
+
 /* =============================== weather & fx =============================== */
 function weatherStep(dt) {
   if (snow.length < 90 && Math.random() < 0.5)
@@ -1986,7 +2510,7 @@ function weatherStep(dt) {
     const f = floats[i];
     f.life += dt / 1.1;
     if (f.life >= 1) { floats.splice(i, 1); continue; }
-    cx.fillStyle = 'rgba(255,214,140,' + (1 - f.life) + ')';
+    cx.fillStyle = (f.bad ? 'rgba(255,138,150,' : 'rgba(255,214,140,') + (1 - f.life) + ')';
     cx.strokeStyle = 'rgba(10,12,24,' + 0.5 * (1 - f.life) + ')'; cx.lineWidth = 3;
     cx.strokeText(f.txt, f.x, f.y - f.life * 30);
     cx.fillText(f.txt, f.x, f.y - f.life * 30);
@@ -2027,6 +2551,7 @@ function drawLighting() {
   for (const h of activeHomes()) if (h.lit) punch(h.winX, h.winY, 46, 0.75);
   for (const b of activeBiz()) if (b.lit) punch(b.winX, b.winY, 40, 0.7);
   for (const l of (G.lamps || [])) if (l.lit) punch(l.gx, l.gy, 62, 0.62);
+  for (const m of MISH) if (m.fam === 'fire') punch(m.b.x, m.b.y - m.b.w * 0.6, 78, 0.7);
   cx.drawImage(light, 0, 0, W, H);
   // warm additive tint at the light sources
   cx.globalCompositeOperation = 'lighter';
@@ -2041,6 +2566,7 @@ function drawLighting() {
   for (const h of activeHomes()) if (h.lit) tint(h.winX, h.winY, 30, 0.08);
   for (const b of activeBiz()) if (b.lit) tint(b.winX, b.winY, 26, 0.07);
   for (const l of (G.lamps || [])) if (l.lit) tint(l.gx, l.gy, 40, 0.10);
+  for (const m of MISH) if (m.fam === 'fire') tint(m.b.x, m.b.y - m.b.w * 0.6, 62, 0.24 * (0.3 + amb));
   cx.globalCompositeOperation = 'source-over';
 }
 
@@ -2050,6 +2576,12 @@ cv.addEventListener('pointerdown', (e) => {
   audioInit();
   const r = cv.getBoundingClientRect();
   const x = e.clientX - r.left, y = e.clientY - r.top;
+  /* Order matters, and it is the whole contract of a tap. The thief first — he
+     is the smallest target and the one the player is hunting. Then incidents,
+     BEFORE villagerAt: a hurt villager is the one villager whose tap is help
+     rather than a chat bubble. Everything after this is unchanged. */
+  if (tapThief(x, y)) return;
+  if (tapMishap(x, y)) return;
   const vt = villagerAt(x, y);
   if (vt) { speak(vt); return; }           // villager taps never stoke; one bubble at a time
   const site = siteAt(x, y);               // MICROMANAGEMENT: direct the camp, or release it
@@ -2134,6 +2666,7 @@ function evolve() {
      references to HOMES entries and to numbered seats, and a stale reference
      is how a villager ends up walking to a house that no longer exists. */
   villagers.length = 0;
+  MISH.length = 0; THIEF = null; mishT = 40;   // incidents belong to the run that was
   HOMES.length = 0;
   for (const k of Object.keys(BIZ)) delete BIZ[k];
   seatTaken.fill(false);
@@ -2263,6 +2796,7 @@ function frame(now) {
   fireStep(dt);
   syncVillagers();
   for (const v of villagers) villagerStep(v, dt);
+  mishapStep(dt);
 
   drawSky();
   drawBackdrop();
@@ -2278,11 +2812,14 @@ function frame(now) {
   items.push({ y: G.fire.y + 2, d: drawFirePit });
   for (const s of G.seats) items.push({ y: s.y + 4, d: () => drawSeat(s) });
   for (const v of villagers) if (v.state !== 'inside') items.push({ y: v.y, d: () => drawVillager(v) });
+  for (const m of MISH) if (m.fam === 'fire') items.push({ y: m.b.y + 1, d: () => drawBlazeFx(m) });
+  if (THIEF) items.push({ y: THIEF.y, d: drawThief });
   items.sort((a, b) => a.y - b.y);
   for (const it of items) it.d();
   fireParticles(dt);
   weatherStep(dt);
   drawLighting();
+  drawMishapMarks();
   drawFocus();
   drawBankRing();
   drawBubble(dt);

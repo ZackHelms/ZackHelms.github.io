@@ -27,15 +27,112 @@ EVOLUTION prestige loop. Sections below are marked built or open.
       2h43 for an optimal player, so a two-hour session lands TOWN and most of
       the way to CITY — which is where evolving becomes the right move.
 
+## Built 2026-08-29 — MISHAPS: accidents, crime and fire
+- [x] **One incident model, three skins.** `MISHAPS[]` is a table beside
+      `STAGES[]` inside the LADDER-SPEC span. Every incident is a work bar:
+      `work` response-seconds closed at `mishapRate()` per second by whichever
+      civic building answers it, and a player tap closes 10% of it. That is the
+      CD's "tapping the disaster expedites recovery, better buildings recover
+      faster" written once instead of three times.
+- [x] **Escalation off the ladder.** Each family lists one row per rung and the
+      highest row the settlement has reached is the one that fires — the same
+      shape as `BIZ_DEFS[].at`. Medicine: DEEP GASH → WINTER FEVER → CRUSH
+      INJURY → PLASMA BURNS. Law: SNOW SNEAK → BURGLAR → SYNDICATE RUNNER →
+      DRONE HEIST. Fire: ROOF CINDER → ROOF BLAZE → BOILER FLASH → CORE FLARE.
+      The RANK of building it takes to answer escalates with them (`need`
+      0/1/1/2).
+- [x] **The service buildings became insurance.** They were flat multipliers
+      with nothing to prevent. `sawbones`, `constable` and `marshal` now each
+      answer a family, their card copy says so, and the pacing eval prices them
+      accordingly — an optimal player buys them for the incidents now, not only
+      for the walk speed.
+- [x] **The THIEF**, the CD's showpiece: a figure who sneaks between the
+      buildings, the trees and the rocks, dips into the stockpile, and leaves
+      with a visibly growing sack unless you spot him. Tapping him only catches
+      him if the settlement has the RANK of law the incident demands —
+      otherwise a villager says so in a chat bubble, by CD spec. A constable
+      catches one unaided about one time in seven; a station one in four. A
+      catch returns the whole bag.
+- [x] **A blaze takes a building's EFFECT off**, not just its looks — every
+      rate now reads `bizLvl()` rather than `S.up[id]`, so a burning tavern
+      costs the walk bonus until the fire is out.
+- [x] **The grab is capped** — the one number here that came out of a
+      measurement. A share of the stockpile is the right FEEL and an unbounded
+      tax on SAVING, which is exactly what an expensive FOUND card demands:
+      uncapped, a hands-off player's TOWN slipped 16% and CITY went from eight
+      hours to unreachable in 33. A grab is now `min(cut × pile, THIEF_GRAB
+      armfuls per villager)`, so the early thief is dramatic and the late one
+      survivable.
+- [x] **Measured.** A hands-off player loses ~5% of throughput at VILLAGE
+      rising to ~21% at METROPOLIS; a player who works the incidents loses
+      under 3% throughout. The skill gap on the stage ladder widened from
+      2.11×/1.98×/2.94× to **2.16×/2.05×/3.17×**, and the analytic model tracks
+      the sim at 5.4%/4.0% MAE. 22 new drive checks.
+
+## The long road: the KARDASHEV ladder (CD, 2026-08-29)
+
+The CD's stated endgame: **a Type III civilization**, handled one type at a
+time, with **Type I as the next arc** after METROPOLIS.
+
+The scale (Kardashev 1964; Sagan's 1973 continuous form):
+
+| Type | Commands | Power | Sagan K |
+|---|---|---|---|
+| **I** | all the energy available on its PLANET | ~10¹⁶ W | 1.0 |
+| **II** | the entire output of its STAR (Dyson swarm) | ~4×10²⁶ W | 2.0 |
+| **III** | the energy of its GALAXY | ~4×10³⁷ W | 3.0 |
+
+Earth today is ~10¹³ W, i.e. **K ≈ 0.73** — humanity is not yet Type I, which
+is the useful framing for a game whose whole subject is one fire. The gaps are
+about ten billion-fold each, so the rungs cannot be linear; the ladder's
+existing geometric `STAGE_STEP` is already the right shape.
+
+Two things about this fit the game unusually well and should be used:
+
+- **Sagan's `K = (log₁₀ P − 6) / 10` is a CONTINUOUS index across a scale that
+  is otherwise three discrete names.** That is the same lesson the evolution
+  reach metric taught: a milestone with five possible values makes a run that
+  got *a bit further* bank nothing. A K read-out climbing 0.31 → 0.44 → 0.73 →
+  1.00 gives the player a live sense of progress between rungs, and it is a
+  real number from a real paper rather than an invented score.
+- **The hearth ladder IS the Kardashev axis.** Campfire → stove → furnace →
+  steam plant → core is already an energy-capture ladder; solar sails, ambient
+  harvest and "minimum entropy" are its next four rungs. The rule that has held
+  for five rungs should hold for the rest: **the flame never changes, only its
+  housing.**
+
+### Next arc — reaching TYPE I
+- [ ] **Rungs 5-7, ending at TYPE I.** Sketch, Needs-Zack on the names and the
+      count: ARCOLOGY (the settlement becomes one structure) → PLANETARY GRID
+      (solar sails, wind, geothermal, tidal — ambient capture, the CD's
+      "minimum entropy") → **TYPE I** (the whole planet's budget, one web).
+      Mechanically each is one row in `STAGES` plus one `case` per painter,
+      which is the contract that table was built to keep.
+- [ ] **A new resource above wood/stone/food?** At planetary scale hauling
+      armfuls of logs stops making sense. The honest options are (a) the three
+      pools stay and are re-skinned per era, (b) a fourth pool — ENERGY —
+      appears at rung 5 and the old three are folded into it, or (c) villagers
+      stop hauling and start *operating*, so throughput comes from
+      infrastructure rather than from population. **Needs-Zack**: this is the
+      biggest single design fork left in the game.
+- [ ] **Mishaps keep escalating**, per the CD's own framing: grid failures and
+      cascade blackouts (fire), data/energy theft and AI crime (law), radiation
+      and industrial medicine (medical). One row per family per rung.
+- [ ] **A K read-out** in the HUD once the ladder passes METROPOLIS.
+
+### Beyond — TYPE II and TYPE III
+- [ ] **Type II** (Dyson swarm): the hearth leaves the planet. Likely where
+      EVOLUTION's embers stop being a percentage and start being a currency the
+      swarm is built from.
+- [ ] **Type III** (galactic): the endgame the CD named. Deliberately not
+      designed yet — it should be designed from what Type I and II turn out to
+      feel like, not from here.
+
 ## Still open at the top of the ladder
-- [ ] **Beyond METROPOLIS.** The CD's "…futuristic city, etc." — further rungs
-      are one row in `STAGES` plus one case per painter now. Needs-Zack: how
-      many, and whether the campfire stays the whole economy at that scale or
-      later stages add heat infrastructure.
-- [ ] **Mishap events.** The constable and fire marshal are priced as flat
-      bonuses because there are no mishaps to prevent yet. Giving them real
-      events would make them read as insurance rather than as another
-      multiplier.
+- [ ] **Beyond METROPOLIS.** Now scoped: the Kardashev ladder above. The open
+      question is no longer "how many rungs" but the resource fork in that
+      section.
+- [x] **Mishap events.** Done 2026-08-29 — see the MISHAPS section above.
 - [ ] Stage-specific chat-bubble lines (school kids, constable, barkeep…).
 - [ ] Town visual polish: vehicles on the city grid, shopfronts along the
       avenue, snow clearing from paved ground during the day.
@@ -46,7 +143,11 @@ EVOLUTION prestige loop. Sections below are marked built or open.
       stocked; currently nothing accrues offline — honest but stingy).
 - [ ] More log seats / bigger fire ring as population grows.
 - [ ] Stockpile art that visibly grows with stored resources.
-- [ ] Mishap events + toasts to give constable/fire marshal something real.
+- [ ] A REPAIR service. A blaze currently disables a building only while it
+      burns, so there is no lasting damage and no repair trade. The CD floated
+      "a new type of service building for repairs" for raiders that break
+      things — **Needs-Zack**, because it needs a sixth civic building and
+      every FOUND card's `bizReady()` gate reprices with it.
 
 ## Balance findings from the persona eval
 

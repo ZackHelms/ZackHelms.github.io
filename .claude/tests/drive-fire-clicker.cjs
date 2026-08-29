@@ -302,6 +302,195 @@ const shot = (page, name) => DIR ? page.screenshot({ path: DIR + '/' + name }) :
      st.gainDeeper > 0 && st.after3.embers === st.after1.embers + st.gainDeeper);
   ok('embers multiply what a trip hauls (' + st.yield + ' from a base of 1)', st.yield > 1.5);
 
+  /* ---------------------------- MISHAPS ------------------------------
+     The accident/crime/fire layer. Like EVOLUTION above this block moves the
+     settlement several rungs up the ladder and back, so it snapshots S and
+     rebuilds the scene at the end — a stage flip resizes every building, and
+     leaving one half-applied breaks a later check a long way from the cause. */
+  st = await page.evaluate(() => {
+    const out = {};
+    const snapshot = JSON.stringify(S);
+    const atStage = (k) => { for (const s of STAGES) if (s.id) S.up[s.id] = 0;
+                             for (let j = 1; j <= k; j++) S.up[STAGES[j].id] = 1; resize(); };
+
+    /* 1. A CAMP has nothing worth stealing and nothing to burn. */
+    atStage(0);
+    MISH.length = 0; THIEF = null;
+    for (let i = 0; i < 60; i++) spawnMishap();
+    out.campQuiet = MISH.length === 0 && !THIEF;
+    out.campNoRow = ['med','crime','fire'].every(f => mishapFor(f) === null);
+
+    /* 2. The ladder escalates the incident AND the rank it takes to answer. */
+    out.ladder = [];
+    for (let k = 1; k < STAGES.length; k++) {
+      atStage(k);
+      out.ladder.push({ st: STAGES[k].n,
+        med: mishapFor('med').id, crime: mishapFor('crime').id, fire: mishapFor('fire').id,
+        need: mishapFor('crime').need });
+    }
+
+    /* 3. An INJURY idles a villager; a tap advances the bar; healing frees them. */
+    atStage(1);
+    S.res = { wood: 2000, stone: 2000, food: 2000 };
+    S.up.house = 8; S.up.bunk = 6; S.up.sawbones = 1; layoutBuildings(); syncVillagers();
+    FIRE.burning = true; S.bank = maxBank();
+    MISH.length = 0; THIEF = null;
+    spawnInjury(mishapFor('med'));
+    const inj = MISH[0];
+    out.injState = inj.v.state;
+    out.injLinked = inj.v.hurt === inj;
+    const p0 = inj.prog;
+    tapMishap(inj.v.x, inj.v.y - 12);
+    out.injTap = +(inj.prog - p0).toFixed(3);
+    out.injTapWant = +(inj.k.work * MISHAP_TAP).toFixed(3);
+    /* A hurt villager is a DEAD END — only mishapStep moves them — so prove
+       the step both holds them there and lets them go. */
+    for (let i = 0; i < 30; i++) villagerStep(inj.v, 1 / 30);
+    out.injStuck = inj.v.state === 'hurt';
+    for (let i = 0; i < 60 * 40 && MISH.length; i++) mishapStep(1 / 60);
+    out.injFreed = inj.v.state !== 'hurt' && !inj.v.hurt && MISH.length === 0;
+
+    /* 4. A better building answers faster — the CD's rule, as arithmetic. */
+    const fever = MISHAPS.find(k => k.id === 'fever');
+    out.rateLadder = [0, 1, 2].map(l => +mishapRate(fever, l).toFixed(2));
+
+    /* 5. A BLAZE takes the building's EFFECT off, not just its looks. */
+    S.up.tavern = 1; S.up.shop = 1; layoutBuildings();
+    MISH.length = 0;
+    out.walkBefore = +walkMul().toFixed(3);
+    BIZ.tavern.dmg = true;
+    out.walkBurning = +walkMul().toFixed(3);
+    BIZ.tavern.dmg = false;
+    spawnBlaze(mishapFor('fire'));
+    out.blazeDmg = MISH[0].b.dmg === true;
+    for (let i = 0; i < 60 * 60 && MISH.length; i++) mishapStep(1 / 60);
+    out.blazeOut = MISH.length === 0 && !BIZ.tavern.dmg && +walkMul().toFixed(3) === out.walkBefore;
+
+    /* 6. The THIEF, and the law. A tap is a real pointer event, because the
+          ORDER of the hit tests is the thing being asserted: the thief has to
+          win against the fire, the work sites and the chat bubble. */
+    atStage(2);                       // TOWN: the burglar needs a constable
+    S.up.constable = 0; S.res = { wood: 1000, stone: 1000, food: 1000 };
+    THIEF = null; MISH.length = 0; bubble = null;
+    spawnThief(mishapFor('crime'));
+    THIEF.x = W / 2; THIEF.y = G.zone.buildBot + 20;
+    THIEF.bag = { wood: 40, stone: 30, food: 20 }; THIEF.loot = 90;
+    const r = cv.getBoundingClientRect();
+    const tapAt = (x, y) => cv.dispatchEvent(new PointerEvent('pointerdown', {
+      clientX: r.left + x, clientY: r.top + y, bubbles: true, pointerId: 1 }));
+    const bank0 = S.bank;
+    tapAt(THIEF.x, THIEF.y - 12);
+    out.noLaw = { still: !!THIEF && THIEF.state !== 'caught', bubble: bubble ? bubble.lines.join(' ') : null,
+                  stoked: +(S.bank - bank0).toFixed(3) };
+    S.up.constable = 1;               // now the settlement can make the catch
+    THIEF.x = W / 2; THIEF.y = G.zone.buildBot + 20;
+    const before = S.res.wood + S.res.stone + S.res.food;
+    tapAt(THIEF.x, THIEF.y - 12);
+    out.withLaw = { state: THIEF && THIEF.state, recovered: (S.res.wood + S.res.stone + S.res.food) - before,
+                    caught: S.caught };
+
+    /* 7. A grab is CAPPED. Uncapped, a share of the hoard is an unbounded tax
+          on saving up for a stage — measured, it put CITY out of reach. */
+    THIEF = null;
+    S.res = { wood: 1e6, stone: 1e6, food: 1e6 };
+    spawnThief(mishapFor('crime'));
+    const huge = S.res.wood;
+    thiefGrab();
+    out.capped = { took: huge - S.res.wood, cap: Math.ceil(thiefGrabCap(popCap(), tripYield())),
+                   share: Math.floor(huge * THIEF.k.cut) };
+
+    /* 8. What an escaped thief costs — and what he CANNOT cost. Reach is what
+          the camp HAULED, and a thief cannot un-haul it. */
+    S.stolen = 0; S.gathered = 5000;
+    THIEF.loot = 777; THIEF.x = -100; THIEF.state = 'flee';
+    thiefStep(1 / 60);
+    out.escaped = { gone: THIEF === null, stolen: S.stolen, gathered: S.gathered };
+
+    /* 9. Incidents belong to the run that was. */
+    MISH.length = 0; spawnInjury(mishapFor('med')); spawnBlaze(mishapFor('fire'));
+    S.gathered = 50000; evolve();
+    out.evolved = MISH.length === 0 && THIEF === null && !villagers.some(v => v.hurt);
+
+    /* 10. The dead-end guard. 'hurt' is a state nothing but mishapStep leaves,
+           so a villager whose ROLE changes while hurt would be stranded there
+           for the rest of the run — the exact shape of the keeper-flag bug
+           this suite already pins. Today the reachable flip is keeper->worker
+           and keepers are never injured, so this drives the other direction
+           (popCap falling below the villager's index) to prove the release
+           actually fires rather than trusting that it is unreachable. */
+    S = JSON.parse(snapshot);
+    atStage(1);
+    S.up.keeper = 0; S.up.house = 8; S.up.bunk = 12; layoutBuildings(); syncVillagers();
+    MISH.length = 0;
+    /* spawnInjury picks at random, so narrow its pool to the two villagers a
+       popCap of 10 will demote — this has to land on a HIGH index to flip. */
+    const hidden = villagers.slice(0, 14);
+    for (const v of hidden) v.state = 'inside';
+    spawnInjury(mishapFor('med'));
+    for (const v of hidden) v.state = 'idle';
+    const hv = MISH[0].v;
+    const hurtIx = villagers.indexOf(hv);
+    S.up.house = 0; layoutBuildings(); syncVillagers();   // popCap falls past it -> role flip
+    out.flip = { flipped: hurtIx >= popCap(), stillHurt: hv.state === 'hurt' || !!hv.hurt,
+                 open: MISH.length };
+
+    /* 11. The clock only runs on a WORKING camp. */
+    S = JSON.parse(snapshot);
+    atStage(1);
+    MISH.length = 0; THIEF = null; FIRE.burning = false; mishT = 0.1;
+    for (let i = 0; i < 60 * 300; i++) mishapStep(1 / 60);
+    out.coldQuiet = MISH.length === 0 && !THIEF;
+
+    S = JSON.parse(snapshot);
+    MISH.length = 0; THIEF = null; bubble = null;
+    /* SILENCE the layer for the rest of the suite. Everything below this block
+       runs a VILLAGE with a burning fire, which is exactly the state that
+       spawns incidents — and an incident intercepts a tap by design (a hurt
+       villager's tap is help, not a chat bubble), so a random injury landing on
+       the villager the bubble checks tap makes those checks flaky. Caught by
+       the gate running this suite while another copy was running: the bubble
+       pair went red there and green in isolation. */
+    mishT = 1e9;
+    HOMES.length = 0; villagers.length = 0; seatTaken.fill(false);
+    resize(); syncVillagers();
+    return out;
+  });
+  ok('a CAMP has no incidents (' + st.campQuiet + ')', st.campQuiet && st.campNoRow);
+  ok('the crime ladder escalates (' + st.ladder.map(l => l.crime).join(' -> ') + ')',
+     st.ladder.map(l => l.crime).join(',') === 'sneak,burglar,runner,heist');
+  ok('...and so does the rank it takes to answer (' + st.ladder.map(l => l.need).join(',') + ')',
+     st.ladder.map(l => l.need).join(',') === '0,1,1,2');
+  ok('every family escalates with the rung (' +
+     st.ladder.map(l => l.med + '/' + l.fire).join(' ') + ')',
+     new Set(st.ladder.map(l => l.med)).size === 4 && new Set(st.ladder.map(l => l.fire)).size === 4);
+  ok('an injury idles a villager (' + st.injState + ')', st.injState === 'hurt' && st.injLinked);
+  ok('a tap advances the recovery bar (+' + st.injTap + ' of ' + st.injTapWant + ')',
+     Math.abs(st.injTap - st.injTapWant) < 1e-6);
+  ok('only mishapStep moves them — villagerStep cannot', st.injStuck === true);
+  ok('the bar closing puts them back to work', st.injFreed === true);
+  ok('a better building recovers faster (' + st.rateLadder.join(' -> ') + ')',
+     st.rateLadder[0] < st.rateLadder[1] && st.rateLadder[1] < st.rateLadder[2]);
+  ok('a burning building loses its EFFECT (walk ' + st.walkBefore + ' -> ' + st.walkBurning + ')',
+     st.walkBurning < st.walkBefore && st.blazeDmg === true);
+  ok('...and gets it back when the fire is out', st.blazeOut === true);
+  ok('a thief tap without the law does not catch him', st.noLaw.still === true);
+  ok('...it explains why, in a villager\'s own words ("' + (st.noLaw.bubble || '') + '")',
+     /constable|station/i.test(st.noLaw.bubble || ''));
+  ok('...and it is not a stoke', st.noLaw.stoked === 0);
+  ok('a thief tap WITH the law makes the catch (' + st.withLaw.state + ')',
+     st.withLaw.state === 'caught' && st.withLaw.caught >= 1);
+  ok('...and every stolen unit comes back (' + st.withLaw.recovered + ' of 90)',
+     st.withLaw.recovered === 90);
+  ok('a grab is capped, not a share of the hoard (' + st.capped.took + ' of a possible ' +
+     st.capped.share + ')', st.capped.took === st.capped.cap && st.capped.took < st.capped.share);
+  ok('an escaped thief costs the stockpile (' + st.escaped.stolen + ')',
+     st.escaped.gone === true && st.escaped.stolen === 777);
+  ok('...but never the evolution reach (' + st.escaped.gathered + ')', st.escaped.gathered === 5000);
+  ok('an evolution clears every incident', st.evolved === true);
+  ok('a role flip releases an injury (flipped ' + st.flip.flipped + ', open ' + st.flip.open + ')',
+     st.flip.flipped === true && st.flip.stillHurt === false && st.flip.open === 0);
+  ok('a cold camp gets no new incidents', st.coldQuiet === true);
+
   /* BELLOWS is hidden until the fire has ROARED once — it multiplies a bonus a
      player who has never crossed 75% has never seen, which made it the one
      card that could be bought for nothing. */

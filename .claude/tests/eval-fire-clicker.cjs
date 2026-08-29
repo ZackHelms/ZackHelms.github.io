@@ -160,7 +160,8 @@ function ok(name, cond, extra) {
    is the shipped game's own top-level scope. */
 async function inPage(cfg) {
   const R = { seed: cfg.seed, persona: cfg.persona, milestones: {}, stalled: null,
-    trips: 0, tapCount: 0, workerSecs: 0, burnSecs: 0, baseTrips: 0, baseWorkerSecs: 0, roarSecs: 0 };
+    trips: 0, tapCount: 0, workerSecs: 0, burnSecs: 0, baseTrips: 0, baseWorkerSecs: 0, roarSecs: 0,
+    thiefCaught: 0, hurtSecs: 0 };
 
   // --- deterministic RNG for the whole run -------------------------------
   const realRandom = Math.random;
@@ -217,8 +218,13 @@ async function inPage(cfg) {
       // tap sawtooth, not the peak: see roarScaleMean() in the harness header.
       const boost = cfg.roars ? 1 + (0.1 + 0.1 * (up.bellows || 0)) * roarScaleMean(maxBank(), tapPower()) : 1;
       const cycle = (CYCLE_WAIT + 2 * meanDist / speed + work) / boost;
+      /* The mishap tax belongs in the SHOPPER's model too, not only in the
+         reported rate: without it a constable and a fire station are worth
+         nothing to an optimal player, who would then never buy the two
+         buildings whose entire job is now insurance. */
+      const drag = mishapDrag(cfg.roars, pop);
       S.up = saved;
-      return pop * yld / cycle;               // resource units per second, all pools
+      return pop * yld / cycle * drag;        // resource units per second, all pools
     }
     const clone = (u) => Object.assign({}, u);
 
@@ -359,6 +365,23 @@ async function inPage(cfg) {
     MS.push({ k: 'ALL MAXED', f: () => UPG.every(u => !showU(u) || (S.up[u.id] || 0) >= maxOf(u)) });
     const left = MS.slice();
 
+    /* One tap per incident per half-second of attention — the eye and the
+       thumb are one player, so this is deliberately NOT "close every bar
+       instantly". A thief is grabbed on sight, but only when the settlement
+       has the law to back it: below that rank a tap on him is a chat bubble
+       and no more, exactly as it is for a real player. */
+    let tendAcc = 0;
+    function tendMishaps() {
+      tendAcc += dt;
+      if (tendAcc < 0.5) return;
+      tendAcc = 0;
+      for (const m of MISH) m.prog += m.k.work * MISHAP_TAP;
+      if (THIEF && THIEF.state !== 'caught' && (S.up.constable || 0) >= THIEF.k.need) {
+        R.thiefCaught = (R.thiefCaught || 0) + 1;
+        catchThief();
+      }
+    }
+
     // --- the loop ----------------------------------------------------------
     S.embers = cfg.embers || 0;      // the page's own tripYield() reads this
     const dt = cfg.dt;
@@ -369,6 +392,11 @@ async function inPage(cfg) {
 
     while (S.day <= cfg.maxDays) {
       // ---- persona input
+      /* MISHAPS are the second skill lever, and they split the personas the
+         same way the roaring fire does. SPEEDRUN is a player watching the
+         scene: they tap an incident down and they grab the thief the moment
+         they have the rank of law to make it stick. CASUAL never notices —
+         which is what makes the constable and the fire station worth buying. */
       if (cfg.persona === 'casual' && (S.up.keeper || 0) >= 1) {
         /* Hands off the moment the auto-stoker is hired. A person still notices
            a dead fire, though, and when they step in they top the bank back up
@@ -405,11 +433,18 @@ async function inPage(cfg) {
       dayStep(dt);
       fireStep(dt);
       syncVillagers();
+      /* The harness owns the clock — requestAnimationFrame is stubbed out — so
+         every system the game steps in frame() has to be stepped here too. A
+         missing mishapStep is not a crash, it is a sim that quietly measures a
+         game nobody plays. */
+      mishapStep(dt);
+      if (cfg.tends) tendMishaps();
       // Calibration counters: the analytic model's `cycle` and `uptime` are
       // guesses until they are measured against the villagers actually walking.
       for (const v of villagers) {
         const was = v.state;
         villagerStep(v, dt);
+        if (v.state === 'hurt') R.hurtSecs += dt;
         if (!v.keeper) {
           // Calibrate against the model's UN-boosted cycle by charging worker
           // time at the heat multiplier: a roaring second is worth `heatBoost()`
@@ -524,7 +559,13 @@ function modelRun(spec, persona, maxDays) {
     const speed = CYCLE_SPEED * walkMul();
     const boost = roars ? 1 + (0.1 + 0.1 * (up.bellows || 0)) * roarScaleMean(5 + up.pit * 5, 1 + up.tinder * 0.5) : 1;
     const cycle = (CYCLE_WAIT + 2 * meanDist / speed + workTime()) / boost;
-    const r = popCap() * tripYield() / cycle;
+    /* MISHAPS. The same persona split as the roaring fire: a player tending
+       the fire at 8 Hz is a player who sees the thief and taps the injured,
+       and one who has handed the camp to the firekeeper sees neither. The
+       tax comes from the GAME's own mishapDrag() inside the spec span, so a
+       retune of the incident table reprices this model with no second edit —
+       which is the whole reason that function lives in the span. */
+    const r = popCap() * tripYield() / cycle * L.mishapDrag(roars, popCap());
     for (const k of Object.keys(sv)) up[k] = sv[k];
     return r;
   }
@@ -743,6 +784,8 @@ function modelRun(spec, persona, maxDays) {
         persona, seed: 1000 + i * 7919, dt: DT, maxDays: DAYS, strict: STRICT, embers: EMBERS,
         cycleWait: CYCLE_WAIT, cycleSpeed: CYCLE_SPEED,
         roars: persona === 'speedrun',   // only a hand-tended fire crosses 75%
+        tends: persona === 'speedrun',   // ...and only a watching player works the incidents
+
       });
       wall += Date.now() - t0; simSec += r.simSeconds;
       runs[persona].push(r);
@@ -945,7 +988,7 @@ function buildSpec(geom) {
      of the ladder now, so a model that redefined them locally would be a
      second copy of the stage table waiting to disagree with the first. */
   const out = new Function('fmtS', 'maxBank', 'tapPower', 'drainRate', 'roarBonus', 'S',
-    '"use strict";' + spec + '\nreturn { UPG, STAGES, BIZ_DEFS, stageIx, houses, stageMaxHouses, bizDef };')
+    '"use strict";' + spec + '\nreturn { UPG, STAGES, BIZ_DEFS, MISHAPS, stageIx, houses, stageMaxHouses, bizDef, mishapFor, mishapMTBF, mishapDrag };')
     (fmtS, maxBank, tapPower, drainRate, roarBonus, S);
   const meanDist = geom.dist.reduce((a, b) => a + b, 0) / geom.dist.length;
   return { UPGS: out.UPG, L: out, levels, meanDist, S };

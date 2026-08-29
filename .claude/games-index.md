@@ -25,7 +25,7 @@ local-2p.
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
 | Neon Clash | `neon-clash/` | card-battler | drag-place, tap, tap-select | match-vs-ai, local-2p | card-deck, resource-economy, ai-opponent, rotated-2p-ui, area-of-effect, art-styles | vs-ai, local-2p | `.claude/neon-clash.md` |
-| Fire Clicker | `fire-clicker/` | idle-clicker | tap | idle-persistent | resource-economy, day-night-cycle, prestige-reset | solo | `.claude/fire-clicker.md` |
+| Fire Clicker | `fire-clicker/` | idle-clicker | tap | idle-persistent | resource-economy, day-night-cycle, prestige-reset, scale-ladder, random-events | solo | `.claude/fire-clicker.md` |
 | Zed Shooter | `zed-shooter/` | shooter | virtual-joystick, kb-mouse | wave-survival | meta-progression | solo | external: zed-fps repo |
 | Mitochondria Simulator | `mitochondria/` | biology-sim | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox, guided-lessons | systems-simulation, scale-ladder, skill-teaching, real-time-3d | solo | `.claude/mitochondria.md` |
 | Quantum Chemist | `qntmchmst/` | grid-puzzle | tap, drag-place | level-campaign | match-clear | solo | external: qntmchmst repo |
