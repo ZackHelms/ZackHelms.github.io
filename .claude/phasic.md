@@ -280,8 +280,11 @@ sliders + mutes (persisted `phasic_v1`); top-left 🔊 is the master toggle.
 ## Licensing (2026-07-31)
 
 games/phasic/ is proprietary — its own LICENSE (all rights reserved,
-play-only permission) excludes it from the repo's root Apache 2.0 grant
-via a scope-exception preamble prepended to LICENSE.txt. Forward-only:
+play-only permission). Originally excluded from the repo's root Apache 2.0
+grant via a scope-exception preamble in LICENSE.txt; on 2026-08-28 the root
+license was removed entirely and licensing went per-directory (see root
+CLAUDE.md § Licensing), so the LICENSE in this directory now stands alone.
+Forward-only:
 copies distributed under Apache 2.0 before 2026-07-31 stay Apache. The
 PHASIC name was never trademark-licensed (Apache §6). In-game: settings
 cogwheel → LICENSE button; every wiki page shows a © footer linking it.

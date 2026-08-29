@@ -120,3 +120,44 @@ Both the diagnosis and those two commands are now step 5 of the canonical
 remote, check the remote, not the local install — `git ls-tree origin/main
 <path>`. A pinned cache and a failed push look identical from inside a
 session, and only one of them is a real problem.
+
+## The second staleness case: the marketplace WORKING TREE (2026-08-28)
+
+The rule above is about the plugin **cache** being pinned to a marketplace SHA.
+There is a second, independent way to reach the same wrong conclusion, and a
+neon-clash session hit it a few hours later.
+
+This repo declares its marketplace as a **directory source**
+(`~/.claude/plugins/known_marketplaces.json` → `{"source":"directory","path":
+"/home/user/zmhstudio"}`), so `/home/user/zmhstudio` is an ordinary git clone
+made when the container was built. **It is never fetched by anything.** Asked
+to load `zmh-3d:sprite-prerender`, that session ran `ls
+/home/user/zmhstudio/plugins/zmh-3d/skills/`, saw six skills and no
+`sprite-prerender`, cross-checked the plugin README (whose "roadmap" section
+also predated the skill), and reported to the CD that the skill did not exist.
+
+It did. The clone was from **2026-08-20**; the skill landed at 21:32 on the
+27th. The tell was there and unread: the clone had **no `.git/FETCH_HEAD` at
+all**. One `git -C /home/user/zmhstudio fetch origin main` produced it — along
+with a HEAD commit literally titled *"pin the bake-size and byte-budget rules in
+sprite-prerender"*.
+
+**Listing a directory is not checking a remote.** Both cases collapse to one
+habit, so make it reflexive before saying a skill, plugin or file is missing:
+
+```bash
+git -C /home/user/zmhstudio fetch origin main -q
+git -C /home/user/zmhstudio ls-tree origin/main --name-only -r | grep <thing>
+```
+
+Cost of not doing it: the session designed and shipped a whole pipeline before
+the CD pointed at the skill, and the skill turned out to carry a rule the
+pipeline had broken (art baked at 1x and blitted at 1.5x — see
+`.claude/notes/20260827-offline-prerender-pipeline.md`). The skill would not
+have changed the architecture, which was the right one for that request, but it
+would have caught a shipped defect a day earlier.
+
+Related and worth knowing together: `1d67ef4` enabled `zmh-3d@zmhstudio` in
+`.claude/settings.json` for exactly this reason, so its skills now load in a
+fresh container without `/load-plugins`. That fixes *resolution*; it does not
+fix a stale clone, because the SessionStart install reads the same directory.

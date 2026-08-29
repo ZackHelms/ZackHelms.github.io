@@ -1,0 +1,34 @@
+FIRE CLICKER (games/fire-clicker/) — PROPRIETARY LICENSE
+
+Copyright (c) 2026 Zack Helms. All rights reserved.
+
+1. SCOPE
+   This license covers everything in the games/fire-clicker/ directory: game
+   code, art, data, audio code, and text (collectively, "the Software").
+
+2. NO PERMISSION GRANTED
+   No permission is granted to copy, modify, distribute, sublicense,
+   sell, or create derivative works of the Software, in whole or in
+   part, without prior written permission from the copyright holder.
+
+3. TRADEMARK
+   The FIRE CLICKER name, its logo, and associated branding are reserved.
+   No trademark rights are granted by this license.
+
+4. PERMITTED USE
+   You may play FIRE CLICKER where it is officially published — the
+   copyright holder's website, and any official app-store release —
+   for personal, non-commercial use. This is not a license to the
+   underlying Software.
+
+5. RELATIONSHIP TO EARLIER REPOSITORY LICENSING
+   This directory has been proprietary since its creation
+   (2026-08-28); no version of it was ever distributed under the
+   repository's former blanket Apache License 2.0.
+
+6. PERMISSIONS AND CONTACT
+   For permission requests, contact the copyright holder via the
+   GitHub repository ZackHelms/ZackHelms.github.io.
+
+7. NO WARRANTY
+   The Software is provided "as is," without warranty of any kind.

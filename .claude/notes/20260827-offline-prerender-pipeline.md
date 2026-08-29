@@ -129,6 +129,18 @@ The guard is three lines and belongs in a test from the first commit: for every
 triangle, the geometric normal must agree with its own stored vertex normal.
 Zero front-facing triangles on a shape that "renders" is the tell.
 
+**The transferable rule, and the most useful thing in this note:** *when a
+render looks wrong in a way you cannot name, stop looking and write the
+invariant.* Several rounds went into "it reads flat and cup-like" — retuning
+materials, reproportioning the figure, rebalancing the rig — because the eye
+reports a symptom and not a cause. One assertion said `zero front-facing
+triangles` and the whole class of symptoms had a single explanation. Screenshot
+review is irreplaceable for *taste* (is the helm too big, does the team ring
+read at arm's length); it is the wrong tool for *correctness*, and the tell that
+you have crossed from one to the other is that you cannot say what is wrong,
+only that it is. That ordering — deterministic check before more looking — is
+this repo's stated principle, and this is the session that earned it.
+
 Related: **an open lathe is a shell**, and under this projection you look
 straight down into it. Cap profile ends by default.
 
@@ -144,6 +156,34 @@ drawn world unit, `bake` per model world unit) so the relationship is
 assertable, and assert it. Cost is the **square** of the factor: this atlas
 went 1.5 MB -> 2.3 MB. This is the skill's rule, and star-surge hit it the same
 way when it tripled its hulls.
+
+### Name the two resolutions, or you will divide by the wrong one
+
+Folding the art scale into the bake means a group now has **two** pixels-per-
+world-unit numbers, and they are easy to conflate — I did, immediately, in the
+commit that fixed the softness: the game was changed to divide by the *bake*
+resolution, which shrank every unit by 1.5x. Give them separate names in the
+manifest and say what each is for:
+
+- `ppu` — atlas pixels per **drawn** world unit. Identical for every group,
+  because they all land on the same board at the same scale. **This is the one
+  the game divides by**, and it is the only one the game should see.
+- `bake` — atlas pixels per **model** world unit. A group drawn larger than
+  life is rendered larger by the same factor. Only the builder cares.
+
+The relationship is then a one-line assertion — `bake / art === ppu` — which is
+worth more than the comment, because the failure has no symptom other than
+looking slightly wrong.
+
+## A JavaScript trap that cost a whole render round
+
+`{...defaults, ...opt}` versus `{...opt, ...defaults}`: a proportions helper
+took multipliers of a height and returned computed dimensions, with `...opt`
+spread **last** as a convenience for extra keys. That silently replaced every
+computed dimension with its own raw multiplier, so the first knight was built
+0.15 world units wide. It renders, it is lit correctly, and it looks like a
+scale bug in the camera. Spread the caller's overrides **first** when the
+object's own later fields are derived from them.
 
 ## Ship it as a fallback, not a dependency
 

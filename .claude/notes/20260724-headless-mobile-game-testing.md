@@ -520,3 +520,31 @@ One wrinkle worth keeping: the scan skips all of `.claude/`. The first version
 did not, and `gates.sh` flagged its own explanatory comment — a scanner that
 matches the documentation of its own convention is a scanner that gets
 disabled. Scan what ships.
+
+## `file://` is not a small difference — two things break there (2026-08-28)
+
+Both suites and `shot-page.cjs` load pages as `file://`, which is fine until a
+game ships an **asset**. Neon Clash's sprite style was the first, and it hit
+both of these inside an hour:
+
+- **`fetch()` fails CORS on `file://`.** A style whose manifest is fetched can
+  therefore never be opened off disk — not by a screenshot run, not by the
+  drive suite, so the feature is untestable by every tool in this repo. The fix
+  is architectural, not a test workaround: **inline the manifest into the page**
+  (it was 4 KB) and load only the image, because `<img>` has no such
+  restriction. The build script writes it between markers and the suite asserts
+  it still matches the generated file.
+- **Drawing a `file://` image into a canvas taints it**, so `getImageData`
+  throws `SecurityError` on that canvas from then on. Several checks here
+  sample a board pixel to prove a style painted; under the sprite style they
+  throw, and the failure surfaces as the *misleading* `page.evaluate:
+  Execution context was destroyed, most likely because of a navigation`.
+  Wrap the sample in try/catch and judge that style another way.
+
+The replacement check is better than the pixel it replaced: expose a
+**monotonic draw counter** the blit path increments, and assert it climbs under
+the style and stays flat under every other. That proves the atlas is genuinely
+being drawn — a dead dispatch branch that silently falls through to the parent
+painter is invisible to any screenshot and to any single pixel, and this is the
+only thing that catches it. Over `https://` none of this bites, so the taint is
+a property of the harness's origin, not of the page.

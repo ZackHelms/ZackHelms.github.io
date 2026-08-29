@@ -52,6 +52,24 @@ Deterministic helpers for working on this repo.
   Drive suites worth keeping across sessions live in `.claude/tests/` — see
   that folder's README for when a suite earns a place there.
 
+- `marketplace-status.sh` — **is the plugin marketplace clone current, and does
+  a skill actually exist?** Fetches the directory-source marketplace this repo
+  declares and reads its skill list off `origin/main`, never off the working
+  tree. Prints `MARKETPLACE=` `LOCAL=` `REMOTE=` `BEHIND=` and either
+  `SKILLS=<all>` or, given a name, `SKILL_FOUND=<plugin:skill>`; exits 1 when
+  the clone is behind or the named skill is absent from the remote.
+
+  ```bash
+  .claude/scripts/marketplace-status.sh                    # freshness + full list
+  .claude/scripts/marketplace-status.sh sprite-prerender   # does this one exist?
+  ```
+
+  Exists because the clone at `/home/user/zmhstudio` is made when the container
+  is built and **never fetched by anything**, so `ls` of its skills directory
+  says only what existed that day. Reported-missing-but-actually-present cost a
+  session on 2026-08-27/28 (`.claude/notes/20260822-zmh-plugin-bootstrap.md`).
+  Run it before telling the CD a skill does not exist.
+
 - `shot-page.cjs` — headless screenshot of any repo page for **visual
   iteration** (WebGL2 renders via SwiftShader). Same Chromium/`NODE_PATH`
   requirements as the smoke gate. Options: `w=/h=/dpr=` viewport,
@@ -158,7 +176,17 @@ Deterministic helpers for working on this repo.
   .claude/scripts/gates.sh                     # derive pages from git
   .claude/scripts/gates.sh games/<slug>/index.html   # explicit
   .claude/scripts/gates.sh --no-drive          # smoke + sync only
+  .claude/scripts/gates.sh --eval              # ALSO run the pacing evals
   ```
+
+  **`--eval` is the one you have to remember.** A drive suite proves the rules;
+  an `eval-<slug>.cjs` proves the **pacing**, and the two fail on different
+  changes — a cost curve, a yield, a walk speed or a work timer can move a
+  milestone by hours while every rule still holds, which is exactly what a
+  rules-only gate is blind to. Evals cost ~a minute, so they are opt-in, but the
+  script never stays quiet about one it did not run: when a changed game has an
+  eval it prints `EVAL available, NOT run: <file>`. Added 2026-08-28, after a
+  fire-clicker balance pass that had to be re-run by hand every time.
 
   With no arguments it takes the changed `.html` from the working tree, the
   index, and `origin/main...HEAD` — the common mid-session case. It reports
@@ -233,3 +261,24 @@ Deterministic helpers for working on this repo.
   regex, it was a tool asserting an outcome it had not verified; the class to
   watch for is any helper whose success line is computed from *intent* rather
   than from re-reading the artifact.
+
+- **`check-canvas-space.cjs`** — diagnostic: does a page lay out in the same
+  coordinate space its taps arrive in? Simulates the iOS rotation quirk (the
+  canvas box ends up shorter than `window.innerHeight`), then compares each
+  visible canvas's backing-store aspect against its CSS box aspect.
+  `SQUASH=1.000` means they agree. Written 2026-08-28 after fire-clicker
+  shipped the mismatch — the scene was drawn higher than it was hit-tested, so
+  the campfire only answered taps at the bottom of its drawn circle and below.
+
+  ```
+  NODE_PATH=<playwright-core dir>/node_modules \
+    node .claude/scripts/check-canvas-space.cjs games/<slug>/index.html
+  ```
+
+  **A diagnostic, not a gate** — deliberately not wired into `smoke-mobile`.
+  A squash on a canvas the page never hit-tests is a stretched picture, not a
+  dead tap, and the caller has to know which. It exempts three cases that each
+  false-positived on the first run (`pinned=inline-css`, `uninit`,
+  `skip-rotated`) — see the script header. Current standing result: every game
+  clean except `wayfinder`'s `gl`/`ui` canvases (render-only; its one
+  hit-tested canvas already measures its own rect).
