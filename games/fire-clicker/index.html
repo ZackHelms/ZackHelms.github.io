@@ -92,6 +92,19 @@ body {
   border-radius: 6px; width: 38px; height: 32px; font-size: 15px; cursor: pointer;
 }
 .up-sub { max-width: 460px; margin: 0 auto 10px; font-size: 0.56rem; color: var(--dim); letter-spacing: 1px; line-height: 1.6; }
+/* The evolve banner reads as a WARNING panel, not as another upgrade card:
+   different ground, a gold rule, and the destructive button in red. It is the
+   only irreversible action in the game. */
+#evolve-box { max-width: 460px; margin: 0 auto 12px; padding: 9px 11px; text-align: left;
+  background: rgba(255,195,0,0.07); border: 1px solid rgba(255,195,0,0.38); border-radius: 9px; }
+#evolve-box .ev-now { font-family: 'Black Ops One', sans-serif; color: var(--gold);
+  font-size: 0.62rem; letter-spacing: 1.5px; margin-bottom: 5px; }
+#evolve-box .ev-gain { font-size: 0.56rem; color: var(--white); line-height: 1.6; margin-bottom: 8px; }
+#evolve-box .ev-gain b { color: var(--gold); }
+.ev-btn { font-family: 'Black Ops One', sans-serif; font-size: 0.56rem; letter-spacing: 1.4px;
+  padding: 7px 12px; margin-right: 7px; border-radius: 7px; cursor: pointer;
+  background: var(--panel); color: var(--white); border: 1px solid var(--border); }
+.ev-btn.ev-danger { background: rgba(255,34,68,0.16); border-color: var(--red); color: #ffd9df; }
 .up-card {
   max-width: 460px; margin: 0 auto 8px; display: flex; gap: 10px; align-items: center;
   background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
@@ -120,7 +133,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-29 14:57 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-29 15:21 UTC</div>
 <canvas id="scene"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
 <button id="mute-btn" aria-label="Mute">&#128266;</button>
@@ -133,6 +146,7 @@ body {
 <div id="upg-panel">
   <div class="up-head"><h2>UPGRADES</h2><button id="upg-close" aria-label="Close">&#10005;</button></div>
   <div class="up-sub" id="upg-sub"></div>
+  <div id="evolve-box" hidden></div>
   <div id="upg-scroll"><div id="upg-list"></div></div>
 </div>
 <div id="toast"></div>
@@ -243,7 +257,15 @@ const UPG = [
      BELLOWS was the game's one trap card, expensive and inert for someone
      letting the firekeeper smoulder. `S.up.bellows > 0` keeps the card
      visible for saves written before S.roared existed. */
-  { id:'bellows', i:'\u{1F4A8}', n:'BELLOWS',      max:6, show:()=>S.roared || S.up.bellows > 0,
+  /* BELLOWS' ceiling GROWS with the settlement (6/9/12/15/18). The roaring
+     fire is the game's skill lever — the one bonus the firekeeper structurally
+     cannot earn — and a fixed +70% cap was worth 2.1x against naive play in a
+     village and only 1.33x once schools, a doctor and the ember bonus were
+     multiplying everything else. A skill lever has to scale with the economy
+     it is a lever ON, or effort quietly stops mattering exactly as the numbers
+     get big. Thematically it is also the right shape: a bigger hearth takes a
+     bigger bellows. */
+  { id:'bellows', i:'\u{1F4A8}', n:'BELLOWS', max:()=>6 + stageIx() * 3, show:()=>S.roared || S.up.bellows > 0,
     d:(l)=>'Leather bellows feed the blaze. Above 75% the fire ROARS and villagers work up to +' + Math.round(roarBonus()*100) + '% \u2192 +' + Math.round(roarBonus(l+1)*100) + '% faster \u2014 half that at the 75% line, all of it at a full bank.',
     cost:(l)=>({ wood: Math.round(30 * Math.pow(1.9, l)), stone: Math.round(20 * Math.pow(1.9, l)) }) },
   { id:'tools',  i:'\u{26CF}',  n:'SHARP TOOLS',  max:6,
@@ -251,7 +273,12 @@ const UPG = [
     cost:(l)=>({ stone: Math.round(16 * Math.pow(1.9, l)), wood: Math.round(8 * Math.pow(1.9, l)) }) },
   { id:'bunk',   i:'\u{1F9E3}', n:'RECRUIT VILLAGER', max:()=>houses()*5 - 4,
     d:(l)=>'Another pair of mittens moves in (' + (4+l) + ' → ' + (4+l+1) + '). Each house sleeps 5.',
-    cost:(l)=>({ wood: Math.round(24 * Math.pow(1.75, l)), food: Math.round(14 * Math.pow(1.75, l)) }) },
+    /* 1.45, not 1.75. At 1.75 the recruit curve walled out around POP 20 and
+       the economy plateaued two stages before the ladder ran out — a
+       metropolis with a village's workforce. Flatter keeps population growing
+       into the late stages, which is the only lever that makes a big
+       settlement feel like one. */
+    cost:(l)=>({ wood: Math.round(24 * Math.pow(1.45, l)), food: Math.round(14 * Math.pow(1.45, l)) }) },
   { id:'keeper', i:'\u{1F9E4}', n:'FIREKEEPER',   max:1,
     d:()=>'Hire a villager to feed the fire for you: throws a log (\u22121 wood) for +4s whenever the bank runs low. Keeps the camp alive while you are away \u2014 but a tended fire only ever smoulders, so the ROARING bonus stays yours to earn.',
     cost:()=>({ food: 30, wood: 15 }) },
@@ -260,7 +287,11 @@ const UPG = [
     cost:()=>({ wood: 100, stone: 80, food: 80 }) },
   { id:'house',  i:'\u{1F3E0}', n:'BUILD HOUSE',  max:()=>stageMaxHouses() - 2,
     d:(l)=>'Raise house #' + (3+l) + ' — beds for 5 more villagers (' + houses() + ' → ' + (houses()+1) + ' of ' + stageMaxHouses() + ').',
-    cost:(l)=>({ wood: Math.round(45 * Math.pow(1.6, l)), stone: Math.round(25 * Math.pow(1.6, l)) }) },
+    /* 1.45, not 1.6. Houses are a GATE as well as a purchase — every FOUND
+       card demands the rung below be fully built — so this curve sets where
+       each stage lands, and at 1.6 the thirty-second house cost 10.6M wood and
+       put METROPOLIS days past anything a bonus could rescue. */
+    cost:(l)=>({ wood: Math.round(45 * Math.pow(1.45, l)), stone: Math.round(25 * Math.pow(1.45, l)) }) },
   { id:'tavern', i:'\u{1F37A}', n:'TAVERN', max:()=>bizMax('tavern'), show:()=>bizShown('tavern'),
     d:()=>'THE THIRSTY YETI opens its doors. A warm mug after every haul — villagers walk 15% faster.',
     cost:()=>({ wood: 150, stone: 60, food: 120 }) },
@@ -352,8 +383,12 @@ function freshState() {
     bank: 0,             // seconds of burn banked
     focus: null,         // MICROMANAGEMENT: 'wood'|'stone'|'food', or null for the villagers' own choice
     day: 1, dayT: 0.16,  // start mid-morning
-    lifeWarm: 0,         // lifetime warm-seconds (for later stages/ascension)
+    lifeWarm: 0,         // lifetime warm-seconds
     roared: false,       // has the fire ever ROARED? gates the BELLOWS card
+    gathered: 0,         // THIS RUN's total resources hauled — the reach metric
+    /* These three survive an evolution; freshState() only supplies the floor
+       for a save that predates them. evolve() carries them across by hand. */
+    bestReach: 0, embers: 0, evolutions: 0,
     muted: false, lastSave: Date.now(),
   };
 }
@@ -377,6 +412,14 @@ function load() {
   S.dayT = (+d.dayT >= 0 && +d.dayT < 1) ? +d.dayT : 0.16;
   S.lifeWarm = Math.max(0, +d.lifeWarm || 0);
   S.roared = !!d.roared || S.up.bellows > 0;
+  S.gathered = Math.max(0, +d.gathered || 0);
+  S.bestReach = Math.max(0, +d.bestReach || 0);
+  S.evolutions = Math.max(0, Math.floor(+d.evolutions || 0));
+  /* Embers are RECOMPUTED from the stored high-water mark rather than loaded.
+     A saved total could disagree with the reach that earned it — through a
+     tuning change to the curve, a partial write, or an edited save — and the
+     mark is the thing the design is actually about. */
+  S.embers = embersFor(S.bestReach);
   S.muted = !!d.muted;
 }
 function maxBank()  { return 5 + S.up.pit * 5; }
@@ -386,7 +429,11 @@ function tapPower() { return 1 + S.up.tinder * 0.5; }
    them ("15% slower") instead of compounding into something neither card
    claims. */
 function drainRate(){ return 1 / (1 + S.up.wind * 0.09 + (S.up.marshal || 0) * 0.18); }
-function tripYield(){ return 1 + S.up.tools + (S.up.shop ? 1 : 0) + (S.up.school || 0); }
+/* Embers multiply YIELD rather than speed. Speed was the obvious place — it
+   is where the roaring bonus lives — but at +900% the villagers sprint, and a
+   camp of blurring dots is a worse read than a camp hauling bigger armfuls.
+   Yield is also the lever both halves of the pacing eval already understand. */
+function tripYield(){ return (1 + S.up.tools + (S.up.shop ? 1 : 0) + (S.up.school || 0)) * emberMul(); }
 /* Walk and work speed, named once so the villager loop, the card copy and the
    pacing eval can never disagree about what a building is worth. */
 function walkMul()  { return (S.up.tavern ? 1.15 : 1) * (1 + (S.up.constable || 0) * 0.10); }
@@ -417,6 +464,32 @@ function heatBoost() { return 1 + roarNow(); }
    RUN note in villagerStep for why one log is not enough. */
 const FORAGE_ARMFUL = 8;
 function popCap()   { return Math.min(4 + S.up.bunk, houses() * 5); }
+/* ============================== EVOLUTION ==============================
+   The prestige loop, on the Egg Inc shape. Two rules make it what it is.
+
+   REACH is total resources GATHERED in a run — continuous, so a run that got
+   "a bit further" banks something even when it did not reach a new stage.
+   (Stage-reached has only five possible values; missing a rung by ten minutes
+   would bank exactly nothing, which is the worst feeling a prestige layer can
+   produce.)
+
+   The bonus is a HIGH-WATER MARK, not an accumulation. Embers are a pure
+   FUNCTION of the best reach ever, so evolving twice at the same depth adds
+   nothing and only going further pays — the CD's rule stated directly. Because
+   there is no running total, the count and the mark cannot drift apart, and
+   retuning the curve below silently re-prices every past run correctly instead
+   of leaving players on a total nobody can reproduce.
+
+   The exponent is sublinear, as Egg Inc's soul eggs are: every 10x of reach is
+   about 3.5x the embers. The stages cost x11 each, so a rung is worth roughly
+   a doubling of the bonus — enough that the next run visibly flies through
+   ground the last one crawled over, never so much that it trivialises it. */
+const EMBER_BASE = 1200;   // reach that earns the first ember
+const EMBER_EXP  = 0.55;
+function embersFor(reach) { return Math.floor(Math.pow(Math.max(0, reach) / EMBER_BASE, EMBER_EXP)); }
+function emberMul()   { return 1 + 0.10 * S.embers; }
+function evolveGain() { return embersFor(Math.max(S.bestReach, S.gathered)) - S.embers; }
+function canEvolve()  { return stageIx() >= 1; }   // a camp has nothing to bank yet
 function fmtS(v)    { return (Math.round(v * 10) / 10) + 's'; }
 
 /* =============================== audio =============================== */
@@ -1579,7 +1652,9 @@ function villagerStep(v, dt) {
     case 'toStock':
       move();
       if (vArrived(v)) {
-        S.res[v.carry] += v.forage ? FORAGE_ARMFUL : tripYield();
+        const haul = v.forage ? FORAGE_ARMFUL : tripYield();
+        S.res[v.carry] += haul;
+        S.gathered += haul;          // reach: what this run has hauled, ever
         floats.push({ txt: '+' + (v.forage ? FORAGE_ARMFUL : tripYield()) + ' ' + RES_ICON[v.carry], x: v.x, y: v.y - 18, life: 0 });
         v.carry = null; v.forage = false;
         v.state = 'idle'; v.wait = 0.4 + Math.random() * 1.2;
@@ -2047,10 +2122,73 @@ function buyUpg(id) {
   save();
   return true;
 }
+function evolve() {
+  if (!canEvolve()) return false;
+  const best = Math.max(S.bestReach, S.gathered);
+  /* Exactly four things cross the reset, and three of them are the mark.
+     Anything else surviving would make the next run not a fresh camp — the
+     whole cost the bonus is paid for. */
+  const carry = { bestReach: best, embers: embersFor(best), evolutions: S.evolutions + 1, muted: S.muted };
+  S = Object.assign(freshState(), carry);
+  /* The scene is rebuilt from nothing rather than adjusted: villagers hold
+     references to HOMES entries and to numbered seats, and a stale reference
+     is how a villager ends up walking to a house that no longer exists. */
+  villagers.length = 0;
+  HOMES.length = 0;
+  for (const k of Object.keys(BIZ)) delete BIZ[k];
+  seatTaken.fill(false);
+  FIRE.burning = false; FIRE.intensity = 0; FIRE.ember = 0;
+  resize();
+  syncVillagers();
+  save();
+  toast('EVOLVED \u2014 ' + carry.embers + ' EMBER' + (carry.embers === 1 ? '' : 'S'));
+  hint('The settlement is gone; the embers are not. Everything hauled from here on comes in '
+       + Math.round(emberMul() * 100 - 100) + '% bigger armfuls than on your first night.');
+  return true;
+}
+/* The evolve banner. Deliberately NOT a card in the list: it is the one
+   irreversible action in the game, and a row that looks like every other row
+   is a row someone taps by reflex on the way to RECRUIT VILLAGER. It states
+   what the run would bank BEFORE asking, and the confirm is a second, separate
+   tap on a button that only exists after the first. */
+function buildEvolveBox() {
+  const box = $('evolve-box');
+  if (!canEvolve()) { box.hidden = true; evolveArmed = false; return; }
+  box.hidden = false;
+  const gain = evolveGain(), after = S.embers + gain;
+  box.innerHTML =
+    '<div class="ev-now">\u2726 ' + S.embers + ' ember' + (S.embers === 1 ? '' : 's') +
+      ' \u00b7 +' + Math.round(emberMul() * 100 - 100) + '% haul' +
+      (S.evolutions ? ' \u00b7 ' + S.evolutions + ' evolution' + (S.evolutions === 1 ? '' : 's') : '') + '</div>' +
+    '<div class="ev-gain">' + (gain > 0
+      ? 'This run is your deepest yet: evolving banks <b>+' + gain + '</b> \u2192 \u2726 ' + after +
+        ' (+' + Math.round(after * 10) + '% haul).'
+      : 'This run has not beaten your best reach yet, so evolving now would bank <b>nothing</b>. ' +
+        'Push further than \u2726 ' + fmtBig(S.bestReach) + ' hauled to earn the next ember.') + '</div>' +
+    (evolveArmed
+      ? '<button id="ev-go" class="ev-btn ev-danger">START OVER \u2014 KEEP \u2726 ' + after + '</button>' +
+        '<button id="ev-no" class="ev-btn">CANCEL</button>'
+      : '<button id="ev-arm" class="ev-btn">EVOLVE\u2026</button>');
+  const arm = $('ev-arm'), go = $('ev-go'), no = $('ev-no');
+  if (arm) arm.addEventListener('click', () => { evolveArmed = true; buildEvolveBox(); });
+  if (no)  no.addEventListener('click',  () => { evolveArmed = false; buildEvolveBox(); });
+  if (go)  go.addEventListener('click',  () => { evolveArmed = false; if (evolve()) buildUpgPanel(); });
+}
+let evolveArmed = false;
+/* Reach numbers run to the millions, and a raw integer that long is unreadable
+   at 0.56rem on a phone. */
+function fmtBig(v) {
+  if (v >= 1e9) return (v / 1e9).toFixed(1) + 'B';
+  if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+  if (v >= 1e3) return (v / 1e3).toFixed(1) + 'k';
+  return Math.floor(v) + '';
+}
 function buildUpgPanel() {
+  buildEvolveBox();
   upgList.innerHTML = '';
   upgSub.textContent = stageName() + ' · ' + villagers.filter(v => !v.keeper).length + '/' + (houses() * 5) +
     ' villagers in ' + houses() + ' house' + (houses() > 1 ? 's' : '') +
+    ' \u00b7 ' + fmtBig(S.gathered) + ' hauled this run' +
     (S.up.keeper ? ' + ' + S.up.keeper + ' firekeeper' + (S.up.keeper > 1 ? 's' : '') : '') +
     ' · they only work while the fire burns';
   for (const u of UPG) {

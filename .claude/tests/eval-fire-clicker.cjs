@@ -101,6 +101,11 @@ const SEEDS   = +opt('--seeds', 3);
 const DT      = +opt('--dt', 1/30);
 const WHO     = opt('--persona', 'both');
 const STRICT  = flag('--casual-strict');
+/* EMBERS: how many the player banked in earlier runs. The prestige layer's
+   whole question is "how much faster is run N than run 1", and that is a
+   pacing question, so it belongs here rather than in the rules drive. Both
+   halves apply it as a multiplier on trip yield — the game's own lever. */
+const EMBERS  = +opt('--embers', 0);
 const REPORT  = flag('--report');
 /* The estimator runs BY DEFAULT. It costs ~0.2 s, and the only thing keeping it
    honest is its error being printed and asserted on every run — an estimator
@@ -248,11 +253,28 @@ async function inPage(cfg) {
     const CAPABILITY_IDS = ['micro'];
     const buyable = () => UPG.filter(u => showU(u) && (S.up[u.id] || 0) < maxOf(u));
     const afford  = (u) => canAfford(u.cost(S.up[u.id] || 0));
+    /* THE NEXT RUNG, AND WHAT IT STILL NEEDS — the same rule as the analytic
+       model's stageNeed(), and it has to be the same or the two halves shop
+       differently and the MAE line stops meaning anything (it went to 35%
+       while only the model had this). A stage card does not SHOW until the
+       rung below is complete, so a shopper reading only buyable cards never
+       sees one coming. A person reads "needs 10 houses" off the locked card
+       and builds houses; so does this. */
+    function stageNeed() {
+      const k = stageIx() + 1;
+      if (k >= STAGES.length) return null;
+      const card = UPG.find(u => u.id === STAGES[k].id);
+      if (!card || showU(card)) return card || null;
+      if (houses() < STAGES[k - 1].cap) return UPG.find(u => u.id === 'house');
+      for (const b of BIZ_DEFS)
+        if ((S.up[b.id] || 0) < b.at.filter(a => a <= k - 1).length) return UPG.find(u => u.id === b.id);
+      return card;
+    }
 
     function shopSpeedrun() {
       // A visible stage upgrade is the goal: save for it, but still take any
       // buy whose payback lands before the stage would otherwise be affordable.
-      const goal = buyable().find(u => STAGE_IDS.includes(u.id));
+      const goal = stageNeed();
       let bought = true;
       while (bought) {
         bought = false;
@@ -287,7 +309,7 @@ async function inPage(cfg) {
        touches it. */
     function directWork() {
       if (!S.up.micro) return;
-      const goal = buyable().find(u => STAGE_IDS.includes(u.id));
+      const goal = stageNeed();
       let target = goal;
       if (!target) {
         let best = null;
@@ -338,6 +360,7 @@ async function inPage(cfg) {
     const left = MS.slice();
 
     // --- the loop ----------------------------------------------------------
+    S.embers = cfg.embers || 0;      // the page's own tripYield() reads this
     const dt = cfg.dt;
     let t = 0, tapAcc = 0, actAcc = 0, cold = 0, lastProgress = 0, prevTotal = 0;
     let tapping = true;
@@ -478,7 +501,8 @@ function modelRun(spec, persona, maxDays) {
   const showU = (u) => !u.show || u.show();
   const houses = L.houses;               // the shipped one: one stage table, never two
   const popCap = () => Math.min(4 + up.bunk, houses() * 5);
-  const tripYield = () => 1 + up.tools + (up.shop ? 1 : 0) + (up.school || 0);
+  const emberMul  = () => 1 + 0.10 * (spec.embers || 0);
+  const tripYield = () => (1 + up.tools + (up.shop ? 1 : 0) + (up.school || 0)) * emberMul();
   /* The civic ladder's other two levers, mirroring the game's own helpers and
      named the same so a change there greps to here. */
   const walkMul  = () => (up.tavern ? 1.15 : 1) * (1 + (up.constable || 0) * 0.10);
@@ -503,6 +527,24 @@ function modelRun(spec, persona, maxDays) {
     const r = popCap() * tripYield() / cycle;
     for (const k of Object.keys(sv)) up[k] = sv[k];
     return r;
+  }
+  /* THE NEXT RUNG, AND WHAT IT STILL NEEDS. A stage card does not SHOW until
+     the rung below it is complete, so a persona that only reads BUYABLE cards
+     can never see one coming — which is exactly how this model first reported
+     that an optimal player never founds a town. That was a finding about the
+     persona, not the game: a person reads "needs 10 houses" off the locked
+     card and goes and builds houses. Houses matter here in particular because
+     they buy no throughput at all once popCap is recruit-limited, so nothing
+     except the gate itself ever motivates one. */
+  function stageNeed() {
+    const k = L.stageIx() + 1;
+    if (k >= L.STAGES.length) return null;
+    const card = UPGS.find(u => u.id === L.STAGES[k].id);
+    if (!card || showU(card)) return card || null;
+    if (houses() < L.STAGES[k - 1].cap) return UPGS.find(u => u.id === 'house');
+    for (const b of L.BIZ_DEFS)
+      if ((up[b.id] || 0) < b.at.filter(a => a <= k - 1).length) return UPGS.find(u => u.id === b.id);
+    return card;
   }
   const canAfford = (c) => Object.keys(c).every(k => res[k] >= c[k]);
   const costSum = (c) => Object.keys(c).reduce((a, k) => a + c[k], 0);
@@ -530,12 +572,18 @@ function modelRun(spec, persona, maxDays) {
     .concat(STAGE_IDS);
   MS.push({ k: 'ECONOMY MAXED', f: () => THRU.every(id => up[id] >= maxOf(UPGS.find(x => x.id === id))) });
   MS.push({ k: 'ALL MAXED', f: () => UPGS.every(u => !showU(u) || up[u.id] >= maxOf(u)) });
+  /* Reach milestones, so the table answers the prestige question directly:
+     how deep is a run when the clock says two hours, and what does that bank?
+     Pushed BEFORE `left` snapshots MS — the first draft added them after, so
+     they existed and were never checked, and the rows silently never printed. */
+  for (const g of [12e3, 60e3, 300e3, 1.5e6, 8e6])
+    MS.push({ k: 'HAULED ' + (g >= 1e6 ? (g / 1e6) + 'M' : (g / 1e3) + 'k'), f: () => gathered >= g });
   const left = MS.slice(), out = {};
 
   /* The resource the next intended purchase is furthest short of — what a
      player with MICROMANAGEMENT aims the camp at. */
   function directed() {
-    const goal = buyable().find(u => STAGE_IDS.includes(u.id));
+    const goal = stageNeed();
     let target = goal;
     if (!target) {
       let best = null;
@@ -557,7 +605,7 @@ function modelRun(spec, persona, maxDays) {
   }
 
   const dt = MODEL_DT, DAY = 300;
-  let t = 0, uptime = 1;
+  let t = 0, uptime = 1, gathered = 0;
   while (t < maxDays * DAY) {
     /* Income does NOT split evenly. `villagerStep` picks the scarcest resource
        with p=0.7 and otherwise picks uniformly, so the scarcest pool takes 80%
@@ -565,6 +613,7 @@ function modelRun(spec, persona, maxDays) {
        camp recovers so fast from a lopsided purchase — a model that split the
        income three ways ran ~30% pessimistic against the sim. */
     const total = rateAt() * uptime * dt;
+    gathered += total;               // REACH: what this run would bank on evolving
     const focus = (roars && up.micro) ? directed() : null;
     if (focus) {
       res[focus] += total;          // MICROMANAGEMENT: every trip goes where it is told
@@ -599,8 +648,11 @@ function modelRun(spec, persona, maxDays) {
       if (persona === 'casual') { buy(aff[0]); bought = true; continue; }
       const cap = aff.find(u => CAPABILITY_IDS.includes(u.id));
       if (cap) { buy(cap); bought = true; continue; }
-      const goal = buyable().find(u => STAGE_IDS.includes(u.id));
-      if (goal && canAfford(goal.cost(up[goal.id]))) { buy(goal); bought = true; continue; }
+      /* A stage prerequisite outranks any marginal-rate purchase: it is the
+         only thing that opens the next tier of throughput cards at all, and
+         its own rate gain is often exactly zero (a house nobody lives in). */
+      const goal = stageNeed();
+      if (goal && aff.includes(goal)) { buy(goal); bought = true; continue; }
       let waitToGoal = Infinity;
       if (goal) {
         const c = goal.cost(up[goal.id]);
@@ -634,7 +686,7 @@ function modelRun(spec, persona, maxDays) {
     for (let i = left.length - 1; i >= 0; i--) if (left[i].f()) { out[left[i].k] = { day: t / DAY }; left.splice(i, 1); }
     if (!left.length) break;
   }
-  return { milestones: out, endDay: t / DAY, up: Object.assign({}, up) };
+  return { milestones: out, endDay: t / DAY, up: Object.assign({}, up), reach: gathered };
 }
 
 /* ===================== driver ===================== */
@@ -648,7 +700,7 @@ function modelRun(spec, persona, maxDays) {
     const out = {}; let ms = 0;
     for (const p of personas) {
       const t0 = process.hrtime.bigint();
-      out[p] = modelRun(spec, p, DAYS);
+      spec.embers = EMBERS; out[p] = modelRun(spec, p, DAYS);
       ms += Number(process.hrtime.bigint() - t0) / 1e6;
     }
     const keys = [];
@@ -688,7 +740,7 @@ function modelRun(spec, persona, maxDays) {
     for (let i = 0; i < SEEDS; i++) {
       const t0 = Date.now();
       const r = await page.evaluate(inPage, {
-        persona, seed: 1000 + i * 7919, dt: DT, maxDays: DAYS, strict: STRICT,
+        persona, seed: 1000 + i * 7919, dt: DT, maxDays: DAYS, strict: STRICT, embers: EMBERS,
         cycleWait: CYCLE_WAIT, cycleSpeed: CYCLE_SPEED,
         roars: persona === 'speedrun',   // only a hand-tended fire crosses 75%
       });
@@ -726,11 +778,12 @@ function modelRun(spec, persona, maxDays) {
     }
     return e.length ? e.reduce((a, b) => a + b, 0) / e.length : null;
   };
-  let model = null;
+  let model = null, modelSpec = null;
   if (WANT_MODEL) {
-    const spec = buildSpec(geom);
+    modelSpec = buildSpec(geom);
     model = {};
-    for (const p of personas) model[p] = modelRun(spec, p, DAYS);
+    modelSpec.embers = EMBERS;
+    for (const p of personas) model[p] = modelRun(modelSpec, p, DAYS);
   }
 
   console.log('\n  ' + pad('MILESTONE', 20) + personas.map(p => pad('    day  ' + p.toUpperCase(), 18)).join(''));
@@ -792,18 +845,59 @@ function modelRun(spec, persona, maxDays) {
        it, optimal play beat naive play by only 1.06x at POP 20 — the personas
        converged, which is the shape of a game where nothing you do matters.
        These guard the separation at both ends of the run. */
-    const s15 = dayOf('speedrun', 'POP 15'), c15 = dayOf('casual', 'POP 15');
-    const s20 = dayOf('speedrun', 'POP 20'), c20 = dayOf('casual', 'POP 20');
-    if (s15 !== null && c15 !== null)
-      ok('skill pays at POP 15 (' + (c15 / s15).toFixed(2) + 'x)', c15 / s15 >= 1.6, { s15, c15 });
-    if (s20 !== null && c20 !== null)
-      ok('skill still pays at POP 20 (' + (c20 / s20).toFixed(2) + 'x)', c20 / s20 >= 1.6, { s20, c20 });
+    /* THE SKILL GAP IS MEASURED ON THE STAGE LADDER, NOT ON POPULATION.
+       POP was the proxy until 2026-08-29 and it stopped being a valid one the
+       moment the recruit curve flattened from 1.75 to 1.45: recruits became
+       cheap for EVERYONE, so the naive persona — which buys them on sight in
+       panel order — closed to 1.33x on POP while still taking twice as long to
+       reach anything. The tell is that casual now reaches POP 10 FIRST (5.7
+       days against 7.5), because the optimal opening spends on FIRE PIT and
+       SHARP TOOLS instead. A proxy that ranks naive play ahead of optimal play
+       is measuring the proxy, not the skill.
+       Founding a stage is what the game is actually about, it is gated on the
+       whole economy rather than one card, and it is what the CD watches. */
+    const gap = (k) => {
+      const sp = dayOf('speedrun', k), ca = dayOf('casual', k);
+      return { sp, ca, x: sp !== null && ca !== null && sp > 0 ? ca / sp : null };
+    };
+    for (const k of ['FOUND VILLAGE Lv1', 'FOUND TOWN Lv1', 'FOUND CITY Lv1']) {
+      const g = gap(k);
+      const label = k.replace(' Lv1', '').replace('FOUND ', '');
+      ok('skill pays to ' + label + (g.x ? ' (' + g.x.toFixed(2) + 'x)'
+          : ' [NOT REACHED in ' + DAYS + ' days: speedrun ' + (g.sp === null ? 'no' : 'yes') +
+            ', casual ' + (g.ca === null ? 'no' : 'yes') + ']'),
+        g.x !== null && g.x >= 1.6, g);
+    }
     // the roar is the reward for tending the fire yourself; the keeper must not earn it
     const sr = runs.speedrun ? runs.speedrun[0].roarUptime : null;
     const cr = runs.casual[0].roarUptime;
     if (sr !== null)
       ok('only the hand-tended fire ROARS (' + (sr * 100).toFixed(0) + '% vs ' + (cr * 100).toFixed(0) + '%)',
         sr > 0.9 && cr < 0.2, { sr, cr });
+  }
+  /* THE EVOLUTION LOOP. Two claims, and they are the whole design.
+     (1) A banked run makes the NEXT one materially faster — otherwise the
+         restart is pure loss and nobody would ever take it.
+     (2) It does not trivialise the game: a bonus that collapses the ladder to
+         nothing has removed the content it was meant to extend.
+     Priced off the analytic model, which is the only affordable way to run a
+     ladder of whole playthroughs. */
+  if (WANT_MODEL && modelSpec && model && model.speedrun) {
+    const base = modelRun(Object.assign({}, modelSpec, { embers: 0 }), 'speedrun', DAYS);
+    const boosted = modelRun(Object.assign({}, modelSpec, { embers: 13 }), 'speedrun', DAYS);
+    const bt = base.milestones['FOUND TOWN Lv1'], gt = boosted.milestones['FOUND TOWN Lv1'];
+    const speedup = bt && gt ? bt.day / gt.day : null;
+    ok('evolving makes the next run faster (' + (speedup ? speedup.toFixed(2) + 'x to TOWN' : 'TOWN not reached') + ')',
+      speedup !== null && speedup >= 1.5, { bt, gt });
+    ok('...without trivialising it (' + (speedup ? speedup.toFixed(2) + 'x' : '?') + ' < 6x)',
+      speedup !== null && speedup < 6, { speedup });
+    /* A two-hour first run should bank a bonus worth taking. 24 days is 2 h at
+       DAY_LEN 300. The floor is what makes the FIRST evolve worth the reset. */
+    const twoHour = 24 * 300;
+    const reach = base.reach || 0;
+    const embers = Math.floor(Math.pow(reach / 1200, 0.55));
+    ok('a full first run banks a bonus worth the reset (' + embers + ' embers from ' +
+       Math.round(reach / 1000) + 'k hauled)', embers >= 8, { reach, embers, twoHour });
   }
   ok('no persona hard-stalled', personas.every(p => runs[p].every(r => !r.stalled)),
     personas.map(p => runs[p].filter(r => r.stalled).length));
@@ -851,7 +945,7 @@ function buildSpec(geom) {
      of the ladder now, so a model that redefined them locally would be a
      second copy of the stage table waiting to disagree with the first. */
   const out = new Function('fmtS', 'maxBank', 'tapPower', 'drainRate', 'roarBonus', 'S',
-    '"use strict";' + spec + '\nreturn { UPG, STAGES, stageIx, houses, stageMaxHouses, bizDef, nameOf: null };')
+    '"use strict";' + spec + '\nreturn { UPG, STAGES, BIZ_DEFS, stageIx, houses, stageMaxHouses, bizDef };')
     (fmtS, maxBank, tapPower, drainRate, roarBonus, S);
   const meanDist = geom.dist.reduce((a, b) => a + b, 0) / geom.dist.length;
   return { UPGS: out.UPG, L: out, levels, meanDist, S };

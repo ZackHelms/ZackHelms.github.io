@@ -114,6 +114,101 @@ Apache/MIT. The CD may develop it into a real app.
   be one transient hint, which is exactly the wrong shape: a dead fire stops
   the entire camp, and the player most likely to meet one has been away long
   enough for the hint to expire.
+- **THE STAGE LADDER** (`STAGES[]`, `stageIx()`/`stage()`, 2026-08-29). Five
+  rungs — CAMP → VILLAGE → TOWN → CITY → METROPOLIS — and **everything that
+  changes with civic scale reads off that one table**. It replaced a scatter of
+  `S.up.village` tests, which is a binary and cannot express five rungs; the
+  failure mode a table prevents is a settlement that goes modern in three
+  places and stays medieval in a fourth. A rung owns its house cap (5/10/16/
+  24/32), what a house is made of (`straw`/`timber`/`brick`/`block`/`tower`),
+  what the **hearth** is, how the ground is surfaced, how streets are drawn,
+  and how many lamps light them. Adding a sixth rung should be one row here
+  plus one `case` in each painter's switch — if it is more, something has
+  drifted back out of the table.
+  - **The hearth ladder**: campfire → cast-iron stove → bricked furnace →
+    steam plant → high-tech containment core. **The flame itself never
+    changes** — it is the lighting anchor, the tap target and the thing the
+    player has touched every second of the run — so only its *housing* is
+    rebuilt. That is what keeps the punch-hole lighting and the bank ring
+    pinned to one point across all five rungs. Modern hearths draw at
+    `hitR/56 * 1.35`: at the campfire's own scale they vanished behind the
+    ~70px flame they were supposed to contain.
+  - **FOUND cards are generated from STAGES**, gated on *filling* the rung
+    below — every house slot built AND every civic building open (`bizReady`)
+    — and cost ×`STAGE_STEP` (11) per rung.
+  - **Civic buildings upgrade IN PLACE** (`BIZ_DEFS[].at` lists the stage index
+    that opens each *level*): sawbones hut → doctor's office, constable hut →
+    police station, fire marshal → fire station, small school → high school →
+    college. One card per building, not one per rung — the panel stays short
+    and each stage adds art to a building the player already knows. Effects are
+    existing levers: schools stack `tripYield`, constables `walkMul()`,
+    marshals `drainRate()`, the doctor `workTime()`.
+  - Slots for CAMP and VILLAGE stay **hand-placed** (ten buildings is few
+    enough to art-direct, and a two-hut camp's flanking pair is a composition);
+    TOWN and up are **generated** (`genSlots`), filling front-to-back because a
+    town grows outward from its hearth, with seeded jitter damped per rung so a
+    town straggles and a metropolis lines up.
+- **THE TWO DISTRICTS** (`G.zone`, `dy()`, 2026-08-29). The ground is banded
+  and every placement derives from the bands: a BUILD district across the top
+  holding all houses and businesses, the hearth in the middle, and a WORK band
+  at the bottom that is nothing but the three sites and the corridor villagers
+  walk. **Nothing may be built in the work band** — Canvas has no collision, so
+  a hut on a lane is not an obstacle, it is a building villagers stroll through,
+  which reads worse. (The sawbones hut used to sit at (0.50W, 0.80H), squarely
+  on the route to the fishing hole.) Two numbers are *derived*, both because
+  picking them by eye broke once: the district's top comes from the tallest
+  building standing in it (`houseW() * 0.78` is a roof peak), and the **hearth
+  is placed first** with the districts measured off it, because the fire's ring
+  and seats claim 40% of the ground in landscape. Slots are authored in
+  district space (`[x of W, y of district]`), so a slot is inside the district
+  by construction.
+- **EVOLUTION** (`embersFor()`, `emberMul()`, `evolveGain()`, `evolve()`,
+  2026-08-29) — the prestige loop, on the Egg Inc shape. Two rules are the
+  whole design and neither is negotiable:
+  1. **Reach is total resources GATHERED in a run** (`S.gathered`), not the
+     stage reached. It is continuous, so a run that got *a bit further* banks
+     something; stage-reached has five possible values and missing a rung by
+     ten minutes would bank exactly nothing.
+  2. **The bonus is a HIGH-WATER MARK, not an accumulation.** Embers are a pure
+     *function* of `S.bestReach` — `floor((reach / 1200) ^ 0.55)` — so evolving
+     twice at the same depth banks nothing and only going further pays. Because
+     there is no running total, the count and the mark cannot drift; retuning
+     the curve silently re-prices every past run instead of stranding players
+     on a number nobody can reproduce. `load()` **recomputes** embers from the
+     mark rather than trusting a saved total.
+
+  Each ember is +10% on `tripYield` — yield, not speed, because at +900% a
+  speed bonus turns the camp into blurring dots. Exactly four things cross the
+  reset (`bestReach`, `embers`, `evolutions`, `muted`); everything else is a
+  fresh camp, and the scene is rebuilt from nothing rather than adjusted
+  because villagers hold references to HOMES entries and numbered seats.
+  Measured: run 1 banks ~13 embers at two hours, and run 2 reaches TOWN
+  **2.27× faster** — asserted at both ends, since a bonus that changes nothing
+  makes the restart pure loss and one that trivialises the ladder deletes the
+  content it was meant to extend. The evolve control is a **banner, not a
+  card** — it is the only irreversible action in the game, and a row that looks
+  like every other row is one someone taps by reflex — and it takes two taps.
+- **The skill gap is measured on the STAGE LADDER, not on population.** POP was
+  the proxy until 2026-08-29 and stopped being a valid one the moment the
+  recruit curve flattened (1.75 → 1.45): recruits became cheap for everyone, so
+  naive play closed to 1.33× on POP while still taking twice as long to reach
+  anything. The tell was that the casual persona reached **POP 10 first**,
+  because the optimal opening spends on FIRE PIT and SHARP TOOLS instead — a
+  proxy that ranks naive play ahead of optimal play is measuring the proxy.
+  The gap now asserts on FOUND VILLAGE / TOWN / CITY (2.11× / 1.98× / 2.94×).
+  Relatedly, **BELLOWS' ceiling grows with the stage** (`6 + stageIx()*3`): a
+  skill lever has to scale with the economy it is a lever on, or effort quietly
+  stops mattering exactly as the numbers get big.
+- **`LADDER-SPEC-BEGIN`/`END` markers** wrap the civic table, the stage table
+  and the whole upgrade catalogue. `.claude/tests/eval-fire-clicker.cjs` slices
+  that span out and evaluates it in Node, so the pacing model prices the real
+  cost curves. Two rules follow: the span must resolve using only the
+  primitives the eval injects (`fmtS`, `maxBank`, `tapPower`, `drainRate`,
+  `roarBonus`, `S`), and nothing outside it may be referenced by a card's
+  `max`, `show` or `cost` (a `d:` blurb may reference anything — the model
+  never calls one). It replaced a regex on `const UPG = [...]`, which stopped
+  at the closing bracket and silently produced a model with **no stages in it**
+  — a model that runs clean and is wrong.
 - **MICROMANAGEMENT** (`S.up.micro`, `S.focus`, `siteAt()`, `drawFocus()`): the
   skill lever. Once bought, tapping the trees / rocks / fishing hole sends
   **every** villager after that resource (`villagerStep`'s idle branch skips the

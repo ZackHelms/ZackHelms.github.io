@@ -198,6 +198,110 @@ const shot = (page, name) => DIR ? page.screenshot({ path: DIR + '/' + name }) :
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(500);
 
+  /* ------------------------- THE STAGE LADDER ------------------------- */
+  st = await page.evaluate(() => {
+    const save = JSON.stringify(S.up);
+    for (const k of Object.keys(S.up)) S.up[k] = 0;
+    const out = { rungs: [], gate: {} };
+    S.res = { wood: 1e12, stone: 1e12, food: 1e12 };
+    /* The FOUND gate is two clauses and both must bite: every house slot of
+       the rung below built, AND every civic building of that rung open. */
+    S.up.village = 1; S.up.house = 8;                 // 10 houses, no businesses
+    out.gate.housesOnly = showU(UPG.find(u => u.id === 'town'));
+    S.up.house = 0; S.up.tavern = 1; S.up.shop = 1; S.up.sawbones = 1;
+    out.gate.bizOnly = showU(UPG.find(u => u.id === 'town'));
+    S.up.house = 8;
+    out.gate.both = showU(UPG.find(u => u.id === 'town'));
+    for (const k of Object.keys(S.up)) S.up[k] = 0;
+    // walk the ladder and record what each rung actually changes
+    for (const stg of STAGES) {
+      if (stg.id) S.up[stg.id] = 1;
+      resize();
+      out.rungs.push({ n: stageName(), cap: stageMaxHouses(), hearth: stage().hearth,
+                       walls: stage().walls, w: +houseW().toFixed(1),
+                       lamps: (G.lamps || []).length, slots: houseSlots().length });
+    }
+    for (const k of Object.keys(S.up)) S.up[k] = 0;
+    Object.assign(S.up, JSON.parse(save)); resize();
+    return out;
+  });
+  ok('FOUND TOWN needs its businesses, not just houses', st.gate.housesOnly === false);
+  ok('FOUND TOWN needs its houses, not just businesses', st.gate.bizOnly === false);
+  ok('FOUND TOWN opens when the village is complete', st.gate.both === true);
+  ok('five rungs: ' + st.rungs.map(r => r.n).join(' -> '), st.rungs.length === 5);
+  ok('every rung has its own hearth (' + st.rungs.map(r => r.hearth).join(',') + ')',
+     new Set(st.rungs.map(r => r.hearth)).size === 5);
+  ok('every rung has its own architecture', new Set(st.rungs.map(r => r.walls)).size === 5);
+  /* Buildings must SHRINK every rung and the cap must grow, or a metropolis
+     does not fit its own district — the two numbers are the whole reason the
+     grid reads as denser rather than just taller. */
+  ok('house caps grow (' + st.rungs.map(r => r.cap).join(',') + ')',
+     st.rungs.every((r, i) => i === 0 || r.cap > st.rungs[i - 1].cap));
+  ok('buildings shrink every rung (' + st.rungs.map(r => r.w).join(',') + ')',
+     st.rungs.every((r, i) => i === 0 || r.w < st.rungs[i - 1].w));
+  ok('a slot exists for every house the rung allows',
+     st.rungs.every(r => r.slots >= r.cap));
+  ok('street lamps arrive with the town and multiply (' + st.rungs.map(r => r.lamps).join(',') + ')',
+     st.rungs[0].lamps === 0 && st.rungs[1].lamps === 0 && st.rungs[4].lamps > st.rungs[2].lamps);
+
+  /* --------------------------- EVOLUTION ----------------------------- */
+  st = await page.evaluate(() => {
+    const out = {};
+    /* evolve() REPLACES S wholesale — that is its job — so this block
+       snapshots the whole run and puts it back afterwards. Without that it
+       silently wiped the upgrades the save-persistence check further down
+       depends on, and that check failed a hundred lines from the cause. */
+    const snapshot = JSON.stringify(S);
+    for (const k of Object.keys(S.up)) S.up[k] = 0;
+    S.bestReach = 0; S.embers = 0; S.evolutions = 0; S.gathered = 0;
+    out.coldCamp = canEvolve();                    // a camp has nothing to bank
+    S.up.village = 1;
+    out.atVillage = canEvolve();
+    S.gathered = 40000; S.res = { wood: 5, stone: 5, food: 5 }; S.up.house = 3;
+    out.gain1 = evolveGain();
+    evolve();
+    out.after1 = { embers: S.embers, best: S.bestReach, evos: S.evolutions,
+                   stage: stageName(), houses: houses(), gathered: S.gathered,
+                   res: S.res.wood + S.res.stone + S.res.food,
+                   villagers: villagers.length, mul: +emberMul().toFixed(2) };
+    // THE HIGH-WATER RULE: a shallower run banks nothing at all
+    S.up.village = 1; S.gathered = 30000;
+    out.gainShallower = evolveGain();
+    evolve();
+    out.after2 = { embers: S.embers, best: S.bestReach, evos: S.evolutions };
+    // ...and a deeper one pays
+    S.up.village = 1; S.gathered = 120000;
+    out.gainDeeper = evolveGain();
+    evolve();
+    out.after3 = { embers: S.embers, best: S.bestReach };
+    // the bonus is a real multiplier on what a trip hauls
+    S.up.tools = 0; S.up.shop = 0; S.up.school = 0;
+    out.yield = +tripYield().toFixed(2);
+    S = JSON.parse(snapshot);
+    HOMES.length = 0; villagers.length = 0; seatTaken.fill(false);
+    resize(); syncVillagers();
+    return out;
+  });
+  ok('a camp cannot evolve yet', st.coldCamp === false);
+  ok('a village can', st.atVillage === true);
+  ok('a first run banks embers (' + st.gain1 + ' from 40k hauled)', st.gain1 > 0);
+  ok('evolving resets the settlement (' + st.after1.stage + ', ' + st.after1.houses +
+     ' houses, ' + st.after1.res + ' res, ' + st.after1.gathered + ' hauled)',
+     st.after1.stage === 'CAMP' && st.after1.houses === 2 && st.after1.res === 0 &&
+     st.after1.gathered === 0 && st.after1.villagers === 4);
+  ok('...and keeps the embers (' + st.after1.embers + ', x' + st.after1.mul + ')',
+     st.after1.embers === st.gain1 && st.after1.mul > 1);
+  /* The rule the CD asked for, stated as a test: reaching the same depth a
+     second time banks NOTHING, because embers are a function of the
+     high-water mark rather than a running total. */
+  ok('a SHALLOWER run banks nothing (gain ' + st.gainShallower + ')', st.gainShallower === 0);
+  ok('...and the mark does not move down (' + st.after2.best + ')',
+     st.after2.best === st.after1.best && st.after2.embers === st.after1.embers);
+  ok('...but the evolution still counted (' + st.after2.evos + ')', st.after2.evos === 2);
+  ok('a DEEPER run pays again (+' + st.gainDeeper + ' -> ' + st.after3.embers + ')',
+     st.gainDeeper > 0 && st.after3.embers === st.after1.embers + st.gainDeeper);
+  ok('embers multiply what a trip hauls (' + st.yield + ' from a base of 1)', st.yield > 1.5);
+
   /* BELLOWS is hidden until the fire has ROARED once — it multiplies a bonus a
      player who has never crossed 75% has never seen, which made it the one
      card that could be bought for nothing. */

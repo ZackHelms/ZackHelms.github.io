@@ -655,12 +655,21 @@ at night. Cel-shaded: flat colour bands + ink outlines on every building,
 prop and villager. Upgrades (fire pit, tinder, windbreak, tools, recruits,
 firekeeper auto-stoker that spends stockpiled wood) are paid in gathered
 resources, from a toggleable bottom-right panel with its own scroll
-container. Houses sleep 5 villagers each; BUILD HOUSE fills slots (5 at
-CAMP), then FOUND VILLAGE shrinks the architecture to timber cabins (up to
-10) with trodden paths and unlocks the tavern (+walk speed), general store
-(+yield) and sawbones hut (+work speed). Town/city/metropolis, building
-upgrade chains and ascension: `games/fire-clicker/TODO.md`. Drive suite:
-`.claude/tests/drive-fire-clicker.cjs` (60 checks); pacing/balance eval:
+container. The scene is **banded**: a build district across the top for every
+house and business, the hearth in the middle, and a work band at the bottom
+that is nothing but the three sites and the lanes villagers walk — nothing is
+ever built on a lane. **Five stages** (CAMP → VILLAGE → TOWN → CITY →
+METROPOLIS) drive one `STAGES` table: house caps 5→32 with buildings shrinking
+each rung, straw → timber → brick → stone → glass, footpaths → a surveyed
+avenue → a lit street grid, snow → paved plaza, and a **hearth ladder** —
+campfire → stove → furnace → steam plant → high-tech core — in which the flame
+never changes, only its housing. Civic buildings upgrade in place (sawbones →
+doctor, constable → police, marshal → fire station, school → high school →
+college). **EVOLUTION** is the prestige loop: reset to a fresh camp and keep
+EMBERS earned from a run's total haul on an Egg Inc curve, where the bonus is
+a **high-water mark** — evolving twice at the same depth banks nothing, only
+going further pays. Remaining ideas: `games/fire-clicker/TODO.md`. Drive suite:
+`.claude/tests/drive-fire-clicker.cjs` (88 checks); pacing/balance eval:
 `.claude/tests/eval-fire-clicker.cjs`. **Proprietary — no permissive license
 in this directory** (one of the five protected games). Detailed context:
 `.claude/fire-clicker.md`.

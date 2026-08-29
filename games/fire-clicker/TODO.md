@@ -2,42 +2,43 @@
 
 Game-specific backlog only (CD-requested, 2026-08-28). The repo-root TODO.md
 is Phasic-scoped — fire-clicker work is tracked here.
-Implemented so far: CAMP → VILLAGE (5→10 houses, 5 villagers/house, tavern /
-general store / sawbones with live effects, cel-shaded art, per-stage layout +
-trodden paths). Everything below is not built yet.
+Implemented: all five stages (CAMP → VILLAGE → TOWN → CITY → METROPOLIS), the
+hearth ladder, the banded scene layout, the civic upgrade chains, and the
+EVOLUTION prestige loop. Sections below are marked built or open.
 
-## TOWN stage
-- [ ] FOUND TOWN upgrade — proposed gate: 10 houses + all three village
-      businesses; big resource cost.
-- [ ] Sawbones hut → **Doctor's office** (upgrade in place: same slot,
-      smarter building, stronger effect — e.g. work speed 25% → 40%).
-- [ ] **Constable hut** (new building; effect TBD — proposal: prevents
-      "mishaps": occasional resource-loss events that start at town scale).
-- [ ] **Fire marshal hut** (proposal: fire safety — bank drains slower, or
-      a dead fire keeps embers longer so relighting is cheaper).
-- [ ] **Small school** (proposal: villagers slowly graduate to +1 yield each).
-- [ ] Town visual overhaul: houses shrink again, plank→brick/frame look,
-      a street grid replaces the radial paths, lamp posts, more house slots.
+## Built 2026-08-29 — the stage ladder and the evolution loop
+- [x] **TOWN, CITY, METROPOLIS.** Five rungs off one `STAGES` table: house caps
+      5/10/16/24/32, buildings shrinking every rung, straw → timber → brick →
+      stone → glass, footpaths → a surveyed gravel avenue → a lit street grid,
+      snow → packed → paved → plaza, street lamps from TOWN on that punch real
+      holes in the night-lighting layer. FOUND cards are generated from the
+      table and gated on *filling* the rung below.
+- [x] **The hearth ladder**: campfire → cast-iron stove → bricked furnace →
+      steam plant → high-tech core. The flame never changes, only its housing.
+- [x] **Civic buildings upgrade in place**, as the CD asked: sawbones hut →
+      doctor's office, constable hut → police station, fire marshal → fire
+      station, small school → high school → college.
+- [x] **EVOLUTION.** Reset to a fresh camp; keep EMBERS earned from the run's
+      total haul, `floor((reach/1200)^0.55)`, +10% haul each. The bonus is a
+      **high-water mark**: evolving twice at the same depth banks nothing, only
+      going further pays. Measured — run 1 banks ~13 embers at two hours and
+      run 2 reaches TOWN 2.27x faster.
+- [x] **Pacing stretched to a ~2 h run.** FOUND VILLAGE 0h21, TOWN 0h55, CITY
+      2h43 for an optimal player, so a two-hour session lands TOWN and most of
+      the way to CITY — which is where evolving becomes the right move.
 
-## CITY stage
-- [ ] Constable hut → **Police station**; fire marshal hut → **Fire station**.
-- [ ] Small school → **Elementary school**, add **Middle school** and
-      **High school** (schooling ladder stacks its effect).
-- [ ] City visual overhaul: paved roads, streetlights, multi-storey
-      buildings, cleared (grey/slushy) ground, maybe vehicles.
-
-## METROPOLIS and beyond
-- [ ] **College**, and further modern/futuristic stages (CD: "…futuristic
-      city, etc."). Each stage keeps shrinking buildings to fit more.
-- [ ] The campfire's role at high stages — CD direction needed: does the
-      whole economy still hang off tapping one fire (a plaza "eternal
-      flame"?), or do later stages add heat infrastructure?
-
-## Ascension
-- [ ] When practical upgrades run out, **ascend**: reset with a permanent
-      productivity boost scaled by how far the run got. `S.lifeWarm`
-      (warm-seconds) and stage reached are the obvious inputs. Needs CD
-      sign-off on the formula and what persists.
+## Still open at the top of the ladder
+- [ ] **Beyond METROPOLIS.** The CD's "…futuristic city, etc." — further rungs
+      are one row in `STAGES` plus one case per painter now. Needs-Zack: how
+      many, and whether the campfire stays the whole economy at that scale or
+      later stages add heat infrastructure.
+- [ ] **Mishap events.** The constable and fire marshal are priced as flat
+      bonuses because there are no mishaps to prevent yet. Giving them real
+      events would make them read as insurance rather than as another
+      multiplier.
+- [ ] Stage-specific chat-bubble lines (school kids, constable, barkeep…).
+- [ ] Town visual polish: vehicles on the city grid, shopfronts along the
+      avenue, snow clearing from paved ground during the day.
 
 ## Smaller / anytime
 - [ ] Stage-specific chat-bubble lines (school kids, constable, barkeep…).
@@ -99,12 +100,25 @@ Measured by `.claude/tests/eval-fire-clicker.cjs`. A day is 5 real minutes.
       the pool instead of killing the run. Where model and sim disagree, the
       sim is the game.
 
+### Addressed 2026-08-29 (pacing and the prestige loop)
+- [x] **The game ran out at ~1 h 11 of play.** Both halves of the fix landed:
+      the recruit curve flattened (`1.75 → 1.45`, so population keeps growing
+      into the late stages instead of walling out at POP 20 — a metropolis with
+      a village's workforce) and the TOWN/CITY/METROPOLIS stages landed above
+      it. BUILD HOUSE flattened too (`1.6 → 1.45`), because houses are a *gate*
+      as well as a purchase and at 1.6 the thirty-second house cost 10.6M wood.
+      An optimal player now sees VILLAGE at 0h21, TOWN at 0h55 and CITY at
+      2h43, and the content past that is the evolution ladder rather than a
+      single run.
+- [x] **Skill stopped paying, and the proxy was the reason.** Flattening
+      recruits made them cheap for everyone, so the naive persona closed to
+      1.33x *on POP* while still taking twice as long to reach anything — it
+      even reached POP 10 first, because the optimal opening buys FIRE PIT and
+      SHARP TOOLS instead. The gap is now asserted on the stage ladder (2.11x /
+      1.98x / 2.94x to VILLAGE / TOWN / CITY) and BELLOWS' ceiling grows with
+      the stage, since a skill lever has to scale with the economy it levers.
+
 ### Open
-- [ ] **The game still runs out at ~1 h 11 of play.** Every multiplier is bought
-      by day 14 (casual) / day 7 (optimal), after which the only card left is
-      RECRUIT VILLAGER at `24 * 1.75^n` — POP 20 costs the speedrunner another
-      five hours and POP 50 would need ~2e12 wood. Either the recruit curve
-      flattens or the TOWN stage lands before that wall. Needs-Zack: which.
 - [ ] **DRY TINDER and WINDBREAK still buy zero throughput.** (FIRE PIT is
       fixed — see above.) The reason is that *tapping is not scarce*: the bank
       drains 1 s per second and a tap banks 1 s, so holding a brimming fire
