@@ -200,8 +200,12 @@ async function inPage(cfg) {
     function rateWith(up) {
       const saved = S.up; S.up = up;
       const pop = popCap(), yld = tripYield();
-      const speed = CYCLE_SPEED * (up.tavern ? 1.15 : 1);
-      const work = up.sawbones ? 2.4 : 3.2;
+      /* walkMul()/workTime() are the GAME's own helpers, called with S.up
+         swapped to the candidate levels above. Copying their arithmetic here
+         is what let the civic ladder's constable and doctor be worth nothing
+         to the shopper while being worth something to the villagers. */
+      const speed = CYCLE_SPEED * walkMul();
+      const work = workTime();
       // ROARING FIRE scales the whole cycle, and only a persona that actually
       // tends the fire gets it — the firekeeper never crosses the 75% line.
       // The bonus RAMPS with heat, so what matters is the MEAN scale over the
@@ -237,7 +241,7 @@ async function inPage(cfg) {
       return { gain, cost, ratio: cost > 0 ? gain / cost : 0 };
     }
 
-    const STAGE_IDS = ['village', 'town', 'city', 'metropolis'];
+    const STAGE_IDS = STAGES.map(x => x.id).filter(Boolean);
     /* MICROMANAGEMENT raises no rate, so the marginal-value greedy would never
        buy it. It is a capability — it removes the tax of gathering into pools
        the next purchase does not need — so a skilled player takes it on sight. */
@@ -316,15 +320,19 @@ async function inPage(cfg) {
     // --- milestones --------------------------------------------------------
     const MS = [];
     MS.push({ k: 'FIRE LIT', f: () => S.lifeWarm > 0 });
-    for (const u of UPG) MS.push({ k: u.n + ' Lv1', f: () => (S.up[u.id] || 0) >= 1 });
-    for (let h = 3; h <= 10; h++) MS.push({ k: 'HOUSE #' + h, f: () => houses() >= h });
-    for (const p of [10, 15, 20, 25, 50]) MS.push({ k: 'POP ' + p, f: () => popCap() >= p });
+    /* Keyed on the level-0 name so a chain card's milestone matches the Node
+       model's key and the two tables can be compared row for row. */
+    const baseName = (u) => { const sv = S.up[u.id]; S.up[u.id] = 0; const n = nameOf(u); S.up[u.id] = sv; return n; };
+    for (const u of UPG) MS.push({ k: baseName(u) + ' Lv1', f: () => (S.up[u.id] || 0) >= 1 });
+    for (const h of [3].concat(STAGES.map(x => x.cap))) MS.push({ k: 'HOUSE #' + h, f: () => houses() >= h });
+    for (const p of [10, 15, 20, 25, 50, 100, 160]) MS.push({ k: 'POP ' + p, f: () => popCap() >= p });
     /* The end of the CURRENT content for anyone buying on value: FIRE PIT,
        DRY TINDER, WINDBREAK and FIREKEEPER move no resources, so a speedrunner
        never touches them and 'ALL MAXED' is unreachable for that persona by
        design. This is the marker that means "nothing left that changes the
        economy". */
-    const THRU = ['tools', 'village', 'tavern', 'shop', 'sawbones', 'bellows', 'micro'];
+    const THRU = ['tools', 'tavern', 'shop', 'sawbones', 'bellows', 'micro', 'school', 'constable', 'marshal']
+      .concat(STAGE_IDS);
     MS.push({ k: 'ECONOMY MAXED', f: () => THRU.every(id => { const u = UPG.find(x => x.id === id); return (S.up[id] || 0) >= maxOf(u); }) });
     MS.push({ k: 'ALL MAXED', f: () => UPG.every(u => !showU(u) || (S.up[u.id] || 0) >= maxOf(u)) });
     const left = MS.slice();
@@ -463,14 +471,18 @@ async function inPage(cfg) {
    shows a small error, which is why the two always print together. */
 function modelRun(spec, persona, maxDays) {
   const roars = persona === 'speedrun';   // only a hand-tended fire crosses 75%
-  const { UPGS, levels: up, meanDist } = spec;
+  const { UPGS, L, levels: up, meanDist } = spec;
   for (const u of UPGS) up[u.id] = 0;
   const res = { wood: 0, stone: 0, food: 0 };
   const maxOf = (u) => typeof u.max === 'function' ? u.max() : u.max;
   const showU = (u) => !u.show || u.show();
-  const houses = () => Math.min(2 + up.house, up.village ? 10 : 5);
+  const houses = L.houses;               // the shipped one: one stage table, never two
   const popCap = () => Math.min(4 + up.bunk, houses() * 5);
-  const tripYield = () => 1 + up.tools + (up.shop ? 1 : 0);
+  const tripYield = () => 1 + up.tools + (up.shop ? 1 : 0) + (up.school || 0);
+  /* The civic ladder's other two levers, mirroring the game's own helpers and
+     named the same so a change there greps to here. */
+  const walkMul  = () => (up.tavern ? 1.15 : 1) * (1 + (up.constable || 0) * 0.10);
+  const workTime = () => [3.2, 2.4, 2.0][up.sawbones || 0];
 
   /* Mean ROARING-FIRE scale over one tap sawtooth — mirror of the in-page
      helper. Kept as a formula on (maxBank, tapPower) so a change to FIRE PIT
@@ -485,25 +497,37 @@ function modelRun(spec, persona, maxDays) {
      speed 46-60 px/s (mean 53) x tavern, work 3.2 s (2.4 with sawbones). */
   function rateAt(over) {
     const sv = {}; for (const k of Object.keys(over || {})) { sv[k] = up[k]; up[k] = over[k]; }
-    const speed = CYCLE_SPEED * (up.tavern ? 1.15 : 1);
+    const speed = CYCLE_SPEED * walkMul();
     const boost = roars ? 1 + (0.1 + 0.1 * (up.bellows || 0)) * roarScaleMean(5 + up.pit * 5, 1 + up.tinder * 0.5) : 1;
-    const cycle = (CYCLE_WAIT + 2 * meanDist / speed + (up.sawbones ? 2.4 : 3.2)) / boost;
+    const cycle = (CYCLE_WAIT + 2 * meanDist / speed + workTime()) / boost;
     const r = popCap() * tripYield() / cycle;
     for (const k of Object.keys(sv)) up[k] = sv[k];
     return r;
   }
   const canAfford = (c) => Object.keys(c).every(k => res[k] >= c[k]);
   const costSum = (c) => Object.keys(c).reduce((a, k) => a + c[k], 0);
-  const STAGE_IDS = ['village', 'town', 'city', 'metropolis'];
+  const STAGE_IDS = L.STAGES.map(x => x.id).filter(Boolean);
   const CAPABILITY_IDS = ['micro'];   // raises no rate; a skilled player takes it on sight
   const buyable = () => UPGS.filter(u => showU(u) && up[u.id] < maxOf(u));
   const buy = (u) => { const c = u.cost(up[u.id]); for (const k of Object.keys(c)) res[k] -= c[k]; up[u.id]++; };
 
+/* A card in a chain renames itself as it levels (SAWBONES HUT -> DOCTOR'S
+   OFFICE), so a milestone key must ASK for the name rather than read the
+   field — printing the field gave rows literally titled
+   "()=>S.up.sawbones >= 1 ? ..." . Keyed on the level-0 name: the one a player
+   first sees, and the one that stays stable as the chain grows. */
+  const baseName = (u) => { const sv = up[u.id]; up[u.id] = 0; const n = typeof u.n === 'function' ? u.n() : u.n; up[u.id] = sv; return n; };
   const MS = [{ k: 'FIRE LIT', f: () => true }];
-  for (const u of UPGS) MS.push({ k: u.n + ' Lv1', f: () => up[u.id] >= 1 });
-  for (let h = 3; h <= 10; h++) MS.push({ k: 'HOUSE #' + h, f: () => houses() >= h });
-  for (const p of [10, 15, 20, 25, 50]) MS.push({ k: 'POP ' + p, f: () => popCap() >= p });
-  const THRU = ['tools', 'village', 'tavern', 'shop', 'sawbones', 'bellows', 'micro'];
+  for (const u of UPGS) MS.push({ k: baseName(u) + ' Lv1', f: () => up[u.id] >= 1 });
+  const CAPS = L.STAGES.map(x => x.cap);
+  for (const h of [3].concat(CAPS)) MS.push({ k: 'HOUSE #' + h, f: () => houses() >= h });
+  for (const p of [10, 15, 20, 25, 50, 100, 160]) MS.push({ k: 'POP ' + p, f: () => popCap() >= p });
+  /* "ECONOMY MAXED" means nothing is left that moves the RATE. The civic
+     ladder added three levers, so the list grows with it — leaving school,
+     constable and marshal out would call the economy finished while three
+     throughput cards were still sitting on the panel. */
+  const THRU = ['tools', 'tavern', 'shop', 'sawbones', 'bellows', 'micro', 'school', 'constable', 'marshal']
+    .concat(STAGE_IDS);
   MS.push({ k: 'ECONOMY MAXED', f: () => THRU.every(id => up[id] >= maxOf(UPGS.find(x => x.id === id))) });
   MS.push({ k: 'ALL MAXED', f: () => UPGS.every(u => !showU(u) || up[u.id] >= maxOf(u)) });
   const left = MS.slice(), out = {};
@@ -803,21 +827,32 @@ function modelRun(spec, persona, maxDays) {
    `max`, `show` and `cost` then work verbatim, unpatched. */
 function buildSpec(geom) {
   const src = fs.readFileSync(path.join(ROOT, 'games', 'fire-clicker', 'index.html'), 'utf8');
-  const m = src.match(/const UPG = \[[\s\S]*?\n\];/);
-  if (!m) throw new Error('could not find the UPG table in games/fire-clicker/index.html');
+  /* The SETTLEMENT SPEC is sliced out between explicit markers rather than
+     matched by a regex on one `const`. The regex form worked only while the
+     whole catalogue was a single array literal; the stage ladder appends its
+     FOUND cards in a loop AFTER that literal, and a regex stopping at the
+     closing bracket silently produced a model with no stages in it — a model
+     that runs clean and is wrong, which is the worst failure available here.
+     Markers also make the contract legible from the game's side. */
+  const a = src.indexOf('LADDER-SPEC-BEGIN'), b = src.indexOf('LADDER-SPEC-END');
+  if (a < 0 || b < 0) throw new Error('LADDER-SPEC markers missing from games/fire-clicker/index.html');
+  const spec = src.slice(src.indexOf('*/', a) + 2, src.lastIndexOf('/*', b));
   const levels = {};
   const fmtS = (v) => (Math.round(v * 10) / 10) + 's';
   const maxBank = () => 5 + levels.pit * 5;
   const tapPower = () => 1 + levels.tinder * 0.5;
-  const drainRate = () => 1 / (1 + levels.wind * 0.09);
-  const stageMaxHouses = () => levels.village ? 10 : 5;
-  const houses = () => Math.min(2 + levels.house, stageMaxHouses());
+  const drainRate = () => 1 / (1 + levels.wind * 0.09 + (levels.marshal || 0) * 0.18);
+  const roarBonus = (l) => 0.1 + 0.1 * (l === undefined ? levels.bellows : l);
   /* `roared` gates the BELLOWS card. Both personas cross it within seconds —
      a fresh 5-second bank is four taps from brimming — so the model starts
      it true rather than tracking a flag that is never false in practice. */
   const S = { up: levels, roared: true };
-  const UPGS = new Function('fmtS', 'maxBank', 'tapPower', 'drainRate', 'houses', 'stageMaxHouses', 'S',
-    '"use strict";' + m[0] + '\nreturn UPG;')(fmtS, maxBank, tapPower, drainRate, houses, stageMaxHouses, S);
+  /* The span brings its OWN houses()/stageMaxHouses()/stageIx(): they are part
+     of the ladder now, so a model that redefined them locally would be a
+     second copy of the stage table waiting to disagree with the first. */
+  const out = new Function('fmtS', 'maxBank', 'tapPower', 'drainRate', 'roarBonus', 'S',
+    '"use strict";' + spec + '\nreturn { UPG, STAGES, stageIx, houses, stageMaxHouses, bizDef, nameOf: null };')
+    (fmtS, maxBank, tapPower, drainRate, roarBonus, S);
   const meanDist = geom.dist.reduce((a, b) => a + b, 0) / geom.dist.length;
-  return { UPGS, levels, meanDist, S };
+  return { UPGS: out.UPG, L: out, levels, meanDist, S };
 }

@@ -120,7 +120,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-29 14:31 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-29 14:57 UTC</div>
 <canvas id="scene"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
 <button id="mute-btn" aria-label="Mute">&#128266;</button>
@@ -146,6 +146,86 @@ const TAU = Math.PI * 2;
 
 /* upgrades: cost = base * growth^lvl, per-resource. `max` may be a number or
    a function; `show()` gates stage-locked entries out of the panel. */
+/* ---------------------------- LADDER-SPEC-BEGIN ----------------------------
+   Everything between these markers is the SETTLEMENT SPEC: the civic ladder,
+   the stage table, and the whole upgrade catalogue. `.claude/tests/eval-fire-clicker.cjs`
+   slices it out by these markers and evaluates it in Node, so the pacing model
+   prices the real cost curves rather than a copy that rots. Two rules follow:
+   the span must resolve using only the handful of primitives the eval injects
+   (fmtS, maxBank, tapPower, drainRate, roarBonus, S), and nothing outside it
+   may be referenced by a card's `max`, `show` or `cost` — a `d:` blurb may
+   reference anything, because the model never calls one.
+   ------------------------------------------------------------------------- */
+/* Civic buildings. `at` lists the stage index that opens each LEVEL, which is
+   what turns a chain into ONE card that upgrades a building in place — same
+   corner, smarter building, stronger effect — instead of a new card and a new
+   plot per rung. Two front rows, because six of them do not fit in one. */
+const BIZ_DEFS = [
+  { id: 'tavern',    fx: 0.15, fd: 0.78, at: [1]       },
+  { id: 'shop',      fx: 0.50, fd: 0.78, at: [1]       },
+  { id: 'sawbones',  fx: 0.85, fd: 0.78, at: [1, 2]    },
+  { id: 'school',    fx: 0.15, fd: 0.99, at: [2, 3, 4] },
+  { id: 'constable', fx: 0.50, fd: 0.99, at: [2, 3]    },
+  { id: 'marshal',   fx: 0.85, fd: 0.99, at: [2, 3]    },
+];
+
+/* ============================ THE STAGE LADDER ============================
+   Everything that changes with civic scale reads off THIS table rather than
+   testing S.up.village. A binary cannot express five rungs, and a scatter of
+   `if (S.up.city)` tests is how a settlement ends up modern in three places
+   and medieval in a fourth. A stage owns how many houses fit, what a house is
+   made of, what the HEARTH is, how the ground is surfaced, how the streets
+   are drawn, and how brightly they are lit at night. Adding a sixth rung
+   should be one row here plus one case in each painter's switch. */
+const STAGES = [
+  { id:null,         n:'CAMP',       cap:5,  walls:'straw',  hearth:'campfire', ground:'snow',   paths:'none',    lamps:0 },
+  { id:'village',    n:'VILLAGE',    cap:10, walls:'timber', hearth:'stove',    ground:'snow',   paths:'trodden', lamps:0 },
+  { id:'town',       n:'TOWN',       cap:16, walls:'brick',  hearth:'furnace',  ground:'packed', paths:'road',    lamps:1 },
+  { id:'city',       n:'CITY',       cap:24, walls:'block',  hearth:'steam',    ground:'paved',  paths:'grid',    lamps:2 },
+  { id:'metropolis', n:'METROPOLIS', cap:32, walls:'tower',  hearth:'core',     ground:'plaza',  paths:'grid',    lamps:3 },
+];
+/* The highest stage actually founded. Walks the whole table instead of
+   stopping at the first miss, so a save that somehow skipped a rung still
+   reports what it really is rather than silently reverting to a camp. */
+function stageIx()  { let i = 0; for (let k = 1; k < STAGES.length; k++) if (S.up[STAGES[k].id]) i = k; return i; }
+function stage()    { return STAGES[stageIx()]; }
+function stageName(){ return stage().n; }
+function stageMaxHouses() { return stage().cap; }
+function houses()   { return Math.min(2 + (S.up.house || 0), stageMaxHouses()); }
+
+/* Each rung costs this much more than the one below it. One constant, because
+   the whole point of the ladder is that it is geometric: a stage you can grind
+   out in the same session as the last one is not a stage, it is a purchase. */
+const STAGE_STEP = 11;
+/* What the player is told when the hearth itself changes. The fire is the one
+   thing they have touched every second of the run, so a stage that rebuilds it
+   deserves a sentence rather than a silent re-skin. */
+const HEARTH_HINT = {
+  campfire: 'A ring of stones and a lick of flame.',
+  stove:    'The fire is boxed into a cast-iron STOVE. Same flame, less of it lost to the snow.',
+  furnace:  'The stove is bricked up into a FURNACE. It roars behind an iron door now.',
+  steam:    'The furnace drives a STEAM PLANT — boiler, piping, and a stack over the rooftops.',
+  core:     'A HIGH-TECH CORE. The same fire you struck with your thumb, behind glass.',
+};
+/* A civic building's cost climbs on the same step as the stage that unlocks
+   its next level, so upgrading a hut in place stays priced against the rung
+   you are standing on rather than the one where you first built it. */
+function scaleBiz(base, l) {
+  const m = Math.pow(STAGE_STEP, l);
+  const out = {}; for (const k of Object.keys(base)) out[k] = Math.round(base[k] * m);
+  return out;
+}
+/* How many levels of a civic building the CURRENT stage has unlocked, and
+   whether its card should be on the panel at all. `at` on each BIZ_DEFS entry
+   lists the stage index that opens each level, so the sawbones hut's second
+   level (the doctor's office) appears at TOWN and not before. */
+function bizDef(id)   { return BIZ_DEFS.find(b => b.id === id); }
+function bizMax(id)   { const ix = stageIx(); return bizDef(id).at.filter(a => a <= ix).length; }
+function bizShown(id) { return stageIx() >= bizDef(id).at[0]; }
+/* Every civic building a given rung offers is built to the level that rung
+   allows — the second half of a FOUND card's gate. */
+function bizReady(k)  { return BIZ_DEFS.every(b => (S.up[b.id] || 0) >= b.at.filter(a => a <= k).length); }
+
 const UPG = [
   { id:'pit',    i:'\u{1F525}', n:'FIRE PIT',     max:8,
     d:(l)=>'Deeper stone pit banks more burn time, and holds a ROARING fire nearer the top between taps. Max bank: ' + fmtS(maxBank()) + ' → ' + fmtS(5 + (l+1)*5) + '.',
@@ -181,21 +261,66 @@ const UPG = [
   { id:'house',  i:'\u{1F3E0}', n:'BUILD HOUSE',  max:()=>stageMaxHouses() - 2,
     d:(l)=>'Raise house #' + (3+l) + ' — beds for 5 more villagers (' + houses() + ' → ' + (houses()+1) + ' of ' + stageMaxHouses() + ').',
     cost:(l)=>({ wood: Math.round(45 * Math.pow(1.6, l)), stone: Math.round(25 * Math.pow(1.6, l)) }) },
-  { id:'village', i:'\u{1F3D8}', n:'FOUND VILLAGE', max:1,
-    show:()=>S.up.village >= 1 ? false : houses() >= 5,
-    d:()=>'Five houses make a VILLAGE: sturdier timber homes (up to 10 of them), trodden paths, and room for businesses.',
-    cost:()=>({ wood: 400, stone: 300, food: 300 }) },
-  { id:'tavern', i:'\u{1F37A}', n:'TAVERN', max:1, show:()=>S.up.village >= 1,
+  { id:'tavern', i:'\u{1F37A}', n:'TAVERN', max:()=>bizMax('tavern'), show:()=>bizShown('tavern'),
     d:()=>'THE THIRSTY YETI opens its doors. A warm mug after every haul — villagers walk 15% faster.',
     cost:()=>({ wood: 150, stone: 60, food: 120 }) },
-  { id:'shop', i:'\u{1F6D2}', n:'GENERAL STORE', max:1, show:()=>S.up.village >= 1,
+  { id:'shop', i:'\u{1F6D2}', n:'GENERAL STORE', max:()=>bizMax('shop'), show:()=>bizShown('shop'),
     d:()=>'Sacks, sleds and sensible prices. Villagers haul +1 resource per trip.',
     cost:()=>({ wood: 180, stone: 100, food: 80 }) },
-  { id:'sawbones', i:'\u{1FA79}', n:'SAWBONES HUT', max:1, show:()=>S.up.village >= 1,
-    d:()=>'Splinters out while you wait. Healthier villagers work 25% faster.',
-    cost:()=>({ wood: 120, stone: 140, food: 100 }) },
+  { id:'sawbones', i:'\u{1FA79}', n:()=>S.up.sawbones >= 1 ? "DOCTOR'S OFFICE" : 'SAWBONES HUT',
+    max:()=>bizMax('sawbones'), show:()=>bizShown('sawbones'),
+    d:(l)=>l === 0
+      ? 'Splinters out while you wait. Healthier villagers work 25% faster.'
+      : 'The sawbones hut becomes a proper surgery — same corner, real medicine. Work speed 25% → 38%.',
+    cost:(l)=>l === 0 ? ({ wood: 120, stone: 140, food: 100 }) : ({ wood: 2600, stone: 3000, food: 2200 }) },
+  { id:'school', i:'\u{1F3EB}', n:()=>['SMALL SCHOOL','HIGH SCHOOL','COLLEGE'][Math.min(2, S.up.school)],
+    max:()=>bizMax('school'), show:()=>bizShown('school'),
+    d:(l)=>['A one-room school. Schooled villagers haul +1 per trip.',
+            'The school grows a second storey and a bell. Another +1 per trip.',
+            'A COLLEGE — surveying, engineering, logistics. Another +1 per trip.'][Math.min(2, l)],
+    cost:(l)=>scaleBiz({ wood: 320, stone: 260, food: 300 }, l) },
+  { id:'constable', i:'\u{1F694}', n:()=>S.up.constable >= 1 ? 'POLICE STATION' : 'CONSTABLE HUT',
+    max:()=>bizMax('constable'), show:()=>bizShown('constable'),
+    d:(l)=>l === 0
+      ? 'A constable keeps the lanes clear and the sleds honest. Villagers walk 10% faster.'
+      : 'The hut becomes a station with a yard and a patrol. Walking bonus 10% → 22%.',
+    cost:(l)=>scaleBiz({ wood: 280, stone: 340, food: 220 }, l) },
+  { id:'marshal', i:'\u{1F692}', n:()=>S.up.marshal >= 1 ? 'FIRE STATION' : 'FIRE MARSHAL HUT',
+    max:()=>bizMax('marshal'), show:()=>bizShown('marshal'),
+    d:(l)=>l === 0
+      ? 'Someone whose whole job is the fire. Banked burn time drains 15% slower.'
+      : 'A real fire station: pumps, a bell, a crew. Drain 15% → 27% slower.',
+    cost:(l)=>scaleBiz({ wood: 300, stone: 300, food: 260 }, l) },
 ];
+/* One FOUND card per rung, generated from STAGES so a sixth stage is one row
+   in that table and nothing here. Each is gated on FILLING the rung below it —
+   every house slot built AND every civic building of that rung open — so a
+   stage is the reward for completing a settlement rather than a pile of
+   resources you happened to be sitting on when the card appeared. */
+const STAGE_ICON = { village:'\u{1F3D8}', town:'\u{1F3D8}', city:'\u{1F306}', metropolis:'\u{1F303}' };
+const STAGE_BLURB = {
+  village:    'Five houses make a VILLAGE: sturdier timber homes (up to 10), trodden paths, and room for businesses.',
+  town:       'Ten houses make a TOWN: brick and frame terraces (up to 16), a gravel ROAD in place of the footpaths, street lamps — and the campfire is bricked up into a FURNACE.',
+  city:       'Sixteen terraces become a CITY: stone blocks (up to 24) on a lit street GRID over paved ground, and the furnace becomes a STEAM PLANT.',
+  metropolis: 'Twenty-four blocks make a METROPOLIS: glass towers (up to 32) over a floodlit plaza, and the steam plant becomes a HIGH-TECH CORE.',
+};
+for (let k = 1; k < STAGES.length; k++) {
+  const st = STAGES[k], prev = STAGES[k - 1];
+  UPG.push({
+    id: st.id, i: STAGE_ICON[st.id], n: 'FOUND ' + st.n, max: 1,
+    show: () => stageIx() === k - 1 && houses() >= prev.cap && bizReady(k - 1),
+    d: () => STAGE_BLURB[st.id],
+    cost: () => {
+      const m = Math.pow(STAGE_STEP, k - 1);
+      return { wood: Math.round(400 * m), stone: Math.round(300 * m), food: Math.round(300 * m) };
+    },
+  });
+}
+/* ----------------------------- LADDER-SPEC-END ---------------------------- */
 const maxOf = (u) => typeof u.max === 'function' ? u.max() : u.max;
+/* A card in a chain renames itself as it levels (SAWBONES HUT -> DOCTOR'S
+   OFFICE), so every reader of a card's name goes through here. */
+const nameOf = (u) => typeof u.n === 'function' ? u.n() : u.n;
 const showU = (u) => !u.show || u.show();
 const RES_ICON = { wood:'\u{1FAB5}', stone:'\u{1FAA8}', food:'\u{1F356}' };
 
@@ -256,8 +381,16 @@ function load() {
 }
 function maxBank()  { return 5 + S.up.pit * 5; }
 function tapPower() { return 1 + S.up.tinder * 0.5; }
-function drainRate(){ return 1 / (1 + S.up.wind * 0.09); }
-function tripYield(){ return 1 + S.up.tools + (S.up.shop ? 1 : 0); }
+/* The fire marshal is a SECOND term in the same denominator as WINDBREAK
+   rather than a multiplier on it, so the two stack the way a player reads
+   them ("15% slower") instead of compounding into something neither card
+   claims. */
+function drainRate(){ return 1 / (1 + S.up.wind * 0.09 + (S.up.marshal || 0) * 0.18); }
+function tripYield(){ return 1 + S.up.tools + (S.up.shop ? 1 : 0) + (S.up.school || 0); }
+/* Walk and work speed, named once so the villager loop, the card copy and the
+   pacing eval can never disagree about what a building is worth. */
+function walkMul()  { return (S.up.tavern ? 1.15 : 1) * (1 + (S.up.constable || 0) * 0.10); }
+function workTime() { return [3.2, 2.4, 2.0][S.up.sawbones || 0]; }
 /* ROARING FIRE — the reward for tending the fire yourself. Above ROAR_AT of a
    full bank the extra heat energises the camp: villagers dawdle less, walk
    faster and work faster, all through ONE multiplier so the effect stays a
@@ -284,9 +417,6 @@ function heatBoost() { return 1 + roarNow(); }
    RUN note in villagerStep for why one log is not enough. */
 const FORAGE_ARMFUL = 8;
 function popCap()   { return Math.min(4 + S.up.bunk, houses() * 5); }
-function houses()   { return Math.min(2 + (S.up.house || 0), stageMaxHouses()); }
-function stageMaxHouses() { return S.up.village ? 10 : 5; }
-function stageName(){ return S.up.village ? 'VILLAGE' : 'CAMP'; }
 function fmtS(v)    { return (Math.round(v * 10) / 10) + 's'; }
 
 /* =============================== audio =============================== */
@@ -485,34 +615,90 @@ const HOMES = [], BIZ = {};
    y <= 1 is inside the district by construction, so nothing can drift onto a
    walking lane. Houses fill the back rows; the businesses take the front row,
    nearest the fire, where they are most legible. */
-const HOUSE_SLOTS = [
+/* CAMP and VILLAGE keep hand-placed slots: ten buildings is few enough to
+   art-direct, and the flanking pair a two-hut camp opens with is a
+   composition, not a grid cell. TOWN and up are GENERATED — sixteen to
+   thirty-two buildings is a street grid, which is exactly what those stages
+   are supposed to look like, and a hand table that long is unmaintainable. */
+const HAND_SLOTS = [
   [0.17, 0.06], [0.83, 0.06], [0.50, 0.00], [0.32, 0.17], [0.68, 0.17],
   [0.08, 0.30], [0.92, 0.30], [0.28, 0.42], [0.72, 0.42], [0.50, 0.44],
 ];
-const BIZ_DEFS = [
-  { id: 'tavern',   fx: 0.15, fd: 0.85 },
-  { id: 'shop',     fx: 0.85, fd: 0.85 },
-  { id: 'sawbones', fx: 0.50, fd: 0.88 },
-];
+function slotCols(cap) { return Math.max(3, Math.min(7, Math.round(Math.sqrt(cap * 1.6)))); }
+/* Generated rows fill FRONT to BACK, because a town grows outward from its
+   hearth — filling back-first would show a settlement that grew away from the
+   fire it exists for. Jitter is seeded (so a slot never slides out from under
+   the villager who lives there) and damped as the stage climbs: a town still
+   straggles, a metropolis lines up, which is the same statement the path
+   style is making one layer down. */
+function genSlots(cap, jit) {
+  const cols = slotCols(cap), rows = Math.ceil(cap / cols), r = prng(7717), out = [];
+  for (let i = 0; i < cap; i++) {
+    const row = rows - 1 - Math.floor(i / cols), col = i % cols;
+    out.push([
+      0.09 + 0.82 * ((col + 0.5) / cols) + (r() - 0.5) * jit / cols,
+      (rows > 1 ? row / (rows - 1) : 0) * 0.74 + (r() - 0.5) * jit * 0.5,
+    ]);
+  }
+  return out;
+}
+function houseSlots() {
+  const ix = stageIx();
+  return ix <= 1 ? HAND_SLOTS : genSlots(STAGES[ix].cap, [0, 0, 0.55, 0.30, 0.10][ix]);
+}
 function houseW() {
-  /* Capped against H as well as W: landscape is a short, wide box, and a hut
-     sized only off width takes a third of the screen height there. */
-  const cap = H * 0.24;
-  if (S.up.village) return Math.min(88, W * 0.14, cap);
-  return houses() > 2 ? Math.min(112, W * 0.18, cap) : Math.min(150, W * 0.24, cap);
+  /* Width follows the COLUMN COUNT, so buildings shrink exactly as fast as the
+     grid tightens and a row always fits however many rungs get added later.
+     The >1 factor is deliberate: neighbours overlap slightly, which is what
+     turns a grid of separate boxes into a terrace. Capped against H too —
+     landscape is a short wide box where a building sized only off width takes
+     a third of the screen height. */
+  const cols = slotCols(stageMaxHouses());
+  const roomy = houses() <= 2 ? 1.55 : 1.15;    // a two-hut camp gets to look generous
+  return Math.min((W / cols) * 0.80 * roomy, H * 0.24, 150);
 }
 /* district y for a slot fraction: 0 = back row, 1 = the front row facing the fire */
 function dy(f) { return G.zone.buildTop + (G.zone.buildBot - G.zone.buildTop) * f; }
 function layoutBuildings() {
-  const w = houseW();
+  const w = houseW(), slots = houseSlots();
   for (let i = 0; i < houses(); i++) {
     if (!HOMES[i]) HOMES[i] = { inside: 0 };
-    Object.assign(HOMES[i], { x: W * HOUSE_SLOTS[i][0], y: dy(HOUSE_SLOTS[i][1]), w });
+    Object.assign(HOMES[i], { x: W * slots[i][0], y: dy(slots[i][1]), w });
   }
   for (const b of BIZ_DEFS) {
     if (!BIZ[b.id]) BIZ[b.id] = { inside: 0, type: b.id };
     Object.assign(BIZ[b.id], { x: W * b.fx, y: dy(b.fd), w: Math.min(94, W * 0.155) });
   }
+  layoutLamps();
+}
+function drawLamp(l) {
+  const lit = ambient() > 0.14;
+  cx.fillStyle = 'rgba(70,86,120,0.26)';
+  cx.beginPath(); cx.ellipse(l.x, l.y + 1, 5, 2, 0, 0, TAU); cx.fill();
+  cx.strokeStyle = '#3f4855'; cx.lineWidth = 2.6; cx.lineCap = 'round';
+  cx.beginPath(); cx.moveTo(l.x, l.y); cx.lineTo(l.x, l.y - l.h); cx.stroke();
+  cx.fillStyle = lit ? '#ffd98a' : '#7d8798';
+  cx.beginPath(); cx.ellipse(l.x, l.y - l.h - 3, 4.4, 5.2, 0, 0, TAU); cx.fill();
+  inkStroke(1.4); cx.stroke();
+  cx.fillStyle = '#3f4855';                              // cap
+  cx.beginPath(); cx.moveTo(l.x - 5.4, l.y - l.h - 6); cx.lineTo(l.x + 5.4, l.y - l.h - 6);
+  cx.lineTo(l.x, l.y - l.h - 11); cx.closePath(); cx.fill();
+  inkStroke(1.3); cx.stroke();
+  l.lit = lit; l.gx = l.x; l.gy = l.y - l.h - 3;
+}
+/* STREET LAMPS. Laid out with the buildings because they belong to the
+   avenue, not to the weather, and stored on G so ONE list feeds both the
+   painter and the night-lighting pass — a lamp that is drawn but punches no
+   hole in the darkness layer is a prop, not a light, and the difference is
+   obvious the first night. Count climbs with the rung, so a metropolis night
+   is genuinely brighter than a town's. */
+function layoutLamps() {
+  G.lamps = [];
+  const n = [0, 0, 3, 5, 7][stageIx()];
+  if (!n) return;
+  const av = G.zone.buildBot + (stage().paths === 'grid' ? 4 : 16);
+  for (let i = 0; i < n; i++)
+    G.lamps.push({ x: W * (0.10 + 0.80 * (n === 1 ? 0.5 : i / (n - 1))), y: av, h: Math.min(34, H * 0.052) });
 }
 function activeHomes() { return HOMES.slice(0, houses()); }
 function activeBiz()   { return BIZ_DEFS.filter(b => S.up[b.id]).map(b => BIZ[b.id]); }
@@ -526,9 +712,21 @@ function bakeGround() {
   groundCv = document.createElement('canvas');
   groundCv.width = Math.round(W); groundCv.height = Math.round(H);
   const g = groundCv.getContext('2d');
-  // snowfield with soft drifts
+  const st = stage();
+  /* GROUND AND STREETS, per rung. Both are baked once here rather than painted
+     per frame — they never animate, and a street grid redrawn sixty times a
+     second is the cheapest possible way to lose the frame budget. The surface
+     desaturates and darkens as the settlement grows, which is what sells
+     "modern" more than any single prop does: a metropolis on fresh snow reads
+     as a diorama, the same towers over grey plaza read as a city. */
+  const SURF = {
+    snow:   ['#dfe9f6', '#eef4fb', '#e2ebf7'],
+    packed: ['#d5deec', '#e4ecf6', '#d8e1ef'],
+    paved:  ['#bfc9d8', '#ccd5e2', '#c3cddc'],
+    plaza:  ['#aeb8c8', '#bcc5d4', '#b2bcca'],
+  }[st.ground];
   const gr = g.createLinearGradient(0, G.horizon, 0, H);
-  gr.addColorStop(0, '#dfe9f6'); gr.addColorStop(0.5, '#eef4fb'); gr.addColorStop(1, '#e2ebf7');
+  gr.addColorStop(0, SURF[0]); gr.addColorStop(0.5, SURF[1]); gr.addColorStop(1, SURF[2]);
   g.fillStyle = gr;
   g.fillRect(0, G.horizon, W, H - G.horizon);
   const r = prng(1234);
@@ -540,21 +738,69 @@ function bakeGround() {
     g.fillStyle = dg;
     g.save(); g.translate(x, y); g.scale(1, rh / rw); g.beginPath(); g.arc(0, 0, rw, 0, TAU); g.fill(); g.restore();
   }
-  for (let i = 0; i < 140; i++) { // sparkle flecks
+  /* Sparkle flecks are SNOW. They thin out as the ground is paved over and
+     stop entirely at the plaza — leaving them on is what made an early draft
+     of the city look like a car park in a blizzard. */
+  const flecks = [140, 140, 80, 30, 0][stageIx()];
+  for (let i = 0; i < flecks; i++) {
     g.fillStyle = 'rgba(255,255,255,' + (0.25 + r() * 0.5) + ')';
     g.fillRect(r() * W, G.horizon + 6 + r() * (H - G.horizon - 6), 1.4, 1.4);
   }
-  // packed path ring around fire
-  g.strokeStyle = 'rgba(196,206,224,0.55)'; g.lineWidth = 10;
+  const ROAD = { none: null, trodden: 'rgba(190,201,222,0.60)', road: '#b6ae9f', grid: '#78828f' }[st.paths];
+  const JOINT = st.paths === 'grid' ? 'rgba(255,255,255,0.16)' : null;
+  // packed path ring around the hearth — the one mark every stage carries
+  g.strokeStyle = ROAD && st.paths !== 'trodden' ? ROAD : 'rgba(196,206,224,0.55)';
+  g.lineWidth = st.paths === 'grid' ? 16 : 10;
   g.beginPath(); g.arc(G.fire.x, G.fire.y, G.hitR * 0.72, 0, TAU); g.stroke();
-  // a village has trodden paths from every doorstep to the fire
-  if (S.up.village) {
-    g.strokeStyle = 'rgba(190,201,222,0.6)'; g.lineWidth = 7; g.lineCap = 'round';
+  if (st.paths === 'trodden') {
+    // a village wears trodden paths from every doorstep to the fire
+    g.strokeStyle = ROAD; g.lineWidth = 7; g.lineCap = 'round';
     for (const b of activeHomes().concat(activeBiz())) {
       g.beginPath();
       g.moveTo(b.x, b.y + 6);
       g.quadraticCurveTo((b.x + G.fire.x) / 2, (b.y + G.fire.y) / 2 + 14, G.fire.x, G.fire.y - 2);
       g.stroke();
+    }
+  } else if (st.paths === 'road') {
+    /* A TOWN surveys its lanes: one gravel avenue across the front of the
+       district and a straight spur from each doorstep down to it. Straight is
+       the whole point — the curve is what read as a footpath. */
+    const av = G.zone.buildBot + 14, back = G.zone.buildTop + (av - G.zone.buildTop) * 0.52;
+    g.strokeStyle = ROAD; g.lineCap = 'round';
+    g.lineWidth = 13; g.beginPath(); g.moveTo(W * 0.06, av); g.lineTo(W * 0.94, av); g.stroke();
+    /* A back street rather than a spur per doorstep. Spurs were the first
+       draft and they read as a picket fence: sixteen verticals, most of them
+       passing behind other houses, all of them fighting the buildings for
+       attention. Two horizontals say "surveyed" just as well and stay quiet. */
+    g.lineWidth = 9; g.beginPath(); g.moveTo(W * 0.10, back); g.lineTo(W * 0.90, back); g.stroke();
+    g.lineWidth = 11;                                   // one avenue down to the hearth
+    g.beginPath(); g.moveTo(G.fire.x, av); g.lineTo(G.fire.x, G.fire.y - G.hitR * 1.05); g.stroke();
+  } else if (st.paths === 'grid') {
+    /* A CITY has a street GRID, and it is orthogonal on purpose: every earlier
+       stage's paths converge on the fire like spokes, and replacing that fan
+       with right angles is the single strongest read of "this is planned now".
+       Joints are struck ON the grid lines rather than by distance, so the
+       paving reads as blocks rather than as a texture. */
+    /* The grid STOPS above the hearth ring. Running the streets through the
+       fire was the first draft and it read as a roundabout the whole game is
+       played inside — the ring is the one mark every stage keeps, and paving
+       over it loses the only piece of the original camp still on screen. */
+    const top = G.zone.buildTop - 10, bot = G.fire.y - G.hitR * 1.15;
+    const rows = 4, cols = slotCols(st.cap);
+    g.strokeStyle = ROAD; g.lineCap = 'butt'; g.lineWidth = 14;
+    for (let i = 0; i <= rows; i++) {
+      const y = top + (bot - top) * (i / rows);
+      g.beginPath(); g.moveTo(W * 0.04, y); g.lineTo(W * 0.96, y); g.stroke();
+    }
+    g.lineWidth = 12;
+    for (let i = 0; i < cols; i++) {
+      const x = W * (0.09 + 0.82 * ((i + 0.5) / cols));
+      g.beginPath(); g.moveTo(x, top); g.lineTo(x, bot); g.stroke();
+    }
+    g.strokeStyle = JOINT; g.lineWidth = 1.6;           // lane markings
+    for (let i = 0; i <= rows; i++) {
+      const y = top + (bot - top) * (i / rows);
+      g.beginPath(); g.moveTo(W * 0.06, y); g.lineTo(W * 0.94, y); g.stroke();
     }
   }
 }
@@ -683,10 +929,14 @@ function mountainPath(seed, base, hf) {
 const INK = '#151823';               // cel ink — every solid thing gets an outline
 function inkStroke(w) { cx.strokeStyle = INK; cx.lineWidth = w; }
 function drawHouse(h) {
-  const w = h.w, x = h.x, y = h.y, flip = x > W * 0.5;
-  const wh = S.up.village ? w * 0.44 : w * 0.34;
+  const w = h.w, x = h.x, y = h.y, flip = x > W * 0.5, st = stage().walls;
+  /* Wall height per style. The three modern styles go UP rather than out: the
+     grid tightens with every rung, so a metropolis tower has to earn its
+     presence in half a village cabin's width. */
+  const wh = { straw: 0.34, timber: 0.44, brick: 0.72, block: 1.05, tower: 1.55 }[st] * w;
+  const grid = st === 'block' || st === 'tower';   // window grid instead of one pane
   cx.save(); cx.translate(x, y); if (flip) cx.scale(-1, 1);
-  if (!S.up.village) {
+  if (st === 'straw') {
     // CAMP: straw hut
     cx.fillStyle = '#8a6b4a';
     cx.fillRect(-w/2, -wh, w, wh);
@@ -715,7 +965,7 @@ function drawHouse(h) {
     cx.lineTo(w*0.46, -w*0.30);
     cx.quadraticCurveTo(0, -w*0.80, -w*0.46, -w*0.30); // underside tucked into the straw
     cx.closePath(); cx.fill();
-  } else {
+  } else if (st === 'timber') {
     // VILLAGE: timber cabin, smaller and sturdier
     cx.fillStyle = '#a8825a';
     cx.fillRect(-w/2, -wh, w, wh);
@@ -737,29 +987,124 @@ function drawHouse(h) {
     cx.fillStyle = '#8b97ab';                          // stone chimney
     cx.fillRect(w*0.22, -w*0.72, w*0.11, w*0.22);
     inkStroke(1.6); cx.strokeRect(w*0.22, -w*0.72, w*0.11, w*0.22);
+  } else if (st === 'brick') {
+    // TOWN: two-storey brick and frame terrace, steep slate gable
+    cx.fillStyle = '#a8524a';
+    cx.fillRect(-w/2, -wh, w, wh);
+    cx.fillStyle = 'rgba(0,0,0,0.18)';
+    cx.fillRect(-w/2, -wh, w * 0.26, wh);
+    cx.fillStyle = 'rgba(255,255,255,0.10)';           // mortar courses
+    for (let i = 1; i < 7; i++) cx.fillRect(-w/2, -wh + i*wh/7, w, 1.2);
+    cx.fillStyle = '#cdb69a';                          // painted first-floor band
+    cx.fillRect(-w/2, -wh*0.46, w, wh*0.16);
+    inkStroke(2); cx.strokeRect(-w/2, -wh, w, wh);
+    cx.fillStyle = '#5a6270';                          // slate gable
+    cx.beginPath(); cx.moveTo(-w*0.58, -wh); cx.lineTo(0, -wh - w*0.34); cx.lineTo(w*0.58, -wh);
+    cx.closePath(); cx.fill();
+    cx.strokeStyle = '#f2f7fd'; cx.lineWidth = w*0.06; cx.lineCap = 'round';
+    cx.beginPath(); cx.moveTo(-w*0.50, -wh - 2); cx.lineTo(0, -wh - w*0.31); cx.lineTo(w*0.50, -wh - 2); cx.stroke();
+    inkStroke(2);
+    cx.beginPath(); cx.moveTo(-w*0.58, -wh); cx.lineTo(0, -wh - w*0.34); cx.lineTo(w*0.58, -wh);
+    cx.closePath(); cx.stroke();
+    cx.fillStyle = '#7d5340';                          // brick chimney pot
+    cx.fillRect(w*0.24, -wh - w*0.30, w*0.12, w*0.26);
+    inkStroke(1.5); cx.strokeRect(w*0.24, -wh - w*0.30, w*0.12, w*0.26);
+  } else if (st === 'block') {
+    // CITY: stone apartment block, flat parapet roof
+    cx.fillStyle = '#8f9aa8';
+    cx.fillRect(-w/2, -wh, w, wh);
+    cx.fillStyle = 'rgba(0,0,0,0.18)';
+    cx.fillRect(-w/2, -wh, w * 0.24, wh);
+    inkStroke(2); cx.strokeRect(-w/2, -wh, w, wh);
+    cx.fillStyle = '#6f7b8a';                          // parapet + snow cap
+    cx.fillRect(-w*0.56, -wh - w*0.10, w*1.12, w*0.10);
+    inkStroke(1.8); cx.strokeRect(-w*0.56, -wh - w*0.10, w*1.12, w*0.10);
+    cx.fillStyle = '#f2f7fd';
+    cx.fillRect(-w*0.56, -wh - w*0.14, w*1.12, w*0.05);
+    cx.fillStyle = '#5b6674';                          // roof tank
+    cx.fillRect(w*0.16, -wh - w*0.26, w*0.16, w*0.16);
+    inkStroke(1.4); cx.strokeRect(w*0.16, -wh - w*0.26, w*0.16, w*0.16);
+  } else {
+    // METROPOLIS: glass tower with a lit crown
+    cx.fillStyle = '#5d6f86';
+    cx.fillRect(-w*0.42, -wh, w*0.84, wh);
+    cx.fillStyle = 'rgba(255,255,255,0.13)';           // glazing highlight down one face
+    cx.fillRect(-w*0.42, -wh, w*0.20, wh);
+    cx.fillStyle = 'rgba(0,0,0,0.20)';
+    cx.fillRect(w*0.24, -wh, w*0.18, wh);
+    inkStroke(1.8); cx.strokeRect(-w*0.42, -wh, w*0.84, wh);
+    cx.fillStyle = '#46566b';                          // setback crown
+    cx.fillRect(-w*0.26, -wh - w*0.22, w*0.52, w*0.22);
+    inkStroke(1.6); cx.strokeRect(-w*0.26, -wh - w*0.22, w*0.52, w*0.22);
+    inkStroke(1.6);                                    // mast
+    cx.beginPath(); cx.moveTo(0, -wh - w*0.22); cx.lineTo(0, -wh - w*0.46); cx.stroke();
+    const beacon = 0.5 + 0.5 * Math.sin(performance.now() / 700 + x);
+    cx.fillStyle = 'rgba(255,90,70,' + (0.35 + 0.5 * beacon).toFixed(2) + ')';
+    cx.beginPath(); cx.arc(0, -wh - w*0.47, w*0.05, 0, TAU); cx.fill();
   }
-  // door + window (shared)
-  const doorH = wh * 0.62;
-  cx.fillStyle = '#4c3722';
-  cx.fillRect(w*0.09, -doorH, w*0.17, doorH);
-  inkStroke(1.6); cx.strokeRect(w*0.09, -doorH, w*0.17, doorH);
   const occ = h.inside > 0;
   const winLit = occ && ambient() > 0.18;
-  cx.fillStyle = winLit ? '#ffca66' : '#2c3a52';
-  cx.fillRect(-w*0.31, -wh*0.72, w*0.15, wh*0.32);
-  inkStroke(1.6); cx.strokeRect(-w*0.31, -wh*0.72, w*0.15, wh*0.32);
+  if (!grid) {
+    // door + window, low-rise styles
+    const doorH = wh * 0.62;
+    cx.fillStyle = '#4c3722';
+    cx.fillRect(w*0.09, -doorH, w*0.17, doorH);
+    inkStroke(1.6); cx.strokeRect(w*0.09, -doorH, w*0.17, doorH);
+    cx.fillStyle = winLit ? '#ffca66' : '#2c3a52';
+    cx.fillRect(-w*0.31, -wh*0.72, w*0.15, wh*0.32);
+    inkStroke(1.6); cx.strokeRect(-w*0.31, -wh*0.72, w*0.15, wh*0.32);
+    h.winX = flip ? x + w*0.235 : x - w*0.235;
+    h.winY = y - wh*0.56;
+  } else {
+    /* A tower gets a GRID of panes, and only some of them are lit — a block
+       where every window turns on at once reads as one lamp behind a stencil.
+       The lit set is picked by a hash of the pane and the building's own x, so
+       it is stable frame to frame (no flickering city) and different per
+       building (no two identical towers). */
+    const rows = st === 'tower' ? 7 : 4, cols = 3;
+    const pw = w * 0.17, ph = wh / rows * 0.46;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const px = (c - 1) * w * 0.24 - pw / 2, py = -wh + (r + 0.30) * (wh / rows);
+      const on = winLit && ((Math.sin((r * 12.9898 + c * 78.233 + x * 0.37)) * 43758.5453) % 1 + 1) % 1 > 0.42;
+      cx.fillStyle = on ? '#ffca66' : '#2c3a52';
+      cx.fillRect(px, py, pw, ph);
+    }
+    inkStroke(1.2);
+    cx.strokeRect(-w*0.36, -wh + wh/rows*0.22, w*0.72, wh - wh/rows*0.5);
+    const doorH = Math.min(wh * 0.16, w * 0.30);       // a lobby, not a cottage door
+    cx.fillStyle = '#3a2c22';
+    cx.fillRect(-w*0.12, -doorH, w*0.24, doorH);
+    inkStroke(1.4); cx.strokeRect(-w*0.12, -doorH, w*0.24, doorH);
+    h.winX = x;
+    h.winY = y - wh * 0.5;
+  }
   cx.restore();
-  h.winX = flip ? x + w*0.235 : x - w*0.235;
-  h.winY = y - wh*0.56;
   h.lit = winLit;
-  if (occ && Math.random() < 0.12) {
-    const sx = (S.up.village ? w*0.27 : w*0.02) * (flip ? -1 : 1);
+  /* Chimney smoke stops at the brick terraces: a city does not vent its
+     heating through the roof of every flat, and the stack over the steam
+     plant is where that plume belongs from TOWN on. */
+  if (occ && !grid && st !== 'brick' && Math.random() < 0.12) {
+    const sx = (st === 'timber' ? w*0.27 : w*0.02) * (flip ? -1 : 1);
     smoke.push({ x: x + sx, y: y - w*0.76, vx: (Math.random()-0.5)*4 + 6, vy: -12 - Math.random()*8, r: 3, life: 0, max: 2.6 });
   }
 }
 function drawBiz(b) {
   const w = b.w, x = b.x, y = b.y, flip = x > W * 0.5;
-  const wall = { tavern: '#8a5a3a', shop: '#5f7d96', sawbones: '#cfd6de' }[b.type];
+  /* Wall colour per civic building, and a SECOND row for its upgraded form —
+     a chain upgrades the building in place, so the doctor's office has to read
+     as the sawbones hut rebuilt rather than as a different plot. Falls back to
+     level 0's colour, so a level added to `at` without a colour here still
+     draws a building instead of inheriting whatever fill ran last. */
+  const WALLS = {
+    tavern:    ['#8a5a3a'],
+    shop:      ['#5f7d96'],
+    sawbones:  ['#cfd6de', '#e8eef5'],
+    school:    ['#b98a52', '#9a6f8e', '#7d6bb0'],
+    constable: ['#4f6d8e', '#39527a'],
+    marshal:   ['#a5453c', '#8c2f2a'],
+  }[b.type] || ['#8a5a3a'];
+  const lvl = Math.max(0, (S.up[b.type] || 1) - 1);
+  const wall = WALLS[Math.min(lvl, WALLS.length - 1)];
   const wh = w * 0.46;
   cx.save(); cx.translate(x, y); if (flip) cx.scale(-1, 1);
   cx.fillStyle = wall;
@@ -767,12 +1112,25 @@ function drawBiz(b) {
   cx.fillStyle = 'rgba(0,0,0,0.16)';
   cx.fillRect(-w/2, -wh, w*0.28, wh);
   inkStroke(2.2); cx.strokeRect(-w/2, -wh, w, wh);
-  cx.fillStyle = '#55402a';
-  cx.beginPath(); cx.moveTo(-w*0.58, -wh); cx.lineTo(0, -w*0.78); cx.lineTo(w*0.58, -wh); cx.closePath(); cx.fill();
-  cx.strokeStyle = '#f2f7fd'; cx.lineWidth = w*0.06; cx.lineCap = 'round';
-  cx.beginPath(); cx.moveTo(-w*0.50, -wh - 1); cx.lineTo(0, -w*0.76); cx.lineTo(w*0.50, -wh - 1); cx.stroke();
-  inkStroke(2.2);
-  cx.beginPath(); cx.moveTo(-w*0.58, -wh); cx.lineTo(0, -w*0.78); cx.lineTo(w*0.58, -wh); cx.closePath(); cx.stroke();
+  /* Roofline follows the settlement, not the building type: a gabled cottage
+     roof in front of stone apartment blocks was the loudest thing wrong with
+     the city, and a civic building is exactly the thing a city rebuilds flat.
+     The walls and signage stay, so the building still reads as the same
+     premises upgraded rather than a different plot. */
+  if (stageIx() >= 3) {
+    cx.fillStyle = '#5b6674';                              // parapet
+    cx.fillRect(-w*0.56, -wh - w*0.11, w*1.12, w*0.11);
+    inkStroke(2); cx.strokeRect(-w*0.56, -wh - w*0.11, w*1.12, w*0.11);
+    cx.fillStyle = '#f2f7fd';
+    cx.fillRect(-w*0.56, -wh - w*0.15, w*1.12, w*0.05);
+  } else {
+    cx.fillStyle = '#55402a';
+    cx.beginPath(); cx.moveTo(-w*0.58, -wh); cx.lineTo(0, -w*0.78); cx.lineTo(w*0.58, -wh); cx.closePath(); cx.fill();
+    cx.strokeStyle = '#f2f7fd'; cx.lineWidth = w*0.06; cx.lineCap = 'round';
+    cx.beginPath(); cx.moveTo(-w*0.50, -wh - 1); cx.lineTo(0, -w*0.76); cx.lineTo(w*0.50, -wh - 1); cx.stroke();
+    inkStroke(2.2);
+    cx.beginPath(); cx.moveTo(-w*0.58, -wh); cx.lineTo(0, -w*0.78); cx.lineTo(w*0.58, -wh); cx.closePath(); cx.stroke();
+  }
   const doorH = wh * 0.6;
   cx.fillStyle = '#3c2c1c';
   cx.fillRect(-w*0.09, -doorH, w*0.18, doorH);
@@ -837,14 +1195,33 @@ function drawHole() {
   cx.stroke(); cx.restore();
 }
 function drawSeat(s) {
+  /* Seating is a stage read too. The log rounds a camp drags up to the fire
+     are the wrong prop in a lit plaza, and leaving them there was the single
+     most jarring thing in the metropolis: glass towers, a containment core,
+     and four felled trees. The seats stay in the same places because the
+     huddle logic targets them — only what a seat IS changes. */
+  const bench = stageIx() >= 2;
   cx.save(); cx.translate(s.x, s.y); cx.rotate(s.rot);
-  cx.fillStyle = '#6b4e2f';
-  if (cx.roundRect) { cx.beginPath(); cx.roundRect(-16, -5, 32, 10, 5); cx.fill(); inkStroke(1.5); cx.stroke(); }
-  else { cx.fillRect(-16, -5, 32, 10); inkStroke(1.5); cx.strokeRect(-16, -5, 32, 10); }
-  cx.fillStyle = '#584022'; cx.beginPath(); cx.arc(-16, 0, 5, 0, TAU); cx.fill();
-  inkStroke(1.3); cx.stroke();
-  cx.fillStyle = 'rgba(240,246,252,0.85)';
-  if (cx.roundRect) { cx.beginPath(); cx.roundRect(-14, -5, 28, 4, 2); cx.fill(); }
+  if (!bench) {
+    cx.fillStyle = '#6b4e2f';
+    if (cx.roundRect) { cx.beginPath(); cx.roundRect(-16, -5, 32, 10, 5); cx.fill(); inkStroke(1.5); cx.stroke(); }
+    else { cx.fillRect(-16, -5, 32, 10); inkStroke(1.5); cx.strokeRect(-16, -5, 32, 10); }
+    cx.fillStyle = '#584022'; cx.beginPath(); cx.arc(-16, 0, 5, 0, TAU); cx.fill();
+    inkStroke(1.3); cx.stroke();
+    cx.fillStyle = 'rgba(240,246,252,0.85)';
+    if (cx.roundRect) { cx.beginPath(); cx.roundRect(-14, -5, 28, 4, 2); cx.fill(); }
+  } else {
+    const slat = stageIx() >= 4 ? '#7d8798' : '#8a6a45';   // timber, then powder-coated steel
+    inkStroke(1.6); cx.strokeStyle = '#3f4855'; cx.lineWidth = 2.2;   // cast legs
+    cx.beginPath(); cx.moveTo(-11, -2); cx.lineTo(-11, 5); cx.moveTo(11, -2); cx.lineTo(11, 5); cx.stroke();
+    cx.fillStyle = slat;
+    if (cx.roundRect) { cx.beginPath(); cx.roundRect(-16, -5, 32, 5, 2); cx.fill(); inkStroke(1.4); cx.stroke(); }
+    else { cx.fillRect(-16, -5, 32, 5); inkStroke(1.4); cx.strokeRect(-16, -5, 32, 5); }
+    cx.fillStyle = slat;                                   // back rail
+    cx.fillRect(-16, -11, 32, 3.4);
+    inkStroke(1.2); cx.strokeRect(-16, -11, 32, 3.4);
+    cx.fillStyle = 'rgba(240,246,252,0.70)'; cx.fillRect(-15, -12, 30, 1.6);
+  }
   cx.restore();
 }
 function drawStock() {
@@ -865,31 +1242,111 @@ function spawnMote(x, y) {
     sparks.push({ x, y, vx: (Math.random()-0.5)*70, vy: -40 - Math.random()*70, life: 0, max: 0.5 + Math.random()*0.4 });
 }
 function drawFirePit() {
-  const f = G.fire;
-  // stone ring
-  for (let i = 0; i < 9; i++) {
-    const a = i / 9 * TAU;
-    const rx = f.x + Math.cos(a) * 22, ry = f.y + Math.sin(a) * 13;
-    cx.fillStyle = i % 2 ? '#8b97ab' : '#77839a';
-    cx.beginPath(); cx.arc(rx, ry, 4.6, 0, TAU); cx.fill();
-    inkStroke(1.2); cx.stroke();
+  const f = G.fire, hearth = stage().hearth;
+  /* THE HEARTH LADDER. The flame itself never changes — it is the lighting
+     anchor, the tap target and the thing the player has touched every second
+     of the run — so only its HOUSING is rebuilt per stage. That keeps the
+     punch-hole lighting and the bank ring pinned to one point across all five
+     rungs, and it is also the better story: the same fire, better contained.
+     Everything scales off `u` so a bigger screen gets a bigger hearth rather
+     than the same 22px ring floating in a larger tap circle. */
+  /* The campfire is drawn at its original scale; every LATER hearth is a
+     structure standing behind a flame that is roughly 70px tall, so at the
+     campfire's own scale it disappeared behind the fire it was supposed to
+     contain. The 1.35 is that correction, applied once here rather than to
+     every coordinate in four painters. */
+  const u = G.hitR / 56 * (hearth === 'campfire' ? 1 : 1.35);
+  const cold = !FIRE.burning && FIRE.ember <= 0.01;
+  if (hearth === 'campfire') {
+    for (let i = 0; i < 9; i++) {                      // stone ring
+      const a = i / 9 * TAU;
+      const rx = f.x + Math.cos(a) * 22 * u, ry = f.y + Math.sin(a) * 13 * u;
+      cx.fillStyle = i % 2 ? '#8b97ab' : '#77839a';
+      cx.beginPath(); cx.arc(rx, ry, 4.6 * u, 0, TAU); cx.fill();
+      inkStroke(1.2); cx.stroke();
+    }
+    cx.save(); cx.translate(f.x, f.y); cx.scale(1, 0.55);
+    cx.fillStyle = '#241a12';
+    cx.beginPath(); cx.arc(0, 0, 18 * u, 0, TAU); cx.fill();
+    cx.restore();
+    cx.strokeStyle = '#4c3722'; cx.lineWidth = 5 * u; cx.lineCap = 'round';   // log tripod
+    cx.beginPath(); cx.moveTo(f.x - 12*u, f.y + 4*u); cx.lineTo(f.x + 10*u, f.y - 8*u); cx.stroke();
+    cx.beginPath(); cx.moveTo(f.x + 12*u, f.y + 4*u); cx.lineTo(f.x - 10*u, f.y - 8*u); cx.stroke();
+    if (cold) {                                        // snow-dusted cold logs
+      cx.strokeStyle = 'rgba(240,246,252,0.75)'; cx.lineWidth = 2 * u;
+      cx.beginPath(); cx.moveTo(f.x - 12*u, f.y + 2*u); cx.lineTo(f.x + 10*u, f.y - 10*u); cx.stroke();
+    }
+  } else {
+    cx.save(); cx.translate(f.x, f.y);
+    cx.fillStyle = 'rgba(70,86,120,0.28)';             // contact shadow
+    cx.beginPath(); cx.ellipse(0, 2*u, 30*u, 8*u, 0, 0, TAU); cx.fill();
+    if (hearth === 'stove') {
+      // VILLAGE: cast-iron box stove on short legs, flue out the back
+      inkStroke(2); cx.strokeStyle = INK;
+      cx.beginPath(); cx.moveTo(-9*u, 0); cx.lineTo(-11*u, 5*u); cx.moveTo(9*u, 0); cx.lineTo(11*u, 5*u); cx.stroke();
+      cx.fillStyle = '#3d434e'; cx.fillRect(-24*u, -6*u, 8*u, -20*u);   // flue pipe (behind)
+      inkStroke(1.6); cx.strokeRect(-24*u, -6*u, 8*u, -20*u);
+      cx.fillStyle = '#4a515e'; cx.fillRect(-20*u, -22*u, 40*u, 22*u);  // body
+      cx.fillStyle = 'rgba(255,255,255,0.10)'; cx.fillRect(-20*u, -22*u, 40*u, 4*u);
+      cx.fillStyle = 'rgba(0,0,0,0.20)'; cx.fillRect(-20*u, -22*u, 9*u, 22*u);
+      inkStroke(2.2); cx.strokeRect(-20*u, -22*u, 40*u, 22*u);
+      cx.fillStyle = cold ? '#241a12' : '#ff8a2b';                      // fire door
+      cx.fillRect(-7*u, -17*u, 16*u, 11*u);
+      inkStroke(1.6); cx.strokeRect(-7*u, -17*u, 16*u, 11*u);
+    } else if (hearth === 'furnace') {
+      // TOWN: bricked-up furnace, arched iron door, stubby stack
+      cx.fillStyle = '#7d5340'; cx.fillRect(-26*u, -6*u, 10*u, -30*u);  // stack
+      inkStroke(1.6); cx.strokeRect(-26*u, -6*u, 10*u, -30*u);
+      cx.fillStyle = '#9a5a4c'; cx.fillRect(-24*u, -30*u, 48*u, 30*u);  // brick body
+      cx.fillStyle = 'rgba(255,255,255,0.10)';
+      for (let i = 1; i < 5; i++) cx.fillRect(-24*u, -30*u + i*6*u, 48*u, 1.2*u);
+      cx.fillStyle = 'rgba(0,0,0,0.20)'; cx.fillRect(-24*u, -30*u, 10*u, 30*u);
+      inkStroke(2.2); cx.strokeRect(-24*u, -30*u, 48*u, 30*u);
+      cx.fillStyle = '#3d434e';                                          // arched door
+      cx.beginPath(); cx.moveTo(-9*u, -6*u); cx.lineTo(-9*u, -17*u);
+      cx.arc(0, -17*u, 9*u, Math.PI, 0); cx.lineTo(9*u, -6*u); cx.closePath(); cx.fill();
+      inkStroke(1.8); cx.stroke();
+      if (!cold) { cx.fillStyle = 'rgba(255,150,40,0.85)'; cx.fillRect(-6*u, -12*u, 12*u, 5*u); }
+    } else if (hearth === 'steam') {
+      // CITY: boiler drum, piping, a stack that clears the rooftops
+      cx.fillStyle = '#57606e'; cx.fillRect(-30*u, -6*u, 11*u, -46*u);  // stack
+      cx.fillStyle = 'rgba(255,255,255,0.10)'; cx.fillRect(-30*u, -50*u, 11*u, 4*u);
+      inkStroke(1.6); cx.strokeRect(-30*u, -6*u, 11*u, -46*u);
+      cx.fillStyle = '#6b5a48'; cx.fillRect(-26*u, -12*u, 52*u, 12*u);  // base
+      inkStroke(2); cx.strokeRect(-26*u, -12*u, 52*u, 12*u);
+      cx.save(); cx.translate(2*u, -24*u); cx.scale(1, 0.72);           // drum
+      cx.fillStyle = '#8d6a45'; cx.beginPath(); cx.arc(0, 0, 18*u, 0, TAU); cx.fill();
+      cx.fillStyle = 'rgba(255,255,255,0.14)'; cx.beginPath(); cx.arc(-5*u, -5*u, 11*u, 0, TAU); cx.fill();
+      inkStroke(2.2); cx.beginPath(); cx.arc(0, 0, 18*u, 0, TAU); cx.stroke();
+      cx.restore();
+      inkStroke(2); cx.lineCap = 'round';                                // pipework
+      cx.beginPath(); cx.moveTo(16*u, -20*u); cx.lineTo(26*u, -20*u); cx.lineTo(26*u, -8*u); cx.stroke();
+      cx.fillStyle = cold ? '#2c3a52' : '#ffb347';                       // sight glass
+      cx.beginPath(); cx.arc(2*u, -18*u, 5*u, 0, TAU); cx.fill();
+      inkStroke(1.5); cx.stroke();
+    } else {
+      // METROPOLIS: containment core — the same fire, behind glass
+      cx.fillStyle = '#2f3644'; cx.fillRect(-28*u, -10*u, 56*u, 10*u);   // plinth
+      inkStroke(2); cx.strokeRect(-28*u, -10*u, 56*u, 10*u);
+      cx.fillStyle = '#39445a';                                          // column
+      cx.fillRect(-15*u, -46*u, 30*u, 36*u);
+      cx.fillStyle = 'rgba(150,200,255,0.16)'; cx.fillRect(-15*u, -46*u, 9*u, 36*u);
+      inkStroke(2.2); cx.strokeRect(-15*u, -46*u, 30*u, 36*u);
+      cx.fillStyle = '#232a38'; cx.fillRect(-20*u, -52*u, 40*u, 7*u);    // cap
+      inkStroke(1.8); cx.strokeRect(-20*u, -52*u, 40*u, 7*u);
+      if (!cold) {                                                       // containment glow
+        const pulse = 0.55 + 0.45 * Math.sin(FIRE.flick * 0.9);
+        cx.fillStyle = 'rgba(120,200,255,' + (0.20 + 0.22 * pulse).toFixed(2) + ')';
+        cx.fillRect(-11*u, -42*u, 22*u, 28*u);
+      }
+      inkStroke(1.4);                                                    // ring struts
+      for (const ry of [-38, -28, -18]) { cx.beginPath(); cx.moveTo(-15*u, ry*u); cx.lineTo(15*u, ry*u); cx.stroke(); }
+    }
+    cx.restore();
   }
-  cx.save(); cx.translate(f.x, f.y); cx.scale(1, 0.55);
-  cx.fillStyle = '#241a12';
-  cx.beginPath(); cx.arc(0, 0, 18, 0, TAU); cx.fill();
-  cx.restore();
-  // log tripod
-  cx.strokeStyle = '#4c3722'; cx.lineWidth = 5; cx.lineCap = 'round';
-  cx.beginPath(); cx.moveTo(f.x - 12, f.y + 4); cx.lineTo(f.x + 10, f.y - 8); cx.stroke();
-  cx.beginPath(); cx.moveTo(f.x + 12, f.y + 4); cx.lineTo(f.x - 10, f.y - 8); cx.stroke();
-  if (!FIRE.burning && FIRE.ember <= 0.01) { // snow-dusted cold logs
-    cx.strokeStyle = 'rgba(240,246,252,0.75)'; cx.lineWidth = 2;
-    cx.beginPath(); cx.moveTo(f.x - 12, f.y + 2); cx.lineTo(f.x + 10, f.y - 10); cx.stroke();
-  }
-  // ember glow after death
-  if (FIRE.ember > 0.01 && !FIRE.burning) {
+  if (FIRE.ember > 0.01 && !FIRE.burning) {            // ember glow after death
     cx.fillStyle = 'rgba(255,110,40,' + (0.35 * FIRE.ember * (0.7 + 0.3*Math.sin(FIRE.flick))) + ')';
-    cx.beginPath(); cx.arc(f.x, f.y - 2, 6, 0, TAU); cx.fill();
+    cx.beginPath(); cx.arc(f.x, f.y - 2, 6 * u, 0, TAU); cx.fill();
   }
 }
 function fireParticles(dt) {
@@ -1070,7 +1527,7 @@ function villagerStep(v, dt) {
   const move = () => {
     const dx = v.tx - v.x, dy = v.ty - v.y, d = Math.hypot(dx, dy);
     if (d > 1) {
-      const sp = v.speed * (S.up.tavern ? 1.15 : 1) * heatBoost() * dt;
+      const sp = v.speed * walkMul() * heatBoost() * dt;
       v.x += dx / d * Math.min(sp, d); v.y += dy / d * Math.min(sp, d);
       v.flip = dx < 0 ? -1 : 1;
     }
@@ -1112,7 +1569,7 @@ function villagerStep(v, dt) {
     case 'working':
       if (!warm && !v.forage) { v.state = 'idle'; v.wait = 0; break; }
       v.w += dt * heatBoost();   // heat-scaled work clock: a roaring fire shortens the job itself
-      if (v.w > (S.up.sawbones ? 2.4 : 3.2)) {
+      if (v.w > workTime()) {
         v.carry = v.job.res;
         v.state = 'toStock'; vSetTarget(v, G.stock.x + (Math.random()-0.5)*10, G.stock.y + 6);
       } else if (v.job.res !== 'food' && Math.random() < dt * 2.2) {
@@ -1494,6 +1951,7 @@ function drawLighting() {
   for (const m of motes) punch(m.x, m.y, 55 * (1 - m.life / m.max) + 18, 0.9 * (1 - m.life / m.max));
   for (const h of activeHomes()) if (h.lit) punch(h.winX, h.winY, 46, 0.75);
   for (const b of activeBiz()) if (b.lit) punch(b.winX, b.winY, 40, 0.7);
+  for (const l of (G.lamps || [])) if (l.lit) punch(l.gx, l.gy, 62, 0.62);
   cx.drawImage(light, 0, 0, W, H);
   // warm additive tint at the light sources
   cx.globalCompositeOperation = 'lighter';
@@ -1507,6 +1965,7 @@ function drawLighting() {
   for (const m of motes) tint(m.x, m.y, 55, 0.14 * (1 - m.life / m.max) * (0.3 + amb));
   for (const h of activeHomes()) if (h.lit) tint(h.winX, h.winY, 30, 0.08);
   for (const b of activeBiz()) if (b.lit) tint(b.winX, b.winY, 26, 0.07);
+  for (const l of (G.lamps || [])) if (l.lit) tint(l.gx, l.gy, 40, 0.10);
   cx.globalCompositeOperation = 'source-over';
 }
 
@@ -1571,16 +2030,20 @@ function buyUpg(id) {
   for (const k of Object.keys(c)) S.res[k] -= c[k];
   S.up[u.id] = lvl + 1;
   if (u.id === 'bunk' || u.id === 'keeper') syncVillagers();
-  if (u.id === 'house' || u.id === 'village' || u.id === 'tavern' || u.id === 'shop' || u.id === 'sawbones') {
-    layoutBuildings(); bakeGround();
-  }
+  /* Which purchases move the scene is DERIVED, not listed. The old whitelist
+     of five ids was already one stage behind the game by the time the second
+     rung existed, and a missed id is invisible until someone notices a new
+     building has no plot. A stage flip needs the full resize() rather than a
+     relayout: houseW() changes, and the build district's top is measured off
+     the tallest building standing in it. */
+  const isStage = STAGES.some(st => st.id === u.id);
+  if (isStage) { resize(); }
+  else if (u.id === 'house' || bizDef(u.id)) { layoutBuildings(); bakeGround(); }
   if (u.id === 'keeper') toast('A FIREKEEPER TENDS THE FLAMES');
   if (u.id === 'micro') hint('Tap the trees, the rocks or the fishing hole to send everyone there. Tap it again to release them.');
   if (u.id === 'bellows') toast('THE BELLOWS BREATHE');
-  if (u.id === 'village') toast('THE CAMP IS NOW A VILLAGE');
-  if (u.id === 'tavern') toast('THE THIRSTY YETI IS OPEN');
-  if (u.id === 'shop') toast('THE GENERAL STORE IS OPEN');
-  if (u.id === 'sawbones') toast('THE SAWBONES WILL SEE YOU NOW');
+  if (isStage) { toast('THIS IS NOW A ' + stageName()); hint(HEARTH_HINT[stage().hearth]); }
+  else if (bizDef(u.id)) toast(nameOf(u) + ' IS OPEN');
   save();
   return true;
 }
@@ -1599,7 +2062,7 @@ function buildUpgPanel() {
     const cost = maxed ? null : u.cost(lvl);
     el.innerHTML =
       '<div class="ui">' + u.i + '</div>' +
-      '<div class="um"><div class="un">' + u.n + '</div>' +
+      '<div class="um"><div class="un">' + nameOf(u) + '</div>' +
       '<div class="ud">' + (maxed ? 'Fully upgraded.' : u.d(lvl)) + '</div>' +
       (maxed ? '' : '<div class="uc">' + costStr(cost) + '</div>') + '</div>' +
       '<div class="ul">' + (maxed ? 'MAX' : 'Lv ' + lvl) + '</div>';
@@ -1670,6 +2133,7 @@ function frame(now) {
   const items = [];
   for (const h of activeHomes()) items.push({ y: h.y, d: () => drawHouse(h) });
   for (const b of activeBiz()) items.push({ y: b.y, d: () => drawBiz(b) });
+  for (const l of (G.lamps || [])) items.push({ y: l.y, d: () => drawLamp(l) });
   for (const t of G.treeItems) items.push({ y: t.y + 2, d: () => drawTree(t) });
   for (const r of G.rockItems) items.push({ y: r.y, d: () => drawRock(r) });
   items.push({ y: G.stock.y + 2, d: drawStock });
