@@ -660,9 +660,10 @@ CAMP), then FOUND VILLAGE shrinks the architecture to timber cabins (up to
 10) with trodden paths and unlocks the tavern (+walk speed), general store
 (+yield) and sawbones hut (+work speed). Town/city/metropolis, building
 upgrade chains and ascension: `games/fire-clicker/TODO.md`. Drive suite:
-`.claude/tests/drive-fire-clicker.cjs` (39 checks). Detailed context:
-`.claude/fire-clicker.md`. **Proprietary — no permissive license in this directory** (one of the
-five protected games). Detailed context: `.claude/fire-clicker.md`.
+`.claude/tests/drive-fire-clicker.cjs` (60 checks); pacing/balance eval:
+`.claude/tests/eval-fire-clicker.cjs`. **Proprietary — no permissive license
+in this directory** (one of the five protected games). Detailed context:
+`.claude/fire-clicker.md`.
 
 ### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)
 The repo's first **async-versus** game. Eight rogue signals hide among ~350

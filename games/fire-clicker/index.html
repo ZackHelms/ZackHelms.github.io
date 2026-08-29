@@ -120,7 +120,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-28 22:21 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-29 02:47 UTC</div>
 <canvas id="scene"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
 <button id="mute-btn" aria-label="Mute">&#128266;</button>
@@ -156,7 +156,14 @@ const UPG = [
   { id:'wind',   i:'\u{1F6A7}', n:'WINDBREAK',    max:5,
     d:(l)=>'Snow fencing shelters the flames. Fire burns ' + Math.round((1-drainRate())*100) + '% → ' + Math.round((1-(1/(1+(l+1)*0.09)))*100) + '% slower.',
     cost:(l)=>({ wood: Math.round(14 * Math.pow(1.9, l)), stone: Math.round(8 * Math.pow(1.9, l)) }) },
-  { id:'bellows', i:'\u{1F4A8}', n:'BELLOWS',      max:6,
+  /* Gated on the first ROAR. The bonus exists at bellows Lv0 (roarBonus(0)
+     is +10%), so any player who taps a fresh 5-second bank to the brim earns
+     it inside the first few seconds and unlocks the card that deepens it. A
+     player who has NOT felt the mechanic cannot buy the multiplier on it —
+     BELLOWS was the game's one trap card, expensive and inert for someone
+     letting the firekeeper smoulder. `S.up.bellows > 0` keeps the card
+     visible for saves written before S.roared existed. */
+  { id:'bellows', i:'\u{1F4A8}', n:'BELLOWS',      max:6, show:()=>S.roared || S.up.bellows > 0,
     d:(l)=>'Leather bellows feed the blaze. Above 75% the fire ROARS and villagers work up to +' + Math.round(roarBonus()*100) + '% \u2192 +' + Math.round(roarBonus(l+1)*100) + '% faster \u2014 half that at the 75% line, all of it at a full bank.',
     cost:(l)=>({ wood: Math.round(30 * Math.pow(1.9, l)), stone: Math.round(20 * Math.pow(1.9, l)) }) },
   { id:'tools',  i:'\u{26CF}',  n:'SHARP TOOLS',  max:6,
@@ -221,6 +228,7 @@ function freshState() {
     focus: null,         // MICROMANAGEMENT: 'wood'|'stone'|'food', or null for the villagers' own choice
     day: 1, dayT: 0.16,  // start mid-morning
     lifeWarm: 0,         // lifetime warm-seconds (for later stages/ascension)
+    roared: false,       // has the fire ever ROARED? gates the BELLOWS card
     muted: false, lastSave: Date.now(),
   };
 }
@@ -243,6 +251,7 @@ function load() {
   S.day = Math.max(1, Math.floor(+d.day || 1));
   S.dayT = (+d.dayT >= 0 && +d.dayT < 1) ? +d.dayT : 0.16;
   S.lifeWarm = Math.max(0, +d.lifeWarm || 0);
+  S.roared = !!d.roared || S.up.bellows > 0;
   S.muted = !!d.muted;
 }
 function maxBank()  { return 5 + S.up.pit * 5; }
@@ -271,6 +280,9 @@ function roarBonus(l){ return 0.1 + 0.1 * (l === undefined ? S.up.bellows : l); 
 function roarScale() { return 0.5 + 0.5 * Math.min(1, Math.max(0, (heat() - ROAR_AT) / (1 - ROAR_AT))); }
 function roarNow()   { return roaring() ? roarBonus() * roarScale() : 0; }
 function heatBoost() { return 1 + roarNow(); }
+/* One desperate wood run brings back this many logs — see the DESPERATE WOOD
+   RUN note in villagerStep for why one log is not enough. */
+const FORAGE_ARMFUL = 8;
 function popCap()   { return Math.min(4 + S.up.bunk, houses() * 5); }
 function houses()   { return Math.min(2 + (S.up.house || 0), stageMaxHouses()); }
 function stageMaxHouses() { return S.up.village ? 10 : 5; }
@@ -500,7 +512,6 @@ function bakeGround() {
 
 /* =============================== fire model =============================== */
 const FIRE = { burning: false, intensity: 0, ember: 0, flick: 0 };
-let roaredOnce = false;
 function stoke(px, py, power) {
   const wasCold = S.bank <= 0;
   S.bank = Math.min(maxBank(), S.bank + power);
@@ -519,9 +530,11 @@ function fireStep(dt) {
     FIRE.ember = 1;
     hint('The fire went out. The cold creeps back in…');
   }
-  if (!roaredOnce && roaring()) {
-    roaredOnce = true;
-    hint('The fire ROARS. The fuller the bank above 75%, the harder the camp works \u2014 up to +' + Math.round(roarBonus() * 100) + '% at a brimming fire.');
+  if (!S.roared && roaring()) {
+    S.roared = true;
+    hint('The fire ROARS. The fuller the bank above 75%, the harder the camp works \u2014 up to +' + Math.round(roarBonus() * 100) + '% at a brimming fire. BELLOWS is now in the upgrades.');
+    toast('BELLOWS UNLOCKED');
+    if (upgPanel.classList.contains('open')) buildUpgPanel();   // the card appears without a reopen
   }
   FIRE.ember = Math.max(0, FIRE.ember - dt * 0.12);
   FIRE.flick += dt * (6 + Math.random() * 6);
@@ -912,6 +925,17 @@ function drawBankRing() {
   if (roaring()) cx.fillStyle = 'rgba(255,244,205,1)';
   cx.strokeText(label, f.x, f.y + G.hitR * 0.72 + 16);
   cx.fillText(label, f.x, f.y + G.hitR * 0.72 + 16);
+  /* A dead fire stops the whole camp, so it gets a PERSISTENT prompt rather
+     than the one transient hint it used to get. A player coming back to a cold
+     village needs to see why nothing is moving without having caught a toast
+     that expired while they were away. */
+  if (!FIRE.burning) {
+    const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 380);
+    cx.font = '12px "Black Ops One", system-ui, sans-serif';
+    cx.fillStyle = 'rgba(255,150,110,' + pulse.toFixed(3) + ')';
+    cx.strokeText('TAP TO RELIGHT', f.x, f.y + G.hitR * 0.72 + 32);
+    cx.fillText('TAP TO RELIGHT', f.x, f.y + G.hitR * 0.72 + 32);
+  }
 }
 
 /* The MICROMANAGEMENT marker: a pulsing ring and icon over the site the player
@@ -958,7 +982,7 @@ const villagers = [];
 function makeVillager(i, keeper) {
   const home = HOMES[i % houses()];
   return {
-    id: i, keeper: !!keeper,
+    id: i, keeper: !!keeper, forage: false,
     x: home.x + (Math.random()-0.5) * 30, y: home.y + 14 + Math.random() * 10,
     tx: 0, ty: 0, speed: 46 + Math.random() * 14,
     coat: COATS[i % COATS.length], home,
@@ -981,7 +1005,7 @@ function syncVillagers() {
      firekeeper and then recruiting used to cost one worker per recruit. */
   villagers.forEach((v, i) => {
     const k = i >= popCap();
-    if (k !== v.keeper) { v.keeper = k; vRelease(v); v.state = 'idle'; v.wait = 0; v.carry = null; }
+    if (k !== v.keeper) { v.keeper = k; vRelease(v); v.state = 'idle'; v.wait = 0; v.carry = null; v.forage = false; }
   });
 }
 const seatTaken = [false, false, false, false];
@@ -1032,12 +1056,12 @@ function villagerStep(v, dt) {
       break;
     }
     case 'toWork':
-      if (!warm) { vRelease(v); v.state = 'idle'; v.wait = 0; break; }
+      if (!warm && !v.forage) { vRelease(v); v.state = 'idle'; v.wait = 0; break; }
       move();
       if (vArrived(v)) { v.state = 'working'; v.t = 0; v.w = 0; }
       break;
     case 'working':
-      if (!warm) { v.state = 'idle'; v.wait = 0; break; }
+      if (!warm && !v.forage) { v.state = 'idle'; v.wait = 0; break; }
       v.w += dt * heatBoost();   // heat-scaled work clock: a roaring fire shortens the job itself
       if (v.w > (S.up.sawbones ? 2.4 : 3.2)) {
         v.carry = v.job.res;
@@ -1049,9 +1073,10 @@ function villagerStep(v, dt) {
     case 'toStock':
       move();
       if (vArrived(v)) {
-        S.res[v.carry] += tripYield();
-        floats.push({ txt: '+' + tripYield() + ' ' + RES_ICON[v.carry], x: v.x, y: v.y - 18, life: 0 });
-        v.carry = null; v.state = 'idle'; v.wait = 0.4 + Math.random() * 1.2;
+        S.res[v.carry] += v.forage ? FORAGE_ARMFUL : tripYield();
+        floats.push({ txt: '+' + (v.forage ? FORAGE_ARMFUL : tripYield()) + ' ' + RES_ICON[v.carry], x: v.x, y: v.y - 18, life: 0 });
+        v.carry = null; v.forage = false;
+        v.state = 'idle'; v.wait = 0.4 + Math.random() * 1.2;
       }
       break;
     case 'toSeat':
@@ -1085,7 +1110,27 @@ function villagerStep(v, dt) {
         sfxLog();
         v.t = 0;
       }
-      if (!FIRE.burning && S.res.wood < 1) { v.state = 'idle'; v.wait = 2; } // nothing to burn: give up for a bit
+      /* DESPERATE WOOD RUN — the camp's only recovery valve. A dead fire plus
+         an empty woodpile is otherwise terminal: cold villagers huddle or go
+         inside, so nothing is gathered, so the keeper has nothing to throw, so
+         the fire stays dead forever. The keeper — whose whole job is feeding
+         the fire — fetches an armful itself. This is deliberately the ONLY
+         work that happens in the cold, it is one villager at cold (unboosted)
+         pace, and it can only start from a state a tending player never
+         reaches, so it buys a hands-off player SURVIVAL and never throughput.
+         The keeper comes back with an ARMFUL (FORAGE_ARMFUL), not one log,
+         and the size is load-bearing: a log is 4 s of fire, while a villager
+         needs ~15 s to stand up, walk out, gather and deliver. Relighting on a
+         single log therefore buys 4 s of warmth in which nobody can finish a
+         trip — the camp flickers 4 s warm, 18 s cold, forever. An armful is
+         ~32 s of continuous fire, which is one full round trip for everybody
+         and is what actually restarts the economy. */
+      if (!FIRE.burning && S.res.wood < 1) {
+        v.forage = true;
+        v.job = JOBS.find(j => j.res === 'wood') || JOBS[0];
+        const s = v.job.site();
+        v.state = 'toWork'; vSetTarget(v, s.x + (Math.random()-0.5)*14, s.y + (Math.random()-0.5)*8);
+      }
       break;
     }
   }

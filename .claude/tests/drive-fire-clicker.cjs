@@ -2,12 +2,18 @@
 /**
  * drive-fire-clicker.cjs — rules drive for the Fire Clicker village sim.
  *
- * 39 checks: cold start (villagers hide/huddle), tap-to-bank (1s/tap, cap,
+ * 60 checks: cold start (villagers hide/huddle), tap-to-bank (1s/tap, cap,
  * drain-from-the-moment-it-lands, off-fire taps bank nothing), warm villagers
  * gather / fire-out retreat, the toggleable upgrade panel + its scroll
  * container, houses (5 villagers each, BUILD HOUSE slots, recruit cap =
  * houses*5), the CAMP→VILLAGE stage gate and the three businesses' live
- * effects, the firekeeper feeding the fire from stockpiled wood, chat bubbles
+ * effects, the firekeeper feeding the fire from stockpiled wood, the
+ * DEAD-CAMP RECOVERY VALVE (a dead fire + empty woodpile is the one terminal
+ * state, so the keeper — and only the keeper — forages in the cold and comes
+ * back with an armful big enough to RELIGHT, not flicker), the ROARING FIRE
+ * ramp (half the bonus at the 75% line, strictly increasing to full at a
+ * brimming bank, and a deeper FIRE PIT paying more one second after a tap),
+ * the BELLOWS card staying hidden until the fire has roared once, chat bubbles
  * (real-tap summon, never stokes, ONE at a time, 5s expiry, contextual
  * pools), a night-lighting pixel assert (fireside snow brighter than far
  * snow), save/reload persistence, and the rotation/orientation geometry:
@@ -116,8 +122,52 @@ const shot = (page, name) => DIR ? page.screenshot({ path: DIR + '/' + name }) :
   st = await page.evaluate(() => ({ bank: S.bank, wood: S.res.wood, burning: FIRE.burning }));
   ok('keeper feeds fire from wood (bank=' + st.bank.toFixed(1) + ', wood=' + st.wood + ')', st.burning && st.wood < 50);
 
+  /* THE DEAD-CAMP RECOVERY VALVE. A dead fire plus an empty woodpile is the one
+     state the camp cannot work its way out of on its own: cold villagers huddle
+     or go inside, so nobody gathers, so the keeper has nothing to throw. A
+     player reaches it by spending the last wood as the bank runs out. The
+     keeper must go fetch wood ITSELF — and it must be the only one who does,
+     or the cold would stop costing a hands-off player anything. */
+  await page.evaluate(() => { S.res.wood = 0; S.bank = 0; FIRE.burning = false; });
+  await page.waitForTimeout(2000);
+  st = await page.evaluate(() => ({
+    keeper: villagers.filter(v => v.forage).length,
+    others: villagers.filter(v => !v.keeper && (v.state === 'toWork' || v.state === 'working')).length,
+  }));
+  ok('only the keeper works in the cold (' + st.keeper + ' foraging, ' + st.others + ' others)',
+     st.keeper === 1 && st.others === 0);
+  /* One armful is a WHOLE round trip of fire, not a flicker: the keeper must
+     come back with enough that the fire is still burning while the rest of the
+     camp completes a gather trip. Asserting `burning` as well as `wood` is what
+     makes this a recovery check rather than a "the keeper walked somewhere"
+     check — a one-log run passes the wood half and still leaves a dead camp. */
+  await page.waitForTimeout(26000);
+  st = await page.evaluate(() => ({ wood: S.res.wood, bank: S.bank, burning: FIRE.burning }));
+  ok('a dead camp relights itself (wood=' + st.wood + ', bank=' + st.bank.toFixed(1) + ', burning=' + st.burning + ')',
+     st.wood > 0 && st.burning);
+  await page.evaluate(() => { S.res.wood = 200; S.bank = 60; });
+
   // --- upgrades panel toggle + scroll container ---
   ok('scroll container exists', await page.locator('#upg-scroll').count() === 1);
+
+  /* BELLOWS is hidden until the fire has ROARED once — it multiplies a bonus a
+     player who has never crossed 75% has never seen, which made it the one
+     card that could be bought for nothing. */
+  st = await page.evaluate(() => {
+    const bellowsShown = () => { buildUpgPanel(); return !!upgList.querySelector('[data-uid="bellows"]'); };
+    const wasRoared = S.roared, wasLvl = S.up.bellows;
+    S.roared = false; S.up.bellows = 0;
+    const hidden = !bellowsShown();
+    S.roared = true;
+    const shown = bellowsShown();
+    S.roared = false; S.up.bellows = 1;
+    const kept = bellowsShown();            // an older save that already owns it
+    S.roared = wasRoared; S.up.bellows = wasLvl; buildUpgPanel();
+    return { hidden, shown, kept };
+  });
+  ok('BELLOWS is hidden until the fire has roared', st.hidden);
+  ok('BELLOWS appears once the fire has roared', st.shown);
+  ok('BELLOWS stays visible for a save that already owns it', st.kept);
   await page.locator('#upg-btn').click();   // panel is open -> toggles closed
   await page.waitForTimeout(200);
   ok('upgrades button toggles panel closed', await page.locator('#upg-panel.open').count() === 0);

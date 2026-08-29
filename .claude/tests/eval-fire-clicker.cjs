@@ -33,6 +33,12 @@
  *              never-taps-again case. As of 2026-08-28 the two are identical —
  *              one firekeeper sustains the fire indefinitely on its own, so the
  *              relight branch never fires and there is no soft-lock to find.
+ *              The one state that WOULD be terminal — a dead fire with an empty
+ *              woodpile, where cold villagers gather nothing so the keeper can
+ *              never relight — is unreachable by either persona, but a player
+ *              can spend into it, so the game gives the keeper its own
+ *              wood run. That valve is guarded in drive-fire-clicker.cjs,
+ *              not here.
  *
  * BOTH PERSONAS PLAY THE REAL GAME. The harness steps the shipped
  * `dayStep`/`fireStep`/`villagerStep` and buys through the shipped `buyUpg()`;
@@ -450,7 +456,7 @@ async function inPage(cfg) {
    doubling the FOUND VILLAGE cost do to time-to-village" is a question it
    answers instantly. It is only trustworthy while the MODEL vs SIM table below
    shows a small error, which is why the two always print together. */
-function modelRun(spec, persona, maxDays, strict) {
+function modelRun(spec, persona, maxDays) {
   const roars = persona === 'speedrun';   // only a hand-tended fire crosses 75%
   const { UPGS, levels: up, meanDist } = spec;
   for (const u of UPGS) up[u.id] = 0;
@@ -543,7 +549,13 @@ function modelRun(spec, persona, maxDays, strict) {
          share one bank and just take turns. Charging per keeper made the model
          run ~12% pessimistic for this persona. */
       res.wood -= dt * (1 / (1 + up.wind * 0.09)) / 4;
-      if (res.wood < 0) { res.wood = 0; if (strict) uptime = 0; }
+      /* Floor only — NOT a stall. The model used to zero `uptime` here for the
+         strict persona, on the theory that an empty woodpile ends the run. The
+         sim disagrees at 100% fire uptime over 40 strict days: villagers gather
+         the SCARCEST pool with p=0.7, so wood is refilled faster than one
+         keeper burns it, and since 2026-08-29 a keeper with a dead fire and no
+         wood forages for its own. The pool bottoming out is a dip, not a death. */
+      if (res.wood < 0) res.wood = 0;
     }
     t += dt;
 
@@ -607,7 +619,7 @@ function modelRun(spec, persona, maxDays, strict) {
     const out = {}; let ms = 0;
     for (const p of personas) {
       const t0 = process.hrtime.bigint();
-      out[p] = modelRun(spec, p, DAYS, STRICT);
+      out[p] = modelRun(spec, p, DAYS);
       ms += Number(process.hrtime.bigint() - t0) / 1e6;
     }
     const keys = [];
@@ -689,7 +701,7 @@ function modelRun(spec, persona, maxDays, strict) {
   if (WANT_MODEL) {
     const spec = buildSpec(geom);
     model = {};
-    for (const p of personas) model[p] = modelRun(spec, p, DAYS, STRICT);
+    for (const p of personas) model[p] = modelRun(spec, p, DAYS);
   }
 
   console.log('\n  ' + pad('MILESTONE', 20) + personas.map(p => pad('    day  ' + p.toUpperCase(), 18)).join(''));
@@ -795,9 +807,12 @@ function buildSpec(geom) {
   const drainRate = () => 1 / (1 + levels.wind * 0.09);
   const stageMaxHouses = () => levels.village ? 10 : 5;
   const houses = () => Math.min(2 + levels.house, stageMaxHouses());
-  const S = { up: levels };
+  /* `roared` gates the BELLOWS card. Both personas cross it within seconds —
+     a fresh 5-second bank is four taps from brimming — so the model starts
+     it true rather than tracking a flag that is never false in practice. */
+  const S = { up: levels, roared: true };
   const UPGS = new Function('fmtS', 'maxBank', 'tapPower', 'drainRate', 'houses', 'stageMaxHouses', 'S',
     '"use strict";' + m[0] + '\nreturn UPG;')(fmtS, maxBank, tapPower, drainRate, houses, stageMaxHouses, S);
   const meanDist = geom.dist.reduce((a, b) => a + b, 0) / geom.dist.length;
-  return { UPGS, levels, meanDist };
+  return { UPGS, levels, meanDist, S };
 }

@@ -70,6 +70,35 @@ Measured by `.claude/tests/eval-fire-clicker.cjs`. A day is 5 real minutes.
       -> 2.10x, POP 20 2.18x — because the ceiling now has to be earned instead
       of arriving free at 75.1% of the bank.
 
+### Addressed 2026-08-29 (the player who does not read, and the one who leaves)
+- [x] **BELLOWS was a trap card.** It multiplies a bonus a player who has never
+      crossed 75% has never seen, and the casual persona bought it at day 2.3
+      while roaring 0.4% of the run. Now gated on `S.roared` (saved): the card
+      appears the first time the fire ROARS, which any player earns within
+      seconds of tapping a fresh five-second bank to the brim. `S.up.bellows > 0`
+      keeps it visible for older saves, so the gate can never delete a card
+      someone paid for. Neither persona's pacing moved — both roar long before
+      they can afford it.
+- [x] **A dead camp could not restart itself.** A dead fire *plus* an empty
+      woodpile is terminal: cold villagers huddle or go inside, so nobody
+      gathers, so the keeper has nothing to throw. The keeper now forages for
+      itself in that state and comes back with an armful (`FORAGE_ARMFUL` 8
+      ≈ 32 s of fire), which is a full round trip for everybody and actually
+      restarts the economy; a single log buys 4 s and just flickers, which the
+      first draft did until the drive check was tightened to require the camp
+      be *burning*, not merely holding wood. Only the keeper works in the cold,
+      so this buys a hands-off player survival and never throughput. A dead
+      fire also now carries a persistent pulsing `TAP TO RELIGHT` rather than
+      one hint that expires while the player is away.
+
+      **Correction to the earlier finding.** The "hard-stalls at day 6" was an
+      artifact of the *estimator*, not the game: it zeroed uptime the instant
+      its wood pool went negative. The browser sim, stepping real villagers,
+      holds 100% fire uptime over 40 strict days — scarcest-first job picking
+      refills wood faster than one keeper burns it. The estimator now floors
+      the pool instead of killing the run. Where model and sim disagree, the
+      sim is the game.
+
 ### Open
 - [ ] **The game still runs out at ~1 h 11 of play.** Every multiplier is bought
       by day 14 (casual) / day 7 (optimal), after which the only card left is
@@ -77,7 +106,7 @@ Measured by `.claude/tests/eval-fire-clicker.cjs`. A day is 5 real minutes.
       five hours and POP 50 would need ~2e12 wood. Either the recruit curve
       flattens or the TOWN stage lands before that wall. Needs-Zack: which.
 - [ ] **DRY TINDER and WINDBREAK still buy zero throughput.** (FIRE PIT is
-      fixed — see below.) The reason is that *tapping is not scarce*: the bank
+      fixed — see above.) The reason is that *tapping is not scarce*: the bank
       drains 1 s per second and a tap banks 1 s, so holding a brimming fire
       costs exactly **1 tap/second** against a hand that can manage eight. A
       stronger tap and a slower drain both cut a tap budget that was never
@@ -91,15 +120,7 @@ Measured by `.claude/tests/eval-fire-clicker.cjs`. A day is 5 real minutes.
          casual persona's 3 Hz eventually stops holding the fire — which may be
          the point, or may be too harsh. The eval can price both in a minute.
       2. Give WINDBREAK a second effect (villagers work through the night?) and
-         DRY TINDER a role in relighting a dead fire.
-
-- [ ] **A naive player can buy BELLOWS and feel nothing.** The casual persona
-      buys it at day 2.3 and roars 0.4% of the run. The card and the FIREKEEPER
-      card both say so in as many words, but it is still a trap card for
-      someone who does not read. Consider hiding BELLOWS until the player has
-      roared once.
-- [ ] **The firekeeper can strand a hands-off player.** If wood hits 0 while the
-      fire is out, nothing gathers and nothing recovers until the player taps.
-      A human notices; the literal never-taps-again persona hard-stalls at day
-      6 (`--casual-strict`). Options: keep one wood in reserve for the keeper,
-      or a louder "THE FIRE IS OUT" state.
+         DRY TINDER a role in relighting a dead fire. Note that since
+         2026-08-29 the keeper's own wood run already covers the *recovery*
+         case, so a DRY TINDER relight effect would have to be about making a
+         relight cheaper or faster, not about making one possible.

@@ -76,6 +76,44 @@ Apache/MIT. The CD may develop it into a real app.
   scarce — the bank drains 1 s/s and a tap banks 1 s, so a brimming fire
   costs 1 tap/second against a hand that can do eight, and neither card cuts a
   budget that was ever binding. See `games/fire-clicker/TODO.md`.
+  **BELLOWS is gated on the first roar** (`S.roared`, saved; `show:()=>S.roared
+  || S.up.bellows > 0`, 2026-08-29). The bonus exists at Lv0 — `roarBonus(0)`
+  is +10% — so any player who taps a fresh five-second bank to the brim earns
+  it within seconds and unlocks the card that deepens it. Before the gate,
+  BELLOWS was the game's one trap card: expensive, and completely inert for
+  someone letting the firekeeper smoulder (the casual persona bought it at day
+  2.3 and roared 0.4% of the run). The `S.up.bellows > 0` half of the guard is
+  load-bearing — it keeps the card visible for saves written before `S.roared`
+  existed, so the gate can never delete a card someone paid for.
+- **The dead-camp recovery valve** (`FORAGE_ARMFUL`, `v.forage`, the DESPERATE
+  WOOD RUN branch of `keeperWait`, 2026-08-29): a dead fire **plus** an empty
+  woodpile is the game's one terminal state. Cold villagers huddle or go
+  inside, so nothing is gathered, so the keeper has nothing to throw, so the
+  fire stays dead — forever. Neither eval persona reaches it (the sim holds
+  100% fire uptime even for the literal never-taps-again player, because
+  scarcest-first job picking refills wood faster than one keeper burns it) but
+  a player spends into it by buying an upgrade as the bank runs out. So the
+  keeper — whose whole job is feeding the fire — fetches wood itself.
+  Two properties are load-bearing and both are pinned in the drive suite:
+  1. **Only the keeper forages.** Any other villager working while cold would
+     quietly refund a hands-off player the cost of neglect. `v.forage` is the
+     flag that lets `toWork`/`working` skip their `!warm` bail-out, and it is
+     cleared on delivery and on any keeper/worker role flip.
+  2. **It brings back an ARMFUL, not a log.** A log is 4 s of fire; a villager
+     needs ~15 s to stand up, walk out, gather and deliver. Relighting on one
+     log buys 4 s in which nobody can finish a trip, so the camp flickers 4 s
+     warm / 18 s cold forever — measured, in the first draft of this fix.
+     `FORAGE_ARMFUL` (8) is ~32 s of continuous fire, one full round trip for
+     everybody, which is what actually restarts the economy. If you change
+     `stoke`'s +4 s or the villager cycle time, this number moves with them.
+  Because it can only start from a state a tending player never reaches, it
+  buys a hands-off player **survival and never throughput** — the eval's
+  skill-gap assertions are untouched by it.
+- **A dead fire says so, persistently.** `drawBank()` paints a pulsing
+  `TAP TO RELIGHT` under the `COLD` label whenever `!FIRE.burning`. It used to
+  be one transient hint, which is exactly the wrong shape: a dead fire stops
+  the entire camp, and the player most likely to meet one has been away long
+  enough for the hint to expire.
 - **MICROMANAGEMENT** (`S.up.micro`, `S.focus`, `siteAt()`, `drawFocus()`): the
   skill lever. Once bought, tapping the trees / rocks / fishing hole sends
   **every** villager after that resource (`villagerStep`'s idle branch skips the
@@ -92,7 +130,8 @@ Apache/MIT. The CD may develop it into a real app.
   houses×5), BELLOWS (the ROARING bonus above), MICROMANAGEMENT (shown at 3
   houses, priced to land just before FOUND VILLAGE), FIREKEEPER (auto-tapper: red-hatted villager, −1 wood → +4 s via
   the same `stoke()` when bank < 35%, **capped at one** — a second would feed
-  the same bank and buy nothing), BUILD HOUSE, FOUND VILLAGE, and the
+  the same bank and buy nothing, and it forages for itself when the camp is
+  dead: see the recovery valve above), BUILD HOUSE, FOUND VILLAGE, and the
   village businesses. `max` may be a function (`maxOf()`), `show()` gates
   stage-locked cards; cards carry `dataset.uid` so `refreshHUD()` updates
   affordability without rebuilding mid-press.
