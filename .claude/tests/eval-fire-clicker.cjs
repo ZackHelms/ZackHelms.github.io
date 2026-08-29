@@ -125,7 +125,12 @@ const MODEL_DT    = +opt('--model-dt', 2);
 /* Stockpile->site distances at 390x844, measured off the shipped resize().
    Only used by --model-only, which never opens a browser; every run that does
    open one reads the live geometry instead. */
-const DEFAULT_GEOM = { dist: [267.5, 154.5, 261.7] };
+/* Stock-to-site distances at 390x844, measured off the shipped layout. Only
+   --model-only uses these; a browser run measures them live and prints the
+   `cycle measured / model` line that says when they have rotted. Re-measure
+   whenever the scene is re-banded — the 2026-08-29 district split shortened
+   the mean lane by 5% and every milestone moved with it. */
+const DEFAULT_GEOM = { dist: [260.7, 142.4, 217.4] };
 /* The fraction of a full bank at which the fire starts to ROAR. Mirrors the
    game's own const; the in-page half reads the real one off the page. */
 const ROAR_AT = 0.75;

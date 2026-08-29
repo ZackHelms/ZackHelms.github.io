@@ -120,7 +120,7 @@ body {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-29 02:47 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-29 14:31 UTC</div>
 <canvas id="scene"></canvas>
 <a id="back-btn" href="../index.html" aria-label="Back to games">&larr;</a>
 <button id="mute-btn" aria-label="Mute">&#128266;</button>
@@ -398,11 +398,48 @@ function resize() {
   light.height = Math.max(1, Math.round(H * LSCALE));
   const land = W > H;
   G.horizon = H * (land ? 0.30 : 0.22);
-  G.fire = { x: W * 0.5, y: H * (land ? 0.62 : 0.58) };
+  /* ================= THE TWO DISTRICTS =================
+     The ground is banded, and EVERY placement derives from the bands rather
+     than from its own fraction of H. One rule holds the whole layout together:
+     nothing is ever BUILT in the work band, because that band is the corridor
+     villagers walk between the stockpile and the three sites. Canvas has no
+     collision, so a hut on a walking lane is not an obstacle — it is a
+     building villagers stroll straight through, which reads worse than an
+     obstacle would. The sawbones hut used to sit at (0.50W, 0.80H), squarely
+     on the route from the stockpile to the fishing hole.
+     The BUILD district is deliberately the bigger of the two (38% of the
+     ground against the work band's 28%): it is where the game's progress is
+     legible, and it has to hold a metropolis before this is done. Bands are
+     fractions of the GROUND, not of H, so landscape gets the same proportions
+     out of a much shorter strip rather than a squashed version of portrait. */
+  const gTop = G.horizon, gH = H - G.horizon;
+  const gy = (f) => gTop + gH * f;
+  /* The district's TOP is derived from the tallest thing standing in it, not
+     picked as a fraction: a building is anchored at its base and drawn upward
+     to a roof peak at 0.78w, so a back row placed by eye puts CAMP's big straw
+     huts through the skyline while VILLAGE's small cabins look fine. Deriving
+     it means the clearance survives every stage's building size. Half a roof
+     of clearance is deliberate — a distant roof breaking the horizon reads as
+     depth; a whole hut floating in the sky reads as a bug. */
+  /* The HEARTH is placed first and the two districts are then measured off it,
+     because the fire is the one fixed thing: its ring and log seats occupy a
+     band whose size comes from hitR (a tap target with a floor, so it does not
+     scale down with a short viewport) rather than from any fraction of the
+     ground. Deriving the districts the other way round is what let buildings
+     land on the seats in landscape, where the ground is 273 px and the fire
+     alone claims 40% of it. */
+  G.fire = { x: W * 0.5, y: gy(land ? 0.58 : 0.53) };
   G.hitR = Math.max(56, Math.min(W, H) * 0.14);
-  G.trees = { x: W * 0.09, y: H * 0.80 };
-  G.rocks = { x: W * 0.91, y: H * 0.80 };
-  G.hole  = { x: W * 0.38, y: H * 0.92 };
+  const seatTop = G.fire.y - G.hitR * 0.95 * 0.75;
+  const roofH = houseW() * 0.78;
+  const buildTop = Math.max(gy(0.10), gTop + roofH * 0.55);
+  const buildBot = Math.max(buildTop + 8, Math.min(gy(land ? 0.40 : 0.43), seatTop - 12));
+  G.zone = { buildTop, buildBot,
+             workTop: gy(land ? 0.80 : 0.72), workBot: gy(land ? 0.97 : 0.96) };
+  const wy = (f) => G.zone.workTop + (G.zone.workBot - G.zone.workTop) * f;
+  G.trees = { x: W * 0.09, y: wy(0.30) };
+  G.rocks = { x: W * 0.91, y: wy(0.30) };
+  G.hole  = { x: W * 0.50, y: wy(0.86) };
   G.stock = { x: G.fire.x + G.hitR * 1.5, y: G.fire.y + G.hitR * 0.9 };
   const s = G.hitR * 0.95;
   G.seats = [
@@ -441,28 +478,40 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', refl
    HOMES/BIZ entries are persistent objects (villagers hold `home` refs and
    `inside` counts must survive resize/relayout). */
 const HOMES = [], BIZ = {};
+/* Slots are [x as a fraction of W, y as a fraction of the BUILD DISTRICT] —
+   0 is the back of the district, 1 the front. Authoring in district space is
+   what lets the band move (or a stage resize it) without every number here
+   needing a second edit, and it makes the invariant checkable: a slot with
+   y <= 1 is inside the district by construction, so nothing can drift onto a
+   walking lane. Houses fill the back rows; the businesses take the front row,
+   nearest the fire, where they are most legible. */
 const HOUSE_SLOTS = [
-  [0.17, 0.115], [0.83, 0.115], [0.50, 0.090], [0.32, 0.135], [0.68, 0.135],
-  [0.10, 0.225], [0.90, 0.225], [0.30, 0.245], [0.70, 0.245], [0.50, 0.255],
+  [0.17, 0.06], [0.83, 0.06], [0.50, 0.00], [0.32, 0.17], [0.68, 0.17],
+  [0.08, 0.30], [0.92, 0.30], [0.28, 0.42], [0.72, 0.42], [0.50, 0.44],
 ];
 const BIZ_DEFS = [
-  { id: 'tavern',   fx: 0.14, fy: 0.56 },
-  { id: 'shop',     fx: 0.86, fy: 0.56 },
-  { id: 'sawbones', fx: 0.50, fy: 0.80 },
+  { id: 'tavern',   fx: 0.15, fd: 0.85 },
+  { id: 'shop',     fx: 0.85, fd: 0.85 },
+  { id: 'sawbones', fx: 0.50, fd: 0.88 },
 ];
 function houseW() {
-  if (S.up.village) return Math.min(88, W * 0.14);
-  return houses() > 2 ? Math.min(112, W * 0.18) : Math.min(150, W * 0.24);
+  /* Capped against H as well as W: landscape is a short, wide box, and a hut
+     sized only off width takes a third of the screen height there. */
+  const cap = H * 0.24;
+  if (S.up.village) return Math.min(88, W * 0.14, cap);
+  return houses() > 2 ? Math.min(112, W * 0.18, cap) : Math.min(150, W * 0.24, cap);
 }
+/* district y for a slot fraction: 0 = back row, 1 = the front row facing the fire */
+function dy(f) { return G.zone.buildTop + (G.zone.buildBot - G.zone.buildTop) * f; }
 function layoutBuildings() {
   const w = houseW();
   for (let i = 0; i < houses(); i++) {
     if (!HOMES[i]) HOMES[i] = { inside: 0 };
-    Object.assign(HOMES[i], { x: W * HOUSE_SLOTS[i][0], y: G.horizon + H * HOUSE_SLOTS[i][1], w });
+    Object.assign(HOMES[i], { x: W * HOUSE_SLOTS[i][0], y: dy(HOUSE_SLOTS[i][1]), w });
   }
   for (const b of BIZ_DEFS) {
     if (!BIZ[b.id]) BIZ[b.id] = { inside: 0, type: b.id };
-    Object.assign(BIZ[b.id], { x: W * b.fx, y: H * b.fy, w: Math.min(94, W * 0.155) });
+    Object.assign(BIZ[b.id], { x: W * b.fx, y: dy(b.fd), w: Math.min(94, W * 0.155) });
   }
 }
 function activeHomes() { return HOMES.slice(0, houses()); }

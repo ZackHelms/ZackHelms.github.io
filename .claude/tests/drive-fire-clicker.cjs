@@ -150,6 +150,54 @@ const shot = (page, name) => DIR ? page.screenshot({ path: DIR + '/' + name }) :
   // --- upgrades panel toggle + scroll container ---
   ok('scroll container exists', await page.locator('#upg-scroll').count() === 1);
 
+  /* THE TWO DISTRICTS. Villagers walk between the stockpile and the three work
+     sites; nothing may be BUILT on that corridor. Canvas has no collision, so
+     a hut on a lane is not an obstacle — villagers stroll straight through it,
+     which reads worse than an obstacle would. Checked at a FULL district (ten
+     houses plus all three businesses) and in both orientations, because the
+     bands are fractions of the ground and landscape's ground is a third the
+     depth of portrait's — the arrangement that fits one can invert in the
+     other. Three claims: every building sits inside the build district, every
+     building clears every walking lane, and the build district is the bigger
+     of the two, which is the CD's actual ask. */
+  for (const vp of [{ width: 390, height: 844, n: 'portrait' }, { width: 844, height: 390, n: 'landscape' }]) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.waitForTimeout(500);
+    st = await page.evaluate(() => {
+      const save = { ...S.up };
+      S.up.village = 1; S.up.house = 8; S.up.tavern = 1; S.up.shop = 1; S.up.sawbones = 1;
+      resize();
+      const lanes = JOBS.map(j => { const s = j.site(); return [G.stock.x, G.stock.y, s.x, s.y]; });
+      const bld = activeHomes().concat(activeBiz()).map(b => ({ x: b.x, y: b.y, w: b.w, top: b.y - b.w * 0.78 }));
+      const d2seg = (px, py, x1, y1, x2, y2) => {
+        const dx = x2 - x1, dy = y2 - y1, L = dx * dx + dy * dy;
+        const t = Math.max(0, Math.min(1, L ? ((px - x1) * dx + (py - y1) * dy) / L : 0));
+        return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+      };
+      let lane = Infinity;
+      for (const b of bld) for (const L of lanes)
+        for (const c of [[b.x, b.y], [b.x - b.w / 2, b.y], [b.x + b.w / 2, b.y], [b.x, b.top]])
+          lane = Math.min(lane, d2seg(c[0], c[1], L[0], L[1], L[2], L[3]));
+      const out = {
+        n: bld.length,
+        inDistrict: bld.every(b => b.y >= G.zone.buildTop - 1 && b.y <= G.zone.buildBot + 1),
+        lane: Math.round(lane),
+        build: Math.round(G.zone.buildBot - G.zone.buildTop),
+        work: Math.round(G.zone.workBot - G.zone.workTop),
+        // the work band must start below the stockpile, or a "lane" is zero-length
+        bandsOrdered: G.zone.buildBot < G.fire.y && G.stock.y < G.zone.workTop,
+      };
+      Object.assign(S.up, save); resize();
+      return out;
+    });
+    ok(vp.n + ': all ' + st.n + ' buildings sit in the build district', st.inDistrict);
+    ok(vp.n + ': no building on a walking lane (' + st.lane + 'px clear)', st.lane > 40);
+    ok(vp.n + ': build district is the bigger one (' + st.build + ' vs work ' + st.work + ')', st.build > st.work);
+    ok(vp.n + ': districts are ordered build < hearth < work', st.bandsOrdered);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(500);
+
   /* BELLOWS is hidden until the fire has ROARED once — it multiplies a bonus a
      player who has never crossed 75% has never seen, which made it the one
      card that could be bought for nothing. */
