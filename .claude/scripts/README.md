@@ -20,6 +20,46 @@ Deterministic helpers for working on this repo.
   and the first attempt threw `KeyError: 'conclusion'` — a run still in flight
   has no `conclusion` key at all, which is exactly the case the check exists for.
 
+- `check-inline-js.cjs` — parse-check the inline `<script>` of a single-file
+  game, with line numbers in **HTML** coordinates. These games keep thousands of
+  lines of JS inside one `<script>`, so a syntax error is invisible to every
+  text tool and otherwise only surfaces when a browser refuses the page. The
+  smoke gate catches it, but costs a Chromium launch per page and reports it as
+  a page error rather than a line. This is ~100 ms and points at the line, so it
+  is the **inner loop after every block edit**; the smoke gate stays the hard
+  gate before committing (a page can parse fine and still throw on load).
+
+  ```
+  node .claude/scripts/check-inline-js.cjs games/fire-clicker/index.html
+  # OK=games/fire-clicker/index.html blocks=1
+  # INLINE-JS: GREEN
+  ```
+
+  Written 2026-08-29 after the same extract-and-`node --check` heredoc was
+  retyped eight times in one session. Parses only — nothing is executed.
+
+- `replace-fn.py` — replace ONE whole JS function in a single-file game, located
+  by **name** and bounded by **brace counting**. `games/CLAUDE.md` § Editing a
+  large single-file game records why: a span replacement between two hand-picked
+  anchors silently deletes whatever sits between them, which has swallowed a
+  whole painter twice. This cannot include a neighbour, and addressing a
+  function by name also sidesteps the other trap in these files — they mix
+  literal Unicode (`→`, `—`) with escaped forms (`\u2192`, `\u2014`) on
+  adjacent lines, so a text match typed from memory fails on a line that looks
+  identical in the terminal.
+
+  ```
+  python3 .claude/scripts/replace-fn.py --show games/x/index.html drawHouse   # read it first
+  python3 .claude/scripts/replace-fn.py games/x/index.html drawHouse new.js
+  # REPLACED=drawHouse FILE=games/x/index.html OLD_LINES=75 NEW_LINES=160
+  ```
+
+  Refuses and writes nothing if the function is missing, defined more than once,
+  has unbalanced braces, or the replacement would rename it (which would leave
+  every call site pointing at nothing). It guarantees the *span* is right, not
+  that the new body parses — chase it with `check-inline-js.cjs`. Importable as
+  well as a CLI; the docstring shows both.
+
 - `smoke-mobile.cjs` — headless mobile smoke gate. Loads each given page in
   Chromium at an iPhone 13 viewport and fails on any console/page error
   (external-font/network noise ignored). Final line `SMOKE: GREEN`/`SMOKE:

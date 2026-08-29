@@ -45,6 +45,20 @@
   work is recoverable rather than silently skipped. Currently outstanding: **nothing** — the long-running
   entry was cleared by the 2026-08-27/28 star-surge scale pass, see below.
 
+  **2026-08-29, fire-clicker stages/prestige pass** (pointer `b013437`, range
+  `b013437..aaa0015`). **Left nothing behind.** The range held five of this
+  session's own commits plus `905f988` (its own earlier refine commit) and one
+  concurrent **Phasic** session's pair — `0a3d729` (`docs(backlog): refine
+  backlog — block-8 audition signed off`) and its merge `307caeb`. Both are
+  that session's own `/zmh-producer:backlog-refine` output, touching only
+  `TODO.md`, `DONE.md`, `.claude/phasic.md` and one plan in `plans/DONE/` —
+  already-refined CD-facing content, skippable by the rule above — and nothing
+  was hidden under the pointer (`git merge-base --is-ancestor 0a3d729 b013437`
+  says no). No shared-file conflict this time: the Phasic session touched the
+  backlog files while this one touched `games/CLAUDE.md`,
+  `.claude/tests/README.md` and the fire-clicker files, and the single
+  `origin/main` merge in range (`e88a1cb`) was clean.
+
   **CLEARED 2026-08-28: `dd6e9c1` + `60ae87c`** — the two Games-hub commits
   (Star Surge first and every card description trimmed to 24 words; Ember
   Depths second in the grid) that the concurrent hub/star-surge session pushed
