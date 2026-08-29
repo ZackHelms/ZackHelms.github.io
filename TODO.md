@@ -55,7 +55,11 @@ backlog entry here.
 
 ## Next
 
-- (none)
+- [phasic] Endless launch-board weighting: endless (73+) never draws the
+  launch template (block-8 curriculum only, by construction). Decide a
+  weighting and wire it in — unblocked 2026-08-29 by the block-8 audition
+  passing. Plan-shaped: draft via `/zmh-producer:backlog-plan-gen`.
+  Source: `.claude/plans/DONE/phasacro.acrobatics-block.follow-up.md`.
 
 ## Later
 
