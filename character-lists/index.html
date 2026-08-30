@@ -68,28 +68,30 @@ h1 {
 /* ---------- hub cards ---------- */
 .cards { display: grid; gap: 11px; margin-top: 26px; }
 .card {
-  display: block; position: relative;
+  display: block; position: relative; min-width: 0;
   background: var(--panel); border: 1px solid var(--border);
   border-left: 3px solid var(--card-accent, var(--green));
-  border-radius: 8px; padding: 15px 44px 15px 16px;
+  border-radius: 8px; padding: 11px 14px 12px;
   cursor: pointer; transition: background .12s, border-color .12s;
 }
 .card:hover, .card:active { background: var(--panel2); border-color: var(--border); border-left-color: var(--card-accent); }
-.card::after {
-  content: '›'; position: absolute; right: 17px; top: 50%; transform: translateY(-55%);
-  font-size: 1.5rem; color: var(--dimmer);
-}
+.card .crow { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.card .crow + .crow { margin-top: 5px; }
 .card .kind {
   font-size: 0.55rem; letter-spacing: 2.5px; color: var(--card-accent);
   border: 1px solid color-mix(in srgb, var(--card-accent) 40%, transparent);
-  border-radius: 3px; padding: 2px 7px; display: inline-block; margin-bottom: 9px;
+  border-radius: 3px; padding: 2px 7px; flex: none;
 }
 .card .name {
-  font-family: 'Black Ops One', sans-serif; font-size: 1.02rem;
+  font-family: 'Black Ops One', sans-serif; font-size: 0.96rem;
   letter-spacing: 1.5px; color: var(--white); line-height: 1.25;
+  flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.card .sub { font-size: 0.66rem; color: var(--dim); margin-top: 6px; letter-spacing: 0.5px; }
-.card .counts { font-size: 0.6rem; color: var(--dimmer); margin-top: 9px; letter-spacing: 1.5px; }
+.card .sub {
+  font-size: 0.66rem; color: var(--dim); letter-spacing: 0.5px;
+  flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.card .counts { font-size: 0.6rem; color: var(--dimmer); letter-spacing: 1.5px; flex: none; }
 
 .empty {
   margin-top: 24px; padding: 20px; text-align: center;
@@ -394,10 +396,14 @@ function renderHub() {
 
   const cards = CL.items.map(t => `
     <a class="card" href="#/${esc(t.slug)}" style="--card-accent:${esc(t.accent || '#39ff14')}">
-      <span class="kind">${esc((t.kind || 'title').toUpperCase())}</span>
-      <div class="name">${esc(t.title)}</div>
-      <div class="sub">${esc(t.byline || '')}</div>
-      <div class="counts">${(t.characters || []).length} CHARACTERS · ${(t.places || []).length} PLACES</div>
+      <div class="crow">
+        <span class="kind">${esc((t.kind || 'title').toUpperCase())}</span>
+        <span class="name">${esc(t.title)}</span>
+      </div>
+      <div class="crow">
+        <span class="sub">${esc(t.byline || '')}</span>
+        <span class="counts">${(t.characters || []).length} CH · ${(t.places || []).length} PL</span>
+      </div>
     </a>`).join('');
 
   app.innerHTML = `
