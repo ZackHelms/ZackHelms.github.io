@@ -43,6 +43,30 @@ body.locked { overflow: hidden; }
 }
 a { color: inherit; text-decoration: none; }
 
+/* ---------- refresh button ----------
+   Sits at the top right of the page and scrolls away with the header. Below
+   #controls (z 30) so the sticky search bar covers it rather than the other
+   way round. */
+.topbar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 20;
+  max-width: 780px; margin: 0 auto;
+  padding: calc(env(safe-area-inset-top,0px) + 22px) 14px 0;
+  display: flex; justify-content: flex-end;
+  pointer-events: none;
+}
+#refresh {
+  pointer-events: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; flex: none;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--dim); cursor: pointer;
+  transition: color .12s, border-color .12s, background .12s;
+}
+#refresh:hover, #refresh:active { color: var(--accent); border-color: var(--accent); background: var(--panel2); }
+#refresh[data-busy] { color: var(--accent); border-color: var(--accent); }
+#refresh[data-busy] svg { animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ---------- header ---------- */
 h1 {
   font-family: 'Black Ops One', sans-serif;
@@ -249,6 +273,18 @@ footer a { color: var(--dim); border-bottom: 1px dotted var(--dimmer); }
 </head>
 <body>
 
+<div class="topbar">
+  <button id="refresh" type="button" aria-label="Force refresh — clear cached page and data"
+          title="Force refresh — clears the cached page and data files">
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+         stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="23 4 23 10 17 10"></polyline>
+      <polyline points="1 20 1 14 7 14"></polyline>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+    </svg>
+  </button>
+</div>
+
 <div class="wrap" id="app"></div>
 
 <div id="shade" hidden>
@@ -258,7 +294,6 @@ footer a { color: var(--dim); border-bottom: 1px dotted var(--dimmer); }
   </div>
 </div>
 
-<script src="data/manifest.js"></script>
 <script>
 /* ============================================================
    CHARACTER LISTS
@@ -576,25 +611,71 @@ document.getElementById('dclose').addEventListener('click', () => closeDialog(fa
 shade.addEventListener('click', ev => { if (ev.target === shade) closeDialog(false); });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !shade.hidden) closeDialog(false); });
 
+/* ---------- hard refresh ----------
+   Chrome — mobile Chrome especially — will serve this page and its data files
+   from cache long after a push, which is why an edit can look "not deployed"
+   in a normal tab but fine in incognito. The ⟳ button forces a genuinely
+   fresh copy: drop any service worker and Cache Storage, then reload on a
+   URL nobody has cached yet. boot() forwards that token to every data file,
+   so the manifest and the titles come down fresh too — a plain reload only
+   ever revalidates the HTML. */
+
+const FRESH = new URLSearchParams(location.search).get('fresh');
+const bust = FRESH ? '?v=' + encodeURIComponent(FRESH) : '';
+
+async function hardRefresh() {
+  const btn = document.getElementById('refresh');
+  btn.setAttribute('data-busy', '1');
+  try {
+    if (navigator.serviceWorker) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch (e) { /* not fatal — keep going and still reload */ }
+  try {
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) { /* ditto */ }
+  /* replace(), not assign() — a forced refresh shouldn't cost a back press. */
+  location.replace(location.pathname + '?fresh=' + Date.now() + location.hash);
+}
+
+document.getElementById('refresh').addEventListener('click', hardRefresh);
+
 /* ---------- boot ---------- */
 
-/* Data files are plain scripts (no fetch) so the app also runs from file://. */
+/* Data files are plain scripts (no fetch) so the app also runs from file://.
+   The manifest is loaded the same way rather than as a static <script src>,
+   so that it too can carry the cache-busting token. */
 (function boot() {
-  const slugs = window.CL_TITLES || [];
-  let left = slugs.length;
-  if (!left) { route(); return; }
-  slugs.forEach(slug => {
-    const s = document.createElement('script');
-    s.src = 'data/' + slug + '.js';
-    s.onload = s.onerror = () => {
+  loadScript('data/manifest.js', () => {
+    const slugs = window.CL_TITLES || [];
+    let left = slugs.length;
+    if (!left) { done(); return; }
+    slugs.forEach(slug => loadScript('data/' + slug + '.js', () => {
       if (--left) return;
       /* They load in parallel and register in whatever order they finish,
          so re-impose the manifest order the hub is documented to follow. */
       CL.items.sort((a, b) => slugs.indexOf(a.slug) - slugs.indexOf(b.slug));
-      route();
-    };
-    document.head.appendChild(s);
+      done();
+    }));
   });
+
+  function loadScript(src, cb) {
+    const s = document.createElement('script');
+    s.src = src + bust;
+    s.onload = s.onerror = cb;
+    document.head.appendChild(s);
+  }
+
+  function done() {
+    route();
+    /* Keep the token out of the address bar so shared/bookmarked links stay
+       clean — the scripts above already captured it. */
+    if (FRESH) history.replaceState(null, '', location.pathname + location.hash);
+  }
 })();
 </script>
 </body>

@@ -22,6 +22,13 @@ standing instructions the CD has asked for:
   (top-level and per-filter) and footnotes must all be safe to read while
   mid-book / mid-season — that is the entire point of the app.
 
+- **Don't make `data/manifest.js` a static `<script src>` tag again.** It is
+  injected by `boot()` along with the title data so the ⟳ refresh button's
+  cache-busting token reaches it; a static tag is fetched before any JS runs
+  and would silently pin the app to a stale list of titles. Same rule for any
+  future data file — load it through `boot()`'s `loadScript`, which appends
+  the token. See README § Refreshing.
+
 - **Hub cards are two lines** (kind badge + title; ellipsized byline +
   `N CH · M PL` counts), no chevron. Keep them that compact if you touch the
   hub. Note the hub card rows use the class `.crow` — the bare `.row` class

@@ -25,7 +25,25 @@ character-lists/
    currently being read/watched near the top — the hub renders in array order).
 
 Data files are loaded as plain `<script>` tags, not `fetch`, so the app also works
-opened straight off disk with `file://`.
+opened straight off disk with `file://`. `boot()` injects them at runtime —
+**including `manifest.js`**, which is deliberately *not* a static `<script src>`
+tag so that it can carry the cache-busting token (see Refreshing below).
+
+## Refreshing
+
+The ⟳ button at the top right of every page forces a genuinely fresh copy.
+
+Mobile Chrome will serve this page and its data files from cache long after a
+push, which is why a change can look undeployed in a normal tab but correct in
+incognito. A plain reload only revalidates the HTML, so the stale `data/*.js`
+files survive it. The button instead:
+
+1. unregisters any service worker and deletes every Cache Storage entry, then
+2. reloads on `?fresh=<timestamp>` — a URL nothing has cached yet.
+
+`boot()` forwards that token to every injected script as `?v=<timestamp>`, so
+the manifest and all title data are re-fetched too. The token is stripped from
+the address bar once boot finishes, keeping shared links clean.
 
 ## Field contract
 
