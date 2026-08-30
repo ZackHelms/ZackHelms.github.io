@@ -9,8 +9,20 @@ CL.add({
          'day shift in March; season 2 picks up ten months later on the Fourth of July.',
   footnote: 'Season 1 (2025) and season 2 (2026). Spoilers folded until tapped.',
   filters: [
-    { id: 's1', label: 'Season 1' },
-    { id: 's2', label: 'Season 2' }
+    {
+      id: 's1', label: 'Season 1',
+      blurb: 'Season 1 (2025): a single 15-hour day shift on a March morning, one episode ' +
+             'per hour from 7 a.m. — and, though he tells nobody, the anniversary of Dr. ' +
+             'Adamson\'s death for Robby. Fifteen hours is long enough for everything.'
+    },
+    {
+      id: 's2', label: 'Season 2',
+      blurb: 'Season 2 (2026): ten months later, the Fourth of July holiday shift — ' +
+             'fireworks injuries, heat illness, and a hospital-wide cyberattack that ' +
+             'knocks the systems back to paper. Robby has planned it as his last shift ' +
+             'before a three-month sabbatical; new chief attending Dr. Al-Hashimi arrives ' +
+             'with other ideas, alongside a fresh crop of students.'
+    }
   ],
 
   characters: [

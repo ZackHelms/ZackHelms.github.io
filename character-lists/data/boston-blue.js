@@ -13,8 +13,18 @@ CL.add({
   footnote: 'Season 2 premieres 2026-10-09 — S2 tags to be added as it airs. Written from ' +
             'published summaries. Spoilers folded until tapped.',
   filters: [
-    { id: 's1', label: 'Season 1' },
-    { id: 's2', label: 'Season 2' }
+    {
+      id: 's1', label: 'Season 1',
+      blurb: 'Season 1 (2025–26): Danny\'s first year on the Boston PD — a partnership ' +
+             'with Lena that has to be earned, reconnecting with Sean, a long-distance ' +
+             'relationship with Baez, and a place at the Silvers\' Shabbat table. It ends ' +
+             'on a finale that leaves both families reeling.'
+    },
+    {
+      id: 's2', label: 'Season 2',
+      blurb: 'Season 2 (premieres 2026-10-09): opens after a time jump, carrying the ' +
+             'finale\'s cliffhanger forward. Entries get tagged here as the season airs.'
+    }
   ],
 
   characters: [

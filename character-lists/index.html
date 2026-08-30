@@ -438,7 +438,7 @@ function renderTitle(t) {
     <a class="backlink" href="#/">‹ ALL TITLES</a>
     <h1>${esc(t.title)}</h1>
     ${t.byline ? `<div class="byline">${esc(t.byline)}</div>` : ''}
-    ${t.blurb ? `<p class="blurb">${esc(t.blurb)}</p>` : ''}
+    <p class="blurb" id="blurb" hidden></p>
     <div id="controls">
       <input class="search" id="search" type="search" placeholder="Filter names…"
              autocomplete="off" autocorrect="off" spellcheck="false">
@@ -465,6 +465,7 @@ function renderTitle(t) {
       filter = btn.dataset.filter;
       app.querySelectorAll('.chip[data-filter]').forEach(b =>
         b.setAttribute('aria-pressed', String(b.dataset.filter === filter)));
+      paintBlurb(t);
       paintLists(t);
     });
   });
@@ -478,7 +479,20 @@ function renderTitle(t) {
     if (!shade.hidden) route();   // repaint an open dialog with the new setting
   });
 
+  paintBlurb(t);
   paintLists(t);
+}
+
+/* The title blurb doubles as the summary for the active filter: with ALL
+   selected it shows t.blurb; a chip whose filter object carries its own
+   `blurb` swaps it in (falling back to t.blurb when it doesn't). */
+function paintBlurb(t) {
+  const el = document.getElementById('blurb');
+  if (!el) return;
+  const f = filter !== 'all' ? (t.filters || []).find(x => x.id === filter) : null;
+  const text = (f && f.blurb) || t.blurb || '';
+  el.textContent = text;
+  el.hidden = !text;
 }
 
 function matches(entry) {

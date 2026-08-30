@@ -41,7 +41,14 @@ CL.add({
 
   // Optional. Renders filter chips (ALL + one per entry) on the title page and
   // labelled tags in the dialog. Match against each entry's `tags` array.
-  filters: [ { id: 's1', label: 'Season 1' }, { id: 's2', label: 'Season 2' } ],
+  // A filter's optional `blurb` REPLACES the title blurb while that chip is
+  // selected (ALL shows the top-level blurb; a filter without one falls back
+  // to it). Multi-season titles must provide one per season — see "Filter
+  // summaries" below.
+  filters: [
+    { id: 's1', label: 'Season 1', blurb: 'Season 1 (2025): one 15-hour day shift…' },
+    { id: 's2', label: 'Season 2', blurb: 'Season 2 (2026): ten months later…' }
+  ],
 
   characters: [ /* entries — authored in importance order, NOT sorted */ ],
   places:     [ /* entries — same shape; omit or leave empty to hide the section */ ]
@@ -64,6 +71,17 @@ Every field except `name` is optional.
 | `detail` | string | Prose. Blank lines split it into paragraphs. |
 | `facts` | string[] | Bulleted quick facts under the prose. |
 | `spoiler` | string | Folded away behind a ⚠ tap. Blank lines split into paragraphs. |
+
+### Filter summaries
+
+The blurb at the top of a title page is filter-aware: selecting a chip whose
+filter object carries a `blurb` swaps that text in; selecting ALL (or a chip
+without one) shows the title's own `blurb`. **Every multi-season title must
+give each season filter its own `blurb`** — a one-paragraph summary of that
+season (when it aired/airs, its framing, its new arrivals) — so the page reads
+correctly whichever season chip is selected. The top-level `blurb` should
+summarise the whole show. Filter blurbs follow the same spoiler rule as
+everything outside `spoiler` fields: safe to read mid-season.
 
 ### Spoilers
 

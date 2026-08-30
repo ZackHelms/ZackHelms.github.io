@@ -12,8 +12,18 @@ CL.add({
   footnote: 'Covers season 1; season 2 (from autumn 2026) tags to be added as it airs. ' +
             'Written from published summaries. Spoilers folded until tapped.',
   filters: [
-    { id: 's1', label: 'Season 1' },
-    { id: 's2', label: 'Season 2' }
+    {
+      id: 's1', label: 'Season 1',
+      blurb: 'Season 1 (2025–26): Mickey\'s first year with her own show and her own ' +
+             'star — Skye\'s fight with addiction, Wes fresh out of prison and angling ' +
+             'back into her life, and a season-long conspiracy the deputies unpick thread ' +
+             'by thread, ending on a reveal that rewrites the Fox family story.'
+    },
+    {
+      id: 's2', label: 'Season 2',
+      blurb: 'Season 2 (from autumn 2026): picks up from the finale\'s last-scene reveal. ' +
+             'Entries get tagged here as the season airs.'
+    }
   ],
 
   characters: [
