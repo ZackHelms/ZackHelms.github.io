@@ -24,6 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
+| Verlet Ragdoll | `verlet-physics-ragdoll/` | physics-toy | drag-grab, drag-steer | open-sandbox | physics-sim, verlet-constraints, direct-manipulation | solo | `.claude/verlet-physics-ragdoll.md` |
 | Neon Clash | `neon-clash/` | card-battler | drag-place, tap, tap-select | match-vs-ai, local-2p | card-deck, resource-economy, ai-opponent, rotated-2p-ui, area-of-effect, art-styles | vs-ai, local-2p | `.claude/neon-clash.md` |
 | Fire Clicker | `fire-clicker/` | idle-clicker | tap | idle-persistent | resource-economy, day-night-cycle, prestige-reset, scale-ladder, random-events | solo | `.claude/fire-clicker.md` |
 | Zed Shooter | `zed-shooter/` | shooter | virtual-joystick, kb-mouse | wave-survival | meta-progression | solo | external: zed-fps repo |
@@ -76,7 +77,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-50 games (48 in-repo + 2 external builds).
+51 games (49 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -236,6 +237,20 @@ from **inventing a new facet value**, not filling a hole. Open directions:
   damage and knockback both fall off from the centre, so the skill is reading
   a crowd rather than hitting a target. Anything with a grenade, a bomb, a
   shockwave or a cleared radius should reuse this value rather than mint one.
+
+### Newly opened by the 2026-08-30 ragdoll starter
+- **`physics-toy`** genre + **`drag-grab`** input + **`verlet-constraints`** /
+  **`direct-manipulation`** mechanics (verlet-physics-ragdoll — a CD-supplied
+  starter page, shipped as a sandbox rather than a scored game). It is the
+  second `open-sandbox` session after town builder and the first title with no
+  goal, no score and no fail state at all: the whole interaction is grabbing a
+  T-Rex skeleton by any bone and feeling the constraint solver answer. Nothing
+  else here lets the player deform the simulated body directly — every other
+  `physics-sim` game (merge-drop, neon-golf, pinball, sky-hopper) launches a
+  body and then watches it. Treat it as the physics playground to grow a real
+  game out of, not as a filled genre shelf: a scored mode over this rig
+  (poses to match, a throw-for-distance, a ragdoll obstacle course) is still
+  open design space.
 
 ### Example picks this table would suggest next
 A `shake` game (one of the two untouched sensors), an `async-versus` retrofit
