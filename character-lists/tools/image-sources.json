@@ -1,0 +1,66 @@
+{
+  "_comment": [
+    "Entry name -> English Wikipedia article title, for entries that depict a REAL",
+    "person or place and can therefore have a freely-licensed picture. Fictional",
+    "characters are deliberately absent: the only images of them are copyrighted",
+    "publicity stills, which this project does not host (see README, Pictures).",
+    "fetch-images.mjs resolves each article's lead image, refuses anything that is",
+    "not public domain or CC, and leaves every unmatched entry as a monogram."
+  ],
+  "johnny-tremain": {
+    "Paul Revere": "Paul Revere",
+    "Dr. Joseph Warren": "Joseph Warren",
+    "James Otis": "James Otis Jr.",
+    "Sam Adams & John Hancock": "Samuel Adams",
+    "Old South Meeting House": "Old South Meeting House",
+    "Griffin's Wharf": "Boston Tea Party",
+    "Boston Common": "Boston Common",
+    "Lexington": "Battles of Lexington and Concord",
+    "Milton": "Milton, Massachusetts"
+  },
+  "the-dante-club": {
+    "Henry Wadsworth Longfellow": "Henry Wadsworth Longfellow",
+    "Dr. Oliver Wendell Holmes": "Oliver Wendell Holmes Sr.",
+    "James Russell Lowell": "James Russell Lowell",
+    "J. T. Fields": "James Thomas Fields",
+    "George Washington Greene": "George Washington Greene",
+    "Oliver Wendell Holmes Jr.": "Oliver Wendell Holmes Jr.",
+    "Fanny Longfellow": "Fanny Appleton Longfellow",
+    "Craigie House": "Longfellow House–Washington's Headquarters National Historic Site",
+    "Harvard College": "Harvard University",
+    "The Corner": "Ticknor and Fields"
+  },
+  "the-winthrop-woman": {
+    "Elizabeth Fones": "Elizabeth Fones",
+    "Governor John Winthrop": "John Winthrop",
+    "John Winthrop Jr.": "John Winthrop the Younger",
+    "Margaret Winthrop": "Margaret Winthrop",
+    "Anne Hutchinson": "Anne Hutchinson",
+    "Governor Willem Kieft": "Willem Kieft",
+    "Peter Stuyvesant": "Peter Stuyvesant",
+    "Boston & the Bay Colony": "Massachusetts Bay Colony",
+    "Watertown": "Watertown, Massachusetts",
+    "Greenwich": "Greenwich, Connecticut",
+    "New Amsterdam": "New Amsterdam",
+    "Hallett's Cove": "Astoria, Queens",
+    "Groton Manor": "Groton, Suffolk"
+  },
+  "bosch-the-black-echo": {
+    "Mulholland Dam / Hollywood Reservoir": "Mulholland Dam",
+    "Parker Center": "Parker Center",
+    "Hollywood Boulevard": "Hollywood Boulevard",
+    "Củ Chi, Vietnam": "Củ Chi tunnels",
+    "The Federal Building, Westwood": "Wilshire Federal Building"
+  },
+  "the-pitt": {
+    "Pittsburgh, Pennsylvania": "Pittsburgh"
+  },
+  "six-feet-under": {
+    "Seattle": "Seattle",
+    "West Adams, Los Angeles": "West Adams, Los Angeles",
+    "Sarah's house, Topanga": "Topanga, California"
+  },
+  "boston-blue": {
+    "Boston PD": "Boston Police Department"
+  }
+}

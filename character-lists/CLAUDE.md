@@ -29,6 +29,13 @@ standing instructions the CD has asked for:
   future data file — load it through `boot()`'s `loadScript`, which appends
   the token. See README § Refreshing.
 
+- **Pictures are opt-in and free-licence only.** Entry `img` fields are filled
+  by `tools/fetch-images.mjs` from Wikimedia Commons, and only for entries
+  naming a real person or place (`tools/image-sources.json`). Do not add
+  publicity stills or actor headshots for fictional characters — they are
+  copyrighted and this site is public; they stay monograms. Anything the
+  script fetches must keep its attribution row in `data/img/<slug>/CREDITS.md`.
+
 - **Hub cards are two lines** (kind badge + title; ellipsized byline +
   `N CH · M PL` counts), no chevron. Keep them that compact if you touch the
   hub. Note the hub card rows use the class `.crow` — the bare `.row` class

@@ -120,6 +120,27 @@ monogram tile instead. To add a real picture, drop the file next to the data fil
 (e.g. `data/img/<slug>/<name>.jpg`) and point `img` at it, or paste in a `data:` URI
 to keep the app single-request.
 
+**Fetching the free ones.** `tools/fetch-images.mjs` fills in the entries that
+depict a *real* person or place, from Wikimedia Commons:
+
+```sh
+node tools/fetch-images.mjs --dry-run   # offline: check the manifest still matches
+node tools/fetch-images.mjs             # fetch, save, patch the data files
+```
+
+It reads `tools/image-sources.json` (entry name → Wikipedia article), takes each
+article's lead image at 480px, **refuses anything not public domain or CC**,
+saves it to `data/img/<slug>/`, records attribution in that folder's
+`CREDITS.md`, and writes the `img:` field. Re-running skips entries that already
+have one, and anything that fails is simply left as a monogram.
+
+It needs egress to `en.wikipedia.org`, `commons.wikimedia.org` and
+`upload.wikimedia.org`; remote sessions are usually blocked from all three.
+
+Fictional characters are deliberately **not** in that manifest — the only
+pictures of them are copyrighted publicity stills. Those stay monograms unless
+a picture is added by hand.
+
 ## URLs
 
 | Hash | Page |
