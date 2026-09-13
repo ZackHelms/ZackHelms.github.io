@@ -177,9 +177,9 @@ h1 {
   flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
   display: grid; place-items: center;
   font-size: 0.62rem; letter-spacing: 0.5px; font-weight: bold;
-  color: #06060e; overflow: hidden; background-size: cover; background-position: center;
+  color: #06060e; overflow: hidden; position: relative;
 }
-.mono img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mono img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .norows { padding: 16px 14px; color: var(--dimmer); font-size: 0.72rem; }
 
 /* ---------- dialog ---------- */
@@ -212,7 +212,7 @@ h1 {
 .dbody { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 0 18px; }
 .portrait {
   width: 100%; aspect-ratio: 16/7; display: grid; place-items: center;
-  background-size: cover; background-position: center top;
+  position: relative;
   border-bottom: 1px solid var(--border); border-radius: 8px 8px 0 0;
   overflow: hidden;
 }
@@ -221,7 +221,7 @@ h1 {
   letter-spacing: 3px; color: rgba(6,6,14,0.72);
   text-shadow: 0 2px 0 rgba(255,255,255,0.14);
 }
-.portrait img { width: 100%; height: 100%; object-fit: cover; }
+.portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .dpad { padding: 15px 17px 0; }
 .dname {
   font-family: 'Black Ops One', sans-serif; font-size: 1.1rem;
@@ -348,10 +348,18 @@ function swatch(name) {
 }
 
 /** <img> when the entry supplies a picture, generated monogram otherwise. */
+/* The monogram is always painted as the backdrop and a picture, when the entry
+   has one, is overlaid on top of it. If that picture fails to load the <img>
+   removes itself and the monogram shows through, so a dead or mistyped `img`
+   path degrades to exactly the same tile as no `img` at all. */
 function faceStyle(entry) {
+  return `background:${swatch(entry.name)}`;
+}
+
+function faceImg(entry) {
   return entry.img
-    ? `background-image:url('${esc(entry.img)}')`
-    : `background:${swatch(entry.name)}`;
+    ? `<img src="${esc(entry.img)}" alt="" loading="lazy" onerror="this.remove()">`
+    : '';
 }
 
 function paras(text) {
@@ -548,7 +556,7 @@ function paintList(host, entries, kind) {
   if (!shown.length) { host.innerHTML = `<div class="norows">Nothing matches.</div>`; return; }
   host.innerHTML = shown.map(e => `
     <a class="row" href="#/${esc(curSlug)}/${kind}/${esc(idOf(e))}">
-      <span class="mono" style="${faceStyle(e)}">${e.img ? '' : esc(initials(e.name))}</span>
+      <span class="mono" style="${faceStyle(e)}">${esc(initials(e.name))}${faceImg(e)}</span>
       <span class="rname">${esc(e.name)}</span>
       <span class="chev">›</span>
     </a>`).join('');
@@ -570,7 +578,7 @@ function openDialog(t, e, kind) {
 
   dbody.innerHTML = `
     <div class="portrait" style="${faceStyle(e)}">
-      ${e.img ? '' : `<span class="big">${esc(initials(e.name))}</span>`}
+      <span class="big">${esc(initials(e.name))}</span>${faceImg(e)}
     </div>
     <div class="dpad">
       <div class="dname" id="dlg-name">${esc(e.name)}</div>

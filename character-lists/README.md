@@ -110,6 +110,10 @@ the choice is remembered in `localStorage`.
 
 ### Pictures
 
+The monogram is always painted first and the picture is overlaid on it, so an
+`img` that 404s or is mistyped falls back to the monogram tile rather than
+leaving a blank circle — a missing picture always looks like no picture.
+
 `img` is left `null` in the current titles: hotlinking publicity stills from
 third-party sites is both fragile and legally murky, so the app generates a
 monogram tile instead. To add a real picture, drop the file next to the data files
