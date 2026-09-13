@@ -2,6 +2,7 @@
    reading/watching at the top). Each slug must have a matching data/<slug>.js
    that calls CL.add({...}). See ../README.md for the field contract. */
 window.CL_TITLES = [
+  'school-spirits',
   'johnny-tremain',
   'the-dante-club',
   'the-winthrop-woman',
