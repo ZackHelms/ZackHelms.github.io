@@ -170,6 +170,17 @@ Each game with significant design complexity has a dedicated context file in `.c
 
 **Standing rule for all games and game updates:** If the design spec is unclear or internally inconsistent, ask clarifying questions before writing code.
 
+**Standing rule — discovery over instruction (CD, 2026-09-17):** Build the
+affordance, not the caption. If a control looks like something the player wants
+to touch, they will touch it, and discovering what it does beats being told. No
+uninvited helper text on the play surface: if a player would find it within one
+touch, delete the text and spend the effort on making the thing obviously
+touchable and the first touch unmistakable. A timed auto-dismiss does not
+rescue an unearned hint. Deep explanation belongs behind an opt-in (a ⚙ or ⓘ
+panel), where it can be as thorough as it likes. Full rule, including the four
+cases where on-screen text does earn its place: `games/CLAUDE.md` § Discovery
+over instruction.
+
 ## Shared game conventions
 
 See `games/CLAUDE.md` for the full shared conventions table (fonts, palette, input, etc.).

@@ -120,7 +120,6 @@ body {
 
 /* ------------------------------------------------------------------- grid */
 #stage {
-  position: relative;
   flex: 1 1 auto;
   display: flex; align-items: center; justify-content: center;
   min-height: 0;
@@ -283,17 +282,6 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
   font-family: 'Black Ops One', sans-serif; font-size: .78rem; letter-spacing: 3px;
   cursor: pointer;
 }
-#hint {
-  position: absolute; left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  background: #05050ce8; border: 1px solid var(--gold); border-radius: 22px;
-  padding: 9px 18px; font-size: .64rem; letter-spacing: 1.2px; color: var(--gold);
-  white-space: nowrap; text-align: center;
-  pointer-events: none; z-index: 30;
-  box-shadow: 0 6px 24px #000a;
-  transition: opacity .5s;
-}
-#hint.gone { opacity: 0; }
 
 /* ----------------------------------------------------- landscape chrome */
 /* Three stacked strips cost 119 px of a 390 px-tall phone — 30% of the
@@ -314,7 +302,7 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-17 21:05 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-17 21:09 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -344,9 +332,7 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
     <button class="chip" id="reload" aria-label="Restart song">&#8635;</button>
   </div>
 
-  <div id="stage"><div id="grid"></div>
-    <div id="hint">HOLD A PAD TO PLAY ITS TRACK</div>
-  </div>
+  <div id="stage"><div id="grid"></div></div>
 </div>
 
 <div id="veil"></div>
@@ -1616,7 +1602,6 @@ function wire() {
     ensureAudio();
     ptr.set(e.pointerId, new Set(hitsAt(e.clientX, e.clientY)));
     recompute();
-    el('hint').classList.add('gone');
     e.preventDefault();
   };
   const mv = (e) => {
@@ -1644,7 +1629,6 @@ function wire() {
     ensureAudio();
     keyHeld[i] = true;
     recompute();
-    el('hint').classList.add('gone');
     e.preventDefault();
   });
   window.addEventListener('keyup', (e) => {
@@ -1779,7 +1763,6 @@ wire();
 selectSong(songIx, true);
 layout();
 requestAnimationFrame(frame);
-setTimeout(() => el('hint').classList.add('gone'), 7000);
 /* one deferred re-measure: web fonts change the header height after load */
 window.addEventListener('load', () => setTimeout(layout, 200));
 </script>

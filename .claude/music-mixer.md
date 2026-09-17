@@ -203,6 +203,17 @@ which throw, and most of which are inaudible until you happen to reach that
 section. The runtime gate exists because "the pads light up" is not evidence
 of audio: the lamp is CSS and runs fine with the graph completely dead.
 
+## No helper text on the grid
+
+The game shipped with `HOLD A PAD TO PLAY ITS TRACK` over the pads and the CD
+cut it the same day: the pads already look like lamps behind plastic, so the
+caption answered a question nobody had while covering one of the pads it
+described. **Do not re-add it**, and do not add a first-run tooltip, a coach
+mark or a timed hint — an auto-dismiss is still instruction and still sits on
+the thing it points at. The cogwheel panel is where explanation lives, and it
+is free to be thorough. This is now a repo-wide rule: `games/CLAUDE.md`
+§ Discovery over instruction.
+
 ## Ideas not taken
 
 - **Contact size from `PointerEvent.width/height`** instead of a fixed spread

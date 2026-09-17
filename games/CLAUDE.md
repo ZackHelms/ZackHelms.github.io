@@ -18,6 +18,50 @@ precedent.
 
 ---
 
+## Discovery over instruction (CD standing rule, 2026-09-17)
+
+**Build the affordance, not the caption.** If a control looks like something
+the player wants to touch, they will touch it, and finding out what it does is
+more fun than being told. A game that explains itself before the player has
+tried anything has replaced the best thirty seconds it had.
+
+Music Mixer shipped with `HOLD A PAD TO PLAY ITS TRACK` floating over the grid
+and the CD cut it on sight: the pads already look like lamps behind plastic, so
+the text was answering a question nobody had while covering one of the pads it
+was describing. **A timed auto-dismiss does not rescue an unearned hint** — it
+is still instruction, and it still sits on top of the thing it points at for as
+long as it is up.
+
+The test is one question: **would a player discover this within one touch?**
+If yes, delete the text and spend the effort on the affordance and on the
+feedback instead — make the touchable thing obviously touchable (depth,
+highlight, a pressed state), and make the first touch answer unmistakably
+(light, sound, movement, a number moving). That pairing *is* the tutorial.
+
+On-screen text still earns its place in four cases, and the common thread is
+that it answers a question the player is **already asking**:
+
+- **A rule the board cannot show, shown while the player is acting on it.**
+  Turret-builder scrims every illegal cell and captions the placement rule
+  *while a card is held* — contextual, gone when the card is down, and it
+  answers "why won't this go here?" at the moment it is asked.
+- **A control with no physical affordance.** Sky-lantern's microphone and
+  tilt-labyrinth's motion permission cannot be guessed from pixels; say so
+  once, on the screen where the player opts in.
+- **A refusal or a consequence.** Why the deploy was rejected, what the mishap
+  is costing, that the run is over. Never silent.
+- **Anything deep, behind an opt-in.** A ⚙ settings panel or an ⓘ overlay can
+  be as thorough as it likes — Music Mixer's cogwheel still explains the
+  layout, the pulse and the keyboard in full. Opt-in text is reference
+  material; uninvited text on the play surface is a lecture.
+
+What this rule is *not*: an argument for hiding a mechanic the player cannot
+find by touching anything (see § Assists that delete the system for the mirror
+image — an affordance so helpful it deletes the decision). Discoverable means
+one touch away, not buried.
+
+---
+
 ## Shared Conventions
 
 | Convention | Detail |
@@ -52,6 +96,7 @@ precedent.
 | Prestige / reset layers (idle) | When practical upgrades run out, the reset layer is the content. Copy Egg Inc's actual shape, which is the **opposite** of the intuition: a **sub-linear exponent on an exponentially-growing quantity** (soul eggs ≈ `(farmValue/1e6)^0.21`, each a flat +10%) — it only *feels* exponential because the base quantity compounds. Three rules carry most of the value. The reach metric must be **continuous** (total resources gathered, not the stage reached: five discrete values means missing a rung by ten minutes banks the same as stopping an hour earlier). The bonus must be a **pure function of the high-water mark**, never an accumulated total — `embers = f(bestReach)` makes "a second run to the same depth banks nothing" fall out with no special case, makes the count and the mark impossible to drift apart, and lets a curve retune silently re-price every past run; recompute it on load rather than trusting the saved number. And multiply **yield, not speed** — at +900% a speed bonus turns a village of agents into streaking dots. Name exactly what crosses the reset in one object, rebuild the scene from nothing (agents hold references into world state), make the control a **banner rather than a card** (it is the only irreversible action in the game), and assert **both** failure modes: a bonus that changes nothing makes the restart pure loss, one that collapses the ladder deletes the content it was meant to extend. Full method + the Egg Inc research: `.claude/notes/20260829-prestige-layers-and-the-high-water-mark.md` |
 | Zoning a scene (agents + buildings) | In a scene where simulated agents walk fixed routes, **derive the layout from named bands and never build on a walking lane**. Canvas has no collision, so a building on a route is not an obstacle — agents stroll straight through it, which reads worse than an obstacle would (fire-clicker's sawbones hut sat squarely on the stockpile→fishing-hole route for a week). Band the ground, author positions in **band-relative space** (`[x of W, y of district]`) so a slot is inside its band by construction and the band can move without re-picking every number, and assert the invariant at a FULL district in **both orientations** — bands are fractions of the ground and landscape's ground can be a third the depth, so an arrangement that fits one can invert in the other. Two numbers must be **derived, not chosen**, and both broke by eye first: a band's top clearance comes from the tallest thing standing in it (a building anchored at its base draws up to a roof peak, so CAMP's big huts pushed through the skyline while VILLAGE's small cabins looked fine), and the **fixed-size element is placed first with the bands measured off it** — fire-clicker's fire ring and seats are sized by a tap-target floor that does not shrink with the viewport, and claim 40% of the ground in landscape, so deriving the other way round put buildings on the log seats. Reference: `games/fire-clicker/` (`G.zone`, `dy()`, `layoutBuildings`) |
 | Random events / disaster layers | A layer of accidents that a player taps away, and that the game's *service* buildings answer, is what turns a flat bonus building into insurance — but it has one trap that is easy to ship and hard to see. **A punishment expressed as a share of a stockpile is an unbounded tax on SAVING**, and saving is exactly what an expensive tier purchase demands. Fire-clicker's thief took `cut` of the pile per grab, arriving every couple of minutes; measured against the pre-change build, a hands-off player's TOWN slipped 16% and CITY went from eight hours to **unreachable in thirty-three** — an amplification of roughly 3x over what the analytic model predicted, because the model assumed a pile being spent and the persona was holding one. The cure is a **ceiling in units of production** (`min(share × pile, k × one gather cycle × population)`): the share binds while the pile is small, so the early event still feels dramatic, and the ceiling binds once it is not. Three more rules that generalise. Drive the escalation from **one table with a per-rung row per family**, highest-row-reached wins — the same shape as any other tier table, so a new rung is a row. Give every event the **same shape** — a `work` bar closed at a rate the answering building sets, with a tap closing a fixed fraction — so "tap to help, better buildings help more" is written once and a fourth family is a row plus a painter. And put the layer's **expected drag** in whatever span the balance model reads, as one function of (attentive?, population): a tax the model does not know about silently rots every milestone it reports, and the personas split on it exactly as they split on any other skill lever. Gate the whole layer above the first tier — a starting camp has nothing to steal and no slack to absorb an idle agent, and gating it also leaves the first measured milestone untouched. Reference: `games/fire-clicker/` (`MISHAPS`, `mishapDrag`, `thiefGrabCap`) |
+| On-screen instructions | See **§ Discovery over instruction** above. Short version: if a player would find it within one touch, **delete the text** and put the effort into the affordance and the first-touch feedback. Uninvited helper text on the play surface is a lecture; a ⚙/ⓘ panel can be as thorough as you like. A timed auto-dismiss does not make an unearned hint acceptable |
 | Build badge | Every game has a `<div id="build-badge">` right after `<body>` — see below |
 
 ---
