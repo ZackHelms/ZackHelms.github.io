@@ -42,8 +42,37 @@
 - **Say what you left behind.** Because moving the pointer hides everything
   below it, a pass that deliberately refines only its own commits should name
   the other session's SHAs in its report *and* leave them listed here, so the
-  work is recoverable rather than silently skipped. Currently outstanding: **nothing** — the long-running
-  entry was cleared by the 2026-08-27/28 star-surge scale pass, see below.
+  work is recoverable rather than silently skipped. Currently outstanding: **six commits from
+  three other sessions**, listed immediately below by the 2026-09-17
+  music-mixer pass.
+
+  **2026-09-17, music-mixer pass** (pointer moved `aaa0015` -> `dcee149`,
+  range `aaa0015..dcee149`). The CD scoped this pass to music-mixer
+  explicitly ("for music mixer"), so it refined only its own four commits —
+  `eee29cd`, `5988faa`, `30b1b2f`, `dcee149` — and **leaves the rest of the
+  range behind**. Nothing was hidden under the old pointer (checked with
+  `git merge-base --is-ancestor <sha> aaa0015` for all nine: all visible),
+  but writing `dcee149` buries them, so they are recorded here:
+  - **character-lists session** — `538e6c2`, `4d4db10`, `77f184f`,
+    `f2ff9c9`, `f38d581`, `64ac03e` (five new titles + compact hub cards,
+    per-season summaries, a cache-busting refresh, School Spirits, the
+    broken-img monogram fallback, the Wikimedia image pipeline). That
+    session refines into `character-lists/CLAUDE.md` and its `README.md`,
+    both of which it touched, so this is likely already-refined content —
+    but it is that session's to confirm, not this one's to assume.
+  - **`99205d8`** `feat(games): add verlet-physics-ragdoll starter page` —
+    has a context file (`.claude/verlet-physics-ragdoll.md`) and hub/index
+    rows, so it looks self-refined; same caveat.
+  - **`c28a947`** `feat(fire-clicker): mishaps` — the fire-clicker session's
+    own work, landed **after** its refine commit `111042c`. Its content does
+    appear in `games/CLAUDE.md` § Random events / disaster layers and in the
+    root `CLAUDE.md` fire-clicker row, i.e. refined inline in the feature
+    commit rather than in a following `docs(claude):` pass.
+  - `111042c` is that session's own refine commit and is skippable by the
+    rule above.
+
+  The previously long-running entry was cleared by the 2026-08-27/28
+  star-surge scale pass, see below.
 
   **2026-08-29, fire-clicker stages/prestige pass** (pointer `b013437`, range
   `b013437..aaa0015`). **Left nothing behind.** The range held five of this
@@ -175,6 +204,17 @@
   `node .claude/scripts/pages-status.cjs <saved-result> <sha>`, which prints a
   `PAGES=` verdict and exits non-zero unless it is `success`. Full procedure:
   `.claude/notes/20260817-pages-deploy-wedged-after-503.md`.
+- **The oversized result is the DEFAULT page size, not the call** (verified
+  2026-09-17 across three deploys). `mcp__github__actions_list` with
+  `method: list_workflow_runs`, **`perPage: 1`** and
+  `workflow_runs_filter: {branch:'main', event:'dynamic'}` returns one run
+  well inside the limit, so the newest deploy can be read inline with no saved
+  file and no `pages-status.cjs` round trip. Keep the script for a history
+  sweep or when several runs must be compared; make the narrow call first for
+  the ordinary "did the SHA I just pushed deploy" check. One gotcha:
+  `list_workflow_jobs` needs the **real** run id out of that listing — a
+  guessed id returns a bare `404 Not Found`, which reads like a permissions
+  problem and is not one.
 - Authorization: pushing to `main` is standing authorization (CLAUDE.md §
   Git workflow); no separate publish sign-off needed.
 

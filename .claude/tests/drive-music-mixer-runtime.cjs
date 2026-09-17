@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * eval-music-mixer-runtime.cjs — runtime gate for Music Mixer.
+ * drive-music-mixer-runtime.cjs — runtime gate for Music Mixer.
  *
- * eval-music-mixer.cjs proves the NOTATION is well formed. This proves the
+ * drive-music-mixer.cjs proves the NOTATION is well formed. This proves the
  * two things that only a browser can: the SOUND path (every pattern character
  * in all five songs reaches a voice that can render it, the transport
  * schedules notes, holding every pad produces a non-silent signal at the
@@ -20,7 +20,7 @@
  * runs fine with the audio graph completely dead.
  *
  * Usage: NODE_PATH=/opt/node22/lib/node_modules/playwright/node_modules \
- *          node .claude/tests/eval-music-mixer-runtime.cjs
+ *          node .claude/tests/drive-music-mixer-runtime.cjs
  *
  * Final line: MIXER-RUNTIME: GREEN | RED   (exit 0 / 1)
  */

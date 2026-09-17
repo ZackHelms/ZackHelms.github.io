@@ -21,6 +21,16 @@
 # Always runs check-games-sync.cjs — it is pure node, costs nothing, and the
 # three files it compares drift independently.
 #
+# Suite discovery takes `drive-<slug>.cjs` AND `drive-<slug>-*.cjs` (same for
+# eval-), because a game may keep more than one suite of a class: music-mixer
+# splits a pure-node notation gate from a Chromium synth/input gate. It was
+# named `eval-music-mixer-runtime.cjs` at first, which matched NOTHING here —
+# a whole suite invisible to the default run, found by the 2026-09-17 refine
+# pass. Prefix caveat: a slug that is a prefix of another (`adventure` /
+# `adventure-icons`, `stick-commander-3d` / `.v001`) would also pick up the
+# longer game's suites. Neither pair has any today; if that changes, make the
+# match exact for those two rather than dropping the glob.
+#
 # Prints one parseable line per gate plus a final `GATES: GREEN|RED`; exit 0/1.
 # Existing to stop sessions hand-retyping the NODE_PATH incantation, which is
 # non-obvious enough that .claude/scripts/README.md documents it twice: remote
@@ -110,8 +120,10 @@ if [ "$DRIVE" = 1 ] && [ "$HAVE_PW" = 1 ]; then
       games/*.html)       slug=$(basename "$p" .html) ;;
       *) continue ;;
     esac
-    s=".claude/tests/drive-$slug.cjs"
-    [ -f "$s" ] && case " ${suites[*]-} " in *" $s "*) ;; *) suites+=("$s") ;; esac
+    for s in ".claude/tests/drive-$slug.cjs" ".claude/tests/drive-$slug"-*.cjs; do
+      [ -f "$s" ] || continue
+      case " ${suites[*]-} " in *" $s "*) ;; *) suites+=("$s") ;; esac
+    done
   done
   if [ ${#suites[@]} -eq 0 ]; then
     echo "DRIVE none (no kept suite for the pages changed)"
@@ -131,8 +143,10 @@ if [ "$HAVE_PW" = 1 ]; then
       games/*.html)       slug=$(basename "$p" .html) ;;
       *) continue ;;
     esac
-    e=".claude/tests/eval-$slug.cjs"
-    [ -f "$e" ] && case " ${evals[*]-} " in *" $e "*) ;; *) evals+=("$e") ;; esac
+    for e in ".claude/tests/eval-$slug.cjs" ".claude/tests/eval-$slug"-*.cjs; do
+      [ -f "$e" ] || continue
+      case " ${evals[*]-} " in *" $e "*) ;; *) evals+=("$e") ;; esac
+    done
   done
   if [ ${#evals[@]} -eq 0 ]; then
     :

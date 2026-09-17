@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * eval-music-mixer.cjs — data gate for games/music-mixer/index.html.
+ * drive-music-mixer.cjs — data gate for games/music-mixer/index.html.
  *
  * Music Mixer is five songs of hand-written step notation: 15 tracks x a
  * handful of pattern strings x an arrangement row per section, about 400
@@ -10,8 +10,8 @@
  * audible, so it gets checked here instead.
  *
  * Usage:
- *   node .claude/tests/eval-music-mixer.cjs              # gate, GREEN/RED
- *   node .claude/tests/eval-music-mixer.cjs --report     # + per-song tables
+ *   node .claude/tests/drive-music-mixer.cjs              # gate, GREEN/RED
+ *   node .claude/tests/drive-music-mixer.cjs --report     # + per-song tables
  *
  * Final line: MUSIC-MIXER: GREEN | RED   (exit 0 / 1)
  */

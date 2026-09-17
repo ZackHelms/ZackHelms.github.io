@@ -20,6 +20,17 @@ Deterministic helpers for working on this repo.
   and the first attempt threw `KeyError: 'conclusion'` — a run still in flight
   has no `conclusion` key at all, which is exactly the case the check exists for.
 
+  **You often do not need it.** The result only overflows at the DEFAULT page
+  size: `mcp__github__actions_list` with `method: list_workflow_runs`,
+  `perPage: 1` and `workflow_runs_filter: {branch:'main', event:'dynamic'}`
+  returns the newest deploy inline (verified across three deploys,
+  2026-09-17). Use this script for a history sweep or to compare several runs;
+  for the ordinary "did the SHA I just pushed go green" check, make the narrow
+  call and read `conclusion` straight off it. If you then need the per-job
+  detail the § Publish SOP asks for, take the run **id** from that same
+  listing — a guessed id returns a bare `404 Not Found` that reads like a
+  permissions failure and is not one.
+
 - `check-inline-js.cjs` — parse-check the inline `<script>` of a single-file
   game, with line numbers in **HTML** coordinates. These games keep thousands of
   lines of JS inside one `<script>`, so a syntax error is invisible to every

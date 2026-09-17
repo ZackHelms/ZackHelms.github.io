@@ -70,7 +70,7 @@ GONG, RIDE/GANKOGUI/KENONG). Keep it that way when adding a song.
 tolerance bug: one fingertip laid across a seam holds both pads, a fingertip
 on a four-pad crossing holds four, and the CD's stated grip — four fingers on
 the inner crossings of two columns plus four on the remaining column's seams —
-holds all fifteen with eight fingers. `eval-music-mixer-runtime.cjs` asserts
+holds all fifteen with eight fingers. `drive-music-mixer-runtime.cjs` asserts
 exactly that (1, 2, 4, 5, 10, 15 pads, and 0 with the spread dialled to zero),
 derived from the live pad rectangles and dispatched as real CDP touches. It
 also asserts the **ladder**: fingers added one at a time must make the held
@@ -243,9 +243,9 @@ pad lit up.
 ## Gates
 
 ```
-node .claude/tests/eval-music-mixer.cjs [--report]        # notation + arrangement
+node .claude/tests/drive-music-mixer.cjs [--report]        # notation + arrangement
 NODE_PATH=/opt/node22/lib/node_modules/playwright/node_modules \
-  node .claude/tests/eval-music-mixer-runtime.cjs         # audio + contact patch
+  node .claude/tests/drive-music-mixer-runtime.cjs         # audio + contact patch
 ```
 
 Run **both** after touching song data or the synth. The data gate caught 39
