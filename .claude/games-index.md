@@ -24,7 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
-| Music Mixer | `music-mixer/` | music-instrument | hold, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation | solo | `.claude/music-mixer.md` |
+| Music Mixer | `music-mixer/` | music-instrument | hold, tap, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation | solo | `.claude/music-mixer.md` |
 | Verlet Ragdoll | `verlet-physics-ragdoll/` | physics-toy | drag-grab, drag-steer | open-sandbox | physics-sim, verlet-constraints, direct-manipulation | solo | `.claude/verlet-physics-ragdoll.md` |
 | Neon Clash | `neon-clash/` | card-battler | drag-place, tap, tap-select | match-vs-ai, local-2p | card-deck, resource-economy, ai-opponent, rotated-2p-ui, area-of-effect, art-styles | vs-ai, local-2p | `.claude/neon-clash.md` |
 | Fire Clicker | `fire-clicker/` | idle-clicker | tap | idle-persistent | resource-economy, day-night-cycle, prestige-reset, scale-ladder, random-events | solo | `.claude/fire-clicker.md` |

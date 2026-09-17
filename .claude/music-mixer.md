@@ -6,10 +6,28 @@ the only way to hear that track. Commissioned by the CD 2026-09-17.
 
 ## The three rules that define it
 
-1. **Nothing latches.** A track sounds only while a pad is held. There is no
-   toggle, no ALL button, no hands-free mode — the CD ruled all of them out on
-   purpose ("people love trying to find ways to press all buttons at the same
-   time"). Do not add one; the grip *is* the instrument.
+1. **Two modes, and the locks outlive the switch.** The CD first ruled every
+   latch out ("people love trying to find ways to press all buttons at the same
+   time") and then, after playing it, asked for a **tap-to-lock** toggle in the
+   chrome rail. Both modes now coexist, and there is still no ALL button — a
+   full mix is either a grip or fifteen taps.
+   - **Hold** (the default): a track sounds only while a pad is held.
+   - **Lock**: a tap turns a pad on and leaves it on until tapped again.
+
+   The case worth reading the code for: **turning lock mode off does NOT
+   release what is already locked.** A locked pad keeps playing, and *tapping*
+   it is what lets it go. So `latched[]` is shared by both modes and
+   `recompute()` handles the two as **edges**, not levels — in lock mode a
+   *press* toggles the lock (so the pad answers at once in both directions), in
+   hold mode a *lift* clears one. `contactPrev[]` is what makes those edges
+   visible, and `recompute(noLatch)` exists so a **programmatic** release
+   (backgrounding the app) cannot be mistaken for the player lifting a finger
+   and thereby silently clear a lock they set.
+
+   Turning lock ON latches whatever is already sounding, so a mix built by hand
+   survives the switch. **Restart (⟳) is the only reset** — it clears fingers,
+   keys and locks; so does changing song, because the next song is a different
+   fifteen tracks. `lockMode` persists in `localStorage`; the locks never do.
 2. **The transport never stops.** From the first touch the clock runs whether
    or not anything is held, so a track always enters on the beat and in sync
    with the others. Pads gate a per-track `GainNode`; they do not start or
@@ -245,8 +263,9 @@ caption answered a question nobody had while covering one of the pads it
 described. **Do not re-add it**, and do not add a first-run tooltip, a coach
 mark or a timed hint — an auto-dismiss is still instruction and still sits on
 the thing it points at. The cogwheel panel is where explanation lives, and it
-is free to be thorough. This is now a repo-wide rule: `games/CLAUDE.md`
-§ Discovery over instruction.
+is free to be thorough — it is also the only place the two pad modes are
+written down, which is the point. This is now a repo-wide rule:
+`games/CLAUDE.md` § Discovery over instruction.
 
 ## Ideas not taken
 

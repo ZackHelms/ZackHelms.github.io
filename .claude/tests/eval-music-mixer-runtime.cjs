@@ -6,8 +6,11 @@
  * two things that only a browser can: the SOUND path (every pattern character
  * in all five songs reaches a voice that can render it, the transport
  * schedules notes, holding every pad produces a non-silent signal at the
- * limiter) and the CONTACT-PATCH hit test (one fingertip on a seam holds both
- * pads, and the CD's eight-finger grip really does hold all fifteen).
+ * limiter), the CONTACT-PATCH hit test (one fingertip on a seam holds both
+ * pads, and the CD's eight-finger grip really does hold all fifteen), and the
+ * two-mode TAP-TO-LOCK state machine, whose awkward case — locks surviving a
+ * switch back to hold mode, then released by a tap — is pure edge handling
+ * and unreadable from the code.
  *
  * Two things make this worth a Chromium launch. First, a voice that throws on
  * one character (a gong handed an 'X', a filter handed a NaN frequency) kills
@@ -236,6 +239,74 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
       'gating pointer events on pointerType has broken the desktop path');
     else console.log('MOUSE=1  a mouse press still holds its pad');
     if (mouseAfter !== 0) fail('a mouse release left ' + mouseAfter + ' pads held');
+
+    /* --- 6. tap-to-lock, every case in the CD's spec ------------------- */
+    const centres = await page.evaluate(() =>
+      [...document.querySelectorAll('.pad')].map((e) => {
+        const r = e.getBoundingClientRect();
+        return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+      }));
+    const snap = () => page.evaluate(() => {
+      const st = window.__MM.state();
+      return st.held + '/' + st.locks + (st.lockMode ? '/lock' : '/hold');
+    });
+    const tap = async (i) => {
+      await setTouches([centres[i]]);
+      await page.waitForTimeout(35);
+      await setTouches([]);
+      await page.waitForTimeout(35);
+    };
+    const toggleLock = async () => { await page.click('#lock'); await page.waitForTimeout(40); };
+    const want = async (label, expect) => {
+      const got = await snap();
+      if (got !== expect) fail('lock: ' + label + ' gave ' + got + ', expected ' + expect +
+        '  (held/locks/mode)');
+      else console.log('LOCK=' + expect.padEnd(10) + label);
+    };
+
+    await page.evaluate(() => window.__MM.state());
+    await want('boot is hold mode, nothing held', '0/0/hold');
+    await tap(0);
+    await want('hold mode: a tap leaves nothing behind', '0/0/hold');
+    await toggleLock();
+    await want('lock mode engaged', '0/0/lock');
+    await tap(0);
+    await want('lock mode: a tap locks the pad ON', '1/1/lock');
+    await tap(0);
+    await want('lock mode: tapping it again releases it', '0/0/lock');
+    await tap(0); await tap(7); await tap(12);
+    await want('lock mode: three pads locked hands-free', '3/3/lock');
+    await toggleLock();
+    /* the CD's exact case: switching to hold mode must NOT release the locks */
+    await want('switching to hold mode leaves the locks standing', '3/3/hold');
+    await tap(7);
+    await want('hold mode: tapping a locked pad unlocks it', '2/2/hold');
+    await setTouches([centres[3]]);
+    await page.waitForTimeout(35);
+    await want('hold mode: holding an unlocked pad adds to the locks', '3/2/hold');
+    await toggleLock();
+    await want('locking while holding keeps what was sounding', '3/3/lock');
+    await setTouches([]);
+    await page.waitForTimeout(35);
+    await want('lifting leaves the newly locked pad on', '3/3/lock');
+    await page.click('#reload');
+    await page.waitForTimeout(60);
+    await want('restart clears the locks too', '0/0/lock');
+    /* a locked pad must look engaged, not merely lit */
+    await tap(4);
+    const engaged = await page.evaluate(() => {
+      const p = document.querySelectorAll('.pad')[4];
+      return p.classList.contains('lit') && p.classList.contains('down');
+    });
+    if (!engaged) fail('lock: a locked pad is not drawn depressed and lit — a latching ' +
+      'switch has to read as engaged with no finger on it');
+    else console.log('LOCK=engaged   a locked pad stays depressed and lit');
+    /* changing song must not carry locks onto a different fifteen tracks */
+    await page.selectOption('#song-select', '2');
+    await page.waitForTimeout(120);
+    await want('changing song clears the locks', '0/0/lock');
+    await toggleLock();
+    await want('back to hold mode for the remaining checks', '0/0/hold');
 
     /* with the spread dialled to zero a seam press must fall between the pads */
     await page.evaluate(() => {

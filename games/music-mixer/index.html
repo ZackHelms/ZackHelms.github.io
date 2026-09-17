@@ -44,13 +44,20 @@ body {
 
 /* ---------------------------------------------------------------- top bar */
 #chrome {
-  position: relative;
   flex: 0 0 auto;
-  display: flex; flex-direction: column; gap: 6px;
-  /* portrait: the restart chip sits at the top right, clear of the title */
-  padding-right: calc(var(--bar) - 4px);
+  display: flex; flex-direction: row; gap: 6px;
 }
-#reload { position: absolute; top: 0; right: 0; }
+/* portrait: a right-hand rail beside the chrome rows — restart on the top
+   row, the lock toggle filling the height of the song and tempo rows */
+#chrome-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+#chrome-rail { flex: 0 0 auto; width: 42px; display: flex; flex-direction: column; gap: 6px; }
+#reload { width: 42px; flex: 0 0 auto; }
+#lock {
+  width: 42px; height: auto; flex: 1 1 auto;
+  flex-direction: column; gap: 2px; line-height: 1;
+}
+#lock .gl { font-size: 1rem; }
+#lock .cap { font-size: .4rem; letter-spacing: 1px; }
 #topbar {
   flex: 0 0 auto;
   display: flex; align-items: center; gap: 6px;
@@ -300,16 +307,21 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
   #song-row { flex: 1 1 auto; max-width: 330px; }
   #song-select { padding: 8px 30px 8px 11px; font-size: .84rem; }
   #info { flex: 1 1 auto; overflow: hidden; }
-  #reload { position: static; margin-left: auto; }
+  #chrome-main { flex-direction: row; align-items: center; gap: 8px; }
+  #chrome-rail { flex-direction: row; width: auto; }
+  #lock { width: 38px; height: 38px; flex: 0 0 auto; }
+  #lock .cap { display: none; }
+  #reload { width: 38px; }
   #app { gap: 4px; }
 }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-17 22:03 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-17 22:11 UTC</div>
 
 <div id="app">
   <div id="chrome">
+   <div id="chrome-main">
     <div id="topbar">
       <a class="chip" id="back-btn" href="../index.html" aria-label="Back to games">&#8592;</a>
       <button class="chip" id="settings-btn" aria-label="Settings">&#9881;</button>
@@ -333,7 +345,13 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
       <span id="section-name"></span>
     </div>
 
-    <button class="chip" id="reload" aria-label="Restart song">&#8635;</button>
+   </div>
+   <div id="chrome-rail">
+     <button class="chip" id="reload" aria-label="Restart song">&#8635;</button>
+     <button class="chip" id="lock" aria-label="Tap to lock" aria-pressed="false">
+       <span class="gl">&#128275;</span><span class="cap">LOCK</span>
+     </button>
+   </div>
   </div>
 
   <div id="stage"><div id="grid"></div></div>
@@ -368,9 +386,13 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
 
   <h3>HOW IT WORKS</h3>
   <p>Every pad is one track of the song. The transport runs whether or not you
-  are holding anything, so tracks always come in on the beat and in sync. Nothing
-  latches &mdash; a track sounds only while it is held. Hold all fifteen and you
-  hear the whole arrangement.</p>
+  are holding anything, so tracks always come in on the beat and in sync. Hold
+  all fifteen and you hear the whole arrangement.</p>
+  <p>The <b>&#128275; LOCK</b> toggle on the right switches how a pad answers. Off,
+  a track sounds only while you hold it. On, a tap turns a pad on and leaves it
+  on until you tap it again. Switching lock off does not release what is already
+  locked &mdash; tap a locked pad to let it go. <b>&#8635;</b> restarts the song
+  and clears everything.</p>
   <p>A held pad <b>pulses</b> on each of its own notes. Lit but not pulsing means
   that track is resting in this section of the song.</p>
 
@@ -1450,6 +1472,13 @@ function setHold(i, on) {
    gesture. `ptr` carries mouse and pen (and fingers only on a browser with no
    TouchEvent at all). */
 const touchOn = new Array(PADS).fill(false);
+/* `latched` is the tap-to-lock state and `contactPrev` is what lets recompute
+   see a press or a lift as an EDGE rather than a level. The two modes share
+   one array on purpose: turning lock mode off does not clear the locks, so a
+   pad locked on keeps playing until it is tapped (CD spec, 2026-09-17). */
+const latched = new Array(PADS).fill(false);
+const contactPrev = new Array(PADS).fill(false);
+let lockMode = false;
 const ptr = new Map();
 function hitsAt(x, y) {
   const out = [];
@@ -1461,11 +1490,23 @@ function hitsAt(x, y) {
   }
   return out;
 }
-function recompute() {
+/* `noLatch` suppresses the edge handling for a PROGRAMMATIC release (going to
+   the background, say) so it cannot be mistaken for the player lifting a
+   finger and thereby clear a lock they set. */
+function recompute(noLatch) {
   for (let i = 0; i < PADS; i++) {
-    let on = keyHeld[i] || touchOn[i];
-    if (!on) for (const set of ptr.values()) { if (set.has(i)) { on = true; break; } }
-    setHold(i, on);
+    let c = keyHeld[i] || touchOn[i];
+    if (!c) for (const set of ptr.values()) { if (set.has(i)) { c = true; break; } }
+    if (c !== contactPrev[i]) {
+      if (!noLatch) {
+        /* in lock mode a press toggles the lock, so the pad answers at once
+           in both directions; in hold mode a LIFT is what clears one */
+        if (c && lockMode) latched[i] = !latched[i];
+        else if (!c && !lockMode && latched[i]) latched[i] = false;
+      }
+      contactPrev[i] = c;
+    }
+    setHold(i, lockMode ? latched[i] : (latched[i] || c));
   }
 }
 function fromTouches(list) {
@@ -1476,11 +1517,12 @@ function fromTouches(list) {
   }
   recompute();
 }
-function releaseAll(fingersToo) {
+function releaseAll(fingersToo, locksToo) {
   ptr.clear();
   for (let i = 0; i < PADS; i++) keyHeld[i] = false;
   if (fingersToo) touchOn.fill(false);
-  recompute();
+  if (locksToo) latched.fill(false);
+  recompute(true);
 }
 
 function ensureAudio() {
@@ -1525,6 +1567,9 @@ function selectSong(ix, keepClock) {
   songIx = ((ix % SONGS.length) + SONGS.length) % SONGS.length;
   S = SONGS[songIx];
   for (let i = 0; i < PADS; i++) { pulse[i] = 0; lastPulse[i] = -1; }
+  /* different song, different fifteen tracks — carrying locks across would
+     lock pads the player never chose */
+  releaseAll(true, true);
   labelPads();
   el('bpm').textContent = String(S.bpm);
   el('sig').textContent = S.sig;
@@ -1541,7 +1586,7 @@ function selectSong(ix, keepClock) {
 function save() {
   try {
     localStorage.setItem('musicMixer.cfg', JSON.stringify(
-      { volume, spreadPx, labelsOn, verbOn, muted }));
+      { volume, spreadPx, labelsOn, verbOn, muted, lockMode }));
   } catch (e) {}
 }
 function load() {
@@ -1552,6 +1597,7 @@ function load() {
     if (typeof c.labelsOn === 'boolean') labelsOn = c.labelsOn;
     if (typeof c.verbOn === 'boolean') verbOn = c.verbOn;
     if (typeof c.muted === 'boolean') muted = c.muted;
+    if (typeof c.lockMode === 'boolean') lockMode = c.lockMode;
     const s = parseInt(localStorage.getItem('musicMixer.song') || '0', 10);
     if (s >= 0 && s < SONGS.length) songIx = s;
   } catch (e) {}
@@ -1567,8 +1613,27 @@ function wire() {
   });
   sel.addEventListener('change', () => selectSong(parseInt(sel.value, 10), false));
 
+  const lockBtn = el('lock');
+  const syncLock = () => {
+    lockBtn.classList.toggle('on', lockMode);
+    lockBtn.setAttribute('aria-pressed', lockMode ? 'true' : 'false');
+    lockBtn.querySelector('.gl').textContent = lockMode ? '\uD83D\uDD12' : '\uD83D\uDD13';
+  };
+  lockBtn.addEventListener('click', () => {
+    lockMode = !lockMode;
+    /* Turning lock ON keeps whatever is already sounding: build a mix by hand,
+       flip the switch, take your fingers off. Turning it OFF leaves the locks
+       standing — tapping a locked pad is what releases it. */
+    if (lockMode) for (let i = 0; i < PADS; i++) if (latched[i] || contactPrev[i]) latched[i] = true;
+    syncLock();
+    recompute(true);
+    save();
+  });
+  syncLock();
+
+  /* Restart is the only reset: it clears the locks as well as the fingers. */
   el('reload').addEventListener('click', () => {
-    releaseAll(true);
+    releaseAll(true, true);
     if (audioReady) startTransport(true); else ensureAudio();
   });
   const syncMute = () => {
@@ -1691,7 +1756,7 @@ function wire() {
   document.addEventListener('visibilitychange', () => {
     if (!AC) return;
     /* genuinely backgrounded — release everything, fingers included */
-    if (document.hidden) { releaseAll(true); AC.suspend(); }
+    if (document.hidden) { releaseAll(true, false); AC.suspend(); }
     else if (T.playing) AC.resume();
   });
   window.addEventListener('resize', layout);
@@ -1797,6 +1862,8 @@ window.__MM = {
     song: S.id, bars: S.bars, dur: +S.dur.toFixed(2), sig: S.sig, bpm: S.bpm,
     playing: T.playing, step: T.absStep, flash: flashQ.length,
     held: held.reduce((a, h) => a + (h ? 1 : 0), 0),
+    locks: latched.reduce((a, h) => a + (h ? 1 : 0), 0),
+    lockMode,
     ctx: AC ? AC.state : 'none',
   }),
 };
