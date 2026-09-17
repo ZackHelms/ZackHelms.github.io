@@ -38,7 +38,9 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     executablePath: fs.existsSync(CHROME) ? CHROME : undefined,
     args: ['--autoplay-policy=no-user-gesture-required', '--mute-audio'],
   });
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  /* hasTouch so Chromium emits real TouchEvents — the CD's six-finger bug
+     lived in the pointer-event path and synthetic PointerEvents cannot see it */
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
   const errs = [];
   page.on('pageerror', (e) => errs.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !NOISE.test(m.text())) errs.push('console: ' + m.text()); });
@@ -114,7 +116,9 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
 
     /* --- 5. the contact patch: seams, crossings, and the CD's grip ---- */
     /* Every point below is derived from the live pad rectangles, so this
-       checks the real geometry rather than numbers typed from a screenshot. */
+       checks the real geometry rather than numbers typed from a screenshot,
+       and the touches are dispatched through CDP so the page receives real
+       TouchEvents with real identifiers. */
     const geom = await page.evaluate(() => {
       const pads = [...document.querySelectorAll('.pad')].map((p) => p.getBoundingClientRect());
       const c = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
@@ -129,41 +133,120 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
         crossings: [mid(5, 11), mid(6, 12), mid(7, 13), mid(8, 14)],
       };
     });
-    const press = async (pts) => page.evaluate((arg) => {
-      const g = document.getElementById('grid');
-      const fire = (type, id, x, y, target) => target.dispatchEvent(new PointerEvent(type, {
-        pointerId: id, clientX: x, clientY: y, bubbles: true, cancelable: true,
-        pointerType: 'touch', isPrimary: id === 1,
-      }));
-      arg.pts.forEach((p, k) => fire('pointerdown', 20 + k, p.x, p.y, g));
-      const n = window.__MM.state().held;
-      arg.pts.forEach((p, k) => fire('pointerup', 20 + k, p.x, p.y, window));
-      return { n, after: window.__MM.state().held };
-    }, { pts });
+    const cdp = await page.context().newCDPSession(page);
+    const setTouches = (pts) => cdp.send('Input.dispatchTouchEvent', {
+      type: pts.length ? 'touchStart' : 'touchEnd',
+      touchPoints: pts.map((p, i) => ({ x: Math.round(p.x), y: Math.round(p.y), id: i + 1 })),
+    });
+    const heldNow = () => page.evaluate(() => window.__MM.state().held);
+    const grip = geom.colSeams.concat(geom.crossings);
 
     const cases = [
       ['a fingertip in the middle of one pad', [geom.centre], 1],
       ['a fingertip laid across one seam', [geom.seam01], 2],
       ['a fingertip on a four-pad crossing', [geom.cross], 4],
-      ['four fingers down one column\'s seams', geom.colSeams, 5],
-      ['four fingers on two columns\' crossings', geom.crossings, 10],
-      ['the CD\'s eight-finger grip', geom.colSeams.concat(geom.crossings), 15],
+      ["four fingers down one column's seams", geom.colSeams, 5],
+      ["four fingers on two columns' crossings", geom.crossings, 10],
+      ["the CD's eight-finger grip", grip, 15],
     ];
     for (const [what, pts, want] of cases) {
-      const r = await press(pts);
-      if (r.n !== want) fail('contact patch: ' + what + ' held ' + r.n + ' pads, expected ' + want);
+      await setTouches(pts);
+      const n = await heldNow();
+      await setTouches([]);
+      const after = await heldNow();
+      if (n !== want) fail('contact patch: ' + what + ' held ' + n + ' pads, expected ' + want);
       else console.log('TOUCH=' + want + '  ' + what);
-      if (r.after !== 0) fail('contact patch: ' + what + ' left ' + r.after + ' pads stuck on after release');
-      await page.waitForTimeout(60);
+      if (after !== 0) fail('contact patch: ' + what + ' left ' + after + ' pads stuck on after release');
+      await page.waitForTimeout(50);
     }
+
+    /* --- 5b. ADDING a finger must never drop the ones already down ----- */
+    /* The CD's report: five fingers held, the sixth took everything with it.
+       Safari fires pointercancel for the fingers already down when its
+       gesture recognizer wakes up, and an incrementally-maintained pointer
+       map never recovers. Build the grip one finger at a time and require the
+       count to climb. */
+    const ladder = [];
+    let worst = '';
+    for (let k = 1; k <= grip.length; k++) {
+      await setTouches(grip.slice(0, k));
+      const n = await heldNow();
+      ladder.push(n);
+      if (k > 1 && n < ladder[k - 2] && !worst)
+        worst = 'finger ' + k + ' dropped the held count from ' + ladder[k - 2] + ' to ' + n;
+      await page.waitForTimeout(40);
+    }
+    await setTouches([]);
+    console.log('LADDER=' + ladder.join(' '));
+    if (worst) fail('adding a finger dropped pads already held: ' + worst);
+    if (ladder[ladder.length - 1] !== 15)
+      fail('the eight-finger grip built up one finger at a time ended on ' +
+           ladder[ladder.length - 1] + ' pads, expected 15');
+    if (await heldNow() !== 0) fail('lifting the whole grip left pads stuck on');
+
+    /* --- 5c. a cancel for ONE finger must not wipe the grip ------------ */
+    /* touchcancel/touchend carry the fingers that REMAIN, and the held set is
+       rebuilt from that list, so losing one finger costs one finger. */
+    await setTouches(grip);
+    const beforeCancel = await heldNow();
+    const afterCancel = await page.evaluate((pts) => {
+      const stage = document.getElementById('stage');
+      const mk = (p, id) => new Touch({ identifier: id, target: stage,
+        clientX: p.x, clientY: p.y, pageX: p.x, pageY: p.y });
+      const keep = pts.slice(0, pts.length - 1).map((p, i) => mk(p, i + 1));
+      const gone = mk(pts[pts.length - 1], pts.length);
+      window.dispatchEvent(new TouchEvent('touchcancel', {
+        touches: keep, targetTouches: keep, changedTouches: [gone],
+        bubbles: true, cancelable: true,
+      }));
+      return window.__MM.state().held;
+    }, grip);
+    await setTouches([]);
+    if (beforeCancel !== 15) fail('cancel check could not get to 15 pads first (got ' + beforeCancel + ')');
+    else if (afterCancel < 13)
+      fail('a touchcancel for ONE of eight fingers dropped the grip from 15 pads to ' +
+           afterCancel + ' — the held set is being cleared instead of rebuilt');
+    else console.log('CANCEL=15->' + afterCancel + '  one cancelled finger costs one finger');
+
+    /* --- 5cc. a window blur must not drop the fingers ------------------ */
+    /* The other half of the six-finger bug, and the half that IS reproducible
+       here: `blur` used to clear the whole touch set. Safari can blur the
+       window for an instant while it decides whether a many-finger touch is a
+       system gesture, so that handler took the grip with it. */
+    await setTouches(grip);
+    const beforeBlur = await heldNow();
+    const afterBlur = await page.evaluate(() => {
+      window.dispatchEvent(new Event('blur'));
+      return window.__MM.state().held;
+    });
+    await setTouches([]);
+    if (beforeBlur !== 15) fail('blur check could not get to 15 pads first (got ' + beforeBlur + ')');
+    else if (afterBlur !== 15)
+      fail('a window blur dropped the grip from 15 pads to ' + afterBlur +
+           ' — fingers must be released by touchend/touchcancel, not by blur');
+    else console.log('BLUR=15  a window blur leaves the fingers held');
+
+    /* --- 5d. the mouse path still works alongside the touch path ------- */
+    await page.mouse.move(Math.round(geom.centre.x), Math.round(geom.centre.y));
+    await page.mouse.down();
+    const mouseHeld = await heldNow();
+    await page.mouse.up();
+    const mouseAfter = await heldNow();
+    if (mouseHeld !== 1) fail('a mouse press on one pad held ' + mouseHeld + ' pads, expected 1 — ' +
+      'gating pointer events on pointerType has broken the desktop path');
+    else console.log('MOUSE=1  a mouse press still holds its pad');
+    if (mouseAfter !== 0) fail('a mouse release left ' + mouseAfter + ' pads held');
+
     /* with the spread dialled to zero a seam press must fall between the pads */
     await page.evaluate(() => {
       const s = document.getElementById('spread');
       s.value = '0';
       s.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    const zero = await press([geom.seam01]);
-    if (zero.n !== 0) fail('with touch spread at 0 a seam press still held ' + zero.n + ' pads');
+    await setTouches([geom.seam01]);
+    const zero = await heldNow();
+    await setTouches([]);
+    if (zero !== 0) fail('with touch spread at 0 a seam press still held ' + zero + ' pads');
     else console.log('TOUCH=0  seam press with spread dialled to zero');
   }
 

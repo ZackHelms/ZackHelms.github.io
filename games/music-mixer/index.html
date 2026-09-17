@@ -123,6 +123,10 @@ body {
   flex: 1 1 auto;
   display: flex; align-items: center; justify-content: center;
   min-height: 0;
+  /* the touch listeners live here, not on #grid, so the margins around the
+     grid must refuse scrolling and zooming too */
+  touch-action: none;
+  overscroll-behavior: none;
 }
 #grid {
   display: grid;
@@ -302,7 +306,7 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-17 21:09 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-17 22:03 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -1440,6 +1444,12 @@ function setHold(i, on) {
 /* A pointer is a CONTACT PATCH, not a point: every pad whose rect it reaches
    within `spreadPx` is held. That is what lets one fingertip on a seam hold
    two pads, and four fingers on the inner crossings of two columns hold ten. */
+/* Held state is RECOMPUTED, never accumulated. `touchOn` is rebuilt from the
+   TouchList — every finger on the glass — on each touch event, so a dropped,
+   duplicated or cancelled event cannot leave it desynced for the rest of the
+   gesture. `ptr` carries mouse and pen (and fingers only on a browser with no
+   TouchEvent at all). */
+const touchOn = new Array(PADS).fill(false);
 const ptr = new Map();
 function hitsAt(x, y) {
   const out = [];
@@ -1453,10 +1463,24 @@ function hitsAt(x, y) {
 }
 function recompute() {
   for (let i = 0; i < PADS; i++) {
-    let on = keyHeld[i];
+    let on = keyHeld[i] || touchOn[i];
     if (!on) for (const set of ptr.values()) { if (set.has(i)) { on = true; break; } }
     setHold(i, on);
   }
+}
+function fromTouches(list) {
+  touchOn.fill(false);
+  for (let t = 0; t < list.length; t++) {
+    const hits = hitsAt(list[t].clientX, list[t].clientY);
+    for (let k = 0; k < hits.length; k++) touchOn[hits[k]] = true;
+  }
+  recompute();
+}
+function releaseAll(fingersToo) {
+  ptr.clear();
+  for (let i = 0; i < PADS; i++) keyHeld[i] = false;
+  if (fingersToo) touchOn.fill(false);
+  recompute();
 }
 
 function ensureAudio() {
@@ -1544,9 +1568,7 @@ function wire() {
   sel.addEventListener('change', () => selectSong(parseInt(sel.value, 10), false));
 
   el('reload').addEventListener('click', () => {
-    ptr.clear();
-    for (let i = 0; i < PADS; i++) keyHeld[i] = false;
-    recompute();
+    releaseAll(true);
     if (audioReady) startTransport(true); else ensureAudio();
   });
   const syncMute = () => {
@@ -1597,30 +1619,52 @@ function wire() {
   vb.addEventListener('click', () => { verbOn = !verbOn; syncVerb(); save(); });
   syncVerb();
 
-  /* ---- input ---- */
-  const dn = (e) => {
+  /* ---- input ---------------------------------------------------------- */
+  /* Fingers go through TOUCH events, not pointer events. Safari DERIVES
+     pointer events from touch events, so preventDefault() on `pointerdown`
+     does not reach its gesture recognizer — only a non-passive
+     touchstart/touchmove listener does. Left unprevented, the recognizer
+     decides a many-finger touch might be a system gesture and fires
+     pointercancel for the fingers ALREADY down, which is what made a sixth
+     finger wipe the other five. */
+  const TOUCH = typeof window.TouchEvent !== 'undefined' && 'ontouchstart' in window;
+  stage.addEventListener('touchstart', (e) => {
+    ensureAudio();
+    fromTouches(e.touches);
+    e.preventDefault();
+  }, { passive: false });
+  stage.addEventListener('touchmove', (e) => {
+    fromTouches(e.touches);
+    e.preventDefault();
+  }, { passive: false });
+  /* touchend/touchcancel carry the fingers that REMAIN, so one cancelled
+     finger drops one pad and the rest of the grip survives */
+  const tEnd = (e) => fromTouches(e.touches);
+  window.addEventListener('touchend', tEnd);
+  window.addEventListener('touchcancel', tEnd);
+
+  /* Mouse and pen. Wherever TouchEvent exists the touch path above owns
+     fingers, so gating on pointerType keeps the two from double-counting —
+     and keeps this working on a browser that has no TouchEvent at all. */
+  const penOnly = (e) => TOUCH && e.pointerType === 'touch';
+  stage.addEventListener('pointerdown', (e) => {
+    if (penOnly(e)) return;
     ensureAudio();
     ptr.set(e.pointerId, new Set(hitsAt(e.clientX, e.clientY)));
     recompute();
     e.preventDefault();
-  };
-  const mv = (e) => {
-    if (!ptr.has(e.pointerId)) return;
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (penOnly(e) || !ptr.has(e.pointerId)) return;
     ptr.set(e.pointerId, new Set(hitsAt(e.clientX, e.clientY)));
     recompute();
-    e.preventDefault();
-  };
-  const up = (e) => {
-    if (!ptr.delete(e.pointerId)) return;
-    recompute();
-  };
-  grid.addEventListener('pointerdown', dn);
-  grid.addEventListener('pointermove', mv);
-  window.addEventListener('pointerup', up);
-  window.addEventListener('pointercancel', up);
-  grid.addEventListener('lostpointercapture', up);
-  grid.addEventListener('contextmenu', (e) => e.preventDefault());
-  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  });
+  const pUp = (e) => { if (ptr.delete(e.pointerId)) recompute(); };
+  window.addEventListener('pointerup', pUp);
+  window.addEventListener('pointercancel', pUp);
+  stage.addEventListener('contextmenu', (e) => e.preventDefault());
+  for (const g of ['gesturestart', 'gesturechange', 'gestureend'])
+    document.addEventListener(g, (e) => e.preventDefault(), { passive: false });
 
   window.addEventListener('keydown', (e) => {
     if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1638,15 +1682,16 @@ function wire() {
     recompute();
   });
 
-  const allOff = () => {
-    ptr.clear();
-    for (let i = 0; i < PADS; i++) keyHeld[i] = false;
-    recompute();
-  };
-  window.addEventListener('blur', allOff);
+  /* A blur must NOT drop a finger. Safari can blur the window for an instant
+     while it works out whether a many-finger touch is a system gesture, and
+     clearing the touch set there was the second half of the six-finger bug.
+     Fingers are released by touchend/touchcancel, which are reliable; only
+     keys and the mouse need releasing on blur. */
+  window.addEventListener('blur', () => releaseAll(false));
   document.addEventListener('visibilitychange', () => {
     if (!AC) return;
-    if (document.hidden) { allOff(); AC.suspend(); }
+    /* genuinely backgrounded — release everything, fingers included */
+    if (document.hidden) { releaseAll(true); AC.suspend(); }
     else if (T.playing) AC.resume();
   });
   window.addEventListener('resize', layout);

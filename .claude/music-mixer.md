@@ -54,7 +54,41 @@ on a four-pad crossing holds four, and the CD's stated grip — four fingers on
 the inner crossings of two columns plus four on the remaining column's seams —
 holds all fifteen with eight fingers. `eval-music-mixer-runtime.cjs` asserts
 exactly that (1, 2, 4, 5, 10, 15 pads, and 0 with the spread dialled to zero),
-derived from the live pad rectangles. Never "fix" this into a point test.
+derived from the live pad rectangles and dispatched as real CDP touches. It
+also asserts the **ladder**: fingers added one at a time must make the held
+count climb and never fall (measured 2 3 4 5 9 11 13 15). Never "fix" this
+into a point test, and never let the ladder regress.
+
+**Fingers come through TOUCH events, and the held set is rebuilt from
+`e.touches` every time** — never accumulated. This is not a style preference;
+it is the fix for the CD's 2026-09-17 report that five fingers held fine and
+the sixth wiped all five. Three things caused that and all three matter:
+
+1. Safari *derives* pointer events from touch events, so `preventDefault()` on
+   `pointerdown` never reaches its gesture recognizer. Only a **non-passive**
+   `touchstart`/`touchmove` listener does. Unprevented, the recognizer decides
+   a many-finger touch might be a system gesture and fires `pointercancel`
+   **for the fingers already down**.
+2. `addEventListener('blur', …)` cleared the whole touch set. Safari can blur
+   the window for an instant while making that decision. **Blur releases keys
+   and the mouse only**; fingers are released by `touchend`/`touchcancel`.
+   `releaseAll(fingersToo)` takes a flag for exactly this reason — only a real
+   `visibilitychange` to hidden, and the restart button, pass `true`.
+3. A `Map` keyed by `pointerId` and maintained incrementally never recovers
+   from one missed or extra event. `e.touches` is the authoritative list of
+   every finger on the glass on *every* touch event — `touchend` and
+   `touchcancel` included, where it carries the fingers that REMAIN — so
+   `fromTouches()` is self-healing and one cancelled finger costs one finger.
+
+`ptr` still exists, but only for mouse and pen (and for fingers on a browser
+with no `TouchEvent` at all — hence the `penOnly()` gate on `pointerType`,
+which is what stops the two paths double-counting). The listeners live on
+`#stage`, not `#grid`, so the margins around the grid refuse scrolling too —
+which is why `touch-action:none` is on `#stage` as well.
+
+**One thing no page can fix:** on iPadOS, four- and five-finger swipes and the
+five-finger pinch are system gestures above the browser. A grip that large is
+unreliable there until multitasking gestures are turned off in Settings.
 
 Keyboard mirrors the **landscape** picture: `12345` percussion, `QWERT`
 harmony/melody, `ASDFG` low end. The letters on the pads are hidden except on
