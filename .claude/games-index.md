@@ -24,6 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
+| Music Mixer | `music-mixer/` | music-instrument | hold, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation | solo | `.claude/music-mixer.md` |
 | Verlet Ragdoll | `verlet-physics-ragdoll/` | physics-toy | drag-grab, drag-steer | open-sandbox | physics-sim, verlet-constraints, direct-manipulation | solo | `.claude/verlet-physics-ragdoll.md` |
 | Neon Clash | `neon-clash/` | card-battler | drag-place, tap, tap-select | match-vs-ai, local-2p | card-deck, resource-economy, ai-opponent, rotated-2p-ui, area-of-effect, art-styles | vs-ai, local-2p | `.claude/neon-clash.md` |
 | Fire Clicker | `fire-clicker/` | idle-clicker | tap | idle-persistent | resource-economy, day-night-cycle, prestige-reset, scale-ladder, random-events | solo | `.claude/fire-clicker.md` |
@@ -77,7 +78,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-51 games (49 in-repo + 2 external builds).
+52 games (50 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -146,6 +147,24 @@ local-2p.
   levels forever: 16 authored, then endless seeded drawers, each beaten by
   the in-game solver before it is served; earmarked as the first web-first
   prototype of a future iOS title).
+
+### Newly opened by the 2026-09-17 build
+- **`music-instrument` genre + `stem-mixing` / `procedural-audio` mechanics +
+  `multi-touch-chord` input** (music-mixer, a direct CD commission). The first
+  title whose subject is **sound itself**: fifteen pads, one stem of the
+  playing song each, and holding a pad is the only way to hear it. Nothing
+  latches, so a performance is a grip. It is the second unscored game after
+  mitochondria and, unlike piano-tiles (`rhythm`, and the repo's only
+  pre-synth-era `.mp3` title), there is no timing to get right and not one
+  byte of sampled audio: all five five-minute songs are synthesized live from
+  pattern tables, including two that are deliberately **not in 12-tone equal
+  temperament** (gamelan in slendro, raga in just intonation) because their
+  genres are not. `multi-touch-chord` is the rarest value here and the reason
+  the game works at all — the hit test treats a pointer as a contact patch, so
+  one fingertip laid across a seam holds both pads and eight fingers hold all
+  fifteen. No other game in the repo asks for more than two fingers at once.
+  It is also the repo's only page that renders its play surface in **DOM/CSS
+  rather than Canvas 2D** (see `games/CLAUDE.md` § Rendering).
 
 ### Newly opened by the 2026-08-15/16 build
 - `biology-sim` genre + `systems-simulation` / `scale-ladder` / `real-time-3d`

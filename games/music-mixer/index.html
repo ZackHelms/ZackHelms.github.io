@@ -1,0 +1,1787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Music Mixer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg: #06060e;
+  --panel: #0b0b16;
+  --border: #1a1a30;
+  --green: #39ff14;
+  --gold: #ffc300;
+  --blue: #4488ff;
+  --red: #ff2244;
+  --white: #dde3ff;
+  --dim: #8899bb;
+  --purple: #b44fff;
+  --bar: 46px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Share Tech Mono', monospace;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#app {
+  height: 100dvh;
+  display: flex; flex-direction: column;
+  padding: calc(env(safe-area-inset-top, 0px) + 4px) 8px calc(env(safe-area-inset-bottom, 0px) + 8px);
+  gap: 6px;
+}
+
+/* ---------------------------------------------------------------- top bar */
+#chrome {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex; flex-direction: column; gap: 6px;
+  /* portrait: the restart chip sits at the top right, clear of the title */
+  padding-right: calc(var(--bar) - 4px);
+}
+#reload { position: absolute; top: 0; right: 0; }
+#topbar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 6px;
+  height: var(--bar);
+}
+#topbar .spacer { flex: 1 1 auto; }
+.chip {
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(#151526, #0a0a14);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--white);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1.05rem; line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 #ffffff14, 0 2px 0 #04040a;
+  transition: border-color .15s, color .15s;
+}
+.chip:active { transform: translateY(1px); box-shadow: inset 0 1px 0 #ffffff14, 0 1px 0 #04040a; }
+.chip.on { border-color: var(--green); color: var(--green); }
+#back-btn { font-size: 1.3rem; }
+#title {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: .78rem; letter-spacing: 3px;
+  color: var(--green);
+  text-shadow: 0 0 12px #39ff1455;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------- selector */
+#song-row { flex: 0 0 auto; }
+#song-select {
+  width: 100%;
+  appearance: none; -webkit-appearance: none;
+  background: linear-gradient(#141426, #0a0a15);
+  color: var(--white);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: .9rem; letter-spacing: 1px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 34px 10px 12px;
+  box-shadow: inset 0 1px 0 #ffffff12;
+}
+#song-row { position: relative; }
+#song-row::after {
+  content: '\25BE';
+  position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
+  color: var(--green); pointer-events: none; font-size: .85rem;
+}
+
+/* ------------------------------------------------------------- info strip */
+#info {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  font-size: .68rem; letter-spacing: 1.5px;
+  color: var(--dim);
+  padding: 0 4px;
+  white-space: nowrap;
+}
+#info b { color: var(--white); font-weight: normal; }
+#elapsed { color: var(--gold); font-variant-numeric: tabular-nums; }
+#section-name { color: var(--purple); }
+#info .sep { color: var(--border); }
+#info .grow { flex: 1 1 auto; }
+
+/* ------------------------------------------------------------------- grid */
+#stage {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 0;
+}
+#grid {
+  display: grid;
+  gap: var(--gap);
+  --gap: 9px;
+  touch-action: none;
+  position: relative;
+}
+/* The pad: a translucent plastic cap in a recessed socket, with a lamp
+   behind it. --glow is the held level (0..1); --pulse flashes per note. */
+.pad {
+  position: relative;
+  border: 0; padding: 0; margin: 0;
+  border-radius: 12%;
+  --h: 0;
+  --glow: 0;
+  --pulse: 0;
+  background:
+    radial-gradient(76% 66% at 50% 62%, hsla(var(--h), 88%, 52%, .24), hsla(var(--h), 88%, 52%, 0) 72%),
+    linear-gradient(180deg, hsl(var(--h), 66%, 27%) 0%, hsl(var(--h), 72%, 18%) 54%, hsl(var(--h), 68%, 9%) 100%);
+  box-shadow:
+    inset 0 0 0 1.5px hsla(var(--h), 60%, 6%, .92),
+    inset 0 1.5px 0 hsla(var(--h), 85%, 76%, .3),
+    inset 0 -7px 10px hsla(var(--h), 70%, 4%, .82),
+    0 4px 0 #05050b,
+    0 6px 10px #000000aa,
+    0 0 calc(30px * var(--glow)) hsla(var(--h), 100%, 55%, calc(.55 * var(--glow)));
+  transition: transform .05s linear, box-shadow .09s linear;
+  overflow: hidden;
+  touch-action: none;
+  cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+}
+/* lamp behind the cap */
+.pad::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(68% 62% at 50% 54%,
+      hsla(var(--h), 100%, 88%, .96) 0%,
+      hsla(var(--h), 100%, 66%, .92) 26%,
+      hsla(var(--h), 97%, 50%, .8) 52%,
+      hsla(var(--h), 94%, 36%, .5) 76%,
+      hsla(var(--h), 90%, 24%, 0) 100%);
+  opacity: calc(var(--glow) * (.74 + .26 * var(--pulse)));
+  transition: opacity .07s linear;
+}
+/* white-hot filament core, only on a note hit */
+.pad::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(40% 36% at 50% 50%, #ffffffdd 0%, hsla(var(--h), 100%, 92%, .55) 45%, transparent 78%),
+    linear-gradient(180deg, #ffffff30 0%, #ffffff00 38%);
+  opacity: calc(var(--glow) * var(--pulse));
+  transition: opacity .05s linear;
+}
+/* specular sheen on the plastic, always present */
+.pad .sheen {
+  position: absolute; left: 9%; right: 9%; top: 5%; height: 25%;
+  border-radius: 50% 50% 44% 44% / 74% 74% 26% 26%;
+  background: linear-gradient(180deg, #ffffff30, #ffffff08 62%, #ffffff00);
+  pointer-events: none;
+}
+.pad .lab {
+  position: absolute; inset: auto 4% 7% 4%;
+  font-size: clamp(.4rem, 2.1vmin, .62rem);
+  letter-spacing: .8px;
+  text-align: center;
+  color: hsla(var(--h), 55%, 84%, .66);
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+  transition: color .1s linear;
+  line-height: 1.05;
+}
+.pad.lit .lab { color: #fffffff2; text-shadow: 0 0 8px hsla(var(--h), 100%, 70%, .9), 0 1px 2px #000; }
+.pad .num { display: none; }
+@media (hover: hover) and (pointer: fine) { .pad .num { display: block; } }
+.pad .num {
+  position: absolute; left: 0; right: 0; top: 7%;
+  text-align: center;
+  font-size: clamp(.34rem, 1.7vmin, .5rem);
+  letter-spacing: 1px;
+  color: hsla(var(--h), 50%, 74%, .42);
+  pointer-events: none;
+}
+.pad.lit .num { color: hsla(var(--h), 85%, 88%, .8); }
+.pad.down { transform: translateY(3px); }
+.pad.down {
+  box-shadow:
+    inset 0 0 0 1.5px hsla(var(--h), 60%, 6%, .92),
+    inset 0 1.5px 0 hsla(var(--h), 85%, 76%, .36),
+    inset 0 -3px 7px hsla(var(--h), 70%, 4%, .7),
+    0 1px 0 #05050b,
+    0 2px 5px #000000aa,
+    0 0 calc(34px * var(--glow)) hsla(var(--h), 100%, 58%, calc(.65 * var(--glow)));
+}
+body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
+
+/* --------------------------------------------------------------- settings */
+#veil {
+  position: fixed; inset: 0;
+  background: #02020899;
+  backdrop-filter: blur(3px);
+  display: none;
+  z-index: 40;
+}
+#veil.open { display: block; }
+#settings {
+  position: fixed; z-index: 41;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(92vw, 420px);
+  max-height: 86dvh; overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 16px 18px;
+  display: none;
+  box-shadow: 0 18px 50px #000d;
+}
+#settings.open { display: block; }
+#settings h2 {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: .95rem; letter-spacing: 3px;
+  color: var(--green); margin-bottom: 12px;
+}
+#settings h3 {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: .68rem; letter-spacing: 2px;
+  color: var(--gold); margin: 16px 0 6px;
+}
+.srow { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: .74rem; }
+.srow label { flex: 1 1 auto; color: var(--dim); letter-spacing: 1px; }
+.srow output { width: 46px; text-align: right; color: var(--white); font-variant-numeric: tabular-nums; }
+.srow input[type=range] { flex: 0 0 46%; accent-color: var(--green); }
+#settings p { font-size: .68rem; line-height: 1.55; color: var(--dim); margin: 6px 0; }
+#settings p b { color: var(--white); font-weight: normal; }
+#settings kbd {
+  display: inline-block; min-width: 1.35em; text-align: center;
+  background: #16162a; border: 1px solid var(--border); border-radius: 4px;
+  padding: 1px 3px; margin: 1px; font-size: .64rem; color: var(--white);
+}
+.toggle {
+  flex: 0 0 auto;
+  background: #16162a; border: 1px solid var(--border); color: var(--dim);
+  border-radius: 6px; padding: 5px 11px; font-family: inherit; font-size: .7rem;
+  letter-spacing: 1px; cursor: pointer;
+}
+.toggle.on { border-color: var(--green); color: var(--green); }
+#close-settings {
+  width: 100%; margin-top: 18px;
+  background: linear-gradient(#1b1b33, #10101f);
+  border: 1px solid var(--green); color: var(--green);
+  border-radius: 8px; padding: 10px;
+  font-family: 'Black Ops One', sans-serif; font-size: .78rem; letter-spacing: 3px;
+  cursor: pointer;
+}
+#hint {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  background: #05050ce8; border: 1px solid var(--gold); border-radius: 22px;
+  padding: 9px 18px; font-size: .64rem; letter-spacing: 1.2px; color: var(--gold);
+  white-space: nowrap; text-align: center;
+  pointer-events: none; z-index: 30;
+  box-shadow: 0 6px 24px #000a;
+  transition: opacity .5s;
+}
+#hint.gone { opacity: 0; }
+
+/* ----------------------------------------------------- landscape chrome */
+/* Three stacked strips cost 119 px of a 390 px-tall phone — 30% of the
+   screen for text. Folded into one row the pads grow from 82 to ~104 px. */
+@media (orientation: landscape) and (max-height: 560px) {
+  #chrome {
+    flex-direction: row; align-items: center; gap: 8px;
+    padding-right: 0;
+  }
+  #topbar .spacer, #title { display: none; }
+  #topbar { height: auto; }
+  #song-row { flex: 1 1 auto; max-width: 330px; }
+  #song-select { padding: 8px 30px 8px 11px; font-size: .84rem; }
+  #info { flex: 1 1 auto; overflow: hidden; }
+  #reload { position: static; margin-left: auto; }
+  #app { gap: 4px; }
+}
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-17 21:05 UTC</div>
+
+<div id="app">
+  <div id="chrome">
+    <div id="topbar">
+      <a class="chip" id="back-btn" href="../index.html" aria-label="Back to games">&#8592;</a>
+      <button class="chip" id="settings-btn" aria-label="Settings">&#9881;</button>
+      <button class="chip" id="mute" aria-label="Mute">&#128266;</button>
+      <div class="spacer"></div>
+      <div id="title">MUSIC MIXER</div>
+      <div class="spacer"></div>
+    </div>
+
+    <div id="song-row">
+      <select id="song-select" aria-label="Song"></select>
+    </div>
+
+    <div id="info">
+      <span id="elapsed">0:00</span><span class="sep">/</span><span id="duration">5:00</span>
+      <span class="sep">&#124;</span>
+      <b id="bpm">--</b>&nbsp;BPM
+      <span class="sep">&#124;</span>
+      <b id="sig">-/-</b>
+      <span class="grow"></span>
+      <span id="section-name"></span>
+    </div>
+
+    <button class="chip" id="reload" aria-label="Restart song">&#8635;</button>
+  </div>
+
+  <div id="stage"><div id="grid"></div>
+    <div id="hint">HOLD A PAD TO PLAY ITS TRACK</div>
+  </div>
+</div>
+
+<div id="veil"></div>
+<div id="settings" role="dialog" aria-label="Settings">
+  <h2>SETTINGS</h2>
+
+  <div class="srow">
+    <label for="vol">MASTER VOLUME</label>
+    <input type="range" id="vol" min="0" max="100" step="1" value="80">
+    <output id="vol-out">80</output>
+  </div>
+  <div class="srow">
+    <label for="spread">TOUCH SPREAD</label>
+    <input type="range" id="spread" min="0" max="30" step="1" value="12">
+    <output id="spread-out">12px</output>
+  </div>
+  <p>Touch spread is how far past a pad&#39;s edge a finger still counts. Raise it
+  and one fingertip laid across a seam fires both pads &mdash; four fingers on the
+  four inner crossings of two columns hold all ten.</p>
+
+  <div class="srow">
+    <label>PAD LABELS</label>
+    <button class="toggle on" id="labels-btn">ON</button>
+  </div>
+  <div class="srow">
+    <label>REVERB</label>
+    <button class="toggle on" id="verb-btn">ON</button>
+  </div>
+
+  <h3>HOW IT WORKS</h3>
+  <p>Every pad is one track of the song. The transport runs whether or not you
+  are holding anything, so tracks always come in on the beat and in sync. Nothing
+  latches &mdash; a track sounds only while it is held. Hold all fifteen and you
+  hear the whole arrangement.</p>
+  <p>A held pad <b>pulses</b> on each of its own notes. Lit but not pulsing means
+  that track is resting in this section of the song.</p>
+
+  <h3>LAYOUT</h3>
+  <p>Hue runs red to magenta up the left column, then the middle, then the right.
+  The <b>right-hand column is the percussion</b> &mdash; low drum at the bottom,
+  metal at the top. Left column is the low end, middle column is harmony and
+  melody. Rotate to landscape and the same three groups become rows, percussion
+  on top.</p>
+
+  <h3>KEYBOARD</h3>
+  <p>Keys match the landscape layout &mdash; percussion on the number row:<br>
+  <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd><kbd>5</kbd> percussion<br>
+  <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd><kbd>T</kbd> harmony &amp; melody<br>
+  <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd> low end</p>
+
+  <button id="close-settings">CLOSE</button>
+</div>
+
+<script>
+'use strict';
+/* ===========================================================================
+   MUSIC MIXER — a 15-pad stem mixer over five fully synthesized songs.
+
+   Nothing is sampled and nothing is downloaded: every voice below is built
+   from oscillators, noise and one Karplus-Strong string model, and every song
+   is a table of pattern strings plus an arrangement. See .claude/music-mixer.md
+   for the notation contract and the pad/track layout rules.
+   ======================================================================== */
+
+/* ------------------------------------------------------------------ layout */
+/* Fifteen pads in three groups of five. Hue climbs the left column, then the
+   middle, then the right, so red sits bottom-left and magenta top-right.
+   Group 2 (right column in portrait, top row in landscape) is the percussion.
+   Within a group, index 0 is the BOTTOM pad in portrait.                    */
+const HUES = [
+  0, 15, 30, 45, 58,        // group 0 — low end        (red    -> yellow)
+  75, 95, 135, 160, 178,    // group 1 — harmony/melody (chartreuse -> teal)
+  196, 220, 252, 282, 315,  // group 2 — percussion     (cyan   -> magenta)
+];
+const GROUPS = 3, PER_GROUP = 5, PADS = GROUPS * PER_GROUP;
+/* Keyboard mirrors the LANDSCAPE picture: number row = percussion (group 2),
+   QWERT = group 1, ASDFG = group 0. Index within the group runs left->right. */
+const KEYMAP = {};
+'12345'.split('').forEach((k, i) => KEYMAP[k] = 10 + i);
+'qwert'.split('').forEach((k, i) => KEYMAP[k] = 5 + i);
+'asdfg'.split('').forEach((k, i) => KEYMAP[k] = 0 + i);
+
+/* ------------------------------------------------------------------- audio */
+let AC = null, master = null, comp = null, bus = null, verb = null, verbIn = null;
+let NOISE = null, audioReady = false;
+const trackGain = [], trackSend = [], trackPan = [];
+let noiseCursor = 0;
+
+/* deterministic PRNG — every bake and every humanise offset is reproducible */
+let rngState = 0x2f6e2b1;
+function rnd() {
+  rngState = (rngState * 1664525 + 1013904223) >>> 0;
+  return rngState / 4294967296;
+}
+function hash2(a, b) {
+  let h = (a * 374761393 + b * 668265263) >>> 0;
+  h = ((h ^ (h >>> 13)) * 1274126177) >>> 0;
+  return (h ^ (h >>> 16)) / 4294967296;
+}
+
+function initAudio() {
+  if (AC) return AC;
+  const Ctor = window.AudioContext || window.webkitAudioContext;
+  if (!Ctor) return null;
+  AC = new Ctor();
+
+  master = AC.createGain();
+  master.gain.value = 0.8;
+  /* All fifteen tracks at once is a loud sum — the limiter is what makes the
+     "hold everything" state land instead of clip. */
+  comp = AC.createDynamicsCompressor();
+  comp.threshold.value = -13; comp.knee.value = 8;
+  comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.14;
+  bus = AC.createGain(); bus.gain.value = 1;
+  bus.connect(comp); comp.connect(master); master.connect(AC.destination);
+
+  /* 2 s synthesized impulse response — a plain room, no assets. */
+  verb = AC.createConvolver();
+  verb.buffer = makeIR(2.1, 2.7, 0.34);
+  verbIn = AC.createGain(); verbIn.gain.value = 1;
+  const vhp = AC.createBiquadFilter(); vhp.type = 'highpass'; vhp.frequency.value = 260;
+  verbIn.connect(vhp); vhp.connect(verb); verb.connect(bus);
+
+  NOISE = AC.createBuffer(1, Math.round(AC.sampleRate * 3), AC.sampleRate);
+  const nd = NOISE.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = rnd() * 2 - 1;
+
+  for (let i = 0; i < PADS; i++) {
+    const g = AC.createGain(); g.gain.value = 0;
+    const pan = AC.createStereoPanner ? AC.createStereoPanner() : null;
+    const send = AC.createGain(); send.gain.value = 0;
+    if (pan) { g.connect(pan); pan.connect(bus); pan.connect(send); }
+    else { g.connect(bus); g.connect(send); }
+    send.connect(verbIn);
+    trackGain[i] = g; trackSend[i] = send; trackPan[i] = pan;
+  }
+  audioReady = true;
+  return AC;
+}
+
+function makeIR(sec, decay, damp) {
+  const sr = AC.sampleRate, n = Math.round(sr * sec);
+  const b = AC.createBuffer(2, n, sr);
+  const pre = Math.round(sr * 0.012);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = b.getChannelData(ch);
+    let lp = 0;
+    for (let i = 0; i < n; i++) {
+      if (i < pre) { d[i] = 0; continue; }
+      const t = (i - pre) / (n - pre);
+      const v = (rnd() * 2 - 1) * Math.pow(1 - t, decay);
+      lp += (v - lp) * damp;
+      d[i] = lp * 0.9;
+    }
+    /* a few discrete early reflections stop it sounding like a noise swell */
+    for (const [ms, amp] of [[17, 0.5], [29, 0.38], [43, 0.3], [61, 0.22]]) {
+      const k = pre + Math.round(sr * ms / 1000 + ch * 40);
+      if (k < n) d[k] += amp * (ch ? -1 : 1);
+    }
+  }
+  return b;
+}
+
+/* --------------------------------------------------------------- utilities */
+function noiseSrc(when, dur) {
+  const s = AC.createBufferSource();
+  s.buffer = NOISE; s.loop = true;
+  noiseCursor = (noiseCursor + 0.137) % 2.5;
+  s.start(when, noiseCursor);
+  s.stop(when + dur + 0.01);
+  return s;
+}
+/* percussive AD envelope */
+function pEnv(when, peak, atk, dec) {
+  const g = AC.createGain();
+  const p = Math.max(peak, 1e-4);
+  g.gain.setValueAtTime(0, when);
+  g.gain.linearRampToValueAtTime(p, when + atk);
+  g.gain.exponentialRampToValueAtTime(p * 0.0007, when + atk + dec);
+  g.gain.setValueAtTime(0, when + atk + dec + 0.002);
+  return g;
+}
+/* sustaining ASR envelope over a note of length dur */
+function sEnv(when, dur, peak, atk, dec, sus, rel) {
+  const g = AC.createGain();
+  const p = Math.max(peak, 1e-4);
+  const end = when + Math.max(dur, atk + 0.02);
+  g.gain.setValueAtTime(0, when);
+  g.gain.linearRampToValueAtTime(p, when + atk);
+  if (dec > 0 && sus < 1) g.gain.exponentialRampToValueAtTime(Math.max(p * sus, 1e-4), when + atk + dec);
+  g.gain.setValueAtTime(Math.max(p * sus, 1e-4), end);
+  g.gain.exponentialRampToValueAtTime(p * 0.0007, end + rel);
+  g.gain.setValueAtTime(0, end + rel + 0.002);
+  return g;
+}
+function lfo(when, until, hz, amt, target) {
+  const o = AC.createOscillator(); o.type = 'sine'; o.frequency.value = hz;
+  const g = AC.createGain(); g.gain.value = amt;
+  o.connect(g); g.connect(target);
+  o.start(when); o.stop(until);
+  return o;
+}
+
+/* ============================================================ voice models */
+/* A voice is { s:sustains, snd:reverb send, f(p) } where
+   p = { t:startTime, f:frequency Hz, d:duration s, v:velocity, out:destination,
+         c:pattern char }.                                                   */
+
+/* --- membranes: kick, toms, congas, djembe, tabla, dholak ---------------- */
+function mem(o) {
+  return {
+    s: false, snd: o.snd == null ? 0.1 : o.snd,
+    f(p) {
+      let f = p.f, slap = o.slap || 0, dec = o.dec, amp = o.amp == null ? 0.9 : o.amp;
+      let up = o.up == null ? 1.6 : o.up;
+      /* four strokes off one model: x tone, X slap/accent, o bass, r rim */
+      if (p.c === 'X') { slap *= 2.3; up *= 1.22; amp *= 1.12; dec *= 0.82; }
+      else if (p.c === 'o') { f *= 0.66; slap *= 0.25; dec *= 1.25; amp *= 0.62; }
+      else if (p.c === 'r') { f *= 1.58; dec *= 0.5; amp *= 0.8; }
+      const life = dec + 0.06;
+      const osc = AC.createOscillator(); osc.type = o.wave || 'sine';
+      osc.frequency.setValueAtTime(Math.min(f * up, 8000), p.t);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(f * (o.down || 1), 20), p.t + (o.bend || 0.05));
+      const g = pEnv(p.t, amp * p.v, 0.0015, dec);
+      osc.connect(g); g.connect(p.out);
+      osc.start(p.t); osc.stop(p.t + life);
+      if (o.mode2) {
+        const o2 = AC.createOscillator(); o2.type = 'sine';
+        o2.frequency.setValueAtTime(f * o.mode2 * up, p.t);
+        o2.frequency.exponentialRampToValueAtTime(Math.max(f * o.mode2, 20), p.t + (o.bend || 0.05) * 0.7);
+        const g2 = pEnv(p.t, amp * p.v * 0.3, 0.002, dec * 0.45);
+        o2.connect(g2); g2.connect(p.out);
+        o2.start(p.t); o2.stop(p.t + life);
+      }
+      if (slap > 0.001) {
+        const sd = o.slapDec || 0.03;
+        const n = noiseSrc(p.t, sd + 0.01);
+        const bp = AC.createBiquadFilter();
+        bp.type = o.slapType || 'bandpass';
+        bp.frequency.value = o.slapHz || 2400; bp.Q.value = o.slapQ || 1.1;
+        const ng = pEnv(p.t, slap * p.v, 0.001, sd);
+        n.connect(bp); bp.connect(ng); ng.connect(p.out);
+      }
+    },
+  };
+}
+
+/* --- noise-based: snares, hats, shakers, brushes, cymbals, claves -------- */
+function noi(o) {
+  return {
+    s: false, snd: o.snd == null ? 0.16 : o.snd,
+    f(p) {
+      let dec = o.dec, amp = o.amp == null ? 0.5 : o.amp, hz = o.hz * (p.r || 1);
+      if (p.c === 'X') { amp *= 1.22; dec *= (o.openMul || 1); }
+      else if (p.c === 'o') { amp *= 0.42; dec *= 0.72; }
+      else if (p.c === 'r') { hz *= 1.45; dec *= 0.6; }
+      const bursts = o.bursts || 1;
+      for (let b = 0; b < bursts; b++) {
+        const bt = p.t + b * (o.gap || 0.009);
+        const ba = amp * (b ? 0.55 : 1);
+        const n = noiseSrc(bt, dec + 0.02);
+        const fl = AC.createBiquadFilter();
+        fl.type = o.type || 'bandpass';
+        fl.frequency.setValueAtTime(hz, bt);
+        if (o.sweep) fl.frequency.exponentialRampToValueAtTime(o.sweep, bt + dec);
+        fl.Q.value = o.q == null ? 1 : o.q;
+        const g = pEnv(bt, ba * p.v, o.atk || 0.001, dec);
+        n.connect(fl); fl.connect(g); g.connect(p.out);
+      }
+      if (o.body) {
+        const bh = o.body * (p.r || 1);
+        const ob = AC.createOscillator(); ob.type = 'triangle';
+        ob.frequency.setValueAtTime(bh * 1.3, p.t);
+        ob.frequency.exponentialRampToValueAtTime(bh, p.t + 0.035);
+        const bg = pEnv(p.t, (o.bodyAmp || 0.3) * amp * p.v, 0.001, dec * 0.7);
+        ob.connect(bg); bg.connect(p.out);
+        ob.start(p.t); ob.stop(p.t + dec + 0.05);
+      }
+    },
+  };
+}
+
+/* --- FM bars and bells: metallophones, gongs, wood, Rhodes, vibes -------- */
+function fm(o) {
+  return {
+    s: !!o.sus, snd: o.snd == null ? 0.3 : o.snd,
+    f(p) {
+      const parts = o.parts || [[1, 1]];
+      const dec = o.dec * (p.c === 'o' ? 0.6 : 1);
+      const amp = (o.amp == null ? 0.5 : o.amp) * (p.c === 'o' ? 0.5 : p.c === 'X' ? 1.2 : 1);
+      const twins = o.beat ? 2 : 1;
+      for (let w = 0; w < twins; w++) {
+        for (let k = 0; k < parts.length; k++) {
+          const [mul, pg] = parts[k];
+          const cf = p.f * mul + (w ? o.beat : 0);
+          if (cf > 15000) continue;
+          const car = AC.createOscillator(); car.type = 'sine';
+          car.frequency.value = cf;
+          const mod = AC.createOscillator(); mod.type = 'sine';
+          mod.frequency.value = cf * o.ratio;
+          const mg = AC.createGain();
+          const idx = cf * o.ratio * o.index;
+          mg.gain.setValueAtTime(idx, p.t);
+          mg.gain.exponentialRampToValueAtTime(Math.max(idx * 0.02, 1), p.t + (o.iDec || 0.08));
+          mod.connect(mg); mg.connect(car.frequency);
+          const pdec = dec * (o.partDec ? Math.pow(o.partDec, k) : 1);
+          const g = o.sus
+            ? sEnv(p.t, p.d, amp * pg * p.v / twins, o.atk || 0.004, pdec * 0.5, 0.45, pdec * 0.5)
+            : pEnv(p.t, amp * pg * p.v / twins, o.atk || 0.003, pdec);
+          car.connect(g); g.connect(p.out);
+          const life = (o.sus ? p.d : 0) + pdec + 0.1;
+          car.start(p.t); car.stop(p.t + life);
+          mod.start(p.t); mod.stop(p.t + life);
+          if (o.trem && k === 0) lfo(p.t, p.t + life, o.trem, amp * 0.22, g.gain);
+        }
+      }
+      if (o.thump) {
+        const ot = AC.createOscillator(); ot.type = 'sine';
+        ot.frequency.value = p.f * 0.5;
+        const g = pEnv(p.t, amp * 0.3 * p.v, 0.004, dec * 0.5);
+        ot.connect(g); g.connect(p.out);
+        ot.start(p.t); ot.stop(p.t + dec + 0.1);
+      }
+      if (o.air) {
+        const n = noiseSrc(p.t, 0.05);
+        const bp = AC.createBiquadFilter(); bp.type = 'bandpass';
+        bp.frequency.value = p.f * 4; bp.Q.value = 0.8;
+        const g = pEnv(p.t, o.air * amp * p.v, 0.001, 0.045);
+        n.connect(bp); bp.connect(g); g.connect(p.out);
+      }
+    },
+  };
+}
+
+/* --- oscillator stacks: basses, leads, arps, pads, strings, bowed, winds - */
+function sub(o) {
+  return {
+    s: !!o.sus, snd: o.snd == null ? 0.18 : o.snd,
+    f(p) {
+      const oscs = o.oscs || [['sawtooth', 0, 1]];
+      const dec = o.dec == null ? 0.3 : o.dec;
+      const rel = o.rel == null ? 0.08 : o.rel;
+      const amp = (o.amp == null ? 0.34 : o.amp) * (p.c === 'o' ? 0.6 : 1);
+      const life = (o.sus ? Math.max(p.d, 0.05) : 0) + dec + rel + 0.12;
+      const lp = AC.createBiquadFilter();
+      lp.type = o.fType || 'lowpass';
+      lp.Q.value = o.q == null ? 0.9 : o.q;
+      const base = Math.min((o.cut || 6) * p.f + (o.cutAdd || 0), 17000);
+      lp.frequency.setValueAtTime(Math.min(base * (1 + (o.fEnv || 0)), 18000), p.t);
+      if (o.fEnv) lp.frequency.exponentialRampToValueAtTime(Math.max(base, 60), p.t + (o.fDec || 0.16));
+      const g = o.sus
+        ? sEnv(p.t, p.d, amp * p.v, o.atk || 0.008, dec, o.sus === true ? 0.72 : o.sus, rel)
+        : pEnv(p.t, amp * p.v, o.atk || 0.004, dec);
+      lp.connect(g); g.connect(p.out);
+      const vibT = o.vib ? AC.createGain() : null;
+      for (const [type, cents, og] of oscs) {
+        const osc = AC.createOscillator();
+        osc.type = type;
+        osc.frequency.value = p.f * (o.mul || 1);
+        osc.detune.value = cents;
+        if (o.glide) {
+          osc.frequency.setValueAtTime(p.f * (o.mul || 1) * 0.94, p.t);
+          osc.frequency.exponentialRampToValueAtTime(p.f * (o.mul || 1), p.t + o.glide);
+        }
+        const og2 = AC.createGain(); og2.gain.value = og;
+        osc.connect(og2); og2.connect(lp);
+        osc.start(p.t); osc.stop(p.t + life);
+        if (vibT) vibT.connect(osc.detune);
+      }
+      if (vibT) {
+        vibT.gain.value = 1;
+        const vo = AC.createOscillator(); vo.type = 'sine';
+        vo.frequency.value = o.vib[0];
+        const vg = AC.createGain(); vg.gain.value = 0;
+        vg.gain.setValueAtTime(0, p.t);
+        vg.gain.linearRampToValueAtTime(o.vib[1], p.t + Math.min(0.35, life));
+        vo.connect(vg); vg.connect(vibT);
+        vo.start(p.t); vo.stop(p.t + life);
+      }
+      if (o.breath) {
+        const n = noiseSrc(p.t, life);
+        const bp = AC.createBiquadFilter(); bp.type = 'bandpass';
+        bp.frequency.value = p.f * 2.4; bp.Q.value = 0.7;
+        const ng = o.sus
+          ? sEnv(p.t, p.d, o.breath * amp * p.v, (o.atk || 0.008) * 1.6, dec, 0.7, rel)
+          : pEnv(p.t, o.breath * amp * p.v, 0.006, dec);
+        n.connect(bp); bp.connect(ng); ng.connect(p.out);
+      }
+    },
+  };
+}
+
+/* --- Karplus-Strong strings: kora, ngoni, nylon, sitar, tanpura, bass ---- */
+/* Baked to buffers in JS because a DelayNode feedback loop cannot go below
+   one render quantum (~375 Hz at 48 kHz), which rules out most of the range.
+   Two anchors per voice, playbackRate covers the semitones between — and the
+   shorter decay an upshifted buffer gets is what a real short string does. */
+const KS_CACHE = new Map();
+function ksBake(f, dur, damp, bright, excite) {
+  const sr = AC.sampleRate;
+  const N = Math.max(2, Math.round(sr / f));
+  const out = new Float32Array(Math.round(sr * dur));
+  const line = new Float32Array(N);
+  let s = 0x9e3779b9 ^ Math.round(f * 1000);
+  const r = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296 * 2 - 1; };
+  let lp = 0;
+  for (let i = 0; i < N; i++) {
+    const v = r();
+    lp += (v - lp) * excite;          // softer pick = more lowpassed excitation
+    line[i] = lp;
+  }
+  let idx = 0;
+  for (let i = 0; i < out.length; i++) {
+    const cur = line[idx];
+    out[i] = cur;
+    const nxt = line[(idx + 1) % N];
+    line[idx] = (bright * cur + (1 - bright) * nxt) * damp;
+    idx = (idx + 1) % N;
+  }
+  /* trim the DC the excitation leaves behind, and fade the tail to silence */
+  let mean = 0;
+  for (let i = 0; i < out.length; i++) mean += out[i];
+  mean /= out.length;
+  const fade = Math.round(sr * 0.02);
+  for (let i = 0; i < out.length; i++) {
+    out[i] -= mean;
+    if (i > out.length - fade) out[i] *= (out.length - i) / fade;
+  }
+  const buf = AC.createBuffer(1, out.length, sr);
+  buf.copyToChannel(out, 0);
+  return buf;
+}
+function ksBuf(name, o, anchor) {
+  const key = name + '|' + anchor;
+  let b = KS_CACHE.get(key);
+  if (!b) {
+    b = ksBake(anchor, o.len || 1.8, o.damp == null ? 0.995 : o.damp,
+               o.bright == null ? 0.5 : o.bright, o.excite == null ? 0.7 : o.excite);
+    KS_CACHE.set(key, b);
+  }
+  return b;
+}
+function ks(name, o) {
+  const anchors = o.anchors || [110, 330];
+  return {
+    s: !!o.sus, snd: o.snd == null ? 0.24 : o.snd, ks: { name, o, anchors },
+    f(p) {
+      let best = anchors[0];
+      for (const a of anchors) if (Math.abs(Math.log(a / p.f)) < Math.abs(Math.log(best / p.f))) best = a;
+      const src = AC.createBufferSource();
+      src.buffer = ksBuf(name, o, best);
+      src.playbackRate.value = p.f / best;
+      const amp = (o.amp == null ? 0.5 : o.amp) * (p.c === 'o' ? 0.55 : p.c === 'X' ? 1.2 : 1);
+      const lp = AC.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = Math.min(p.f * (o.cut || 14) + 700, 17000);
+      const hold = o.sus ? Math.max(p.d, 0.2) : (o.hold || 9);
+      const g = AC.createGain();
+      g.gain.setValueAtTime(amp * p.v, p.t);
+      /* a damped string: the mixer cuts the note when the pattern says rest */
+      const stop = p.t + Math.min(hold, src.buffer.duration / src.playbackRate.value);
+      g.gain.setValueAtTime(amp * p.v, Math.max(p.t, stop - 0.06));
+      g.gain.exponentialRampToValueAtTime(amp * p.v * 0.0008, stop + 0.06);
+      src.connect(lp); lp.connect(g); g.connect(p.out);
+      src.start(p.t); src.stop(stop + 0.1);
+      if (o.buzz) {
+        /* jawari-style bridge buzz — a second, brighter tap a hair later */
+        const s2 = AC.createBufferSource();
+        s2.buffer = src.buffer;
+        s2.playbackRate.value = p.f / best * 1.004;
+        const hp = AC.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = p.f * 5;
+        const g2 = AC.createGain(); g2.gain.value = amp * p.v * o.buzz;
+        g2.gain.setValueAtTime(amp * p.v * o.buzz, Math.max(p.t, stop - 0.06));
+        g2.gain.exponentialRampToValueAtTime(amp * p.v * 0.0005, stop + 0.06);
+        s2.connect(hp); hp.connect(g2); g2.connect(p.out);
+        s2.start(p.t + 0.004); s2.stop(stop + 0.1);
+      }
+      if (o.pick) {
+        const n = noiseSrc(p.t, 0.02);
+        const bp = AC.createBiquadFilter(); bp.type = 'bandpass';
+        bp.frequency.value = 2600; bp.Q.value = 0.9;
+        const ng = pEnv(p.t, o.pick * amp * p.v, 0.001, 0.016);
+        n.connect(bp); bp.connect(ng); ng.connect(p.out);
+      }
+    },
+  };
+}
+
+/* ======================================================== the voice table */
+/* Built lazily: the factories above need AC, so VOICES is a table of
+   thunks resolved on first use after initAudio(). */
+const VOICE_DEFS = {
+  /* ---- membranes ---------------------------------------------------- */
+  kick:      () => mem({ up: 3.4, down: 0.94, bend: 0.045, dec: 0.26, amp: 1.0, slap: 0.18, slapHz: 2600, slapDec: 0.012, snd: 0.04 }),
+  kickSoft:  () => mem({ up: 2.4, down: 0.96, bend: 0.06,  dec: 0.3,  amp: 0.72, slap: 0.05, slapHz: 1800, snd: 0.08 }),
+  surdo:     () => mem({ up: 1.9, down: 0.95, bend: 0.075, dec: 0.46, amp: 0.82, slap: 0.06, slapHz: 1400, mode2: 1.58, snd: 0.12 }),
+  tom:       () => mem({ up: 1.55, down: 1, bend: 0.09, dec: 0.4, amp: 0.7, slap: 0.1, slapHz: 2100, mode2: 1.6, snd: 0.18 }),
+  conga:     () => mem({ up: 1.3, down: 1, bend: 0.035, dec: 0.27, amp: 0.66, slap: 0.3, slapHz: 3200, slapDec: 0.022, mode2: 1.72, snd: 0.14 }),
+  djembe:    () => mem({ up: 1.5, down: 1, bend: 0.03, dec: 0.3, amp: 0.74, slap: 0.42, slapHz: 2900, slapDec: 0.03, slapQ: 0.8, mode2: 1.66, snd: 0.15 }),
+  dundun:    () => mem({ up: 1.7, down: 0.92, bend: 0.08, dec: 0.5, amp: 0.9, slap: 0.08, slapHz: 1500, mode2: 1.5, snd: 0.1 }),
+  dholak:    () => mem({ up: 1.42, down: 1, bend: 0.045, dec: 0.33, amp: 0.68, slap: 0.22, slapHz: 2500, mode2: 1.63, snd: 0.16 }),
+  /* tabla bayan: the long downward glide is the whole character of "ge" */
+  tablaGe:   () => mem({ up: 1.45, down: 0.55, bend: 0.2, dec: 0.62, amp: 0.8, slap: 0.07, slapHz: 1700, snd: 0.14 }),
+  /* tabla dayan: a tuned RING, so most of the sound is the tonal mode */
+  tablaNa:   () => mem({ up: 1.06, down: 1, bend: 0.012, dec: 0.5, amp: 0.62, slap: 0.3, slapHz: 3400, slapDec: 0.016, mode2: 2.0, snd: 0.2 }),
+  kendang:   () => mem({ up: 1.6, down: 0.97, bend: 0.04, dec: 0.28, amp: 0.7, slap: 0.26, slapHz: 2700, mode2: 1.68, snd: 0.16 }),
+
+  /* ---- noise ------------------------------------------------------- */
+  snare:     () => noi({ type: 'bandpass', hz: 1750, q: 0.9, dec: 0.15, amp: 0.5, body: 195, bodyAmp: 0.42, snd: 0.18 }),
+  snareGhost:() => noi({ type: 'bandpass', hz: 1900, q: 1.1, dec: 0.08, amp: 0.3, body: 210, bodyAmp: 0.22, snd: 0.16 }),
+  rim:       () => noi({ type: 'bandpass', hz: 2500, q: 4.2, dec: 0.05, amp: 0.42, body: 360, bodyAmp: 0.5, snd: 0.2 }),
+  clap:      () => noi({ type: 'bandpass', hz: 1250, q: 1.4, dec: 0.12, amp: 0.4, bursts: 4, gap: 0.0085, snd: 0.22 }),
+  hat:       () => noi({ type: 'highpass', hz: 7400, dec: 0.038, amp: 0.3, openMul: 5.5, snd: 0.1 }),
+  shaker:    () => noi({ type: 'bandpass', hz: 5300, q: 1.1, atk: 0.013, dec: 0.085, amp: 0.3, openMul: 2, snd: 0.12 }),
+  brush:     () => noi({ type: 'bandpass', hz: 3100, q: 0.7, atk: 0.042, dec: 0.2, amp: 0.26, openMul: 1.8, snd: 0.2 }),
+  ride:      () => noi({ type: 'highpass', hz: 5200, dec: 0.5, amp: 0.15, openMul: 2.4, snd: 0.24 }),
+  crash:     () => noi({ type: 'highpass', hz: 3600, dec: 1.5, amp: 0.3, sweep: 8200, snd: 0.35 }),
+  kecer:     () => noi({ type: 'bandpass', hz: 7000, q: 5, dec: 0.07, amp: 0.26, openMul: 2.6, snd: 0.18 }),
+  clave:     () => noi({ type: 'bandpass', hz: 2450, q: 9, dec: 0.045, amp: 0.36, body: 2300, bodyAmp: 0.4, snd: 0.2 }),
+  gankogui:  () => noi({ type: 'bandpass', hz: 3400, q: 7, dec: 0.16, amp: 0.3, body: 1160, bodyAmp: 0.55, openMul: 1.8, snd: 0.24 }),
+
+  /* ---- FM bars, bells, gongs -------------------------------------- */
+  /* the detuned twin (beat) is the gamelan OMBAK — paired bars are tuned a
+     couple of Hz apart on purpose and the shimmer is the beating between */
+  saron:     () => fm({ ratio: 2.76, index: 2.3, iDec: 0.085, dec: 0.85, amp: 0.4, beat: 1.4, parts: [[1, 1], [2.71, 0.16]], partDec: 0.45, air: 0.1, snd: 0.34 }),
+  peking:    () => fm({ ratio: 2.76, index: 2.0, iDec: 0.06, dec: 0.5, amp: 0.3, beat: 2.1, parts: [[1, 1], [2.68, 0.2]], partDec: 0.4, air: 0.14, snd: 0.32 }),
+  slenthem:  () => fm({ ratio: 2.4, index: 1.5, iDec: 0.11, dec: 1.9, amp: 0.4, beat: 0.8, parts: [[1, 1], [2.5, 0.1]], partDec: 0.5, snd: 0.3 }),
+  gender:    () => fm({ ratio: 2.62, index: 1.1, iDec: 0.14, dec: 2.1, atk: 0.006, amp: 0.3, beat: 1.0, parts: [[1, 1], [2.66, 0.12]], partDec: 0.5, snd: 0.38 }),
+  bonang:    () => fm({ ratio: 1.86, index: 1.9, iDec: 0.07, dec: 0.62, amp: 0.34, beat: 1.7, parts: [[1, 1], [2.3, 0.22]], partDec: 0.4, air: 0.12, snd: 0.32 }),
+  gongAgeng: () => fm({ ratio: 1.42, index: 2.6, iDec: 0.6, dec: 6.5, atk: 0.02, amp: 0.66, beat: 0.5, parts: [[1, 1], [1.43, 0.5], [2.07, 0.24], [2.81, 0.1]], partDec: 0.72, sus: true, snd: 0.4 }),
+  gongMid:   () => fm({ ratio: 1.48, index: 2.1, iDec: 0.3, dec: 2.6, atk: 0.01, amp: 0.48, beat: 0.9, parts: [[1, 1], [1.52, 0.38], [2.38, 0.14]], partDec: 0.7, snd: 0.4 }),
+  gambang:   () => fm({ ratio: 3.15, index: 1.05, iDec: 0.022, dec: 0.26, amp: 0.34, parts: [[1, 1], [3.1, 0.13]], partDec: 0.35, thump: 1, snd: 0.22 }),
+  balafon:   () => fm({ ratio: 2.05, index: 1.35, iDec: 0.03, dec: 0.42, amp: 0.38, parts: [[1, 1], [2.9, 0.12]], partDec: 0.4, thump: 1, snd: 0.26 }),
+  kalimba:   () => fm({ ratio: 2.9, index: 0.85, iDec: 0.03, dec: 0.55, amp: 0.3, parts: [[1, 1], [3.4, 0.1]], partDec: 0.4, snd: 0.3 }),
+  rhodes:    () => fm({ ratio: 1, index: 1.9, iDec: 0.07, dec: 1.25, amp: 0.34, parts: [[1, 1], [2, 0.14]], partDec: 0.55, snd: 0.22 }),
+  vibes:     () => fm({ ratio: 4, index: 0.6, iDec: 0.05, dec: 1.7, amp: 0.3, parts: [[1, 1], [4.02, 0.1]], partDec: 0.5, trem: 4.2, snd: 0.32 }),
+  fmbell:    () => fm({ ratio: 3.5, index: 0.9, iDec: 0.06, dec: 1.15, amp: 0.26, parts: [[1, 1], [2.76, 0.12]], partDec: 0.45, snd: 0.36 }),
+  celeste:   () => fm({ ratio: 4.2, index: 0.55, iDec: 0.04, dec: 0.85, amp: 0.24, parts: [[1, 1]], snd: 0.34 }),
+  manjira:   () => fm({ ratio: 5.4, index: 0.8, iDec: 0.05, dec: 0.55, amp: 0.2, parts: [[1, 1], [2.43, 0.3], [3.77, 0.16]], partDec: 0.8, snd: 0.3 }),
+  jazzRide:  () => fm({ ratio: 4.6, index: 1.3, iDec: 0.12, dec: 1.0, amp: 0.13, parts: [[1, 1], [1.73, 0.6], [2.41, 0.4], [3.19, 0.25]], partDec: 0.9, air: 0.5, snd: 0.3 }),
+
+  /* ---- oscillator stacks ------------------------------------------- */
+  subBass:   () => sub({ oscs: [['sine', 0, 1], ['triangle', 0, 0.3]], cut: 6, dec: 0.5, amp: 0.55, sus: 0.8, rel: 0.1, atk: 0.012, snd: 0.02 }),
+  sawBass:   () => sub({ oscs: [['sawtooth', 0, 0.8], ['triangle', -1200, 0.5]], cut: 4.5, cutAdd: 120, q: 3.2, fEnv: 2.2, fDec: 0.11, dec: 0.22, amp: 0.4, snd: 0.05 }),
+  pulseLead: () => sub({ oscs: [['square', 0, 0.6], ['square', 7, 0.4]], cut: 7, q: 2.4, fEnv: 1.4, fDec: 0.09, dec: 0.2, amp: 0.2, snd: 0.24 }),
+  squareArp: () => sub({ oscs: [['square', 0, 0.5]], cut: 9, q: 1.6, fEnv: 1.8, fDec: 0.05, dec: 0.14, amp: 0.16, snd: 0.3 }),
+  supersaw:  () => sub({ oscs: [['sawtooth', -14, 0.5], ['sawtooth', 0, 0.55], ['sawtooth', 15, 0.5]], cut: 6, cutAdd: 400, q: 2.8, fEnv: 1.6, fDec: 0.25, dec: 0.5, amp: 0.2, sus: 0.7, rel: 0.14, atk: 0.014, snd: 0.3 }),
+  sawPad:    () => sub({ oscs: [['sawtooth', -9, 0.4], ['sawtooth', 5, 0.4], ['triangle', 1202, 0.25]], cut: 4.2, cutAdd: 260, q: 1.1, dec: 0.9, amp: 0.13, sus: 0.85, atk: 0.42, rel: 0.4, snd: 0.42 }),
+  strings:   () => sub({ oscs: [['sawtooth', -11, 0.34], ['sawtooth', 4, 0.34], ['sawtooth', 13, 0.3]], cut: 4.8, cutAdd: 300, q: 0.9, dec: 0.7, amp: 0.11, sus: 0.9, atk: 0.3, rel: 0.45, vib: [4.6, 5], snd: 0.44 }),
+  voxPad:    () => sub({ oscs: [['sawtooth', -6, 0.3], ['triangle', 6, 0.4]], fType: 'bandpass', cut: 3.4, cutAdd: 500, q: 2.1, dec: 0.8, amp: 0.15, sus: 0.85, atk: 0.36, rel: 0.4, breath: 0.16, vib: [5.2, 7], snd: 0.5 }),
+  rebab:     () => sub({ oscs: [['sawtooth', -4, 0.45], ['sawtooth', 5, 0.4]], cut: 3.6, cutAdd: 340, q: 2.6, dec: 0.5, amp: 0.17, sus: 0.82, atk: 0.09, rel: 0.2, vib: [5.4, 16], breath: 0.1, snd: 0.4 }),
+  sarangi:   () => sub({ oscs: [['sawtooth', -6, 0.4], ['sawtooth', 7, 0.4], ['triangle', 0, 0.2]], cut: 3.9, cutAdd: 300, q: 2.2, dec: 0.5, amp: 0.16, sus: 0.85, atk: 0.1, rel: 0.24, vib: [5.8, 20], breath: 0.08, snd: 0.44 }),
+  bansuri:   () => sub({ oscs: [['sine', 0, 0.85], ['triangle', 1202, 0.14]], cut: 8, q: 0.8, dec: 0.4, amp: 0.24, sus: 0.88, atk: 0.07, rel: 0.2, vib: [5.0, 14], breath: 0.3, snd: 0.4 }),
+  suling:    () => sub({ oscs: [['sine', 0, 0.8], ['triangle', 0, 0.2]], cut: 7, q: 0.8, dec: 0.35, amp: 0.2, sus: 0.86, atk: 0.06, rel: 0.18, vib: [4.4, 18], breath: 0.42, snd: 0.44 }),
+  sax:       () => sub({ oscs: [['sawtooth', 0, 0.5], ['square', 4, 0.22]], cut: 3.2, cutAdd: 420, q: 3.4, fEnv: 0.8, fDec: 0.1, dec: 0.4, amp: 0.17, sus: 0.8, atk: 0.05, rel: 0.16, vib: [5.1, 11], breath: 0.22, snd: 0.34 }),
+  trumpet:   () => sub({ oscs: [['sawtooth', 0, 0.45], ['square', -3, 0.18]], cut: 3.6, cutAdd: 520, q: 3.8, fEnv: 1.1, fDec: 0.07, dec: 0.35, amp: 0.15, sus: 0.78, atk: 0.04, rel: 0.13, vib: [5.6, 9], breath: 0.15, snd: 0.36 }),
+  organ:     () => sub({ oscs: [['sine', 0, 0.5], ['sine', 1200, 0.3], ['sine', 1902, 0.2]], cut: 8, dec: 0.3, amp: 0.15, sus: 0.9, atk: 0.02, rel: 0.1, snd: 0.3 }),
+
+  /* ---- Karplus-Strong strings -------------------------------------- */
+  kora:      () => ks('kora',    { anchors: [98, 294], len: 1.7, damp: 0.9955, bright: 0.52, excite: 0.62, amp: 0.46, cut: 13, pick: 0.1, snd: 0.26 }),
+  koraHi:    () => ks('koraHi',  { anchors: [196, 440], len: 1.2, damp: 0.9945, bright: 0.55, excite: 0.7, amp: 0.4, cut: 15, pick: 0.13, snd: 0.3 }),
+  ngoni:     () => ks('ngoni',   { anchors: [131, 330], len: 1.1, damp: 0.991, bright: 0.58, excite: 0.8, amp: 0.4, cut: 16, pick: 0.18, snd: 0.24 }),
+  nylon:     () => ks('nylon',   { anchors: [110, 294], len: 1.5, damp: 0.9948, bright: 0.48, excite: 0.5, amp: 0.42, cut: 11, pick: 0.09, snd: 0.24 }),
+  steelStr:  () => ks('steelStr',{ anchors: [123, 330], len: 1.6, damp: 0.9958, bright: 0.56, excite: 0.82, amp: 0.4, cut: 17, pick: 0.2, snd: 0.26 }),
+  sitar:     () => ks('sitar',   { anchors: [131, 349], len: 2.0, damp: 0.9965, bright: 0.6, excite: 0.85, amp: 0.4, cut: 18, pick: 0.16, buzz: 0.3, snd: 0.32 }),
+  tanpura:   () => ks('tanpura', { anchors: [73, 147], len: 3.6, damp: 0.9982, bright: 0.45, excite: 0.5, amp: 0.34, cut: 9, buzz: 0.22, snd: 0.4 }),
+  santoor:   () => ks('santoor', { anchors: [196, 494], len: 1.0, damp: 0.9935, bright: 0.62, excite: 0.9, amp: 0.32, cut: 20, pick: 0.14, snd: 0.34 }),
+  harpGliss: () => ks('harpGliss',{ anchors: [175, 440], len: 1.3, damp: 0.9952, bright: 0.5, excite: 0.55, amp: 0.3, cut: 14, snd: 0.36 }),
+  upright:   () => ks('upright', { anchors: [55, 131], len: 1.5, damp: 0.9935, bright: 0.38, excite: 0.35, amp: 0.62, cut: 7, pick: 0.07, snd: 0.06 }),
+  bassPick:  () => ks('bassPick',{ anchors: [55, 131], len: 1.3, damp: 0.992, bright: 0.45, excite: 0.6, amp: 0.55, cut: 9, pick: 0.14, snd: 0.05 }),
+};
+const VOICES = {};
+function voice(name) {
+  let v = VOICES[name];
+  if (!v) {
+    const def = VOICE_DEFS[name];
+    if (!def) throw new Error('unknown voice: ' + name);
+    v = VOICES[name] = def();
+  }
+  return v;
+}
+
+/* ============================================================== the songs */
+/* NOTATION  (see .claude/music-mixer.md for the full contract)
+   Pattern strings are step grids whose length must be a multiple of the
+   song's `steps` (steps per bar), so a 2- or 4-bar pattern is just a longer
+   string. '.' rests, '-' ties the previous note one more step.
+     k:'m' (melodic)    1-9 = scale degree 0-8, a-f = degree 9-14
+     k:'p' (percussive) X accent, x normal, o soft/low, r rim/alt
+   A track's `oct` shifts it in octaves, `ch` spawns a chord in scale
+   degrees, `harm:1` transposes it by the current bar's chord root, `tune`
+   scales a percussion voice's natural pitch, `push` nudges it in ms.
+   An arrangement row is { n:name, b:bars, k:[chord roots], p:'<15 chars>' }
+   where p[i] picks the pattern for pad i, '.' meaning that track rests. */
+
+const SONGS = [
+/* ------------------------------------------------------------------------ 1
+   PULSE — synthwave. F# minor, four-on-the-floor, i-VI-III-VII.           */
+{
+  id: 'pulse', name: 'PULSE', style: 'Synthwave',
+  sig: '4/4', bpm: 104, pulses: 4, steps: 16, rootHz: 46.249, swing: 0, mix: 0.72,
+  cents: [0, 200, 300, 500, 700, 800, 1000],
+  tracks: [
+    /* --- group 0: the low end ------------------------------------------ */
+    { lab: 'SUB',    v: 'subBass',   k: 'm', oct: 1, harm: 1, g: 0.95, pan: 0, pats: {
+      a: '1---------------', b: '1-------1-------', c: '1-----------5---' } },
+    { lab: 'BASS',   v: 'sawBass',   k: 'm', oct: 2, harm: 1, g: 1, pan: 0, push: 4, pats: {
+      a: '1...1...1...1...', b: '1.1.1.1.1.1.1.1.', c: '1.1.1.5.1.1.3.1.', d: '11.1.1.111.1.1.1' } },
+    { lab: 'BASSARP',v: 'pulseLead', k: 'm', oct: 2, harm: 1, g: 0.8, pan: -0.18, pats: {
+      a: '..5...5...5...5.', b: '.5.8.5.8.5.8.5.8', c: '..5.......8...5.' } },
+    { lab: 'STABS',  v: 'supersaw',  k: 'm', oct: 3, harm: 1, ch: [0, 2, 4], g: 0.82, pan: 0.2, pats: {
+      a: '....1.......1...', b: '..1...1...1...1.', c: '1.......1.......', d: '..1.1.....1.1...' } },
+    { lab: 'ARP',    v: 'squareArp', k: 'm', oct: 4, harm: 1, g: 0.66, pan: -0.3, pats: {
+      a: '1358531358531358', b: '1358135813581358', c: '1.5.8.5.1.5.8.5.', d: '1858185818581858' } },
+    /* --- group 1: harmony and melody ----------------------------------- */
+    { lab: 'PAD',    v: 'sawPad',    k: 'm', oct: 3, harm: 1, ch: [0, 2, 4, 6], g: 1, pan: 0, pats: {
+      a: '1---------------', b: '1-------5-------' } },
+    { lab: 'STRINGS',v: 'strings',   k: 'm', oct: 4, harm: 1, ch: [0, 2, 4], g: 0.9, pan: 0.26, pats: {
+      a: '1---------------', b: '1-------3-------', c: '3-------1-------' } },
+    { lab: 'ORGAN',  v: 'organ',     k: 'm', oct: 4, ch: [0, 2], g: 0.78, pan: -0.24, pats: {
+      a: '5-------3-------', b: '3---5---6---5---', c: '1-------2-------', d: '6---5---3---2---' } },
+    { lab: 'LEAD',   v: 'supersaw',  k: 'm', oct: 4, g: 1, pan: 0.1, pats: {
+      a: '5-------6---5---3-------2-------',
+      b: '8-------7---6---5-------3-------',
+      c: '3.5.6.8.7---6---5---3---2-------',
+      d: '5---8---b---8---7-------6-------' } },
+    { lab: 'SPARKLE',v: 'fmbell',    k: 'm', oct: 5, g: 0.72, pan: 0.34, pats: {
+      a: '8.......5.......', b: '....8.......b...', c: '8...b...8...5...', d: 'b.......8...5...' } },
+    /* --- group 2: percussion ------------------------------------------- */
+    { lab: 'KICK',   v: 'kick',      k: 'p', tune: 1, g: 1, pan: 0, pats: {
+      a: 'X...x...X...x...', b: 'X.......X...x...', c: 'X...x...X.x.x...', d: 'X..x..X...X..x..' } },
+    { lab: 'SNARE',  v: 'snare',     k: 'p', tune: 1, g: 0.9, pan: -0.06, pats: {
+      a: '....X.......X...', b: '....X...o...X..o', c: '....X.o.....X.oX', d: '....X..o....X.oo' } },
+    { lab: 'HATS',   v: 'hat',       k: 'p', tune: 1, g: 0.8, pan: 0.16, push: -5, pats: {
+      a: '..x...x...x...x.', b: 'x.x.x.x.x.x.x.x.', c: 'xxxxxxxxxxxxxxxx', d: 'x.x.X.x.x.x.X.x.' } },
+    { lab: 'TOMS',   v: 'tom',       k: 'p', tune: 1, g: 0.8, pan: -0.3, pats: {
+      a: '........x.x.....', b: '..o...o...o...o.', c: '............xrxr', d: 'o.....x.o.....xr' } },
+    { lab: 'RIDE',   v: 'ride',      k: 'p', tune: 1, g: 0.72, pan: 0.32, pats: {
+      a: 'x.x.x.x.x.x.x.x.', b: 'X.x.x.x.x.x.x.x.', c: 'x.xxx.xxx.xxx.xx', d: 'X...............' } },
+  ],
+  /*        SUB BASS BARP STAB ARP  PAD STR ORG LEAD SPK  KICK SNR HAT TOM RIDE */
+  arr: [
+    { n: 'INTRO',   b: 8,  k: [0, 0, 5, 5, 2, 2, 6, 6], p: 'a...aa..ca.....' },
+    { n: 'BUILD',   b: 8,  k: [0, 0, 5, 5, 2, 2, 6, 6], p: 'aca.aaac.aa.a..' },
+    { n: 'VERSE',   b: 16, k: [0, 5, 2, 6],              p: 'abaaaabaaaaabaa' },
+    { n: 'CHORUS',  b: 16, k: [0, 5, 2, 6],              p: 'bcbbbabbbcabbab' },
+    { n: 'BRIDGE',  b: 8,  k: [0, 0, 6, 6],              p: 'a.c.caab..b.c.d' },
+    { n: 'VERSE 2', b: 16, k: [0, 5, 2, 6],              p: 'bbbdbabcdbcbcaa' },
+    { n: 'LIFT',    b: 16, k: [0, 5, 2, 6],              p: 'bdbbbabdbdcbcdb' },
+    { n: 'BREAK',   b: 8,  k: [0, 0, 5, 5],              p: 'a..c.aadc....cd' },
+    { n: 'DROP',    b: 16, k: [0, 5, 2, 6],              p: 'bdcdbabbbccccdc' },
+    { n: 'OUTRO',   b: 18, k: [0, 0, 5, 5, 2, 2, 6, 6], p: 'aca.aabaaba.aba' },
+  ],
+},
+
+/* ------------------------------------------------------------------------ 2
+   KORA — West African polyrhythm. 12/8 with the seven-stroke bell as the
+   timeline; static I-V harmony under a kumbengo ostinato.                  */
+{
+  id: 'kora', name: 'KORA', style: 'West African Polyrhythm',
+  sig: '12/8', bpm: 77, pulses: 4, steps: 24, rootHz: 43.654, swing: 0.05, mix: 0.88,
+  cents: [0, 200, 400, 500, 700, 900, 1100],
+  tracks: [
+    { lab: 'BASS',    v: 'upright',  k: 'm', oct: 1, harm: 1, g: 1, pan: 0, pats: {
+      a: '1.....5.....1.....5.....', b: '1.....1...5.1.....5...3.', c: '1...........1...........' } },
+    { lab: 'KORA LO', v: 'kora',     k: 'm', oct: 2, harm: 1, g: 0.95, pan: -0.2, pats: {
+      a: '1...5...8...5...1...5...', b: '1..5..8..5..1..5..8..3..', c: '1.......8.......5.......' } },
+    { lab: 'KORA MID',v: 'kora',     k: 'm', oct: 3, g: 0.9, pan: 0.22, push: 6, pats: {
+      a: '..8...6...5...3...5...6.', b: '..8.6...5.3...5.6...8.6.', c: '......8.......5.........' } },
+    { lab: 'BALAFON', v: 'balafon',  k: 'm', oct: 3, harm: 1, g: 0.85, pan: -0.3, pats: {
+      a: '5.3.1...5.3.1...5.3.1...', b: '1.3.5.3.1.3.5.3.1.3.5.3.', c: '5.......3.......1.......' } },
+    { lab: 'NGONI',   v: 'ngoni',    k: 'm', oct: 3, g: 0.8, pan: 0.3, pats: {
+      a: '....6.....3.....6.....3.', b: '..6..3..6..3..6..3..6..1', c: '....6...............3...' } },
+    { lab: 'VOICES',  v: 'voxPad',   k: 'm', oct: 3, harm: 1, ch: [0, 2, 4], g: 0.9, pan: 0, pats: {
+      a: '1-----------------------', b: '1-----------5-----------' } },
+    { lab: 'BALA HI', v: 'balafon',  k: 'm', oct: 4, g: 0.7, pan: 0.34, pats: {
+      a: '8.6.5.3.8.6.5.3.8.6.5.3.', b: '8...6...5...3...1...3...', c: '8.......5.......3.......' } },
+    { lab: 'FLUTE',   v: 'bansuri',  k: 'm', oct: 4, g: 0.85, pan: -0.12, pats: {
+      a: '5-----6-----5-----3-----', b: '8-----------6-----5-----',
+      c: '3...5.6-----8-----6-----5-----------3-----------' } },
+    { lab: 'KORA LEAD',v: 'koraHi',  k: 'm', oct: 4, g: 0.95, pan: 0.14, pats: {
+      a: '8.b.8.6.5.....3.5.6.8...', b: '..8.6.5.3.1...3.5.....6.',
+      c: 'b.8.b.d.b.8.6.5.3.....5.8.b.8.6.5.3.1.......3.5.' } },
+    { lab: 'KALIMBA', v: 'kalimba',  k: 'm', oct: 4, g: 0.72, pan: -0.34, pats: {
+      a: '......8.....6.....5.....', b: '..8.....6.....5.....3...', c: '............8...........' } },
+    { lab: 'DUNDUN',  v: 'dundun',   k: 'p', tune: 1, g: 1, pan: 0, pats: {
+      a: 'X.....x.....X.....x.....', b: 'X.....x...x.X.....x...x.', c: 'X...........X...........',
+      d: 'X...x.x...x.X...x.x.x.x.' } },
+    { lab: 'DJEMBE',  v: 'djembe',   k: 'p', tune: 1, g: 0.95, pan: -0.24, push: -4, pats: {
+      a: '..x...X...x...x...X...x.', b: 'o.x.x.X...x.o.x.x.X...x.',
+      c: '..x.......X.......x.....', d: 'oxxXoxxXoxxXoxxXoxxXoxxX' } },
+    { lab: 'SHAKER',  v: 'shaker',   k: 'p', tune: 1, g: 0.8, pan: 0.3, pats: {
+      a: 'x.x.x.x.x.x.x.x.x.x.x.x.', b: 'xxxxxxxxxxxxxxxxxxxxxxxx', c: 'x.....x.....x.....x.....',
+      d: 'X.x.x.X.x.x.X.x.x.X.x.x.' } },
+    { lab: 'KENKENI', v: 'conga',    k: 'p', tune: 1, g: 0.85, pan: -0.32, pats: {
+      a: '....x.....x.....x.....x.', b: '..r.x...r.x...r.x...r.x.', c: '....x...........x.......',
+      d: 'r.x.r.x.r.x.r.x.r.x.r.x.' } },
+    { lab: 'GANKOGUI',v: 'gankogui', k: 'p', tune: 1, g: 0.9, pan: 0.36, pats: {
+      a: 'X...x.x...x...x.x...x...', b: 'X.....x...x...X.....x...', c: 'X...........X...........',
+      d: 'X.r.x.x.r.x.r.x.x.r.x.r.' } },
+  ],
+  /*        BAS KLO KMD BAL NGO  VOX BHI FLU KLD KAL  DUN DJE SHK KEN BEL */
+  arr: [
+    { n: 'BELL ALONE',  b: 8,  k: [0],       p: 'c.....c......a.' },
+    { n: 'KUMBENGO',    b: 16, k: [0, 0, 4, 4], p: 'aa.c..c..caacca' },
+    { n: 'FULL CYCLE',  b: 16, k: [0, 0, 4, 4], p: 'aaaaaabaabaaaaa' },
+    { n: 'BREAK',       b: 8,  k: [0],       p: 'c.c..a.c.ccc.cc' },
+    { n: 'BIRIMINTINGO',b: 16, k: [0, 0, 4, 4], p: 'baabaabbcbbbbba' },
+    { n: 'DENSE',       b: 16, k: [0, 0, 4, 4], p: 'bbbbbabaabdddda' },
+    { n: 'CALL',        b: 8,  k: [0, 0, 4, 4], p: 'ab.baab.ba.babb' },
+    { n: 'CLOSE',       b: 8,  k: [0],       p: 'aa.c.abcaaaaaca' },
+  ],
+},
+
+/* ------------------------------------------------------------------------ 3
+   GAMELAN — Indonesian metallophone. Slendro, five near-equal steps and
+   deliberately NOT 12-tone equal temperament; paired bars are detuned a
+   couple of Hz so the whole ensemble shimmers (ombak). Colotomic: the four
+   -bar gongan is the real unit, which is why the gong patterns are 64 long. */
+{
+  id: 'gamelan', name: 'GAMELAN', style: 'Indonesian Metallophone',
+  sig: '4/4', bpm: 72, pulses: 4, steps: 16, rootHz: 65.406, swing: 0, mix: 1.85,
+  cents: [0, 231, 474, 717, 955],
+  tracks: [
+    { lab: 'SLENTHEM', v: 'slenthem', k: 'm', oct: 1, g: 1, pan: 0, pats: {
+      a: '3...............2...............3...............1...............',
+      b: '3.......2.......3.......5.......3.......2.......2.......1.......',
+      c: '3...............................1...............................' } },
+    { lab: 'DEMUNG',   v: 'saron',    k: 'm', oct: 2, g: 0.95, pan: -0.2, pats: {
+      a: '3...2...3...5...3...2...3...1...2...3...5...3...2...1...2...1...',
+      b: '3.......3.......3.......1.......2.......5.......2.......1.......',
+      c: '3.2.3.5.3.2.3.1.2.3.5.3.2.1.2.1.3.2.3.5.3.2.3.1.2.1.5.3.2.1.2.1.' } },
+    { lab: 'SARON',    v: 'saron',    k: 'm', oct: 3, g: 0.9, pan: 0.2, push: 3, pats: {
+      a: '3...2...3...5...3...2...3...1...2...3...5...3...2...1...2...1...',
+      b: '3.2.3.5.3.2.3.1.2.3.5.3.2.1.2.1.3.2.3.5.3.2.3.1.2.1.5.3.2.1.2.1.',
+      c: '5...3...5...8...5...3...5...6...7...8...a...8...7...6...7...6...' } },
+    { lab: 'PEKING',   v: 'peking',   k: 'm', oct: 4, g: 0.72, pan: -0.32, pats: {
+      a: '33..22..33..55..33..22..33..11..22..33..55..33..22..11..22..11..',
+      b: '3333222233335555333322223333111122223333555533332222111122221111',
+      c: '3.......2.......3.......5.......3.......2.......2.......1.......' } },
+    { lab: 'BONANG',   v: 'bonang',   k: 'm', oct: 3, g: 0.85, pan: 0.3, pats: {
+      a: '..3...5...3...1...2...5...2...1...3...5...3...6...2...1...2...1.',
+      b: '.3.5.3.5.3.1.3.1.2.5.2.5.2.1.2.1.3.5.3.5.3.6.3.6.2.1.2.1.2.1.2..',
+      c: '..3.......5.......2.......1.......3.......5.......2.......1.....' } },
+    { lab: 'GENDER',   v: 'gender',   k: 'm', oct: 3, g: 0.9, pan: -0.1, pats: {
+      a: '3-------5-------3-------1-------2-------5-------2-------1-------',
+      b: '3---------------2---------------5---------------1---------------' } },
+    { lab: 'GAMBANG',  v: 'gambang',  k: 'm', oct: 4, g: 0.78, pan: 0.34, pats: {
+      a: '3535353535313131252525252121212135353535363636362121212121212121',
+      b: '3.5.3.5.3.1.3.1.2.5.2.5.2.1.2.1.3.5.3.5.3.6.3.6.2.1.2.1.2.1.2.1.',
+      c: '35313531253125312531253135363536' } },
+    { lab: 'SULING',   v: 'suling',   k: 'm', oct: 4, g: 0.85, pan: 0.12, pats: {
+      a: '5---------------6---------------8-------6-------5---------------',
+      b: '8-------6-------5---------------3-------5-------6---------------',
+      c: '5---------------3---------------' } },
+    { lab: 'REBAB',    v: 'rebab',    k: 'm', oct: 3, g: 0.9, pan: -0.14, pats: {
+      a: '3-----5---------3-------1-------2-----5---------2-------1-------',
+      b: '3---------------1---------------2---------------1---------------',
+      c: '5---3---5-------8-------6---5---3-------2-------1---------------' } },
+    { lab: 'PANERUS',  v: 'bonang',   k: 'm', oct: 4, g: 0.62, pan: -0.36, pats: {
+      a: '3.5.3.5.3.1.3.1.2.5.2.5.2.1.2.1.3.5.3.5.3.6.3.6.2.1.2.1.2.1.2.1.',
+      b: '3535353531313131252525252121212135353535363636362121212121212121',
+      c: '..3...5...3...1...2...5...2...1.' } },
+    /* the gong strokes are the cycle marker: one gongan is four bars */
+    { lab: 'GONG',     v: 'gongAgeng', k: 'm', oct: 0, g: 1, pan: 0, pats: {
+      a: '1...............................................................',
+      b: '1...............................1...............................' } },
+    { lab: 'KENDANG',  v: 'kendang',  k: 'p', tune: 1, g: 0.9, pan: -0.06, pats: {
+      a: 'o...x...o...x...', b: 'o..xx..o.x.xo..x', c: 'o.......o.......', d: 'oxxXoxxxoxxXox.x' } },
+    { lab: 'KECER',    v: 'kecer',    k: 'p', tune: 1, g: 0.66, pan: 0.32, pats: {
+      a: '..x...x...x...x.', b: 'x.x.x.x.x.x.x.x.', c: '......x.......x.', d: 'xxxxxxxxxxxxxxxx' } },
+    { lab: 'KEMPUL',   v: 'gongMid',  k: 'm', oct: 1, g: 0.9, pan: -0.28, pats: {
+      a: '................................2...............1...............',
+      b: '................2...............2...............1...............',
+      c: '................................................1...............',
+      d: '....2...............3...............2...............1...........' } },
+    { lab: 'KENONG',   v: 'gongMid',  k: 'm', oct: 2, g: 0.85, pan: 0.28, pats: {
+      a: '............3...............5...............2...............1...',
+      b: '............3...........5...........2...........1...........1...' } },
+  ],
+  /*        SLE DEM SAR PEK BON  GEN GAM SUL REB PAN  GNG KEN KEC KMP KNG */
+  arr: [
+    { n: 'BUKA',      b: 6,  k: [0], p: 'c..c..c.b..a.c.' },
+    { n: 'GONGAN I',  b: 12, k: [0], p: 'aa.a.ac.a.aaaaa' },
+    { n: 'IRAMA II',  b: 16, k: [0], p: 'aaaaaabaaaabaaa' },
+    { n: 'SEPI',      b: 8,  k: [0], p: 'cba..bc.b.b.ca.' },
+    { n: 'IMBAL',     b: 16, k: [0], p: 'abbbbabaabaabba' },
+    { n: 'RAMAI',     b: 12, k: [0], p: 'aabbbabbcbaabab' },
+    { n: 'SESEG',     b: 12, k: [0], p: 'bbbbbababbabdda' },
+    { n: 'SUWUK',     b: 8,  k: [0], p: 'ba.c.ac.c.acaab' },
+  ],
+},
+
+/* ------------------------------------------------------------------------ 4
+   RAGA — Indian classical over a drone. Bhairavi in just-intonation cents,
+   Jhaptaal (10 beats, 2+3+2+3) so the bar is 20 steps. No chord motion at
+   all: the tanpura never leaves Sa-Pa and the melody is the whole story.   */
+{
+  id: 'raga', name: 'RAGA', style: 'Indian Classical Drone',
+  sig: '10/8', bpm: 96, pulses: 5, steps: 20, rootHz: 73.416, swing: 0.03, mix: 1.65,
+  cents: [0, 112, 316, 498, 702, 814, 1018],
+  tracks: [
+    { lab: 'TANPURA',  v: 'tanpura', k: 'm', oct: 1, g: 1, pan: 0, pats: {
+      a: '5....1....1....1....', b: '5..1..1..1..5..1..1.', c: '5.........1.........' } },
+    { lab: 'SURBAHAR', v: 'sitar',   k: 'm', oct: 1, g: 0.95, pan: -0.16, pats: {
+      a: '1........5........1.', b: '1....3....5....3....', c: '1...................' } },
+    { lab: 'SITAR LO', v: 'sitar',   k: 'm', oct: 2, g: 0.9, pan: -0.24, pats: {
+      a: '1..3..5..3..1..3..5.', b: '1.2.3.4.5.4.3.2.1.2.', c: '1.........3.........' } },
+    { lab: 'SANTOOR',  v: 'santoor', k: 'm', oct: 3, g: 0.78, pan: 0.28, pats: {
+      a: '5.3.1...5.3.1...5.3.', b: '5353131553531315535.', c: '5.......3.......1...' } },
+    { lab: 'SWARMANDAL',v: 'harpGliss', k: 'm', oct: 3, g: 0.72, pan: 0.34, pats: {
+      a: '1234567.............', b: '.......1234567......', c: '123456789abc........' } },
+    { lab: 'SARANGI',  v: 'sarangi', k: 'm', oct: 2, g: 0.9, pan: -0.3, pats: {
+      a: '3-------5-------3---', b: '5-------------3-----', c: '1-------------------' } },
+    { lab: 'SITAR MID',v: 'sitar',   k: 'm', oct: 3, g: 0.88, pan: 0.18, push: 5, pats: {
+      a: '...5..3..1..3..5..3.', b: '5.6.5.3.2.3.5.6.5.3.', c: '.....5..........3...' } },
+    { lab: 'BANSURI',  v: 'bansuri', k: 'm', oct: 3, g: 0.95, pan: 0.1, pats: {
+      a: '5-----6-----5---3---', b: '8-------6-----5-----',
+      c: '3...5.6-----8-------6-----5-------3-----2-------------------' } },
+    { lab: 'SITAR LEAD',v: 'sitar',  k: 'm', oct: 3, g: 1, pan: -0.08, pats: {
+      a: '8.b.8.6.5...3.5.6.8.', b: '8765432123456787654.',
+      c: 'b.d.b.8.6.5.3...5.6.8.b.d.b.8.6.5.3.1.......3.5.6.8.b.8.6.5.' } },
+    { lab: 'SHEHNAI',  v: 'sax',     k: 'm', oct: 3, g: 0.82, pan: 0.24, pats: {
+      a: '6-------5-----3-----', b: '8-----------6-------', c: '5-------------------' } },
+    { lab: 'BAYAN',    v: 'tablaGe', k: 'p', tune: 1, g: 1, pan: -0.05, pats: {
+      a: 'X.......x...X.......', b: 'X...x...x...X...x...', c: 'X...................', d: 'X.x.x.x.x.x.X.x.x.x.' } },
+    { lab: 'DAYAN',    v: 'tablaNa', k: 'p', tune: 1, g: 0.95, pan: 0.08, pats: {
+      a: '....x.....x...x...r.', b: 'x...x.r.x.x...x.r.x.', c: '....x.........x.....', d: 'xrxrxrxrxrxrxrxrxrxr' } },
+    { lab: 'TIRAKITA', v: 'tablaNa', k: 'p', tune: 1.62, g: 0.72, pan: 0.3, push: -4, pats: {
+      a: '..o...o...o...o...o.', b: 'oxoxoxoxoxoxoxoxoxox', c: '..............oxox..', d: 'oooxoooxoooxoooxooox' } },
+    { lab: 'DHOLAK',   v: 'dholak',  k: 'p', tune: 1, g: 0.85, pan: -0.3, pats: {
+      a: 'o...x...o...x...o...', b: 'o.x.x.o.x.o.x.x.o.x.', c: 'o.........o.........', d: 'oxxXoxxoxxXoxxoxxXox' } },
+    { lab: 'MANJIRA',  v: 'manjira', k: 'p', tune: 1, g: 0.7, pan: 0.36, pats: {
+      a: 'x...x...x...x...x...', b: 'x.x.x.x.x.x.x.x.x.x.', c: 'x.........x.........', d: 'X...x.x.X...x.x.X...' } },
+  ],
+  /*        TAN SUR SLO SAN SWA  SAR SMD BAN SLD SHE  BAY DAY TIR DHO MAN */
+  arr: [
+    { n: 'ALAP',      b: 8,  k: [0], p: 'cc.....c..c....' },
+    { n: 'JOR',       b: 12, k: [0], p: 'aac.abac.c.a...' },
+    { n: 'VILAMBIT',  b: 16, k: [0], p: 'aaaaaaaaa.aacac' },
+    { n: 'GAT',       b: 12, k: [0], p: 'abaa.baaabaaaaa' },
+    { n: 'MADHYA',    b: 16, k: [0], p: 'abbbaaabbbabaab' },
+    { n: 'TAAN',      b: 12, k: [0], p: 'abbbcabbcbbbbba' },
+    { n: 'DRUT',      b: 12, k: [0], p: 'bbbbcbbbbabdbdd' },
+    { n: 'SAM',       b: 8,  k: [0], p: 'ac.cbaacac.a.ca' },
+  ],
+},
+
+/* ------------------------------------------------------------------------ 5
+   BOSSA — latin jazz. D dorian with diatonic sevenths, so the chord track
+   reads Dm7-G7-Cmaj7-Fmaj7 straight off the scale.                        */
+{
+  id: 'bossa', name: 'BOSSA', style: 'Latin Jazz',
+  sig: '4/4', bpm: 132, pulses: 4, steps: 16, rootHz: 73.416, swing: 0.045, mix: 1.25,
+  cents: [0, 200, 300, 500, 700, 900, 1000],
+  tracks: [
+    { lab: 'BASS',    v: 'upright',  k: 'm', oct: 0, harm: 1, g: 1, pan: 0, pats: {
+      a: '1.......5.......', b: '1.....5.1.....3.', c: '1...............', d: '1...5...8...5...' } },
+    { lab: 'GUITAR',  v: 'nylon',    k: 'm', oct: 2, harm: 1, ch: [0, 2, 4, 6], g: 0.92, pan: -0.26, push: 6, pats: {
+      a: '..1...1...1...1.', b: '1..1..1...1..1..', c: '....1.......1...', d: '..1.1...1.1...1.' } },
+    { lab: 'RHODES',  v: 'rhodes',   k: 'm', oct: 2, harm: 1, ch: [0, 2, 4, 6], g: 0.88, pan: 0.24, pats: {
+      a: '....1.......1...', b: '..1...1...1...1.', c: '1...............', d: '1.....1...1.....' } },
+    { lab: 'VIBES',   v: 'vibes',    k: 'm', oct: 3, harm: 1, ch: [0, 2, 4], g: 0.78, pan: 0.32, pats: {
+      a: '1.......5.......', b: '....1.......3...', c: '1...5...3...5...', d: '1.......3...5...' } },
+    { lab: 'GTR LINE',v: 'steelStr', k: 'm', oct: 3, g: 0.8, pan: -0.34, pats: {
+      a: '5.3.1...3.5.....', b: '5.6.5.3.2.3.5.3.', c: '5.......3.......', d: '8.7.6.5.3.2.1.2.' } },
+    { lab: 'STRINGS', v: 'strings',  k: 'm', oct: 3, harm: 1, ch: [0, 2, 4], g: 0.85, pan: 0, pats: {
+      a: '1---------------', b: '1-------5-------' } },
+    { lab: 'FLUTE',   v: 'bansuri',  k: 'm', oct: 3, g: 0.85, pan: 0.14, pats: {
+      a: '5-----6-----5---', b: '8-------6---5---', c: '3.5.6-----8-----6---5-----------' } },
+    { lab: 'SAX',     v: 'sax',      k: 'm', oct: 3, g: 0.92, pan: -0.16, pats: {
+      a: '3-----5-----6---', b: '5---6---8-------', c: '1.2.3-----5-----6-------5-------' } },
+    { lab: 'TRUMPET', v: 'trumpet',  k: 'm', oct: 3, g: 0.85, pan: 0.2, pats: {
+      a: '8-------7---6---', b: '5-----3-----2---', c: '6---8---b-------8-------6-------' } },
+    { lab: 'CELESTE', v: 'celeste',  k: 'm', oct: 4, g: 0.7, pan: 0.36, pats: {
+      a: '8.......5.......', b: '....8.......b...', c: '8.b.8.5.8.b.8.5.' } },
+    { lab: 'KICK',    v: 'kickSoft', k: 'p', tune: 1, g: 0.95, pan: 0, pats: {
+      a: 'X.....x.X.....x.', b: 'X.......X.......', c: 'X...............', d: 'X.....x.X...x.x.' } },
+    { lab: 'RIM',     v: 'rim',      k: 'p', tune: 1, g: 0.85, pan: -0.1, pats: {
+      a: 'x..x..x...x..x....x..x...x..x...', b: 'x..x..x...x..x..', c: '....x.......x...',
+      d: 'x..x..x.x.x..x..x.x..x...x..x.x.' } },
+    { lab: 'BRUSH',   v: 'brush',    k: 'p', tune: 1, g: 0.8, pan: 0.18, push: -4, pats: {
+      a: 'x.x.x.x.x.x.x.x.', b: 'x...x...x...x...', c: 'xxxxxxxxxxxxxxxx', d: 'X.x.x.x.X.x.x.x.' } },
+    { lab: 'CONGA',   v: 'conga',    k: 'p', tune: 1, g: 0.82, pan: -0.3, pats: {
+      a: 'o..x..o.o..x..o.', b: 'o.....x.o.....x.', c: 'o...............', d: 'orxroxxrorxroxxr' } },
+    { lab: 'RIDE',    v: 'jazzRide', k: 'p', tune: 1, g: 0.88, pan: 0.34, pats: {
+      a: 'x.x.x.x.x.x.x.x.', b: 'x..xx..xx..xx..x', c: 'x.......x.......', d: 'X.x.x.x.x.x.x.x.' } },
+  ],
+  /*        BAS GTR RHD VIB GLN  STR FLU SAX TRP CEL  KIK RIM BRU CON RID */
+  arr: [
+    { n: 'INTRO',    b: 8,  k: [0, 3, 6, 2], p: 'ca.c.....ac.c.c' },
+    { n: 'HEAD A',   b: 16, k: [0, 3, 6, 2], p: 'aaabcaa.aaaaaaa' },
+    { n: 'HEAD B',   b: 16, k: [5, 1, 4, 0], p: 'baaa.abab.abaaa' },
+    { n: 'HEAD A2',  b: 16, k: [0, 3, 6, 2], p: 'aabbabaabbaaaba' },
+    { n: 'SAX SOLO', b: 16, k: [0, 3, 6, 2], p: 'babaaa.c..bdaab' },
+    { n: 'GTR SOLO', b: 16, k: [5, 1, 4, 0], p: 'bbabbab.acbaaba' },
+    { n: 'BRIDGE',   b: 8,  k: [6, 2, 5, 1], p: 'ac.c.a.a.bc.c.c' },
+    { n: 'TRP SOLO', b: 16, k: [0, 3, 6, 2], p: 'badbbaabcabdaba' },
+    { n: 'HEAD A3',  b: 16, k: [0, 3, 6, 2], p: 'dabdb.bcbcadbda' },
+    { n: 'TRADES',   b: 16, k: [5, 1, 4, 0], p: 'bdbdcabab.ddbdd' },
+    { n: 'OUT HEAD', b: 21, k: [0, 3, 6, 2], p: 'aaabaaa.ababaaa' },
+  ],
+},
+];
+
+/* ================================================== transport + scheduler */
+/* Natural pitch of each percussion voice; a track's `tune` scales it. */
+const PERC_BASE = {
+  kick: 52, kickSoft: 48, surdo: 62, tom: 118, conga: 188, djembe: 164,
+  dundun: 72, dholak: 148, tablaGe: 96, tablaNa: 318, kendang: 132,
+  gongAgeng: 58, gongMid: 155, manjira: 1380, jazzRide: 380,
+};
+const LOOKAHEAD = 0.09, TICK_MS = 20;
+
+let S = null, songIx = 0;
+const T = { playing: false, absStep: 0, nextT: 0, t0: 0 };
+let schedTimer = null;
+
+function degOf(c) {
+  if (c >= '1' && c <= '9') return c.charCodeAt(0) - 49;
+  if (c >= 'a' && c <= 'f') return c.charCodeAt(0) - 97 + 9;
+  return -1;
+}
+const PERC_VEL = { X: 1, x: 0.78, o: 0.62, r: 0.8 };
+function degHz(song, tr, deg) {
+  const n = song.cents.length;
+  const oct = Math.floor(deg / n);
+  const i = deg - oct * n;
+  const c = song.cents[i] + 1200 * oct + 1200 * (tr.oct || 0);
+  return song.rootHz * Math.pow(2, c / 1200);
+}
+
+function prepSong(song) {
+  if (song.ready) return song;
+  song.barSec = song.pulses * 60 / song.bpm;
+  song.stepSec = song.barSec / song.steps;
+  song.bars = song.arr.reduce((a, s) => a + s.b, 0);
+  song.totalSteps = song.bars * song.steps;
+  song.dur = song.bars * song.barSec;
+  song.barMap = [];
+  let bar = 0;
+  song.arr.forEach((sec, si) => {
+    for (let k = 0; k < sec.b; k++) song.barMap[bar + k] = { s: si, b: bar };
+    bar += sec.b;
+  });
+  song.pulseStep = song.steps / song.pulses;
+  song.ready = true;
+  return song;
+}
+SONGS.forEach(prepSong);
+
+/* velocity shape: the bar's downbeat leads, pulse heads next, the rest sit back */
+function accentAt(st, song) {
+  if (st === 0) return 1;
+  if (st % song.pulseStep === 0) return 0.9;
+  if (st % (song.pulseStep / 2 || 1) === 0) return 0.82;
+  return 0.74;
+}
+
+const flashQ = [];
+function scheduleStep(abs, t) {
+  const total = S.totalSteps;
+  const a = ((abs % total) + total) % total;
+  const bar = (a / S.steps) | 0, st = a % S.steps;
+  const info = S.barMap[bar];
+  if (!info) return;
+  const sec = S.arr[info.s];
+  const cr = sec.k[(bar - info.b) % sec.k.length] || 0;
+  const swingT = (st % 2 === 1) ? S.swing * S.stepSec : 0;
+  let budget = 26;
+  for (let i = 0; i < PADS; i++) {
+    const tr = S.tracks[i];
+    const key = sec.p[i];
+    if (key === '.' || key === undefined) continue;
+    const pat = tr.pats[key];
+    if (!pat) continue;
+    const pi = a % pat.length;
+    const c = pat[pi];
+    if (c === '.' || c === '-') continue;
+    if (budget-- <= 0) break;
+    let L = 1;
+    while (L < pat.length && pat[(pi + L) % pat.length] === '-') L++;
+    const v = voice(tr.v);
+    const jit = (hash2(i + 1, abs + 7) - 0.5) * 0.007;
+    const when = t + swingT + (tr.push || 0) / 1000 + jit;
+    const dur = L * S.stepSec;
+    const hum = 0.94 + 0.12 * hash2(i + 31, abs);
+    const base = (tr.g == null ? 1 : tr.g) * accentAt(st, S) * hum;
+    if (tr.k === 'p') {
+      v.f({ t: when, f: (PERC_BASE[tr.v] || 140) * (tr.tune || 1), r: tr.tune || 1,
+            d: dur, v: base * (PERC_VEL[c] || 0.78), c, out: trackGain[i] });
+    } else {
+      const d0 = degOf(c);
+      if (d0 < 0) continue;
+      const offs = tr.ch || [0];
+      const spread = 1 / Math.sqrt(offs.length);
+      for (let k = 0; k < offs.length; k++) {
+        const deg = d0 + (tr.harm ? cr : 0) + offs[k];
+        v.f({ t: when, f: degHz(S, tr, deg), r: 1, d: dur, v: base * spread, c, out: trackGain[i] });
+      }
+    }
+    if (flashQ.length < 400) flashQ.push({ t: when, i });
+  }
+}
+
+function scheduleLoop() {
+  if (!T.playing || !AC) return;
+  const limit = AC.currentTime + LOOKAHEAD;
+  let guard = 400;
+  while (T.nextT < limit && guard-- > 0) {
+    scheduleStep(T.absStep, T.nextT);
+    T.absStep++;
+    T.nextT += S.stepSec;
+  }
+}
+
+function startTransport(reset) {
+  if (!AC) return;
+  if (reset || !T.playing) {
+    T.absStep = 0;
+    T.nextT = AC.currentTime + 0.1;
+    T.t0 = T.nextT;
+    flashQ.length = 0;
+  }
+  T.playing = true;
+  if (!schedTimer) schedTimer = setInterval(scheduleLoop, TICK_MS);
+  scheduleLoop();
+}
+
+/* =============================================================== the pads */
+const padEl = [], rects = [], held = [], keyHeld = [], pulse = [], lastPulse = [];
+let grid, stage, spreadPx = 12, labelsOn = true, verbOn = true, volume = 0.8, muted = false;
+
+function buildPads() {
+  grid = document.getElementById('grid');
+  stage = document.getElementById('stage');
+  grid.innerHTML = '';
+  for (let i = 0; i < PADS; i++) {
+    const b = document.createElement('button');
+    b.className = 'pad';
+    b.style.setProperty('--h', String(HUES[i]));
+    b.setAttribute('aria-label', 'track ' + (i + 1));
+    b.tabIndex = -1;
+    const sh = document.createElement('div'); sh.className = 'sheen';
+    const num = document.createElement('div'); num.className = 'num';
+    const lab = document.createElement('div'); lab.className = 'lab';
+    b.appendChild(sh); b.appendChild(num); b.appendChild(lab);
+    grid.appendChild(b);
+    padEl[i] = b;
+    held[i] = false; keyHeld[i] = false; pulse[i] = 0; lastPulse[i] = -1;
+  }
+}
+
+function labelPads() {
+  const keys = ['A', 'S', 'D', 'F', 'G', 'Q', 'W', 'E', 'R', 'T', '1', '2', '3', '4', '5'];
+  for (let i = 0; i < PADS; i++) {
+    padEl[i].querySelector('.lab').textContent = S.tracks[i].lab;
+    padEl[i].querySelector('.num').textContent = keys[i];
+  }
+}
+
+function layout() {
+  const landscape = window.innerWidth > window.innerHeight;
+  const cols = landscape ? PER_GROUP : GROUPS;
+  const rows = landscape ? GROUPS : PER_GROUP;
+  grid.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
+  grid.style.gridTemplateRows = 'repeat(' + rows + ',1fr)';
+  for (let i = 0; i < PADS; i++) {
+    const g = (i / PER_GROUP) | 0, k = i % PER_GROUP;
+    /* portrait: group = column, index climbs upward.
+       landscape: group = row counted from the top, index climbs rightward. */
+    padEl[i].style.gridColumn = String(landscape ? k + 1 : g + 1);
+    padEl[i].style.gridRow = String(landscape ? GROUPS - g : PER_GROUP - k);
+  }
+  const gap = parseFloat(getComputedStyle(grid).gap) || 9;
+  const availW = stage.clientWidth, availH = stage.clientHeight;
+  let cw = (availW - gap * (cols - 1)) / cols;
+  let ch = (availH - gap * (rows - 1)) / rows;
+  const MAXR = 1.38;
+  if (cw / ch > MAXR) cw = ch * MAXR;
+  if (ch / cw > MAXR) ch = cw * MAXR;
+  grid.style.width = Math.max(40, cw * cols + gap * (cols - 1)) + 'px';
+  grid.style.height = Math.max(40, ch * rows + gap * (rows - 1)) + 'px';
+  measure();
+}
+function measure() {
+  for (let i = 0; i < PADS; i++) rects[i] = padEl[i].getBoundingClientRect();
+}
+
+function setHold(i, on) {
+  if (held[i] === on) return;
+  held[i] = on;
+  padEl[i].classList.toggle('down', on);
+  padEl[i].classList.toggle('lit', on);
+  padEl[i].style.setProperty('--glow', on ? '1' : '0');
+  if (!audioReady) return;
+  const g = trackGain[i].gain, now = AC.currentTime;
+  const v = voice(S.tracks[i].v);
+  const rel = v.s ? 0.13 : 0.028;
+  if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(now);
+  else { g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); }
+  g.linearRampToValueAtTime(on ? 1 : 0, now + (on ? 0.007 : rel));
+}
+
+/* A pointer is a CONTACT PATCH, not a point: every pad whose rect it reaches
+   within `spreadPx` is held. That is what lets one fingertip on a seam hold
+   two pads, and four fingers on the inner crossings of two columns hold ten. */
+const ptr = new Map();
+function hitsAt(x, y) {
+  const out = [];
+  for (let i = 0; i < PADS; i++) {
+    const r = rects[i];
+    if (!r) continue;
+    if (x >= r.left - spreadPx && x <= r.right + spreadPx &&
+        y >= r.top - spreadPx && y <= r.bottom + spreadPx) out.push(i);
+  }
+  return out;
+}
+function recompute() {
+  for (let i = 0; i < PADS; i++) {
+    let on = keyHeld[i];
+    if (!on) for (const set of ptr.values()) { if (set.has(i)) { on = true; break; } }
+    setHold(i, on);
+  }
+}
+
+function ensureAudio() {
+  if (!AC) {
+    if (!initAudio()) return;
+    applyAudioSong();
+    applyVolume();
+  }
+  if (AC.state === 'suspended') AC.resume();
+  startTransport(false);
+}
+
+function applyAudioSong() {
+  if (!audioReady) return;
+  /* A gamelan ensemble and a synthwave track do not sum to the same level;
+     without this the song dropdown doubles as a volume control. */
+  bus.gain.setTargetAtTime(S.mix == null ? 1 : S.mix, AC.currentTime, 0.05);
+  for (let i = 0; i < PADS; i++) {
+    const tr = S.tracks[i];
+    const v = voice(tr.v);
+    if (trackPan[i]) trackPan[i].pan.value = tr.pan || 0;
+    trackSend[i].gain.value = verbOn ? v.snd : 0;
+    trackGain[i].gain.cancelScheduledValues(AC.currentTime);
+    trackGain[i].gain.setValueAtTime(held[i] ? 1 : 0, AC.currentTime);
+    /* bake this song's string models up front rather than on the first note */
+    if (v.ks) for (const a of v.ks.anchors) ksBuf(v.ks.name, v.ks.o, a);
+  }
+}
+function applyVolume() {
+  if (!master) return;
+  master.gain.setTargetAtTime(muted ? 0 : volume, AC.currentTime, 0.02);
+}
+
+/* ================================================================== chrome */
+const el = (id) => document.getElementById(id);
+function fmtTime(s) {
+  s = Math.max(0, s);
+  return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+}
+
+function selectSong(ix, keepClock) {
+  songIx = ((ix % SONGS.length) + SONGS.length) % SONGS.length;
+  S = SONGS[songIx];
+  for (let i = 0; i < PADS; i++) { pulse[i] = 0; lastPulse[i] = -1; }
+  labelPads();
+  el('bpm').textContent = String(S.bpm);
+  el('sig').textContent = S.sig;
+  el('duration').textContent = fmtTime(S.dur);
+  el('song-select').value = String(songIx);
+  flashQ.length = 0;
+  if (audioReady) {
+    applyAudioSong();
+    if (!keepClock) startTransport(true);
+  }
+  try { localStorage.setItem('musicMixer.song', String(songIx)); } catch (e) {}
+}
+
+function save() {
+  try {
+    localStorage.setItem('musicMixer.cfg', JSON.stringify(
+      { volume, spreadPx, labelsOn, verbOn, muted }));
+  } catch (e) {}
+}
+function load() {
+  try {
+    const c = JSON.parse(localStorage.getItem('musicMixer.cfg') || '{}');
+    if (typeof c.volume === 'number') volume = Math.min(1, Math.max(0, c.volume));
+    if (typeof c.spreadPx === 'number') spreadPx = Math.min(30, Math.max(0, c.spreadPx));
+    if (typeof c.labelsOn === 'boolean') labelsOn = c.labelsOn;
+    if (typeof c.verbOn === 'boolean') verbOn = c.verbOn;
+    if (typeof c.muted === 'boolean') muted = c.muted;
+    const s = parseInt(localStorage.getItem('musicMixer.song') || '0', 10);
+    if (s >= 0 && s < SONGS.length) songIx = s;
+  } catch (e) {}
+}
+
+function wire() {
+  const sel = el('song-select');
+  SONGS.forEach((s, i) => {
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = s.name + ' (' + s.style + ')';
+    sel.appendChild(o);
+  });
+  sel.addEventListener('change', () => selectSong(parseInt(sel.value, 10), false));
+
+  el('reload').addEventListener('click', () => {
+    ptr.clear();
+    for (let i = 0; i < PADS; i++) keyHeld[i] = false;
+    recompute();
+    if (audioReady) startTransport(true); else ensureAudio();
+  });
+  const syncMute = () => {
+    el('mute').textContent = muted ? '🔇' : '🔊';
+    el('mute').classList.toggle('on', muted);
+    applyVolume();
+  };
+  el('mute').addEventListener('click', () => { muted = !muted; syncMute(); save(); });
+  syncMute();
+
+  const veil = el('veil'), panel = el('settings');
+  const openS = () => { veil.classList.add('open'); panel.classList.add('open'); };
+  const closeS = () => { veil.classList.remove('open'); panel.classList.remove('open'); save(); };
+  el('settings-btn').addEventListener('click', openS);
+  el('close-settings').addEventListener('click', closeS);
+  veil.addEventListener('click', closeS);
+
+  const vol = el('vol'), spread = el('spread');
+  vol.value = String(Math.round(volume * 100));
+  el('vol-out').textContent = vol.value;
+  vol.addEventListener('input', () => {
+    volume = (+vol.value) / 100;
+    el('vol-out').textContent = vol.value;
+    applyVolume();
+  });
+  spread.value = String(spreadPx);
+  el('spread-out').textContent = spreadPx + 'px';
+  spread.addEventListener('input', () => {
+    spreadPx = +spread.value;
+    el('spread-out').textContent = spreadPx + 'px';
+  });
+
+  const lb = el('labels-btn');
+  const syncLabels = () => {
+    lb.textContent = labelsOn ? 'ON' : 'OFF';
+    lb.classList.toggle('on', labelsOn);
+    document.body.classList.toggle('nolabels', !labelsOn);
+  };
+  lb.addEventListener('click', () => { labelsOn = !labelsOn; syncLabels(); save(); });
+  syncLabels();
+
+  const vb = el('verb-btn');
+  const syncVerb = () => {
+    vb.textContent = verbOn ? 'ON' : 'OFF';
+    vb.classList.toggle('on', verbOn);
+    if (audioReady) for (let i = 0; i < PADS; i++) trackSend[i].gain.value = verbOn ? voice(S.tracks[i].v).snd : 0;
+  };
+  vb.addEventListener('click', () => { verbOn = !verbOn; syncVerb(); save(); });
+  syncVerb();
+
+  /* ---- input ---- */
+  const dn = (e) => {
+    ensureAudio();
+    ptr.set(e.pointerId, new Set(hitsAt(e.clientX, e.clientY)));
+    recompute();
+    el('hint').classList.add('gone');
+    e.preventDefault();
+  };
+  const mv = (e) => {
+    if (!ptr.has(e.pointerId)) return;
+    ptr.set(e.pointerId, new Set(hitsAt(e.clientX, e.clientY)));
+    recompute();
+    e.preventDefault();
+  };
+  const up = (e) => {
+    if (!ptr.delete(e.pointerId)) return;
+    recompute();
+  };
+  grid.addEventListener('pointerdown', dn);
+  grid.addEventListener('pointermove', mv);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+  grid.addEventListener('lostpointercapture', up);
+  grid.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+    const i = KEYMAP[e.key.toLowerCase()];
+    if (i === undefined) return;
+    ensureAudio();
+    keyHeld[i] = true;
+    recompute();
+    el('hint').classList.add('gone');
+    e.preventDefault();
+  });
+  window.addEventListener('keyup', (e) => {
+    const i = KEYMAP[e.key.toLowerCase()];
+    if (i === undefined) return;
+    keyHeld[i] = false;
+    recompute();
+  });
+
+  const allOff = () => {
+    ptr.clear();
+    for (let i = 0; i < PADS; i++) keyHeld[i] = false;
+    recompute();
+  };
+  window.addEventListener('blur', allOff);
+  document.addEventListener('visibilitychange', () => {
+    if (!AC) return;
+    if (document.hidden) { allOff(); AC.suspend(); }
+    else if (T.playing) AC.resume();
+  });
+  window.addEventListener('resize', layout);
+  window.addEventListener('orientationchange', () => setTimeout(layout, 120));
+}
+
+/* ================================================================== frames */
+let lastFrame = 0;
+function frame(ts) {
+  const dt = Math.min(0.1, (ts - lastFrame) / 1000) || 0.016;
+  lastFrame = ts;
+  if (audioReady) {
+    const now = AC.currentTime;
+    while (flashQ.length && flashQ[0].t <= now) {
+      const f = flashQ.shift();
+      if (now - f.t < 0.35) pulse[f.i] = 1;
+    }
+  }
+  for (let i = 0; i < PADS; i++) {
+    if (pulse[i] > 0) {
+      pulse[i] = Math.max(0, pulse[i] - dt * 4.6);
+      if (Math.abs(pulse[i] - lastPulse[i]) > 0.02 || pulse[i] === 0) {
+        padEl[i].style.setProperty('--pulse', pulse[i].toFixed(3));
+        lastPulse[i] = pulse[i];
+      }
+    }
+  }
+  if (audioReady && T.playing) {
+    const e2 = ((AC.currentTime - T.t0) % S.dur + S.dur) % S.dur;
+    el('elapsed').textContent = fmtTime(e2);
+    const bar = Math.min(S.bars - 1, Math.floor(e2 / S.barSec));
+    const info = S.barMap[bar];
+    if (info) {
+      const nm = S.arr[info.s].n;
+      const node = el('section-name');
+      if (node.textContent !== nm) node.textContent = nm;
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ------------------------------------------------------------- test hook */
+/* Used by .claude/tests/eval-music-mixer-audio.cjs. `audition` fires every
+   distinct (track, pattern, character) combination in all five songs through
+   its real voice, which is the only way to prove no pattern char reaches a
+   voice that cannot handle it — a live listen only ever covers the sections
+   that happen to play. */
+window.__MM = {
+  songs: SONGS,
+  select: (i) => selectSong(i, false),
+  audio: () => { ensureAudio(); return !!AC && audioReady; },
+  holdAll: (on) => { for (let i = 0; i < PADS; i++) keyHeld[i] = !!on; recompute(); },
+  hold: (i, on) => { keyHeld[i] = !!on; recompute(); },
+  probe: () => {
+    if (!AC) return false;
+    if (!window.__mmAn) {
+      const a = AC.createAnalyser();
+      a.fftSize = 2048;
+      comp.connect(a);
+      window.__mmAn = a;
+      window.__mmBuf = new Float32Array(a.fftSize);
+    }
+    return true;
+  },
+  level: () => {
+    const a = window.__mmAn;
+    if (!a) return -1;
+    a.getFloatTimeDomainData(window.__mmBuf);
+    let sum = 0;
+    for (let i = 0; i < window.__mmBuf.length; i++) sum += window.__mmBuf[i] * window.__mmBuf[i];
+    return Math.sqrt(sum / window.__mmBuf.length);
+  },
+  audition: () => {
+    if (!audioReady) return -1;
+    let n = 0;
+    const t0 = AC.currentTime + 0.06;
+    for (const song of SONGS) {
+      for (let i = 0; i < PADS; i++) {
+        const tr = song.tracks[i];
+        const v = voice(tr.v);
+        const seen = new Set();
+        for (const key of Object.keys(tr.pats)) {
+          for (const c of tr.pats[key]) {
+            if (c === '.' || c === '-' || seen.has(c)) continue;
+            seen.add(c);
+            const when = t0 + (n % 300) * 0.005;
+            if (tr.k === 'p') {
+              v.f({ t: when, f: (PERC_BASE[tr.v] || 140) * (tr.tune || 1), r: tr.tune || 1,
+                    d: 0.2, v: 0.04, c, out: trackGain[i] });
+            } else {
+              const d0 = degOf(c);
+              for (const off of (tr.ch || [0]))
+                v.f({ t: when, f: degHz(song, tr, d0 + off), r: 1, d: 0.2, v: 0.04, c, out: trackGain[i] });
+            }
+            n++;
+          }
+        }
+      }
+    }
+    return n;
+  },
+  state: () => ({
+    song: S.id, bars: S.bars, dur: +S.dur.toFixed(2), sig: S.sig, bpm: S.bpm,
+    playing: T.playing, step: T.absStep, flash: flashQ.length,
+    held: held.reduce((a, h) => a + (h ? 1 : 0), 0),
+    ctx: AC ? AC.state : 'none',
+  }),
+};
+
+/* ==================================================================== boot */
+load();
+buildPads();
+wire();
+selectSong(songIx, true);
+layout();
+requestAnimationFrame(frame);
+setTimeout(() => el('hint').classList.add('gone'), 7000);
+/* one deferred re-measure: web fonts change the header height after load */
+window.addEventListener('load', () => setTimeout(layout, 200));
+</script>
+</body>
+</html>

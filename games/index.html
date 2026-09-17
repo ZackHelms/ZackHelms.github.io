@@ -140,12 +140,20 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-08-29 15:21 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-17 21:05 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
 
   <div class="grid">
+    <a class="game-card" href="music-mixer/">
+      <div class="game-icon">🎛️</div>
+      <div class="game-info">
+        <div class="game-name">MUSIC MIXER</div>
+        <div class="game-desc">Fifteen lamp-lit pads, one song stem each. Hold what you want to hear &mdash; five songs from synthwave to gamelan, nothing sampled.</div>
+      </div>
+    </a>
+
     <a class="game-card" href="verlet-physics-ragdoll/">
       <div class="game-icon">🦖</div>
       <div class="game-info">
@@ -572,6 +580,7 @@ h1 {
 // Facet catalog — mirrors .claude/games-index.md. MAINTENANCE: every new game
 // adds its entry here in the same commit as its hub card (and index row).
 const GAMES = [
+  { n: 'MUSIC MIXER', i: '🎛️', h: 'music-mixer/', genre: ['music-instrument'], input: ['hold', 'multi-touch-chord'], session: ['open-sandbox'], mech: ['procedural-audio', 'stem-mixing', 'direct-manipulation'], players: ['solo'] },
   { n: 'VERLET RAGDOLL', i: '🦖', h: 'verlet-physics-ragdoll/', genre: ['physics-toy'], input: ['drag-grab', 'drag-steer'], session: ['open-sandbox'], mech: ['physics-sim', 'verlet-constraints', 'direct-manipulation'], players: ['solo'] },
   { n: 'NEON CLASH', i: '🎴', h: 'neon-clash/', genre: ['card-battler'], input: ['drag-place', 'tap', 'tap-select'], session: ['match-vs-ai', 'local-2p'], mech: ['card-deck', 'resource-economy', 'ai-opponent', 'rotated-2p-ui', 'area-of-effect', 'art-styles'], players: ['vs-ai', 'local-2p'] },
   { n: 'FIRE CLICKER', i: '🏕️', h: 'fire-clicker/', genre: ['idle-clicker'], input: ['tap'], session: ['idle-persistent'], mech: ['resource-economy', 'day-night-cycle', 'prestige-reset', 'scale-ladder', 'random-events'], players: ['solo'] },
