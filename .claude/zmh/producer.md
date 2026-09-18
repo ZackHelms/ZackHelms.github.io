@@ -42,9 +42,21 @@
 - **Say what you left behind.** Because moving the pointer hides everything
   below it, a pass that deliberately refines only its own commits should name
   the other session's SHAs in its report *and* leave them listed here, so the
-  work is recoverable rather than silently skipped. Currently outstanding: **six commits from
-  three other sessions**, listed immediately below by the 2026-09-17
-  music-mixer pass.
+  work is recoverable rather than silently skipped. Currently outstanding: **eight commits from
+  three other sessions** (six character-lists, plus `99205d8` and `c28a947`),
+  listed below by the 2026-09-17 music-mixer pass and re-confirmed still
+  hidden by the 2026-09-18 one.
+
+  **2026-09-18, music-mixer recorder pass** (pointer moved `dcee149` ->
+  `0effc3d`, range `dcee149..0effc3d`). **Left nothing new behind.** Every
+  commit in the range was this session's own — `2c4b6e7`, `ce256cd`, `a626d59`,
+  `7d720a1`, `0effc3d` — plus `64aa651`, this same session's earlier refine
+  commit, skippable by the rule above. No other session pushed during the
+  window, so there was also no shared-file merge to resolve. The eight commits
+  the 2026-09-17 pass left behind are **still outstanding and still hidden**
+  under the pointer (re-checked with `git merge-base --is-ancestor <sha>
+  dcee149`: all eight report ancestor); they are listed immediately below and
+  are carried forward unchanged, not cleared.
 
   **2026-09-17, music-mixer pass** (pointer moved `aaa0015` -> `dcee149`,
   range `aaa0015..dcee149`). The CD scoped this pass to music-mixer

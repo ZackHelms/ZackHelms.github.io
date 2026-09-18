@@ -24,7 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
-| Music Mixer | `music-mixer/` | music-instrument | hold, tap, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation | solo | `.claude/music-mixer.md` |
+| Music Mixer | `music-mixer/` | music-instrument | hold, tap, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation, user-authoring | solo | `.claude/music-mixer.md` |
 | Verlet Ragdoll | `verlet-physics-ragdoll/` | physics-toy | drag-grab, drag-steer | open-sandbox | physics-sim, verlet-constraints, direct-manipulation | solo | `.claude/verlet-physics-ragdoll.md` |
 | Neon Clash | `neon-clash/` | card-battler | drag-place, tap, tap-select | match-vs-ai, local-2p | card-deck, resource-economy, ai-opponent, rotated-2p-ui, area-of-effect, art-styles | vs-ai, local-2p | `.claude/neon-clash.md` |
 | Fire Clicker | `fire-clicker/` | idle-clicker | tap | idle-persistent | resource-economy, day-night-cycle, prestige-reset, scale-ladder, random-events | solo | `.claude/fire-clicker.md` |
@@ -147,6 +147,18 @@ local-2p.
   levels forever: 16 authored, then endless seeded drawers, each beaten by
   the in-game solver before it is served; earmarked as the first web-first
   prototype of a future iOS title).
+
+### Newly opened by the 2026-09-18 build
+
+- **`user-authoring`** (1 game: Music Mixer) — the player MAKES content that
+  persists, rather than progressing through content we wrote. Music Mixer
+  records a performance, detects its tempo and metre, saves it to local storage
+  beside the five built-in songs and exports it as a file. Distinct from
+  `meta-progression`, which persists *progress*, and from `open-sandbox`, which
+  is a session shape rather than an output. The obvious second: a level editor
+  for one of the puzzlers, where the authored artefact is a board rather than a
+  performance — the hard part is the same either way, which is validating
+  what the player made before letting it into the catalog.
 
 ### Newly opened by the 2026-09-17 build
 - **`music-instrument` genre + `stem-mixing` / `procedural-audio` mechanics +

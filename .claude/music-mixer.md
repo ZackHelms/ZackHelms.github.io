@@ -419,6 +419,9 @@ flashes reads as a glitch rather than as a step completing.
 
 ### Tempo and metre, and how much to trust them
 
+Full derivation, the four wrong versions and the measured accuracy table:
+`.claude/notes/20260918-tempo-and-metre-from-taps.md`.
+
 Both are measured from nothing but tap times, over an **onset-strength** series
 (pads struck together are one onset carrying weight). That weighting is
 load-bearing: an early version deduped simultaneous hits away, which left metre
@@ -442,12 +445,11 @@ that read a plain 4/4 take as 5/4. Not by downbeat weight either, which an
 ordinary backbeat defeats (the snare outweighs the downbeat). Periodicity does
 not care where the bar starts.
 
-Measured on synthetic takes (`/tmp` tuning harness, weights tuned on one set
-and reported on another): **metre ~94%**, **tempo ~76% overall** but near 90%
-inside roughly 85-145 BPM, dropping off outside it where the octave gets
-ambiguous. Those numbers are why the edit bar carries a one-tap **÷2 and ×2**
-next to the BPM field rather than only a number: an octave error is *the*
-characteristic failure, so undoing it is one tap. They refuse out-of-range
+Measured on synthetic takes, weights tuned on one set and scored on another:
+**98% tempo accuracy between 85 and 145 BPM** (189 cases), against 43% below 85
+and 35% above 145. A single "overall" figure is close to meaningless here —
+an earlier holdout reported 76% purely because it sampled two of its five tempi
+outside the usable band. Those numbers are why the edit bar carries a one-tap **/2 and x2** next to the BPM field rather than only a number. The failures are not a few percent off, they are octave errors — and the detector's bias pulls them *toward* the good band, so a 68 BPM take comes back as 136 and a 166 BPM one comes back as 83. Both are one tap from correct, and it is always the same tap. They refuse out-of-range
 rather than clamping — clamping means x2 then /2 does not return where it
 started, which defeats the point.
 
