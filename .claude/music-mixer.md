@@ -350,12 +350,22 @@ fire and leave the tool where it was, which is why both are intercepted in the
 menu's click handler before `setTool()` ever sees them.
 
 **DELETE asks twice, and asks the second time somewhere else.** It is the only
-irreversible thing in the game, and the menu hangs off the wrench at the top of
-the screen, so `#del` is pinned to the *bottom* (`bottom: 12vh`): a second tap
-where the first one landed cannot answer it. Deleting the current selection
-falls back to nothing selected rather than sliding to whichever song took its
-place in the list — the runtime gate measures the actual on-screen gap between
-the menu and the confirm, not just that both exist.
+irreversible thing in the game, so a second tap where the first one landed must
+not be able to answer it. The menu hangs off the wrench at the top of the
+screen, so `#del` normally pins to the *bottom* — but `askDelete(fromY)` takes
+the clicked row's centre and **flips to the top when that row was in the lower
+half of the screen**, which is what landscape does. Pinning it to the bottom
+unconditionally put the confirm straight over the row in landscape (measured:
+confirm 214-343, row at 275). Deleting the current selection falls back to
+nothing selected rather than sliding to whichever song took its place in the
+list. The runtime gate measures the actual on-screen geometry in both
+orientations, not just that both elements exist.
+
+Adding that seventh row also means the menu can outgrow the space under the
+wrench, so its top is clamped to keep it on screen — measured *after* it is
+shown, because a hidden element has no height. No phone is short enough to
+need it today, so the gate squashes the viewport to 260 px to give that check
+something to fail on.
 
 Under **TAP PAD**, a pad that goes down *on its own* and comes back up inside
 650 ms opens its picker; a chord, a hold or a slide across a seam is left

@@ -489,6 +489,8 @@ body.erasing .pad .ex { display: flex; }
   box-shadow: 0 14px 40px #000d;
 }
 #toolmenu.open { display: block; }
+/* seven rows do not fit above the fold on a landscape phone */
+#toolmenu { max-height: calc(100dvh - 16px); overflow-y: auto; }
 #toolmenu button {
   display: flex; align-items: center; gap: 8px;
   width: 100%; height: 34px;
@@ -567,7 +569,7 @@ body.erasing .pad .ex { display: flex; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 21:18 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 21:27 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -2998,11 +3000,19 @@ function askSave() {
 
 /* Delete is a two-step: the menu row asks, and the answer is given somewhere
    else entirely (see #del). Nothing is removed until YES. */
-function askDelete() {
+function askDelete(fromY) {
   if (!TK) return;
   el('del-name').textContent = TK.name;
+  const d = el('del');
+  /* The answer never opens where the question was. Normally that means the
+     bottom of the screen, since the menu hangs off the wrench at the top - but
+     in landscape the menu is clamped up against the bottom edge, so a row down
+     there sends the confirm to the top instead. */
+  const low = typeof fromY === 'number' && fromY > window.innerHeight / 2;
+  d.style.top = low ? '12vh' : 'auto';
+  d.style.bottom = low ? 'auto' : '12vh';
   el('veil').classList.add('open');
-  el('del').classList.add('open');
+  d.classList.add('open');
 }
 /* Deleting the selection leaves no selection: fall back to nothing picked
    rather than silently sliding to whichever song took its place in the list. */
@@ -3450,8 +3460,9 @@ function wire() {
       /* EXPORT and DELETE are the two rows that are actions rather than
          modes: they fire and leave the tool where it was */
       if (t[0] === 'export' || t[0] === 'delete') {
+        const rr = b.getBoundingClientRect();
         closeOverlays();
-        if (t[0] === 'export') exportTake(); else askDelete();
+        if (t[0] === 'export') exportTake(); else askDelete(rr.top + rr.height / 2);
         return;
       }
       setTool(t[0]);
@@ -3463,9 +3474,13 @@ function wire() {
     const r = el('tools').getBoundingClientRect();
     const w = 200;
     menu.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px';
-    menu.style.top = (r.bottom + 6) + 'px';
+    menu.style.top = '0px';
     menu.classList.add('open');
     el('veil').classList.add('open');
+    /* measured after it is shown, because a hidden element has no height:
+       in landscape the whole menu is taller than the space under the wrench */
+    const h = menu.getBoundingClientRect().height;
+    menu.style.top = Math.max(6, Math.min(r.bottom + 6, window.innerHeight - h - 8)) + 'px';
   });
 
   el('pk-voice').addEventListener('change', () => {

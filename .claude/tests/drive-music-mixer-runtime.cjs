@@ -1042,6 +1042,64 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
       else console.log('DELETE=gone, and the list falls back to nothing selected');
     }
 
+    /* Landscape is the awkward case: the menu is now seven rows and does not
+       fit under the wrench on a 390 px-tall screen, so it clamps upward - and
+       once it does, "the confirm goes at the bottom" would put the answer
+       under the finger that asked the question. */
+    await page.evaluate(`(() => {
+      const mk = ${mkLoose};
+      const made = window.__MM.process(mk(120, 4, 4, 2.6, 3), 'LAND SCAPE');
+      window.__MM.pick('t:' + made.id);
+    })()`);
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.waitForTimeout(250);
+    await page.click('#tools');
+    await page.waitForTimeout(80);
+    const land = await page.evaluate(() => {
+      const m = document.getElementById('toolmenu').getBoundingClientRect();
+      const b = document.querySelector('#toolmenu button[data-tool="delete"]');
+      const r = b.getBoundingClientRect();
+      b.click();
+      const d = document.getElementById('del').getBoundingClientRect();
+      return { menuTop: Math.round(m.top), menuBottom: Math.round(m.bottom),
+               rowMid: Math.round(r.top + r.height / 2),
+               delTop: Math.round(d.top), delBottom: Math.round(d.bottom),
+               h: window.innerHeight };
+    });
+    if (land.menuBottom > land.h)
+      fail('in landscape the tool menu runs ' + (land.menuBottom - land.h) +
+           'px off the bottom of the screen (menu ' + land.menuTop + '-' + land.menuBottom +
+           ' of ' + land.h + ')');
+    else if (land.delTop <= land.rowMid && land.delBottom >= land.rowMid)
+      fail('in landscape the delete confirm (' + land.delTop + '-' + land.delBottom +
+           ') opens over the menu row that asked, at y=' + land.rowMid);
+    else console.log('DELETE=landscape: menu clamped to ' + land.menuTop + '-' + land.menuBottom +
+                     ' of ' + land.h + ', confirm at ' + land.delTop + '-' + land.delBottom +
+                     ' clear of the row at ' + land.rowMid);
+    const landGone = await page.evaluate(() => window.__MM.del('yes'));
+    if (landGone.takes !== 0) fail('deleting in landscape left ' + landGone.takes + ' songs');
+    /* and the menu itself has to stay on the screen. Seven rows fit under the
+       wrench on every phone in landscape today, so squash the viewport until
+       they cannot - otherwise this is an assertion that can never go red. */
+    await page.evaluate(() => window.__MM.pick('rec'));
+    await page.setViewportSize({ width: 844, height: 260 });
+    await page.waitForTimeout(220);
+    await page.click('#tools');
+    await page.waitForTimeout(80);
+    const squash = await page.evaluate(() => {
+      const m = document.getElementById('toolmenu').getBoundingClientRect();
+      const r = { top: Math.round(m.top), bottom: Math.round(m.bottom), h: window.innerHeight };
+      document.getElementById('veil').click();
+      return r;
+    });
+    if (squash.bottom > squash.h || squash.top < 0)
+      fail('squashed to ' + squash.h + 'px the tool menu sits at ' + squash.top + '-' +
+           squash.bottom + ', off the screen');
+    else console.log('MENU=fits a ' + squash.h + 'px screen at ' + squash.top + '-' + squash.bottom);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(250);
+
     /* a built-in song is not the CD's to delete */
     await page.evaluate(() => window.__MM.pick('0'));
     await page.waitForTimeout(150);
