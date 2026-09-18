@@ -451,6 +451,110 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     if (chord.open) fail('a two-pad chord under TAP PAD opened a picker — the view must stay playable');
     else console.log('TAP=chord  two pads at once is a chord, not an assignment');
 
+    /* --- 8. CHANGE KEY & MODE ---------------------------------------- */
+    /* The rule the CD set is that the sample's STRUCTURE never moves, only
+       its colour: changing key or mode mid-playback must retune the next note
+       and nothing else. A version that restarted the loop on every tap would
+       look identical on screen and be wrong in exactly the way that matters. */
+    await page.evaluate(() => window.__MM.setTool('keymode'));
+    await page.waitForTimeout(200);
+    const km = await page.evaluate(() => window.__MM.keymode());
+    if (!km.up) fail('CHANGE KEY & MODE did not open its screen');
+    if (km.gridUp) fail('the pad grid is still up behind the key/mode screen');
+    if (km.keys !== 12) fail('the key list has ' + km.keys + ' entries, expected 12');
+    if (km.modes < 7) fail('the mode list has only ' + km.modes + ' entries');
+    else console.log('KEYMODE=' + km.keys + ' keys / ' + km.modes + ' modes, grid swapped out');
+
+    /* the pads are inert while this screen is up, and its lists must scroll */
+    await setTouches([{ x: 60, y: 300 }]);
+    await page.waitForTimeout(60);
+    const kmHeld = await heldNow();
+    await setTouches([]);
+    if (kmHeld !== 0) fail('a touch on the key/mode screen held ' + kmHeld + ' pads');
+    const scrollable = await page.evaluate(() =>
+      getComputedStyle(document.getElementById('km-keys')).touchAction);
+    if (!/pan-y|auto/.test(scrollable))
+      fail('the key list has touch-action "' + scrollable + '" and cannot scroll');
+    else console.log('KEYMODE=inert  no pad answers, and the lists can scroll');
+
+    /* a key change retunes the pads, which is the transposition contract */
+    const tr = await page.evaluate(() => {
+      window.__MM.setKeyMode(9, 'dorian');
+      return { key: window.__MM.keymode(), labs: window.__MM.padLabels() };
+    });
+    const wantDorian = ['A4', 'B4', 'C5', 'D5', 'E5', 'F#5', 'G5', 'A5', 'B5', 'C6'];
+    if (tr.labs.slice(0, 10).join(' ') !== wantDorian.join(' '))
+      fail('A dorian gave [' + tr.labs.slice(0, 10).join(' ') + '], expected [' + wantDorian.join(' ') + ']');
+    else if (!/A DORIAN/.test(tr.key.scale) || !/F#/.test(tr.key.scale))
+      fail('the scale readout says "' + tr.key.scale + '"');
+    else console.log('KEYMODE=' + tr.key.scale.trim());
+
+    /* the sample: it sounds, it keeps its place through a key change, pause
+       holds that place and stop returns it to the top */
+    await page.evaluate(() => window.__MM.sample('play'));
+    let smpPeak = 0;
+    for (let k = 0; k < 24; k++) {
+      await page.waitForTimeout(60);
+      smpPeak = Math.max(smpPeak, await page.evaluate(() => window.__MM.level()));
+    }
+    const mid = await page.evaluate(() => window.__MM.keymode());
+    if (smpPeak < 0.01) fail('the key/mode sample peaked at ' + smpPeak.toFixed(4) + ' — it is silent');
+    else if (!mid.playing || mid.step < 4) fail('the sample is not advancing (step ' + mid.step + ')');
+    else console.log('SAMPLE=playing  peak ' + smpPeak.toFixed(3) + ' at step ' + mid.step);
+
+    const before = mid.step;
+    await page.evaluate(() => window.__MM.setKeyMode(3, 'blues'));
+    await page.waitForTimeout(350);
+    const after = await page.evaluate(() => window.__MM.keymode());
+    if (!after.playing) fail('changing key stopped the sample');
+    else if (after.step < before) fail('changing key restarted the sample (step ' + before + ' -> ' +
+      after.step + ') — the structure must not move, only the key');
+    else console.log('SAMPLE=step ' + before + ' -> ' + after.step + ' through a key change, no restart');
+
+    await page.evaluate(() => window.__MM.sample('pause'));
+    await page.waitForTimeout(300);
+    const paused = await page.evaluate(() => window.__MM.keymode());
+    if (paused.playing) fail('pause did not stop the sample');
+    else if (paused.step !== after.step && paused.step < after.step)
+      fail('pause moved the playhead backwards');
+    const held2 = await page.evaluate(() => window.__MM.keymode());
+    if (held2.step !== paused.step) fail('the sample is still advancing while paused');
+    else console.log('SAMPLE=paused at step ' + paused.step + ', and it stays there');
+
+    await page.evaluate(() => window.__MM.sample('stop'));
+    const stopped = await page.evaluate(() => window.__MM.keymode());
+    if (stopped.playing || stopped.step !== 0) fail('stop left the sample at step ' + stopped.step);
+    else console.log('SAMPLE=stopped and rewound');
+
+    /* Leaving the tool has to put the pads back AND re-measure them. Rotating
+       WHILE the screen is up is what makes this bite: `resize` still fires and
+       still runs layout(), but the grid is display:none, so every pad rect
+       measures as zero and the hit test goes completely deaf. Coming back
+       without a re-measure leaves a grid that lights up for nobody. */
+    await page.setViewportSize({ width: 844, height: 390 });
+    await page.waitForTimeout(250);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(250);
+    await page.evaluate(() => window.__MM.setTool('tappad'));
+    await page.waitForTimeout(250);
+    const backGrid = await page.evaluate(() => window.__MM.keymode());
+    if (backGrid.up || !backGrid.gridUp) fail('leaving CHANGE KEY & MODE did not restore the grid');
+    const rg = await page.evaluate(() => {
+      const pads = [...document.querySelectorAll('.pad')].map((q) => q.getBoundingClientRect());
+      const c = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+      return { seam: { x: (c(pads[0]).x + c(pads[1]).x) / 2, y: (c(pads[0]).y + c(pads[1]).y) / 2 } };
+    });
+    await setTouches([rg.seam]);
+    await page.waitForTimeout(60);
+    const seamBack = await heldNow();
+    await setTouches([]);
+    await page.waitForTimeout(80);
+    await page.evaluate(() => { window.__MM.setTool('none'); });
+    if (seamBack !== 2) fail('after rotating on the key/mode screen and leaving it, a seam press held ' +
+      seamBack + ' pads, expected 2 — the pad rects were not re-measured');
+    else console.log('KEYMODE=left   rotated while up, grid back and re-measured, a seam holds two');
+    await page.evaluate(() => window.__MM.setKeyMode(0, 'major'));
+
     /* and back: a song must restore gating, the tempo strip and the transport */
     await page.evaluate(() => window.__MM.pick('0'));
     await page.waitForTimeout(200);

@@ -298,6 +298,62 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
   cursor: pointer;
 }
 
+/* -------------------------------------------------- key and mode screen */
+/* Takes the whole play surface rather than opening over it: picking a key is
+   a decision about the instrument, not an adjustment while you play. The two
+   lists scroll, so they set their OWN touch-action — #stage refuses every
+   gesture on behalf of the pads, and that would refuse these scrolls too. */
+#keymode {
+  align-self: stretch;
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; gap: 8px;
+}
+#keymode.gone { display: none !important; }
+.km-cols { flex: 1 1 auto; min-height: 0; display: flex; gap: 8px; }
+.km-col {
+  flex: 1 1 50%; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column;
+  background: #0a0a16;
+  border: 1px solid var(--border); border-radius: 10px;
+  overflow: hidden;
+}
+.km-col h3 {
+  flex: 0 0 auto;
+  font-family: 'Black Ops One', sans-serif;
+  font-size: .62rem; letter-spacing: 3px; color: var(--gold);
+  padding: 9px 12px 7px;
+  border-bottom: 1px solid var(--border);
+}
+.km-list {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px;
+}
+.km-list button {
+  display: block; width: 100%;
+  background: none; border: 0; border-radius: 7px;
+  color: var(--dim); font-family: inherit;
+  font-size: .78rem; letter-spacing: 2px; text-align: left;
+  padding: 10px 11px; cursor: pointer;
+}
+.km-list button.sel { background: #1d1d38; color: var(--green); }
+.km-foot { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+/* the scale itself, spelled out — data about what you just picked, not a
+   caption telling you what to do with it */
+#km-scale {
+  flex: 1 1 auto; min-width: 0;
+  font-size: .68rem; letter-spacing: 2px; color: var(--dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#km-scale b { color: var(--white); font-weight: normal; }
+.km-foot .chip { flex: 0 0 auto; }
+.km-bars { display: flex; gap: 3px; }
+.km-bars i { display: block; width: 3px; height: 12px; background: currentColor; }
+#km-play.on { border-color: var(--green); color: var(--green); }
+
 /* ---------------------------------------------------- tool menu + picker */
 /* The menu hangs off the wrench instead of sitting centred, so the pad you
    are about to act on stays visible behind it. */
@@ -389,7 +445,7 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 14:56 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 15:15 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -422,7 +478,21 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
     </div>
   </div>
 
-  <div id="stage"><div id="grid"></div></div>
+  <div id="stage">
+    <div id="grid"></div>
+    <div id="keymode" class="gone">
+      <div class="km-cols">
+        <div class="km-col"><h3>KEY</h3><div class="km-list" id="km-keys"></div></div>
+        <div class="km-col"><h3>MODE</h3><div class="km-list" id="km-modes"></div></div>
+      </div>
+      <div class="km-foot">
+        <div id="km-scale"></div>
+        <button class="chip" id="km-stop" aria-label="Stop">&#9632;</button>
+        <button class="chip" id="km-pause" aria-label="Pause"><span class="km-bars"><i></i><i></i></span></button>
+        <button class="chip" id="km-play" aria-label="Play">&#9654;</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="veil"></div>
@@ -536,6 +606,7 @@ const KEYMAP = {};
 /* ------------------------------------------------------------------- audio */
 let AC = null, master = null, comp = null, bus = null, verb = null, verbIn = null;
 let NOISE = null, audioReady = false;
+let smpOut = null, smpSend = null;
 const trackGain = [], trackSend = [], trackPan = [], trackLive = [];
 let noiseCursor = 0;
 
@@ -577,6 +648,12 @@ function initAudio() {
   NOISE = AC.createBuffer(1, Math.round(AC.sampleRate * 3), AC.sampleRate);
   const nd = NOISE.getChannelData(0);
   for (let i = 0; i < nd.length; i++) nd[i] = rnd() * 2 - 1;
+
+  /* the key/mode sample is not a pad and not a track, so it gets its own way
+     to the bus rather than borrowing one and inheriting its gate */
+  smpOut = AC.createGain(); smpOut.gain.value = 1;
+  smpSend = AC.createGain(); smpSend.gain.value = 0;
+  smpOut.connect(bus); smpOut.connect(smpSend); smpSend.connect(verbIn);
 
   for (let i = 0; i < PADS; i++) {
     const g = AC.createGain(); g.gain.value = 0;
@@ -1628,6 +1705,53 @@ function measure() {
   for (let i = 0; i < PADS; i++) rects[i] = padEl[i].getBoundingClientRect();
 }
 
+/* ======================================================= the key/mode sample */
+/* Eight bars of plain piano, written ENTIRELY IN SCALE DEGREES. The left hand
+   and the chords are degrees relative to the bar's CHORD ROOT — so stacking
+   0,2,4 yields whatever triad the mode actually has in that position (major,
+   minor or diminished, correctly) with no second version of the piece — and
+   the melody is degrees relative to the TONIC. That is what makes the CD's
+   rule hold: change the key or the mode and the structure is untouched, only
+   its colour moves. Both are read at SCHEDULE time, so a change lands inside
+   one lookahead without restarting the loop.
+     event = [startStep, [degrees], lengthInSteps, velocity]                  */
+const SAMPLE = {
+  bpm: 92, beats: 4, steps: 16, bars: 8,
+  chords: [0, 5, 3, 4, 0, 5, 1, 4],         /* I vi IV V I vi ii V in major */
+  lh: [
+    [[0, [0], 6, 0.90], [8, [4], 6, 0.62]],
+    [[0, [0], 4, 0.88], [6, [2], 2, 0.50], [8, [4], 4, 0.66], [14, [0], 2, 0.46]],
+    [[0, [0], 10, 0.86], [12, [4], 4, 0.58]],
+    [[0, [0], 4, 0.88], [4, [4], 4, 0.60], [8, [2], 4, 0.58], [12, [4], 4, 0.62]],
+    [[0, [0], 6, 0.90], [8, [4], 6, 0.62]],
+    [[0, [0], 4, 0.88], [6, [2], 2, 0.50], [8, [4], 4, 0.66], [14, [0], 2, 0.46]],
+    [[0, [0], 8, 0.84], [8, [4], 4, 0.58], [12, [2], 4, 0.54]],
+    [[0, [0], 8, 0.92], [8, [4], 4, 0.64], [12, [0], 4, 0.70]],
+  ],
+  rh: [
+    [[4, [0, 2, 4], 3, 0.50], [12, [0, 2, 4], 3, 0.45]],
+    [[2, [0, 2, 4], 2, 0.42], [6, [0, 2, 4], 2, 0.40], [10, [0, 2, 4], 2, 0.44], [14, [0, 2, 4], 2, 0.38]],
+    [[0, [0, 2, 4, 6], 8, 0.46], [8, [0, 2, 4], 6, 0.42]],
+    [[4, [0, 2, 4], 2, 0.50], [7, [0, 2, 4], 1, 0.34], [12, [0, 2, 4], 4, 0.46]],
+    [[4, [0, 2, 4], 3, 0.50], [12, [0, 2, 4], 3, 0.45]],
+    [[2, [0, 2, 4], 2, 0.42], [6, [0, 2, 4], 2, 0.40], [10, [0, 2, 4], 2, 0.44], [14, [0, 2, 4], 2, 0.38]],
+    [[0, [0, 2, 4], 4, 0.46], [6, [0, 2, 4], 2, 0.38], [10, [0, 2, 4, 6], 6, 0.44]],
+    [[0, [0, 2, 4], 6, 0.50], [8, [0, 2, 4], 8, 0.44]],
+  ],
+  mel: [
+    [[0, [4], 4, 0.60], [6, [2], 2, 0.50], [8, [0], 6, 0.55]],
+    [[2, [2], 2, 0.50], [4, [4], 4, 0.58], [10, [5], 6, 0.52]],
+    [[0, [7], 6, 0.62], [8, [5], 4, 0.52], [12, [4], 4, 0.48]],
+    [[0, [4], 2, 0.50], [4, [2], 2, 0.48], [8, [4], 8, 0.56]],
+    [[0, [4], 4, 0.60], [6, [2], 2, 0.50], [8, [0], 6, 0.55]],
+    [[2, [2], 2, 0.50], [4, [4], 4, 0.58], [10, [7], 6, 0.54]],
+    [[0, [8], 6, 0.62], [8, [7], 4, 0.52], [12, [5], 4, 0.50]],
+    [[0, [4], 8, 0.58], [8, [0], 8, 0.62]],
+  ],
+};
+const KEY_NAMES = ['C', 'C# / Db', 'D', 'D# / Eb', 'E', 'F',
+                   'F# / Gb', 'G', 'G# / Ab', 'A', 'A# / Bb', 'B'];
+
 /* ------------------------------------------------------- the live pad path */
 /* The five built-in songs GATE a running transport: a held pad opens its
    track gain and the scheduler was always going to play that note anyway. A
@@ -1748,6 +1872,11 @@ function hitsAt(x, y) {
 /* `noLatch` suppresses the edge handling for a PROGRAMMATIC release (going to
    the background, say) so it cannot be mistaken for the player lifting a
    finger and thereby clear a lock they set. */
+/* The key/mode screen replaces the grid, so nothing on it is a pad press —
+   and its two lists have to be free to SCROLL, which #stage's listeners would
+   otherwise preventDefault away. */
+function padsOff() { return tool === 'keymode'; }
+
 function recompute(noLatch) {
   for (let i = 0; i < PADS; i++) {
     let c = keyHeld[i] || touchOn[i];
@@ -1830,6 +1959,7 @@ function fmtTime(s) {
 function leaveMode() {
   releaseAll(true, true);
   stopTransport();
+  smpStop();
   for (let i = 0; i < PADS; i++) releaseNote(i, true);
   for (let i = 0; i < PADS; i++) { pulse[i] = 0; lastPulse[i] = -1; }
   closeOverlays();
@@ -1928,6 +2058,94 @@ function load() {
   } catch (e) {}
 }
 
+/* --------------------------------------------------- the sample transport */
+const SMP = { playing: false, step: 0, nextT: 0 };
+let smpTimer = null;
+function smpStepSec() { return (60 / SAMPLE.bpm) * SAMPLE.beats / SAMPLE.steps; }
+function smpSchedule() {
+  if (!SMP.playing || !AC) return;
+  const total = SAMPLE.bars * SAMPLE.steps;
+  const ss = smpStepSec();
+  const limit = AC.currentTime + LOOKAHEAD;
+  const v = voice('piano');
+  let guard = 400;
+  while (SMP.nextT < limit && guard-- > 0) {
+    const a = ((SMP.step % total) + total) % total;
+    const bar = (a / SAMPLE.steps) | 0, st = a % SAMPLE.steps;
+    const cr = SAMPLE.chords[bar];
+    /* KIT.root and KIT.mode are read HERE, once per step — that is what lets
+       a key change take effect without the loop losing its place */
+    const fire = (list, octShift, rel) => {
+      for (const e of list) {
+        if (e[0] !== st) continue;
+        for (const d of e[1]) {
+          v.f({ t: SMP.nextT, r: 1, c: '1', out: smpOut,
+                f: midiHz(degMidi(KIT.root, KIT.mode, KIT.oct + octShift, (rel ? cr : 0) + d)),
+                d: e[2] * ss, v: e[3] * 0.5 });
+        }
+      }
+    };
+    fire(SAMPLE.lh[bar], -1, true);
+    fire(SAMPLE.rh[bar], 0, true);
+    fire(SAMPLE.mel[bar], 1, false);
+    SMP.step++;
+    SMP.nextT += ss;
+  }
+}
+function smpPlay() {
+  ensureAudio();
+  if (!audioReady || SMP.playing) return;
+  if (smpSend) smpSend.gain.value = verbOn ? voice('piano').snd : 0;
+  SMP.nextT = AC.currentTime + 0.08;
+  SMP.playing = true;
+  if (!smpTimer) smpTimer = setInterval(smpSchedule, TICK_MS);
+  smpSchedule();
+  syncSample();
+}
+/* Pause leaves the ~90 ms already in the graph to play out and the decays to
+   ring. Cutting them would be a mute, not a pause. */
+function smpPause() {
+  SMP.playing = false;
+  if (smpTimer) { clearInterval(smpTimer); smpTimer = null; }
+  syncSample();
+}
+function smpStop() { smpPause(); SMP.step = 0; }
+function syncSample() {
+  const b = el('km-play');
+  if (b) b.classList.toggle('on', SMP.playing);
+}
+
+/* the scale spelled out, so the screen shows what you picked rather than
+   describing what the screen is for */
+function scaleText() {
+  const sc = scaleOf(KIT.mode);
+  const names = sc.map((_, i) => midiName(degMidi(KIT.root, KIT.mode, KIT.oct, i)).replace(/-?\d+$/, ''));
+  return names.join(' ');
+}
+function syncKeyMode() {
+  const keys = el('km-keys'), modes = el('km-modes');
+  if (keys) for (const b of keys.children) b.classList.toggle('sel', +b.dataset.root === KIT.root);
+  if (modes) for (const b of modes.children) b.classList.toggle('sel', b.dataset.mode === KIT.mode);
+  const out = el('km-scale');
+  if (out) {
+    out.innerHTML = '';
+    const t = document.createElement('b');
+    t.textContent = KEY_NAMES[KIT.root].split(' ')[0] + ' ' + MODES[KIT.mode][0];
+    out.appendChild(t);
+    out.appendChild(document.createTextNode('  ' + scaleText()));
+  }
+}
+/* A key or mode change retunes everything that reads a degree: the pads, the
+   picker's note list and the sample already playing. Nothing restarts. */
+function setKeyMode(root, modeName) {
+  if (root != null) KIT.root = root;
+  if (modeName) KIT.mode = modeName;
+  saveKit();
+  syncKeyMode();
+  labelPads();
+  if (el('picker').classList.contains('open') && pickIx >= 0) fillNoteSelect(KIT.pads[pickIx]);
+}
+
 /* ================================================== tools menu and picker */
 /* The wrench is a MODE picker, not a command button: each entry puts the pad
    grid into a different job. Entries whose stage has not landed yet sit in the
@@ -1940,12 +2158,13 @@ const TOOLS = [
   ['record',  'RECORD'],
   ['edit',    'REPLAY & EDIT'],
 ];
-const TOOL_READY = { none: 1, tappad: 1 };
+const TOOL_READY = { none: 1, tappad: 1, keymode: 1 };
 let tool = 'none';
 let pickIx = -1;
 
 function setTool(id) {
   if (!TOOL_READY[id]) id = 'none';
+  const was = tool;
   tool = id;
   tapCand = -1;
   const menu = el('toolmenu');
@@ -1953,6 +2172,18 @@ function setTool(id) {
     b.classList.toggle('sel', b.dataset.tool === id);
     b.querySelector('.tick').textContent = b.dataset.tool === id ? '✓' : '';
   }
+  /* CHANGE KEY & MODE takes the whole play surface, so leaving it has to put
+     the pads back AND drop whatever was held while it was up. */
+  const km = el('keymode');
+  if (!km) return;
+  const on = id === 'keymode';
+  if (was === 'keymode' && !on) smpStop();
+  if (on) { releaseAll(true, true); for (let i = 0; i < PADS; i++) releaseNote(i, true); }
+  km.classList.toggle('gone', !on);
+  if (grid) grid.classList.toggle('gone', on);
+  if (on) syncKeyMode();
+  /* swapping the surface changes every pad rect — see syncChrome() */
+  if (grid && !on) layout();
 }
 
 /* TAP PAD assignment. A pad that goes down ON ITS OWN and comes back up
@@ -2098,6 +2329,27 @@ function wire() {
     saveKit();
     auditionPad(pickIx);
   });
+  /* ---- key and mode ---------------------------------------------------- */
+  const keyList = el('km-keys');
+  KEY_NAMES.forEach((nm, i) => {
+    const b = document.createElement('button');
+    b.dataset.root = String(i);
+    b.textContent = nm;
+    b.addEventListener('click', () => setKeyMode(i, null));
+    keyList.appendChild(b);
+  });
+  const modeList = el('km-modes');
+  for (const m of Object.keys(MODES)) {
+    const b = document.createElement('button');
+    b.dataset.mode = m;
+    b.textContent = MODES[m][0];
+    b.addEventListener('click', () => setKeyMode(null, m));
+    modeList.appendChild(b);
+  }
+  el('km-play').addEventListener('click', smpPlay);
+  el('km-pause').addEventListener('click', smpPause);
+  el('km-stop').addEventListener('click', smpStop);
+
   el('pk-hear').addEventListener('click', () => auditionPad(pickIx));
   el('pk-close').addEventListener('click', closeOverlays);
 
@@ -2169,9 +2421,12 @@ function wire() {
   const syncVerb = () => {
     vb.textContent = verbOn ? 'ON' : 'OFF';
     vb.classList.toggle('on', verbOn);
-    if (audioReady) for (let i = 0; i < PADS; i++) {
-      const nm = padVoiceName(i);
-      trackSend[i].gain.value = verbOn && nm ? voice(nm).snd : 0;
+    if (audioReady) {
+      for (let i = 0; i < PADS; i++) {
+        const nm = padVoiceName(i);
+        trackSend[i].gain.value = verbOn && nm ? voice(nm).snd : 0;
+      }
+      smpSend.gain.value = verbOn ? voice('piano').snd : 0;
     }
   };
   vb.addEventListener('click', () => { verbOn = !verbOn; syncVerb(); save(); });
@@ -2187,11 +2442,13 @@ function wire() {
      finger wipe the other five. */
   const TOUCH = typeof window.TouchEvent !== 'undefined' && 'ontouchstart' in window;
   stage.addEventListener('touchstart', (e) => {
+    if (padsOff()) return;
     ensureAudio();
     fromTouches(e.touches);
     e.preventDefault();
   }, { passive: false });
   stage.addEventListener('touchmove', (e) => {
+    if (padsOff()) return;
     fromTouches(e.touches);
     e.preventDefault();
   }, { passive: false });
@@ -2206,7 +2463,7 @@ function wire() {
      and keeps this working on a browser that has no TouchEvent at all. */
   const penOnly = (e) => TOUCH && e.pointerType === 'touch';
   stage.addEventListener('pointerdown', (e) => {
-    if (penOnly(e)) return;
+    if (penOnly(e) || padsOff()) return;
     ensureAudio();
     ptr.set(e.pointerId, new Set(hitsAt(e.clientX, e.clientY)));
     recompute();
@@ -2225,7 +2482,7 @@ function wire() {
     document.addEventListener(g, (e) => e.preventDefault(), { passive: false });
 
   window.addEventListener('keydown', (e) => {
-    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || padsOff()) return;
     const i = KEYMAP[e.key.toLowerCase()];
     if (i === undefined) return;
     ensureAudio();
@@ -2312,6 +2569,22 @@ window.__MM = {
   padLabels: () => { const a = []; for (let i = 0; i < PADS; i++) a.push(padLabel(i)); return a; },
   padMidi: (i) => padMidi(i),
   setTool: (t) => { setTool(t); return tool; },
+  keymode: () => ({
+    up: !el('keymode').classList.contains('gone'),
+    gridUp: !document.getElementById('grid').classList.contains('gone'),
+    keys: el('km-keys').children.length,
+    modes: el('km-modes').children.length,
+    key: KIT.root, mode: KIT.mode,
+    scale: el('km-scale').textContent,
+    playing: SMP.playing, step: SMP.step,
+  }),
+  setKeyMode: (r, m) => { setKeyMode(r, m); return [KIT.root, KIT.mode]; },
+  sample: (what) => {
+    if (what === 'play') smpPlay();
+    else if (what === 'pause') smpPause();
+    else if (what === 'stop') smpStop();
+    return { playing: SMP.playing, step: SMP.step };
+  },
   picker: () => ({
     open: el('picker').classList.contains('open'),
     pad: pickIx,

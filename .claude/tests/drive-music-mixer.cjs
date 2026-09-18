@@ -364,11 +364,74 @@ for (let d = 0; d < 10; d++) {
 if (degMidi(0, major, 4, 7) - degMidi(0, major, 4, 0) !== 12)
   fail('the eighth note of the default kit is not an octave above the first');
 
+/* ------------------------------------------- the key/mode sample piece ---- */
+/* Written once in scale degrees and rendered through whatever key and mode is
+   picked, so a bad event is bad in all 144 combinations at once. The failure
+   worth catching is two events in one layer starting on the same step: that
+   double-triggers one note at double velocity and reads as a random accent. */
+const SAMPLE = eval('(' + bracketed(src, 'const SAMPLE =', '{', '}') + ')');  // eslint-disable-line no-eval
+const KEY_NAMES = eval(bracketed(src, 'const KEY_NAMES =', '[', ']'));        // eslint-disable-line no-eval
+
+if (KEY_NAMES.length !== 12) fail('KEY_NAMES has ' + KEY_NAMES.length + ' entries, expected 12');
+if (SAMPLE.chords.length !== SAMPLE.bars)
+  fail('SAMPLE has ' + SAMPLE.bars + ' bars but ' + SAMPLE.chords.length + ' chord roots');
+if (SAMPLE.bpm < 50 || SAMPLE.bpm > 200) fail('SAMPLE bpm ' + SAMPLE.bpm + ' is out of range');
+for (const r of SAMPLE.chords) {
+  if (!Number.isInteger(r) || r < 0 || r > 13) fail('SAMPLE chord root ' + r + ' is out of range');
+}
+let sampleNotes = 0;
+for (const layer of ['lh', 'rh', 'mel']) {
+  const rows = SAMPLE[layer];
+  if (!Array.isArray(rows) || rows.length !== SAMPLE.bars) {
+    fail('SAMPLE.' + layer + ' has ' + (rows || []).length + ' bars, expected ' + SAMPLE.bars);
+    continue;
+  }
+  rows.forEach((bar, b) => {
+    if (!bar.length) fail('SAMPLE.' + layer + ' bar ' + b + ' is empty — a silent bar in all three layers is a hole');
+    const seen = new Set();
+    for (const e of bar) {
+      const [st, degs, len, vel] = e;
+      const at = 'SAMPLE.' + layer + ' bar ' + b + ' step ' + st;
+      if (!Number.isInteger(st) || st < 0 || st >= SAMPLE.steps) fail(at + ': step out of the bar');
+      if (seen.has(st)) fail(at + ': two events start on this step, which double-triggers the note');
+      seen.add(st);
+      if (!Array.isArray(degs) || !degs.length) fail(at + ': no degrees');
+      for (const d of degs) {
+        if (!Number.isInteger(d) || d < -7 || d > 14) fail(at + ': degree ' + d + ' is out of range');
+      }
+      if (!Number.isInteger(len) || len < 1 || len > SAMPLE.steps * 2) fail(at + ': length ' + len + ' is out of range');
+      if (!(vel > 0) || vel > 1) fail(at + ': velocity ' + vel + ' is out of range');
+      sampleNotes += degs.length;
+    }
+  });
+}
+/* it has to sound like music in EVERY mode, so the walk is checked against the
+   shortest scale offered as well as the seven-note ones */
+for (const m of Object.keys(MODES)) {
+  const sc = MODES[m][1];
+  for (let b = 0; b < SAMPLE.bars; b++) {
+    for (const e of SAMPLE.rh[b]) {
+      for (const d of e[1]) {
+        const midi = degMidi(0, sc, 4, SAMPLE.chords[b] + d);
+        if (midi < 24 || midi > 108) fail('SAMPLE chord in ' + m + ' bar ' + b + ' lands at MIDI ' + midi);
+      }
+    }
+    for (const e of SAMPLE.mel[b]) {
+      for (const d of e[1]) {
+        const midi = degMidi(0, sc, 5, d);
+        if (midi < 36 || midi > 110) fail('SAMPLE melody in ' + m + ' bar ' + b + ' lands at MIDI ' + midi);
+      }
+    }
+  }
+}
+
 console.log('');
 console.log('SONGS=' + SONGS.length);
 console.log('VOICES=' + voiceNames.size);
 console.log('KIT=' + PITCH_KIT.length + ' pitched + ' + PERC_KIT.length + ' percussion, '
   + Object.keys(MODES).length + ' modes');
+console.log('SAMPLE=' + SAMPLE.bars + ' bars, ' + sampleNotes + ' notes, all '
+  + (Object.keys(MODES).length * 12) + ' key/mode combinations in range');
 console.log('PROBLEMS=' + problems.length);
 for (const p of problems) console.log('  - ' + p);
 console.log('MUSIC-MIXER: ' + (problems.length ? 'RED' : 'GREEN'));

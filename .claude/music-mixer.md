@@ -340,6 +340,51 @@ alone, so the grid stays playable in that view. The decision lives in
 contact patch, *which* pad a finger is on is `recompute()`'s answer, not the
 event's.
 
+## The key/mode screen and its sample
+
+CHANGE KEY & MODE takes the **whole play surface** rather than opening over it:
+picking a key is a decision about the instrument, not an adjustment made while
+playing. `setTool` swaps `#grid` for `#keymode` and back.
+
+`SAMPLE` is eight bars of plain piano written **once, in scale degrees**, and
+rendered through whatever is picked:
+
+- the left hand and the chord voicings are degrees relative to the **bar's
+  chord root**, so stacking `0, 2, 4` yields whatever triad the mode actually
+  has in that position — major, minor or diminished, correctly — with no
+  second version of the piece;
+- the melody is degrees relative to the **tonic**;
+- both are read at **schedule time**, once per step, which is what lets a key
+  change land inside one lookahead *without the loop losing its place*. That
+  is the CD's rule stated exactly: the structure never moves, only its colour.
+  The runtime gate asserts the step counter climbs across a key change, and a
+  version that reset it went red at `step 10 -> 2`.
+
+The sample gets **its own way to the bus** (`smpOut`) rather than borrowing a
+track's and inheriting that track's gate. Pause leaves the ~90 ms already in
+the graph to play out and the decays to ring — cutting them would be a mute,
+not a pause.
+
+The two lists set their **own** `touch-action: pan-y`. `#stage` refuses every
+gesture on behalf of the pads, and without that override it would refuse these
+scrolls too; `padsOff()` also makes the stage's touch, pointer and key
+handlers bail while the screen is up, so nothing on it reads as a pad press.
+
+### Rotating while the screen is up is the sharp edge
+
+`resize` still fires and still runs `layout()` while `#grid` is
+`display:none` — and a hidden element measures as **zero**, so every entry in
+`rects[]` becomes an empty box. Come back to the grid without re-measuring and
+the hit test is completely deaf: pads that light for nobody, no error, no clue.
+`setTool` therefore calls `layout()` on the way out.
+
+Worth knowing how this was nearly missed. The first version of the gate check
+only left the screen and pressed a seam; that passed with the re-measure
+deleted, because leaving the tool does not change the chrome's height and the
+grid came back the same size it left. Only rotating *while the screen was up*
+exposed it — and then it failed at **0 pads held, not one short**. A check that
+cannot be made to fail is not evidence.
+
 ## Gates
 
 ```
