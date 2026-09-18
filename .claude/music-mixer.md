@@ -340,6 +340,19 @@ alone, so the grid stays playable in that view. The decision lives in
 contact patch, *which* pad a finger is on is `recompute()`'s answer, not the
 event's.
 
+**TAP PAD suspends the lock toggle**, and has to. In lock mode a press
+*latches*, so the pad is still held on release and the "nothing held now" test
+that opens the picker never fires: the CD got a lit pad, a played note and no
+dialog (report, 2026-09-18). Note the shape of that bug — the tap did
+everything *except* the one thing it was for, which is why it read as
+intermittent rather than broken.
+
+It is **suspended, not switched off**: `lockOn()` is `lockMode && !lockSuspend`,
+and every latch decision goes through it. `lockMode` is a persisted CD setting,
+so a tool that cleared it would quietly change a preference as a side effect of
+being opened; this way the setting is untouched and comes back on the way out.
+The toggle is `disabled` while suspended rather than silently inert.
+
 ## The key/mode screen and its sample
 
 CHANGE KEY & MODE takes the **whole play surface** rather than opening over it:

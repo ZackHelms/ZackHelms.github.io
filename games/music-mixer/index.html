@@ -74,6 +74,7 @@ body {
 }
 .chip:active { transform: translateY(1px); box-shadow: inset 0 1px 0 #ffffff14, 0 1px 0 #04040a; }
 .chip.on { border-color: var(--green); color: var(--green); }
+.chip[disabled] { opacity: .3; pointer-events: none; }
 /* `gone` removes a control from the row entirely rather than dimming it: a
    tool that does not apply to what is selected is not a disabled button, it
    is not a button. */
@@ -445,7 +446,7 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 15:15 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 16:00 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -1858,6 +1859,21 @@ const touchOn = new Array(PADS).fill(false);
 const latched = new Array(PADS).fill(false);
 const contactPrev = new Array(PADS).fill(false);
 let lockMode = false;
+/* TAP PAD needs a press and a lift to be one gesture, and in lock mode a press
+   LATCHES: the pad is still held on release, so the "nothing held now" test
+   that opens the picker never fires and the pad just stays lit (CD report,
+   2026-09-18). The tool suspends lock rather than switching it off, so the
+   CD's own setting — which is persisted — survives a trip through the tool. */
+let lockSuspend = false;
+function lockOn() { return lockMode && !lockSuspend; }
+function syncLock() {
+  const b = el('lock');
+  if (!b) return;
+  b.classList.toggle('on', lockOn());
+  b.setAttribute('aria-pressed', lockOn() ? 'true' : 'false');
+  b.disabled = lockSuspend;
+  b.querySelector('.gl').textContent = lockOn() ? '\uD83D\uDD12' : '\uD83D\uDD13';
+}
 const ptr = new Map();
 function hitsAt(x, y) {
   const out = [];
@@ -1885,12 +1901,12 @@ function recompute(noLatch) {
       if (!noLatch) {
         /* in lock mode a press toggles the lock, so the pad answers at once
            in both directions; in hold mode a LIFT is what clears one */
-        if (c && lockMode) latched[i] = !latched[i];
-        else if (!c && !lockMode && latched[i]) latched[i] = false;
+        if (c && lockOn()) latched[i] = !latched[i];
+        else if (!c && !lockOn() && latched[i]) latched[i] = false;
       }
       contactPrev[i] = c;
     }
-    setHold(i, lockMode ? latched[i] : (latched[i] || c));
+    setHold(i, lockOn() ? latched[i] : (latched[i] || c));
   }
 }
 function fromTouches(list) {
@@ -2174,6 +2190,14 @@ function setTool(id) {
   }
   /* CHANGE KEY & MODE takes the whole play surface, so leaving it has to put
      the pads back AND drop whatever was held while it was up. */
+  /* TAP PAD reads a press-and-lift as one gesture, so it cannot share the
+     surface with a latch. Suspend lock for it and grey the toggle out. */
+  const wantHoldOnly = id === 'tappad';
+  if (wantHoldOnly !== lockSuspend) {
+    lockSuspend = wantHoldOnly;
+    releaseAll(true, true);
+    syncLock();
+  }
   const km = el('keymode');
   if (!km) return;
   const on = id === 'keymode';
@@ -2354,11 +2378,6 @@ function wire() {
   el('pk-close').addEventListener('click', closeOverlays);
 
   const lockBtn = el('lock');
-  const syncLock = () => {
-    lockBtn.classList.toggle('on', lockMode);
-    lockBtn.setAttribute('aria-pressed', lockMode ? 'true' : 'false');
-    lockBtn.querySelector('.gl').textContent = lockMode ? '\uD83D\uDD12' : '\uD83D\uDD13';
-  };
   lockBtn.addEventListener('click', () => {
     lockMode = !lockMode;
     /* Turning lock ON keeps whatever is already sounding: build a mix by hand,
@@ -2673,7 +2692,8 @@ window.__MM = {
     playing: T.playing, step: T.absStep, flash: flashQ.length,
     held: held.reduce((a, h) => a + (h ? 1 : 0), 0),
     locks: latched.reduce((a, h) => a + (h ? 1 : 0), 0),
-    lockMode,
+    lockMode, lockSuspend, lockEffective: lockOn(),
+    lockDisabled: !!el('lock').disabled,
     ctx: AC ? AC.state : 'none',
   }),
 };

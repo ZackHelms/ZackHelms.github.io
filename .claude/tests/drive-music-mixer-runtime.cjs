@@ -426,12 +426,62 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     else console.log('PICK=E4 CLAP, and the note list returns with a pitched voice');
     await page.evaluate(() => { window.__MM.setPad(0, 'm:piano', 0); window.__MM.setPad(12, 'p:hat'); });
 
-    /* TAP PAD's gesture rule: one quick tap opens the picker, a chord does not */
     const rgeom = await page.evaluate(() => {
       const pads = [...document.querySelectorAll('.pad')].map((p) => p.getBoundingClientRect());
       const c = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
       return { p2: c(pads[2]), p3: c(pads[3]), p7: c(pads[7]) };
     });
+
+    /* TAP PAD cannot share the surface with a latch. With lock ON, a press
+       LATCHES the pad, so it is still held on release and the "nothing held
+       now" test that opens the picker never fires: the CD got a lit pad, a
+       played note and no dialog (report, 2026-09-18). The tool suspends lock
+       rather than switching it off, so the persisted setting survives. */
+    const lockTrip = await page.evaluate(() => {
+      window.__MM.setTool('none');
+      const before = window.__MM.state().lockMode;
+      if (!before) document.getElementById('lock').click();   /* lock ON */
+      const onNow = window.__MM.state();
+      window.__MM.setTool('tappad');
+      const inTool = window.__MM.state();
+      window.__MM.setTool('none');
+      return { locked: onNow.lockEffective, inTool, after: window.__MM.state() };
+    });
+    if (!lockTrip.locked) fail('could not turn lock on to set up the TAP PAD check');
+    if (lockTrip.inTool.lockEffective)
+      fail('TAP PAD is active with lock still in effect — a press will latch and swallow the tap');
+    else if (!lockTrip.inTool.lockDisabled)
+      fail('the lock toggle is still enabled under TAP PAD');
+    else if (!lockTrip.after.lockMode)
+      fail('leaving TAP PAD lost the CD\'s lock setting instead of restoring it');
+    else console.log('TAP=lock suspended under the tool, setting restored on the way out');
+
+    /* and the symptom itself: with lock on, entering TAP PAD and tapping a pad
+       must still open the picker and must not leave the pad lit */
+    await page.evaluate(() => { window.__MM.setTool('tappad'); });
+    await page.waitForTimeout(120);
+    await setTouches([rgeom.p7]);
+    await page.waitForTimeout(60);
+    await setTouches([]);
+    await page.waitForTimeout(120);
+    const lockTap = await page.evaluate(() => ({
+      picker: window.__MM.picker(), held: window.__MM.state().held,
+    }));
+    if (!lockTap.picker.open) fail('with lock previously on, a tap under TAP PAD still opened no picker');
+    else if (lockTap.held !== 0) fail('the tapped pad stayed lit (' + lockTap.held + ' held) after the lift');
+    else console.log('TAP=lock-on regression clear: picker opens, pad does not stay lit');
+    await page.evaluate(() => document.getElementById('pk-close').click());
+    await page.waitForTimeout(60);
+    /* put lock back to off for the remaining checks — the toggle is disabled
+       under the tool, so it has to be left before it can be clicked */
+    await page.evaluate(() => {
+      window.__MM.setTool('none');
+      if (window.__MM.state().lockMode) document.getElementById('lock').click();
+      window.__MM.setTool('tappad');
+    });
+    await page.waitForTimeout(120);
+
+    /* TAP PAD's gesture rule: one quick tap opens the picker, a chord does not */
     await setTouches([rgeom.p2]);
     await page.waitForTimeout(60);
     await setTouches([]);
@@ -440,7 +490,7 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     if (!opened.open) fail('a single quick tap under TAP PAD did not open the picker');
     else if (opened.pad !== 2) fail('the tap opened the picker on pad ' + (opened.pad + 1) + ', expected 3');
     else console.log('TAP=pad 3  a lone quick tap opens its picker');
-    await page.click('#pk-close');
+    await page.evaluate(() => document.getElementById('pk-close').click());
     await page.waitForTimeout(60);
 
     await setTouches([rgeom.p3, rgeom.p7]);
