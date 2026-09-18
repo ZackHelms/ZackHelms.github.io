@@ -54,6 +54,34 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
   if (!(await page.evaluate(() => !!window.__MM))) {
     fail('the page exposes no __MM test hook');
   } else {
+    /* --- 0. boot state: nothing selected, but the grid is already there --
+       The CD's rule is that the grid is the invitation, so an unselected app
+       still shows pads. The failure this catches is the opposite one: a mode
+       with no song quietly taking the tempo strip, the wrench or the pads
+       with it, or the song list losing the two entries above the songs. */
+    const boot = await page.evaluate(() => window.__MM.state());
+    if (boot.mode !== 'none') fail('boot mode is "' + boot.mode + '", expected "none"');
+    if (boot.song !== null) fail('boot has song "' + boot.song + '" selected, expected none');
+    if (boot.sel !== '') fail('boot select value is "' + boot.sel + '", expected empty');
+    if (boot.infoShown) fail('the tempo strip is showing with no song selected');
+    if (boot.toolsShown) fail('the wrench is showing with no song selected');
+    const padsUp = await page.evaluate(() =>
+      [...document.querySelectorAll('.pad')].filter((p) => p.getBoundingClientRect().width > 20).length);
+    if (padsUp !== 15) fail('only ' + padsUp + ' pads are laid out with nothing selected, expected 15');
+    else console.log('BOOT=none  15 pads up, no song, no tempo strip, no wrench');
+
+    const opts = await page.evaluate(() => window.__MM.options());
+    const wantOpts = ['', 'rec', '0', '1', '2', '3', '4'];
+    if (opts.join('|') !== wantOpts.join('|'))
+      fail('song list is [' + opts.join(',') + '], expected [' + wantOpts.join(',') + ']');
+    else console.log('OPTIONS=' + opts.length + '  make-a-selection, record, then the five songs');
+
+    /* every icon in the song row must be the same height as the select */
+    const rowH = await page.evaluate(() => window.__MM.rowHeights());
+    if (rowH['song-select'] !== rowH.lock)
+      fail('song row heights differ: select ' + rowH['song-select'] + 'px vs lock ' + rowH.lock + 'px');
+    else console.log('ROW=' + rowH['song-select'] + 'px  select and lock match');
+
     /* --- 1. does an AudioContext come up at all? --------------------- */
     const up = await page.evaluate(() => window.__MM.audio());
     if (!up) fail('initAudio() did not produce a running AudioContext');
@@ -319,6 +347,120 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     await setTouches([]);
     if (zero !== 0) fail('with touch spread at 0 a seam press still held ' + zero + ' pads');
     else console.log('TOUCH=0  seam press with spread dialled to zero');
+
+    /* --- 7. RECORD NEW SONG: the pads become instruments -------------- */
+    /* A song GATES a running transport; the kit TRIGGERS notes. The bug this
+       is here for is the one where the two paths cross: a kit pad left gated
+       (silent, because no transport ever opens its gain) or a song pad left
+       triggering (every hold firing a stray one-shot). */
+    await page.evaluate(() => {
+      const s = document.getElementById('spread');
+      s.value = '12';
+      s.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.evaluate(() => window.__MM.pick('rec'));
+    await page.waitForTimeout(150);
+    const rec = await page.evaluate(() => window.__MM.state());
+    if (rec.mode !== 'rec') fail('picking RECORD NEW SONG left mode "' + rec.mode + '"');
+    if (rec.padMode !== 'live') fail('record mode has padMode "' + rec.padMode + '", expected "live"');
+    if (rec.playing) fail('record mode is running the song transport, which has nothing to play');
+    if (rec.infoShown) fail('record mode is showing a tempo strip for a song that does not exist yet');
+    if (!rec.toolsShown) fail('the wrench is hidden in record mode, where it is the only way in');
+    if (rec.tool !== 'tappad') fail('record mode opened on tool "' + rec.tool + '", expected "tappad"');
+    else console.log('REC=live   transport off, wrench up, TAP PAD selected');
+
+    const recH = await page.evaluate(() => window.__MM.rowHeights());
+    if (recH['song-select'] !== recH.tools || recH.tools !== recH.lock)
+      fail('record-mode row heights differ: select ' + recH['song-select'] +
+           ' / wrench ' + recH.tools + ' / lock ' + recH.lock);
+    else console.log('ROW=' + recH.tools + 'px  select, wrench and lock all match');
+
+    /* the default kit, exactly as specified: ten degrees of C major climbing
+       the two left columns, PULSE's five drums in the right one */
+    const labs = await page.evaluate(() => window.__MM.padLabels());
+    const wantLabs = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5',
+                      'KICK', 'SNARE', 'HAT', 'TOM', 'RIDE'];
+    if (labs.join(' ') !== wantLabs.join(' '))
+      fail('default kit reads [' + labs.join(' ') + '], expected [' + wantLabs.join(' ') + ']');
+    else console.log('KIT=' + labs.slice(0, 10).join(' ') + ' | ' + labs.slice(10).join(' '));
+    const oct = await page.evaluate(() => window.__MM.padMidi(7) - window.__MM.padMidi(0));
+    if (oct !== 12) fail('pad 8 is ' + oct + ' semitones over pad 1, expected an octave');
+
+    /* Switching modes must also SILENCE the song you left. Its already-
+       scheduled notes are still in the graph — a gamelan gong rings for six
+       seconds — so a record mode that opened the track gains to hear its own
+       pads would play the last song's tail underneath them. This floor check
+       is what tells the peak check below that it is measuring the kit. */
+    await page.waitForTimeout(700);
+    let ghost = 0;
+    for (let k = 0; k < 10; k++) {
+      await page.waitForTimeout(40);
+      ghost = Math.max(ghost, await page.evaluate(() => window.__MM.level()));
+    }
+    if (ghost > 0.01) fail('record mode is leaking the previous song at ' + ghost.toFixed(4) +
+      ' with no pad held — the outgoing song\'s tails are not damped');
+    else console.log('REC=quiet  ' + ghost.toFixed(4) + ' with nothing held, the old song is damped');
+
+    /* a kit pad must actually SOUND — the lamp lighting proves nothing */
+    let recPeak = 0;
+    await page.evaluate(() => window.__MM.hold(3, true));
+    for (let k = 0; k < 14; k++) {
+      await page.waitForTimeout(25);
+      recPeak = Math.max(recPeak, await page.evaluate(() => window.__MM.level()));
+    }
+    await page.evaluate(() => window.__MM.hold(3, false));
+    if (recPeak < 0.01) fail('holding a kit pad produced peak ' + recPeak.toFixed(4) + ' — the live path is silent');
+    else console.log('REC=sound  a kit pad peaks at ' + recPeak.toFixed(3));
+
+    /* assigning a pad: both halves of the picker, across the pitched/perc line */
+    const a1 = await page.evaluate(() => window.__MM.setPad(0, 'm:organ', 2));
+    if (a1 !== 'E4') fail('assigning organ at degree 2 labelled pad 1 "' + a1 + '", expected E4');
+    const a2 = await page.evaluate(() => window.__MM.setPad(12, 'p:clap'));
+    if (a2 !== 'CLAP') fail('assigning clap labelled pad 13 "' + a2 + '", expected CLAP');
+    /* crossing back to a pitched voice has to bring the note list back with it */
+    const a3 = await page.evaluate(() => {
+      window.__MM.setPad(12, 'm:vibes', 0);
+      return window.__MM.picker();
+    });
+    if (a3.notes < 14) fail('the note list offered only ' + a3.notes + ' notes after a pitched reassignment');
+    else console.log('PICK=E4 CLAP, and the note list returns with a pitched voice');
+    await page.evaluate(() => { window.__MM.setPad(0, 'm:piano', 0); window.__MM.setPad(12, 'p:hat'); });
+
+    /* TAP PAD's gesture rule: one quick tap opens the picker, a chord does not */
+    const rgeom = await page.evaluate(() => {
+      const pads = [...document.querySelectorAll('.pad')].map((p) => p.getBoundingClientRect());
+      const c = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+      return { p2: c(pads[2]), p3: c(pads[3]), p7: c(pads[7]) };
+    });
+    await setTouches([rgeom.p2]);
+    await page.waitForTimeout(60);
+    await setTouches([]);
+    await page.waitForTimeout(80);
+    const opened = await page.evaluate(() => window.__MM.picker());
+    if (!opened.open) fail('a single quick tap under TAP PAD did not open the picker');
+    else if (opened.pad !== 2) fail('the tap opened the picker on pad ' + (opened.pad + 1) + ', expected 3');
+    else console.log('TAP=pad 3  a lone quick tap opens its picker');
+    await page.click('#pk-close');
+    await page.waitForTimeout(60);
+
+    await setTouches([rgeom.p3, rgeom.p7]);
+    await page.waitForTimeout(60);
+    await setTouches([]);
+    await page.waitForTimeout(80);
+    const chord = await page.evaluate(() => window.__MM.picker());
+    if (chord.open) fail('a two-pad chord under TAP PAD opened a picker — the view must stay playable');
+    else console.log('TAP=chord  two pads at once is a chord, not an assignment');
+
+    /* and back: a song must restore gating, the tempo strip and the transport */
+    await page.evaluate(() => window.__MM.pick('0'));
+    await page.waitForTimeout(200);
+    const back = await page.evaluate(() => window.__MM.state());
+    if (back.mode !== 'song' || back.padMode !== 'gate')
+      fail('going back to a song left mode "' + back.mode + '" / padMode "' + back.padMode + '"');
+    else if (!back.playing) fail('going back to a song did not restart the transport');
+    else if (!back.infoShown) fail('going back to a song did not bring the tempo strip back');
+    else if (back.toolsShown) fail('the wrench is still showing on a built-in song');
+    else console.log('BACK=' + back.song + '  gating, tempo strip and transport all restored');
   }
 
   for (const e of errs) fail(e);

@@ -188,9 +188,15 @@ the data gate only demands a `PERC_BASE` entry for the latter.
 ## Signal chain
 
 ```
-voice -> trackGain[i] -> trackPan[i] -+-> bus -> limiter -> master -> out
-                                      +-> send -> convolver -> bus
+scheduled note -> trackGain[i] --+
+                                 +-> trackPan[i] -+-> bus -> limiter -> master
+live note -> its own gain -----> +                +-> send -> convolver -> bus
+              (trackLive[i])
 ```
+
+`trackGain[i]` is the song gate (0 unless the pad is held). `trackLive[i]` is
+always open and is how a kit note gets past it — see **Three selections, two
+pad behaviours** for why that separation is load-bearing.
 
 - The **limiter** (`DynamicsCompressorNode`) is what makes "hold everything"
   land instead of clip. Fifteen tracks is a loud sum.
@@ -239,6 +245,100 @@ JS only ever writes `--glow` and `--pulse`.
 Unlit pads are deliberately **saturated, not near-black** — the first pass had
 them at 38% saturation / 13% lightness and the rainbow was unreadable until a
 pad lit up.
+
+## Three selections, two pad behaviours
+
+The song dropdown has three kinds of entry, and each one puts the grid into a
+different job. `mode` names the selection, `padMode` names what a press does.
+
+| Selection | `mode` | `padMode` | Transport | Tempo strip | Wrench |
+| --- | --- | --- | --- | --- | --- |
+| MAKE A SELECTION (default) | `none` | `off` | stopped | hidden | hidden |
+| RECORD NEW SONG | `rec` | `live` | stopped | hidden | shown |
+| one of the five songs | `song` | `gate` | running | shown | hidden |
+
+**`gate` and `live` are opposite directions of travel and must stay separate
+code paths.** A song GATES a transport that was going to play that note anyway,
+so a held pad opens `trackGain[i]`. The kit has no transport, so a press has to
+TRIGGER a note that would not otherwise exist. Triggers also have to *stack* —
+tap the same pad twice quickly and you want two notes ringing — so each live
+note carries its own `GainNode` rather than sharing the track's.
+
+**A live note joins the chain past the song gate** (`trackLive[i]`, straight
+into the pan node). This is not a style choice. The song gate is what damps the
+notes an outgoing song already scheduled, and those tails run for seconds — a
+`gongAgeng` for six and a half. The first cut opened `trackGain` in live mode
+so kit pads could be heard, and the result was the last song bleeding in
+underneath the new kit for several seconds after the switch. The runtime gate's
+`REC=quiet` check measures exactly that: the floor with nothing held right
+after a mode switch, which read 0.132 with the bug and 0.0009 without.
+
+Re-striking a **sustaining** voice damps the note already on that pad, the way
+a re-struck key does; a drum, pluck or bell is left to ring and stack. Every
+live note is retired on a timer (`liveIdle`, swept in `frame()`), because a
+five-minute take would otherwise leave one `GainNode` per tap on the track
+forever.
+
+**`enterNone()` is silent on purpose.** The CD asked for "no song, no time
+track, no meter, but you do see the tap pads" — so the grid is up and lights
+under a finger, and makes no sound. That costs the game its old property that
+the very first touch always sounded (it used to boot straight into PULSE).
+Worth re-checking at playtest: if the silent first touch reads as broken rather
+than as "pick something", the fix is to let `none` borrow the kit, not to
+restore an auto-selected song.
+
+## Chrome geometry is cached, so every mode switch re-lays-out
+
+`rects[]` is filled by `measure()` from `layout()`, and the contact-patch hit
+test reads it — never the live DOM. Hiding the tempo strip changes the chrome's
+height, which moves and resizes all fifteen pads, so `syncChrome()` ends with a
+`layout()` call.
+
+This bit immediately on the first build: with the re-layout missing, every
+contact-patch check came up exactly one pad short (the CD's eight-finger grip
+held 12 instead of 15) because the hit test was aiming at where the pads used
+to be. It is a **silent** failure — the pads still light when you do hit one —
+and it is why the rule is written as "any layout-affecting change re-measures",
+not "resize and orientationchange re-measure".
+
+## The recording kit
+
+`KIT = { root, mode, oct, pads[15] }`, persisted at `musicMixer.kit`.
+
+- A pitched pad stores a **scale degree**, never a fixed pitch. That is the
+  whole reason CHANGE KEY & MODE can transpose a performance already recorded
+  rather than only retuning what you play next (CD call, 2026-09-18). `degMidi`
+  indexes the mode's interval table and wraps into the next octave past its
+  length, so degree 7 of a seven-note mode is the octave above degree 0.
+- The **default kit** is ten degrees of C major climbing the two left columns
+  (C4 D4 E4 F4 G4 | A4 B4 C5 D5 E5 — the eighth an octave over the first) and
+  PULSE's five drums in the right column, keeping the standing rule that the
+  right column is always percussion.
+- `PITCH_KIT` / `PERC_KIT` are the picker's two lists and they carry the same
+  `k:'m'` / `k:'p'` split the songs use, so an assigned pad drops straight into
+  the scheduler's existing branches. The data gate checks a percussion voice
+  has a `PERC_BASE` entry or is a `noi()` voice, and that no noise voice is
+  offered as pitched.
+- The note list is the **current scale across three octaves**, not a chromatic
+  run: a pad holds a degree, and an out-of-scale note would have no degree to
+  hold. Chromatic notes are the key/mode screen's problem, not the picker's.
+- `load()` rebuilds a stored kit field by field and never trusts it wholesale —
+  a pad naming a voice a later build dropped would throw on its first tap.
+
+## The wrench is a mode picker
+
+`TOOLS` lists five entries and `TOOL_READY` gates which are live; entries whose
+stage has not landed sit in the menu **disabled rather than hidden**, so the
+menu keeps its final shape and a greyed row says "later" without a caption
+saying so. The 0th entry is deliberately blank — it is "no tool", the plain
+replay state, and it is the default for a recorded song.
+
+Under **TAP PAD**, a pad that goes down *on its own* and comes back up inside
+650 ms opens its picker; a chord, a hold or a slide across a seam is left
+alone, so the grid stays playable in that view. The decision lives in
+`noteTap()`, called from `setHold`, rather than in the touch handlers — with a
+contact patch, *which* pad a finger is on is `recompute()`'s answer, not the
+event's.
 
 ## Gates
 

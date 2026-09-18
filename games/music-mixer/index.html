@@ -43,21 +43,15 @@ body {
 }
 
 /* ---------------------------------------------------------------- top bar */
+/* One chrome column: title bar, song row, tempo strip. EVERY control in the
+   song row is 38 px tall, the select included, because the CD asked for one
+   unbroken line of equal-height icons there — a 42 px lock beside a 40 px
+   select reads as a mistake even when it is deliberate. Restart moved back up
+   to the top bar's right end (its original spec home) to free that room. */
 #chrome {
   flex: 0 0 auto;
-  display: flex; flex-direction: row; gap: 6px;
+  display: flex; flex-direction: column; gap: 6px;
 }
-/* portrait: a right-hand rail beside the chrome rows — restart on the top
-   row, the lock toggle filling the height of the song and tempo rows */
-#chrome-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-#chrome-rail { flex: 0 0 auto; width: 42px; display: flex; flex-direction: column; gap: 6px; }
-#reload { width: 42px; flex: 0 0 auto; }
-#lock {
-  width: 42px; height: auto; flex: 1 1 auto;
-  flex-direction: column; gap: 2px; line-height: 1;
-}
-#lock .gl { font-size: 1rem; }
-#lock .cap { font-size: .4rem; letter-spacing: 1px; }
 #topbar {
   flex: 0 0 auto;
   display: flex; align-items: center; gap: 6px;
@@ -80,6 +74,10 @@ body {
 }
 .chip:active { transform: translateY(1px); box-shadow: inset 0 1px 0 #ffffff14, 0 1px 0 #04040a; }
 .chip.on { border-color: var(--green); color: var(--green); }
+/* `gone` removes a control from the row entirely rather than dimming it: a
+   tool that does not apply to what is selected is not a disabled button, it
+   is not a button. */
+.gone { display: none !important; }
 #back-btn { font-size: 1.3rem; }
 #title {
   font-family: 'Black Ops One', sans-serif;
@@ -90,9 +88,13 @@ body {
 }
 
 /* --------------------------------------------------------------- selector */
-#song-row { flex: 0 0 auto; }
+/* The select gives up full width so the row can carry the wrench and, later,
+   the transport. It truncates rather than wraps — a whole song title is worth
+   less than a reachable button. */
+#song-row { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+#song-wrap { position: relative; flex: 1 1 auto; min-width: 0; max-width: 430px; }
 #song-select {
-  width: 100%;
+  width: 100%; height: 38px;
   appearance: none; -webkit-appearance: none;
   background: linear-gradient(#141426, #0a0a15);
   color: var(--white);
@@ -100,16 +102,18 @@ body {
   font-size: .9rem; letter-spacing: 1px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 10px 34px 10px 12px;
+  padding: 0 32px 0 12px;
+  text-overflow: ellipsis;
   box-shadow: inset 0 1px 0 #ffffff12;
 }
-#song-row { position: relative; }
-#song-row::after {
+#song-select.unset { color: var(--dim); }
+#song-wrap::after {
   content: '\25BE';
   position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
   color: var(--green); pointer-events: none; font-size: .85rem;
 }
-
+#lock .gl { font-size: 1rem; }
+#tools { font-size: .95rem; }
 /* ------------------------------------------------------------- info strip */
 #info {
   flex: 0 0 auto;
@@ -294,34 +298,101 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
   cursor: pointer;
 }
 
+/* ---------------------------------------------------- tool menu + picker */
+/* The menu hangs off the wrench instead of sitting centred, so the pad you
+   are about to act on stays visible behind it. */
+#toolmenu {
+  position: fixed; z-index: 42;
+  min-width: 196px;
+  background: linear-gradient(#141428, #0b0b16);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 5px;
+  display: none;
+  box-shadow: 0 14px 40px #000d;
+}
+#toolmenu.open { display: block; }
+#toolmenu button {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; height: 34px;
+  background: none; border: 0; border-radius: 7px;
+  color: var(--white); font-family: inherit;
+  font-size: .72rem; letter-spacing: 1.5px; text-align: left;
+  padding: 0 9px; cursor: pointer;
+}
+#toolmenu button .tick { flex: 0 0 12px; color: var(--green); }
+#toolmenu button.sel { background: #1d1d38; }
+#toolmenu button:disabled { color: #2c2c48; cursor: default; }
+
+#picker {
+  position: fixed; z-index: 43;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(92vw, 400px);
+  max-height: 86dvh; overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px;
+  display: none;
+  box-shadow: 0 18px 50px #000d;
+}
+#picker.open { display: block; }
+#picker h2 {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'Black Ops One', sans-serif;
+  font-size: .9rem; letter-spacing: 3px;
+  color: var(--green); margin-bottom: 14px;
+}
+/* the swatch is the only thing tying this dialog to the pad it edits, so it
+   carries that pad's exact hue */
+#pk-swatch {
+  width: 22px; height: 22px; border-radius: 5px;
+  background: hsl(var(--h) 85% 52%);
+  box-shadow: 0 0 12px hsl(var(--h) 90% 55% / .6);
+}
+#picker select {
+  flex: 1 1 auto; min-width: 0; height: 34px;
+  appearance: none; -webkit-appearance: none;
+  background: linear-gradient(#141426, #0a0a15);
+  color: var(--white); font-family: inherit; font-size: .74rem;
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 0 10px;
+}
+#picker select:disabled { color: var(--border); }
+#pk-hear {
+  width: 100%; margin-top: 14px;
+  background: #16162a; border: 1px solid var(--border); color: var(--white);
+  border-radius: 8px; padding: 9px;
+  font-family: 'Black Ops One', sans-serif; font-size: .7rem; letter-spacing: 3px;
+  cursor: pointer;
+}
+#pk-close {
+  width: 100%; margin-top: 8px;
+  background: linear-gradient(#1b1b33, #10101f);
+  border: 1px solid var(--green); color: var(--green);
+  border-radius: 8px; padding: 10px;
+  font-family: 'Black Ops One', sans-serif; font-size: .78rem; letter-spacing: 3px;
+  cursor: pointer;
+}
+
 /* ----------------------------------------------------- landscape chrome */
 /* Three stacked strips cost 119 px of a 390 px-tall phone — 30% of the
    screen for text. Folded into one row the pads grow from 82 to ~104 px. */
 @media (orientation: landscape) and (max-height: 560px) {
-  #chrome {
-    flex-direction: row; align-items: center; gap: 8px;
-    padding-right: 0;
-  }
+  #chrome { flex-direction: row; align-items: center; gap: 8px; }
   #topbar .spacer, #title { display: none; }
   #topbar { height: auto; }
-  #song-row { flex: 1 1 auto; max-width: 330px; }
-  #song-select { padding: 8px 30px 8px 11px; font-size: .84rem; }
+  #song-row { flex: 1 1 auto; min-width: 0; }
+  #song-wrap { max-width: 300px; }
+  #song-select { font-size: .84rem; }
   #info { flex: 1 1 auto; overflow: hidden; }
-  #chrome-main { flex-direction: row; align-items: center; gap: 8px; }
-  #chrome-rail { flex-direction: row; width: auto; }
-  #lock { width: 38px; height: 38px; flex: 0 0 auto; }
-  #lock .cap { display: none; }
-  #reload { width: 38px; }
   #app { gap: 4px; }
 }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-17 22:11 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 14:56 UTC</div>
 
 <div id="app">
   <div id="chrome">
-   <div id="chrome-main">
     <div id="topbar">
       <a class="chip" id="back-btn" href="../index.html" aria-label="Back to games">&#8592;</a>
       <button class="chip" id="settings-btn" aria-label="Settings">&#9881;</button>
@@ -329,10 +400,15 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
       <div class="spacer"></div>
       <div id="title">MUSIC MIXER</div>
       <div class="spacer"></div>
+      <button class="chip" id="reload" aria-label="Restart song">&#8635;</button>
     </div>
 
     <div id="song-row">
-      <select id="song-select" aria-label="Song"></select>
+      <div id="song-wrap"><select id="song-select" aria-label="Song"></select></div>
+      <button class="chip gone" id="tools" aria-label="Tools">&#128295;</button>
+      <button class="chip" id="lock" aria-label="Tap to lock" aria-pressed="false">
+        <span class="gl">&#128275;</span>
+      </button>
     </div>
 
     <div id="info">
@@ -344,14 +420,6 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
       <span class="grow"></span>
       <span id="section-name"></span>
     </div>
-
-   </div>
-   <div id="chrome-rail">
-     <button class="chip" id="reload" aria-label="Restart song">&#8635;</button>
-     <button class="chip" id="lock" aria-label="Tap to lock" aria-pressed="false">
-       <span class="gl">&#128275;</span><span class="cap">LOCK</span>
-     </button>
-   </div>
   </div>
 
   <div id="stage"><div id="grid"></div></div>
@@ -388,7 +456,7 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
   <p>Every pad is one track of the song. The transport runs whether or not you
   are holding anything, so tracks always come in on the beat and in sync. Hold
   all fifteen and you hear the whole arrangement.</p>
-  <p>The <b>&#128275; LOCK</b> toggle on the right switches how a pad answers. Off,
+  <p>The <b>&#128275;</b> toggle at the end of the song row switches how a pad answers. Off,
   a track sounds only while you hold it. On, a tap turns a pad on and leaves it
   on until you tap it again. Switching lock off does not release what is already
   locked &mdash; tap a locked pad to let it go. <b>&#8635;</b> restarts the song
@@ -403,6 +471,14 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
   melody. Rotate to landscape and the same three groups become rows, percussion
   on top.</p>
 
+  <h3>RECORDING</h3>
+  <p>Pick <b>RECORD NEW SONG</b> at the top of the song list and the pads stop
+  being a mixer and become instruments: the two left columns are ten notes of a
+  scale climbing from the red pad, and the right column stays percussion. The
+  <b>&#128295;</b> button beside the song list is where the rest of it lives.</p>
+  <p>Under <b>TAP PAD</b>, a quick tap on a single pad opens its sound. Chords,
+  holds and slides still play normally, so you can keep playing in that view.</p>
+
   <h3>KEYBOARD</h3>
   <p>Keys match the landscape layout &mdash; percussion on the number row:<br>
   <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd><kbd>5</kbd> percussion<br>
@@ -410,6 +486,22 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
   <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd> low end</p>
 
   <button id="close-settings">CLOSE</button>
+</div>
+
+<div id="toolmenu" role="menu" aria-label="Tools"></div>
+
+<div id="picker" role="dialog" aria-label="Pad sound">
+  <h2><span id="pk-swatch"></span><span id="pk-title">PAD</span></h2>
+  <div class="srow">
+    <label for="pk-voice">SOUND</label>
+    <select id="pk-voice"></select>
+  </div>
+  <div class="srow">
+    <label for="pk-note">NOTE</label>
+    <select id="pk-note"></select>
+  </div>
+  <button id="pk-hear">HEAR IT</button>
+  <button id="pk-close">DONE</button>
 </div>
 
 <script>
@@ -444,7 +536,7 @@ const KEYMAP = {};
 /* ------------------------------------------------------------------- audio */
 let AC = null, master = null, comp = null, bus = null, verb = null, verbIn = null;
 let NOISE = null, audioReady = false;
-const trackGain = [], trackSend = [], trackPan = [];
+const trackGain = [], trackSend = [], trackPan = [], trackLive = [];
 let noiseCursor = 0;
 
 /* deterministic PRNG — every bake and every humanise offset is reproducible */
@@ -488,12 +580,17 @@ function initAudio() {
 
   for (let i = 0; i < PADS; i++) {
     const g = AC.createGain(); g.gain.value = 0;
+    /* A live (kit) note joins the chain PAST the song gate. It has to: the
+       gate is what mutes the notes an outgoing song already scheduled, and
+       those tails run for seconds — a gong for six. Opening the gate to let
+       kit notes through would have let the last song bleed in under them. */
+    const lg = AC.createGain(); lg.gain.value = 1;
     const pan = AC.createStereoPanner ? AC.createStereoPanner() : null;
     const send = AC.createGain(); send.gain.value = 0;
-    if (pan) { g.connect(pan); pan.connect(bus); pan.connect(send); }
-    else { g.connect(bus); g.connect(send); }
+    if (pan) { g.connect(pan); lg.connect(pan); pan.connect(bus); pan.connect(send); }
+    else { g.connect(bus); lg.connect(bus); g.connect(send); lg.connect(send); }
     send.connect(verbIn);
-    trackGain[i] = g; trackSend[i] = send; trackPan[i] = pan;
+    trackGain[i] = g; trackSend[i] = send; trackPan[i] = pan; trackLive[i] = lg;
   }
   audioReady = true;
   return AC;
@@ -893,6 +990,8 @@ const VOICE_DEFS = {
   gambang:   () => fm({ ratio: 3.15, index: 1.05, iDec: 0.022, dec: 0.26, amp: 0.34, parts: [[1, 1], [3.1, 0.13]], partDec: 0.35, thump: 1, snd: 0.22 }),
   balafon:   () => fm({ ratio: 2.05, index: 1.35, iDec: 0.03, dec: 0.42, amp: 0.38, parts: [[1, 1], [2.9, 0.12]], partDec: 0.4, thump: 1, snd: 0.26 }),
   kalimba:   () => fm({ ratio: 2.9, index: 0.85, iDec: 0.03, dec: 0.55, amp: 0.3, parts: [[1, 1], [3.4, 0.1]], partDec: 0.4, snd: 0.3 }),
+  /* the hammer is the fast index decay; `thump` is the knock under it */
+  piano:     () => fm({ ratio: 1, index: 2.8, iDec: 0.03, dec: 2.0, amp: 0.36, parts: [[1, 1], [2, 0.2], [3.01, 0.07]], partDec: 0.62, thump: 1, snd: 0.22 }),
   rhodes:    () => fm({ ratio: 1, index: 1.9, iDec: 0.07, dec: 1.25, amp: 0.34, parts: [[1, 1], [2, 0.14]], partDec: 0.55, snd: 0.22 }),
   vibes:     () => fm({ ratio: 4, index: 0.6, iDec: 0.05, dec: 1.7, amp: 0.3, parts: [[1, 1], [4.02, 0.1]], partDec: 0.5, trem: 4.2, snd: 0.32 }),
   fmbell:    () => fm({ ratio: 3.5, index: 0.9, iDec: 0.06, dec: 1.15, amp: 0.26, parts: [[1, 1], [2.76, 0.12]], partDec: 0.45, snd: 0.36 }),
@@ -1271,6 +1370,81 @@ const PERC_BASE = {
   dundun: 72, dholak: 148, tablaGe: 96, tablaNa: 318, kendang: 132,
   gongAgeng: 58, gongMid: 155, manjira: 1380, jazzRide: 380,
 };
+/* ================================================== keys, modes and the kit */
+/* A recording stores SCALE DEGREES, never fixed pitches. That is the whole
+   reason "change key and mode" can transpose a performance you already played
+   rather than only retuning what you play next (CD call, 2026-09-18). A degree
+   indexes the mode's interval table and wraps into the next octave past its
+   length, so degree 7 of a seven-note mode is the octave above degree 0 — that
+   is what puts the top of the left column an octave over its foot. */
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const MODES = {
+  major:      ['MAJOR',            [0, 2, 4, 5, 7, 9, 11]],
+  minor:      ['NATURAL MINOR',    [0, 2, 3, 5, 7, 8, 10]],
+  dorian:     ['DORIAN',           [0, 2, 3, 5, 7, 9, 10]],
+  phrygian:   ['PHRYGIAN',         [0, 1, 3, 5, 7, 8, 10]],
+  lydian:     ['LYDIAN',           [0, 2, 4, 6, 7, 9, 11]],
+  mixolydian: ['MIXOLYDIAN',       [0, 2, 4, 5, 7, 9, 10]],
+  locrian:    ['LOCRIAN',          [0, 1, 3, 5, 6, 8, 10]],
+  harmMinor:  ['HARMONIC MINOR',   [0, 2, 3, 5, 7, 8, 11]],
+  melMinor:   ['MELODIC MINOR',    [0, 2, 3, 5, 7, 9, 11]],
+  pentaMaj:   ['MAJOR PENTATONIC', [0, 2, 4, 7, 9]],
+  pentaMin:   ['MINOR PENTATONIC', [0, 3, 5, 7, 10]],
+  blues:      ['BLUES',            [0, 3, 5, 6, 7, 10]],
+};
+function scaleOf(m) { return (MODES[m] || MODES.major)[1]; }
+/* MIDI 60 is C4, so octave o starts at 12 * (o + 1). */
+function degMidi(root, mode, oct, deg) {
+  const sc = scaleOf(mode), n = sc.length;
+  const o = Math.floor(deg / n);
+  return 12 * (oct + 1) + root + sc[deg - o * n] + 12 * o;
+}
+function midiName(m) { return NOTE_NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1); }
+function midiHz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+/* The picker's two lists. A voice is PERCUSSIVE here when it is played the
+   percussion way — its own natural pitch scaled by `tune` — and PITCHED when
+   it is played by scale degree. Same k:'p' / k:'m' split the songs use, so a
+   pad assigned here drops straight into the scheduler's existing branches. */
+const PERC_KIT = [
+  ['kick', 'KICK'], ['kickSoft', 'SOFT KICK'], ['surdo', 'SURDO'], ['tom', 'TOM'],
+  ['conga', 'CONGA'], ['djembe', 'DJEMBE'], ['dundun', 'DUNDUN'], ['dholak', 'DHOLAK'],
+  ['tablaGe', 'TABLA GE'], ['tablaNa', 'TABLA NA'], ['kendang', 'KENDANG'],
+  ['snare', 'SNARE'], ['snareGhost', 'GHOST SNARE'], ['rim', 'RIM'], ['clap', 'CLAP'],
+  ['hat', 'HAT'], ['shaker', 'SHAKER'], ['brush', 'BRUSH'], ['ride', 'RIDE'],
+  ['crash', 'CRASH'], ['kecer', 'KECER'], ['clave', 'CLAVE'], ['gankogui', 'GANKOGUI'],
+  ['manjira', 'MANJIRA'], ['jazzRide', 'JAZZ RIDE'], ['gongMid', 'GONG'],
+  ['gongAgeng', 'GREAT GONG'],
+];
+const PITCH_KIT = [
+  ['piano', 'PIANO'], ['rhodes', 'RHODES'], ['organ', 'ORGAN'], ['celeste', 'CELESTE'],
+  ['vibes', 'VIBES'], ['fmbell', 'BELL'], ['kalimba', 'KALIMBA'], ['balafon', 'BALAFON'],
+  ['gambang', 'GAMBANG'], ['saron', 'SARON'], ['peking', 'PEKING'], ['slenthem', 'SLENTHEM'],
+  ['gender', 'GENDER'], ['bonang', 'BONANG'], ['nylon', 'NYLON GUITAR'],
+  ['steelStr', 'STEEL GUITAR'], ['kora', 'KORA'], ['koraHi', 'KORA HIGH'],
+  ['ngoni', 'NGONI'], ['sitar', 'SITAR'], ['tanpura', 'TANPURA'], ['santoor', 'SANTOOR'],
+  ['harpGliss', 'HARP'], ['upright', 'UPRIGHT BASS'], ['bassPick', 'PICKED BASS'],
+  ['subBass', 'SUB BASS'], ['sawBass', 'SAW BASS'], ['pulseLead', 'PULSE LEAD'],
+  ['squareArp', 'SQUARE ARP'], ['supersaw', 'SUPERSAW'], ['sawPad', 'PAD'],
+  ['strings', 'STRINGS'], ['voxPad', 'VOICES'], ['rebab', 'REBAB'], ['sarangi', 'SARANGI'],
+  ['bansuri', 'BANSURI'], ['suling', 'SULING'], ['sax', 'SAX'], ['trumpet', 'TRUMPET'],
+];
+const VOICE_LAB = {};
+for (const e of PERC_KIT) VOICE_LAB[e[0]] = e[1];
+for (const e of PITCH_KIT) VOICE_LAB[e[0]] = e[1];
+
+/* The default recording kit: ten scale degrees climbing the two left columns
+   and PULSE's drum kit in the right one, which keeps the standing rule that
+   the right column is always percussion. */
+const DEFAULT_PERC = ['kick', 'snare', 'hat', 'tom', 'ride'];
+function defaultKit() {
+  const pads = [];
+  for (let i = 0; i < 10; i++) pads.push({ v: 'piano', k: 'm', deg: i });
+  for (let i = 0; i < 5; i++) pads.push({ v: DEFAULT_PERC[i], k: 'p', tune: 1 });
+  return { root: 0, mode: 'major', oct: 4, pads };
+}
+let KIT = defaultKit();
+
 const LOOKAHEAD = 0.09, TICK_MS = 20;
 
 let S = null, songIx = 0;
@@ -1375,6 +1549,12 @@ function scheduleLoop() {
   }
 }
 
+function stopTransport() {
+  T.playing = false;
+  if (schedTimer) { clearInterval(schedTimer); schedTimer = null; }
+  flashQ.length = 0;
+}
+
 function startTransport(reset) {
   if (!AC) return;
   if (reset || !T.playing) {
@@ -1412,11 +1592,11 @@ function buildPads() {
   }
 }
 
+const PAD_KEYS = ['A', 'S', 'D', 'F', 'G', 'Q', 'W', 'E', 'R', 'T', '1', '2', '3', '4', '5'];
 function labelPads() {
-  const keys = ['A', 'S', 'D', 'F', 'G', 'Q', 'W', 'E', 'R', 'T', '1', '2', '3', '4', '5'];
   for (let i = 0; i < PADS; i++) {
-    padEl[i].querySelector('.lab').textContent = S.tracks[i].lab;
-    padEl[i].querySelector('.num').textContent = keys[i];
+    padEl[i].querySelector('.lab').textContent = padLabel(i);
+    padEl[i].querySelector('.num').textContent = PAD_KEYS[i];
   }
 }
 
@@ -1448,13 +1628,88 @@ function measure() {
   for (let i = 0; i < PADS; i++) rects[i] = padEl[i].getBoundingClientRect();
 }
 
+/* ------------------------------------------------------- the live pad path */
+/* The five built-in songs GATE a running transport: a held pad opens its
+   track gain and the scheduler was always going to play that note anyway. A
+   kit pad does the opposite — a press TRIGGERS a note that would not exist
+   otherwise. They have to be separate paths because triggers STACK (tap the
+   same pad twice quickly and you want two notes ringing), so each live note
+   gets its own gain to be released through instead of sharing the track's.
+     padMode: 'gate' a song | 'live' the kit | 'off' nothing selected. */
+let padMode = 'off';
+let mode = 'none';                 /* 'none' | 'rec' | 'song' */
+let selValue = '';
+const REC_VALUE = 'rec';
+const liveNote = new Array(PADS).fill(null);
+const liveIdle = [];
+
+function padMidi(i) {
+  const pd = KIT.pads[i];
+  return degMidi(KIT.root, KIT.mode, KIT.oct, pd.deg || 0);
+}
+function padVoiceName(i) {
+  if (padMode === 'live') return KIT.pads[i].v;
+  return S ? S.tracks[i].v : null;
+}
+function padLabel(i) {
+  if (mode === 'song') return S.tracks[i].lab;
+  if (mode !== 'rec') return '';
+  const pd = KIT.pads[i];
+  return pd.k === 'p' ? (VOICE_LAB[pd.v] || pd.v) : midiName(padMidi(i));
+}
+
+function trigger(i) {
+  if (!audioReady) return;
+  const pd = KIT.pads[i], v = voice(pd.v);
+  /* re-striking a SUSTAINING voice damps the note already there, the way a
+     re-struck key does; a drum, pluck or bell is left to ring and stack */
+  if (liveNote[i] && liveNote[i].sus) releaseNote(i, true);
+  liveNote[i] = null;
+  const g = AC.createGain();
+  g.gain.value = 1;
+  g.connect(trackLive[i]);
+  const t = AC.currentTime + 0.003;
+  const d = pd.k === 'p' ? 0.4 : (v.s ? 8 : 3);
+  if (pd.k === 'p') {
+    v.f({ t, f: (PERC_BASE[pd.v] || 140) * (pd.tune || 1), r: pd.tune || 1,
+          d, v: 0.9, c: 'X', out: g });
+  } else {
+    v.f({ t, f: midiHz(padMidi(i)), r: 1, d, v: 0.8, c: '1', out: g });
+  }
+  /* every live note is retired on a timer: a five-minute take would otherwise
+     leave one GainNode per tap hanging off the track forever */
+  liveIdle.push({ g, at: t + d + 3 });
+  liveNote[i] = { g, sus: !!v.s };
+  pulse[i] = 1;
+}
+function releaseNote(i, hard) {
+  const n = liveNote[i];
+  if (!n) return;
+  liveNote[i] = null;
+  if (!n.sus && !hard) return;     /* nothing left to cut off */
+  const now = AC.currentTime, g = n.g.gain;
+  if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(now);
+  else { g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); }
+  g.linearRampToValueAtTime(0, now + (hard ? 0.006 : 0.11));
+}
+function sweepLive() {
+  if (!AC) return;
+  const now = AC.currentTime;
+  while (liveIdle.length && liveIdle[0].at <= now) {
+    try { liveIdle.shift().g.disconnect(); } catch (e) {}
+  }
+}
+
 function setHold(i, on) {
   if (held[i] === on) return;
   held[i] = on;
   padEl[i].classList.toggle('down', on);
   padEl[i].classList.toggle('lit', on);
   padEl[i].style.setProperty('--glow', on ? '1' : '0');
-  if (!audioReady) return;
+  noteTap(i, on);
+  if (!audioReady || padMode === 'off') return;
+  if (padMode === 'live') { if (on) trigger(i); else releaseNote(i); return; }
+  if (!S) return;
   const g = trackGain[i].gain, now = AC.currentTime;
   const v = voice(S.tracks[i].v);
   const rel = v.s ? 0.13 : 0.028;
@@ -1532,21 +1787,27 @@ function ensureAudio() {
     applyVolume();
   }
   if (AC.state === 'suspended') AC.resume();
-  startTransport(false);
+  if (padMode === 'gate' && S) startTransport(false);
 }
 
 function applyAudioSong() {
   if (!audioReady) return;
+  const now = AC.currentTime;
   /* A gamelan ensemble and a synthwave track do not sum to the same level;
      without this the song dropdown doubles as a volume control. */
-  bus.gain.setTargetAtTime(S.mix == null ? 1 : S.mix, AC.currentTime, 0.05);
+  bus.gain.setTargetAtTime(padMode === 'gate' && S && S.mix != null ? S.mix : 1, now, 0.05);
   for (let i = 0; i < PADS; i++) {
-    const tr = S.tracks[i];
-    const v = voice(tr.v);
-    if (trackPan[i]) trackPan[i].pan.value = tr.pan || 0;
+    /* the song gate closes in every mode but a playing song — live notes come
+       in past it, so this can stay shut and damp the outgoing song's tails */
+    const open = padMode === 'gate' && S && held[i] ? 1 : 0;
+    const name = padVoiceName(i);
+    trackGain[i].gain.cancelScheduledValues(now);
+    trackGain[i].gain.setValueAtTime(open, now);
+    if (!name) continue;
+    const v = voice(name);
+    const tr = padMode === 'gate' && S ? S.tracks[i] : null;
+    if (trackPan[i]) trackPan[i].pan.value = tr ? (tr.pan || 0) : 0;
     trackSend[i].gain.value = verbOn ? v.snd : 0;
-    trackGain[i].gain.cancelScheduledValues(AC.currentTime);
-    trackGain[i].gain.setValueAtTime(held[i] ? 1 : 0, AC.currentTime);
     /* bake this song's string models up front rather than on the first note */
     if (v.ks) for (const a of v.ks.anchors) ksBuf(v.ks.name, v.ks.o, a);
   }
@@ -1563,24 +1824,69 @@ function fmtTime(s) {
   return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
 }
 
+/* Leaving a mode is its own step: release the fingers and the locks, stop the
+   clock and damp every live note BEFORE padMode changes, or the outgoing
+   mode's notes get released down the incoming mode's path and hang. */
+function leaveMode() {
+  releaseAll(true, true);
+  stopTransport();
+  for (let i = 0; i < PADS; i++) releaseNote(i, true);
+  for (let i = 0; i < PADS; i++) { pulse[i] = 0; lastPulse[i] = -1; }
+  closeOverlays();
+}
+
 function selectSong(ix, keepClock) {
+  leaveMode();
   songIx = ((ix % SONGS.length) + SONGS.length) % SONGS.length;
   S = SONGS[songIx];
-  for (let i = 0; i < PADS; i++) { pulse[i] = 0; lastPulse[i] = -1; }
-  /* different song, different fifteen tracks — carrying locks across would
-     lock pads the player never chose */
-  releaseAll(true, true);
-  labelPads();
+  mode = 'song'; padMode = 'gate'; selValue = String(songIx);
   el('bpm').textContent = String(S.bpm);
   el('sig').textContent = S.sig;
   el('duration').textContent = fmtTime(S.dur);
-  el('song-select').value = String(songIx);
-  flashQ.length = 0;
+  setTool('none');
+  syncChrome();
+  labelPads();
   if (audioReady) {
     applyAudioSong();
     if (!keepClock) startTransport(true);
   }
-  try { localStorage.setItem('musicMixer.song', String(songIx)); } catch (e) {}
+}
+
+/* Nothing picked: the pads are still there and still light up, because the
+   grid is the invitation — but there is no song, so there is no clock, no
+   meter and no sound. */
+function enterNone() {
+  leaveMode();
+  S = null;
+  mode = 'none'; padMode = 'off'; selValue = '';
+  setTool('none');
+  syncChrome();
+  labelPads();
+  if (audioReady) applyAudioSong();
+}
+
+/* RECORD NEW SONG: no arrangement to gate, so the pads become instruments. */
+function enterRecord() {
+  leaveMode();
+  S = null;
+  mode = 'rec'; padMode = 'live'; selValue = REC_VALUE;
+  setTool('tappad');
+  syncChrome();
+  labelPads();
+  if (audioReady) applyAudioSong();
+}
+
+function syncChrome() {
+  el('info').classList.toggle('gone', mode !== 'song');
+  el('tools').classList.toggle('gone', mode !== 'rec');
+  const sel = el('song-select');
+  sel.value = selValue;
+  sel.classList.toggle('unset', selValue === '');
+  /* Hiding the tempo strip changes the chrome's height, which moves and
+     resizes every pad. The hit test reads CACHED rects, so a mode switch that
+     did not re-measure would leave the contact patch aiming at where the pads
+     used to be — a silent miss, since the pads still light when hit. */
+  if (grid) layout();
 }
 
 function save() {
@@ -1588,6 +1894,9 @@ function save() {
     localStorage.setItem('musicMixer.cfg', JSON.stringify(
       { volume, spreadPx, labelsOn, verbOn, muted, lockMode }));
   } catch (e) {}
+}
+function saveKit() {
+  try { localStorage.setItem('musicMixer.kit', JSON.stringify(KIT)); } catch (e) {}
 }
 function load() {
   try {
@@ -1598,20 +1907,199 @@ function load() {
     if (typeof c.verbOn === 'boolean') verbOn = c.verbOn;
     if (typeof c.muted === 'boolean') muted = c.muted;
     if (typeof c.lockMode === 'boolean') lockMode = c.lockMode;
-    const s = parseInt(localStorage.getItem('musicMixer.song') || '0', 10);
-    if (s >= 0 && s < SONGS.length) songIx = s;
   } catch (e) {}
+  /* The kit is rebuilt field by field, never trusted wholesale: a stored pad
+     naming a voice a later build dropped would throw on its first tap. */
+  try {
+    const k = JSON.parse(localStorage.getItem('musicMixer.kit') || 'null');
+    if (k && Array.isArray(k.pads) && k.pads.length === PADS) {
+      const out = defaultKit();
+      if (typeof k.root === 'number' && k.root >= 0 && k.root < 12) out.root = k.root | 0;
+      if (MODES[k.mode]) out.mode = k.mode;
+      if (typeof k.oct === 'number' && k.oct >= 0 && k.oct <= 7) out.oct = k.oct | 0;
+      for (let i = 0; i < PADS; i++) {
+        const q = k.pads[i] || {};
+        if (!VOICE_LAB[q.v]) continue;
+        out.pads[i] = { v: q.v, k: q.k === 'p' ? 'p' : 'm',
+                        deg: typeof q.deg === 'number' ? q.deg | 0 : 0, tune: 1 };
+      }
+      KIT = out;
+    }
+  } catch (e) {}
+}
+
+/* ================================================== tools menu and picker */
+/* The wrench is a MODE picker, not a command button: each entry puts the pad
+   grid into a different job. Entries whose stage has not landed yet sit in the
+   list disabled rather than being hidden, so the menu keeps its final shape
+   and a greyed row says "later" without a caption saying it. */
+const TOOLS = [
+  ['none',    ''],
+  ['tappad',  'TAP PAD'],
+  ['keymode', 'CHANGE KEY & MODE'],
+  ['record',  'RECORD'],
+  ['edit',    'REPLAY & EDIT'],
+];
+const TOOL_READY = { none: 1, tappad: 1 };
+let tool = 'none';
+let pickIx = -1;
+
+function setTool(id) {
+  if (!TOOL_READY[id]) id = 'none';
+  tool = id;
+  tapCand = -1;
+  const menu = el('toolmenu');
+  if (menu) for (const b of menu.children) {
+    b.classList.toggle('sel', b.dataset.tool === id);
+    b.querySelector('.tick').textContent = b.dataset.tool === id ? '✓' : '';
+  }
+}
+
+/* TAP PAD assignment. A pad that goes down ON ITS OWN and comes back up
+   quickly opens its picker; anything else — a chord, a hold, a slide across
+   the seam — is left alone, so the grid still plays normally in this view.
+   Decided here rather than in the touch handlers because the contact patch
+   means WHICH pad a finger is on is recompute()'s answer, not the event's. */
+let tapCand = -1, tapAt = 0;
+function noteTap(i, on) {
+  if (tool !== 'tappad') return;
+  let n = 0;
+  for (let k = 0; k < PADS; k++) if (held[k]) n++;
+  if (on) { tapCand = n === 1 ? i : -1; tapAt = performance.now(); }
+  else if (i === tapCand && n === 0 && performance.now() - tapAt < 650) {
+    tapCand = -1;
+    openPicker(i);
+  }
+}
+
+function closeOverlays() {
+  const v = el('veil');
+  if (!v) return;
+  v.classList.remove('open');
+  el('settings').classList.remove('open');
+  el('toolmenu').classList.remove('open');
+  el('picker').classList.remove('open');
+}
+
+function fillVoiceSelect(pd) {
+  const s = el('pk-voice');
+  s.innerHTML = '';
+  const add = (label, list, k) => {
+    const g = document.createElement('optgroup');
+    g.label = label;
+    for (const e of list) {
+      const o = document.createElement('option');
+      o.value = k + ':' + e[0];
+      o.textContent = e[1];
+      g.appendChild(o);
+    }
+    s.appendChild(g);
+  };
+  add('PITCHED', PITCH_KIT, 'm');
+  add('PERCUSSION', PERC_KIT, 'p');
+  s.value = pd.k + ':' + pd.v;
+}
+/* The note list is the CURRENT SCALE across three octaves, not a chromatic
+   run: pads hold degrees so that changing key transposes what is already
+   recorded, and an out-of-scale pad would have no degree to hold. Chromatic
+   notes are the key/mode screen's job. */
+function fillNoteSelect(pd) {
+  const s = el('pk-note');
+  s.innerHTML = '';
+  s.disabled = pd.k !== 'm';
+  if (s.disabled) {
+    const o = document.createElement('option');
+    o.textContent = '—';
+    s.appendChild(o);
+    return;
+  }
+  const n = scaleOf(KIT.mode).length;
+  for (let d = -n; d < 3 * n; d++) {
+    const o = document.createElement('option');
+    o.value = String(d);
+    o.textContent = midiName(degMidi(KIT.root, KIT.mode, KIT.oct, d)) +
+                    '  ·  deg ' + ((((d % n) + n) % n) + 1);
+    s.appendChild(o);
+  }
+  s.value = String(pd.deg || 0);
+}
+function openPicker(i) {
+  pickIx = i;
+  const pd = KIT.pads[i];
+  el('pk-title').textContent = 'PAD ' + (i + 1);
+  el('pk-swatch').style.setProperty('--h', String(HUES[i]));
+  fillVoiceSelect(pd);
+  fillNoteSelect(pd);
+  el('veil').classList.add('open');
+  el('picker').classList.add('open');
+}
+function auditionPad(i) {
+  ensureAudio();
+  if (!audioReady) return;
+  trigger(i);
+  const pd = KIT.pads[i];
+  if (voice(pd.v).s) setTimeout(() => releaseNote(i), 900);
 }
 
 function wire() {
   const sel = el('song-select');
-  SONGS.forEach((s, i) => {
+  const opt = (v, t) => {
     const o = document.createElement('option');
-    o.value = String(i);
-    o.textContent = s.name + ' (' + s.style + ')';
+    o.value = v; o.textContent = t;
     sel.appendChild(o);
+    return o;
+  };
+  opt('', 'MAKE A SELECTION');
+  opt(REC_VALUE, 'RECORD NEW SONG');
+  SONGS.forEach((s, i) => opt(String(i), s.name + ' (' + s.style + ')'));
+  sel.addEventListener('change', () => {
+    const v = sel.value;
+    if (v === '') enterNone();
+    else if (v === REC_VALUE) enterRecord();
+    else selectSong(parseInt(v, 10), false);
   });
-  sel.addEventListener('change', () => selectSong(parseInt(sel.value, 10), false));
+
+  /* ---- tools ---------------------------------------------------------- */
+  const menu = el('toolmenu');
+  for (const t of TOOLS) {
+    const b = document.createElement('button');
+    b.dataset.tool = t[0];
+    b.setAttribute('role', 'menuitem');
+    const tick = document.createElement('span'); tick.className = 'tick';
+    const lab = document.createElement('span'); lab.textContent = t[1];
+    b.appendChild(tick); b.appendChild(lab);
+    if (!TOOL_READY[t[0]]) b.disabled = true;
+    b.addEventListener('click', () => { setTool(t[0]); closeOverlays(); });
+    menu.appendChild(b);
+  }
+  el('tools').addEventListener('click', () => {
+    const r = el('tools').getBoundingClientRect();
+    const w = 200;
+    menu.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px';
+    menu.style.top = (r.bottom + 6) + 'px';
+    menu.classList.add('open');
+    el('veil').classList.add('open');
+  });
+
+  el('pk-voice').addEventListener('change', () => {
+    const parts = el('pk-voice').value.split(':');
+    const pd = KIT.pads[pickIx];
+    pd.k = parts[0]; pd.v = parts[1];
+    if (pd.tune == null) pd.tune = 1;
+    fillNoteSelect(pd);
+    labelPads();
+    if (audioReady) applyAudioSong();
+    saveKit();
+    auditionPad(pickIx);
+  });
+  el('pk-note').addEventListener('change', () => {
+    KIT.pads[pickIx].deg = parseInt(el('pk-note').value, 10);
+    labelPads();
+    saveKit();
+    auditionPad(pickIx);
+  });
+  el('pk-hear').addEventListener('click', () => auditionPad(pickIx));
+  el('pk-close').addEventListener('click', closeOverlays);
 
   const lockBtn = el('lock');
   const syncLock = () => {
@@ -1634,6 +2122,8 @@ function wire() {
   /* Restart is the only reset: it clears the locks as well as the fingers. */
   el('reload').addEventListener('click', () => {
     releaseAll(true, true);
+    for (let i = 0; i < PADS; i++) releaseNote(i, true);
+    if (mode !== 'song') return;
     if (audioReady) startTransport(true); else ensureAudio();
   });
   const syncMute = () => {
@@ -1646,7 +2136,7 @@ function wire() {
 
   const veil = el('veil'), panel = el('settings');
   const openS = () => { veil.classList.add('open'); panel.classList.add('open'); };
-  const closeS = () => { veil.classList.remove('open'); panel.classList.remove('open'); save(); };
+  const closeS = () => { closeOverlays(); save(); };
   el('settings-btn').addEventListener('click', openS);
   el('close-settings').addEventListener('click', closeS);
   veil.addEventListener('click', closeS);
@@ -1679,7 +2169,10 @@ function wire() {
   const syncVerb = () => {
     vb.textContent = verbOn ? 'ON' : 'OFF';
     vb.classList.toggle('on', verbOn);
-    if (audioReady) for (let i = 0; i < PADS; i++) trackSend[i].gain.value = verbOn ? voice(S.tracks[i].v).snd : 0;
+    if (audioReady) for (let i = 0; i < PADS; i++) {
+      const nm = padVoiceName(i);
+      trackSend[i].gain.value = verbOn && nm ? voice(nm).snd : 0;
+    }
   };
   vb.addEventListener('click', () => { verbOn = !verbOn; syncVerb(); save(); });
   syncVerb();
@@ -1768,6 +2261,7 @@ let lastFrame = 0;
 function frame(ts) {
   const dt = Math.min(0.1, (ts - lastFrame) / 1000) || 0.016;
   lastFrame = ts;
+  sweepLive();
   if (audioReady) {
     const now = AC.currentTime;
     while (flashQ.length && flashQ[0].t <= now) {
@@ -1784,7 +2278,7 @@ function frame(ts) {
       }
     }
   }
-  if (audioReady && T.playing) {
+  if (audioReady && T.playing && S) {
     const e2 = ((AC.currentTime - T.t0) % S.dur + S.dur) % S.dur;
     el('elapsed').textContent = fmtTime(e2);
     const bar = Math.min(S.bars - 1, Math.floor(e2 / S.barSec));
@@ -1807,6 +2301,44 @@ function frame(ts) {
 window.__MM = {
   songs: SONGS,
   select: (i) => selectSong(i, false),
+  pick: (v) => {
+    const sel = el('song-select');
+    sel.value = v;
+    sel.dispatchEvent(new Event('change'));
+    return sel.value;
+  },
+  options: () => Array.prototype.map.call(el('song-select').options, (o) => o.value),
+  kit: () => JSON.parse(JSON.stringify(KIT)),
+  padLabels: () => { const a = []; for (let i = 0; i < PADS; i++) a.push(padLabel(i)); return a; },
+  padMidi: (i) => padMidi(i),
+  setTool: (t) => { setTool(t); return tool; },
+  picker: () => ({
+    open: el('picker').classList.contains('open'),
+    pad: pickIx,
+    voice: el('pk-voice').value,
+    note: el('pk-note').value,
+    notes: el('pk-note').options.length,
+  }),
+  setPad: (i, voiceVal, deg) => {
+    openPicker(i);
+    el('pk-voice').value = voiceVal;
+    el('pk-voice').dispatchEvent(new Event('change'));
+    if (deg != null) {
+      el('pk-note').value = String(deg);
+      el('pk-note').dispatchEvent(new Event('change'));
+    }
+    closeOverlays();
+    return padLabel(i);
+  },
+  rowHeights: () => {
+    const ids = ['song-select', 'tools', 'lock'];
+    const out = {};
+    for (const id of ids) {
+      const n = el(id);
+      out[id] = n.classList.contains('gone') ? null : Math.round(n.getBoundingClientRect().height);
+    }
+    return out;
+  },
   audio: () => { ensureAudio(); return !!AC && audioReady; },
   holdAll: (on) => { for (let i = 0; i < PADS; i++) keyHeld[i] = !!on; recompute(); },
   hold: (i, on) => { keyHeld[i] = !!on; recompute(); },
@@ -1859,7 +2391,12 @@ window.__MM = {
     return n;
   },
   state: () => ({
-    song: S.id, bars: S.bars, dur: +S.dur.toFixed(2), sig: S.sig, bpm: S.bpm,
+    mode, padMode, tool, sel: selValue,
+    song: S ? S.id : null,
+    bars: S ? S.bars : 0, dur: S ? +S.dur.toFixed(2) : 0,
+    sig: S ? S.sig : null, bpm: S ? S.bpm : 0,
+    infoShown: !el('info').classList.contains('gone'),
+    toolsShown: !el('tools').classList.contains('gone'),
     playing: T.playing, step: T.absStep, flash: flashQ.length,
     held: held.reduce((a, h) => a + (h ? 1 : 0), 0),
     locks: latched.reduce((a, h) => a + (h ? 1 : 0), 0),
@@ -1872,7 +2409,7 @@ window.__MM = {
 load();
 buildPads();
 wire();
-selectSong(songIx, true);
+enterNone();
 layout();
 requestAnimationFrame(frame);
 /* one deferred re-measure: web fonts change the header height after load */

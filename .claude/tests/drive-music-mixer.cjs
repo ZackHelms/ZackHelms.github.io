@@ -289,9 +289,86 @@ for (const S of SONGS) {
   }
 }
 
+/* ============================================ the recording kit and scales */
+/* The kit is hand-authored data exactly like the songs are, and it fails the
+   same silent way: a mode whose intervals do not ascend, a pad naming a voice
+   that no longer exists, or a drum outside the percussion column produces a
+   grid that looks right and plays wrong. */
+const MODES = eval('(' + bracketed(src, 'const MODES =', '{', '}') + ')');   // eslint-disable-line no-eval
+const PERC_KIT = eval(bracketed(src, 'const PERC_KIT =', '[', ']'));         // eslint-disable-line no-eval
+const PITCH_KIT = eval(bracketed(src, 'const PITCH_KIT =', '[', ']'));       // eslint-disable-line no-eval
+const DEFAULT_PERC = eval(bracketed(src, 'const DEFAULT_PERC =', '[', ']')); // eslint-disable-line no-eval
+
+const modeNames = Object.keys(MODES);
+if (modeNames.length < 7) fail('MODES has only ' + modeNames.length + ' entries');
+for (const m of modeNames) {
+  const [lab, sc] = MODES[m];
+  if (!lab || !/^[A-Z ]+$/.test(lab)) fail('MODES.' + m + ' label is not a plain caps name: ' + lab);
+  if (!Array.isArray(sc) || sc.length < 5)
+    fail('MODES.' + m + ' needs at least 5 degrees, has ' + (sc || []).length);
+  if (sc[0] !== 0) fail('MODES.' + m + ' must start on the tonic (0), starts ' + sc[0]);
+  for (let i = 1; i < sc.length; i++) {
+    if (sc[i] <= sc[i - 1]) fail('MODES.' + m + ' intervals must ascend: ' + sc.join(','));
+    if (sc[i] > 11) fail('MODES.' + m + ' degree ' + i + ' is ' + sc[i] + ', past the octave');
+  }
+}
+
+const kitLab = new Map();
+for (const [v, l] of PERC_KIT.concat(PITCH_KIT)) {
+  if (!voiceNames.has(v)) fail('kit names voice "' + v + '", which VOICE_DEFS does not define');
+  if (kitLab.has(v)) fail('voice "' + v + '" is listed in the picker twice');
+  kitLab.set(v, l);
+}
+/* a pitched pad is played by scale degree, so a voice with no usable pitch
+   range has no business in that list — the split has to match the songs' */
+for (const [v] of PERC_KIT) {
+  if (!noiseVoices.has(v) && !(v in PERC_BASE))
+    fail('percussion voice "' + v + '" has no PERC_BASE entry and is not a noi() voice');
+}
+for (const [v] of PITCH_KIT) {
+  if (noiseVoices.has(v)) fail('pitched voice "' + v + '" is a noise voice and cannot hold a pitch');
+}
+if (PITCH_KIT.length < 20) fail('only ' + PITCH_KIT.length + ' pitched voices offered');
+if (PERC_KIT.length < 15) fail('only ' + PERC_KIT.length + ' percussion voices offered');
+
+/* the default kit: ten degrees up the left two columns, drums on the right */
+if (DEFAULT_PERC.length !== PER) fail('DEFAULT_PERC has ' + DEFAULT_PERC.length + ' voices, expected ' + PER);
+for (const v of DEFAULT_PERC) {
+  if (!voiceNames.has(v)) fail('DEFAULT_PERC names unknown voice "' + v + '"');
+  if (!PERC_KIT.some(([n]) => n === v))
+    fail('DEFAULT_PERC voice "' + v + '" is not offered in the percussion list');
+}
+/* Every default drum comes from PULSE, the synthwave song, by CD spec. */
+const pulse = SONGS.find((s) => s.id === 'pulse');
+if (pulse) {
+  const pulsePerc = pulse.tracks.slice(10).map((t) => t.v);
+  for (const v of DEFAULT_PERC) {
+    if (!pulsePerc.includes(v))
+      fail('default kit drum "' + v + '" is not one of PULSE\'s five percussion voices (' + pulsePerc.join(',') + ')');
+  }
+}
+
+/* The scale walk itself: C major from C4 must give C4..E5 with the eighth pad
+   exactly an octave over the first, which is the shape the CD specified. */
+function degMidi(root, sc, oct, deg) {
+  const n = sc.length, o = Math.floor(deg / n);
+  return 12 * (oct + 1) + root + sc[deg - o * n] + 12 * o;
+}
+const major = MODES.major[1];
+const wantMidi = [60, 62, 64, 65, 67, 69, 71, 72, 74, 76];   /* C4 D E F G A B C5 D E */
+for (let d = 0; d < 10; d++) {
+  const got = degMidi(0, major, 4, d);
+  if (got !== wantMidi[d])
+    fail('default pad ' + d + ' should be MIDI ' + wantMidi[d] + ' in C major, got ' + got);
+}
+if (degMidi(0, major, 4, 7) - degMidi(0, major, 4, 0) !== 12)
+  fail('the eighth note of the default kit is not an octave above the first');
+
 console.log('');
 console.log('SONGS=' + SONGS.length);
 console.log('VOICES=' + voiceNames.size);
+console.log('KIT=' + PITCH_KIT.length + ' pitched + ' + PERC_KIT.length + ' percussion, '
+  + Object.keys(MODES).length + ' modes');
 console.log('PROBLEMS=' + problems.length);
 for (const p of problems) console.log('  - ' + p);
 console.log('MUSIC-MIXER: ' + (problems.length ? 'RED' : 'GREEN'));
