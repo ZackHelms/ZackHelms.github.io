@@ -397,6 +397,29 @@ body.erasing .pad .ex { display: flex; }
 }
 #ask-yes { border-color: var(--green); color: var(--green); }
 
+/* Deleting a song is the one thing here that cannot be undone, so the confirm
+   deliberately does NOT open where the finger already is: the tool menu hangs
+   off the wrench at the top of the screen and this sits at the bottom, far
+   enough that a second tap in the same place can never mean yes. */
+#del {
+  position: fixed; z-index: 47;
+  left: 50%; bottom: 12vh; transform: translateX(-50%);
+  width: min(88vw, 320px);
+  background: var(--panel); border: 1px solid var(--red); border-radius: 12px;
+  padding: 18px; display: none; box-shadow: 0 18px 50px #000d;
+}
+#del.open { display: block; }
+#del h2 {
+  font-family: 'Black Ops One', sans-serif; font-size: .82rem;
+  letter-spacing: 3px; color: var(--red); margin-bottom: 8px; text-align: center;
+}
+#del-name {
+  font-size: .76rem; letter-spacing: 2px; color: var(--white);
+  text-align: center; margin-bottom: 16px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#del-yes { border-color: var(--red); color: var(--red); }
+
 /* -------------------------------------------------- key and mode screen */
 /* Takes the whole play surface rather than opening over it: picking a key is
    a decision about the instrument, not an adjustment while you play. The two
@@ -544,7 +567,7 @@ body.erasing .pad .ex { display: flex; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 17:24 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 21:18 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -661,6 +684,11 @@ body.erasing .pad .ex { display: flex; }
   <b>&#128295;</b> button beside the song list is where the rest of it lives.</p>
   <p>Under <b>TAP PAD</b>, a quick tap on a single pad opens its sound. Chords,
   holds and slides still play normally, so you can keep playing in that view.</p>
+  <p>A recording is a <b>loop</b>. What you played before the first bar line and
+  after the last one is not part of it: the wait before you start is cut, bar
+  one lands at zero, and the notes past the last whole bar are dropped, so the
+  song joins back onto itself. <b>BPM</b> and <b>BEATS</b> in the edit bar move
+  those bar lines if it read the beat wrong.</p>
 
   <h3>KEYBOARD</h3>
   <p>Keys match the landscape layout &mdash; percussion on the number row:<br>
@@ -678,6 +706,15 @@ body.erasing .pad .ex { display: flex; }
   <div class="ask-row">
     <button id="ask-no">NO</button>
     <button id="ask-yes">YES</button>
+  </div>
+</div>
+
+<div id="del" role="dialog" aria-label="Delete song">
+  <h2>DELETE THIS SONG?</h2>
+  <div id="del-name"></div>
+  <div class="ask-row">
+    <button id="del-no">KEEP</button>
+    <button id="del-yes">DELETE</button>
   </div>
 </div>
 
@@ -1895,7 +1932,7 @@ let editing = false, overdub = false;
 let takeDirty = false, takeBackup = null;
 
 const SNAPS = [[0, 'OFF'], [1, '1/16'], [2, '1/8'], [4, '1/4'], [8, '1/2']];
-const PAD_UNITS = [[1, '1/16'], [2, '1/8'], [4, '1/4'], [8, '1/2'], [16, 'BAR']];
+const PAD_UNITS = [[1, '1/16'], [2, '1/8'], [4, '1/4'], [8, '1/2'], [0, 'BAR']];
 
 function cloneKit(k) { return JSON.parse(JSON.stringify(k)); }
 
@@ -2002,58 +2039,141 @@ function detectBeats(raws, best) {
   return bestN;
 }
 
+/* Where the bar lines fall. Tempo and metre give the GRID; this gives its
+   PHASE - which of a bar's sixteenths is beat one. Almost always it is the
+   first thing played, because a take starts when the player starts, so that
+   candidate carries a bonus and the accent fold only overrules it when some
+   other rotation is clearly the accented one. */
+function detectDownbeat(on, best, beats) {
+  const barSteps = beats * 4;
+  const idx = on.map((o) => Math.round((o.t - best.phase) / best.grid));
+  const first = ((idx[0] % barSteps) + barSteps) % barSteps;
+  const prof = new Array(barSteps).fill(0);
+  for (let k = 0; k < on.length; k++) prof[((idx[k] % barSteps) + barSteps) % barSteps] += on[k].w;
+  const tmpl = [];
+  for (let p = 0; p < barSteps; p++)
+    tmpl.push(p === 0 ? 1
+      : (barSteps % 2 === 0 && p === barSteps / 2) ? 0.45
+      : (p % 4 === 0) ? 0.3 : 0.04);
+  let bestR = first, bestScore = -Infinity;
+  for (let r = 0; r < barSteps; r++) {
+    let sc = 0;
+    for (let p = 0; p < barSteps; p++) sc += prof[(r + p) % barSteps] * tmpl[p];
+    if (r === first) sc *= 1.2;
+    if (sc > bestScore) { bestScore = sc; bestR = r; }
+  }
+  return bestR;
+}
+/* How long the loop is. Nobody stops on the bar line: a take is four bars
+   plus whatever was still being played when the recording stopped, so the end
+   has to be CHOSEN, and choosing it means throwing the remainder away. Three
+   terms decide it and, as with the tempo octave, none of them works alone:
+     - cost: the share of the performance a length discards;
+     - fill: how full its last bar is, since a length whose final bar is a
+       fragment is the exact case being cut;
+     - a mild preference for 4, 8 and 16 over 5, 7 and 9.
+   Held out against synthetic takes with known lengths this picks the right
+   number of bars 99% of the time wherever the metre was right. */
+function loopBars(on, zero, stepSec, steps) {
+  const w = [];
+  let total = 0, maxBar = 0;
+  for (const o of on) {
+    const st = Math.round((o.t - zero) / stepSec);
+    if (st < 0) continue;
+    const b = Math.floor(st / steps);
+    w[b] = (w[b] || 0) + o.w;
+    total += o.w;
+    if (b > maxBar) maxBar = b;
+  }
+  if (!total) return 1;
+  let bestL = maxBar + 1, bestScore = -Infinity;
+  for (let L = 1; L <= maxBar + 1; L++) {
+    let kept = 0;
+    for (let b = 0; b < L; b++) kept += (w[b] || 0);
+    const mean = kept / L;
+    const fill = Math.min(1, 0.4 + 0.6 * (mean > 0 ? (w[L - 1] || 0) / mean : 0));
+    const mus = (L % 4 === 0) ? 1 : (L % 2 === 0) ? 0.94 : 0.9;
+    const sc = (kept / total) * mus * fill;
+    if (sc > bestScore) { bestScore = sc; bestL = L; }
+  }
+  return bestL;
+}
+
 function processTake(events, kit, name) {
   const usable = events.filter((e) => e.d >= 0 && isFinite(e.t));
   if (!usable.length) return null;
   const onsets = usable.map((e) => e.t).sort((a, b) => a - b);
   const best = detectTempo(onsets);
   const beats = detectBeats(onsets, best);
-  const steps = 16;
+  const steps = beats * 4;                    /* a step is a sixteenth, always */
+  const on = onsetStrength(onsets);
   const barSec = best.beat * beats;
-  /* Nobody starts or stops on the exact beat, so the song's edges come from
-     the notes: the bar line at or before the first onset, and the one at or
-     after the last note ends. */
-  let lastEnd = 0;
-  for (const e of usable) lastEnd = Math.max(lastEnd, e.t + e.d);
-  const zero = best.phase + Math.floor((onsets[0] - best.phase) / barSec) * barSec;
-  const baseBars = Math.max(1, Math.ceil((lastEnd - zero) / barSec - 1e-6));
+  const stepSec = best.beat / 4;
+  /* A take is a LOOP, so BOTH edges are ours to find. The count-in and the
+     seconds of nothing before the first hit go; the bar line nearest that hit
+     becomes t=0; anything played past the last whole bar is the remainder and
+     is thrown away. What survives is a whole number of bars that joins back
+     onto itself. */
+  const r = detectDownbeat(on, best, beats);
+  const firstIdx = Math.round((on[0].t - best.phase) / best.grid);
+  const off = (((firstIdx - r) % steps) + steps) % steps;
+  const zeroIdx = firstIdx - off + (off > steps / 2 ? steps : 0);
+  const zero = best.phase + zeroIdx * best.grid;
+  const bars = loopBars(on, zero, stepSec, steps);
+  const dur = bars * barSec;
   const notes = [];
   for (const e of usable) {
-    const t = e.t - zero;
-    if (t < -barSec) continue;
-    notes.push({ i: e.i, t: Math.max(0, t), d: Math.max(0.03, e.d) });
+    let t = e.t - zero;
+    /* a pickup is not early, it is LATE: it plays out of the end of the loop */
+    if (t < -stepSec / 2) t += dur;
+    if (t < 0) t = 0;
+    if (Math.round(t / stepSec) >= bars * steps) continue;
+    notes.push({ i: e.i, t, d: Math.max(0.03, e.d) });
   }
+  if (!notes.length) return null;
+  notes.sort((x, y) => x.t - y.t);
   return prepTake({
     id: 'u' + Date.now().toString(36),
     name: name || 'TAKE ' + (TAKES.length + 1),
     kit: cloneKit(kit), bpm: Math.round(best.bpm * 10) / 10,
-    beats, steps, baseBars, notes, snap: 1, padSteps: 0, created: Date.now(),
+    beats, steps, notes, snap: 1, padSteps: 0, created: Date.now(),
   });
 }
 
 /* --- derived state, recomputed whenever a knob moves --------------------- */
 function prepTake(tk) {
   tk.beats = Math.min(7, Math.max(2, tk.beats | 0));
-  tk.steps = tk.steps || 16;
+  /* Four steps to the beat in EVERY metre, so a step is a sixteenth whatever
+     the bar length is - that is what makes the SNAP menu's 1/16, 1/8, 1/4
+     true in 3/4 and 7/4, and what puts the edit click on every beat. */
+  tk.steps = tk.beats * 4;
   tk.bpm = Math.min(260, Math.max(30, tk.bpm));
   tk.barSec = (60 / tk.bpm) * tk.beats;
   tk.stepSec = tk.barSec / tk.steps;
-  tk.perBeat = tk.steps / tk.beats;
+  tk.perBeat = 4;
   const padS = Math.max(0, tk.padSteps | 0);
   const snap = Math.max(0, tk.snap | 0);
+  /* The length is read off the SIXTEENTH grid, never off the snapped
+     positions: a coarse snap has to be able to move the last note onto the
+     closing bar line without the song growing a bar to hold it. */
   let lastStep = 0;
+  for (const n of tk.notes) lastStep = Math.max(lastStep, Math.round(n.t / tk.stepSec) + padS);
+  const padBars = Math.ceil(padS / tk.steps);
+  tk.bars = Math.max(1, padBars, Math.ceil((lastStep + 1) / tk.steps - 1e-9));
+  tk.baseBars = Math.max(1, tk.bars - padBars);
+  tk.songSteps = tk.bars * tk.steps;
+  tk.dur = tk.bars * tk.barSec;
   for (const n of tk.notes) {
     let s = n.t / tk.stepSec;
     if (snap) s = Math.round(s / snap) * snap;
-    n.sT = (s + padS) * tk.stepSec;
+    s += padS;
+    /* a note snapped onto the loop point IS the downbeat, played a hair early */
+    while (s >= tk.songSteps - 1e-6) s -= tk.songSteps;
+    n.sT = Math.max(0, s) * tk.stepSec;
     n.sD = Math.max(tk.stepSec * 0.5, n.d);
-    lastStep = Math.max(lastStep, s + padS + n.sD / tk.stepSec);
+    /* and nothing rings past the seam, or the loop overlaps itself */
+    if (n.sT + n.sD > tk.dur) n.sD = Math.max(0.03, tk.dur - n.sT);
   }
-  tk.baseBars = Math.max(1, tk.baseBars | 0);
-  tk.bars = Math.max(tk.baseBars + Math.ceil(padS / tk.steps),
-                     Math.ceil(lastStep / tk.steps - 1e-6), 1);
-  tk.songSteps = tk.bars * tk.steps;
-  tk.dur = tk.bars * tk.barSec;
   /* bucketed per step so the scheduler never scans the whole take */
   tk.buckets = [];
   for (const n of tk.notes) {
@@ -2067,8 +2187,8 @@ function reprocess() { if (TK) { prepTake(TK); syncEditBar(); saveTakes(); } }
 function saveTakes() {
   try {
     localStorage.setItem('musicMixer.takes', JSON.stringify(TAKES.map((t) => ({
-      id: t.id, name: t.name, kit: t.kit, bpm: t.bpm, beats: t.beats, steps: t.steps,
-      baseBars: t.baseBars, snap: t.snap, padSteps: t.padSteps, created: t.created,
+      id: t.id, name: t.name, kit: t.kit, bpm: t.bpm, beats: t.beats,
+      snap: t.snap, padSteps: t.padSteps, created: t.created,
       notes: t.notes.map((n) => ({ i: n.i, t: +n.t.toFixed(4), d: +n.d.toFixed(4) })),
     }))));
   } catch (e) {}
@@ -2091,8 +2211,7 @@ function loadTakes() {
       if (!notes.length) continue;
       TAKES.push(prepTake({
         id: String(t.id || 'u' + TAKES.length), name: String(t.name || 'TAKE'),
-        kit: sanitizeKit(t.kit), bpm: +t.bpm || 100, beats: +t.beats || 4,
-        steps: +t.steps || 16, baseBars: +t.baseBars || 1, notes,
+        kit: sanitizeKit(t.kit), bpm: +t.bpm || 100, beats: +t.beats || 4, notes,
         snap: +t.snap || 0, padSteps: +t.padSteps || 0, created: +t.created || 0,
       }));
     }
@@ -2249,6 +2368,17 @@ function hitsAt(x, y) {
    and its two lists have to be free to SCROLL, which #stage's listeners would
    otherwise preventDefault away. */
 function padsOff() { return tool === 'keymode'; }
+/* A letter is a pad only while nothing else is listening for it. The song
+   title box and the BPM field share letters and digits with the pad keys, and
+   a window-level handler that preventDefault()s them makes half the keyboard
+   untypeable - which is exactly how it read: some letters simply never
+   appeared in the name. */
+function typingInField() {
+  const a = document.activeElement;
+  if (!a) return false;
+  const t = a.tagName;
+  return t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || a.isContentEditable === true;
+}
 
 function recompute(noLatch) {
   for (let i = 0; i < PADS; i++) {
@@ -2814,6 +2944,12 @@ function syncTransport() {
   if (r) r.classList.toggle('on', overdub);
   document.body.classList.toggle('erasing', overdub);
 }
+/* BAR is a sentinel rather than a number, because a bar is 16 steps only in
+   4/4 - in 3/4 it is 12 and in 7/4 it is 28. */
+function padUnit() {
+  const v = +el('tk-padu').value | 0;
+  return v > 0 ? v : (TK ? TK.steps : 16);
+}
 function syncEditBar() {
   if (!TK || tool !== 'edit') return;
   const t = el('tk-title');
@@ -2821,8 +2957,7 @@ function syncEditBar() {
   el('tk-snap').value = String(TK.snap | 0);
   el('tk-bpm').value = String(Math.round(TK.bpm));
   el('tk-beats').value = String(TK.beats);
-  const unit = +el('tk-padu').value || 1;
-  el('tk-padn').value = String(Math.max(0, Math.round((TK.padSteps | 0) / unit)));
+  el('tk-padn').value = String(Math.max(0, Math.round((TK.padSteps | 0) / padUnit())));
   el('duration').textContent = fmtTime(TK.dur);
   el('bpm').textContent = String(Math.round(TK.bpm));
   el('sig').textContent = TK.beats + '/4';
@@ -2859,6 +2994,26 @@ function applyEdits(keep) {
 function askSave() {
   el('veil').classList.add('open');
   el('ask').classList.add('open');
+}
+
+/* Delete is a two-step: the menu row asks, and the answer is given somewhere
+   else entirely (see #del). Nothing is removed until YES. */
+function askDelete() {
+  if (!TK) return;
+  el('del-name').textContent = TK.name;
+  el('veil').classList.add('open');
+  el('del').classList.add('open');
+}
+/* Deleting the selection leaves no selection: fall back to nothing picked
+   rather than silently sliding to whichever song took its place in the list. */
+function deleteTake() {
+  if (!TK) return;
+  const id = TK.id, keep = [];
+  for (const t of TAKES) if (t.id !== id) keep.push(t);
+  TAKES = keep;
+  enterNone();
+  saveTakes();
+  rebuildSongs();
 }
 
 function rebuildSongs() {
@@ -3053,6 +3208,7 @@ const TOOLS = [
   ['record',  'RECORD'],
   ['edit',    'REPLAY & EDIT'],
   ['export',  'EXPORT FILE'],
+  ['delete',  'DELETE SONG'],
 ];
 /* Which tools apply is a question about the SELECTION, not about what has
    been built: RECORD belongs to a new song, REPLAY & EDIT to a recorded one.
@@ -3062,7 +3218,7 @@ function toolOK(id) {
   if (id === 'none') return true;
   if (id === 'tappad' || id === 'keymode') return mode === 'rec' || mode === 'take';
   if (id === 'record') return mode === 'rec';
-  if (id === 'edit' || id === 'export') return mode === 'take' && !!TK;
+  if (id === 'edit' || id === 'export' || id === 'delete') return mode === 'take' && !!TK;
   return false;
 }
 function syncToolMenu() {
@@ -3073,7 +3229,7 @@ let tool = 'none';
 let pickIx = -1;
 
 function setTool(id) {
-  if (id === 'export' || !toolOK(id)) id = 'none';
+  if (id === 'export' || id === 'delete' || !toolOK(id)) id = 'none';
   const was = tool;
   tool = id;
   tapCand = -1;
@@ -3143,6 +3299,7 @@ function closeOverlays() {
   el('toolmenu').classList.remove('open');
   el('picker').classList.remove('open');
   el('ask').classList.remove('open');
+  el('del').classList.remove('open');
 }
 
 function fillVoiceSelect(pd) {
@@ -3218,6 +3375,8 @@ function wire() {
   el('rec-btn').addEventListener('click', recArm);
   el('ask-yes').addEventListener('click', () => { applyEdits(true); closeOverlays(); });
   el('ask-no').addEventListener('click', () => { applyEdits(false); closeOverlays(); });
+  el('del-yes').addEventListener('click', () => { deleteTake(); closeOverlays(); });
+  el('del-no').addEventListener('click', closeOverlays);
 
   const fill = (id, pairs) => {
     const s = el(id);
@@ -3233,6 +3392,7 @@ function wire() {
   fill('tk-padn', Array.from({ length: 65 }, (_, i) => [i, String(i)]));
   el('tk-padu').value = '1';
 
+  el('tk-title').addEventListener('keydown', (e) => { if (e.key === 'Enter') el('tk-title').blur(); });
   el('tk-title').addEventListener('input', () => {
     if (!TK) return;
     TK.name = el('tk-title').value.slice(0, 24) || 'TAKE';
@@ -3269,7 +3429,7 @@ function wire() {
   });
   const padChange = () => {
     if (!TK) return;
-    TK.padSteps = (+el('tk-padn').value | 0) * (+el('tk-padu').value | 0);
+    TK.padSteps = (+el('tk-padn').value | 0) * padUnit();
     TT.pos = 0; TT.step = 0;
     reprocess();
   };
@@ -3287,9 +3447,13 @@ function wire() {
     b.appendChild(tick); b.appendChild(lab);
     b.disabled = !toolOK(t[0]);
     b.addEventListener('click', () => {
-      /* EXPORT is the one row that is an action rather than a mode: it fires
-         and leaves the tool where it was */
-      if (t[0] === 'export') { closeOverlays(); exportTake(); return; }
+      /* EXPORT and DELETE are the two rows that are actions rather than
+         modes: they fire and leave the tool where it was */
+      if (t[0] === 'export' || t[0] === 'delete') {
+        closeOverlays();
+        if (t[0] === 'export') exportTake(); else askDelete();
+        return;
+      }
       setTool(t[0]);
       closeOverlays();
     });
@@ -3475,7 +3639,7 @@ function wire() {
     document.addEventListener(g, (e) => e.preventDefault(), { passive: false });
 
   window.addEventListener('keydown', (e) => {
-    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || padsOff()) return;
+    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || padsOff() || typingInField()) return;
     const i = KEYMAP[e.key.toLowerCase()];
     if (i === undefined) return;
     ensureAudio();
@@ -3587,6 +3751,21 @@ window.__MM = {
     notes: TK.notes.length, snap: TK.snap, padSteps: TK.padSteps, dur: +TK.dur.toFixed(2),
     pos: +takePos().toFixed(2), playing: TT.playing, editing, overdub, dirty: takeDirty,
     steps: TK.notes.map((n) => +(n.sT / TK.stepSec).toFixed(3)).slice(0, 40) }),
+  /* everything the loop seam depends on, in one read */
+  loop: () => {
+    if (!TK) return null;
+    let lo = Infinity, hi = -Infinity, over = 0;
+    for (const n of TK.notes) {
+      const st = n.sT / TK.stepSec;
+      if (st < lo) lo = st;
+      if (st > hi) hi = st;
+      over = Math.max(over, n.sT + n.sD - TK.dur);
+    }
+    return { bars: TK.bars, steps: TK.steps, songSteps: TK.songSteps, perBeat: TK.perBeat,
+             dur: +TK.dur.toFixed(4), barSec: +TK.barSec.toFixed(4),
+             first: +lo.toFixed(3), last: +hi.toFixed(3), over: +over.toFixed(4),
+             notes: TK.notes.length };
+  },
   /* feed a synthetic performance straight into the processor: the only way to
      check tempo and metre detection against a KNOWN answer */
   process: (events, name) => {
@@ -3621,6 +3800,13 @@ window.__MM = {
     return { bars: TK.bars, dur: +TK.dur.toFixed(2), snap: TK.snap, padSteps: TK.padSteps };
   },
   wipeTakes: () => { TAKES = []; TK = null; saveTakes(); rebuildSongs(); return 0; },
+  del: (what) => {
+    if (what === 'ask') askDelete();
+    else if (what === 'yes') el('del-yes').click();
+    else if (what === 'no') el('del-no').click();
+    return { open: el('del').classList.contains('open'), name: el('del-name').textContent,
+             takes: TAKES.length, sel: selValue };
+  },
   exportText: () => buildExport(TK),
   exportFile: () => exportTake(),
   takeGrid: () => {

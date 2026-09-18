@@ -879,6 +879,186 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     if (dl !== 'keep-me-take.json') fail('the export downloaded as "' + dl + '", expected keep-me-take.json');
     else console.log('EXPORT=downloads as ' + dl);
 
+
+    /* --- 11. the loop edges, the title field and DELETE ---------------- */
+    /* A take is a LOOP, and nobody starts or stops on a bar line. Whatever was
+       played before the first bar line and after the last one is not part of
+       the song, so a performance that wanders in three seconds late and stops
+       mid-phrase still has to come back as a whole number of bars that joins
+       onto itself: first note on step 0, last note inside the grid, nothing
+       ringing past the seam. */
+    const mkLoose = `(bpm, beats, bars, lead, extra) => {
+      const beat = 60 / bpm, barSec = beat * beats, ev = [];
+      const hit = (t, n) => { for (let q = 0; q < n; q++)
+        ev.push({ i: q % 3 === 0 ? 10 : (q % 3 === 1 ? 11 : 0), t, d: 0.2 }); };
+      for (let bar = 0; bar < bars; bar++) for (let b = 0; b < beats; b++) {
+        const t = lead + bar * barSec + b * beat + Math.sin(bar * 5 + b * 3) * 0.011;
+        hit(t, b === 0 ? 3 : 2);
+        hit(t + beat / 2, 1);
+      }
+      /* and then a few quarter notes past the end, the way a person stops */
+      for (let k = 0; k < extra; k++) hit(lead + bars * barSec + k * beat, 1);
+      return ev;
+    }`;
+    await page.evaluate(() => { window.__MM.wipeTakes(); window.__MM.pick('rec'); });
+    await page.waitForTimeout(150);
+
+    for (const c of [[120, 4, 4, 2.6, 3], [132, 4, 8, 0.9, 1], [96, 4, 4, 4.2, 5]]) {
+      const lab = c[0] + ' BPM ' + c[1] + '/4 x ' + c[2] + ' bars, in at ' + c[3] + 's +' + c[4];
+      const r = await page.evaluate(`(() => {
+        const mk = ${mkLoose};
+        const ev = mk(${c.join(', ')});
+        const made = window.__MM.process(ev, 'LOOP ME');
+        if (!made) return null;
+        window.__MM.pick('t:' + made.id);
+        return { made, fed: ev.length, loop: window.__MM.loop() };
+      })()`);
+      if (!r) { fail('processing a loose take (' + lab + ') produced nothing'); continue; }
+      const L = r.loop, want = c[2], barSec = (60 / c[0]) * c[1], extras = c[4];
+      if (r.made.beats !== c[1]) { fail('a ' + lab + ' take read as ' + r.made.beats + '/4'); continue; }
+      if (L.bars !== want) fail('a ' + lab + ' take came back ' + L.bars +
+        ' bars long - the trailing fragment was not cut back to the bar line');
+      else if (Math.abs(L.dur - want * barSec) > 0.02)
+        fail('a ' + lab + ' take runs ' + L.dur + 's, expected ' + (want * barSec).toFixed(3));
+      else if (L.first !== 0)
+        fail('a ' + lab + ' take starts at step ' + L.first + ' - the lead-in was not shifted off');
+      else if (L.last >= L.songSteps)
+        fail('a ' + lab + ' take has a note at step ' + L.last + ' of ' + L.songSteps);
+      else if (L.over > 0.001)
+        fail('a ' + lab + ' take rings ' + L.over + 's past its own loop point');
+      else if (L.steps !== c[1] * 4 || L.perBeat !== 4)
+        fail('a ' + c[1] + '/4 take grids at ' + L.steps + ' steps a bar (' + L.perBeat + ' a beat)');
+      else if (L.notes !== r.fed - extras)
+        fail('a ' + lab + ' take kept ' + L.notes + ' of ' + r.fed + ' hits, expected ' +
+             (r.fed - extras) + ' - the remainder was not dropped exactly');
+      else console.log('LOOP=' + want + ' bars exactly, ' + L.dur.toFixed(2) + 's, ' +
+        extras + ' trailing hits cut  (' + lab + ')');
+    }
+
+    /* The grid is four steps to the beat in every metre, not sixteen steps to
+       the bar - otherwise SNAP's 1/16 is a lie in 3/4 and the edit click, which
+       fires every `perBeat` steps, only ever lands on the downbeat. */
+    const odd = await page.evaluate(() => {
+      window.__MM.setTake('beats', 3);
+      return window.__MM.loop();
+    });
+    if (odd.steps !== 12 || odd.perBeat !== 4)
+      fail('a 3/4 take grids at ' + odd.steps + ' steps a bar, ' + odd.perBeat + ' a beat');
+    else if (odd.songSteps !== odd.bars * 12 || odd.last >= odd.songSteps || odd.over > 0.001)
+      fail('re-gridding to 3/4 left the loop ragged: last=' + odd.last + ' of ' +
+           odd.songSteps + ', over=' + odd.over);
+    else console.log('LOOP=3/4 regrids to 12 steps a bar, 4 to the beat, still closed');
+
+    /* and it has to come round again: play past the end and the playhead is
+       back inside the loop with the transport still running */
+    const short = await page.evaluate(`(() => {
+      const mk = ${mkLoose};
+      const made = window.__MM.process(mk(120, 4, 2, 0.8, 0), 'ROUND AND ROUND');
+      window.__MM.pick('t:' + made.id);
+      return window.__MM.loop();
+    })()`);
+    await page.evaluate(() => window.__MM.holdAll(true));
+    await page.waitForTimeout(Math.round(short.dur * 1000) + 500);
+    const wrapped = await page.evaluate(() => window.__MM.take());
+    await page.evaluate(() => window.__MM.holdAll(false));
+    if (!wrapped.playing) fail('the take stopped instead of looping');
+    else if (wrapped.pos >= short.dur)
+      fail('after ' + short.dur + 's the playhead reads ' + wrapped.pos + ' - it ran off the end');
+    else console.log('LOOP=came round: ' + short.dur.toFixed(2) + 's loop, playhead back at ' +
+                     wrapped.pos.toFixed(2) + 's');
+
+    /* one clean take to name and then delete */
+    await page.evaluate(() => { window.__MM.wipeTakes(); window.__MM.pick('rec'); });
+    await page.waitForTimeout(150);
+    await page.evaluate(`(() => {
+      const mk = ${mkLoose};
+      const made = window.__MM.process(mk(120, 4, 4, 2.6, 3), 'LOOP ME');
+      window.__MM.pick('t:' + made.id);
+    })()`);
+    await page.waitForTimeout(200);
+
+    /* Typing a name must not play the drums. Every letter in this string bar
+       one is a pad key, and a window-level handler that preventDefault()s them
+       is why half of them never reached the field. */
+    await page.evaluate(() => window.__MM.setTool('edit'));
+    await page.waitForTimeout(80);
+    await page.click('#tk-title');
+    await page.evaluate(() => { document.getElementById('tk-title').value = ''; });
+    await page.keyboard.type('SAD FROG 12', { delay: 12 });
+    const typed = await page.evaluate(() => ({
+      v: document.getElementById('tk-title').value,
+      held: window.__MM.state().held,
+      name: window.__MM.take().name,
+    }));
+    if (typed.v !== 'SAD FROG 12')
+      fail('typing a song title produced "' + typed.v + '" - the pad keys ate the rest');
+    else if (typed.held) fail('typing a song title held ' + typed.held + ' pads down');
+    else if (typed.name !== 'SAD FROG 12') fail('the take is named "' + typed.name + '"');
+    else console.log('TITLE=' + typed.v + '  every pad letter and digit reached the field');
+
+    /* and the keys have to come BACK the moment the field is done with them */
+    await page.keyboard.press('Enter');
+    await page.keyboard.down('a');
+    await page.waitForTimeout(60);
+    const keyBack = await page.evaluate(() => window.__MM.state().held);
+    await page.keyboard.up('a');
+    if (keyBack !== 1) fail('after leaving the title field a pad key held ' + keyBack + ' pads, expected 1');
+    else console.log('TITLE=enter hands the keyboard back to the pads');
+
+    /* DELETE is the only irreversible thing in the game, so it asks twice and
+       asks the second time somewhere else: the menu hangs off the wrench at
+       the top, the confirm sits at the bottom, and a second tap where the
+       first one landed cannot answer it. */
+    await page.evaluate(() => window.__MM.setTool('none'));
+    await page.click('#tools');
+    await page.waitForTimeout(80);
+    const menuBox = await page.locator('#toolmenu').boundingBox();
+    const row = await page.evaluate(() => {
+      const b = document.querySelector('#toolmenu button[data-tool="delete"]');
+      return b ? { label: b.textContent.trim(), off: !!b.disabled } : null;
+    });
+    if (!row) fail('there is no DELETE row in the tool menu');
+    else if (row.off) fail('the DELETE row is disabled on a recorded song');
+    else {
+      await page.evaluate(() => document.querySelector('#toolmenu button[data-tool="delete"]').click());
+      await page.waitForTimeout(80);
+      const delBox = await page.locator('#del').boundingBox();
+      const d1 = await page.evaluate(() => window.__MM.del());
+      if (!d1.open) fail('picking DELETE did not open a confirmation');
+      else if (d1.name !== 'SAD FROG 12')
+        fail('the confirmation names "' + d1.name + '" rather than the selected song');
+      else if (!delBox || delBox.y < menuBox.y + menuBox.height + 40)
+        fail('the delete confirmation opens at y=' + (delBox && Math.round(delBox.y)) +
+             ', right under the menu row that opened it (menu ends at ' +
+             Math.round(menuBox.y + menuBox.height) + ')');
+      else console.log('DELETE=asks at y=' + Math.round(delBox.y) + ', clear of the menu at ' +
+                       Math.round(menuBox.y + menuBox.height));
+      const d2 = await page.evaluate(() => window.__MM.del('no'));
+      if (d2.open || d2.takes !== 1) fail('answering KEEP left ' + d2.takes + ' songs and open=' + d2.open);
+      else console.log('DELETE=KEEP puts the song back untouched');
+      const d3 = await page.evaluate(() => { window.__MM.del('ask'); return window.__MM.del('yes'); });
+      if (d3.takes !== 0) fail('answering DELETE left ' + d3.takes + ' songs');
+      else if (d3.sel !== '') fail('after deleting the selection the song list sits on "' + d3.sel + '"');
+      else console.log('DELETE=gone, and the list falls back to nothing selected');
+    }
+
+    /* a built-in song is not the CD's to delete */
+    await page.evaluate(() => window.__MM.pick('0'));
+    await page.waitForTimeout(150);
+    const builtIn = await page.evaluate(() => ({
+      tools: window.__MM.state().toolsShown,
+      off: !!document.querySelector('#toolmenu button[data-tool="delete"]').disabled,
+    }));
+    if (builtIn.tools) fail('the wrench is showing on a built-in song');
+    else if (!builtIn.off) fail('the DELETE row is live on a built-in song');
+    else console.log('DELETE=refused on the five built-in songs');
+
+    await page.reload();
+    await page.waitForTimeout(900);
+    const gone = await page.evaluate(() => window.__MM.takes());
+    if (gone.length) fail('a deleted song came back after a reload');
+    else console.log('DELETE=still gone after a reload');
+
     await page.evaluate(() => window.__MM.wipeTakes());
   }
 

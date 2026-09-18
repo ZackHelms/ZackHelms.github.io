@@ -112,6 +112,16 @@ Keyboard mirrors the **landscape** picture: `12345` percussion, `QWERT`
 harmony/melody, `ASDFG` low end. The letters on the pads are hidden except on
 `(pointer: fine)`.
 
+**A window-level key handler has to yield to whatever is focused.** Once the
+recorder added a song-title field and a BPM box, those fifteen keys were also
+ordinary characters, and the handler's `preventDefault()` swallowed them: the
+CD typed a name and got the letters that happen not to be pad keys back
+(report, 2026-09-18 — "SAD FROG 12" came out as " O "). `typingInField()`
+checks `document.activeElement` for INPUT / TEXTAREA / SELECT /
+`isContentEditable` and is the *first* thing `keydown` asks. Note what it is
+**not** on: `keyup` releases unconditionally, so a key pressed before the field
+took focus can never stick down.
+
 ## Notation contract
 
 A pattern is a step-grid string whose length **must be a multiple of the
@@ -327,11 +337,25 @@ not "resize and orientationchange re-measure".
 
 ## The wrench is a mode picker
 
-`TOOLS` lists five entries and `TOOL_READY` gates which are live; entries whose
-stage has not landed sit in the menu **disabled rather than hidden**, so the
-menu keeps its final shape and a greyed row says "later" without a caption
+`TOOLS` lists seven entries and `toolOK()` gates which are live **off the
+SELECTION, not off what has been built**: RECORD belongs to a new song, REPLAY
+& EDIT / EXPORT FILE / DELETE SONG to a recorded one. A row that does not apply
+sits in the menu **disabled rather than hidden**, so the menu keeps one shape
+and its greyed rows say what this selection cannot do, without a caption
 saying so. The 0th entry is deliberately blank — it is "no tool", the plain
 replay state, and it is the default for a recorded song.
+
+Five rows are **modes**; `EXPORT FILE` and `DELETE SONG` are **actions** — they
+fire and leave the tool where it was, which is why both are intercepted in the
+menu's click handler before `setTool()` ever sees them.
+
+**DELETE asks twice, and asks the second time somewhere else.** It is the only
+irreversible thing in the game, and the menu hangs off the wrench at the top of
+the screen, so `#del` is pinned to the *bottom* (`bottom: 12vh`): a second tap
+where the first one landed cannot answer it. Deleting the current selection
+falls back to nothing selected rather than sliding to whichever song took its
+place in the list — the runtime gate measures the actual on-screen gap between
+the menu and the confirm, not just that both exist.
 
 Under **TAP PAD**, a pad that goes down *on its own* and comes back up inside
 650 ms opens its picker; a chord, a hold or a slide across a seam is left
@@ -453,12 +477,65 @@ outside the usable band. Those numbers are why the edit bar carries a one-tap **
 rather than clamping — clamping means x2 then /2 does not return where it
 started, which defeats the point.
 
-### Edges
+### Edges: a take is a LOOP, so both of them are ours to find
 
-Nobody starts or stops on the beat, so the song's edges come from the notes:
-the bar line at or before the first onset, and the one at or after the last
-note ends. INTRO padding then shifts everything later by N note values and
-grows the bar count to match.
+Nobody starts or stops on a bar line. The CD waits a few seconds, plays four
+bars of a beat, and stops a few quarter notes into the fifth. Neither the wait
+nor the remainder is part of the song, so **both edges are decided, not
+recorded**, and what comes back is a whole number of bars that joins onto
+itself.
+
+**The start** needs a bar *phase*, not just a bar *line* — tempo and metre give
+the grid, `detectDownbeat()` gives which of the bar's sixteenths is beat one.
+It folds the onset-strength series into one bar and scores each rotation
+against a template (downbeat heaviest, then the half-bar, then the other
+beats), with a **1.2x bonus on the rotation the first onset sits on**, because
+a take starts when the player starts and that is nearly always beat one. The
+bar line nearest the first onset becomes `t = 0`; if the first onset turns out
+to be a pickup more than half a bar early, it is not shifted forward but
+**wrapped to the end of the loop**, which is where it actually plays from.
+
+A bug worth remembering: the old code did `floor((first - phase) / barSec)`
+where `phase` is a *sixteenth* phase within half a step of the first onset. Get
+the sign wrong by a hair and `floor` returns -1, so the song opened with a
+whole empty bar.
+
+**The end** is `loopBars()`, which scores every candidate length on three terms
+that (as with the tempo octave) are each useless alone:
+
+| Term | What it prefers |
+| --- | --- |
+| cost — the share of the performance discarded | keeping everything |
+| fill — how full the candidate's *last* bar is | cutting a trailing fragment |
+| a mild prior on 4, 8, 16 over 5, 7, 9 | round phrase lengths |
+
+Held out against synthetic takes with known lengths: **~99% correct wherever
+the metre was right** (792/796), and 100% on the start alignment (864/864).
+Where it is wrong the take is two bars long and the "fragment" is nearly a bar,
+which is genuinely ambiguous.
+
+Two rules keep the seam closed once the length is chosen:
+
+- **Length is read off the sixteenth grid, never off the snapped positions.**
+  A coarse SNAP has to be able to move the last note *onto* the closing bar
+  line without the song growing a bar to hold it — so a note that snaps onto
+  the loop point wraps to step 0, where it is the downbeat played a hair early.
+- **Nothing rings past `dur`.** `n.sD` is clipped at the loop point, or the
+  loop overlaps itself on every pass.
+
+`tk.bars` is therefore **derived** every time `prepTake()` runs, not stored.
+That is what makes correcting the BPM or the metre in the edit bar behave: the
+same performance at half the tempo is genuinely half as many bars. INTRO
+padding shifts everything later by N note values and adds whole bars, so the
+loop stays bar-aligned.
+
+### Four steps to the beat, in every metre
+
+`tk.steps = tk.beats * 4`, not a flat 16 per bar. The flat version made SNAP's
+`1/16` a lie in 3/4 (a "step" was a 12th of a beat) and left `perBeat = 16/3`,
+so the edit click — which fires when `step % perBeat === 0` — only ever landed
+on the downbeat. `steps` and `perBeat` are derived, so a stored take that
+predates this re-grids itself on load.
 
 ## Replay, and editing a take
 
