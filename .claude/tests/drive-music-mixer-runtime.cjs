@@ -795,6 +795,90 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     else if (kept2.st.mode !== 'none')
       fail('a reload with takes stored opened on "' + kept2.st.mode + '" instead of nothing selected');
     else console.log('TAKE=survives a reload as "' + kept2.takes[0].name + '", listed at slot 2');
+
+    /* --- 10. export ---------------------------------------------------- */
+    /* The export exists so a Claude Code session can USE it, which means the
+       rendered song has to satisfy the same notation contract as the five
+       built-in ones — a file that would not load is not an export. The check
+       that matters is the ROUND TRIP: walk the pattern strings back out and
+       require exactly the notes the take holds, no more and no fewer. */
+    /* the reload above left nothing selected, so pick the take back up first */
+    const exTake = await page.evaluate(() => {
+      const t = window.__MM.takes()[0];
+      window.__MM.pick('t:' + t.id);
+      return t.id;
+    });
+    await page.waitForTimeout(300);
+    const ex = await page.evaluate(() => ({
+      text: window.__MM.exportText(), grid: window.__MM.takeGrid(),
+    }));
+    let J = null;
+    try { J = JSON.parse(ex.text); } catch (e) { fail('the export is not valid JSON: ' + e.message); }
+    /* An empty export must FAIL rather than skip every check below it. The
+       first version of this section ran with nothing selected, got null, and
+       went green having tested nothing at all. */
+    if (!ex.text || !J) fail('exporting take ' + exTake + ' produced nothing');
+    else {
+      if (J.format !== 'music-mixer-take/v1') fail('export format is "' + J.format + '"');
+      for (const k of ['song', 'songSource', 'kit', 'performance', 'readme'])
+        if (!J[k]) fail('the export has no "' + k + '" section');
+      const S2 = J.song || {};
+      if (!S2.tracks || S2.tracks.length !== 15) fail('the exported song has ' + (S2.tracks || []).length + ' tracks, expected 15');
+      else if (!S2.arr || S2.arr.length !== 1 || S2.arr[0].p.length !== 15)
+        fail('the exported arrangement row is malformed');
+      else {
+        /* the same structural rules the data gate holds SONGS[] to */
+        for (let i = 0; i < 15; i++) {
+          const t = S2.tracks[i];
+          if (t.pats.a.length % S2.steps !== 0)
+            fail('exported pad' + i + ' pattern is ' + t.pats.a.length + ' chars, not a multiple of ' + S2.steps);
+          if (i >= 10 && t.k !== 'p') fail('exported pad' + i + ' is in the percussion column but k="' + t.k + '"');
+          if (i < 10 && t.k === 'p') fail('exported pad' + i + ' is a drum outside the percussion column');
+          const ok = t.k === 'p' ? /^[Xxor.\-]*$/ : /^[1-9a-f.\-]*$/;
+          if (!ok.test(t.pats.a)) fail('exported pad' + i + ' uses characters its kind cannot render');
+          if (S2.arr[0].p[i] !== '.' && !(S2.arr[0].p[i] in t.pats))
+            fail('exported pad' + i + ' is arranged to a pattern it does not have');
+        }
+        const total = S2.arr[0].b * S2.steps, out = new Set();
+        for (let i = 0; i < 15; i++) {
+          if (S2.arr[0].p[i] === '.') continue;
+          const pat = S2.tracks[i].pats.a;
+          for (let a = 0; a < total; a++) {
+            const c = pat[a % pat.length];
+            if (c !== '.' && c !== '-') out.add(i + '@' + a);
+          }
+        }
+        const want = new Set(ex.grid);
+        let missing = 0, extra = 0;
+        want.forEach((x) => { if (!out.has(x)) missing++; });
+        out.forEach((x) => { if (!want.has(x)) extra++; });
+        if (missing || extra)
+          fail('the exported notation does not match the take: ' + missing + ' notes missing, ' +
+               extra + ' invented (of ' + want.size + ')');
+        else console.log('EXPORT=round trip exact, ' + want.size + ' notes through ' +
+                         S2.tracks[0].pats.a.length + '-char patterns');
+      }
+      /* the readme has to tell the receiving session the one thing that will
+         otherwise waste its time: this is a seed and it will fail the gate */
+      const txt = (J.readme || []).join(' ');
+      if (!/285/.test(txt) || !/drive-music-mixer/.test(txt))
+        fail('the export readme does not tell a session the song contract or which gate to run');
+      if (!/^\{[\s\S]*\}$/.test(J.songSource || '') || (J.songSource || '').indexOf('tracks: [') < 0)
+        fail('songSource is not a pasteable object literal');
+      if (/[^\x00-\x7F]/.test(ex.text)) fail('the export contains non-ASCII characters');
+      else console.log('EXPORT=' + ex.text.length + ' bytes, ASCII, readme names the contract and the gate');
+    }
+    /* and the button really produces a file */
+    const dl = await page.evaluate(async () => {
+      let name = null;
+      const real = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () { if (this.download) name = this.download; };
+      try { window.__MM.exportFile(); } finally { HTMLAnchorElement.prototype.click = real; }
+      return name;
+    });
+    if (dl !== 'keep-me-take.json') fail('the export downloaded as "' + dl + '", expected keep-me-take.json');
+    else console.log('EXPORT=downloads as ' + dl);
+
     await page.evaluate(() => window.__MM.wipeTakes());
   }
 

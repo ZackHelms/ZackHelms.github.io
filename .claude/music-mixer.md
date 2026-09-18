@@ -496,6 +496,48 @@ Two traps worth keeping in mind, both hit during the build:
   called each other and blew the stack. Waking the graph and starting a
   transport are separate jobs.
 
+## Export
+
+`EXPORT FILE` is the one row in the wrench menu that is an **action rather than
+a mode**: it fires and leaves the tool where it was. It writes a
+`music-mixer-take/v1` JSON file, downloaded as `<slug>-take.json`.
+
+The point is that a Claude Code session can *use* it, so the file carries the
+take rendered into **this game's own SONGS[] notation** — pattern strings plus
+an arrangement — and not just a dump of tap times:
+
+| Section | What it is for |
+| --- | --- |
+| `song` | the take as a SONGS[] object |
+| `songSource` | the same thing as pasteable JS, already in the repo's style (unquoted keys, single quotes, one pattern per line) |
+| `performance` | the raw tap times and durations, so a session can re-quantize at a different snap |
+| `kit` | which voice and scale degree each of the fifteen pads held |
+| `readme` | what this is, and the song contract it does **not** yet meet |
+
+Rendering details worth knowing:
+
+- A pad's scale degree becomes the pattern character directly, since the
+  notation's `1-9`/`a-f` covers degrees 0-14 and `degHz` wraps past the scale
+  length on its own. A pad outside that range is carried by the track's `oct`.
+- Percussion has no recorded velocity, so the accent map is **metrical**: a
+  note on a bar line is `X`, everything else `x`.
+- `shortestPattern()` collapses a pattern that repeats. A looped performance
+  exports as a tidy one-bar string; a through-composed one exports as the whole
+  thing, which is honest — the string *is* the take.
+
+**The readme earns its place** (it is the carve-out the discovery rule allows:
+text for a reader who is not holding the device). It states the thing that
+would otherwise waste a session's time — this is a **seed, not a drop-in**.
+Pasting it into `SONGS[]` as-is fails the data gate on purpose, because a song
+there must run 285-315 s, keep every pad under 45% rest and 28 bars straight,
+average 0.22 notes/bar, sound on 60% of steps held, and stay under 26 voices a
+step. The readme lists all of it and names the gate to run.
+
+The runtime gate's real check is the **round trip**: walk the exported pattern
+strings back into `pad@step` heads and require exactly the take's notes, none
+missing and none invented. Losing a third of the notes reports
+`36 notes missing, 0 invented (of 105)`.
+
 ## Gates
 
 ```

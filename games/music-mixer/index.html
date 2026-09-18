@@ -544,7 +544,7 @@ body.erasing .pad .ex { display: flex; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 16:26 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 17:24 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -2883,6 +2883,164 @@ function pickSelection(v) {
   else selectSong(parseInt(v, 10), false);
 }
 
+/* ================================================================= export */
+/* The point of an export is that a Claude Code session can USE it, so the
+   file carries the take rendered into this game's own SONGS[] notation —
+   pattern strings plus an arrangement — not just a dump of tap times. The raw
+   performance rides along too, because quantizing is lossy and a session may
+   want to re-derive it at a different snap. */
+const EXPORT_FORMAT = 'music-mixer-take/v1';
+
+function degChar(d) { return d < 9 ? String.fromCharCode(49 + d) : String.fromCharCode(97 + d - 9); }
+
+/* A pattern that simply repeats is written once. A performance usually does
+   not repeat at all, and then this returns the whole thing — which is honest:
+   the string IS the take. */
+function shortestPattern(s, unit, bars) {
+  for (let b = 1; b <= bars; b++) {
+    if (bars % b) continue;
+    const len = b * unit;
+    let ok = true;
+    for (let k = len; k < s.length; k++) if (s[k] !== s[k % len]) { ok = false; break; }
+    if (ok) return s.slice(0, len);
+  }
+  return s;
+}
+
+function takeToSong(tk) {
+  const steps = tk.steps, bars = tk.bars, total = bars * steps;
+  const sc = scaleOf(tk.kit.mode), n = sc.length;
+  const tracks = [], pick = [];
+  for (let i = 0; i < PADS; i++) {
+    const pd = tk.kit.pads[i];
+    /* The notation's degree characters cover 0-14, so a pad sitting outside
+       that range is carried by the track's `oct` instead. */
+    let deg = pd.deg || 0, oct = 0;
+    while (deg < 0) { deg += n; oct--; }
+    while (deg > 14) { deg -= n; oct++; }
+    const grid = new Array(total).fill('.');
+    let notes = 0;
+    for (const note of tk.notes) {
+      if (note.i !== i) continue;
+      const st = Math.round(note.sT / tk.stepSec);
+      if (st < 0 || st >= total) continue;
+      /* no velocity is recorded, so the accent map is metrical: a note on a
+         bar line is the loud one */
+      grid[st] = pd.k === 'p' ? (st % steps === 0 ? 'X' : 'x') : degChar(deg);
+      notes++;
+      const len = Math.max(1, Math.round(note.sD / tk.stepSec));
+      for (let k = 1; k < len && st + k < total; k++) if (grid[st + k] === '.') grid[st + k] = '-';
+    }
+    const tr = { lab: padLabelFor(tk.kit, i), v: pd.v, k: pd.k, oct, g: 1, pan: 0 };
+    if (pd.k === 'p') tr.tune = pd.tune || 1;
+    tr.pats = { a: shortestPattern(grid.join(''), steps, bars) };
+    tracks.push(tr);
+    pick.push(notes ? 'a' : '.');
+  }
+  return {
+    id: (tk.name || 'take').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 12) || 'take',
+    name: (tk.name || 'TAKE').toUpperCase(), style: 'Recorded',
+    sig: tk.beats + '/4', bpm: Math.round(tk.bpm * 10) / 10,
+    pulses: tk.beats, steps: steps,
+    rootHz: Math.round(midiHz(degMidi(tk.kit.root, tk.kit.mode, tk.kit.oct, 0)) * 1000) / 1000,
+    swing: 0, mix: 1,
+    cents: sc.map((x) => x * 100),
+    tracks,
+    arr: [{ n: 'TAKE', b: bars, k: [0], p: pick.join('') }],
+  };
+}
+function padLabelFor(kit, i) {
+  const pd = kit.pads[i];
+  return pd.k === 'p' ? (VOICE_LAB[pd.v] || pd.v)
+                      : midiName(degMidi(kit.root, kit.mode, kit.oct, pd.deg || 0));
+}
+
+/* Emitted in the repo's own style — unquoted keys, single quotes, one pattern
+   per line — so it can go straight into SONGS[] without being reformatted. */
+function jsLit(song) {
+  const q = (s) => "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+  const L = [];
+  L.push('{');
+  L.push('  id: ' + q(song.id) + ', name: ' + q(song.name) + ', style: ' + q(song.style) + ',');
+  L.push('  sig: ' + q(song.sig) + ', bpm: ' + song.bpm + ', pulses: ' + song.pulses +
+         ', steps: ' + song.steps + ', rootHz: ' + song.rootHz + ', swing: 0, mix: 1,');
+  L.push('  cents: [' + song.cents.join(', ') + '],');
+  L.push('  tracks: [');
+  for (const t of song.tracks) {
+    const head = '    { lab: ' + q(t.lab) + ', v: ' + q(t.v) + ', k: ' + q(t.k) +
+                 ', oct: ' + t.oct + (t.tune != null ? ', tune: ' + t.tune : '') +
+                 ', g: 1, pan: 0, pats: {';
+    L.push(head);
+    L.push('      a: ' + q(t.pats.a) + ' } },');
+  }
+  L.push('  ],');
+  L.push('  arr: [');
+  L.push('    { n: ' + q(song.arr[0].n) + ', b: ' + song.arr[0].b + ', k: [0], p: ' + q(song.arr[0].p) + ' },');
+  L.push('  ],');
+  L.push('}');
+  return L.join('\n');
+}
+
+function buildExport(tk) {
+  if (!tk) return null;
+  const song = takeToSong(tk);
+  const dur = tk.dur.toFixed(1);
+  return JSON.stringify({
+    format: EXPORT_FORMAT,
+    exported: new Date().toISOString(),
+    readme: [
+      'A Music Mixer take: a RECORDED PERFORMANCE from games/music-mixer/, not a finished song.',
+      '',
+      'What is in this file:',
+      '  song        the take rendered into the game\'s own SONGS[] shape (pattern strings + arrangement)',
+      '  songSource  the same thing as pasteable JS, already in the repo\'s style',
+      '  performance the raw tap times and durations, so it can be re-quantized at a different snap',
+      '  kit         which voice and scale degree each of the fifteen pads was set to',
+      '',
+      'To build a song from it, read .claude/music-mixer.md first. Then note that this is a SEED,',
+      'not a drop-in: pasting it into SONGS[] as-is will FAIL the data gate, on purpose. A song there',
+      'must satisfy all of:',
+      '  - 285 to 315 seconds long. This take is ' + dur + 's, so build sections around it.',
+      '  - no pad resting more than 45% of the song, or more than 28 bars straight',
+      '  - every pad averaging at least 0.22 notes per bar',
+      '  - at least 60% of steps sounding with every pad held',
+      '  - at most 26 simultaneous voices on any one step',
+      '  - percussion only on pads 10-14; pads 0-9 are pitched, hue climbing each column',
+      '  - every pattern string a whole multiple of `steps` characters',
+      '  - mix trim between 0.4 and 2.5, set so this song sits level with the other five',
+      '',
+      'Run `node .claude/tests/drive-music-mixer.cjs` after adding it. It names every violation.',
+    ],
+    song,
+    songSource: jsLit(song),
+    kit: tk.kit,
+    performance: {
+      bpm: tk.bpm, beats: tk.beats, steps: tk.steps, bars: tk.bars,
+      snap: tk.snap, padSteps: tk.padSteps, seconds: +tk.dur.toFixed(3),
+      note: 'times are seconds from the take\'s first bar line; `snap` is in steps, 0 meaning off',
+      notes: tk.notes.map((x) => ({ i: x.i, t: +x.t.toFixed(4), d: +x.d.toFixed(4) })),
+    },
+  }, null, 2);
+}
+
+function exportTake() {
+  const text = buildExport(TK);
+  if (!text) return null;
+  const slug = (TK.name || 'take').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'take';
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = slug + '-take.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    if (a.parentNode) a.parentNode.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 4000);
+  return text.length;
+}
+
 /* ================================================== tools menu and picker */
 /* The wrench is a MODE picker, not a command button: each entry puts the pad
    grid into a different job. Entries whose stage has not landed yet sit in the
@@ -2894,6 +3052,7 @@ const TOOLS = [
   ['keymode', 'CHANGE KEY & MODE'],
   ['record',  'RECORD'],
   ['edit',    'REPLAY & EDIT'],
+  ['export',  'EXPORT FILE'],
 ];
 /* Which tools apply is a question about the SELECTION, not about what has
    been built: RECORD belongs to a new song, REPLAY & EDIT to a recorded one.
@@ -2903,7 +3062,7 @@ function toolOK(id) {
   if (id === 'none') return true;
   if (id === 'tappad' || id === 'keymode') return mode === 'rec' || mode === 'take';
   if (id === 'record') return mode === 'rec';
-  if (id === 'edit') return mode === 'take' && !!TK;
+  if (id === 'edit' || id === 'export') return mode === 'take' && !!TK;
   return false;
 }
 function syncToolMenu() {
@@ -2914,7 +3073,7 @@ let tool = 'none';
 let pickIx = -1;
 
 function setTool(id) {
-  if (!toolOK(id)) id = 'none';
+  if (id === 'export' || !toolOK(id)) id = 'none';
   const was = tool;
   tool = id;
   tapCand = -1;
@@ -3127,7 +3286,13 @@ function wire() {
     const lab = document.createElement('span'); lab.textContent = t[1];
     b.appendChild(tick); b.appendChild(lab);
     b.disabled = !toolOK(t[0]);
-    b.addEventListener('click', () => { setTool(t[0]); closeOverlays(); });
+    b.addEventListener('click', () => {
+      /* EXPORT is the one row that is an action rather than a mode: it fires
+         and leaves the tool where it was */
+      if (t[0] === 'export') { closeOverlays(); exportTake(); return; }
+      setTool(t[0]);
+      closeOverlays();
+    });
     menu.appendChild(b);
   }
   el('tools').addEventListener('click', () => {
@@ -3456,6 +3621,14 @@ window.__MM = {
     return { bars: TK.bars, dur: +TK.dur.toFixed(2), snap: TK.snap, padSteps: TK.padSteps };
   },
   wipeTakes: () => { TAKES = []; TK = null; saveTakes(); rebuildSongs(); return 0; },
+  exportText: () => buildExport(TK),
+  exportFile: () => exportTake(),
+  takeGrid: () => {
+    if (!TK) return [];
+    const out = [];
+    for (const n of TK.notes) out.push(n.i + '@' + Math.round(n.sT / TK.stepSec));
+    return out;
+  },
   sample: (what) => {
     if (what === 'play') smpPlay();
     else if (what === 'pause') smpPause();
