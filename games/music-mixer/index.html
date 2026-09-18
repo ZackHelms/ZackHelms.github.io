@@ -299,6 +299,104 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
   cursor: pointer;
 }
 
+/* ------------------------------------------------- record / edit surfaces */
+#recbar { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+#recbar.gone, #rec-btn.gone, #editbar.gone { display: none !important; }
+/* the CD asked for a DOUBLE-WIDE rec button — it is the only control on its
+   bar and it is pressed with a thumb while the other hand is over the pads */
+#rec-btn {
+  flex: 1 1 auto; height: 40px; max-width: 260px;
+  background: linear-gradient(#1b1b33, #10101f);
+  border: 1px solid var(--border); color: var(--white);
+  border-radius: 9px;
+  font-family: 'Black Ops One', sans-serif; font-size: .8rem; letter-spacing: 4px;
+  cursor: pointer;
+}
+#rec-btn.count { color: var(--gold); border-color: var(--gold); font-size: 1.15rem; }
+#rec-btn.live { border-color: var(--red); color: transparent; position: relative; }
+#rec-btn.live::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 16px; height: 16px; margin: -8px 0 0 -8px;
+  border-radius: 50%; background: var(--red);
+  box-shadow: 0 0 14px var(--red);
+  animation: recpulse 1.4s ease-in-out infinite;
+}
+@keyframes recpulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+
+#editbar { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+#tk-title {
+  flex: 1 1 130px; min-width: 0; height: 30px;
+  background: #0d0d1a; border: 1px solid var(--border); border-radius: 7px;
+  color: var(--white); font-family: inherit; font-size: .76rem; letter-spacing: 1px;
+  padding: 0 9px;
+}
+.eb {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 4px;
+  font-size: .58rem; letter-spacing: 1.5px; color: var(--dim);
+}
+.eb select, .eb input {
+  height: 30px;
+  background: #0d0d1a; border: 1px solid var(--border); border-radius: 7px;
+  color: var(--white); font-family: inherit; font-size: .7rem;
+  padding: 0 4px;
+}
+.eb input[type=number] { width: 52px; text-align: center; }
+.ebtn {
+  height: 30px; min-width: 28px;
+  background: #16162a; border: 1px solid var(--border); color: var(--white);
+  border-radius: 7px; font-family: inherit; font-size: .68rem; cursor: pointer;
+}
+
+/* the overdub dot, and the per-pad erase handle it turns on */
+#tr-rec .dot { width: 13px; height: 13px; border-radius: 50%; border: 2px solid currentColor; }
+#tr-rec.on { border-color: var(--red); color: var(--red); }
+#tr-rec.on .dot { background: var(--red); box-shadow: 0 0 10px var(--red); }
+.pad .ex {
+  position: absolute; top: 4px; right: 5px;
+  width: 22px; height: 22px; border-radius: 6px;
+  display: none; align-items: center; justify-content: center;
+  background: #00000066; color: #fff;
+  font-size: .9rem; line-height: 1;
+}
+body.erasing .pad .ex { display: flex; }
+.pad .ex.hot { background: var(--red); box-shadow: 0 0 12px var(--red); }
+
+/* processing: a real modal block, because a half-processed take is not a
+   thing the rest of the UI can safely talk to */
+#busy {
+  position: fixed; inset: 0; z-index: 60;
+  background: #0a0a12cc;
+  display: none; align-items: center; justify-content: center;
+}
+#busy.open { display: flex; }
+#busy-dots {
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 2.6rem; letter-spacing: 6px; color: var(--green);
+  min-width: 4ch; text-align: center;
+}
+#ask {
+  position: fixed; z-index: 46;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(88vw, 320px);
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  padding: 18px; display: none; box-shadow: 0 18px 50px #000d;
+}
+#ask.open { display: block; }
+#ask h2 {
+  font-family: 'Black Ops One', sans-serif; font-size: .82rem;
+  letter-spacing: 3px; color: var(--green); margin-bottom: 16px; text-align: center;
+}
+.ask-row { display: flex; gap: 10px; }
+.ask-row button {
+  flex: 1 1 50%;
+  background: linear-gradient(#1b1b33, #10101f);
+  border: 1px solid var(--border); color: var(--white);
+  border-radius: 8px; padding: 11px;
+  font-family: 'Black Ops One', sans-serif; font-size: .74rem; letter-spacing: 3px;
+  cursor: pointer;
+}
+#ask-yes { border-color: var(--green); color: var(--green); }
+
 /* -------------------------------------------------- key and mode screen */
 /* Takes the whole play surface rather than opening over it: picking a key is
    a decision about the instrument, not an adjustment while you play. The two
@@ -446,7 +544,7 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 16:00 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 16:26 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -463,9 +561,23 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
     <div id="song-row">
       <div id="song-wrap"><select id="song-select" aria-label="Song"></select></div>
       <button class="chip gone" id="tools" aria-label="Tools">&#128295;</button>
+      <button class="chip gone" id="tr-rew" aria-label="Back to the start">&#9198;</button>
+      <button class="chip gone" id="tr-play" aria-label="Play">&#9654;</button>
+      <button class="chip gone" id="tr-rec" aria-label="Record over the song"><span class="dot"></span></button>
       <button class="chip" id="lock" aria-label="Tap to lock" aria-pressed="false">
         <span class="gl">&#128275;</span>
       </button>
+    </div>
+
+    <div id="recbar" class="gone">
+      <button id="rec-btn" class="gone">REC</button>
+      <div id="editbar" class="gone">
+        <input id="tk-title" type="text" maxlength="24" aria-label="Song title" spellcheck="false">
+        <label class="eb">SNAP<select id="tk-snap" aria-label="Snap"></select></label>
+        <label class="eb">BPM<button class="ebtn" id="tk-half" aria-label="Halve the tempo">&#247;2</button><input id="tk-bpm" type="number" min="30" max="260" step="1" aria-label="BPM"><button class="ebtn" id="tk-dbl" aria-label="Double the tempo">&#215;2</button></label>
+        <label class="eb">BEATS<select id="tk-beats" aria-label="Beats per bar"></select></label>
+        <label class="eb">INTRO<select id="tk-padn" aria-label="Intro padding count"></select><select id="tk-padu" aria-label="Intro padding note value"></select></label>
+      </div>
     </div>
 
     <div id="info">
@@ -559,6 +671,16 @@ body.nolabels .pad .lab, body.nolabels .pad .num { display: none; }
   <button id="close-settings">CLOSE</button>
 </div>
 
+<div id="busy" aria-live="polite"><div id="busy-dots">&#183;</div></div>
+
+<div id="ask" role="dialog" aria-label="Save changes">
+  <h2>SAVE CHANGES?</h2>
+  <div class="ask-row">
+    <button id="ask-no">NO</button>
+    <button id="ask-yes">YES</button>
+  </div>
+</div>
+
 <div id="toolmenu" role="menu" aria-label="Tools"></div>
 
 <div id="picker" role="dialog" aria-label="Pad sound">
@@ -607,7 +729,7 @@ const KEYMAP = {};
 /* ------------------------------------------------------------------- audio */
 let AC = null, master = null, comp = null, bus = null, verb = null, verbIn = null;
 let NOISE = null, audioReady = false;
-let smpOut = null, smpSend = null;
+let smpOut = null, smpSend = null, clkOut = null;
 const trackGain = [], trackSend = [], trackPan = [], trackLive = [];
 let noiseCursor = 0;
 
@@ -652,6 +774,11 @@ function initAudio() {
 
   /* the key/mode sample is not a pad and not a track, so it gets its own way
      to the bus rather than borrowing one and inheriting its gate */
+  /* the click is a reference, never part of the mix: dry, and never sent to
+     the room, so it stays legible under whatever the take is doing */
+  clkOut = AC.createGain(); clkOut.gain.value = 1;
+  clkOut.connect(bus);
+
   smpOut = AC.createGain(); smpOut.gain.value = 1;
   smpSend = AC.createGain(); smpSend.gain.value = 0;
   smpOut.connect(bus); smpOut.connect(smpSend); smpSend.connect(verbIn);
@@ -1663,7 +1790,8 @@ function buildPads() {
     const sh = document.createElement('div'); sh.className = 'sheen';
     const num = document.createElement('div'); num.className = 'num';
     const lab = document.createElement('div'); lab.className = 'lab';
-    b.appendChild(sh); b.appendChild(num); b.appendChild(lab);
+    const ex = document.createElement('div'); ex.className = 'ex'; ex.textContent = '\u00d7';
+    b.appendChild(sh); b.appendChild(num); b.appendChild(lab); b.appendChild(ex);
     grid.appendChild(b);
     padEl[i] = b;
     held[i] = false; keyHeld[i] = false; pulse[i] = 0; lastPulse[i] = -1;
@@ -1703,7 +1831,10 @@ function layout() {
   measure();
 }
 function measure() {
-  for (let i = 0; i < PADS; i++) rects[i] = padEl[i].getBoundingClientRect();
+  for (let i = 0; i < PADS; i++) {
+    rects[i] = padEl[i].getBoundingClientRect();
+    exRects[i] = padEl[i].querySelector('.ex').getBoundingClientRect();
+  }
 }
 
 /* ======================================================= the key/mode sample */
@@ -1753,6 +1884,221 @@ const SAMPLE = {
 const KEY_NAMES = ['C', 'C# / Db', 'D', 'D# / Eb', 'E', 'F',
                    'F# / Gb', 'G', 'G# / Ab', 'A', 'A# / Bb', 'B'];
 
+/* ============================================================ recorded takes */
+/* A take is stored as EXACT tap times and quantized on the way out, per the
+   CD's call: `n.t` and `n.d` are what was played, `n.sT`/`n.sD` are where it
+   lands under the current snap and intro padding. Nothing is destructive, so
+   moving the snap from 1/16 to OFF gets the human timing back intact.        */
+let TAKES = [];
+let TK = null;                       /* the take selected or being edited */
+let editing = false, overdub = false;
+let takeDirty = false, takeBackup = null;
+
+const SNAPS = [[0, 'OFF'], [1, '1/16'], [2, '1/8'], [4, '1/4'], [8, '1/2']];
+const PAD_UNITS = [[1, '1/16'], [2, '1/8'], [4, '1/4'], [8, '1/2'], [16, 'BAR']];
+
+function cloneKit(k) { return JSON.parse(JSON.stringify(k)); }
+
+/* --- tempo, metre and the edges ------------------------------------------ */
+/* ONSET STRENGTH, not just onset times: pads struck together are one onset
+   with weight, and that weight is the only evidence of where a bar starts.
+   An earlier version deduped simultaneous hits away and metre detection then
+   had a flat series to work with and got everything wrong. */
+function onsetStrength(raws) {
+  const out = [];
+  for (const t of raws) {
+    const last = out[out.length - 1];
+    if (last && t - last.t <= 0.025) { last.w++; continue; }
+    out.push({ t, w: 1 });
+  }
+  return out;
+}
+/* Tempo. The grid fit is the easy half and it is solid; the hard half is the
+   OCTAVE — half, double and 1.5x all fit a steady performance about as well
+   (a stream of eighths at 76 is a stream of dotted eighths at 114, each dead
+   on its own grid). Three things settle it, and they have to pull against
+   each other:
+     - metrical position: the right tempo puts notes on beats and off-beats,
+       a wrong one smears them across every subdivision. On its own this
+       always prefers DOUBLING, since an eighth becomes a quarter;
+     - density: music runs about two onsets to the beat, so doubling halves
+       that and halving doubles it. On its own this prefers the slower read;
+     - a preference for ordinary tempi, which only breaks what is left.
+   Measured on synthetic takes this lands ~90% inside roughly 85-145 BPM and
+   drops off outside it, which is why the edit bar carries a one-tap halve and
+   double rather than only a number field. */
+function detectTempo(raws) {
+  const on = onsetStrength(raws);
+  if (on.length < 4) return { bpm: 100, beat: 0.6, grid: 0.15, phase: on.length ? on[0].t : 0 };
+  const cands = [];
+  let top = 0;
+  for (let bpm = 60; bpm <= 190.001; bpm += 0.5) {
+    const beat = 60 / bpm, grid = beat / 4;
+    let bp = null;
+    for (let ph = 0; ph < 16; ph++) {
+      const phase = on[0].t - grid / 2 + (ph / 16) * grid;
+      let raw = 0, metric = 0, tot = 0;
+      for (const o of on) {
+        const e = (o.t - phase) / grid;
+        const k = Math.round(e);
+        const err = Math.abs(e - k) * grid / 0.030;
+        const fit = Math.exp(-err * err);
+        raw += fit * o.w;
+        const pos = ((k % 4) + 4) % 4;
+        metric += fit * o.w * (pos === 0 ? 1 : pos === 2 ? 0.55 : 0.12);
+        tot += o.w;
+      }
+      if (!bp || raw > bp.raw) bp = { raw, metric: metric / Math.max(1, tot), phase };
+    }
+    cands.push({ bpm, beat, grid, raw: bp.raw, metric: bp.metric, phase: bp.phase });
+    if (bp.raw > top) top = bp.raw;
+  }
+  const span = on[on.length - 1].t - on[0].t;
+  let best = null;
+  for (const c of cands) {
+    if (c.raw < top * 0.97) continue;
+    const opb = on.length / Math.max(1, span / c.beat);
+    const dens = Math.exp(-Math.pow(Math.log(opb / 2.2) / Math.LN2, 2) / 2.8);
+    const d = Math.log(c.bpm / 112) / Math.LN2;
+    const key = (0.2 + c.metric) * dens * Math.exp(-(d * d) / 0.7);
+    if (!best || key > best.key) best = { key, bpm: c.bpm, beat: c.beat, grid: c.grid, phase: c.phase };
+  }
+  return best;
+}
+/* Metre by autocorrelation of the onset-strength series, binned on SIXTEENTHS.
+   Not on beats: an onset half a beat from the phase sits exactly on a
+   beat-level rounding boundary, and which side it falls on makes the bar
+   appear to drift — that read a plain 4/4 take as 5/4. And not by downbeat
+   weight either, which an ordinary backbeat defeats. Periodicity does not care
+   where the bar starts, only that the pattern repeats. */
+function detectBeats(raws, best) {
+  const on = onsetStrength(raws);
+  if (on.length < 8) return 4;
+  const idx = on.map((o) => Math.round((o.t - best.phase) / best.grid));
+  let lo = Infinity, hi = -Infinity;
+  for (const x of idx) { if (x < lo) lo = x; if (x > hi) hi = x; }
+  const L = hi - lo + 1;
+  if (L < 32) return 4;
+  const c = new Array(L).fill(0);
+  for (let k = 0; k < on.length; k++) c[idx[k] - lo] += on[k].w;
+  let mean = 0;
+  for (const x of c) mean += x;
+  mean /= L;
+  let den = 0;
+  for (const x of c) den += (x - mean) * (x - mean);
+  if (den <= 0) return 4;
+  let bestN = 4, bestScore = -Infinity;
+  for (const n of [2, 3, 4, 5, 6, 7]) {
+    const lag = n * 4;
+    if (L < lag * 2) continue;
+    let num = 0, cnt = 0;
+    for (let k = 0; k + lag < L; k++) { num += (c[k] - mean) * (c[k + lag] - mean); cnt++; }
+    const r = num / (den * cnt / L);
+    /* a 4/4 pattern correlates at lag 2 as well, and a 3/4 one at lag 6, so
+       the neighbouring harmonics must clearly beat the fundamental to win */
+    const adj = r + (n === 4 ? 0.16 : 0) - (n === 2 ? 0.04 : 0) - (n === 6 ? 0.04 : 0);
+    if (adj > bestScore) { bestScore = adj; bestN = n; }
+  }
+  return bestN;
+}
+
+function processTake(events, kit, name) {
+  const usable = events.filter((e) => e.d >= 0 && isFinite(e.t));
+  if (!usable.length) return null;
+  const onsets = usable.map((e) => e.t).sort((a, b) => a - b);
+  const best = detectTempo(onsets);
+  const beats = detectBeats(onsets, best);
+  const steps = 16;
+  const barSec = best.beat * beats;
+  /* Nobody starts or stops on the exact beat, so the song's edges come from
+     the notes: the bar line at or before the first onset, and the one at or
+     after the last note ends. */
+  let lastEnd = 0;
+  for (const e of usable) lastEnd = Math.max(lastEnd, e.t + e.d);
+  const zero = best.phase + Math.floor((onsets[0] - best.phase) / barSec) * barSec;
+  const baseBars = Math.max(1, Math.ceil((lastEnd - zero) / barSec - 1e-6));
+  const notes = [];
+  for (const e of usable) {
+    const t = e.t - zero;
+    if (t < -barSec) continue;
+    notes.push({ i: e.i, t: Math.max(0, t), d: Math.max(0.03, e.d) });
+  }
+  return prepTake({
+    id: 'u' + Date.now().toString(36),
+    name: name || 'TAKE ' + (TAKES.length + 1),
+    kit: cloneKit(kit), bpm: Math.round(best.bpm * 10) / 10,
+    beats, steps, baseBars, notes, snap: 1, padSteps: 0, created: Date.now(),
+  });
+}
+
+/* --- derived state, recomputed whenever a knob moves --------------------- */
+function prepTake(tk) {
+  tk.beats = Math.min(7, Math.max(2, tk.beats | 0));
+  tk.steps = tk.steps || 16;
+  tk.bpm = Math.min(260, Math.max(30, tk.bpm));
+  tk.barSec = (60 / tk.bpm) * tk.beats;
+  tk.stepSec = tk.barSec / tk.steps;
+  tk.perBeat = tk.steps / tk.beats;
+  const padS = Math.max(0, tk.padSteps | 0);
+  const snap = Math.max(0, tk.snap | 0);
+  let lastStep = 0;
+  for (const n of tk.notes) {
+    let s = n.t / tk.stepSec;
+    if (snap) s = Math.round(s / snap) * snap;
+    n.sT = (s + padS) * tk.stepSec;
+    n.sD = Math.max(tk.stepSec * 0.5, n.d);
+    lastStep = Math.max(lastStep, s + padS + n.sD / tk.stepSec);
+  }
+  tk.baseBars = Math.max(1, tk.baseBars | 0);
+  tk.bars = Math.max(tk.baseBars + Math.ceil(padS / tk.steps),
+                     Math.ceil(lastStep / tk.steps - 1e-6), 1);
+  tk.songSteps = tk.bars * tk.steps;
+  tk.dur = tk.bars * tk.barSec;
+  /* bucketed per step so the scheduler never scans the whole take */
+  tk.buckets = [];
+  for (const n of tk.notes) {
+    const k = Math.max(0, Math.min(tk.songSteps - 1, Math.floor(n.sT / tk.stepSec + 1e-6)));
+    (tk.buckets[k] || (tk.buckets[k] = [])).push(n);
+  }
+  return tk;
+}
+function reprocess() { if (TK) { prepTake(TK); syncEditBar(); saveTakes(); } }
+
+function saveTakes() {
+  try {
+    localStorage.setItem('musicMixer.takes', JSON.stringify(TAKES.map((t) => ({
+      id: t.id, name: t.name, kit: t.kit, bpm: t.bpm, beats: t.beats, steps: t.steps,
+      baseBars: t.baseBars, snap: t.snap, padSteps: t.padSteps, created: t.created,
+      notes: t.notes.map((n) => ({ i: n.i, t: +n.t.toFixed(4), d: +n.d.toFixed(4) })),
+    }))));
+  } catch (e) {}
+}
+function loadTakes() {
+  TAKES = [];
+  try {
+    const raw = JSON.parse(localStorage.getItem('musicMixer.takes') || '[]');
+    if (!Array.isArray(raw)) return;
+    for (const t of raw) {
+      /* field by field, same rule as the kit: a take written by a later build
+         must not be able to throw on the first scheduled step */
+      if (!t || !Array.isArray(t.notes) || !t.notes.length) continue;
+      const notes = [];
+      for (const n of t.notes) {
+        if (!Number.isInteger(n.i) || n.i < 0 || n.i >= PADS) continue;
+        if (!isFinite(n.t) || !isFinite(n.d)) continue;
+        notes.push({ i: n.i, t: Math.max(0, +n.t), d: Math.max(0.03, +n.d) });
+      }
+      if (!notes.length) continue;
+      TAKES.push(prepTake({
+        id: String(t.id || 'u' + TAKES.length), name: String(t.name || 'TAKE'),
+        kit: sanitizeKit(t.kit), bpm: +t.bpm || 100, beats: +t.beats || 4,
+        steps: +t.steps || 16, baseBars: +t.baseBars || 1, notes,
+        snap: +t.snap || 0, padSteps: +t.padSteps || 0, created: +t.created || 0,
+      }));
+    }
+  } catch (e) {}
+}
+
 /* ------------------------------------------------------- the live pad path */
 /* The five built-in songs GATE a running transport: a held pad opens its
    track gain and the scheduler was always going to play that note anyway. A
@@ -1768,24 +2114,29 @@ const REC_VALUE = 'rec';
 const liveNote = new Array(PADS).fill(null);
 const liveIdle = [];
 
+/* A take carries its OWN kit, so selecting one must not clobber the kit being
+   built under RECORD NEW SONG. Everything that reads a pad's sound goes
+   through here rather than at KIT directly. */
+function activeKit() { return mode === 'take' && TK ? TK.kit : KIT; }
+function saveActive() { if (mode === 'take' && TK) saveTakes(); else saveKit(); }
 function padMidi(i) {
-  const pd = KIT.pads[i];
-  return degMidi(KIT.root, KIT.mode, KIT.oct, pd.deg || 0);
+  const k = activeKit(), pd = k.pads[i];
+  return degMidi(k.root, k.mode, k.oct, pd.deg || 0);
 }
 function padVoiceName(i) {
-  if (padMode === 'live') return KIT.pads[i].v;
+  if (mode === 'rec' || mode === 'take') return activeKit().pads[i].v;
   return S ? S.tracks[i].v : null;
 }
 function padLabel(i) {
-  if (mode === 'song') return S.tracks[i].lab;
-  if (mode !== 'rec') return '';
-  const pd = KIT.pads[i];
+  if (mode === 'song') return S ? S.tracks[i].lab : '';
+  if (mode !== 'rec' && mode !== 'take') return '';
+  const pd = activeKit().pads[i];
   return pd.k === 'p' ? (VOICE_LAB[pd.v] || pd.v) : midiName(padMidi(i));
 }
 
 function trigger(i) {
   if (!audioReady) return;
-  const pd = KIT.pads[i], v = voice(pd.v);
+  const pd = activeKit().pads[i], v = voice(pd.v);
   /* re-striking a SUSTAINING voice damps the note already there, the way a
      re-struck key does; a drum, pluck or bell is left to ring and stack */
   if (liveNote[i] && liveNote[i].sus) releaseNote(i, true);
@@ -1833,10 +2184,16 @@ function setHold(i, on) {
   padEl[i].style.setProperty('--glow', on ? '1' : '0');
   noteTap(i, on);
   if (!audioReady || padMode === 'off') return;
-  if (padMode === 'live') { if (on) trigger(i); else releaseNote(i); return; }
-  if (!S) return;
+  if (padMode === 'live') {
+    if (on) { trigger(i); captureOn(i); } else { releaseNote(i); captureOff(i); }
+    return;
+  }
+  /* a recorded take gates through this same path, and it has no `S` — read
+     the voice through padVoiceName so both kinds of song are covered */
+  const name = padVoiceName(i);
+  if (!name) return;
   const g = trackGain[i].gain, now = AC.currentTime;
-  const v = voice(S.tracks[i].v);
+  const v = voice(name);
   const rel = v.s ? 0.13 : 0.028;
   if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(now);
   else { g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); }
@@ -1911,28 +2268,47 @@ function recompute(noLatch) {
 }
 function fromTouches(list) {
   touchOn.fill(false);
+  eraseOn.fill(false);
   for (let t = 0; t < list.length; t++) {
-    const hits = hitsAt(list[t].clientX, list[t].clientY);
+    const x = list[t].clientX, y = list[t].clientY;
+    /* the erase handle is NOT the pad: a finger on it rubs the take out and
+       must not also play the note it is deleting */
+    const ex = exAt(x, y);
+    if (ex >= 0) { eraseOn[ex] = true; continue; }
+    const hits = hitsAt(x, y);
     for (let k = 0; k < hits.length; k++) touchOn[hits[k]] = true;
   }
   recompute();
+  syncErase();
+}
+function syncErase() {
+  for (let i = 0; i < PADS; i++) padEl[i].querySelector('.ex').classList.toggle('hot', eraseOn[i]);
 }
 function releaseAll(fingersToo, locksToo) {
   ptr.clear();
   for (let i = 0; i < PADS; i++) keyHeld[i] = false;
-  if (fingersToo) touchOn.fill(false);
+  if (fingersToo) { touchOn.fill(false); eraseOn.fill(false); }
   if (locksToo) latched.fill(false);
   recompute(true);
 }
 
-function ensureAudio() {
+/* wakeAudio brings the graph up; ensureAudio wakes it AND starts whatever
+   transport the selection implies. They are separate because takePlay() has
+   to wake the graph, and an ensureAudio() that started takes would then call
+   straight back into it — which it did, and blew the stack. */
+function wakeAudio() {
   if (!AC) {
-    if (!initAudio()) return;
+    if (!initAudio()) return false;
     applyAudioSong();
     applyVolume();
   }
   if (AC.state === 'suspended') AC.resume();
+  return audioReady;
+}
+function ensureAudio() {
+  if (!wakeAudio()) return;
   if (padMode === 'gate' && S) startTransport(false);
+  else if (mode === 'take' && TK && !TT.playing && !editing) takePlay();
 }
 
 function applyAudioSong() {
@@ -1944,7 +2320,7 @@ function applyAudioSong() {
   for (let i = 0; i < PADS; i++) {
     /* the song gate closes in every mode but a playing song — live notes come
        in past it, so this can stay shut and damp the outgoing song's tails */
-    const open = padMode === 'gate' && S && held[i] ? 1 : 0;
+    const open = padMode === 'gate' && (S || TK) && held[i] ? 1 : 0;
     const name = padVoiceName(i);
     trackGain[i].gain.cancelScheduledValues(now);
     trackGain[i].gain.setValueAtTime(open, now);
@@ -1976,6 +2352,9 @@ function leaveMode() {
   releaseAll(true, true);
   stopTransport();
   smpStop();
+  takeStopAll();
+  recReset();
+  editing = false; overdub = false; takeDirty = false; takeBackup = null;
   for (let i = 0; i < PADS; i++) releaseNote(i, true);
   for (let i = 0; i < PADS; i++) { pulse[i] = 0; lastPulse[i] = -1; }
   closeOverlays();
@@ -1983,6 +2362,7 @@ function leaveMode() {
 
 function selectSong(ix, keepClock) {
   leaveMode();
+  TK = null;
   songIx = ((ix % SONGS.length) + SONGS.length) % SONGS.length;
   S = SONGS[songIx];
   mode = 'song'; padMode = 'gate'; selValue = String(songIx);
@@ -2001,9 +2381,28 @@ function selectSong(ix, keepClock) {
 /* Nothing picked: the pads are still there and still light up, because the
    grid is the invitation — but there is no song, so there is no clock, no
    meter and no sound. */
+/* A take is a song the CD made: it replays with the pads GATING it, exactly
+   like the built-in five, and it keeps its own kit rather than borrowing the
+   one being built under RECORD NEW SONG. */
+function selectTake(id) {
+  const tk = TAKES.filter((t) => t.id === id)[0];
+  if (!tk) { enterNone(); return; }
+  leaveMode();
+  S = null; TK = tk;
+  mode = 'take'; padMode = 'gate'; selValue = 't:' + id;
+  TT.pos = 0; TT.step = 0;
+  el('bpm').textContent = String(Math.round(tk.bpm));
+  el('sig').textContent = tk.beats + '/4';
+  el('duration').textContent = fmtTime(tk.dur);
+  setTool('none');
+  labelPads();
+  if (audioReady) applyAudioSong();
+  takePlay();
+}
+
 function enterNone() {
   leaveMode();
-  S = null;
+  S = null; TK = null;
   mode = 'none'; padMode = 'off'; selValue = '';
   setTool('none');
   syncChrome();
@@ -2014,7 +2413,7 @@ function enterNone() {
 /* RECORD NEW SONG: no arrangement to gate, so the pads become instruments. */
 function enterRecord() {
   leaveMode();
-  S = null;
+  S = null; TK = null;
   mode = 'rec'; padMode = 'live'; selValue = REC_VALUE;
   setTool('tappad');
   syncChrome();
@@ -2023,8 +2422,15 @@ function enterRecord() {
 }
 
 function syncChrome() {
-  el('info').classList.toggle('gone', mode !== 'song');
-  el('tools').classList.toggle('gone', mode !== 'rec');
+  const isTake = mode === 'take';
+  el('info').classList.toggle('gone', !(mode === 'song' || isTake));
+  el('tools').classList.toggle('gone', !(mode === 'rec' || isTake));
+  /* the transport belongs to REPLAY & EDIT and nowhere else */
+  const tp = isTake && tool === 'edit';
+  for (const id of ['tr-rew', 'tr-play', 'tr-rec']) el(id).classList.toggle('gone', !tp);
+  el('recbar').classList.toggle('gone', !(tool === 'record' || tool === 'edit'));
+  el('rec-btn').classList.toggle('gone', tool !== 'record');
+  el('editbar').classList.toggle('gone', tool !== 'edit');
   const sel = el('song-select');
   sel.value = selValue;
   sel.classList.toggle('unset', selValue === '');
@@ -2041,6 +2447,24 @@ function save() {
       { volume, spreadPx, labelsOn, verbOn, muted, lockMode }));
   } catch (e) {}
 }
+/* A stored kit is rebuilt field by field, never trusted wholesale: a pad
+   naming a voice a later build dropped would throw on its first tap. Takes
+   carry their own kit, so they go through the same door. */
+function sanitizeKit(k) {
+  const out = defaultKit();
+  if (!k || !Array.isArray(k.pads) || k.pads.length !== PADS) return out;
+  if (typeof k.root === 'number' && k.root >= 0 && k.root < 12) out.root = k.root | 0;
+  if (MODES[k.mode]) out.mode = k.mode;
+  if (typeof k.oct === 'number' && k.oct >= 0 && k.oct <= 7) out.oct = k.oct | 0;
+  for (let i = 0; i < PADS; i++) {
+    const q = k.pads[i] || {};
+    if (!VOICE_LAB[q.v]) continue;
+    out.pads[i] = { v: q.v, k: q.k === 'p' ? 'p' : 'm',
+                    deg: typeof q.deg === 'number' ? q.deg | 0 : 0, tune: 1 };
+  }
+  return out;
+}
+
 function saveKit() {
   try { localStorage.setItem('musicMixer.kit', JSON.stringify(KIT)); } catch (e) {}
 }
@@ -2054,24 +2478,11 @@ function load() {
     if (typeof c.muted === 'boolean') muted = c.muted;
     if (typeof c.lockMode === 'boolean') lockMode = c.lockMode;
   } catch (e) {}
-  /* The kit is rebuilt field by field, never trusted wholesale: a stored pad
-     naming a voice a later build dropped would throw on its first tap. */
   try {
     const k = JSON.parse(localStorage.getItem('musicMixer.kit') || 'null');
-    if (k && Array.isArray(k.pads) && k.pads.length === PADS) {
-      const out = defaultKit();
-      if (typeof k.root === 'number' && k.root >= 0 && k.root < 12) out.root = k.root | 0;
-      if (MODES[k.mode]) out.mode = k.mode;
-      if (typeof k.oct === 'number' && k.oct >= 0 && k.oct <= 7) out.oct = k.oct | 0;
-      for (let i = 0; i < PADS; i++) {
-        const q = k.pads[i] || {};
-        if (!VOICE_LAB[q.v]) continue;
-        out.pads[i] = { v: q.v, k: q.k === 'p' ? 'p' : 'm',
-                        deg: typeof q.deg === 'number' ? q.deg | 0 : 0, tune: 1 };
-      }
-      KIT = out;
-    }
+    if (k) KIT = sanitizeKit(k);
   } catch (e) {}
+  loadTakes();
 }
 
 /* --------------------------------------------------- the sample transport */
@@ -2084,19 +2495,20 @@ function smpSchedule() {
   const ss = smpStepSec();
   const limit = AC.currentTime + LOOKAHEAD;
   const v = voice('piano');
+  const AK = activeKit();
   let guard = 400;
   while (SMP.nextT < limit && guard-- > 0) {
     const a = ((SMP.step % total) + total) % total;
     const bar = (a / SAMPLE.steps) | 0, st = a % SAMPLE.steps;
     const cr = SAMPLE.chords[bar];
-    /* KIT.root and KIT.mode are read HERE, once per step — that is what lets
-       a key change take effect without the loop losing its place */
+    /* the key and mode are read HERE, once per step — that is what lets a key
+       change take effect without the loop losing its place */
     const fire = (list, octShift, rel) => {
       for (const e of list) {
         if (e[0] !== st) continue;
         for (const d of e[1]) {
           v.f({ t: SMP.nextT, r: 1, c: '1', out: smpOut,
-                f: midiHz(degMidi(KIT.root, KIT.mode, KIT.oct + octShift, (rel ? cr : 0) + d)),
+                f: midiHz(degMidi(AK.root, AK.mode, AK.oct + octShift, (rel ? cr : 0) + d)),
                 d: e[2] * ss, v: e[3] * 0.5 });
         }
       }
@@ -2109,7 +2521,7 @@ function smpSchedule() {
   }
 }
 function smpPlay() {
-  ensureAudio();
+  wakeAudio();
   if (!audioReady || SMP.playing) return;
   if (smpSend) smpSend.gain.value = verbOn ? voice('piano').snd : 0;
   SMP.nextT = AC.currentTime + 0.08;
@@ -2134,19 +2546,20 @@ function syncSample() {
 /* the scale spelled out, so the screen shows what you picked rather than
    describing what the screen is for */
 function scaleText() {
-  const sc = scaleOf(KIT.mode);
-  const names = sc.map((_, i) => midiName(degMidi(KIT.root, KIT.mode, KIT.oct, i)).replace(/-?\d+$/, ''));
-  return names.join(' ');
+  const k = activeKit();
+  return scaleOf(k.mode).map((_, i) =>
+    midiName(degMidi(k.root, k.mode, k.oct, i)).replace(/-?\d+$/, '')).join(' ');
 }
 function syncKeyMode() {
+  const k = activeKit();
   const keys = el('km-keys'), modes = el('km-modes');
-  if (keys) for (const b of keys.children) b.classList.toggle('sel', +b.dataset.root === KIT.root);
-  if (modes) for (const b of modes.children) b.classList.toggle('sel', b.dataset.mode === KIT.mode);
+  if (keys) for (const b of keys.children) b.classList.toggle('sel', +b.dataset.root === k.root);
+  if (modes) for (const b of modes.children) b.classList.toggle('sel', b.dataset.mode === k.mode);
   const out = el('km-scale');
   if (out) {
     out.innerHTML = '';
     const t = document.createElement('b');
-    t.textContent = KEY_NAMES[KIT.root].split(' ')[0] + ' ' + MODES[KIT.mode][0];
+    t.textContent = KEY_NAMES[k.root].split(' ')[0] + ' ' + MODES[k.mode][0];
     out.appendChild(t);
     out.appendChild(document.createTextNode('  ' + scaleText()));
   }
@@ -2154,12 +2567,320 @@ function syncKeyMode() {
 /* A key or mode change retunes everything that reads a degree: the pads, the
    picker's note list and the sample already playing. Nothing restarts. */
 function setKeyMode(root, modeName) {
-  if (root != null) KIT.root = root;
-  if (modeName) KIT.mode = modeName;
-  saveKit();
+  const k = activeKit();
+  if (root != null) k.root = root;
+  if (modeName) k.mode = modeName;
+  saveActive();
   syncKeyMode();
   labelPads();
-  if (el('picker').classList.contains('open') && pickIx >= 0) fillNoteSelect(KIT.pads[pickIx]);
+  if (el('picker').classList.contains('open') && pickIx >= 0) fillNoteSelect(k.pads[pickIx]);
+}
+
+/* ------------------------------------------------- the take transport ---- */
+const TT = { playing: false, step: 0, nextT: 0, t0: 0, pos: 0 };
+let ttTimer = null;
+
+function click(t, v) {
+  if (!audioReady) return;
+  voice('clave').f({ t, f: 140, r: 1, d: 0.06, v, c: 'X', out: clkOut });
+}
+/* Edit mode runs two extra bars of click at the end. The CD's spec for them is
+   an audible "the song is over, and here it comes again": the first bar's last
+   two clicks fade down, the second bar's first two come back up. */
+function takeTotal() { return TK ? TK.songSteps + (editing ? 2 * TK.steps : 0) : 0; }
+function clickVel(bar, beat) {
+  if (bar < TK.bars) return beat === 0 ? 0.50 : 0.30;
+  const tail = bar - TK.bars;
+  if (tail === 0 && beat >= TK.beats - 2) return beat === TK.beats - 2 ? 0.17 : 0.08;
+  if (tail === 1 && beat < 2) return beat === 0 ? 0.11 : 0.24;
+  return beat === 0 ? 0.50 : 0.30;
+}
+function takeStep(abs, t) {
+  const tot = takeTotal();
+  if (!tot) return;
+  const a = ((abs % tot) + tot) % tot;
+  const bar = (a / TK.steps) | 0, st = a % TK.steps;
+  if (editing && st % TK.perBeat === 0) click(t, clickVel(bar, st / TK.perBeat));
+  if (bar >= TK.bars) return;                       /* the tail is click only */
+  const bucket = TK.buckets[a];
+  if (!bucket) return;
+  for (const n of bucket) {
+    const pd = TK.kit.pads[n.i];
+    const v = voice(pd.v);
+    /* Replay GATES, edit does not. A gated note goes through trackGain, which
+       is 0 unless the pad is held — the same contract the five built-in songs
+       keep, so your own song behaves like theirs. */
+    const out = editing ? trackLive[n.i] : trackGain[n.i];
+    const when = t + Math.max(0, n.sT - a * TK.stepSec);
+    if (pd.k === 'p') {
+      v.f({ t: when, f: (PERC_BASE[pd.v] || 140) * (pd.tune || 1), r: pd.tune || 1,
+            d: n.sD, v: 0.85, c: 'X', out });
+    } else {
+      v.f({ t: when, f: midiHz(degMidi(TK.kit.root, TK.kit.mode, TK.kit.oct, pd.deg || 0)),
+            r: 1, d: n.sD, v: 0.78, c: '1', out });
+    }
+    if (flashQ.length < 400) flashQ.push({ t: when, i: n.i });
+  }
+}
+function takeLoop() {
+  if (!TT.playing || !AC || !TK) return;
+  const limit = AC.currentTime + LOOKAHEAD;
+  let guard = 400;
+  while (TT.nextT < limit && guard-- > 0) {
+    takeStep(TT.step, TT.nextT);
+    TT.step++;
+    TT.nextT += TK.stepSec;
+  }
+}
+function takePos() {
+  if (!TK) return 0;
+  const tot = takeTotal() * TK.stepSec;
+  if (!tot) return 0;
+  if (!TT.playing || !AC) return Math.min(TT.pos, tot);
+  return ((AC.currentTime - TT.t0) % tot + tot) % tot;
+}
+function takePlay() {
+  wakeAudio();
+  if (!audioReady || !TK || TT.playing) return;
+  const tot = takeTotal();
+  TT.step = Math.floor(TT.pos / TK.stepSec + 1e-6) % tot;
+  TT.nextT = AC.currentTime + 0.08;
+  TT.t0 = TT.nextT - TT.step * TK.stepSec;
+  TT.playing = true;
+  if (!ttTimer) ttTimer = setInterval(takeLoop, TICK_MS);
+  takeLoop();
+  syncTransport();
+}
+/* Pause keeps the playhead where it is — the CD's rule is that hitting play
+   again carries on from there, not from the top. Rewind is the only reset. */
+function takePause() {
+  if (TK && TT.playing) TT.pos = takePos();
+  TT.playing = false;
+  if (ttTimer) { clearInterval(ttTimer); ttTimer = null; }
+  syncTransport();
+}
+function takeStopAll() { takePause(); TT.pos = 0; TT.step = 0; }
+function takeRewind() {
+  const was = TT.playing;
+  takePause();
+  TT.pos = 0; TT.step = 0;
+  if (was) takePlay(); else syncTransport();
+}
+
+/* ------------------------------------------------------------- recording -- */
+const RC = { state: 'idle', t0: 0, events: [], open: {}, timer: null };
+let busyTimer = null;
+
+function busyOn() {
+  const n = el('busy');
+  n.classList.add('open');
+  let k = 0;
+  const dots = el('busy-dots');
+  busyTimer = setInterval(() => { k = (k + 1) % 3; dots.textContent = '···'.slice(0, k + 1); }, 280);
+}
+function busyOff() {
+  el('busy').classList.remove('open');
+  if (busyTimer) { clearInterval(busyTimer); busyTimer = null; }
+}
+function recReset() {
+  if (RC.timer) { clearTimeout(RC.timer); RC.timer = null; }
+  RC.state = 'idle'; RC.events = []; RC.open = {};
+  const b = el('rec-btn');
+  if (b) { b.className = ''; b.textContent = 'REC'; }
+}
+function recArm() {
+  wakeAudio();
+  if (RC.state === 'recording') { recStop(); return; }
+  if (RC.state !== 'idle') return;
+  RC.state = 'count';
+  const b = el('rec-btn');
+  let n = 3;
+  const tick = () => {
+    if (RC.state !== 'count') return;
+    if (n > 0) {
+      b.className = 'count';
+      b.textContent = String(n);
+      if (audioReady) click(AC.currentTime + 0.01, 0.42);
+      n--;
+      RC.timer = setTimeout(tick, 1000);
+    } else {
+      /* the CD asked for one more second of nothing after "1" — it is the
+         breath before the downbeat, and it is what stops the first note
+         landing on the count */
+      b.textContent = '';
+      RC.timer = setTimeout(recBegin, 1000);
+    }
+  };
+  tick();
+}
+function recBegin() {
+  RC.state = 'recording';
+  RC.t0 = AC ? AC.currentTime : 0;
+  RC.events = []; RC.open = {};
+  const b = el('rec-btn');
+  b.className = 'live';
+  b.textContent = '';
+}
+function recStop() {
+  if (RC.state !== 'recording') return;
+  const now = (AC ? AC.currentTime : 0) - RC.t0;
+  for (const k in RC.open) {
+    const o = RC.open[k];
+    RC.events.push({ i: o.i, t: o.t, d: Math.max(0.03, now - o.t) });
+  }
+  RC.open = {};
+  RC.state = 'processing';
+  releaseAll(true, true);
+  for (let i = 0; i < PADS; i++) releaseNote(i, true);
+  const events = RC.events.slice();
+  busyOn();
+  /* The work is milliseconds. The overlay is held for a beat anyway, because
+     a modal that flashes reads as a glitch rather than as a step completing —
+     and because the CD asked to be told to wait. */
+  setTimeout(() => {
+    let tk = null;
+    try { tk = processTake(events, KIT, null); } catch (e) { tk = null; }
+    busyOff();
+    recReset();
+    if (!tk) return;
+    TAKES.push(tk);
+    saveTakes();
+    rebuildSongs();
+    selectTake(tk.id);
+    setTool('edit');
+  }, 1300);
+}
+
+/* Both the first take and an overdub come through here. An overdub's time is
+   converted back to RAW take time, so it goes through exactly the same snap
+   and padding as everything already recorded. */
+function captureOn(i) {
+  if (RC.state === 'recording') { RC.open[i] = { i, t: (AC.currentTime - RC.t0) }; return; }
+  if (overdub && TK) {
+    const raw = takePos() / TK.stepSec - (TK.padSteps | 0);
+    RC.open[i] = { i, t: Math.max(0, raw * TK.stepSec), live: true };
+  }
+}
+function captureOff(i) {
+  const o = RC.open[i];
+  if (!o) return;
+  delete RC.open[i];
+  if (o.live) {
+    if (!TK) return;
+    const raw = takePos() / TK.stepSec - (TK.padSteps | 0);
+    const d = Math.max(0.05, raw * TK.stepSec - o.t);
+    TK.notes.push({ i, t: o.t, d });
+    takeDirty = true;
+    prepTake(TK);
+  } else if (RC.state === 'recording') {
+    RC.events.push({ i, t: o.t, d: Math.max(0.03, (AC.currentTime - RC.t0) - o.t) });
+  }
+}
+
+/* ---------------------------------------------------------------- erasing - */
+const exRects = [], eraseOn = new Array(PADS).fill(false);
+function exAt(x, y) {
+  if (!overdub) return -1;
+  for (let i = 0; i < PADS; i++) {
+    const r = exRects[i];
+    if (r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return i;
+  }
+  return -1;
+}
+/* Erase is a moving window at the playhead, not a selection: hold the handle
+   and the take is rubbed out under it for as long as you hold, which is the
+   only erase gesture that works while the song is running. */
+function eraseTick() {
+  if (!TK || !overdub) return;
+  const pos = takePos(), w = TK.stepSec * 1.6;
+  let cut = 0;
+  for (let i = 0; i < PADS; i++) {
+    if (!eraseOn[i]) continue;
+    const keep = [];
+    for (const n of TK.notes) {
+      if (n.i === i && n.sT > pos - w && n.sT < pos + w) { cut++; continue; }
+      keep.push(n);
+    }
+    if (cut) TK.notes = keep;
+  }
+  if (cut) { takeDirty = true; prepTake(TK); }
+}
+
+/* ----------------------------------------------------- transport + edit UI */
+function syncTransport() {
+  const b = el('tr-play');
+  if (b) b.innerHTML = TT.playing ? '<span class="km-bars"><i></i><i></i></span>' : '&#9654;';
+  const r = el('tr-rec');
+  if (r) r.classList.toggle('on', overdub);
+  document.body.classList.toggle('erasing', overdub);
+}
+function syncEditBar() {
+  if (!TK || tool !== 'edit') return;
+  const t = el('tk-title');
+  if (document.activeElement !== t) t.value = TK.name;
+  el('tk-snap').value = String(TK.snap | 0);
+  el('tk-bpm').value = String(Math.round(TK.bpm));
+  el('tk-beats').value = String(TK.beats);
+  const unit = +el('tk-padu').value || 1;
+  el('tk-padn').value = String(Math.max(0, Math.round((TK.padSteps | 0) / unit)));
+  el('duration').textContent = fmtTime(TK.dur);
+  el('bpm').textContent = String(Math.round(TK.bpm));
+  el('sig').textContent = TK.beats + '/4';
+}
+/* Overdub is a transaction: the notes are snapshotted on the way in so that
+   answering NO really does put the song back, rather than leaving whatever
+   survived the last erase. */
+function setOverdub(on, quiet) {
+  if (!!on === overdub) return;
+  if (on) {
+    if (!TK) return;
+    takeBackup = JSON.stringify(TK.notes);
+    takeDirty = false;
+    overdub = true;
+    syncTransport();
+    return;
+  }
+  overdub = false;
+  eraseOn.fill(false);
+  syncErase();
+  syncTransport();
+  if (!takeDirty) { takeBackup = null; return; }
+  if (quiet) applyEdits(true);
+  else askSave();
+}
+function applyEdits(keep) {
+  if (TK && !keep && takeBackup) {
+    try { TK.notes = JSON.parse(takeBackup); } catch (e) {}
+  }
+  takeBackup = null;
+  takeDirty = false;
+  if (TK) { prepTake(TK); saveTakes(); syncEditBar(); }
+}
+function askSave() {
+  el('veil').classList.add('open');
+  el('ask').classList.add('open');
+}
+
+function rebuildSongs() {
+  const sel = el('song-select');
+  sel.innerHTML = '';
+  const opt = (v, t) => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = t;
+    sel.appendChild(o);
+  };
+  opt('', 'MAKE A SELECTION');
+  opt(REC_VALUE, 'RECORD NEW SONG');
+  for (const t of TAKES) opt('t:' + t.id, t.name + ' (Recorded)');
+  SONGS.forEach((s, i) => opt(String(i), s.name + ' (' + s.style + ')'));
+  sel.value = selValue;
+  sel.classList.toggle('unset', selValue === '');
+}
+function pickSelection(v) {
+  if (v === '') enterNone();
+  else if (v === REC_VALUE) enterRecord();
+  else if (v.slice(0, 2) === 't:') selectTake(v.slice(2));
+  else selectSong(parseInt(v, 10), false);
 }
 
 /* ================================================== tools menu and picker */
@@ -2174,12 +2895,26 @@ const TOOLS = [
   ['record',  'RECORD'],
   ['edit',    'REPLAY & EDIT'],
 ];
-const TOOL_READY = { none: 1, tappad: 1, keymode: 1 };
+/* Which tools apply is a question about the SELECTION, not about what has
+   been built: RECORD belongs to a new song, REPLAY & EDIT to a recorded one.
+   A row that does not apply is disabled rather than hidden, so the menu keeps
+   one shape and its greyed rows say what this selection cannot do. */
+function toolOK(id) {
+  if (id === 'none') return true;
+  if (id === 'tappad' || id === 'keymode') return mode === 'rec' || mode === 'take';
+  if (id === 'record') return mode === 'rec';
+  if (id === 'edit') return mode === 'take' && !!TK;
+  return false;
+}
+function syncToolMenu() {
+  const menu = el('toolmenu');
+  if (menu) for (const b of menu.children) b.disabled = !toolOK(b.dataset.tool);
+}
 let tool = 'none';
 let pickIx = -1;
 
 function setTool(id) {
-  if (!TOOL_READY[id]) id = 'none';
+  if (!toolOK(id)) id = 'none';
   const was = tool;
   tool = id;
   tapCand = -1;
@@ -2198,6 +2933,18 @@ function setTool(id) {
     releaseAll(true, true);
     syncLock();
   }
+  if (was === 'record' && id !== 'record') recReset();
+  if (was === 'edit' && id !== 'edit') {
+    setOverdub(false, true);
+    editing = false;
+    takePause();
+    if (mode === 'take') padMode = 'gate';
+  }
+  if (id === 'edit') {
+    editing = true;
+    padMode = 'live';           /* so a pad can be overdubbed onto the take */
+    takeStopAll();
+  }
   const km = el('keymode');
   if (!km) return;
   const on = id === 'keymode';
@@ -2206,8 +2953,10 @@ function setTool(id) {
   km.classList.toggle('gone', !on);
   if (grid) grid.classList.toggle('gone', on);
   if (on) syncKeyMode();
-  /* swapping the surface changes every pad rect — see syncChrome() */
-  if (grid && !on) layout();
+  syncToolMenu();
+  syncEditBar();
+  syncTransport();
+  syncChrome();
 }
 
 /* TAP PAD assignment. A pad that goes down ON ITS OWN and comes back up
@@ -2234,6 +2983,7 @@ function closeOverlays() {
   el('settings').classList.remove('open');
   el('toolmenu').classList.remove('open');
   el('picker').classList.remove('open');
+  el('ask').classList.remove('open');
 }
 
 function fillVoiceSelect(pd) {
@@ -2268,11 +3018,12 @@ function fillNoteSelect(pd) {
     s.appendChild(o);
     return;
   }
-  const n = scaleOf(KIT.mode).length;
+  const k = activeKit();
+  const n = scaleOf(k.mode).length;
   for (let d = -n; d < 3 * n; d++) {
     const o = document.createElement('option');
     o.value = String(d);
-    o.textContent = midiName(degMidi(KIT.root, KIT.mode, KIT.oct, d)) +
+    o.textContent = midiName(degMidi(k.root, k.mode, k.oct, d)) +
                     '  ·  deg ' + ((((d % n) + n) % n) + 1);
     s.appendChild(o);
   }
@@ -2280,7 +3031,7 @@ function fillNoteSelect(pd) {
 }
 function openPicker(i) {
   pickIx = i;
-  const pd = KIT.pads[i];
+  const pd = activeKit().pads[i];
   el('pk-title').textContent = 'PAD ' + (i + 1);
   el('pk-swatch').style.setProperty('--h', String(HUES[i]));
   fillVoiceSelect(pd);
@@ -2289,30 +3040,82 @@ function openPicker(i) {
   el('picker').classList.add('open');
 }
 function auditionPad(i) {
-  ensureAudio();
+  wakeAudio();
   if (!audioReady) return;
   trigger(i);
-  const pd = KIT.pads[i];
+  const pd = activeKit().pads[i];
   if (voice(pd.v).s) setTimeout(() => releaseNote(i), 900);
 }
 
 function wire() {
   const sel = el('song-select');
-  const opt = (v, t) => {
-    const o = document.createElement('option');
-    o.value = v; o.textContent = t;
-    sel.appendChild(o);
-    return o;
+  rebuildSongs();
+  sel.addEventListener('change', () => pickSelection(sel.value));
+
+  /* ---- transport, record and the edit bar ------------------------------ */
+  el('tr-rew').addEventListener('click', takeRewind);
+  el('tr-play').addEventListener('click', () => { if (TT.playing) takePause(); else takePlay(); });
+  el('tr-rec').addEventListener('click', () => setOverdub(!overdub));
+  el('rec-btn').addEventListener('click', recArm);
+  el('ask-yes').addEventListener('click', () => { applyEdits(true); closeOverlays(); });
+  el('ask-no').addEventListener('click', () => { applyEdits(false); closeOverlays(); });
+
+  const fill = (id, pairs) => {
+    const s = el(id);
+    for (const pr of pairs) {
+      const o = document.createElement('option');
+      o.value = String(pr[0]); o.textContent = pr[1];
+      s.appendChild(o);
+    }
   };
-  opt('', 'MAKE A SELECTION');
-  opt(REC_VALUE, 'RECORD NEW SONG');
-  SONGS.forEach((s, i) => opt(String(i), s.name + ' (' + s.style + ')'));
-  sel.addEventListener('change', () => {
-    const v = sel.value;
-    if (v === '') enterNone();
-    else if (v === REC_VALUE) enterRecord();
-    else selectSong(parseInt(v, 10), false);
+  fill('tk-snap', SNAPS);
+  fill('tk-beats', [2, 3, 4, 5, 6, 7].map((n) => [n, String(n)]));
+  fill('tk-padu', PAD_UNITS);
+  fill('tk-padn', Array.from({ length: 65 }, (_, i) => [i, String(i)]));
+  el('tk-padu').value = '1';
+
+  el('tk-title').addEventListener('input', () => {
+    if (!TK) return;
+    TK.name = el('tk-title').value.slice(0, 24) || 'TAKE';
+    saveTakes();
+    rebuildSongs();
   });
+  el('tk-snap').addEventListener('change', () => {
+    if (!TK) return;
+    TK.snap = +el('tk-snap').value | 0;
+    reprocess();
+  });
+  el('tk-bpm').addEventListener('change', () => {
+    if (!TK) return;
+    TK.bpm = Math.min(260, Math.max(30, +el('tk-bpm').value || TK.bpm));
+    reprocess();
+  });
+  /* Refuse rather than clamp. Clamping means x2 then /2 does not come back to
+     where it started, and the whole point of these two buttons is that an
+     octave error is undone in one tap. */
+  const scaleBpm = (m) => {
+    if (!TK) return;
+    const next = TK.bpm * m;
+    if (next < 30 || next > 260) return;
+    TK.bpm = next;
+    reprocess();
+  };
+  el('tk-half').addEventListener('click', () => scaleBpm(0.5));
+  el('tk-dbl').addEventListener('click', () => scaleBpm(2));
+
+  el('tk-beats').addEventListener('change', () => {
+    if (!TK) return;
+    TK.beats = +el('tk-beats').value | 0;
+    reprocess();
+  });
+  const padChange = () => {
+    if (!TK) return;
+    TK.padSteps = (+el('tk-padn').value | 0) * (+el('tk-padu').value | 0);
+    TT.pos = 0; TT.step = 0;
+    reprocess();
+  };
+  el('tk-padn').addEventListener('change', padChange);
+  el('tk-padu').addEventListener('change', padChange);
 
   /* ---- tools ---------------------------------------------------------- */
   const menu = el('toolmenu');
@@ -2323,7 +3126,7 @@ function wire() {
     const tick = document.createElement('span'); tick.className = 'tick';
     const lab = document.createElement('span'); lab.textContent = t[1];
     b.appendChild(tick); b.appendChild(lab);
-    if (!TOOL_READY[t[0]]) b.disabled = true;
+    b.disabled = !toolOK(t[0]);
     b.addEventListener('click', () => { setTool(t[0]); closeOverlays(); });
     menu.appendChild(b);
   }
@@ -2394,6 +3197,7 @@ function wire() {
   el('reload').addEventListener('click', () => {
     releaseAll(true, true);
     for (let i = 0; i < PADS; i++) releaseNote(i, true);
+    if (mode === 'take') { takeRewind(); return; }
     if (mode !== 'song') return;
     if (audioReady) startTransport(true); else ensureAudio();
   });
@@ -2484,6 +3288,8 @@ function wire() {
   stage.addEventListener('pointerdown', (e) => {
     if (penOnly(e) || padsOff()) return;
     ensureAudio();
+    const ex = exAt(e.clientX, e.clientY);
+    if (ex >= 0) { eraseOn.fill(false); eraseOn[ex] = true; syncErase(); e.preventDefault(); return; }
     ptr.set(e.pointerId, new Set(hitsAt(e.clientX, e.clientY)));
     recompute();
     e.preventDefault();
@@ -2493,7 +3299,10 @@ function wire() {
     ptr.set(e.pointerId, new Set(hitsAt(e.clientX, e.clientY)));
     recompute();
   });
-  const pUp = (e) => { if (ptr.delete(e.pointerId)) recompute(); };
+  const pUp = (e) => {
+    if (eraseOn.indexOf(true) >= 0 && !TOUCH) { eraseOn.fill(false); syncErase(); }
+    if (ptr.delete(e.pointerId)) recompute();
+  };
   window.addEventListener('pointerup', pUp);
   window.addEventListener('pointercancel', pUp);
   stage.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -2554,6 +3363,14 @@ function frame(ts) {
       }
     }
   }
+  if (mode === 'take' && TK) {
+    eraseTick();
+    const pos = takePos();
+    el('elapsed').textContent = fmtTime(Math.min(pos, TK.dur));
+    const nm = pos >= TK.dur ? 'COUNT-IN' : (overdub ? 'REC' : (editing ? 'EDIT' : ''));
+    const node = el('section-name');
+    if (node.textContent !== nm) node.textContent = nm;
+  }
   if (audioReady && T.playing && S) {
     const e2 = ((AC.currentTime - T.t0) % S.dur + S.dur) % S.dur;
     el('elapsed').textContent = fmtTime(e2);
@@ -2597,7 +3414,48 @@ window.__MM = {
     scale: el('km-scale').textContent,
     playing: SMP.playing, step: SMP.step,
   }),
-  setKeyMode: (r, m) => { setKeyMode(r, m); return [KIT.root, KIT.mode]; },
+  setKeyMode: (r, m) => { setKeyMode(r, m); return [activeKit().root, activeKit().mode]; },
+  takes: () => TAKES.map((t) => ({ id: t.id, name: t.name, bpm: t.bpm, beats: t.beats,
+    bars: t.bars, notes: t.notes.length, snap: t.snap, padSteps: t.padSteps,
+    dur: +t.dur.toFixed(2) })),
+  take: () => TK && ({ id: TK.id, name: TK.name, bpm: TK.bpm, beats: TK.beats, bars: TK.bars,
+    notes: TK.notes.length, snap: TK.snap, padSteps: TK.padSteps, dur: +TK.dur.toFixed(2),
+    pos: +takePos().toFixed(2), playing: TT.playing, editing, overdub, dirty: takeDirty,
+    steps: TK.notes.map((n) => +(n.sT / TK.stepSec).toFixed(3)).slice(0, 40) }),
+  /* feed a synthetic performance straight into the processor: the only way to
+     check tempo and metre detection against a KNOWN answer */
+  process: (events, name) => {
+    const tk = processTake(events, activeKit(), name);
+    if (!tk) return null;
+    TAKES.push(tk); saveTakes(); rebuildSongs();
+    return { id: tk.id, bpm: tk.bpm, beats: tk.beats, bars: tk.bars, notes: tk.notes.length };
+  },
+  detect: (onsets) => {
+    const b = detectTempo(onsets.slice().sort((x, y) => x - y));
+    return { bpm: b.bpm, beats: detectBeats(onsets.slice().sort((x, y) => x - y), b) };
+  },
+  rec: (what) => {
+    if (what === 'arm') recArm();
+    else if (what === 'begin') recBegin();
+    else if (what === 'stop') recStop();
+    return { state: RC.state, events: RC.events.length,
+             btn: el('rec-btn').className, label: el('rec-btn').textContent };
+  },
+  transport: (what) => {
+    if (what === 'play') takePlay();
+    else if (what === 'pause') takePause();
+    else if (what === 'rewind') takeRewind();
+    return { playing: TT.playing, pos: +takePos().toFixed(2) };
+  },
+  overdub: (on) => { setOverdub(on); return { overdub, dirty: takeDirty, ask: el('ask').classList.contains('open') }; },
+  answer: (yes) => { el(yes ? 'ask-yes' : 'ask-no').click(); return TK ? TK.notes.length : 0; },
+  erase: (i, on) => { eraseOn.fill(false); if (on) eraseOn[i] = true; syncErase(); eraseTick(); return TK ? TK.notes.length : 0; },
+  setTake: (k, v) => {
+    if (!TK) return null;
+    TK[k] = v; reprocess();
+    return { bars: TK.bars, dur: +TK.dur.toFixed(2), snap: TK.snap, padSteps: TK.padSteps };
+  },
+  wipeTakes: () => { TAKES = []; TK = null; saveTakes(); rebuildSongs(); return 0; },
   sample: (what) => {
     if (what === 'play') smpPlay();
     else if (what === 'pause') smpPause();
@@ -2684,9 +3542,17 @@ window.__MM = {
   },
   state: () => ({
     mode, padMode, tool, sel: selValue,
-    song: S ? S.id : null,
-    bars: S ? S.bars : 0, dur: S ? +S.dur.toFixed(2) : 0,
-    sig: S ? S.sig : null, bpm: S ? S.bpm : 0,
+    song: S ? S.id : (TK ? TK.id : null),
+    takeCount: TAKES.length,
+    takePlaying: TT.playing,
+    editing, overdub,
+    transportShown: !el('tr-play').classList.contains('gone'),
+    recbarShown: !el('recbar').classList.contains('gone'),
+    busy: el('busy').classList.contains('open'),
+    bars: S ? S.bars : (TK ? TK.bars : 0),
+    dur: S ? +S.dur.toFixed(2) : (TK ? +TK.dur.toFixed(2) : 0),
+    sig: S ? S.sig : (TK ? TK.beats + '/4' : null),
+    bpm: S ? S.bpm : (TK ? Math.round(TK.bpm) : 0),
     infoShown: !el('info').classList.contains('gone'),
     toolsShown: !el('tools').classList.contains('gone'),
     playing: T.playing, step: T.absStep, flash: flashQ.length,
@@ -2702,6 +3568,7 @@ window.__MM = {
 load();
 buildPads();
 wire();
+syncToolMenu();
 enterNone();
 layout();
 requestAnimationFrame(frame);

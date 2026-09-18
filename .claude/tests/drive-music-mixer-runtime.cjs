@@ -615,6 +615,187 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     else if (!back.infoShown) fail('going back to a song did not bring the tempo strip back');
     else if (back.toolsShown) fail('the wrench is still showing on a built-in song');
     else console.log('BACK=' + back.song + '  gating, tempo strip and transport all restored');
+
+    /* --- 9. record, process, replay and edit -------------------------- */
+    /* The processor is the part that cannot be eyeballed: it decides a tempo,
+       a metre and where the song starts and stops from nothing but tap times.
+       Synthetic takes at KNOWN tempi are the only way to check it, so that is
+       what these drive — a real recording has no right answer to compare to. */
+    const mkTake = `(bpm, beats, bars) => {
+      const beat = 60 / bpm, ev = [];
+      for (let bar = 0; bar < bars; bar++) for (let s = 0; s < beats * 4; s++) {
+        const t = 1.4 + bar * beat * beats + s * beat / 4 + Math.sin(bar * 5 + s * 3) * 0.012;
+        const w = (s === 0 ? 3 : 0) + (s === beats * 2 ? 1 : 0)
+                + (s === 4 || s === beats * 4 - 4 ? 1 : 0) + (s % 2 === 0 ? 1 : 0);
+        for (let q = 0; q < w; q++) ev.push({ i: q % 3 === 0 ? 10 : (q % 3 === 1 ? 11 : 0), t, d: 0.2 });
+      }
+      return ev;
+    }`;
+    await page.evaluate(() => { window.__MM.wipeTakes(); window.__MM.pick('rec'); });
+    await page.waitForTimeout(150);
+
+    const det = await page.evaluate(`(() => {
+      const mk = ${mkTake};
+      const out = [];
+      for (const c of [[112, 4], [96, 4], [120, 3], [104, 5]]) {
+        const ev = mk(c[0], c[1], 8);
+        const d = window.__MM.detect(ev.map((e) => e.t));
+        out.push({ want: c, got: [d.bpm, d.beats] });
+      }
+      return out;
+    })()`);
+    let detOK = 0;
+    for (const d of det) {
+      if (Math.abs(d.got[0] - d.want[0]) < 2 && d.got[1] === d.want[1]) detOK++;
+      else fail('detection: a ' + d.want[0] + ' BPM ' + d.want[1] + '/4 take read as ' +
+                d.got[0] + ' BPM ' + d.got[1] + '/4');
+    }
+    if (detOK === det.length) console.log('DETECT=' + detOK + '/' + det.length + '  tempo and metre recovered from tap times alone');
+
+    /* the record button's own sequence: 3, 2, 1, a beat of nothing, then live */
+    const seq = [];
+    await page.evaluate(() => { window.__MM.setTool('record'); window.__MM.rec('arm'); });
+    for (let k = 0; k < 5; k++) {
+      seq.push(await page.evaluate(() => {
+        const r = window.__MM.rec();
+        return r.state + ':' + (r.label || (r.btn.indexOf('live') >= 0 ? 'DOT' : '-'));
+      }));
+      await page.waitForTimeout(1000);
+    }
+    const got = seq.join(' ');
+    if (!/count:3 count:2 count:1 count:- recording:DOT/.test(got))
+      fail('the record countdown ran "' + got + '", expected 3, 2, 1, a blank beat, then the dot');
+    else console.log('REC=3 2 1 . then the red dot');
+
+    /* a take end to end, then what replay must and must not do */
+    const made = await page.evaluate(`(() => {
+      const mk = ${mkTake};
+      window.__MM.rec('stop');
+      return window.__MM.process(mk(112, 4, 8), 'GATE TAKE');
+    })()`);
+    if (!made) fail('processing a synthetic take produced nothing');
+    else if (made.bpm !== 112 || made.beats !== 4 || made.bars !== 8)
+      fail('the processed take is ' + made.bpm + ' BPM ' + made.beats + '/4 x ' + made.bars +
+           ' bars, expected 112 / 4 / 8');
+    else console.log('TAKE=' + made.bpm + ' BPM ' + made.beats + '/4, ' + made.bars +
+                     ' bars, ' + made.notes + ' notes');
+
+    await page.evaluate((id) => window.__MM.pick('t:' + id), made.id);
+    await page.waitForTimeout(400);
+    const rep = await page.evaluate(() => window.__MM.state());
+    if (rep.mode !== 'take' || rep.padMode !== 'gate')
+      fail('a recorded song replays in mode "' + rep.mode + '" / padMode "' + rep.padMode + '"');
+    if (!rep.infoShown) fail('a recorded song shows no tempo strip');
+    if (rep.transportShown) fail('the transport is showing outside REPLAY & EDIT');
+    if (rep.sig !== '4/4' || rep.bpm !== 112) fail('the tempo strip reads ' + rep.bpm + ' ' + rep.sig);
+
+    /* THE contract for a recorded song: the pads gate it, exactly like the
+       built-in five. Silent with nothing held, loud with everything held. */
+    let tkQuiet = 1, loud = 0;
+    for (let k = 0; k < 12; k++) {
+      await page.waitForTimeout(45);
+      tkQuiet = Math.min(tkQuiet, await page.evaluate(() => window.__MM.level()));
+    }
+    await page.evaluate(() => window.__MM.holdAll(true));
+    for (let k = 0; k < 20; k++) {
+      await page.waitForTimeout(45);
+      loud = Math.max(loud, await page.evaluate(() => window.__MM.level()));
+    }
+    await page.evaluate(() => window.__MM.holdAll(false));
+    if (tkQuiet > 0.01) fail('a recorded song is audible at ' + tkQuiet.toFixed(4) + ' with no pad held — it is not gating');
+    else if (loud < 0.02) fail('holding every pad of a recorded song peaked at ' + loud.toFixed(4) + ' — it is silent');
+    else console.log('TAKE=gated  ' + tkQuiet.toFixed(4) + ' held nothing, ' + loud.toFixed(3) + ' held everything');
+
+    /* the knobs: snap and intro padding both move the song, non-destructively */
+    const knobs = await page.evaluate(() => {
+      const base = window.__MM.take().dur;
+      const off = window.__MM.setTake('snap', 0);
+      const pad = window.__MM.setTake('padSteps', 32);
+      const back = window.__MM.setTake('padSteps', 0);
+      window.__MM.setTake('snap', 1);
+      return { base, off: off.dur, padBars: pad.bars, backBars: back.bars, backDur: back.dur };
+    });
+    if (knobs.padBars - knobs.backBars !== 2)
+      fail('32 steps of intro padding added ' + (knobs.padBars - knobs.backBars) + ' bars, expected 2');
+    else if (Math.abs(knobs.backDur - knobs.base) > 0.01)
+      fail('removing the padding did not restore the duration (' + knobs.backDur + ' vs ' + knobs.base + ')');
+    else console.log('TAKE=padding 2 bars in and back out, snap off and on, nothing lost');
+
+    const dbl = await page.evaluate(() => {
+      const a = window.__MM.take().bpm;
+      document.getElementById('tk-dbl').click();
+      const b = window.__MM.take().bpm;
+      document.getElementById('tk-half').click();
+      return [a, b, window.__MM.take().bpm];
+    });
+    if (dbl[1] !== dbl[0] * 2 || dbl[2] !== dbl[0])
+      fail('halve/double gave ' + dbl.join(' -> ') + ' — an octave error must be a one-tap fix');
+    else console.log('TAKE=x2 and /2 round-trip ' + dbl[0] + ' -> ' + dbl[1] + ' -> ' + dbl[2]);
+
+    /* edit: overdub adds, the erase handle removes, and NO really does undo */
+    await page.evaluate(() => window.__MM.setTool('edit'));
+    await page.waitForTimeout(200);
+    const ed = await page.evaluate(() => window.__MM.state());
+    if (!ed.editing || ed.padMode !== 'live') fail('REPLAY & EDIT left editing=' + ed.editing + ' padMode=' + ed.padMode);
+    if (!ed.transportShown || !ed.recbarShown) fail('REPLAY & EDIT is missing its transport or its edit bar');
+    else console.log('EDIT=transport and edit bar up, pads live for overdub');
+
+    const dub = await page.evaluate(async () => {
+      const before = window.__MM.take().notes;
+      window.__MM.overdub(true);
+      window.__MM.transport('play');
+      await new Promise((r) => setTimeout(r, 350));
+      window.__MM.hold(5, true);
+      await new Promise((r) => setTimeout(r, 150));
+      window.__MM.hold(5, false);
+      const added = window.__MM.take().notes;
+      const erased = window.__MM.erase(10, true);
+      const ask = window.__MM.overdub(false);
+      const after = window.__MM.answer(false);
+      return { before, added, erased, ask: ask.ask, after };
+    });
+    if (dub.added <= dub.before) fail('overdubbing a pad added no note (' + dub.before + ' -> ' + dub.added + ')');
+    else if (dub.erased >= dub.added) fail('the erase handle removed nothing (' + dub.added + ' -> ' + dub.erased + ')');
+    else if (!dub.ask) fail('leaving overdub with changes did not ask whether to save them');
+    else if (dub.after !== dub.before)
+      fail('answering NO left ' + dub.after + ' notes, expected the original ' + dub.before);
+    else console.log('EDIT=overdub +1, erase -1, and NO restores ' + dub.after + ' notes');
+
+    const kept = await page.evaluate(async () => {
+      window.__MM.overdub(true);
+      window.__MM.transport('play');
+      await new Promise((r) => setTimeout(r, 300));
+      window.__MM.hold(6, true);
+      await new Promise((r) => setTimeout(r, 140));
+      window.__MM.hold(6, false);
+      const n = window.__MM.take().notes;
+      window.__MM.overdub(false);
+      return { n, after: window.__MM.answer(true) };
+    });
+    if (kept.after !== kept.n) fail('answering YES kept ' + kept.after + ' notes, expected ' + kept.n);
+    else console.log('EDIT=YES keeps the overdub (' + kept.after + ' notes)');
+
+    /* and it has to survive a reload, since that is the only copy */
+    await page.evaluate(() => { document.getElementById('tk-title').value = 'KEEP ME'; });
+    await page.evaluate(() => {
+      const t = document.getElementById('tk-title');
+      t.value = 'KEEP ME';
+      t.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.waitForTimeout(150);
+    await page.reload();
+    await page.waitForTimeout(900);
+    const kept2 = await page.evaluate(() => ({
+      takes: window.__MM.takes(), opts: window.__MM.options(), st: window.__MM.state(),
+    }));
+    if (!kept2.takes.length) fail('the recorded take did not survive a reload');
+    else if (kept2.takes[0].name !== 'KEEP ME') fail('the take came back named "' + kept2.takes[0].name + '"');
+    else if (kept2.opts.indexOf('t:' + kept2.takes[0].id) !== 2)
+      fail('a recorded song is not listed under RECORD NEW SONG: ' + kept2.opts.join(','));
+    else if (kept2.st.mode !== 'none')
+      fail('a reload with takes stored opened on "' + kept2.st.mode + '" instead of nothing selected');
+    else console.log('TAKE=survives a reload as "' + kept2.takes[0].name + '", listed at slot 2');
+    await page.evaluate(() => window.__MM.wipeTakes());
   }
 
   for (const e of errs) fail(e);

@@ -398,6 +398,104 @@ grid came back the same size it left. Only rotating *while the screen was up*
 exposed it — and then it failed at **0 pads held, not one short**. A check that
 cannot be made to fail is not evidence.
 
+## Recording a take
+
+A take is stored as **exact tap times**, quantized on the way out:
+
+```
+n.t, n.d   what was actually played, never overwritten
+n.sT, n.sD where it lands under the current snap and intro padding
+```
+
+`prepTake()` derives the second pair from the first, so moving SNAP from 1/16
+to OFF gets the human timing back intact and nothing about editing is
+destructive. Notes are bucketed per step so the scheduler never scans the take.
+
+`RECORD` runs the CD's countdown — 3, 2, 1, then **one more second of nothing**
+before the dot, which is the breath before the downbeat and what stops the
+first note landing on the count. Stopping opens a blocking overlay: the work is
+milliseconds, but the overlay is held ~1.3 s deliberately, because a modal that
+flashes reads as a glitch rather than as a step completing.
+
+### Tempo and metre, and how much to trust them
+
+Both are measured from nothing but tap times, over an **onset-strength** series
+(pads struck together are one onset carrying weight). That weighting is
+load-bearing: an early version deduped simultaneous hits away, which left metre
+detection a flat series and it got every case wrong.
+
+**Tempo.** The grid fit is the easy half and it is solid. The hard half is the
+*octave* — half, double and 1.5x all fit a steady performance about as well; a
+stream of eighths at 76 is a stream of dotted eighths at 114, each dead on its
+own grid. Three terms settle it and they pull against each other:
+
+| Term | What it prefers | Why it cannot work alone |
+| --- | --- | --- |
+| metrical position | notes on beats and off-beats, not smeared across every subdivision | always prefers **doubling** — an eighth becomes a quarter, so everything lands on a beat |
+| density | about two onsets to the beat | always prefers **halving** on sparse material |
+| ordinary tempo (~112) | breaks what is left | near-useless between 76 and 152, which are equidistant from it |
+
+**Metre.** Autocorrelation of the onset-strength series binned on *sixteenths*.
+Not on beats: an onset half a beat from the phase sits exactly on a beat-level
+rounding boundary, and which side it falls makes the bar appear to drift —
+that read a plain 4/4 take as 5/4. Not by downbeat weight either, which an
+ordinary backbeat defeats (the snare outweighs the downbeat). Periodicity does
+not care where the bar starts.
+
+Measured on synthetic takes (`/tmp` tuning harness, weights tuned on one set
+and reported on another): **metre ~94%**, **tempo ~76% overall** but near 90%
+inside roughly 85-145 BPM, dropping off outside it where the octave gets
+ambiguous. Those numbers are why the edit bar carries a one-tap **÷2 and ×2**
+next to the BPM field rather than only a number: an octave error is *the*
+characteristic failure, so undoing it is one tap. They refuse out-of-range
+rather than clamping — clamping means x2 then /2 does not return where it
+started, which defeats the point.
+
+### Edges
+
+Nobody starts or stops on the beat, so the song's edges come from the notes:
+the bar line at or before the first onset, and the one at or after the last
+note ends. INTRO padding then shifts everything later by N note values and
+grows the bar count to match.
+
+## Replay, and editing a take
+
+A take is a song the CD made, so it **replays exactly like the built-in five**:
+the pads gate it (`padMode: 'gate'`, notes routed through `trackGain`), silent
+until something is held. That is the contract the runtime gate measures
+directly — 0.0000 with nothing held, 0.29 with everything held.
+
+REPLAY & EDIT is the other half: `editing` routes notes through `trackLive`
+instead, so everything sounds without holding anything, and `padMode` goes
+`live` so a pad can be overdubbed onto the take. The click track runs only
+here — it is a recording aid, not part of the song.
+
+The two bars of click after the last one are the CD's "the song is over, and
+here it comes again": the first bar's last two clicks fade down, the second
+bar's first two come back up (`clickVel`).
+
+**Overdub is a transaction.** The notes are snapshotted when REC goes on, so
+answering NO really does put the song back rather than leaving whatever
+survived the last erase. The erase handle is a **moving window at the
+playhead**, not a selection — the only erase gesture that works while the song
+is running. A finger on the handle is deliberately *not* a pad press
+(`exAt()` is consulted before `hitsAt()` in `fromTouches`), or you would play
+the note you are deleting.
+
+`activeKit()` exists because a take carries its own kit: selecting one must not
+clobber the kit being built under RECORD NEW SONG. Everything that reads a
+pad's sound goes through it rather than at `KIT` directly.
+
+Two traps worth keeping in mind, both hit during the build:
+
+- `setHold`'s gate branch used to bail on `!S` and read `S.tracks[i].v`. A take
+  has no `S`, so recorded songs were **completely silent on replay** while
+  every pad still lit. It reads the voice through `padVoiceName()` now.
+- `takePlay()` calls `wakeAudio()`, not `ensureAudio()`. `ensureAudio` starts
+  whatever transport the selection implies, including takes — so the two
+  called each other and blew the stack. Waking the graph and starting a
+  transport are separate jobs.
+
 ## Gates
 
 ```
