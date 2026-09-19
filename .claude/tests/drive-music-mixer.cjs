@@ -2,7 +2,7 @@
 /**
  * drive-music-mixer.cjs — data gate for games/music-mixer/index.html.
  *
- * Music Mixer is five songs of hand-written step notation: 15 tracks x a
+ * Music Mixer is six songs of hand-written step notation: 15 tracks x a
  * handful of pattern strings x an arrangement row per section, about 400
  * strings in total. A mistyped string does not throw — it silently drops a
  * note, shifts a whole pattern by a step, or leaves a pad that lights up and
@@ -64,7 +64,7 @@ const DEG = (c) => (c >= '1' && c <= '9') ? c.charCodeAt(0) - 49
   : (c >= 'a' && c <= 'f') ? c.charCodeAt(0) - 97 + 9 : -1;
 
 /* ------------------------------------------------------------- top level */
-if (SONGS.length !== 5) fail('expected 5 songs, found ' + SONGS.length);
+if (SONGS.length !== 6) fail('expected 6 songs, found ' + SONGS.length);
 if (HUES.length !== PADS) fail('HUES has ' + HUES.length + ' entries, expected ' + PADS);
 for (let i = 1; i < HUES.length; i++) {
   if (HUES[i] <= HUES[i - 1])

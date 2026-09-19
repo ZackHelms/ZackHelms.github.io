@@ -153,7 +153,7 @@ local-2p.
 - **`user-authoring`** (1 game: Music Mixer) — the player MAKES content that
   persists, rather than progressing through content we wrote. Music Mixer
   records a performance, detects its tempo and metre, saves it to local storage
-  beside the five built-in songs and exports it as a file. Distinct from
+  beside the built-in songs and exports it as a file. Distinct from
   `meta-progression`, which persists *progress*, and from `open-sandbox`, which
   is a session shape rather than an output. The obvious second: a level editor
   for one of the puzzlers, where the authored artefact is a board rather than a

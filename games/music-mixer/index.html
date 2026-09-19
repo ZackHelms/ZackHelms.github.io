@@ -569,7 +569,7 @@ body.erasing .pad .ex { display: flex; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-19 05:04 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-19 13:14 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -739,7 +739,7 @@ body.erasing .pad .ex { display: flex; }
 <script>
 'use strict';
 /* ===========================================================================
-   MUSIC MIXER — a 15-pad stem mixer over five fully synthesized songs.
+   MUSIC MIXER — a 15-pad stem mixer over six fully synthesized songs.
 
    Nothing is sampled and nothing is downloaded: every voice below is built
    from oscillators, noise and one Karplus-Strong string model, and every song
@@ -1619,6 +1619,70 @@ const SONGS = [
     { n: 'OUT HEAD', b: 21, k: [0, 3, 6, 2], p: 'aaabaaa.ababaaa' },
   ],
 },
+
+/* ------------------------------------------------------------------------ 6
+   DORIAN — neo-soul piano, built from the CD's own recording (ZCK0,
+   2026-09-19). Its key, tempo, drum groove and i-bVII vamp are the take's;
+   the band around it is new. C dorian, 103.5 BPM, backbeat.               */
+{
+  id: 'dorian', name: 'DORIAN', style: 'Neo-Soul Piano',
+  sig: '4/4', bpm: 103.5, pulses: 4, steps: 16, rootHz: 65.406, swing: 0, mix: 0.7,
+  cents: [0, 200, 300, 500, 700, 900, 1000],
+  tracks: [
+    /* --- group 0: the rhythm section ----------------------------------- */
+    { lab: 'SUB',    v: 'subBass',   k: 'm', oct: 0, harm: 1, g: 0.95, pan: 0, pats: {
+      a: '1---------------', b: '1-------1-------', c: '1-----------1---' } },
+    { lab: 'BASS',   v: 'upright',   k: 'm', oct: 0, harm: 1, g: 1, pan: 0, push: 6, pats: {
+      a: '1.......5.......', b: '1...1...5...3...', c: '1.1...5...3...1.', d: '1...5...8...5...' } },
+    { lab: 'RHODES', v: 'rhodes',    k: 'm', oct: 1, harm: 1, ch: [0, 2, 4], g: 0.8, pan: -0.2, pats: {
+      a: '1------.....1---', b: '..1---....1---..', c: '1-------........', d: '..1-..1---..1---' } },
+    { lab: 'CLAV',   v: 'pulseLead', k: 'm', oct: 1, harm: 1, g: 0.62, pan: 0.26, pats: {
+      a: '..5...5...5...5.', b: '.5.8.5.8.5.8.5.8', c: '1...5...1...5...', d: '..1.1...5.1.1...' } },
+    { lab: 'VIBES',  v: 'vibes',     k: 'm', oct: 2, harm: 1, g: 0.7, pan: -0.32, pats: {
+      a: '1.3.5.3.1.3.5.3.', b: '1358531358531358', c: '1...5...8...5...', d: '8.5.3.1.3.5.8.5.' } },
+    /* --- group 1: harmony and melody ----------------------------------- */
+    { lab: 'PAD',    v: 'sawPad',    k: 'm', oct: 1, harm: 1, ch: [0, 2, 4, 6], g: 0.85, pan: 0, pats: {
+      a: '1---------------', b: '1-------5-------' } },
+    { lab: 'PIANO',  v: 'piano',     k: 'm', oct: 2, harm: 1, ch: [0, 2], g: 1, pan: 0.12, pats: {
+      a: '1------...1-..1-----------1---..',
+      b: '1---....1---....',
+      c: '1-------1-------',
+      d: '1-..1-..1---..1-1-..1-..1---..1-' } },
+    { lab: 'STRINGS',v: 'strings',   k: 'm', oct: 2, harm: 1, ch: [0, 2, 4], g: 0.8, pan: 0.3, pats: {
+      a: '1---------------', b: '1-------3-------', c: '3-------1-------' } },
+    { lab: 'SAX',    v: 'sax',       k: 'm', oct: 2, g: 0.9, pan: -0.14, pats: {
+      a: '8-------a---8---5-------3-------',
+      b: 'b-------a---8---7-------5-------',
+      c: '8.a.b.a.8---7---5---3---1-------',
+      d: 'a---8---7---8---b-------a-------' } },
+    { lab: 'CELESTE',v: 'celeste',   k: 'm', oct: 3, harm: 1, g: 0.66, pan: 0.34, pats: {
+      a: '..111.1.1.......', b: '....5.......8...', c: '8...5...3...5...', d: '1.......5.......' } },
+    /* --- group 2: percussion ------------------------------------------- */
+    { lab: 'KICK',   v: 'kick',      k: 'p', tune: 1, g: 1, pan: 0, pats: {
+      a: 'X.......x.......', b: 'X.....x.x.......', c: 'X..x....x.....x.', d: 'X.x.....X..x....' } },
+    { lab: 'SNARE',  v: 'snare',     k: 'p', tune: 1, g: 0.9, pan: -0.06, pats: {
+      a: '....x.......x...', b: '....x.......x..o', c: '....X...o...X.o.', d: '..o.X..o..o.X.oo' } },
+    { lab: 'HAT',    v: 'hat',       k: 'p', tune: 1, g: 0.78, pan: 0.16, push: -5, pats: {
+      a: '..x...x...x...x.', b: 'x.x.x.x.x.x.x.x.', c: 'x.xxx.xxx.xxx.xx', d: 'x...x.x.x...x.x.' } },
+    { lab: 'RIM',    v: 'rim',       k: 'p', tune: 1, g: 0.72, pan: -0.28, pats: {
+      a: '....r.......r...', b: '..r...r...r...r.', c: '....r...r...r.r.', d: 'r.r...r.r.r...r.' } },
+    { lab: 'RIDE',   v: 'ride',      k: 'p', tune: 1, g: 0.7, pan: 0.32, pats: {
+      a: 'x...x...x...x...', b: 'x.x.x.x.x.x.x.x.', c: 'X...x.x.x...x.x.', d: 'X...............' } },
+  ],
+  /*        SUB BAS RHO CLV VIB  PAD PNO STR SAX CEL  KICK SNR HAT RIM RIDE */
+  arr: [
+    { n: 'INTRO',  b: 8,  k: [0, 0, 6, 6], p: 'a....aa..a..a..' },
+    { n: 'THEME',  b: 16, k: [0, 0, 6, 6], p: 'aaa.aaaa.aaaaa.' },
+    { n: 'VERSE',  b: 16, k: [0, 6, 0, 6], p: 'bbbaaaaaabaabaa' },
+    { n: 'LIFT',   b: 16, k: [0, 6, 3, 6], p: 'bdbbbbbbbcbbbbb' },
+    { n: 'BREAK',  b: 8,  k: [0, 0],       p: 'a.c..ac......bd' },
+    { n: 'CHORUS', b: 16, k: [0, 6, 3, 4], p: 'bcdbbbdbccccccb' },
+    { n: 'SOLO',   b: 16, k: [0, 6, 3, 6], p: 'adbbdabcdbbdbdc' },
+    { n: 'QUIET',  b: 8,  k: [0, 6],       p: 'aac.caaa....aa.' },
+    { n: 'DROP',   b: 16, k: [0, 6, 3, 4], p: 'ccdbbbdbbcdcccb' },
+    { n: 'OUTRO',  b: 8,  k: [0, 0, 6, 0], p: 'aaaaaaaaaaaaaaa' },
+  ],
+},
 ];
 
 /* ================================================== transport + scheduler */
@@ -2275,7 +2339,7 @@ function loadTakes() {
 }
 
 /* ------------------------------------------------------- the live pad path */
-/* The five built-in songs GATE a running transport: a held pad opens its
+/* The built-in songs GATE a running transport: a held pad opens its
    track gain and the scheduler was always going to play that note anyway. A
    kit pad does the opposite — a press TRIGGERS a note that would not exist
    otherwise. They have to be separate paths because triggers STACK (tap the
@@ -2568,7 +2632,7 @@ function selectSong(ix, keepClock) {
    grid is the invitation — but there is no song, so there is no clock, no
    meter and no sound. */
 /* A take is a song the CD made: it replays with the pads GATING it, exactly
-   like the built-in five, and it keeps its own kit rather than borrowing the
+   like the built-in songs, and it keeps its own kit rather than borrowing the
    one being built under RECORD NEW SONG. */
 function selectTake(id) {
   const tk = TAKES.filter((t) => t.id === id)[0];
@@ -2794,7 +2858,7 @@ function takeStep(abs, t) {
     const pd = TK.kit.pads[n.i];
     const v = voice(pd.v);
     /* Replay GATES, edit does not. A gated note goes through trackGain, which
-       is 0 unless the pad is held — the same contract the five built-in songs
+       is 0 unless the pad is held — the same contract the built-in songs
        keep, so your own song behaves like theirs. */
     const out = editing ? trackLive[n.i] : trackGain[n.i];
     const when = t + Math.max(0, n.sT - a * TK.stepSec);
@@ -3226,7 +3290,7 @@ function buildExport(tk) {
       '  - at most 26 simultaneous voices on any one step',
       '  - percussion only on pads 10-14; pads 0-9 are pitched, hue climbing each column',
       '  - every pattern string a whole multiple of `steps` characters',
-      '  - mix trim between 0.4 and 2.5, set so this song sits level with the other five',
+      '  - mix trim between 0.4 and 2.5, set so this song sits level with the others',
       '',
       'Run `node .claude/tests/drive-music-mixer.cjs` after adding it. It names every violation.',
     ],
@@ -3785,7 +3849,7 @@ function frame(ts) {
 
 /* ------------------------------------------------------------- test hook */
 /* Used by .claude/tests/eval-music-mixer-audio.cjs. `audition` fires every
-   distinct (track, pattern, character) combination in all five songs through
+   distinct (track, pattern, character) combination in every song through
    its real voice, which is the only way to prove no pattern char reaches a
    voice that cannot handle it — a live listen only ever covers the sections
    that happen to play. */

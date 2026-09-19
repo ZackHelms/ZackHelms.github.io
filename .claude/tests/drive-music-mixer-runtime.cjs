@@ -4,7 +4,7 @@
  *
  * drive-music-mixer.cjs proves the NOTATION is well formed. This proves the
  * two things that only a browser can: the SOUND path (every pattern character
- * in all five songs reaches a voice that can render it, the transport
+ * in every song reaches a voice that can render it, the transport
  * schedules notes, holding every pad produces a non-silent signal at the
  * limiter), the CONTACT-PATCH hit test (one fingertip on a seam holds both
  * pads, and the CD's eight-finger grip really does hold all fifteen), and the
@@ -71,10 +71,11 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     else console.log('BOOT=none  15 pads up, no song, no tempo strip, no wrench');
 
     const opts = await page.evaluate(() => window.__MM.options());
-    const wantOpts = ['', 'rec', '0', '1', '2', '3', '4'];
+    const wantOpts = ['', 'rec', '0', '1', '2', '3', '4', '5'];
     if (opts.join('|') !== wantOpts.join('|'))
       fail('song list is [' + opts.join(',') + '], expected [' + wantOpts.join(',') + ']');
-    else console.log('OPTIONS=' + opts.length + '  make-a-selection, record, then the five songs');
+    else console.log('OPTIONS=' + opts.length + '  make-a-selection, record, then the ' +
+                     (wantOpts.length - 2) + ' songs');
 
     /* every icon in the song row must be the same height as the select */
     const rowH = await page.evaluate(() => window.__MM.rowHeights());
@@ -98,7 +99,10 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
 
     /* --- 3. per song: transport runs, pads sound, nothing throws ----- */
     const peaks = [];
-    for (let i = 0; i < 5; i++) {
+    /* read the count off the song list rather than hard-coding it, so adding
+       a song does not silently leave the newest one untested */
+    const nSongs = (await page.evaluate(() => window.__MM.options())).length - 2;
+    for (let i = 0; i < nSongs; i++) {
       const before = errs.length;
       await page.evaluate((k) => { window.__MM.select(k); window.__MM.holdAll(true); }, i);
       await page.waitForTimeout(1500);
@@ -125,8 +129,8 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
       await page.waitForTimeout(200);
     }
 
-    /* --- 3b. the five songs must be level-matched -------------------- */
-    if (peaks.length === 5) {
+    /* --- 3b. the songs must be level-matched -------------------------- */
+    if (peaks.length === nSongs) {
       const lo = Math.min(...peaks), hi = Math.max(...peaks);
       console.log('LEVELS=' + peaks.map((x) => x.toFixed(3)).join(' ') + '  spread=' + (hi / lo).toFixed(2) + 'x');
       if (hi / lo > 2.2)
@@ -690,7 +694,7 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     if (rep.sig !== '4/4' || rep.bpm !== 112) fail('the tempo strip reads ' + rep.bpm + ' ' + rep.sig);
 
     /* THE contract for a recorded song: the pads gate it, exactly like the
-       built-in five. Silent with nothing held, loud with everything held. */
+       built-in songs. Silent with nothing held, loud with everything held. */
     let tkQuiet = 1, loud = 0;
     for (let k = 0; k < 12; k++) {
       await page.waitForTimeout(45);
@@ -1163,7 +1167,7 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     }));
     if (builtIn.tools) fail('the wrench is showing on a built-in song');
     else if (!builtIn.off) fail('the DELETE row is live on a built-in song');
-    else console.log('DELETE=refused on the five built-in songs');
+    else console.log('DELETE=refused on the built-in songs');
 
     await page.reload();
     await page.waitForTimeout(900);

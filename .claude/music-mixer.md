@@ -44,7 +44,7 @@ the only way to hear that track. Commissioned by the CD 2026-09-17.
 Fifteen pads in **three groups of five**. Hue climbs the left column, then the
 middle, then the right, so **red is bottom-left and magenta is top-right**
 (`HUES[]`, asserted strictly increasing by the data gate). Groups are fixed
-roles, and a track keeps its slot across all five songs:
+roles, and a track keeps its slot across all six songs:
 
 | group | portrait | landscape | role | pad 0 -> pad 4 |
 |---|---|---|---|---|
@@ -167,9 +167,39 @@ on degree `1` with a chord root of 3 gives degrees 3,5,7,9 — a G7 in D dorian
   1018]`) with no chord motion at all — `k` is `[0]` in every section, because
   the tanpura never leaves Sa-Pa and the melody is the whole story.
 
-PULSE, KORA and BOSSA are 12-TET. Time signatures are real: 12/8 (KORA, on the
-seven-stroke bell as its timeline), 10/8 Jhaptaal (RAGA), 4/4 for the rest.
-`bpm` counts the **displayed pulse**, and `barSec = pulses * 60 / bpm`.
+PULSE, KORA, BOSSA and DORIAN are 12-TET. Time signatures are real: 12/8
+(KORA, on the seven-stroke bell as its timeline), 10/8 Jhaptaal (RAGA), 4/4
+for the rest. `bpm` counts the **displayed pulse**, and
+`barSec = pulses * 60 / bpm`.
+
+## DORIAN is the CD's own recording, grown into a song
+
+The sixth song came from a take the CD played on the pads and exported
+(ZCK0, 2026-09-19). What is **theirs** and must not drift:
+
+| kept from the take | value |
+| --- | --- |
+| key | C dorian, `cents: [0, 200, 300, 500, 700, 900, 1000]` |
+| tempo | 103.5 BPM, 4/4, `swing: 0` (their take is dead straight) |
+| drum groove | KICK `X.......x.......`, SNARE `....x.......x...`, HAT `..x...x...x...x.` — pattern `a` on pads 10-12 is their performance, transcribed |
+| harmony | the i-bVII vamp their held piano spelled out: Cm with Bb passing |
+| the flourish | CELESTE's `a` pattern `..111.1.1.......` is the rhythm of the Eb5 run they played in bar 1 |
+
+What is **new**: the band. The take is piano only, one note per pad across
+pads 0-9; a song needs the layout contract (low end, harmony/melody,
+percussion) and fifteen distinct roles, so the vamp is re-voiced as sub,
+upright bass, Rhodes, clav, vibes, pad, piano, strings, sax and celeste. The
+chords move through `k` and `harm: 1` rather than being spelled note by note,
+which is what lets one 2-bar piano figure sit over Cm7 - Bbmaj7 - F7 - Gm7.
+
+`rootHz: 65.406` is C2, so `oct` reads as an octave number: 0 is the bass, 2
+is the take's own C4 piano register, 3 is the lead.
+
+**This is the worked example of what the export is for.** The readme in an
+exported take says it is a seed, not a drop-in, and this is the shape of the
+work between the two: the take gives key, tempo, groove and harmony; the
+arrangement, the instrumentation and the 285-315 s duration are written around
+it.
 
 ## Voices
 
@@ -267,7 +297,7 @@ pad behaviours** for why that separation is load-bearing.
   and the reason the runtime gate's released-floor check allows ~0.001.
 - `bus.gain` carries the **per-song `mix` trim**. Without it the dropdown
   doubles as a volume control (gamelan measured 2.6x quieter than synthwave
-  before trimming); the runtime gate fails if the five songs spread past 2.2x.
+  before trimming); the runtime gate fails if the songs spread past 2.2x.
 
 ## Scheduling
 
@@ -315,7 +345,7 @@ different job. `mode` names the selection, `padMode` names what a press does.
 | --- | --- | --- | --- | --- | --- |
 | MAKE A SELECTION (default) | `none` | `off` | stopped | hidden | hidden |
 | RECORD NEW SONG | `rec` | `live` | stopped | hidden | shown |
-| one of the five songs | `song` | `gate` | running | shown | hidden |
+| one of the built-in songs | `song` | `gate` | running | shown | hidden |
 
 **`gate` and `live` are opposite directions of travel and must stay separate
 code paths.** A song GATES a transport that was going to play that note anyway,
@@ -618,7 +648,7 @@ predates this re-grids itself on load.
 
 ## Replay, and editing a take
 
-A take is a song the CD made, so it **replays exactly like the built-in five**:
+A take is a song the CD made, so it **replays exactly like the built-in songs**:
 the pads gate it (`padMode: 'gate'`, notes routed through `trackGain`), silent
 until something is held. That is the contract the runtime gate measures
 directly — 0.0000 with nothing held, 0.29 with everything held.
