@@ -569,7 +569,7 @@ body.erasing .pad .ex { display: flex; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-18 21:27 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-19 03:23 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -2101,6 +2101,40 @@ function loopBars(on, zero, stepSec, steps) {
   return bestL;
 }
 
+/* Takes recorded before the loop-edge pass carry whatever the old code made
+   of their edges: typically a whole empty bar at the front (a sign slip in the
+   old bar-line search) and a trailing fragment at the back - the CD's first
+   recording opened one bar early and ended with a lone kick in a bar of its
+   own. The exact tap times are still stored, so the edges can simply be found
+   again. It runs once per take, is marked so it does not run twice, and is
+   idempotent anyway: on a take it has already fixed it moves nothing.
+
+   The take's OWN bpm and beats are used rather than re-detected, because the
+   CD may have corrected them by hand in the edit bar and that correction is
+   better information than the detector has. */
+const EDGES_V = 2;
+function retrimEdges(notes, bpm, beats) {
+  const steps = beats * 4;
+  const barSec = (60 / bpm) * beats, stepSec = barSec / steps;
+  const on = onsetStrength(notes.map((n) => n.t).sort((a, b) => a - b));
+  if (on.length < 4) return notes;
+  const r = detectDownbeat(on, { phase: 0, grid: stepSec }, beats);
+  const firstIdx = Math.round(on[0].t / stepSec);
+  const off = (((firstIdx - r) % steps) + steps) % steps;
+  const zero = (firstIdx - off + (off > steps / 2 ? steps : 0)) * stepSec;
+  const bars = loopBars(on, zero, stepSec, steps);
+  const out = [];
+  for (const n of notes) {
+    let t = n.t - zero;
+    if (t < -stepSec / 2) t += bars * barSec;
+    if (t < 0) t = 0;
+    if (Math.round(t / stepSec) >= bars * steps) continue;
+    out.push({ i: n.i, t, d: n.d });
+  }
+  /* a seatbelt: this is here to cut a fragment, never a performance */
+  return out.length >= notes.length * 0.6 ? out : notes;
+}
+
 function processTake(events, kit, name) {
   const usable = events.filter((e) => e.d >= 0 && isFinite(e.t));
   if (!usable.length) return null;
@@ -2138,7 +2172,7 @@ function processTake(events, kit, name) {
     id: 'u' + Date.now().toString(36),
     name: name || 'TAKE ' + (TAKES.length + 1),
     kit: cloneKit(kit), bpm: Math.round(best.bpm * 10) / 10,
-    beats, steps, notes, snap: 1, padSteps: 0, created: Date.now(),
+    beats, steps, notes, snap: 1, padSteps: 0, created: Date.now(), edges: EDGES_V,
   });
 }
 
@@ -2190,7 +2224,7 @@ function saveTakes() {
   try {
     localStorage.setItem('musicMixer.takes', JSON.stringify(TAKES.map((t) => ({
       id: t.id, name: t.name, kit: t.kit, bpm: t.bpm, beats: t.beats,
-      snap: t.snap, padSteps: t.padSteps, created: t.created,
+      snap: t.snap, padSteps: t.padSteps, created: t.created, edges: EDGES_V,
       notes: t.notes.map((n) => ({ i: n.i, t: +n.t.toFixed(4), d: +n.d.toFixed(4) })),
     }))));
   } catch (e) {}
@@ -2200,6 +2234,7 @@ function loadTakes() {
   try {
     const raw = JSON.parse(localStorage.getItem('musicMixer.takes') || '[]');
     if (!Array.isArray(raw)) return;
+    let migrated = false;
     for (const t of raw) {
       /* field by field, same rule as the kit: a take written by a later build
          must not be able to throw on the first scheduled step */
@@ -2211,12 +2246,17 @@ function loadTakes() {
         notes.push({ i: n.i, t: Math.max(0, +n.t), d: Math.max(0.03, +n.d) });
       }
       if (!notes.length) continue;
+      const bpm = +t.bpm || 100, beats = +t.beats || 4;
+      if ((+t.edges || 0) < EDGES_V) migrated = true;
       TAKES.push(prepTake({
         id: String(t.id || 'u' + TAKES.length), name: String(t.name || 'TAKE'),
-        kit: sanitizeKit(t.kit), bpm: +t.bpm || 100, beats: +t.beats || 4, notes,
+        kit: sanitizeKit(t.kit), bpm, beats, edges: EDGES_V,
+        notes: (+t.edges || 0) >= EDGES_V ? notes : retrimEdges(notes, bpm, beats),
         snap: +t.snap || 0, padSteps: +t.padSteps || 0, created: +t.created || 0,
       }));
     }
+    /* write the marker back, or every load re-does work it has already done */
+    if (migrated) saveTakes();
   } catch (e) {}
 }
 

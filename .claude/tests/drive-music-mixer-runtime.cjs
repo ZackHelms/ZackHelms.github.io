@@ -967,6 +967,60 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     else console.log('LOOP=came round: ' + short.dur.toFixed(2) + 's loop, playhead back at ' +
                      wrapped.pos.toFixed(2) + 's');
 
+    /* A take recorded before the loop-edge pass still holds its exact tap
+       times, so its edges can be found again on load - which is what the CD's
+       first recording needed (report + export, 2026-09-19): it opened a whole
+       empty bar early and ended with a lone kick alone in a sixth bar. These
+       are that take's real times, 103.5 BPM, kick/hat/snare/hat eighths. */
+    const ZCK = [2.3098, 2.6058, 2.8884, 3.1551, 3.4564, 3.7551, 4.0404, 4.3231, 4.6244,
+      4.9231, 5.2271, 5.5258, 5.8084, 6.1071, 6.3738, 6.6404, 6.9418, 7.2564, 7.5418,
+      7.8431, 8.1258, 8.4058, 8.7071, 8.9924, 9.2564, 9.5924, 9.8751, 10.1604, 10.4244,
+      10.7231, 11.0218, 11.2911, 11.5898];
+    await page.evaluate((ts) => {
+      window.__MM.wipeTakes();
+      localStorage.setItem('musicMixer.takes', JSON.stringify([{
+        id: 'zck0', name: 'ZCK0', bpm: 103.5, beats: 4, snap: 1, padSteps: 0, created: 1,
+        notes: ts.map((t, k) => ({ i: [10, 12, 11, 12][k % 4], t, d: 0.09 })),
+      }]));
+    }, ZCK);
+    await page.reload();
+    await page.waitForTimeout(900);
+    const mig = await page.evaluate(() => {
+      const t = window.__MM.takes()[0];
+      if (!t) return null;
+      window.__MM.pick('t:' + t.id);
+      return { loop: window.__MM.loop(),
+               stored: JSON.parse(localStorage.getItem('musicMixer.takes') || '[]')[0] };
+    });
+    if (!mig) fail('the pre-loop-edge take did not load at all');
+    else if (mig.loop.bars !== 4)
+      fail('the pre-loop-edge take came back ' + mig.loop.bars + ' bars, expected 4 ' +
+           '(it was stored as 6: one empty at the front, one lone kick at the back)');
+    else if (mig.loop.notes !== ZCK.length - 1)
+      fail('re-trimming kept ' + mig.loop.notes + ' of ' + ZCK.length +
+           ' notes, expected exactly one dropped');
+    else if (mig.loop.first !== 0)
+      fail('the re-trimmed take still starts at step ' + mig.loop.first);
+    else if (!mig.stored || mig.stored.edges !== 2)
+      fail('the re-trim did not write its marker back (edges=' +
+           (mig.stored && mig.stored.edges) + ')');
+    else console.log('LEGACY=the CD\'s first take re-trims 6 bars -> 4, one lone kick cut, ' +
+                     'first note back on step 0');
+
+    /* and it must not keep re-cutting on every load */
+    await page.reload();
+    await page.waitForTimeout(900);
+    const mig2 = await page.evaluate(() => {
+      const t = window.__MM.takes()[0];
+      if (!t) return null;
+      window.__MM.pick('t:' + t.id);
+      return window.__MM.loop();
+    });
+    if (!mig2) fail('the re-trimmed take did not survive a second load');
+    else if (mig2.bars !== 4 || mig2.notes !== ZCK.length - 1)
+      fail('a second load re-cut the take to ' + mig2.bars + ' bars / ' + mig2.notes + ' notes');
+    else console.log('LEGACY=idempotent: a second load moves nothing');
+
     /* one clean take to name and then delete */
     await page.evaluate(() => { window.__MM.wipeTakes(); window.__MM.pick('rec'); });
     await page.waitForTimeout(150);

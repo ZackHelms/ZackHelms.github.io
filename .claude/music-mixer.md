@@ -539,6 +539,25 @@ same performance at half the tempo is genuinely half as many bars. INTRO
 padding shifts everything later by N note values and adds whole bars, so the
 loop stays bar-aligned.
 
+### Takes recorded before this: `retrimEdges()`
+
+The edges changed, but the *stored data did not lose anything* — a take keeps
+its exact tap times, so its edges can simply be found again. `loadTakes()`
+re-derives them once for any take without `edges: EDGES_V`, then writes the
+marker back so it never repeats. It uses the take's **own** `bpm` and `beats`
+rather than re-detecting them, because the CD may have corrected those by hand
+in the edit bar and that correction beats anything the detector knows.
+
+Measured on the CD's first recording (report + export, 2026-09-19), which is
+now the gate's fixture: stored as **6 bars** — an empty one at the front from
+the old `floor()` sign slip, and a lone kick alone in a sixth — it re-trims to
+**4 bars, 32 of 33 notes, first note back on step 0**. Running it again moves
+nothing, which the gate also asserts: an idempotent migration is the only kind
+safe to leave in a load path.
+
+One seatbelt: if a re-trim would keep under 60% of the notes, the original is
+kept. The job is cutting a fragment, never a performance.
+
 ### Four steps to the beat, in every metre
 
 `tk.steps = tk.beats * 4`, not a flat 16 per bar. The flat version made SNAP's
