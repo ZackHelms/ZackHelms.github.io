@@ -217,6 +217,164 @@ CL.add({
     }
   ],
 
+  chapters: [
+    { name: 'Chapter 1', role: 'A judge dead at Wide Oaks',
+      detail: 'Chief John Kurtz carries the news out to Wide Oaks. Chief Justice Artemus ' +
+              'Healey has been found dead on his own grounds, in a condition the police ' +
+              'cannot describe let alone explain, and it is the maid, Nell Ranney, who ' +
+              'found him. His widow Ednah receives Kurtz believing her husband is simply ' +
+              'away. Boston\'s upper world has no framework for this: men of Healey\'s rank ' +
+              'are not murdered.' },
+
+    { name: 'Chapter 2', role: 'The leaper, and a few words of Italian',
+      detail: 'Kurtz has the police sweep the city for "suspicious persons", and the station ' +
+              'fills with every grade of criminal. One stranger behaves oddly, then panics ' +
+              'on overhearing the details of Healey\'s death and goes out of a window. The ' +
+              'words he leaves behind are not English. Nicholas Rey, the first Black ' +
+              'patrolman on the force, is the one who catches them. At Harvard, Lowell is ' +
+              'defending Dante\'s place on his syllabus.' },
+
+    { name: 'Chapter 3', role: 'A Wednesday session, interrupted',
+      detail: 'A translation evening at Craigie House: Longfellow reading, the others ' +
+              'correcting proofs, the Wood of Suicides. Rey arrives with his fragment of a ' +
+              'foreign tongue, which sets Lowell off about what the police really want. ' +
+              'Under the dinner talk sit the two standing threats — Harvard\'s campaign ' +
+              'against Lowell\'s course, and whether the publication schedule should be ' +
+              'scaled back to avoid provoking the Corporation.' },
+
+    { name: 'Chapter 4', role: 'Under the church',
+      detail: 'Reverend Elisha Talbot moves through the burial vaults beneath his church ' +
+              'with a lantern, carrying his fear of dying and his conscience about the ' +
+              'railroad scheme that left widows and orphans behind. Someone takes hold of ' +
+              'him from behind. Afterwards: Ednah Healey, hardening into vengeance, posts a ' +
+              'large reward, and the sexton finds what is left of Talbot.' },
+
+    { name: 'Chapter 5', role: 'The reward, and what was done to them',
+      detail: 'The reward stirs the city and the police. What was actually done to Healey ' +
+              'is spelled out, and Talbot\'s end is confirmed: buried head-down with his ' +
+              'feet set alight, a staging out of the Inferno, discovered by Sexton Gregg ' +
+              'while the fire still burned. Holmes is called from the medical college to ' +
+              'identify the body.' },
+
+    { name: 'Chapter 6', role: 'The club sees it',
+      detail: 'Holmes gathers the others at Craigie House and describes what he saw. The ' +
+              'parallel to Dante\'s punishments is exact enough that the room goes cold: ' +
+              'their translation may be the thing that taught someone how. Lowell says they ' +
+              'are obliged to go to the police. Holmes begs for silence, certain that being ' +
+              'the only men in America who can read the crime scenes would make them the ' +
+              'obvious suspects.' },
+
+    { name: 'Chapter 7', role: 'Ulysses, and a decision',
+      detail: 'Holmes arrives late meaning to resign from the translation, sick with the ' +
+              'thought that their work let this loose. Greene is present, so nothing can be ' +
+              'said aloud, and the session proceeds over Canto Twenty-six and Ulysses. ' +
+              'Lowell turns Tennyson\'s lines on the same passage into an argument for ' +
+              'acting rather than waiting, and the four of them come round to it.' },
+
+    { name: 'Chapter 8', role: 'The vault, and the reward-hunters',
+      detail: 'The city absorbs a second death while Rey works the streets against the ' +
+              'prejudice he meets for his colour and his uniform. Langdon Peaslee, a thief ' +
+              'with an eye on the reward money, tries to make use of him. Holmes and ' +
+              'Longfellow visit Talbot\'s church, where the sexton explains the vault was a ' +
+              'shortcut the minister used often.' },
+
+    { name: 'Chapter 9', role: 'Contrapasso named',
+      detail: 'Sermons across New England take up the two unsolved deaths, and the ' +
+              'newspapers make the police ridiculous. Kurtz and Rey talk about punishment ' +
+              'and order; scraps of paper near Talbot\'s grave catch Rey\'s attention. ' +
+              'Holmes turns to insects. The club finally puts the word to what they are ' +
+              'looking at — contrapasso, the punishment shaped to fit the sin.' },
+
+    { name: 'Chapter 10', role: 'Pressure from every side',
+      detail: 'Henry Oscar Houghton is unsettled at the Riverside Press by a card delivered ' +
+              'to him. Kurtz meets the mayor and aldermen under mounting political ' +
+              'pressure. The club works through how precisely the killings track the poem, ' +
+              'and how badly exposed their own work has left them.' },
+
+    { name: 'Chapter 11', role: 'The third: Jennison',
+      detail: 'Holmes is called to Fort Warren, where Phineas Jennison has been found ' +
+              'mutilated — a reading of the punishment Dante gives the sowers of discord. ' +
+              'Rey makes the same connection. Nobody can explain how the murderer worked ' +
+              'with patrols doubled. Back in the Authors\' Room the strain between Holmes ' +
+              'and Lowell starts to show.' },
+
+    { name: 'Chapter 12', role: 'The case left to the wrong men',
+      detail: 'Kurtz departs on a lyceum tour and leaves the case with detectives Rey does ' +
+              'not trust, ordering Rey himself to stay put. Rey argues and loses. On his ' +
+              'way home he meets Mabel Lowell, who hands him her father\'s notes on Dante — ' +
+              'including a sketch of Talbot\'s feet. Longfellow calls on George Ticknor and ' +
+              'goes on translating.' },
+
+    { name: 'Chapter 13', role: 'A Pinkerton, and an arrest',
+      detail: 'Simon Camp, the Pinkerton man Dr. Manning hired to find something damaging ' +
+              'in Lowell\'s Dante course, confronts the club — and then takes their money, ' +
+              'which leaves them angrier than the threat did. Lowell, worn through, breaks ' +
+              'down at home in front of Mabel and then his wife. Then Fields brings word of ' +
+              'an arrest: Willard Burndy, a safecracker, who says he is innocent.' },
+
+    { name: 'Chapter 14', role: 'Holmes names the soldier',
+      detail: 'Holmes argues the case he has been building: the killer is a soldier. The ' +
+              'violence is a returning veteran\'s, the movements are those of a man who ' +
+              'knows Boston intimately, and Dante\'s own exile and wars run underneath it. ' +
+              'The others take fire from it. Meanwhile Manning grows suspicious of the ' +
+              'club, and Camp reappears — no longer bribable, now blackmailing Fields.' },
+
+    { name: 'Chapter 15', role: 'Where the killer learned it',
+      detail: 'Greene preaches Dante to an audience — the descent, and the ice of Cocytus ' +
+              'where traitors are kept — and mentions that he has been preaching to ' +
+              'soldiers. Holmes and Lowell realise with horror that the sermons are where ' +
+              'the killer got his text. Pressed, Greene remembers one soldier who asked him ' +
+              'about Dante: tall, a handlebar moustache, a limp.' },
+
+    { name: 'Chapter 16', role: 'The money, and a missing shopboy',
+      detail: 'Talbot\'s letters surface: the Harvard Corporation had been paying him to ' +
+              'lead a campaign of articles against Dante and against Longfellow\'s ' +
+              'translation. The sum promised him is exactly the sum the killer took, which ' +
+              'means the killer knew. The club needs Harvard\'s records, and needs Dan ' +
+              'Teal, the shopboy who has stopped turning up for work — and at his lodgings, ' +
+              'Mrs. Galvin does not know her boarder by that name.' },
+
+    { name: 'Chapter 17', role: 'Teal is Galvin',
+      detail: 'The search for Teal, with Rey unaccountably absent and Fields sick with ' +
+              'guilt for having drawn the boy into it. At Mrs. Galvin\'s a tintype settles ' +
+              'it: Dan Teal is Benjamin Galvin, a lieutenant home from the war. A sabre in ' +
+              'the house tells Holmes what is coming. Teal has taken Manning and the ' +
+              'student Pliny Mead out onto the ice.' },
+
+    { name: 'Chapter 18', role: 'Bachi, cleared',
+      detail: 'Lowell seizes Pietro Bachi and the club questions him. What comes out is ' +
+              'bitterness rather than guilt: passed over, cast off by Harvard, quietly ' +
+              'making his own translation of the Inferno, and contemptuous of American ' +
+              'poets helping themselves to someone else\'s literature. He is not the ' +
+              'murderer. The club turns back to Greene\'s sermons, and to the fact that ' +
+              'Manning is the next name on the list.' },
+
+    { name: 'Chapter 19', role: 'Galvin\'s war',
+      detail: 'Galvin\'s story from the beginning, told straight through. An abolitionist ' +
+              'who had sheltered fugitive slaves, he enlisted at twenty-four and could not ' +
+              'read well enough to rise; his quietness earned him the name Possum. He saw ' +
+              'the dead go to maggots, shot deserters under orders, took a bullet, and ' +
+              'spent four months in Libby Prison. He came home to a country that had moved ' +
+              'on, carrying all of it, and found in Greene\'s preaching a shape for what he ' +
+              'thought he owed the world.' },
+
+    { name: 'Chapter 20', role: 'Craigie House',
+      detail: 'Teal holds Lowell and Fields, and puts it to Holmes that he is a traitor to ' +
+              'the club. Holmes finds his friends bound, and has to choose between freeing ' +
+              'them and reaching Longfellow in time. Rey, shut in at Central Station, ' +
+              'breaks away to give warning. At Craigie House Teal puts a revolver in ' +
+              'Longfellow\'s hand and demands he pass sentence on his own friends. Holmes ' +
+              'arrives, the standoff breaks, and a shot ends it — Teal dead in the snow, ' +
+              'shot by Manning.' },
+
+    { name: 'Chapter 21', role: 'After',
+      detail: 'The reckoning up. Peaslee holds forth on Burndy, who is facing execution for ' +
+              'a thing he did not do, until Rey warns him that a man asking questions could ' +
+              'cost him the reward. Camp is still circling. In an alley, Fields and Lowell ' +
+              'settle what is to be done for Longfellow, whose translation and the Dante ' +
+              'anniversary still lie ahead of him.' }
+  ],
+
   notes: [
     {
       title: '1865 Boston: Frame-of-Mind Reference',

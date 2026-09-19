@@ -70,6 +70,7 @@ CL.add({
 
   characters: [ /* entries — authored in importance order, NOT sorted */ ],
   places:     [ /* entries — same shape; omit or leave empty to hide the section */ ],
+  chapters:   [ /* entries — same shape again; a per-chapter summary list */ ],
 
   // Optional. Reference blocks appended after the two lists — see "Notes" below.
   notes: [ { title: '1865 Boston…', hint: '…', sections: [ { heading: '…', items: ['…'] } ] } ]
@@ -103,6 +104,26 @@ season (when it aired/airs, its framing, its new arrivals) — so the page reads
 correctly whichever season chip is selected. The top-level `blurb` should
 summarise the whole show. Filter blurbs follow the same spoiler rule as
 everything outside `spoiler` fields: safe to read mid-season.
+
+### Chapters
+
+`chapters` is a third entry list, rendered after `places` and behaving exactly
+like the other two: one row each, tap for a dialog, and its own deep link at
+`#/<slug>/x/<entry-id>`.
+
+Name the entries plainly — `Chapter 1`, `Chapter 2` — so the **list itself
+gives nothing away**; that is the spoiler gate for a book being read now, and
+it is why the summaries are not folded behind the ⚠ tap. Put a short neutral
+tag in `role` (it only shows inside the dialog) and the summary in `detail`.
+**A chapter's summary covers only what happens in that chapter** — never
+foreshadow a later reveal, or the gate stops working.
+
+An entry name ending in a number is tiled with that number rather than its
+initials, so `Chapter 12` reads `12` and not `C1`.
+
+The three lists come from the `LISTS` table in `index.html`, keyed by the
+letter used in dialog URLs (`c`, `p`, `x`). A fourth list is an entry there
+plus a section in `renderTitle`.
 
 ### Notes
 

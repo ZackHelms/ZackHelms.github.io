@@ -347,6 +347,10 @@ const HONORIFIC = /^(dr|mr|mrs|ms|st|sgt|det|lt|capt|the|a|an|of|deputy|chief|nu
 
 /** Two-letter monogram: skips honorifics and quoted nicknames. */
 function initials(name) {
+  /* A name that ends in a number is tiled with the number — otherwise every
+     "Chapter 1x" collapses to the same two letters. */
+  const num = String(name).match(/(\d{1,3})\s*$/);
+  if (num) return num[1];
   const words = String(name).replace(/["'’“”()]/g, ' ').split(/[\s.\-\/&]+/)
     .filter(w => w && !HONORIFIC.test(w));
   if (!words.length) return String(name).slice(0, 2).toUpperCase();
@@ -389,7 +393,8 @@ function paras(text) {
 /* #/                      hub
    #/<slug>                title page
    #/<slug>/c/<id>         title page + character dialog
-   #/<slug>/p/<id>         title page + place dialog          */
+   #/<slug>/p/<id>         title page + place dialog
+   #/<slug>/x/<id>         title page + chapter dialog        */
 
 const app = document.getElementById('app');
 const shade = document.getElementById('shade');
@@ -431,7 +436,7 @@ function route() {
     window.scrollTo(0, 0);
   }
 
-  const entry = (kind === 'c' || kind === 'p') ? findEntry(CL.bySlug[slug], kind, id) : null;
+  const entry = LISTS[kind] ? findEntry(CL.bySlug[slug], kind, id) : null;
   if (entry) {
     openedInApp = (lastRoute.slug === slug && !lastRoute.dialog);
     openDialog(CL.bySlug[slug], entry, kind);
@@ -441,9 +446,18 @@ function route() {
   lastRoute = { slug: slug, dialog: !!entry };
 }
 
+/* The lists a title page can show, keyed by the letter used in dialog URLs.
+   Adding another list is an entry here plus a section in renderTitle. */
+const LISTS = {
+  c: { field: 'characters', host: 'charlist' },
+  p: { field: 'places',     host: 'placelist' },
+  x: { field: 'chapters',   host: 'chapterlist' },
+};
+
 function findEntry(title, kind, id) {
-  const pool = kind === 'p' ? (title.places || []) : (title.characters || []);
-  return pool.find(e => idOf(e) === id) || null;
+  const spec = LISTS[kind];
+  if (!spec) return null;
+  return (title[spec.field] || []).find(e => idOf(e) === id) || null;
 }
 
 function go(hash) { location.hash = hash; }
@@ -516,6 +530,12 @@ function renderTitle(t) {
       <h2>PLACES</h2>
       <div class="hint">SETTINGS, LANDMARKS AND TERMS WORTH LOOKING UP</div>
       <div class="list" id="placelist"></div>
+    </div>` : ''}
+    ${(t.chapters || []).length ? `
+    <div class="section">
+      <h2>CHAPTERS</h2>
+      <div class="hint">TAP A CHAPTER FOR ITS SUMMARY · ONLY WHAT HAPPENS IN THAT CHAPTER</div>
+      <div class="list" id="chapterlist"></div>
     </div>` : ''}
     ${renderNotes(t)}
     <footer>${esc(t.footnote || 'Details written from published summaries — spoilers stay folded until tapped.')}</footer>`;
@@ -595,8 +615,9 @@ function matches(entry) {
 }
 
 function paintLists(t) {
-  paintList(document.getElementById('charlist'), t.characters || [], 'c');
-  paintList(document.getElementById('placelist'), t.places || [], 'p');
+  for (const [kind, spec] of Object.entries(LISTS)) {
+    paintList(document.getElementById(spec.host), t[spec.field] || [], kind);
+  }
 }
 
 function paintList(host, entries, kind) {

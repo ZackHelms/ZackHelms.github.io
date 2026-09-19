@@ -36,6 +36,12 @@ standing instructions the CD has asked for:
   copyrighted and this site is public; they stay monograms. Anything the
   script fetches must keep its attribution row in `data/img/<slug>/CREDITS.md`.
 
+- **Chapter summaries carry only their own chapter.** The `chapters` list is
+  spoiler-gated by nothing but its labels (`Chapter 1`, `Chapter 2`…), so a
+  summary that foreshadows a later reveal breaks the gate for someone reading
+  the book now. Summarise from a source rather than from memory — chapter
+  boundaries are exactly what gets invented otherwise.
+
 - **Hub cards are two lines** (kind badge + title; ellipsized byline +
   `N CH · M PL` counts), no chevron. Keep them that compact if you touch the
   hub. Note the hub card rows use the class `.crow` — the bare `.row` class
