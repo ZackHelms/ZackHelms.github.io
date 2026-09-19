@@ -116,7 +116,7 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
       if (!st.playing) fail(tag + ': transport is not running after a hold');
       if (st.held !== 15) fail(tag + ': holdAll left ' + st.held + '/15 pads held');
       if (st.step < 6) fail(tag + ': only ' + st.step + ' steps scheduled in 1.5 s');
-      if (st.dur < 285 || st.dur > 315) fail(tag + ': duration ' + st.dur + 's outside 285-315');
+      if (st.dur < 120 || st.dur > 315) fail(tag + ': duration ' + st.dur + 's outside 120-315');
       if (!(peak > 0.02)) fail(tag + ': signal at the limiter peaked at ' + peak.toFixed(4) +
         ' with all 15 pads held — effectively silent');
       if (peak > 0.99) fail(tag + ': signal peaked at ' + peak.toFixed(3) + ' — the limiter is being overrun');
@@ -865,7 +865,7 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
       /* the readme has to tell the receiving session the one thing that will
          otherwise waste its time: this is a seed and it will fail the gate */
       const txt = (J.readme || []).join(' ');
-      if (!/285/.test(txt) || !/drive-music-mixer/.test(txt))
+      if (!/120 to 315 seconds/.test(txt) || !/drive-music-mixer/.test(txt))
         fail('the export readme does not tell a session the song contract or which gate to run');
       if (!/^\{[\s\S]*\}$/.test(J.songSource || '') || (J.songSource || '').indexOf('tracks: [') < 0)
         fail('songSource is not a pasteable object literal');

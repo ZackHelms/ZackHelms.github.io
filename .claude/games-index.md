@@ -168,10 +168,11 @@ local-2p.
   latches, so a performance is a grip. It is the second unscored game after
   mitochondria and, unlike piano-tiles (`rhythm`, and the repo's only
   pre-synth-era `.mp3` title), there is no timing to get right and not one
-  byte of sampled audio: all five five-minute songs are synthesized live from
-  pattern tables, including two that are deliberately **not in 12-tone equal
+  byte of sampled audio: all six songs are synthesized live from pattern
+  tables, including two that are deliberately **not in 12-tone equal
   temperament** (gamelan in slendro, raga in just intonation) because their
-  genres are not. `multi-touch-chord` is the rarest value here and the reason
+  genres are not, and one (dorian) grown from a take the CD recorded in the
+  game itself. `multi-touch-chord` is the rarest value here and the reason
   the game works at all — the hit test treats a pointer as a contact patch, so
   one fingertip laid across a seam holds both pads and eight fingers hold all
   fifteen. No other game in the repo asks for more than two fingers at once.

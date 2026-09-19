@@ -96,9 +96,12 @@ for (const S of SONGS) {
   const barSec = S.pulses * 60 / S.bpm;
   const bars = S.arr.reduce((a, s) => a + s.b, 0);
   const dur = bars * barSec;
-  /* the CD asked for "about five minutes" each */
-  if (dur < 285 || dur > 315)
-    fail(tag + ': duration ' + dur.toFixed(1) + 's is outside 285-315s (' + bars + ' bars x ' + barSec.toFixed(3) + 's)');
+  /* Was 285-315s, "about five minutes" each. Widened to 120-315s (CD,
+     2026-09-19) once a recorded take could become a song: a performance the CD
+     plays is a couple of minutes of material, and padding one out to five
+     minutes to satisfy a gate is the gate writing the music. */
+  if (dur < 120 || dur > 315)
+    fail(tag + ': duration ' + dur.toFixed(1) + 's is outside 120-315s (' + bars + ' bars x ' + barSec.toFixed(3) + 's)');
 
   /* --- tracks ---------------------------------------------------------- */
   const labels = new Set();

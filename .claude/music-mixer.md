@@ -198,7 +198,7 @@ is the take's own C4 piano register, 3 is the lead.
 **This is the worked example of what the export is for.** The readme in an
 exported take says it is a seed, not a drop-in, and this is the shape of the
 work between the two: the take gives key, tempo, groove and harmony; the
-arrangement, the instrumentation and the 285-315 s duration are written around
+arrangement, the instrumentation and the duration are written around
 it.
 
 ## Voices
@@ -717,7 +717,7 @@ Rendering details worth knowing:
 text for a reader who is not holding the device). It states the thing that
 would otherwise waste a session's time — this is a **seed, not a drop-in**.
 Pasting it into `SONGS[]` as-is fails the data gate on purpose, because a song
-there must run 285-315 s, keep every pad under 45% rest and 28 bars straight,
+there must run 120-315 s, keep every pad under 45% rest and 28 bars straight,
 average 0.22 notes/bar, sound on 60% of steps held, and stay under 26 voices a
 step. The readme lists all of it and names the gate to run.
 
