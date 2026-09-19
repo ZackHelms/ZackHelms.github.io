@@ -39,12 +39,14 @@ available there — verify the Pages run instead, per `.claude/zmh/producer.md`
   per-signal iOS Safari status and native-bridge notes. Data-table-driven: to add a
   signal, append one object to `SIGNALS[]` (or `NATIVE_ONLY[]`). See `signals/README.md`
 - `character-lists/` — **not a game.** Personal reference app for remembering who's who
-  in a book/show/film: a hub of titles, each with a name-only character list and a
-  second list of places, and a tap-for-detail dialog. Data-driven — to add a title,
-  write `character-lists/data/<slug>.js` (one `CL.add({...})` call) and add the slug to
-  `data/manifest.js`; **never edit `index.html` to add content.** Spoilers go in each
-  entry's `spoiler` field so `role`/`detail` stay safe to read mid-book. Full field
-  contract in `character-lists/README.md`
+  in a book/show/film: a hub of titles, each with name-only lists of **characters**,
+  **places** and (where useful) **chapters**, a tap-for-detail dialog on every entry,
+  and optional `notes` reference blocks for whole-title context. Data-driven — to add a
+  title, write `character-lists/data/<slug>.js` (one `CL.add({...})` call) and add the
+  slug to `data/manifest.js`; **never edit `index.html` to add content.** Spoilers go in
+  each entry's `spoiler` field so `role`/`detail` stay safe to read mid-book. Standing
+  rules (incl. the free-licence-only picture rule) in `character-lists/CLAUDE.md`; full
+  field contract in `character-lists/README.md`
 - `experiments/` — **not games.** Interactive dioramas probing web rendering/sensor tech
   (WebGL2, DeviceOrientation, instancing…), one self-contained single-file page per
   experiment in its own subdirectory, listed on `experiments/index.html` (add a card there

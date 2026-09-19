@@ -49,6 +49,30 @@ Deterministic helpers for working on this repo.
   Written 2026-08-29 after the same extract-and-`node --check` heredoc was
   retyped eight times in one session. Parses only — nothing is executed.
 
+- `pdf-text.py` — pull the text out of a PDF the CD attached. The agent proxy
+  403s most of the open web from a remote session, so when a reference page is
+  needed the working intake is: the CD prints it to PDF and attaches the file.
+  That arrives as a print rendering, i.e. content interleaved with nav and
+  repeated ad strips, which is what `--split` and `--strip` are for.
+
+  ```
+  python3 .claude/scripts/pdf-text.py doc.pdf --out raw.txt
+  python3 .claude/scripts/pdf-text.py doc.pdf --split '^Chapter [0-9]+ \|' \
+      --strip 'Quote Q&A Quiz' --section 12
+  # sections=21
+  # PDF-TEXT: GREEN pages=38 chars=64562
+  ```
+
+  Written 2026-09-19 after a 38-page print needed parsing. It carries two
+  gotchas so they are not re-derived: `import pypdf` dies with a
+  `pyo3_runtime.PanicException` from cryptography's rust bindings unless the
+  module is stubbed first (pypdf only wants it for encrypted files), and
+  boilerplate must be stripped **after** splitting — strip first and the
+  boilerplate sharing a line with a section marker joins the lines, so the
+  `^` anchor stops matching. That silently returned 19 sections for a
+  21-chapter document. Full intake note:
+  `.claude/notes/20260919-blocked-pages-and-pdf-intake.md`.
+
 - `replace-fn.py` — replace ONE whole JS function in a single-file game, located
   by **name** and bounded by **brace counting**. `games/CLAUDE.md` § Editing a
   large single-file game records why: a span replacement between two hand-picked
@@ -350,3 +374,32 @@ Deterministic helpers for working on this repo.
   `skip-rotated`) — see the script header. Current standing result: every game
   clean except `wayfinder`'s `gl`/`ui` canvases (render-only; its one
   hit-tested canvas already measures its own rect).
+
+## Editing from a heredoc: assert the anchor, and mind `&&`
+
+Two failure modes hit while editing `character-lists/index.html` on 2026-09-19,
+both of which produce a **silent no-op that reads as success**:
+
+* **`&&` short-circuits the edit away.** A command written as
+  `grep -n 'something' file && python3 - <<'PY' … PY` never runs the Python if
+  the grep matches nothing — and a *separate* command on the next line (the
+  syntax gate) still ran and still printed GREEN, so the whole block looked
+  like it had worked. The next twenty minutes were spent testing an unmodified
+  file and believing its old behaviour was the new one. Never put a file edit
+  downstream of `&&` from a probe whose exit code you do not control; give the
+  edit its own command, or use `;`.
+
+* **A `str.replace` that matches nothing changes nothing, quietly.** Wrap every
+  anchor in an assertion so a missed match is loud:
+
+  ```python
+  def sub(a, b):
+      global s
+      assert s.count(a) == 1, ('anchor count %d for %r' % (s.count(a), a[:70]))
+      s = s.replace(a, b, 1)
+  ```
+
+  This is the same hazard `replace-fn.py` exists for, one level down: that
+  script guards the *span*, this guards the *match*. Together with a final
+  `assert s != orig` before writing, an edit that did nothing cannot be
+  mistaken for one that worked.

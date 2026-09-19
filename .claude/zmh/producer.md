@@ -47,6 +47,23 @@
   listed below by the 2026-09-17 music-mixer pass and re-confirmed still
   hidden by the 2026-09-18 and 2026-09-19 ones.
 
+  **2026-09-19, character-lists pass** (pointer moved `1948aba` -> `4b333e0`,
+  range `1948aba..4b333e0`). Range held this session's own
+  `3c341ee` and `4b333e0` plus `22c0e7e`, the music-mixer session's refine
+  commit — skippable by the rule above. **CLEARED: the six character-lists
+  commits** (`538e6c2`, `4d4db10`, `77f184f`, `f2ff9c9`, `f38d581`, `64ac03e`)
+  that the 2026-09-17 pass left behind and the two after it carried forward.
+  This *is* that session, and the guess those passes recorded was right: all
+  six had been refined inline into `character-lists/CLAUDE.md` and its
+  `README.md` as they landed, so every rule they established is on disk
+  (hub-card shape, per-season blurbs, the manifest-must-stay-dynamic rule, the
+  free-licence picture rule, the broken-img fallback). Confirmed rather than
+  assumed, and now closed. **Still outstanding and still hidden:** `99205d8`
+  (verlet-physics-ragdoll) and `c28a947` (fire-clicker mishaps) — both
+  re-checked this pass with `git merge-base --is-ancestor <sha> 1948aba`, both
+  report ancestor. They look self-refined (each has a context file and index
+  rows) but that remains their sessions' to confirm, not this one's to assume.
+
   **2026-09-19, music-mixer loop-edges/DORIAN pass** (pointer moved `0effc3d`
   -> `1948aba`, range `0effc3d..1948aba`). **Left nothing new behind.** Every
   commit in the range was this session's own — `c0aa55a`, `b934cc3`,
@@ -238,6 +255,17 @@
   `list_workflow_jobs` needs the **real** run id out of that listing — a
   guessed id returns a bare `404 Not Found`, which reads like a permissions
   problem and is not one.
+- **Budget two checks, then report and stop** (2026-09-19). The stale-status
+  warning above has a sharper form: a run that had **finished in ~80 seconds**
+  reported `in_progress` for ~25 minutes, and so did its jobs *and* the
+  `status:'completed'` listing — filtering to completed runs is not a
+  workaround. The tell is a **frozen `updated_at`**: a genuinely running job
+  advances it every few seconds, so an unchanged one alongside `in_progress`
+  is a cached response, not a wedge. Make the narrow check once, re-check once
+  a few minutes later, then stop and report the push plus the run URL rather
+  than burning wall clock. Detail + the numbers:
+  `.claude/notes/20260817-pages-deploy-wedged-after-503.md` § The opposite
+  failure.
 - **Waiting for the deploy: foreground `sleep` is blocked in this harness**
   (verified 2026-09-19 — a `sleep 45 && <check>` chain is refused outright).
   Either poll with a `Monitor` whose command exits on the terminal state, or

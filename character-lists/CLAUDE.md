@@ -40,7 +40,10 @@ standing instructions the CD has asked for:
   spoiler-gated by nothing but its labels (`Chapter 1`, `Chapter 2`…), so a
   summary that foreshadows a later reveal breaks the gate for someone reading
   the book now. Summarise from a source rather than from memory — chapter
-  boundaries are exactly what gets invented otherwise.
+  boundaries are exactly what gets invented otherwise. **Write from the
+  source, never reproduce it:** the summary sites are commercial products and
+  this site is public, so what happens in a chapter is usable and someone
+  else's paragraph about it is not. Same line the picture rule draws.
 
 - **Hub cards are two lines** (kind badge + title; ellipsized byline +
   `N CH · M PL` counts), no chevron. Keep them that compact if you touch the

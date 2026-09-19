@@ -123,3 +123,55 @@ is ~1 KB and ends with `Reported success!` when the deploy is genuinely done.
 Never diagnose a wedge, and never re-push, off a status field alone.
 `list_workflow_jobs` with a run ID is small enough to come back in a tool
 result, unlike the repo-wide run listing.
+
+---
+
+# The opposite failure: a finished deploy reported `in_progress` for ~25 minutes
+
+Added 2026-09-19, from the character-lists session. The note above is about a
+deploy that really was broken. This is the far more common case, and the rule
+it produces is the reverse: **do not keep polling.**
+
+## What was seen
+
+Two pushes in one session, both fine, both looking wedged:
+
+| | run 702 (`3c341ee`) | run 703 (`4b333e0`) |
+|---|---|---|
+| created | 15:02:27 | — |
+| build job actually completed | 15:03:49 | — |
+| still reporting `in_progress` | for ~25 min of polling | same |
+| appeared as `completed / success` | on the next turn, `updated_at` **15:03:49** | later |
+
+The `updated_at` on the returned run was **frozen at 15:02:33** for the whole
+polling window and then jumped straight to the true completion time. So the
+deploy had finished in about eighty seconds and the API simply kept serving a
+stale snapshot for twenty-five.
+
+## What does not help
+
+* **Reading the jobs instead of the run.** § Publish says to prefer
+  `list_workflow_jobs`, and for the 2026-08-23 case that was right. Here the
+  jobs endpoint lagged too, reporting `Checkout` still running long after it
+  had finished.
+* **Filtering to `status: 'completed'`.** The obvious workaround — ask only for
+  finished runs — was tried and is **not** a fix: the finished run did not show
+  up in that listing either until the same lag expired. An earlier session note
+  of mine claiming this endpoint "stayed accurate" was wrong and is corrected
+  here.
+* **Polling harder.** Roughly a dozen calls and forty minutes of wall clock
+  across two turns produced no information that waiting would not have.
+
+## The tell, and the rule
+
+The signature of staleness rather than a wedge is a **frozen `updated_at`**: a
+genuinely running job advances it every few seconds. A run whose `updated_at`
+has not moved in several minutes while `status` stays `in_progress` is a cached
+response, not a stuck deploy.
+
+Practical budget: make the narrow `perPage: 1` check once, and if it is still
+`in_progress` after **two** checks a few minutes apart, stop. Say in the report
+that the push landed and the run had not yet reported green, and name the run
+URL. That is an honest and complete report — the 2026-08-23 case above is real,
+so "it is probably fine" is not something to assert, but neither is burning the
+session's wall clock on an endpoint that is not going to answer.
