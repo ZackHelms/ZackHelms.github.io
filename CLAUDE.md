@@ -60,6 +60,12 @@ available there — verify the Pages run instead, per `.claude/zmh/producer.md`
   **ARViewport** (`experiments/rain-on-glass/`, scenes × times × weather × beings +
   wipeable glass): `.claude/arviewport.md`. Directory names are historical; titles renamed
   2026-08-15.
+- `games/interlock/` — 3-D disassembly puzzle supplied by the CD. `src/` is the
+  source (six ES modules + a vendored Three.js r169); `index.html` is
+  **generated, do NOT edit by hand** — `cd games/interlock && node build.mjs`.
+  Deliberately not the neon aesthetic, and the only game bundling a
+  third-party renderer; both are documented exceptions, not precedents. See
+  `.claude/interlock.md`
 - `games/neon-clash/models/` — **3D source** for Neon Clash's pre-rendered `sprite`
   graphics style: a dependency-free software renderer (rasteriser, PBR shading,
   procedural materials, PNG encoder) plus the six models it bakes. Edit here,
@@ -89,14 +95,17 @@ one from the root `index.html`. Licensing is per-directory:
   Helms) in their own `games/<slug>/` directory. The root-level single-file
   games (plus `games/adventure-icons/`) are covered by `games/LICENSE.txt`,
   whose scope preamble explicitly stops at subdirectories.
-- **Protected games — NEVER add a permissive license to these five:**
+- **Protected games — NEVER add a permissive license to these six:**
   `games/fire-clicker/`, `games/phasic/`, `games/mitochondria/`,
-  `games/qntmchmst/`, `games/turret-builder/`. The CD may develop these into
-  real apps; all except qntmchmst carry an explicit proprietary LICENSE
-  (all rights reserved, play-only). qntmchmst has no license file here
-  because its directory is overwritten by its source repo's publish script —
-  default copyright protects it; a license file for it belongs in the
-  `ZackHelms/qntmchmst` repo.
+  `games/qntmchmst/`, `games/turret-builder/`, `games/interlock/`. The CD may
+  develop these into real apps; all except qntmchmst carry an explicit
+  proprietary LICENSE (all rights reserved, play-only). qntmchmst has no
+  license file here because its directory is overwritten by its source repo's
+  publish script — default copyright protects it; a license file for it
+  belongs in the `ZackHelms/qntmchmst` repo. `games/interlock/` was protected
+  on the CD's call the day it shipped (2026-09-19) and never carried a
+  permissive licence; its proprietary LICENSE carves out the bundled Three.js,
+  which stays MIT on its own terms.
 - `games/zed-shooter/`'s MIT LICENSE will be wiped whenever zed-fps
   republishes — its publish script should carry the license from that repo.
 - **New game default:** copy the MIT `LICENSE` from any open game directory
@@ -129,6 +138,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 
 | Game | Context file | When to use |
 |---|---|---|
+| Interlock (`games/interlock/`) | `.claude/interlock.md` | Any work on the 3-D disassembly puzzle — the `src/` → `build.mjs` → generated `index.html` pipeline and the scope trick that makes the bundle possible, the polycube generator and its solvability gate, the standard chrome row painted in the game's own glass rather than the neon palette, the Three.js carve-out, and its **proprietary-license** status (one of the six protected games) |
 | Adventure (`games/adventure.html`) | `.claude/adventure.md` | Any work on the adventure RPG — character systems, combat, RP encounters, save system, progression |
 | Sorcery (`games/sorcery.html`) | `.claude/sorcery.md` | Any work on the sorcery tower-defense game |
 | Merge Drop (`games/merge-drop/`) | `.claude/merge-drop.md` | Any work on the orb-merge physics puzzler |
@@ -168,7 +178,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 | Neon Clash (`games/neon-clash/`) | `.claude/neon-clash.md` | Any work on the real-time card skirmish — the rotated two-player tray, the unit/building/**spell** card-type contract every rule branches on, the deploy contract (drag **or** tap-to-arm, and the border rule that clamps a cross-line aim onto your own side), bunker/garrison rules, the fireball falloff, the siege lock, the base turret and its rim-measured envelope, the **two-second spell lob** that is the contract for every future spell, the **sudden-death energy ramp** to a 10:00 wall, the 3-second **finale**, the five music tracks and their tempo scaling, unit stats, the AI ladder, and the **three graphics styles** (`neon` / cel-shaded `toon` / pre-rendered 3D `sprite`) behind the settings cogwheel — where "a skin is paint" is the invariant, `glow()` goes no-op instead of branching, arena scenery is seeded once and shared between styles, and the sprite atlas loads lazily with a toon fallback (its 3D source and build script live in `games/neon-clash/models/`) |
 | Phasic (`games/phasic/`) | `.claude/phasic.md` | Any work on the phase-change block sort — soft-body particle physics, symmetric phase/base rules, gas guidance field, gravity-well bucket, curriculum blocks + complexity metric, generator/solver (three board templates, in-path obstacle weaving), STUCK ghost-replay, in-game wiki + tactics registry, resting-freeze fairness rule, chrome/layout (landscape column, rotation self-heal), proprietary-license carve-out, iOS-port notes |
 
-| Fire Clicker (`games/fire-clicker/`) | `.claude/fire-clicker.md` | Any work on the snowy-village fire-keeping sim — tap-banked burn seconds, the villager state machine (huddle/hide when cold, gather wood/stone/food when warm), the 5-minute day/night cycle and its punch-hole lighting, upgrades incl. the firekeeper auto-stoker, the **banded scene layout** (a build district for every building, a work band that is nothing but the sites and the lanes villagers walk, and the rule that nothing is ever built on a lane), the **five-stage ladder** off one `STAGES` table (CAMP→VILLAGE→TOWN→CITY→METROPOLIS: house caps 5→32 with buildings shrinking each rung, straw→timber→brick→stone→glass, footpaths→avenue→lit street grid, and the **hearth ladder** campfire→stove→furnace→steam plant→core in which the flame never changes, only its housing), civic buildings that upgrade in place, the **EVOLUTION** prestige loop (embers as a pure function of a **high-water mark**, so a second run to the same depth banks nothing), the **MISHAP layer** (injury/theft/blaze off one `MISHAPS` table, escalating per rung, closed by tapping and by the rank of civic building that answers — plus the thief who sneaks between the buildings with a growing sack, and the **grab ceiling** that stops a share-of-the-stockpile theft becoming an unbounded tax on saving), the `LADDER-SPEC` markers the pacing eval slices its model out of (`mishapDrag` included), the long-term **Kardashev roadmap** in `games/fire-clicker/TODO.md`, and its **proprietary-license** status (one of the five protected games) |
+| Fire Clicker (`games/fire-clicker/`) | `.claude/fire-clicker.md` | Any work on the snowy-village fire-keeping sim — tap-banked burn seconds, the villager state machine (huddle/hide when cold, gather wood/stone/food when warm), the 5-minute day/night cycle and its punch-hole lighting, upgrades incl. the firekeeper auto-stoker, the **banded scene layout** (a build district for every building, a work band that is nothing but the sites and the lanes villagers walk, and the rule that nothing is ever built on a lane), the **five-stage ladder** off one `STAGES` table (CAMP→VILLAGE→TOWN→CITY→METROPOLIS: house caps 5→32 with buildings shrinking each rung, straw→timber→brick→stone→glass, footpaths→avenue→lit street grid, and the **hearth ladder** campfire→stove→furnace→steam plant→core in which the flame never changes, only its housing), civic buildings that upgrade in place, the **EVOLUTION** prestige loop (embers as a pure function of a **high-water mark**, so a second run to the same depth banks nothing), the **MISHAP layer** (injury/theft/blaze off one `MISHAPS` table, escalating per rung, closed by tapping and by the rank of civic building that answers — plus the thief who sneaks between the buildings with a growing sack, and the **grab ceiling** that stops a share-of-the-stockpile theft becoming an unbounded tax on saving), the `LADDER-SPEC` markers the pacing eval slices its model out of (`mishapDrag` included), the long-term **Kardashev roadmap** in `games/fire-clicker/TODO.md`, and its **proprietary-license** status (one of the six protected games) |
 
 | Music Mixer (`games/music-mixer/`) | `.claude/music-mixer.md` | Any work on the 15-pad stem mixer **or the song recorder built on it** — the **three selections** the song dropdown offers (nothing, RECORD NEW SONG, a song) and the **two pad behaviours** under them (a song GATES a running transport, the recording kit TRIGGERS notes; separate paths, because triggers stack and a live note joins past the song gate so an outgoing song's tails stay damped), the **two pad modes** (hold, and the tap-to-lock toggle whose locks deliberately outlive a switch back to hold — suspended, never cleared, while TAP PAD is active), the **contact-patch** hit test that makes one fingertip on a seam hold two pads and eight fingers hold fifteen (and why fingers go through **touch** events, never pointer events), the pad layout contract (hue climbs each column in turn, red bottom-left to magenta top-right, percussion the right column), the **notation contract** for ~450 pattern strings plus the arrangement, the five voice factories, the Karplus-Strong bake and the **envelope rule** that every segment must be clamped to the note's own length (Web Audio runs automation in time order, so a note shorter than its attack+decay otherwise rings a second time after it has stopped), the **cent**-based scales that make gamelan really slendro and raga really just-intonation and that let a recording be **transposed** (pads store scale degrees, never pitches), per-song level trims, the schedule-everything/gate-with-gain scheduler, the rule that it renders in **DOM/CSS rather than Canvas 2D**, and the recording half — the countdown, the **tempo and metre detection** from tap times alone and how far to trust it (`.claude/notes/20260918-tempo-and-metre-from-taps.md`), the **loop edges** (a take is trimmed back to whole bars and shifted so bar one lands at t=0, both derived rather than stored), non-destructive snap and intro padding, overdub as a transaction, the moving-window erase handle, the **export** that renders a take into this game's own SONGS[] notation as a seed rather than a drop-in (DORIAN, the sixth song, is one of the CD's takes grown into a full arrangement, and is the worked example of that path), and DELETE, whose confirm deliberately opens at the far end of the screen from the menu row that asked for it |
 

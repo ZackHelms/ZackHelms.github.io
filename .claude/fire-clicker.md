@@ -8,9 +8,9 @@ is one rendered scene: a stylized-cartoon snowy landscape, two straw houses
 top-left/top-right, an unlit campfire in the centre ringed by log seats, and
 simulated villagers.
 
-**Licensing: one of the five protected games** (with phasic, mitochondria,
-qntmchmst, turret-builder) — proprietary LICENSE in its directory, never
-Apache/MIT. The CD may develop it into a real app.
+**Licensing: one of the six protected games** (with phasic, mitochondria,
+qntmchmst, turret-builder, interlock) — proprietary LICENSE in its directory,
+never Apache/MIT. The CD may develop it into a real app.
 
 ## Core loop (the CD's spec, implemented)
 - **Tap the campfire** (generous elliptical hit zone, `G.hitR`): a mote of

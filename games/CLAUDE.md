@@ -746,7 +746,7 @@ The long road from here is a **Kardashev ladder** to a Type III civilization,
 scoped in `games/fire-clicker/TODO.md` alongside the remaining ideas. Drive
 suite: `.claude/tests/drive-fire-clicker.cjs` (110 checks); pacing/balance eval:
 `.claude/tests/eval-fire-clicker.cjs`. **Proprietary — no permissive license
-in this directory** (one of the five protected games). Detailed context:
+in this directory** (one of the six protected games). Detailed context:
 `.claude/fire-clicker.md`.
 
 ### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)
@@ -882,7 +882,7 @@ atlas that never loads falls back to toon instead of an empty board):
 5. Create `.claude/<slug>.md` with architecture notes before the session gets long
 6. Copy the standard MIT `LICENSE` from any open game directory into the new
    game's directory — unless the CD marks the game protected/proprietary
-   (root `CLAUDE.md` § Licensing lists the five protected games)
+   (root `CLAUDE.md` § Licensing lists the six protected games)
 7. Add the game's row to `.claude/games-index.md` **and refresh its coverage
    summary** (facet vocabulary: `templates/design/game-facets.md` in the
    zmhstudio repo) — when *choosing* what game to build, read that index's

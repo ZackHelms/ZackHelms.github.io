@@ -24,6 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
+| Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
 | Music Mixer | `music-mixer/` | music-instrument | hold, tap, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation, user-authoring | solo | `.claude/music-mixer.md` |
 | Verlet Ragdoll | `verlet-physics-ragdoll/` | physics-toy | drag-grab, drag-steer | open-sandbox | physics-sim, verlet-constraints, direct-manipulation | solo | `.claude/verlet-physics-ragdoll.md` |
 | Neon Clash | `neon-clash/` | card-battler | drag-place, tap, tap-select | match-vs-ai, local-2p | card-deck, resource-economy, ai-opponent, rotated-2p-ui, area-of-effect, art-styles | vs-ai, local-2p | `.claude/neon-clash.md` |
@@ -78,7 +79,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-52 games (50 in-repo + 2 external builds).
+53 games (51 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -147,6 +148,26 @@ local-2p.
   levels forever: 16 authored, then endless seeded drawers, each beaten by
   the in-game solver before it is served; earmarked as the first web-first
   prototype of a future iOS title).
+
+### Newly opened by the 2026-09-19 build
+- **`disassembly-puzzle`** genre + **`spatial-reasoning`** mechanic
+  (interlock, a CD-supplied build). The puzzle shelf here was flat: grid
+  (block-fit, qntmchmst), match (bubble-blaster), physics (merge-drop) and
+  phase (phasic) all ask you to arrange things on a plane. This one asks you to
+  read a SOLID — a cube subdivided into connected polycube pieces, where the
+  only question is which piece has a clear straight exit and in which of the
+  six directions, and the only way to answer it is to turn the thing over. It
+  is the repo's third WebGL page after wayfinder and mitochondria, and the
+  first to reach for a third-party renderer (Three.js r169, bundled; see
+  `.claude/interlock.md` for why that is a documented exception rather than a
+  precedent). `real-time-3d` and `day-night-cycle` are reused, not new: the
+  optional backgrounds run one continuous 24-minute sky that never restarts
+  between puzzles, which is fire-clicker's cycle put to a purely atmospheric
+  use. `endless-levels` is phasic's session shape without the authored prefix —
+  every board is generated, size ramps one piece per completion between the
+  player's own min and max, and there is no score at all.
+  The obvious next step on this axis is a board the player cannot brute-force:
+  a real burr with rotation, or a piece count that outruns trial and error.
 
 ### Newly opened by the 2026-09-18 build
 
