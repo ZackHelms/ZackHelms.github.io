@@ -1172,6 +1172,58 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     else console.log('DELETE=still gone after a reload');
 
     await page.evaluate(() => window.__MM.wipeTakes());
+
+    /* --- 12. one note is one note ------------------------------------- */
+    /* A sustaining voice handed a note SHORTER than its own attack+decay used
+       to schedule that decay ramp later on the timeline than its own release.
+       Web Audio runs automation in time order, so the note went quiet on the
+       beat and then swelled back up to the sustain level with nothing left to
+       stop it: a ghost chord roughly 3.5 sixteenths behind every PULSE STABS
+       hit, and an ORGAN that simply droned. The CD heard it as "STABS often
+       sounds off rhythm, LEAD sometimes" (2026-09-19) - often because all 12
+       of STABS' hits are one step long, sometimes because only 4 of LEAD's 25
+       are.
+
+       It is invisible in a mix and unmistakable in the envelope, so this fires
+       one note of each voice a song plays short and watches its shape: once
+       the level has fallen away, nothing may come back. */
+    await page.evaluate(() => window.__MM.audio());
+    await page.waitForTimeout(250);
+    const SHAPES = [
+      ['supersaw',  0.144, 90,  'PULSE STABS and LEAD'],
+      ['organ',     0.144, 90,  'PULSE ORGAN'],
+      ['bansuri',   0.114, 90,  'BOSSA and KORA FLUTE'],
+      ['sax',       0.114, 90,  'BOSSA SAX'],
+      ['gongAgeng', 0.208, 200, 'GAMELAN GONG'],
+    ];
+    for (const [v, d, n, where] of SHAPES) {
+      const rows = await page.evaluate(async (a) => {
+        window.__MM.envNote(a[0], a[1]);
+        const out = [];
+        await new Promise((res) => {
+          let k = 0;
+          const id = setInterval(() => {
+            out.push(window.__MM.envLevel());
+            if (++k >= a[2]) { clearInterval(id); res(); }
+          }, 10);
+        });
+        return out;
+      }, [v, d, n]);
+      const peak = Math.max.apply(null, rows);
+      if (!(peak > 0.002)) { fail('a ' + v + ' note at ' + d + 's made no sound at all'); continue; }
+      const pk = rows.indexOf(peak);
+      let quiet = -1, ghost = -1;
+      for (let k = pk + 1; k < rows.length; k++) {
+        if (quiet < 0) { if (rows[k] < peak * 0.12) quiet = k; }
+        else if (rows[k] > peak * 0.4) { ghost = k; break; }
+      }
+      const spark = rows.map((r) => ' .:-=+*#%@'[Math.min(9, Math.round(r / peak * 9))]).join('');
+      if (ghost >= 0)
+        fail(v + ' (' + where + ') at ' + d + 's rings again ' + (ghost * 10) + 'ms after the hit, ' +
+             'having gone quiet at ' + (quiet * 10) + 'ms - one note, two attacks:\n      ' + spark);
+      else console.log('SHAPE=' + v.padEnd(10) + d + 's -> one note, gone by ' +
+        (quiet < 0 ? '>' + (n * 10) : quiet * 10) + 'ms  (' + where + ')');
+    }
   }
 
   for (const e of errs) fail(e);

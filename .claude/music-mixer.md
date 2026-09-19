@@ -195,6 +195,56 @@ is what a real short string does, so it is a feature.
 voices take an absolute Hz from `PERC_BASE[voice] * tune`. That split is why
 the data gate only demands a `PERC_BASE` entry for the latter.
 
+### The envelope trap: Web Audio runs automation in TIME order
+
+`sEnv()` is the sustaining envelope and it is used by `sub()` and `fm()`. The
+decay ramp **must be clamped to end by the note's end**:
+
+```js
+const dEnd = Math.min(when + atk + dec, end);
+hold = p * Math.pow(sus, (dEnd - when - atk) / dec);   // where the decay got to
+g.gain.exponentialRampToValueAtTime(hold, dEnd);
+```
+
+Without that clamp, a note shorter than `atk + dec` schedules its decay ramp
+at a time **later than its own release**. Web Audio does not care what order
+you called the methods in — it sorts events by time — so the timeline read:
+attack, release to zero on the beat, `setValueAtTime(0)`, and *then* a ramp
+back up to the sustain level, with no event after it. The note went quiet
+correctly and then **came back**, and stayed.
+
+It is silent on any note longer than its own decay, which is why it survived:
+every long note in the game was fine.
+
+Measured cost, per track (short hits / all hits):
+
+| song | track | voice | affected | note | decay needs |
+| --- | --- | --- | --- | --- | --- |
+| PULSE | STABS | supersaw | **12/12** | 0.144 s | 0.514 s |
+| PULSE | LEAD | supersaw | 4/25 | 0.144 s | 0.514 s |
+| BOSSA | FLUTE | bansuri | 6/12 | 0.114 s | 0.470 s |
+| GAMELAN | GONG | gongAgeng | 3/3 | 0.208 s | 3.270 s |
+| KORA | FLUTE | bansuri | 2/14 | 0.130 s | 0.470 s |
+| RAGA | BANSURI | bansuri | 2/15 | 0.156 s | 0.470 s |
+| BOSSA | SAX | sax | 2/12 | 0.114 s | 0.450 s |
+| PULSE, BOSSA | PAD, STRINGS | sawPad, strings | 2/3 each | 0.9-1.2 s | 1.0-1.3 s |
+
+That table is the CD's report read back exactly: STABS, whose every hit is one
+step long, "often sounds off rhythm"; LEAD, where only pattern `c`'s opening
+run is short, "sometimes" (2026-09-19). The ghost lands ~3.5 sixteenths behind
+the hit, which is why it reads as bad timing rather than as a bad sound.
+
+**The scheduler was never the problem** and it is worth knowing why, so nobody
+re-investigates it: `scheduleStep` adds exactly three things to a step's time —
+`swing` (0 on PULSE), the track's `push` (unset on STABS and LEAD) and a +/-3.5 ms
+humanise jitter. There is nowhere else for timing to come from.
+
+The gate is section 12 of the runtime suite: fire one note of each voice a
+song plays short, sample the envelope every 10 ms, and require that once the
+level has fallen away nothing comes back. `__MM.envNote()` / `__MM.envLevel()`
+exist for it — a dry analyser, muted into the bus so the graph pulls it,
+because this is invisible in a mix.
+
 ## Signal chain
 
 ```

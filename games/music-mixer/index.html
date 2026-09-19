@@ -569,7 +569,7 @@ body.erasing .pad .ex { display: flex; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-19 03:23 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-19 05:04 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -883,14 +883,28 @@ function pEnv(when, peak, atk, dec) {
   return g;
 }
 /* sustaining ASR envelope over a note of length dur */
+/* THE DECAY HAS TO FINISH BY THE NOTE'S END. Web Audio runs automation in
+   TIME order, not in the order you schedule it, so a note shorter than
+   atk + dec used to put its decay ramp LATER on the timeline than its own
+   release: it went quiet on the beat, then swelled back up to the sustain
+   level a moment after, with no event left to shut it up. Measured on PULSE's
+   supersaw, that is a ghost chord about 3.5 sixteenths behind every STABS
+   hit — the CD heard it as "often sounds off rhythm" (2026-09-19) — and the
+   ORGAN simply droned on. Clamping the ramp changes nothing for a note longer
+   than its own decay, which is why it went unheard on the long notes. */
 function sEnv(when, dur, peak, atk, dec, sus, rel) {
   const g = AC.createGain();
   const p = Math.max(peak, 1e-4);
   const end = when + Math.max(dur, atk + 0.02);
   g.gain.setValueAtTime(0, when);
   g.gain.linearRampToValueAtTime(p, when + atk);
-  if (dec > 0 && sus < 1) g.gain.exponentialRampToValueAtTime(Math.max(p * sus, 1e-4), when + atk + dec);
-  g.gain.setValueAtTime(Math.max(p * sus, 1e-4), end);
+  let hold = p;
+  if (dec > 0 && sus < 1) {
+    const dEnd = Math.min(when + atk + dec, end);
+    hold = p * Math.pow(sus, (dEnd - when - atk) / dec);
+    g.gain.exponentialRampToValueAtTime(Math.max(hold, 1e-4), dEnd);
+  }
+  g.gain.setValueAtTime(Math.max(hold, 1e-4), end);
   g.gain.exponentialRampToValueAtTime(p * 0.0007, end + rel);
   g.gain.setValueAtTime(0, end + rel + 0.002);
   return g;
@@ -3916,6 +3930,32 @@ window.__MM = {
       window.__mmBuf = new Float32Array(a.fftSize);
     }
     return true;
+  },
+  /* One note of one voice, dry, into its own analyser. The only way to see an
+     envelope's SHAPE: a note that goes quiet and then swells again half a
+     second later is easy to miss in a mix and unmistakable here. The analyser
+     is muted into the bus so the graph actually pulls it. */
+  envNote: (name, d, f) => {
+    if (!audioReady) return -1;
+    if (!window.__mmEnvAn) {
+      const a = AC.createAnalyser(); a.fftSize = 2048;
+      const g = AC.createGain(); g.gain.value = 1;
+      const mute = AC.createGain(); mute.gain.value = 0;
+      g.connect(a); a.connect(mute); mute.connect(bus);
+      window.__mmEnvAn = a; window.__mmEnvBuf = new Float32Array(a.fftSize);
+      window.__mmEnvOut = g;
+    }
+    voice(name).f({ t: AC.currentTime + 0.04, f: f || 440, r: 1, d: d, v: 0.9, c: '1',
+                    out: window.__mmEnvOut });
+    return AC.currentTime;
+  },
+  envLevel: () => {
+    const a = window.__mmEnvAn;
+    if (!a) return -1;
+    a.getFloatTimeDomainData(window.__mmEnvBuf);
+    let s = 0;
+    for (let i = 0; i < window.__mmEnvBuf.length; i++) s += window.__mmEnvBuf[i] * window.__mmEnvBuf[i];
+    return Math.sqrt(s / window.__mmEnvBuf.length);
   },
   level: () => {
     const a = window.__mmAn;
