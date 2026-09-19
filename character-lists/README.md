@@ -69,7 +69,10 @@ CL.add({
   ],
 
   characters: [ /* entries — authored in importance order, NOT sorted */ ],
-  places:     [ /* entries — same shape; omit or leave empty to hide the section */ ]
+  places:     [ /* entries — same shape; omit or leave empty to hide the section */ ],
+
+  // Optional. Reference blocks appended after the two lists — see "Notes" below.
+  notes: [ { title: '1865 Boston…', hint: '…', sections: [ { heading: '…', items: ['…'] } ] } ]
 })
 ```
 
@@ -100,6 +103,30 @@ season (when it aired/airs, its framing, its new arrivals) — so the page reads
 correctly whichever season chip is selected. The top-level `blurb` should
 summarise the whole show. Filter blurbs follow the same spoiler rule as
 everything outside `spoiler` fields: safe to read mid-season.
+
+### Notes
+
+`notes` renders free-form reference blocks after the character and place lists,
+for things that belong to the whole title rather than to one entry — period
+context, a glossary, a family tree in prose. Each block is a `section` on the
+page:
+
+```js
+notes: [{
+  title: '1865 Boston: Frame-of-Mind Reference',  // becomes the section heading
+  hint:  'The world the club actually lives in',  // optional small-caps line
+  sections: [
+    { heading: 'Medicine & Health',
+      body:  'optional prose; blank lines split it into paragraphs',
+      items: ['Doctor visits: No routine check-ups…', 'Germ theory: Not yet accepted…'] }
+  ]
+}]
+```
+
+An item written `Label: the rest` gets its label picked out automatically;
+anything without that shape renders exactly as written. Notes sit **outside**
+the search box and the filter chips — they are context, not entries, so they
+never disappear when a season chip is active or a search matches nothing.
 
 ### Spoilers
 

@@ -249,6 +249,25 @@ h1 {
 .dfacts li::before { content: '▸'; position: absolute; left: 0; color: var(--accent); }
 .dfacts li b { color: var(--white); font-weight: normal; }
 
+/* ---------- reference notes ---------- */
+.notes { display: grid; gap: 11px; }
+.note {
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel); padding: 12px 14px 13px;
+}
+.note h3 {
+  font-family: 'Black Ops One', sans-serif; font-size: 0.7rem;
+  letter-spacing: 2px; color: var(--accent); margin-bottom: 9px;
+}
+.note p { font-size: 0.76rem; color: var(--dim); line-height: 1.55; margin-bottom: 9px; }
+.note ul { list-style: none; display: grid; gap: 7px; }
+.note li {
+  font-size: 0.75rem; color: var(--dim); padding-left: 15px;
+  position: relative; line-height: 1.5;
+}
+.note li::before { content: '\25B8'; position: absolute; left: 0; color: var(--accent); }
+.note li b { color: var(--white); font-weight: normal; }
+
 .spoiler { margin-top: 15px; border: 1px solid var(--red); border-radius: 6px; overflow: hidden; }
 .spoiler > button {
   width: 100%; text-align: left; cursor: pointer;
@@ -498,6 +517,7 @@ function renderTitle(t) {
       <div class="hint">SETTINGS, LANDMARKS AND TERMS WORTH LOOKING UP</div>
       <div class="list" id="placelist"></div>
     </div>` : ''}
+    ${renderNotes(t)}
     <footer>${esc(t.footnote || 'Details written from published summaries — spoilers stay folded until tapped.')}</footer>`;
 
   const search = document.getElementById('search');
@@ -536,6 +556,35 @@ function paintBlurb(t) {
   const text = (f && f.blurb) || t.blurb || '';
   el.textContent = text;
   el.hidden = !text;
+}
+
+/* Free-form reference blocks appended after the lists — period context, glossaries,
+   anything about the whole title rather than one entry. Deliberately outside the
+   search box and the filter chips: this is context, not entries, so it never
+   disappears when a season chip is active. */
+function renderNotes(t) {
+  return (t.notes || []).map(n => `
+    <div class="section">
+      <h2>${esc((n.title || 'NOTES').toUpperCase())}</h2>
+      ${n.hint ? `<div class="hint">${esc(n.hint.toUpperCase())}</div>` : ''}
+      <div class="notes">
+        ${(n.sections || []).map(sec => `
+          <div class="note">
+            ${sec.heading ? `<h3>${esc(sec.heading)}</h3>` : ''}
+            ${sec.body ? paras(sec.body) : ''}
+            ${(sec.items || []).length
+              ? `<ul>${sec.items.map(i => `<li>${noteItem(i)}</li>`).join('')}</ul>`
+              : ''}
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+/** An item written "Label: the rest" gets its label picked out; anything else
+    renders exactly as authored. */
+function noteItem(text) {
+  const m = String(text).match(/^([^:.;]{2,44}): (.+)$/s);
+  return m ? `<b>${esc(m[1])}:</b> ${esc(m[2])}` : esc(text);
 }
 
 function matches(entry) {

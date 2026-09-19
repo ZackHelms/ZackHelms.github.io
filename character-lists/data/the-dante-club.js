@@ -215,5 +215,86 @@ CL.add({
               'sermons to broken soldiers. The whole case begins in its pews, though the ' +
               'club is the last to know it.'
     }
+  ],
+
+  notes: [
+    {
+      title: '1865 Boston: Frame-of-Mind Reference',
+      hint: 'The world the club actually lives in',
+      sections: [
+        {
+          heading: 'Medicine & Health',
+          items: [
+            'Doctor visits: No routine check-ups; you see a doctor only when sick or injured, not for prevention',
+            'Dentistry: Separate trade from medicine; tooth extraction (often without real anesthesia beyond ether or nothing) is common, fillings crude',
+            'Anesthesia: Available — ether was pioneered at Massachusetts General Hospital in 1846, so surgery isn\'t agony-only anymore',
+            'Germ theory: Not yet accepted; doctors don\'t wash hands between patients, infection rates after surgery are high',
+            'Hospitals: Boston City Hospital opens in 1864, brand new; hospitals are still seen partly as places poor people go to die, not where the wealthy get treated (the wealthy get treated at home)',
+            'Medical training: No licensing standardization yet; "doctor" could mean anything from Harvard-trained physician to self-taught practitioner'
+          ]
+        },
+        {
+          heading: 'Education',
+          items: [
+            'Elementary/grammar school: Mandatory-ish in Massachusetts, ends around age 10-14 for most kids',
+            'High school: Exists but optional and not universal — Boston English High School (1821) is the nation\'s first public high school, but most working-class kids never attend',
+            'College: Rare and elite — Harvard is nearby in Cambridge, reserved for the wealthy',
+            'Trades: Apprenticeships are still the standard path for crafts like silversmithing, printing, shipbuilding — you\'d apprentice as a teenager, not attend trade school',
+            'Girls\' education: Limited compared to boys; higher ed for women barely exists yet'
+          ]
+        },
+        {
+          heading: 'Streets & Transportation',
+          items: [
+            'Roads: Cobblestone or packed dirt in most areas, not paved asphalt',
+            'No cars: Everything is horse, horse-drawn carriage, or foot',
+            'Horsecars: Boston has horse-drawn streetcars on rails since the 1850s — an early form of public transit',
+            'Railroads: Steam trains connect Boston to other cities, a major technology of the era',
+            'Streetlights: Gas lamps, lit by lamplighters at dusk'
+          ]
+        },
+        {
+          heading: 'Public Safety',
+          items: [
+            'Police: Boston Police Department formed in 1854, replacing the old night Watch system — so it\'s only about a decade old at this point',
+            'Fire: Organized fire companies exist, though modern combined fire/police infrastructure comes later'
+          ]
+        },
+        {
+          heading: 'Shops & Street Life',
+          items: [
+            'General stores, apothecaries (proto-pharmacies), dry goods stores, print shops, tailors, milliners (hat makers), and butcher/grocer stalls',
+            'No brand chains — everything local and individually owned',
+            'Street vendors selling food, newspapers (multiple competing daily papers)'
+          ]
+        },
+        {
+          heading: 'Jobs by Education Level',
+          items: [
+            'Early school-leaver: Factory/mill work, dock labor, domestic service, unskilled trades',
+            'Apprenticeship-trained: Skilled craft work — silversmith, printer, cabinetmaker, blacksmith',
+            'High school educated: Clerk work, bookkeeping, teaching (grammar school)',
+            'College educated (Harvard): Law, medicine, ministry, or the literary/academic class the Dante Club characters belong to'
+          ]
+        },
+        {
+          heading: 'Noticeably Similar to Today',
+          items: [
+            'Boston\'s elite/immigrant class tension already exists',
+            'Multiple competing newspapers shaping public opinion, similar to media fragmentation now',
+            'A recognizable "old money" versus "working class" cultural divide'
+          ]
+        },
+        {
+          heading: 'Noticeably Different from Today',
+          items: [
+            'No electricity, telephones, or indoor plumbing in most homes',
+            'Photography exists but is still a slow, formal process — no snapshots',
+            'The Civil War is a living, raw memory, not history — amputee veterans are a common sight on the street',
+            'Religion (largely Protestant/Unitarian among the elite, Catholic among Irish immigrants) is a much bigger organizing force in daily and civic life'
+          ]
+        }
+      ]
+    }
   ]
 });
