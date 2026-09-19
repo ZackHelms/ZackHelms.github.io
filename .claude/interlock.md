@@ -118,19 +118,61 @@ sides, the shell around it is blocked by the core, the solver must call that
 board stuck, and the same piece alone must slide every way. Every row of the
 suite has been made to go red on purpose; keep it that way when adding one.
 
+## The viewport — fixed 2026-09-19, and how it hid
+
+`viewBox()` is the **only** place a layout number comes from. `fit()` sizes the
+backing store from it and `tap()` normalises against it, offsets included; a
+zero box (hidden, not yet laid out) falls back to the window rather than being
+divided by. `reflow()` re-measures and is a strict no-op unless the box moved,
+and it runs on `resize`, on `orientationchange` (thrice, because iOS can hand
+the first one a stale box), on `visualViewport` resize/scroll, and **once per
+frame** — the frame pass is what catches a box change that fires no event at
+all, which is a row in the gate.
+
+`renderer.setSize(w, h, false)` — the third argument is `updateStyle`. It must
+stay `false`. With the default `true`, three.js writes `style.width/height` in
+px, which pins the box to whatever `innerHeight` said at the last `resize`
+instead of letting `100vw/100dvh` track the real viewport.
+
+**How the original bug hid, which is the part worth remembering.**
+`check-canvas-space.cjs` reported `CANVAS=ok ... SQUASH=1.000` and it meant
+nothing. Two independent reasons, both of them documented behaviour of that
+probe:
+
+1. It **exempts** any canvas with an inline `style.width`/`style.height`
+   (`pinned=inline-css`, its cure #2) — and three.js's `setSize()` had set
+   exactly those, so Interlock was never measured. The exemption exists so the
+   probe cannot prise apart what iOS cannot; here it hid a real 0.711 squash.
+2. It shrinks the box with a **percentage** `max-height`, which resolves to
+   `none` against this page's auto-height body. Even without the exemption it
+   could not have moved this box.
+
+So the probe was green for the wrong reason twice over. `SQUASH=1.000` with
+`pinned=inline-css` in the row is not evidence — read the whole line. Since
+the fix the row carries no `pinned=` tag, which means it is a real measurement.
+
+The gate that does bite is `.claude/tests/drive-interlock-viewport.cjs`: it
+pins the box in **px**, confirms box and window really are apart, and then
+checks what actually matters — that a tap at the pixel a piece is *drawn* on
+hits *that* piece. Its method is deliberately not circular: `ndcOf()` returns
+camera-projection NDC with no viewport in it, the suite maps that through the
+canvas rect it measured itself (the same mapping the browser composites with),
+and `pick()` has to agree.
+
+Two traps that suite fell into first, both fixed, both worth not repeating:
+aiming at a piece's bounding-sphere centre can aim at a point a **neighbour
+occludes**, so candidates are narrowed by asking `pick()` first; and asserting
+that *a* piece was removed passes on the very bug being tested, because a tap
+normalised by `innerHeight` in a shorter box lands on a piece **higher up**
+that is often also free. The assertion has to be that the piece aimed at is
+the piece that went.
+
 ## Known, deliberate, or watched
 
-- **Viewport measurement.** `fit()` sizes the renderer from
-  `innerWidth/innerHeight` while the CSS box is `100vw/100dvh`, and `tap()`
-  normalises pointer coordinates against `innerWidth/innerHeight` too. That is
-  the two-coordinate-space shape `games/CLAUDE.md` § Canvas sizing warns about.
-  `check-canvas-space.cjs` reports `SQUASH=1.000`, so it is not biting today,
-  but if taps ever drift low on iOS this is the first place to look: the cure
-  is one `getBoundingClientRect()` helper feeding both. There is also only a
-  `resize` listener — no `orientationchange`/`visualViewport` reflow.
 - **No score, no save beyond settings.** Progress is the current piece count,
   and it resets to the player's minimum on every visit. That is the design.
-- Diagnostics: `window.interlock.state` (piece count, what remains, which
-  pieces are free) and `window.interlock.audio` (live bus gains). Read-only,
-  and the drive suite and any future browser check should use them rather than
-  reaching into the IIFE.
+- Diagnostics, all read-only: `window.interlock.state` (piece count, what
+  remains, which pieces are free), `.audio` (live bus gains), `.box()` (the
+  measured viewport), `.ndcOf(id)` (a piece's centre in camera NDC, no viewport
+  in it) and `.pick(x, y)` (what is under a client point). A browser check
+  should go through these rather than reaching into the IIFE.
