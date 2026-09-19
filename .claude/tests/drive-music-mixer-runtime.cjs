@@ -1193,14 +1193,35 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
        the level has fallen away, nothing may come back. */
     await page.evaluate(() => window.__MM.audio());
     await page.waitForTimeout(250);
+    /* Every voice `node .claude/scripts/short-notes.cjs` names, plus organ.
+       That script is the maintenance question behind this list: it reports
+       which tracks play notes shorter than their voice's own attack+decay, so
+       a voice it names and this list does not is a voice whose envelope
+       nothing is watching. Re-run it after adding a song or retuning a voice
+       (it found sawPad and strings missing from the first hand-picked list).
+
+       The duration is NOT each voice's shortest note in the data. Tried that
+       first: sawPad's shortest is 1.154s against a 1.320s attack+decay, only
+       13% short, and the re-rise is too small for the note to have gone quiet
+       first — both rows passed with the fix deleted, which is a check that
+       cannot fail. Fire a note WELL inside atk+dec instead. What is being
+       guarded is sEnv across the voice parameters in use, not the song. */
     const SHAPES = [
       ['supersaw',  0.144, 90,  'PULSE STABS and LEAD'],
       ['organ',     0.144, 90,  'PULSE ORGAN'],
       ['bansuri',   0.114, 90,  'BOSSA and KORA FLUTE'],
-      ['sax',       0.114, 90,  'BOSSA SAX'],
+      ['sax',       0.114, 90,  'BOSSA and DORIAN SAX'],
       ['gongAgeng', 0.208, 200, 'GAMELAN GONG'],
+      ['sawPad',    0.300, 250, 'PULSE and DORIAN PAD'],
+      ['strings',   0.250, 250, 'BOSSA STRINGS'],
     ];
     for (const [v, d, n, where] of SHAPES) {
+      /* Wait out the PREVIOUS voice before firing this one. A voice's
+         oscillators outlive its envelope by design, and gongAgeng runs 6.8s,
+         so without this the row after it measures a gong tail: sawPad's own
+         levels then sit so far below `peak` that its ghost never crosses the
+         threshold and the row passes while testing nothing. */
+      await page.waitForTimeout(1200);
       const rows = await page.evaluate(async (a) => {
         window.__MM.envNote(a[0], a[1]);
         const out = [];
@@ -1215,16 +1236,27 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
       }, [v, d, n]);
       const peak = Math.max.apply(null, rows);
       if (!(peak > 0.002)) { fail('a ' + v + ' note at ' + d + 's made no sound at all'); continue; }
-      const pk = rows.indexOf(peak);
-      let quiet = -1, ghost = -1;
-      for (let k = pk + 1; k < rows.length; k++) {
-        if (quiet < 0) { if (rows[k] < peak * 0.12) quiet = k; }
-        else if (rows[k] > peak * 0.4) { ghost = k; break; }
+      /* COUNT HUMPS; do not anchor on the peak. The obvious version walked
+         forward from the loudest sample, which is wrong for a slow-attack
+         voice: sawPad's note is cut off mid-attack while its ghost reaches
+         full sustain, so the maximum sits INSIDE the ghost and the walk
+         starts past the evidence. Both pad rows passed with the fix deleted
+         until this was rewritten. A hump is a rise over 40% of peak; it ends
+         on a fall under 12%. One note is one hump. */
+      let humps = 0, inHump = false, quiet = -1, ghost = -1;
+      for (let k = 0; k < rows.length; k++) {
+        if (!inHump && rows[k] > peak * 0.4) {
+          inHump = true;
+          if (++humps === 2) ghost = k;
+        } else if (inHump && rows[k] < peak * 0.12) {
+          inHump = false;
+          if (humps === 1) quiet = k;
+        }
       }
       const spark = rows.map((r) => ' .:-=+*#%@'[Math.min(9, Math.round(r / peak * 9))]).join('');
-      if (ghost >= 0)
+      if (humps > 1)
         fail(v + ' (' + where + ') at ' + d + 's rings again ' + (ghost * 10) + 'ms after the hit, ' +
-             'having gone quiet at ' + (quiet * 10) + 'ms - one note, two attacks:\n      ' + spark);
+             'having gone quiet at ' + (quiet * 10) + 'ms - one note, ' + humps + ' attacks:\n      ' + spark);
       else console.log('SHAPE=' + v.padEnd(10) + d + 's -> one note, gone by ' +
         (quiet < 0 ? '>' + (n * 10) : quiet * 10) + 'ms  (' + where + ')');
     }

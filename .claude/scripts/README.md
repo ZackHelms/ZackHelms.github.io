@@ -245,6 +245,23 @@ Deterministic helpers for working on this repo.
   quietly, because a silently-skipped gate is the failure mode
   `.claude/zmh/producer.md` § Validation explicitly forbids.
 
+- `short-notes.cjs` — music-mixer survey: which tracks play notes **shorter
+  than their voice's own attack+decay**. That ratio is what broke on
+  2026-09-19 (a sustaining envelope handed a short note scheduled its decay
+  ramp later on the timeline than its own release, so the note swelled back up
+  after it had stopped). `sEnv()` clamps the decay now, so this is not a defect
+  report — it is the maintenance question behind the runtime gate's `SHAPES`
+  list, which fires one note of each such voice and watches its envelope.
+  **Run it after adding a song or retuning a voice**: any voice it names that
+  `SHAPES` does not is a voice whose envelope nothing is watching. It found
+  `sawPad` and `strings` missing from the first hand-picked list.
+
+      node .claude/scripts/short-notes.cjs
+
+  One `TRACK=` line per affected track, worst ratio first, then a
+  `SHORT-NOTES=` summary. Exit 0 always — it is a survey, not a gate; exit 1
+  only if the voice table or `SONGS[]` moved, which means the parse is stale.
+
 - `check-games-sync.cjs` — three-way catalog gate. A new game has to land in
   the hub card, the hub's `GAMES[]` facet dataset, **and** the
   `.claude/games-index.md` row, and those drift independently. Checks card ↔

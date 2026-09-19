@@ -45,7 +45,18 @@
   work is recoverable rather than silently skipped. Currently outstanding: **eight commits from
   three other sessions** (six character-lists, plus `99205d8` and `c28a947`),
   listed below by the 2026-09-17 music-mixer pass and re-confirmed still
-  hidden by the 2026-09-18 one.
+  hidden by the 2026-09-18 and 2026-09-19 ones.
+
+  **2026-09-19, music-mixer loop-edges/DORIAN pass** (pointer moved `0effc3d`
+  -> `1948aba`, range `0effc3d..1948aba`). **Left nothing new behind.** Every
+  commit in the range was this session's own — `c0aa55a`, `b934cc3`,
+  `0593ca4`, `3e50847`, `f32cb4e`, `1948aba` — plus `2b97e49`, this same
+  session's earlier refine commit, skippable by the rule above. No other
+  session pushed during the window, so there was no shared-file merge. The
+  **eight commits from three other sessions are still outstanding and still
+  hidden** (re-checked this pass with `git merge-base --is-ancestor <sha>
+  0effc3d`: all eight report ancestor); they are carried forward unchanged
+  below, not cleared.
 
   **2026-09-18, music-mixer recorder pass** (pointer moved `dcee149` ->
   `0effc3d`, range `dcee149..0effc3d`). **Left nothing new behind.** Every
@@ -227,6 +238,13 @@
   `list_workflow_jobs` needs the **real** run id out of that listing — a
   guessed id returns a bare `404 Not Found`, which reads like a permissions
   problem and is not one.
+- **Waiting for the deploy: foreground `sleep` is blocked in this harness**
+  (verified 2026-09-19 — a `sleep 45 && <check>` chain is refused outright).
+  Either poll with a `Monitor` whose command exits on the terminal state, or
+  run the wait with `run_in_background`. A Monitor that greps only for
+  `success` is the wrong shape here for the usual reason — silence then means
+  both "still building" and "failed" — so match `completed` and print the
+  conclusion, letting the caller judge it.
 - Authorization: pushing to `main` is standing authorization (CLAUDE.md §
   Git workflow); no separate publish sign-off needed.
 

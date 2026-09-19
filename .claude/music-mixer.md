@@ -34,9 +34,9 @@ the only way to hear that track. Commissioned by the CD 2026-09-17.
    stop playback. This is why pressing a pad mid-bar sounds musical instead of
    sounding like a tape starting.
 3. **Nothing is sampled.** Every voice is oscillators, noise or one
-   Karplus-Strong string; every song is a table of pattern strings. Five
-   five-minute songs would be hundreds of megabytes as audio files and would
-   break the single-file rule. The trade the CD accepted: the songs sound like
+   Karplus-Strong string; every song is a table of pattern strings. Six songs
+   of several minutes each would be hundreds of megabytes as audio files and
+   would break the single-file rule. The trade the CD accepted: the songs sound like
    a very good synthesizer, not like a recording.
 
 ## Pad layout — hue is the address
@@ -198,8 +198,37 @@ is the take's own C4 piano register, 3 is the lead.
 **This is the worked example of what the export is for.** The readme in an
 exported take says it is a seed, not a drop-in, and this is the shape of the
 work between the two: the take gives key, tempo, groove and harmony; the
-arrangement, the instrumentation and the duration are written around
-it.
+arrangement, the instrumentation and the duration are written around it.
+
+### Growing a take into a song - the procedure
+
+The CD will do this again, so: read the export's `performance` block, not just
+its `song` block. The rendered `song` is one track per pad with one note each,
+which is what a take is; the reusable material is underneath it.
+
+1. **Read the identity out of the take.** Key (`kit.root` + `kit.mode`, and
+   `song.cents`), tempo, metre, and the drum patterns on pads 10-14. Those are
+   the CD's performance and should survive verbatim - DORIAN's KICK/SNARE/HAT
+   pattern `a` is exactly what was played.
+2. **Read the harmony off the held notes.** Step through the pitched patterns
+   and write down which degrees sound together. ZCK0's held piano spelled Cm
+   with a Bb passing chord: that became `k: [0, 6, ...]` plus `harm: 1`. Chord
+   roots and `harm` are how a full song says what a take says note by note,
+   and they are what lets one figure ride a moving progression.
+3. **Re-voice into the layout contract.** Fifteen roles: low end, harmony and
+   melody, percussion on the right. A take has no such split - every pitched
+   pad is the same instrument - so this step is composition, not transcription.
+4. **Set `rootHz` to an octave anchor** so `oct` reads as an octave number.
+   DORIAN uses C2, which puts the take's own C4 register at `oct: 2`.
+5. **Write the arrangement to the duration rule** (120-315 s) and check phrase
+   alignment: a multi-bar pattern is indexed off the ABSOLUTE step, so every
+   section must start on an even bar or a 2-bar phrase flips halfway.
+6. **Trim `mix` by measuring, not guessing.** Play it with everything held,
+   read the runtime gate's `LEVELS=` line, and scale so it sits in the pack.
+   DORIAN came in at 0.365 against 0.212-0.327; 0.9 -> 0.7 fixed it.
+7. **Both gates, then the badge.** Adding a song also means revisiting the
+   suites' song-count assumptions - both now read the count rather than
+   hard-coding it - and sweeping for prose that still says "five songs".
 
 ## Voices
 
@@ -740,6 +769,13 @@ arrangement referenced but no track had, pads resting half the song) — none of
 which throw, and most of which are inaudible until you happen to reach that
 section. The runtime gate exists because "the pads light up" is not evidence
 of audio: the lamp is CSS and runs fine with the graph completely dead.
+
+`node .claude/scripts/short-notes.cjs` is not a gate but belongs in the same
+breath: it lists the tracks whose notes are shorter than their voice's own
+attack+decay, which is the maintenance question behind the runtime gate's
+`SHAPES` list (see § The envelope trap). Run it after adding a song or
+retuning a voice - a voice it names that `SHAPES` does not is a voice whose
+envelope nothing is watching. It found two the first hand-picked list missed.
 
 ## No helper text on the grid
 
