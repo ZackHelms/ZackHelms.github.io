@@ -29,7 +29,13 @@ Each puzzle is a connected solid subdivided into connected polycube pieces. Gene
 
 Settings save locally in this browser. Each page load starts at your chosen minimum. Completing a puzzle advances one piece up to the maximum, then generates new puzzles at that maximum. Empty minimum/maximum fields resolve to 5/20 on blur or closing settings; out-of-range values are clamped and inverted bounds are reconciled. Size changes apply to the next puzzle.
 
-The default background is pure black. The other backgrounds are stylized procedural 3-D landscapes with clouds, water, grass or snow, sun/moon and stars. Their lighting follows a continuous 24-minute cycle from page load without restarting between puzzles or background changes. Audio begins after the first tap, as required by mobile browsers. Effects and distinct environmental ambience are synthesized locally with Web Audio. There is no music.
+The default background is pure black. The other four are procedural landscapes: a shader sky with a sun disc and its glow, a moon, two drifting cloud decks and stars, over a displaced heightfield coloured by height and slope, with reflective water, grass or falling snow.
+
+The **only light sources are the sun and the moon**. Ambient comes from the sky itself — the same shader you are looking at is baked into an environment map — so daylight carries the blue and the clouds overhead and night is only what the moon gives. Exactly one of the two casts shadows at a time. Shadow mapping handles what the sun is blocked from; ambient occlusion, baked per vertex from the cells still on the board and recomputed every time a piece comes out, handles the seams and crevices the sun never reached. Lighting follows a continuous 24-minute cycle from page load without restarting between puzzles or background changes.
+
+The three translucent materials refract, and you can see the **other pieces** through them, not just the background: piece outlines are drawn opaque so they reach the refraction pass, and colour comes from absorption scaled to each piece's size, so a thick piece is deeply saturated and a thin one is nearly clear.
+
+Audio begins after the first tap, as required by mobile browsers. Effects and distinct environmental ambience are synthesized locally with Web Audio. There is no music.
 
 Modern WebGL-capable Safari, Chrome, Firefox or Edge is required. Browser power-saving can pause animation when the tab is hidden; the day cycle catches up when it resumes.
 

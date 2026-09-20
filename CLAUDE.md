@@ -138,7 +138,7 @@ Each game with significant design complexity has a dedicated context file in `.c
 
 | Game | Context file | When to use |
 |---|---|---|
-| Interlock (`games/interlock/`) | `.claude/interlock.md` | Any work on the 3-D disassembly puzzle — the `src/` → `build.mjs` → generated `index.html` pipeline and the scope trick that makes the bundle possible, the polycube generator and its solvability gate, the standard chrome row painted in the game's own glass rather than the neon palette, the Three.js carve-out, and its **proprietary-license** status (one of the six protected games) |
+| Interlock (`games/interlock/`) | `.claude/interlock.md` | Any work on the 3-D disassembly puzzle — the `src/` → `build.mjs` → generated `index.html` pipeline and the scope trick that makes the bundle possible, the polycube generator and its solvability gate, the standard chrome row painted in the game's own glass rather than the neon palette, the **lighting model** (sun and moon and nothing else, ambient baked from the sky shader itself, one shadow-caster at a time, voxel AO recomputed on every removal) and the **opaque edge lines** that are the only reason the other pieces are visible through the glass — three renders just the opaque list into the transmission target — plus the Three.js carve-out and its **proprietary-license** status (one of the six protected games) |
 | Adventure (`games/adventure.html`) | `.claude/adventure.md` | Any work on the adventure RPG — character systems, combat, RP encounters, save system, progression |
 | Sorcery (`games/sorcery.html`) | `.claude/sorcery.md` | Any work on the sorcery tower-defense game |
 | Merge Drop (`games/merge-drop/`) | `.claude/merge-drop.md` | Any work on the orb-merge physics puzzler |

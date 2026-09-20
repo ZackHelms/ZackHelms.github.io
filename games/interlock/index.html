@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#000000"><title>Interlock</title><style>:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#f6f2e9;background:#000}*{box-sizing:border-box}body{margin:0;overflow:hidden}#game{display:block;width:100vw;height:100dvh;touch-action:none;outline:none}button,input{font:inherit}button{cursor:pointer;color:inherit}/* Standard site chrome row, top-left: back, mute, reload, settings. Geometry   matches the other games (38x32 at 8/50/92/134); the glass fill is this   game's own, so the row reads as part of the scene rather than bolted on. */.chrome{position:fixed;top:calc(6px + env(safe-area-inset-top));z-index:80;width:38px;height:32px;display:grid;place-items:center;border:1px solid #ffffff26;background:#17191b99;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:8px;color:#f6f2e9;font-size:16px;line-height:1;text-decoration:none;padding:0;touch-action:manipulation;transition:background .2s}.chrome:hover,.chrome:active{background:#434341}#back-btn{left:calc(8px + env(safe-area-inset-left))}#mute-btn{left:calc(50px + env(safe-area-inset-left))}#reload-btn{left:calc(92px + env(safe-area-inset-left))}#settingsButton{left:calc(134px + env(safe-area-inset-left))}svg{width:19px;height:19px}dialog{width:min(510px,calc(100% - 24px));max-height:calc(100dvh - 32px);padding:28px;border:1px solid #ffffff24;border-radius:24px;background:#171a1eeb;backdrop-filter:blur(30px);box-shadow:0 28px 100px #0009}dialog::backdrop{background:#0007;backdrop-filter:blur(7px)}header{display:flex;align-items:center;justify-content:space-between}.eyebrow{font-size:12px;letter-spacing:.22em;color:#ccb991}h1{font-size:28px;font-weight:500;margin:7px 0 0}h2{font-size:15px;font-weight:500;margin:0 0 13px}.close{border:0;background:transparent;font-size:32px;color:#aaa;width:44px;height:44px}section{border-top:1px solid #ffffff12;margin-top:23px;padding-top:22px}.choices{display:grid;gap:8px}.materials{grid-template-columns:repeat(3,1fr)}.backgrounds{grid-template-columns:repeat(5,1fr)}.choice{border:1px solid #ffffff14;border-radius:10px;background:#ffffff04;padding:10px 4px;font-size:13px;min-height:46px}.choice[aria-pressed=true]{border-color:#d6bd86;background:#d6bd8617;color:#f4d9a4}.swatch{display:block;width:26px;height:26px;border-radius:7px;margin:0 auto 7px;box-shadow:inset 0 1px 3px #fff4}p,footer{font-size:13px;color:#9b9da2;line-height:1.6;margin:12px 0 0}.slider{display:grid;grid-template-columns:110px 1fr 38px;gap:10px;align-items:center;font-size:14px;margin-top:15px}.slider output{font-size:12px;color:#b3b3b3;text-align:right}input[type=range]{width:100%;accent-color:#d6bd86}.numbers{display:flex;gap:16px}.numbers label{flex:1;font-size:14px}.numbers input{display:block;margin-top:9px;width:100%;background:#0004;border:1px solid #ffffff23;color:inherit;padding:11px;border-radius:8px;font-size:16px}.done{width:100%;margin-top:18px;background:#d6bd86;color:#24201a;border:0;border-radius:10px;padding:12px}.done:hover{background:#e8d2a7}#success{pointer-events:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;opacity:0;width:95%;text-shadow:0 2px 24px #000}#success h2{font-size:clamp(25px,5vw,42px);margin:12px 0}#success p{color:#efdec0;font-size:18px}.celebrate{animation:celebrate 1s both}@keyframes celebrate{0%{opacity:0;filter:blur(6px)}15%,78%{opacity:1;filter:blur(0)}100%{opacity:0;filter:blur(5px)}}#notice{position:fixed;inset:35% 15%;text-align:center;background:#181818;padding:30px;border-radius:20px}button:focus-visible,input:focus-visible{outline:2px solid #ebd3a0;outline-offset:3px}@media(max-width:420px){dialog{padding:22px}.backgrounds{gap:4px}.backgrounds .choice{font-size:12px}.slider{grid-template-columns:100px 1fr 30px}}</style></head><body><div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-19 22:51 UTC</div><canvas id="game" aria-label="3-D interlocking puzzle. Drag to rotate; tap a piece to remove it." tabindex="0"></canvas><a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">&#8592;</a><button id="mute-btn" class="chrome" type="button" aria-label="Mute">&#128266;</button><button id="reload-btn" class="chrome" type="button" aria-label="New puzzle">&#8635;</button><button id="settingsButton" class="chrome" type="button" aria-label="Open settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h6l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/></svg></button><dialog id="settings"><form method="dialog"><header><div><span class="eyebrow">INTERLOCK</span><h1>Settings</h1></div><button class="close" aria-label="Close settings">×</button></header><section><h2>Piece material</h2><div id="materials" class="choices materials"></div></section><section><h2>Background</h2><div id="backgrounds" class="choices backgrounds"></div><p>A living world. One full day every 24 minutes.</p></section><section><h2>Sound</h2><label class="slider">Master <input id="master" type="range" min="0" max="100"><output id="masterValue"></output></label><label class="slider">Sound effects <input id="effects" type="range" min="0" max="100"><output id="effectsValue"></output></label><label class="slider">Ambience <input id="ambient" type="range" min="0" max="100"><output id="ambientValue"></output></label></section><section><h2>Puzzle size</h2><div class="numbers"><label>Min puzzle pieces<input id="min" type="number" min="5" max="20" inputmode="numeric"></label><label>Max puzzle pieces<input id="max" type="number" min="5" max="20" inputmode="numeric"></label></div><p>5–20 pieces. Changes apply to the next puzzle.<br>Each new visit starts at your minimum.</p></section><footer>Drag to rotate · Tap to remove · Pinch to zoom</footer><button class="done">Done</button></form></dialog><div id="success" role="status"><span class="eyebrow">BEAUTIFULLY UNTANGLED</span><h2><span id="completed"></span> pieces complete</h2><p>Up next: <span id="next"></span> pieces</p></div><div id="notice" role="alert" hidden></div><script type="module">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#000000"><title>Interlock</title><style>:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#f6f2e9;background:#000}*{box-sizing:border-box}body{margin:0;overflow:hidden}#game{display:block;width:100vw;height:100dvh;touch-action:none;outline:none}button,input{font:inherit}button{cursor:pointer;color:inherit}/* Standard site chrome row, top-left: back, mute, reload, settings. Geometry   matches the other games (38x32 at 8/50/92/134); the glass fill is this   game's own, so the row reads as part of the scene rather than bolted on. */.chrome{position:fixed;top:calc(6px + env(safe-area-inset-top));z-index:80;width:38px;height:32px;display:grid;place-items:center;border:1px solid #ffffff26;background:#17191b99;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:8px;color:#f6f2e9;font-size:16px;line-height:1;text-decoration:none;padding:0;touch-action:manipulation;transition:background .2s}.chrome:hover,.chrome:active{background:#434341}#back-btn{left:calc(8px + env(safe-area-inset-left))}#mute-btn{left:calc(50px + env(safe-area-inset-left))}#reload-btn{left:calc(92px + env(safe-area-inset-left))}#settingsButton{left:calc(134px + env(safe-area-inset-left))}svg{width:19px;height:19px}dialog{width:min(510px,calc(100% - 24px));max-height:calc(100dvh - 32px);padding:28px;border:1px solid #ffffff24;border-radius:24px;background:#171a1eeb;backdrop-filter:blur(30px);box-shadow:0 28px 100px #0009}dialog::backdrop{background:#0007;backdrop-filter:blur(7px)}header{display:flex;align-items:center;justify-content:space-between}.eyebrow{font-size:12px;letter-spacing:.22em;color:#ccb991}h1{font-size:28px;font-weight:500;margin:7px 0 0}h2{font-size:15px;font-weight:500;margin:0 0 13px}.close{border:0;background:transparent;font-size:32px;color:#aaa;width:44px;height:44px}section{border-top:1px solid #ffffff12;margin-top:23px;padding-top:22px}.choices{display:grid;gap:8px}.materials{grid-template-columns:repeat(3,1fr)}.backgrounds{grid-template-columns:repeat(5,1fr)}.choice{border:1px solid #ffffff14;border-radius:10px;background:#ffffff04;padding:10px 4px;font-size:13px;min-height:46px}.choice[aria-pressed=true]{border-color:#d6bd86;background:#d6bd8617;color:#f4d9a4}.swatch{display:block;width:26px;height:26px;border-radius:7px;margin:0 auto 7px;box-shadow:inset 0 1px 3px #fff4}p,footer{font-size:13px;color:#9b9da2;line-height:1.6;margin:12px 0 0}.slider{display:grid;grid-template-columns:110px 1fr 38px;gap:10px;align-items:center;font-size:14px;margin-top:15px}.slider output{font-size:12px;color:#b3b3b3;text-align:right}input[type=range]{width:100%;accent-color:#d6bd86}.numbers{display:flex;gap:16px}.numbers label{flex:1;font-size:14px}.numbers input{display:block;margin-top:9px;width:100%;background:#0004;border:1px solid #ffffff23;color:inherit;padding:11px;border-radius:8px;font-size:16px}.done{width:100%;margin-top:18px;background:#d6bd86;color:#24201a;border:0;border-radius:10px;padding:12px}.done:hover{background:#e8d2a7}#success{pointer-events:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;opacity:0;width:95%;text-shadow:0 2px 24px #000}#success h2{font-size:clamp(25px,5vw,42px);margin:12px 0}#success p{color:#efdec0;font-size:18px}.celebrate{animation:celebrate 1s both}@keyframes celebrate{0%{opacity:0;filter:blur(6px)}15%,78%{opacity:1;filter:blur(0)}100%{opacity:0;filter:blur(5px)}}#notice{position:fixed;inset:35% 15%;text-align:center;background:#181818;padding:30px;border-radius:20px}button:focus-visible,input:focus-visible{outline:2px solid #ebd3a0;outline-offset:3px}@media(max-width:420px){dialog{padding:22px}.backgrounds{gap:4px}.backgrounds .choice{font-size:12px}.slider{grid-template-columns:100px 1fr 30px}}</style></head><body><div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-20 03:43 UTC</div><canvas id="game" aria-label="3-D interlocking puzzle. Drag to rotate; tap a piece to remove it." tabindex="0"></canvas><a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">&#8592;</a><button id="mute-btn" class="chrome" type="button" aria-label="Mute">&#128266;</button><button id="reload-btn" class="chrome" type="button" aria-label="New puzzle">&#8635;</button><button id="settingsButton" class="chrome" type="button" aria-label="Open settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h6l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/></svg></button><dialog id="settings"><form method="dialog"><header><div><span class="eyebrow">INTERLOCK</span><h1>Settings</h1></div><button class="close" aria-label="Close settings">×</button></header><section><h2>Piece material</h2><div id="materials" class="choices materials"></div></section><section><h2>Background</h2><div id="backgrounds" class="choices backgrounds"></div><p>A living world. One full day every 24 minutes.</p></section><section><h2>Sound</h2><label class="slider">Master <input id="master" type="range" min="0" max="100"><output id="masterValue"></output></label><label class="slider">Sound effects <input id="effects" type="range" min="0" max="100"><output id="effectsValue"></output></label><label class="slider">Ambience <input id="ambient" type="range" min="0" max="100"><output id="ambientValue"></output></label></section><section><h2>Puzzle size</h2><div class="numbers"><label>Min puzzle pieces<input id="min" type="number" min="5" max="20" inputmode="numeric"></label><label>Max puzzle pieces<input id="max" type="number" min="5" max="20" inputmode="numeric"></label></div><p>5–20 pieces. Changes apply to the next puzzle.<br>Each new visit starts at your minimum.</p></section><footer>Drag to rotate · Tap to remove · Pinch to zoom</footer><button class="done">Done</button></form></dialog><div id="success" role="status"><span class="eyebrow">BEAUTIFULLY UNTANGLED</span><h2><span id="completed"></span> pieces complete</h2><p>Up next: <span id="next"></span> pieces</p></div><div id="notice" role="alert" hidden></div><script type="module">
 /**
  * @license
  * Copyright 2010-2024 Three.js Authors
@@ -14,7 +14,581 @@ function connected(cells){if(!cells.size)return true;const todo=[cells.values().
 function generatePuzzle(n,random=Math.random){const size=n<9?4:n<15?5:6;const left=new Map();for(let x=0;x<size;x++)for(let y=0;y<size;y++)for(let z=0;z<size;z++)left.set(key([x,y,z]),[x,y,z]);const pieces=[];for(let id=0;id<n-1;id++){let best=null;for(let attempt=0;attempt<18;attempt++){const dir=directions[Math.floor(random()*6)],picked=new Map(),working=new Map(left),target=Math.max(1,Math.round(left.size/(n-id)*(0.65+random()*.6)));const clear=c=>{for(let s=1;s<size;s++)if(working.has(key(c.map((v,i)=>v+dir[i]*s))))return false;return true;};while(picked.size<target){let candidates=[...working.values()].filter(c=>clear(c)&&(!picked.size||directions.some(d=>picked.has(key(c.map((v,i)=>v+d[i]))))));let found=false;while(candidates.length){const c=candidates.splice(Math.floor(random()*candidates.length),1)[0],k=key(c);working.delete(k);if(connected(working)){picked.set(k,c);found=true;break;}working.set(k,c);}if(!found)break;}if(picked.size&&(!best||picked.size>best.cells.length))best={id,cells:[...picked.values()],dir};if(best&&best.cells.length>=target)break;}if(!best)throw Error('Puzzle generation failed');best.cells.forEach(c=>left.delete(key(c)));pieces.push(best);}pieces.push({id:n-1,cells:[...left.values()],dir:[0,1,0]});return {size,pieces};}
 
 
-class World{constructor(scene){this.scene=scene;this.root=new T.Group();scene.add(this.root);this.moving=[];this.kind='none';this.sun=new T.DirectionalLight(0xffe4bc,3);this.sun.position.set(-5,8,6);scene.add(this.sun);this.fill=new T.HemisphereLight(0xaacbff,0x573824,2);scene.add(this.fill);this.rim=new T.DirectionalLight(0xd5e8ff,2);this.rim.position.set(5,2,-5);scene.add(this.rim);}mesh(g,c,x,y,z){const m=new T.Mesh(g,new T.MeshStandardMaterial({color:c,roughness:.85}));m.position.set(x,y,z);this.root.add(m);return m;}set(kind){this.kind=kind;this.root.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});this.root.clear();this.moving=[];if(kind==='none'){this.scene.background=new T.Color(0);this.scene.fog=null;return;}this.scene.fog=new T.FogExp2(0x8abbd0,.014);const ground=kind==='meadow'?0x486f34:kind==='mountains'?0x44564e:kind==='beach'?0xd9bd85:0xbbd6e2;const floor=this.mesh(new T.PlaneGeometry(250,250),ground,0,-7,-50);floor.rotation.x=-Math.PI/2;for(let i=0;i<22;i++){let h=kind==='beach'?2+Math.random()*3:8+Math.random()*20;const mountain=this.mesh(new T.ConeGeometry(8+Math.random()*13,h,5),kind==='arctic'?0xd9e9f2:kind==='meadow'?0x487046:0x637a80,(i-11)*13,-7+h/2,-40-Math.random()*40);mountain.rotation.y=Math.random()*6;if(kind==='mountains'||kind==='arctic'){const snow=this.mesh(new T.ConeGeometry(mountain.geometry.parameters.radius*.34,h*.34,5),0xe7edf0,mountain.position.x,-7+h*.84,mountain.position.z);snow.rotation.y=mountain.rotation.y;}}if(kind==='beach'||kind==='arctic'){const sea=this.mesh(new T.PlaneGeometry(230,190,50,50),kind==='beach'?0x248eab:0x739fae,0,-6.7,-85);sea.rotation.x=-Math.PI/2;sea.material.roughness=.22;sea.material.metalness=.25;this.moving.push({type:'sea',mesh:sea});}if(kind==='meadow'){const g=new T.ConeGeometry(.13,1.2,3),mat=new T.MeshStandardMaterial({color:0x78a850});const grass=new T.InstancedMesh(g,mat,550),dummy=new T.Object3D();for(let i=0;i<550;i++){dummy.position.set((Math.random()-.5)*85,-6.6,-8-Math.random()*48);dummy.rotation.z=(Math.random()-.5)*.4;dummy.scale.setScalar(.5+Math.random());dummy.updateMatrix();grass.setMatrixAt(i,dummy.matrix);}this.root.add(grass);this.moving.push({type:'grass',mesh:grass});}for(let i=0;i<12;i++){const cloud=this.mesh(new T.SphereGeometry(1,12,8),0xe6edf3,(i-6)*14,14+Math.random()*12,-55-Math.random()*30);cloud.scale.set(5+Math.random()*7,1.2+Math.random(),2);this.moving.push({type:'cloud',mesh:cloud,base:cloud.position.x});}const points=[];for(let i=0;i<300;i++)points.push((Math.random()-.5)*230,Math.random()*90+5,-90-Math.random()*70);const geom=new T.BufferGeometry();geom.setAttribute('position',new T.Float32BufferAttribute(points,3));this.stars=new T.Points(geom,new T.PointsMaterial({color:0xe0efff,size:.17,transparent:true}));this.root.add(this.stars);this.orb=this.mesh(new T.SphereGeometry(2,24,16),0xffe4b0,0,20,-85);this.orb.material=new T.MeshBasicMaterial({color:0xffe4b0});this.moon=this.mesh(new T.SphereGeometry(1.5,20,12),0xdeeeff,0,20,-85);this.moon.material=new T.MeshBasicMaterial({color:0xdeeeff});if(kind==='arctic'){const snow=[];for(let i=0;i<500;i++)snow.push((Math.random()-.5)*90,Math.random()*50-7,-Math.random()*60-10);const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(snow,3));this.flakes=new T.Points(geo,new T.PointsMaterial({color:0xe9f7ff,size:.09,transparent:true,opacity:.7}));this.root.add(this.flakes);}}tick(t){const phase=t/1440*Math.PI*2+.65,alt=Math.sin(phase),day=T.MathUtils.smoothstep(alt,-.2,.5);if(this.kind==='none'){this.sun.intensity=3;this.fill.intensity=2;return day;}this.sun.position.set(Math.cos(phase)*40,alt*40,12);this.sun.intensity=.25+day*3;this.sun.color.setHSL(.07+day*.04,.4,.75);this.fill.intensity=.6+day*1.7;this.rim.intensity=.8+day*.8;const sky=new T.Color(0x060c21).lerp(new T.Color(this.kind==='arctic'?0x98bdcf:0x84bddd),day);if(alt>-.15&&alt<.25)sky.lerp(new T.Color(0xb97665),(1-Math.abs(alt-.05)/.2)*.5);this.scene.background=sky;this.scene.fog.color.copy(sky);this.orb.position.set(Math.cos(phase)*65,alt*50,-85);this.moon.position.set(-Math.cos(phase)*65,-alt*50,-85);this.stars.material.opacity=1-day;for(const o of this.moving){if(o.type==='cloud')o.mesh.position.x=((o.base+t*.35+90)%180)-90;if(o.type==='grass')o.mesh.rotation.z=Math.sin(t*.8)*.007;if(o.type==='sea'){const a=o.mesh.geometry.attributes.position;for(let i=0;i<a.count;i++)a.setZ(i,Math.sin(a.getX(i)*.35+t*.7)*.16+Math.cos(a.getY(i)*.3+t*.5)*.13);a.needsUpdate=true;o.mesh.geometry.computeVertexNormals();}}if(this.kind==='arctic'&&this.flakes){const a=this.flakes.geometry.attributes.position;for(let i=0;i<a.count;i++){a.setY(i,a.getY(i)-.025);if(a.getY(i)<-7)a.setY(i,43);}a.needsUpdate=true;}return day;}}
+
+/* ===========================================================================
+ * world.js — sky, terrain, water and the light rig.
+ *
+ * LIGHTING MODEL (CD, 2026-09-20). The only light sources are:
+ *   1. the sun, a directional light, shadow-casting while it is up;
+ *   2. the moon, a directional light opposite it, very dim, shadow-casting
+ *      while the sun is down;
+ *   3. the sky itself, as image-based ambient — a PMREM of the same sky shader
+ *      the player is looking at, so the ambient really is the blue and the
+ *      clouds overhead, and at night really is just the moon's glow on a dark
+ *      sky.
+ * There is no fill light, no rim light and no studio environment. Those three
+ * (a HemisphereLight at intensity 2, a second DirectionalLight at 2, and a
+ * PMREM of three white quads) are what this file replaced: they lit the cube
+ * from directions with nothing in them, which is why it never read as being
+ * outdoors.
+ *
+ * The consequence to keep in mind when touching anything here: ambient is now
+ * a CONSEQUENCE of the sky, not a number. Brightening the night means changing
+ * the night sky or the exposure curve, never adding a light.
+ * ========================================================================= */
+
+/* --- deterministic value noise, for terrain and nothing else -------------
+ * Seeded so a background looks the same every time it is chosen in a session
+ * and across reloads; the sky's noise lives in the shader instead. */
+function mulberry(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function noiseField(seed) {
+  const N = 256, g = new Float32Array(N * N), rnd = mulberry(seed);
+  for (let i = 0; i < g.length; i++) g[i] = rnd();
+  const at = (x, y) => g[(((y % N) + N) % N) * N + (((x % N) + N) % N)];
+  const smooth = (t) => t * t * (3 - 2 * t);
+  return function value(x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = smooth(x - xi), yf = smooth(y - yi);
+    const a = at(xi, yi), b = at(xi + 1, yi), c = at(xi, yi + 1), d = at(xi + 1, yi + 1);
+    return (a + (b - a) * xf) + ((c + (d - c) * xf) - (a + (b - a) * xf)) * yf;
+  };
+}
+
+function fbm(value, x, y, octaves, ridged) {
+  let sum = 0, amp = 0.5, freq = 1, norm = 0;
+  for (let o = 0; o < octaves; o++) {
+    let v = value(x * freq, y * freq);
+    if (ridged) { v = 1 - Math.abs(v * 2 - 1); v *= v; }
+    sum += v * amp; norm += amp; amp *= 0.5; freq *= 2.03;
+  }
+  return sum / norm;
+}
+
+/* --- the sky ------------------------------------------------------------
+ * One shader draws the gradient, the sun and its glow, the moon, two drifting
+ * cloud decks and the stars. Everything the eye reads as "sky" is in here on
+ * purpose: the same material is put on a small sphere and run through PMREM
+ * for the ambient, so the light in the scene and the picture behind it can
+ * never disagree. It is also written as OPAQUE (depthWrite off, drawn first),
+ * which matters beyond tidiness — three's transmission pass renders only the
+ * opaque list into the refraction target, so an sky built out of transparent
+ * sprites would vanish when seen through a glass piece. */
+const SKY_VERT = `
+varying vec3 vDir;
+void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+
+const SKY_FRAG = `
+precision highp float;
+varying vec3 vDir;
+uniform vec3  uSunDir, uMoonDir, uZenith, uHorizon, uGround, uSunCol, uMoonCol;
+uniform float uDay, uTime, uHaze, uCloud, uStars;
+
+float hash21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash21(i), b = hash21(i + vec2(1,0)), c = hash21(i + vec2(0,1)), d = hash21(i + vec2(1,1));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+float fbm2(vec2 p){
+  float s = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++){ s += vnoise(p) * a; p = p * 2.03 + 17.1; a *= 0.5; }
+  return s;
+}
+
+// A cloud deck read as a flat layer at height h: project the view ray onto it,
+// so clouds compress towards the horizon the way real ones do. Two decks at
+// different heights drifting at different speeds give parallax without a
+// single transparent sprite.
+float deck(vec3 dir, float h, float scale, float speed, float cover){
+  if (dir.y <= 0.012) return 0.0;
+  vec2 uv = dir.xz / dir.y * h * scale + vec2(uTime * speed, uTime * speed * 0.37);
+  float n = fbm2(uv);
+  float f = smoothstep(cover, cover + 0.30, n);
+  return f * smoothstep(0.012, 0.16, dir.y);          // fade into the haze
+}
+
+void main(){
+  vec3 dir = normalize(vDir);
+  float h  = dir.y;
+  float mu = dot(dir, uSunDir);
+
+  // --- gradient. Horizon stays hazy and pale, zenith deepens.
+  float t   = pow(clamp(h, 0.0, 1.0), 0.45);
+  vec3  col = mix(uHorizon, uZenith, t);
+  col = mix(uGround, col, smoothstep(-0.10, 0.02, h));  // below the horizon
+
+  // --- stars, before the sun and clouds so both can wash them out
+  if (uStars > 0.001) {
+    vec2 cell = floor(dir.xz / max(abs(dir.y), 0.28) * 34.0 + 31.7);
+    float r = hash21(cell);
+    if (r > 0.9835) {
+      vec2 c  = (dir.xz / max(abs(dir.y), 0.28) * 34.0 + 31.7) - cell - 0.5;
+      float d = length(c);
+      float tw = 0.65 + 0.35 * sin(uTime * (1.4 + r * 9.0) + r * 60.0);
+      float mag = (1.0 - smoothstep(0.0, 0.16, d)) * (0.35 + hash21(cell + 3.3));
+      vec3 tint = mix(vec3(0.72, 0.82, 1.0), vec3(1.0, 0.88, 0.74), hash21(cell + 9.1));
+      col += tint * mag * tw * uStars * smoothstep(0.0, 0.18, h);
+    }
+  }
+
+  // --- the moon: a crisp disc with faint maria. The halo is deliberately
+  //     tight (2200, not 700) — a moon is a hard-edged disc, and a soft glow
+  //     around it reads as a lens artifact rather than as moonlight.
+#ifndef PROBE
+  float mm = dot(dir, uMoonDir);
+  col += uMoonCol * pow(max(mm, 0.0), 2200.0) * 0.30;
+  if (mm > 0.99965) {
+    vec2 mp = (dir.xz - uMoonDir.xz) * 420.0;
+    float maria = fbm2(mp * 1.7 + 4.0);
+    col = mix(col, uMoonCol * (1.32 - maria * 0.42), smoothstep(0.99965, 0.99975, mm));
+  }
+#endif
+
+  // --- the sun: disc, tight glow, then a wide mie haze that also warms the
+  //     whole sky on its side. This is what makes dawn and dusk read.
+  // The WIDE mie haze stays in the probe: that really is sky luminance on the
+  // sun's side and it is what warms the ambient at dawn and dusk. The tight
+  // glow and the disc are the sun itself, and the sun is a light.
+  col += uSunCol * pow(max(mu, 0.0), 9.0) * 0.22 * (0.35 + uDay * 0.9);
+  col += uSunCol * pow(max(mu, 0.0), 2.4) * uHaze * (1.0 - smoothstep(0.0, 0.55, h)) * 0.55;
+#ifndef PROBE
+  col += uSunCol * pow(max(mu, 0.0), 220.0) * 1.1 * (0.35 + uDay * 0.9);
+  col = mix(col, uSunCol * 2.4, smoothstep(0.99975, 0.99985, mu));   // the disc
+#endif
+
+  // --- clouds. Lit from the sun side, shadowed underneath; they go grey and
+  //     then almost black as the sun sets, never disappearing into the sky.
+  // scale is in noise-cells across the deck; at 0.08 the whole sky sampled a
+  // single cell and the clouds came out as one flat wash (2026-09-20)
+  float lo = deck(dir, 1.0, 3.10, 0.0042, 0.48);
+  float hi = deck(dir, 2.2, 1.55, 0.0019, 0.56);
+  float c  = clamp(lo * 0.85 + hi * 0.55, 0.0, 1.0) * uCloud;
+  if (c > 0.001) {
+    float lit  = 0.35 + 0.65 * pow(max(mu, 0.0), 1.6);
+    vec3 shade = mix(vec3(0.16, 0.19, 0.26), vec3(0.62, 0.66, 0.74), uDay);
+    vec3 bright= mix(uMoonCol * 0.45, mix(vec3(1.0), uSunCol, 0.45) * 1.06, uDay);
+    col = mix(col, mix(shade, bright, lit), c * (0.55 + 0.45 * uDay));
+  }
+
+  gl_FragColor = vec4(col, 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+
+function skyMaterial(uniforms, probe) {
+  return new T.ShaderMaterial({
+    uniforms, vertexShader: SKY_VERT, fragmentShader: SKY_FRAG,
+    defines: probe ? { PROBE: 1 } : {},
+    side: T.BackSide, depthWrite: false, depthTest: true, toneMapped: true, fog: false,
+  });
+}
+
+/* --- a seamless ripple normal map for water, baked once ------------------ */
+function rippleNormals() {
+  const N = 256, c = document.createElement('canvas'); c.width = c.height = N;
+  const ctx = c.getContext('2d'), img = ctx.createImageData(N, N), v = noiseField(7717);
+  const hAt = (x, y) => fbm(v, x / N * 6, y / N * 6, 4, false);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const dx = hAt(x + 1, y) - hAt(x - 1, y), dy = hAt(x, y + 1) - hAt(x, y - 1);
+    const n = [-dx * 5, -dy * 5, 1], l = Math.hypot(n[0], n[1], n[2]), i = (y * N + x) * 4;
+    img.data[i] = (n[0] / l * 0.5 + 0.5) * 255;
+    img.data[i + 1] = (n[1] / l * 0.5 + 0.5) * 255;
+    img.data[i + 2] = (n[2] / l * 0.5 + 0.5) * 255;
+    img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new T.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = T.RepeatWrapping;
+  return tex;
+}
+
+/* A soft round dot, so a Points sprite is a flake and not a quad. */
+let DOT = null;
+function softDot() {
+  if (DOT) return DOT;
+  const N = 64, c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d'), rad = g.createRadialGradient(N / 2, N / 2, 0, N / 2, N / 2, N / 2);
+  rad.addColorStop(0, 'rgba(255,255,255,1)');
+  rad.addColorStop(0.45, 'rgba(255,255,255,0.75)');
+  rad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = rad; g.fillRect(0, 0, N, N);
+  DOT = new T.CanvasTexture(c);
+  return DOT;
+}
+
+/* --- per-background terrain shaping -------------------------------------
+ * Height is (base + amplitude * fbm) * falloff, and the falloff is the part
+ * that matters: it holds the ground flat and low directly under the puzzle and
+ * only lets the landscape rise further out, so no ridge can ever grow through
+ * the board the player is trying to read. */
+const GROUND_Y = -7.2;
+const PRESETS = {
+  meadow:    { amp: 19, rim: 30, ridged: false, oct: 5, scale: 0.030, water: null,
+               low: 0x3f6b2f, high: 0x6e8f45, rock: 0x6b6152, peak: 0x86a05a, seed: 41 },
+  mountains: { amp: 62, rim: 86, ridged: true,  oct: 6, scale: 0.016, water: null,
+               low: 0x5d7551, high: 0x6c7563, rock: 0x7b7e84, peak: 0xf4f8fb, seed: 7 },
+  beach:     { amp: 11, rim: 20, ridged: false, oct: 4, scale: 0.026, water: 0x1d7e9e,
+               low: 0xcdb287, high: 0xe0cca4, rock: 0x9c8d74, peak: 0x8fa762, seed: 23 },
+  arctic:    { amp: 30, rim: 52, ridged: true,  oct: 5, scale: 0.019, water: 0x5f8ba0,
+               low: 0xc3d7e4, high: 0xe6f1f8, rock: 0x767f88, peak: 0xffffff, seed: 90 },
+};
+
+class World {
+  constructor(scene, renderer) {
+    this.scene = scene;
+    this.renderer = renderer;
+    this.root = new T.Group();
+    scene.add(this.root);
+    this.moving = [];
+    this.kind = 'none';
+
+    /* Shadow budget: one 2048 map is crisp over the ~28-unit box the puzzle
+     * lives in (73 texels a unit), but two of them on a phone is 32 MB of
+     * depth texture for a picture nobody is looking at, so halve it there. */
+    const big = Math.min(innerWidth, innerHeight) > 520 && devicePixelRatio <= 2;
+    this.bigDevice = big;
+    const SM = big ? 2048 : 1024;
+
+    const shadowed = (light) => {
+      light.castShadow = true;
+      light.shadow.mapSize.set(SM, SM);
+      const c = light.shadow.camera;
+      c.left = c.bottom = -14; c.right = c.top = 14; c.near = 1; c.far = 140;
+      c.updateProjectionMatrix();
+      light.shadow.bias = -0.0004;        // against acne on the flat cube faces
+      light.shadow.normalBias = 0.022;    // against peter-panning on thin pieces
+      light.shadow.radius = 3;            // PCFSoft blur, in texels
+      return light;
+    };
+
+    this.sun = shadowed(new T.DirectionalLight(0xfff0d8, 3));
+    this.moon = shadowed(new T.DirectionalLight(0xb9ccf2, 0.16));
+    scene.add(this.sun, this.sun.target, this.moon, this.moon.target);
+
+    /* The sky, and the ambient that comes out of it. One uniforms object is
+     * shared by the dome the player sees and the sphere PMREM reads, so the
+     * two cannot drift apart. */
+    this.sky = {
+      uSunDir:  { value: new T.Vector3(0, 1, 0) },
+      uMoonDir: { value: new T.Vector3(0, -1, 0) },
+      uZenith:  { value: new T.Color(0x2f6ec4) },
+      uHorizon: { value: new T.Color(0xbfd8ea) },
+      uGround:  { value: new T.Color(0x53585c) },
+      uSunCol:  { value: new T.Color(0xfff1d6) },
+      uMoonCol: { value: new T.Color(0xd8e4ff) },
+      uDay:     { value: 1 },
+      uTime:    { value: 0 },
+      uHaze:    { value: 0.5 },
+      uCloud:   { value: 1 },
+      uStars:   { value: 0 },
+    };
+    this.dome = new T.Mesh(new T.SphereGeometry(1, 48, 32), skyMaterial(this.sky));
+    this.dome.scale.setScalar(900);
+    this.dome.renderOrder = 1000;
+    this.dome.frustumCulled = false;
+    scene.add(this.dome);
+    this.dome.visible = false;
+
+    // the miniature the ambient is cooked from
+    this.probe = new T.Scene();
+    this.probe.add(new T.Mesh(new T.SphereGeometry(1, 24, 16), skyMaterial(this.sky, true)));
+    this.pmrem = new T.PMREMGenerator(renderer);
+    this.pmrem.compileEquirectangularShader();
+    this.envTarget = null;
+    this.envAlt = 99;                    // forces a bake on the first tick
+
+    this.ripple = null;
+  }
+
+  /* One bake of the sky into an environment map. Called from tick() only when
+   * the sun has actually moved, because fromScene() allocates a render target
+   * each time and the old one has to go back. */
+  bakeEnv() {
+    const next = this.pmrem.fromScene(this.probe, 0.0, 0.1, 100);
+    if (this.envTarget) this.envTarget.dispose();
+    this.envTarget = next;
+    this.scene.environment = next.texture;
+  }
+
+  mesh(geo, mat, x, y, z) {
+    const m = new T.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    this.root.add(m);
+    return m;
+  }
+
+  /* Every preset field is read into vertex positions, and a missing one
+   * multiplies to NaN — which does not throw, it just produces a geometry with
+   * no bounding sphere and an empty screen (2026-09-20: `beach` lost its `rim`
+   * to a bad search-and-replace and only a console warning said so). Check the
+   * table rather than trusting it. */
+  static checkPresets() {
+    const need = ['amp', 'rim', 'oct', 'scale', 'seed', 'low', 'high', 'rock', 'peak'];
+    for (const [k, P] of Object.entries(PRESETS)) {
+      for (const f of need) {
+        if (!Number.isFinite(P[f])) throw new Error('world preset ' + k + '.' + f + ' is not a number');
+      }
+      if (P.water !== null && !Number.isFinite(P.water)) throw new Error('world preset ' + k + '.water is invalid');
+    }
+    return Object.keys(PRESETS);
+  }
+
+  set(kind) {
+    this.kind = kind;
+    // the water's normal map is a per-background CLONE, so disposing the
+    // material is not enough to release it
+    this.root.traverse((o) => {
+      o.geometry?.dispose();
+      if (o.material) { o.material.normalMap?.dispose(); o.material.map?.dispose(); o.material.dispose(); }
+    });
+    this.root.clear();
+    this.moving = [];
+    this.envAlt = 99;                    // the sky changed; re-bake the ambient
+
+    if (kind === 'none') {
+      // The void. Still sun-plus-ambient, but the sky behind it is black and
+      // the cycle is pinned to daylight, because a background the player chose
+      // to be empty must not also become unreadable for twelve minutes.
+      this.scene.background = new T.Color(0);
+      this.scene.fog = null;
+      this.dome.visible = false;
+      this.sky.uZenith.value.setHex(0x6b7a9c);
+      this.sky.uHorizon.value.setHex(0x49536a);
+      this.sky.uGround.value.setHex(0x262b36);
+      this.sky.uCloud.value = 0;
+      this.sky.uStars.value = 0;
+      this.sky.uHaze.value = 0;
+      return;
+    }
+
+    const P = PRESETS[kind];
+    World.checkPresets();
+    this.scene.background = null;        // the dome is the background now
+    this.dome.visible = true;
+    this.sky.uCloud.value = kind === 'arctic' ? 0.85 : 1;
+    this.sky.uHaze.value = kind === 'beach' ? 0.75 : kind === 'arctic' ? 0.35 : 0.5;
+    this.scene.fog = new T.FogExp2(0x9ec4da, kind === 'mountains' ? 0.0030 : 0.0040);
+
+    this.buildTerrain(P);
+    if (P.water) this.buildWater(P);
+    if (kind === 'meadow') this.buildGrass();
+    if (kind === 'arctic') this.buildSnowfall();
+  }
+
+  /* --- terrain ----------------------------------------------------------
+   * A displaced heightfield with baked vertex colours, replacing the flat
+   * plane plus twenty-two random cones this used to be. Colour comes from
+   * height AND slope, which is what stops it reading as a painted gradient:
+   * steep faces go to rock at any altitude, flats take snow or grass. */
+  buildTerrain(P) {
+    const N = this.bigDevice ? 168 : 96, SIZE = 720, v = noiseField(P.seed), v2 = noiseField(P.seed + 811);
+    const geo = new T.PlaneGeometry(SIZE, SIZE, N, N);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position, n = pos.count;
+    const col = new Float32Array(n * 3);
+    const c = new T.Color(), lo = new T.Color(P.low), hi = new T.Color(P.high),
+          rk = new T.Color(P.rock), pk = new T.Color(P.peak);
+
+    const heightAt = (x, z) => {
+      const r = Math.hypot(x, z);
+      // flat and low under the board, rising only once well clear of it
+      const keep = T.MathUtils.smoothstep(r, 16, 104);
+      let e = fbm(v, x * P.scale, z * P.scale, P.oct, P.ridged);
+      if (P.ridged) e = Math.pow(e, 1.35);
+      const detail = fbm(v2, x * P.scale * 5.5, z * P.scale * 5.5, 3, false) - 0.5;
+      // The rim. Without it the far edge of the ground plane IS the skyline,
+      // which reads as a ruler-straight horizon however much relief is nearer
+      // in (2026-09-20). Lifting the distance into hills hides the edge and
+      // gives the valley a rim to sit in.
+      const rim = T.MathUtils.smoothstep(r, 150, 360) * P.rim
+        * (0.45 + 1.05 * fbm(v, x * P.scale * 0.55 + 40, z * P.scale * 0.55 + 40, 4, P.ridged));
+      return GROUND_Y + (e * P.amp + detail * P.amp * 0.08) * keep + rim;
+    };
+    this.heightAt = heightAt;                    // grass and snow settle on it
+
+    for (let i = 0; i < n; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      pos.setY(i, heightAt(x, z));
+    }
+    geo.computeVertexNormals();
+    const nor = geo.attributes.normal;
+    for (let i = 0; i < n; i++) {
+      const y = pos.getY(i), slope = 1 - nor.getY(i);
+      const alt = T.MathUtils.clamp((y - GROUND_Y) / Math.max(1, P.amp + P.rim * 0.75), 0, 1);
+      c.copy(lo).lerp(hi, T.MathUtils.smoothstep(alt, 0.05, 0.55));
+      c.lerp(pk, T.MathUtils.smoothstep(alt, 0.62, 0.92));
+      c.lerp(rk, T.MathUtils.smoothstep(slope, 0.22, 0.62));   // steep goes rocky
+      // Two scales of mottle. The broad one is what stops a flat valley floor
+      // reading as a painted plane; the fine one keeps it from banding.
+      const m = (0.82 + 0.36 * fbm(v2, x * 0.010, z * 0.010, 3, false))
+              * (0.95 + 0.10 * v2(x * 0.09, z * 0.09));
+      col[i * 3] = c.r * m; col[i * 3 + 1] = c.g * m; col[i * 3 + 2] = c.b * m;
+    }
+    geo.setAttribute('color', new T.BufferAttribute(col, 3));
+
+    const m = this.mesh(geo, new T.MeshStandardMaterial({
+      vertexColors: true, roughness: 0.96, metalness: 0,
+      envMapIntensity: 0.65,          // ground takes less sky than the board does
+    }), 0, 0, 0);
+    m.receiveShadow = true;
+    m.castShadow = false;             // one tight shadow camera; see constructor
+  }
+
+  /* --- water ------------------------------------------------------------
+   * A scrolling normal map over a near-mirror surface. The colour is almost
+   * all reflected sky, which is the point: it changes with the hour for free,
+   * and at night it is the moon's path on dark water. */
+  buildWater(P) {
+    if (!this.ripple) this.ripple = rippleNormals();
+    const tex = this.ripple.clone();
+    tex.needsUpdate = true;
+    tex.wrapS = tex.wrapT = T.RepeatWrapping;
+    tex.repeat.set(15, 15);
+    const mat = new T.MeshStandardMaterial({
+      color: P.water, roughness: 0.075, metalness: 0.06,
+      normalMap: tex, envMapIntensity: 1.5,
+    });
+    mat.normalScale.set(0.30, 0.30);
+    const sea = this.mesh(new T.PlaneGeometry(900, 900), mat, 0, GROUND_Y + 1.15, 0);
+    sea.rotation.x = -Math.PI / 2;
+    sea.receiveShadow = false;
+    this.moving.push({ type: 'sea', tex });
+  }
+
+  buildGrass() {
+    const rnd = mulberry(5150), COUNT = this.bigDevice ? 2600 : 1500;
+    const blade = new T.ConeGeometry(0.13, 0.5, 3);
+    blade.translate(0, 0.25, 0);
+    const mesh = new T.InstancedMesh(blade, new T.MeshStandardMaterial({
+      color: 0xffffff, roughness: 0.9, envMapIntensity: 0.6,
+    }), COUNT);
+    const d = new T.Object3D(), c = new T.Color();
+    for (let i = 0; i < COUNT; i++) {
+      // a ring around the board, never under it
+      // sqrt keeps the ring evenly dense instead of bunching at the inside
+      const a = rnd() * Math.PI * 2, r = 14 + Math.sqrt(rnd()) * 84;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      d.position.set(x, (this.heightAt ? this.heightAt(x, z) : GROUND_Y) - 0.08, z);
+      d.rotation.set((rnd() - 0.5) * 0.25, rnd() * 6.3, (rnd() - 0.5) * 0.25);
+      d.scale.set(0.8 + rnd() * 0.6, 0.8 + rnd() * 1.3, 0.8 + rnd() * 0.6);
+      d.updateMatrix();
+      mesh.setMatrixAt(i, d.matrix);
+      c.setHSL(0.23 + rnd() * 0.07, 0.45 + rnd() * 0.22, 0.17 + rnd() * 0.14);
+      mesh.setColorAt(i, c);
+    }
+    mesh.instanceColor.needsUpdate = true;
+    mesh.castShadow = false;
+    this.root.add(mesh);
+    this.moving.push({ type: 'grass', mesh });
+  }
+
+  buildSnowfall() {
+    const rnd = mulberry(311), COUNT = this.bigDevice ? 1100 : 650, p = new Float32Array(COUNT * 3);
+    for (let i = 0; i < COUNT; i++) {
+      // a ring, never the column the board occupies: a near flake is drawn
+      // large by size attenuation and reads as a white square stuck to a piece
+      const a = rnd() * Math.PI * 2, r = 34 + rnd() * 72;
+      p[i * 3] = Math.cos(a) * r;
+      p[i * 3 + 1] = rnd() * 60 + GROUND_Y;
+      p[i * 3 + 2] = Math.sin(a) * r;
+    }
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.BufferAttribute(p, 3));
+    const flakes = new T.Points(g, new T.PointsMaterial({
+      color: 0xf2fbff, size: 0.22, map: softDot(), transparent: true, opacity: 0.75,
+      depthWrite: false, sizeAttenuation: true,
+    }));
+    flakes.frustumCulled = false;
+    this.root.add(flakes);
+    this.moving.push({ type: 'snow', mesh: flakes });
+  }
+
+  /* --- per-frame --------------------------------------------------------
+   * Returns the day factor, 0 at night and 1 at noon, which game.js uses for
+   * exposure and audio. */
+  tick(t) {
+    const phase = t / 1440 * Math.PI * 2 + 0.65;
+    const alt = Math.sin(phase);
+    const day = T.MathUtils.smoothstep(alt, -0.2, 0.5);
+    const S = this.sky;
+
+    const sunDir = new T.Vector3(Math.cos(phase) * 0.80, alt, -0.24).normalize();
+    const moonDir = sunDir.clone().negate();
+    S.uSunDir.value.copy(sunDir);
+    S.uMoonDir.value.copy(moonDir);
+    S.uTime.value = t;
+    S.uDay.value = day;
+
+    /* The sun's own colour reddens as it sets — this is the only place the
+     * warm dusk comes from, since there is no longer a tinted fill light to
+     * fake it with. */
+    const low = 1 - T.MathUtils.smoothstep(alt, -0.05, 0.42);
+    S.uSunCol.value.setHSL(0.115 - low * 0.085, 0.35 + low * 0.55, 0.72 - low * 0.10);
+    this.sun.color.copy(S.uSunCol.value);
+    this.sun.intensity = 3.4 * T.MathUtils.smoothstep(alt, -0.09, 0.22);
+    this.sun.position.copy(sunDir).multiplyScalar(70);
+    this.moon.position.copy(moonDir).multiplyScalar(70);
+    this.moon.intensity = 0.17 * T.MathUtils.smoothstep(-alt, -0.05, 0.30);
+
+    // exactly one shadow map is rendered per frame
+    const sunUp = this.sun.intensity > 0.05;
+    this.sun.castShadow = sunUp;
+    this.moon.castShadow = !sunUp && this.moon.intensity > 0.01;
+
+    if (this.kind === 'none') {
+      // pinned daylight from a fixed angle, black sky, low neutral ambient
+      this.sun.color.setHex(0xfff2de);
+      this.sun.intensity = 3.1;
+      this.sun.position.set(-26, 46, 34);
+      this.sun.castShadow = true;
+      this.moon.intensity = 0; this.moon.castShadow = false;
+      if (this.envAlt !== 0) { this.bakeEnv(); this.envAlt = 0; }
+      this.scene.environmentIntensity = 1.5;
+      return 1;
+    }
+
+    /* Sky colours. Zenith deepens as the sun climbs; the horizon keeps a pale
+     * haze so the terrain has something to fade into. */
+    const night = 1 - day;
+    S.uZenith.value.setHex(this.kind === 'arctic' ? 0x3a78bd : 0x2a68c6)
+      .lerp(new T.Color(0x05070f), night * 0.97);
+    S.uHorizon.value.setHex(this.kind === 'beach' ? 0xd2e2ec : 0xbcd6e8)
+      .lerp(new T.Color(0x0b1020), night * 0.94);
+    // the warm band, strongest when the sun is right on the horizon
+    const dusk = Math.max(0, 1 - Math.abs(alt - 0.02) / 0.26);
+    if (dusk > 0) {
+      S.uHorizon.value.lerp(new T.Color(0xe08a52), dusk * 0.62);
+      S.uZenith.value.lerp(new T.Color(0x4a4a86), dusk * 0.22);
+    }
+    S.uGround.value.copy(S.uHorizon.value).multiplyScalar(0.45);
+    S.uStars.value = Math.pow(night, 1.6);
+    S.uMoonCol.value.setHex(0xdce8ff).multiplyScalar(0.55 + 0.45 * night);
+
+    this.scene.fog.color.copy(S.uHorizon.value);
+    this.scene.environmentIntensity = 0.82;
+
+    /* Re-bake the ambient only when the sun has actually moved. Over one
+     * 24-minute cycle this runs a couple of hundred times, not 86 000. */
+    if (Math.abs(alt - this.envAlt) > 0.018) { this.bakeEnv(); this.envAlt = alt; }
+
+    for (const o of this.moving) {
+      if (o.type === 'sea') { o.tex.offset.x = t * 0.0065; o.tex.offset.y = t * 0.0031; }
+      if (o.type === 'grass') o.mesh.rotation.z = Math.sin(t * 0.7) * 0.006;
+      if (o.type === 'snow') {
+        const a = o.mesh.geometry.attributes.position;
+        for (let i = 0; i < a.count; i++) {
+          let y = a.getY(i) - 0.035;
+          if (y < GROUND_Y - 2) y = GROUND_Y + 60;
+          a.setY(i, y);
+          a.setX(i, a.getX(i) + Math.sin(t * 0.6 + i) * 0.004);
+        }
+        a.needsUpdate = true;
+      }
+    }
+    return day;
+  }
+}
 
 class Sound{constructor(settings){this.s=settings;this.ctx=null;this.bg='none';this.nextBird=0;}start(){if(!this.ctx){const C=window.AudioContext||window.webkitAudioContext;if(!C)return;this.ctx=new C();this.master=this.ctx.createGain();this.master.connect(this.ctx.destination);this.fx=this.ctx.createGain();this.fx.connect(this.master);this.amb=this.ctx.createGain();this.amb.connect(this.master);const b=this.ctx.createBuffer(1,this.ctx.sampleRate*4,this.ctx.sampleRate),a=b.getChannelData(0);let v=0;for(let i=0;i<a.length;i++){v=(v+(Math.random()*2-1)*.025)/1.025;a[i]=v*4;}this.noise=this.ctx.createBufferSource();this.noise.buffer=b;this.noise.loop=true;this.filter=this.ctx.createBiquadFilter();this.filter.type='lowpass';this.wind=this.ctx.createGain();this.noise.connect(this.filter);this.filter.connect(this.wind);this.wind.connect(this.amb);this.noise.start();}this.ctx.resume();this.update();}update(){if(!this.ctx)return;this.master.gain.value=this.s.muted?0:this.s.master/100;this.fx.gain.value=this.s.effects/100;this.amb.gain.value=this.s.ambient/100;}tone(freq,duration,volume,type='sine',bus=this.fx,end=freq){if(!this.ctx)return;const t=this.ctx.currentTime,o=this.ctx.createOscillator(),g=this.ctx.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);o.frequency.exponentialRampToValueAtTime(Math.max(20,end),t+duration);g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(Math.max(.002,volume),t+.008);g.gain.exponentialRampToValueAtTime(.001,t+duration);o.connect(g);g.connect(bus);o.start();o.stop(t+duration+.02);}effect(ok,mat){const metal=mat.includes('metal'),glass=['jello','honey','ice'].includes(mat);this.tone(ok?metal?780:glass?520:240:95,ok?.24:.12,ok?.13:.12,metal?'sine':'triangle',this.fx,ok?metal?320:150:55);if(ok&&metal)this.tone(1210,.35,.04);}firework(){this.tone(70,.22,.22,'triangle',this.fx,24);}tick(t,day){if(!this.ctx)return;const b=this.bg;this.wind.gain.setTargetAtTime(b==='none'?0:b==='beach'?.20+.12*Math.sin(t*.5):b==='arctic'?.12+.06*Math.sin(t*.18):b==='mountains'?.075+.025*Math.sin(t*.22):.025,this.ctx.currentTime,.3);this.filter.frequency.value=b==='beach'?950:b==='arctic'?1500:450;if(t>this.nextBird){this.nextBird=t+3+Math.random()*7;if(b==='meadow'){if(day>.2){this.tone(2300,.15,.027,'sine',this.amb,3400);setTimeout(()=>this.tone(2900,.18,.02,'sine',this.amb,2200),160);}else this.tone(4200,.09,.014,'sine',this.amb,4400);}if(b==='mountains')this.tone(1100,.45,.018,'sine',this.amb,700);if(b==='beach')this.tone(950,.5,.014,'sine',this.amb,1700);if(b==='arctic')this.tone(140,.5,.025,'sine',this.amb,60);}}}
 
@@ -24,12 +598,75 @@ class Sound{constructor(settings){this.s=settings;this.ctx=null;this.bg='none';t
 const $=id=>document.getElementById(id),defaults={material:'pine',background:'none',master:70,effects:75,ambient:40,muted:false,min:5,max:20};let saved={};try{saved=JSON.parse(localStorage.getItem('interlock-settings'))||{};}catch{}const s={...defaults,...saved};
 const materials=[['pine','Light pine','#dec391'],['walnut','Warm walnut','#a27043'],['ebony','Dark ebony','#4e3426'],['rust','Rusty metal','#945030'],['metal','Polished metal','#b7c2cc'],['jello','Green jello','#53d97c'],['honey','Gold honey','#efac32'],['ice','Blue ice','#83d7ed']];if(!materials.some(m=>m[0]===s.material))s.material='pine';if(!['none','meadow','mountains','beach','arctic'].includes(s.background))s.background='none';for(const k of ['master','effects','ambient'])s[k]=Number.isFinite(+s[k])?Math.max(0,Math.min(100,+s[k])):defaults[k];s.muted=!!s.muted;
 const bound=(v,d)=>v===''||!Number.isFinite(+v)?d:Math.max(5,Math.min(20,Math.round(+v)));s.min=bound(s.min,5);s.max=Math.max(s.min,bound(s.max,20));function save(){try{localStorage.setItem('interlock-settings',JSON.stringify(s));}catch{}}
-let renderer;try{renderer=new T.WebGLRenderer({canvas:$('game'),antialias:true,alpha:false,powerPreference:'high-performance'});}catch{$('notice').hidden=false;$('notice').textContent='This game needs WebGL. Please open it in a browser with hardware acceleration enabled.';throw Error('WebGL unavailable');}renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;const scene=new T.Scene(),camera=new T.PerspectiveCamera(38,1,.1,300),root=new T.Group();scene.add(root);const world=new World(scene);world.set(s.background);const sound=new Sound(s);sound.bg=s.background;let puzzle,count=s.min,locked=false,zoom=1,arrival=0;const ray=new T.Raycaster(),pointer=new T.Vector2(),animations=[],clockStart=performance.now();let lastTime=clockStart;
+let renderer;try{renderer=new T.WebGLRenderer({canvas:$('game'),antialias:true,alpha:false,powerPreference:'high-performance'});}catch{$('notice').hidden=false;$('notice').textContent='This game needs WebGL. Please open it in a browser with hardware acceleration enabled.';throw Error('WebGL unavailable');}renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;const scene=new T.Scene(),camera=new T.PerspectiveCamera(38,1,.5,1400),root=new T.Group();scene.add(root);const world=new World(scene,renderer);world.set(s.background);const sound=new Sound(s);sound.bg=s.background;let puzzle,count=s.min,locked=false,zoom=1,arrival=0;const ray=new T.Raycaster(),pointer=new T.Vector2(),animations=[];let clockStart=performance.now();let lastTime=clockStart;
 function texture(){const c=document.createElement('canvas');c.width=c.height=256;const a=c.getContext('2d');a.fillStyle='#d1bd99';a.fillRect(0,0,256,256);for(let x=0;x<256;x++){a.strokeStyle=`rgba(75,38,16,${.025+Math.random()*.09})`;a.lineWidth=.5+Math.random();a.beginPath();for(let y=0;y<=256;y+=4){const p=x+Math.sin(y*.018+x*.024)*3+Math.sin(y*.04)*.5;y?a.lineTo(p,y):a.moveTo(p,y);}a.stroke();}const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;tex.wrapS=tex.wrapT=T.RepeatWrapping;return tex;}const grain=texture();const rustCanvas=document.createElement('canvas');rustCanvas.width=rustCanvas.height=128;const rc=rustCanvas.getContext('2d'),rd=rc.createImageData(128,128);for(let i=0;i<rd.data.length;i+=4){const v=Math.random();rd.data[i]=90+v*150;rd.data[i+1]=65+v*100;rd.data[i+2]=40+v*80;rd.data[i+3]=255;}rc.putImageData(rd,0,0);const rustTexture=new T.CanvasTexture(rustCanvas);rustTexture.colorSpace=T.SRGBColorSpace;rustTexture.wrapS=rustTexture.wrapT=T.RepeatWrapping;
-// A local reflection map keeps polished metal and glass legible even in the black void.
-const studio=new T.Scene();studio.background=new T.Color(0x333944);for(const [x,y,z,w,h,c]of [[-5,4,2,5,8,0xffedce],[5,1,0,3,7,0xd2e8ff],[0,7,-2,8,3,0xffffff]]){const m=new T.Mesh(new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({color:c,side:T.DoubleSide}));m.position.set(x,y,z);m.lookAt(0,0,0);studio.add(m);}const pmrem=new T.PMREMGenerator(renderer);const env=pmrem.fromScene(studio,.08);scene.environment=env.texture;pmrem.dispose();
-function mat(id){const def=materials.find(m=>m[0]===s.material),color=new T.Color(def[2]);color.offsetHSL((id%3-1)*.008,0,(id%5-2)*.025);const wood=['pine','walnut','ebony'].includes(s.material),glass=['jello','honey','ice'].includes(s.material);return new T.MeshPhysicalMaterial({color,map:wood?grain:s.material==='rust'?rustTexture:null,roughness:wood?.43:s.material==='metal'?.16:s.material==='rust'?.85:.12,metalness:s.material==='metal'?1:s.material==='rust'?.7:0,transmission:glass?.72:0,thickness:glass?1.2:0,ior:s.material==='ice'?1.31:1.4,clearcoat:glass?1:wood?.15:.3,transparent:false,attenuationColor:color,attenuationDistance:3,envMapIntensity:1.1});}
-function geometry(cells,size){const set=new Set(cells.map(c=>c.join(','))),verts=[],normals=[],uv=[];const faces=[[[1,0,0],[[.5,-.5,-.5],[.5,.5,-.5],[.5,.5,.5],[.5,-.5,.5]]],[[-1,0,0],[[-.5,-.5,.5],[-.5,.5,.5],[-.5,.5,-.5],[-.5,-.5,-.5]]],[[0,1,0],[[-.5,.5,.5],[.5,.5,.5],[.5,.5,-.5],[-.5,.5,-.5]]],[[0,-1,0],[[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5]]],[[0,0,1],[[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5],[-.5,-.5,.5]]],[[0,0,-1],[[-.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],[.5,-.5,-.5]]]];const center=new T.Vector3();cells.forEach(c=>center.add(new T.Vector3(...c)));center.divideScalar(cells.length);for(const c of cells)for(const[d,corners]of faces){if(set.has(c.map((v,i)=>v+d[i]).join(',')))continue;for(const k of [0,1,2,0,2,3]){const p=corners[k].map((v,i)=>(v+c[i]-center.getComponent(i))*.975+center.getComponent(i)-(size-1)/2);verts.push(...p);normals.push(...d);uv.push((c[0]+corners[k][0]+c[2]+corners[k][2])*.24,(c[1]+corners[k][1])*.24);}}const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(verts,3));g.setAttribute('normal',new T.Float32BufferAttribute(normals,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.computeBoundingSphere();return g;}
+// The environment map is baked from the sky by world.js — see its header for
+// why there is no studio rig here any more. Polished metal and the glass
+// materials take their reflections from whatever is actually overhead, so a
+// background with no sky ('none') supplies a dim neutral one instead.
+function mat(id,radius){const def=materials.find(m=>m[0]===s.material),color=new T.Color(def[2]);color.offsetHSL((id%3-1)*.008,0,(id%5-2)*.025);const k=s.material,wood=['pine','walnut','ebony'].includes(k),glass=['jello','honey','ice'].includes(k),metal=k==='metal',rust=k==='rust';
+// Glass is deliberately CLEARER than it was (.92 against .72) and gets its
+// colour from absorption instead: attenuationDistance scales with the piece's
+// own radius, so a chunky piece is deeply saturated and a thin one is nearly
+// water. That is the depth cue that tells two overlapping pieces apart.
+// polygonOffset pushes the filled surface a hair away from the camera so the
+// edge lines sit in FRONT of it rather than z-fighting with it — without this
+// the lines are coincident with the faces and simply never win the depth test.
+return new T.MeshPhysicalMaterial({color,map:wood?grain:rust?rustTexture:null,
+  roughness:wood?.43:metal?.14:rust?.85:k==='ice'?.055:glass?.09:.12,
+  metalness:metal?1:rust?.7:0,
+  transmission:glass?.92:0,
+  thickness:glass?Math.max(.8,radius*.85):0,
+  ior:k==='ice'?1.31:k==='honey'?1.48:k==='jello'?1.37:1.45,
+  attenuationColor:color,attenuationDistance:glass?Math.max(4,radius*3.4):3,
+  clearcoat:glass?.35:wood?.15:.3,clearcoatRoughness:glass?.07:.2,
+  side:glass?T.DoubleSide:T.FrontSide,
+  vertexColors:true,envMapIntensity:1,transparent:false,
+  polygonOffset:true,polygonOffsetFactor:1.4,polygonOffsetUnits:1.4});}
+// Edges must be OPAQUE, and that is not a style choice. three renders only the
+// opaque list into the transmission render target, so a transparent line is
+// invisible through a glass piece — which is exactly why the board used to
+// show the background cleanly and show nothing of the other pieces (CD,
+// 2026-09-20). Opaque lines land in that target and read through the glass.
+function edgeMat(id){const def=materials.find(m=>m[0]===s.material),c=new T.Color(def[2]);c.offsetHSL((id%3-1)*.008,0,(id%5-2)*.025);const glass=['jello','honey','ice'].includes(s.material);
+c.lerp(new T.Color(0x0a0806),glass?.60:.52);if(glass)c.lerp(new T.Color(0xcfe6ff),.14);
+return new T.LineBasicMaterial({color:c,transparent:false});}
+
+/* Voxel ambient occlusion, baked per vertex against the cells that are STILL
+ * on the board. This is the other half of "shadow quality": a shadow map only
+ * darkens what the sun is blocked from, and between two flush pieces the sun
+ * was never reaching anyway — the seams were being filled in flat by the sky
+ * ambient, which is exactly what ambient occlusion is for. Each face vertex
+ * looks at the two edge neighbours and the corner neighbour one cell out along
+ * the face normal; the classic 0-3 level, with the two-sided case forced dark.
+ *
+ * It is recomputed on every removal (`rebuildAO`), because a face that was
+ * buried in a crevice is genuinely out in the open once the piece next to it
+ * has slid away — bake it once and the board keeps painting shadows for pieces
+ * that are no longer there. */
+const AO_LEVEL=[0.42,0.60,0.79,1.0];
+const FACES=[[[1,0,0],[[.5,-.5,-.5],[.5,.5,-.5],[.5,.5,.5],[.5,-.5,.5]]],[[-1,0,0],[[-.5,-.5,.5],[-.5,.5,.5],[-.5,.5,-.5],[-.5,-.5,-.5]]],[[0,1,0],[[-.5,.5,.5],[.5,.5,.5],[.5,.5,-.5],[-.5,.5,-.5]]],[[0,-1,0],[[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5]]],[[0,0,1],[[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5],[-.5,-.5,.5]]],[[0,0,-1],[[-.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],[.5,-.5,-.5]]]];
+function vertexAO(cell,dir,corner,occupied){
+  // the two axes lying in the face plane
+  const ax=[];for(let i=0;i<3;i++)if(dir[i]===0)ax.push(i);
+  const at=o=>occupied.has((cell[0]+dir[0]+(o[0]||0))+','+(cell[1]+dir[1]+(o[1]||0))+','+(cell[2]+dir[2]+(o[2]||0)));
+  const s1=[0,0,0];s1[ax[0]]=Math.sign(corner[ax[0]]);
+  const s2=[0,0,0];s2[ax[1]]=Math.sign(corner[ax[1]]);
+  const a=at(s1),b=at(s2),c=at([s1[0]+s2[0],s1[1]+s2[1],s1[2]+s2[2]]);
+  return AO_LEVEL[(a&&b)?0:3-((a?1:0)+(b?1:0)+(c?1:0))];
+}
+function geometry(cells,size,occupied){const set=new Set(cells.map(c=>c.join(','))),verts=[],normals=[],uv=[],col=[];
+const center=new T.Vector3();cells.forEach(c=>center.add(new T.Vector3(...c)));center.divideScalar(cells.length);
+for(const c of cells)for(const[d,corners]of FACES){if(set.has(c.map((v,i)=>v+d[i]).join(',')))continue;
+for(const k of [0,1,2,0,2,3]){const p=corners[k].map((v,i)=>(v+c[i]-center.getComponent(i))*.975+center.getComponent(i)-(size-1)/2);
+verts.push(...p);normals.push(...d);uv.push((c[0]+corners[k][0]+c[2]+corners[k][2])*.24,(c[1]+corners[k][1])*.24);
+const a=occupied?vertexAO(c,d,corners[k],occupied):1;col.push(a,a,a);}}
+const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(verts,3));g.setAttribute('normal',new T.Float32BufferAttribute(normals,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setAttribute('color',new T.Float32BufferAttribute(col,3));g.computeBoundingSphere();return g;}
+// every cell still on the board, which is what AO is computed against
+function occupancy(){const o=new Set();for(const p of puzzle.pieces)if(!p.removed)for(const c of p.cells)o.add(c.join(','));return o;}
+function rebuildAO(){const occ=occupancy();for(const p of puzzle.pieces){if(p.removed)continue;
+const g=geometry(p.cells,puzzle.size,occ);p.mesh.geometry.dispose();p.mesh.geometry=g;
+const e=p.mesh.getObjectByName('edges');if(e){e.geometry.dispose();e.geometry=new T.EdgesGeometry(g,20);}}}
 // --- the viewport, measured in ONE place ---------------------------------
 // games/CLAUDE.md § Canvas sizing: sizing the backing store from
 // innerWidth/innerHeight while taps are read off clientX/clientY uses two
@@ -60,8 +697,9 @@ function reflow(){const b=viewBox();if(b.w!==boxW||b.h!==boxH)fit();}
 addEventListener('resize',reflow);
 addEventListener('orientationchange',()=>{reflow();setTimeout(reflow,120);setTimeout(reflow,400);});
 if(window.visualViewport){visualViewport.addEventListener('resize',reflow);visualViewport.addEventListener('scroll',reflow);}
-function newPuzzle(){root.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});root.clear();puzzle=generatePuzzle(count);for(const p of puzzle.pieces){p.mesh=new T.Mesh(geometry(p.cells,puzzle.size),mat(p.id));p.mesh.userData.piece=p;const edges=new T.LineSegments(new T.EdgesGeometry(p.mesh.geometry,20),new T.LineBasicMaterial({color:0x231a12,transparent:true,opacity:.25}));p.mesh.add(edges);root.add(p.mesh);}root.rotation.set(.38,-.65,.12);arrival=performance.now();locked=false;zoom=1;fit();}newPuzzle();
-function updateMaterials(){for(const p of puzzle.pieces){p.mesh.material.dispose();p.mesh.material=mat(p.id);}}
+function newPuzzle(){root.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});root.clear();puzzle=generatePuzzle(count);const occ0=new Set();for(const p of puzzle.pieces)for(const c of p.cells)occ0.add(c.join(','));
+for(const p of puzzle.pieces){const g=geometry(p.cells,puzzle.size,occ0);p.mesh=new T.Mesh(g,mat(p.id,g.boundingSphere.radius));p.mesh.userData.piece=p;p.mesh.castShadow=!['jello','honey','ice'].includes(s.material);p.mesh.receiveShadow=true;const edges=new T.LineSegments(new T.EdgesGeometry(g,20),edgeMat(p.id));edges.name='edges';p.mesh.add(edges);root.add(p.mesh);}root.rotation.set(.38,-.65,.12);arrival=performance.now();locked=false;zoom=1;fit();}newPuzzle();
+function updateMaterials(){const glass=['jello','honey','ice'].includes(s.material);for(const p of puzzle.pieces){p.mesh.material.dispose();p.mesh.material=mat(p.id,p.mesh.geometry.boundingSphere.radius);p.mesh.castShadow=!glass;const e=p.mesh.getObjectByName('edges');if(e){e.material.dispose();e.material=edgeMat(p.id);}}}
 let sparks=null;function celebrate(){locked=true;const next=Math.min(s.max,Math.max(s.min,count+1));$('completed').textContent=count;$('next').textContent=next;$('success').classList.remove('celebrate');void $('success').offsetWidth;$('success').classList.add('celebrate');const pos=[],vel=[],colors=[];for(let b=0;b<5;b++){const x=(Math.random()-.5)*9,y=(Math.random()-.3)*6;const color=new T.Color().setHSL(b/5,.7,.65);for(let i=0;i<60;i++){pos.push(x,y,1);const v=new T.Vector3().randomDirection().multiplyScalar(2+Math.random()*4);vel.push(v.x,v.y,v.z);colors.push(color.r,color.g,color.b);}}const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('color',new T.Float32BufferAttribute(colors,3));sparks={mesh:new T.Points(g,new T.PointsMaterial({size:.055,vertexColors:true,transparent:true,depthTest:false,blending:T.AdditiveBlending})),vel,start:performance.now()};scene.add(sparks.mesh);sound.firework();setTimeout(()=>{scene.remove(sparks.mesh);sparks.mesh.geometry.dispose();sparks.mesh.material.dispose();sparks=null;count=next;newPuzzle();},1000);}
 function tap(x,y){if(locked||$('settings').open)return;const b=viewBox();pointer.set((x-b.x)/b.w*2-1,-(y-b.y)/b.h*2+1);ray.setFromCamera(pointer,camera);const hit=ray.intersectObjects(puzzle.pieces.filter(p=>!p.removed&&!p.busy).map(p=>p.mesh),false)[0];if(!hit)return;const p=hit.object.userData.piece;const dir=[p.dir,...directions].find(d=>canSlide(p,d,puzzle.pieces));p.busy=true;sound.effect(!!dir,s.material==='rust'?'metal':s.material);animations.push({p,dir:dir||p.dir,start:performance.now(),ok:!!dir});}
 const fingers=new Map();let gesture=null,lastPinch=0;canvas.addEventListener('pointerdown',e=>{sound.start();canvas.setPointerCapture(e.pointerId);fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(fingers.size===1)gesture={x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:0,multi:false};else{gesture.multi=true;lastPinch=pinch();}});function pinch(){const a=[...fingers.values()];return a.length<2?0:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);}canvas.addEventListener('pointermove',e=>{if(!fingers.has(e.pointerId))return;fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(fingers.size>1){const d=pinch();if(lastPinch)zoom=Math.max(.65,Math.min(1.7,zoom*lastPinch/d));lastPinch=d;fit();return;}if(!gesture)return;const dx=e.clientX-gesture.lastX,dy=e.clientY-gesture.lastY;gesture.moved=Math.max(gesture.moved,Math.hypot(e.clientX-gesture.x,e.clientY-gesture.y));if(gesture.moved>5){const q=new T.Quaternion().setFromEuler(new T.Euler(dy*.007,dx*.007,0));root.quaternion.premultiply(q);}gesture.lastX=e.clientX;gesture.lastY=e.clientY;});canvas.addEventListener('pointerup',e=>{if(gesture&&!gesture.multi&&gesture.moved<7)tap(e.clientX,e.clientY);fingers.delete(e.pointerId);if(!fingers.size)gesture=null;});canvas.addEventListener('pointercancel',e=>{fingers.delete(e.pointerId);gesture=null;});canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.65,Math.min(1.7,zoom+e.deltaY*.001));fit();},{passive:false});canvas.addEventListener('keydown',e=>{if(e.key.startsWith('Arrow')){e.preventDefault();root.rotation.y+=e.key==='ArrowLeft'?-.15:e.key==='ArrowRight'?.15:0;root.rotation.x+=e.key==='ArrowUp'?-.15:e.key==='ArrowDown'?.15:0;}if(e.key==='Enter'||e.key===' '){e.preventDefault();sound.start();const b=viewBox();tap(b.x+b.w/2,b.y+b.h/2);}});
@@ -75,7 +713,7 @@ muteBtn.onclick=()=>{sound.start();s.muted=!s.muted;paintMute();sound.update();s
 $('reload-btn').onclick=()=>{sound.start();if(locked)return;animations.length=0;newPuzzle();};
 document.addEventListener('visibilitychange',()=>{if(!sound.ctx)return;document.hidden?sound.ctx.suspend():sound.ctx.resume();});
 $('settingsButton').onclick=()=>{sound.start();$('settings').showModal();};$('settings').addEventListener('close',()=>{commitBounds();$('settingsButton').focus();});$('settings').addEventListener('click',e=>{if(e.target===$('settings')){const r=$('settings').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)$('settings').close();}});
-function frame(now){reflow();const dt=Math.min(.05,(now-lastTime)/1000);lastTime=now;const t=(now-clockStart)/1000;const day=world.tick(t);sound.tick(t,day);const fade=Math.min(1,(now-arrival)/260);root.scale.setScalar(.85+.15*fade);root.visible=fade>.01;for(const p of puzzle.pieces){p.mesh.material.opacity=fade;const tr=fade<1;if(p.mesh.material.transparent!==tr){p.mesh.material.transparent=tr;p.mesh.material.needsUpdate=true;}}for(let i=animations.length-1;i>=0;i--){const a=animations[i],u=Math.min(1,(now-a.start)/(a.ok?650:260));const dist=a.ok?u*u*(puzzle.size*3+5):Math.sin(u*Math.PI*6)*.055*(1-u);a.p.mesh.position.set(...a.dir).multiplyScalar(dist);if(u===1){a.p.busy=false;if(a.ok){a.p.removed=true;a.p.mesh.visible=false;}else a.p.mesh.position.set(0,0,0);animations.splice(i,1);if(a.ok&&puzzle.pieces.every(p=>p.removed))celebrate();}}if(sparks){const a=sparks.mesh.geometry.attributes.position;for(let i=0;i<a.count;i++){a.setXYZ(i,a.getX(i)+sparks.vel[i*3]*dt,a.getY(i)+sparks.vel[i*3+1]*dt,a.getZ(i)+sparks.vel[i*3+2]*dt);sparks.vel[i*3+1]-=3*dt;}a.needsUpdate=true;sparks.mesh.material.opacity=Math.max(0,1-(now-sparks.start)/1000);}renderer.render(scene,camera);requestAnimationFrame(frame);}requestAnimationFrame(frame);
+function frame(now){reflow();const dt=Math.min(.05,(now-lastTime)/1000);lastTime=now;const t=(now-clockStart)/1000;const day=world.tick(t);sound.tick(t,day);renderer.toneMappingExposure=1.02+(1-day)*0.58;const fade=Math.min(1,(now-arrival)/260);root.scale.setScalar(.85+.15*fade);root.visible=fade>.01;for(const p of puzzle.pieces){p.mesh.material.opacity=fade;const tr=fade<1;if(p.mesh.material.transparent!==tr){p.mesh.material.transparent=tr;p.mesh.material.needsUpdate=true;}}for(let i=animations.length-1;i>=0;i--){const a=animations[i],u=Math.min(1,(now-a.start)/(a.ok?650:260));const dist=a.ok?u*u*(puzzle.size*3+5):Math.sin(u*Math.PI*6)*.055*(1-u);a.p.mesh.position.set(...a.dir).multiplyScalar(dist);if(u===1){a.p.busy=false;if(a.ok){a.p.removed=true;a.p.mesh.visible=false;rebuildAO();}else a.p.mesh.position.set(0,0,0);animations.splice(i,1);if(a.ok&&puzzle.pieces.every(p=>p.removed))celebrate();}}if(sparks){const a=sparks.mesh.geometry.attributes.position;for(let i=0;i<a.count;i++){a.setXYZ(i,a.getX(i)+sparks.vel[i*3]*dt,a.getY(i)+sparks.vel[i*3+1]*dt,a.getZ(i)+sparks.vel[i*3+2]*dt);sparks.vel[i*3+1]-=3*dt;}a.needsUpdate=true;sparks.mesh.material.opacity=Math.max(0,1-(now-sparks.start)/1000);}renderer.render(scene,camera);requestAnimationFrame(frame);}requestAnimationFrame(frame);
 // Read-only diagnostics for local validation.
 // pick() and ndcOf() exist so a gate can prove taps land where pieces are
 // DRAWN. ndcOf() is deliberately box-free — camera projection only — so a
@@ -92,6 +730,38 @@ window.interlock={
     r.setFromCamera(v,camera);
     const hit=r.intersectObjects(puzzle.pieces.filter(q=>!q.removed).map(q=>q.mesh),false)[0];
     return hit?hit.object.userData.piece.id:null;},
+  // The light rig, so the "sun and moon and nothing else" contract is
+  // assertable rather than eyeballed: any fill light someone adds later shows
+  // up here as a third entry.
+  // The ONLY diagnostic here that writes anything: winds the 24-minute day
+  // cycle to a given second so a gate can check the night rig without waiting
+  // twelve minutes for it. Nothing in the game calls it.
+  /* --- the three writers, all test-only; nothing in the game calls them.
+   * They exist so a gate can prove a rendering property CAUSALLY (turn the
+   * feature off, see the pixels move) instead of comparing two materials and
+   * hoping the difference came from the thing under test — a cross-material
+   * comparison put opaque pine ABOVE two of the three glasses on interior
+   * detail, because wood grain is high-frequency too (2026-09-20). */
+  clock(sec){clockStart=performance.now()-sec*1000;return sec;},
+  // The other writer, also test-only: lets a gate prove shadows change
+  // pixels rather than only that the flags are set.
+  shadows(on){renderer.shadowMap.enabled=!!on;scene.traverse(o=>{if(o.material)o.material.needsUpdate=true;});return !!on;},
+  transmission(on){for(const p of puzzle.pieces){const m=p.mesh.material;
+    if(on){if(m.userData.tSave!==undefined){m.transmission=m.userData.tSave;delete m.userData.tSave;}}
+    else if(m.transmission>0){m.userData.tSave=m.transmission;m.transmission=0;}
+    m.needsUpdate=true;}return !!on;},
+  edges(){const e=puzzle.pieces[0].mesh.getObjectByName('edges');
+    return e?{transparent:e.material.transparent,opacity:e.material.opacity,
+      color:'#'+e.material.color.getHexString()}:null;},
+  rig(){const lights=[];scene.traverse(o=>{if(o.isLight)lights.push({type:o.type,
+    intensity:+o.intensity.toFixed(4),castShadow:!!o.castShadow,
+    shadowMap:!!(o.shadow&&o.shadow.map)});});
+    return {lights,shadowMapEnabled:renderer.shadowMap.enabled,
+      environment:!!scene.environment,
+      environmentIntensity:scene.environmentIntensity,
+      exposure:+renderer.toneMappingExposure.toFixed(3),
+      casters:puzzle.pieces.filter(p=>p.mesh.castShadow).length,
+      receivers:puzzle.pieces.filter(p=>p.mesh.receiveShadow).length};},
   get audio(){return sound.ctx?{muted:s.muted,master:sound.master.gain.value,effects:sound.fx.gain.value,ambient:sound.amb.gain.value}:null;},get state(){return {count,remaining:puzzle.pieces.filter(p=>!p.removed).length,settings:{...s},pieces:puzzle.pieces.map(p=>({id:p.id,removed:!!p.removed,free:directions.some(d=>canSlide(p,d,puzzle.pieces))}))};}};
 
 })();

@@ -36,6 +36,31 @@ let bad = 0;
 const fail = (m) => { bad++; console.log('  FAIL ' + m); };
 const ok = (c, m) => { if (c) console.log('  ok   ' + m); else fail(m); };
 
+/* Wait in RENDERED FRAMES, never milliseconds.
+ *
+ * This suite passed on its own and went RED inside gates.sh, which runs three
+ * Chromium suites back to back (2026-09-20). Nothing about the page changed —
+ * the waits did not survive the load. WebGL here is rasterized in software and
+ * a frame can cost 300-700 ms, so `waitForTimeout(400)` on a busy machine is
+ * ZERO frames, and the row it guarded ("the box coming back is picked up too")
+ * is precisely the one that depends on the frame loop having run. A gate that
+ * is green alone and red in the suite is still a flaky gate. */
+const frames = (page, n = 4) => page.evaluate((k) => new Promise((res) => {
+  let i = 0;
+  const step = () => (++i >= k ? res(i) : requestAnimationFrame(step));
+  requestAnimationFrame(step);
+}), n).catch(() => null);
+
+async function until(page, fn, label, ms = 60000, arg) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (await page.evaluate(fn, arg)) return true;
+    await frames(page, 1);
+  }
+  fail('timed out after ' + ms + 'ms waiting for ' + label);
+  return false;
+}
+
 // The board is drawn by compositing the backing store into the CSS box, so the
 // screen point of a piece is its NDC mapped through THAT box. This is the
 // browser's own mapping, written out; nothing in the page supplies it.
@@ -71,7 +96,8 @@ async function pickAll(page, label) {
   page.on('pageerror', (e) => errs.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   await page.goto(PAGE, { waitUntil: 'load' });
-  await page.waitForTimeout(1200);
+  await until(page, () => !!(window.interlock && window.interlock.state.pieces.length), 'the board to exist');
+  await frames(page, 5);
 
   const squash = (b) => (b.backing.w / b.backing.h) / (b.box.w / b.box.h);
   const measure = () => page.evaluate(() => {
@@ -92,7 +118,8 @@ async function pickAll(page, label) {
   // this page's auto-height body, so it would not move the box at all.
   await page.addStyleTag({ content: '#game{height:600px!important}' });
   await page.evaluate(() => { window.dispatchEvent(new Event('resize')); window.dispatchEvent(new Event('orientationchange')); });
-  await page.waitForTimeout(600);
+  await until(page, () => Math.round(window.interlock.box().h) === 600, 'the box to reach 600px');
+  await frames(page, 5);
   m = await measure();
   ok(Math.round(m.box.h) === 600 && m.inner.h === VH, 'box is ' + Math.round(m.box.h) + 'px inside a ' + m.inner.h + 'px window (the two really are apart)');
   ok(Math.abs(squash(m) - 1) < 0.02, 'backing store followed the box down (squash ' + squash(m).toFixed(3) + ')');
@@ -101,51 +128,78 @@ async function pickAll(page, label) {
   ok(r.hits === r.tried, 'every tap still landed on the board (' + r.hits + '/' + r.tried + ')' +
      (r.worst ? ' — first miss: piece ' + r.worst.id + ' at y=' + r.worst.pt.y.toFixed(0) : ''));
 
-  console.log('-- a real tap removes a piece at the bottom of a squashed board --');
-  // The failure this guards reads as "the low part of the cube stopped
-  // answering", so aim at the LOWEST target on screen rather than a convenient
-  // one. A piece's bounding-sphere centre can sit BEHIND a neighbour, so the
-  // candidates are narrowed to pieces that are both free and unoccluded at
-  // their own centre — asked of pick(), then confirmed by the click itself.
+  console.log('-- real taps hit the piece they are aimed at, on a squashed board --');
+  /* Three taps, each at the point FURTHEST FROM THE VERTICAL MIDDLE of the box
+   * where a free piece can be reached.
+   *
+   * Two earlier shapes of this row both failed as checks, and both failures
+   * were about which board the generator happened to deal (2026-09-20):
+   *   - one tap at the LOWEST free piece passed with tap() broken, because the
+   *     innerHeight error is zero at the centre line and grows with distance
+   *     from it, so a target near the middle is barely displaced and a large
+   *     piece absorbs the displacement;
+   *   - requiring a piece to be unoccluded AT ITS OWN CENTRE found no
+   *     candidate at all on some boards, and reported that as a failure.
+   * So the aim points come from scanning the board rather than from the
+   * pieces: every grid point pick() says holds a free piece is a candidate,
+   * which always yields some, and the extreme one maximises the displacement a
+   * broken mapping would produce. Three rounds mean one lucky board cannot
+   * carry the row.
+   *
+   * What it asserts is that the REAL tap path agrees with pick() about what is
+   * under a pixel. They read the same viewBox(), so a regression in either
+   * shows up here. */
   {
-    const rect = await page.locator('#game').boundingBox();
-    const ids = await page.evaluate(() => window.interlock.state.pieces.filter((p) => !p.removed && p.free).map((p) => p.id));
-    let low = null;
-    for (const id of ids) {
-      const ndc = await page.evaluate((i) => window.interlock.ndcOf(i), id);
-      if (!ndc) continue;
-      const pt = screenOf(rect, ndc);
-      if (pt.x < rect.x || pt.x > rect.x + rect.width || pt.y < rect.y || pt.y > rect.y + rect.height) continue;
-      const at = await page.evaluate(([x, y]) => window.interlock.pick(x, y), [pt.x, pt.y]);
-      if (at !== id) continue;                       // occluded by a neighbour
-      if (!low || pt.y > low.pt.y) low = { id, pt };
-    }
-    // An empty candidate set is a FAILURE, not a skip: it means either no
-    // piece is removable or nothing projected, and both are bugs.
-    if (!low) fail('no free, unoccluded piece to aim at — nothing was actually tested');
-    else {
-      const gone = () => page.evaluate(() => window.interlock.state.pieces.filter((p) => p.removed).map((p) => p.id).sort().join(','));
+    let taps = 0;
+    for (let round = 0; round < 3; round++) {
+      const rect = await page.locator('#game').boundingBox();
+      const midY = rect.y + rect.height / 2;
+      const free = new Set(await page.evaluate(() =>
+        window.interlock.state.pieces.filter((p) => !p.removed && p.free).map((p) => p.id)));
+      let best = null;
+      for (let iy = 1; iy < 14; iy++) for (let ix = 1; ix < 8; ix++) {
+        const x = rect.x + rect.width * ix / 8, y = rect.y + rect.height * iy / 14;
+        const off = Math.abs(y - midY);
+        if (best && off <= best.off) continue;                 // cannot win; skip the round trip
+        const id = await page.evaluate(([a, b]) => window.interlock.pick(a, b), [x, y]);
+        if (id === null || !free.has(id)) continue;
+        best = { id, x, y, off };
+      }
+      if (!best) { fail('round ' + round + ': no reachable free piece anywhere on the board'); break; }
+
+      const gone = () => page.evaluate(() =>
+        window.interlock.state.pieces.filter((p) => p.removed).map((p) => p.id).sort().join(','));
       const before = await gone();
-      await page.mouse.click(low.pt.x, low.pt.y);
-      await page.waitForTimeout(900);
+      const wasGone = before.split(',').filter(Boolean).length;
+      await page.mouse.click(best.x, best.y);
+      // The slide-out takes 650 ms of ANIMATION time, many frames on this
+      // rasterizer, so wait for the BOARD to change, not for a wall clock.
+      await until(page, (n) => window.interlock.state.pieces.filter((q) => q.removed).length > n,
+                  'the tapped piece to leave', 20000, wasGone);
+      await frames(page, 6);
       const after = await gone();
-      // "a piece was removed" is NOT the check. A tap normalised by innerHeight
-      // in a shorter box lands on a piece HIGHER up the board, which is often
-      // also free — so the count still falls by one and a count assertion goes
-      // green on the exact bug this file exists for (caught by negative test,
-      // 2026-09-19). The removed piece has to be the one that was aimed at.
       const removed = after.split(',').filter(Boolean).filter((id) => !before.split(',').includes(id));
-      ok(removed.length === 1 && +removed[0] === low.id,
-         'tapping the lowest free piece (id ' + low.id + ', y=' + low.pt.y.toFixed(0) + ' of a ' +
-         Math.round(rect.height) + 'px box in an ' + VH + 'px window) removed THAT piece' +
-         (removed.length === 1 && +removed[0] !== low.id ? ' — it removed ' + removed[0] + ' instead' :
-          removed.length === 0 ? ' — nothing was removed' : ''));
+
+      // "a piece was removed" is NOT the check: a tap normalised by innerHeight
+      // in a shorter box lands on a piece HIGHER up, which is often also free,
+      // so a count assertion goes green on the very bug this file exists for.
+      ok(removed.length === 1 && +removed[0] === best.id,
+         'tap ' + (round + 1) + ': pick() said piece ' + best.id + ' at y=' + best.y.toFixed(0) +
+         ' (' + best.off.toFixed(0) + 'px off centre, box ' + Math.round(rect.height) +
+         'px in a ' + VH + 'px window) and THAT piece left' +
+         (removed.length === 0 ? ' — nothing was removed' :
+          +removed[0] !== best.id ? ' — piece ' + removed[0] + ' left instead' : ''));
+      taps++;
     }
+    ok(taps === 3, 'all three taps were actually taken (' + taps + '/3)');
   }
 
   console.log('-- the box coming back is picked up too --');
   await page.addStyleTag({ content: '#game{height:100dvh!important}' });
-  await page.waitForTimeout(400);                       // no resize event fired: the frame loop must catch this
+  // deliberately no resize event: the per-frame re-measure is what must catch
+  // this, so wait on FRAMES, which is the only thing that can
+  await until(page, () => Math.round(window.interlock.box().h) === 844, 'the box to return to 844px');
+  await frames(page, 4);
   m = await measure();
   ok(Math.round(m.box.h) === VH, 'box is back to ' + Math.round(m.box.h) + 'px');
   ok(Math.abs(squash(m) - 1) < 0.02, 'and the backing store came with it (squash ' + squash(m).toFixed(3) + ')');
