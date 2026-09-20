@@ -39,7 +39,8 @@ one line let an unbuilt edit through on the first try.
 
 The repo wants one self-contained file per game and the smoke gate loads pages
 over `file://`, where an ES module import is a CORS error and every page would
-report RED. The shipped game is six ES modules. So `build.mjs` inlines the CSS
+report RED. The shipped game is four ES modules plus a vendored Three.js. So
+`build.mjs` inlines the CSS
 and concatenates the JS into one `<script type="module">`.
 
 The one non-obvious part is **scope**. Three.js minifies to ~450 top-level

@@ -61,7 +61,7 @@ available there — verify the Pages run instead, per `.claude/zmh/producer.md`
   wipeable glass): `.claude/arviewport.md`. Directory names are historical; titles renamed
   2026-08-15.
 - `games/interlock/` — 3-D disassembly puzzle supplied by the CD. `src/` is the
-  source (six ES modules + a vendored Three.js r169); `index.html` is
+  source (four ES modules + a vendored Three.js r169); `index.html` is
   **generated, do NOT edit by hand** — `cd games/interlock && node build.mjs`.
   Deliberately not the neon aesthetic, and the only game bundling a
   third-party renderer; both are documented exceptions, not precedents. See

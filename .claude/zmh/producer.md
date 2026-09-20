@@ -45,7 +45,30 @@
   work is recoverable rather than silently skipped. Currently outstanding: **eight commits from
   three other sessions** (six character-lists, plus `99205d8` and `c28a947`),
   listed below by the 2026-09-17 music-mixer pass and re-confirmed still
-  hidden by the 2026-09-18 and 2026-09-19 ones.
+  hidden by the 2026-09-18, 2026-09-19 and 2026-09-20 ones. The six
+  character-lists commits were CLEARED on 2026-09-19; the two that remain are
+  `99205d8` and `c28a947`.
+
+  **2026-09-20, interlock pass** (pointer moved `4b333e0` -> `26f201a`, range
+  `4b333e0..26f201a`). Range held this session's own three commits — `6726c4e`
+  (the game added), `4218bfc` (the viewport fix) and `26f201a` (the lighting
+  rewrite) — plus three that are not this session's:
+  - **`9a194fe`** `docs(claude): refine the character-lists pass` — that
+    session's own refine commit, skippable by the rule above.
+  - **`c6d314a`** and **`3f7fce1`** — the **CD's own** direct pushes (a
+    leg-dance share video and a de-interlaced v2, author `Zack Helms`, into
+    `35eade27-088a-4688-bd1c-6ff57543ae02/`). Not a Claude session's work, so
+    there are no session learnings to recover; they are named here only because
+    the new pointer buries them and "buried" should never mean "unaccounted
+    for".
+
+  **Still outstanding and still hidden:** `99205d8`
+  (verlet-physics-ragdoll) and `c28a947` (fire-clicker mishaps) — carried
+  forward unchanged for the fourth pass running. Re-checked this pass with
+  `git merge-base --is-ancestor <sha> 4b333e0`: both report ancestor, i.e. both
+  were already buried before this pass started and nothing here made it worse.
+  They still look self-refined (each has a context file and index rows) but
+  that remains their sessions' to confirm.
 
   **2026-09-19, character-lists pass** (pointer moved `1948aba` -> `4b333e0`,
   range `1948aba..4b333e0`). Range held this session's own

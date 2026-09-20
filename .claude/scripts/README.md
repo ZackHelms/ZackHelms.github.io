@@ -324,6 +324,20 @@ Deterministic helpers for working on this repo.
   .claude/scripts/negtest.sh scan                              # anything left behind?
   ```
 
+
+  `scan` fails on two things now: an `@negtest` marker left in a changed file,
+  and **a snapshot that was `save`d and never `restore`d** — an outstanding
+  snapshot means a negative test is still in flight, so `gates.sh` will not go
+  green until it is restored (or `.git/negtest/` is cleared, if the break was
+  already reverted by hand). That second check exists because the marker
+  convention only ever protected a break someone remembered to mark: on
+  2026-09-20 an interlock session skipped this script entirely, hand-rolled
+  `cp` backups, and left an unmarked line live in `world.js` that overwrote the
+  night sky with daytime blue — `NEGTEST-SCAN` reported GREEN through several
+  gate runs, and the failing restore was the same drifted-working-directory
+  `cp` this script was written for in the first place. Nothing can protect a
+  break made without the script; the point of the new check is to make the
+  correct workflow the self-enforcing one.
   `save` snapshots into `.git/negtest/`, which cannot be committed and never
   shows up in `git status`. `restore` copies back and then `cmp`s the result,
   because `cp` reports success against a path that is not the one you meant.

@@ -10,7 +10,7 @@
 # Usage:
 #   .claude/scripts/negtest.sh save    <file>   # snapshot before breaking it
 #   .claude/scripts/negtest.sh restore <file>   # restore, then PROVE it worked
-#   .claude/scripts/negtest.sh scan    [file…]  # any @negtest marker left behind?
+#   .claude/scripts/negtest.sh scan    [file…]  # any break left behind?
 #
 # Prints one parseable KEY=value line per action; exits non-zero on any failure.
 # Snapshots live in .git/negtest/ (inside .git, so they can never be committed
@@ -19,6 +19,22 @@
 # Convention: mark every deliberate break with the token @negtest in a comment,
 # so `scan` can find one that outlived its test. gates.sh runs `scan` over the
 # changed files on every invocation.
+#
+# `scan` ALSO fails on an OUTSTANDING SNAPSHOT — a file that was `save`d and
+# never `restore`d. That closes the marker convention's hole, which is that it
+# only protects a break you remembered to mark: on 2026-09-20 an interlock
+# session hand-rolled `cp` backups instead of using this script, left an
+# unmarked sabotage line live in world.js, and NEGTEST-SCAN reported GREEN
+# through several gate runs while the night sky was being overwritten with
+# daytime blue on every frame. The restoring `cp` had failed for the very
+# reason in the note above — it ran from a drifted working directory — which
+# `restore` would have caught on the spot, because it cmp-verifies and exits
+# non-zero.
+#
+# So an outstanding snapshot now means "a negative test is in flight, you are
+# not done", and the gate says so until it is restored. That is deterministic
+# where the marker is discipline; it protects anyone who runs `save`, which is
+# the workflow this file exists to make the easy one.
 #
 # ONE SNAPSHOT PER BREAK: `restore` CONSUMES the snapshot (it is deleted once
 # the bytes are verified), so a second break needs a second `save`. Running two
@@ -61,6 +77,19 @@ restore)
   ;;
 scan)
   files=("$@")
+  # An unrestored snapshot is a live break, whether or not it was marked.
+  outstanding=0
+  if [ -d "$STORE" ]; then
+    for s in "$STORE"/*; do
+      [ -e "$s" ] || continue
+      echo "OUTSTANDING $(basename "$s" | tr '_' '/') — saved but never restored"
+      outstanding=$((outstanding+1))
+    done
+  fi
+  if [ "$outstanding" -gt 0 ]; then
+    echo "NEGTEST-SCAN: RED ($outstanding negative test(s) still in flight — run: $0 restore <file>, or delete .git/negtest/ if the break is already reverted)"
+    exit 1
+  fi
   if [ ${#files[@]} -eq 0 ]; then
     while IFS= read -r f; do
       [ -n "$f" ] && [ -f "$f" ] && files+=("$f")
@@ -72,7 +101,14 @@ scan)
     # .claude/ is context and tooling, never deployed content — and the files
     # that DOCUMENT this convention naturally contain the marker. Scan what
     # ships. (Skipping this exclusion once made gates.sh flag its own comment.)
+    #
+    # CLAUDE.md at ANY depth is context too, and the same trap bit a second way
+    # on 2026-09-20: writing the negative-test rule into games/CLAUDE.md put the
+    # marker in a file the exclusion did not cover, and the scan went red on its
+    # own documentation. A gate that cries wolf is worse than no gate, so the
+    # exclusion follows the convention rather than one directory.
     case "$f" in .claude/*) continue;; esac
+    case "$f" in CLAUDE.md|*/CLAUDE.md) continue;; esac
     [ -f "$f" ] || continue
     while IFS= read -r line; do
       echo "LEFTOVER $f:$line"; hits=$((hits+1))
