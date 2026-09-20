@@ -153,6 +153,11 @@ to justify any ambient, but a player who picked an empty background did not ask
 for an unlit board. It pins a fixed daylight key and a dim neutral studio sky
 that feeds the IBL only — the visible background stays pure black.
 
+**Settled, do not re-open (CD, 2026-09-20).** This is the one place the
+sun-and-moon rule is bent, so it reads as an open question to anyone auditing
+the rig against the brief. It is not: the CD reviewed it on device and closed
+it. Bending the rule here is the decision, not an oversight to correct.
+
 ### Shadows, and why AO matters more here
 
 `PCFSoftShadowMap`, one 2048 map (1024 on a phone), an ortho camera of +-14
