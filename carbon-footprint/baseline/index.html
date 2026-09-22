@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Reference tables for household energy, carbon and water, what maxed-out Claude plans cost the grid, and outside benchmarks from a streetlight to the Pentagon, on a log-scale carbon ladder.">
+<title>Energy, carbon and water: household baseline vs AI vs the big stuff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F1F4F3; --card:#FFFFFF; --ink:#14202A; --muted:#55626C; --rule:#D2D9D8;
+  --kwh:#2C58B5; --h2o:#0E7C83; --co2:#3F4750;
+  --src:#2C58B5; --inf:#8F5500; --asm:#74399A;
+  --bar:#2C58B5; --track:#E2E8E7; --ai:#A8326B;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F161C; --card:#162028; --ink:#E4EAEE; --muted:#9AA6AF; --rule:#27343D;
+    --kwh:#86A8F2; --h2o:#52C4CA; --co2:#C3C9CF;
+    --src:#86A8F2; --inf:#E2AA5E; --asm:#C79BE3;
+    --bar:#86A8F2; --track:#22303A; --ai:#EE86B6;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F161C; --card:#162028; --ink:#E4EAEE; --muted:#9AA6AF; --rule:#27343D;
+  --kwh:#86A8F2; --h2o:#52C4CA; --co2:#C3C9CF;
+  --src:#86A8F2; --inf:#E2AA5E; --asm:#C79BE3;
+  --bar:#86A8F2; --track:#22303A; --ai:#EE86B6;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Source Serif 4",Georgia,"Times New Roman",serif;font-size:1.0625rem;line-height:1.6}
+.wrap{max-width:780px;margin:0 auto;padding:2rem 1.1rem 4rem}
+h1,h2,h3,.num,.ladder,.calc,table,.facts{font-family:"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif}
+h1{font-size:clamp(2.1rem,7vw,3.4rem);line-height:1.02;font-weight:700;margin:.2rem 0 1rem;letter-spacing:-.01em}
+h2{font-size:1.75rem;line-height:1.15;font-weight:700;margin:3rem 0 .6rem;padding-top:1rem;border-top:3px solid var(--ink)}
+h3{font-size:1.25rem;font-weight:600;margin:1.8rem 0 .4rem}
+p{margin:.5rem 0 1rem;max-width:68ch}
+.lede{font-size:1.15rem;color:var(--muted)}
+a{color:var(--kwh)}
+a:focus-visible,select:focus-visible,input:focus-visible,button:focus-visible{outline:3px solid var(--kwh);outline-offset:2px}
+.t{font-family:"Barlow Semi Condensed",Arial,sans-serif;font-size:.8rem;font-weight:600;white-space:nowrap;padding:0 .3em;border-radius:3px;border:1px solid currentColor}
+.t.s{color:var(--src)} .t.i{color:var(--inf)} .t.a{color:var(--asm)}
+.fact .t{white-space:normal}
+.legend{display:flex;flex-wrap:wrap;gap:.5rem 1rem;font-size:.95rem;color:var(--muted);margin:.4rem 0 1.2rem}
+.kwh{color:var(--kwh);font-weight:600} .h2o{color:var(--h2o);font-weight:600} .co2{color:var(--co2);font-weight:600}
+
+/* Ladder: the one bold element */
+.ladder{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:1rem .9rem .6rem;margin:1.2rem 0 .6rem}
+.ladder-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:.2rem 1rem;font-size:.95rem;color:var(--muted);margin-bottom:.6rem}
+.ladder-head > span:last-child{white-space:nowrap}
+.rung{display:grid;grid-template-columns:1fr auto;gap:0 .8rem;padding:.35rem 0;border-bottom:1px dashed var(--rule)}
+.rung:last-child{border-bottom:0}
+.rung .lab{font-size:1.02rem;font-weight:500}
+.rung .val{font-size:1.02rem;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.rung .track{grid-column:1 / -1;height:9px;margin-top:.25rem;border-radius:2px;
+  background:repeating-linear-gradient(90deg,var(--track) 0 calc(100%/9 - 1px),var(--rule) calc(100%/9 - 1px) calc(100%/9))}
+.rung .fill{height:100%;background:var(--bar);border-radius:2px;transform-origin:left;animation:grow .9s cubic-bezier(.2,.7,.2,1) both}
+.rung.you .fill{background:var(--inf)} .rung.ai .fill{background:var(--ai)}
+.key-ai{color:var(--ai);font-weight:600} .key-you{color:var(--inf);font-weight:600} .key-oth{color:var(--bar);font-weight:600}
+.rung.you .lab::after{content:" (our listed items)";color:var(--inf);font-weight:600}
+.axis{position:relative;height:1.1rem;font-size:.78rem;color:var(--muted);margin-top:.3rem}
+.axis span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media (prefers-reduced-motion: reduce){.rung .fill{animation:none}}
+
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.6rem;margin:1rem 0}
+.fact{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:.7rem .8rem}
+.fact .num{font-size:1.6rem;font-weight:700;line-height:1.05}
+.fact div:last-child{font-family:"Source Serif 4",Georgia,serif;font-size:.93rem;color:var(--muted);margin-top:.25rem}
+
+.tbl{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:.8rem 0 1.2rem;border:1px solid var(--rule);border-radius:8px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:600px;font-size:.98rem}
+th,td{padding:.5rem .6rem;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule)}
+th{font-weight:700;background:var(--track)}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+tr.total td{font-weight:700;background:var(--track)}
+.note{font-size:.93rem;color:var(--muted)}
+
+.calc{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:1rem;margin:1rem 0}
+.calc label{display:block;font-size:.95rem;color:var(--muted);margin:.5rem 0 .2rem}
+.calc .row{display:grid;grid-template-columns:90px 1fr;gap:.5rem}
+.calc select,.calc input{width:100%;font:inherit;font-size:1.05rem;padding:.45rem .5rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg);color:var(--ink)}
+.calc output{display:block;margin-top:.9rem;font-size:1.35rem;line-height:1.3;font-weight:600}
+.calc .sub{font-family:"Source Serif 4",Georgia,serif;font-size:.95rem;color:var(--muted);font-weight:400;margin-top:.3rem}
+ul.src{padding-left:1.1rem;font-size:.93rem} ul.src li{margin:.3rem 0}
+.kicker{font-family:"Barlow Semi Condensed",Arial,sans-serif;font-size:.9rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;flex-wrap:wrap;gap:.2rem .9rem;margin:0 0 .4rem}
+.kicker a{color:inherit;text-decoration:none} .kicker a:hover{color:var(--kwh);text-decoration:underline}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<nav class="kicker" aria-label="Site"><a href="/">tythos.com</a><a href="../">Compare tool</a></nav>
+<h1>Energy, carbon and water: from a microwave to the Pentagon</h1>
+<p class="lede">A reference for our household baseline, what Claude Pro and Max cost the grid when maxed out, and big outside benchmarks. US-average numbers, September 2026.</p>
+<div class="legend">
+  <span><span class="t s">source</span> taken from a named source</span>
+  <span><span class="t i">inferred</span> my calculation from sourced numbers</span>
+  <span><span class="t a">assumed</span> a guess about our household</span>
+</div>
+
+<section class="ladder" aria-label="Carbon ladder, log scale">
+  <div class="ladder-head"><span>CO2 per item, log scale: <span class="key-ai">AI</span>, <span class="key-you">our household</span>, <span class="key-oth">everything else</span></span><span>each gridline = 100x</span></div>
+  <div id="ladder"></div>
+  <div class="axis" aria-hidden="true"><span style="left:11.11%">1 g</span><span style="left:33.33%">10 kg</span><span style="left:55.56%">100 t</span><span style="left:77.78%">1 Mt</span></div>
+</section>
+<p class="note">Bars are log scale: one short AI prompt to the whole US power sector spans about 16 orders of magnitude. CO2 for electricity uses the US-average grid. <span class="t i">inferred</span></p>
+
+<h2>Conversion factors used everywhere</h2>
+<div class="facts">
+  <div class="fact"><div class="num">0.35 kg CO2</div><div>per kWh of US grid electricity. EIA 2024: 785 lb/MWh; eGRID 2024: 341 g/kWh. <span class="t s">source: EIA, eGRID via Hausfather</span></div></div>
+  <div class="fact"><div class="num">8.9 kg CO2</div><div>per gallon of gasoline burned. <span class="t s">source: EPA</span></div></div>
+  <div class="fact"><div class="num">~0.4 kg CO2</div><div>per mile in an average gas car (about 22 mpg). <span class="t s">source: EPA</span></div></div>
+  <div class="fact"><div class="num">~53 kg CO2</div><div>per million Btu of natural gas (about 5.3 kg per therm). <span class="t s">source: standard EPA factor, not re-checked this session</span></div></div>
+  <div class="fact"><div class="num">0.37 L / kWh</div><div>onsite water, average US data center (17.4 billion gal / 176 TWh, 2023). Google fleet is about 1.1 L/kWh. <span class="t i">inferred from LBNL, Google</span></div></div>
+  <div class="fact"><div class="num">~4.5 L / kWh</div><div>extra water consumed at the power plants feeding data centers. <span class="t s">source: LBNL 2024</span></div></div>
+</div>
+
+<h2>Our household baseline</h2>
+<p>Home size, climate, heating fuel and car are unknown, so HVAC and appliances use measured national averages and the driving uses the assumptions below. <span class="t a">assumed</span></p>
+<p class="note">Assumptions: a short daily round trip of ~5 mi on 240 days, and a long daily round trip of ~30 mi (range 20-40) on 180 days. PC tower averages 100 W (range 60-150). About 25 LED bulbs at 3 h/day. <span class="t a">assumed</span></p>
+
+<div class="tbl"><table>
+<thead><tr><th>Item</th><th>Per use</th><th>Per year</th><th>CO2 per year</th><th>Label</th></tr></thead>
+<tbody>
+<tr><td>Phone</td><td class="n">~18 Wh per full charge (6 g)</td><td class="n">~6 kWh</td><td class="n">~2 kg charging; 55 kg to make an iPhone 17 (lifetime)</td><td><span class="t s">source: ElectricRates, Apple PER</span></td></tr>
+<tr><td>LED lights</td><td class="n">9 W bulb = 9 Wh/hour (3 g)</td><td class="n">~250 kWh (US avg lighting 654)</td><td class="n">~90-230 kg</td><td><span class="t a">assumed</span> <span class="t s">source: RECS</span></td></tr>
+<tr><td>Microwave, 4 min</td><td class="n">~0.08 kWh (28 g)</td><td class="n">~107 kWh avg home</td><td class="n">~37 kg</td><td><span class="t i">inferred</span> from 1,200 W</td></tr>
+<tr><td>Electric oven, 350F, 20 min</td><td class="n">~0.9-1.5 kWh incl. preheat (0.3-0.5 kg)</td><td class="n">-</td><td class="n">-</td><td><span class="t i">inferred</span> from 2.5 kW element, cycling</td></tr>
+<tr><td>Stovetop: boil 4 qt + cook spaghetti</td><td class="n">~0.7-1.0 kWh electric (0.25-0.35 kg); gas ~0.4-0.6 kg</td><td class="n">-</td><td class="n">-</td><td><span class="t i">inferred</span> from heating 3.8 kg water 85C, 70% burner efficiency (gas ~40%)</td></tr>
+<tr><td>PC tower, 24/7</td><td class="n">~2.4 kWh/day at 100 W</td><td class="n">~525-1,315 kWh</td><td class="n">~185-460 kg</td><td><span class="t a">assumed</span> wattage</td></tr>
+<tr><td>Laptop, 8 h x 5 days</td><td class="n">~0.24-0.48 kWh/day</td><td class="n">~60-125 kWh</td><td class="n">~20-45 kg</td><td><span class="t i">inferred</span> from 30-60 W</td></tr>
+<tr><td>Short daily round trip</td><td class="n">~5 mi = 2 kg</td><td class="n">~1,200 mi, ~55 gal</td><td class="n">~480 kg</td><td><span class="t a">assumed</span> miles</td></tr>
+<tr><td>Long daily round trip</td><td class="n">~30 mi = ~12 kg (8-16)</td><td class="n">~5,400 mi, ~245 gal</td><td class="n">~2,160 kg (1,400-2,900)</td><td><span class="t a">assumed</span> miles</td></tr>
+<tr><td>Central AC at 72F (with fan)</td><td class="n">~3 kW while running</td><td class="n">~2,300-2,800 kWh; South 3,300; hot-humid 4,200</td><td class="n">~0.8-1.0 t (up to 1.5 t)</td><td><span class="t s">source: EIA RECS 2020</span></td></tr>
+<tr><td>Heating at 72F</td><td class="n">-</td><td class="n">Gas furnace ~45 MMBtu; heat pump ~2,500 kWh; resistance 5,000-8,000 kWh</td><td class="n">Gas ~2.4 t; heat pump ~0.9 t; resistance ~1.8-2.8 t</td><td><span class="t s">source: RECS</span> <span class="t i">CO2 inferred</span></td></tr>
+<tr><td>Washer</td><td class="n">~0.4 kWh/load machine only (0.14 kg), plus hot water if warm</td><td class="n">~110 kWh</td><td class="n">~40 kg</td><td><span class="t s">source: ENERGY STAR</span></td></tr>
+<tr><td>Electric dryer</td><td class="n">~2.4 kWh/load (0.84 kg)</td><td class="n">~680 kWh</td><td class="n">~240 kg</td><td><span class="t s">source: RECS</span></td></tr>
+<tr><td>Dishwasher</td><td class="n">~1.1 kWh/load incl. its own heating (0.39 kg)</td><td class="n">~240 kWh</td><td class="n">~85 kg</td><td><span class="t s">source: ENERGY STAR</span></td></tr>
+<tr><td>Water heater</td><td class="n">-</td><td class="n">Electric tank ~2,700 kWh; heat pump ~1,180 kWh; gas ~18 MMBtu</td><td class="n">Electric ~950 kg; heat pump ~410 kg; gas ~960 kg</td><td><span class="t s">source: RECS, ENERGY STAR</span> <span class="t i">CO2 inferred</span></td></tr>
+<tr><td>Refrigerator</td><td class="n">~57 W average</td><td class="n">~500 kWh</td><td class="n">~175 kg</td><td><span class="t s">source: ENERGY STAR, RECS</span></td></tr>
+<tr><td>Main TV</td><td class="n">~100 W on</td><td class="n">~210 kWh</td><td class="n">~75 kg</td><td><span class="t s">source: RECS</span></td></tr>
+<tr><td>Wi-Fi router / modem, 24/7</td><td class="n">~10 W</td><td class="n">~88 kWh</td><td class="n">~30 kg</td><td><span class="t s">source: ElectricRates est.</span></td></tr>
+<tr><td>Everything else plugged in (standby, chargers, small appliances)</td><td class="n">-</td><td class="n">~800 kWh</td><td class="n">~280 kg</td><td><span class="t a">assumed</span></td></tr>
+<tr class="total"><td>Total, gas heat + gas water heater</td><td class="n">~7,200 kWh + ~63 MMBtu gas</td><td class="n">+ 6,600 mi</td><td class="n">~8.5 t (~23 kg/day)</td><td><span class="t i">inferred</span></td></tr>
+<tr class="total"><td>Total, all-electric (heat pump, electric tank)</td><td class="n">~12,400 kWh</td><td class="n">+ 6,600 mi</td><td class="n">~7.0 t (~19 kg/day)</td><td><span class="t i">inferred</span></td></tr>
+</tbody></table></div>
+<p class="note">For scale: the average US home uses about 10,500 kWh of electricity a year, and US per-person emissions are about 14 t energy CO2 (2024) or 17.2 t of all greenhouse gases (2023). Those per-person figures include food, goods, flights and services, which the table above leaves out. <span class="t s">source: EIA, Statista</span></p>
+
+<h2>AI: one prompt to a maxed-out Max plan</h2>
+<p>Anthropic has not published per-prompt or per-token energy figures, so every Claude number here is an outside estimate. <span class="t s">source: Earth911, Hausfather 2026</span></p>
+
+<h3>Per interaction</h3>
+<div class="tbl"><table>
+<thead><tr><th>Activity</th><th>Energy</th><th>CO2 (US grid)</th><th>Water, onsite / incl. power plants</th><th>Label</th></tr></thead>
+<tbody>
+<tr><td>Median Gemini text prompt (Google measured)</td><td class="n">0.24 Wh</td><td class="n">0.03 g (market-based)</td><td class="n">0.26 mL / -</td><td><span class="t s">source: Google 2025</span></td></tr>
+<tr><td>Average ChatGPT query (OpenAI stated)</td><td class="n">0.34 Wh</td><td class="n">~0.12 g</td><td class="n">~0.1 / ~1.7 mL</td><td><span class="t s">source: Altman via Hausfather</span> <span class="t i">CO2, water inferred</span></td></tr>
+<tr><td>Claude Sonnet: short / medium / long prompt</td><td class="n">0.8 / 2.8 / 5.5 Wh</td><td class="n">0.3 / 1.0 / 1.9 g</td><td class="n">0.3-2 / 4-27 mL</td><td><span class="t s">source: Jegham et al. 2025</span> <span class="t i">CO2, water inferred</span></td></tr>
+<tr><td>Claude 3.7 Sonnet, extended thinking, long prompt</td><td class="n">~17 Wh</td><td class="n">~6 g</td><td class="n">~6 / ~85 mL</td><td><span class="t s">source: Jegham et al. 2025</span></td></tr>
+<tr><td>Median Claude Code session (24 calls, 592k tokens)</td><td class="n">~41 Wh</td><td class="n">~14 g</td><td class="n">~15 mL / ~0.2 L</td><td><span class="t s">source: Couch 2026</span></td></tr>
+<tr><td>Heavy Claude Code session (subagents, ~10M tokens)</td><td class="n">~600 Wh (250-1,200)</td><td class="n">~210 g</td><td class="n">~0.2 / ~3 L</td><td><span class="t s">source: Hausfather 2026</span></td></tr>
+<tr><td>Heavy agentic workday</td><td class="n">~3.0 kWh (1.2-5.9)</td><td class="n">~1 kg</td><td class="n">~1 / ~15 L</td><td><span class="t s">source: Hausfather 2026</span></td></tr>
+</tbody></table></div>
+
+<h3>Maxing a 7-day quota, every week</h3>
+<p>Method: Anthropic publishes no token budgets, so I start from measured API-dollar value of a full weekly limit, then convert dollars to energy using Hausfather's logged Claude Code usage (3.2B tokens, 96% cache reads, about $0.80 per million tokens at Opus-class list prices, 170 kWh with a 70-330 range). That gives roughly 27 / 66 / 129 Wh per API dollar for min / central / max. <span class="t i">inferred</span></p>
+<div class="tbl"><table>
+<thead><tr><th></th><th>Claude Pro ($20/mo), maxed</th><th>Claude Max 20x ($200/mo), maxed</th></tr></thead>
+<tbody>
+<tr><td>API-equivalent compute per week</td><td class="n">~$70-130 <span class="t i">inferred</span></td><td class="n">~$1,100 measured (lower bound); up to ~$1,650 <span class="t s">source: Botfarm</span> <span class="t a">+50% assumed</span></td></tr>
+<tr><td>Energy per week, min / central / max</td><td class="n kwh">1.9 / 7 / 17 kWh</td><td class="n kwh">30 / 73 / 213 kWh</td></tr>
+<tr><td>Energy per year</td><td class="n kwh">0.10 / 0.36 / 0.87 MWh</td><td class="n kwh">1.5 / 3.8 / 11 MWh</td></tr>
+<tr><td>CO2 per week (US-average grid)</td><td class="n co2">0.7 / 2.4 / 5.9 kg</td><td class="n co2">10 / 26 / 75 kg</td></tr>
+<tr><td>CO2 per year</td><td class="n co2">35 / 126 / 305 kg</td><td class="n co2">0.55 / 1.3 / 3.9 t</td></tr>
+<tr><td>Water per week, onsite cooling</td><td class="n h2o">0.7 / 2.6 / 19 L</td><td class="n h2o">11 / 27 / 234 L</td></tr>
+<tr><td>Water per week, incl. power plants</td><td class="n h2o">9 / 34 / 95 L</td><td class="n h2o">150 / 360 / 1,190 L</td></tr>
+<tr><td>Central year, in everyday terms</td><td>~70% of a fridge's electricity; ~10 long daily round trips; ~1.5% of our listed baseline</td><td>~36% of an average home's electricity; ~110 long daily round trips; ~15% of our listed baseline</td></tr>
+</tbody></table></div>
+<p class="note">Not included: model training, chip and server manufacturing, networking, and the user's own laptop (30-60 W, small next to this). Market-based carbon could be far lower: Hausfather estimates the same workload on clean power cuts emissions about 90%. Plan limits also change, for example the 50% Claude Code weekly boost that ran through Aug 31, 2026. <span class="t s">source: Hausfather, morphllm</span></p>
+
+<h2>Big outside benchmarks</h2>
+<div class="tbl"><table>
+<thead><tr><th>Thing</th><th>Energy per year</th><th>CO2 per year</th><th>Water / notes</th><th>Label</th></tr></thead>
+<tbody>
+<tr><td>Typical gasoline car</td><td class="n">~520 gal (11,500 mi)</td><td class="n">4.6 t</td><td>22 mpg</td><td><span class="t s">source: EPA</span></td></tr>
+<tr><td>One SF-NY round trip flight, economy</td><td class="n">-</td><td class="n">~0.75 t (CO2 only)</td><td>Contrails add 50%+</td><td><span class="t i">inferred from Hausfather</span></td></tr>
+<tr><td>One streetlight (2013 fleet, mostly sodium)</td><td class="n">~520 kWh</td><td class="n">~180 kg</td><td>LEDs use much less</td><td><span class="t i">inferred</span> from DOE survey: 5.7B kWh / 11M lights</td></tr>
+<tr><td>All ~26.5M US streetlights</td><td class="n">~14 TWh</td><td class="n">~4.8 Mt</td><td>About $2B/yr electricity</td><td><span class="t i">inferred</span> <span class="t s">count: DOE survey</span></td></tr>
+<tr><td>18-hole golf facility</td><td class="n">~2,400 MMBtu median (~700 MWh-equiv.)</td><td class="n">~150-250 t</td><td>~120 acre-ft = ~39M gal (national 1.68M acre-ft / ~14,000 facilities)</td><td><span class="t s">source: GCSAA</span> <span class="t i">per-course, CO2 inferred</span></td></tr>
+<tr><td>McDonald's-size restaurant (4,500 sq ft)</td><td class="n">~365 MWh electric + ~780 MMBtu gas</td><td class="n">~170 t</td><td>81 kWh + 174k Btu per sq ft</td><td><span class="t s">source: DTE via Energybox</span> <span class="t i">totals inferred</span></td></tr>
+<tr><td>Gas station convenience store</td><td class="n">~280 MWh (3,000 sq ft at ~94 kWh/sq ft)</td><td class="n">~100 t building; ~15,000 t from the fuel it sells</td><td>~141,800 gal sold per month (2023)</td><td><span class="t s">source: NACS, Hillphoenix</span> <span class="t a">size assumed</span></td></tr>
+<tr><td>Walmart supercenter</td><td class="n">~5-7 GWh</td><td class="n">~1.8-2.4 kt</td><td>LED retrofit saved 340,000 kWh, "more than 5%"</td><td><span class="t i">inferred</span> from Walmart/GE figures</td></tr>
+<tr><td>1 million median Gemini prompts</td><td class="n">240 kWh</td><td class="n">30 kg</td><td>260 L onsite</td><td><span class="t s">source: Google via DCD</span></td></tr>
+<tr><td>US Department of Defense</td><td class="n">~86M barrels operational fuel (FY2016)</td><td class="n">~59 Mt CO2e (2017)</td><td>Largest institutional oil user</td><td><span class="t s">source: Costs of War (Crawford)</span></td></tr>
+<tr><td>US data centers</td><td class="n">176 TWh (2023, 4.4% of US); 325-580 TWh by 2028</td><td class="n">~62 Mt at avg grid</td><td>17B gal onsite + ~211B gal at power plants</td><td><span class="t s">source: LBNL 2024</span> <span class="t i">CO2 inferred</span></td></tr>
+<tr><td>Bitcoin network (global)</td><td class="n">~177 TWh (Nov 2024)</td><td class="n">Depends on grid</td><td>Similar to all US data centers</td><td><span class="t s">source: Cambridge CBECI</span></td></tr>
+<tr><td>US electricity sector</td><td class="n">4,309 TWh (2024)</td><td class="n">1,537 Mt</td><td>-</td><td><span class="t s">source: EIA</span></td></tr>
+</tbody></table></div>
+
+<h2>Compare any two things</h2>
+<p>Compares CO2, since that is the common unit across electricity, gasoline and gas. Uses central estimates. <span class="t i">inferred</span></p>
+<div class="calc">
+  <label for="qa">This many</label>
+  <div class="row">
+    <input id="qa" type="number" min="0" step="any" value="1" inputmode="decimal">
+    <select id="ia" aria-label="First item"></select>
+  </div>
+  <label for="ib">Equals how many</label>
+  <select id="ib"></select>
+  <output id="out" aria-live="polite"></output>
+</div>
+
+<h2 id="sources">Sources</h2>
+<ul class="src">
+<li>EIA, US electricity CO2 per kWh and 2024 state profile: <a href="https://www.eia.gov/electricity/State/unitedstates">eia.gov</a></li>
+<li>EPA, typical passenger vehicle: <a href="https://www.epa.gov/greenvehicles/greenhouse-gas-emissions-typical-passenger-vehicle">epa.gov</a></li>
+<li>EIA RECS 2020 end-use tables, compiled with ENERGY STAR data: <a href="https://electricrates.org/guides/appliance-electricity-usage/">electricrates.org</a></li>
+<li>Apple iPhone 17 Product Environmental Report: <a href="https://www.apple.com/environment/pdf/products/iphone/iPhone_17_PER_Sept2025.pdf">apple.com</a></li>
+<li>Google, environmental impact of AI inference: <a href="https://cloud.google.com/blog/products/infrastructure/measuring-the-environmental-impact-of-ai-inference">cloud.google.com</a></li>
+<li>Jegham et al., How Hungry is AI?: <a href="https://arxiv.org/abs/2505.09598">arxiv.org</a></li>
+<li>Couch, Electricity use of AI coding agents: <a href="https://simonpcouch.com/blog/2026-01-20-cc-impact/">simonpcouch.com</a></li>
+<li>Hausfather, The real energy use of agentic AI: <a href="https://www.theclimatebrink.com/p/the-real-energy-use-of-agentic-ai">theclimatebrink.com</a></li>
+<li>Botfarm, API-dollar value of Max weekly limits: <a href="https://botfarm.run/blog/claude-max-true-price/">botfarm.run</a></li>
+<li>LBNL 2024 US data center report (via DOE): <a href="https://www.energy.gov/articles/doe-releases-new-report-evaluating-increase-electricity-demand-data-centers">energy.gov</a></li>
+<li>GCSAA golf energy survey: <a href="https://www.gcsaa.org/docs/default-source/Environment/phase-2-energy-survey-full-report.pdf">gcsaa.org</a>; water use: <a href="https://www.firstcallgolf.com/industry-news/release/2022-07-26/golf-courses-reduce-water-usage-by-29-percent-according-to-national-survey">firstcallgolf.com</a></li>
+<li>Quick-service restaurant intensity: <a href="https://www.energybox.com/?p=6249">energybox.com</a></li>
+<li>NACS fuel gallons per store: <a href="https://nacsmagazine.com/issues/january-2025/a-recap-of-2023-retail-fuel-data">nacsmagazine.com</a>; c-store intensity: <a href="https://hillphoenix.com/?p=1900">hillphoenix.com</a></li>
+<li>Walmart LED retrofit: <a href="https://chainstoreage.com/news/wal-mart-making-switch-led-ceiling-lights">chainstoreage.com</a></li>
+<li>DOE street lighting survey: <a href="https://www.ecmag.com/magazine/articles/article-detail/lighting-taking-inventory">ecmag.com</a></li>
+<li>Costs of War, Pentagon emissions: <a href="https://costsofwar.watson.brown.edu/paper/pentagon-fuel-use-climate-change-and-costs-war">brown.edu</a></li>
+<li>Bitcoin CBECI figure: <a href="https://www.techopedia.com/?p=82316">techopedia.com</a></li>
+</ul>
+</main>
+
+<script>
+(function(){
+  var ladder = [
+    ["One short AI chat prompt", 0.0001, "ai"],
+    ["Phone full charge", 0.0063, ""],
+    ["Median Claude Code session", 0.014, "ai"],
+    ["Microwave, 4 min", 0.028, ""],
+    ["Oven, 350F, 20 min", 0.35, ""],
+    ["Long daily round trip (30 mi)", 12, ""],
+    ["Claude Max 20x maxed, 1 week", 26, "ai"],
+    ["Making one iPhone 17 (lifetime)", 55, ""],
+    ["Claude Pro maxed, 1 year", 126, "ai"],
+    ["One streetlight, 1 year", 180, ""],
+    ["Claude Max 20x maxed, 1 year", 1300, "ai"],
+    ["Our household, 1 year", 8500, "you"],
+    ["McDonald's restaurant, 1 year", 170000, ""],
+    ["Walmart supercenter, 1 year", 2100000, ""],
+    ["Fuel sold by one gas station, 1 year", 15100000, ""],
+    ["US Department of Defense, 1 year", 59e9, ""],
+    ["US data centers, 1 year", 61.6e9, ""],
+    ["US power sector, 1 year", 1.537e12, ""]
+  ];
+  function fmtKg(kg){
+    if (kg >= 1e9) return (kg/1e9).toFixed(kg>=1e10?0:1).replace(/\.0$/,"") + " Mt";
+    if (kg >= 1e6) return (kg/1e6).toFixed(kg>=1e7?0:1).replace(/\.0$/,"") + " kt";
+    if (kg >= 1000) return (kg/1000).toFixed(kg>=1e4?0:1).replace(/\.0$/,"") + " t";
+    if (kg >= 1) return (kg>=10?Math.round(kg):kg.toFixed(1)) + " kg";
+    return Math.round(kg*1000*10)/10 + " g";
+  }
+  var box = document.getElementById("ladder");
+  var minL = -5, span = 18;
+  ladder.forEach(function(r, i){
+    var pct = Math.max(1, Math.min(100, (Math.log10(r[1]) - minL) / span * 100));
+    var d = document.createElement("div");
+    d.className = "rung " + r[2];
+    d.innerHTML = '<span class="lab"></span><span class="val"></span><div class="track"><div class="fill"></div></div>';
+    d.querySelector(".lab").textContent = r[0];
+    d.querySelector(".val").textContent = fmtKg(r[1]);
+    var f = d.querySelector(".fill");
+    f.style.width = pct + "%";
+    f.style.animationDelay = (i * 45) + "ms";
+    box.appendChild(d);
+  });
+
+  var items = [
+    ["short AI chat prompts (0.3 Wh)", 0.000105],
+    ["long Claude Sonnet prompts (5.5 Wh)", 0.0019],
+    ["median Claude Code sessions (41 Wh)", 0.0144],
+    ["heavy Claude Code sessions (600 Wh)", 0.21],
+    ["weeks of Claude Pro maxed", 2.4],
+    ["weeks of Claude Max 20x maxed", 26],
+    ["phone full charges", 0.0063],
+    ["hours of one LED bulb", 0.00315],
+    ["4-min microwave runs", 0.028],
+    ["20-min oven bakes at 350F", 0.35],
+    ["spaghetti dinners on an electric stove", 0.3],
+    ["laptop workdays (8 h)", 0.126],
+    ["days of the PC tower on 24/7", 0.84],
+    ["dryer loads", 0.84],
+    ["dishwasher loads", 0.385],
+    ["short round trips (5 mi)", 2.0],
+    ["long round trips (30 mi)", 12],
+    ["miles in an average car", 0.4],
+    ["gallons of gasoline", 8.887],
+    ["days of an average US home's electricity", 10.1],
+    ["days of our listed household baseline", 23.3],
+    ["days of an average American (all GHG)", 47],
+    ["iPhone 17s manufactured", 55],
+    ["SF-NY round trip flights", 750],
+    ["years of one McDonald's", 170000],
+    ["years of one Walmart supercenter", 2100000]
+  ];
+  var ia = document.getElementById("ia"), ib = document.getElementById("ib"), qa = document.getElementById("qa"), out = document.getElementById("out");
+  items.forEach(function(it, i){
+    var o1 = document.createElement("option"); o1.value = i; o1.textContent = it[0]; ia.appendChild(o1);
+    var o2 = document.createElement("option"); o2.value = i; o2.textContent = it[0]; ib.appendChild(o2);
+  });
+  ia.value = 5; ib.value = 16;
+  function nice(n){
+    if (!isFinite(n)) return "-";
+    if (n >= 100) return Math.round(n).toLocaleString("en-US");
+    if (n >= 10) return n.toFixed(0);
+    if (Number.isInteger(n)) return String(n);
+    if (n >= 1) return n.toFixed(1);
+    if (n === 0) return "0";
+    if (Number.isInteger(n)) return String(n);
+    return n.toPrecision(2);
+  }
+  function calc(){
+    var q = parseFloat(qa.value);
+    if (isNaN(q) || q < 0) { out.textContent = "Enter a number of 0 or more."; return; }
+    var a = items[ia.value], b = items[ib.value];
+    var kg = q * a[1];
+    out.innerHTML = "";
+    var main = document.createElement("div");
+    main.textContent = nice(q) + " " + a[0] + " = about " + nice(kg / b[1]) + " " + b[0];
+    var sub = document.createElement("div"); sub.className = "sub";
+    sub.textContent = "Both come to roughly " + fmtKg(kg) + " CO2.";
+    out.appendChild(main); out.appendChild(sub);
+  }
+  [ia, ib, qa].forEach(function(el){ el.addEventListener("input", calc); el.addEventListener("change", calc); });
+  calc();
+})();
+</script>
+</body>
+</html>

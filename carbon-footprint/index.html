@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="A two-adult, one-child household's daily carbon, energy and water footprint at its low and high end, and a tool to compare AI sessions, appliances, driving and big outside benchmarks against it.">
+<title>Our family's daily footprint: compare anything</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F1F4F3; --card:#FFFFFF; --ink:#14202A; --muted:#55626C; --rule:#D2D9D8; --soft:#E4EAE9;
+  --kwh:#2C58B5; --h2o:#0E7C83; --heat:#9A4A12; --min:#3A7536; --max:#A3372A;
+  --src:#2C58B5; --inf:#8F5500; --asm:#74399A;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F161C; --card:#162028; --ink:#E4EAEE; --muted:#9AA6AF; --rule:#27343D; --soft:#1D2A33;
+    --kwh:#86A8F2; --h2o:#52C4CA; --heat:#EFA46B; --min:#86C981; --max:#F0907E;
+    --src:#86A8F2; --inf:#E2AA5E; --asm:#C79BE3;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F161C; --card:#162028; --ink:#E4EAEE; --muted:#9AA6AF; --rule:#27343D; --soft:#1D2A33;
+  --kwh:#86A8F2; --h2o:#52C4CA; --heat:#EFA46B; --min:#86C981; --max:#F0907E;
+  --src:#86A8F2; --inf:#E2AA5E; --asm:#C79BE3;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Source Serif 4",Georgia,"Times New Roman",serif;font-size:1.0625rem;line-height:1.55}
+.wrap{max-width:760px;margin:0 auto;padding:1.6rem 1rem 4rem}
+h1,h2,.big,.pill,.res,select,input,button,summary,.chips{font-family:"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif}
+h1{font-size:clamp(1.9rem,6.5vw,2.9rem);line-height:1.04;margin:.1rem 0 .8rem;font-weight:700}
+h2{font-size:1.55rem;line-height:1.15;margin:2.4rem 0 .5rem;padding-top:.8rem;border-top:3px solid var(--ink);font-weight:700}
+p{margin:.4rem 0 .9rem;max-width:68ch}
+.muted{color:var(--muted)} .note{font-size:.92rem;color:var(--muted)}
+a{color:var(--kwh)}
+:focus-visible{outline:3px solid var(--kwh);outline-offset:2px}
+.t{font-family:"Barlow Semi Condensed",Arial,sans-serif;font-size:.78rem;font-weight:600;white-space:nowrap;padding:0 .3em;border-radius:3px;border:1px solid currentColor}
+.t.s{color:var(--src)} .t.i{color:var(--inf)} .t.a{color:var(--asm)}
+
+.days{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin:1rem 0 .4rem}
+.day{background:var(--card);border:1px solid var(--rule);border-top:6px solid var(--min);border-radius:8px;padding:.75rem .8rem}
+.day.max{border-top-color:var(--max)}
+.day .who{font-family:"Barlow Semi Condensed",Arial,sans-serif;font-weight:600;font-size:1rem;line-height:1.2;color:var(--muted)}
+.day .big{font-size:clamp(2.2rem,11vw,3.4rem);font-weight:700;line-height:1;margin:.25rem 0 .1rem;font-variant-numeric:tabular-nums}
+.day.min .big{color:var(--min)} .day.max .big{color:var(--max)}
+.day .unit{font-family:"Barlow Semi Condensed",Arial,sans-serif;font-size:1.05rem;font-weight:600}
+.day dl{margin:.55rem 0 0;display:grid;grid-template-columns:auto 1fr;gap:.1rem .5rem;font-size:.95rem}
+.day dt{color:var(--muted)} .day dd{margin:0;font-weight:600;font-family:"Barlow Semi Condensed",Arial,sans-serif;font-size:1.02rem;text-align:right}
+@media (max-width:380px){.days{grid-template-columns:1fr}}
+
+details{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:.5rem .8rem;margin:.6rem 0}
+summary{cursor:pointer;font-weight:600;font-size:1.05rem}
+details ul{margin:.4rem 0 .2rem;padding-left:1.1rem;font-size:.95rem} details li{margin:.25rem 0}
+
+.tool{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:.9rem;margin:.8rem 0}
+.chips{display:flex;flex-wrap:wrap;gap:.4rem;margin:.1rem 0 .8rem}
+.chips button{font-size:.98rem;font-weight:600;padding:.35rem .6rem;border-radius:999px;border:1px solid var(--rule);background:var(--soft);color:var(--ink);cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.pick{display:grid;grid-template-columns:84px 1fr;gap:.5rem}
+label.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+select,input{width:100%;font-size:1.08rem;padding:.5rem .5rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg);color:var(--ink)}
+
+.res{margin-top:.9rem}
+.say{font-family:"Source Serif 4",Georgia,serif;font-size:1.12rem;line-height:1.45;background:var(--soft);border-radius:8px;padding:.7rem .8rem;margin:0 0 .7rem}
+.row{display:grid;grid-template-columns:4.4rem 1fr;gap:.2rem .7rem;padding:.55rem 0;border-top:1px solid var(--rule)}
+.row .k{font-weight:700;font-size:1.05rem;padding-top:.1rem}
+.row .v{font-size:1.35rem;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+.row .d{font-family:"Source Serif 4",Georgia,serif;font-size:.93rem;color:var(--muted);margin-top:.15rem}
+.row.co2 .k{color:var(--ink)} .row.kwh .k{color:var(--kwh)} .row.h2o .k{color:var(--h2o)} .row.heat .k{color:var(--heat)}
+.bars{display:grid;gap:.3rem;margin-top:.4rem}
+.bar{display:grid;grid-template-columns:4.2rem 1fr 4.4rem;align-items:center;gap:.4rem;font-size:.9rem}
+.bar .track{height:10px;background:var(--soft);border-radius:2px;overflow:hidden}
+.bar .fill{height:100%;border-radius:2px;transition:width .35s ease}
+.bar.min .fill{background:var(--min)} .bar.max .fill{background:var(--max)}
+.bar .p{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion: reduce){.bar .fill{transition:none}}
+.lab{font-size:.9rem;margin-top:.5rem}
+ul.src{padding-left:1.1rem;font-size:.92rem} ul.src li{margin:.25rem 0}
+.kicker{font-family:"Barlow Semi Condensed",Arial,sans-serif;font-size:.9rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;flex-wrap:wrap;gap:.2rem .9rem;margin:0 0 .4rem}
+.kicker a{color:inherit;text-decoration:none} .kicker a:hover{color:var(--kwh);text-decoration:underline}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<nav class="kicker" aria-label="Site"><a href="/">tythos.com</a><a href="baseline/">Reference tables</a></nav>
+<h1>Our family's daily footprint</h1>
+<p class="muted">Two adults and a child, averaged over a year. Home energy, both cars' daily driving, and home tap water. Food, goods and flights are not included.</p>
+
+<div class="days">
+  <section class="day min" aria-label="Minimum daily footprint">
+    <div class="who">Low end: solar + home battery, all-electric, 2 hybrids</div>
+    <div class="big" id="minBig">-</div><div class="unit">kg CO2 per day</div>
+    <dl>
+      <dt>Energy</dt><dd id="minE">-</dd>
+      <dt>Water</dt><dd id="minW">-</dd>
+      <dt>Heat</dt><dd id="minH">-</dd>
+      <dt>Per year</dt><dd id="minY">-</dd>
+    </dl>
+  </section>
+  <section class="day max" aria-label="Maximum daily footprint">
+    <div class="who">High end: today's setup, gas heat, 2 average gas cars</div>
+    <div class="big" id="maxBig">-</div><div class="unit">kg CO2 per day</div>
+    <dl>
+      <dt>Energy</dt><dd id="maxE">-</dd>
+      <dt>Water</dt><dd id="maxW">-</dd>
+      <dt>Heat</dt><dd id="maxH">-</dd>
+      <dt>Per year</dt><dd id="maxY">-</dd>
+    </dl>
+  </section>
+</div>
+
+<details>
+  <summary>What goes into these two numbers</summary>
+  <ul>
+    <li>Driving, both ends: 13,200 mi/yr across two cars (~6,600 each). <span class="t a">assumed</span></li>
+    <li>High end: 22 mpg cars (0.4 kg CO2/mi), ~7,200 kWh grid electricity, gas furnace and gas water heater (~63 MMBtu/yr). This is the <a href="baseline/">reference page's</a> baseline plus the second car's driving. <span class="t s">source: EPA, EIA RECS</span> <span class="t i">inferred</span></li>
+    <li>Low end: 50 mpg hybrids (not plug-in). House goes all-electric with a heat pump (~12,400 kWh/yr), fully covered by rooftop solar at 41 g CO2/kWh lifecycle. <span class="t a">assumed</span> <span class="t s">solar factor: IPCC median via Wikipedia</span></li>
+    <li>Low end battery: one 13.5 kWh home battery at ~75 kg CO2 per kWh to build (published range 40-150), spread over 12 years = ~0.23 kg/day. <span class="t i">inferred</span></li>
+    <li>Tap water, both ends: ~300 gal (1,136 L) per day, the EPA average for a family at home. <span class="t s">source: EPA WaterSense</span></li>
+  </ul>
+</details>
+
+<h2>Compare anything to our day</h2>
+<p class="note">Tap a shortcut or pick any item. Numbers are central estimates, with ranges where the source gives one.</p>
+
+<div class="tool">
+  <div class="chips" id="chips" role="group" aria-label="Shortcuts"></div>
+  <div class="pick">
+    <label class="sr" for="qty">Quantity</label>
+    <input id="qty" type="number" min="0" step="any" value="1" inputmode="decimal">
+    <label class="sr" for="item">Item</label>
+    <select id="item"></select>
+  </div>
+  <div class="res" id="res" aria-live="polite"></div>
+</div>
+
+<details>
+  <summary>How each number is calculated</summary>
+  <ul>
+    <li><b>CO2:</b> grid electricity and data centers 0.35 kg/kWh (US average); rooftop solar 0.041 kg/kWh; gasoline 8.89 kg/gal; natural gas 53 kg/MMBtu. <span class="t s">source: EIA, EPA, IPCC</span></li>
+    <li><b>Energy:</b> energy used at the point of use (your meter, your gas tank, the data center). Gasoline counted at 33.7 kWh/gal. <span class="t s">source: EPA MPGe basis</span></li>
+    <li><b>Water:</b> water consumed at home plus upstream. Grid electricity ~4.35 L/kWh at power plants (LBNL; USGS-based estimates are about half). Data centers add ~0.37 L/kWh onsite cooling. Gasoline ~19 L/gal for extraction and refining (Argonne: 2.1-5.4 gal per gal of oil produced plus ~1.5 gal refining). Solar and natural gas treated as ~0. <span class="t i">inferred</span></li>
+    <li><b>Heat:</b> nearly all energy ends up as heat. Grid electricity counts power-plant losses using the EPA source-to-site ratio of 2.80; onsite solar 1.00; natural gas 1.05; gasoline 1.0. One "kettle" = heating 1.5 L of water from 20C to boiling = 0.14 kWh. <span class="t s">source: ENERGY STAR Portfolio Manager</span> <span class="t i">kettle inferred</span></li>
+    <li><b>Entropy:</b> heat released divided by room temperature (293 K). A simple physics estimate of the entropy added to the environment when useful energy turns into waste heat. <span class="t i">inferred</span></li>
+    <li><b>AI sessions:</b> a 30-min Claude Opus extra-high session is assumed to cost $3-15 in API-equivalent compute, converted at 27-129 Wh per dollar from Hausfather's logged Claude Code usage. Central estimate ~0.6 kWh, which matches Hausfather's median heavy session. Anthropic publishes no per-token energy data. <span class="t a">assumed</span> <span class="t i">inferred</span></li>
+  </ul>
+</details>
+
+<h2>Sources</h2>
+<ul class="src">
+  <li>EIA 2024 grid CO2 and EIA RECS 2020 home end uses (compiled at <a href="https://electricrates.org/guides/appliance-electricity-usage/">electricrates.org</a>)</li>
+  <li>EPA typical vehicle and gasoline CO2: <a href="https://www.epa.gov/greenvehicles/greenhouse-gas-emissions-typical-passenger-vehicle">epa.gov</a></li>
+  <li>EPA WaterSense family water use: <a href="https://19january2021snapshot.epa.gov/watersense/how-we-use-water_.html">epa.gov</a></li>
+  <li>Lifecycle emissions of rooftop solar (IPCC table): <a href="https://en.wikipedia.org/wiki/Life-cycle_greenhouse_gas_emissions_of_energy_sources">wikipedia.org</a></li>
+  <li>Battery manufacturing carbon estimates: <a href="https://www.solarquotes.com.au/blog/does-battery-storage-help-or-hurt-the-environment/">solarquotes.com.au</a></li>
+  <li>ENERGY STAR source-site ratios: <a href="https://portfoliomanager.energystar.gov/pdf/reference/Source%20Energy.pdf">energystar.gov</a></li>
+  <li>Argonne oil and refining water use (via AAPG): <a href="https://explorer.aapg.org/story/articleid/2829">aapg.org</a></li>
+  <li>AI energy: <a href="https://www.theclimatebrink.com/p/the-real-energy-use-of-agentic-ai">Hausfather 2026</a>, <a href="https://simonpcouch.com/blog/2026-01-20-cc-impact/">Couch 2026</a>, <a href="https://botfarm.run/blog/claude-max-true-price/">Botfarm</a>, <a href="https://cloud.google.com/blog/products/infrastructure/measuring-the-environmental-impact-of-ai-inference">Google 2025</a>, <a href="https://arxiv.org/abs/2505.09598">Jegham et al. 2025</a></li>
+  <li>Data center water: LBNL 2024 via <a href="https://www.energy.gov/articles/doe-releases-new-report-evaluating-increase-electricity-demand-data-centers">energy.gov</a></li>
+  <li>Outside benchmarks (restaurant, gas station, golf, Walmart, military): see the <a href="baseline/#sources">reference page's sources</a></li>
+</ul>
+</main>
+
+<script>
+(function(){
+  // Factors
+  var F = {
+    gridKg:0.35, dcKg:0.35, solarKg:0.041, gasKgPerGal:8.887, ngKgPerMMBtu:53.06,
+    gasKwhPerGal:33.7, ngKwhPerMMBtu:293.07,
+    gridL:4.35, dcOnsiteL:0.37, gasLPerGal:19,
+    srcGrid:2.8, srcNg:1.05, T0:293, kettleKwh:0.1395
+  };
+
+  // Item fields: grid, dc, solar (kWh); gal (gasoline); ng (MMBtu); other (kWh of site energy with no CO2 factor);
+  // kg (extra CO2); L (direct water); noL (direct water not estimated); noE (energy not estimated); lo/hi multipliers.
+  var G = [
+    ["Our family", [
+      {id:"fmin", n:"Our family day, low end", solar:34.04, gal:0.723, kg:0.23, L:1136, lab:"inferred"},
+      {id:"fmax", n:"Our family day, high end", grid:19.82, ng:0.1727, gal:1.644, L:1136, lab:"inferred"}
+    ]],
+    ["AI", [
+      {id:"prompt", n:"Short AI chat prompt", dc:0.0003, lo:0.8, hi:2.7, lab:"source: Google, OpenAI, Jegham"},
+      {id:"sonnet", n:"Long Claude Sonnet prompt", dc:0.0055, lo:0.5, hi:3.1, lab:"source: Jegham et al."},
+      {id:"ccmed", n:"Median Claude Code session", dc:0.041, lo:0.5, hi:2, lab:"source: Couch 2026"},
+      {id:"opus30", n:"30-min Claude Opus extra-high session", dc:0.6, lo:0.135, hi:3.2, lab:"assumed + inferred"},
+      {id:"agday", n:"Heavy agentic workday", dc:3.0, lo:0.4, hi:1.97, lab:"source: Hausfather 2026"},
+      {id:"proday", n:"Claude Pro maxed, 1 day", dc:1.0, lo:0.27, hi:2.43, lab:"inferred"},
+      {id:"proweek", n:"Claude Pro maxed, 1 week", dc:7, lo:0.27, hi:2.43, lab:"inferred"},
+      {id:"maxday", n:"Claude Max 20x maxed, 1 day", dc:10.4, lo:0.41, hi:2.92, lab:"inferred"},
+      {id:"maxweek", n:"Claude Max 20x maxed, 1 week", dc:73, lo:0.41, hi:2.92, lab:"inferred"},
+      {id:"gem1m", n:"1 million median Gemini prompts", dc:240, lab:"source: Google (their market-based CO2 is 30 kg)"}
+    ]],
+    ["Home", [
+      {id:"micro", n:"Microwave, 4 min", grid:0.08, lab:"inferred"},
+      {id:"oven", n:"Electric oven, 350F, 20 min", grid:1.2, lo:0.75, hi:1.25, lab:"inferred"},
+      {id:"pasta", n:"Spaghetti dinner, electric stove", grid:0.85, L:4, lo:0.82, hi:1.18, lab:"inferred"},
+      {id:"shower", n:"10-min hot shower, electric water heater", grid:2.4, L:79, lo:0.75, hi:1.25, lab:"inferred"},
+      {id:"showerg", n:"10-min hot shower, gas water heater", ng:0.0122, L:79, lo:0.75, hi:1.25, lab:"inferred"},
+      {id:"flush", n:"Toilet flush (1.6 gal)", L:6.06, noE:true, lab:"source: federal standard via WaterSense"},
+      {id:"dryer", n:"Dryer load", grid:2.4, lab:"source: RECS"},
+      {id:"washer", n:"Washer load (machine only)", grid:0.4, L:60, lab:"source: ENERGY STAR; water assumed"},
+      {id:"dish", n:"Dishwasher load", grid:1.1, L:13, lab:"source: ENERGY STAR; water assumed"},
+      {id:"pc", n:"PC tower on for 24 h", grid:2.4, lo:0.6, hi:1.5, lab:"assumed"},
+      {id:"laptop", n:"Laptop, 8-h workday", grid:0.36, lo:0.67, hi:1.33, lab:"inferred"},
+      {id:"phone", n:"Phone full charge", grid:0.018, lab:"inferred"},
+      {id:"led", n:"LED bulb, 1 hour", grid:0.009, lab:"source: ENERGY STAR"},
+      {id:"ac", n:"Central AC, 1 hour", grid:3, lo:0.7, hi:1.2, lab:"source: RECS"},
+      {id:"furnace", n:"Gas furnace, average winter day", ng:0.3, lo:0.5, hi:1.67, lab:"inferred from RECS"},
+      {id:"hp", n:"Heat pump, average winter day", grid:16.5, lo:0.5, hi:2, lab:"inferred from RECS"},
+      {id:"fridge", n:"Refrigerator, 1 day", grid:1.37, lab:"source: ENERGY STAR, RECS"},
+      {id:"router", n:"Wi-Fi router, 1 day", grid:0.24, lab:"inferred"},
+      {id:"home", n:"Average US home's electricity, 1 day", grid:28.8, lab:"source: EIA"}
+    ]],
+    ["Driving", [
+      {id:"long", n:"Long daily round trip, ~30 mi, average car", gal:1.364, lo:0.67, hi:1.33, lab:"assumed miles"},
+      {id:"longh", n:"Long daily round trip, ~30 mi, 50 mpg hybrid", gal:0.6, lo:0.67, hi:1.33, lab:"assumed"},
+      {id:"long2", n:"Both cars' long daily round trips, average cars", gal:2.727, lo:0.67, hi:1.33, lab:"assumed miles"},
+      {id:"short", n:"Short daily round trip, ~5 mi, average car", gal:0.227, lab:"assumed miles"},
+      {id:"mile", n:"1 mile, average car", gal:0.04545, lab:"source: EPA"},
+      {id:"gallon", n:"1 gallon of gasoline", gal:1, lab:"source: EPA"}
+    ]],
+    ["Outside world", [
+      {id:"mcd", n:"McDonald's-size restaurant, 1 day", grid:1000, ng:2.14, noL:true, lab:"inferred"},
+      {id:"walmart", n:"Walmart supercenter, 1 day", grid:16400, lo:0.83, hi:1.17, noL:true, lab:"inferred"},
+      {id:"station", n:"Gas station store building, 1 day", grid:767, noL:true, lab:"inferred"},
+      {id:"fuel", n:"Fuel sold by one gas station, 1 day", gal:4662, lab:"source: NACS"},
+      {id:"golf", n:"18-hole golf course, 1 day", other:1930, kg:548, L:404000, lo:0.75, hi:1.25, lab:"inferred from GCSAA"},
+      {id:"light", n:"One streetlight, 1 day", grid:1.42, lab:"inferred"},
+      {id:"iphone", n:"Making one iPhone 17", kg:55, noE:true, noL:true, lab:"source: Apple"},
+      {id:"flight", n:"SF-NY round trip flight, 1 passenger", kg:750, noE:true, noL:true, lab:"inferred"},
+      {id:"american", n:"Average American, 1 day (all GHG)", kg:47, noE:true, noL:true, lab:"source: EIA via Statista"},
+      {id:"dod", n:"US Department of Defense, 1 day", kg:161600000, other:372000000, noL:true, lab:"source: Costs of War; energy = operational fuel only"},
+      {id:"dc", n:"All US data centers, 1 day", dc:482000000, lab:"source: LBNL"},
+      {id:"btc", n:"Bitcoin network, 1 day (if on US-average grid)", grid:485000000, lab:"source: CBECI; grid assumed"}
+    ]]
+  ];
+
+  var byId = {};
+  G.forEach(function(g){ g[1].forEach(function(it){ byId[it.id] = it; }); });
+
+  function calc(it, mult){
+    var grid=(it.grid||0)*mult, dc=(it.dc||0)*mult, sol=(it.solar||0)*mult, gal=(it.gal||0)*mult, ng=(it.ng||0)*mult, oth=(it.other||0)*mult;
+    var r = {};
+    r.kwh = grid + dc + sol + gal*F.gasKwhPerGal + ng*F.ngKwhPerMMBtu + oth;
+    r.kg = grid*F.gridKg + dc*F.dcKg + sol*F.solarKg + gal*F.gasKgPerGal + ng*F.ngKgPerMMBtu + (it.kg||0)*mult;
+    r.L = grid*F.gridL + dc*(F.gridL + F.dcOnsiteL) + gal*F.gasLPerGal + (it.L||0)*mult;
+    r.Lonsite = dc*F.dcOnsiteL;
+    r.heat = (grid + dc)*F.srcGrid + sol + gal*F.gasKwhPerGal + ng*F.ngKwhPerMMBtu*F.srcNg + oth;
+    r.S = r.heat*3600/F.T0; // kJ/K
+    return r;
+  }
+
+  function sig(n, s){
+    s = s || 2;
+    if (!isFinite(n)) return "-";
+    if (n === 0) return "0";
+    var d = Math.ceil(Math.log10(Math.abs(n)));
+    var p = s - d;
+    var m = Math.pow(10, p);
+    var v = Math.round(n*m)/m;
+    return v.toLocaleString("en-US", {maximumFractionDigits: Math.max(0, p)});
+  }
+  function kg(x){
+    if (x < 1) return sig(x*1000) + " g";
+    if (x < 1000) return sig(x) + " kg";
+    if (x < 1e6) return sig(x/1000) + " t";
+    if (x < 1e9) return sig(x/1e6) + " kt";
+    if (x < 1e12) return sig(x/1e9) + " Mt";
+    return sig(x/1e12) + " Gt";
+  }
+  function kwh(x){
+    if (x < 1) return sig(x*1000) + " Wh";
+    if (x < 1000) return sig(x) + " kWh";
+    if (x < 1e6) return sig(x/1000) + " MWh";
+    if (x < 1e9) return sig(x/1e6) + " GWh";
+    return sig(x/1e9) + " TWh";
+  }
+  function liters(x){
+    var gal = x/3.785;
+    var lp = x < 1 ? sig(x*1000) + " mL" : (x < 1e6 ? sig(x) + " L" : (x < 1e9 ? sig(x/1e6) + " million L" : sig(x/1e9) + " billion L"));
+    var gp = gal < 1e6 ? sig(gal) + " gal" : (gal < 1e9 ? sig(gal/1e6) + " million gal" : sig(gal/1e9) + " billion gal");
+    return lp + " (" + gp + ")";
+  }
+  function mj(x){
+    if (x < 1000) return sig(x) + " MJ";
+    if (x < 1e6) return sig(x/1000) + " GJ";
+    if (x < 1e9) return sig(x/1e6) + " TJ";
+    return sig(x/1e9) + " PJ";
+  }
+  function ent(x){
+    if (x < 1000) return sig(x) + " kJ/K";
+    if (x < 1e6) return sig(x/1000) + " MJ/K";
+    if (x < 1e9) return sig(x/1e6) + " GJ/K";
+    return sig(x/1e9) + " TJ/K";
+  }
+  function pct(x, base){
+    var p = x/base*100;
+    if (p === 0) return "0%";
+    if (p < 0.01) return "<0.01%";
+    if (p < 10) return sig(p) + "%";
+    if (p < 200) return Math.round(p) + "%";
+    return sig(x/base) + "x";
+  }
+
+  var fmin = calc(byId.fmin, 1), fmax = calc(byId.fmax, 1);
+  function fill(prefix, r){
+    document.getElementById(prefix+"Big").textContent = sig(r.kg, 2);
+    document.getElementById(prefix+"E").textContent = sig(r.kwh,3) + " kWh";
+    document.getElementById(prefix+"W").textContent = sig(r.L,3) + " L";
+    document.getElementById(prefix+"H").textContent = sig(r.heat,3) + " kWh";
+    document.getElementById(prefix+"Y").textContent = sig(r.kg*365/1000) + " t CO2";
+  }
+  fill("min", fmin); fill("max", fmax);
+
+  var sel = document.getElementById("item");
+  G.forEach(function(g){
+    var og = document.createElement("optgroup"); og.label = g[0];
+    g[1].forEach(function(it){ var o = document.createElement("option"); o.value = it.id; o.textContent = it.n; og.appendChild(o); });
+    sel.appendChild(og);
+  });
+
+  var chipIds = [["opus30","30-min Opus extra-high"],["mcd","McDonald's day"],["long","30-mi round trip"],["maxday","Max 20x maxed day"],["shower","10-min shower"],["micro","Microwave 4 min"]];
+  var chipBox = document.getElementById("chips");
+  chipIds.forEach(function(c){
+    var b = document.createElement("button"); b.type = "button"; b.textContent = c[1]; b.dataset.id = c[0];
+    b.setAttribute("aria-pressed","false");
+    b.addEventListener("click", function(){ sel.value = c[0]; document.getElementById("qty").value = 1; render(); });
+    chipBox.appendChild(b);
+  });
+
+  var res = document.getElementById("res");
+  function el(tag, cls, txt){ var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+
+  function render(){
+    var it = byId[sel.value];
+    var q = parseFloat(document.getElementById("qty").value);
+    Array.prototype.forEach.call(chipBox.children, function(b){ b.setAttribute("aria-pressed", String(b.dataset.id === it.id)); });
+    res.innerHTML = "";
+    if (isNaN(q) || q < 0){ res.appendChild(el("p","note","Enter a quantity of 0 or more.")); return; }
+    var mid = calc(it, q), hasR = it.lo != null;
+    var lo = hasR ? calc(it, q*it.lo) : null, hi = hasR ? calc(it, q*it.hi) : null;
+    var name = (q === 1 ? "" : sig(q, 3) + " x ") + it.n;
+
+    var say = name + ": about " + kg(mid.kg) + " of CO2 (" + pct(mid.kg, fmax.kg) + " of our high-end day, " + pct(mid.kg, fmin.kg) + " of our low-end day)";
+    if (!it.noL && mid.L > 0) say += ", " + liters(mid.L) + " of water";
+    if (!it.noE && mid.kwh > 0) say += " and " + kwh(mid.kwh) + " of energy";
+    say += ".";
+    res.appendChild(el("p","say",say));
+
+    // CO2 row with bars
+    var r1 = el("div","row co2"); r1.appendChild(el("div","k","CO2"));
+    var v1 = el("div"); v1.appendChild(el("div","v",kg(mid.kg)));
+    if (hasR) v1.appendChild(el("div","d","Range " + kg(lo.kg) + " to " + kg(hi.kg)));
+    var bars = el("div","bars");
+    [["min","Low end",fmin.kg],["max","High end",fmax.kg]].forEach(function(b){
+      var row = el("div","bar " + b[0]); row.appendChild(el("span","",b[1]));
+      var tr = el("div","track"), fl = el("div","fill");
+      fl.style.width = Math.max(0.5, Math.min(100, mid.kg/b[2]*100)) + "%";
+      tr.appendChild(fl); row.appendChild(tr); row.appendChild(el("span","p",pct(mid.kg,b[2])));
+      bars.appendChild(row);
+    });
+    v1.appendChild(bars); r1.appendChild(v1); res.appendChild(r1);
+
+    // Energy
+    var r2 = el("div","row kwh"); r2.appendChild(el("div","k","Energy"));
+    var v2 = el("div");
+    if (it.noE){ v2.appendChild(el("div","v","-")); v2.appendChild(el("div","d","Not estimated for this item.")); }
+    else {
+      v2.appendChild(el("div","v",kwh(mid.kwh)));
+      v2.appendChild(el("div","d",(hasR ? "Range " + kwh(lo.kwh) + " to " + kwh(hi.kwh) + ". " : "") + "Our day uses " + sig(fmin.kwh,3) + " to " + sig(fmax.kwh,3) + " kWh" + "; this is " + pct(mid.kwh, fmax.kwh) + " to " + pct(mid.kwh, fmin.kwh) + " of that."));
+    }
+    r2.appendChild(v2); res.appendChild(r2);
+
+    // Water
+    var r3 = el("div","row h2o"); r3.appendChild(el("div","k","Water"));
+    var v3 = el("div");
+    if (it.noL && mid.L === 0){ v3.appendChild(el("div","v","-")); v3.appendChild(el("div","d","Not estimated for this item.")); }
+    else {
+      v3.appendChild(el("div","v",liters(mid.L)));
+      var wd = [];
+      if (hasR) wd.push("Range " + liters(lo.L) + " to " + liters(hi.L) + ".");
+      if (mid.Lonsite > 0) wd.push("About " + liters(mid.Lonsite) + " is data center cooling; the rest is at power plants.");
+      if (it.noL) wd.push("Power-plant water only; onsite water use not estimated.");
+      wd.push("Our day: ~" + sig(fmin.L,3) + "-" + sig(fmax.L,3) + " L, so this is " + pct(mid.L, fmax.L) + ". A 16.9 oz bottle is 0.5 L.");
+      v3.appendChild(el("div","d",wd.join(" ")));
+    }
+    r3.appendChild(v3); res.appendChild(r3);
+
+    // Heat and entropy
+    var r4 = el("div","row heat"); r4.appendChild(el("div","k","Heat"));
+    var v4 = el("div");
+    if (it.noE){ v4.appendChild(el("div","v","-")); v4.appendChild(el("div","d","Not estimated for this item.")); }
+    else {
+      v4.appendChild(el("div","v",kwh(mid.heat) + " = " + mj(mid.heat*3.6)));
+      v4.appendChild(el("div","d","About " + sig(mid.heat/F.kettleKwh) + " kettles boiled. Entropy added: ~" + ent(mid.S) + " (our day: " + ent(fmin.S) + " to " + ent(fmax.S) + ")."));
+    }
+    r4.appendChild(v4); res.appendChild(r4);
+
+    res.appendChild(el("div","lab note","Label: " + it.lab + "."));
+  }
+
+  sel.addEventListener("change", render);
+  document.getElementById("qty").addEventListener("input", render);
+  sel.value = "opus30";
+  render();
+})();
+</script>
+</body>
+</html>

@@ -43,6 +43,12 @@ available there — verify the Pages run instead, per `.claude/zmh/producer.md`
   app can monitor, feature-detected and probed live in the visitor's own browser, with
   per-signal iOS Safari status and native-bridge notes. Data-table-driven: to add a
   signal, append one object to `SIGNALS[]` (or `NATIVE_ONLY[]`). See `signals/README.md`
+- `carbon-footprint/` — **not a game.** Household energy / carbon / water footprint page
+  plus a compare-anything tool (AI sessions, appliances, driving, outside benchmarks), with
+  a reference page at `baseline/`. Published at tythos.com/carbon-footprint. Built in the
+  **Almanac** style, not neon. **No PII:** the household is "two adults and a child" only -
+  never names, family roles, the child's gender, school, trip purposes, town or routes. Rules in
+  `carbon-footprint/CLAUDE.md`; data, verification checklist in its `README.md`
 - `character-lists/` — **not a game.** Personal reference app for remembering who's who
   in a book/show/film: a hub of titles, each with name-only lists of **characters**,
   **places** and (where useful) **chapters**, a tap-for-detail dialog on every entry,
@@ -131,6 +137,10 @@ coverage gaps → build → test → ship → report). Manual steps:
 3. Commit and push to `main` (full checklist: `games/CLAUDE.md` § Adding a New Game)
 
 ## Code style
+
+The rules below are the **Neon Arcade** style, the default for every page. Other named
+styles (currently **Almanac**, used by `carbon-footprint/`) are specced in
+`.claude/styles/`; build a page in one only when the CD names it.
 
 - Google Fonts: `Black Ops One` (headings) + `Share Tech Mono` (body)
 - Color palette via `:root` CSS vars; dark background (`#06060e`), neon accents
