@@ -1,0 +1,669 @@
+/* Cary, NC 27513 - 2026 general election research data.
+ *
+ * SINGLE SOURCE OF TRUTH for index.html, candidates.json and candidates.csv.
+ * Edit here, then run:  node 2026election/build.mjs
+ * (regenerates the JSON/CSV downloads and runs the checks).
+ *
+ * Keep this file plain ASCII (no curly quotes, no en/em dashes).
+ *
+ * Candidate fields
+ *   n      name as it appears on the ballot (NCSBE)
+ *   p      party on ballot: DEM | REP | LIB | GRE | "" (nonpartisan contest)
+ *   pn     party note for nonpartisan contests (from reporting), optional
+ *   inc    true when the candidate currently holds this seat
+ *   home   city of residence from the NCSBE filing
+ *   bio    one or two sentences: who they are
+ *   rec    past actions / record / controversies worth knowing (with sources in src)
+ *   ai     { c: green|yellow|orange|red|gray,
+ *            conf: high|med|low (confidence in the COLOR, not in the person),
+ *            basis: stated|inferred|none|na,
+ *            why: the reasoning behind the color,
+ *            q: best direct quote, optional }
+ *   src    sources for bio/rec/ai: [label, url]
+ *   links  where to read their own words: [label, url, flag]
+ *          flag "u" = campaign site taken from the NCSBE filing email domain,
+ *          not independently opened (the research proxy blocks direct page loads)
+ */
+window.ELECTION = {
+  meta: {
+    title: 'Cary 27513 - 2026 General Election',
+    electionDate: '2026-11-03',
+    zip: '27513',
+    updated: '2026-09-22',
+    candidateListAsOf: 'NCSBE candidate list dated 2026-09-21',
+    voterFileAsOf: 'NCSBE Wake County voter file dated 2026-09-20'
+  },
+
+  ratings: {
+    green:  { label: 'Pro, with conditions', short: 'Supports AI / data centers AND says they must pay their own way or leave the community better off (own power, no ratepayer subsidy, local benefits, local say).' },
+    yellow: { label: 'Mixed / unclear',       short: 'Wishy-washy, contradictory, or only partly formed: e.g. states conditions but also backs incentives, or opposes one project without saying what would be acceptable.' },
+    orange: { label: 'Opposed, no nuance',    short: 'Opposes data centers or backs pauses/moratoria without describing terms under which one would be welcome.' },
+    red:    { label: 'Pro, no nuance',        short: 'Backs AI / data-center growth (incentives, speed) with no stated protections for ratepayers or the host community.' },
+    gray:   { label: 'No position found',     short: 'No public statement found as of the update date, or the office (judge, clerk, sheriff) does not set AI / data-center policy. Not a rating.' }
+  },
+
+  /* District keys used by contest.when and by the geography below. */
+  districtKeys: {
+    cong: 'U.S. House district',
+    sen:  'NC Senate district',
+    house:'NC House district',
+    comm: 'County commissioner district',
+    boe:  'School board district',
+    sup:  'Superior Court district',
+    dct:  'District Court district'
+  },
+
+  /* Every active+inactive registered voter whose residential ZIP is 27513,
+     grouped by district combination. Aggregated from the NCSBE Wake voter
+     file (ncvoter92, 2026-09-20); no individual records are kept. */
+  combos27513: [
+    [11442, { cong:'02', sen:'17', house:'41', comm:'3', boe:'9', sup:'10D', dct:'10D' }],
+    [ 7129, { cong:'02', sen:'16', house:'11', comm:'3', boe:'9', sup:'10A', dct:'10D' }],
+    [ 6954, { cong:'04', sen:'16', house:'11', comm:'3', boe:'9', sup:'10A', dct:'10F' }],
+    [ 3413, { cong:'02', sen:'17', house:'41', comm:'3', boe:'9', sup:'10D', dct:'10F' }],
+    [ 2137, { cong:'02', sen:'16', house:'49', comm:'7', boe:'9', sup:'10A', dct:'10D' }],
+    [ 1904, { cong:'02', sen:'16', house:'49', comm:'7', boe:'9', sup:'10D', dct:'10D' }],
+    [  860, { cong:'04', sen:'16', house:'11', comm:'4', boe:'9', sup:'10A', dct:'10D' }],
+    [  858, { cong:'02', sen:'16', house:'11', comm:'4', boe:'9', sup:'10A', dct:'10D' }],
+    [    3, { cong:'02', sen:'16', house:'41', comm:'7', boe:'7', sup:'10D', dct:'10D' }]
+  ],
+
+  /* Precincts containing 27513 addresses. v = 27513 voters in the precinct.
+     combos = district combinations for ALL voters in the precinct (districts
+     follow the address, not the ZIP). 05-05 (3 voters in 27513, rest 27617)
+     is left out of the picker; see methodology. */
+  precincts: [
+    { id:'04-05', v:1904, combos:[[3960,{ cong:'02', sen:'16', house:'49', comm:'7', boe:'9', sup:'10D', dct:'10D' }]] },
+    { id:'04-08', v:2916, combos:[[2918,{ cong:'02', sen:'17', house:'41', comm:'3', boe:'9', sup:'10D', dct:'10D' }]] },
+    { id:'04-09', v:3317, combos:[[3318,{ cong:'02', sen:'17', house:'41', comm:'3', boe:'9', sup:'10D', dct:'10D' }]] },
+    { id:'04-10', v:1718, combos:[[2071,{ cong:'04', sen:'16', house:'11', comm:'4', boe:'9', sup:'10A', dct:'10D' }],
+                                  [ 903,{ cong:'02', sen:'16', house:'11', comm:'4', boe:'9', sup:'10A', dct:'10D' }]] },
+    { id:'04-11', v: 977, combos:[[1822,{ cong:'02', sen:'16', house:'11', comm:'3', boe:'9', sup:'10A', dct:'10D' }]] },
+    { id:'04-13', v:5054, combos:[[5282,{ cong:'04', sen:'16', house:'11', comm:'3', boe:'9', sup:'10A', dct:'10F' }]] },
+    { id:'04-15', v:2728, combos:[[2729,{ cong:'02', sen:'16', house:'11', comm:'3', boe:'9', sup:'10A', dct:'10D' }]] },
+    { id:'04-17', v:2039, combos:[[2039,{ cong:'02', sen:'17', house:'41', comm:'3', boe:'9', sup:'10D', dct:'10D' }]] },
+    { id:'04-18', v:3170, combos:[[3171,{ cong:'02', sen:'17', house:'41', comm:'3', boe:'9', sup:'10D', dct:'10D' }]] },
+    { id:'04-19', v:1900, combos:[[1900,{ cong:'04', sen:'16', house:'11', comm:'3', boe:'9', sup:'10A', dct:'10F' }]] },
+    { id:'04-20', v:3424, combos:[[3426,{ cong:'02', sen:'16', house:'11', comm:'3', boe:'9', sup:'10A', dct:'10D' }]] },
+    { id:'04-21', v:2137, combos:[[2137,{ cong:'02', sen:'16', house:'49', comm:'7', boe:'9', sup:'10A', dct:'10D' }]] },
+    { id:'05-01', v:1615, combos:[[4556,{ cong:'02', sen:'17', house:'41', comm:'3', boe:'9', sup:'10D', dct:'10F' }]] },
+    { id:'05-03', v:1798, combos:[[5022,{ cong:'02', sen:'17', house:'41', comm:'3', boe:'9', sup:'10D', dct:'10F' }]] }
+  ],
+
+  levels: [
+    { id:'federal', name:'Federal',                 blurb:'U.S. Senate and U.S. House.' },
+    { id:'scourt',  name:'State appellate courts',  blurb:'NC Supreme Court and Court of Appeals. Statewide, partisan.' },
+    { id:'leg',     name:'NC General Assembly',     blurb:'State Senate and State House. These seats write NC data-center, energy and utility law.' },
+    { id:'county',  name:'Wake County offices',     blurb:'County commissioners (land use in unincorporated Wake, budget), sheriff, clerk of court.' },
+    { id:'lcourt',  name:'Local courts and DA',     blurb:'Wake superior and district court judges (elected by sub-district) and the district attorney.' },
+    { id:'school',  name:'School board',            blurb:'Wake County Board of Education. Nonpartisan on the ballot.' },
+    { id:'soil',    name:'Soil and Water',          blurb:'Wake Soil and Water Conservation District. Nonpartisan, countywide, vote for 2.' }
+  ],
+
+  contests: [
+  /* ------------------------------------------------------------------ FEDERAL */
+  {
+    id:'us-senate', level:'federal', type:'U.S. Senate', title:'U.S. Senate', voteFor:1, term:'6 years', partisan:true, when:null,
+    note:'Open seat (Thom Tillis, R, retiring).',
+    cands:[
+      { n:'Roy Cooper', p:'DEM', inc:false, home:'Raleigh',
+        bio:'Former NC governor (2017-2024) and attorney general.',
+        rec:'As governor he celebrated large tech and data-center investments that received state incentives; the NRSC calls his 2026 stance a flip-flop (partisan source).',
+        ai:{ c:'green', conf:'med', basis:'stated',
+          why:'Accepts data centers but says they must pay for all of their power, should build their own generation, and that local communities get the final say (including local moratoriums). Has not called for a ban.',
+          q:'We need to make sure data centers pay for their own power and we need to encourage them to build their own energy sources because right now that\'s causing rates to go up for consumers.' },
+        src:[['Spectrum News: data centers and the Senate race (Aug 2026)','https://spectrumlocalnews.com/nc/charlotte/news/2026/08/27/data-centers-roy-cooper-whatley'],
+             ['Charlotte Observer fact check: Whatley vs Cooper on data centers','https://www.newsbreak.com/charlotte-observer-1592553/4885526834049-fact-check-where-michael-whatley-and-roy-cooper-stand-on-data-centers'],
+             ['Fox News: Cooper shifts his stance on data centers','https://www.foxnews.com/politics/roy-cooper-changes-tune-data-centers-rising-power-costs-collide-senate-campaign'],
+             ['NRSC: "Roy Cooper flip-flopped on data centers" (partisan)','https://www.nrsc.org/press-releases/roy-cooper-flip-flopped-on-data-centers-2026-08-31/']],
+        links:[['Campaign site','https://www.roycooper.com','u'],['Wikipedia','https://en.wikipedia.org/wiki/Roy_Cooper'],['Ballotpedia: race page','https://ballotpedia.org/United_States_Senate_election_in_North_Carolina,_2026']] },
+      { n:'Michael Whatley', p:'REP', inc:false, home:'Gastonia',
+        bio:'Former Republican National Committee chair and former NC GOP chair.',
+        rec:'NC Democrats, citing his family financial disclosure, say he holds up to $1.6M in data-center company investments and at least $149K of Duke Energy stock (claims made at a Democratic press event; check the disclosure yourself).',
+        ai:{ c:'yellow', conf:'med', basis:'stated',
+          why:'Strong pay-your-own-way terms (Big Tech buys every megawatt and every grid upgrade, zero cost to households, communities decide) would read green, BUT he also backs tax breaks for data centers (fails your "no subsidy" test) and told Fox News local opposition "is not organic" and is "being ginned up". Mixed signals.',
+          q:'We don\'t want to lose the AI race to China ... but you can\'t have the data centers be a burden to local communities.' },
+        src:[['Breitbart radio interview (Aug 25, 2026)','https://www.breitbart.com/radio/2026/08/25/exclusive-nc-senate-candidate-michael-whatley-we-cannot-have-data-centers-raising-water-or-electricity-rates-on-consumers/'],
+             ['Charlotte Observer fact check','https://www.newsbreak.com/charlotte-observer-1592553/4885526834049-fact-check-where-michael-whatley-and-roy-cooper-stand-on-data-centers'],
+             ['MSNBC/MaddowBlog: "not organic ... ginned up" quote','https://www.ms.now/rachel-maddow-show/maddowblog/data-centers-scalise-trump-republicans-china-conspiracy-theory-gop-elections-midterms'],
+             ['CBS17: Democrats attack Whatley data-center investments','https://www.cbs17.com/news/north-carolina-news/nc-democrats-sharpen-attacks-against-whatley-over-data-center-investments/'],
+             ['Cardinal Pine (progressive outlet)','https://cardinalpine.com/news/democrats-criticize-whatley-duke-energy-data-center-investments/']],
+        links:[['Campaign site','https://www.whatleyforsenate.com','u'],['Wikipedia','https://en.wikipedia.org/wiki/Michael_Whatley']] },
+      { n:'Shannon W. Bray', p:'LIB', inc:false, home:'Angier',
+        bio:'Navy veteran; cybersecurity specialist with a PhD in computer science.',
+        rec:'Platform centers on privacy, modernizing government, and rejecting mass data collection and a "surveillance state".',
+        ai:{ c:'gray', conf:'low', basis:'none',
+          why:'Tech-literate privacy platform, but no specific AI or data-center position found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Shannon_Bray'],['WAVY candidate profile','https://www.wavy.com/news/politics/candidates/candidate-profile-shannon-bray-nc-senate/']],
+        links:[['Campaign site','https://www.shannonbray.us/'],['Ballotpedia','https://ballotpedia.org/Shannon_Bray']] },
+      { n:'Michael Dublin', p:'GRE', inc:false, home:'Garner',
+        bio:'Raleigh-raised public school teacher; 2024 Green nominee for NC-2.',
+        rec:'Platform: 100% renewable energy and net-zero-or-better by 2035, halt new fossil-fuel approvals, $25 minimum wage, universal health care; refuses corporate donations.',
+        ai:{ c:'gray', conf:'low', basis:'none',
+          why:'Strong climate platform, but no specific AI or data-center position found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Michael_Dublin'],['Green Party profile','https://www.gp.org/michael_dublin_for_congress']],
+        links:[['Campaign site','https://www.dublinforcongress.com/'],['Ballotpedia','https://ballotpedia.org/Michael_Dublin']] }
+    ]
+  },
+  {
+    id:'us-house-02', level:'federal', type:'U.S. House', title:'U.S. House, NC District 2', voteFor:1, term:'2 years', partisan:true, when:{cong:'02'},
+    note:'Most of 27513.',
+    cands:[
+      { n:'Deborah K. Ross', p:'DEM', inc:true, home:'Raleigh',
+        bio:'U.S. Representative since 2021; former state House member and former ACLU of NC executive director.',
+        rec:'Her AI Incident Reporting and Security Enhancement Act was folded into the bipartisan American Leadership in AI Act (Apr 2026).',
+        ai:{ c:'green', conf:'low', basis:'stated',
+          why:'Pro-AI (sponsors AI security legislation, touts RTP as an AI hub) and has raised concerns about data centers in her district, saying communities should have more input on projects that need large amounts of power and water. The House passed the federal Ratepayer Protection Act 417-3; the three "no" votes were other members, so she did not oppose it (inferred: likely a yes).' },
+        src:[['Ross press release: AI bill in bipartisan package','https://ross.house.gov/2026/4/ross-bill-included-in-bipartisan-proposal-to-advance-american-leadership-in-ai'],
+             ['Fox News: first data-center bill clears House (Ross quoted)','https://www.foxnews.com/politics/first-data-center-bill-clears-house-republicans-democrats-scramble-answers-affordability-energy'],
+             ['Breitbart: the three "no" votes on the Ratepayer Protection Act','https://www.breitbart.com/tech/2026/09/17/house-passes-ratepayer-protection-act-417-3-to-address-ai-data-center-power-concerns/']],
+        links:[['House office site','https://ross.house.gov/'],['Campaign site','https://www.deborahross.com','u'],['Ballotpedia','https://ballotpedia.org/Deborah_Ross']] },
+      { n:'Eugene F. Douglass', p:'REP', inc:false, home:'Raleigh',
+        bio:'Retired college chemistry professor and education consultant.',
+        rec:'Placed second (22.5%) in the 2024 NC-2 GOP primary. Platform: stricter abortion limits, stricter immigration enforcement, opposes gender-affirming care for minors.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center position found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Eugene_Douglass'],['INDY: who is running for Congress','https://indyweek.com/news/politics/whos-running-congress/']],
+        links:[['PBS State Lines interview','https://www.pbs.org/video/eugene-douglass-republican-candidate-for-ncs-2nd-congressional-district-biv9vp/'],['Campaign site','https://gdouglass.us','u'],['Ballotpedia','https://ballotpedia.org/Eugene_Douglass']] },
+      { n:'Matthew Laszacs', p:'LIB', inc:false, home:'Cary (27513)',
+        bio:'Cary resident; previously the Libertarian nominee for NC House 41.',
+        rec:'Past platform: repeal exclusionary zoning to allow more housing, low taxes, deregulate health care (full practice authority, end Certificate of Need), education savings accounts for all.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center position found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Matthew_Laszacs'],['N&O Q&A (earlier race)','https://www.yahoo.com/news/libertarian-matthew-laszacs-candidate-nc-175746902.html']],
+        links:[['Ballotpedia','https://ballotpedia.org/Matthew_Laszacs'],['Earlier campaign site','https://matt4nc.us/meet-matt-laszacs/']] }
+    ]
+  },
+  {
+    id:'us-house-04', level:'federal', type:'U.S. House', title:'U.S. House, NC District 4', voteFor:1, term:'2 years', partisan:true, when:{cong:'04'},
+    note:'Western 27513 (precincts 04-13, 04-19 and part of 04-10).',
+    cands:[
+      { n:'Valerie P. Foushee', p:'DEM', inc:true, home:'Chapel Hill',
+        bio:'U.S. Representative since 2023; former state senator.',
+        rec:'Sits on the House Bipartisan AI Task Force and co-chairs the House Democratic Commission on AI and the Innovation Economy. DISCLOSURE: a super PAC funded by Anthropic (the company that makes Claude, the AI that compiled this page) spent about $1.6M supporting her in the March 2026 primary.',
+        ai:{ c:'yellow', conf:'med', basis:'stated',
+          why:'Pro-AI with regulation (generative-AI labeling, frontier-AI safety, data-center energy and water measures; cosponsor of a federal data-center community-impact study), but publicly opposed the one local proposal (New Hill, 300 MW) while saying local leaders should decide, without saying what terms would make a data center acceptable.',
+          q:'Plainly, I don\'t support a new data center in the heart of our district.' },
+        src:[['Foushee: AI and data-center measures advance in House Science','https://foushee.house.gov/media/press-releases/rep-foushee-led-generative-ai-labeling-frontier-ai-safety-and-data-center-measures-advance-through-house-science-committee'],
+             ['WUNC: opposition to data centers "catching a fire"','https://www.wunc.org/environment/2026-04-10/opposition-to-data-centers-is-catching-a-fire-across-north-carolina-spurring-political-challenges'],
+             ['WRAL: AI-related PACs back Foushee','https://www.wral.com/news/nccapitol/ai-pacs-2m-nc-2026-primaries-foushee-buckhout-feb-27/'],
+             ['The American Prospect: Anthropic-funded PAC and Foushee','https://prospect.org/2026/02/25/ai-anthropic-claude-super-pac-valerie-foushee-congress-north-carolina/']],
+        links:[['House office site','https://foushee.house.gov/'],['Campaign site','https://www.valeriefoushee.com','u'],['Wikipedia','https://en.wikipedia.org/wiki/Valerie_Foushee']] },
+      { n:'Mahesh (Max) Ganorkar', p:'REP', inc:false, home:'Pittsboro',
+        bio:'Home designer and builder; former Tea Party leader; describes himself as an "anti-socialism warrior".',
+        rec:'Repeat NC-4 candidate.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center position found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Mahesh_Ganorkar']],
+        links:[['PBS State Lines interview','https://www.pbs.org/video/mahesh-ganorkar-republican-candidate-for-ncs-4th-congressional-district-xiojuf/'],['Ballotpedia','https://ballotpedia.org/Mahesh_Ganorkar']] },
+      { n:'Guy Meilleur', p:'LIB', inc:false, home:'Durham',
+        bio:'ISA board-certified master arborist; former NC State lecturer.',
+        rec:'Frequent Libertarian candidate (U.S. House 2024, NC House 2020 and 2022).',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center position found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Guy_Meilleur']],
+        links:[['Campaign site','https://guy4nc.org','u'],['Ballotpedia','https://ballotpedia.org/Guy_Meilleur']] }
+    ]
+  },
+
+  /* ------------------------------------------------------ STATE APPELLATE COURTS */
+  {
+    id:'ncsc-1', level:'scourt', type:'NC Supreme Court', title:'NC Supreme Court, Associate Justice Seat 1', voteFor:1, term:'8 years', partisan:true, when:null,
+    note:'Court is 5-2 Republican; this seat decides whether it goes 6-1.',
+    cands:[
+      { n:'Anita Earls', p:'DEM', inc:true, home:'Durham',
+        bio:'Associate Justice since 2019; former voting-rights lawyer.',
+        rec:'Frequent dissenter on redistricting and voter-ID rehearings. In 2023 sued the Judicial Standards Commission over an investigation of her comments on diversity in the courts; dropped the suit after the commission dismissed the complaints.',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race. Judges are generally barred from pre-committing on policy issues; no AI or data-center position expected or found.' },
+        src:[['NC Newsline: Earls sues commission (2023)','https://ncnewsline.com/2023/08/29/nc-supreme-court-justice-anita-earls-sues-states-judicial-standards-commission/'],['Bolts: Earls vs Stevens','https://boltsmag.org/north-carolina-supreme-court-election-2026/']],
+        links:[['Campaign site','https://www.earls4justice.com','u'],['Wikipedia','https://en.wikipedia.org/wiki/Anita_Earls'],['NCSBE judicial voter guide','https://www.ncsbe.gov/voting/upcoming-election/judicial-voter-guide-2026-general-election']] },
+      { n:'Sarah Stevens', p:'REP', inc:false, home:'Mount Airy',
+        bio:'NC House member 2009-2026 (speaker pro tem 2017-2025); resigned in June 2026 to campaign.',
+        rec:'Conservative legislative record (12-week abortion law, permitless-carry measures, election-law bills).',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race. No AI or data-center position expected or found.' },
+        src:[['WRAL: Stevens resigns House seat','https://www.wral.com/news/nccapitol/sarah-stevens-resign-legislature-supreme-nc-anita-earls-june-2026/'],['Carolina Journal: Stevens files','https://www.carolinajournal.com/stevens-files-for-2026-nc-supreme-court-race/']],
+        links:[['Campaign site','https://www.sarahstevensnc.com','u'],['Wikipedia','https://en.wikipedia.org/wiki/Sarah_Stevens_(politician)'],['Ballotpedia','https://ballotpedia.org/Sarah_Stevens']] }
+    ]
+  },
+  {
+    id:'coa-1', level:'scourt', type:'NC Court of Appeals', title:'NC Court of Appeals, Seat 1', voteFor:1, term:'8 years', partisan:true, when:null, note:'',
+    cands:[
+      { n:'John S. Arrowood', p:'DEM', inc:true, home:'Raleigh',
+        bio:'Court of Appeals judge (appointed 2007 and 2017; elected 2018).',
+        rec:'In 2018 became the first openly gay person to win a statewide race in NC.',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race; no AI or data-center position expected or found.' },
+        src:[['Ballotpedia: 2026 appellate elections','https://ballotpedia.org/North_Carolina_intermediate_appellate_court_elections,_2026']],
+        links:[['Campaign site','https://www.keepjudgearrowood.com','u'],['NCSBE judicial voter guide','https://www.ncsbe.gov/voting/upcoming-election/judicial-voter-guide-2026-general-election']] },
+      { n:'Michael C. Byrne', p:'REP', inc:false, home:'Raleigh',
+        bio:'NC administrative law judge since 2020; grew up in Wake County.',
+        rec:'Says he has issued almost 400 decisions as an ALJ. Won the March GOP primary over Matt Smith.',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race; no AI or data-center position expected or found.' },
+        src:[['The Assembly: appellate primary results','https://www.theassemblync.com/news/politics/nc-appellate-courts-primary-results/']],
+        links:[['Campaign site','https://www.mb4nc.com','u'],['NCSBE judicial voter guide','https://www.ncsbe.gov/voting/upcoming-election/judicial-voter-guide-2026-general-election']] }
+    ]
+  },
+  {
+    id:'coa-2', level:'scourt', type:'NC Court of Appeals', title:'NC Court of Appeals, Seat 2', voteFor:1, term:'8 years', partisan:true, when:null, note:'',
+    cands:[
+      { n:'Tobias (Toby) Hampson', p:'DEM', inc:true, home:'Raleigh',
+        bio:'Court of Appeals judge.',
+        rec:'Sat on the three-judge panel in the 2024 Riggs v. Griffin Supreme Court election dispute.',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race; no AI or data-center position expected or found.' },
+        src:[['Ballotpedia: 2026 appellate elections','https://ballotpedia.org/North_Carolina_intermediate_appellate_court_elections,_2026']],
+        links:[['NCSBE judicial voter guide','https://www.ncsbe.gov/voting/upcoming-election/judicial-voter-guide-2026-general-election'],['INDY: who is running for state courts','https://indyweek.com/news/whos-running-state-courts/']] },
+      { n:'George Cooper Bell', p:'REP', inc:false, home:'Cornelius',
+        bio:'Superior Court judge, District 26C (Mecklenburg).',
+        rec:'',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race; no AI or data-center position expected or found.' },
+        src:[['Ballotpedia: 2026 appellate elections','https://ballotpedia.org/North_Carolina_intermediate_appellate_court_elections,_2026']],
+        links:[['NCSBE judicial voter guide','https://www.ncsbe.gov/voting/upcoming-election/judicial-voter-guide-2026-general-election']] }
+    ]
+  },
+  {
+    id:'coa-3', level:'scourt', type:'NC Court of Appeals', title:'NC Court of Appeals, Seat 3', voteFor:1, term:'8 years', partisan:true, when:null, note:'',
+    cands:[
+      { n:'Christine Marie Walczyk', p:'DEM', inc:false, home:'Raleigh',
+        bio:'Wake County district court judge for 19 years.',
+        rec:'Endorsed by former Chief Justice Cheri Beasley; won the March Democratic primary over James Whalen.',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race; no AI or data-center position expected or found.' },
+        src:[['The Assembly: appellate primary results','https://www.theassemblync.com/news/politics/nc-appellate-courts-primary-results/']],
+        links:[['Campaign site','https://judgechristine.org','u'],['NCSBE judicial voter guide','https://www.ncsbe.gov/voting/upcoming-election/judicial-voter-guide-2026-general-election']] },
+      { n:'Craig Collins', p:'REP', inc:false, home:'Gastonia',
+        bio:'District Court judge, District 27A (Gaston County).',
+        rec:'',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race; no AI or data-center position expected or found.' },
+        src:[['Ballotpedia: 2026 appellate elections','https://ballotpedia.org/North_Carolina_intermediate_appellate_court_elections,_2026']],
+        links:[['Campaign site','https://www.votecraigcollins.com','u'],['NCSBE judicial voter guide','https://www.ncsbe.gov/voting/upcoming-election/judicial-voter-guide-2026-general-election']] }
+    ]
+  },
+
+  /* ------------------------------------------------------- NC GENERAL ASSEMBLY */
+  {
+    id:'sd-16', level:'leg', type:'NC Senate', title:'NC Senate, District 16', voteFor:1, term:'2 years', partisan:true, when:{sen:'16'},
+    note:'Northern and western 27513.',
+    cands:[
+      { n:'Gale Adcock', p:'DEM', inc:true, home:'Raleigh',
+        bio:'Family nurse practitioner; state senator since 2023, state House 2015-2023.',
+        rec:'The Senate has not voted on the House version of the GOP data-center bill (SB 730, parked in Senate Rules since June 2026), so there is no Senate data-center floor vote to judge her by.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No personal AI or data-center statement found.' },
+        src:[['Wikipedia','https://en.wikipedia.org/wiki/Gale_Adcock'],['WUNC: House passes SB 730, Senate next','https://www.wunc.org/politics/2026-06-04/nc-house-passes-data-center-regulation']],
+        links:[['Campaign site','https://www.galeadcock.com','u'],['Wikipedia','https://en.wikipedia.org/wiki/Gale_Adcock'],['Ballotpedia','https://ballotpedia.org/Gale_Adcock']] },
+      { n:'Philip Hensley', p:'REP', inc:false, home:'Cary (27513)',
+        bio:'Cary resident; lost the 2024 race for NC House 11 to Allison Dahle.',
+        rec:'2024 priorities: advocate for Cary and small business, repave state roads in Cary, plan transportation, housing and infrastructure 20-30 years ahead.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center position found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Philip_Hensley'],['N&O Q&A (2024)','https://ca.news.yahoo.com/republican-philip-hensley-candidate-nc-223629155.html']],
+        links:[['Campaign Facebook','https://www.facebook.com/hensley4senate/'],['Ballotpedia','https://ballotpedia.org/Philip_Hensley']] },
+      { n:'Jonathan D. Miller', p:'LIB', inc:false, home:'Cary',
+        bio:'Lifelong Libertarian; has run since 2020 to give voters a Libertarian option.',
+        rec:'',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center position found.' },
+        src:[['Libertarian Party candidate page','https://lp.org/candidate/jonathan-d-miller/']],
+        links:[['LP candidate page','https://lp.org/candidate/jonathan-d-miller/'],['Ballotpedia: district','https://ballotpedia.org/North_Carolina_State_Senate_District_16']] }
+    ]
+  },
+  {
+    id:'sd-17', level:'leg', type:'NC Senate', title:'NC Senate, District 17', voteFor:1, term:'2 years', partisan:true, when:{sen:'17'},
+    note:'Eastern and southern 27513.',
+    cands:[
+      { n:'Mrs. Sydney Batch', p:'DEM', inc:true, home:'Raleigh',
+        bio:'State senator since 2021; Senate Minority Leader since 2025; attorney.',
+        rec:'As with SD 16, the Senate has not voted on the House data-center bill.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No personal AI or data-center statement found.' },
+        src:[['Wikipedia','https://en.wikipedia.org/wiki/Sydney_Batch']],
+        links:[['Campaign site','https://www.sydneybatch.com/'],['Wikipedia','https://en.wikipedia.org/wiki/Sydney_Batch'],['Ballotpedia','https://ballotpedia.org/Sydney_Batch']] },
+      { n:'Shirley Johnson', p:'REP', inc:false, home:'Cary',
+        bio:'Won the March 2026 GOP primary over Sarah Al-Baghdadi.',
+        rec:'',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center position found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Shirley_Johnson_(North_Carolina)'],['INDY primary questionnaire','https://indyweek.com/news/n-c-senate-district-17-shirley-johnson-2026/']],
+        links:[['INDY questionnaire','https://indyweek.com/news/n-c-senate-district-17-shirley-johnson-2026/'],['Ballotpedia','https://ballotpedia.org/Shirley_Johnson_(North_Carolina)']] },
+      { n:'Patrick J. Bowersox', p:'LIB', inc:false, home:'Holly Springs',
+        bio:'Retail manager; former vice chair of the Wake County Libertarian Party.',
+        rec:'Got 25.6% against Batch in 2024. Past priorities: health-care choice, inflation relief, medical cannabis.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center position found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Patrick_Bowersox']],
+        links:[['Campaign site','https://bowersoxforfreedom.org/meet-patrick-bowersox/'],['Ballotpedia','https://ballotpedia.org/Patrick_Bowersox']] }
+    ]
+  },
+  {
+    id:'hd-11', level:'leg', type:'NC House', title:'NC House, District 11', voteFor:1, term:'2 years', partisan:true, when:{house:'11'},
+    note:'Western and northern 27513. No Republican filed.',
+    cands:[
+      { n:'Allison A. Dahle', p:'DEM', inc:true, home:'Raleigh',
+        bio:'State representative since 2019.',
+        rec:'Co-sponsor of HB 1063 (2026), the House Democrats\' data-center bill.',
+        ai:{ c:'green', conf:'low', basis:'inferred',
+          why:'Inferred from co-sponsoring HB 1063, which lets data centers build but makes them pay their own way: report power and water use, big ones (over 40 MW or 1 billion liters of water a year) must self-supply at least 25% carbon-free power, repeal their state sales-tax breaks, and ban ratepayer-funded and local tax incentives. That is close to your green example. No personal statement found.',
+          q:'(Lead sponsor Rep. Lindsey Prather, not Dahle) If a company wants to build a data center in North Carolina, they can. They must simply pay their own way.' },
+        src:[['WUNC: House Democrats propose data-center bill','https://www.wunc.org/politics/2026-04-27/nc-house-democrats-propose-data-center-legislation'],
+             ['NCGA: HB 1063 sponsors and text','https://www.ncleg.gov/BillLookUp/2025/H1063']],
+        links:[['Campaign site','https://www.allisonforhouse.com','u'],['NCGA member page','https://www.ncleg.gov/Members/Biography/h/740'],['Ballotpedia','https://ballotpedia.org/Allison_Dahle']] },
+      { n:'Matthew Kordon', p:'LIB', inc:false, home:'Cary',
+        bio:'Cary software engineer and entrepreneur; 2024 Libertarian nominee for this seat.',
+        rec:'',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center position found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Matthew_Kordon']],
+        links:[['Campaign site','https://kordonforliberty.org/meet/'],['INDY questionnaire (2024)','https://indyweek.com/news/elections-news/candidate-questionnaire-matthew-kordon-nc-house-district-11/'],['Ballotpedia','https://ballotpedia.org/Matthew_Kordon']] }
+    ]
+  },
+  {
+    id:'hd-41', level:'leg', type:'NC House', title:'NC House, District 41', voteFor:1, term:'2 years', partisan:true, when:{house:'41'},
+    note:'Eastern and southern 27513.',
+    cands:[
+      { n:'Maria Cervania', p:'DEM', inc:true, home:'Cary',
+        bio:'State representative since 2023.',
+        rec:'Co-sponsor of HB 1063. On SB 730 (GOP data-center plus nuclear/coal bill) she moved to split the data-center rules from the energy provisions; the GOP majority blocked the split. Hosted a June 2026 legislative press event where residents spoke against AI data-center development, mainly over water.',
+        ai:{ c:'yellow', conf:'med', basis:'stated',
+          why:'Backs a pay-your-own-way regulatory framework (green-like), but her most visible action amplified opposition to data centers and she has not said what terms would make one welcome. Leans skeptical.',
+          q:'[Lawmakers have been open to AI regulation, but] they could do better.' },
+        src:[['GovTech: advocates air data-center worries (Jun 2026)','https://www.govtech.com/artificial-intelligence/at-north-carolina-assembly-advocates-air-data-center-worries'],
+             ['WRAL: House passes SB 730','https://www.wral.com/news/nccapitol/data-center-nuclear-plant-duke-energy-price-bill-nc-june-2026/'],
+             ['NCGA: HB 1063','https://www.ncleg.gov/BillLookUp/2025/H1063']],
+        links:[['Campaign site','https://www.mariafornc.com','u'],['Wikipedia','https://en.wikipedia.org/wiki/Maria_Cervania']] },
+      { n:'Bruce Forster', p:'REP', inc:false, home:'Raleigh',
+        bio:'Rematch: lost this seat to Cervania in 2022.',
+        rec:'Reported $340 raised as of Feb 2026.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center position found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Bruce_Forster']],
+        links:[['iVoterGuide profile','https://ivoterguide.com/candidate/60855/race/30859/election/1457'],['Campaign site','https://www.forsterforhouse.com','u'],['Ballotpedia','https://ballotpedia.org/Bruce_Forster']] }
+    ]
+  },
+  {
+    id:'hd-49', level:'leg', type:'NC House', title:'NC House, District 49', voteFor:1, term:'2 years', partisan:true, when:{house:'49'},
+    note:'North-east edge of 27513 (precincts 04-05, 04-21).',
+    cands:[
+      { n:'Cynthia Ball', p:'DEM', inc:true, home:'Raleigh',
+        bio:'State representative since 2017; House Deputy Minority Leader.',
+        rec:'Co-sponsor of HB 1063.',
+        ai:{ c:'green', conf:'low', basis:'inferred',
+          why:'Inferred from co-sponsoring HB 1063 (data centers may build but must pay their own way; no tax breaks or ratepayer-funded incentives). No personal statement found.' },
+        src:[['WUNC: House Democrats propose data-center bill','https://www.wunc.org/politics/2026-04-27/nc-house-democrats-propose-data-center-legislation'],['NCGA: HB 1063','https://www.ncleg.gov/BillLookUp/2025/H1063']],
+        links:[['Campaign site','https://www.cynthiafornc.com/'],['Wikipedia','https://en.wikipedia.org/wiki/Cynthia_Ball']] },
+      { n:'Daran Thomas', p:'REP', inc:false, home:'Raleigh',
+        bio:'Raleigh resident; little public campaign information found.',
+        rec:'',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center position found.' },
+        src:[['NCGA: House candidate list','https://webservices.ncleg.gov/ViewDocSiteFile/103525']],
+        links:[['Campaign site','https://www.daranthomas.com','u'],['Ballotpedia: district','https://ballotpedia.org/North_Carolina_House_of_Representatives_District_49']] }
+    ]
+  },
+
+  /* -------------------------------------------------------------- WAKE COUNTY */
+  {
+    id:'bocc-al', level:'county', type:'County Commissioners', title:'Wake County Board of Commissioners, At-Large (vote for 2)', voteFor:2, term:'4 years', partisan:true, when:null,
+    note:'Two NEW countywide seats. You pick two of the four.',
+    cands:[
+      { n:'Christine Kushner', p:'DEM', inc:false, home:'Raleigh',
+        bio:'Wake school board member 2011-2022 (two years as chair); Wake Health and Human Services board; public-health policy background.',
+        rec:'Top vote-getter (about 29%) in the 7-way Democratic primary.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center statement found.' },
+        src:[['INDY: Kushner, Singh win primary','https://indyweek.com/news/kushner-singh-win-wake-county-board-of-commissioners-democratic-primary/'],['Ballotpedia','https://ballotpedia.org/Christine_Kushner']],
+        links:[['Campaign site','https://christineforwake.com/'],['INDY questionnaire','https://indyweek.com/news/wake-county-board-of-county-commissioners-christine-kushner-2026/'],['Ballotpedia','https://ballotpedia.org/Christine_Kushner']] },
+      { n:'Mona Singh', p:'DEM', inc:false, home:'Cary',
+        bio:'Cary technology consultant with 130+ U.S. patents (smartphones, AR); first-time candidate.',
+        rec:'Platform: responsible use of technology in county government, public education, health-care access, housing, better county services.',
+        ai:{ c:'green', conf:'low', basis:'stated',
+          why:'Pro-AI with guardrails for county government: wants to use AI and smart tech while managing risk, privacy and transparency. No data-center-specific statement found, so this is about AI, not data centers.',
+          q:'AI and smart technologies promise major benefits but they are not without risks that must be managed.' },
+        src:[['Campaign site','https://www.monaforwake.com/'],['INDY primary questionnaire','https://indyweek.com/news/wake-county-board-of-county-commissioners-mona-singh-2026/']],
+        links:[['Campaign site','https://www.monaforwake.com/'],['INDY questionnaire','https://indyweek.com/news/wake-county-board-of-county-commissioners-mona-singh-2026/'],['Ballotpedia','https://ballotpedia.org/Mona_Singh']] },
+      { n:'Kyle Stogoski', p:'REP', inc:false, home:'Raleigh',
+        bio:'26-year-old southwest Raleigh community organizer; hourly and front-line work history; left Wake Tech during a period of homelessness.',
+        rec:'"Broad Prosperity Initiative": starter-home ownership, local business, outcome-tied workforce spending, farmland protection, government accountability.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'Platform includes farmland protection, but no AI or data-center statement found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Kyle_Stogoski']],
+        links:[['Campaign site','https://www.stogoskiforwake.com/'],['Platform','https://www.stogoskiforwake.com/platform'],['Ballotpedia','https://ballotpedia.org/Kyle_Stogoski']] },
+      { n:'Gary Dale Hartong', p:'REP', inc:false, home:'Wake Forest',
+        bio:'Professional engineer; president of The Wooten Company (civil and environmental engineering, water and sewer).',
+        rec:'Platform: prioritize infrastructure (roads, water, sewer, parks, broadband), modernize schools, support business.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center statement found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Gary_Hartong']],
+        links:[['Campaign site','https://www.garyforwake.org/'],['Ballotpedia','https://ballotpedia.org/Gary_Hartong']] }
+    ]
+  },
+  {
+    id:'bocc-3', level:'county', type:'County Commissioners', title:'Wake County Board of Commissioners, District 3', voteFor:1, term:'4 years', partisan:true, when:{comm:'3'},
+    note:'Most of 27513. Unopposed. 2026 completes the county\'s switch to by-district commissioner elections.',
+    cands:[
+      { n:'Cheryl F. Stallings', p:'DEM', inc:true, home:'Apex',
+        bio:'Wake County commissioner.',
+        rec:'Voted for the WakeMed-Atrium Health deal (Sept 2026). Wake County has not considered a data-center moratorium.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center statement found.' },
+        src:[['NC Health News: WakeMed-Atrium vote','https://www.northcarolinahealthnews.org/2026/09/22/commissioners-clear-way-for-atrium-wakemed/']],
+        links:[['Wikipedia','https://en.wikipedia.org/wiki/Cheryl_Stallings'],['Wake commissioners page','https://www.wake.gov/departments-government/board-commissioners/about-board/commissioners']] }
+    ]
+  },
+  {
+    id:'bocc-7', level:'county', type:'County Commissioners', title:'Wake County Board of Commissioners, District 7', voteFor:1, term:'4 years', partisan:true, when:{comm:'7'},
+    note:'North-east edge of 27513. Unopposed.',
+    cands:[
+      { n:'Vickie Adamson', p:'DEM', inc:true, home:'Raleigh',
+        bio:'Wake County commissioner.',
+        rec:'Voted against the WakeMed-Atrium Health deal (Sept 2026), objecting that the documents arrived days before the vote.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center statement found.' },
+        src:[['NC Health News: WakeMed-Atrium vote','https://www.northcarolinahealthnews.org/2026/09/22/commissioners-clear-way-for-atrium-wakemed/']],
+        links:[['Wake commissioners page','https://www.wake.gov/departments-government/board-commissioners/about-board/commissioners']] }
+    ]
+  },
+  {
+    id:'sheriff', level:'county', type:'Sheriff', title:'Wake County Sheriff', voteFor:1, term:'4 years', partisan:true, when:null, note:'',
+    cands:[
+      { n:'Willie Rowe', p:'DEM', inc:true, home:'Raleigh',
+        bio:'Sheriff since 2022; joined the Sheriff\'s Office in 1985, retired in 2013.',
+        rec:'Points to community engagement, staffing gains and mental-health initiatives. Jail has been over capacity (he attributes it to Iryna\'s Law); county added $7M for overcrowding costs; 840 beds being added; plans 200-300 more deputies over five years.',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Office does not set AI or data-center policy; none found.' },
+        src:[['Wake Weekly: competing visions','https://www.wakeweekly.com/news/rowe-and-blackwell-outline-competing-visions-for-wake-county-sheriff-92928238'],['Jail overcrowding coverage','https://www.yahoo.com/news/us/articles/wake-county-sheriff-cites-overcrowding-212338180.html']],
+        links:[['Campaign site','https://www.roweforsheriff.com/'],['Ballotpedia','https://ballotpedia.org/Willie_Rowe']] },
+      { n:'Kenny Blackwell', p:'REP', inc:false, home:'Wake Forest',
+        bio:'Former Wake deputy and U.S. Marshal; now a State Capitol Police investigator.',
+        rec:'Platform: faster response times, more visible patrol, rebuild investigative units, focus on opioids and human trafficking, mental-health services, higher pay.',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Office does not set AI or data-center policy; none found.' },
+        src:[['Wake Weekly: competing visions','https://www.wakeweekly.com/news/rowe-and-blackwell-outline-competing-visions-for-wake-county-sheriff-92928238']],
+        links:[['Campaign site','https://www.kenny4wake.com','u'],['Ballotpedia','https://ballotpedia.org/Kenny_Blackwell']] }
+    ]
+  },
+  {
+    id:'clerk', level:'county', type:'Clerk of Superior Court', title:'Wake County Clerk of Superior Court', voteFor:1, term:'4 years', partisan:true, when:null, note:'',
+    cands:[
+      { n:'Claudia C. Croom', p:'DEM', inc:true, home:'Raleigh',
+        bio:'Appointed clerk in January 2026 after 17+ years as a Wake civil magistrate and 10 years in private practice.',
+        rec:'',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Office does not set AI or data-center policy; none found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Claudia_Croom']],
+        links:[['Campaign site','https://www.claudiacroom.com/'],['Ballotpedia','https://ballotpedia.org/Claudia_Croom']] },
+      { n:'Joe E. Teague, Jr.', p:'REP', inc:false, home:'Raleigh',
+        bio:'Little public information found.',
+        rec:'',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Office does not set AI or data-center policy; none found.' },
+        src:[['Ballotpedia: Wake 2026 elections','https://ballotpedia.org/Wake_County,_North_Carolina,_elections,_2026']],
+        links:[['Ballotpedia: Wake 2026 elections','https://ballotpedia.org/Wake_County,_North_Carolina,_elections,_2026']] }
+    ]
+  },
+
+  /* ------------------------------------------------------ LOCAL COURTS AND DA */
+  {
+    id:'da-10', level:'lcourt', type:'District Attorney', title:'District Attorney, Prosecutorial District 10 (Wake)', voteFor:1, term:'4 years', partisan:true, when:null,
+    note:'Unopposed. Open seat (Lorrin Freeman not running).',
+    cands:[
+      { n:'Wiley Nickel', p:'DEM', inc:false, home:'Raleigh',
+        bio:'Former U.S. Representative (NC-13, 2023-2025) and state senator.',
+        rec:'Won a 3-way Democratic primary with 49%. Priorities: public-corruption investigations and roughly doubling the DA office\'s staff.',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Office does not set AI or data-center policy; none found.' },
+        src:[['WUNC: Nickel wins DA primary','https://www.wunc.org/politics/2026-03-04/wiley-nickel-wins-wake-county-district-attorney'],['Axios: Nickel wants to expand DA office','https://www.axios.com/local/raleigh/2026/03/16/wiley-nickel-wants-to-significantly-expand-the-wake-county-das-office']],
+        links:[['Campaign site','https://www.wileynickel.com','u'],['Wikipedia','https://en.wikipedia.org/wiki/Wiley_Nickel']] }
+    ]
+  },
+  {
+    id:'sup-10d-1', level:'lcourt', type:'Superior Court Judge', title:'Superior Court Judge, District 10D Seat 1', voteFor:1, term:'8 years', partisan:true, when:{sup:'10D'},
+    note:'Only voters in Superior Court district 10D (about half of 27513). Unopposed.',
+    cands:[
+      { n:'Keith Gregory', p:'DEM', inc:true, home:'Cary (27513)',
+        bio:'Superior Court judge since his 2018 appointment by Gov. Cooper; district court judge for about eight years before that.',
+        rec:'',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race; no AI or data-center position expected or found.' },
+        src:[['INDY candidate page','https://indyweek.com/news/elections-news/keith-gregory/'],['Ballotpedia','https://ballotpedia.org/Keith_O._Gregory']],
+        links:[['Ballotpedia','https://ballotpedia.org/Keith_O._Gregory']] }
+    ]
+  },
+  {
+    id:'dct-10d-1', level:'lcourt', type:'District Court Judge', title:'District Court Judge, District 10D Seat 1', voteFor:1, term:'4 years', partisan:true, when:{dct:'10D'},
+    note:'Unopposed.',
+    cands:[
+      { n:'Margaret Eagles', p:'DEM', inc:true, home:'Raleigh',
+        bio:'Wake district court judge (inferred incumbent: "Keep Judge Eagles" campaign).',
+        rec:'',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race; no AI or data-center position expected or found.' },
+        src:[['INDY: Wake DA, sheriff and judiciary','https://indyweek.com/news/whos-running-wake-county-da-sheriff-and-judiciary/']],
+        links:[['INDY: Wake judiciary races','https://indyweek.com/news/whos-running-wake-county-da-sheriff-and-judiciary/']] }
+    ]
+  },
+  {
+    id:'dct-10d-2', level:'lcourt', type:'District Court Judge', title:'District Court Judge, District 10D Seat 2', voteFor:1, term:'4 years', partisan:true, when:{dct:'10D'},
+    note:'The only contested local judicial race on 27513 ballots.',
+    cands:[
+      { n:'Amalia Mercedes Restucha', p:'DEM', inc:false, home:'Raleigh',
+        bio:'Assistant attorney general at the NC Department of Justice; formerly a staff attorney at Disability Rights NC and in private practice.',
+        rec:'',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race; no AI or data-center position expected or found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Amalia_Mercedes_Restucha']],
+        links:[['Ballotpedia','https://ballotpedia.org/Amalia_Mercedes_Restucha'],['INDY: competitive district court races','https://indyweek.com/news/heres-whos-running-in-wake-countys-competitive-district-court-elections/']] },
+      { n:'J. Brian Ratledge', p:'REP', inc:true, home:'Raleigh',
+        bio:'District court judge since 2019; Wake\'s lead family-court judge since 2021.',
+        rec:'',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race; no AI or data-center position expected or found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/J._Brian_Ratledge']],
+        links:[['Campaign site','https://www.ratledgeforjudge.com/'],['INDY candidate page','https://indyweek.com/news/elections/j-brian-ratledge/'],['Ballotpedia','https://ballotpedia.org/J._Brian_Ratledge']] }
+    ]
+  },
+  {
+    id:'dct-10d-3', level:'lcourt', type:'District Court Judge', title:'District Court Judge, District 10D Seat 3', voteFor:1, term:'4 years', partisan:true, when:{dct:'10D'},
+    note:'Unopposed.',
+    cands:[
+      { n:'Kevin Boxberger', p:'DEM', inc:true, home:'Raleigh',
+        bio:'Appointed district court judge by Gov. Cooper in 2024; formerly a regional defender with NC Indigent Defense Services.',
+        rec:'',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race; no AI or data-center position expected or found.' },
+        src:[['INDY: Wake judiciary races','https://indyweek.com/news/whos-running-wake-county-da-sheriff-and-judiciary/']],
+        links:[['Campaign site','https://www.boxbergerforjudge.com/']] }
+    ]
+  },
+  {
+    id:'dct-10f-1', level:'lcourt', type:'District Court Judge', title:'District Court Judge, District 10F Seat 1', voteFor:1, term:'4 years', partisan:true, when:{dct:'10F'},
+    note:'About 30% of 27513 (precincts 04-13, 04-19, 05-01, 05-03). Unopposed.',
+    cands:[
+      { n:'Chris Brooks', p:'DEM', inc:true, home:'Apex',
+        bio:'Appointed March 2025; former special deputy attorney general advising the NC Division of Motor Vehicles.',
+        rec:'',
+        ai:{ c:'gray', conf:'high', basis:'na', why:'Judicial race; no AI or data-center position expected or found.' },
+        src:[['INDY: Wake judiciary races','https://indyweek.com/news/whos-running-wake-county-da-sheriff-and-judiciary/']],
+        links:[['INDY: Wake judiciary races','https://indyweek.com/news/whos-running-wake-county-da-sheriff-and-judiciary/']] }
+    ]
+  },
+
+  /* ------------------------------------------------------------- SCHOOL BOARD */
+  {
+    id:'boe-9', level:'school', type:'Board of Education', title:'Wake County Board of Education, District 9', voteFor:1, term:'4 years', partisan:false, when:{boe:'9'},
+    note:'Covers most of Cary plus parts of Apex and Morrisville. Nonpartisan on the ballot; party ties below are from news reports.',
+    cands:[
+      { n:'Tyler Swanson', p:'', pn:'Democrat (per N&O)', inc:true, home:'Cary (27513)',
+        bio:'School board member since 2022 and board chair since Dec 2025 (youngest in Wake history); former Wake special-education teacher; campaign strategist.',
+        rec:'Board is adopting its first AI policy (no AI detectors, students must disclose AI use, AI literacy, staff training, data-privacy review of AI tools).',
+        ai:{ c:'green', conf:'low', basis:'stated',
+          why:'On AI in schools: treats AI as a useful learning tool with a clear limit (it does not replace classroom teaching). Not about data centers.',
+          q:'AI is a tool, but it does not replace teaching and learning that should take place in the classroom.' },
+        src:[['N&O via AOL: Wake AI policy falls short, board says','https://www.aol.com/news/wake-developing-policy-ai-school-211300245.html'],['WRAL: what is in the Wake AI policy draft','https://www.wral.com/news/education/whats-in-wake-schools-new-ai-policy-draft-june-2026/']],
+        links:[['Campaign site','https://www.swansonforwake.com/about'],['Ballotpedia','https://ballotpedia.org/Tyler_Swanson']] },
+      { n:'Brian Olson', p:'', pn:'Unaffiliated approach (self-described independent)', inc:false, home:'Cary (27513)',
+        bio:'Military veteran, small-business owner and wheelchair user; vice president of the West Cary Middle School PTA; former community-college board member in California.',
+        rec:'Promises a "pragmatic, independent approach".',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI position found.' },
+        src:[['INDY: who is running for school board','https://indyweek.com/news/whos-running-for-wake-county-school-board-in-2026/']],
+        links:[['Campaign site','https://olsonforwakecountykids.com/']] },
+      { n:'Cheryl Alexis', p:'', pn:'Promoted by the Wake County GOP', inc:false, home:'Apex',
+        bio:'Human-resources consultant with past work in career counseling and law; Harvard graduate per the Wake GOP.',
+        rec:'No campaign website found; did not respond to media requests.',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI position found.' },
+        src:[['INDY: who is running for school board','https://indyweek.com/news/whos-running-for-wake-county-school-board-in-2026/']],
+        links:[['Wake GOP announcement (Facebook)','https://www.facebook.com/WakeGOP/posts/cheryl-alexis-for-wake-county-schools-is-running-for-wake-county-school-board-di/1545523897608907/']] }
+    ]
+  },
+
+  /* ----------------------------------------------------------- SOIL AND WATER */
+  {
+    id:'swcd', level:'soil', type:'Soil and Water Supervisor', title:'Wake Soil and Water Conservation District Supervisor (vote for 2)', voteFor:2, term:'4 years', partisan:false, when:null,
+    note:'Nonpartisan. The district advises on land and water conservation, which is where data-center water use shows up.',
+    cands:[
+      { n:'Samantha Krop', p:'', inc:false, home:'Raleigh',
+        bio:'Neuse Riverkeeper and Director of Advocacy at Sound Rivers; environmental educator.',
+        rec:'Spoke for Durham\'s data-center moratorium; her organization works to "oppose the proliferation of large-scale data centers".',
+        ai:{ c:'orange', conf:'med', basis:'stated',
+          why:'Publicly supports moratoriums and opposing large data centers on water grounds; no terms under which one would be acceptable. Statements were made as Riverkeeper, not as a candidate.',
+          q:'We are involved in community-led efforts to oppose the proliferation of large-scale data centers such as the one proposed in Kingsboro.' },
+        src:[['Sound Rivers: Durham moratorium vote','https://soundrivers.org/unanimous-vote-for-durham-data-center-moratorium/'],['Reflector: is new tech harmful or helpful?','https://www.reflector.com/enterprise/across_carolina/waterways-need-protection-more-than-ever-is-new-tech-harmful-or-helpful/article_4f106f2a-305a-5bc5-b3d2-bc138a844088.html']],
+        links:[['Campaign site','https://www.krop4wake.com/'],['Sound Rivers bio','https://soundrivers.org/personnel/samantha-krop/']] },
+      { n:'Beth Pugh Farrell', p:'', inc:true, home:'Cary (27513)',
+        bio:'Current Wake Soil and Water supervisor seeking re-election.',
+        rec:'',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center statement found.' },
+        src:[['Wake SWCD staff and board','https://www.wake.gov/departments-government/soil-and-water-conservation-district/about-wake-swcd/staff-and-board']],
+        links:[['Campaign Facebook','https://www.facebook.com/p/Beth-Pugh-Farrell-Wake-Soil-Water-Conservation-District-Supervisor-100082328534290/']] },
+      { n:'Jim White', p:'', inc:false, home:'Apex',
+        bio:'Candidate for supervisor.',
+        rec:'',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center statement found.' },
+        src:[['Campaign site','https://www.jimwhite4wake.com/']],
+        links:[['Campaign site','https://www.jimwhite4wake.com/']] },
+      { n:'Brian K. Lewis', p:'', inc:false, home:'Raleigh',
+        bio:'Candidate for supervisor.',
+        rec:'',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center statement found.' },
+        src:[['Ballotpedia','https://ballotpedia.org/Brian_Lewis_(North_Carolina)']],
+        links:[['Campaign site','https://lewisfornc.org/'],['Ballotpedia','https://ballotpedia.org/Brian_Lewis_(North_Carolina)']] },
+      { n:'Terence Thomas', p:'', inc:false, home:'Raleigh',
+        bio:'Candidate for supervisor; little public information found.',
+        rec:'',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center statement found.' },
+        src:[['VOTE411: race page','https://onyourballot.vote411.org/m/race-detail.do?id=20906503']],
+        links:[['VOTE411: race page','https://onyourballot.vote411.org/m/race-detail.do?id=20906503']] },
+      { n:'Cece Grant', p:'', inc:false, home:'Raleigh',
+        bio:'Candidate for supervisor; little public information found.',
+        rec:'',
+        ai:{ c:'gray', conf:'low', basis:'none', why:'No AI or data-center statement found.' },
+        src:[['VOTE411: race page','https://onyourballot.vote411.org/m/race-detail.do?id=20906503']],
+        links:[['VOTE411: race page','https://onyourballot.vote411.org/m/race-detail.do?id=20906503']] }
+    ]
+  }
+  ],
+
+  /* Statewide constitutional amendments (on every NC ballot). */
+  referenda: [
+    { title:'Require photo ID for all voting', text:'Extends the constitution\'s photo-ID requirement from in-person voting to every method of voting, including absentee by mail.' },
+    { title:'Cap the state income tax at 3.5%', text:'Lowers the constitutional ceiling on state personal and corporate income tax rates from 7% to 3.5%.' },
+    { title:'Limit local property-tax increases', text:'Requires the General Assembly to pass laws limiting property-tax levy increases by local governments; the actual limit would be set by later legislation.' }
+  ],
+  referendaSrc: [
+    ['WUNC explainer (Sep 22, 2026)','https://www.wunc.org/politics/2026-09-22/explainer-nc-constitutional-amendments-2026-ballot-property-tax-voter-id'],
+    ['League of Women Voters NC','https://my.lwv.org/north-carolina-state/action-alert/three-constitutional-amendments-north-carolinas-2026-ballot'],
+    ['NCSBE: statewide referendum list','https://s3.amazonaws.com/dl.ncsbe.gov/Elections/2026/Candidate%20Filing/statewide_referendums_20261103.pdf']
+  ],
+
+  /* Data-center backdrop: what is already happening around Cary. */
+  context: [
+    { d:'2026-03', t:'New Hill (south Wake) 300 MW data-center proposal withdrawn after heavy opposition; Apex later adopts a one-year moratorium.', s:['WRAL','https://www.wral.com/news/local/natelli-withdraws-apex-data-center-project-shearon-harris-march-2026/'] },
+    { d:'2026-04', t:'NC House Democrats file HB 1063 (disclosure, 25% clean self-supply for large sites, repeal tax breaks). Gov. Stein urges a review of data-center tax breaks.', s:['WUNC','https://www.wunc.org/politics/2026-04-27/nc-house-democrats-propose-data-center-legislation'] },
+    { d:'2026-06', t:'NC House passes GOP SB 730 "Ratepayer Protection Act" 69-44 (data centers must cover their own grid costs, no local incentives or eminent domain, plus nuclear/coal provisions Democrats opposed). It has sat in Senate Rules since.', s:['WUNC','https://www.wunc.org/politics/2026-06-04/nc-house-passes-data-center-regulation'] },
+    { d:'2026-06', t:'Holly Springs adopts a one-year pause on data centers.', s:['WRAL','https://www.wral.com/news/local/holly-springs-officials-aprove-one-year-pause-data-center-development-june-2026/'] },
+    { d:'2026-08', t:'Cary Town Council unanimously adopts an 18-month data-center moratorium (through Feb 2028) to study power, water, noise and siting. No applications were pending.', s:['WRAL','https://www.wral.com/news/local/cary-18-month-data-center-moratorium-aug-2026/'] },
+    { d:'2026-08', t:'Southeast Raleigh data-center annexation withdrawn; Wake County itself has not considered a moratorium.', s:['NC Newsline','https://ncnewsline.com/2026/08/17/three-more-nc-localities-weigh-pauses-on-data-centers-as-developer-backs-away-from-raleigh-project/'] },
+    { d:'2026-09', t:'AG Jeff Jackson asks regulators for a separate Duke Energy rate class for data centers.', s:['NC Newsline','https://ncnewsline.com/2026/09/14/nc-ag-jackson-requests-new-duke-rate-class-for-data-centers/'] },
+    { d:'2026-09', t:'U.S. House passes the federal Ratepayer Protection Act 417-3 (large data centers cover grid and generation costs).', s:['Utility Dive','https://www.utilitydive.com/news/house-passes-ratepayer-protection-bill-data-centers/830658/'] },
+    { d:'2026-10-06', t:'Raleigh City Council scheduled to vote on a six-month moratorium.', s:['WUNC','https://www.wunc.org/environment/2026-09-16/raleigh-cary-data-center-moratorium'] }
+  ],
+
+  tools: [
+    ['NCSBE Voter Search (your precinct and sample ballot)','https://vt.ncsbe.gov/RegLkup/'],
+    ['NCSBE 2026 judicial voter guide','https://www.ncsbe.gov/voting/upcoming-election/judicial-voter-guide-2026-general-election'],
+    ['NCSBE official candidate list (PDF)','https://s3.amazonaws.com/dl.ncsbe.gov/Elections/2026/Candidate%20Filing/2026_general_candidate_list_by_contest_federal_and_state.pdf'],
+    ['NCSBE candidate listing (CSV, all counties)','https://s3.amazonaws.com/dl.ncsbe.gov/Elections/2026/Candidate%20Filing/Candidate_Listing_2026.csv'],
+    ['Wake County Board of Elections','https://www.wake.gov/departments-government/board-elections'],
+    ['INDY Week 2026 questionnaires','https://indyweek.com/news/2026-primary-candidate-questionnaires/'],
+    ['Ballotpedia: Wake County 2026','https://ballotpedia.org/Wake_County,_North_Carolina,_elections,_2026']
+  ]
+};

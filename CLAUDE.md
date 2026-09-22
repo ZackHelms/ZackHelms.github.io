@@ -34,6 +34,11 @@ available there — verify the Pages run instead, per `.claude/zmh/producer.md`
 
 - `games/` — self-contained single-file HTML games (CSS + JS inline, no shared libs)
 - `games/index.html` — games hub; add a card here for every new game
+- `2026election/` — **not a game.** Cary, NC 27513 voter guide for the Nov 3, 2026
+  general election (contests, candidates, color-coded AI / data-center stances,
+  sources). Data-driven: edit `2026election/data.js`, then run
+  `node 2026election/build.mjs` (checks the data, regenerates the `candidates.csv` /
+  `candidates.json` downloads). See `2026election/README.md`
 - `signals/` — **not a game.** Single-file reference app cataloguing every signal a web
   app can monitor, feature-detected and probed live in the visitor's own browser, with
   per-signal iOS Safari status and native-bridge notes. Data-table-driven: to add a

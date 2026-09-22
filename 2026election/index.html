@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Every contest a Cary, NC 27513 voter can see on the Nov 3, 2026 ballot: who is running, their party, sources, and where each candidate stands on AI and data centers.">
+<meta name="theme-color" content="#06060e">
+<title>Cary 2026 Ballot</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗳️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap">
+<style>
+:root {
+  --bg: #06060e;
+  --panel: #0b0b16;
+  --panel2: #101020;
+  --panel3: #16162b;
+  --border: #1f1f3a;
+  --white: #e4e8ff;
+  --dim: #9aa6c8;
+  --dimmer: #5c6488;
+  --accent: #39ff14;
+  --link: #7fb2ff;
+
+  /* stance colors: the ONLY color-coded field on the page */
+  --st-green: #3ddc84;
+  --st-yellow: #ffd23f;
+  --st-orange: #ff8a1f;
+  --st-red: #ff3b5c;
+  --st-gray: #6f7898;
+  --chip-ink: #06060e;
+
+  --mono: 'Share Tech Mono', ui-monospace, monospace;
+  --head: 'Black Ops One', system-ui, sans-serif;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--bg); color: var(--white);
+  font-family: var(--sans); font-size: 15px; line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+a { color: var(--link); }
+a:hover { text-decoration: none; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: calc(env(safe-area-inset-top,0px) + 22px) 16px calc(env(safe-area-inset-bottom,0px) + 60px); }
+
+/* ---------- header ---------- */
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: 2px; color: var(--dim); }
+.kicker a { color: var(--dim); text-decoration: none; }
+h1 { font-family: var(--head); font-weight: normal; font-size: clamp(26px, 6vw, 44px); letter-spacing: 2px; line-height: 1.1; margin-top: 6px; }
+h1 span { color: var(--accent); }
+.lede { color: var(--dim); max-width: 75ch; margin-top: 10px; }
+.lede b { color: var(--white); font-weight: 600; }
+.stamp { font-family: var(--mono); font-size: 12px; color: var(--dimmer); margin-top: 8px; }
+
+h2 { font-family: var(--head); font-weight: normal; letter-spacing: 2px; font-size: 20px; margin: 34px 0 4px; }
+h2 small { font-family: var(--mono); font-size: 12px; color: var(--dim); letter-spacing: 1px; margin-left: 8px; }
+.sub { color: var(--dim); font-size: 14px; max-width: 80ch; }
+
+/* ---------- KPI tiles ---------- */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
+.kpi { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.kpi .v { font-family: var(--head); font-size: 30px; line-height: 1.1; }
+.kpi .v.hl { color: var(--accent); }
+.kpi .l { font-family: var(--mono); font-size: 12px; color: var(--dim); letter-spacing: .5px; margin-top: 4px; }
+@media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi .v { font-size: 24px; } }
+
+/* ---------- breakdown table ---------- */
+.grid2 { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; margin-top: 14px; align-items: start; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.card h3 { font-family: var(--mono); font-weight: normal; font-size: 13px; letter-spacing: 1.5px; color: var(--dim); margin-bottom: 8px; }
+table.bd { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.bd th, table.bd td { text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--border); }
+table.bd th { font-family: var(--mono); font-weight: normal; font-size: 12px; color: var(--dim); white-space: nowrap; overflow-wrap: normal; }
+table.bd td.n, table.bd th.n { text-align: right; font-family: var(--mono); }
+table.bd tr.tot td { border-bottom: 0; font-weight: 600; }
+.legend { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 9px 12px; align-items: start; font-size: 13.5px; color: var(--dim); }
+@media (max-width: 480px) { .legend { grid-template-columns: minmax(0, 1fr); gap: 3px; } .legend > span:nth-child(2n) { margin-bottom: 8px; } }
+
+/* ---------- stance chip ---------- */
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px; font-family: var(--mono); font-size: 12.5px; color: var(--chip-ink); font-weight: bold; white-space: nowrap; letter-spacing: .3px; }
+.chip.green { background: var(--st-green); } .chip.yellow { background: var(--st-yellow); }
+.chip.orange { background: var(--st-orange); } .chip.red { background: var(--st-red); }
+.chip.gray { background: var(--st-gray); }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.dot.green { background: var(--st-green); } .dot.yellow { background: var(--st-yellow); }
+.dot.orange { background: var(--st-orange); } .dot.red { background: var(--st-red); }
+.dot.gray { background: var(--st-gray); }
+
+/* ---------- controls ---------- */
+#controls { position: sticky; top: 0; z-index: 20; background: rgba(6,6,14,.96); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); margin: 26px -16px 0; padding: 10px 16px; }
+.crow { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.crow + .crow { margin-top: 8px; }
+.ctl { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ctl label { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: 1px; }
+select, input[type=search] { font: 14px var(--sans); color: var(--white); background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; min-height: 36px; max-width: 100%; }
+select:focus, input:focus, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#q { width: 220px; }
+.stances { display: flex; flex-wrap: wrap; gap: 6px; }
+.sbtn { font-family: var(--mono); font-size: 12.5px; border-radius: 999px; padding: 5px 10px; border: 1px solid var(--border); background: var(--panel2); color: var(--dim); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; min-height: 32px; }
+.sbtn[aria-pressed=true] { color: var(--white); border-color: var(--dim); background: var(--panel3); }
+.sbtn[aria-pressed=false] .dot { opacity: .25; }
+.tog { display: inline-flex; gap: 6px; align-items: center; font-size: 13.5px; color: var(--dim); cursor: pointer; }
+.btn { font-family: var(--mono); font-size: 12.5px; color: var(--white); background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; cursor: pointer; min-height: 32px; text-decoration: none; display: inline-flex; align-items: center; }
+.btn:hover { border-color: var(--dim); }
+#count { font-family: var(--mono); font-size: 12px; color: var(--dim); margin-left: auto; }
+#ballotNote { font-size: 13px; color: var(--dim); margin-top: 8px; }
+#ballotNote b { color: var(--white); font-weight: 600; }
+@media (max-width: 760px), (max-height: 560px) { #controls { position: static; } }
+@media (max-width: 640px) { #q { width: 100%; } .ctl.grow { flex: 1 1 100%; } .ctl.grow select { width: 100%; } #count { margin-left: 0; } }
+
+/* ---------- level sections + contests ---------- */
+.level { margin-top: 30px; scroll-margin-top: 200px; }
+.level > h2 { margin-top: 0; padding-top: 6px; }
+.contest { margin-top: 14px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--panel); }
+.chead { padding: 11px 14px; background: var(--panel2); border-bottom: 1px solid var(--border); }
+.ctitle { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.ctitle h3 { font-size: 16.5px; font-weight: 650; }
+.tag { font-family: var(--mono); font-size: 11.5px; color: var(--dim); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+.tag.warn { color: var(--st-yellow); border-color: #5c4d12; }
+.cnote { font-size: 13.5px; color: var(--dim); margin-top: 3px; }
+.matchup { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 7px; font-size: 13.5px; }
+.matchup span { display: inline-flex; align-items: center; gap: 5px; }
+.matchup .vs { color: var(--dimmer); font-family: var(--mono); font-size: 11px; }
+
+table.cands { width: 100%; border-collapse: collapse; }
+table.cands th { font-family: var(--mono); font-weight: normal; font-size: 11.5px; color: var(--dimmer); text-align: left; padding: 7px 12px 5px; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
+table.cands td { padding: 10px 12px; vertical-align: top; border-bottom: 1px solid var(--border); font-size: 14px; }
+table.cands tr:last-child td { border-bottom: 0; }
+table.cands tr.cand td:first-child { border-left: 4px solid var(--st-gray); }
+tr.cand.green td:first-child { border-left-color: var(--st-green); }
+tr.cand.yellow td:first-child { border-left-color: var(--st-yellow); }
+tr.cand.orange td:first-child { border-left-color: var(--st-orange); }
+tr.cand.red td:first-child { border-left-color: var(--st-red); }
+tr.cand.dim { opacity: .35; }
+col.c1 { width: 170px; } col.c2 { width: 230px; } col.c4 { width: 120px; }
+.cname { font-weight: 650; font-size: 15px; }
+.meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.home { font-size: 12.5px; color: var(--dim); margin-top: 3px; }
+.why { color: var(--white); }
+.quote { margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--border); color: var(--dim); font-style: italic; font-size: 13.5px; }
+.conf { font-family: var(--mono); font-size: 12px; color: var(--dim); line-height: 1.5; }
+.conf b { color: var(--white); font-weight: normal; }
+details { margin-top: 8px; }
+summary { cursor: pointer; font-family: var(--mono); font-size: 12.5px; color: var(--link); list-style: none; display: inline-flex; gap: 6px; align-items: center; min-height: 28px; }
+summary::-webkit-details-marker { display: none; }
+summary::before { content: '+'; display: inline-block; width: 12px; }
+details[open] summary::before { content: '-'; }
+.more { margin-top: 6px; font-size: 13.5px; color: var(--dim); display: grid; gap: 6px; }
+.more b { color: var(--white); font-weight: 600; }
+.more ul { list-style: none; display: grid; gap: 3px; }
+.more li::before { content: '> '; color: var(--dimmer); font-family: var(--mono); }
+.unv { font-family: var(--mono); font-size: 11px; color: var(--dimmer); }
+
+/* table -> cards on narrow screens */
+@media (max-width: 760px) {
+  table.cands thead { display: none; }
+  table.cands, table.cands tbody, table.cands tr, table.cands td { display: block; width: 100%; }
+  table.cands colgroup { display: none; }
+  table.cands tr.cand { border-bottom: 1px solid var(--border); border-left: 4px solid var(--st-gray); padding: 10px 12px; }
+  tr.cand.green { border-left-color: var(--st-green) !important; } tr.cand.yellow { border-left-color: var(--st-yellow) !important; }
+  tr.cand.orange { border-left-color: var(--st-orange) !important; } tr.cand.red { border-left-color: var(--st-red) !important; }
+  table.cands tr.cand td { border: 0 !important; padding: 3px 0; }
+  table.cands tr:last-child { border-bottom: 0; }
+}
+
+/* ---------- context / referenda / methodology ---------- */
+.timeline { list-style: none; display: grid; gap: 8px; margin-top: 12px; }
+.timeline li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; font-size: 14px; }
+.timeline .d { font-family: var(--mono); color: var(--dim); font-size: 12.5px; padding-top: 2px; }
+@media (max-width: 480px) { .timeline li { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+.refs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+@media (max-width: 760px) { .refs { grid-template-columns: minmax(0, 1fr); } }
+.refs .card b { display: block; margin-bottom: 4px; }
+.refs .card p { font-size: 14px; color: var(--dim); }
+.method { margin-top: 12px; display: grid; gap: 10px; font-size: 14px; color: var(--dim); max-width: 90ch; }
+.method b { color: var(--white); font-weight: 600; }
+.method ul { padding-left: 20px; display: grid; gap: 4px; }
+.links-list { list-style: none; display: grid; gap: 4px; margin-top: 10px; font-size: 14px; }
+.dl { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+footer { margin-top: 40px; font-family: var(--mono); font-size: 12px; color: var(--dimmer); border-top: 1px solid var(--border); padding-top: 12px; }
+.empty { margin-top: 20px; padding: 18px; border: 1px dashed var(--border); border-radius: 8px; color: var(--dim); text-align: center; }
+.noscript { padding: 12px; border: 1px solid var(--st-yellow); color: var(--st-yellow); border-radius: 8px; margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker"><a href="/">TYTHOS</a> / CIVIC REFERENCE</div>
+  <h1>CARY <span>27513</span> - 2026 BALLOT</h1>
+  <p class="lede">Every contest a voter living in ZIP <b>27513</b> can see on the <b>Tuesday, November 3, 2026</b> general election ballot: who is running, their party, where to read their own words and their record, and <b>where each candidate stands on AI and data centers</b>.</p>
+  <p class="stamp" id="stamp"></p>
+  <noscript><div class="noscript">This page needs JavaScript to build its tables. The raw data is in <a href="candidates.csv">candidates.csv</a> and <a href="candidates.json">candidates.json</a>.</div></noscript>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>BREAKDOWN BY POSITION TYPE</h3>
+      <table class="bd" id="breakdown"></table>
+    </div>
+    <div class="card">
+      <h3>AI / DATA-CENTER STANCE KEY</h3>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+
+  <div id="controls" role="region" aria-label="Filters">
+    <div class="crow">
+      <div class="ctl grow">
+        <label for="precinct">MY PRECINCT</label>
+        <select id="precinct"></select>
+      </div>
+      <div class="ctl">
+        <label for="level">POSITION TYPE</label>
+        <select id="level"></select>
+      </div>
+      <div class="ctl">
+        <label for="party">PARTY</label>
+        <select id="party">
+          <option value="all">All parties</option>
+          <option value="DEM">Democratic</option>
+          <option value="REP">Republican</option>
+          <option value="LIB">Libertarian</option>
+          <option value="GRE">Green</option>
+          <option value="">Nonpartisan races</option>
+        </select>
+      </div>
+      <div class="ctl grow">
+        <label for="q">SEARCH</label>
+        <input id="q" type="search" placeholder="Name or office" autocomplete="off">
+      </div>
+    </div>
+    <div class="crow">
+      <div class="stances" id="stances" aria-label="Filter by AI stance"></div>
+      <label class="tog"><input type="checkbox" id="contested"> Contested races only</label>
+      <button class="btn" id="reset" type="button">Reset</button>
+      <span id="count" aria-live="polite"></span>
+    </div>
+    <div id="ballotNote"></div>
+  </div>
+
+  <main id="main"></main>
+
+  <h2>DATA CENTERS AROUND CARY <small>BACKDROP</small></h2>
+  <p class="sub">What has already happened locally, so a candidate's words can be read against it.</p>
+  <ul class="timeline" id="context"></ul>
+
+  <h2>ALSO ON YOUR BALLOT <small>3 CONSTITUTIONAL AMENDMENTS</small></h2>
+  <p class="sub">Statewide yes/no questions. Not candidates, so no stance color.</p>
+  <div class="refs" id="refs"></div>
+  <p class="sub" id="refsSrc" style="margin-top:8px"></p>
+
+  <h2>DOWNLOAD THE DATA</h2>
+  <p class="sub">The full research file. The CSV opens in any spreadsheet; the JSON is the same data this page is built from.</p>
+  <div class="dl">
+    <a class="btn" href="candidates.csv" download>candidates.csv (all 56 candidates)</a>
+    <a class="btn" href="candidates.json" download>candidates.json (full dataset)</a>
+    <button class="btn" id="dlView" type="button">CSV of the current filtered view</button>
+  </div>
+
+  <h2>OFFICIAL TOOLS</h2>
+  <ul class="links-list" id="tools"></ul>
+
+  <h2>HOW THIS WAS BUILT <small>READ BEFORE TRUSTING A COLOR</small></h2>
+  <div class="method">
+    <p><b>Candidate list.</b> Taken from the NC State Board of Elections general-election candidate list (PDF dated 2026-09-21, plus the statewide candidate CSV), filtered to contests on Wake County ballots. Names are spelled exactly as they appear on the ballot.</p>
+    <p><b>Which contests reach 27513.</b> A ZIP code is not a voting district. I aggregated the NCSBE Wake County voter file (2026-09-20) by residential ZIP: all 34,700 active and inactive voters in 27513 were counted by U.S. House, NC Senate, NC House, commissioner, school-board, superior-court and district-court district. Only the counts were kept. That is how the page knows, for example, that 27513 splits between U.S. House NC-2 (77%) and NC-4 (23%), and that about 5% of 27513 (commissioner District 4) has no district commissioner race this year. Precinct 05-05 (3 voters in 27513, the rest in 27617) is left out of the picker.</p>
+    <p><b>Your exact ballot.</b> Pick your precinct above. Precinct 04-10 is split between NC-2 and NC-4, so if you live there, check your sample ballot with the NCSBE Voter Search link.</p>
+    <p><b>How the colors were assigned.</b> Each color is my reading of the candidate's public statements, votes and bill sponsorships, using your definitions:</p>
+    <ul>
+      <li><b>Green</b> needs support for AI or data centers AND conditions that make them pay their own way or leave the community better off (own power, no ratepayer subsidy, no tax breaks, local benefits, local say).</li>
+      <li><b>Yellow</b> covers mixed or contradictory positions, for example strong pay-your-own-way terms combined with support for tax breaks.</li>
+      <li><b>Orange</b> is opposition (or support for pauses) with no stated terms for yes. <b>Red</b> is support with no stated protections. No candidate currently rates red.</li>
+      <li><b>Gray</b> is not a rating. It means nothing public was found, or the office (judges, sheriff, clerk, DA) does not set AI or data-center policy. Most down-ballot candidates are gray.</li>
+      <li>"Inferred" means the color comes from a bill co-sponsorship or vote, not the candidate's own words. Confidence describes how sure I am of the color, not anything about the person.</li>
+    </ul>
+    <p><b>Limits.</b> Research was done through web search. The research environment blocked direct page loads, so a few campaign-site links were derived from the email domain on the candidate's NCSBE filing and are marked <span class="unv">(unverified)</span>. Quotes come from the news sources linked beside them. Some sources are partisan (party committees, Cardinal Pine, Breitbart, NRSC); they are labeled where used.</p>
+    <p><b>Disclosure.</b> This page was researched and written by Claude, an AI made by Anthropic. Anthropic funds a super PAC that spent about $1.6M supporting Rep. Valerie Foushee (NC-4) in her 2026 primary. Her entry notes this; weigh her rating accordingly.</p>
+    <p><b>Updating.</b> The data lives in <code>2026election/data.js</code>. Edit it, then run <code>node 2026election/build.mjs</code> to re-check the data and regenerate the downloads.</p>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  'use strict';
+  var E = window.ELECTION;
+  var $ = function (id) { return document.getElementById(id); };
+  var COLORS = ['green', 'yellow', 'orange', 'red', 'gray'];
+  var PARTY = { DEM: 'DEM', REP: 'REP', LIB: 'LIB', GRE: 'GRE', '': 'NONPARTISAN' };
+  var PARTY_LONG = { DEM: 'Democratic', REP: 'Republican', LIB: 'Libertarian', GRE: 'Green', '': 'Nonpartisan' };
+  var BASIS = { stated: 'own words', inferred: 'inferred from votes/bills', none: 'nothing found', na: 'not applicable to office' };
+  var LEVEL = {}; E.levels.forEach(function (l) { LEVEL[l.id] = l; });
+  var TOTAL = E.combos27513.reduce(function (a, x) { return a + x[0]; }, 0);
+  var STORE = 'tythos.2026election.v1';
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return n.toLocaleString('en-US'); }
+  function pct(x) { var p = Math.round(x * 1000) / 10; return (p >= 99.95 ? '100' : p) + '%'; }
+  function applies(c, combo) {
+    if (!c.when) return true;
+    for (var k in c.when) if (combo[k] !== c.when[k]) return false;
+    return true;
+  }
+
+  // ---------- state ----------
+  var state = { precinct: 'all', level: 'all', party: 'all', q: '', contested: false, colors: COLORS.slice() };
+  try {
+    var saved = JSON.parse(localStorage.getItem(STORE) || 'null');
+    if (saved && typeof saved === 'object') {
+      for (var k in state) if (k in saved) state[k] = saved[k];
+      if (!Array.isArray(state.colors)) state.colors = COLORS.slice();
+      if (state.precinct !== 'all' && !E.precincts.some(function (p) { return p.id === state.precinct; })) state.precinct = 'all';
+    }
+  } catch (e) { /* storage unavailable: defaults are fine */ }
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+
+  // Geography for the current precinct choice: a list of [weight, combo].
+  function geo() {
+    if (state.precinct === 'all') return E.combos27513;
+    var p = E.precincts.filter(function (x) { return x.id === state.precinct; })[0];
+    return p ? p.combos : E.combos27513;
+  }
+  // For a contest: share of the current geography that sees it (0..1).
+  function share(c, g) {
+    var tot = 0, hit = 0;
+    g.forEach(function (x) { tot += x[0]; if (applies(c, x[1])) hit += x[0]; });
+    return tot ? hit / tot : 0;
+  }
+  function ballotRange(g) {
+    var sizes = g.filter(function (x) { return x[0] > 10; }).map(function (x) {
+      return E.contests.filter(function (c) { return applies(c, x[1]); }).length;
+    });
+    return [Math.min.apply(null, sizes), Math.max.apply(null, sizes)];
+  }
+  function rangeText(r) { return r[0] === r[1] ? String(r[0]) : r[0] + '-' + r[1]; }
+
+  // ---------- static pieces ----------
+  $('stamp').textContent = 'Updated ' + E.meta.updated + '  |  ' + E.meta.candidateListAsOf + '  |  districts from the ' + E.meta.voterFileAsOf;
+
+  $('legend').innerHTML = COLORS.map(function (c) {
+    return '<span><span class="chip ' + c + '">' + esc(E.ratings[c].label) + '</span></span><span>' + esc(E.ratings[c].short) + '</span>';
+  }).join('');
+
+  $('stances').innerHTML = COLORS.map(function (c) {
+    return '<button type="button" class="sbtn" data-c="' + c + '" aria-pressed="true"><span class="dot ' + c + '"></span>' + esc(E.ratings[c].label) + '</button>';
+  }).join('');
+
+  var pOpts = ['<option value="all">All of 27513 (' + E.precincts.length + ' precincts)</option>'];
+  E.precincts.forEach(function (p) {
+    var split = p.combos.length > 1 ? ' - split precinct' : '';
+    pOpts.push('<option value="' + p.id + '">Precinct ' + p.id + ' (' + fmt(p.v) + ' voters in 27513)' + split + '</option>');
+  });
+  $('precinct').innerHTML = pOpts.join('');
+  $('level').innerHTML = '<option value="all">All position types</option>' + E.levels.map(function (l) {
+    return '<option value="' + l.id + '">' + esc(l.name) + '</option>';
+  }).join('');
+
+  $('context').innerHTML = E.context.map(function (x) {
+    return '<li><span class="d">' + esc(x.d) + '</span><span>' + esc(x.t) + ' <a href="' + esc(x.s[1]) + '" target="_blank" rel="noopener">' + esc(x.s[0]) + '</a></span></li>';
+  }).join('');
+  $('refs').innerHTML = E.referenda.map(function (r) {
+    return '<div class="card"><b>' + esc(r.title) + '</b><p>' + esc(r.text) + '</p></div>';
+  }).join('');
+  $('refsSrc').innerHTML = 'Sources: ' + E.referendaSrc.map(function (s) {
+    return '<a href="' + esc(s[1]) + '" target="_blank" rel="noopener">' + esc(s[0]) + '</a>';
+  }).join(' | ');
+  $('tools').innerHTML = E.tools.map(function (t) {
+    return '<li><a href="' + esc(t[1]) + '" target="_blank" rel="noopener">' + esc(t[0]) + '</a></li>';
+  }).join('');
+  $('foot').innerHTML = 'tythos.com/2026election  |  research compiled ' + esc(E.meta.updated) + '  |  not affiliated with any campaign, party or election office  |  verify your ballot at <a href="https://vt.ncsbe.gov/RegLkup/" target="_blank" rel="noopener">NCSBE Voter Search</a>';
+
+  // ---------- filtering ----------
+  function candMatches(c, k) {
+    if (state.colors.indexOf(k.ai.c) < 0) return false;
+    if (state.party !== 'all' && k.p !== state.party) return false;
+    var q = state.q.trim().toLowerCase();
+    if (q && (k.n + ' ' + c.title + ' ' + c.type).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  }
+  function visibleContests() {
+    var g = geo();
+    return E.contests.filter(function (c) {
+      if (state.level !== 'all' && c.level !== state.level) return false;
+      if (state.contested && c.cands.length <= c.voteFor) return false;
+      if (share(c, g) === 0) return false;
+      return c.cands.some(function (k) { return candMatches(c, k); });
+    });
+  }
+
+  // ---------- render ----------
+  function renderSummary() {
+    var g = geo();
+    var inGeo = E.contests.filter(function (c) { return share(c, g) > 0; });
+    var r = ballotRange(g);
+    var seatsR = (function () {
+      var s = g.filter(function (x) { return x[0] > 10; }).map(function (x) {
+        return E.contests.filter(function (c) { return applies(c, x[1]); }).reduce(function (a, c) { return a + c.voteFor; }, 0);
+      });
+      return [Math.min.apply(null, s), Math.max.apply(null, s)];
+    })();
+    var nC = inGeo.reduce(function (a, c) { return a + c.cands.length; }, 0);
+    var contested = inGeo.filter(function (c) { return c.cands.length > c.voteFor; }).length;
+    var where = state.precinct === 'all' ? 'across 27513' : 'in precinct ' + state.precinct;
+    $('kpis').innerHTML = [
+      ['hl', rangeText(r), 'contests on one ballot (' + rangeText(seatsR) + ' votes to cast)'],
+      ['', inGeo.length, 'distinct contests ' + where],
+      ['', contested + ' / ' + inGeo.length, 'contests with a real choice'],
+      ['', nC, 'candidates ' + where + ' (+' + E.referenda.length + ' amendments)']
+    ].map(function (t) {
+      return '<div class="kpi"><div class="v ' + t[0] + '">' + t[1] + '</div><div class="l">' + esc(t[2]) + '</div></div>';
+    }).join('');
+
+    var rows = E.levels.map(function (l) {
+      var cs = inGeo.filter(function (c) { return c.level === l.id; });
+      var per = g.filter(function (x) { return x[0] > 10; }).map(function (x) {
+        return cs.filter(function (c) { return applies(c, x[1]); }).length;
+      });
+      var one = [Math.min.apply(null, per), Math.max.apply(null, per)];
+      var types = [];
+      cs.forEach(function (c) { if (types.indexOf(c.type) < 0) types.push(c.type); });
+      return '<tr><td><b>' + esc(l.name) + '</b><br><span style="color:var(--dim);font-size:12.5px">' + esc(types.join(', ')) + '</span></td>' +
+        '<td class="n">' + cs.length + '</td><td class="n">' + rangeText(one) + '</td><td class="n">' +
+        cs.filter(function (c) { return c.cands.length > c.voteFor; }).length + '</td></tr>';
+    });
+    rows.push('<tr class="tot"><td>Total</td><td class="n">' + inGeo.length + '</td><td class="n">' + rangeText(r) + '</td><td class="n">' + contested + '</td></tr>');
+    $('breakdown').innerHTML = '<thead><tr><th>Position type</th><th class="n">' + (state.precinct === 'all' ? 'In 27513' : 'Here') + '</th><th class="n">Per ballot</th><th class="n">Contested</th></tr></thead><tbody>' + rows.join('') + '</tbody>';
+
+    // Ballot note for a chosen precinct
+    if (state.precinct === 'all') {
+      $('ballotNote').innerHTML = 'Showing every contest any 27513 voter might see; the badge on each contest says what share of 27513 gets it. Pick your precinct for your exact ballot (find it with <a href="https://vt.ncsbe.gov/RegLkup/" target="_blank" rel="noopener">NCSBE Voter Search</a>).';
+    } else {
+      var p = E.precincts.filter(function (x) { return x.id === state.precinct; })[0];
+      // One line per district type; a split precinct lists both values.
+      var vals = function (k) {
+        var out = [];
+        p.combos.forEach(function (x) { if (out.indexOf(x[1][k]) < 0) out.push(x[1][k]); });
+        return out;
+      };
+      var NO = { comm: ['4'], sup: ['10A'] };
+      var LBL = { cong: 'U.S. House NC-', sen: 'NC Senate ', house: 'NC House ', comm: 'commissioner district ', boe: 'school board ', sup: 'superior court ', dct: 'district court ' };
+      var parts = Object.keys(LBL).map(function (k) {
+        var v = vals(k).map(function (x) { return LBL[k] + (k === 'cong' ? +x : x) + ((NO[k] || []).indexOf(x) >= 0 ? ' (no race in 2026)' : ''); });
+        return v.length > 1 ? v.join(' or ') + ' (depends on your address)' : v[0];
+      });
+      $('ballotNote').innerHTML = '<b>Precinct ' + esc(p.id) + ':</b> ' + esc(parts.join(', ')) + '.' +
+        (p.combos.length > 1 ? ' <b>Split precinct:</b> confirm your U.S. House race on your sample ballot.' : '');
+    }
+  }
+
+  function renderMain() {
+    var g = geo();
+    var list = visibleContests();
+    var shownCands = 0, totalCands = 0;
+    var html = [];
+    E.levels.forEach(function (l) {
+      var cs = list.filter(function (c) { return c.level === l.id; });
+      if (!cs.length) return;
+      html.push('<section class="level" id="lv-' + l.id + '"><h2>' + esc(l.name.toUpperCase()) + ' <small>' + cs.length + ' CONTEST' + (cs.length > 1 ? 'S' : '') + '</small></h2><p class="sub">' + esc(l.blurb) + '</p>');
+      cs.forEach(function (c) {
+        var sh = share(c, g);
+        var badges = [];
+        badges.push('<span class="tag">VOTE FOR ' + c.voteFor + '</span>');
+        badges.push('<span class="tag">' + esc(c.term) + '</span>');
+        if (!c.partisan) badges.push('<span class="tag">NONPARTISAN</span>');
+        if (c.cands.length <= c.voteFor) badges.push('<span class="tag">UNOPPOSED</span>');
+        if (state.precinct === 'all') badges.push('<span class="tag">' + (sh >= 0.9995 ? 'ALL OF 27513' : pct(sh) + ' OF 27513') + '</span>');
+        else if (sh < 0.9995) badges.push('<span class="tag warn">SPLIT PRECINCT: DEPENDS ON ADDRESS</span>');
+        var match = c.cands.map(function (k, i) {
+          return (i ? '<span class="vs">vs</span>' : '') + '<span><span class="dot ' + k.ai.c + '" title="' + esc(E.ratings[k.ai.c].label) + '"></span>' + esc(k.n) + '</span>';
+        }).join('');
+        html.push('<article class="contest" id="c-' + c.id + '"><div class="chead"><div class="ctitle"><h3>' + esc(c.title) + '</h3>' + badges.join('') + '</div>' +
+          (c.note ? '<div class="cnote">' + esc(c.note) + '</div>' : '') +
+          (c.cands.length > 1 ? '<div class="matchup">' + match + '</div>' : '') + '</div>');
+        html.push('<table class="cands"><colgroup><col class="c1"><col class="c2"><col><col class="c4"></colgroup><thead><tr><th>AI / DATA-CENTER STANCE</th><th>CANDIDATE</th><th>WHY THIS COLOR</th><th>BASIS</th></tr></thead><tbody>');
+        c.cands.forEach(function (k) {
+          totalCands++;
+          var m = candMatches(c, k);
+          if (m) shownCands++;
+          var party = k.p ? '<span class="tag">' + PARTY[k.p] + '</span>' : '<span class="tag">' + esc(k.pn || 'NONPARTISAN') + '</span>';
+          var inc = k.inc ? '<span class="tag">INCUMBENT</span>' : '';
+          var links = (k.links || []).map(function (L) {
+            return '<li><a href="' + esc(L[1]) + '" target="_blank" rel="noopener">' + esc(L[0]) + '</a>' + (L[2] === 'u' ? ' <span class="unv">(unverified)</span>' : '') + '</li>';
+          }).join('');
+          var srcs = (k.src || []).map(function (S) {
+            return '<li><a href="' + esc(S[1]) + '" target="_blank" rel="noopener">' + esc(S[0]) + '</a></li>';
+          }).join('');
+          html.push('<tr class="cand ' + k.ai.c + (m ? '' : ' dim') + '">' +
+            '<td><span class="chip ' + k.ai.c + '">' + esc(E.ratings[k.ai.c].label) + '</span></td>' +
+            '<td><div class="cname">' + esc(k.n) + '</div><div class="meta">' + party + inc + '</div><div class="home">' + esc(k.home) + '</div></td>' +
+            '<td><div class="why">' + esc(k.ai.why) + '</div>' + (k.ai.q ? '<div class="quote">"' + esc(k.ai.q) + '"</div>' : '') +
+              '<details><summary>Who they are, record, links and sources</summary><div class="more">' +
+              '<div><b>Who:</b> ' + esc(k.bio) + '</div>' + (k.rec ? '<div><b>Record:</b> ' + esc(k.rec) + '</div>' : '') +
+              (links ? '<div><b>Their own words / profiles</b><ul>' + links + '</ul></div>' : '') +
+              (srcs ? '<div><b>Sources for this entry</b><ul>' + srcs + '</ul></div>' : '') +
+              '</div></details></td>' +
+            '<td><div class="conf">Basis: <b>' + esc(BASIS[k.ai.basis]) + '</b><br>Confidence: <b>' + esc(k.ai.conf) + '</b></div></td></tr>');
+        });
+        html.push('</tbody></table></article>');
+      });
+      html.push('</section>');
+    });
+    $('main').innerHTML = html.length ? html.join('') : '<div class="empty">No contest matches these filters. <button class="btn" type="button" onclick="document.getElementById(\'reset\').click()">Reset filters</button></div>';
+    $('count').textContent = list.length + ' contests, ' + shownCands + ' of ' + totalCands + ' candidates match';
+  }
+
+  function syncControls() {
+    $('precinct').value = state.precinct;
+    $('level').value = state.level;
+    $('party').value = state.party;
+    $('q').value = state.q;
+    $('contested').checked = state.contested;
+    Array.prototype.forEach.call(document.querySelectorAll('.sbtn'), function (b) {
+      b.setAttribute('aria-pressed', state.colors.indexOf(b.dataset.c) >= 0 ? 'true' : 'false');
+    });
+  }
+  function render() { syncControls(); renderSummary(); renderMain(); save(); }
+
+  // ---------- events ----------
+  $('precinct').addEventListener('change', function (e) { state.precinct = e.target.value; render(); });
+  $('level').addEventListener('change', function (e) { state.level = e.target.value; render(); });
+  $('party').addEventListener('change', function (e) { state.party = e.target.value; render(); });
+  $('contested').addEventListener('change', function (e) { state.contested = e.target.checked; render(); });
+  $('q').addEventListener('input', function (e) { state.q = e.target.value; renderSummary(); renderMain(); save(); });
+  $('stances').addEventListener('click', function (e) {
+    var b = e.target.closest('.sbtn'); if (!b) return;
+    var c = b.dataset.c, i = state.colors.indexOf(c);
+    if (i >= 0) state.colors.splice(i, 1); else state.colors.push(c);
+    render();
+  });
+  $('reset').addEventListener('click', function () {
+    state = { precinct: state.precinct, level: 'all', party: 'all', q: '', contested: false, colors: COLORS.slice() };
+    render();
+  });
+
+  // CSV of whatever is currently visible (matching candidates only).
+  $('dlView').addEventListener('click', function () {
+    var g = geo();
+    var head = ['level', 'contest', 'vote_for', 'candidate', 'party', 'incumbent', 'ai_color', 'ai_label', 'ai_confidence', 'ai_basis', 'ai_why', 'ai_quote', 'share_of_selection'];
+    var cell = function (v) { var s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    var lines = [head.join(',')];
+    visibleContests().forEach(function (c) {
+      c.cands.forEach(function (k) {
+        if (!candMatches(c, k)) return;
+        lines.push([LEVEL[c.level].name, c.title, c.voteFor, k.n, PARTY_LONG[k.p], k.inc ? 'yes' : 'no', k.ai.c, E.ratings[k.ai.c].label, k.ai.conf, k.ai.basis, k.ai.why, k.ai.q || '', pct(share(c, g))].map(cell).join(','));
+      });
+    });
+    var blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'cary-27513-2026-' + (state.precinct === 'all' ? 'all' : 'precinct-' + state.precinct) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
