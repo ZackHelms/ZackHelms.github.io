@@ -70,7 +70,7 @@ one touch away, not buried.
 | Palette | `--bg:#06060e` `--panel:#0b0b16` `--border:#1a1a30` `--green:#39ff14` `--gold:#ffc300` `--blue:#4488ff` `--red:#ff2244` `--white:#dde3ff` `--dim:#8899bb` `--purple:#b44fff` |
 | Rendering | Canvas 2D, `requestAnimationFrame` loop, delta-time capped at ~100 ms. **Documented exception:** `wayfinder/` renders with hand-written **WebGL2 + GLSL** — real 3D terrain is not achievable in Canvas 2D and Three.js would break the no-external-libraries rule. All its assets are still generated procedurally in-file, it keeps a 2D canvas over the top for the HUD, and it degrades gracefully (simulation, map and compass all still run) when WebGL2 is unavailable. Reach for WebGL only when a game genuinely cannot exist without it. **Second documented exception:** `music-mixer/` renders its play surface in **DOM/CSS** — fifteen buttons whose coloured cap, lamp layer, filament core and specular streak are stacked gradients, with `box-shadow` supplying the bezel, the body depth and the coloured light bleed onto neighbouring pads for free. It is a control surface rather than a rendered scene: a canvas would have to re-implement all of that and would still lose crisp text labels. JS only ever writes two custom properties (`--glow`, `--pulse`); there is no draw loop |
 | Input | Touch + mouse events, `user-select:none`, `touch-action:manipulation` |
-| No dependencies | Zero external JS libs; Google Fonts is the only external resource |
+| No dependencies | Zero external JS libs; Google Fonts is the only external resource. **Documented exception:** `cyoa/` calls the Anthropic Messages API at runtime with the player's own key (raw `fetch`, no SDK) — `.claude/cyoa.md` |
 | Responsive | Portrait/landscape via `@media (orientation:landscape)` or `100dvh` layout; a canvas inside a flex column needs `min-height:0` or its intrinsic 300:150 ratio overflows landscape |
 | Canvas sizing | A fullscreen canvas needs explicit CSS `width:100%;height:100%` — `position:absolute;inset:0` alone does NOT stretch a replaced element, it renders at its intrinsic (dpr-scaled) attribute size and the page looks 2–3× zoomed. A layout that rescales stored positions by a relative factor (newCell/oldCell) must floor the derived scale above zero AND make repeated calls strict no-ops: a transient degenerate viewport once drove phasic's cell size negative, and a `oldCell>0` guard then silently dropped every healing rescale — the squish became permanent until reload (2026-07-31 rotation bug). **Lay out in the space pointer events resolve in.** Sizing the backing store from `window.innerWidth/innerHeight` while reading taps off `getBoundingClientRect()` uses two coordinate spaces that iOS makes disagree: after rotating into landscape, Safari's chrome can leave the canvas box *shorter* than `innerHeight`, CSS squashes the taller backing store into it, and every sprite is drawn higher than it is hit-tested — by an offset that **grows with y**, so it reads as "the thing low on the screen stopped answering taps" while the top of the scene looks fine (2026-08-28: fire-clicker's campfire answered only taps at the bottom of its drawn circle and below). A game needs exactly one of two cures: **measure the element** — one `viewBox()` helper wrapping `getBoundingClientRect()` that every layout number comes from (fire-clicker) — or **pin the CSS size** to the numbers you sized the backing store with (`cv.style.width = W + 'px'`, turret-builder). What you cannot do is size from `inner*` and leave the box to `width:100%`. Rotation compounds it: iOS can hand every rotation event a stale box and then never fire again, so pair either cure with phasic's `reflow()` (three passes across `resize`/`orientationchange`/`visualViewport`) plus a cheap re-measure in the frame loop — all strict no-ops once the box settles, provided the layout function is idempotent for a given box. **A guard written as `innerWidth !== W` cannot fire**, because both sides of it are the wrong space; that is how fire-clicker shipped the bug twice in one day. Diagnose any page with `.claude/scripts/check-canvas-space.cjs` — but **read its whole line, not the SQUASH number**. That probe EXEMPTS any canvas carrying an inline `style.width`/`style.height` (it prints `pinned=inline-css`), because that is cure #2 and the probe reaches the element through a stylesheet it could otherwise prise apart. A page whose framework sets those for you is therefore never measured at all: interlock reported `CANVAS=ok … SQUASH=1.000` while sitting on a real 0.711 squash, because three.js's `renderer.setSize()` writes them by default (2026-09-20). The probe also shrinks the box with a percentage `max-height`, which resolves to `none` against an auto-height body — so on such a page it could not have moved the box even unexempted. `SQUASH=1.000` next to `pinned=` is an exemption, not evidence; pin the box in **px** from a suite of your own and check what actually matters, which is whether a tap at the pixel a thing is DRAWN on hits that thing |
 | Canvas-drawn UI | Buttons/cards drawn on the canvas keep their hitbox arrays (`cardRects`-style) in JS — any branch that hides the widgets MUST clear the arrays too, or invisible stale hitboxes swallow taps (2026-07-24 grid-defense bug). Canvas has **no layout engine**: nothing clips, nothing reflows, nothing reports a collision, so assert what a layout engine would — every button rect inside the viewport, no two overlapping, and every off-button thing a widget points at fully on-screen. Derive the geometry from `W`/`H` in **one** layout function that the renderer and the hit-tester both call; two copies is how a button stops matching what it draws. Assert the layout's own structural invariant too, whatever it is — star-surge's station pairs left-column buttons with left-hand features so no connector line crosses the scene, and re-pairing one still looks "fine" to a screenshot reviewer who does not know the rule (2026-08-23). **Sweep those assertions across viewports, don't run them at one** — with no reflow, a widget sized off a content count and a row sized off a viewport fraction can collide at one aspect ratio and be fine at every other. Six or seven sizes including a landscape and a very narrow one, `page.setViewportSize` between each, **a real `draw()` at every one** (a layout that computes fine still throws in a painter), and collect violations as named strings rather than a boolean so a red tells you which rule broke at which size (2026-08-24) |
@@ -183,7 +183,10 @@ Tiles) carry a `#back-link` "← GAMES" text link instead — both forms satisfy
 the rule; new games use the `#back-btn` form.
 
 Excluded: externally-published games (`zed-shooter/`, `qntmchmst/` — their
-source repos own their UI) and frozen checkpoint files.
+source repos own their UI), frozen checkpoint files, and `cyoa/` — by the CD's
+call it has no top-left chrome at all: its title page carries an EXIT plaque
+back to the hub, mute lives in its Settings, and its reload button sits
+top-right at twice the usual size (`.claude/cyoa.md`).
 
 ---
 
@@ -746,7 +749,7 @@ The long road from here is a **Kardashev ladder** to a Type III civilization,
 scoped in `games/fire-clicker/TODO.md` alongside the remaining ideas. Drive
 suite: `.claude/tests/drive-fire-clicker.cjs` (110 checks); pacing/balance eval:
 `.claude/tests/eval-fire-clicker.cjs`. **Proprietary — no permissive license
-in this directory** (one of the six protected games). Detailed context:
+in this directory** (one of the seven protected games). Detailed context:
 `.claude/fire-clicker.md`.
 
 ### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)
@@ -882,8 +885,26 @@ removal. Its edge lines are **opaque** on purpose — three renders only the
 opaque list into the transmission target, so transparent ones are invisible
 through the glass materials, which is exactly the bug that made the board show
 the background cleanly and none of the other pieces. **Proprietary** (one of
-the six protected games). Detailed context: `.claude/interlock.md`; the
+the seven protected games). Detailed context: `.claude/interlock.md`; the
 measurement method behind its gates: `.claude/notes/20260920-measuring-a-rendering-change.md`.
+
+### CYOA (`cyoa/index.html`, ~3,200 lines)
+A tabletop RPG in the spirit of D&D with **Claude as the Game Master**, commissioned
+by the CD on 2026-09-25 and built in the new **Grimoire** style (illuminated
+manuscript: vellum, ink, rubrics, gold leaf, woodcut plates) rather than neon. A seed
+generates a world bible — region, threat, lair, MacGuffin, factions, 9-11 connected
+places, ~10 people and a three-act main quest — and the GM opens the tale in prose
+that is revealed in step with the device's narrator voice. Players type or **speak**
+(speech recognition) as whichever character is selected; the GM creates characters
+by conversation, runs checks, combat and travel, and can change the world **only**
+through 23 engine tools that validate before they mutate. Every accepted call is an
+event, replaying the events rebuilds the state exactly, and the canon it records is
+fed back on later turns, which is what keeps a revisited place the same place.
+Autosave + three slots + export/import; a code-drawn woodcut plate per place. Runs
+on the **player's own Anthropic key** (Opus 5.5 by default), the repo's only page
+that calls an API at runtime. **Proprietary** (one of the seven protected games).
+Suite: `.claude/tests/drive-cyoa.cjs` (76 checks, including the real client against
+stubbed network). Detailed context: `.claude/cyoa.md`.
 
 ---
 
@@ -912,7 +933,7 @@ measurement method behind its gates: `.claude/notes/20260920-measuring-a-renderi
 5. Create `.claude/<slug>.md` with architecture notes before the session gets long
 6. Copy the standard MIT `LICENSE` from any open game directory into the new
    game's directory — unless the CD marks the game protected/proprietary
-   (root `CLAUDE.md` § Licensing lists the six protected games)
+   (root `CLAUDE.md` § Licensing lists the seven protected games)
 7. Add the game's row to `.claude/games-index.md` **and refresh its coverage
    summary** (facet vocabulary: `templates/design/game-facets.md` in the
    zmhstudio repo) — when *choosing* what game to build, read that index's

@@ -24,6 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
+| CYOA | `cyoa/` | tabletop-rpg | voice, text-entry, tap | save-campaign | llm-game-master, speech-narration, procedural-generation, seeded-determinism | solo, local-coop | `.claude/cyoa.md` |
 | Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
 | Music Mixer | `music-mixer/` | music-instrument | hold, tap, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation, user-authoring | solo | `.claude/music-mixer.md` |
 | Verlet Ragdoll | `verlet-physics-ragdoll/` | physics-toy | drag-grab, drag-steer | open-sandbox | physics-sim, verlet-constraints, direct-manipulation | solo | `.claude/verlet-physics-ragdoll.md` |
@@ -79,7 +80,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-53 games (51 in-repo + 2 external builds).
+54 games (52 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -148,6 +149,24 @@ local-2p.
   levels forever: 16 authored, then endless seeded drawers, each beaten by
   the in-game solver before it is served; earmarked as the first web-first
   prototype of a future iOS title).
+
+### Newly opened by the 2026-09-25 build
+- **`tabletop-rpg`** genre + **`voice`** / **`text-entry`** input +
+  **`llm-game-master`** / **`speech-narration`** mechanics + **`local-coop`**
+  players (cyoa, a direct CD commission). The first game whose opponent,
+  narrator and referee is a language model: Claude runs a D&D-style table over
+  the player's own API key, while a deterministic engine owns the world (every
+  change is a validated tool call, logged as an event, replayable exactly), so
+  the fiction can improvise but the facts cannot drift. It is the first game you
+  can play by **talking** (speech recognition in, a narrator voice out) and the
+  first built for **several people round one device cooperating** rather than
+  competing, which is why `local-coop` joins `local-2p`. It is also the first
+  page in the **Grimoire** style (`.claude/styles/grimoire.md`) and the first
+  that makes a network call at runtime. `rpg-adventure` (Adventure) stays a
+  separate shelf: that is a tap-driven stat RPG with authored encounters, this
+  is an open conversation with a referee. Next on this axis: an offline scripted
+  GM for visitors without a key, and a second model-driven genre (a mystery
+  interrogation, a debate) where the engine's job is the same.
 
 ### Newly opened by the 2026-09-19 build
 - **`disassembly-puzzle`** genre + **`spatial-reasoning`** mechanic

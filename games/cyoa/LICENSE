@@ -1,0 +1,43 @@
+CYOA (games/cyoa/) — PROPRIETARY LICENSE
+
+Copyright (c) 2026 Zack Helms. All rights reserved.
+
+1. SCOPE
+   This license covers everything in the games/cyoa/ directory: game
+   code, the world generator and its tables, the rules engine, the Game
+   Master prompts and tool definitions, the scene-drawing code, audio
+   code, styling, and text (collectively, "the Software").
+
+2. NO PERMISSION GRANTED
+   No permission is granted to copy, modify, distribute, sublicense,
+   sell, or create derivative works of the Software, in whole or in
+   part, without prior written permission from the copyright holder.
+
+3. TRADEMARK
+   The CYOA name as used for this game, its logo, and associated
+   branding are reserved. No trademark rights are granted by this
+   license.
+
+4. PERMITTED USE
+   You may play CYOA where it is officially published — the copyright
+   holder's website, and any official app-store release — for personal,
+   non-commercial use. This is not a license to the underlying Software.
+
+5. NO EARLIER LICENSING
+   This directory has been proprietary from its first publication
+   (2026-09-25). It was never covered by the repository's former root
+   Apache License 2.0, which had already been removed on 2026-08-28,
+   and no version of it has been distributed under any other license
+   by the copyright holder.
+
+6. THIRD-PARTY SERVICES
+   The Software can send requests to third-party services (such as the
+   Anthropic API) using credentials the player supplies. Those services
+   are governed by their own terms, which this license does not change.
+
+7. PERMISSIONS AND CONTACT
+   For permission requests, contact the copyright holder via the
+   GitHub repository ZackHelms/ZackHelms.github.io.
+
+8. NO WARRANTY
+   The Software is provided "as is," without warranty of any kind.
