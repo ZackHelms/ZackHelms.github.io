@@ -450,11 +450,12 @@ A second dropdown, `#kit-select`, sits beside the song list and is shown **only
 under RECORD NEW SONG** (`syncChrome`). `KIT_PRESETS` lists them:
 
 - **DEFAULT** - `defaultKit()`'s pads, the kit described above.
-- **DRUMS 1** - fifteen percussion pads (`DRUMS1[]`), keeping the layout's
-  low-to-high climb: low drums up the left column (KICK SURDO TOM DJEMBE
-  CONGA), snares and wood in the middle (SNARE GHOST SNARE RIM CLAP CLAVE),
-  cymbals and metal on the right (HAT SHAKER RIDE CRASH GANKOGUI - slot 14
-  still the metal).
+- **DRUMS 1** - fifteen percussion pads (`DRUMS1[]`): cymbals and metal up
+  the left column (HAT SHAKER RIDE CRASH GANKOGUI), snares and wood in the
+  middle (SNARE GHOST SNARE RIM CLAP CLAVE), low drums on the right (KICK
+  SURDO TOM DJEMBE CONGA), so the kick keeps slot 10 as in every song. The
+  first cut had the left and right columns the other way round; the CD had
+  them swapped (2026-09-25).
 
 Rules worth keeping:
 

@@ -432,7 +432,7 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     await page.evaluate(() => { window.__MM.setPad(0, 'm:piano', 0); window.__MM.setPad(12, 'p:hat'); });
 
     /* Pad presets: DEFAULT is the kit above; DRUMS 1 is fifteen percussion
-       pads, low drums on the left and metal top-right. Editing a pad reads as
+       pads, metal on the left and low drums on the right. Editing a pad reads as
        CUSTOM, and a preset change must keep the key and mode. */
     const pre = await page.evaluate(async () => {
       const M = window.__MM;
@@ -460,8 +460,8 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
       M.pick('rec');
       return out;
     });
-    const wantDrums = ['KICK', 'SURDO', 'TOM', 'DJEMBE', 'CONGA', 'SNARE', 'GHOST SNARE', 'RIM',
-                       'CLAP', 'CLAVE', 'HAT', 'SHAKER', 'RIDE', 'CRASH', 'GANKOGUI'];
+    const wantDrums = ['HAT', 'SHAKER', 'RIDE', 'CRASH', 'GANKOGUI', 'SNARE', 'GHOST SNARE', 'RIM',
+                       'CLAP', 'CLAVE', 'KICK', 'SURDO', 'TOM', 'DJEMBE', 'CONGA'];
     if (!pre.start.shown || pre.start.value !== 'default')
       fail('preset list in record mode reads ' + JSON.stringify(pre.start) + ', expected DEFAULT shown');
     else if (pre.drums !== 'drums1' || pre.drumLabs.join(' ') !== wantDrums.join(' '))

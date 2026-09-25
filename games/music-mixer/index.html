@@ -573,7 +573,7 @@ body.erasing .pad .ex { display: flex; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 03:04 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 03:37 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -691,8 +691,8 @@ body.erasing .pad .ex { display: flex; }
   <b>&#128295;</b> button beside the song list is where the rest of it lives.</p>
   <p>The <b>preset</b> list beside it swaps the whole set of pads:
   <b>DEFAULT</b> is the layout above, <b>DRUMS 1</b> makes all fifteen pads
-  percussion &mdash; low drums on the left, snares and wood in the middle,
-  cymbals and metal on the right. Change a pad under <b>TAP PAD</b> and the
+  percussion &mdash; cymbals and metal on the left, snares and wood in the
+  middle, low drums on the right. Change a pad under <b>TAP PAD</b> and the
   list reads <b>CUSTOM</b>; picking a preset replaces your pads but keeps the
   key and mode.</p>
   <p>Under <b>TAP PAD</b>, a quick tap on a single pad opens its sound. Chords,
@@ -1781,13 +1781,14 @@ let KIT = defaultKit();
 /* Pad presets for RECORD NEW SONG. A preset replaces the fifteen pads and
    leaves key, mode and octave alone, so a key picked on CHANGE KEY & MODE
    survives a preset change. DEFAULT is the kit above; DRUMS 1 turns every pad
-   into percussion, keeping the layout's low-to-high climb: low drums up the
-   left column, snares and wood in the middle, cymbals and metal on the right
-   (slot 14 still the metal). Pads edited under TAP PAD read as CUSTOM. */
+   into percussion: cymbals and metal up the left column, snares and wood in
+   the middle, low drums on the right, so the kick keeps slot 10 as in every
+   song (CD call, 2026-09-25: the first cut had the columns the other way
+   round). Pads edited under TAP PAD read as CUSTOM. */
 const DRUMS1 = [
-  'kick', 'surdo', 'tom', 'djembe', 'conga',
-  'snare', 'snareGhost', 'rim', 'clap', 'clave',
   'hat', 'shaker', 'ride', 'crash', 'gankogui',
+  'snare', 'snareGhost', 'rim', 'clap', 'clave',
+  'kick', 'surdo', 'tom', 'djembe', 'conga',
 ];
 const KIT_PRESETS = [
   ['default', 'DEFAULT', () => defaultKit().pads],
