@@ -295,7 +295,7 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 23:11 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 23:36 UTC</div>
 
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
@@ -1930,7 +1930,9 @@ const Speech = {
   },
   best() { return this.ranked()[0] || null; },
   /* re-read every time: iOS may not announce a voice downloaded while the page is open */
-  pick() { this.load(); return this.voices.find((v) => v.voiceURI === Settings.data.voiceURI) || this.best(); },
+  /* 'system' = set no voice at all and let the device use its own setting: a downloaded voice
+     Safari will not list (it hides them from pages, assumed as anti-fingerprinting) may still speak */
+  pick() { if (Settings.data.voiceURI === 'system') return null; this.load(); return this.voices.find((v) => v.voiceURI === Settings.data.voiceURI) || this.best(); },
   prime() { if (!this.has()) return; try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) { /* ignore */ } },
   stop() { if (this.has()) try { speechSynthesis.cancel(); } catch (e) { /* ignore */ } },
 };
@@ -3392,7 +3394,7 @@ function fillVoices() {
   const sel = $('set-voiceuri'); if (!sel) return;
   Speech.load();
   const vs = Speech.ranked(), tier = (v) => { const q = Speech.quality(v); return q && !new RegExp(q, 'i').test(v.name) ? ' \u00b7 ' + q : ''; };
-  fillSelect(sel, [['', vs.length ? 'Best available: ' + vs[0].name + tier(vs[0]) : 'No voices on this device']].concat(vs.map((v) => [v.voiceURI, v.name + ' (' + v.lang + ')' + tier(v)])), Settings.data.voiceURI);
+  fillSelect(sel, [['', vs.length ? 'Best available: ' + vs[0].name + tier(vs[0]) : 'No voices on this device'], ['system', 'This device\u2019s own voice setting']].concat(vs.map((v) => [v.voiceURI, v.name + ' (' + v.lang + ')' + tier(v)])), Settings.data.voiceURI);
   if (sel.value !== Settings.data.voiceURI) sel.value = '';
 }
 function fillSettings() {

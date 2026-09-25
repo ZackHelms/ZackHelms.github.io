@@ -582,6 +582,14 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
     await startNew(p);
     r = await p.evaluate(() => window.__spoken.slice());
     ok(r.length >= 1 && r.every((x) => x.voice === 'com.apple.voice.enhanced.en-US.Evan' && x.lang === 'en-US'), 'the narration speaks every sentence in the chosen voice (' + r.length + ' sentences)');
+    await p.evaluate(() => { window.__spoken.length = 0; document.getElementById('btn-settings').click(); const s = document.getElementById('set-voiceuri'); s.value = 'system'; s.dispatchEvent(new Event('change')); });
+    await p.waitForTimeout(40);
+    r = await p.evaluate(() => ({ opt: (document.querySelector('#set-voiceuri option[value="system"]') || {}).textContent, spoken: window.__spoken.slice() }));
+    ok(r.opt && r.spoken.length === 1 && r.spoken[0].voice === null && r.spoken[0].lang == null, 'the device\u2019s own voice setting sets no voice and no language, so the phone chooses');
+    await p.evaluate(() => { window.CYOA.UI.closePanel('pnl-settings'); window.__spoken.length = 0; });
+    await say(p, 'we listen');
+    r = await p.evaluate(() => window.__spoken.slice());
+    ok(r.length >= 1 && r.every((x) => x.voice === null && x.lang == null), 'and the narration leaves the choice to the phone too (' + r.length + ' sentences)');
     ok(!p.errors.length, 'no page errors with a device voice ' + (p.errors[0] || ''));
     await ctx.close();
   }

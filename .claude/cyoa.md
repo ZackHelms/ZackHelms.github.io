@@ -6,7 +6,7 @@ D&D where **Claude is the Game Master**: a seed generates a world, the GM narrat
 to the world goes through a **deterministic engine** that validates it, logs it, and
 feeds the recorded canon back to the GM so revisits stay consistent. CD commission,
 2026-09-25. Plan: `.claude/plans/cyoa.ai-gm-adventure.md`. Suite:
-`.claude/tests/drive-cyoa.cjs` (124 checks). Style: **Grimoire**
+`.claude/tests/drive-cyoa.cjs` (126 checks). Style: **Grimoire**
 (`.claude/styles/grimoire.md`). **Proprietary** (`games/cyoa/LICENSE`).
 
 ## CD decisions (2026-09-25 interview) — do not relitigate
@@ -101,7 +101,13 @@ PLATES / COSTS / PREMIUM / STORAGE / SESSION / UI / BOOT`
   penalising the id would rank another language above them). "Best available" =
   language, then tier (Premium > Enhanced/Natural), then `v.default` as a tiebreak so the
   device's own choice wins within a tier. The game always sets `u.voice`, so the phone's
-  system voice setting only matters through that tiebreak. The list is re-read on every
+  system voice setting only matters through that tiebreak - except under the list's
+  second entry, "This device's own voice setting" (`voiceURI: 'system'`), where
+  `pick()` returns null and the utterance carries no voice and no language, so the
+  device decides. That entry exists because the CD's downloaded Jamie (Premium) never
+  appeared in the list (2026-09-25): Safari appears to hide downloaded voices from pages
+  (assumed: anti-fingerprinting). Whether the device default then speaks in it is
+  unverified. The list is re-read on every
   Settings open, on returning to the tab and at every `pick()`: iOS may not fire
   `voiceschanged` for a voice downloaded while the page is open.
 - **Plates.** `Plates.specFor(st)` = `{id, k, land, season, f, fig, tod, wx}`; a place's

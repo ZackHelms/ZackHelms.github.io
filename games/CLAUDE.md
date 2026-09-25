@@ -908,7 +908,7 @@ ledger** prices every paid call in US dollars (Claude exactly, from each reply's
 voice and pictures estimated), shows it per passage and in the header, travels in the
 save, and opens from a $ button on the Load screen; Settings can route the opening,
 player turns and the epilogue to different models. **Proprietary** (one of the seven protected games).
-Suite: `.claude/tests/drive-cyoa.cjs` (124 checks, including the real clients against
+Suite: `.claude/tests/drive-cyoa.cjs` (126 checks, including the real clients against
 stubbed network). Detailed context: `.claude/cyoa.md`.
 
 ---
