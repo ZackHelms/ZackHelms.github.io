@@ -374,10 +374,11 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     else console.log('REC=live   transport off, wrench up, TAP PAD selected');
 
     const recH = await page.evaluate(() => window.__MM.rowHeights());
-    if (recH['song-select'] !== recH.tools || recH.tools !== recH.lock)
+    if (recH['song-select'] !== recH.tools || recH.tools !== recH.lock ||
+        recH['kit-select'] !== recH.tools)
       fail('record-mode row heights differ: select ' + recH['song-select'] +
-           ' / wrench ' + recH.tools + ' / lock ' + recH.lock);
-    else console.log('ROW=' + recH.tools + 'px  select, wrench and lock all match');
+           ' / preset ' + recH['kit-select'] + ' / wrench ' + recH.tools + ' / lock ' + recH.lock);
+    else console.log('ROW=' + recH.tools + 'px  select, preset, wrench and lock all match');
 
     /* the default kit, exactly as specified: ten degrees of C major climbing
        the two left columns, PULSE's five drums in the right one */
@@ -429,6 +430,54 @@ const NOISE = /fonts\.googleapis|fonts\.gstatic|net::ERR_|favicon/i;
     if (a3.notes < 14) fail('the note list offered only ' + a3.notes + ' notes after a pitched reassignment');
     else console.log('PICK=E4 CLAP, and the note list returns with a pitched voice');
     await page.evaluate(() => { window.__MM.setPad(0, 'm:piano', 0); window.__MM.setPad(12, 'p:hat'); });
+
+    /* Pad presets: DEFAULT is the kit above; DRUMS 1 is fifteen percussion
+       pads, low drums on the left and metal top-right. Editing a pad reads as
+       CUSTOM, and a preset change must keep the key and mode. */
+    const pre = await page.evaluate(async () => {
+      const M = window.__MM;
+      const out = { start: M.preset() };
+      M.setKeyMode(2, 'dorian');
+      out.drums = M.preset('drums1').value;
+      out.drumLabs = M.padLabels();
+      out.keyKept = [M.kit().root, M.kit().mode];
+      M.hold(0, true);
+      let pk = 0;
+      for (let k = 0; k < 14; k++) {
+        await new Promise((r) => setTimeout(r, 25));
+        pk = Math.max(pk, M.level());
+      }
+      M.hold(0, false);
+      out.drumPeak = pk;
+      M.setPad(4, 'p:tablaNa');
+      out.custom = M.preset().value;
+      out.back = M.preset('default').value;
+      out.backLabs = M.padLabels();
+      M.setKeyMode(0, 'major');
+      out.restored = M.padLabels();
+      M.pick('');
+      out.hiddenOff = M.preset().shown;
+      M.pick('rec');
+      return out;
+    });
+    const wantDrums = ['KICK', 'SURDO', 'TOM', 'DJEMBE', 'CONGA', 'SNARE', 'GHOST SNARE', 'RIM',
+                       'CLAP', 'CLAVE', 'HAT', 'SHAKER', 'RIDE', 'CRASH', 'GANKOGUI'];
+    if (!pre.start.shown || pre.start.value !== 'default')
+      fail('preset list in record mode reads ' + JSON.stringify(pre.start) + ', expected DEFAULT shown');
+    else if (pre.drums !== 'drums1' || pre.drumLabs.join(' ') !== wantDrums.join(' '))
+      fail('DRUMS 1 reads [' + pre.drumLabs.join(' ') + ']');
+    else if (pre.keyKept.join() !== '2,dorian')
+      fail('a preset change reset the key/mode to ' + pre.keyKept.join(' '));
+    else if (pre.drumPeak < 0.01)
+      fail('a DRUMS 1 pad peaks at ' + pre.drumPeak.toFixed(4) + ' — silent');
+    else if (pre.custom !== 'custom')
+      fail('an edited pad left the preset list reading "' + pre.custom + '", expected CUSTOM');
+    else if (pre.back !== 'default' || pre.restored.join(' ') !== wantLabs.join(' '))
+      fail('DEFAULT did not restore the default kit: [' + pre.restored.join(' ') + ']');
+    else if (pre.hiddenOff)
+      fail('the preset list is showing outside RECORD NEW SONG');
+    else console.log('PRESET=DEFAULT/DRUMS 1/CUSTOM, key kept, drums sound (' +
+                     pre.drumPeak.toFixed(3) + '), hidden off-record');
 
     const rgeom = await page.evaluate(() => {
       const pads = [...document.querySelectorAll('.pad')].map((p) => p.getBoundingClientRect());

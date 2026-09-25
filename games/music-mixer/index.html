@@ -94,7 +94,9 @@ body {
    less than a reachable button. */
 #song-row { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
 #song-wrap { position: relative; flex: 1 1 auto; min-width: 0; max-width: 430px; }
-#song-select {
+#kit-wrap { position: relative; flex: 0 0 104px; }
+#song-row > .chip { flex-shrink: 0; }
+#song-select, #kit-select {
   width: 100%; height: 38px;
   appearance: none; -webkit-appearance: none;
   background: linear-gradient(#141426, #0a0a15);
@@ -108,9 +110,11 @@ body {
   box-shadow: inset 0 1px 0 #ffffff12;
 }
 #song-select.unset { color: var(--dim); }
-#song-wrap::after {
+#kit-select { padding: 0 24px 0 10px; letter-spacing: .5px; }
+#kit-select:disabled { opacity: .45; }
+#song-wrap::after, #kit-wrap::after {
   content: '\25BE';
-  position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
   color: var(--green); pointer-events: none; font-size: .85rem;
 }
 #lock .gl { font-size: 1rem; }
@@ -562,14 +566,14 @@ body.erasing .pad .ex { display: flex; }
   #topbar { height: auto; }
   #song-row { flex: 1 1 auto; min-width: 0; }
   #song-wrap { max-width: 300px; }
-  #song-select { font-size: .84rem; }
+  #song-select, #kit-select { font-size: .84rem; }
   #info { flex: 1 1 auto; overflow: hidden; }
   #app { gap: 4px; }
 }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-19 13:27 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 03:04 UTC</div>
 
 <div id="app">
   <div id="chrome">
@@ -585,6 +589,7 @@ body.erasing .pad .ex { display: flex; }
 
     <div id="song-row">
       <div id="song-wrap"><select id="song-select" aria-label="Song"></select></div>
+      <div id="kit-wrap" class="gone"><select id="kit-select" aria-label="Pad preset"></select></div>
       <button class="chip gone" id="tools" aria-label="Tools">&#128295;</button>
       <button class="chip gone" id="tr-rew" aria-label="Back to the start">&#9198;</button>
       <button class="chip gone" id="tr-play" aria-label="Play">&#9654;</button>
@@ -684,6 +689,12 @@ body.erasing .pad .ex { display: flex; }
   being a mixer and become instruments: the two left columns are ten notes of a
   scale climbing from the red pad, and the right column stays percussion. The
   <b>&#128295;</b> button beside the song list is where the rest of it lives.</p>
+  <p>The <b>preset</b> list beside it swaps the whole set of pads:
+  <b>DEFAULT</b> is the layout above, <b>DRUMS 1</b> makes all fifteen pads
+  percussion &mdash; low drums on the left, snares and wood in the middle,
+  cymbals and metal on the right. Change a pad under <b>TAP PAD</b> and the
+  list reads <b>CUSTOM</b>; picking a preset replaces your pads but keeps the
+  key and mode.</p>
   <p>Under <b>TAP PAD</b>, a quick tap on a single pad opens its sound. Chords,
   holds and slides still play normally, so you can keep playing in that view.</p>
   <p>A recording is a <b>loop</b>. What you played before the first bar line and
@@ -1767,6 +1778,34 @@ function defaultKit() {
 }
 let KIT = defaultKit();
 
+/* Pad presets for RECORD NEW SONG. A preset replaces the fifteen pads and
+   leaves key, mode and octave alone, so a key picked on CHANGE KEY & MODE
+   survives a preset change. DEFAULT is the kit above; DRUMS 1 turns every pad
+   into percussion, keeping the layout's low-to-high climb: low drums up the
+   left column, snares and wood in the middle, cymbals and metal on the right
+   (slot 14 still the metal). Pads edited under TAP PAD read as CUSTOM. */
+const DRUMS1 = [
+  'kick', 'surdo', 'tom', 'djembe', 'conga',
+  'snare', 'snareGhost', 'rim', 'clap', 'clave',
+  'hat', 'shaker', 'ride', 'crash', 'gankogui',
+];
+const KIT_PRESETS = [
+  ['default', 'DEFAULT', () => defaultKit().pads],
+  ['drums1', 'DRUMS 1', () => DRUMS1.map((v) => ({ v, k: 'p', deg: 0, tune: 1 }))],
+];
+function kitPresetOf(kit) {
+  for (const pr of KIT_PRESETS) {
+    const pads = pr[2]();
+    let same = true;
+    for (let i = 0; i < pads.length && same; i++) {
+      const a = kit.pads[i], b = pads[i];
+      same = a.v === b.v && a.k === b.k && (b.k !== 'm' || (a.deg | 0) === b.deg);
+    }
+    if (same) return pr[0];
+  }
+  return 'custom';
+}
+
 const LOOKAHEAD = 0.09, TICK_MS = 20;
 
 let S = null, songIx = 0;
@@ -2675,6 +2714,8 @@ function syncChrome() {
   const isTake = mode === 'take';
   el('info').classList.toggle('gone', !(mode === 'song' || isTake));
   el('tools').classList.toggle('gone', !(mode === 'rec' || isTake));
+  el('kit-wrap').classList.toggle('gone', mode !== 'rec');
+  syncKitSelect();
   /* the transport belongs to REPLAY & EDIT and nowhere else */
   const tp = isTake && tool === 'edit';
   for (const id of ['tr-rew', 'tr-play', 'tr-rec']) el(id).classList.toggle('gone', !tp);
@@ -2932,17 +2973,43 @@ function busyOff() {
   el('busy').classList.remove('open');
   if (busyTimer) { clearInterval(busyTimer); busyTimer = null; }
 }
+/* The preset dropdown shows which preset the kit matches, or CUSTOM once a
+   pad has been changed under TAP PAD. It is locked from the count-in until
+   the take is stored, because a take is voiced from KIT when it stops: a
+   preset change mid-take would re-voice everything already played. */
+function syncKitSelect() {
+  const s = el('kit-select');
+  if (!s) return;
+  const cur = kitPresetOf(KIT);
+  const cu = s.querySelector('option[value="custom"]');
+  if (cu) cu.hidden = cur !== 'custom';
+  s.value = cur;
+  s.disabled = RC.state !== 'idle';
+}
+function applyPreset(id) {
+  const pr = KIT_PRESETS.find((p) => p[0] === id);
+  if (!pr || RC.state !== 'idle' || mode !== 'rec') { syncKitSelect(); return; }
+  releaseAll(true, true);
+  for (let i = 0; i < PADS; i++) releaseNote(i, true);
+  KIT.pads = pr[2]();
+  saveKit();
+  labelPads();
+  if (audioReady) applyAudioSong();
+  syncKitSelect();
+}
 function recReset() {
   if (RC.timer) { clearTimeout(RC.timer); RC.timer = null; }
   RC.state = 'idle'; RC.events = []; RC.open = {};
   const b = el('rec-btn');
   if (b) { b.className = ''; b.textContent = 'REC'; }
+  syncKitSelect();
 }
 function recArm() {
   wakeAudio();
   if (RC.state === 'recording') { recStop(); return; }
   if (RC.state !== 'idle') return;
   RC.state = 'count';
+  syncKitSelect();
   const b = el('rec-btn');
   let n = 3;
   const tick = () => {
@@ -3495,6 +3562,15 @@ function wire() {
   const sel = el('song-select');
   rebuildSongs();
   sel.addEventListener('change', () => pickSelection(sel.value));
+  const ks = el('kit-select');
+  for (const pr of KIT_PRESETS.concat([['custom', 'CUSTOM']])) {
+    const o = document.createElement('option');
+    o.value = pr[0]; o.textContent = pr[1];
+    if (pr[0] === 'custom') o.disabled = true;
+    ks.appendChild(o);
+  }
+  ks.addEventListener('change', () => applyPreset(ks.value));
+  syncKitSelect();
 
   /* ---- transport, record and the edit bar ------------------------------ */
   el('tr-rew').addEventListener('click', takeRewind);
@@ -3610,12 +3686,14 @@ function wire() {
     labelPads();
     if (audioReady) applyAudioSong();
     saveKit();
+    syncKitSelect();
     auditionPad(pickIx);
   });
   el('pk-note').addEventListener('change', () => {
     KIT.pads[pickIx].deg = parseInt(el('pk-note').value, 10);
     labelPads();
     saveKit();
+    syncKitSelect();
     auditionPad(pickIx);
   });
   /* ---- key and mode ---------------------------------------------------- */
@@ -3864,6 +3942,12 @@ window.__MM = {
   },
   options: () => Array.prototype.map.call(el('song-select').options, (o) => o.value),
   kit: () => JSON.parse(JSON.stringify(KIT)),
+  preset: (id) => {
+    const ks = el('kit-select');
+    if (id != null) { ks.value = id; ks.dispatchEvent(new Event('change')); }
+    return { value: ks.value, shown: !el('kit-wrap').classList.contains('gone'),
+             disabled: ks.disabled };
+  },
   padLabels: () => { const a = []; for (let i = 0; i < PADS; i++) a.push(padLabel(i)); return a; },
   padMidi: (i) => padMidi(i),
   setTool: (t) => { setTool(t); return tool; },
@@ -3973,7 +4057,7 @@ window.__MM = {
     return padLabel(i);
   },
   rowHeights: () => {
-    const ids = ['song-select', 'tools', 'lock'];
+    const ids = ['song-select', 'kit-select', 'tools', 'lock'];
     const out = {};
     for (const id of ids) {
       const n = el(id);
