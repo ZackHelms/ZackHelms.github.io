@@ -7,6 +7,7 @@ Named visual styles a page on this site can be built in. The CD picks one by nam
 |---|---|---|---|
 | **Neon Arcade** (default) | Near-black `#06060e`, neon accents, Black Ops One + Share Tech Mono, Canvas 2D | `games/CLAUDE.md`, section "Shared Conventions" | every game, the games and experiments hubs, `2026election/`, `signals/` |
 | **Almanac** | Light paper-grey with a matching dark mode, Barlow Semi Condensed + Source Serif 4, ink rules, source-labelled numbers | `almanac.md` | `carbon-footprint/` |
+| **Grimoire** | Illuminated manuscript: vellum, iron-gall ink, vermilion rubrics, gold leaf, woodcut plates, candlelit night mode; Cinzel + IM Fell English | `grimoire.md` | `games/cyoa/` |
 
 ## How styles work here
 
