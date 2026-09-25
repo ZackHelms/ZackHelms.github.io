@@ -71,6 +71,7 @@ async function newPage(browser, opts) {
   const ctx = await browser.newContext({ viewport: opts.viewport || { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const init = [];
   if (!opts.noMock) init.push(MOCK);
+  if (opts.init) init.push(opts.init);
   init.push('if (!localStorage.getItem("cyoa.settings.v1")) localStorage.setItem("cyoa.settings.v1", ' + JSON.stringify(JSON.stringify(Object.assign({}, SETTINGS, opts.settings || {}))) + ');');
   await ctx.addInitScript(init.join('\n'));
   const page = await ctx.newPage();
@@ -544,6 +545,45 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
       ok(r.failed && r.src === 'woodcut' && /painted pictures failed/.test(r.toast), 'a refused picture request keeps the woodcut and says why');
       await ctx.close();
     }
+  }
+
+  /* ---------------- O. device voices (a fake iPhone speech engine) ---------------- */
+  console.log('O. device voices (fake engine)');
+  {
+    /* Apple's shape: a downloaded voice has a plain name and its tier only in the id */
+    const FAKE = `(() => {
+      const V = (name, lang, id, def) => ({ name, lang, voiceURI: id, localService: true, default: !!def });
+      window.__voices = [V('Samantha', 'en-US', 'com.apple.voice.compact.en-US.Samantha', true), V('Daniel', 'en-GB', 'com.apple.voice.compact.en-GB.Daniel'),
+        V('Eddy (English (US))', 'en-US', 'com.apple.eloquence.en-US.Eddy'), V('Evan', 'en-US', 'com.apple.voice.enhanced.en-US.Evan'), V('Zoe', 'en-US', 'com.apple.voice.premium.en-US.Zoe')];
+      window.__spoken = [];
+      const ss = { getVoices: () => window.__voices.slice(), /* a fresh list per call, as real engines return */ cancel() {}, resume() {}, pause() {}, addEventListener() {}, speaking: false, pending: false,
+        speak(u) { if (u.text.trim()) window.__spoken.push({ text: u.text, voice: u.voice ? u.voice.voiceURI : null, lang: u.lang });
+          setTimeout(() => { if (u.onstart) u.onstart(); setTimeout(() => { if (u.onend) u.onend(); }, 5); }, 5); } };
+      Object.defineProperty(window, 'speechSynthesis', { value: ss, configurable: true });
+      window.SpeechSynthesisUtterance = function (t) { this.text = t; };
+    })();`;
+    const { ctx, page: p } = await newPage(browser, { init: FAKE, settings: { voiceOn: true, textSpeed: 'normal' } });
+    let r = await p.evaluate(() => { const S = window.CYOA.Speech; return { best: (S.best() || {}).voiceURI, q: S.voices.map((v) => S.quality(v)) }; });
+    ok(r.best === 'com.apple.voice.premium.en-US.Zoe', 'Best available finds a Premium voice by its id when its name is plain (' + r.best + ')');
+    await p.evaluate(() => document.getElementById('btn-settings').click());
+    r = await p.evaluate(() => [...document.querySelectorAll('#set-voiceuri option')].map((o) => o.textContent));
+    ok(/^Best available: Zoe \u00b7 Premium$/.test(r[0]) && r.includes('Evan (en-US) \u00b7 Enhanced') && r.indexOf('Samantha (en-US)') > r.indexOf('Evan (en-US) \u00b7 Enhanced'),
+      'the voice list names the voice Best available resolves to and marks each tier (' + r.slice(0, 3).join(' | ') + ')');
+    ok(r.indexOf('Eddy (English (US)) (en-US)') === r.length - 1, 'novelty voices (eloquence) sink to the bottom even when only their id says so');
+    await p.evaluate(() => { window.__voices.push({ name: 'Ava', lang: 'en-US', voiceURI: 'com.apple.voice.premium.en-US.Ava', localService: true, default: true }); window.CYOA.UI.closePanel('pnl-settings'); });
+    await p.evaluate(() => document.getElementById('btn-settings').click());
+    r = await p.evaluate(() => [...document.querySelectorAll('#set-voiceuri option')].map((o) => o.textContent));
+    ok(r.includes('Ava (en-US) \u00b7 Premium') && /^Best available: Ava/.test(r[0]), 'a voice downloaded while the page is open appears the next time Settings opens, and the device default wins a tie within its tier');
+    await p.evaluate(() => { window.__spoken.length = 0; const s = document.getElementById('set-voiceuri'); s.value = 'com.apple.voice.enhanced.en-US.Evan'; s.dispatchEvent(new Event('change')); });
+    await p.waitForTimeout(40);
+    r = await p.evaluate(() => ({ saved: window.CYOA.Settings.data.voiceURI, spoken: window.__spoken.slice() }));
+    ok(r.saved === 'com.apple.voice.enhanced.en-US.Evan' && r.spoken.length === 1 && r.spoken[0].voice === r.saved, 'choosing a voice saves it and plays the sample in that voice');
+    await p.evaluate(() => { window.CYOA.UI.closePanel('pnl-settings'); window.__spoken.length = 0; });
+    await startNew(p);
+    r = await p.evaluate(() => window.__spoken.slice());
+    ok(r.length >= 1 && r.every((x) => x.voice === 'com.apple.voice.enhanced.en-US.Evan' && x.lang === 'en-US'), 'the narration speaks every sentence in the chosen voice (' + r.length + ' sentences)');
+    ok(!p.errors.length, 'no page errors with a device voice ' + (p.errors[0] || ''));
+    await ctx.close();
   }
 
   await browser.close();

@@ -295,7 +295,7 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 22:13 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 23:11 UTC</div>
 
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
@@ -1912,19 +1912,25 @@ const Speech = {
   has: () => 'speechSynthesis' in window && typeof SpeechSynthesisUtterance === 'function',
   load() { if (!this.has()) return; try { const v = speechSynthesis.getVoices(); if (v && v.length) this.voices = v; } catch (e) { /* no voices */ } },
   available() { return this.has() && this.voices.length > 0; },
+  /* Apple names a downloaded voice plainly ("Zoe") and keeps the tier in its id
+     (com.apple.voice.premium.en-US.Zoe), so the tier is read from both */
+  quality(v) { const t = (v.name || '') + ' ' + (v.voiceURI || ''); return /premium/i.test(t) ? 'Premium' : /enhanced/i.test(t) ? 'Enhanced' : /natural|neural/i.test(t) ? 'Natural' : ''; },
   score(v, lang) {
-    let s = 0; const n = v.name || '';
+    let s = 0; const n = v.name || '', q = this.quality(v);
     if (v.lang && v.lang.toLowerCase().startsWith(lang)) s += 20; else if (v.lang && v.lang.toLowerCase().startsWith(lang.slice(0, 2))) s += 12;
-    if (/premium/i.test(n)) s += 8; if (/enhanced/i.test(n)) s += 7; if (/natural|neural/i.test(n)) s += 7;
+    if (q === 'Premium') s += 10; else if (q) s += 8;
+    if (v.default) s += 3; /* the device's own choice wins a tie within a tier */
     if (/google/i.test(n)) s += 3; if (/siri/i.test(n)) s += 4; if (v.localService) s += 1;
-    if (/compact|eloquence|novelty|bells|whisper|zarvox|trinoids|bubbles|boing|jester|organ|cellos|bahh|albert|bad news|good news|superstar|wobble/i.test(n)) s -= 30;
+    if (/compact/i.test(n) || /eloquence|novelty|bells|whisper|zarvox|trinoids|bubbles|boing|jester|organ|cellos|bahh|albert|bad news|good news|superstar|wobble/i.test(n + ' ' + (v.voiceURI || ''))) s -= 30;
     return s;
   },
-  best() {
+  ranked() {
     const lang = (Settings.data.srLang || navigator.language || 'en-US').toLowerCase();
-    return this.voices.slice().sort((a, b) => this.score(b, lang) - this.score(a, lang))[0] || null;
+    return this.voices.slice().sort((a, b) => this.score(b, lang) - this.score(a, lang));
   },
-  pick() { return this.voices.find((v) => v.voiceURI === Settings.data.voiceURI) || this.best(); },
+  best() { return this.ranked()[0] || null; },
+  /* re-read every time: iOS may not announce a voice downloaded while the page is open */
+  pick() { this.load(); return this.voices.find((v) => v.voiceURI === Settings.data.voiceURI) || this.best(); },
   prime() { if (!this.has()) return; try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) { /* ignore */ } },
   stop() { if (this.has()) try { speechSynthesis.cancel(); } catch (e) { /* ignore */ } },
 };
@@ -3384,9 +3390,9 @@ function openSettings(notice) {
 function fillSelect(sel, pairs, value) { sel.textContent = ''; for (const [v, l] of pairs) { const o = el('option', null, l); o.value = v; sel.appendChild(o); } sel.value = value; }
 function fillVoices() {
   const sel = $('set-voiceuri'); if (!sel) return;
-  const lang = (navigator.language || 'en').slice(0, 2).toLowerCase();
-  const vs = Speech.voices.slice().sort((a, b) => Speech.score(b, lang) - Speech.score(a, lang));
-  fillSelect(sel, [['', vs.length ? 'Best available' : 'No voices on this device']].concat(vs.map((v) => [v.voiceURI, v.name + ' (' + v.lang + ')'])), Settings.data.voiceURI);
+  Speech.load();
+  const vs = Speech.ranked(), tier = (v) => { const q = Speech.quality(v); return q && !new RegExp(q, 'i').test(v.name) ? ' \u00b7 ' + q : ''; };
+  fillSelect(sel, [['', vs.length ? 'Best available: ' + vs[0].name + tier(vs[0]) : 'No voices on this device']].concat(vs.map((v) => [v.voiceURI, v.name + ' (' + v.lang + ')' + tier(v)])), Settings.data.voiceURI);
   if (sel.value !== Settings.data.voiceURI) sel.value = '';
 }
 function fillSettings() {
@@ -3601,11 +3607,12 @@ function sampleVoice() {
 function boot() {
   Settings.load(); applyTheme(); applyCostVisibility(); bind();
   Speech.load(); if (Speech.has()) try { speechSynthesis.addEventListener('voiceschanged', () => { Speech.load(); fillVoices(); }); } catch (e) { /* old engines */ }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) fillVoices(); }); /* back from the device's voice settings */
   drawFrontis($('frontis'));
   refreshTitle();
   window.CYOA = { /* test + debug hooks: read-only views and pure functions */
     generateWorld, newGame, exec, replay, stable, hashHex, bibleText, turnContext, endingOf, TOOLS, SYSTEM_PROMPT, toolDefs, Plates, Settings, Store,
-    makeSave, restore, validSave, randomSeed, get G() { return G; }, UI, Narrator, AnthropicGM, modelProfile, MODELS, TOOL_NAMES, Premium, Art, Costs, claudePrice, taskSettings,
+    makeSave, restore, validSave, randomSeed, get G() { return G; }, UI, Narrator, AnthropicGM, modelProfile, MODELS, TOOL_NAMES, Premium, Art, Costs, claudePrice, taskSettings, Speech,
   };
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

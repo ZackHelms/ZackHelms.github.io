@@ -6,7 +6,7 @@ D&D where **Claude is the Game Master**: a seed generates a world, the GM narrat
 to the world goes through a **deterministic engine** that validates it, logs it, and
 feeds the recorded canon back to the GM so revisits stay consistent. CD commission,
 2026-09-25. Plan: `.claude/plans/cyoa.ai-gm-adventure.md`. Suite:
-`.claude/tests/drive-cyoa.cjs` (117 checks). Style: **Grimoire**
+`.claude/tests/drive-cyoa.cjs` (124 checks). Style: **Grimoire**
 (`.claude/styles/grimoire.md`). **Proprietary** (`games/cyoa/LICENSE`).
 
 ## CD decisions (2026-09-25 interview) — do not relitigate
@@ -93,7 +93,17 @@ PLATES / COSTS / PREMIUM / STORAGE / SESSION / UI / BOOT`
   sentence (also dodges engines that cut long utterances), words revealed by
   `onboundary` or a rate estimate, hard timeout per sentence. Voice off -> text speed.
   Tap the scroll = skip (reveal all, cancel speech). Headless Chromium has no voices,
-  which the page treats as voice off.
+  which the page treats as voice off; section O of the suite fakes an iPhone engine.
+- **Device voice choice** (`Speech`). Apple gives a downloaded voice a plain name
+  ("Zoe") and keeps its tier in the id (`com.apple.voice.premium.en-US.Zoe`), so
+  `Speech.quality()` reads name AND `voiceURI`; the novelty filter (eloquence etc.) does
+  too, but "compact" is only penalised by name (every stock iPhone voice is compact, and
+  penalising the id would rank another language above them). "Best available" =
+  language, then tier (Premium > Enhanced/Natural), then `v.default` as a tiebreak so the
+  device's own choice wins within a tier. The game always sets `u.voice`, so the phone's
+  system voice setting only matters through that tiebreak. The list is re-read on every
+  Settings open, on returning to the tab and at every `pick()`: iOS may not fire
+  `voiceschanged` for a voice downloaded while the page is open.
 - **Plates.** `Plates.specFor(st)` = `{id, k, land, season, f, fig, tod, wx}`; a place's
   `scene` (`k` + features) is fixed at creation, so a revisit looks the same in the
   same light and weather. Placement PRNG is seeded by the place id. Cached (8) at 1.25x.
@@ -183,6 +193,10 @@ the CD's first try: that ElevenLabs answers browser (CORS) requests on a plain A
 (its docs recommend single-use tokens for client-side use), and that the default
 ElevenLabs voice id `JBFqnCBsd6RMkjVDRZzb` is still a stock voice. Either failure falls
 back to the device voice with a toast naming the error.
+
+Also unverified: whether iOS Safari lists downloaded Enhanced/Premium voices in
+`getVoices()` at all, and whether their names carry the tier. The code handles both
+shapes; if Safari hides them, no page can use them.
 
 ## Follow-ups (not built)
 
