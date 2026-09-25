@@ -122,7 +122,7 @@ body.in-tale #ribbon-btn { display:block; }
 
 /* ===== tale ===== */
 #scr-tale { flex-direction:column; padding:0 var(--sar) 0 var(--sal); }
-.tale-head { flex:0 0 auto; height:calc(84px + var(--sat)); padding:calc(10px + var(--sat)) 160px 0 12px;
+.tale-head { flex:0 0 auto; height:calc(88px + var(--sat)); padding:calc(6px + var(--sat)) 160px 0 12px;
   display:flex; flex-direction:column; justify-content:center; min-width:0; }
 #place-name { font-family:var(--caps); font-weight:700; font-size:17px; letter-spacing:.08em; color:var(--rubric);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -149,6 +149,20 @@ body.in-tale #ribbon-btn { display:block; }
 .passage.sys { font-style:italic; color:var(--rubric); }
 .passage.sys .plaque { margin-top:8px; font-style:normal; }
 .passage.void { opacity:.4; text-decoration:line-through; }
+.cost-tag { margin:-10px 0 16px; font-family:var(--caps); font-size:12px; letter-spacing:.06em; color:var(--ink-2); text-align:right; }
+#cost-btn { align-self:flex-start; margin-top:3px; min-height:28px; padding:2px 10px; font-family:var(--caps); font-size:13px; letter-spacing:.08em;
+  color:var(--ink-2); background:transparent; border:1px solid var(--ink-3); border-radius:2px; }
+#cost-btn:active { background:var(--vellum-3); }
+body.hide-costs .cost-tag, body.hide-costs #cost-btn { display:none; }
+.cost-sum { display:grid; grid-template-columns:1fr auto; gap:4px 16px; margin:0 auto 18px; padding:12px 14px; border:2px solid var(--ink); outline:1px solid var(--gold); outline-offset:2px; background:var(--vellum-2); }
+.cost-sum b { font-family:var(--caps); letter-spacing:.06em; }
+.cost-sum .big { font-family:var(--caps); font-size:22px; color:var(--rubric); }
+.cost-sum .h { grid-column:1 / -1; font-family:var(--caps); font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--rubric); margin-top:8px; }
+.cost-row { display:grid; grid-template-columns:auto 1fr; gap:2px 12px; padding:8px 0; border-bottom:1px solid var(--vellum-3); margin:0 auto; }
+.cost-row .usd { font-family:var(--caps); font-weight:700; font-size:15px; min-width:5.2em; }
+.cost-row .usd.failed { color:var(--rubric); }
+.cost-row .what { font-size:16px; line-height:1.35; }
+.cost-row .how { grid-column:2; font-family:var(--caps); font-size:11px; letter-spacing:.06em; color:var(--ink-2); }
 .chips { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 14px; }
 .chip { display:inline-flex; align-items:center; gap:6px; padding:3px 9px 3px 5px;
   font-family:var(--caps); font-size:13px; letter-spacing:.04em; line-height:1.3;
@@ -281,7 +295,7 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 21:12 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 22:13 UTC</div>
 
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
@@ -301,7 +315,7 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
 
 <!-- ===== tale ===== -->
 <section id="scr-tale" class="screen" aria-label="The tale">
-  <header class="tale-head"><div id="place-name"></div><div id="clock"></div></header>
+  <header class="tale-head"><div id="place-name"></div><div id="clock"></div><button id="cost-btn" type="button" aria-label="Cost history"></button></header>
   <div class="tale-body">
     <div id="plate-frame"><canvas id="plate" aria-label="Scene"></canvas></div>
     <div class="tale-right">
@@ -347,6 +361,10 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
       <label class="field"><span>Content</span>
         <select id="set-rating"><option value="family">Family</option><option value="teen">Teen</option><option value="mature">Mature</option></select>
       </label>
+      <label class="check"><input id="set-showcosts" type="checkbox"> Show what each turn costs</label>
+      <label class="field"><span>Model for the opening story</span><select id="set-task-opening"></select></label>
+      <label class="field"><span>Model for player turns</span><select id="set-task-turn"></select></label>
+      <label class="field"><span>Model for the epilogue</span><select id="set-task-epilogue"></select></label>
     </fieldset>
     <fieldset>
       <legend>World</legend>
@@ -439,6 +457,11 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
 </section>
 
 <!-- ===== party ===== -->
+<section id="pnl-costs" class="panel" aria-label="Costs">
+  <div class="panel-head"><h2>Costs</h2><button class="plaque small" type="button" data-close>Back</button></div>
+  <div class="panel-body"><div id="costs-body"></div></div>
+</section>
+
 <section id="pnl-party" class="panel" aria-label="Party">
   <div class="panel-head"><h2>The Party</h2><button class="plaque small" type="button" data-close>Back</button></div>
   <div class="panel-body"><div id="party-body"></div></div>
@@ -450,6 +473,7 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
   <button class="plaque" type="button" data-act="load">Load</button>
   <button class="plaque" type="button" data-act="chron">Chronicle</button>
   <button class="plaque" type="button" data-act="party">Party</button>
+  <button class="plaque" type="button" data-act="costs">Costs</button>
   <button class="plaque" type="button" data-act="settings">Settings</button>
   <button class="plaque" type="button" data-act="title">Title</button>
 </nav>
@@ -1768,9 +1792,10 @@ const AnthropicGM = {
       throw new GMError(kind, msg + (type ? ' (' + type + ')' : ''), resp.status);
     }
     const blocks = [], partial = [];
-    let stop = null, usage = {}, streamedText = false;
+    let stop = null, usage = {}, streamedText = false, served = prof.id;
+    try {
     for await (const { j } of sseEvents(resp)) {
-      if (j.type === 'message_start') usage = Object.assign({}, j.message && j.message.usage);
+      if (j.type === 'message_start') { usage = Object.assign({}, j.message && j.message.usage); if (j.message && j.message.model) served = j.message.model; }
       else if (j.type === 'content_block_start') { blocks[j.index] = Object.assign({}, j.content_block); partial[j.index] = ''; }
       else if (j.type === 'content_block_delta') {
         const blk = blocks[j.index], d = j.delta; if (!blk) continue;
@@ -1784,7 +1809,13 @@ const AnthropicGM = {
       } else if (j.type === 'message_delta') { if (j.delta && j.delta.stop_reason) stop = j.delta.stop_reason; if (j.usage) Object.assign(usage, j.usage); }
       else if (j.type === 'error') { const t = (j.error && j.error.type) || 'error'; throw new GMError(/overloaded|rate/.test(t) ? 'busy' : 'bad', (j.error && j.error.message) || t, streamedText ? -1 : 0); }
     }
-    return { content: blocks.filter(Boolean), stop_reason: stop, usage };
+    } catch (e) {
+      /* a stream that dies after message_start was still billed for what it used: carry the usage out */
+      const ge = e instanceof GMError ? e : new GMError(e && e.name === 'AbortError' ? 'aborted' : 'network', 'The connection dropped mid-reply.', streamedText ? -1 : 0);
+      if (usage.input_tokens != null) { ge.usage = usage; ge.model = served; }
+      throw ge;
+    }
+    return { content: blocks.filter(Boolean), stop_reason: stop, usage, model: served };
   },
   /* What to echo back as the assistant turn. After a server-side fallback,
      blocks before the last fallback marker are dropped except text. */
@@ -1814,12 +1845,13 @@ const AnthropicGM = {
       for (;;) {
         try { res = await this.request(key, prof, settings, messages, (t) => { narrated += t; hooks.text(t); }, hooks.signal); break; }
         catch (e) {
+          if (e.usage) { hooks.usage(e.usage, e.model); e.usage = null; }
           const retryable = e.kind === 'busy' || e.kind === 'network';
           if (!retryable || attempt >= 2 || e.status === -1 || narrated) throw e;
           attempt++; hooks.status('busy'); await sleep(attempt === 1 ? 1500 : 4000);
         }
       }
-      hooks.usage(res.usage);
+      hooks.usage(res.usage, res.model);
       if (res.stop_reason === 'refusal') throw new GMError('refusal', 'The Game Master declined that turn.');
       const uses = res.content.filter((b) => b.type === 'tool_use');
       if (!uses.length) {
@@ -1845,7 +1877,7 @@ const AnthropicGM = {
     const { b, betas } = this.body(prof, Object.assign({}, settings, { effort: 'low' }), [{ role: 'user', content: 'Reply with the single word: ready' }], false);
     b.max_tokens = 256; b.stream = false; delete b.system;
     const resp = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: this.headers(key, betas), body: JSON.stringify(b) });
-    if (resp.ok) return { ok: true, model: prof.id };
+    if (resp.ok) { let j = {}; try { j = await resp.json(); } catch (e) { /* no body */ } const m = j.model || prof.id; return { ok: true, model: m, usage: j.usage || null, usd: j.usage ? Costs.claude(m, j.usage).usd : null }; }
     let msg = resp.statusText; try { const j = await resp.json(); msg = (j.error && j.error.message) || msg; } catch (e) { /* not JSON */ }
     return { ok: false, status: resp.status, message: msg };
   },
@@ -1861,7 +1893,8 @@ const MockGM = {
       req,
       text: async (s) => { for (const piece of String(s).match(/[\s\S]{1,24}/g) || []) { narrated += piece; hooks.text(piece); await sleep(2); } },
       tool: (name, input) => hooks.tool(name, input),
-      fail: (kind, msg) => { throw new GMError(kind, msg || kind); },
+      usage: (u, model) => hooks.usage(u, model || modelProfile(req.settings).id),
+      fail: (kind, msg, u, model) => { const e = new GMError(kind, msg || kind); if (u) { hooks.usage(u, model || modelProfile(req.settings).id); } throw e; },
     };
     await window.__CYOA_MOCK__(api);
     return { text: narrated, stop: 'end_turn' };
@@ -1899,7 +1932,7 @@ const Speech = {
 const Narrator = {
   q: [], buf: '', running: false, ended: true, skip: false, passage: null, para: null, waiters: [], speaking: false,
   insert: null, scroller: null,
-  begin(insert, scroller) { this.stopNow(); this.q = []; this.buf = ''; this.ended = false; this.skip = false; this.passage = null; this.para = null; this.insert = insert; this.scroller = scroller; },
+  begin(insert, scroller, costTurn) { this.stopNow(); this.q = []; this.buf = ''; this.ended = false; this.skip = false; this.passage = null; this.para = null; this.insert = insert; this.scroller = scroller; this.costTurn = costTurn; },
   ensure() {
     if (this.passage) return;
     this.passage = el('div', 'passage gm'); this.para = el('p'); this.passage.appendChild(this.para);
@@ -1923,7 +1956,7 @@ const Narrator = {
     if (final && this.buf.trim()) { this.enq(this.buf.replace(/\s*\n\s*/g, ' ').trim()); this.buf = ''; }
   },
   /* a sentence joins the queue; with a premium voice its audio is requested now, so it is ready by its turn */
-  enq(text) { const it = { t: 's', text }; if (!this.skip && Premium.active()) it.audio = Premium.fetch(text); this.q.push(it); },
+  enq(text) { const it = { t: 's', text }; if (!this.skip && Premium.active()) it.audio = Premium.fetch(text, this.costTurn); this.q.push(it); },
   async pump() {
     if (this.running) return;
     this.running = true;
@@ -2662,6 +2695,141 @@ function star(g, x, y, s) {
   g.closePath(); g.fill();
 }
 
+/* ============================== COSTS ==============================
+   What every paid call cost, in US dollars, kept per game in its save.
+   Game Master entries are EXACT token counts from the API's usage report
+   times list prices; voice and pictures report no usage, so theirs are
+   estimates (est: true, shown with a tilde). Prices checked 2026-09-25:
+   Anthropic from the claude-api reference; OpenAI speech/images and
+   ElevenLabs from their price pages via search (see .claude/cyoa.md).    */
+const PRICES_CHECKED = '2026-09-25';
+/* USD per million tokens: input, output, cache read, 5-minute cache write (1-hour writes = 2x input) */
+const CLAUDE_PRICES = {
+  'claude-opus-5-5': [4, 20, 0.20, 5, 'Opus 5.5'],
+  'claude-opus-5': [5, 25, 0.50, 6.25, 'Opus 5'],
+  'claude-opus-4-8': [5, 25, 0.50, 6.25, 'Opus 4.8'],
+  'claude-sonnet-5': [2, 10, 0.20, 2.5, 'Sonnet 5'],
+  'claude-sonnet-4-6': [3, 15, 0.30, 3.75, 'Sonnet 4.6'],
+  'claude-haiku-4-5': [1, 5, 0.10, 1.25, 'Haiku 4.5'],
+  'claude-fable-5-1': [10, 50, 0.25, 12.5, 'Fable 5.1'],
+};
+function claudePrice(model) {
+  let best = null; const m = String(model || '');
+  for (const k of Object.keys(CLAUDE_PRICES)) if (m.startsWith(k) && (!best || k.length > best.length)) best = k;
+  return best ? CLAUDE_PRICES[best] : null;
+}
+function modelLabel(model) { const p = claudePrice(model); return p ? p[4] : String(model || '?'); }
+const COST_KINDS = { gm: 'Game Master', voice: 'Narrator voice', picture: 'Scene pictures', test: 'Tests' };
+const Costs = {
+  fmt(x) { return x == null || !isFinite(x) ? '$?' : '$' + (x >= 1 ? x.toFixed(2) : x.toFixed(4)); },
+  claude(model, u) {
+    const t = { in: u.input_tokens || 0, out: u.output_tokens || 0, read: u.cache_read_input_tokens || 0, write: u.cache_creation_input_tokens || 0 };
+    const w1h = (u.cache_creation && u.cache_creation.ephemeral_1h_input_tokens) || 0, p = claudePrice(model);
+    if (!p) return { usd: 0, known: false, t };
+    return { usd: (t.in * p[0] + t.out * p[1] + t.read * p[2] + Math.max(0, t.write - w1h) * p[3] + w1h * p[0] * 2) / 1e6, known: true, t };
+  },
+  /* speech: OpenAI gpt-4o-mini-tts ~ $0.60/M text tokens + $0.015 per minute of audio; tts-1 $15/M chars, tts-1-hd $30/M;
+     ElevenLabs pay-as-you-go $0.10 per 1k chars (Multilingual), $0.05 (Flash/Turbo) */
+  speech(provider, model, text, seconds) {
+    if (provider === 'elevenlabs') return (text.length / 1000) * (/flash|turbo/i.test(model) ? 0.05 : 0.10);
+    if (/^tts-1-hd/.test(model)) return (text.length * 30) / 1e6;
+    if (/^tts-1/.test(model)) return (text.length * 15) / 1e6;
+    return (((text.length + NARRATOR_STYLE.length) / 4) * 0.60) / 1e6 + (seconds / 60) * 0.015;
+  },
+  /* images: gpt-image-2 $5/M text in, $8/M image in, $30/M image out (~$0.041 for one 1536x1024 medium);
+     gpt-image-1 $5 / $10 / $40 (~$0.063). Usage from the reply when present, else the flat figure. */
+  image(model, usage) {
+    const r = /^gpt-image-1($|-\d)/.test(model) ? { t: 5, ii: 10, o: 40, flat: 0.063 } : { t: 5, ii: 8, o: 30, flat: 0.041 };
+    if (usage && usage.output_tokens) {
+      const d = usage.input_tokens_details || {}, img = d.image_tokens || 0, txt = d.text_tokens != null ? d.text_tokens : Math.max(0, (usage.input_tokens || 0) - img);
+      return { usd: (txt * r.t + img * r.ii + usage.output_tokens * r.o) / 1e6, fromUsage: true };
+    }
+    return { usd: r.flat, fromUsage: false };
+  },
+  add(entry) {
+    if (!G) return null;
+    const e = Object.assign({ at: Date.now(), turn: G.st.turn, calls: 1, est: false }, entry);
+    G.costs.push(e); this.changed(e.turn); return e;
+  },
+  /* a narrated passage's voice is one ledger line that grows sentence by sentence */
+  addVoice(turn, provider, model, text, seconds) {
+    if (!G) return;
+    const usd = this.speech(provider, model, text, seconds);
+    let e = G.costs.find((x) => x.kind === 'voice' && x.turn === turn);
+    if (!e) e = this.add({ kind: 'voice', task: 'voice', turn, desc: 'Narrator voice for turn ' + turn, model: (provider === 'elevenlabs' ? 'ElevenLabs ' : 'OpenAI ') + model, usd: 0, calls: 0, est: true, secs: 0, chars: 0 });
+    e.usd += usd; e.calls++; e.secs = +(e.secs + seconds).toFixed(3); e.chars += text.length;
+    this.changed(turn);
+  },
+  total(list) { return (list || (G ? G.costs : [])).reduce((a, e) => a + (e.usd || 0), 0); },
+  changed(turn) { UI.refreshCost(); this.refreshTag(turn); },
+  tagText(turn) {
+    if (!G) return '';
+    const es = G.costs.filter((e) => e.turn === turn), part = [];
+    const gm = es.filter((e) => e.kind === 'gm');
+    if (gm.length) {
+      const calls = gm.reduce((a, e) => a + e.calls, 0), models = [...new Set(gm.map((e) => e.model))].map(modelLabel).join(' + ');
+      part.push(this.fmt(this.total(gm)) + ' · ' + models + ' · ' + plural(calls, 'call'));
+    }
+    for (const k of ['voice', 'picture', 'test']) { const xs = es.filter((e) => e.kind === k); if (xs.length) part.push(k + ' ~' + this.fmt(this.total(xs))); }
+    return part.join(' · ');
+  },
+  tag(turn) { const n = el('div', 'cost-tag', this.tagText(turn)); n.dataset.turn = String(turn); return n; },
+  refreshTag(turn) { const t = this.tagText(turn); for (const n of document.querySelectorAll('.cost-tag[data-turn="' + turn + '"]')) n.textContent = t; },
+  sanitize(list) {
+    if (!Array.isArray(list)) return [];
+    const num = (v) => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0);
+    return list.filter((e) => e && typeof e === 'object' && COST_KINDS[e.kind] && typeof e.usd === 'number' && isFinite(e.usd)).slice(-5000).map((e) => ({
+      at: num(e.at), turn: Math.floor(num(e.turn)), kind: e.kind, task: clip(e.task, 20), desc: clip(e.desc, 200), model: clip(e.model, 80), usd: num(e.usd),
+      calls: Math.floor(num(e.calls)), est: !!e.est, failed: e.failed ? clip(e.failed, 20) : undefined, unknown: !!e.unknown,
+      tok: e.tok ? { in: num(e.tok.in), out: num(e.tok.out), read: num(e.tok.read), write: num(e.tok.write) } : undefined,
+      secs: e.secs != null ? num(e.secs) : undefined, chars: e.chars != null ? num(e.chars) : undefined }));
+  },
+  csv(list) {
+    const q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const rows = [['time', 'turn', 'kind', 'task', 'description', 'model', 'calls', 'input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens', 'audio_seconds', 'characters', 'usd', 'estimated', 'failed']];
+    for (const e of list) rows.push([new Date(e.at).toISOString(), e.turn, e.kind, e.task, e.desc, e.model, e.calls, e.tok ? e.tok.in : '', e.tok ? e.tok.read : '', e.tok ? e.tok.write : '', e.tok ? e.tok.out : '', e.secs != null ? e.secs : '', e.chars != null ? e.chars : '', e.usd.toFixed(6), e.est ? 'yes' : 'no', e.failed || '']);
+    return rows.map((r) => r.map(q).join(',')).join('\n') + '\n';
+  },
+};
+const kTok = (n) => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n));
+function renderCosts(list, title) {
+  const box = $('costs-body'); box.textContent = '';
+  const total = Costs.total(list), sum = el('div', 'cost-sum');
+  const row = (a, b, cls) => { sum.appendChild(el('span', cls || null, a)); sum.appendChild(el('b', cls || null, b)); };
+  sum.appendChild(el('span', 'h', title || 'This tale'));
+  row('Total spent', Costs.fmt(total), 'big');
+  row('Paid calls', String(list.reduce((a, e) => a + (e.calls || 0), 0)));
+  const byKind = {}, byModel = {};
+  for (const e of list) { byKind[e.kind] = (byKind[e.kind] || 0) + e.usd; const m = e.kind === 'gm' ? modelLabel(e.model) : e.model; const b = byModel[m] || (byModel[m] = { usd: 0, n: 0 }); b.usd += e.usd; b.n += e.calls || 0; }
+  if (list.length) {
+    sum.appendChild(el('span', 'h', 'By kind'));
+    for (const k of Object.keys(COST_KINDS)) if (byKind[k] != null) row(COST_KINDS[k], (k === 'gm' ? '' : '~') + Costs.fmt(byKind[k]));
+    sum.appendChild(el('span', 'h', 'By model'));
+    for (const m of Object.keys(byModel).sort((a, b) => byModel[b].usd - byModel[a].usd)) row(m + ' · ' + plural(byModel[m].n, 'call'), Costs.fmt(byModel[m].usd));
+    const turns = new Set(list.filter((e) => e.kind === 'gm' && e.task === 'turn').map((e) => e.turn)).size;
+    if (turns) row('Average per player turn', Costs.fmt(list.filter((e) => e.task === 'turn' || (e.kind !== 'gm' && e.kind !== 'test')).reduce((a, e) => a + e.usd, 0) / turns));
+  }
+  box.appendChild(sum);
+  const acts = el('div', 'row'); acts.style.justifyContent = 'center'; acts.style.marginBottom = '14px';
+  const ex = el('button', 'plaque small', 'Export CSV'); ex.type = 'button'; ex.disabled = !list.length;
+  ex.onclick = () => downloadText('cyoa-costs-' + new Date().toISOString().slice(0, 10) + '.csv', Costs.csv(list), 'text/csv');
+  acts.appendChild(ex); box.appendChild(acts);
+  if (!list.length) box.appendChild(el('p', 'note', 'Nothing has been spent on this tale yet.'));
+  for (const e of list.slice().reverse()) {
+    const r = el('div', 'cost-row');
+    r.appendChild(el('span', 'usd' + (e.failed ? ' failed' : ''), (e.est ? '~' : '') + (e.unknown ? '$?' : Costs.fmt(e.usd))));
+    r.appendChild(el('span', 'what', e.desc + (e.failed ? ' (failed: ' + e.failed + ')' : '')));
+    const how = [e.kind === 'gm' ? modelLabel(e.model) : e.model, plural(e.calls || 0, 'call')];
+    if (e.tok) how.push(kTok(e.tok.in + e.tok.read + e.tok.write) + ' in (' + kTok(e.tok.read) + ' cached)', kTok(e.tok.out) + ' out');
+    if (e.secs) how.push((Math.round(e.secs * 10) / 10) + ' s audio'); if (e.chars) how.push(e.chars + ' chars');
+    how.push(new Date(e.at).toLocaleString());
+    r.appendChild(el('span', 'how', how.join(' · ')));
+    box.appendChild(r);
+  }
+  box.appendChild(el('p', 'note', 'Game Master costs are the exact tokens each request used times list prices checked ' + PRICES_CHECKED + '. Amounts with ~ (voice, pictures) are estimates. Your invoice can differ: discounts, taxes, plan credits, or a price change since then.'));
+}
+function openCosts(list, title) { renderCosts(list, title); UI.openPanel('pnl-costs'); SFX.page(); }
+
 /* ============================== PREMIUM ==============================
    Optional paid services on the player's own keys, each with the free
    version as its fallback: a narrator voice (OpenAI speech or ElevenLabs),
@@ -2693,13 +2861,18 @@ const Premium = {
     if (!resp.ok) throw new Error(resp.status + ' ' + (await errText(resp)));
     return resp.arrayBuffer();
   },
-  fetch(text) {
+  model() { return this.provider() === 'elevenlabs' ? Settings.data.elevenModel || 'eleven_multilingual_v2' : Settings.data.ttsModel || 'gpt-4o-mini-tts'; },
+  fetch(text, turn) {
+    const provider = this.provider(), model = this.model();
     const p = (async () => {
       await this.slot();
       try {
         const ab = await this.request(text);
         AudioSys.init(); if (!AudioSys.ac) throw new Error('no audio output');
-        return await new Promise((res, rej) => { const r = AudioSys.ac.decodeAudioData(ab, res, rej); if (r && r.catch) r.catch(rej); });
+        const buf = await new Promise((res, rej) => { const r = AudioSys.ac.decodeAudioData(ab, res, rej); if (r && r.catch) r.catch(rej); });
+        if (turn != null) Costs.addVoice(turn, provider, model, text, buf.duration);
+        buf.costUsd = Costs.speech(provider, model, text, buf.duration);
+        return buf;
       } finally { this.release(); }
     })();
     p.catch(() => {});
@@ -2735,6 +2908,8 @@ const Art = {
     if (!resp.ok) throw new Error(resp.status + ' ' + (await errText(resp)));
     const j = await resp.json(), b64 = j && j.data && j.data[0] && j.data[0].b64_json;
     if (!b64) throw new Error('no image in the reply');
+    const model = Settings.data.imageModel || 'gpt-image-2', cost = Costs.image(model, j.usage);
+    Costs.add({ kind: 'picture', task: 'picture', desc: 'Scene picture: ' + loc.name, model, usd: cost.usd, est: !cost.fromUsage });
     const img = await loadImg('data:image/png;base64,' + b64), c = document.createElement('canvas');
     c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0);
     return await new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('could not encode'))), 'image/jpeg', 0.86));
@@ -2775,7 +2950,7 @@ const Settings = {
   KEY: 'cyoa.settings.v1',
   defaults: { model: 'claude-opus-5-5', customModel: '', effort: 'medium', rating: 'teen', remember: true, seed: '', tone: 'random', land: 'random', threat: 'random',
     voiceOn: true, voiceURI: '', rate: 1, textSpeed: 'normal', autoSend: false, srLang: '', musicVol: 0.5, sfxVol: 0.7, theme: 'auto', lastSeed: '', debug: false,
-    voiceProvider: 'device', openaiVoice: 'cedar', ttsModel: 'gpt-4o-mini-tts', elevenVoice: 'JBFqnCBsd6RMkjVDRZzb', elevenModel: 'eleven_multilingual_v2', pictures: 'drawn', imageModel: 'gpt-image-2' },
+    voiceProvider: 'device', openaiVoice: 'cedar', ttsModel: 'gpt-4o-mini-tts', elevenVoice: 'JBFqnCBsd6RMkjVDRZzb', elevenModel: 'eleven_multilingual_v2', pictures: 'drawn', imageModel: 'gpt-image-2', showCosts: true, taskModels: { opening: '', turn: '', epilogue: '' } },
   data: null, memKey: '',
   load() { let d = {}; try { d = JSON.parse(localStorage.getItem(this.KEY) || '{}') || {}; } catch (e) { d = {}; } this.data = Object.assign({}, this.defaults, d); },
   save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* private mode: settings last this visit */ } },
@@ -2834,13 +3009,13 @@ const SLOT_NAMES = { auto: 'Autosave', s1: 'Slot I', s2: 'Slot II', s3: 'Slot II
 
 /* ============================== SESSION ============================== */
 let G = null;   /* the live game: {st, events, transcript, speaker, ...} */
-function newSession(st) { return { st, events: [], transcript: [], speaker: 'all', playMs: 0, since: Date.now(), endingAck: false, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, abort: null }; }
+function newSession(st) { return { st, events: [], transcript: [], costs: [], speaker: 'all', playMs: 0, since: Date.now(), endingAck: false, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, abort: null }; }
 function makeSave(slot) {
   const st = G.st, now = Date.now();
   return { format: 'cyoa-save', v: 1, engine: ENGINE_V, slot, seed: st.seed, pins: st.pins, bible: st.bible, events: G.events, transcript: G.transcript,
-    turn: st.turn, endingAck: G.endingAck,
+    turn: st.turn, endingAck: G.endingAck, costs: G.costs,
     meta: { party: st.party.map((c) => c.name), place: st.locations[st.here].name, day: st.time.day, region: st.bible.region, savedAt: now,
-      playMs: G.playMs + (now - G.since), plate: Plates.specFor(st) } };
+      playMs: G.playMs + (now - G.since), plate: Plates.specFor(st), usd: Costs.total(G.costs) } };
 }
 function validSave(s) {
   return s && s.format === 'cyoa-save' && s.v === 1 && typeof s.seed === 'string' && s.bible && Array.isArray(s.bible.locations) && Array.isArray(s.events) && Array.isArray(s.transcript);
@@ -2854,6 +3029,7 @@ function restore(save) {
   g.transcript = save.transcript.filter((e) => e && typeof e.text === 'string' && ['gm', 'pl', 'chip'].includes(e.t))
     .map((e) => ({ t: e.t, text: e.text.slice(0, 8000), who: e.who ? String(e.who).slice(0, 40) : undefined, id: e.id, cls: e.cls, kind: e.kind, turn: e.turn }));
   g.playMs = (save.meta && save.meta.playMs) || 0; g.endingAck = !!save.endingAck;
+  g.costs = Costs.sanitize(save.costs);
   return { g, mismatches };
 }
 async function autosave() {
@@ -2948,7 +3124,10 @@ const UI = {
   /* ---- rendering the transcript ---- */
   renderEntry(e) {
     if (e.t === 'pl') { const d = el('div', 'passage pl'); d.append(el('span', 'who', e.who || 'The table'), el('span', null, e.text)); return this.insert(d); }
-    if (e.t === 'gm') { const d = el('div', 'passage gm'); for (const p of e.text.split(/\n\s*\n/)) if (p.trim()) d.appendChild(el('p', null, p.replace(/\s*\n\s*/g, ' ').trim())); return this.insert(d); }
+    if (e.t === 'gm') {
+      const d = el('div', 'passage gm'); for (const p of e.text.split(/\n\s*\n/)) if (p.trim()) d.appendChild(el('p', null, p.replace(/\s*\n\s*/g, ' ').trim()));
+      this.insert(d); if (G && e.turn != null && Costs.tagText(e.turn)) this.insert(Costs.tag(e.turn)); return d;
+    }
     if (e.t === 'chip') { const row = this.chipRow(true); row.appendChild(this.chipNode(e)); return row; }
     if (e.t === 'sys') { const d = el('div', 'passage sys', e.text); if (e.action) { const b = el('button', 'plaque small', e.action.label); b.type = 'button'; b.onclick = e.action.fn; d.appendChild(el('br')); d.appendChild(b); } return this.insert(d); }
   },
@@ -2967,7 +3146,9 @@ const UI = {
     for (const e of G.transcript) this.renderEntry(e);
     s.scrollTop = s.scrollHeight;
     this.refreshHud(G.st, true);
+    this.refreshCost();
   },
+  refreshCost() { const b = $('cost-btn'); if (!G) { b.textContent = ''; return; } b.textContent = Costs.fmt(Costs.total()); },
 
   /* ---- HUD: place, clock, plate, speakers ---- */
   refreshHud(st, plate) {
@@ -3005,8 +3186,14 @@ const UI = {
     const pc = G.speaker !== 'all' ? pcById(G.st, G.speaker) : null;
     gmTurn('player', { text: text.slice(0, 2000), who: pc ? pc.name : G.st.party.length ? 'All' : 'The table', id: pc ? pc.id : null });
   },
-  afterSettings() { AudioSys.apply(); applyTheme(); if (G && document.body.classList.contains('in-tale')) this.refreshHud(G.st); },
+  afterSettings() { AudioSys.apply(); applyTheme(); applyCostVisibility(); if (G && document.body.classList.contains('in-tale')) this.refreshHud(G.st); },
 };
+function applyCostVisibility() { document.body.classList.toggle('hide-costs', !Settings.data.showCosts); }
+/* which model a Game Master task uses: its own choice in Settings, or the main model */
+function taskSettings(kind) {
+  const d = Settings.data, m = (d.taskModels || {})[kind === 'player' ? 'turn' : kind];
+  return m ? Object.assign({}, d, { model: m }) : d;
+}
 function hasKey() { return typeof window.__CYOA_MOCK__ === 'function' || !!Settings.key(); }
 
 /* ---- one Game Master turn: stage on a copy, commit only on success ---- */
@@ -3021,14 +3208,21 @@ async function gmTurn(kind, line) {
   let chipRow = null;
   const stage = kind === 'opening' ? OPENING_STAGE : kind === 'epilogue' ? epilogueStage(endingOf(work)) : null;
   const context = turnContext(work, G.transcript, line || {}, { rating: Settings.data.rating, stage });
-  Narrator.begin((node) => track(UI.insert(node)), $('scroll'));
+  const costTurn = work.turn;
+  Narrator.begin((node) => track(UI.insert(node)), $('scroll'), costTurn);
   G.abort = typeof AbortController === 'function' ? new AbortController() : null;
+  const bill = { usd: 0, calls: 0, tok: { in: 0, out: 0, read: 0, write: 0 }, models: [], unknown: false };
   const hooks = {
     signal: G.abort ? G.abort.signal : undefined,
     text: (t) => Narrator.push(t),
     status: () => {},
-    usage: (u) => { if (!u) return; G.usage.input += u.input_tokens || 0; G.usage.output += u.output_tokens || 0; G.usage.cacheRead += u.cache_read_input_tokens || 0; G.usage.cacheWrite += u.cache_creation_input_tokens || 0;
-      if (Settings.data.debug) console.info('CYOA usage', JSON.stringify(u), 'session', JSON.stringify(G.usage)); },
+    usage: (u, model) => {
+      if (!u) return; G.usage.input += u.input_tokens || 0; G.usage.output += u.output_tokens || 0; G.usage.cacheRead += u.cache_read_input_tokens || 0; G.usage.cacheWrite += u.cache_creation_input_tokens || 0;
+      const c = Costs.claude(model, u);
+      bill.usd += c.usd; bill.calls++; for (const k of Object.keys(bill.tok)) bill.tok[k] += c.t[k];
+      if (!c.known) bill.unknown = true; if (model && !bill.models.includes(model)) bill.models.push(model);
+      if (Settings.data.debug) console.info('CYOA usage', model, JSON.stringify(u), Costs.fmt(c.usd), 'session', JSON.stringify(G.usage));
+    },
     tool: (name, input) => {
       if (kind === 'epilogue' && name !== 'end_scene') return err('The story is over: narrate the epilogue without tools.');
       const r = exec(work, name, input);
@@ -3042,9 +3236,14 @@ async function gmTurn(kind, line) {
     },
   };
   let out = null, failure = null;
-  try { out = await gmProvider().run({ key: Settings.key(), settings: Settings.data, bible: bibleText(work.bible), context }, hooks); }
+  try { out = await gmProvider().run({ key: Settings.key(), settings: taskSettings(kind), bible: bibleText(work.bible), context }, hooks); }
   catch (e) { failure = e; }
   G.abort = null;
+  if (bill.calls) {
+    const desc = kind === 'opening' ? 'Opening of the tale' : kind === 'epilogue' ? 'Epilogue' : 'Turn ' + costTurn + ' \u00b7 ' + (line.who || 'The table') + ': \u201c' + clip(line.text, 60) + '\u201d';
+    Costs.add({ kind: 'gm', task: kind === 'player' ? 'turn' : kind, turn: costTurn, desc, model: bill.models.join(', '), usd: bill.usd, calls: bill.calls, tok: bill.tok, unknown: bill.unknown || undefined,
+      failed: failure && failure.kind !== 'aborted' ? failure.kind : failure ? 'cancelled' : undefined });
+  }
   if (failure) {
     await finishNarration();
     for (const n of nodes) n.remove();
@@ -3061,6 +3260,7 @@ async function gmTurn(kind, line) {
     }[failure.kind] || 'Something went wrong in the telling: ' + clip(failure.message, 160);
     const act = failure.kind === 'auth' || failure.kind === 'model' ? { label: 'Settings', fn: () => openSettings() } : null;
     UI.renderEntry({ t: 'sys', text: msg, action: act });
+    if (bill.calls) { UI.insert(Costs.tag(costTurn)); autosave(); }
     if (Settings.data.debug) console.warn('CYOA GM error', failure);
     return;
   }
@@ -3073,6 +3273,7 @@ async function gmTurn(kind, line) {
   if (text) G.transcript.push({ t: 'gm', text, turn: work.turn - 1 });
   else Narrator.push('The Game Master pauses, quill hovering over the page. What do you do?');
   Narrator.end();
+  if (Costs.tagText(costTurn)) { const tg = Costs.tag(costTurn); if (Narrator.passage && Narrator.passage.isConnected) Narrator.passage.after(tg); else UI.insert(tg); }
   UI.setBusy(false);
   UI.refreshHud(G.st);
   autosave();
@@ -3109,6 +3310,7 @@ function enterTale() {
   $('ending').classList.remove('open');
   UI.showScreen('scr-tale'); UI.lastPlateKey = '';
   UI.renderAll();
+  applyCostVisibility();
   $('mic').hidden = !Listen.supported();
   G.since = Date.now();
 }
@@ -3128,6 +3330,10 @@ async function playSave(save) {
   await UI.crossfade(() => enterTale());
   autosave();
   return true;
+}
+function downloadText(name, text, type) {
+  const blob = new Blob([text], { type: type || 'text/plain' }), url = URL.createObjectURL(blob), a = el('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 function download(name, obj) {
   const blob = new Blob([JSON.stringify(obj)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = el('a');
@@ -3152,7 +3358,10 @@ async function renderSlots() {
     if (s) {
       const acts = el('div', 'slot-actions'); const ex = el('button', 'plaque small', 'Export'); ex.type = 'button';
       ex.onclick = (e) => { e.stopPropagation(); download(fileName(s), s); };
-      acts.appendChild(ex); card.appendChild(acts);
+      const costs = Costs.sanitize(s.costs), cb = el('button', 'plaque small cost-hist', Costs.fmt(Costs.total(costs))); cb.type = 'button';
+      cb.setAttribute('aria-label', 'Cost history');
+      cb.onclick = (e) => { e.stopPropagation(); openCosts(costs, SLOT_NAMES[slot] + ' \u00b7 ' + (s.meta && s.meta.party.length ? s.meta.party.join(', ') : 'no characters yet')); };
+      acts.append(cb, ex); card.appendChild(acts);
       const go = () => { SFX.page(); playSave(s); };
       card.onclick = go; card.onkeydown = (e) => { if (e.key === 'Enter') go(); };
     }
@@ -3186,6 +3395,8 @@ function fillSettings() {
   fillSelect($('set-model'), MODELS.map((m) => [m.id, m.label]), d.model);
   $('custom-model-field').hidden = d.model !== 'custom'; $('set-custom-model').value = d.customModel;
   $('set-effort').value = d.effort; $('set-rating').value = d.rating;
+  $('set-showcosts').checked = !!d.showCosts;
+  for (const k of ['opening', 'turn', 'epilogue']) fillSelect($('set-task-' + k), [['', 'Same as the model above']].concat(MODELS.map((m) => [m.id, m.label])), (d.taskModels || {})[k] || '');
   $('set-seed').value = d.seed;
   $('last-seed').textContent = d.lastSeed ? 'Last tale’s seed: ' + d.lastSeed : '';
   fillSelect($('set-tone'), [['random', 'Random']].concat(Object.keys(TONES).map((k) => [k, TONES[k].label])), d.tone);
@@ -3284,6 +3495,7 @@ function bind() {
     else if (a === 'load') { renderSlots(); UI.openPanel('pnl-load'); }
     else if (a === 'chron') { renderChronicle('places'); UI.openPanel('pnl-chron'); }
     else if (a === 'party') { renderParty(); UI.openPanel('pnl-party'); }
+    else if (a === 'costs') { if (G) openCosts(G.costs, 'This tale \u00b7 ' + G.st.bible.region); }
     else if (a === 'settings') openSettings();
     else if (a === 'title') { if (await UI.confirm('Return to the title?', 'Your tale is saved automatically after every turn.', 'Title')) leaveToTitle(); }
   });
@@ -3315,13 +3527,21 @@ function bind() {
     Settings.setKey(k, $('set-remember').checked);
     if (!k) { s.textContent = 'Enter a key first.'; s.className = 'status bad grow'; return; }
     s.textContent = 'Asking…'; s.className = 'status grow';
-    try { const r = await AnthropicGM.testKey(k, Settings.data); s.textContent = r.ok ? 'The Game Master answers (' + r.model + ').' : 'Refused (' + r.status + '): ' + clip(r.message, 120); s.className = 'status grow ' + (r.ok ? 'ok' : 'bad'); }
+    try {
+      const r = await AnthropicGM.testKey(k, Settings.data);
+      s.textContent = r.ok ? 'The Game Master answers (' + modelLabel(r.model) + ')' + (r.usd != null ? ' \u00b7 cost ' + Costs.fmt(r.usd) : '') + '.' : 'Refused (' + r.status + '): ' + clip(r.message, 120);
+      s.className = 'status grow ' + (r.ok ? 'ok' : 'bad');
+      if (r.ok && r.usd != null && G) Costs.add({ kind: 'test', task: 'key test', desc: 'Key test in Settings', model: r.model, usd: r.usd });
+    }
     catch (e) { s.textContent = 'No answer: the network or the browser blocked the request.'; s.className = 'status bad grow'; }
   });
   on('set-model', 'change', () => { set('model', $('set-model').value); $('custom-model-field').hidden = Settings.data.model !== 'custom'; AnthropicGM.noFallbacks = false; });
   on('set-custom-model', 'change', () => set('customModel', $('set-custom-model').value.trim()));
   on('set-effort', 'change', () => set('effort', $('set-effort').value));
   on('set-rating', 'change', () => set('rating', $('set-rating').value));
+  on('set-showcosts', 'change', () => { set('showCosts', $('set-showcosts').checked); applyCostVisibility(); });
+  for (const k of ['opening', 'turn', 'epilogue']) on('set-task-' + k, 'change', () => { const t = Object.assign({ opening: '', turn: '', epilogue: '' }, Settings.data.taskModels); t[k] = $('set-task-' + k).value; set('taskModels', t); AnthropicGM.noFallbacks = false; });
+  on('cost-btn', 'click', () => { if (G) openCosts(G.costs, 'This tale \u00b7 ' + G.st.bible.region); });
   on('set-seed', 'change', () => set('seed', $('set-seed').value.trim()));
   on('set-tone', 'change', () => set('tone', $('set-tone').value));
   on('set-land', 'change', () => set('land', $('set-land').value));
@@ -3352,7 +3572,7 @@ function bind() {
     try {
       const buf = await Premium.fetch('The tale begins by candlelight, and the rain has not stopped for three days.');
       if (AudioSys.ac && AudioSys.ac.state === 'running') { const src = AudioSys.ac.createBufferSource(); src.buffer = buf; src.connect(AudioSys.voice); src.start(); }
-      st2.textContent = 'The narrator answers.'; st2.className = 'status ok grow';
+      st2.textContent = 'The narrator answers \u00b7 about ' + Costs.fmt(buf.costUsd) + '.'; st2.className = 'status ok grow';
     } catch (e) { st2.textContent = 'Refused: ' + clip(e.message, 120); st2.className = 'status bad grow'; }
   });
   on('btn-export-all', 'click', async () => { const all = await Store.all(); if (!Object.keys(all).length) { UI.toast('There are no saved tales yet.'); return; } download('cyoa-all-saves-' + new Date().toISOString().slice(0, 10) + '.json', { format: 'cyoa-archive', v: 1, saves: all }); });
@@ -3379,13 +3599,13 @@ function sampleVoice() {
   try { speechSynthesis.speak(u); } catch (e) { /* ignore */ }
 }
 function boot() {
-  Settings.load(); applyTheme(); bind();
+  Settings.load(); applyTheme(); applyCostVisibility(); bind();
   Speech.load(); if (Speech.has()) try { speechSynthesis.addEventListener('voiceschanged', () => { Speech.load(); fillVoices(); }); } catch (e) { /* old engines */ }
   drawFrontis($('frontis'));
   refreshTitle();
   window.CYOA = { /* test + debug hooks: read-only views and pure functions */
     generateWorld, newGame, exec, replay, stable, hashHex, bibleText, turnContext, endingOf, TOOLS, SYSTEM_PROMPT, toolDefs, Plates, Settings, Store,
-    makeSave, restore, validSave, randomSeed, get G() { return G; }, UI, Narrator, AnthropicGM, modelProfile, MODELS, TOOL_NAMES, Premium, Art,
+    makeSave, restore, validSave, randomSeed, get G() { return G; }, UI, Narrator, AnthropicGM, modelProfile, MODELS, TOOL_NAMES, Premium, Art, Costs, claudePrice, taskSettings,
   };
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

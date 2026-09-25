@@ -1,12 +1,12 @@
 # CYOA — context
 
-`games/cyoa/index.html` (single file, ~3,200 lines). A tabletop RPG in the spirit of
+`games/cyoa/index.html` (single file, ~3,600 lines). A tabletop RPG in the spirit of
 D&D where **Claude is the Game Master**: a seed generates a world, the GM narrates it
 (text revealed in step with a narrator voice), players type or speak, and every change
 to the world goes through a **deterministic engine** that validates it, logs it, and
 feeds the recorded canon back to the GM so revisits stay consistent. CD commission,
 2026-09-25. Plan: `.claude/plans/cyoa.ai-gm-adventure.md`. Suite:
-`.claude/tests/drive-cyoa.cjs` (90 checks). Style: **Grimoire**
+`.claude/tests/drive-cyoa.cjs` (117 checks). Style: **Grimoire**
 (`.claude/styles/grimoire.md`). **Proprietary** (`games/cyoa/LICENSE`).
 
 ## CD decisions (2026-09-25 interview) — do not relitigate
@@ -15,6 +15,10 @@ feeds the recorded canon back to the GM so revisits stay consistent. CD commissi
   "remember" is on, else sessionStorage), sent only to `api.anthropic.com`. No server.
 - Default model **Claude Opus 5.5** (`claude-opus-5-5`); Settings offers Opus 5,
   Sonnet 5, Haiku 4.5 and a custom id. Default effort `medium`.
+- **Cost ledger** (CD request, 2026-09-25): every paid call is priced in US dollars as
+  it happens, saved in the game's save, and listed from a $ button on the Load screen.
+  The CD will experiment with models and may later script more of the GM or pin some
+  tasks to Haiku; per-task model routing is the first step (see Costs below).
 - Scene pictures **code-drawn** (woodcut plates) by default; **painted by OpenAI** is an
   opt-in on the player's own OpenAI key.
 - Narrator: **built-in speech synthesis** by default; **OpenAI** or **ElevenLabs** voices
@@ -40,7 +44,7 @@ feeds the recorded canon back to the GM so revisits stay consistent. CD commissi
 ## Architecture (sections in the script, in order)
 
 `UTIL / PRNG / TABLES / WORLD / ENGINE / CONTEXT / GM / NARRATION / SPEECH-IN / AUDIO /
-PLATES / PREMIUM / STORAGE / SESSION / UI / BOOT`
+PLATES / COSTS / PREMIUM / STORAGE / SESSION / UI / BOOT`
 
 - **PRNG.** `rngFor(seed, stream, n)` = a fresh sfc32 per (seed, stream, index). The
   engine keeps the indices (`st.n.roll`, `st.n.name`, `st.n.pregen`) **in state**, so a
@@ -136,11 +140,40 @@ PLATES / PREMIUM / STORAGE / SESSION / UI / BOOT`
 - The ribbon (z 69) must stay **under** the panels (z 70) or it covers their Back
   button; the reload button (z 90) stays above everything.
 
-## Costs (inferred, not measured)
+## Costs (the ledger)
 
-Opus 5.5 at medium effort: roughly $0.03-0.10 per player turn with 1-3 requests per
-turn; the ~7k-token prefix is cached (cache reads $0.20/MTok). Set `debug: true` in
-`cyoa.settings.v1` to log `usage` per request and per session to the console.
+`G.costs` is a list of entries `{at, turn, kind, task, desc, model, usd, calls, est,
+tok?, secs?, chars?, failed?, unknown?}`, saved as `costs` in every save (plus
+`meta.usd` for the slot list) and run through `Costs.sanitize` on load and import.
+
+- **Claude is exact**: `Costs.claude(model, usage)` = usage from each reply x the list
+  price of the model that **served** it (`message_start.message.model`, so a server-side
+  fallback is billed at the fallback's price). Cache writes at 1.25x input (5-min) or 2x
+  (1-hour, from `usage.cache_creation`); reads at 0.1x. One `gm` entry per turn, summing
+  every request of its tool loop. A **failed turn is still billed** (its tokens were
+  spent) and marked `failed`; a stream that dies after `message_start` carries its usage
+  out on the thrown `GMError` so it is billed once. A 401 has no usage and costs nothing.
+- **Voice and pictures are estimates** (`est: true`, shown with `~`): OpenAI
+  `gpt-4o-mini-tts` = text tokens (chars/4, plus `NARRATOR_STYLE`) at $0.60/M + audio at
+  $0.015/min of decoded clip; `tts-1` $15/M chars, `tts-1-hd` $30/M; ElevenLabs $0.10 per
+  1k chars (Flash/Turbo $0.05). One voice entry per passage, growing per sentence. A
+  picture is billed from the reply's `usage` when present (gpt-image-2 $5/M text in,
+  $8/M image in, $30/M image out), else a flat ~$0.041 (gpt-image-1: $0.063).
+- Prices live in `CLAUDE_PRICES` / `Costs.speech` / `Costs.image`, checked
+  `PRICES_CHECKED` = 2026-09-25 (sources: the claude-api skill's model table for
+  Claude; OpenAI and ElevenLabs pricing pages). An unknown Claude model id is recorded with
+  its tokens and `unknown: true` and shown as `$?` - update the table rather than guess.
+- **Where it shows**: the header total (`#cost-btn`, opens the history), a line under
+  each passage (`.cost-tag`, per turn: GM cost, models, calls, voice, picture), the
+  menu's Cost history, and a $ plaque on every Load slot. The history panel has totals
+  by kind and by model, an average per player turn, and a CSV export. Settings > Show
+  what each turn costs hides the tags and the header button (the ledger still records).
+- **Per-task models**: `Settings.data.taskModels = {opening, turn, epilogue}`; empty =
+  the main model. `taskSettings(kind)` is the only place a request picks its model. To
+  pin another task to Haiku or script it, split it into its own `gmTurn` kind (or a
+  deterministic path that never calls the provider) and add a row there.
+- Rough scale (inferred, not measured): Opus 5.5 at medium effort, $0.03-0.10 per
+  player turn. `debug: true` in `cyoa.settings.v1` still logs raw usage per request.
 
 ## Unverified here (no keys in the build container)
 
@@ -154,6 +187,6 @@ back to the device voice with a toast naming the error.
 ## Follow-ups (not built)
 
 An offline scripted GM for visitors without a key; an optional server proxy; more world
-tables and a bigger bestiary; an initiative tracker UI; a cost meter; an effort sweep
+tables and a bigger bestiary; an initiative tracker UI; an effort sweep
 after the first playtest; caching premium audio per passage (nothing replays a passage
 yet, so it would buy nothing today).

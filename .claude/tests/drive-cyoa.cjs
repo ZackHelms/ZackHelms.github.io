@@ -26,6 +26,9 @@
  *   K. tap-to-skip; the ending runs an epilogue and opens the ending screen
  *   M. the optional premium voice (OpenAI / ElevenLabs) and painted pictures
  *      (OpenAI images) against stubbed endpoints, and their fallbacks
+ *   N. the cost ledger: exact per-model pricing from token usage, failed turns
+ *      still billed, the running total, per-passage cost lines, per-task model
+ *      routing, the ledger saved with the game and shown from the Load screen
  *   L. the REAL Anthropic client against a stubbed network (page.route): SSE
  *      parsing, the tool loop, thinking blocks echoed unchanged, request shape
  *      per model profile, the fallbacks-400 retry, and a 401
@@ -48,13 +51,13 @@ const MOCK = `
 window.__CYOA_MOCK__ = async (api) => {
   const ctx = api.req.context, line = ctx.slice(ctx.lastIndexOf('\\n') + 1);
   window.__lastContext = ctx;
-  if (/Open the adventure/.test(line)) { api.tool('set_scene', { figures: ['humanoid'], mood: 'uneasy' }); await api.text((window.__OPENING || 'Rain falls on the village.\\n\\nWho is at the table?')); return; }
+  if (/Open the adventure/.test(line)) { api.usage({ input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 8000, cache_creation_input_tokens: 0 }, 'claude-opus-5-5'); api.tool('set_scene', { figures: ['humanoid'], mood: 'uneasy' }); await api.text((window.__OPENING || 'Rain falls on the village.\\n\\nWho is at the table?')); return; }
   if (/main story has ended/.test(line)) { api.tool('end_scene', { summary: 'The tale reached its end.' }); await api.text('And so the region was saved. The end.'); return; }
-  if (/#make/.test(line)) { api.tool('create_character', { name: 'Mira', class: 'Rogue', ancestry: 'elf' }); api.tool('create_character', { name: 'Bran', class: 'Fighter' }); await api.text('Mira and Bran take their seats.'); return; }
+  if (/#make/.test(line)) { api.usage({ input_tokens: 2000, output_tokens: 1000, cache_read_input_tokens: 0, cache_creation_input_tokens: 6000 }, 'claude-haiku-4-5'); api.tool('create_character', { name: 'Mira', class: 'Rogue', ancestry: 'elf' }); api.tool('create_character', { name: 'Bran', class: 'Fighter' }); await api.text('Mira and Bran take their seats.'); return; }
   if (/#roll/.test(line)) { window.__roll = api.tool('roll_check', { character_id: 'C1', check: 'stealth', dc: 12 }); await api.text('The dice fall.'); return; }
   const go = line.match(/#go (L\\d+)/); if (go) { window.__move = api.tool('move_party', { to: go[1] }); await api.text('You travel on.'); return; }
   if (/#badmove/.test(line)) { window.__bad = api.tool('move_party', { to: 'L999' }); await api.text('That way is not open.'); return; }
-  if (/#fail/.test(line)) { api.tool('create_character', { name: 'Ghost', class: 'Bard' }); await api.text('You begin to'); api.fail('busy'); }
+  if (/#fail/.test(line)) { api.tool('create_character', { name: 'Ghost', class: 'Bard' }); await api.text('You begin to'); api.fail('busy', null, { input_tokens: 500, output_tokens: 100 }, 'claude-opus-5-5'); }
   if (/#refuse/.test(line)) { api.fail('refusal'); }
   if (/#xss/.test(line)) { await api.text('A note reads <img src=x onerror="window.__pwned=1"> and <b>bold</b>.'); return; }
   if (/#long/.test(line)) { await api.text('This is a very long passage that goes on and on. '.repeat(40)); return; }
@@ -301,6 +304,63 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
     await ctx.close();
   }
 
+  /* ---------------- N. costs ---------------- */
+  console.log('N. costs');
+  {
+    const { ctx, page: p } = await newPage(browser);
+    await startNew(p);
+    let r = await p.evaluate(() => ({ e: window.CYOA.G.costs.slice(), btn: document.getElementById('cost-btn').textContent, tag: (document.querySelector('#scroll .cost-tag') || {}).textContent || '' }));
+    ok(r.e.length === 1 && r.e[0].kind === 'gm' && r.e[0].task === 'opening' && r.e[0].calls === 1 && Math.abs(r.e[0].usd - 0.0156) < 1e-9,
+      'the opening is billed from its token usage at Opus 5.5 list prices, cache reads at $0.20/M ($' + (r.e[0] && r.e[0].usd) + ')');
+    ok(r.btn === '$0.0156', 'the running total for the tale sits in the header (' + r.btn + ')');
+    ok(/^\$0\.0156 · Opus 5\.5 · 1 call$/.test(r.tag), 'a cost line sits under the passage it paid for (' + r.tag + ')');
+    await say(p, '#make us two characters');
+    r = await p.evaluate(() => ({ e: window.CYOA.G.costs[1], btn: document.getElementById('cost-btn').textContent }));
+    ok(r.e && r.e.model === 'claude-haiku-4-5' && Math.abs(r.e.usd - 0.0145) < 1e-9 && /^Turn 1 · The table: “#make us two characters”$/.test(r.e.desc),
+      'each turn is priced at the model that served it (Haiku 4.5, 5-minute cache writes at 1.25x) and says what it was for');
+    ok(r.btn === '$0.0301', 'the total follows every paid call (' + r.btn + ')');
+    await say(p, '#fail this turn');
+    r = await p.evaluate(() => ({ e: window.CYOA.G.costs[2], btn: document.getElementById('cost-btn').textContent, party: window.CYOA.G.st.party.length,
+      after: (() => { const sys = [...document.querySelectorAll('#scroll .passage.sys')].pop(); const n = sys && sys.nextElementSibling; return n && n.classList.contains('cost-tag') ? n.textContent : ''; })() }));
+    ok(r.e && r.e.failed === 'busy' && Math.abs(r.e.usd - 0.004) < 1e-9 && r.btn === '$0.0341' && r.party === 2, 'a failed turn is rolled back but its spend is still recorded');
+    ok(/\$0\.0040/.test(r.after), 'the failure message carries what the failed turn cost (' + r.after + ')');
+    await p.fill('#say', '');
+    await p.evaluate(() => { const c = document.getElementById('set-showcosts'); c.checked = false; c.dispatchEvent(new Event('change')); });
+    r = await p.evaluate(() => ({ tag: getComputedStyle(document.querySelector('#scroll .cost-tag')).display, btn: getComputedStyle(document.getElementById('cost-btn')).display, saved: window.CYOA.Settings.data.showCosts }));
+    ok(r.tag === 'none' && r.btn === 'none' && r.saved === false, 'Settings can hide the cost lines and the total while playing');
+    await p.evaluate(() => { const c = document.getElementById('set-showcosts'); c.checked = true; c.dispatchEvent(new Event('change')); });
+    r = await p.evaluate(() => { const C = window.CYOA; C.Settings.data.taskModels = { opening: '', turn: 'claude-haiku-4-5', epilogue: 'claude-sonnet-5' };
+      const out = [C.taskSettings('opening').model, C.taskSettings('player').model, C.taskSettings('epilogue').model]; C.Settings.data.taskModels = { opening: '', turn: '', epilogue: '' }; return out; });
+    ok(r.join() === 'claude-opus-5-5,claude-haiku-4-5,claude-sonnet-5', 'each Game Master task can run on its own model, defaulting to the main one (' + r.join() + ')');
+    await p.evaluate(() => document.getElementById('cost-btn').click());
+    r = await p.evaluate(() => ({ open: document.getElementById('pnl-costs').classList.contains('open'), rows: document.querySelectorAll('#costs-body .cost-row').length }));
+    ok(r.open && r.rows === 3, 'tapping the total opens this tale’s cost history (' + r.rows + ' lines)');
+    await p.evaluate(() => document.querySelector('#pnl-costs [data-close]').click());
+    await p.waitForTimeout(300);
+    await p.reload({ waitUntil: 'load' });
+    await p.waitForFunction(() => window.CYOA && window.CYOA.Settings.data);
+    await p.evaluate(() => document.getElementById('btn-load').click());
+    await p.waitForSelector('#slots .slot:not(.empty) .cost-hist');
+    r = await p.evaluate(() => document.querySelector('#slots .slot .cost-hist').textContent);
+    ok(r === '$0.0341', 'each save on the Load screen has a $ cost-history button showing its total (' + r + ')');
+    await p.evaluate(() => document.querySelector('#slots .slot .cost-hist').click());
+    r = await p.evaluate(() => ({ open: document.getElementById('pnl-costs').classList.contains('open'), load: document.getElementById('pnl-load').classList.contains('open'),
+      rows: [...document.querySelectorAll('#costs-body .cost-row')].map((x) => x.textContent), sum: document.querySelector('#costs-body .cost-sum').textContent,
+      csv: !document.querySelector('#costs-body .plaque').disabled, game: !!window.CYOA.G }));
+    ok(r.open && !r.game && r.rows.length === 3, 'it opens that save’s history without loading the game');
+    ok(/Opening of the tale/.test(r.rows[2]) && /Turn 1 · The table/.test(r.rows[1]) && /failed: busy/.test(r.rows[0]) && /\$0\.0156/.test(r.rows[2]), 'every expense is listed newest first, in USD, with what it was for');
+    ok(/\$0\.0341/.test(r.sum) && /Opus 5\.5/.test(r.sum) && /Haiku 4\.5/.test(r.sum) && r.csv, 'the summary totals by kind and by model, and the list exports as CSV');
+    r = await p.evaluate(async () => { const s = await window.CYOA.Store.get('auto'); const csv = window.CYOA.Costs.csv(s.costs).trim().split('\n'); return { n: csv.length, head: csv[0], last: csv[3] }; });
+    ok(r.n === 4 && /"usd"/.test(r.head) && /"0\.004000"/.test(r.last), 'the CSV has one row per expense with exact dollars');
+    await p.evaluate(() => { document.querySelector('#pnl-costs [data-close]').click(); document.querySelector('#slots .slot').click(); });
+    await p.waitForFunction(() => window.CYOA.G && document.getElementById('scr-tale').classList.contains('active'), null, { timeout: 8000 });
+    await idle(p);
+    r = await p.evaluate(() => ({ n: window.CYOA.G.costs.length, btn: document.getElementById('cost-btn').textContent, tags: document.querySelectorAll('#scroll .cost-tag').length }));
+    ok(r.n === 3 && r.btn === '$0.0341' && r.tags === 2, 'a loaded game keeps its ledger and redraws the cost lines under its passages');
+    ok(!p.errors.length, 'no page errors across the cost flow ' + (p.errors[0] || ''));
+    await ctx.close();
+  }
+
   /* ---------------- L. the real client, stubbed network ---------------- */
   console.log('L. Anthropic client (stubbed network)');
   {
@@ -320,8 +380,8 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
     ok(shapes.hdrBrowser === 'true' && shapes.hdrVer === '2023-06-01', 'browser-access and version headers are sent');
 
     const sse = (events) => events.map((e) => 'event: ' + e.type + '\ndata: ' + JSON.stringify(e) + '\n\n').join('');
-    const msg = (content, stop) => {
-      const ev = [{ type: 'message_start', message: { id: 'm', type: 'message', role: 'assistant', model: 'claude-opus-5-5', content: [], usage: { input_tokens: 10, cache_read_input_tokens: 5, output_tokens: 1 } } }];
+    const msg = (content, stop, model) => {
+      const ev = [{ type: 'message_start', message: { id: 'm', type: 'message', role: 'assistant', model: model || 'claude-opus-5-5', content: [], usage: { input_tokens: 10, cache_read_input_tokens: 5, output_tokens: 1 } } }];
       content.forEach((b, i) => {
         if (b.type === 'thinking') { ev.push({ type: 'content_block_start', index: i, content_block: { type: 'thinking', thinking: '' } }, { type: 'content_block_delta', index: i, delta: { type: 'signature_delta', signature: b.signature } }); }
         else if (b.type === 'text') { ev.push({ type: 'content_block_start', index: i, content_block: { type: 'text', text: '' } }); for (const piece of b.text.match(/.{1,7}/g)) ev.push({ type: 'content_block_delta', index: i, delta: { type: 'text_delta', text: piece } }); }
@@ -337,11 +397,13 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
       const req = route.request(), body = JSON.parse(req.postData() || '{}');
       bodies.push({ body, headers: req.headers() });
       if (mode === 'auth') return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }) });
+      if (mode === 'midfail') return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: sse([{ type: 'message_start', message: { id: 'm', type: 'message', role: 'assistant', model: body.model, content: [], usage: { input_tokens: 10, cache_read_input_tokens: 5, output_tokens: 1 } } },
+        { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }, { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'The door ' } }, { type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }]) });
       if (mode === 'fb' && body.fallbacks) return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'fallbacks: model not permitted' } }) });
-      const last = body.messages[body.messages.length - 1];
+      const last = body.messages[body.messages.length - 1], served = mode === 'served' ? 'claude-opus-5' : body.model;
       const isResult = Array.isArray(last.content) && last.content[0] && last.content[0].type === 'tool_result';
-      if (!isResult) return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: msg([{ type: 'thinking', signature: 'SIG-abc' }, { type: 'tool_use', id: 'tu1', name: 'create_character', input: { name: 'Ada', class: 'Wizard' } }], 'tool_use') });
-      return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: msg([{ type: 'text', text: 'Ada the wizard steps out of the rain. What do you do?' }], 'end_turn') });
+      if (!isResult) return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: msg([{ type: 'thinking', signature: 'SIG-abc' }, { type: 'tool_use', id: 'tu1', name: 'create_character', input: { name: 'Ada', class: 'Wizard' } }], 'tool_use', served) });
+      return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: msg([{ type: 'text', text: 'Ada the wizard steps out of the rain. What do you do?' }], 'end_turn', served) });
     });
     await p.evaluate(() => { window.CYOA.Settings.setKey('sk-ant-test-key', false); document.getElementById('btn-new').click(); });
     await p.waitForFunction(() => window.CYOA.G && window.CYOA.G.st.turn >= 1, null, { timeout: 8000 });
@@ -360,16 +422,41 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
       'turn request: cached world bible block, then the volatile turn context');
     ok(bodies[0] && bodies[0].headers['x-api-key'] === 'sk-ant-test-key', 'the key goes only in the x-api-key header');
     ok(r.usage.input === 20 && r.usage.cacheRead === 10, 'usage (incl. cache reads) is accounted per request');
+    r = await p.evaluate(() => window.CYOA.G.costs.slice());
+    ok(r.length === 1 && r[0].calls === 2 && r[0].model === 'claude-opus-5-5' && Math.abs(r[0].usd - 2 * (10 * 4 + 5 * 0.2 + 20 * 20) / 1e6) < 1e-12,
+      'a turn is billed per request from the streamed usage and the served model (' + (r[0] && r[0].usd) + ')');
+    await p.evaluate(() => { window.CYOA.Settings.data.taskModels = { opening: '', turn: 'claude-haiku-4-5', epilogue: '' }; });
+    bodies.length = 0;
+    await say(p, 'we look around');
+    r = await p.evaluate(() => window.CYOA.G.costs[window.CYOA.G.costs.length - 1]);
+    ok(bodies.length === 2 && bodies.every((b) => b.body.model === 'claude-haiku-4-5' && !b.body.thinking && !b.body.output_config && !b.body.fallbacks),
+      'with a turn model set, player turns go to that model (Haiku 4.5, with its own request shape)');
+    ok(r && r.model === 'claude-haiku-4-5' && Math.abs(r.usd - 2 * (10 * 1 + 5 * 0.1 + 20 * 5) / 1e6) < 1e-12, 'and are priced at that model\u2019s rates');
+    await p.evaluate(() => { window.CYOA.Settings.data.taskModels = { opening: '', turn: '', epilogue: '' }; });
 
     mode = 'fb'; bodies.length = 0;
     await say(p, 'hello');
     ok(bodies.length >= 2 && bodies[0].body.fallbacks && !bodies[1].body.fallbacks, 'a 400 about fallbacks retries once without them');
+    mode = 'served'; bodies.length = 0;
+    await say(p, 'we wait by the fire');
+    r = await p.evaluate(() => window.CYOA.G.costs[window.CYOA.G.costs.length - 1]);
+    ok(bodies.every((b) => b.body.model === 'claude-opus-5-5') && r && r.model === 'claude-opus-5' && Math.abs(r.usd - 2 * (10 * 5 + 5 * 0.5 + 20 * 25) / 1e6) < 1e-12,
+      'a reply served by a fallback model is billed at the fallback\u2019s prices, not the requested model\u2019s');
     mode = 'auth'; bodies.length = 0;
     const st0 = await p.evaluate(() => window.CYOA.stable(window.CYOA.G.st));
     await say(p, 'hello again');
     r = await p.evaluate(() => ({ sys: [...document.querySelectorAll('#scroll .passage.sys')].pop(), st: window.CYOA.stable(window.CYOA.G.st) }));
     const sysText = await p.evaluate(() => { const s = [...document.querySelectorAll('#scroll .passage.sys')].pop(); return s ? s.textContent : ''; });
     ok(/key was refused/.test(sysText) && r.st === st0, 'a 401 is explained ("key was refused"), offers Settings, and commits nothing');
+    r = await p.evaluate(() => window.CYOA.G.costs.filter((e) => e.failed === 'auth').length);
+    ok(r === 0, 'a refused request (HTTP 401) is not billed');
+    mode = 'midfail'; bodies.length = 0;
+    const n0 = await p.evaluate(() => window.CYOA.G.costs.length);
+    await say(p, 'we open the door');
+    await p.fill('#say', '');
+    r = await p.evaluate(() => ({ e: window.CYOA.G.costs[window.CYOA.G.costs.length - 1], n: window.CYOA.G.costs.length, st: window.CYOA.stable(window.CYOA.G.st) }));
+    ok(r.n === n0 + 1 && r.e.failed === 'busy' && r.e.calls === 1 && Math.abs(r.e.usd - (10 * 4 + 5 * 0.2 + 1 * 20) / 1e6) < 1e-12 && r.st === st0,
+      'a reply that dies mid-stream is still billed for what it used, and the turn rolls back');
     ok(!p.errors.length, 'no page errors with the real client ' + (p.errors[0] || ''));
     await ctx.close();
   }
@@ -384,10 +471,11 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
     const run = async (settings, keys, routes) => {
       const { ctx, page: p } = await newPage(browser, { settings: Object.assign({ textSpeed: 'normal', voiceOn: true }, settings) });
       await p.evaluate((k) => { for (const [n, v] of Object.entries(k)) window.CYOA.Settings.setKeyOf(n, v, true); }, keys);
-      const log = { speech: [], eleven: [], images: [] };
+      const log = { speech: [], eleven: [], images: [] }; let imgN = 0;
       await p.route('https://api.openai.com/v1/audio/speech', async (r) => { log.speech.push({ body: JSON.parse(r.request().postData()), h: r.request().headers() }); return routes.speech ? routes.speech(r) : r.fulfill({ status: 200, contentType: 'audio/wav', body: wav }); });
       await p.route(/https:\/\/api\.elevenlabs\.io\/v1\/text-to-speech\/.*/, async (r) => { log.eleven.push({ url: r.request().url(), body: JSON.parse(r.request().postData()), h: r.request().headers() }); return r.fulfill({ status: 200, contentType: 'audio/mpeg', body: wav }); });
-      await p.route('https://api.openai.com/v1/images/generations', async (r) => { log.images.push({ body: JSON.parse(r.request().postData()), h: r.request().headers() }); return routes.images ? routes.images(r) : r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [{ b64_json: PNG1 }] }) }); });
+      await p.route('https://api.openai.com/v1/images/generations', async (r) => { log.images.push({ body: JSON.parse(r.request().postData()), h: r.request().headers() }); return routes.images ? routes.images(r) : r.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify(imgN++ === 0 ? { data: [{ b64_json: PNG1 }] } : { data: [{ b64_json: PNG1 }], usage: { input_tokens: 100, output_tokens: 1000, input_tokens_details: { text_tokens: 100, image_tokens: 0 } } }) }); });
       return { ctx, p, log };
     };
     /* OpenAI voice */
@@ -402,6 +490,11 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
       ok(log.speech[0] && log.speech[0].h.authorization === 'Bearer sk-openai-TEST-77', 'OpenAI voice: the key goes only in the Authorization header');
       ok(/Rain falls on the village\.[\s\S]*Who is at the table\?/.test(r.text) && !r.failed, 'the narration is fully revealed alongside the decoded audio');
       ok(!r.html && !r.save, 'the OpenAI key never reaches the markup or a save');
+      const v = await p.evaluate(() => { const C = window.CYOA, e = C.G.costs.find((x) => x.kind === 'voice');
+        return e ? { e, want: C.Costs.speech('openai', 'gpt-4o-mini-tts', 'Rain falls on the village.', e.secs / 2) + C.Costs.speech('openai', 'gpt-4o-mini-tts', 'Who is at the table?', e.secs / 2),
+          tag: (document.querySelector('#scroll .cost-tag') || {}).textContent || '' } : null; });
+      ok(v && v.e.est && v.e.calls === 2 && Math.abs(v.e.secs - 0.5) < 0.01 && Math.abs(v.e.usd - v.want) < 1e-9, 'the narrator voice is one estimated ledger line per passage, growing per sentence');
+      ok(v && /voice ~\$/.test(v.tag), 'the passage\u2019s cost line includes its voice (' + (v && v.tag) + ')');
       await ctx.close();
     }
     /* OpenAI voice refused -> device voice / text, once */
@@ -419,6 +512,8 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
       const { ctx, p, log } = await run({ voiceProvider: 'elevenlabs', elevenVoice: 'VOICE123' }, { eleven: 'xi-TEST-55' }, {});
       await startNew(p);
       const e = log.eleven[0];
+      const ev = await p.evaluate(() => window.CYOA.G.costs.find((x) => x.kind === 'voice'));
+      ok(ev && ev.model === 'ElevenLabs eleven_multilingual_v2' && ev.chars > 0 && Math.abs(ev.usd - ev.chars / 1000 * 0.10) < 1e-12, 'ElevenLabs voice is estimated at $0.10 per 1,000 characters');
       ok(e && /\/v1\/text-to-speech\/VOICE123\?/.test(e.url) && e.h['xi-api-key'] === 'xi-TEST-55' && e.body.model_id === 'eleven_multilingual_v2' && typeof e.body.text === 'string', 'ElevenLabs voice: voice id in the path, key in xi-api-key, text + model in the body');
       await ctx.close();
     }
@@ -436,6 +531,9 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
       r = await p.evaluate(async () => ({ src: document.getElementById('plate').dataset.src, rec: !!(await window.CYOA.Store.artGet(window.CYOA.G.st.seed + '|L0')) }));
       ok(log.images.length === 2, 'a new place asks once; a revisited place asks again never (' + log.images.length + ' requests for 3 arrivals)');
       ok(r.rec && r.src === 'art', 'the painting is cached per place in IndexedDB and shown again on return');
+      r = await p.evaluate(() => window.CYOA.G.costs.filter((e) => e.kind === 'picture'));
+      ok(r.length === 2 && r[0].est && Math.abs(r[0].usd - 0.041) < 1e-12 && /^Scene picture: /.test(r[0].desc) && !r[1].est && Math.abs(r[1].usd - (100 * 5 + 1000 * 30) / 1e6) < 1e-12,
+        'each painting is billed once: from the reply\u2019s usage when given, else the ~$0.041 list estimate');
       await ctx.close();
     }
     {
