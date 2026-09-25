@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.anthropic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.anthropic.com https://api.openai.com https://api.elevenlabs.io; img-src 'self' data: blob:; media-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#efe3c8">
 <title>CYOA</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23efe3c8'/%3E%3Cpath d='M14 40 Q32 34 50 40 L46 44 Q32 40 18 44Z' fill='%232a1d12'/%3E%3Cpath d='M20 40 L33 6 Q36 4 36 9 L44 40Z' fill='%232a1d12'/%3E%3Cpath d='M33 18 l1.6 3.4 3.7.4-2.8 2.5.8 3.6-3.3-1.9-3.3 1.9.8-3.6-2.8-2.5 3.7-.4z' fill='%23b8892b'/%3E%3Ccircle cx='32' cy='47' r='7' fill='%23efe3c8' stroke='%232a1d12' stroke-width='2'/%3E%3Cpath d='M23 47 Q32 64 41 47 Q37 52 32 51 Q27 52 23 47Z' fill='%23fff8e8' stroke='%232a1d12' stroke-width='2'/%3E%3Ccircle cx='29' cy='46' r='1.3' fill='%232a1d12'/%3E%3Ccircle cx='35' cy='46' r='1.3' fill='%232a1d12'/%3E%3C/svg%3E">
@@ -281,7 +281,7 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 21:04 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 21:12 UTC</div>
 
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
@@ -366,6 +366,26 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
       <label class="field"><span>Text speed when silent</span>
         <select id="set-textspeed"><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option><option value="instant">Instant</option></select>
       </label>
+    </fieldset>
+    <fieldset id="fs-premium">
+      <legend>Premium voice &amp; pictures</legend>
+      <label class="field"><span>Narrator</span>
+        <select id="set-voiceprov"><option value="device">This device&#8217;s voice (free)</option><option value="openai">OpenAI voice (your key)</option><option value="elevenlabs">ElevenLabs voice (your key)</option></select>
+      </label>
+      <label class="field"><span>Scene pictures</span>
+        <select id="set-pictures"><option value="drawn">Woodcuts drawn on this device (free)</option><option value="openai">Painted by OpenAI (your key)</option></select>
+      </label>
+      <div id="need-openai" hidden>
+        <label class="field"><span>OpenAI API key</span><input id="set-openai-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-..."></label>
+        <label class="field" id="openai-voice-field"><span>OpenAI voice</span><select id="set-openai-voice"></select></label>
+        <label class="field" id="image-model-field"><span>Image model</span><input id="set-image-model" type="text" autocomplete="off" spellcheck="false"></label>
+      </div>
+      <div id="need-eleven" hidden>
+        <label class="field"><span>ElevenLabs API key</span><input id="set-eleven-key" type="password" autocomplete="off" spellcheck="false"></label>
+        <label class="field"><span>ElevenLabs voice id</span><input id="set-eleven-voice" type="text" autocomplete="off" spellcheck="false"></label>
+      </div>
+      <div class="row" id="voice-test-row" hidden style="margin-top:10px"><button id="btn-testvoice" class="plaque small" type="button">Test voice</button><div id="voice-status" class="status grow"></div></div>
+      <p class="note">These cost a little per sentence or picture on your own account. Keys stay in this browser, follow the remember setting above, and go only to their own service. If one fails, the free version takes over.</p>
     </fieldset>
     <fieldset>
       <legend>Speech input</legend>
@@ -1894,14 +1914,16 @@ const Narrator = {
       const m = this.buf.match(/[.!?…]+["'”’)\]]*(?=\s)/);
       const sEnd = m ? m.index + m[0].length : -1;
       if (para >= 0 && (sEnd < 0 || para < sEnd)) {
-        const head = this.buf.slice(0, para).trim(); if (head) this.q.push({ t: 's', text: head });
+        const head = this.buf.slice(0, para).trim(); if (head) this.enq(head);
         this.q.push({ t: 'p' }); this.buf = this.buf.slice(para).replace(/^\s*\n\s*\n\s*/, ''); continue;
       }
-      if (sEnd >= 0) { const s = this.buf.slice(0, sEnd).replace(/\s*\n\s*/g, ' ').trim(); if (s) this.q.push({ t: 's', text: s }); this.buf = this.buf.slice(sEnd).replace(/^\s+/, ''); continue; }
+      if (sEnd >= 0) { const s = this.buf.slice(0, sEnd).replace(/\s*\n\s*/g, ' ').trim(); if (s) this.enq(s); this.buf = this.buf.slice(sEnd).replace(/^\s+/, ''); continue; }
       break;
     }
-    if (final && this.buf.trim()) { this.q.push({ t: 's', text: this.buf.replace(/\s*\n\s*/g, ' ').trim() }); this.buf = ''; }
+    if (final && this.buf.trim()) { this.enq(this.buf.replace(/\s*\n\s*/g, ' ').trim()); this.buf = ''; }
   },
+  /* a sentence joins the queue; with a premium voice its audio is requested now, so it is ready by its turn */
+  enq(text) { const it = { t: 's', text }; if (!this.skip && Premium.active()) it.audio = Premium.fetch(text); this.q.push(it); },
   async pump() {
     if (this.running) return;
     this.running = true;
@@ -1911,15 +1933,16 @@ const Narrator = {
       this.ensure();
       const node = document.createTextNode(this.para.textContent ? ' ' : '');
       this.para.appendChild(node);
-      await this.say(node, it.text);
+      await this.say(node, it.text, it.audio);
     }
     this.running = false;
     if (this.ended || !this.q.length) { const w = this.waiters; this.waiters = []; w.forEach((r) => r()); }
   },
-  say(node, text) {
+  say(node, text, audio) {
     const lead = node.data;
     const show = (n) => { node.data = lead + text.slice(0, n); this.follow(); };
     if (this.skip) { show(text.length); return Promise.resolve(); }
+    if (audio && !Premium.failed) return audio.then((buf) => this.playBuf(show, text, buf), (e) => { Premium.fail(e); node.data = lead; return this.say(node, text, null); });
     const voice = Settings.data.voiceOn && Speech.available();
     if (!voice) {
       const speeds = { slow: 22, normal: 42, fast: 95, instant: 0 }, cps = Settings.data.textSpeed in speeds ? speeds[Settings.data.textSpeed] : 42;
@@ -1954,6 +1977,22 @@ const Narrator = {
         if (el2 > est * 2 + 3000) { Speech.stop(); finish(); }
       }, 60);
       try { speechSynthesis.resume(); speechSynthesis.speak(u); } catch (e) { finish(); }
+    });
+  },
+  /* a premium clip: words revealed in proportion to playback time */
+  playBuf(show, text, buf) {
+    return new Promise((res) => {
+      if (this.skip) { show(text.length); return res(); }
+      const ac = AudioSys.ac, dur = Math.max(200, buf.duration * 1000), t0 = performance.now();
+      let src = null, done = false;
+      const finish = () => { if (done) return; done = true; clearInterval(tick); if (src) { try { src.stop(); } catch (e) { /* ended */ } } show(text.length); this.speaking = false; AudioSys.duck(false); res(); };
+      if (ac && ac.state === 'running') { src = ac.createBufferSource(); src.buffer = buf; src.connect(AudioSys.voice); src.onended = finish; src.start(); this.speaking = true; AudioSys.duck(true); }
+      const tick = setInterval(() => {
+        if (this.skip) return finish();
+        const f = (performance.now() - t0) / dur;
+        show(wordEnd(text, Math.floor(Math.min(1, f) * text.length)));
+        if ((!src && f >= 1) || performance.now() - t0 > dur + 4000) finish();
+      }, 50);
     });
   },
   follow() {
@@ -2010,6 +2049,7 @@ const AudioSys = {
     this.master = ac.createGain(); this.master.connect(ac.destination);
     this.music = ac.createGain(); this.music.connect(this.master);
     this.sfx = ac.createGain(); this.sfx.connect(this.master);
+    this.voice = ac.createGain(); this.voice.gain.value = 1; this.voice.connect(this.master);
     const len = ac.sampleRate; const nb = ac.createBuffer(1, len, ac.sampleRate), d = nb.getChannelData(0);
     for (let k = 0; k < len; k++) d[k] = Math.random() * 2 - 1;
     this.noise = nb;
@@ -2552,7 +2592,7 @@ const Plates = {
     const sc = Math.max(W / src.width, H / src.height), dw = src.width * sc, dh = src.height * sc;
     g.fillStyle = PAPER; g.fillRect(0, 0, W, H);
     g.drawImage(src, (W - dw) / 2, (H - dh) * 0.62, dw, dh);
-    canvas.dataset.key = hashHex(stable(spec));
+    canvas.dataset.key = hashHex(stable(spec)); canvas.dataset.src = 'woodcut';
   },
   hash(spec) {
     const c = this.get(spec), g = c.getContext('2d'), d = g.getImageData(0, 0, c.width, c.height).data;
@@ -2622,15 +2662,130 @@ function star(g, x, y, s) {
   g.closePath(); g.fill();
 }
 
+/* ============================== PREMIUM ==============================
+   Optional paid services on the player's own keys, each with the free
+   version as its fallback: a narrator voice (OpenAI speech or ElevenLabs),
+   and painted scene pictures (OpenAI images, cached per place so a
+   revisited place shows the same painting). Nothing here is required.    */
+const OPENAI_VOICES = ['alloy', 'ash', 'ballad', 'cedar', 'coral', 'echo', 'fable', 'marin', 'nova', 'onyx', 'sage', 'shimmer', 'verse'];
+const NARRATOR_STYLE = 'You are the narrator of a tabletop fantasy adventure, reading aloud to friends around a table. Speak like a warm, weathered storyteller: unhurried, clear and expressive, with small dramatic pauses. Give quoted dialogue a light change of voice.';
+const Premium = {
+  failed: false, inflight: 0, waiting: [],
+  provider() {
+    const p = Settings.data.voiceProvider;
+    if (p === 'openai' && Settings.keyOf('openai')) return 'openai';
+    if (p === 'elevenlabs' && Settings.keyOf('eleven')) return 'elevenlabs';
+    return null;
+  },
+  active() { return !!Settings.data.voiceOn && !this.failed && !!this.provider() && !!(window.AudioContext || window.webkitAudioContext); },
+  async slot() { while (this.inflight >= 3) await new Promise((r) => this.waiting.push(r)); this.inflight++; },
+  release() { this.inflight--; const n = this.waiting.shift(); if (n) n(); },
+  async request(text) {
+    const p = this.provider(); let resp;
+    if (p === 'openai') {
+      resp = await fetch('https://api.openai.com/v1/audio/speech', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + Settings.keyOf('openai') },
+        body: JSON.stringify({ model: Settings.data.ttsModel || 'gpt-4o-mini-tts', voice: Settings.data.openaiVoice || 'cedar', input: text, instructions: NARRATOR_STYLE, response_format: 'mp3', speed: clamp(+Settings.data.rate || 1, 0.5, 2) }) });
+    } else if (p === 'elevenlabs') {
+      resp = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + encodeURIComponent(Settings.data.elevenVoice || 'JBFqnCBsd6RMkjVDRZzb') + '?output_format=mp3_44100_128', { method: 'POST',
+        headers: { 'content-type': 'application/json', 'xi-api-key': Settings.keyOf('eleven'), accept: 'audio/mpeg' },
+        body: JSON.stringify({ text, model_id: Settings.data.elevenModel || 'eleven_multilingual_v2' }) });
+    } else throw new Error('no provider');
+    if (!resp.ok) throw new Error(resp.status + ' ' + (await errText(resp)));
+    return resp.arrayBuffer();
+  },
+  fetch(text) {
+    const p = (async () => {
+      await this.slot();
+      try {
+        const ab = await this.request(text);
+        AudioSys.init(); if (!AudioSys.ac) throw new Error('no audio output');
+        return await new Promise((res, rej) => { const r = AudioSys.ac.decodeAudioData(ab, res, rej); if (r && r.catch) r.catch(rej); });
+      } finally { this.release(); }
+    })();
+    p.catch(() => {});
+    return p;
+  },
+  fail(e) {
+    if (this.failed) return; this.failed = true;
+    UI.toast('The premium voice failed (' + clip((e && e.message) || String(e), 90) + '). Using this device\u2019s voice.', 4500);
+    if (Settings.data.debug) console.warn('CYOA premium voice', e);
+  },
+};
+async function errText(resp) {
+  let m = resp.statusText || 'error';
+  try { const j = await resp.json(); const e = j.error || j.detail || j; m = (e && (e.message || e.status)) || (typeof e === 'string' ? e : JSON.stringify(e)); } catch (e) { /* not JSON */ }
+  return clip(String(m), 160);
+}
+function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('image did not load')); i.src = src; }); }
+const Art = {
+  failed: false, pending: new Set(), imgs: new Map(),
+  active() { return Settings.data.pictures === 'openai' && !!Settings.keyOf('openai') && !this.failed; },
+  keyFor(st) { return st.seed + '|' + st.here; },
+  prompt(st, loc) {
+    const land = LANDS[st.bible.land].label, facts = st.facts.filter((f) => f.subject === loc.id).slice(0, 4).map((f) => f.text).join(' ');
+    return 'An illustration for a fantasy adventure book: ' + loc.name + ', ' + loc.summary + ' (a ' + loc.kind + ') in the ' + land +
+      (st.bible.land !== 'underdark' ? ', in ' + st.bible.season : '') + '. ' +
+      (loc.scene.k === 'indoor' ? 'An interior view. ' : loc.scene.k === 'underground' ? 'Deep underground. ' : 'A wide landscape view. ') +
+      (facts ? 'Details that must be true: ' + facts + ' ' : '') +
+      'Style: a hand-carved woodcut print in black ink on warm parchment, fine cross-hatching, bold silhouettes, a single accent of gold or vermilion, like a plate from an illuminated manuscript. No people in the foreground, no text, no letters, no border, no watermark.';
+  },
+  async generate(st, loc) {
+    const resp = await fetch('https://api.openai.com/v1/images/generations', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + Settings.keyOf('openai') },
+      body: JSON.stringify({ model: Settings.data.imageModel || 'gpt-image-2', prompt: this.prompt(st, loc), size: '1536x1024', quality: 'medium', n: 1 }) });
+    if (!resp.ok) throw new Error(resp.status + ' ' + (await errText(resp)));
+    const j = await resp.json(), b64 = j && j.data && j.data[0] && j.data[0].b64_json;
+    if (!b64) throw new Error('no image in the reply');
+    const img = await loadImg('data:image/png;base64,' + b64), c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0);
+    return await new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('could not encode'))), 'image/jpeg', 0.86));
+  },
+  draw(canvas, img) {
+    const box = canvas.getBoundingClientRect(); if (box.width < 2) return;
+    const dpr = Math.min(3, window.devicePixelRatio || 1), W = Math.round(box.width * dpr), H = Math.round(box.height * dpr);
+    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+    const g = canvas.getContext('2d'), sc = Math.max(W / img.naturalWidth, H / img.naturalHeight), dw = img.naturalWidth * sc, dh = img.naturalHeight * sc;
+    g.drawImage(img, (W - dw) / 2, (H - dh) * 0.6, dw, dh);
+    canvas.dataset.src = 'art';
+  },
+  /* paint the place's picture if we have it; otherwise ask for it once, in the background */
+  async apply(canvas, st, token) {
+    if (!this.active()) return;
+    const key = this.keyFor(st), here = st.here;
+    const current = () => UI.plateToken === token;   /* the token moves on whenever the plate is redrawn for anything else */
+    if (this.imgs.has(key)) { if (current()) this.draw(canvas, this.imgs.get(key)); return; }
+    const rec = await Store.artGet(key);
+    if (rec && rec.blob) { const img = await this.fromBlob(rec.blob); if (img) { this.imgs.set(key, img); if (current()) this.draw(canvas, img); } return; }
+    if (this.pending.has(key)) return;
+    this.pending.add(key);
+    try {
+      const blob = await this.generate(st, st.locations[here]);
+      await Store.artPut({ key, blob, at: Date.now() });
+      const img = await this.fromBlob(blob);
+      if (img) { this.imgs.set(key, img); if (current()) this.draw(canvas, img); }
+    } catch (e) {
+      this.failed = true; UI.toast('The painted pictures failed (' + clip(e.message, 90) + '). Keeping the woodcuts.', 4500);
+      if (Settings.data.debug) console.warn('CYOA art', e);
+    } finally { this.pending.delete(key); }
+  },
+  async fromBlob(blob) { const url = URL.createObjectURL(blob); try { return await loadImg(url); } catch (e) { return null; } finally { setTimeout(() => URL.revokeObjectURL(url), 1000); } },
+};
+
 /* ============================== STORAGE ============================== */
 const Settings = {
   KEY: 'cyoa.settings.v1',
   defaults: { model: 'claude-opus-5-5', customModel: '', effort: 'medium', rating: 'teen', remember: true, seed: '', tone: 'random', land: 'random', threat: 'random',
-    voiceOn: true, voiceURI: '', rate: 1, textSpeed: 'normal', autoSend: false, srLang: '', musicVol: 0.5, sfxVol: 0.7, theme: 'auto', lastSeed: '', debug: false },
+    voiceOn: true, voiceURI: '', rate: 1, textSpeed: 'normal', autoSend: false, srLang: '', musicVol: 0.5, sfxVol: 0.7, theme: 'auto', lastSeed: '', debug: false,
+    voiceProvider: 'device', openaiVoice: 'cedar', ttsModel: 'gpt-4o-mini-tts', elevenVoice: 'JBFqnCBsd6RMkjVDRZzb', elevenModel: 'eleven_multilingual_v2', pictures: 'drawn', imageModel: 'gpt-image-2' },
   data: null, memKey: '',
   load() { let d = {}; try { d = JSON.parse(localStorage.getItem(this.KEY) || '{}') || {}; } catch (e) { d = {}; } this.data = Object.assign({}, this.defaults, d); },
   save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* private mode: settings last this visit */ } },
   key() { try { return localStorage.getItem('cyoa.key') || sessionStorage.getItem('cyoa.key') || this.memKey; } catch (e) { return this.memKey; } },
+  mem: {},
+  keyOf(name) { const id = 'cyoa.key.' + name; try { return localStorage.getItem(id) || sessionStorage.getItem(id) || this.mem[name] || ''; } catch (e) { return this.mem[name] || ''; } },
+  setKeyOf(name, k, remember) {
+    const id = 'cyoa.key.' + name; this.mem[name] = k || '';
+    try { localStorage.removeItem(id); sessionStorage.removeItem(id); if (k) (remember ? localStorage : sessionStorage).setItem(id, k); } catch (e) { /* memory only */ }
+  },
   setKey(k, remember) {
     this.memKey = k || '';
     try { localStorage.removeItem('cyoa.key'); sessionStorage.removeItem('cyoa.key'); if (k) (remember ? localStorage : sessionStorage).setItem('cyoa.key', k); } catch (e) { /* memory only */ }
@@ -2643,11 +2798,17 @@ const Store = {
     if (this.db || this.mode !== 'idb') return;
     try {
       this.db = await Promise.race([
-        new Promise((res, rej) => { const rq = indexedDB.open('cyoa', 1); rq.onupgradeneeded = () => rq.result.createObjectStore('saves', { keyPath: 'slot' }); rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); }),
+        new Promise((res, rej) => {
+          const rq = indexedDB.open('cyoa', 2);
+          rq.onupgradeneeded = () => { const db = rq.result; if (!db.objectStoreNames.contains('saves')) db.createObjectStore('saves', { keyPath: 'slot' }); if (!db.objectStoreNames.contains('art')) db.createObjectStore('art', { keyPath: 'key' }); };
+          rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); }),
         new Promise((_, rej) => setTimeout(() => rej(new Error('idb timeout')), 2500)) ]);
     } catch (e) { this.mode = 'ls'; this.db = null; }
   },
-  tx(mode, fn) { return new Promise((res, rej) => { const t = this.db.transaction('saves', mode), rq = fn(t.objectStore('saves')); t.oncomplete = () => res(rq ? rq.result : undefined); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); },
+  tx(mode, fn, store) { store = store || 'saves'; return new Promise((res, rej) => { const t = this.db.transaction(store, mode), rq = fn(t.objectStore(store)); t.oncomplete = () => res(rq ? rq.result : undefined); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); },
+  artMem: new Map(),
+  async artGet(key) { await this.open(); if (this.db) { try { return await this.tx('readonly', (s) => s.get(key), 'art'); } catch (e) { return null; } } return this.artMem.get(key) || null; },
+  async artPut(rec) { await this.open(); if (this.db) { try { return await this.tx('readwrite', (s) => s.put(rec), 'art'); } catch (e) { /* fall through */ } } this.artMem.set(rec.key, rec); },
   async put(save) {
     await this.open();
     if (this.db) return this.tx('readwrite', (s) => s.put(save));
@@ -2662,7 +2823,8 @@ const Store = {
   async all() { const out = {}; for (const s of SLOTS) { const v = await this.get(s); if (v) out[s] = v; } return out; },
   async clear() {
     await this.open();
-    if (this.db) await this.tx('readwrite', (s) => s.clear());
+    if (this.db) { await this.tx('readwrite', (s) => s.clear()); try { await this.tx('readwrite', (s) => s.clear(), 'art'); } catch (e) { /* no art store */ } }
+    this.artMem.clear();
     for (const s of SLOTS) { try { localStorage.removeItem('cyoa.save.' + s); } catch (e) { /* ignore */ } }
     this.mem = {};
   },
@@ -2815,13 +2977,16 @@ const UI = {
     if (plate !== false) this.drawPlate(st);
     this.renderSpeakers(st);
   },
+  plateToken: 0,
   drawPlate(st) {
-    const spec = Plates.specFor(st), key = stable(spec), cv = $('plate');
+    const spec = Plates.specFor(st), key = stable(spec) + (Art.active() ? '|art' : ''), cv = $('plate');
     if (key === this.lastPlateKey && cv.width > 2) return;
-    const first = !this.lastPlateKey; this.lastPlateKey = key;
-    if (first) { Plates.blit(cv, spec); return; }
+    const first = !this.lastPlateKey, sameArt = Art.imgs.has(Art.keyFor(st)) && Art.active(); this.lastPlateKey = key;
+    const token = ++this.plateToken;
+    const paint = () => { Plates.blit(cv, spec); if (Art.active()) Art.apply(cv, st, token); };
+    if (first || sameArt) { paint(); return; }
     cv.style.opacity = '0';
-    setTimeout(() => { Plates.blit(cv, spec); cv.style.opacity = '1'; }, 260);
+    setTimeout(() => { if (token === this.plateToken) paint(); cv.style.opacity = '1'; }, 260);
   },
   renderSpeakers(st) {
     const box = $('speakers'); box.textContent = '';
@@ -3029,7 +3194,17 @@ function fillSettings() {
   $('set-voice').checked = !!d.voiceOn; fillVoices(); $('set-rate').value = d.rate; $('set-textspeed').value = d.textSpeed;
   $('set-autosend').checked = !!d.autoSend; $('set-srlang').value = d.srLang;
   $('set-music').value = d.musicVol; $('set-sfx').value = d.sfxVol; $('set-theme').value = d.theme;
+  $('set-voiceprov').value = d.voiceProvider; $('set-pictures').value = d.pictures;
+  fillSelect($('set-openai-voice'), OPENAI_VOICES.map((v) => [v, cap(v)]), d.openaiVoice);
+  $('set-openai-key').value = Settings.keyOf('openai'); $('set-eleven-key').value = Settings.keyOf('eleven');
+  $('set-eleven-voice').value = d.elevenVoice; $('set-image-model').value = d.imageModel;
+  $('voice-status').textContent = ''; premiumFields();
   $('key-status').textContent = ''; $('key-status').className = 'status grow';
+}
+function premiumFields() {
+  const d = Settings.data, oai = d.voiceProvider === 'openai' || d.pictures === 'openai';
+  $('need-openai').hidden = !oai; $('openai-voice-field').hidden = d.voiceProvider !== 'openai'; $('image-model-field').hidden = d.pictures !== 'openai';
+  $('need-eleven').hidden = d.voiceProvider !== 'elevenlabs'; $('voice-test-row').hidden = d.voiceProvider === 'device';
 }
 function applyTheme() {
   const t = Settings.data.theme, root = document.documentElement;
@@ -3134,7 +3309,7 @@ function bind() {
   const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
   const set = (k, v) => { Settings.data[k] = v; Settings.save(); };
   on('set-key', 'change', () => { Settings.setKey($('set-key').value.trim(), $('set-remember').checked); $('key-notice').hidden = true; });
-  on('set-remember', 'change', () => { set('remember', $('set-remember').checked); Settings.setKey($('set-key').value.trim(), $('set-remember').checked); });
+  on('set-remember', 'change', () => { const r = $('set-remember').checked; set('remember', r); Settings.setKey($('set-key').value.trim(), r); Settings.setKeyOf('openai', Settings.keyOf('openai'), r); Settings.setKeyOf('eleven', Settings.keyOf('eleven'), r); });
   on('btn-testkey', 'click', async () => {
     const k = $('set-key').value.trim(), s = $('key-status');
     Settings.setKey(k, $('set-remember').checked);
@@ -3161,6 +3336,25 @@ function bind() {
   on('set-sfx', 'input', () => { set('sfxVol', +$('set-sfx').value); AudioSys.apply(); });
   on('set-sfx', 'change', () => SFX.dice());
   on('set-theme', 'change', () => { set('theme', $('set-theme').value); applyTheme(); });
+  const premiumChanged = () => { Premium.failed = false; Art.failed = false; premiumFields(); };
+  on('set-voiceprov', 'change', () => { set('voiceProvider', $('set-voiceprov').value); premiumChanged(); });
+  on('set-pictures', 'change', () => { set('pictures', $('set-pictures').value); premiumChanged(); });
+  on('set-openai-key', 'change', () => { Settings.setKeyOf('openai', $('set-openai-key').value.trim(), $('set-remember').checked); premiumChanged(); });
+  on('set-eleven-key', 'change', () => { Settings.setKeyOf('eleven', $('set-eleven-key').value.trim(), $('set-remember').checked); premiumChanged(); });
+  on('set-openai-voice', 'change', () => set('openaiVoice', $('set-openai-voice').value));
+  on('set-eleven-voice', 'change', () => { set('elevenVoice', $('set-eleven-voice').value.trim()); premiumChanged(); });
+  on('set-image-model', 'change', () => { set('imageModel', $('set-image-model').value.trim()); premiumChanged(); });
+  on('btn-testvoice', 'click', async () => {
+    const st2 = $('voice-status'); AudioSys.init(); Premium.failed = false;
+    Settings.setKeyOf('openai', $('set-openai-key').value.trim(), $('set-remember').checked); Settings.setKeyOf('eleven', $('set-eleven-key').value.trim(), $('set-remember').checked);
+    if (!Premium.provider()) { st2.textContent = 'Enter that service\u2019s key first.'; st2.className = 'status bad grow'; return; }
+    st2.textContent = 'Asking\u2026'; st2.className = 'status grow';
+    try {
+      const buf = await Premium.fetch('The tale begins by candlelight, and the rain has not stopped for three days.');
+      if (AudioSys.ac && AudioSys.ac.state === 'running') { const src = AudioSys.ac.createBufferSource(); src.buffer = buf; src.connect(AudioSys.voice); src.start(); }
+      st2.textContent = 'The narrator answers.'; st2.className = 'status ok grow';
+    } catch (e) { st2.textContent = 'Refused: ' + clip(e.message, 120); st2.className = 'status bad grow'; }
+  });
   on('btn-export-all', 'click', async () => { const all = await Store.all(); if (!Object.keys(all).length) { UI.toast('There are no saved tales yet.'); return; } download('cyoa-all-saves-' + new Date().toISOString().slice(0, 10) + '.json', { format: 'cyoa-archive', v: 1, saves: all }); });
   on('btn-delete-all', 'click', async () => { if (await UI.confirm('Delete every saved tale?', 'The autosave and all three slots will be erased. This cannot be undone.', 'Delete')) { await Store.clear(); UI.toast('All saved tales erased.'); refreshTitle(); } });
   document.addEventListener('keydown', (e) => {
@@ -3191,7 +3385,7 @@ function boot() {
   refreshTitle();
   window.CYOA = { /* test + debug hooks: read-only views and pure functions */
     generateWorld, newGame, exec, replay, stable, hashHex, bibleText, turnContext, endingOf, TOOLS, SYSTEM_PROMPT, toolDefs, Plates, Settings, Store,
-    makeSave, restore, validSave, randomSeed, get G() { return G; }, UI, Narrator, AnthropicGM, modelProfile, MODELS, TOOL_NAMES,
+    makeSave, restore, validSave, randomSeed, get G() { return G; }, UI, Narrator, AnthropicGM, modelProfile, MODELS, TOOL_NAMES, Premium, Art,
   };
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

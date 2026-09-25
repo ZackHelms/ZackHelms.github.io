@@ -24,6 +24,8 @@
  *   I. plates are deterministic; a revisited place looks the same
  *   J. model text is never HTML; the API key never reaches the DOM or a save
  *   K. tap-to-skip; the ending runs an epilogue and opens the ending screen
+ *   M. the optional premium voice (OpenAI / ElevenLabs) and painted pictures
+ *      (OpenAI images) against stubbed endpoints, and their fallbacks
  *   L. the REAL Anthropic client against a stubbed network (page.route): SSE
  *      parsing, the tool loop, thinking blocks echoed unchanged, request shape
  *      per model profile, the fallbacks-400 retry, and a 401
@@ -39,6 +41,7 @@ const PAGE = 'file://' + path.join(ROOT, 'games', 'cyoa', 'index.html');
 let bad = 0, good = 0;
 const fail = (m) => { bad++; console.log('  FAIL ' + m); };
 const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(m); };
+const clip = (t, n) => (String(t).length > n ? String(t).slice(0, n - 1) + '\u2026' : String(t));
 
 const SETTINGS = { textSpeed: 'instant', voiceOn: false, seed: 'drive-seed-1', musicVol: 0, sfxVol: 0 };
 const MOCK = `
@@ -369,6 +372,80 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
     ok(/key was refused/.test(sysText) && r.st === st0, 'a 401 is explained ("key was refused"), offers Settings, and commits nothing');
     ok(!p.errors.length, 'no page errors with the real client ' + (p.errors[0] || ''));
     await ctx.close();
+  }
+
+  /* ---------------- M. premium voice + painted pictures (stubbed network) ---------------- */
+  console.log('M. premium voice + AI pictures (stubbed network)');
+  {
+    /* a 0.25 s silent 8 kHz mono WAV: decodeAudioData accepts it, so the real decode path runs */
+    const wav = (() => { const n = 2000, b = Buffer.alloc(44 + n * 2); b.write('RIFF', 0); b.writeUInt32LE(36 + n * 2, 4); b.write('WAVE', 8); b.write('fmt ', 12); b.writeUInt32LE(16, 16);
+      b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(8000, 24); b.writeUInt32LE(16000, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(n * 2, 40); return b; })();
+    const PNG1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const run = async (settings, keys, routes) => {
+      const { ctx, page: p } = await newPage(browser, { settings: Object.assign({ textSpeed: 'normal', voiceOn: true }, settings) });
+      await p.evaluate((k) => { for (const [n, v] of Object.entries(k)) window.CYOA.Settings.setKeyOf(n, v, true); }, keys);
+      const log = { speech: [], eleven: [], images: [] };
+      await p.route('https://api.openai.com/v1/audio/speech', async (r) => { log.speech.push({ body: JSON.parse(r.request().postData()), h: r.request().headers() }); return routes.speech ? routes.speech(r) : r.fulfill({ status: 200, contentType: 'audio/wav', body: wav }); });
+      await p.route(/https:\/\/api\.elevenlabs\.io\/v1\/text-to-speech\/.*/, async (r) => { log.eleven.push({ url: r.request().url(), body: JSON.parse(r.request().postData()), h: r.request().headers() }); return r.fulfill({ status: 200, contentType: 'audio/mpeg', body: wav }); });
+      await p.route('https://api.openai.com/v1/images/generations', async (r) => { log.images.push({ body: JSON.parse(r.request().postData()), h: r.request().headers() }); return routes.images ? routes.images(r) : r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [{ b64_json: PNG1 }] }) }); });
+      return { ctx, p, log };
+    };
+    /* OpenAI voice */
+    {
+      const { ctx, p, log } = await run({ voiceProvider: 'openai', openaiVoice: 'fable' }, { openai: 'sk-openai-TEST-77' }, {});
+      await startNew(p);
+      const r = await p.evaluate(() => ({ text: (document.querySelector('#scroll .passage.gm') || {}).textContent || '', failed: window.CYOA.Premium.failed,
+        html: document.documentElement.outerHTML.includes('TEST-77'), save: JSON.stringify(window.CYOA.makeSave('auto')).includes('TEST-77') }));
+      const b = log.speech[0] && log.speech[0].body;
+      ok(log.speech.length === 2, 'OpenAI voice: one speech request per sentence, fetched ahead (' + log.speech.length + ')');
+      ok(b && b.model === 'gpt-4o-mini-tts' && b.voice === 'fable' && /storyteller/.test(b.instructions) && b.response_format === 'mp3', 'OpenAI voice: model, chosen voice, narrator instructions');
+      ok(log.speech[0] && log.speech[0].h.authorization === 'Bearer sk-openai-TEST-77', 'OpenAI voice: the key goes only in the Authorization header');
+      ok(/Rain falls on the village\.[\s\S]*Who is at the table\?/.test(r.text) && !r.failed, 'the narration is fully revealed alongside the decoded audio');
+      ok(!r.html && !r.save, 'the OpenAI key never reaches the markup or a save');
+      await ctx.close();
+    }
+    /* OpenAI voice refused -> device voice / text, once */
+    {
+      const { ctx, p, log } = await run({ voiceProvider: 'openai' }, { openai: 'sk-bad' }, { speech: (r) => r.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: { message: 'Incorrect API key provided' } }) }) });
+      await startNew(p);
+      const r = await p.evaluate(() => ({ text: (document.querySelector('#scroll .passage.gm') || {}).textContent || '', failed: window.CYOA.Premium.failed, toast: document.getElementById('toast').textContent }));
+      ok(r.failed && /premium voice failed/.test(r.toast) && /401/.test(r.toast), 'a refused premium voice says so once and falls back (' + clip(r.toast, 60) + ')');
+      ok(/Rain falls on the village\.[\s\S]*Who is at the table\?/.test(r.text), 'the narration still arrives in full after the fallback');
+      ok(log.speech.length <= 2, 'no further premium requests after the failure');
+      await ctx.close();
+    }
+    /* ElevenLabs voice */
+    {
+      const { ctx, p, log } = await run({ voiceProvider: 'elevenlabs', elevenVoice: 'VOICE123' }, { eleven: 'xi-TEST-55' }, {});
+      await startNew(p);
+      const e = log.eleven[0];
+      ok(e && /\/v1\/text-to-speech\/VOICE123\?/.test(e.url) && e.h['xi-api-key'] === 'xi-TEST-55' && e.body.model_id === 'eleven_multilingual_v2' && typeof e.body.text === 'string', 'ElevenLabs voice: voice id in the path, key in xi-api-key, text + model in the body');
+      await ctx.close();
+    }
+    /* painted pictures */
+    {
+      const { ctx, p, log } = await run({ pictures: 'openai', voiceOn: false, textSpeed: 'instant' }, { openai: 'sk-openai-ART' }, {});
+      await startNew(p);
+      await p.waitForFunction(() => document.getElementById('plate').dataset.src === 'art', null, { timeout: 5000 }).catch(() => {});
+      let r = await p.evaluate(() => ({ src: document.getElementById('plate').dataset.src, name: window.CYOA.G.st.locations.L0.name }));
+      const b = log.images[0] && log.images[0].body;
+      ok(log.images.length === 1 && b && b.model === 'gpt-image-2' && b.size === '1536x1024' && b.prompt.includes(r.name) && /woodcut/.test(b.prompt), 'AI pictures: one request for the place, its name and the house style in the prompt');
+      ok(r.src === 'art', 'the painted picture replaces the woodcut on the plate');
+      await say(p, '#go L1'); await p.waitForTimeout(600); await say(p, '#go L0');
+      await p.waitForTimeout(400);
+      r = await p.evaluate(async () => ({ src: document.getElementById('plate').dataset.src, rec: !!(await window.CYOA.Store.artGet(window.CYOA.G.st.seed + '|L0')) }));
+      ok(log.images.length === 2, 'a new place asks once; a revisited place asks again never (' + log.images.length + ' requests for 3 arrivals)');
+      ok(r.rec && r.src === 'art', 'the painting is cached per place in IndexedDB and shown again on return');
+      await ctx.close();
+    }
+    {
+      const { ctx, p } = await run({ pictures: 'openai', voiceOn: false, textSpeed: 'instant' }, { openai: 'sk-openai-ART' }, { images: (r) => r.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: { message: 'Invalid value for size' } }) }) });
+      await startNew(p);
+      await p.waitForTimeout(400);
+      const r = await p.evaluate(() => ({ src: document.getElementById('plate').dataset.src, failed: window.CYOA.Art.failed, toast: document.getElementById('toast').textContent }));
+      ok(r.failed && r.src === 'woodcut' && /painted pictures failed/.test(r.toast), 'a refused picture request keeps the woodcut and says why');
+      await ctx.close();
+    }
   }
 
   await browser.close();

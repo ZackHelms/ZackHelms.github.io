@@ -6,7 +6,7 @@ D&D where **Claude is the Game Master**: a seed generates a world, the GM narrat
 to the world goes through a **deterministic engine** that validates it, logs it, and
 feeds the recorded canon back to the GM so revisits stay consistent. CD commission,
 2026-09-25. Plan: `.claude/plans/cyoa.ai-gm-adventure.md`. Suite:
-`.claude/tests/drive-cyoa.cjs` (76 checks). Style: **Grimoire**
+`.claude/tests/drive-cyoa.cjs` (90 checks). Style: **Grimoire**
 (`.claude/styles/grimoire.md`). **Proprietary** (`games/cyoa/LICENSE`).
 
 ## CD decisions (2026-09-25 interview) — do not relitigate
@@ -15,8 +15,10 @@ feeds the recorded canon back to the GM so revisits stay consistent. CD commissi
   "remember" is on, else sessionStorage), sent only to `api.anthropic.com`. No server.
 - Default model **Claude Opus 5.5** (`claude-opus-5-5`); Settings offers Opus 5,
   Sonnet 5, Haiku 4.5 and a custom id. Default effort `medium`.
-- Scene pictures **code-drawn** (woodcut plates); AI art is a phase-2 option.
-- Narrator: **built-in speech synthesis**; premium voices are a phase-2 option.
+- Scene pictures **code-drawn** (woodcut plates) by default; **painted by OpenAI** is an
+  opt-in on the player's own OpenAI key.
+- Narrator: **built-in speech synthesis** by default; **OpenAI** or **ElevenLabs** voices
+  are opt-ins on the player's own keys.
 - Characters are **created by talking with the GM** (`create_character`,
   `suggest_character` for "surprise me").
 - Story: a **seeded main quest in three acts inside an open world**; victory or a
@@ -32,13 +34,13 @@ feeds the recorded canon back to the GM so revisits stay consistent. CD commissi
 | Hub back button + mute top-left | None; EXIT on the title; mute is the Settings volume sliders | CD request |
 | Neon Arcade style | Grimoire | CD request: "a new distinct style" |
 | Canvas 2D for everything | DOM/CSS page; Canvas 2D only for plates + frontispiece | a text game; music-mixer is the DOM precedent |
-| No network | Calls `https://api.anthropic.com/v1/messages` | the game is an LLM conversation |
+| No network | Calls `https://api.anthropic.com/v1/messages`; optionally `api.openai.com` (speech, images) and `api.elevenlabs.io` (speech). All three are the only `connect-src` hosts in the CSP | the game is an LLM conversation; the rest are opt-ins |
 | No external JS | Raw `fetch` + a hand-written SSE parser, no SDK | no bundler here; the claude-api skill's `curl/` examples are the wire reference |
 
 ## Architecture (sections in the script, in order)
 
 `UTIL / PRNG / TABLES / WORLD / ENGINE / CONTEXT / GM / NARRATION / SPEECH-IN / AUDIO /
-PLATES / STORAGE / SESSION / UI / BOOT`
+PLATES / PREMIUM / STORAGE / SESSION / UI / BOOT`
 
 - **PRNG.** `rngFor(seed, stream, n)` = a fresh sfc32 per (seed, stream, index). The
   engine keeps the indices (`st.n.roll`, `st.n.name`, `st.n.pregen`) **in state**, so a
@@ -91,6 +93,24 @@ PLATES / STORAGE / SESSION / UI / BOOT`
 - **Plates.** `Plates.specFor(st)` = `{id, k, land, season, f, fig, tod, wx}`; a place's
   `scene` (`k` + features) is fixed at creation, so a revisit looks the same in the
   same light and weather. Placement PRNG is seeded by the place id. Cached (8) at 1.25x.
+- **Premium voice** (`Premium`). When the narrator is OpenAI or ElevenLabs and that key
+  is set, `Narrator.enq()` starts each sentence's audio request **as the sentence is
+  queued** (pool of 3), so the clip is usually decoded before its turn; `playBuf()` plays
+  it through `AudioSys.voice` (WebAudio, which the NEW tap already unlocked on iOS) and
+  reveals words in proportion to playback time. Any error -> one toast, `Premium.failed`
+  for the session (reset by changing the provider or key), and the device voice / text
+  takes over mid-passage. OpenAI: `POST /v1/audio/speech`, `gpt-4o-mini-tts`, voice
+  default `cedar`, `instructions` = `NARRATOR_STYLE`. ElevenLabs: `POST
+  /v1/text-to-speech/{voice}`, `xi-api-key`, `eleven_multilingual_v2`.
+- **Painted pictures** (`Art`). `POST /v1/images/generations` (`gpt-image-2` default,
+  editable; 1536x1024, quality medium), prompt = place name, summary, kind, land,
+  season, up to 4 canon facts about the place, plus a fixed woodcut house style. The PNG
+  is re-encoded to JPEG and stored in IndexedDB store `art` keyed `seed|placeId`, and in
+  memory as a decoded image, so a place is painted **once** and a revisit shows the same
+  painting (asserted). The woodcut draws first and the painting replaces it when ready;
+  `UI.plateToken` is the only "is this still the current plate" check (checking
+  `G.st.here` was a bug: during a turn the plate is drawn from the uncommitted copy).
+  Paintings are a cache: not in saves or exports; "Delete all" clears them.
 - **Saves.** IndexedDB `cyoa/saves` (autosave + 3 slots), localStorage then memory as
   fallbacks. Save = `{format:'cyoa-save', v:1, seed, pins, bible, events, transcript,
   turn, endingAck, meta}`; load = replay. Export/import = the same JSON. Keys are never
@@ -122,11 +142,18 @@ Opus 5.5 at medium effort: roughly $0.03-0.10 per player turn with 1-3 requests 
 turn; the ~7k-token prefix is cached (cache reads $0.20/MTok). Set `debug: true` in
 `cyoa.settings.v1` to log `usage` per request and per session to the console.
 
-## Phase 2 / follow-ups (not built)
+## Unverified here (no keys in the build container)
 
-Premium narrator (OpenAI TTS / ElevenLabs, BYO key, per-passage audio cached in
-IndexedDB, reveal synced to `currentTime`); optional AI scene art (OpenAI Images, cached
-per place); an offline scripted GM for visitors without a key; an optional server proxy;
-more world tables and a bigger bestiary; an initiative tracker UI; a cost meter; an
-effort sweep after the first playtest. Each phase-2 provider needs its host added to the
-CSP `connect-src`/`img-src`/`media-src`.
+The OpenAI speech/images and ElevenLabs request shapes were checked against their docs
+on 2026-09-25 and exercised against stubs, never live. Two things are assumptions until
+the CD's first try: that ElevenLabs answers browser (CORS) requests on a plain API key
+(its docs recommend single-use tokens for client-side use), and that the default
+ElevenLabs voice id `JBFqnCBsd6RMkjVDRZzb` is still a stock voice. Either failure falls
+back to the device voice with a toast naming the error.
+
+## Follow-ups (not built)
+
+An offline scripted GM for visitors without a key; an optional server proxy; more world
+tables and a bigger bestiary; an initiative tracker UI; a cost meter; an effort sweep
+after the first playtest; caching premium audio per passage (nothing replays a passage
+yet, so it would buy nothing today).

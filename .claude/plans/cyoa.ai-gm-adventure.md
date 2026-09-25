@@ -1,6 +1,6 @@
 # cyoa - AI Game Master tabletop adventure (new game, Grimoire style)
 
-**Status:** PARTIAL - phase 1 (steps 1-9) IMPLEMENTED 2026-09-25; phase 2 (steps 10-11) not started
+**Status:** IMPLEMENTED 2026-09-25 (fb344b1..HEAD; phase 1 = steps 1-9, phase 2 = steps 10-11). Live checks with real keys pending the CD playtest.
 **Requested:** 2026-09-25.
 **Scope:** new `games/cyoa/` (single-file `index.html` + proprietary `LICENSE`),
 new style spec `.claude/styles/grimoire.md`, hub card + `GAMES[]` entry in
