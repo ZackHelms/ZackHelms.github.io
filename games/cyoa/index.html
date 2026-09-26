@@ -126,7 +126,8 @@ body.in-tale #ribbon-btn { display:block; }
   display:flex; flex-direction:column; justify-content:center; min-width:0; }
 #place-name { font-family:var(--caps); font-weight:700; font-size:17px; letter-spacing:.08em; color:var(--rubric);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-#clock { font-family:var(--caps); font-size:12px; letter-spacing:.14em; color:var(--ink-2); text-transform:uppercase; }
+#clock { font-family:var(--caps); font-size:12px; letter-spacing:.1em; color:var(--ink-2); text-transform:uppercase;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .tale-body { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
 #plate-frame { flex:0 0 auto; height:min(34vh, 300px); margin:0 12px; position:relative;
   border:2px solid var(--ink); outline:1px solid var(--ink); outline-offset:3px; background:var(--vellum-2); }
@@ -260,6 +261,37 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
 .stats > div { border:1px solid var(--ink-3); padding:4px 0; }
 .stats b { display:block; font-family:var(--caps); font-size:11px; letter-spacing:.1em; color:var(--ink-2); }
 .stats span { font-family:var(--caps); font-size:17px; }
+.stats > .stat { font:inherit; color:inherit; background:var(--vellum); border:1px solid var(--ink-3); padding:4px 0; cursor:pointer; }
+.stats > .stat:active { background:var(--vellum-3); }
+.stats > .stat div { font-size:13px; color:var(--ink-2); }
+.terms { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:8px 0; }
+.terms-l { flex:0 0 100%; font-family:var(--caps); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-2); }
+.term { font:inherit; font-size:14px; color:var(--ink); background:var(--vellum); border:1px solid var(--ink-3); border-radius:2px;
+  min-height:34px; padding:4px 9px; cursor:pointer; }
+.term:active { background:var(--vellum-3); }
+.term.trained { border-color:var(--ink); font-weight:700; }
+.term.bad { color:var(--rubric); border-color:var(--rubric); }
+#notes-list { list-style:none; margin:0 auto; padding:0; }
+#notes-list li { display:flex; align-items:flex-start; gap:8px; margin:0 auto 10px; }
+#notes-list li::before { content:'\2767'; color:var(--rubric); font-size:18px; line-height:38px; flex:0 0 auto; }
+#notes-list textarea { flex:1 1 auto; min-height:38px; resize:none; overflow:hidden; font:inherit; font-size:16px; line-height:1.4; color:var(--ink);
+  background:var(--vellum-2); border:1px solid var(--ink-3); border-radius:2px; padding:7px 9px; }
+#notes-list li.story textarea { font-style:italic; }
+#notes-list .note-del { flex:0 0 auto; width:38px; height:38px; font:inherit; font-size:18px; color:var(--rubric); background:var(--vellum);
+  border:1px solid var(--ink-3); border-radius:2px; cursor:pointer; }
+.notes-add { text-align:center; margin-top:8px; }
+#note-grab { position:fixed; z-index:84; display:none; min-height:40px; padding:6px 14px; font-family:var(--caps); font-size:14px; letter-spacing:.06em;
+  color:var(--vellum); background:var(--rubric); border:2px solid var(--ink); border-radius:2px; box-shadow:0 6px 16px var(--shadow);
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+#note-grab.on { display:block; }
+#pop-scrim { position:fixed; inset:0; z-index:86; display:none; background:rgba(27,20,13,.18); }
+#pop-scrim.open { display:block; }
+#pop { position:fixed; z-index:87; left:50%; top:50%; transform:translate(-50%,-50%); width:min(88vw, 380px); max-height:70vh; overflow-y:auto;
+  display:none; padding:14px 16px; background:var(--vellum); border:2px solid var(--ink); outline:1px solid var(--gold); outline-offset:3px;
+  box-shadow:0 12px 32px var(--shadow); }
+#pop.open { display:block; }
+#pop h4 { margin:0 0 6px; font-family:var(--caps); color:var(--rubric); letter-spacing:.06em; font-size:17px; }
+#pop p { margin:0 0 .5em; }
 .hpbar { height:10px; border:1px solid var(--ink); background:var(--vellum); margin:6px 0; }
 .hpbar i { display:block; height:100%; background:var(--verdigris); }
 .hpbar.low i { background:var(--rubric); }
@@ -295,7 +327,7 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 23:36 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-26 21:26 UTC</div>
 
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
@@ -462,17 +494,26 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
   <div class="panel-body"><div id="costs-body"></div></div>
 </section>
 
+<section id="pnl-notes" class="panel" aria-label="Notes">
+  <div class="panel-head"><h2>Notes</h2><button class="plaque small" type="button" data-close>Back</button></div>
+  <div class="panel-body"><ul id="notes-list"></ul><div class="notes-add"><button id="note-add" class="plaque small" type="button">Add a note</button></div></div>
+</section>
+
 <section id="pnl-party" class="panel" aria-label="Party">
   <div class="panel-head"><h2>The Party</h2><button class="plaque small" type="button" data-close>Back</button></div>
   <div class="panel-body"><div id="party-body"></div></div>
 </section>
 
 <div id="scrim"></div>
+<button id="note-grab" type="button" aria-label="Add the selected words to your notes">+ Note</button>
+<div id="pop-scrim"></div>
+<div id="pop" role="dialog" aria-modal="true" aria-labelledby="pop-title"><h4 id="pop-title"></h4><div id="pop-body"></div></div>
 <nav id="menu" aria-label="Game menu">
   <button class="plaque" type="button" data-act="save">Save</button>
   <button class="plaque" type="button" data-act="load">Load</button>
   <button class="plaque" type="button" data-act="chron">Chronicle</button>
   <button class="plaque" type="button" data-act="party">Party</button>
+  <button class="plaque" type="button" data-act="notes">Notes</button>
   <button class="plaque" type="button" data-act="costs">Costs</button>
   <button class="plaque" type="button" data-act="settings">Settings</button>
   <button class="plaque" type="button" data-act="title">Title</button>
@@ -956,7 +997,7 @@ function newGame(seed, pins, bible) {
   const st = {
     v: ENGINE_V, seed: b.seed, pins: b.pins, bible: b,
     party: [], locations: {}, npcs: {}, foes: {}, quests: {}, facts: [],
-    time: { day: 1, minute: b.startMinute }, here: 'L0', scene: { figures: [], mood: '' },
+    time: { day: 1, minute: b.startMinute }, here: 'L0', scene: { figures: [], mood: '', topic: 0, moment: null },
     combat: null, gold: 0, summaries: [], turn: 0,
     n: { roll: 0, name: 0, pregen: 0, L: b.locations.length, N: b.npcs.length, C: 0, F: 0, Q: 1, f: 0 },
   };
@@ -1031,6 +1072,11 @@ function weatherOf(st) {
   let table = land.weather.slice();
   if (st.bible.season === 'winter' && st.bible.land !== 'desert') table = table.concat([['snow', 3]]);
   return weighted(rngFor(st.seed, 'weather', st.time.day), table);
+}
+/* the header's short form (the engine's clockText, which tool results carry, must not change) */
+function hudClock(st, outdoor) {
+  const m = st.time.minute, t = timeOfDay(m);
+  return 'Day ' + st.time.day + ' \u00b7 ' + String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0') + (t === 'day' ? '' : ' ' + t) + (outdoor ? ' \u00b7 ' + weatherOf(st) : '');
 }
 function clockText(st) {
   const m = st.time.minute, hh = String(Math.floor(m / 60)).padStart(2, '0'), mm = String(m % 60).padStart(2, '0');
@@ -1141,7 +1187,7 @@ const TOOLS = {
       st.here = to.id; to.visited = true;
       const people = npcsAt(st, to.id);
       for (const n of people) n.met = true;
-      st.scene = { figures: people.length >= 3 ? ['crowd'] : people.length ? ['humanoid'] : [], mood: '' };
+      st.scene = { figures: people.length >= 3 ? ['crowd'] : people.length ? ['humanoid'] : [], mood: '', topic: st.scene.topic || 0, moment: st.scene.moment || null };
       return ok({ arrived: locBrief(st, to), firstVisit: first, travelHours: hours, time: clockText(st), weather: weatherOf(st),
         people: people.map((n) => ({ id: n.id, name: n.name, role: n.role, disposition: n.disposition })),
         canon: st.facts.filter((f) => f.subject === to.id).map((f) => f.text) });
@@ -1498,7 +1544,9 @@ const TOOLS = {
     schema: obj({ figures: S.arr(S.enm(FIGURES, 'figure'), 'Up to 3 kinds of figure in view'), mood: S.str('A few words') }, []),
     run(st, i) {
       const f = Array.isArray(i.figures) ? [...new Set(i.figures.filter((x) => FIGURES.includes(x)))].slice(0, 3) : st.scene.figures;
-      st.scene = { figures: f, mood: str(i.mood, 60) || st.scene.mood };
+      const mood = str(i.mood, 60) || st.scene.mood;
+      if (stable(f) !== stable(st.scene.figures) || mood !== st.scene.mood) st.scene.topic = (st.scene.topic || 0) + 1;
+      st.scene.figures = f; st.scene.mood = mood;
       return ok({ figures: st.scene.figures, mood: st.scene.mood });
     } },
   lookup: {
@@ -1532,6 +1580,32 @@ function nameOf(st, id) {
   const x = st.locations[id] || st.npcs[id] || pcById(st, id) || st.foes[id] || st.quests[id];
   return x ? (x.name || x.title) : id;
 }
+/* What the scene picture shows after each accepted call. exec records it, so a replay of the
+   log draws the same pictures. A turn keeps its most dramatic moment (a fight outranks a check
+   outranks a new face); a topic - one painting's worth - turns over when a scene ends, a fight
+   starts or ends, the party moves on or the Game Master changes who is in view. */
+const MOMENT_PRI = { arrive: 1, rest: 2, person: 3, item: 4, quest: 5, check: 6, magic: 7, fallen: 8, battle: 9 };
+function momentOf(name, i, r) {
+  switch (name) {
+    case 'move_party': return ['arrive', ''];
+    case 'rest': return ['rest', i.kind];
+    case 'create_npc': case 'update_npc': return ['person', r.id];
+    case 'inventory': return i.op === 'give' ? ['item', r.item] : i.op === 'gold' && r.change > 0 ? ['item', 'gold'] : null;
+    case 'update_quest': return ['quest', r.status];
+    case 'roll_check': return ['check', r.check];
+    case 'use_ability': return ['magic', r.ability + (r.healed != null ? '|heal' : r.damage != null ? '|harm' : '')];
+    case 'death_save': return ['fallen', ''];
+    case 'start_combat': case 'attack': return ['battle', ''];
+    default: return null;
+  }
+}
+function noteScene(st, name, input, res) {
+  if (name === 'end_scene' || name === 'start_combat' || name === 'end_combat') st.scene.topic = (st.scene.topic || 0) + 1;
+  const m = momentOf(name, input, res || {}); if (!m) return;
+  const cur = st.scene.moment;
+  if (cur && cur.turn === st.turn && MOMENT_PRI[cur.k] > MOMENT_PRI[m[0]]) return;
+  st.scene.moment = { k: m[0], sub: String(m[1] || '').toLowerCase().slice(0, 60), turn: st.turn };
+}
 /* exec: the only door into the state. Snapshot-and-restore guards against a
    throw half way through a tool leaving the state partly mutated. */
 function exec(st, name, input) {
@@ -1539,7 +1613,7 @@ function exec(st, name, input) {
   if (!t) return err('Unknown tool "' + name + '".');
   if (!input || typeof input !== 'object' || Array.isArray(input)) input = {};
   const snap = JSON.stringify(st);
-  try { return t.run(st, input); }
+  try { const r = t.run(st, input); if (r.ok && !t.ro) noteScene(st, name, input, r.result); return r; }
   catch (e) { const back = JSON.parse(snap); for (const k of Object.keys(st)) delete st[k]; Object.assign(st, back); return err('Engine error: ' + e.message); }
 }
 function replay(seed, pins, bible, events, finalTurn) {
@@ -1704,7 +1778,7 @@ const SYSTEM_PROMPT = [
   '- When you invent a lasting detail - a name, what is in a room, a clue, a price, a promise, what an NPC revealed, what lies behind a door - record it with record_fact in the same turn, one concise fact per call, so it stays true later.',
   '- Places: move the party only along known exits with move_party. To reach somewhere new, create_location connected to where they are, then move_party there. Check the bible and turn context first so you never duplicate a place that exists.',
   '- People: before introducing someone, check whether an existing person fits. New named people go through create_npc; leave the name empty to let the engine name them in the region’s style.',
-  '- Travel time passes automatically. Use advance_time for other long activities and rest for short or long rests.',
+  '- Time passes on its own: move_party times travel, and the engine moves the clock on a few minutes after every exchange (longer after searches and other checks, a minute per round in a fight). Use advance_time only when an activity takes longer than that (searching a library all afternoon, waiting for nightfall), and rest for short or long rests.',
   '- Keep the scene picture current with set_scene when who is in view or the mood changes noticeably.',
   '- When a scene ends - the party leaves a place, or a conversation or fight concludes - call end_scene with a two- or three-sentence summary of what happened and what changed. These summaries are your long memory.',
   '',
@@ -2582,7 +2656,89 @@ function drawWeather(g, s, r, accent) {
   }
 }
 const FRONT_LAYER = new Set(['mountain', 'sea', 'lake', 'river', 'forest', 'moon']);
+/* ---- the moment inset: a woodcut roundel in the corner showing what the last reply was about.
+   Drawn on the visible canvas at blit time (so it sits in the corner whatever the crop), in a
+   unit space of radius 100. Pure function of the spec's moment kind and subject. ---- */
+function momentIcon(s) {
+  const t = s.ms || '';
+  switch (s.m) {
+    case 'item': return /key/.test(t) ? 'key' : /gold|coin|silver|copper|purse/.test(t) ? 'coins' : /scroll|letter|map|note|paper|parchment|deed|writ/.test(t) ? 'scroll'
+      : /potion|vial|flask|elixir|draught|tonic/.test(t) ? 'potion' : /sword|blade|dagger|axe|mace|spear|bow|knife|hammer|weapon/.test(t) ? 'sword'
+      : /book|tome|journal|diary|ledger/.test(t) ? 'book' : /gem|jewel|ring|amulet|necklace|crown|pearl|ruby|emerald|diamond|sapphire/.test(t) ? 'gem'
+      : /lantern|torch|lamp|candle/.test(t) ? 'lantern' : 'chest';
+    case 'check': return / save$/.test(t) ? 'ward' : /perception|insight|wisdom/.test(t) ? 'eye' : /investigation/.test(t) ? 'glass' : /stealth|deception|sleight/.test(t) ? 'hood'
+      : /survival|nature|animal/.test(t) ? 'tracks' : /athletics|acrobatics|strength|dexterity|constitution/.test(t) ? 'climb' : /arcana|history|religion|intelligence/.test(t) ? 'rune'
+      : /persuasion|intimidation|performance|charisma/.test(t) ? 'speech' : /medicine/.test(t) ? 'medic' : 'eye';
+    case 'magic': return /\|heal/.test(t) ? 'heal' : /\|harm/.test(t) ? 'bolt' : 'burst';
+    case 'person': return 'person';
+    case 'quest': return 'seal';
+    case 'rest': return 'camp';
+    case 'battle': return 'swords';
+    case 'fallen': return 'skull';
+  }
+  return null;
+}
+function lineI(g, pts, lw, col) { g.beginPath(); g.moveTo(pts[0], pts[1]); for (let k = 2; k < pts.length; k += 2) g.lineTo(pts[k], pts[k + 1]); g.strokeStyle = col || INK; g.lineWidth = lw; g.lineCap = 'round'; g.lineJoin = 'round'; g.stroke(); }
+function blade(g, x0, y0, x1, y1) {
+  lineI(g, [x0, y0, x1, y1], 15); lineI(g, [x0, y0, x1, y1], 7, PAPER2);
+  const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy), nx = -dy / l, ny = dx / l, gx = x0 + dx * 0.18, gy = y0 + dy * 0.18;
+  lineI(g, [gx - nx * 26, gy - ny * 26, gx + nx * 26, gy + ny * 26], 9); g.beginPath(); g.arc(x0 - dx * 0.06, y0 - dy * 0.06, 8, 0, 7); inkPath(g, GOLD, 3);
+}
+const ICON = {
+  key(g) { g.beginPath(); g.arc(-34, -6, 22, 0, 7); g.strokeStyle = INK; g.lineWidth = 11; g.stroke(); lineI(g, [-12, -6, 58, -6], 11); lineI(g, [40, -6, 40, 16], 10); lineI(g, [54, -6, 54, 10], 10); },
+  coins(g) { for (let k = 0; k < 4; k++) { g.beginPath(); g.ellipse(-22, 42 - k * 13, 34, 11, 0, 0, 7); inkPath(g, GOLD, 4); } g.beginPath(); g.arc(26, 0, 30, 0, 7); inkPath(g, GOLD, 4); g.fillStyle = INK; star(g, 26, 0, 14); },
+  scroll(g) { g.beginPath(); g.rect(-42, -40, 84, 76); inkPath(g, PAPER2, 5); for (const x of [-46, 46]) { g.beginPath(); g.ellipse(x, -2, 9, 42, 0, 0, 7); inkPath(g, PAPER, 4); } for (let k = 0; k < 4; k++) lineI(g, [-28, -22 + k * 13, 24 - (k % 2) * 14, -22 + k * 13], 3); g.beginPath(); g.arc(24, 26, 13, 0, 7); inkPath(g, VERM, 3); },
+  potion(g) { g.beginPath(); g.rect(-11, -64, 22, 30); inkPath(g, PAPER2, 4); g.beginPath(); g.rect(-15, -74, 30, 12); inkPath(g, INK, 3); g.save(); g.beginPath(); g.arc(0, 14, 44, 0, 7); g.clip(); g.fillStyle = PAPER; g.fillRect(-50, -40, 100, 100); g.fillStyle = VERM; g.fillRect(-50, 8, 100, 60); g.restore(); g.beginPath(); g.arc(0, 14, 44, 0, 7); g.strokeStyle = INK; g.lineWidth = 5; g.stroke(); g.fillStyle = PAPER; g.beginPath(); g.arc(-16, -4, 7, 0, 7); g.fill(); },
+  sword(g) { blade(g, -48, 52, 50, -50); },
+  book(g) { g.beginPath(); g.moveTo(-50, -34); g.lineTo(38, -46); g.lineTo(50, 36); g.lineTo(-38, 48); g.closePath(); inkPath(g, INK, 4); lineI(g, [-38, 48, -30, 54, 58, 42, 50, 36], 4); g.beginPath(); g.rect(-4, -10, 18, 14); inkPath(g, GOLD, 3); },
+  gem(g) { g.beginPath(); g.moveTo(-46, -14); g.lineTo(-24, -40); g.lineTo(24, -40); g.lineTo(46, -14); g.lineTo(0, 50); g.closePath(); inkPath(g, VERM, 5); lineI(g, [-46, -14, 46, -14], 3); lineI(g, [-24, -40, -12, -14, 0, 50, 12, -14, 24, -40], 3); g.fillStyle = PAPER; g.beginPath(); g.arc(-20, -26, 5, 0, 7); g.fill(); },
+  chest(g) { g.beginPath(); g.rect(-56, -6, 112, 56); inkPath(g, PAPER2, 5); g.beginPath(); g.moveTo(-56, -6); g.quadraticCurveTo(0, -60, 56, -6); g.closePath(); inkPath(g, PAPER2, 5); for (const x of [-34, 34]) lineI(g, [x, -30, x, 50], 7); g.beginPath(); g.rect(-9, -8, 18, 22); inkPath(g, GOLD, 3); },
+  lantern(g) { g.beginPath(); g.arc(0, -58, 12, Math.PI, 0); g.strokeStyle = INK; g.lineWidth = 5; g.stroke(); g.beginPath(); g.rect(-30, -44, 60, 88); inkPath(g, PAPER, 5); lineI(g, [-30, -44, 30, -44], 9); lineI(g, [-34, 44, 34, 44], 9); flame(g, 0, 26, 28, VERM); },
+  eye(g) { g.beginPath(); g.moveTo(-64, 0); g.quadraticCurveTo(0, -52, 64, 0); g.quadraticCurveTo(0, 52, -64, 0); inkPath(g, PAPER, 6); g.beginPath(); g.arc(0, 0, 22, 0, 7); inkPath(g, GOLD, 4); g.fillStyle = INK; g.beginPath(); g.arc(0, 0, 10, 0, 7); g.fill(); g.fillStyle = PAPER; g.beginPath(); g.arc(-6, -6, 4, 0, 7); g.fill(); },
+  glass(g) { g.beginPath(); g.arc(-14, -14, 34, 0, 7); inkPath(g, PAPER2, 10); lineI(g, [12, 12, 56, 56], 16); g.fillStyle = PAPER; g.beginPath(); g.arc(-26, -26, 8, 0, 7); g.fill(); },
+  hood(g) { g.beginPath(); g.moveTo(-54, 64); g.quadraticCurveTo(-56, -10, -10, -58); g.quadraticCurveTo(30, -66, 48, -20); g.quadraticCurveTo(58, 20, 54, 64); g.closePath(); inkPath(g, INK, 4); g.fillStyle = PAPER; g.beginPath(); g.ellipse(-14, 2, 7, 4, 0, 0, 7); g.ellipse(14, 2, 7, 4, 0, 0, 7); g.fill(); },
+  tracks(g) { for (const [x, y, a] of [[-30, 40, -0.3], [8, 6, 0.2], [-10, -34, -0.3], [28, -62, 0.2]]) { g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = INK; g.beginPath(); g.ellipse(0, 0, 11, 17, 0, 0, 7); g.fill(); for (const tx of [-9, -3, 3, 9]) { g.beginPath(); g.arc(tx, -22, 4, 0, 7); g.fill(); } g.restore(); } },
+  climb(g) { g.beginPath(); g.moveTo(-66, 52); g.lineTo(-10, -50); g.lineTo(18, -10); g.lineTo(34, -30); g.lineTo(70, 52); g.closePath(); inkPath(g, PAPER2, 5); hatch(g, (c) => { c.moveTo(-10, -50); c.lineTo(18, -10); c.lineTo(10, 52); c.lineTo(-66, 52); c.closePath(); }, 0.9, 7, 2, INK, 0.7); lineI(g, [-10, -50, -18, -10, -6, 20, -22, 52], 4, VERM); },
+  rune(g) { g.beginPath(); g.arc(0, 0, 56, 0, 7); g.strokeStyle = GOLD; g.lineWidth = 6; g.stroke(); g.beginPath(); g.arc(0, 0, 44, 0, 7); g.strokeStyle = INK; g.lineWidth = 3; g.stroke(); g.fillStyle = INK; star(g, 0, 0, 36); for (let k = 0; k < 8; k++) { const a = (k * Math.PI) / 4; lineI(g, [Math.cos(a) * 46, Math.sin(a) * 46, Math.cos(a) * 54, Math.sin(a) * 54], 4); } },
+  speech(g) { g.beginPath(); g.moveTo(-60, -30); g.quadraticCurveTo(0, -52, 60, -30); g.lineTo(60, 18); g.quadraticCurveTo(0, -4, -20, 22); g.lineTo(-44, 50); g.lineTo(-40, 18); g.quadraticCurveTo(-52, 16, -60, 18); g.closePath(); inkPath(g, PAPER2, 5); for (let k = 0; k < 2; k++) lineI(g, [-40, -18 + k * 16, 40, -22 + k * 16], 3); },
+  medic(g) { g.beginPath(); g.rect(-16, -54, 32, 108); g.rect(-54, -16, 108, 32); inkPath(g, VERM, 5); g.fillStyle = VERM; g.fillRect(-13, -13, 26, 26); },
+  ward(g) { g.beginPath(); g.moveTo(-48, -48); g.lineTo(48, -48); g.lineTo(46, 4); g.quadraticCurveTo(40, 44, 0, 62); g.quadraticCurveTo(-40, 44, -46, 4); g.closePath(); inkPath(g, PAPER2, 6); g.save(); g.clip(); lineI(g, [-60, -60, 60, 60], 22, VERM); g.restore(); g.beginPath(); g.moveTo(-48, -48); g.lineTo(48, -48); g.lineTo(46, 4); g.quadraticCurveTo(40, 44, 0, 62); g.quadraticCurveTo(-40, 44, -46, 4); g.closePath(); g.strokeStyle = INK; g.lineWidth = 6; g.stroke(); },
+  heal(g) { for (let k = 0; k < 12; k++) { const a = (k * Math.PI) / 6; lineI(g, [Math.cos(a) * 34, Math.sin(a) * 34, Math.cos(a) * (k % 2 ? 50 : 62), Math.sin(a) * (k % 2 ? 50 : 62)], 5, k % 2 ? INK : GOLD); } g.beginPath(); g.arc(0, 0, 26, 0, 7); inkPath(g, GOLD, 4); },
+  bolt(g) { g.beginPath(); g.moveTo(10, -66); g.lineTo(-30, 6); g.lineTo(0, 6); g.lineTo(-14, 66); g.lineTo(34, -12); g.lineTo(4, -12); g.lineTo(22, -66); g.closePath(); inkPath(g, VERM, 5); },
+  burst(g) { g.fillStyle = GOLD; star(g, 0, 0, 62); g.strokeStyle = INK; g.lineWidth = 4; g.stroke(); g.fillStyle = PAPER; star(g, 0, 0, 22); },
+  person(g, s) {
+    const v = cyrb128(s.ms || 'x')[0] % 4;
+    g.fillStyle = INK; g.beginPath(); g.moveTo(-58, 80); g.quadraticCurveTo(-54, 20, 0, 14); g.quadraticCurveTo(54, 20, 58, 80); g.closePath(); g.fill();
+    g.beginPath(); g.arc(0, -16, 28, 0, 7); g.fill();
+    if (v === 0) { g.beginPath(); g.moveTo(-36, 4); g.quadraticCurveTo(-40, -44, 0, -60); g.quadraticCurveTo(40, -44, 36, 4); g.quadraticCurveTo(0, -24, -36, 4); g.fill(); }
+    else if (v === 1) { g.beginPath(); g.ellipse(0, -40, 46, 9, 0, 0, 7); g.fill(); g.beginPath(); g.rect(-24, -72, 48, 32); g.fill(); lineI(g, [-24, -46, 24, -46], 4, VERM); }
+    else if (v === 2) { g.beginPath(); g.moveTo(-26, -38); g.lineTo(-26, -64); g.lineTo(-13, -50); g.lineTo(0, -68); g.lineTo(13, -50); g.lineTo(26, -64); g.lineTo(26, -38); g.closePath(); inkPath(g, GOLD, 3); }
+    else { g.beginPath(); g.moveTo(-20, -6); g.quadraticCurveTo(0, 40, 20, -6); g.closePath(); g.fillStyle = PAPER2; g.fill(); g.strokeStyle = INK; g.lineWidth = 3; g.stroke(); }
+  },
+  seal(g) { ICON.scroll(g); lineI(g, [18, 34, 10, 62], 7, VERM); lineI(g, [30, 34, 38, 62], 7, VERM); g.beginPath(); g.arc(24, 26, 18, 0, 7); inkPath(g, VERM, 3); g.fillStyle = PAPER; star(g, 24, 26, 8); },
+  camp(g) { g.beginPath(); g.arc(28, -34, 22, 0, 7); g.fillStyle = GOLD; g.fill(); g.beginPath(); g.arc(38, -40, 20, 0, 7); g.fillStyle = PAPER; g.fill(); lineI(g, [-46, 52, 38, 30], 10); lineI(g, [-38, 30, 46, 52], 10); flame(g, 0, 40, 40, VERM); },
+  swords(g) { blade(g, -52, 54, 48, -52); blade(g, 52, 54, -48, -52); },
+  skull(g) { g.beginPath(); g.arc(0, -10, 42, Math.PI * 0.85, Math.PI * 2.15); g.lineTo(22, 40); g.lineTo(-22, 40); g.closePath(); inkPath(g, PAPER2, 5); g.fillStyle = INK; g.beginPath(); g.ellipse(-16, -4, 11, 13, 0, 0, 7); g.ellipse(16, -4, 11, 13, 0, 0, 7); g.fill(); g.beginPath(); g.moveTo(0, 12); g.lineTo(-6, 24); g.lineTo(6, 24); g.closePath(); g.fill(); for (const x of [-12, -4, 4, 12]) lineI(g, [x, 32, x, 42], 3); },
+};
+function drawMoment(g, s, W, H) {
+  const icon = momentIcon(s); if (!icon || !ICON[icon]) return;
+  const R = Math.round(Math.min(W, H) * 0.2), pad = Math.round(R * 0.22), cx = W - R - pad, cy = R + pad;
+  g.save(); g.translate(cx, cy); g.scale(R / 100, R / 100);
+  g.shadowColor = 'rgba(42,29,18,.35)'; g.shadowBlur = 12; g.beginPath(); g.arc(0, 0, 100, 0, 7); g.fillStyle = PAPER; g.fill(); g.shadowColor = 'transparent'; g.shadowBlur = 0;
+  g.strokeStyle = INK; g.lineWidth = 7; g.stroke(); g.beginPath(); g.arc(0, 0, 88, 0, 7); g.strokeStyle = GOLD; g.lineWidth = 3; g.stroke();
+  g.beginPath(); g.arc(0, 0, 84, 0, 7); g.clip();
+  ICON[icon](g, s);
+  g.restore();
+}
+/* framings: [zoom, focus x, focus y] - the same place seen from a new angle after every reply */
+const VIEWS = [[1, 0.5, 0.6], [1.25, 0.26, 0.62], [1.25, 0.74, 0.62], [1.18, 0.5, 0.95], [1.2, 0.5, 0.3]];
 function drawPlate(g, s) {
+  const vw = VIEWS[s.v || 0] || VIEWS[0];
+  g.save(); g.translate(PW * vw[1] * (1 - vw[0]), PH * vw[2] * (1 - vw[0])); g.scale(vw[0], vw[0]);
+  drawScene(g, s);
+  g.restore();
+}
+function drawScene(g, s) {
   const r = prngFromString('plate|' + s.id + '|' + s.k + '|' + s.f.join(','));
   const fire = s.f.includes('campfire') || s.f.includes('hearth') || s.f.includes('altar');
   const accent = fire || s.tod === 'dusk' ? VERM : GOLD;
@@ -2611,8 +2767,11 @@ const Plates = {
   cache: new Map(),
   specFor(st) {
     const l = st.locations[st.here];
+    /* the moment of the turn just told, if any; the view turns with every reply */
+    const m = st.scene.moment, fresh = m && m.turn === st.turn - 1 ? m : null, mk = fresh ? fresh.k : '';
     return { id: l.id, k: l.scene.k, land: st.bible.land, season: st.bible.season, f: l.scene.f.slice(), fig: (st.scene.figures || []).slice(),
-      tod: timeOfDay(st.time.minute), wx: l.scene.k === 'outdoor' ? weatherOf(st) : 'none' };
+      tod: timeOfDay(st.time.minute), wx: l.scene.k === 'outdoor' ? weatherOf(st) : 'none',
+      v: mk === 'arrive' ? 0 : mk === 'battle' ? 3 : st.turn % VIEWS.length, m: mk === 'arrive' ? '' : mk, ms: fresh ? fresh.sub : '' };
   },
   get(spec) {
     const key = stable(spec);
@@ -2633,7 +2792,8 @@ const Plates = {
     const sc = Math.max(W / src.width, H / src.height), dw = src.width * sc, dh = src.height * sc;
     g.fillStyle = PAPER; g.fillRect(0, 0, W, H);
     g.drawImage(src, (W - dw) / 2, (H - dh) * 0.62, dw, dh);
-    canvas.dataset.key = hashHex(stable(spec)); canvas.dataset.src = 'woodcut';
+    if (spec.m) drawMoment(g, spec, W, H);
+    canvas.dataset.key = hashHex(stable(spec)); canvas.dataset.src = 'woodcut'; canvas.dataset.moment = spec.m || '';
   },
   hash(spec) {
     const c = this.get(spec), g = c.getContext('2d'), d = g.getImageData(0, 0, c.width, c.height).data;
@@ -2901,14 +3061,22 @@ function loadImg(src) { return new Promise((res, rej) => { const i = new Image()
 const Art = {
   failed: false, pending: new Set(), imgs: new Map(),
   active() { return Settings.data.pictures === 'openai' && !!Settings.keyOf('openai') && !this.failed; },
-  keyFor(st) { return st.seed + '|' + st.here; },
+  /* one painting per topic: the place, and the scene within it (see noteScene) */
+  keyFor(st) { return st.seed + '|' + st.here + '|' + (st.scene.topic || 0); },
+  moment(st) {
+    const m = st.scene.moment, figs = { humanoid: 'a lone figure', beast: 'a beast', dragon: 'a dragon', spirit: 'a ghostly spirit', crowd: 'a crowd of people' };
+    const f = (st.scene.figures || []).map((x) => figs[x]).filter(Boolean), n = m && m.k === 'person' ? st.npcs[String(m.sub).toUpperCase()] : null;
+    const what = !m ? '' : m.k === 'battle' ? 'a fight breaking out' : m.k === 'rest' ? 'travellers resting by a fire' : m.k === 'fallen' ? 'a hero fallen in battle'
+      : n ? 'a meeting with ' + n.name + ', ' + n.role : m.k === 'item' ? 'the discovery of ' + m.sub : m.k === 'magic' ? 'a spell being cast' : '';
+    return [what, f.length ? 'In view: ' + f.join(', ') : '', st.scene.mood ? 'Mood: ' + st.scene.mood : ''].filter(Boolean).join('. ');
+  },
   prompt(st, loc) {
     const land = LANDS[st.bible.land].label, facts = st.facts.filter((f) => f.subject === loc.id).slice(0, 4).map((f) => f.text).join(' ');
     return 'An illustration for a fantasy adventure book: ' + loc.name + ', ' + loc.summary + ' (a ' + loc.kind + ') in the ' + land +
       (st.bible.land !== 'underdark' ? ', in ' + st.bible.season : '') + '. ' +
       (loc.scene.k === 'indoor' ? 'An interior view. ' : loc.scene.k === 'underground' ? 'Deep underground. ' : 'A wide landscape view. ') +
-      (facts ? 'Details that must be true: ' + facts + ' ' : '') +
-      'Style: a hand-carved woodcut print in black ink on warm parchment, fine cross-hatching, bold silhouettes, a single accent of gold or vermilion, like a plate from an illuminated manuscript. No people in the foreground, no text, no letters, no border, no watermark.';
+      (facts ? 'Details that must be true: ' + facts + ' ' : '') + (this.moment(st) ? 'The moment: ' + this.moment(st) + '. ' : '') +
+      'Style: a hand-carved woodcut print in black ink on warm parchment, fine cross-hatching, bold silhouettes, a single accent of gold or vermilion, like a plate from an illuminated manuscript. Figures small and seen from a distance, no text, no letters, no border, no watermark.';
   },
   async generate(st, loc) {
     const resp = await fetch('https://api.openai.com/v1/images/generations', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + Settings.keyOf('openai') },
@@ -2922,29 +3090,32 @@ const Art = {
     c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0);
     return await new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('could not encode'))), 'image/jpeg', 0.86));
   },
-  draw(canvas, img) {
+  draw(canvas, img, spec) {
     const box = canvas.getBoundingClientRect(); if (box.width < 2) return;
     const dpr = Math.min(3, window.devicePixelRatio || 1), W = Math.round(box.width * dpr), H = Math.round(box.height * dpr);
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
     const g = canvas.getContext('2d'), sc = Math.max(W / img.naturalWidth, H / img.naturalHeight), dw = img.naturalWidth * sc, dh = img.naturalHeight * sc;
     g.drawImage(img, (W - dw) / 2, (H - dh) * 0.6, dw, dh);
+    if (spec && spec.m) drawMoment(g, spec, W, H);
     canvas.dataset.src = 'art';
   },
   /* paint the place's picture if we have it; otherwise ask for it once, in the background */
   async apply(canvas, st, token) {
     if (!this.active()) return;
-    const key = this.keyFor(st), here = st.here;
+    const key = this.keyFor(st), here = st.here, spec = Plates.specFor(st);
+    /* ask only for a finished reply's state: never the blank page before the opening, never a mid-turn copy */
+    const committed = G && st === G.st && st.turn > 0;
     const current = () => UI.plateToken === token;   /* the token moves on whenever the plate is redrawn for anything else */
-    if (this.imgs.has(key)) { if (current()) this.draw(canvas, this.imgs.get(key)); return; }
+    if (this.imgs.has(key)) { if (current()) this.draw(canvas, this.imgs.get(key), spec); return; }
     const rec = await Store.artGet(key);
-    if (rec && rec.blob) { const img = await this.fromBlob(rec.blob); if (img) { this.imgs.set(key, img); if (current()) this.draw(canvas, img); } return; }
-    if (this.pending.has(key)) return;
+    if (rec && rec.blob) { const img = await this.fromBlob(rec.blob); if (img) { this.imgs.set(key, img); if (current()) this.draw(canvas, img, spec); } return; }
+    if (this.pending.has(key) || !committed) return;
     this.pending.add(key);
     try {
       const blob = await this.generate(st, st.locations[here]);
       await Store.artPut({ key, blob, at: Date.now() });
       const img = await this.fromBlob(blob);
-      if (img) { this.imgs.set(key, img); if (current()) this.draw(canvas, img); }
+      if (img) { this.imgs.set(key, img); if (current()) this.draw(canvas, img, spec); }
     } catch (e) {
       this.failed = true; UI.toast('The painted pictures failed (' + clip(e.message, 90) + '). Keeping the woodcuts.', 4500);
       if (Settings.data.debug) console.warn('CYOA art', e);
@@ -3017,11 +3188,11 @@ const SLOT_NAMES = { auto: 'Autosave', s1: 'Slot I', s2: 'Slot II', s3: 'Slot II
 
 /* ============================== SESSION ============================== */
 let G = null;   /* the live game: {st, events, transcript, speaker, ...} */
-function newSession(st) { return { st, events: [], transcript: [], costs: [], speaker: 'all', playMs: 0, since: Date.now(), endingAck: false, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, abort: null }; }
+function newSession(st) { return { st, events: [], transcript: [], costs: [], notes: [], speaker: 'all', playMs: 0, since: Date.now(), endingAck: false, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, abort: null }; }
 function makeSave(slot) {
   const st = G.st, now = Date.now();
   return { format: 'cyoa-save', v: 1, engine: ENGINE_V, slot, seed: st.seed, pins: st.pins, bible: st.bible, events: G.events, transcript: G.transcript,
-    turn: st.turn, endingAck: G.endingAck, costs: G.costs,
+    turn: st.turn, endingAck: G.endingAck, costs: G.costs, notes: G.notes,
     meta: { party: st.party.map((c) => c.name), place: st.locations[st.here].name, day: st.time.day, region: st.bible.region, savedAt: now,
       playMs: G.playMs + (now - G.since), plate: Plates.specFor(st), usd: Costs.total(G.costs) } };
 }
@@ -3038,6 +3209,7 @@ function restore(save) {
     .map((e) => ({ t: e.t, text: e.text.slice(0, 8000), who: e.who ? String(e.who).slice(0, 40) : undefined, id: e.id, cls: e.cls, kind: e.kind, turn: e.turn }));
   g.playMs = (save.meta && save.meta.playMs) || 0; g.endingAck = !!save.endingAck;
   g.costs = Costs.sanitize(save.costs);
+  g.notes = Notes.sanitize(save.notes);
   return { g, mismatches };
 }
 async function autosave() {
@@ -3096,7 +3268,7 @@ const UI = {
   },
   showScreen(id) { for (const s of document.querySelectorAll('.screen')) s.classList.toggle('active', s.id === id); document.body.classList.toggle('in-tale', id === 'scr-tale'); },
   openPanel(id) { this.closeMenu(); const p = $(id); p.classList.add('open'); if (!this.panelStack.includes(id)) this.panelStack.push(id); const b = p.querySelector('.panel-body'); if (b) b.scrollTop = 0; },
-  closePanel(id) { $(id).classList.remove('open'); this.panelStack = this.panelStack.filter((x) => x !== id); if (id === 'pnl-settings') this.afterSettings(); },
+  closePanel(id) { $(id).classList.remove('open'); this.panelStack = this.panelStack.filter((x) => x !== id); if (id === 'pnl-settings') this.afterSettings(); if (id === 'pnl-notes') Notes.close(); },
   openMenu() { $('menu').classList.add('open'); $('scrim').classList.add('open'); SFX.tick(); },
   closeMenu() { $('menu').classList.remove('open'); $('scrim').classList.remove('open'); },
   confirm(title, body, okLabel, cancelLabel) {
@@ -3162,13 +3334,13 @@ const UI = {
   refreshHud(st, plate) {
     const l = st.locations[st.here];
     $('place-name').textContent = l.name;
-    $('clock').textContent = clockText(st) + (l.scene.k === 'outdoor' ? ' · ' + weatherOf(st) : '');
+    $('clock').textContent = hudClock(st, l.scene.k === 'outdoor');
     if (plate !== false) this.drawPlate(st);
     this.renderSpeakers(st);
   },
   plateToken: 0,
   drawPlate(st) {
-    const spec = Plates.specFor(st), key = stable(spec) + (Art.active() ? '|art' : ''), cv = $('plate');
+    const spec = Plates.specFor(st), key = stable(spec) + (Art.active() ? '|art' + (G && st === G.st ? '|c' : '') : ''), cv = $('plate');
     if (key === this.lastPlateKey && cv.width > 2) return;
     const first = !this.lastPlateKey, sameArt = Art.imgs.has(Art.keyFor(st)) && Art.active(); this.lastPlateKey = key;
     const token = ++this.plateToken;
@@ -3203,6 +3375,21 @@ function taskSettings(kind) {
   return m ? Object.assign({}, d, { model: m }) : d;
 }
 function hasKey() { return typeof window.__CYOA_MOCK__ === 'function' || !!Settings.key(); }
+
+/* ---- the clock: every exchange takes time ----
+   When the Game Master moved the clock itself (travel, rest, advance_time) that stands. Otherwise
+   the engine advances it by an estimate - talk takes a couple of minutes plus about one per 60
+   words narrated, each check adds what that activity takes, a fight moves a minute per reply -
+   and logs it as an ordinary advance_time event, so a replay lands on the same minute. */
+const CHECK_MINUTES = { investigation: 15, survival: 20, nature: 10, arcana: 10, religion: 5, history: 5, medicine: 10, perception: 3, stealth: 10, athletics: 5,
+  acrobatics: 2, 'sleight of hand': 2, insight: 2, persuasion: 5, deception: 5, intimidation: 3, performance: 15, 'animal handling': 10 };
+function exchangeMinutes(st, events, text) {
+  if (!st.party.length || events.some((e) => ['move_party', 'rest', 'advance_time', 'create_character'].includes(e.name))) return 0;
+  if (st.combat || events.some((e) => ['start_combat', 'attack', 'end_combat', 'death_save'].includes(e.name))) return 1;
+  let m = 2 + Math.ceil(((String(text).match(/\S+/g) || []).length) / 60);
+  for (const e of events) if (e.name === 'roll_check') m += CHECK_MINUTES[String((e.result && e.result.check) || '').toLowerCase()] || 3;
+  return Math.min(m, 120);
+}
 
 /* ---- one Game Master turn: stage on a copy, commit only on success ---- */
 async function gmTurn(kind, line) {
@@ -3273,6 +3460,10 @@ async function gmTurn(kind, line) {
     return;
   }
   /* commit */
+  if (kind === 'player') {
+    const mins = exchangeMinutes(work, turnEvents, (out && out.text) || '');
+    if (mins) { const r = exec(work, 'advance_time', { minutes: mins }); if (r.ok) turnEvents.push({ turn: work.turn, name: 'advance_time', input: { minutes: mins }, result: deepClone(r.result), auto: true }); }
+  }
   work.turn++;
   G.st = work; for (const e of turnEvents) G.events.push(e);
   if (playerEntry) G.transcript.push(playerEntry);
@@ -3459,23 +3650,198 @@ function renderChronicle(tab) {
     const row = el('div', 'chips'); for (const r of rolls) row.appendChild(UI.chipNode(r)); box.appendChild(row);
   }
 }
+/* ---- the party sheet: every stat, skill, save, attack, ability and item is a term that
+   opens a popup saying what it does, with this character's numbers. Tap outside to close. ---- */
+const ABIL_INFO = {
+  str: 'Physical power: melee weapons that use Strength, Athletics, lifting, pushing and breaking things.',
+  dex: 'Agility and reflexes: bows and finesse weapons, Acrobatics, Stealth and Sleight of Hand, and dodging traps and fire.',
+  con: 'Health and stamina: it adds to your hit points and helps you hold out against poison, cold and exhaustion.',
+  int: 'Reasoning and memory: Arcana, History, Investigation, Nature and Religion. A wizard casts with it.',
+  wis: 'Awareness and intuition: Perception, Insight, Survival, Medicine and Animal Handling. Clerics and rangers cast with it.',
+  cha: 'Force of personality: Persuasion, Deception, Intimidation and Performance. A bard casts with it.',
+};
+const SAVE_INFO = { str: 'resist being shoved, grappled or crushed', dex: 'leap clear of fire, traps and falling stone', con: 'endure poison, disease and cold',
+  int: 'see through illusions and shrug off mind-bending magic', wis: 'resist charms, fear and madness', cha: 'resist possession and banishment' };
+const SKILL_INFO = {
+  athletics: 'Climbing, jumping, swimming, grappling and shoving.', acrobatics: 'Keeping your balance, tumbling, slipping out of a hold.',
+  'sleight of hand': 'Picking pockets, palming things, planting something unseen.', stealth: 'Moving without being seen or heard, and hiding.',
+  arcana: 'Knowing spells, runes, magic items and the planes.', history: 'Knowing old kingdoms, wars, heroes and legends.',
+  investigation: 'Searching for clues and working out how they fit: hidden doors, forged letters, a trap’s trigger.',
+  nature: 'Knowing plants, animals, weather and the land.', religion: 'Knowing gods, rites, holy symbols and the undead.',
+  'animal handling': 'Calming, reading or steering an animal.', insight: 'Reading people: a lie, a hidden motive, a mood.',
+  medicine: 'Steadying the dying and telling what ails someone.', perception: 'Noticing things: a sound in the dark, an ambush, a glint in the grass.',
+  survival: 'Tracking, hunting, finding the way and reading the weather.', deception: 'Lying convincingly, disguises and misdirection.',
+  intimidation: 'Getting your way with threats and presence.', performance: 'Music, song, acting and stories that hold a crowd.',
+  persuasion: 'Winning someone over with tact, charm or a good argument.',
+};
+const COND_INFO = {
+  poisoned: 'Sick and shaking: disadvantage on your attacks and checks.', frightened: 'Afraid: disadvantage on your attacks and checks.',
+  blinded: 'You cannot see: your attacks have disadvantage and attacks against you have advantage.',
+  charmed: 'Under a spell of friendship: you will not attack the one who charmed you.',
+  restrained: 'Held fast: your attacks have disadvantage and attacks against you have advantage.',
+  prone: 'Knocked down: your attacks have disadvantage and attacks against you have advantage.',
+  exhausted: 'Worn out: disadvantage on checks until a long rest.', invisible: 'Unseen: attacks against you have disadvantage.',
+  blessed: 'Blessed: add 1d4 to attacks and saving throws for a while.', marked: 'Marked as a hunter’s quarry.',
+  hidden: 'Out of sight: your next attack has advantage, and the attack gives you away.',
+  grappled: 'Held: you cannot move away until you break free.', stunned: 'Reeling: attacks against you have advantage.',
+  shielded: 'A shimmering ward: +5 Armour until your next turn.',
+};
+const CLASS_INFO = {
+  Fighter: 'A master of arms and armour who can keep fighting long after others fall.', Rogue: 'A sneak and a specialist, deadly when a foe is caught off guard.',
+  Wizard: 'A scholar of arcane magic who casts from a spellbook.', Cleric: 'A priest who heals, blesses and turns the undead through divine power.',
+  Ranger: 'A hunter and tracker of the wild, at home with bow and trail.', Bard: 'A performer whose words and music carry real magic.',
+};
+const ITEM_INFO = [
+  [/shield/, 'A shield: part of your Armour.'], [/mail|leather|armou?r/, 'Armour: part of your Armour class.'],
+  [/sword|axe|mace|dagger|rapier|club|spear|hammer/, 'A weapon. It is one of your attacks if its name is listed there.'], [/bow|arrow|bolt/, 'A ranged weapon and its ammunition.'],
+  [/spellbook/, 'Your spells, written down. Losing it would be a disaster.'], [/holy symbol/, 'The focus for your prayers and divine spells.'],
+  [/component pouch/, 'Pinches of dust, feathers and wax that spells call for.'], [/thieves/, 'Picks and files for locks and traps.'],
+  [/lute|flute|drum|horn/, 'An instrument, for Performance and bardic magic.'], [/ration|bread|food/, 'Food for the road.'],
+  [/pack|bedroll|cloak|rope|torch/, 'Travelling gear.'], [/potion/, 'A potion. Drinking it is an action.'],
+];
+function termInfo(c, kind, key) {
+  const pb = profBonus(c.level), C = CLASSES[c.cls];
+  const mod = (a) => abMod(c.scores[a]), aName = (a) => cap(ABIL_NAMES[a]);
+  if (kind === 'abil') {
+    const m = mod(key), skills = Object.keys(SKILLS).filter((k) => SKILLS[k] === key);
+    const sv = m + (C.saves.includes(key) ? pb : 0);
+    return { title: aName(key) + ' ' + c.scores[key], lines: [ABIL_INFO[key], 'Modifier ' + signed(m) + ': added to every ' + aName(key) + ' roll.',
+      skills.length ? 'Skills that use it: ' + skills.map((k) => cap(k) + ' ' + signed(m + (C.skills.includes(k) ? pb : 0))).join(', ') + '.' : '',
+      aName(key) + ' saving throw ' + signed(sv) + (C.saves.includes(key) ? ' (trained).' : '.')] };
+  }
+  if (kind === 'save') {
+    const prof = C.saves.includes(key), t = mod(key) + (prof ? pb : 0);
+    return { title: aName(key) + ' save ' + signed(t), lines: ['Rolled to ' + SAVE_INFO[key] + '.',
+      'd20 ' + signed(mod(key)) + ' ' + aName(key) + (prof ? ' + ' + pb + ' training (a ' + c.cls + ' is trained in this save)' : '') + ', against the danger’s difficulty.'] };
+  }
+  if (kind === 'skill') {
+    const ab = SKILLS[key], prof = C.skills.includes(key), t = mod(ab) + (prof ? pb : 0);
+    return { title: cap(key) + ' ' + signed(t), lines: [SKILL_INFO[key], 'Uses ' + aName(ab) + ' (' + signed(mod(ab)) + ')' + (prof ? ', plus ' + pb + ' because a ' + c.cls + ' is trained in it.' : '. Not trained.'),
+      'The Game Master calls for it when an outcome is uncertain: d20 ' + signed(t) + ' against a difficulty (10 easy, 15 moderate, 20 hard).'] };
+  }
+  if (kind === 'attack') {
+    const at = c.attacks[key], m = mod(at.ab), ranged = /bow|bolt|sling/i.test(at.n);
+    return { title: at.n, lines: [at.spell ? 'A cantrip: a spell you can cast as often as you like.' : ranged ? 'A ranged weapon attack.' : 'A melee weapon attack.',
+      'To hit: d20 ' + signed(m + pb) + ' (' + aName(at.ab) + ' ' + signed(m) + ', training +' + pb + ') against the target’s Armour. A natural 20 always hits and doubles the damage dice; a natural 1 always misses.',
+      'Damage: ' + at.d + (at.spell ? '' : signed(m)) + '.' + (c.cls === 'Rogue' ? ' With advantage, Sneak Attack adds ' + Math.ceil(c.level / 2) + 'd6.' : '')] };
+  }
+  if (kind === 'ability') {
+    const a = c.abilities[key], roll = a.heal || a.dmg;
+    return { title: a.n, lines: [a.t, roll ? (a.heal ? 'Heals ' : 'Deals ') + expandStatExpr(roll, c) + (a.heal ? ' hit points.' : ' damage.') : '',
+      a.n === 'Sneak Attack' ? 'Adds ' + Math.ceil(c.level / 2) + 'd6 damage to a hit when you attack with advantage.' : '',
+      a.max === null ? 'Always available.' : a.uses + ' of ' + a.max + ' uses left. All return after a ' + (a.per === 'short' ? 'short or long' : 'long') + ' rest.'] };
+  }
+  if (kind === 'item') {
+    const it = c.items[key], hit = ITEM_INFO.find(([re]) => re.test(it.n.toLowerCase()));
+    return { title: it.n + (it.q > 1 ? ' ×' + it.q : ''), lines: [hit ? hit[1] : 'Something you carry.'] };
+  }
+  if (kind === 'hp') return { title: 'Hit points ' + c.hp + ' / ' + c.hpMax, lines: ['How much harm you can take before you fall.',
+    'At 0 you are down: each turn you roll a death save. Three successes and you steady; three failures and you die. Any healing brings you back.',
+    'A short rest (an hour) heals about a ' + C.hd + '-sided die ' + signed(mod('con')) + '; a long rest (eight hours) heals you fully.'] };
+  if (kind === 'ac') {
+    const worn = c.items.filter((it) => /shield|mail|leather|armou?r/i.test(it.n)).map((it) => it.n);
+    return { title: 'Armour ' + acOf(c), lines: ['An attack against you hits if its d20 plus bonus reaches this number.', worn.length ? 'From your ' + worn.join(' and ') + '.' : '',
+      c.conditions.includes('shielded') ? 'Includes +5 from Shield until your next turn.' : ''] };
+  }
+  if (kind === 'cond') return { title: cap(key), lines: [COND_INFO[key] || ''] };
+  if (kind === 'status') return { title: cap(c.status), lines: [c.status === 'down' ? 'At 0 hit points: death saves each turn until healed or steady (' + c.saves.s + ' successes, ' + c.saves.f + ' failures so far).' : c.status === 'dead' ? 'Fallen. Only powerful magic could bring them back.' : 'Steady but still hurt.'] };
+  if (kind === 'level') return { title: 'Level ' + c.level, lines: [c.xp + ' experience' + (c.level < 5 ? '; level ' + (c.level + 1) + ' at ' + XP_LEVELS[c.level] + '.' : ', the highest level in this game.'),
+    'Training bonus +' + pb + ': added to trained skills and saves and to every attack.', 'Each level adds hit points; levels 3 and 5 add a use to each limited ability.'] };
+  if (kind === 'class') return { title: c.cls, lines: [CLASS_INFO[c.cls], 'Hit die d' + C.hd + '. Trained in ' + C.skills.join(', ') + ', and in ' + C.saves.map((a) => ABIL_NAMES[a]).join(' and ') + ' saves.'] };
+  return { title: '', lines: [] };
+}
+const Pop = {
+  open(title, lines) {
+    $('pop-title').textContent = title; const b = $('pop-body'); b.textContent = '';
+    for (const l of lines) if (l) b.appendChild(el('p', null, l));
+    $('pop').classList.add('open'); $('pop-scrim').classList.add('open'); SFX.tick();
+  },
+  close() { $('pop').classList.remove('open'); $('pop-scrim').classList.remove('open'); },
+  isOpen() { return $('pop').classList.contains('open'); },
+};
+/* The selected words as the page holds them. Selection.toString() follows the rendering, and the
+   drop cap's float swallows the space after it ("Awolf" for "A wolf"); the DOM text does not.
+   Paragraphs are kept apart by line breaks. */
+function rangeText(range) {
+  const parts = []; let cur = '';
+  const flush = () => { if (cur.trim()) parts.push(cur.replace(/\s+/g, ' ').trim()); cur = ''; };
+  const walk = (n) => { for (const c of n.childNodes) { if (c.nodeType === 3) cur += c.data; else if (c.nodeType === 1) { const block = /^(P|DIV|LI|H[1-6])$/.test(c.tagName); if (block) flush(); walk(c); if (block) flush(); } } };
+  walk(range.cloneContents()); flush();
+  return parts.join('\n');
+}
+/* ---- notes: words lifted verbatim from the story, plus the players' own; saved with the tale ---- */
+const Notes = {
+  sanitize(list) {
+    return (Array.isArray(list) ? list : []).filter((n) => n && typeof n.text === 'string').slice(0, 500)
+      .map((n) => ({ id: String(n.id || '').slice(0, 20) || Notes.newId(), text: n.text.slice(0, 4000), src: n.src === 'story' ? 'story' : 'mine', at: Number(n.at) || 0 }));
+  },
+  newId() { return 'n' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36); },
+  add(text, src) {
+    if (!G) return null; text = String(text || '').replace(/\s+$/, '').replace(/^\s+/, ''); if (!text && src === 'story') return null;
+    const n = { id: this.newId(), text: text.slice(0, 4000), src, at: Date.now() }; G.notes.push(n); autosave(); return n;
+  },
+  openPanel() { this.render(); UI.openPanel('pnl-notes'); SFX.page(); },
+  fit(ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; },
+  render() {
+    const ul = $('notes-list'); ul.textContent = '';
+    if (!G) return;
+    for (const n of G.notes) {
+      const li = el('li', n.src === 'story' ? 'story' : null), ta = document.createElement('textarea'), del = el('button', 'note-del', '✕');
+      ta.value = n.text; ta.rows = 1; ta.setAttribute('aria-label', 'Note');
+      ta.addEventListener('input', () => { n.text = ta.value.slice(0, 4000); this.fit(ta); this.dirty = true; });
+      ta.addEventListener('blur', () => { if (this.dirty) { this.dirty = false; autosave(); } });
+      del.type = 'button'; del.setAttribute('aria-label', 'Remove this note');
+      del.onclick = () => { G.notes = G.notes.filter((x) => x !== n); li.remove(); autosave(); SFX.tick(); };
+      li.append(ta, del); ul.appendChild(li);
+      requestAnimationFrame(() => this.fit(ta));
+    }
+  },
+  /* leaving the page drops notes left empty and saves any edit still pending */
+  close() { if (!G) return; const before = G.notes.length; G.notes = G.notes.filter((n) => n.text.trim()); if (this.dirty || G.notes.length !== before) { this.dirty = false; autosave(); } },
+  /* a selection inside the story shows "+ Note" just under it; tapping it keeps those exact words */
+  grabbed: '',
+  onSelection() {
+    const b = $('note-grab'), sel = window.getSelection ? window.getSelection() : null;
+    const txt = sel && !sel.isCollapsed && sel.rangeCount ? rangeText(sel.getRangeAt(0)) : '';
+    const inStory = txt.trim() && G && sel.rangeCount && $('scroll').contains(sel.anchorNode) && $('scroll').contains(sel.focusNode);
+    if (!inStory) { b.classList.remove('on'); this.grabbed = ''; return; }
+    this.grabbed = txt;
+    const r = sel.getRangeAt(0).getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+    b.classList.add('on');
+    const bw = b.offsetWidth || 90, bh = b.offsetHeight || 40;
+    let top = r.bottom + 14; if (top + bh > vh - 8) top = r.top - bh - 14;
+    top = Math.min(vh - bh - 8, Math.max(8, top));
+    b.style.left = Math.round(Math.min(vw - bw - 8, Math.max(8, r.left + r.width / 2 - bw / 2))) + 'px'; b.style.top = Math.round(top) + 'px';
+  },
+  grab() {
+    const t = this.grabbed; if (!t.trim()) return;
+    this.add(t, 'story'); this.grabbed = '';
+    try { window.getSelection().removeAllRanges(); } catch (e) { /* ignore */ }
+    $('note-grab').classList.remove('on'); SFX.tick(); UI.toast('Added to your notes');
+  },
+};
 function renderParty() {
   const box = $('party-body'); box.textContent = '';
   if (!G || !G.st.party.length) { box.appendChild(el('p', 'note', 'No one has joined the party yet.')); return; }
+  const term = (c, kind, key, label, cls) => { const b = el('button', 'term' + (cls ? ' ' + cls : ''), label); b.type = 'button'; b.onclick = () => { const i = termInfo(c, kind, key); Pop.open(i.title, i.lines); }; return b; };
+  const row = (label, items) => { const r = el('div', 'terms'); if (label) r.appendChild(el('span', 'terms-l', label)); for (const it of items) r.appendChild(it); return r; };
   for (const c of G.st.party) {
-    const d = el('div', 'sheet');
+    const d = el('div', 'sheet'), C = CLASSES[c.cls], pb = profBonus(c.level);
     d.appendChild(el('h3', null, c.name));
-    d.appendChild(el('div', 'sub', cap(c.ancestry) + ' ' + c.cls + ' · level ' + c.level + ' · ' + c.xp + (c.level < 5 ? ' / ' + XP_LEVELS[c.level] : '') + ' XP' + (c.player ? ' · played by ' + c.player : '')));
+    d.appendChild(el('div', 'sub', cap(c.ancestry) + (c.player ? ' · played by ' + c.player : '')));
+    d.appendChild(row(null, [term(c, 'class', null, c.cls), term(c, 'level', null, 'Level ' + c.level + ' · ' + c.xp + ' XP'), term(c, 'hp', null, 'HP ' + c.hp + '/' + c.hpMax), term(c, 'ac', null, 'Armour ' + acOf(c))]
+      .concat(c.status !== 'ok' ? [term(c, 'status', null, c.status.toUpperCase(), 'bad')] : []).concat(c.conditions.map((x) => term(c, 'cond', x, cap(x), 'bad')))));
     const bar = el('div', 'hpbar' + (c.hp <= c.hpMax / 3 ? ' low' : '')), fill = el('i'); fill.style.width = Math.round((100 * c.hp) / c.hpMax) + '%'; bar.appendChild(fill);
-    d.appendChild(el('div', null, 'Hit points ' + c.hp + ' / ' + c.hpMax + ' · Armour ' + acOf(c) + (c.status !== 'ok' ? ' · ' + c.status.toUpperCase() : '') + (c.conditions.length ? ' · ' + c.conditions.join(', ') : '')));
     d.appendChild(bar);
     const stats = el('div', 'stats');
-    for (const a of ABILS) { const s = el('div'); s.append(el('b', null, a.toUpperCase()), el('span', null, String(c.scores[a])), el('div', null, signed(abMod(c.scores[a])))); stats.appendChild(s); }
+    for (const a of ABILS) { const s = el('button', 'stat'); s.type = 'button'; s.append(el('b', null, a.toUpperCase()), el('span', null, String(c.scores[a])), el('div', null, signed(abMod(c.scores[a])))); s.onclick = () => { const i = termInfo(c, 'abil', a); Pop.open(i.title, i.lines); }; stats.appendChild(s); }
     d.appendChild(stats);
-    const C = CLASSES[c.cls];
-    d.appendChild(el('p', 'note', 'Skilled in ' + C.skills.join(', ') + '. Saves: ' + C.saves.map((x) => ABIL_NAMES[x]).join(', ') + '.'));
-    d.appendChild(el('p', 'note', 'Attacks: ' + c.attacks.map((a) => a.n + ' (' + a.d + ')').join(', ')));
-    d.appendChild(el('p', 'note', 'Abilities: ' + c.abilities.map((a) => a.n + (a.max === null ? '' : ' ' + a.uses + '/' + a.max)).join(', ')));
+    d.appendChild(row('Saves', ABILS.map((a) => term(c, 'save', a, a.toUpperCase() + ' ' + signed(abMod(c.scores[a]) + (C.saves.includes(a) ? pb : 0)), C.saves.includes(a) ? 'trained' : ''))));
+    const sk = Object.keys(SKILLS).sort((x, y) => (C.skills.includes(y) - C.skills.includes(x)) || x.localeCompare(y));
+    d.appendChild(row('Skills', sk.map((k) => term(c, 'skill', k, cap(k) + ' ' + signed(abMod(c.scores[SKILLS[k]]) + (C.skills.includes(k) ? pb : 0)), C.skills.includes(k) ? 'trained' : ''))));
+    d.appendChild(row('Attacks', c.attacks.map((a, k) => term(c, 'attack', k, a.n))));
+    d.appendChild(row('Abilities & spells', c.abilities.map((a, k) => term(c, 'ability', k, a.n + (a.max === null ? '' : ' ' + a.uses + '/' + a.max)))));
+    if (c.items.length) d.appendChild(row('Pack', c.items.map((it, k) => term(c, 'item', k, it.n + (it.q > 1 ? ' ×' + it.q : '')))));
     if (c.background || c.personality || c.look) d.appendChild(el('p', 'note', [c.background, c.personality, c.look].filter(Boolean).join('. ')));
     box.appendChild(d);
   }
@@ -3495,6 +3861,13 @@ function bind() {
     const url = new URL(window.location.href); url.searchParams.set('_r', Date.now().toString()); window.location.replace(url.toString());
   });
   $('ribbon-btn').addEventListener('click', () => { AudioSys.init(); $('menu').classList.contains('open') ? UI.closeMenu() : UI.openMenu(); });
+  $('pop-scrim').addEventListener('click', () => Pop.close());
+  document.addEventListener('selectionchange', () => Notes.onSelection());
+  $('scroll').addEventListener('scroll', () => { if ($('note-grab').classList.contains('on')) Notes.onSelection(); }, { passive: true });
+  /* act on press, before the tap collapses the selection; preventDefault keeps it alive */
+  $('note-grab').addEventListener('pointerdown', (e) => { e.preventDefault(); Notes.grab(); });
+  $('note-grab').addEventListener('click', (e) => e.preventDefault());
+  $('note-add').addEventListener('click', () => { Notes.add('', 'mine'); Notes.render(); const tas = $('notes-list').querySelectorAll('textarea'); if (tas.length) tas[tas.length - 1].focus(); });
   $('scrim').addEventListener('click', () => { if ($('dialog').classList.contains('open')) { if (UI._dlgCancel) UI._dlgCancel(); } else UI.closeMenu(); });
   $('menu').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-act]'); if (!b) return; UI.closeMenu(); SFX.page();
@@ -3503,6 +3876,7 @@ function bind() {
     else if (a === 'load') { renderSlots(); UI.openPanel('pnl-load'); }
     else if (a === 'chron') { renderChronicle('places'); UI.openPanel('pnl-chron'); }
     else if (a === 'party') { renderParty(); UI.openPanel('pnl-party'); }
+    else if (a === 'notes') { if (G) Notes.openPanel(); }
     else if (a === 'costs') { if (G) openCosts(G.costs, 'This tale \u00b7 ' + G.st.bible.region); }
     else if (a === 'settings') openSettings();
     else if (a === 'title') { if (await UI.confirm('Return to the title?', 'Your tale is saved automatically after every turn.', 'Title')) leaveToTitle(); }
@@ -3587,6 +3961,7 @@ function bind() {
   on('btn-delete-all', 'click', async () => { if (await UI.confirm('Delete every saved tale?', 'The autosave and all three slots will be erased. This cannot be undone.', 'Delete')) { await Store.clear(); UI.toast('All saved tales erased.'); refreshTitle(); } });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    if (Pop.isOpen()) { Pop.close(); return; }
     if ($('dialog').classList.contains('open')) { if (UI._dlgCancel) UI._dlgCancel(); return; }
     if ($('menu').classList.contains('open')) { UI.closeMenu(); return; }
     const top = UI.panelStack[UI.panelStack.length - 1]; if (top) UI.closePanel(top);
@@ -3615,6 +3990,7 @@ function boot() {
   window.CYOA = { /* test + debug hooks: read-only views and pure functions */
     generateWorld, newGame, exec, replay, stable, hashHex, bibleText, turnContext, endingOf, TOOLS, SYSTEM_PROMPT, toolDefs, Plates, Settings, Store,
     makeSave, restore, validSave, randomSeed, get G() { return G; }, UI, Narrator, AnthropicGM, modelProfile, MODELS, TOOL_NAMES, Premium, Art, Costs, claudePrice, taskSettings, Speech,
+    Notes, termInfo, momentIcon, ICON, drawMoment, exchangeMinutes, VIEWS,
   };
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

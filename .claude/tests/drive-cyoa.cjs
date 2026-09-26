@@ -61,6 +61,12 @@ window.__CYOA_MOCK__ = async (api) => {
   if (/#refuse/.test(line)) { api.fail('refusal'); }
   if (/#xss/.test(line)) { await api.text('A note reads <img src=x onerror="window.__pwned=1"> and <b>bold</b>.'); return; }
   if (/#long/.test(line)) { await api.text('This is a very long passage that goes on and on. '.repeat(40)); return; }
+  if (/#search/.test(line)) { api.tool('roll_check', { character_id: 'C1', check: 'investigation', dc: 12 }); await api.text('You search the room from end to end.'); return; }
+  if (/#fight/.test(line)) { api.tool('start_combat', { foes: [{ template: 'wolf' }] }); await api.text('A wolf lunges out of the dark!'); return; }
+  if (/#give/.test(line)) { api.tool('inventory', { op: 'give', character_id: 'C1', item: 'iron key' }); await api.text('Mira pockets an iron key.'); return; }
+  if (/#endscene/.test(line)) { api.tool('end_scene', { summary: 'The talk at the inn is over and night draws in.' }); await api.text('The fire burns low.'); return; }
+  if (/#endfight/.test(line)) { api.tool('end_combat', { outcome: 'fled' }); await api.text('The wolf slinks away.'); return; }
+  if (/#wait/.test(line)) { api.tool('advance_time', { minutes: 240 }); await api.text('The afternoon passes.'); return; }
   if (/#fact/.test(line)) { api.tool('record_fact', { subject: 'L1', text: 'A silver bell hangs over the bar.' }); await api.text('Noted.'); return; }
   if (/#win/.test(line)) { for (let k = 0; k < 3; k++) api.tool('update_quest', { op: 'advance', quest_id: 'Q0' }); await api.text('Victory is yours.'); return; }
   await api.text('The Game Master nods.');
@@ -362,6 +368,134 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
     await ctx.close();
   }
 
+  /* ---------------- P. party details / Q. notes / R. clock / S. pictures ---------------- */
+  console.log('P. party details · Q. notes · R. clock · S. pictures');
+  {
+    const { ctx, page: p } = await newPage(browser);
+    await startNew(p);
+    await say(p, '#make');
+    const pop = () => p.evaluate(() => ({ open: document.getElementById('pop').classList.contains('open'), title: document.getElementById('pop-title').textContent,
+      body: document.getElementById('pop-body').textContent, party: document.getElementById('pnl-party').classList.contains('open') }));
+    const tap = (label) => p.evaluate((l) => { const b = [...document.querySelectorAll('#party-body .term, #party-body .stat')].find((x) => x.textContent.startsWith(l)); if (b) b.click(); return !!b; }, label);
+    await p.evaluate(() => { document.getElementById('ribbon-btn').click(); document.querySelector('#menu [data-act="party"]').click(); });
+    let r = await p.evaluate(() => ({ terms: document.querySelectorAll('#party-body .term').length, stats: document.querySelectorAll('#party-body .stat').length }));
+    ok(r.stats === 12 && r.terms >= 70, 'every ability score, save, skill, attack, ability and item on the sheet can be tapped (' + r.terms + ' terms, ' + r.stats + ' scores)');
+    await tap('DEX'); r = await pop();
+    ok(r.open && r.title === 'Dexterity 15' && /Modifier \+2/.test(r.body) && /Stealth \+4/.test(r.body) && /saving throw \+4 \(trained\)/.test(r.body), 'a score explains itself with this character’s numbers (' + r.title + ')');
+    await p.mouse.click(12, 420); r = await pop();
+    ok(!r.open && r.party, 'a tap outside the popup closes it, and only it');
+    await tap('Stealth'); r = await pop();
+    ok(r.title === 'Stealth +4' && /Uses Dexterity \(\+2\), plus 2 because a Rogue is trained/.test(r.body), 'a skill: what it is for, its ability and training, its bonus');
+    await p.mouse.click(12, 420);
+    await tap('Rapier'); r = await pop();
+    ok(/To hit: d20 \+4/.test(r.body) && /Damage: 1d8\+2/.test(r.body) && /Sneak Attack adds 1d6/.test(r.body), 'an attack: to-hit and damage worked out, plus Sneak Attack for a rogue');
+    await p.keyboard.press('Escape'); r = await pop();
+    ok(!r.open && r.party, 'Escape closes the popup first, not the page under it');
+    await tap('Cunning Action'); r = await pop();
+    ok(/bonus action/.test(r.body) && /Always available/.test(r.body), 'an ability or spell: what it does and how many uses are left');
+    await p.mouse.click(12, 420);
+    for (const [label, re] of [['HP', /death save/], ['Armour', /From your leather armor/], ['Level 1', /level 2 at 300/], ['STR +', /shoved, grappled/], ['Rogue', /Hit die d8/], ['thieves', /locks and traps/]]) {
+      await tap(label); r = await pop(); ok(r.open && re.test(r.body), 'popup for "' + label + '" (' + r.title + ')'); await p.mouse.click(12, 420);
+    }
+    await p.evaluate(() => document.querySelector('#pnl-party [data-close]').click());
+
+    /* R. the clock */
+    const clk = () => p.evaluate(() => ({ m: window.CYOA.G.st.time.day * 1440 + window.CYOA.G.st.time.minute, text: document.getElementById('clock').textContent, last: window.CYOA.G.events[window.CYOA.G.events.length - 1] }));
+    let c0 = await clk();
+    await say(p, 'we look about the common room'); let c1 = await clk();
+    ok(c1.m - c0.m === 3 && c1.text !== c0.text && c1.last.name === 'advance_time' && c1.last.auto, 'an exchange of talk moves the clock a few minutes (' + (c1.m - c0.m) + ' min, ' + c1.text + ')');
+    await say(p, '#search'); let c2 = await clk();
+    ok(c2.m - c1.m === 18, 'a search takes longer: talk plus the check’s own time (' + (c2.m - c1.m) + ' min)');
+    await say(p, '#wait'); let c3 = await clk();
+    ok(c3.m - c2.m === 240, 'when the Game Master passes time itself, that stands alone (' + (c3.m - c2.m) + ' min)');
+    await say(p, '#fight'); let c4 = await clk();
+    await say(p, 'I stand my ground'); let c5 = await clk();
+    ok(c4.m - c3.m === 1 && c5.m - c4.m === 1, 'a fight moves the clock a minute per reply');
+    await say(p, '#endfight');
+    await say(p, '#go L1'); let c6 = await clk();
+    ok(c6.last.name === 'move_party', 'travel is timed by the journey alone');
+    r = await p.evaluate(() => { const C = window.CYOA, G = C.G, st = G.st; return C.stable(C.replay(st.seed, st.pins, st.bible, G.events, st.turn).st) === C.stable(st); });
+    ok(r, 'the clock’s own steps are logged events: a replay lands on the same minute');
+
+    /* S. pictures */
+    const pl = async () => { await p.waitForTimeout(350); return p.evaluate(() => ({ key: document.getElementById('plate').dataset.key, m: document.getElementById('plate').dataset.moment, spec: window.CYOA.Plates.specFor(window.CYOA.G.st) })); };
+    const keys = [];
+    for (const t of ['we rest a moment', 'what is that smell?', 'we listen at the door']) { await say(p, t); keys.push((await pl()).key); }
+    ok(new Set(keys).size === 3, 'every reply redraws the plate from a new angle (' + keys.length + ' replies, ' + new Set(keys).size + ' pictures)');
+    await say(p, '#search'); r = await pl();
+    ok(r.m === 'check' && r.spec.ms === 'investigation' && await p.evaluate((s) => window.CYOA.momentIcon(s), r.spec) === 'glass', 'a search shows a magnifying glass in the corner');
+    await say(p, '#give'); r = await pl();
+    ok(r.m === 'item' && await p.evaluate((s) => window.CYOA.momentIcon(s), r.spec) === 'key', 'a found key shows a key');
+    await say(p, 'we move on'); r = await pl();
+    ok(r.m === '', 'the inset lasts one reply: the next plain reply clears it');
+    await say(p, '#fight'); r = await pl();
+    ok(r.m === 'battle' && r.spec.v === 3, 'a fight: crossed swords and the close view');
+    await say(p, '#endfight');
+    r = await p.evaluate(() => { const C = window.CYOA, out = []; const cv = document.createElement('canvas'); cv.width = 300; cv.height = 200; const g = cv.getContext('2d');
+      for (const k of Object.keys(C.ICON)) { g.clearRect(0, 0, 300, 200); let e = null; try { C.ICON[k](g, { ms: 'n1' }); } catch (x) { e = x.message; } out.push([k, e]); } return out; });
+    ok(r.length >= 26 && r.every((x) => !x[1]), 'all ' + r.length + ' inset pictures draw without error');
+    r = await p.evaluate(() => { const C = window.CYOA, icons = new Set(); const kinds = { item: ['iron key', 'gold', 'map', 'potion of healing', 'longsword', 'old tome', 'ruby ring', 'lantern', 'crate'], check: ['perception', 'investigation', 'stealth', 'survival', 'athletics', 'arcana', 'persuasion', 'medicine', 'dexterity save'],
+      magic: ['cure wounds|heal', 'magic missile|harm', 'bless'], person: ['n1'], quest: ['done'], rest: ['long'], battle: [''], fallen: [''] };
+      for (const [m, subs] of Object.entries(kinds)) for (const ms of subs) icons.add(C.momentIcon({ m, ms })); return { n: icons.size, all: [...icons].every((k) => C.ICON[k]) }; });
+    ok(r.all && r.n === 26, 'every moment maps to a drawn inset (' + r.n + ' distinct)');
+    const before = await pl();
+
+    /* Q. notes */
+    await say(p, 'we look around');
+    r = await p.evaluate(() => { const para = [...document.querySelectorAll('#scroll .passage.gm p')].find((x) => /Rain falls on the village\./.test(x.textContent));
+      para.scrollIntoView({ block: 'center' });
+      const tn = para.firstChild, i = tn.data.indexOf('Rain falls'), rg = document.createRange(); rg.setStart(tn, i); rg.setEnd(tn, i + 'Rain falls on the village.'.length);
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); return rg.getBoundingClientRect().bottom; });
+    await p.waitForFunction(() => document.getElementById('note-grab').classList.contains('on'), null, { timeout: 2000 }).catch(() => {});
+    let b = await p.evaluate(() => ({ on: document.getElementById('note-grab').classList.contains('on'), top: document.getElementById('note-grab').getBoundingClientRect().top }));
+    ok(b.on && b.top > r, 'selecting words in the story raises "+ Note" just under them');
+    await p.click('#note-grab');
+    r = await p.evaluate(() => ({ notes: window.CYOA.G.notes.slice(), sel: getSelection().toString(), on: document.getElementById('note-grab').classList.contains('on'), toast: document.getElementById('toast').textContent }));
+    ok(r.notes.length === 1 && r.notes[0].text === 'Rain falls on the village.' && r.notes[0].src === 'story' && !r.sel && !r.on, 'tapping it adds the words verbatim as a new note (' + JSON.stringify(r.notes[0] && r.notes[0].text) + ')');
+    await p.evaluate(() => { const rg = document.createRange(); rg.selectNodeContents(document.getElementById('place-name')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); });
+    await p.waitForTimeout(150);
+    r = await p.evaluate(() => document.getElementById('note-grab').classList.contains('on'));
+    ok(!r, 'a selection outside the story does not offer it'); await p.evaluate(() => getSelection().removeAllRanges());
+    /* a one-letter first word is the case that bites: the drop cap takes "A" and the rendering swallows the space after it */
+    r = await p.evaluate(() => { const first = [...document.querySelectorAll('#scroll .passage.gm p:first-of-type')].find((x) => /^A wolf/.test(x.textContent));
+      first.scrollIntoView({ block: 'center' }); const tn = first.firstChild, rg = document.createRange(); rg.setStart(tn, 0); rg.setEnd(tn, 13);
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); return tn.data.slice(0, 13); });
+    await p.waitForTimeout(150); await p.click('#note-grab');
+    const dc = await p.evaluate(() => window.CYOA.G.notes[window.CYOA.G.notes.length - 1].text);
+    ok(dc === r, 'words taken from under the drop cap keep their spaces (' + JSON.stringify(dc) + ')');
+    await p.evaluate(() => { window.CYOA.G.notes.pop(); });
+    await p.evaluate(() => { document.getElementById('ribbon-btn').click(); document.querySelector('#menu [data-act="notes"]').click(); });
+    r = await p.evaluate(() => ({ open: document.getElementById('pnl-notes').classList.contains('open'), vals: [...document.querySelectorAll('#notes-list textarea')].map((t) => t.value) }));
+    ok(r.open && r.vals.length === 1 && r.vals[0] === 'Rain falls on the village.', 'the Notes page lists it as a bullet');
+    await p.click('#note-add'); await p.keyboard.type('Ask the smith about the iron key');
+    await p.evaluate(() => document.activeElement.blur()); await p.waitForTimeout(100);
+    await p.click('#note-add');
+    await p.evaluate(() => document.querySelector('#notes-list li .note-del').click());
+    r = await p.evaluate(() => ({ notes: window.CYOA.G.notes.map((n) => n.text), lis: document.querySelectorAll('#notes-list li').length }));
+    ok(r.notes.length === 2 && r.notes[0] === 'Ask the smith about the iron key' && r.lis === 2, 'you can type your own notes and remove old ones');
+    await p.evaluate(() => document.querySelector('#pnl-notes [data-close]').click()); await p.waitForTimeout(300);
+    r = await p.evaluate(() => window.CYOA.G.notes.map((n) => n.text));
+    ok(r.length === 1 && r[0] === 'Ask the smith about the iron key', 'a note left empty is dropped when the page closes');
+    await p.evaluate(() => { const n = window.CYOA.Notes.add('<img src=x onerror="window.__pwned2=1">', 'mine'); window.CYOA.Notes.render(); });
+    await p.waitForTimeout(100);
+    r = await p.evaluate(() => ({ pwned: !!window.__pwned2, img: !!document.querySelector('#notes-list img') }));
+    ok(!r.pwned && !r.img, 'notes are text, never markup');
+    const save = await p.evaluate(() => window.CYOA.G.st.turn);
+    await p.waitForTimeout(300);
+    await p.reload({ waitUntil: 'load' });
+    await p.waitForFunction(() => window.CYOA && window.CYOA.Settings.data);
+    await p.evaluate(() => document.getElementById('btn-load').click());
+    await p.waitForSelector('#slots .slot:not(.empty)');
+    await p.evaluate(() => document.querySelector('#slots .slot').click());
+    await p.waitForFunction(() => window.CYOA.G && document.getElementById('scr-tale').classList.contains('active'), null, { timeout: 8000 });
+    await p.waitForTimeout(400);
+    r = await p.evaluate(() => ({ notes: window.CYOA.G.notes.map((n) => n.text), turn: window.CYOA.G.st.turn, key: document.getElementById('plate').dataset.key, spec: window.CYOA.Plates.specFor(window.CYOA.G.st) }));
+    ok(r.notes.length === 2 && r.notes[0] === 'Ask the smith about the iron key', 'notes travel in the save and come back on load');
+    ok(r.turn === save, 'the loaded tale is at the same turn');
+    ok(!p.errors.length, 'no page errors in party, notes, clock and pictures ' + (p.errors[0] || ''));
+    await ctx.close();
+  }
+
   /* ---------------- L. the real client, stubbed network ---------------- */
   console.log('L. Anthropic client (stubbed network)');
   {
@@ -529,12 +663,17 @@ async function startNew(p) { await p.evaluate(() => document.getElementById('btn
       ok(r.src === 'art', 'the painted picture replaces the woodcut on the plate');
       await say(p, '#go L1'); await p.waitForTimeout(600); await say(p, '#go L0');
       await p.waitForTimeout(400);
-      r = await p.evaluate(async () => ({ src: document.getElementById('plate').dataset.src, rec: !!(await window.CYOA.Store.artGet(window.CYOA.G.st.seed + '|L0')) }));
+      r = await p.evaluate(async () => ({ src: document.getElementById('plate').dataset.src, rec: !!(await window.CYOA.Store.artGet(window.CYOA.Art.keyFor(window.CYOA.G.st))), key: window.CYOA.Art.keyFor(window.CYOA.G.st) }));
       ok(log.images.length === 2, 'a new place asks once; a revisited place asks again never (' + log.images.length + ' requests for 3 arrivals)');
-      ok(r.rec && r.src === 'art', 'the painting is cached per place in IndexedDB and shown again on return');
+      ok(r.rec && r.src === 'art' && /\|L0\|\d+$/.test(r.key), 'the painting is cached per place and topic in IndexedDB and shown again on return (' + r.key + ')');
       r = await p.evaluate(() => window.CYOA.G.costs.filter((e) => e.kind === 'picture'));
       ok(r.length === 2 && r[0].est && Math.abs(r[0].usd - 0.041) < 1e-12 && /^Scene picture: /.test(r[0].desc) && !r[1].est && Math.abs(r[1].usd - (100 * 5 + 1000 * 30) / 1e6) < 1e-12,
         'each painting is billed once: from the reply\u2019s usage when given, else the ~$0.041 list estimate');
+      await say(p, '#endscene'); await p.waitForTimeout(400);
+      r = await p.evaluate(() => ({ src: document.getElementById('plate').dataset.src, key: window.CYOA.Art.keyFor(window.CYOA.G.st) }));
+      ok(log.images.length === 3 && r.src === 'art', 'a new topic in the same place (the scene ended) asks for one new painting (' + log.images.length + ' requests, ' + r.key + ')');
+      await say(p, 'we sit and talk'); await p.waitForTimeout(300);
+      ok(log.images.length === 3, 'an ordinary reply within the topic asks for none');
       await ctx.close();
     }
     {

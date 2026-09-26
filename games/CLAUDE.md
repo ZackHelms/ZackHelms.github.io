@@ -888,7 +888,7 @@ the background cleanly and none of the other pieces. **Proprietary** (one of
 the seven protected games). Detailed context: `.claude/interlock.md`; the
 measurement method behind its gates: `.claude/notes/20260920-measuring-a-rendering-change.md`.
 
-### CYOA (`cyoa/index.html`, ~3,600 lines)
+### CYOA (`cyoa/index.html`, ~4,000 lines)
 A tabletop RPG in the spirit of D&D with **Claude as the Game Master**, commissioned
 by the CD on 2026-09-25 and built in the new **Grimoire** style (illuminated
 manuscript: vellum, ink, rubrics, gold leaf, woodcut plates) rather than neon. A seed
@@ -907,8 +907,11 @@ OpenAI-painted scenes (cached per place) run on the player's own keys too. A **c
 ledger** prices every paid call in US dollars (Claude exactly, from each reply's usage;
 voice and pictures estimated), shows it per passage and in the header, travels in the
 save, and opens from a $ button on the Load screen; Settings can route the opening,
-player turns and the epilogue to different models. **Proprietary** (one of the seven protected games).
-Suite: `.claude/tests/drive-cyoa.cjs` (126 checks, including the real clients against
+player turns and the epilogue to different models. The plate turns to a new view after
+every reply with an inset of the moment (paintings, when on, change per topic); the clock
+moves with every exchange; every line of the party sheet opens a popup; selected story
+text goes to a per-tale Notes page. **Proprietary** (one of the seven protected games).
+Suite: `.claude/tests/drive-cyoa.cjs` (165 checks, including the real clients against
 stubbed network). Detailed context: `.claude/cyoa.md`.
 
 ---

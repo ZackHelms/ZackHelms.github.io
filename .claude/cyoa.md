@@ -1,12 +1,12 @@
 # CYOA — context
 
-`games/cyoa/index.html` (single file, ~3,600 lines). A tabletop RPG in the spirit of
+`games/cyoa/index.html` (single file, ~4,000 lines). A tabletop RPG in the spirit of
 D&D where **Claude is the Game Master**: a seed generates a world, the GM narrates it
 (text revealed in step with a narrator voice), players type or speak, and every change
 to the world goes through a **deterministic engine** that validates it, logs it, and
 feeds the recorded canon back to the GM so revisits stay consistent. CD commission,
 2026-09-25. Plan: `.claude/plans/cyoa.ai-gm-adventure.md`. Suite:
-`.claude/tests/drive-cyoa.cjs` (126 checks). Style: **Grimoire**
+`.claude/tests/drive-cyoa.cjs` (165 checks). Style: **Grimoire**
 (`.claude/styles/grimoire.md`). **Proprietary** (`games/cyoa/LICENSE`).
 
 ## CD decisions (2026-09-25 interview) — do not relitigate
@@ -110,9 +110,20 @@ PLATES / COSTS / PREMIUM / STORAGE / SESSION / UI / BOOT`
   unverified. The list is re-read on every
   Settings open, on returning to the tab and at every `pick()`: iOS may not fire
   `voiceschanged` for a voice downloaded while the page is open.
-- **Plates.** `Plates.specFor(st)` = `{id, k, land, season, f, fig, tod, wx}`; a place's
-  `scene` (`k` + features) is fixed at creation, so a revisit looks the same in the
-  same light and weather. Placement PRNG is seeded by the place id. Cached (8) at 1.25x.
+- **Plates.** `Plates.specFor(st)` = `{id, k, land, season, f, fig, tod, wx, v, m, ms}`; a
+  place's `scene` (`k` + features) is fixed at creation, so a revisit shows the same
+  scenery. Placement PRNG is seeded by the place id. Cached (8) at 1.25x.
+  **A new picture after every reply** (CD, 2026-09-26): `v` picks one of five `VIEWS`
+  framings (`st.turn % 5`; wide for an arrival, the low wide view for a fight), and `m`/`ms`
+  is the turn's **moment**, drawn by `drawMoment()` as a woodcut roundel in the canvas's
+  top-right corner **at blit time** (so it survives any crop). Moments come from the
+  engine: `exec` calls `noteScene()` after every accepted call, which keeps the turn's
+  most dramatic moment by `MOMENT_PRI` (battle > fallen > magic > check > quest > item >
+  person > rest > arrive) in `st.scene.moment = {k, sub, turn}`; `specFor` shows it only
+  while `moment.turn === st.turn - 1`, so it lasts exactly one reply. `momentIcon()` maps
+  kind + subject (item name, skill label, `ability|heal`) onto one of 26 `ICON` drawers.
+  Because moments live in the state and come from the logged calls, a reload or replay
+  draws the same picture. The plate fades (260 ms) on every change.
 - **Premium voice** (`Premium`). When the narrator is OpenAI or ElevenLabs and that key
   is set, `Narrator.enq()` starts each sentence's audio request **as the sentence is
   queued** (pool of 3), so the clip is usually decoded before its turn; `playBuf()` plays
@@ -125,16 +136,45 @@ PLATES / COSTS / PREMIUM / STORAGE / SESSION / UI / BOOT`
 - **Painted pictures** (`Art`). `POST /v1/images/generations` (`gpt-image-2` default,
   editable; 1536x1024, quality medium), prompt = place name, summary, kind, land,
   season, up to 4 canon facts about the place, plus a fixed woodcut house style. The PNG
-  is re-encoded to JPEG and stored in IndexedDB store `art` keyed `seed|placeId`, and in
-  memory as a decoded image, so a place is painted **once** and a revisit shows the same
-  painting (asserted). The woodcut draws first and the painting replaces it when ready;
+  is re-encoded to JPEG and stored in IndexedDB store `art` keyed `seed|placeId|topic`,
+  and in memory as a decoded image: **one painting per topic** (CD, 2026-09-26; a
+  painting costs ~$0.04, so not per reply). `st.scene.topic` turns over on `end_scene`,
+  `start_combat`, `end_combat` and a `set_scene` that changes who is in view or the mood
+  (not on `move_party`: a new place is a new key anyway, and a return within the topic
+  reuses the painting). The prompt adds the moment and who is in view (`Art.moment`).
+  Paintings are asked for only for a **finished reply's** state (`st === G.st && st.turn >
+  0`): never the blank page before the opening (the opening's `set_scene` would make it a
+  wasted $0.04 at once) and never the mid-turn copy. The moment roundel is drawn over
+  the painting too. The woodcut draws first and the painting replaces it when ready;
   `UI.plateToken` is the only "is this still the current plate" check (checking
   `G.st.here` was a bug: during a turn the plate is drawn from the uncommitted copy).
   Paintings are a cache: not in saves or exports; "Delete all" clears them.
 - **Saves.** IndexedDB `cyoa/saves` (autosave + 3 slots), localStorage then memory as
   fallbacks. Save = `{format:'cyoa-save', v:1, seed, pins, bible, events, transcript,
-  turn, endingAck, meta}`; load = replay. Export/import = the same JSON. Keys are never
-  in a save.
+  turn, endingAck, costs, notes, meta}`; load = replay. Export/import = the same JSON.
+  Keys are never in a save.
+- **Clock.** Every player exchange takes time: after the turn, unless the GM already
+  moved the clock (`move_party`, `rest`, `advance_time`) or characters are being made,
+  `exchangeMinutes()` adds 2 min + 1 per 60 narrated words + `CHECK_MINUTES` per
+  `roll_check` (investigation 15, survival 20, ...), or 1 min per reply in a fight, capped
+  at 120. It is executed and **logged as an ordinary `advance_time` event** (`auto: true`),
+  so replay lands on the same minute. The system prompt tells the GM this happens, so it
+  uses `advance_time` only for longer activities. The header shows `hudClock()` (short,
+  one line); the engine's `clockText()` stays unchanged because tool results carry it.
+- **Party sheet.** Every score, save, skill, attack, ability, item, HP, Armour, level,
+  class and condition is a `.term` button; `termInfo(c, kind, key)` writes the popup from
+  `ABIL_INFO` / `SAVE_INFO` / `SKILL_INFO` / `COND_INFO` / `CLASS_INFO` / `ITEM_INFO` plus
+  this character's numbers, computed the way the engine computes them (keep them in step
+  when a rule changes). `Pop` is a centred dialog over its own scrim: a tap outside
+  closes it and is swallowed; Escape closes it before the page under it.
+- **Notes.** `G.notes = [{id, text, src: 'story'|'mine', at}]`, saved with the tale. A
+  selection inside `#scroll` raises the fixed "+ Note" button just under it (clamped on
+  screen, repositioned on scroll); it acts on **pointerdown** with `preventDefault` so the
+  tap does not collapse the selection first. The text comes from `rangeText()` (the DOM
+  text, paragraphs joined by line breaks): `Selection.toString()` follows the rendering,
+  and the drop cap's float swallowed the space after it ("Awolf"). The Notes page edits
+  in place (textarea per bullet, autosave on blur), removes with the cross, and drops
+  empty notes when it closes. Notes are text only (`textarea.value`), never markup.
 
 ## Rules that are easy to break
 
@@ -207,6 +247,7 @@ shapes; if Safari hides them, no page can use them.
 ## Follow-ups (not built)
 
 An offline scripted GM for visitors without a key; an optional server proxy; more world
-tables and a bigger bestiary; an initiative tracker UI; an effort sweep
+tables and a bigger bestiary; an initiative tracker UI; more moment kinds (a portrait per
+NPC role, a clue still life for `record_fact`); an effort sweep
 after the first playtest; caching premium audio per passage (nothing replays a passage
 yet, so it would buy nothing today).
