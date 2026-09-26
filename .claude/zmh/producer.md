@@ -49,6 +49,25 @@
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
 
+  **2026-09-26, CYOA pass** (pointer moved `26f201a` -> `21c0905`, range
+  `26f201a..21c0905`). The CD scoped this pass to CYOA ("for CYOA"), so it
+  refined only this session's nine commits — `061a62e`, `fb344b1`, `ef0c656`,
+  `b959e90`, `15a4175`, `ccf248d`, `4f113d6`, `d9ece56`, `21c0905` — and
+  **leaves six behind**, now buried by the new pointer:
+  - **`4b3e8a6`** — the interlock session's own refine commit, skippable.
+  - **`1f666da`** `docs(interlock): close the black-background ambient
+    question` — that session's docs-only follow-up after its refine commit
+    (touches only `.claude/interlock.md`), so already on disk.
+  - **`601291e`** (2026election voter guide) and **`a0b0bbc`**
+    (carbon-footprint, the Almanac style) — each ships its own `README.md` /
+    `CLAUDE.md` and a root `CLAUDE.md` bullet, so they look self-documented.
+  - **`aa8a172`** + **`d0a1b5b`** (music-mixer DRUMS 1 preset) — both edit
+    `.claude/music-mixer.md` and its suite alongside the code, i.e. refined
+    inline.
+  None of them had a `docs(claude): refine` pass of its own; they are those
+  sessions' to confirm. `99205d8` and `c28a947` are still outstanding and still
+  hidden (both re-checked ancestors of `26f201a`, fifth pass running).
+
   **2026-09-20, interlock pass** (pointer moved `4b333e0` -> `26f201a`, range
   `4b333e0..26f201a`). Range held this session's own three commits — `6726c4e`
   (the game added), `4218bfc` (the viewport fix) and `26f201a` (the lighting

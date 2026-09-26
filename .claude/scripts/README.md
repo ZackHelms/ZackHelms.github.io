@@ -73,6 +73,27 @@ Deterministic helpers for working on this repo.
   21-chapter document. Full intake note:
   `.claude/notes/20260919-blocked-pages-and-pdf-intake.md`.
 
+- `negtest-batch.py` — run a LIST of negative tests against a suite, one break
+  at a time, through `negtest.sh` (save, break, run, restore-and-verify, next).
+  Every anchor must occur exactly once and every replacement must carry the
+  `@negtest` marker — both checked for the whole list before anything runs — and
+  it refuses to start while a break is already live. A break the suite does not
+  turn red is reported `MISSED`: that is a hole in the suite, so write the row
+  that can see it and re-run that one break.
+
+  ```
+  NODE_PATH=... python3 .claude/scripts/negtest-batch.py breaks.json -- node .claude/tests/drive-cyoa.cjs
+  # NEG=clock never moves VERDICT=caught EXIT=1 CHECKS=165 PASSED=162 FAILED=3
+  #     FAIL an exchange of talk moves the clock a few minutes (0 min, ...)
+  # NEGBATCH: GREEN caught=15/15
+  ```
+
+  `breaks.json` = `[{"name", "file", "old", "new"}]`. Exit 1 = a break missed or
+  the list is invalid; exit 2 = a restore could not be verified (stop and look).
+  `NEGBATCH_TIMEOUT` (seconds, default 900) bounds each run. Written 2026-09-26
+  after the CYOA session hand-rolled this loop in the scratchpad four times (29
+  breaks); three came back MISSED and each was a real blind spot in the suite.
+
 - `replace-fn.py` — replace ONE whole JS function in a single-file game, located
   by **name** and bounded by **brace counting**. `games/CLAUDE.md` § Editing a
   large single-file game records why: a span replacement between two hand-picked

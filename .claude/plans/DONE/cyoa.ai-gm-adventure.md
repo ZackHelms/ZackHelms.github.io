@@ -486,5 +486,5 @@ is not rendered (no caption).
 
 ```
 /compact
-/zmh-producer:oversee-implementation .claude/plans/cyoa.ai-gm-adventure.md
+/zmh-producer:oversee-implementation .claude/plans/DONE/cyoa.ai-gm-adventure.md
 ```

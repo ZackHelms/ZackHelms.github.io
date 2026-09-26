@@ -5,7 +5,8 @@ D&D where **Claude is the Game Master**: a seed generates a world, the GM narrat
 (text revealed in step with a narrator voice), players type or speak, and every change
 to the world goes through a **deterministic engine** that validates it, logs it, and
 feeds the recorded canon back to the GM so revisits stay consistent. CD commission,
-2026-09-25. Plan: `.claude/plans/cyoa.ai-gm-adventure.md`. Suite:
+2026-09-25. Plan (implemented, archived): `.claude/plans/DONE/cyoa.ai-gm-adventure.md`.
+Lessons and root causes: `.claude/notes/20260926-cyoa-ai-gm-lessons.md`. Suite:
 `.claude/tests/drive-cyoa.cjs` (165 checks). Style: **Grimoire**
 (`.claude/styles/grimoire.md`). **Proprietary** (`games/cyoa/LICENSE`).
 
@@ -30,6 +31,20 @@ feeds the recorded canon back to the GM so revisits stay consistent. CD commissi
 - Title: NEW / LOAD / SETTINGS / EXIT. **No top-left back/mute/settings chrome**;
   EXIT is the way back. **Reload button top-right at 2x** (76x60), below the badge.
 - Hub: the **first** card, icon 🧙.
+
+## CD decisions (2026-09-26, second round) — do not relitigate
+
+- **A new picture after every Game Master reply** (the free woodcut: a new framing plus
+  a moment inset); a paid painting changes **per topic change**, not per reply.
+- **The clock moves a realistic amount with every interaction.**
+- **Every line of the party sheet opens a popup** that closes on a tap outside it.
+- **Selected story text goes to a Notes page verbatim**, one bullet per selection; the
+  page also takes typed notes and removes old ones.
+- Asked whether an Anthropic key can make better voices: **no**, the API has no speech
+  output (source: the claude-api skill). The CD will try the OpenAI voice later.
+- **Open, CD undecided (2026-09-25):** which GM tasks to script or pin to Haiku. They
+  first want to experiment with models using the cost ledger. Ask again once they have
+  cost history to look at; per-task routing (Costs below) is where it plugs in.
 
 ## Documented exceptions to repo conventions
 
@@ -242,7 +257,11 @@ back to the device voice with a toast naming the error.
 
 Also unverified: whether iOS Safari lists downloaded Enhanced/Premium voices in
 `getVoices()` at all, and whether their names carry the tier. The code handles both
-shapes; if Safari hides them, no page can use them.
+shapes; if Safari hides them, no page can use them. The CD's Jamie (Premium) did NOT
+appear (2026-09-25); whether "This device's own voice setting" then speaks in it is
+the open question. Also unverified on a real iPhone: that the "+ Note" button's
+`pointerdown` keeps the native selection alive next to iOS's own Copy callout
+(verified in headless Chromium only).
 
 ## Follow-ups (not built)
 

@@ -65,6 +65,16 @@ both are ways a **pixel check** goes green for the wrong reason:
   letter drawn on top was styled per style *outside* the branch. Prefer an
   assertion about behaviour — "the mesh pickups tumble and the flat ones hold
   still" — which a fall-through cannot fake.
+- **A double that mirrors its input cannot catch a bug about that input**
+  (CYOA, 2026-09-25/26 - three negative tests came back GREEN, each for this
+  reason). The Anthropic stub echoed the *requested* model in `message_start`, so
+  "bill the model that actually served the reply" was untestable until a stub
+  mode answered as a different model. The fake speech engine returned the *same*
+  voices array on every `getVoices()` call, so a pushed voice appeared without the
+  refresh under test; real engines return a fresh list. The drop-cap note check
+  selected "Rain falls", but the space is only lost after a ONE-letter drop cap
+  ("A wolf"). When writing a stub, a fake or an example, ask which input would
+  make the buggy and the fixed code disagree, and use that one.
 - **Negative controls go stale when the art moves — re-fire them after any
   visual retune.** "Banking changes the lighting" measured left-flank vs
   right-flank, and its control (kill the lighting) legitimately failed the
@@ -177,6 +187,9 @@ Every check above was verified by deliberately breaking the thing it guards and
 confirming that check — and only that check — went red. `.claude/scripts/negtest.sh`
 exists so the break always gets restored (`save` before, `restore` after, and
 note that `restore` consumes the snapshot, so re-`save` before the next break).
+For more than two or three breaks, list them in a JSON file and run
+`.claude/scripts/negtest-batch.py`: it validates every anchor first, does the
+save/break/run/restore dance per break, and names any break the suite MISSED.
 
 | Suite | Game | Why it lives here |
 | --- | --- | --- |
