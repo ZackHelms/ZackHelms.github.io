@@ -140,6 +140,11 @@ Deterministic helpers for working on this repo.
     node .claude/scripts/smoke-mobile.cjs signals/index.html
   ```
 
+  A `#route` suffix is loaded as a client-side hash route (the file is checked
+  without it), so a hash-routed app's inner page can be gated directly:
+
+    node .claude/scripts/smoke-mobile.cjs 'character-lists/index.html#/widows-bay'
+
   The gate is not games-only — it is an error-free-load check for any page in
   the repo, `signals/index.html` included.
 

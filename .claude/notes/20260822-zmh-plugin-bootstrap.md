@@ -55,12 +55,28 @@ teardown commands do.
 3. **Remote, no sibling clone** — falls back to `marketplace add
    ZackHelms/zmhstudio` and clones from GitHub. This is the path a normal
    single-repo session on this repo takes, so it is the one that matters most.
+   **It fails if `ZackHelms/zmhstudio` is not in the session's GitHub scope**
+   (seen 2026-09-27): `Failed to clone marketplace repository: HTTPS
+   authentication failed … could not read Username for 'https://github.com':
+   terminal prompts disabled`. The session's git proxy only authenticates
+   repos attached to the session. Fix: attach it with the `add_repo` tool
+   (owner `ZackHelms`, repo `zmhstudio`), `git clone --depth 1
+   https://github.com/ZackHelms/zmhstudio /home/user/zmhstudio`,
+   `register_repo_root`, then re-run the hook — it now takes path 2. On the
+   next resume the hook reported the plugins "load in place" from that clone,
+   so edits there go live on `/reload-plugins`.
 4. **Idempotent rerun** — reports "already installed", exit 0.
 
 In all four the repo's `settings.json` stayed byte-identical.
 
 ## Caveats that will bite again
 
+- **The command is namespaced.** A bare `/refine-context` does not resolve;
+  it is `/zmh-producer:refine-context` (same for every plugin command).
+- **zmh-3d's MCP server may fail to connect** after a mid-session install
+  (`plugin:zmh-3d:zmh-3d-models (CONNECTION_CLOSED)`, 2026-09-27). Its skills
+  and commands still load; only the `mcp__…zmh-3d…` tools are missing. Harmless
+  unless the session actually needs the 3-D pipelines.
 - Plugin installs are **user scope inside the ephemeral container** — they do
   not survive to the next session's container. The hook re-runs every start,
   which is the point.

@@ -49,6 +49,12 @@
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
 
+  **2026-09-27, character-lists (Widow's Bay) pass** (pointer moved `21c0905`
+  -> `9cceecb`, range `21c0905..9cceecb`). Clean: the range held only
+  `1349dc1` (the CYOA session's own refine commit, skippable) and this
+  session's `9cceecb`. Nothing new left behind; `99205d8` and `c28a947` are
+  still outstanding and still hidden.
+
   **2026-09-26, CYOA pass** (pointer moved `26f201a` -> `21c0905`, range
   `26f201a..21c0905`). The CD scoped this pass to CYOA ("for CYOA"), so it
   refined only this session's nine commits — `061a62e`, `fb344b1`, `ef0c656`,

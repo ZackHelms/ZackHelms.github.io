@@ -9,6 +9,8 @@
 //
 // Usage:
 //   node .claude/scripts/smoke-mobile.cjs games/index.html games/neon-golf/index.html
+//   node .claude/scripts/smoke-mobile.cjs 'character-lists/index.html#/widows-bay'
+//   (a `#route` suffix is loaded as a hash route — quote it for the shell)
 //
 // Requirements: `playwright-core` resolvable (NODE_PATH works), and a
 // Chromium binary — $SMOKE_CHROMIUM, /opt/pw-browsers/chromium (remote
@@ -58,7 +60,12 @@ const repoRoot = path.resolve(__dirname, '..', '..');
   }
   let red = false;
   for (const p of pages) {
-    const abs = path.isAbsolute(p) ? p : path.join(repoRoot, p);
+    // A `#fragment` is a client-side route (e.g. character-lists/index.html#/widows-bay),
+    // not part of the file path: check the file without it, load it with it.
+    const hashAt = p.indexOf('#');
+    const file = hashAt < 0 ? p : p.slice(0, hashAt);
+    const hash = hashAt < 0 ? '' : p.slice(hashAt);
+    const abs = path.isAbsolute(file) ? file : path.join(repoRoot, file);
     if (!fs.existsSync(abs)) { console.log('FAIL ' + p + ' — file not found'); red = true; continue; }
     const ctx = await browser.newContext({
       viewport: { width: 390, height: 844 }, deviceScaleFactor: 3,
@@ -69,7 +76,7 @@ const repoRoot = path.resolve(__dirname, '..', '..');
     page.on('pageerror', e => errors.push('pageerror: ' + e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
     try {
-      await page.goto('file://' + abs, { waitUntil: 'load', timeout: 20000 });
+      await page.goto('file://' + abs + hash, { waitUntil: 'load', timeout: 20000 });
       await page.waitForTimeout(1500);
     } catch (e) {
       errors.push('load: ' + e.message);

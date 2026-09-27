@@ -15,9 +15,26 @@ CL.add({
             'yet dated. Compiled from published recaps and reviews, not from the episodes ' +
             'themselves. Spoilers folded until tapped.',
 
+  filters: [
+    {
+      id: 's1', label: 'Season 1',
+      blurb: 'Season 1 (2026, ten episodes): the summer Tom finally gets his tourists ' +
+             'and the island gets its fog. Each episode takes a piece of the season ' +
+             'brochure — lodging, the inaugural swim, beach reads, the town\'s history — ' +
+             'and finds the thing lurking in it, while the town hall staff slowly stop ' +
+             'arguing about whether the curse is real and start arguing about what to do.'
+    },
+    {
+      id: 's2', label: 'Season 2',
+      blurb: 'Season 2: renewed June 2026, not yet dated (filming is expected in 2027). ' +
+             'Entries get tagged here as the season airs.'
+    }
+  ],
+
   characters: [
     {
       name: 'Tom Loftis',
+      tags: ['s1'],
       role: 'Mayor of Widow\'s Bay — widower, sceptic, salesman',
       actor: 'Matthew Rhys',
       detail: 'Grew up on the mainland in Massachusetts, married an islander, and has made ' +
@@ -40,6 +57,7 @@ CL.add({
     },
     {
       name: 'Patricia Moyer',
+      tags: ['s1'],
       role: 'Tom\'s eccentric assistant — also drives the bookmobile',
       actor: 'Kate O\'Flynn',
       detail: 'Odd, lonely and fiercely loyal to Tom. The town has never forgiven her for ' +
@@ -58,6 +76,7 @@ CL.add({
     },
     {
       name: 'Wyck Crawford',
+      tags: ['s1'],
       role: 'The local who knows the island\'s history — and believes all of it',
       actor: 'Stephen Root',
       detail: 'The old man who knows things. Wyck has been warning the town about the ' +
@@ -73,6 +92,7 @@ CL.add({
     },
     {
       name: 'Evan Loftis',
+      tags: ['s1'],
       role: 'Tom\'s teenage son',
       actor: 'Kingston Rumi Southwick',
       detail: 'Born on the island, bored stiff by it, and at the rebellious age where his ' +
@@ -84,6 +104,7 @@ CL.add({
     },
     {
       name: 'Bechir Clemmons',
+      tags: ['s1'],
       role: 'Sheriff of Widow\'s Bay',
       actor: 'Kevin Carroll',
       detail: 'The island\'s law, and increasingly aware that none of what is happening is ' +
@@ -99,6 +120,7 @@ CL.add({
     },
     {
       name: 'Rosemary',
+      tags: ['s1'],
       role: 'Town hall — the island-born busybody',
       actor: 'Dale Dickey',
       detail: 'Deadpan, sharp, and knows everyone\'s business, because she grew up on the ' +
@@ -113,6 +135,7 @@ CL.add({
     },
     {
       name: 'Dale',
+      tags: ['s1'],
       role: 'Town hall staffer',
       actor: 'Jeff Hiller',
       detail: 'Nervous, twitchy and permanently one step from a scream. Credited with the ' +
@@ -127,6 +150,7 @@ CL.add({
     },
     {
       name: 'Ruth Livingston',
+      tags: ['s1'],
       role: 'Tom\'s elderly secretary',
       actor: 'K Callan',
       detail: 'Quietly beloved, deceptively sweet, and one of the town hall fixtures that ' +
@@ -138,6 +162,7 @@ CL.add({
     },
     {
       name: 'Gerrie Doyle',
+      tags: ['s1'],
       role: 'Runs the historical society',
       actor: 'Nancy Lenehan',
       detail: 'Keeper of the island\'s records and folklore, and the person to ask when ' +
@@ -145,6 +170,7 @@ CL.add({
     },
     {
       name: 'Dr. Calvin Morgan',
+      tags: ['s1'],
       role: 'The town doctor',
       actor: 'Christian Clemenson',
       detail: 'Runs the island\'s small hospital, which is where the fog\'s first victim ' +
@@ -152,6 +178,7 @@ CL.add({
     },
     {
       name: 'Kurt',
+      tags: ['s1'],
       role: 'Innkeeper of the Breakwater Inn',
       actor: 'Neil Casey',
       detail: 'Runs the island\'s supposedly haunted inn and would very much like the ' +
@@ -161,6 +188,7 @@ CL.add({
     },
     {
       name: 'Arthur Lloyd',
+      tags: ['s1'],
       role: 'The New York Times reporter',
       actor: 'Bashir Salahuddin',
       detail: 'The travel writer Tom has lured over to put Widow\'s Bay on the map. His ' +
@@ -169,6 +197,7 @@ CL.add({
     },
     {
       name: 'Shep Clark',
+      tags: ['s1'],
       role: 'Fisherman — lost in the fog',
       detail: 'Goes missing at sea when the fog comes in at the start of the pilot, and ' +
               'staggers back into town, half-drowned, while everyone is still arguing ' +
@@ -178,6 +207,7 @@ CL.add({
     },
     {
       name: 'Marissa',
+      tags: ['s1'],
       role: 'Episode 3 — a tourist Tom picks up by the road',
       actor: 'Elizabeth Alderfer',
       detail: 'A lost visitor staying at the inn, whom Tom invites to the season\'s ' +
@@ -187,6 +217,7 @@ CL.add({
     },
     {
       name: 'William',
+      tags: ['s1'],
       role: 'Episode 2 — a guest at the Breakwater Inn',
       detail: 'A friendly man Tom gets talking to during his night at the inn.',
       spoiler: 'He returns in Tom\'s nightmare as a killer clown in the crawl space. The ' +
@@ -194,6 +225,7 @@ CL.add({
     },
     {
       name: 'Reverend Bryce',
+      tags: ['s1'],
       role: 'The island\'s minister',
       actor: 'Toby Huss',
       spoiler: 'Found dead in his church office at the end of episode 4, apparently by ' +
@@ -201,6 +233,7 @@ CL.add({
     },
     {
       name: 'Lauren Loftis',
+      tags: ['s1'],
       role: 'Tom\'s late wife, Evan\'s mother — seen in flashback',
       actor: 'Meredith Casey',
       detail: 'Island-born. Evan has grown up believing she died when he was born.',
@@ -212,6 +245,7 @@ CL.add({
     },
     {
       name: 'Richard Warren',
+      tags: ['s1'],
       role: 'Founding father of Widow\'s Bay, 1700s',
       actor: 'Hamish Linklater',
       detail: 'The revered founder of the settlement. Episode 6 is set in his house in ' +
@@ -230,6 +264,7 @@ CL.add({
     },
     {
       name: 'Sarah Westcott Warren',
+      tags: ['s1'],
       role: 'Episode 6 — Richard Warren\'s bride, 1702',
       actor: 'Betty Gilpin',
       detail: 'Crosses to the island in September 1702 to marry a man she has never met, ' +
@@ -238,6 +273,7 @@ CL.add({
     },
     {
       name: 'The Boogeyman',
+      tags: ['s1'],
       role: 'The masked killer from Patricia\'s school days',
       actor: 'Airon Armstrong',
       detail: 'A local serial killer from decades ago, remembered by the town as a story ' +
@@ -250,6 +286,7 @@ CL.add({
   places: [
     {
       name: 'Widow\'s Bay',
+      tags: ['s1'],
       role: 'The island and its town',
       detail: 'A fictional island off the New England coast: one small town, a harbour ' +
               'and a local history that reads like a list of disasters. The ' +
@@ -261,12 +298,14 @@ CL.add({
     },
     {
       name: 'Town Hall',
+      tags: ['s1'],
       role: 'Tom\'s office — the sitcom half of the show',
       detail: 'Where Tom, Patricia, Ruth, Rosemary and Dale work, in gloriously dated ' +
               'offices. It sits over the town\'s underground emergency shelter.'
     },
     {
       name: 'The emergency shelter',
+      tags: ['s1'],
       role: 'Under Town Hall',
       detail: 'Where the whole island — residents and tourists — is herded when the storm ' +
               'comes in episode 9, with a generator that does not want to work.',
@@ -275,6 +314,7 @@ CL.add({
     },
     {
       name: 'The Breakwater Inn',
+      tags: ['s1'],
       role: 'The haunted hotel',
       detail: 'The island\'s inn, run by Kurt, and supposedly haunted. In episode 2 Tom ' +
               'agrees on a dare to spend the night in its Captain\'s Suite and film ' +
@@ -287,6 +327,7 @@ CL.add({
     },
     {
       name: 'The historical society museum',
+      tags: ['s1'],
       role: 'Widow\'s Bay Local Museum — Richard Warren\'s house',
       detail: 'Gerrie\'s domain: the island\'s records, relics and oddities, housed in ' +
               'the founder\'s old home. The Boogeyman\'s ' +
@@ -294,12 +335,14 @@ CL.add({
     },
     {
       name: 'The lighthouse',
+      tags: ['s1'],
       role: 'On the point',
       detail: 'Tom drives across the island to it in the storm in episode 9, looking for a ' +
               'battery to get the shelter\'s generator running.'
     },
     {
       name: 'The bell tower',
+      tags: ['s1'],
       role: 'The town bell',
       detail: 'The town bell. Keep count when it rings.',
       spoiler: 'Each toll counts a sacrifice the thing under the island is owed. The ' +
@@ -307,23 +350,27 @@ CL.add({
     },
     {
       name: 'The church',
+      tags: ['s1'],
       role: 'Reverend Bryce\'s church',
       spoiler: 'Where Tom and Wyck find the Reverend dead at the end of episode 4.'
     },
     {
       name: 'The bookmobile',
+      tags: ['s1'],
       role: 'Patricia\'s mobile library',
       detail: 'Heavy on Stephen King. Patricia drives it round the island, and in episode ' +
               '4 finds a party-planning self-help book in it that she cannot stop reading.'
     },
     {
       name: 'The beach',
+      tags: ['s1'],
       role: 'Opened each summer with the Inaugural Swim',
       detail: 'Tom officially "opens the ocean" to kick off the tourist season in episode ' +
               '3. Patricia\'s Sunset Cocktails party in episode 4 is held nearby.'
     },
     {
       name: 'The fog',
+      tags: ['s1'],
       role: 'Not a place — the weather everyone watches',
       detail: 'Rolls in off the sea, brings blackouts with it, and according to Wyck means ' +
               'the island is waking up. Old sailors\' stories call it soul-stealing.'

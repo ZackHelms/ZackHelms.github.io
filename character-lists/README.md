@@ -105,6 +105,13 @@ correctly whichever season chip is selected. The top-level `blurb` should
 summarise the whole show. Filter blurbs follow the same spoiler rule as
 everything outside `spoiler` fields: safe to read mid-season.
 
+**A show with one aired season that is renewed** still gets chips: `s1` with its
+own blurb, plus an `s2` placeholder blurb (when it premieres, "entries get tagged
+here as the season airs"), and every entry tagged `['s1']`. That is the pattern
+`sheriff-country`, `boston-blue` and `widows-bay` follow, and it means season 2
+arrives as tags, not a restructure. Only a one-off (a film, a miniseries, a book)
+goes without `filters`.
+
 ### Chapters
 
 `chapters` is a third entry list, rendered after `places` and behaving exactly
@@ -188,6 +195,27 @@ It needs egress to `en.wikipedia.org`, `commons.wikimedia.org` and
 Fictional characters are deliberately **not** in that manifest — the only
 pictures of them are copyrighted publicity stills. Those stay monograms unless
 a picture is added by hand.
+
+### Researching a title
+
+Remote sessions can usually **search but not fetch**: on 2026-09-27 WebFetch
+was egress-blocked for every reference site tried — Wikipedia, Rotten Tomatoes,
+TVmaze (site and `api.`), Fandom wikis, and the recap/review sites — and plain
+`curl` reaches none of them either. `WebSearch` still works, and its result
+summaries are enough to build a title from if the queries are narrow:
+
+- `<title> cast characters` — then again naming the characters found, for roles.
+- `<title> episode N recap` (or `"<episode title>" recap`), **one query per
+  episode** — this is what yields the plot, the per-episode titles and the
+  twists that go in `spoiler` fields.
+- `<title> finale ending explained` — the season's reveals in one place.
+- `<title> locations` / `notable locations` — places, often via filming-location
+  articles.
+- `<title> season 2 renewal` — for the byline and the `s2` placeholder blurb.
+
+Say in `footnote` that the title was compiled from recaps rather than watched,
+and keep invented colour out: a detail no search result supports (a ferry, where
+a prop is kept) is exactly the kind of thing to cut before shipping.
 
 ## URLs
 
