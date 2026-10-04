@@ -25,6 +25,7 @@ local-2p.
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
 | CYOA | `cyoa/` | tabletop-rpg | voice, text-entry, tap | save-campaign | llm-game-master, speech-narration, procedural-generation, seeded-determinism | solo, local-coop | `.claude/cyoa.md` |
+| Animation Rigs | `animation-rigs/` | animation-sandbox | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox | procedural-animation, inverse-kinematics, simulated-agents, real-time-3d | solo | `.claude/animation-rigs.md` |
 | Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
 | Music Mixer | `music-mixer/` | music-instrument | hold, tap, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation, user-authoring | solo | `.claude/music-mixer.md` |
 | Verlet Ragdoll | `verlet-physics-ragdoll/` | physics-toy | drag-grab, drag-steer | open-sandbox | physics-sim, verlet-constraints, direct-manipulation | solo | `.claude/verlet-physics-ragdoll.md` |
@@ -80,7 +81,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-54 games (52 in-repo + 2 external builds).
+55 games (53 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -149,6 +150,21 @@ local-2p.
   levels forever: 16 authored, then endless seeded drawers, each beaten by
   the in-game solver before it is served; earmarked as the first web-first
   prototype of a future iOS title).
+
+### Newly opened by the 2026-10-04 build
+- **`animation-sandbox`** genre + **`procedural-animation`** /
+  **`inverse-kinematics`** / **`simulated-agents`** mechanics (animation-rigs, a
+  direct CD commission). The first page whose content is MOTION itself: eight
+  21-joint stick-figure rigs walk, run, climb a ladder, press a button, fall and
+  slide through a grey-box course, every limb solved by two-bone IK over feet
+  that are planted in the world. There is no goal, score or fail state, which
+  puts it next to `physics-toy` (verlet-ragdoll), but the player does not handle
+  the bodies: they orbit, zoom, follow a figure and slow time, and the figures
+  run their own errands (a one-ladder queue, stairs that become slides under
+  whoever is on them). `real-time-3d` is reused, but this is the first 3D scene
+  drawn with a hand-written perspective projection onto Canvas 2D rather than
+  WebGL. Next on this axis: a rig the player poses or keys, or a crowd that has
+  to share a narrow route.
 
 ### Newly opened by the 2026-09-25 build
 - **`tabletop-rpg`** genre + **`voice`** / **`text-entry`** input +

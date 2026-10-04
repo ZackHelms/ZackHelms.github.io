@@ -914,6 +914,18 @@ text goes to a per-tale Notes page. **Proprietary** (one of the seven protected 
 Suite: `.claude/tests/drive-cyoa.cjs` (165 checks, including the real clients against
 stubbed network). Detailed context: `.claude/cyoa.md`.
 
+
+### ANIMATION RIGS (`animation-rigs/index.html`, ~1,100 lines)
+A grey-box diorama of eight 21-joint stick-figure rigs (CD commission 2026-10-04,
+placed after CYOA on the hub). They walk, run, take the stairs over a platform,
+queue for one ladder up a tower, press its button (which folds both flights into
+slides: anyone on them falls, slides and gets up) and climb back down. Every limb
+is two-bone IK over feet planted in the world. Orbit / zoom / pan / tap-to-follow,
+½× and ¼× time. The first 3D scene here drawn by a hand-written projection onto
+Canvas 2D (tiled faces, painter's sort) rather than WebGL. Hub icon is
+`animation-rigs/icon.svg` via the same CSS override Phasic uses (the card keeps
+🩻 for the sync check). Suite: `.claude/tests/drive-animation-rigs.cjs`.
+Detailed context: `.claude/animation-rigs.md`.
 ---
 
 ## Adding a New Game

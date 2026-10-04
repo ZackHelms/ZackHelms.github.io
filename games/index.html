@@ -58,6 +58,7 @@ h1 {
 }
 .game-icon { font-size: 1.8rem; flex-shrink: 0; }
 .game-card[href="phasic/"] .game-icon { width: 2.1rem; height: 2.1rem; background: url('phasic/icon.svg') center/contain no-repeat; font-size: 0; }
+.game-card[href="animation-rigs/"] .game-icon { width: 2.1rem; height: 2.1rem; background: url('animation-rigs/icon.svg') center/contain no-repeat; font-size: 0; }
 .game-info { display: flex; flex-direction: column; gap: 3px; }
 .game-name {
   font-family: 'Black Ops One', sans-serif;
@@ -140,7 +141,7 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-09-25 21:04 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-04 21:41 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
@@ -151,6 +152,14 @@ h1 {
       <div class="game-info">
         <div class="game-name">CYOA</div>
         <div class="game-desc">An AI game master spins a seeded world, narrates it aloud and remembers everything. Speak or type what your party does.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="animation-rigs/">
+      <div class="game-icon">🩻</div>
+      <div class="game-info">
+        <div class="game-name">ANIMATION RIGS</div>
+        <div class="game-desc">Wireframe stick-figure rigs walk, run and climb a grey-box course. Orbit the camera, then watch the button turn the stairs into slides.</div>
       </div>
     </a>
 
@@ -597,6 +606,7 @@ h1 {
 // adds its entry here in the same commit as its hub card (and index row).
 const GAMES = [
   { n: 'CYOA', i: '🧙', h: 'cyoa/', genre: ['tabletop-rpg'], input: ['voice', 'text-entry', 'tap'], session: ['save-campaign'], mech: ['llm-game-master', 'speech-narration', 'procedural-generation', 'seeded-determinism'], players: ['solo', 'local-coop'] },
+  { n: 'ANIMATION RIGS', i: '🩻', h: 'animation-rigs/', genre: ['animation-sandbox'], input: ['orbit-drag', 'pinch-zoom', 'two-finger-pan', 'tap'], session: ['open-sandbox'], mech: ['procedural-animation', 'inverse-kinematics', 'simulated-agents', 'real-time-3d'], players: ['solo'] },
   { n: 'INTERLOCK', i: '🧊', h: 'interlock/', genre: ['disassembly-puzzle'], input: ['orbit-drag', 'pinch-zoom', 'tap'], session: ['endless-levels'], mech: ['procedural-generation', 'real-time-3d', 'spatial-reasoning', 'day-night-cycle'], players: ['solo'] },
   { n: 'MUSIC MIXER', i: '🎛️', h: 'music-mixer/', genre: ['music-instrument'], input: ['hold', 'tap', 'multi-touch-chord'], session: ['open-sandbox'], mech: ['procedural-audio', 'stem-mixing', 'direct-manipulation', 'user-authoring'], players: ['solo'] },
   { n: 'VERLET RAGDOLL', i: '🦖', h: 'verlet-physics-ragdoll/', genre: ['physics-toy'], input: ['drag-grab', 'drag-steer'], session: ['open-sandbox'], mech: ['physics-sim', 'verlet-constraints', 'direct-manipulation'], players: ['solo'] },
