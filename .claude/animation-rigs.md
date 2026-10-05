@@ -1,6 +1,6 @@
 # Animation Rigs — context
 
-`games/animation-rigs/index.html`, one self-contained file (~1,100 lines).
+`games/animation-rigs/index.html`, one self-contained file (~1,450 lines).
 CD commission 2026-10-04. Placed directly after CYOA on the hub. Open (MIT).
 
 ## What it is
@@ -85,9 +85,107 @@ few seconds later. No goal, no score: the motion is the content.
 top reaches ~5.6 m/s and runs out ~3 m past the bottom, inside the floor.
 Climb rate 0.9 c/s (0.54 m/s). Walk 1.35 m/s, run 3.5 m/s, both x0.62 on stairs.
 
+## Versions (CD request 2026-10-05)
+A **version** dropdown sits top-right beside the **speed** dropdown (4x / 2x /
+1x / half / quarter, default 1x; both are native `<select>`s on `change`, never
+`bindTap`). Versions are listed newest first and the newest is the default;
+`?v=A001` opens an older one. Switching is live: every figure blends 0.35 s
+into the new model.
+
+- **A001** is the first release. **Its code paths are frozen**: `locoParams`,
+  `pressParams`, `getupParams` and every A001 branch are never edited. A later
+  version adds its own function (`locoParams2`, `pressParams2`,
+  `getupParams2`) or branches on `VER>=n`; blend durations go through
+  `BD(a001, a002)`. `buildPose`/`ik2` take A002-only fields (`softIK`,
+  `sagPoles`, `roll`, `sideLean`, `breath`) that are absent, and therefore
+  inert, in A001's parameter blocks. The suite proves it: the shipped A001
+  (`.claude/tests/fixtures/animation-rigs-a001.html`, from commit 6c9d5ff) and
+  the page opened with `?v=A001` produce the same joints **bit for bit** for
+  300 s under one seed. A version must also never consume `Math.random` on an
+  older version's path, or that comparison breaks.
+- **A002** (CD notes: legs and feet snap between frames; torso too upright on
+  stairs; humans bob and sway) adds the three things below.
+- **Adding A003:** add `{id:'A003',n:3}` to the front of `VERSIONS`, write new
+  functions or `VER>=3` branches, copy the current page into a fixture only if
+  you want A002 frozen too, and extend the suite.
+
+### A002: why it snapped and what fixed it
+Measured with an impulse metric (a joint's frame acceleration more than 3x its
+own recent average and > 0.02 m/frame^2), A001 had ~282 snaps per 1000
+figure-frames, 23,784 of them in the legs, worst 1.63 m/frame^2 (a foot
+teleporting). A002: ~49, legs ~3,000, worst ~0.23. The causes, in the order
+they were found, are worth knowing for any procedural gait:
+- **Swing defined as a phase window** (`lp < sf`): when `sf` changes (walk ->
+  run) a foot drops into or out of the middle of a swing. Fix: a swing starts
+  when the foot's phase wraps and runs on its own clock (`ft.t`), which
+  follows the current gait.
+- **Lift-off from the flat foot while the heel was raised**: ankle dropped
+  ~10 cm at lift-off. Fix: swing starts from the displayed ankle (`fromAnk`)
+  and the heel offset decays.
+- **Landing target recomputed and tread-snapped every frame**: it jumped 0.5 m
+  when the prediction crossed a tread edge, or when a turn began late in a
+  swing. Fix: hysteresis snap (`snapTread2`), a glide (`toS`, tau 0.06 s),
+  commit at t=0.85, the target height reached through a spring and made
+  exact for touch-down; on flights `stepOver()` lands each step one tread
+  beyond the other foot, and steps that leave a flight land clear of the edge.
+- **Rise-early / drop-late timing curves on stairs** switched branch when the
+  target height crossed a threshold, and lifted the foot to hip height while
+  still far behind (knee whip). Fix: `clearY()`, the stair profile dilated by
+  a slope cone, followed through a spring, acting mid-swing only. Do not use a
+  rounded max chained across treads: it inflates plateaus by centimetres.
+- **sin() step arc**: non-zero vertical speed at lift-off and touch-down. Fix:
+  sin^2.
+- **IK singularities**: a knee whips as the leg nears full extension, and flips
+  sideways when the hip-to-ankle line nears the pole. Fix: soft IK (`soft`
+  arg to `ik2`) and **sagittal poles** (pole = side axis x limb direction, a
+  quarter turn from the limb, so it can never line up with it).
+- **First-order lag on targets that step** (pelvis height when the leg-reach
+  clamp switches feet; lean; sway): velocity jumps. Fix: `spring()`
+  (critically damped) for pelvis height, lean, fore-aft and lateral offsets,
+  head pitch, foot load shares, the arm-phase offset.
+- **Gait desync**: an early lift landed just after its own slot and so lifted
+  early again every cycle (both feet planted, body walking off them). Fix: an
+  early lift re-times the gait clock; the arms follow through a sprung
+  offset (`B.aOff`) so they never jump.
+- **Snapshot pose blends** freeze velocity at a state change. Fix: the
+  snapshot is extrapolated along its last velocity (`snapV`).
+- Smaller: hard speed cut at a closed flight (now brakes on approach),
+  one-frame crowd shoves (rate-limited), ladder toe/pole switches (blended),
+  stair cadence switching in one frame (eased).
+
+### A002: body masses and balance
+`SEGS`: fourteen segments with Winter/Dempster mass fractions and segment-COM
+positions (head+neck 8.1%, trunk 49.7%, upper arm 2.8%, forearm 1.6%, hand
+0.6%, thigh 10%, shank 4.65%, foot 1.45%). `comOf(J)` is the whole-body centre
+of mass of a built pose. Each frame `locoParams2` compares it with a target and
+moves either the trunk lean (walking, solved with a numeric sensitivity probe
+and a low-passed error so per-step wobble is ignored) or the hips fore-aft
+(`mod` present, i.e. reaching for the button). The **target is the centre of
+pressure, not the ankles** — that was the bug behind a first version that
+leaned everyone backwards: standing it is the feet midpoint + 5 cm, walking
+~7 cm ahead of the ankles on average, plus acceleration x ~0.06 (a*h/g), and on
+stairs a load share toward the upper foot plus a bias (climbing pushes off the
+upper step). Laterally the target is the loaded foot, 85% standing and 35%
+walking; foot load shares are springs; the swing-side hip drops (`roll`,
+~4 deg) and the trunk leans toward the stance side (`sideLean`). Standing
+figures breathe, sway ~1 cm and shift their weight leg to leg every 2.5-6 s.
+`getupParams2` solves the lean so the mass is over the feet once the hands
+leave the floor. Measured (skeleton pelvis->chest line): walk ~4 deg forward,
+stairs up ~22, run ~13.5, standing ~-2; walking sway ~3.4 cm and standing
+weight shifts ~15 cm (5th-95th); the pelvis bob is +-2.4 cm per step by design.
+
+Legs: A001 stood with knees bent ~30 deg (pelvis 0.93 m for 0.89 m legs).
+A002 carries the pelvis at ~0.985 m standing, lower walking/running, and 17 cm
+lower on stairs, where the next tread is otherwise out of reach.
+
 ## Tests
-`.claude/tests/drive-animation-rigs.cjs` — 300 simulated seconds through the
-`window.__AR` hook: no NaN, no bone stretch outside blends, repeated climbs,
-presses and slides, <=1 on the ladder, <=2 on the tower, nobody walks onto a
-slide, no fold under a rider, no walker inside a block, no buried planted
-foot, armed / refused button presses. `--shots <dir>` for eyeballing.
+`.claude/tests/drive-animation-rigs.cjs` (~25 s), all seeded with `rAF`
+stubbed: the rules under both versions (no NaN, no bone stretch outside
+blends, climbs/presses/slides, ladder and tower limits, nobody on a slide, no
+fold under a rider, nobody inside a block, planted feet on their surface as a
+bounded rate); **A001 bit-identical to the fixture**; A002 snaps <= 30% of
+A001's overall and <= 20% in the legs, worst < 0.35; A002 lean/sway/bob
+ranges; both dropdowns, live switching and `?v=`; the button by hook and by a
+real tap. Negative-tested 2026-10-05: freezing the lean, editing an A001 blend
+and turning off soft IK + sagittal poles each turn it red. `--shots <dir>` for
+eyeballing.

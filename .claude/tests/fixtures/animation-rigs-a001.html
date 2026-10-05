@@ -23,10 +23,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 #back-btn{left:8px;font-size:17px}
 #mute-btn{left:52px}
 #info-btn{left:96px;font-size:16px}
-#rchrome{position:fixed;top:calc(16px + env(safe-area-inset-top));right:8px;z-index:80;display:flex;gap:6px}
-.pick{height:30px;background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--green);
-  font-family:'Share Tech Mono',monospace;font-size:13px;padding:0 6px;cursor:pointer}
-#ver-sel{color:var(--gold)}
+#speed-btn{right:8px;top:calc(16px + env(safe-area-inset-top));width:46px;color:var(--green);font-size:13px}
 #info{position:fixed;inset:0;z-index:70;background:rgba(4,4,10,0.88);display:none;
   overflow-y:auto;-webkit-overflow-scrolling:touch;padding:56px 16px 32px}
 #info.open{display:block}
@@ -42,32 +39,21 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-05 04:49 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-04 21:41 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute-btn" class="chrome" aria-label="Toggle sound">🔊</button>
 <button id="info-btn" class="chrome" aria-label="How it works">ⓘ</button>
-<div id="rchrome">
-  <select id="ver-sel" class="pick" aria-label="Version"></select>
-  <select id="speed-sel" class="pick" aria-label="Playback speed">
-    <option value="4">4×</option><option value="2">2×</option><option value="1" selected>1×</option><option value="0.5">½×</option><option value="0.25">¼×</option>
-  </select>
-</div>
+<button id="speed-btn" class="chrome" aria-label="Playback speed">1×</button>
 <div id="info"><div class="panel">
   <h2>ANIMATION RIGS</h2>
   <p>Eight stick-figure rigs live in a grey-box course: two flights of stairs over a platform, and a ladder up a tower with a big red button on top.</p>
   <h3>CAMERA</h3>
-  <p><b>Drag</b> to orbit. <b>Pinch</b> or scroll to zoom. <b>Two fingers</b> (or right-drag / shift-drag) to pan. <b>Tap a figure</b> to follow it, tap empty space to let go. <b>Tap the button</b> yourself if you like. The speed menu top-right runs time at 4&times;, 2&times;, 1&times;, &frac12;&times; or &frac14;&times; so you can study the gait; the version menu beside it switches the animation model live, so the same figures can be compared under each.</p>
-  <h3>VERSIONS</h3>
-  <p><b>A002</b> (default) adds the body-mass model, balance, smoothing and torso sway described below. <b>A001</b> is the first release, kept exactly as it shipped. Add <b>?v=A001</b> to the address to open on an older version.</p>
+  <p><b>Drag</b> to orbit. <b>Pinch</b> or scroll to zoom. <b>Two fingers</b> (or right-drag / shift-drag) to pan. <b>Tap a figure</b> to follow it, tap empty space to let go. <b>Tap the button</b> yourself if you like. The speed button top-right slows time to &frac12;&times; and &frac14;&times; so you can study the gait.</p>
   <h3>THE RIG</h3>
   <p>Every figure is 21 joints: pelvis, two spine joints, neck and head, then shoulder, elbow, wrist and hand per arm and hip, knee, ankle and toe per leg. Bone lengths never change. Legs and arms are solved every frame with <b>two-bone inverse kinematics</b>: the code decides where a foot or hand should be, and the knee or elbow is placed analytically, bent toward a pole direction (knees forward, elbows back and out).</p>
   <h3>WALKING AND RUNNING</h3>
   <p>Feet are <b>planted in the world</b> and only move during their swing, so they never skate. When a foot lifts, its landing spot is predicted from the body's velocity so it lands under the hips at mid-stance. On stairs the landing is snapped to the centre of a tread: one tread per step walking, two running. The heel peels up late in each stance, the toe pitches through the swing, the pelvis bobs (lowest at mid-stance when running, highest when walking) and is pulled down whenever a leg could not reach, and the arms and shoulders counter-swing the legs. Turning on the spot re-plants the feet.</p>
-  <h3>BALANCE (A002)</h3>
-  <p>Each figure has a body-mass model: fourteen segments (head and neck 8.1% of body mass, trunk 49.7%, each upper arm 2.8%, forearm 1.6%, hand 0.6%, thigh 10%, shank 4.65%, foot 1.45%) with each segment's own centre of mass placed along it from published anthropometric tables (source: Winter, <i>Biomechanics and Motor Control of Human Movement</i>, after Dempster 1955). Every frame the whole-body centre of mass is computed from the actual pose and moved to where the support says it must be. Walking, that is solved with <b>trunk lean</b>: on stairs the upper foot carries the body, so climbing leans the trunk forward over the step ahead; speeding up needs the centre of mass ahead of the feet (acceleration &times; height &divide; g), slowing down behind them. Reaching for the button keeps the trunk where the reach puts it and slides the <b>hips back</b> instead, as people do. Getting up off the floor leans as far forward as it must to bring the mass over the feet before rising.</p>
-  <p><b>Side to side</b>, the mass shifts toward whichever foot is carrying weight: part-way when walking, almost fully when standing. The hip of the swinging leg drops about 4&deg; and the trunk leans slightly toward the stance side. The pelvis rises and falls twice per stride. Standing, figures breathe, sway a centimetre or so, and every few seconds settle their weight onto one leg.</p>
-  <p><b>Smoothing:</b> each foot's swing runs on its own clock and starts from where the heel actually lifted, rising and landing with zero vertical speed; the landing spot glides toward the prediction and is committed before touch-down; on stairs each step lands one tread beyond the other foot, and the foot clears each riser by following the stair profile rather than a timing curve; the heel strikes first and the foot rolls flat. Knees and elbows bend in the limb's own plane and ease toward straight instead of snapping straight. Pelvis height, lean, sway and head pitch move on critically damped springs, so no target change ever jolts them; pose changes blend from where each joint was heading, not from a frozen snapshot. Ladder hand-offs blend instead of switching, and figures are never shoved apart faster than they can walk.</p>
   <h3>THE LADDER</h3>
   <p>Climbing moves the limbs in diagonal pairs, left hand with right foot and then the other pair, each up two rungs at a time, while the pelvis rises steadily. Getting on, mounting the platform and stepping off are their own keyed transitions, again with IK limbs.</p>
   <h3>THE BUTTON</h3>
@@ -102,12 +88,9 @@ const UP=V(0,1,0);
 
 // Two-bone IK: returns [middle joint, end joint]. The end is pulled back
 // onto the reachable shell when the target is out of range.
-// soft (A002): within `soft` of full extension the reach eases in exponentially, so a
-// limb never snaps straight and the joint never whips across the singular point.
-function ik2(root,target,a,b,pole,soft){
+function ik2(root,target,a,b,pole){
   const d=sub(target,root);let dist=vlen(d);
   const dir=dist>1e-6?mul(d,1/dist):V(0,-1,0);
-  if(soft){const ds=a+b-soft;if(dist>ds) dist=ds+soft*(1-Math.exp(-(dist-ds)/soft));}
   dist=clamp(dist,Math.abs(a-b)+1e-3,a+b-1e-4);
   const ca=(a*a+dist*dist-b*b)/(2*a*dist);
   const along=a*ca,h=Math.sqrt(Math.max(0,a*a-along*along));
@@ -223,13 +206,6 @@ const BONES=[[0,1],[1,2],[2,3],[3,4],[2,5],[5,6],[6,7],[7,8],[2,9],[9,10],[10,11
 const chars=[];
 const ladder={occ:null,next:null};
 let simT=0;
-// Versions, newest first. A001 code paths are frozen: the drive suite proves that
-// selecting A001 reproduces the shipped A001 frame for frame. Later versions add
-// their own functions (locoParams2...) or branch on VER, never edit an A001 path.
-const VERSIONS=[{id:'A002',n:2},{id:'A001',n:1}];
-let VER=VERSIONS[0].n;
-try{const q=(new URLSearchParams(location.search).get('v')||'').toUpperCase(),m=VERSIONS.find(v=>v.id===q);if(m) VER=m.n;}catch(e){}
-const BD=(a001,a002)=>VER>=2?a002:a001;   // pose-blend seconds per version
 
 function makeChar(i){
   const p=randGround();
@@ -243,9 +219,8 @@ function makeChar(i){
 function buildPose(s,P){
   const f=P.f,u=P.u,r=norm(cross(f,u));
   const lean=P.lean||0,cl=lean*1.25+(P.chestLean||0);
-  let sd=norm(add(mul(u,Math.cos(lean)),mul(f,Math.sin(lean))));
-  let cd=norm(add(mul(u,Math.cos(cl)),mul(f,Math.sin(cl))));
-  if(P.sideLean){sd=norm(madd(sd,r,Math.sin(P.sideLean)));cd=norm(madd(cd,r,Math.sin(P.sideLean*1.4)));}
+  const sd=norm(add(mul(u,Math.cos(lean)),mul(f,Math.sin(lean))));
+  const cd=norm(add(mul(u,Math.cos(cl)),mul(f,Math.sin(cl))));
   const pel=P.pelvis;
   const spine=madd(pel,sd,0.2*s),chest=madd(spine,cd,0.26*s),neck=madd(chest,cd,0.1*s);
   const fp=norm(cross(cd,r));
@@ -256,18 +231,12 @@ function buildPose(s,P){
   const nose=madd(head,norm(add(mul(nf,Math.cos(hy)),mul(r,Math.sin(hy)))),0.17*s);
   const tw=P.twist||0;
   const rs=add(mul(r,Math.cos(tw)),mul(fp,Math.sin(tw)));
-  const shY=-0.035*s+(P.breath||0);
-  const shL=madd(madd(chest,rs,-0.18*s),cd,shY),shR=madd(madd(chest,rs,0.18*s),cd,shY);
-  const fpp=norm(cross(sd,r));let rp=add(mul(r,Math.cos(-tw*0.5)),mul(fpp,Math.sin(-tw*0.5)));
-  if(P.roll) rp=norm(add(mul(rp,Math.cos(P.roll)),mul(u,-Math.sin(P.roll))));   // +roll drops the right hip
+  const shL=madd(madd(chest,rs,-0.18*s),cd,-0.035*s),shR=madd(madd(chest,rs,0.18*s),cd,-0.035*s);
+  const fpp=norm(cross(sd,r)),rp=add(mul(r,Math.cos(-tw*0.5)),mul(fpp,Math.sin(-tw*0.5)));
   const hipL=madd(madd(pel,rp,-0.1*s),sd,-0.04*s),hipR=madd(madd(pel,rp,0.1*s),sd,-0.04*s);
   const kp=P.kneePole||f;
-  const sk=P.softIK?0.025*s:0;
-  // sagPoles (A002): bend in the limb's own sagittal plane, a quarter turn from the limb
-  // direction about the body's side axis, so the pole can never line up with the limb
-  const sag=(a,b,sg,out)=>madd(norm(cross(r,norm(sub(b,a)))),r,sg*out);
-  const [knL,anL]=ik2(hipL,P.ankL,0.45*s,0.44*s,P.sagPoles?sag(hipL,P.ankL,-1,0.12):madd(kp,r,-0.12),sk);
-  const [knR,anR]=ik2(hipR,P.ankR,0.45*s,0.44*s,P.sagPoles?sag(hipR,P.ankR,1,0.12):madd(kp,r,0.12),sk);
+  const [knL,anL]=ik2(hipL,P.ankL,0.45*s,0.44*s,madd(kp,r,-0.12));
+  const [knR,anR]=ik2(hipR,P.ankR,0.45*s,0.44*s,madd(kp,r,0.12));
   const defToe=norm(add(mul(f,0.9),mul(u,-0.45)));
   const toeL=madd(anL,P.toeL?norm(sub(P.toeL,anL)):defToe,0.15*s);
   const toeR=madd(anR,P.toeR?norm(sub(P.toeR,anR)):defToe,0.15*s);
@@ -276,8 +245,7 @@ function buildPose(s,P){
     A=A||{sw:0,reach:0.52*s,out:0.06*s};
     const rest=madd(add(sh,mul(add(mul(u,-Math.cos(A.sw)),mul(f,Math.sin(A.sw))),A.reach)),r,sg*A.out);
     const tgt=grip?lerpV(rest,grip,w==null?1:w):rest;
-    const pole=P.sagPoles?madd(mul(norm(cross(r,norm(sub(tgt,sh)))),-1),r,sg*0.5):madd(ep,r,sg*0.5);
-    const [el,wr]=ik2(sh,tgt,0.29*s,0.26*s,pole,P.softIK?0.035*s:0);
+    const [el,wr]=ik2(sh,tgt,0.29*s,0.26*s,madd(ep,r,sg*0.5));
     return [el,wr,madd(wr,norm(sub(wr,el)),0.08*s)];
   };
   const [elL,wrL,haL]=arm(shL,-1,P.armL,P.gripL,P.wL);
@@ -287,7 +255,6 @@ function buildPose(s,P){
 
 function setState(ch,s,bd){
   ch.snap=ch.out?ch.out.slice():null;ch.blendT=0;ch.blendDur=bd;ch.state=s;
-  ch.snapV=ch.out&&ch.outPrev&&ch.lastDt>0?ch.out.map((p,i)=>mul(sub(p,ch.outPrev[i]),1/ch.lastDt)):null;
 }
 // Plant both feet where the last displayed pose left the ankles.
 function initFeet(ch){
@@ -295,7 +262,7 @@ function initFeet(ch){
     const a=ch.out?ch.out[i?19:15]:V(ch.x+(i?0.1:-0.1),0,ch.z);
     ch.feet[i]={plant:V(a.x,footY(a.x,a.z),a.z),fyaw:ch.yaw,sw:false,from:null,to:null,fromYaw:ch.yaw};
   }
-  ch.py=null;ch.spd=0;ch.b2=null;
+  ch.py=null;ch.spd=0;
 }
 
 /* ---------- locomotion: planted feet, predicted landings, IK legs ---------- */
@@ -382,284 +349,6 @@ function locoParams(ch,dt){
     armL:{sw:-amp*cs+0.3*ra,reach,out},armR:{sw:amp*cs+0.3*ra,reach,out}};
 }
 
-/* ---------- A002: smoothed gait + whole-body centre-of-mass balance ---------- */
-// Segment masses as fractions of body mass, and where each segment's own centre of
-// mass sits along it from the proximal joint (Winter, "Biomechanics and Motor Control
-// of Human Movement", after Dempster 1955). [proximal, distal, mass, com fraction].
-const SEGS=[[3,4,0.081,0.8],[0,2,0.497,0.5],
-  [5,6,0.028,0.436],[6,7,0.016,0.43],[7,8,0.006,0.5],[9,10,0.028,0.436],[10,11,0.016,0.43],[11,12,0.006,0.5],
-  [13,14,0.1,0.433],[14,15,0.0465,0.433],[15,16,0.0145,0.5],[17,18,0.1,0.433],[18,19,0.0465,0.433],[19,20,0.0145,0.5]];
-function comOf(J){
-  let x=0,y=0,z=0;
-  for(const g of SEGS){const a=J[g[0]],b=J[g[1]],m=g[2],t=g[3];x+=m*(a.x+(b.x-a.x)*t);y+=m*(a.y+(b.y-a.y)*t);z+=m*(a.z+(b.z-a.z)*t);}
-  return V(x,y,z);
-}
-const approach=(c,t,dt,tau)=>c+(t-c)*(1-Math.exp(-dt/tau));
-// Critically damped spring toward a target: unlike a first-order lag, a step in the
-// target produces no step in velocity, so a moving target never jolts what follows it.
-function spring(o,k,target,dt,w){
-  const v=o[k+'V']||0,x=o[k],a=w*w*(target-x)-2*w*v,nv=v+a*dt;
-  o[k+'V']=nv;o[k]=x+nv*dt;
-}
-const toeDir=(fd,a)=>V(fd.x*Math.cos(a),Math.sin(a),fd.z*Math.cos(a));
-// Tread snapping with hysteresis: a predicted landing keeps its tread until it is well
-// past the edge, so the target never flips back and forth between two treads.
-function snapTread2(ft,x,z){
-  const s=ST.m>0?null:stairAt(x,z,0);
-  if(!s){
-    ft.snapD=null;
-    const n=ST.m>0?null:stairAt(x,z,0.12);       // off the flight but within a toe of a riser: step clear of it
-    if(n) return stX(n.st,n.d<0?-0.12:RUN+0.12);
-    return x;
-  }
-  let d=Math.min(RUN-0.25,0.5*Math.floor(s.d/0.5)+0.25);
-  if(ft.snapD!=null&&ft.snapSt===s.st&&Math.abs(s.d-ft.snapD)<0.38) d=ft.snapD;
-  ft.snapD=d;ft.snapSt=s.st;
-  return stX(s.st,d);
-}
-// Swing-foot clearance: the walkable heightfield along each flight dilated by a slope
-// cone, so a swinging foot rises as it nears a riser and only drops once it is past an
-// edge. The foot follows it through a spring (below), which rounds the cone's corners.
-const smax=(a,b,k)=>(a+b+Math.sqrt((a-b)*(a-b)+k*k))/2;   // a maximum with a rounded corner
-function clearY(x,z){
-  let h=footY(x,z);
-  if(ST.m>0||Math.abs(z)>SZ+0.1) return h;
-  for(const st of STAIRS){
-    const d=stD(st,x);
-    if(d<-0.7||d>RUN+0.7) continue;
-    for(let i=0;i<=NSTEP;i++){
-      const a=0.5*i,b=i<NSTEP?a+0.5:RUN+4,hh=i<NSTEP?0.25*(i+1):H_PLAT;
-      const dd=d<a?a-d:d>b?d-b:0;
-      if(dd<0.6) h=Math.max(h,hh-1.1*dd);
-    }
-  }
-  return h;
-}
-// On a flight, each step lands one tread beyond the other foot's (step-over-step), which
-// keeps the feet in rhythm with the treads; elsewhere the hysteresis snap above applies.
-function stepOver(ft,other,x,z,fw){
-  const s=ST.m>0?null:stairAt(x,z,0);
-  if(!s) return snapTread2(ft,x,z);
-  const o=stairAt(other.plant.x,other.plant.z,0.6);
-  if(!o||o.st!==s.st) return snapTread2(ft,x,z);
-  const dirD=s.st.up*Math.sign(fw.x||1);            // +1 when walking up this flight (d increasing)
-  const oi=o.d<0?-1:o.d>=RUN?NSTEP:Math.floor(o.d/0.5),ti=oi+(dirD>0?1:-1);
-  // the next step is off the flight: land clearly on the ground or the platform, never on the edge
-  if(ti<0||ti>NSTEP-1){ft.snapD=null;return stX(s.st,ti<0?Math.min(s.d,-0.12):Math.max(s.d,RUN+0.12));}
-  if(Math.abs(s.d-(0.5*ti+0.25))>0.6) return snapTread2(ft,x,z);   // prediction disagrees: trust it
-  ft.snapD=0.5*ti+0.25;ft.snapSt=s.st;
-  return stX(s.st,ft.snapD);
-}
-function locoParams2(ch,dt,mod){
-  const s=ch.s,yaw=ch.yaw;
-  const fw=V(Math.cos(yaw),0,Math.sin(yaw)),rt=V(-Math.sin(yaw),0,Math.cos(yaw));
-  if(!ch.feet[0]) initFeet(ch);
-  if(!ch.b2) ch.b2={mv:0,lean:0.04,lat:0,fa:0,acc:0,pSpd:ch.spd,hp:0.1,up:0,ws:0,wsT:0,wsTgt:0,Sl:0,Sf:0};
-  const B=ch.b2,sa=stairAt(ch.x,ch.z,0.1),onSt=!!sa,ra=ch.runAmt;
-  B.mv=approach(B.mv,clamp(ch.spd/1.3,0,1),dt,0.15);
-  B.acc=approach(B.acc,dt>0?(ch.spd-B.pSpd)/dt:0,dt,0.2);B.pSpd=ch.spd;
-  B.up=approach(B.up,sa?sa.st.up*fw.x:0,dt,0.3);          // +1 heading up a flight, -1 heading down
-  const mv=B.mv,still=1-mv;
-  // one tread per step on stairs, even running; the cadence eases between the two
-  B.cyc=approach(B.cyc||1.45*s,(stairAt(ch.x,ch.z,0.45)?1.0:lerp(1.45,2.7,ra))*s,dt,0.18);
-  const cyc=B.cyc;
-  const sf=lerp(0.38,0.6,ra);
-  const turning=Math.abs(ch.yawRate)>0.5,moving=ch.spd>0.06||turning;
-  const swingAny=ch.feet[0].sw||ch.feet[1].sw;
-  let rate;
-  if(moving) rate=Math.max(0.85,ch.spd/cyc+(turning?0.6:0))+clamp(B.acc,0,6)*0.1;   // short quick steps when speeding up
-  else{
-    let mis=false;
-    for(let i=0;i<2;i++){
-      const ft=ch.feet[i],sg=i?1:-1;
-      const ix=ch.x+rt.x*sg*0.1*s,iz=ch.z+rt.z*sg*0.1*s;
-      if(Math.hypot(ft.plant.x-ix,ft.plant.z-iz)>0.17*s||Math.abs(wrapA(ft.fyaw-yaw))>0.6) mis=true;
-    }
-    rate=(swingAny||mis)?1.4:0;
-  }
-  // setting off from a standstill, the foot that is furthest behind steps first
-  if(moving&&!B.was&&!swingAny&&B.mv<0.12){
-    const b0=(ch.feet[0].plant.x-ch.x)*fw.x+(ch.feet[0].plant.z-ch.z)*fw.z,b1=(ch.feet[1].plant.x-ch.x)*fw.x+(ch.feet[1].plant.z-ch.z)*fw.z;
-    const np=frac(1-(b0<=b1?0:0.5)-1e-4);B.aOff=(B.aOff||0)-(frac(np-ch.phase+0.5)-0.5);ch.phase=np;
-  }
-  B.was=moving;
-  if(B.yawU==null){B.yawU=yaw;B.yawL=yaw;}
-  B.yawU+=wrapA(yaw-B.yawL);B.yawL=yaw;
-  const ph0=ch.phase;ch.phase=frac(ch.phase+rate*dt);
-  const cycT=rate>0?1/rate:1;
-  const ank=[null,null],toe=[null,null],gw=[0,0];
-  for(let i=0;i<2;i++){
-    const ft=ch.feet[i],sg=i?1:-1,lp0=frac(ph0+i*0.5),lp=frac(ch.phase+i*0.5);
-    if(ft.sw&&ft.t==null){ // mid-swing when switched over from A001
-      ft.t=clamp(lp/sf,0,0.99);ft.sf=sf;ft.fromG=ft.from.y;ft.fromAnk=V(ft.from.x,ft.from.y+0.08*s,ft.from.z);ft.fromA=-1.05;ft.toS=null;
-    }
-    // each swing runs on its own clock from the moment this foot's phase wraps, so a
-    // change of gait mid-step can never drop a foot into the middle of a swing
-    // a stance foot left out of reach behind the hips lifts early rather than dragging the body down
-    const hpx=ch.x+rt.x*sg*0.1*s,hpz=ch.z+rt.z*sg*0.1*s;
-    const reach=Math.hypot(ft.plant.x-hpx,(ch.py||0)-0.04*s-ft.plant.y-0.08*s,ft.plant.z-hpz);
-    const behind=(ft.plant.x-ch.x)*fw.x+(ft.plant.z-ch.z)*fw.z<-(0.5+0.2*ra)*s||reach>0.875*s;
-    const other=ch.feet[1-i],otherOk=!other.sw||(other.t||0)>0.5||reach>0.89*s;   // out of reach lifts regardless
-    const wrapped=rate>0&&lp<lp0&&lp0>0.7&&lp<0.3;
-    if(!ft.sw&&(wrapped||(moving&&behind&&otherOk))){
-      // an early lift re-times the gait to this foot, or it would miss its next turn too
-      if(!wrapped){const np=frac(-i*0.5+1e-4);B.aOff=(B.aOff||0)-(frac(np-ch.phase+0.5)-0.5);ch.phase=np;}
-      ft.sw=true;ft.t=0;ft.sf=sf;ft.from=ft.plant;ft.fromYaw=B.yawU+wrapA(ft.fyaw-B.yawU);ft.fromG=ft.plant.y;
-      ft.fromAnk=ft.ank||V(ft.plant.x,ft.plant.y+0.08*s,ft.plant.z);   // lift off from the raised heel
-      ft.fromA=ft.a==null?-0.45:ft.a;ft.toS=null;ft.snapD=null;ft.cl=null;ft.ty=null;
-    }
-    if(ft.sw){
-      ft.sf=sf;ft.t+=(rate>0?rate:1.4)*dt/sf;   // the swing clock follows the current gait
-      const t=Math.min(1,ft.t);
-      const remain=(1-t)*ft.sf*cycT,stanceT=(1-ft.sf)*cycT,T=remain+stanceT*0.5;
-      const lead=ch.spd*T+0.5*clamp(B.acc,-4,6)*T*T;     // where the hips will be by mid-stance
-      let tx=ch.x+fw.x*lead+rt.x*sg*0.1*s;const tz=ch.z+fw.z*lead+rt.z*sg*0.1*s;
-      tx=stepOver(ft,ch.feet[1-i],tx,tz,fw);
-      const raw=V(tx,footY(tx,tz),tz);
-      // the landing target glides toward the prediction rather than jumping with it
-      // the landing spot glides toward the prediction instead of jumping with it, and is
-      // committed for the last stretch of the swing so a late change cannot yank the foot
-      if(!ft.toS) ft.toS=raw;
-      else if(t<0.85) ft.toS=lerpV(ft.toS,raw,1-Math.exp(-dt/0.06));
-      // the target's height is always the surface under it, reached through a spring
-      if(ft.ty==null){ft.ty=ft.toS.y;ft.tyV=0;}
-      const fyT=footY(ft.toS.x,ft.toS.z);
-      spring(ft,'ty',fyT,dt,40);
-      const to=V(ft.toS.x,lerp(ft.ty,fyT,smooth((t-0.8)/0.2)),ft.toS.z),e=smooth(t);   // exact on touch-down
-      ft.to=to;   // kept current so a live switch to A001 mid-step lands this foot where it was going
-      const hx=lerp(ft.fromAnk.x,to.x,e),hz=lerp(ft.fromAnk.z,to.z,e);
-      const arc=Math.sin(Math.PI*t)**2;   // zero vertical speed at lift-off and at touch-down
-      const line=ft.fromG+(to.y-ft.fromG)*e,cw=smooth(t/0.15)*smooth((1-t)/0.15);   // clearance acts mid-swing only
-      if(ft.cl==null){ft.cl=ft.fromG;ft.clV=0;}
-      spring(ft,'cl',clearY(hx,hz),dt,35);
-      const vy=line+cw*(smax(line,ft.cl+0.03*arc,0.03*arc+0.002)-line);
-      const h0=ft.fromAnk.y-(ft.fromG+0.08*s);
-      const lift=arc*lerp(0.1,0.22,ra)*lerp(0.6,1,mv)*s;
-      ank[i]=V(hx,vy+0.08*s+lift+h0*(1-smooth(t/0.35)),hz);
-      const fy=lerp(ft.fromYaw,B.yawU,e),a=lerp(ft.fromA,-0.45+lerp(-0.6,0.3,t),smooth(t/0.3));
-      ft.a=a;
-      toe[i]=madd(ank[i],toeDir(V(Math.cos(fy),0,Math.sin(fy)),a),0.15*s);
-      if(ft.t>=1){ft.sw=false;ft.t=null;ft.plant=V(to.x,footY(to.x,to.z),to.z);ft.fyaw=B.yawU;ft.landA=a;ft.st=0;}
-    }else{
-      ft.plant.y=footY(ft.plant.x,ft.plant.z);
-      ft.st=(ft.st||0)+dt;
-      const sp=clamp((lp-sf)/(1-sf),0,1),hl=smooth((sp-0.62)/0.38)*0.1*s*mv;
-      const fd=V(Math.cos(ft.fyaw),0,Math.sin(ft.fyaw));
-      ank[i]=V(ft.plant.x+fd.x*hl*0.4,ft.plant.y+0.08*s+hl,ft.plant.z+fd.z*hl*0.4);
-      const tp=V(ft.plant.x+fd.x*0.13*s,ft.plant.y+0.015,ft.plant.z+fd.z*0.13*s);
-      let dir=norm(sub(tp,ank[i]));
-      if(ft.landA!=null&&ft.st<0.12) dir=norm(lerpV(toeDir(fd,ft.landA),dir,smooth(ft.st/0.12)));   // heel strike rolls flat
-      ft.a=Math.atan2(dir.y,Math.hypot(dir.x,dir.z));
-      toe[i]=madd(ank[i],dir,0.15*s);
-      gw[i]=lerp(1,smooth(sp/0.2)*smooth((1-sp)/0.25)+0.05,mv);   // load carried by this foot
-    }
-    ft.ank=ank[i];
-  }
-  // standing still, people shift their weight from leg to leg every few seconds
-  if(!moving){B.wsT-=dt;if(B.wsT<=0){B.wsT=rand(2.5,6);B.wsTgt=Math.random()<0.3?0:(Math.random()<0.5?-1:1);}}
-  else B.wsTgt=0;
-  B.ws=approach(B.ws,B.wsTgt,dt,0.9);
-  // each foot's share of the load moves smoothly, even when a slow or settling step lifts it
-  for(let i=0;i<2;i++){const ft=ch.feet[i];if(ft.w==null){ft.w=gw[i];ft.wV=0;}spring(ft,'w',gw[i],dt,30);}
-  const wts=[Math.max(0,ch.feet[0].w)*Math.max(0,1-0.8*B.ws),Math.max(0,ch.feet[1].w)*Math.max(0,1+0.8*B.ws)];
-  let wsum=0,Sl=0;
-  for(let i=0;i<2;i++){const p=ch.feet[i].plant;Sl+=wts[i]*((p.x-ch.x)*rt.x+(p.z-ch.z)*rt.z);wsum+=wts[i];}
-  const dn=Math.max(wsum,0.6);
-  B.Sl=Sl/dn;
-  const wn=(wts[0]-wts[1])/dn;                                   // +1: all weight on the left foot
-  // on stairs the UPPER foot carries the body: ahead when climbing, behind when descending
-  let Sf=0;
-  const f0=ch.feet[0].plant,f1=ch.feet[1].plant;
-  if(Math.abs(B.up)>0.02){
-    const ym=Math.max(f0.y,f1.y),k=B.up>0?7:0;
-    const w0=Math.exp(k*(f0.y-ym)),w1=Math.exp(k*(f1.y-ym));
-    Sf=(w0*((f0.x-ch.x)*fw.x+(f0.z-ch.z)*fw.z)+w1*((f1.x-ch.x)*fw.x+(f1.z-ch.z)*fw.z))/(w0+w1);
-    const q=Math.min(1,Math.abs(B.up)*1.5);
-    // climbing pushes up off the upper foot, so the mass leads; descending it still rides a little ahead
-    Sf=Sf*q*(B.up>0?0.2:0.3)+(B.up>0?0.03+0.06*ra:0.09)*s*q;
-  }
-  B.Sf=approach(B.Sf,Sf,dt,0.45);
-  // pelvis: vertical bob, breathing, quiet postural sway, never higher than the legs reach
-  const base=pelvisBaseY(ch.x,ch.z),breath=Math.sin(ch.t*1.65);
-  const bob=lerp(1,-1.6,ra)*0.024*Math.cos(4*Math.PI*(ch.phase-(1+sf)/2))*mv;
-  B.stS=approach(B.stS||0,stairAt(ch.x,ch.z,0.3)?1:0,dt,0.25);
-  // on a flight the next tread is ~1 m below the hip, more than a leg can reach, so stairs
-  // are taken with the knees bent and the pelvis carried lower
-  // standing the legs are all but straight; walking, running and stairs flex the knees more
-  let py=base+(0.985-0.03*mv-0.05*ra-0.17*B.stS)*s+bob+0.004*breath*still;
-  const L=0.88*s;
-  for(let i=0;i<2;i++){
-    const ft=ch.feet[i],sg=i?1:-1,hx=ch.x+rt.x*(sg*0.1*s+B.lat),hz=ch.z+rt.z*(sg*0.1*s+B.lat);
-    // a swinging leg just bends: its limit fades out after lift-off and back in before landing
-    const slack=ft.sw?0.35*Math.min(smooth((ft.t||0)/0.25),smooth((1-(ft.t||0))/0.25)):0;
-    const hd=Math.hypot(ank[i].x-hx,ank[i].z-hz);
-    if(hd<L) py=Math.min(py,ank[i].y+Math.sqrt(L*L-hd*hd)+0.04*s+slack);
-  }
-  if(ch.py==null){ch.py=py;B.pyV=0;}
-  B.py=ch.py;spring(B,'py',py,dt,28);ch.py=B.py;
-  const apS=(0.007*Math.sin(ch.t*0.83)+0.004*Math.sin(ch.t*2.1+1.3))*still,mlS=0.005*Math.sin(ch.t*1.27+2.1)*still;
-  const mkPel=()=>V(ch.x+rt.x*(B.lat+mlS)+fw.x*(B.fa+apS),ch.py,ch.z+rt.z*(B.lat+mlS)+fw.z*(B.fa+apS));
-  // arms follow the gait clock through a sprung offset, so a re-timed step never jerks them
-  // (a re-timed step moves the clock; aOff absorbs the jump and springs back to zero)
-  if(B.aOff==null) B.aOff=0;
-  spring(B,'aOff',0,dt,7);
-  const amp=lerp(0.32,0.95,ra)*mv,cs=Math.cos(2*Math.PI*(ch.phase+B.aOff-sf));
-  const reach=lerp(0.53,0.36,ra)*s,out=0.07*s;
-  spring(B,'hp',lerp(0.1,0.3,smooth((-B.up-0.2)/0.3))-0.45*(B.lean-0.05),dt,7);
-  if(!moving){ch.lookT-=dt;if(ch.lookT<=0){ch.lookT=rand(1.2,3.5);ch.lookTgt=Math.random()<0.4?0:rand(-0.9,0.9);}}
-  else ch.lookTgt=0;
-  ch.look+=(ch.lookTgt-ch.look)*(1-Math.exp(-dt*4));
-  const lean0=B.lean;
-  const P={pelvis:mkPel(),f:fw,u:UP,lean:B.lean,twist:0.25*amp*cs,headPitch:B.hp,headYaw:ch.look,
-    roll:wn*0.075,sideLean:-wn*0.03,breath:0.006*s*breath,chestLean:0.012*breath*still,softIK:true,sagPoles:true,
-    ankL:ank[0],ankR:ank[1],toeL:toe[0],toeR:toe[1],
-    armL:{sw:-amp*cs+0.3*ra,reach,out},armR:{sw:amp*cs+0.3*ra,reach,out}};
-  if(mod) mod(P);
-  // balance: move the whole-body centre of mass to where the support says it must be.
-  // Walking it is solved with trunk lean; while reaching (mod) the hips slide back instead.
-  const C=comOf(buildPose(s,P));
-  const cF=(C.x-ch.x)*fw.x+(C.z-ch.z)*fw.z,cL=(C.x-ch.x)*rt.x+(C.z-ch.z)*rt.z;
-  // Support is the centre of pressure, not the ankles: standing it sits ~5 cm in front of the
-  // ankles over the feet as they are planted; walking it rolls heel to toe, ~7 cm ahead on
-  // average. Accelerating needs the COM further ahead (~a*h/g).
-  const fMid=((f0.x+f1.x)/2-ch.x)*fw.x+((f0.z+f1.z)/2-ch.z)*fw.z;
-  const tF=lerp(fMid+0.05*s,0.07*s,mv)+B.Sf+clamp(B.acc,-2,2.5)*0.06-0.015*ra;
-  const tL=B.Sl*lerp(0.85,0.35,mv);                               // walking only part-way over the stance foot
-  // the trunk answers the slow part of the error, not the wobble of each step
-  B.eF=approach(B.eF==null?0:B.eF,tF-cF,dt,0.35);
-  if(!mod){
-    const C2=comOf(buildPose(s,Object.assign({},P,{lean:P.lean+0.05})));
-    const k=Math.max(0.15,((C2.x-ch.x)*fw.x+(C2.z-ch.z)*fw.z-cF)/0.05);
-    spring(B,'lean',clamp(B.lean+B.eF/k,-0.25,0.6),dt,4);
-    spring(B,'fa',0,dt,8);
-  }else spring(B,'fa',clamp(B.fa+(tF-cF)/0.85,-0.15,0.12),dt,10);
-  spring(B,'lat',clamp(B.lat+(tL-cL)/0.85,-0.09,0.09),dt,lerp(5,12,mv));
-  P.lean+=B.lean-lean0;P.pelvis=mkPel();
-  return P;
-}
-function pressParams2(ch,dt){
-  const t=ch.pr.t,w=t<0.35?smooth(t/0.35):t<0.75?1:1-smooth((t-0.75)/0.4);
-  const push=t<0.45?0.08-0.08*smooth((t-0.2)/0.25):t<0.62?-0.02:0.06;
-  return locoParams2(ch,dt,P=>{
-    P.gripR=V(BTN.x+0.02,BTN.y+0.07+push,BTN.z+0.05);P.wR=w;
-    P.lean+=0.28*w;P.headPitch=lerp(P.headPitch,0.35,w);
-  });
-}
-// Rising from the floor: once the hands leave the ground the trunk leans as far as it
-// must to keep the centre of mass over the feet.
-function getupParams2(ch,dt){
-  const P=getupParams(ch),g=ch.gu,w=P.wL;
-  if(w<0.999){
-    const fc=V(g.x0+g.f.x*0.5*ch.s,0,g.z0+g.f.z*0.5*ch.s);
-    const C=comOf(buildPose(ch.s,P)),C2=comOf(buildPose(ch.s,Object.assign({},P,{lean:P.lean+0.05})));
-    const e=(fc.x-C.x)*g.f.x+(fc.z-C.z)*g.f.z,k=Math.max(0.15,((C2.x-C.x)*g.f.x+(C2.z-C.z)*g.f.z)/0.05);
-    const want=clamp(P.lean+e/k,-0.3,1.15);
-    g.lS=g.lS==null?want:approach(g.lS,want,dt,0.12);
-    P.lean=lerp(P.lean,g.lS,1-w);
-  }
-  return P;
-}
-
 function moveRoot(ch,dt){
   const err=wrapA(ch.tYaw-ch.yaw),rate=lerp(4,7,ch.runAmt);
   const dy=clamp(err,-rate*dt,rate*dt);
@@ -688,8 +377,6 @@ function goStep(ch,st,dt){
   const te=Math.abs(wrapA(ch.tYaw-ch.yaw));
   sp*=te>1.0?0.2:1-te*0.5;
   if(last) sp=Math.min(sp,dist*1.8+0.12);
-  // A002: a flight that is not stairs is seen coming, so the approach brakes instead of halting dead
-  else if(VER>=2&&ST.mode!=='stairs'&&st.pts[st.i+1]&&st.pts[st.i+1].st) sp=Math.min(sp,dist*1.8+0.3);
   // queue behind whoever is ahead on the structure; on the ground just ease off
   const lvl=pelvisBaseY(ch.x,ch.z);let blocked=false;
   for(const o of chars){
@@ -787,7 +474,7 @@ function ladderAssign(){
   if(best){ladder.next=best;ladderTask(best);}
 }
 function enterLadder(ch,dir){
-  setState(ch,'ladder',BD(0.3,0.45));ch.yaw=-Math.PI/2;ch.spd=0;
+  setState(ch,'ladder',0.3);ch.yaw=-Math.PI/2;ch.spd=0;
   if(dir==='up'){ch.lad={sub:'on',t:0,c:C_START};ch.x=0;ch.z=LAD.pz;}
   else{ch.lad={sub:'unmount',t:1,c:C_END};ch.onTower=false;}
 }
@@ -796,10 +483,10 @@ function ladderLogic(ch,dt){
   switch(L.sub){
     case 'on': L.t+=dt/0.7;if(L.t>=1){L.t=1;L.sub='up';}break;
     case 'up': L.c+=dt*C_RATE;if(L.c>=C_END){L.c=C_END;L.sub='mount';L.t=0;}break;
-    case 'mount': L.t+=dt/1.3;if(L.t>=1){ch.onTower=true;ch.x=0;ch.z=MOUNT_Z;setState(ch,'loco',BD(0.15,0.3));initFeet(ch);}break;
+    case 'mount': L.t+=dt/1.3;if(L.t>=1){ch.onTower=true;ch.x=0;ch.z=MOUNT_Z;setState(ch,'loco',0.15);initFeet(ch);}break;
     case 'unmount': L.t-=dt/1.3;if(L.t<=0){L.t=0;L.sub='down';L.c=C_END;}break;
     case 'down': L.c-=dt*C_RATE;if(L.c<=C_START){L.c=C_START;L.sub='off';L.t=1;}break;
-    case 'off': L.t-=dt/0.7;if(L.t<=0){ch.x=0;ch.z=LAD.pz;setState(ch,'loco',BD(0.15,0.3));initFeet(ch);}break;
+    case 'off': L.t-=dt/0.7;if(L.t<=0){ch.x=0;ch.z=LAD.pz;setState(ch,'loco',0.15);initFeet(ch);}break;
   }
 }
 // Limbs move in diagonal pairs, two rungs (0.6 m) per cycle; the pelvis rises steadily.
@@ -826,19 +513,12 @@ function mountP(ch,t){
   P.pelvis=V(0,lerp(K[i][1],K[i+1][1],k),lerp(K[i][2],K[i+1][2],k));
   const endL=V(-0.1*s,h+0.08*s,-6.0),endR=V(0.1*s,h+0.08*s,-6.15);
   const kl=clamp((t-0.06)/0.32,0,1),kr=clamp((t-0.4)/0.38,0,1);
-  if(VER>=2){
-    const dt_=norm(V(0,-0.45,-0.9));
-    if(kl>0){P.ankL=stepArc(P.ankL,endL,kl);P.toeL=lerpV(P.toeL,madd(P.ankL,dt_,0.15*s),smooth(kl/0.5));}
-    if(kr>0){P.ankR=stepArc(P.ankR,endR,kr);P.toeR=lerpV(P.toeR,madd(P.ankR,dt_,0.15*s),smooth(kr/0.5));}
-  }else{
   if(kl>0){P.ankL=stepArc(P.ankL,endL,kl);P.toeL=null;}
   if(kr>0){P.ankR=stepArc(P.ankR,endR,kr);P.toeR=null;}
-  }
   P.wL=P.wR=1-smooth((t-0.55)/0.35);
   P.lean=t<0.35?lerp(0.16,0.42,smooth(t/0.35)):lerp(0.42,0.04,smooth((t-0.35)/0.65));
   P.headPitch=lerp(-0.3,0.08,smooth(t));
-  if(VER>=2){const k=smooth((t-0.4)/0.35);P.elbowPole=lerpV(P.elbowPole,V(0,-0.3,1),k);P.kneePole=lerpV(P.kneePole,V(0,0,-1),k);}
-  else if(t>0.5){P.elbowPole=null;P.kneePole=null;}
+  if(t>0.5){P.elbowPole=null;P.kneePole=null;}
   return P;
 }
 function bottomP(ch,t){
@@ -846,15 +526,8 @@ function bottomP(ch,t){
   const sL=V(-0.1*s,0.08*s,LAD.pz+0.03),sR=V(0.1*s,0.08*s,LAD.pz-0.03);
   P.pelvis=lerpV(stand,P.pelvis,smooth(t));
   const kl=clamp((t-0.15)/0.6,0,1);
-  if(VER>=2){
-    const dt_=norm(V(0,-0.45,-0.9)),tL=P.toeL,tR=P.toeR;
-    P.ankL=kl>0?stepArc(sL,P.ankL,kl):sL;P.toeL=lerpV(madd(P.ankL,dt_,0.15*s),tL,smooth(kl));
-    P.ankR=lerpV(sR,P.ankR,smooth(t));P.toeR=lerpV(madd(P.ankR,dt_,0.15*s),tR,smooth(t));
-    const k=smooth(t);P.elbowPole=lerpV(V(0,-0.3,1),P.elbowPole,k);P.kneePole=lerpV(V(0,0,-1),P.kneePole,k);
-  }else{
   P.ankL=kl>0?stepArc(sL,P.ankL,kl):sL;if(kl<0.05) P.toeL=null;
   P.ankR=lerpV(sR,P.ankR,smooth(t));if(t<0.5) P.toeR=null;
-  }
   P.wL=P.wR=smooth(t/0.75);
   P.lean=lerp(0.04,0.16,smooth(t));P.headPitch=lerp(0.05,-0.3,smooth(t));
   return P;
@@ -895,7 +568,7 @@ function startFall(c,st,d){
   c.steps=[];c.kind='wander';
   if(ladder.next===c) ladder.next=null;
   c.sl={st,d,z:c.z,sp:downhill?c.spd*0.7+0.15:0.15,t:0,yaw0:c.yaw,down:st.up>0?Math.PI:0};
-  setState(c,'fall',BD(0.12,0.2));
+  setState(c,'fall',0.12);
   setTimeout(()=>SFX.whistle(),rand(0,160));
 }
 function slideFrame(L){
@@ -909,7 +582,7 @@ function fallLogic(ch,dt){
   L.d-=L.sp*(onRamp?COS:1)*dt;
   ch.x=stX(L.st,L.d);ch.z=L.z;
   ch.yaw=lerpAngle(L.yaw0,L.down,smooth(L.t/0.5));
-  if(L.t>=0.55){ch.yaw=L.down;setState(ch,'slide',BD(0.25,0.3));}
+  if(L.t>=0.55){ch.yaw=L.down;setState(ch,'slide',0.25);}
 }
 function fallParams(ch){
   const L=ch.sl,s=ch.s,e=smooth(L.t/0.55),fr=slideFrame(L);
@@ -935,7 +608,7 @@ function slideLogic(ch,dt){
     L.sp=0;
     const f=V(-L.st.up,0,0);
     ch.gu={t:0,x0:ch.x,z0:ch.z,f};
-    setState(ch,'getup',BD(0.2,0.3));
+    setState(ch,'getup',0.2);
   }
 }
 function slideParams(ch){
@@ -954,7 +627,7 @@ function getupLogic(ch,dt){
   if(g.t>=1){
     g.t=1;
     ch.x=g.x0+g.f.x*0.5*ch.s;ch.z=g.z0+g.f.z*0.5*ch.s;ch.yaw=Math.atan2(g.f.z,g.f.x);
-    setState(ch,'loco',BD(0.12,0.3));initFeet(ch);ch.steps=[];
+    setState(ch,'loco',0.12);initFeet(ch);ch.steps=[];
   }
 }
 function getupParams(ch){
@@ -979,7 +652,7 @@ function updateChar(ch,dt){
     case 'press':
       ch.tSpd=0;ch.tYaw=ch.yaw;moveRoot(ch,dt);ch.pr.t+=dt;
       if(!ch.pr.fired&&ch.pr.t>=0.45){ch.pr.fired=true;pressButton();}
-      if(ch.pr.t>=1.2){if(VER>=2) setState(ch,'loco',0.3);else ch.state='loco';}
+      if(ch.pr.t>=1.2) ch.state='loco';
       break;
     case 'ladder': ladderLogic(ch,dt);break;
     case 'fall': fallLogic(ch,dt);break;
@@ -988,27 +661,23 @@ function updateChar(ch,dt){
   }
   let P;
   switch(ch.state){
-    case 'loco': P=VER>=2?locoParams2(ch,dt):locoParams(ch,dt);break;
-    case 'press': P=VER>=2?pressParams2(ch,dt):pressParams(ch,dt);break;
+    case 'loco': P=locoParams(ch,dt);break;
+    case 'press': P=pressParams(ch,dt);break;
     case 'ladder': P=ladderParams(ch);break;
     case 'fall': P=fallParams(ch);break;
     case 'slide': P=slideParams(ch);break;
-    case 'getup': P=VER>=2?getupParams2(ch,dt):getupParams(ch);break;
+    case 'getup': P=getupParams(ch);break;
   }
   const pose=buildPose(ch.s,P);
   if(ch.snap&&ch.blendT<ch.blendDur){
     const k=smooth(ch.blendT/ch.blendDur);
-    if(VER>=2&&ch.snapV){
-      const ex=0.12*(1-Math.exp(-ch.blendT/0.12));
-      for(let i=0;i<pose.length;i++) pose[i]=lerpV(madd(ch.snap[i],ch.snapV[i],ex),pose[i],k);
-    }else for(let i=0;i<pose.length;i++) pose[i]=lerpV(ch.snap[i],pose[i],k);
+    for(let i=0;i<pose.length;i++) pose[i]=lerpV(ch.snap[i],pose[i],k);
+    ch.blendT+=dt;
   }
-  ch.blendT+=dt;   // keeps counting after a blend ends: the suite reads it as time-since-blend
-  ch.outPrev=ch.out;ch.lastDt=dt;
   ch.out=pose;
   if(ch.state==='ladder'){ch.x=pose[0].x;ch.z=pose[0].z;}
 }
-function separate(dt){
+function separate(){
   for(let i=0;i<chars.length;i++) for(let j=i+1;j<chars.length;j++){
     const a=chars[i],b=chars[j];
     if(a.state!=='loco'||b.state!=='loco') continue;
@@ -1016,7 +685,7 @@ function separate(dt){
     if(d>0.5||d<1e-4) continue;
     const la=pelvisBaseY(a.x,a.z),lb=pelvisBaseY(b.x,b.z);
     if(Math.abs(la-lb)>0.3) continue;
-    const push=VER>=2?Math.min((0.5-d)*0.5,0.9*dt):(0.5-d)*0.5,nx=dx/d,nz=dz/d;
+    const push=(0.5-d)*0.5,nx=dx/d,nz=dz/d;
     if(la<0.01){
       const A={x:a.x-nx*push,z:a.z-nz*push},B={x:b.x+nx*push,z:b.z+nz*push};
       if(OBS.every(r=>!inRect(a.x,a.z,r,INF)&&!inRect(A.x,A.z,r,INF))){a.x=A.x;a.z=A.z;}
@@ -1047,7 +716,7 @@ function update(dt){
   }
   ladderAssign();
   for(const c of chars) updateChar(c,dt);
-  separate(dt);
+  separate();
 }
 
 /* ============================== STATIC GEOMETRY ============================== */
@@ -1348,21 +1017,8 @@ function bindTap(el,fn){
   el.addEventListener('touchend',h,{passive:false});el.addEventListener('click',h);
 }
 bindTap(document.getElementById('mute-btn'),()=>{muted=!muted;try{localStorage.setItem('animation-rigs-mute',muted?'1':'0');}catch(e){}applyMute();});
-// Native pickers listen for 'change' and never go through bindTap (it would stop iOS opening them).
-let speed=1;
-const speedSel=document.getElementById('speed-sel'),verSel=document.getElementById('ver-sel');
-speedSel.addEventListener('change',()=>{speed=+speedSel.value||1;audioInit();});
-for(const v of VERSIONS){const o=document.createElement('option');o.value=String(v.n);o.textContent=v.id;verSel.appendChild(o);}
-verSel.value=String(VER);
-verSel.addEventListener('change',()=>{setVersion(+verSel.value);audioInit();});
-function setVersion(n){
-  if(n===VER) return;
-  VER=n;
-  for(const ch of chars){
-    ch.snap=ch.out?ch.out.slice():null;ch.snapV=null;ch.blendT=0;ch.blendDur=0.35;ch.b2=null;
-    for(const ft of ch.feet) if(ft) ft.ank=null;
-  }
-}
+const SPEEDS=[[1,'1×'],[0.5,'½×'],[0.25,'¼×']];let speedI=0;
+bindTap(document.getElementById('speed-btn'),()=>{speedI=(speedI+1)%SPEEDS.length;document.getElementById('speed-btn').textContent=SPEEDS[speedI][1];});
 bindTap(document.getElementById('info-btn'),()=>document.getElementById('info').classList.add('open'));
 bindTap(document.getElementById('info-close'),()=>document.getElementById('info').classList.remove('open'));
 
@@ -1443,7 +1099,7 @@ let lastT=performance.now();
 function frame(now){
   if(cv.clientWidth!==Math.round(W)||cv.clientHeight!==Math.round(H)) resize();
   const dt=Math.min(0.1,(now-lastT)/1000);lastT=now;
-  step(dt*speed);
+  step(dt*SPEEDS[speedI][0]);
   if(follow&&follow.out){const p=follow.out[0],k=1-Math.exp(-dt*4);cam.tx+=(p.x-cam.tx)*k;cam.ty+=(p.y+0.2-cam.ty)*k;cam.tz+=(p.z-cam.tz)*k;}
   else{const k=1-Math.exp(-dt*2);cam.ty+=(1.3-cam.ty)*k;}
   render();
@@ -1453,7 +1109,6 @@ requestAnimationFrame(frame);
 // Test hook (drive suite): advance the simulation deterministically and read state.
 window.__AR={step:(dt,n)=>{for(let i=0;i<n;i++) step(dt);},chars,ST,ladder,
   press:pressButton,render,cam,footY,stairAt,pelvisBaseY,OBS,TW,
-  setVersion,get VER(){return VER;},comOf,
   btnScreen:()=>{camUpdate();const b=toCam(BTN);return {x:sx(b),y:sy(b),z:b[2]};},
   get follow(){return follow;},get simT(){return simT;}};
 </script>
