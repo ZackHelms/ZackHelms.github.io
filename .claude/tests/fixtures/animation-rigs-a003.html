@@ -42,7 +42,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-05 15:05 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-05 12:33 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute-btn" class="chrome" aria-label="Toggle sound">🔊</button>
@@ -55,23 +55,27 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 </div>
 <div id="info"><div class="panel">
   <h2>ANIMATION RIGS</h2>
-  <h3>A001</h3>
-  <p>Eight stick-figure rigs live in a grey-box course: two flights of stairs over a platform, and a ladder up a tower with a big red button on top. <b>Drag</b> to orbit, <b>pinch</b> or scroll to zoom, <b>two fingers</b> (or right-drag) to pan, <b>tap a figure</b> to follow it.</p>
-  <p><b>The rig:</b> 21 joints, bone lengths fixed, every arm and leg solved each frame with two-bone inverse kinematics. <b>Walking:</b> feet are planted in the world and only move in their swing, landing where the body will be at mid-stance; on stairs one tread per step. <b>The ladder:</b> limbs climb in diagonal pairs, with keyed moves to get on, onto the tower and off.</p>
-  <p><b>The button:</b> whoever reaches the top presses it and the flights fold into slides; anyone on them falls, slides down and gets up. The slides fold back a few seconds later, never under a rider, and the button only works (and glows) while the flights are stairs. One climber at a time: someone always waits at the foot of the ladder to go next.</p>
-  <p><b>Rendering:</b> no 3D library, a hand-written perspective projection onto a 2D canvas, faces tiled and drawn far to near, shadows projected from one sun.</p>
-  <h3>A002</h3>
-  <p>Added the <b>speed</b> and <b>version</b> menus. Every older version stays exactly as it shipped; <b>?v=A001</b> on the address opens on one.</p>
-  <p>A <b>body-mass model</b>: fourteen segments with their share of the mass (head and neck 8.1%, trunk 49.7%, upper arm 2.8%, forearm 1.6%, hand 0.6%, thigh 10%, shank 4.65%, foot 1.45%; source: Winter, <i>Biomechanics and Motor Control of Human Movement</i>, after Dempster). The whole-body centre of mass is computed from the pose every frame and kept over the support by <b>leaning the trunk</b>: forward up stairs and when speeding up, the hips back when reaching for the button. Weight shifts side to side onto the loaded foot, the swing hip drops, the pelvis bobs, figures breathe and shift weight while standing.</p>
-  <p><b>Smoothing</b>, after legs and feet were seen to snap: each swing runs on its own clock, landings glide and commit before touch-down, feet follow the stair profile over each riser, knees and elbows ease toward straight, and every follower is a damped spring.</p>
-  <h3>A003</h3>
-  <p>Fixed A002's walk on flat ground (short, rapid steps and a lean back): normal ~0.7 m steps at a normal pace. Standing balance moved to the hips and ankles, trunk upright.</p>
-  <p>Shadows on the stairs now glide down the flight instead of jumping a step per tread. That is drawing only, so it shows under every version.</p>
-  <h3>A004 (default)</h3>
-  <p>A <b>physics engine</b> under the gait, built on A002's segment masses. The <b>trunk</b> is a rigid body hinged at the hips with the mass and inertia of its segments: gravity tips it, the pelvis's acceleration drags it, the hip muscles hold it, so it lags, overshoots and settles like a mass. The <b>legs</b> push the body up but can never pull it down faster than it would fall, and never reach further than they are long.</p>
-  <p><b>Balance is the force law</b>: the ground pushes from under the feet through the centre of mass, and its forward part is what accelerates the body, so the mass sits ahead of the feet by height &times; acceleration &divide; gravity. A figure starting to run leans forward while it speeds up and straightens once it is at speed; it brakes with its feet, trunk up; it leans into turns; up a flight its mass rides over the upper foot. Before, A001 to A003 bent the trunk to put the mass there, so slowing into the stairs leaned it back and speeding up at the top leaned it forward.</p>
-  <p><b>Stairs without the squat:</b> climbed on nearly straight legs, the trailing foot rising onto its toes; a foot that cannot reach the tread flat lands on the ball of the foot. Going down, the standing leg bends to lower the body. <b>The plan</b> each figure follows now asks only for what feet can deliver: accelerations ramped in and out, strides that lengthen with speed, slowing before a sharp turn or a flight.</p>
-  <p>Not simulated: the fall-and-catch inside each step. A draft that did it fell off the flights whenever a step could not catch it.</p>
+  <p>Eight stick-figure rigs live in a grey-box course: two flights of stairs over a platform, and a ladder up a tower with a big red button on top.</p>
+  <h3>CAMERA</h3>
+  <p><b>Drag</b> to orbit. <b>Pinch</b> or scroll to zoom. <b>Two fingers</b> (or right-drag / shift-drag) to pan. <b>Tap a figure</b> to follow it, tap empty space to let go. <b>Tap the button</b> yourself if you like. The speed menu top-right runs time at 4&times;, 2&times;, 1&times;, &frac12;&times; or &frac14;&times; so you can study the gait; the version menu beside it switches the animation model live, so the same figures can be compared under each.</p>
+  <h3>VERSIONS</h3>
+  <p><b>A003</b> (default) fixes A002's walk on flat ground: full-length steps at a normal pace instead of short rapid ones, a slight forward lean instead of rocking back, and standing balance kept at the hips and ankles with the trunk upright. <b>A002</b> added the body-mass model, balance, smoothing and torso sway described below. <b>A001</b> is the first release. Older versions are kept exactly as they shipped; add <b>?v=A001</b> or <b>?v=A002</b> to the address to open on one.</p>
+  <h3>THE RIG</h3>
+  <p>Every figure is 21 joints: pelvis, two spine joints, neck and head, then shoulder, elbow, wrist and hand per arm and hip, knee, ankle and toe per leg. Bone lengths never change. Legs and arms are solved every frame with <b>two-bone inverse kinematics</b>: the code decides where a foot or hand should be, and the knee or elbow is placed analytically, bent toward a pole direction (knees forward, elbows back and out).</p>
+  <h3>WALKING AND RUNNING</h3>
+  <p>Feet are <b>planted in the world</b> and only move during their swing, so they never skate. When a foot lifts, its landing spot is predicted from the body's velocity so it lands under the hips at mid-stance. On stairs the landing is snapped to the centre of a tread: one tread per step walking, two running. The heel peels up late in each stance, the toe pitches through the swing, the pelvis bobs (lowest at mid-stance when running, highest when walking) and is pulled down whenever a leg could not reach, and the arms and shoulders counter-swing the legs. Turning on the spot re-plants the feet.</p>
+  <h3>BALANCE (A002)</h3>
+  <p>Each figure has a body-mass model: fourteen segments (head and neck 8.1% of body mass, trunk 49.7%, each upper arm 2.8%, forearm 1.6%, hand 0.6%, thigh 10%, shank 4.65%, foot 1.45%) with each segment's own centre of mass placed along it from published anthropometric tables (source: Winter, <i>Biomechanics and Motor Control of Human Movement</i>, after Dempster 1955). Every frame the whole-body centre of mass is computed from the actual pose and moved to where the support says it must be. Walking, that is solved with <b>trunk lean</b> (standing, from A003, with the hips and ankles instead, so the trunk stays upright): on stairs the upper foot carries the body, so climbing leans the trunk forward over the step ahead; speeding up needs the centre of mass ahead of the feet (acceleration &times; height &divide; g), slowing down behind them. Reaching for the button keeps the trunk where the reach puts it and slides the <b>hips back</b> instead, as people do. Getting up off the floor leans as far forward as it must to bring the mass over the feet before rising.</p>
+  <p><b>Side to side</b>, the mass shifts toward whichever foot is carrying weight: part-way when walking, almost fully when standing. The hip of the swinging leg drops about 4&deg; and the trunk leans slightly toward the stance side. The pelvis rises and falls twice per stride. Standing, figures breathe, sway a centimetre or so, and every few seconds settle their weight onto one leg.</p>
+  <p><b>Smoothing:</b> each foot's swing runs on its own clock and starts from where the heel actually lifted, rising and landing with zero vertical speed; the landing spot glides toward the prediction and is committed before touch-down; on stairs each step lands one tread beyond the other foot, and the foot clears each riser by following the stair profile rather than a timing curve; the heel strikes first and the foot rolls flat. Knees and elbows bend in the limb's own plane and ease toward straight instead of snapping straight. Pelvis height, lean, sway and head pitch move on critically damped springs, so no target change ever jolts them; pose changes blend from where each joint was heading, not from a frozen snapshot. Ladder hand-offs blend instead of switching, and figures are never shoved apart faster than they can walk.</p>
+  <h3>THE LADDER</h3>
+  <p>Climbing moves the limbs in diagonal pairs, left hand with right foot and then the other pair, each up two rungs at a time, while the pelvis rises steadily. Getting on, mounting the platform and stepping off are their own keyed transitions, again with IK limbs.</p>
+  <h3>THE BUTTON</h3>
+  <p>Whoever reaches the top walks to the button and presses it. The treads fold into a <b>slide</b>, everyone standing on either flight loses their footing, falls onto their back, turns feet-first and slides down under gravity and friction, then gets up. The slides turn back into stairs a few seconds later, and never while anyone is still on them. A press while the slides are out does nothing; the button only glows when it is armed.</p>
+  <h3>THE QUEUE</h3>
+  <p>One ladder, one climber at a time. Whenever someone is on the ladder or the tower, another figure walks over and waits at the foot of the ladder to go up next; someone waiting at the top to come down goes first.</p>
+  <h3>RENDERING</h3>
+  <p>No 3D library: a hand-written perspective projection onto a 2D canvas. Surfaces are split into small tiles, back faces are culled, everything is drawn far-to-near, and walls are flat-shaded from one sun direction whose shadows are projected onto the floor. A figure up on the structure casts its shadow along it: over a flight onto the smooth line through the tread centres, so the shadow glides down the steps instead of jumping a step at every tread.</p>
   <button id="info-close">CLOSE</button>
 </div></div>
 <script>
@@ -222,7 +226,7 @@ let simT=0;
 // Versions, newest first. A001 code paths are frozen: the drive suite proves that
 // selecting A001 reproduces the shipped A001 frame for frame. Later versions add
 // their own functions (locoParams2...) or branch on VER, never edit an A001 path.
-const VERSIONS=[{id:'A004',n:4},{id:'A003',n:3},{id:'A002',n:2},{id:'A001',n:1}];
+const VERSIONS=[{id:'A003',n:3},{id:'A002',n:2},{id:'A001',n:1}];
 let VER=VERSIONS[0].n;
 try{const q=(new URLSearchParams(location.search).get('v')||'').toUpperCase(),m=VERSIONS.find(v=>v.id===q);if(m) VER=m.n;}catch(e){}
 const BD=(a001,a002)=>VER>=2?a002:a001;   // pose-blend seconds per version
@@ -672,387 +676,6 @@ function getupParams2(ch,dt){
   return P;
 }
 
-/* ============================== A004: PHYSICS ============================== */
-// A001-A003 moved a figure's root on a scripted speed ramp and then bent the TRUNK until the centre
-// of mass sat where the support said it should. That runs cause and effect backwards: a body
-// speeds up because its mass is ahead of its feet and slows down because a foot went down ahead of
-// it, so braking into the stairs leaned the trunk back and speeding up at the top leaned it
-// forward (the CD's report, 2026-10-05). A004 adds a small physics engine built on the same
-// segment-mass table:
-//  - the TRUNK (head, arms and trunk, ~68% of the mass) is a rigid body hinged at the hips, with
-//    the mass and moment of inertia of its segments. Gravity tips it, the pelvis's acceleration
-//    drags it, the hip muscles (a torque-limited PD controller) hold it. It is integrated, not
-//    posed, so it lags, overshoots and settles like a mass does;
-//  - the VERTICAL is integrated too: the legs push the pelvis toward the height the gait wants,
-//    but can never pull, and a leg that is down always carries some weight, so the body can never
-//    come down faster than it would fall; a leg can never be longer than it is;
-//  - BALANCE is the force law: the ground force runs from the centre of pressure through the
-//    centre of mass, and its horizontal part is what accelerates the body (F = m a), so the mass
-//    has to sit ahead of the feet by height x a/g to speed up, behind them to brake, inside a
-//    turn to turn, over the upper foot on a flight. The whole body moves to put it there (the
-//    pose is solved so that its centre of mass is exactly that point), and the trunk's own swing
-//    shifts it by the angular momentum it takes;
-//  - the PLAN (where the figure means to go, and how fast) only asks for what feet can deliver:
-//    a person's accelerations, ramped in and out, and no sharper turn than the body can lean into.
-// What is NOT simulated: the body's own fall and catch within each step (an inverted pendulum
-// stepping). A first A004 draft did that and needed a balance assist a figure in five of the
-// time, falling off the flights whenever a step could not catch it; the force law above keeps
-// every relation that matters to the eye and cannot fall over.
-const PHY={g:9.81,mu:0.9,sub:1/240,hipMax:2.6};
-let HAT=null;
-// The trunk as one rigid body: its share of the body mass, the height of its centre of mass above
-// the pelvis joint and its moment of inertia about the hips, summed from the segment table on an
-// upright neutral pose (per unit body mass at scale 1; a figure of scale s has r*s and I*s^2).
-// Irel is the inertia the WHOLE body shows to a trunk rotation (two-body reduced inertia plus the
-// trunk's own): the angular momentum the ground has to supply when the trunk pitches.
-function hatModel(){
-  if(HAT) return HAT;
-  const J=buildPose(1,{pelvis:V(0,0.985,0),f:V(1,0,0),u:UP,ankL:V(0,0.08,-0.1),ankR:V(0,0.08,0.1),softIK:true,sagPoles:true});
-  let m=0,my=0,I=0;
-  for(const g of SEGS){
-    if(g[0]>=13) continue;                                          // the legs are the other body
-    const a=J[g[0]],b=J[g[1]],c=lerpV(a,b,g[3]),L=vlen(sub(b,a)),dx=c.x-J[0].x,dy=c.y-J[0].y;
-    m+=g[2];my+=g[2]*dy;I+=g[2]*(dx*dx+dy*dy+L*L/12);
-  }
-  const r=my/m;
-  HAT={m,r,I,Irel:m*(1-m)*r*r+(I-m*r*r)};
-  return HAT;
-}
-// One frame of physics for one figure, in fixed 240 Hz sub-steps (semi-implicit Euler).
-// Q.e is where the centre of mass sits relative to the plan's root (the lean the force law asks
-// for); it cannot jump, so it is moved by a critically damped spring (the body takes a moment to
-// re-lean). The body's horizontal acceleration is the plan's plus that offset's.
-function physStep(Q,K,dt){
-  const n=Math.max(1,Math.ceil(dt/PHY.sub-1e-9)),h=dt/n,g=PHY.g,T=K.hat;
-  const mr=T.m*T.r*K.s,I=T.I*K.s*K.s,Ir=T.Irel*K.s*K.s,we=10;
-  // hip muscles: a PD toward the reference lean that also carries the reference's own load
-  // (gravity and 70% of the drag from the pelvis's acceleration), within a human torque limit
-  const hip=(th,thd,ref,a,ge)=>clamp(I*K.wt*K.wt*(ref-th)-1.8*I*K.wt*thd-mr*(ge*Math.sin(ref)-0.7*a*Math.cos(ref)),-PHY.hipMax,PHY.hipMax);
-  let ax=0,ay=0,az=0;
-  for(let i=0;i<n;i++){
-    ay=-g;
-    if(K.sup){
-      // the legs push the pelvis toward the height the gait wants; they can push hard, but never
-      // pull: the body can come down no faster than it would fall
-      ay=clamp(K.wv*K.wv*(K.pyT-(Q.c.y-Q.off.y))-2*K.wv*Q.v.y,-g,Q.reachHit?0:2*g);
-    }
-    const ge=g+ay;
-    ax=K.aPlan.x+Q.eA.x;az=K.aPlan.z+Q.eA.z;
-    const af=ax*K.fw.x+az*K.fw.z,al=ax*K.rt.x+az*K.rt.z;
-    // the trunk: gravity tips it, the pelvis's acceleration drags it, the hips hold it
-    const thdd=(mr*(ge*Math.sin(Q.th)-af*Math.cos(Q.th))+hip(Q.th,Q.thd,K.thR,af,ge))/I;
-    const rodd=(mr*(ge*Math.sin(Q.ro)-al*Math.cos(Q.ro))+hip(Q.ro,Q.rod,K.roR,al,ge))/I;
-    Q.thd+=thdd*h;Q.th+=Q.thd*h;Q.rod+=rodd*h;Q.ro+=Q.rod*h;
-    // where the mass must sit: h a/g ahead of the support for the acceleration, plus the angular
-    // momentum the trunk is taking (it has to come out of the ground force, moving its line)
-    let tx=K.eRef.x,tz=K.eRef.z;
-    if(K.sup&&ge>1){const lp=clamp(thdd*Ir/ge,-0.05,0.05),ls=clamp(rodd*Ir/ge,-0.05,0.05);tx+=K.fw.x*lp+K.rt.x*ls;tz+=K.fw.z*lp+K.rt.z*ls;}
-    Q.eA=V(we*we*(tx-Q.e.x)-2*we*Q.ev.x,0,we*we*(tz-Q.e.z)-2*we*Q.ev.z);
-    Q.ev.x+=Q.eA.x*h;Q.ev.z+=Q.eA.z*h;Q.e.x+=Q.ev.x*h;Q.e.z+=Q.ev.z*h;
-    Q.v.y+=ay*h;Q.c.y+=Q.v.y*h;
-    if(Q.c.y<K.floor){Q.c.y=K.floor;if(Q.v.y<0) Q.v.y=0;}                         // the ground is solid
-  }
-  Q.c=V(K.root.x+Q.e.x,Q.c.y,K.root.z+Q.e.z);
-  Q.v=V(K.vr.x+Q.ev.x,Q.v.y,K.vr.z+Q.ev.z);
-  Q.a=V(ax,ay,az);
-}
-function physInit(ch,s,fw){
-  const J=ch.out,c=J?comOf(J):V(ch.x,footY(ch.x,ch.z)+0.97*s,ch.z);
-  let vy=0;
-  if(J&&ch.outPrev&&ch.lastDt>0) vy=clamp((c.y-comOf(ch.outPrev).y)/ch.lastDt,-3,3);
-  let th=0.04;
-  if(J){const d=sub(J[2],J[0]);th=clamp(Math.atan2(d.x*fw.x+d.z*fw.z,d.y)/1.14,-0.3,0.8);}
-  ch.ph={c,v:V(0,vy,0),e:V(c.x-ch.x,0,c.z-ch.z),ev:V(0,0,0),eA:V(0,0,0),th,thd:0,ro:0,rod:0,a:V(0,0,0),aF:V(0,0,0),
-    off:J?sub(c,J[0]):V(0,0.05*s,0),pel:J?J[0]:V(c.x,c.y-0.05*s,c.z),
-    nReach:ch.ph?ch.ph.nReach:0,nEarly:ch.ph?ch.ph.nEarly:0,nLift:ch.ph?ch.ph.nLift:0};   // counters outlive a re-init (suite)
-  if(ch.acc==null) ch.acc=0;
-}
-const gauss=()=>Math.sqrt(-2*Math.log(Math.random()+1e-12))*Math.cos(2*Math.PI*Math.random());
-// How far a planted heel must rise (the foot rolling onto its toes) for the hip to reach it.
-function heelNeed(hip,plant,fd,s){
-  const Lr=0.86*s,d=V(hip.x-plant.x,hip.y-plant.y-0.08*s,hip.z-plant.z),e=V(0.4*fd.x,1,0.4*fd.z);
-  const dd=dot(d,d);if(dd<=Lr*Lr) return 0;
-  const de=dot(d,e),ee=dot(e,e),disc=de*de-ee*(dd-Lr*Lr);
-  return disc<0?0.15*s:clamp((de-Math.sqrt(disc))/ee,0,0.15*s);
-}
-// The plan: where the figure means to be, at the speed it means to go. A person's plan, not a
-// sprinter's: accelerations a body can actually produce, ramped in and out (limited jerk), so the
-// lean that pays for them builds and fades instead of switching.
-function moveRoot4(ch,dt){
-  // turning at speed needs the body leaned into the turn (centripetal a = v x turn rate) and a body
-  // can only lean so far: the faster it goes, the slower it can turn (~0.6 g sideways, a cut)
-  const err=wrapA(ch.tYaw-ch.yaw),rate=Math.min(lerp(4,7,ch.runAmt),Math.max(1.5,6/Math.max(ch.spd,0.1)));
-  const dy=clamp(err,-rate*dt,rate*dt);
-  ch.yaw=wrapA(ch.yaw+dy);
-  ch.yawRate=dt>0?dy/dt:0;
-  ch.runAmt+=((ch.run?1:0)-ch.runAmt)*(1-Math.exp(-dt*3));
-  // ...so a figure that has to turn hard first plants and brakes (up to 5 m/s^2) to a speed it can
-  // turn at, instead of swinging wide on its momentum
-  const ra=ch.runAmt,te=Math.abs(err),tS=te>0.6?Math.min(ch.tSpd,Math.max(0.6,2.6-1.4*te)*ch.s):ch.tSpd;
-  const want=clamp((tS-ch.spd)/0.3,-(te>0.6?lerp(3,5,ra):lerp(2.5,3.5,ra)),lerp(1.6,3,ra));
-  if(ch.acc==null) ch.acc=0;
-  const J=lerp(10,14,ra)*dt*(te>0.6?2:1);
-  ch.acc+=clamp(want-ch.acc,-J,J);
-  ch.spd+=ch.acc*dt;
-  if(ch.spd<0){ch.spd=0;if(ch.acc<0) ch.acc=0;}
-  let nx=ch.x+Math.cos(ch.yaw)*ch.spd*dt,nz=ch.z+Math.sin(ch.yaw)*ch.spd*dt;
-  // On the ground the plan never cuts into the stair block or the tower (A003's root followed the
-  // path exactly and never needed this; a body with momentum can swing wide). The flights' ends
-  // stay open: that is where they are walked onto.
-  if(pelvisBaseY(ch.x,ch.z)<0.01&&pelvisBaseY(nx,nz)<0.01){
-    const m=INF-0.12;
-    if(Math.abs(nx)<RUN+2+m&&Math.abs(nz)<SZ+m&&!(Math.abs(nz)<SZ-0.15&&Math.abs(nx)>RUN+1.8)){
-      if(Math.abs(ch.z)>=SZ+m-1e-3) nz=Math.sign(ch.z)*(SZ+m);else if(Math.abs(nx)<RUN+2+m) nx=Math.sign(ch.x)*(RUN+2+m);
-      if(ch.acc>0) ch.acc=0;
-    }
-    if(nx>TW.x0-m&&nx<TW.x1+m&&nz>TW.z0-m&&nz<TW.z1+m){
-      if(ch.x<=TW.x0-m) nx=TW.x0-m;else if(ch.x>=TW.x1+m) nx=TW.x1+m;else if(ch.z<=TW.z0-m) nz=TW.z0-m;else nz=TW.z1+m;
-    }
-  }
-  ch.x=nx;ch.z=nz;
-}
-// A004's step-over-step: as A002's (each step on a flight lands one tread beyond the other foot),
-// but it trusts the prediction once the two disagree by more than 30 cm (A002: 60): a sequence that
-// had got a tread ahead of the body otherwise stayed ahead all the way down, and with the pelvis
-// no longer crouched the landing leg could not reach. A half step onto the same tread re-syncs it.
-function stepOver4(ft,other,x,z,fw){
-  const s=ST.m>0?null:stairAt(x,z,0);
-  if(!s) return snapTread2(ft,x,z);
-  const o=stairAt(other.plant.x,other.plant.z,0.6);
-  if(!o||o.st!==s.st) return snapTread2(ft,x,z);
-  const dirD=s.st.up*Math.sign(fw.x||1);
-  const oi=o.d<0?-1:o.d>=RUN?NSTEP:Math.floor(o.d/0.5),ti=oi+(dirD>0?1:-1);
-  if(ti<0||ti>NSTEP-1){ft.snapD=null;return stX(s.st,ti<0?Math.min(s.d,-0.12):Math.max(s.d,RUN+0.12));}
-  if(Math.abs(s.d-(0.5*ti+0.25))>0.3) return snapTread2(ft,x,z);
-  ft.snapD=0.5*ti+0.25;ft.snapSt=s.st;
-  return stX(s.st,ft.snapD);
-}
-function locoParams4(ch,dt,mod){
-  const s=ch.s,yaw=ch.yaw,g=PHY.g,hat=hatModel();
-  const fw=V(Math.cos(yaw),0,Math.sin(yaw)),rt=V(-Math.sin(yaw),0,Math.cos(yaw));
-  if(!ch.feet[0]) initFeet(ch);
-  if(!ch.b2){ch.b2={mv:0,up:0,hp:0.1,ws:0,wsT:0,wsTgt:0,stS:0,wn2:0,wn2V:0,nx:0,nz:0};physInit(ch,s,fw);}
-  const B=ch.b2,Q=ch.ph,sa=stairAt(ch.x,ch.z,0.1),ra=ch.runAmt;
-  B.mv=approach(B.mv,clamp(ch.spd/1.3,0,1),dt,0.15);
-  B.up=approach(B.up,sa?sa.st.up*fw.x:0,dt,0.3);
-  B.stS=approach(B.stS,stairAt(ch.x,ch.z,0.3)?1:0,dt,0.25);
-  const mv=B.mv,still=1-mv;
-  // the stride follows the speed (people take short quick steps while they speed up and lengthen
-  // them with speed: ~0.72 m steps at a 1.35 m/s walk, ~1.2 m at a 3.5 m/s run; A001-A003 tied it
-  // to the gait alone, so a runner still getting going took long, slow strides). One tread per
-  // step on a flight, as before.
-  B.cyc=approach(B.cyc||1.45*s,(stairAt(ch.x,ch.z,0.45)?1.0:clamp(0.84+0.44*ch.spd/s,1.05,2.6))*s,dt,0.18);
-  const cyc=B.cyc,sf=lerp(0.38,0.64,ra);   // a runner's foot is down ~36% of the stride (A001-A003: 40%)
-  const turning=Math.abs(ch.yawRate)>0.5,moving=ch.spd>0.06||turning;
-  const swingAny=ch.feet[0].sw||ch.feet[1].sw;
-  let rate;
-  if(moving) rate=Math.max(0.85,ch.spd/cyc+(turning?0.6:0))+clamp(ch.acc,0,6)*0.1;   // quick steps when speeding up
-  else{
-    let mis=false;
-    for(let i=0;i<2;i++){
-      const ft=ch.feet[i],sg=i?1:-1;
-      const ix=ch.x+rt.x*sg*0.1*s,iz=ch.z+rt.z*sg*0.1*s;
-      if(Math.hypot(ft.plant.x-ix,ft.plant.z-iz)>0.17*s||Math.abs(wrapA(ft.fyaw-yaw))>0.6) mis=true;
-    }
-    rate=(swingAny||mis)?1.4:0;
-  }
-  if(moving&&!B.was&&!swingAny&&B.mv<0.12){
-    const p0=ch.feet[0].plant,p1=ch.feet[1].plant;
-    const b0=(p0.x-ch.x)*fw.x+(p0.z-ch.z)*fw.z,b1=(p1.x-ch.x)*fw.x+(p1.z-ch.z)*fw.z;
-    const np=frac(1-(b0<=b1?0:0.5)-1e-4);B.aOff=(B.aOff||0)-(frac(np-ch.phase+0.5)-0.5);ch.phase=np;
-  }
-  B.was=moving;
-  if(B.yawU==null){B.yawU=yaw;B.yawL=yaw;}
-  B.yawU+=wrapA(yaw-B.yawL);B.yawL=yaw;
-  const ph0=ch.phase;ch.phase=frac(ch.phase+rate*dt);
-  const cycT=rate>0?1/rate:1;
-  const ank=[null,null],toe=[null,null],hls=[0,0],gw=[0,0];
-  const pelN=madd(Q.pel,Q.v,dt);              // where the pelvis is heading this frame
-  for(let i=0;i<2;i++){
-    const ft=ch.feet[i],sg=i?1:-1,lp0=frac(ph0+i*0.5),lp=frac(ch.phase+i*0.5);
-    if(ft.sw&&ft.t==null){ft.t=clamp(lp/sf,0,0.99);ft.sf=sf;ft.fromG=ft.from.y;ft.fromAnk=V(ft.from.x,ft.from.y+0.08*s,ft.from.z);ft.fromA=-1.05;ft.toS=null;}
-    const hp=V(pelN.x+rt.x*sg*0.1*s,pelN.y-0.04*s,pelN.z+rt.z*sg*0.1*s);
-    // a stance foot really out of reach, even up on its toes, lifts early (counted: should be rare)
-    const fdS=V(Math.cos(ft.fyaw),0,Math.sin(ft.fyaw));
-    const reachT=Math.hypot(ft.plant.x+fdS.x*0.06*s-hp.x,hp.y-ft.plant.y-0.23*s,ft.plant.z+fdS.z*0.06*s-hp.z);
-    const behind=(ft.plant.x-ch.x)*fw.x+(ft.plant.z-ch.z)*fw.z<-(0.62+0.25*ra)*s||reachT>0.9*s;
-    const other=ch.feet[1-i],otherOk=!other.sw||(other.t||0)>0.5||reachT>0.97*s;
-    const wrapped=rate>0&&lp<lp0&&lp0>0.7&&lp<0.3;
-    if(!ft.sw&&(wrapped||(moving&&behind&&otherOk))){
-      if(!wrapped){const np=frac(-i*0.5+1e-4);B.aOff=(B.aOff||0)-(frac(np-ch.phase+0.5)-0.5);ch.phase=np;Q.nEarly++;}
-      Q.nLift++;
-      ft.sw=true;ft.t=0;ft.sf=sf;ft.from=ft.plant;ft.fromYaw=B.yawU+wrapA(ft.fyaw-B.yawU);ft.fromG=ft.plant.y;
-      ft.fromAnk=ft.ank||V(ft.plant.x,ft.plant.y+0.08*s,ft.plant.z);
-      ft.fromA=ft.a==null?-0.45:ft.a;ft.toS=null;ft.snapD=null;ft.cl=null;ft.ty=null;
-    }
-    if(ft.sw){
-      ft.sf=sf;ft.t+=(rate>0?rate:1.4)*dt/sf;
-      const t=Math.min(1,ft.t);
-      // where the plan will be 42% of the way through the stance this foot starts (A003: 50%). A
-      // foot lands about 36 cm ahead of the hip and leaves further behind, the rising heel
-      // lengthening the back leg; landing it under mid-stance put it 45 cm ahead, out of a straight
-      // leg's reach, and the pelvis dropped ~10 cm into every heel strike
-      const remain=(1-t)*ft.sf*cycT,stanceT=(1-ft.sf)*cycT,T=remain+stanceT*0.42;
-      const lead=ch.spd*T+0.5*ch.acc*T*T;
-      let tx=ch.x+fw.x*lead+rt.x*sg*0.1*s,tz=ch.z+fw.z*lead+rt.z*sg*0.1*s;
-      tx=stepOver4(ft,ch.feet[1-i],tx,tz,fw);
-      // up on a flight or the platform, a foot never lands off its side (that is a drop, not a step)
-      if(Math.abs(ch.z)<=SZ&&Math.abs(ch.x)<=RUN+2) tz=clamp(tz,-SZ+0.1,SZ-0.1);
-      const raw=V(tx,footY(tx,tz),tz);
-      if(!ft.toS) ft.toS=raw;
-      else if(t<0.85) ft.toS=lerpV(ft.toS,raw,1-Math.exp(-dt/0.06));
-      if(ft.ty==null){ft.ty=ft.toS.y;ft.tyV=0;}
-      const fyT=footY(ft.toS.x,ft.toS.z);
-      spring(ft,'ty',fyT,dt,40);
-      const to=V(ft.toS.x,lerp(ft.ty,fyT,smooth((t-0.8)/0.2)),ft.toS.z),e=smooth(t);
-      ft.to=to;
-      const hx=lerp(ft.fromAnk.x,to.x,e),hz=lerp(ft.fromAnk.z,to.z,e);
-      const arc=Math.sin(Math.PI*t)**2;
-      const line=ft.fromG+(to.y-ft.fromG)*e,cw=smooth(t/0.15)*smooth((1-t)/0.15);
-      if(ft.cl==null){ft.cl=ft.fromG;ft.clV=0;}
-      spring(ft,'cl',clearY(hx,hz),dt,35);
-      const vy=line+cw*(smax(line,ft.cl+0.03*arc,0.03*arc+0.002)-line);
-      const h0=ft.fromAnk.y-(ft.fromG+0.08*s);
-      const lift=arc*lerp(0.1,0.22,ra)*lerp(0.6,1,mv)*s;
-      ank[i]=V(hx,vy+0.08*s+lift+h0*(1-smooth(t/0.35)),hz);
-      // a swinging foot stays a thigh's length below the hip (eased in, never a kink): a pelvis
-      // lowered to reach a tread below must not fold the other leg up past it (the knee flips)
-      {const lim=pelN.y-0.42*s,k0=lim-0.08*s;if(ank[i].y>k0) ank[i].y=k0+0.08*s*(1-Math.exp(-(ank[i].y-k0)/(0.08*s)));}
-      // a foot that could not reach the ground flat from where the hip will be lands on the ball of
-      // the foot, and the heel comes down as the body does (runners land like this)
-      const fdL=V(Math.cos(B.yawU),0,Math.sin(B.yawU)),hpL=madd(hp,Q.v,remain);
-      const hlL=heelNeed(hpL,to,fdL,s),kL=smooth((t-0.55)/0.45);
-      ank[i]=V(ank[i].x+fdL.x*0.4*hlL*kL,ank[i].y+hlL*kL,ank[i].z+fdL.z*0.4*hlL*kL);ft.hlL=hlL;
-      const fy=lerp(ft.fromYaw,B.yawU,e),a=lerp(ft.fromA,-0.45+lerp(-0.6,0.3,t),smooth(t/0.3));
-      ft.a=a;
-      toe[i]=madd(ank[i],toeDir(V(Math.cos(fy),0,Math.sin(fy)),a),0.15*s);
-      if(ft.t>=1){ft.sw=false;ft.t=null;ft.plant=V(to.x,footY(to.x,to.z),to.z);ft.fyaw=B.yawU;ft.landA=a;ft.st=0;ft.hl=ft.hlL||0;ft.hlV=0;}
-    }else{
-      ft.plant.y=footY(ft.plant.x,ft.plant.z);
-      ft.st=(ft.st||0)+dt;
-      const sp=clamp((lp-sf)/(1-sf),0,1);
-      // the heel peels late in stance as before, AND whenever the hips have moved beyond what the
-      // flat foot reaches: the trailing foot on a stair rises onto its toes rather than dragging
-      // the pelvis down into a crouch (A003's stair squat)
-      const hlT=smooth((sp-0.62)/0.38)*0.1*s*mv;
-      if(ft.hl==null){ft.hl=0;ft.hlV=0;}
-      spring(ft,'hl',Math.max(hlT,heelNeed(hp,ft.plant,fdS,s)),dt,45);
-      const hl=clamp(ft.hl,0,0.15*s);hls[i]=hl;
-      ank[i]=V(ft.plant.x+fdS.x*hl*0.4,ft.plant.y+0.08*s+hl,ft.plant.z+fdS.z*hl*0.4);
-      const tp=V(ft.plant.x+fdS.x*0.13*s,ft.plant.y+0.015,ft.plant.z+fdS.z*0.13*s);
-      let dir=norm(sub(tp,ank[i]));
-      if(ft.landA!=null&&ft.st<0.12) dir=norm(lerpV(toeDir(fdS,ft.landA),dir,smooth(ft.st/0.12)));
-      ft.a=Math.atan2(dir.y,Math.hypot(dir.x,dir.z));
-      toe[i]=madd(ank[i],dir,0.15*s);
-      gw[i]=lerp(1,smooth(sp/0.2)*smooth((1-sp)/0.25)+0.05,mv);   // load this foot carries (as A002)
-    }
-    ft.ank=ank[i];
-  }
-  // ---- standing: every few seconds the weight settles onto one leg
-  if(!moving){B.wsT-=dt;if(B.wsT<=0){B.wsT=rand(2.5,6);B.wsTgt=Math.random()<0.3?0:(Math.random()<0.5?-1:1);}}
-  else B.wsTgt=0;
-  B.ws=approach(B.ws,B.wsTgt,dt,0.9);
-  for(let i=0;i<2;i++){const ft=ch.feet[i];if(ft.w==null){ft.w=gw[i];ft.wV=0;}spring(ft,'w',gw[i],dt,30);}
-  const wts=[Math.max(0,ch.feet[0].w)*Math.max(0,1-0.8*B.ws),Math.max(0,ch.feet[1].w)*Math.max(0,1+0.8*B.ws)];
-  const wsum=Math.max(wts[0]+wts[1],0.6),wn=(wts[0]-wts[1])/wsum;   // +1: all weight on the left foot
-  let Sx=0,Sz=0;for(let i=0;i<2;i++){const p=ch.feet[i].plant;Sx+=wts[i]*(p.x-ch.x);Sz+=wts[i]*(p.z-ch.z);}
-  Sx/=wsum;Sz/=wsum;
-  spring(B,'wn2',wn,dt,25);
-  // ---- where the mass has to sit, by the force law. The ground force runs from the centre of
-  // pressure through the centre of mass and its horizontal part is the acceleration: the mass leads
-  // the support by height x a/g (speeding up, braking, and turning: v x turn rate). Sideways it
-  // rides toward the foot carrying the load, part-way walking and almost fully standing, and on a
-  // flight it rides over the upper foot (climbing pushes up off it).
-  const aPl=V(fw.x*ch.acc+rt.x*ch.spd*ch.yawRate,0,fw.z*ch.acc+rt.z*ch.spd*ch.yawRate);
-  const hh=Math.max(0.5*s,Q.c.y-0.5*(ch.feet[0].plant.y+ch.feet[1].plant.y));
-  const upA=clamp(B.up,0,1)*B.stS,dnA=clamp(-B.up,0,1)*B.stS;
-  const Sl=Sx*rt.x+Sz*rt.z,Sf=Sx*fw.x+Sz*fw.z;
-  const fwd=(0.11*upA-0.04*dnA)*s*smooth(ch.spd/0.3)+lerp(Sf+0.04*s,0,mv);   // standing: over the feet, a little ahead of the ankles
-  const lat=Sl*lerp(0.85,0.35,mv);
-  // postural sway: nobody stands perfectly still (a slow random wander of a centimetre or so)
-  const kOU=Math.exp(-dt/0.9),qOU=Math.sqrt(1-kOU*kOU)*0.008*s*still;
-  B.nx=B.nx*kOU+qOU*gauss();B.nz=B.nz*kOU+qOU*gauss();
-  let eRef=V(aPl.x*hh/g+fw.x*fwd+rt.x*lat+B.nx,0,aPl.z*hh/g+fw.z*fwd+rt.z*lat+B.nz);
-  // never more than ~a foot's length from over the support: harder than that is done with the feet
-  {const el=Math.hypot(eRef.x,eRef.z),em=0.35*s;if(el>em) eRef=mul(eRef,em/el);}
-  // ---- what the controller wants of the vertical: the pelvis height (as A003, but stairs are
-  // climbed on nearly straight legs; only what the legs can reach brings the pelvis down)
-  const base=pelvisBaseY(ch.x,ch.z),breath=Math.sin(ch.t*1.65);
-  const bob=lerp(1,-1.6,ra)*0.024*Math.cos(4*Math.PI*(ch.phase-(1+sf)/2))*mv;
-  // (going DOWN, the standing leg does bend to lower the body onto the tread below, as people's do)
-  let py=base+(0.985-0.03*mv-0.05*ra-(0.03+0.03*ra)*upA-0.14*dnA)*s+bob+0.004*breath*still;
-  const L=0.88*s;
-  // a swinging foot constrains the pelvis through where it will LAND, seen from where the hip will
-  // be by then, phased in over the swing: legs cannot pull the body down faster than gravity, so a
-  // pelvis that waited for touch-down to find out it was too high would arrive late
-  for(let i=0;i<2;i++){
-    const ft=ch.feet[i],sg=i?1:-1;
-    let a=ank[i],hx=pelN.x+rt.x*sg*0.1*s,hz=pelN.z+rt.z*sg*0.1*s,extra=0;
-    if(ft.sw&&ft.to){
-      const t=Math.min(1,ft.t||0),rem=(1-t)*ft.sf*cycT;
-      a=V(ft.to.x,ft.to.y+0.08*s,ft.to.z);hx+=Q.v.x*rem;hz+=Q.v.z*rem;extra=(1-smooth((t+0.25*dnA-0.1)/0.5))*0.5*s;
-    }
-    const hd=Math.hypot(a.x-hx,a.z-hz);
-    if(hd<L) py=Math.min(py,a.y+Math.sqrt(L*L-hd*hd)+0.04*s+extra);
-  }
-  // ---- what the controller wants of the trunk: a posture for the gait and the ground, leaned into
-  // the acceleration (the ground force's own lean, a/g) so the hips carry as little torque as they
-  // can; mostly what the plan is about to ask for (people lean before they push), partly what the
-  // body has. Braking leans back only a little: people brake with their feet, not their trunk.
-  Q.aF=lerpV(Q.aF,V(Q.a.x,0,Q.a.z),1-Math.exp(-dt/0.2));
-  const aL=clamp(0.35*(Q.aF.x*fw.x+Q.aF.z*fw.z)+0.65*ch.acc,-5,5),aS=clamp(0.5*(Q.aF.x*rt.x+Q.aF.z*rt.z)+0.5*ch.spd*ch.yawRate,-4,4);
-  // (up a flight people lean into the climb: A001's ~9 deg read as too upright to the CD, A003's
-  // ~26-37 came from bending the trunk to drag the mass over the upper foot; here ~18)
-  const post=lerp(0.015,lerp(0.045,0.09,ra),mv)+upA*lerp(0.24,0.2,ra)*smooth(ch.spd/0.4)-dnA*0.02*mv;
-  let thR=post+(aL>0?0.8:0.2)*Math.atan(aL/g);
-  if(mod) thR+=mod.lean||0;
-  const roR=-B.wn2*0.03+0.8*Math.atan(aS/g);
-  // ---- step the physics
-  let ns=0,supY=0,fl=1e9;
-  for(let i=0;i<2;i++){const ft=ch.feet[i];if(ft.sw) continue;supY+=ft.plant.y;fl=Math.min(fl,ft.plant.y);ns++;}
-  physStep(Q,{sup:ns>0,floor:(ns?fl:footY(ch.x,ch.z))+0.45*s,aPlan:aPl,root:V(ch.x,0,ch.z),vr:V(fw.x*ch.spd,0,fw.z*ch.spd),
-    eRef,pyT:py,wv:24,thR:clamp(thR,-0.2,0.7),roR:clamp(roR,-0.4,0.4),wt:8,fw,rt,s,hat},dt);
-  // ---- arms, head, twist (as A003)
-  if(B.aOff==null) B.aOff=0;
-  spring(B,'aOff',0,dt,7);
-  const amp=lerp(0.32,0.95,ra)*mv,cs=Math.cos(2*Math.PI*(ch.phase+B.aOff-sf));
-  const reach=lerp(0.53,0.36,ra)*s,out=0.07*s;
-  spring(B,'hp',lerp(0.1,0.3,smooth((-B.up-0.2)/0.3))-0.45*(Q.th-0.05),dt,7);
-  if(!moving){ch.lookT-=dt;if(ch.lookT<=0){ch.lookT=rand(1.2,3.5);ch.lookTgt=Math.random()<0.4?0:rand(-0.9,0.9);}}
-  else ch.lookTgt=0;
-  ch.look+=(ch.lookTgt-ch.look)*(1-Math.exp(-dt*4));
-  const P={pelvis:sub(Q.c,Q.off),f:fw,u:UP,lean:Q.th,twist:0.25*amp*cs,headPitch:B.hp,headYaw:ch.look,
-    roll:B.wn2*0.075,sideLean:Q.ro,breath:0.006*s*breath,chestLean:0.012*breath*still,softIK:true,sagPoles:true,
-    ankL:ank[0],ankR:ank[1],toeL:toe[0],toeR:toe[1],
-    armL:{sw:-amp*cs+0.3*ra,reach,out},armR:{sw:amp*cs+0.3*ra,reach,out}};
-  if(mod&&mod.apply) mod.apply(P);
-  // ---- the pose's own centre of mass goes exactly where the physics put the body's
-  for(let k=0;k<2;k++){const C=comOf(buildPose(s,P));P.pelvis=madd(P.pelvis,sub(Q.c,C),1.15);}
-  // a leg cannot be longer than it is: if a planted foot is out of reach the pelvis comes down to it
-  // and the body loses its upward speed (counted: should be rare). Only ever down.
-  let reachHit=false;
-  for(let i=0;i<2;i++){
-    const ft=ch.feet[i];if(ft.sw) continue;
-    const sg=i?1:-1,hp=V(P.pelvis.x+rt.x*sg*0.1*s,P.pelvis.y-0.04*s,P.pelvis.z+rt.z*sg*0.1*s);
-    const d=sub(hp,ank[i]),Lm=0.895*s,hd2=d.x*d.x+d.z*d.z;
-    if(d.y>0&&hd2<Lm*Lm&&d.y*d.y+hd2>Lm*Lm){
-      const dy=Math.min(d.y-Math.sqrt(Lm*Lm-hd2),0.03*s);   // over a few frames, not one
-      P.pelvis=V(P.pelvis.x,P.pelvis.y-dy,P.pelvis.z);Q.c=V(Q.c.x,Q.c.y-dy*0.86,Q.c.z);
-      if(Q.v.y>0) Q.v.y=0;Q.nReach++;reachHit=true;
-    }
-  }
-  Q.reachHit=reachHit;
-  Q.off=sub(Q.c,P.pelvis);Q.pel=P.pelvis;
-  return P;
-}
-function pressParams4(ch,dt){
-  const t=ch.pr.t,w=t<0.35?smooth(t/0.35):t<0.75?1:1-smooth((t-0.75)/0.4);
-  const push=t<0.45?0.08-0.08*smooth((t-0.2)/0.25):t<0.62?-0.02:0.06;
-  // the reach leans the trunk forward; the physics keeps the mass over the feet, so the hips go back
-  return locoParams4(ch,dt,{lean:0.28*w,apply:P=>{
-    P.gripR=V(BTN.x+0.02,BTN.y+0.07+push,BTN.z+0.05);P.wR=w;P.headPitch=lerp(P.headPitch,0.35,w);}});
-}
-
 function moveRoot(ch,dt){
   const err=wrapA(ch.tYaw-ch.yaw),rate=lerp(4,7,ch.runAmt);
   const dy=clamp(err,-rate*dt,rate*dt);
@@ -1083,14 +706,6 @@ function goStep(ch,st,dt){
   if(last) sp=Math.min(sp,dist*1.8+0.12);
   // A002: a flight that is not stairs is seen coming, so the approach brakes instead of halting dead
   else if(VER>=2&&ST.mode!=='stairs'&&st.pts[st.i+1]&&st.pts[st.i+1].st) sp=Math.min(sp,dist*1.8+0.3);
-  // A004: a body moved by physics cannot turn on the spot or stop dead, so it slows BEFORE a
-  // sharp corner, and comes down to stair pace before it reaches a flight rather than on it
-  if(VER>=4&&!last){
-    const nx=st.pts[st.i+1],turn=Math.abs(wrapA(Math.atan2(nx.z-pt.z,nx.x-pt.x)-Math.atan2(dz,dx)));
-    let vc=lerp(3.5,0.9,clamp((turn-0.3)/1.4,0,1))*ch.s;
-    if(nx.st&&!onSt) vc=Math.min(vc,(st.run?3.5*0.62:1.35*0.64)*ch.s);
-    sp=Math.min(sp,Math.sqrt(vc*vc+2*2.2*Math.max(0,dist-0.32)));
-  }
   // queue behind whoever is ahead on the structure; on the ground just ease off
   const lvl=pelvisBaseY(ch.x,ch.z);let blocked=false;
   for(const o of chars){
@@ -1376,9 +991,9 @@ function getupParams(ch){
 function updateChar(ch,dt){
   ch.t+=dt;
   switch(ch.state){
-    case 'loco': runSteps(ch,dt);if(ch.state==='loco') (VER>=4?moveRoot4:moveRoot)(ch,dt);break;
+    case 'loco': runSteps(ch,dt);if(ch.state==='loco') moveRoot(ch,dt);break;
     case 'press':
-      ch.tSpd=0;ch.tYaw=ch.yaw;(VER>=4?moveRoot4:moveRoot)(ch,dt);ch.pr.t+=dt;
+      ch.tSpd=0;ch.tYaw=ch.yaw;moveRoot(ch,dt);ch.pr.t+=dt;
       if(!ch.pr.fired&&ch.pr.t>=0.45){ch.pr.fired=true;pressButton();}
       if(ch.pr.t>=1.2){if(VER>=2) setState(ch,'loco',0.3);else ch.state='loco';}
       break;
@@ -1389,8 +1004,8 @@ function updateChar(ch,dt){
   }
   let P;
   switch(ch.state){
-    case 'loco': P=VER>=4?locoParams4(ch,dt):VER>=2?locoParams2(ch,dt):locoParams(ch,dt);break;
-    case 'press': P=VER>=4?pressParams4(ch,dt):VER>=2?pressParams2(ch,dt):pressParams(ch,dt);break;
+    case 'loco': P=VER>=2?locoParams2(ch,dt):locoParams(ch,dt);break;
+    case 'press': P=VER>=2?pressParams2(ch,dt):pressParams(ch,dt);break;
     case 'ladder': P=ladderParams(ch);break;
     case 'fall': P=fallParams(ch);break;
     case 'slide': P=slideParams(ch);break;

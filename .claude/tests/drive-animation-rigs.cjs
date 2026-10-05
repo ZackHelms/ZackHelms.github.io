@@ -10,7 +10,7 @@
  * run is reproducible and wall-clock load cannot change what is measured.
  * The newest version (NEW) is the one the CD sees by default.
  *
- *  1. RULES, under EVERY version (A003 default, A002, A001), 300 s each:
+ *  1. RULES, under EVERY version (A004 default, A003, A002, A001), 300 s each:
  *     no NaN joint; no limb bone stretched outside a pose blend (IK may never
  *     stretch a bone); someone climbs, presses and slides, repeatedly; <=1 on
  *     the ladder and <=2 on the tower; nobody walks onto a flight that is not
@@ -38,10 +38,21 @@
  *     standing; a side-to-side sway walking and a bigger one standing (weight
  *     shifts); a vertical bob walking.
  *  5. SHADOWS on the stairs follow the figure smoothly: a climber's head
- *     shadow moves more than 6 cm between frames in under 0.2% of frames
- *     (projecting onto a flat plane at the tread height, the old renderer,
- *     jumps a step at every tread: ~3%).
- *  6. UI: the speed menu offers 4x/2x/1x/half/quarter defaulting to 1x and 4x
+ *     shadow moves more than twice as far as the head itself (+3 cm) between
+ *     frames in under 0.2% of frames (projecting onto a flat plane at the
+ *     tread height, the old renderer, jumps a step at every tread: ~3%). The
+ *     relative form matters since A004: its runners take a flight faster, and
+ *     a fixed 6 cm/frame bar started counting speed instead of snaps.
+ *  6. PHYSICS (A004, each check also run on A003 with the same seed, and required
+ *     to fail there: a check that cannot see the old behaviour proves nothing):
+ *     walking up stairs is not a squat (stance knee); the centre of mass rides
+ *     over the upper foot, not behind it; running up a flight the lean is even
+ *     from bottom to top (A003: 12 -> 26 -> 37 deg); starting to run leans
+ *     further forward WHILE speeding up than at speed (A003 leaned less while
+ *     accelerating, then most at speed); and the two corrective rules
+ *     (a stance foot lifted early, the pelvis brought down to a leg out of
+ *     reach) stay rare.
+ *  7. UI: the speed menu offers 4x/2x/1x/half/quarter defaulting to 1x and 4x
  *     really runs faster; the version menu lists newest first, defaults to
  *     it, switches the model live, and ?v= opens an older one; the button
  *     works through __AR and through a real tap on its drawn pixel.
@@ -55,7 +66,7 @@ const { chromium } = require('playwright-core');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PAGE = 'file://' + path.join(ROOT, 'games', 'animation-rigs', 'index.html');
 const FIX = (v) => 'file://' + path.join(__dirname, 'fixtures', 'animation-rigs-' + v.toLowerCase() + '.html');
-const VERS = ['A003', 'A002', 'A001'];   // newest first, as the page lists them
+const VERS = ['A004', 'A003', 'A002', 'A001'];   // newest first, as the page lists them
 const NEW = VERS[0];
 const shotDir = process.argv.includes('--shots') ? process.argv[process.argv.indexOf('--shots') + 1] : null;
 
@@ -282,15 +293,81 @@ async function shadows(browser) {
         const old = { x: P.x - L.x * kk, y: lvl, z: P.z - L.z * kk }, nw = A.shadowHit(P, lvl - 0.6);
         if (!nw) { H.delete(c.id); continue; }
         const h = H.get(c.id);
-        if (h) { frames++; if (d(h[0], old) > 0.06) bigOld++; if (d(h[1], nw) > 0.06) bigNew++; }
-        H.set(c.id, [old, nw]);
+        // a jump is a shadow that moves much further than the head casting it (a fast runner's
+        // shadow legitimately covers 6 cm a frame going down a flight; a snap does it standing still)
+        if (h) { frames++; const lim = 2 * d(h[2], P) + 0.03; if (d(h[0], old) > lim) bigOld++; if (d(h[1], nw) > lim) bigNew++; }
+        H.set(c.id, [old, nw, { x: P.x, y: P.y, z: P.z }]);
       }
     }
     return { frames, bigNew, bigOld };
   });
   await page.close();
   ok(r.frames > 3000 && r.bigNew < r.frames * 0.002 && r.bigOld > r.frames * 0.01,
-    'a stair climber\'s shadow follows smoothly (' + r.bigNew + ' jumps over 6 cm in ' + r.frames + ' frames; a flat plane at the tread height would jump ' + r.bigOld + ' times)');
+    'a stair climber\'s shadow follows smoothly (' + r.bigNew + ' jumps of more than twice its head\'s move + 3 cm in ' + r.frames + ' frames; a flat plane at the tread height would jump ' + r.bigOld + ' times)');
+}
+
+// A004's physics, measured on the skeleton, against A003 on the same seed (each claim must
+// separate the two, or it is not evidence of anything)
+async function physicsRun(browser, url) {
+  const { page } = await simPage(browser, url, 12345);
+  const r = await page.evaluate(() => {
+    const A = window.__AR, cat = {}, st = {};
+    const add = (k, v) => { (cat[k] = cat[k] || []).push(v); };
+    const knee = (a, b, c) => { const u = [a.x - b.x, a.y - b.y, a.z - b.z], v = [c.x - b.x, c.y - b.y, c.z - b.z];
+      return 180 - Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) / Math.hypot(...u) / Math.hypot(...v)))) * 180 / Math.PI; };
+    for (let k = 0; k < 60 * 240; k++) {
+      A.step(1 / 60, 1);
+      for (const c of A.chars) {
+        const S = st[c.id] || (st[c.id] = { ps: c.spd });
+        const acc = c.acc != null ? c.acc : (c.spd - S.ps) * 60; S.ps = c.spd;   // A004 plans it; A003 has only the speed
+        if (c.state !== 'loco') continue;
+        const J = c.out, fw = { x: Math.cos(c.yaw), z: Math.sin(c.yaw) };
+        const lean = Math.atan2((J[2].x - J[0].x) * fw.x + (J[2].z - J[0].z) * fw.z, J[2].y - J[0].y) * 180 / Math.PI;
+        const sa = A.stairAt(c.x, c.z, 0), flat = !sa && A.pelvisBaseY(c.x, c.z) < 0.01;
+        if (flat && c.runAmt > 0.7) {
+          if (acc > 1) add('accel', lean);
+          else if (Math.abs(acc) < 0.2 && c.spd > 3) add('steady', lean);
+        }
+        if (sa && sa.st.up * fw.x > 0.3) {
+          const gait = c.runAmt > 0.7 && c.spd > 1.5 ? 'run' : c.runAmt < 0.3 && c.spd > 0.5 ? 'walk' : null;
+          if (!gait) continue;
+          if (gait === 'run') add('run' + (sa.d < 1.83 ? 1 : sa.d < 3.67 ? 2 : 3), lean);
+          let up = null, ui = 0;
+          for (let i = 0; i < 2; i++) { const f = c.feet[i]; if (f.sw) continue; if (!up || f.plant.y > up.y) { up = f.plant; ui = i; } }
+          if (gait === 'walk' && up) {
+            add('knee', knee(J[ui ? 17 : 13], J[ui ? 18 : 14], J[ui ? 19 : 15]));
+            const C = A.comOf(J); add('com', ((C.x - up.x) * fw.x + (C.z - up.z) * fw.z) * 100);
+          }
+        }
+      }
+    }
+    const o = {};
+    for (const k in cat) { const a = cat[k].slice().sort((x, y) => x - y), n = a.length; o[k] = { n, mean: a.reduce((x, y) => x + y, 0) / n, p5: a[Math.floor(n * 0.05)] }; }
+    let lifts = 0, early = 0, reach = 0;
+    for (const c of A.chars) if (c.ph) { lifts += c.ph.nLift; early += c.ph.nEarly; reach += c.ph.nReach; }
+    o.counts = { lifts, early, reach };
+    return o;
+  });
+  await page.close();
+  return r;
+}
+async function physics(browser) {
+  const a = await physicsRun(browser, PAGE), b = await physicsRun(browser, PAGE + '?v=A003');
+  const g = (r, k) => r[k] || { n: 0, mean: NaN, p5: NaN };
+  const f = (x) => (+x).toFixed(1);
+  const kn = g(a, 'knee'), kb = g(b, 'knee');
+  ok(kn.n > 2000 && kn.mean < 65 && kb.mean > 75, NEW + ' walking up stairs is not a squat: loaded knee ' + f(kn.mean) + ' deg (A003 ' + f(kb.mean) + ')');
+  const cn = g(a, 'com'), cb = g(b, 'com');
+  ok(cn.n > 2000 && Math.abs(cn.mean) < 6 && cb.mean < -8, NEW + ' climbing, the centre of mass rides over the upper foot: ' + f(cn.mean) + ' cm (A003 ' + f(cb.mean) + ', behind it)');
+  const r1 = g(a, 'run1'), r3 = g(a, 'run3'), q1 = g(b, 'run1'), q3 = g(b, 'run3');
+  ok(r1.n > 200 && r3.n > 200 && Math.abs(r3.mean - r1.mean) < 8 && r1.mean > 8 && q3.mean - q1.mean > 12,
+    NEW + ' running up a flight the lean is even: ' + f(r1.mean) + ' -> ' + f(r3.mean) + ' deg bottom to top third (A003 ' + f(q1.mean) + ' -> ' + f(q3.mean) + ')');
+  const ac = g(a, 'accel'), sd = g(a, 'steady'), bc = g(b, 'accel'), bs = g(b, 'steady');
+  ok(ac.n > 200 && sd.n > 500 && ac.mean > sd.mean + 3 && !(bc.mean > bs.mean + 3),
+    NEW + ' a runner leans further forward while speeding up than at speed: ' + f(ac.mean) + ' vs ' + f(sd.mean) + ' deg (A003 ' + f(bc.mean) + ' vs ' + f(bs.mean) + ')');
+  const c = a.counts;
+  ok(c.lifts > 1000 && c.early < c.lifts * 0.03 && c.reach < c.lifts * 0.05,
+    NEW + ' corrective rules stay rare: ' + c.early + ' early lifts and ' + c.reach + ' reach corrections in ' + c.lifts + ' steps');
 }
 
 async function ui(browser) {
@@ -305,7 +382,7 @@ async function ui(browser) {
   }));
   ok(JSON.stringify(S.speeds) === JSON.stringify(['4×', '2×', '1×', '½×', '¼×']) && S.speed === '1×',
     'speed menu offers 4x 2x 1x half quarter, default 1x (' + S.speeds.join(' ') + ', default ' + S.speed + ')');
-  ok(JSON.stringify(S.vers) === JSON.stringify(VERS) && S.ver === NEW && S.VER === 3,
+  ok(JSON.stringify(S.vers) === JSON.stringify(VERS) && S.ver === NEW && S.VER === 4,
     'version menu lists newest first and defaults to it (' + S.vers.join(' ') + ', default ' + S.ver + ')');
   const rate = async (v) => {
     await page.selectOption('#speed-sel', v);
@@ -318,9 +395,9 @@ async function ui(browser) {
   ok(r4 > r1 * 2.5 && rq < r1 * 0.5, 'speed menu changes simulated time per real second (1x ' + r1.toFixed(2) + ', 4x ' + r4.toFixed(2) + ', quarter ' + rq.toFixed(2) + ')');
   await page.selectOption('#speed-sel', '1');
   const got = [];
-  for (const n of ['1', '2', '3']) { await page.selectOption('#ver-sel', n); got.push(await page.evaluate(() => window.__AR.VER)); }
-  ok(got.join() === '1,2,3', 'version menu switches the animation model live (A001/A002/A003 -> ' + got.join('/') + ')');
-  for (const [v, n] of [['A001', 1], ['A002', 2]]) {
+  for (const n of ['1', '2', '3', '4']) { await page.selectOption('#ver-sel', n); got.push(await page.evaluate(() => window.__AR.VER)); }
+  ok(got.join() === '1,2,3,4', 'version menu switches the animation model live (A001/A002/A003/A004 -> ' + got.join('/') + ')');
+  for (const [v, n] of [['A001', 1], ['A002', 2], ['A003', 3]]) {
     const q = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await q.goto(PAGE + '?v=' + v); await q.waitForFunction(() => !!window.__AR);
     const qv = await q.evaluate(() => [window.__AR.VER, document.getElementById('ver-sel').selectedOptions[0].textContent]);
@@ -367,6 +444,7 @@ async function ui(browser) {
   ok(s2.max < 0.35, NEW + ' worst single snap under 0.35 m/frame^2 (' + s2.max.toFixed(3) + ', A001 ' + s1.max.toFixed(3) + ')');
   await balance(browser);
   await shadows(browser);
+  await physics(browser);
   await ui(browser);
   await browser.close();
   console.log(bad ? 'DRIVE animation-rigs: RED (' + bad + ')' : 'DRIVE animation-rigs: GREEN');

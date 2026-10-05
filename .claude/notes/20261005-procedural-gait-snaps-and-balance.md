@@ -94,3 +94,32 @@ Shadows of a figure on stairs: projecting onto one flat plane at the tread heigh
 jumps a step per tread; projecting onto the exact treads still jumps wherever the
 light falls off a step edge. For a stick figure the smooth line through the tread
 centres reads best.
+
+## Addendum (A004): adding physics to a procedural walker
+
+The CD's report: climbers squat, a runner's mass sits on its heels at the bottom
+of a flight and leans further forward at the top, where a real runner leans while
+speeding up and straightens at speed. Traced cause: the root moved on a scripted
+speed ramp and the trunk was bent afterwards to put the COM where the support
+wanted it, which runs cause and effect backwards (braking leaned back, speeding
+up leaned forward, whatever the eye expected).
+
+What was tried, in order:
+- **Full stepping physics** (COM as an inverted pendulum, feet placed at capture
+  points): figures needed a balance assist 6-30% of the time, walked backwards
+  when a foot lifted with the COM behind the other one, and fell off the flights
+  whenever a step could not catch them. Too unstable to be the motion itself.
+- **Plan + leash** (a planned root the physics COM is pulled toward): diverged
+  into 15 m/s runaways whenever the leash and the step placement disagreed.
+- **What shipped:** simulate the stable parts (the trunk as a rigid body on the
+  hips under a torque-limited PD, the pelvis height with legs that push but never
+  pull) and impose the unstable part through the **force law**: the COM sits
+  ahead of the feet by `h * a / g` for the plan's acceleration, then solve the
+  pose so its COM is exactly there. Make the plan physically feasible (jerk-limited
+  human accelerations, turn rate <= ~0.6 g lateral, brake before corners) so the
+  law never asks for an absurd lean.
+
+Lessons: a vertical that can fall but not pull makes landings late, which shows
+as a pelvis snap, so preview the landing reach and land toe-first; measure big
+per-frame jumps (> 0.3 m) across several seeds, not one; and write each realism
+check so the previous version **fails** it, or it proves nothing.

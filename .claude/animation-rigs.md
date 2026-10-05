@@ -1,6 +1,6 @@
 # Animation Rigs — context
 
-`games/animation-rigs/index.html`, one self-contained file (~1,520 lines).
+`games/animation-rigs/index.html`, one self-contained file (~1,910 lines).
 CD commission 2026-10-04. Placed directly after CYOA on the hub. Open (MIT).
 
 ## What it is
@@ -106,11 +106,16 @@ into the new model.
 - **A002** (CD notes: legs and feet snap between frames; torso too upright on
   stairs; humans bob and sway) adds the three things below. **Frozen**
   2026-10-05 with fixture `animation-rigs-a002.html` (from commit 2a58ef2).
-- **A003** fixes A002's flat-ground walk (below). The current default.
-- **Adding A004:** copy the shipped page into `fixtures/animation-rigs-a003.html`,
-  add `{id:'A004',n:4}` to the front of `VERSIONS`, write new functions or
-  `VER>=4` branches (never edit a path an older version runs), add it to `VERS`
-  in the suite and bump the `S.VER === 3` default check. The CD chose, on
+- **A003** fixes A002's flat-ground walk (below). **Frozen** 2026-10-05 with
+  fixture `animation-rigs-a003.html` (from commit e679e2e).
+- **A004** adds a physics engine (below). The current default.
+- **Adding A005:** copy the shipped page into `fixtures/animation-rigs-a004.html`,
+  add `{id:'A005',n:5}` to the front of `VERSIONS`, write new functions or
+  `VER>=5` branches (never edit a path an older version runs), add it to `VERS`
+  in the suite, add the fixture to the bit-identical list and bump the
+  `S.VER === 4` default check. Give it its own `<h3>` in the info panel, which
+  lists versions only: A001 holds the general features, every later version
+  says what it changed. The CD chose, on
   2026-10-05, that a fix to a shipped version ships as a NEW version rather than
   a correction, so the old one stays selectable for comparison.
 - **Why the freeze is the point (CD, 2026-10-05, after A003):** "I definitely
@@ -122,6 +127,51 @@ into the new model.
   bit-identical, but A001/A002 no longer show their original snapping shadow. If
   the CD wants that visible too, gate `charShadowSteps` on `VER>=3`. Until the CD
   answers, ask before shipping any other cross-version renderer change.
+
+### A004 (CD report 2026-10-05: squatting up stairs, runners' mass on their heels at the bottom of a flight and leaning more at the top; "implement A004 with a physics engine")
+The diagnosis (traced in A003's code): A001-A003 move the root on a scripted
+speed ramp and then bend the TRUNK until the centre of mass is where the support
+says it should be. That runs cause and effect backwards, so braking into a flight
+leaned the trunk back and speeding up at the top leaned it forward; and the
+stair pelvis was 17 cm low, so a climber's loaded knee sat at ~85 deg.
+A004 (`moveRoot4`, `locoParams4`, `pressParams4`, `physStep`, all new functions;
+the "A004: PHYSICS" block's header comment is the full design note):
+- **Trunk as a rigid body.** Head + arms + trunk (~68% of the mass, from `SEGS`
+  via `hatModel()`: mass, COM height, inertia, and `Irel`, the inertia the whole
+  body shows a trunk rotation) hinged at the hips, pitch and roll integrated at
+  240 Hz. Gravity tips it, the pelvis acceleration drags it, a torque-limited hip
+  PD (`hipMax` 2.6, feedforward gravity + 70% of the drag) holds it. It lags,
+  overshoots and settles; it is not posed.
+- **Vertical integrated.** The legs push the pelvis toward the gait's height
+  (PD, `wv` 24) but never pull: down acceleration is limited to -g, up to 2g, and
+  0 when a leg is at full reach. A landing-reach preview, toe-first landing and a
+  rate-limited reach drop stop the gravity-limited descent arriving late (snaps).
+- **Balance is the force law.** The ground force runs from the centre of pressure
+  through the COM, so the COM sits ahead of the feet by `h * a / g` to speed up,
+  behind to brake, inside a turn, and over the upper foot on a flight (+0.11 m
+  up, -0.04 down), clamped to 0.35 s and moved by a critically damped spring
+  (omega 10); the trunk's swing shifts it by `Irel * theta'' / g`. The pose is
+  solved so `comOf(pose)` IS that point (pelvis, 2 iterations).
+- **The plan asks only for what feet can deliver.** Jerk-limited acceleration
+  (walk 1.6, run 3 m/s^2; braking 2.5 / 3.5, up to 5 into a hard turn), turn rate
+  <= 6/speed (~0.6 g lateral), braking before sharp corners (`goStep` `VER>=4`),
+  and a ground keep-out around the stair block and tower with the flight ends open.
+- **Gait.** Stride from speed (`0.84 + 0.44 * speed`, 1.05-2.6 s; 1.0 s on
+  stairs), run swing fraction up to 0.64, landing at 42% of stance (bob 10.4 ->
+  6.1 cm), need-based heel lift, swing ankle capped below the hip, `stepOver4`
+  (0.3 tolerance), feet clamped inside the flight edges, pelvis -0.14 s going down.
+- **Not simulated, on purpose:** the fall-and-catch inside each step (an inverted
+  pendulum stepping onto capture points). Draft v1 did that and needed a balance
+  assist 6-30% of the time and fell off the flights when a step could not catch
+  it; v2/v3 (plan + leash) diverged into 15 m/s runaways. What works: simulate the
+  stable parts (trunk, vertical) and impose the unstable part through the force
+  law on a physically feasible plan. The drafts are not kept.
+Measured against `?v=A003`, seed 12345, 240 s: loaded knee on stairs 62 deg (A003
+85); climbing COM vs upper foot +1.5 cm (A003 -10, behind it); a runner's lean
+bottom -> top third of a flight 14.8 -> 19.3 deg (A003 15.3 -> 37.0); speeding up
+vs at speed 12.2 vs 7.0 deg (A003 8.5 vs 14.8, backwards); jumps > 0.3 m in a
+frame 0 on six seeds (A003 0-1); snaps 32-38 per 1000 (A003 41); early lifts and
+reach corrections ~0.5% and ~1.6% of steps.
 
 ### A003 (CD report 2026-10-05: "regular walking on the ground looks weird; the model leans back and takes short rapid steps")
 Measured, not guessed: A002 on flat ground took 0.32 m steps at 2.3 strides/s
@@ -223,10 +273,13 @@ A002 carries the pelvis at ~0.985 m standing, lower walking/running, and 17 cm
 lower on stairs, where the next tread is otherwise out of reach.
 
 ## Tests
-`.claude/tests/drive-animation-rigs.cjs` (~30 s), all seeded with `rAF`
-stubbed: the rules under every version; A001 and A002 bit-identical to their
-fixtures; the newest version's gait (step length, cadence), balance and the
-stair-shadow smoothness; plus, from the A002 era: the rules under both versions (no NaN, no bone stretch outside
+`.claude/tests/drive-animation-rigs.cjs` (~25 min), all seeded with `rAF`
+stubbed: the rules under every version; A001, A002 and A003 bit-identical to
+their fixtures; the gait (step length, cadence), balance and the stair-shadow
+smoothness (measured relative to the head's own motion, so a fast runner is not
+a false jump); A004's physics, each check also run on A003 and required to fail
+there (stair knee, COM over the upper foot, even lean up a flight, accelerating
+lean > steady lean, corrective rules rare; negative-tested 2026-10-05); plus, from the A002 era: the rules under both versions (no NaN, no bone stretch outside
 blends, climbs/presses/slides, ladder and tower limits, nobody on a slide, no
 fold under a rider, nobody inside a block, planted feet on their surface as a
 bounded rate); **A001 bit-identical to the fixture**; A002 snaps <= 30% of
