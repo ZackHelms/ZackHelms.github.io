@@ -140,6 +140,15 @@ Deterministic helpers for working on this repo.
     node .claude/scripts/smoke-mobile.cjs signals/index.html
   ```
 
+  **That path is container-dependent** (2026-10-05): a newer image left
+  `/opt/node22/.../playwright/node_modules` empty and hoisted `playwright-core`
+  to a top-level package in `/opt/node-tools/node_modules`, so every
+  hand-written `NODE_PATH` in this repo's headers silently stopped resolving
+  and `gates.sh` reported `NO-PLAYWRIGHT` -> `GATES: RED`. `gates.sh` now tries
+  both; by hand, use whichever of these makes
+  `node -e 'require("playwright-core")'` succeed:
+  `/opt/node-tools/node_modules` or `/opt/node22/lib/node_modules/playwright/node_modules`.
+
   A `#route` suffix is loaded as a client-side hash route (the file is checked
   without it), so a hash-routed app's inner page can be gated directly:
 

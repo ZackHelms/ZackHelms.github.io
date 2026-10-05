@@ -113,6 +113,15 @@ into the new model.
   in the suite and bump the `S.VER === 3` default check. The CD chose, on
   2026-10-05, that a fix to a shipped version ships as a NEW version rather than
   a correction, so the old one stays selectable for comparison.
+- **Why the freeze is the point (CD, 2026-10-05, after A003):** "I definitely
+  want to keep each version separate; part of this experiment is observing each
+  incremental change." The version list is the experiment's record, not a
+  compatibility shim, so a behaviour fix is never back-ported into an older
+  version, even a clear bug. **Open question for the CD:** the A003 stair-shadow
+  fix (below) is renderer-only and was applied to every version; joints stay
+  bit-identical, but A001/A002 no longer show their original snapping shadow. If
+  the CD wants that visible too, gate `charShadowSteps` on `VER>=3`. Until the CD
+  answers, ask before shipping any other cross-version renderer change.
 
 ### A003 (CD report 2026-10-05: "regular walking on the ground looks weird; the model leans back and takes short rapid steps")
 Measured, not guessed: A002 on flat ground took 0.32 m steps at 2.3 strides/s

@@ -53,7 +53,10 @@ done
 
 # --- resolve a NODE_PATH that can see playwright-core -----------------------
 if [ -z "${NODE_PATH:-}" ] || ! NODE_PATH="$NODE_PATH" node -e 'require("playwright-core")' 2>/dev/null; then
-  for c in /opt/node22/lib/node_modules/playwright/node_modules \
+  # /opt/node-tools: newer containers hoist playwright-core to a top-level
+  # package there and leave the nested node22 path empty (2026-10-05).
+  for c in /opt/node-tools/node_modules \
+           /opt/node22/lib/node_modules/playwright/node_modules \
            "$HOME/node_modules" ./node_modules; do
     if [ -d "$c" ] && NODE_PATH="$c" node -e 'require("playwright-core")' 2>/dev/null; then
       export NODE_PATH="$c"; break

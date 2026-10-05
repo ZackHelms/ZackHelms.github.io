@@ -9,7 +9,11 @@
   `playwright-core`; remote sessions have Chromium pre-installed at
   `/opt/pw-browsers/chromium` and can `npm install playwright-core` in the
   session scratchpad (run the gate with `NODE_PATH` pointing at that
-  `node_modules`).
+  `node_modules`). Usually no install is needed: `.claude/scripts/gates.sh`
+  finds a preinstalled `playwright-core` itself, and where it lives varies by
+  container image (`/opt/node-tools/node_modules` or
+  `/opt/node22/lib/node_modules/playwright/node_modules`; see
+  `.claude/scripts/README.md` § smoke-mobile).
 
 ## Backlog (TODO.md)
 - Buckets, in file order: In progress · Now · Needs Zack · Next · Later ·
@@ -48,6 +52,16 @@
   hidden by the 2026-09-18, 2026-09-19 and 2026-09-20 ones. The six
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
+
+  **2026-10-05, animation-rigs pass** (pointer moved `9cceecb` -> `e679e2e`,
+  range `9cceecb..e679e2e`). Refined this session's three commits (`6c9d5ff`,
+  `2a58ef2`, `e679e2e`). The range also held `58cdad9` (the Widow's Bay
+  session's refine commit, skippable) and two character-lists commits,
+  **`bf7c349`** (The Names) and **`29534b5`** (The Boroughs), which now sit
+  under the pointer. Both touch only `character-lists/data/<slug>.js` plus
+  `manifest.js`: content added under rules that already exist, so there was
+  nothing in them to refine (checked with `git show --stat`, not assumed).
+  `99205d8` and `c28a947` are still outstanding and still hidden.
 
   **2026-09-27, character-lists (Widow's Bay) pass** (pointer moved `21c0905`
   -> `9cceecb`, range `21c0905..9cceecb`). Clean: the range held only
@@ -303,6 +317,19 @@
   `list_workflow_jobs` needs the **real** run id out of that listing — a
   guessed id returns a bare `404 Not Found`, which reads like a permissions
   problem and is not one.
+- **If the `event` filter is refused, narrow by workflow id instead**
+  (2026-10-05). In one harness the tool's `event` enum did not include
+  `dynamic`, and `{branch:'main'}` on its own listed a **two-month-old** run
+  first (`total_count` 223, not the 729 the workflow really had), which looks
+  like a deploy that never happened. `resource_id: '266280069'` (the "pages
+  build and deployment" workflow) with `perPage: 1` and no filter returned the
+  newest run, the pushed SHA, inline. Always match `head_sha` to the push
+  before reading `conclusion`.
+- **Another way to wait:** `send_later` (claude-code-remote MCP) with
+  `delay_minutes: 3` and a message naming the run id and SHA delivers the
+  re-check as a fresh turn, so the session reports its push and goes idle
+  instead of holding a Monitor open. It is the second of the two checks
+  budgeted below.
 - **Budget two checks, then report and stop** (2026-09-19). The stale-status
   warning above has a sharper form: a run that had **finished in ~80 seconds**
   reported `in_progress` for ~25 minutes, and so did its jobs *and* the
