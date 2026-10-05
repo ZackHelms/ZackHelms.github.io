@@ -53,6 +53,18 @@
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
 
+  **2026-10-05, second animation-rigs pass** (pointer moved `e679e2e` ->
+  `f30efc2`, range `e679e2e..f30efc2`). Clean: every commit in the range was
+  this session's own (`0fac577` A004 physics, `c684ecb`, `f30efc2` the
+  per-version drawing freeze) plus `2a8d7b8`, its own earlier refine commit.
+  Nothing new left behind. `99205d8` re-checked ancestor of `e679e2e`;
+  **`c28a947` could not be re-checked** because this container's clone is
+  shallow (57 commits, `git rev-parse --is-shallow-repository` says true), so
+  `merge-base --is-ancestor` fails with "Not a valid object name" rather than
+  answering. Earlier passes proved it buried; nothing here changed that. In a
+  shallow clone, `git fetch --deepen=<n> origin main` before trusting an
+  ancestor check.
+
   **2026-10-05, animation-rigs pass** (pointer moved `9cceecb` -> `e679e2e`,
   range `9cceecb..e679e2e`). Refined this session's three commits (`6c9d5ff`,
   `2a58ef2`, `e679e2e`). The range also held `58cdad9` (the Widow's Bay

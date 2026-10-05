@@ -111,9 +111,12 @@ into the new model.
 - **A004** adds a physics engine (below). The current default.
 - **Adding A005:** copy the shipped page into `fixtures/animation-rigs-a004.html`,
   add `{id:'A005',n:5}` to the front of `VERSIONS`, write new functions or
-  `VER>=5` branches (never edit a path an older version runs), add it to `VERS`
-  in the suite, add the fixture to the bit-identical list and bump the
-  `S.VER === 4` default check. Give it its own `<h3>` in the info panel, which
+  `VER>=5` branches (never edit a path an older version runs, the renderer
+  included), and put `'A005'` at the front of `VERS` in the suite. That is the
+  whole suite edit: the freeze check (joints and pixels) runs over
+  `VERS.slice(1)` and the menu / `?v=` checks are derived from `VERS`. The A004
+  physics checks then guard the new default against A003, so A005 must keep
+  passing them or change them on purpose. Give it its own `<h3>` in the info panel, which
   lists versions only: A001 holds the general features, every later version
   says what it changed. The CD chose, on
   2026-10-05, that a fix to a shipped version ships as a NEW version rather than
@@ -298,4 +301,6 @@ A001's overall and <= 20% in the legs, worst < 0.35; A002 lean/sway/bob
 ranges; both dropdowns, live switching and `?v=`; the button by hook and by a
 real tap. Negative-tested 2026-10-05: freezing the lean, editing an A001 blend
 and turning off soft IK + sagittal poles each turn it red. `--shots <dir>` for
-eyeballing.
+eyeballing; `--only identity,physics` (any of rules, identity, snaps, balance,
+shadows, physics, ui) runs a subset while iterating, instead of slicing the
+suite into a scratch copy (a copy loses `__dirname`, so its fixture paths break).

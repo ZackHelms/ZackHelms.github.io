@@ -3,7 +3,12 @@
  * drive-animation-rigs.cjs — rules + version suite for games/animation-rigs/.
  *
  *   NODE_PATH=<dir-with-playwright-core>/node_modules \
- *     node .claude/tests/drive-animation-rigs.cjs [--shots <dir>]
+ *     node .claude/tests/drive-animation-rigs.cjs [--shots <dir>] [--only <sections>]
+ *
+ * --only runs a comma-separated subset while iterating (rules, identity, snaps,
+ * balance, shadows, physics, ui), e.g. `--only identity,physics`; the gate runs
+ * them all. Adding a version: copy the shipped page to fixtures/, put its id at
+ * the front of VERS. Every version check below is derived from VERS.
  *
  * Every simulation section runs with a seeded Math.random and the page's own
  * requestAnimationFrame loop stubbed out, stepping through window.__AR, so a
@@ -70,7 +75,10 @@ const PAGE = 'file://' + path.join(ROOT, 'games', 'animation-rigs', 'index.html'
 const FIX = (v) => 'file://' + path.join(__dirname, 'fixtures', 'animation-rigs-' + v.toLowerCase() + '.html');
 const VERS = ['A004', 'A003', 'A002', 'A001'];   // newest first, as the page lists them
 const NEW = VERS[0];
+const VN = (v) => +v.slice(1);                      // 'A004' -> 4, the page's VER
 const shotDir = process.argv.includes('--shots') ? process.argv[process.argv.indexOf('--shots') + 1] : null;
+const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : null;
+const want = (s) => !only || only.includes(s);
 
 let bad = 0;
 const fail = (m) => { bad++; console.log('  FAIL ' + m); };
@@ -405,7 +413,7 @@ async function ui(browser) {
   }));
   ok(JSON.stringify(S.speeds) === JSON.stringify(['4×', '2×', '1×', '½×', '¼×']) && S.speed === '1×',
     'speed menu offers 4x 2x 1x half quarter, default 1x (' + S.speeds.join(' ') + ', default ' + S.speed + ')');
-  ok(JSON.stringify(S.vers) === JSON.stringify(VERS) && S.ver === NEW && S.VER === 4,
+  ok(JSON.stringify(S.vers) === JSON.stringify(VERS) && S.ver === NEW && S.VER === VN(NEW),
     'version menu lists newest first and defaults to it (' + S.vers.join(' ') + ', default ' + S.ver + ')');
   const rate = async (v) => {
     await page.selectOption('#speed-sel', v);
@@ -417,10 +425,10 @@ async function ui(browser) {
   const r1 = await rate('1'), r4 = await rate('4'), rq = await rate('0.25');
   ok(r4 > r1 * 2.5 && rq < r1 * 0.5, 'speed menu changes simulated time per real second (1x ' + r1.toFixed(2) + ', 4x ' + r4.toFixed(2) + ', quarter ' + rq.toFixed(2) + ')');
   await page.selectOption('#speed-sel', '1');
-  const got = [];
-  for (const n of ['1', '2', '3', '4']) { await page.selectOption('#ver-sel', n); got.push(await page.evaluate(() => window.__AR.VER)); }
-  ok(got.join() === '1,2,3,4', 'version menu switches the animation model live (A001/A002/A003/A004 -> ' + got.join('/') + ')');
-  for (const [v, n] of [['A001', 1], ['A002', 2], ['A003', 3]]) {
+  const got = [], order = VERS.slice().reverse();
+  for (const v of order) { await page.selectOption('#ver-sel', String(VN(v))); got.push(await page.evaluate(() => window.__AR.VER)); }
+  ok(got.join() === order.map(VN).join(), 'version menu switches the animation model live (' + order.join('/') + ' -> ' + got.join('/') + ')');
+  for (const [v, n] of VERS.slice(1).map(v => [v, VN(v)])) {
     const q = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await q.goto(PAGE + '?v=' + v); await q.waitForFunction(() => !!window.__AR);
     const qv = await q.evaluate(() => [window.__AR.VER, document.getElementById('ver-sel').selectedOptions[0].textContent]);
@@ -457,19 +465,21 @@ async function ui(browser) {
 
 (async () => {
   const browser = await launch();
-  for (const v of VERS) await rules(browser, v, v === NEW ? PAGE : PAGE + '?v=' + v);
-  for (const v of VERS.slice(1)) await identity(browser, v);
+  if (want('rules')) for (const v of VERS) await rules(browser, v, v === NEW ? PAGE : PAGE + '?v=' + v);
+  if (want('identity')) for (const v of VERS.slice(1)) await identity(browser, v);
+  if (want('snaps')) {
   const s1 = await snaps(browser, PAGE + '?v=A001'), s2 = await snaps(browser, PAGE);
   console.log('snaps per 1000 figure-frames: A001 ' + s1.per1000.toFixed(1) + ' (legs ' + s1.legs + ', worst ' + s1.max.toFixed(3) + ')  ' + NEW + ' ' + s2.per1000.toFixed(1) + ' (legs ' + s2.legs + ', worst ' + s2.max.toFixed(3) + ')');
   ok(s1.tot > 1000, 'the snap metric sees A001\'s snapping (' + s1.tot + ' events) - a metric that cannot see the old bug proves nothing');
   ok(s2.per1000 <= s1.per1000 * 0.3, NEW + ' has at most 30% of A001\'s snaps (' + (100 * s2.per1000 / s1.per1000).toFixed(0) + '%)');
   ok(s2.legs <= s1.legs * 0.2, NEW + ' legs have at most 20% of A001\'s snaps (' + (100 * s2.legs / s1.legs).toFixed(0) + '%)');
   ok(s2.max < 0.35, NEW + ' worst single snap under 0.35 m/frame^2 (' + s2.max.toFixed(3) + ', A001 ' + s1.max.toFixed(3) + ')');
-  await balance(browser);
-  await shadows(browser);
-  await physics(browser);
-  await ui(browser);
+  }
+  if (want('balance')) await balance(browser);
+  if (want('shadows')) await shadows(browser);
+  if (want('physics')) await physics(browser);
+  if (want('ui')) await ui(browser);
   await browser.close();
-  console.log(bad ? 'DRIVE animation-rigs: RED (' + bad + ')' : 'DRIVE animation-rigs: GREEN');
+  console.log((bad ? 'DRIVE animation-rigs: RED (' + bad + ')' : 'DRIVE animation-rigs: GREEN') + (only ? ' (only ' + only.join(',') + ')' : ''));
   process.exit(bad ? 1 : 0);
 })().catch(e => { console.error(e); console.log('DRIVE animation-rigs: RED'); process.exit(1); });
