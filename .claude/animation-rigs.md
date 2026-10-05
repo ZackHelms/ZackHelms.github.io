@@ -273,7 +273,7 @@ A002 carries the pelvis at ~0.985 m standing, lower walking/running, and 17 cm
 lower on stairs, where the next tread is otherwise out of reach.
 
 ## Tests
-`.claude/tests/drive-animation-rigs.cjs` (~25 min), all seeded with `rAF`
+`.claude/tests/drive-animation-rigs.cjs` (~45 s), all seeded with `rAF`
 stubbed: the rules under every version; A001, A002 and A003 bit-identical to
 their fixtures; the gait (step length, cadence), balance and the stair-shadow
 smoothness (measured relative to the head's own motion, so a fast runner is not
