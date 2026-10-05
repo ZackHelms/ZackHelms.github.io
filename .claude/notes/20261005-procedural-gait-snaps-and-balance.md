@@ -74,6 +74,11 @@ When a CD wants to compare versions side by side, freeze the old code paths
 a test fixture, and assert the old selection reproduces it **bit for bit**
 under a seeded `Math.random` with `requestAnimationFrame` and timers stubbed.
 A new version must not consume `Math.random` on an old version's path.
+Freeze the drawing too: a renderer fix applied to every version (A003's stair
+shadow) left the joints bit-identical but changed what A001/A002 looked like,
+which the CD did not want. Compare canvas pixels against the fixture as well
+(row hashes of a fresh render are cheap), so a cross-version drawing change
+fails a test instead of waiting for the CD to notice.
 
 ## Addendum (same day): the safety valve that became the gait
 A002 shipped with an "out of reach, lift now" rule whose thresholds the rig's

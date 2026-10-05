@@ -122,11 +122,20 @@ into the new model.
   want to keep each version separate; part of this experiment is observing each
   incremental change." The version list is the experiment's record, not a
   compatibility shim, so a behaviour fix is never back-ported into an older
-  version, even a clear bug. **Open question for the CD:** the A003 stair-shadow
-  fix (below) is renderer-only and was applied to every version; joints stay
-  bit-identical, but A001/A002 no longer show their original snapping shadow. If
-  the CD wants that visible too, gate `charShadowSteps` on `VER>=3`. Until the CD
-  answers, ask before shipping any other cross-version renderer change.
+  version, even a clear bug.
+- **The freeze covers what is DRAWN, not only the joints (CD, 2026-10-05):**
+  "Yes, I definitely want each version to retain what it looked like so that I
+  can compare. This might mean keeping them separate versions of the code that
+  displays in the page while having some shared code like for the menu at the
+  top." So the renderer branches on `VER` like the simulation does (the stair
+  shadow: `charShadow` on one flat plane before A003, `charShadowSteps` from
+  A003), and the suite renders the canvas 90 times over 300 s under each old
+  selection and requires every pixel row to match its fixture. **Shared, by the
+  CD's call:** only the DOM chrome around the canvas (the speed and version
+  menus, the info panel, the badge). A001 shipped with a 1x/half/quarter speed
+  button instead of the menus; that is the one visible difference, and it is
+  the shared menu. Any future change to what the canvas shows is a `VER>=n`
+  branch.
 
 ### A004 (CD report 2026-10-05: squatting up stairs, runners' mass on their heels at the bottom of a flight and leaning more at the top; "implement A004 with a physics engine")
 The diagnosis (traced in A003's code): A001-A003 move the root on a scripted
@@ -190,7 +199,7 @@ Result: steps ~0.66-0.69 m at ~0.95-1.03 strides/s, walking lean ~5 deg and neve
 negative at the 5th percentile, standing ~2 deg with a ~7 deg spread (A002: ~30),
 stairs up ~19, down ~1, running ~14.5; snaps 41 per 1000 (A002 49, A001 282).
 
-### Shadows on the structure (renderer, every version)
+### Shadows on the structure (renderer, A003 on)
 A figure up on the structure used to cast its shadow onto ONE flat plane at the
 height of the tread under its root, so the whole shadow jumped ~12 cm each time it
 climbed a tread (CD report, same day). Projecting onto the exact treads is no
@@ -199,8 +208,9 @@ off each step edge. `charShadowSteps` marches each point (bones subdivided x4) d
 the light ray to `shadowY()`: over a flight the smooth line through the tread
 centres (the ramp when folded), elsewhere the real platform/tower/ground height;
 pieces landing > 0.6 m below the figure (off an edge) are left out. Fallers and
-sliders get a shadow too now. This is drawing only: no version's joints change,
-which is why A001/A002 stay bit-identical. Measured: a climber's head shadow moves
+sliders get a shadow too. First shipped to every version as drawing only; gated
+to `VER>=3` the same day once the CD said each version keeps its look, so A001
+and A002 show their original jumping shadow again. Measured: a climber's head shadow moves
 > 6 cm in one frame 5 times in 18,371 frames (flat plane: 524).
 
 ### A002: why it snapped and what fixed it
@@ -275,7 +285,8 @@ lower on stairs, where the next tread is otherwise out of reach.
 ## Tests
 `.claude/tests/drive-animation-rigs.cjs` (~45 s), all seeded with `rAF`
 stubbed: the rules under every version; A001, A002 and A003 bit-identical to
-their fixtures; the gait (step length, cadence), balance and the stair-shadow
+their fixtures in joints AND in canvas pixels (negative-tested: drawing A003's
+shadow under every version turns A001 and A002 red); the gait (step length, cadence), balance and the stair-shadow
 smoothness (measured relative to the head's own motion, so a fast runner is not
 a false jump); A004's physics, each check also run on A003 and required to fail
 there (stair knee, COM over the upper foot, even lean up a flight, accelerating

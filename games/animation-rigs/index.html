@@ -42,7 +42,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-05 15:05 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-05 17:04 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute-btn" class="chrome" aria-label="Toggle sound">🔊</button>
@@ -66,7 +66,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
   <p><b>Smoothing</b>, after legs and feet were seen to snap: each swing runs on its own clock, landings glide and commit before touch-down, feet follow the stair profile over each riser, knees and elbows ease toward straight, and every follower is a damped spring.</p>
   <h3>A003</h3>
   <p>Fixed A002's walk on flat ground (short, rapid steps and a lean back): normal ~0.7 m steps at a normal pace. Standing balance moved to the hips and ankles, trunk upright.</p>
-  <p>Shadows on the stairs now glide down the flight instead of jumping a step per tread. That is drawing only, so it shows under every version.</p>
+  <p>Shadows on the stairs now glide down the flight instead of jumping a step per tread.</p>
   <h3>A004 (default)</h3>
   <p>A <b>physics engine</b> under the gait, built on A002's segment masses. The <b>trunk</b> is a rigid body hinged at the hips with the mass and inertia of its segments: gravity tips it, the pelvis's acceleration drags it, the hip muscles hold it, so it lags, overshoots and settles like a mass. The <b>legs</b> push the body up but can never pull it down faster than it would fall, and never reach further than they are long.</p>
   <p><b>Balance is the force law</b>: the ground pushes from under the feet through the centre of mass, and its forward part is what accelerates the body, so the mass sits ahead of the feet by height &times; acceleration &divide; gravity. A figure starting to run leans forward while it speeds up and straightens once it is at speed; it brakes with its feet, trunk up; it leans into turns; up a flight its mass rides over the upper foot. Before, A001 to A003 bent the trunk to put the mass there, so slowing into the stairs leaned it back and speeding up at the top leaned it forward.</p>
@@ -1643,8 +1643,10 @@ function drawChar(ch){
   const J=ch.out;if(!J) return;
   const C=J.map(toCam);
   if(C[0][2]<NEAR) return;
-  const lvl=ch.state==='ladder'?0:footY(ch.x,ch.z);
-  if(lvl>0.01&&ch.state!=='ladder') charShadowSteps(ch,lvl);
+  // Each version draws its shadow as it shipped: A001/A002 on one flat plane at the height under
+  // a walking figure (so it jumps a step per tread), A003 on along the structure, fallers too.
+  const lvl=VER>=3?(ch.state==='ladder'?0:footY(ch.x,ch.z)):(ch.state==='loco'||ch.state==='press'?footY(ch.x,ch.z):0);
+  if(lvl>0.01&&ch.state!=='ladder') (VER>=3?charShadowSteps:charShadow)(ch,lvl);
   if(ch===follow){
     const y=ch.state==='ladder'?J[0].y-0.9:(ch.state==='loco'||ch.state==='press'?lvl:footY(ch.x,ch.z));
     ctx.beginPath();

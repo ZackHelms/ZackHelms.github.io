@@ -23,8 +23,10 @@
  *  2. OLDER VERSIONS ARE FROZEN: each shipped version is kept as a fixture
  *     (.claude/tests/fixtures/animation-rigs-a00N.html, copied from the commit
  *     that shipped it) and today's page opened with ?v=A00N must produce the
- *     same joints, bit for bit, for 300 s. This is what lets a new version be
- *     added without touching what the old ones show.
+ *     same joints, bit for bit, for 300 s, AND draw the same canvas, pixel for
+ *     pixel, 90 times over it (the CD, 2026-10-05: each version keeps what it
+ *     looked like; only the menus above the canvas are shared). This is what
+ *     lets a new version be added without touching what the old ones show.
  *  3. SMOOTHNESS (NEW vs A001, same seed, 240 s at 60 Hz): a "snap" is a
  *     joint's frame-to-frame acceleration more than 3x its own recent average
  *     (and > 0.02 m/frame^2), i.e. an impulse rather than fast smooth motion.
@@ -174,9 +176,20 @@ async function identity(browser, v) {
   const run = async (url) => {
     const { page } = await simPage(browser, url, 777, true);
     const r = await page.evaluate(() => {
-      const A = window.__AR, snaps = [];
-      for (let k = 0; k < 9000; k++) { A.step(1 / 30, 1); if (k % 300 === 299) snaps.push(A.chars.map(c => c.out.map(p => [p.x, p.y, p.z]))); }
-      return { snaps, presses: A.ST.presses };
+      const A = window.__AR, snaps = [], pix = [];
+      // what the canvas shows: one FNV hash per pixel row of a fresh render
+      const rows = () => {
+        A.render();
+        const c = document.getElementById('cv'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, w = c.width * 4, out = [];
+        for (let y = 0; y < c.height; y++) { let h = 2166136261; for (let i = y * w; i < (y + 1) * w; i++) { h ^= d[i]; h = Math.imul(h, 16777619); } out.push(h >>> 0); }
+        return out;
+      };
+      for (let k = 0; k < 9000; k++) {
+        A.step(1 / 30, 1);
+        if (k % 300 === 299) snaps.push(A.chars.map(c => c.out.map(p => [p.x, p.y, p.z])));
+        if (k % 100 === 99) pix.push(rows());
+      }
+      return { snaps, pix, presses: A.ST.presses };
     });
     await page.close();
     return r;
@@ -188,6 +201,16 @@ async function identity(browser, v) {
   }
   ok(a.snaps.length === 30 && n > 0 && maxd === 0 && a.presses === b.presses,
     v + ' selection reproduces the shipped ' + v + ' bit for bit (' + n + ' coordinates over 300 s, max diff ' + maxd + ', presses ' + a.presses + '/' + b.presses + ')');
+  // and it LOOKS as it shipped: the canvas, pixel for pixel (only the menus above it are shared)
+  let rowsN = 0, rowsBad = 0, shotsBad = 0;
+  for (let i = 0; i < a.pix.length; i++) {
+    let badHere = 0;
+    for (let y = 0; y < a.pix[i].length; y++) { rowsN++; if (a.pix[i][y] !== b.pix[i][y]) badHere++; }
+    if (badHere || a.pix[i].length !== b.pix[i].length) shotsBad++;
+    rowsBad += badHere;
+  }
+  ok(a.pix.length === 90 && rowsN > 0 && shotsBad === 0,
+    v + ' selection draws exactly what the shipped ' + v + ' drew (90 renders over 300 s; ' + shotsBad + ' differ, ' + rowsBad + ' of ' + rowsN + ' pixel rows)');
 }
 
 async function snaps(browser, url) {
