@@ -53,6 +53,15 @@
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
 
+  **2026-10-05, third animation-rigs pass** (pointer moved `f30efc2` ->
+  `8e62e0f`, range `f30efc2..8e62e0f`). Clean: `8e62e0f` (follow menu, A005
+  turns, the shared loop's dt fix) is this session's, and `b5bc466` is its own
+  earlier refine commit. Nothing left behind. **`c28a947` re-checked at last:**
+  after `git fetch --deepen=400 origin main` (the clone had been 57 commits
+  deep), `merge-base --is-ancestor` reports both `99205d8` and `c28a947`
+  ancestors of `f30efc2`, so both stay buried, as earlier passes proved, and
+  `--deepen=400` is enough here.
+
   **2026-10-05, second animation-rigs pass** (pointer moved `e679e2e` ->
   `f30efc2`, range `e679e2e..f30efc2`). Clean: every commit in the range was
   this session's own (`0fac577` A004 physics, `c684ecb`, `f30efc2` the

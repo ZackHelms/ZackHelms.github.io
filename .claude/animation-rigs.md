@@ -390,3 +390,11 @@ and turning off soft IK + sagittal poles each turn it red. `--shots <dir>` for
 eyeballing; `--only identity,physics` (any of rules, identity, snaps, balance,
 shadows, physics, turns, ui) runs a subset while iterating, instead of slicing the
 suite into a scratch copy (a copy loses `__dirname`, so its fixture paths break).
+
+**Diagnosing motion:** `.claude/tests/trace-animation-rigs.cjs` (not a gate).
+`tilt` lists the fastest sideways tilts with the turn rate before each, `jumps`
+lists root jumps, `trace <id> <from> <to>` prints one figure frame by frame
+(root, speed, accel, turn rate, COM offset, trunk roll, feet, step and its
+waypoints). The A005 diagnosis was: `tilt` on A004 (the turn rate goes 0 -> 4
+in one frame), then `jumps` and `trace` on the A005 draft (a runner circling
+the waypoint at a flight's foot, then thrown out of the keep-out).
