@@ -42,7 +42,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-05 12:33 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-05 04:49 UTC</div>
 <canvas id="cv"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute-btn" class="chrome" aria-label="Toggle sound">🔊</button>
@@ -59,13 +59,13 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
   <h3>CAMERA</h3>
   <p><b>Drag</b> to orbit. <b>Pinch</b> or scroll to zoom. <b>Two fingers</b> (or right-drag / shift-drag) to pan. <b>Tap a figure</b> to follow it, tap empty space to let go. <b>Tap the button</b> yourself if you like. The speed menu top-right runs time at 4&times;, 2&times;, 1&times;, &frac12;&times; or &frac14;&times; so you can study the gait; the version menu beside it switches the animation model live, so the same figures can be compared under each.</p>
   <h3>VERSIONS</h3>
-  <p><b>A003</b> (default) fixes A002's walk on flat ground: full-length steps at a normal pace instead of short rapid ones, a slight forward lean instead of rocking back, and standing balance kept at the hips and ankles with the trunk upright. <b>A002</b> added the body-mass model, balance, smoothing and torso sway described below. <b>A001</b> is the first release. Older versions are kept exactly as they shipped; add <b>?v=A001</b> or <b>?v=A002</b> to the address to open on one.</p>
+  <p><b>A002</b> (default) adds the body-mass model, balance, smoothing and torso sway described below. <b>A001</b> is the first release, kept exactly as it shipped. Add <b>?v=A001</b> to the address to open on an older version.</p>
   <h3>THE RIG</h3>
   <p>Every figure is 21 joints: pelvis, two spine joints, neck and head, then shoulder, elbow, wrist and hand per arm and hip, knee, ankle and toe per leg. Bone lengths never change. Legs and arms are solved every frame with <b>two-bone inverse kinematics</b>: the code decides where a foot or hand should be, and the knee or elbow is placed analytically, bent toward a pole direction (knees forward, elbows back and out).</p>
   <h3>WALKING AND RUNNING</h3>
   <p>Feet are <b>planted in the world</b> and only move during their swing, so they never skate. When a foot lifts, its landing spot is predicted from the body's velocity so it lands under the hips at mid-stance. On stairs the landing is snapped to the centre of a tread: one tread per step walking, two running. The heel peels up late in each stance, the toe pitches through the swing, the pelvis bobs (lowest at mid-stance when running, highest when walking) and is pulled down whenever a leg could not reach, and the arms and shoulders counter-swing the legs. Turning on the spot re-plants the feet.</p>
   <h3>BALANCE (A002)</h3>
-  <p>Each figure has a body-mass model: fourteen segments (head and neck 8.1% of body mass, trunk 49.7%, each upper arm 2.8%, forearm 1.6%, hand 0.6%, thigh 10%, shank 4.65%, foot 1.45%) with each segment's own centre of mass placed along it from published anthropometric tables (source: Winter, <i>Biomechanics and Motor Control of Human Movement</i>, after Dempster 1955). Every frame the whole-body centre of mass is computed from the actual pose and moved to where the support says it must be. Walking, that is solved with <b>trunk lean</b> (standing, from A003, with the hips and ankles instead, so the trunk stays upright): on stairs the upper foot carries the body, so climbing leans the trunk forward over the step ahead; speeding up needs the centre of mass ahead of the feet (acceleration &times; height &divide; g), slowing down behind them. Reaching for the button keeps the trunk where the reach puts it and slides the <b>hips back</b> instead, as people do. Getting up off the floor leans as far forward as it must to bring the mass over the feet before rising.</p>
+  <p>Each figure has a body-mass model: fourteen segments (head and neck 8.1% of body mass, trunk 49.7%, each upper arm 2.8%, forearm 1.6%, hand 0.6%, thigh 10%, shank 4.65%, foot 1.45%) with each segment's own centre of mass placed along it from published anthropometric tables (source: Winter, <i>Biomechanics and Motor Control of Human Movement</i>, after Dempster 1955). Every frame the whole-body centre of mass is computed from the actual pose and moved to where the support says it must be. Walking, that is solved with <b>trunk lean</b>: on stairs the upper foot carries the body, so climbing leans the trunk forward over the step ahead; speeding up needs the centre of mass ahead of the feet (acceleration &times; height &divide; g), slowing down behind them. Reaching for the button keeps the trunk where the reach puts it and slides the <b>hips back</b> instead, as people do. Getting up off the floor leans as far forward as it must to bring the mass over the feet before rising.</p>
   <p><b>Side to side</b>, the mass shifts toward whichever foot is carrying weight: part-way when walking, almost fully when standing. The hip of the swinging leg drops about 4&deg; and the trunk leans slightly toward the stance side. The pelvis rises and falls twice per stride. Standing, figures breathe, sway a centimetre or so, and every few seconds settle their weight onto one leg.</p>
   <p><b>Smoothing:</b> each foot's swing runs on its own clock and starts from where the heel actually lifted, rising and landing with zero vertical speed; the landing spot glides toward the prediction and is committed before touch-down; on stairs each step lands one tread beyond the other foot, and the foot clears each riser by following the stair profile rather than a timing curve; the heel strikes first and the foot rolls flat. Knees and elbows bend in the limb's own plane and ease toward straight instead of snapping straight. Pelvis height, lean, sway and head pitch move on critically damped springs, so no target change ever jolts them; pose changes blend from where each joint was heading, not from a frozen snapshot. Ladder hand-offs blend instead of switching, and figures are never shoved apart faster than they can walk.</p>
   <h3>THE LADDER</h3>
@@ -75,7 +75,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
   <h3>THE QUEUE</h3>
   <p>One ladder, one climber at a time. Whenever someone is on the ladder or the tower, another figure walks over and waits at the foot of the ladder to go up next; someone waiting at the top to come down goes first.</p>
   <h3>RENDERING</h3>
-  <p>No 3D library: a hand-written perspective projection onto a 2D canvas. Surfaces are split into small tiles, back faces are culled, everything is drawn far-to-near, and walls are flat-shaded from one sun direction whose shadows are projected onto the floor. A figure up on the structure casts its shadow along it: over a flight onto the smooth line through the tread centres, so the shadow glides down the steps instead of jumping a step at every tread.</p>
+  <p>No 3D library: a hand-written perspective projection onto a 2D canvas. Surfaces are split into small tiles, back faces are culled, everything is drawn far-to-near, and walls are flat-shaded from one sun direction whose shadows are projected onto the floor.</p>
   <button id="info-close">CLOSE</button>
 </div></div>
 <script>
@@ -226,7 +226,7 @@ let simT=0;
 // Versions, newest first. A001 code paths are frozen: the drive suite proves that
 // selecting A001 reproduces the shipped A001 frame for frame. Later versions add
 // their own functions (locoParams2...) or branch on VER, never edit an A001 path.
-const VERSIONS=[{id:'A003',n:3},{id:'A002',n:2},{id:'A001',n:1}];
+const VERSIONS=[{id:'A002',n:2},{id:'A001',n:1}];
 let VER=VERSIONS[0].n;
 try{const q=(new URLSearchParams(location.search).get('v')||'').toUpperCase(),m=VERSIONS.find(v=>v.id===q);if(m) VER=m.n;}catch(e){}
 const BD=(a001,a002)=>VER>=2?a002:a001;   // pose-blend seconds per version
@@ -395,8 +395,6 @@ function comOf(J){
   return V(x,y,z);
 }
 const approach=(c,t,dt,tau)=>c+(t-c)*(1-Math.exp(-dt/tau));
-// A003 balance targets (metres of COM lead, x body scale): walking, running, braking, stairs
-const T3={walk:0.035,run:0.015,brake:0.025,up:0.1,down:0.19};
 // Critically damped spring toward a target: unlike a first-order lag, a step in the
 // target produces no step in velocity, so a moving target never jolts what follows it.
 function spring(o,k,target,dt,w){
@@ -500,11 +498,8 @@ function locoParams2(ch,dt,mod){
     // a stance foot left out of reach behind the hips lifts early rather than dragging the body down
     const hpx=ch.x+rt.x*sg*0.1*s,hpz=ch.z+rt.z*sg*0.1*s;
     const reach=Math.hypot(ft.plant.x-hpx,(ch.py||0)-0.04*s-ft.plant.y-0.08*s,ft.plant.z-hpz);
-    // A003: only a foot that is really out of reach lifts early. A002's thresholds fired on
-    // nearly every ordinary step on flat ground, re-timing the gait into short rapid steps.
-    const behind=VER>=3?(ft.plant.x-ch.x)*fw.x+(ft.plant.z-ch.z)*fw.z<-(0.62+0.25*ra)*s||reach>0.93*s
-                       :(ft.plant.x-ch.x)*fw.x+(ft.plant.z-ch.z)*fw.z<-(0.5+0.2*ra)*s||reach>0.875*s;
-    const other=ch.feet[1-i],otherOk=!other.sw||(other.t||0)>0.5||reach>(VER>=3?0.96:0.89)*s;   // out of reach lifts regardless
+    const behind=(ft.plant.x-ch.x)*fw.x+(ft.plant.z-ch.z)*fw.z<-(0.5+0.2*ra)*s||reach>0.875*s;
+    const other=ch.feet[1-i],otherOk=!other.sw||(other.t||0)>0.5||reach>0.89*s;   // out of reach lifts regardless
     const wrapped=rate>0&&lp<lp0&&lp0>0.7&&lp<0.3;
     if(!ft.sw&&(wrapped||(moving&&behind&&otherOk))){
       // an early lift re-times the gait to this foot, or it would miss its next turn too
@@ -581,7 +576,7 @@ function locoParams2(ch,dt,mod){
     Sf=(w0*((f0.x-ch.x)*fw.x+(f0.z-ch.z)*fw.z)+w1*((f1.x-ch.x)*fw.x+(f1.z-ch.z)*fw.z))/(w0+w1);
     const q=Math.min(1,Math.abs(B.up)*1.5);
     // climbing pushes up off the upper foot, so the mass leads; descending it still rides a little ahead
-    Sf=Sf*q*(B.up>0?0.2:0.3)+(VER>=3?(B.up>0?T3.up+0.06*ra:T3.down):(B.up>0?0.03+0.06*ra:0.09))*s*q;
+    Sf=Sf*q*(B.up>0?0.2:0.3)+(B.up>0?0.03+0.06*ra:0.09)*s*q;
   }
   B.Sf=approach(B.Sf,Sf,dt,0.45);
   // pelvis: vertical bob, breathing, quiet postural sway, never higher than the legs reach
@@ -628,22 +623,11 @@ function locoParams2(ch,dt,mod){
   // ankles over the feet as they are planted; walking it rolls heel to toe, ~7 cm ahead on
   // average. Accelerating needs the COM further ahead (~a*h/g).
   const fMid=((f0.x+f1.x)/2-ch.x)*fw.x+((f0.z+f1.z)/2-ch.z)*fw.z;
-  const tF=VER>=3
-    // A003: with full-length strides the walking target sits closer over the feet, and
-    // slowing down leans back far less than speeding up leans forward (people brake by stepping)
-    ?lerp(fMid+0.05*s,(T3.walk+T3.run*ra)*s,mv)+B.Sf+(B.acc>0?Math.min(B.acc,2.5)*0.06:Math.max(B.acc,-2)*T3.brake)
-    :lerp(fMid+0.05*s,0.07*s,mv)+B.Sf+clamp(B.acc,-2,2.5)*0.06-0.015*ra;
+  const tF=lerp(fMid+0.05*s,0.07*s,mv)+B.Sf+clamp(B.acc,-2,2.5)*0.06-0.015*ra;
   const tL=B.Sl*lerp(0.85,0.35,mv);                               // walking only part-way over the stance foot
   // the trunk answers the slow part of the error, not the wobble of each step
   B.eF=approach(B.eF==null?0:B.eF,tF-cF,dt,0.35);
-  if(!mod&&VER>=3){
-    // A003: standing still, balance is kept at the hips and ankles with the trunk upright;
-    // the trunk takes over the correction as the figure gets moving
-    const C2=comOf(buildPose(s,Object.assign({},P,{lean:P.lean+0.05})));
-    const k=Math.max(0.15,((C2.x-ch.x)*fw.x+(C2.z-ch.z)*fw.z-cF)/0.05),wl=smooth((mv-0.15)/0.45);
-    spring(B,'lean',lerp(0.04,clamp(B.lean+B.eF/k,-0.25,0.6),wl),dt,4);
-    spring(B,'fa',(1-wl)*clamp(B.fa+B.eF/0.85,-0.1,0.1),dt,8);
-  }else if(!mod){
+  if(!mod){
     const C2=comOf(buildPose(s,Object.assign({},P,{lean:P.lean+0.05})));
     const k=Math.max(0.15,((C2.x-ch.x)*fw.x+(C2.z-ch.z)*fw.z-cF)/0.05);
     spring(B,'lean',clamp(B.lean+B.eF/k,-0.25,0.6),dt,4);
@@ -1196,52 +1180,6 @@ function drawGroundShadows(sg){
   }
   ctx.fillStyle='rgba(8,8,16,0.32)';ctx.fill('nonzero');
 }
-// A figure up on the structure casts its shadow along the structure: each point is marched
-// down the light ray to a shadow surface. Projecting onto one flat plane at the height under
-// the figure made the whole shadow jump a step every time it climbed a tread; projecting onto
-// the exact treads still jumps wherever the light falls off a step edge. So over a flight the
-// surface is the smooth line through the tread centres (the slide itself when folded), which
-// lets the shadow glide down the steps; platform, tower and ground are as they are.
-function shadowY(x,z){
-  const st=stairAt(x,z,0.25);
-  if(st) return lerp(clamp(0.5*st.d+0.125,0,H_PLAT),rampY(st.d),ST.m);
-  return footY(x,z);
-}
-function shadowHit(p,lo){
-  let t=0;const dt=0.05;
-  const at=t=>V(p.x-LDIR.x*t,p.y-LDIR.y*t,p.z-LDIR.z*t);
-  let q=at(0);
-  if(q.y<=shadowY(q.x,q.z)) return V(q.x,shadowY(q.x,q.z),q.z);
-  for(let i=0;i<120;i++){
-    t+=dt;q=at(t);
-    if(q.y<lo) return null;
-    if(q.y<=shadowY(q.x,q.z)){
-      let a=t-dt,b=t;
-      for(let k=0;k<6;k++){const m=(a+b)/2,r=at(m);if(r.y<=shadowY(r.x,r.z)) b=m;else a=m;}
-      return at(b);
-    }
-  }
-  return null;
-}
-function charShadowSteps(ch,lvl){
-  const J=ch.out;if(!J) return;
-  const pc=toCam(J[0]);if(pc[2]<NEAR) return;
-  const lo=lvl-0.6;   // a shadow falling off the structure is left out rather than drawn in mid-air
-  ctx.beginPath();
-  for(const b of BONES){
-    const a=J[b[0]],c=J[b[1]];let prev=null;
-    for(let k=0;k<=4;k++){
-      const h=shadowHit(lerpV(a,c,k/4),lo);
-      if(h&&prev) linePath(V(prev.x,prev.y+0.01,prev.z),V(h.x,h.y+0.01,h.z));
-      prev=h;
-    }
-  }
-  ctx.lineWidth=Math.max(1.5,0.07*ch.s*F/pc[2]);ctx.lineCap='round';
-  ctx.strokeStyle='rgba(6,6,14,0.34)';ctx.stroke();
-  const hh=shadowHit(J[4],lo);
-  if(hh){const hc=toCam(V(hh.x,hh.y+0.01,hh.z));
-    if(hc[2]>NEAR){ctx.beginPath();ctx.arc(sx(hc),sy(hc),Math.max(1.5,0.1*ch.s*F/hc[2]),0,7);ctx.fillStyle='rgba(6,6,14,0.34)';ctx.fill();}}
-}
 function charShadow(ch,h){
   const J=ch.out;if(!J) return;
   const pr=p=>{const k=(p.y-h)/LDIR.y;return V(p.x-LDIR.x*k,h+0.01,p.z-LDIR.z*k);};
@@ -1258,8 +1196,8 @@ function drawChar(ch){
   const J=ch.out;if(!J) return;
   const C=J.map(toCam);
   if(C[0][2]<NEAR) return;
-  const lvl=ch.state==='ladder'?0:footY(ch.x,ch.z);
-  if(lvl>0.01&&ch.state!=='ladder') charShadowSteps(ch,lvl);
+  const lvl=ch.state==='loco'||ch.state==='press'?footY(ch.x,ch.z):0;
+  if(lvl>0.01&&ch.state!=='ladder') charShadow(ch,lvl);
   if(ch===follow){
     const y=ch.state==='ladder'?J[0].y-0.9:(ch.state==='loco'||ch.state==='press'?lvl:footY(ch.x,ch.z));
     ctx.beginPath();
@@ -1517,7 +1455,6 @@ window.__AR={step:(dt,n)=>{for(let i=0;i<n;i++) step(dt);},chars,ST,ladder,
   press:pressButton,render,cam,footY,stairAt,pelvisBaseY,OBS,TW,
   setVersion,get VER(){return VER;},comOf,
   btnScreen:()=>{camUpdate();const b=toCam(BTN);return {x:sx(b),y:sy(b),z:b[2]};},
-  shadowHit,
   get follow(){return follow;},get simT(){return simT;}};
 </script>
 </body>

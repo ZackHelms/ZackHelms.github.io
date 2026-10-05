@@ -74,3 +74,23 @@ When a CD wants to compare versions side by side, freeze the old code paths
 a test fixture, and assert the old selection reproduces it **bit for bit**
 under a seeded `Math.random` with `requestAnimationFrame` and timers stubbed.
 A new version must not consume `Math.random` on an old version's path.
+
+## Addendum (same day): the safety valve that became the gait
+A002 shipped with an "out of reach, lift now" rule whose thresholds the rig's
+own (newly taller) standing pose crossed on almost every normal toe-off. Every
+step was then an early lift that re-timed the gait: 0.32 m steps at 2.3
+strides/s, which the CD saw at once and no smoothness metric could, because it
+was smooth. Two lessons: **measure the gait itself** (step length and cadence
+against human norms, ~0.7 m and ~0.9 strides/s walking) whenever you touch a
+gait, not only its smoothness; and a corrective rule should be **rare** in
+normal motion, so count how often it fires.
+
+Standing balance is done at the hips and ankles, not by tilting the trunk.
+Solving a standing figure's COM error with trunk lean rocked it about +-15
+degrees; a fore-aft pelvis shift with the trunk upright is both what people do
+and what reads as standing still.
+
+Shadows of a figure on stairs: projecting onto one flat plane at the tread height
+jumps a step per tread; projecting onto the exact treads still jumps wherever the
+light falls off a step edge. For a stick figure the smooth line through the tread
+centres reads best.

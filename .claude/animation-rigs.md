@@ -1,6 +1,6 @@
 # Animation Rigs — context
 
-`games/animation-rigs/index.html`, one self-contained file (~1,450 lines).
+`games/animation-rigs/index.html`, one self-contained file (~1,520 lines).
 CD commission 2026-10-04. Placed directly after CYOA on the hub. Open (MIT).
 
 ## What it is
@@ -104,10 +104,45 @@ into the new model.
   300 s under one seed. A version must also never consume `Math.random` on an
   older version's path, or that comparison breaks.
 - **A002** (CD notes: legs and feet snap between frames; torso too upright on
-  stairs; humans bob and sway) adds the three things below.
-- **Adding A003:** add `{id:'A003',n:3}` to the front of `VERSIONS`, write new
-  functions or `VER>=3` branches, copy the current page into a fixture only if
-  you want A002 frozen too, and extend the suite.
+  stairs; humans bob and sway) adds the three things below. **Frozen**
+  2026-10-05 with fixture `animation-rigs-a002.html` (from commit 2a58ef2).
+- **A003** fixes A002's flat-ground walk (below). The current default.
+- **Adding A004:** copy the shipped page into `fixtures/animation-rigs-a003.html`,
+  add `{id:'A004',n:4}` to the front of `VERSIONS`, write new functions or
+  `VER>=4` branches (never edit a path an older version runs), add it to `VERS`
+  in the suite and bump the `S.VER === 3` default check. The CD chose, on
+  2026-10-05, that a fix to a shipped version ships as a NEW version rather than
+  a correction, so the old one stays selectable for comparison.
+
+### A003 (CD report 2026-10-05: "regular walking on the ground looks weird; the model leans back and takes short rapid steps")
+Measured, not guessed: A002 on flat ground took 0.32 m steps at 2.3 strides/s
+(A001 and real walking: ~0.7 m at ~0.9/s). Cause: A002's early-lift rule
+("a stance foot out of reach lifts now") used thresholds that A002's own taller
+standing pelvis crossed on almost every ordinary toe-off, so the gait was re-timed
+every step. A003 (`VER>=3` branches inside `locoParams2`; A002 is frozen with its
+own fixture):
+- early lift only for a foot really out of reach (`behind` < -(0.62+0.25ra)s or
+  reach > 0.93s; `otherOk` at 0.96s);
+- balance targets retuned for full strides (`T3`: walk 0.035, run 0.015, stairs up
+  0.10, down 0.19 m of COM lead) and braking leans back at 0.025*a, not 0.06*a;
+- standing balance with the **hips and ankles** (fore-aft pelvis shift), trunk held
+  upright; the trunk takes over as the figure gets moving (`wl` blend on `mv`).
+Result: steps ~0.66-0.69 m at ~0.95-1.03 strides/s, walking lean ~5 deg and never
+negative at the 5th percentile, standing ~2 deg with a ~7 deg spread (A002: ~30),
+stairs up ~19, down ~1, running ~14.5; snaps 41 per 1000 (A002 49, A001 282).
+
+### Shadows on the structure (renderer, every version)
+A figure up on the structure used to cast its shadow onto ONE flat plane at the
+height of the tread under its root, so the whole shadow jumped ~12 cm each time it
+climbed a tread (CD report, same day). Projecting onto the exact treads is no
+better: the light falls downhill on flight A, so the shadow of a moving point drops
+off each step edge. `charShadowSteps` marches each point (bones subdivided x4) down
+the light ray to `shadowY()`: over a flight the smooth line through the tread
+centres (the ramp when folded), elsewhere the real platform/tower/ground height;
+pieces landing > 0.6 m below the figure (off an edge) are left out. Fallers and
+sliders get a shadow too now. This is drawing only: no version's joints change,
+which is why A001/A002 stay bit-identical. Measured: a climber's head shadow moves
+> 6 cm in one frame 5 times in 18,371 frames (flat plane: 524).
 
 ### A002: why it snapped and what fixed it
 Measured with an impulse metric (a joint's frame acceleration more than 3x its
@@ -179,8 +214,10 @@ A002 carries the pelvis at ~0.985 m standing, lower walking/running, and 17 cm
 lower on stairs, where the next tread is otherwise out of reach.
 
 ## Tests
-`.claude/tests/drive-animation-rigs.cjs` (~25 s), all seeded with `rAF`
-stubbed: the rules under both versions (no NaN, no bone stretch outside
+`.claude/tests/drive-animation-rigs.cjs` (~30 s), all seeded with `rAF`
+stubbed: the rules under every version; A001 and A002 bit-identical to their
+fixtures; the newest version's gait (step length, cadence), balance and the
+stair-shadow smoothness; plus, from the A002 era: the rules under both versions (no NaN, no bone stretch outside
 blends, climbs/presses/slides, ladder and tower limits, nobody on a slide, no
 fold under a rider, nobody inside a block, planted feet on their surface as a
 bounded rate); **A001 bit-identical to the fixture**; A002 snaps <= 30% of

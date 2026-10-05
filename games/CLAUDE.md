@@ -915,20 +915,22 @@ Suite: `.claude/tests/drive-cyoa.cjs` (165 checks, including the real clients ag
 stubbed network). Detailed context: `.claude/cyoa.md`.
 
 
-### ANIMATION RIGS (`animation-rigs/index.html`, ~1,450 lines)
+### ANIMATION RIGS (`animation-rigs/index.html`, ~1,520 lines)
 A grey-box diorama of eight 21-joint stick-figure rigs (CD commission 2026-10-04,
 placed after CYOA on the hub). They walk, run, take the stairs over a platform,
 queue for one ladder up a tower, press its button (which folds both flights into
 slides: anyone on them falls, slides and gets up) and climb back down. Every limb
 is two-bone IK over feet planted in the world. Orbit / zoom / pan / tap-to-follow.
 Two native dropdowns top-right: **speed** (4x/2x/1x/half/quarter) and **version**
-(newest first and default; `?v=A001` opens an older one, and switching is live).
-**A001's code paths are frozen** and the suite proves the A001 selection is
-bit-identical to the shipped file (`.claude/tests/fixtures/`); **A002** adds a
+(newest first and default; `?v=A00N` opens an older one, and switching is live).
+**Older versions' code paths are frozen** and the suite proves A001 and A002 are
+bit-identical to their shipped files (`.claude/tests/fixtures/`); **A002** added a
 14-segment body-mass model with centre-of-mass balance (trunk lean while walking,
 hips back while reaching, a forward lean up stairs), side-to-side sway, pelvis bob,
 idle breathing and weight shifts, and a gait rebuilt to stop snapping (~6x fewer
-snaps than A001, measured). The first 3D scene here drawn by a hand-written
+snaps than A001, measured); **A003** (default) fixes A002's short rapid steps on
+flat ground and balances standing figures at the hips with the trunk upright.
+Stair shadows glide along the flight instead of jumping a step per tread. The first 3D scene here drawn by a hand-written
 projection onto Canvas 2D (tiled faces, painter's sort) rather than WebGL. Hub
 icon is `animation-rigs/icon.svg` via the same CSS override Phasic uses (the card
 keeps 🩻 for the sync check). Suite: `.claude/tests/drive-animation-rigs.cjs`.
