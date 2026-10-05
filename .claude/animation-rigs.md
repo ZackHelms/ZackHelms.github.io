@@ -1,6 +1,6 @@
 # Animation Rigs — context
 
-`games/animation-rigs/index.html`, one self-contained file (~1,910 lines).
+`games/animation-rigs/index.html`, one self-contained file (~2,000 lines).
 CD commission 2026-10-04. Placed directly after CYOA on the hub. Open (MIT).
 
 ## What it is
@@ -16,6 +16,18 @@ few seconds later. No goal, no score: the motion is the content.
   can rotate and zoom": orbit drag, pinch / wheel zoom, plus two-finger /
   right-drag pan and tap-a-figure-to-follow (not asked for; cheap and it is
   how you study one rig).
+- "a follow mode where I can select from a dropdown menu which character I want
+  to follow ... zoom in and rotate my view around the character. Default ... is
+  none ... part of shared UI, so no new version needed" (CD, 2026-10-05): a
+  third native `<select>` (`#follow-sel`, under the version/speed row) listing
+  `follow: none` and the eight figures by colour name. Picking a figure flies
+  the camera to 6 m (assumed framing) and a pitch of 0.2-0.5; while following,
+  zoom reaches 1.2 m (3 m otherwise), orbit goes round the figure, and a
+  pinch only zooms (its drift used to pan, which dropped the follow). The
+  camera aims a quarter second ahead of the pelvis, cancelling its 4/s lag so a
+  runner stays centred close up. Tapping a figure or empty ground and
+  right-drag panning keep the menu in sync (`setFollow`). `none` flies back to
+  the overview (`overview()`; `defaultView()` assigns the same numbers).
 - "stairs to go up to a platform and then stairs that go down": stair A rises
   toward +x, platform at y=3, stair B falls toward +x. 11 treads of 0.25 x 0.5.
 - "a ladder ... to a platform where they push a button that turns the stairs
@@ -108,15 +120,26 @@ into the new model.
   2026-10-05 with fixture `animation-rigs-a002.html` (from commit 2a58ef2).
 - **A003** fixes A002's flat-ground walk (below). **Frozen** 2026-10-05 with
   fixture `animation-rigs-a003.html` (from commit e679e2e).
-- **A004** adds a physics engine (below). The current default.
-- **Adding A005:** copy the shipped page into `fixtures/animation-rigs-a004.html`,
-  add `{id:'A005',n:5}` to the front of `VERSIONS`, write new functions or
-  `VER>=5` branches (never edit a path an older version runs, the renderer
-  included), and put `'A005'` at the front of `VERS` in the suite. That is the
+- **A004** adds a physics engine (below). **Frozen** 2026-10-05 with fixture
+  `animation-rigs-a004.html` (from commit f30efc2).
+- **A005** gives turns rotational inertia (below). The current default.
+- **Adding A006:** copy the shipped page into `fixtures/animation-rigs-a005.html`,
+  add `{id:'A006',n:6}` to the front of `VERSIONS`, write new functions or
+  `VER>=6` branches (never edit a path an older version runs, the renderer
+  included), and put `'A006'` at the front of `VERS` in the suite. That is the
   whole suite edit: the freeze check (joints and pixels) runs over
-  `VERS.slice(1)` and the menu / `?v=` checks are derived from `VERS`. The A004
-  physics checks then guard the new default against A003, so A005 must keep
-  passing them or change them on purpose. Give it its own `<h3>` in the info panel, which
+  `VERS.slice(1)`, the menu / `?v=` / live-NaN checks are derived from `VERS`,
+  and the turn checks compare the new default with `VERS[1]`. The A004 physics
+  checks guard the new default against A003, so A006 must keep passing them or
+  change them on purpose (A005 moved the climbing COM from +1.5 to ~+6 cm
+  ahead of the upper ankle: the step-over-step tread phase is set when a
+  figure steps onto the flight, and slower turns change how it arrives; the
+  bound is now "over the foot", -4 to +12 cm, and A003's -10 still fails it.
+  The walking-sway check samples straight walking only, since A005's turn
+  leans last longer and filled its 95th percentile; straight sway is A004
+  6.8 cm, A005 6.0). The turn checks require the old version to FAIL them, so
+  once A006 ships they compare A006 with A005: rewrite them for what A006
+  changes, or point them at A004. Give it its own `<h3>` in the info panel, which
   lists versions only: A001 holds the general features, every later version
   says what it changed. The CD chose, on
   2026-10-05, that a fix to a shipped version ships as a NEW version rather than
@@ -134,11 +157,67 @@ into the new model.
   shadow: `charShadow` on one flat plane before A003, `charShadowSteps` from
   A003), and the suite renders the canvas 90 times over 300 s under each old
   selection and requires every pixel row to match its fixture. **Shared, by the
-  CD's call:** only the DOM chrome around the canvas (the speed and version
-  menus, the info panel, the badge). A001 shipped with a 1x/half/quarter speed
+  CD's call:** only the DOM chrome around the canvas (the speed, version and
+  follow menus, the info panel, the badge), the camera that the follow menu
+  drives (it moves the view, never what a version draws from it), and the
+  animation loop. **One shared fix** went into the loop while A005 was built: a
+  frame's timestamp can come before the moment the script started, so the
+  first `dt` could be negative, and a negative step through A004's physics
+  made every figure NaN for good (traced in headless Chromium, on the shipped
+  A004 fixture: 8 of 8 figures NaN after the first frame; A001-A003 survive
+  it). `frame()` clamps `dt` to [0, 0.1] and skips a zero step. Restoring a
+  version that drew nothing is not a change to what it looked like, and the
+  suite now runs every version on its own loop and requires finite joints. A001 shipped with a 1x/half/quarter speed
   button instead of the menus; that is the one visible difference, and it is
   the shared menu. Any future change to what the canvas shows is a `VER>=n`
   branch.
+
+### A005 (CD report 2026-10-05: "a character was walking and turned abruptly with a quick tilt ... the turn was unrealistically fast ... perhaps we need some realistic rotational inertia")
+The diagnosis (traced on A004, seed 12345, 300 s at 60 Hz): `moveRoot4` turned the
+plan at a capped RATE that switched on and off in one frame, 0 -> 4 rad/s (229
+deg/s) at a walk, so its yaw acceleration hit 240-480 rad/s^2. The force law
+leans the body by the centripetal acceleration `speed x turn rate`, so 0.45 g of
+lean target appeared in one frame. The COM spring (omega 10) then kicked the
+pelvis sideways at up to ~35 m/s^2, and the trunk's own dynamics whipped it: the
+centre-of-mass lean swung at up to 170-200 deg/s and the trunk roll reached 45.7
+deg. The CD's guess was right: rotational inertia was missing.
+A005 (`turn5`, `yawModel`, `turnGait` and `TURN`, new; `VER>=5` branches in
+`moveRoot4`, `goStep` and `initFeet`):
+- **The turn rate is a state** with an angular-acceleration limit, approached by
+  a rate that can still stop within the heading left to turn (no overshoot).
+- **On the spot: rotational inertia.** `yawModel()` sums the body's moment of
+  inertia about the vertical from `SEGS` on the neutral pose, with each segment
+  as a cylinder about its own axis (`YAWR` radii assumed: trunk 0.13 m, thigh
+  7.5 cm ...): 0.0151 m^2 per kg, ~1.06 kg m^2 for 70 kg. The torque a foot can
+  twist the floor with is `mu m g x 3 cm` (contact radius assumed), so a
+  standing turn starts and stops at <= ~18 rad/s^2.
+- **Moving: the lean builds over about a step.** The sideways force that bends
+  the path comes from where the feet land, so lateral jerk is limited (walk 5,
+  run 15 m/s^3, as `alpha <= jerk / speed`) and lateral acceleration capped
+  (walk 1.8 m/s^2 ~ 0.18 g, run 5 ~ 0.5 g, as `rate <= a / speed`; A004 allowed
+  6 at any gait). `turnGait` takes the run limits only at running speed: a
+  runner slowed to a jog for a corner turns like a walker. These numbers are
+  assumed (no measured source found), chosen for a lean that builds over a
+  step.
+- **Consequences, fixed in the same version.** A wider-turning body circled
+  waypoints (it reached them at 0.32 m with its turning circle bigger than
+  that), carried its sideways momentum onto a flight and walked off its side,
+  and, on stepping off a tread's end, landed inside the ground keep-out, whose
+  A004 rule (written for a body that is always outside it) threw it out past
+  the block's end, up to a metre in a frame. A005: `goStep` slows until the
+  turning circle (`v^2 / a`) passes through the waypoint and for each corner
+  on the arc that starts 0.32 m before it; the root never steps off the side of
+  a flight or the platform (`|z| <= SZ - 0.2` while on them); the keep-out
+  pushes out the shortest way, the walls of the lane into each flight's end
+  included; and `initFeet` zeroes the turn rate so none is carried back from a
+  ladder or a fall.
+Measured against `?v=A004`, seed 12345, 240 s at 60 Hz (the suite's turn
+section): yaw acceleration max 18.6 rad/s^2 (A004 480); trunk roll max 13.0 deg
+(45.7), its rate 42 deg/s at the 99.9th percentile (168); the COM lean's rate
+64 deg/s at the 99.9th percentile (114); root jumps > 7 cm per frame 0 on three
+seeds (an early A005 draft: 1-4 per seed). A004's checks still pass: stair knee
+59 deg, COM ~+6 cm over the upper foot, a runner's lean 16.5 -> 19.4 deg up a
+flight, accelerating vs steady 10.4 vs 7.2 deg.
 
 ### A004 (CD report 2026-10-05: squatting up stairs, runners' mass on their heels at the bottom of a flight and leaning more at the top; "implement A004 with a physics engine")
 The diagnosis (traced in A003's code): A001-A003 move the root on a scripted
@@ -286,14 +365,21 @@ A002 carries the pelvis at ~0.985 m standing, lower walking/running, and 17 cm
 lower on stairs, where the next tread is otherwise out of reach.
 
 ## Tests
-`.claude/tests/drive-animation-rigs.cjs` (~45 s), all seeded with `rAF`
-stubbed: the rules under every version; A001, A002 and A003 bit-identical to
+`.claude/tests/drive-animation-rigs.cjs` (~1.5 min), all seeded with `rAF`
+stubbed except the UI section: the rules under every version; A001-A004 bit-identical to
 their fixtures in joints AND in canvas pixels (negative-tested: drawing A003's
 shadow under every version turns A001 and A002 red); the gait (step length, cadence), balance and the stair-shadow
 smoothness (measured relative to the head's own motion, so a fast runner is not
 a false jump); A004's physics, each check also run on A003 and required to fail
 there (stair knee, COM over the upper foot, even lean up a flight, accelerating
-lean > steady lean, corrective rules rare; negative-tested 2026-10-05); plus, from the A002 era: the rules under both versions (no NaN, no bone stretch outside
+lean > steady lean, corrective rules rare; negative-tested 2026-10-05); A005's
+turns against A004, each check required to fail there (yaw acceleration, trunk
+roll and its rate, the lean's rate) plus no root jump; every version left on
+its own animation loop keeps finite joints; the follow menu (none + 8, default
+none, flies in and centres, zooms to 1.2 m and orbits while following, a tap
+follows and syncs it, none flies back out). Negative-tested 2026-10-05:
+removing the dt guard (8 of 8 NaN on A004 and A005), the zoom-in limit (3 m),
+or A005's keep-out and flight-side rules (3 root jumps) each turn it red; plus, from the A002 era: the rules under both versions (no NaN, no bone stretch outside
 blends, climbs/presses/slides, ladder and tower limits, nobody on a slide, no
 fold under a rider, nobody inside a block, planted feet on their surface as a
 bounded rate); **A001 bit-identical to the fixture**; A002 snaps <= 30% of
@@ -302,5 +388,5 @@ ranges; both dropdowns, live switching and `?v=`; the button by hook and by a
 real tap. Negative-tested 2026-10-05: freezing the lean, editing an A001 blend
 and turning off soft IK + sagittal poles each turn it red. `--shots <dir>` for
 eyeballing; `--only identity,physics` (any of rules, identity, snaps, balance,
-shadows, physics, ui) runs a subset while iterating, instead of slicing the
+shadows, physics, turns, ui) runs a subset while iterating, instead of slicing the
 suite into a scratch copy (a copy loses `__dirname`, so its fixture paths break).

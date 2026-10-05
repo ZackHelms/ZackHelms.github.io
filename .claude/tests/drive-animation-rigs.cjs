@@ -6,7 +6,7 @@
  *     node .claude/tests/drive-animation-rigs.cjs [--shots <dir>] [--only <sections>]
  *
  * --only runs a comma-separated subset while iterating (rules, identity, snaps,
- * balance, shadows, physics, ui), e.g. `--only identity,physics`; the gate runs
+ * balance, shadows, physics, turns, ui), e.g. `--only identity,physics`; the gate runs
  * them all. Adding a version: copy the shipped page to fixtures/, put its id at
  * the front of VERS. Every version check below is derived from VERS.
  *
@@ -15,7 +15,7 @@
  * run is reproducible and wall-clock load cannot change what is measured.
  * The newest version (NEW) is the one the CD sees by default.
  *
- *  1. RULES, under EVERY version (A004 default, A003, A002, A001), 300 s each:
+ *  1. RULES, under EVERY version (A005 default, A004 ... A001), 300 s each:
  *     no NaN joint; no limb bone stretched outside a pose blend (IK may never
  *     stretch a bone); someone climbs, presses and slides, repeatedly; <=1 on
  *     the ladder and <=2 on the tower; nobody walks onto a flight that is not
@@ -42,7 +42,7 @@
  *     strides/s and looked frantic: the CD's 2026-10-05 report); trunk lean
  *     (pelvis->chest vs vertical) is slightly forward walking and never
  *     tipped back, clearly further forward up stairs, upright and steady
- *     standing; a side-to-side sway walking and a bigger one standing (weight
+ *     standing; a side-to-side sway walking straight and a bigger one standing (weight
  *     shifts); a vertical bob walking.
  *  5. SHADOWS on the stairs follow the figure smoothly: a climber's head
  *     shadow moves more than twice as far as the head itself (+3 cm) between
@@ -50,7 +50,7 @@
  *     tread height, the old renderer, jumps a step at every tread: ~3%). The
  *     relative form matters since A004: its runners take a flight faster, and
  *     a fixed 6 cm/frame bar started counting speed instead of snaps.
- *  6. PHYSICS (A004, each check also run on A003 with the same seed, and required
+ *  6. PHYSICS (A004 on, run on the newest version; each check also run on A003 with the same seed, and required
  *     to fail there: a check that cannot see the old behaviour proves nothing):
  *     walking up stairs is not a squat (stance knee); the centre of mass rides
  *     over the upper foot, not behind it; running up a flight the lean is even
@@ -59,10 +59,24 @@
  *     accelerating, then most at speed); and the two corrective rules
  *     (a stance foot lifted early, the pelvis brought down to a leg out of
  *     reach) stay rare.
- *  7. UI: the speed menu offers 4x/2x/1x/half/quarter defaulting to 1x and 4x
+ *  7. TURNS (A005, each check also run on the version before it, with the same
+ *     seed, and required to fail there): a turn starts and stops with the
+ *     body's rotational inertia (A004 switched 0 -> 4 rad/s in one frame);
+ *     the trunk never rolls past 20 deg and its roll rate stays a lean's, not
+ *     a whip's (A004: 46 deg, 175 deg/s at the 99.9th percentile); the lean
+ *     into a turn builds and fades over about a step; and the plan's root
+ *     never jumps (A005's own guard: a slower turn swung figures into a rule
+ *     that threw them out past the stair block's end).
+ *  8. UI: the speed menu offers 4x/2x/1x/half/quarter defaulting to 1x and 4x
  *     really runs faster; the version menu lists newest first, defaults to
  *     it, switches the model live, and ?v= opens an older one; the button
- *     works through __AR and through a real tap on its drawn pixel.
+ *     works through __AR and through a real tap on its drawn pixel; the page
+ *     left to run on its own animation loop keeps every joint finite (a
+ *     negative first frame step once made every A004 figure NaN); the follow
+ *     menu offers none + the eight figures, defaults to none, flies in to the
+ *     one picked and keeps it centred, zooms in closer than the overview may,
+ *     keeps following through an orbit, follows a tapped figure, and "none"
+ *     flies back to the overview.
  * --shots writes a few screenshots for eyeballing (not asserted).
  */
 'use strict';
@@ -73,7 +87,7 @@ const { chromium } = require('playwright-core');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PAGE = 'file://' + path.join(ROOT, 'games', 'animation-rigs', 'index.html');
 const FIX = (v) => 'file://' + path.join(__dirname, 'fixtures', 'animation-rigs-' + v.toLowerCase() + '.html');
-const VERS = ['A004', 'A003', 'A002', 'A001'];   // newest first, as the page lists them
+const VERS = ['A005', 'A004', 'A003', 'A002', 'A001'];   // newest first, as the page lists them
 const NEW = VERS[0];
 const VN = (v) => +v.slice(1);                      // 'A004' -> 4, the page's VER
 const shotDir = process.argv.includes('--shots') ? process.argv[process.argv.indexOf('--shots') + 1] : null;
@@ -267,7 +281,9 @@ async function balance(browser) {
         else if (!sa && A.pelvisBaseY(c.x, c.z) < 0.01) key = c.spd < 0.05 ? 'idle' : c.runAmt > 0.7 && c.spd > 2.5 ? 'run' : c.spd > 1.1 && c.runAmt < 0.3 ? 'walk' : null;
         if (!key) continue;
         add(key + ':lean', lean);
-        add(key + ':lat', ((J[0].x - c.x) * rt.x + (J[0].z - c.z) * rt.z) * 100);
+        // sway is the gait's own side to side, so it is sampled walking STRAIGHT: the lean into a turn
+        // is checked in TURNS (A005's longer, milder turn leans otherwise filled the 95th percentile)
+        if (Math.abs(c.yawRate) < 0.15) add(key + ':lat', ((J[0].x - c.x) * rt.x + (J[0].z - c.z) * rt.z) * 100);
         // bob: the pelvis against its own 1 s running average over an unbroken walk, so
         // figure height and speed changes drop out and only the per-step rise and fall is left
         const w = ema[c.id] && ema[c.id].k === k - 1 ? ema[c.id] : { e: J[0].y, t: 0 };
@@ -389,7 +405,10 @@ async function physics(browser) {
   const kn = g(a, 'knee'), kb = g(b, 'knee');
   ok(kn.n > 2000 && kn.mean < 65 && kb.mean > 75, NEW + ' walking up stairs is not a squat: loaded knee ' + f(kn.mean) + ' deg (A003 ' + f(kb.mean) + ')');
   const cn = g(a, 'com'), cb = g(b, 'com');
-  ok(cn.n > 2000 && Math.abs(cn.mean) < 6 && cb.mean < -8, NEW + ' climbing, the centre of mass rides over the upper foot: ' + f(cn.mean) + ' cm (A003 ' + f(cb.mean) + ', behind it)');
+  // over the foot: from just behind the ankle to the ball of the foot (the toe is 15 cm ahead of the
+  // ankle). Where in that range depends on the tread phase a figure steps onto the flight with
+  // (A004 +1.5, A005 ~+6); A003's -10 is behind the heel.
+  ok(cn.n > 2000 && cn.mean > -4 && cn.mean < 12 && cb.mean < -8, NEW + ' climbing, the centre of mass rides over the upper foot: ' + f(cn.mean) + ' cm ahead of its ankle (A003 ' + f(cb.mean) + ', behind it)');
   const r1 = g(a, 'run1'), r3 = g(a, 'run3'), q1 = g(b, 'run1'), q3 = g(b, 'run3');
   ok(r1.n > 200 && r3.n > 200 && Math.abs(r3.mean - r1.mean) < 8 && r1.mean > 8 && q3.mean - q1.mean > 12,
     NEW + ' running up a flight the lean is even: ' + f(r1.mean) + ' -> ' + f(r3.mean) + ' deg bottom to top third (A003 ' + f(q1.mean) + ' -> ' + f(q3.mean) + ')');
@@ -399,6 +418,46 @@ async function physics(browser) {
   const c = a.counts;
   ok(c.lifts > 1000 && c.early < c.lifts * 0.03 && c.reach < c.lifts * 0.05,
     NEW + ' corrective rules stay rare: ' + c.early + ' early lifts and ' + c.reach + ' reach corrections in ' + c.lifts + ' steps');
+}
+
+async function turnRun(browser, url) {
+  const { page } = await simPage(browser, url, 12345);
+  const r = await page.evaluate(() => {
+    const A = window.__AR, last = {}, ya = [], rr = [], lr = [], roll = [];
+    let jumps = 0;
+    for (let k = 0; k < 60 * 240; k++) {
+      A.step(1 / 60, 1);
+      for (const c of A.chars) {
+        const J = c.out, L = last[c.id];
+        if (c.state !== 'loco' || !J) { last[c.id] = null; continue; }
+        const rt = { x: -Math.sin(c.yaw), z: Math.cos(c.yaw) }, C = A.comOf(J);
+        const my = (J[15].y + J[19].y) / 2;
+        const tr = Math.atan2((J[3].x - J[0].x) * rt.x + (J[3].z - J[0].z) * rt.z, J[3].y - J[0].y) * 180 / Math.PI;
+        const ln = Math.atan2((C.x - c.x) * rt.x + (C.z - c.z) * rt.z, C.y - my) * 180 / Math.PI;
+        const N = { x: c.x, z: c.z, w: c.yawRate, tr, ln };
+        last[c.id] = N;
+        if (!L) continue;
+        if (Math.hypot(N.x - L.x, N.z - L.z) > 0.07) jumps++;
+        ya.push(Math.abs(N.w - L.w) * 60); rr.push(Math.abs(N.tr - L.tr) * 60); lr.push(Math.abs(N.ln - L.ln) * 60); roll.push(Math.abs(tr));
+      }
+    }
+    const q = (a, p) => { const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
+    return { n: ya.length, yaMax: q(ya, 1), rollMax: q(roll, 1), rr999: q(rr, 0.999), lr999: q(lr, 0.999), jumps };
+  });
+  await page.close();
+  return r;
+}
+async function turns(browser) {
+  const PREV = VERS[1];
+  const a = await turnRun(browser, PAGE), b = await turnRun(browser, PAGE + '?v=' + PREV);
+  const f = (x) => (+x).toFixed(1);
+  ok(a.n > 50000 && a.yaMax < 30 && b.yaMax > 100,
+    NEW + ' turns start and stop with the body\'s rotational inertia: yaw acceleration at most ' + f(a.yaMax) + ' rad/s^2 (' + PREV + ' ' + f(b.yaMax) + ')');
+  ok(a.rollMax < 20 && a.rr999 < 60 && (b.rollMax > 30 || b.rr999 > 100),
+    NEW + ' the trunk rolls into a turn, never whips: at most ' + f(a.rollMax) + ' deg, 99.9th pct ' + f(a.rr999) + ' deg/s (' + PREV + ' ' + f(b.rollMax) + ' deg, ' + f(b.rr999) + ' deg/s)');
+  ok(a.lr999 < 75 && b.lr999 > 100,
+    NEW + ' the lean into a turn builds over about a step: 99.9th pct ' + f(a.lr999) + ' deg/s (' + PREV + ' ' + f(b.lr999) + ')');
+  ok(a.jumps === 0, NEW + ' the plan\'s root never jumps more than 7 cm in a frame (' + a.jumps + '; ' + PREV + ' ' + b.jumps + ')');
 }
 
 async function ui(browser) {
@@ -452,6 +511,42 @@ async function ui(browser) {
   const s1 = await page.evaluate(() => window.__AR.ST.slides);
   ok(T.mode === 'stairs' && s1 === T.s0 + 1, 'a tap on the drawn button presses it (' + T.s0 + ' -> ' + s1 + ')');
 
+  // the page on its own animation loop, every version: every joint stays finite
+  for (const v of VERS) {
+    const q = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await q.goto(PAGE + '?v=' + v); await q.waitForFunction(() => !!window.__AR);
+    await q.waitForTimeout(700);
+    const nan = await q.evaluate(() => window.__AR.chars.filter(c => !c.out || c.out.some(p => !isFinite(p.x) || !isFinite(p.y) || !isFinite(p.z))).length);
+    await q.close();
+    ok(nan === 0, v + ' running live, every figure stays finite (' + nan + ' of 8 NaN)');
+  }
+
+  // FOLLOW: shared camera menu
+  const F0 = await page.evaluate(() => ({ opts: [...document.querySelectorAll('#follow-sel option')].map(o => o.textContent),
+    sel: document.getElementById('follow-sel').value, f: window.__AR.follow, d: window.__AR.cam.dist }));
+  ok(F0.opts.length === 9 && F0.opts[0] === 'follow: none' && F0.sel === 'none' && F0.f === null,
+    'follow menu offers none + 8 figures, defaults to none (' + F0.opts.join(', ') + ')');
+  await page.selectOption('#follow-sel', '5');
+  await page.waitForTimeout(2500);
+  const centred = () => page.evaluate(() => { const A = window.__AR, p = A.follow.out[0], c = A.cam; return { id: A.follow.id, off: Math.hypot(c.tx - p.x, c.tz - p.z), dist: c.dist, yaw: c.yaw }; });
+  const F1 = await centred();
+  ok(F1.id === 5 && F1.off < 0.3 && F1.dist < 6.5, 'picking a figure follows it and flies in (figure ' + F1.id + ', ' + F1.off.toFixed(2) + ' m off centre, ' + F1.dist.toFixed(1) + ' m away)');
+  await page.mouse.move(195, 600);
+  for (let i = 0; i < 14; i++) { await page.mouse.wheel(0, -220); await page.waitForTimeout(25); }
+  await page.mouse.down(); await page.mouse.move(275, 590, { steps: 8 }); await page.mouse.up();
+  await page.waitForTimeout(600);
+  const F2 = await centred();
+  ok(F2.id === 5 && F2.dist < 2 && Math.abs(F2.yaw - F1.yaw) > 0.3 && F2.off < 0.3,
+    'while following, zoom reaches in close and orbit goes round the figure (' + F2.dist.toFixed(2) + ' m, yaw moved ' + Math.abs(F2.yaw - F1.yaw).toFixed(2) + ' rad, ' + F2.off.toFixed(2) + ' m off centre)');
+  await page.selectOption('#follow-sel', 'none');
+  await page.waitForTimeout(3500);
+  const F3 = await page.evaluate(() => ({ f: window.__AR.follow, d: window.__AR.cam.dist, sel: document.getElementById('follow-sel').value }));
+  ok(F3.f === null && F3.sel === 'none' && Math.abs(F3.d - F0.d) < 0.5, '"none" stops following and flies back to the overview (' + F3.d.toFixed(1) + ' m, was ' + F0.d.toFixed(1) + ')');
+  const tp = await page.evaluate(() => { const A = window.__AR; let best = null; for (let i = 0; i < 8; i++) { const s = A.charScreen(i); if (s.z > 1 && s.x > 30 && s.x < 360 && s.y > 120 && s.y < 800 && (!best || s.z < best.z)) best = { ...s, i }; } return best; });
+  if (tp) { await page.evaluate(() => { window.__tapT = performance.now(); }); }
+  const tapped = tp ? await (async () => { const s = await page.evaluate((i) => window.__AR.charScreen(i), tp.i); await page.mouse.click(s.x, s.y); return page.evaluate(() => [window.__AR.follow && window.__AR.follow.id, document.getElementById('follow-sel').value]); })() : null;
+  ok(tp && tapped[0] === tp.i && tapped[1] === String(tp.i), 'a tap on a figure follows it and the menu shows it (' + (tapped ? tapped.join(' / ') : 'no figure on screen') + ')');
+
   if (shotDir) {
     fs.mkdirSync(shotDir, { recursive: true });
     for (let i = 0; i < 4; i++) {
@@ -478,6 +573,7 @@ async function ui(browser) {
   if (want('balance')) await balance(browser);
   if (want('shadows')) await shadows(browser);
   if (want('physics')) await physics(browser);
+  if (want('turns')) await turns(browser);
   if (want('ui')) await ui(browser);
   await browser.close();
   console.log((bad ? 'DRIVE animation-rigs: RED (' + bad + ')' : 'DRIVE animation-rigs: GREEN') + (only ? ' (only ' + only.join(',') + ')' : ''));

@@ -128,3 +128,33 @@ Lessons: a vertical that can fall but not pull makes landings late, which shows
 as a pelvis snap, so preview the landing reach and land toe-first; measure big
 per-frame jumps (> 0.3 m) across several seeds, not one; and write each realism
 check so the previous version **fails** it, or it proves nothing.
+
+## Addendum (A005): a rate limit is not inertia
+
+A004's plan turned at a capped *rate* that switched on in one frame (0 -> 4 rad/s
+at a walk). Anything computed from the turn rate inherits the step: the force law
+leans the body by `speed x turn rate`, so the lean target jumped 0.45 g in a
+frame, the COM spring kicked the pelvis sideways, and the trunk whipped to 46
+deg. The CD saw "a quick tilt" on one abrupt turn. A cap on a rate looks like
+physics and is not: limit the **acceleration** of every quantity the body would
+have to supply a force or torque for. A005 makes the turn rate a state, with
+the body's yaw inertia (summed from the segment table) and a foot's friction
+torque limiting it on the spot, and a lateral-jerk limit (the sideways force
+builds as the feet land) and a lateral-acceleration cap limiting it moving.
+
+What it cost: a body that turns with inertia swings wider, and path following
+that assumed instant turns broke three ways at once. Figures circled waypoints
+their turning circle could not reach, carried sideways momentum off the side of
+a flight, and landed inside a keep-out rule written for a body that is always
+outside it (which threw them a metre out past its far end in one frame). So
+when you add inertia to a planner, **plan for the turning circle**: slow until
+the circle `v^2 / a` passes through the target, keep the root inside walkable
+edges, and make every keep-out push out the shortest way. Count per-frame root
+jumps on several seeds; that is how all three showed up.
+
+Unrelated, found on the way: a frame's timestamp can precede the moment the
+script started, so the first `dt` came out negative, and A004's physics turned
+every figure NaN on the first frame (in headless Chromium; A001-A003 survived it).
+A deterministic suite with `rAF` stubbed never runs the real loop, so it never
+saw it. **Clamp `dt` to [0, max]** in any `requestAnimationFrame` loop, and let
+one check run the page on its own loop and assert finite state.
