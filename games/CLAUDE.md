@@ -187,7 +187,8 @@ Excluded: externally-published games (`zed-shooter/`, `qntmchmst/` — their
 source repos own their UI), frozen checkpoint files, and `cyoa/` — by the CD's
 call it has no top-left chrome at all: its title page carries an EXIT plaque
 back to the hub, mute lives in its Settings, and its reload button sits
-top-right at twice the usual size (`.claude/cyoa.md`).
+top-right at twice the usual size (`.claude/cyoa.md`). `cyoa2/` follows CYOA
+in all of this, as its sequel; that was assumed, not asked (`.claude/cyoa2.md`).
 
 ---
 
@@ -750,7 +751,7 @@ The long road from here is a **Kardashev ladder** to a Type III civilization,
 scoped in `games/fire-clicker/TODO.md` alongside the remaining ideas. Drive
 suite: `.claude/tests/drive-fire-clicker.cjs` (110 checks); pacing/balance eval:
 `.claude/tests/eval-fire-clicker.cjs`. **Proprietary — no permissive license
-in this directory** (one of the seven protected games). Detailed context:
+in this directory** (one of the eight protected games). Detailed context:
 `.claude/fire-clicker.md`.
 
 ### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)
@@ -886,7 +887,7 @@ removal. Its edge lines are **opaque** on purpose — three renders only the
 opaque list into the transmission target, so transparent ones are invisible
 through the glass materials, which is exactly the bug that made the board show
 the background cleanly and none of the other pieces. **Proprietary** (one of
-the seven protected games). Detailed context: `.claude/interlock.md`; the
+the eight protected games). Detailed context: `.claude/interlock.md`; the
 measurement method behind its gates: `.claude/notes/20260920-measuring-a-rendering-change.md`.
 
 ### CYOA (`cyoa/index.html`, ~4,000 lines)
@@ -911,10 +912,31 @@ save, and opens from a $ button on the Load screen; Settings can route the openi
 player turns and the epilogue to different models. The plate turns to a new view after
 every reply with an inset of the moment (paintings, when on, change per topic); the clock
 moves with every exchange; every line of the party sheet opens a popup; selected story
-text goes to a per-tale Notes page. **Proprietary** (one of the seven protected games).
+text goes to a per-tale Notes page. **Proprietary** (one of the eight protected games).
 Suite: `.claude/tests/drive-cyoa.cjs` (165 checks, including the real clients against
 stubbed network). Detailed context: `.claude/cyoa.md`.
 
+
+### CYOA2 (`cyoa2/index.html`, ~2,560 lines)
+CYOA's sequel, commissioned by the CD on 2026-10-09: the same seeded world, played on a
+**board of 5 ft squares**. A seed makes a bible (region, town, inn, a gang and its cave,
+seven people who matter, three plot threads); the town's board is charted at once, and
+every other place - the inn, the smithy, the shop, the chapel, each house the town
+generator made up, the bandit cave - is **charted the first time someone walks in** and
+kept in the save from then on, so the world stays the same world. Terrain sits on
+squares and **walls and doors sit on the edges between them**, so a long table really is
+5 x 10 ft. Rooms are furnished from recipes out of a 73-row **asset library** in which a
+thing on a thing is its own object (the table, and the flower pot on it); a furnisher
+puts backs to walls, keeps doorways clear and refuses anything that would cut a room in
+two. Tap a square to walk there (the path and its length in feet are shown; doors open as
+you pass), tap a thing or a person to read it, tap a roof to go in. Drawn as an inked map
+on vellum - hatched rock, sepia washes, one accent colour per map - in the **Grimoire**
+style with CYOA's chrome. **Step 1 of 5**: no Game Master model, no combat, no fog and no
+network call yet; the engine already takes every change as a validated **intent**, which
+is what a second player's phone or a model will send later. **Proprietary** (one of the
+eight protected games; assumed, see `.claude/cyoa2.md`). Suite:
+`.claude/tests/drive-cyoa2.cjs` (98 checks over 36 worlds). Detailed context:
+`.claude/cyoa2.md`.
 
 ### ANIMATION RIGS (`animation-rigs/index.html`, ~2,000 lines)
 A grey-box diorama of eight 21-joint stick-figure rigs (CD commission 2026-10-04,
@@ -974,7 +996,7 @@ Detailed context: `.claude/animation-rigs.md`.
 5. Create `.claude/<slug>.md` with architecture notes before the session gets long
 6. Copy the standard MIT `LICENSE` from any open game directory into the new
    game's directory — unless the CD marks the game protected/proprietary
-   (root `CLAUDE.md` § Licensing lists the seven protected games)
+   (root `CLAUDE.md` § Licensing lists the eight protected games)
 7. Add the game's row to `.claude/games-index.md` **and refresh its coverage
    summary** (facet vocabulary: `templates/design/game-facets.md` in the
    zmhstudio repo) — when *choosing* what game to build, read that index's

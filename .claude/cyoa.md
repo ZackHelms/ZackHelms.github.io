@@ -30,7 +30,7 @@ Lessons and root causes: `.claude/notes/20260926-cyoa-ai-gm-lessons.md`. Suite:
   party wipe runs an epilogue and opens an ending screen; play may continue.
 - Title: NEW / LOAD / SETTINGS / EXIT. **No top-left back/mute/settings chrome**;
   EXIT is the way back. **Reload button top-right at 2x** (76x60), below the badge.
-- Hub: the **first** card, icon 🧙.
+- Hub: the **first** card, icon 🧙. (Second since 2026-10-09: the CD put CYOA2 directly above it.)
 
 ## CD decisions (2026-09-26, second round) — do not relitigate
 

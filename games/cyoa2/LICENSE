@@ -1,0 +1,39 @@
+CYOA2 (games/cyoa2/) — PROPRIETARY LICENSE
+
+Copyright (c) 2026 Zack Helms. All rights reserved.
+
+1. SCOPE
+   This license covers everything in the games/cyoa2/ directory: game
+   code, the world and map generators and their tables, the asset
+   library and its painters, the room recipes, the rules engine, the
+   map-drawing code, audio code, styling, and text (collectively, "the
+   Software").
+
+2. NO PERMISSION GRANTED
+   No permission is granted to copy, modify, distribute, sublicense,
+   sell, or create derivative works of the Software, in whole or in
+   part, without prior written permission from the copyright holder.
+
+3. TRADEMARK
+   The CYOA2 name as used for this game, its logo, and associated
+   branding are reserved. No trademark rights are granted by this
+   license.
+
+4. PERMITTED USE
+   You may play CYOA2 where it is officially published — the copyright
+   holder's website, and any official app-store release — for personal,
+   non-commercial use. This is not a license to the underlying Software.
+
+5. NO EARLIER LICENSING
+   This directory has been proprietary from its first publication
+   (2026-10-09). It was never covered by the repository's former root
+   Apache License 2.0, which had already been removed on 2026-08-28,
+   and no version of it has been distributed under any other license
+   by the copyright holder.
+
+6. PERMISSIONS AND CONTACT
+   For permission requests, contact the copyright holder via the
+   GitHub repository ZackHelms/ZackHelms.github.io.
+
+7. NO WARRANTY
+   The Software is provided "as is," without warranty of any kind.

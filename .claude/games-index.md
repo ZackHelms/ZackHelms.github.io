@@ -24,6 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
+| CYOA2 | `cyoa2/` | tabletop-rpg | tap-to-move, pinch-zoom, drag-pan | open-sandbox, save-campaign | tile-board, asset-library, procedural-generation, seeded-determinism | solo | `.claude/cyoa2.md` |
 | CYOA | `cyoa/` | tabletop-rpg | voice, text-entry, tap | save-campaign | llm-game-master, speech-narration, procedural-generation, seeded-determinism | solo, local-coop | `.claude/cyoa.md` |
 | Animation Rigs | `animation-rigs/` | animation-sandbox | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox | procedural-animation, inverse-kinematics, simulated-agents, real-time-3d | solo | `.claude/animation-rigs.md` |
 | Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
@@ -81,7 +82,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-55 games (53 in-repo + 2 external builds).
+56 games (54 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -150,6 +151,21 @@ local-2p.
   levels forever: 16 authored, then endless seeded drawers, each beaten by
   the in-game solver before it is served; earmarked as the first web-first
   prototype of a future iOS title).
+
+### Newly opened by the 2026-10-09 build
+- **`tile-board`** / **`asset-library`** mechanics + **`drag-pan`** input (cyoa2, a
+  direct CD commission and CYOA's sequel; `tabletop-rpg` is reused on purpose). The
+  first game whose play surface is a **battle map**: a board of 5 ft squares with
+  walls on the EDGES between them, so furniture footprints are honest (a long table
+  is 5 x 10 ft and fills two squares). The first with a **data-table asset library**
+  where a small thing sitting on a bigger one is its own object, and the first whose
+  places are **charted lazily**: the bible exists up front, a board only when someone
+  walks in, and from then on it lives in the save and is never regenerated. Step 1
+  of 5 is a sandbox with no Game Master, no combat and no fog. `neon-tactics` and
+  `ember-depths` are the other grid games here, but both are fights on one authored
+  or one generated floor; this is a connected world of furnished rooms. Next on this
+  axis is the roadmap in `.claude/cyoa2.md`: grid rules (sight, fog, turns), then
+  CYOA's Game Master on top, then several devices sharing one host's board.
 
 ### Newly opened by the 2026-10-04 build
 - **`animation-sandbox`** genre + **`procedural-animation`** /

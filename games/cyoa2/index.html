@@ -1,0 +1,2561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'none'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#efe3c8">
+<title>CYOA2</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23efe3c8'/%3E%3Cpath d='M12 12h40v40H12z' fill='none' stroke='%232a1d12' stroke-width='4'/%3E%3Cpath d='M12 25.3h40M12 38.6h40M25.3 12v40M38.6 12v40' stroke='%238a7458' stroke-width='1.5'/%3E%3Ccircle cx='32' cy='32' r='8' fill='%23b8892b' stroke='%232a1d12' stroke-width='2.5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<style>
+/* ===== Grimoire tokens (.claude/styles/grimoire.md) ===== */
+:root {
+  --vellum:#efe3c8; --vellum-2:#e6d6b2; --vellum-3:#d9c59a;
+  --ink:#2a1d12; --ink-2:#5a4632; --ink-3:#8a7458;
+  --rubric:#a5301f; --gold:#b8892b; --gold-hi:#e2c068; --gold-lo:#7d5a17;
+  --lapis:#27456e; --verdigris:#3f6f5f; --shadow:rgba(42,29,18,.28);
+  --plate-filter:none;
+  --sat:env(safe-area-inset-top,0px); --sar:env(safe-area-inset-right,0px);
+  --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px);
+  --serif:'IM Fell English','Iowan Old Style',Palatino,Georgia,serif;
+  --caps:'Cinzel','Trajan Pro','Times New Roman',serif;
+  --deco:'Cinzel Decorative','Cinzel','Times New Roman',serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --vellum:#1b140d; --vellum-2:#251b12; --vellum-3:#3a2b1c;
+    --ink:#ecdcb9; --ink-2:#bba580; --ink-3:#7d6a50;
+    --rubric:#e0664c; --gold:#d4a64a; --gold-hi:#f0d488; --gold-lo:#d4a64a;
+    --lapis:#8fb0e0; --verdigris:#79ad99; --shadow:rgba(0,0,0,.5);
+    --plate-filter:brightness(.86) sepia(.15);
+  }
+}
+:root[data-theme="dark"] {
+  --vellum:#1b140d; --vellum-2:#251b12; --vellum-3:#3a2b1c;
+  --ink:#ecdcb9; --ink-2:#bba580; --ink-3:#7d6a50;
+  --rubric:#e0664c; --gold:#d4a64a; --gold-hi:#f0d488; --gold-lo:#d4a64a;
+  --lapis:#8fb0e0; --verdigris:#79ad99; --shadow:rgba(0,0,0,.5);
+  --plate-filter:brightness(.86) sepia(.15);
+}
+
+* { box-sizing:border-box; }
+html, body { margin:0; height:100%; }
+body {
+  background:var(--vellum); color:var(--ink);
+  font-family:var(--serif); font-size:18px; line-height:1.55;
+  overflow:hidden; -webkit-text-size-adjust:100%;
+  touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+}
+body::before { /* vignette toward the deckle */
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:radial-gradient(ellipse at 50% 40%, transparent 55%, var(--vellum-3) 140%);
+}
+button, input, select, textarea { font:inherit; color:inherit; }
+button { cursor:pointer; }
+[hidden] { display:none !important; }
+
+/* ===== chrome: 2x reload (top-right) + menu ribbon, as in CYOA ===== */
+#reload-btn {
+  position:fixed; z-index:90; top:calc(18px + var(--sat)); right:calc(8px + var(--sar));
+  width:76px; height:60px; padding:0;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--caps); font-size:34px; line-height:1;
+  background:var(--vellum-2); color:var(--ink);
+  border:2px solid var(--ink); outline:1px solid var(--gold); outline-offset:2px; border-radius:3px;
+  box-shadow:0 2px 6px var(--shadow);
+}
+#reload-btn:active { background:var(--vellum-3); transform:translateY(1px); }
+#ribbon-btn {
+  position:fixed; z-index:69; top:0; right:calc(98px + var(--sar));
+  width:46px; height:calc(80px + var(--sat)); padding:var(--sat) 0 14px;
+  border:0; background:var(--rubric); color:var(--gold-hi);
+  clip-path:polygon(0 0,100% 0,100% 100%,50% 82%,0 100%);
+  font-family:var(--caps); font-size:22px; display:none;
+  box-shadow:inset -3px 0 0 rgba(0,0,0,.18);
+}
+body.in-play #ribbon-btn { display:block; }
+#ribbon-btn:active { filter:brightness(.9); }
+
+/* ===== screens + crossfade veil ===== */
+.screen { position:fixed; inset:0; z-index:1; display:none; }
+.screen.active { display:flex; }
+#veil { position:fixed; inset:0; z-index:95; background:var(--vellum); opacity:0; pointer-events:none;
+  transition:opacity .45s ease-in-out; }
+#veil.on { opacity:1; pointer-events:auto; }
+
+/* ===== plaques (buttons) ===== */
+.plaque {
+  display:inline-flex; align-items:center; justify-content:center; gap:.5em;
+  min-height:48px; padding:10px 18px;
+  font-family:var(--caps); font-weight:600; font-size:16px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink); background:var(--vellum-2); text-decoration:none;
+  border:2px solid var(--ink); outline:1px solid var(--gold); outline-offset:2px; border-radius:2px;
+  position:relative; user-select:none; -webkit-user-select:none;
+}
+.plaque::after { content:''; position:absolute; left:50%; right:50%; bottom:6px; height:2px;
+  background:var(--gold); transition:left .2s, right .2s; }
+.plaque:hover::after, .plaque:focus-visible::after { left:18%; right:18%; }
+.plaque:focus-visible { outline:2px solid var(--lapis); }
+.plaque:active { background:var(--vellum-3); transform:translateY(1px); }
+.plaque:disabled, .plaque.disabled { color:var(--ink-3); border-color:var(--ink-3); outline-color:transparent; }
+.plaque:disabled::after, .plaque.disabled::after { display:none; }
+.plaque.small { min-height:40px; padding:6px 12px; font-size:13px; }
+.plaque.danger { color:var(--rubric); border-color:var(--rubric); }
+
+/* ===== title ===== */
+#scr-title { flex-direction:column; align-items:center; justify-content:flex-start;
+  padding:calc(84px + var(--sat)) 16px calc(20px + var(--sab)); overflow-y:auto; z-index:2; }
+#frontis-frame { width:min(78vw, 360px, 38vh); aspect-ratio:6/5; flex:0 0 auto; position:relative;
+  border:2px solid var(--ink); outline:1px solid var(--ink); outline-offset:3px; background:#efe3c8; }
+#frontis-frame::before, #frontis-frame::after { content:''; position:absolute; width:10px; height:10px; background:var(--gold);
+  border:1px solid var(--ink); z-index:2; top:-7px; }
+#frontis-frame::before { left:-7px; } #frontis-frame::after { right:-7px; }
+#frontis { display:block; width:100%; height:100%; filter:var(--plate-filter); }
+.title { font-family:var(--deco); font-weight:700; font-size:clamp(50px, 14vw, 84px); letter-spacing:.08em;
+  margin:14px 0 0; line-height:1; color:var(--gold-lo);
+  background:linear-gradient(180deg, var(--gold-hi), var(--gold) 45%, var(--gold-lo));
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 1px 0 var(--ink)); }
+.subtitle { font-family:var(--caps); font-size:14px; letter-spacing:.3em; text-transform:uppercase; color:var(--rubric);
+  margin:6px 0 18px; text-align:center; }
+.subtitle::before, .subtitle::after { content:'\2766'; color:var(--ink-3); margin:0 .6em; letter-spacing:0; }
+.plaques { display:flex; flex-direction:column; gap:14px; width:min(300px, 80vw); }
+.plaques .plaque { width:100%; }
+
+/* ===== play: a header, then the map table ===== */
+#scr-play { flex-direction:column; padding:0 var(--sar) 0 var(--sal); }
+.play-head { flex:0 0 auto; height:calc(88px + var(--sat)); padding:calc(6px + var(--sat)) 160px 0 12px;
+  display:flex; flex-direction:column; justify-content:center; min-width:0; }
+#place-name { font-family:var(--caps); font-weight:700; font-size:17px; letter-spacing:.08em; color:var(--rubric);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#place-sub { font-family:var(--caps); font-size:12px; letter-spacing:.1em; color:var(--ink-2); text-transform:uppercase;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#board { flex:1 1 auto; min-height:0; position:relative; overflow:hidden;
+  border-top:2px solid var(--ink); background:#efe3c8; }
+#map { position:absolute; left:0; top:0; width:100%; height:100%; display:block;
+  touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; cursor:grab; }
+#map.walk { cursor:pointer; }
+#map:focus { outline:none; }
+#info { position:absolute; z-index:5; left:10px; right:10px; bottom:calc(10px + var(--sab)); margin:0 auto; max-width:560px;
+  padding:8px 44px 8px 12px; background:var(--vellum); border:2px solid var(--ink); outline:1px solid var(--gold); outline-offset:2px;
+  box-shadow:0 6px 16px var(--shadow); font-size:16px; line-height:1.35; }
+#info b { display:block; font-family:var(--caps); font-size:14px; letter-spacing:.1em; color:var(--rubric); text-transform:uppercase; }
+#info-x { position:absolute; top:2px; right:2px; width:40px; height:40px; border:0; background:transparent; color:var(--ink-2);
+  font-family:var(--caps); font-size:20px; }
+#act { position:absolute; z-index:6; left:50%; transform:translateX(-50%); bottom:calc(18px + var(--sab)); max-width:calc(100% - 24px);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 6px 16px var(--shadow); }
+#act:active { transform:translateX(-50%) translateY(1px); }
+#board.has-info #act { bottom:calc(92px + var(--sab)); }
+.iconbtn { flex:0 0 auto; width:48px; height:48px; padding:0; display:flex; align-items:center; justify-content:center;
+  background:var(--vellum-2); border:2px solid var(--ink); border-radius:2px; color:var(--ink); font-size:24px; line-height:1; }
+.iconbtn:active { background:var(--vellum-3); }
+#recenter { position:absolute; z-index:4; right:10px; top:10px; box-shadow:0 2px 6px var(--shadow); }
+
+/* ===== panels (chronicle, library, settings) ===== */
+.panel { position:fixed; inset:0; z-index:70; background:var(--vellum); display:none; flex-direction:column; }
+.panel.open { display:flex; }
+.panel-head { flex:0 0 auto; display:flex; align-items:center; gap:12px;
+  padding:calc(12px + var(--sat)) calc(100px + var(--sar)) 10px calc(14px + var(--sal)); min-height:calc(84px + var(--sat));
+  border-bottom:1px solid var(--vellum-3); }
+.panel-head h2 { margin:0; font-family:var(--caps); font-weight:700; font-size:22px; letter-spacing:.1em; color:var(--rubric); flex:1 1 auto; }
+.panel-body { flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  padding:14px calc(16px + var(--sar)) calc(40px + var(--sab)) calc(16px + var(--sal)); }
+.panel-body > * { max-width:640px; margin-left:auto; margin-right:auto; }
+fieldset { border:1px solid var(--ink-3); border-radius:2px; margin:0 auto 18px; padding:10px 14px 14px; }
+legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--rubric); padding:0 6px; }
+.field { display:flex; flex-direction:column; gap:4px; margin:10px 0 0; }
+.field > span { font-family:var(--caps); font-size:13px; letter-spacing:.08em; color:var(--ink-2); }
+.field input[type=text], .field select {
+  min-height:44px; padding:8px 10px; background:var(--vellum-2); border:1.5px solid var(--ink-2); border-radius:2px;
+  font-family:var(--serif); font-size:17px; }
+.field input:focus, .field select:focus { outline:2px solid var(--lapis); outline-offset:1px; }
+.field input[type=range] { width:100%; accent-color:var(--rubric); min-height:32px; }
+.check { display:flex; align-items:center; gap:10px; margin:12px 0 0; min-height:36px; }
+.check input { width:22px; height:22px; accent-color:var(--rubric); }
+.row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.note { font-size:15px; color:var(--ink-2); margin:8px 0 0; }
+.tabs { display:flex; gap:4px; flex-wrap:wrap; margin:0 auto 14px; }
+.tab { font-family:var(--caps); font-size:13px; letter-spacing:.1em; padding:8px 12px; min-height:40px;
+  border:1px solid var(--ink-3); background:transparent; color:var(--ink-2); border-radius:2px; }
+.tab[aria-selected="true"] { background:var(--ink); color:var(--vellum); border-color:var(--ink); }
+.entry { margin:0 auto 14px; padding:0 0 12px; border-bottom:1px solid var(--vellum-3); display:flex; gap:12px; align-items:center; }
+.entry .grow { flex:1 1 auto; min-width:0; }
+.entry h3 { margin:0 0 2px; font-family:var(--caps); font-size:16px; letter-spacing:.06em; color:var(--rubric); }
+.entry .sub { font-family:var(--caps); font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-2); }
+.entry p { margin:4px 0 0; font-size:16px; line-height:1.4; }
+.entry.here h3::after { content:' \2766'; color:var(--gold-lo); }
+.lib-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(136px, 1fr)); gap:12px; max-width:880px !important; }
+.lib-card { border:2px solid var(--ink); outline:1px solid var(--gold); outline-offset:2px; background:var(--vellum-2); padding:8px; text-align:center; }
+.lib-card canvas { display:block; margin:0 auto 6px; background:#efe3c8; border:1px solid var(--ink-3); filter:var(--plate-filter); }
+.lib-card b { display:block; font-family:var(--caps); font-size:13px; letter-spacing:.06em; color:var(--rubric); }
+.lib-card span { display:block; font-family:var(--caps); font-size:11px; letter-spacing:.08em; color:var(--ink-2); text-transform:uppercase; line-height:1.5; }
+.lib-h { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacing:.14em; text-transform:uppercase; color:var(--rubric);
+  margin:6px auto 10px; max-width:880px !important; }
+
+/* ===== menu + dialog + toast ===== */
+#menu { position:fixed; z-index:80; top:calc(84px + var(--sat)); right:calc(12px + var(--sar));
+  display:none; flex-direction:column; gap:10px; padding:14px; min-width:220px;
+  background:var(--vellum); border:2px solid var(--ink); outline:1px solid var(--gold); outline-offset:3px;
+  box-shadow:0 8px 24px var(--shadow); }
+#menu.open { display:flex; }
+#menu .plaque { width:100%; }
+#scrim { position:fixed; inset:0; z-index:78; background:rgba(27,20,13,.25); display:none; }
+#scrim.open { display:block; }
+#dialog { position:fixed; z-index:88; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:min(92vw, 460px); max-height:86vh; overflow-y:auto; display:none; padding:18px;
+  background:var(--vellum); border:2px solid var(--ink); outline:1px solid var(--gold); outline-offset:3px;
+  box-shadow:0 12px 32px var(--shadow); }
+#dialog.open { display:block; }
+#dialog h3 { margin:0 0 8px; font-family:var(--caps); color:var(--rubric); letter-spacing:.08em; }
+#dialog .dlg-body { margin:0 0 14px; }
+#dialog .dlg-body p { margin:0 0 .6em; }
+#dialog .dlg-body p.lead::first-letter { float:left; font-family:var(--deco); font-weight:700; font-size:3.05em; line-height:.82;
+  padding:7px 7px 3px; margin:5px 9px 0 0; color:var(--rubric);
+  background:linear-gradient(135deg, var(--gold-hi), var(--gold) 55%, var(--gold-lo)); border:1px solid var(--ink); }
+#dialog .dlg-btns { display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; }
+#toast { position:fixed; z-index:92; left:50%; bottom:calc(110px + var(--sab)); transform:translateX(-50%);
+  max-width:86vw; padding:10px 16px; background:var(--ink); color:var(--vellum); font-family:var(--caps); font-size:14px;
+  letter-spacing:.06em; border-radius:2px; opacity:0; transition:opacity .3s; pointer-events:none; text-align:center; }
+#toast.on { opacity:1; }
+</style>
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-09 21:16 UTC</div>
+<button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
+<button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
+
+<!-- ===== title ===== -->
+<section id="scr-title" class="screen active" aria-label="Title">
+  <div id="frontis-frame"><canvas id="frontis" width="720" height="600" aria-hidden="true"></canvas></div>
+  <h1 class="title">CYOA2</h1>
+  <div class="subtitle">A Tale Told on the Table</div>
+  <nav class="plaques">
+    <button id="btn-continue" class="plaque" type="button" hidden>Continue</button>
+    <button id="btn-new" class="plaque" type="button">New</button>
+    <button id="btn-import" class="plaque" type="button">Load a file</button>
+    <button id="btn-settings" class="plaque" type="button">Settings</button>
+    <a id="btn-exit" class="plaque" href="../index.html">Exit</a>
+  </nav>
+  <input id="file-in" type="file" accept="application/json,.json" hidden>
+</section>
+
+<!-- ===== play ===== -->
+<section id="scr-play" class="screen" aria-label="The map table">
+  <header class="play-head"><div id="place-name"></div><div id="place-sub"></div></header>
+  <div id="board">
+    <canvas id="map" aria-label="Map" tabindex="0"></canvas>
+    <button id="recenter" class="iconbtn" type="button" aria-label="Centre the map on your token" hidden>&#8982;</button>
+    <button id="act" class="plaque" type="button" hidden></button>
+    <div id="info" role="status" hidden><b id="info-name"></b><span id="info-text"></span><button id="info-x" type="button" aria-label="Close">&#215;</button></div>
+  </div>
+</section>
+
+<!-- ===== chronicle ===== -->
+<section id="pan-chron" class="panel" aria-label="Chronicle">
+  <div class="panel-head"><h2>Chronicle</h2><button class="plaque small" type="button" data-close>Back</button></div>
+  <div class="panel-body">
+    <div class="tabs" role="tablist">
+      <button class="tab" type="button" role="tab" data-tab="tale" aria-selected="true">Tale</button>
+      <button class="tab" type="button" role="tab" data-tab="places" aria-selected="false">Places</button>
+      <button class="tab" type="button" role="tab" data-tab="people" aria-selected="false">People</button>
+      <button class="tab" type="button" role="tab" data-tab="journal" aria-selected="false">Journal</button>
+    </div>
+    <div id="chron-list"></div>
+  </div>
+</section>
+
+<!-- ===== asset library ===== -->
+<section id="pan-lib" class="panel" aria-label="Asset library">
+  <div class="panel-head"><h2>Library</h2><button class="plaque small" type="button" data-close>Back</button></div>
+  <div class="panel-body" id="lib-body"></div>
+</section>
+
+<!-- ===== settings ===== -->
+<section id="pan-settings" class="panel" aria-label="Settings">
+  <div class="panel-head"><h2>Settings</h2><button class="plaque small" type="button" data-close>Done</button></div>
+  <div class="panel-body">
+    <fieldset><legend>World</legend>
+      <label class="field"><span>Seed for the next new tale (blank for a random world)</span><input id="set-seed" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60"></label>
+      <p class="note" id="set-seed-now"></p>
+    </fieldset>
+    <fieldset><legend>Map</legend>
+      <label class="check"><input id="set-grid" type="checkbox"><span>Show the 5 ft grid</span></label>
+      <label class="check"><input id="set-foot" type="checkbox"><span>Show footprints (what blocks, what slows, what holds things)</span></label>
+      <p class="note">Tap a square to walk there. Drag to pan, pinch or scroll to zoom. Tap a door, a thing or a person to see it. Arrow keys and WASD also walk; Q E Z C step diagonally.</p>
+    </fieldset>
+    <fieldset><legend>Sound</legend>
+      <label class="field"><span>Music</span><input id="set-music" type="range" min="0" max="1" step="0.05"></label>
+      <label class="field"><span>Effects</span><input id="set-sfx" type="range" min="0" max="1" step="0.05"></label>
+    </fieldset>
+    <fieldset><legend>Appearance</legend>
+      <label class="field"><span>Page</span><select id="set-theme"><option value="auto">Follow this device</option><option value="light">Parchment</option><option value="dark">Night reading</option></select></label>
+    </fieldset>
+    <fieldset><legend>Saved tale</legend>
+      <p class="note">The tale saves itself on this device after every move. A saved file holds the whole world, including every place charted so far.</p>
+      <div class="row" style="margin-top:10px">
+        <button id="set-export" class="plaque small" type="button">Save to a file</button>
+        <button id="set-import" class="plaque small" type="button">Load a file</button>
+        <button id="set-delete" class="plaque small danger" type="button">Delete</button>
+      </div>
+    </fieldset>
+  </div>
+</section>
+
+<div id="scrim"></div>
+<nav id="menu" aria-label="Game menu">
+  <button class="plaque" type="button" data-act="chron">Chronicle</button>
+  <button class="plaque" type="button" data-act="lib">Library</button>
+  <button class="plaque" type="button" data-act="export">Save to a file</button>
+  <button class="plaque" type="button" data-act="settings">Settings</button>
+  <button class="plaque" type="button" data-act="title">Title</button>
+</nav>
+<div id="dialog" role="dialog" aria-modal="true"><h3 id="dlg-title"></h3><div id="dlg-body" class="dlg-body"></div><div id="dlg-btns" class="dlg-btns"></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="veil"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   CYOA2 - a tale told on the table. The world of CYOA, played on a
+   board of 5 ft squares: a seeded town, the insides of its buildings
+   and a bandit cave, each charted the first time someone walks in and
+   kept in the save from then on.
+   Architecture notes: .claude/cyoa2.md. Style: .claude/styles/grimoire.md.
+   Sections: UTIL / PRNG / TABLES / ASSETS / MAP / FURNISH / WORLD /
+   SITES / ENGINE / ART / VIEW / AUDIO / STORAGE / UI / BOOT
+   ===================================================================== */
+
+/* ============================== UTIL ============================== */
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const clip = (s, n) => { s = String(s == null ? '' : s).trim(); return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s; };
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;   // NEVER innerHTML: a loaded file is untrusted text
+  return e;
+}
+const deepClone = (o) => JSON.parse(JSON.stringify(o));
+const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];          /* 0 north, 1 east, 2 south, 3 west */
+const FT = 5;                                           /* one square is five feet */
+
+/* ============================== PRNG ============================== */
+function cyrb128(str) {
+  let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
+  for (let i = 0, k; i < str.length; i++) {
+    k = str.charCodeAt(i);
+    h1 = h2 ^ Math.imul(h1 ^ k, 597399067); h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+    h3 = h4 ^ Math.imul(h3 ^ k, 951274213); h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+  }
+  h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067); h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+  h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213); h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+  h1 ^= (h2 ^ h3 ^ h4); h2 ^= h1; h3 ^= h1; h4 ^= h1;
+  return [h1 >>> 0, h2 >>> 0, h3 >>> 0, h4 >>> 0];
+}
+function sfc32(a, b, c, d) {
+  return function () {
+    a |= 0; b |= 0; c |= 0; d |= 0;
+    const t = (((a + b) | 0) + d) | 0;
+    d = (d + 1) | 0; a = b ^ (b >>> 9); b = (c + (c << 3)) | 0;
+    c = (c << 21) | (c >>> 11); c = (c + t) | 0;
+    return (t >>> 0) / 4294967296;
+  };
+}
+/* One independent generator per (seed, stream, index): the world, each site and each
+   site's people draw from their own stream, so charting places in a different order
+   never changes what any of them turns out to be. */
+function rngFor(seed, stream, n) {
+  const h = cyrb128(seed + '\u0001' + stream + '\u0001' + n);
+  const r = sfc32(h[0], h[1], h[2], h[3]);
+  for (let i = 0; i < 12; i++) r();
+  return r;
+}
+const pick = (r, a) => a[Math.floor(r() * a.length)];
+const rint = (r, lo, hi) => lo + Math.floor(r() * (hi - lo + 1));
+function shuffled(r, a) { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; }
+function weighted(r, pairs) { let t = 0; for (const p of pairs) t += p[1]; let x = r() * t; for (const p of pairs) { if ((x -= p[1]) < 0) return p[0]; } return pairs[pairs.length - 1][0]; }
+/* stable scatter for the ART only (never for anything the rules read) */
+function h2(x, y, s) {
+  let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul((s | 0) + 1, 1274126177);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+function strHash(s) { return cyrb128(String(s))[0]; }
+
+const SEED_WORDS = ['amber','ash','bramble','candle','cinder','copper','crow','dusk','ember','fable','fern','frost','gilded','hollow','ivory','juniper',
+  'lantern','larch','marrow','mist','moth','nettle','oak','onyx','owl','pale','quill','raven','rook','rowan','rune','sable','salt','silver','sparrow',
+  'stag','thistle','thorn','tallow','umber','vellum','willow','wolf','wren','yew','harrow','briar','gloam','hearth','moor','spindle','tide','veil'];
+function randomSeed() {
+  const u = new Uint32Array(4);
+  if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(u); else for (let i = 0; i < 4; i++) u[i] = Math.random() * 4294967296;
+  return SEED_WORDS[u[0] % SEED_WORDS.length] + '-' + SEED_WORDS[u[1] % SEED_WORDS.length] + '-' + SEED_WORDS[u[2] % SEED_WORDS.length] + '-' + (10 + (u[3] % 90));
+}
+
+/* ============================== TABLES ============================== */
+/* Extend these freely: every table is data, read by the generators in order. */
+const PLACE_PRE = ['Harrow','Thorn','Crow','Ash','Bramble','Elder','Raven','Mill','Stone','Wolf','Fen','Oak','Grim','Wind','Marl','Dun','Black','Red','Whit','Holl','Bar','Cold','Wren','Hazel'];
+const PLACE_SUF = ['mere','wick','ford','fell','stead','haven','bury','dale','moor','gate','holt','combe','ton','by','brook','field'];
+const REGION_SUF = ['Vale','Marches','Reach','Downs','Fens','Wold','Hundred','Weald'];
+const GIVEN = ['Aldric','Bram','Corwin','Dunstan','Edric','Garrick','Hob','Ivo','Jory','Kester','Merrick','Ned','Osric','Perrin','Rafe','Tobias','Wat','Alys','Bess','Cecily','Dulcie','Edith','Greta','Hilde','Isolde','Joan','Maud','Nell','Orla','Petra','Rowena','Sibyl','Tamsin','Una','Wynne'];
+const FAMILY = ['Ashdown','Barrow','Coldwell','Dunmore','Fenwick','Greaves','Harker','Ironside','Kettle','Lark','Marlowe','Nettles','Oakes','Pike','Quarry','Rooke','Sedge','Thatcher','Underhill','Vane','Wainwright','Yarrow'];
+const INN_ADJ = ['Drowsy','Crooked','Laughing','Gilded','Wandering','Salted','Silver','Three-Legged','Hanged','Sleeping','Merry','Black'];
+const INN_NOUN = ['Stag','Crow','Mermaid','Lantern','Goose','Kettle','Boar','Harp','Moon','Fiddler','Hound','Wheel'];
+const GANGS = ['the Red Hand','the Ash Crows','the Hollow Men','the Thorn Knives','the Gallows Dogs','the Rust Coats','the Night Reeves','the Marrow Boys'];
+const CAVE_SUF = ['Hollow','Cleft','Delve','Den','Grotto','Maw'];
+const TRAITS = ['soft-spoken','quick to laugh','short-tempered','watchful','weary','proud','superstitious','generous','sly','blunt','nervous','stubborn','kindly','greedy','devout','curious'];
+const FOLK = ['farmer','carter','washerwoman','peddler','watchman','shepherd','fishwife','tinker','miller\'s hand','goose girl','woodcutter','beggar'];
+const PATRONS = ['traveller','drover','off-duty watchman','minstrel','merchant\'s guard','old soldier','card sharp','pilgrim','trapper','farmhand'];
+const BANDITS = ['cutpurse','bruiser','lookout','poacher','deserter','knife-hand','road agent'];
+/* plot threads: one main, two that tangle with it. {town}{gang}{chief}{cave}{captive}{elder}{inn}{keeper}{smith}{priest}{shop} */
+const THREADS_MAIN = [
+  { k: 'kidnap', t: '{gang} took {captive} on the north road three nights ago and hold them at {cave}. {elder} will pay whoever brings them home.' },
+  { k: 'toll',   t: '{gang} have set a toll on the north road and beat those who will not pay. {elder} wants {chief} driven out of {cave}; {captive} went to bargain and never came back.' },
+  { k: 'relic',  t: 'The chapel\'s silver reliquary is gone, and {captive}, who kept its key, with it. {priest} is sure both lie in {cave}, where {gang} sleep.' },
+  { k: 'caravan', t: 'A wool caravan bound for {town} never arrived. Its factor, {captive}, was seen being marched toward {cave} by {gang}.' },
+];
+const THREADS_SIDE = [
+  { k: 'debt',     t: '{keeper} of {inn} owes {chief} money and passes word of rich travellers to settle it.' },
+  { k: 'blades',   t: '{smith} has been forging blades at night that no one in {town} has bought.' },
+  { k: 'informer', t: 'Someone in {town} warns {gang} whenever the watch rides out. {shop} keeps very odd hours.' },
+  { k: 'tunnel',   t: 'Old folk say the cellars under {inn} once ran all the way to {cave}.' },
+  { k: 'kin',      t: '{chief} was born in {town}, and {priest} still calls them by their childhood name.' },
+  { k: 'ledger',   t: 'A ledger in {cave} is said to name every hand in {town} that has taken the gang\'s coin.' },
+];
+
+/* ============================== ASSETS ==============================
+   The asset library. One row per thing that can stand on the board; its painter is
+   ART[id] (same id) further down. To add an asset: one row here, one painter there,
+   and a line in whichever ROOMS recipe should use it.
+     w, h   footprint in squares, drawn with its BACK to the north (a bed's head, a
+            hearth's chimney breast, the server's side of a bar). r = 0..3 turns it.
+     mv     'b' blocks a square, 'r' slows it (rough: two squares of movement), 'f' free
+     tall   blocks line of sight (kept for the sight rules to come)
+     surf   small things each square of it can carry (0 = not a surface)
+     sz     's' = a small thing: it sits ON a surface, half a square across
+     lay    'd' = a floor decal (a rug): under everything, never in anyone's way     */
+const ASSETS = {};
+function asset(id, n, w, h, mv, cat, o) { ASSETS[id] = Object.assign({ id, n, w, h, mv, cat, surf: 0, tall: false, sz: '', lay: 'o', d: '' }, o || {}); }
+/* furniture */
+asset('table_long', 'Long table', 1, 2, 'b', 'Furniture', { surf: 1, d: 'Scarred oak, room for six.' });
+asset('table_round', 'Round table', 1, 1, 'b', 'Furniture', { surf: 1, d: 'A small round table.' });
+asset('table_small', 'Side table', 1, 1, 'b', 'Furniture', { surf: 1, d: 'A plain square stand.' });
+asset('chair', 'Chair', 1, 1, 'r', 'Furniture', { d: 'A ladder-back chair.' });
+asset('stool', 'Stool', 1, 1, 'r', 'Furniture', { d: 'A three-legged stool.' });
+asset('bench', 'Bench', 2, 1, 'r', 'Furniture', { d: 'A plank bench.' });
+asset('bar', 'Bar counter', 3, 1, 'b', 'Furniture', { surf: 1, d: 'A long counter, sticky with old ale.' });
+asset('counter', 'Shop counter', 2, 1, 'b', 'Furniture', { surf: 1, d: 'A counter worn smooth by coin.' });
+asset('bed', 'Bed', 1, 2, 'b', 'Furniture', { d: 'A straw mattress on a rope frame.' });
+asset('wardrobe', 'Wardrobe', 1, 1, 'b', 'Furniture', { tall: true, d: 'A tall press for clothes.' });
+asset('shelf', 'Shelves', 2, 1, 'b', 'Furniture', { tall: true, surf: 1, d: 'Shelves to the rafters.' });
+asset('desk', 'Writing desk', 2, 1, 'b', 'Furniture', { surf: 1, d: 'A desk with an inkwell ring.' });
+asset('chest', 'Chest', 1, 1, 'b', 'Furniture', { d: 'An iron-bound chest.' });
+asset('stairs', 'Stairs up', 1, 2, 'b', 'Furniture', { d: 'Steep stairs to the floor above.' });
+asset('altar', 'Altar', 1, 1, 'b', 'Furniture', { surf: 2, d: 'A stone altar under a plain cloth.' });
+asset('lectern', 'Lectern', 1, 1, 'b', 'Furniture', { d: 'A reading stand.' });
+asset('statue', 'Statue', 1, 1, 'b', 'Furniture', { tall: true, d: 'A saint, nose worn away by touching.' });
+asset('pillar', 'Pillar', 1, 1, 'b', 'Furniture', { tall: true, d: 'A stone pillar.' });
+asset('candlestand', 'Candle stand', 1, 1, 'r', 'Furniture', { d: 'A tall iron stand of candles.' });
+/* hearth and craft */
+asset('hearth', 'Hearth', 2, 1, 'b', 'Hearth and craft', { tall: true, d: 'A wide stone hearth, fire banked low.' });
+asset('stove', 'Iron stove', 1, 1, 'b', 'Hearth and craft', { d: 'A squat iron stove.' });
+asset('cauldron', 'Cauldron', 1, 1, 'b', 'Hearth and craft', { d: 'A black pot on a tripod.' });
+asset('forge', 'Forge', 2, 1, 'b', 'Hearth and craft', { tall: true, d: 'A brick forge and its bellows.' });
+asset('anvil', 'Anvil', 1, 1, 'b', 'Hearth and craft', { d: 'An anvil on an elm block.' });
+asset('workbench', 'Workbench', 2, 1, 'b', 'Hearth and craft', { surf: 1, d: 'A bench with a vice.' });
+asset('weapon_rack', 'Weapon rack', 2, 1, 'b', 'Hearth and craft', { d: 'Spears and bills in a rack.' });
+asset('grindstone', 'Grindstone', 1, 1, 'b', 'Hearth and craft', { d: 'A treadle grindstone.' });
+/* stores */
+asset('barrel', 'Barrel', 1, 1, 'b', 'Stores', { surf: 1, d: 'An oak barrel.' });
+asset('keg', 'Keg', 1, 1, 'b', 'Stores', { d: 'A tapped keg on a cradle.' });
+asset('crate', 'Crate', 1, 1, 'b', 'Stores', { surf: 1, d: 'A nailed crate.' });
+asset('sacks', 'Sacks', 1, 1, 'r', 'Stores', { d: 'Sacks of grain.' });
+asset('haybale', 'Hay bale', 1, 1, 'b', 'Stores', { d: 'A tied bale of hay.' });
+/* floor */
+asset('rug', 'Rug', 2, 3, 'f', 'Floor', { lay: 'd', d: 'A woven rug.' });
+asset('rug_small', 'Runner', 1, 2, 'f', 'Floor', { lay: 'd', d: 'A narrow runner.' });
+asset('hide', 'Bearskin', 2, 2, 'f', 'Floor', { lay: 'd', d: 'A bearskin, head and all.' });
+asset('garden', 'Vegetable patch', 2, 2, 'f', 'Floor', { lay: 'd', d: 'Rows of leeks and cabbages.' });
+/* outdoors */
+asset('well', 'Well', 1, 1, 'b', 'Outdoors', { d: 'The town well.' });
+asset('stall', 'Market stall', 2, 1, 'b', 'Outdoors', { surf: 1, d: 'A trestle under an awning.' });
+asset('cart', 'Handcart', 1, 2, 'b', 'Outdoors', { d: 'A two-wheeled handcart.' });
+asset('trough', 'Trough', 2, 1, 'b', 'Outdoors', { d: 'A water trough.' });
+asset('signpost', 'Signpost', 1, 1, 'r', 'Outdoors', { d: 'A fingerpost.' });
+asset('lamp', 'Lamp post', 1, 1, 'r', 'Outdoors', { d: 'A lantern on a post.' });
+asset('notice', 'Notice board', 1, 1, 'b', 'Outdoors', { d: 'Bills and warrants, nailed up.' });
+asset('tree', 'Tree', 1, 1, 'b', 'Outdoors', { tall: true, d: 'A broad old tree.' });
+asset('bush', 'Bush', 1, 1, 'r', 'Outdoors', { d: 'A tangle of bramble.' });
+asset('stump', 'Stump', 1, 1, 'r', 'Outdoors', { d: 'A chopping stump.' });
+asset('boulder', 'Boulder', 1, 1, 'b', 'Outdoors', { d: 'A lichened boulder.' });
+/* cave */
+asset('campfire', 'Campfire', 1, 1, 'b', 'Cave', { d: 'A ring of stones round a fire.' });
+asset('bedroll', 'Bedroll', 1, 2, 'r', 'Cave', { d: 'A blanket roll on the stone.' });
+asset('barricade', 'Barricade', 2, 1, 'b', 'Cave', { d: 'Stakes lashed into a barrier.' });
+asset('stalagmite', 'Stalagmite', 1, 1, 'b', 'Cave', { d: 'A cone of wet stone.' });
+asset('rubble', 'Rubble', 1, 1, 'r', 'Cave', { d: 'Loose fallen stone.' });
+asset('mushrooms', 'Glowcaps', 1, 1, 'f', 'Cave', { d: 'Pale mushrooms.' });
+/* small things: they sit on surfaces */
+for (const [id, n, d] of [
+  ['flower_pot', 'Flower pot', 'Meadow flowers in a clay pot.'], ['candle', 'Candle', 'A tallow candle.'], ['tankard', 'Tankard', 'A pewter tankard.'],
+  ['plate', 'Plate', 'A trencher with a heel of bread.'], ['bottle', 'Bottle', 'A green glass bottle.'], ['book', 'Book', 'A book with a cracked spine.'],
+  ['scroll', 'Map', 'A rolled map.'], ['coins', 'Coins', 'A scatter of coins.'], ['key', 'Key', 'An iron key.'], ['skull', 'Skull', 'A yellowed skull.'],
+  ['dagger', 'Dagger', 'A long knife.'], ['bowl', 'Bowl', 'A bowl of stew.'], ['loaf', 'Loaf', 'A round loaf.'], ['jug', 'Jug', 'A stoneware jug.'],
+  ['lantern', 'Lantern', 'A shuttered lantern.'], ['hammer', 'Hammer', 'A smith\'s hammer.'], ['chalice', 'Chalice', 'A plain cup.'],
+  ['dice', 'Dice', 'A pair of bone dice.'], ['basket', 'Basket', 'A basket of apples.'], ['pouch', 'Pouch', 'A drawstring pouch.'],
+]) asset(id, n, 1, 1, 'f', 'Small things', { sz: 's', d });
+
+/* what turns up on a surface: p per slot, then a weighted draw */
+const TOPS = {
+  tavern:  { p: .5,  items: [['tankard', 5], ['plate', 3], ['candle', 2], ['jug', 1], ['dice', 1], ['bowl', 2], ['flower_pot', 1], ['loaf', 1]] },
+  bar:     { p: .6,  items: [['tankard', 5], ['bottle', 3], ['jug', 2], ['candle', 1], ['coins', 1], ['flower_pot', 1]] },
+  kitchen: { p: .75, items: [['loaf', 3], ['bowl', 3], ['plate', 2], ['jug', 1], ['basket', 2], ['dagger', 1]] },
+  home:    { p: .5,  items: [['candle', 3], ['plate', 2], ['bowl', 2], ['flower_pot', 3], ['book', 1], ['jug', 1], ['basket', 1]] },
+  night:   { p: .85, items: [['candle', 4], ['book', 1], ['jug', 1], ['flower_pot', 1]] },
+  shop:    { p: .8,  items: [['bottle', 2], ['basket', 2], ['pouch', 2], ['lantern', 2], ['book', 1], ['scroll', 1], ['candle', 1], ['jug', 1]] },
+  smith:   { p: .8,  items: [['hammer', 4], ['dagger', 3], ['key', 1], ['lantern', 1]] },
+  altar:   { p: 1,   items: [['candle', 3], ['chalice', 2], ['book', 1]] },
+  loot:    { p: .7,  items: [['coins', 4], ['dagger', 2], ['scroll', 2], ['bottle', 2], ['skull', 1], ['key', 1], ['candle', 2], ['pouch', 2]] },
+  camp:    { p: .5,  items: [['tankard', 3], ['bottle', 2], ['dice', 2], ['dagger', 1], ['bowl', 2], ['candle', 1]] },
+  store:   { p: .3,  items: [['lantern', 2], ['bottle', 1], ['pouch', 1], ['candle', 1], ['basket', 1]] },
+};
+
+/* ============================== MAP ==============================
+   A map is a grid of 5 ft squares. Each square has a terrain; each EDGE between two
+   squares may carry a wall, a door, a window or bars, so walls take no floor away and
+   a 5 x 10 ft table really does fill two squares of a room. Things stand on squares
+   (objs), small things sit on things (obj.on), and people stand on squares (tokens).
+   Everything below is plain data, so a map goes into the save as it is.            */
+const GEN_V = 1;                                         /* bump when a generator's output changes */
+const TR = { VOID: 0, GRASS: 1, DIRT: 2, COBBLE: 3, WOOD: 4, STONE: 5, CAVE: 6, ROCK: 7, WATER: 8, ROOF: 9 };
+const TERRAIN = ['nothing', 'grass', 'bare earth', 'cobbles', 'floorboards', 'flagstones', 'cave floor', 'solid rock', 'water', 'a roof'];
+const TWALK = [0, 1, 1, 1, 1, 1, 1, 0, 0, 0];
+const ED = { OPEN: 0, WALL: 1, DOOR: 2, WINDOW: 3, BARS: 4 };
+
+function newMap(id, kind, w, h, fill) {
+  return { id, kind, w, h, gen: GEN_V, title: '', sub: '',
+    t: new Uint8Array(w * h).fill(fill), wn: new Uint8Array(w * (h + 1)), ww: new Uint8Array((w + 1) * h),
+    rg: new Uint8Array(w * h), rooms: [], doors: [], objs: [], tokens: [], exits: [], lots: [], labels: [], n: { o: 0, d: 0, k: 0 } };
+}
+const inb = (m, x, y) => x >= 0 && y >= 0 && x < m.w && y < m.h;
+const tAt = (m, x, y) => (inb(m, x, y) ? m.t[y * m.w + x] : TR.VOID);
+/* edges: wn[y*w+x] is the NORTH edge of square (x,y) (y may be h: the map's south rim);
+          ww[y*(w+1)+x] is its WEST edge (x may be w: the east rim) */
+function eGet(m, x, y, d) {
+  return d === 0 ? m.wn[y * m.w + x] : d === 2 ? m.wn[(y + 1) * m.w + x] : d === 3 ? m.ww[y * (m.w + 1) + x] : m.ww[y * (m.w + 1) + x + 1];
+}
+function eSet(m, x, y, d, v) {
+  if (d === 0) m.wn[y * m.w + x] = v; else if (d === 2) m.wn[(y + 1) * m.w + x] = v;
+  else if (d === 3) m.ww[y * (m.w + 1) + x] = v; else m.ww[y * (m.w + 1) + x + 1] = v;
+}
+/* a door is named by the edge it hangs in: {k:'n'|'w', x, y} */
+const edgeRef = (x, y, d) => (d === 0 ? { k: 'n', x, y } : d === 2 ? { k: 'n', x, y: y + 1 } : d === 3 ? { k: 'w', x, y } : { k: 'w', x: x + 1, y });
+const doorKey = (e) => e.k + e.x + ',' + e.y;
+const doorSides = (d) => (d.k === 'n' ? [[d.x, d.y - 1], [d.x, d.y]] : [[d.x - 1, d.y], [d.x, d.y]]);
+function addDoor(m, x, y, d, o) {
+  eSet(m, x, y, d, ED.DOOR);
+  const e = edgeRef(x, y, d);
+  const door = Object.assign({ id: 'D' + (m.n.d++), k: e.k, x: e.x, y: e.y, open: false, lock: false, kind: 'door', ext: false }, o || {});
+  m.doors.push(door);
+  return door;
+}
+function wallRect(m, x, y, w, h) {
+  for (let i = 0; i < w; i++) { eSet(m, x + i, y, 0, ED.WALL); eSet(m, x + i, y + h - 1, 2, ED.WALL); }
+  for (let j = 0; j < h; j++) { eSet(m, x, y + j, 3, ED.WALL); eSet(m, x + w - 1, y + j, 1, ED.WALL); }
+}
+/* the squares a thing covers once turned */
+function footprint(o) {
+  const a = ASSETS[o.a];
+  return (o.r & 1) ? { x: o.x, y: o.y, w: a.h, h: a.w } : { x: o.x, y: o.y, w: a.w, h: a.h };
+}
+/* derived lookups, rebuilt whenever a map's contents change; never saved */
+function indexMap(m) {
+  const n = m.w * m.h;
+  const occ = new Int16Array(n).fill(-1), dec = new Int16Array(n).fill(-1), tok = new Int16Array(n).fill(-1), ex = new Int16Array(n).fill(-1);
+  const door = new Map(), kids = new Map(), byId = new Map();
+  m.objs.forEach((o, k) => {
+    byId.set(o.id, o);
+    if (o.on) { if (!kids.has(o.on)) kids.set(o.on, []); kids.get(o.on).push(o); return; }
+    const f = footprint(o), grid = ASSETS[o.a].lay === 'd' ? dec : occ;
+    for (let j = 0; j < f.h; j++) for (let i = 0; i < f.w; i++) if (inb(m, f.x + i, f.y + j)) grid[(f.y + j) * m.w + f.x + i] = k;
+  });
+  for (const d of m.doors) door.set(doorKey(d), d);
+  m.tokens.forEach((t, k) => { tok[t.y * m.w + t.x] = k; });
+  m.exits.forEach((e, k) => { for (const p of e.tiles || []) ex[p[1] * m.w + p[0]] = k; });
+  m._ = { occ, dec, tok, ex, door, kids, byId };
+  return m;
+}
+const doorOn = (m, x, y, d) => m._.door.get(doorKey(edgeRef(x, y, d))) || null;
+const objAt = (m, x, y) => { if (!inb(m, x, y)) return null; const i = y * m.w + x, k = m._.occ[i] >= 0 ? m._.occ[i] : m._.dec[i]; return k >= 0 ? m.objs[k] : null; };
+const tokenAt = (m, x, y) => { if (!inb(m, x, y)) return null; const k = m._.tok[y * m.w + x]; return k >= 0 ? m.tokens[k] : null; };
+function exitAt(m, x, y) {
+  if (!inb(m, x, y)) return null;
+  const k = m._.ex[y * m.w + x];
+  if (k >= 0) return m.exits[k];
+  /* inside a building, every walkable square outside its walls leads back out */
+  if (!m.rg[y * m.w + x] && TWALK[m.t[y * m.w + x]]) return m.exits.find((e) => e.zone) || null;
+  return null;
+}
+/* may someone stand on this square? */
+function tileFree(m, x, y) {
+  if (!inb(m, x, y)) return false;
+  const i = y * m.w + x;
+  if (!TWALK[m.t[i]]) return false;
+  const k = m._.occ[i];
+  return !(k >= 0 && ASSETS[m.objs[k].a].mv === 'b');
+}
+function tileCost(m, x, y) { const k = m._.occ[y * m.w + x]; return k >= 0 && ASSETS[m.objs[k].a].mv === 'r' ? 2 : 1; }
+/* One step from (x,y) by (dx,dy): null if it cannot be taken, else what it costs and
+   which closed door it goes through. Diagonals may not cut a corner or pass a door.
+   `all` treats every door as passable, locked or not (used to prove a map is whole). */
+function stepInfo(m, x, y, dx, dy, all) {
+  const nx = x + dx, ny = y + dy;
+  if (!tileFree(m, nx, ny)) return null;
+  const cost = tileCost(m, nx, ny);
+  if (dx && dy) {
+    if (!tileFree(m, nx, y) || !tileFree(m, x, ny)) return null;
+    const hx = dx > 0 ? 1 : 3, hy = dy > 0 ? 2 : 0;
+    if (eGet(m, x, y, hx) || eGet(m, x, y, hy) || eGet(m, nx, y, hy) || eGet(m, x, ny, hx)) return null;
+    return { door: null, cost };
+  }
+  const d = dx > 0 ? 1 : dx < 0 ? 3 : dy > 0 ? 2 : 0, e = eGet(m, x, y, d);
+  if (e === ED.OPEN) return { door: null, cost };
+  if (e !== ED.DOOR) return null;
+  const dr = doorOn(m, x, y, d);
+  if (!dr) return null;
+  if (dr.open) return { door: null, cost };
+  if (dr.lock && !all) return null;
+  return { door: dr, cost: cost + 1 };                  /* a closed door: a little dearer than an open way */
+}
+const STEPS = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]];
+/* cheapest path from (sx,sy) to any square in `goals` (a Set of y*w+x). `taken(x,y)`
+   says a square is occupied by someone. Returns {path:[[x,y]...], ft} or null.      */
+function findPath(m, sx, sy, goals, taken) {
+  const W = m.w, n = W * m.h, s = sy * W + sx;
+  const dist = new Float64Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1), done = new Uint8Array(n);
+  const heap = [];
+  const push = (d, i) => { heap.push([d, i]); let c = heap.length - 1; while (c > 0) { const p = (c - 1) >> 1; if (heap[p][0] <= heap[c][0]) break; [heap[p], heap[c]] = [heap[c], heap[p]]; c = p; } };
+  const pop = () => {
+    const top = heap[0], last = heap.pop();
+    if (heap.length) { heap[0] = last; let p = 0; for (;;) { let c = 2 * p + 1; if (c >= heap.length) break; if (c + 1 < heap.length && heap[c + 1][0] < heap[c][0]) c++; if (heap[p][0] <= heap[c][0]) break; [heap[p], heap[c]] = [heap[c], heap[p]]; p = c; } }
+    return top;
+  };
+  dist[s] = 0; push(0, s);
+  while (heap.length) {
+    const [d, i] = pop();
+    if (done[i]) continue;
+    done[i] = 1;
+    if (i !== s && goals.has(i)) {
+      const path = []; let ft = 0;
+      for (let c = i; c !== s; c = prev[c]) { const x = c % W, y = (c - x) / W; path.push([x, y]); ft += tileCost(m, x, y) * FT; }
+      return { path: path.reverse(), ft };
+    }
+    const x = i % W, y = (i - x) / W;
+    for (let k = 0; k < 8; k++) {
+      const dx = STEPS[k][0], dy = STEPS[k][1], info = stepInfo(m, x, y, dx, dy, false);
+      if (!info) continue;
+      const nx = x + dx, ny = y + dy, j = ny * W + nx;
+      if (done[j] || (taken && taken(nx, ny))) continue;
+      const nd = d + info.cost + (k > 3 ? 0.001 : 0);
+      if (nd < dist[j]) { dist[j] = nd; prev[j] = i; push(nd, j); }
+    }
+  }
+  return null;
+}
+/* every square that can be walked to from (sx,sy) with every door open */
+function floodReach(m, sx, sy) {
+  const W = m.w, seen = new Uint8Array(W * m.h), q = [sy * W + sx];
+  seen[q[0]] = 1;
+  while (q.length) {
+    const i = q.pop(), x = i % W, y = (i - x) / W;
+    for (let k = 0; k < 4; k++) {
+      const nx = x + STEPS[k][0], ny = y + STEPS[k][1];
+      if (!inb(m, nx, ny) || seen[ny * W + nx] || !stepInfo(m, x, y, STEPS[k][0], STEPS[k][1], true)) continue;
+      seen[ny * W + nx] = 1; q.push(ny * W + nx);
+    }
+  }
+  return seen;
+}
+
+/* ---- maps in a save: byte grids as strings, the rest as it is ---- */
+const b2s = (a) => { let s = ''; for (let i = 0; i < a.length; i++) s += String.fromCharCode(48 + a[i]); return s; };
+const s2b = (s, n, max) => { const a = new Uint8Array(n); s = typeof s === 'string' ? s : ''; for (let i = 0; i < n && i < s.length; i++) a[i] = clamp(s.charCodeAt(i) - 48, 0, max); return a; };
+function packMap(m) {
+  return { id: m.id, kind: m.kind, w: m.w, h: m.h, gen: m.gen, title: m.title, sub: m.sub, t: b2s(m.t), wn: b2s(m.wn), ww: b2s(m.ww), rg: b2s(m.rg),
+    rooms: m.rooms, doors: m.doors, objs: m.objs, tokens: m.tokens, exits: m.exits, lots: m.lots, labels: m.labels, n: m.n };
+}
+/* A loaded file is untrusted: rebuild the map field by field and drop anything that does
+   not fit, so a bad save can cost a table or a door but can never break the board.      */
+function unpackMap(p) {
+  if (!p || typeof p !== 'object') return null;
+  const w = p.w | 0, h = p.h | 0;
+  if (w < 4 || h < 4 || w > 96 || h > 96) return null;
+  const str = (v, n) => clip(typeof v === 'string' ? v : '', n);
+  const int = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : null);
+  const list = (v) => (Array.isArray(v) ? v.slice(0, 4000) : []);
+  const m = newMap(str(p.id, 12), str(p.kind, 16), w, h, TR.VOID);
+  m.gen = p.gen | 0; m.title = str(p.title, 80); m.sub = str(p.sub, 120);
+  m.t = s2b(p.t, w * h, 9); m.wn = s2b(p.wn, w * (h + 1), 4); m.ww = s2b(p.ww, (w + 1) * h, 4); m.rg = s2b(p.rg, w * h, 250);
+  for (const r of list(p.rooms)) if (r && typeof r === 'object') m.rooms.push({ id: str(r.id, 8), kind: str(r.kind, 20), name: str(r.name, 60), x: r.x | 0, y: r.y | 0, w: r.w | 0, h: r.h | 0 });
+  for (const d of list(p.doors)) {
+    if (!d || (d.k !== 'n' && d.k !== 'w')) continue;
+    const x = int(d.x, 0, w), y = int(d.y, 0, h);
+    if (x === null || y === null || (d.k === 'n' ? x >= w : y >= h)) continue;
+    const grid = d.k === 'n' ? m.wn : m.ww, i = d.k === 'n' ? y * w + x : y * (w + 1) + x;
+    if (grid[i] !== ED.DOOR) continue;
+    m.doors.push({ id: str(d.id, 8), k: d.k, x, y, open: !!d.open, lock: !!d.lock, kind: str(d.kind, 12) || 'door', ext: !!d.ext });
+  }
+  /* an edge marked as a door with no door record would be a hole in a wall: wall it up */
+  const have = new Set(m.doors.map(doorKey));
+  for (let y = 0; y <= h; y++) for (let x = 0; x < w; x++) if (m.wn[y * w + x] === ED.DOOR && !have.has('n' + x + ',' + y)) m.wn[y * w + x] = ED.WALL;
+  for (let y = 0; y < h; y++) for (let x = 0; x <= w; x++) if (m.ww[y * (w + 1) + x] === ED.DOOR && !have.has('w' + x + ',' + y)) m.ww[y * (w + 1) + x] = ED.WALL;
+  /* things in their saved order (a thing always comes before what sits on it) */
+  const ids = new Set(), slots = new Set(), kept = new Map();
+  for (const o of list(p.objs)) {
+    if (!o || !ASSETS[o.a]) continue;
+    const id = str(o.id, 8); if (!id || ids.has(id)) continue;
+    if (o.on) {
+      const par = kept.get(o.on);
+      if (!par || ASSETS[o.a].sz !== 's' || !ASSETS[par.a].surf) continue;
+      const f = footprint(par), slot = int(o.slot, 0, f.w * f.h * ASSETS[par.a].surf - 1);
+      if (slot === null || slots.has(par.id + ':' + slot)) continue;
+      ids.add(id); slots.add(par.id + ':' + slot); m.objs.push({ id, a: o.a, x: par.x, y: par.y, r: 0, on: par.id, slot });
+      continue;
+    }
+    const x = int(o.x, 0, w - 1), y = int(o.y, 0, h - 1), r = int(o.r, 0, 3);
+    if (x === null || y === null || r === null) continue;
+    const f = footprint({ a: o.a, x, y, r });
+    if (f.x + f.w > w || f.y + f.h > h) continue;
+    const q = { id, a: o.a, x, y, r };
+    ids.add(id); kept.set(id, q); m.objs.push(q);
+  }
+  indexMap(m);
+  const tkinds = ['npc', 'foe', 'captive'];
+  for (const t of list(p.tokens)) {
+    if (!t) continue;
+    const x = int(t.x, 0, w - 1), y = int(t.y, 0, h - 1);
+    if (x === null || y === null || !tileFree(m, x, y) || m.tokens.some((q) => q.x === x && q.y === y)) continue;
+    m.tokens.push({ id: str(t.id, 8), k: tkinds.includes(t.k) ? t.k : 'npc', npc: str(t.npc, 8), x, y });
+  }
+  for (const e of list(p.exits)) {
+    if (!e) continue;
+    const tiles = list(e.tiles).filter((q) => Array.isArray(q) && int(q[0], 0, w - 1) !== null && int(q[1], 0, h - 1) !== null).map((q) => [q[0], q[1]]);
+    const arr = Array.isArray(e.arrive) && int(e.arrive[0], 0, w - 1) !== null && int(e.arrive[1], 0, h - 1) !== null ? [e.arrive[0], e.arrive[1]] : null;
+    if (!arr) continue;
+    m.exits.push({ id: str(e.id, 8), to: str(e.to, 12), tiles, zone: !!e.zone, auto: !!e.auto, arrive: arr, label: str(e.label, 80) });
+  }
+  for (const l of list(p.lots)) {
+    if (!l) continue;
+    const x = int(l.x, 0, w - 1), y = int(l.y, 0, h - 1), lw = int(l.w, 2, 40), lh = int(l.h, 2, 40), side = int(l.side, 0, 3), off = int(l.off, 0, 40);
+    if (x === null || y === null || lw === null || lh === null || side === null || off === null || x + lw > w || y + lh > h) continue;
+    const plan = l.plan && typeof l.plan === 'object' ? { mir: !!l.plan.mir, kw: clamp(l.plan.kw | 0, 3, 6) } : null;
+    m.lots.push({ site: str(l.site, 12), kind: str(l.kind, 16), x, y, w: lw, h: lh, side, off, plan });
+  }
+  for (const l of list(p.labels)) if (l && typeof l.x === 'number' && typeof l.y === 'number') m.labels.push({ x: clamp(l.x, -2, w + 2), y: clamp(l.y, -2, h + 2), t: str(l.t, 60), s: clamp(+l.s || .4, .2, 1), a: +l.a || 0 });
+  const nn = p.n && typeof p.n === 'object' ? p.n : {};
+  m.n = { o: Math.max(nn.o | 0, m.objs.length), d: Math.max(nn.d | 0, m.doors.length), k: Math.max(nn.k | 0, m.tokens.length) };
+  return indexMap(m);
+}
+
+/* ============================== FURNISH ==============================
+   The furnisher fills a room from its recipe (ROOMS, below). It knows three things a
+   hand would: a thing with a back goes against a wall; nothing may stand in a doorway;
+   and nothing that blocks may cut a room in two. Small things then go ON things, each
+   as its own object, so a long table and the flower pot on it are two entries.      */
+function Furnisher(st, m, r) {
+  const W = m.w, H = m.h, N = W * H;
+  const occ = new Int16Array(N).fill(-1), dec = new Uint8Array(N), keep = new Uint8Array(N), tok = new Uint8Array(N);
+  const cache = new Map();
+  const F = { st, m, r, occ, dec, keep, tok, seat: [] };
+  const solid = (x, y) => { if (!inb(m, x, y)) return true; const t = m.t[y * W + x]; return t === TR.ROCK || t === TR.VOID || t === TR.ROOF; };
+  const each = (o, fn) => { const f = footprint(o); for (let j = 0; j < f.h; j++) for (let i = 0; i < f.w; i++) fn((f.y + j) * W + f.x + i); };
+  /* the walkable squares of room ri (ri = -1: open ground outside every room) */
+  F.tiles = (ri) => { let a = cache.get(ri); if (!a) { a = []; for (let i = 0; i < N; i++) if (m.rg[i] === ri + 1 && TWALK[m.t[i]]) a.push(i); cache.set(ri, a); } return a; };
+  F.stale = () => cache.clear();
+  F.sideBlocked = (x, y, d) => { const e = eGet(m, x, y, d); if (e === ED.DOOR) return false; if (e) return true; return solid(x + DX[d], y + DY[d]); };
+  F.blocks = (i) => occ[i] >= 0 && ASSETS[m.objs[occ[i]].a].mv === 'b';
+  /* gates: the squares a room is entered by (either side of a door, or where a cave
+     chamber opens into a passage). They stay clear and they stay reachable.        */
+  F.findGates = () => {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x; if (!TWALK[m.t[i]]) continue;
+      for (let d = 0; d < 4; d++) {
+        const nx = x + DX[d], ny = y + DY[d]; if (!inb(m, nx, ny) || !TWALK[m.t[ny * W + nx]]) continue;
+        const e = eGet(m, x, y, d);
+        if (e === ED.DOOR || (e === ED.OPEN && m.rg[ny * W + nx] !== m.rg[i])) { keep[i] = 1; break; }
+      }
+    }
+  };
+  /* Is the room still whole? Twice over: every free square, the ones people stand on
+     included, must join up (so nobody gets walled in behind a crate), and the squares
+     nobody stands on must join up with the people left standing (so nobody blocks the
+     only way through).                                                             */
+  const joined = (ri, people) => {
+    let start = -1, open = 0;
+    for (const i of F.tiles(ri)) { if (F.blocks(i) || (people && tok[i])) continue; open++; if (start < 0 || (keep[i] && !keep[start])) start = i; }
+    if (start < 0) return true;
+    const seen = new Uint8Array(N), q = [start]; seen[start] = 1; let n = 1;
+    while (q.length) {
+      const i = q.pop(), x = i % W, y = (i - x) / W;
+      for (let d = 0; d < 4; d++) {
+        const nx = x + DX[d], ny = y + DY[d]; if (!inb(m, nx, ny)) continue;
+        const j = ny * W + nx;
+        if (seen[j] || m.rg[j] !== ri + 1 || !TWALK[m.t[j]] || F.blocks(j) || (people && tok[j]) || eGet(m, x, y, d)) continue;
+        seen[j] = 1; n++; q.push(j);
+      }
+    }
+    return n === open;
+  };
+  F.whole = (ri) => ri < 0 || (joined(ri, false) && joined(ri, true));
+  F.canPut = (a, x, y, rot, ri, force) => {
+    const fw = rot & 1 ? a.h : a.w, fh = rot & 1 ? a.w : a.h;
+    for (let j = 0; j < fh; j++) for (let i = 0; i < fw; i++) {
+      const tx = x + i, ty = y + j; if (!inb(m, tx, ty)) return false;
+      const k = ty * W + tx;
+      if (m.rg[k] !== ri + 1 || !TWALK[m.t[k]]) return false;
+      if (a.lay === 'd') { if (dec[k]) return false; }
+      else if (occ[k] >= 0 || tok[k] || (keep[k] && !force)) return false;
+    }
+    return true;
+  };
+  F.put = (aId, x, y, rot, ri, force) => {
+    const a = ASSETS[aId]; if (!F.canPut(a, x, y, rot, ri, force)) return null;
+    const o = { id: 'O' + (m.n.o++), a: aId, x, y, r: rot }, k = m.objs.length;
+    m.objs.push(o);
+    each(o, (i) => { if (a.lay === 'd') dec[i] = 1; else occ[i] = k; });
+    if (a.mv === 'b' && !F.whole(ri)) { m.objs.pop(); m.n.o--; each(o, (i) => { occ[i] = -1; }); return null; }
+    return o;
+  };
+  F.fits = (a, x, y, rot, at, opt) => {
+    const fw = rot & 1 ? a.h : a.w, fh = rot & 1 ? a.w : a.h;
+    if (opt && opt.gap) for (let j = -1; j <= fh; j++) for (let i = -1; i <= fw; i++) { const tx = x + i, ty = y + j; if (inb(m, tx, ty) && F.blocks(ty * W + tx)) return false; }
+    if (at === 'any') return true;
+    let side = false, any = false;
+    for (let j = 0; j < fh; j++) for (let i = 0; i < fw; i++) for (let d = 0; d < 4; d++) if (F.sideBlocked(x + i, y + j, d)) { any = true; if ((d & 1) !== (rot & 1)) side = true; }
+    if (at === 'mid') return !any;
+    /* wall / corner: the whole back is against something solid, and a square in front is free */
+    let back = true, front = false;
+    const n = (rot & 1) ? fh : fw, fd = (rot + 2) % 4;
+    for (let k = 0; k < n; k++) {
+      const bx = rot === 1 ? x + fw - 1 : rot === 3 ? x : x + k, by = rot === 0 ? y : rot === 2 ? y + fh - 1 : y + k;
+      if (!F.sideBlocked(bx, by, rot)) back = false;
+      const px = rot === 1 ? x : rot === 3 ? x + fw - 1 : x + k, py = rot === 0 ? y + fh - 1 : rot === 2 ? y : y + k;
+      const qx = px + DX[fd], qy = py + DY[fd];
+      if (inb(m, qx, qy) && TWALK[m.t[qy * W + qx]] && !F.blocks(qy * W + qx) && !eGet(m, px, py, fd)) front = true;
+    }
+    if (!back || !front) return false;
+    return at === 'corner' ? side : true;
+  };
+  F.cands = (a, ri, at, opt) => {
+    const out = [], rots = (a.w === a.h && at !== 'wall' && at !== 'corner') ? [0] : [0, 1, 2, 3];
+    for (const i of F.tiles(ri)) { const x = i % W, y = (i - x) / W; for (const rot of rots) if (F.canPut(a, x, y, rot, ri) && F.fits(a, x, y, rot, at, opt)) out.push([x, y, rot]); }
+    return out;
+  };
+  F.place = (aId, ri, at, opt) => {
+    const a = ASSETS[aId];
+    let c = F.cands(a, ri, at, opt);
+    if (!c.length && opt && opt.fb) c = F.cands(a, ri, opt.fb, opt);
+    c = shuffled(r, c);
+    for (let k = 0; k < c.length && k < 40; k++) { const o = F.put(aId, c[k][0], c[k][1], c[k][2], ri); if (o) return o; }
+    return null;
+  };
+  /* seats go on free squares beside the thing, each turned to face it */
+  F.seats = (o, ri, spec) => {
+    const f = footprint(o), c = [];
+    for (let j = 0; j < f.h; j++) for (let i = 0; i < f.w; i++) for (let d = 0; d < 4; d++) {
+      const x = f.x + i + DX[d], y = f.y + j + DY[d];
+      if (x >= f.x && x < f.x + f.w && y >= f.y && y < f.y + f.h) continue;
+      if (!eGet(m, f.x + i, f.y + j, d) && F.canPut(ASSETS[spec[0]], x, y, d, ri)) c.push([x, y, d]);
+    }
+    let n = rint(r, spec[1], spec[2]);
+    for (const p of shuffled(r, c)) { if (n <= 0) break; const s = F.put(spec[0], p[0], p[1], p[2], ri); if (s) { n--; F.seat.push(s); } }
+  };
+  /* small things onto a surface: one slot at a time, each its own object */
+  F.tops = (o, key) => {
+    const T = TOPS[key], f = footprint(o), n = f.w * f.h * ASSETS[o.a].surf;
+    for (let s = 0; s < n; s++) if (r() < T.p) m.objs.push({ id: 'O' + (m.n.o++), a: weighted(r, T.items), x: o.x, y: o.y, r: 0, on: o.id, slot: s });
+  };
+  F.token = (ri, k, npc, x, y, force) => {
+    if (!inb(m, x, y)) return null;
+    const i = y * W + x;
+    if (m.rg[i] !== ri + 1 || !TWALK[m.t[i]] || F.blocks(i) || tok[i] || (keep[i] && !force)) return null;
+    tok[i] = 1;
+    if (!F.whole(ri)) { tok[i] = 0; return null; }
+    const t = { id: 'K' + (m.n.k++), k, npc, x, y };
+    m.tokens.push(t);
+    return t;
+  };
+  F.tokenAny = (ri, k, npc, pref) => {
+    let c = [];
+    if (pref === 'seat') c = F.seat.filter((s) => m.rg[s.y * W + s.x] === ri + 1).map((s) => [s.x, s.y]);
+    else if (pref && pref.near) { const f = footprint(pref.near); for (let j = -1; j <= f.h; j++) for (let i = -1; i <= f.w; i++) if ((i < 0 || i >= f.w) !== (j < 0 || j >= f.h)) c.push([f.x + i, f.y + j]); }
+    c = shuffled(r, c).concat(shuffled(r, F.tiles(ri)).filter((i) => occ[i] < 0).map((i) => [i % W, (i - i % W) / W]));
+    for (const p of c) { const t = F.token(ri, k, npc, p[0], p[1]); if (t) return t; }
+    return null;
+  };
+  /* people: a name from the bible ('N3') stands where the recipe says; anyone else is
+     made up on the spot and written into the save, so they are the same person tomorrow */
+  F.people = (ri, rule) => {
+    const n = Array.isArray(rule.n) ? rint(r, rule.n[0], rule.n[1]) : (rule.n == null ? 1 : rule.n);
+    for (let k = 0; k < n; k++) {
+      if (/^N\d+$/.test(rule.who)) { const p = st.npcs[rule.who]; if (p) F.tokenAny(ri, p.kind, p.id, rule.pref); return; }
+      const t = F.tokenAny(ri, rule.k || 'npc', '', rule.pref);
+      if (!t) return;
+      t.npc = addNpc(st, m.id, r, pick(r, rule.roles), rule.k || 'npc', rule.fam ? st.sites[m.id].fam : '').id;
+    }
+  };
+  F.furnish = (ri) => {
+    for (const rule of ROOMS[m.rooms[ri].kind] || []) {
+      if (typeof rule === 'function') { rule(F, ri); continue; }
+      if (rule.p != null && r() >= rule.p) continue;
+      if (rule.who) { F.people(ri, rule); continue; }
+      const n = Array.isArray(rule.n) ? rint(r, rule.n[0], rule.n[1]) : (rule.n == null ? 1 : rule.n);
+      for (let k = 0; k < n; k++) {
+        const o = F.place(Array.isArray(rule.a) ? pick(r, rule.a) : rule.a, ri, rule.at || 'any', rule);
+        if (!o) break;
+        if (rule.seats) F.seats(o, ri, rule.seats);
+        if (rule.tops) F.tops(o, rule.tops);
+      }
+    }
+  };
+  return F;
+}
+
+/* ---- set pieces a plain rule cannot say ---- */
+/* the bar: a counter one square off the kitchen wall, the keeper in the lane behind
+   it, stools on the room side, a keg at the lane's end */
+function fnBar(F, ri) {
+  const m = F.m, r = F.r, R = m.rooms[ri];
+  const who = F.st.npcs.N0;
+  let stood = false;
+  if (R.w >= 6 && R.h >= 5 && R.ks) {
+    const east = R.ks === 1, laneX = east ? R.x + R.w - 1 : R.x, barX = east ? laneX - 1 : laneX + 1, stoolX = east ? barX - 1 : barX + 1;
+    const y0 = R.y + 1 + rint(r, 0, R.h - 5);
+    const bar = F.put('bar', barX, y0, east ? 1 : 3, ri);
+    if (bar) {
+      F.tops(bar, 'bar');
+      for (let j = 0; j < 3; j++) if (r() < .75) { const s = F.put('stool', stoolX, y0 + j, 0, ri); if (s) F.seat.push(s); }
+      if (who) for (const j of [1, 0, 2]) if (F.token(ri, 'npc', who.id, laneX, y0 + j)) { stood = true; break; }
+      /* kegs go in after the keeper, so the furnisher refuses one that would pen him in */
+      for (const y of shuffled(r, [R.y, R.y + R.h - 1])) if (r() < .7) F.put('keg', laneX, y, east ? 1 : 3, ri);
+    }
+  }
+  if (who && !stood) F.tokenAny(ri, 'npc', who.id, null);
+}
+/* the shop: a counter facing the door, the keeper behind it */
+function fnCounter(F, ri) {
+  const o = F.place('counter', ri, 'mid', { fb: 'any', gap: 1 });
+  if (!o) return;
+  F.tops(o, 'shop');
+  const who = F.st.npcs[F.st.sites[F.m.id].keeper];
+  if (who) F.tokenAny(ri, 'npc', who.id, { near: o });
+}
+/* the nave: altar on the far wall, pews either side of an aisle, facing it */
+function fnPews(F, ri) {
+  const m = F.m, R = m.rooms[ri], s = R.ds == null ? 3 : R.ds, lat = s === 1 || s === 3;
+  const along = lat ? R.w : R.h, across = lat ? R.h : R.w, mid = (across - 1) >> 1;
+  const P = (u, v) => (s === 3 ? [R.x + u, R.y + v] : s === 1 ? [R.x + R.w - 1 - u, R.y + v] : s === 0 ? [R.x + v, R.y + u] : [R.x + v, R.y + R.h - 1 - u]);
+  const far = (s + 2) % 4;
+  const a = P(along - 1, mid), altar = F.put('altar', a[0], a[1], far, ri);
+  if (altar) F.tops(altar, 'altar');
+  for (const v of [mid - 1, mid + 1]) if (v >= 0 && v < across) { const p = P(along - 1, v); F.put('candlestand', p[0], p[1], 0, ri); }
+  for (const v of [0, across - 1]) if (Math.abs(v - mid) > 1 && F.r() < .6) { const p = P(along - 1, v); F.put('statue', p[0], p[1], far, ri); }
+  for (let u = 2; u <= along - 3; u += 2) for (const v0 of [mid - 2, mid + 1]) {
+    if (v0 < 0 || v0 + 1 >= across) continue;
+    const p = P(u, v0), q = P(u, v0 + 1);
+    const b = F.put('bench', Math.min(p[0], q[0]), Math.min(p[1], q[1]), s, ri);
+    if (b) F.seat.push(b);
+  }
+  if (across >= 5 && F.r() < .75) { const q = P(along - 2, mid + (F.r() < .5 ? -1 : 1)); F.put('lectern', q[0], q[1], far, ri); }
+  for (const v of [0, across - 1]) if (Math.abs(v - mid) > 1 && F.r() < .5) { const q = P(0, v); F.put('pillar', q[0], q[1], 0, ri); }
+  const who = F.st.npcs.N3, p = P(along - 2, mid);
+  if (who && !F.token(ri, 'npc', who.id, p[0], p[1])) F.tokenAny(ri, 'npc', who.id, null);
+}
+/* the cell: one square cut into the rock off a chamber, behind a locked, barred door */
+function fnCell(F, ri) {
+  const m = F.m, W = m.w, st = F.st, c = [];
+  for (const i of F.tiles(ri)) {
+    const x = i % W, y = (i - x) / W;
+    if (F.keep[i] || F.occ[i] >= 0) continue;
+    for (let d = 0; d < 4; d++) {
+      const rx = x + DX[d], ry = y + DY[d];
+      if (rx < 2 || ry < 2 || rx > W - 3 || ry > m.h - 3 || m.t[ry * W + rx] !== TR.ROCK) continue;
+      let rock = 0; for (let e = 0; e < 4; e++) if (m.t[(ry + DY[e]) * W + rx + DX[e]] === TR.ROCK) rock++;
+      if (rock === 3) c.push([x, y, d, rx, ry]);
+    }
+  }
+  if (!c.length) return;
+  const [x, y, d, rx, ry] = pick(F.r, c);
+  m.rooms.push({ id: 'R' + (m.rooms.length + 1), kind: 'cell', name: 'a cell', x: rx, y: ry, w: 1, h: 1 });
+  m.t[ry * W + rx] = TR.CAVE; m.rg[ry * W + rx] = m.rooms.length;
+  addDoor(m, x, y, d, { lock: true, kind: 'bars' });
+  F.keep[y * W + x] = 1; F.stale();
+  const who = st.npcs.N6;
+  if (who) F.token(m.rooms.length - 1, 'captive', who.id, rx, ry, true);
+}
+
+/* ---- room recipes: what a room of each kind holds, in the order it is placed ----
+   {a: asset or list, n: count or [lo,hi], at: wall|corner|mid|any, fb: fallback place,
+    gap: keep a square clear all round, seats: [asset, lo, hi], tops: TOPS key, p: chance}
+   {who: bible id or a made-up role, n, roles, k: npc|foe, pref: 'seat'}             */
+const ROOMS = {
+  common: [fnBar, { a: 'hearth', at: 'wall' }, { a: 'rug', at: 'mid', fb: 'any', p: .6 },
+    { a: ['table_long', 'table_long', 'table_round'], n: [3, 5], at: 'mid', fb: 'any', gap: 1, seats: ['chair', 2, 4], tops: 'tavern' },
+    { a: 'bench', n: [0, 2], at: 'wall' }, { a: 'barrel', n: [0, 2], at: 'corner', tops: 'store' }, { a: 'stairs', at: 'corner', p: .7 },
+    { who: 'patron', n: [2, 5], roles: PATRONS, pref: 'seat' }],
+  kitchen: [{ a: 'stove', at: 'wall' }, { a: 'table_long', at: 'mid', fb: 'any', tops: 'kitchen' }, { a: 'shelf', n: [1, 2], at: 'wall', tops: 'store' },
+    { a: 'barrel', n: [1, 2], at: 'corner' }, { a: 'sacks', n: [0, 2], at: 'wall' }, { a: 'cauldron', at: 'wall', p: .5 },
+    { who: 'cook', roles: ['cook', 'scullion', 'pot-boy'] }],
+  scullery: [{ a: 'stove', at: 'wall' }, { a: 'table_small', at: 'wall', tops: 'kitchen' }, { a: 'shelf', at: 'wall', tops: 'store', p: .7 }, { a: 'barrel', at: 'corner' }, { a: 'sacks', n: [0, 1], at: 'wall' }],
+  store: [{ a: 'crate', n: [2, 4], at: 'wall', tops: 'store' }, { a: 'barrel', n: [1, 3], at: 'wall' }, { a: 'keg', n: [0, 2], at: 'wall' },
+    { a: 'sacks', n: [1, 2] }, { a: 'shelf', at: 'wall', tops: 'store', p: .6 }],
+  guest: [{ a: 'bed', at: 'wall' }, { a: 'table_small', at: 'wall', tops: 'night', p: .8 }, { a: 'chest', at: 'wall', p: .7 }, { a: 'rug_small', p: .4 }],
+  corridor: [],
+  living: [{ a: 'hearth', at: 'wall' }, { a: ['table_long', 'table_round'], at: 'mid', fb: 'any', gap: 1, seats: ['chair', 1, 3], tops: 'home' },
+    { a: 'shelf', at: 'wall', tops: 'store', p: .7 }, { a: 'chest', at: 'wall', p: .6 }, { a: 'rug', at: 'mid', fb: 'any', p: .4 }, { a: 'barrel', at: 'corner', p: .5 },
+    { who: 'resident', n: [1, 2], roles: ['goodwife', 'weaver', 'old soldier', 'cooper', 'thatcher', 'midwife', 'grandsire'], fam: true }],
+  bedroom: [{ a: 'bed', n: [1, 2], at: 'wall' }, { a: 'wardrobe', at: 'wall', p: .7 }, { a: 'chest', at: 'wall', p: .6 }, { a: 'table_small', at: 'wall', tops: 'night', p: .6 }, { a: 'rug_small', p: .5 }],
+  shopfloor: [fnCounter, { a: 'shelf', n: [2, 4], at: 'wall', tops: 'shop' }, { a: 'table_small', n: [0, 2], at: 'mid', fb: 'any', tops: 'shop' },
+    { a: 'crate', n: [1, 2], at: 'corner', tops: 'store' }, { a: 'barrel', n: [0, 2], at: 'wall' }],
+  forge: [{ a: 'forge', at: 'wall' }, { a: 'anvil', at: 'mid', fb: 'any' }, { a: 'workbench', at: 'wall', tops: 'smith' }, { a: 'weapon_rack', at: 'wall' },
+    { a: 'grindstone', p: .7 }, { a: 'barrel', at: 'wall' }, { a: 'sacks', n: [1, 2], at: 'corner' }, { who: 'N1' }],
+  nave: [fnPews],
+  cave_guard: [{ a: 'barricade', n: [1, 2] }, { a: 'campfire', at: 'mid', fb: 'any', p: .6 }, { a: 'crate', n: [1, 2], at: 'wall', tops: 'camp' }, { a: 'bedroll', n: [0, 1], at: 'wall' },
+    { a: 'stalagmite', n: [0, 2], at: 'wall' }, { who: 'bandit', n: [1, 2], roles: ['lookout', 'sentry'], k: 'foe' }],
+  cave_den: [{ a: 'campfire', at: 'mid', fb: 'any' }, { a: 'table_long', at: 'any', gap: 1, seats: ['stool', 1, 3], tops: 'camp' }, { a: 'bedroll', n: [3, 5] },
+    { a: 'barrel', n: [1, 3], at: 'wall', tops: 'camp' }, { a: 'keg', at: 'wall', p: .6 }, { a: 'weapon_rack', at: 'wall', p: .5 },
+    { who: 'bandit', n: [2, 3], roles: BANDITS, k: 'foe', pref: 'seat' }],
+  cave_stash: [{ a: 'chest', n: [1, 3], at: 'wall' }, { a: 'crate', n: [2, 4], at: 'wall', tops: 'loot' }, { a: 'barrel', n: [1, 3], at: 'wall' }, { a: 'sacks', n: [1, 3] },
+    { a: 'weapon_rack', at: 'wall', p: .6 }, { who: 'bandit', n: [0, 1], roles: BANDITS, k: 'foe' }],
+  cave_cells: [fnCell, { a: 'bedroll', n: [0, 1], at: 'wall' }, { a: 'crate', n: [0, 2], at: 'wall' }, { a: 'stalagmite', n: [0, 2], at: 'wall' },
+    { who: 'bandit', roles: ['gaoler', 'turnkey'], k: 'foe' }],
+  cave_chief: [{ a: 'bed', at: 'wall' }, { a: 'hide', at: 'mid', fb: 'any' }, { a: 'desk', at: 'wall', tops: 'loot' }, { a: 'chest', n: [1, 2], at: 'wall' },
+    { a: 'candlestand', n: [1, 2], at: 'wall' }, { a: 'weapon_rack', at: 'wall', p: .6 }, { who: 'N5' }],
+  cave_pool: [{ a: 'mushrooms', n: [2, 5], at: 'wall' }, { a: 'stalagmite', n: [2, 4] }, { a: 'boulder', n: [0, 2] }],
+  cell: [],
+};
+
+/* ============================== WORLD ==============================
+   Tier one: the bible. Region, town, the gang and its hideout, the people who matter
+   and the threads that tie them. A pure function of the seed, and it travels in the
+   save, so later changes to the tables never rewrite an old world.                */
+function generateWorld(seed) {
+  const r = rngFor(seed, 'world', 0), used = new Set();
+  const place = () => { for (let k = 0; k < 40; k++) { const n = pick(r, PLACE_PRE) + pick(r, PLACE_SUF); if (!used.has(n)) { used.add(n); return n; } } return 'Nowhere'; };
+  const person = () => { for (let k = 0; k < 40; k++) { const n = pick(r, GIVEN) + ' ' + pick(r, FAMILY); if (!used.has(n)) { used.add(n); return n; } } return 'Nobody'; };
+  const town = place(), region = 'the ' + place() + ' ' + pick(r, REGION_SUF);
+  const inn = 'The ' + pick(r, INN_ADJ) + ' ' + pick(r, INN_NOUN), gang = pick(r, GANGS), cave = place() + ' ' + pick(r, CAVE_SUF);
+  const names = { keeper: person(), smith: person(), shopk: person(), priest: person(), elder: person(), chief: person(), captive: person() };
+  const fam = (n) => n.split(' ')[1];
+  const shop = fam(names.shopk) + '’s ' + pick(r, ['Sundries', 'Chandlery', 'Provisions', 'Dry Goods']);
+  const chapel = 'Chapel of Saint ' + pick(r, ['Osric', 'Wynne', 'Edith', 'Alys', 'Dunstan', 'Maud']);
+  const sites = [
+    { id: 'S0', kind: 'town', name: town }, { id: 'S1', kind: 'inn', name: inn, keeper: 'N0' }, { id: 'S2', kind: 'cave', name: cave },
+    { id: 'S3', kind: 'smithy', name: fam(names.smith) + '’s Forge', keeper: 'N1' }, { id: 'S4', kind: 'shop', name: shop, keeper: 'N2' },
+    { id: 'S5', kind: 'chapel', name: chapel, keeper: 'N3' },
+  ];
+  const who = (id, name, role, home, kind) => ({ id, name, role, home, kind, trait: pick(r, TRAITS) });
+  const npcs = [
+    who('N0', names.keeper, 'innkeeper', 'S1', 'npc'), who('N1', names.smith, 'smith', 'S3', 'npc'), who('N2', names.shopk, 'shopkeeper', 'S4', 'npc'),
+    who('N3', names.priest, 'priest', 'S5', 'npc'), who('N4', names.elder, 'town elder', 'S0', 'npc'),
+    who('N5', names.chief, 'chief of ' + gang, 'S2', 'foe'), who('N6', names.captive, 'a prisoner of ' + gang, 'S2', 'captive'),
+  ];
+  const fill = (t) => cap(t.replace(/\{(\w+)\}/g, (_, k) => ({ town, gang, cave, inn, shop, chief: names.chief, captive: names.captive, elder: names.elder, keeper: names.keeper, smith: names.smith, priest: names.priest }[k] || k)));
+  const main = pick(r, THREADS_MAIN);
+  const threads = [{ k: main.k, main: true, t: fill(main.t) }].concat(shuffled(r, THREADS_SIDE).slice(0, 2).map((s) => ({ k: s.k, main: false, t: fill(s.t) })));
+  return { v: 1, gen: GEN_V, seed, town, region, inn, gang, cave, sites, npcs, threads,
+    opening: 'You wake in a rented room at ' + inn + ', in ' + town + '. ' + cap(gang) + ' are the talk of the town.' };
+}
+/* tier-two records: people and places made up while charting. They are numbered by
+   the site that made them, so charting places in another order changes nothing.   */
+function addNpc(st, siteId, r, role, kind, fam) {
+  const site = st.sites[siteId];
+  site.nn = (site.nn || 0) + 1;
+  const p = { id: siteId + 'n' + site.nn, name: pick(r, GIVEN) + ' ' + (fam || pick(r, FAMILY)), role, home: siteId, kind, trait: pick(r, TRAITS), made: true };
+  st.npcs[p.id] = p;
+  return p;
+}
+function addSite(st, kind, name, extra) {
+  const id = 'S' + (st.n.site++);
+  st.sites[id] = Object.assign({ id, kind, name, made: true }, extra || {});
+  return st.sites[id];
+}
+
+/* ============================== SITES ==============================
+   Tier two: a site's board, charted the first time anyone goes there. Each is a pure
+   function of (seed, site id) plus what the town map says about its lot.          */
+const KIND_SUB = { town: 'a town', inn: 'an inn', smithy: 'a smithy', shop: 'a shop', chapel: 'a chapel', house: 'a house', cave: 'a cave' };
+
+function innPlan(r, w) {
+  const mir = r() < .5, kw = w >= 15 ? rint(r, 4, 5) : 4;
+  const lo = mir ? kw : 0, hi = mir ? w - 1 : w - kw - 1;
+  return { mir, kw, off: rint(r, lo + 2, hi - 2) };
+}
+
+function genTown(st) {
+  const W = 40, H = 32, m = newMap('S0', 'town', W, H, TR.GRASS), r = rngFor(st.seed, 'site:S0', 0), B = st.bible;
+  m.title = B.town; m.sub = 'a town in ' + B.region;
+  const F = Furnisher(st, m, r), res = F.keep;
+  const set = (x, y, t) => { if (inb(m, x, y)) m.t[y * W + x] = t; };
+  const ry = 17 + rint(r, -1, 1), lx = 20 + rint(r, -1, 2);
+  /* the high road east-west, the lane north to the hills, a cobbled square where they meet */
+  for (let x = 0; x < W; x++) for (let j = 0; j < 2; j++) { set(x, ry + j, (x < 4 || x > W - 5) ? TR.DIRT : TR.COBBLE); res[(ry + j) * W + x] = 1; }
+  for (let y = 0; y < ry; y++) for (let i = 0; i < 2; i++) { set(lx + i, y, TR.DIRT); res[y * W + lx + i] = 1; }
+  const sq = { x: lx - 3, y: ry - 2, w: 8, h: 6 };
+  for (let j = 0; j < sq.h; j++) for (let i = 0; i < sq.w; i++) { set(sq.x + i, sq.y + j, TR.COBBLE); res[(sq.y + j) * W + sq.x + i] = 1; }
+  /* lots: each a roof on this map and a whole building once someone opens its door */
+  const lot = (site, kind, x, y, w, h, side, off, plan) => {
+    const L = { site, kind, x, y, w, h, side, off, plan: plan || null };
+    m.lots.push(L);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) set(x + i, y + j, TR.ROOF);
+    const dx = side === 1 ? x + w : side === 3 ? x - 1 : x + off, dy = side === 2 ? y + h : side === 0 ? y - 1 : y + off;
+    set(dx, dy, TR.DIRT); res[dy * W + dx] = 1;
+    m.exits.push({ id: 'E' + m.exits.length, to: site, tiles: [[dx, dy]], zone: false, auto: false, arrive: [dx, dy], label: 'Enter ' + st.sites[site].name });
+    return L;
+  };
+  const fams = shuffled(r, FAMILY);
+  const house = () => { const fam = fams.pop() || 'Nameless'; return addSite(st, 'house', 'The ' + fam + ' house', { fam }).id; };
+  const iw = clamp(lx - 6 - rint(r, 0, 1), 13, 16), ih = rint(r, 10, 12), plan = innPlan(r, iw);
+  lot('S1', 'inn', lx - 4 - iw, ry - 1 - ih, iw, ih, 2, plan.off, { mir: plan.mir, kw: plan.kw });
+  const trade = shuffled(r, [['S3', 'smithy'], ['S4', 'shop']]);
+  { /* north-east row, doors south onto the road */
+    const x0 = lx + 6, avail = W - 2 - x0, w1 = rint(r, 4, Math.min(6, avail - 6)), w2 = Math.min(7, avail - w1 - 1), h1 = rint(r, 4, 6), h2b = rint(r, 4, 6);
+    lot(trade[0][0], trade[0][1], x0, ry - 1 - h1, w1, h1, 2, rint(r, 1, w1 - 2));
+    lot(trade[1][0], trade[1][1], x0 + w1 + 1, ry - 1 - h2b, w2, h2b, 2, rint(r, 1, w2 - 2));
+  }
+  { /* the chapel stands up the lane, its door west onto it */
+    const cw = rint(r, 7, 8), cy = rint(r, 1, Math.min(3, ry - 13));
+    lot('S5', 'chapel', lx + 3, cy, cw, 5, 3, 2);
+  }
+  { /* south of the road: the second trade if it found no room, and the houses, doors north */
+    const rows = [[2, lx - 5], [lx + 6, W - 3]], spare = m.lots.some((l) => l.site === trade[1][0]) ? null : trade[1];
+    let used = false;
+    for (const [a, b] of rows) {
+      let x = a + rint(r, 0, 1);
+      while (b - x + 1 >= 5) {
+        const w = Math.min(rint(r, 5, 7), b - x + 1), h = rint(r, 4, 6);
+        if (spare && !used) { lot(spare[0], spare[1], x, ry + 3, w, h, 0, rint(r, 1, w - 2)); used = true; }
+        else lot(house(), 'house', x, ry + 3, w, h, 0, rint(r, 1, w - 2));
+        x += w + rint(r, 1, 2);
+      }
+    }
+  }
+  /* the trail north leaves the map for the hills */
+  m.exits.push({ id: 'E' + m.exits.length, to: 'S2', tiles: [[lx, 0], [lx + 1, 0]], zone: false, auto: true, arrive: [lx, 1], label: 'Take the trail to ' + B.cave });
+  m.labels.push({ x: lx + 1, y: -.55, t: 'to ' + B.cave, s: .34, a: 0 });
+  /* a pond, out of everyone's way */
+  { const c = []; for (let y = ry + 9; y < H - 3; y++) for (let x = 4; x < W - 4; x++) if (m.t[y * W + x] === TR.GRASS) c.push([x, y]);
+    if (c.length) { const [px, py] = pick(r, c), R = 1.5 + r() * 1.3;
+      for (let y = py - 3; y <= py + 3; y++) for (let x = px - 4; x <= px + 4; x++) { const d = ((x - px) / 1.35) ** 2 + (y - py) ** 2; if (inb(m, x, y) && m.t[y * W + x] === TR.GRASS && !res[y * W + x] && d < R * R + (r() - .5) * 1.2 && y > ry + 7) set(x, y, TR.WATER); } } }
+  F.stale();
+  /* the square: the well, two stalls, the board where warrants are nailed */
+  F.put('well', sq.x + 1 + rint(r, 0, 1), sq.y + 4 + rint(r, 0, 1), 0, -1, true);
+  for (const p of [[sq.x + 5, sq.y + 4 + rint(r, 0, 1), 0], [sq.x, sq.y, 2]]) { const s = F.put('stall', p[0], p[1], p[2], -1, true); if (s) F.tops(s, 'shop'); }
+  F.put('notice', sq.x + 7, sq.y, 2, -1, true);
+  F.put('lamp', sq.x + 6, sq.y + 1, 0, -1, true); F.put('lamp', sq.x, sq.y + 5, 0, -1, true);
+  F.put('signpost', lx + 2, ry - 3, 0, -1, true);
+  for (const p of [[sq.x + 7, sq.y + 5], [sq.x + 2, sq.y]]) if (r() < .7) F.put(pick(r, ['barrel', 'crate']), p[0], p[1], 0, -1, true);
+  /* things by the buildings: a bench and barrels at the inn, the smith's clutter, kitchen gardens */
+  const beside = (L, list) => {
+    const c = [];
+    for (let y = L.y - 1; y <= L.y + L.h; y++) for (let x = L.x - 1; x <= L.x + L.w; x++) {
+      if (!inb(m, x, y) || res[y * W + x] || m.t[y * W + x] !== TR.GRASS) continue;
+      if ((x < L.x || x >= L.x + L.w) !== (y < L.y || y >= L.y + L.h)) c.push([x, y]);
+    }
+    const s = shuffled(r, c);
+    list.forEach((a, k) => { if (s[k]) F.put(a, s[k][0], s[k][1], rint(r, 0, 3), -1); });
+  };
+  for (const L of m.lots) {
+    if (L.kind === 'inn') beside(L, ['barrel', 'barrel', 'bench', 'crate']);
+    else if (L.kind === 'smithy') beside(L, ['trough', 'haybale', 'stump', 'cart']);
+    else if (L.kind === 'shop') beside(L, ['crate', 'barrel', 'cart']);
+    else if (L.kind === 'chapel') beside(L, ['bush', 'bush']);
+    else { beside(L, r() < .5 ? ['barrel'] : ['stump']);
+      const gx = L.x + rint(r, 0, L.w - 2), gy = L.side === 0 ? L.y + L.h + 1 : L.y - 3;
+      if (r() < .7) F.put('garden', gx, gy, 0, -1); }
+  }
+  /* trees gather in clumps and thicken toward the map's edge; nothing grows on a path */
+  { const gw = (W >> 2) + 2, gh = (H >> 2) + 2, g = []; for (let i = 0; i < gw * gh; i++) g.push(r());
+    const noise = (x, y) => { const fx = x / 4, fy = y / 4, x0 = Math.floor(fx), y0 = Math.floor(fy), u = fx - x0, v = fy - y0, a = g[y0 * gw + x0], b = g[y0 * gw + x0 + 1], c = g[(y0 + 1) * gw + x0], d = g[(y0 + 1) * gw + x0 + 1], su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v); return lerp(lerp(a, b, su), lerp(c, d, su), sv); };
+    const nearLot = (x, y) => m.lots.some((L) => x >= L.x - 1 && x <= L.x + L.w && y >= L.y - 1 && y <= L.y + L.h);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x; if (m.t[i] !== TR.GRASS || res[i]) { r(); continue; }
+      const edge = Math.min(x, y, W - 1 - x, H - 1 - y), n = noise(x, y) + (edge < 2 ? (2 - edge) * .14 : 0), roll = r();
+      if (nearLot(x, y)) continue;
+      if (n > .62 && roll < .5) F.put('tree', x, y, 0, -1);
+      else if (n > .5 && roll < .12) F.put(roll < .04 ? 'boulder' : 'bush', x, y, 0, -1);
+    } }
+  /* people in the street */
+  const elder = st.npcs.N4;
+  if (elder) for (const p of shuffled(r, [[sq.x + 3, sq.y + 4], [sq.x + 4, sq.y + 5], [sq.x + 2, sq.y + 3], [sq.x + 5, sq.y + 3]])) if (F.token(-1, 'npc', elder.id, p[0], p[1], true)) break;
+  { const spots = []; for (let i = 0; i < W * H; i++) if (res[i] && m.t[i] !== TR.DIRT) spots.push(i);
+    let n = rint(r, 3, 5);
+    for (const i of shuffled(r, spots)) { if (n <= 0) break; const x = i % W, y = (i - x) / W; if (x < 3 || x > W - 4) continue;
+      let crowd = false; for (const t of m.tokens) if (Math.abs(t.x - x) < 3 && Math.abs(t.y - y) < 3) crowd = true;
+      if (crowd) continue;
+      const t = F.token(-1, 'npc', '', x, y, true); if (t) { t.npc = addNpc(st, 'S0', r, pick(r, FOLK), 'npc', '').id; n--; } } }
+  /* proof the town is whole: every door and the trail can be walked to from the square */
+  indexMap(m);
+  for (let guard = 0; guard < 60; guard++) {
+    const seen = floodReach(m, lx, ry + 1);
+    if (m.exits.every((e) => e.tiles.some((p) => seen[p[1] * W + p[0]]))) break;
+    let k = -1; for (let i = m.objs.length - 1; i >= 0; i--) if (!m.objs[i].on && ASSETS[m.objs[i].a].mv === 'b') { k = i; break; }
+    if (k < 0) break;
+    const id = m.objs[k].id; m.objs = m.objs.filter((o) => o.id !== id && o.on !== id); indexMap(m);
+  }
+  return m;
+}
+
+/* split a rectangle into n rooms, always cutting the biggest one that can be cut */
+function bspRooms(r, B, n) {
+  const leaves = [{ x: B.x, y: B.y, w: B.w, h: B.h }];
+  while (leaves.length < n) {
+    const c = leaves.filter((l) => Math.max(l.w, l.h) >= 5).sort((a, b) => b.w * b.h - a.w * a.h)[0];
+    if (!c) break;
+    const wide = c.w > c.h || (c.w === c.h && r() < .5), dim = wide ? c.w : c.h, cut = rint(r, 2, dim - 2);
+    leaves.splice(leaves.indexOf(c), 1);
+    if (wide) leaves.push({ x: c.x, y: c.y, w: cut, h: c.h }, { x: c.x + cut, y: c.y, w: c.w - cut, h: c.h });
+    else leaves.push({ x: c.x, y: c.y, w: c.w, h: cut }, { x: c.x, y: c.y + cut, w: c.w, h: c.h - cut });
+  }
+  return leaves;
+}
+const ROOM_NAME = { common: 'the common room', kitchen: 'the kitchen', store: 'a storeroom', guest: 'a guest room', corridor: 'the passage', living: 'the hearth room', scullery: 'the scullery',
+  bedroom: 'a bedroom', shopfloor: 'the shop floor', forge: 'the forge', nave: 'the nave', cell: 'a cell' };
+const HOUSE_BACK = { house: ['bedroom', 'scullery', 'store'], shop: ['store', 'bedroom'], smithy: ['bedroom', 'store'], chapel: [] };
+const HOUSE_FRONT = { house: 'living', shop: 'shopfloor', smithy: 'forge', chapel: 'nave' };
+
+function genBuilding(st, id) {
+  const site = st.sites[id], lot = st.maps.S0.lots.find((l) => l.site === id), r = rngFor(st.seed, 'site:' + id, 0);
+  const M = 2, w = lot.w + 2 * M, h = lot.h + 2 * M, m = newMap(id, site.kind, w, h, TR.GRASS);
+  m.title = site.name; m.sub = KIND_SUB[site.kind] + ' in ' + st.bible.town;
+  const B = { x: M, y: M, w: lot.w, h: lot.h }, s = lot.side;
+  const stone = site.kind === 'smithy' || site.kind === 'chapel';
+  for (let j = 0; j < B.h; j++) for (let i = 0; i < B.w; i++) m.t[(B.y + j) * w + B.x + i] = stone ? TR.STONE : TR.WOOD;
+  /* the street side: the far row is the road itself, the near one grass with a worn doorstep */
+  for (let k = 0; k < (s & 1 ? h : w); k++) { const x = s === 1 ? w - 1 : s === 3 ? 0 : k, y = s === 2 ? h - 1 : s === 0 ? 0 : k; m.t[y * w + x] = site.kind === 'chapel' ? TR.DIRT : TR.COBBLE; }
+  wallRect(m, B.x, B.y, B.w, B.h);
+  const dx = s === 1 ? B.x + B.w - 1 : s === 3 ? B.x : B.x + lot.off, dy = s === 2 ? B.y + B.h - 1 : s === 0 ? B.y : B.y + lot.off;
+  addDoor(m, dx, dy, s, { ext: true });
+  m.t[(dy + DY[s]) * w + dx + DX[s]] = TR.DIRT;
+  /* rooms */
+  let rects;
+  if (site.kind === 'inn') {
+    const P = lot.plan || { mir: false, kw: 4 }, gd = 3, cy = B.y + gd + 1, ch = B.h - gd - 1, kw = P.kw, cw = B.w - kw;
+    const cx = P.mir ? B.x + kw : B.x, kx = P.mir ? B.x : B.x + cw;
+    rects = [{ kind: 'common', x: cx, y: cy, w: cw, h: ch, ks: P.mir ? 3 : 1 }, { kind: 'kitchen', x: kx, y: cy, w: kw, h: ch },
+      { kind: 'corridor', x: B.x, y: B.y + gd, w: B.w, h: 1 }, { kind: 'store', x: kx, y: B.y, w: kw, h: gd }];
+    const n = cw <= 8 ? 2 : (cw >= 12 && r() < .5 ? 4 : 3), widths = [];
+    for (let k = 0; k < n; k++) widths.push(Math.floor(cw / n) + (k < cw % n ? 1 : 0));
+    let gx = cx; for (const gw of shuffled(r, widths)) { rects.push({ kind: 'guest', x: gx, y: B.y, w: gw, h: gd }); gx += gw; }
+  } else {
+    const area = B.w * B.h, n = site.kind === 'chapel' ? 1 : site.kind === 'house' ? (area >= 30 ? 3 : 2) : site.kind === 'shop' ? 2 : (area >= 28 ? 2 : 1);
+    rects = bspRooms(r, B, n);
+    const front = rects.find((q) => dx >= q.x && dx < q.x + q.w && dy >= q.y && dy < q.y + q.h), back = HOUSE_BACK[site.kind].slice();
+    front.kind = HOUSE_FRONT[site.kind]; front.ds = s;
+    for (const q of rects.filter((q) => q !== front).sort((a, b) => b.w * b.h - a.w * a.h)) q.kind = back.shift() || 'store';
+  }
+  rects.forEach((q, k) => {
+    m.rooms.push({ id: 'R' + (k + 1), kind: q.kind, name: ROOM_NAME[q.kind] || q.kind, x: q.x, y: q.y, w: q.w, h: q.h, ks: q.ks, ds: q.ds });
+    for (let j = 0; j < q.h; j++) for (let i = 0; i < q.w; i++) m.rg[(q.y + j) * w + q.x + i] = k + 1;
+    if (q.kind === 'kitchen') for (let j = 0; j < q.h; j++) for (let i = 0; i < q.w; i++) m.t[(q.y + j) * w + q.x + i] = TR.STONE;
+  });
+  /* a wall wherever two rooms meet */
+  for (let y = B.y; y < B.y + B.h; y++) for (let x = B.x; x < B.x + B.w; x++) {
+    if (x + 1 < B.x + B.w && m.rg[y * w + x] !== m.rg[y * w + x + 1]) eSet(m, x, y, 1, ED.WALL);
+    if (y + 1 < B.y + B.h && m.rg[y * w + x] !== m.rg[(y + 1) * w + x]) eSet(m, x, y, 2, ED.WALL);
+  }
+  /* doors between rooms: every edge two rooms share is a candidate; skip the corners when the wall is long */
+  const between = (a, b) => {
+    const c = [];
+    for (let y = B.y; y < B.y + B.h; y++) for (let x = B.x; x < B.x + B.w; x++) for (const d of [1, 2]) {
+      const nx = x + DX[d], ny = y + DY[d]; if (nx >= B.x + B.w || ny >= B.y + B.h) continue;
+      const p = m.rg[y * w + x] - 1, q = m.rg[ny * w + nx] - 1;
+      if ((p === a && q === b) || (p === b && q === a)) c.push([x, y, d]);
+    }
+    return c.length >= 3 ? c.slice(1, -1) : c;
+  };
+  const link = (a, b, o) => { const c = between(a, b); if (!c.length) return false; const p = pick(r, c); addDoor(m, p[0], p[1], p[2], o); return true; };
+  if (site.kind === 'inn') {
+    const ix = (k) => rects.findIndex((q) => q.kind === k), cor = ix('corridor');
+    rects.forEach((q, k) => { if (q.kind === 'guest' || q.kind === 'store') link(k, cor); });
+    link(ix('common'), cor); link(ix('kitchen'), cor); link(ix('kitchen'), ix('common'));
+    if (r() < .7) { /* the kitchen's back door */
+      const K = rects[ix('kitchen')], P = lot.plan || { mir: false }, side = P.mir ? 3 : 1, y = K.y + rint(r, 1, K.h - 2);
+      addDoor(m, P.mir ? K.x : K.x + K.w - 1, y, side, { ext: true });
+    }
+  } else {
+    /* a spanning tree from the front room, so every room has a way in */
+    const front = rects.findIndex((q) => q.kind === HOUSE_FRONT[site.kind]), done = new Set([front]);
+    for (let guard = 0; guard < 20 && done.size < rects.length; guard++) {
+      for (const a of shuffled(r, [...done])) { let hit = false; for (const b of shuffled(r, rects.map((_, k) => k))) if (!done.has(b) && link(a, b)) { done.add(b); hit = true; break; } if (hit) break; }
+    }
+  }
+  /* windows in the outer walls, never beside a door or in a corner */
+  const windowAt = (x, y, d) => { if (eGet(m, x, y, d) === ED.WALL && r() < .24) eSet(m, x, y, d, ED.WINDOW); };
+  const nearDoor = (x, y, d) => { for (const k of [-1, 1]) { const ax = x + (d & 1 ? 0 : k), ay = y + (d & 1 ? k : 0); if (inb(m, ax, ay) && eGet(m, ax, ay, d) !== ED.WALL) return true; } return false; };
+  for (let i = 1; i < B.w - 1; i++) for (const [y, d] of [[B.y, 0], [B.y + B.h - 1, 2]]) if (!nearDoor(B.x + i, y, d)) windowAt(B.x + i, y, d);
+  for (let j = 1; j < B.h - 1; j++) for (const [x, d] of [[B.x, 3], [B.x + B.w - 1, 1]]) if (!nearDoor(x, B.y + j, d)) windowAt(x, B.y + j, d);
+  m.exits.push({ id: 'E0', to: 'S0', tiles: [], zone: true, auto: true, arrive: [dx, dy], label: 'Step out into ' + st.bible.town });
+  const F = Furnisher(st, m, r);
+  F.findGates();
+  m.rooms.forEach((_, ri) => F.furnish(ri));
+  for (const q of m.rooms) { delete q.ks; delete q.ds; }                /* notes for the furnisher only */
+  /* a little green outside, never on a doorstep */
+  { const out = shuffled(r, F.tiles(-1)).filter((i) => m.t[i] === TR.GRASS && !F.keep[i]); for (let k = 0; k < rint(r, 2, 5) && k < out.length; k++) F.put('bush', out[k] % w, (out[k] - out[k] % w) / w, 0, -1); }
+  return m;
+}
+
+function genCave(st) {
+  let W = 34, H = 30, m = newMap('S2', 'cave', W, H, TR.ROCK);
+  const r = rngFor(st.seed, 'site:S2', 0), B = st.bible;
+  m.title = B.cave; m.sub = 'the hideout of ' + B.gang;
+  const cut = (x, y) => { if (x > 0 && y > 0 && x < W - 1 && y < H - 1 && m.t[y * W + x] === TR.ROCK) m.t[y * W + x] = TR.CAVE; };
+  /* chambers sit on a loose three-by-three lattice; a walk from the bottom-middle cell picks five or six */
+  const cellW = (W - 4) / 3, cellH = (H - 7) / 3, want = rint(r, 5, 6), order = [[1, 2]], links = [];
+  const has = (c) => order.some((o) => o[0] === c[0] && o[1] === c[1]);
+  while (order.length < want) {
+    const open = order.filter((o) => [[0, -1], [1, 0], [0, 1], [-1, 0]].some((d) => { const c = [o[0] + d[0], o[1] + d[1]]; return c[0] >= 0 && c[0] < 3 && c[1] >= 0 && c[1] < 3 && !has(c); }));
+    const from = r() < .6 && open.includes(order[order.length - 1]) ? order[order.length - 1] : pick(r, open);
+    const nb = shuffled(r, [[0, -1], [1, 0], [0, 1], [-1, 0]]).map((d) => [from[0] + d[0], from[1] + d[1]]).find((c) => c[0] >= 0 && c[0] < 3 && c[1] >= 0 && c[1] < 3 && !has(c));
+    links.push([order.indexOf(from), order.length]); order.push(nb);
+  }
+  const ch = order.map((c) => ({ cx: 2 + (c[0] + .5) * cellW + (r() - .5) * 2, cy: 2 + (c[1] + .5) * cellH + (r() - .5), rx: 2.6 + r() * 1.3, ry: 2.2 + r() * .8 }));
+  const inBlob = (c, x, y, k) => ((x + .5 - c.cx) / c.rx) ** 2 + ((y + .5 - c.cy) / c.ry) ** 2 < k;
+  ch.forEach((c) => { for (let y = Math.floor(c.cy - c.ry - 1); y <= c.cy + c.ry + 1; y++) for (let x = Math.floor(c.cx - c.rx - 1); x <= c.cx + c.rx + 1; x++) if (inBlob(c, x, y, 1 + (r() - .5) * .5)) cut(x, y); });
+  /* passages wander from one chamber's heart to the next, widening now and then */
+  const tunnel = new Uint8Array(W * H), paths = [];
+  const dig = (a, b) => {
+    let x = Math.round(a.cx), y = Math.round(a.cy); const tx = Math.round(b.cx), ty = Math.round(b.cy), path = [];
+    for (let guard = 0; guard < 200 && (x !== tx || y !== ty); guard++) {
+      const ax = Math.abs(tx - x), ay = Math.abs(ty - y);
+      if (ax && (!ay || r() < (ax >= ay ? .7 : .3))) x += Math.sign(tx - x); else y += Math.sign(ty - y);
+      cut(x, y); tunnel[y * W + x] = 1; path.push([x, y]);
+      if (r() < .22) { const d = rint(r, 0, 3); cut(x + DX[d], y + DY[d]); }
+    }
+    paths.push(path);
+  };
+  for (const [a, b] of links) dig(ch[a], ch[b]);
+  { const extra = []; for (let a = 0; a < order.length; a++) for (let b = a + 1; b < order.length; b++) if (Math.abs(order[a][0] - order[b][0]) + Math.abs(order[a][1] - order[b][1]) === 1 && !links.some((l) => (l[0] === a && l[1] === b) || (l[0] === b && l[1] === a))) extra.push([a, b]);
+    if (extra.length && r() < .65) { const e = pick(r, extra); dig(ch[e[0]], ch[e[1]]); } }
+  /* the way in: down from the first chamber to the south rim */
+  let ex = clamp(Math.round(ch[0].cx), 3, W - 4);
+  { let x = ex;
+    for (let y = Math.round(ch[0].cy); y < H - 1; y++) {
+      const was = x;
+      if (y >= H - 6) x += Math.sign(ex - x); else if (r() < .25) x = clamp(x + (r() < .5 ? -1 : 1), ex - 2, ex + 2);
+      cut(was, y); cut(x, y); tunnel[y * W + was] = 1; tunnel[y * W + x] = 1;      /* both squares, so a sidestep never leaves a corner to cut */
+      if (y < H - 6 && r() < .2) cut(x + 1, y);
+    }
+    m.t[(H - 1) * W + ex] = TR.CAVE; tunnel[(H - 1) * W + ex] = 1; }
+  /* one smoothing pass rounds the chambers off; passages are left as cut */
+  { const t0 = m.t.slice();
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      let n = 0; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if ((i || j) && t0[(y + j) * W + x + i] === TR.CAVE) n++;
+      if (t0[y * W + x] === TR.ROCK && n >= 5) m.t[y * W + x] = TR.CAVE;
+      else if (t0[y * W + x] === TR.CAVE && n <= 1 && !tunnel[y * W + x]) m.t[y * W + x] = TR.ROCK;
+    } }
+  /* keep only what joins the mouth */
+  { const seen = new Uint8Array(W * H), q = [(H - 1) * W + ex]; seen[q[0]] = 1;
+    while (q.length) { const i = q.pop(), x = i % W, y = (i - x) / W; for (let d = 0; d < 4; d++) { const nx = x + DX[d], ny = y + DY[d]; if (inb(m, nx, ny) && !seen[ny * W + nx] && m.t[ny * W + nx] === TR.CAVE) { seen[ny * W + nx] = 1; q.push(ny * W + nx); } } }
+    for (let i = 0; i < W * H; i++) if (m.t[i] === TR.CAVE && !seen[i]) m.t[i] = TR.ROCK; }
+  /* trim the rock nobody will ever see: the board is the cave and a margin */
+  { let x0 = W, x1 = 0, y0 = H;
+    for (let i = 0; i < W * H; i++) if (m.t[i] === TR.CAVE) { const x = i % W, y = (i - x) / W; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); }
+    x0 = Math.max(0, x0 - 2); x1 = Math.min(W - 1, x1 + 2); y0 = Math.max(0, y0 - 2);
+    const nw = x1 - x0 + 1, nh = H - y0, m2 = newMap('S2', 'cave', nw, nh, TR.ROCK);
+    for (let y = 0; y < nh; y++) for (let x = 0; x < nw; x++) m2.t[y * nw + x] = m.t[(y + y0) * W + x + x0];
+    m2.title = m.title; m2.sub = m.sub;
+    for (const c of ch) { c.cx -= x0; c.cy -= y0; }
+    for (const p of paths) for (const q of p) { q[0] -= x0; q[1] -= y0; }
+    ex -= x0; m = m2; W = nw; H = nh; }
+  /* a chamber's squares are those inside its rough oval; the rest is passage */
+  ch.forEach((c, k) => { for (let i = 0; i < W * H; i++) { const x = i % W, y = (i - x) / W; if (m.t[i] === TR.CAVE && !m.rg[i] && y < H - 2 && inBlob(c, x, y, 1.2)) m.rg[i] = k + 1; } });
+  /* what each chamber is for goes by how deep it lies: the guard post first, the chief last */
+  const dist = new Int32Array(W * H).fill(-1);
+  { const q = [(H - 1) * W + ex]; dist[q[0]] = 0; for (let h = 0; h < q.length; h++) { const i = q[h], x = i % W, y = (i - x) / W; for (let d = 0; d < 4; d++) { const nx = x + DX[d], ny = y + DY[d]; if (inb(m, nx, ny) && dist[ny * W + nx] < 0 && m.t[ny * W + nx] === TR.CAVE) { dist[ny * W + nx] = dist[i] + 1; q.push(ny * W + nx); } } } }
+  const depth = ch.map((c, k) => { let best = 1e9; for (let i = 0; i < W * H; i++) if (m.rg[i] === k + 1 && dist[i] >= 0 && dist[i] < best) best = dist[i]; return best; });
+  const area = ch.map((c, k) => { let n = 0; for (let i = 0; i < W * H; i++) if (m.rg[i] === k + 1) n++; return n; });
+  const byDepth = ch.map((_, k) => k).sort((a, b) => depth[a] - depth[b] || a - b), kinds = new Array(ch.length).fill('');
+  kinds[byDepth[0]] = 'cave_guard'; kinds[byDepth[byDepth.length - 1]] = 'cave_chief';
+  const midd = byDepth.slice(1, -1).sort((a, b) => area[b] - area[a] || a - b), rest = ['cave_den', 'cave_stash', 'cave_cells', 'cave_pool'];
+  midd.forEach((k, n) => { kinds[k] = rest[n] || 'cave_pool'; });
+  const NAMES = { cave_guard: 'the guard post', cave_den: 'the den', cave_stash: 'the stash', cave_cells: 'the cells', cave_chief: 'the chief’s chamber', cave_pool: 'the pool' };
+  ch.forEach((c, k) => m.rooms.push({ id: 'R' + (k + 1), kind: kinds[k], name: NAMES[kinds[k]], x: Math.floor(c.cx - c.rx), y: Math.floor(c.cy - c.ry), w: Math.ceil(c.rx * 2), h: Math.ceil(c.ry * 2) }));
+  m.exits.push({ id: 'E0', to: 'S0', tiles: [[ex, H - 1]], zone: false, auto: true, arrive: [ex, H - 2], label: 'Take the trail down to ' + B.town });
+  m.labels.push({ x: ex + .5, y: H + .5, t: 'to ' + B.town, s: .34, a: 0 });
+  /* a gate across the passage to the chief, where the passage is one square wide */
+  { const ci = byDepth[byDepth.length - 1], li = links.findIndex((l) => l[1] === ci), path = li >= 0 ? paths[li] : null;
+    if (path && r() < .85) for (let k = path.length - 2; k > 0; k--) {
+      const a = path[k - 1], b = path[k]; if (m.rg[a[1] * W + a[0]] || m.rg[b[1] * W + b[0]]) continue;
+      const vert = a[0] === b[0], rock = (x, y) => tAt(m, x, y) === TR.ROCK;
+      const tight = vert ? rock(a[0] - 1, a[1]) && rock(a[0] + 1, a[1]) && rock(b[0] - 1, b[1]) && rock(b[0] + 1, b[1]) : rock(a[0], a[1] - 1) && rock(a[0], a[1] + 1) && rock(b[0], b[1] - 1) && rock(b[0], b[1] + 1);
+      if (!tight) continue;
+      addDoor(m, a[0], a[1], vert ? (b[1] > a[1] ? 2 : 0) : (b[0] > a[0] ? 1 : 3), { kind: 'gate' });
+      break;
+    } }
+  /* a pool in the pool chamber: water creeps in from one wall and stops before it cuts anything off */
+  const F = Furnisher(st, m, r);
+  F.findGates();
+  F.keep[(H - 1) * W + ex] = 1; F.keep[(H - 2) * W + ex] = 1;
+  { const pi = kinds.indexOf('cave_pool');
+    if (pi >= 0) { const T = F.tiles(pi).filter((i) => !F.keep[i]), edge = T.filter((i) => { const x = i % W, y = (i - x) / W; return [0, 1, 2, 3].some((d) => tAt(m, x + DX[d], y + DY[d]) === TR.ROCK); });
+      if (edge.length) { const wet = [pick(r, edge)], n = rint(r, 3, 7);
+        for (let guard = 0; guard < 60 && wet.length < n; guard++) { const i = pick(r, wet), x = i % W, y = (i - x) / W, d = rint(r, 0, 3), j = (y + DY[d]) * W + x + DX[d]; if (T.includes(j) && !wet.includes(j)) wet.push(j); }
+        for (const i of wet) m.t[i] = TR.WATER; F.stale();
+        if (!F.whole(pi)) { for (const i of wet) m.t[i] = TR.CAVE; F.stale(); } } } }
+  m.rooms.slice().forEach((_, ri) => F.furnish(ri));
+  /* loose stone in the passages: it slows a step, it never blocks one */
+  for (const i of F.tiles(-1)) if (!F.keep[i] && r() < .07) F.put('rubble', i % W, (i - i % W) / W, 0, -1);
+  return m;
+}
+
+/* ============================== ENGINE ==============================
+   The engine is the truth. Nothing on the board changes except through intent():
+   it validates completely before it mutates, a refusal changes nothing and says why,
+   and every accepted change is written to the journal. The interface only ever sends
+   intents, so a second player's phone, or a Game Master model, can send the very same
+   ones later and the host's engine will judge them the same way.                   */
+const ENGINE_V = 1;
+const pcOf = (st, who) => st.party.find((p) => p.id === who) || null;
+function note(st, t, o) {
+  const e = Object.assign({ n: st.n.ev++, t }, o || {});
+  st.log.push(e);
+  if (st.log.length > 400) st.log.splice(0, st.log.length - 400);
+  return e;
+}
+/* chart(): the one place a site's board comes into being. Once charted it lives in the
+   state, and so in the save: the generator is never asked about that site again.    */
+function chart(st, id) {
+  if (st.maps[id]) return st.maps[id];
+  const site = st.sites[id];
+  if (!site) return null;
+  if (id !== 'S0' && !st.maps.S0) chart(st, 'S0');
+  if (site.kind !== 'town' && site.kind !== 'cave' && !st.maps.S0.lots.some((l) => l.site === id)) return null;
+  const m = site.kind === 'town' ? genTown(st) : site.kind === 'cave' ? genCave(st) : genBuilding(st, id);
+  st.maps[id] = indexMap(m);
+  note(st, 'chart', { site: id, gen: GEN_V });
+  return m;
+}
+function taken(st, m, x, y, self) {
+  if (tokenAt(m, x, y)) return true;
+  for (const p of st.party) if (p.id !== self && p.site === m.id && p.x === x && p.y === y) return true;
+  return false;
+}
+/* the free square nearest (x,y): where an arrival stands if the usual spot is taken */
+function freeNear(st, m, x, y, self) {
+  const W = m.w, seen = new Uint8Array(W * m.h), q = [[x, y]];
+  if (inb(m, x, y)) seen[y * W + x] = 1;
+  for (let h = 0; h < q.length; h++) {
+    const [cx, cy] = q[h];
+    if (tileFree(m, cx, cy) && !taken(st, m, cx, cy, self)) return [cx, cy];
+    for (let k = 0; k < 8; k++) { const nx = cx + STEPS[k][0], ny = cy + STEPS[k][1]; if (inb(m, nx, ny) && !seen[ny * W + nx] && TWALK[m.t[ny * W + nx]]) { seen[ny * W + nx] = 1; q.push([nx, ny]); } }
+  }
+  for (let i = 0; i < W * m.h; i++) if (tileFree(m, i % W, (i - i % W) / W) && !taken(st, m, i % W, (i - i % W) / W, self)) return [i % W, (i - i % W) / W];
+  return null;
+}
+function newGame(seed) {
+  const bible = generateWorld(seed);
+  const st = { format: 'cyoa2-save', v: ENGINE_V, seed, bible, sites: {}, npcs: {}, maps: {}, party: [{ id: 'P1', name: 'Wayfarer', site: 'S1', x: 0, y: 0 }],
+    here: 'S1', walk: null, log: [], n: { ev: 0, site: bible.sites.length }, made: Date.now() };
+  for (const s of bible.sites) st.sites[s.id] = deepClone(s);
+  for (const p of bible.npcs) st.npcs[p.id] = Object.assign(deepClone(p), { bible: true });
+  chart(st, 'S0');
+  const inn = chart(st, 'S1'), pc = st.party[0];
+  /* the tale begins in a rented room: the first free square of the first guest room */
+  const gi = inn.rooms.findIndex((q) => q.kind === 'guest');
+  let spot = null;
+  for (let i = 0; i < inn.w * inn.h && !spot; i++) { const x = i % inn.w, y = (i - x) / inn.w; if (inn.rg[i] === gi + 1 && tileFree(inn, x, y) && inn._.occ[i] < 0 && !taken(st, inn, x, y, pc.id)) spot = [x, y]; }
+  if (!spot) spot = freeNear(st, inn, inn.exits[0].arrive[0], inn.exits[0].arrive[1], pc.id);
+  pc.x = spot[0]; pc.y = spot[1];
+  note(st, 'begin', { who: pc.id, site: 'S1', at: spot });
+  return st;
+}
+/* the squares a tap on (x,y) means: the square itself, or the way out it belongs to */
+function exitGoals(m, e) {
+  if (!e.zone) return e.tiles.slice();
+  const out = [];
+  for (let i = 0; i < m.w * m.h; i++) if (!m.rg[i] && TWALK[m.t[i]]) out.push([i % m.w, (i - i % m.w) / m.w]);
+  return out;
+}
+const REFUSE = { blocked: 'Something is in the way.', noway: 'There is no way there.', locked: 'It is locked.', far: 'You are not beside it.', noexit: 'There is no way out here.',
+  uncharted: 'That place cannot be reached.', nobody: 'No such traveller.', bad: 'That cannot be done.' };
+function intent(st, it) {
+  const no = (why) => ({ ok: false, why, say: REFUSE[why] || REFUSE.bad });
+  if (!it || typeof it !== 'object') return no('bad');
+  const pc = pcOf(st, it.who || 'P1');
+  if (!pc) return no('nobody');
+  const m = st.maps[pc.site];
+  if (!m) return no('bad');
+  switch (it.t) {
+    case 'move': {   /* {to:[x,y]} or {goals:[[x,y]...]}, optional then:{t:'travel'}|{t:'door',id} */
+      const list = (it.goals || [it.to]).filter((p) => Array.isArray(p) && inb(m, p[0] | 0, p[1] | 0)).map((p) => [p[0] | 0, p[1] | 0]);
+      if (!list.length) return no('bad');
+      const goals = new Set();
+      for (const p of list) if (tileFree(m, p[0], p[1]) && !taken(st, m, p[0], p[1], pc.id)) goals.add(p[1] * m.w + p[0]);
+      if (!goals.size) return no('blocked');
+      if (goals.has(pc.y * m.w + pc.x)) { st.walk = null; return it.then ? intent(st, Object.assign({ who: pc.id }, it.then)) : { ok: true, path: [], ft: 0 }; }
+      const res = findPath(m, pc.x, pc.y, goals, (x, y) => taken(st, m, x, y, pc.id));
+      if (!res) return no('noway');
+      const then = it.then && (it.then.t === 'travel' || it.then.t === 'door') ? { t: it.then.t, id: it.then.id } : null;
+      st.walk = { who: pc.id, path: res.path, i: 0, from: [pc.x, pc.y], ft: 0, then };
+      return { ok: true, path: res.path, ft: res.ft };
+    }
+    case 'step': {   /* the host's clock asks for the next square of a walk */
+      const w = st.walk;
+      if (!w || w.who !== pc.id) return no('bad');
+      const next = w.path[w.i], info = stepInfo(m, pc.x, pc.y, next[0] - pc.x, next[1] - pc.y, false);
+      const end = (done) => { st.walk = null; if (w.i) note(st, 'move', { who: pc.id, site: m.id, from: w.from, to: [pc.x, pc.y], ft: w.ft }); return done; };
+      if (!info || taken(st, m, next[0], next[1], pc.id)) { end(false); return { ok: false, why: 'blocked', say: REFUSE.blocked, at: [pc.x, pc.y], done: true }; }
+      const out = { ok: true, door: null, done: false, next: null };
+      if (info.door) { info.door.open = true; out.door = info.door.id; note(st, 'door', { who: pc.id, site: m.id, id: info.door.id, open: true }); }
+      pc.x = next[0]; pc.y = next[1]; w.i++; w.ft += tileCost(m, pc.x, pc.y) * FT;
+      out.at = [pc.x, pc.y];
+      if (w.i >= w.path.length) { out.done = true; end(true); out.next = w.then; }   /* what the walker meant to do on arriving: theirs to ask for */
+      return out;
+    }
+    case 'halt': { const w = st.walk; if (w && w.who === pc.id) { st.walk = null; if (w.i) note(st, 'move', { who: pc.id, site: m.id, from: w.from, to: [pc.x, pc.y], ft: w.ft }); } return { ok: true }; }
+    case 'door': {   /* open or close a door you stand beside */
+      const d = m.doors.find((q) => q.id === it.id);
+      if (!d) return no('bad');
+      if (!doorSides(d).some((p) => p[0] === pc.x && p[1] === pc.y)) return no('far');
+      if (d.lock) return no('locked');
+      d.open = !d.open;
+      note(st, 'door', { who: pc.id, site: m.id, id: d.id, open: d.open });
+      return { ok: true, id: d.id, open: d.open };
+    }
+    case 'travel': { /* leave by the way out you stand on; the far side is charted if need be */
+      const e = exitAt(m, pc.x, pc.y);
+      if (!e) return no('noexit');
+      return arrive(st, pc, m, e.to, 'travel');
+    }
+    case 'jump': {   /* the table's hand lifts the token to another site (a sandbox convenience) */
+      if (!st.sites[it.site]) return no('uncharted');
+      return arrive(st, pc, m, it.site, 'jump');
+    }
+    default: return no('bad');
+  }
+}
+function arrive(st, pc, from, to, how) {
+  const dest = chart(st, to);
+  if (!dest) return { ok: false, why: 'uncharted', say: REFUSE.uncharted };
+  const back = dest.exits.find((e) => e.to === from.id) || dest.exits[0];
+  const want = back ? back.arrive : [dest.w >> 1, dest.h >> 1], spot = freeNear(st, dest, want[0], want[1], pc.id);
+  if (!spot) return { ok: false, why: 'blocked', say: REFUSE.blocked };
+  st.walk = null;
+  pc.site = dest.id; pc.x = spot[0]; pc.y = spot[1]; st.here = dest.id;
+  note(st, how, { who: pc.id, from: from.id, to: dest.id, at: spot });
+  return { ok: true, site: dest.id, at: spot };
+}
+
+/* ---- the whole state in and out of a save ---- */
+function packState(st) {
+  const maps = {};
+  for (const k of Object.keys(st.maps)) maps[k] = packMap(st.maps[k]);
+  return { format: 'cyoa2-save', v: ENGINE_V, seed: st.seed, bible: st.bible, sites: st.sites, npcs: st.npcs, maps, party: st.party, here: st.here, log: st.log, n: st.n, made: st.made, saved: Date.now() };
+}
+/* plain, bounded data only: strings clipped, depth capped, no prototype keys */
+function cleanData(v, depth) {
+  if (v === null || typeof v === 'boolean') return v;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  if (typeof v === 'string') return clip(v, 400);
+  if (depth > 6 || typeof v !== 'object') return null;
+  if (Array.isArray(v)) return v.slice(0, 600).map((x) => cleanData(x, depth + 1));
+  const out = {};
+  for (const k of Object.keys(v).slice(0, 300)) if (k !== '__proto__' && k !== 'constructor' && k !== 'prototype') out[k] = cleanData(v[k], depth + 1);
+  return out;
+}
+function unpackState(p) {
+  if (!p || typeof p !== 'object' || p.format !== 'cyoa2-save') throw new Error('That file is not a CYOA2 tale.');
+  if ((p.v | 0) > ENGINE_V) throw new Error('That tale was saved by a newer version of the game.');
+  const s = (v, n) => clip(typeof v === 'string' ? v : '', n);
+  const st = { format: 'cyoa2-save', v: ENGINE_V, seed: s(p.seed, 80) || 'unknown', bible: cleanData(p.bible, 0) || {}, sites: {}, npcs: {}, maps: {}, party: [], here: '', walk: null, log: [], n: { ev: 0, site: 0 }, made: +p.made || Date.now() };
+  const B = st.bible;
+  for (const k of ['town', 'region', 'inn', 'gang', 'cave', 'opening']) B[k] = s(B[k], 200);
+  B.threads = (Array.isArray(B.threads) ? B.threads : []).filter((t) => t && typeof t.t === 'string');
+  const sites = cleanData(p.sites, 0) || {};
+  for (const k of Object.keys(sites)) { const q = sites[k]; if (q && typeof q === 'object' && /^S\d+$/.test(k)) st.sites[k] = Object.assign(q, { id: k, kind: s(q.kind, 16), name: s(q.name, 80) || k }); }
+  const npcs = cleanData(p.npcs, 0) || {};
+  for (const k of Object.keys(npcs)) { const q = npcs[k]; if (q && typeof q === 'object') st.npcs[k] = Object.assign(q, { id: k, name: s(q.name, 60) || 'Someone', role: s(q.role, 80), kind: ['npc', 'foe', 'captive'].includes(q.kind) ? q.kind : 'npc', trait: s(q.trait, 40), home: s(q.home, 12) }); }
+  const maps = p.maps && typeof p.maps === 'object' ? p.maps : {};
+  for (const k of Object.keys(maps)) { if (!st.sites[k]) continue; const m = unpackMap(maps[k]); if (m) { m.id = k; st.maps[k] = m; } }
+  if (!st.maps.S0) throw new Error('That tale has no town in it.');
+  for (const q of (Array.isArray(p.party) ? p.party : []).slice(0, 8)) {
+    if (!q || !st.maps[q.site]) continue;
+    const m = st.maps[q.site], pc = { id: s(q.id, 8) || 'P' + (st.party.length + 1), name: s(q.name, 40) || 'Wayfarer', site: q.site, x: q.x | 0, y: q.y | 0 };
+    if (!tileFree(m, pc.x, pc.y) || taken(st, m, pc.x, pc.y, pc.id)) { const f = freeNear(st, m, clamp(pc.x, 0, m.w - 1), clamp(pc.y, 0, m.h - 1), pc.id); if (!f) continue; pc.x = f[0]; pc.y = f[1]; }
+    st.party.push(pc);
+  }
+  if (!st.party.length) { const m = st.maps.S0, f = freeNear(st, m, m.w >> 1, m.h >> 1, 'P1'); if (!f) throw new Error('That tale has nowhere to stand.'); st.party.push({ id: 'P1', name: 'Wayfarer', site: 'S0', x: f[0], y: f[1] }); }
+  st.here = st.party[0].site;
+  st.log = (Array.isArray(p.log) ? p.log.slice(-400) : []).map((e) => cleanData(e, 0)).filter((e) => e && typeof e.t === 'string');
+  const nn = p.n && typeof p.n === 'object' ? p.n : {};
+  let top = 0; for (const k of Object.keys(st.sites)) top = Math.max(top, +k.slice(1) + 1);
+  st.n = { ev: Math.max(nn.ev | 0, st.log.length), site: Math.max(nn.site | 0, top) };
+  return st;
+}
+
+/* ============================== ART ==============================
+   The board is drawn as an inked map on vellum: iron-gall line, sepia washes, rock
+   shown by hatching, and ONE accent colour per map (green for the town, lapis for the
+   cave, vermilion indoors). Everything is code: no image is loaded. The map keeps its
+   parchment palette in night reading and is dimmed instead, as plates are in CYOA.
+   Painters draw in SQUARES: one unit is one square, whatever the zoom.              */
+const INK = '#2a1d12', INK2 = '#5a4632', INK3 = '#8a7458', VEL = '#efe3c8', VEL2 = '#e6d6b2', VEL3 = '#d9c59a';
+const RUB = '#a5301f', GOLD = '#b8892b', GOLDHI = '#e2c068', GOLDLO = '#7d5a17', LAPIS = '#27456e', VERD = '#3f6f5f';
+const WASH = { wood: '#e2cfa4', woodD: '#cbb07e', woodDD: '#aa8c5a', stone: '#e4d9bc', stoneD: '#cbbe9d', cobble: '#e2d4b2', dirt: '#e8dbb9', cave: '#e9dcbf',
+  roof: '#d0b98e', iron: '#958b7b', cloth: '#ecdfc3', straw: '#dfcd95', white: '#f6eedb' };
+const FONT_CAPS = "'Cinzel','Trajan Pro','Times New Roman',serif", FONT_DECO = "'Cinzel Decorative','Cinzel','Times New Roman',serif";
+const MG = 1.5;                                          /* blank vellum round a map, in squares */
+const accentOf = (m) => (m.kind === 'town' ? VERD : m.kind === 'cave' ? LAPIS : RUB);
+function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
+function rr(g, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  g.beginPath(); g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r); g.lineTo(x + w, y + h - r);
+  g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r); g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath();
+}
+/* a pen bound to one canvas: the handful of strokes every painter is made of */
+function Pen(g, acc) {
+  const end = (fill, lw, c) => { if (fill) { g.fillStyle = fill; g.fill(); } if (lw !== 0) { g.lineWidth = lw || .04; g.strokeStyle = c || INK; g.stroke(); } return P; };
+  const P = {
+    g, acc, wash: (a) => rgba(acc, a), leaf: (a) => (acc === VERD ? rgba(VERD, a) : rgba(INK2, a * .5)),
+    box(x, y, w, h, fill, r, lw, c) { rr(g, x, y, w, h, r == null ? .05 : r); return end(fill, lw, c); },
+    disc(x, y, r, fill, lw, c) { g.beginPath(); g.arc(x, y, r, 0, 6.2832); return end(fill, lw, c); },
+    poly(pts, fill, lw, c, open) { g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]))); if (!open) g.closePath(); return end(fill, lw, c); },
+    line(x1, y1, x2, y2, lw, c) { g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.lineWidth = lw || .02; g.strokeStyle = c || INK2; g.stroke(); return P; },
+    dot(x, y, r, c) { g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fillStyle = c || INK; g.fill(); return P; },
+    flame(x, y, s) { g.beginPath(); g.moveTo(x, y - s); g.quadraticCurveTo(x + s * .9, y, x, y + s * .7); g.quadraticCurveTo(x - s * .9, y, x, y - s); return end(acc, .02); },
+    /* a scalloped blob: foliage, a bearskin, a boulder */
+    blob(x, y, r, n, wob, fill, lw, seed) {
+      g.beginPath();
+      for (let k = 0; k <= n; k++) {
+        const a0 = (k - 1) / n * 6.2832, a1 = k / n * 6.2832, am = (a0 + a1) / 2, r1 = r * (1 - wob * h2(k % n, seed, 5)), rm = r * (1.12 + wob * .5);
+        if (!k) g.moveTo(x + Math.cos(a1) * r1, y + Math.sin(a1) * r1); else g.quadraticCurveTo(x + Math.cos(am) * rm, y + Math.sin(am) * rm, x + Math.cos(a1) * r1, y + Math.sin(a1) * r1);
+      }
+      g.closePath(); return end(fill, lw);
+    },
+  };
+  return P;
+}
+
+/* ---- the asset painters: ART[id](pen, asset, object). Drawn back-to-north in a box
+        of asset.w x asset.h squares; small things in a box of one square.           ---- */
+const ART = {
+  table_long(P) { P.box(.14, .1, .72, 1.8, WASH.wood, .06).line(.38, .16, .38, 1.84, .014, INK3).line(.62, .16, .62, 1.84, .014, INK3); },
+  table_round(P) { P.disc(.5, .5, .36, WASH.wood).disc(.5, .5, .26, null, .014, INK3); },
+  table_small(P) { P.box(.2, .2, .6, .6, WASH.wood, .04).line(.2, .5, .8, .5, .014, INK3); },
+  chair(P) { P.box(.27, .3, .46, .44, WASH.wood, .05, .03).box(.24, .19, .52, .13, WASH.woodD, .04, .03); },
+  stool(P) { P.disc(.5, .5, .2, WASH.wood, .03).dot(.5, .5, .03, INK3); },
+  bench(P) { P.box(.12, .34, 1.76, .32, WASH.wood, .04, .03).line(.2, .5, 1.8, .5, .014, INK3); },
+  bar(P) { P.box(.04, .22, 2.92, .56, WASH.woodD, .05).line(.1, .34, 2.9, .34, .02, INK2); for (const x of [1, 2]) P.line(x, .36, x, .76, .014, INK3); },
+  counter(P) { P.box(.06, .25, 1.88, .5, WASH.woodD, .05).line(.12, .37, 1.88, .37, .02, INK2); },
+  bed(P) { P.box(.12, .08, .76, 1.84, WASH.woodD, .05).box(.18, .16, .64, 1.7, WASH.white, .04, .02).box(.18, .72, .64, 1.14, P.wash(.26), .04, .025).box(.27, .23, .46, .3, WASH.cloth, .09, .025).line(.18, .84, .82, .84, .016, INK3); },
+  wardrobe(P) { P.box(.1, .12, .8, .76, WASH.woodDD, .04).line(.5, .14, .5, .86, .02, INK).dot(.44, .52, .03).dot(.56, .52, .03); },
+  shelf(P, a, o) { P.box(.06, .08, 1.88, .5, WASH.woodD, .03).line(.68, .1, .68, .56, .02, INK2).line(1.32, .1, 1.32, .56, .02, INK2);
+    for (let k = 0; k < 6; k++) { const x = .16 + k * .3, s = strHash((o && o.id) || 'x') + k; if (h2(s, 1, 2) < .7) P.box(x, .2 + h2(s, 2, 2) * .1, .14 + h2(s, 3, 2) * .08, .2, k % 2 ? WASH.cloth : WASH.stone, .03, .02); } },
+  desk(P) { P.box(.1, .16, 1.8, .62, WASH.wood, .05).line(.7, .18, .7, .76, .014, INK3).line(1.3, .18, 1.3, .76, .014, INK3); },
+  chest(P) { P.box(.16, .24, .68, .52, WASH.woodD, .08).line(.16, .44, .84, .44, .03, INK).line(.32, .26, .32, .74, .02, INK2).line(.68, .26, .68, .74, .02, INK2).box(.45, .4, .1, .12, WASH.iron, .02, .02); },
+  stairs(P) { P.box(.1, .06, .8, 1.88, WASH.wood, .02); for (let k = 1; k < 9; k++) P.line(.12, .06 + k * .21, .88, .06 + k * .21, .02, INK2); P.poly([[.5, .2], [.64, .48], [.36, .48]], INK2, 0); P.line(.5, .48, .5, 1.6, .03, INK2); },
+  altar(P) { P.box(.1, .18, .8, .64, WASH.stoneD, .03).box(.18, .14, .64, .72, WASH.white, .02, .025).line(.5, .28, .5, .72, .03, P.acc).line(.36, .42, .64, .42, .03, P.acc); },
+  lectern(P) { P.poly([[.3, .3], [.7, .3], [.78, .62], [.22, .62]], WASH.wood).line(.3, .46, .7, .46, .014, INK3).dot(.5, .74, .06, INK2); },
+  statue(P) { P.box(.2, .2, .6, .6, WASH.stoneD, .03).disc(.5, .5, .2, WASH.stone).disc(.5, .44, .08, WASH.white, .02); },
+  pillar(P) { P.box(.18, .18, .64, .64, WASH.stoneD, .02).disc(.5, .5, .24, WASH.stone); },
+  candlestand(P) { P.disc(.5, .5, .1, WASH.iron, .03); for (const a of [0, 2.1, 4.2]) { const x = .5 + Math.cos(a) * .22, y = .5 + Math.sin(a) * .22; P.line(.5, .5, x, y, .02, INK2).flame(x, y, .08); } },
+  hearth(P) { P.box(.04, .04, 1.92, .8, WASH.stoneD, .04).box(.32, .14, 1.36, .66, rgba(INK, .82), .08, .03).line(.6, .62, 1.4, .5, .05, WASH.woodDD).line(.62, .46, 1.38, .64, .05, WASH.woodDD);
+    P.flame(.82, .44, .15).flame(1.04, .4, .19).flame(1.24, .46, .14).box(.2, .84, 1.6, .1, WASH.stone, .02, .025); },
+  stove(P) { P.box(.16, .14, .68, .7, WASH.iron, .08).disc(.5, .52, .17, rgba(INK, .7), .03).disc(.5, .22, .06, WASH.stoneD, .02).flame(.5, .54, .09); },
+  cauldron(P) { for (const a of [.6, 2.7, 4.8]) P.line(.5, .5, .5 + Math.cos(a) * .4, .5 + Math.sin(a) * .4, .03, INK2); P.disc(.5, .5, .3, rgba(INK, .8)).disc(.5, .5, .2, WASH.woodD, .02).flame(.5, .86, .07); },
+  forge(P) { P.box(.04, .04, 1.3, .84, WASH.stoneD, .04).box(.18, .16, 1.02, .6, rgba(INK, .82), .12, .03).flame(.5, .46, .15).flame(.74, .42, .19).flame(.96, .48, .14);
+    P.poly([[1.42, .34], [1.94, .16], [1.94, .76], [1.42, .58]], WASH.woodD).line(1.42, .46, 1.94, .46, .014, INK3); for (let k = 0; k < 3; k++) P.line(.04, .24 + k * .2, .16, .24 + k * .2, .014, INK3); },
+  anvil(P) { P.box(.3, .3, .4, .4, WASH.woodD, .04).poly([[.18, .38], [.7, .38], [.88, .5], [.7, .62], [.18, .62]], WASH.iron).line(.3, .46, .62, .46, .014, INK); },
+  workbench(P) { P.box(.06, .14, 1.88, .6, WASH.wood, .03).line(.1, .34, 1.9, .34, .014, INK3).line(.1, .54, 1.9, .54, .014, INK3).box(1.58, .6, .22, .22, WASH.iron, .02, .03); },
+  weapon_rack(P) { P.box(.08, .12, 1.84, .2, WASH.woodD, .03); for (let k = 0; k < 6; k++) { const x = .26 + k * .3; P.line(x, .16, x, .86, .03, INK2).poly([[x, .94], [x - .05, .82], [x + .05, .82]], WASH.iron, .015); } },
+  grindstone(P) { P.box(.2, .36, .6, .28, WASH.woodD, .03).disc(.5, .5, .26, WASH.stone).disc(.5, .5, .15, null, .014, INK3).dot(.5, .5, .04, INK2); },
+  barrel(P) { P.disc(.5, .5, .34, WASH.woodD).disc(.5, .5, .25, WASH.wood, .02, INK2).line(.3, .42, .7, .42, .014, INK3).line(.28, .56, .72, .56, .014, INK3); },
+  keg(P) { P.box(.16, .2, .68, .6, WASH.wood, .04, .03).box(.24, .12, .52, .76, WASH.woodD, .22).line(.26, .34, .74, .34, .025, INK2).line(.26, .66, .74, .66, .025, INK2).dot(.5, .9, .045, INK2); },
+  crate(P) { P.box(.16, .16, .68, .68, WASH.wood, .02).box(.24, .24, .52, .52, null, .01, .016, INK3).line(.24, .24, .76, .76, .016, INK3).line(.76, .24, .24, .76, .016, INK3); },
+  sacks(P) { P.disc(.36, .42, .2, WASH.cloth, .03).disc(.63, .5, .2, WASH.cloth, .03).disc(.46, .67, .19, WASH.cloth, .03).dot(.36, .3, .03, INK2).dot(.68, .38, .03, INK2).dot(.4, .56, .03, INK2); },
+  haybale(P) { P.box(.14, .22, .72, .56, WASH.straw, .08).line(.36, .22, .36, .78, .02, INK2).line(.64, .22, .64, .78, .02, INK2); for (let k = 0; k < 5; k++) P.line(.18 + k * .15, .3, .22 + k * .15, .4, .012, INK3); },
+  rug(P) { P.box(.18, .16, 1.64, 2.68, P.wash(.2), .03, .03).box(.32, .32, 1.36, 2.36, null, .02, .018, INK2).poly([[1, .7], [1.42, 1.5], [1, 2.3], [.58, 1.5]], P.wash(.22), .02, INK2);
+    for (let k = 0; k < 9; k++) { const x = .26 + k * .185; P.line(x, .16, x, .06, .014, INK2).line(x, 2.84, x, 2.94, .014, INK2); } },
+  rug_small(P) { P.box(.2, .12, .6, 1.76, P.wash(.2), .03, .03).line(.5, .22, .5, 1.78, .014, INK2).line(.34, .22, .34, 1.78, .012, INK3).line(.66, .22, .66, 1.78, .012, INK3); },
+  hide(P) { P.poly([[1, .16], [1.3, .34], [1.84, .2], [1.66, .74], [1.72, 1.26], [1.86, 1.82], [1.3, 1.62], [1, 1.74], [.7, 1.62], [.14, 1.82], [.28, 1.26], [.34, .74], [.16, .2], [.7, .34]], WASH.woodD, .03)
+    .disc(1, .34, .2, WASH.woodD, .03).dot(.92, .28, .025).dot(1.08, .28, .025).line(1, .56, 1, 1.5, .014, INK3); },
+  garden(P) { P.box(.1, .1, 1.8, 1.8, WASH.dirt, .04, .025, INK2); for (let j = 0; j < 4; j++) { P.line(.2, .36 + j * .44, 1.8, .36 + j * .44, .012, INK3); for (let i = 0; i < 6; i++) P.disc(.3 + i * .28, .28 + j * .44, .07, P.leaf(.4), .016, INK2); } },
+  well(P) { P.disc(.5, .5, .42, WASH.stoneD).disc(.5, .5, .27, rgba(INK, .75), .03); for (let k = 0; k < 8; k++) { const a = k * .785 + .3; P.line(.5 + Math.cos(a) * .28, .5 + Math.sin(a) * .28, .5 + Math.cos(a) * .41, .5 + Math.sin(a) * .41, .016, INK2); } P.line(.06, .5, .94, .5, .04, WASH.woodDD).dot(.62, .5, .06, WASH.woodD); },
+  stall(P) { P.box(.08, .42, 1.84, .5, WASH.wood, .03).box(.02, .04, 1.96, .52, WASH.cloth, .03); for (let k = 0; k < 5; k++) P.box(.08 + k * .4, .06, .2, .48, P.wash(.42), 0, 0); P.box(.02, .04, 1.96, .52, null, .03); },
+  cart(P) { P.box(.07, .72, .12, .5, INK2, .04, .02).box(.81, .72, .12, .5, INK2, .04, .02).box(.2, .34, .6, 1.3, WASH.wood, .03).line(.4, .36, .4, 1.62, .014, INK3).line(.6, .36, .6, 1.62, .014, INK3).line(.28, .34, .28, .04, .04, WASH.woodDD).line(.72, .34, .72, .04, .04, WASH.woodDD); },
+  trough(P) { P.box(.1, .26, 1.8, .48, WASH.woodD, .05).box(.18, .33, 1.64, .34, P.wash(.3), .03, .02).line(.4, .46, .7, .46, .012, INK3).line(1.1, .54, 1.5, .54, .012, INK3); },
+  signpost(P) { P.poly([[.5, .43], [.9, .43], [.98, .5], [.9, .57], [.5, .57]], WASH.wood, .03).poly([[.5, .37], [.2, .2], [.1, .22], [.14, .32], [.44, .49]], WASH.wood, .03).dot(.5, .5, .08, INK2); },
+  lamp(P) { P.disc(.5, .5, .32, P.wash(.12), 0).disc(.5, .5, .12, WASH.iron, .03).flame(.5, .5, .08); },
+  notice(P) { P.box(.08, .38, .84, .22, WASH.wood, .02).dot(.12, .49, .05, INK2).dot(.88, .49, .05, INK2).box(.24, .4, .16, .18, WASH.white, .01, .016).box(.46, .41, .12, .16, WASH.white, .01, .016).box(.63, .4, .14, .18, WASH.white, .01, .016); },
+  tree(P, a, o) { const s = strHash((o && o.id) || 't'); P.blob(.5, .5, .62 + h2(s, 1, 1) * .16, 9, .16, VEL, 0, s).blob(.5, .5, .62 + h2(s, 1, 1) * .16, 9, .16, P.leaf(.3), .04, s);
+    P.blob(.46, .46, .3, 6, .2, P.leaf(.16), .016, s + 3).dot(.5, .5, .05, INK2); },
+  bush(P, a, o) { const s = strHash((o && o.id) || 'b'); P.blob(.5, .5, .32, 7, .2, VEL, 0, s).blob(.5, .5, .32, 7, .2, P.leaf(.26), .03, s).dot(.42, .46, .02, INK2).dot(.58, .54, .02, INK2); },
+  stump(P) { P.disc(.5, .5, .24, WASH.wood).disc(.5, .5, .15, null, .014, INK3).disc(.5, .5, .07, null, .014, INK3).line(.5, .5, .7, .38, .014, INK3); },
+  boulder(P, a, o) { const s = strHash((o && o.id) || 'r'); P.blob(.5, .5, .34, 6, .28, WASH.stoneD, .04, s).line(.4, .4, .56, .52, .016, INK2).line(.56, .52, .5, .66, .016, INK2); },
+  campfire(P) { for (let k = 0; k < 8; k++) { const a = k * .785; P.disc(.5 + Math.cos(a) * .32, .5 + Math.sin(a) * .32, .075, WASH.stoneD, .02); } P.line(.32, .6, .68, .4, .05, WASH.woodDD).line(.34, .4, .66, .62, .05, WASH.woodDD).flame(.42, .5, .11).flame(.54, .44, .15).flame(.6, .54, .1); },
+  bedroll(P) { P.box(.2, .16, .6, 1.68, WASH.cloth, .16, .03).box(.17, .1, .66, .26, WASH.woodD, .13, .03).line(.5, .4, .5, 1.78, .012, INK3).line(.24, .96, .76, .96, .012, INK3); },
+  barricade(P) { P.box(.06, .42, 1.88, .16, WASH.woodD, .02); for (let k = 0; k < 5; k++) { const x = .26 + k * .37; P.line(x - .13, .16, x + .13, .84, .055, WASH.woodDD).line(x - .13, .16, x + .13, .84, .012, INK).line(x + .13, .16, x - .13, .84, .055, WASH.woodDD).line(x + .13, .16, x - .13, .84, .012, INK); } },
+  stalagmite(P, a, o) { const s = strHash((o && o.id) || 's'); P.blob(.5, .5, .3, 7, .22, WASH.stoneD, .04, s).disc(.47, .47, .17, WASH.stone, .02, INK2).dot(.45, .45, .06, WASH.white); },
+  rubble(P, a, o) { const s = strHash((o && o.id) || 'u'); for (let k = 0; k < 6; k++) P.disc(.22 + h2(s, k, 1) * .56, .22 + h2(s, k, 2) * .56, .06 + h2(s, k, 3) * .07, WASH.stoneD, .02); },
+  mushrooms(P, a, o) { const s = strHash((o && o.id) || 'm'); for (let k = 0; k < 5; k++) { const x = .22 + h2(s, k, 1) * .56, y = .22 + h2(s, k, 2) * .56, r = .06 + h2(s, k, 3) * .06; P.disc(x, y, r, P.wash(.34), .02).dot(x, y, r * .3, WASH.white); } },
+  /* small things */
+  flower_pot(P) { P.disc(.5, .58, .22, WASH.woodD); for (const p of [[.36, .38], [.62, .36], [.5, .2], [.5, .5], [.72, .56], [.3, .6]]) P.disc(p[0], p[1], .1, P.wash(.8), .03); P.dot(.5, .38, .04, WASH.white); },
+  candle(P) { P.disc(.5, .58, .15, WASH.white).flame(.5, .42, .16); },
+  tankard(P) { P.disc(.74, .5, .1, null, .05, INK2).disc(.48, .5, .22, WASH.iron).disc(.48, .5, .13, rgba(INK, .45), .03); },
+  plate(P) { P.disc(.5, .5, .28, WASH.white).disc(.5, .5, .18, null, .025, INK3).disc(.45, .5, .1, WASH.woodD, .03); },
+  bottle(P) { P.box(.33, .34, .34, .46, rgba(INK, .32), .12).box(.43, .12, .14, .26, rgba(INK, .32), .04).line(.4, .44, .4, .7, .03, WASH.white); },
+  book(P) { P.box(.22, .26, .56, .48, WASH.woodDD, .04).box(.27, .3, .46, .4, WASH.white, .02, .025).line(.5, .3, .5, .7, .025, INK2); },
+  scroll(P) { P.box(.2, .36, .6, .28, WASH.white, .04).disc(.2, .5, .14, WASH.cloth).disc(.8, .5, .14, WASH.cloth).line(.34, .46, .66, .46, .02, INK3).line(.34, .55, .58, .55, .02, INK3); },
+  coins(P) { for (const p of [[.36, .42], [.56, .36], [.66, .56], [.44, .62], [.5, .48]]) P.disc(p[0], p[1], .1, WASH.straw, .035); },
+  key(P) { P.disc(.3, .5, .12, null, .06, INK).line(.42, .5, .82, .5, .06, INK).line(.7, .5, .7, .64, .05, INK).line(.8, .5, .8, .62, .05, INK); },
+  skull(P) { P.disc(.5, .44, .24, WASH.white).box(.38, .6, .24, .16, WASH.white, .03).dot(.41, .44, .055).dot(.59, .44, .055).line(.46, .64, .46, .74, .02, INK2).line(.54, .64, .54, .74, .02, INK2); },
+  dagger(P) { P.poly([[.5, .1], [.58, .56], [.42, .56]], WASH.iron, .03).line(.34, .58, .66, .58, .06, INK).box(.45, .6, .1, .26, WASH.woodDD, .03, .03); },
+  bowl(P) { P.disc(.5, .5, .26, WASH.wood).disc(.5, .5, .17, WASH.woodD, .03); },
+  loaf(P) { P.disc(.5, .5, .26, WASH.straw); for (const x of [.38, .5, .62]) P.line(x - .05, .4, x + .05, .6, .03, INK2); },
+  jug(P) { P.disc(.74, .52, .1, null, .05, INK2).disc(.5, .52, .24, WASH.stoneD).disc(.5, .52, .11, rgba(INK, .55), .03).poly([[.4, .3], [.5, .2], [.6, .3]], WASH.stoneD, .03); },
+  lantern(P) { P.disc(.5, .5, .32, P.wash(.14), 0).box(.3, .3, .4, .4, WASH.iron, .05).disc(.5, .5, .12, P.wash(.7), .03); },
+  hammer(P) { P.line(.28, .74, .62, .4, .08, WASH.woodDD).line(.28, .74, .62, .4, .02, INK).box(.5, .2, .3, .2, WASH.iron, .03); },
+  chalice(P) { P.disc(.5, .5, .24, WASH.straw).disc(.5, .5, .13, rgba(INK, .5), .03); },
+  dice(P) { P.box(.2, .28, .26, .26, WASH.white, .04, .03).box(.52, .44, .26, .26, WASH.white, .04, .03).dot(.33, .41, .03).dot(.59, .51, .03).dot(.71, .63, .03); },
+  basket(P) { P.disc(.5, .5, .28, WASH.straw).disc(.5, .5, .2, null, .02, INK3); for (const p of [[.42, .44], [.58, .46], [.5, .6]]) P.disc(p[0], p[1], .09, P.wash(.7), .03); },
+  pouch(P) { P.disc(.5, .56, .22, WASH.woodD).box(.42, .24, .16, .14, WASH.woodD, .03).line(.36, .36, .64, .36, .03, INK); },
+};
+
+/* text on a map sits in pixel space, so it stays crisp and legible at any zoom */
+function mapText(g, s, x, y, size, o) {
+  o = o || {};
+  const T = g.getTransform(), px = size * Math.hypot(T.a, T.b);
+  if (px < 5) return 0;
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+  g.font = (o.w || 600) + ' ' + px.toFixed(2) + 'px ' + (o.deco ? FONT_DECO : FONT_CAPS);
+  g.textAlign = o.align || 'center'; g.textBaseline = 'middle';
+  const X = T.a * x + T.c * y + T.e, Y = T.b * x + T.d * y + T.f, wd = g.measureText(s).width;
+  if (o.bg) {      /* a vellum label: text never sits straight on the picture */
+    const pw = wd + px * .9, ph = px * 1.55, lx = (o.align === 'left' ? X - px * .45 : X - pw / 2);
+    g.fillStyle = VEL; g.fillRect(lx, Y - ph / 2, pw, ph); g.lineWidth = Math.max(1, px * .07); g.strokeStyle = INK; g.strokeRect(lx, Y - ph / 2, pw, ph);
+  }
+  g.fillStyle = o.c || INK; g.fillText(s, X, Y + px * .05);
+  g.restore();
+  return wd / Math.hypot(T.a, T.b);
+}
+/* the largest size (in squares) at which s fits a width, down to a floor */
+function fitText(g, s, size, maxW, w) {
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.font = (w || 600) + ' 100px ' + FONT_CAPS; const per = g.measureText(s).width / 100; g.restore();
+  return per * size > maxW ? maxW / per : size;
+}
+
+/* one thing, turned and placed, then whatever sits on it */
+function paintObj(g, P, m, o) {
+  const a = ASSETS[o.a], f = footprint(o);
+  g.save(); g.translate(f.x + f.w / 2, f.y + f.h / 2); g.rotate(o.r * Math.PI / 2); g.translate(-a.w / 2, -a.h / 2);
+  ART[o.a](P, a, o);
+  g.restore();
+  const kids = m._.kids.get(o.id);
+  if (kids) for (const k of kids) {
+    const per = a.surf, tile = Math.floor(k.slot / per), sub = k.slot % per, tx = f.x + tile % f.w, ty = f.y + Math.floor(tile / f.w), s = strHash(k.id);
+    const cx = tx + .5 + (per > 1 ? (sub ? .2 : -.2) : (h2(s, 1, 7) - .5) * .22), cy = ty + .5 + (h2(s, 2, 7) - .5) * .22;
+    g.save(); g.translate(cx, cy); g.rotate((h2(s, 3, 7) - .5) * 1.2); g.scale(.46, .46); g.translate(-.5, -.5);
+    ART[k.a](P, ASSETS[k.a], k);
+    g.restore();
+  }
+}
+/* a town lot from above: a hipped roof, its door, its name on a label */
+function paintRoof(g, P, L, name) {
+  const x = L.x + .06, y = L.y + .06, w = L.w - .12, h = L.h - .12, wide = w >= h, half = (wide ? h : w) / 2;
+  P.box(x, y, w, h, WASH.roof, .03, .08);
+  const a = wide ? [x + half, y + h / 2] : [x + w / 2, y + half], b = wide ? [x + w - half, y + h / 2] : [x + w / 2, y + h - half];
+  for (let d = .28; d < half - .05; d += .3) {       /* courses of shingles, stepping down each slope */
+    const t = d / half, lw = .014;
+    if (wide) { P.line(lerp(a[0], x, t), a[1] - d, lerp(b[0], x + w, t), b[1] - d, lw, INK3).line(lerp(a[0], x, t), a[1] + d, lerp(b[0], x + w, t), b[1] + d, lw, INK3).line(a[0] - d, lerp(a[1], y, t), a[0] - d, lerp(a[1], y + h, t), lw, INK3).line(b[0] + d, lerp(b[1], y, t), b[0] + d, lerp(b[1], y + h, t), lw, INK3); }
+    else { P.line(a[0] - d, lerp(a[1], y, t), b[0] - d, lerp(b[1], y + h, t), lw, INK3).line(a[0] + d, lerp(a[1], y, t), b[0] + d, lerp(b[1], y + h, t), lw, INK3).line(lerp(a[0], x, t), a[1] - d, lerp(a[0], x + w, t), a[1] - d, lw, INK3).line(lerp(b[0], x, t), b[1] + d, lerp(b[0], x + w, t), b[1] + d, lw, INK3); }
+  }
+  P.line(a[0], a[1], b[0], b[1], .05, INK);
+  for (const c of [[x, y, a], [x, y + h, wide ? a : b], [x + w, y, wide ? b : a], [x + w, y + h, b]]) P.line(c[0], c[1], c[2][0], c[2][1], .03, INK);
+  const s = strHash(L.site), cx = lerp(a[0], b[0], .25 + h2(s, 1, 1) * .5) + (wide ? 0 : .5), cy = lerp(a[1], b[1], .25 + h2(s, 1, 1) * .5) + (wide ? .5 : 0);
+  P.box(cx - .16, cy - .16, .32, .32, WASH.stoneD, .02, .03).box(cx - .08, cy - .08, .16, .16, rgba(INK, .7), .02, 0);
+  /* the door, standing a little proud of the wall */
+  const dx = L.side === 1 ? L.x + L.w : L.side === 3 ? L.x : L.x + L.off + .5, dy = L.side === 2 ? L.y + L.h : L.side === 0 ? L.y : L.y + L.off + .5;
+  if (L.side & 1) P.box(dx - .11, dy - .32, .22, .64, VEL, .02, .04); else P.box(dx - .32, dy - .11, .64, .22, VEL, .02, .04);
+  const size = fitText(g, name, .4, L.w - .9);
+  if (size >= .2) mapText(g, name, L.x + L.w / 2, L.y + L.h / 2 - (wide ? .0 : 0), size, { bg: true, c: RUB });
+  else mapText(g, clip(name, 12), L.x + L.w / 2, L.y + L.h / 2, .26, { bg: true, c: RUB });
+}
+
+/* paintMap: every still thing on a map, for the squares in R = {x0,y0,x1,y1}. The
+   caller has set the transform so one unit is one square. Doors and people are not
+   here: they change, so the view draws them fresh each frame.                     */
+function paintMap(g, m, R, opt, names) {
+  opt = opt || {};
+  const W = m.w, H = m.h, acc = accentOf(m), P = Pen(g, acc), cave = m.kind === 'cave';
+  const x0 = clamp(Math.floor(R.x0) - 1, 0, W), x1 = clamp(Math.ceil(R.x1) + 1, 0, W), y0 = clamp(Math.floor(R.y0) - 1, 0, H), y1 = clamp(Math.ceil(R.y1) + 1, 0, H);
+  const rock = (x, y) => (inb(m, x, y) ? m.t[y * W + x] === TR.ROCK : cave && m._.ex[clamp(y, 0, H - 1) * W + clamp(x, 0, W - 1)] < 0);
+  /* corners are nudged wherever rock or water meets other ground, so a cave wall or a shore is never a ruler line */
+  const soft = (x, y) => (inb(m, x, y) ? (m.t[y * W + x] === TR.ROCK ? 1 : m.t[y * W + x] === TR.WATER ? 2 : 0) : rock(x, y) ? 1 : 0);
+  const V = (x, y) => {
+    const a = soft(x - 1, y - 1), b = soft(x, y - 1), c = soft(x - 1, y), d = soft(x, y);
+    return a === b && b === c && c === d ? [x, y] : [x + (h2(x, y, 3) - .5) * .36, y + (h2(x, y, 4) - .5) * .36];
+  };
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  /* 1. rock: hatching that thins out away from the open ground */
+  if (cave) {
+    const hx0 = Math.max(0, x0 - 2), hx1 = Math.min(W, x1 + 2), hy0 = Math.max(0, y0 - 2), hy1 = Math.min(H, y1 + 2);
+    for (let y = hy0; y < hy1; y++) for (let x = hx0; x < hx1; x++) {
+      if (m.t[y * W + x] !== TR.ROCK) continue;
+      let near = 9; for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) if (!rock(x + i, y + j)) near = Math.min(near, Math.max(Math.abs(i), Math.abs(j)));
+      if (near > 2) continue;
+      g.beginPath();
+      for (let k = 0; k < (near === 1 ? 4 : 2); k++) {
+        const cx = x + h2(x, y, 10 + k), cy = y + h2(x, y, 20 + k), an = h2(x, y, 30 + k) * 3.1416, len = .16 + h2(x, y, 40 + k) * .14, ux = Math.cos(an), uy = Math.sin(an);
+        for (let j = -1; j <= 1; j++) { const ox = -uy * j * .085, oy = ux * j * .085; g.moveTo(cx + ox - ux * len, cy + oy - uy * len); g.lineTo(cx + ox + ux * len, cy + oy + uy * len); }
+      }
+      g.lineWidth = .024; g.strokeStyle = rgba(INK, near === 1 ? .6 : .3); g.stroke();
+    }
+  }
+  /* 2. ground: one wash per square, then the marks that say what it is */
+  const greenwash = acc === VERD ? rgba(VERD, .14) : null;
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const t = m.t[y * W + x];
+    if (t === TR.ROCK || t === TR.VOID || t === TR.ROOF) continue;
+    const a = V(x, y), b = V(x + 1, y), c = V(x + 1, y + 1), d = V(x, y + 1), s = (y * 131 + x) | 0;
+    g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath();
+    g.fillStyle = t === TR.WOOD ? WASH.wood : t === TR.STONE ? WASH.stone : t === TR.COBBLE ? WASH.cobble : t === TR.DIRT ? WASH.dirt : t === TR.CAVE ? WASH.cave : VEL;
+    g.fill(); g.lineWidth = .02; g.strokeStyle = g.fillStyle; g.stroke();       /* the hairline closes the seam between washes */
+    if (t === TR.GRASS && greenwash) { g.fillStyle = greenwash; g.fill(); }
+    if (t === TR.WATER) { g.fillStyle = acc === RUB ? rgba(INK, .1) : rgba(acc, .26); g.fill(); }
+    g.lineWidth = .014; g.strokeStyle = rgba(INK, .34); g.beginPath();
+    if (t === TR.WOOD) {          /* boards, running the same way through a room */
+      const along = m.rg[y * W + x] % 2 === 0;
+      for (let k = 1; k < 3; k++) { if (along) { g.moveTo(x, y + k / 3); g.lineTo(x + 1, y + k / 3); } else { g.moveTo(x + k / 3, y); g.lineTo(x + k / 3, y + 1); } }
+      for (let k = 0; k < 3; k++) { const q = .15 + h2(s, k, 6) * .7; if (along) { g.moveTo(x + q, y + k / 3); g.lineTo(x + q, y + (k + 1) / 3); } else { g.moveTo(x + k / 3, y + q); g.lineTo(x + (k + 1) / 3, y + q); } }
+    } else if (t === TR.STONE) {  /* flags: one cracked joint each way */
+      const q = .3 + h2(s, 1, 6) * .4, p = .3 + h2(s, 2, 6) * .4;
+      g.moveTo(x + q, y); g.lineTo(x + q + (h2(s, 3, 6) - .5) * .12, y + 1); g.moveTo(x, y + p); g.lineTo(x + q, y + p + (h2(s, 4, 6) - .5) * .1);
+    } else if (t === TR.COBBLE) {
+      for (let k = 0; k < 5; k++) { const cx = x + .14 + h2(s, k, 7) * .72, cy = y + .14 + h2(s, k, 8) * .72, r = .07 + h2(s, k, 9) * .05; g.moveTo(cx + r, cy); g.arc(cx, cy, r, 0, 5); }
+    } else if (t === TR.GRASS) {
+      for (let k = 0; k < 2; k++) { if (h2(s, k, 12) > .55) continue; const cx = x + .15 + h2(s, k, 10) * .7, cy = y + .25 + h2(s, k, 11) * .6; g.moveTo(cx - .06, cy - .09); g.lineTo(cx - .02, cy); g.moveTo(cx, cy - .12); g.lineTo(cx, cy); g.moveTo(cx + .06, cy - .09); g.lineTo(cx + .02, cy); }
+    } else if (t === TR.WATER) {
+      for (let k = 0; k < 2; k++) { const cx = x + .2 + h2(s, k, 13) * .4, cy = y + .28 + k * .4 + h2(s, k, 14) * .1; g.moveTo(cx, cy); g.quadraticCurveTo(cx + .1, cy - .07, cx + .2, cy); g.quadraticCurveTo(cx + .3, cy + .07, cx + .4, cy); }
+    }
+    g.stroke();
+    if (t === TR.DIRT || t === TR.CAVE) { g.fillStyle = rgba(INK, .32); for (let k = 0; k < 4; k++) { g.beginPath(); g.arc(x + .1 + h2(s, k, 15) * .8, y + .1 + h2(s, k, 16) * .8, .014 + h2(s, k, 17) * .014, 0, 6.2832); g.fill(); } }
+  }
+  /* 3. the 5 ft grid, on every square a token can stand on */
+  if (opt.grid !== false) {
+    g.beginPath();
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      if (!TWALK[m.t[y * W + x]]) continue;
+      const a = V(x, y), b = V(x + 1, y), d = V(x, y + 1);
+      g.moveTo(b[0], b[1]); g.lineTo(a[0], a[1]); g.lineTo(d[0], d[1]);
+      if (!TWALK[tAt(m, x + 1, y)]) { const c = V(x + 1, y + 1); g.moveTo(b[0], b[1]); g.lineTo(c[0], c[1]); }
+      if (!TWALK[tAt(m, x, y + 1)]) { const c = V(x + 1, y + 1); g.moveTo(d[0], d[1]); g.lineTo(c[0], c[1]); }
+    }
+    g.lineWidth = .018; g.strokeStyle = rgba(INK3, .5); g.stroke();
+  }
+  /* 4. shorelines and the cave's wall */
+  g.beginPath();
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    if (m.t[y * W + x] !== TR.WATER) continue;
+    for (let d = 0; d < 4; d++) if (tAt(m, x + DX[d], y + DY[d]) !== TR.WATER) { const p = V(x + (d === 1 ? 1 : 0), y + (d === 2 ? 1 : 0)), q = V(x + (d === 3 ? 0 : 1), y + (d === 0 ? 0 : 1)); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }
+  }
+  g.lineWidth = .04; g.strokeStyle = INK2; g.stroke();
+  if (cave) {
+    g.beginPath();
+    for (let y = Math.max(0, y0 - 1); y < Math.min(H, y1 + 1); y++) for (let x = Math.max(0, x0 - 1); x < Math.min(W, x1 + 1); x++) {
+      if (m.t[y * W + x] === TR.ROCK) continue;
+      for (let d = 0; d < 4; d++) if (rock(x + DX[d], y + DY[d])) { const p = V(x + (d === 1 ? 1 : 0), y + (d === 2 ? 1 : 0)), q = V(x + (d === 3 ? 0 : 1), y + (d === 0 ? 0 : 1)); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }
+    }
+    g.lineWidth = .1; g.strokeStyle = INK; g.stroke();
+  }
+  const seen = (f) => f.x < x1 + 1 && f.x + f.w > x0 - 1 && f.y < y1 + 1 && f.y + f.h > y0 - 1;
+  /* 5. rugs and beds of earth, under everything else */
+  for (const o of m.objs) if (!o.on && ASSETS[o.a].lay === 'd' && seen(footprint(o))) paintObj(g, P, m, o);
+  /* 6. roofs */
+  for (const L of m.lots) if (seen(L)) paintRoof(g, P, L, (names && names[L.site]) || '');
+  /* 7. walls on the edges between squares; a door leaves a gap with a jamb each side */
+  g.lineCap = 'square';
+  const edge = (e, ax, ay, bx, by) => {
+    if (e === ED.WALL) { P.line(ax, ay, bx, by, .17, INK); }
+    else if (e === ED.WINDOW) { g.lineCap = 'butt'; P.line(ax, ay, bx, by, .17, INK).line(lerp(ax, bx, .1), lerp(ay, by, .1), lerp(ax, bx, .9), lerp(ay, by, .9), .09, WASH.white); g.lineCap = 'square'; }
+    else if (e === ED.BARS) { P.line(ax, ay, bx, by, .04, INK); for (let k = 0; k <= 4; k++) P.dot(lerp(ax, bx, k / 4), lerp(ay, by, k / 4), .045, INK); }
+    else if (e === ED.DOOR) { P.line(ax, ay, lerp(ax, bx, .1), lerp(ay, by, .1), .17, INK).line(lerp(ax, bx, .9), lerp(ay, by, .9), bx, by, .17, INK); }
+  };
+  for (let y = y0; y <= y1 && y <= H; y++) for (let x = x0; x < x1; x++) { const e = m.wn[y * W + x]; if (e) edge(e, x, y, x + 1, y); }
+  for (let y = y0; y < y1; y++) for (let x = x0; x <= x1 && x <= W; x++) { const e = m.ww[y * (W + 1) + x]; if (e) edge(e, x, y, x, y + 1); }
+  g.lineCap = 'round';
+  /* 8. things, back to front; trees last, their crowns spread over their neighbours */
+  const late = [];
+  for (const o of m.objs) { if (o.on || ASSETS[o.a].lay === 'd' || !seen(footprint(o))) continue; if (o.a === 'tree') late.push(o); else paintObj(g, P, m, o); }
+  for (const o of late) paintObj(g, P, m, o);
+  /* 9. what stops a step and what holds things, on request */
+  if (opt.foot) {
+    for (const o of m.objs) {
+      if (o.on) continue; const a = ASSETS[o.a], f = footprint(o); if (!seen(f) || a.lay === 'd') continue;
+      g.fillStyle = a.mv === 'b' ? rgba(RUB, .3) : a.mv === 'r' ? rgba(GOLD, .34) : rgba(VERD, .2); g.fillRect(f.x + .04, f.y + .04, f.w - .08, f.h - .08);
+      if (a.surf) for (let j = 0; j < f.h; j++) for (let i = 0; i < f.w; i++) for (let k = 0; k < a.surf; k++) P.disc(f.x + i + .5 + (a.surf > 1 ? (k ? .2 : -.2) : 0), f.y + j + .5, .09, null, .03, LAPIS);
+    }
+  }
+  /* 10. words */
+  for (const l of m.labels) mapText(g, l.t, l.x, l.y, l.s, { c: INK2, w: 600 });
+  if (opt.frame) {
+    mapText(g, m.title.toUpperCase(), 0, -.98, fitText(g, m.title.toUpperCase(), .58, W - 2.4, 700), { align: 'left', c: RUB, w: 700 });
+    mapText(g, m.sub + ' · one square is five feet', 0, -.4, fitText(g, m.sub + ' · one square is five feet', .27, W - 2.4, 400), { align: 'left', c: INK2, w: 400 });
+    /* a compass, north up */
+    const cx = W - .55, cy = -.72;
+    P.poly([[cx, cy - .6], [cx + .14, cy], [cx, cy + .6], [cx - .14, cy]], VEL, .03).poly([[cx, cy - .6], [cx + .14, cy], [cx - .14, cy]], INK, .03).poly([[cx - .5, cy], [cx, cy - .1], [cx + .5, cy], [cx, cy + .1]], null, .025, INK2);
+    mapText(g, 'N', cx - .42, cy - .46, .26, { c: INK, w: 700 });
+    /* a scale: six squares, thirty feet */
+    for (let k = 0; k < 6; k++) P.box(k, H + .5, 1, .14, k % 2 ? VEL : INK, 0, .025);
+    mapText(g, '30 ft', 6.3, H + .58, .26, { align: 'left', c: INK2, w: 600 });
+  }
+}
+
+/* ---- the moving parts: doors and people (drawn fresh each frame) ---- */
+function paintDoor(g, d) {
+  g.save(); g.translate(d.x, d.y); if (d.k === 'w') { g.rotate(Math.PI / 2); g.scale(1, -1); }
+  const bars = d.kind === 'bars', fill = bars ? WASH.iron : d.kind === 'gate' ? WASH.woodDD : WASH.woodD;
+  g.lineWidth = .04; g.strokeStyle = INK; g.fillStyle = fill;
+  if (d.open) {
+    g.beginPath(); g.arc(.12, 0, .76, 0, Math.PI / 2); g.lineWidth = .014; g.strokeStyle = rgba(INK, .4); g.stroke();
+    g.lineWidth = .04; g.strokeStyle = INK; g.beginPath(); g.rect(.07, 0, .1, .76); g.fill(); g.stroke();
+  } else {
+    g.beginPath(); g.rect(.12, -.085, .76, .17); g.fill(); g.stroke();
+    if (bars) for (let k = 1; k < 6; k++) { g.beginPath(); g.moveTo(.12 + k * .127, -.085); g.lineTo(.12 + k * .127, .085); g.lineWidth = .025; g.stroke(); }
+    else { g.beginPath(); g.arc(.76, 0, .035, 0, 6.2832); g.fillStyle = INK; g.fill(); }
+    if (d.lock) { g.beginPath(); g.rect(.44, -.06, .12, .12); g.fillStyle = INK; g.fill(); }
+  }
+  g.restore();
+}
+const TOKEN_R = .36;
+function paintToken(g, kind, letter, cx, cy, mark) {
+  g.beginPath(); g.ellipse(cx + .04, cy + .07, TOKEN_R, TOKEN_R * .92, 0, 0, 6.2832); g.fillStyle = rgba(INK, .22); g.fill();
+  g.beginPath(); g.arc(cx, cy, TOKEN_R, 0, 6.2832);
+  if (kind === 'pc') { const gr = g.createLinearGradient(cx - TOKEN_R, cy - TOKEN_R, cx + TOKEN_R, cy + TOKEN_R); gr.addColorStop(0, GOLDHI); gr.addColorStop(.55, GOLD); gr.addColorStop(1, GOLDLO); g.fillStyle = gr; }
+  else g.fillStyle = kind === 'foe' ? INK : kind === 'captive' ? VEL3 : WASH.white;
+  g.fill(); g.lineWidth = .05; g.strokeStyle = INK; g.stroke();
+  g.beginPath(); g.arc(cx, cy, TOKEN_R - .085, 0, 6.2832); g.lineWidth = .04;
+  g.strokeStyle = kind === 'pc' || kind === 'foe' ? RUB : kind === 'captive' ? INK2 : LAPIS;
+  if (kind === 'captive') g.setLineDash([.08, .07]);
+  g.stroke(); g.setLineDash([]);
+  if (mark) { g.beginPath(); g.arc(cx, cy, TOKEN_R + .09, 0, 6.2832); g.lineWidth = .045; g.strokeStyle = GOLD; g.stroke(); }
+  mapText(g, letter, cx, cy, .36, { c: kind === 'foe' ? VEL : INK, w: 700 });
+}
+
+/* a whole map on a small canvas: the title frontispiece, and any picture of a place */
+function paintThumb(cv, m, st) {
+  const g = cv.getContext('2d'), s = Math.min(cv.width / (m.w + 1), cv.height / (m.h + 1));
+  g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = VEL; g.fillRect(0, 0, cv.width, cv.height);
+  g.setTransform(s, 0, 0, s, (cv.width - m.w * s) / 2, (cv.height - m.h * s) / 2);
+  const names = {}; if (st) for (const k of Object.keys(st.sites)) names[k] = st.sites[k].name;
+  paintMap(g, m, { x0: 0, y0: 0, x1: m.w, y1: m.h }, { grid: true, frame: false }, names);
+  for (const d of m.doors) paintDoor(g, d);
+  for (const t of m.tokens) { const p = st && st.npcs[t.npc]; paintToken(g, t.k, p ? p.name.charAt(0) : '?', t.x + .5, t.y + .5, false); }
+}
+
+/* ============================== VIEW ==============================
+   The map table. The still part of a map is painted once into a bitmap (and again,
+   sharp, for just the part on screen whenever the camera comes to rest); doors, people,
+   the path and the selection are drawn over it each frame. Everything is laid out from
+   the canvas's own box, the same box taps are read from, so a tap lands on the square
+   that is drawn there whatever the browser's chrome is doing.                       */
+const G = { st: null };                                   /* the live game */
+const WALK_SPEED = 7;                                     /* squares a second, on screen */
+const View = { cv: null, g: null, vw: 0, vh: 0, dpr: 1, cam: { x: 0, y: 0, z: 40 }, zmin: 6, zmax: 110, map: null, base: null, sharp: null,
+  dirty: true, free: false, userCam: false, easing: false, moved: 0, sharpFor: -1, frames: 0, last: 0, fonts: 0, night: false,
+  sel: null, path: null, hoverKey: '', anim: { px: 0, py: 0, t: 1 }, walking: false, pending: null, opt: { grid: true, foot: false } };
+let Ptr = null;                                           /* the gesture in hand */
+
+const siteNames = () => { const o = {}; if (G.st) for (const k of Object.keys(G.st.sites)) o[k] = G.st.sites[k].name; return o; };
+const bakeKey = (m) => m.id + '|' + View.opt.grid + '|' + View.opt.foot + '|' + View.fonts;
+const s2w = (sx, sy) => [(sx - View.vw / 2) / View.cam.z + View.cam.x, (sy - View.vh / 2) / View.cam.z + View.cam.y];
+const w2s = (wx, wy) => [(wx - View.cam.x) * View.cam.z + View.vw / 2, (wy - View.cam.y) * View.cam.z + View.vh / 2];
+function localPt(e) { const r = View.cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+
+/* size the backing store from the element's own box; a no-op once the box has settled */
+function viewMeasure() {
+  const r = View.cv.getBoundingClientRect();
+  if (r.width < 2 || r.height < 2) return;                /* hidden: keep the last good size */
+  const dpr = Math.min(window.devicePixelRatio || 1, 3), pw = Math.round(r.width * dpr), ph = Math.round(r.height * dpr);
+  if (pw !== View.cv.width || ph !== View.cv.height || dpr !== View.dpr) { View.cv.width = pw; View.cv.height = ph; View.dpr = dpr; View.sharp = null; View.dirty = true; View.moved = performance.now(); }
+  if (r.width !== View.vw || r.height !== View.vh) { View.vw = r.width; View.vh = r.height; if (View.map) viewLimits(); View.dirty = true; }
+}
+function viewLimits() {
+  const m = View.map;
+  View.zmin = clamp(Math.min(View.vw / (m.w + 2 * MG), View.vh / (m.h + 2 * MG)), 4, 40);
+  View.cam.z = clamp(View.cam.z, View.zmin, View.zmax);
+  /* the board never slides off the table: past its margin there is nothing to see */
+  const hw = View.vw / View.cam.z / 2, hh = View.vh / View.cam.z / 2, hold = (v, lo, hi, mid) => (lo > hi ? mid : clamp(v, lo, hi));
+  View.cam.x = hold(View.cam.x, hw - MG, m.w + MG - hw, m.w / 2); View.cam.y = hold(View.cam.y, hh - MG, m.h + MG - hh, m.h / 2);
+}
+function bakeBase(m) {
+  const tw = m.w + 2 * MG, th = m.h + 2 * MG, px = clamp(Math.floor(Math.sqrt(4.2e6 / (tw * th))), 14, Math.round(44 * View.dpr));
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(tw * px); cv.height = Math.ceil(th * px);
+  const g = cv.getContext('2d'); g.fillStyle = VEL; g.fillRect(0, 0, cv.width, cv.height);
+  g.setTransform(px, 0, 0, px, MG * px, MG * px);
+  paintMap(g, m, { x0: 0, y0: 0, x1: m.w, y1: m.h }, { grid: View.opt.grid, foot: View.opt.foot, frame: true }, siteNames());
+  return { cv, px, key: bakeKey(m) };
+}
+/* the part of the map on screen, painted at exactly the pixels it is shown at */
+function bakeSharp() {
+  const m = View.map, z = View.cam.z, s = z * View.dpr, hw = View.vw / z / 2, hh = View.vh / z / 2;
+  for (const pad of [.3, .1, 0]) {
+    let x0 = Math.max(-MG, View.cam.x - hw * (1 + pad)), y0 = Math.max(-MG, View.cam.y - hh * (1 + pad));
+    const x1 = Math.min(m.w + MG, View.cam.x + hw * (1 + pad)), y1 = Math.min(m.h + MG, View.cam.y + hh * (1 + pad));
+    x0 = Math.floor(x0 * s) / s; y0 = Math.floor(y0 * s) / s;
+    const pw = Math.ceil((x1 - x0) * s), ph = Math.ceil((y1 - y0) * s);
+    if (pw < 2 || ph < 2) break;
+    if (pw * ph > 9e6) continue;
+    const cv = (View.sharp && View.sharp.cv) || document.createElement('canvas'); cv.width = pw; cv.height = ph;
+    const g = cv.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = VEL; g.fillRect(0, 0, pw, ph);
+    g.setTransform(s, 0, 0, s, -x0 * s, -y0 * s);
+    paintMap(g, m, { x0, y0, x1, y1 }, { grid: View.opt.grid, foot: View.opt.foot, frame: true }, siteNames());
+    View.sharp = { cv, x0, y0, x1: x0 + pw / s, y1: y0 + ph / s, z, key: bakeKey(m) };
+    return;
+  }
+  View.sharp = null;
+}
+function sharpOK() {
+  const S = View.sharp, m = View.map; if (!S || S.z !== View.cam.z || S.key !== bakeKey(m)) return false;
+  const hw = View.vw / View.cam.z / 2, hh = View.vh / View.cam.z / 2, e = 1e-6;
+  return S.x0 <= Math.max(-MG, View.cam.x - hw) + e && S.y0 <= Math.max(-MG, View.cam.y - hh) + e && S.x1 >= Math.min(m.w + MG, View.cam.x + hw) - e && S.y1 >= Math.min(m.h + MG, View.cam.y + hh) - e;
+}
+function camMoved(user) { View.moved = performance.now(); View.dirty = true; if (user) { View.free = true; View.userCam = true; View.easing = false; UI.chrome(); } viewLimits(); }
+function viewZoom(f, sx, sy) {
+  const w = s2w(sx, sy), z = clamp(View.cam.z * f, View.zmin, View.zmax);
+  View.cam.z = z; View.cam.x = w[0] - (sx - View.vw / 2) / z; View.cam.y = w[1] - (sy - View.vh / 2) / z;
+  camMoved(true);
+}
+/* show a map: all of it if it fits at a readable size, else a close view on the traveller */
+function viewSetMap(m) {
+  viewMeasure();
+  View.map = m; View.base = bakeBase(m); View.sharp = null; View.sel = null; View.path = null; View.pending = null; View.walking = false; View.anim.t = 1; View.hoverKey = '';
+  const pc = G.st.party[0], fit = Math.min(View.vw / (m.w + 2 * MG), View.vh / (m.h + 2 * MG));
+  View.cam.z = 40; viewLimits();
+  if (fit >= 26) { View.cam.z = Math.min(fit, 66); View.cam.x = m.w / 2; View.cam.y = m.h / 2; View.free = true; }
+  else { View.cam.z = clamp(Math.min(View.vw, View.vh) / 9.5, 30, 60); View.cam.x = pc.x + .5; View.cam.y = pc.y + .5; View.free = false; }
+  View.userCam = false; View.easing = false;
+  camMoved(false);
+}
+const pcVisual = () => { const pc = G.st.party[0], A = View.anim, t = A.t; return A.t >= 1 ? [pc.x + .5, pc.y + .5] : [lerp(A.px, pc.x, t) + .5, lerp(A.py, pc.y, t) + .5]; };
+
+function viewDraw() {
+  const g = View.g, m = View.map, z = View.cam.z, dpr = View.dpr, ox = View.vw / 2 - View.cam.x * z, oy = View.vh / 2 - View.cam.y * z;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = VEL; g.fillRect(0, 0, View.cv.width, View.cv.height);
+  if (!m || !View.base) return;
+  if (View.base.key !== bakeKey(m)) { View.base = bakeBase(m); View.sharp = null; }
+  if (sharpOK()) g.drawImage(View.sharp.cv, Math.round((View.sharp.x0 * z + ox) * dpr), Math.round((View.sharp.y0 * z + oy) * dpr));
+  else { const b = View.base; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(b.cv, (ox - MG * z) * dpr, (oy - MG * z) * dpr, b.cv.width / b.px * z * dpr, b.cv.height / b.px * z * dpr); }
+  g.setTransform(z * dpr, 0, 0, z * dpr, ox * dpr, oy * dpr);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  const st = G.st, pc = st.party[0], vis = pcVisual();
+  for (const d of m.doors) paintDoor(g, d);
+  if (View.sel) { const s = View.sel; g.lineWidth = .09; g.strokeStyle = INK; g.strokeRect(s.x + .03, s.y + .03, s.w - .06, s.h - .06); g.lineWidth = .045; g.strokeStyle = GOLDHI; g.strokeRect(s.x + .03, s.y + .03, s.w - .06, s.h - .06); }
+  const P = View.path;
+  if (P && P.pts.length > P.i) {       /* the way ahead: a dotted line of footfalls, and how far it is */
+    g.beginPath(); g.moveTo(vis[0], vis[1]);
+    for (let k = P.i; k < P.pts.length; k++) g.lineTo(P.pts[k][0] + .5, P.pts[k][1] + .5);
+    g.lineWidth = .05; g.strokeStyle = rgba(RUB, .55); g.setLineDash([.02, .16]); g.stroke(); g.setLineDash([]);
+    for (let k = P.i; k < P.pts.length - 1; k++) { g.beginPath(); g.arc(P.pts[k][0] + .5, P.pts[k][1] + .5, .07, 0, 6.2832); g.fillStyle = rgba(RUB, .7); g.fill(); }
+    const e = P.pts[P.pts.length - 1];
+    g.beginPath(); g.arc(e[0] + .5, e[1] + .5, .3, 0, 6.2832); g.lineWidth = .06; g.strokeStyle = RUB; g.stroke();
+    if (P.preview) mapText(g, P.ft + ' ft', e[0] + .5, e[1] - .2, Math.max(.3, 13 / z), { bg: true, c: INK, w: 600 });
+  }
+  for (const t of m.tokens) { const p = st.npcs[t.npc]; paintToken(g, t.k, p ? p.name.charAt(0) : '?', t.x + .5, t.y + .5, View.sel && View.sel.tok === t.id); }
+  if (pc.site === m.id) paintToken(g, 'pc', pc.name.charAt(0), vis[0], vis[1], false);
+  if (View.night) { g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = 'rgba(27,20,13,.26)'; g.fillRect(0, 0, View.cv.width, View.cv.height); }
+}
+
+/* ---- what a tap on a square means: the same answer for the preview and for the tap ---- */
+function plan(tx, ty) {
+  const m = View.map;
+  if (!inb(m, tx, ty)) return null;
+  const L = m.lots.find((l) => tx >= l.x && tx < l.x + l.w && ty >= l.y && ty < l.y + l.h);
+  if (L) { const e = m.exits.find((q) => q.to === L.site); return e ? { goals: e.tiles, then: { t: 'travel' }, lot: L } : { lot: L }; }
+  const tok = tokenAt(m, tx, ty); if (tok) return { tok };
+  const obj = objAt(m, tx, ty);
+  if (!tileFree(m, tx, ty)) return { obj, tx, ty };
+  const e = exitAt(m, tx, ty);
+  if (e && e.auto) return { goals: exitGoals(m, e), then: { t: 'travel' }, obj };
+  return { goals: [[tx, ty]], obj };
+}
+function doorNear(m, wx, wy) {
+  const tx = Math.floor(wx), ty = Math.floor(wy); if (!inb(m, tx, ty)) return null;
+  const fx = wx - tx, fy = wy - ty, lim = Math.max(.22, 12 / View.cam.z);
+  const c = [[0, fy, fx], [2, 1 - fy, fx], [3, fx, fy], [1, 1 - fx, fy]].filter((q) => q[1] < lim && q[2] > .08 && q[2] < .92 && eGet(m, tx, ty, q[0]) === ED.DOOR).sort((a, b) => a[1] - b[1]);
+  return c.length ? doorOn(m, tx, ty, c[0][0]) : null;
+}
+function hitPc(sx, sy) { const v = pcVisual(), s = w2s(v[0], v[1]); return Math.hypot(sx - s[0], sy - s[1]) < Math.max(22, TOKEN_R * View.cam.z * 1.25); }
+function previewTo(sx, sy) {
+  const w = s2w(sx, sy), tx = Math.floor(w[0]), ty = Math.floor(w[1]), key = tx + ',' + ty;
+  if (key === View.hoverKey) return;
+  View.hoverKey = key;
+  const st = G.st, pc = st.party[0], m = View.map, p = st.walk ? null : plan(tx, ty);
+  let path = null;
+  if (p && p.goals) {
+    const goals = new Set();
+    for (const q of p.goals) if (tileFree(m, q[0], q[1]) && !taken(st, m, q[0], q[1], pc.id)) goals.add(q[1] * m.w + q[0]);
+    if (goals.size && !goals.has(pc.y * m.w + pc.x)) path = findPath(m, pc.x, pc.y, goals, (x, y) => taken(st, m, x, y, pc.id));
+  }
+  const had = !!(View.path && View.path.preview);
+  if (path) View.path = { pts: path.path, ft: path.ft, i: 0, preview: true, plan: p };
+  else if (had) View.path = null;
+  if (path || had) View.dirty = true;
+  View.cv.classList.toggle('walk', !!path);
+}
+/* ask the engine to walk; it answers with the path it chose, or says why not */
+function go(p) {
+  const st = G.st, pc = st.party[0];
+  const res = intent(st, { t: 'move', who: pc.id, goals: p.goals, then: p.then });
+  if (!res.ok) { UI.toast(res.say); Sfx.deny(); if (View.path && View.path.preview) View.path = null; View.dirty = true; return; }
+  if (!res.path) { UI.follow(res); return; }             /* already standing there: the engine did the rest */
+  if (!res.path.length) return;
+  View.path = { pts: res.path, ft: res.ft, i: 0, preview: false }; View.walking = true; View.hoverKey = ''; View.dirty = true;
+  const s = w2s(pc.x + .5, pc.y + .5);
+  if (s[0] < 0 || s[1] < 0 || s[0] > View.vw || s[1] > View.vh) { View.free = false; View.userCam = false; UI.chrome(); }
+  UI.act(null);
+}
+function tapAt(sx, sy) {
+  const w = s2w(sx, sy), tx = Math.floor(w[0]), ty = Math.floor(w[1]), m = View.map, st = G.st, pc = st.party[0];
+  View.sel = null; View.dirty = true;
+  const d = doorNear(m, w[0], w[1]);
+  if (d && !(inb(m, tx, ty) && tokenAt(m, tx, ty))) {
+    UI.card(null);
+    if (!st.walk && doorSides(d).some((q) => q[0] === pc.x && q[1] === pc.y)) { UI.follow(intent(st, { t: 'door', who: pc.id, id: d.id })); return; }
+    go({ goals: doorSides(d), then: { t: 'door', id: d.id } });
+    return;
+  }
+  const p = plan(tx, ty);
+  if (!p) { UI.card(null); return; }
+  if (p.tok) {
+    const n = st.npcs[p.tok.npc] || { name: 'Someone', role: '', trait: '' };
+    View.sel = { x: tx, y: ty, w: 1, h: 1, tok: p.tok.id };
+    UI.card(n.name, cap(n.role) + (n.trait ? ', ' + n.trait : '') + '.' + (p.tok.k === 'foe' ? ' No friend of yours.' : p.tok.k === 'captive' ? ' Held behind bars.' : ''));
+    return;
+  }
+  if (p.lot) {
+    const site = st.sites[p.lot.site] || { name: 'A building', kind: 'house' };
+    View.sel = { x: p.lot.x, y: p.lot.y, w: p.lot.w, h: p.lot.h };
+    UI.card(site.name, cap(KIND_SUB[site.kind] || 'a building') + ', ' + p.lot.w * FT + ' by ' + p.lot.h * FT + ' ft.' + (st.maps[site.id] ? '' : ' Nobody has charted its rooms yet.'));
+  } else if (p.obj) {
+    const a = ASSETS[p.obj.a], f = footprint(p.obj), kids = (m._.kids.get(p.obj.id) || []).map((k) => ASSETS[k.a].n.toLowerCase());
+    View.sel = { x: f.x, y: f.y, w: f.w, h: f.h };
+    UI.card(a.n, a.d + ' ' + f.w * FT + ' by ' + f.h * FT + ' ft' + (a.mv === 'b' ? ', and in the way.' : a.mv === 'r' ? ', slow going.' : '.') + (kids.length ? ' On it: ' + kids.join(', ') + '.' : ''));
+  } else if (!p.goals) UI.card(cap(TERRAIN[m.t[ty * m.w + tx]]), 'No way through.');
+  else UI.card(null);
+  if (p.goals) go(p);
+}
+
+/* ---- gestures. Fingers come through TOUCH events (the held set rebuilt from
+        e.touches every time); the mouse and wheel are a second, separate path. ---- */
+function dragTo(x, y) {
+  const P = Ptr; if (!P) return;
+  if (P.mode === 'tap' && Math.hypot(x - P.sx, y - P.sy) > 9) P.mode = P.onPc ? 'drag' : 'pan';
+  if (P.mode === 'pan') { View.cam.x -= (x - P.x) / View.cam.z; View.cam.y -= (y - P.y) / View.cam.z; camMoved(true); }
+  else if (P.mode === 'drag') previewTo(x, y);
+  P.x = x; P.y = y;
+}
+function release() {
+  const P = Ptr; Ptr = null; if (!P) return;
+  if (P.mode === 'tap') tapAt(P.sx, P.sy);
+  else if (P.mode === 'drag') { const pv = View.path; View.hoverKey = ''; if (pv && pv.preview && pv.plan) go(pv.plan); }
+}
+function viewAttach() {
+  const cv = View.cv = $('map'); View.g = cv.getContext('2d');
+  const pinch = (ts) => { const a = localPt(ts[0]), b = localPt(ts[1]); return { mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) || 1 }; };
+  cv.addEventListener('touchstart', (e) => {
+    e.preventDefault(); Sfx.wake();
+    const ts = e.touches;
+    if (ts.length === 1) { const p = localPt(ts[0]); Ptr = { mode: 'tap', sx: p.x, sy: p.y, x: p.x, y: p.y, onPc: !G.st.walk && hitPc(p.x, p.y) }; }
+    else if (ts.length >= 2) { const q = pinch(ts); Ptr = { mode: 'pinch', d: q.d, z: View.cam.z, w: s2w(q.mx, q.my) }; if (View.path && View.path.preview) View.path = null; }
+  }, { passive: false });
+  cv.addEventListener('touchmove', (e) => {
+    e.preventDefault(); const ts = e.touches; if (!Ptr) return;
+    if (Ptr.mode === 'pinch' && ts.length >= 2) {
+      const q = pinch(ts), z = clamp(Ptr.z * q.d / Ptr.d, View.zmin, View.zmax);
+      View.cam.z = z; View.cam.x = Ptr.w[0] - (q.mx - View.vw / 2) / z; View.cam.y = Ptr.w[1] - (q.my - View.vh / 2) / z; camMoved(true);
+    } else if (ts.length === 1 && Ptr.mode !== 'pinch') { const p = localPt(ts[0]); dragTo(p.x, p.y); }
+  }, { passive: false });
+  const up = (e) => {
+    e.preventDefault(); const ts = e.touches; if (!Ptr) return;
+    if (ts.length === 0) { if (e.type === 'touchcancel') { Ptr = null; if (View.path && View.path.preview) { View.path = null; View.dirty = true; } } else release(); }
+    else if (ts.length === 1 && Ptr.mode === 'pinch') { const p = localPt(ts[0]); Ptr = { mode: 'pan', sx: p.x, sy: p.y, x: p.x, y: p.y }; }   /* one finger left: it pans, it never taps */
+    else if (ts.length >= 2) { const q = pinch(ts); Ptr = { mode: 'pinch', d: q.d, z: View.cam.z, w: s2w(q.mx, q.my) }; }
+  };
+  cv.addEventListener('touchend', up, { passive: false }); cv.addEventListener('touchcancel', up, { passive: false });
+  for (const t of ['gesturestart', 'gesturechange', 'gestureend']) cv.addEventListener(t, (e) => e.preventDefault());
+  cv.addEventListener('mousedown', (e) => { if (e.button !== 0) return; Sfx.wake(); const p = localPt(e); Ptr = { mode: 'tap', sx: p.x, sy: p.y, x: p.x, y: p.y, onPc: !G.st.walk && hitPc(p.x, p.y), mouse: true }; });
+  window.addEventListener('mousemove', (e) => {
+    if (!View.map) return;
+    const p = localPt(e);
+    if (Ptr && Ptr.mouse) dragTo(p.x, p.y);
+    else if (!Ptr && e.target === cv && !G.st.walk && !View.walking) previewTo(p.x, p.y);
+  });
+  window.addEventListener('mouseup', () => { if (Ptr && Ptr.mouse) release(); });
+  cv.addEventListener('mouseleave', () => { if (!Ptr && View.path && View.path.preview) { View.path = null; View.hoverKey = ''; View.dirty = true; } });
+  cv.addEventListener('wheel', (e) => { e.preventDefault(); const p = localPt(e); viewZoom(Math.exp(-clamp(e.deltaY, -240, 240) * .0018), p.x, p.y); }, { passive: false });
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  const reflow = () => { viewMeasure(); setTimeout(viewMeasure, 120); setTimeout(viewMeasure, 420); };
+  window.addEventListener('resize', reflow); window.addEventListener('orientationchange', reflow);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', reflow);
+}
+
+/* one frame: the host's clock moves the walk on, the camera keeps up, the picture is redrawn if anything changed */
+function viewFrame(now) {
+  requestAnimationFrame(viewFrame);
+  const dt = clamp((now - View.last) / 1000, 0, .1); View.last = now;
+  if (!View.map || !G.st || !document.body.classList.contains('in-play')) return;
+  if ((View.frames++ % 20) === 0) viewMeasure();
+  const st = G.st, pc = st.party[0], A = View.anim;
+  if (A.t < 1) { A.t = Math.min(1, A.t + dt * WALK_SPEED); View.dirty = true; }
+  if (A.t >= 1) {
+    if (st.walk) {
+      const from = [pc.x, pc.y], res = intent(st, { t: 'step', who: pc.id });
+      if (res.ok) { A.px = from[0]; A.py = from[1]; A.t = 0; Sfx.step(); if (res.door) Sfx.door(); if (res.done) View.pending = res.next || null; if (View.path) View.path.i++; }
+      else { UI.toast(res.say); View.pending = null; }
+      View.dirty = true; UI.saveSoon();
+    } else if (View.walking) {
+      View.walking = false; View.path = null; View.dirty = true;
+      const p = View.pending; View.pending = null;
+      if (p) UI.follow(intent(st, Object.assign({ who: pc.id }, p)));
+      UI.arrived();
+    }
+  }
+  /* the camera: it keeps the traveller centred, or, once the table has been pushed about by hand, only ever keeps them on the board */
+  if (pc.site === View.map.id) {
+    const v = pcVisual(), cam = View.cam;
+    if (!View.free && (A.t < 1 || st.walk || View.easing)) {
+      const k = 1 - Math.exp(-dt * 6), dx = v[0] - cam.x, dy = v[1] - cam.y;
+      if (Math.abs(dx) + Math.abs(dy) > .002) { cam.x += dx * k; cam.y += dy * k; camMoved(false); } else View.easing = false;
+    } else if (View.free && (A.t < 1 || st.walk)) {
+      const s = w2s(v[0], v[1]), mx = Math.min(70, View.vw * .16), my = Math.min(70, View.vh * .16);
+      const ox = s[0] < mx ? s[0] - mx : s[0] > View.vw - mx ? s[0] - (View.vw - mx) : 0, oy = s[1] < my ? s[1] - my : s[1] > View.vh - my ? s[1] - (View.vh - my) : 0;
+      if (ox || oy) { cam.x += ox / cam.z; cam.y += oy / cam.z; camMoved(false); }
+    }
+  }
+  if (View.sharpFor !== View.moved && now - View.moved > 170 && !Ptr) { View.sharpFor = View.moved; if (!sharpOK()) { bakeSharp(); View.dirty = true; } }
+  if (View.dirty) { View.dirty = false; viewDraw(); }
+}
+
+/* ============================== AUDIO ==============================
+   WebAudio only, no files. The context is made on the first gesture; footfalls and
+   door creaks are filtered noise and a sliding saw; the music is a slow plucked
+   Dorian round, scheduled a little ahead of the clock.                            */
+const Sfx = {
+  ctx: null, sfx: null, mus: null, noise: null, timer: 0, nextT: 0, n: 0, foot: 0, mel: 4,
+  wake() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      try { this.ctx = new AC(); } catch (e) { return; }
+      const c = this.ctx, lim = c.createDynamicsCompressor(); lim.connect(c.destination);
+      this.sfx = c.createGain(); this.mus = c.createGain(); this.sfx.connect(lim); this.mus.connect(lim);
+      const len = Math.floor(c.sampleRate * .5), b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      this.noise = b; this.vols(); this.nextT = c.currentTime + .3;
+      this.timer = setInterval(() => this.tick(), 120);
+    }
+    if (this.ctx.state === 'suspended' && !document.hidden) this.ctx.resume().catch(() => {});
+  },
+  vols() { if (!this.ctx) return; this.sfx.gain.value = Settings.data.sfxVol; this.mus.gain.value = Settings.data.musicVol * .55; },
+  tone(f0, f1, dur, type, vol, at, bus) {
+    const c = this.ctx; if (!c || c.state !== 'running') return;
+    const t = c.currentTime + (at || 0), o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g); g.connect(bus || this.sfx); o.start(t); o.stop(t + dur + .02);
+  },
+  burst(dur, f, q, vol, at) {
+    const c = this.ctx; if (!c || c.state !== 'running') return;
+    const t = c.currentTime + (at || 0), s = c.createBufferSource(), bp = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = this.noise; bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    s.connect(bp); bp.connect(g); g.connect(this.sfx); s.start(t, Math.random() * .3, dur + .02);
+  },
+  step() { this.foot ^= 1; this.burst(.06, this.foot ? 430 : 350, 1.4, .55); },
+  door() { this.tone(190, 105, .24, 'sawtooth', .07); this.burst(.09, 170, .9, .7, .2); },
+  deny() { this.tone(130, 110, .12, 'square', .06); },
+  travel() { this.tone(392, 392, .5, 'sine', .14); this.tone(587.3, 587.3, .8, 'sine', .1, .13); },
+  page() { this.burst(.12, 2200, .6, .25); },
+  /* the round: eight quavers to the bar over D, C, G, D; a bass note twice a bar, a wandering tune above */
+  tick() {
+    const c = this.ctx; if (!c || c.state !== 'running') return;
+    const SC = [146.83, 164.81, 174.61, 196, 220, 246.94, 261.63, 293.66, 329.63, 349.23, 392, 440], ROOT = [73.42, 65.41, 98, 73.42], dur = .46;
+    if (this.nextT < c.currentTime) this.nextT = c.currentTime + .1;
+    while (this.nextT < c.currentTime + .45) {
+      const k = this.n % 8, bar = Math.floor(this.n / 8) % 4, t = this.nextT - c.currentTime;
+      if (k === 0 || k === 4) this.tone(ROOT[bar], ROOT[bar], 1.6, 'triangle', .5, t, this.mus);
+      if (Math.random() < (k % 2 ? .45 : .75)) {
+        this.mel = clamp(this.mel + Math.round((Math.random() - .5) * 4), 0, SC.length - 1);
+        this.tone(SC[this.mel], SC[this.mel], 1.1, 'triangle', .22, t, this.mus); this.tone(SC[this.mel] * 2, SC[this.mel] * 2, .5, 'sine', .05, t, this.mus);
+      }
+      this.n++; this.nextT += dur;
+    }
+  },
+};
+
+/* ============================== STORAGE ============================== */
+const Settings = {
+  KEY: 'cyoa2.settings.v1',
+  defaults: { seed: '', grid: true, foot: false, musicVol: .35, sfxVol: .7, theme: 'auto' },
+  data: null,
+  load() { let d = {}; try { d = JSON.parse(localStorage.getItem(this.KEY) || '{}') || {}; } catch (e) { d = {}; } this.data = Object.assign({}, this.defaults, d); },
+  save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* private mode: settings last this visit */ } },
+};
+/* the tale saves itself: IndexedDB, then localStorage, then memory */
+const Store = {
+  db: null, mode: 'idb', mem: {},
+  async open() {
+    if (this.db || this.mode !== 'idb') return;
+    try {
+      this.db = await Promise.race([
+        new Promise((res, rej) => { const rq = indexedDB.open('cyoa2', 1); rq.onupgradeneeded = () => { if (!rq.result.objectStoreNames.contains('saves')) rq.result.createObjectStore('saves', { keyPath: 'slot' }); }; rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('idb timeout')), 2500))]);
+    } catch (e) { this.mode = 'ls'; this.db = null; }
+  },
+  tx(mode, fn) { return new Promise((res, rej) => { const t = this.db.transaction('saves', mode), rq = fn(t.objectStore('saves')); t.oncomplete = () => res(rq ? rq.result : undefined); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); },
+  async put(rec) { await this.open(); if (this.db) { try { return await this.tx('readwrite', (s) => s.put(rec)); } catch (e) { /* fall through */ } } try { localStorage.setItem('cyoa2.save.' + rec.slot, JSON.stringify(rec)); } catch (e) { this.mem[rec.slot] = rec; } },
+  async get(slot) { await this.open(); if (this.db) { try { const r = await this.tx('readonly', (s) => s.get(slot)); if (r) return r; } catch (e) { /* fall through */ } } try { const j = localStorage.getItem('cyoa2.save.' + slot); if (j) return JSON.parse(j); } catch (e) { /* fall through */ } return this.mem[slot] || null; },
+  async del(slot) { await this.open(); if (this.db) { try { await this.tx('readwrite', (s) => s.delete(slot)); } catch (e) { /* ignore */ } } try { localStorage.removeItem('cyoa2.save.' + slot); } catch (e) { /* ignore */ } delete this.mem[slot]; },
+};
+
+/* ============================== UI ============================== */
+const UI = {
+  saveT: 0, toastT: 0, tab: 'tale', libDone: false, hasSave: false, dlgDefault: null,
+  show(id) { for (const s of document.querySelectorAll('.screen')) s.classList.toggle('active', s.id === id); },
+  veil(fn, ms) { const v = $('veil'); v.classList.add('on'); setTimeout(() => { try { fn(); } finally { requestAnimationFrame(() => v.classList.remove('on')); } }, ms || 460); },
+  toast(msg) { if (!msg) return; const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(this.toastT); this.toastT = setTimeout(() => t.classList.remove('on'), 2200); },
+  dialog(title, paras, btns, lead) {
+    $('dlg-title').textContent = title;
+    const body = $('dlg-body'), row = $('dlg-btns'); body.textContent = ''; row.textContent = '';
+    paras.forEach((p, k) => body.appendChild(el('p', lead && k === 0 ? 'lead' : '', p)));
+    this.dlgDefault = null;
+    for (const b of btns) { const e = el('button', 'plaque small' + (b.cls ? ' ' + b.cls : ''), b.t); e.type = 'button'; e.addEventListener('click', () => { this.closeDialog(); if (b.fn) b.fn(); }); row.appendChild(e); if (b.main) this.dlgDefault = e; }
+    $('dialog').classList.add('open'); $('scrim').classList.add('open');
+  },
+  closeDialog() { $('dialog').classList.remove('open'); if (!$('menu').classList.contains('open')) $('scrim').classList.remove('open'); },
+  openMenu() { $('menu').classList.add('open'); $('scrim').classList.add('open'); },
+  closeMenu() { $('menu').classList.remove('open'); if (!$('dialog').classList.contains('open')) $('scrim').classList.remove('open'); },
+  panelOpen() { return !!document.querySelector('.panel.open'); },
+  openPanel(id) { this.closeMenu(); for (const p of document.querySelectorAll('.panel')) p.classList.toggle('open', p.id === id); Ptr = null; },
+  /* a hidden canvas measures as nothing, so re-measure on the way back to the board */
+  closePanels() { for (const p of document.querySelectorAll('.panel')) p.classList.remove('open'); if (View.map) { viewMeasure(); View.dirty = true; } },
+
+  /* ---- the board's chrome: the name of the place, the card, the way-out plaque ---- */
+  header() { const m = View.map; $('place-name').textContent = m ? m.title : ''; $('place-sub').textContent = m ? m.sub : ''; },
+  card(name, text) {
+    const on = !!name; $('info').hidden = !on; $('board').classList.toggle('has-info', on);
+    if (on) { $('info-name').textContent = name; $('info-text').textContent = text || ''; } else if (View.sel) { View.sel = null; View.dirty = true; }
+  },
+  act(e) { const b = $('act'); b.hidden = !e; if (e) b.textContent = e.label || 'Go'; },
+  chrome() { $('recenter').hidden = !View.userCam; },
+  arrived() { const st = G.st, pc = st.party[0], m = st.maps[pc.site]; this.act(st.walk ? null : exitAt(m, pc.x, pc.y)); this.saveSoon(); },
+  /* what came back from the engine after a door or a way out was asked for */
+  follow(res) {
+    if (!res) return;
+    if (!res.ok) { this.toast(res.say); Sfx.deny(); return; }
+    if (res.site) { Sfx.travel(); this.enterSite(); return; }
+    if ('open' in res) { Sfx.door(); View.dirty = true; this.saveSoon(); }
+  },
+  enterSite() { this.card(null); this.act(null); this.veil(() => { viewSetMap(G.st.maps[G.st.here]); this.header(); this.chrome(); this.arrived(); }, 240); },
+  enterPlay(opening) {
+    this.veil(() => {
+      this.closePanels(); this.show('scr-play'); document.body.classList.add('in-play');
+      View.opt.grid = Settings.data.grid; View.opt.foot = Settings.data.foot;
+      viewSetMap(G.st.maps[G.st.here]); this.header(); this.card(null); this.chrome(); this.arrived();
+      if (opening) { const B = G.st.bible, main = B.threads.find((t) => t.main); this.dialog(B.town, [B.opening].concat(main ? [main.t] : []), [{ t: 'Begin', main: true }], true); }
+    });
+  },
+  toTitle() { this.saveNow(); this.veil(() => { this.closePanels(); this.closeMenu(); document.body.classList.remove('in-play'); this.show('scr-title'); this.titleState(); }); },
+  async titleState() {
+    const rec = await Store.get('auto');
+    this.hasSave = !!(rec && rec.data);
+    $('btn-continue').hidden = !this.hasSave;
+    let st = G.st;
+    if (!st && this.hasSave) { try { st = unpackState(rec.data); } catch (e) { st = null; } }
+    if (!st) { st = newGame(randomSeed()); }
+    paintThumb($('frontis'), st.maps[st.here] || st.maps.S0, st);
+  },
+
+  /* ---- saving ---- */
+  saveSoon() { clearTimeout(this.saveT); this.saveT = setTimeout(() => this.saveNow(), 700); },
+  saveNow() { clearTimeout(this.saveT); if (!G.st) return; const data = packState(G.st); this.hasSave = true; Store.put({ slot: 'auto', at: Date.now(), data }).catch(() => {}); },
+  exportFile() {
+    if (!G.st) return;
+    const blob = new Blob([JSON.stringify(packState(G.st))], { type: 'application/json' }), a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'cyoa2-' + G.st.bible.town.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + G.st.seed.replace(/[^a-z0-9]+/gi, '-') + '.json';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    this.toast('Saved to a file.');
+  },
+  importFile(file) {
+    if (!file) return;
+    if (file.size > 8e6) { this.toast('That file is too large to be a tale.'); return; }
+    const rd = new FileReader();
+    rd.onload = () => { try { G.st = unpackState(JSON.parse(String(rd.result))); this.saveNow(); this.enterPlay(false); } catch (e) { this.toast(e && /tale/.test(e.message) ? e.message : 'That file could not be read as a tale.'); } };
+    rd.onerror = () => this.toast('That file could not be read.');
+    rd.readAsText(file);
+  },
+  newTale() {
+    const start = () => { const seed = (Settings.data.seed || '').trim().slice(0, 60) || randomSeed(); G.st = newGame(seed); this.saveNow(); this.enterPlay(true); };
+    if (this.hasSave) this.dialog('A new tale', ['Beginning again replaces the tale saved on this device. Save it to a file first if you want to keep it.'], [{ t: 'Keep it' }, { t: 'Begin anew', cls: 'danger', fn: start, main: true }]);
+    else start();
+  },
+  async continueTale() {
+    if (!G.st) { const rec = await Store.get('auto'); try { G.st = unpackState(rec && rec.data); } catch (e) { this.toast('The saved tale could not be read.'); return; } }
+    this.enterPlay(false);
+  },
+
+  /* ---- chronicle: the tale's threads, its places, its people, and the journal ---- */
+  chron(tab) {
+    if (tab) this.tab = tab;
+    for (const t of document.querySelectorAll('#pan-chron .tab')) t.setAttribute('aria-selected', String(t.dataset.tab === this.tab));
+    const box = $('chron-list'), st = G.st; box.textContent = '';
+    const entry = (name, sub, text, here) => { const e = el('div', 'entry' + (here ? ' here' : '')), g = el('div', 'grow'); g.appendChild(el('h3', '', name)); if (sub) g.appendChild(el('div', 'sub', sub)); if (text) g.appendChild(el('p', '', text)); e.appendChild(g); box.appendChild(e); return e; };
+    const siteName = (id) => (st.sites[id] ? st.sites[id].name : 'parts unknown');
+    if (this.tab === 'tale') {
+      entry(st.bible.town, 'in ' + st.bible.region, st.bible.opening);
+      for (const t of st.bible.threads) entry(t.main ? 'The matter at hand' : 'A whisper', '', t.t);
+      entry('Seed', '', st.seed);
+    } else if (this.tab === 'places') {
+      for (const id of Object.keys(st.sites)) {
+        const s = st.sites[id], here = id === st.here, lost = s.kind !== 'town' && s.kind !== 'cave' && !st.maps.S0.lots.some((l) => l.site === id);
+        const e = entry(s.name, (KIND_SUB[s.kind] || 'a place') + ' · ' + (st.maps[id] ? 'charted' : 'not yet charted'), s.made ? 'Found while charting the town.' : '', here);
+        if (!here && !lost) { const b = el('button', 'plaque small', 'Go'); b.type = 'button'; b.addEventListener('click', () => { const res = intent(st, { t: 'jump', who: st.party[0].id, site: id }); this.closePanels(); this.follow(res); }); e.appendChild(b); }
+      }
+    } else if (this.tab === 'people') {
+      const all = Object.keys(st.npcs).map((k) => st.npcs[k]).sort((a, b) => (a.made ? 1 : 0) - (b.made ? 1 : 0));
+      for (const p of all) entry(p.name, p.role, cap(p.trait || 'unremarkable') + '. ' + (p.kind === 'foe' ? 'To be found at ' : 'At ') + siteName(p.home) + '.' + (p.made ? ' First met in play.' : ''));
+    } else {
+      const lines = st.log.slice(-80).reverse();
+      for (const e of lines) {
+        const t = e.t === 'chart' ? 'Charted ' + siteName(e.site) + '.' : e.t === 'move' ? 'Walked ' + (e.ft | 0) + ' ft in ' + siteName(e.site) + '.' : e.t === 'door' ? (e.open ? 'Opened' : 'Closed') + ' a door in ' + siteName(e.site) + '.'
+          : e.t === 'travel' ? 'Went from ' + siteName(e.from) + ' to ' + siteName(e.to) + '.' : e.t === 'jump' ? 'Was set down in ' + siteName(e.to) + '.' : e.t === 'begin' ? 'The tale began in ' + siteName(e.site) + '.' : '';
+        if (t) box.appendChild(el('p', 'note', t));
+      }
+    }
+  },
+  /* ---- library: every asset, drawn by its own painter, with its rules ---- */
+  library() {
+    if (this.libDone) return; this.libDone = true;
+    const body = $('lib-body'), cats = [];
+    for (const id of Object.keys(ASSETS)) if (!cats.includes(ASSETS[id].cat)) cats.push(ASSETS[id].cat);
+    for (const cat of cats) {
+      body.appendChild(el('div', 'lib-h', cat));
+      const grid = el('div', 'lib-grid'); body.appendChild(grid);
+      for (const id of Object.keys(ASSETS)) {
+        const a = ASSETS[id]; if (a.cat !== cat) continue;
+        const card = el('div', 'lib-card'), cv = document.createElement('canvas'), px = 44, pad = .25, cw = (a.w + pad * 2) * px, ch = (a.h + pad * 2) * px;
+        cv.width = cw * 2; cv.height = ch * 2; cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+        const g = cv.getContext('2d'); g.fillStyle = VEL; g.fillRect(0, 0, cv.width, cv.height); g.setTransform(px * 2, 0, 0, px * 2, pad * px * 2, pad * px * 2);
+        g.lineCap = 'round'; g.lineJoin = 'round';
+        if (!a.sz) { g.lineWidth = .016; g.strokeStyle = rgba(INK3, .5); for (let i = 0; i <= a.w; i++) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, a.h); g.stroke(); } for (let j = 0; j <= a.h; j++) { g.beginPath(); g.moveTo(0, j); g.lineTo(a.w, j); g.stroke(); } }
+        ART[id](Pen(g, RUB), a, { id });
+        card.appendChild(cv); card.appendChild(el('b', '', a.n));
+        card.appendChild(el('span', '', a.sz ? 'sits on a surface' : a.w * FT + ' x ' + a.h * FT + ' ft'));
+        card.appendChild(el('span', '', (a.sz ? 'small' : a.lay === 'd' ? 'underfoot' : a.mv === 'b' ? 'blocks' : a.mv === 'r' ? 'slows' : 'free') + (a.surf ? ' · holds ' + a.surf * a.w * a.h : '') + (a.tall ? ' · tall' : '')));
+        grid.appendChild(card);
+      }
+    }
+  },
+  settings() {
+    const d = Settings.data;
+    $('set-seed').value = d.seed; $('set-grid').checked = d.grid; $('set-foot').checked = d.foot; $('set-music').value = d.musicVol; $('set-sfx').value = d.sfxVol; $('set-theme').value = d.theme;
+    $('set-seed-now').textContent = G.st ? 'This tale’s seed: ' + G.st.seed : '';
+    $('set-export').disabled = !G.st;
+  },
+  theme() {
+    const t = Settings.data.theme;
+    if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+    View.night = t === 'dark' || (t === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    View.dirty = true;
+  },
+};
+
+/* ============================== BOOT ============================== */
+(function boot() {
+  Settings.load(); UI.theme();
+  View.opt.grid = Settings.data.grid; View.opt.foot = Settings.data.foot;
+  viewAttach();
+  const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
+  on('reload-btn', 'click', async () => {
+    try {
+      if ('caches' in window) { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); }
+      if ('serviceWorker' in navigator) { const regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map((r) => r.unregister())); }
+    } catch (e) { /* best-effort cache clear */ }
+    const url = new URL(window.location.href); url.searchParams.set('_r', Date.now().toString()); window.location.replace(url.toString());
+  });
+  on('ribbon-btn', 'click', () => { Sfx.wake(); if ($('menu').classList.contains('open')) UI.closeMenu(); else UI.openMenu(); });
+  on('scrim', 'click', () => { if (!$('dialog').classList.contains('open')) UI.closeMenu(); });
+  on('btn-new', 'click', () => { Sfx.wake(); UI.newTale(); });
+  on('btn-continue', 'click', () => { Sfx.wake(); UI.continueTale(); });
+  on('btn-settings', 'click', () => { Sfx.wake(); UI.settings(); UI.openPanel('pan-settings'); });
+  on('btn-import', 'click', () => $('file-in').click());
+  on('set-import', 'click', () => $('file-in').click());
+  on('file-in', 'change', (e) => { UI.importFile(e.target.files[0]); e.target.value = ''; });
+  on('set-export', 'click', () => UI.exportFile());
+  on('set-delete', 'click', () => UI.dialog('Delete the saved tale', ['This removes the tale saved on this device. A file you saved yourself is not touched.'], [{ t: 'Keep it', main: true }, { t: 'Delete', cls: 'danger', fn: async () => {
+    clearTimeout(UI.saveT); await Store.del('auto'); UI.hasSave = false;
+    if (document.body.classList.contains('in-play')) { G.st = null; View.map = null; UI.veil(() => { UI.closePanels(); document.body.classList.remove('in-play'); UI.show('scr-title'); UI.titleState(); }); }
+    else { G.st = null; UI.titleState(); UI.settings(); }
+    UI.toast('The saved tale is gone.');
+  } }]));
+  on('menu', 'click', (e) => {
+    const act = e.target && e.target.dataset ? e.target.dataset.act : ''; if (!act) return;
+    UI.closeMenu(); Sfx.page();
+    if (act === 'chron') { UI.chron(); UI.openPanel('pan-chron'); }
+    else if (act === 'lib') { UI.library(); UI.openPanel('pan-lib'); }
+    else if (act === 'settings') { UI.settings(); UI.openPanel('pan-settings'); }
+    else if (act === 'export') UI.exportFile();
+    else if (act === 'title') UI.toTitle();
+  });
+  for (const b of document.querySelectorAll('[data-close]')) b.addEventListener('click', () => UI.closePanels());
+  for (const t of document.querySelectorAll('#pan-chron .tab')) t.addEventListener('click', () => UI.chron(t.dataset.tab));
+  on('info-x', 'click', () => UI.card(null));
+  on('act', 'click', () => { const st = G.st; if (!st || st.walk) return; UI.follow(intent(st, { t: 'travel', who: st.party[0].id })); });
+  on('recenter', 'click', () => { View.free = false; View.userCam = false; View.easing = true; UI.chrome(); View.dirty = true; });
+  on('set-seed', 'input', (e) => { Settings.data.seed = e.target.value; Settings.save(); });
+  on('set-grid', 'change', (e) => { Settings.data.grid = View.opt.grid = e.target.checked; Settings.save(); View.moved = performance.now(); View.dirty = true; });
+  on('set-foot', 'change', (e) => { Settings.data.foot = View.opt.foot = e.target.checked; Settings.save(); View.moved = performance.now(); View.dirty = true; });
+  on('set-music', 'input', (e) => { Settings.data.musicVol = +e.target.value; Settings.save(); Sfx.wake(); Sfx.vols(); });
+  on('set-sfx', 'input', (e) => { Settings.data.sfxVol = +e.target.value; Settings.save(); Sfx.wake(); Sfx.vols(); });
+  on('set-sfx', 'change', () => Sfx.step());
+  on('set-theme', 'change', (e) => { Settings.data.theme = e.target.value; Settings.save(); UI.theme(); });
+  if (window.matchMedia) { const mq = window.matchMedia('(prefers-color-scheme: dark)'); if (mq.addEventListener) mq.addEventListener('change', () => UI.theme()); }
+
+  /* keys: a text field keeps every letter it is given; only the board walks */
+  const KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0], q: [-1, -1], e: [1, -1], z: [-1, 1], c: [1, 1] };
+  window.addEventListener('keydown', (e) => {
+    const f = document.activeElement, tag = f ? f.tagName : '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (f && f.isContentEditable)) return;
+    if (e.key === 'Escape') { if ($('dialog').classList.contains('open')) UI.closeDialog(); else if ($('menu').classList.contains('open')) UI.closeMenu(); else if (UI.panelOpen()) UI.closePanels(); else UI.card(null); return; }
+    if ($('dialog').classList.contains('open')) { if (e.key === 'Enter' && UI.dlgDefault) { e.preventDefault(); UI.dlgDefault.click(); } return; }
+    if (!document.body.classList.contains('in-play') || UI.panelOpen() || $('menu').classList.contains('open') || e.metaKey || e.ctrlKey || e.altKey) return;
+    const st = G.st, pc = st.party[0], k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (KEYS[k]) {
+      e.preventDefault(); Sfx.wake();
+      if (st.walk || View.anim.t < 1) return;
+      const to = [pc.x + KEYS[k][0], pc.y + KEYS[k][1]], m = View.map;
+      if (!inb(m, to[0], to[1]) || !stepInfo(m, pc.x, pc.y, KEYS[k][0], KEYS[k][1], false) || taken(st, m, to[0], to[1], pc.id)) { Sfx.deny(); return; }
+      UI.card(null); go({ goals: [to] });
+    } else if (k === '+' || k === '=') viewZoom(1.25, View.vw / 2, View.vh / 2);
+    else if (k === '-' || k === '_') viewZoom(.8, View.vw / 2, View.vh / 2);
+    else if (k === '0') $('recenter').click();
+    else if ((k === 'Enter' || k === ' ') && !$('act').hidden) { e.preventDefault(); $('act').click(); }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { if (G.st && document.body.classList.contains('in-play')) UI.saveNow(); if (Sfx.ctx && Sfx.ctx.state === 'running') Sfx.ctx.suspend().catch(() => {}); }
+    else if (Sfx.ctx && Sfx.ctx.state === 'suspended') Sfx.ctx.resume().catch(() => {});
+  });
+  window.addEventListener('pagehide', () => { if (G.st && document.body.classList.contains('in-play')) UI.saveNow(); });
+  /* the lettering on a map waits for the faces: when they arrive, the bitmaps are painted again */
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { View.fonts++; View.moved = performance.now(); View.dirty = true; if (!document.body.classList.contains('in-play')) UI.titleState(); });
+  UI.titleState();
+  requestAnimationFrame(viewFrame);
+}());
+</script>
+</body>
+</html>
