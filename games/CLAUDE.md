@@ -70,7 +70,7 @@ one touch away, not buried.
 | Palette | `--bg:#06060e` `--panel:#0b0b16` `--border:#1a1a30` `--green:#39ff14` `--gold:#ffc300` `--blue:#4488ff` `--red:#ff2244` `--white:#dde3ff` `--dim:#8899bb` `--purple:#b44fff` |
 | Rendering | Canvas 2D, `requestAnimationFrame` loop, delta-time **clamped to [0, ~100 ms]**: a frame's timestamp can precede the moment the script started, so the first `dt` can come out negative, and one negative step through Animation Rigs A004's physics made every figure NaN for good (2026-10-05). **Documented exception:** `wayfinder/` renders with hand-written **WebGL2 + GLSL** — real 3D terrain is not achievable in Canvas 2D and Three.js would break the no-external-libraries rule. All its assets are still generated procedurally in-file, it keeps a 2D canvas over the top for the HUD, and it degrades gracefully (simulation, map and compass all still run) when WebGL2 is unavailable. Reach for WebGL only when a game genuinely cannot exist without it. **Second documented exception:** `music-mixer/` renders its play surface in **DOM/CSS** — fifteen buttons whose coloured cap, lamp layer, filament core and specular streak are stacked gradients, with `box-shadow` supplying the bezel, the body depth and the coloured light bleed onto neighbouring pads for free. It is a control surface rather than a rendered scene: a canvas would have to re-implement all of that and would still lose crisp text labels. JS only ever writes two custom properties (`--glow`, `--pulse`); there is no draw loop |
 | Input | Touch + mouse events, `user-select:none`, `touch-action:manipulation` |
-| No dependencies | Zero external JS libs; Google Fonts is the only external resource. **Documented exception:** `cyoa/` calls the Anthropic Messages API at runtime with the player's own key (raw `fetch`, no SDK), and optionally OpenAI / ElevenLabs — `.claude/cyoa.md` |
+| No dependencies | Zero external JS libs; Google Fonts is the only external resource. **Documented exception:** `cyoa/` calls the Anthropic Messages API at runtime with the player's own key (raw `fetch`, no SDK), and optionally OpenAI / ElevenLabs — `.claude/cyoa.md`; `cyoa2/` calls the Anthropic Messages API the same way and nothing else — `.claude/cyoa2.md` |
 | Responsive | Portrait/landscape via `@media (orientation:landscape)` or `100dvh` layout; a canvas inside a flex column needs `min-height:0` or its intrinsic 300:150 ratio overflows landscape |
 | Canvas sizing | A fullscreen canvas needs explicit CSS `width:100%;height:100%` — `position:absolute;inset:0` alone does NOT stretch a replaced element, it renders at its intrinsic (dpr-scaled) attribute size and the page looks 2–3× zoomed. A layout that rescales stored positions by a relative factor (newCell/oldCell) must floor the derived scale above zero AND make repeated calls strict no-ops: a transient degenerate viewport once drove phasic's cell size negative, and a `oldCell>0` guard then silently dropped every healing rescale — the squish became permanent until reload (2026-07-31 rotation bug). **Lay out in the space pointer events resolve in.** Sizing the backing store from `window.innerWidth/innerHeight` while reading taps off `getBoundingClientRect()` uses two coordinate spaces that iOS makes disagree: after rotating into landscape, Safari's chrome can leave the canvas box *shorter* than `innerHeight`, CSS squashes the taller backing store into it, and every sprite is drawn higher than it is hit-tested — by an offset that **grows with y**, so it reads as "the thing low on the screen stopped answering taps" while the top of the scene looks fine (2026-08-28: fire-clicker's campfire answered only taps at the bottom of its drawn circle and below). A game needs exactly one of two cures: **measure the element** — one `viewBox()` helper wrapping `getBoundingClientRect()` that every layout number comes from (fire-clicker) — or **pin the CSS size** to the numbers you sized the backing store with (`cv.style.width = W + 'px'`, turret-builder). What you cannot do is size from `inner*` and leave the box to `width:100%`. Rotation compounds it: iOS can hand every rotation event a stale box and then never fire again, so pair either cure with phasic's `reflow()` (three passes across `resize`/`orientationchange`/`visualViewport`) plus a cheap re-measure in the frame loop — all strict no-ops once the box settles, provided the layout function is idempotent for a given box. **A guard written as `innerWidth !== W` cannot fire**, because both sides of it are the wrong space; that is how fire-clicker shipped the bug twice in one day. Diagnose any page with `.claude/scripts/check-canvas-space.cjs` — but **read its whole line, not the SQUASH number**. That probe EXEMPTS any canvas carrying an inline `style.width`/`style.height` (it prints `pinned=inline-css`), because that is cure #2 and the probe reaches the element through a stylesheet it could otherwise prise apart. A page whose framework sets those for you is therefore never measured at all: interlock reported `CANVAS=ok … SQUASH=1.000` while sitting on a real 0.711 squash, because three.js's `renderer.setSize()` writes them by default (2026-09-20). The probe also shrinks the box with a percentage `max-height`, which resolves to `none` against an auto-height body — so on such a page it could not have moved the box even unexempted. `SQUASH=1.000` next to `pinned=` is an exemption, not evidence; pin the box in **px** from a suite of your own and check what actually matters, which is whether a tap at the pixel a thing is DRAWN on hits that thing |
 | Canvas-drawn UI | Buttons/cards drawn on the canvas keep their hitbox arrays (`cardRects`-style) in JS — any branch that hides the widgets MUST clear the arrays too, or invisible stale hitboxes swallow taps (2026-07-24 grid-defense bug). Canvas has **no layout engine**: nothing clips, nothing reflows, nothing reports a collision, so assert what a layout engine would — every button rect inside the viewport, no two overlapping, and every off-button thing a widget points at fully on-screen. Derive the geometry from `W`/`H` in **one** layout function that the renderer and the hit-tester both call; two copies is how a button stops matching what it draws. Assert the layout's own structural invariant too, whatever it is — star-surge's station pairs left-column buttons with left-hand features so no connector line crosses the scene, and re-pairing one still looks "fine" to a screenshot reviewer who does not know the rule (2026-08-23). **Sweep those assertions across viewports, don't run them at one** — with no reflow, a widget sized off a content count and a row sized off a viewport fraction can collide at one aspect ratio and be fine at every other. Six or seven sizes including a landscape and a very narrow one, `page.setViewportSize` between each, **a real `draw()` at every one** (a layout that computes fine still throws in a painter), and collect violations as named strings rather than a boolean so a red tells you which rule broke at which size (2026-08-24) |
@@ -917,7 +917,7 @@ Suite: `.claude/tests/drive-cyoa.cjs` (165 checks, including the real clients ag
 stubbed network). Detailed context: `.claude/cyoa.md`.
 
 
-### CYOA2 (`cyoa2/index.html`, ~3,250 lines)
+### CYOA2 (`cyoa2/index.html`, ~5,490 lines)
 CYOA's sequel, commissioned by the CD on 2026-10-09: the same seeded world, played on a
 **board of 5 ft squares**. A seed makes a bible (region, town, inn, a gang and its cave,
 seven people who matter, three plot threads); the town's board is charted at once, and
@@ -931,21 +931,37 @@ puts backs to walls, keeps doorways clear and refuses anything that would cut a 
 two. Tap a square to walk there (the path and its length in feet are shown; doors open as
 you pass), tap a thing or a person to read it, tap a roof to go in. Drawn as an inked map
 on vellum - hatched rock, sepia washes, one accent colour per map - in the **Grimoire**
-style with CYOA's chrome. **Step 2 of 5** added the grid rules. **Sight and fog of war:**
+style with CYOA's chrome. **Step 2** added the grid rules. **Sight and fog of war:**
 the map shows only what the party has seen (blank vellum where it has not, faded where it
 has been and gone), people show only while in sight, and walls on the edges, shut doors,
 rock, roofs and tall things stop the eye while windows and bars do not. **A party of up
 to six**, added and named in a Party panel: one leads and is walked, the rest trail,
 change places with the leader in a narrow passage and close up when the leader stops.
 **Rounds:** ROLL INITIATIVE on the bar at any time, and offered when a bandit first sees
-the party; everyone in sight rolls a seeded d20, takes a turn in order with 30 ft of
-movement (the squares still in reach are washed gold), and on a monster's turn whoever
-holds the table moves it. Still no Game Master model, no attack and no network call; the
-engine takes every change as a validated **intent**, which is what a second player's
-phone or a model will send later. **Proprietary** (one of the eight protected games;
-assumed, see `.claude/cyoa2.md`). Suite: `.claude/tests/drive-cyoa2.cjs` (176 checks over
-36 worlds, with the engine's sight judged by an independent line walker). Detailed
-context: `.claude/cyoa2.md`.
+the party; everyone in sight rolls, and takes a turn in order with 30 ft of movement (the
+squares still in reach are washed gold). **Step 3 of 5 (first push, 2026-10-10)** put a
+table round the board. Every traveller has a **sheet** (six callings, levels 1 to 5,
+two ways to strike, two or three abilities); a turn is 30 ft, an action and a bonus
+action; **a tap on an enemy in reach is a blow** (those in reach wear a red ring), a tap
+on your own piece or a friend's is a card with what else the turn can hold, and the
+engine rolls seeded dice, applies half cover and line of sight, and shows the result as a
+number rising off the square and a line in the story. Travellers at 0 hit points roll
+against death; a party beaten but breathing wakes at the inn next morning, lighter of
+purse. **The monsters play themselves** from a script (strike, shoot, close in, dash) and
+never strike the fallen; Settings can hand their turns to the Game Master, or back to
+whoever holds the table. **The Game Master is Claude over the player's own API key**
+(Opus 5.5 by default; a model can be pinned for the players' lines, the beats and the
+monsters separately): it narrates into a **story panel** under or beside the board at
+the beats (a tale's opening, a place first entered, a fight begun and ended) and when
+spoken to, and acts only through **25 engine tools** that name things by the ids of a
+board digest and never do geometry. A telling that fails puts the tale back exactly; what
+it cost is in a **ledger** either way. With no key the board still plays by its rules.
+Not in this push: the narrator's voice, speech input, the notes page, rule popups.
+**Proprietary** (one of the eight protected games; confirmed by the CD on 2026-10-10).
+Suite: `.claude/tests/drive-cyoa2.cjs` (@@CHECKS@@ checks: generators over 36 worlds, sight
+judged by an independent line walker, fights played out by the script against the
+suite's own traveller, every tool called with one of each kind of bad input, the real
+client against a stand-in for the API). Detailed context: `.claude/cyoa2.md`.
 
 ### ANIMATION RIGS (`animation-rigs/index.html`, ~2,000 lines)
 A grey-box diorama of eight 21-joint stick-figure rigs (CD commission 2026-10-04,

@@ -24,7 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
-| CYOA2 | `cyoa2/` | tabletop-rpg | tap-to-move, pinch-zoom, drag-pan | open-sandbox, save-campaign | tile-board, asset-library, procedural-generation, seeded-determinism, line-of-sight, fog-of-war, initiative-order | solo, local-coop | `.claude/cyoa2.md` |
+| CYOA2 | `cyoa2/` | tabletop-rpg | tap-to-move, pinch-zoom, drag-pan, text-entry | open-sandbox, save-campaign | tile-board, asset-library, procedural-generation, seeded-determinism, line-of-sight, fog-of-war, initiative-order, grid-combat, llm-game-master | solo, local-coop | `.claude/cyoa2.md` |
 | CYOA | `cyoa/` | tabletop-rpg | voice, text-entry, tap | save-campaign | llm-game-master, speech-narration, procedural-generation, seeded-determinism | solo, local-coop | `.claude/cyoa.md` |
 | Animation Rigs | `animation-rigs/` | animation-sandbox | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox | procedural-animation, inverse-kinematics, simulated-agents, real-time-3d | solo | `.claude/animation-rigs.md` |
 | Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
@@ -174,6 +174,18 @@ local-2p.
   moved by whoever holds the device until the Game Master model arrives. `neon-tactics`
   has line of sight but no fog and no order beyond sides; `ember-depths` has memory fog
   but one hero and no turns to roll for. Still no attacks: a round is movement only.
+
+- **cyoa2 step 3 (2026-10-10) opens no new facet** and is worth knowing about anyway:
+  `llm-game-master`, `grid-combat` and `text-entry` are all reused, but this is the
+  first game here where **the model and a finger send the same intents to the same
+  engine**. A tap on an enemy in reach is a blow resolved at once and for free; the
+  Game Master (Claude, over the player's own key) is asked only at the beats and when
+  spoken to, and acts through 25 tools that name things by the ids of a board digest
+  and never do geometry. It is also the first with a **scripted opponent that can be
+  swapped for the model** turn by turn (the monsters' script by default, the Game
+  Master or the table's own hand as settings), and the second with a per-save cost
+  ledger. `cyoa` is the conversation without a board; `neon-tactics` and
+  `ember-depths` are the board without a conversation.
 
 ### Newly opened by the 2026-10-04 build
 - **`animation-sandbox`** genre + **`procedural-animation`** /
