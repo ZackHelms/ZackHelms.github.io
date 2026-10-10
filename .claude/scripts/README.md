@@ -94,6 +94,35 @@ Deterministic helpers for working on this repo.
   after the CYOA session hand-rolled this loop in the scratchpad four times (29
   breaks); three came back MISSED and each was a real blind spot in the suite.
 
+- `negtest-copies.py` — the same list, run against **copies** of the page, two
+  (or `--jobs N`) at a time. Each break is applied to a fresh copy in a scratch
+  directory and the suite is pointed at the copy through an environment variable
+  the suite itself reads (`--page-env CYOA2_PAGE`), so **the shipping file is
+  never touched**: an interrupted run leaves nothing live, and with
+  `--freeze <suite file>` the suite can be edited while a run is going. Use it
+  when a list is long (it was written for 343 breaks; the in-place runner left a
+  break live in the shipping file twice that afternoon when a run was cut short).
+  For a dozen breaks `negtest-batch.py` is still the simpler tool, and it needs
+  nothing from the suite.
+
+  ```
+  CYOA2_ONLY=QS NODE_PATH=... python3 .claude/scripts/negtest-copies.py breaks.json \
+      --page-env CYOA2_PAGE --jobs 2 --freeze .claude/tests/drive-cyoa2.cjs --log out.log \
+      -- node .claude/tests/drive-cyoa2.cjs
+  # NEG=nat1-hits VERDICT=caught EXIT=1 fails=1
+  #     FAIL a natural 1 misses even when its total beats the armour: ...
+  # NEGCOPIES: RED caught=117/118 missed=nobonus-ignored
+  ```
+
+  A suite supports it with one line (read the page's path from the variable when
+  it is set) and one rule (**never print GREEN when pointed at a copy**).
+  Verdicts: `caught`, `MISSED`, and `CAUGHT-BY-CRASH` for a break whose only
+  failure was a timeout or an exception in the suite, not a named row: usually
+  real, but read it. Two cautions: more jobs than cores makes timing rows flaky,
+  and **a row that "catches" breaks it has nothing to do with is a flaky row**
+  (one such row was found that way: it reloaded the page before an autosave had
+  landed). `--only a,b` re-runs the ones that were missed.
+
 - `replace-fn.py` — replace ONE whole JS function in a single-file game, located
   by **name** and bounded by **brace counting**. `games/CLAUDE.md` § Editing a
   large single-file game records why: a span replacement between two hand-picked

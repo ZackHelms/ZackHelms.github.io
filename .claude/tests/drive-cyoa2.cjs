@@ -56,8 +56,48 @@
  *      newcomer joining mid-fight; a round through a save; and the whole flow by
  *      touch, from "You are seen" to standing down
  *
+ * Step 3 (the Game Master, sheets and blows) added four. What goes wrong here is
+ * quiet in a third way: a rule that only matters on a natural 1, a tool that
+ * refuses for the wrong reason, a telling that fails half way and leaves half of
+ * itself behind, a key that ends up in a save.
+ *
+ *   Q. sheets, blows and dying, in the engine alone: sheets by calling; dice parsed
+ *      strictly; many fights played out by the monsters' script against the suite's
+ *      OWN traveller with every invariant checked after every deed; the same seed
+ *      fights the same fight; reach, sight and cover on ground chosen for them; each
+ *      trick in a fight arranged for it; then the rules a lucky run does not reach,
+ *      with THE DICE MADE TO FALL as each row needs (the tale's dice are counted, so
+ *      `force` sets the count to where a wanted number comes up next): natural 1 and
+ *      20, bless, inspiration, sneak attack alone and with advantage, the undead,
+ *      death saves die by die; old saves and hostile files
+ *   R. the table by touch, no Game Master: the story panel on five screens; a fight
+ *      in which the monsters play themselves and the travellers are played by taps
+ *      (the ring, the blow, the card, DASH); wounds and marks off the painter's own
+ *      pixels; sheets, rests, the journal; then by hand, the cross, defeat and
+ *      rescue, the end of a tale
+ *   S. the Game Master's 25 tools, called directly: closed schemas; one of each kind
+ *      of bad call refused with the tale byte for byte the same; a tool that throws
+ *      puts the tale back; each tool's happy path; a fight through the tools; harm,
+ *      peace and truce in the middle of one; what the turn context carries and why;
+ *      fog honesty in the board digest; the bible text byte-stable
+ *   T. the Game Master at the table. First the REAL client against a stand-in for
+ *      api.anthropic.com (request shapes, the cached prefix, a streamed tool call,
+ *      markup that stays text, billing on the model that served, a field healed
+ *      once, retries, refusals, silence after tools, broken tool JSON, a failure
+ *      half way that puts the tale back, the busy lock and STOP, the key's hiding
+ *      places, the ledger, a reload). Then a stand-in for the model itself
+ *      (window.__CYOA2_MOCK__): beats, pieces moved by name, TALK, travel, the
+ *      monsters' turn handed over on a pinned model, the script taking it back when
+ *      the Game Master fails, and a tale opened from a file while another is told
+ *
+ * A to P run with the story folded and (P) the monsters moved by hand, through
+ * open()'s settings argument: step 3 changed both defaults, and the older rows are
+ * about geometry and movement that those defaults would move or play for them.
+ *
  * CYOA2_ONLY=NOP (any letters; A stands for A to I) runs only those sections, for
- * negative tests aimed at one of them. A partial run never prints "CYOA2: GREEN".
+ * negative tests aimed at one of them. CYOA2_PAGE=<path> points the suite at a COPY
+ * of the page, which is how .claude/scripts/negtest-copies.py runs breaks several at
+ * a time without touching the shipping file. Neither ever prints "CYOA2: GREEN".
  *
  * Sections K and L lift the fog through its own setting, on purpose: both ask
  * whether a tap walked, and under fog a tap on unseen ground walks nobody whatever
@@ -69,13 +109,16 @@ const path = require('path');
 const { chromium } = require('playwright-core');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const PAGE = 'file://' + path.join(ROOT, 'games', 'cyoa2', 'index.html');
+/* CYOA2_PAGE=<path> points the suite at a copy of the page (to write rows while a negative-test batch is breaking the real one). Like a partial run, it never prints GREEN. */
+const COPY = process.env.CYOA2_PAGE || '';
+const PAGE = 'file://' + (COPY ? path.resolve(COPY) : path.join(ROOT, 'games', 'cyoa2', 'index.html'));
 const SEEDS = 36;
 /* CYOA2_ONLY=NOP runs only those sections (A stands for A to I, which share a page). It is for negative tests, where
    one break is aimed at one section; a partial run never prints the GREEN line a gate looks for.                       */
 const ONLY = (process.env.CYOA2_ONLY || '').toUpperCase(), want = (k) => !ONLY || ONLY.includes(k);
 let bad = 0, good = 0;
 const fail = (m) => { bad++; console.log('  FAIL ' + m); };
+const clipTo = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + '...' : String(s));
 const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(m); };
 
 (async () => {
@@ -83,12 +126,12 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
   try { browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }); }
   catch (e) { try { browser = await chromium.launch(); } catch (e2) { console.log('CYOA2: RED'); console.error('no chromium: ' + e2.message); process.exit(1); } }
   const errors = [];
-  const open = async (vp, opts) => {
+  const open = async (vp, opts, settings) => {
     const ctx = await browser.newContext(Object.assign({ viewport: vp, deviceScaleFactor: 2, hasTouch: true, isMobile: true }, opts || {}));
     const page = await ctx.newPage();
     page.on('console', (m) => { if (m.type() === 'error' && !/fonts\.g|net::ERR|Failed to load resource/i.test(m.text())) errors.push(m.text()); });
     page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
-    await page.addInitScript(() => { try { localStorage.setItem('cyoa2.settings.v1', JSON.stringify({ seed: 'drive-seed-1', musicVol: 0, sfxVol: 0, theme: 'light' })); } catch (e) { /* ignore */ } });
+    await page.addInitScript((extra) => { try { localStorage.setItem('cyoa2.settings.v1', JSON.stringify(Object.assign({ seed: 'drive-seed-1', musicVol: 0, sfxVol: 0, theme: 'light', storyOpen: false }, extra || {}))); } catch (e) { /* ignore */ } }, settings || null);
     await page.goto(PAGE);
     await page.waitForFunction(() => typeof newGame === 'function' && typeof View === 'object');
     return { ctx, page };
@@ -118,7 +161,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     ok(r.title === 'CYOA2', 'title reads CYOA2');
     ok(/^build \d{4}-\d\d-\d\d \d\d:\d\d UTC$/.test(r.badge), 'build badge carries a real timestamp: ' + r.badge);
     ok(r.cont === true, 'no Continue before there is a tale');
-    ok(/connect-src 'none'/.test(r.csp), 'the page may not call any network service');
+    ok(/connect-src https:\/\/api\.anthropic\.com;/.test(r.csp) && !/connect-src[^;]*(\*|http:|'self'|data:)/.test(r.csp) && (r.csp.match(/https?:\/\/[a-z0-9.-]+/g) || []).sort().join() === 'https://api.anthropic.com,https://fonts.googleapis.com,https://fonts.gstatic.com', 'the page may call one service and one only: the Game Master, at api.anthropic.com');
   }
 
   /* ------------------------------------------------------------------ B */
@@ -583,10 +626,27 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     await touch('touchStart', [[150, 400]]); await touch('touchStart', [[150, 400], [250, 400]]);
     for (let k = 1; k <= 6; k++) await touch('touchMove', [[150 - k * 8, 400], [250 + k * 8, 400]]);
     const mid = await state();
-    await touch('touchEnd', [[102, 400]]); await touch('touchMove', [[104, 402]]); await touch('touchEnd', []);
+    /* The finger that stays down must be over ground a tap WOULD walk to, or the row proves nothing. Twice now a change of
+       geometry has left it over something a tap only reads (step 3's story bar made the board 50 px shorter and put it on
+       the bar counter), and the row went green with its fix removed. So: lift one finger, ask the PAGE where it thinks the
+       other one is (not this script: the first finger listed in a touchEnd is the one that LIFTS, so for two steps this row
+       had been reasoning about the wrong finger), slide the table until a free square a walk can reach is under it, and
+       only then lift it. Afterwards a real tap at the same spot must walk.                                              */
+    await touch('touchEnd', [[102, 400]]);
+    const under = await page.evaluate(() => { const st = G.st, a = actor(), m = View.map, P = Ptr, c = []; if (!P) return null;
+      for (let i = 0; i < m.w * m.h; i++) { const x = i % m.w, y = (i - x) / m.w; if (!tileFree(m, x, y) || taken(st, m, x, y, '') || m._.dec[i] >= 0 || m._.occ[i] >= 0) continue; const r = route(st, a, [[x, y]], false); if (r.ok && r.path.length >= 2) c.push([r.path.length, x, y]); }
+      c.sort((p, q) => p[0] - q[0]);
+      for (const q of c) { const w = s2w(P.sx, P.sy); View.cam.x += q[1] + .5 - w[0]; View.cam.y += q[2] + .5 - w[1]; camMoved(true); const v = s2w(P.sx, P.sy); if (Math.abs(v[0] - q[1] - .5) < .2 && Math.abs(v[1] - q[2] - .5) < .2) { viewDraw(); return { x: q[1], y: q[2], sx: P.sx, sy: P.sy, mode: P.mode }; } }
+      return null; });
+    if (under) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: box.l + under.sx + 2, y: box.t + under.sy + 2, id: 1 }] });
+    await touch('touchEnd', []);
     const s2 = await state();
     ok(mid.z > s1.z * 1.5, 'a pinch zooms in (' + s1.z.toFixed(1) + ' -> ' + mid.z.toFixed(1) + ' px a square)');
-    ok(!s2.walk && s2.x === s0.x && s2.y === s0.y, 'and the last finger off the glass does not count as a tap');
+    ok(under && !s2.walk && s2.x === s0.x && s2.y === s0.y, 'and the last finger off the glass does not count as a tap');
+    if (under) { const at = await page.evaluate(([x, y]) => { const r = View.cv.getBoundingClientRect(), q = w2s(x + .5, y + .5); return [r.left + q[0], r.top + q[1]]; }, [under.x, under.y]); await page.touchscreen.tap(at[0], at[1]); await page.waitForTimeout(120); }
+    const s2b = await state();
+    ok(under && (s2b.walk || s2b.x !== s0.x || s2b.y !== s0.y), 'though a tap on the square that finger was over does walk: it was open ground, so the row above could have failed');
+    await page.evaluate(() => { intent(G.st, { t: 'halt' }); View.walking = false; View.path = null; }); await idle(page);
     await page.evaluate(() => document.getElementById('recenter').click()); await page.waitForTimeout(900);
     const s3 = await state();
     ok(!s3.re && Math.abs(s3.cx - (s3.x + .5)) < 3.5, 'recentre brings the traveller back into the middle and puts itself away');
@@ -785,7 +845,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     ok(r.known[0], 'a move to ground nobody has seen is refused in words, and changes nothing');
     ok(r.known[1] && r.known[2], 'the engine itself knows the way there; a traveller keeping to known ground walks over seen squares only');
     ok(r.known[3], 'grass seen through a window, with unseen rooms between: for a traveller keeping to known ground there is no way there yet');
-    ok(r.v1 && r.v1.v === 2 && r.v1.seen > 3 && r.v1.lead === 'P1' && !r.v1.town, 'a save from before the fog loads: the party sees from where it stands, and the rest waits to be seen' + (typeof r.v1 === 'string' ? ' (' + r.v1 + ')' : ''));
+    ok(r.v1 && r.v1.v === 3 && r.v1.seen > 3 && r.v1.lead === 'P1' && !r.v1.town, 'a save from before the fog loads: the party sees from where it stands, and the rest waits to be seen' + (typeof r.v1 === 'string' ? ' (' + r.v1 + ')' : ''));
 
     /* on the table: what is drawn, and what a tap means */
     await begin(page);
@@ -999,7 +1059,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
   /* ------------------------------------------------------------------ P */
   console.log('P. rounds');
   {
-    const P = await open({ width: 390, height: 844 }), page = P.page;
+    const P = await open({ width: 390, height: 844 }, null, { monsters: 'hand' }), page = P.page;   /* these rows are about a monster moved by hand; the script that plays them by default has section R */
     const r = await page.evaluate(() => {
       const out = {};
       /* a party of four walks into the cave until a bandit sees it */
@@ -1192,7 +1252,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     }
     await tapEl('#btn-stand');
     const off = await page.evaluate(() => ({ round: G.st.round, init: !document.getElementById('btn-init').hidden, end: document.getElementById('btn-end').hidden, add: !!document.querySelector('#chips .chip.add'), sub: document.getElementById('place-sub').textContent, mapSub: View.map.sub }));
-    ok(off.round === null && off.init && off.end && off.add && off.sub === off.mapSub, 'the cross stands everyone down: the dice are back on the bar and the header names the place again');
+    ok(off.round === null && off.init && off.end && off.add && off.sub.startsWith(off.mapSub), 'the cross stands everyone down: the dice are back on the bar and the header names the place again');
     await tapEl('#btn-init');
     ok(await page.evaluate(() => !!G.st.round && G.st.round.n === 1), 'and ROLL INITIATIVE on the bar starts them again at any time');
     /* a round in progress survives a reload */
@@ -1208,10 +1268,1432 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
   }
 
   }
+  if (want('Q')) {
+  /* ------------------------------------------------------------------ Q */
+  console.log('Q. sheets, blows and dying');
+  {
+    const Q = await open({ width: 390, height: 844 }), page = Q.page;
+    const rows = await page.evaluate((SEEDS_Q) => {
+      const rows = [], row = (c, m) => rows.push([!!c, m]);
+      const snap = (st) => JSON.stringify(packState(st)).replace(/"saved":\d+/, '');
+      const walk = (st, who) => { let g = 0, res; do { res = intent(st, { t: 'step', who }); } while (res.ok && !res.done && ++g < 800); return res; };
+      /* a traveller's turn played by the rules a monster plays by: strike, shoot, close in. The suite's own, so the script under test has an opponent it did not write. */
+      const pcPlan = (st) => {
+        const R = st.round, a = turnOf(st), m = a.m, p = a.o, foes = m.tokens.filter((t) => t.k === 'foe' && R.order.some((c) => c.id === t.id));
+        if (!foes.length) return { t: 'end' };
+        if (p.hp <= p.hpMax / 2 && R.bonus > 0) { const sw = p.abilities.find((x) => (x.n === 'Second Wind' || x.n === 'Healing Word') && x.uses > 0); if (sw) return { t: 'ability', name: sw.n }; }
+        if (R.act > 0) for (const w of weaponsOf(p).slice().sort((x, y) => x.rg - y.rg)) for (const t of foes.slice().sort((x, y) => cheb(x, p) - cheb(y, p))) if (!reachWhy(m, p, t, w.rg)) return { t: 'attack', target: t.id, attack: w.n };
+        if (R.act > 0 && moveLeft(R) >= 5) { const way = approach(st, a, foes); if (way && way.to) return { t: 'move', to: way.to }; }
+        return { t: 'end' };
+      };
+      const toFoe = (st, m) => { const foes = m.tokens.filter((t) => t.k === 'foe'); if (!foes.length) return false; const L = leadOf(st), tgt = foes.slice().sort((x, y) => cheb(x, L) - cheb(y, L))[0], goals = []; for (const s of STEPS) goals.push([tgt.x + s[0], tgt.y + s[1]]); if (!intent(st, { t: 'move', goals }).ok) return false; walk(st); return true; };
+      const inSight = (st, m) => { const V = visOf(st).g; return m.tokens.filter((t) => t.k === 'foe' && V[t.y * m.w + t.x]); };
+
+      /* 1. sheets */
+      {
+        const st = newGame('sheet-1'), pc = st.party[0];
+        row(pc.cls === 'Fighter' && pc.hp === 12 && pc.hpMax === 12 && pc.ac === 16 && pc.level === 1 && pc.xp === 0 && pc.stock === true && pc.status === 'ok' && pc.abilities.map((a) => a.n + a.uses).join() === 'Second Wind1,Action Surge1' && pc.scores.str === 15 && pc.scores.int === 8,
+          'the first traveller wakes with a sheet: a level 1 Fighter, 12 hit points, AC 16, the standard array by the calling\'s own priorities');
+        row(st.gold === 15 && st.time.day === 1 && st.time.minute === 480 && st.quests.Q0.status === 'active' && st.quests.Q0.main && st.quests.Q0.goal === st.bible.threads.find((t) => t.main).t && st.turn === 0 && st.v === 3, 'and the tale with a purse, a clock at eight in the morning, and the matter at hand as its first quest');
+        for (let j = 0; j < 5; j++) intent(st, { t: 'party', op: 'add' });
+        row(st.party.map((p) => p.cls).join() === 'Fighter,Rogue,Cleric,Wizard,Ranger,Bard' && st.gold === 15 + 20 + 15 + 10 + 15 + 20, 'newcomers take the six callings in turn, and each brings their purse: ' + st.party.map((p) => p.cls).join() + ', ' + st.gold + ' gold');
+        row(st.party.every((p) => p.hpMax === CLASSES[p.cls].hd + abMod(p.scores.con) && p.hp === p.hpMax && p.ac === CLASSES[p.cls].ac && weaponsOf(p).length === 2), 'every sheet follows its calling: hit die plus constitution, the calling\'s armour, two ways to strike');
+        { const w = weaponsOf(st.party[0]); row(w[0].n === 'Longsword' && w[0].hit === 2 + 2 && w[0].d === '1d8+2' && w[0].rg === 1 && w[1].hit === abMod(st.party[0].scores.dex) + 2 && w[1].rg === 30, 'a weapon strikes with its ability and the proficiency bonus, and adds the ability to its damage: ' + w.map((q) => q.n + ' ' + signed(q.hit) + ' ' + q.d).join(', ')); }
+        const a = snap(st), b = snap(unpackState(JSON.parse(JSON.stringify(packState(st)))));
+        row(a === b, 'a save round-trips byte for byte with six sheets in it');
+        /* a calling can be changed until it has been tested */
+        const wz = st.party[3], c1 = intent(st, { t: 'party', op: 'class', id: wz.id, cls: 'Bard' });
+        row(c1.ok && wz.cls === 'Bard' && wz.hpMax === 8 + abMod(wz.scores.con) && wz.abilities[0].n === 'Bardic Inspiration' && wz.stock === false && st.gold === 95 + 10, 'a calling may be changed while it is untested: the sheet is made again, and the purse is the new calling\'s');
+        wz.xp = 40;
+        row(intent(st, { t: 'party', op: 'class', id: wz.id, cls: 'Wizard' }).why === 'seasoned' && intent(st, { t: 'party', op: 'class', id: wz.id, cls: 'Paladin' }).why === 'noclass', 'but not once experience has been earned, and never to a calling that does not exist');
+        /* experience and levels */
+        const f = st.party[0], ups = []; grantXp(f, 300, ups);
+        row(f.level === 2 && f.hpMax === 12 + 6 + 2 && f.hp === f.hpMax && ups.length === 1 && ups[0].hpGain === 8, 'at 300 experience a Fighter is level 2 with 8 more hit points, to have and to hold');
+        grantXp(f, 600, ups);
+        row(f.level === 3 && f.abilities[0].max === 2 && f.abilities[0].uses === 2 && profBonus(f.level) === 2, 'and at level 3 the limited abilities gain a use');
+        grantXp(f, 999999, ups);
+        row(f.level === 5 && profBonus(5) === 3, 'levels stop at five');
+        /* refusals outside a fight change nothing */
+        const before = snap(st); let allNo = true;
+        for (const it of [{ t: 'attack', target: 'K0' }, { t: 'dash' }, { t: 'ability', name: 'Action Surge' }, { t: 'ability', name: 'nonsense' }, { t: 'ability', who: 'P9', name: 'Second Wind' }, { t: 'rest', kind: 'nap' }, { t: 'lead', id: 'P9' }, { t: 'ability', who: 'P2', name: 'Sneak Attack' }]) { const r = intent(st, it); if (r.ok || typeof r.say !== 'string' || r.say.length < 4) allNo = false; }
+        row(allNo && snap(st) === before, 'outside a fight, a blow, a dash and a fighting trick are refused with a reason, and change nothing');
+      }
+
+      /* the dice */
+      {
+        const st = newGame('dice-1'), d = diceRng(st), plain = rollTerms(d, parseDice('2d6+3'), false), crit = rollTerms(d, parseDice('2d6+3'), true), neg = rollTerms(d, parseDice('1d4-1'), false);
+        row(plain.rolls.length === 2 && crit.rolls.length === 4 && plain.total === plain.rolls[0] + plain.rolls[1] + 3 && crit.total === crit.rolls.reduce((a, b) => a + b, 0) + 3 && neg.total === neg.rolls[0] - 1 && st.n.roll === 1, 'dice: a critical doubles the dice and not the bonus, and one generator serves one deed');
+        row(parseDice('9d9999') === null && parseDice('31d6') === null && parseDice('1d6+201') === null && parseDice('alert(1)') === null && parseDice('') === null && parseDice(' 1D8 + 2 ').length === 2, 'dice expressions are parsed strictly: only real dice, bounded counts, nothing else');
+        const a = d20s(() => 7, 'normal'), seq = [3, 17], adv = d20s(() => seq.shift(), 'advantage'), seq2 = [3, 17], dis = d20s(() => seq2.shift(), 'disadvantage');
+        row(a.kept === 7 && adv.kept === 17 && dis.kept === 3 && combineMode('', true, true) === 'normal' && combineMode('advantage', false, true) === 'normal' && combineMode('', true, false) === 'advantage', 'advantage keeps the higher of two, disadvantage the lower, and the two cancel');
+      }
+
+      /* 2. many fights, played out: the script against the suite's own traveller, every invariant after every deed */
+      const T = { fights: 0, won: 0, lost: 0, over: 0, swings: 0, hits: 0, foeTurns: 0, foeDeeds: 0, dashes: 0, shots: 0, bad: {}, first: {} };
+      const inv = (k, c, m) => { if (!c) { T.bad[k] = (T.bad[k] || 0) + 1; if (!T.first[k]) T.first[k] = m; } };
+      let trip = true, restOK = true, rescue = { n: 0, ok: 0 }, victory = { n: 0, ok: 0 };
+      for (let k = 0; k < SEEDS_Q; k++) {
+        const seed = 'q-' + k, st = newGame(seed);
+        for (let j = 0; j < 3; j++) intent(st, { t: 'party', op: 'add' });
+        intent(st, { t: 'jump', site: 'S2' });
+        const cave = st.maps.S2;
+        for (let g = 0; g < 40 && !inSight(st, cave).length; g++) if (!toFoe(st, cave)) break;
+        for (let fight = 0; fight < 12 && !st.over && st.here === 'S2'; fight++) {
+          if (!inSight(st, cave).length) { if (!toFoe(st, cave) || !inSight(st, cave).length) break; }
+          const s = intent(st, { t: 'rounds', op: 'start' }); if (!s.ok) break;
+          T.fights++;
+          inv('fresh', st.round.act === 1 && st.round.bonus === 1 && st.round.extra === 0 && st.round.had && st.round.order.filter((c) => c.k === 'foe').every((c) => !!st.npcs[cave.tokens.find((q) => q.id === c.id).npc].sheet), seed + ' a fresh round');
+          let ended = null, guard = 0, lastKey = '', same = 0;
+          while (st.round && !ended && guard++ < 3000) {
+            const a = turnOf(st), R = st.round;
+            inv('acts', !!a && (a.pc ? a.o.status === 'ok' : !sheetOf(st, a.o, false).asleep), seed + ' ' + (a ? a.id : 'nobody') + ' acts');
+            if (!a) break;
+            const it = a.pc ? pcPlan(st) : (foePlan(st) || { t: 'end' });
+            if (!a.pc) { if (it.t === 'end') T.foeTurns++; else T.foeDeeds++; }
+            const key = a.id + JSON.stringify(it) + R.n; same = key === lastKey ? same + 1 : 0; lastKey = key;
+            if (same > 6) { inv('stall', false, seed + ' ' + key); intent(st, { t: 'end' }); continue; }
+            const wasUp = it.t === 'attack' && !a.pc ? (pcOf(st, it.target) || {}).status === 'ok' : true;
+            if (!a.pc && it.t === 'dash') T.dashes++;
+            const res = intent(st, Object.assign({ who: a.id }, it));
+            if (!res.ok) { inv(a.pc ? 'plan' : 'script', false, seed + ' ' + JSON.stringify(it) + ' ' + res.why); intent(st, { t: 'end' }); continue; }
+            if (it.t === 'move') inv('walks', walk(st, a.id).ok, seed + ' a planned move walks');
+            if (it.t === 'attack') {
+              T.swings++; if (res.hit) T.hits++;
+              inv('hitRule', res.natural === 1 ? !res.hit : res.natural === 20 ? res.hit && res.crit : res.hit === (res.total >= res.ac), seed + ' ' + res.say);
+              inv('dmg', res.hit ? res.dmg >= 1 : res.dmg === 0, seed + ' ' + res.say);
+              if (res.fell && a.pc) inv('fallen', !cave.tokens.some((t) => t.id === res.target) && !(st.round && st.round.order.some((c) => c.id === res.target)) && !(st.met.S2 || []).includes(res.target), seed + ' the fallen leave');
+              if (!a.pc) { inv('mercy', wasUp, seed + ' ' + res.say); if (cheb(a.o, { x: res.at[0], y: res.at[1] }) > 1) T.shots++; }
+            }
+            ended = res.ended || null;
+            const sq = new Set(); let clash = false;
+            for (const p of st.party) { if (p.site !== st.here) continue; const q = p.x + ',' + p.y; if (sq.has(q)) clash = true; sq.add(q); inv('hp', p.hp >= 0 && p.hp <= p.hpMax && ((p.hp > 0) === (p.status === 'ok')), seed + ' ' + p.name + ' ' + p.hp + ' ' + p.status); }
+            for (const t of st.maps[st.here].tokens) { const q = t.x + ',' + t.y; if (sq.has(q)) clash = true; sq.add(q); inv('index', tokenAt(st.maps[st.here], t.x, t.y) === t, seed + ' the board knows where ' + t.id + ' stands'); }
+            inv('squares', !clash, seed + ' after ' + a.id + ' ' + JSON.stringify(it));
+            if (st.round) inv('spend', st.round.act >= 0 && st.round.bonus >= 0 && moveLeft(st.round) >= 0, seed + ' overspent');
+          }
+          inv('ends', guard < 3000 && (!!ended || !st.round), seed + ' the fight ends');
+          if (ended) {
+            inv('outcome', ['victory', 'defeat'].includes(ended.outcome) && !st.round && endedSay(ended).length > 10, seed + ' ' + ended.outcome);
+            if (ended.outcome === 'victory') { T.won++; victory.n++; if (ended.xp > 0 && ended.each === Math.floor(ended.xp / st.party.length) && st.party.every((p) => p.status === 'ok' || p.status === 'stable')) victory.ok++; }
+            else { T.lost++; if (ended.over) T.over++; else { rescue.n++; if (ended.rescued && st.here === 'S1' && st.party.every((p) => p.hp === 1 && p.status === 'ok') && st.time.minute === 480) rescue.ok++; } }
+          }
+          if (!st.over && st.here === 'S2') { const r = intent(st, { t: 'rest', kind: 'short' }); if (r.ok === inSight(st, cave).length > 0) restOK = false; }
+        }
+        if (!st.over && snap(st) !== snap(unpackState(JSON.parse(JSON.stringify(packState(st)))))) trip = false;
+      }
+      const badKeys = Object.keys(T.bad);
+      row(T.fights >= SEEDS_Q * 2 && T.swings > 200, 'fights were fought: ' + T.fights + ' over ' + SEEDS_Q + ' worlds, ' + T.swings + ' blows, ' + T.won + ' won and ' + T.lost + ' lost by a party of four played by the suite');
+      for (const [k, m] of [['acts', 'whoever acts can act: nobody down, dead or asleep is ever handed a turn'], ['hitRule', 'a blow lands exactly when its total meets the armour class; a natural 1 never, a natural 20 always and as a critical'], ['dmg', 'a hit does at least 1, a miss does nothing'],
+        ['fallen', 'a monster that falls leaves the board, the order and the list of those met'], ['squares', 'nobody ever shares a square when a deed is done'], ['index', 'the board\'s lookup knows where every monster stands, after monsters have passed through one another'],
+        ['hp', 'hit points stay within bounds, and standing is exactly having some'], ['spend', 'no turn overspends its movement, its action or its bonus action'], ['script', 'the monsters\' script never asks for anything the engine refuses'], ['stall', 'no turn goes round in circles'],
+        ['walks', 'a move the script planned can be walked'], ['ends', 'every fight ends'], ['outcome', 'in a victory or a defeat, which can be told'], ['fresh', 'a round opens with one action, one bonus action, and a block for every monster in it'], ['mercy', 'the script never strikes the fallen: every blow of a monster\'s is at a traveller still standing'], ['plan', 'the suite\'s own traveller never asks for anything refused (so the rows above are about the engine)']])
+        row(!T.bad[k], m + (T.bad[k] ? ' (' + T.bad[k] + ' times; first: ' + T.first[k] + ')' : ''));
+      row(badKeys.every((k) => ['acts', 'hitRule', 'dmg', 'fallen', 'squares', 'index', 'hp', 'spend', 'script', 'stall', 'walks', 'ends', 'outcome', 'fresh', 'mercy', 'plan'].includes(k)), 'no invariant went unreported');
+      row(T.dashes > 0 && T.shots > 0, 'a monster too far to strike runs for it (' + T.dashes + ' dashes), and one with a bow shoots from where it stands (' + T.shots + ' shots)');
+      row(T.foeDeeds > T.fights * 2 && T.hits > T.swings * .3 && T.hits < T.swings * .75, 'the script does things with its turns (' + T.foeDeeds + ' deeds), and about half of all blows land (' + T.hits + ' of ' + T.swings + ')');
+      row(victory.n > 5 && victory.ok === victory.n, 'a victory shares the experience among the living, and tends the dying (' + victory.ok + ' of ' + victory.n + ')');
+      row(rescue.ok === rescue.n && T.over <= T.lost, 'a party beaten but breathing wakes at the inn at eight, each with 1 hit point (' + rescue.ok + ' of ' + rescue.n + ' defeats; ' + T.over + ' tales ended)');
+      row(restOK, 'a rest is refused exactly when an enemy is in sight');
+      row(trip, 'after the fighting a save still round-trips byte for byte, in every world');
+
+      /* 3. the same tale fights the same fight */
+      {
+        const run = () => { const st = newGame('det-1'); intent(st, { t: 'party', op: 'add' }); intent(st, { t: 'jump', site: 'S2' }); const cave = st.maps.S2; for (let g = 0; g < 30 && !inSight(st, cave).length; g++) if (!toFoe(st, cave)) break;
+          intent(st, { t: 'rounds', op: 'start' }); let g = 0; while (st.round && g++ < 600) { const a = turnOf(st), it = a.pc ? pcPlan(st) : foePlan(st), r = intent(st, it); if (r.ok && it.t === 'move') walk(st, a.id); if (!r.ok) intent(st, { t: 'end' }); } return snap(st).replace(/"made":\d+/, ''); };
+        const a = run(), b = run();
+        row(a === b && /"t":"tell"/.test(a), 'the same seed fights the same fight, blow for blow, and the journal tells it');
+      }
+
+      /* 4. reach, sight and cover, on ground chosen for it */
+      {
+        const st = newGame('reach-1'), inn = st.maps.S1;
+        const d = inn.doors.find((q) => !q.ext && !q.lock), sd = doorSides(d);
+        d.open = false; const shut = meleeClear(inn, sd[0][0], sd[0][1], sd[1][0], sd[1][1]), los0 = reachWhy(inn, { x: sd[0][0], y: sd[0][1] }, { x: sd[1][0], y: sd[1][1] }, 12);
+        d.open = true; const open = meleeClear(inn, sd[0][0], sd[0][1], sd[1][0], sd[1][1]), los1 = reachWhy(inn, { x: sd[0][0], y: sd[0][1] }, { x: sd[1][0], y: sd[1][1] }, 12);
+        row(!shut && open && los0 === 'nosight' && los1 === '', 'a shut door stops a blade and a shot alike; open, it stops neither');
+        /* a wall between two squares side by side: no blade passes, whichever way */
+        let wall = null; for (let y = 1; y < inn.h - 1 && !wall; y++) for (let x = 1; x < inn.w - 1 && !wall; x++) if (eGet(inn, x, y, 1) === ED.WALL && tileFree(inn, x, y) && tileFree(inn, x + 1, y)) wall = [x, y];
+        row(wall && !meleeClear(inn, wall[0], wall[1], wall[0] + 1, wall[1]) && !meleeClear(inn, wall[0] + 1, wall[1], wall[0], wall[1]) && reachWhy(inn, { x: wall[0], y: wall[1] }, { x: wall[0] + 1, y: wall[1] }, 1) === 'reach', 'a wall between two neighbours is out of a blade\'s reach, from either side');
+        row(!meleeClear(inn, 3, 3, 5, 3) && !meleeClear(inn, 3, 3, 3, 3), 'a blade reaches the squares next to it and no further');
+        /* cover: someone standing on the line of a shot */
+        const town = st.maps.S0; let lane = null;
+        for (let y = 2; y < town.h - 2 && !lane; y++) for (let x = 2; x < town.w - 8 && !lane; x++) { let free = true; for (let i = 0; i < 7; i++) if (!tileFree(town, x + i, y) || tokenAt(town, x + i, y) || town._.occ[y * town.w + x + i] >= 0) free = false; if (free) lane = [x, y]; }
+        const none = coverOn(st, town, lane[0], lane[1], lane[0] + 6, lane[1]);
+        st.party[0].site = 'S0'; st.party[0].x = lane[0] + 3; st.party[0].y = lane[1];
+        const some = coverOn(st, town, lane[0], lane[1], lane[0] + 6, lane[1]), beside = coverOn(st, town, lane[0], lane[1], lane[0] + 3, lane[1]);
+        row(lane && !none && some && !beside, 'someone standing on the line of a shot is cover; the shooter and the target themselves are not');
+      }
+
+      /* 5. tricks, one by one, in a fight arranged for them */
+      {
+        const st = newGame('abil-1'); for (let j = 0; j < 5; j++) intent(st, { t: 'party', op: 'add' });
+        const by = (c) => st.party.find((p) => p.cls === c), F = by('Fighter'), Rg = by('Rogue'), C = by('Cleric'), Wz = by('Wizard'), Rn = by('Ranger'), Bd = by('Bard');
+        intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2;
+        /* the ground is arranged by hand: the fighter and a bandit side by side in a chamber, the rest of the party and a second bandit close by */
+        const foes = m.tokens.filter((t) => t.k === 'foe'), tok = foes[0], tok2 = foes[1];
+        let pair = null; for (let i = 0; i < m.w * m.h && !pair; i++) { const x = i % m.w, y = (i - x) / m.w; if (m.rg[i] && tileFree(m, x, y) && tileFree(m, x + 1, y) && !taken(st, m, x, y, '') && !taken(st, m, x + 1, y, '') && meleeClear(m, x, y, x + 1, y) && [[0, 1], [0, -1], [1, 1], [1, -1]].filter((s) => tileFree(m, x + s[0], y + s[1])).length >= 3) pair = [x, y]; }
+        F.x = pair[0]; F.y = pair[1]; moveToken(m, tok, pair[0] + 1, pair[1]);
+        for (const p of st.party) if (p !== F) { const f = freeNear(st, m, F.x, F.y, p.id); p.x = f[0]; p.y = f[1]; }
+        { const f = freeNear(st, m, tok.x, tok.y, 'x'); moveToken(m, tok2, f[0], f[1]); }
+        look(st);
+        const n0 = st.n.roll, V0 = visOf(st).g, rollers = st.party.map((p) => [p.id, abMod(p.scores.dex)]).concat(m.tokens.filter((t) => t.k === 'foe' && V0[t.y * m.w + t.x]).map((t) => [t.id, BESTIARY[tplOf(st.npcs[t.npc])].dex]));
+        const s = intent(st, { t: 'rounds', op: 'start' });
+        const exact = rollers.every((q, k) => { const c = st.round.order.find((x) => x.id === q[0]); return c && c.roll === 1 + Math.floor(rngFor(st.seed, 'dice', n0 + k)() * 20) + q[1]; });
+        row(s.ok && st.round.order.some((c) => c.id === tok.id) && st.round.order.length === rollers.length && exact && rollers.some((q) => q[1] !== 0), 'initiative is the tale\'s own die plus dexterity, for travellers and monsters alike: ' + st.round.order.map((c) => c.roll).join(' '));
+        const to = (id) => { for (let g = 0; g < 80 && st.round && turnOf(st).id !== id; g++) intent(st, { t: 'end' }); return !!st.round && turnOf(st).id === id; };
+        const big = (t) => { const S2 = sheetOf(st, t, true); S2.hpMax = 400; S2.hp = 400; };     /* a punching bag: the tricks are under test, not the bandit */
+        big(tok); big(tok2);
+        for (const p of st.party) { p.hpMax = 300; p.hp = 300; }
+        row(to(F.id), 'the turn comes round to the fighter');
+        F.hp = 3;
+        { const r = intent(st, { t: 'ability', name: 'Second Wind' });
+          row(r.ok && r.heal >= 2 && r.heal <= 11 && F.hp === 3 + r.heal && st.round.bonus === 0 && st.round.act === 1 && F.abilities[0].uses === 0, 'Second Wind heals 1d10+1 for the bonus action, and leaves the action');
+          row(intent(st, { t: 'ability', name: 'Second Wind' }).why === 'nouses', 'and cannot be used twice before a rest');
+          const before = snap(st), far = intent(st, { t: 'attack', target: 'K999' }), friend = intent(st, { t: 'attack', target: Rg.id });
+          row(far.why === 'notarget' && friend.why === 'friend' && snap(st) === before, 'a blow at nobody, or at a friend, is refused and changes nothing');
+          const a1 = intent(st, { t: 'attack', target: tok.id });
+          row(a1.ok && a1.attack === 'Longsword' && st.round.act === 0, 'the fighter beside a bandit strikes with the blade, and the action is spent: ' + (a1.say || a1.why));
+          const b2 = snap(st);
+          row(intent(st, { t: 'attack', target: tok.id }).why === 'noact' && intent(st, { t: 'dash' }).why === 'noact' && snap(st) === b2, 'one action a turn: a second blow or a dash is refused, and changes nothing');
+          const sg = intent(st, { t: 'ability', name: 'Action Surge' });
+          row(sg.ok && st.round.act === 1 && intent(st, { t: 'attack', target: tok.id, attack: 'longsw' }).ok && st.round.act === 0, 'Action Surge gives one more action, and a weapon can be named by part of its name');
+          row(intent(st, { t: 'attack', target: tok.id, attack: 'Halberd' }).why === 'noact', 'and that one is spent too'); }
+        row(to(Wz.id), 'the turn comes round to the wizard');
+        { const hp0 = sheetOf(st, tok, false).hp, r = intent(st, { t: 'ability', name: 'Magic Missile', target: tok.id });
+          row(r.ok && r.dmg >= 6 && r.dmg <= 15 && sheetOf(st, tok, false).hp === hp0 - r.dmg && Wz.abilities.find((x) => x.n === 'Magic Missile').uses === 1 && st.round.act === 0, 'Magic Missile: 3d4+3, no roll to hit, one use and the action spent');
+          const r2 = intent(st, { t: 'ability', name: 'Shield' });
+          row(r2.ok && Wz.conditions.includes('shielded') && acOf(Wz) === Wz.ac + 5 && st.round.bonus === 0, 'Shield: +5 armour class for the bonus action');
+          row(intent(st, { t: 'ability', name: 'Magic Missile', target: F.id }).why === 'noact', 'no action left for another spell'); }
+        row(to(Bd.id) && Wz.conditions.includes('shielded'), 'the turn comes round to the bard, and the wizard\'s shield is still up');
+        { const r = intent(st, { t: 'ability', name: 'Bardic Inspiration', target: F.id });
+          row(r.ok ? F.conditions.includes('inspired') && st.round.bonus === 0 : ['reach', 'nosight'].includes(r.why), 'Bardic Inspiration goes to a friend within reach of the voice: ' + (r.say || r.why));
+          st.round.bonus = 1;
+          row(intent(st, { t: 'ability', name: 'Bardic Inspiration', target: Bd.id }).why === 'notself' && intent(st, { t: 'ability', name: 'Bardic Inspiration', target: tok.id }).why === 'notarget' && intent(st, { t: 'ability', name: 'Bardic Inspiration' }).why === 'notarget' && st.round.bonus === 1, 'never to oneself, never to an enemy, never to nobody');
+          st.round.bonus = 0;
+          const b = snap(st);
+          row(intent(st, { t: 'ability', name: 'Healing Word', target: F.id }).why === 'nobonus' && intent(st, { t: 'ability', name: 'Bardic Inspiration', target: F.id }).why === 'nobonus' && snap(st) === b, 'one bonus action a turn: a second word of power is refused, and changes nothing'); }
+        row(to(C.id), 'the turn comes round to the cleric');
+        { const r = intent(st, { t: 'ability', name: 'Bless' });
+          row(r.ok && r.blessed.length === 3 && r.blessed.includes(C.id) && st.round.act === 0 && r.blessed.every((id) => pcOf(st, id).conditions.includes('blessed')), 'Bless: the cleric and the two nearest add 1d4 to their attacks'); }
+        row(to(Rn.id), 'the turn comes round to the ranger');
+        { const r = intent(st, { t: 'ability', name: 'hunter', target: tok.id });
+          row(r.ok ? Rn.mark === tok.id && st.round.bonus === 0 : ['reach', 'nosight'].includes(r.why), 'Hunter\'s Mark, named by part of its name: ' + (r.say || r.why));
+          let marked = null; for (let g = 0; g < 40 && !marked && r.ok; g++) { st.round.act = 1; const a = intent(st, { t: 'attack', target: tok.id }); if (a.ok && a.hit) marked = a; }
+          row(!r.ok || (marked && marked.mark >= 1 && marked.mark <= 12), 'a hit on the quarry carries 1d6 more'); }
+        row(to(Rg.id), 'the turn comes round to the rogue');
+        { const r = intent(st, { t: 'ability', name: 'Cunning Action' });
+          row(r.ok && moveLeft(st.round) === 60 && st.round.bonus === 0 && st.round.act === 1, 'Cunning Action: 30 ft more for the bonus action');
+          row(intent(st, { t: 'ability', name: 'Sneak Attack' }).why === 'passive', 'Sneak Attack is not something one does');
+          const d = intent(st, { t: 'dash' });
+          row(d.ok && moveLeft(st.round) === 90 && st.round.act === 0, 'and a dash on top of it: 90 ft in the turn');
+          /* sneak attack: with a friend beside the target, once a turn */
+          const spot = freeNear(st, m, tok.x, tok.y, Rg.id); Rg.x = spot[0]; Rg.y = spot[1]; const spot2 = freeNear(st, m, tok.x, tok.y, F.id); F.x = spot2[0]; F.y = spot2[1]; look(st);
+          const flank = meleeClear(m, Rg.x, Rg.y, tok.x, tok.y) && meleeClear(m, F.x, F.y, tok.x, tok.y);
+          let first = null, second = null;
+          for (let g = 0; g < 60 && !first && flank; g++) { st.round.act = 1; st.round.sneak = false; const a = intent(st, { t: 'attack', target: tok.id, attack: 'Rapier' }); if (a.ok && a.hit) first = a; }
+          for (let g = 0; g < 60 && !second && first; g++) { st.round.act = 1; const a = intent(st, { t: 'attack', target: tok.id, attack: 'Rapier' }); if (a.ok && a.hit) second = a; }
+          row(flank && first && first.sneak >= 1 && second && !second.sneak, 'a rogue\'s hit on a foe a friend stands beside is a sneak attack, once a turn and no more'); }
+        /* sleep: the weakest first, and a blow wakes them */
+        row(to(Wz.id) && !Wz.conditions.includes('shielded') && acOf(Wz) === Wz.ac, 'the turn comes round to the wizard again, and the shield is down: it lasts until their next turn');
+        { sheetOf(st, tok, true).hp = 5; sheetOf(st, tok2, true).hp = 399; const near = cheb(tok, tok2) <= 4;
+          const r = intent(st, { t: 'ability', name: 'Sleep', target: tok.id });
+          row(r.ok ? r.slept.includes(tok.id) && !r.slept.includes(tok2.id) && sheetOf(st, tok, false).asleep > st.round.n : ['reach', 'nosight'].includes(r.why), 'Sleep takes the weakest within 20 ft and leaves the strong awake' + (near ? '' : ' (the second bandit stood apart)') + ': ' + (r.say || r.why));
+          if (r.ok) { let skipped = false; for (let g = 0; g < 14 && st.round; g++) { const e = intent(st, { t: 'end' }); if ((e.events || []).some((x) => x.k === 'sleep' && x.who === tok.id)) skipped = true; if (st.round && turnOf(st).id === tok.id) { skipped = false; break; } if (skipped) break; }
+            row(skipped, 'a sleeper is passed over when its turn comes');
+            to(F.id); let woke = null; for (let g = 0; g < 40 && !woke; g++) { st.round.act = 1; const a = intent(st, { t: 'attack', target: tok.id }); if (a.ok) woke = a; }
+            row(woke && woke.mode === 'advantage' && (!woke.hit || sheetOf(st, tok, false).asleep === 0), 'a blow at a sleeper has advantage, and a hit wakes it'); } }
+        if (st.round) { const e = intent(st, { t: 'rounds', op: 'stop' });
+          row(e.ok && e.ended.outcome === 'stop' && !st.round && !Wz.conditions.includes('shielded') && !F.conditions.includes('inspired') && !C.conditions.includes('blessed'), 'standing down ends what lasts a fight: the shield, the blessing, the inspiration'); }
+        for (const t of [tok, tok2]) dropToken(st, m, t);
+        look(st);
+        F.hp = 2; const cure = intent(st, { t: 'ability', who: C.id, name: 'Cure Wounds', target: F.id });
+        row(cure.ok && F.hp > 2 && C.abilities.find((x) => x.n === 'Cure Wounds').uses === 1, 'outside a fight a healer\'s hands still work, with nobody\'s turn asked: ' + (cure.say || cure.why));
+        row(intent(st, { t: 'ability', who: Wz.id, name: 'Magic Missile', target: 'K0' }).why === 'noround' && intent(st, { t: 'ability', who: Rg.id, name: 'Cunning Action' }).why === 'noround', 'a fighting trick outside a fight is refused');
+        intent(st, { t: 'jump', site: 'S0' });
+        const lr = intent(st, { t: 'rest', kind: 'long' });
+        row(lr.ok && st.party.every((p) => p.hp === p.hpMax && p.abilities.every((a) => a.max === null || a.uses === a.max)), 'a night\'s sleep restores every hit point and every ability');
+      }
+
+      /* 6. dying */
+      {
+        const st = newGame('dying-1'); intent(st, { t: 'party', op: 'add' }); intent(st, { t: 'jump', site: 'S2' });
+        const m = st.maps.S2, P1 = st.party[0], tok = m.tokens.find((t) => t.k === 'foe'), spot = freeNear(st, m, P1.x, P1.y - 1, 'x'); moveToken(m, tok, spot[0], spot[1]); look(st);
+        intent(st, { t: 'rounds', op: 'start' });
+        if (turnOf(st).id === P1.id) intent(st, { t: 'end' });
+        P1.hp = 0; P1.status = 'down'; P1.saves = { s: 0, f: 0 };
+        let saves = 0, acted = false, told = true;
+        for (let g = 0; g < 80 && st.round && P1.status === 'down'; g++) { if (turnOf(st).id === P1.id) acted = true; const r = intent(st, { t: 'end' }); for (const e of r.events || []) if (e.k === 'death') { saves++; if (!(e.roll >= 1 && e.roll <= 20 && /fights for life/.test(e.say))) told = false; } }
+        row(saves >= 1 && !acted && told, 'the dying roll against death when their turn comes, and are passed over (' + saves + ' rolls)');
+        row(['dead', 'stable', 'ok'].includes(P1.status) || !st.round, 'three one way or the other settles it: ' + P1.status);
+        /* a blow at the fallen: an automatic step toward death; massive damage kills outright */
+        const p = newPc('PX', 'Test', 'S2', 0, 0, 'Wizard', false); hurtPC(p, p.hpMax, false); const down = p.status; hurtPC(p, 1, false); const f1 = p.saves.f; hurtPC(p, 1, true); const f3 = p.saves.f, dead = p.status;
+        const q = newPc('PY', 'Test', 'S2', 0, 0, 'Wizard', false); hurtPC(q, q.hpMax * 2, false);
+        row(down === 'down' && f1 === 1 && f3 === 3 && dead === 'dead' && q.status === 'dead', 'at 0 a traveller is down; each blow after is a failed save, a critical two; twice their hit points at once is death');
+        const h = newPc('PZ', 'Test', 'S2', 0, 0, 'Wizard', false); hurtPC(h, h.hpMax, false); const got = healPC(h, 4);
+        row(h.status === 'ok' && h.hp === 4 && got === 4 && h.saves.f === 0, 'any healing puts the fallen back on their feet');
+        /* nobody standing: defeat */
+        if (st.round) { for (const x of st.party) if (x.status === 'ok') { x.hp = 0; x.status = 'down'; x.saves = { s: 0, f: 0 }; } const r = intent(st, { t: 'end' });
+          row(r.ended && r.ended.outcome === 'defeat' && !st.round && (st.over === 'dead' ? st.party.every((x) => x.status === 'dead') : st.here === 'S1' && st.party.every((x) => x.hp === 1 && x.status === 'ok') && st.gold === Math.floor((15 + 20) / 2)), 'with nobody standing the fight is lost: the living wake at the inn, half their gold gone'); }
+        /* everyone dead: the tale is over, and says so */
+        const st2 = newGame('dying-2'); intent(st2, { t: 'jump', site: 'S2' }); const m2 = st2.maps.S2, t2 = m2.tokens.find((t) => t.k === 'foe'), s2 = freeNear(st2, m2, st2.party[0].x, st2.party[0].y - 1, 'x'); moveToken(m2, t2, s2[0], s2[1]); look(st2);
+        intent(st2, { t: 'rounds', op: 'start' }); st2.party[0].hp = 0; st2.party[0].status = 'dead'; const e2 = intent(st2, { t: 'end' });
+        row(e2.ended && e2.ended.over && st2.over === 'dead' && intent(st2, { t: 'jump', site: 'S0' }).why === 'over' && intent(st2, { t: 'party', op: 'add' }).why === 'over', 'with nobody alive the tale is over, and every intent after says so');
+        const st3 = unpackState(JSON.parse(JSON.stringify(packState(st2))));
+        row(st3.over === 'dead' && !st3.round, 'and it is still over after a save');
+      }
+
+      /* 7. the token lookup when monsters pass through one another (found by step 3's fights: a monster left behind vanished from the lookup) */
+      {
+        const st = newGame('index-1'); chart(st, 'S2'); const m = st.maps.S2, foes = m.tokens.filter((t) => t.k === 'foe'), A2 = foes[0], B2 = foes[1], home = [A2.x, A2.y];
+        moveToken(m, A2, B2.x, B2.y); const shared = tokenAt(m, B2.x, B2.y) === A2;
+        const on = freeNear(st, m, B2.x, B2.y, 'x'); moveToken(m, A2, on[0], on[1]);
+        row(shared && tokenAt(m, B2.x, B2.y) === B2 && tokenAt(m, on[0], on[1]) === A2 && tokenAt(m, home[0], home[1]) === null, 'a monster that steps through another leaves it findable on its own square');
+      }
+
+      /* 8. old saves and hostile files */
+      {
+        const st = newGame('old-1'); intent(st, { t: 'party', op: 'add' }); intent(st, { t: 'party', op: 'add' });
+        const v2 = JSON.parse(JSON.stringify(packState(st))); v2.v = 2;
+        for (const k of ['time', 'gold', 'facts', 'summaries', 'quests', 'story', 'costs', 'turn', 'told', 'fallen', 'over']) delete v2[k];
+        v2.party = v2.party.map((p) => ({ id: p.id, name: p.name, site: p.site, x: p.x, y: p.y })); delete v2.n.f; delete v2.n.Q;
+        let o = null; try { o = unpackState(v2); } catch (e) { o = null; }
+        row(o && o.v === 3 && o.party.map((p) => p.cls).join() === 'Fighter,Rogue,Cleric' && o.party.every((p) => p.hp === p.hpMax && p.stock && p.status === 'ok') && o.gold === 50 && o.time.minute === 480 && o.quests.Q0 && o.quests.Q0.status === 'active' && Array.isArray(o.story) && o.turn === 0,
+          'a tale saved before there were sheets loads: each traveller is given a calling by their place in the party, a full sheet, and the tale a purse, a clock and its quest');
+        const evil = JSON.parse(JSON.stringify(packState(st)));
+        Object.assign(evil.party[0], { cls: 'God', level: 99, hp: 99999, hpMax: 99999, ac: 99 });
+        Object.assign(evil.party[1], { level: 99, xp: -5, hp: 99999, hpMax: 5000, ac: 99, status: 'ascended', conditions: ['flying', 'blessed', 'blessed'], scores: { str: 500, dex: -3 }, items: [{ n: '<img src=x onerror=1>', q: 1e9 }, { n: '', q: 1 }, null], abilities: [{ n: 'Sneak Attack', uses: 50 }, { n: 'Wish', uses: 9 }], saves: { s: 9, f: -2 }, mark: '<script>' });
+        Object.assign(evil.party[2], { hp: 0, status: 'ok', abilities: [{ n: 'Cure Wounds', uses: 99 }] });
+        evil.gold = -50; evil.time = { day: -3, minute: 99999 }; evil.turn = 'x'; evil.over = 'dead';
+        evil.story = [{ t: 'gm', text: 'x'.repeat(9000) }, { t: 'evil', text: 'no' }, { t: 'pl', text: 5 }, null, { t: 'chip', text: 'ok', k: '<b>' }];
+        evil.costs = [{ usd: 'lots' }, null, { usd: 2, kind: 'bribe', calls: -4, tok: { in: 'a' } }]; evil.facts = [{ text: 'f'.repeat(999), subject: 'x'.repeat(99) }, { text: 3 }];
+        evil.quests = { Q0: { title: 7, status: 'won' }, '__proto__': { title: 'x' }, QQ: { title: 'no' } }; evil.told = { '<x>': 1, open: 1 }; evil.fallen = [{ name: 'A', cls: 'God', level: 50 }];
+        evil.npcs.N5.sheet = { tpl: 'tarrasque', hp: 99999, hpMax: 99999, ac: 99, atk: [['doom', 99, '99d99', 99]] }; evil.npcs.N5.status = 'immortal';
+        let e = null; try { e = unpackState(evil); } catch (x) { e = String(x); }
+        const p0 = e && e.party && e.party[0], p1 = e && e.party && e.party[1], p2 = e && e.party && e.party[2];
+        row(p0 && p0.cls === 'Fighter' && p0.level === 1 && p0.hp === 12 && p0.ac === 16, 'a file naming a calling that does not exist gets an honest level 1 sheet, whatever else it claimed');
+        row(p1 && p1.level === 5 && p1.xp === 0 && p1.hpMax === 999 && p1.hp === 999 && p1.ac === 30 && p1.status === 'ok' && p1.conditions.join() === 'blessed' && p1.scores.str === 30 && p1.scores.dex === 1 && p1.items.length === 1 && p1.items[0].q === 999 && p1.items[0].n.startsWith('<img') && p1.saves.s === 3 && p1.saves.f === 0 && p1.mark === '' && p1.abilities.map((a) => a.n).join() === 'Sneak Attack,Cunning Action' && p1.abilities.every((a) => a.uses === null),
+          'a tampered sheet is bounded: level 5 at most, every number in range, only real conditions, and the abilities are the calling\'s own');
+        row(p2 && p2.hp === 0 && p2.status === 'stable' && p2.abilities.find((a) => a.n === 'Cure Wounds').uses === 2, 'nobody stands at 0 hit points, and nobody has more uses than their calling gives');
+        row(e && e.gold === 0 && e.time.day === 1 && e.time.minute === 1439 && e.turn === 0 && e.over === '' && e.story.length === 2 && e.story[0].text.length === 6000 && e.story[1].k === '<b>' && e.costs.length === 1 && e.costs[0].kind === 'gm' && e.costs[0].calls === 0 && e.facts.length === 1 && e.facts[0].text.length === 280 && e.facts[0].subject.length <= 12 &&
+          Object.keys(e.quests).join() === 'Q0' && e.quests.Q0.status === 'active' && e.quests.Q0.title === 'A task' && Object.keys(e.told).join() === 'open' && e.fallen[0].cls === 'Fighter' && e.fallen[0].level === 5,
+          'the purse, the clock, the story, the ledger, the facts and the quests out of a hostile file are all bounded and plain');
+        { const ev2 = JSON.parse(JSON.stringify(packState(st))); Object.assign(ev2.party[1], { hp: 5, status: 'down', saves: { s: 2, f: 2 } }); Object.assign(ev2.party[2], { hp: 3, status: 'dead' }); ev2.over = 'dead'; ev2.v = 99;
+          let newer = ''; try { unpackState(ev2); } catch (x) { newer = String(x.message); }
+          ev2.v = 3; let e2 = null; try { e2 = unpackState(ev2); } catch (x) { e2 = null; }
+          row(/newer version/.test(newer), 'a tale saved by a newer version of the game is refused, in words');
+          row(e2 && e2.party[1].status === 'ok' && e2.party[1].hp === 5 && e2.party[2].status === 'dead' && e2.over === '', 'a file cannot leave someone lying down with hit points in hand, nor end a tale whose travellers still live'); }
+        row(e && e.npcs.N5.sheet.tpl === 'bandit captain' && e.npcs.N5.sheet.hpMax === 400 && e.npcs.N5.sheet.hp === 400 && e.npcs.N5.sheet.ac === 25 && !('atk' in e.npcs.N5.sheet) && e.npcs.N5.status === 'alive' && foeWeapons(e.npcs.N5.sheet)[0].n === 'scimitar', 'a monster\'s block out of a file keeps bounded numbers and nothing else: its attacks are always the template\'s own');
+      }
+
+      /* 9. the rules a lucky run does not reach. The tale's dice are counted, so the count can be set where a wanted number comes up next. */
+      {
+        const force = (st, die, v) => { for (let n = st.n.roll; n < st.n.roll + 4000; n++) if (1 + Math.floor(rngFor(st.seed, 'dice', n)() * die) === v) { st.n.roll = n; return true; } return false; };
+        const st = newGame('edge-1'); for (let j = 0; j < 5; j++) intent(st, { t: 'party', op: 'add' });
+        const by = (c) => st.party.find((p) => p.cls === c), F = by('Fighter'), Rg = by('Rogue'), C = by('Cleric'), Wz = by('Wizard'), Rn = by('Ranger'), Bd = by('Bard');
+        intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2;
+        const foes = m.tokens.filter((t) => t.k === 'foe'), tok = foes[0], tok2 = foes[1];
+        let pair = null; for (let i = 0; i < m.w * m.h && !pair; i++) { const x = i % m.w, y = (i - x) / m.w; if (m.rg[i] && tileFree(m, x, y) && tileFree(m, x + 1, y) && !taken(st, m, x, y, '') && !taken(st, m, x + 1, y, '') && meleeClear(m, x, y, x + 1, y) && [[0, 1], [0, -1], [1, 1], [1, -1]].filter((s) => tileFree(m, x + s[0], y + s[1])).length >= 3) pair = [x, y]; }
+        F.x = pair[0]; F.y = pair[1]; moveToken(m, tok, pair[0] + 1, pair[1]);
+        for (const p of st.party) if (p !== F) { const f = freeNear(st, m, F.x, F.y, p.id); p.x = f[0]; p.y = f[1]; }
+        { const f = freeNear(st, m, tok.x, tok.y, 'x'); moveToken(m, tok2, f[0], f[1]); }
+        look(st);
+        const b0 = snap(st);
+        row(intent(st, { t: 'rest', kind: 'short' }).why === 'unsafe' && intent(st, { t: 'rest', kind: 'long' }).why === 'unsafe' && snap(st) === b0, 'no rest, short or long, with an enemy in sight');
+        row(foePlan(st) === null, 'the monsters\' script plays nobody while no rounds are counted');
+        intent(st, { t: 'rounds', op: 'start' });
+        const to = (id) => { for (let g = 0; g < 80 && st.round && turnOf(st).id !== id; g++) intent(st, { t: 'end' }); return !!st.round && turnOf(st).id === id; };
+        const S1 = sheetOf(st, tok, true), S2 = sheetOf(st, tok2, true), blow = (o) => { st.round.act = 1; return intent(st, Object.assign({ t: 'attack', target: tok.id, attack: 'Longsword' }, o || {})); };
+        S1.hpMax = S1.hp = 400; S2.hpMax = S2.hp = 400;
+        for (const p of st.party) { p.hpMax = 300; p.hp = 300; }
+        row(to(F.id) && foePlan(st) === null, 'nor ever a traveller: on a traveller\'s turn it has no plan');
+        const b1 = snap(st);
+        row(intent(st, { t: 'rest', kind: 'long' }).why === 'inround' && snap(st) === b1, 'no rest in the middle of a round');
+        row(intent(st, { t: 'attack', target: tok.id, attack: 'Halberd' }).why === 'noweapon' && snap(st) === b1, 'a weapon nobody carries is refused, and the action kept');
+        const hitF = weaponsOf(F)[0].hit;
+        S1.ac = 2; force(st, 20, 1); const n1 = blow();
+        row(n1.ok && n1.natural === 1 && !n1.hit && n1.dmg === 0 && n1.total >= n1.ac, 'a natural 1 misses even when its total beats the armour: ' + n1.say);
+        S1.ac = 60; force(st, 20, 20); const n20 = blow();
+        row(n20.ok && n20.natural === 20 && n20.hit && n20.crit && n20.total < n20.ac, 'and a natural 20 lands whatever the armour: ' + n20.say);
+        S1.ac = 12; F.conditions = ['blessed']; force(st, 20, 10); const bl = blow();
+        row(bl.ok && bl.natural === 10 && bl.total >= 10 + hitF + 1 && bl.total <= 10 + hitF + 4 && /bless \+\d/.test(bl.say) && F.conditions.includes('blessed'), 'a blessed blow adds 1d4 to its total, and the blessing stays: ' + bl.say);
+        F.conditions = ['inspired']; force(st, 20, 10); const ins = blow();
+        row(ins.ok && ins.total >= 10 + hitF + 1 && ins.total <= 10 + hitF + 6 && /inspiration \+\d/.test(ins.say) && !F.conditions.includes('inspired'), 'inspiration adds 1d6 to one blow, and is spent by it: ' + ins.say);
+        force(st, 20, 10); const plain = blow();
+        row(plain.ok && plain.total === 10 + hitF && plain.rolls.length === 1, 'and the blow after is plain again: the die and the bonus, ' + plain.total);
+        const claim = blow({ mode: 'advantage' }), given = blow({ mode: 'advantage', by: 'gm' });
+        row(claim.ok && claim.mode === 'normal' && claim.rolls.length === 1 && given.ok && given.mode === 'advantage' && given.rolls.length === 2 && given.natural === Math.max(given.rolls[0], given.rolls[1]), 'advantage is the engine\'s to give: an intent that claims it rolls one die, and only the Game Master\'s word adds a second');
+        F.hp = 3; st.round.bonus = 1; force(st, 10, 1); const sw = intent(st, { t: 'ability', name: 'Second Wind' });
+        row(sw.ok && sw.heal === 2 && F.hp === 5, 'Second Wind on a 1 heals 2: the die and the fighter\'s level');
+        F.hp = 300;
+        /* spells aimed at the wrong people */
+        row(to(Wz.id), 'the wizard\'s turn');
+        { const b = snap(st); tok2.k = 'npc'; const calm = intent(st, { t: 'ability', name: 'Magic Missile', target: tok2.id }); tok2.k = 'foe';
+          row(calm.why === 'peace' && intent(st, { t: 'ability', name: 'Magic Missile', target: F.id }).why === 'friend' && intent(st, { t: 'ability', name: 'Magic Missile' }).why === 'notarget' && snap(st) === b, 'Magic Missile is for an enemy: not someone peaceful, not a friend, not nobody'); }
+        /* the dead */
+        row(to(tok.id), 'the bandit\'s turn');
+        { Bd.hp = 0; Bd.status = 'dead'; const b = snap(st), gone = intent(st, { t: 'attack', who: tok.id, target: Bd.id });
+          row(gone.why === 'gone' && snap(st) === b, 'nobody strikes the dead'); }
+        row(to(C.id), 'the cleric\'s turn');
+        { const b = snap(st);
+          row(intent(st, { t: 'ability', name: 'Cure Wounds', target: Bd.id }).why === 'gone' && snap(st) === b, 'and no healing reaches them');
+          Bd.hp = 300; Bd.status = 'ok';
+          /* touch is touch: in a fight a healer must stand beside whoever they mend */
+          const spot = []; for (let i = 0; i < m.w * m.h && spot.length < 1; i++) { const x = i % m.w, y = (i - x) / m.w; if (tileFree(m, x, y) && !taken(st, m, x, y, '') && Math.max(Math.abs(x - C.x), Math.abs(y - C.y)) === 3 && visOf(st).g[i]) spot.push([x, y]); }
+          const was = [Rn.x, Rn.y]; if (spot.length) { Rn.x = spot[0][0]; Rn.y = spot[0][1]; } Rn.hp = 100;
+          const b3 = snap(st), far = intent(st, { t: 'ability', name: 'Cure Wounds', target: Rn.id });
+          row(spot.length === 1 && far.why === 'reach' && snap(st) === b3, 'in a fight, Cure Wounds needs the healer beside whoever is mended: three squares off is out of reach');
+          Rn.x = was[0]; Rn.y = was[1]; Rn.hp = 300; }
+        /* the undead: turned by the cleric, untouched by sleep. The later of the two bandits on the board is the skeleton, so a rule that forgot to ask would roll for the living one first. */
+        { S2.tpl = 'skeleton'; const f = freeNear(st, m, tok2.x, tok2.y, C.id); C.x = f[0]; C.y = f[1]; look(st);
+          const seen = sightFrom(m, C.x, C.y, sightOf(m)), both = [tok, tok2].every((t) => cheb(t, C) <= 6 && seen[t.y * m.w + t.x]);
+          force(st, 20, 2); const tu = intent(st, { t: 'ability', name: 'Turn Undead' });
+          row(both && tu.ok && tu.turned.join() === tok2.id && S2.turned === st.round.n + 3 && !S1.turned && st.round.act === 0, 'Turn Undead turns the dead that fail their save, and never the living: ' + (tu.say || tu.why)); }
+        row(to(tok2.id), 'the skeleton\'s turn');
+        { const b = snap(st), tr = intent(st, { t: 'attack', who: tok2.id, target: C.id }), plan = foePlan(st);
+          row(tr.why === 'turned' && snap(st) === b && plan && plan.t === 'end', 'a turned thing cannot strike, and its script knows to do nothing'); }
+        row(to(Wz.id), 'the wizard\'s turn again');
+        { S2.hp = 1; S1.hp = 5; const near = cheb(tok, tok2) <= 4, sl = intent(st, { t: 'ability', name: 'Sleep', target: tok.id });
+          row(near && sl.ok && sl.slept.join() === tok.id && !S2.asleep && S1.asleep === st.round.n + 10, 'Sleep passes over the undead, however weak, and takes the living: ' + (sl.say || sl.why));
+          S1.hp = 400; S2.hp = 400;
+          /* and it runs out by itself */
+          S1.asleep = st.round.n + 1; let woke = false, slept = 0;
+          for (let g = 0; g < 40 && st.round && !woke; g++) { const e = intent(st, { t: 'end' }); if ((e.events || []).some((x) => x.k === 'sleep' && x.who === tok.id)) slept++; if (st.round && turnOf(st).id === tok.id) woke = true; }
+          row(woke && S1.asleep === 0 && slept <= 1, 'sleep runs out by itself: in its last round the sleeper has its turn again'); }
+        /* sneak attack needs a friend at the target's side, or advantage */
+        row(to(Rg.id), 'the rogue\'s turn');
+        { const away = []; for (let i = 0; i < m.w * m.h; i++) { const x = i % m.w, y = (i - x) / m.w, d = Math.max(Math.abs(x - tok.x), Math.abs(y - tok.y)); if (tileFree(m, x, y) && !taken(st, m, x, y, '') && d >= 3 && d <= 5 && visOf(st).g[i]) away.push([x, y]); }
+          const others = st.party.filter((p) => p !== Rg); others.forEach((p, k) => { if (away[k]) { p.x = away[k][0]; p.y = away[k][1]; } });
+          const rs = freeNear(st, m, tok.x, tok.y, Rg.id); Rg.x = rs[0]; Rg.y = rs[1]; look(st);
+          const lone = away.length >= others.length && meleeClear(m, Rg.x, Rg.y, tok.x, tok.y) && !others.some((p) => cheb(p, tok) <= 1);
+          S1.ac = 5; S1.asleep = 0; st.round.sneak = false; st.round.act = 1; force(st, 20, 15); const al = intent(st, { t: 'attack', target: tok.id, attack: 'Rapier' });
+          row(lone && al.ok && al.hit && al.mode === 'normal' && !al.sneak && !st.round.sneak, 'a rogue alone at a waking foe lands no sneak attack: ' + (al.say || al.why));
+          S1.asleep = st.round.n + 5; st.round.act = 1; force(st, 20, 15); const ad = intent(st, { t: 'attack', target: tok.id, attack: 'Rapier' });
+          row(lone && ad.ok && ad.hit && ad.mode === 'advantage' && ad.sneak >= 1 && st.round.sneak && S1.asleep === 0, 'but advantage is enough: a blow at a sleeper is a sneak attack, and wakes it: ' + (ad.say || ad.why));
+          CLASSES.Rogue.attacks.push({ n: 'Test Spark', ab: 'dex', d: '1d4', rg: 1, spell: true });
+          S1.asleep = st.round.n + 5; st.round.sneak = false; st.round.act = 1; force(st, 20, 15); const sp = intent(st, { t: 'attack', target: tok.id, attack: 'Test Spark' });
+          CLASSES.Rogue.attacks.pop();
+          row(sp.ok && sp.hit && sp.mode === 'advantage' && !sp.sneak && !st.round.sneak && CLASSES.Rogue.attacks.length === 2, 'and it rides a weapon, never a spell (the rogue is lent one for a single blow to prove it)'); }
+        /* the quarry falls: the mark goes with it */
+        { Rn.mark = tok.id; S1.hp = 1; const fell = hurtFoe(st, m, tok, 5);
+          row(fell && Rn.mark === '' && st.npcs[tok.npc].status === 'defeated' && !m.tokens.includes(tok), 'when the quarry falls the mark is gone with it'); }
+        intent(st, { t: 'rounds', op: 'stop' });
+        /* rests, by the clock */
+        intent(st, { t: 'jump', site: 'S0' });
+        { const clock = () => st.time.day * 1440 + st.time.minute, gain = (p) => Math.max(1, CLASSES[p.cls].hd + abMod(p.scores.con));
+          for (const p of st.party) { p.hp = 100; for (const a of p.abilities) if (a.max !== null) a.uses = 0; }
+          const t0 = clock(), sr = intent(st, { t: 'rest', kind: 'short' }), t1 = clock(), per = (p, n) => abilityDef(p.cls, n).per;
+          row(sr.ok && t1 - t0 === 60 && st.party.every((p) => p.hp >= 101 && p.hp <= 100 + gain(p) && p.abilities.every((a) => a.max === null || a.uses === (per(p, a.n) === 'short' ? a.max : 0))) && F.abilities.every((a) => a.uses === a.max) && Wz.abilities.every((a) => a.uses === 0),
+            'a short rest takes an hour, mends a hit die\'s worth, and brings back only what a short rest brings back: the fighter\'s tricks, not the wizard\'s spells');
+          const lr = intent(st, { t: 'rest', kind: 'long' }), t2 = clock();
+          row(lr.ok && t2 - t1 === 480 && st.party.every((p) => p.hp === p.hpMax && p.abilities.every((a) => a.max === null || a.uses === a.max)), 'a long rest takes eight hours and brings back everything');
+          /* what is for a fight stays in a fight; what is not, works anywhere */
+          const b = snap(st), only = [[F, 'Action Surge'], [Rg, 'Cunning Action'], [Wz, 'Shield'], [Wz, 'Magic Missile'], [Wz, 'Sleep'], [C, 'Bless'], [C, 'Turn Undead'], [Rn, 'hunter']];
+          const no = only.filter(([p, n]) => intent(st, { t: 'ability', who: p.id, name: n, target: 'K0' }).why !== 'noround').map((q) => q[1]);
+          row(!no.length && snap(st) === b, 'every fighting trick is refused outside a fight, and changes nothing' + (no.length ? ' (allowed: ' + no.join(', ') + ')' : ''));
+          const bi = intent(st, { t: 'ability', who: Bd.id, name: 'Bardic Inspiration', target: F.id }); F.hp = 250; const hw = intent(st, { t: 'ability', who: Bd.id, name: 'Healing Word', target: F.id });
+          row(bi.ok && F.conditions.includes('inspired') && hw.ok && F.hp > 250, 'while a word of inspiration or of healing may be spoken any time'); }
+      }
+      /* the party's order of things */
+      {
+        const st = newGame('lead-1'); intent(st, { t: 'party', op: 'add' }); const A = st.party[0], B = st.party[1];
+        B.hp = 0; B.status = 'stable';
+        const b = snap(st);
+        row(intent(st, { t: 'lead', id: B.id }).why === 'downed' && intent(st, { t: 'party', op: 'drop', id: A.id }).why === 'last' && snap(st) === b, 'the fallen cannot lead, and the last one standing cannot be sent away');
+        B.hp = 5; B.status = 'ok';
+        const s = intent(st, { t: 'rounds', op: 'start' }), e1 = intent(st, { t: 'end' }), e2 = intent(st, { t: 'end' });
+        row(s.ok && e1.ok && !e1.ended && e2.ok && !e2.ended && st.round && st.round.had === false, 'rounds counted with no enemy in them are nobody\'s victory: they go on until the table stands down');
+        A.hp = 0; A.status = 'down'; const e = intent(st, { t: 'rounds', op: 'stop' });
+        row(e.ok && st.lead === B.id && A.status === 'stable' && !st.round, 'when the leader has fallen, the lead passes to someone standing, and the dying are tended once the rounds are over');
+      }
+      /* rolling against death, die by die */
+      {
+        const force = (st, v) => { for (let n = st.n.roll; n < st.n.roll + 4000; n++) if (1 + Math.floor(rngFor(st.seed, 'dice', n)() * 20) === v) { st.n.roll = n; return true; } return false; };
+        const st = newGame('saves-1'), p = st.party[0], down = () => { p.hp = 0; p.status = 'down'; p.saves = { s: 0, f: 0 }; }, save = (v) => { force(st, v); return deathSave(st, p); };
+        down(); const r20 = save(20);
+        row(r20.roll === 20 && p.hp === 1 && p.status === 'ok', 'a 20 against death puts the dying back on their feet with 1 hit point');
+        down(); save(1); const two = p.saves.f === 2 && p.status === 'down'; save(5);
+        row(two && p.status === 'dead', 'a 1 is two failures, and the third failure is death');
+        down(); save(5); save(9); const hang = p.saves.f === 2 && p.status === 'down'; save(10); const held = p.saves.f === 2 && p.saves.s === 1 && p.status === 'down'; save(4);
+        row(hang && held && p.status === 'dead', 'two failures are not yet death, a 10 is a success, and a third failure whenever it comes is the end');
+        down(); save(12); save(19); const near = p.saves.s === 2 && p.status === 'down'; save(10);
+        row(near && p.status === 'stable' && p.hp === 0, 'three successes and they will live, though not yet stand');
+      }
+      /* a shot: its range, what stands in its way, and who stands at the shooter's elbow */
+      {
+        const st = newGame('cover-1'); intent(st, { t: 'party', op: 'add' }); intent(st, { t: 'jump', site: 'S0' });
+        const town = st.maps.S0, A = st.party[0], B = st.party[1], free = (x, y) => tileFree(town, x, y) && !tokenAt(town, x, y) && town._.occ[y * town.w + x] < 0;
+        let lane = null;
+        for (let y = 2; y < town.h - 3 && !lane; y++) for (let x = 2; x < town.w - 8 && !lane; x++) { let all = free(x + 1, y + 1) && free(x + 3, y + 1); for (let i = 0; i < 7 && all; i++) all = free(x + i, y); if (all && meleeClear(town, x, y, x + 1, y + 1) && reachWhy(town, { x, y }, { x: x + 6, y }, 30) === '') lane = [x, y]; }
+        const at = (dx, dy) => ({ x: lane[0] + dx, y: lane[1] + (dy || 0) });
+        row(lane && reachWhy(town, at(0), at(6), 5) === 'reach' && reachWhy(town, at(0), at(6), 6) === '' && reachWhy(town, at(0), at(2), 1) === 'reach', 'a shot reaches as far as its range and no further, sight or no sight');
+        A.x = lane[0]; A.y = lane[1]; B.x = lane[0] + 3; B.y = lane[1];
+        const t1 = town.tokens[0], t2 = town.tokens[1]; moveToken(town, t1, lane[0] + 6, lane[1]); t1.k = 'foe'; st.npcs[t1.npc].kind = 'foe';
+        look(st); intent(st, { t: 'rounds', op: 'start' });
+        const S = sheetOf(st, t1, true); S.hpMax = S.hp = 400;
+        for (let g = 0; g < 20 && turnOf(st).id !== A.id; g++) intent(st, { t: 'end' });
+        const shot = () => { st.round.act = 1; return intent(st, { t: 'attack', target: t1.id, attack: 'Longbow' }); };
+        const c1 = shot(); B.y = lane[1] + 1; const c2 = shot();
+        row(c1.ok && c1.cover === true && c1.ac === S.ac + 2 && c1.mode === 'normal' && /\(cover\)/.test(c1.say) && c2.ok && c2.cover === false && c2.ac === S.ac, 'a shot past someone must beat 2 more armour; with the line clear it need not: ' + c1.say);
+        moveToken(town, t2, lane[0] + 1, lane[1] + 1); t2.k = 'foe'; st.npcs[t2.npc].kind = 'foe'; look(st);
+        const c3 = shot(); st.round.act = 1; const c4 = intent(st, { t: 'attack', target: t2.id, attack: 'Longsword' });
+        row(c3.ok && c3.mode === 'disadvantage' && c3.rolls.length === 2 && c3.natural === Math.min(c3.rolls[0], c3.rolls[1]) && c4.ok && c4.mode === 'normal' && c4.rolls.length === 1, 'a shot with an enemy at the shooter\'s elbow is at disadvantage; the blade drawn on that enemy is not: ' + c3.say);
+      }
+      return rows;
+    }, 14);
+    for (const [c, m] of rows) ok(c, m);
+    await Q.ctx.close();
+  }
+  }
+
+  if (want('R')) {
+  /* ------------------------------------------------------------------ R */
+  console.log('R. a fight by touch, and the monsters\' own script');
+  {
+    const R1 = await open({ width: 390, height: 844 }, null, { storyOpen: true }), page = R1.page;
+    const quiet = (ms) => page.waitForFunction(() => G.st && !G.busy && !G.st.walk && !View.walking && View.anim.t >= 1 && !View.easing && !document.getElementById('veil').classList.contains('on'), null, { timeout: ms || 15000 });
+    const frames = (n) => page.evaluate((n) => new Promise((res) => { let k = 0; const f = () => (++k >= n ? res() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n || 3);
+    const tapEl = async (sel) => { const p = await page.evaluate((sel) => { const e = document.querySelector(sel); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, sel); await page.touchscreen.tap(p[0], p[1]); await page.waitForTimeout(120); };
+    /* centre the table on a square, clear the card off it, and say where on the glass that square is */
+    const aimAt = async (x, y) => { await page.evaluate(([x, y]) => { UI.card(null); View.cam.x = x + .5; View.cam.y = y + .5; camMoved(true); viewDraw(); }, [x, y]); await frames(2); return page.evaluate(([x, y]) => { const r = View.cv.getBoundingClientRect(), s = w2s(x + .5, y + .5); return [r.left + s[0], r.top + s[1]]; }, [x, y]); };
+    await begin(page);
+
+    /* the story sits under the board; its bar is always in reach; folding it gives the board the room back */
+    const lay = () => page.evaluate(() => { const q = (id) => { const r = document.getElementById(id).getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; }; const cv = View.cv.getBoundingClientRect();
+      return { board: q('board'), story: q('story'), bar: q('story-bar'), log: q('story-log'), say: q('say'), send: q('say-send'), open: document.getElementById('story').classList.contains('open'), vw: View.vw, vh: View.vh, cw: cv.width, ch: cv.height, W: innerWidth, H: innerHeight,
+        sys: document.querySelectorAll('#story-log .st-sys').length, text: document.getElementById('story-log').textContent, story0: G.st.story.length, over: document.documentElement.scrollWidth > innerWidth + 1 }; });
+    let L = await lay();
+    ok(L.open && L.sys === 2 && L.text.includes(await page.evaluate(() => G.st.bible.opening)) && L.story0 === 2, 'with no Game Master the story opens on the tale\'s own opening lines, kept in the tale');
+    ok(L.bar.b <= L.H + 1 && L.bar.t >= L.board.b - 1 && L.log.h >= 110 && L.board.h >= 380 && L.say.w >= 90 && L.send.r <= L.W + 1 && !L.over, 'the story sits under the board: its bar inside the screen, the board ' + Math.round(L.board.h) + ' px tall above it');
+    await tapEl('#story-toggle'); await frames(6);
+    const L2 = await lay();
+    ok(!L2.open && L2.log.h === 0 && L2.board.h >= L.board.h + L.log.h - 4 && Math.abs(L2.vh - L2.ch) < 1 && Math.abs(L2.ch - L2.board.h) < 3 && L2.bar.b <= L2.H + 1, 'folding the story gives the board its room back, and the table is measured again at once (' + Math.round(L2.board.h) + ' px)');
+    { /* a tap still lands on the square drawn there, after the board has changed size */
+      const tgt = await page.evaluate(() => { const st = G.st, m = View.map, a = actor(), E = eyes(); let best = null; for (let i = 0; i < m.w * m.h; i++) { const x = i % m.w, y = (i - x) / m.w; if (!E.vis[i] || !tileFree(m, x, y) || taken(st, m, x, y, '') || m._.dec[i] >= 0) continue; const r = route(st, a, [[x, y]], true); if (r.ok && r.path.length >= 2 && (!best || r.path.length > best.n)) best = { x, y, n: r.path.length }; } return best; });
+      const p = await aimAt(tgt.x, tgt.y); await page.touchscreen.tap(p[0], p[1]); await quiet();
+      const at = await page.evaluate(() => [G.st.party[0].x, G.st.party[0].y]);
+      ok(at[0] === tgt.x && at[1] === tgt.y, 'and a tap still lands on the square that is drawn there');
+    }
+    { const tc = await page.evaluate(() => { const t = document.getElementById('toast'), n = G.st.story.length; t.textContent = ''; UI.chip('fight', 'A line while folded.'); const said = t.textContent, kept = G.st.story.length === n + 1 && G.st.story[n].text === 'A line while folded.'; G.st.story.pop(); UI.renderStory(); return { said, kept }; });
+      ok(tc.said === 'A line while folded.' && tc.kept, 'with the story folded away, what the engine does is still said in passing, and still written down'); }
+    await tapEl('#story-toggle'); await frames(6);
+    { const tc = await page.evaluate(() => { const t = document.getElementById('toast'); t.textContent = ''; UI.chip('fight', 'A line while open.'); const said = t.textContent, shown = [...document.querySelectorAll('#story-log .st-chip.fight')].some((x) => x.textContent === 'A line while open.'); G.st.story.pop(); UI.renderStory(); return { said, shown }; });
+      ok(tc.said === '' && tc.shown, 'with the story open it is written there, and not said twice'); }
+    /* the same on other screens: beside the board when the screen is wide or lying down, under it otherwise */
+    { const bad = [];
+      for (const [w, h] of [[320, 568], [844, 390], [1280, 800], [768, 1024], [390, 844]]) {
+        await page.setViewportSize({ width: w, height: h }); await frames(8); await page.waitForTimeout(450); await frames(3);
+        const v = await lay(), side = (w > h && h <= 520) || (w >= 1000 && w / h >= 1.25);
+        if (v.bar.b > v.H + 1 || v.send.r > v.W + 1 || v.say.w < 60) bad.push(w + 'x' + h + ' the bar leaves the screen');
+        if (v.board.w < 150 || v.board.h < (side ? 130 : 190)) bad.push(w + 'x' + h + ' the board is squeezed to ' + Math.round(v.board.w) + 'x' + Math.round(v.board.h));
+        if (side ? !(v.story.l >= v.board.r - 2 && v.log.h >= 100) : !(v.story.t >= v.board.b - 2)) bad.push(w + 'x' + h + ' the story is on the wrong side');
+        if (Math.abs(v.vw - v.cw) > 1 || Math.abs(v.vh - v.ch) > 1 || Math.abs(v.cw - v.board.w) > 3) bad.push(w + 'x' + h + ' the table was not measured again');
+        if (v.over) bad.push(w + 'x' + h + ' the page scrolls sideways');
+      }
+      ok(bad.length === 0, 'on five screens the story is beside the board when the screen is wide or lying down and under it otherwise, its bar always in reach, the board never squeezed' + (bad.length ? ': ' + bad.join('; ') : ''));
+    }
+    { /* the panels with the most in them: nothing in Settings or the Party pushes the page sideways (a long option in a list once did) */
+      const wide = await page.evaluate(() => { const out = []; UI.settings(); UI.openPanel('pan-settings'); const body = document.querySelector('#pan-settings .panel-body'); if (body.scrollWidth > body.clientWidth + 1) out.push('settings scrolls sideways');
+        for (const e of body.querySelectorAll('fieldset, select, input, button, p')) { const r = e.getBoundingClientRect(); if (r.width && r.right > innerWidth + 1) out.push((e.id || e.tagName) + ' runs off the screen'); }
+        const n = document.querySelectorAll('#set-model option').length + ',' + document.querySelectorAll('#set-m-monsters option').length; UI.closePanels(); return { out, n }; });
+      ok(wide.out.length === 0 && wide.n === '4,4', 'Settings fits the screen it is on, the Game Master\'s part included' + (wide.out.length ? ': ' + wide.out.slice(0, 3).join('; ') : ''));
+    }
+    { /* a thing the Game Master sets down or takes away is painted: the board's picture is made again, not left as it was */
+      const rp = await page.evaluate(() => { viewDraw(); const b0 = View.base, put = exec(G.st, 'place_object', { asset: 'chest', near: 'R1' }); viewDraw(); const b1 = View.base, gone = put.ok && exec(G.st, 'remove_object', { object_id: put.result.id }); viewDraw();
+        return { put: put.ok, again: b1 !== b0, gone: !!gone && gone.ok, twice: View.base !== b1, key: View.base.key === bakeKey(View.map) }; });
+      ok(rp.put && rp.again && rp.gone && rp.twice && rp.key, 'a thing set down on the board, or taken off it, makes the table paint its picture again');
+    }
+    /* letters typed into the story walk nobody; a line with no Game Master asks for a key and sends nothing */
+    { const at0 = await page.evaluate(() => [G.st.party[0].x, G.st.party[0].y]);
+      await page.evaluate(() => document.getElementById('say').focus()); await page.keyboard.type('wasd qezc 0+-'); await page.waitForTimeout(150);
+      const typed = await page.evaluate(() => ({ v: document.getElementById('say').value, at: [G.st.party[0].x, G.st.party[0].y], walk: !!G.st.walk || View.walking }));
+      ok(typed.v === 'wasd qezc 0+-' && typed.at[0] === at0[0] && typed.at[1] === at0[1] && !typed.walk, 'letters typed into the story are letters: nobody walks');
+      await page.keyboard.press('Enter'); await page.waitForTimeout(200);
+      const nk = await page.evaluate(() => ({ dlg: document.getElementById('dialog').classList.contains('open'), title: document.getElementById('dlg-title').textContent, kept: document.getElementById('say').value, story: G.st.story.length, busy: G.busy, on: Session.on() }));
+      ok(nk.dlg && /No Game Master/.test(nk.title) && nk.kept === 'wasd qezc 0+-' && nk.story === 2 && !nk.busy && !nk.on, 'with no key, a line sent asks for one, keeps what was typed, and tells nothing');
+      await page.evaluate(() => { [...document.querySelectorAll('#dlg-btns button')].find((b) => /Not now/.test(b.textContent)).click(); document.getElementById('say').value = ''; document.getElementById('say').blur(); });
+      await page.evaluate(() => UI.storyOpen(false)); await frames(3);
+      await page.keyboard.press('/'); await frames(3);
+      const sl = await page.evaluate(() => ({ focus: document.activeElement && document.activeElement.id, open: document.getElementById('story').classList.contains('open'), v: document.getElementById('say').value }));
+      ok(sl.focus === 'say' && sl.open && sl.v === '', 'the slash key opens the story and puts the pen in it, without writing a slash');
+      await page.evaluate(() => document.getElementById('say').blur());
+      const tk = await page.evaluate(() => { const tok = View.map.tokens[0]; UI.tokCard(tok); const all = [...document.querySelectorAll('#info-acts button')], btns = all.map((b) => b.textContent), talk = all.find((b) => b.textContent === 'Talk'); if (talk) talk.click();
+        const out = { btns, dlg: document.getElementById('dialog').classList.contains('open'), title: document.getElementById('dlg-title').textContent, to: Session.to, ph: document.getElementById('say').placeholder, focus: document.activeElement && document.activeElement.id }; UI.closeDialog(); UI.card(null); return out; });
+      ok(tk.btns.join() === 'Talk' && tk.dlg && /No Game Master/.test(tk.title) && tk.to === null && tk.ph === 'Say or do something' && tk.focus !== 'say', 'TALK with no Game Master asks for a key, and addresses nobody');
+    }
+
+    /* a party of four, to the cave, and seen */
+    await page.evaluate(() => { for (let k = 0; k < 3; k++) document.getElementById('party-add').click(); for (const p of G.st.party) { p.hpMax = 60; p.hp = 60; } UI.follow(intent(G.st, { t: 'jump', site: 'S2' })); });   /* sixty hit points each: the flow is under test, the odds are section Q's */
+    await page.waitForFunction(() => G.st.here === 'S2' && View.map && View.map.id === 'S2', null, { timeout: 8000 }); await quiet();
+    const dlgOpen = () => page.evaluate(() => document.getElementById('dialog').classList.contains('open'));
+    for (let h = 0; h < 30 && !(await dlgOpen()); h++) {
+      await page.evaluate(() => { const st = G.st, m = View.map, Ld = leadOf(st), foes = m.tokens.filter((t) => t.k === 'foe').sort((a, b) => cheb(a, Ld) - cheb(b, Ld)), goals = []; for (const s of STEPS) goals.push([foes[0].x + s[0], foes[0].y + s[1]]); if (intent(st, { t: 'move', goals }).ok) View.walking = true; });
+      await quiet(); await page.waitForTimeout(150);
+    }
+    ok(await dlgOpen(), 'walking into the cave, the party is seen and the table says so');
+    await page.evaluate(() => [...document.querySelectorAll('#dlg-btns button')].find((b) => /initiative/i.test(b.textContent)).click());
+    await page.waitForFunction(() => !!G.st.round, null, { timeout: 5000 });
+    const told = await page.evaluate(() => ({ chips: G.st.story.filter((e) => e.t === 'chip').map((e) => e.text), nodes: document.querySelectorAll('#story-log .st-chip.fight').length, mode: Settings.data.monsters, order: G.st.round.order.map((c) => c.k).join() }));
+    ok(told.chips.some((t) => /seen the party/.test(t)) && told.chips.some((t) => /Initiative is rolled/.test(t)) && told.nodes >= 2 && told.mode === 'script', 'being seen and rolling initiative are written into the story as they happen');
+
+    /* the monsters' turns play themselves; the travellers' are played here by touch */
+    const seen = { foeTurn: null, blow: null, noact: null, ring: null, dash: null, heal: null, foeAim: 0, foeAdj: 0, hp: null, point: null, far: null };
+    for (let turn = 0; turn < 80; turn++) {
+      const s0 = await page.evaluate(() => { const st = G.st, R = st.round; if (!R) return null; const a = turnOf(st); return { pc: a.pc, id: a.id, i: R.i, n: R.n, at: [a.o.x, a.o.y], story: st.story.length, hp: st.party.map((p) => p.hp).join(), armed: R.act > 0, aimN: a.pc ? -1 : [...aims()].length, inReach: a.pc ? 0 : st.party.filter((p) => p.site === a.m.id && p.status === 'ok' && !weaponFor(st, a, { pc: true, o: p, id: p.id }, '').why).length }; });
+      if (!s0) break;
+      if (!s0.pc) {
+        if (s0.armed && s0.inReach > 0) { seen.foeAdj++; seen.foeAim += s0.aimN; }      /* a monster with a traveller in reach and its action in hand: in script mode nobody is ringed for it */
+        /* a monster: nobody touches anything. It must do its deed and pass the turn by itself. */
+        const moved = await page.waitForFunction((s0) => { const st = G.st, R = st.round; if (!R) return true; const a = turnOf(st); return !!a && (a.id !== s0.id || R.n !== s0.n) && !st.walk && !View.walking && View.anim.t >= 1; }, s0, { timeout: 20000 }).then(() => true, () => false);
+        const s1 = await page.evaluate((s0) => { const st = G.st, m = st.maps.S2, t = m.tokens.find((q) => q.id === s0.id), n = t && st.npcs[t.npc]; return { round: !!st.round, at: t ? [t.x, t.y] : null, said: st.story.slice(s0.story).map((e) => e.text), name: n ? n.name : '', hp: st.party.map((p) => p.hp).join() }; }, s0);
+        if (!seen.foeTurn && moved) seen.foeTurn = { passed: true, did: !s1.at || s1.at[0] !== s0.at[0] || s1.at[1] !== s0.at[1] || s1.said.some((t) => t.startsWith(s1.name + ':')), said: s1.said.join(' | ') };
+        if (!moved) { seen.foeTurn = seen.foeTurn || { passed: false, did: false, said: 'the turn never passed' }; break; }
+        continue;
+      }
+      await quiet();
+      /* a traveller: what can be struck is ringed; a tap on it is a blow */
+      const view = await page.evaluate(() => {
+        const st = G.st, a = actor(), R = st.round, m = View.map, ids = [...aims()], marked = [], hps = [], orig = paintToken;
+        paintToken = function (g, kind, letter, cx, cy, mark, o) { if (o && o.aim) marked.push(Math.floor(cx) + ',' + Math.floor(cy));
+          const tk = kind === 'foe' ? tokenAt(m, Math.floor(cx), Math.floor(cy)) : null; if (tk) { const S = (st.npcs[tk.npc] || {}).sheet; hps.push([o ? o.hp : undefined, S ? S.hp / S.hpMax : null]); }
+          return orig.apply(this, arguments); };
+        try { viewDraw(); } finally { paintToken = orig; }
+        const want = ids.map((id) => { const t = m.tokens.find((q) => q.id === id); return t.x + ',' + t.y; }).sort().join(' '), truth = m.tokens.filter((t) => t.k === 'foe' && eyes().vis[t.y * m.w + t.x] && !weaponFor(st, a, { pc: false, o: t, id: t.id }, '').why).map((t) => t.id).sort().join();
+        const t = ids.length ? m.tokens.find((q) => q.id === ids[0]) : null, foes = m.tokens.filter((q) => q.k === 'foe' && R.order.some((c) => c.id === q.id));
+        return { ids, hpOK: hps.every((q) => q[0] === q[1]), wounded: hps.filter((q) => q[1] !== null && q[1] < 1).length, ring: marked.sort().join(' ') === want && ids.slice().sort().join() === truth, act: R.act, tgt: t ? { id: t.id, x: t.x, y: t.y, hp: sheetOf(st, t, false).hp } : null, story: st.story.length, hurt: a.o.hp < a.o.hpMax, cls: a.o.cls, fx: View.fx.length, foes: foes.length, id: a.id };
+      });
+      if (view.ids.length && seen.ring === null) seen.ring = view.ring; else if (view.ids.length && !view.ring) seen.ring = false;
+      if (!view.hpOK) seen.hp = false; else if (view.wounded && seen.hp === null) seen.hp = true;
+      /* an enemy who stands further off than a blade: their card offers no blade, and in a fight neither the dice nor a word */
+      { const far = await page.evaluate(() => { const st = G.st, a = actor(), m = a.m, E = eyes(), t = m.tokens.find((q) => q.k === 'foe' && E.vis[q.y * m.w + q.x] && cheb(q, a.o) > 1); if (!t || st.round.act < 1) return null; UI.tokCard(t);
+          const btns = [...document.querySelectorAll('#info-acts button')].map((b) => b.textContent), blades = weaponsOf(a.o).filter((w) => w.rg <= 1).map((w) => w.n); UI.card(null); return { blade: btns.some((b) => blades.includes(b)), other: btns.includes('Roll initiative') || btns.includes('Talk') }; });
+        if (far) { if (far.blade || far.other) seen.far = false; else if (seen.far === null) seen.far = true; } }
+      /* once: the traveller's own card, by a tap on their own piece - DASH is on it, and spends the action for 30 ft more */
+      if (!seen.dash && view.act > 0 && !view.ids.length) {
+        const me = await page.evaluate(() => { const a = actor(); return [a.o.x, a.o.y]; }), p = await aimAt(me[0], me[1]);
+        const r0 = await page.evaluate(() => { let n = 0; for (const v of reach()) n += v; return n; });
+        await page.touchscreen.tap(p[0], p[1]); await page.waitForTimeout(150);
+        const card = await page.evaluate(() => ({ on: !document.getElementById('info').hidden, text: document.getElementById('info-text').textContent, btns: [...document.querySelectorAll('#info-acts button')].map((b) => b.textContent), at: [actor().o.x, actor().o.y] }));
+        await page.evaluate(() => { const b = [...document.querySelectorAll('#info-acts button')].find((x) => /^Dash/.test(x.textContent)); if (b) b.click(); }); await page.waitForTimeout(150);
+        const d = await page.evaluate(() => { let n = 0; for (const v of reach()) n += v; return { left: moveLeft(G.st.round), act: G.st.round.act, sub: document.getElementById('place-sub').textContent, n, chip: G.st.story[G.st.story.length - 1].text }; });
+        const p2 = await aimAt(me[0], me[1]); await page.touchscreen.tap(p2[0], p2[1]); await page.waitForTimeout(150);
+        const spent = await page.evaluate(() => [...document.querySelectorAll('#info-acts button')].map((b) => b.textContent));
+        seen.dashGone = spent.includes('Sheet') && !spent.some((b) => /^Dash/.test(b));
+        seen.dash = { card: card.on && /HP \d+\/\d+/.test(card.text) && card.btns.some((b) => /^Dash/.test(b)) && card.btns.includes('Sheet') && card.at[0] === me[0] && card.at[1] === me[1], ok: d.left === 60 && d.act === 0 && /action spent/.test(d.sub) && d.sub.startsWith('60 ft left') && d.n > r0 && /dashes/.test(d.chip), detail: JSON.stringify([card.btns, d.sub, r0, d.n]) };
+        await page.evaluate(() => UI.card(null));
+      }
+      const v2 = await page.evaluate(() => ({ act: G.st.round ? G.st.round.act : 0, ids: G.st.round ? [...aims()] : [] }));
+      if (!seen.point && v2.ids.length && v2.act > 0) seen.point = await page.evaluate((id) => { const st = G.st, n = st.story.length, t = View.map.tokens.find((q) => q.id === id), hp = sheetOf(st, t, false).hp, act = st.round.act; UI.point(id);
+        const out = { card: !document.getElementById('info').hidden && document.getElementById('info-name').textContent === (st.npcs[t.npc] || {}).name, same: st.story.length === n && sheetOf(st, t, false).hp === hp && st.round.act === act }; UI.card(null); return out; }, v2.ids[0]);
+      if (v2.ids.length && v2.act > 0) {
+        const tgt = await page.evaluate((id) => { const t = View.map.tokens.find((q) => q.id === id); return { id, x: t.x, y: t.y, hp: sheetOf(G.st, t, false).hp, story: G.st.story.length }; }, v2.ids[0]);
+        const p = await aimAt(tgt.x, tgt.y);
+        await page.touchscreen.tap(p[0], p[1]);
+        const fx = await page.evaluate(() => View.fx.map((f) => f.text).join());
+        await page.waitForTimeout(140);
+        const after = await page.evaluate((tgt) => { const st = G.st, t = View.map.tokens.find((q) => q.id === tgt.id), said = st.story.slice(tgt.story).map((e) => e.text), R = st.round; return { act: R ? R.act : -1, hp: t ? sheetOf(st, t, false).hp : 0, gone: !t, said, sub: document.getElementById('place-sub').textContent, card: !document.getElementById('info').hidden, name: document.getElementById('info-name').textContent, text: document.getElementById('info-text').textContent, round: !!R, nodes: document.querySelectorAll('#story-log .st-chip').length, chips: st.story.filter((e) => e.t === 'chip').length, walk: !!st.walk || View.walking }; }, tgt);
+        if (!seen.blow) seen.blow = { ok: after.said.length >= 1 && / at /.test(after.said[0]) && (after.act === 0 || !after.round) && after.hp <= tgt.hp && (/miss|−\d/.test(fx)) && !after.walk && after.nodes === after.chips, hit: after.hp < tgt.hp || after.gone, said: after.said[0], fx };
+        /* and a second tap on the same enemy, with the action spent: a card that says so, never a second blow */
+        if (!seen.noact && after.round && !after.gone && after.act === 0) {
+          const p2 = await aimAt(tgt.x, tgt.y); await page.touchscreen.tap(p2[0], p2[1]); await page.waitForTimeout(140);
+          const again = await page.evaluate((n) => ({ story: G.st.story.length, card: !document.getElementById('info').hidden, text: document.getElementById('info-text').textContent, hp: (() => { const t = View.map.tokens.find((q) => q.id === n.id); return t ? sheetOf(G.st, t, false).hp : -1; })() }), { id: tgt.id });
+          seen.noact = { ok: again.card && /No action is left/.test(again.text) && again.hp === after.hp, text: again.text, wound: /unhurt|hurt|bloodied|barely standing/i.test(again.text) };
+          await page.evaluate(() => UI.card(null));
+        }
+      } else if (v2.act > 0 && view.foes) {
+        /* nobody in reach: walk toward the nearest of them (the engine's own planner, asked from the table), then try again next turn */
+        await page.evaluate(() => { const st = G.st, a = turnOf(st), foes = a.m.tokens.filter((q) => q.k === 'foe' && st.round.order.some((c) => c.id === q.id)), way = approach(st, a, foes); if (way && way.to && intent(st, { t: 'move', who: a.id, to: way.to }).ok) View.walking = true; });
+        await quiet();
+        const more = await page.evaluate(() => (G.st.round ? [...aims()].length : 0));
+        if (more) continue;
+      }
+      if (await page.evaluate(() => !!G.st.round && turnOf(G.st).pc)) { await tapEl('#btn-end'); await page.waitForTimeout(80); }
+    }
+    ok(seen.foeTurn && seen.foeTurn.passed && seen.foeTurn.did, 'a monster\'s turn plays itself: it does its deed and passes the turn with nobody touching the table' + (seen.foeTurn ? ' ("' + clipTo(seen.foeTurn.said, 90) + '")' : ''));
+    ok(seen.ring === true, 'whoever the acting traveller could strike is ringed on the board: exactly those, by the engine\'s own reckoning');
+    ok(seen.blow && seen.blow.ok, 'a tap on an enemy in reach is a blow: the action is spent, a number rises off the square, and the story says what happened' + (seen.blow ? ' ("' + clipTo(seen.blow.said, 90) + '", ' + seen.blow.fx + ')' : ''));
+    ok(seen.noact && seen.noact.ok && seen.noact.wound, 'a second tap with the action spent is a card that says so and how the enemy looks, never a second blow' + (seen.noact ? ' ("' + clipTo(seen.noact.text, 90) + '")' : ''));
+    ok(seen.dash && seen.dash.card && seen.dash.ok, 'a tap on your own piece is its card, with what else the turn can hold; DASH spends the action for 30 ft more, and the gold wash grows' + (seen.dash ? ' ' + seen.dash.detail : ''));
+    ok(seen.dashGone === true, 'and once the action is spent the card no longer offers it');
+    ok(seen.foeAdj > 0 && seen.foeAim === 0, 'while the script plays the monsters no traveller is ever ringed as a monster\'s target (' + seen.foeAdj + ' monster turns began with someone in reach)');
+    ok(seen.hp === true, 'a monster that has been hurt is painted with what is left of it, and one that has not with nothing');
+    ok(seen.point && seen.point.card && seen.point.same, 'an enemy\'s counter on the bar, tapped with that enemy in reach, is a card and never a blow');
+    ok(seen.far === true, 'an enemy\'s card offers only what can reach: no blade for one who stands further off, and in a fight neither the dice nor a word');
+    await page.waitForFunction(() => !G.st.round, null, { timeout: 3000 }).catch(() => {});
+    const end = await page.evaluate(() => ({ round: !!G.st.round, init: !document.getElementById('btn-init').hidden, end: document.getElementById('btn-end').hidden, said: G.st.story.filter((e) => e.t === 'chip').map((e) => e.text).join(' | '), xp: G.st.party.map((p) => p.xp), here: G.st.here, foes: G.st.maps.S2.tokens.filter((t) => t.k === 'foe').length, log: G.st.log.filter((e) => e.t === 'tell').length, over: G.st.over }));
+    ok(!end.round && end.init && end.end && /The fight is won\./.test(end.said) && end.xp.every((x) => x > 0) && /experience, \d+ each/.test(end.said) && end.log >= 3, 'the last enemy falls and the fight ends by itself: the dice are back on the bar, the experience is shared, the journal has the blows');
+
+    /* wounds, the fallen and the mark of a target, measured off the token painter's own pixels */
+    { const px = await page.evaluate(() => {
+        const paint = (o, kind) => { const cv = document.createElement('canvas'); cv.width = cv.height = 160; const g = cv.getContext('2d'); g.fillStyle = VEL; g.fillRect(0, 0, 160, 160); g.setTransform(80, 0, 0, 80, 0, 0); g.lineCap = 'round'; paintToken(g, kind || 'foe', 'X', 1, 1, false, o); const d = g.getImageData(0, 0, 160, 160).data; return d; };
+        const ringCount = (d, test, r0, r1) => { let n = 0; for (let y = 0; y < 160; y++) for (let x = 0; x < 160; x++) { const r = Math.hypot(x - 80, y - 80) / 80, i = (y * 160 + x) * 4; if (r >= r0 && r <= r1 && test(d[i], d[i + 1], d[i + 2])) n++; } return n; };
+        const red = (r, g, b) => r > 130 && g < 90 && b < 80, green = (r, g, b) => g > r + 12 && g > b && r < 120, dark = (r, g, b) => r < 110 && g < 90 && b < 80;
+        const plain = paint({}), half = paint({ hp: .7 }), low = paint({ hp: .2 }), full = paint({ hp: 1 }), aim = paint({ aim: true }), down = paint({ down: true, hp: 0 }, 'pc'), up = paint({ hp: 1 }, 'pc');
+        let diff = 0; for (let i = 0; i < full.length; i++) if (full[i] !== plain[i]) diff++;
+        const gold = (d) => ringCount(d, (r, g, b) => r > 150 && g > 110 && b < 110, 0, .3);
+        return { g7: ringCount(half, green, .5, .62), g0: ringCount(plain, green, .5, .62), r2: ringCount(low, red, .5, .62), r0: ringCount(plain, red, .5, .62), same: diff, aim: ringCount(aim, red, .4, .62), aim0: ringCount(plain, red, .4, .62), cross: ringCount(down, red, 0, .2), cross0: ringCount(up, red, 0, .2), faded: gold(down) < gold(up) * .6, gU: gold(up) };
+      });
+      ok(px.g7 > 60 && px.g0 === 0 && px.r2 > 15 && px.r2 < px.g7 && px.r0 === 0 && px.same === 0, 'a wound shows as an arc round the piece: most of a ring in green at 70%, a short red one at 20%, nothing at all on the unhurt (' + px.g7 + ', ' + px.r2 + ' px)');
+      ok(px.aim > 80 && px.aim0 === 0 && px.cross > 30 && px.cross0 === 0 && px.faded && px.gU > 100, 'a target in reach wears a red broken ring; the fallen are faded and struck through (' + px.aim + ', ' + px.cross + ' px)');
+    }
+
+    /* the party's sheets, and rest */
+    await page.evaluate(() => { UI.party(); UI.openPanel('pan-party'); }); await page.waitForTimeout(200);
+    const sheet = await page.evaluate(() => { const rows = [...document.querySelectorAll('#party-list .entry.pc')], sel = rows.map((r) => r.querySelector('select')); return { n: rows.length, text: rows[0].textContent, dis: sel.every((s) => s.disabled), cls: sel.map((s) => s.value).join(), purse: document.getElementById('party-purse').textContent, w: rows.every((r) => r.getBoundingClientRect().right <= innerWidth + 1 && [...r.children].every((c) => c.getBoundingClientRect().right <= innerWidth + 1)), gold: G.st.gold, img: document.querySelectorAll('#pan-party img').length }; });
+    ok(sheet.n === 4 && /Level 1/.test(sheet.text) && /HP \d+\/60/.test(sheet.text) && /Longsword \+4, 1d8\+2/.test(sheet.text) && /Second Wind \d\/1/.test(sheet.text) && /chain mail/.test(sheet.text) && sheet.cls === 'Fighter,Rogue,Cleric,Wizard' && sheet.purse.includes('Gold ' + sheet.gold) && sheet.w,
+      'the Party panel is a sheet for each traveller: calling, level, hit points, what they strike with, what they know, what they carry, all inside the screen');
+    ok(sheet.dis, 'a calling that has earned experience can no longer be changed');
+    await tapEl('#party-add'); await page.waitForTimeout(150);
+    const fresh = await page.evaluate(() => { const rows = [...document.querySelectorAll('#party-list .entry.pc')], sel = rows[4].querySelector('select'), before = { cls: G.st.party[4].cls, hp: G.st.party[4].hpMax, dis: sel.disabled }; sel.value = 'Bard'; sel.dispatchEvent(new Event('change', { bubbles: true })); const row2 = [...document.querySelectorAll('#party-list .entry.pc')][4]; return { before, cls: G.st.party[4].cls, hp: G.st.party[4].hpMax, text: row2.textContent, sel: row2.querySelector('select').value }; });
+    ok(fresh.before.cls === 'Ranger' && !fresh.before.dis && fresh.cls === 'Bard' && fresh.hp === 9 && fresh.sel === 'Bard' && /Bardic Inspiration/.test(fresh.text) && /HP 9\/9/.test(fresh.text), 'a newcomer\'s calling can still be chosen, and the sheet is written again on the spot');
+    const t0 = await page.evaluate(() => { for (const t of G.st.maps.S2.tokens.slice()) if (t.k === 'foe') dropToken(G.st, G.st.maps.S2, t); look(G.st); G.st.party[0].hp = 5; return G.st.time.day * 1440 + G.st.time.minute; });
+    await tapEl('#party-short'); await page.waitForTimeout(200);
+    const rest = await page.evaluate(() => ({ t: G.st.time.day * 1440 + G.st.time.minute, hp: G.st.party[0].hp, text: [...document.querySelectorAll('#party-list .entry.pc')][0].textContent, chip: G.st.story[G.st.story.length - 1].text, purse: document.getElementById('party-purse').textContent }));
+    ok(rest.t === t0 + 60 && rest.hp > 5 && rest.text.includes('HP ' + rest.hp + '/60') && /rests an hour/.test(rest.chip), 'REST AN HOUR: an hour passes, wounds are bound, and the sheet shows it');
+    await page.evaluate(() => { UI.closePanels(); UI.chron('journal'); UI.openPanel('pan-chron'); }); await page.waitForTimeout(150);
+    const jr = await page.evaluate(() => ({ text: document.getElementById('chron-list').textContent, img: document.querySelectorAll('#pan-chron img').length }));
+    ok(/ at .*: a (hit|miss|critical hit)/.test(jr.text) && /The rounds ended: victory/.test(jr.text) && /rests an hour/.test(jr.text), 'the journal keeps the blows, the end of the fight and the rest');
+    await page.evaluate(() => UI.closePanels());
+    const hh = await page.evaluate(() => { const st = G.st, P = st.party[0], C = st.party.find((p) => p.cls === 'Cleric'), name = C.name.split(' ')[0]; P.hp = 5; UI.pcCard(P);
+      const all = [...document.querySelectorAll('#info-acts button')], btns = all.map((b) => b.textContent), b = all.find((x) => x.textContent.startsWith('Cure Wounds, ' + name)), n = st.story.length; if (b) b.click();
+      return { btns, mine: btns.some((x) => x.startsWith('Cure Wounds, ' + name)), hp: P.hp, said: st.story.slice(n).map((e) => e.text).join('|'), uses: C.abilities.find((a) => a.n === 'Cure Wounds').uses }; });
+    ok(hh.mine && hh.btns.includes('Sheet') && hh.hp > 5 && /uses Cure Wounds on/.test(hh.said) && hh.uses === 1, 'outside a fight a wounded traveller\'s card offers the hands of whoever in the party can heal, by name: ' + hh.btns.join(', '));
+    const fl = await page.evaluate(() => { G.st.fallen.push({ name: 'Old Tom', cls: 'Rogue', level: 2, day: 1 }); UI.party(); const t = document.getElementById('party-fallen').textContent; G.st.fallen.pop(); UI.party(); return { t, after: document.getElementById('party-fallen').textContent }; });
+    ok(/Old Tom/.test(fl.t) && /Rogue 2 . fell on day 1/.test(fl.t) && fl.after === '', 'the Party panel keeps the names of the fallen');
+    /* a table that folded its story finds it folded when the tale is taken up again */
+    await page.evaluate(() => { UI.card(null); UI.storyOpen(false); UI.toTitle(); });
+    await page.waitForFunction(() => !document.body.classList.contains('in-play') && !document.getElementById('btn-continue').hidden && !document.getElementById('veil').classList.contains('on'), null, { timeout: 8000 });
+    await page.evaluate(() => document.getElementById('btn-continue').click());
+    await page.waitForFunction(() => document.body.classList.contains('in-play') && !document.getElementById('veil').classList.contains('on'), null, { timeout: 8000 }); await frames(4);
+    const fd = await page.evaluate(() => ({ open: document.getElementById('story').classList.contains('open'), log: document.getElementById('story-log').offsetHeight, story: G.st.story.length, vh: View.vh, ch: View.cv.getBoundingClientRect().height }));
+    ok(!fd.open && fd.log === 0 && fd.story > 5 && Math.abs(fd.vh - fd.ch) < 1, 'a table that folded its story finds it folded when the tale is taken up again, though there is a story to show');
+    await R1.ctx.close();
+
+    /* by hand: with the monsters set to be moved by whoever holds the table, nothing moves by itself, and a tap strikes */
+    const R2 = await open({ width: 390, height: 844 }, null, { monsters: 'hand', storyOpen: true }), pg = R2.page;
+    await begin(pg);
+    const hand = await pg.evaluate(async () => {
+      const st = G.st; intent(st, { t: 'jump', site: 'S2' }); viewSetMap(st.maps.S2); UI.bar();
+      const m = st.maps.S2, P = st.party[0], tok = m.tokens.find((t) => t.k === 'foe'), spot = STEPS.map((s) => [P.x + s[0], P.y + s[1]]).find((q) => tileFree(m, q[0], q[1]) && !taken(st, m, q[0], q[1], '') && meleeClear(m, q[0], q[1], P.x, P.y));
+      moveToken(m, tok, spot[0], spot[1]); look(st); P.hpMax = 60; P.hp = 60;
+      const btnsOf = () => [...document.querySelectorAll('#info-acts button')].map((b) => b.textContent).join();
+      UI.tokCard(tok); const pre = btnsOf(), dice = [...document.querySelectorAll('#info-acts button')].find((b) => b.textContent === 'Roll initiative'); if (dice) dice.click(); const rolled = !!st.round; if (!rolled) UI.rounds(true);
+      UI.tokCard(tok); const mid = btnsOf().includes('Roll initiative'); UI.card(null);
+      const cap = m.tokens.find((t) => t.k === 'captive'); UI.tokCard(cap); const capBtns = btnsOf(); UI.card(null);
+      UI.party(); const shut = ['party-short', 'party-long', 'party-add'].every((id) => document.getElementById(id).disabled);
+      for (let g = 0; g < 6 && turnOf(st).pc; g++) UI.endTurn();
+      const a = turnOf(st), key = [st.round.i, a.o.x, a.o.y, st.story.length].join();
+      await new Promise((res) => setTimeout(res, 1600));
+      const still = !a.pc && [st.round.i, a.o.x, a.o.y, st.story.length].join() === key, ids = [...aims()];
+      UI.card(null); View.cam.x = P.x + .5; View.cam.y = P.y + .5; camMoved(true); viewDraw();
+      const r = View.cv.getBoundingClientRect(), s = w2s(P.x + .5, P.y + .5);
+      return { still, foe: !a.pc, ids, pid: P.id, tap: [r.left + s[0], r.top + s[1]], story: st.story.length, name: (st.npcs[a.o.npc] || {}).name, pre, rolled, mid, capBtns, shut };
+    });
+    await pg.touchscreen.tap(hand.tap[0], hand.tap[1]); await pg.waitForTimeout(200);
+    const struck = await pg.evaluate((h) => ({ said: G.st.story.slice(h.story).map((e) => e.text), act: G.st.round ? G.st.round.act : -1, lead: G.st.lead }), hand);
+    ok(hand.pre === 'Roll initiative' && hand.rolled && !hand.mid, 'an enemy\'s card, before a fight, offers the dice, and they roll; once rolled it offers them no more');
+    ok(hand.capBtns === '' && hand.shut, 'in a fight nobody is talked to from their card, and the party neither rests nor grows');
+    ok(hand.foe && hand.still, 'with the monsters moved by hand, a monster\'s turn waits: nothing moves and nothing is said by itself');
+    ok(hand.ids.join() === hand.pid && struck.said.length === 1 && struck.said[0].startsWith(hand.name + ':') && / at /.test(struck.said[0]) && struck.act === 0, 'and on its turn a tap on a traveller in its reach is its blow: "' + clipTo(struck.said[0] || '', 80) + '"');
+    /* the cross on the bar stands everyone down, and says so */
+    const stood = await pg.evaluate(async () => { const st = G.st, n = st.story.length, t = document.getElementById('toast'); t.textContent = ''; document.getElementById('btn-stand').click(); await new Promise((res) => setTimeout(res, 150));
+      UI.party(); const out = { round: !!st.round, said: st.story.slice(n).map((e) => e.text).join('|'), toast: t.textContent, init: !document.getElementById('btn-init').hidden, end: document.getElementById('btn-end').hidden, rest: !document.getElementById('party-short').disabled && !document.getElementById('party-long').disabled };
+      UI.rounds(true); for (let g = 0; g < 6 && turnOf(st).pc; g++) UI.endTurn(); out.back = !!st.round && !turnOf(st).pc; return out; });
+    ok(!stood.round && /The party stands down\./.test(stood.said) && /rounds are over/.test(stood.toast) && stood.init && stood.end && stood.rest && stood.back, 'the cross stands everyone down: the story says so, the dice are back on the bar, and the party may rest again');
+    /* beaten but breathing: the party wakes at the inn, and the page shows the inn */
+    const lost = await pg.evaluate(async () => {
+      const st = G.st, P = st.party[0], gold0 = st.gold; P.hp = 0; P.status = 'down'; P.saves = { s: 0, f: 0 };
+      UI.endTurn();
+      await new Promise((res) => setTimeout(res, 900));
+      return { here: st.here, map: View.map && View.map.id, hp: P.hp, status: P.status, gold: st.gold, gold0, time: st.time, round: !!st.round, init: !document.getElementById('btn-init').hidden, said: st.story.filter((e) => e.t === 'chip').slice(-2).map((e) => e.text).join(' | '), title: document.getElementById('place-name').textContent, inn: st.bible.inn, dlg: document.getElementById('dialog').classList.contains('open') };
+    });
+    ok(lost.here === 'S1' && lost.map === 'S1' && lost.title === lost.inn && lost.hp === 1 && lost.status === 'ok' && lost.gold === Math.floor(lost.gold0 / 2) && lost.time.day === 2 && lost.time.minute === 480 && !lost.round && lost.init && /fights for life/.test(lost.said) && /The party is beaten\..*wake at the inn the next morning, half their gold gone/.test(lost.said) && !lost.dlg,
+      'beaten with someone still breathing: the death save is told, then the party wakes at the inn next morning with 1 hit point and half its gold, and the table shows the inn');
+    /* nobody left: the tale is over, the table says so, and stays so */
+    const dead = await pg.evaluate(async () => {
+      const st = G.st, P = st.party[0]; UI.rounds(true); P.hp = 0; P.status = 'dead'; UI.endTurn();
+      await new Promise((res) => setTimeout(res, 300));
+      const dlg = document.getElementById('dialog').classList.contains('open'), title = document.getElementById('dlg-title').textContent, body = document.getElementById('dlg-body').textContent; UI.closeDialog();
+      const a = actor(), s = w2s(a.o.x + 1.5, a.o.y + .5); tapAt(s[0], s[1]); await UI.saveNow();
+      return { over: st.over, dlg, title, body, name: P.name, walk: !!st.walk || View.walking, toast: document.getElementById('toast').textContent, act: document.getElementById('act').hidden, round: !!st.round, add: intent(st, { t: 'party', op: 'add' }).why };
+    });
+    ok(dead.over === 'dead' && dead.dlg && dead.title === 'The tale ends' && dead.body.includes(dead.name) && !dead.walk && /tale has ended/.test(dead.toast) && dead.act && !dead.round && dead.add === 'over', 'with nobody left alive the tale ends: the table says who fell, and a tap after that walks nobody');
+    await pg.reload(); await pg.waitForFunction(() => typeof UI === 'object');
+    await pg.waitForFunction(() => !document.getElementById('btn-continue').hidden, null, { timeout: 8000 });
+    await pg.evaluate(() => document.getElementById('btn-continue').click());
+    await pg.waitForFunction(() => G.st && document.body.classList.contains('in-play') && document.getElementById('dialog').classList.contains('open'), null, { timeout: 8000 }).catch(() => {});
+    ok(await pg.evaluate(() => G.st.over === 'dead' && document.getElementById('dialog').classList.contains('open') && document.getElementById('dlg-title').textContent === 'The tale ends'), 'and it is still over when the tale is opened again');
+    const told2 = await pg.evaluate(() => ({ chips: document.querySelectorAll('#story-log .st-chip').length, st: G.st.story.filter((e) => e.t === 'chip').length, sys: document.querySelectorAll('#story-log .st-sys').length, sysSt: G.st.story.filter((e) => e.t === 'sys').length }));
+    ok(told2.chips === told2.st && told2.chips >= 4 && told2.sys === told2.sysSt && told2.sys === 2, 'with its story written out again from the save: ' + told2.chips + ' lines of what the dice did, and the opening');
+    await R2.ctx.close();
+  }
+  }
+
+  if (want('S')) {
+  /* ------------------------------------------------------------------ S */
+  console.log('S. the Game Master\'s tools and what it is told');
+  {
+    const S0 = await open({ width: 390, height: 844 }), page = S0.page;
+    const rows = await page.evaluate(() => {
+      const rows = [], row = (c, m) => rows.push([!!c, m]);
+      const snap = (st) => JSON.stringify(packState(st)).replace(/"saved":\d+/, '');
+      const st = newGame('tools-1'), x = (n, i) => exec(st, n, i), bible0 = bibleText(st);
+      let m = st.maps.S1;
+      const defs = toolDefs();
+      row(TOOL_NAMES.length === 25 && defs.every((t) => /^[a-z_]{3,24}$/.test(t.name) && t.description.length > 60 && t.input_schema.type === 'object' && t.input_schema.additionalProperties === false && (t.input_schema.required || []).every((k) => k in t.input_schema.properties)),
+        'the Game Master has ' + TOOL_NAMES.length + ' tools, each described, each with a closed schema whose required fields exist');
+      row(defs.every((t) => Object.values(t.input_schema.properties).every((p) => p.description && p.description.length > 3)), 'and every field of every tool says what it is for');
+      /* refusals: one of each kind of bad call, and the tale byte for byte the same afterwards */
+      const before = snap(st);
+      const badCalls = [['roll_check', { character_id: 'P9', check: 'stealth', dc: 10 }], ['roll_check', { character_id: 'P1', check: 'juggling', dc: 10 }], ['roll_check', { character_id: 'P1', check: 'stealth', dc: 99 }], ['roll_dice', { expr: '9d9999' }], ['roll_dice', { expr: 'alert(1)' }],
+        ['move', { id: 'P1', toward: 'R99' }], ['move', { id: 'nobody', toward: 'R1' }], ['move', { id: 'P1', toward: '999,999' }], ['travel_party', { to: 'Atlantis' }], ['travel_party', { to: 'S1' }], ['set_door', { door_id: 'D99', open: true }], ['set_door', { door_id: 'D0' }],
+        ['place_object', { asset: 'dragon' }], ['place_object', { asset: 'coins' }], ['place_object', { asset: 'coins', on: 'O9999' }], ['remove_object', { object_id: 'O9999' }], ['reveal', { site_id: 'S99' }], ['reveal', { room_id: 'R99' }], ['create_npc', {}], ['create_npc', { role: 'x', template: 'tarrasque' }],
+        ['update_npc', { npc_id: 'N99' }], ['update_npc', { npc_id: 'N0', attitude: 'smitten' }], ['update_npc', { npc_id: 'N0', status: 'ascended' }], ['end_combat', { outcome: 'truce' }], ['attack', { attacker_id: 'P1', target_id: 'N0' }], ['attack', { attacker_id: 'P1', target_id: 'nobody' }],
+        ['use_ability', { character_id: 'P1', ability: 'Fireball' }], ['use_ability', { character_id: 'P1', ability: 'Action Surge' }], ['end_turn', {}], ['rest', { kind: 'nap' }], ['advance_time', { minutes: 0 }], ['advance_time', { minutes: 1.5 }],
+        ['inventory', { op: 'gold', amount: -99999 }], ['inventory', { op: 'take', character_id: 'P1', item: 'crown' }], ['inventory', { op: 'steal' }], ['update_character', { character_id: 'P1', hp_change: 5000 }], ['update_character', { character_id: 'P1', add_conditions: ['sparkly'] }],
+        ['create_character', { name: '', class: 'Fighter' }], ['create_character', { name: 'X', class: 'Paladin' }], ['update_quest', { op: 'note', quest_id: 'Q0' }], ['update_quest', { op: 'complete', quest_id: 'Q9' }], ['update_quest', { op: 'add', title: 'x' }],
+        ['record_fact', { subject: 'N99', text: 'x y z' }], ['record_fact', { subject: 'world', text: '' }], ['lookup', { query: 'a' }], ['end_scene', { summary: 'no' }], ['nonsense', {}], ['move', null], ['roll_dice', []]];
+      let refused = 0; const slack = [];
+      for (const [n, i] of badCalls) { const r = x(n, i); if (!r.ok && typeof r.error === 'string' && r.error.length > 8) refused++; else slack.push(n + ' ' + JSON.stringify(i)); }
+      row(refused === badCalls.length, badCalls.length + ' bad calls, one of each kind, are each refused with a reason' + (slack.length ? ' (accepted: ' + slack.join('; ') + ')' : ''));
+      row(snap(st) === before, 'and a refused call changes nothing: the tale is byte for byte what it was');
+      row(new Set(badCalls.map((b) => b[0])).size >= TOOL_NAMES.length - 2, 'the bad calls cover the tools: ' + TOOL_NAMES.filter((n) => !badCalls.some((b) => b[0] === n)).join(', ') + ' have none because they take nothing that can be wrong');
+      /* a tool that throws half way leaves nothing behind */
+      TOOLS.__boom = { desc: '', schema: {}, run(s) { s.gold = 9999; s.party[0].hp = 1; s.maps.S1.doors[0].open = !s.maps.S1.doors[0].open; throw new Error('boom'); } };
+      const b2 = snap(st), boom = x('__boom', {}); delete TOOLS.__boom;
+      const swapped = m !== st.maps.S1; m = st.maps.S1;        /* the tale was put back: its boards are new objects, and anything holding an old one must let go */
+      row(!boom.ok && /boom/.test(boom.error) && snap(st) === b2 && st.gold !== 9999 && swapped && visOf(st).site === 'S1' && tokenAt(m, m.tokens[0].x, m.tokens[0].y) === m.tokens[0], 'a tool that throws half way through changes nothing either: the tale is put back, and the engine says what broke');
+
+      /* characters */
+      const c1 = x('create_character', { name: 'Maud Ashdown', class: 'ranger', ancestry: 'elf', background: 'bounty hunter', player: 'Zack' });
+      row(c1.ok && st.party.length === 1 && st.party[0].name === 'Maud Ashdown' && st.party[0].cls === 'Ranger' && st.party[0].ancestry === 'elf' && !st.party[0].stock && c1.result.took_the_place_of_a_placeholder && /joins the tale/.test(c1.say), 'create_character turns the nameless placeholder into the character, where it stands');
+      const c2 = x('create_character', { name: 'Bram', class: 'Wizard' });
+      row(c2.ok && st.party.length === 2 && st.party[1].cls === 'Wizard' && !c2.result.took_the_place_of_a_placeholder && tileFree(m, st.party[1].x, st.party[1].y) && st.gold === 15 + 10, 'the next one joins beside the party, purse and all');
+      row(!x('create_character', { name: 'bram', class: 'Bard' }).ok && st.party.length === 2, 'no two characters of one name');
+      const sg = x('suggest_character', { class: 'Bard' });
+      row(sg.ok && sg.result.class === 'Bard' && sg.result.name.split(' ').length === 2 && st.party.length === 2, 'suggest_character offers one and creates nothing');
+      /* dice */
+      const rc = x('roll_check', { character_id: 'Maud', check: 'Perception check', dc: 12, reason: 'listening at the door' });
+      row(rc.ok && rc.result.total === rc.result.natural + rc.result.modifier && rc.result.modifier === 2 + 2 && rc.result.success === (rc.result.total >= 12) && /Perception/.test(rc.say) && /listening at the door/.test(rc.say), 'roll_check finds the character by first name, adds wisdom and proficiency, and says what came of it: ' + rc.say);
+      const dn = st.n.roll, rd = x('roll_dice', { expr: '2d6+3' });
+      row(rd.ok && rd.result.total >= 5 && rd.result.total <= 15 && rd.result.rolls.length === 2 && st.n.roll === dn + 1, 'roll_dice rolls the tale\'s own dice');
+      /* the board: the model names things, the engine does the geometry */
+      const keeper = m.tokens.find((t) => t.npc === 'N0'), L = st.party[0];
+      const mv = x('move', { id: 'P1', toward: 'N0' });
+      row(mv.ok && mv.result.beside_it && meleeClear(m, L.x, L.y, keeper.x, keeper.y) && cheb(st.party[1], L) <= 3 && !st.walk, 'move walks the leader to stand beside the innkeeper, through the inn\'s doors, and the party comes too');
+      const was = roomAt(m, keeper.x, keeper.y).id, mn = x('move', { id: 'N0', toward: 'R2' });
+      row(was === 'R1' && mn.ok && tokenAt(m, keeper.x, keeper.y) === keeper && roomAt(m, keeper.x, keeper.y).id === 'R2', 'a person can be walked to another room too, and the board\'s lookup follows');
+      const door = m.doors.find((d) => !d.ext), sd = x('set_door', { door_id: door.id, locked: true });
+      row(sd.ok && door.lock && !door.open && /locked/.test(sd.say), 'set_door locks a door (and shuts it)');
+      row(!x('set_door', { door_id: door.id, open: true }).ok && door.lock && !door.open, 'a locked door does not open by saying so');
+      row(x('set_door', { door_id: door.id, open: true, locked: false }).ok && door.open && !door.lock, 'unlocked and opened in one call');
+      const table = m.objs.find((o) => !o.on && ASSETS[o.a].surf && (m._.kids.get(o.id) || []).length < ASSETS[o.a].surf * ASSETS[o.a].w * ASSETS[o.a].h);
+      const n0 = m.objs.length, rev0 = m.rev | 0, po = x('place_object', { asset: 'key', on: table.id });
+      row(po.ok && m.objs.length === n0 + 1 && m._.byId.get(po.result.id).on === table.id && (m.rev | 0) === rev0 + 1, 'place_object puts a key on a table as an object of its own, and the board knows it has changed');
+      const pf = x('place_object', { asset: 'chest', near: 'P1' }), chest = pf.ok && m._.byId.get(pf.result.id);
+      row(pf.ok && chest && m._.occ[chest.y * m.w + chest.x] >= 0 && !tileFree(m, chest.x, chest.y) && !m.doors.some((d) => doorSides(d).some((q) => q[0] === chest.x && q[1] === chest.y)), 'and a chest on a free square near the party, never in a doorway');
+      /* nothing the model puts down may wall anyone in: in a tale of its own, pile crates round the traveller until the engine says no */
+      { const s4 = newGame('pile-1'), m4 = s4.maps.S1, P4 = s4.party[0]; let put = 0, said = '';
+        for (let k = 0; k < 60; k++) { const r = exec(s4, 'place_object', { asset: 'crate', near: 'P1' }); if (!r.ok) { said = r.error; break; } put++; }
+        const reach = floodReach(m4, P4.x, P4.y), exitOK = exitGoals(m4, m4.exits[0]).some((q) => reach[q[1] * m4.w + q[0]]);
+        let ring = 0; for (const d of STEPS) if (!tileFree(m4, P4.x + d[0], P4.y + d[1])) ring++;
+        row(put >= 1 && put < 8 && ring < 8 && exitOK && /block a way|no free place/.test(said), 'crates piled round a traveller (' + put + ' accepted before the engine said no) never wall them in: the way out can still be walked'); }
+      row(x('remove_object', { object_id: po.result.id }).ok && !m._.byId.get(po.result.id), 'remove_object takes a thing away');
+      const cave0 = !!st.maps.S2, rv = x('reveal', { site_id: 'S2' });
+      row(!cave0 && rv.ok && st.maps.S2 && st.maps.S2.seen.every((v) => v === 1) && st.here === 'S1', 'reveal charts a place and shows its whole map, and moves nobody');
+      /* people */
+      const cn = x('create_npc', { role: 'bandit scout', hostile: true, template: 'bandit archer', near: 'P1', name: 'Rafe Sedge', trait: 'nervous' });
+      const scout = cn.ok && m.tokens.find((t) => t.npc === cn.result.id);
+      row(cn.ok && scout && scout.k === 'foe' && st.npcs[cn.result.id].tpl === 'bandit archer' && st.npcs[cn.result.id].trait === 'nervous' && tokenAt(m, scout.x, scout.y) === scout && (st.met.S1 || []).includes(scout.id), 'create_npc sets a hostile down beside the party, with the block asked for, and the party has seen them');
+      row(!x('create_npc', { role: 'twin', name: 'rafe sedge' }).ok, 'no two people of one name');
+      const peace = x('update_npc', { npc_id: cn.result.id, attitude: 'neutral' });
+      row(peace.ok && scout.k === 'npc' && st.npcs[cn.result.id].kind === 'npc', 'update_npc makes peace');
+      const war = x('update_npc', { npc_id: 'Rafe Sedge', attitude: 'hostile', note: 'Sold the party out to the Hand.' });
+      row(war.ok && scout.k === 'foe' && st.facts.some((f) => f.subject === cn.result.id && /Sold the party/.test(f.text)), 'or an enemy, by name, with a note that becomes canon');
+      /* a fight through the tools: only whoever's turn it is, and by the engine's rules */
+      for (const p of st.party) { p.hpMax = 300; p.hp = 300; }       /* the tools are under test here, not the party's luck */
+      const sc = x('start_combat', {});
+      row(sc.ok && st.round && sc.result.order.length === 3 && sc.result.order.some((o) => o.id === cn.result.id && o.side === 'hostile') && sc.result.hostiles[0].hp === 11 && sc.result.turn.round === 1, 'start_combat rolls initiative and reports the order by the ids the model knows');
+      const saw = { atk: 0, wrong: 0, end: 0, told: true, peace: 0 };
+      for (let g = 0; g < 60 && st.round; g++) {
+        const a = turnOf(st), aid = a.pc ? a.id : a.o.npc, other = a.pc ? cn.result.id : 'P1', b4 = snap(st);
+        const w = x('attack', { attacker_id: other, target_id: aid }); if (!w.ok && /turn/.test(w.error) && snap(st) === b4) saw.wrong++;
+        const tgt = a.pc ? cn.result.id : (st.party.find((p) => p.status === 'ok') || {}).id;
+        if (a.pc) { const pz = x('attack', { attacker_id: aid, target_id: 'N0' }); if (!pz.ok && /no harm/.test(pz.error) && snap(st) === b4) saw.peace++; x('move', { id: aid, toward: cn.result.id }); }
+        const r = x('attack', { attacker_id: aid, target_id: tgt });
+        if (r.ok) { saw.atk++; if (!(typeof r.result.to_hit === 'number' && r.result.turn && / at /.test(r.say))) saw.told = false; }
+        if (!st.round) break;
+        if (x('end_turn', {}).ok) saw.end++;
+      }
+      row(saw.atk >= 2 && saw.wrong >= 2 && saw.end >= 1 && saw.told, 'in a fight the Game Master can act only for whoever\'s turn it is, and each blow is reported: ' + JSON.stringify(saw));
+      row(saw.peace >= 1, 'and nobody peaceful can be struck, whoever asks');
+      if (st.round) x('end_combat', { outcome: 'truce' });
+      row(!st.round, 'the fight ends (won, lost or called off)');
+      /* the rest of the tale's furniture */
+      if (!st.over && st.here === 'S1' && st.party[0].status === 'ok') {
+        const P = st.party[0], inv = x('inventory', { op: 'give', character_id: P.id, item: 'cell key', qty: 2 });
+        row(inv.ok && P.items.find((q) => q.n === 'cell key').q === 2 && x('inventory', { op: 'take', character_id: P.id, item: 'Cell Key' }).ok && P.items.find((q) => q.n === 'cell key').q === 1, 'inventory gives and takes, by name whatever the case');
+        const g0 = st.gold; row(x('inventory', { op: 'gold', amount: 7 }).ok && st.gold === g0 + 7 && !x('inventory', { op: 'gold', amount: -(g0 + 8) }).ok && st.gold === g0 + 7, 'gold comes and goes, and never below nothing');
+        const hp0 = P.hp, uc = x('update_character', { character_id: P.id, hp_change: -1, add_conditions: ['poisoned'], xp: 50, note: 'Bitten by the cellar rat.' });
+        row(uc.ok && P.hp === Math.max(0, hp0 - 1) && P.conditions.includes('poisoned') && P.xp >= 50 && st.facts.some((f) => f.subject === P.id), 'update_character applies harm, a condition, experience and a note in one call');
+        const uq = x('update_quest', { op: 'add', title: 'Find the ledger', goal: 'It names every hand that took the coin.' });
+        row(uq.ok && st.quests[uq.result.id].status === 'active' && x('update_quest', { op: 'complete', quest_id: uq.result.id, note: 'Found under the chief\'s bed.' }).ok && st.quests[uq.result.id].status === 'done' && !x('update_quest', { op: 'fail', quest_id: uq.result.id }).ok, 'a quest is added, noted, closed, and cannot be closed twice');
+        const f0 = st.facts.length;
+        row(x('record_fact', { subject: 'N0', text: 'Owes the chief forty crowns.' }).ok && st.facts.length === f0 + 1 && x('record_fact', { subject: 'N0', text: 'owes the chief forty crowns.' }).result.duplicate && st.facts.length === f0 + 1 && x('record_fact', { subject: st.npcs.N0.name, text: 'Keeps a cudgel under the bar.' }).ok, 'record_fact writes canon once, by id or by name');
+        const lk = x('lookup', { query: 'forty crowns' }), b3 = snap(st); x('lookup', { query: 'cudgel' });
+        row(lk.ok && lk.result.matches.some((s) => /forty crowns/.test(s)) && snap(st) === b3, 'lookup finds it, and reading changes nothing');
+        row(x('end_scene', { summary: 'The party met the innkeeper and learned of his debt.' }).ok && st.summaries.length === 1, 'end_scene keeps a summary');
+        const t0 = st.time.minute, at = x('advance_time', { minutes: 90 });
+        row(at.ok && st.time.minute === t0 + 90, 'advance_time moves the clock');
+        const tp = x('travel_party', { to: st.sites.S0.name });
+        row(tp.ok && st.here === 'S0' && st.party.every((p) => p.site === 'S0') && st.time.minute === t0 + 95, 'travel_party takes everyone to a place by its name, and the walk takes five minutes');
+        /* what the Game Master is told */
+        const ctx2 = turnContext(st, { who: P.name, id: P.id, text: 'Where does the innkeeper keep his forty crowns?', to: 'N0 ' + st.npcs.N0.name }, { rating: 'family', monsters: 'script' });
+        row(/BOARD IN PLAY: S0/.test(ctx2) && /CANON/.test(ctx2) && /forty crowns/.test(ctx2) && /STORY SO FAR/.test(ctx2) && /Party \(shared gold/.test(ctx2) && /content rating family/.test(ctx2) && ctx2.trim().endsWith('says: Where does the innkeeper keep his forty crowns?') && /speaking to N0/.test(ctx2),
+          'the turn context carries the board, the party, the canon that bears on the line, the story so far, and ends with the line itself');
+        row(/played by: the engine/.test(ctx2) && /played by: YOU/.test(turnContext(st, { text: '' }, { monsters: 'gm', stage: 'x' })) && turnContext(st, {}, { stage: 'STAGE DIRECTION - test' }).trim().endsWith('STAGE DIRECTION - test'), 'it says who plays the monsters, and a stage direction takes the place of the line');
+        /* fog honesty: the digest marks exactly what the party can see */
+        const town = st.maps.S0, V = visOf(st).g, dg = boardDigest(st); let honest = true, n = 0;
+        for (const t of town.tokens) { const line = dg.split('\n').find((l) => l.startsWith('  ' + t.npc + ' ')); if (!line) { honest = false; continue; } n++; if (/IN SIGHT of the party/.test(line) !== !!V[t.y * town.w + t.x]) honest = false; if (!line.includes('(' + t.x + ',' + t.y + ')')) honest = false; }
+        row(honest && n === town.tokens.length && n >= 3, 'the board digest lists every person with where they stand, and marks IN SIGHT exactly those the party can see (' + n + ' people)');
+        const inn = st.maps.S1; intent(st, { t: 'jump', site: 'S1' }); const dg2 = boardDigest(st); let roomsOK = true;
+        inn.rooms.forEach((r, k) => { let a2 = 0, b = 0; for (let i = 0; i < inn.w * inn.h; i++) if (inn.rg[i] === k + 1) { a2++; if (inn.seen[i]) b++; } const line = dg2.split('\n').find((l) => l.startsWith('  ' + r.id + ' ')); if (!line || /UNSEEN by the party/.test(line) !== (b === 0)) roomsOK = false; });
+        row(roomsOK && /Doors: D0/.test(dg2) && /Ways out: E0 to S0/.test(dg2), 'and every room, with UNSEEN on exactly the rooms nobody has looked into; then the doors and the ways out');
+        row(dg2.includes(table.id + ' ' + ASSETS[table.a].n.toLowerCase()) && /\d+ x chair|\d+ x stool/.test(dg2), 'things are named with their ids; chairs and stools are only counted');
+        /* the prefix that is cached must not move */
+        const bt = bibleText(st);
+        row(bt === bible0 && bt === bibleText(unpackState(JSON.parse(JSON.stringify(packState(st))))) && /WORLD BIBLE/.test(bt) && bt.includes(st.bible.town) && bt.includes(st.npcs.N5.name) && !/forty crowns/.test(bt) && !bt.includes(String(st.gold) + ' gold'), 'the bible text is what it was before any of this, and the same after a save: nothing that changes in play is in it, so the cached prefix stays byte-stable');
+        row(SYSTEM_PROMPT.length > 6000 && /never work out distances/.test(SYSTEM_PROMPT) && /Fog of war is real/.test(SYSTEM_PROMPT) && Object.keys(CLASSES).every((c) => SYSTEM_PROMPT.includes(c)) && SYSTEM_PROMPT.includes('bandit captain') && SYSTEM_PROMPT.includes('flower_pot'), 'the instructions name the callings, the bestiary and the asset library, and tell the model it never does geometry');
+        const a = snap(st), b = snap(unpackState(JSON.parse(JSON.stringify(packState(st)))));
+        row(a === b && st.facts.length >= 3 && st.summaries.length === 1, 'and after all of that a save round-trips byte for byte');
+      } else row(false, 'the party did not come through the tools\' fight in a state to go on (' + st.over + ' ' + st.here + ')');
+
+      /* ---- the calls a first pass did not ask for. Every row from here on was written for a deliberate break the rows above let through. ---- */
+      {
+        const st = newGame('tools-2'), x = (n, i) => exec(st, n, i), inn = st.maps.S1, P = st.party[0];
+        const force = (v) => { for (let n = st.n.roll; n < st.n.roll + 4000; n++) if (1 + Math.floor(rngFor(st.seed, 'dice', n)() * 20) === v) { st.n.roll = n; return true; } return false; };
+        const seenIn = (m, k) => { let n = 0; for (let i = 0; i < m.w * m.h; i++) if ((!k || m.rg[i] === k) && m.seen[i]) n++; return n; };
+        const lineOf = (dg, id) => dg.split('\n').find((l) => l.startsWith('  ' + id + ' ')) || '';
+        const dg0 = boardDigest(st);
+        row(inn.tokens.length === 4 && inn.tokens.every((t) => { const l = lineOf(dg0, t.npc); return /out of the party.s sight/.test(l) && !/IN SIGHT/.test(l) && /peaceful/.test(l) && !/ AC \d/.test(l); }), 'behind a shut door the digest marks everyone out of the party\'s sight, peaceful, and with no stat block they have not earned');
+        row(/\[a placeholder nobody has claimed/.test(partyDigest(st)), 'the party digest marks the nameless placeholder that create_character fills');
+        row(TOOL_NAMES.filter((n) => TOOLS[n].ro).join() === 'lookup', 'lookup is the one tool that only reads');
+        /* dice */
+        force(10); const eq = x('roll_check', { character_id: 'P1', check: 'athletics', dc: 14 }); force(10); const lt = x('roll_check', { character_id: 'P1', check: 'athletics', dc: 15 });
+        row(eq.ok && eq.result.natural === 10 && eq.result.total === 14 && eq.result.success === true && lt.ok && lt.result.total === 14 && lt.result.success === false, 'a check that meets its DC exactly succeeds; one short of it fails');
+        /* doors */
+        const D2 = inn.doors.find((d) => d.id === 'D2'), far = doorSides(D2).find((q) => !inn.seen[q[1] * inn.w + q[0]]), s0 = seenIn(inn);
+        const od = x('set_door', { door_id: 'D2', open: true });
+        row(far && od.ok && D2.open && seenIn(inn) > s0 && inn.seen[far[1] * inn.w + far[0]] === 1, 'a door the Game Master opens lets the party see through it at once');
+        const lk = x('set_door', { door_id: 'D2', locked: true });
+        row(lk.ok && D2.lock && !D2.open, 'locking an open door shuts it');
+        x('set_door', { door_id: 'D2', open: true, locked: false });
+        /* showing one room shows one room */
+        const R4 = inn.rooms.findIndex((r) => r.id === 'R4') + 1, R6 = inn.rooms.findIndex((r) => r.id === 'R6') + 1, was6 = seenIn(inn, R6), rv = x('reveal', { room_id: 'R4' });
+        let all4 = true; for (let i = 0; i < inn.w * inn.h; i++) if (inn.rg[i] === R4 && !inn.seen[i]) all4 = false;
+        row(rv.ok && all4 && rv.result.squares_newly_shown >= 15 && seenIn(inn, R6) === was6 && was6 === 0, 'reveal with a room shows that room and no other');
+        /* things */
+        const chair = inn.objs.find((o) => !o.on && !ASSETS[o.a].surf), b1 = snap(st), onChair = x('place_object', { asset: 'coins', on: chair.id });
+        row(!onChair.ok && /surface/.test(onChair.error) && snap(st) === b1, 'a small thing cannot be set on something that is no surface');
+        const tbl = inn.objs.find((o) => !o.on && ASSETS[o.a].surf && !(inn._.kids.get(o.id) || []).length), cap = ASSETS[tbl.a].surf * ASSETS[tbl.a].w * ASSETS[tbl.a].h; let put = 0, full = null;
+        for (let k = 0; k < cap + 3; k++) { const r = x('place_object', { asset: 'coins', on: tbl.id }); if (r.ok) put++; else { full = r; break; } }
+        const kids = (inn._.kids.get(tbl.id) || []).map((k) => k.id);
+        row(put === cap && full && /no room left/.test(full.error) && kids.length === cap && new Set((inn._.kids.get(tbl.id) || []).map((k) => k.slot)).size === cap, 'a surface holds what it holds: ' + cap + ' on the ' + ASSETS[tbl.a].n.toLowerCase() + ', each in a place of its own, and then no more');
+        const rm = x('remove_object', { object_id: tbl.id });
+        row(rm.ok && !inn._.byId.get(tbl.id) && kids.every((id) => !inn._.byId.get(id)) && !inn.objs.some((o) => o.on === tbl.id), 'taking a table away takes what stood on it');
+        const rev0 = inn.rev | 0, n0 = inn.objs.length, ch = x('place_object', { asset: 'chest', near: 'R1' });
+        row(ch.ok && (inn.rev | 0) === rev0 + 1 && inn.objs.length === n0 + 1, 'a thing set on the floor tells the board it has changed, so it is painted');
+        const b2 = snap(st), onDoor = x('place_object', { asset: 'rubble', near: 'D2' }), onMe = x('place_object', { asset: 'rubble', near: P.x + ',' + P.y });
+        row(!onDoor.ok && !onMe.ok && /no free place/.test(onDoor.error) && snap(st) === b2, 'nothing is set down in a doorway or on the square someone stands on, even a thing that does not block');
+        /* people */
+        const cn = x('create_npc', { role: 'bandit scout', hostile: true, near: 'R1' }), sc = cn.ok && inn.tokens.find((t) => t.npc === cn.result.id);
+        const hidden = cn.ok && cn.result.in_the_partys_sight === false && !(st.met.S1 || []).includes(sc.id) && cn.say === '';
+        const mv = x('move', { id: cn.result.id, toward: 'P1' });
+        row(hidden && mv.ok && mv.result.beside_it && meleeClear(inn, sc.x, sc.y, P.x, P.y) && (st.met.S1 || []).includes(sc.id), 'a hostile set down out of sight is unknown to the party until the Game Master walks them in: then they are met');
+        const b5 = snap(st), thru = x('move', { id: 'N0', toward: 'P1' });
+        row(!thru.ok && /no way/.test(thru.error) && snap(st) === b5, 'nobody is walked through someone standing in the only way: the innkeeper cannot be brought to the party past the scout');
+        const dl = lineOf(boardDigest(st), cn.result.id);
+        row(/HOSTILE/.test(dl) && /IN SIGHT of the party/.test(dl) && /; bandit AC 12 HP 11\/11 \[scimitar\]/.test(dl), 'and the digest then says so: hostile, in sight, with the block they fight by:' + dl.replace(/^.* - /, ' '));
+        /* a fight */
+        for (const p of st.party) { p.hpMax = 300; p.hp = 300; }
+        const sc0 = x('start_combat', {}), S = sheetOf(st, sc, true); S.hpMax = S.hp = 400;
+        const ctxF = turnContext(st, { who: 'x', text: 'Zzz.' }, {});
+        row(sc0.ok && /FIGHT, round 1\. Order: /.test(ctxF) && /Acting now: \S+ .* ft of movement, 1 action, 1 bonus action left\./.test(ctxF) && !/No fight is in progress/.test(ctxF), 'in a fight the turn context gives the order, and what the one acting has left');
+        const b3 = snap(st), tp = x('travel_party', { to: 'S0' }), ec = x('end_combat', { outcome: 'won' });
+        row(!tp.ok && /fight/.test(tp.error) && !ec.ok && /truce or fled/.test(ec.error) && snap(st) === b3 && st.round && st.here === 'S1', 'nobody walks out of a fight by travel_party, and a fight is not ended by declaring it won');
+        const act = turnOf(st), om = x('move', { id: act.pc ? cn.result.id : 'P1', toward: 'R3' });
+        row(!om.ok && /turn/.test(om.error) && snap(st) === b3, 'in a fight only whoever\'s turn it is can be moved');
+        for (let g = 0; g < 6 && st.round && !turnOf(st).pc; g++) x('end_turn', {});
+        const adv = x('attack', { attacker_id: 'P1', target_id: cn.result.id, mode: 'advantage' });
+        row(adv.ok && adv.result.mode === 'advantage' && adv.result.rolls.length === 2, 'the Game Master may grant advantage for what the engine cannot see: two dice, the higher kept');
+        st.round.act = 1; const left0 = moveLeft(st.round), dm = x('move', { id: 'P1', toward: 'R5', dash: true });
+        row(dm.ok && st.round.extra === 30 && st.round.act === 0 && dm.result.move_left_ft === left0 + 30 - dm.result.moved_ft, 'move with dash spends the action on 30 ft more: ' + (dm.ok ? dm.result.move_left_ft + ' ft left of ' + left0 : dm.error));
+        const nd = x('move', { id: 'P1', toward: 'R5', dash: true });
+        row(!nd.ok && /action/i.test(nd.error) && st.round.extra === 30, 'and cannot be asked twice in a turn');
+        x('end_combat', { outcome: 'fled' });
+        /* numbers and words out of bounds */
+        const b4 = snap(st), nos = [['inventory', { op: 'gold', amount: 0 }], ['inventory', { op: 'gold', amount: 2.5 }], ['inventory', { op: 'gold', amount: 200000 }], ['inventory', { op: 'give', character_id: 'P1', item: '' }], ['inventory', { op: 'give', character_id: 'P1', item: 'rope', qty: 0 }],
+          ['inventory', { op: 'give', character_id: 'P1', item: 'rope', qty: 1000 }], ['inventory', { op: 'give', character_id: 'P1', item: 'rope', qty: 1.5 }], ['inventory', { op: 'take', character_id: 'P1', item: 'bedroll', qty: 2 }], ['update_character', { character_id: 'P1', xp: -5 }],
+          ['update_character', { character_id: 'P1', xp: 20001 }], ['update_character', { character_id: 'P1', hp_change: 0.5 }], ['update_quest', { op: 'burn' }], ['advance_time', { minutes: 10081 }]];
+        const let2 = nos.filter(([n, i]) => x(n, i).ok).map(([n, i]) => n + ' ' + JSON.stringify(i));
+        row(!let2.length && snap(st) === b4, nos.length + ' more bad calls, each a number or a word out of bounds, are refused and change nothing' + (let2.length ? ' (accepted: ' + let2.join('; ') + ')' : ''));
+        const had = P.items.length, tk = x('inventory', { op: 'take', character_id: 'P1', item: 'bedroll' });
+        row(tk.ok && tk.result.left === 0 && P.items.length === had - 1 && !P.items.some((q) => q.n === 'bedroll'), 'the last of a thing taken leaves no empty line on the sheet');
+        /* what reaches the Game Master, and why */
+        x('record_fact', { subject: 'N0', text: 'Waters the ale after dark.' }); x('record_fact', { subject: 'N5', text: 'Carries the strongbox key on a chain.' });
+        st.story.push({ t: 'chip', text: 'Chip Alpha happened.', turn: 0, k: 'fight' }, { t: 'gm', text: 'The door creaks.', turn: 0 }, { t: 'chip', text: 'Chip Beta happened.', turn: 1, k: 'fight' }, { t: 'pl', text: 'I listen.', turn: 1, who: 'Maud', id: 'P1' });
+        const cA = turnContext(st, { who: 'Maud', id: 'P1', text: 'Zzz qqq.' }, {}), cB = turnContext(st, { who: 'Maud', id: 'P1', text: 'Who holds the strongbox?' }, {});
+        row(/Waters the ale/.test(cA) && !/strongbox key/.test(cA) && /strongbox key/.test(cB) && /Waters the ale/.test(cB), 'canon reaches the Game Master by what is at hand (a fact about someone on the board) and by the words of the line (a fact about someone far off, once asked after)');
+        const since = (cA.split('SINCE YOU LAST SPOKE')[1] || '').split('\n\n')[0];
+        row(/Chip Beta/.test(since) && !/Chip Alpha/.test(since), 'it is told what the board did since it last spoke, and not what it was told before');
+        row(/RECENT EXCHANGES:\n {2}GM: The door creaks\.\n {2}Maud: I listen\./.test(cA), 'and the last things said, in order, by whom');
+      }
+      /* harm done by the Game Master's hand, in a fight */
+      {
+        const st = newGame('harm-1'), x = (n, i) => exec(st, n, i); intent(st, { t: 'party', op: 'add' }); intent(st, { t: 'party', op: 'add' });
+        const [A, B, C] = st.party; x('create_npc', { role: 'bandit', hostile: true, near: 'P1' }); x('start_combat', {});
+        const k1 = x('update_character', { character_id: 'P3', hp_change: -999 }), k2 = x('update_character', { character_id: 'P3', hp_change: 5 });
+        row(k1.ok && C.status === 'dead' && st.party.includes(C) && st.round && !k2.ok && /is dead/.test(k2.error) && C.hp === 0, 'in a fight the dead stay where they fell until it is over, and nothing changes them');
+        const d1 = x('update_character', { character_id: 'P1', hp_change: -A.hp }), mid = !!st.round && A.status === 'down', d2 = x('update_character', { character_id: 'P2', hp_change: -B.hp });
+        row(d1.ok && mid && d2.ok && /beaten/.test(d2.result.fight || '') && !st.round && st.party.length === 2 && st.fallen.length === 1 && st.fallen[0].name === C.name && st.here === 'S1' && st.party.every((p) => p.hp === 1 && p.status === 'ok'),
+          'harm that takes the last one standing ends the fight then and there: the dead are mourned, the rest wake at the inn');
+      }
+      /* ...and outside one */
+      {
+        const st = newGame('harm-2'), x = (n, i) => exec(st, n, i); intent(st, { t: 'party', op: 'add' }); intent(st, { t: 'jump', site: 'S0' });
+        const [A, B] = st.party, g0 = st.gold, u1 = x('update_character', { character_id: 'P2', hp_change: -B.hp }), rc = x('roll_check', { character_id: 'P2', check: 'stealth', dc: 10 });
+        row(u1.ok && B.status === 'stable' && B.hp === 0 && st.here === 'S0' && !rc.ok && /cannot act/.test(rc.error), 'outside a fight someone struck down is tended at once (stable, not dying), and can attempt nothing');
+        const u2 = x('update_character', { character_id: 'P1', hp_change: -A.hp });
+        row(u2.ok && u2.result.party_rescued === true && st.here === 'S1' && st.party.every((p) => p.hp === 1 && p.status === 'ok') && st.gold === Math.floor(g0 / 2) && /carried back to the inn/.test(u2.say), 'and when the last one standing falls, the party is carried back to the inn: one hit point each, half the purse');
+      }
+      /* attitudes in the middle of a fight */
+      {
+        const st = newGame('peace-1'), x = (n, i) => exec(st, n, i), m = st.maps.S1;
+        const a = x('create_npc', { role: 'bandit', hostile: true, near: 'P1' }), b = x('create_npc', { role: 'bandit', hostile: true, near: 'P1' }), ta = m.tokens.find((t) => t.npc === a.result.id), tb = m.tokens.find((t) => t.npc === b.result.id);
+        for (const p of st.party) { p.hpMax = 300; p.hp = 300; }
+        x('start_combat', {}); for (let g = 0; g < 6 && !turnOf(st).pc; g++) x('end_turn', {});
+        const pa = x('update_npc', { npc_id: a.result.id, attitude: 'neutral' });
+        row(pa.ok && st.round && ta.k === 'npc' && m.tokens.includes(ta) && tokenAt(m, ta.x, ta.y) === ta && !st.round.order.some((c) => c.id === ta.id) && st.round.order.some((c) => c.id === tb.id) && turnOf(st).pc, 'someone who makes peace in the middle of a fight leaves the order and stays on the board; the fight goes on with the rest');
+        const kb = x('update_npc', { npc_id: b.result.id, status: 'dead' });
+        row(kb.ok && !m.tokens.includes(tb) && tokenAt(m, tb.x, tb.y) !== tb && st.npcs[b.result.id].status === 'dead' && !st.round && /fight/i.test(kb.result.fight || ''), 'and when the last enemy is declared dead they leave the board, and the fight is over: ' + (kb.ok ? kb.say : kb.error));
+      }
+      /* a truce, and a flight */
+      {
+        const st = newGame('truce-1'), x = (n, i) => exec(st, n, i), m = st.maps.S1, a = x('create_npc', { role: 'bandit', hostile: true, near: 'P1' }), ta = m.tokens.find((t) => t.npc === a.result.id);
+        x('start_combat', {}); const tr = x('end_combat', { outcome: 'truce' });
+        row(tr.ok && !st.round && ta.k === 'npc' && st.npcs[a.result.id].kind === 'npc' && /truce/.test(tr.say), 'a truce ends the fight and the enmity: those who stood down are enemies no longer');
+        x('update_npc', { npc_id: a.result.id, attitude: 'hostile' }); x('start_combat', {}); const fl = x('end_combat', { outcome: 'fled' });
+        row(fl.ok && !st.round && ta.k === 'foe' && /broken off/.test(fl.say), 'a fight broken off leaves them enemies still');
+      }
+      /* how many a board holds, and where they stand */
+      {
+        const st = newGame('crowd-1'), m = st.maps.S1; let made = 0, said = '';
+        for (let k = 0; k < 60; k++) { const r = exec(st, 'create_npc', { role: 'extra', near: 'R1' }); if (!r.ok) { said = r.error; break; } made++; }
+        const sq = new Set(m.tokens.map((t) => t.x + ',' + t.y).concat(st.party.map((p) => p.x + ',' + p.y)));
+        row(m.tokens.length === 40 && made === 36 && /crowded/.test(said) && sq.size === m.tokens.length + st.party.length && m.tokens.every((t) => tileFree(m, t.x, t.y) && tokenAt(m, t.x, t.y) === t), 'a board takes forty people and no more, each on a free square of their own (' + made + ' set down in the common room: ' + said + ')');
+      }
+      /* the captive */
+      {
+        const st = newGame('cap-1'); intent(st, { t: 'jump', site: 'S2' });
+        const cv = st.maps.S2, cap = cv.tokens.find((t) => t.k === 'captive'), b = snap(st), r = exec(st, 'move', { id: cap.npc, toward: 'P1' });
+        row(cap && !r.ok && /held/.test(r.error) && snap(st) === b, 'a captive cannot be walked anywhere while they are held');
+        const fr = exec(st, 'update_npc', { npc_id: cap.npc, attitude: 'free' });
+        row(fr.ok && cap.k === 'npc' && st.npcs[cap.npc].kind === 'npc' && /is free/.test(fr.say), 'until update_npc frees them');
+      }
+      return rows;
+    });
+    for (const [c, m] of rows) ok(c, m);
+    await S0.ctx.close();
+  }
+  }
+
+  if (want('T')) {
+  /* ------------------------------------------------------------------ T */
+  console.log('T. the Game Master at the table');
+  {
+    const KEY = 'sk-ant-test-key-7f3a';
+    /* ---- the real client, against a stand-in for api.anthropic.com ---- */
+    const T1 = await open({ width: 390, height: 844 }, null, { storyOpen: true }), page = T1.page;
+    const calm = (pg, ms) => pg.waitForFunction(() => G.st && !G.busy && !Session.beats.length && !G.st.walk && !View.walking && View.anim.t >= 1 && !document.getElementById('veil').classList.contains('on'), null, { timeout: ms || 15000 });
+    const snapOf = (pg, noCosts) => pg.evaluate((noCosts) => { const p = packState(G.st); delete p.saved; if (noCosts) delete p.costs; return JSON.stringify(p); }, !!noCosts);
+    const sse = (events) => events.map((e) => 'event: ' + e.type + '\ndata: ' + JSON.stringify(e) + '\n\n').join('');
+    const USAGE = { input_tokens: 10, cache_read_input_tokens: 5, output_tokens: 1 };
+    const msg = (content, stop, model) => {
+      const ev = [{ type: 'message_start', message: { id: 'm', type: 'message', role: 'assistant', model: model || 'claude-opus-5-5', content: [], usage: USAGE } }];
+      content.forEach((b, i) => {
+        if (b.type === 'thinking') ev.push({ type: 'content_block_start', index: i, content_block: { type: 'thinking', thinking: '' } }, { type: 'content_block_delta', index: i, delta: { type: 'signature_delta', signature: b.signature } });
+        else if (b.type === 'text') { ev.push({ type: 'content_block_start', index: i, content_block: { type: 'text', text: '' } }); for (const piece of (b.whole ? [b.text] : b.text.match(/[\s\S]{1,7}/g))) ev.push({ type: 'content_block_delta', index: i, delta: { type: 'text_delta', text: piece } }); }
+        else if (b.type === 'tool_use') { const j = b.bad ? '{"expr": "1d6", "reason": ' : JSON.stringify(b.input); ev.push({ type: 'content_block_start', index: i, content_block: { type: 'tool_use', id: b.id, name: b.name, input: {} } }, { type: 'content_block_delta', index: i, delta: { type: 'input_json_delta', partial_json: j.slice(0, 9) } }, { type: 'content_block_delta', index: i, delta: { type: 'input_json_delta', partial_json: j.slice(9) } }); }
+        ev.push({ type: 'content_block_stop', index: i });
+      });
+      ev.push({ type: 'message_delta', delta: { stop_reason: stop }, usage: { output_tokens: 20 } }, { type: 'message_stop' });
+      return sse(ev);
+    };
+    const PER = (p) => (10 * p[0] + 20 * p[1] + 5 * p[2]) / 1e6;       /* what one stand-in reply costs at a price row [in, out, cache read] */
+    const bodies = [], urls = [], tests = [];
+    let mode = 'none', release = null, once = false, whole = false, tool = { name: 'create_character', input: { name: 'Ada', class: 'Wizard' } }, text = 'Ada the wizard wakes. <img src=x onerror="window.__pwned=1"> What do you do?';
+    await page.route('**/*', async (route) => { const u = route.request().url(); if (/^https?:/.test(u) && !/fonts\.(googleapis|gstatic)\.com/.test(u)) urls.push(u); return route.fallback(); });
+    await page.route('https://api.anthropic.com/v1/messages', async (route) => {
+      const req = route.request(), body = JSON.parse(req.postData() || '{}');
+      bodies.push({ body, headers: req.headers(), raw: req.postData() || '' }); urls.push(req.url());
+      const json = (status, type, message) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ type: 'error', error: { type, message } }) });
+      const stream = (b) => route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: b });
+      if (mode === 'auth') return json(401, 'authentication_error', 'invalid x-api-key');
+      if (body.stream === false) { tests.push(body); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'm', type: 'message', role: 'assistant', model: body.model, content: [{ type: 'text', text: 'ready' }], stop_reason: 'end_turn', usage: { input_tokens: 12, output_tokens: 3 } }) }); }
+      if (mode === 'busyOnce' && !once) { once = true; return json(529, 'overloaded_error', 'Overloaded'); }
+      if (mode === 'fbAlways' && bodies.length <= 3) return json(400, 'invalid_request_error', 'fallbacks: model not permitted');     /* relents at the fourth asking, so a client that never gives up is caught by a count and not by a timeout */
+      if (mode === 'refusal') return stream(msg([{ type: 'text', text: 'I will not.' }], 'refusal'));
+      if (mode === 'slow') { await new Promise((res) => { release = res; }); return stream(msg([{ type: 'text', text: 'Too late.' }], 'end_turn')).catch(() => {}); }
+      if (mode === 'fb' && body.fallbacks) return json(400, 'invalid_request_error', 'fallbacks: model not permitted');
+      if (mode === 'effort' && body.output_config) return json(400, 'invalid_request_error', 'output_config.effort: Extra inputs are not permitted');
+      const last = body.messages[body.messages.length - 1], isResult = Array.isArray(last.content) && last.content[0] && last.content[0].type === 'tool_result', served = mode === 'served' ? 'claude-opus-5' : body.model;
+      if (mode === 'midfail' && isResult) return stream(sse([{ type: 'message_start', message: { id: 'm', type: 'message', role: 'assistant', model: body.model, content: [], usage: USAGE } },
+        { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }, { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'The purse is ' } }, { type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }]));
+      if (mode === 'silent') { const nudged = Array.isArray(last.content) && last.content.some((b) => b.type === 'text' && /Now narrate/.test(b.text)); return stream(body.messages.length === 1 ? msg([{ type: 'tool_use', id: 'tu1', name: 'roll_dice', input: { expr: '1d6' } }], 'tool_use') : nudged ? msg([{ type: 'text', text: 'The die comes up.' }], 'end_turn') : msg([], 'end_turn')); }
+      if (mode === 'badjson' && !isResult) return stream(msg([{ type: 'tool_use', id: 'tu9', name: 'start_combat', bad: true }], 'tool_use'));
+      if (!isResult && tool) return stream(msg([{ type: 'thinking', signature: 'SIG-abc' }, { type: 'tool_use', id: 'tu1', name: tool.name, input: tool.input }], 'tool_use', served));
+      return stream(msg([{ type: 'text', text, whole }], 'end_turn', served));
+    });
+    const say = async (line, who) => { await page.evaluate(([line, who]) => { if (who != null) document.getElementById('say-who').value = who; document.getElementById('say').value = line; document.getElementById('say-send').click(); }, [line, who == null ? null : who]); await page.waitForFunction(() => G.busy || document.getElementById('dialog').classList.contains('open'), null, { timeout: 4000 }).catch(() => {}); await calm(page); };
+
+    /* request shapes, model by model (ids and fields checked against the docs on 2026-10-10) */
+    const shapes = await page.evaluate(() => {
+      const set = { effort: 'medium' }, o = AnthropicGM.body(modelProfile({ model: 'claude-opus-5-5' }), set, [], true), s = AnthropicGM.body(modelProfile({ model: 'claude-sonnet-5-5' }), { effort: 'high' }, [], true), h = AnthropicGM.body(modelProfile({ model: 'claude-haiku-5-5' }), { effort: 'bogus' }, [], true),
+        c = AnthropicGM.body(modelProfile({ model: 'custom', customModel: ' claude-next-9 ' }), set, [], true), hdr = AnthropicGM.headers('k', o.betas), raw = JSON.stringify(o.b);
+      return { ids: MODELS.map((m) => m.id).join(), oThink: o.b.thinking && o.b.thinking.type, oEffort: o.b.output_config && o.b.output_config.effort, oFb: o.b.fallbacks, oBeta: o.betas.join(), oTools: o.b.tools.length, n: TOOL_NAMES.length, oChoice: 'tool_choice' in o.b, oCache: !!o.b.system[0].cache_control, oSys: o.b.system[0].text === SYSTEM_PROMPT, oMax: o.b.max_tokens, oStream: o.b.stream,
+        sThink: s.b.thinking && s.b.thinking.type, sEffort: s.b.output_config.effort, sFb: 'fallbacks' in s.b, sBeta: s.betas.length, hThink: h.b.thinking && h.b.thinking.type, hEffort: h.b.output_config.effort, hFb: 'fallbacks' in h.b, cId: c.b.model, budget: /budget_tokens|temperature|top_p/.test(raw),
+        hdrBrowser: hdr['anthropic-dangerous-direct-browser-access'], hdrVer: hdr['anthropic-version'], hdrKey: hdr['x-api-key'], hdrBeta: hdr['anthropic-beta'], url: API_URL };
+    });
+    ok(shapes.ids === 'claude-opus-5-5,claude-sonnet-5-5,claude-haiku-5-5,custom' && shapes.url === 'https://api.anthropic.com/v1/messages' && shapes.cId === 'claude-next-9', 'the models offered are Opus 5.5, Sonnet 5.5, Haiku 5.5 and one typed by hand, and there is one address they are asked at');
+    ok(shapes.oThink === 'adaptive' && shapes.oEffort === 'medium' && shapes.oFb === 'default' && shapes.oBeta === 'server-side-fallback-2026-07-01' && shapes.hdrBeta === shapes.oBeta && !shapes.budget, 'Opus 5.5: adaptive thinking, explicit effort, refusal fallbacks with their beta header; never a thinking budget or a sampling knob');
+    ok(shapes.sThink === 'adaptive' && shapes.sEffort === 'high' && !shapes.sFb && shapes.sBeta === 0 && shapes.hThink === 'adaptive' && shapes.hEffort === 'medium' && !shapes.hFb, 'Sonnet 5.5 and Haiku 5.5: adaptive thinking and effort, no fallbacks field; an effort that is not one becomes medium');
+    ok(!shapes.oChoice && shapes.oTools === shapes.n && shapes.oCache && shapes.oSys && shapes.oMax === 16000 && shapes.oStream === true && shapes.hdrBrowser === 'true' && shapes.hdrVer === '2023-06-01' && shapes.hdrKey === 'k', 'every tool declared, no forced tool choice, the instructions cached, streamed, with the browser-access and version headers');
+
+    /* what is sent back as the assistant's turn inside a tool loop */
+    const echo = await page.evaluate(() => { const E = (c) => AnthropicGM.echo(c).map((b) => b.type + (b.type === 'text' ? ':' + b.text : b.type === 'thinking' ? ':' + b.signature : b.type === 'tool_use' ? ':' + b.id + JSON.stringify(b.input) : '')).join('|');
+      return { plain: E([{ type: 'thinking', thinking: 'hm', signature: 'S1' }, { type: 'text', text: 'Hello.' }, { type: 'tool_use', id: 't1', name: 'x', input: { a: 1 }, badJson: false }]), blank: E([{ type: 'text', text: ' \n ' }, { type: 'text', text: '' }, { type: 'tool_use', id: 't2', name: 'x' }]),
+        fb: E([{ type: 'thinking', thinking: 'a', signature: 'OLD' }, { type: 'text', text: 'Before.' }, { type: 'tool_use', id: 'gone', name: 'x', input: {} }, { type: 'fallback' }, { type: 'thinking', thinking: 'b', signature: 'NEW' }, { type: 'tool_use', id: 't3', name: 'x', input: {} }]), red: E([{ type: 'redacted_thinking', data: 'zz' }, { type: 'tool_use', id: 't4', name: 'x', input: {} }]) }; });
+    ok(echo.plain === 'thinking:S1|text:Hello.|tool_use:t1{"a":1}' && echo.blank === 'tool_use:t2{}' && echo.red === 'redacted_thinking|tool_use:t4{}', 'the assistant turn goes back as it came (thinking with its signature, redacted thinking, tool calls), less any text block that is empty or only space');
+    ok(echo.fb === 'text:Before.|thinking:NEW|tool_use:t3{}', 'after a server-side fallback, what the first model thought and called is dropped and only its words are kept, ahead of the second model\'s turn');
+    const price = await page.evaluate(() => { const u = (i, o, r, w) => ({ input_tokens: i, output_tokens: o, cache_read_input_tokens: r || 0, cache_creation_input_tokens: w || 0 });
+      return { opus: Costs.claude('claude-opus-5-5', u(1000, 500, 10000, 2000)).usd, sonnet: Costs.claude('claude-sonnet-5-5-20260901', u(1000, 500, 10000, 2000)).usd, h1: Costs.claude('claude-haiku-5-5', u(50000, 1000)).usd, h2: Costs.claude('claude-haiku-5-5', u(500, 1000, 100000)).usd, h3: Costs.claude('claude-haiku-5-5', u(500, 1000, 99500)).usd,
+        hour: Costs.claude('claude-opus-5-5', Object.assign(u(0, 0, 0, 1000), { cache_creation: { ephemeral_1h_input_tokens: 400 } })).usd, unk: Costs.claude('some-new-model', u(5, 5)), fmt: [Costs.fmt(1.5), Costs.fmt(.01234), Costs.fmt(NaN)].join() }; });
+    const near = (a, b) => Math.abs(a - b) < 1e-12;
+    ok(near(price.opus, (1000 * 4 + 500 * 20 + 10000 * .2 + 2000 * 5) / 1e6) && near(price.sonnet, (1000 * 2 + 500 * 10 + 10000 * .1 + 2000 * 2.5) / 1e6) && near(price.hour, (600 * 5 + 400 * 8) / 1e6), 'prices: Opus 5.5 and Sonnet 5.5 from the usage a reply reports (a dated id is priced as its family), cache reads and writes at their own rates, an hour-long cache write at twice the input price');
+    ok(near(price.h1, (50000 * .1 + 1000 * .5) / 1e6) && near(price.h2, (500 * .5 + 1000 * 2.5 + 100000 * .05) / 1e6) && near(price.h3, (500 * .1 + 1000 * .5 + 99500 * .01) / 1e6), 'Haiku 5.5 has a second price above 100,000 prompt tokens, cached or not; at exactly 100,000 it is still the first');
+    ok(!price.unk.known && price.unk.usd === 0 && price.fmt === '$1.50,$0.0123,$?', 'a model nobody has priced is not guessed at');
+
+    /* the opening, through the real client */
+    await page.evaluate((k) => { Settings.setKey(k, false); document.getElementById('btn-new').click(); }, KEY);
+    await page.waitForFunction(() => G.st && G.st.turn >= 1 && !G.busy, null, { timeout: 12000 }); await calm(page);
+    let r = await page.evaluate(() => ({ party: G.st.party.map((c) => c.name + ':' + c.cls + ':' + c.stock).join(), gm: [...document.querySelectorAll('#story-log .st-gm')].map((x) => x.textContent).join(' '), img: document.querySelectorAll('#story-log img, #story-log script').length, pwned: window.__pwned || 0, dlg: document.getElementById('dialog').classList.contains('open'),
+      story: G.st.story.map((e) => e.t).join(), chip: G.st.story.find((e) => e.t === 'chip').text, told: Object.keys(G.st.told).sort().join(), open: document.getElementById('story').classList.contains('open'), first: !!document.querySelector('#story-log .st-gm.first'), turn: G.st.turn, costs: G.st.costs.slice(), tag: (document.querySelector('#story-log .cost-tag') || { textContent: '' }).textContent, letter: document.querySelector('#chips .chip.pc').textContent.charAt(0) }));
+    ok(bodies.length === 2 && !r.dlg && r.open, 'with a key, a new tale opens in the story, told by the Game Master: one request, then one more after its tool call');
+    ok(r.party === 'Ada:Wizard:false' && r.letter === 'A' && /Ada the Wizard joins the tale/.test(r.chip), 'a streamed tool call (its JSON split across deltas) runs through the engine: the placeholder has become Ada the wizard, on the board and on the bar');
+    ok(/Ada the wizard wakes\. <img src=x onerror="window\.__pwned=1"> What do you do\?/.test(r.gm) && r.img === 0 && r.pwned === 0 && r.first, 'the streamed words become the telling, as text: markup from the model is never markup on the page');
+    ok(r.story === 'chip,gm' && r.told === 'S1,open' && r.turn === 1, 'the tale keeps the telling: what the engine did, then what was said, and that this place has been told');
+    const first = bodies[0].body, second = bodies[1].body, asst = second.messages[1], res = second.messages[2];
+    ok(first.messages.length === 1 && first.messages[0].content[0].cache_control && /^WORLD BIBLE/.test(first.messages[0].content[0].text) && !first.messages[0].content[1].cache_control && /^TURN CONTEXT/.test(first.messages[0].content[1].text) && /STAGE DIRECTION - the tale begins now/.test(first.messages[0].content[1].text) && /BOARD IN PLAY: S1/.test(first.messages[0].content[1].text),
+      'the request: the world bible as a cached block, then the turn context with the board in words and the stage direction');
+    ok(asst && asst.role === 'assistant' && asst.content[0].type === 'thinking' && asst.content[0].signature === 'SIG-abc' && asst.content[1].type === 'tool_use' && asst.content[1].input.class === 'Wizard' && res.role === 'user' && res.content[0].type === 'tool_result' && res.content[0].tool_use_id === 'tu1' && !res.content[0].is_error && /"took_the_place_of_a_placeholder":true/.test(res.content[0].content),
+      'the assistant turn is echoed back unchanged, thinking signature and all, and the tool result follows in one user message');
+    ok(bodies.every((b) => b.headers['x-api-key'] === KEY && !b.raw.includes(KEY)) && urls.every((u) => u === 'https://api.anthropic.com/v1/messages') && urls.length === 2, 'the key travels in the x-api-key header and nowhere else, and nothing but the Game Master is ever asked for anything');
+    ok(r.costs.length === 1 && r.costs[0].task === 'opening' && r.costs[0].calls === 2 && r.costs[0].model === 'claude-opus-5-5' && Math.abs(r.costs[0].usd - 2 * PER([4, 20, .2])) < 1e-12 && r.costs[0].tok.in === 20 && r.costs[0].tok.read === 10 && r.costs[0].tok.out === 40 && r.tag === '$0.0009 · Opus 5.5 · 2 calls',
+      'the telling is billed from the usage each reply reported, at Opus 5.5\'s prices, and the page says so under it: ' + r.tag);
+
+    /* a player's line */
+    tool = { name: 'roll_check', input: { character_id: 'P1', check: 'arcana', dc: 10, reason: '<b>runes</b>' } }; text = 'The runes mean nothing good.';
+    bodies.length = 0; await say('What do the runes on the bedpost say?');
+    r = await page.evaluate(() => ({ story: G.st.story.slice(2).map((e) => e.t + ':' + (e.who || '')).join(), ctx: '', chip: [...document.querySelectorAll('#story-log .st-chip.check')].map((x) => x.textContent).join(), b: document.querySelectorAll('#story-log b').length, pl: document.querySelector('#story-log .st-pl').textContent, turn: G.st.turn, min: G.st.time.minute, cost: G.st.costs[1], val: document.getElementById('say').value, who: document.getElementById('say-who').value }));
+    const ctx1 = bodies[0].body.messages[0].content[1].text;
+    ok(bodies.length === 2 && r.story === 'pl:Ada,chip:,gm:' && r.turn === 2 && r.val === '' && ctx1.trim().endsWith('PLAYER LINE - Ada (P1) says: What do the runes on the bedpost say?') && /RECENT EXCHANGES:\s+GM: Ada the wizard wakes/.test(ctx1), 'a typed line goes out as the speaker\'s, after what was said before; the reply is kept after it');
+    ok(/Ada: Arcana \d+ against DC 10/.test(r.chip) && /<b>runes<\/b>/.test(r.chip) && r.b === 1 && /^AdaWhat do the runes/.test(r.pl), 'a roll the Game Master asked for is shown as it happened, its reason as text');
+    ok(r.cost.task === 'turn' && r.cost.turn === 1 && /Ada: “What do the runes/.test(r.cost.desc) && r.min > 480 && r.min <= 485, 'a line and its answer take a couple of minutes of the tale\'s clock, and are billed as a player turn');
+    /* a model pinned for a task: its own request shape, its own prices */
+    await page.evaluate(() => { Settings.data.taskModels.turn = 'claude-haiku-5-5'; });
+    tool = null; bodies.length = 0; await say('I get up.');
+    r = await page.evaluate(() => G.st.costs[G.st.costs.length - 1]);
+    ok(bodies.length === 1 && bodies[0].body.model === 'claude-haiku-5-5' && bodies[0].body.thinking.type === 'adaptive' && !bodies[0].body.fallbacks && !('anthropic-beta' in bodies[0].headers) && r.model === 'claude-haiku-5-5' && Math.abs(r.usd - PER([.1, .5, .01])) < 1e-12, 'with a model pinned for the players\' lines, they go to it in its own shape and are priced at its rates (Haiku 5.5)');
+    await page.evaluate(() => { Settings.data.taskModels.turn = ''; });
+    /* a request field the model will not take: learned from its own 400, once */
+    mode = 'fb'; bodies.length = 0; await say('hello');
+    ok(bodies.length === 2 && bodies[0].body.fallbacks && !bodies[1].body.fallbacks && !('anthropic-beta' in bodies[1].headers) && (await page.evaluate(() => G.st.turn)) === 4, 'a 400 that names fallbacks is retried once without them, and the turn goes through');
+    mode = 'effort'; bodies.length = 0; await say('hello again');
+    ok(bodies.length === 2 && bodies[0].body.output_config && !bodies[1].body.output_config && !bodies[1].body.fallbacks && bodies[1].body.thinking && (await page.evaluate(() => G.st.turn)) === 5, 'and one that names effort likewise, keeping what was learned before');
+    mode = 'served'; bodies.length = 0; await say('and again');
+    r = await page.evaluate(() => G.st.costs[G.st.costs.length - 1]);
+    ok(bodies.length === 1 && !bodies[0].body.output_config && r.model === 'claude-opus-5' && Math.abs(r.usd - PER([5, 25, .5])) < 1e-12, 'a reply served by another model is priced as the model that answered');
+
+    /* failures: the tale is put back exactly, and what was paid for is still billed */
+    mode = 'auth'; bodies.length = 0;
+    const before = await snapOf(page); await say('Is anyone there?');
+    r = await page.evaluate(() => ({ sys: [...document.querySelectorAll('#story-log .st-sys')].map((x) => x.textContent).join('|'), btn: !!document.querySelector('#story-log .st-sys button'), val: document.getElementById('say').value, pl: document.querySelectorAll('#story-log .st-pl').length, plSt: G.st.story.filter((e) => e.t === 'pl').length, busy: G.busy, stop: document.getElementById('say-stop').hidden, send: !document.getElementById('say-send').hidden }));
+    ok(bodies.length === 1 && (await snapOf(page)) === before && /the key was refused/.test(r.sys) && r.btn && r.val === 'Is anyone there?' && r.pl === r.plSt && !r.busy && r.stop && r.send, 'a refused key: the tale is byte for byte what it was, the story says why with a way to Settings, and the line is back in the box');
+    await page.evaluate(() => { document.getElementById('say').value = ''; });
+    mode = 'midfail'; tool = { name: 'inventory', input: { op: 'gold', amount: 5 } }; bodies.length = 0;
+    const b4 = await snapOf(page, true), n0 = await page.evaluate(() => G.st.costs.length);
+    await say('I count my coins.');
+    r = await page.evaluate(() => ({ gold: G.st.gold, cost: G.st.costs[G.st.costs.length - 1], n: G.st.costs.length, chips: document.querySelectorAll('#story-log .st-chip').length, chipSt: G.st.story.filter((e) => e.t === 'chip').length, gm: [...document.querySelectorAll('#story-log .st-gm')].map((x) => x.textContent).join('|'), sys: [...document.querySelectorAll('#story-log .st-sys')].map((x) => x.textContent).join('|'), tags: [...document.querySelectorAll('#story-log .cost-tag')].map((x) => x.textContent), map: View.map === G.st.maps[G.st.here] }));
+    ok(bodies.length === 2 && (await snapOf(page, true)) === b4 && r.gold === 10 && r.chips === r.chipSt && !/The purse is/.test(r.gm) && /overwhelmed/.test(r.sys) && r.map, 'a telling that dies half way, after the engine had already paid out gold: the tale is put back exactly as it was, and the page shows the board that is true');
+    ok(r.n === n0 + 1 && r.cost.failed === 'busy' && r.cost.calls === 2 && Math.abs(r.cost.usd - (PER([4, 20, .2]) + (10 * 4 + 1 * 20 + 5 * .2) / 1e6)) < 1e-12 && r.tags.some((t) => /2 calls/.test(t)), 'but both replies were paid for, the half one included, and the ledger says so');
+    await page.evaluate(() => { document.getElementById('say').value = ''; });
+
+    /* while the Game Master speaks the table only shows; STOP gives the turn back */
+    mode = 'slow'; tool = null; bodies.length = 0;
+    const b5 = await snapOf(page);
+    await page.evaluate(() => { document.getElementById('say').value = 'Wait for it.'; document.getElementById('say-send').click(); });
+    await page.waitForFunction(() => G.busy, null, { timeout: 4000 });
+    await page.waitForFunction(() => document.querySelector('#story-log .st-wait'), null, { timeout: 4000 });
+    const lock = await page.evaluate(async () => {
+      const st = G.st, m = View.map, a = actor(), E = eyes(); let tgt = null;
+      for (let i = 0; i < m.w * m.h && !tgt; i++) { const x = i % m.w, y = (i - x) / m.w; if (E.vis[i] && tileFree(m, x, y) && !taken(st, m, x, y, '') && m._.dec[i] < 0 && m._.occ[i] < 0 && (x !== a.o.x || y !== a.o.y) && route(st, a, [[x, y]], true).ok) tgt = [x, y]; }
+      UI.card(null); const s = w2s(tgt[0] + .5, tgt[1] + .5), at0 = [a.o.x, a.o.y];
+      tapAt(s[0], s[1]);
+      const walked = !!st.walk || View.walking, toast = document.getElementById('toast').textContent;
+      document.getElementById('btn-init').click(); const round = !!st.round;
+      document.getElementById('party-add').click(); const party = st.party.length;
+      const toastEl = document.getElementById('toast'), tried = (fn) => { toastEl.textContent = ''; fn(); return toastEl.textContent; }, mark = () => JSON.stringify([st.party, st.time, st.round, st.n]), m0 = mark();
+      const shut = [tried(() => UI.attack('K1')), tried(() => UI.ability('P1', 'Magic Missile', 'K1')), tried(() => UI.act1({ t: 'rest', kind: 'short' })), tried(() => UI.endTurn()), tried(() => UI.exportFile())];
+      document.getElementById('say').value = 'A second line.'; const again = tried(() => UI.send()), kept = document.getElementById('say').value; document.getElementById('say').value = '';
+      const second = await Promise.race([Session.turn('player', { who: 'The table', id: '', text: 'A third line.', to: '' }), new Promise((res) => setTimeout(() => res('hung'), 400))]);
+      UI.saveNow(); await new Promise((res) => setTimeout(res, 300)); const rec = await Store.get('auto');
+      return { shut: shut.concat([again]).filter((t) => !/Game Master is speaking/.test(t)).length, kept, second, same: mark() === m0, walked, toast, round, party, at: a.o.x === at0[0] && a.o.y === at0[1], stop: !document.getElementById('say-stop').hidden, send: document.getElementById('say-send').hidden, savedPl: rec.data.story.filter((e) => e.t === 'pl' && e.text === 'Wait for it.').length };
+    });
+    ok(!lock.walked && lock.at && /Game Master is speaking/.test(lock.toast) && !lock.round && lock.party === 1 && lock.stop && lock.send, 'while the Game Master is speaking a tap walks nobody, the dice and the party wait, and the send button has become STOP');
+    ok(lock.savedPl === 0, 'and nothing is saved in the middle of a telling: the save on the device is the tale before it began');
+    ok(lock.shut === 0 && lock.same && lock.kept === 'A second line.', 'a blow, a trick, a rest, the end of a turn, a file to save and a second line are each turned away with the same words, and the second line stays in the box');
+    ok(lock.second === false && bodies.length === 1, 'and a second telling cannot begin under the first, whoever asks for it: the session itself says no, and nothing more is sent');
+    await page.evaluate(() => document.getElementById('say-stop').click());
+    await page.waitForFunction(() => !G.busy, null, { timeout: 4000 });
+    if (release) release();
+    r = await page.evaluate(() => ({ sys: [...document.querySelectorAll('#story-log .st-sys')].length, val: document.getElementById('say').value, wait: !!document.querySelector('#story-log .st-wait'), stop: document.getElementById('say-stop').hidden }));
+    ok((await snapOf(page)) === b5 && r.val === 'Wait for it.' && r.sys === 0 && !r.wait && r.stop, 'STOP: the telling is called off without a word of complaint, the tale is as it was, and the line is back in the box');
+    await page.evaluate(() => { document.getElementById('say').value = ''; });
+
+    /* a call the engine refuses goes back to the model as an error it can read */
+    mode = 'none'; tool = { name: 'move', input: { id: 'P1', toward: 'the moon' } }; text = 'There is no moon in here.'; bodies.length = 0;
+    await page.evaluate(() => { Settings.data.rating = 'family'; }); await say('I walk to the moon.');
+    const refused = bodies.length === 2 ? bodies[1].body.messages[2].content[0] : {};
+    ok(refused.type === 'tool_result' && refused.is_error === true && /"error":"Nothing on this board is called/.test(refused.content) && /content rating family/.test(bodies[0].body.messages[0].content[1].text), 'a refused tool call goes back flagged as an error, with the engine\'s reason in it; and the table\'s content rating travels in the turn context');
+    await page.evaluate(() => { Settings.data.rating = 'teen'; });
+    /* overloaded before a word has arrived: tried again */
+    mode = 'busyOnce'; once = false; tool = null; text = 'The floor holds.'; bodies.length = 0; const turnA = await page.evaluate(() => G.st.turn);
+    await say('I test the floor.');
+    r = await page.evaluate(() => ({ turn: G.st.turn, cost: G.st.costs[G.st.costs.length - 1], sys: document.querySelectorAll('#story-log .st-sys').length, gm: G.st.story[G.st.story.length - 1].text }));
+    ok(bodies.length === 2 && r.turn === turnA + 1 && r.cost.calls === 1 && !r.cost.failed && r.sys === 0 && r.gm === 'The floor holds.', 'an overloaded reply before a word has arrived is tried again after a moment: the turn goes through, and only the reply that came is paid for');
+    /* a model that goes on refusing a field it has already been spared is not asked for ever */
+    mode = 'fbAlways'; bodies.length = 0; const b6 = await snapOf(page); await say('I wait.');
+    r = await page.evaluate(() => ({ sys: [...document.querySelectorAll('#story-log .st-sys')].map((x) => x.textContent).join('|'), val: document.getElementById('say').value }));
+    ok(bodies.length === 1 && (await snapOf(page)) === b6 && /Something went wrong in the telling: fallbacks/.test(r.sys) && r.val === 'I wait.', 'a 400 that names a field already dropped is not healed twice: the turn fails in words, the tale and the ledger untouched');
+    await page.evaluate(() => { document.getElementById('say').value = ''; });
+    /* a reply the model declines */
+    mode = 'refusal'; bodies.length = 0; const b7 = await snapOf(page, true), n7 = await page.evaluate(() => G.st.costs.length); await say('Tell me what you will not.');
+    r = await page.evaluate(() => ({ sys: [...document.querySelectorAll('#story-log .st-sys')].map((x) => x.textContent).join('|'), gm: [...document.querySelectorAll('#story-log .st-gm')].map((x) => x.textContent).join('|'), cost: G.st.costs[G.st.costs.length - 1], n: G.st.costs.length }));
+    ok(bodies.length === 1 && (await snapOf(page, true)) === b7 && /will not tell that part/.test(r.sys) && !/I will not\./.test(r.gm) && r.n === n7 + 1 && r.cost.failed === 'refusal', 'a reply the model declines is not kept as the telling: the tale is put back, the story says so, and the reply is still paid for');
+    await page.evaluate(() => { document.getElementById('say').value = ''; });
+    /* tools, then silence: asked once for the telling, without an empty turn ever being sent back */
+    mode = 'silent'; bodies.length = 0; await say('I roll a die.');
+    r = await page.evaluate(() => ({ gm: G.st.story[G.st.story.length - 1], cost: G.st.costs[G.st.costs.length - 1] }));
+    const third = bodies.length === 3 ? bodies[2].body.messages : [[], [], { content: [] }];
+    ok(bodies.length === 3 && third.length === 3 && third.every((m) => Array.isArray(m.content) && m.content.length > 0) && third[2].content[0].type === 'tool_result' && third[2].content[third[2].content.length - 1].text === 'Now narrate the result to the table.' && r.gm.t === 'gm' && r.gm.text === 'The die comes up.' && r.cost.calls === 3,
+      'a model that calls its tools and then says nothing is asked once more for the telling, in the same user turn as the results: no empty message is ever sent');
+    /* a tool call whose input arrives broken is not run on a guess */
+    mode = 'badjson'; text = 'Nothing happens.'; bodies.length = 0; await say('I mumble.');
+    const bj = bodies.length === 2 ? bodies[1].body.messages : [{}, { content: [{}] }, { content: [{}] }];
+    ok(bodies.length === 2 && bj[1].content[0].type === 'tool_use' && JSON.stringify(bj[1].content[0].input) === '{}' && bj[2].content[0].is_error === true && /INVALID_JSON/.test(bj[2].content[0].content) && (await page.evaluate(() => !G.st.round && G.st.story[G.st.story.length - 1].text === 'Nothing happens.')), 'a tool call whose input arrives broken is not run on a guess: the model is told to call it again, and no fight began');
+    /* markup that arrives whole in one piece of the stream is still only text */
+    mode = 'none'; whole = true; tool = null; text = 'Look: <img src=x onerror="window.__pwned=2"> there.'; bodies.length = 0; await say('I look.'); await page.waitForTimeout(250);
+    r = await page.evaluate(() => ({ pwned: window.__pwned || 0, img: document.querySelectorAll('#story-log img').length, gm: G.st.story[G.st.story.length - 1].text, shown: [...document.querySelectorAll('#story-log .st-gm')].pop().textContent }));
+    ok(r.pwned === 0 && r.img === 0 && r.gm === text && r.shown === text, 'a whole tag arriving in one piece of the stream is never an element, not even for the moment it is streaming');
+    whole = false;
+
+    /* the key */
+    mode = 'none';
+    r = await page.evaluate((KEY) => { const all = (s) => Object.keys(s).map((k) => k + '=' + s.getItem(k)).join('\n'); UI.settings();
+      return { save: JSON.stringify(packState(G.st)).includes(KEY), ls: all(localStorage).includes(KEY), ss: sessionStorage.getItem('cyoa2.key') === KEY, blob: (localStorage.getItem('cyoa2.settings.v1') || '').includes(KEY), type: document.getElementById('set-key').type, shown: document.getElementById('set-key').value === KEY, note: document.getElementById('key-note').textContent }; }, KEY);
+    const saved = await page.evaluate(async (KEY) => { await UI.saveNow(); const rec = await Store.get('auto'); return JSON.stringify(rec).includes(KEY); }, KEY);
+    ok(!r.save && !saved && !r.ls && !r.blob && r.ss && r.type === 'password' && r.shown, 'the key is never in a save, never in the settings, and with "remember" off it is in this tab\'s session only');
+    await page.evaluate((KEY) => { document.getElementById('set-remember').checked = true; document.getElementById('set-remember').dispatchEvent(new Event('change')); }, KEY);
+    r = await page.evaluate((KEY) => ({ ls: localStorage.getItem('cyoa2.key') === KEY, ss: sessionStorage.getItem('cyoa2.key'), blob: (localStorage.getItem('cyoa2.settings.v1') || '').includes(KEY) }), KEY);
+    ok(r.ls && r.ss === null && !r.blob, 'with "remember" on it is kept on the device, under its own name and still not in the settings');
+    await page.evaluate(() => document.getElementById('set-test').click());
+    await page.waitForFunction(() => /works|refused|did not/.test(document.getElementById('key-note').textContent), null, { timeout: 6000 });
+    r = await page.evaluate(() => ({ note: document.getElementById('key-note').textContent, cost: G.st.costs[G.st.costs.length - 1], n: G.st.costs.length }));
+    ok(tests.length === 1 && tests[0].max_tokens === 256 && tests[0].stream === false && !('system' in tests[0]) && !('tools' in tests[0]) && tests[0].messages.length === 1 && /The key works: Opus 5\.5 answered \(\$0\.0001\)/.test(r.note) && r.cost.kind === 'test' && r.cost.task === 'test' && Math.abs(r.cost.usd - (12 * 4 + 3 * 20) / 1e6) < 1e-12,
+      'TEST KEY asks one small question with no tools and no instructions, says which model answered, and writes what it cost in the ledger: ' + r.note);
+    mode = 'auth'; const nT = r.n; await page.evaluate(() => { document.getElementById('key-note').textContent = ''; document.getElementById('set-test').click(); });
+    await page.waitForFunction(() => /works|refused|did not/.test(document.getElementById('key-note').textContent), null, { timeout: 6000 });
+    r = await page.evaluate(() => ({ note: document.getElementById('key-note').textContent, n: G.st.costs.length }));
+    ok(r.note === 'The key was refused.' && r.n === nT, 'and a key that is refused is said to be, at no cost');
+    mode = 'none';
+
+    /* the ledger */
+    await page.evaluate(() => { UI.costs(); UI.openPanel('pan-costs'); }); await page.waitForTimeout(150);
+    r = await page.evaluate(() => { const list = G.st.costs, rows = [...document.querySelectorAll('#costs-body .cost-row')]; return { n: list.length, rows: rows.length, big: document.querySelector('#costs-body .cost-sum b.big').textContent, total: Costs.fmt(Costs.total(list)), failed: rows.filter((x) => /failed: busy/.test(x.textContent) && x.querySelector('.usd.failed')).length, text: document.getElementById('costs-body').textContent, csv: Costs.csv(list).trim().split('\n'), w: rows.every((x) => x.getBoundingClientRect().right <= innerWidth + 1) }; });
+    ok(r.rows === r.n && r.n === 14 && r.big === r.total && r.failed === 1 && /failed: refusal/.test(r.text) && /Key test/.test(r.text) && /Opening/.test(r.text) && /Player turns/.test(r.text) && /Opus 5\.5/.test(r.text) && /Haiku 5\.5/.test(r.text) && /Opus 5 /.test(r.text) && /2026-10-10/.test(r.text) && r.w, 'the Costs panel lists every paid telling, newest first, the failed one marked, with totals by task and by model: ' + r.big);
+    ok(r.csv.length === r.n + 1 && /^"time","turn","kind","task"/.test(r.csv[0]) && r.csv.filter((l) => /"busy"$/.test(l)).length === 1 && r.csv[1].endsWith(',"0.000882",""'), 'and exports as a CSV, one line a telling, the dollars to six places: ' + r.csv[1].split(',').slice(-2).join(','));
+    await page.evaluate(() => UI.closePanels());
+
+    /* a tale told is still told after a reload: no second opening, nothing asked for again */
+    await page.evaluate(() => UI.saveNow()); await page.waitForTimeout(400);
+    const keep = await page.evaluate(() => JSON.stringify({ story: G.st.story, costs: G.st.costs, told: G.st.told, turn: G.st.turn, party: G.st.party }));
+    bodies.length = 0; tool = null; text = 'Should not be asked.';
+    const hadKeys = await page.evaluate(() => Object.keys(localStorage).sort().join());
+    await page.reload(); await page.waitForFunction(() => typeof UI === 'object');
+    const gotKeys = await page.evaluate(() => Object.keys(localStorage).sort().join());
+    await page.waitForFunction(() => !document.getElementById('btn-continue').hidden, null, { timeout: 8000 });
+    await page.evaluate(() => document.getElementById('btn-continue').click());
+    await page.waitForFunction(() => G.st && document.body.classList.contains('in-play'), null, { timeout: 8000 }); await page.waitForTimeout(900); await calm(page);
+    r = await page.evaluate(() => ({ s: JSON.stringify({ story: G.st.story, costs: G.st.costs, told: G.st.told, turn: G.st.turn, party: G.st.party }), gm: document.querySelectorAll('#story-log .st-gm').length, gmSt: G.st.story.filter((e) => e.t === 'gm').length, tags: document.querySelectorAll('#story-log .cost-tag').length, on: Session.on(), where: (localStorage.getItem('cyoa2.key') ? 'device' : sessionStorage.getItem('cyoa2.key') ? 'tab' : 'nowhere') + '/' + localStorage.length + ' keys', first: document.querySelectorAll('#story-log .st-gm.first').length, img: document.querySelectorAll('#story-log img').length }));
+    ok(r.s === keep && r.gm === r.gmSt && r.gm >= 5 && r.tags >= 5 && r.first === 1 && r.img === 0 && r.on && bodies.length === 0, 'Continue brings back the story, the sheets and the ledger exactly, and the Game Master is not asked to open the tale again' + (r.s === keep ? '' : ' (the tale differs: ' + r.s.length + ' against ' + keep.length + ' characters)') + ' [' + [r.gm, r.gmSt, r.tags, r.first, r.img, r.on, r.where, bodies.length].join(' ') + '] storage before the reload: ' + hadKeys + '; after: ' + gotKeys);
+    await T1.ctx.close();
+
+    /* a key saved for CYOA on this device is offered, never taken */
+    const T0 = await open({ width: 390, height: 844 }, null, { storyOpen: true }), p0 = T0.page; const asked = [];
+    await p0.route('https://api.anthropic.com/**', async (route) => { asked.push(route.request().url()); return route.abort(); });
+    await p0.evaluate(() => localStorage.setItem('cyoa.key', 'sk-ant-cyoa-ONE'));
+    /* begun by hand rather than with begin(): if the key were taken unasked there would be no opening dialog to wait for, and this must fail by name, not by a timeout */
+    await p0.evaluate(() => document.getElementById('btn-new').click());
+    await p0.waitForFunction(() => document.getElementById('dialog').classList.contains('open') || (G.st && G.busy), null, { timeout: 8000 }).catch(() => {});
+    await p0.waitForTimeout(300);
+    const quiet0 = await p0.evaluate(() => { const dlg = document.getElementById('dialog').classList.contains('open'), out = { dlg, on: Session.on(), busy: !!G.busy }; if (dlg) document.querySelector('#dlg-btns button').click(); return out; });
+    await p0.waitForTimeout(500);
+    await p0.evaluate(() => { document.getElementById('say').value = 'Hello?'; document.getElementById('say-send').click(); });
+    await p0.waitForTimeout(300);
+    let c = await p0.evaluate(() => { const dlg = document.getElementById('dialog').classList.contains('open'); UI.closeDialog(); UI.settings(); return { on: Session.on(), dlg, offer: !document.getElementById('set-cyoa-key').hidden, note: document.getElementById('key-note').textContent, own: localStorage.getItem('cyoa2.key') }; });
+    ok(quiet0.dlg && !quiet0.on && !quiet0.busy && !c.on && c.dlg && c.offer && /saved on this device for CYOA/.test(c.note) && c.own === null && asked.length === 0, 'a key saved for CYOA on the same device is never used unasked: the tale begins with no Game Master and nothing is sent, and Settings offers it');
+    await p0.evaluate(() => document.getElementById('set-cyoa-key').click());
+    c = await p0.evaluate(() => ({ on: Session.on(), own: localStorage.getItem('cyoa2.key'), offer: !document.getElementById('set-cyoa-key').hidden, other: localStorage.getItem('cyoa.key') }));
+    ok(c.on && c.own === 'sk-ant-cyoa-ONE' && !c.offer && c.other === 'sk-ant-cyoa-ONE', 'and takes it when the button is pressed');
+    await T0.ctx.close();
+
+    /* ---- the table's side of it, with a stand-in for the model itself ---- */
+    const T2 = await open({ width: 390, height: 844 }, null, { storyOpen: true }), pg = T2.page;
+    await T2.ctx.addInitScript(() => {
+      window.__calls = [];
+      window.__CYOA2_MOCK__ = async (api) => {
+        const c = api.req.context, kind = /STAGE DIRECTION - the tale begins/.test(c) ? 'opening' : /STAGE DIRECTION - the party has just walked into (S\d+)/.test(c) ? 'enter:' + RegExp.$1 : /STAGE DIRECTION - a fight has just begun/.test(c) ? 'fight' : /STAGE DIRECTION - the fight has just ended/.test(c) ? 'fightend' : /STAGE DIRECTION - it is the monsters/.test(c) ? 'monsters' : 'line';
+        window.__calls.push({ kind, model: api.req.settings.model, ctx: c, bible: api.req.bible });
+        api.usage({ input_tokens: 100, output_tokens: 50 });
+        if (window.__gm) { const r = await window.__gm(api, kind); if (r !== 'default') return; }
+        await api.text('Told: ' + kind + '.');
+      };
+    });
+    await pg.reload(); await pg.waitForFunction(() => typeof newGame === 'function' && typeof View === 'object');
+    const kinds = () => pg.evaluate(() => window.__calls.map((c) => c.kind).join());
+    await pg.evaluate(() => document.getElementById('btn-new').click());
+    await pg.waitForFunction(() => G.st && G.st.turn >= 1 && !G.busy, null, { timeout: 12000 }); await calm(pg);
+    ok((await kinds()) === 'opening' && (await pg.evaluate(() => !document.getElementById('dialog').classList.contains('open') && G.st.story.length === 1 && G.st.story[0].text === 'Told: opening.')), 'a new tale: the table asks for the opening, once');
+    /* beats: the first sight of a place, once; a place already told is not told again */
+    const go = async (site) => { await pg.evaluate((site) => UI.follow(intent(G.st, { t: 'jump', site })), site); await pg.waitForFunction((site) => G.st.here === site && View.map && View.map.id === site && !document.getElementById('veil').classList.contains('on'), site, { timeout: 8000 }); await pg.waitForTimeout(500); await calm(pg); };
+    await go('S0'); await go('S1'); await go('S0');
+    ok((await kinds()) === 'opening,enter:S0', 'walking out into the town for the first time is a beat; coming back to the inn the tale opened in, and out again, is not: ' + (await kinds()));
+    await pg.evaluate(() => { Settings.data.narrate = 'asked'; }); await go('S3');
+    const quietRun = await kinds();
+    await pg.evaluate(() => { Settings.data.narrate = 'beats'; }); await go('S0'); await go('S3');
+    ok(quietRun === 'opening,enter:S0' && (await kinds()) === 'opening,enter:S0,enter:S3', 'set to speak only when spoken to, the Game Master is not asked for beats; set back, a place not yet told is told when the party next walks in');
+    ok(await pg.evaluate(() => { const c = window.__calls; return c.every((x) => x.bible === c[0].bible) && /^WORLD BIBLE/.test(c[0].bible) && c.every((x) => /^TURN CONTEXT/.test(x.ctx)) && /BOARD IN PLAY: S3/.test(c[2].ctx); }), 'every telling carries the same world bible, byte for byte, and the board the party is standing on');
+
+    /* the Game Master moves pieces by naming them; the board follows, and the page with it */
+    await go('S1');
+    await pg.evaluate(() => { window.__gm = async (api, kind) => { if (kind !== 'line') return 'default'; window.__res = [api.tool('create_character', { name: 'Maud <i>A</i>', class: 'Ranger' }), api.tool('create_character', { name: 'Bram', class: 'Cleric' }), api.tool('move', { id: 'P1', toward: 'N0' }), api.tool('move', { id: 'P1', toward: 'the moon' }), api.tool('create_npc', { role: 'pedlar', name: '<b>Tam</b>', near: 'P1' })]; await api.text('The innkeeper looks up.'); }; });
+    await pg.evaluate(() => { document.getElementById('say-who').value = ''; document.getElementById('say').value = 'We go and find the innkeeper.'; document.getElementById('say-send').click(); });
+    await pg.waitForFunction(() => G.busy, null, { timeout: 4000 }).catch(() => {}); await calm(pg);
+    let g = await pg.evaluate(() => { const st = G.st, m = st.maps.S1, k = m.tokens.find((t) => t.npc === 'N0'), L = leadOf(st), tam = m.tokens.find((t) => (st.npcs[t.npc] || {}).name === '<b>Tam</b>'); viewDraw();
+      return { res: window.__res.map((r) => r.ok).join(), err: window.__res[3].error, party: st.party.map((p) => p.name + ':' + p.cls).join(), beside: meleeClear(m, L.x, L.y, k.x, k.y), near: cheb(st.party[1], L) <= 3, chips: [...document.querySelectorAll('#chips .chip.pc')].map((x) => x.textContent.charAt(0)).join(''), tam: !!tam && tokenAt(m, tam.x, tam.y) === tam, els: document.querySelectorAll('#story-log i, #story-log b:not(.st-pl b)').length, plB: document.querySelectorAll('#story-log .st-pl b').length, said: st.story.filter((e) => e.t === 'chip').map((e) => e.text).join('|'), who: st.story.find((e) => e.t === 'pl').who, map: View.map === m, walk: !!st.walk, ctxWho: window.__calls[window.__calls.length - 1].ctx.trim().split('\n').pop() }; });
+    ok(g.res === 'true,true,true,false,true' && /Nothing on this board is called/.test(g.err) && g.party === 'Maud <i>A</i>:Ranger,Bram:Cleric' && g.chips === 'MB' && g.beside && g.near && g.tam && g.map && !g.walk, 'in one telling the Game Master names two characters, walks the party to the innkeeper and sets a pedlar down; a place that is not on the board is refused and nothing breaks');
+    ok(g.els === 0 && /Maud <i>A<\/i> the Ranger joins/.test(g.said) && /<b>Tam<\/b>, pedlar, appears/.test(g.said) && g.who === 'The table' && /^PLAYER LINE - The table says: We go and find/.test(g.ctxWho), 'names with markup in them are names; a line sent as All is the table\'s');
+    /* talking to someone: a tap on them offers it, and the line that follows is spoken to them */
+    await pg.evaluate(() => { window.__gm = null; });
+    const tk = await pg.evaluate(() => { const st = G.st, k = View.map.tokens.find((t) => t.npc === 'N0'); UI.card(null); View.cam.x = k.x + .5; View.cam.y = k.y + .5; camMoved(true); viewDraw(); const r = View.cv.getBoundingClientRect(), s = w2s(k.x + .5, k.y + .5); return { tap: [r.left + s[0], r.top + s[1]], name: st.npcs.N0.name }; });
+    await pg.waitForTimeout(80); await pg.touchscreen.tap(tk.tap[0], tk.tap[1]); await pg.waitForTimeout(160);
+    const card = await pg.evaluate(() => ({ name: document.getElementById('info-name').textContent, btns: [...document.querySelectorAll('#info-acts button')].map((b) => b.textContent), at: [G.st.party[0].x, G.st.party[0].y] }));
+    await pg.evaluate(() => [...document.querySelectorAll('#info-acts button')].find((b) => b.textContent === 'Talk').click()); await pg.waitForTimeout(100);
+    const ready = await pg.evaluate(() => ({ ph: document.getElementById('say').placeholder, focus: document.activeElement && document.activeElement.id, card: document.getElementById('info').hidden, open: document.getElementById('story').classList.contains('open'), who: (() => { const p = pcOf(G.st, document.getElementById('say-who').value); return p ? p.name + ' (' + p.id + ')' : 'The table'; })() }));
+    await pg.keyboard.type('What news of the north road?'); await pg.keyboard.press('Enter');
+    await pg.waitForFunction(() => G.busy, null, { timeout: 4000 }).catch(() => {}); await calm(pg);
+    const spoke = await pg.evaluate(() => ({ last: window.__calls[window.__calls.length - 1].ctx.trim().split('\n').pop(), ph: document.getElementById('say').placeholder, val: document.getElementById('say').value, pl: G.st.story.filter((e) => e.t === 'pl').pop().text }));
+    ok(card.name === tk.name && card.btns.join() === 'Talk' && ready.ph === 'Say to ' + tk.name.split(' ')[0] && ready.focus === 'say' && ready.card && ready.open, 'a tap on someone peaceful is their card with TALK on it, which puts the pen in the story with their name on it');
+    ok(spoke.last === 'PLAYER LINE - ' + ready.who + ', speaking to N0 ' + tk.name + ' says: What news of the north road?' && spoke.ph === 'Say or do something' && spoke.val === '' && spoke.pl === 'What news of the north road?', 'and the line that follows goes to the Game Master as spoken to them: "' + spoke.last + '"');
+    /* and takes the party somewhere else: the page changes board */
+    await pg.evaluate(() => { window.__gm = async (api, kind) => { if (kind !== 'line') return 'default'; window.__res = [api.tool('travel_party', { to: 'S0' })]; await api.text('Out into the square.'); }; });
+    const clock0 = await pg.evaluate(() => G.st.time.day * 1440 + G.st.time.minute);
+    await pg.evaluate(() => { document.getElementById('say-who').value = G.st.party[1].id; document.getElementById('say').value = 'Let us go outside.'; document.getElementById('say-send').click(); });
+    await pg.waitForFunction(() => G.busy, null, { timeout: 4000 }).catch(() => {}); await calm(pg);
+    g = await pg.evaluate(() => ({ clock: G.st.time.day * 1440 + G.st.time.minute, here: G.st.here, map: View.map.id, title: document.getElementById('place-name').textContent, town: G.st.bible.town, who: G.st.story.filter((e) => e.t === 'pl').pop().who, last: window.__calls[window.__calls.length - 1].ctx.trim().split('\n').pop(), kinds: window.__calls.map((c) => c.kind).join() }));
+    ok(g.here === 'S0' && g.map === 'S0' && g.title === g.town && g.who === 'Bram' && /^PLAYER LINE - Bram \(P2\) says: Let us go outside\./.test(g.last) && !/enter:S0.*enter:S0/.test(g.kinds), 'travel_party changes the board on the page too; the line was Bram\'s because Bram was chosen to speak');
+    ok(g.clock - clock0 === 5, 'and the walk out took its five minutes and no more: a telling in which the Game Master moved the clock does not add the talk\'s own minutes on top (' + (g.clock - clock0) + ')');
+    /* a line sent in the middle of a walk stops the walk where it is */
+    await pg.evaluate(() => { window.__gm = async (api, kind) => { if (kind !== 'line') return 'default'; const L = leadOf(G.st); window.__mid = { walk: !!G.st.walk, walking: !!View.walking, at: [L.x, L.y] }; await api.text('You stop to listen.'); }; });
+    const strode = await pg.evaluate(() => { const st = G.st, a = actor(), m = View.map, E = eyes(); let best = null;
+      for (let i = 0; i < m.w * m.h; i++) { const x = i % m.w, y = (i - x) / m.w; if (!E.vis[i] || !tileFree(m, x, y) || taken(st, m, x, y, '') || m._.occ[i] >= 0) continue; const r = route(st, a, [[x, y]], true); if (r.ok && r.path.length >= 6 && (!best || r.path.length > best.n)) best = { x, y, n: r.path.length }; }
+      const from = [a.o.x, a.o.y], ok = !!best && intent(st, { t: 'move', goals: [[best.x, best.y]], known: true }).ok; if (ok) View.walking = true;
+      const walking = !!st.walk; document.getElementById('say-who').value = ''; document.getElementById('say').value = 'What is that sound?'; document.getElementById('say-send').click(); return { ok, walking, best, from }; });
+    await pg.waitForFunction(() => G.busy, null, { timeout: 4000 }).catch(() => {}); await calm(pg);
+    g = await pg.evaluate(() => { const L = leadOf(G.st); return { mid: window.__mid, at: [L.x, L.y], walk: !!G.st.walk || !!View.walking, last: G.st.story[G.st.story.length - 1].text }; });
+    ok(strode.ok && strode.walking && g.mid && !g.mid.walk && !g.mid.walking && g.at[0] === g.mid.at[0] && g.at[1] === g.mid.at[1] && !g.walk && (g.at[0] !== strode.best.x || g.at[1] !== strode.best.y) && g.last === 'You stop to listen.',
+      'a line sent in the middle of a walk stops the walk where it is: the party stands still while the Game Master speaks, short of where it was going');
+
+    /* a fight: its beats, then the monsters played by the Game Master, on a model pinned for them */
+    await pg.evaluate(() => { window.__gm = null; });
+    await go('S2');
+    await pg.evaluate(() => { const st = G.st, m = st.maps.S2, P = st.party[0]; for (const p of st.party) { p.hpMax = 80; p.hp = 80; }
+      const foes = m.tokens.filter((t) => t.k === 'foe'), tok = foes[0], spot = STEPS.map((s) => [P.x + s[0], P.y + s[1]]).find((q) => tileFree(m, q[0], q[1]) && !taken(st, m, q[0], q[1], '') && meleeClear(m, q[0], q[1], P.x, P.y));
+      for (const t of foes.slice(1)) dropToken(st, m, t);
+      moveToken(m, tok, spot[0], spot[1]); const S = sheetOf(st, tok, true); S.hpMax = 300; S.hp = 300; look(st); window.__foe = tok.npc;
+      Settings.data.monsters = 'gm'; Settings.data.taskModels.monsters = 'claude-haiku-5-5';
+      window.__gm = async (api, kind) => { if (kind !== 'monsters') return 'default'; window.__mon = (window.__mon || 0) + 1; if (window.__monFail) api.fail('busy', 'no'); const a = api.tool('attack', { attacker_id: window.__foe, target_id: 'P1' }), b = api.tool('attack', { attacker_id: window.__foe, target_id: 'P1' }), e = api.tool('end_turn', {}); window.__monRes = [a.ok, b.ok, b.error, e.ok, e.ok && e.result.turn.is_player_character]; await api.text('The bandit swings.'); };
+      UI.rounds(true); });
+    /* whoever won the initiative, pass the travellers' turns until the monster's comes up and has been played */
+    const untilMon = async (n) => { for (let k = 0; k < 60 && (await pg.evaluate(() => window.__mon || 0)) < n; k++) { await pg.evaluate(() => { if (!G.busy && !Session.beats.length && G.st.round && turnOf(G.st).pc && !G.st.walk && !View.walking) UI.endTurn(); }); await pg.waitForTimeout(250); } };
+    await untilMon(1);
+    await pg.waitForFunction(() => window.__mon >= 1 && !G.busy && G.st.round && turnOf(G.st).pc, null, { timeout: 20000 }); await calm(pg);
+    g = await pg.evaluate(() => ({ kinds: window.__calls.map((c) => c.kind), model: window.__calls.filter((c) => c.kind === 'monsters').map((c) => c.model).join(), other: window.__calls.filter((c) => c.kind !== 'monsters').every((c) => c.model === 'claude-opus-5-5'), res: window.__monRes, cost: G.st.costs.filter((e) => e.task === 'monsters')[0], said: G.st.story.filter((e) => e.t === 'chip').map((e) => e.text), mon: window.__mon, pc: turnOf(G.st).pc, ctx: window.__calls.find((c) => c.kind === 'monsters').ctx }));
+    ok(g.kinds.includes('fight') && g.kinds.indexOf('fight') < g.kinds.indexOf('monsters'), 'rolling initiative is a beat, told before anyone acts');
+    ok(g.model === 'claude-haiku-5-5' && g.other && g.mon === 1 && g.res[0] === true && g.res[1] === false && /No action is left/.test(g.res[2]) && g.res[3] === true && g.res[4] === true && g.pc && g.cost && g.cost.model === 'claude-haiku-5-5' && /played by: YOU/.test(g.ctx) && /Acting now: /.test(g.ctx),
+      'set to play the monsters, the Game Master is handed their turn on the model pinned for it: one blow lands by the rules, a second in the same turn is refused, end_turn passes to a traveller');
+    /* when the Game Master cannot be reached on a monster's turn, the engine's script takes it, and the fight goes on */
+    await pg.evaluate(() => { window.__monFail = true; });
+    await untilMon(2);
+    await pg.waitForFunction(() => window.__mon >= 2, null, { timeout: 15000 });
+    await pg.waitForFunction(() => !G.busy && G.st.round && turnOf(G.st).pc && !G.st.walk && !View.walking, null, { timeout: 20000 }); await calm(pg);
+    g = await pg.evaluate(() => ({ mon: window.__mon, sys: [...document.querySelectorAll('#story-log .st-sys')].map((x) => x.textContent).join('|'), last: G.st.story.filter((e) => e.t === 'chip').slice(-1)[0].text, foe: (G.st.npcs[window.__foe] || {}).name, failed: G.st.costs.filter((e) => e.task === 'monsters' && e.failed).length, round: G.st.round.n }));
+    ok(g.mon === 2 && /overwhelmed/.test(g.sys) && g.last.startsWith(g.foe + ':') && g.failed === 1 && g.round >= 2, 'when the Game Master fails on a monster\'s turn the script plays it instead, so the turn still comes back to the travellers: "' + clipTo(g.last, 70) + '"');
+    /* the end of the fight is a beat, and it is told what happened */
+    await pg.evaluate(() => { window.__monFail = false; window.__gm = null; Settings.data.monsters = 'script'; const st = G.st, m = st.maps.S2, t = m.tokens.find((q) => q.npc === window.__foe); sheetOf(st, t, true).hp = 1; });
+    for (let k = 0; k < 40 && (await pg.evaluate(() => !!G.st.round)); k++) { await pg.evaluate(() => { const a = turnOf(G.st); if (a && a.pc && !G.busy && !G.st.walk && !View.walking) { const ids = [...aims()]; if (ids.length && G.st.round.act > 0) UI.attack(ids[0]); else UI.endTurn(); } }); await pg.waitForTimeout(250); }
+    await pg.waitForTimeout(600); await calm(pg);
+    g = await pg.evaluate(() => { const c = window.__calls.filter((x) => x.kind === 'fightend'); return { n: c.length, ctx: c.length ? c[0].ctx.trim().split('\n').pop() : '', round: !!G.st.round, last: G.st.story[G.st.story.length - 1].text, since: c.length ? /SINCE YOU LAST SPOKE[\s\S]* falls\./.test(c[0].ctx) : false }; });
+    ok(!g.round && g.n === 1 && /the fight has just ended: The fight is won\. \d+ experience/.test(g.ctx) && g.last === 'Told: fightend.' && g.since, 'the end of the fight is a beat: the Game Master is told how it ended and what the board did since it last spoke');
+
+    /* beats wait their turn: asked for once however often they are queued, never over an open panel, and not for a fight already over */
+    const nCalls = () => pg.evaluate(() => window.__calls.length), c0 = await nCalls();
+    const held = await pg.evaluate(async () => { UI.party(); UI.openPanel('pan-party'); for (let k = 0; k < 3; k++) Session.queue('fightend', 'The fight is won.'); const n = Session.beats.length; await new Promise((res) => setTimeout(res, 700)); return { n, still: Session.beats.length, busy: G.busy }; });
+    const c1 = await nCalls();
+    await pg.evaluate(() => UI.closePanels()); await pg.waitForFunction((c) => window.__calls.length > c, c1, { timeout: 6000 }).catch(() => {}); await calm(pg);
+    const c2 = await nCalls();
+    ok(held.n === 1 && held.still === 1 && !held.busy && c1 === c0 && c2 === c0 + 1 && (await kinds()).endsWith('fightend'), 'a beat is asked for once however often it is queued, waits while a panel is open, and is told when the table is clear');
+    await pg.evaluate(() => Session.queue('fight')); await pg.waitForTimeout(700); await calm(pg);
+    ok((await nCalls()) === c2 && (await pg.evaluate(() => Session.beats.length)) === 0, 'and a fight that was over before its beat could be told is not announced');
+
+    /* the table moves on to another tale while one is still being told: the old telling can touch nothing */
+    const other = await pg.evaluate(() => JSON.stringify(packState(newGame('another-tale'))));
+    await pg.evaluate(() => { window.__gm = async (api, kind) => { if (kind !== 'line') return 'default'; await new Promise((res) => { window.__go = res; }); window.__late = api.tool('inventory', { op: 'gold', amount: 50 }); await api.text('Too late for this table.'); api.fail('busy', 'late'); }; });
+    await pg.evaluate(() => { document.getElementById('say').value = 'Hold that thought.'; document.getElementById('say-send').click(); });
+    await pg.waitForFunction(() => G.busy && typeof window.__go === 'function', null, { timeout: 4000 });
+    await pg.evaluate((json) => UI.importFile(new File([json], 'other.json', { type: 'application/json' })), other);
+    await pg.waitForFunction(() => G.st && G.st.seed === 'another-tale' && G.st.turn >= 1 && !G.busy, null, { timeout: 12000 }); await calm(pg);
+    await pg.evaluate(() => window.__go()); await pg.waitForTimeout(500); await calm(pg);
+    g = await pg.evaluate(() => ({ seed: G.st.seed, gold: G.st.gold, story: G.st.story.map((e) => e.t + ':' + e.text).join('|'), late: window.__late, busy: G.busy, shown: document.getElementById('story-log').textContent, costs: G.st.costs.length, here: View.map && View.map.id, wait: !!document.querySelector('#story-log .st-wait') }));
+    ok(g.seed === 'another-tale' && g.gold === 15 && g.story === 'gm:Told: opening.' && g.late && g.late.ok === false && /another tale/.test(g.late.error) && !g.busy && !g.wait && !/Too late|Gold \+50/.test(g.shown) && g.costs === 1 && g.here === 'S1',
+      'a tale opened from a file while another was being told: the old telling\'s tools are refused, its words and its failure reach nothing, and the new tale is exactly as it was opened');
+    await T2.ctx.close();
+  }
+  }
+
   ok(errors.length === 0, 'no console error or uncaught exception anywhere' + (errors.length ? ': ' + errors.slice(0, 4).join(' | ') : ''));
 
   await browser.close();
   console.log(good + ' checks passed, ' + bad + ' failed');
-  console.log(bad ? 'CYOA2: RED' : ONLY ? 'CYOA2: PARTIAL sections=' + ONLY + ' (not a gate result)' : 'CYOA2: GREEN');
+  console.log(bad ? 'CYOA2: RED' : ONLY || COPY ? 'CYOA2: PARTIAL' + (ONLY ? ' sections=' + ONLY : '') + (COPY ? ' page=' + COPY : '') + ' (not a gate result)' : 'CYOA2: GREEN');
   process.exit(bad ? 1 : 0);
 })().catch((e) => { console.log('  FAIL crashed: ' + (e && e.stack || e)); console.log('CYOA2: RED'); process.exit(1); });

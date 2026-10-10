@@ -1,2 +1,4 @@
 mnt-c-dev
 
+# a suite frozen by .claude/scripts/negtest-copies.py --freeze; removed when the run ends, ignored in case it is cut short
+.claude/tests/.negcopies-*
