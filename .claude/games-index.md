@@ -161,11 +161,13 @@ local-2p.
   where a small thing sitting on a bigger one is its own object, and the first whose
   places are **charted lazily**: the bible exists up front, a board only when someone
   walks in, and from then on it lives in the save and is never regenerated. Step 1
-  of 5 is a sandbox with no Game Master, no combat and no fog. `neon-tactics` and
+  of 5 shipped as a sandbox with no Game Master, no combat and no fog (steps 2 and 3,
+  below, added all three). `neon-tactics` and
   `ember-depths` are the other grid games here, but both are fights on one authored
-  or one generated floor; this is a connected world of furnished rooms. Next on this
-  axis is the roadmap in `.claude/cyoa2.md`: grid rules (sight, fog, turns), then
-  CYOA's Game Master on top, then several devices sharing one host's board.
+  or one generated floor; this is a connected world of furnished rooms. Still ahead
+  on this axis, per the roadmap in `.claude/cyoa2.md`: the Game Master's voice, speech
+  input and notes (step 3, second push), several devices sharing one host's board
+  (step 4), and a physical table (step 5).
 - **`fog-of-war`** / **`initiative-order`** mechanics (cyoa2 step 2, 2026-10-10;
   `line-of-sight` and `local-coop` are reused). The first game here with a map that
   **inks itself in** as it is explored and fades where the party has been and gone, and

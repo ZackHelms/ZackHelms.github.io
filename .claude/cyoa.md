@@ -263,6 +263,29 @@ the open question. Also unverified on a real iPhone: that the "+ Note" button's
 `pointerdown` keeps the native selection alive next to iOS's own Copy callout
 (verified in headless Chromium only).
 
+## Known, not fixed
+
+- **A silent reply is echoed back as an empty assistant turn** (found 2026-10-10 while
+  testing CYOA2's copy of this client; not reproduced live, no key in the build
+  container). In `AnthropicGM.run`, when a reply has no tool call and no narration, the
+  loop pushes `{ role: 'assistant', content: this.echo(res.content) }` and then the
+  nudge. If that reply's content is empty, the next request carries an empty assistant
+  message. An empty reply with `end_turn` is documented as something that happens
+  "particularly after tool results" (source:
+  https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons, read
+  2026-10-10); that the API then answers 400 is from third-party reports of the error
+  text ("all messages must have non-empty content except for the optional final
+  assistant message"). Also `echo()` drops a text block only when it is `''`, not when
+  it is whitespace. Expected effect if it happens: the turn fails as a bad request (not
+  retried), rolls back, and the player's line is handed back, so nothing is corrupted
+  and the nudge that would have saved the turn never runs. **Fix, as shipped in CYOA2:**
+  do not push the silent reply; append the nudge text to the last user turn instead
+  (`messages[messages.length - 1].content.push({ type: 'text', text: 'Now narrate...' })`),
+  and filter text blocks on `!b.text.trim()`. `drive-cyoa.cjs` would need a stub mode
+  that answers a tool round with nothing (CYOA2's is `silent`) to hold it. Keep the
+  nudge once per turn: the same page warns that text after tool results on every round
+  teaches the model to stop and wait for it.
+
 ## Follow-ups (not built)
 
 An offline scripted GM for visitors without a key; an optional server proxy; more world

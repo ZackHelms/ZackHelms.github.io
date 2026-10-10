@@ -15,6 +15,23 @@ backlog entry here.
 
 ## Needs Zack
 
+- [repo] Delete the remote branch **`cyoa2-step3`** (GitHub > branches). It is
+  a safety copy pushed mid-session on 2026-10-10 (`8020174`, work in progress);
+  everything in it shipped in `3ea55c4` on `main`. A remote session cannot
+  delete it: the agent proxy refuses ref deletion and API writes
+  (`.claude/zmh/producer.md` § Environment).
+- [cyoa2] First play with a real key. Step 3's Game Master has only ever
+  answered a stand-in server: no request has been sent to the live API, and
+  nothing has been tried on a real iPhone. While there, read the "assumed, not
+  decided" tables in `.claude/cyoa2.md` (no reactions, half cover, the script
+  never strikes the fallen, a beaten party wakes at the inn) and overrule any
+  that are wrong.
+- [cyoa] Say yes or no to a two-line fix in CYOA's client: a reply with no
+  words after a tool round is echoed back as an empty turn, which is expected
+  to fail that turn (rolled back, nothing lost) where one nudge would have
+  saved it. CYOA2 already carries the fix. Not reproduced live.
+  `.claude/cyoa.md` § Known, not fixed.
+
 - [phasic·IP] USPTO clearance search for "PHASIC" before filing:
   https://www.uspto.gov/trademarks/search — check live + dead marks in
   Class 9 (downloadable game software) and Class 41 (online game
@@ -52,6 +69,25 @@ backlog entry here.
   already-private rn-ios-flightdeck repo. Revisit at submission time
   (going private then = its own plan: Pages restructure / built-output
   only).*
+
+### AGENT-OPP: break-writer (proposed 2026-10-10, not built)
+
+- **What:** an agent that reads a page (or a diff) and writes a negative-test
+  break list for it, one-line changes that each delete a rule the page is
+  supposed to keep, in `negtest-batch.py`'s JSON format, **without being shown
+  the suite**. Then `negtest-copies.py` runs the list and the session writes
+  rows for what came back MISSED.
+- **Why:** CYOA2 step 3's suite was written by the same hand as the code, in
+  the same hour, and was green at 390 checks while 129 of 335 first-pass breaks
+  passed it. The breaks were also written by that hand, which bounds what they
+  can find. A reader with no stake in the suite is the cheap independent check.
+- **Tools:** Read, Grep, Bash (to validate that each `old` anchor is found
+  exactly once). No write access to the page or the suite.
+- **Draws on:** `.claude/tests/README.md` § Rules a check has to clear,
+  `.claude/scripts/README.md` (negtest-batch, negtest-copies), the game's
+  context file.
+- **Decision for Zack:** worth a `.claude/agents/` home in this repo (it has
+  none today), or keep it as a prompt in the tests README?
 
 ## Next
 

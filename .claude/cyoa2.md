@@ -17,8 +17,8 @@ dying, rests and levels**, a **script that plays the monsters**, and a **cost le
 It is the second page in the repo that calls an API at runtime (CYOA is the first), and
 like CYOA it calls nothing but `api.anthropic.com`, and only with a key the player typed.
 
-The page is built from **parts** (see "Working source" at the end): the scratchpad that
-holds them is not in the repo, so the shipped file is the source of truth.
+The shipped file is the source of truth. It is 5,492 lines; to work on it as parts,
+split it with `.claude/scripts/page-parts.py` (see "Working source" at the end).
 
 ## CD decisions (2026-10-09, chat) - do not relitigate
 
@@ -431,9 +431,14 @@ Step 3:
   and after a save.
 - **Never send an empty message.** A reply with no text and no tool call cannot go back
   as an assistant turn; the one nudge ("Now narrate...") joins the last user turn.
-  `echo()` also drops text blocks that are empty or only space. (CYOA's client still
-  sends the empty turn in that case: inferred from the API's documented rule, not seen
-  live; worth the same two-line fix there.)
+  `echo()` also drops text blocks that are empty or only space. The nudge is the
+  documented last resort for an empty `end_turn` after tool results, and it must stay
+  **once per turn**: the same page warns that text added after tool results on every
+  round teaches the model to stop and wait for it (source:
+  https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons, read
+  2026-10-10). That an echoed empty turn is refused with a 400 is from third-party
+  reports of the error text, not seen live. CYOA's client still sends the empty turn
+  (`.claude/cyoa.md` § Known, not fixed).
 - **A tool validates completely, then mutates.** The suite calls every tool with one of
   each kind of bad input and compares the tale byte for byte. A new tool needs a row in
   `TOOLS`, a bad call in section S, and (if it changes the board) a `say` for its chip.
@@ -650,11 +655,25 @@ physical table (the engine's `d20` is the only place a roll is made).
 
 ## Working source
 
-The page is assembled from eleven **parts** by a `build.sh` that concatenates them and
-runs `check-inline-js.cjs`: `01-head.html` (CSS and markup), `02-core.js`, `03-map.js`,
-`04-gen.js`, `04b-rules.js`, `05-engine.js`, `05b-gm.js`, `06-art.js`, `07-view.js`,
-`08-ui.js`, `09-tail.html`. They live in the session scratchpad, which is not in the
-repo, so **the shipped `index.html` is the source of truth**: a later session edits it
-directly (`.claude/scripts/replace-fn.py` for a whole function), or splits it again at
-the banner comments (`/* ===== NAME ===== */`) if it wants parts back. The same goes
-for the break lists: their generators are scratch, the traces above are the record.
+**The shipped `index.html` is the source of truth.** It was written as parts in a session
+scratchpad (eleven files and a `build.sh`), and those are gone when the container is.
+To get parts back, split the page at its banner comments:
+
+```
+python3 .claude/scripts/page-parts.py split games/cyoa2/index.html <scratch dir>
+#   24 parts: 00-head.html (CSS and markup), 02-util.js ... 11-engine.js,
+#   12-game-master-tools.js, 13-game-master-context.js, 14-game-master-client.js,
+#   15-costs.js, 16-art.js, 17-view.js, 20-ui.js, 21-session.js, 22-boot.js, 23-tail.html
+python3 .claude/scripts/page-parts.py join  <scratch dir>     # byte for byte, then the parse check
+python3 .claude/scripts/page-parts.py check <scratch dir>     # was the page edited behind the parts?
+```
+
+`stamp-badge.sh` edits the shipped page, so after stamping the head part is stale: run
+`check`, and `split --force` again before the next edit (that drift happened once on
+2026-10-10 and was only caught because the parts were compared with the page by hand).
+For one function, `.claude/scripts/replace-fn.py` on the page itself is still quicker.
+A new section needs a banner (`/* ============================== NAME`, twenty `=` or
+more at the start of a line) or it will ride in its neighbour's part.
+
+The break lists are scratch too: their generators are gone, the traces above are the
+record. `negtest-copies.py` runs a list if one is written again.

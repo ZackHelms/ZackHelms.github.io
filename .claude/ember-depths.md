@@ -564,12 +564,21 @@ intro banner and descend fade.
   closed in one turn, which is 0 whenever the layout blocks it — flaky on a
   procedural floor. Counting SWINGS from an enemy already beside you is
   layout-independent and is what the rule actually says.
-- Drive: **`.claude/tests/drive-ember-depths.cjs` (115 checks)** — kept, and
+- Drive: **`.claude/tests/drive-ember-depths.cjs` (117 checks)** — kept, and
   picked up automatically by `gates.sh` for any change under
   `games/ember-depths/`. Covers the zoom range and clamps, zoom-1 layout
   identity, free look (tethered before a drag, never re-tethering after one,
   handed back by ⌖), a real CDP pinch that zooms without firing a tap or
-  scaling the page, the panel-is-not-a-turn contract with its positive control,
+  scaling the page (**"without firing a tap" was vacuous until 2026-10-10**: in
+  a CDP `touchEnd` the finger listed is the one that lifts, so the survivor was
+  the *other* finger, parked over rock where a tap does nothing; the row was
+  green with `gestured` reset in the two-to-one `touchend` branch. It now reads
+  the game's own `touchStart` for where the survivor is, slides a walkable tile
+  under it with `camX`/`camY` + `applyView()`, and afterwards requires a real
+  tap on that spot to walk; **not covered**: a ONE-finger drag past the slop and
+  then a lift is never driven through real touch, the camera rows call `panBy`
+  directly, so "a pan is not a tap" has no row), the panel-is-not-a-turn
+  contract with its positive control,
   and one check that drives **all six** stacking sites through the game's own
   `hurtPlayer` / `killEnemy` / `lightRadius`. That last point was learned the
   hard way: the first version re-derived `damage - relicCount('skin')` inside

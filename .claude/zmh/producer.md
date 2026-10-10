@@ -14,6 +14,22 @@
   container image (`/opt/node-tools/node_modules` or
   `/opt/node22/lib/node_modules/playwright/node_modules`; see
   `.claude/scripts/README.md` § smoke-mobile).
+- The working tree's path varies by harness (`/home/user/ZackHelms.github.io`,
+  or `/home/claude/zackhelms.github.io` on 2026-10-10): use
+  `git rev-parse --show-toplevel`, never a remembered path.
+- **A container can restart under a long job** (seen once, 2026-10-10: uptime
+  read 7 minutes in the middle of a long negative-test sweep). The disk
+  survived, repo and scratchpad both; every background job was gone. So a long
+  run must be resumable or leave nothing behind (`negtest-copies.py` works on
+  copies for exactly this reason), and after any surprise, check the shipping
+  files first: `bash .claude/scripts/negtest.sh scan <page>`.
+- **This session cannot delete anything on the remote.** `git push --delete`
+  is hung up on by the agent proxy and `gh api -X DELETE` answers 403 ("Write
+  access to this GitHub API path is not permitted through this proxy"). A
+  branch pushed as an off-box safety copy therefore stays until the CD deletes
+  it. Pushing one is still right when hours of uncommitted work are at stake;
+  name it so it is recognisable, say so in the report, and list it in
+  `TODO.md` § Needs Zack.
 
 ## Backlog (TODO.md)
 - Buckets, in file order: In progress · Now · Needs Zack · Next · Later ·
@@ -52,6 +68,16 @@
   hidden by the 2026-09-18, 2026-09-19 and 2026-09-20 ones. The six
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
+
+  **2026-10-10, CYOA2 pass** (pointer moved `8e62e0f` -> `3ea55c4`, range
+  `8e62e0f..3ea55c4`). Clean: `a677485`, `188890f` and `3ea55c4` (CYOA2 steps
+  1, 2 and 3) are this session's, and `ddd0c5a` is the animation-rigs
+  session's own refine commit, skippable. Nothing left behind. `99205d8` and
+  `c28a947` re-checked after `git fetch --deepen=400 origin main` (the clone
+  was 64 commits deep): both ancestors of `8e62e0f`, so both stay buried as
+  before. One thing outside the range was touched on purpose: Ember Depths'
+  suite, because a hole found in CYOA2's pinch row had been copied from it
+  (`.claude/tests/README.md`, the 2026-10-10 rules).
 
   **2026-10-05, third animation-rigs pass** (pointer moved `f30efc2` ->
   `8e62e0f`, range `f30efc2..8e62e0f`). Clean: `8e62e0f` (follow menu, A005
@@ -346,6 +372,16 @@
   build and deployment" workflow) with `perPage: 1` and no filter returned the
   newest run, the pushed SHA, inline. Always match `head_sha` to the push
   before reading `conclusion`.
+- **No `mcp__github` tool in the session? `gh` reads the same thing**
+  (2026-10-10, CYOA2 step 3's deploy was verified this way; the proxy allows
+  GitHub API reads and refuses writes):
+  ```
+  gh run list --repo ZackHelms/ZackHelms.github.io --workflow "pages-build-deployment" \
+      --limit 2 --json headSha,status,conclusion,createdAt,databaseId
+  gh run view <databaseId> --repo ZackHelms/ZackHelms.github.io --json jobs
+  ```
+  Match `headSha` to the push, then read the jobs (build, deploy,
+  report-build-status), not only the run.
 - **Another way to wait:** `send_later` (claude-code-remote MCP) with
   `delay_minutes: 3` and a message naming the run id and SHA delivers the
   re-check as a fresh turn, so the session reports its push and goes idle

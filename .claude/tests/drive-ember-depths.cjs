@@ -162,12 +162,39 @@ const ok = (name, cond, extra) => {
     await page.waitForTimeout(16);
   }
   await touch('touchEnd', [[cx + 152, cy, 2]]);
+  // In a CDP touchEnd the points LISTED are the ones that lift, so finger 2 is up and finger 1 is the survivor (this row
+  // was written believing the opposite). "Never fires a tap" only means something if the survivor is over a tile a tap
+  // WOULD act on: where the pinch happens to leave it, it is over rock or unseen ground, and the row passed with the
+  // gesture latch removed (negative test, 2026-10-10). So ask the PAGE where the survivor is, slide the board until a
+  // floor tile next to the hero is under it, lift it, and afterwards require a real tap on that same spot to walk.
+  const survivor = await page.evaluate(() => {
+    if (!touchStart) return null;
+    const sx = touchStart.x, sy = touchStart.y;
+    const floor = (x, y) => x >= 0 && x < COLS && y >= 0 && y < ROWS && seen[IDX(x, y)] && grid[IDX(x, y)] !== 1 && !enemyAt(x, y);
+    const all = [];
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (floor(x, y)) all.push([x, y]);
+    const near = (ax, ay) => all.slice().sort((p, q) => (Math.abs(p[0] - ax) + Math.abs(p[1] - ay)) - (Math.abs(q[0] - ax) + Math.abs(q[1] - ay)));
+    // an earlier camera row parks the hero in the far corner of the board, which may be rock: stand them on real floor again
+    if (!floor(player.x, player.y) && all.length) { const f = near(player.x, player.y)[0]; player.x = f[0]; player.y = f[1]; player.vx = f[0]; player.vy = f[1]; }
+    for (const [x, y] of near(player.x, player.y).slice(0, 60)) {
+      if (x === player.x && y === player.y) continue;
+      pathQueue = []; buildPathTo(x, y, false); const walkable = pathQueue.length > 0; pathQueue = [];
+      if (!walkable) continue;
+      camX = x + 0.5 - (sx - (viewX + viewW / 2)) / tile; camY = y + 0.5 - (sy - (viewY + viewH / 2)) / tile; applyView();
+      if (Math.floor((sx - ox) / tile) === x && Math.floor((sy - oy) / tile) === y) return { x, y, sx, sy };
+    }
+    return null;
+  });
   await touch('touchEnd', []);
   await page.waitForTimeout(80);
   const pinched = await page.evaluate(() => ({ zoom, camFree, queued: pathQueue.length, turn: turnCount }));
   ok('a real pinch zooms in', pinched.zoom > 1.2, pinched);
   ok('a real pinch frees the camera', pinched.camFree === true, pinched);
+  ok('the finger that stays down is over a floor tile a tap would walk to', !!survivor, survivor);
   ok('a real pinch never fires a tap', pinched.queued === 0 && pinched.turn === 0, pinched);
+  if (survivor) { await page.touchscreen.tap(survivor.sx, survivor.sy); await page.waitForTimeout(60); }
+  const tapped = await page.evaluate(() => { const r = { queued: pathQueue.length, turn: turnCount }; pathQueue = []; return r; });
+  ok('though a tap on that very spot does walk (so the row above could have failed)', !!survivor && (tapped.queued > 0 || tapped.turn > 0), tapped);
 
   const pageState = await page.evaluate(() => ({
     scale: window.visualViewport ? window.visualViewport.scale : 1,

@@ -123,6 +123,48 @@ Deterministic helpers for working on this repo.
   (one such row was found that way: it reloaded the page before an autosave had
   landed). `--only a,b` re-runs the ones that were missed.
 
+- `probe-cdp-touch.cjs` — **what does a synthetic touch mean in this Chromium?**
+  Three suites drive real multi-touch through CDP's `Input.dispatchTouchEvent`,
+  and two notes here described its `touchPoints` wrongly (one said a `touchEnd`
+  lists the fingers that *stay*, the other that the list is diffed against the
+  previous call). A pinch row built on the first belief checked the ground under
+  the wrong finger and stayed green with its rule removed, in two suites. The
+  probe logs what a page really sees (`touches`, `changedTouches`) for seven
+  short sequences and compares them with what the suites rely on: start and move
+  act on the points **listed** and the rest stay down, **`touchEnd` lifts the
+  points listed**, an empty `touchEnd` lifts everyone, points are matched by
+  `id`. Run it before writing a multi-touch row and whenever a container ships a
+  new Chromium; `CHANGED` means the gesture rows need reading again.
+
+  ```
+  NODE_PATH=/opt/node-tools/node_modules node .claude/scripts/probe-cdp-touch.cjs [--quiet]
+  # same    A: two down, touchEnd lists finger 0: finger 0 lifts, finger 1 stays
+  #     touchend touches[1@250] changed[0@102]
+  # CDP-TOUCH: AS-DOCUMENTED chromium=141.0.7390.37        (exit 0; CHANGED ... exits 1)
+  ```
+
+- `page-parts.py` — **split a big single-file page into parts at its section
+  banners, and join them back byte for byte.** For a page past a few thousand
+  lines (CYOA2 is 5,492) a dozen files are easier on every tool than one, but
+  parts kept in a scratchpad die with the container and go stale without a word
+  when anything edits the shipped page directly (`stamp-badge.sh` does). So the
+  page stays the source of truth and the parts are a view of it: `split` cuts at
+  every banner line (default `^/\* ={20,}`; `--at REGEX` for a page with other
+  banners) and proves the round trip before reporting, `join` concatenates and
+  runs `check-inline-js.cjs`, and `check` says whether the two still agree and
+  where they first differ. Keep the parts directory in the scratchpad, never in
+  the repo.
+
+  ```
+  python3 .claude/scripts/page-parts.py split games/cyoa2/index.html $SCRATCH/parts
+  # SPLIT=games/cyoa2/index.html PARTS=24 DIR=... ROUNDTRIP=identical
+  python3 .claude/scripts/page-parts.py join $SCRATCH/parts
+  # JOINED=games/cyoa2/index.html PARTS=24 BYTES=422567
+  # INLINE-JS: GREEN
+  python3 .claude/scripts/page-parts.py check $SCRATCH/parts
+  # PARTS=in-sync PAGE=games/cyoa2/index.html        (or PARTS=DRIFTED ... FIRST=06-map.js:357, exit 1)
+  ```
+
 - `replace-fn.py` — replace ONE whole JS function in a single-file game, located
   by **name** and bounded by **brace counting**. `games/CLAUDE.md` § Editing a
   large single-file game records why: a span replacement between two hand-picked

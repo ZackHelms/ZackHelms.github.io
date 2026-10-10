@@ -62,13 +62,31 @@ now asks the page where it thinks the remaining finger is, slides the table unti
 ground is under it, and afterwards requires a real tap on that square to walk.
 **A row that says "nothing happened" needs a twin that shows something would have.**
 
+The same hole was then looked for where the row had been copied from, and found: Ember
+Depths' suite had the identical pinch row, written from the same wrong note. One break
+(reset the latch when a pinch drops to one finger) came back green against it; the row
+was rebuilt the same way and now fails by name. The semantics are measured rather than
+remembered now (`.claude/scripts/probe-cdp-touch.cjs`, table in
+`20260724-headless-mobile-game-testing.md` § CDP multi-touch), and both older notes
+carry a dated correction. **When a row turns out to rest on a wrong belief, grep for
+the belief, not for the row.**
+
 ## The breaks found bugs, not only missing rows
 
 - **An empty message.** Writing the row for "the model calls its tools and then says
-  nothing" showed the client echoing that empty reply back as an assistant turn. The
-  Messages API takes no empty message (inferred from its documented validation, not
-  seen live), so the nudge now joins the last user turn instead. CYOA's client has the
-  same two lines.
+  nothing" showed the client echoing that empty reply back as an assistant turn. That
+  reply is a documented case, not an exotic one: an empty response with `end_turn`
+  "typically occurs ... particularly after tool results", and the documented last
+  resort is a continuation prompt as new user input, never the empty reply sent back
+  (source: https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons,
+  read 2026-10-10). The nudge now joins the last user turn. That an echoed empty
+  assistant turn is answered with a 400 ("all messages must have non-empty content
+  except for the optional final assistant message") is from third-party reports of
+  that error text, not reproduced here: there is no key in the build container. The
+  same page warns against the opposite habit, text after tool results on EVERY round
+  (the model learns to stop and wait for it), so the nudge stays a once-per-turn last
+  resort. CYOA's client still echoes the empty turn (`.claude/cyoa.md` § Known,
+  not fixed).
 - **A save that had not landed.** One row (reload, Continue, compare) "caught" seven
   breaks that had nothing to do with it. It saved, waited 400 ms and reloaded; under two
   browsers on two cores the write had not finished. `UI.saveNow()` now returns its
