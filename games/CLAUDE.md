@@ -917,7 +917,7 @@ Suite: `.claude/tests/drive-cyoa.cjs` (165 checks, including the real clients ag
 stubbed network). Detailed context: `.claude/cyoa.md`.
 
 
-### CYOA2 (`cyoa2/index.html`, ~2,560 lines)
+### CYOA2 (`cyoa2/index.html`, ~3,250 lines)
 CYOA's sequel, commissioned by the CD on 2026-10-09: the same seeded world, played on a
 **board of 5 ft squares**. A seed makes a bible (region, town, inn, a gang and its cave,
 seven people who matter, three plot threads); the town's board is charted at once, and
@@ -931,12 +931,21 @@ puts backs to walls, keeps doorways clear and refuses anything that would cut a 
 two. Tap a square to walk there (the path and its length in feet are shown; doors open as
 you pass), tap a thing or a person to read it, tap a roof to go in. Drawn as an inked map
 on vellum - hatched rock, sepia washes, one accent colour per map - in the **Grimoire**
-style with CYOA's chrome. **Step 1 of 5**: no Game Master model, no combat, no fog and no
-network call yet; the engine already takes every change as a validated **intent**, which
-is what a second player's phone or a model will send later. **Proprietary** (one of the
-eight protected games; assumed, see `.claude/cyoa2.md`). Suite:
-`.claude/tests/drive-cyoa2.cjs` (98 checks over 36 worlds). Detailed context:
-`.claude/cyoa2.md`.
+style with CYOA's chrome. **Step 2 of 5** added the grid rules. **Sight and fog of war:**
+the map shows only what the party has seen (blank vellum where it has not, faded where it
+has been and gone), people show only while in sight, and walls on the edges, shut doors,
+rock, roofs and tall things stop the eye while windows and bars do not. **A party of up
+to six**, added and named in a Party panel: one leads and is walked, the rest trail,
+change places with the leader in a narrow passage and close up when the leader stops.
+**Rounds:** ROLL INITIATIVE on the bar at any time, and offered when a bandit first sees
+the party; everyone in sight rolls a seeded d20, takes a turn in order with 30 ft of
+movement (the squares still in reach are washed gold), and on a monster's turn whoever
+holds the table moves it. Still no Game Master model, no attack and no network call; the
+engine takes every change as a validated **intent**, which is what a second player's
+phone or a model will send later. **Proprietary** (one of the eight protected games;
+assumed, see `.claude/cyoa2.md`). Suite: `.claude/tests/drive-cyoa2.cjs` (176 checks over
+36 worlds, with the engine's sight judged by an independent line walker). Detailed
+context: `.claude/cyoa2.md`.
 
 ### ANIMATION RIGS (`animation-rigs/index.html`, ~2,000 lines)
 A grey-box diorama of eight 21-joint stick-figure rigs (CD commission 2026-10-04,

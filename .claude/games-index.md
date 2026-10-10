@@ -24,7 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
-| CYOA2 | `cyoa2/` | tabletop-rpg | tap-to-move, pinch-zoom, drag-pan | open-sandbox, save-campaign | tile-board, asset-library, procedural-generation, seeded-determinism | solo | `.claude/cyoa2.md` |
+| CYOA2 | `cyoa2/` | tabletop-rpg | tap-to-move, pinch-zoom, drag-pan | open-sandbox, save-campaign | tile-board, asset-library, procedural-generation, seeded-determinism, line-of-sight, fog-of-war, initiative-order | solo, local-coop | `.claude/cyoa2.md` |
 | CYOA | `cyoa/` | tabletop-rpg | voice, text-entry, tap | save-campaign | llm-game-master, speech-narration, procedural-generation, seeded-determinism | solo, local-coop | `.claude/cyoa.md` |
 | Animation Rigs | `animation-rigs/` | animation-sandbox | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox | procedural-animation, inverse-kinematics, simulated-agents, real-time-3d | solo | `.claude/animation-rigs.md` |
 | Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
@@ -166,6 +166,14 @@ local-2p.
   or one generated floor; this is a connected world of furnished rooms. Next on this
   axis is the roadmap in `.claude/cyoa2.md`: grid rules (sight, fog, turns), then
   CYOA's Game Master on top, then several devices sharing one host's board.
+- **`fog-of-war`** / **`initiative-order`** mechanics (cyoa2 step 2, 2026-10-10;
+  `line-of-sight` and `local-coop` are reused). The first game here with a map that
+  **inks itself in** as it is explored and fades where the party has been and gone, and
+  the first with a **turn order rolled on dice**: a party of up to six and whatever
+  bandits are in sight each take a turn with 30 ft of movement, and the monsters are
+  moved by whoever holds the device until the Game Master model arrives. `neon-tactics`
+  has line of sight but no fog and no order beyond sides; `ember-depths` has memory fog
+  but one hero and no turns to roll for. Still no attacks: a round is movement only.
 
 ### Newly opened by the 2026-10-04 build
 - **`animation-sandbox`** genre + **`procedural-animation`** /

@@ -141,7 +141,7 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-09 21:16 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-10 02:40 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
@@ -151,7 +151,7 @@ h1 {
       <div class="game-icon">🎲</div>
       <div class="game-info">
         <div class="game-name">CYOA2</div>
-        <div class="game-desc">CYOA's world on a board of 5 ft squares. Walk a seeded town, its inn and a bandit cave, each charted as you enter.</div>
+        <div class="game-desc">CYOA's world on a board of 5 ft squares. Lead a party through fog of war in a seeded town and cave; roll initiative.</div>
       </div>
     </a>
 
@@ -613,7 +613,7 @@ h1 {
 // Facet catalog — mirrors .claude/games-index.md. MAINTENANCE: every new game
 // adds its entry here in the same commit as its hub card (and index row).
 const GAMES = [
-  { n: 'CYOA2', i: '🎲', h: 'cyoa2/', genre: ['tabletop-rpg'], input: ['tap-to-move', 'pinch-zoom', 'drag-pan'], session: ['open-sandbox', 'save-campaign'], mech: ['tile-board', 'asset-library', 'procedural-generation', 'seeded-determinism'], players: ['solo'] },
+  { n: 'CYOA2', i: '🎲', h: 'cyoa2/', genre: ['tabletop-rpg'], input: ['tap-to-move', 'pinch-zoom', 'drag-pan'], session: ['open-sandbox', 'save-campaign'], mech: ['tile-board', 'asset-library', 'procedural-generation', 'seeded-determinism', 'line-of-sight', 'fog-of-war', 'initiative-order'], players: ['solo', 'local-coop'] },
   { n: 'CYOA', i: '🧙', h: 'cyoa/', genre: ['tabletop-rpg'], input: ['voice', 'text-entry', 'tap'], session: ['save-campaign'], mech: ['llm-game-master', 'speech-narration', 'procedural-generation', 'seeded-determinism'], players: ['solo', 'local-coop'] },
   { n: 'ANIMATION RIGS', i: '🩻', h: 'animation-rigs/', genre: ['animation-sandbox'], input: ['orbit-drag', 'pinch-zoom', 'two-finger-pan', 'tap'], session: ['open-sandbox'], mech: ['procedural-animation', 'inverse-kinematics', 'simulated-agents', 'real-time-3d'], players: ['solo'] },
   { n: 'INTERLOCK', i: '🧊', h: 'interlock/', genre: ['disassembly-puzzle'], input: ['orbit-drag', 'pinch-zoom', 'tap'], session: ['endless-levels'], mech: ['procedural-generation', 'real-time-3d', 'spatial-reasoning', 'day-night-cycle'], players: ['solo'] },
