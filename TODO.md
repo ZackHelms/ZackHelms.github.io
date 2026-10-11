@@ -38,6 +38,20 @@ backlog entry here.
   hideout**, nowhere else; **only things in the hideout can be searched**;
   what each whisper does once settled; and the pay (60 gold and 150 experience
   for the job, 75 for a whisper).
+- [cyoa2] **Hear it on your phone.** The narrator and the microphone have only
+  ever met stand-ins: a headless browser has no voice and cannot listen. Four
+  things only a device can answer. Does the opening speak on the first new
+  tale after a fresh load in Safari? Which voice did it pick (Settings > Voice
+  lists them best first; on an iPhone "Whatever this device is set to" may
+  sound better than anything Safari lists)? Does a tap on the story silence it
+  at once? Does the microphone work at all in your browser (it shows only
+  where Claude reads the line)?
+- [cyoa2] Say if the narrator should be **off** until asked for. It is on by
+  default because CYOA's is; one tap on the speaker beside the story turns it
+  off for good. Other calls in the same table that are yours to overrule
+  (`.claude/cyoa2.md`, the second push's "assumed" table): it reads tellings
+  but not dice lines; an answer interrupts, a beat waits; the words do not
+  wait for the voice; no microphone at the script's table.
 - [cyoa2] First play with a real key. Step 3's Game Master has only ever
   answered a stand-in server: no request has been sent to the live API, and
   nothing has been tried on a real iPhone. While there, read the older

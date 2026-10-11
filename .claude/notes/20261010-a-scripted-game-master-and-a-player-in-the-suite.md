@@ -1,8 +1,9 @@
-# A scripted Game Master, and a player in the suite
+# A scripted Game Master, a player in the suite, and a voice with nobody to hear it
 
 From CYOA2, 2026-10-10: the CD asked for a default mode that is "deterministic scripted
-everything", with the model as something to add area by area and compare against. Full
-detail is in `.claude/cyoa2.md`; this note keeps what generalises.
+everything", with the model as something to add area by area and compare against. Then,
+the same day, the second push of step 3: a narrator's voice, a microphone, notes and a
+rule book. Full detail is in `.claude/cyoa2.md`; this note keeps what generalises.
 
 ## A deterministic narrator is tables and a hash, and the hash is the whole trick
 
@@ -95,3 +96,45 @@ on a machine that is "running tests" is the tell.
 both callers, first. Deleting the test changed nothing because it did nothing. A break
 that cannot be caught is sometimes the suite's fault and sometimes the code telling you a
 line is dead; look before writing a row for it.
+
+## A voice with nobody to hear it (the second push, the same day)
+
+The narrator reads the tale in the device's own voice, and a line can be spoken where a
+model reads it. Neither can be tried in the place the suite runs: a headless browser
+has `speechSynthesis` with no voices in it and a `SpeechRecognition` that never hears
+anything. Three things came out of building it anyway.
+
+**Bring a stand-in that misbehaves, and install it before the page's script.** The
+suite's synthesizer records every utterance *together with what the page looked like at
+that instant* (which passage wore the mark, whether the music was ducked, whether the
+button was lit), takes a set time over it, and has three switches: hang for ever, offer
+no voices, and be **rude**, which is to drop what it was saying on `cancel()` and fire
+neither `end` nor `error`. Each switch is a property that could not otherwise be
+stated, let alone tested: "a stalled voice costs one sentence", "a device with no voice
+is silent, not stuck", "silence does not wait for the device to agree". Recording the
+page's state inside `speak()` matters more than it looks: asked afterwards, "was the
+passage marked while it was read" is a race; asked at the moment of the call, it is a
+fact.
+
+**A queue of sentences, and two classes of telling.** One utterance per sentence means a
+model's first sentence is being read while its last is still arriving, a stall costs a
+sentence, and silence is immediate. The policy that made it livable is two words long:
+*an answer interrupts, a beat waits.* What someone says in answer to a tap cuts off
+whatever was being read; narration nobody asked for queues behind it. One rule for
+everything (always interrupt, or always queue) is wrong half the time in either
+direction: the voice is either talking over a person or still describing the last room.
+
+**Stop must not wait to be told it stopped.** `Narrator.stop()` ends the utterance in
+hand itself and clears that utterance's time limit. The obvious version (cancel, then
+carry on when the device fires `end`) has two failures on a device that never fires it,
+and the second is nasty: the old sentence's watchdog comes round seconds later and
+cancels whatever is being read by then. Any "cancel and restart" over an API whose
+callbacks are advisory needs the same shape: resolve your own promise, disarm your own
+timers, and treat the callback as a courtesy.
+
+**What is still unknown is listed, not guessed.** Whether a phone lets the first
+sentence through, which voices Safari will list, and whether it reports a cancel are in
+`TODO.md` as things only a device can answer. The 90 ms left between a cancel and the
+next utterance is a precaution from reports, never observed here, and is labelled as
+one where it is defined.
+

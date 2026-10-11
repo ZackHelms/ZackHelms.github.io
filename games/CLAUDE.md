@@ -917,7 +917,7 @@ Suite: `.claude/tests/drive-cyoa.cjs` (165 checks, including the real clients ag
 stubbed network). Detailed context: `.claude/cyoa.md`.
 
 
-### CYOA2 (`cyoa2/index.html`, ~6,500 lines)
+### CYOA2 (`cyoa2/index.html`, ~7,000 lines)
 CYOA's sequel, commissioned by the CD on 2026-10-09: the same seeded world, played on a
 **board of 5 ft squares**. A seed makes a bible (region, town, inn, a gang and its cave,
 seven people who matter, three plot threads); the town's board is charted at once, and
@@ -970,14 +970,23 @@ never do geometry, and a telling that fails puts the tale back exactly; what it 
 in a **ledger** either way. Under each of Claude's passages the page can keep **the
 script's version of the same moment**; every passage says who told it and takes a thumb
 up or down; and a **Compare** page adds up tellings, words, ratings and cost by area and
-teller, with a CSV. Not in this push: the narrator's voice, speech input, the notes
-page, rule popups.
+teller, with a CSV. **The second push of step 3** (the same day) gave the table a
+voice: a **narrator reads every telling aloud** in the device's own voice, the script's
+and Claude's alike, a sentence at a time, so a model's first sentence is being read
+while its last is still arriving; an answer to a tap interrupts what was being read and
+a beat waits its turn; a tap on the story, or the speaker beside it, is silence. Where a
+model reads the line there is a **microphone** in place of SEND while the field is
+empty. **Notes** are kept by selecting words in the story or by the pen under a telling,
+travel in the save and are never shown to the model. And **every line of a traveller's
+sheet is a button** that opens its page of a rule book, with that traveller's own
+numbers and the rules as this table plays them.
 **Proprietary** (one of the eight protected games; confirmed by the CD on 2026-10-10).
-Suite: `.claude/tests/drive-cyoa2.cjs` (671 checks: generators over 36 worlds, sight
+Suite: `.claude/tests/drive-cyoa2.cjs` (750 checks: generators over 36 worlds, sight
 judged by an independent line walker, fights played out by the script against the
 suite's own traveller, every tool called with one of each kind of bad input, the real
-client against a stand-in for the API, and whole scripted tales played start to ending
-by the suite's own player, `.claude/tests/cyoa2-player.js`). Detailed context:
+client against a stand-in for the API, whole scripted tales played start to ending
+by the suite's own player, `.claude/tests/cyoa2-player.js`, and the narrator and the
+microphone against a synthesizer and a recognizer the suite brings with it). Detailed context:
 `.claude/cyoa2.md`.
 
 ### ANIMATION RIGS (`animation-rigs/index.html`, ~2,000 lines)

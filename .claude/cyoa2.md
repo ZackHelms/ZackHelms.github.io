@@ -1,10 +1,10 @@
 # CYOA2 - context
 
-`games/cyoa2/index.html` (single file, ~6,500 lines). The world of CYOA played on a
+`games/cyoa2/index.html` (single file, ~7,000 lines). The world of CYOA played on a
 **board of 5 ft squares**: a seed makes a town, its inn and trades, its houses and a
 bandit cave; each place's board is **charted the first time someone walks in** and is
 kept in the save from then on. CD commission, 2026-10-09 (in chat, not `/create-new-games`).
-Suite: `.claude/tests/drive-cyoa2.cjs` (671 checks) with its own player,
+Suite: `.claude/tests/drive-cyoa2.cjs` (750 checks) with its own player,
 `.claude/tests/cyoa2-player.js`. Style: **Grimoire** (`.claude/styles/grimoire.md`).
 **Proprietary** (`games/cyoa2/LICENSE`), confirmed by the CD on 2026-10-10.
 
@@ -25,8 +25,14 @@ six, rounds. Step 3 is the Game Master, and it now comes in **two kinds**:
   it all up. That is the experiment the CD asked for: play it scripted, see what the model
   adds, tune how much of the table it gets.
 
+Whoever tells it, **the narrator reads it aloud** in the device's own voice (the second
+push of step 3, 2026-10-10: voice, a microphone where a model is listening, a notes
+page, and a rule book behind every line of a traveller's sheet).
+
 It is the second page in the repo that calls an API at runtime (CYOA is the first), and
 like CYOA it calls nothing but `api.anthropic.com`, and only with a key the player typed.
+The voice and the microphone are the browser's own (`speechSynthesis`,
+`SpeechRecognition`); the page calls nothing for either.
 
 The shipped file is the source of truth. To work on it as parts, split it with
 `.claude/scripts/page-parts.py` (see "Working source" at the end).
@@ -216,6 +222,28 @@ THE SCRIPT section are data, and the CD should feel free to rewrite any of it.
 | Two **generator fallbacks** (`GEN_V` 2): where no rock can be cut for a cell (about 1 hideout in 60) the prisoner is kept **bound in the chamber**; a keeper the recipe could not seat (the smith, in about 1 forge in 13) is seated in **any room, then the yard** | the plot needs someone to free and someone to ask on every seed. Boards that already had both are drawn exactly as before | `fnCell`, the end of `genBuilding` |
 | **Balance, measured not tuned** (the suite's own player, 24 seeds, asserted in section U): four travellers finish every tale, in about two climbs and two days; **one alone finishes 23 of 24 within eight climbs** | the gang keeps its wounds between climbs, so persistence wins. Nothing was tuned to get these numbers | section U's rows; `.claude/tests/cyoa2-player.js` |
 
+The second push of step 3 added these (voice, microphone, notes, rule book). One answer
+shaped it ("Device voice only"); the rest is how I filled it in.
+
+| Assumed | Why | To change it |
+|---|---|---|
+| The narrator is **on by default** | CYOA's is. One tap on the speaker beside the story turns it off, and that is remembered | `Settings.defaults.voiceOn` |
+| It reads **tellings only**: the beats, what people say, what a model says. Not the engine's own lines (dice, doors, loot), not cards, not toasts | read aloud, the dice lines are noise | `UI.script`, `Session.turn` |
+| **The words do not wait for the voice.** Text appears as it always did; the passage being read wears a mark in its margin | CYOA reveals words at speaking pace, but that is a book, and this is a board with a game going on | `Narrator.mark`, `.st-gm.speaking` |
+| **An answer interrupts, a beat waits.** What someone says in answer to a tap cuts off whatever was being read; a beat queues behind it | so the voice is never on the last thing while the player is on the next, and never talks over a person | `UI.script` |
+| **Silence** is: a tap on the story (not on a button in it, not while selecting words), the speaker button, STOP, a line sent to the table, BEGIN on the opening card, leaving for the title, a hidden page | CYOA's tap-to-skip, plus every place the table moves on | callers of `Narrator.stop()` |
+| The opening is read **while it is on its card**, and not again when it is written into the story | the card is where it is read | `Session.openRead` |
+| At most **40 sentences** wait to be read; older ones are dropped unread | nothing is read long after the table has moved on | `NARR_MAX` |
+| A sentence gets **twice its expected time plus 3 s**; one over 240 letters is read a clause at a time; **90 ms** is left between cutting the voice off and giving it something new | device voices stall, some stop dead on a long utterance, and some are reported to swallow an utterance handed over in the same breath as a cancel (**not seen here; a precaution**) | `Narrator.patience`, `SENT_MAX`, `CANCEL_GAP` |
+| Which voice: the best for the device's language (premium, then enhanced, then plain; compact and novelty voices last), or one chosen, or "whatever this device is set to" | CYOA's ranking, ported | `Speech.score`, `Speech.pick` |
+| **A microphone only where a model reads the line**, and it takes SEND's place while the field is empty | the script takes no typed lines, so there is nothing to say to it; and a phone's bar has no room for both buttons | `UI.sayBtns`, `Listen` |
+| A spoken line **waits in the field** to be read before it is sent, unless "send as soon as I stop speaking" is on | recognition gets names wrong | `Settings.data.autoSend` |
+| Notes are **the players' own**: in the save, never shown to the model, no clock, no journal line, written even mid-round or after the tale is over; they **survive a telling that is taken back**. 300 notes of 2,000 letters | CYOA's notes page; a note is not part of the tale | `jot()`, the failure path of `Session.turn` |
+| A note is made by **selecting words in the story**, by the **pen under a telling**, or by ADD A NOTE | selecting is CYOA's way; the pen is one tap on a phone, where selecting is fiddly | `UI.selChanged`, `UI.storyFoot`, `UI.notes` |
+| The rule book opens from the **party sheet only**, and the sheet gained the **six scores** | CYOA's popups. The scores were shown nowhere before | `UI.party`, `ruleOf()` |
+| On the sheet an ability is its **name and uses**; what it does moved into its page of the book | the sheet was a wall of text | `UI.party` |
+| The book says the rules **as this table plays them** (no reactions, half cover, the bed rule), in my words | it is opened by someone asking "what does this do HERE" | the tables at the top of RULE BOOK |
+
 ## The road from here (agreed in outline, 2026-10-09)
 
 1. **Done:** generators, asset library, renderer, a token to walk.
@@ -228,9 +256,9 @@ THE SCRIPT section are data, and the CD should feel free to rewrite any of it.
    - **Done (the two kinds of Game Master, 2026-10-10):** the script as the default, the
      model per area, the twin, tags, ratings, the Compare page, and a whole scripted
      adventure with an ending.
-   - **Next (second push):** the narrator's voice on the **device's own speech** and its
-     sentence queue, speech instead of typing, the notes page, rule popups. All four exist
-     in CYOA (`.claude/cyoa.md`); the CD chose device voice only.
+   - **Done (second push, 2026-10-10):** the narrator's voice on the **device's own
+     speech** with a sentence queue, a microphone where a model reads the line, the notes
+     page, and a rule book behind every line of the party sheet. Step 3 is complete.
    - Not planned yet: places the Game Master makes up beyond the charted ones, woodcut
      plates, a second adventure once the hill is taken.
 4. Multiplayer: other devices send the SAME intents; the host's engine judges them. A web
@@ -243,8 +271,8 @@ THE SCRIPT section are data, and the CD should feel free to rewrite any of it.
 ## Architecture (sections in the script, in order)
 
 `UTIL / PRNG / TABLES / ASSETS / MAP / FURNISH / WORLD / SITES / RULES / ENGINE /
-GAME MASTER: TOOLS / THE SCRIPT / CONTEXT / CLIENT / COSTS / ART / VIEW / AUDIO /
-STORAGE / UI / SESSION / BOOT`
+GAME MASTER: TOOLS / THE SCRIPT / RULE BOOK / CONTEXT / CLIENT / COSTS / ART / VIEW /
+AUDIO / STORAGE / VOICE / UI / SESSION / BOOT`
 
 **The two Game Masters share one door.** The script and the model both act on the tale
 through the engine (`intent()`, and the helpers the tools are built from), are told the
@@ -460,7 +488,40 @@ the only place that does, and it is asked by the table (UI, SESSION), never by t
   the context, run the provider with hooks that stream words into the story and run
   tools on the live tale (`UI.sync` after each, so the page follows), then either keep it
   (story, clock, turn count, ledger) or put the tale back and say why.
-- **Saves.** `packState` / `unpackState`, format `v: 4` (two-mode push: `flags`, `tells`,
+- **The rule book** (`RULE BOOK`, after THE SCRIPT). `ruleOf(st, p, kind, key)` returns
+  `{ title, lines }` for one line of one traveller's sheet, or null for what is not on
+  it. Kinds: `abil` (a score: what it is for, every skill and the save it feeds, with
+  totals), `hp`, `ac`, `level`, `class`, `attack`, `ability`, `item`, `cond`, `status`,
+  `purse`. It is pure, and **every number in it comes from the helper the engine rolls
+  with** (`weaponsOf`, `checkFor`, `profBonus`, `acOf`, `expandStatExpr`), never from a
+  second copy of the arithmetic. "Only in a fight" is `fightOnly(def)` in RULES, which is
+  also the engine's own refusal. The words are tables at the top of the section
+  (`ABIL_INFO`, `SKILL_INFO`, `COND_INFO`, `CLASS_INFO`, `KIT_INFO`).
+- **Voice** (`VOICE`, after STORAGE). Three objects and a pure function.
+  - `Speech`: the device's voices, ranked (`score`: language first, then how well made;
+    compact and novelty voices last), `pick()` (the chosen one, the best, or null for
+    "whatever this device is set to"), `prime()` (a silent utterance on the first touch,
+    once: a phone lets a page speak only after a finger has asked), `stop()`.
+  - `sentencesOf(buf, final)` -> `{ out, rest }`: whole sentences, and the start of one
+    still arriving. Pure, so a model's words can be fed to it as they stream.
+  - `Narrator`: a queue of sentences, each its own utterance. `begin(node)` / `push(t)` /
+    `end()` for a telling that streams, `say(text, node)` for one that is whole. `pump()`
+    reads them in order and marks the passage being read (`mark`: a class on the node,
+    the music ducked, the speaker button lit). `stop()` is silence now: it empties the
+    queue, cancels the device, **and ends the utterance in hand itself rather than
+    waiting to be told it ended**.
+  - `Listen`: `SpeechRecognition`, writing what it hears into the line field. `drop()`
+    closes it without sending.
+  The narrator is told what to read in exactly three places: `UI.script()` (the script),
+  the `text` hook and the end of `Session.turn()` (a model), and `UI.enterPlay()` (the
+  opening on its card).
+- **Notes** (`jot()` in ENGINE; `UI.keep` / `notes` / `selChanged` / `grab`). `st.notes`
+  is `[{ id: 'J7', text, src: 'story' | 'mine', turn, day, minute }]`, numbered by
+  `st.n.note`. `intent({ t: 'jot', op: 'add' | 'edit' | 'drop' | 'tidy' })` is handled
+  **before** the "the tale is over" refusal and outside every turn rule, writes no
+  journal entry, moves no clock and rolls nothing.
+- **Saves.** `packState` / `unpackState`, format `v: 5` (second push: `notes` and
+  `n.note`; a v4 save opens with an empty notes page. Two-mode push, v4: `flags`, `tells`,
   `n.tell`, and on a telling `n`, `src`, `area`, `twin`; a v3 save loads with nothing
   settled and its old tellings unclaimed). A save is the whole state: bible,
   sites, people (monsters' blocks included), every charted board (byte grids as strings,
@@ -522,6 +583,16 @@ the only place that does, and it is asked by the table (UI, SESSION), never by t
   `UI.chip` is the engine's own line, toasted too when the log is folded. Settings holds
   the key, the model, effort, content rating, when the Game Master speaks, who plays the
   monsters and the three per-task models.
+  **Second push:** the story bar gained the narrator's speaker (`#voice-btn`, `UI.voice`)
+  and, where a model reads the line, a microphone (`#mic`). `UI.sayBtns()` decides what
+  sits at the end of the line field: STOP while a model is telling, else the microphone
+  while there is nothing to send and SEND once there is. Every line of a sheet in the
+  Party panel is a `.term` button that opens its page of the rule book in the dialog
+  (`UI.rule`); the six scores are a row of `.stat` buttons. A telling's foot has a pen
+  (`UI.keep`), selected words in the story raise a "+ Note" button (`UI.selChanged`,
+  `UI.grab`, `rangeText()` in UTIL), and Notes is a panel of its own (`UI.notes`).
+  Settings has a Voice group: the switch, which voice, the pace, HEAR IT, and the two
+  settings for listening.
 
 ## Rules that are easy to break
 
@@ -644,16 +715,52 @@ The two kinds of Game Master:
 - **A new tale opens the party sheet by itself** when the script makes the characters; a
   test that begins a tale closes it first (`begin()` in the suite does).
 
+The second push (voice, microphone, notes, rule book):
+
+- **The narrator must never be what something waits for.** Nothing awaits it. And
+  `Narrator.stop()` ends the utterance in hand ITSELF (`cut`), which also clears that
+  utterance's time limit. Wait for the device to report the cancel instead and two
+  things go wrong on a device that does not report it: the new words queue behind a
+  sentence nobody is saying, and the old sentence's time limit comes round seconds later
+  and cancels whatever is being read by then. The suite has a synthesizer that is rude
+  in exactly that way.
+- **Whatever moves the table on calls `Narrator.stop()`**: an answer to a tap
+  (`UI.script` for anything but a beat), a line sent, STOP, a telling that fails, BEGIN
+  on the opening card, `Session.reset()`, a hidden page. A beat is the one thing that
+  must NOT: it waits its turn.
+- **Any code that changes the line field calls `UI.sayBtns()`** (`send`, `Listen.show`,
+  `busy`, the failure path that puts a line back), or the wrong button is left at the
+  end of the line: a microphone beside a line waiting to be sent, or no SEND at all.
+- **`Listen.drop()` forgets the recognizer before it aborts it.** The recognizer's
+  `onend` fires during the abort, and with auto-send on it would send what was half
+  heard after the line that was sent by hand.
+- **Notes are not the telling's to take back.** A failed telling restores the tale from
+  a snapshot; `Session.turn` carries `st.notes` and `st.n.note` across that. And they are
+  not the tale's to refuse: `jot` is answered before `st.over` is looked at.
+- **The rule book prints a number only if it got it from the engine's helper.** The
+  suite rolls every skill and save of every calling with the d20 forced to 10 and
+  compares what the dice added with what the book says; it uses every ability outside a
+  fight and compares the refusal with the book's "only in a fight". A rule changed in
+  the engine with its own copy of the number in the book is how the two would drift.
+- **A voice's name is the device's text, not ours**: `el('option', '', name)`, never
+  markup. The suite offers a voice named `<img onerror>`.
+- **A headless browser has `speechSynthesis` with no voices and a `SpeechRecognition`
+  that hears nothing.** Sections X and Y install stand-ins before the page's own script;
+  `open()` in the suite turns the narrator off for every other section, so nothing else
+  depends on what a test machine happens to be able to say.
+
 ## Tests
 
-`drive-cyoa2.cjs` (671 checks, about 180 s) runs the generators inside the real page
+`drive-cyoa2.cjs` (750 checks, about 225 s) runs the generators inside the real page
 across 36 worlds (329 boards) and asserts they are whole, then the engine's refusals,
 lazy charting, saves (including a tampered file), the phone flow, tap accuracy at five
 viewports after a resize-while-hidden, gestures, keys and the panels (sections A to M,
 step 1), then **N sight and fog, O the party, P rounds** (step 2), then **Q sheets,
 blows and dying, R the table by touch, S the Game Master's tools, T the Game Master at
 the table** (step 3), then **U the script alone, V the script's table by touch, W the
-model's share of the table** (the two kinds of Game Master). `CYOA2_ONLY=NOP` runs only
+model's share of the table** (the two kinds of Game Master), then **X the narrator's
+voice, Y the narrator and the microphone at a model's table, Z notes and the rule book**
+(step 3's second push). `CYOA2_ONLY=NOP` runs only
 the named sections (A stands for A to I) and `CYOA2_PAGE=<path>` points the suite at a
 copy of the page; both are for negative tests and neither prints the GREEN line a gate
 looks for. **A watchdog ends a run that is still going after 25 minutes**
@@ -710,9 +817,71 @@ The three sections of the two kinds of Game Master:
   tags, the tally, the monsters' twin played on a copy, an ending the model tells, and
   the key going away in the middle of a tale.
 
+The second push's three sections:
+
+- **X** is the narrator at the script's table, against a stand-in synthesizer that
+  records what it is asked to say, takes a set time over each utterance, and can be made
+  to hang, to offer no voices, or to drop an utterance without saying so. Text into
+  sentences (and the same sentences when fed a letter at a time), which voice, the
+  opening read on its card and not twice, the mark and the ducked music measured at the
+  moment each sentence is handed over, an answer that interrupts and a beat that waits,
+  every kind of silence, a voice that never finishes, a device with none, Settings.
+- **Y** is the same narrator where a model is telling (a telling read while it is still
+  arriving, one that fails, STOP, a line that cuts in), and the microphone against a
+  stand-in recognizer the suite speaks for: guesses replaced by what was settled on,
+  speech added after what was typed, auto-send, each way it can fail, a line sent by
+  hand while it is open, the areas taken away from the model mid-listen.
+- **Z** is notes (the engine alone, in and out of a save, a hostile file, the pen, a
+  selection across two passages, the page) and the rule book (a page for every line of
+  six callings at three levels, **every number checked against a roll made for it**, and
+  the sheet by touch on two phones).
+
 **Not verified:** no request has been sent to the live API from this suite or by hand;
 model ids, request fields and prices come from platform.claude.com/docs as read on
-2026-10-10. The first real key will be the first real test of the client.
+2026-10-10. The first real key will be the first real test of the client. **Nor has any
+real voice or microphone been heard**: X and Y run against stand-ins, because a headless
+browser has neither. Whether a phone lets the first sentence speak, which voices it
+lists, and whether it reports a cancel are all still to be found out on a device.
+
+### Negative tests, the second push (2026-10-10, `negtest-copies.py`)
+
+**171 deliberate breaks**: 59 at the narrator, 34 at the model's table and the
+microphone, 77 at notes and the rule book, and one in the engine that both halves of
+"only in a fight" read. The suite was green at 745 checks when they started.
+
+**On the first pass 10 came back GREEN**, and 9 more were caught only by a crash or a
+timeout. Nine of the ten were holes, closed with rows. The tenth was a style rule that
+did nothing (`.stat { min-height:48px }`: three lines of text are already taller than
+that) and is gone. Run again against the suite as shipped, with the two that had timed
+out: **161 of the 171 are caught by a named row, 9 by a crash or a timeout, and 1 was
+retired with the rule it exposed.** As with the two-mode push, a second pass of all of
+them was not run.
+
+What the nine had in common:
+
+- *The test did the page's job for it.* Two rows called `UI.saveNow()` and then looked
+  for the note in the save, so the pen's and the typing's own "save soon" could both be
+  deleted unseen. They now flush whatever is waiting, do the deed, wait a second and
+  look. Same shape: the row that turned the narrator on did it with the speaker button,
+  which asks the device for leave to speak, so the asking on the first touch could go.
+- *A value that never varied.* Every note in the suite was written on day 1, so the
+  date under a note could have been the words "Day 1". A fighter's strength and
+  constitution modifiers are equal, so the book could read the wrong one. The healing
+  draught was never asked whether it "matters to the tale".
+- *A guard for a path the test did not take.* `Listen.drop()` forgets the recognizer
+  before aborting it, so that a half-heard line is not sent by the recognizer's own
+  ending. The one row that dropped it did so from SEND, which empties the field first,
+  so there was nothing to send either way. The row now puts the page away with the
+  microphone open, auto-send on and half a line heard.
+- *A desktop forgave what a phone will not.* "+ Note" acts on the way down, because a
+  phone lets a selection go before a click arrives. A desktop keeps the selection, so
+  the listener could be moved to `click` and still pass. The row now looks between the
+  press and the release.
+- *An input that took any word.* A note's `src` is `story` or `mine`; nothing asked what
+  became of `theirs`.
+
+The first of those is the one to carry forward: **when a row needs something saved,
+shown or primed, check whether the row itself just did it.**
 
 ### Negative tests, the two kinds of Game Master (2026-10-10, `negtest-copies.py`)
 
@@ -906,6 +1075,11 @@ the first tap, and saving a file through the share sheet are the three to check 
 For step 2 add: whether the bar's counters scroll comfortably under a thumb with six in
 the party plus bandits, and whether a walk holds 60 fps on the phone itself (the frame
 times above are headless and software-rendered, a rough proxy).
+For the second push add: **the narrator on a real phone.** Does the first sentence
+speak (the silent utterance on the first touch is there to earn that, and has only ever
+met a stand-in)? Which voices does Safari list, and is "whatever this device is set to"
+the better default there? Does a tap on the story stop it at once? And the microphone
+in Safari and in Chrome on Android, which is the only place it can be tried at all.
 For step 3 add: **a real key against the real API** (nothing has been sent to it); how
 the story panel sits above the iPhone's keyboard when the line field has the focus
 (the board is squeezed between the header and a keyboard in headless only by guess);
@@ -918,6 +1092,13 @@ Save slots beyond the autosave; a second floor behind the inn's stairs and a cel
 way into the locked cell (a key in the chief's chest is the obvious one); locked doors in
 buildings; a road beyond the town's east and west ends; more site kinds (mill, watch
 house, crypt); weather and time of day.
+
+From the second push: a way to SAY a topic at the script's table (the microphone is
+offered only where a model reads the line; a topic's name spoken and matched to its
+button would give the script's table a voice in both directions); the words lit in step
+with the voice; rule pages opened from a card on the board and from a dice line in the
+story, not only from the sheet; notes the Game Master can be shown; a voice per speaker.
+Paid voices were offered and declined (the CD: device voice only).
 
 From the two kinds of Game Master: a blind pick between the script's telling and the
 model's (offered to the CD, not chosen); a second adventure once the hill is taken (the
@@ -950,10 +1131,11 @@ To get parts back, split the page at its banner comments:
 
 ```
 python3 .claude/scripts/page-parts.py split games/cyoa2/index.html <scratch dir>
-#   25 parts: 00-head.html (CSS and markup), 02-util.js ... 11-engine.js,
-#   12-game-master-tools.js, 13-the-script.js, 14-game-master-context.js,
-#   15-game-master-client.js, 16-costs.js, 17-art.js, 18-view.js, 19-audio.js,
-#   20-storage.js, 21-ui.js, 22-session.js, 23-boot.js, 24-tail.html
+#   27 parts: 00-head.html (CSS and markup), 02-util.js ... 11-engine.js,
+#   12-game-master-tools.js, 13-the-script.js, 14-rule-book.js,
+#   15-game-master-context.js, 16-game-master-client.js, 17-costs.js, 18-art.js,
+#   19-view.js, 20-audio.js, 21-storage.js, 22-voice.js, 23-ui.js, 24-session.js,
+#   25-boot.js, 26-tail.html
 python3 .claude/scripts/page-parts.py join  <scratch dir>     # byte for byte, then the parse check
 python3 .claude/scripts/page-parts.py check <scratch dir>     # was the page edited behind the parts?
 ```

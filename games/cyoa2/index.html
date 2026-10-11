@@ -224,8 +224,30 @@ body.hide-tags .st-foot { display:none; }
 .st-twin { flex:1 1 100%; margin:4px 0 2px; padding:6px 0 2px 10px; border-left:3px double var(--ink-3); }
 .st-twin .twin-text { font-family:var(--serif); font-size:16px; line-height:1.45; letter-spacing:0; text-transform:none; color:var(--ink-2); white-space:pre-wrap; }
 .st-twin .twin-rate { display:flex; align-items:center; gap:2px 8px; margin-top:2px; }
-/* the typed line is for a model: where none is listening, the bar is only the fold */
-body.no-say #say, body.no-say #say-who, body.no-say #say-send { display:none; }
+/* the typed line is for a model: where none is listening, the bar is only the fold and the narrator's speaker */
+body.no-say #say, body.no-say #say-who, body.no-say #say-send, body.no-say #mic { display:none; }
+/* the passage being read aloud: a rubric in its margin */
+.st-gm { position:relative; }
+.st-gm.speaking::before { content:''; position:absolute; left:-9px; top:3px; bottom:3px; width:3px; background:var(--rubric); border-radius:1px; }
+#voice-btn .slash { display:none; }
+#voice-btn[aria-pressed="false"] { color:var(--ink-3); }
+#voice-btn[aria-pressed="false"] .slash { display:inline; } #voice-btn[aria-pressed="false"] .wave { display:none; }
+#voice-btn.live { border-color:var(--rubric); color:var(--rubric); }
+#mic.live { border-color:var(--rubric); color:var(--vellum); background:var(--rubric); animation:micpulse 1.1s ease-in-out infinite; }
+@keyframes micpulse { 50% { opacity:.6; } }
+.st-foot .keep { min-width:36px; min-height:36px; padding:0; border:0; background:transparent; font-size:16px; line-height:1; color:var(--ink-3); cursor:pointer; }
+.st-foot .keep:active { color:var(--rubric); }
+#note-grab { position:fixed; z-index:60; left:8px; top:8px; display:none; min-height:44px; box-shadow:0 2px 8px var(--shadow); }
+#note-grab.on { display:block; }
+#notes-list { list-style:none; padding:0; margin:0 auto; }
+#notes-list li { display:flex; gap:8px; align-items:flex-start; margin:0 0 12px; padding:0 0 10px; border-bottom:1px solid var(--vellum-3); }
+#notes-list .grow { flex:1 1 auto; min-width:0; }
+#notes-list textarea { display:block; width:100%; min-height:44px; padding:8px 10px; resize:none; overflow:hidden; background:var(--vellum-2); color:var(--ink);
+  border:1.5px solid var(--ink-2); border-radius:2px; font-family:var(--serif); font-size:17px; line-height:1.4; }
+#notes-list li.story textarea { border-left:4px solid var(--rubric); }
+#notes-list textarea:focus { outline:2px solid var(--lapis); outline-offset:1px; }
+#notes-list .sub { margin-top:3px; font-family:var(--caps); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); }
+#notes-list .note-del { width:44px; height:44px; }
 #story-bar { flex:0 0 auto; display:flex; align-items:center; gap:6px; min-width:0;
   padding:6px 8px calc(6px + var(--sab)); border-top:1px solid var(--vellum-3); }
 #story-bar .iconbtn { width:44px; height:44px; font-size:20px; }
@@ -244,7 +266,19 @@ body.no-say #say, body.no-say #say-who, body.no-say #say-send { display:none; }
   #story-log, #story.open #story-log { display:block; flex:1 1 auto; height:auto; max-height:none; }
   #story-toggle { display:none !important; }
 }
-/* a sheet in the party panel */
+/* a sheet in the party panel: every line of it is a term, and a term is a button that says what it means */
+.term { display:inline; margin:0; padding:5px 1px; border:0; border-radius:0; background:transparent;
+  font:inherit; letter-spacing:inherit; color:inherit; text-align:left; cursor:pointer;
+  text-decoration:underline dotted; text-decoration-color:var(--ink-3); text-decoration-thickness:1px; text-underline-offset:4px; }
+.term:active { background:var(--vellum-3); }
+.term:focus-visible { outline:2px solid var(--lapis); outline-offset:1px; }
+.sheet > div { margin-top:5px; line-height:1.75; }
+.sheet .stats { display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:4px; margin-top:8px; max-width:420px; }
+.sheet .stat { text-decoration:none; display:flex; flex-direction:column; align-items:center; gap:0; padding:4px 0; border:1px solid var(--ink-3); border-radius:2px;
+  background:var(--vellum-2); font-family:var(--caps); font-size:10.5px; letter-spacing:.1em; line-height:1.2; color:var(--ink-2); }
+.sheet .stat span { font-size:17px; font-weight:700; color:var(--ink); letter-spacing:0; }
+.sheet .stat i { font-style:normal; font-size:11px; color:var(--rubric); letter-spacing:0; }
+#party-purse .term { color:var(--ink); }
 .sheet { margin:6px 0 0; font-size:15px; line-height:1.4; color:var(--ink-2); }
 .sheet b { font-family:var(--caps); font-size:12px; letter-spacing:.08em; color:var(--ink); text-transform:uppercase; }
 .sheet select { min-height:36px; padding:4px 6px; background:var(--vellum-2); border:1.5px solid var(--ink-2); border-radius:2px; font-family:var(--caps); font-size:13px; }
@@ -349,7 +383,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-11 00:36 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-11 01:17 UTC</div>
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
 
@@ -390,8 +424,10 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
       <div id="story-log" role="log" aria-live="polite" tabindex="0"></div>
       <div id="story-bar">
         <button id="story-toggle" class="iconbtn" type="button" aria-label="Show or hide the story" aria-expanded="false"><b>&#9652;</b></button>
+        <button id="voice-btn" class="iconbtn" type="button" aria-label="Read the tale aloud" aria-pressed="false" hidden><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z" fill="currentColor"/><path class="wave" d="M15.2 8.8a4.6 4.6 0 0 1 0 6.4M17.6 6.4a8 8 0 0 1 0 11.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path class="slash" d="M4.5 4.5l15 15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></button>
         <select id="say-who" aria-label="Who speaks"></select>
         <input id="say" type="text" aria-label="Say or do something" placeholder="Say or do something" maxlength="600" autocomplete="off" enterkeyhint="send">
+        <button id="mic" class="iconbtn" type="button" aria-label="Speak a line instead of typing it" aria-pressed="false" hidden><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="9" y="3.5" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11.5a6 6 0 0 0 12 0M12 17.5v3M8.5 20.5h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
         <button id="say-send" class="iconbtn" type="button" aria-label="Send">&#10148;</button>
         <button id="say-stop" class="iconbtn" type="button" aria-label="Stop the Game Master" hidden>&#9632;</button>
       </div>
@@ -480,6 +516,19 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
       <label class="field"><span>Model for what the players say</span><select id="set-m-turn"></select></label>
       <label class="check"><input id="set-showcosts" type="checkbox"><span>Show what each reply cost</span></label>
     </fieldset>
+    <fieldset><legend>Voice</legend>
+      <label class="check"><input id="set-voice" type="checkbox"><span>Read the tellings aloud</span></label>
+      <label class="field"><span>Voice</span><select id="set-voiceuri"></select></label>
+      <label class="field"><span>Pace</span><input id="set-rate" type="range" min="0.6" max="1.6" step="0.05"></label>
+      <div class="row" style="margin-top:10px"><button id="set-voice-test" class="plaque small" type="button">Hear it</button></div>
+      <p class="note" id="voice-note"></p>
+      <p class="note">The voice is this device's own and costs nothing. It reads the script's tellings and Claude's alike; tap the story, or the speaker beside it, for silence.</p>
+      <div id="listen-rows">
+        <label class="check"><input id="set-autosend" type="checkbox"><span>Send a spoken line as soon as I stop speaking</span></label>
+        <label class="field"><span>Language to listen in, and to choose a voice by (blank follows this device; for example en-GB)</span><input id="set-srlang" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="12"></label>
+      </div>
+      <p class="note" id="listen-note"></p>
+    </fieldset>
     <fieldset><legend>Sound</legend>
       <label class="field"><span>Music</span><input id="set-music" type="range" min="0" max="1" step="0.05"></label>
       <label class="field"><span>Effects</span><input id="set-sfx" type="range" min="0" max="1" step="0.05"></label>
@@ -504,6 +553,16 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
   <div class="panel-body" id="costs-body"></div>
 </section>
 
+<!-- ===== notes: the players' own, and words kept from the story ===== -->
+<section id="pan-notes" class="panel" aria-label="Notes">
+  <div class="panel-head"><h2>Notes</h2><button class="plaque small" type="button" data-close>Back</button></div>
+  <div class="panel-body">
+    <div class="row" style="margin:0 auto 14px"><button id="notes-add" class="plaque small" type="button">Add a note</button></div>
+    <ul id="notes-list"></ul>
+    <p class="note" id="notes-none">Nothing kept yet. Select words in the story to keep them, or press the pen under a telling.</p>
+  </div>
+</section>
+
 <!-- ===== compare: the script and the model, side by side ===== -->
 <section id="pan-compare" class="panel" aria-label="Compare">
   <div class="panel-head"><h2>Script and AI</h2><button class="plaque small" type="button" data-close>Back</button></div>
@@ -514,6 +573,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
 <nav id="menu" aria-label="Game menu">
   <button class="plaque" type="button" data-act="party">Party</button>
   <button class="plaque" type="button" data-act="chron">Chronicle</button>
+  <button class="plaque" type="button" data-act="notes">Notes</button>
   <button class="plaque" type="button" data-act="compare">Compare</button>
   <button class="plaque" type="button" data-act="lib">Library</button>
   <button class="plaque" type="button" data-act="export">Save to a file</button>
@@ -522,6 +582,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
 </nav>
 <div id="dialog" role="dialog" aria-modal="true"><h3 id="dlg-title"></h3><div id="dlg-body" class="dlg-body"></div><div id="dlg-btns" class="dlg-btns"></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<button id="note-grab" class="plaque small" type="button">+ Note</button>
 <div id="veil"></div>
 
 <script>
@@ -538,6 +599,16 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
 
 /* ============================== UTIL ============================== */
 const $ = (id) => document.getElementById(id);
+/* The selected words as the page holds them, paragraphs kept apart by line breaks. Selection.toString() follows the
+   rendering (a drop cap's float swallows the space after it); the text nodes do not. What sits under a telling (who
+   told it, the marks, what it cost) is the page's furniture and is left out.                                         */
+function rangeText(range) {
+  const parts = []; let cur = '';
+  const flush = () => { if (cur.trim()) parts.push(cur.replace(/\s+/g, ' ').trim()); cur = ''; };
+  const walk = (n) => { for (const c of n.childNodes) { if (c.nodeType === 3) cur += c.data; else if (c.nodeType === 1) { if (/\b(st-foot|cost-tag|st-wait)\b/.test(c.className || '') || c.tagName === 'BUTTON') continue; const block = /^(P|DIV|LI|H[1-6])$/.test(c.tagName); if (block) flush(); walk(c); if (block) flush(); } } };
+  walk(range.cloneContents()); flush();
+  return parts.join('\n');
+}
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -1775,6 +1846,8 @@ const LOOKS = ['a crooked grin and a patched cloak', 'silver-streaked hair and i
   'too many rings and a threadbare coat', 'a braid tied with red thread', 'a burn scar along one arm', 'a hat with a heron feather'];
 const CONDITIONS = ['poisoned', 'frightened', 'blinded', 'charmed', 'restrained', 'prone', 'exhausted', 'invisible', 'blessed', 'inspired', 'hidden', 'grappled', 'stunned', 'shielded'];
 const FIGHT_COND = ['shielded', 'blessed', 'inspired', 'hidden'];            /* these end when the fight does */
+const FIGHT_FX = ['surge', 'dash', 'shield', 'bless', 'sleep', 'turn', 'mark'];
+const fightOnly = (def) => !!(def.dmg || FIGHT_FX.includes(def.fx));        /* what is refused until initiative is rolled: the engine and the rule book both ask here */
 /* Classes. attacks: {n, ab, d, rg} with rg the reach in SQUARES (1 = a blade's length); spell
    attacks add no ability modifier to damage. abilities: cost is 'action' | 'bonus' | 'free' |
    'passive'; tg is who it may be aimed at ('self', 'ally', 'other' = an ally but not oneself,
@@ -1978,7 +2051,7 @@ function clockText(st) {
    a turn in initiative order: 30 ft of movement, one action (an attack, a dash, most
    abilities) and one bonus action. A monster's turn is taken by the script at the
    bottom of this section, by the Game Master, or by whoever holds the table.       */
-const ENGINE_V = 4;
+const ENGINE_V = 5;
 const SPEED = 30;                                         /* feet a turn, for everyone */
 const PARTY_MAX = 6;
 const AREAS = ['narrate', 'talk', 'act', 'monsters', 'create'];   /* what a Game Master does at the table: each is the script's or a model's */
@@ -2054,8 +2127,8 @@ function bedside(inn) {
 function newGame(seed) {
   const bible = generateWorld(seed), pc = newPc('P1', 'Wayfarer', 'S1', 0, 0, CLASS_ORDER[0], true);
   const st = { format: 'cyoa2-save', v: ENGINE_V, seed, bible, sites: {}, npcs: {}, maps: {}, party: [pc], lead: 'P1',
-    here: 'S1', walk: null, round: null, met: {}, log: [], time: { day: 1, minute: 480 }, gold: CLASSES[pc.cls].gold, facts: [], summaries: [], quests: {}, story: [], costs: [], turn: 0, told: {}, fallen: [], over: '', flags: {}, tells: [],
-    n: { ev: 0, site: bible.sites.length, pc: 1, roll: 0, f: 0, Q: 1, tell: 0 }, made: Date.now() };
+    here: 'S1', walk: null, round: null, met: {}, log: [], time: { day: 1, minute: 480 }, gold: CLASSES[pc.cls].gold, facts: [], summaries: [], quests: {}, story: [], costs: [], turn: 0, told: {}, fallen: [], over: '', flags: {}, tells: [], notes: [],
+    n: { ev: 0, site: bible.sites.length, pc: 1, roll: 0, f: 0, Q: 1, tell: 0, note: 0 }, made: Date.now() };
   for (const s of bible.sites) st.sites[s.id] = deepClone(s);
   for (const p of bible.npcs) st.npcs[p.id] = Object.assign(deepClone(p), { bible: true });
   st.quests.Q0 = questOf(st);
@@ -2394,7 +2467,7 @@ function nextTurn(st) {
   return { ok: true, round: R.n, who: a ? a.id : '', fresh: !!ev.fresh, events: ev.slice(), ended };
 }
 
-const REFUSE = { blocked: 'Something is in the way.', noway: 'There is no way there.', locked: 'It is locked.', far: 'You are not beside it.', noexit: 'There is no way out here.',
+const REFUSE = { blank: 'There is nothing there to keep.', fullnotes: 'The notes are full: remove one first.', nonote: 'That note is gone.', blocked: 'Something is in the way.', noway: 'There is no way there.', locked: 'It is locked.', far: 'You are not beside it.', noexit: 'There is no way out here.',
   uncharted: 'That place cannot be reached.', nobody: 'No such traveller.', bad: 'That cannot be done.', unseen: 'Nobody has seen that ground yet.',
   notturn: 'It is not their turn.', notlead: 'Only the one who leads walks the party.', inround: 'Not in the middle of a round.', noround: 'No rounds are being counted.',
   full: 'Six is as many as the table seats.', last: 'Someone has to stay.', spent: 'No movement is left this turn.', noname: 'A traveller needs a name.',
@@ -2465,7 +2538,7 @@ function useAbility(st, a, it) {
   if (!def) return refuse('noability');
   if (def.cost === 'passive') return refuse('passive');
   if (slot.max !== null && slot.uses <= 0) return refuse('nouses', p.name + ' has no ' + def.n + ' left until a ' + (def.per || 'long') + ' rest.');
-  if (!R && (def.dmg || ['surge', 'dash', 'shield', 'bless', 'sleep', 'turn', 'mark'].includes(def.fx))) return refuse('noround', 'That is for a fight: roll initiative first.');
+  if (!R && fightOnly(def)) return refuse('noround', 'That is for a fight: roll initiative first.');
   if (R && def.cost === 'action' && R.act < 1) return refuse('noact');
   if (R && def.cost === 'bonus' && R.bonus < 1) return refuse('nobonus');
   let tgt = { pc: true, o: p, id: p.id };
@@ -2521,6 +2594,7 @@ function useAbility(st, a, it) {
 function intent(st, it) {
   const no = refuse;
   if (!it || typeof it !== 'object') return no('bad');
+  if (it.t === 'jot') return jot(st, it);                    /* the players' notes are theirs: kept even when the tale is over, in or out of a round */
   if (st.over) return no('over');
   const R = st.round;
   switch (it.t) {   /* first, the things that are nobody's turn in particular */
@@ -2828,13 +2902,33 @@ function tellRow(e) {
   return { n: int(e.n, 0, 1e7), turn: int(e.turn, 0, 1e6), area: AREAS.includes(e.area) ? e.area : 'narrate', src: e.src, w: int(e.w, 0, 1e5), usd: typeof e.usd === 'number' && isFinite(e.usd) && e.usd > 0 ? e.usd : 0,
     model: clip(typeof e.model === 'string' ? e.model : '', 80), r: int(e.r, -1, 1), tw: int(e.tw, 0, 1e5), tr: int(e.tr, -1, 1) };
 }
+/* ---- the players' notes. They travel in the save and are no part of the tale: nothing in the world reads them, no
+   clock moves, nothing is journalled. {op:'add', text, src?} | {op:'edit', id, text} | {op:'drop', id} | {op:'tidy'} ---- */
+const NOTES_MAX = 300, NOTE_LEN = 2000;
+function jot(st, it) {
+  const text = clip(String(it.text == null ? '' : it.text).replace(/\r/g, ''), NOTE_LEN);
+  if (it.op === 'add') {
+    const src = it.src === 'story' ? 'story' : 'mine', t = text.trim();
+    if (!t && src === 'story') return refuse('blank');
+    if (st.notes.length >= NOTES_MAX) return refuse('fullnotes');
+    const z = { id: 'J' + (++st.n.note), text: t, src, turn: st.turn, day: st.time.day, minute: st.time.minute };
+    st.notes.push(z);
+    return { ok: true, t: 'jot', op: 'add', id: z.id };
+  }
+  if (it.op === 'tidy') { const n = st.notes.length; st.notes = st.notes.filter((q) => q.text.trim()); return { ok: true, t: 'jot', op: 'tidy', dropped: n - st.notes.length }; }
+  const z = st.notes.find((q) => q.id === it.id);
+  if (!z) return refuse('nonote');
+  if (it.op === 'edit') { z.text = text; return { ok: true, t: 'jot', op: 'edit', id: z.id }; }
+  if (it.op === 'drop') { st.notes = st.notes.filter((q) => q !== z); return { ok: true, t: 'jot', op: 'drop', id: z.id }; }
+  return refuse('bad');
+}
 /* ---- the whole state in and out of a save ---- */
 function packState(st) {
   const maps = {};
   for (const k of Object.keys(st.maps)) maps[k] = packMap(st.maps[k]);
   return { format: 'cyoa2-save', v: ENGINE_V, seed: st.seed, bible: st.bible, sites: st.sites, npcs: st.npcs, maps, party: st.party, lead: st.lead, here: st.here,
     round: st.round, met: st.met, log: st.log, time: st.time, gold: st.gold, facts: st.facts, summaries: st.summaries, quests: st.quests, story: st.story, costs: st.costs,
-    turn: st.turn, told: st.told, fallen: st.fallen, over: st.over, flags: st.flags, tells: st.tells, n: st.n, made: st.made, saved: Date.now() };
+    turn: st.turn, told: st.told, fallen: st.fallen, over: st.over, flags: st.flags, tells: st.tells, notes: st.notes, n: st.n, made: st.made, saved: Date.now() };
 }
 /* plain, bounded data only: strings clipped, depth capped, no prototype keys */
 function cleanData(v, depth) {
@@ -2871,7 +2965,7 @@ function unpackState(p) {
   if ((p.v | 0) > ENGINE_V) throw new Error('That tale was saved by a newer version of the game.');
   const s = (v, n) => clip(typeof v === 'string' ? v : '', n), int = (v, lo, hi, d) => (Number.isFinite(+v) ? clamp(Math.round(+v), lo, hi) : d);
   const st = { format: 'cyoa2-save', v: ENGINE_V, seed: s(p.seed, 80) || 'unknown', bible: cleanData(p.bible, 0) || {}, sites: {}, npcs: {}, maps: {}, party: [], lead: '', here: '', walk: null, round: null, met: {},
-    log: [], time: { day: 1, minute: 480 }, gold: 0, facts: [], summaries: [], quests: {}, story: [], costs: [], turn: 0, told: {}, fallen: [], over: '', flags: {}, tells: [], n: { ev: 0, site: 0, pc: 1, roll: 0, f: 0, Q: 1, tell: 0 }, made: +p.made || Date.now() };
+    log: [], time: { day: 1, minute: 480 }, gold: 0, facts: [], summaries: [], quests: {}, story: [], costs: [], turn: 0, told: {}, fallen: [], over: '', flags: {}, tells: [], notes: [], n: { ev: 0, site: 0, pc: 1, roll: 0, f: 0, Q: 1, tell: 0, note: 0 }, made: +p.made || Date.now() };
   const B = st.bible;
   for (const k of ['town', 'region', 'inn', 'gang', 'cave', 'opening']) B[k] = s(B[k], 200);
   B.threads = (Array.isArray(B.threads) ? B.threads : []).filter((t) => t && typeof t.t === 'string');
@@ -2946,6 +3040,9 @@ function unpackState(p) {
   const F = p.flags && typeof p.flags === 'object' ? p.flags : {};
   for (const k of Object.keys(F).slice(0, 600)) if (/^[\w:]{1,40}$/.test(k) && k !== '__proto__' && F[k]) st.flags[k] = typeof F[k] === 'string' && /^Q\d{1,4}$/.test(F[k]) ? F[k] : Number.isInteger(F[k]) && F[k] > 0 && F[k] < 1e4 ? F[k] : 1;
   for (const e of Array.isArray(p.tells) ? p.tells.slice(-3000) : []) { const z = tellRow(e); if (z) st.tells.push(z); }
+  /* the players' own notes: text and nothing else, each with an id of its own */
+  for (const z of Array.isArray(p.notes) ? p.notes.slice(0, NOTES_MAX) : []) if (z && typeof z.text === 'string' && typeof z.id === 'string' && /^J\d{1,7}$/.test(z.id) && !st.notes.some((q) => q.id === z.id))
+    st.notes.push({ id: z.id, text: clip(z.text, NOTE_LEN), src: z.src === 'story' ? 'story' : 'mine', turn: int(z.turn, 0, 1e6, 0), day: int(z.day, 1, 99999, 1), minute: int(z.minute, 0, 1439, 0) });
   st.costs = Costs.sanitize(p.costs);
   const told = p.told && typeof p.told === 'object' ? p.told : {};
   for (const k of Object.keys(told).slice(0, 300)) if (/^[\w:.-]{1,24}$/.test(k) && told[k]) st.told[k] = 1;
@@ -2956,7 +3053,8 @@ function unpackState(p) {
   let fs = 0; for (const f of st.facts) fs = Math.max(fs, +f.id.slice(1) || 0);
   let qs = 1; for (const k of Object.keys(st.quests)) qs = Math.max(qs, +k.slice(1) + 1);
   let ts = 0; for (const e of st.story) if (e.n) ts = Math.max(ts, e.n); for (const e of st.tells) ts = Math.max(ts, e.n);
-  st.n = { ev: Math.max(nn.ev | 0, st.log.length), site: Math.max(nn.site | 0, top), pc: clamp(Math.max(nn.pc | 0, pcs), 1, 9000), roll: Math.max(nn.roll | 0, 0), f: Math.max(nn.f | 0, fs), Q: Math.max(nn.Q | 0, qs), tell: clamp(Math.max(nn.tell | 0, ts), 0, 1e7) };
+  let js = 0; for (const z of st.notes) js = Math.max(js, +z.id.slice(1));
+  st.n = { ev: Math.max(nn.ev | 0, st.log.length), site: Math.max(nn.site | 0, top), pc: clamp(Math.max(nn.pc | 0, pcs), 1, 9000), roll: Math.max(nn.roll | 0, 0), f: Math.max(nn.f | 0, fs), Q: Math.max(nn.Q | 0, qs), tell: clamp(Math.max(nn.tell | 0, ts), 0, 1e7), note: clamp(Math.max(nn.note | 0, js), 0, 9999999) };
   /* the monsters already met, and a round in progress, as far as they still make sense */
   const met = p.met && typeof p.met === 'object' ? p.met : {};
   for (const k of Object.keys(met)) if (st.maps[k] && Array.isArray(met[k])) st.met[k] = met[k].filter((v) => typeof v === 'string' && st.maps[k].tokens.some((t) => t.id === v && t.k === 'foe')).slice(0, 200);
@@ -4146,6 +4244,118 @@ function monstersTwin(snap) {
   }
   return lines.join(' ') || 'The script would have had them hold where they stand.';
 }
+
+/* ============================== RULE BOOK ==============================
+   What each line of a traveller's sheet means, said with that traveller's own numbers and
+   as THIS table plays it (no reactions, half cover, the bed rule...). Pure: ruleOf() reads
+   a sheet and returns { title, lines }, and every number in it is worked out by the same
+   helpers the engine rolls with (weaponsOf, checkFor, profBonus, acOf), so the book cannot
+   say one thing while the dice do another. The page opens it from the party sheet.        */
+const ABIL_INFO = {
+  str: 'Physical power: blades and clubs swung with strength, Athletics, forcing a door or a lid.',
+  dex: 'Agility and reflexes: bows and light blades, who acts first in a fight, Acrobatics, Stealth and Sleight of Hand (which is how a lock is picked).',
+  con: 'Health and stamina: it adds to hit points at every level, and to every hit die spent on a short rest.',
+  int: 'Reasoning and memory: Arcana, History, Investigation, Nature and Religion. A wizard casts with it.',
+  wis: 'Awareness and intuition: Perception, Insight, Survival, Medicine and Animal Handling. Clerics cast with it, and healing leans on it.',
+  cha: 'Force of personality: Persuasion, Deception, Intimidation and Performance. A bard casts with it, and most of what is asked of people in town is settled by it.',
+};
+const SAVE_INFO = { str: 'resist being shoved, grappled or crushed', dex: 'leap clear of fire, traps and falling stone', con: 'endure poison, disease and cold',
+  int: 'see through illusions and shrug off mind-bending magic', wis: 'resist charms, fear and madness', cha: 'resist possession and banishment' };
+const SKILL_INFO = {
+  athletics: 'Climbing, jumping, swimming, shoving; and the shoulder put to a locked lid or door.', acrobatics: 'Keeping your balance, tumbling, slipping out of a hold.',
+  'sleight of hand': 'Quick fingers: picking a lock, palming something, planting something unseen.', stealth: 'Moving without being seen or heard.',
+  arcana: 'Knowing spells, runes and things of magic.', history: 'Knowing old kingdoms, wars and legends.',
+  investigation: 'Searching for clues and working out how they fit.', nature: 'Knowing plants, animals, weather and the land.',
+  religion: 'Knowing gods, rites, holy symbols and the undead.', 'animal handling': 'Calming, reading or steering an animal.',
+  insight: 'Reading people: a lie, a hidden motive, a mood.', medicine: 'Steadying the dying and telling what ails someone.',
+  perception: 'Noticing things: a sound in the dark, an ambush, a glint in the grass.', survival: 'Tracking, hunting, finding the way.',
+  deception: 'Lying convincingly, disguises and misdirection.', intimidation: 'Getting your way with threats and presence.',
+  performance: 'Music, song and stories that hold a crowd.', persuasion: 'Winning someone over with tact, charm or a good argument.',
+};
+const COND_INFO = {
+  poisoned: 'Sick and shaking: disadvantage on attacks and on checks.', frightened: 'Afraid: disadvantage on attacks and on checks.',
+  blinded: 'Unable to see: disadvantage on attacks, and attacks against you have advantage.',
+  charmed: 'Under a spell of friendship. The Game Master rules on what that allows; the dice do not.',
+  restrained: 'Held fast: disadvantage on attacks, and attacks against you have advantage.',
+  prone: 'Knocked down: disadvantage on attacks, and attacks against you have advantage.',
+  exhausted: 'Worn out: disadvantage on checks.', invisible: 'Unseen: your attacks have advantage, and attacks against you have disadvantage.',
+  blessed: 'Blessed: 1d4 is added to every attack roll until the fight ends.',
+  inspired: 'Inspired: 1d6 is added to the next attack roll or check, and then it is spent.',
+  hidden: 'Out of sight: the next attack has advantage, and gives you away.',
+  grappled: 'Held. The Game Master rules on what that allows; the dice do not.', stunned: 'Reeling: attacks against you have advantage.',
+  shielded: 'Behind a shimmering ward: +5 Armour until your next turn.',
+};
+const CLASS_INFO = {
+  Fighter: 'A master of arms and armour who can keep fighting long after others fall.', Rogue: 'A sneak and a specialist, deadly when a foe is caught off guard or kept busy by a friend.',
+  Wizard: 'A scholar of arcane magic: frail, far-reaching, and the only one who can put a room to sleep.', Cleric: 'A priest who heals, blesses and turns the undead.',
+  Ranger: 'A hunter and tracker, at home with a bow and a quarry marked.', Bard: 'A performer whose words carry real magic: they heal at a distance and put heart into a friend.',
+};
+const KIT_INFO = [
+  [/shield/, 'A shield: counted in Armour already.'], [/mail|leather|armou?r/, 'Armour: counted in Armour already.'],
+  [/sword|axe|mace|dagger|rapier|club|spear|hammer/, 'A weapon. It is one of this traveller’s strikes if it is listed among them.'], [/bow|arrow|bolt/, 'A bow and what it shoots. Arrows are not counted.'],
+  [/spellbook/, 'A wizard’s spells, written down.'], [/holy symbol/, 'The focus for prayers.'], [/component pouch/, 'Pinches of dust, feathers and wax that spells call for.'],
+  [/lute|flute|drum|horn/, 'An instrument, for Performance and a bard’s magic.'], [/ration|bread|food/, 'Food for the road.'], [/pack|bedroll|cloak|rope|torch/, 'Travelling gear.'],
+];
+const COST_WORDS = { action: 'Costs the turn’s action.', bonus: 'Costs the turn’s bonus action.', free: 'Costs nothing: it can be used on top of an action and a bonus action.', passive: 'Always at work: nothing to spend, nothing to press.' };
+function ruleOf(st, p, kind, key) {
+  const C = CLASSES[p.cls], pb = profBonus(p.level), mod = (a) => abMod(p.scores[a]), aName = (a) => cap(ABIL_NAMES[a]), ft = (sq) => sq * FT + ' ft';
+  const total = (c) => mod(c.ab) + (c.prof ? pb : 0);
+  if (kind === 'abil' && ABIL_NAMES[key]) {
+    const skills = Object.keys(SKILLS).filter((k) => SKILLS[k] === key), sv = checkFor(p, key + ' save');
+    return { title: aName(key) + ' ' + p.scores[key], lines: [ABIL_INFO[key], 'Modifier ' + signed(mod(key)) + ': added to every ' + aName(key) + ' roll.',
+      skills.length ? 'Skills that use it: ' + skills.map((k) => cap(k) + ' ' + signed(total(checkFor(p, k))) + (C.skills.includes(k) ? ' (trained)' : '')).join(', ') + '.' : 'No skill uses it.',
+      aName(key) + ' save ' + signed(total(sv)) + (sv.prof ? ' (trained)' : '') + ': rolled to ' + SAVE_INFO[key] + '.',
+      'A check is a d20 plus the number, against a difficulty: 10 is easy, 15 hard. Trained means the training bonus (+' + pb + ') is in it.'] };
+  }
+  if (kind === 'hp') return { title: 'Hit points ' + p.hp + ' / ' + p.hpMax, lines: ['How much harm ' + first(p.name) + ' can take before falling.',
+    'At 0 a traveller is down, and on each of their turns rolls a d20 for their life: 10 or more holds on, less slips, a 20 puts them back on their feet with 1, a 1 counts twice. Three of either settles it. A blow taken while down is a slip (a critical, two). Harm of twice their hit points at once kills outright. Any healing brings them back.',
+    'A short rest (an hour, never with enemies in sight) heals a d' + C.hd + ' ' + signed(mod('con')) + ', and puts anyone at 0 back on their feet with 1. A night’s sleep heals everything: at the inn for a coin a head, or in a hideout emptied of its owners.',
+    'Each new level adds ' + Math.max(1, Math.floor(C.hd / 2) + 1 + mod('con')) + ' (half a d' + C.hd + ', rounded up, ' + signed(mod('con')) + ' constitution).'] };
+  if (kind === 'ac') return { title: 'Armour ' + acOf(p), lines: ['An attack on ' + first(p.name) + ' hits when its d20 plus bonus reaches this number. A natural 20 always hits and a natural 1 never does.',
+    'From what a ' + p.cls + ' wears: ' + C.ac + '.' + (p.conditions.includes('shielded') ? ' +5 from Shield, until their next turn.' : ''),
+    'Half cover adds 2 against a shot when someone, or something that fills its square, stands on the line.'] };
+  if (kind === 'level') return { title: 'Level ' + p.level, lines: [p.xp + ' experience' + (p.level < 5 ? '; level ' + (p.level + 1) + ' at ' + XP_LEVELS[p.level] + '.' : ', and the highest level this table goes to.'),
+    'Experience is shared among the living when a fight is won, and paid when a task is done.',
+    'Training bonus +' + pb + ': it is in every attack and in every trained skill and save.', 'A level adds hit points; levels 3 and 5 add a use to each ability that has a number of uses.'] };
+  if (kind === 'class') return { title: p.cls, lines: [CLASS_INFO[p.cls], 'Hit die d' + C.hd + '. Trained in ' + C.skills.map(cap).join(', ') + ', and in ' + C.saves.map((a) => ABIL_NAMES[a]).join(' and ') + ' saves.',
+    p.xp > 0 || p.level > 1 ? 'A calling that has earned experience cannot be changed.' : 'The calling can be changed until it has earned experience.'] };
+  if (kind === 'attack') {
+    const w = weaponsOf(p).find((x) => x.n === key), at = C.attacks.find((x) => x.n === key);
+    if (!w || !at) return null;
+    const ranged = w.rg > 1;
+    return { title: w.n, lines: [(w.spell ? 'A cantrip: a spell cast as often as you like. ' : ranged ? 'A shot. ' : 'A blow. ') + (ranged ? 'It reaches ' + ft(w.rg) + ' (and never further than can be seen: 40 ft by torchlight in a cave), and needs a clear line.' : 'It reaches the eight squares round its wielder, never through a wall, a shut door or round a hard corner.'),
+      'To hit: d20 ' + signed(w.hit) + ' (' + aName(at.ab) + ' ' + signed(mod(at.ab)) + ', training +' + pb + ') against the target’s Armour. A natural 20 always hits and doubles the damage dice; a natural 1 always misses.',
+      'Damage: ' + w.d + (w.spell ? ' (a spell adds no modifier).' : '.') + (p.cls === 'Rogue' && !w.spell ? ' Sneak Attack adds ' + Math.ceil(p.level / 2) + 'd6 once a turn.' : ''),
+      ranged ? 'With an enemy beside the shooter the shot is at disadvantage; a target behind someone or something has half cover (+2 Armour).' : 'A target that is asleep or down is struck with advantage.',
+      'A strike is the turn’s action. Tap an enemy in reach to make it.'] };
+  }
+  if (kind === 'ability') {
+    const a = p.abilities.find((x) => x.n === key), d = abilityDef(p.cls, key);
+    if (!a || !d) return null;
+    const roll = d.heal || d.dmg;
+    return { title: d.n, lines: [d.t, roll ? (d.heal ? 'Heals ' : 'Deals ') + expandStatExpr(roll, p) + (d.heal ? ' hit points.' : ' damage.') : '',
+      d.n === 'Sneak Attack' ? 'Adds ' + Math.ceil(p.level / 2) + 'd6 to a weapon’s hit, once a turn; never to a spell.' : '',
+      COST_WORDS[d.cost] || '', d.rg ? (d.rg > 1 ? 'Reaches ' + ft(d.rg) + ', in sight.' : 'By touch: the one it is for must be beside you (outside a fight, anyone in the party).') : '',
+      d.cost === 'passive' ? '' : fightOnly(d) ? 'Only in a fight, once initiative is rolled.' : 'Works anywhere, fight or no fight.',
+      a.max === null ? '' : a.uses + ' of ' + a.max + ' left. They come back after a ' + (d.per === 'short' ? 'short rest or a night’s sleep.' : 'night’s sleep.')] };
+  }
+  if (kind === 'item') {
+    const it = p.items.find((x) => x.n === key);
+    if (!it) return null;
+    const I = ITEMS[itemKey(it.n)], hit = KIT_INFO.find(([re]) => re.test(it.n.toLowerCase()));
+    return { title: cap(it.n) + (it.q > 1 ? ' x' + it.q : ''), lines: [I ? I.t : hit ? hit[1] : 'Something carried. It has no rule of its own.',
+      I && I.use === 'heal' ? 'Outside a fight whoever carries it may drink it or hand it over. In a fight it is the action of whoever is acting, for themselves or for someone beside them.' : '',
+      I && I.use === 'plot' ? 'It matters to the tale: somebody in town will want to see it, or something in the hideout answers to it.' : '',
+      I && I.price ? 'The shop in town sells these for ' + I.price + ' gold.' : ''] };
+  }
+  if (kind === 'cond' && COND_INFO[key]) return { title: cap(key), lines: [COND_INFO[key], FIGHT_COND.includes(key) ? 'It ends when the fight does.' : ''] };
+  if (kind === 'status') return { title: cap(p.status), lines: [p.status === 'down' ? 'At 0 hit points and rolling for their life each turn: held on ' + p.saves.s + ' of 3, slipped ' + p.saves.f + ' of 3. Any healing puts them back on their feet.'
+    : p.status === 'stable' ? 'Out of danger, but out of the fight: at 0 hit points until healed or rested.' : p.status === 'dead' ? 'Dead. When the fight is over their name goes to the list of the fallen.' : 'On their feet.'] };
+  if (kind === 'purse') return { title: 'Gold ' + st.gold, lines: ['The party’s purse, held in common.', 'A bed at the inn is a coin a head. The shop sells a healing draught (' + ITEMS['healing draught'].price + '), thieves’ tools (' + ITEMS['thieves’ tools'].price + ') and a crowbar (' + ITEMS.crowbar.price + '); the priest tends the wounded for 5, or for what the purse holds.',
+    'A party that is beaten but breathing wakes at the inn with half of it gone.'] };
+  return null;
+}
+const ruleLines = (r) => (r ? r.lines.filter(Boolean) : []);
 
 /* ============================== GAME MASTER: CONTEXT ==============================
    What the Game Master reads each turn. Order matters for prompt caching: the tools,
@@ -5425,8 +5635,9 @@ function viewFrame(now) {
    WebAudio only, no files. The context is made on the first gesture; footfalls and
    door creaks are filtered noise and a sliding saw; the music is a slow plucked
    Dorian round, scheduled a little ahead of the clock.                            */
+const DUCK = .3;
 const Sfx = {
-  ctx: null, sfx: null, mus: null, noise: null, timer: 0, nextT: 0, n: 0, foot: 0, mel: 4,
+  ctx: null, sfx: null, mus: null, noise: null, timer: 0, nextT: 0, n: 0, foot: 0, mel: 4, ducked: false,
   wake() {
     if (!this.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
@@ -5440,7 +5651,9 @@ const Sfx = {
     }
     if (this.ctx.state === 'suspended' && !document.hidden) this.ctx.resume().catch(() => {});
   },
-  vols() { if (!this.ctx) return; this.sfx.gain.value = Settings.data.sfxVol; this.mus.gain.value = Settings.data.musicVol * .55; },
+  vols() { if (!this.ctx) return; this.sfx.gain.value = Settings.data.sfxVol; this.mus.gain.setTargetAtTime(Settings.data.musicVol * .55 * (this.ducked ? DUCK : 1), this.ctx.currentTime, .12); },
+  /* the music steps back while the narrator is reading, and comes forward again after */
+  duck(on) { on = !!on; if (this.ducked === on) return; this.ducked = on; this.vols(); },
   tone(f0, f1, dur, type, vol, at, bus) {
     const c = this.ctx; if (!c || c.state !== 'running') return;
     const t = c.currentTime + (at || 0), o = c.createOscillator(), g = c.createGain();
@@ -5491,6 +5704,8 @@ const Settings = {
     /* who runs the table. gm: 'script' (the default: no model, no key, free) or 'ai' (Claude, over the player's own key, for
        the areas chosen below; the script keeps the rest). monsters is the fifth area and keeps its older name and values. */
     gm: 'script', areas: { narrate: 'ai', talk: 'ai', act: 'ai', create: 'ai' }, twin: true, tags: true,
+    /* the narrator's voice is the device's own. voiceURI: '' the best voice here, 'system' whatever the device is set to, or one voice by its id */
+    voiceOn: true, voiceURI: '', rate: 1, autoSend: false, srLang: '',
     model: 'claude-opus-5-5', customModel: '', effort: 'medium', rating: 'teen', remember: true, monsters: 'script', showCosts: true, storyOpen: true, taskModels: { turn: '', beat: '', monsters: '' } },
   data: null, memKey: '',
   load() {
@@ -5504,6 +5719,9 @@ const Settings = {
     for (const k of Object.keys(this.defaults.areas)) this.data.areas[k] = A[k] === 'script' || A[k] === 'ai' ? A[k] : this.defaults.areas[k];
     if (d.narrate === 'asked' && !A.narrate) this.data.areas.narrate = 'script';     /* the older setting "only when spoken to" */
     delete this.data.narrate;
+    this.data.voiceOn = !!this.data.voiceOn; this.data.autoSend = !!this.data.autoSend;
+    this.data.rate = Number.isFinite(+this.data.rate) ? clamp(+this.data.rate, .5, 2) : 1;
+    this.data.voiceURI = clip(typeof this.data.voiceURI === 'string' ? this.data.voiceURI : '', 200); this.data.srLang = clip(typeof this.data.srLang === 'string' ? this.data.srLang : '', 12);
   },
   save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* private mode: settings last this visit */ } },
   /* The key is the player's own. It lives in this browser only (never in a save, never in the settings blob) and is sent only to api.anthropic.com. */
@@ -5553,6 +5771,165 @@ const Store = {
   async del(slot) { await this.open(); if (this.db) { try { await this.tx('readwrite', (s) => s.delete(slot)); } catch (e) { /* ignore */ } } try { localStorage.removeItem('cyoa2.save.' + slot); } catch (e) { /* ignore */ } delete this.mem[slot]; },
 };
 
+/* ============================== VOICE ==============================
+   The narrator reads the tellings aloud in the DEVICE'S OWN voice (speechSynthesis): free, and
+   the same whoever is telling the tale, the script or a model. And where a model is listening,
+   a line may be spoken instead of typed (SpeechRecognition, where the browser has one). Both
+   are the browser's own; this page calls nothing for either.
+   A telling is cut into sentences and each is its own utterance, so a model's first sentence
+   is being read while its last is still arriving, a stalled utterance costs one sentence and
+   not the telling, and silence is one tap away. The words on the page do not wait for the
+   voice: this is a board with a game going on, and the text is already there to read.          */
+const Speech = {
+  voices: [], primed: false,
+  has: () => 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function',
+  load() { if (!this.has()) return; try { const v = speechSynthesis.getVoices(); if (v && v.length) this.voices = Array.from(v); } catch (e) { /* no voices */ } },
+  available() { if (!this.voices.length) this.load(); return this.has() && this.voices.length > 0; },
+  /* Apple names a downloaded voice plainly ("Zoe") and keeps the tier in its id (com.apple.voice.premium.en-US.Zoe), so the tier is read from both */
+  quality(v) { const t = (v.name || '') + ' ' + (v.voiceURI || ''); return /premium/i.test(t) ? 'Premium' : /enhanced/i.test(t) ? 'Enhanced' : /natural|neural/i.test(t) ? 'Natural' : ''; },
+  score(v, lang) {
+    let s = 0; const n = v.name || '', q = this.quality(v), l = (v.lang || '').toLowerCase().replace('_', '-');
+    if (l && l.startsWith(lang)) s += 20; else if (l && l.startsWith(lang.slice(0, 2))) s += 12;
+    if (q === 'Premium') s += 10; else if (q) s += 8;
+    if (v.default) s += 3;                                   /* the device's own choice wins a tie within a tier */
+    if (/google/i.test(n)) s += 3; if (/siri/i.test(n)) s += 4; if (v.localService) s += 1;
+    if (/compact/i.test(n + ' ' + (v.voiceURI || '')) || /eloquence|novelty|bells|whisper|zarvox|trinoids|bubbles|boing|jester|organ|cellos|bahh|albert|bad news|good news|superstar|wobble/i.test(n + ' ' + (v.voiceURI || ''))) s -= 30;
+    return s;
+  },
+  lang() { return ((Settings.data.srLang || '').trim() || navigator.language || 'en-US').toLowerCase(); },
+  ranked() { const lang = this.lang(); return this.voices.map((v, k) => ({ v, k, s: this.score(v, lang) })).sort((a, b) => b.s - a.s || a.k - b.k).map((z) => z.v); },
+  best() { return this.ranked()[0] || null; },
+  /* 'system' sets no voice at all and lets the device use its own setting: a voice a browser will not list to a page may still speak.
+     Read again every time: a voice downloaded while the page is open is not always announced.                                       */
+  pick() { if (Settings.data.voiceURI === 'system') return null; this.load(); return this.voices.find((v) => v.voiceURI === Settings.data.voiceURI) || this.best(); },
+  /* a phone lets a page speak only once a finger has asked it to: the first touch says nothing, aloud */
+  prime() { if (this.primed || !this.has()) return; this.primed = true; try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) { /* ignore */ } },
+  /* when the voice was last cut off: an utterance handed over in the same breath as a cancel can be swallowed with it
+     (a precaution, from reports of some engines; not seen here), so the narrator leaves a moment between the two */
+  cancelAt: 0,
+  stop() { if (this.has()) try { speechSynthesis.cancel(); this.cancelAt = performance.now(); } catch (e) { /* ignore */ } },
+};
+/* text -> whole sentences, and what is left over (the start of a sentence still arriving). A sentence ends at . ! ? or an
+   ellipsis, with any closing quote or bracket, and then white space; a blank line ends one too. With `final` the rest is a sentence. */
+const SENT_MAX = 240;
+function sentencesOf(buf, final) {
+  const out = []; let rest = String(buf == null ? '' : buf);
+  const keep = (s) => {
+    s = s.replace(/\s+/g, ' ').trim();
+    while (s.length > SENT_MAX) {                            /* a very long sentence is read a clause at a time: some voices stop dead on one */
+      const head = s.slice(0, SENT_MAX), at = Math.max(head.lastIndexOf(', '), head.lastIndexOf('; '), head.lastIndexOf(': ')), cut = at > 40 ? at + 1 : (head.lastIndexOf(' ') > 40 ? head.lastIndexOf(' ') : SENT_MAX);
+      out.push(s.slice(0, cut).trim()); s = s.slice(cut).trim();
+    }
+    if (/[\p{L}\p{N}]/u.test(s)) out.push(s);                /* nothing but dots and dashes is not said */
+  };
+  for (;;) {
+    const para = rest.search(/\n\s*\n/), m = rest.match(/[.!?…]+["'”’)\]]*(?=\s)/), end = m ? m.index + m[0].length : -1;
+    if (para >= 0 && (end < 0 || para < end)) { keep(rest.slice(0, para)); rest = rest.slice(para).replace(/^\s+/, ''); continue; }
+    if (end >= 0) { keep(rest.slice(0, end)); rest = rest.slice(end).replace(/^\s+/, ''); continue; }
+    break;
+  }
+  if (final) { keep(rest); rest = ''; }
+  return { out, rest };
+}
+const CANCEL_GAP = 90;                                       /* ms left between cutting the voice off and giving it something new to say */
+const NARR_MAX = 40;                                         /* sentences waiting: past this the oldest are dropped, not read late */
+const Narrator = {
+  q: [], buf: '', node: null, running: false, gen: 0, cut: null, lit: null, spoken: 0,
+  on() { return !!Settings.data.voiceOn && Speech.available(); },
+  busy() { return this.running || this.q.length > 0; },
+  /* how long one sentence may take before it is given up on (a device voice can simply never finish) */
+  patience(text, rate) { return Math.round((String(text).length / (14.5 * (rate || 1))) * 2000 + 3000); },
+  /* a telling begins: its sentences are marked on this node while they are read */
+  begin(node) { this.buf = ''; this.node = node || null; },
+  push(t) { if (!this.on()) { this.buf = ''; return; } this.buf += String(t == null ? '' : t); this.take(false); },
+  end() { if (this.on() && this.buf) this.take(true); this.buf = ''; },
+  say(text, node) { this.begin(node); this.push(text); this.end(); },
+  take(final) {
+    const r = sentencesOf(this.buf, final); this.buf = r.rest;
+    for (const s of r.out) this.q.push({ text: s, node: this.node });
+    if (this.q.length > NARR_MAX) this.q.splice(0, this.q.length - NARR_MAX);
+    this.pump();
+  },
+  async pump() {
+    if (this.running || !this.q.length) return;
+    this.running = true; const gen = this.gen;
+    while (this.q.length) { const it = this.q.shift(); this.mark(it.node); await this.speak(it); if (gen !== this.gen) return; }
+    this.running = false; this.mark(null);
+  },
+  speak(it) {
+    return new Promise((res) => {
+      let done = false, timer = 0, lead = 0;
+      const finish = () => { if (done) return; done = true; clearTimeout(timer); clearTimeout(lead); if (this.cut === finish) this.cut = null; res(); };
+      this.cut = finish;
+      const go = () => {
+        if (done) return;
+        try {
+          const u = new SpeechSynthesisUtterance(it.text), v = Speech.pick();
+          if (v) { u.voice = v; u.lang = v.lang; }
+          u.rate = clamp(+Settings.data.rate || 1, .5, 2);
+          u.onend = finish; u.onerror = finish;
+          timer = setTimeout(() => { Speech.stop(); finish(); }, this.patience(it.text, u.rate));
+          this.spoken++;
+          speechSynthesis.resume(); speechSynthesis.speak(u);
+        } catch (e) { finish(); }
+      };
+      const wait = Speech.cancelAt ? CANCEL_GAP - (performance.now() - Speech.cancelAt) : 0;
+      if (wait > 0) lead = setTimeout(go, wait); else go();
+    });
+  },
+  /* which passage is being read: a mark in its margin, the music turned down under the voice, the speaker button lit */
+  mark(node) {
+    if (this.lit && this.lit !== node) this.lit.classList.remove('speaking');
+    this.lit = node || null;
+    if (node && node.classList) node.classList.add('speaking');
+    const on = this.running; Sfx.duck(on);
+    const b = $('voice-btn'); if (b) b.classList.toggle('live', on);
+  },
+  /* silence, now: whatever was waiting is not read later */
+  stop() {
+    const was = this.busy();
+    this.gen++; this.q = []; this.buf = ''; this.running = false;
+    Speech.stop(); if (this.cut) this.cut();
+    this.mark(null);
+    return was;
+  },
+};
+/* a line spoken instead of typed: what is heard is written into the same field, to be read before it is sent */
+const Listen = {
+  rec: null, live: false,
+  sr() { return window.SpeechRecognition || window.webkitSpeechRecognition || null; },
+  supported() { return !!this.sr(); },
+  toggle() { if (this.live) this.stop(); else this.start(); },
+  show(on) { this.live = on; const b = $('mic'); b.classList.toggle('live', on); b.setAttribute('aria-pressed', String(on)); UI.sayBtns(); },
+  start() {
+    const SR = this.sr();
+    if (!SR || this.live) return;
+    if (G.busy) { UI.toast(BUSY); return; }
+    if (!Mode.typed()) { UI.needKey(); return; }
+    Narrator.stop(); Sfx.wake();
+    const r = new SR(), say = $('say'), base = say.value.trim() ? say.value.trim() + ' ' : '';
+    r.lang = (Settings.data.srLang || '').trim() || navigator.language || 'en-US';
+    r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
+    let fin = '';
+    r.onresult = (e) => {
+      let interim = '';
+      for (let k = e.resultIndex; k < e.results.length; k++) { const t = e.results[k][0].transcript; if (e.results[k].isFinal) fin += t; else interim += t; }
+      say.value = clip((base + fin + interim).replace(/\s+/g, ' '), 600);
+    };
+    r.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') UI.toast('The microphone is blocked for this page.');
+      else if (e.error === 'no-speech') UI.toast('Nothing was heard.');
+      else if (e.error !== 'aborted') UI.toast('Listening stopped (' + clip(String(e.error || 'unknown'), 40) + ').');
+    };
+    r.onend = () => { if (this.rec !== r) return; this.rec = null; this.show(false); if (Settings.data.autoSend && fin.trim() && !G.busy) UI.send(); };
+    this.rec = r;
+    try { r.start(); this.show(true); UI.storyOpen(true, true); } catch (e) { this.rec = null; this.show(false); UI.toast('Listening is not available here.'); }
+  },
+  stop() { try { if (this.rec) this.rec.stop(); } catch (e) { /* ignore */ } },
+  /* dropped, not sent: the table has moved on */
+  drop() { const r = this.rec; this.rec = null; if (r) { try { r.abort(); } catch (e) { /* ignore */ } } if (this.live) this.show(false); },
+};
+
 /* ============================== UI ============================== */
 const UI = {
   saveT: 0, toastT: 0, tab: 'tale', libDone: false, hasSave: false, dlgDefault: null,
@@ -5576,7 +5953,7 @@ const UI = {
   blocked() { return this.panelOpen() || $('dialog').classList.contains('open') || $('menu').classList.contains('open'); },
   openPanel(id) { this.closeMenu(); for (const p of document.querySelectorAll('.panel')) p.classList.toggle('open', p.id === id); Ptr = null; },
   /* a hidden canvas measures as nothing, so re-measure on the way back to the board */
-  closePanels() { for (const p of document.querySelectorAll('.panel')) p.classList.remove('open'); if (View.map) { viewMeasure(); View.dirty = true; } },
+  closePanels() { if ($('pan-notes').classList.contains('open')) this.notesTidy(); for (const p of document.querySelectorAll('.panel')) p.classList.remove('open'); if (View.map) { viewMeasure(); View.dirty = true; } },
 
   /* ---- the board's chrome: the name of the place, the card, the way-out plaque ---- */
   header() {
@@ -5829,7 +6206,8 @@ const UI = {
   party() {
     const st = G.st, box = $('party-list'), R = st.round, busy = G.busy, redo = () => { this.party(); this.bar(); this.arrived(); View.dirty = true; this.saveSoon(); };
     box.textContent = '';
-    $('party-purse').textContent = 'Gold ' + st.gold + ' · ' + clockText(st) + ' · ' + st.quests.Q0.title + (st.quests.Q0.status === 'active' ? '' : ' (' + st.quests.Q0.status + ')');
+    { const pp = $('party-purse'), b = el('button', 'term', 'Gold ' + st.gold); b.type = 'button'; b.addEventListener('click', () => this.rule(st.party[0], 'purse', '')); pp.textContent = ''; pp.appendChild(b);
+      pp.appendChild(document.createTextNode(' · ' + clockText(st) + ' · ' + st.quests.Q0.title + (st.quests.Q0.status === 'active' ? '' : ' (' + st.quests.Q0.status + ')'))); }
     for (const p of st.party) {
       const row = el('div', 'entry pc'), chip = el('span', 'chip pc' + (p.id === st.lead ? ' on' : ''), p.name.charAt(0)), g = el('div', 'grow'), inp = document.createElement('input');
       inp.type = 'text'; inp.className = 'pname'; inp.value = p.name; inp.maxLength = 24; inp.autocomplete = 'off'; inp.spellcheck = false; inp.setAttribute('aria-label', 'Name'); inp.disabled = busy;
@@ -5840,16 +6218,22 @@ const UI = {
       out.addEventListener('click', () => { const res = intent(st, { t: 'party', op: 'drop', id: p.id }); if (!res.ok) { this.toast(res.say); return; } redo(); });
       /* the sheet: a calling that can be changed until it has been tested, then what it comes with */
       const sh = el('div', 'sheet'), sel = document.createElement('select');
+      /* every line of a sheet is a term: tap it for what it means, with this traveller's own numbers */
+      const term = (kind, key, label, cls) => { const b = el('button', 'term' + (cls ? ' ' + cls : ''), label); b.type = 'button'; b.addEventListener('click', () => this.rule(p, kind, key)); return b; };
+      const line = (head, parts, sep, tail) => { const d = el('div', ''); if (head) d.appendChild(el('b', '', head)); parts.forEach((x, k) => { if (k) d.appendChild(document.createTextNode(sep)); d.appendChild(x); }); if (tail) d.appendChild(document.createTextNode(tail)); return d; };
       for (const c of CLASS_ORDER) { const o = el('option', '', c); o.value = c; sel.appendChild(o); }
       sel.value = p.cls; sel.disabled = !!R || busy || p.xp > 0 || p.level > 1; sel.setAttribute('aria-label', 'Calling');
       sel.addEventListener('change', () => { const res = intent(st, { t: 'party', op: 'class', id: p.id, cls: sel.value }); if (!res.ok) { this.toast(res.say); sel.value = p.cls; return; } redo(); });
-      sh.appendChild(sel);
+      sh.appendChild(term('class', '', 'Calling')); sh.appendChild(document.createTextNode(' ')); sh.appendChild(sel); sh.appendChild(document.createTextNode(' '));
       if (!sel.disabled) { const sup = el('button', 'plaque small', 'Surprise me'); sup.type = 'button'; sup.addEventListener('click', () => { const res = intent(st, { t: 'party', op: 'roll', id: p.id }); if (!res.ok) { this.toast(res.say); return; } Sfx.roll(); redo(); }); sh.appendChild(sup); }
-      sh.appendChild(el('span', '', ' Level ' + p.level + ' · HP ' + p.hp + '/' + p.hpMax + ' · AC ' + acOf(p) + ' · XP ' + p.xp + (p.level < 5 ? '/' + XP_LEVELS[p.level] : '') + (p.status !== 'ok' ? ' · ' + p.status.toUpperCase() : '') + (p.conditions.length ? ' · ' + p.conditions.join(', ') : '')));
-      const l2 = el('div', ''); l2.appendChild(el('b', '', 'Strikes with ')); l2.appendChild(document.createTextNode(weaponsOf(p).map((w) => w.n + ' ' + signed(w.hit) + ', ' + w.d + (w.rg > 1 ? ', ' + w.rg * FT + ' ft' : '')).join('; ') + '.'));
-      const l3 = el('div', ''); l3.appendChild(el('b', '', 'Knows ')); l3.appendChild(document.createTextNode(p.abilities.map((a) => { const d = abilityDef(p.cls, a.n); return a.n + (a.max === null ? '' : ' ' + a.uses + '/' + a.max) + ' (' + d.t + ')'; }).join(' ')));
-      const l4 = el('div', ''); l4.appendChild(el('b', '', 'Carries ')); l4.appendChild(document.createTextNode((p.items.map((x) => x.n + (x.q > 1 ? ' x' + x.q : '')).join(', ') || 'nothing') + '.'));
-      sh.appendChild(l2); sh.appendChild(l3); sh.appendChild(l4);
+      { const facts = [term('level', '', 'Level ' + p.level), term('hp', '', 'HP ' + p.hp + '/' + p.hpMax), term('ac', '', 'AC ' + acOf(p)), term('level', '', 'XP ' + p.xp + (p.level < 5 ? '/' + XP_LEVELS[p.level] : ''))];
+        if (p.status !== 'ok') facts.push(term('status', '', p.status.toUpperCase()));
+        for (const c of p.conditions) facts.push(term('cond', c, c));
+        const l1 = line('', facts, ' · '); l1.className = 'facts'; sh.appendChild(l1); }
+      { const stats = el('div', 'stats'); for (const a of ABILS) { const b = term('abil', a, a.toUpperCase(), 'stat'); b.setAttribute('aria-label', ABIL_NAMES[a] + ' ' + p.scores[a]); b.appendChild(el('span', '', String(p.scores[a]))); b.appendChild(el('i', '', signed(abMod(p.scores[a])))); stats.appendChild(b); } sh.appendChild(stats); }
+      sh.appendChild(line('Strikes with ', weaponsOf(p).map((w) => term('attack', w.n, w.n + ' ' + signed(w.hit) + ', ' + w.d + (w.rg > 1 ? ', ' + w.rg * FT + ' ft' : ''))), '; ', '.'));
+      sh.appendChild(line('Knows ', p.abilities.map((a) => term('ability', a.n, a.n + (a.max === null ? '' : ' ' + a.uses + '/' + a.max))), ', ', '.'));
+      sh.appendChild(line('Carries ', p.items.length ? p.items.map((x) => term('item', x.n, x.n + (x.q > 1 ? ' x' + x.q : ''))) : [document.createTextNode('nothing')], ', ', '.'));
       if (p.background || p.personality || p.look) sh.appendChild(el('div', '', [p.ancestry, p.background, p.personality, p.look].filter(Boolean).join('; ') + '.'));
       g.appendChild(inp); row.appendChild(chip); row.appendChild(g); row.appendChild(lead); row.appendChild(out); row.appendChild(sh); box.appendChild(row);
     }
@@ -5859,6 +6243,8 @@ const UI = {
     const fb = $('party-fallen'); fb.textContent = '';
     for (const f of st.fallen) { const e = el('div', 'entry gone'), gg = el('div', 'grow'); gg.appendChild(el('h3', '', f.name)); gg.appendChild(el('div', 'sub', f.cls + ' ' + f.level + ' · fell on day ' + f.day)); e.appendChild(gg); fb.appendChild(e); }
   },
+  /* a line of a sheet, explained: what it is, and this traveller's own numbers in it */
+  rule(p, kind, key) { const r = p && G.st ? ruleOf(G.st, p, kind, key) : null; if (!r) return; Sfx.page(); this.dialog(r.title, ruleLines(r), [{ t: 'Close', main: true }]); },
   card(name, text, acts, cls) {
     const on = !!name, box = $('info-acts'); $('info').hidden = !on; $('board').classList.toggle('has-info', on); $('info').classList.toggle('talk', on && cls === 'talk');
     box.textContent = '';
@@ -5897,7 +6283,11 @@ const UI = {
       this.sayBar();
       if (opening || fresh) Session.queue('opening');
       /* told by the script, the opening is also the tale's title card; then the travellers are made on the party sheet */
-      if (opening && !Mode.ai('narrate')) this.dialog(B.town, beatText(st, 'opening').split('\n\n'), [{ t: 'Begin', main: true, fn: () => { if (!Mode.ai('create')) this.whoIsHere(); } }], true);
+      if (opening && !Mode.ai('narrate')) {
+        const text = beatText(st, 'opening');
+        Session.openRead = Narrator.on(); Narrator.say(text, null);        /* read while it is on the card; the same words in the story are then not read a second time */
+        this.dialog(B.town, text.split('\n\n'), [{ t: 'Begin', main: true, fn: () => { Narrator.stop(); if (!Mode.ai('create')) this.whoIsHere(); } }], true);   /* turning the page ends the reading of it */
+      }
       this.storyOpen(Settings.data.storyOpen, true);
       if (st.over) this.over();
     });
@@ -5912,7 +6302,20 @@ const UI = {
   /* who runs the table has changed, perhaps in the middle of a tale: nothing is half-addressed, and the board shows it */
   modeChanged() { Session.to = null; this.sayBar(); if (G.st && document.body.classList.contains('in-play')) { $('say').placeholder = 'Say or do something'; this.card(null); this.bar(); View.dirty = true; } },
   /* the typed line is for a model: where none is listening, it is not offered */
-  sayBar() { document.body.classList.toggle('no-say', !Mode.typed()); document.body.classList.toggle('hide-tags', !Settings.data.tags); },
+  sayBar() {
+    document.body.classList.toggle('no-say', !Mode.typed()); document.body.classList.toggle('hide-tags', !Settings.data.tags);
+    const v = $('voice-btn'); v.hidden = !Speech.has(); v.setAttribute('aria-pressed', String(!!Settings.data.voiceOn));
+    if (!Mode.typed()) Listen.drop();
+    this.sayBtns();
+  },
+  /* the end of the line field: STOP while a model is telling; else the microphone while there is nothing to send, and SEND once there is */
+  sayBtns() {
+    const busy = $('story').classList.contains('busy'), mic = Listen.supported() && Mode.typed(), has = !!$('say').value.trim();
+    $('say-stop').hidden = !busy; $('mic').hidden = busy || !mic || (has && !Listen.live); $('say-send').hidden = busy || (mic && (!has || Listen.live));
+  },
+  /* the narrator on or off, from the bar: off is silence at once */
+  voice(on) { Settings.data.voiceOn = !!on; Settings.save(); if (on) Speech.prime(); else Narrator.stop(); this.sayBar(); if ($('pan-settings').classList.contains('open')) this.settings(); },
+
   /* the matter at hand is settled and its ending told */
   ending() {
     const st = G.st, q = st.quests.Q0;
@@ -5952,6 +6355,7 @@ const UI = {
     f.appendChild(el('span', 'src ' + e.src, e.src === 'ai' ? 'AI' : 'Script'));
     f.appendChild(el('span', 'area', AREA_SHORT[e.area] || ''));
     marks(f, 'r', 'This telling');
+    { const k = el('button', 'keep', '\u270E'); k.type = 'button'; k.setAttribute('aria-label', 'Keep this passage in your notes'); k.addEventListener('click', () => this.keep(e.text, 'story')); f.appendChild(k); }
     if (e.twin) {
       const b = el('button', 'twin-btn', 'Script’s version'), box = el('div', 'st-twin'), tr = el('div', 'twin-rate');
       b.type = 'button'; b.setAttribute('aria-expanded', 'false'); box.hidden = true;
@@ -5960,6 +6364,60 @@ const UI = {
       f.appendChild(b); f.appendChild(box);
     }
     return f;
+  },
+  /* ---- notes: words lifted from the story as they stand, and the players' own. Kept with the tale. ---- */
+  keep(text, src) {
+    const st = G.st; if (!st) return null;
+    const res = intent(st, { t: 'jot', op: 'add', text, src });
+    if (!res.ok) { this.toast(res.say); Sfx.deny(); return null; }
+    Sfx.page(); this.saveSoon(); if (src === 'story') this.toast('Kept in your notes.');
+    return res;
+  },
+  notes(focusId) {
+    const st = G.st, ul = $('notes-list'); ul.textContent = '';
+    $('notes-add').disabled = !st; $('notes-none').hidden = !!(st && st.notes.length);
+    if (!st) return;
+    for (const n of st.notes) {
+      const li = el('li', n.src === 'story' ? 'story' : ''), g = el('div', 'grow'), ta = document.createElement('textarea'), del = el('button', 'iconbtn note-del', '\u00D7');
+      const fit = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
+      ta.value = n.text; ta.rows = 1; ta.maxLength = NOTE_LEN; ta.dataset.id = n.id; ta.setAttribute('aria-label', n.src === 'story' ? 'A note from the story' : 'A note of your own'); ta.placeholder = 'Write here';
+      ta.addEventListener('input', () => { fit(); const res = intent(st, { t: 'jot', op: 'edit', id: n.id, text: ta.value }); if (res.ok) this.saveSoon(); });
+      del.type = 'button'; del.setAttribute('aria-label', 'Remove this note');
+      del.addEventListener('click', () => { const res = intent(st, { t: 'jot', op: 'drop', id: n.id }); if (!res.ok) { this.toast(res.say); return; } li.remove(); Sfx.page(); this.saveSoon(); $('notes-none').hidden = st.notes.length > 0; });
+      g.appendChild(ta); g.appendChild(el('div', 'sub', (n.src === 'story' ? 'From the story · ' : '') + 'Day ' + n.day + ', ' + String(Math.floor(n.minute / 60)).padStart(2, '0') + ':' + String(n.minute % 60).padStart(2, '0')));
+      li.appendChild(g); li.appendChild(del); ul.appendChild(li);
+      requestAnimationFrame(fit);
+      if (n.id === focusId) requestAnimationFrame(() => ta.focus());
+    }
+  },
+  /* leaving the page: a note left blank was never written */
+  notesTidy() { const st = G.st; if (!st) return; if (intent(st, { t: 'jot', op: 'tidy' }).dropped) this.saveSoon(); },
+  /* words selected in the story: a button under them keeps exactly those words */
+  grabbed: '',
+  selChanged() {
+    const b = $('note-grab'), log = $('story-log'), sel = window.getSelection ? window.getSelection() : null;
+    const inside = !!(G.st && sel && !sel.isCollapsed && sel.rangeCount && log.contains(sel.anchorNode) && log.contains(sel.focusNode)), txt = inside ? rangeText(sel.getRangeAt(0)) : '';
+    if (!txt.trim()) { b.classList.remove('on'); this.grabbed = ''; return; }
+    this.grabbed = txt; b.classList.add('on');
+    const r = sel.getRangeAt(0).getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight, bw = b.offsetWidth || 96, bh = b.offsetHeight || 44;
+    let top = r.bottom + 12; if (top + bh > vh - 8) top = r.top - bh - 12;
+    b.style.left = Math.round(clamp(r.left + r.width / 2 - bw / 2, 8, Math.max(8, vw - bw - 8))) + 'px'; b.style.top = Math.round(clamp(top, 8, Math.max(8, vh - bh - 8))) + 'px';
+  },
+  grab() {
+    const t = this.grabbed; this.grabbed = ''; $('note-grab').classList.remove('on');
+    if (!t.trim()) return;
+    this.keep(t, 'story');
+    try { window.getSelection().removeAllRanges(); } catch (e) { /* ignore */ }
+  },
+  /* the voices this device offers, best first, with two ways of not choosing one */
+  voices() {
+    const sel = $('set-voiceuri'), d = Settings.data, best = Speech.best(), add = (v, t) => { const o = el('option', '', t); o.value = v; sel.appendChild(o); };
+    Speech.load(); sel.textContent = '';
+    add('', 'The best one here' + (best ? ': ' + clip(best.name || '', 40) : ''));
+    add('system', 'Whatever this device is set to');
+    for (const v of Speech.ranked().slice(0, 80)) { const q = Speech.quality(v); add(v.voiceURI, clip(v.name || 'A voice', 40) + ' (' + clip(v.lang || '?', 12) + (q ? ', ' + q : '') + ')'); }
+    sel.value = d.voiceURI === 'system' || Speech.voices.some((v) => v.voiceURI === d.voiceURI) ? d.voiceURI : '';
+    $('voice-note').textContent = !Speech.has() ? 'This browser cannot read aloud.' : !Speech.voices.length ? 'This device has not offered a voice yet. Some only do after the first tap.' : plural(Speech.voices.length, 'voice') + ' on this device. Better ones can usually be downloaded in its own settings, under speech or accessibility.';
   },
   /* a telling: the words, who told them, and a line in the tally that the Compare page adds up */
   told(src, area, text, turn, twin, usd, model) {
@@ -5972,9 +6430,10 @@ const UI = {
     return e;
   },
   /* the script speaks: at once, and for nothing */
-  script(area, text) {
+  script(area, text, quiet) {
     const st = G.st, first = !st.story.some((x) => x.t === 'gm'), e = this.told('script', area, text, st.turn), n = this.logEnd(this.storyNode(e, first)), f = this.storyFoot(e);
     if (f) this.logEnd(f);
+    if (!quiet) { if (area !== 'narrate') Narrator.stop(); Narrator.say(text, n); }      /* an answer to a tap is read at once; a beat waits its turn behind what is being read */
     if (!$('story-log').offsetHeight) $('story-toggle').classList.add('new');      /* a story folded away stays folded: the fold is marked instead */
     return n;
   },
@@ -6025,7 +6484,7 @@ const UI = {
   },
   busy(on) {
     const log = $('story-log'), wait = log.querySelector('.st-wait');
-    $('story').classList.toggle('busy', on); $('say-send').hidden = on; $('say-stop').hidden = !on;
+    $('story').classList.toggle('busy', on); this.sayBtns();
     if (on && !wait) { log.appendChild(el('div', 'st-wait', 'The Game Master')); log.scrollTop = log.scrollHeight; } else if (!on && wait) wait.remove();
     View.dirty = true;
   },
@@ -6037,7 +6496,7 @@ const UI = {
     const p = pcOf(st, $('say-who').value), to = Session.to;
     if (!Mode.typed()) { this.needKey(); return; }
     if (!Mode.ai(to ? 'talk' : 'act')) { this.toast(to ? 'The script voices people at this table: tap them and choose Talk.' : 'Tap someone and choose Talk to speak to them.'); Session.to = null; inp.placeholder = 'Say or do something'; return; }
-    inp.value = ''; inp.placeholder = 'Say or do something'; Session.to = null;
+    inp.value = ''; inp.placeholder = 'Say or do something'; Session.to = null; Listen.drop(); this.sayBtns();
     Session.turn('player', { who: p ? p.name : 'The table', id: p ? p.id : '', text: clip(text, 600), to: to ? to.id + ' ' + to.name : '', toId: to ? to.id : '' });
   },
   /* where everyone stands, before the Game Master does something; and afterwards, the board made to show it */
@@ -6175,6 +6634,11 @@ const UI = {
     $('set-m-monsters').value = d.taskModels.monsters || ''; $('set-m-beat').value = d.taskModels.beat || ''; $('set-m-turn').value = d.taskModels.turn || '';
     $('set-costs').disabled = !G.st;
     $('key-note').textContent = Settings.key() ? 'A key is set.' : Settings.cyoaKey() ? 'No key is set here. One is saved on this device for CYOA.' : 'No key is set.';
+    /* the narrator's voice, and speaking a line */
+    $('set-voice').checked = !!d.voiceOn; $('set-voice').disabled = !Speech.has(); $('set-rate').value = d.rate; this.voices();
+    $('set-voiceuri').disabled = $('set-voice-test').disabled = !Speech.has();
+    $('set-autosend').checked = !!d.autoSend; $('set-srlang').value = d.srLang; $('listen-rows').hidden = !Listen.supported();
+    $('listen-note').textContent = !Listen.supported() ? 'This browser cannot listen, so a line to Claude is typed.' : 'Where Claude is given the talking or the typed lines, a microphone sits at the end of the line field. The browser does the listening, and some browsers send the sound to their maker to do it.';
   },
   costs() {
     const st = G.st, list = st ? st.costs : [], box = $('costs-body'); box.textContent = '';
@@ -6272,9 +6736,9 @@ const UI = {
    telling fails half way, the tale is put back exactly as it was before it began;
    the reply is paid for either way, and the ledger says so.                       */
 const Session = {
-  beats: [], to: null, tried: '',
+  beats: [], to: null, tried: '', openRead: false,
   on() { return typeof window.__CYOA2_MOCK__ === 'function' || !!Settings.key(); },
-  reset() { if (G.abort) G.abort.abort(); this.beats = []; this.to = null; this.tried = ''; G.busy = false; G.abort = null; G.foeKey = ''; G.foeN = 0; },
+  reset() { if (G.abort) G.abort.abort(); Narrator.stop(); Listen.drop(); this.openRead = false; this.beats = []; this.to = null; this.tried = ''; G.busy = false; G.abort = null; G.foeKey = ''; G.foeN = 0; },
   /* a beat: something the table asks its Game Master to tell without being spoken to */
   queue(kind, data) {
     const st = G.st;
@@ -6305,7 +6769,8 @@ const Session = {
     const st = G.st;
     if (b.kind === 'create') return;
     const text = beatText(st, b.kind, b.data);
-    if (text) UI.script('narrate', text);
+    if (text) UI.script('narrate', text, b.kind === 'opening' && this.openRead);
+    if (b.kind === 'opening') this.openRead = false;
     st.told.open = 1;
     if (b.kind !== 'ending') st.told[st.here] = 1;
     if (b.kind === 'fightend') sceneNote(st, 'At ' + st.sites[b.site || st.here].name + ': ' + String(b.data || 'a fight ended.'));
@@ -6335,13 +6800,13 @@ const Session = {
     /* what the script would have said or done at this same moment: asked now, before the model changes anything, and it costs nothing */
     let twin = '';
     if (Settings.data.twin) { try { twin = kind === 'player' ? (d.toId ? talkTwin(st, d.toId, d.text) : actTwin(st)) : kind === 'monsters' ? monstersTwin(snap) : beatText(st, d.kind, d.data); } catch (e) { twin = ''; } }
-    if (kind === 'player') UI.tell(storyEntry('pl', d.text, turnNo, { who: d.who, id: d.id }));
+    if (kind === 'player') { Narrator.stop(); UI.tell(storyEntry('pl', d.text, turnNo, { who: d.who, id: d.id })); }      /* someone has spoken: whatever was being read gives way */
     G.abort = typeof AbortController === 'function' ? new AbortController() : null;
     const bill = { usd: 0, calls: 0, tok: { in: 0, out: 0, read: 0, write: 0 }, models: [], unknown: false };
     let pass = null, timed = false;
     const hooks = {
       signal: G.abort ? G.abort.signal : undefined,
-      text: (t) => { if (G.st === st) pass = UI.stream(pass, t); },
+      text: (t) => { if (G.st !== st) return; const first = !pass; pass = UI.stream(pass, t); if (first) Narrator.begin(pass); Narrator.push(t); },   /* read as it arrives, a sentence at a time */
       usage: (u, model) => { if (!u) return; const c = Costs.claude(model, u); bill.usd += c.usd; bill.calls++; for (const k of Object.keys(bill.tok)) bill.tok[k] += c.t[k]; if (!c.known) bill.unknown = true; if (model && !bill.models.includes(model)) bill.models.push(model); },
       tool: (name, input) => {
         if (G.st !== st) return err('The table has moved on to another tale.');
@@ -6363,7 +6828,10 @@ const Session = {
     const cost = bill.calls ? { kind: 'gm', task, turn: turnNo, desc, model: bill.models.join(', '), usd: bill.usd, calls: bill.calls, tok: bill.tok, unknown: bill.unknown, failed: failure ? (failure.kind === 'aborted' ? 'cancelled' : failure.kind) : '' } : null;
     if (failure) {
       /* the telling failed: the tale is put back exactly as it was before it began */
+      Narrator.stop();                                      /* a telling taken back is not read on */
+      const kept = st.notes, keptN = st.n.note;
       st = G.st = unpackState(JSON.parse(snap));
+      st.notes = kept; st.n.note = Math.max(st.n.note, keptN);          /* the players' notes are not the telling's to take back */
       if (cost) Costs.add(st, cost);
       G.busy = false; UI.busy(false);
       viewResync(); UI.renderStory();
@@ -6375,11 +6843,12 @@ const Session = {
       }
       if (cost) UI.costTag(turnNo);
       if (kind === 'player' && !$('say').value.trim()) $('say').value = d.text;
+      UI.sayBtns();
     } else {
       const text = ((out && out.text) || '').trim();
       if (text) {
         const e = UI.told('ai', area, text, turnNo, twin, bill.usd, bill.models.join(', '));
-        if (!pass) pass = UI.logEnd(UI.storyNode(e, false));
+        if (!pass) { pass = UI.logEnd(UI.storyNode(e, false)); Narrator.say(text, pass); } else Narrator.end();
         pass.textContent = text; pass.classList.add('by-ai');
         const foot = UI.storyFoot(e); if (foot) pass.after(foot);
       }
@@ -6436,6 +6905,7 @@ const Session = {
     if (act === 'chron') { UI.chron(); UI.openPanel('pan-chron'); }
     else if (act === 'lib') { UI.library(); UI.openPanel('pan-lib'); }
     else if (act === 'compare') { UI.compare(); UI.openPanel('pan-compare'); }
+    else if (act === 'notes') { UI.notes(); UI.openPanel('pan-notes'); }
     else if (act === 'party') { UI.party(); UI.openPanel('pan-party'); }
     else if (act === 'settings') { UI.settings(); UI.openPanel('pan-settings'); }
     else if (act === 'export') UI.exportFile();
@@ -6494,7 +6964,28 @@ const Session = {
   /* the story bar */
   on('story-toggle', 'click', () => { Sfx.wake(); UI.storyOpen(!$('story').classList.contains('open')); });
   on('say-send', 'click', () => { Sfx.wake(); UI.send(); });
-  on('say-stop', 'click', () => { if (G.abort) G.abort.abort(); });
+  on('say-stop', 'click', () => { Narrator.stop(); if (G.abort) G.abort.abort(); });
+  on('say', 'input', () => UI.sayBtns());
+  on('mic', 'click', () => { Sfx.wake(); Listen.toggle(); });
+  on('voice-btn', 'click', () => { Sfx.wake(); UI.voice(!Settings.data.voiceOn); });
+  /* a tap on the story while it is being read is silence (a tap that selects words is not) */
+  on('story-log', 'click', (e) => { const sel = window.getSelection ? window.getSelection() : null; if (Narrator.busy() && (!sel || sel.isCollapsed) && !(e.target.closest && e.target.closest('button'))) Narrator.stop(); });
+  /* notes */
+  on('notes-add', 'click', () => { const res = UI.keep('', 'mine'); if (res) UI.notes(res.id); });
+  document.addEventListener('selectionchange', () => UI.selChanged());
+  on('note-grab', 'pointerdown', (e) => { e.preventDefault(); UI.grab(); });      /* on the way down: by the time a click arrives a phone has let the selection go */
+  on('note-grab', 'keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); UI.grab(); } });
+  /* the voice */
+  on('set-voice', 'change', (e) => UI.voice(e.target.checked));
+  on('set-voiceuri', 'change', (e) => set('voiceURI', e.target.value));
+  on('set-rate', 'input', (e) => set('rate', clamp(+e.target.value || 1, .5, 2)));
+  on('set-voice-test', 'click', () => { Sfx.wake(); Speech.prime(); if (!Speech.available()) { UI.voices(); UI.toast('No voice is on offer here.'); return; } Narrator.stop(); Narrator.q.push({ text: 'The road out of town runs up into the hills, and somebody is watching it.', node: null }); Narrator.pump(); });
+  on('set-autosend', 'change', (e) => set('autoSend', e.target.checked));
+  on('set-srlang', 'change', (e) => { set('srLang', clip(e.target.value.trim(), 12)); UI.voices(); });
+  Speech.load();
+  if (Speech.has()) { try { speechSynthesis.addEventListener('voiceschanged', () => { Speech.load(); if ($('pan-settings').classList.contains('open')) UI.voices(); }); } catch (e) { /* an older engine: the list is read again whenever it is needed */ } }
+  /* a phone lets a page speak only after a finger has asked: the first touch anywhere does the asking */
+  window.addEventListener('pointerdown', () => { if (Settings.data.voiceOn) Speech.prime(); }, true);
   on('say', 'keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); UI.send(); } else if (e.key === 'Escape') e.target.blur(); });
   if (window.matchMedia) { const mq = window.matchMedia('(prefers-color-scheme: dark)'); if (mq.addEventListener) mq.addEventListener('change', () => UI.theme()); }
 
@@ -6522,7 +7013,7 @@ const Session = {
     else if ((k === 'Enter' || k === ' ') && !$('btn-end').hidden) { e.preventDefault(); $('btn-end').click(); }
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { if (G.st && document.body.classList.contains('in-play')) UI.saveNow(); if (Sfx.ctx && Sfx.ctx.state === 'running') Sfx.ctx.suspend().catch(() => {}); }
+    if (document.hidden) { Narrator.stop(); Listen.drop(); if (G.st && document.body.classList.contains('in-play')) UI.saveNow(); if (Sfx.ctx && Sfx.ctx.state === 'running') Sfx.ctx.suspend().catch(() => {}); }
     else if (Sfx.ctx && Sfx.ctx.state === 'suspended') Sfx.ctx.resume().catch(() => {});
   });
   window.addEventListener('pagehide', () => { if (G.st && document.body.classList.contains('in-play')) UI.saveNow(); });
