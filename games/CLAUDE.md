@@ -982,7 +982,7 @@ travel in the save and are never shown to the model. And **every line of a trave
 sheet is a button** that opens its page of a rule book, with that traveller's own
 numbers and the rules as this table plays them.
 **Proprietary** (one of the eight protected games; confirmed by the CD on 2026-10-10).
-Suite: `.claude/tests/drive-cyoa2.cjs` (806 checks: generators over 36 worlds, sight
+Suite: `.claude/tests/drive-cyoa2.cjs` (807 checks: generators over 36 worlds, sight
 judged by an independent line walker, fights played out by the script against the
 suite's own traveller, every tool called with one of each kind of bad input, the real
 client against a stand-in for the API, whole scripted tales played start to ending

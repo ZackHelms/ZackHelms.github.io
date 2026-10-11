@@ -52,8 +52,9 @@ backlog entry here.
   voice is **still the default**; **one sentence that fails is read by the
   device's voice** and only a refusal or three failures running hand it the
   rest (CYOA gives up at the first); **OpenAI only**, no ElevenLabs; the
-  narrator dropdown's wording, which copies yours; and whether the five area
-  dropdowns should be shortened the way you shortened the Game Master's.
+  narrator dropdown's wording, which copies yours; and the words on the five
+  dropdowns you asked to have shortened, which are mine: "Scripted" / "AI",
+  "Off" for typed lines, "By hand" for the monsters.
 - [cyoa2] **Hear it on your phone.** The narrator and the microphone have only
   ever met stand-ins: a headless browser has no voice and cannot listen. Four
   things only a device can answer. Does the opening speak on the first new

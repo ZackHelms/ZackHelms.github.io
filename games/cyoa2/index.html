@@ -383,7 +383,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-11 16:10 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-11 16:36 UTC</div>
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
 
@@ -486,13 +486,13 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
       <label class="field"><span>The Game Master is</span><select id="set-gm"><option value="script">Scripted (free)</option><option value="ai">AI (Claude api key)</option></select></label>
       <p class="note" id="gm-note"></p>
       <div id="ai-areas">
-      <label class="field"><span>Narration at the beats</span><select id="set-a-narrate"><option value="script">The script</option><option value="ai">Claude</option></select></label>
-      <label class="field"><span>Talking to people</span><select id="set-a-talk"><option value="script">The script: topics to choose from</option><option value="ai">Claude: say anything</option></select></label>
-      <label class="field"><span>Lines typed to the table</span><select id="set-a-act"><option value="script">Not offered</option><option value="ai">Claude</option></select></label>
-      <label class="field"><span>Making characters</span><select id="set-a-create"><option value="script">On the party sheet</option><option value="ai">Claude, in conversation</option></select></label>
+      <label class="field"><span>Narration at the beats</span><select id="set-a-narrate"><option value="script">Scripted</option><option value="ai">AI</option></select></label>
+      <label class="field"><span>Talking to people</span><select id="set-a-talk"><option value="script">Scripted</option><option value="ai">AI</option></select></label>
+      <label class="field"><span>Lines typed to the table</span><select id="set-a-act"><option value="script">Off</option><option value="ai">AI</option></select></label>
+      <label class="field"><span>Making characters</span><select id="set-a-create"><option value="script">Scripted</option><option value="ai">AI</option></select></label>
       <label class="check"><input id="set-twin" type="checkbox"><span>Under Claude's tellings, keep what the script would have said</span></label>
       </div>
-      <label class="field"><span>Monsters in a fight are played by</span><select id="set-monsters"><option value="script">The script</option><option value="gm">Claude</option><option value="hand">You, by hand</option></select></label>
+      <label class="field"><span>Monsters in a fight are played by</span><select id="set-monsters"><option value="script">Scripted</option><option value="gm">AI</option><option value="hand">By hand</option></select></label>
       <label class="check"><input id="set-tags" type="checkbox"><span>Mark who told each passage, with marks to rate it by</span></label>
       <div class="row" style="margin-top:10px"><button id="set-compare" class="plaque small" type="button">Compare</button></div>
       <p class="note">The beats: the opening, the first sight of a new place, a fight starting and ending, the tale's end. Walking, doors, blows, chests and locks are always the engine's, and free.</p>

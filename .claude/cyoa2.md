@@ -4,7 +4,7 @@
 **board of 5 ft squares**: a seed makes a town, its inn and trades, its houses and a
 bandit cave; each place's board is **charted the first time someone walks in** and is
 kept in the save from then on. CD commission, 2026-10-09 (in chat, not `/create-new-games`).
-Suite: `.claude/tests/drive-cyoa2.cjs` (806 checks) with its own player,
+Suite: `.claude/tests/drive-cyoa2.cjs` (807 checks) with its own player,
 `.claude/tests/cyoa2-player.js`. Style: **Grimoire** (`.claude/styles/grimoire.md`).
 **Proprietary** (`games/cyoa2/LICENSE`), confirmed by the CD on 2026-10-10.
 
@@ -114,6 +114,10 @@ how much the ai assists in different areas."* Four questions:
 - **The Game Master dropdown's two options are the CD's words (2026-10-11): "Scripted
   (free)" and "AI (Claude api key)".** The older wording was "too verbose". Do not
   lengthen them.
+- **The other dropdowns in that block are to be short too (CD, the same day, asked
+  whether to shorten them the same way: "Yes").** The four areas and the monsters now
+  read "Scripted" / "AI", with "Off" for typed lines (the script takes none) and "By
+  hand" for the monsters. The request is the CD's; those five words are mine.
 
 Told to the CD with the questions, and not objected to: the script is the default **even
 when a key is saved**; the model is switched **per area**, not all-or-nothing; the
@@ -275,7 +279,7 @@ use the gpt key"); these are how I filled it in, and where it departs from CYOA'
 | The voice's cost is **not** on the tags under passages, nor on the Compare page | it is the same whoever tells the tale, so it says nothing about script against model | `Costs.tagText` |
 | A **Costs** button sits beside "Hear it" once the paid voice is chosen | the only other way to the ledger is a button in the Claude block, which a player at the script's table has no reason to open | `set-voice-costs` |
 | **Pace** is sent as the service's `speed` | CYOA does. **Not heard**, so whether gpt-4o-mini-tts honours it is not known (OpenAI's API reference, read 2026-10-11, lists it without a caveat) | `Premium.request` |
-| The five **area** dropdowns keep their longer wording ("The script: topics to choose from") | the CD named the Game Master dropdown only | the `set-a-*` options |
+| The area dropdowns read **"Scripted" / "AI"**; typed lines read **"Off" / "AI"**; the monsters add **"By hand"**. Nothing on the option says what the choice means any more ("topics to choose from", "say anything", "in conversation" are gone) | the CD said yes to shortening them like the Game Master's and gave no words; "(free)" and "(Claude api key)" are not repeated because the dropdown above them has just said it | the `set-a-*` and `set-monsters` options |
 
 ## The road from here (agreed in outline, 2026-10-09)
 
@@ -825,7 +829,7 @@ The second push (voice, microphone, notes, rule book):
 
 ## Tests
 
-`drive-cyoa2.cjs` (806 checks, about 250 s) runs the generators inside the real page
+`drive-cyoa2.cjs` (807 checks, about 250 s) runs the generators inside the real page
 across 36 worlds (329 boards) and asserts they are whole, then the engine's refusals,
 lazy charting, saves (including a tampered file), the phone flow, tap accuracy at five
 viewports after a resize-while-hidden, gestures, keys and the panels (sections A to M,
@@ -962,7 +966,8 @@ a hole one of them had company in. The waits in section 1 now give up quietly, s
 row which cannot get what it waits for fails by name and the rows after it still run.
 Four more went with a Costs button added beside "Hear it" at the end. Run again against
 the suite as shipped: **all 174 are caught by a named row.** As before, a second pass of
-the 152 that were caught the first time was not run.
+the 152 that were caught the first time was not run. Eleven more, one at each name on
+the five shortened dropdowns, were all red at once against the one row that reads them.
 
 What the seven had in common:
 
@@ -1245,8 +1250,7 @@ From the paid voice: ElevenLabs, which CYOA has and nobody asked for here; a sma
 of clips, since the script is deterministic and a line it says twice is paid for twice;
 a choice of speech model in Settings (`ttsModel` is settable only by hand);
 `navigator.audioSession.type = 'playback'`, which is said to let WebAudio play past an
-iPhone's silent switch (not tried); the five area dropdowns shortened the way the CD
-shortened the Game Master's.
+iPhone's silent switch (not tried).
 
 From the two kinds of Game Master: a blind pick between the script's telling and the
 model's (offered to the CD, not chosen); a second adventure once the hill is taken (the
