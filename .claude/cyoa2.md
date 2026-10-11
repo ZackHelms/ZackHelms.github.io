@@ -4,7 +4,7 @@
 **board of 5 ft squares**: a seed makes a town, its inn and trades, its houses and a
 bandit cave; each place's board is **charted the first time someone walks in** and is
 kept in the save from then on. CD commission, 2026-10-09 (in chat, not `/create-new-games`).
-Suite: `.claude/tests/drive-cyoa2.cjs` (750 checks) with its own player,
+Suite: `.claude/tests/drive-cyoa2.cjs` (806 checks) with its own player,
 `.claude/tests/cyoa2-player.js`. Style: **Grimoire** (`.claude/styles/grimoire.md`).
 **Proprietary** (`games/cyoa2/LICENSE`), confirmed by the CD on 2026-10-10.
 
@@ -16,7 +16,7 @@ six, rounds. Step 3 is the Game Master, and it now comes in **two kinds**:
   "deterministic scripted everything"). No model, no key, no cost. It narrates the beats
   out of tables, people answer from **topic buttons**, things offer **verb buttons**, and a
   quest machine in the engine carries the whole adventure to an ending. The page calls
-  nothing at all in this mode.
+  nothing at all in this mode (unless the narrator's paid voice has been chosen: below).
 - **Claude**, over the player's own API key, for any of **five areas** the player gives it
   (narration, talking to people, lines typed to the table, the monsters' turns, making
   characters), acting through 26 engine tools. The script keeps the rest. Under each of
@@ -25,14 +25,19 @@ six, rounds. Step 3 is the Game Master, and it now comes in **two kinds**:
   it all up. That is the experiment the CD asked for: play it scripted, see what the model
   adds, tune how much of the table it gets.
 
-Whoever tells it, **the narrator reads it aloud** in the device's own voice (the second
-push of step 3, 2026-10-10: voice, a microphone where a model is listening, a notes
-page, and a rule book behind every line of a traveller's sheet).
+Whoever tells it, **the narrator reads it aloud** (the second push of step 3,
+2026-10-10: voice, a microphone where a model is listening, a notes page, and a rule
+book behind every line of a traveller's sheet). In the device's own voice by default,
+which is free; or, since 2026-10-11, in **OpenAI's voice over the player's own OpenAI
+key**, as CYOA has it. The CD asked for that after playing it: the free voice "is
+unbearable".
 
-It is the second page in the repo that calls an API at runtime (CYOA is the first), and
-like CYOA it calls nothing but `api.anthropic.com`, and only with a key the player typed.
-The voice and the microphone are the browser's own (`speechSynthesis`,
-`SpeechRecognition`); the page calls nothing for either.
+It is the second page in the repo that calls an API at runtime (CYOA is the first). It
+calls `api.anthropic.com` only where Claude has been given part of the table, and
+`api.openai.com` only where the paid narrator is chosen: each with a key the player
+typed, and each key goes to its own service and nowhere else. **With neither chosen,
+which is the default, the page calls nothing at all.** The device's voice and the
+microphone are the browser's own (`speechSynthesis`, `SpeechRecognition`).
 
 The shipped file is the source of truth. To work on it as parts, split it with
 `.claude/scripts/page-parts.py` (see "Working source" at the end).
@@ -102,6 +107,13 @@ how much the ai assists in different areas."* Four questions:
   report"** (three of four offered; a blind A/B pick was not chosen).
 - **Voice, for the push after this? "Device voice only."** The phone's own speech
   synthesis, free and the same in both modes; no paid voices.
+- **Reversed on 2026-10-11, once the CD had played it: "The biggest pain point is the
+  narrator voice. The free one is unbearable; please add the same option from cyoa where i
+  use the gpt key for narrator voice."** So the narrator has two voices: the device's
+  (free, still the default) and OpenAI's speech on the player's own OpenAI key.
+- **The Game Master dropdown's two options are the CD's words (2026-10-11): "Scripted
+  (free)" and "AI (Claude api key)".** The older wording was "too verbose". Do not
+  lengthen them.
 
 Told to the CD with the questions, and not objected to: the script is the default **even
 when a key is saved**; the model is switched **per area**, not all-or-nothing; the
@@ -243,6 +255,27 @@ shaped it ("Device voice only"); the rest is how I filled it in.
 | The rule book opens from the **party sheet only**, and the sheet gained the **six scores** | CYOA's popups. The scores were shown nowhere before | `UI.party`, `ruleOf()` |
 | On the sheet an ability is its **name and uses**; what it does moved into its page of the book | the sheet was a wall of text | `UI.party` |
 | The book says the rules **as this table plays them** (no reactions, half cover, the bed rule), in my words | it is opened by someone asking "what does this do HERE" | the tables at the top of RULE BOOK |
+
+The paid voice (2026-10-11). One sentence shaped it ("the same option from cyoa where i
+use the gpt key"); these are how I filled it in, and where it departs from CYOA's.
+
+| Assumed | Why | To change it |
+|---|---|---|
+| The device's voice is **still the default**; the paid one is chosen in Settings | the default table calls nothing and needs no key: the CD's rule for the Game Master, kept for the narrator | `Settings.defaults.voiceProvider` |
+| **OpenAI only**. CYOA also offers ElevenLabs; that is not here | "the gpt key" | a provider in `Premium.request`, a host in the CSP, a key name |
+| Voice **Cedar** of thirteen, model **gpt-4o-mini-tts**, CYOA's storyteller direction. The model has no control in Settings | CYOA's values, unchanged | `OPENAI_VOICES`, `NARRATOR_STYLE`, `Settings.data.ttsModel` |
+| The narrator dropdown reads **"Device voice (free)"** and **"OpenAI voice (GPT api key)"** | the pattern the CD set for the Game Master dropdown the same day | the `set-voiceprov` options |
+| **"Use the key saved for CYOA"** is offered when CYOA has an OpenAI key on this device and this page has none | the CD has one there already | `Settings.cyoaKeyOf` |
+| The OpenAI key **follows the Claude key's "remember" box** | one box, as in CYOA | the `set-remember` handler |
+| **One sentence that fails is read by the device's voice** and the paid voice has the next. **A refusal** (400, 401, 403, 404) **or three failures running** hands the rest to the device, with a toast that stays 5 s. Any change to the voice settings, or "Hear it", tries it afresh | **departs from CYOA**, which gives up for the visit on the first failure of any kind. The CD finds the device's voice unbearable, so one dropped request should not cost the rest of the session | `Premium.fail`, `TTS_STRIKES` |
+| A sentence's sound may take **12 s** to arrive; three are asked for **at once** | CYOA sets no limit (a request that hangs would hold its narrator for ever); three is CYOA's | `TTS_WAIT`, `TTS_ABREAST` |
+| Sound for a sentence that will not be read is **let go** (the request is called off): on silence, when an answer cuts in, past the 40-sentence cap | not to pay for what is not heard. **Whether OpenAI bills a request called off in flight is not known**; the ledger counts only sound that arrived | `finish` in `Narrator.speak`, `Narrator.stop`, `Narrator.take` |
+| The paid voice plays **past the music and effects sliders, and past the limiter** | a player with both sliders at nothing still wants the narrator. CYOA gives it its own bus too | `Sfx.voice` |
+| Its cost is an **estimate** (the speech service reports no usage): CYOA's figures, one ledger line for a game day's reading (per turn at a model's table), `~` before the amount on the Costs page, three columns added at the END of the CSV | CYOA's way. **Not checked against an invoice** | `Costs.speech`, `Costs.addVoice` |
+| The voice's cost is **not** on the tags under passages, nor on the Compare page | it is the same whoever tells the tale, so it says nothing about script against model | `Costs.tagText` |
+| A **Costs** button sits beside "Hear it" once the paid voice is chosen | the only other way to the ledger is a button in the Claude block, which a player at the script's table has no reason to open | `set-voice-costs` |
+| **Pace** is sent as the service's `speed` | CYOA does. **Not heard**, so whether gpt-4o-mini-tts honours it is not known (OpenAI's API reference, read 2026-10-11, lists it without a caveat) | `Premium.request` |
+| The five **area** dropdowns keep their longer wording ("The script: topics to choose from") | the CD named the Game Master dropdown only | the `set-a-*` options |
 
 ## The road from here (agreed in outline, 2026-10-09)
 
@@ -468,7 +501,12 @@ the only place that does, and it is asked by the table (UI, SESSION), never by t
   exact token counts from every reply's usage, times list price, **priced on the model
   that served the reply**. Haiku 5.5 has a second price above 100,000 prompt tokens. An
   unpriced model is marked unknown, never guessed. The Costs panel totals by task and by
-  model and exports CSV.
+  model and exports CSV. **The one estimate in the ledger is the narrator's paid voice**
+  (`kind: 'voice'`, `est: true`, with `secs` and `chars`): the speech service reports no
+  usage, so `Costs.speech()` prices the characters sent and the seconds of sound, on
+  CYOA's figures (its `PRICES_CHECKED` is 2026-09-25). `Costs.addVoice()` keeps one line
+  per turn and game day and grows it a sentence at a time. "Hear it" writes a `test`
+  line (`task: 'vtest'`).
 - **Mode** (in STORAGE, beside `Settings`). `master()` is `'ai'` only when the table is
   set to Claude AND a key is there; `ai(area)` adds "and that area is given to it";
   `now()` is all five; `typed()` is whether a typed line would be read; `strict()` is
@@ -497,7 +535,7 @@ the only place that does, and it is asked by the table (UI, SESSION), never by t
   second copy of the arithmetic. "Only in a fight" is `fightOnly(def)` in RULES, which is
   also the engine's own refusal. The words are tables at the top of the section
   (`ABIL_INFO`, `SKILL_INFO`, `COND_INFO`, `CLASS_INFO`, `KIT_INFO`).
-- **Voice** (`VOICE`, after STORAGE). Three objects and a pure function.
+- **Voice** (`VOICE`, after STORAGE). Four objects and a pure function.
   - `Speech`: the device's voices, ranked (`score`: language first, then how well made;
     compact and novelty voices last), `pick()` (the chosen one, the best, or null for
     "whatever this device is set to"), `prime()` (a silent utterance on the first touch,
@@ -510,6 +548,17 @@ the only place that does, and it is asked by the table (UI, SESSION), never by t
     the music ducked, the speaker button lit). `stop()` is silence now: it empties the
     queue, cancels the device, **and ends the utterance in hand itself rather than
     waiting to be told it ended**.
+  - `Premium` (2026-10-11): the paid voice, ported from CYOA. `provider()` is `'openai'`
+    only when that is chosen AND there is a key; `ready()` adds "and it has not failed".
+    `fetch(text, bill)` asks `https://api.openai.com/v1/audio/speech` for ONE sentence
+    (three abreast, 12 s each), decodes it, prices it, charges it to the tale named in
+    `bill`, and resolves to `{ buf, model, secs, chars, usd }`; the promise has an
+    `abort()`. `fail(e)` counts strikes (a refusal is all three at once).
+    `Narrator.enq()` calls `fetch` **as a sentence joins the queue**, so its sound is
+    ready by its turn; `Narrator.speak()` plays the clip through `Sfx.voice` when it
+    comes and falls to the device's voice when it does not, or when the page's sound is
+    not running. `Narrator.on()` is true with either voice; `Narrator.able()` says
+    whether there is anything here that could read at all.
   - `Listen`: `SpeechRecognition`, writing what it hears into the line field. `drop()`
     closes it without sending.
   The narrator is told what to read in exactly three places: `UI.script()` (the script),
@@ -637,7 +686,10 @@ Step 3:
   streaming.
 - **The key lives only under `cyoa2.key`** (localStorage with "remember", else
   sessionStorage, else memory): never in the settings blob, never in a save or an
-  export. `connect-src` in the CSP names `https://api.anthropic.com` and nothing else.
+  export. The OpenAI key lives the same way under `cyoa2.key.openai`
+  (`Settings.keyOf` / `setKeyOf`). `connect-src` in the CSP names
+  `https://api.anthropic.com` and `https://api.openai.com` and nothing else, and **each
+  key is sent to its own host only**: the suite reads the bearer off every request.
 - **Nothing that changes in play goes into `bibleText()` or `SYSTEM_PROMPT`**: they are
   the cached prefix. The suite compares the bible text with the tale's first, after play
   and after a save.
@@ -744,6 +796,28 @@ The second push (voice, microphone, notes, rule book):
   the engine with its own copy of the number in the book is how the two would drift.
 - **A voice's name is the device's text, not ours**: `el('option', '', name)`, never
   markup. The suite offers a voice named `<img onerror>`.
+- **The default calls nothing.** `voiceProvider` defaults to `'device'`, and section V
+  still asserts that a whole scripted tale asks nothing of any service. Making the paid
+  voice the default, or asking for sound while the narrator is off, breaks the CD's first
+  rule for this game.
+- **Whoever lets a sentence go stops listening first.** `finish()` in `Narrator.speak`
+  sets `done` and only then calls off the sound; both handlers on the sound's promise
+  begin `if (done) return`. That order is why silence is never counted as the service's
+  failure (no strike, no toast, no device voice reading the sentence instead), and why
+  sound that could not be called back in time is not played into the silence that was
+  asked for. `Premium.fail()` therefore never sees a sentence that was let go, and does
+  not check for one.
+- **What was read aloud stays on the bill.** A telling that fails puts the tale back
+  from a snapshot; `Session.turn` carries the ledger's `voice` lines across that and
+  puts the ledger back in time order. Sound that arrives for a tale no longer on the
+  table is charged to nobody (`Premium.charge` compares `made` and `seed`).
+- **The paid voice is WebAudio, so it needs a gesture and a running context.** The first
+  pointerdown wakes `Sfx` when the paid voice is ready; `sound()` hands the sentence to
+  the device's voice if the context is not running when the clip arrives, and that is
+  not a strike. *Inferred, not tested on a phone:* an iPhone's ring/silent switch mutes
+  WebAudio, so it will mute this voice as it mutes CYOA's.
+- **The ledger's CSV grows at the end.** The three voice columns come after `failed`, so
+  a sheet built on the older columns still reads.
 - **A headless browser has `speechSynthesis` with no voices and a `SpeechRecognition`
   that hears nothing.** Sections X and Y install stand-ins before the page's own script;
   `open()` in the suite turns the narrator off for every other section, so nothing else
@@ -751,7 +825,7 @@ The second push (voice, microphone, notes, rule book):
 
 ## Tests
 
-`drive-cyoa2.cjs` (750 checks, about 225 s) runs the generators inside the real page
+`drive-cyoa2.cjs` (806 checks, about 250 s) runs the generators inside the real page
 across 36 worlds (329 boards) and asserts they are whole, then the engine's refusals,
 lazy charting, saves (including a tampered file), the phone flow, tap accuracy at five
 viewports after a resize-while-hidden, gestures, keys and the panels (sections A to M,
@@ -836,12 +910,79 @@ The second push's three sections:
   six callings at three levels, **every number checked against a roll made for it**, and
   the sheet by touch on two phones).
 
+The paid voice's section (2026-10-11; `CYOA2_ONLY=1`):
+
+- **1** is the narrator's paid voice against two stand-ins. The SERVICE (a route on
+  `api.openai.com`) answers each request with a short WAV **whose length is its own**,
+  so a clip the page plays can be traced back to the sentence it was asked for; it can
+  refuse, answer with rubbish, drop the line, hold an answer back or never answer. The
+  page's SOUND is watched where it leaves: `AudioBufferSourceNode.start` records every
+  clip with what the page looked like at that instant. The device's voice is section
+  X's synthesizer, so what falls back to it is seen too. The request itself (endpoint,
+  bearer, voice, pace, direction, nothing else), order kept when answers come back out
+  of turn, three abreast, an answer cutting in, every kind of silence including sound
+  that could not be called back, each way the sound can fail to come, the ledger, the
+  Costs page and CSV, Settings, "Hear it", and at a model's table: asked as the words
+  arrive, a line a turn, and the bill kept through a telling that is taken back.
+
 **Not verified:** no request has been sent to the live API from this suite or by hand;
 model ids, request fields and prices come from platform.claude.com/docs as read on
 2026-10-10. The first real key will be the first real test of the client. **Nor has any
 real voice or microphone been heard**: X and Y run against stand-ins, because a headless
 browser has neither. Whether a phone lets the first sentence speak, which voices it
 lists, and whether it reports a cancel are all still to be found out on a device.
+**Nor has OpenAI's speech service been called**: the request is CYOA's, which the CD
+uses, and section 1's stand-in answers with WAV where the service sends MP3. What a real
+clip sounds like, how long a sentence takes to come back, whether `speed` is honoured,
+whether a request called off in flight is billed, and what an iPhone's silent switch
+does to it are for a real key on a real phone.
+
+### Negative tests, the paid voice (2026-10-11, `negtest-copies.py`)
+
+**174 deliberate breaks** at the new code: the request and its key, where the key is
+kept, the queue and its sound, each way of falling back, the ledger and the Costs page,
+Settings and "Hear it", the session's rollback, the first touch, the CSP.
+
+**Writing them retired three lines before any were run.** Each was a line whose break I
+could not name a row for, and on a second look could not name an effect for either:
+
+- a check for "already called off" before a request is sent (the browser refuses a
+  request whose signal is already aborted, so nothing was sent either way);
+- a loop that called off queued sound when the paid voice was given up on (each sentence
+  calls off its own when its turn ends, a moment later);
+- re-enabling a button that the next line re-renders.
+
+It also changed one row before it could fail to bite: "a request that is never answered
+is given up on" asserted the outcome and not the time, so putting the limit back to its
+12 s default would have passed.
+
+**On the first pass (168 breaks) 7 came back GREEN and 9 were caught only by a wait that
+timed out.** All seven were holes in the rows, closed; two more breaks were written for
+a hole one of them had company in. The waits in section 1 now give up quietly, so that a
+row which cannot get what it waits for fails by name and the rows after it still run.
+Four more went with a Costs button added beside "Hear it" at the end. Run again against
+the suite as shipped: **all 174 are caught by a named row.** As before, a second pass of
+the 152 that were caught the first time was not run.
+
+What the seven had in common:
+
+- *A second copy of the value hid the first.* The key is also held in memory, so a key
+  that was only in the visit's storage read back correctly with the read of that
+  storage deleted. The row now empties memory first, which is what a reload does.
+- *The state was already what the deed would make it.* The cursor was in the key field
+  before "Hear it" was asked to put it there. Every key the suite typed was typed with
+  "remember" ticked, so the box could have been ignored (in three places: the field,
+  "Hear it", and the button that takes CYOA's key).
+- *A rule with three conditions, tried on one.* The cursor goes to the key field when
+  OpenAI is chosen AND no key is set AND CYOA's is not on offer; the row tried only the
+  case where it should.
+- *Nothing was happening when it was told to stop.* "Hear it" silences the narrator
+  first; no row pressed it while anything was being read.
+- *A rule about what comes after the failure.* Once the paid voice is given up on, the
+  device reads on even where sound had already come for a later sentence. Every telling
+  that failed had failed on all its sentences.
+- *A branch that only changes words.* A request that times out and one that is called
+  off differ in the message alone, and no row read the message.
 
 ### Negative tests, the second push (2026-10-10, `negtest-copies.py`)
 
@@ -1098,7 +1239,14 @@ offered only where a model reads the line; a topic's name spoken and matched to 
 button would give the script's table a voice in both directions); the words lit in step
 with the voice; rule pages opened from a card on the board and from a dice line in the
 story, not only from the sheet; notes the Game Master can be shown; a voice per speaker.
-Paid voices were offered and declined (the CD: device voice only).
+Paid voices were declined at first and then asked for (2026-10-11): OpenAI's is in.
+
+From the paid voice: ElevenLabs, which CYOA has and nobody asked for here; a small cache
+of clips, since the script is deterministic and a line it says twice is paid for twice;
+a choice of speech model in Settings (`ttsModel` is settable only by hand);
+`navigator.audioSession.type = 'playback'`, which is said to let WebAudio play past an
+iPhone's silent switch (not tried); the five area dropdowns shortened the way the CD
+shortened the Game Master's.
 
 From the two kinds of Game Master: a blind pick between the script's telling and the
 model's (offered to the CD, not chosen); a second adventure once the hill is taken (the

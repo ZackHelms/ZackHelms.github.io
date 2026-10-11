@@ -38,6 +38,22 @@ backlog entry here.
   hideout**, nowhere else; **only things in the hideout can be searched**;
   what each whisper does once settled; and the pay (60 gold and 150 experience
   for the job, 75 for a whisper).
+- [cyoa2] **Turn on the OpenAI voice and listen.** Settings > Voice > Narrator >
+  "OpenAI voice (GPT api key)". If CYOA has your OpenAI key on this device a
+  button offers to take it; otherwise paste it, then "Hear it". It has only
+  ever met a stand-in here: **no request has gone to OpenAI**. What only your
+  key on your phone can answer: does it sound like CYOA's (Cedar, the same
+  direction); how long before the first sentence; does Pace change it; does
+  the phone's silent switch mute it (inferred: yes, as it would CYOA's). The
+  cost (the Costs button beside "Hear it") is an estimate on CYOA's figures,
+  never set against an invoice.
+- [cyoa2] Overrule what is wrong in the new "assumed" table for the paid voice
+  (`.claude/cyoa2.md`, "The paid voice"). Most worth a look: the device's
+  voice is **still the default**; **one sentence that fails is read by the
+  device's voice** and only a refusal or three failures running hand it the
+  rest (CYOA gives up at the first); **OpenAI only**, no ElevenLabs; the
+  narrator dropdown's wording, which copies yours; and whether the five area
+  dropdowns should be shortened the way you shortened the Game Master's.
 - [cyoa2] **Hear it on your phone.** The narrator and the microphone have only
   ever met stand-ins: a headless browser has no voice and cannot listen. Four
   things only a device can answer. Does the opening speak on the first new

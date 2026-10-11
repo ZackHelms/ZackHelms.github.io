@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.anthropic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.anthropic.com https://api.openai.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#efe3c8">
 <title>CYOA2</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23efe3c8'/%3E%3Cpath d='M12 12h40v40H12z' fill='none' stroke='%232a1d12' stroke-width='4'/%3E%3Cpath d='M12 25.3h40M12 38.6h40M25.3 12v40M38.6 12v40' stroke='%238a7458' stroke-width='1.5'/%3E%3Ccircle cx='32' cy='32' r='8' fill='%23b8892b' stroke='%232a1d12' stroke-width='2.5'/%3E%3C/svg%3E">
@@ -383,7 +383,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-11 01:17 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-11 16:10 UTC</div>
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
 
@@ -483,7 +483,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
       <p class="note">Roll initiative to count rounds: everyone in the fight takes a turn in order, with 30 ft of movement, one action and one bonus action. Tap an enemy in reach to strike it; tap your own piece for what else it can do. Enter ends a turn.</p>
     </fieldset>
     <fieldset><legend>Who runs the table</legend>
-      <label class="field"><span>The Game Master is</span><select id="set-gm"><option value="script">The script: free, no key</option><option value="ai">Claude, where chosen below (your key)</option></select></label>
+      <label class="field"><span>The Game Master is</span><select id="set-gm"><option value="script">Scripted (free)</option><option value="ai">AI (Claude api key)</option></select></label>
       <p class="note" id="gm-note"></p>
       <div id="ai-areas">
       <label class="field"><span>Narration at the beats</span><select id="set-a-narrate"><option value="script">The script</option><option value="ai">Claude</option></select></label>
@@ -518,11 +518,17 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
     </fieldset>
     <fieldset><legend>Voice</legend>
       <label class="check"><input id="set-voice" type="checkbox"><span>Read the tellings aloud</span></label>
-      <label class="field"><span>Voice</span><select id="set-voiceuri"></select></label>
+      <label class="field"><span>Narrator</span><select id="set-voiceprov"><option value="device">Device voice (free)</option><option value="openai">OpenAI voice (GPT api key)</option></select></label>
+      <div id="need-openai" hidden>
+        <label class="field"><span>Your OpenAI API key</span><input id="set-openai-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="300" placeholder="sk-..."></label>
+        <label class="field"><span>OpenAI voice</span><select id="set-openai-voice"></select></label>
+      </div>
+      <label class="field" id="device-voice-row"><span>Voice</span><select id="set-voiceuri"></select></label>
       <label class="field"><span>Pace</span><input id="set-rate" type="range" min="0.6" max="1.6" step="0.05"></label>
-      <div class="row" style="margin-top:10px"><button id="set-voice-test" class="plaque small" type="button">Hear it</button></div>
+      <div class="row" style="margin-top:10px"><button id="set-voice-test" class="plaque small" type="button">Hear it</button><button id="set-cyoa-openai" class="plaque small" type="button" hidden>Use the key saved for CYOA</button><button id="set-voice-costs" class="plaque small" type="button" hidden>Costs</button></div>
+      <p class="note" id="voice-status" role="status"></p>
       <p class="note" id="voice-note"></p>
-      <p class="note">The voice is this device's own and costs nothing. It reads the script's tellings and Claude's alike; tap the story, or the speaker beside it, for silence.</p>
+      <p class="note" id="voice-about"></p>
       <div id="listen-rows">
         <label class="check"><input id="set-autosend" type="checkbox"><span>Send a spoken line as soon as I stop speaking</span></label>
         <label class="field"><span>Language to listen in, and to choose a voice by (blank follows this device; for example en-GB)</span><input id="set-srlang" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="12"></label>
@@ -4741,6 +4747,8 @@ const gmProvider = () => (typeof window.__CYOA2_MOCK__ === 'function' ? MockGM :
    What every Game Master call cost, in US dollars, kept in the tale's save. The
    figures are EXACT token counts from the API's usage report times list prices,
    priced on the model that SERVED the reply (a fallback is priced as what it was).
+   The narrator's paid voice is the one ESTIMATE in the ledger: the speech service
+   reports no usage, so it is priced from the characters sent and the seconds of sound.
    Prices checked 2026-10-10: platform.claude.com/docs/en/about-claude/pricing.   */
 const PRICES_CHECKED = '2026-10-10';
 /* USD per million tokens: input, output, cache read, 5-minute cache write (1-hour writes = 2x input) */
@@ -4761,8 +4769,8 @@ function claudePrice(model, promptTokens) {
   return best ? CLAUDE_PRICES[best] : null;
 }
 function modelLabel(model) { const p = claudePrice(model, 0); return p ? p[4] : String(model || '?'); }
-const COST_KINDS = { gm: 'Game Master', test: 'Tests' };
-const COST_TASKS = { opening: 'Opening', turn: 'Player turns', beat: 'Beats', monsters: 'Monsters’ turns', test: 'Key test' };
+const COST_KINDS = { gm: 'Game Master', voice: 'Narrator voice', test: 'Tests' };
+const COST_TASKS = { opening: 'Opening', turn: 'Player turns', beat: 'Beats', monsters: 'Monsters’ turns', voice: 'Narrator voice', test: 'Key test', vtest: 'Voice test' };
 const Costs = {
   fmt(x) { return x == null || !isFinite(x) ? '$?' : '$' + (x >= 1 ? x.toFixed(2) : x.toFixed(4)); },
   claude(model, u) {
@@ -4771,12 +4779,32 @@ const Costs = {
     if (!p) return { usd: 0, known: false, t };
     return { usd: (t.in * p[0] + t.out * p[1] + t.read * p[2] + Math.max(0, t.write - w1h) * p[3] + w1h * p[0] * 2) / 1e6, known: true, t };
   },
+  /* the paid narrator, estimated: gpt-4o-mini-tts at about $0.60 per million text tokens in (the words and the style note,
+     four characters to a token) and about $0.015 a minute of sound; tts-1 $15 and tts-1-hd $30 per million characters.
+     The figures are CYOA's, checked 2026-09-25; no invoice has been set against them. */
+  speech(model, text, seconds) {
+    const n = String(text).length;
+    if (/^tts-1-hd/.test(model)) return (n * 30) / 1e6;
+    if (/^tts-1/.test(model)) return (n * 15) / 1e6;
+    return (((n + NARRATOR_STYLE.length) / 4) * 0.60) / 1e6 + ((seconds || 0) / 60) * 0.015;
+  },
+  /* the narrator's paid voice: one ledger line for a day's reading (within a turn), which grows a sentence at a time */
+  addVoice(st, bill, snd) {
+    const desc = 'Narrator voice, day ' + bill.day;
+    let e = st.costs.find((x) => x.kind === 'voice' && x.turn === bill.turn && x.desc === desc);
+    if (!e) e = this.add(st, { kind: 'voice', task: 'voice', turn: bill.turn, desc, model: 'OpenAI ' + snd.model, usd: 0, calls: 0, est: true, secs: 0, chars: 0 });
+    e.usd = +(e.usd + snd.usd).toFixed(8); e.calls++; e.secs = +(e.secs + snd.secs).toFixed(3); e.chars += snd.chars;
+    return e;
+  },
   /* one ledger line, its fields always in the same order (a save is compared byte for byte) */
   norm(e) {
     const num = (v) => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0), o = { at: num(e.at), turn: Math.floor(num(e.turn)), kind: COST_KINDS[e.kind] ? e.kind : 'gm', task: clip(e.task, 20), desc: clip(e.desc, 200), model: clip(e.model, 80),
       usd: num(e.usd), calls: Math.floor(num(e.calls)), unknown: !!e.unknown };
     if (e.failed) o.failed = clip(e.failed, 20);
     if (e.tok) o.tok = { in: num(e.tok.in), out: num(e.tok.out), read: num(e.tok.read), write: num(e.tok.write) };
+    if (e.est) o.est = true;                                 /* an estimate, shown with a ~ */
+    if (e.secs != null) o.secs = num(e.secs);
+    if (e.chars != null) o.chars = Math.floor(num(e.chars));
     return o;
   },
   add(st, entry) { const e = this.norm(Object.assign({ at: Date.now(), turn: st.turn, calls: 1 }, entry)); st.costs.push(e); if (st.costs.length > 5000) st.costs.splice(0, st.costs.length - 5000); return e; },
@@ -4793,8 +4821,8 @@ const Costs = {
   },
   csv(list) {
     const q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-    const rows = [['time', 'turn', 'kind', 'task', 'description', 'model', 'calls', 'input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens', 'usd', 'failed']];
-    for (const e of list) rows.push([new Date(e.at).toISOString(), e.turn, e.kind, e.task, e.desc, e.model, e.calls, e.tok ? e.tok.in : '', e.tok ? e.tok.read : '', e.tok ? e.tok.write : '', e.tok ? e.tok.out : '', e.usd.toFixed(6), e.failed || '']);
+    const rows = [['time', 'turn', 'kind', 'task', 'description', 'model', 'calls', 'input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens', 'usd', 'failed', 'audio_seconds', 'characters', 'estimated']];
+    for (const e of list) rows.push([new Date(e.at).toISOString(), e.turn, e.kind, e.task, e.desc, e.model, e.calls, e.tok ? e.tok.in : '', e.tok ? e.tok.read : '', e.tok ? e.tok.write : '', e.tok ? e.tok.out : '', e.usd.toFixed(6), e.failed || '', e.secs != null ? e.secs : '', e.chars != null ? e.chars : '', e.est ? 'yes' : '']);
     return rows.map((r) => r.map(q).join(',')).join('\n') + '\n';
   },
 };
@@ -5637,13 +5665,14 @@ function viewFrame(now) {
    Dorian round, scheduled a little ahead of the clock.                            */
 const DUCK = .3;
 const Sfx = {
-  ctx: null, sfx: null, mus: null, noise: null, timer: 0, nextT: 0, n: 0, foot: 0, mel: 4, ducked: false,
+  ctx: null, sfx: null, mus: null, voice: null, noise: null, timer: 0, nextT: 0, n: 0, foot: 0, mel: 4, ducked: false,
   wake() {
     if (!this.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
       try { this.ctx = new AC(); } catch (e) { return; }
       const c = this.ctx, lim = c.createDynamicsCompressor(); lim.connect(c.destination);
       this.sfx = c.createGain(); this.mus = c.createGain(); this.sfx.connect(lim); this.mus.connect(lim);
+      this.voice = c.createGain(); this.voice.connect(c.destination);      /* the narrator's paid voice: its own way out, past the limiter and the two volume sliders */
       const len = Math.floor(c.sampleRate * .5), b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       this.noise = b; this.vols(); this.nextT = c.currentTime + .3;
@@ -5704,8 +5733,10 @@ const Settings = {
     /* who runs the table. gm: 'script' (the default: no model, no key, free) or 'ai' (Claude, over the player's own key, for
        the areas chosen below; the script keeps the rest). monsters is the fifth area and keeps its older name and values. */
     gm: 'script', areas: { narrate: 'ai', talk: 'ai', act: 'ai', create: 'ai' }, twin: true, tags: true,
-    /* the narrator's voice is the device's own. voiceURI: '' the best voice here, 'system' whatever the device is set to, or one voice by its id */
+    /* the narrator's voice is the device's own unless a paid one is chosen. voiceURI: '' the best voice here, 'system' whatever the device is set to, or one voice by its id */
     voiceOn: true, voiceURI: '', rate: 1, autoSend: false, srLang: '',
+    /* voiceProvider: 'device' (free) or 'openai' (OpenAI's speech, over the player's own OpenAI key) */
+    voiceProvider: 'device', openaiVoice: 'cedar', ttsModel: 'gpt-4o-mini-tts',
     model: 'claude-opus-5-5', customModel: '', effort: 'medium', rating: 'teen', remember: true, monsters: 'script', showCosts: true, storyOpen: true, taskModels: { turn: '', beat: '', monsters: '' } },
   data: null, memKey: '',
   load() {
@@ -5721,6 +5752,9 @@ const Settings = {
     delete this.data.narrate;
     this.data.voiceOn = !!this.data.voiceOn; this.data.autoSend = !!this.data.autoSend;
     this.data.rate = Number.isFinite(+this.data.rate) ? clamp(+this.data.rate, .5, 2) : 1;
+    this.data.voiceProvider = this.data.voiceProvider === 'openai' ? 'openai' : 'device';
+    this.data.openaiVoice = OPENAI_VOICES.includes(this.data.openaiVoice) ? this.data.openaiVoice : 'cedar';
+    this.data.ttsModel = /^[a-z0-9][a-z0-9._-]{0,59}$/i.test(this.data.ttsModel) ? this.data.ttsModel : 'gpt-4o-mini-tts';
     this.data.voiceURI = clip(typeof this.data.voiceURI === 'string' ? this.data.voiceURI : '', 200); this.data.srLang = clip(typeof this.data.srLang === 'string' ? this.data.srLang : '', 12);
   },
   save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* private mode: settings last this visit */ } },
@@ -5734,6 +5768,18 @@ const Settings = {
       drop.removeItem('cyoa2.key');
     } catch (e) { /* memory only */ }
   },
+  /* the key to another service (the narrator's paid voice): kept the same way, in the same places, and sent only to that service */
+  mem: {},
+  keyOf(name) { const id = 'cyoa2.key.' + name; try { return localStorage.getItem(id) || sessionStorage.getItem(id) || this.mem[name] || ''; } catch (e) { return this.mem[name] || ''; } },
+  setKeyOf(name, k, remember) {
+    const id = 'cyoa2.key.' + name; this.mem[name] = k || '';
+    try {
+      const keep = remember ? localStorage : sessionStorage, drop = remember ? sessionStorage : localStorage;
+      if (!k) keep.removeItem(id); else if (keep.getItem(id) !== k) keep.setItem(id, k);
+      drop.removeItem(id);
+    } catch (e) { /* memory only */ }
+  },
+  cyoaKeyOf(name) { try { return localStorage.getItem('cyoa.key.' + name) || sessionStorage.getItem('cyoa.key.' + name) || ''; } catch (e) { return ''; } },
   cyoaKey() { try { return localStorage.getItem('cyoa.key') || sessionStorage.getItem('cyoa.key') || ''; } catch (e) { return ''; } },
 };
 /* Who does what at the table right now. The script is the default and needs nothing. A model is asked only when the
@@ -5772,12 +5818,13 @@ const Store = {
 };
 
 /* ============================== VOICE ==============================
-   The narrator reads the tellings aloud in the DEVICE'S OWN voice (speechSynthesis): free, and
-   the same whoever is telling the tale, the script or a model. And where a model is listening,
-   a line may be spoken instead of typed (SpeechRecognition, where the browser has one). Both
-   are the browser's own; this page calls nothing for either.
-   A telling is cut into sentences and each is its own utterance, so a model's first sentence
-   is being read while its last is still arriving, a stalled utterance costs one sentence and
+   The narrator reads the tellings aloud, the same whoever is telling the tale, the script or a
+   model. By default in the DEVICE'S OWN voice (speechSynthesis): free, and the page calls
+   nothing for it. Or, where the player chooses it and gives an OpenAI key, in OpenAI's: the
+   words go to api.openai.com a sentence at a time, at the player's own cost. And where a model
+   is listening, a line may be spoken instead of typed (SpeechRecognition, the browser's own).
+   A telling is cut into sentences and each is read on its own, so a model's first sentence
+   is being read while its last is still arriving, a stalled sentence costs one sentence and
    not the telling, and silence is one tap away. The words on the page do not wait for the
    voice: this is a board with a game going on, and the text is already there to read.          */
 const Speech = {
@@ -5831,11 +5878,84 @@ function sentencesOf(buf, final) {
   if (final) { keep(rest); rest = ''; }
   return { out, rest };
 }
+/* ---- the paid voice ----
+   An option, as in CYOA: OpenAI's speech reads the sentences over the player's OWN key, one request a sentence, asked
+   for as each sentence joins the queue so that its sound is ready by its turn. The device's voice is the fallback: a
+   sentence whose sound does not come is read by it, and after a refusal (a bad key, a voice that is not there) or
+   three failures running it reads the rest. The words of the tale go to api.openai.com to be read; nothing else does. */
+const OPENAI_VOICES = ['alloy', 'ash', 'ballad', 'cedar', 'coral', 'echo', 'fable', 'marin', 'nova', 'onyx', 'sage', 'shimmer', 'verse'];
+const NARRATOR_STYLE = 'You are the narrator of a tabletop fantasy adventure, reading aloud to friends around a table. Speak like a warm, weathered storyteller: unhurried, clear and expressive, with small dramatic pauses. Give quoted dialogue a light change of voice.';
+const TTS_URL = 'https://api.openai.com/v1/audio/speech';
+const TTS_WAIT = 12000;                                      /* ms one sentence's sound may take to arrive */
+const TTS_STRIKES = 3;                                       /* failures running before the device's voice is left to read the rest */
+const TTS_ABREAST = 3;                                       /* sentences asked for at once */
+const CLIP_GRACE = 4000;                                     /* ms past its own length a clip may run before it is given up on */
+async function errText(resp) {
+  let m = resp.statusText || 'error';
+  try { const j = await resp.json(), e = j.error || j.detail || j; m = (e && (e.message || e.status)) || (typeof e === 'string' ? e : JSON.stringify(e)); } catch (e) { /* not JSON */ }
+  return clip(String(m), 160);
+}
+const Premium = {
+  failed: false, strikes: 0, inflight: 0, waiting: [], asked: 0, wait: TTS_WAIT,
+  provider() { return Settings.data.voiceProvider === 'openai' && Settings.keyOf('openai') ? 'openai' : null; },
+  can() { return !!(window.AudioContext || window.webkitAudioContext); },
+  /* will the next sentence be asked of the paid voice */
+  ready() { return !this.failed && !!this.provider() && this.can(); },
+  /* the key, the voice or the choice has changed, or the player asks to hear it: it is tried again */
+  reset() { this.failed = false; this.strikes = 0; },
+  model() { return Settings.data.ttsModel || 'gpt-4o-mini-tts'; },
+  async slot() { while (this.inflight >= TTS_ABREAST) await new Promise((r) => this.waiting.push(r)); this.inflight++; },
+  release() { this.inflight--; const n = this.waiting.shift(); if (n) n(); },
+  async request(text, signal) {
+    const model = this.model(), body = { model, voice: Settings.data.openaiVoice || 'cedar', input: text, response_format: 'mp3', speed: clamp(+Settings.data.rate || 1, .5, 2) };
+    if (!/^tts-1/.test(model)) body.instructions = NARRATOR_STYLE;      /* the older models take no direction */
+    const resp = await fetch(TTS_URL, { method: 'POST', signal, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + Settings.keyOf('openai') }, body: JSON.stringify(body) });
+    if (!resp.ok) { const e = new Error(resp.status + ' ' + (await errText(resp))); e.hard = [400, 401, 403, 404].includes(resp.status); throw e; }
+    return resp.arrayBuffer();
+  },
+  /* one sentence's sound, asked for now: { buf, model, secs, chars, usd }. The promise has an abort(), since a sentence
+     that will not be read is not waited for (and, with luck, not paid for). `bill` says which tale's ledger it goes in. */
+  fetch(text, bill) {
+    const ctl = new AbortController(), model = this.model(); let late = false;
+    const p = (async () => {
+      await this.slot();
+      const t = setTimeout(() => { late = true; ctl.abort(); }, this.wait);
+      try {
+        this.asked++;
+        let ab; try { ab = await this.request(text, ctl.signal); }      /* let go before its turn came, it is not sent at all: the browser refuses a request that is already called off */
+        catch (e) { throw ctl.signal.aborted ? new Error(late ? 'no answer in time' : 'stopped') : e; }
+        Sfx.wake(); if (!Sfx.ctx) throw new Error('no sound output');
+        const buf = await new Promise((res, rej) => { const bad = () => rej(new Error('the sound could not be read')), r = Sfx.ctx.decodeAudioData(ab, res, bad); if (r && r.catch) r.catch(bad); });
+        const snd = { buf, model, secs: buf.duration, chars: text.length, usd: Costs.speech(model, text, buf.duration) };
+        if (bill) this.charge(bill, snd);
+        return snd;
+      } finally { clearTimeout(t); this.release(); }
+    })();
+    p.catch(() => {});
+    p.abort = () => ctl.abort();
+    return p;
+  },
+  /* what a sentence cost goes into the ledger of the tale it was read for, if that tale is still the one on the table */
+  charge(bill, snd) {
+    const st = G.st; if (!st || st.made !== bill.made || st.seed !== bill.seed) return;
+    Costs.addVoice(st, bill, snd); UI.saveSoon();
+  },
+  /* a sentence's sound did not come (never called for one that was let go: whoever lets go has stopped listening first).
+     A refusal ends the paid voice until something is changed; anything else costs that sentence, and three running the rest. */
+  fail(e) {
+    if (this.failed) return;
+    if (!(e && e.hard) && ++this.strikes < TTS_STRIKES) return;
+    this.failed = true;
+    UI.toast('The OpenAI voice failed (' + clip((e && e.message) || String(e), 90) + '). This device is reading instead.', 5000);
+  },
+};
 const CANCEL_GAP = 90;                                       /* ms left between cutting the voice off and giving it something new to say */
 const NARR_MAX = 40;                                         /* sentences waiting: past this the oldest are dropped, not read late */
 const Narrator = {
   q: [], buf: '', node: null, running: false, gen: 0, cut: null, lit: null, spoken: 0,
-  on() { return !!Settings.data.voiceOn && Speech.available(); },
+  on() { return !!Settings.data.voiceOn && (Premium.ready() || Speech.available()); },
+  /* is there anything here that could read aloud at all: the device's voice, or the paid one once it is set up */
+  able() { return Speech.has() || (!!Premium.provider() && Premium.can()); },
   busy() { return this.running || this.q.length > 0; },
   /* how long one sentence may take before it is given up on (a device voice can simply never finish) */
   patience(text, rate) { return Math.round((String(text).length / (14.5 * (rate || 1))) * 2000 + 3000); },
@@ -5844,10 +5964,16 @@ const Narrator = {
   push(t) { if (!this.on()) { this.buf = ''; return; } this.buf += String(t == null ? '' : t); this.take(false); },
   end() { if (this.on() && this.buf) this.take(true); this.buf = ''; },
   say(text, node) { this.begin(node); this.push(text); this.end(); },
+  /* a sentence joins the queue. With the paid voice its sound is asked for NOW, so that it is ready by its turn */
+  enq(text, node) {
+    const it = { text, node: node || null }, st = G.st;
+    if (Premium.ready()) it.audio = Premium.fetch(text, st ? { made: st.made, seed: st.seed, turn: st.turn, day: st.time.day } : null);
+    this.q.push(it); return it;
+  },
   take(final) {
     const r = sentencesOf(this.buf, final); this.buf = r.rest;
-    for (const s of r.out) this.q.push({ text: s, node: this.node });
-    if (this.q.length > NARR_MAX) this.q.splice(0, this.q.length - NARR_MAX);
+    for (const s of r.out) this.enq(s, this.node);
+    if (this.q.length > NARR_MAX) for (const it of this.q.splice(0, this.q.length - NARR_MAX)) if (it.audio) it.audio.abort();
     this.pump();
   },
   async pump() {
@@ -5856,10 +5982,16 @@ const Narrator = {
     while (this.q.length) { const it = this.q.shift(); this.mark(it.node); await this.speak(it); if (gen !== this.gen) return; }
     this.running = false; this.mark(null);
   },
+  /* one sentence, aloud: the paid voice's sound if it was asked for and comes, and the device's own voice if not */
   speak(it) {
     return new Promise((res) => {
-      let done = false, timer = 0, lead = 0;
-      const finish = () => { if (done) return; done = true; clearTimeout(timer); clearTimeout(lead); if (this.cut === finish) this.cut = null; res(); };
+      let done = false, timer = 0, lead = 0, src = null;
+      const finish = () => {
+        if (done) return; done = true; clearTimeout(timer); clearTimeout(lead);
+        if (src) { src.onended = null; try { src.stop(); } catch (e) { /* it had ended */ } }
+        if (it.audio) it.audio.abort();                      /* sound still on its way is not waited for; once it has come this does nothing */
+        if (this.cut === finish) this.cut = null; res();
+      };
       this.cut = finish;
       const go = () => {
         if (done) return;
@@ -5873,8 +6005,25 @@ const Narrator = {
           speechSynthesis.resume(); speechSynthesis.speak(u);
         } catch (e) { finish(); }
       };
-      const wait = Speech.cancelAt ? CANCEL_GAP - (performance.now() - Speech.cancelAt) : 0;
-      if (wait > 0) lead = setTimeout(go, wait); else go();
+      const device = () => {
+        if (done) return;
+        if (!Speech.available()) { finish(); return; }       /* no voice here either: the sentence goes unread, and the next is not kept waiting */
+        const wait = Speech.cancelAt ? CANCEL_GAP - (performance.now() - Speech.cancelAt) : 0;
+        if (wait > 0) lead = setTimeout(go, wait); else go();
+      };
+      const sound = (snd) => {
+        if (done) return;
+        Premium.strikes = 0;
+        const c = Sfx.ctx;
+        if (!c || c.state !== 'running') { device(); return; }      /* nothing to sound it with just now: the device reads this one */
+        try {
+          src = c.createBufferSource(); src.buffer = snd.buf; src.connect(Sfx.voice); src.onended = finish;
+          timer = setTimeout(finish, Math.round(snd.buf.duration * 1000) + CLIP_GRACE);
+          this.spoken++; src.start();
+        } catch (e) { src = null; clearTimeout(timer); device(); }
+      };
+      if (it.audio && !Premium.failed) it.audio.then(sound, (e) => { if (done) return; Premium.fail(e); device(); });
+      else device();
     });
   },
   /* which passage is being read: a mark in its margin, the music turned down under the voice, the speaker button lit */
@@ -5885,10 +6034,11 @@ const Narrator = {
     const on = this.running; Sfx.duck(on);
     const b = $('voice-btn'); if (b) b.classList.toggle('live', on);
   },
-  /* silence, now: whatever was waiting is not read later */
+  /* silence, now: whatever was waiting is not read later, and sound that was on its way for it is not waited for */
   stop() {
     const was = this.busy();
-    this.gen++; this.q = []; this.buf = ''; this.running = false;
+    this.gen++; for (const it of this.q) if (it.audio) it.audio.abort();
+    this.q = []; this.buf = ''; this.running = false;
     Speech.stop(); if (this.cut) this.cut();
     this.mark(null);
     return was;
@@ -5935,7 +6085,7 @@ const UI = {
   saveT: 0, toastT: 0, tab: 'tale', libDone: false, hasSave: false, dlgDefault: null,
   show(id) { for (const s of document.querySelectorAll('.screen')) s.classList.toggle('active', s.id === id); },
   veil(fn, ms) { const v = $('veil'); v.classList.add('on'); setTimeout(() => { try { fn(); } finally { requestAnimationFrame(() => v.classList.remove('on')); } }, ms || 460); },
-  toast(msg) { if (!msg) return; const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(this.toastT); this.toastT = setTimeout(() => t.classList.remove('on'), 2200); },
+  toast(msg, ms) { if (!msg) return; const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(this.toastT); this.toastT = setTimeout(() => t.classList.remove('on'), ms || 2200); },
   dialog(title, paras, btns, lead) {
     $('dlg-title').textContent = title;
     const body = $('dlg-body'), row = $('dlg-btns'); body.textContent = ''; row.textContent = '';
@@ -6304,7 +6454,7 @@ const UI = {
   /* the typed line is for a model: where none is listening, it is not offered */
   sayBar() {
     document.body.classList.toggle('no-say', !Mode.typed()); document.body.classList.toggle('hide-tags', !Settings.data.tags);
-    const v = $('voice-btn'); v.hidden = !Speech.has(); v.setAttribute('aria-pressed', String(!!Settings.data.voiceOn));
+    const v = $('voice-btn'); v.hidden = !Narrator.able(); v.setAttribute('aria-pressed', String(!!Settings.data.voiceOn));
     if (!Mode.typed()) Listen.drop();
     this.sayBtns();
   },
@@ -6635,8 +6785,18 @@ const UI = {
     $('set-costs').disabled = !G.st;
     $('key-note').textContent = Settings.key() ? 'A key is set.' : Settings.cyoaKey() ? 'No key is set here. One is saved on this device for CYOA.' : 'No key is set.';
     /* the narrator's voice, and speaking a line */
-    $('set-voice').checked = !!d.voiceOn; $('set-voice').disabled = !Speech.has(); $('set-rate').value = d.rate; this.voices();
-    $('set-voiceuri').disabled = $('set-voice-test').disabled = !Speech.has();
+    const oai = d.voiceProvider === 'openai', vsel = $('set-openai-voice');
+    $('set-voice').checked = !!d.voiceOn; $('set-voice').disabled = !Narrator.able(); $('set-rate').value = d.rate; this.voices();
+    $('set-voiceuri').disabled = !Speech.has(); $('set-voice-test').disabled = !oai && !Speech.has();
+    /* whose voice: the device's, or OpenAI's over the player's own key (asked for only once that is chosen) */
+    if (!vsel.options.length) for (const v of OPENAI_VOICES) { const o = el('option', '', cap(v)); o.value = v; vsel.appendChild(o); }
+    $('set-voiceprov').value = d.voiceProvider; vsel.value = d.openaiVoice; $('set-openai-key').value = Settings.keyOf('openai');
+    $('need-openai').hidden = !oai; $('device-voice-row').hidden = oai; $('voice-note').hidden = oai;
+    $('set-cyoa-openai').hidden = !oai || !!Settings.keyOf('openai') || !Settings.cyoaKeyOf('openai');
+    $('set-voice-costs').hidden = !oai; $('set-voice-costs').disabled = !G.st;      /* what the paid voice has cost this tale: the ledger, a tap from where it is switched on */
+    $('voice-about').textContent = !oai ? 'The voice is this device’s own and costs nothing. It reads the script’s tellings and Claude’s alike; tap the story, or the speaker beside it, for silence.'
+      : 'OpenAI reads each sentence over your own key and at your own cost: a fraction of a cent a sentence, estimated under Costs here. The key stays in this browser, follows the remember setting above, is sent only to api.openai.com and is never written into a save; the words of the tale go there to be read. If it fails, this device’s voice takes over.'
+        + (Premium.failed ? ' It has failed, and this device is reading: Hear it tries it again.' : !Settings.keyOf('openai') ? ' No OpenAI key is set, so this device is reading.' : '');
     $('set-autosend').checked = !!d.autoSend; $('set-srlang').value = d.srLang; $('listen-rows').hidden = !Listen.supported();
     $('listen-note').textContent = !Listen.supported() ? 'This browser cannot listen, so a line to Claude is typed.' : 'Where Claude is given the talking or the typed lines, a microphone sits at the end of the line field. The browser does the listening, and some browsers send the sound to their maker to do it.';
   },
@@ -6659,15 +6819,16 @@ const UI = {
     const kTok = (n) => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n));
     for (const e of list.slice().reverse()) {
       const r = el('div', 'cost-row');
-      r.appendChild(el('span', 'usd' + (e.failed ? ' failed' : ''), e.unknown ? '$?' : Costs.fmt(e.usd)));
+      r.appendChild(el('span', 'usd' + (e.failed ? ' failed' : ''), e.unknown ? '$?' : (e.est ? '~' : '') + Costs.fmt(e.usd)));
       r.appendChild(el('span', 'what', e.desc + (e.failed ? ' (failed: ' + e.failed + ')' : '')));
       const how = [modelLabel(e.model), plural(e.calls || 0, 'call')];
       if (e.tok) how.push(kTok(e.tok.in + e.tok.read + e.tok.write) + ' in (' + kTok(e.tok.read) + ' cached)', kTok(e.tok.out) + ' out');
+      if (e.secs) how.push((Math.round(e.secs * 10) / 10) + ' s of sound'); if (e.chars) how.push(e.chars + ' characters');
       how.push(new Date(e.at).toLocaleString());
       r.appendChild(el('span', 'how', how.join(' · ')));
       box.appendChild(r);
     }
-    box.appendChild(el('p', 'note', 'These are the exact tokens each request used times list prices checked ' + PRICES_CHECKED + ', for the model that answered. A reply that failed was still paid for. Your invoice can differ: discounts, taxes, plan credits, or a price change since then.'));
+    box.appendChild(el('p', 'note', 'These are the exact tokens each request used times list prices checked ' + PRICES_CHECKED + ', for the model that answered. A reply that failed was still paid for. Your invoice can differ: discounts, taxes, plan credits, or a price change since then.' + (list.some((e) => e.est) ? ' Amounts marked ~ are the narrator’s paid voice, and are estimates: that service reports no usage.' : '')));
   },
   /* ---- compare: every telling by who told it and what kind it was, how the table rated it, what it cost ---- */
   compare() {
@@ -6829,8 +6990,9 @@ const Session = {
     if (failure) {
       /* the telling failed: the tale is put back exactly as it was before it began */
       Narrator.stop();                                      /* a telling taken back is not read on */
-      const kept = st.notes, keptN = st.n.note;
+      const kept = st.notes, keptN = st.n.note, voiced = st.costs.filter((e) => e.kind === 'voice');
       st = G.st = unpackState(JSON.parse(snap));
+      st.costs = st.costs.filter((e) => e.kind !== 'voice').concat(voiced).sort((a, b) => a.at - b.at);      /* what was read aloud was paid for, whatever became of the telling */
       st.notes = kept; st.n.note = Math.max(st.n.note, keptN);          /* the players' notes are not the telling's to take back */
       if (cost) Costs.add(st, cost);
       G.busy = false; UI.busy(false);
@@ -6932,7 +7094,7 @@ const Session = {
   /* the Game Master's settings */
   const set = (k, v) => { Settings.data[k] = v; Settings.save(); };
   on('set-key', 'change', () => { Settings.setKey($('set-key').value.trim(), $('set-remember').checked); UI.settings(); UI.modeChanged(); });
-  on('set-remember', 'change', () => { set('remember', $('set-remember').checked); Settings.setKey($('set-key').value.trim(), $('set-remember').checked); });
+  on('set-remember', 'change', () => { set('remember', $('set-remember').checked); Settings.setKey($('set-key').value.trim(), $('set-remember').checked); Settings.setKeyOf('openai', Settings.keyOf('openai'), $('set-remember').checked); });
   on('set-cyoa-key', 'click', () => { Settings.setKey(Settings.cyoaKey(), $('set-remember').checked); UI.settings(); UI.modeChanged(); UI.toast('Using the key saved for CYOA.'); });
   on('set-test', 'click', async () => {
     const k = $('set-key').value.trim(), note = $('key-note');
@@ -6979,13 +7141,40 @@ const Session = {
   on('set-voice', 'change', (e) => UI.voice(e.target.checked));
   on('set-voiceuri', 'change', (e) => set('voiceURI', e.target.value));
   on('set-rate', 'input', (e) => set('rate', clamp(+e.target.value || 1, .5, 2)));
-  on('set-voice-test', 'click', () => { Sfx.wake(); Speech.prime(); if (!Speech.available()) { UI.voices(); UI.toast('No voice is on offer here.'); return; } Narrator.stop(); Narrator.q.push({ text: 'The road out of town runs up into the hills, and somebody is watching it.', node: null }); Narrator.pump(); });
+  /* whose voice it is. Any change here is silence, and the paid voice is tried afresh */
+  const voiceSet = () => { Premium.reset(); Narrator.stop(); $('voice-status').textContent = ''; UI.settings(); UI.sayBar(); };
+  on('set-voiceprov', 'change', (e) => { set('voiceProvider', e.target.value === 'openai' ? 'openai' : 'device'); voiceSet(); if (Settings.data.voiceProvider === 'openai' && !Settings.keyOf('openai') && $('set-cyoa-openai').hidden) $('set-openai-key').focus(); });
+  on('set-openai-key', 'change', (e) => { Settings.setKeyOf('openai', e.target.value.trim(), $('set-remember').checked); voiceSet(); });
+  on('set-openai-voice', 'change', (e) => { if (OPENAI_VOICES.includes(e.target.value)) set('openaiVoice', e.target.value); voiceSet(); });
+  on('set-cyoa-openai', 'click', () => { Settings.setKeyOf('openai', Settings.cyoaKeyOf('openai'), $('set-remember').checked); voiceSet(); UI.toast('Using the OpenAI key saved for CYOA.'); });
+  on('set-voice-costs', 'click', () => { UI.costs(); UI.openPanel('pan-costs'); });
+  on('set-voice-test', 'click', async (ev) => {
+    const line = 'The road out of town runs up into the hills, and somebody is watching it.', note = $('voice-status'), btn = ev.currentTarget;
+    Sfx.wake(); Speech.prime(); Narrator.stop(); note.textContent = '';
+    if (Settings.data.voiceProvider === 'openai') {
+      Settings.setKeyOf('openai', $('set-openai-key').value.trim(), $('set-remember').checked); Premium.reset();
+      if (!Premium.provider()) { note.textContent = 'Enter your OpenAI key first.'; UI.settings(); $('set-openai-key').focus(); return; }
+      if (!Premium.can()) { note.textContent = 'This browser cannot play it.'; return; }
+      note.textContent = 'Asking OpenAI.'; btn.disabled = true;
+      const audio = Premium.fetch(line, null);
+      try {
+        const snd = await audio;
+        note.textContent = 'The narrator answers: about ' + Costs.fmt(snd.usd) + ' for that sentence.';
+        if (G.st) { Costs.add(G.st, { kind: 'test', task: 'vtest', desc: 'Voice test', model: 'OpenAI ' + snd.model, usd: snd.usd, calls: 1, est: true, secs: +snd.secs.toFixed(3), chars: snd.chars }); UI.saveSoon(); }
+        Narrator.q.push({ text: line, node: null, audio }); Narrator.pump();
+      } catch (e) { note.textContent = 'Refused: ' + clip((e && e.message) || String(e), 140); }
+      UI.settings();                                        /* which also gives the button back */
+      return;
+    }
+    if (!Speech.available()) { UI.voices(); UI.toast('No voice is on offer here.'); return; }
+    Narrator.q.push({ text: line, node: null }); Narrator.pump();
+  });
   on('set-autosend', 'change', (e) => set('autoSend', e.target.checked));
   on('set-srlang', 'change', (e) => { set('srLang', clip(e.target.value.trim(), 12)); UI.voices(); });
   Speech.load();
   if (Speech.has()) { try { speechSynthesis.addEventListener('voiceschanged', () => { Speech.load(); if ($('pan-settings').classList.contains('open')) UI.voices(); }); } catch (e) { /* an older engine: the list is read again whenever it is needed */ } }
   /* a phone lets a page speak only after a finger has asked: the first touch anywhere does the asking */
-  window.addEventListener('pointerdown', () => { if (Settings.data.voiceOn) Speech.prime(); }, true);
+  window.addEventListener('pointerdown', () => { if (!Settings.data.voiceOn) return; Speech.prime(); if (Premium.ready()) Sfx.wake(); }, true);      /* and the paid voice is sound like any other: it needs the same asking */
   on('say', 'keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); UI.send(); } else if (e.key === 'Escape') e.target.blur(); });
   if (window.matchMedia) { const mq = window.matchMedia('(prefers-color-scheme: dark)'); if (mq.addEventListener) mq.addEventListener('change', () => UI.theme()); }
 
