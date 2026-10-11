@@ -548,3 +548,42 @@ being drawn — a dead dispatch branch that silently falls through to the parent
 painter is invisible to any screenshot and to any single pixel, and this is the
 only thing that catches it. Over `https://` none of this bites, so the taint is
 a property of the harness's origin, not of the page.
+
+## CDP multi-touch: what `touchPoints` means (measured 2026-10-10, Chromium 141)
+
+Two notes here had this wrong, in opposite directions, and both read as fact
+(`20260825-ember-depths-pinch-zoom-and-multi-touch-testing.md` § 4 said a
+`touchEnd` lists the fingers still down; `20260917-many-finger-touch-ios.md`
+said Chromium diffs the list against the previous call). What a page actually
+sees, from `.claude/scripts/probe-cdp-touch.cjs`:
+
+| Call | Effect |
+| --- | --- |
+| `touchStart` / `touchMove` with some points | acts on the points **listed**; points not listed **stay down**, unmoved. A shorter list lifts nobody. A listed point that is already down and has not moved fires nothing. |
+| `touchEnd` with some points | **the points listed are the ones that lift** (`changedTouches`), at the coordinates given; the rest stay in `touches`. One `touchend` per lifted point. |
+| `touchEnd` with `[]` | lifts every point still down, one `touchend` each. |
+| any | points are matched by `id`, so a finger keeps one id for its whole life. |
+
+So "one finger of a pinch up, then the other" is
+`touchEnd [the finger that LIFTS]` then `touchEnd []`, and the finger left on
+the glass is the one you did **not** name. A helper that only ever grows the
+set or ends it with `[]` (music-mixer's `setTouches`) is unaffected; a row that
+reasons about *which* finger remains is exactly where the wrong belief bites.
+
+Two rows had been reasoning that way. Each asserted "the last finger of a
+pinch is not a tap" while checking the ground under the finger that had already
+lifted, so each passed or failed by what happened to be under the other one:
+rock, or unseen ground, where a tap does nothing whatever the code does. Both
+were green with the gesture latch removed. The repair has three parts and is
+the shape to copy:
+
+1. **Ask the page which finger remains and where** (its own pointer record:
+   `Ptr` in CYOA2, `touchStart` in Ember Depths). Do not work it out in the
+   script.
+2. **Put something a tap would act on under that finger** before it lifts:
+   slide the board until a walkable square is there.
+3. **Afterwards, tap that same spot for real and require it to act.** Without
+   this twin, "nothing happened" is also what a dead input layer says.
+
+The probe exits non-zero if a future Chromium answers differently. Run it
+before writing a multi-touch row rather than trusting this table.

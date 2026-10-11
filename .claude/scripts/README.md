@@ -94,6 +94,77 @@ Deterministic helpers for working on this repo.
   after the CYOA session hand-rolled this loop in the scratchpad four times (29
   breaks); three came back MISSED and each was a real blind spot in the suite.
 
+- `negtest-copies.py` — the same list, run against **copies** of the page, two
+  (or `--jobs N`) at a time. Each break is applied to a fresh copy in a scratch
+  directory and the suite is pointed at the copy through an environment variable
+  the suite itself reads (`--page-env CYOA2_PAGE`), so **the shipping file is
+  never touched**: an interrupted run leaves nothing live, and with
+  `--freeze <suite file>` the suite can be edited while a run is going. Use it
+  when a list is long (it was written for 343 breaks; the in-place runner left a
+  break live in the shipping file twice that afternoon when a run was cut short).
+  For a dozen breaks `negtest-batch.py` is still the simpler tool, and it needs
+  nothing from the suite.
+
+  ```
+  CYOA2_ONLY=QS NODE_PATH=... python3 .claude/scripts/negtest-copies.py breaks.json \
+      --page-env CYOA2_PAGE --jobs 2 --freeze .claude/tests/drive-cyoa2.cjs --log out.log \
+      -- node .claude/tests/drive-cyoa2.cjs
+  # NEG=nat1-hits VERDICT=caught EXIT=1 fails=1
+  #     FAIL a natural 1 misses even when its total beats the armour: ...
+  # NEGCOPIES: RED caught=117/118 missed=nobonus-ignored
+  ```
+
+  A suite supports it with one line (read the page's path from the variable when
+  it is set) and one rule (**never print GREEN when pointed at a copy**).
+  Verdicts: `caught`, `MISSED`, and `CAUGHT-BY-CRASH` for a break whose only
+  failure was a timeout or an exception in the suite, not a named row: usually
+  real, but read it. Two cautions: more jobs than cores makes timing rows flaky,
+  and **a row that "catches" breaks it has nothing to do with is a flaky row**
+  (one such row was found that way: it reloaded the page before an autosave had
+  landed). `--only a,b` re-runs the ones that were missed.
+
+- `probe-cdp-touch.cjs` — **what does a synthetic touch mean in this Chromium?**
+  Three suites drive real multi-touch through CDP's `Input.dispatchTouchEvent`,
+  and two notes here described its `touchPoints` wrongly (one said a `touchEnd`
+  lists the fingers that *stay*, the other that the list is diffed against the
+  previous call). A pinch row built on the first belief checked the ground under
+  the wrong finger and stayed green with its rule removed, in two suites. The
+  probe logs what a page really sees (`touches`, `changedTouches`) for seven
+  short sequences and compares them with what the suites rely on: start and move
+  act on the points **listed** and the rest stay down, **`touchEnd` lifts the
+  points listed**, an empty `touchEnd` lifts everyone, points are matched by
+  `id`. Run it before writing a multi-touch row and whenever a container ships a
+  new Chromium; `CHANGED` means the gesture rows need reading again.
+
+  ```
+  NODE_PATH=/opt/node-tools/node_modules node .claude/scripts/probe-cdp-touch.cjs [--quiet]
+  # same    A: two down, touchEnd lists finger 0: finger 0 lifts, finger 1 stays
+  #     touchend touches[1@250] changed[0@102]
+  # CDP-TOUCH: AS-DOCUMENTED chromium=141.0.7390.37        (exit 0; CHANGED ... exits 1)
+  ```
+
+- `page-parts.py` — **split a big single-file page into parts at its section
+  banners, and join them back byte for byte.** For a page past a few thousand
+  lines (CYOA2 is 5,492) a dozen files are easier on every tool than one, but
+  parts kept in a scratchpad die with the container and go stale without a word
+  when anything edits the shipped page directly (`stamp-badge.sh` does). So the
+  page stays the source of truth and the parts are a view of it: `split` cuts at
+  every banner line (default `^/\* ={20,}`; `--at REGEX` for a page with other
+  banners) and proves the round trip before reporting, `join` concatenates and
+  runs `check-inline-js.cjs`, and `check` says whether the two still agree and
+  where they first differ. Keep the parts directory in the scratchpad, never in
+  the repo.
+
+  ```
+  python3 .claude/scripts/page-parts.py split games/cyoa2/index.html $SCRATCH/parts
+  # SPLIT=games/cyoa2/index.html PARTS=24 DIR=... ROUNDTRIP=identical
+  python3 .claude/scripts/page-parts.py join $SCRATCH/parts
+  # JOINED=games/cyoa2/index.html PARTS=24 BYTES=422567
+  # INLINE-JS: GREEN
+  python3 .claude/scripts/page-parts.py check $SCRATCH/parts
+  # PARTS=in-sync PAGE=games/cyoa2/index.html        (or PARTS=DRIFTED ... FIRST=06-map.js:357, exit 1)
+  ```
+
 - `replace-fn.py` — replace ONE whole JS function in a single-file game, located
   by **name** and bounded by **brace counting**. `games/CLAUDE.md` § Editing a
   large single-file game records why: a span replacement between two hand-picked
@@ -139,6 +210,15 @@ Deterministic helpers for working on this repo.
   NODE_PATH=/opt/node22/lib/node_modules/playwright/node_modules \
     node .claude/scripts/smoke-mobile.cjs signals/index.html
   ```
+
+  **That path is container-dependent** (2026-10-05): a newer image left
+  `/opt/node22/.../playwright/node_modules` empty and hoisted `playwright-core`
+  to a top-level package in `/opt/node-tools/node_modules`, so every
+  hand-written `NODE_PATH` in this repo's headers silently stopped resolving
+  and `gates.sh` reported `NO-PLAYWRIGHT` -> `GATES: RED`. `gates.sh` now tries
+  both; by hand, use whichever of these makes
+  `node -e 'require("playwright-core")'` succeed:
+  `/opt/node-tools/node_modules` or `/opt/node22/lib/node_modules/playwright/node_modules`.
 
   A `#route` suffix is loaded as a client-side hash route (the file is checked
   without it), so a hash-routed app's inner page can be gated directly:

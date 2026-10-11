@@ -24,7 +24,9 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
+| CYOA2 | `cyoa2/` | tabletop-rpg | tap-to-move, pinch-zoom, drag-pan, text-entry, voice | open-sandbox, save-campaign | tile-board, asset-library, procedural-generation, seeded-determinism, line-of-sight, fog-of-war, initiative-order, grid-combat, llm-game-master, scripted-game-master, dialogue-choices, speech-narration | solo, local-coop | `.claude/cyoa2.md` |
 | CYOA | `cyoa/` | tabletop-rpg | voice, text-entry, tap | save-campaign | llm-game-master, speech-narration, procedural-generation, seeded-determinism | solo, local-coop | `.claude/cyoa.md` |
+| Animation Rigs | `animation-rigs/` | animation-sandbox | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox | procedural-animation, inverse-kinematics, simulated-agents, real-time-3d | solo | `.claude/animation-rigs.md` |
 | Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
 | Music Mixer | `music-mixer/` | music-instrument | hold, tap, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation, user-authoring | solo | `.claude/music-mixer.md` |
 | Verlet Ragdoll | `verlet-physics-ragdoll/` | physics-toy | drag-grab, drag-steer | open-sandbox | physics-sim, verlet-constraints, direct-manipulation | solo | `.claude/verlet-physics-ragdoll.md` |
@@ -80,7 +82,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-54 games (52 in-repo + 2 external builds).
+56 games (54 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -149,6 +151,73 @@ local-2p.
   levels forever: 16 authored, then endless seeded drawers, each beaten by
   the in-game solver before it is served; earmarked as the first web-first
   prototype of a future iOS title).
+
+### Newly opened by the 2026-10-09 build
+- **`tile-board`** / **`asset-library`** mechanics + **`drag-pan`** input (cyoa2, a
+  direct CD commission and CYOA's sequel; `tabletop-rpg` is reused on purpose). The
+  first game whose play surface is a **battle map**: a board of 5 ft squares with
+  walls on the EDGES between them, so furniture footprints are honest (a long table
+  is 5 x 10 ft and fills two squares). The first with a **data-table asset library**
+  where a small thing sitting on a bigger one is its own object, and the first whose
+  places are **charted lazily**: the bible exists up front, a board only when someone
+  walks in, and from then on it lives in the save and is never regenerated. Step 1
+  of 5 shipped as a sandbox with no Game Master, no combat and no fog (steps 2 and 3,
+  below, added all three). `neon-tactics` and
+  `ember-depths` are the other grid games here, but both are fights on one authored
+  or one generated floor; this is a connected world of furnished rooms. Still ahead
+  on this axis, per the roadmap in `.claude/cyoa2.md`: several devices sharing one
+  host's board (step 4), and a physical table (step 5).
+- **`fog-of-war`** / **`initiative-order`** mechanics (cyoa2 step 2, 2026-10-10;
+  `line-of-sight` and `local-coop` are reused). The first game here with a map that
+  **inks itself in** as it is explored and fades where the party has been and gone, and
+  the first with a **turn order rolled on dice**: a party of up to six and whatever
+  bandits are in sight each take a turn with 30 ft of movement, and the monsters are
+  moved by whoever holds the device until the Game Master model arrives. `neon-tactics`
+  has line of sight but no fog and no order beyond sides; `ember-depths` has memory fog
+  but one hero and no turns to roll for. Still no attacks: a round is movement only.
+
+- **cyoa2 step 3 (2026-10-10) opens no new facet** and is worth knowing about anyway:
+  `llm-game-master`, `grid-combat` and `text-entry` are all reused, but this is the
+  first game here where **the model and a finger send the same intents to the same
+  engine**. A tap on an enemy in reach is a blow resolved at once and for free; the
+  Game Master (Claude, over the player's own key) is asked only at the beats and when
+  spoken to, and acts through 25 tools that name things by the ids of a board digest
+  and never do geometry. It is also the first with a **scripted opponent that can be
+  swapped for the model** turn by turn (the monsters' script by default, the Game
+  Master or the table's own hand as settings), and the second with a per-save cost
+  ledger. `cyoa` is the conversation without a board; `neon-tactics` and
+  `ember-depths` are the board without a conversation.
+- **`scripted-game-master`** / **`dialogue-choices`** mechanics (cyoa2, the two kinds
+  of Game Master, 2026-10-10; a CD direction: "default mode is deterministic scripted
+  everything"). The first game here whose **narrator is a table**: the beats, what
+  people say and the whole quest are data chosen by a hash of the seed, so the same
+  seed and the same moves give the same words, for nothing and with no network. People
+  are talked to through **topic buttons** drawn from the seed's plot (some of them a
+  skill check, shown on the button with whose it is), and chests and locks offer verb
+  buttons. And the first where the **same moment can be told twice**: with Claude given
+  an area, the page keeps the script's version of each passage beside the model's, tags
+  both, takes a thumb up or down on either and adds it up, so how much of the table to
+  give the model is something the player can measure. `adventure.html` has encounters
+  and choices but no seeded world and no second teller.
+- **cyoa2's second push of step 3 (2026-10-10) opens no new facet**: `speech-narration`
+  and `voice` are CYOA's, reused. What is new is that the narrator reads a **script**:
+  the device's own voice over tables, so a game with no model, no key and no network
+  still tells its tale aloud.
+
+### Newly opened by the 2026-10-04 build
+- **`animation-sandbox`** genre + **`procedural-animation`** /
+  **`inverse-kinematics`** / **`simulated-agents`** mechanics (animation-rigs, a
+  direct CD commission). The first page whose content is MOTION itself: eight
+  21-joint stick-figure rigs walk, run, climb a ladder, press a button, fall and
+  slide through a grey-box course, every limb solved by two-bone IK over feet
+  that are planted in the world. There is no goal, score or fail state, which
+  puts it next to `physics-toy` (verlet-ragdoll), but the player does not handle
+  the bodies: they orbit, zoom, follow a figure and slow time, and the figures
+  run their own errands (a one-ladder queue, stairs that become slides under
+  whoever is on them). `real-time-3d` is reused, but this is the first 3D scene
+  drawn with a hand-written perspective projection onto Canvas 2D rather than
+  WebGL. Next on this axis: a rig the player poses or keys, or a crowd that has
+  to share a narrow route.
 
 ### Newly opened by the 2026-09-25 build
 - **`tabletop-rpg`** genre + **`voice`** / **`text-entry`** input +

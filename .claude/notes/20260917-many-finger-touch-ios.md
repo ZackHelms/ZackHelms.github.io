@@ -76,8 +76,12 @@ CDP.
 ```js
 const page = await browser.newPage({ viewport: {...}, hasTouch: true });
 const cdp = await page.context().newCDPSession(page);
-// Chromium DIFFS touchPoints against the previous call and synthesizes the
-// per-finger events, so pass the FULL active set each time.
+// Pass the full set when ADDING fingers: points already down and unmoved fire
+// nothing, new ids start. (Corrected 2026-10-10: this comment used to say
+// Chromium diffs the list against the previous call. It does not. A SHORTER
+// list lifts nobody; only a touchEnd lifts, and it lifts the points it lists,
+// or everyone when the list is empty. This helper only grows the set or ends
+// it with [], so it was never bitten. See .claude/scripts/probe-cdp-touch.cjs.)
 const setTouches = (pts) => cdp.send('Input.dispatchTouchEvent', {
   type: pts.length ? 'touchStart' : 'touchEnd',
   touchPoints: pts.map((p, i) => ({ x: Math.round(p.x), y: Math.round(p.y), id: i + 1 })),

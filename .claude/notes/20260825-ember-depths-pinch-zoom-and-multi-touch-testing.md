@@ -133,8 +133,18 @@ await T('touchEnd', []);                             // …then the other
 
 Notes that cost time:
 
-- `touchPoints` is the **current** set, not a delta: for `touchEnd` pass the
-  points that are *still down*, and `[]` for the last lift.
+- **Corrected 2026-10-10.** This note used to say here that `touchPoints` is
+  the current set and that a `touchEnd` lists the points *still down*. That is
+  backwards: **in a `touchEnd` the points listed are the ones that LIFT**, and
+  `[]` lifts whoever is left. So the sequence above lifts finger 2 first and
+  leaves finger 1, the left one, on the glass. Measured, not read:
+  `.claude/scripts/probe-cdp-touch.cjs`; the table is in
+  `20260724-headless-mobile-game-testing.md` § CDP multi-touch. The wrong belief
+  cost a real hole: the suite's "a pinch never fires a tap" row checked the
+  ground under the lifted finger and was green with the `gestured` latch reset
+  in the two-to-one branch. It was rebuilt on 2026-10-10 (ask the page where the
+  survivor is, slide a walkable tile under it, and afterwards require a real tap
+  there to walk).
 - Stable `id`s per finger across the whole sequence, or the page sees fingers
   teleporting.
 - The context needs `hasTouch: true`; `devices['iPhone 13']` supplies it.
