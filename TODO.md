@@ -20,12 +20,30 @@ backlog entry here.
   everything in it shipped in `3ea55c4` on `main`. A remote session cannot
   delete it: the agent proxy refuses ref deletion and API writes
   (`.claude/zmh/producer.md` § Environment).
+- [cyoa2] **Play a tale with only the script** (the default now: no key, no
+  cost), then give Claude one area at a time in Settings and play on. That is
+  the experiment you asked for. Rate passages with the thumbs as you go, open
+  "Script's version" under Claude's, and read Menu > Compare at the end
+  (there is a CSV). What I most need to hear: where the script is good enough,
+  and where it is not.
+- [cyoa2] **Every line the script speaks is mine and you have not read any of
+  it**: the four jobs, six whispers, the greetings, small talk, place
+  descriptions and the ending (tables `MAIN`, `WHISPERS`, `GREET`, `GANG`,
+  `ABOUT`, `IDLE`, `ENTER` in the page's THE SCRIPT section). Rewrite freely;
+  the suite checks shape, not wording.
+- [cyoa2] Overrule what is wrong in the two new "assumed, not decided" tables
+  in `.claude/cyoa2.md` (who runs the table; the script's adventure). The ones
+  most worth a look: with only the script at the table **being seen is always
+  a fight**; a night is slept **at the inn for a coin a head or in an emptied
+  hideout**, nowhere else; **only things in the hideout can be searched**;
+  what each whisper does once settled; and the pay (60 gold and 150 experience
+  for the job, 75 for a whisper).
 - [cyoa2] First play with a real key. Step 3's Game Master has only ever
   answered a stand-in server: no request has been sent to the live API, and
-  nothing has been tried on a real iPhone. While there, read the "assumed, not
-  decided" tables in `.claude/cyoa2.md` (no reactions, half cover, the script
-  never strikes the fallen, a beaten party wakes at the inn) and overrule any
-  that are wrong.
+  nothing has been tried on a real iPhone. While there, read the older
+  "assumed, not decided" tables in `.claude/cyoa2.md` (no reactions, half
+  cover, the script never strikes the fallen, a beaten party wakes at the inn)
+  and overrule any that are wrong.
 - [cyoa] Say yes or no to a two-line fix in CYOA's client: a reply with no
   words after a tool round is echoed back as an empty turn, which is expected
   to fail that turn (rolled back, nothing lost) where one nudge would have

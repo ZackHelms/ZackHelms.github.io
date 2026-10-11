@@ -180,6 +180,10 @@ button.chip:active { transform:translateY(1px); }
 #info-acts:empty { display:none; }
 #info-acts .plaque { min-height:40px; }
 #info-acts .plaque i { font-style:normal; font-size:11px; letter-spacing:.06em; color:var(--ink-2); margin-left:.2em; }
+#info-acts .plaque:disabled i { color:var(--ink-3); }
+/* the card as a conversation: what they said, and what can be asked next */
+#info.talk { max-height:calc(100% - 20px); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+#info.talk #info-text { display:block; margin-top:2px; }
 
 /* ===== the story: what was said and what the dice did, beside the board ===== */
 #story { flex:0 0 auto; display:flex; flex-direction:column; min-width:0; min-height:0;
@@ -205,6 +209,23 @@ button.chip:active { transform:translateY(1px); }
 @keyframes waitdot { 0% { opacity:.2; } 100% { opacity:1; } }
 .cost-tag { margin:-4px auto 10px; text-align:right; font-family:var(--caps); font-size:10.5px; letter-spacing:.08em; color:var(--ink-3); }
 body.hide-costs .cost-tag { display:none; }
+/* under a telling: who told it, two marks to rate it by, and (under a model's) what the script would have said */
+.st-foot { margin:-8px auto 10px; display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; font-family:var(--caps); font-size:10.5px;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); }
+body.hide-tags .st-foot { display:none; }
+.st-foot .src { padding:1px 6px; border:1px solid var(--ink-3); border-radius:2px; color:var(--ink-2); }
+.st-foot .src.ai { border-color:var(--lapis); color:var(--lapis); }
+.st-foot .rate { min-width:40px; min-height:36px; padding:0; border:0; background:transparent; font-size:15px; line-height:1; filter:grayscale(1); opacity:.6; cursor:pointer; }
+.st-foot .rate[aria-pressed="true"] { opacity:1; filter:none; }
+.st-foot .rate:disabled { opacity:.15; }
+.st-foot .twin-btn { margin-left:auto; min-height:32px; padding:2px 10px; border:1px solid var(--ink-3); border-radius:2px; background:transparent;
+  font:inherit; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-2); cursor:pointer; }
+.st-foot .twin-btn[aria-expanded="true"] { border-color:var(--ink); color:var(--ink); }
+.st-twin { flex:1 1 100%; margin:4px 0 2px; padding:6px 0 2px 10px; border-left:3px double var(--ink-3); }
+.st-twin .twin-text { font-family:var(--serif); font-size:16px; line-height:1.45; letter-spacing:0; text-transform:none; color:var(--ink-2); white-space:pre-wrap; }
+.st-twin .twin-rate { display:flex; align-items:center; gap:2px 8px; margin-top:2px; }
+/* the typed line is for a model: where none is listening, the bar is only the fold */
+body.no-say #say, body.no-say #say-who, body.no-say #say-send { display:none; }
 #story-bar { flex:0 0 auto; display:flex; align-items:center; gap:6px; min-width:0;
   padding:6px 8px calc(6px + var(--sab)); border-top:1px solid var(--vellum-3); }
 #story-bar .iconbtn { width:44px; height:44px; font-size:20px; }
@@ -214,6 +235,8 @@ body.hide-costs .cost-tag { display:none; }
   border:1.5px solid var(--ink-2); border-radius:2px; font-family:var(--serif); font-size:17px; }
 #say:focus, #say-who:focus { outline:2px solid var(--lapis); outline-offset:1px; }
 #story-toggle b { display:block; transition:transform .2s; font-weight:400; }
+#story-toggle { position:relative; }
+#story-toggle.new::after { content:''; position:absolute; top:5px; right:5px; width:10px; height:10px; border-radius:50%; background:var(--rubric); border:1.5px solid var(--vellum); }
 #story.open #story-toggle b { transform:rotate(180deg); }
 @media (orientation:landscape) and (max-height:520px), (min-width:1000px) and (min-aspect-ratio:5/4) {
   #play-main { flex-direction:row; }
@@ -236,6 +259,12 @@ body.hide-costs .cost-tag { display:none; }
 .cost-row { display:grid; grid-template-columns:auto 1fr; gap:2px 12px; padding:8px 0; border-top:1px solid var(--vellum-3); font-size:15px; }
 .cost-row .usd { font-family:var(--caps); font-weight:700; color:var(--rubric); }
 .cost-row .usd.failed { color:var(--ink-3); text-decoration:line-through; }
+table.cmp { width:100%; max-width:640px; margin:10px auto 0; border-collapse:collapse; font-size:15px; }
+table.cmp th { font-family:var(--caps); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2); text-align:right; padding:4px 6px; font-weight:400; }
+table.cmp td { text-align:right; padding:5px 6px; border-top:1px solid var(--vellum-3); font-family:var(--caps); }
+table.cmp td:first-child, table.cmp th:first-child { text-align:left; }
+table.cmp tr.area td { font-weight:700; font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--rubric); border-top:0; padding-top:12px; }
+table.cmp tr.ai td:first-child { color:var(--lapis); }
 .cost-row .how { grid-column:2; font-family:var(--caps); font-size:11px; letter-spacing:.06em; color:var(--ink-3); }
 .field input[type=password] { min-height:44px; padding:8px 10px; background:var(--vellum-2); border:1.5px solid var(--ink-2); border-radius:2px;
   font-family:var(--serif); font-size:17px; }
@@ -320,7 +349,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-10 18:51 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-11 00:36 UTC</div>
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
 
@@ -417,7 +446,22 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
       <p class="note">Tap a square to walk there. Drag to pan, pinch or scroll to zoom. Tap a door, a thing or a person to see it. Arrow keys and WASD also walk; Q E Z C step diagonally.</p>
       <p class="note">Roll initiative to count rounds: everyone in the fight takes a turn in order, with 30 ft of movement, one action and one bonus action. Tap an enemy in reach to strike it; tap your own piece for what else it can do. Enter ends a turn.</p>
     </fieldset>
-    <fieldset><legend>Game Master</legend>
+    <fieldset><legend>Who runs the table</legend>
+      <label class="field"><span>The Game Master is</span><select id="set-gm"><option value="script">The script: free, no key</option><option value="ai">Claude, where chosen below (your key)</option></select></label>
+      <p class="note" id="gm-note"></p>
+      <div id="ai-areas">
+      <label class="field"><span>Narration at the beats</span><select id="set-a-narrate"><option value="script">The script</option><option value="ai">Claude</option></select></label>
+      <label class="field"><span>Talking to people</span><select id="set-a-talk"><option value="script">The script: topics to choose from</option><option value="ai">Claude: say anything</option></select></label>
+      <label class="field"><span>Lines typed to the table</span><select id="set-a-act"><option value="script">Not offered</option><option value="ai">Claude</option></select></label>
+      <label class="field"><span>Making characters</span><select id="set-a-create"><option value="script">On the party sheet</option><option value="ai">Claude, in conversation</option></select></label>
+      <label class="check"><input id="set-twin" type="checkbox"><span>Under Claude's tellings, keep what the script would have said</span></label>
+      </div>
+      <label class="field"><span>Monsters in a fight are played by</span><select id="set-monsters"><option value="script">The script</option><option value="gm">Claude</option><option value="hand">You, by hand</option></select></label>
+      <label class="check"><input id="set-tags" type="checkbox"><span>Mark who told each passage, with marks to rate it by</span></label>
+      <div class="row" style="margin-top:10px"><button id="set-compare" class="plaque small" type="button">Compare</button></div>
+      <p class="note">The beats: the opening, the first sight of a new place, a fight starting and ending, the tale's end. Walking, doors, blows, chests and locks are always the engine's, and free.</p>
+    </fieldset>
+    <fieldset><legend>Claude</legend>
       <label class="field"><span>Your Anthropic API key</span><input id="set-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="300" placeholder="sk-ant-..."></label>
       <label class="check"><input id="set-remember" type="checkbox"><span>Remember the key on this device</span></label>
       <div class="row" style="margin-top:10px">
@@ -426,14 +470,11 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
         <button id="set-costs" class="plaque small" type="button">Costs</button>
       </div>
       <p class="note" id="key-note"></p>
-      <p class="note">The Game Master is Claude, speaking through your own key and at your own cost. The key stays in this browser, is sent only to api.anthropic.com, and is never written into a save. Without one the board still plays: walking, fighting and resting are the engine's, and free.</p>
+      <p class="note">Claude speaks through your own key and at your own cost. The key stays in this browser, is sent only to api.anthropic.com, and is never written into a save. Nothing here is needed to play: the script tells the whole tale without it.</p>
       <label class="field"><span>Model</span><select id="set-model"></select></label>
       <label class="field" id="set-custom-row" hidden><span>Custom model id</span><input id="set-custom" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="80"></label>
       <label class="field"><span>Effort</span><select id="set-effort"><option value="low">Quick</option><option value="medium">Balanced</option><option value="high">Thorough</option></select></label>
       <label class="field"><span>Content rating</span><select id="set-rating"><option value="family">Family</option><option value="teen">Teen</option><option value="mature">Mature</option></select></label>
-      <label class="field"><span>The Game Master speaks</span><select id="set-narrate"><option value="beats">At the beats</option><option value="asked">Only when spoken to</option></select></label>
-      <p class="note">The beats: the opening, the first sight of a new place, a fight starting and ending. Walking, doors and looking at things are always silent and free.</p>
-      <label class="field"><span>Monsters in a fight are played by</span><select id="set-monsters"><option value="script">The engine (free)</option><option value="gm">The Game Master</option><option value="hand">You, by hand</option></select></label>
       <label class="field"><span>Model for the monsters' turns</span><select id="set-m-monsters"></select></label>
       <label class="field"><span>Model for the beats</span><select id="set-m-beat"></select></label>
       <label class="field"><span>Model for what the players say</span><select id="set-m-turn"></select></label>
@@ -463,10 +504,17 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
   <div class="panel-body" id="costs-body"></div>
 </section>
 
+<!-- ===== compare: the script and the model, side by side ===== -->
+<section id="pan-compare" class="panel" aria-label="Compare">
+  <div class="panel-head"><h2>Script and AI</h2><button class="plaque small" type="button" data-close>Back</button></div>
+  <div class="panel-body" id="compare-body"></div>
+</section>
+
 <div id="scrim"></div>
 <nav id="menu" aria-label="Game menu">
   <button class="plaque" type="button" data-act="party">Party</button>
   <button class="plaque" type="button" data-act="chron">Chronicle</button>
+  <button class="plaque" type="button" data-act="compare">Compare</button>
   <button class="plaque" type="button" data-act="lib">Library</button>
   <button class="plaque" type="button" data-act="export">Save to a file</button>
   <button class="plaque" type="button" data-act="settings">Settings</button>
@@ -690,7 +738,7 @@ const TOPS = {
    a 5 x 10 ft table really does fill two squares of a room. Things stand on squares
    (objs), small things sit on things (obj.on), and people stand on squares (tokens).
    Everything below is plain data, so a map goes into the save as it is.            */
-const GEN_V = 1;                                         /* bump when a generator's output changes */
+const GEN_V = 2;                                         /* bump when a generator's output changes */
 const TR = { VOID: 0, GRASS: 1, DIRT: 2, COBBLE: 3, WOOD: 4, STONE: 5, CAVE: 6, ROCK: 7, WATER: 8, ROOF: 9 };
 const TERRAIN = ['nothing', 'grass', 'bare earth', 'cobbles', 'floorboards', 'flagstones', 'cave floor', 'solid rock', 'water', 'a roof'];
 const TWALK = [0, 1, 1, 1, 1, 1, 1, 0, 0, 0];
@@ -1267,7 +1315,10 @@ function fnCell(F, ri) {
       if (rock === 3) c.push([x, y, d, rx, ry]);
     }
   }
-  if (!c.length) return;
+  if (!c.length) {   /* no rock to cut a cell into: the prisoner is kept bound in the chamber itself, so there is always someone to free */
+    const held = st.npcs.N6; if (held) F.tokenAny(ri, 'captive', held.id, null);
+    return;
+  }
   const [x, y, d, rx, ry] = pick(F.r, c);
   m.rooms.push({ id: 'R' + (m.rooms.length + 1), kind: 'cell', name: 'a cell', x: rx, y: ry, w: 1, h: 1 });
   m.t[ry * W + rx] = TR.CAVE; m.rg[ry * W + rx] = m.rooms.length;
@@ -1585,6 +1636,11 @@ function genBuilding(st, id) {
   for (const q of m.rooms) { delete q.ks; delete q.ds; }                /* notes for the furnisher only */
   /* a little green outside, never on a doorstep */
   { const out = shuffled(r, F.tiles(-1)).filter((i) => m.t[i] === TR.GRASS && !F.keep[i]); for (let k = 0; k < rint(r, 2, 5) && k < out.length; k++) F.put('bush', out[k] % w, (out[k] - out[k] % w) / w, 0, -1); }
+  /* whoever keeps the place is in it: if the recipe found them no square (a forge too full of forge), any room will do.
+     Asked last, so a board whose keeper was already seated is drawn exactly as before.                                 */
+  { const kp = site.keeper && st.npcs[site.keeper], home = () => m.tokens.some((t) => t.npc === kp.id);
+    if (kp && !home()) for (let ri = 0; ri < m.rooms.length && !home(); ri++) F.tokenAny(ri, kp.kind, kp.id, null);
+    if (kp && !home()) F.tokenAny(-1, kp.kind, kp.id, null); }                       /* ...and failing every room, the yard outside the door */
   return m;
 }
 
@@ -1857,7 +1913,7 @@ function grantXp(p, xp, out) {
   while (p.level < 5 && p.xp >= XP_LEVELS[p.level]) {
     p.level++;
     const gain = Math.max(1, Math.floor(CLASSES[p.cls].hd / 2) + 1 + abMod(p.scores.con));
-    p.hpMax += gain; p.hp += gain;
+    p.hpMax += gain; if (p.hp > 0) p.hp += gain;            /* a level is not a healing: whoever earns one lying down is still lying down */
     if (p.level === 3 || p.level === 5) for (const a of p.abilities) if (typeof a.max === 'number') { a.max++; a.uses++; }
     out.push({ id: p.id, name: p.name, level: p.level, hpGain: gain });
   }
@@ -1871,6 +1927,31 @@ function checkFor(p, check) {
   const ab = normAbil(c);
   return ab ? { ab, prof: false, label: cap(ABIL_NAMES[ab]) } : null;
 }
+/* one check, rolled: the Game Master's roll_check and the script's own both come through here, so a model and a script are judged by the same dice */
+function rollCheck(st, p, c, dc, want) {
+  const mode = combineMode(want, false, p.conditions.some((x) => ['poisoned', 'frightened', 'exhausted'].includes(x)));
+  const d = diceRng(st), r = d20s(d, mode);
+  let m = abMod(p.scores[c.ab]) + (c.prof ? profBonus(p.level) : 0), extra = '';
+  if (p.conditions.includes('inspired')) { const v = d(6); m += v; extra = ' (inspiration +' + v + ')'; p.conditions = p.conditions.filter((x) => x !== 'inspired'); }
+  const total = r.kept + m;
+  return { mode, rolls: r.rolls, natural: r.kept, modifier: m, total, dc, success: total >= dc, extra };
+}
+const checkSay = (p, c, r, reason) => p.name + ': ' + c.label + ' ' + r.total + ' against DC ' + r.dc + (r.success ? ', a success' : ', a failure') + r.extra + (reason ? ' (' + reason + ')' : '') + '.';
+/* Things with a rule of their own. Anything else a traveller carries is a name and nothing more.
+   use: 'heal' is drunk (an action in a fight); 'pick' and 'force' are tools the party's hands are better with; 'plot' matters to the tale. */
+const ITEMS = {
+  'healing draught': { use: 'heal', dice: '2d4+2', price: 12, t: 'Drunk in a moment: 2d4+2 hit points.' },
+  'thieves’ tools':  { use: 'pick', price: 10, t: 'Without them a lock is picked at a disadvantage.' },
+  'crowbar':         { use: 'force', price: 4, t: 'A lid or a door is forced with advantage.' },
+  'the gang’s keys': { use: 'plot', t: 'Every lock in the hideout.' },
+  'silver reliquary': { use: 'plot', t: 'The chapel’s own.' },
+  'the gang’s ledger': { use: 'plot', t: 'Names, sums and dates.' },
+  'a letter in the keeper’s hand': { use: 'plot', t: 'It lists travellers worth robbing.' },
+};
+const itemKey = (n) => String(n || '').toLowerCase().replace(/'/g, '’').trim();
+const carries = (st, name) => st.party.find((p) => p.status !== 'dead' && p.items.some((x) => itemKey(x.n) === itemKey(name))) || null;
+function giveItem(p, name, q) { const have = p.items.find((x) => itemKey(x.n) === itemKey(name)); if (have) have.q = Math.min(999, have.q + (q || 1)); else if (p.items.length < 60) p.items.push({ n: name, q: q || 1 }); }
+function takeItem(p, name) { const have = p.items.find((x) => itemKey(x.n) === itemKey(name)); if (!have) return false; have.q--; if (have.q <= 0) p.items = p.items.filter((x) => x !== have); return true; }
 /* what someone can strike with, as the dice read it: {n, hit, d, rg, spell} */
 function weaponsOf(p) {
   return CLASSES[p.cls].attacks.map((at) => { const m = abMod(p.scores[at.ab]); return { n: at.n, hit: m + profBonus(p.level), d: at.d + (at.spell ? '' : signed(m)), rg: at.rg, spell: !!at.spell }; });
@@ -1897,9 +1978,10 @@ function clockText(st) {
    a turn in initiative order: 30 ft of movement, one action (an attack, a dash, most
    abilities) and one bonus action. A monster's turn is taken by the script at the
    bottom of this section, by the Game Master, or by whoever holds the table.       */
-const ENGINE_V = 3;
+const ENGINE_V = 4;
 const SPEED = 30;                                         /* feet a turn, for everyone */
 const PARTY_MAX = 6;
+const AREAS = ['narrate', 'talk', 'act', 'monsters', 'create'];   /* what a Game Master does at the table: each is the script's or a model's */
 const SIGHT = { town: 24, cave: 8 };                      /* how far the party sees, in squares: daylight, torchlight */
 const sightOf = (m) => SIGHT[m.kind] || 16;               /* and a lit room */
 const pcOf = (st, who) => st.party.find((p) => p.id === who) || null;
@@ -1972,8 +2054,8 @@ function bedside(inn) {
 function newGame(seed) {
   const bible = generateWorld(seed), pc = newPc('P1', 'Wayfarer', 'S1', 0, 0, CLASS_ORDER[0], true);
   const st = { format: 'cyoa2-save', v: ENGINE_V, seed, bible, sites: {}, npcs: {}, maps: {}, party: [pc], lead: 'P1',
-    here: 'S1', walk: null, round: null, met: {}, log: [], time: { day: 1, minute: 480 }, gold: CLASSES[pc.cls].gold, facts: [], summaries: [], quests: {}, story: [], costs: [], turn: 0, told: {}, fallen: [], over: '',
-    n: { ev: 0, site: bible.sites.length, pc: 1, roll: 0, f: 0, Q: 1 }, made: Date.now() };
+    here: 'S1', walk: null, round: null, met: {}, log: [], time: { day: 1, minute: 480 }, gold: CLASSES[pc.cls].gold, facts: [], summaries: [], quests: {}, story: [], costs: [], turn: 0, told: {}, fallen: [], over: '', flags: {}, tells: [],
+    n: { ev: 0, site: bible.sites.length, pc: 1, roll: 0, f: 0, Q: 1, tell: 0 }, made: Date.now() };
   for (const s of bible.sites) st.sites[s.id] = deepClone(s);
   for (const p of bible.npcs) st.npcs[p.id] = Object.assign(deepClone(p), { bible: true });
   st.quests.Q0 = questOf(st);
@@ -2097,6 +2179,16 @@ function look(st) {
   }
   if (out.fresh.length) note(st, 'spot', { site: m.id, ids: out.fresh.slice() });
   return out;
+}
+/* is an enemy who is awake in sight of a traveller who is still on their feet? (The fallen see nothing, and the sleeping see nobody.) */
+function threatOf(st) {
+  const m = st.maps[st.here];
+  if (!m) return false;
+  const foes = m.tokens.filter((t) => t.k === 'foe' && awake(st, t));
+  if (!foes.length) return false;
+  const g = new Uint8Array(m.w * m.h), r = sightOf(m);
+  for (const p of st.party) if (p.site === m.id && p.status === 'ok') sightFrom(m, p.x, p.y, r, g);
+  return foes.some((t) => g[t.y * m.w + t.x]);
 }
 function visOf(st) { let v = VIS.get(st); if (!v || v.site !== st.here) { look(st); v = VIS.get(st); } return v; }
 /* The party trails its leader. Whoever stands where the leader steps changes places with
@@ -2251,6 +2343,7 @@ function endFight(st, outcome) {
   const h = afterHarm(st);
   out.lost = h.lost; out.rescued = h.rescued; out.over = h.over;
   if (!out.over) look(st);
+  out.plot = plotCheck(st);                                   /* what the fight settled, if it settled anything */
   return out;
 }
 /* has the fight decided itself? Nobody of the party standing is a defeat; the last monster gone is a victory. */
@@ -2308,7 +2401,8 @@ const REFUSE = { blocked: 'Something is in the way.', noway: 'There is no way th
   over: 'The tale has ended.', noact: 'No action is left this turn.', nobonus: 'No bonus action is left this turn.', notarget: 'There is nobody there to aim at.',
   peace: 'They mean you no harm.', friend: 'They are on the same side.', reach: 'Out of reach.', nosight: 'There is no clear line to them.', downed: 'They are in no state to do that.',
   noability: 'They know no such trick.', passive: 'That works by itself.', nouses: 'None of that is left until they rest.', notself: 'Someone else, not themselves.', gone: 'They are beyond help.',
-  unsafe: 'Not with enemies in sight.', seasoned: 'Too late to change their calling.', turned: 'They are turned and cannot strike.', noweapon: 'They carry no such weapon.', noclass: 'No such calling.' };
+  unsafe: 'Not with enemies in sight.', hostiles: 'Not here: enemies are still about.', nobed: 'There is no bed here.', notopic: 'They have nothing to say to that.', nothing: 'There is nothing there to use.',
+  noverb: 'That cannot be done with it.', tried: 'They have tried that already.', noitem: 'They carry no such thing.', unheard: 'They are not in sight.', seasoned: 'Too late to change their calling.', turned: 'They are turned and cannot strike.', noweapon: 'They carry no such weapon.', noclass: 'No such calling.' };
 const refuse = (why, say) => ({ ok: false, why, say: say || REFUSE[why] || REFUSE.bad });
 
 /* one attack, start to finish. Called only by intent(), which has already found who is acting. */
@@ -2347,6 +2441,7 @@ function strike(st, a, it) {
       const sn = rollTerms(d, [{ sign: 1, n: Math.ceil(a.o.level / 2), die: 6 }], crit).total; dmg += sn; out.sneak = sn; R.sneak = true; extra.push('sneak attack +' + sn);
     }
     if (a.pc && a.o.mark === tgt.id && !w.spell) { const mk = rollTerms(d, [{ sign: 1, n: 1, die: 6 }], crit).total; dmg += mk; out.mark = mk; extra.push('quarry +' + mk); }
+    if (a.pc && !w.spell && st.flags.keen) { dmg += 1; extra.push('keen edge +1'); }
     dmg = Math.max(1, dmg); out.dmg = dmg;
     say += ': ' + (crit ? 'a critical hit' : 'a hit') + ' for ' + dmg + '.';
     if (tgt.pc) { hurtPC(tgt.o, dmg, crit); out.status = tgt.o.status; out.hp = tgt.o.hp; out.hpMax = tgt.o.hpMax; if (tgt.o.status !== 'ok') { out.fell = true; say += ' ' + T + (tgt.o.status === 'dead' ? ' is dead.' : ' is down.'); } }
@@ -2473,6 +2568,20 @@ function intent(st, it) {
         if (p.cls !== it.cls) { const keep = { ancestry: p.ancestry, background: p.background, personality: p.personality, look: p.look, player: p.player }; st.gold = Math.max(0, st.gold + CLASSES[it.cls].gold - CLASSES[p.cls].gold); makeSheet(p, it.cls); Object.assign(p, keep); p.stock = false; fixLead(st); note(st, 'party', { op: 'class', who: p.id, name: p.name, cls: p.cls }); }
         return { ok: true, id: p.id, cls: p.cls };
       }
+      if (it.op === 'roll') {    /* a traveller rolled up whole by the seed (a name, a calling, a few words), for a player who would rather be surprised */
+        const p = pcOf(st, it.id);
+        if (!p) return no('nobody');
+        if (p.xp > 0 || p.level > 1) return no('seasoned');
+        const r = rngFor(st.seed, 'pregen', st.n.roll++), cls = pick(r, CLASS_ORDER), used = new Set(st.party.filter((q) => q !== p).map((q) => q.name));
+        let name = '';
+        for (let k = 0; k < 40 && !name; k++) { const n = pick(r, GIVEN); if (!used.has(n)) name = n; }
+        if (p.cls !== cls) { st.gold = Math.max(0, st.gold + CLASSES[cls].gold - CLASSES[p.cls].gold); makeSheet(p, cls); }
+        p.name = clip(name || p.name, 24); p.stock = false;
+        p.ancestry = pick(r, ANCESTRIES); p.background = pick(r, BACKGROUNDS); p.personality = pick(r, PERSONALITIES); p.look = pick(r, LOOKS);
+        fixLead(st);
+        note(st, 'party', { op: 'class', who: p.id, name: p.name, cls: p.cls });
+        return { ok: true, id: p.id, name: p.name, cls: p.cls };
+      }
       return no('bad');
     }
     case 'lead': {   /* {id}: who the party follows when it is not counting rounds */
@@ -2507,10 +2616,15 @@ function intent(st, it) {
     case 'rest': {   /* {kind:'short'|'long'}: an hour to catch breath, or a night's sleep */
       if (R) return no('inround');
       if (it.kind !== 'short' && it.kind !== 'long') return no('bad');
-      const m = st.maps[st.here], V = visOf(st).g;
+      const m = st.maps[st.here], V = visOf(st).g, long = it.kind === 'long', gm = it.by === 'gm';
       if (m.tokens.some((t) => t.k === 'foe' && V[t.y * m.w + t.x])) return no('unsafe');
+      /* a night is slept where it is safe: not on a board enemies still hold, and in town in a bed, which the inn sells.
+         (The Game Master may rule otherwise: a barn, a hayloft, a watch kept in turns.)                                */
+      if (long && !gm && m.tokens.some((t) => t.k === 'foe')) return no('hostiles');
+      if (long && !gm && m.kind !== 'cave' && st.here !== 'S1') return no('nobed', 'There is no bed here. ' + (st.sites.S1 ? st.sites.S1.name : 'The inn') + ' has rooms.');
       closeWalk(st);
-      const d = diceRng(st), long = it.kind === 'long', out = [];
+      const d = diceRng(st), out = [], inn = long && !gm && st.here === 'S1', paid = inn && !st.flags.freebed ? Math.min(st.gold, st.party.filter((p) => p.status !== 'dead').length) : 0;
+      st.gold -= paid;
       for (const p of st.party) {
         if (p.status === 'dead') continue;
         if (long) { p.hp = p.hpMax; p.status = 'ok'; p.saves = { s: 0, f: 0 }; p.conditions = []; p.mark = ''; for (const a of p.abilities) if (a.max !== null) a.uses = a.max; }
@@ -2523,9 +2637,30 @@ function intent(st, it) {
       }
       addMinutes(st, long ? 480 : 60);
       fixLead(st);
-      const say = long ? 'The party sleeps the night through and wakes whole.' : 'The party rests an hour and binds its wounds.';
+      const say = !long ? 'The party rests an hour and binds its wounds.' : (inn ? (paid ? 'The party pays ' + paid + ' gold for beds, ' : st.flags.freebed ? 'The party is given beds for nothing, ' : 'The party beds down in the stable for nothing, ') + 'sleeps the night through' : 'The party sleeps the night through') + ' and wakes whole.';
       note(st, 'tell', { say });
-      return { ok: true, t: 'rest', kind: it.kind, party: out, time: clockText(st), say };
+      return { ok: true, t: 'rest', kind: it.kind, party: out, time: clockText(st), paid, say };
+    }
+    case 'talk': {   /* {npc, topic}: ask someone in sight about one of the things they can be asked (the script's dialogue) */
+      if (R) return no('inround');
+      const m = st.maps[st.here], tok = m.tokens.find((t) => t.npc === it.npc);
+      if (!tok) return no('notarget');
+      if (!visOf(st).g[tok.y * m.w + tok.x]) return no('unheard');
+      if (leadOf(st).status !== 'ok') return no('downed');
+      closeWalk(st);
+      return talkOf(st, it.npc, String(it.topic || ''), false);
+    }
+    case 'use': {    /* {what: O# | D#, verb}: search a thing, or unlock, pick or force a lock, standing beside it */
+      if (R) return no('inround');
+      if (leadOf(st).status !== 'ok') return no('downed');
+      closeWalk(st);
+      return useOf(st, it);
+    }
+    case 'item': {   /* {item, who?, target?}: outside a fight any traveller may drink or hand one over */
+      if (R) break;
+      const p = it.who == null ? leadOf(st) : pcOf(st, it.who);
+      if (!p) return no('nobody');
+      return itemOf(st, { id: p.id, pc: true, o: p, m: st.maps[p.site] }, it);
     }
     case 'ability': {   /* outside a fight anyone in the party may use one (a healer's hands need no initiative) */
       if (R) break;
@@ -2550,7 +2685,7 @@ function intent(st, it) {
     case 'move': {   /* {to:[x,y]} or {goals:[[x,y]...]}, optional then:{t:'travel'}|{t:'door',id}, optional known:true */
       const res = route(st, a, it.goals || [it.to], !!it.known && a.pc);
       if (!res.ok) return res.why === 'spent' && res.left > 0 ? no('spent', 'That is ' + res.ft + ' ft, and ' + res.left + ' ft of this turn are left.') : no(res.why);
-      const t = it.then && it.then.t, then = t === 'door' || (t === 'travel' && !R) ? { t, id: it.then.id } : null;
+      const t = it.then && it.then.t, then = t === 'door' || (t === 'travel' && !R) ? { t, id: it.then.id } : t === 'use' && !R ? { t, what: String(it.then.what || ''), verb: String(it.then.verb || '') } : null;
       closeWalk(st, res.path.length > 0);
       if (!res.path.length) return then ? intent(st, Object.assign({ who: a.id }, then)) : { ok: true, path: [], ft: 0 };
       st.walk = { who: a.id, path: res.path, i: 0, from: [o.x, o.y], ft: 0, then };
@@ -2589,6 +2724,7 @@ function intent(st, it) {
     }
     case 'attack': return strike(st, a, it);       /* {target, attack?}: one action */
     case 'ability': return useAbility(st, a, it);  /* {name, target?} */
+    case 'item': return itemOf(st, a, it);         /* {item, target?}: an action in a fight */
     case 'dash': {   /* the action spent on running: 30 ft more this turn */
       if (!R) return no('noround');
       if (R.act < 1) return no('noact');
@@ -2633,6 +2769,8 @@ function arrive(st, from, to, how, spot) {
   st.walk = null;
   if (w && w.i) note(st, 'move', { who: w.who, site: from.id, from: w.from, to: [was[0][1], was[0][2]], ft: w.ft });
   st.here = dest.id;
+  plotLeave(st, from);
+  if (dest.id === 'S2') hush(st);
   if (how === 'travel') addMinutes(st, from.kind === 'cave' || dest.kind === 'cave' ? 45 : 5);
   note(st, how, { who: L.id, from: from.id, to: dest.id, at: [L.x, L.y] });
   return { ok: true, site: dest.id, at: [L.x, L.y], spotted: look(st).fresh };
@@ -2682,13 +2820,21 @@ function foePlan(st) {
   return { t: 'end' };
 }
 
+/* one line of the tally of tellings: who told it (the script or a model), about what, how long, what it cost, and how the
+   table rated it and its twin. The fields are always in this order (a save is compared byte for byte).                    */
+function tellRow(e) {
+  if (!e || typeof e !== 'object' || !(e.src === 'script' || e.src === 'ai')) return null;
+  const int = (v, lo, hi) => (Number.isFinite(+v) ? clamp(Math.round(+v), lo, hi) : 0);
+  return { n: int(e.n, 0, 1e7), turn: int(e.turn, 0, 1e6), area: AREAS.includes(e.area) ? e.area : 'narrate', src: e.src, w: int(e.w, 0, 1e5), usd: typeof e.usd === 'number' && isFinite(e.usd) && e.usd > 0 ? e.usd : 0,
+    model: clip(typeof e.model === 'string' ? e.model : '', 80), r: int(e.r, -1, 1), tw: int(e.tw, 0, 1e5), tr: int(e.tr, -1, 1) };
+}
 /* ---- the whole state in and out of a save ---- */
 function packState(st) {
   const maps = {};
   for (const k of Object.keys(st.maps)) maps[k] = packMap(st.maps[k]);
   return { format: 'cyoa2-save', v: ENGINE_V, seed: st.seed, bible: st.bible, sites: st.sites, npcs: st.npcs, maps, party: st.party, lead: st.lead, here: st.here,
     round: st.round, met: st.met, log: st.log, time: st.time, gold: st.gold, facts: st.facts, summaries: st.summaries, quests: st.quests, story: st.story, costs: st.costs,
-    turn: st.turn, told: st.told, fallen: st.fallen, over: st.over, n: st.n, made: st.made, saved: Date.now() };
+    turn: st.turn, told: st.told, fallen: st.fallen, over: st.over, flags: st.flags, tells: st.tells, n: st.n, made: st.made, saved: Date.now() };
 }
 /* plain, bounded data only: strings clipped, depth capped, no prototype keys */
 function cleanData(v, depth) {
@@ -2725,7 +2871,7 @@ function unpackState(p) {
   if ((p.v | 0) > ENGINE_V) throw new Error('That tale was saved by a newer version of the game.');
   const s = (v, n) => clip(typeof v === 'string' ? v : '', n), int = (v, lo, hi, d) => (Number.isFinite(+v) ? clamp(Math.round(+v), lo, hi) : d);
   const st = { format: 'cyoa2-save', v: ENGINE_V, seed: s(p.seed, 80) || 'unknown', bible: cleanData(p.bible, 0) || {}, sites: {}, npcs: {}, maps: {}, party: [], lead: '', here: '', walk: null, round: null, met: {},
-    log: [], time: { day: 1, minute: 480 }, gold: 0, facts: [], summaries: [], quests: {}, story: [], costs: [], turn: 0, told: {}, fallen: [], over: '', n: { ev: 0, site: 0, pc: 1, roll: 0, f: 0, Q: 1 }, made: +p.made || Date.now() };
+    log: [], time: { day: 1, minute: 480 }, gold: 0, facts: [], summaries: [], quests: {}, story: [], costs: [], turn: 0, told: {}, fallen: [], over: '', flags: {}, tells: [], n: { ev: 0, site: 0, pc: 1, roll: 0, f: 0, Q: 1, tell: 0 }, made: +p.made || Date.now() };
   const B = st.bible;
   for (const k of ['town', 'region', 'inn', 'gang', 'cave', 'opening']) B[k] = s(B[k], 200);
   B.threads = (Array.isArray(B.threads) ? B.threads : []).filter((t) => t && typeof t.t === 'string');
@@ -2790,8 +2936,16 @@ function unpackState(p) {
     const z = { t: e.t, text: clip(e.text, e.t === 'gm' ? 6000 : 600), turn: int(e.turn, 0, 1e6, 0) };
     if (e.t === 'pl') { z.who = s(e.who, 30); z.id = s(e.id, 8); }
     if (e.t === 'chip') z.k = s(e.k, 12);
+    if (e.t === 'gm' && (e.src === 'script' || e.src === 'ai')) {   /* who told it, and what the other would have said */
+      z.n = int(e.n, 0, 1e7, 0); z.src = e.src; z.area = AREAS.includes(e.area) ? e.area : 'narrate';
+      if (typeof e.twin === 'string' && e.twin.trim()) z.twin = clip(e.twin, 3000);
+    }
     st.story.push(z);
   }
+  /* what has come true in the plot, and the tally of who told what */
+  const F = p.flags && typeof p.flags === 'object' ? p.flags : {};
+  for (const k of Object.keys(F).slice(0, 600)) if (/^[\w:]{1,40}$/.test(k) && k !== '__proto__' && F[k]) st.flags[k] = typeof F[k] === 'string' && /^Q\d{1,4}$/.test(F[k]) ? F[k] : Number.isInteger(F[k]) && F[k] > 0 && F[k] < 1e4 ? F[k] : 1;
+  for (const e of Array.isArray(p.tells) ? p.tells.slice(-3000) : []) { const z = tellRow(e); if (z) st.tells.push(z); }
   st.costs = Costs.sanitize(p.costs);
   const told = p.told && typeof p.told === 'object' ? p.told : {};
   for (const k of Object.keys(told).slice(0, 300)) if (/^[\w:.-]{1,24}$/.test(k) && told[k]) st.told[k] = 1;
@@ -2801,7 +2955,8 @@ function unpackState(p) {
   let pcs = 1; for (const q of st.party) pcs = Math.max(pcs, +q.id.slice(1) || 1);
   let fs = 0; for (const f of st.facts) fs = Math.max(fs, +f.id.slice(1) || 0);
   let qs = 1; for (const k of Object.keys(st.quests)) qs = Math.max(qs, +k.slice(1) + 1);
-  st.n = { ev: Math.max(nn.ev | 0, st.log.length), site: Math.max(nn.site | 0, top), pc: clamp(Math.max(nn.pc | 0, pcs), 1, 9000), roll: Math.max(nn.roll | 0, 0), f: Math.max(nn.f | 0, fs), Q: Math.max(nn.Q | 0, qs) };
+  let ts = 0; for (const e of st.story) if (e.n) ts = Math.max(ts, e.n); for (const e of st.tells) ts = Math.max(ts, e.n);
+  st.n = { ev: Math.max(nn.ev | 0, st.log.length), site: Math.max(nn.site | 0, top), pc: clamp(Math.max(nn.pc | 0, pcs), 1, 9000), roll: Math.max(nn.roll | 0, 0), f: Math.max(nn.f | 0, fs), Q: Math.max(nn.Q | 0, qs), tell: clamp(Math.max(nn.tell | 0, ts), 0, 1e7) };
   /* the monsters already met, and a round in progress, as far as they still make sense */
   const met = p.met && typeof p.met === 'object' ? p.met : {};
   for (const k of Object.keys(met)) if (st.maps[k] && Array.isArray(met[k])) st.met[k] = met[k].filter((v) => typeof v === 'string' && st.maps[k].tokens.some((t) => t.id === v && t.k === 'foe')).slice(0, 200);
@@ -2903,7 +3058,7 @@ function endedSay(e) {
   if (!e) return '';
   const head = { victory: 'The fight is won.', defeat: 'The party is beaten.', stop: 'The party stands down.', truce: 'The fighting stops: a truce.', fled: 'The fight is broken off.' }[e.outcome] || 'The fight is over.';
   return head + (e.xp ? ' ' + e.xp + ' experience, ' + e.each + ' each.' : '') + e.ups.map((u) => ' ' + u.name + ' reaches level ' + u.level + '.').join('') + (e.lost.length ? ' Lost: ' + e.lost.join(', ') + '.' : '') +
-    (e.over ? ' Nobody is left to tell the tale.' : e.rescued ? ' They wake at the inn the next morning, half their gold gone.' : '');
+    (e.over ? ' Nobody is left to tell the tale.' : e.rescued ? ' They wake at the inn the next morning, half their gold gone.' : '') + (e.plot || []).map((z) => ' ' + z.t).join('');
 }
 function turnInfo(st) {
   const R = st.round, a = R ? turnOf(st) : null;
@@ -2950,13 +3105,8 @@ const TOOLS = {
       if (!intIn(i.dc, 1, 40)) return err('dc must be an integer between 1 and 40.');
       const c = checkFor(p, i.check);
       if (!c) return err('Unknown check "' + i.check + '". Use a skill (' + Object.keys(SKILLS).join(', ') + '), an ability, or "<ability> save".');
-      const mode = combineMode(i.mode, false, p.conditions.some((x) => ['poisoned', 'frightened', 'exhausted'].includes(x)));
-      const d = diceRng(st), r = d20s(d, mode);
-      let m = abMod(p.scores[c.ab]) + (c.prof ? profBonus(p.level) : 0), note2 = '';
-      if (p.conditions.includes('inspired')) { const v = d(6); m += v; note2 = ' (inspiration +' + v + ')'; p.conditions = p.conditions.filter((x) => x !== 'inspired'); }
-      const total = r.kept + m, success = total >= i.dc;
-      return ok({ character: p.name, id: p.id, check: c.label, mode, rolls: r.rolls, natural: r.kept, modifier: m, total, dc: i.dc, success, reason: str(i.reason, 120) },
-        p.name + ': ' + c.label + ' ' + total + ' against DC ' + i.dc + (success ? ', a success' : ', a failure') + note2 + (str(i.reason, 120) ? ' (' + str(i.reason, 120) + ')' : '') + '.', 'check');
+      const r = rollCheck(st, p, c, i.dc, i.mode), reason = str(i.reason, 120);
+      return ok({ character: p.name, id: p.id, check: c.label, mode: r.mode, rolls: r.rolls, natural: r.natural, modifier: r.modifier, total: r.total, dc: i.dc, success: r.success, reason }, checkSay(p, c, r, reason), 'check');
     } },
   roll_dice: {
     desc: 'Roll arbitrary dice (e.g. "2d6+1") for anything the other tools do not cover: a random table, treasure, a trap’s damage before you apply it with update_character.',
@@ -3217,7 +3367,27 @@ const TOOLS = {
   rest: {
     desc: 'The party rests. Short: one hour, each conscious character regains a hit die of health, short-rest abilities return. Long: eight hours, full health and all abilities. Not during a fight, and not with enemies in sight.',
     schema: obj({ kind: Sc.enm(['short', 'long'], 'Rest length') }, ['kind']),
-    run(st, i) { return viaIntent(st, { t: 'rest', kind: i.kind }, (res) => ok({ kind: res.kind, party: res.party, time: res.time }, res.say, 'heal')); } },
+    run(st, i) { return viaIntent(st, { t: 'rest', kind: i.kind, by: 'gm' }, (res) => ok({ kind: res.kind, party: res.party, time: res.time }, res.say, 'heal')); } },
+  use_thing: {
+    desc: 'Do what the board itself offers with a thing, exactly as a player’s tap would: "search" a chest, crate, barrel, sack or desk in a hideout; "unlock" (with the gang’s keys), "pick" or "force" a lock on a door or a chest. The party’s leader walks beside it, the engine rolls any check, and what is found goes into their pack. The digest marks what can be searched and what is locked. Use this rather than inventing what such a thing holds.',
+    schema: obj({ thing_id: Sc.str('The thing (O#) or door (D#), from the digest'), verb: Sc.enm(['search', 'unlock', 'pick', 'force'], 'What to do with it') }, ['thing_id', 'verb']),
+    run(st, i) {
+      const m = st.maps[st.here], T = thingOf(st, m, i.thing_id), L = leadOf(st);
+      if (!T) return err('Nothing on this board is called "' + i.thing_id + '". Use an O# or D# id from the digest.');
+      if (st.round) return err('Not in the middle of a fight.');
+      const V = verbsFor(st, T.id), v = V.find((x) => x.verb === i.verb);
+      if (!v) return err('That cannot be done with ' + T.id + ' now. It offers: ' + (V.map((x) => x.verb).join(', ') || 'nothing (not a container of the hideout, already searched, or not locked)') + '.');
+      if (v.off) return err(cap(v.off) + ': let someone else lead, or find another way.');
+      if (!T.stand.some((q) => q[0] === L.x && q[1] === L.y)) {
+        const mv = intent(st, { t: 'move', who: L.id, goals: T.stand });
+        if (!mv.ok) return err(L.name + ' cannot get beside it: ' + mv.say);
+        walkOut(st, L.id);
+        if (!T.stand.some((q) => q[0] === L.x && q[1] === L.y)) return err(L.name + ' stopped on the way there' + (st.round ? ': a fight has begun.' : '.'));
+      }
+      const res = intent(st, { t: 'use', what: T.id, verb: i.verb });
+      if (!res.ok) return err(res.say);
+      return ok({ thing: T.id, verb: i.verb, opened: res.opened, what_happened: res.lines.map((z) => z.t), said: res.text || undefined }, res.lines.map((z) => z.t).join(' '), 'thing');
+    } },
   advance_time: {
     desc: 'Let time pass for something that takes a while (searching all afternoon, waiting for nightfall). Travel, rests and ordinary talk move the clock by themselves.',
     schema: obj({ minutes: Sc.int('Minutes to pass, 1-10080') }, ['minutes']),
@@ -3377,6 +3547,606 @@ function exec(st, name, input) {
   }
 }
 
+/* ============================== THE SCRIPT ==============================
+   The other Game Master: no model, no key, no cost, and the default. It tells the
+   same beats, voices the same people and runs the same plot as the model does, out of
+   the tables below, and it acts on the tale through the same engine. Three rules:
+
+   - It is DETERMINISTIC. Every line is chosen by a hash of the seed and of what the
+     line is about (never by a counter, never by the clock), so the same seed played
+     the same way reads the same, and asking what the script WOULD have said changes
+     nothing. That is what lets the table show the script's version under a model's.
+   - People are talked to by TOPIC and things are used by VERB: the table offers the
+     choices as buttons. A check is the traveller's who leads, once each per attempt.
+   - The plot is the engine's, not the script's alone: plotCheck() reads what is true
+     (the chief is beaten, the captive is free, the reliquary is in a pack) whoever
+     made it so, so a tale may pass between the script and a model at any moment.    */
+const flag = (st, k) => (st.flags && st.flags[k]) || 0;
+function setFlag(st, k, v) { st.flags[k] = v == null ? 1 : v; }
+const varyOf = (st, key, list) => list[Math.floor(rngFor(st.seed, 'say:' + key, 0)() * list.length) % list.length];
+const mainK = (st) => { const t = (st.bible.threads || []).find((x) => x.main); return t && MAIN[t.k] ? t.k : 'kidnap'; };
+const sideKs = (st) => (st.bible.threads || []).filter((x) => !x.main && WHISPERS[x.k]).map((x) => x.k);
+const giverOf = (st) => (st.npcs[MAIN[mainK(st)].giver] ? MAIN[mainK(st)].giver : 'N4');
+const first = (name) => String(name || '').split(' ')[0];
+/* the names a line may use */
+function namesOf(st, extra) {
+  const B = st.bible, n = (id) => (st.npcs[id] ? st.npcs[id].name : 'someone'), s = (id) => (st.sites[id] ? st.sites[id].name : 'that place');
+  return Object.assign({ town: B.town, gang: B.gang, cave: B.cave, inn: B.inn, region: B.region, shop: s('S4'), forge: s('S3'), chapel: s('S5'), keeper: n('N0'), smith: n('N1'), shopk: n('N2'), priest: n('N3'), elder: n('N4'), chief: n('N5'),
+    captive: n('N6'), giver: n(giverOf(st)), lead: leadOf(st).name, pet: petName(st) }, extra || {});
+}
+const fillT = (st, text, extra) => { const N = namesOf(st, extra); return String(text).replace(/\{(\w+)\}/g, (_, k) => (N[k] != null ? N[k] : k)).replace(/(^|[.!?…]\s+|“)([a-z])/g, (_, a, b) => a + b.toUpperCase()); };
+const PET_NAMES = ['Sparrow', 'Pip', 'Mouse', 'Button', 'Wren', 'Nettle', 'Bramble', 'Tuppence', 'Minnow', 'Dandy'];
+const petName = (st) => varyOf(st, 'pet', PET_NAMES);
+
+/* ---- the matter at hand, four ways. goal: what must be true before it can be reported ---- */
+const MAIN = {
+  kidnap: { giver: 'N4', goal: 'free', ask: 'Ask after {captive}',
+    job: '{elder} looks you over the way a farmer looks at weather. “Three nights {captive} has been in that hole. Bring them back walking and there is sixty in gold for you, out of the town chest. The trail starts where the north road ends. You will see their smoke before you see {cave}.”',
+    met: '{captive} is out of the cell and out of {cave}.',
+    done: '{elder} takes a long breath, the first in days. “Home. You brought {captive} home.” The town chest is opened without a word of haggling, and sixty in gold is counted into your hands.' },
+  toll: { giver: 'N4', goal: 'chief', ask: 'Ask about the toll',
+    job: '{elder} spits into the dust. “A toll, on our own road, and a beating for those who will not pay. I want {chief} gone from {cave}, and I do not much mind how. Sixty in gold from the town chest when it is done. {captive} went up to talk terms and has not come down.”',
+    met: '{chief} holds {cave} no longer.',
+    done: '{elder} hears it out, then laughs, short and surprised. “No toll. No {chief}. The carters will not believe it until they have driven it.” Sixty in gold is counted out of the town chest and into your hands.' },
+  relic: { giver: 'N3', goal: 'relic', ask: 'Ask about the reliquary',
+    job: '{priest} folds both hands as if around something that is not there. “The reliquary went in the night, and {captive}, who kept its key, went with it. I am certain both are in {cave}. Bring the silver home. The chapel can find sixty in gold, and my prayers besides.”',
+    met: 'The silver reliquary is in the party’s hands.',
+    done: '{priest} takes the reliquary in both hands and for a moment cannot speak. Then the chapel’s strongbox is opened, and sixty in gold is pressed on you with a blessing you had not asked for.' },
+  caravan: { giver: 'N4', goal: 'free', ask: 'Ask about the caravan',
+    job: '{elder} unrolls a bill of lading that nobody has signed for. “Forty bales of wool, six carters and a factor: {captive}. The carters walked in barefoot. The factor was marched up to {cave}. Fetch the factor back and the guild pays sixty in gold. I will see that it does.”',
+    met: '{captive}, the factor, is out of {cave}.',
+    done: '{elder} sends a boy running for the guild’s clerk before you have finished. “The factor alive. Then the wool can be traced and the debts paid.” Sixty in gold comes from the guild’s box, grudged by the clerk and counted twice.' },
+};
+const MAIN_XP = 150, MAIN_GOLD = 60, SIDE_XP = 75;
+
+/* ---- the whispers. who: the one it is settled with; tell: how it reaches the party; ask: the button;
+        check: what the asking takes (the better of the two for whoever leads); win / lose: what is said ---- */
+const WHISPERS = {
+  debt: { title: 'What the keeper owes', about: 'N0', who: 'N0', ask: 'Ask what is owed to {chief}', check: ['persuasion', 'intimidation'], dc: 13, proof: 'a letter in the keeper’s hand',
+    goal: 'They say {keeper} of {inn} owes {chief} money, and pays it in word of rich travellers.',
+    tell: ['“Mind what you say of your purse in {inn}. {keeper} owes the wrong people, and pays in whispers. So I hear.”', '“Funny how {gang} always know which traveller is worth stopping. Funny how that traveller always slept at {inn}.”'],
+    win: '{keeper} sets the mug down very carefully. “A bad winter, a loan, and then no end to it. I told them who had coin. Never who to hurt.” The words come out like splinters. “Sleep here free as long as you like. And listen: two at the mouth of {cave}, one with a bow. That much I know.”',
+    lose: '{keeper} polishes the same mug a while longer. “Folk say all sorts. Was there anything else?”',
+    shown: '{keeper} reads three lines of their own handwriting and sits down on a keg. “Then you know.” The rest comes out without being asked for: the loan, the names, the guard at the mouth of {cave}. “Sleep here free. It is the least of what I owe.”',
+    note: '{keeper} confessed to passing word to {gang}, and told what guards the mouth of {cave}.' },
+  blades: { title: 'Blades nobody bought', about: 'N1', who: 'N1', ask: 'Ask about the night work', check: ['insight', 'persuasion'], dc: 12,
+    goal: 'They say {smith} forges blades at night that nobody in {town} has bought.',
+    tell: ['“The forge is lit past midnight, most nights. Ask {smith} what for and you get the hammer for an answer.”', '“{smith} has made more swords this month than {town} has hands to hold. I have not seen one for sale.”'],
+    win: '{smith} looks at the door before answering. “They come at night. I forge, they do not burn the roof. That is the whole bargain.” A whetstone is already turning. “Give me your edges. If steel of mine is going up that hill in their hands, yours is going up sharper.”',
+    lose: '{smith} turns the iron in the coals. “Night work is day work that ran late. Mind the sparks.”',
+    note: '{smith} forges for {gang} under threat, and put a keener edge on the party’s weapons.' },
+  informer: { title: 'A lamp in the window', about: 'N2', who: 'N2', ask: 'Ask about the odd hours', check: ['insight', 'intimidation'], dc: 13,
+    goal: 'Someone in {town} warns {gang} whenever the watch rides out. They say {shop} keeps very odd hours.',
+    tell: ['“Every time the watch rides, the hill is empty when they get there. Somebody tells. I would look at who is awake when honest folk are not.”', '“There is a lamp in the top window of {shop} some nights. Not every night. I have started counting which.”'],
+    win: '{shopk} goes the colour of tallow. “A lamp in the top window when the watch musters. Dark when it is safe. They pay in coin I am ashamed to spend.” The lamp is taken down from its hook and set on the counter between you. “No light tonight, then. They will think the road is clear.”',
+    lose: '{shopk} straightens a row of jars that was already straight. “I keep the hours my trade keeps. Will you be buying?”',
+    note: '{shopk} signalled {gang} with a lamp, and has stopped. The guards at {cave} expect no trouble.' },
+  tunnel: { title: 'The old cellar road', about: '', who: 'N0', ask: 'Ask about the cellars', check: null, dc: 0,
+    goal: 'Old folk say the cellars under {inn} once ran all the way to {cave}.',
+    tell: ['“My grandmother swore you could walk from the cellar of {inn} to {cave} without seeing the sky. Smugglers’ work, long before the gang.”', '“There is an arch in the cellar of {inn} that goes nowhere. It went somewhere once.”'],
+    win: '{keeper} leads you down among the kegs to an arch bricked up in some grandfather’s day. “Fallen in past the first bend, they say. But the man who dug it drew what he dug.” From behind a loose stone comes a square of oilcloth: a survey of the delve, every chamber of {cave} inked and numbered.',
+    lose: '',
+    note: 'An old survey from the cellar of {inn} shows every chamber of {cave}.' },
+  kin: { title: 'A childhood name', about: '', who: 'N3', ask: 'Ask what {chief} was called as a child', check: null, dc: 0,
+    goal: '{chief} was born in {town}, and they say {priest} still uses the name they had as a child.',
+    tell: ['“{chief}? Born not two streets from here, and no worse than the rest of us at ten. {priest} still says the old name, when nobody stops them.”', '“You know the chief of {gang} was baptised in our own chapel? {priest} remembers. {priest} remembers everybody.”'],
+    win: '{priest} smiles, and it hurts to watch. “{pet}. Small for their age, and furious about it. I taught that child their letters.” The smile goes. “If you stand before {chief}, say {pet}. It will not make them good. It may make them listen.”',
+    lose: '',
+    note: '{priest} told the party the name {chief} had as a child: {pet}.' },
+  ledger: { title: 'The gang’s ledger', about: '', who: 'N4', ask: 'Hand over the ledger', check: null, dc: 0, needs: 'the gang’s ledger',
+    goal: 'A ledger in {cave} is said to name every hand in {town} that has taken the gang’s coin.',
+    tell: ['“{chief} writes everything down. Every coin, every name. If that book ever came down the hill, half this town would not sleep.”', '“They keep a ledger up there. I have seen it open. I would give a year of my life to see it burn, or to see it read out. I am not sure which.”'],
+    win: '{elder} turns the pages slowly, and stops at more than one. “Well. Now I know who to stop greeting.” The book goes inside the coat, close. “Thirty in gold for the carrying of it. And my word that it is used for mending, not for hanging.”',
+    lose: '',
+    note: 'The gang’s ledger is in {elder}’s keeping.' },
+};
+
+/* ---- how people talk. group: who they are to the script. Each line is one of a few, chosen by the seed. ---- */
+function groupOf(st, n) {
+  if (!n) return 'folk';
+  const g = { N0: 'keeper', N1: 'smith', N2: 'shopk', N3: 'priest', N4: 'elder', N5: 'chief', N6: 'captive' }[n.id];
+  if (g) return g;
+  if (n.kind === 'foe') return 'bandit';
+  const r = n.role || '', home = st.sites[n.home] ? st.sites[n.home].kind : '';
+  if (PATRONS.includes(r)) return 'patron';
+  if (/cook|scullion|pot-boy/.test(r)) return 'cook';
+  return home === 'house' ? 'resident' : home === 'inn' ? 'patron' : 'folk';
+}
+const GREET = {
+  keeper: ['{n} sets down a mug. “Rooms, ale, or talk? I have all three, and only the last is free.”', '{n} looks up from the slate where the reckonings are chalked. “Travellers. Good. The house could use some.”'],
+  smith: ['{n} does not stop hammering, but nods you toward the cool end of the forge.', '{n} wipes both hands on a leather apron that has seen worse. “If it is shoeing, I am behind. If it is talk, be quick.”'],
+  shopk: ['{n} is at the counter before the door has finished closing. “Looking, or buying?”', '{n} counts you, then counts the shelves, as if checking the two sums agree. “What can I find for you?”'],
+  priest: ['{n} finishes trimming a candle before turning. “You are welcome here, whatever you carry.”', '{n} rises from the front pew, slower than they would like. “Travellers. Sit, or stand, as suits you.”'],
+  elder: ['{n} is reading the notice board as if it might have changed. “You are not from here. Good. Nobody from here will go up that hill.”', '{n} gives you the nod of someone who has greeted every stranger in {town} for thirty years.'],
+  patron: ['{n}, {role}, makes room on the bench without being asked.', '{n} looks you over across a mug. “New faces. Sit, if you are sitting.”', '{n}, {role}, raises two fingers from the table by way of greeting.'],
+  cook: ['{n} does not turn from the pot. “If you are not carrying water, mind the floor.”', '{n} looks you up and down, ladle in hand. “Kitchen is not for guests. Talk fast.”'],
+  resident: ['{n} keeps one hand on the door. “Yes?”', '{n}, {role}, looks past you to see who else is in the street. “Well, come in out of it.”'],
+  folk: ['{n}, {role}, stops and waits to hear what you want.', '{n} shifts a load from one shoulder to the other. “Aye?”', '{n}, {role}, squints at you against the light.'],
+  captive: ['{n} is at the bars the moment you come in sight, knuckles white. “Not so loud. Are you from {town}?”'],
+  freed: ['{n} has washed, and eaten, and still looks at every door twice. “I had not thought to see you again so soon. Or anyone.”'],
+};
+const GANG = {
+  keeper: ['“{gang}? They drink here, some of them, and pay, which is more than I can say for the watch. They hole up at {cave}, an hour up the north trail.”'],
+  smith: ['“{gang}. I know their steel when I see it.” {n} lets that sit. “{cave}, north, up the trail. Do not go by night.”'],
+  shopk: ['“Bad for trade, good for locks. {gang} take what they like on the north road. I would not walk it with a full purse.”'],
+  priest: ['“They are somebody’s children, every one, and they have forgotten it. {cave} is where they keep themselves, north of here where the trail gives out.”'],
+  elder: ['“{gang}. Eight, ten of them, more by rumour. {chief} leads. They sit in {cave} like a tick in a dog’s ear, an hour up the north trail.”'],
+  patron: ['“{gang}? I paid them once. Cheaper than arguing. They have a lookout at the mouth of {cave} who can put an arrow through a hat.”', '“You do not see {gang} in daylight much. You see what they leave.”', '“{chief} runs them. Runs them hard, too. I would rather meet the lot of them than {chief} alone.”'],
+  cook: ['“They eat better than we do, I know that. Half my larder goes up that hill, one way or another.”'],
+  resident: ['“We bar the door at dusk now. We never used to bar the door.”', '“My neighbour’s boy ran off to join {gang}. Came back with a scar and nothing to say.”'],
+  folk: ['“{gang} are up at {cave}. Everybody knows it. Nobody does a thing.”', '“North road is theirs now. I go round by the mill and lose half a day.”', '“Ask {elder}. {elder} has been trying to hire somebody for a week.”'],
+  captive: ['“Seven or eight of them, and they do not all like each other. {chief} keeps the keys on a ring, never off the belt. I have watched that ring for three days.”'],
+  freed: ['“I mean never to think about {gang} again. I expect I shall think about them every night.”'],
+};
+const ABOUT = {
+  kidnap: { giver: '“{captive} is a neighbour, not a soldier. Whatever was done up there, it was done to somebody who did not ask for it. Bring them down.”',
+    other: ['“{captive}? Taken on the north road, three nights back. {elder} is offering gold to whoever fetches them.”', '“They say {captive} is alive. {gang} do not feed what they mean to kill.”'], captive: '“I was walking home. That is all. I was walking home.”' },
+  toll: { giver: '“A road that is not free is not a road. Break {chief} and the rest will blow away like chaff.”',
+    other: ['“Two silver a cart, they ask. Then three. {captive} went up to bargain and that was the last anyone saw.”', '“{elder} wants {chief} out of {cave}. So do we all. Wanting is cheap.”'], captive: '“I went to talk terms. {chief} listened very politely and then locked the door.”' },
+  relic: { giver: '“It is silver, and it is old, and it is ours. But I would trade it tonight to have {captive} walk back through that door.”',
+    other: ['“The chapel’s reliquary. Gone, and {captive} with it. {priest} has not slept.”', '“Some say {captive} stole it. I say nobody steals from their own chapel and then vanishes up a bandit’s hill.”'], captive: '“They wanted the key. I gave them the key. They kept me anyway. The silver is in {chief}’s own strongbox, I heard it go in.”' },
+  caravan: { giver: '“Forty bales. A year of somebody’s sheep. The factor knows where it went, which is why the factor is in a hole.”',
+    other: ['“The wool never came. The carters did, on foot, and would not say a word. Their factor, {captive}, was taken up to {cave}.”', '“No wool, no weaving, no winter coin. {elder} will pay well for that factor.”'], captive: '“They want the guild’s letters of credit, and I am the only one who can sign them. So here I sit, not signing.”' },
+};
+const IDLE = {
+  keeper: ['“News? The ale is fresh and the stew is not. That is today’s.”', '“A drover came through who swore he had seen a wolf the size of a calf. He had also seen the bottom of four mugs.”', '“Ask me tomorrow. Tonight’s gossip has not come in yet.”'],
+  smith: ['“Iron is dear and charcoal dearer. There is your news.”', '“The miller wants a new spindle and will not say how he broke the old one.”', '“I hear what the anvil says, and it says the same thing all day.”'],
+  shopk: ['“Salt is up. Candles are up. Everything a careful person needs is up.”', '“A pedlar offered me a map to a buried crown. I offered him the door.”', '“The carter is a week late, and so is everything I ordered.”'],
+  priest: ['“Two christenings and a burial this month. The balance is still on the side of the cradle.”', '“The bell rope wants replacing. It has wanted replacing for nine years.”', '“People tell me their sins, not their news. The two are rarely the same.”'],
+  elder: ['“The mill race needs clearing and nobody will do it while the hill is full of knives.”', '“I have written to the reeve three times. I expect a fourth letter will do as much good.”', '“The harvest is fair. I would call it good if I thought we would keep it.”'],
+  patron: ['“Weather is turning. My knee says so.”', '“I am only passing through, and passing slower than I meant to.”', '“They say the ford is up to the axle. I say, drink here until it is not.”', '“You hear things. Mostly you hear them twice and they do not match.”'],
+  cook: ['“The news is that somebody has been at the pies. If it was you, we are done talking.”', '“Onions are small this year. Everything is small this year.”'],
+  resident: ['“Nothing worth the telling. Which is how I like it.”', '“The roof leaks over the bed and nowhere else. That is my news.”', '“My neighbour’s goat got into the chapel again. It is a devout goat.”'],
+  folk: ['“The well is low for the season. That is all the news there is.”', '“If I knew anything, I would have sold it by now.”', '“Market was thin. Folk are keeping what they have.”', '“There will be frost before the month is out. Mark me.”'],
+};
+const BYE = { keeper: 'mind the step', smith: 'mind the sparks', shopk: 'come again', priest: 'go gently', elder: 'go carefully' };
+
+/* ---- what is where: the chief's strongbox and desk, found on the charted cave (a pure function of its board) ---- */
+function plotSpots(st) {
+  const m = st.maps.S2;
+  if (!m) return { strong: '', desk: '' };
+  const ci = m.rooms.findIndex((r) => r.kind === 'cave_chief'), inR = (o) => m.rg[o.y * m.w + o.x] === ci + 1, top = m.objs.filter((o) => !o.on);
+  const strong = top.find((o) => o.a === 'chest' && inR(o)) || top.find((o) => o.a === 'chest') || top.find((o) => o.a === 'crate') || null;
+  const desk = top.find((o) => o.a === 'desk' && inR(o)) || top.find((o) => o.a === 'desk') || strong;
+  return { strong: strong ? strong.id : '', desk: desk ? desk.id : '' };
+}
+const CONTAINERS = { chest: 1, crate: 1, barrel: 1, sacks: 1, desk: 1 };
+/* what a thing in the hideout holds: decided by the seed and by which thing it is, never by when it is opened */
+function lootOf(st, m, o) {
+  if (!o || o.on || !CONTAINERS[o.a] || m.kind !== 'cave') return null;
+  const r = rngFor(st.seed, 'loot:' + m.id + ':' + o.id, 0), S = m.id === 'S2' ? plotSpots(st) : { strong: '', desk: '' }, out = { gold: 0, items: [], lock: false, dc: 13, text: '' };
+  const strong = o.id === S.strong, desk = o.id === S.desk, sides = sideKs(st);
+  if (o.a === 'chest') { out.gold = rint(r, 6, 22); out.lock = strong || r() < .5; if (r() < .4) out.items.push('healing draught'); }
+  else if (o.a === 'crate') { out.gold = r() < .5 ? rint(r, 1, 6) : 0; const x = r(); if (x < .22) out.items.push('healing draught'); else if (x < .32) out.items.push('crowbar'); }
+  else if (o.a === 'desk') out.gold = rint(r, 1, 6);
+  else out.gold = r() < .2 ? rint(r, 1, 4) : 0;
+  if (strong) { out.gold += 30; out.dc = 15; if (mainK(st) === 'relic') out.items.push('silver reliquary'); if (!out.items.includes('healing draught')) out.items.push('healing draught'); }
+  if (desk) { if (sides.includes('ledger')) out.items.push('the gang’s ledger'); if (sides.includes('debt')) out.items.push('a letter in the keeper’s hand'); }
+  out.text = o.a === 'barrel' ? 'salt pork and lamp oil' : o.a === 'sacks' ? 'meal, onions and somebody’s laundry' : o.a === 'crate' ? 'straw and stolen crockery' : o.a === 'desk' ? 'tallies, a dry inkwell and a ring of candle wax' : 'a jumble of other people’s things';
+  return out;
+}
+const thingKey = (m, id) => m.id + ':' + id;
+const lockDc = (st, m, d) => (d.kind === 'bars' ? 15 : 13);
+/* the people of the plot, as they stand now, whoever made it so */
+const chiefOut = (st) => { const n = st.npcs.N5; return !n || ['defeated', 'dead', 'gone'].includes(n.status) || n.kind !== 'foe'; };
+const captiveFree = (st) => { const n = st.npcs.N6; return !!n && n.kind !== 'captive' && n.status !== 'dead'; };
+function goalMet(st) {
+  const g = MAIN[mainK(st)].goal;
+  if (g === 'relic') return !!carries(st, 'silver reliquary');
+  if (g === 'chief') return chiefOut(st);
+  return captiveFree(st);
+}
+function addQuest(st, title, goal) {
+  if (Object.keys(st.quests).length >= 40) return null;
+  const id = 'Q' + st.n.Q++;
+  st.quests[id] = { id, title: clip(title, 80), goal: clip(goal, 300), main: false, status: 'active', notes: [] };
+  return st.quests[id];
+}
+function questNote(st, id, text, status) {
+  const q = st.quests[id];
+  if (!q || q.status !== 'active') return false;
+  if (text) { q.notes.push({ turn: st.turn, text: clip(text, 200) }); if (q.notes.length > 40) q.notes.shift(); }
+  if (status) q.status = status;
+  return true;
+}
+function sceneNote(st, text) { st.summaries.push({ turn: st.turn, day: st.time.day, text: clip(text, 600) }); if (st.summaries.length > 60) st.summaries.splice(0, st.summaries.length - 60); }
+/* a whisper reaches the party: it becomes a task of its own */
+function hearWhisper(st, k) {
+  if (flag(st, 'heard:' + k) || !WHISPERS[k]) return null;
+  const q = addQuest(st, WHISPERS[k].title, fillT(st, WHISPERS[k].goal));
+  setFlag(st, 'heard:' + k, q ? q.id : 1);
+  return q;
+}
+function settleWhisper(st, k, out) {
+  if (flag(st, 'done:' + k)) return;
+  setFlag(st, 'done:' + k);
+  const W = WHISPERS[k], note = fillT(st, W.note), qid = flag(st, 'heard:' + k);
+  if (typeof qid === 'string') questNote(st, qid, note, 'done');
+  addFact(st, W.who || 'world', note);
+  out.lines.push({ k: 'quest', t: W.title + ': done.' });
+  reward(st, SIDE_XP, k === 'ledger' ? 30 : 0, out);
+  const S2 = st.maps.S2;
+  if (k === 'debt') { setFlag(st, 'freebed'); const m = chart(st, 'S2'); if (m) { const gi = m.rooms.findIndex((r) => r.kind === 'cave_guard'), g = new Uint8Array(m.w * m.h); for (let i = 0; i < g.length; i++) if (m.rg[i] === gi + 1) g[i] = 1; sightFaces(m, g); if (reveal(m, g)) out.lines.push({ k: 'thing', t: 'The guard post of ' + st.bible.cave + ' is marked on your map.' }); } }
+  if (k === 'blades') { setFlag(st, 'keen'); out.lines.push({ k: 'thing', t: 'A keener edge: the party’s weapons deal 1 more damage.' }); }
+  if (k === 'informer') { const n = hush(st); out.lines.push({ k: 'thing', t: n || !S2 ? 'No warning goes up the hill tonight.' : 'No more warnings will go up the hill.' }); }
+  if (k === 'tunnel') { const m = chart(st, 'S2'); if (m && reveal(m, new Uint8Array(m.w * m.h).fill(1))) out.lines.push({ k: 'thing', t: 'The map of ' + st.bible.cave + ' fills in.' }); }
+  if (k === 'ledger') { const p = carries(st, 'the gang’s ledger'); if (p) takeItem(p, 'the gang’s ledger'); }
+}
+/* the lookouts at the mouth of the cave are caught dozing, if nobody warned them and nobody has seen the party there yet */
+function hush(st) {
+  const m = st.maps.S2;
+  if (!m || flag(st, 'hush') || !flag(st, 'done:informer') || st.round) return 0;
+  setFlag(st, 'hush');
+  if ((st.met.S2 || []).length) return 0;                   /* too late: they have already seen the party */
+  const gi = m.rooms.findIndex((r) => r.kind === 'cave_guard');
+  let n = 0;
+  for (const t of m.tokens) if (t.k === 'foe' && m.rg[t.y * m.w + t.x] === gi + 1) { sheetOf(st, t, true).asleep = 99999; n++; }
+  return n;
+}
+function reward(st, xp, gold, out) {
+  const ups = [];
+  for (const p of st.party) if (p.status !== 'dead') grantXp(p, xp, ups);
+  if (gold) st.gold += gold;
+  out.lines.push({ k: 'quest', t: (gold ? gold + ' gold. ' : '') + xp + ' experience each.' + ups.map((u) => ' ' + u.name + ' reaches level ' + u.level + '.').join('') });
+}
+/* the captive walks free: no longer held, and the task says so */
+function freeCaptive(st, out) {
+  const n = st.npcs.N6;
+  if (!n || n.kind !== 'captive') return false;
+  n.kind = 'npc';
+  for (const k of Object.keys(st.maps)) for (const t of st.maps[k].tokens) if (t.npc === 'N6') t.k = 'npc';
+  out.lines.push({ k: 'person', t: n.name + ' is free.' });
+  return true;
+}
+/* What has come true since the plot was last looked at. Called after anything that could matter (a fight ending, a lock
+   opened, a word said, a board left); each consequence happens once. Returns lines for the table to show.               */
+function plotCheck(st) {
+  const out = { lines: [] }, L = leadOf(st), N = namesOf(st);
+  if (st.over) return out.lines;
+  if (st.npcs.N5 && ['defeated', 'dead'].includes(st.npcs.N5.status) && !flag(st, 'spoils')) {
+    setFlag(st, 'spoils');
+    if (!carries(st, 'the gang’s keys')) { giveItem(L, 'the gang’s keys'); out.lines.push({ k: 'thing', t: 'On ' + N.chief + ': the gang’s keys. ' + L.name + ' takes them.' }); }
+  }
+  /* a captive nobody could have locked up (an old cave with no cell) is found when the chief falls */
+  if (chiefOut(st) && st.npcs.N6 && st.npcs.N6.kind === 'captive' && st.maps.S2 && !st.maps.S2.tokens.some((t) => t.npc === 'N6') && !flag(st, 'found')) { setFlag(st, 'found'); st.npcs.N6.kind = 'npc'; out.lines.push({ k: 'person', t: N.captive + ' is found bound in a side passage, and cut loose.' }); }
+  if (goalMet(st) && !flag(st, 'goal') && st.quests.Q0 && st.quests.Q0.status === 'active') {
+    setFlag(st, 'goal');
+    questNote(st, 'Q0', fillT(st, MAIN[mainK(st)].met) + ' ' + N.giver + ' should hear of it.');
+    out.lines.push({ k: 'quest', t: fillT(st, MAIN[mainK(st)].met) + ' ' + N.giver + ' should hear of it.' });
+  }
+  if (carries(st, 'the gang’s ledger') && sideKs(st).includes('ledger') && !flag(st, 'heard:ledger')) hearWhisper(st, 'ledger');
+  return out.lines;
+}
+/* leaving the hideout, whoever has been freed comes down the trail with the party and is seen home */
+function plotLeave(st, from) {
+  if (from.id !== 'S2' || !captiveFree(st)) return;
+  const k = from.tokens.findIndex((t) => t.npc === 'N6'), town = st.maps.S0;
+  if (k < 0 || !town) return;
+  dropToken(st, from, from.tokens[k]);
+  const by = town.tokens.find((t) => t.npc === 'N4') || { x: town.w >> 1, y: town.h >> 1 }, spot = freeNear(st, town, by.x, by.y, '');
+  st.npcs.N6.home = 'S0';
+  if (spot) { town.tokens.push({ id: 'K' + (town.n.k++), k: 'npc', npc: 'N6', x: spot[0], y: spot[1] }); indexMap(town); }
+}
+
+/* ---- talking: what can be asked of someone, and what comes of asking ---- */
+function bestCheck(p, list) {
+  let best = null;
+  for (const name of list) { const c = checkFor(p, name), mod = abMod(p.scores[c.ab]) + (c.prof ? profBonus(p.level) : 0); if (!best || mod > best.mod) best = { name, c, mod }; }
+  return best;
+}
+const bedPrice = (st) => Math.min(st.gold, st.party.filter((p) => p.status !== 'dead').length);     /* what the purse would pay; whether the beds are free is the flag's to say */
+function topicsFor(st, npcId) {
+  const n = st.npcs[npcId], out = [], L = leadOf(st), k = mainK(st), M = MAIN[k], N = namesOf(st);
+  if (!n) return out;
+  const g = groupOf(st, n), giver = npcId === giverOf(st), q0 = st.quests.Q0 && st.quests.Q0.status === 'active', add = (id, label, sub, off, shown) => out.push({ id, label: fillT(st, label), sub: sub || '', off: off || '', shown: !!shown });
+  if (g === 'chief' || g === 'bandit') {
+    if (g === 'chief' && flag(st, 'done:kin') && !flag(st, 'called')) { const b = bestCheck(L, ['persuasion']); add('name', 'Call out: “' + N.pet + '”', 'Persuasion DC 12, ' + first(L.name) + ' ' + signed(b.mod)); }
+    return out;
+  }
+  if (g === 'captive' && n.kind === 'captive') {
+    const m = st.maps[st.here], bars = m.doors.some((d) => d.kind === 'bars' && d.lock);
+    if (!bars) add('free', 'Set them free');
+    add('plea', 'Ask how they are held'); add('matter', M.ask); add('gang', 'Ask about {gang}');
+    return out;
+  }
+  if (giver && q0 && goalMet(st)) add('report', 'Tell them it is done');
+  if (giver && q0 && !goalMet(st) && !flag(st, 'job')) add('job', 'Offer to help');
+  if (g === 'keeper') { const p = bedPrice(st); add('bed', 'A bed for the night', flag(st, 'freebed') ? 'free' : p ? p + ' gold' : 'the stable, free', st.round ? 'not now' : ''); }
+  if (g === 'shopk') for (const name of ['healing draught', 'thieves’ tools', 'crowbar']) { const it = ITEMS[name]; add('buy:' + name, 'Buy ' + (name === 'healing draught' ? 'a healing draught' : name === 'crowbar' ? 'a crowbar' : name), it.price + ' gold', st.gold < it.price ? 'too dear' : ''); }
+  if (g === 'priest' && st.party.some((p) => p.status !== 'dead' && p.hp < p.hpMax)) add('mend', 'Ask for the wounded to be tended', Math.min(5, st.gold) ? Math.min(5, st.gold) + ' gold' : 'for charity');
+  for (const w of sideKs(st)) {
+    const W = WHISPERS[w];
+    if (W.who !== npcId || flag(st, 'done:' + w)) continue;
+    if (W.needs) { if (carries(st, W.needs)) add('w:' + w, W.ask); continue; }
+    if (!flag(st, 'heard:' + w)) continue;
+    if (!W.check) { add('w:' + w, W.ask); continue; }
+    const shown = (W.proof && carries(st, W.proof)) || (carries(st, 'the gang’s ledger') && (w === 'debt' || w === 'informer'));
+    if (shown) { add('w:' + w, w === 'debt' && carries(st, W.proof) ? 'Show {keeper} the letter' : 'Show them their name in the ledger', '', '', true); continue; }
+    const b = bestCheck(L, W.check), tried = flag(st, 'tried:w:' + w + ':' + L.id);
+    add('w:' + w, W.ask, b.c.label + ' DC ' + W.dc + ', ' + first(L.name) + ' ' + signed(b.mod), tried ? first(L.name) + ' has tried' : '');
+  }
+  if (g === 'freed' || (npcId === 'N6' && n.kind !== 'captive')) { add('thanks', 'Ask how they are'); add('gang', 'Ask about {gang}'); return out; }
+  if (q0) add('matter', M.ask);
+  add('gang', 'Ask about {gang}');
+  add('news', 'Ask for news');
+  return out;
+}
+/* Who has a whisper to tell. Each whisper is known to two of the five named townsfolk, chosen by the seed and never the one
+   it is about, so the party has to ask around; of everyone else in town, about one in three has heard one of them.       */
+function tellersOf(st, k) {
+  const named = ['N0', 'N1', 'N2', 'N3', 'N4'].filter((id) => st.npcs[id] && id !== WHISPERS[k].about);
+  return shuffled(rngFor(st.seed, 'tellers:' + k, 0), named).slice(0, 2);
+}
+function whisperOf(st, n) {
+  const all = sideKs(st), fresh = all.filter((k) => !flag(st, 'heard:' + k));
+  if (!fresh.length) return '';
+  if (n.bible) return fresh.find((k) => tellersOf(st, k).includes(n.id)) || '';
+  const r = rngFor(st.seed, 'knows:' + n.id, 0), mine = r() < .35 ? all[Math.floor(r() * all.length)] : '';
+  return fresh.includes(mine) ? mine : '';
+}
+const greetOf = (st, n) => { const g = n.id === 'N6' && n.kind !== 'captive' ? 'freed' : groupOf(st, n); return fillT(st, varyOf(st, 'greet:' + n.id, GREET[g] || GREET.folk), { n: first(n.name), role: n.role }); };
+/* What would be said, and what would follow. `dry` asks without changing anything (no dice, no coin): it is how the table
+   shows what the script would have answered while a model is the one speaking.                                          */
+function talkOf(st, npcId, topic, dry) {
+  const n = st.npcs[npcId], L = leadOf(st), out = { ok: true, t: 'talk', npc: npcId, topic, ask: '', text: '', lines: [], next: '' };
+  const T = topicsFor(st, npcId).find((x) => x.id === topic), g = n ? groupOf(st, n) : 'folk', k = mainK(st), X = { n: n ? first(n.name) : '', role: n ? n.role : '' }, line = (t) => fillT(st, t, X);
+  if (!n || !T) return refuse('notopic');
+  if (T.off) return refuse('notopic', T.off === 'too dear' ? 'The purse will not stretch to that.' : cap(T.off) + '.');
+  out.ask = T.label;
+  if (topic === 'gang') out.text = line(varyOf(st, 'gang:' + npcId, (npcId === 'N6' && n.kind !== 'captive' ? GANG.freed : GANG[g]) || GANG.folk));
+  else if (topic === 'matter') out.text = line(npcId === giverOf(st) ? ABOUT[k].giver : g === 'captive' || npcId === 'N6' ? ABOUT[k].captive : varyOf(st, 'about:' + npcId, ABOUT[k].other));
+  else if (topic === 'plea') out.text = line('“There is a ring of keys, and {chief} never takes it off. If you cannot get the ring, the lock is old. Somebody with good hands might turn it. Somebody strong might break it. Only do not leave me here.”');
+  else if (topic === 'thanks') out.text = line('“Alive. Which this morning I would not have wagered on. If ever you need a door opened in {town}, knock on mine.”');
+  else if (topic === 'news') {
+    const w = whisperOf(st, n);
+    if (w) { out.text = line(varyOf(st, 'tell:' + w + ':' + npcId, WHISPERS[w].tell)); if (!dry) { const q = hearWhisper(st, w); if (q) { addFact(st, 'world', q.goal); out.lines.push({ k: 'quest', t: 'A new task: ' + q.title + '.' }); } } }
+    else { const list = IDLE[g] || IDLE.folk, at = (Math.floor(rngFor(st.seed, 'say:idle:' + npcId, 0)() * list.length) + (flag(st, 'n:' + npcId) | 0)) % list.length; out.text = line(list[at]); if (!dry) setFlag(st, 'n:' + npcId, Math.min(9999, (flag(st, 'n:' + npcId) | 0) + 1)); }
+  } else if (topic === 'job') {
+    out.text = line(MAIN[k].job);
+    if (!dry) { setFlag(st, 'job'); questNote(st, 'Q0', n.name + ' promised ' + MAIN_GOLD + ' gold for it.'); addFact(st, npcId, n.name + ' promised ' + MAIN_GOLD + ' gold when the matter is settled.'); }
+  } else if (topic === 'report') {
+    out.text = line(MAIN[k].done);
+    if (!dry) { questNote(st, 'Q0', 'Done, and paid for.', 'done'); out.lines.push({ k: 'quest', t: st.quests.Q0.title + ': done.' }); reward(st, MAIN_XP, MAIN_GOLD, out); sceneNote(st, fillT(st, MAIN[k].met) + ' ' + n.name + ' paid what was promised.'); out.next = 'ending'; }
+  } else if (topic === 'bed') {
+    const price = bedPrice(st);
+    out.text = line(flag(st, 'freebed') ? '{n} will not hear of payment. “Top of the stairs. The good blankets.”' : price ? '{n} takes the coin and jerks a thumb at the stairs. “Top of the stairs. Breakfast when the bell goes.”' : '{n} looks at the empty purse and sighs. “The stable is dry and the horses do not snore. Go on.”');
+    if (!dry) { const res = intent(st, { t: 'rest', kind: 'long' }); if (!res.ok) return res; out.lines.push({ k: 'heal', t: res.say }); }
+  } else if (topic.startsWith('buy:')) {
+    const name = topic.slice(4), it = ITEMS[name];
+    out.text = line('{n} sets it on the counter and waits for the coin to be on the counter too. “' + (name === 'healing draught' ? 'Bitter, but it works.' : name === 'crowbar' ? 'Good iron. Do not tell me what for.' : 'Oiled last week. Do not tell me what for.') + '”');
+    if (!dry) { st.gold -= it.price; giveItem(L, name); out.lines.push({ k: 'thing', t: L.name + ' buys ' + name + ' for ' + it.price + ' gold (now ' + st.gold + ').' }); }
+  } else if (topic === 'mend') {
+    const price = Math.min(5, st.gold);
+    out.text = line('{n} washes their hands twice, and then works for most of an hour with needle, linen and a low steady voice. “There. Try not to need me again this week.”');
+    if (!dry) { st.gold -= price; for (const p of st.party) if (p.status !== 'dead') { p.hp = p.hpMax; p.status = 'ok'; p.saves = { s: 0, f: 0 }; } addMinutes(st, 50); fixLead(st); out.lines.push({ k: 'heal', t: 'The party’s wounds are tended' + (price ? ' for ' + price + ' gold' : '') + ': everyone is whole.' }); }
+  } else if (topic === 'free') {
+    out.text = line('{n} is out before the door has stopped moving, and then stands quite still, as if the open air might be taken back. “Thank you. I can walk. I will keep behind you until we are off this hill.”');
+    if (!dry) freeCaptive(st, out);
+  } else if (topic === 'name') {
+    const b = bestCheck(L, ['persuasion']);
+    if (dry) { out.text = line('{lead} says the old name aloud. What {chief} does with it is for the dice.'); return out; }
+    setFlag(st, 'called');
+    const r = rollCheck(st, L, b.c, 12, 'normal');
+    out.lines.push({ k: 'check', t: checkSay(L, b.c, r, 'a childhood name') });
+    if (r.success) {
+      out.text = line('“{pet}.” The word goes across the chamber and {chief} stops as if struck. For a breath nobody moves. Then the blade goes down, slowly, point first into the dirt. “Nobody has called me that in twenty years.” A long look round the walls. “Enough. Take what you came for. We are done here.” The ring of keys is tossed at your feet, and by ones and twos {gang} file out into the dark.');
+      const m = st.maps[st.here]; let xp = 0;
+      for (const t of m.tokens.slice()) if (t.k === 'foe') { const nn = st.npcs[t.npc]; xp += BESTIARY[sheetOf(st, t, true).tpl].xp; if (nn) nn.status = 'gone'; dropToken(st, m, t); }
+      st.npcs.N5.kind = 'npc'; setFlag(st, 'spoils'); setFlag(st, 'routed');
+      if (!carries(st, 'the gang’s keys')) giveItem(L, 'the gang’s keys');
+      out.lines.push({ k: 'thing', t: L.name + ' picks up the gang’s keys.' });
+      const alive = st.party.filter((p) => p.status !== 'dead').length; reward(st, Math.floor(xp / 2 / Math.max(1, alive)), 0, out);
+      sceneNote(st, L.name + ' called ' + st.npcs.N5.name + ' by a childhood name, and ' + st.bible.gang + ' left ' + st.bible.cave + ' without a blow.');
+      look(st);
+    } else { out.text = line('“{pet}.” {chief} goes white, then red. “Who told you that? Who TOLD you?” Steel comes out all round the chamber.'); out.next = 'fight'; }
+  } else if (topic.startsWith('w:')) {
+    const w = topic.slice(2), W = WHISPERS[w];
+    if (dry) { out.text = line(W.check ? W.lose || W.win : W.win); return out; }
+    let win = true;
+    if (W.check && !T.shown) {
+      const b = bestCheck(L, W.check), r = rollCheck(st, L, b.c, W.dc, 'normal');
+      setFlag(st, 'tried:w:' + w + ':' + L.id);
+      out.lines.push({ k: 'check', t: checkSay(L, b.c, r, W.title.toLowerCase()) });
+      win = r.success;
+    }
+    out.text = line(win ? (T.shown && W.shown ? W.shown : W.win) : W.lose);
+    if (win) settleWhisper(st, w, out);
+  } else return refuse('notopic');
+  if (/^“/.test(out.text) && topic !== 'name') out.text = first(n.name) + ': ' + out.text;      /* a bare line of speech says whose it is */
+  if (!dry) {
+    addMinutes(st, topic === 'mend' || topic === 'bed' ? 0 : 2);
+    setFlag(st, 'met:' + npcId);
+    note(st, 'talk', { who: L.id, npc: npcId, topic });
+    for (const z of plotCheck(st)) out.lines.push(z);
+  }
+  return out;
+}
+
+/* ---- things: what can be done with a chest, a desk or a locked door, and what comes of doing it ---- */
+function thingOf(st, m, ref) {
+  const s = String(ref == null ? '' : ref).trim().toUpperCase();
+  if (/^D\d+$/.test(s)) { const d = m.doors.find((q) => q.id === s); return d ? { door: d, id: d.id, stand: doorSides(d) } : null; }
+  if (!/^O\d+$/.test(s)) return null;
+  let o = m._.byId.get(s); if (!o) return null;
+  if (o.on) o = m._.byId.get(o.on) || o;
+  const f = footprint(o), stand = [];
+  for (let j = -1; j <= f.h; j++) for (let i = -1; i <= f.w; i++) { const x = f.x + i, y = f.y + j; if (!tileFree(m, x, y)) continue; if (i >= 0 && i < f.w && j >= 0 && j < f.h) { stand.push([x, y]); continue; } const nx = clamp(x, f.x, f.x + f.w - 1), ny = clamp(y, f.y, f.y + f.h - 1); if (meleeClear(m, x, y, nx, ny)) stand.push([x, y]); }
+  return { obj: o, id: o.id, stand };
+}
+function verbsFor(st, ref) {
+  const m = st.maps[st.here], T = thingOf(st, m, ref), out = [], L = leadOf(st);
+  if (!T || st.round) return out;
+  const keys = !!carries(st, 'the gang’s keys'), tools = !!carries(st, 'thieves’ tools'), bar = !!carries(st, 'crowbar');
+  const locks = (dc, key) => {
+    if (keys && m.kind === 'cave') { out.push({ verb: 'unlock', label: 'Unlock it', sub: 'the gang’s keys', off: '' }); return; }
+    const pk = checkFor(L, 'sleight of hand'), fc = checkFor(L, 'athletics'), mod = (c) => abMod(L.scores[c.ab]) + (c.prof ? profBonus(L.level) : 0);
+    out.push({ verb: 'pick', label: 'Pick the lock', sub: 'Sleight of Hand DC ' + dc + ', ' + first(L.name) + ' ' + signed(mod(pk)) + (tools ? '' : ', no tools'), off: flag(st, 'tried:' + key + ':pick:' + L.id) ? first(L.name) + ' has tried' : '' });
+    out.push({ verb: 'force', label: 'Force it', sub: 'Athletics DC ' + (dc + 3) + ', ' + first(L.name) + ' ' + signed(mod(fc)) + (bar ? ', crowbar' : ''), off: flag(st, 'tried:' + key + ':force:' + L.id) ? first(L.name) + ' has tried' : '' });
+  };
+  if (T.door) { if (T.door.lock) locks(lockDc(st, m, T.door), thingKey(m, T.id)); return out; }
+  const loot = lootOf(st, m, T.obj), key = thingKey(m, T.id);
+  if (!loot || flag(st, 'u:' + key)) return out;
+  if (loot.lock && !flag(st, 'o:' + key)) locks(loot.dc, key);
+  else out.push({ verb: 'search', label: 'Search it', sub: '', off: '' });
+  return out;
+}
+function useOf(st, it) {
+  const m = st.maps[st.here], L = leadOf(st), T = thingOf(st, m, it.what), out = { ok: true, t: 'use', what: T ? T.id : '', verb: it.verb, text: '', lines: [], opened: false, door: '', spotted: [] };
+  if (!T) return refuse('nothing');
+  const V = verbsFor(st, T.id).find((v) => v.verb === it.verb);
+  if (!V) return refuse('noverb');
+  if (V.off) return refuse('tried', cap(V.off) + '.');
+  if (!T.stand.some((q) => q[0] === L.x && q[1] === L.y)) return refuse('far');
+  const key = thingKey(m, T.id), what = T.door ? (T.door.kind === 'bars' ? 'the barred door' : T.door.kind === 'gate' ? 'the gate' : 'the door') : 'the ' + ASSETS[T.obj.a].n.toLowerCase();
+  const opens = () => {
+    out.opened = true;
+    if (T.door) { T.door.lock = false; T.door.open = true; out.door = T.door.id; note(st, 'door', { who: L.id, site: m.id, id: T.door.id, open: true }); if (T.door.kind === 'bars' && st.npcs.N6 && st.npcs.N6.kind === 'captive' && m.tokens.some((t) => t.npc === 'N6')) { freeCaptive(st, out); out.text = fillT(st, '{captive} is out before the door has stopped moving, and then stands quite still, as if the open air might be taken back. “Thank you. I can walk. I will keep behind you until we are off this hill.”'); } }
+    else setFlag(st, 'o:' + key);
+  };
+  if (it.verb === 'unlock') { opens(); out.lines.push({ k: 'door', t: L.name + ' tries the gang’s keys on ' + what + '. The third one turns.' }); }
+  else if (it.verb === 'pick' || it.verb === 'force') {
+    const pick = it.verb === 'pick', c = checkFor(L, pick ? 'sleight of hand' : 'athletics'), base = T.door ? lockDc(st, m, T.door) : lootOf(st, m, T.obj).dc;
+    const mode = pick ? (carries(st, 'thieves’ tools') ? 'normal' : 'disadvantage') : (carries(st, 'crowbar') ? 'advantage' : 'normal'), r = rollCheck(st, L, c, base + (pick ? 0 : 3), mode);
+    setFlag(st, 'tried:' + key + ':' + it.verb + ':' + L.id);
+    out.lines.push({ k: 'check', t: checkSay(L, c, r, (pick ? 'picking ' : 'forcing ') + what) });
+    if (r.success) { opens(); out.lines.push({ k: 'door', t: cap(what) + (pick ? ' clicks open.' : ' gives way.') }); }
+    else out.lines.push({ k: 'door', t: cap(what) + ' holds.' });
+    addMinutes(st, pick ? 5 : 1);
+  } else if (it.verb === 'search') {
+    const loot = lootOf(st, m, T.obj), got = [];
+    setFlag(st, 'u:' + key);
+    if (loot.gold) { st.gold += loot.gold; got.push(loot.gold + ' gold'); }
+    for (const name of loot.items) { giveItem(L, name); got.push(name); }
+    out.lines.push({ k: 'thing', t: L.name + ' searches ' + what + ': ' + (got.length ? got.join(', ') + '.' : 'nothing but ' + loot.text + '.') });
+    if (got.length) addFact(st, m.id, cap(what) + ' ' + T.id + ' at ' + m.title + ' has been emptied.');
+    addMinutes(st, 5);
+  } else return refuse('noverb');
+  note(st, 'use', { who: L.id, site: m.id, what: T.id, verb: it.verb });
+  if (out.opened && T.door) { const s = look(st); out.spotted = s.fresh; }
+  for (const z of plotCheck(st)) out.lines.push(z);
+  return out;
+}
+/* a thing drunk or handed over: {item, who?, target?} */
+function itemOf(st, a, it) {
+  const R = st.round, p = a.o, name = itemKey(it.item), def = ITEMS[name];
+  if (!a.pc) return refuse('bad');
+  if (p.status !== 'ok') return refuse('downed');
+  if (!def || def.use !== 'heal') return refuse('noitem', 'That is not a thing to use like that.');
+  if (!p.items.some((x) => itemKey(x.n) === name)) return refuse('noitem', p.name + ' carries no ' + name + '.');
+  const tgt = it.target == null || it.target === '' ? p : pcOf(st, it.target);
+  if (!tgt || tgt.site !== p.site) return refuse('notarget');
+  if (tgt.status === 'dead') return refuse('gone');
+  if (R && R.act < 1) return refuse('noact');
+  if (R && tgt !== p && !meleeClear(a.m, p.x, p.y, tgt.x, tgt.y)) return refuse('reach');
+  takeItem(p, name);
+  if (R) R.act--;
+  const amt = Math.max(1, rollTerms(diceRng(st), parseDice(def.dice), false).total), healed = healPC(tgt, amt);
+  const say = p.name + (tgt === p ? ' drinks a ' : ' gives ' + tgt.name + ' a ') + name + ': ' + healed + ' hit points restored.';
+  note(st, 'tell', { say });
+  fixLead(st);
+  return { ok: true, t: 'item', who: p.id, target: tgt.id, item: name, heal: healed, hp: tgt.hp, hpMax: tgt.hpMax, at: [tgt.x, tgt.y], say, ended: null };
+}
+
+/* ---- telling: the beats, in the script's own words. Pure: it reads the tale and returns text. ---- */
+const A_AN = (s) => (/^[aeiou]/i.test(s) ? 'an ' : 'a ') + s;
+const listOf = (a) => (a.length <= 1 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
+const COUNT = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+function sceneOf(st) {
+  const m = st.maps[st.here], V = visOf(st).g, L = leadOf(st), W = m.w, r = roomAt(m, L.x, L.y), ri = r ? m.rooms.indexOf(r) + 1 : 0, out = { room: r ? r.name : '', folk: [], foes: [], things: [] };
+  for (const t of m.tokens) { if (!V[t.y * W + t.x]) continue; const n = st.npcs[t.npc] || { name: 'Someone', role: 'stranger', trait: '' }; (t.k === 'foe' ? out.foes : out.folk).push({ n, t }); }
+  const seen = new Set();
+  for (const o of m.objs) { if (o.on || SCATTER[o.a] || ASSETS[o.a].lay === 'd') continue; const f = footprint(o); if (!V[f.y * W + f.x] || (ri && m.rg[f.y * W + f.x] !== ri)) continue; seen.add(ASSETS[o.a].n.toLowerCase()); }
+  out.things = [...seen].slice(0, 3);
+  return out;
+}
+const TOD = { dawn: 'The light is thin and grey, and the roofs are still wet.', day: 'It is full day, and the street is about its business.', dusk: 'The light is going, and shutters are being pulled to.', night: 'It is night, and most windows are dark.' };
+const folkLine = (st, S) => {
+  const who = S.folk.map((x) => (x.n.bible ? x.n.name + ' the ' + x.n.role : A_AN((x.n.trait ? x.n.trait + ' ' : '') + x.n.role)));
+  return !who.length ? 'Nobody is about.' : who.length === 1 ? cap(who[0]) + ' is here.' : who.length <= 4 ? cap(listOf(who)) + ' are here.' : cap(listOf(who.slice(0, 3))) + ' are here, and ' + (COUNT[who.length - 3] || 'several') + ' more besides.';
+};
+const foeLine = (st, S) => {
+  if (!S.foes.length) return '';
+  const roles = S.foes.map((x) => A_AN(x.n.id === 'N5' ? 'figure who can only be ' + x.n.name : x.n.role)), sleeping = S.foes.every((x) => x.n.sheet && x.n.sheet.asleep);
+  return cap(listOf(roles)) + (S.foes.length === 1 ? ' is' : ' are') + (sleeping ? ' here, slumped and snoring.' : ' here, and no friend of yours.');
+};
+const thingLine = (S) => (S.things.length ? 'You make out ' + listOf(S.things.map(A_AN)) + '.' : '');
+const ENTER = {
+  town: ['{town} is a market square, a north road and the houses that grew up along them. {tod} {folk} North, past the last roof, the trail climbs toward {cave}.', 'You step out into {town}. {tod} {folk} The road runs north to where the hills begin, and somewhere up there is {cave}.'],
+  inn: ['{inn} smells of woodsmoke, spilled ale and yesterday’s stew. {things} {folk}', 'The door of {inn} lets you into warmth and low talk that drops a little as you come in. {things} {folk}'],
+  smithy: ['The forge breathes heat at you from across the room. {things} {folk}', 'Inside {site} it is all coal smoke and the ring of iron. {things} {folk}'],
+  shop: ['{site} is narrow, and every shelf of it is full. {things} {folk}', 'A bell on a spring announces you to {site}. {things} {folk}'],
+  chapel: ['{site} is cool and dim and smells of wax. {things} {folk}', 'Your steps sound too loud in {site}. {things} {folk}'],
+  house: ['A plain room, lived in and swept. {things} {folk}', 'Somebody’s home: you can tell by how carefully little there is. {things} {folk}'],
+  cave: ['The trail ends at a split in the rock: {cave}. Inside it is cold and close, and the torchlight reaches forty feet and stops. {things} {foes}', 'You duck into {cave}. Smoke has blackened the roof, and the dark beyond the torch has a listening quality. {things} {foes}'],
+};
+const FIGHT_OPEN = ['Steel is out.', 'There is no more talking to be done.', 'Somebody shouts, and then everybody moves at once.', 'It comes to blows.'];
+function beatText(st, kind, data) {
+  const m = st.maps[st.here], site = st.sites[st.here] || { kind: 'house', name: 'this place' }, S = sceneOf(st), k = mainK(st), N = namesOf(st);
+  const X = { site: (site.kind === 'chapel' ? 'the ' : '') + site.name, tod: TOD[timeOfDay(st.time.minute)], folk: folkLine(st, S), foes: foeLine(st, S) || 'Nothing moves that you can see.', things: thingLine(S) };
+  const tidy = (s) => s.replace(/\s{2,}/g, ' ').replace(/\s+([.,])/g, '$1').trim();
+  if (kind === 'opening') {
+    const main = (st.bible.threads || []).find((t) => t.main), g = st.npcs[giverOf(st)] || { name: 'the elder', role: 'elder' };
+    return tidy(fillT(st, 'You wake in a rented room at {inn}, in {town}. Through the boards comes the low talk of the common room, and one name in it again and again: {gang}.', X)) + '\n\n' +
+      tidy((main ? main.t + ' ' : '') + g.name + ', the ' + g.role + ', is the one to see about it: ' + (g.id === 'N3' ? 'at the ' + N.chapel + '.' : 'most days to be found in the market square.'));
+  }
+  if (kind === 'enter') return tidy(fillT(st, varyOf(st, 'enter:' + st.here, ENTER[site.kind] || ENTER.house), X));
+  if (kind === 'fight') {
+    const R = st.round, a = R ? turnOf(st) : null, foes = R ? R.order.filter((c) => c.k === 'foe').map((c) => m.tokens.find((t) => t.id === c.id)).filter(Boolean) : [];
+    const roles = foes.map((t) => { const n = st.npcs[t.npc] || { role: 'bandit' }; return n.id === 'N5' ? n.name + ' in person' : A_AN(n.role); });
+    return tidy(varyOf(st, 'fight:' + st.here + ':' + st.time.day + ':' + st.time.minute, FIGHT_OPEN) + ' ' + (roles.length ? cap(listOf(roles)) + (roles.length === 1 ? ' stands' : ' stand') + ' against you.' : 'Nobody stands against you yet.') + (a ? ' ' + nameOf(st, a) + ' is quickest, and moves first.' : ''));
+  }
+  if (kind === 'fightend') {
+    const d = String(data || '');
+    if (/^The fight is won/.test(d)) return tidy('It is over. ' + (m.tokens.some((t) => t.k === 'foe') ? 'The dark beyond the torch is not empty yet, but for now nothing in it moves.' : m.kind === 'cave' ? 'The last echo dies, and ' + N.cave + ' is only a hole in a hill again.' : 'The quiet afterwards is very loud.'));
+    if (/^The party is beaten/.test(d)) return tidy(/wake at the inn/.test(d) ? 'The last of you goes down, and the dark comes up to meet you. It is morning when it lets go: a bed at ' + N.inn + ', a split lip, and a purse lighter by half. Somebody carried you down that hill, and has not stayed to be thanked.' : 'The last of you goes down, and nobody is left to say what happened next.');
+    return tidy('Blades are lowered, though nobody puts one away. Whatever this was, it is not being settled today.');
+  }
+  if (kind === 'ending') {
+    const P = [fillT(st, MAIN[k].met) + ' ' + cap(N.town) + ' will tell it for years, and get it a little more wrong each winter.'];
+    const sides = sideKs(st), done = sides.filter((w) => flag(st, 'done:' + w)), open = sides.filter((w) => !flag(st, 'done:' + w));
+    if (done.length) P.push(done.map((w) => fillT(st, WHISPERS[w].note)).join(' '));
+    if (open.length) P.push(open.length === sides.length ? 'What else was whispered in ' + N.town + ' stays whispered: you never did get to the bottom of it.' : 'One whisper you never ran to ground. It will keep.');
+    if (st.fallen.length) P.push('Not everyone who set out is here to hear the thanks: ' + listOf(st.fallen.map((f) => f.name)) + ' ' + (st.fallen.length === 1 ? 'lies' : 'lie') + ' in the chapel yard, under a stone the town paid for.');
+    P.push('The road out of ' + N.town + ' is open in both directions now. You may take it, or stay a while.');
+    return P.join('\n\n');
+  }
+  return '';
+}
+/* the nearest thing the script has to an answer for a typed line: the topic whose words it shares most, or the greeting */
+function talkTwin(st, npcId, text) {
+  const n = st.npcs[npcId];
+  if (!n) return '';
+  const words = keywords(text), T = topicsFor(st, npcId).filter((t) => !t.off && t.id !== 'name');
+  let best = null, score = 0;
+  for (const t of T) { const hay = (t.label + ' ' + t.id + ' ' + ({ gang: 'bandits gang thieves cave hideout', news: 'news rumour rumours heard hear town gossip', matter: 'prisoner taken missing help find', bed: 'room sleep rest night bed', job: 'help work hire job pay reward', report: 'done finished back returned' }[t.id] || '')).toLowerCase(); let s = 0; for (const w of words) if (hay.includes(w)) s++; if (s > score) { score = s; best = t; } }
+  if (!best) return greetOf(st, n) + ' (The script answers topics, not typed lines: it offers ' + (T.map((t) => '“' + t.label + '”').join(', ') || 'nothing here') + '.)';
+  const r = talkOf(st, npcId, best.id, true);
+  return r.ok ? '[' + best.label + '] ' + r.text : greetOf(st, n);
+}
+/* and for a line typed to the table at large: the script has only what the board offers */
+function actTwin(st) {
+  const m = st.maps[st.here], L = leadOf(st), near = [];
+  for (const o of m.objs) { if (o.on || cheb(o, L) > 3) continue; for (const v of verbsFor(st, o.id)) if (!v.off) near.push(v.label + ' (' + ASSETS[o.a].n.toLowerCase() + ')'); }
+  for (const d of m.doors) if (d.lock && doorSides(d).some((q) => Math.max(Math.abs(q[0] - L.x), Math.abs(q[1] - L.y)) <= 3)) for (const v of verbsFor(st, d.id)) if (!v.off) near.push(v.label + ' (door)');
+  return 'The script cannot read a typed line. From where ' + L.name + ' stands the board offers: ' + (near.length ? [...new Set(near)].slice(0, 6).join(', ') : 'walking, doors, and whoever is in sight to talk to') + '.';
+}
+/* what the monsters' own script would have done with the turns a model is about to take: played out on a copy of the tale */
+function monstersTwin(snap) {
+  const st = unpackState(JSON.parse(snap)), lines = [];
+  for (let k = 0; k < 80 && st.round && !st.over; k++) {
+    const a = turnOf(st);
+    if (!a || a.pc) break;
+    const it = foePlan(st) || { t: 'end' }, who = nameOf(st, a);
+    if (it.t === 'move') { const res = intent(st, { t: 'move', who: a.id, to: it.to }); if (res.ok && res.path && res.path.length) { walkOut(st, a.id); lines.push(who + ' closes ' + res.ft + ' ft.'); continue; } }
+    else if (it.t === 'attack' || it.t === 'dash') { const res = intent(st, Object.assign({ who: a.id }, it)); if (res.ok) { lines.push(res.say); if (res.ended) { lines.push(endedSay(res.ended)); break; } continue; } }
+    const e = intent(st, { t: 'end' });
+    if (!e.ok) break;
+    for (const ev of e.events || []) lines.push(ev.say);
+    if (e.ended) { lines.push(endedSay(e.ended)); break; }
+  }
+  return lines.join(' ') || 'The script would have had them hold where they stand.';
+}
+
 /* ============================== GAME MASTER: CONTEXT ==============================
    What the Game Master reads each turn. Order matters for prompt caching: the tools,
    the instructions and the world bible are byte-stable for a tale and sit before the
@@ -3412,7 +4182,8 @@ function boardDigest(st) {
     for (const o of list || []) {
       const a = ASSETS[o.a], kids = m._.kids.get(o.id) || [];
       if (SCATTER[o.a] && !kids.length) { count[a.n.toLowerCase()] = (count[a.n.toLowerCase()] || 0) + 1; continue; }
-      named.push(o.id + ' ' + a.n.toLowerCase() + (kids.length ? ' (on it: ' + kids.map((k) => k.id + ' ' + ASSETS[k.a].n.toLowerCase()).join(', ') + ')' : ''));
+      const loot = lootOf(st, m, o), lk = loot ? thingKey(m, o.id) : '';
+      named.push(o.id + ' ' + a.n.toLowerCase() + (!loot ? '' : flag(st, 'u:' + lk) ? ' [searched: empty]' : loot.lock && !flag(st, 'o:' + lk) ? ' [LOCKED; can be searched once open]' : ' [can be searched]') + (kids.length ? ' (on it: ' + kids.map((k) => k.id + ' ' + ASSETS[k.a].n.toLowerCase()).join(', ') + ')' : ''));
     }
     return named.concat(Object.keys(count).map((n) => count[n] + ' x ' + n)).join('; ') || 'nothing of note';
   };
@@ -3422,6 +4193,11 @@ function boardDigest(st) {
   if (m.lots.length) L.push('Buildings (roofs on this board): ' + m.lots.map((l) => l.site + ' ' + (st.sites[l.site] ? st.sites[l.site].name : '?') + ' (' + l.kind + (st.maps[l.site] ? '' : ', not yet entered') + ')').join('; '));
   if (m.doors.length) L.push('Doors: ' + m.doors.map((d) => { const sd = doorSides(d).map((p) => { const r = roomAt(m, p[0], p[1]); return r ? r.id : 'outside'; }); return d.id + ' ' + (d.kind === 'bars' ? 'barred door' : d.kind) + ' ' + sd[0] + '|' + sd[1] + ' ' + (d.lock ? 'LOCKED' : d.open ? 'open' : 'closed'); }).join('; '));
   L.push('Ways out: ' + (m.exits.map((e) => e.id + ' to ' + e.to + ' ' + (st.sites[e.to] ? st.sites[e.to].name : '?') + (e.zone ? ' (anywhere outside the walls)' : e.tiles.length ? ' (at ' + e.tiles[0][0] + ',' + e.tiles[0][1] + ')' : '')).join('; ') || 'none'));
+  if (m.id === 'S2') {   /* where the plot's own things lie, for the Game Master's eyes */
+    const S = plotSpots(st), hold = (id) => { const o = id && m._.byId.get(id), loot = o && lootOf(st, m, o); return loot && !flag(st, 'u:' + thingKey(m, id)) ? id + ' holds ' + ([loot.gold ? loot.gold + ' gold' : ''].concat(loot.items).filter(Boolean).join(', ') || 'nothing of worth') : ''; };
+    const lines = [hold(S.strong), S.desk !== S.strong ? hold(S.desk) : ''].filter(Boolean);
+    if (lines.length) L.push('Hidden here (GM eyes only; the engine hands it over when the thing is searched): ' + lines.join('; ') + '.');
+  }
   L.push('People on this board (' + (m.tokens.length || 'none') + '):');
   for (const t of m.tokens) {
     const n = st.npcs[t.npc] || { name: 'Someone', role: '', trait: '' }, vis = !!V[t.y * W + t.x], d = cheb(t, Ld) * FT;
@@ -3447,6 +4223,9 @@ function turnContext(st, player, opts) {
   L.push('TURN CONTEXT - the current truth. Where it differs from the world bible, this wins.');
   L.push('Table: content rating ' + (opts.rating || 'teen') + '. Turn ' + st.turn + '. Time: ' + clockText(st) + '.');
   L.push('Monsters’ turns in a fight are played by: ' + (opts.monsters === 'gm' ? 'YOU (when a stage direction says so)' : opts.monsters === 'hand' ? 'the players, by hand, on the board' : 'the engine’s own script') + (opts.monsters === 'gm' ? '.' : '. Do not move or attack with a hostile yourself unless the story truly needs it.'));
+  const A = opts.areas || {};
+  L.push('At this table a SCRIPT (no model) shares the Game Master’s work. Narration at the beats: ' + (A.narrate === 'ai' ? 'you' : 'the script') + '. Voicing people: ' + (A.talk === 'ai' ? 'you' : 'the script (players pick topics from buttons)') + '. Lines typed to the table: ' + (A.act === 'ai' ? 'you' : 'not offered') +
+    '. Making characters: ' + (A.create === 'ai' ? 'you, in conversation (see Characters)' : 'the players, on the party sheet: do NOT ask who is at the table and do not call create_character unless a player asks you to') + '. What the script said is in RECENT EXCHANGES marked SCRIPT: it is part of the tale, stay consistent with it.');
   L.push('');
   L.push(boardDigest(st));
   L.push('');
@@ -3458,6 +4237,9 @@ function turnContext(st, player, opts) {
   } else L.push('No fight is in progress.');
   L.push('Quests:');
   for (const q of Object.values(st.quests)) { L.push('  ' + q.id + ' ' + q.title + ' - ' + q.status + ': ' + q.goal); for (const n of q.notes.slice(-3)) L.push('    note: ' + n.text); }
+  { const k = mainK(st), gv = st.npcs[giverOf(st)], heard = sideKs(st).filter((w) => flag(st, 'heard:' + w)), done = sideKs(st).filter((w) => flag(st, 'done:' + w));
+    L.push('Plot (the engine keeps this, whoever is telling): the matter at hand is ' + (st.quests.Q0 && st.quests.Q0.status !== 'active' ? st.quests.Q0.status.toUpperCase() : goalMet(st) ? 'DONE IN DEED - ' + fillT(st, MAIN[k].met) + ' It is closed (update_quest complete, and the reward) when the party tells ' + (gv ? gv.id + ' ' + gv.name : 'whoever asked') + '.' : 'open; ' + (gv ? gv.id + ' ' + gv.name : 'the elder') + (flag(st, 'job') ? ' has promised ' + MAIN_GOLD + ' gold for it.' : ' would pay ' + MAIN_GOLD + ' gold for it.')) +
+      ' Whispers heard: ' + (heard.map((w) => WHISPERS[w].title).join(', ') || 'none') + '; settled: ' + (done.map((w) => WHISPERS[w].title).join(', ') || 'none') + '.' + (flag(st, 'keen') ? ' The party’s weapons have a keener edge (+1 damage).' : '') + (flag(st, 'freebed') ? ' The inn’s beds are free to them.' : '')); }
   if (st.fallen.length) L.push('The fallen: ' + st.fallen.map((f) => f.name + ' the ' + f.cls).join(', ') + '.');
   /* canon: facts about what is in focus, plus keyword matches on the player's words */
   const text = (player && player.text) || '', lower = text.toLowerCase(), kw = keywords(text);
@@ -3471,7 +4253,7 @@ function turnContext(st, player, opts) {
   const said = st.story.filter((e) => e.t === 'gm' || e.t === 'pl').slice(-8);
   if (said.length) {
     L.push('RECENT EXCHANGES:');
-    said.forEach((e, k) => L.push(e.t === 'gm' ? '  GM: ' + (k === said.length - 1 ? e.text : clip(e.text, 700)).replace(/\s*\n+\s*/g, ' ') : '  ' + (e.who || 'The table') + ': ' + e.text));
+    said.forEach((e, k) => L.push(e.t === 'gm' ? '  ' + (e.src === 'script' ? 'SCRIPT' : 'GM') + ': ' + (k === said.length - 1 ? e.text : clip(e.text, 700)).replace(/\s*\n+\s*/g, ' ') : '  ' + (e.who || 'The table') + ': ' + e.text));
   }
   let from = st.story.length; while (from > 0 && st.story[from - 1].t !== 'gm') from--;
   const since = st.story.slice(from).filter((e) => e.t === 'chip').slice(-30);
@@ -3498,6 +4280,8 @@ const SYSTEM_PROMPT = [
   '',
   'The board and the engine are the truth',
   '- A deterministic engine holds the board: every wall, door, thing and person, who stands where, who can see whom. The turn context gives you the board in words. You never work out distances, paths, reach or lines of sight yourself: name who and what by the ids in the digest and the engine does the geometry. Trust tool results over your own ideas.',
+  '- Some things the board resolves by its own rules, with or without you: a chest, crate, barrel, sack or desk in a hideout can be searched once (what it holds is fixed by the seed; the digest marks it), a lock can be unlocked with the gang’s keys, picked (Sleight of Hand; at a disadvantage without thieves’ tools) or forced (Athletics; with advantage with a crowbar), and a healing draught restores 2d4+2 hit points. Players do these by touch; when they ask in words, call use_thing rather than inventing the outcome. A night’s sleep by touch needs the inn or a place clear of enemies; your rest tool may rule otherwise.',
+  '- The engine also watches the plot: when the chief falls the gang’s keys come to the party, a freed captive walks down the hill with them, and the turn context says where the matter at hand stands. You never need to track that yourself.',
   '- The players act on the board by touch: they walk, open doors, attack and use abilities themselves, and the engine resolves those at once. The turn context lists what they did SINCE YOU LAST SPOKE. That has already happened: never repeat it with tools; narrate its meaning when it matters.',
   '- Fog of war is real. The digest marks rooms and people as seen, in sight, or unseen. Describe only what the party can see or has seen. Never mention anyone or anything marked unseen or out of sight, however much you know.',
   '- Make all of your tool calls first, then write the narration as your final reply. Do not narrate before or between tool calls; describe outcomes only after you have seen the results.',
@@ -3509,10 +4293,11 @@ const SYSTEM_PROMPT = [
   '- When a scene ends - the party leaves a place, or a conversation or a fight concludes - call end_scene with a two- or three-sentence summary. These summaries are your long memory.',
   '',
   'Stage directions',
-  '- Sometimes, instead of a player line, the turn context ends with a STAGE DIRECTION from the table itself (the tale opens, the party enters a place for the first time, a fight starts or ends, the monsters’ turn). Do what it asks, at the length it asks.',
+  '- Sometimes, instead of a player line, the turn context ends with a STAGE DIRECTION from the table itself (the tale opens, the party enters a place for the first time, a fight starts or ends, the monsters’ turn, the tale’s ending). Do what it asks, at the length it asks.',
+  '- A script with no model behind it may share the table with you: the turn context says which of the Game Master’s jobs are yours this turn. Do only those. What the script has already told is part of the tale.',
   '',
   'Characters',
-  '- The party starts as one nameless placeholder traveller. After the opening, find out who is at the table: invite each player to describe a character - a name and one of the classes Fighter, Rogue, Cleric, Wizard, Ranger or Bard, plus anything else they like - and call create_character for each. The first replaces the placeholder where it stands; the rest join beside it (six at most). When a player wants to be surprised, call suggest_character, offer the result, and create it once they agree.',
+  '- The party starts as one nameless placeholder traveller. When the turn context says making characters is yours, find out who is at the table after the opening: invite each player to describe a character - a name and one of the classes Fighter, Rogue, Cleric, Wizard, Ranger or Bard, plus anything else they like - and call create_character for each. The first replaces the placeholder where it stands; the rest join beside it (six at most). When a player wants to be surprised, call suggest_character, offer the result, and create it once they agree.',
   '- Each player line is tagged with the speaking character; "the table" means everyone.',
   '',
   'Fights',
@@ -3524,7 +4309,7 @@ const SYSTEM_PROMPT = [
   '',
   'The story',
   '- The world bible sets the town, the gang, its cave and three threads: the matter at hand and two whispers. Let the players find their own way; seed clues through the people they talk to. Keep the townsfolk distinct: each has a role and a trait.',
-  '- When the matter at hand is truly resolved, call update_quest with op "complete" for Q0. Side tasks: op "add".',
+  '- When the matter at hand is truly resolved - done in deed, and told to whoever asked for it - call update_quest with op "complete" for Q0 and hand over what was promised with inventory. Side tasks: op "add".',
   '- Be fair and consistent. Consequences are real, but give the players what a careful character would notice.',
   '',
   'Tone and content',
@@ -3540,13 +4325,15 @@ const SYSTEM_PROMPT = [
   '- Asset library for place_object (floor things, then small things that sit on surfaces): ' + Object.keys(ASSETS).filter((k) => !ASSETS[k].sz).join(', ') + '; small: ' + Object.keys(ASSETS).filter((k) => ASSETS[k].sz).join(', ') + '.',
 ].join('\n');
 const STAGES = {
-  opening: (st) => 'STAGE DIRECTION - the tale begins now. In about 150 words, narrate the opening: the party wakes in a rented room at the inn (use the opening situation and the matter at hand from the bible; describe only what can be seen from the room). Then find out who is at the table: ask how many travellers there are and, for each, a name and a calling.',
+  opening: (st, d, A) => 'STAGE DIRECTION - the tale begins now. In about 150 words, narrate the opening: the party wakes in a rented room at the inn (use the opening situation and the matter at hand from the bible; describe only what can be seen from the room). ' +
+    (A && A.create === 'ai' ? 'Then find out who is at the table: ask how many travellers there are and, for each, a name and a calling.' : 'The players make their own characters on the party sheet: do not ask who they are. End by handing the moment to them.'),
+  create: () => 'STAGE DIRECTION - the opening has been told. Find out who is at the table: in 40 to 70 words, ask how many travellers there are and, for each, a name and a calling.',
   enter: (st) => 'STAGE DIRECTION - the party has just walked into ' + st.here + ' ' + st.sites[st.here].name + ' for the first time. In 40 to 90 words describe what they see from where they stand (only what the digest marks as seen or in sight), with one detail worth a second look, then hand the moment back.',
   fight: () => 'STAGE DIRECTION - a fight has just begun: initiative is rolled (see FIGHT above). In 30 to 70 words set the moment - who squares up to whom, what the room offers - and say whose turn it is. Do not act for anyone.',
   fightend: (st, d) => 'STAGE DIRECTION - the fight has just ended: ' + d + ' In 30 to 80 words narrate the aftermath as the party would see it, then call end_scene.',
   monsters: () => 'STAGE DIRECTION - it is the monsters’ turn and you play them. For each hostile whose turn comes up, in order: move, attack if it can, then end_turn. Keep going until end_turn reports that a player character is acting (or the fight ends). Then narrate what the monsters did in 30 to 80 words.',
+  ending: () => 'STAGE DIRECTION - the matter at hand is settled and paid for: the tale has reached its ending. In 120 to 180 words tell an epilogue: what becomes of the town, the gang and the people the party dealt with, drawing on CANON and the story so far, and on any whisper left unsettled. Do not start anything new. Then call end_scene.',
 };
-
 /* ============================== GAME MASTER: CLIENT ==============================
    Raw fetch to the Messages API with the player's own key (no SDK: the repo allows no
    external JS). Each turn is a fresh conversation: earlier turns reach the model as
@@ -4493,6 +5280,7 @@ function tapAt(sx, sy) {
   if (d && doorSides(d).some((q) => known(q[0], q[1])) && !(inSight(tx, ty) && tokenAt(m, tx, ty))) {
     UI.card(null);
     if (G.busy) { UI.toast(BUSY); return; }
+    if (d.lock) { UI.thingCard(d.id, d.kind === 'bars' ? 'Barred door' : d.kind === 'gate' ? 'Gate' : 'Door', d.kind === 'bars' ? 'Iron bars, a hand apart.' : 'Shut fast.'); return; }      /* a lock is a thing to be dealt with, not walked through */
     if (!st.walk && doorSides(d).some((q) => q[0] === pc.x && q[1] === pc.y)) { UI.follow(intent(st, { t: 'door', who: a.id, id: d.id })); return; }
     go({ goals: doorSides(d), then: { t: 'door', id: d.id } });
     return;
@@ -4513,7 +5301,8 @@ function tapAt(sx, sy) {
   } else if (p.obj) {
     const o = ASSETS[p.obj.a], f = footprint(p.obj), kids = (m._.kids.get(p.obj.id) || []).map((k) => ASSETS[k.a].n.toLowerCase());
     View.sel = { x: f.x, y: f.y, w: f.w, h: f.h };
-    UI.card(o.n, o.d + ' ' + f.w * FT + ' by ' + f.h * FT + ' ft' + (o.mv === 'b' ? ', and in the way.' : o.mv === 'r' ? ', slow going.' : '.') + (kids.length ? ' On it: ' + kids.join(', ') + '.' : ''));
+    UI.thingCard(p.obj.id, o.n, o.d + ' ' + f.w * FT + ' by ' + f.h * FT + ' ft' + (o.mv === 'b' ? ', and in the way.' : o.mv === 'r' ? ', slow going.' : '.') + (kids.length ? ' On it: ' + kids.join(', ') + '.' : ''));
+    if (verbsFor(st, p.obj.id).length) return;             /* something can be done with it: the card offers that, and nobody walks onto it */
   } else if (!p.goals) UI.card(cap(TERRAIN[m.t[ty * m.w + tx]]), 'No way through.');
   else UI.card(null);
   if (p.goals) go(p);
@@ -4595,6 +5384,7 @@ function viewFrame(now) {
         if (res.done) View.pending = res.next ? Object.assign({ who }, res.next) : null;
         if (View.path) View.path.i++;
         if (res.spotted.length && !st.round) View.spot = res.spotted;
+        else if (!st.round && st.walk && Mode.strict() && threatOf(st)) { intent(st, { t: 'halt' }); View.pending = null; }      /* seen again by someone already met: the walk stops, and alarm() rolls */
         if (res.joined.length) UI.joined(res.joined);
         if (st.round) UI.header();
       } else { UI.toast(res.say); View.pending = null; }
@@ -4605,6 +5395,7 @@ function viewFrame(now) {
       if (p) UI.follow(intent(st, p));
       UI.arrived();
       if (sp && !st.round) UI.spotted(sp);                 /* a monster came in sight and the party stopped: the table asks what now */
+      else UI.alarm();
     }
   }
   /* the camera: it keeps whoever acts centred, or, once the table has been pushed about by hand, only ever keeps them on the board */
@@ -4697,13 +5488,22 @@ const Sfx = {
 const Settings = {
   KEY: 'cyoa2.settings.v1',
   defaults: { seed: '', grid: true, foot: false, fog: true, musicVol: .35, sfxVol: .7, theme: 'auto',
-    model: 'claude-opus-5-5', customModel: '', effort: 'medium', rating: 'teen', remember: true, narrate: 'beats', monsters: 'script', showCosts: true, storyOpen: true, taskModels: { turn: '', beat: '', monsters: '' } },
+    /* who runs the table. gm: 'script' (the default: no model, no key, free) or 'ai' (Claude, over the player's own key, for
+       the areas chosen below; the script keeps the rest). monsters is the fifth area and keeps its older name and values. */
+    gm: 'script', areas: { narrate: 'ai', talk: 'ai', act: 'ai', create: 'ai' }, twin: true, tags: true,
+    model: 'claude-opus-5-5', customModel: '', effort: 'medium', rating: 'teen', remember: true, monsters: 'script', showCosts: true, storyOpen: true, taskModels: { turn: '', beat: '', monsters: '' } },
   data: null, memKey: '',
   load() {
     let d = {}; try { d = JSON.parse(localStorage.getItem(this.KEY) || '{}') || {}; } catch (e) { d = {}; }
     this.data = Object.assign({}, this.defaults, d);
     this.data.taskModels = Object.assign({}, this.defaults.taskModels, d.taskModels && typeof d.taskModels === 'object' ? d.taskModels : {});
     if (!['script', 'gm', 'hand'].includes(this.data.monsters)) this.data.monsters = 'script';
+    if (this.data.gm !== 'ai') this.data.gm = 'script';
+    const A = d.areas && typeof d.areas === 'object' ? d.areas : {};
+    this.data.areas = {};
+    for (const k of Object.keys(this.defaults.areas)) this.data.areas[k] = A[k] === 'script' || A[k] === 'ai' ? A[k] : this.defaults.areas[k];
+    if (d.narrate === 'asked' && !A.narrate) this.data.areas.narrate = 'script';     /* the older setting "only when spoken to" */
+    delete this.data.narrate;
   },
   save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* private mode: settings last this visit */ } },
   /* The key is the player's own. It lives in this browser only (never in a save, never in the settings blob) and is sent only to api.anthropic.com. */
@@ -4717,6 +5517,18 @@ const Settings = {
     } catch (e) { /* memory only */ }
   },
   cyoaKey() { try { return localStorage.getItem('cyoa.key') || sessionStorage.getItem('cyoa.key') || ''; } catch (e) { return ''; } },
+};
+/* Who does what at the table right now. The script is the default and needs nothing. A model is asked only when the
+   table is set to 'ai', a key is there to ask with, and the area in question is given to it; otherwise the script has it. */
+const AREA_SHORT = { narrate: 'narration', talk: 'talk', act: 'the table', monsters: 'monsters', create: 'characters' };
+const AREA_NAMES = { narrate: 'Narration at the beats', talk: 'Talking to people', act: 'Lines typed to the table', monsters: 'Monsters in a fight', create: 'Making characters' };
+const Mode = {
+  master() { return Settings.data.gm === 'ai' && Session.on() ? 'ai' : 'script'; },
+  ai(area) { return this.master() === 'ai' && (area === 'monsters' ? Settings.data.monsters === 'gm' : Settings.data.areas[area] === 'ai'); },
+  now() { const o = {}; for (const a of AREAS) o[a] = this.ai(a) ? 'ai' : 'script'; return o; },
+  typed() { return this.ai('act') || this.ai('talk'); },
+  /* nobody at this table can rule on the unusual: enemies that see the party fight, and a fight is fought out */
+  strict() { return !this.ai('narrate') && !this.ai('act') && !this.ai('monsters') && Settings.data.monsters !== 'hand'; },
 };
 /* which model a Game Master task uses: its own choice in Settings, or the main model */
 function taskSettings(task) { const d = Settings.data, m = (d.taskModels || {})[task]; return m ? Object.assign({}, d, { model: m }) : d; }
@@ -4751,11 +5563,12 @@ const UI = {
     $('dlg-title').textContent = title;
     const body = $('dlg-body'), row = $('dlg-btns'); body.textContent = ''; row.textContent = '';
     paras.forEach((p, k) => body.appendChild(el('p', lead && k === 0 ? 'lead' : '', p)));
-    this.dlgDefault = null;
+    this.dlgDefault = null; this.dlgEsc = null;
     for (const b of btns) { const e = el('button', 'plaque small' + (b.cls ? ' ' + b.cls : ''), b.t); e.type = 'button'; e.addEventListener('click', () => { this.closeDialog(); if (b.fn) b.fn(); }); row.appendChild(e); if (b.main) this.dlgDefault = e; }
     $('dialog').classList.add('open'); $('scrim').classList.add('open');
   },
-  closeDialog() { $('dialog').classList.remove('open'); if (!$('menu').classList.contains('open')) $('scrim').classList.remove('open'); },
+  escDialog() { const f = this.dlgEsc; this.closeDialog(); if (f) f(); },
+  closeDialog() { this.dlgEsc = null; $('dialog').classList.remove('open'); if (!$('menu').classList.contains('open')) $('scrim').classList.remove('open'); },
   openMenu() { $('menu').classList.add('open'); $('scrim').classList.add('open'); },
   closeMenu() { $('menu').classList.remove('open'); if (!$('dialog').classList.contains('open')) $('scrim').classList.remove('open'); },
   panelOpen() { return !!document.querySelector('.panel.open'); },
@@ -4787,7 +5600,7 @@ const UI = {
       for (const p of st.party) chip('pc' + (p.status !== 'ok' ? ' out' : ''), p.name.charAt(0), p.name + (p.id === st.lead ? ', leading' : '') + (p.status !== 'ok' ? ', ' + p.status : ''), p.id === st.lead && st.party.length > 1).addEventListener('click', () => this.point(p.id));
       chip('add', '+', 'The party').addEventListener('click', () => { Sfx.page(); this.party(); this.openPanel('pan-party'); });
     }
-    $('btn-init').hidden = !!R; $('btn-end').hidden = !R; $('btn-stand').hidden = !R;
+    $('btn-init').hidden = !!R; $('btn-end').hidden = !R; $('btn-stand').hidden = !R || this.mustFight();
     this.header(); this.speakers();
     const cur = box.querySelector('.chip.on');
     if (cur) box.scrollLeft = Math.max(0, cur.offsetLeft - box.clientWidth / 2 + cur.offsetWidth / 2);
@@ -4811,8 +5624,14 @@ const UI = {
     View.sel = pc ? { x: o.x, y: o.y, w: 1, h: 1, pc: pc.id } : { x: o.x, y: o.y, w: 1, h: 1, tok: t.id }; View.dirty = true;
     if (pc) this.pcCard(pc); else this.tokCard(t);
   },
+  /* With only the script at the table nobody can rule on a truce or on slipping past. So while an enemy who is awake can see
+     a traveller who is standing, a fight is fought (the cross comes back once the party has broken from their sight), and
+     outside one, being seen by them starts one: the first time through spotted(), every time after through alarm().      */
+  mustFight() { return !!(G.st && G.st.round) && Mode.strict() && threatOf(G.st); },
+  alarm() { const st = G.st; if (!st || st.round || st.over || G.busy || !Mode.strict() || !threatOf(st)) return false; this.card(null); this.rounds(true); return true; },
   rounds(on) {
     if (G.busy) { this.toast(BUSY); return; }
+    if (!on && this.mustFight()) { this.toast('Not while they are at your throat.'); Sfx.deny(); return; }
     const st = G.st, res = intent(st, { t: 'rounds', op: on ? 'start' : 'stop' });
     if (!res.ok) { this.toast(res.say); Sfx.deny(); return; }
     View.pending = null; View.spot = null; View.path = null; this.card(null);
@@ -4838,15 +5657,23 @@ const UI = {
     const st = G.st, m = st.maps[st.here], t = m.tokens.find((q) => q.id === ids[0]), n = t && st.npcs[t.npc];
     this.toast((n ? n.name : 'Someone') + (ids.length > 1 ? ' and ' + (ids.length - 1) + ' more join' : ' joins') + ' the fight.'); Sfx.alarm(); this.bar();
   },
-  /* a monster has come in sight for the first time: the table says so, and offers the dice */
+  /* a monster has come in sight for the first time: the table says so, and offers the dice. With a Game Master who can
+     rule on it (a model, or a hand moving the monsters) the party may carry on; with only the script, those who are awake
+     and have seen the party fight, unless there is a word to be said to them first. Sleepers are a choice either way. */
   spotted(ids) {
-    const st = G.st, m = st.maps[st.here], names = [];
-    for (const id of ids) { const t = m.tokens.find((q) => q.id === id), n = t && st.npcs[t.npc]; if (n) names.push(n.name + ' the ' + n.role); }
+    const st = G.st, m = st.maps[st.here], names = [], seen = [];
+    for (const id of ids) { const t = m.tokens.find((q) => q.id === id), n = t && st.npcs[t.npc]; if (n) { names.push(n.name + ' the ' + n.role); seen.push(t); } }
     if (!names.length || st.round) return;
+    const asleep = seen.every((t) => { const n = st.npcs[t.npc]; return n.sheet && n.sheet.asleep; });
+    const who = names.length === 1 ? names[0] : names.length === 2 ? names[0] + ' and ' + names[1] : names[0] + ' and ' + (names.length - 1) + ' more';
+    const one = names.length === 1, say = asleep ? who + (one ? ' is asleep, and has not stirred.' : ' are asleep, and have not stirred.') : who + (one ? ' has' : ' have') + ' seen the party.';
     Sfx.alarm();
-    const who = names.length === 1 ? names[0] + ' has' : (names.length === 2 ? names[0] + ' and ' + names[1] : names[0] + ' and ' + (names.length - 1) + ' more') + ' have';
-    this.chip('fight', who + ' seen the party.');
-    this.dialog('You are seen', [who + ' seen the party.'], [{ t: 'Carry on' }, { t: 'Roll initiative', main: true, fn: () => this.rounds(true) }]);
+    this.chip('fight', say);
+    const roll = { t: 'Roll initiative', main: true, fn: () => this.rounds(true) }, strict = Mode.strict() && !asleep, words = [];
+    if (strict && !Mode.ai('talk')) for (const t of seen) for (const x of topicsFor(st, t.npc)) if (!x.off) words.push({ t: x.label, fn: () => this.ask(t.npc, x.id) });
+    if (strict && !words.length) { this.rounds(true); return; }
+    this.dialog(asleep ? 'Unseen' : 'You are seen', [say], strict ? words.concat([roll]) : [{ t: asleep ? 'Carry on quietly' : 'Carry on' }, roll]);
+    if (strict) this.dlgEsc = () => this.rounds(true);
   },
 
   /* ---- blows and tricks: the table asks, the engine answers, and the answer is shown ---- */
@@ -4867,7 +5694,7 @@ const UI = {
     const heal = res.heal != null || res.t === 'rest';
     if (res.say) this.chip(heal ? 'heal' : 'fight', res.say);
     if (res.t === 'attack') { floater(res.at[0], res.at[1], res.hit ? '−' + res.dmg : 'miss', res.hit ? RUB : INK2); if (res.hit) Sfx.hit(res.crit); else Sfx.miss(); }
-    else if (res.t === 'ability' && res.heal != null) { floater(res.at[0], res.at[1], '+' + res.heal, VERD); Sfx.heal(); }
+    else if ((res.t === 'ability' || res.t === 'item') && res.heal != null) { floater(res.at[0], res.at[1], '+' + res.heal, VERD); Sfx.heal(); }
     else if (res.t === 'ability' && res.dmg) { floater(res.at[0], res.at[1], '−' + res.dmg, RUB); Sfx.hit(false); }
     else if (res.t === 'rest') Sfx.heal(); else Sfx.page();
     if (res.fell) Sfx.fall();
@@ -4879,8 +5706,8 @@ const UI = {
   },
   /* a fight is over: tell it, put the bar back, and if the party was carried home, show where it woke */
   fightOver(e, told) {
-    const st = G.st, say = endedSay(e);
-    if (!told) this.chip('fight', say);
+    const st = G.st, say = endedSay(Object.assign({}, e, { plot: null }));
+    if (!told) { this.chip('fight', say); for (const z of e.plot || []) this.chip(z.k, z.t); }
     View.pending = null; View.path = null; View.walking = false; View.spot = null; this.card(null);
     if (e.outcome === 'victory') Sfx.win(); else Sfx.page();
     this.toast(e.outcome === 'victory' ? 'The fight is won.' : e.outcome === 'defeat' ? 'The party is beaten.' : 'The rounds are over.');
@@ -4909,6 +5736,11 @@ const UI = {
         for (const h of st.party) { if (h.status !== 'ok') continue; for (const s of h.abilities) { const d = abilityDef(h.cls, s.n); if (d.heal && (d.tg === 'ally' || h === p) && ready(d, s)) acts.push({ t: d.n + (h === p ? '' : ', ' + h.name.split(' ')[0]), sub: uses(s), fn: () => this.ability(h.id, d.n, p.id) }); } }
       }
     }
+    /* a healing draught: on their own turn the one acting drinks or hands one over; outside a fight whoever carries one does */
+    if (!G.busy && p.status !== 'dead' && hurt) {
+      const has = (q) => q.items.find((x) => itemKey(x.n) === 'healing draught'), from = R ? (a.pc && a.o.status === 'ok' && R.act > 0 && has(a.o) && (a.o === p || meleeClear(a.m, a.o.x, a.o.y, p.x, p.y)) ? a.o : null) : (p.status === 'ok' && has(p) ? p : st.party.find((q) => q.status === 'ok' && q.site === p.site && has(q)) || null);
+      if (from) acts.push({ t: 'Healing draught' + (from === p ? '' : ', ' + from.name.split(' ')[0]), sub: 'x' + has(from).q, fn: () => this.act1({ t: 'item', who: from.id, item: 'healing draught', target: p.id }) });
+    }
     acts.push({ t: 'Sheet', fn: () => { this.party(); this.openPanel('pan-party'); } });
     this.card(p.name, text, acts);
   },
@@ -4926,19 +5758,72 @@ const UI = {
       if (R.act > 0) for (const w of weaponsOf(a.o)) if (!reachWhy(a.m, a.o, tok, w.rg)) acts.push({ t: w.n, fn: () => this.attack(tok.id, w.n) });
       for (const s of a.o.abilities) { const d = abilityDef(a.o.cls, s.n); if (d.tg === 'foe' && (s.max === null || s.uses > 0) && (d.cost !== 'action' || R.act > 0) && (d.cost !== 'bonus' || R.bonus > 0)) acts.push({ t: d.n, sub: s.uses + '/' + s.max, fn: () => this.ability(a.id, d.n, tok.id) }); }
     }
+    if (!G.busy && tok.k === 'foe' && !R && !Mode.ai('talk')) for (const x of topicsFor(st, tok.npc)) acts.push({ t: x.label, sub: x.sub, off: x.off, fn: () => this.ask(tok.npc, x.id) });
     if (!G.busy && tok.k !== 'foe' && !R) acts.push({ t: 'Talk', fn: () => this.talkTo(tok) });
     this.card(n.name, text, acts);
   },
+  /* TALK. Where a model voices people, the line is typed (or spoken) to it. Where the script does, the card becomes the
+     conversation: what they said last, and what can be asked next.                                                     */
   talkTo(tok) {
     const n = G.st.npcs[tok.npc] || { name: 'them' };
-    if (!Session.on()) { this.needKey(); return; }
+    if (!Mode.ai('talk')) { this.talkCard(tok.npc); return; }
     Session.to = { id: tok.npc, name: n.name };
     this.card(null); this.storyOpen(true);
     const inp = $('say'); inp.placeholder = 'Say to ' + n.name.split(' ')[0]; inp.focus();
   },
+  talkCard(npcId, text) {
+    const st = G.st, n = st.npcs[npcId], m = st.maps[st.here], tok = n && m.tokens.find((t) => t.npc === npcId);
+    if (!n || !tok || st.round) { this.card(null); return; }
+    View.sel = { x: tok.x, y: tok.y, w: 1, h: 1, tok: tok.id }; View.dirty = true;
+    this.card(n.name, text || greetOf(st, n), topicsFor(st, npcId).map((x) => ({ t: x.label, sub: x.sub, off: x.off, fn: () => this.ask(npcId, x.id) })), 'talk');
+  },
+  /* one thing asked of one person: the engine answers, the story keeps it, and the card shows what they said */
+  ask(npcId, topic) {
+    if (G.busy) { this.toast(BUSY); return; }
+    const st = G.st, n = st.npcs[npcId] || { name: 'Someone' }, L = leadOf(st), was = this.where(), res = intent(st, { t: 'talk', npc: npcId, topic });
+    if (!res.ok) { this.toast(res.say); Sfx.deny(); return; }
+    this.tell(storyEntry('pl', 'to ' + n.name.split(' ')[0] + ': ' + res.ask, st.turn, { who: L.name, id: L.id }));
+    if (res.text) this.script('talk', res.text);
+    for (const z of res.lines) this.chip(z.k, z.t);
+    if (res.lines.some((z) => z.k === 'heal')) Sfx.heal(); else if (res.lines.some((z) => z.k === 'quest')) Sfx.win(); else Sfx.page();
+    this.sync(was); this.saveSoon();
+    if (this.panelOpen()) this.party();
+    if (res.next === 'fight') { this.rounds(true); return; }
+    if (res.next === 'ending') { Session.queue('ending'); return; }
+    this.talkCard(npcId, res.text);
+  },
   needKey() {
-    this.dialog('No Game Master yet', ['The Game Master is Claude, speaking through your own Anthropic API key, at your own cost.', 'Without one the board still plays by its rules: walk, fight, rest. With one, there is someone to talk to.'],
+    this.dialog('The script is telling this tale', ['Everything at this table can be run by the script, for nothing: it narrates, voices the people you meet and plays the monsters.', 'To hear Claude instead, for any part of that, add your own Anthropic API key in Settings. It is used at your own cost.'],
       [{ t: 'Not now' }, { t: 'Settings', main: true, fn: () => { this.settings(); this.openPanel('pan-settings'); $('set-key').focus(); } }]);
+  },
+  /* THINGS. A chest in a hideout, a locked door: what the board offers to do with it, as buttons */
+  thingCard(ref, name, text) {
+    const st = G.st, m = st.maps[st.here], T = thingOf(st, m, ref);
+    if (!T) { this.card(null); return; }
+    const V = G.busy ? [] : verbsFor(st, T.id), key = thingKey(m, T.id), loot = T.obj ? lootOf(st, m, T.obj) : null;
+    const state = T.door ? (T.door.lock ? ' Locked.' : '') : !loot ? '' : flag(st, 'u:' + key) ? ' It has been searched.' : loot.lock && !flag(st, 'o:' + key) ? ' Locked.' : '';
+    this.card(name, text + state, V.map((v) => ({ t: v.label, sub: v.sub, off: v.off, fn: () => this.useThing(T.id, v.verb) })));
+  },
+  useThing(what, verb) {
+    if (G.busy) { this.toast(BUSY); return; }
+    const st = G.st, m = st.maps[st.here], T = thingOf(st, m, what), L = leadOf(st);
+    if (!T) return;
+    if (T.stand.some((q) => q[0] === L.x && q[1] === L.y)) { this.used(intent(st, { t: 'use', what: T.id, verb })); return; }
+    this.card(null); go({ goals: T.stand, then: { t: 'use', what: T.id, verb } });
+  },
+  used(res) {
+    if (!res.ok) { this.toast(res.say); Sfx.deny(); return false; }
+    const st = G.st, m = st.maps[st.here];
+    for (const z of res.lines) this.chip(z.k, z.t);
+    if (res.text) this.script('act', res.text);
+    if (res.opened) Sfx.door(); else if (res.verb === 'search') Sfx.page(); else Sfx.deny();
+    this.card(null); this.bar(); this.arrived(); View.dirty = true; this.saveSoon();
+    if (this.panelOpen()) this.party();
+    if (res.spotted && res.spotted.length && !st.round) { this.spotted(res.spotted); return true; }
+    if (this.alarm()) return true;
+    const T = thingOf(st, m, res.what);
+    if (T && T.obj && verbsFor(st, T.id).length) { const o = ASSETS[T.obj.a], f = footprint(T.obj); View.sel = { x: f.x, y: f.y, w: f.w, h: f.h }; this.thingCard(T.id, o.n, o.d); }
+    return true;
   },
   /* the party panel: names, callings, sheets, who leads, who comes and goes */
   party() {
@@ -4959,6 +5844,7 @@ const UI = {
       sel.value = p.cls; sel.disabled = !!R || busy || p.xp > 0 || p.level > 1; sel.setAttribute('aria-label', 'Calling');
       sel.addEventListener('change', () => { const res = intent(st, { t: 'party', op: 'class', id: p.id, cls: sel.value }); if (!res.ok) { this.toast(res.say); sel.value = p.cls; return; } redo(); });
       sh.appendChild(sel);
+      if (!sel.disabled) { const sup = el('button', 'plaque small', 'Surprise me'); sup.type = 'button'; sup.addEventListener('click', () => { const res = intent(st, { t: 'party', op: 'roll', id: p.id }); if (!res.ok) { this.toast(res.say); return; } Sfx.roll(); redo(); }); sh.appendChild(sup); }
       sh.appendChild(el('span', '', ' Level ' + p.level + ' · HP ' + p.hp + '/' + p.hpMax + ' · AC ' + acOf(p) + ' · XP ' + p.xp + (p.level < 5 ? '/' + XP_LEVELS[p.level] : '') + (p.status !== 'ok' ? ' · ' + p.status.toUpperCase() : '') + (p.conditions.length ? ' · ' + p.conditions.join(', ') : '')));
       const l2 = el('div', ''); l2.appendChild(el('b', '', 'Strikes with ')); l2.appendChild(document.createTextNode(weaponsOf(p).map((w) => w.n + ' ' + signed(w.hit) + ', ' + w.d + (w.rg > 1 ? ', ' + w.rg * FT + ' ft' : '')).join('; ') + '.'));
       const l3 = el('div', ''); l3.appendChild(el('b', '', 'Knows ')); l3.appendChild(document.createTextNode(p.abilities.map((a) => { const d = abilityDef(p.cls, a.n); return a.n + (a.max === null ? '' : ' ' + a.uses + '/' + a.max) + ' (' + d.t + ')'; }).join(' ')));
@@ -4973,12 +5859,12 @@ const UI = {
     const fb = $('party-fallen'); fb.textContent = '';
     for (const f of st.fallen) { const e = el('div', 'entry gone'), gg = el('div', 'grow'); gg.appendChild(el('h3', '', f.name)); gg.appendChild(el('div', 'sub', f.cls + ' ' + f.level + ' · fell on day ' + f.day)); e.appendChild(gg); fb.appendChild(e); }
   },
-  card(name, text, acts) {
-    const on = !!name, box = $('info-acts'); $('info').hidden = !on; $('board').classList.toggle('has-info', on);
+  card(name, text, acts, cls) {
+    const on = !!name, box = $('info-acts'); $('info').hidden = !on; $('board').classList.toggle('has-info', on); $('info').classList.toggle('talk', on && cls === 'talk');
     box.textContent = '';
     if (on) {
       $('info-name').textContent = name; $('info-text').textContent = text || '';
-      for (const a of acts || []) { const b = el('button', 'plaque small', a.t); b.type = 'button'; if (a.sub) b.appendChild(el('i', '', a.sub)); b.addEventListener('click', () => { Sfx.wake(); a.fn(); }); box.appendChild(b); }
+      for (const a of acts || []) { const b = el('button', 'plaque small', a.t); b.type = 'button'; if (a.off || a.sub) b.appendChild(el('i', '', a.off || a.sub)); if (a.off) b.disabled = true; b.addEventListener('click', () => { Sfx.wake(); a.fn(); }); box.appendChild(b); }
     } else if (View.sel) { View.sel = null; View.dirty = true; }
   },
   act(e) { const b = $('act'); b.hidden = !e; if (e) b.textContent = e.label || 'Go'; },
@@ -4991,15 +5877,16 @@ const UI = {
   /* what came back from the engine after a door or a way out was asked for */
   follow(res) {
     if (!res) return;
+    if (res.t === 'use') { this.used(res); return; }
     if (!res.ok) { this.toast(res.say); Sfx.deny(); return; }
     if (res.site) { Sfx.travel(); this.enterSite(res.spotted); return; }
     if ('open' in res) {
       Sfx.door(); View.dirty = true; this.saveSoon();
       if (res.joined && res.joined.length) this.joined(res.joined);
-      if (res.spotted && res.spotted.length && !G.st.round) this.spotted(res.spotted);
+      if (res.spotted && res.spotted.length && !G.st.round) this.spotted(res.spotted); else this.alarm();
     }
   },
-  enterSite(spotted) { this.card(null); this.act(null); this.veil(() => { viewSetMap(G.st.maps[G.st.here]); this.bar(); this.chrome(); this.arrived(); if (spotted && spotted.length) this.spotted(spotted); Session.entered(); }, 240); },
+  enterSite(spotted) { this.card(null); this.act(null); this.veil(() => { viewSetMap(G.st.maps[G.st.here]); this.bar(); this.chrome(); this.arrived(); if (spotted && spotted.length) this.spotted(spotted); else this.alarm(); Session.entered(); }, 240); },
   enterPlay(opening) {
     Session.reset();
     this.veil(() => {
@@ -5007,14 +5894,30 @@ const UI = {
       View.opt.grid = Settings.data.grid; View.opt.foot = Settings.data.foot; View.fog = Settings.data.fog;
       const st = G.st, B = st.bible, main = B.threads.find((t) => t.main), fresh = st.turn === 0 && !st.told.open && st.here === 'S1' && !st.story.length;
       viewSetMap(st.maps[st.here]); this.renderStory(); this.bar(); this.card(null); this.chrome(); this.arrived();
-      if (Session.on() && (opening || fresh)) Session.queue('opening');
-      else if (opening) {
-        if (!st.story.length) { this.tell(storyEntry('sys', B.opening, 0)); if (main) this.tell(storyEntry('sys', main.t, 0)); }
-        this.dialog(B.town, [B.opening].concat(main ? [main.t] : []), [{ t: 'Begin', main: true }], true);
-      }
-      this.storyOpen(Settings.data.storyOpen && (Session.on() || st.story.length > 0), true);
+      this.sayBar();
+      if (opening || fresh) Session.queue('opening');
+      /* told by the script, the opening is also the tale's title card; then the travellers are made on the party sheet */
+      if (opening && !Mode.ai('narrate')) this.dialog(B.town, beatText(st, 'opening').split('\n\n'), [{ t: 'Begin', main: true, fn: () => { if (!Mode.ai('create')) this.whoIsHere(); } }], true);
+      this.storyOpen(Settings.data.storyOpen, true);
       if (st.over) this.over();
     });
+  },
+  /* a new tale's travellers: made on the party sheet unless a model is asking for them in conversation */
+  whoIsHere(ask) {
+    const st = G.st, open = () => { this.party(); this.openPanel('pan-party'); };
+    if (!st || st.round || st.party.length !== 1 || !st.party[0].stock) return;
+    if (!ask) { open(); return; }                           /* after a model's opening the page is not turned for the reader: a line in the story leads to the sheet */
+    const n = this.logEnd(el('div', 'st-sys', 'Who is at the table?')), b = el('button', 'plaque small', 'The party'); b.type = 'button'; b.addEventListener('click', open); n.appendChild(b);
+  },
+  /* who runs the table has changed, perhaps in the middle of a tale: nothing is half-addressed, and the board shows it */
+  modeChanged() { Session.to = null; this.sayBar(); if (G.st && document.body.classList.contains('in-play')) { $('say').placeholder = 'Say or do something'; this.card(null); this.bar(); View.dirty = true; } },
+  /* the typed line is for a model: where none is listening, it is not offered */
+  sayBar() { document.body.classList.toggle('no-say', !Mode.typed()); document.body.classList.toggle('hide-tags', !Settings.data.tags); },
+  /* the matter at hand is settled and its ending told */
+  ending() {
+    const st = G.st, q = st.quests.Q0;
+    this.dialog('The tale is told', [q.title + ': done, on day ' + st.time.day + '.', st.fallen.length ? 'Fallen on the way: ' + st.fallen.map((f) => f.name).join(', ') + '.' : 'Everyone who set out came home.', 'The world is still here, if you care to wander it.'], [{ t: 'Title', fn: () => this.toTitle() }, { t: 'Wander on', main: true }], true);
+    Sfx.win();
   },
   toTitle() { if (G.abort) G.abort.abort(); Session.reset(); this.saveNow(); this.veil(() => { this.closePanels(); this.closeMenu(); document.body.classList.remove('in-play'); this.show('scr-title'); this.titleState(); }); },
   async titleState() {
@@ -5029,10 +5932,51 @@ const UI = {
 
   /* ---- the story: what was said, and what the dice did ---- */
   storyNode(e, first) {
-    if (e.t === 'gm') return el('div', 'st-gm' + (first ? ' first' : ''), e.text);
+    if (e.t === 'gm') return el('div', 'st-gm' + (first ? ' first' : '') + (e.src ? ' by-' + e.src : ''), e.text);
     if (e.t === 'pl') { const n = el('div', 'st-pl'); n.appendChild(el('b', '', e.who || 'The table')); n.appendChild(document.createTextNode(e.text)); return n; }
     if (e.t === 'chip') return el('div', 'st-chip ' + (/^[a-z]{1,12}$/.test(e.k || '') ? e.k : 'thing'), e.text);
     return el('div', 'st-sys', e.text);
+  },
+  /* under a telling: who told it (the script or a model) and what kind of telling it was, two marks to rate it by, and,
+     where a model spoke, what the script would have said at the same moment, with marks of its own                    */
+  storyFoot(e) {
+    if (e.t !== 'gm' || !e.src) return null;
+    const st = G.st, row = st.tells.find((r) => r.n === e.n) || null, f = el('div', 'st-foot'); f.dataset.n = String(e.n);
+    const marks = (box, key, what) => {
+      const up = el('button', 'rate up', '\uD83D\uDC4D'), dn = el('button', 'rate down', '\uD83D\uDC4E'), show = () => { const v = row ? row[key] : 0; up.setAttribute('aria-pressed', String(v === 1)); dn.setAttribute('aria-pressed', String(v === -1)); };
+      up.type = dn.type = 'button'; up.setAttribute('aria-label', what + ': good'); dn.setAttribute('aria-label', what + ': poor'); up.disabled = dn.disabled = !row;
+      up.addEventListener('click', () => { row[key] = row[key] === 1 ? 0 : 1; show(); this.saveSoon(); });
+      dn.addEventListener('click', () => { row[key] = row[key] === -1 ? 0 : -1; show(); this.saveSoon(); });
+      show(); box.appendChild(up); box.appendChild(dn);
+    };
+    f.appendChild(el('span', 'src ' + e.src, e.src === 'ai' ? 'AI' : 'Script'));
+    f.appendChild(el('span', 'area', AREA_SHORT[e.area] || ''));
+    marks(f, 'r', 'This telling');
+    if (e.twin) {
+      const b = el('button', 'twin-btn', 'Script’s version'), box = el('div', 'st-twin'), tr = el('div', 'twin-rate');
+      b.type = 'button'; b.setAttribute('aria-expanded', 'false'); box.hidden = true;
+      box.appendChild(el('div', 'twin-text', e.twin)); tr.appendChild(el('span', 'src script', 'Script')); marks(tr, 'tr', 'The script’s version'); box.appendChild(tr);
+      b.addEventListener('click', () => { box.hidden = !box.hidden; b.setAttribute('aria-expanded', String(!box.hidden)); });
+      f.appendChild(b); f.appendChild(box);
+    }
+    return f;
+  },
+  /* a telling: the words, who told them, and a line in the tally that the Compare page adds up */
+  told(src, area, text, turn, twin, usd, model) {
+    const st = G.st, n = ++st.n.tell, e = storyEntry('gm', text, turn, { n, src, area }), words = (t) => (String(t).match(/\S+/g) || []).length;
+    if (twin) e.twin = clip(twin, 3000);
+    st.tells.push(tellRow({ n, turn, area, src, w: words(text), usd: usd || 0, model: model || '', r: 0, tw: twin ? words(e.twin) : 0, tr: 0 }));
+    if (st.tells.length > 3000) st.tells.splice(0, st.tells.length - 3000);
+    st.story.push(e);
+    if (st.story.length > 600) st.story.splice(0, st.story.length - 600);
+    return e;
+  },
+  /* the script speaks: at once, and for nothing */
+  script(area, text) {
+    const st = G.st, first = !st.story.some((x) => x.t === 'gm'), e = this.told('script', area, text, st.turn), n = this.logEnd(this.storyNode(e, first)), f = this.storyFoot(e);
+    if (f) this.logEnd(f);
+    if (!$('story-log').offsetHeight) $('story-toggle').classList.add('new');      /* a story folded away stays folded: the fold is marked instead */
+    return n;
   },
   logEnd(node) { const log = $('story-log'), wait = log.querySelector('.st-wait'), near = log.scrollHeight - log.scrollTop - log.clientHeight < 80; if (wait) log.insertBefore(node, wait); else log.appendChild(node); if (near) log.scrollTop = log.scrollHeight; return node; },
   /* write a line of the story into the tale and onto the page */
@@ -5068,13 +6012,14 @@ const UI = {
     for (const e of st.story.slice(-300)) {
       if (last >= 0 && e.turn !== last) tag(last);
       log.appendChild(this.storyNode(e, e.t === 'gm' && first)); if (e.t === 'gm') first = false; last = e.turn;
+      const foot = this.storyFoot(e); if (foot) log.appendChild(foot);
     }
     if (last >= 0) tag(last);
     log.scrollTop = log.scrollHeight;
   },
   storyOpen(on, quiet) {
     const s = $('story'), was = s.classList.contains('open');
-    s.classList.toggle('open', !!on); $('story-toggle').setAttribute('aria-expanded', String(!!on));
+    s.classList.toggle('open', !!on); $('story-toggle').setAttribute('aria-expanded', String(!!on)); if (on) $('story-toggle').classList.remove('new');
     if (!quiet) { Settings.data.storyOpen = !!on; Settings.save(); }
     if (was !== !!on) { const log = $('story-log'); log.scrollTop = log.scrollHeight; viewMeasure(); View.dirty = true; setTimeout(viewMeasure, 60); }
   },
@@ -5089,10 +6034,11 @@ const UI = {
     if (!st || !text) return;
     if (G.busy) { this.toast(BUSY); return; }
     if (st.over) { this.toast(REFUSE.over); return; }
-    if (!Session.on()) { this.needKey(); return; }
     const p = pcOf(st, $('say-who').value), to = Session.to;
+    if (!Mode.typed()) { this.needKey(); return; }
+    if (!Mode.ai(to ? 'talk' : 'act')) { this.toast(to ? 'The script voices people at this table: tap them and choose Talk.' : 'Tap someone and choose Talk to speak to them.'); Session.to = null; inp.placeholder = 'Say or do something'; return; }
     inp.value = ''; inp.placeholder = 'Say or do something'; Session.to = null;
-    Session.turn('player', { who: p ? p.name : 'The table', id: p ? p.id : '', text: clip(text, 600), to: to ? to.id + ' ' + to.name : '' });
+    Session.turn('player', { who: p ? p.name : 'The table', id: p ? p.id : '', text: clip(text, 600), to: to ? to.id + ' ' + to.name : '', toId: to ? to.id : '' });
   },
   /* where everyone stands, before the Game Master does something; and afterwards, the board made to show it */
   where() { const st = G.st, m = st.maps[st.here], pos = {}; for (const p of st.party) pos[p.id] = [p.x, p.y]; for (const t of m.tokens) pos[t.id] = [t.x, t.y]; return { here: st.here, round: !!st.round, pos }; },
@@ -5176,6 +6122,7 @@ const UI = {
           : e.t === 'rescue' ? 'Was carried back to ' + siteName(e.to) + '.' : e.t === 'tell' ? String(e.say || '')
           : e.t === 'party' ? (e.op === 'add' ? e.name + ' joined the party.' : e.op === 'drop' ? e.name + ' left the party.' : e.op === 'class' ? e.name + ' became a ' + e.cls + '.' : '') : e.t === 'lead' ? (pcOf(st, e.who) ? pcOf(st, e.who).name + ' took the lead.' : '')
           : e.t === 'rounds' ? (e.on ? 'Initiative was rolled in ' + siteName(e.site) + '.' : 'The rounds ended' + (e.outcome && e.outcome !== 'stop' ? ': ' + e.outcome : '') + '.') : e.t === 'round' ? 'Round ' + (e.n | 0) + ' began.'
+          : e.t === 'talk' ? 'Spoke with ' + ((st.npcs[e.npc] || {}).name || 'someone') + '.' : e.t === 'use' ? ({ search: 'Searched', pick: 'Tried the lock of', force: 'Put a shoulder to', unlock: 'Unlocked' }[e.verb] || 'Used') + ' something in ' + siteName(e.site) + '.'
           : e.t === 'spot' ? 'Came in sight of ' + ((e.ids || []).length === 1 ? 'a foe' : (e.ids || []).length + ' foes') + ' in ' + siteName(e.site) + '.' : '';
         if (t) box.appendChild(el('p', 'note', t));
       }
@@ -5212,7 +6159,19 @@ const UI = {
     $('set-export').disabled = !G.st;
     $('set-key').value = Settings.key(); $('set-remember').checked = !!d.remember; $('set-cyoa-key').hidden = !!Settings.key() || !Settings.cyoaKey();
     $('set-model').value = MODELS.some((m) => m.id === d.model) ? d.model : MODELS[0].id; $('set-custom').value = d.customModel; $('set-custom-row').hidden = d.model !== 'custom';
-    $('set-effort').value = d.effort; $('set-rating').value = d.rating; $('set-narrate').value = d.narrate; $('set-monsters').value = d.monsters; $('set-showcosts').checked = !!d.showCosts;
+    $('set-effort').value = d.effort; $('set-rating').value = d.rating; $('set-monsters').value = d.monsters; $('set-showcosts').checked = !!d.showCosts;
+    /* who runs the table: the script unless a model is asked for, and a model only where a key can pay for it */
+    const ai = d.gm === 'ai', can = Session.on();
+    $('set-gm').value = d.gm;
+    $('ai-areas').hidden = !ai;                              /* what Claude is given is only asked about once Claude is asked for */
+    for (const k of Object.keys(d.areas)) { const sel = $('set-a-' + k); sel.value = d.areas[k]; sel.disabled = !ai; }
+    if (!ai && d.monsters === 'gm') $('set-monsters').value = 'script';
+    for (const o of $('set-monsters').options) if (o.value === 'gm') o.disabled = !ai;
+    $('set-twin').checked = !!d.twin; $('set-twin').disabled = !ai; $('set-tags').checked = !!d.tags;
+    $('gm-note').textContent = !ai ? 'The script runs the whole table: no key, no cost. It narrates the beats, people answer from a list of topics, and the monsters play themselves.'
+      : !can ? 'Claude is asked for, but no key is set: the script is running everything until there is one.'
+      : 'Claude does what is given to it below, at your cost; the script does the rest for nothing. Changes take effect at once, in the middle of a tale if you like.';
+    $('set-compare').disabled = !G.st;
     $('set-m-monsters').value = d.taskModels.monsters || ''; $('set-m-beat').value = d.taskModels.beat || ''; $('set-m-turn').value = d.taskModels.turn || '';
     $('set-costs').disabled = !G.st;
     $('key-note').textContent = Settings.key() ? 'A key is set.' : Settings.cyoaKey() ? 'No key is set here. One is saved on this device for CYOA.' : 'No key is set.';
@@ -5246,6 +6205,42 @@ const UI = {
     }
     box.appendChild(el('p', 'note', 'These are the exact tokens each request used times list prices checked ' + PRICES_CHECKED + ', for the model that answered. A reply that failed was still paid for. Your invoice can differ: discounts, taxes, plan credits, or a price change since then.'));
   },
+  /* ---- compare: every telling by who told it and what kind it was, how the table rated it, what it cost ---- */
+  compare() {
+    const st = G.st, box = $('compare-body'), rows = st ? st.tells : []; box.textContent = '';
+    const now = Mode.now(), mine = AREAS.filter((a) => now[a] === 'ai');
+    box.appendChild(el('p', 'note', mine.length ? 'Now: Claude has ' + mine.map((a) => AREA_NAMES[a].toLowerCase()).join(', ') + '. The script has the rest.' : Settings.data.monsters === 'hand' ? 'Now: the script runs the table, and you move the monsters by hand.' : 'Now: the script runs the whole table.'));
+    const T = el('table', 'cmp'), head = el('tr', '');
+    for (const h of ['', 'Told', 'Words', 'Good', 'Poor', 'Cost', 'Each']) head.appendChild(el('th', '', h));
+    T.appendChild(head);
+    const sum = (list) => ({ n: list.length, w: list.reduce((a, r) => a + r.w, 0), up: list.filter((r) => r.r === 1).length, dn: list.filter((r) => r.r === -1).length, usd: list.reduce((a, r) => a + r.usd, 0) });
+    for (const a of AREAS) {
+      const mineA = rows.filter((r) => r.area === a);
+      if (!mineA.length) continue;
+      const h = el('tr', 'area'), hc = el('td', '', AREA_NAMES[a]); hc.colSpan = 7; h.appendChild(hc); T.appendChild(h);
+      for (const src of ['script', 'ai']) {
+        const z = sum(mineA.filter((r) => r.src === src));
+        if (!z.n) continue;
+        const tr = el('tr', src); tr.dataset.area = a; tr.dataset.src = src;
+        for (const c of [src === 'ai' ? 'AI' : 'Script', z.n, z.w, z.up, z.dn, src === 'ai' ? Costs.fmt(z.usd) : 'free', src === 'ai' ? Costs.fmt(z.usd / z.n) : '']) tr.appendChild(el('td', '', String(c)));
+        T.appendChild(tr);
+      }
+    }
+    if (rows.length) box.appendChild(T); else box.appendChild(el('p', 'note', 'Nothing has been told in this tale yet.'));
+    const tw = rows.filter((r) => r.tw > 0);
+    if (tw.length) box.appendChild(el('p', 'note', 'Under ' + plural(tw.length, 'telling') + ' of Claude’s the script’s version was kept: rated good ' + tw.filter((r) => r.tr === 1).length + ', poor ' + tw.filter((r) => r.tr === -1).length + '. Claude’s own, beside them: good ' + tw.filter((r) => r.r === 1).length + ', poor ' + tw.filter((r) => r.r === -1).length + '.'));
+    const acts = el('div', 'row'), ex = el('button', 'plaque small', 'Export CSV'); acts.style.justifyContent = 'center'; acts.style.margin = '14px auto'; ex.type = 'button'; ex.disabled = !rows.length;
+    ex.addEventListener('click', () => { const blob = new Blob([this.compareCsv()], { type: 'text/csv' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'cyoa2-compare-' + new Date().toISOString().slice(0, 10) + '.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); });
+    acts.appendChild(ex); box.appendChild(acts);
+    box.appendChild(el('p', 'note', 'Every passage in the story is marked with who told it. Rate any of them with the two marks under it; where Claude spoke, “Script’s version” shows what the script would have said at the same moment, and can be rated too. The export has one row for each telling, with its words.'));
+  },
+  compareCsv() {
+    const st = G.st, q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"', text = {};
+    for (const e of st.story) if (e.t === 'gm' && e.n) text[e.n] = e;
+    const rows = [['n', 'turn', 'area', 'source', 'model', 'words', 'usd', 'rating', 'twin_words', 'twin_rating', 'text', 'twin_text']];
+    for (const r of st.tells) { const e = text[r.n] || {}; rows.push([r.n, r.turn, r.area, r.src, r.model, r.w, r.usd.toFixed(6), r.r, r.tw, r.tr, e.text || '', e.twin || '']); }
+    return rows.map((r) => r.map(q).join(',')).join('\n') + '\n';
+  },
   theme() {
     const t = Settings.data.theme;
     if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
@@ -5269,7 +6264,9 @@ const UI = {
 };
 
 /* ============================== SESSION ==============================
-   When the Game Master speaks. A turn is one telling: the player's line (or a stage
+   When the Game Master speaks, and which one. A beat (the opening, a place first seen, a fight starting and ending, the
+   tale's ending) is told by the SCRIPT, at once and for nothing, unless narration has been given to a model; a monster's
+   turn is the script's unless that has. Everything below turn() is the model's side. A turn is one telling: the player's line (or a stage
    direction from the table: a beat) goes out with the board in words, the model works
    through its tools on the live tale, and its words stream onto the page. If the
    telling fails half way, the tale is put back exactly as it was before it began;
@@ -5278,10 +6275,10 @@ const Session = {
   beats: [], to: null, tried: '',
   on() { return typeof window.__CYOA2_MOCK__ === 'function' || !!Settings.key(); },
   reset() { if (G.abort) G.abort.abort(); this.beats = []; this.to = null; this.tried = ''; G.busy = false; G.abort = null; G.foeKey = ''; G.foeN = 0; },
-  /* a beat: something the table asks the Game Master to tell without being spoken to */
+  /* a beat: something the table asks its Game Master to tell without being spoken to */
   queue(kind, data) {
     const st = G.st;
-    if (!this.on() || !st || st.over || (kind !== 'opening' && Settings.data.narrate !== 'beats') || this.beats.some((b) => b.kind === kind)) return;
+    if (!st || st.over || this.beats.some((b) => b.kind === kind) || (kind === 'ending' && flag(st, 'end'))) return;      /* a tale has one ending */
     this.beats.push({ kind, data, site: st.here });
   },
   entered() { const st = G.st; if (!st.told[st.here]) this.queue('enter'); },
@@ -5289,14 +6286,41 @@ const Session = {
   tick(now) {
     const st = G.st;
     if (G.busy || !st || st.over || UI.blocked()) return;
-    if (this.beats.length) { const b = this.beats.shift(); if ((b.kind !== 'enter' || (b.site === st.here && !st.told[st.here])) && (b.kind !== 'fight' || st.round)) this.turn('beat', b); return; }
+    if (this.beats.length) {
+      const b = this.beats.shift();
+      if ((b.kind === 'enter' && (b.site !== st.here || st.told[st.here])) || (b.kind === 'fight' && !st.round)) return;
+      if (Mode.ai(b.kind === 'create' ? 'create' : 'narrate')) this.turn('beat', b); else this.scripted(b);
+      return;
+    }
     const R = st.round, a = R ? turnOf(st) : null, mode = Settings.data.monsters;
     if (!a || a.pc || mode === 'hand') return;
     const key = R.n + ':' + R.i + ':' + a.id;
-    if (mode === 'gm' && this.on() && this.tried !== key) { this.tried = key; this.turn('monsters'); return; }   /* one telling per monster's turn; whatever it leaves undone, the script finishes */
+    if (Mode.ai('monsters') && this.tried !== key) { this.tried = key; this.turn('monsters'); return; }   /* one telling per monster's turn; whatever it leaves undone, the script finishes */
     if (now < View.foeAt) return;
     View.foeAt = now + 480;
     UI.foeAct(key);
+  },
+  /* the script tells a beat. Making characters is not a telling of its: at its table that is done on the party sheet. */
+  scripted(b) {
+    const st = G.st;
+    if (b.kind === 'create') return;
+    const text = beatText(st, b.kind, b.data);
+    if (text) UI.script('narrate', text);
+    st.told.open = 1;
+    if (b.kind !== 'ending') st.told[st.here] = 1;
+    if (b.kind === 'fightend') sceneNote(st, 'At ' + st.sites[b.site || st.here].name + ': ' + String(b.data || 'a fight ended.'));
+    if (b.kind === 'opening' && Mode.ai('create')) this.queue('create');
+    if (b.kind === 'ending') this.ended();
+    UI.saveSoon();
+  },
+  /* the tale's ending has been told: the table says so, once, and the world stays open */
+  ended() { const st = G.st; if (flag(st, 'end')) return; setFlag(st, 'end'); UI.ending(); UI.saveSoon(); },
+  /* after anything a model did: what its deeds settled in the plot, and whether the tale has reached its ending */
+  after(d) {
+    const st = G.st;
+    for (const z of plotCheck(st)) UI.chip(z.k, z.t);
+    if (d && d.kind === 'ending') this.ended();
+    else if (st.quests.Q0 && st.quests.Q0.status === 'done' && !flag(st, 'end')) this.queue('ending');
   },
   async turn(kind, d) {
     let st = G.st;
@@ -5304,9 +6328,13 @@ const Session = {
     if (st.walk) { intent(st, { t: 'halt' }); View.walking = false; View.path = null; View.pending = null; }
     UI.saveNow();
     G.busy = true; UI.card(null); UI.busy(true); UI.storyOpen(true, true);
-    const task = kind === 'player' ? 'turn' : kind === 'monsters' ? 'monsters' : d.kind === 'opening' ? 'opening' : 'beat', turnNo = st.turn, snap = JSON.stringify(packState(st));
-    const stage = kind === 'player' ? null : STAGES[kind === 'monsters' ? 'monsters' : d.kind](st, d && d.data);
-    const context = turnContext(st, kind === 'player' ? d : {}, { rating: Settings.data.rating, monsters: Settings.data.monsters, stage });
+    const task = kind === 'player' ? 'turn' : kind === 'monsters' ? 'monsters' : d.kind === 'opening' ? 'opening' : 'beat', turnNo = st.turn, snap = JSON.stringify(packState(st)), areas = Mode.now();
+    const area = kind === 'player' ? (d.toId ? 'talk' : 'act') : kind === 'monsters' ? 'monsters' : d.kind === 'create' ? 'create' : 'narrate';
+    const stage = kind === 'player' ? null : STAGES[kind === 'monsters' ? 'monsters' : d.kind](st, d && d.data, areas);
+    const context = turnContext(st, kind === 'player' ? d : {}, { rating: Settings.data.rating, monsters: areas.monsters === 'ai' ? 'gm' : Settings.data.monsters === 'hand' ? 'hand' : 'script', stage, areas });
+    /* what the script would have said or done at this same moment: asked now, before the model changes anything, and it costs nothing */
+    let twin = '';
+    if (Settings.data.twin) { try { twin = kind === 'player' ? (d.toId ? talkTwin(st, d.toId, d.text) : actTwin(st)) : kind === 'monsters' ? monstersTwin(snap) : beatText(st, d.kind, d.data); } catch (e) { twin = ''; } }
     if (kind === 'player') UI.tell(storyEntry('pl', d.text, turnNo, { who: d.who, id: d.id }));
     G.abort = typeof AbortController === 'function' ? new AbortController() : null;
     const bill = { usd: 0, calls: 0, tok: { in: 0, out: 0, read: 0, write: 0 }, models: [], unknown: false };
@@ -5331,7 +6359,7 @@ const Session = {
     catch (e) { failure = e; }
     if (G.st !== st) return false;                          /* the table moved on to another tale while this one was being told */
     G.abort = null;
-    const desc = kind === 'player' ? d.who + ': “' + clip(d.text, 60) + '”' : kind === 'monsters' ? 'The monsters’ turn, round ' + (st.round ? st.round.n : '') : { opening: 'The opening of the tale', enter: 'Entering ' + (st.sites[d.site] || { name: 'a place' }).name, fight: 'A fight begins', fightend: 'A fight ends' }[d.kind] || 'A beat';
+    const desc = kind === 'player' ? d.who + ': “' + clip(d.text, 60) + '”' : kind === 'monsters' ? 'The monsters’ turn, round ' + (st.round ? st.round.n : '') : { opening: 'The opening of the tale', enter: 'Entering ' + (st.sites[d.site] || { name: 'a place' }).name, fight: 'A fight begins', fightend: 'A fight ends', create: 'Who is at the table', ending: 'The ending of the tale' }[d.kind] || 'A beat';
     const cost = bill.calls ? { kind: 'gm', task, turn: turnNo, desc, model: bill.models.join(', '), usd: bill.usd, calls: bill.calls, tok: bill.tok, unknown: bill.unknown, failed: failure ? (failure.kind === 'aborted' ? 'cancelled' : failure.kind) : '' } : null;
     if (failure) {
       /* the telling failed: the tale is put back exactly as it was before it began */
@@ -5349,13 +6377,20 @@ const Session = {
       if (kind === 'player' && !$('say').value.trim()) $('say').value = d.text;
     } else {
       const text = ((out && out.text) || '').trim();
-      if (text) { st.story.push(storyEntry('gm', text, turnNo)); if (st.story.length > 600) st.story.splice(0, st.story.length - 600); if (pass) pass.textContent = text; }
+      if (text) {
+        const e = UI.told('ai', area, text, turnNo, twin, bill.usd, bill.models.join(', '));
+        if (!pass) pass = UI.logEnd(UI.storyNode(e, false));
+        pass.textContent = text; pass.classList.add('by-ai');
+        const foot = UI.storyFoot(e); if (foot) pass.after(foot);
+      }
       st.told.open = 1;
       if (text || kind === 'beat') st.told[st.here] = 1;      /* wherever the party stands when the Game Master has spoken, that place has been told */
       if (kind === 'player' && !st.round && !timed) addMinutes(st, 2 + Math.ceil(((text.match(/\S+/g) || []).length) / 60));
       st.turn++;
       if (cost) { Costs.add(st, cost); UI.costTag(turnNo); }
       G.busy = false; UI.busy(false);
+      if (kind === 'beat' && d.kind === 'opening' && !Mode.ai('create')) UI.whoIsHere(true);
+      this.after(kind === 'beat' ? d : null);
     }
     UI.bar(); UI.arrived(); View.dirty = true; View.foeAt = performance.now() + 650;
     if (UI.panelOpen()) UI.party();
@@ -5369,7 +6404,7 @@ const Session = {
 (function boot() {
   Settings.load(); UI.theme();
   View.opt.grid = Settings.data.grid; View.opt.foot = Settings.data.foot; View.fog = Settings.data.fog;
-  document.body.classList.toggle('hide-costs', !Settings.data.showCosts);
+  document.body.classList.toggle('hide-costs', !Settings.data.showCosts); UI.sayBar();
   viewAttach();
   const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
   on('reload-btn', 'click', async () => {
@@ -5400,6 +6435,7 @@ const Session = {
     UI.closeMenu(); Sfx.page();
     if (act === 'chron') { UI.chron(); UI.openPanel('pan-chron'); }
     else if (act === 'lib') { UI.library(); UI.openPanel('pan-lib'); }
+    else if (act === 'compare') { UI.compare(); UI.openPanel('pan-compare'); }
     else if (act === 'party') { UI.party(); UI.openPanel('pan-party'); }
     else if (act === 'settings') { UI.settings(); UI.openPanel('pan-settings'); }
     else if (act === 'export') UI.exportFile();
@@ -5425,9 +6461,9 @@ const Session = {
   on('set-theme', 'change', (e) => { Settings.data.theme = e.target.value; Settings.save(); UI.theme(); });
   /* the Game Master's settings */
   const set = (k, v) => { Settings.data[k] = v; Settings.save(); };
-  on('set-key', 'change', () => { Settings.setKey($('set-key').value.trim(), $('set-remember').checked); UI.settings(); });
+  on('set-key', 'change', () => { Settings.setKey($('set-key').value.trim(), $('set-remember').checked); UI.settings(); UI.modeChanged(); });
   on('set-remember', 'change', () => { set('remember', $('set-remember').checked); Settings.setKey($('set-key').value.trim(), $('set-remember').checked); });
-  on('set-cyoa-key', 'click', () => { Settings.setKey(Settings.cyoaKey(), $('set-remember').checked); UI.settings(); UI.toast('Using the key saved for CYOA.'); });
+  on('set-cyoa-key', 'click', () => { Settings.setKey(Settings.cyoaKey(), $('set-remember').checked); UI.settings(); UI.modeChanged(); UI.toast('Using the key saved for CYOA.'); });
   on('set-test', 'click', async () => {
     const k = $('set-key').value.trim(), note = $('key-note');
     if (!k) { note.textContent = 'Enter a key first.'; return; }
@@ -5443,8 +6479,16 @@ const Session = {
   on('set-custom', 'change', (e) => set('customModel', e.target.value.trim().slice(0, 80)));
   on('set-effort', 'change', (e) => set('effort', e.target.value));
   on('set-rating', 'change', (e) => set('rating', e.target.value));
-  on('set-narrate', 'change', (e) => set('narrate', e.target.value));
-  on('set-monsters', 'change', (e) => { set('monsters', e.target.value); View.dirty = true; });
+  /* who runs the table. The script needs nothing; Claude needs a key, and is refused without one. */
+  on('set-gm', 'change', (e) => {
+    if (e.target.value === 'ai' && !Session.on()) { e.target.value = 'script'; $('key-note').textContent = 'Enter a key first: Claude is paid for with your own.'; UI.toast('A key first: Claude is paid for with your own.'); $('set-key').focus(); return; }
+    set('gm', e.target.value); UI.settings(); UI.modeChanged();
+  });
+  for (const k of ['narrate', 'talk', 'act', 'create']) on('set-a-' + k, 'change', (e) => { Settings.data.areas[k] = e.target.value === 'ai' ? 'ai' : 'script'; Settings.save(); UI.modeChanged(); });
+  on('set-monsters', 'change', (e) => { set('monsters', e.target.value); UI.modeChanged(); });
+  on('set-twin', 'change', (e) => set('twin', e.target.checked));
+  on('set-tags', 'change', (e) => { set('tags', e.target.checked); UI.sayBar(); });
+  on('set-compare', 'click', () => { UI.compare(); UI.openPanel('pan-compare'); });
   on('set-showcosts', 'change', (e) => { set('showCosts', e.target.checked); document.body.classList.toggle('hide-costs', !e.target.checked); });
   for (const [id, k] of [['set-m-monsters', 'monsters'], ['set-m-beat', 'beat'], ['set-m-turn', 'turn']]) on(id, 'change', (e) => { Settings.data.taskModels[k] = e.target.value; Settings.save(); });
   /* the story bar */
@@ -5459,7 +6503,7 @@ const Session = {
   window.addEventListener('keydown', (e) => {
     const f = document.activeElement, tag = f ? f.tagName : '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (f && f.isContentEditable)) return;
-    if (e.key === 'Escape') { if ($('dialog').classList.contains('open')) UI.closeDialog(); else if ($('menu').classList.contains('open')) UI.closeMenu(); else if (UI.panelOpen()) UI.closePanels(); else UI.card(null); return; }
+    if (e.key === 'Escape') { if ($('dialog').classList.contains('open')) UI.escDialog(); else if ($('menu').classList.contains('open')) UI.closeMenu(); else if (UI.panelOpen()) UI.closePanels(); else UI.card(null); return; }
     if ($('dialog').classList.contains('open')) { if (e.key === 'Enter' && UI.dlgDefault) { e.preventDefault(); UI.dlgDefault.click(); } return; }
     if (!document.body.classList.contains('in-play') || UI.panelOpen() || $('menu').classList.contains('open') || e.metaKey || e.ctrlKey || e.altKey) return;
     const st = G.st, a = actor(), pc = a.o, k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -5473,7 +6517,7 @@ const Session = {
     } else if (k === '+' || k === '=') viewZoom(1.25, View.vw / 2, View.vh / 2);
     else if (k === '-' || k === '_') viewZoom(.8, View.vw / 2, View.vh / 2);
     else if (k === '0') $('recenter').click();
-    else if (k === '/') { e.preventDefault(); UI.storyOpen(true); $('say').focus(); }
+    else if (k === '/' && Mode.typed()) { e.preventDefault(); UI.storyOpen(true); $('say').focus(); }
     else if ((k === 'Enter' || k === ' ') && !$('act').hidden) { e.preventDefault(); $('act').click(); }
     else if ((k === 'Enter' || k === ' ') && !$('btn-end').hidden) { e.preventDefault(); $('btn-end').click(); }
   });

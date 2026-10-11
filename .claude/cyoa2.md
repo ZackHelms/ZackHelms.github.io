@@ -1,24 +1,35 @@
 # CYOA2 - context
 
-`games/cyoa2/index.html` (single file, ~5,490 lines). The world of CYOA played on a
+`games/cyoa2/index.html` (single file, ~6,500 lines). The world of CYOA played on a
 **board of 5 ft squares**: a seed makes a town, its inn and trades, its houses and a
 bandit cave; each place's board is **charted the first time someone walks in** and is
 kept in the save from then on. CD commission, 2026-10-09 (in chat, not `/create-new-games`).
-Suite: `.claude/tests/drive-cyoa2.cjs` (511 checks). Style: **Grimoire**
-(`.claude/styles/grimoire.md`). **Proprietary** (`games/cyoa2/LICENSE`), confirmed by the
-CD on 2026-10-10.
+Suite: `.claude/tests/drive-cyoa2.cjs` (671 checks) with its own player,
+`.claude/tests/cyoa2-player.js`. Style: **Grimoire** (`.claude/styles/grimoire.md`).
+**Proprietary** (`games/cyoa2/LICENSE`), confirmed by the CD on 2026-10-10.
 
-This is **step 3 of 5, first push**. Step 1 was the map generator, the asset library, the
-renderer and a token to walk. Step 2 was the grid rules: line of sight and fog of war, a
-party of up to six, rounds. Step 3 (2026-10-10) brings the **Game Master**: Claude, over
-the player's own API key, narrating into a story panel beside the board and acting on the
-world through 25 engine tools; and with it **character sheets, checks, attacks, hit points,
-dying, rests and levels**, a **script that plays the monsters**, and a **cost ledger**.
+This is **step 3 of 5**. Step 1 was the map generator, the asset library, the renderer and
+a token to walk. Step 2 was the grid rules: line of sight and fog of war, a party of up to
+six, rounds. Step 3 is the Game Master, and it now comes in **two kinds**:
+
+- **The script** (the default; added 2026-10-10 on the CD's word that the default must be
+  "deterministic scripted everything"). No model, no key, no cost. It narrates the beats
+  out of tables, people answer from **topic buttons**, things offer **verb buttons**, and a
+  quest machine in the engine carries the whole adventure to an ending. The page calls
+  nothing at all in this mode.
+- **Claude**, over the player's own API key, for any of **five areas** the player gives it
+  (narration, talking to people, lines typed to the table, the monsters' turns, making
+  characters), acting through 26 engine tools. The script keeps the rest. Under each of
+  Claude's passages the page can keep **the script's version of the same moment** (the
+  twin), every passage is tagged with who told it and can be rated, and a Compare page adds
+  it all up. That is the experiment the CD asked for: play it scripted, see what the model
+  adds, tune how much of the table it gets.
+
 It is the second page in the repo that calls an API at runtime (CYOA is the first), and
 like CYOA it calls nothing but `api.anthropic.com`, and only with a key the player typed.
 
-The shipped file is the source of truth. It is 5,492 lines; to work on it as parts,
-split it with `.claude/scripts/page-parts.py` (see "Working source" at the end).
+The shipped file is the source of truth. To work on it as parts, split it with
+`.claude/scripts/page-parts.py` (see "Working source" at the end).
 
 ## CD decisions (2026-10-09, chat) - do not relitigate
 
@@ -67,6 +78,29 @@ Step 3, asked and answered before a line of it was written (2026-10-10, four que
 - **Narration: "At the beats."** The Game Master speaks, unasked, the first time the party
   enters a place, when a fight starts and when it ends, on the monsters' turns when it is
   playing them, and when it is spoken to. Walking, doors and looking at things are silent.
+
+The two kinds of Game Master, asked and answered before a line was written (2026-10-10,
+the same day, after the first push had shipped). The CD's own words: *"default mode is
+deterministic scripted everything"*; *"ai mode where ai api keys are required and ai is
+used for certain aspects as already discussed"*; *"I want to experiment with deterministic
+game play quality and show how ai enhanced gameplay differs to help me with fine tuning
+how much the ai assists in different areas."* Four questions:
+
+- **With the AI off, how do you talk and try unusual things? "Choice buttons."** Each
+  person offers topics drawn from the seed's plot; chests, locks and desks offer verbs.
+  No typing.
+- **How much adventure does the script carry alone? "Whole adventure."** The main quest
+  winnable start to finish with an ending, both whispers discoverable, loot, a shop, inn
+  stays.
+- **How is the difference shown? "Script twin", "Source and cost tags" and "Ratings and
+  report"** (three of four offered; a blind A/B pick was not chosen).
+- **Voice, for the push after this? "Device voice only."** The phone's own speech
+  synthesis, free and the same in both modes; no paid voices.
+
+Told to the CD with the questions, and not objected to: the script is the default **even
+when a key is saved**; the model is switched **per area**, not all-or-nothing; the
+switches can be flipped **in the middle of a tale**; every passage **records who told
+it**; scripted text is **seeded** (the same seed and the same moves give the same words).
 
 ## Assumed, not decided (flag these when the CD next looks)
 
@@ -143,6 +177,45 @@ Step 3 added these. The four answers above settled what, who and when; this is t
 | When the model calls tools and then says nothing, it is **asked once** for the telling | CYOA does the same | `AnthropicGM.run()` |
 | `update_npc` with `attitude:'free'` releases the captive; **there is no cell-key rule in the engine** | the Game Master has `set_door` and `update_npc`; a rule can come when the plot needs one | a `key` item check in `intent('door')` |
 
+The two-mode push added these. The four answers settled the shape; this is what I filled
+in to make a whole adventure out of it. **Every line the script speaks is mine**, written
+for this push: the tables `MAIN`, `WHISPERS`, `GREET`, `GANG`, `ABOUT`, `IDLE`, `ENTER` in
+THE SCRIPT section are data, and the CD should feel free to rewrite any of it.
+
+**Who runs the table:**
+
+| Assumed | Why | To change it |
+|---|---|---|
+| **Five areas**: narration at the beats, talking to people, lines typed to the table, the monsters' turns, making characters | the Game Master's jobs as the first push already had them, cut where one can be the script's while another is the model's | `AREAS`, `Mode`, the "Who runs the table" fieldset |
+| With the table set to Claude the areas default to **all Claude except the monsters** | the CD's step 3 answer: a scripted engine plays the monsters by default | `Settings.defaults.areas`, `monsters` |
+| **Asking for Claude with no key is refused where it is asked** (the choice snaps back, the key field takes the pen); a key that goes away mid-tale hands everything back to the script | "ai mode where ai api keys are required" | the `set-gm` handler, `Mode.master()` |
+| **The plot is the engine's, not an area.** The quest machine runs whoever narrates; a model can close a quest too | so a tale can pass between script and model at any moment without the plot forking | `plotCheck()` |
+| **The twin is kept by default** when Claude speaks; tags and ratings are **on by default** | the CD wants to compare; both can be switched off | `Settings.defaults.twin`, `.tags` |
+| Rating marks are 👍 👎, shown greyed until pressed | "thumbs up or down" was the wording of the question | `UI.storyFoot`, `.st-foot .rate` |
+| A story the player folded away **stays folded** when the script speaks; the fold gets a red dot | the model's telling forces it open because it is paid for; the script's is not worth taking the board away for | `UI.script`, `#story-toggle.new` |
+| Told by the script, a new tale's **BEGIN goes on to the party sheet**, with a **SURPRISE ME** button per traveller | character creation without a conversation; nobody should play "Wayfarer the Fighter" by accident | `UI.whoIsHere`, `intent party op:'roll'` |
+
+**The script's adventure:**
+
+| Assumed | Why | To change it |
+|---|---|---|
+| **Being seen is a fight.** With only the script at the table, an enemy who is awake and sees a traveller on their feet starts one (no "Carry on"), every time, not only at first sight; the cross is off the bar until the party has broken from their sight | step 2's "a button, plus a prompt" let a party walk past the whole gang; a Game Master would not allow it and the script cannot be asked | `Mode.strict()`, `threatOf()`, `UI.spotted`, `UI.alarm`, `UI.mustFight` |
+| **Sleepers are a choice**, and so is a word to say (the chief's old name) | the two things the script can rule on | `UI.spotted` |
+| **A night is slept at the inn (1 gold a head; the stable, free, for an empty purse) or in a hideout emptied of its owners**; never in the street, never where enemies still hold the board. The Game Master's own `rest` tool may rule otherwise | so the hill costs something to climb twice, and "inn stays" mean something | `intent('rest')`, `by:'gm'` |
+| **Only things in a hideout can be searched** (chest, crate, barrel, sacks, desk), once each; a townsperson's chest offers nothing | theft from neighbours needs a Game Master to judge it | `CONTAINERS`, `lootOf()` |
+| What a thing holds is **fixed by the seed and the thing's id**; the chief's **strongbox** (first chest in the chief's chamber) is locked, DC 15, holds 30 gold more, a draught, and the reliquary when that is the matter at hand; the **desk** holds the ledger and the keeper's letter when those whispers are in the seed | "generated on the fly must be documented": here it is not even stored, it is derived | `plotSpots()`, `lootOf()` |
+| **Locks**: the gang's keys open any lock in the hideout; else pick (Sleight of Hand DC 13, or 15 for the strongbox and the cell; **disadvantage without thieves' tools**) or force (Athletics, DC 3 higher; **advantage with a crowbar**); **one try each per traveller** | failure has to mean something without a softlock: beat the chief and the keys open everything | `verbsFor()`, `useOf()` |
+| **The chief's keys come to whoever leads** when the chief falls; opening the cell frees the prisoner; a freed prisoner **walks down the hill with the party** and stands by the elder | so the plot's things move without a narrator moving them | `plotCheck()`, `plotLeave()` |
+| The matter at hand pays **60 gold and 150 experience each**; a whisper **75 experience each** (the ledger 30 gold more) | enough that a party of four reaches level 2 by the ending | `MAIN_GOLD`, `MAIN_XP`, `SIDE_XP` |
+| **Checks are the leader's**: talk checks DC 12-13 by the better of two skills, the name DC 12; a failed try is spent for that traveller, so the party changes who leads | makes "who speaks" a decision the board already has a control for | `bestCheck()`, `flag tried:*` |
+| **Each whisper is known to two of the five named townsfolk** (never the one it is about); about a third of everyone else knows one | so the party has to ask around, and always can | `tellersOf()`, `whisperOf()` |
+| What settling each whisper **does**: the keeper's debt = free beds and the guard post on the map; the smith's blades = **+1 damage on every weapon hit** for the rest of the tale; the informer = **the lookouts are found asleep** (unless the gang has already seen the party); the tunnel = the whole hideout on the map; the chief's kin = a name that, said to the chief on a Persuasion check, **ends the gang without a blow** (one try; on a failure the fight is on); the ledger = 30 gold from the elder, and it can prove the debt or the informing without a roll | each whisper should change the hill, not only the purse | `settleWhisper()`, `hush()`, `talkOf` (`name`) |
+| The shop sells a **healing draught (12, 2d4+2), thieves' tools (10), a crowbar (4)**; the priest tends everyone for 5 gold or what the purse holds | only things with a rule of their own | `ITEMS`, `topicsFor()` |
+| When the tale ends the script tells an **epilogue** and the table says so once: **Title, or Wander on**. The tale is not over | the first push had no ending | `beatText('ending')`, `UI.ending`, `flag end` |
+| **A level earned at 0 hit points does not heal** | found by the suite's player: a traveller was "stable at 8". The level's hit points raise the maximum only | `grantXp()` |
+| Two **generator fallbacks** (`GEN_V` 2): where no rock can be cut for a cell (about 1 hideout in 60) the prisoner is kept **bound in the chamber**; a keeper the recipe could not seat (the smith, in about 1 forge in 13) is seated in **any room, then the yard** | the plot needs someone to free and someone to ask on every seed. Boards that already had both are drawn exactly as before | `fnCell`, the end of `genBuilding` |
+| **Balance, measured not tuned** (the suite's own player, 24 seeds, asserted in section U): four travellers finish every tale, in about two climbs and two days; **one alone finishes 23 of 24 within eight climbs** | the gang keeps its wounds between climbs, so persistence wins. Nothing was tuned to get these numbers | section U's rows; `.claude/tests/cyoa2-player.js` |
+
 ## The road from here (agreed in outline, 2026-10-09)
 
 1. **Done:** generators, asset library, renderer, a token to walk.
@@ -152,10 +225,14 @@ Step 3 added these. The four answers above settled what, who and when; this is t
    - **Done (first push, 2026-10-10):** the key, the model client, 25 tools, the world
      bible and canon, the story panel, typed lines, talking to people, sheets, checks,
      attacks, hit points, dying, rests, levels, cover, the monsters' script, the ledger.
-   - **Next (second push):** the narrator's voice and its sentence queue, speech instead
-     of typing, the notes page, rule popups. All four exist in CYOA (`.claude/cyoa.md`).
-   - Not planned yet: an ending or epilogue screen when Q0 is completed, places the
-     Game Master makes up beyond the charted ones, woodcut plates.
+   - **Done (the two kinds of Game Master, 2026-10-10):** the script as the default, the
+     model per area, the twin, tags, ratings, the Compare page, and a whole scripted
+     adventure with an ending.
+   - **Next (second push):** the narrator's voice on the **device's own speech** and its
+     sentence queue, speech instead of typing, the notes page, rule popups. All four exist
+     in CYOA (`.claude/cyoa.md`); the CD chose device voice only.
+   - Not planned yet: places the Game Master makes up beyond the charted ones, woodcut
+     plates, a second adventure once the hill is taken.
 4. Multiplayer: other devices send the SAME intents; the host's engine judges them. A web
    page on an iPhone cannot use Bluetooth or host a LAN server, so the realistic route is
    WebRTC data channels with QR pairing or a small relay (assumed from general knowledge,
@@ -166,8 +243,14 @@ Step 3 added these. The four answers above settled what, who and when; this is t
 ## Architecture (sections in the script, in order)
 
 `UTIL / PRNG / TABLES / ASSETS / MAP / FURNISH / WORLD / SITES / RULES / ENGINE /
-GAME MASTER: TOOLS / CONTEXT / CLIENT / COSTS / ART / VIEW / AUDIO / STORAGE / UI /
-SESSION / BOOT`
+GAME MASTER: TOOLS / THE SCRIPT / CONTEXT / CLIENT / COSTS / ART / VIEW / AUDIO /
+STORAGE / UI / SESSION / BOOT`
+
+**The two Game Masters share one door.** The script and the model both act on the tale
+through the engine (`intent()`, and the helpers the tools are built from), are told the
+same plot by the same `plotCheck()`, and write into the same story with a tag saying who
+spoke. Nothing in the engine knows which of them is at the table; `Mode` (in STORAGE) is
+the only place that does, and it is asked by the table (UI, SESSION), never by the rules.
 
 - **PRNG.** `rngFor(seed, stream, n)`, as in CYOA. Streams: `world`, then `site:<id>` per
   board. Because every board draws from its own stream, **charting places in a different
@@ -270,12 +353,49 @@ SESSION / BOOT`
     end. It never plans for a traveller and never strikes the fallen.
   - `dropToken()` takes a monster off the board for good: out of the order (keeping the
     turn in hand), out of `st.met`, and off any ranger's mark. `hurtFoe` calls it.
+- **The script's intents** (two-mode push). `talk {npc, topic}` asks someone in sight one of
+  the things `topicsFor()` says they can be asked; `use {what: O#|D#, verb}` searches a
+  thing or unlocks, picks or forces a lock, standing beside it (a `move` may carry it as
+  its `then`, so a tap walks there first); `item {item, who?, target?}` drinks or hands
+  over a healing draught (an action in a fight, arm's reach); `party op:'roll'` rolls a
+  traveller whole by the seed. `rest` gained the bed rule (`nobed`, `hostiles`; `by:'gm'`
+  is a ruling and skips it). **`threatOf(st)`**: an enemy who is awake, in sight of a
+  traveller who is on their feet; it is what forces a fight and what holds the cross back.
 - **Rules** (`04b-rules`). Tables and pure functions only: `CLASSES`, `BESTIARY`,
   `ROLE_TPL` (which block a bandit's role fights with), `parseDice` (strict: real dice,
   bounded counts), `rollTerms`, `d20s`, `combineMode`, `makeSheet` (fixes the key order
   of a sheet, so a save round-trips byte for byte), `hurtPC` / `healPC` / `grantXp`,
   `checkFor` (a skill, an ability or "<ability> save"), `weaponsOf`, the clock.
-- **Game Master: tools** (`TOOLS`, `exec`). Twenty-five tools, each a description, a
+- **The script** (`THE SCRIPT`, its own section after the tools). The other Game Master.
+  - *Tables:* `MAIN` (the four matters at hand: giver, goal `free`/`chief`/`relic`, the
+    offer, what "done in deed" reads as, the thanks), `WHISPERS` (six: who it is about, who
+    it is settled with, the button, the check, the lines for telling, winning, losing and
+    being shown proof), `GREET` / `GANG` / `ABOUT` / `IDLE` (lines by the kind of person:
+    `groupOf()`), `ENTER` (a place first seen, by kind), `ITEMS` (in RULES).
+  - *Determinism:* a line is chosen by `varyOf(st, key, list)`, a hash of the seed and of
+    what the line is about. **Never a counter, never the clock.** That is what makes
+    `beatText()` and `talkOf(..., dry)` free to ask, and the twin possible. (The one
+    counter, how far someone has got through their small talk, is a flag `n:<npc>`, read
+    but not advanced when asked dry.)
+  - *Plot, derived not stored:* `chiefOut()`, `captiveFree()`, `goalMet()`, `carries()`
+    read what is true; `plotCheck()` applies each consequence once (the keys to the
+    leader, "the giver should hear of it", the ledger noticed) behind a flag; `plotLeave()`
+    brings a freed prisoner down the hill; `hush()` puts the lookouts to sleep. `st.flags`
+    holds only what cannot be derived: heard / done / tried, what has been searched or
+    opened (`u:<site>:<id>`, `o:<site>:<id>`), `job`, `goal`, `spoils`, `called`, `end`.
+  - *Talking:* `topicsFor(st, npc)` -> `[{id, label, sub, off, shown}]` (a button each;
+    `off` greys it and says why); `talkOf(st, npc, topic, dry)` is one question and its
+    consequences, or with `dry` only its words. `tellersOf()` / `whisperOf()` decide who
+    has news.
+  - *Things:* `thingOf()` (what `O#`/`D#` means and where to stand), `verbsFor()` (the
+    buttons), `useOf()` (the deed), `lootOf()` (what it holds), `plotSpots()` (the chief's
+    strongbox and desk).
+  - *Telling:* `beatText(st, kind, data)` for `opening`, `enter`, `fight`, `fightend`,
+    `ending`; `sceneOf()` is what the leader sees, in words.
+  - *Twins:* `talkTwin()` (the nearest topic to a typed line, asked dry), `actTwin()`
+    (what the board offers from where the leader stands), `monstersTwin(snap)` (the
+    monsters' own script played out **on a copy** of the tale).
+- **Game Master: tools** (`TOOLS`, `exec`). Twenty-six tools, each a description, a
   closed JSON schema and a `run(st, input)` that **validates everything before it changes
   anything** and returns `ok(result, say, kind)` or `err(reason)`. Most are a thin wrapper
   round the intents the board sends (`viaIntent`), so the model and a finger are judged
@@ -287,16 +407,19 @@ SESSION / BOOT`
   let go, which `UI.sync` does). `lookup` is the one read-only tool.
   The tools: `roll_check`, `roll_dice`, `move`, `travel_party`, `set_door`,
   `place_object`, `remove_object`, `reveal`, `create_npc`, `update_npc`, `start_combat`,
-  `end_combat`, `attack`, `use_ability`, `end_turn`, `rest`, `advance_time`, `inventory`,
+  `end_combat`, `attack`, `use_ability`, `end_turn`, `rest`, `use_thing` (the board's own
+  search / unlock / pick / force, exactly as a tap), `advance_time`, `inventory`,
   `update_character`, `suggest_character`, `create_character`, `update_quest`,
   `record_fact`, `lookup`, `end_scene`.
 - **Context.** What the model reads. **Cached prefix, byte-stable for a tale:** the tool
   definitions, `SYSTEM_PROMPT`, then `bibleText(st)` (the seed's world: people, threads,
   places, the opening). **After the cache breakpoints, fresh every turn:**
-  `turnContext()` = the table's settings, `boardDigest()` (the board in words: rooms with
+  `turnContext()` = the table's settings, **which of the Game Master's jobs are the
+  model's this turn and which the script is doing**, `boardDigest()` (the board in words: rooms with
   what is in them and whether the party has SEEN them, doors, ways out, every person with
   where they stand and whether they are IN SIGHT, hostiles with their block),
-  `partyDigest()`, the fight if there is one, quests, CANON (facts about whoever is at
+  `partyDigest()`, the fight if there is one, quests, **where the plot stands** (open,
+  done in deed and whom to tell, whispers heard and settled), CANON (facts about whoever is at
   hand, plus keyword matches on the player's words), the last ten scene summaries, the
   last eight exchanges, **what the board did SINCE YOU LAST SPOKE** (the chips), and last
   the player's line or a `STAGES` stage direction.
@@ -318,16 +441,28 @@ SESSION / BOOT`
   that served the reply**. Haiku 5.5 has a second price above 100,000 prompt tokens. An
   unpriced model is marked unknown, never guessed. The Costs panel totals by task and by
   model and exports CSV.
-- **Session** (`Session`, after UI). When the Game Master speaks. `queue(kind)` holds
-  the beats (`opening`, `enter`, `fight`, `fightend`), each kind at most once;
+- **Mode** (in STORAGE, beside `Settings`). `master()` is `'ai'` only when the table is
+  set to Claude AND a key is there; `ai(area)` adds "and that area is given to it";
+  `now()` is all five; `typed()` is whether a typed line would be read; `strict()` is
+  "nobody at this table can rule on the unusual" (no model narrating or reading lines or
+  playing the monsters, and no hand moving them).
+- **Session** (`Session`, after UI). When the Game Master speaks, and which one.
+  `queue(kind)` holds the beats (`opening`, `create`, `enter`, `fight`, `fightend`,
+  `ending`), each kind at most once, whoever will tell them; `tick()` hands a beat to
+  `turn()` if its area is the model's, else to `scripted()`, which tells it at once.
+  `turn()` asks for **the twin before the provider runs**, so the script's version is of
+  the same moment and costs nothing. `after()` runs `plotCheck()` on what a model did and
+  queues the ending when the matter at hand has been closed; `ended()` says so once.
   `tick()` runs between one thing and the next on the board, never while a panel, a
   dialog or the menu is open, and tells a waiting beat or hands a monster its turn (to
-  the Game Master once per turn if `monsters === 'gm'`, else to `UI.foeAct` and the
-  script). `turn()` is one telling: halt any walk, save, set `G.busy`, snapshot, build
+  the model once per turn if the monsters are its, else to `UI.foeAct` and the monsters'
+  script). `turn()` is one telling by the model: halt any walk, save, set `G.busy`, snapshot, build
   the context, run the provider with hooks that stream words into the story and run
   tools on the live tale (`UI.sync` after each, so the page follows), then either keep it
   (story, clock, turn count, ledger) or put the tale back and say why.
-- **Saves.** `packState` / `unpackState`, format `v: 3`. A save is the whole state: bible,
+- **Saves.** `packState` / `unpackState`, format `v: 4` (two-mode push: `flags`, `tells`,
+  `n.tell`, and on a telling `n`, `src`, `area`, `twin`; a v3 save loads with nothing
+  settled and its old tellings unclaimed). A save is the whole state: bible,
   sites, people (monsters' blocks included), every charted board (byte grids as strings,
   **`seen` included**), the party with their sheets and who leads, a round in progress,
   who has been met, the journal, and step 3's: the clock, the purse, facts, scene
@@ -376,8 +511,14 @@ SESSION / BOOT`
   answered: a chip in the story, a number rising off the square, a sound. The Party
   panel is a sheet for each traveller (calling, level, hit points, what they strike
   with, know and carry), with REST AN HOUR / SLEEP THE NIGHT and the list of the fallen.
+  **Two-mode push:** `talkTo()` is the pen (model) or `talkCard()` (script: the card is
+  the conversation, `ask()` is one question); `thingCard()` / `useThing()` / `used()` are
+  verbs on a chest or a lock; `told()` writes a telling with its tally row, `script()` is
+  the script speaking, `storyFoot()` the line under a passage (who, what kind, two rating
+  marks, the twin); `compare()` / `compareCsv()` the Compare page; `spotted()` / `alarm()`
+  / `mustFight()` the strict table; `whoIsHere()` the party sheet at the start; `ending()`.
   The story (`#story`) is a log plus a bar: who speaks, the line, SEND (STOP while the
-  Game Master is speaking). `UI.tell` writes an entry into `st.story` and onto the page;
+  Game Master is speaking). The pen is shown only while `Mode.typed()`. `UI.tell` writes an entry into `st.story` and onto the page;
   `UI.chip` is the engine's own line, toasted too when the log is folded. Settings holds
   the key, the model, effort, content rating, when the Game Master speaks, who plays the
   monsters and the three per-task models.
@@ -460,17 +601,65 @@ Step 3:
 - **Prices and model ids go stale.** `CLAUDE_PRICES`, `MODELS` and `PRICES_CHECKED` are
   one place; the Costs panel prints the date they were checked.
 
+The two kinds of Game Master:
+
+- **`Mode` is the only place that decides who does what.** `Mode.ai(area)`, `Mode.typed()`
+  (is there anyone to read a typed line), `Mode.strict()` (is the script the only one
+  ruling). The engine never asks; an intent means the same thing whoever sent it.
+- **The script's words are a pure function of the tale.** `varyOf(st, key, list)` picks by
+  a hash of the seed and the key: never a counter, the clock or `Math.random`.
+  `beatText()` and `talkOf(st, npc, topic, true)` (dry) must not write to the tale. The
+  suite plays the same seed twice and compares the story byte for byte, and asks every
+  topic dry and compares the tale before and after.
+- **The twin is worked out BEFORE the model is called**, on the tale as it stood (the
+  monsters' twin on a copy), and stored on the model's entry as `twin`. Worked out
+  afterwards it would describe a board the model had already moved.
+- **The plot is derived, not stored.** `chiefOut`, `captiveFree`, `goalMet`, `carries`
+  read the board and the packs; `plotCheck()` applies each consequence once, behind a
+  flag, and is called after anything that can change the answer (`endFight`, `useOf`,
+  `talkOf`, `arrive`). A new consequence is a flag and a branch there, never a line in
+  the UI: the model's tools reach the same rule only because it lives in the engine.
+- **`st.flags` is all the script remembers.** Keys match `/^[\w:]{1,40}$/`; a loaded
+  file's flag that does not fit, or whose value is not 1 to 9999 or a quest id, is
+  dropped or made 1. The names in use are listed under THE SCRIPT above.
+- **A button is an intent the engine can refuse.** `topicsFor()` and `verbsFor()` say
+  what a card offers; `intent('talk')` and `intent('use')` refuse anything they would not
+  have offered (`notopic`, `noverb`, `tried`), so a model, a save or a test cannot ask what
+  a player could not. Never give a card its own list.
+- **Every telling goes through `UI.told()`**, the script's and the model's alike: it
+  writes the story entry (keys in a fixed order, for the byte-for-byte round trip) and
+  the `st.tells` row the Compare page counts. A rating lives on the row.
+- **Being seen is `threatOf(st)`**: an enemy who is awake, on this board, with a standing
+  traveller in its sight. The strict table reads nothing else (first sight, a second
+  sighting, each step of a walk, whether the cross is on the bar). The monsters' script
+  must be able to path to the party or the fight can stand still for ever (the suite's
+  player found one, behind a corridor of the fallen): that is why standing down is
+  allowed again once the party has broken from their sight.
+- **A long rest by the player obeys the bed rule; the Game Master's `rest` tool does not**
+  (`by:'gm'`): a model may rule that the party sleeps in a barn. Keep the two apart.
+- **Adding a matter at hand or a whisper** is a row in `THREADS_MAIN` / `THREADS_SIDE`
+  (TABLES) and a row in `MAIN` / `WHISPERS` with every field section U's first row asks
+  for, a consequence in `settleWhisper()`, and a row in section U that settles it with the
+  dice forced both ways. Then run the suite's player: every seed must still be winnable.
+- **A new tale opens the party sheet by itself** when the script makes the characters; a
+  test that begins a tale closes it first (`begin()` in the suite does).
+
 ## Tests
 
-`drive-cyoa2.cjs` (511 checks, about 145 s) runs the generators inside the real page
+`drive-cyoa2.cjs` (671 checks, about 180 s) runs the generators inside the real page
 across 36 worlds (329 boards) and asserts they are whole, then the engine's refusals,
 lazy charting, saves (including a tampered file), the phone flow, tap accuracy at five
 viewports after a resize-while-hidden, gestures, keys and the panels (sections A to M,
 step 1), then **N sight and fog, O the party, P rounds** (step 2), then **Q sheets,
 blows and dying, R the table by touch, S the Game Master's tools, T the Game Master at
-the table** (step 3). `CYOA2_ONLY=NOP` runs only the named sections (A stands for A to
-I) and `CYOA2_PAGE=<path>` points the suite at a copy of the page; both are for negative
-tests and neither prints the GREEN line a gate looks for.
+the table** (step 3), then **U the script alone, V the script's table by touch, W the
+model's share of the table** (the two kinds of Game Master). `CYOA2_ONLY=NOP` runs only
+the named sections (A stands for A to I) and `CYOA2_PAGE=<path>` points the suite at a
+copy of the page; both are for negative tests and neither prints the GREEN line a gate
+looks for. **A watchdog ends a run that is still going after 25 minutes**
+(`CYOA2_WATCHDOG_MIN`): `page.evaluate` has no timeout of its own, and a deliberate
+break once left a row awaiting a walk that could not start, so the run sat idle for
+fourteen minutes and reported nothing.
 
 Section N judges the engine's sight with **an independent judge**: a line walked in
 fiftieths of a square that shares no code with the ray march. *Sound:* every square shown
@@ -490,7 +679,7 @@ Step 3's four sections, and what each is for:
 - **R** is the page with no Game Master: a whole fight by touch against the script,
   what is ringed and what a card offers, the token painter's own pixels, sheets, rests,
   the cross, defeat and rescue, the end of a tale.
-- **S** calls the 25 tools directly: one of each kind of bad input (62 in all), the tale
+- **S** calls the 26 tools directly: one of each kind of bad input (65 in all), the tale
   compared byte for byte; each happy path; and what the turn context carries, with the
   sharp cases built (someone behind a shut door, a fact about someone far away).
 - **T** is the seam with the model. The real client runs against a stand-in for
@@ -498,9 +687,100 @@ Step 3's four sections, and what each is for:
   way; then `window.__CYOA2_MOCK__` stands in for the model so the table's side (beats,
   the monsters' turn, a tale opened while another is told) can be driven exactly.
 
+The three sections of the two kinds of Game Master:
+
+- **U** is the script with no page under it. Its tables are whole (every thread has a
+  giver, a goal and its lines; no line leaves a `{blank}` unfilled on any of 24 worlds,
+  about 4,000 lines said),
+  and asking it what it WOULD say changes nothing. Then **whole tales are played by the
+  suite's own player** (`.claude/tests/cyoa2-player.js`, loaded into the page): it knows
+  the intents and nothing else, asks around town, takes the job, climbs the hill, breaks
+  off when it is losing, sleeps, buys a draught, comes back, searches what it has won and
+  reports. After every intent the engine accepts it checks the tale is still whole. That
+  player is how the script was debugged, and it found things no rule row was looking for
+  (below). After it, each rule with **the dice made to fall both ways**: every whisper
+  pressed and lost on a 1 and won on a 20, every lock picked and forced, the name said to
+  the chief.
+- **V** is the script's table by touch: the opening on its card, travellers rolled on
+  the party sheet, topic buttons, a bed, the shop, a chest, a lock, the cell, sleepers,
+  being seen a second time, a blow that fells the chief, the ending, the Compare page and
+  its CSV; and that in all of it nothing was asked of any service.
+- **W** is the model's share, with `__CYOA2_MOCK__` standing in for the model: who is
+  asked for what under each setting, the twin worked out before the model is called, the
+  tags, the tally, the monsters' twin played on a copy, an ending the model tells, and
+  the key going away in the middle of a tale.
+
 **Not verified:** no request has been sent to the live API from this suite or by hand;
 model ids, request fields and prices come from platform.claude.com/docs as read on
 2026-10-10. The first real key will be the first real test of the client.
+
+### Negative tests, the two kinds of Game Master (2026-10-10, `negtest-copies.py`)
+
+**249 deliberate breaks** in two batches: 126 aimed at the script and the engine under
+it (the tables, talk, things, locks, loot, the plot, rests, the generator fallbacks), 123
+at the table and the model's share (the cards, being seen, the story's feet, the twin,
+Settings, Compare, the session). The suite was green at 645 checks when they started.
+
+**On the first pass 24 came back GREEN** from the sections they were aimed at, 12 in each
+batch, and 22 more were caught only by a crash or a timeout (a row that throws, or waits
+8 to 15 seconds for something the break had removed). Of the 24:
+
+- **20 were holes in the suite**, closed with rows (below);
+- **3 have no observable effect** (table below);
+- **1 was a line of the page that did nothing**: `bedPrice()` asked whether the beds
+  were free, and so did both of its callers before they looked at the price. The
+  redundant test is gone.
+
+**Where it ended.** Once the rows were written, the 24 green breaks, the nine that had
+been caught only by a timeout and the 23 aimed at rows that had been rewritten were run
+again against the suite as shipped: **223 of the 249 are caught by a named row, 22 by a
+crash or a timeout, 3 have no observable effect, and 1 was retired with the line it
+exposed.** A second pass of all 249 was NOT run. Step 3's second pass found four holes
+its first could not (a row fixed for one break had been the only thing catching
+another), so that is a known gap here, not a formality skipped.
+
+What the 20 had in common:
+
+- *A sample without the sharp case, three more times.* "Thieves' tools roll one die,
+  bare hands keep the lower of two" was judged on two dice where the FIRST happened to be
+  the lower, so "the lower" and "the first" were the same number and the tools could be
+  deleted. "The purse follows the calling" was rolled on a seed whose new calling starts
+  with the same gold as a fighter. Compare's Good and Poor columns were checked with one
+  thumb up and one down, so a column could count its neighbour's. Each row now builds the
+  case: two dice chosen so the first is higher (and, for the crowbar, lower), a seed
+  searched for until the purse differs, two up and one down.
+- *A rule hidden behind its own fallback.* The keeper who finds no square in their own
+  room is tried in every other room, and failing that in the yard. With the first
+  fallback deleted the second caught everyone, and the row only asked "is the keeper on
+  the board". It now counts keepers standing outdoors (1 in 1,200; 23 without the rule).
+- *The page's half of a rule, when only the engine's half had a row.* The engine says a
+  failed word to the chief means a fight (`next: 'fight'`), and the page has to start
+  one; the engine returns what a fight's end settled in the plot, and the page has to say
+  so; the model's deeds have to be held against the plot afterwards. All three were
+  tested where they are decided and not where they are carried out.
+- *Something shown that no row read.* The difficulty on a lock's BUTTON was checked, the
+  difficulty the dice were rolled against was not (they are separate expressions, and
+  "three harder to force" lived in only one). Same for what the ending says of the
+  whispers, the ledger in the desk, the journal's lines for talk and for things, the
+  word on the chief's own card, and the digest still advertising a strongbox after it
+  had been emptied.
+- *A setting saved but never loaded in a test.* Every page in the suite was opened with
+  the areas it wanted, so "what was chosen is what is loaded" had no row; nor had the
+  case that tells `Mode.strict()` apart from "the model has nothing": a narrator alone.
+
+Two things the pass found that were not holes. **A break that hangs the suite:** with
+the pen offered where nobody reads it, a later row sat awaiting a walk that could not
+start, for fourteen minutes, at no CPU, printing nothing. `page.evaluate` has no timeout.
+The suite now has a watchdog (above). **And two of the three no-effect breaks are code
+that guards a case today's worlds cannot produce**, which is worth knowing before
+deleting either:
+
+| Break | Why nothing can see it |
+|---|---|
+| "a whisper already heard is not heard again" removed from `hearWhisper()` | both callers (`talkOf` on news, `plotCheck` on finding the ledger) already ask whether it has been heard |
+| "Hidden here" in the digest allowed on every board, not only the hideout | `lootOf()` answers only for a cave, and a world has one |
+| the script made to "tell" a `create` beat | it has nothing to say for one (`beatText` returns nothing), and the only other thing a telling does is mark the place told, which the opening before it already did |
+
 
 ### Negative tests, step 3 (2026-10-10, `negtest-copies.py`)
 
@@ -639,12 +919,21 @@ way into the locked cell (a key in the chief's chest is the obvious one); locked
 buildings; a road beyond the town's east and west ends; more site kinds (mill, watch
 house, crypt); weather and time of day.
 
-From step 3 (first push): everything in the second push (voice, speech, the notes page,
-rule popups); an ending when the matter at hand is completed; opportunity attacks and
-reactions; conditions that do something on the board (prone, restrained are honoured
-only as advantage); hiding and stealth; a key for the cell as an engine rule; loot off
-the fallen; shops and prices; places the Game Master makes up; tuning the cave for a
-party of one to three; a way to undo a mis-tapped blow (there is none, as at a table).
+From the two kinds of Game Master: a blind pick between the script's telling and the
+model's (offered to the CD, not chosen); a second adventure once the hill is taken (the
+ending leaves the party wandering a town with nothing left to ask); a script for more
+than one matter at a time; loot off anyone but the chief; things to search outside the
+hideout; a price for what the party sells; more than one line of small talk per kind of
+person per whisper; the script's lines read by someone other than their author (every
+one is mine, and the CD has not seen them); a rating scale finer than up or down; the
+Compare page across tales rather than one tale at a time (the CSV is the only way to
+add two tales up today).
+
+From step 3 (first push), still open: opportunity attacks and reactions; conditions that
+do something on the board (prone, restrained are honoured only as advantage); hiding and
+stealth; places the Game Master makes up; a way to undo a mis-tapped blow (there is none,
+as at a table). Done since: an ending, a key for the cell, the chief's keys off the
+fallen, a shop with prices, and a party of one or two that can win by coming back.
 
 From step 2: bystanders who move (a town that goes about its day); a marching order the
 player sets, instead of nearest-first; dashing and difficult ground beyond furniture;
@@ -661,9 +950,10 @@ To get parts back, split the page at its banner comments:
 
 ```
 python3 .claude/scripts/page-parts.py split games/cyoa2/index.html <scratch dir>
-#   24 parts: 00-head.html (CSS and markup), 02-util.js ... 11-engine.js,
-#   12-game-master-tools.js, 13-game-master-context.js, 14-game-master-client.js,
-#   15-costs.js, 16-art.js, 17-view.js, 20-ui.js, 21-session.js, 22-boot.js, 23-tail.html
+#   25 parts: 00-head.html (CSS and markup), 02-util.js ... 11-engine.js,
+#   12-game-master-tools.js, 13-the-script.js, 14-game-master-context.js,
+#   15-game-master-client.js, 16-costs.js, 17-art.js, 18-view.js, 19-audio.js,
+#   20-storage.js, 21-ui.js, 22-session.js, 23-boot.js, 24-tail.html
 python3 .claude/scripts/page-parts.py join  <scratch dir>     # byte for byte, then the parse check
 python3 .claude/scripts/page-parts.py check <scratch dir>     # was the page edited behind the parts?
 ```

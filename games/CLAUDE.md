@@ -70,7 +70,7 @@ one touch away, not buried.
 | Palette | `--bg:#06060e` `--panel:#0b0b16` `--border:#1a1a30` `--green:#39ff14` `--gold:#ffc300` `--blue:#4488ff` `--red:#ff2244` `--white:#dde3ff` `--dim:#8899bb` `--purple:#b44fff` |
 | Rendering | Canvas 2D, `requestAnimationFrame` loop, delta-time **clamped to [0, ~100 ms]**: a frame's timestamp can precede the moment the script started, so the first `dt` can come out negative, and one negative step through Animation Rigs A004's physics made every figure NaN for good (2026-10-05). **Documented exception:** `wayfinder/` renders with hand-written **WebGL2 + GLSL** — real 3D terrain is not achievable in Canvas 2D and Three.js would break the no-external-libraries rule. All its assets are still generated procedurally in-file, it keeps a 2D canvas over the top for the HUD, and it degrades gracefully (simulation, map and compass all still run) when WebGL2 is unavailable. Reach for WebGL only when a game genuinely cannot exist without it. **Second documented exception:** `music-mixer/` renders its play surface in **DOM/CSS** — fifteen buttons whose coloured cap, lamp layer, filament core and specular streak are stacked gradients, with `box-shadow` supplying the bezel, the body depth and the coloured light bleed onto neighbouring pads for free. It is a control surface rather than a rendered scene: a canvas would have to re-implement all of that and would still lose crisp text labels. JS only ever writes two custom properties (`--glow`, `--pulse`); there is no draw loop |
 | Input | Touch + mouse events, `user-select:none`, `touch-action:manipulation` |
-| No dependencies | Zero external JS libs; Google Fonts is the only external resource. **Documented exception:** `cyoa/` calls the Anthropic Messages API at runtime with the player's own key (raw `fetch`, no SDK), and optionally OpenAI / ElevenLabs — `.claude/cyoa.md`; `cyoa2/` calls the Anthropic Messages API the same way and nothing else — `.claude/cyoa2.md` |
+| No dependencies | Zero external JS libs; Google Fonts is the only external resource. **Documented exception:** `cyoa/` calls the Anthropic Messages API at runtime with the player's own key (raw `fetch`, no SDK), and optionally OpenAI / ElevenLabs — `.claude/cyoa.md`; `cyoa2/` calls the Anthropic Messages API the same way and nothing else, and only where the player has given Claude a part of the table: its default Game Master is a script, and with that alone the page calls nothing at all — `.claude/cyoa2.md` |
 | Responsive | Portrait/landscape via `@media (orientation:landscape)` or `100dvh` layout; a canvas inside a flex column needs `min-height:0` or its intrinsic 300:150 ratio overflows landscape |
 | Canvas sizing | A fullscreen canvas needs explicit CSS `width:100%;height:100%` — `position:absolute;inset:0` alone does NOT stretch a replaced element, it renders at its intrinsic (dpr-scaled) attribute size and the page looks 2–3× zoomed. A layout that rescales stored positions by a relative factor (newCell/oldCell) must floor the derived scale above zero AND make repeated calls strict no-ops: a transient degenerate viewport once drove phasic's cell size negative, and a `oldCell>0` guard then silently dropped every healing rescale — the squish became permanent until reload (2026-07-31 rotation bug). **Lay out in the space pointer events resolve in.** Sizing the backing store from `window.innerWidth/innerHeight` while reading taps off `getBoundingClientRect()` uses two coordinate spaces that iOS makes disagree: after rotating into landscape, Safari's chrome can leave the canvas box *shorter* than `innerHeight`, CSS squashes the taller backing store into it, and every sprite is drawn higher than it is hit-tested — by an offset that **grows with y**, so it reads as "the thing low on the screen stopped answering taps" while the top of the scene looks fine (2026-08-28: fire-clicker's campfire answered only taps at the bottom of its drawn circle and below). A game needs exactly one of two cures: **measure the element** — one `viewBox()` helper wrapping `getBoundingClientRect()` that every layout number comes from (fire-clicker) — or **pin the CSS size** to the numbers you sized the backing store with (`cv.style.width = W + 'px'`, turret-builder). What you cannot do is size from `inner*` and leave the box to `width:100%`. Rotation compounds it: iOS can hand every rotation event a stale box and then never fire again, so pair either cure with phasic's `reflow()` (three passes across `resize`/`orientationchange`/`visualViewport`) plus a cheap re-measure in the frame loop — all strict no-ops once the box settles, provided the layout function is idempotent for a given box. **A guard written as `innerWidth !== W` cannot fire**, because both sides of it are the wrong space; that is how fire-clicker shipped the bug twice in one day. Diagnose any page with `.claude/scripts/check-canvas-space.cjs` — but **read its whole line, not the SQUASH number**. That probe EXEMPTS any canvas carrying an inline `style.width`/`style.height` (it prints `pinned=inline-css`), because that is cure #2 and the probe reaches the element through a stylesheet it could otherwise prise apart. A page whose framework sets those for you is therefore never measured at all: interlock reported `CANVAS=ok … SQUASH=1.000` while sitting on a real 0.711 squash, because three.js's `renderer.setSize()` writes them by default (2026-09-20). The probe also shrinks the box with a percentage `max-height`, which resolves to `none` against an auto-height body — so on such a page it could not have moved the box even unexempted. `SQUASH=1.000` next to `pinned=` is an exemption, not evidence; pin the box in **px** from a suite of your own and check what actually matters, which is whether a tap at the pixel a thing is DRAWN on hits that thing |
 | Canvas-drawn UI | Buttons/cards drawn on the canvas keep their hitbox arrays (`cardRects`-style) in JS — any branch that hides the widgets MUST clear the arrays too, or invisible stale hitboxes swallow taps (2026-07-24 grid-defense bug). Canvas has **no layout engine**: nothing clips, nothing reflows, nothing reports a collision, so assert what a layout engine would — every button rect inside the viewport, no two overlapping, and every off-button thing a widget points at fully on-screen. Derive the geometry from `W`/`H` in **one** layout function that the renderer and the hit-tester both call; two copies is how a button stops matching what it draws. Assert the layout's own structural invariant too, whatever it is — star-surge's station pairs left-column buttons with left-hand features so no connector line crosses the scene, and re-pairing one still looks "fine" to a screenshot reviewer who does not know the rule (2026-08-23). **Sweep those assertions across viewports, don't run them at one** — with no reflow, a widget sized off a content count and a row sized off a viewport fraction can collide at one aspect ratio and be fine at every other. Six or seven sizes including a landscape and a very narrow one, `page.setViewportSize` between each, **a real `draw()` at every one** (a layout that computes fine still throws in a painter), and collect violations as named strings rather than a boolean so a red tells you which rule broke at which size (2026-08-24) |
@@ -917,7 +917,7 @@ Suite: `.claude/tests/drive-cyoa.cjs` (165 checks, including the real clients ag
 stubbed network). Detailed context: `.claude/cyoa.md`.
 
 
-### CYOA2 (`cyoa2/index.html`, ~5,490 lines)
+### CYOA2 (`cyoa2/index.html`, ~6,500 lines)
 CYOA's sequel, commissioned by the CD on 2026-10-09: the same seeded world, played on a
 **board of 5 ft squares**. A seed makes a bible (region, town, inn, a gang and its cave,
 seven people who matter, three plot threads); the town's board is charted at once, and
@@ -949,19 +949,36 @@ number rising off the square and a line in the story. Travellers at 0 hit points
 against death; a party beaten but breathing wakes at the inn next morning, lighter of
 purse. **The monsters play themselves** from a script (strike, shoot, close in, dash) and
 never strike the fallen; Settings can hand their turns to the Game Master, or back to
-whoever holds the table. **The Game Master is Claude over the player's own API key**
-(Opus 5.5 by default; a model can be pinned for the players' lines, the beats and the
-monsters separately): it narrates into a **story panel** under or beside the board at
-the beats (a tale's opening, a place first entered, a fight begun and ended) and when
-spoken to, and acts only through **25 engine tools** that name things by the ids of a
-board digest and never do geometry. A telling that fails puts the tale back exactly; what
-it cost is in a **ledger** either way. With no key the board still plays by its rules.
-Not in this push: the narrator's voice, speech input, the notes page, rule popups.
+whoever holds the table. **There are two Game Masters over the one engine** (CD,
+2026-10-10: "default mode is deterministic scripted everything"). **The script is the
+default**: no model, no key, no cost, and the page calls nothing. It tells the beats (a
+tale's opening, a place first entered, a fight begun and ended, the ending) into a
+**story panel** under or beside the board out of tables, each line chosen by a hash of
+the seed so the same tale told twice is the same words; people are talked to through
+**topic buttons** drawn from the seed's plot (some a skill check, shown on the button
+with whose it is), chests and locks offer **verb buttons**, and a quest machine in the
+engine carries a **whole adventure**: a job from its giver, two whispers to hear by
+asking around and settle (each changes the hill: free beds, keener blades, sleeping
+lookouts, the hideout on the map, a name that ends the gang without a blow), a shop, an
+inn that charges for its beds, loot fixed by the seed, a locked strongbox, a prisoner to
+free, and an ending. With only the script at the table an enemy who sees the party
+starts a fight, every time. **Claude, over the player's own API key** (Opus 5.5 by
+default; a model can be pinned per task), can be given any of **five areas**: narration,
+talking to people, lines typed to the table, the monsters' turns, making characters. It
+acts only through **26 engine tools** that name things by the ids of a board digest and
+never do geometry, and a telling that fails puts the tale back exactly; what it cost is
+in a **ledger** either way. Under each of Claude's passages the page can keep **the
+script's version of the same moment**; every passage says who told it and takes a thumb
+up or down; and a **Compare** page adds up tellings, words, ratings and cost by area and
+teller, with a CSV. Not in this push: the narrator's voice, speech input, the notes
+page, rule popups.
 **Proprietary** (one of the eight protected games; confirmed by the CD on 2026-10-10).
-Suite: `.claude/tests/drive-cyoa2.cjs` (511 checks: generators over 36 worlds, sight
+Suite: `.claude/tests/drive-cyoa2.cjs` (671 checks: generators over 36 worlds, sight
 judged by an independent line walker, fights played out by the script against the
 suite's own traveller, every tool called with one of each kind of bad input, the real
-client against a stand-in for the API). Detailed context: `.claude/cyoa2.md`.
+client against a stand-in for the API, and whole scripted tales played start to ending
+by the suite's own player, `.claude/tests/cyoa2-player.js`). Detailed context:
+`.claude/cyoa2.md`.
 
 ### ANIMATION RIGS (`animation-rigs/index.html`, ~2,000 lines)
 A grey-box diorama of eight 21-joint stick-figure rigs (CD commission 2026-10-04,

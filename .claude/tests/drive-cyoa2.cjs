@@ -90,6 +90,28 @@
  *      monsters' turn handed over on a pinned model, the script taking it back when
  *      the Game Master fails, and a tale opened from a file while another is told
  *
+ * The two kinds of Game Master (the script as the default, Claude per area) added three.
+ * What goes wrong here is quiet in a fourth way: a tale that cannot be finished on one
+ * seed in forty, a line with a blank left in it, a rule whose fallback hides that it is
+ * gone, a model asked for something the script was meant to do.
+ *
+ *   U. the script, in the engine alone: its tables whole and every blank filled on 24
+ *      worlds; asking what it WOULD say changes nothing; WHOLE TALES played start to
+ *      ending by the suite's own player (cyoa2-player.js: it knows the intents and
+ *      nothing else) with the tale checked after every accepted intent; then talk,
+ *      every whisper and every lock with the dice made to fall both ways, loot fixed by
+ *      the seed, the plot as whatever is true, threat, what the script adds to a save,
+ *      the Game Master's own door to all of it, the monsters' twin
+ *   V. the script's table by touch: the opening on its card, travellers rolled on the
+ *      sheet, ratings, topic buttons, a bed, the shop, a chest, a lock, the cell,
+ *      sleepers and a word to say, being seen again, a blow that fells the chief, the
+ *      ending, Compare and its export, Settings; and that nothing was asked of any
+ *      service from the first morning to the ending
+ *   W. the model's share (window.__CYOA2_MOCK__): who is asked for what under every
+ *      setting, the twin worked out before the model is called, tags and the tally,
+ *      the monsters' twin on a copy, an ending the model tells, what a model's deed
+ *      settles in the plot, the key going away in the middle of a tale
+ *
  * A to P run with the story folded and (P) the monsters moved by hand, through
  * open()'s settings argument: step 3 changed both defaults, and the older rows are
  * about geometry and movement that those defaults would move or play for them.
@@ -98,6 +120,8 @@
  * negative tests aimed at one of them. CYOA2_PAGE=<path> points the suite at a COPY
  * of the page, which is how .claude/scripts/negtest-copies.py runs breaks several at
  * a time without touching the shipping file. Neither ever prints "CYOA2: GREEN".
+ * CYOA2_WATCHDOG_MIN=<minutes> (default 25) is how long a run may take before it is
+ * called a hang and goes red: page.evaluate has no timeout of its own.
  *
  * Sections K and L lift the fog through its own setting, on purpose: both ask
  * whether a tap walked, and under fog a tap on unseen ground walks nobody whatever
@@ -106,6 +130,7 @@
  */
 'use strict';
 const path = require('path');
+const fs = require('fs');
 const { chromium } = require('playwright-core');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -113,10 +138,17 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const COPY = process.env.CYOA2_PAGE || '';
 const PAGE = 'file://' + (COPY ? path.resolve(COPY) : path.join(ROOT, 'games', 'cyoa2', 'index.html'));
 const SEEDS = 36;
+/* the suite's own player (section U): loaded into the page, it plays whole tales by intents alone */
+const PLAYER = fs.readFileSync(path.join(__dirname, 'cyoa2-player.js'), 'utf8');
 /* CYOA2_ONLY=NOP runs only those sections (A stands for A to I, which share a page). It is for negative tests, where
    one break is aimed at one section; a partial run never prints the GREEN line a gate looks for.                       */
 const ONLY = (process.env.CYOA2_ONLY || '').toUpperCase(), want = (k) => !ONLY || ONLY.includes(k);
 let bad = 0, good = 0;
+/* A suite that waits for ever reports nothing, and a gate that reports nothing is worse than a red one. page.evaluate has
+   no timeout of its own, and a deliberate break once left a row awaiting a walk that could never start: the run sat
+   idle for fourteen minutes. After this long the suite says so and goes red. CYOA2_WATCHDOG_MIN changes the limit. */
+const WATCHDOG_MIN = Math.max(1, +process.env.CYOA2_WATCHDOG_MIN || 25);
+setTimeout(() => { console.log('  FAIL crashed: the suite was still running after ' + WATCHDOG_MIN + ' minutes (a wait that never ends)'); console.log('CYOA2: RED'); process.exit(1); }, WATCHDOG_MIN * 60 * 1000).unref();
 const fail = (m) => { bad++; console.log('  FAIL ' + m); };
 const clipTo = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + '...' : String(s));
 const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(m); };
@@ -141,6 +173,9 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     await page.evaluate(() => document.getElementById('btn-new').click());
     await page.waitForFunction(() => document.getElementById('dialog').classList.contains('open'), null, { timeout: 8000 });
     await page.evaluate(() => document.querySelector('#dlg-btns button').click());
+    /* told by the script, a new tale goes straight on to the party sheet, where its travellers are made (section V asks for that).
+       Every other row wants the board, so the sheet is closed the way a player closes it.                                        */
+    await page.evaluate(() => { if (document.getElementById('pan-party').classList.contains('open')) document.querySelector('#pan-party [data-close]').click(); });
     await idle(page);
   };
 
@@ -445,6 +480,12 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     ok(dlg.seed === 'drive-seed-1' && dlg.inPlay, 'NEW begins a tale from the seed in Settings');
     ok(dlg.title === dlg.town && dlg.text.includes(dlg.town) && dlg.text.length > 80, 'the opening names the town and the matter at hand');
     await page.evaluate(() => document.querySelector('#dlg-btns button').click());
+    { /* told by the script, the travellers are made on the party sheet: BEGIN goes on to it, and Done comes back to the board */
+      const sh = await page.evaluate(() => ({ open: document.getElementById('pan-party').classList.contains('open'), rows: document.querySelectorAll('#party-list .entry.pc').length, sup: [...document.querySelectorAll('#party-list .sheet button')].map((b) => b.textContent).join(), stock: G.st.party[0].stock }));
+      await page.evaluate(() => document.querySelector('#pan-party [data-close]').click());
+      const back = await page.evaluate(() => ({ open: UI.panelOpen() }));
+      ok(sh.open && sh.rows === 1 && sh.sup === 'Surprise me' && sh.stock && !back.open, 'told by the script, BEGIN goes on to the party sheet, where the travellers are made; Done comes back to the board');
+      await page.evaluate(() => UI.closePanels()); }
     await idle(page);
     const s0 = await page.evaluate(() => { const m = View.map, pc = G.st.party[0], r = m.rooms[m.rg[pc.y * m.w + pc.x] - 1]; return { site: G.st.here, room: r && r.kind, name: document.getElementById('place-name').textContent, title: m.title, w: View.cv.width, h: View.cv.height, vw: View.vw, dpr: View.dpr }; });
     ok(s0.site === 'S1' && s0.room === 'guest', 'the tale begins in a guest room of the inn');
@@ -845,7 +886,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     ok(r.known[0], 'a move to ground nobody has seen is refused in words, and changes nothing');
     ok(r.known[1] && r.known[2], 'the engine itself knows the way there; a traveller keeping to known ground walks over seen squares only');
     ok(r.known[3], 'grass seen through a window, with unseen rooms between: for a traveller keeping to known ground there is no way there yet');
-    ok(r.v1 && r.v1.v === 3 && r.v1.seen > 3 && r.v1.lead === 'P1' && !r.v1.town, 'a save from before the fog loads: the party sees from where it stands, and the rest waits to be seen' + (typeof r.v1 === 'string' ? ' (' + r.v1 + ')' : ''));
+    ok(r.v1 && r.v1.v === 4 && r.v1.seen > 3 && r.v1.lead === 'P1' && !r.v1.town, 'a save from before the fog loads: the party sees from where it stands, and the rest waits to be seen' + (typeof r.v1 === 'string' ? ' (' + r.v1 + ')' : ''));
 
     /* on the table: what is drawn, and what a tap means */
     await begin(page);
@@ -1294,7 +1335,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         const st = newGame('sheet-1'), pc = st.party[0];
         row(pc.cls === 'Fighter' && pc.hp === 12 && pc.hpMax === 12 && pc.ac === 16 && pc.level === 1 && pc.xp === 0 && pc.stock === true && pc.status === 'ok' && pc.abilities.map((a) => a.n + a.uses).join() === 'Second Wind1,Action Surge1' && pc.scores.str === 15 && pc.scores.int === 8,
           'the first traveller wakes with a sheet: a level 1 Fighter, 12 hit points, AC 16, the standard array by the calling\'s own priorities');
-        row(st.gold === 15 && st.time.day === 1 && st.time.minute === 480 && st.quests.Q0.status === 'active' && st.quests.Q0.main && st.quests.Q0.goal === st.bible.threads.find((t) => t.main).t && st.turn === 0 && st.v === 3, 'and the tale with a purse, a clock at eight in the morning, and the matter at hand as its first quest');
+        row(st.gold === 15 && st.time.day === 1 && st.time.minute === 480 && st.quests.Q0.status === 'active' && st.quests.Q0.main && st.quests.Q0.goal === st.bible.threads.find((t) => t.main).t && st.turn === 0 && st.v === 4, 'and the tale with a purse, a clock at eight in the morning, and the matter at hand as its first quest');
         for (let j = 0; j < 5; j++) intent(st, { t: 'party', op: 'add' });
         row(st.party.map((p) => p.cls).join() === 'Fighter,Rogue,Cleric,Wizard,Ranger,Bard' && st.gold === 15 + 20 + 15 + 10 + 15 + 20, 'newcomers take the six callings in turn, and each brings their purse: ' + st.party.map((p) => p.cls).join() + ', ' + st.gold + ' gold');
         row(st.party.every((p) => p.hpMax === CLASSES[p.cls].hd + abMod(p.scores.con) && p.hp === p.hpMax && p.ac === CLASSES[p.cls].ac && weaponsOf(p).length === 2), 'every sheet follows its calling: hit die plus constitution, the calling\'s armour, two ways to strike');
@@ -1509,7 +1550,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         F.hp = 2; const cure = intent(st, { t: 'ability', who: C.id, name: 'Cure Wounds', target: F.id });
         row(cure.ok && F.hp > 2 && C.abilities.find((x) => x.n === 'Cure Wounds').uses === 1, 'outside a fight a healer\'s hands still work, with nobody\'s turn asked: ' + (cure.say || cure.why));
         row(intent(st, { t: 'ability', who: Wz.id, name: 'Magic Missile', target: 'K0' }).why === 'noround' && intent(st, { t: 'ability', who: Rg.id, name: 'Cunning Action' }).why === 'noround', 'a fighting trick outside a fight is refused');
-        intent(st, { t: 'jump', site: 'S0' });
+        intent(st, { t: 'jump', site: 'S1' });
         const lr = intent(st, { t: 'rest', kind: 'long' });
         row(lr.ok && st.party.every((p) => p.hp === p.hpMax && p.abilities.every((a) => a.max === null || a.uses === a.max)), 'a night\'s sleep restores every hit point and every ability');
       }
@@ -1557,7 +1598,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         for (const k of ['time', 'gold', 'facts', 'summaries', 'quests', 'story', 'costs', 'turn', 'told', 'fallen', 'over']) delete v2[k];
         v2.party = v2.party.map((p) => ({ id: p.id, name: p.name, site: p.site, x: p.x, y: p.y })); delete v2.n.f; delete v2.n.Q;
         let o = null; try { o = unpackState(v2); } catch (e) { o = null; }
-        row(o && o.v === 3 && o.party.map((p) => p.cls).join() === 'Fighter,Rogue,Cleric' && o.party.every((p) => p.hp === p.hpMax && p.stock && p.status === 'ok') && o.gold === 50 && o.time.minute === 480 && o.quests.Q0 && o.quests.Q0.status === 'active' && Array.isArray(o.story) && o.turn === 0,
+        row(o && o.v === 4 && o.party.map((p) => p.cls).join() === 'Fighter,Rogue,Cleric' && o.party.every((p) => p.hp === p.hpMax && p.stock && p.status === 'ok') && o.gold === 50 && o.time.minute === 480 && o.quests.Q0 && o.quests.Q0.status === 'active' && Array.isArray(o.story) && o.turn === 0,
           'a tale saved before there were sheets loads: each traveller is given a calling by their place in the party, a full sheet, and the tale a purse, a clock and its quest');
         const evil = JSON.parse(JSON.stringify(packState(st)));
         Object.assign(evil.party[0], { cls: 'God', level: 99, hp: 99999, hpMax: 99999, ac: 99 });
@@ -1684,8 +1725,25 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
           const t0 = clock(), sr = intent(st, { t: 'rest', kind: 'short' }), t1 = clock(), per = (p, n) => abilityDef(p.cls, n).per;
           row(sr.ok && t1 - t0 === 60 && st.party.every((p) => p.hp >= 101 && p.hp <= 100 + gain(p) && p.abilities.every((a) => a.max === null || a.uses === (per(p, a.n) === 'short' ? a.max : 0))) && F.abilities.every((a) => a.uses === a.max) && Wz.abilities.every((a) => a.uses === 0),
             'a short rest takes an hour, mends a hit die\'s worth, and brings back only what a short rest brings back: the fighter\'s tricks, not the wizard\'s spells');
-          const lr = intent(st, { t: 'rest', kind: 'long' }), t2 = clock();
-          row(lr.ok && t2 - t1 === 480 && st.party.every((p) => p.hp === p.hpMax && p.abilities.every((a) => a.max === null || a.uses === a.max)), 'a long rest takes eight hours and brings back everything');
+          /* a night is slept where it is safe and, in town, where there is a bed: the street has none, the inn sells one, a hideout must be cleared first */
+          const b0 = snap(st), street = intent(st, { t: 'rest', kind: 'long' }), same0 = snap(st) === b0;
+          const cv = unpackState(JSON.parse(JSON.stringify(packState(st)))); intent(cv, { t: 'jump', site: 'S2' });
+          const m2 = cv.maps.S2, inView = () => m2.tokens.filter((t) => t.k === 'foe' && visOf(cv).g[t.y * m2.w + t.x]);
+          for (let g = 0; g < 20 && inView().length; g++) { dropToken(cv, m2, inView()[0]); look(cv); }      /* nobody in sight, but the hideout is still theirs */
+          const left = m2.tokens.filter((t) => t.k === 'foe').length, b2 = snap(cv), held = intent(cv, { t: 'rest', kind: 'long' }), same2 = snap(cv) === b2, nap = intent(cv, { t: 'rest', kind: 'short' });
+          const ruled = intent(unpackState(JSON.parse(JSON.stringify(packState(cv)))), { t: 'rest', kind: 'long', by: 'gm' });
+          for (const t of m2.tokens.slice()) if (t.k === 'foe') dropToken(cv, m2, t); look(cv);
+          const g2 = cv.gold, camp = intent(cv, { t: 'rest', kind: 'long' });
+          row(street.why === 'nobed' && /has rooms/.test(street.say) && same0 && left > 0 && held.why === 'hostiles' && same2 && nap.ok,
+            'a night is not slept in the street (the inn has rooms) nor in a hideout its owners still hold, though an hour\'s rest out of their sight is; neither refusal changes anything');
+          row(ruled.ok && ruled.paid === 0 && camp.ok && camp.paid === 0 && cv.gold === g2 && /sleeps the night through/.test(camp.say), 'the Game Master\'s own rest may rule otherwise, and a hideout emptied of its owners is a camp, slept in for nothing');
+          intent(st, { t: 'jump', site: 'S1' });
+          const g0 = st.gold, heads = st.party.filter((p) => p.status !== 'dead').length, t1b = clock(), lr = intent(st, { t: 'rest', kind: 'long' }), t2 = clock();
+          row(lr.ok && t2 - t1b === 480 && st.party.every((p) => p.hp === p.hpMax && p.abilities.every((a) => a.max === null || a.uses === a.max)), 'a long rest takes eight hours and brings back everything');
+          row(lr.paid === Math.min(g0, heads) && st.gold === g0 - lr.paid && lr.paid > 0 && new RegExp('pays ' + lr.paid + ' gold for beds').test(lr.say), 'at the inn it is paid for: a gold piece a head, out of the purse, and the story says so (' + lr.paid + ' gold)');
+          { const poor = unpackState(JSON.parse(JSON.stringify(packState(st)))); poor.gold = 0; const pr = intent(poor, { t: 'rest', kind: 'long' }); const free = unpackState(JSON.parse(JSON.stringify(packState(st)))); free.flags.freebed = 1; const fg = free.gold, fr = intent(free, { t: 'rest', kind: 'long' });
+            row(pr.ok && pr.paid === 0 && poor.gold === 0 && /stable/.test(pr.say) && fr.ok && fr.paid === 0 && free.gold === fg && /for nothing/.test(fr.say), 'an empty purse sleeps in the stable all the same, and a keeper who owes the party a bed takes nothing'); }
+          intent(st, { t: 'jump', site: 'S0' });
           /* what is for a fight stays in a fight; what is not, works anywhere */
           const b = snap(st), only = [[F, 'Action Surge'], [Rg, 'Cunning Action'], [Wz, 'Shield'], [Wz, 'Magic Missile'], [Wz, 'Sleep'], [C, 'Bless'], [C, 'Turn Undead'], [Rn, 'hunter']];
           const no = only.filter(([p, n]) => intent(st, { t: 'ability', who: p.id, name: n, target: 'K0' }).why !== 'noround').map((q) => q[1]);
@@ -1760,10 +1818,15 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     /* the story sits under the board; its bar is always in reach; folding it gives the board the room back */
     const lay = () => page.evaluate(() => { const q = (id) => { const r = document.getElementById(id).getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; }; const cv = View.cv.getBoundingClientRect();
       return { board: q('board'), story: q('story'), bar: q('story-bar'), log: q('story-log'), say: q('say'), send: q('say-send'), open: document.getElementById('story').classList.contains('open'), vw: View.vw, vh: View.vh, cw: cv.width, ch: cv.height, W: innerWidth, H: innerHeight,
-        sys: document.querySelectorAll('#story-log .st-sys').length, text: document.getElementById('story-log').textContent, story0: G.st.story.length, over: document.documentElement.scrollWidth > innerWidth + 1 }; });
+        sys: document.querySelectorAll('#story-log .st-sys').length, text: document.getElementById('story-log').textContent, story0: G.st.story.length, over: document.documentElement.scrollWidth > innerWidth + 1,
+        gm: document.querySelectorAll('#story-log .st-gm.by-script').length, foot: [...document.querySelectorAll('#story-log .st-foot')].map((f) => f.querySelector('.src').textContent + '/' + f.querySelector('.area').textContent).join(), e0: G.st.story[0], tells: G.st.tells.length,
+        typed: !document.body.classList.contains('no-say'), fold: q('story-toggle'), who: q('say-who') }; });
+    await page.waitForFunction(() => G.st.story.length > 0, null, { timeout: 8000 });      /* the opening is told on the table's next tick: wait for the telling, not for a while */
     let L = await lay();
-    ok(L.open && L.sys === 2 && L.text.includes(await page.evaluate(() => G.st.bible.opening)) && L.story0 === 2, 'with no Game Master the story opens on the tale\'s own opening lines, kept in the tale');
-    ok(L.bar.b <= L.H + 1 && L.bar.t >= L.board.b - 1 && L.log.h >= 110 && L.board.h >= 380 && L.say.w >= 90 && L.send.r <= L.W + 1 && !L.over, 'the story sits under the board: its bar inside the screen, the board ' + Math.round(L.board.h) + ' px tall above it');
+    ok(L.open && L.sys === 0 && L.gm === 1 && L.foot === 'Script/narration' && L.story0 === 1 && L.e0.src === 'script' && L.e0.area === 'narrate' && L.e0.text.includes(await page.evaluate(() => G.st.bible.town)) && L.e0.text.includes(await page.evaluate(() => G.st.bible.threads.find((t) => t.main).t)) && L.tells === 1,
+      'the story opens on the script\'s own telling of the opening, with the matter at hand in it: one passage, marked as the script\'s narration, kept in the tale and tallied');
+    ok(L.bar.b <= L.H + 1 && L.bar.t >= L.board.b - 1 && L.log.h >= 110 && L.board.h >= 380 && L.fold.w >= 40 && L.fold.r <= L.W + 1 && !L.over, 'the story sits under the board: its bar inside the screen, the board ' + Math.round(L.board.h) + ' px tall above it');
+    ok(!L.typed && L.say.w === 0 && L.send.w === 0 && L.who.w === 0, 'with only the script at the table no typed line is offered: no field, no speaker, no send');
     await tapEl('#story-toggle'); await frames(6);
     const L2 = await lay();
     ok(!L2.open && L2.log.h === 0 && L2.board.h >= L.board.h + L.log.h - 4 && Math.abs(L2.vh - L2.ch) < 1 && Math.abs(L2.ch - L2.board.h) < 3 && L2.bar.b <= L2.H + 1, 'folding the story gives the board its room back, and the table is measured again at once (' + Math.round(L2.board.h) + ' px)');
@@ -1783,7 +1846,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       for (const [w, h] of [[320, 568], [844, 390], [1280, 800], [768, 1024], [390, 844]]) {
         await page.setViewportSize({ width: w, height: h }); await frames(8); await page.waitForTimeout(450); await frames(3);
         const v = await lay(), side = (w > h && h <= 520) || (w >= 1000 && w / h >= 1.25);
-        if (v.bar.b > v.H + 1 || v.send.r > v.W + 1 || v.say.w < 60) bad.push(w + 'x' + h + ' the bar leaves the screen');
+        if (v.bar.b > v.H + 1 || (v.typed ? v.send.r > v.W + 1 || v.say.w < 60 : v.say.w !== 0)) bad.push(w + 'x' + h + ' the bar leaves the screen');
         if (v.board.w < 150 || v.board.h < (side ? 130 : 190)) bad.push(w + 'x' + h + ' the board is squeezed to ' + Math.round(v.board.w) + 'x' + Math.round(v.board.h));
         if (side ? !(v.story.l >= v.board.r - 2 && v.log.h >= 100) : !(v.story.t >= v.board.b - 2)) bad.push(w + 'x' + h + ' the story is on the wrong side');
         if (Math.abs(v.vw - v.cw) > 1 || Math.abs(v.vh - v.ch) > 1 || Math.abs(v.cw - v.board.w) > 3) bad.push(w + 'x' + h + ' the table was not measured again');
@@ -1802,36 +1865,33 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         return { put: put.ok, again: b1 !== b0, gone: !!gone && gone.ok, twice: View.base !== b1, key: View.base.key === bakeKey(View.map) }; });
       ok(rp.put && rp.again && rp.gone && rp.twice && rp.key, 'a thing set down on the board, or taken off it, makes the table paint its picture again');
     }
-    /* letters typed into the story walk nobody; a line with no Game Master asks for a key and sends nothing */
-    { const at0 = await page.evaluate(() => [G.st.party[0].x, G.st.party[0].y]);
-      await page.evaluate(() => document.getElementById('say').focus()); await page.keyboard.type('wasd qezc 0+-'); await page.waitForTimeout(150);
-      const typed = await page.evaluate(() => ({ v: document.getElementById('say').value, at: [G.st.party[0].x, G.st.party[0].y], walk: !!G.st.walk || View.walking }));
-      ok(typed.v === 'wasd qezc 0+-' && typed.at[0] === at0[0] && typed.at[1] === at0[1] && !typed.walk, 'letters typed into the story are letters: nobody walks');
-      await page.keyboard.press('Enter'); await page.waitForTimeout(200);
-      const nk = await page.evaluate(() => ({ dlg: document.getElementById('dialog').classList.contains('open'), title: document.getElementById('dlg-title').textContent, kept: document.getElementById('say').value, story: G.st.story.length, busy: G.busy, on: Session.on() }));
-      ok(nk.dlg && /No Game Master/.test(nk.title) && nk.kept === 'wasd qezc 0+-' && nk.story === 2 && !nk.busy && !nk.on, 'with no key, a line sent asks for one, keeps what was typed, and tells nothing');
-      await page.evaluate(() => { [...document.querySelectorAll('#dlg-btns button')].find((b) => /Not now/.test(b.textContent)).click(); document.getElementById('say').value = ''; document.getElementById('say').blur(); });
-      await page.evaluate(() => UI.storyOpen(false)); await frames(3);
+    /* the script voices people: TALK turns the card into the conversation, and the pen is nowhere (the typed line's own rows are in section W) */
+    { await page.evaluate(() => UI.storyOpen(false)); await frames(3);
       await page.keyboard.press('/'); await frames(3);
-      const sl = await page.evaluate(() => ({ focus: document.activeElement && document.activeElement.id, open: document.getElementById('story').classList.contains('open'), v: document.getElementById('say').value }));
-      ok(sl.focus === 'say' && sl.open && sl.v === '', 'the slash key opens the story and puts the pen in it, without writing a slash');
-      await page.evaluate(() => document.getElementById('say').blur());
-      const tk = await page.evaluate(() => { const tok = View.map.tokens[0]; UI.tokCard(tok); const all = [...document.querySelectorAll('#info-acts button')], btns = all.map((b) => b.textContent), talk = all.find((b) => b.textContent === 'Talk'); if (talk) talk.click();
-        const out = { btns, dlg: document.getElementById('dialog').classList.contains('open'), title: document.getElementById('dlg-title').textContent, to: Session.to, ph: document.getElementById('say').placeholder, focus: document.activeElement && document.activeElement.id }; UI.closeDialog(); UI.card(null); return out; });
-      ok(tk.btns.join() === 'Talk' && tk.dlg && /No Game Master/.test(tk.title) && tk.to === null && tk.ph === 'Say or do something' && tk.focus !== 'say', 'TALK with no Game Master asks for a key, and addresses nobody');
+      const sl = await page.evaluate(() => ({ focus: document.activeElement && document.activeElement.id, open: document.getElementById('story').classList.contains('open') }));
+      ok(sl.focus !== 'say' && !sl.open, 'the slash key, which puts the pen in the story for a model, does nothing where nobody would read the line');
+      await page.evaluate(() => UI.storyOpen(true)); await frames(3);
+      const tk = await page.evaluate(() => { const st = G.st, tok = View.map.tokens[0], n0 = st.story.length; UI.tokCard(tok); const all = [...document.querySelectorAll('#info-acts button')], btns = all.map((b) => b.textContent), talk = all.find((b) => b.textContent === 'Talk'); if (talk) talk.click();
+        const out = { btns, dlg: document.getElementById('dialog').classList.contains('open'), to: Session.to, card: !document.getElementById('info').hidden, talk: document.getElementById('info').classList.contains('talk'), name: document.getElementById('info-name').textContent, who: st.npcs[tok.npc].name, text: document.getElementById('info-text').textContent,
+          topics: [...document.querySelectorAll('#info-acts button')].map((b) => b.textContent), want: topicsFor(st, tok.npc).map((t) => t.label + (t.off || t.sub)), same: st.story.length === n0, greet: greetOf(st, st.npcs[tok.npc]) }; UI.card(null); return out; });
+      ok(tk.btns.join() === 'Talk' && !tk.dlg && tk.to === null && tk.card && tk.talk && tk.name === tk.who && tk.text === tk.greet && tk.topics.length >= 3 && tk.topics.join('|') === tk.want.join('|') && tk.same,
+        'TALK, with the script voicing people, turns the card into the conversation: their greeting, and a button for each thing they can be asked (' + tk.topics.length + '); nothing is said yet');
     }
 
     /* a party of four, to the cave, and seen */
     await page.evaluate(() => { for (let k = 0; k < 3; k++) document.getElementById('party-add').click(); for (const p of G.st.party) { p.hpMax = 60; p.hp = 60; } UI.follow(intent(G.st, { t: 'jump', site: 'S2' })); });   /* sixty hit points each: the flow is under test, the odds are section Q's */
     await page.waitForFunction(() => G.st.here === 'S2' && View.map && View.map.id === 'S2', null, { timeout: 8000 }); await quiet();
     const dlgOpen = () => page.evaluate(() => document.getElementById('dialog').classList.contains('open'));
-    for (let h = 0; h < 30 && !(await dlgOpen()); h++) {
-      await page.evaluate(() => { const st = G.st, m = View.map, Ld = leadOf(st), foes = m.tokens.filter((t) => t.k === 'foe').sort((a, b) => cheb(a, Ld) - cheb(b, Ld)), goals = []; for (const s of STEPS) goals.push([foes[0].x + s[0], foes[0].y + s[1]]); if (intent(st, { t: 'move', goals }).ok) View.walking = true; });
+    const fighting = () => page.evaluate(() => !!G.st.round);
+    for (let h = 0; h < 30 && !(await fighting()) && !(await dlgOpen()); h++) {
+      await page.evaluate(() => { const st = G.st, m = View.map, Ld = leadOf(st), foes = m.tokens.filter((t) => t.k === 'foe').sort((a, b) => cheb(a, Ld) - cheb(b, Ld)), goals = []; for (const s of STEPS) goals.push([foes[0].x + s[0], foes[0].y + s[1]]); if (!st.round && intent(st, { t: 'move', goals }).ok) View.walking = true; });
       await quiet(); await page.waitForTimeout(150);
     }
-    ok(await dlgOpen(), 'walking into the cave, the party is seen and the table says so');
-    await page.evaluate(() => [...document.querySelectorAll('#dlg-btns button')].find((b) => /initiative/i.test(b.textContent)).click());
-    await page.waitForFunction(() => !!G.st.round, null, { timeout: 5000 });
+    /* with only the script at the table nobody can rule on slipping past: those who are awake and see the party fight it, and the fight is fought out */
+    const met = await page.evaluate(() => { const t = document.getElementById('toast'); t.textContent = ''; const st = G.st, R = st.round, n = R ? R.n : 0; UI.rounds(false);
+      return { round: !!st.round, same: !!st.round && st.round.n === n, dlg: document.getElementById('dialog').classList.contains('open'), strict: Mode.strict(), threat: threatOf(st), stand: document.getElementById('btn-stand').hidden, end: document.getElementById('btn-end').hidden, toast: t.textContent }; });
+    ok(met.round && !met.dlg && met.strict, 'walking into the cave the party is seen, and with only the script at the table nobody asks what now: the dice are rolled at once');
+    ok(met.threat && met.stand && !met.end && met.same && /at your throat/.test(met.toast), 'while an enemy who is awake can see a traveller on their feet the cross is not on the bar, and standing down is refused in words');
     const told = await page.evaluate(() => ({ chips: G.st.story.filter((e) => e.t === 'chip').map((e) => e.text), nodes: document.querySelectorAll('#story-log .st-chip.fight').length, mode: Settings.data.monsters, order: G.st.round.order.map((c) => c.k).join() }));
     ok(told.chips.some((t) => /seen the party/.test(t)) && told.chips.some((t) => /Initiative is rolled/.test(t)) && told.nodes >= 2 && told.mode === 'script', 'being seen and rolling initiative are written into the story as they happen');
 
@@ -1981,9 +2041,9 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       const cap = m.tokens.find((t) => t.k === 'captive'); UI.tokCard(cap); const capBtns = btnsOf(); UI.card(null);
       UI.party(); const shut = ['party-short', 'party-long', 'party-add'].every((id) => document.getElementById(id).disabled);
       for (let g = 0; g < 6 && turnOf(st).pc; g++) UI.endTurn();
-      const a = turnOf(st), key = [st.round.i, a.o.x, a.o.y, st.story.length].join();
+      const deeds = () => st.story.filter((e) => e.t === 'chip').length, a = turnOf(st), key = [st.round.i, a.o.x, a.o.y, deeds()].join();
       await new Promise((res) => setTimeout(res, 1600));
-      const still = !a.pc && [st.round.i, a.o.x, a.o.y, st.story.length].join() === key, ids = [...aims()];
+      const still = !a.pc && [st.round.i, a.o.x, a.o.y, deeds()].join() === key, ids = [...aims()];      /* (the script's telling of the fight's start arrives meanwhile: that is narration, not a deed) */
       UI.card(null); View.cam.x = P.x + .5; View.cam.y = P.y + .5; camMoved(true); viewDraw();
       const r = View.cv.getBoundingClientRect(), s = w2s(P.x + .5, P.y + .5);
       return { still, foe: !a.pc, ids, pid: P.id, tap: [r.left + s[0], r.top + s[1]], story: st.story.length, name: (st.npcs[a.o.npc] || {}).name, pre, rolled, mid, capBtns, shut };
@@ -2022,8 +2082,8 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     await pg.evaluate(() => document.getElementById('btn-continue').click());
     await pg.waitForFunction(() => G.st && document.body.classList.contains('in-play') && document.getElementById('dialog').classList.contains('open'), null, { timeout: 8000 }).catch(() => {});
     ok(await pg.evaluate(() => G.st.over === 'dead' && document.getElementById('dialog').classList.contains('open') && document.getElementById('dlg-title').textContent === 'The tale ends'), 'and it is still over when the tale is opened again');
-    const told2 = await pg.evaluate(() => ({ chips: document.querySelectorAll('#story-log .st-chip').length, st: G.st.story.filter((e) => e.t === 'chip').length, sys: document.querySelectorAll('#story-log .st-sys').length, sysSt: G.st.story.filter((e) => e.t === 'sys').length }));
-    ok(told2.chips === told2.st && told2.chips >= 4 && told2.sys === told2.sysSt && told2.sys === 2, 'with its story written out again from the save: ' + told2.chips + ' lines of what the dice did, and the opening');
+    const told2 = await pg.evaluate(() => ({ chips: document.querySelectorAll('#story-log .st-chip').length, st: G.st.story.filter((e) => e.t === 'chip').length, sys: document.querySelectorAll('#story-log .st-sys').length, sysSt: G.st.story.filter((e) => e.t === 'sys').length, gm: document.querySelectorAll('#story-log .st-gm.by-script').length, gmSt: G.st.story.filter((e) => e.t === 'gm' && e.src === 'script').length, foot: document.querySelectorAll('#story-log .st-foot').length }));
+    ok(told2.chips === told2.st && told2.chips >= 4 && told2.sys === told2.sysSt && told2.gm === told2.gmSt && told2.gm >= 1 && told2.foot === told2.gm, 'with its story written out again from the save: ' + told2.chips + ' lines of what the dice did, and ' + told2.gm + ' of the script\'s tellings, each still marked as the script\'s');
     await R2.ctx.close();
   }
   }
@@ -2039,7 +2099,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       const st = newGame('tools-1'), x = (n, i) => exec(st, n, i), bible0 = bibleText(st);
       let m = st.maps.S1;
       const defs = toolDefs();
-      row(TOOL_NAMES.length === 25 && defs.every((t) => /^[a-z_]{3,24}$/.test(t.name) && t.description.length > 60 && t.input_schema.type === 'object' && t.input_schema.additionalProperties === false && (t.input_schema.required || []).every((k) => k in t.input_schema.properties)),
+      row(TOOL_NAMES.length === 26 && defs.every((t) => /^[a-z_]{3,24}$/.test(t.name) && t.description.length > 60 && t.input_schema.type === 'object' && t.input_schema.additionalProperties === false && (t.input_schema.required || []).every((k) => k in t.input_schema.properties)),
         'the Game Master has ' + TOOL_NAMES.length + ' tools, each described, each with a closed schema whose required fields exist');
       row(defs.every((t) => Object.values(t.input_schema.properties).every((p) => p.description && p.description.length > 3)), 'and every field of every tool says what it is for');
       /* refusals: one of each kind of bad call, and the tale byte for byte the same afterwards */
@@ -2048,7 +2108,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         ['move', { id: 'P1', toward: 'R99' }], ['move', { id: 'nobody', toward: 'R1' }], ['move', { id: 'P1', toward: '999,999' }], ['travel_party', { to: 'Atlantis' }], ['travel_party', { to: 'S1' }], ['set_door', { door_id: 'D99', open: true }], ['set_door', { door_id: 'D0' }],
         ['place_object', { asset: 'dragon' }], ['place_object', { asset: 'coins' }], ['place_object', { asset: 'coins', on: 'O9999' }], ['remove_object', { object_id: 'O9999' }], ['reveal', { site_id: 'S99' }], ['reveal', { room_id: 'R99' }], ['create_npc', {}], ['create_npc', { role: 'x', template: 'tarrasque' }],
         ['update_npc', { npc_id: 'N99' }], ['update_npc', { npc_id: 'N0', attitude: 'smitten' }], ['update_npc', { npc_id: 'N0', status: 'ascended' }], ['end_combat', { outcome: 'truce' }], ['attack', { attacker_id: 'P1', target_id: 'N0' }], ['attack', { attacker_id: 'P1', target_id: 'nobody' }],
-        ['use_ability', { character_id: 'P1', ability: 'Fireball' }], ['use_ability', { character_id: 'P1', ability: 'Action Surge' }], ['end_turn', {}], ['rest', { kind: 'nap' }], ['advance_time', { minutes: 0 }], ['advance_time', { minutes: 1.5 }],
+        ['use_ability', { character_id: 'P1', ability: 'Fireball' }], ['use_ability', { character_id: 'P1', ability: 'Action Surge' }], ['end_turn', {}], ['rest', { kind: 'nap' }], ['use_thing', { thing_id: 'O9999', verb: 'search' }], ['use_thing', { thing_id: 'O1', verb: 'smash' }], ['use_thing', { verb: 'search' }], ['advance_time', { minutes: 0 }], ['advance_time', { minutes: 1.5 }],
         ['inventory', { op: 'gold', amount: -99999 }], ['inventory', { op: 'take', character_id: 'P1', item: 'crown' }], ['inventory', { op: 'steal' }], ['update_character', { character_id: 'P1', hp_change: 5000 }], ['update_character', { character_id: 'P1', add_conditions: ['sparkly'] }],
         ['create_character', { name: '', class: 'Fighter' }], ['create_character', { name: 'X', class: 'Paladin' }], ['update_quest', { op: 'note', quest_id: 'Q0' }], ['update_quest', { op: 'complete', quest_id: 'Q9' }], ['update_quest', { op: 'add', title: 'x' }],
         ['record_fact', { subject: 'N99', text: 'x y z' }], ['record_fact', { subject: 'world', text: '' }], ['lookup', { query: 'a' }], ['end_scene', { summary: 'no' }], ['nonsense', {}], ['move', null], ['roll_dice', []]];
@@ -2056,7 +2116,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       for (const [n, i] of badCalls) { const r = x(n, i); if (!r.ok && typeof r.error === 'string' && r.error.length > 8) refused++; else slack.push(n + ' ' + JSON.stringify(i)); }
       row(refused === badCalls.length, badCalls.length + ' bad calls, one of each kind, are each refused with a reason' + (slack.length ? ' (accepted: ' + slack.join('; ') + ')' : ''));
       row(snap(st) === before, 'and a refused call changes nothing: the tale is byte for byte what it was');
-      row(new Set(badCalls.map((b) => b[0])).size >= TOOL_NAMES.length - 2, 'the bad calls cover the tools: ' + TOOL_NAMES.filter((n) => !badCalls.some((b) => b[0] === n)).join(', ') + ' have none because they take nothing that can be wrong');
+      row(TOOL_NAMES.filter((n) => !badCalls.some((b) => b[0] === n)).join() === 'start_combat,suggest_character', 'the bad calls cover the tools: ' + TOOL_NAMES.filter((n) => !badCalls.some((b) => b[0] === n)).join(', ') + ' have none because they take nothing that can be wrong');
       /* a tool that throws half way leaves nothing behind */
       TOOLS.__boom = { desc: '', schema: {}, run(s) { s.gold = 9999; s.party[0].hp = 1; s.maps.S1.doors[0].open = !s.maps.S1.doors[0].open; throw new Error('boom'); } };
       const b2 = snap(st), boom = x('__boom', {}); delete TOOLS.__boom;
@@ -2312,7 +2372,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
   {
     const KEY = 'sk-ant-test-key-7f3a';
     /* ---- the real client, against a stand-in for api.anthropic.com ---- */
-    const T1 = await open({ width: 390, height: 844 }, null, { storyOpen: true }), page = T1.page;
+    const T1 = await open({ width: 390, height: 844 }, null, { storyOpen: true, gm: 'ai' }), page = T1.page;
     const calm = (pg, ms) => pg.waitForFunction(() => G.st && !G.busy && !Session.beats.length && !G.st.walk && !View.walking && View.anim.t >= 1 && !document.getElementById('veil').classList.contains('on'), null, { timeout: ms || 15000 });
     const snapOf = (pg, noCosts) => pg.evaluate((noCosts) => { const p = packState(G.st); delete p.saved; if (noCosts) delete p.costs; return JSON.stringify(p); }, !!noCosts);
     const sse = (events) => events.map((e) => 'event: ' + e.type + '\ndata: ' + JSON.stringify(e) + '\n\n').join('');
@@ -2548,7 +2608,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     await T1.ctx.close();
 
     /* a key saved for CYOA on this device is offered, never taken */
-    const T0 = await open({ width: 390, height: 844 }, null, { storyOpen: true }), p0 = T0.page; const asked = [];
+    const T0 = await open({ width: 390, height: 844 }, null, { storyOpen: true, gm: 'ai' }), p0 = T0.page; const asked = [];
     await p0.route('https://api.anthropic.com/**', async (route) => { asked.push(route.request().url()); return route.abort(); });
     await p0.evaluate(() => localStorage.setItem('cyoa.key', 'sk-ant-cyoa-ONE'));
     /* begun by hand rather than with begin(): if the key were taken unasked there would be no opening dialog to wait for, and this must fail by name, not by a timeout */
@@ -2567,7 +2627,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     await T0.ctx.close();
 
     /* ---- the table's side of it, with a stand-in for the model itself ---- */
-    const T2 = await open({ width: 390, height: 844 }, null, { storyOpen: true }), pg = T2.page;
+    const T2 = await open({ width: 390, height: 844 }, null, { storyOpen: true, gm: 'ai' }), pg = T2.page;
     await T2.ctx.addInitScript(() => {
       window.__calls = [];
       window.__CYOA2_MOCK__ = async (api) => {
@@ -2587,11 +2647,13 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     const go = async (site) => { await pg.evaluate((site) => UI.follow(intent(G.st, { t: 'jump', site })), site); await pg.waitForFunction((site) => G.st.here === site && View.map && View.map.id === site && !document.getElementById('veil').classList.contains('on'), site, { timeout: 8000 }); await pg.waitForTimeout(500); await calm(pg); };
     await go('S0'); await go('S1'); await go('S0');
     ok((await kinds()) === 'opening,enter:S0', 'walking out into the town for the first time is a beat; coming back to the inn the tale opened in, and out again, is not: ' + (await kinds()));
-    await pg.evaluate(() => { Settings.data.narrate = 'asked'; }); await go('S3');
-    const quietRun = await kinds();
-    await pg.evaluate(() => { Settings.data.narrate = 'beats'; }); await go('S0'); await go('S3');
-    ok(quietRun === 'opening,enter:S0' && (await kinds()) === 'opening,enter:S0,enter:S3', 'set to speak only when spoken to, the Game Master is not asked for beats; set back, a place not yet told is told when the party next walks in');
-    ok(await pg.evaluate(() => { const c = window.__calls; return c.every((x) => x.bible === c[0].bible) && /^WORLD BIBLE/.test(c[0].bible) && c.every((x) => /^TURN CONTEXT/.test(x.ctx)) && /BOARD IN PLAY: S3/.test(c[2].ctx); }), 'every telling carries the same world bible, byte for byte, and the board the party is standing on');
+    /* narration handed back to the script in the middle of a tale: the model is not asked, the script tells the beat, and the place is told */
+    await pg.evaluate(() => { Settings.data.areas.narrate = 'script'; }); await go('S3');
+    const quietRun = await kinds(), byScript = await pg.evaluate(() => { const st = G.st, e = st.story[st.story.length - 1], row = st.tells.find((r) => r.n === e.n); return { t: e.t, src: e.src, area: e.area, told: st.told.S3, words: e.text.split(' ').length, usd: row && row.usd, rsrc: row && row.src, costs: st.costs.length, foot: [...document.querySelectorAll('#story-log .st-foot > .src')].map((x) => x.textContent).join() }; });
+    await pg.evaluate(() => { Settings.data.areas.narrate = 'ai'; }); await go('S0'); await go('S3'); await go('S4');
+    ok(quietRun === 'opening,enter:S0' && byScript.t === 'gm' && byScript.src === 'script' && byScript.area === 'narrate' && byScript.told === 1 && byScript.words > 8 && byScript.usd === 0 && byScript.rsrc === 'script' && byScript.costs === 2 && byScript.foot === 'AI,AI,Script' && (await kinds()) === 'opening,enter:S0,enter:S4',
+      'narration handed to the script in the middle of a tale: the model is not asked for the next place, the script tells it for nothing and it counts as told; handed back, the next place not yet told is the model\'s again: ' + (await kinds()));
+    ok(await pg.evaluate(() => { const c = window.__calls; return c.every((x) => x.bible === c[0].bible) && /^WORLD BIBLE/.test(c[0].bible) && c.every((x) => /^TURN CONTEXT/.test(x.ctx)) && /BOARD IN PLAY: S4/.test(c[2].ctx) && /\n {2}SCRIPT: /.test(c[2].ctx) && /Narration at the beats: you\./.test(c[2].ctx); }), 'every telling carries the same world bible, byte for byte, the board the party is standing on, and what the script told while it had the telling');
 
     /* the Game Master moves pieces by naming them; the board follows, and the page with it */
     await go('S1');
@@ -2687,6 +2749,894 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     ok(g.seed === 'another-tale' && g.gold === 15 && g.story === 'gm:Told: opening.' && g.late && g.late.ok === false && /another tale/.test(g.late.error) && !g.busy && !g.wait && !/Too late|Gold \+50/.test(g.shown) && g.costs === 1 && g.here === 'S1',
       'a tale opened from a file while another was being told: the old telling\'s tools are refused, its words and its failure reach nothing, and the new tale is exactly as it was opened');
     await T2.ctx.close();
+  }
+  }
+
+  if (want('U')) {
+  /* ------------------------------------------------------------------ U */
+  console.log('U. the script\'s tale, in the engine alone');
+  {
+    const U = await open({ width: 390, height: 844 }), page = U.page;
+    await page.evaluate(PLAYER);
+    const rows = await page.evaluate((N) => {
+      const rows = [], row = (c, m) => rows.push([!!c, m]);
+      const snap = (st) => JSON.stringify(packState(st)).replace(/"saved":\d+/, '');
+      const copy = (st) => unpackState(JSON.parse(JSON.stringify(packState(st))));
+      const force = (st, die, v) => { for (let n = st.n.roll; n < st.n.roll + 4000; n++) if (1 + Math.floor(rngFor(st.seed, 'dice', n)() * die) === v) { st.n.roll = n; return true; } return false; };
+      const party4 = (seed) => { const st = newGame(seed); for (let k = 0; k < 3; k++) intent(st, { t: 'party', op: 'add' }); return st; };
+      /* stand the leader beside someone, as a walk would have */
+      const beside = (st, npcId) => { const m = st.maps[st.here], t = m.tokens.find((q) => q.npc === npcId), L = leadOf(st); if (!t) return false; const f = STEPS.map((s) => [t.x + s[0], t.y + s[1]]).find((q) => tileFree(m, q[0], q[1]) && !taken(st, m, q[0], q[1], L.id) && meleeClear(m, q[0], q[1], t.x, t.y)); if (!f) return false; L.x = f[0]; L.y = f[1]; look(st); return !!visOf(st).g[t.y * m.w + t.x]; };
+      const at = (st, site, npcId) => { if (st.here !== site) intent(st, { t: 'jump', site }); return beside(st, npcId); };
+      const ask = (st, npc, topic) => intent(st, { t: 'talk', npc, topic });
+      const seedWith = (pred, tag) => { for (let k = 0; k < 400; k++) { const st = party4(tag + '-' + k); if (pred(st)) return st; } return null; };
+      const xpOf = (st) => st.party.map((p) => p.xp).join();
+
+      /* 1. the script is tables */
+      {
+        const bad = [];
+        for (const t of THREADS_MAIN) { const M = MAIN[t.k]; if (!M || !['free', 'chief', 'relic'].includes(M.goal) || !/^N\d$/.test(M.giver) || [M.ask, M.job, M.met, M.done].some((x) => typeof x !== 'string' || x.length < 8)) bad.push('main ' + t.k); }
+        for (const t of THREADS_SIDE) { const W = WHISPERS[t.k]; if (!W || [W.title, W.ask, W.goal, W.win, W.note].some((x) => typeof x !== 'string' || x.length < 8) || !Array.isArray(W.tell) || W.tell.length < 2 || !/^N\d$/.test(W.who) || (W.check && !(W.check.every((c) => SKILLS[c]) && W.dc >= 8 && W.dc <= 20 && W.lose.length > 8))) bad.push('whisper ' + t.k); }
+        for (const g of ['keeper', 'smith', 'shopk', 'priest', 'elder', 'patron', 'cook', 'resident', 'folk']) if (!(GREET[g] || []).length || !(GANG[g] || []).length || (IDLE[g] || []).length < 2) bad.push('lines for a ' + g);
+        for (const k of Object.keys(ITEMS)) if (!['heal', 'pick', 'force', 'plot'].includes(ITEMS[k].use) || (ITEMS[k].use === 'heal' && !parseDice(ITEMS[k].dice)) || itemKey(k) !== k) bad.push('item ' + k);
+        row(!bad.length && Object.keys(MAIN).length === THREADS_MAIN.length && Object.keys(WHISPERS).length === THREADS_SIDE.length && AREAS.join() === 'narrate,talk,act,monsters,create',
+          'the script is tables: each matter at hand the seed can deal has its giver, its goal and its lines; each whisper its teller\'s lines, the one it is settled with and its check; each kind of person a greeting, a word on the gang and small talk' + (bad.length ? ': ' + bad.join('; ') : ''));
+      }
+
+      /* 2. no line leaves a blank unfilled, on any world */
+      {
+        let n = 0; const bad = [], say = new Set();
+        const chk = (t, where) => { n++; say.add(t); if (typeof t !== 'string' || !t || /[{}]|undefined|\bnull\b|NaN|\[object|"/.test(t) || / {2,}/.test(t) || !/^[A-Z“\[]/.test(t)) bad.push(where + ': ' + String(t).slice(0, 70)); };
+        for (let k = 0; k < N; k++) {
+          const st = party4('lines-' + k);
+          chk(beatText(st, 'opening'), 'opening');
+          for (const id of ['S0', 'S1', 'S3', 'S4', 'S5', 'S2']) {
+            intent(st, { t: 'jump', site: id }); chk(beatText(st, 'enter'), 'entering ' + id);
+            for (const t of st.maps[id].tokens) { const nn = st.npcs[t.npc]; if (t.k === 'foe' || !nn) continue; chk(greetOf(st, nn), 'the greeting of ' + nn.role);
+              for (const x of topicsFor(st, t.npc)) { chk(x.label, 'a button'); if (x.off) continue; const r = talkOf(st, t.npc, x.id, true); if (!r.ok) bad.push(x.id + ' asked of ' + nn.role + ' is refused'); else chk(r.text, x.id + ' asked of ' + nn.role); } }
+          }
+          for (const d of ['The fight is won.', 'The party is beaten. They wake at the inn the next morning, half their gold gone.', 'The party stands down.']) chk(beatText(st, 'fightend', d), 'a fight ending');
+          chk(beatText(st, 'ending'), 'the ending'); chk(actTwin(st), 'the table\'s twin'); chk(talkTwin(st, 'N6', 'who has the keys?'), 'a talk twin');
+          for (const w of Object.keys(WHISPERS)) for (const f of ['goal', 'win', 'lose', 'shown', 'note', 'ask']) if (WHISPERS[w][f]) chk(fillT(st, WHISPERS[w][f], { n: 'Ned', role: 'smith' }), w + '.' + f);
+          for (const m of Object.keys(MAIN)) for (const f of ['ask', 'job', 'met', 'done']) chk(fillT(st, MAIN[m][f]), m + '.' + f);
+        }
+        row(!bad.length && n > N * 90 && say.size > N * 25, 'over ' + N + ' worlds every line the script can say is whole: no blank left unfilled, no stray quote, a capital at the head (' + n + ' lines, ' + say.size + ' different)' + (bad.length ? ': ' + bad.slice(0, 4).join(' | ') : ''));
+      }
+
+      /* 3. asking what the script WOULD say changes nothing, and the same question has the same answer */
+      {
+        const st = party4('pure-1'); intent(st, { t: 'jump', site: 'S0' }); beside(st, 'N4');
+        const b = snap(st), roll = st.n.roll, e1 = beatText(st, 'enter'), e2 = beatText(st, 'enter'), o1 = beatText(st, 'opening'), f1 = beatText(st, 'fightend', 'The fight is won.');
+        const dry = topicsFor(st, 'N4').filter((x) => !x.off).map((x) => talkOf(st, 'N4', x.id, true).text), tw = talkTwin(st, 'N4', 'What do you know about the bandits in the cave?'), tw2 = talkTwin(st, 'N4', 'xyzzy plugh'), act = actTwin(st);
+        row(e1 === e2 && e1.length > 40 && o1.length > 120 && f1.length > 10 && dry.length >= 3 && dry.every((t) => t.length > 20) && snap(st) === b && st.n.roll === roll,
+          'asking what the script WOULD say is free: the beats and every topic of the elder\'s, asked dry, leave the tale byte for byte the same and roll no dice');
+        row(/^\[Ask about /.test(tw) && tw.includes(dry[topicsFor(st, 'N4').filter((x) => !x.off).findIndex((x) => x.id === 'gang')]) && /answers topics, not typed lines/.test(tw2) && /cannot read a typed line/.test(act) && snap(st) === b,
+          'for a typed line the script offers its nearest topic (bandits: the gang), or says plainly that it answers topics; for a line to the table, what the board offers. Neither changes anything');
+        const again = party4('pure-1'), other = party4('pure-2');
+        row(beatText(again, 'opening') === o1 && beatText(other, 'opening') !== o1 && greetOf(again, again.npcs.N0) === greetOf(st, st.npcs.N0), 'the same seed reads the same and another seed reads otherwise');
+      }
+
+      /* 4. whole tales, by the suite's own player */
+      {
+        const T = []; for (let k = 0; k < N; k++) T.push(playTale('tale-' + k, {}));
+        const lost = T.filter((r) => !r.won), broke = T.filter((r) => r.broken), mains = new Set(T.map((r) => r.k)), sides = new Set([].concat(...T.map((r) => r.sides)));
+        const kinds = {}; for (const r of T) for (const k of Object.keys(r.refused)) kinds[k] = (kinds[k] || 0) + r.refused[k];
+        const odd = Object.keys(kinds).filter((k) => !/^(move:(blocked|noway|spent|unseen)|talk:unheard)$/.test(k));
+        row(!lost.length, 'a party of four played by the suite\'s own player finishes the tale on every one of ' + N + ' seeds: the matter at hand done in deed, reported, and paid' + (lost.length ? ' - not on ' + lost.slice(0, 4).map((r) => r.seed + ' (' + r.why + ')').join(', ') : ''));
+        row(!broke.length && T.every((r) => !/THREW/.test(r.why)), 'and after every deed the engine accepted the tale was whole: nobody sharing a square, nobody past their sheet, the purse never in debt' + (broke.length ? ' - ' + broke[0].seed + ': ' + broke[0].broken : ''));
+        row(T.every((r) => r.heard === 2) && T.filter((r) => r.whispers === 2).length >= N * .6 && T.every((r) => /Q0:done/.test(r.quests)), 'both whispers are heard on every seed by asking around, and both are settled on most (' + T.filter((r) => r.whispers === 2).length + ' of ' + N + ')');
+        row(mains.size === 4 && sides.size === 6, 'between them the seeds dealt all four matters at hand and all six whispers');
+        row(!odd.length, 'the only things the engine refused the player were ways it could not walk and people it could not see' + (odd.length ? ' - also ' + odd.map((k) => k + ' x' + kinds[k]).join(', ') : ''));
+        row(T.every((r) => r.tries <= 6 && !r.stale) && T.reduce((n, r) => n + r.days, 0) / N < 4, 'no fight ends in a standstill, and the hill is taken within a few days (' + (T.reduce((n, r) => n + r.days, 0) / N).toFixed(1) + ' on average, ' + (T.reduce((n, r) => n + r.tries, 0) / N).toFixed(1) + ' climbs)');
+        row(T.every((r) => r.ending.includes(r.ending.split(' ')[0]) && r.ending.length > 120 && /The road out of /.test(r.ending)), 'and each won tale has an ending to tell');
+        const twice = playTale('tale-3', {}), first = T[3];
+        row(JSON.stringify(twice) === JSON.stringify(first), 'the same seed played the same way is the same tale, to the last coin');
+        /* alone it is hard, and is meant to be: the row is here so that a change which makes it impossible, or trivial, is seen */
+        const solo = []; for (let k = 0; k < N; k++) solo.push(playTale('tale-' + k, { party: 1, tries: 8 }));
+        const sw = solo.filter((r) => r.won).length;
+        row(solo.every((r) => !r.broken && !/THREW/.test(r.why)) && sw >= N * .5 && sw < N, 'one traveller alone can finish it too, by going back up the hill until the gang is worn down: ' + sw + ' of ' + N + ' within eight climbs, and never a broken tale');
+      }
+
+      /* 5. talking: who can be asked what, and what cannot be asked at all */
+      {
+        const st = party4('talk-1'), L = leadOf(st);
+        const b0 = snap(st), far = ask(st, 'N0', 'gang');                      /* the keeper is in the common room; the party wakes upstairs */
+        intent(st, { t: 'jump', site: 'S0' }); beside(st, 'N4');
+        const b1 = snap(st), r1 = ask(st, 'N4', 'the weather'), r2 = ask(st, 'N0', 'gang'), r3 = ask(st, 'nobody', 'gang');
+        const tk = topicsFor(st, 'N2').find((x) => x.id.startsWith('buy:'));
+        row(far.why === 'unheard' && snap(newGame('talk-0')) !== '' && r1.why === 'notopic' && r2.why === 'notarget' && r3.why === 'notarget' && snap(st) === b1 && b0.length > 100,
+          'nobody is asked what they cannot be asked: someone out of sight, someone on another board, nobody at all, a topic they do not have. Each is refused in words and changes nothing');
+        L.status = 'down'; L.hp = 0; const down = ask(st, 'N4', 'gang'); L.status = 'ok'; L.hp = L.hpMax;
+        const cv = copy(st); intent(cv, { t: 'jump', site: 'S2' }); intent(cv, { t: 'rounds', op: 'start' }); const inr = ask(cv, 'N6', 'plea'), inu = intent(cv, { t: 'use', what: 'O1', verb: 'search' });
+        row(down.why === 'downed' && inr.why === 'inround' && inu.why === 'inround', 'nor does anyone talk, or rummage, while lying down or in the middle of a round');
+        void tk;
+      }
+      {
+        const st = party4('mend-1'); at(st, 'S5', 'N3'); const none = topicsFor(st, 'N3').some((x) => x.id === 'mend');
+        st.party[0].hp = 2; st.party[1].hp = 0; st.party[1].status = 'stable'; st.gold = 9; const top = topicsFor(st, 'N3').find((x) => x.id === 'mend'), t0 = st.time.day * 1440 + st.time.minute, dry = talkOf(st, 'N3', 'mend', true), g0 = st.gold, r = ask(st, 'N3', 'mend');
+        const poor = party4('mend-2'); at(poor, 'S5', 'N3'); poor.party[0].hp = 1; poor.gold = 3; const tp = topicsFor(poor, 'N3').find((x) => x.id === 'mend'), rp = ask(poor, 'N3', 'mend'); poor.party[0].hp = 1; poor.gold = 0; const tz = topicsFor(poor, 'N3').find((x) => x.id === 'mend'), rz = ask(poor, 'N3', 'mend');
+        row(!none && top && top.sub === '5 gold' && dry.ok && g0 === 9 && r.ok && st.gold === 4 && st.party.every((p) => p.hp === p.hpMax && p.status === 'ok') && st.time.day * 1440 + st.time.minute === t0 + 50 && !topicsFor(st, 'N3').some((x) => x.id === 'mend') && r.lines.some((z) => z.k === 'heal' && /for 5 gold/.test(z.t)) &&
+          tp.sub === '3 gold' && rp.ok && poor.gold === 0 && tz.sub === 'for charity' && rz.ok && poor.party[0].hp === poor.party[0].hpMax, 'the priest tends the wounded when there are any: everyone whole again, the fallen on their feet, most of an hour gone, for five gold, or for what the purse holds, or for charity');
+      }
+      /* the matter at hand, all four ways: offered, done in deed (by whatever means), reported, paid, and not twice */
+      for (const k of ['kidnap', 'toll', 'relic', 'caravan']) {
+        const st = seedWith((s) => mainK(s) === k, 'main-' + k);
+        if (!st) { row(false, 'no seed deals ' + k); continue; }
+        const g = giverOf(st), L = leadOf(st), home = st.npcs[g].home;
+        at(st, home, g);
+        const t0 = topicsFor(st, g).map((x) => x.id), job = ask(st, g, 'job'), t1 = topicsFor(st, g).map((x) => x.id);
+        const early = ask(st, g, 'report');
+        if (MAIN[k].goal === 'free') st.npcs.N6.kind = 'npc'; else if (MAIN[k].goal === 'chief') st.npcs.N5.status = 'defeated'; else giveItem(L, 'silver reliquary');
+        const p1 = plotCheck(st), p2 = plotCheck(st), t2 = topicsFor(st, g).map((x) => x.id), gold0 = st.gold, xp0 = st.party.map((p) => p.xp), sums = st.summaries.length;
+        const rep = ask(st, g, 'report'), b = snap(st), twice = ask(st, g, 'report');
+        row(g === MAIN[k].giver && t0.includes('job') && !t0.includes('report') && job.ok && job.text.includes(st.npcs[g].name) && flag(st, 'job') && !t1.includes('job') && early.why === 'notopic',
+          k + ': ' + st.npcs[g].role + ' offers the task, once, and cannot be told it is done before it is');
+        row(p1.some((z) => /should hear of it/.test(z.t)) && !p2.some((z) => /should hear of it/.test(z.t)) && goalMet(st) && t2.includes('report') && rep.ok && rep.next === 'ending' && st.gold === gold0 + MAIN_GOLD && st.party.every((p, i) => p.xp === xp0[i] + MAIN_XP) && st.quests.Q0.status === 'done' && st.summaries.length === sums + 1 && rep.lines.some((z) => /done\.$/.test(z.t)),
+          k + ': once it is true in deed the plot says so once, the giver can be told, and telling them pays ' + MAIN_GOLD + ' gold and ' + MAIN_XP + ' experience each and closes the task');
+        row(twice.why === 'notopic' && snap(st) === b && !topicsFor(st, g).some((x) => x.id === 'job' || x.id === 'report'), k + ': and it is paid once');
+      }
+      /* news: two of the five named townsfolk know each whisper, never the one it is about */
+      {
+        let ok1 = true, ok2 = true, told = 0, why = '';
+        for (let k = 0; k < N; k++) {
+          const st = party4('news-' + k);
+          for (const w of sideKs(st)) { const T2 = tellersOf(st, w); if (T2.length !== 2 || T2.includes(WHISPERS[w].about) || T2[0] === T2[1] || T2.join() !== tellersOf(st, w).join()) { ok1 = false; why = 'news-' + k + ' ' + w + ' ' + T2.join(); } }
+          for (let pass = 0; pass < 2; pass++) for (const [site, id] of [['S1', 'N0'], ['S3', 'N1'], ['S4', 'N2'], ['S5', 'N3'], ['S0', 'N4']]) { if (!at(st, site, id)) continue; const q = Object.keys(st.quests).length, r = ask(st, id, 'news'); if (r.ok && Object.keys(st.quests).length > q) told++; }
+          if (sideKs(st).some((w) => !flag(st, 'heard:' + w)) || Object.keys(st.quests).length !== 3) { ok2 = false; why = 'news-' + k + ' heard ' + sideKs(st).filter((w) => flag(st, 'heard:' + w)).join(); }
+        }
+        row(ok1, 'each whisper is known to exactly two of the five named townsfolk, the same two every time, and never to the one it is about' + (why && !ok1 ? ': ' + why : ''));
+        row(ok2 && told === N * 2, 'asking those five for news, twice round, always brings both whispers out, each as a task of its own and each only once (' + told + ' told over ' + N + ' seeds)' + (why && !ok2 ? ': ' + why : ''));
+        { let quiet = 0, loud = 0;
+          for (let k = 0; k < N; k++) { const s2 = party4('news-' + k), tell = new Set([].concat(...sideKs(s2).map((w) => tellersOf(s2, w))));
+            for (const [site, id] of [['S1', 'N0'], ['S3', 'N1'], ['S4', 'N2'], ['S5', 'N3'], ['S0', 'N4']]) { if (tell.has(id) || !at(s2, site, id)) continue; const r = ask(s2, id, 'news'); if (r.ok && Object.keys(s2.quests).length === 1 && !r.lines.length) quiet++; else loud++; } }
+          row(quiet >= N && loud === 0, 'and one of the five who is not among a whisper\'s tellers has only small talk when asked for news (' + quiet + ' asked)'); }
+        { const F = party4('best-1').party[0], B = (() => { const z = newGame('best-2'); intent(z, { t: 'party', op: 'class', id: 'P1', cls: 'Bard' }); return z.party[0]; })(), bf = bestCheck(F, ['persuasion', 'intimidation']), bb = bestCheck(B, ['persuasion', 'intimidation']), one = bestCheck(F, ['insight']);
+          row(bf.name === 'intimidation' && bf.mod === 2 && bb.name === 'persuasion' && bb.mod === 4 && one.name === 'insight' && bestCheck(F, ['intimidation', 'persuasion']).name === 'intimidation', 'where a whisper may be pressed two ways, whoever leads uses the one they are better at: the fighter leans on them (+2), the bard talks them round (+4)'); }
+        const st = party4('news-idle'); at(st, 'S5', 'N3'); for (const w of sideKs(st)) hearWhisper(st, w);
+        { const j = copy(st), n0 = j.log.length, ev0 = j.n.ev, dry = talkOf(j, 'N3', 'gang', true), n1 = j.log.length, r = ask(j, 'N3', 'gang'), e = j.log[j.log.length - 1];
+          row(dry.ok && n1 === n0 && r.ok && j.log.length === n0 + 1 && e.t === 'talk' && e.npc === 'N3' && e.topic === 'gang' && e.who === leadOf(j).id && e.n === ev0, 'a question asked is an event in the journal (who asked whom about what); the same question asked dry is not'); }
+        const i1 = ask(st, 'N3', 'news').text, i2 = ask(st, 'N3', 'news').text, i3 = ask(st, 'N3', 'news').text, i4 = ask(st, 'N3', 'news').text, back = copy(st);
+        row(i1 !== i2 && i2 !== i3 && i4 === i1 && IDLE.priest.every((l) => [i1, i2, i3].some((t) => t.includes(l.slice(1, 30)))) && flag(back, 'n:N3') === 4 && /^[A-Z][a-z]+: “/.test(i1), 'with nothing left to tell, someone asked again goes through their small talk in turn rather than saying the same thing twice, a bare line of speech says whose it is, and the save remembers how far they got');
+      }
+
+      /* 6. the whispers, settled: each with the dice made to fall both ways */
+      const withW = (w) => { const st = seedWith((s) => sideKs(s).includes(w), 'w-' + w); if (st) hearWhisper(st, w); return st; };
+      for (const w of ['debt', 'blades', 'informer']) {
+        const st = withW(w), W = WHISPERS[w], who = W.who;
+        if (!st || !at(st, st.npcs[who].home, who)) { row(false, w + ': could not be set up'); continue; }
+        { const un = seedWith((z) => sideKs(z).includes(w), 'w-' + w), set = un && at(un, un.npcs[who].home, who), tops = set ? topicsFor(un, who) : [], b = set ? snap(un) : '', r = set ? ask(un, who, 'w:' + w) : {};
+          row(set && tops.length > 0 && !tops.some((x) => x.id === 'w:' + w) && r.why === 'notopic' && snap(un) === b, w + ': until somebody in town has passed the whisper on there is nothing to put to the one it is about, and asking anyway is refused and rolls nothing'); }
+        const L = leadOf(st), other = st.party.find((p) => p !== L), top0 = topicsFor(st, who).find((x) => x.id === 'w:' + w), qid = flag(st, 'heard:' + w), xp0 = xpOf(st);
+        force(st, 20, 1); const lose = ask(st, who, 'w:' + w), top1 = topicsFor(st, who).find((x) => x.id === 'w:' + w), b = snap(st), again = ask(st, who, 'w:' + w);
+        row(top0 && !top0.off && /DC \d+/.test(top0.sub) && top0.sub.includes(L.name.split(' ')[0]) && lose.ok && lose.text.includes(fillT(st, W.lose, { n: st.npcs[who].name.split(' ')[0] }).slice(0, 30)) && lose.lines.some((z) => z.k === 'check' && /a failure/.test(z.t)) && !flag(st, 'done:' + w) && xpOf(st) === xp0 &&
+          top1 && /has tried/.test(top1.off) && again.why === 'notopic' && /has tried/.test(again.say) && snap(st) === b, w + ': the asking is a check, shown on its button with whose it is; on a 1 they give nothing away, and the same traveller may not ask again');
+        intent(st, { t: 'lead', id: other.id }); beside(st, who);
+        const top2 = topicsFor(st, who).find((x) => x.id === 'w:' + w); force(st, 20, 20); const win = ask(st, who, 'w:' + w);
+        row(top2 && !top2.off && top2.sub.includes(other.name.split(' ')[0]) && win.ok && win.lines.some((z) => /a success/.test(z.t)) && flag(st, 'done:' + w) === 1 && st.quests[qid].status === 'done' && st.party.every((p) => p.xp === SIDE_XP) && !topicsFor(st, who).some((x) => x.id === 'w:' + w) && st.facts.some((f) => f.subject === who),
+          w + ': another traveller may, and on a 20 it is settled: the task done, ' + SIDE_XP + ' experience each, a fact recorded, the topic gone');
+        if (w === 'debt') { const cave = st.maps.S2, gi = cave ? cave.rooms.findIndex((r) => r.kind === 'cave_guard') : -1; let seen = 0, all = 0; if (cave) for (let i = 0; i < cave.w * cave.h; i++) if (cave.rg[i] === gi + 1) { all++; if (cave.seen[i]) seen++; }
+          at(st, 'S1', 'N0'); const g = st.gold, bed = topicsFor(st, 'N0').find((x) => x.id === 'bed'), r = ask(st, 'N0', 'bed');
+          row(flag(st, 'freebed') && cave && all > 0 && seen === all && bed.sub === 'free' && r.ok && st.gold === g && r.lines.some((z) => /for nothing/.test(z.t)), 'debt: the keeper\'s confession marks the guard post of the hideout on the party\'s map, and the beds are free from then on'); }
+        if (w === 'blades') { const mk = (keen, cls, weapon) => { const c = party4('keen-1'); if (keen) setFlag(c, 'keen'); intent(c, { t: 'jump', site: 'S2' }); const m = c.maps.S2, F = c.party.find((p) => p.cls === cls), tok = m.tokens.find((t) => t.k === 'foe');
+            for (const t of m.tokens.slice()) if (t.k === 'foe' && t !== tok) dropToken(c, m, t);
+            /* a blade stands beside its mark; a spell two or three squares off with a clear line, so that nobody is at its caster's elbow */
+            let spot = null; for (let i = 0; i < m.w * m.h && !spot; i++) { const x = i % m.w, y = (i - x) / m.w, d = cheb({ x, y }, tok); if (!tileFree(m, x, y) || taken(c, m, x, y, F.id)) continue; if (weapon === 'Longsword' ? d === 1 && meleeClear(m, x, y, tok.x, tok.y) : d >= 2 && d <= 3 && sightFrom(m, x, y, 8)[tok.y * m.w + tok.x]) spot = [x, y]; }
+            F.x = spot[0]; F.y = spot[1]; look(c); intent(c, { t: 'rounds', op: 'start' }); for (let g = 0; g < 40 && turnOf(c).id !== F.id; g++) intent(c, { t: 'end' }); const S = sheetOf(c, tok, true); S.hp = S.hpMax = 200; S.ac = 5;
+            for (let n = 500; n < 900; n++) if (1 + Math.floor(rngFor(c.seed, 'dice', n)() * 20) === 12) { c.n.roll = n; break; }
+            c.round.act = 1; return intent(c, { t: 'attack', who: F.id, target: tok.id, attack: weapon }); };
+          const plain = mk(false, 'Fighter', 'Longsword'), keen = mk(true, 'Fighter', 'Longsword'), sp0 = mk(false, 'Cleric', 'Sacred Flame'), sp1 = mk(true, 'Cleric', 'Sacred Flame');
+          row(flag(st, 'keen') && plain.ok && keen.ok && plain.hit && keen.hit && keen.natural === 12 && plain.natural === 12 && keen.dmg === plain.dmg + 1 && /keen edge \+1/.test(keen.say) && !/keen/.test(plain.say), 'blades: the smith\'s whetstone is real: the same blow on the same dice does exactly one more damage (' + plain.dmg + ' and ' + keen.dmg + ')');
+          row(sp0.ok && sp1.ok && sp0.hit && sp1.hit && sp0.mode === 'normal' && sp1.dmg === sp0.dmg && !/keen/.test(sp1.say), 'blades: and a spell is not a blade: Sacred Flame on the same dice does the same with or without it (' + sp0.dmg + ')'); }
+        if (w === 'informer') { const c1 = copy(st); intent(c1, { t: 'jump', site: 'S2' }); const m = c1.maps.S2, gi = m.rooms.findIndex((r) => r.kind === 'cave_guard'), guards = m.tokens.filter((t) => t.k === 'foe' && m.rg[t.y * m.w + t.x] === gi + 1), rest = m.tokens.filter((t) => t.k === 'foe' && m.rg[t.y * m.w + t.x] !== gi + 1);
+          const plainTale = party4(st.seed); intent(plainTale, { t: 'jump', site: 'S2' }); const awakeThere = plainTale.maps.S2.tokens.filter((t) => t.k === 'foe').every((t) => !sheetOf(plainTale, t, true).asleep);
+          row(flag(c1, 'hush') && guards.length >= 1 && guards.every((t) => sheetOf(c1, t, false).asleep > 0) && rest.every((t) => !sheetOf(c1, t, true).asleep) && awakeThere, 'informer: with no lamp in the window the lookouts at the mouth of the hideout are found asleep (' + guards.length + '), and nobody deeper in is; in a tale where the lamp still burns they are all awake');
+          const late = copy(st); chart(late, 'S2'); late.met.S2 = [late.maps.S2.tokens.find((t) => t.k === 'foe').id]; intent(late, { t: 'jump', site: 'S2' });
+          row(flag(late, 'hush') === 1 && late.maps.S2.tokens.filter((t) => t.k === 'foe').every((t) => !sheetOf(late, t, true).asleep), 'informer: but a lamp put out after the gang has already seen the party on their hill comes too late: nobody is found dozing');
+          const seenSleepers = guards.filter((t) => visOf(c1).g[t.y * m.w + t.x]).length, others = rest.filter((t) => visOf(c1).g[t.y * m.w + t.x]).length;
+          row(seenSleepers === 0 || others > 0 || !threatOf(c1), 'informer: and a sleeper in plain sight is no threat: nothing forces a fight on a party that can see only them'); }
+      }
+      {
+        const st = withW('debt'), b = at(st, 'S1', 'N0'), L = leadOf(st); giveItem(L, 'a letter in the keeper’s hand');
+        const top = topicsFor(st, 'N0').find((x) => x.id === 'w:debt'), roll = st.n.roll, r = ask(st, 'N0', 'w:debt');
+        row(b && top && /letter/.test(top.label) && !top.sub && r.ok && st.n.roll === roll && flag(st, 'done:debt') && r.text.includes('handwriting') && !r.lines.some((z) => z.k === 'check'), 'debt: with the letter from the chief\'s desk in hand there is nothing to roll: the keeper is shown it, and that settles it');
+        const s2 = withW('informer'); at(s2, 'S4', 'N2'); giveItem(leadOf(s2), 'the gang’s ledger'); const t2 = topicsFor(s2, 'N2').find((x) => x.id === 'w:informer'), roll2 = s2.n.roll, r2 = ask(s2, 'N2', 'w:informer');
+        row(t2 && /ledger/.test(t2.label) && r2.ok && s2.n.roll === roll2 && flag(s2, 'done:informer'), 'informer: and a name in the gang\'s ledger does the same for whoever it names');
+      }
+      {
+        const st = withW('tunnel'); at(st, 'S1', 'N0'); const had = !!st.maps.S2, r = ask(st, 'N0', 'w:tunnel'), m = st.maps.S2; let floor = 0, seen = 0; if (m) for (let i = 0; i < m.w * m.h; i++) if (TWALK[m.t[i]]) { floor++; if (m.seen[i]) seen++; }
+        row(!had && r.ok && !r.lines.some((z) => z.k === 'check') && m && floor > 50 && seen === floor && flag(st, 'done:tunnel') && st.here === 'S1', 'tunnel: the keeper\'s old survey needs no check and charts the hideout whole: every square of its floor is on the map before anyone has climbed the hill (' + floor + ' squares)');
+      }
+      {
+        const st = withW('kin'), N = namesOf(st);
+        const c0 = copy(st); intent(c0, { t: 'jump', site: 'S2' }); const before = topicsFor(c0, 'N5').length;
+        at(st, 'S5', 'N3'); const told = ask(st, 'N3', 'w:kin');
+        row(before === 0 && told.ok && told.text.includes(N.pet) && flag(st, 'done:kin') && PET_NAMES.includes(N.pet) && petName(party4(st.seed)) === N.pet, 'kin: the priest gives the chief\'s childhood name, fixed by the seed (' + N.pet + '); until then the chief has nothing to be said to');
+        intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2, chief = m.tokens.find((t) => t.npc === 'N5'), L = leadOf(st), f = freeNear(st, m, chief.x, chief.y, L.id); L.x = f[0]; L.y = f[1]; look(st);
+        const top = topicsFor(st, 'N5'), win = copy(st), lose = copy(st), foes0 = m.tokens.filter((t) => t.k === 'foe').length;
+        force(win, 20, 20); const w = ask(win, 'N5', 'name'), wm = win.maps.S2;
+        row(top.length === 1 && top[0].id === 'name' && top[0].label.includes(N.pet) && /Persuasion DC 12/.test(top[0].sub) && w.ok && w.next === '' && foes0 >= 4 && !wm.tokens.some((t) => t.k === 'foe') && chiefOut(win) && win.npcs.N5.status === 'gone' && carries(win, 'the gang’s keys') && win.party.every((p) => p.xp > SIDE_XP) && flag(win, 'called') && !topicsFor(win, 'N5').length && !win.round && win.summaries.length === st.summaries.length + 1,
+          'kin: said to the chief\'s face on a 20, the name ends it: the whole gang (' + foes0 + ') files out, the keys are thrown down, half the fight\'s experience is earned without a blow');
+        force(lose, 20, 1); const l = ask(lose, 'N5', 'name');
+        row(l.ok && l.next === 'fight' && lose.maps.S2.tokens.filter((t) => t.k === 'foe').length === foes0 && flag(lose, 'called') && !topicsFor(lose, 'N5').length && ask(lose, 'N5', 'name').why === 'notopic', 'kin: on a 1 it is an insult, the fight is on, and the name cannot be tried twice');
+      }
+      {
+        const st = withW('ledger'); at(st, 'S0', 'N4'); const none = topicsFor(st, 'N4').some((x) => x.id === 'w:ledger'); giveItem(leadOf(st), 'the gang’s ledger');
+        const g = st.gold, r = ask(st, 'N4', 'w:ledger');
+        row(!none && r.ok && st.gold === g + 30 && st.party.every((p) => p.xp === SIDE_XP) && !carries(st, 'the gang’s ledger') && flag(st, 'done:ledger'), 'ledger: the elder cannot be handed a book the party does not have; with it in hand it is worth 30 gold, and it leaves the pack');
+        const s2 = seedWith((s) => sideKs(s).includes('ledger'), 'w-ledger-b'), had = flag(s2, 'heard:ledger'); giveItem(leadOf(s2), 'the gang’s ledger'); plotCheck(s2);
+        row(!had && typeof flag(s2, 'heard:ledger') === 'string' && s2.quests[flag(s2, 'heard:ledger')].title === WHISPERS.ledger.title, 'ledger: a party that finds the book before hearing of it learns what it has: the task appears by itself');
+      }
+
+      /* 7. things: what a chest, a desk or a lock offers, and what comes of it */
+      {
+        const st = party4('things-1'); const inn = st.maps.S1, chest = inn.objs.find((o) => CONTAINERS[o.a] && !o.on);
+        row(chest && lootOf(st, inn, chest) === null && verbsFor(st, chest.id).length === 0 && intent(st, { t: 'use', what: chest.id, verb: 'search' }).why === 'noverb', 'a chest in somebody\'s inn is not for rummaging: it holds nothing for the script and offers nothing');
+        intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2; for (const t of m.tokens.slice()) if (t.k === 'foe') dropToken(st, m, t); look(st);
+        const L = leadOf(st), S = plotSpots(st), tops = m.objs.filter((o) => !o.on && CONTAINERS[o.a]), loot = (o) => lootOf(st, m, o), strong = m._.byId.get(S.strong);
+        const open1 = tops.find((o) => !loot(o).lock && (loot(o).gold > 0 || loot(o).items.length) && o.id !== S.desk), locked = tops.find((o) => loot(o).lock && o.id !== S.strong);
+        row(tops.length >= 6 && tops.every((o) => JSON.stringify(loot(o)) === JSON.stringify(loot(o))) && strong && loot(strong).lock && loot(strong).dc === 15 && loot(strong).gold >= 30 && loot(strong).items.includes('healing draught') && S.desk && S.desk !== S.strong && m.rooms[m.rg[strong.y * m.w + strong.x] - 1].kind === 'cave_chief',
+          'in the hideout what a thing holds is fixed by the seed and by which thing it is; the chief\'s own strongbox is in the chief\'s chamber, locked, harder than the rest, and worth opening (' + tops.length + ' things to search)');
+        { const was = JSON.stringify(tops.map(loot)); addMinutes(st, 777); st.n.roll += 13; st.gold += 5; st.turn += 3; const anew = party4('things-1'), ma = chart(anew, 'S2'); row(JSON.stringify(tops.map(loot)) === was && JSON.stringify(tops.map((o) => lootOf(anew, ma, ma._.byId.get(o.id)))) === was, 'and it holds the same whenever it is asked: a day later, after other dice have been rolled, or in the same tale begun again'); st.gold -= 5; }
+        const b0 = snap(st), far = intent(st, { t: 'use', what: open1.id, verb: 'search' }), bogus = intent(st, { t: 'use', what: 'O9999', verb: 'search' }), wrong = intent(st, { t: 'use', what: open1.id, verb: 'unlock' });
+        row((far.why === 'far' || thingOf(st, m, open1.id).stand.some((q) => q[0] === L.x && q[1] === L.y)) && bogus.why === 'nothing' && wrong.why === 'noverb' && (far.ok || snap(st) === b0), 'a thing is used from beside it; a thing that is not there, or a deed it does not offer, is refused and changes nothing');
+        const c = copy(st); { const Lc = leadOf(c), mc = c.maps.S2, T = thingOf(c, mc, open1.id), q = T.stand.find((z) => !taken(c, mc, z[0], z[1], Lc.id)); Lc.x = q[0]; Lc.y = q[1]; look(c);
+          const want = lootOf(c, mc, mc._.byId.get(open1.id)), g = c.gold, t0 = c.time.day * 1440 + c.time.minute, roll = c.n.roll, r = intent(c, { t: 'use', what: open1.id, verb: 'search' }), b = snap(c), again = intent(c, { t: 'use', what: open1.id, verb: 'search' });
+          row(r.ok && r.verb === 'search' && c.gold === g + want.gold && want.items.every((n) => Lc.items.some((x) => itemKey(x.n) === itemKey(n))) && flag(c, 'u:S2:' + open1.id) && c.time.day * 1440 + c.time.minute === t0 + 5 && c.n.roll === roll && r.lines[0].t.includes(want.gold ? want.gold + ' gold' : want.items[0]) && again.why === 'noverb' && snap(c) === b && /\[searched: empty\]/.test(boardDigest(c)),
+            'searching hands over exactly what the seed put there (' + r.lines[0].t + '), takes five minutes and no dice, and can be done once'); }
+        /* a lock, three ways */
+        if (!locked) row(false, 'no locked chest but the strongbox on this seed'); else {
+          const mk = () => { const z = copy(st), Lz = leadOf(z), mz = z.maps.S2, T = thingOf(z, mz, locked.id), q = T.stand.find((s) => !taken(z, mz, s[0], s[1], Lz.id)); Lz.x = q[0]; Lz.y = q[1]; look(z); for (const p of z.party) p.items = p.items.filter((x) => !/thieves|crowbar/.test(x.n)); return z; };
+          const a = mk(), v0 = verbsFor(a, locked.id).map((v) => v.verb).join(), sub0 = verbsFor(a, locked.id).map((v) => v.sub).join(' | ');
+          force(a, 20, 20); const p1 = intent(a, { t: 'use', what: locked.id, verb: 'pick' }), rolls1 = (p1.lines[0].t.match(/Sleight of Hand (\d+)/i) || [])[1];
+          const b2 = mk(); giveItem(leadOf(b2), 'thieves’ tools'); const n0 = b2.n.roll; force(b2, 20, 1); const p2 = intent(b2, { t: 'use', what: locked.id, verb: 'pick' }), v2 = verbsFor(b2, locked.id), sn = snap(b2), p2b = intent(b2, { t: 'use', what: locked.id, verb: 'pick' });
+          row(v0 === 'pick,force' && /no tools/.test(sub0) && /Sleight of Hand DC 13/.test(sub0) && /Athletics DC 16/.test(sub0) && p1.ok && p1.opened && rolls1 && p2.ok && !p2.opened && p2.lines.some((z) => /holds\.$/.test(z.t)) && v2.find((v) => v.verb === 'pick').off && !v2.find((v) => v.verb === 'force').off && p2b.why === 'tried' && snap(b2) === sn && n0 <= b2.n.roll,
+            'a locked chest offers the pick and the shoulder, each with its check on the button; a pick that fails is spent for that traveller, though the shoulder is not');
+          /* two dice in a row, chosen: first higher (so 'the lower of two' differs from 'the first') and first lower (so 'the higher' does) */
+          const twoDice = (z, want) => { for (let n = 900; n < 1400; n++) { const r = rngFor(z.seed, 'dice', n), x = 1 + Math.floor(r() * 20), y = 1 + Math.floor(r() * 20); if (want(x, y)) return [n, x, y]; } return null; };
+          const d1 = mk(), hi = twoDice(d1, (x, y) => x > y + 2), lo = twoDice(d1, (x, y) => x + 2 < y); d1.n.roll = hi[0]; const pd = intent(d1, { t: 'use', what: locked.id, verb: 'pick' }), c = checkFor(leadOf(d1), 'sleight of hand'), mod = abMod(leadOf(d1).scores[c.ab]) + (c.prof ? profBonus(1) : 0);
+          const d2 = mk(); giveItem(leadOf(d2), 'thieves’ tools'); d2.n.roll = hi[0]; const pt = intent(d2, { t: 'use', what: locked.id, verb: 'pick' });
+          const d3 = mk(); giveItem(leadOf(d3), 'crowbar'); d3.n.roll = lo[0]; const pf = intent(d3, { t: 'use', what: locked.id, verb: 'force' }), cf = checkFor(leadOf(d3), 'athletics'), modF = abMod(leadOf(d3).scores[cf.ab]) + (cf.prof ? profBonus(1) : 0);
+          const d4 = mk(); d4.n.roll = lo[0]; const pn = intent(d4, { t: 'use', what: locked.id, verb: 'force' });
+          const tot = (r) => +(r.lines[0].t.match(/ (-?\d+) against DC/) || [])[1], dcOf = (r) => +(r.lines[0].t.match(/against DC (\d+)/) || [])[1];
+          row(tot(pd) === hi[2] + mod && tot(pt) === hi[1] + mod && tot(pf) === lo[2] + modF && tot(pn) === lo[1] + modF, 'the tools are real: on the same two dice (' + hi[1] + ' then ' + hi[2] + ') bare hands keep the lower and thieves\' tools roll one; on ' + lo[1] + ' then ' + lo[2] + ' the bare shoulder rolls one and a crowbar keeps the higher');
+          row(dcOf(pd) === 13 && dcOf(pt) === 13 && dcOf(pf) === 16 && dcOf(pn) === 16, 'and the shoulder really is three harder than the pick: the check is rolled against the number on the button (13 and 16)');
+          const k = mk(); giveItem(leadOf(k), 'the gang’s keys'); const vk = verbsFor(k, locked.id), nk = k.n.roll, uk = intent(k, { t: 'use', what: locked.id, verb: 'unlock' }), after = verbsFor(k, locked.id).map((v) => v.verb).join();
+          row(vk.length === 1 && vk[0].verb === 'unlock' && uk.ok && uk.opened && k.n.roll === nk && flag(k, 'o:S2:' + locked.id) && after === 'search' && /\[can be searched\]/.test(boardDigest(k).split('\n').find((l) => l.includes(locked.id + ' '))), 'with the gang\'s keys a lock is simply opened: no dice, and then the thing can be searched');
+        }
+        /* the cell */
+        { const k = seedWith((s) => { intent(s, { t: 'jump', site: 'S2' }); return s.maps.S2.doors.some((d) => d.kind === 'bars' && d.lock); }, 'cell'), mk = k.maps.S2, door = mk.doors.find((d) => d.kind === 'bars'), Lk = leadOf(k);
+          for (const t of mk.tokens.slice()) if (t.k === 'foe') dropToken(k, mk, t);
+          const side = doorSides(door).find((q) => tileFree(mk, q[0], q[1]) && !tokenAt(mk, q[0], q[1])); Lk.x = side[0]; Lk.y = side[1]; for (const p of k.party) if (p !== Lk) { const f = freeNear(k, mk, Lk.x, Lk.y, p.id); p.x = f[0]; p.y = f[1]; } look(k);
+          const cap = k.npcs.N6, t0 = topicsFor(k, 'N6').map((x) => x.id).join(), v0 = verbsFor(k, door.id).map((v) => v.verb).join(); giveItem(Lk, 'the gang’s keys');
+          const u = intent(k, { t: 'use', what: door.id, verb: 'unlock' }), tok = mk.tokens.find((t) => t.npc === 'N6');
+          row(t0 === 'plea,matter,gang' && v0 === 'pick,force' && u.ok && u.opened && !door.lock && door.open && cap.kind === 'npc' && tok.k === 'npc' && u.lines.some((z) => z.t === cap.name + ' is free.') && u.text.includes(cap.name.split(' ')[0]) && captiveFree(k) && !verbsFor(k, door.id).length,
+            'the cell: through the bars the prisoner can only be talked to; the barred door is a lock like any other, and opening it sets them free, in words');
+          const town = k.maps.S0, was = town.tokens.length; intent(k, { t: 'jump', site: 'S0' }); const home = town.tokens.find((t) => t.npc === 'N6'), elder = town.tokens.find((t) => t.npc === 'N4');
+          row(!mk.tokens.some((t) => t.npc === 'N6') && home && home.k === 'npc' && town.tokens.length === was + 1 && cheb(home, elder) <= 3 && tokenAt(town, home.x, home.y) === home && k.npcs.N6.home === 'S0' && topicsFor(k, 'N6').map((x) => x.id).join() === 'thanks,gang',
+            'and when the party leaves the hill they come down with it: gone from the hideout, standing by the elder in town, with thanks to give'); }
+      }
+      /* the two fallbacks in the generators: someone to free in every hideout, and every keeper at home */
+      {
+        let noCell = 0, bound = 0, missing = [], away = [], freed = null, yard = 0;
+        for (let k = 0; k < 300; k++) { const st = newGame('probe-' + k), cave = chart(st, 'S2');
+          const cell = cave.rooms.some((r) => r.kind === 'cell'), cap = cave.tokens.find((t) => t.npc === 'N6');
+          if (!cap || cap.k !== 'captive') missing.push(k);
+          if (!cell) { noCell++; if (cap) { bound++; if (!freed) { intent(st, { t: 'jump', site: 'S2' }); for (const t of cave.tokens.slice()) if (t.k === 'foe') dropToken(st, cave, t); const L = leadOf(st), f = freeNear(st, cave, cap.x, cap.y, L.id); L.x = f[0]; L.y = f[1]; look(st); const ids = topicsFor(st, 'N6').map((x) => x.id), r = intent(st, { t: 'talk', npc: 'N6', topic: 'free' }); freed = { ids: ids.join(), ok: r.ok && captiveFree(st) && !cave.doors.some((d) => d.kind === 'bars') }; } } }
+          for (const [site, who] of [['S1', 'N0'], ['S3', 'N1'], ['S4', 'N2'], ['S5', 'N3']]) { const m = chart(st, site), t = m.tokens.find((q) => q.npc === who); if (!t) away.push(k + ':' + who); else if (!m.rg[t.y * m.w + t.x]) yard++; }
+          if (!st.maps.S0.tokens.some((t) => t.npc === 'N4')) away.push(k + ':N4');
+        }
+        row(!missing.length && noCell >= 1 && bound === noCell && freed && /^free,/.test(freed.ids) && freed.ok, 'over 300 worlds every hideout holds the prisoner: where the rock leaves no room for a cell (' + noCell + ' of them) they are kept bound in the chamber, and can be cut loose' + (missing.length ? ' - missing on ' + missing.slice(0, 5).join(', ') : ''));
+        row(!away.length, 'and every keeper is in their own place: the innkeeper, the smith, the shopkeeper, the priest, and the elder in the square' + (away.length ? ' - not ' + away.slice(0, 6).join(', ') : ''));
+        row(yard <= 3, 'under their own roof, too: a keeper the recipe could not seat is given any room of the house before the yard (' + yard + ' of 1200 stand outside)');
+      }
+
+      /* 8. the plot is whatever is true, whoever made it so */
+      {
+        const st = party4('plot-1'); intent(st, { t: 'jump', site: 'S2' }); const L = leadOf(st), m = st.maps.S2;
+        const none = plotCheck(st).length; st.npcs.N5.status = 'defeated';
+        const a = plotCheck(st), b = plotCheck(st), keys = L.items.filter((x) => itemKey(x.n) === 'the gang’s keys');
+        row(none === 0 && a.some((z) => /the gang’s keys/.test(z.t)) && !b.some((z) => /keys/.test(z.t)) && keys.length === 1 && keys[0].q === 1 && flag(st, 'spoils'), 'the chief beaten, the gang\'s keys come to whoever leads, once, however the chief was beaten');
+        const old = party4('plot-2'); intent(old, { t: 'jump', site: 'S2' }); const mo = old.maps.S2; dropToken(old, mo, mo.tokens.find((t) => t.npc === 'N6')); old.npcs.N5.status = 'dead';
+        const f = plotCheck(old);
+        row(old.npcs.N6.kind === 'npc' && f.some((z) => /found bound/.test(z.t)) && !plotCheck(old).some((z) => /found bound/.test(z.t)), 'and a prisoner no board shows (a hideout charted before every one had someone to free) is found when the chief falls');
+        /* a fight that ends tells the plot */
+        const fg = party4('plot-3'); intent(fg, { t: 'jump', site: 'S2' }); const mf = fg.maps.S2, chief = mf.tokens.find((t) => t.npc === 'N5'), F = fg.party[0]; for (const t of mf.tokens.slice()) if (t.k === 'foe' && t !== chief) dropToken(fg, mf, t);
+        { const q = STEPS.map((s) => [chief.x + s[0], chief.y + s[1]]).find((z) => tileFree(mf, z[0], z[1]) && !taken(fg, mf, z[0], z[1], F.id) && meleeClear(mf, z[0], z[1], chief.x, chief.y)); F.x = q[0]; F.y = q[1]; for (const p of fg.party) if (p !== F) { const z = freeNear(fg, mf, F.x, F.y, p.id); p.x = z[0]; p.y = z[1]; } look(fg); }
+        intent(fg, { t: 'rounds', op: 'start' }); for (let g = 0; g < 40 && turnOf(fg).id !== F.id; g++) intent(fg, { t: 'end' });
+        const S = sheetOf(fg, chief, true); S.hp = 1; S.ac = 1; force(fg, 20, 15); const blow = intent(fg, { t: 'attack', who: F.id, target: chief.id, attack: 'Longsword' });
+        row(blow.ok && blow.fell && blow.ended && blow.ended.outcome === 'victory' && Array.isArray(blow.ended.plot) && blow.ended.plot.some((z) => /keys/.test(z.t)) && /the gang’s keys/.test(endedSay(blow.ended)) && carries(fg, 'the gang’s keys'), 'the blow that fells the chief ends the fight, and the fight\'s own ending says what it settled: the keys, in the story and in the Game Master\'s tool result');
+      }
+
+      {
+        const st = seedWith((z) => mainK(z) === 'kidnap', 'free-talk'); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2;
+        for (const t of m.tokens.slice()) if (t.k === 'foe') dropToken(st, m, t);
+        for (const d of m.doors) if (d.kind === 'bars') { d.lock = false; d.open = true; }
+        const cp = m.tokens.find((t) => t.npc === 'N6'), L = leadOf(st), f = freeNear(st, m, cp.x, cp.y, L.id); L.x = f[0]; L.y = f[1]; look(st);
+        const before = flag(st, 'goal'), tops = topicsFor(st, 'N6').map((x) => x.id), r = ask(st, 'N6', 'free');
+        row(!before && tops.includes('free') && r.ok && captiveFree(st) && flag(st, 'goal') === 1 && r.lines.some((z) => z.k === 'quest' && /should hear of it/.test(z.t)) && /should hear of it/.test(st.quests.Q0.notes.map((x) => x.text).join(' ')),
+          'a deed done by talking is held against the plot like any other: the prisoner cut loose with a word, and the answer itself says the matter at hand is done and who should hear of it');
+      }
+      {
+        const st = party4('end-1'), sides = sideKs(st), n0 = fillT(st, WHISPERS[sides[0]].note), n1 = fillT(st, WHISPERS[sides[1]].note);
+        const e0 = beatText(st, 'ending'); setFlag(st, 'done:' + sides[0]); const e1 = beatText(st, 'ending'); setFlag(st, 'done:' + sides[1]); const e2 = beatText(st, 'ending');
+        row(sides.length === 2 && n0.length > 20 && n1.length > 20 && /stays whispered/.test(e0) && !e0.includes(n0) && !e0.includes(n1) && e1.includes(n0) && !e1.includes(n1) && /One whisper you never ran to ground/.test(e1) && e2.includes(n0) && e2.includes(n1) && !/stays whispered|never ran to ground/.test(e2),
+          'the ending remembers the whispers: none settled, it says the town kept them; one, it tells that one and says one got away; both, it tells both and regrets nothing');
+      }
+      {
+        const withL = seedWith((z) => sideKs(z).includes('ledger'), 'desk-l'), bare = seedWith((z) => !sideKs(z).includes('ledger') && !sideKs(z).includes('debt'), 'desk-n');
+        const desk = (z) => { const m = chart(z, 'S2'), S = plotSpots(z), o = m.objs.find((q) => q.id === S.desk); return o ? lootOf(z, m, o) : null; };
+        const a = withL && desk(withL), b = bare && desk(bare);
+        row(a && b && a.items.includes('the gang’s ledger') && !b.items.includes('the gang’s ledger') && !b.items.includes('a letter in the keeper’s hand'), 'the gang\'s ledger lies in the chief\'s desk on a world whose whispers include it, and on no other');
+      }
+
+      /* 9. a healing draught */
+      {
+        const st = party4('item-1'), A = st.party[0], B = st.party[1]; giveItem(A, 'healing draught', 2); giveItem(A, 'crowbar'); A.hp = 2; B.hp = 1;
+        const b = snap(st), no1 = intent(st, { t: 'item', who: B.id, item: 'healing draught' }), no2 = intent(st, { t: 'item', who: A.id, item: 'crowbar' }), no3 = intent(st, { t: 'item', who: A.id, item: 'healing draught', target: 'P99' }), no4 = intent(st, { t: 'item', who: 'P99', item: 'healing draught' });
+        row(no1.why === 'noitem' && no2.why === 'noitem' && no3.why === 'notarget' && no4.why === 'nobody' && snap(st) === b, 'nobody drinks what they do not carry, or a crowbar, or to the health of someone who is not there');
+        st.n.roll = 40; const r = rngFor(st.seed, 'dice', 40), want = 1 + Math.floor(r() * 4) + 1 + Math.floor(r() * 4) + 2, d = intent(st, { t: 'item', who: A.id, item: 'healing draught' }), g = intent(st, { t: 'item', who: A.id, item: 'healing draught', target: B.id });
+        row(d.ok && d.heal === Math.min(want, A.hpMax - 2) && A.hp === 2 + d.heal && g.ok && B.hp === 1 + g.heal && g.heal >= 4 && !A.items.some((x) => itemKey(x.n) === 'healing draught') && /gives .* a healing draught/.test(g.say) && st.log[st.log.length - 1].t === 'tell', 'a healing draught restores 2d4+2 to whoever drinks it or is handed it, is used up, and is journalled (' + d.heal + ', then ' + g.heal + ')');
+        const f = party4('item-2'); intent(f, { t: 'jump', site: 'S2' }); intent(f, { t: 'rounds', op: 'start' }); for (let k = 0; k < 40 && !turnOf(f).pc; k++) intent(f, { t: 'end' });
+        const a = turnOf(f).o, o = f.party.find((p) => p !== a); giveItem(a, 'healing draught', 3); a.hp = 1; const d1 = intent(f, { t: 'item', item: 'healing draught' }), act = f.round.act, d2 = intent(f, { t: 'item', item: 'healing draught' });
+        f.round.act = 1; o.hp = 1; const adj = meleeClear(a.m || f.maps.S2, a.x, a.y, o.x, o.y), d3 = intent(f, { t: 'item', item: 'healing draught', target: o.id }), notMine = intent(f, { t: 'item', who: o.id, item: 'healing draught' });
+        row(d1.ok && act === 0 && d2.why === 'noact' && (adj ? d3.ok : d3.why === 'reach') && notMine.why === 'notturn', 'in a fight it takes the action, on the drinker\'s own turn, and can only be handed to someone within arm\'s reach');
+      }
+
+      /* 10. threat: awake, in sight of someone standing */
+      {
+        const st = newGame('threat-1'); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2, P = st.party[0], tok = m.tokens.find((t) => t.k === 'foe'), f = freeNear(st, m, tok.x, tok.y, P.id); P.x = f[0]; P.y = f[1]; look(st);
+        const seen = !!visOf(st).g[tok.y * m.w + tok.x], t1 = threatOf(st); for (const t of m.tokens) if (t.k === 'foe') sheetOf(st, t, true).asleep = 99999; const t2 = threatOf(st);
+        for (const t of m.tokens) if (t.k === 'foe') sheetOf(st, t, true).asleep = 0; P.hp = 0; P.status = 'down'; look(st); const stillSeen = !!visOf(st).g[tok.y * m.w + tok.x], t3 = threatOf(st);
+        row(seen && t1 && !t2 && stillSeen && !t3, 'a threat is an enemy who is awake, in sight of a traveller who is on their feet: the sleeping threaten nobody, and the fallen, though the map still shows what lies round them, are no reason to fight on');
+      }
+
+      /* 11. what the script adds to a save */
+      {
+        const r = playTale('save-1', { keep: true }), st = r.st;
+        st.story.push({ t: 'gm', text: 'A scripted line.', turn: 0, n: ++st.n.tell, src: 'script', area: 'talk' }); st.tells.push(tellRow({ n: st.n.tell, turn: 0, area: 'talk', src: 'script', w: 3 }));
+        { const e = { t: 'gm', text: 'A modelled line.', turn: 1, n: ++st.n.tell, src: 'ai', area: 'narrate' }; e.twin = 'What the script would have said.'; st.story.push(e); st.tells.push(tellRow({ n: st.n.tell, turn: 1, area: 'narrate', src: 'ai', w: 3, usd: .0123, model: 'claude-opus-5-5', r: 1, tw: 6, tr: -1 })); }
+        const a = snap(st), back = unpackState(JSON.parse(JSON.stringify(packState(st)))), b = snap(back);
+        row(r.won && Object.keys(st.flags).length >= 8 && a === b && back.tells.length === 2 && back.tells[1].usd === .0123 && back.tells[1].r === 1 && back.tells[1].tr === -1 && back.story[back.story.length - 1].twin === 'What the script would have said.' && back.n.tell === st.n.tell,
+          'a tale played to its end, with what it settled, who told what and how it was rated, goes through a save byte for byte (' + Object.keys(st.flags).length + ' things settled)');
+        const evil = JSON.parse(JSON.stringify(packState(st)));
+        evil.flags = { 'ok:key': 1, quest: 'Q7', word: 'evil', count: 5, big: 1e9, 'bad key!': 1, ['x'.repeat(60)]: 1, zero: 0 }; Object.defineProperty(evil.flags, '__proto__', { value: 1, enumerable: true });
+        evil.tells = [{ src: 'evil', n: 1 }, null, { src: 'ai', n: -5, turn: 1e9, usd: -3, r: 9, tr: -9, model: 'x'.repeat(500), area: '<b>', w: 1e9, tw: 'many' }];
+        evil.story = [{ t: 'gm', text: 'a', turn: 0, n: 3, src: 'evil', area: 'talk', twin: 'kept?' }, { t: 'gm', text: 'b', turn: 0, n: 1e12, src: 'ai', area: '<i>', twin: 'x'.repeat(9000) }, { t: 'gm', text: 'c', turn: 0, n: 2, src: 'script', area: 'act', twin: '   ' }];
+        evil.n.tell = -4;
+        let e = null; try { e = unpackState(evil); } catch (x) { e = String(x); }
+        row(e && typeof e === 'object' && JSON.stringify(e.flags) === JSON.stringify({ 'ok:key': 1, quest: 'Q7', word: 1, count: 5, big: 1 }) && e.tells.length === 1 && JSON.stringify(e.tells[0]) === JSON.stringify({ n: 0, turn: 1000000, area: 'narrate', src: 'ai', w: 100000, usd: 0, model: 'x'.repeat(79) + '…', r: 1, tw: 0, tr: -1 }) &&
+          !('src' in e.story[0]) && !('twin' in e.story[0]) && e.story[1].src === 'ai' && e.story[1].area === 'narrate' && e.story[1].n === 1e7 && e.story[1].twin.length === 3000 && e.story[2].area === 'act' && !('twin' in e.story[2]) && e.n.tell === 1e7,
+          'out of a hostile file the script\'s part is bounded and plain: flags with real names and small values only, a tally row with every number in range, no telling claimed by anyone but the script or a model, a twin clipped');
+        const v3 = JSON.parse(JSON.stringify(packState(newGame('old-3')))); v3.v = 3; delete v3.flags; delete v3.tells; delete v3.n.tell; v3.story = [{ t: 'gm', text: 'Told before anyone was counting.', turn: 0 }];
+        let o = null; try { o = unpackState(v3); } catch (x) { o = null; }
+        row(o && o.v === 4 && JSON.stringify(o.flags) === '{}' && o.tells.length === 0 && o.n.tell === 0 && o.story.length === 1 && !('src' in o.story[0]) && topicsFor(o, 'N0').length >= 3, 'a tale saved before the script kept anything loads with nothing settled and nothing tallied, its old tellings unclaimed, and can be talked through from there');
+      }
+
+      /* 12. the Game Master's own door to all this, and what it is told */
+      {
+        const st = party4('tool-u'); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2; for (const t of m.tokens.slice()) if (t.k === 'foe') dropToken(st, m, t); look(st);
+        const S = plotSpots(st), free = m.objs.find((o) => !o.on && CONTAINERS[o.a] && !lootOf(st, m, o).lock), want = lootOf(st, m, free), L = leadOf(st), g = st.gold;
+        const d0 = boardDigest(st), b = snap(st), e1 = exec(st, 'use_thing', { thing_id: 'O999', verb: 'search' }), e2 = exec(st, 'use_thing', { thing_id: free.id, verb: 'unlock' }), e3 = exec(st, 'use_thing', { thing_id: S.strong, verb: 'search' }), e4 = exec(st, 'use_thing', { thing_id: free.id, verb: 'smash' }), same = snap(st) === b;
+        const r = exec(st, 'use_thing', { thing_id: free.id, verb: 'search' }), T = thingOf(st, m, free.id);
+        row(/Nothing on this board/.test(e1.error) && /It offers: search/.test(e2.error) && /It offers: (pick, force|unlock)/.test(e3.error) && !e4.ok && same && r.ok && r.k === 'thing' && st.gold === g + want.gold && T.stand.some((q) => q[0] === L.x && q[1] === L.y) && r.result.what_happened.length >= 1 && exec(st, 'use_thing', { thing_id: free.id, verb: 'search' }).ok === false,
+          'the Game Master\'s use_thing does exactly what a tap does: the leader is walked beside the thing, it is searched once, and a thing or a deed that is not on offer is refused with what IS');
+        row(/\[can be searched\]/.test(d0) && /\[LOCKED; can be searched once open\]/.test(d0) && /Hidden here \(GM eyes only/.test(d0) && d0.includes(S.strong + ' holds') && !/Hidden here/.test(boardDigest((() => { const t = party4('tool-u'); intent(t, { t: 'jump', site: 'S1' }); return t; })())),
+          'the board digest marks what can be searched and what is locked, and tells the Game Master alone what the chief\'s strongbox and desk hold: on the hideout\'s board, and nowhere else');
+        { const z = party4('tool-u'); intent(z, { t: 'jump', site: 'S2' }); const mz = z.maps.S2; for (const t of mz.tokens.slice()) if (t.k === 'foe') dropToken(z, mz, t); look(z); giveItem(leadOf(z), 'the gang’s keys');
+          const Sz = plotSpots(z), before = boardDigest(z), u = exec(z, 'use_thing', { thing_id: Sz.strong, verb: 'unlock' }), mid = boardDigest(z), sr = exec(z, 'use_thing', { thing_id: Sz.strong, verb: 'search' }), after = boardDigest(z);
+          row(Sz.desk !== Sz.strong && before.includes(Sz.strong + ' holds') && before.includes(Sz.desk + ' holds') && u.ok && mid.includes(Sz.strong + ' holds') && sr.ok && !after.includes(Sz.strong + ' holds') && after.includes(Sz.desk + ' holds'),
+            'and only until it has been taken: unlocked, the strongbox is still said to hold what it holds; searched, it is no longer said to hold anything, while the desk nobody has opened still is'); }
+        const ctxA = turnContext(st, { text: 'x' }, { areas: { narrate: 'ai', talk: 'script', act: 'ai', create: 'script' } }), ctxB = turnContext(st, { text: 'x' }, {});
+        row(/Narration at the beats: you\./.test(ctxA) && /Voicing people: the script/.test(ctxA) && /Lines typed to the table: you/.test(ctxA) && /do NOT ask who is at the table/.test(ctxA) && /Narration at the beats: the script/.test(ctxB) && /Plot \(the engine keeps this/.test(ctxA) && /the matter at hand is open/.test(ctxA) && /Whispers heard: none/.test(ctxA),
+          'each turn the Game Master is told which of its jobs are its own at this table and which the script is doing, and where the plot stands');
+        st.npcs.N5.status = 'defeated'; if (MAIN[mainK(st)].goal === 'free') st.npcs.N6.kind = 'npc'; else if (MAIN[mainK(st)].goal === 'relic') giveItem(L, 'silver reliquary'); plotCheck(st); setFlag(st, 'keen');
+        const ctxC = turnContext(st, { text: 'x' }, {});
+        row(/DONE IN DEED/.test(ctxC) && ctxC.includes(st.npcs[giverOf(st)].name) && /keener edge/.test(ctxC), 'and once the matter at hand is done in deed it is told so, and whom the party should tell');
+        row(/do not ask who they are/.test(STAGES.opening(st, null, { create: 'script' })) && /ask how many travellers/.test(STAGES.opening(st, null, { create: 'ai' })) && /ask how many travellers/.test(STAGES.create()) && /epilogue/.test(STAGES.ending()) && (() => { const t = party4('rest-gm'); intent(t, { t: 'jump', site: 'S0' }); const g = t.gold; return intent(t, { t: 'rest', kind: 'long' }).why === 'nobed' && TOOLS.rest.run(t, { kind: 'long' }).ok && t.gold === g && t.party.every((p) => p.hp === p.hpMax); })(),
+          'the opening asks who is at the table only when making characters is the model\'s; there are stage directions for that asking alone and for the tale\'s ending; and the Game Master\'s rest is a ruling, not a bed');
+      }
+
+      /* 13. the monsters' twin: the script's turn, played on a copy */
+      {
+        const st = party4('twin-1'); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2, P = st.party[0], tok = m.tokens.find((t) => t.k === 'foe'), f = freeNear(st, m, tok.x, tok.y, P.id); P.x = f[0]; P.y = f[1]; look(st);
+        intent(st, { t: 'rounds', op: 'start' }); for (let g = 0; g < 40 && turnOf(st).pc; g++) intent(st, { t: 'end' });
+        const a = turnOf(st), b = snap(st), text = monstersTwin(JSON.stringify(packState(st))), name = nameOf(st, a);
+        row(!a.pc && text.length > 10 && text.includes(name.split(' ')[0]) && snap(st) === b && turnOf(st).id === a.id, 'what the script would have done with a monster\'s turn can be asked while a model takes it: played out on a copy ("' + text.slice(0, 70) + '"), with the tale itself untouched');
+      }
+
+      /* 14. a traveller rolled up by the seed */
+      {
+        const st = newGame('roll-1'), p = st.party[0], g0 = st.gold, r1 = intent(st, { t: 'party', op: 'roll', id: p.id }), n1 = p.name, c1 = p.cls;
+        const st2 = newGame('roll-1'), r2 = intent(st2, { t: 'party', op: 'roll', id: 'P1' });
+        const r3 = intent(st, { t: 'party', op: 'roll', id: p.id }); p.xp = 10; const b = snap(st), r4 = intent(st, { t: 'party', op: 'roll', id: p.id }), r5 = intent(st, { t: 'party', op: 'roll', id: 'P9' });
+        row(r1.ok && GIVEN.includes(n1) && CLASSES[c1] && !p.stock && ANCESTRIES.includes(p.ancestry) && p.background && p.personality && p.look && st2.party[0].name === n1 && st2.party[0].cls === c1 && r2.ok && r3.ok && st.gold === g0 - CLASSES.Fighter.gold + CLASSES[p.cls].gold && p.hp === p.hpMax && r4.why === 'seasoned' && r5.why === 'nobody' && snap(st) === b,
+          'SURPRISE ME rolls a traveller whole by the seed: a name, a calling, a few words about them, the purse following the calling; the same tale rolls the same one; someone who has earned experience is past it');
+        { let hit = null; for (let k = 0; k < 60 && !hit; k++) { const z = newGame('roll-g' + k), g = z.gold; intent(z, { t: 'party', op: 'roll', id: 'P1' }); if (CLASSES[z.party[0].cls].gold !== CLASSES.Fighter.gold) hit = { g, z }; }
+          row(hit && hit.g === CLASSES.Fighter.gold && hit.z.gold === CLASSES[hit.z.party[0].cls].gold && hit.z.gold !== hit.g, 'and the purse really does follow: rolled into a calling that starts richer or poorer than a fighter, the party holds that calling\'s gold' + (hit ? ' (' + hit.z.party[0].cls + ', ' + hit.z.gold + ')' : '')); }
+      }
+      return rows;
+    }, 24);
+    for (const [c, m] of rows) ok(c, m);
+    await U.ctx.close();
+  }
+  }
+
+  if (want('V')) {
+  /* ------------------------------------------------------------------ V */
+  console.log('V. the script\'s table, by touch');
+  {
+    const V1 = await open({ width: 390, height: 844 }, null, { storyOpen: true, seed: 'script-table-1' }), page = V1.page;
+    let asked = 0; page.on('request', (r) => { if (/anthropic|openai|elevenlabs/.test(r.url())) asked++; });
+    const quiet = (ms) => page.waitForFunction(() => G.st && !G.busy && !G.st.walk && !View.walking && View.anim.t >= 1 && !View.easing && !document.getElementById('veil').classList.contains('on'), null, { timeout: ms || 15000 });
+    const frames = (n) => page.evaluate((n) => new Promise((res) => { let k = 0; const f = () => (++k >= n ? res() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n || 3);
+    const tapEl = async (sel) => { const p = await page.evaluate((sel) => { const e = document.querySelector(sel); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, sel); await page.touchscreen.tap(p[0], p[1]); await page.waitForTimeout(140); };
+    /* a button on the card or in a dialog, found by its words and tapped where it is drawn */
+    const tapBtn = async (box, re) => { const hit = await page.evaluate(([box, re]) => { const b = [...document.querySelectorAll(box + ' button')].find((x) => new RegExp(re).test(x.textContent)); if (!b) return false; for (const o of document.querySelectorAll('[data-tap]')) o.removeAttribute('data-tap'); b.setAttribute('data-tap', '1'); return true; }, [box, re]); if (!hit) return false; await tapEl('[data-tap="1"]'); return true; };
+    const aimAt = async (x, y) => { await page.evaluate(([x, y]) => { UI.card(null); View.cam.x = x; View.cam.y = y; camMoved(true); viewDraw(); }, [x, y]); await frames(2); return page.evaluate(([x, y]) => { const r = View.cv.getBoundingClientRect(), s = w2s(x, y); return [r.left + s[0], r.top + s[1]]; }, [x, y]); };
+    const tapSq = async (x, y) => { const p = await aimAt(x + .5, y + .5); await page.touchscreen.tap(p[0], p[1]); await page.waitForTimeout(140); };
+    const card = () => page.evaluate(() => ({ on: !document.getElementById('info').hidden, name: document.getElementById('info-name').textContent, text: document.getElementById('info-text').textContent, btns: [...document.querySelectorAll('#info-acts button')].map((b) => b.textContent), off: [...document.querySelectorAll('#info-acts button')].filter((b) => b.disabled).map((b) => b.textContent), talk: document.getElementById('info').classList.contains('talk') }));
+    const story = () => page.evaluate(() => G.st.story.map((e) => ({ t: e.t, text: e.text, src: e.src || '', area: e.area || '', who: e.who || '', k: e.k || '' })));
+    /* set the leader beside someone or something, as a walk would have, and show it */
+    const stand = (ref) => page.evaluate((ref) => { const st = G.st, m = st.maps[st.here], A = anchorOf(st, m, ref), L = leadOf(st), q = A.stand.find((z) => !taken(st, m, z[0], z[1], L.id)); L.x = q[0]; L.y = q[1]; for (const p of st.party) if (p !== L) { const f = freeNear(st, m, L.x, L.y, p.id); p.x = f[0]; p.y = f[1]; } look(st); viewResync(); UI.bar(); UI.arrived(); View.dirty = true; }, ref);
+    const go = async (site) => { await page.evaluate((site) => UI.follow(intent(G.st, { t: 'jump', site })), site); await page.waitForFunction((site) => G.st.here === site && View.map && View.map.id === site && !document.getElementById('veil').classList.contains('on'), site, { timeout: 8000 }); await quiet(); await frames(4); };
+
+    /* the travellers are made on the party sheet */
+    await page.evaluate(() => document.getElementById('btn-new').click());
+    await page.waitForFunction(() => document.getElementById('dialog').classList.contains('open'), null, { timeout: 8000 });
+    const dlg0 = await page.evaluate(() => ({ body: [...document.querySelectorAll('#dlg-body p')].map((p) => p.textContent), want: beatText(G.st, 'opening').split('\n\n'), story: G.st.story.length }));
+    await tapBtn('#dlg-btns', '^Begin$'); await page.waitForTimeout(200);
+    const before = await page.evaluate(() => ({ open: document.getElementById('pan-party').classList.contains('open'), name: G.st.party[0].name, cls: G.st.party[0].cls, gold: G.st.gold }));
+    await tapBtn('#party-list .sheet', 'Surprise me');
+    const rolled = await page.evaluate(() => { const p = G.st.party[0], row = document.querySelector('#party-list .entry.pc'); return { name: p.name, cls: p.cls, stock: p.stock, look: p.look, bg: p.background, inp: row.querySelector('input').value, sel: row.querySelector('select').value, text: row.textContent, gold: G.st.gold, want: CLASSES[p.cls].gold }; });
+    ok(dlg0.body.join('|') === dlg0.want.join('|') && dlg0.body.length === 2 && dlg0.story === 0 && before.open && before.name === 'Wayfarer', 'the title card of a new tale is the script\'s own opening, word for word; BEGIN goes on to the party sheet before anything is told');
+    ok(rolled.name !== 'Wayfarer' && !rolled.stock && rolled.inp === rolled.name && rolled.sel === rolled.cls && rolled.look && rolled.text.includes(rolled.look) && rolled.text.includes(rolled.bg) && rolled.gold === rolled.want, 'SURPRISE ME, by touch, rolls the placeholder into someone: ' + rolled.name + ' the ' + rolled.cls + ', with a look and a past written on the sheet and the purse to match');
+    for (let k = 0; k < 3; k++) await tapEl('#party-add');
+    await tapEl('#pan-party [data-close]'); await quiet();
+    await page.waitForFunction(() => G.st.story.length > 0, null, { timeout: 8000 });
+    const s0 = await story();
+    ok(await page.evaluate(() => { UI.whoIsHere(); const a = UI.panelOpen(); UI.whoIsHere(true); return !a && !UI.panelOpen() && !document.querySelector('#story-log .st-sys'); }), 'once the travellers are made the sheet is not pushed at the table again');
+    ok(s0.length === 1 && s0[0].src === 'script' && s0[0].area === 'narrate' && s0[0].text === dlg0.want.join('\n\n') && (await page.evaluate(() => G.st.party.length === 4 && G.st.told.open === 1 && G.st.told.S1 === 1 && !document.getElementById('pan-party').classList.contains('open'))),
+      'with four at the table and the sheet closed the opening is told: the same words, in the story, as the script\'s narration, and the inn counts as told');
+
+    /* rating a telling: two marks under it, kept in the tale */
+    await page.evaluate(() => { const f = document.querySelector('#story-log .st-foot'); f.querySelector('.rate.up').id = 'r-up'; f.querySelector('.rate.down').id = 'r-dn'; });
+    const rate = () => page.evaluate(() => ({ r: G.st.tells[0].r, up: document.getElementById('r-up').getAttribute('aria-pressed'), dn: document.getElementById('r-dn').getAttribute('aria-pressed'), lab: document.getElementById('r-up').getAttribute('aria-label') + '|' + document.getElementById('r-dn').getAttribute('aria-label'), w: document.getElementById('r-up').getBoundingClientRect().width, h: document.getElementById('r-up').getBoundingClientRect().height }));
+    const r0 = await rate(); await tapEl('#r-up'); const r1 = await rate(); await tapEl('#r-up'); const r2 = await rate(); await tapEl('#r-dn'); const r3 = await rate(); await tapEl('#r-up'); const r4 = await rate();
+    ok(r0.r === 0 && r0.up === 'false' && r1.r === 1 && r1.up === 'true' && r1.dn === 'false' && r2.r === 0 && r2.up === 'false' && r3.r === -1 && r3.dn === 'true' && r4.r === 1 && r4.up === 'true' && r4.dn === 'false' && /good/.test(r0.lab) && /poor/.test(r0.lab) && r0.w >= 40 && r0.h >= 36,
+      'under each telling are two marks a thumb can hit: one tap rates it good, the other poor, the same again takes it back, and one replaces the other');
+    await page.evaluate(() => UI.saveNow());
+    ok(await page.evaluate(async () => { const rec = await Store.get('auto'); return rec.data.tells[0].r === 1 && rec.data.story[0].src === 'script' && rec.data.tells[0].w === G.st.story[0].text.split(/\s+/).length; }), 'the rating is saved with the tale, beside who told the passage and how many words it ran to');
+
+    /* talking: the card is the conversation */
+    await stand('N0');
+    const kp = await page.evaluate(() => { const t = View.map.tokens.find((q) => q.npc === 'N0'); return { x: t.x, y: t.y, name: G.st.npcs.N0.name, gold: G.st.gold, t: G.st.time.day * 1440 + G.st.time.minute }; });
+    await tapSq(kp.x, kp.y); const c1 = await card();
+    await tapBtn('#info-acts', '^Talk$'); const c2 = await card(), n0 = (await story()).length;
+    await tapBtn('#info-acts', '^Ask for news'); await page.waitForTimeout(150);
+    const c3 = await card(), s1 = (await story()).slice(n0), lead = await page.evaluate(() => leadOf(G.st).name);
+    ok(c1.on && c1.name === kp.name && c1.btns.join() === 'Talk' && c2.talk && c2.name === kp.name && c2.btns.some((b) => /^A bed for the night/.test(b)) && c2.btns.some((b) => /^Ask for news/.test(b)) && c2.text.length > 20 && n0 === 1,
+      'a tap on the innkeeper is their card, TALK turns it into a conversation with their greeting and what they can be asked, and nothing is written until something is');
+    ok(s1.length >= 2 && s1[0].t === 'pl' && s1[0].who === lead && s1[0].text === 'to ' + kp.name.split(' ')[0] + ': Ask for news' && s1[1].t === 'gm' && s1[1].src === 'script' && s1[1].area === 'talk' && c3.on && c3.talk && c3.text === s1[1].text && c3.btns.length === c2.btns.length &&
+      (await page.evaluate(([t]) => G.st.time.day * 1440 + G.st.time.minute === t + 2 && G.st.tells.length === 2 && G.st.tells[1].area === 'talk' && flag(G.st, 'met:N0') === 1, [kp.t])),
+      'asking writes the question as the leader\'s line and the answer as the script\'s, shows the answer on the card with the topics still under it, and takes two minutes: "' + clipTo(s1[1].text, 70) + '"');
+    /* the fold: a story folded away stays folded, and says there is something new */
+    await tapEl('#story-toggle'); await frames(5);
+    await tapBtn('#info-acts', '^Ask about the '); await page.waitForTimeout(150);
+    const fold = await page.evaluate(() => ({ open: document.getElementById('story').classList.contains('open'), mark: document.getElementById('story-toggle').classList.contains('new'), card: document.getElementById('info-text').textContent, last: G.st.story[G.st.story.length - 1].text }));
+    await tapEl('#story-toggle'); await frames(5);
+    const unfold = await page.evaluate(() => ({ open: document.getElementById('story').classList.contains('open'), mark: document.getElementById('story-toggle').classList.contains('new'), shown: [...document.querySelectorAll('#story-log .st-gm')].pop().textContent, last: G.st.story[G.st.story.length - 1].text }));
+    ok(!fold.open && fold.mark && fold.card === fold.last && unfold.open && !unfold.mark && unfold.shown === unfold.last, 'with the story folded away an answer is still on the card, the fold is marked as having something new, and nothing springs open; unfolding shows it and clears the mark');
+    /* a bed for the night */
+    await tapBtn('#info-acts', '^A bed for the night'); await page.waitForTimeout(200);
+    const bed = await page.evaluate(([g, t]) => ({ gold: G.st.gold, dt: G.st.time.day * 1440 + G.st.time.minute - t, chip: G.st.story.filter((e) => e.t === 'chip').pop().text, card: document.getElementById('info-text').textContent, sub: [...document.querySelectorAll('#info-acts button')].find((b) => /^A bed/.test(b.textContent)).textContent, g }), [kp.gold, kp.t]);
+    ok(bed.gold === bed.g - 4 && bed.dt === 2 + 2 + 480 && /pays 4 gold for beds/.test(bed.chip) && /stairs/.test(bed.card) && /4 gold$/.test(bed.sub), 'A BED FOR THE NIGHT shows its price, takes it, and takes the night: a gold piece a head, eight hours, and the keeper\'s word for it');
+    await page.evaluate(() => UI.card(null));
+
+    /* a place first seen is told by the script, once */
+    const nA = (await story()).length; await go('S0'); await page.waitForFunction((n) => G.st.story.length > n, nA, { timeout: 8000 });
+    const ent = (await story()).slice(nA), nB = (await story()).length; await go('S1'); await go('S0'); await frames(10);
+    ok(ent.length === 1 && ent[0].src === 'script' && ent[0].area === 'narrate' && ent[0].text.includes(await page.evaluate(() => G.st.bible.town)) && (await story()).length === nB && (await page.evaluate(() => G.st.told.S0 === 1)), 'stepping out into the town for the first time is told by the script, naming it; going back in and out again is not told twice: "' + clipTo(ent[0] ? ent[0].text : '', 80) + '"');
+
+    /* the shop: what cannot be afforded is on the card, greyed, with why */
+    await go('S4'); await stand('N2'); await page.evaluate(() => { G.st.gold = 11; const t = View.map.tokens.find((q) => q.npc === 'N2'); UI.talkCard('N2'); void t; });
+    const shop = await card(), snapA = await page.evaluate(() => JSON.stringify(packState(G.st)).replace(/"saved":\d+/, ''));
+    await page.evaluate(() => { const b = [...document.querySelectorAll('#info-acts button')].find((x) => /healing draught/.test(x.textContent)); b.click(); });
+    const snapB = await page.evaluate(() => JSON.stringify(packState(G.st)).replace(/"saved":\d+/, ''));
+    await tapBtn('#info-acts', '^Buy a crowbar'); await page.waitForTimeout(120);
+    const bought = await page.evaluate(() => ({ gold: G.st.gold, has: !!carries(G.st, 'crowbar'), chip: G.st.story.filter((e) => e.t === 'chip').pop().text }));
+    ok(shop.off.length === 1 && /healing draught.*too dear/.test(shop.off[0]) && shop.btns.some((b) => /Buy a crowbar.*4 gold/.test(b)) && snapA === snapB && bought.gold === 7 && bought.has && /buys crowbar for 4 gold \(now 7\)/.test(bought.chip), 'at the shop each thing shows its price; what the purse cannot reach is there but greyed, says why, and does nothing; what it can reach is bought');
+    await page.evaluate(() => { UI.card(null); G.st.gold = 60; });
+
+    /* things: a chest, a lock, a cell */
+    await go('S2');
+    await page.waitForFunction(() => !!G.st.round, null, { timeout: 6000 }).catch(() => {});
+    await page.evaluate(() => { const st = G.st, m = st.maps.S2; if (st.round) { for (const t of m.tokens.slice()) if (t.k === 'foe') dropToken(st, m, t); fightCheck(st); } for (const t of m.tokens.slice()) if (t.k === 'foe') dropToken(st, m, t); look(st); Session.beats = []; UI.closeDialog(); UI.card(null); UI.bar(); UI.arrived(); viewResync(); for (const p of st.party) p.items = p.items.filter((x) => !/thieves/.test(x.n)); const g = new Uint8Array(m.w * m.h).fill(1); reveal(m, g); View.dirty = true; });
+    await quiet(); await frames(4);
+    const things = await page.evaluate(() => { const st = G.st, m = st.maps.S2, S = plotSpots(st), tops = m.objs.filter((o) => !o.on && CONTAINERS[o.a] && ASSETS[o.a].mv === 'b'), L = leadOf(st);
+      const far = (o) => !thingOf(st, m, o.id).stand.some((q) => q[0] === L.x && q[1] === L.y) && route(st, turnOf(st), thingOf(st, m, o.id).stand, true).ok;
+      const free = tops.find((o) => !lootOf(st, m, o).lock && far(o) && (lootOf(st, m, o).gold || lootOf(st, m, o).items.length)), locked = tops.find((o) => lootOf(st, m, o).lock && o.id !== S.strong && far(o)), door = m.doors.find((d) => d.kind === 'bars' && d.lock);
+      const f = (o) => (o ? { id: o.id, x: o.x, y: o.y, n: ASSETS[o.a].n, loot: lootOf(st, m, o) } : null);
+      return { free: f(free), locked: f(locked), door: door ? (() => { const sd = doorSides(door), held = tokenAt(m, sd[0][0], sd[0][1]) ? -1 : 1;        /* aim a shade to the side the prisoner is NOT on: a tap on them is their card, not the door's */
+        return { id: door.id, at: door.k === 'n' ? [door.x + .5, door.y - .12 * held] : [door.x - .12 * held, door.y + .5], sides: sd }; })() : null, gold: st.gold }; });
+    if (!things.free || !things.locked || !things.door) fail('this seed\'s hideout lacks a chest, a locked chest or a cell to try: ' + JSON.stringify([!!things.free, !!things.locked, !!things.door])); else {
+      await tapSq(things.free.x, things.free.y); const tc = await card();
+      await tapBtn('#info-acts', '^Search it'); await quiet(); await page.waitForTimeout(150);
+      const got = await page.evaluate(([id, g]) => { const st = G.st, m = st.maps.S2, L = leadOf(st), T = thingOf(st, m, id); return { beside: T.stand.some((q) => q[0] === L.x && q[1] === L.y), gold: st.gold - g, flag: flag(st, 'u:S2:' + id), chip: st.story.filter((e) => e.t === 'chip').pop().text, card: !document.getElementById('info').hidden }; }, [things.free.id, things.gold]);
+      await tapSq(things.free.x, things.free.y); const tc2 = await card();
+      ok(tc.on && tc.name === things.free.n && tc.btns.join() === 'Search it' && got.beside && got.gold === things.free.loot.gold && got.flag === 1 && /searches the /.test(got.chip) && !got.card && tc2.on && tc2.btns.length === 0 && /has been searched/.test(tc2.text),
+        'a tap on a crate in the hideout offers to search it; the tap on SEARCH IT walks the leader beside it and hands over what the seed put there ("' + got.chip + '"); after that its card says it has been searched and offers nothing');
+      /* sacks can be walked over AND searched: a tap on them means the card, not a walk onto them */
+      const soft = await page.evaluate(() => { const st = G.st, m = st.maps.S2, L = leadOf(st);
+        const o = m.objs.find((q) => !q.on && CONTAINERS[q.a] && ASSETS[q.a].mv !== 'b' && verbsFor(st, q.id).length && !thingOf(st, m, q.id).stand.some((z) => z[0] === L.x && z[1] === L.y) && route(st, turnOf(st), [[q.x, q.y]], true).ok);
+        return o ? { id: o.id, x: o.x, y: o.y, n: ASSETS[o.a].n, at: [L.x, L.y].join() } : null; });
+      if (!soft) fail('this hideout has nothing that can be both walked over and searched'); else {
+        await tapSq(soft.x, soft.y); await page.waitForTimeout(400); const sc = await card();
+        const stay = await page.evaluate(() => { const st = G.st, L = leadOf(st); return { at: [L.x, L.y].join(), walk: !!st.walk || !!View.walking || !!View.pending }; });
+        ok(sc.on && sc.name === soft.n && sc.btns.join() === 'Search it' && stay.at === soft.at && !stay.walk, 'a tap on ' + soft.n.toLowerCase() + ', which could be walked over, is their card and not a walk onto them: what can be done with a thing comes before where it is');
+        await page.evaluate(() => UI.card(null));
+      }
+      /* a lock: the dice made to fall both ways, the card offering what comes next */
+      const dice = (want) => page.evaluate((want) => { const st = G.st; for (let n = st.n.roll; n < st.n.roll + 9000; n++) { const r = rngFor(st.seed, 'dice', n), a = 1 + Math.floor(r() * 20), b = 1 + Math.floor(r() * 20); if (Math.min(a, b) === want) { st.n.roll = n; return true; } } return false; }, want);
+      await tapSq(things.locked.x, things.locked.y); const lc = await card();
+      await dice(1);                                                   /* bare hands roll two and keep the lower: a 1 among them fails */
+      await tapBtn('#info-acts', '^Pick the lock'); await quiet(); await page.waitForTimeout(150);
+      const lost = await page.evaluate(([id]) => { const st = G.st, m = st.maps.S2, L = leadOf(st); return { beside: thingOf(st, m, id).stand.some((q) => q[0] === L.x && q[1] === L.y), tried: flag(st, 'tried:S2:' + id + ':pick:' + L.id), open: flag(st, 'o:S2:' + id), chips: st.story.filter((e) => e.t === 'chip').slice(-2).map((e) => e.text), lead: L.name.split(' ')[0] }; }, [things.locked.id]);
+      const lcF = await card();
+      await page.evaluate(([id]) => { const st = G.st, m = st.maps.S2, other = st.party.find((p) => p.id !== st.lead); intent(st, { t: 'lead', id: other.id }); const T = thingOf(st, m, id), q = T.stand.find((z) => !taken(st, m, z[0], z[1], other.id)); other.x = q[0]; other.y = q[1]; look(st); viewResync(); UI.bar(); UI.card(null); }, [things.locked.id]);
+      await tapSq(things.locked.x, things.locked.y); const lc2 = await card();
+      await dice(20);
+      await tapBtn('#info-acts', '^Pick the lock'); await quiet(); await page.waitForTimeout(150);
+      const opened = await page.evaluate(([id]) => ({ open: flag(G.st, 'o:S2:' + id), chips: G.st.story.filter((e) => e.t === 'chip').slice(-2).map((e) => e.text).join(' | ') }), [things.locked.id]);
+      const lc3 = await card();
+      ok(lc.on && /Locked\.$/.test(lc.text) && lc.btns.length === 2 && /^Pick the lock.*Sleight of Hand DC 13.*no tools/.test(lc.btns[0]) && /^Force it.*Athletics DC 16.*crowbar/.test(lc.btns[1]) && lost.beside && lost.tried === 1 && !lost.open && lost.chips.some((t) => /Sleight Of Hand -?\d+ against DC 13, a failure/.test(t)) && lost.chips.some((t) => /holds\.$/.test(t)),
+        'a locked chest\'s card says so and offers the pick and the shoulder, each with its check, whose it is and what tools are to hand; the tap walks the leader there and the check is rolled where everyone can read it');
+      ok(lcF.on && lcF.off.length === 1 && lcF.off[0].includes(lost.lead + ' has tried') && lcF.btns.length === 2 && lc2.off.length === 0 && opened.open === 1 && /a success/.test(opened.chips) && /clicks open/.test(opened.chips) && lc3.on && lc3.btns.join() === 'Search it',
+        'a pick that fails is spent for that traveller, and the card says so; another hand may try, and once the lock gives the card comes back offering the search (' + opened.chips + ')');
+      /* the cell: a tap on its door is the door's card; with the keys in hand it is simply unlocked, and the prisoner walks free */
+      await page.evaluate(() => UI.card(null));
+      const where = () => page.evaluate(() => [leadOf(G.st).x, leadOf(G.st).y, !!G.st.walk || View.walking].join());
+      const atA = await where(), dp = await aimAt(things.door.at[0], things.door.at[1]); await page.touchscreen.tap(dp[0], dp[1]); await page.waitForTimeout(250);
+      const dc = await card(), atB = await where();
+      await page.evaluate(() => { giveItem(leadOf(G.st), 'the gang’s keys'); UI.card(null); });
+      const dp2 = await aimAt(things.door.at[0], things.door.at[1]); await page.touchscreen.tap(dp2[0], dp2[1]); await page.waitForTimeout(150);
+      const dc2 = await card(), nS = (await story()).length;
+      await tapBtn('#info-acts', '^Unlock it'); await quiet(); await page.waitForTimeout(200);
+      const freed = await page.evaluate(([id, sides]) => { const st = G.st, m = st.maps.S2, d = m.doors.find((q) => q.id === id), L = leadOf(st), cap = m.tokens.find((t) => t.npc === 'N6'); return { lock: d.lock, open: d.open, beside: sides.some((q) => q[0] === L.x && q[1] === L.y), kind: st.npcs.N6.kind, tok: cap && cap.k, name: st.npcs.N6.name }; }, [things.door.id, things.door.sides]);
+      const sF = (await story()).slice(nS);
+      ok(dc.on && dc.name === 'Barred door' && /Locked\.$/.test(dc.text) && dc.btns.length === 2 && /^Pick the lock/.test(dc.btns[0]) && atA === atB && /false$/.test(atB) && dc2.btns.length === 1 && /^Unlock it.*keys/.test(dc2.btns[0]),
+        'a tap on the cell\'s barred door is the door\'s card, not a walk into it: locked, with the pick and the shoulder on offer, or only the key once the party holds the gang\'s');
+      ok(!freed.lock && freed.open && freed.beside && freed.kind === 'npc' && freed.tok === 'npc' && sF.some((e) => e.t === 'chip' && e.text === freed.name + ' is free.') && sF.some((e) => e.t === 'gm' && e.src === 'script' && e.area === 'act' && e.text.includes(freed.name.split(' ')[0])) && sF.some((e) => e.t === 'chip' && /third one turns/.test(e.text)),
+        'UNLOCK IT walks the leader to the bars, turns the key, and the prisoner is free: said by the dice\'s line, and told by the script in a passage of its own');
+    }
+
+    /* the journal keeps what was asked and what was rummaged, in words */
+    const jr = await page.evaluate(() => { const st = G.st; UI.chron('journal'); const t = [...document.querySelectorAll('#chron-list p')].map((p) => p.textContent); UI.closePanels();
+      return { t, talks: st.log.filter((e) => e.t === 'talk').length, uses: st.log.filter((e) => e.t === 'use').length, cave: st.sites.S2.name }; });
+    ok(jr.talks >= 2 && jr.uses >= 2 && jr.t.includes('Spoke with ' + kp.name + '.') && jr.t.some((x) => /^Searched something in /.test(x) && x.includes(jr.cave)) && jr.t.some((x) => /^(Tried the lock of|Put a shoulder to|Unlocked) something in /.test(x)) && !jr.t.some((x) => !x.trim()),
+      'the journal says who was spoken with and what was searched, tried or unlocked, and where (' + jr.talks + ' questions and ' + jr.uses + ' deeds with things so far)');
+
+    /* a healing draught, from the card of whoever is hurt */
+    await page.evaluate(() => { const st = G.st, P = leadOf(st); giveItem(P, 'healing draught'); P.hp = 3; UI.card(null); });
+    { const me = await page.evaluate(() => [leadOf(G.st).x, leadOf(G.st).y]); await tapSq(me[0], me[1]); const pc = await card(); await tapBtn('#info-acts', '^Healing draught'); await page.waitForTimeout(150);
+      const dr = await page.evaluate(() => { const P = leadOf(G.st); return { hp: P.hp, has: P.items.some((x) => itemKey(x.n) === 'healing draught'), chip: G.st.story.filter((e) => e.t === 'chip').pop().text, k: G.st.story.filter((e) => e.t === 'chip').pop().k, fx: View.fx.length }; });
+      ok(pc.btns.some((b) => /^Healing draughtx1$/.test(b)) && dr.hp >= 7 && !dr.has && /drinks a healing draught: \d+ hit points restored/.test(dr.chip) && dr.k === 'heal', 'a wounded traveller\'s own card offers the draught they carry, with how many; a tap drinks it (' + dr.chip + ')'); }
+
+    /* sleepers, and a name: what being seen offers when there is a choice */
+    const seenRows = await page.evaluate(() => { const out = {}, st = G.st, btns = () => [...document.querySelectorAll('#dlg-btns button')].map((b) => b.textContent), open = () => document.getElementById('dialog').classList.contains('open');
+      /* a sentry, asleep */
+      const t1 = unpackState(JSON.parse(JSON.stringify(packState(newGame('seen-1'))))); intent(t1, { t: 'jump', site: 'S2' }); G.st = t1; viewSetMap(t1.maps.S2); UI.bar();
+      const m = t1.maps.S2, foe = m.tokens.find((t) => t.k === 'foe'); for (const t of m.tokens) if (t.k === 'foe') sheetOf(t1, t, true).asleep = 99999; look(t1);
+      UI.spotted([foe.id]); out.sleep = { open: open(), title: document.getElementById('dlg-title').textContent, text: document.getElementById('dlg-body').textContent, btns: btns().join('|'), round: !!t1.round, threat: threatOf(t1), alarm: UI.alarm() };
+      [...document.querySelectorAll('#dlg-btns button')].find((b) => /quietly/.test(b.textContent)).click(); out.sleep.after = !open() && !t1.round;
+      /* the chief, awake, and a name to say */
+      const t2 = newGame('seen-2'); intent(t2, { t: 'jump', site: 'S2' }); G.st = t2; viewSetMap(t2.maps.S2); UI.bar(); setFlag(t2, 'done:kin');
+      const m2 = t2.maps.S2, chief = m2.tokens.find((t) => t.npc === 'N5'), L = leadOf(t2), f = freeNear(t2, m2, chief.x, chief.y, L.id); L.x = f[0]; L.y = f[1]; look(t2);
+      UI.spotted([chief.id]); out.name = { open: open(), title: document.getElementById('dlg-title').textContent, btns: btns().join('|'), round: !!t2.round, pet: petName(t2) };
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); out.name.esc = !open() && !!t2.round;
+      /* and with no word to say, awake: nobody is asked */
+      const t3 = newGame('seen-3'); intent(t3, { t: 'jump', site: 'S2' }); G.st = t3; viewSetMap(t3.maps.S2); UI.bar(); const m3 = t3.maps.S2, f3 = m3.tokens.find((t) => t.k === 'foe'), L3 = leadOf(t3), q3 = freeNear(t3, m3, f3.x, f3.y, L3.id); L3.x = q3[0]; L3.y = q3[1]; look(t3);
+      UI.spotted([f3.id]); out.plain = { open: open(), round: !!t3.round };
+      return out; });
+    ok(seenRows.sleep.open && seenRows.sleep.title === 'Unseen' && /asleep, and has not stirred/.test(seenRows.sleep.text) && seenRows.sleep.btns === 'Carry on quietly|Roll initiative' && !seenRows.sleep.round && !seenRows.sleep.threat && seenRows.sleep.alarm === false && seenRows.sleep.after,
+      'a sentry found asleep is a choice, even with only the script at the table: the card says they have not stirred and offers to carry on quietly or to roll, and carrying on starts nothing');
+    ok(seenRows.name.open && seenRows.name.title === 'You are seen' && seenRows.name.btns === 'Call out: “' + seenRows.name.pet + '”|Roll initiative' && !seenRows.name.round && seenRows.name.esc, 'seen by the chief with the old name known, there is a word to say before the dice: the card offers it beside them, and turning away from the card (Escape) is not a way out of the fight');
+    ok(!seenRows.plain.open && seenRows.plain.round, 'and seen by anyone awake with nothing to say to them, nobody is asked anything: initiative is rolled');
+    /* the word, said: by the card's own button, with the die made to fall each way */
+    const called = await page.evaluate(() => { const out = {};
+      for (const [tag, die] of [['lost', 1], ['won', 20]]) { const t = newGame('seen-2'); intent(t, { t: 'jump', site: 'S2' }); G.st = t; Session.reset(); viewSetMap(t.maps.S2); UI.renderStory(); UI.bar(); setFlag(t, 'done:kin');
+        const m = t.maps.S2, chief = m.tokens.find((q) => q.npc === 'N5'), L = leadOf(t), f = freeNear(t, m, chief.x, chief.y, L.id); L.x = f[0]; L.y = f[1]; look(t); UI.spotted([chief.id]);
+        for (let n = t.n.roll; n < t.n.roll + 4000; n++) if (1 + Math.floor(rngFor(t.seed, 'dice', n)() * 20) === die) { t.n.roll = n; break; }
+        const k0 = t.story.length; [...document.querySelectorAll('#dlg-btns button')].find((b) => /^Call out/.test(b.textContent)).click();
+        const said = t.story.slice(k0); out[tag] = { round: !!t.round, dlg: document.getElementById('dialog').classList.contains('open'), pl: said.some((e) => e.t === 'pl' && /^to /.test(e.text)), check: said.filter((e) => e.t === 'chip' && /against DC/.test(e.text)).map((e) => e.text).join(' '), gm: said.some((e) => e.t === 'gm' && e.area === 'talk'), foes: m.tokens.filter((q) => q.k === 'foe').length, tried: !!flag(t, 'called') }; UI.closeDialog(); }
+      return out; });
+    ok(called.lost.pl && called.lost.gm && /a failure/.test(called.lost.check) && called.lost.round && called.lost.foes > 0 && called.lost.tried && called.won.pl && /a success/.test(called.won.check) && !called.won.round && called.won.foes === 0,
+      'the word is one tap on that card and one roll: on a 1 the chief is not moved and the dice are rolled then and there; on a 20 the gang files out and there is nobody left to fight');
+    const foeCard = await page.evaluate(() => { const t = newGame('seen-2'); intent(t, { t: 'jump', site: 'S2' }); G.st = t; Session.reset(); viewSetMap(t.maps.S2); UI.bar(); UI.closeDialog(); setFlag(t, 'done:kin');
+      const m = t.maps.S2, chief = m.tokens.find((q) => q.npc === 'N5'), btns = () => [...document.querySelectorAll('#info-acts button')].map((x) => x.textContent); UI.tokCard(chief); const a = btns();
+      setFlag(t, 'called'); UI.tokCard(chief); const b = btns(); UI.card(null); return { a, b, round: !!t.round }; });
+    ok(!foeCard.round && foeCard.a.some((x) => /^Call out/.test(x)) && foeCard.a.some((x) => /^Roll initiative/.test(x)) && !foeCard.b.some((x) => /^Call out/.test(x)) && foeCard.b.some((x) => /^Roll initiative/.test(x)),
+      'the chief\'s own card carries the word as well, beside ROLL INITIATIVE, until it has been said');
+    /* seen AGAIN, by someone already met: no card this time, and no slipping past */
+    const again = await page.evaluate(async () => {
+      const st = newGame('seen-5'); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2, foe = m.tokens.find((t) => t.k === 'foe'), P = leadOf(st);
+      for (const t of m.tokens.slice()) if (t.k === 'foe' && t !== foe) dropToken(st, m, t);
+      reveal(m, new Uint8Array(m.w * m.h).fill(1)); st.met.S2 = [foe.id];
+      const vis = sightFrom(m, foe.x, foe.y, sightOf(m)), dest = STEPS.map((s) => [foe.x + s[0], foe.y + s[1]]).find((q) => tileFree(m, q[0], q[1]) && meleeClear(m, q[0], q[1], foe.x, foe.y));
+      /* a place to start from: out of their sight, with a walk of some length to their side that begins unseen */
+      let start = null, way = null;
+      for (let i = 0; i < m.w * m.h && !start; i++) { const x = i % m.w, y = (i - x) / m.w; if (!tileFree(m, x, y) || vis[i] || tokenAt(m, x, y)) continue; P.x = x; P.y = y; const r = route(st, turnOf(st), [dest], false); if (r.ok && r.path.length >= 5 && !vis[r.path[0][1] * m.w + r.path[0][0]]) { start = [x, y]; way = r.path; } }
+      if (!start) return { none: true };
+      P.x = start[0]; P.y = start[1]; look(st); G.st = st; Session.reset(); viewSetMap(m); UI.bar(); UI.closeDialog(); UI.card(null);
+      const threat0 = threatOf(st), first = way.findIndex((q) => vis[q[1] * m.w + q[0]]);
+      go({ goals: [dest] });
+      for (let k = 0; k < 400 && (st.walk || View.walking || !st.round); k++) await new Promise((res) => setTimeout(res, 25));
+      return { threat0, round: !!st.round, dlg: document.getElementById('dialog').classList.contains('open'), at: [P.x, P.y].join(), dest: dest.join(), stopAt: way[first].join(), seenThere: !!vis[P.y * m.w + P.x], len: way.length, first, chips: st.story.filter((e) => e.t === 'chip').map((e) => e.text).join(' | ') };
+    });
+    ok(!again.none && !again.threat0 && again.round && !again.dlg && again.at === again.stopAt && again.at !== again.dest && again.seenThere && again.first >= 1 && /Initiative is rolled/.test(again.chips) && !/seen the party/.test(again.chips),
+      'an enemy the party has met before, coming into sight again, is a fight again and nobody is asked: the walk stops on the very square where they can see (' + (again.first + 1) + ' of ' + again.len + '), and initiative is rolled');
+    /* the blow that fells the chief: what the plot makes of it is said in the story, not only done */
+    const fell = await page.evaluate(() => { const st = newGame('fell-1'); for (let k = 0; k < 3; k++) intent(st, { t: 'party', op: 'add' }); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2;
+      for (const t of m.tokens.slice()) if (t.k === 'foe' && t.npc !== 'N5') dropToken(st, m, t);
+      const chief = m.tokens.find((t) => t.npc === 'N5'), L = leadOf(st), f = freeNear(st, m, chief.x, chief.y, L.id); L.x = f[0]; L.y = f[1]; look(st); sheetOf(st, chief, true).hp = 1;
+      G.st = st; Session.reset(); viewSetMap(m); UI.renderStory(); UI.bar(); UI.closeDialog(); UI.card(null);
+      intent(st, { t: 'rounds', op: 'start' }); for (let k = 0; k < 20 && st.round && turnOf(st).id !== L.id; k++) intent(st, { t: 'end' });
+      for (let n = st.n.roll; n < st.n.roll + 4000; n++) if (1 + Math.floor(rngFor(st.seed, 'dice', n)() * 20) === 20) { st.n.roll = n; break; }
+      const k0 = st.story.length, mine = st.round && turnOf(st).id === L.id; UI.attack(chief.id, '');
+      const chips = st.story.slice(k0).filter((e) => e.t === 'chip').map((e) => e.text), shown = [...document.querySelectorAll('#story-log .st-chip')].map((n) => n.textContent);
+      return { mine, round: !!st.round, keys: !!carries(st, 'the gang’s keys'), chips, shown: chips.every((c) => shown.includes(c)), chief: st.npcs.N5.name.split(' ')[0], beat: Session.beats.map((b) => b.kind).join() }; });
+    ok(fell.mine && !fell.round && fell.keys && fell.chips.some((c) => /^The fight is won/.test(c)) && fell.chips.some((c) => c.includes('the gang’s keys') && c.includes(fell.chief)) && fell.shown && fell.beat === 'fightend',
+      'when the chief falls to a blow struck by touch, the story says what the plot made of it as well as that the fight is won: the keys on ' + fell.chief + ', and who took them');
+    await V1.ctx.close();
+
+    /* the ending: reported, told, said once */
+    const V2 = await open({ width: 390, height: 844 }, null, { storyOpen: true, seed: 'script-table-2' }), pg = V2.page;
+    let asked2 = 0; pg.on('request', (r) => { if (/anthropic|openai|elevenlabs/.test(r.url())) asked2++; });
+    await begin(pg);
+    await pg.waitForFunction(() => G.st.story.length > 0, null, { timeout: 8000 });
+    const giver = await pg.evaluate(() => { const st = G.st, g = giverOf(st), k = mainK(st), L = leadOf(st); for (let j = 0; j < 3; j++) intent(st, { t: 'party', op: 'add' });
+      if (MAIN[k].goal === 'free') st.npcs.N6.kind = 'npc'; else if (MAIN[k].goal === 'chief') st.npcs.N5.status = 'defeated'; else giveItem(L, 'silver reliquary');
+      for (const z of plotCheck(st)) UI.chip(z.k, z.t); return { g, home: st.npcs[g].home, name: st.npcs[g].name, k }; });
+    await pg.evaluate((site) => UI.follow(intent(G.st, { t: 'jump', site })), giver.home);
+    await pg.waitForFunction((site) => G.st.here === site && View.map && View.map.id === site && !document.getElementById('veil').classList.contains('on'), giver.home, { timeout: 8000 });
+    await pg.waitForFunction(() => !!G.st.told[G.st.here], null, { timeout: 8000 });
+    await pg.evaluate((g) => { const st = G.st, m = st.maps[st.here], A = anchorOf(st, m, g), L = leadOf(st), q = A.stand.find((z) => !taken(st, m, z[0], z[1], L.id)); L.x = q[0]; L.y = q[1]; look(st); viewResync(); UI.talkCard(g); }, giver.g);
+    const repBtns = await pg.evaluate(() => [...document.querySelectorAll('#info-acts button')].map((b) => b.textContent)), nE = await pg.evaluate(() => G.st.story.length);
+    await pg.evaluate(() => [...document.querySelectorAll('#info-acts button')].find((b) => /^Tell them it is done/.test(b.textContent)).click());
+    await pg.waitForFunction(() => document.getElementById('dialog').classList.contains('open') && document.getElementById('dlg-title').textContent === 'The tale is told', null, { timeout: 8000 });
+    const end = await pg.evaluate((n) => ({ title: document.getElementById('dlg-title').textContent, body: document.getElementById('dlg-body').textContent, btns: [...document.querySelectorAll('#dlg-btns button')].map((b) => b.textContent).join('|'), q: G.st.quests.Q0.status, flag: flag(G.st, 'end'), over: G.st.over,
+      said: G.st.story.slice(n).map((e) => e.t + (e.src ? ':' + e.area : '') + ':' + e.text.slice(0, 40)), last: G.st.story[G.st.story.length - 1], card: !document.getElementById('info').hidden, want: beatText(G.st, 'ending') }), nE);
+    ok(repBtns[0] === 'Tell them it is done' && end.q === 'done' && end.said.some((t) => /^pl:to .*Tell them it is done/.test(t)) && end.said.some((t) => /^gm:talk:/.test(t)) && end.said.some((t) => /^chip:.*: done\./.test(t)) && end.said.some((t) => /^chip:60 gold\. 150 experience each/.test(t)),
+      'with the deed done, TELL THEM IT IS DONE is the first thing on the giver\'s card; the tap closes the task, pays, and the story has the question, the thanks and the sums');
+    ok(end.last.src === 'script' && end.last.area === 'narrate' && end.last.text === end.want && /The road out of/.test(end.last.text) && end.title === 'The tale is told' && /done, on day \d/.test(end.body) && end.btns === 'Title|Wander on' && end.flag === 1 && end.over === '',
+      'then the script tells the ending as a passage of its own, and the table says the tale is told: Title, or wander on. The tale is not over; the world stays open');
+    await pg.evaluate(() => [...document.querySelectorAll('#dlg-btns button')].find((b) => /Wander/.test(b.textContent)).click());
+    const wand = await pg.evaluate(() => { const st = G.st, a = actor(), n = st.story.length; Session.queue('ending'); return { play: document.body.classList.contains('in-play'), dlg: document.getElementById('dialog').classList.contains('open'), move: intent(st, { t: 'party', op: 'add' }).ok, beats: Session.beats.length, n }; });
+    await pg.waitForFunction(() => Session.beats.length === 0, null, { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(200);
+    const once = await pg.evaluate((n) => ({ dlg: document.getElementById('dialog').classList.contains('open'), extra: G.st.story.length - n }), wand.n);
+    ok(wand.play && !wand.dlg && wand.move && wand.beats === 0 && !once.dlg && once.extra === 0, 'WANDER ON goes back to the board with everything still working, and the ending is neither told nor announced a second time');
+    await pg.evaluate(() => UI.saveNow()); await pg.reload(); await pg.waitForFunction(() => typeof UI === 'object');
+    await pg.waitForFunction(() => !document.getElementById('btn-continue').hidden, null, { timeout: 8000 });
+    await pg.evaluate(() => document.getElementById('btn-continue').click());
+    await pg.waitForFunction(() => G.st && document.body.classList.contains('in-play') && !document.getElementById('veil').classList.contains('on'), null, { timeout: 8000 }); await pg.waitForTimeout(400);
+    const re = await pg.evaluate(() => ({ dlg: document.getElementById('dialog').classList.contains('open'), flag: flag(G.st, 'end'), q: G.st.quests.Q0.status, gm: document.querySelectorAll('#story-log .st-gm.by-script').length, foot: document.querySelectorAll('#story-log .st-foot').length, st: G.st.story.filter((e) => e.t === 'gm').length, purse: (UI.party(), document.getElementById('party-purse').textContent) }));
+    ok(!re.dlg && re.flag === 1 && re.q === 'done' && re.gm === re.st && re.foot === re.st && re.gm >= 3 && /\(done\)/.test(re.purse), 'opened again, the finished tale is where it was left: its tellings written out with their marks, the task shown as done, and no second ending');
+
+    /* compare: every telling by who told it, how it was rated, what it cost */
+    await pg.evaluate(() => { const st = G.st; st.tells[0].r = 1; st.tells[1].r = -1; st.tells[st.tells.length - 1].r = 1; UI.renderStory(); document.getElementById('ribbon-btn').click(); });      /* two good and one poor: lopsided, so a column cannot be mistaken for its neighbour */
+    await pg.waitForTimeout(150);
+    const menu = await pg.evaluate(() => [...document.querySelectorAll('#menu button')].map((b) => b.textContent).join('|'));
+    await pg.evaluate(() => document.querySelector('#menu [data-act="compare"]').click()); await pg.waitForTimeout(150);
+    const cmp = await pg.evaluate(() => { const st = G.st, rows = [...document.querySelectorAll('#compare-body table.cmp tr')].map((tr) => [...tr.children].map((c) => c.textContent)), by = (a) => st.tells.filter((r) => r.area === a);
+      const csv = UI.compareCsv().split('\n'), body = document.getElementById('compare-body').textContent, q = st.story.find((e) => e.t === 'gm' && /“/.test(e.text));
+      return { open: document.getElementById('pan-compare').classList.contains('open'), rows, nar: by('narrate').length, narW: by('narrate').reduce((n, r) => n + r.w, 0), talk: by('talk').length, up: st.tells.filter((r) => r.r === 1).length, dn: st.tells.filter((r) => r.r === -1).length, tells: st.tells.length, head: csv[0], recs: csv.filter((l) => /^"\d+","\d+","(narrate|talk|act|monsters|create)","(script|ai)",/.test(l)).length, body,
+        one: csv.find((l) => l.includes(st.story.find((e) => e.t === 'gm').text.slice(0, 30))) || '', wide: document.querySelector('#compare-body table.cmp').getBoundingClientRect().right <= innerWidth + 1, ex: !document.querySelector('#compare-body button').disabled }; });
+    const narRow = cmp.rows.find((r, i) => i > 0 && cmp.rows[i - 1][0] === 'Narration at the beats'), talkRow = cmp.rows.find((r, i) => i > 0 && cmp.rows[i - 1][0] === 'Talking to people');
+    ok(/Compare/.test(menu) && cmp.open && /Now: the script runs the whole table\./.test(cmp.body) && cmp.rows[0].join() === ',Told,Words,Good,Poor,Cost,Each' && narRow && narRow.join() === ['Script', cmp.nar, cmp.narW, narRow[3], narRow[4], 'free', ''].join() && talkRow && +talkRow[1] === cmp.talk && +narRow[3] + +talkRow[3] === cmp.up && +narRow[4] + +talkRow[4] === cmp.dn && cmp.up === 2 && cmp.dn === 1 && cmp.tells >= 3 && cmp.wide,
+      'COMPARE, from the menu, adds up every telling by what kind it was and who told it: how many, how many words, how many rated good and poor, and what it cost (the script: free), inside the screen');
+    ok(cmp.head === '"n","turn","area","source","model","words","usd","rating","twin_words","twin_rating","text","twin_text"' && cmp.recs === cmp.tells && /"narrate","script","","\d+","0\.000000","1"/.test(cmp.one) && cmp.ex, 'and its export is a sheet with one row for each telling: what, who, the words, the rating, the cost, and the text itself');
+    await pg.evaluate(() => UI.closePanels());
+
+    /* settings: the script needs nothing; the model needs a key, and is refused without one */
+    await pg.evaluate(() => { UI.settings(); UI.openPanel('pan-settings'); });
+    const set0 = await pg.evaluate(() => ({ gm: document.getElementById('set-gm').value, areas: document.getElementById('ai-areas').hidden, note: document.getElementById('gm-note').textContent, mon: [...document.getElementById('set-monsters').options].map((o) => o.value + (o.disabled ? '!' : '')).join(), tags: document.getElementById('set-tags').checked, wide: [...document.querySelectorAll('#pan-settings fieldset, #pan-settings select, #pan-settings button')].every((e) => !e.getBoundingClientRect().width || e.getBoundingClientRect().right <= innerWidth + 1), key: document.getElementById('set-key').value }));
+    const refuse = await pg.evaluate(() => { const sel = document.getElementById('set-gm'), t = document.getElementById('toast'); t.textContent = ''; sel.value = 'ai'; sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return { val: sel.value, data: Settings.data.gm, saved: JSON.parse(localStorage.getItem('cyoa2.settings.v1')).gm, note: document.getElementById('key-note').textContent, toast: t.textContent, focus: document.activeElement && document.activeElement.id, areas: document.getElementById('ai-areas').hidden, master: Mode.master(), nosay: document.body.classList.contains('no-say') }; });
+    ok(set0.gm === 'script' && set0.areas && /The script runs the whole table: no key, no cost/.test(set0.note) && set0.mon === 'script,gm!,hand' && set0.tags && set0.wide && set0.key === '', 'Settings opens on who runs the table: the script, with nothing else to choose but who moves the monsters (the script or your own hand), and all of it inside the screen');
+    ok(refuse.val === 'script' && refuse.data === 'script' && refuse.saved !== 'ai' && /key first/.test(refuse.note) && /key first/.test(refuse.toast) && refuse.focus === 'set-key' && refuse.areas && refuse.master === 'script' && refuse.nosay, 'asking for Claude with no key is refused where it is asked: the choice goes back to the script, the page says a key comes first and puts the pen in the key\'s field');
+    const tags = await pg.evaluate(() => { UI.closePanels(); const f = document.querySelector('#story-log .st-foot'), cb = document.getElementById('set-tags'), shown0 = getComputedStyle(f).display; cb.checked = false; cb.dispatchEvent(new Event('change', { bubbles: true })); const off = getComputedStyle(f).display, cls = document.body.classList.contains('hide-tags'), saved = JSON.parse(localStorage.getItem('cyoa2.settings.v1')).tags; cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true })); return { shown0, off, cls, saved, back: getComputedStyle(f).display }; });
+    ok(tags.shown0 !== 'none' && tags.off === 'none' && tags.cls && tags.saved === false && tags.back !== 'none', 'the marks under each passage can be put away in Settings, and brought back');
+    ok(asked === 0 && asked2 === 0, 'in all of this, from the first morning to the ending, nothing was asked of any service: the script\'s table calls nobody');
+    await V2.ctx.close();
+  }
+  }
+
+  if (want('W')) {
+  /* ------------------------------------------------------------------ W */
+  console.log('W. the model\'s share of the table');
+  {
+    const W1 = await open({ width: 390, height: 844 }, null, { storyOpen: true, gm: 'ai', seed: 'model-share-1' }), pg = W1.page;
+    await W1.ctx.addInitScript(() => {
+      window.__calls = [];
+      window.__CYOA2_MOCK__ = async (api) => {
+        const c = api.req.context, kind = /STAGE DIRECTION - the tale begins/.test(c) ? 'opening' : /STAGE DIRECTION - the opening has been told/.test(c) ? 'create' : /STAGE DIRECTION - the party has just walked into (S\d+)/.test(c) ? 'enter:' + RegExp.$1 : /STAGE DIRECTION - a fight has just begun/.test(c) ? 'fight'
+          : /STAGE DIRECTION - the fight has just ended/.test(c) ? 'fightend' : /STAGE DIRECTION - it is the monsters/.test(c) ? 'monsters' : /STAGE DIRECTION - the matter at hand is settled/.test(c) ? 'ending' : 'line';
+        window.__calls.push({ kind, model: api.req.settings.model, ctx: c, roll: G.st.n.roll, round: G.st.round ? G.st.round.i : -1 });
+        api.usage({ input_tokens: 100, output_tokens: 50 });
+        if (window.__gm) { const r = await window.__gm(api, kind); if (r !== 'default') return; }
+        await api.text('Told: ' + kind + '.');
+      };
+    });
+    await pg.reload(); await pg.waitForFunction(() => typeof newGame === 'function' && typeof View === 'object');
+    const calm = (ms) => pg.waitForFunction(() => G.st && !G.busy && !Session.beats.length && !G.st.walk && !View.walking && View.anim.t >= 1 && !document.getElementById('veil').classList.contains('on'), null, { timeout: ms || 15000 });
+    const kinds = () => pg.evaluate(() => window.__calls.map((c) => c.kind).join());
+    const last = () => pg.evaluate(() => { const st = G.st, e = st.story[st.story.length - 1], row = e && st.tells.find((r) => r.n === e.n); return { t: e.t, text: e.text, src: e.src || '', area: e.area || '', twin: e.twin || '', row: row || null }; });
+    const setArea = (id, v) => pg.evaluate(([id, v]) => { const sel = document.getElementById(id); sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true })); }, [id, v]);
+    const say = async (text, who) => { await pg.evaluate(([text, who]) => { if (who != null) document.getElementById('say-who').value = who; document.getElementById('say').value = text; document.getElementById('say-send').click(); }, [text, who == null ? null : who]); await pg.waitForFunction(() => G.busy, null, { timeout: 3000 }).catch(() => {}); await calm(); };
+    const fresh = async (seed) => { await pg.evaluate((seed) => { Session.reset(); window.__calls = []; G.st = newGame(seed); UI.enterPlay(true); }, seed); await pg.waitForFunction(() => document.body.classList.contains('in-play') && !document.getElementById('veil').classList.contains('on'), null, { timeout: 8000 }); };
+    const stand = (ref) => pg.evaluate((ref) => { const st = G.st, m = st.maps[st.here], A = anchorOf(st, m, ref), L = leadOf(st), q = A.stand.find((z) => !taken(st, m, z[0], z[1], L.id)); L.x = q[0]; L.y = q[1]; for (const p of st.party) if (p !== L) { const f = freeNear(st, m, L.x, L.y, p.id); p.x = f[0]; p.y = f[1]; } look(st); viewResync(); UI.bar(); UI.arrived(); View.dirty = true; }, ref);
+
+    /* who does what: every job a table has, each the script's or the model's, and what follows from the choice */
+    const modes = await pg.evaluate(() => { const d = Settings.data, keep = JSON.stringify(d), out = [];
+      const tryIt = (gm, areas, monsters) => { d.gm = gm; Object.assign(d.areas, areas); d.monsters = monsters; const n = Mode.now(); return [Mode.master(), AREAS.map((a) => n[a] === 'ai' ? a : '').filter(Boolean).join('+') || 'none', Mode.strict(), Mode.typed()].join(' '); };
+      out.push(tryIt('script', { narrate: 'ai', talk: 'ai', act: 'ai', create: 'ai' }, 'gm'));
+      out.push(tryIt('ai', { narrate: 'ai', talk: 'ai', act: 'ai', create: 'ai' }, 'script'));
+      out.push(tryIt('ai', { narrate: 'script', talk: 'ai', act: 'script', create: 'script' }, 'script'));
+      out.push(tryIt('ai', { narrate: 'script', talk: 'script', act: 'script', create: 'script' }, 'gm'));
+      out.push(tryIt('ai', { narrate: 'script', talk: 'script', act: 'script', create: 'script' }, 'hand'));
+      out.push(tryIt('ai', { narrate: 'script', talk: 'script', act: 'ai', create: 'script' }, 'script'));
+      out.push(tryIt('ai', { narrate: 'ai', talk: 'script', act: 'script', create: 'script' }, 'script'));     /* a narrator alone is someone to rule on being seen */
+      out.push(tryIt('ai', { narrate: 'script', talk: 'script', act: 'script', create: 'ai' }, 'script'));     /* someone who only makes the characters is not */
+      Object.assign(d, JSON.parse(keep)); return out; });
+    ok(modes.join(' | ') === 'script none true false | ai narrate+talk+act+create false true | ai talk true true | ai monsters false false | ai none false false | ai act false true | ai narrate false false | ai create true false',
+      'each of a Game Master\'s five jobs is the script\'s unless the table is set to the model AND that job is given to it; a typed line is offered only where a model would read it, and fights are forced only where no model and no hand could rule otherwise');
+
+    /* what was chosen is what is loaded */
+    const loaded = await pg.evaluate(() => { const blob = localStorage.getItem('cyoa2.settings.v1'), live = Settings.data, read = () => { Settings.load(); const d = Settings.data; return [d.gm, d.areas.narrate, d.areas.talk, d.areas.act, d.areas.create, d.monsters, d.twin, d.tags].join(); };
+      localStorage.setItem('cyoa2.settings.v1', JSON.stringify({ gm: 'ai', areas: { narrate: 'script', talk: 'ai', act: 'script', create: 'bogus' }, monsters: 'gm', twin: false, tags: false })); const a = read();
+      localStorage.setItem('cyoa2.settings.v1', JSON.stringify({ gm: 'claude', areas: 'all', monsters: 'everyone' })); const b = read();
+      localStorage.setItem('cyoa2.settings.v1', JSON.stringify({ narrate: 'asked' })); const c = read();
+      localStorage.setItem('cyoa2.settings.v1', blob); Settings.data = live; return { a, b, c }; });
+    ok(loaded.a === 'ai,script,ai,script,ai,gm,false,false' && loaded.b === 'script,ai,ai,ai,ai,script,true,true' && loaded.c === 'script,script,ai,ai,ai,script,true,true',
+      'who runs the table is remembered area by area, and a saved choice that is not one of the two is read as the default (an older "only when spoken to" is read as: the script narrates)');
+
+    /* Settings, with a key to pay with */
+    await pg.evaluate(() => { UI.settings(); UI.openPanel('pan-settings'); });
+    const set0 = await pg.evaluate(() => ({ gm: document.getElementById('set-gm').value, shown: !document.getElementById('ai-areas').hidden, vals: ['narrate', 'talk', 'act', 'create'].map((k) => document.getElementById('set-a-' + k).value + (document.getElementById('set-a-' + k).disabled ? '!' : '')).join(), mon: [...document.getElementById('set-monsters').options].map((o) => o.value + (o.disabled ? '!' : '')).join(), note: document.getElementById('gm-note').textContent, twin: document.getElementById('set-twin').checked && !document.getElementById('set-twin').disabled,
+      wide: [...document.querySelectorAll('#pan-settings fieldset, #pan-settings select, #pan-settings button, #pan-settings label')].every((e) => !e.getBoundingClientRect().width || e.getBoundingClientRect().right <= innerWidth + 1) }));
+    ok(set0.gm === 'ai' && set0.shown && set0.vals === 'ai,ai,ai,ai' && set0.mon === 'script,gm,hand' && /at your cost; the script does the rest for nothing/.test(set0.note) && set0.twin && set0.wide, 'with the table set to Claude, Settings shows each job with who has it, the monsters\' third choice open, and the twin kept by default; all inside the screen');
+    await pg.evaluate(() => UI.closePanels());
+
+    /* a tale opened by the model: its words, marked as its own, with the script's version folded under them */
+    await pg.evaluate(() => document.getElementById('btn-new').click());
+    await pg.waitForFunction(() => G.st && G.st.turn >= 1 && !G.busy, null, { timeout: 12000 }); await calm();
+    const o1 = await pg.evaluate(() => { const st = G.st, e = st.story[0], row = st.tells[0], f = document.querySelector('#story-log .st-foot'), tw = f.querySelector('.st-twin'), b = f.querySelector('.twin-btn');
+      return { e, row, want: beatText(st, 'opening'), src: f.querySelector(':scope > .src').textContent, cls: f.querySelector(':scope > .src').className, area: f.querySelector('.area').textContent, btn: b && b.textContent, hidden: tw && tw.hidden, exp: b && b.getAttribute('aria-expanded'), node: document.querySelector('#story-log .st-gm').className, panel: UI.panelOpen(), dlg: document.getElementById('dialog').classList.contains('open'), ctx: window.__calls[0].ctx, sys: document.querySelectorAll('#story-log .st-sys').length, cost: document.querySelector('#story-log .cost-tag').textContent }; });
+    ok((await kinds()) === 'opening' && o1.e.text === 'Told: opening.' && o1.e.src === 'ai' && o1.e.area === 'narrate' && o1.e.twin === o1.want && o1.src === 'AI' && /\bai\b/.test(o1.cls) && o1.area === 'narration' && /by-ai/.test(o1.node) && !o1.panel && !o1.dlg,
+      'a tale opened by the model: its passage is marked AI, and with it is kept, word for word, what the script would have said at the same moment');
+    ok(o1.row.src === 'ai' && o1.row.area === 'narrate' && Math.abs(o1.row.usd - 0.0014) < 1e-9 && o1.row.model === 'claude-opus-5-5' && o1.row.w === 2 && o1.row.tw === o1.want.split(/\s+/).length && /\$0\.0014/.test(o1.cost), 'the tally has it too: who, what kind, the model that answered, the words, the cost to the hundredth of a cent, and how long the script\'s version ran');
+    ok(/ask how many travellers/.test(o1.ctx) && /Making characters: you, in conversation/.test(o1.ctx) && /Narration at the beats: you\./.test(o1.ctx) && /Voicing people: you\./.test(o1.ctx) && o1.sys === 0, 'with making characters given to it, the model is asked to find out who is at the table, and the party sheet is left alone');
+    await pg.evaluate(() => { const f = document.querySelector('#story-log .st-foot'); f.querySelector('.twin-btn').id = 'tw-btn'; f.querySelector(':scope > .rate.up').id = 'm-up'; f.querySelector('.twin-rate .rate.down').id = 't-dn'; });
+    const tapEl = async (sel) => { const p = await pg.evaluate((sel) => { const e = document.querySelector(sel); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, sel); await pg.touchscreen.tap(p[0], p[1]); await pg.waitForTimeout(140); };
+    await tapEl('#tw-btn');
+    const t1 = await pg.evaluate(() => { const f = document.querySelector('#story-log .st-foot'), tw = f.querySelector('.st-twin'); return { hidden: tw.hidden, exp: document.getElementById('tw-btn').getAttribute('aria-expanded'), text: tw.querySelector('.twin-text').textContent, src: tw.querySelector('.src').textContent, inside: tw.getBoundingClientRect().right <= innerWidth + 1 && tw.getBoundingClientRect().height > 40 }; });
+    await tapEl('#m-up'); await tapEl('#t-dn');
+    const t2 = await pg.evaluate(() => ({ r: G.st.tells[0].r, tr: G.st.tells[0].tr, up: document.getElementById('m-up').getAttribute('aria-pressed'), dn: document.getElementById('t-dn').getAttribute('aria-pressed') }));
+    await tapEl('#tw-btn'); const t3 = await pg.evaluate(() => document.querySelector('#story-log .st-twin').hidden);
+    ok(o1.btn === 'Script’s version' && o1.hidden === true && o1.exp === 'false' && !t1.hidden && t1.exp === 'true' && t1.text === o1.want && t1.src === 'Script' && t1.inside && t3 === true, 'SCRIPT\'S VERSION, under the model\'s passage, unfolds the script\'s own telling of the same moment, marked as the script\'s, and folds it away again');
+    ok(t2.r === 1 && t2.tr === -1 && t2.up === 'true' && t2.dn === 'true', 'the two tellings are rated apart: the model\'s good and the script\'s poor, or the other way about');
+
+    /* making characters left to the players while the model narrates: it is told not to ask, and the story leads to the sheet */
+    await pg.evaluate(() => { Settings.data.areas.create = 'script'; }); await fresh('model-share-2');
+    await pg.waitForFunction(() => G.st && G.st.turn >= 1 && !G.busy, null, { timeout: 12000 }); await calm();
+    const o2 = await pg.evaluate(() => { const sys = [...document.querySelectorAll('#story-log .st-sys')].map((n) => n.textContent), b = document.querySelector('#story-log .st-sys button'), open0 = UI.panelOpen(); if (b) b.click(); return { ctx: window.__calls[0].ctx, sys, open0, open1: document.getElementById('pan-party').classList.contains('open'), dlg: document.getElementById('dialog').classList.contains('open') }; });
+    ok((await kinds()) === 'opening' && /do not ask who they are/.test(o2.ctx) && !/ask how many travellers/.test(o2.ctx) && /Making characters: the players, on the party sheet/.test(o2.ctx) && o2.sys.length === 1 && /^Who is at the table\?The party$/.test(o2.sys[0]) && !o2.open0 && o2.open1 && !o2.dlg,
+      'with characters left to the players, the model\'s opening is told not to ask who they are; the page is not turned on the reader, and a line under the opening leads to the party sheet');
+    await pg.evaluate(() => UI.closePanels());
+    /* and the other way round: the script opens, the model asks who is there */
+    await pg.evaluate(() => { Settings.data.areas.create = 'ai'; Settings.data.areas.narrate = 'script'; }); await fresh('model-share-3');
+    await pg.waitForFunction(() => document.getElementById('dialog').classList.contains('open'), null, { timeout: 8000 });
+    await pg.evaluate(() => document.querySelector('#dlg-btns button').click());
+    await pg.waitForFunction(() => window.__calls.length >= 1 && !G.busy && G.st.story.length >= 2, null, { timeout: 12000 }); await calm();
+    const o3 = await pg.evaluate(() => ({ story: G.st.story.map((e) => e.src + ':' + e.area + ':' + (e.twin ? 'twin' : '')).join(), ctx: window.__calls[0].ctx, panel: UI.panelOpen(), btn: document.querySelectorAll('#story-log .twin-btn').length }));
+    ok((await kinds()) === 'create' && o3.story === 'script:narrate:,ai:create:' && /find out who is at the table/i.test(o3.ctx) && /Narration at the beats: the script/.test(o3.ctx) && /\n {2}SCRIPT: You wake/.test(o3.ctx) && !o3.panel && o3.btn === 0,
+      'the other way round, the script tells the opening for nothing and the model is then asked one thing only: who is at the table. It is shown what the script said, and a job the script has no version of carries no twin');
+    await pg.evaluate(() => { Settings.data.areas.narrate = 'ai'; });
+
+    /* talking: typed to the model, or topics from the script, changed in the middle of a tale */
+    await pg.evaluate(() => { for (let k = 0; k < 2; k++) intent(G.st, { t: 'party', op: 'add' }); UI.bar(); }); await stand('N0');
+    const kp = await pg.evaluate(() => { const st = G.st, k = View.map.tokens.find((t) => t.npc === 'N0'); UI.card(null); View.cam.x = k.x + .5; View.cam.y = k.y + .5; camMoved(true); viewDraw(); const r = View.cv.getBoundingClientRect(), s = w2s(k.x + .5, k.y + .5); return { tap: [r.left + s[0], r.top + s[1]], name: st.npcs.N0.name, bar: !document.body.classList.contains('no-say') }; });
+    await pg.touchscreen.tap(kp.tap[0], kp.tap[1]); await pg.waitForTimeout(160);
+    await pg.evaluate(() => [...document.querySelectorAll('#info-acts button')].find((b) => b.textContent === 'Talk').click()); await pg.waitForTimeout(100);
+    const ready = await pg.evaluate(() => ({ ph: document.getElementById('say').placeholder, focus: document.activeElement && document.activeElement.id, card: document.getElementById('info').hidden, to: Session.to && Session.to.id }));
+    const at0 = await pg.evaluate(() => [leadOf(G.st).x, leadOf(G.st).y].join());
+    await pg.keyboard.type('wasd qezc 0+-'); await pg.waitForTimeout(120);
+    const typed = await pg.evaluate(() => ({ v: document.getElementById('say').value, at: [leadOf(G.st).x, leadOf(G.st).y].join(), walk: !!G.st.walk || View.walking }));
+    await pg.evaluate(() => { document.getElementById('say').value = 'What do you know about the bandits?'; }); await pg.keyboard.press('Enter');
+    await pg.waitForFunction(() => G.busy, null, { timeout: 3000 }).catch(() => {}); await calm();
+    const l1 = await last(), c1 = await pg.evaluate(() => { const c = window.__calls[window.__calls.length - 1]; return { kind: c.kind, to: /speaking to N0 /.test(c.ctx), n: window.__calls.length, pl: G.st.story[G.st.story.length - 2] }; });
+    ok(kp.bar && ready.ph === 'Say to ' + kp.name.split(' ')[0] && ready.focus === 'say' && ready.card && ready.to === 'N0' && typed.v === 'wasd qezc 0+-' && typed.at === at0 && !typed.walk, 'with talking given to the model, TALK puts the pen in the story, addressed to them; letters typed there are letters, and nobody walks');
+    ok(c1.kind === 'line' && c1.to && c1.pl.t === 'pl' && c1.pl.text === 'What do you know about the bandits?' && l1.src === 'ai' && l1.area === 'talk' && /^\[Ask about /.test(l1.twin) && l1.row.tw > 5, 'Enter sends it; the answer is the model\'s, marked as talk, and its twin is the script\'s nearest topic: ' + clipTo(l1.twin, 70));
+    /* talk handed to the script, mid-tale, from Settings */
+    await pg.evaluate(() => { UI.settings(); UI.openPanel('pan-settings'); }); await setArea('set-a-talk', 'script'); await pg.evaluate(() => UI.closePanels());
+    const nC = await pg.evaluate(() => window.__calls.length);
+    await pg.touchscreen.tap(kp.tap[0], kp.tap[1]); await pg.waitForTimeout(160);
+    await pg.evaluate(() => [...document.querySelectorAll('#info-acts button')].find((b) => b.textContent === 'Talk').click()); await pg.waitForTimeout(100);
+    const sc = await pg.evaluate(() => { const talk = document.getElementById('info').classList.contains('talk'), n = [...document.querySelectorAll('#info-acts button')].length, b = [...document.querySelectorAll('#info-acts button')].find((x) => /^Ask about the /.test(x.textContent)); if (b) b.click(); const e = G.st.story[G.st.story.length - 1]; return { talk, n, src: e.src, area: e.area, to: Session.to, bar: !document.body.classList.contains('no-say'), saved: JSON.parse(localStorage.getItem('cyoa2.settings.v1')).areas.talk }; });
+    ok(sc.talk && sc.n >= 3 && sc.src === 'script' && sc.area === 'talk' && sc.to === null && (await pg.evaluate(() => window.__calls.length)) === nC && sc.bar && sc.saved === 'script', 'talk handed to the script in Settings, in the middle of the tale: the same TALK is now a card of topics, the answer is the script\'s, and the model is not asked; the pen stays, for lines to the table');
+    await pg.evaluate(() => UI.card(null));
+    await say('I look for a loose floorboard.', '');
+    const l2 = await last(), c2 = await pg.evaluate(() => { const c = window.__calls[window.__calls.length - 1]; return { ctx: c.ctx, n: window.__calls.length }; });
+    ok(c2.n === nC + 1 && l2.src === 'ai' && l2.area === 'act' && /cannot read a typed line/.test(l2.twin) && /Voicing people: the script/.test(c2.ctx) && /Lines typed to the table: you/.test(c2.ctx) && /PLAYER LINE - The table says: I look for a loose floorboard\./.test(c2.ctx),
+      'a line to the table at large still goes to the model, which is told that the script now voices people; its twin says plainly that the script cannot read a typed line, and what the board offers instead');
+    /* the other way: the model voices people, the script has the table */
+    await pg.evaluate(() => { Settings.data.areas.talk = 'ai'; Settings.data.areas.act = 'script'; UI.modeChanged(); });
+    const nD = await pg.evaluate(() => window.__calls.length);
+    const lone = await pg.evaluate(() => { const t = document.getElementById('toast'); t.textContent = ''; document.getElementById('say').value = 'Hello?'; document.getElementById('say-send').click(); return { toast: t.textContent, busy: G.busy, kept: document.getElementById('say').value, bar: !document.body.classList.contains('no-say') }; });
+    ok(/Tap someone and choose Talk/.test(lone.toast) && !lone.busy && lone.bar && (await pg.evaluate(() => window.__calls.length)) === nD, 'with lines to the table left to the script and people to the model, a line addressed to nobody is not sent: the table says to tap someone');
+    await pg.evaluate(() => { Settings.data.areas.talk = 'script'; UI.modeChanged(); });
+    const none = await pg.evaluate(() => ({ nosay: document.body.classList.contains('no-say'), w: document.getElementById('say').getBoundingClientRect().width, typed: Mode.typed(), master: Mode.master() }));
+    ok(none.nosay && none.w === 0 && !none.typed && none.master === 'ai', 'and with neither given to the model the pen is put away, though the model still narrates');
+
+    /* the monsters, given to the model: its turn is told, and the script's own turn is its twin, played on a copy */
+    await pg.evaluate(() => { Settings.data.areas.act = 'ai'; Settings.data.areas.talk = 'ai'; Settings.data.monsters = 'gm'; UI.modeChanged(); window.__gm = async (api, kind) => { if (kind !== 'monsters') return 'default'; window.__mon = { roll: G.st.n.roll }; for (let k = 0; k < 12; k++) { const r = api.tool('end_turn', {}); if (!r.ok || !r.result || r.result.turn.is_player_character !== false) break; } await api.text('The gang hold their ground.'); }; });
+    await pg.evaluate(() => UI.follow(intent(G.st, { t: 'jump', site: 'S2' })));
+    await pg.waitForFunction(() => G.st.here === 'S2' && View.map && View.map.id === 'S2' && !document.getElementById('veil').classList.contains('on'), null, { timeout: 8000 });
+    await pg.waitForTimeout(300);                                     /* (if the gang is in sight from the mouth of the cave the table is already asking what now: the rows below ask it on ground of their own) */
+    const pre = await pg.evaluate(() => { const st = G.st, m = st.maps.S2, P = leadOf(st), tok = m.tokens.find((t) => t.k === 'foe'), f = freeNear(st, m, tok.x, tok.y, P.id); P.x = f[0]; P.y = f[1]; for (const p of st.party) if (p !== P) { const z = freeNear(st, m, P.x, P.y, p.id); p.x = z[0]; p.y = z[1]; p.hpMax = p.hp = 90; } P.hpMax = P.hp = 90; look(st); viewResync(); UI.closeDialog();
+      const strict = Mode.strict(); UI.spotted([tok.id]); const btns = [...document.querySelectorAll('#dlg-btns button')].map((b) => b.textContent).join('|'); [...document.querySelectorAll('#dlg-btns button')].find((b) => /initiative/i.test(b.textContent)).click(); window.__preRoll = st.n.roll; return { strict, btns, round: !!st.round, name: st.npcs[tok.npc].name }; });
+    for (let k = 0; k < 12 && !(await pg.evaluate(() => window.__calls.some((c) => c.kind === 'monsters'))); k++) { await calm(); if (await pg.evaluate(() => !!G.st.round && turnOf(G.st).pc && !G.busy)) await pg.evaluate(() => { UI.endTurn(); window.__preRoll = G.st.n.roll; }); await pg.waitForTimeout(250); }
+    await calm();
+    const mon = await pg.evaluate(() => { const st = G.st, e = st.story.filter((x) => x.t === 'gm' && x.area === 'monsters').pop(), c = window.__calls.find((x) => x.kind === 'monsters'), row = e && st.tells.find((r) => r.n === e.n); return { e, c: c && { roll: c.roll }, mon: window.__mon, pre: window.__preRoll, row, ctx: c && /played by: YOU/.test(c.ctx), stand: document.getElementById('btn-stand').hidden, must: UI.mustFight() }; });
+    ok(!pre.strict && pre.btns === 'Carry on|Roll initiative' && pre.round, 'with a model at the table to rule on it, being seen is a choice again: carry on, or roll');
+    ok(mon.e && mon.e.src === 'ai' && mon.e.text === 'The gang hold their ground.' && mon.ctx && mon.e.twin.length > 10 && mon.row && mon.row.tw > 2 && mon.c.roll === mon.pre && mon.mon.roll === mon.pre && !mon.stand && !mon.must,
+      'the monsters\' turn, given to the model, is told by it; kept under it is what the monsters\' own script would have done with the same turn ("' + clipTo(mon.e ? mon.e.twin : '', 80) + '"), played out on a copy: when the model began, not one of the tale\'s dice had been rolled for it');
+    await pg.evaluate(() => { window.__gm = null; const st = G.st, m = st.maps.S2; Settings.data.monsters = 'script'; if (st.round) { for (const t of m.tokens.slice()) if (t.k === 'foe') dropToken(st, m, t); UI.fightOver(fightCheck(st) || endFight(st, 'stop'), true); } for (const t of m.tokens.slice()) if (t.k === 'foe') dropToken(st, m, t); look(st); Session.beats = []; UI.modeChanged(); });
+    await calm();
+
+    /* no twin kept, when the table says not to */
+    await pg.evaluate(() => { Settings.data.twin = false; }); await say('Is anyone left in here?', '');
+    const l3 = await last(), f3 = await pg.evaluate(() => { const feet = [...document.querySelectorAll('#story-log .st-foot')], f = feet[feet.length - 1]; return { btn: !!f.querySelector('.twin-btn'), src: f.querySelector(':scope > .src').textContent }; });
+    ok(l3.src === 'ai' && l3.twin === '' && l3.row.tw === 0 && !f3.btn && f3.src === 'AI', 'with the twin switched off the model\'s passage stands alone: nothing kept under it, nothing to unfold');
+    await pg.evaluate(() => { Settings.data.twin = true; });
+
+    /* what a model's deed settles in the plot, the table says: the plot is the engine's, whoever did the deed */
+    await pg.evaluate(() => { window.__gm = async (api, kind) => { if (kind !== 'line') return 'default'; window.__r = api.tool('update_npc', { npc_id: 'N5', status: 'dead' }); await api.text('It is done, far away and out of sight.'); }; });
+    const kP = await pg.evaluate(() => G.st.story.length);
+    await say('We hear the chief has met an end.', '');
+    const plot = await pg.evaluate((kP) => { const st = G.st, said = st.story.slice(kP); return { ok: !!(window.__r && window.__r.ok), err: (window.__r && window.__r.error) || '', keys: !!carries(st, 'the gang’s keys'), spoils: flag(st, 'spoils'), chips: said.filter((e) => e.t === 'chip').map((e) => e.text).join(' | '),
+      shown: [...document.querySelectorAll('#story-log .st-chip')].some((n) => /the gang’s keys/.test(n.textContent)), gm: said.some((e) => e.t === 'gm' && e.src === 'ai') }; }, kP);
+    ok(plot.ok && plot.gm && plot.keys && plot.spoils === 1 && /the gang’s keys/.test(plot.chips) && plot.shown, 'when it is the model whose deed ends the chief, the engine\'s plot still follows and the table says so in the story: the keys, and who has them' + (plot.err ? ' (' + plot.err + ')' : ''));
+    await pg.evaluate(() => { window.__gm = null; });
+
+    /* the ending, when it is the model that closes the matter at hand */
+    await pg.evaluate(() => { window.__gm = async (api, kind) => { if (kind !== 'line') return 'default'; window.__q = api.tool('update_quest', { op: 'complete', quest_id: 'Q0', note: 'Settled by a word.' }); await api.text('And so it is settled.'); }; });
+    const kE = await pg.evaluate(() => window.__calls.length);
+    await say('We tell the elder everything.', '');
+    await pg.waitForFunction(() => document.getElementById('dialog').classList.contains('open') && document.getElementById('dlg-title').textContent === 'The tale is told', null, { timeout: 12000 });
+    const end = await pg.evaluate((kE) => { const st = G.st, e = st.story[st.story.length - 1]; return { kinds: window.__calls.slice(kE).map((c) => c.kind).join(), q: st.quests.Q0.status, e, want: beatText(st, 'ending'), flag: flag(st, 'end'), ok: window.__q.ok, btns: [...document.querySelectorAll('#dlg-btns button')].map((b) => b.textContent).join('|'), ctx: window.__calls[window.__calls.length - 1].ctx }; }, kE);
+    ok(end.ok && end.q === 'done' && end.kinds === 'line,ending' && end.e.src === 'ai' && end.e.area === 'narrate' && end.e.text === 'Told: ending.' && end.e.twin === end.want && end.flag === 1 && end.btns === 'Title|Wander on' && /epilogue/.test(end.ctx),
+      'when it is the model that closes the matter at hand, the table notices: the model is asked for an epilogue, the script\'s own ending is kept under it, and the tale is said to be told, once');
+    await pg.evaluate(() => { [...document.querySelectorAll('#dlg-btns button')].find((b) => /Wander/.test(b.textContent)).click(); window.__gm = null; });
+
+    /* compare, with both at the table */
+    await pg.evaluate(() => { G.st.tells.find((r) => r.tw > 0).tr = 1; UI.compare(); UI.openPanel('pan-compare'); });
+    const cmp = await pg.evaluate(() => { const st = G.st, rows = [...document.querySelectorAll('#compare-body table.cmp tr')].map((tr) => ({ cls: tr.className, area: tr.dataset.area || '', cells: [...tr.children].map((c) => c.textContent) })), ai = st.tells.filter((r) => r.src === 'ai'), body = document.getElementById('compare-body').textContent, csv = UI.compareCsv();
+      const sum = (a, s) => st.tells.filter((r) => r.area === a && r.src === s); return { rows, ai: ai.length, usd: ai.reduce((n, r) => n + r.usd, 0), body, csv, talkAi: sum('talk', 'ai').length, talkSc: sum('talk', 'script').length, tw: st.tells.filter((r) => r.tw > 0).length, wide: document.querySelector('#compare-body table.cmp').getBoundingClientRect().right <= innerWidth + 1 }; });
+    const tA = cmp.rows.find((r) => r.cls === 'ai' && r.area === 'talk'), tS = cmp.rows.find((r) => r.cls === 'script' && r.area === 'talk'), aiCost = cmp.rows.filter((r) => r.cls === 'ai').reduce((n, r) => n + parseFloat(r.cells[5].slice(1)), 0);
+    ok(/Now: Claude has narration at the beats, talking to people, lines typed to the table, making characters\. The script has the rest\./.test(cmp.body) && tA && tS && +tA.cells[1] === cmp.talkAi && +tS.cells[1] === cmp.talkSc && tA.cells[0] === 'AI' && /^\$0\.00\d\d$/.test(tA.cells[5]) && tA.cells[6] === '$0.0014' && tS.cells[5] === 'free' && Math.abs(aiCost - cmp.usd) < 0.0002 && cmp.wide,
+      'COMPARE with both at the table: under each job a row for the script and a row for the model, the model\'s with what it cost in all and for each telling, the script\'s free, and a line saying who has what now');
+    ok(new RegExp('Under ' + cmp.tw + ' tellings of Claude’s the script’s version was kept: rated good 1, poor 0\\.').test(cmp.body) && /"talk","ai","claude-opus-5-5","\d+","0\.001400","0","\d+","1","Told: line\.","\[Ask about /.test(cmp.csv) && /"narrate","ai","claude-opus-5-5","2","0\.001400","0","\d+","0","Told: ending\."/.test(cmp.csv),
+      'it counts the twins and how they were rated beside the model\'s own, and the export carries both texts side by side for every telling that has two');
+    await pg.evaluate(() => UI.closePanels());
+
+    /* the key goes away in the middle of a tale: the script takes everything back */
+    const gone = await pg.evaluate(async () => { const mock = window.__CYOA2_MOCK__, n = window.__calls.length; window.__CYOA2_MOCK__ = null; UI.modeChanged();
+      const out = { on: Session.on(), master: Mode.master(), nosay: document.body.classList.contains('no-say'), strict: Mode.strict() };
+      UI.settings(); out.note = document.getElementById('gm-note').textContent; out.sel = document.getElementById('set-gm').value;
+      const st = G.st, k = st.story.length; delete st.told.S3; UI.follow(intent(st, { t: 'jump', site: 'S3' })); await new Promise((res) => setTimeout(res, 1200));
+      const e = st.story[st.story.length - 1]; out.told = st.story.length > k && e.src === 'script' && e.area === 'narrate'; out.calls = window.__calls.length === n; window.__CYOA2_MOCK__ = mock; UI.modeChanged(); out.back = Mode.master(); return out; });
+    ok(!gone.on && gone.master === 'script' && gone.nosay && gone.strict && gone.sel === 'ai' && /no key is set: the script is running everything/.test(gone.note) && gone.told && gone.calls && gone.back === 'ai',
+      'if the key goes away in the middle of a tale the script takes everything back at once, for nothing: it tells the next place, the pen is put away, Settings says why; and with a key again the model has its jobs back');
+    await W1.ctx.close();
   }
   }
 

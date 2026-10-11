@@ -24,7 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
-| CYOA2 | `cyoa2/` | tabletop-rpg | tap-to-move, pinch-zoom, drag-pan, text-entry | open-sandbox, save-campaign | tile-board, asset-library, procedural-generation, seeded-determinism, line-of-sight, fog-of-war, initiative-order, grid-combat, llm-game-master | solo, local-coop | `.claude/cyoa2.md` |
+| CYOA2 | `cyoa2/` | tabletop-rpg | tap-to-move, pinch-zoom, drag-pan, text-entry | open-sandbox, save-campaign | tile-board, asset-library, procedural-generation, seeded-determinism, line-of-sight, fog-of-war, initiative-order, grid-combat, llm-game-master, scripted-game-master, dialogue-choices | solo, local-coop | `.claude/cyoa2.md` |
 | CYOA | `cyoa/` | tabletop-rpg | voice, text-entry, tap | save-campaign | llm-game-master, speech-narration, procedural-generation, seeded-determinism | solo, local-coop | `.claude/cyoa.md` |
 | Animation Rigs | `animation-rigs/` | animation-sandbox | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox | procedural-animation, inverse-kinematics, simulated-agents, real-time-3d | solo | `.claude/animation-rigs.md` |
 | Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
@@ -188,6 +188,18 @@ local-2p.
   Master or the table's own hand as settings), and the second with a per-save cost
   ledger. `cyoa` is the conversation without a board; `neon-tactics` and
   `ember-depths` are the board without a conversation.
+- **`scripted-game-master`** / **`dialogue-choices`** mechanics (cyoa2, the two kinds
+  of Game Master, 2026-10-10; a CD direction: "default mode is deterministic scripted
+  everything"). The first game here whose **narrator is a table**: the beats, what
+  people say and the whole quest are data chosen by a hash of the seed, so the same
+  seed and the same moves give the same words, for nothing and with no network. People
+  are talked to through **topic buttons** drawn from the seed's plot (some of them a
+  skill check, shown on the button with whose it is), and chests and locks offer verb
+  buttons. And the first where the **same moment can be told twice**: with Claude given
+  an area, the page keeps the script's version of each passage beside the model's, tags
+  both, takes a thumb up or down on either and adds it up, so how much of the table to
+  give the model is something the player can measure. `adventure.html` has encounters
+  and choices but no seeded world and no second teller.
 
 ### Newly opened by the 2026-10-04 build
 - **`animation-sandbox`** genre + **`procedural-animation`** /
