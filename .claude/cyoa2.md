@@ -296,6 +296,9 @@ use the gpt key"); these are how I filled it in, and where it departs from CYOA'
    - **Done (second push, 2026-10-10):** the narrator's voice on the **device's own
      speech** with a sentence queue, a microphone where a model reads the line, the notes
      page, and a rule book behind every line of the party sheet. Step 3 is complete.
+   - **Done (2026-10-11, after the CD played it):** the narrator's **paid voice**,
+     OpenAI's speech on the player's own key, with the device's voice as its fallback;
+     the Game Master dropdown in the CD's own words, and the five under it shortened.
    - Not planned yet: places the Game Master makes up beyond the charted ones, woodcut
      plates, a second adventure once the hill is taken.
 4. Multiplayer: other devices send the SAME intents; the host's engine judges them. A web
