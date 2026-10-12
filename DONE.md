@@ -1,5 +1,18 @@
 # DONE — done log
 
+- 2026-10-11 [cyoa2] The narrator's **paid voice**: OpenAI's speech on the
+  player's own key, as CYOA has it, with the device's voice as fallback and
+  its cost estimated in the ledger (`334f14e`); the Game Master dropdown in
+  the CD's words, "Scripted (free)" / "AI (Claude api key)", and the five
+  under it shortened (`ea48684`). The CD asked for both after playing the
+  scripted table. Suite 807 checks; what is still to be heard on a phone is
+  in TODO § Needs Zack.
+
+- 2026-10-10 [cyoa2] Step 3 complete: two Game Masters over one engine, a
+  script by default and Claude per area with a twin, tags, ratings and a
+  Compare page (`d7cc8a2`); then the narrator's voice, a microphone, notes
+  and a rule book (`4b316cd`). Design record: `.claude/cyoa2.md`.
+
 - 2026-08-29 [phasic] Launch-block audition PASSED — the CD signed off on
   the block-8 playtest and the `Launch` / `The Flue` name+hint wording
   (backlog-refine interview). Closes phasacro's "Blocked — needs you"
