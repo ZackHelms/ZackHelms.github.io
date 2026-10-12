@@ -166,14 +166,16 @@ ok(!mono.length, 'each level asks at least as much as the one below, and gives a
   ok(st.level === 3, 'funding the year-1 opportunities reaches L3a', T.LEVELS[st.level].id);
   const rot = T.forecast(st, { opp: false, inv: {} }), kept = T.forecast(st, { opp: false, inv: { shared: 2 } });
   ok(rot.drift.context === -C.contextRot && kept.drift.context === 0, 'from L3a, context rots without upkeep and holds with it', rot.drift.context + ' / ' + kept.drift.context);
-  ok(rot.out.gain - rot.out.rework > 0.03 ? rot.drift.trust === C.trustUp : true, 'a clearly positive measured gain raises trust', rot.drift.trust);
+  // the precondition is asserted, not assumed: a row that is green whenever its premise fails can never fail
+  ok(rot.out.gain - rot.out.rework > 0.03 && rot.drift.trust === C.trustUp, 'a clearly positive measured gain raises trust', (rot.out.gain - rot.out.rework).toFixed(3) + ' -> ' + rot.drift.trust);
 
   // not ready for deterministic-first: the burn saving is halved too
   let early = T.newGame();
   for (let q = 0; q < 4; q++) early = T.commit(early, T.emptyPlan());
   const half = T.commit(early, { opp: true, inv: {} });
   ok(Math.abs(half.burnFactor - (1 + T.OPPS[4].burnFactor) / 2) < 1e-9, 'an unready deterministic-first push saves half the AI credits', half.burnFactor);
-  ok(half.agentUnits === 0, 'no lasting bonus from an opportunity the team was not ready for');
+  // (this row used to check agentUnits after Y2Q1, whose opportunity has no agent at all: it could not fail.
+  //  The agent rows are in section 9, at the quarters that have one.)
 }
 
 /* ---------- 7. year 1 and the budget cut ---------- */
@@ -198,11 +200,154 @@ ok(!mono.length, 'each level asks at least as much as the one below, and gives a
     if (m.score !== want) bad = 'run ' + n + ': ' + m.score + ' vs ' + want;
   }
   ok(!bad, 'score = units over 480 - shortfalls + 2 x (exit rate - 60)', bad);
+
+  // the score row recomputes from m.exit, so it cannot see a wrong exit rate; these rows can.
+  // Exit rate = what forecast() says a plain quarter would ship: all SP on delivery, no dip, the full budget
+  // (the cut is year 2's only). A sweep end state plus a credit-bound one, since the sweep never binds at 9,000.
+  const plain = s => T.forecast(Object.assign({}, s, { q: 7, leveledUp: false, budgetCut: false }), T.emptyPlan()).out.units;
+  const r3 = rng(31);
+  let exitBad = '', sawUp = false, grades = '', goals = '', sawNeg = 0, sawPos = 0;
+  for (let n = 0; n < 120; n++) {
+    const { s } = play(st => randomPlan(st, r3));
+    const m = T.summary(s);
+    if (s.leveledUp) sawUp = true;
+    if (!exitBad && m.exit !== plain(s)) exitBad = 'run ' + n + ': ' + m.exit + ' vs ' + plain(s);
+    const wantGoals = (m.y1 >= C.yearGoal ? 1 : 0) + (m.y2 >= C.yearGoal ? 1 : 0);
+    if (!goals && m.goals !== wantGoals) goals = 'run ' + n + ': ' + m.goals + ' vs ' + wantGoals + ' (' + m.y1 + '/' + m.y2 + ')';
+    const trad = s.level === 0 && m.total >= m.base;
+    if (m.score < 0) sawNeg++; else if (!trad) sawPos++;
+    if (!grades && (trad !== (m.grade === 'Traditional') || (!trad && (m.score < 0) !== (m.grade === 'Stalled pilot'))))
+      grades = 'run ' + n + ': score ' + m.score + ' graded ' + m.grade;
+  }
+  const bound = Object.assign(T.newGame(), { q: 8, level: 5, leveledUp: true, budgetCut: true,
+    stats: { knowledge: 90, context: 90, quality: 90, trust: 100, flow: 90 } });
+  const boundExit = T.exitRate(bound);
+  ok(!exitBad && sawUp && boundExit === plain(bound),
+    'the exit rate is a plain quarter by forecast(): no learning dip, the full budget even after a cut',
+    exitBad || (sawUp ? boundExit + ' vs ' + plain(bound) : 'no sweep run ended on a level-up'));
+  ok(!goals, 'goals met counts the years that shipped 240', goals);
+  ok(!grades && sawNeg > 0 && sawPos > 0, 'a negative score is graded Stalled pilot and nothing else is; Traditional means L0 and 480',
+    grades || ('negative ' + sawNeg + ', non-negative ' + sawPos));
   const plans = [];
   const r2 = rng(99);
   const a = play(st => { const p = randomPlan(st, r2); plans.push(p); return p; }).s;
   const b = play(st => plans[st.q]).s;
   ok(JSON.stringify(a) === JSON.stringify(b), 'the same plans always give the same two years');
+}
+
+/* ---------- 9. rules the seeded play cannot reach, on hand-built states ----------
+ * Every row above plays real quarters, and some rules never come up in play: the
+ * sweep never runs short of credits at 9,000, never rots a stat to 0, and never has
+ * an agent's quarter arrive before the team is ready for it. These build the state
+ * the rule is about. Each was written after a deliberate break of that rule passed
+ * the rest of the suite (.claude/tests/README.md, negative tests). */
+const ZERO = { knowledge: 0, context: 0, quality: 0, trust: 0, flow: 0 };
+const at = (o) => Object.assign(T.newGame(), o, { stats: Object.assign({}, ZERO, o.stats) });
+const MID = { knowledge: 50, context: 50, quality: 50, trust: 50, flow: 50 };
+{
+  // every quarter's opportunity gives exactly its table gain when ready, half when not
+  const bad = [];
+  T.OPPS.forEach((o, q) => {
+    [o.minLevel, o.minLevel - 1].filter(l => l >= 0).forEach(level => {
+      const s = at({ q, level, stats: MID });
+      const a = T.forecast(s, { opp: true, inv: {} }), b = T.forecast(s, T.emptyPlan());
+      const f = level >= o.minLevel ? 1 : 0.5;
+      T.STATS.forEach(k => { if (Math.abs((a.gains[k] - b.gains[k]) - (o.gain[k] || 0) * f) > 1e-9) bad.push(o.id + '@' + T.LEVELS[level].id + '.' + k); });
+    });
+  });
+  ok(!bad.length, 'every opportunity gives exactly its table gain when ready and half when not', bad.join(', '));
+
+  // the agent quarters: a lasting bonus only when ready
+  const agents = [];
+  T.OPPS.forEach((o, q) => {
+    if (!o.agentUnits) return;
+    const ready = T.commit(at({ q, level: o.minLevel, stats: MID }), { opp: true, inv: {} });
+    const early = T.commit(at({ q, level: o.minLevel - 1, stats: MID }), { opp: true, inv: {} });
+    if (ready.agentUnits !== o.agentUnits || ready.agentAic !== o.agentAic || early.agentUnits !== 0 || early.agentAic !== 0)
+      agents.push(o.id + ' ready ' + ready.agentUnits + ' early ' + early.agentUnits);
+  });
+  ok(T.OPPS.some(o => o.agentUnits) && !agents.length, 'an agent opportunity adds its units for good only if the team was ready', agents.join(', '));
+}
+{
+  // the dip is the quarter after a level-up and no other
+  const s = at({ q: 3, level: 2, stats: MID });
+  const flat = T.forecast(s, T.emptyPlan()).out.dip, up = T.forecast(Object.assign({}, s, { leveledUp: true }), T.emptyPlan()).out.dip;
+  ok(flat === 0 && up === C.transitionTax, 'at L2 with no fresh level-up there is no dip, and with one there is', flat + ' / ' + up);
+}
+{
+  // which work counts as upkeep, and from which level each stat rots.
+  // Stated here as the design says it (.claude/taas.md, the model: drift), so changing it is a decision.
+  const CONTEXT_OPPS = ['context', 'lessons'], QUALITY_OPPS = ['determ', 'lessons'];
+  const bad = [];
+  [[2, 0, 0], [3, -C.contextRot, 0], [4, -C.contextRot, -C.evalRot], [5, -C.contextRot, -C.evalRot]].forEach(([level, c, qd]) => {
+    const d = T.forecast(at({ q: 4, level, stats: MID }), T.emptyPlan()).drift;
+    if (d.context !== c || d.quality !== qd) bad.push(T.LEVELS[level].id + ' rots ' + d.context + '/' + d.quality);
+  });
+  T.OPPS.forEach((o, q) => {
+    const d = T.forecast(at({ q, level: 5, stats: MID }), { opp: true, inv: {} }).drift;
+    if ((d.context === 0) !== CONTEXT_OPPS.includes(o.id)) bad.push(o.id + ' context ' + d.context);
+    if ((d.quality === 0) !== QUALITY_OPPS.includes(o.id)) bad.push(o.id + ' quality ' + d.quality);
+  });
+  T.INVESTS.forEach(i => {
+    const d = T.forecast(at({ q: 4, level: 5, stats: MID }), { opp: false, inv: { [i.id]: C.investStep } }).drift;
+    if ((d.context === 0) !== (i.upkeep === 'context')) bad.push(i.id + ' context ' + d.context);
+    if ((d.quality === 0) !== (i.upkeep === 'quality')) bad.push(i.id + ' quality ' + d.quality);
+  });
+  ok(!bad.length, 'context rots from L3a and quality from L3b, and only their own upkeep work stops it', bad.join(', '));
+
+  const low = T.forecast(at({ q: 4, level: 4, stats: { knowledge: 50, context: 1, quality: 1, trust: 50, flow: 50 } }), T.emptyPlan()).after;
+  ok(low.context === 0 && low.quality === 0, 'a stat rotting past 0 stops at 0', low.context + ' / ' + low.quality);
+}
+{
+  // trust falls when rework outweighs the gain. No level in today's tables can get there
+  // (gain / rework is at least 3.25 even at Flow, Quality and Context 0), so the row
+  // borrows L1 with its rework risk raised, and puts the table back.
+  const L1 = T.LEVELS[1], keep = L1.risk;
+  L1.risk = 1;
+  let d;
+  try { d = T.forecast(at({ q: 2, level: 1, stats: { knowledge: 20, trust: 20 } }), T.emptyPlan()); } finally { L1.risk = keep; }
+  ok(d.out.rework > d.out.gain && d.drift.trust === -C.trustDown, 'when rework outweighs the gain, trust falls', d.out.rework.toFixed(3) + ' vs ' + d.out.gain.toFixed(3) + ' -> ' + d.drift.trust);
+}
+{
+  // investments: half return past fullRateSp, and nothing from one the team has not unlocked
+  const s = T.newGame();
+  const k = sp => T.forecast(s, { opp: false, inv: { train: sp } }).gains.knowledge;
+  const step = C.investStep, full = C.fullRateSp;
+  ok(Math.abs((k(full + step) - k(full)) - (k(step) / 2)) < 1e-9 && k(full) === full * k(step) / step,
+    'an investment returns full rate up to ' + full + ' SP and half beyond', [k(step), k(full), k(full + step)].join(' / '));
+  const locked = T.INVESTS.filter(i => i.unlock > s.level);
+  const base = T.forecast(s, T.emptyPlan());
+  const leak = locked.filter(i => JSON.stringify(T.forecast(s, { opp: false, inv: { [i.id]: step } })) !== JSON.stringify(base)).map(i => i.id);
+  ok(locked.length > 0 && !leak.length, 'an investment the team has not unlocked buys nothing and costs nothing', leak.join(', '));
+}
+{
+  // credits: spare ones buy nothing, short ones cost units (agents included), deterministic-first cuts the need
+  const rich = at({ q: 4, level: 2, stats: MID }), richCut = Object.assign({}, rich, { budgetCut: true });
+  const u = s => T.forecast(s, T.emptyPlan()).out;
+  ok(u(rich).cover === 1 && u(richCut).cover === 1 && u(rich).units === u(richCut).units,
+    'once the AI work is covered, more credits buy nothing', u(rich).units + ' vs ' + u(richCut).units);
+  const hungry = at({ q: 4, level: 5, burnFactor: 1, agentUnits: 6, agentAic: 600, stats: Object.assign({}, MID, { trust: 100 }) });
+  const full = u(hungry), cut = u(Object.assign({}, hungry, { budgetCut: true }));
+  ok(full.cover < 1 && cut.cover < full.cover && cut.units < full.units && cut.agent < full.agent && full.agent < hungry.agentUnits,
+    'credits short of the AI work cost units, and the agents ship less too', [full.cover.toFixed(2), cut.cover.toFixed(2), full.agent, cut.agent].join(' / '));
+  const lean = u(Object.assign({}, rich, { burnFactor: T.OPPS[4].burnFactor }));
+  ok(Math.abs(lean.aicNeed - u(rich).aicNeed * T.OPPS[4].burnFactor) <= 1, 'the deterministic-first saving cuts what AI-assisted delivery needs', lean.aicNeed + ' vs ' + u(rich).aicNeed);
+}
+{
+  // direction of the model at every AI level: Quality and Context guard against rework, Flow lets more gain through,
+  // and "Team says" is the speedup felt while prompting: it ignores Flow, Quality, Context and the credits.
+  const bad = [];
+  for (let level = 1; level < T.LEVELS.length; level++) {
+    const s = at({ q: 4, level, stats: MID }), id = T.LEVELS[level].id;
+    const o = T.forecast(s, T.emptyPlan()).out;
+    const up = (k) => T.forecast(at({ q: 4, level, stats: Object.assign({}, MID, { [k]: 80 }) }), T.emptyPlan()).out;
+    if (!(up('quality').rework < o.rework && up('context').rework < o.rework)) bad.push(id + ' guard');
+    if (!(up('flow').gain > o.gain)) bad.push(id + ' flow');
+    const shortOf = T.forecast(Object.assign({}, s, { budgetCut: true, burnFactor: 1, agentAic: 7000 }), T.emptyPlan()).out;
+    if (['quality', 'context', 'flow'].some(k => up(k).reported !== o.reported) || shortOf.cover >= 1 || shortOf.reported !== o.reported) bad.push(id + ' team says');
+    if (!(o.reported >= o.net)) bad.push(id + ' says < measured');
+  }
+  ok(!bad.length, 'Quality and Context cut rework, Flow lets gain through, and "Team says" ignores all three and the credits', bad.join(', '));
 }
 
 console.log('CHECKS=' + checks + ' PASSED=' + (checks - failed) + ' FAILED=' + failed);

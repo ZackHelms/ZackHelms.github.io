@@ -11,8 +11,10 @@ Designed with the CD in a claude.ai session on 2026-10-09 (research, a four-ques
 Q&A, then a playable first draft published as a private artifact named "TAAS"), and
 shipped here on 2026-10-12 at the CD's request: 3rd card on the hub, after CYOA2 and
 CYOA, with the restrictive licence. **Proprietary** (`games/taas/LICENSE`; one of the
-nine protected games). Suites: `.claude/tests/drive-taas.cjs` (rules, 29 checks, pure
-node) and `.claude/tests/eval-taas.cjs` (balance shape, opt-in). It is a **first draft
+nine protected games). Suites: `.claude/tests/drive-taas.cjs` (the engine's rules, 43
+checks, pure node), `.claude/tests/drive-taas-ui.cjs` (the page, 26 checks, Chromium at
+phone width) and `.claude/tests/eval-taas.cjs` (balance shape, opt-in); both drive suites
+are negative-tested (§ Negative tests). It is a **first draft
 the CD is still designing**; most numbers below are guesses waiting for the CD's tuning.
 
 ## The CD's brief (2026-10-09) - stated, do not relitigate
@@ -146,6 +148,14 @@ the model works" panel too.
   pilot is a bet on year three with little in-game payoff.
 - **Context rot can block L4 by one point** (the hand line sat at Context 58 vs 60 for a
   quarter because a quarter had no context work). Realistic, possibly frustrating.
+- **Trust can never fall in today's tables** (found by the 2026-10-12 negative tests). The
+  drift rule "Trust -4 when rework outweighs the gain" needs rework > gain, and gain over
+  rework is at least 3.25 at every level even with Flow, Quality and Context all at 0
+  (L1 and L2: (speedup - 1) x 0.65 / risk = 3.25; L5: 5.85). So trust only ever rises,
+  and the "How the model works" panel promises a fall that cannot happen. Fixing it is a
+  tuning call (riskier levels, a learning dip that counts against the gain, or a fall when
+  the measured gain is small rather than negative); the rule itself is tested on a
+  borrowed table so it stays right whatever the CD picks.
 
 ## Architecture
 
@@ -178,6 +188,10 @@ One file, two `<script>` blocks.
    - **Storage:** `localStorage['taas.v' + CFG.version]` holds `{ state, plan }`; bump
      `CFG.version` whenever the state shape or the tables change meaning, which discards
      old saves instead of replaying them under new rules. `taas-mute` holds the mute.
+     `drive-taas-ui` reads the run and the plan back out of this save after every click
+     and checks the screen against `forecast()` on them, so the save's shape is part of
+     what that suite relies on. It serves the page over a local http server rather than
+     `file://`, so a copy with `CFG.version` bumped shares the same localStorage.
    - **Chart:** an SVG redrawn on resize at the container's width (300-640 px) so the
      type stays readable on a phone; value labels sit inside the bars so they never
      collide with the dashed 60 baseline.
@@ -253,10 +267,43 @@ asserts: J-curve, payback, sequencing, over-investment loses, skill beats coasti
 the horizon. When the CD retunes, re-run the eval, update this table, and change an eval
 row only if the CD has changed the design it describes.
 
+## Negative tests (2026-10-12)
+
+Every rule the two drive suites claim was broken on purpose, on copies of the page, and
+each break had to turn a named row red. The lists are kept so they can be re-run after a
+redesign (`.claude/tests/negtests/taas-engine.json`, 39 breaks; `taas-ui.json`, 24):
+
+```
+python3 .claude/scripts/negtest-copies.py .claude/tests/negtests/taas-engine.json --page-env TAAS_PAGE --jobs 4 -- node .claude/tests/drive-taas.cjs
+NODE_PATH=/opt/node-tools/node_modules python3 .claude/scripts/negtest-copies.py .claude/tests/negtests/taas-ui.json --page-env TAAS_PAGE --jobs 3 -- node .claude/tests/drive-taas-ui.cjs
+```
+
+A break whose anchor no longer exists is reported before anything runs; re-anchor it on
+the new code rather than dropping it.
+
+- **Engine, first pass: 19 of 39 caught.** The rows played real quarters, and most of the
+  rules never come up in seeded play: the sweep never runs short of credits at 9,000,
+  never rots a stat to 0, never reaches an agent quarter unready, and no level-up-free
+  quarter at L1 or above was in the dip row's line. Two rows could not fail at all: "no
+  lasting bonus from an unready opportunity" checked Y2Q1, whose opportunity has no
+  agent, and "a positive gain raises trust" was written `premise ? check : true`. Section
+  9 of `drive-taas.cjs` builds the states those rules are about; now **39 of 39**.
+- **Page: 23 of 24 caught**, and the first pass also caught three only by a 30 s click
+  timeout. The suite now gives each section a clean save, catches its own crash, and
+  clicks with a 4 s timeout, so each break fails a row that names it.
+- **One equivalent change, recorded rather than tested:** the `inc` click handler
+  clamps to `investMax`, but `renderLeft()` disables the + at 12 and a disabled button
+  never fires a click, so the clamp is unreachable through the page. Removing the
+  *disabled* state is caught (`ui-no-invest-max`); removing the clamp is not, and cannot be.
+- What the page suite measures that a reading of the code would not: a log table allowed
+  to overflow widens the phone's layout viewport to ~850 px, and the tracker then lies
+  over the plan's buttons. The layout row asks for `innerWidth` to stay the screen's.
+
 ## How to change it
 
-- **Retune:** edit the tables only. Run `node .claude/tests/drive-taas.cjs` (rules must
-  stay green whatever the numbers) and `node .claude/tests/eval-taas.cjs --search`
+- **Retune:** edit the tables only. Run `.claude/scripts/gates.sh games/taas/index.html`
+  (smoke + both drive suites; rules must stay green whatever the numbers) and
+  `node .claude/tests/eval-taas.cjs --search`
   (shape), then bump `CFG.version` if a saved run would now replay differently.
 - **Add an opportunity or reorder the story:** `OPPS` must stay eight long (one per
   quarter, `drive-taas` checks it); give it `short`, `title`, `pitch`, `basis`; if it
@@ -277,3 +324,7 @@ row only if the CD has changed the design it describes.
 - 2026-10-12: shipped to `games/taas/` (3rd on the hub, proprietary), with the repo's
   chrome, badge and audio added and the score made to add up from its printed parts
   (`summary()` now rounds the shortfalls before scoring). Suites added.
+- 2026-10-12 (later): negative tests over both drive suites. `drive-taas` grew from 29 to
+  43 checks (section 9, hand-built states) and lost two rows that could not fail;
+  `drive-taas-ui` added (the page in Chromium); found that trust can never fall in
+  today's tables (Weak spots). No change to the game.

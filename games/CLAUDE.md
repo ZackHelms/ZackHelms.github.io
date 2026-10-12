@@ -1008,8 +1008,8 @@ scrolls and fixed buttons would cover the text. The whole simulation is one DOM-
 engine block whose `forecast()` is the only place an outcome is computed, so the
 preview on screen is exactly what running the quarter does. Every number is a first
 draft the CD is still tuning. **Proprietary** (one of the nine protected games).
-Suites: `.claude/tests/drive-taas.cjs` (rules, pure node) and `eval-taas.cjs` (balance
-shape, opt-in). Detailed context: `.claude/taas.md`.
+Suites: `.claude/tests/drive-taas.cjs` (rules, pure node), `drive-taas-ui.cjs` (the page
+in Chromium) and `eval-taas.cjs` (balance shape, opt-in). Detailed context: `.claude/taas.md`.
 
 ### ANIMATION RIGS (`animation-rigs/index.html`, ~2,000 lines)
 A grey-box diorama of eight 21-joint stick-figure rigs (CD commission 2026-10-04,

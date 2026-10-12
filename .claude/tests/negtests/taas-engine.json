@@ -1,0 +1,236 @@
+[
+ {
+  "name": "preview-units",
+  "file": "games/taas/index.html",
+  "old": "units: f.out.units, gain: f.out.gain,",
+  "new": "units: r1(f.out.units + (f.out.agent ? 0.5 : 0)), gain: f.out.gain, /* @negtest */"
+ },
+ {
+  "name": "stats-cap-100",
+  "file": "games/taas/index.html",
+  "old": "after[k] = r1(clamp(state.stats[k] + gains[k] + drift[k], 0, 100));",
+  "new": "after[k] = r1(Math.max(0, state.stats[k] + gains[k] + drift[k])); /* @negtest */"
+ },
+ {
+  "name": "stats-floor-0",
+  "file": "games/taas/index.html",
+  "old": "after[k] = r1(clamp(state.stats[k] + gains[k] + drift[k], 0, 100));",
+  "new": "after[k] = r1(Math.min(100, state.stats[k] + gains[k] + drift[k])); /* @negtest */"
+ },
+ {
+  "name": "valid-ignores-aic",
+  "file": "games/taas/index.html",
+  "old": "valid: deliverySp >= 0 && aicLeft >= 0,",
+  "new": "valid: deliverySp >= 0, /* @negtest */"
+ },
+ {
+  "name": "valid-ignores-sp",
+  "file": "games/taas/index.html",
+  "old": "valid: deliverySp >= 0 && aicLeft >= 0,",
+  "new": "valid: aicLeft >= 0, /* @negtest */"
+ },
+ {
+  "name": "commit-no-guard",
+  "file": "games/taas/index.html",
+  "old": "if (!f.valid) return state;",
+  "new": "; /* @negtest */"
+ },
+ {
+  "name": "cover-uncapped",
+  "file": "games/taas/index.html",
+  "old": "const cover = need > 0 ? clamp(aicLeft / need, 0, 1) : 1;",
+  "new": "const cover = need > 0 ? Math.max(0, aicLeft / need) : 1; /* @negtest */"
+ },
+ {
+  "name": "skills-pay-now",
+  "file": "games/taas/index.html",
+  "old": "const out = output(state, Math.max(0, deliverySp), Math.max(0, aicLeft));",
+  "new": "const out = output(Object.assign({}, state, { stats: Object.fromEntries(STATS.map(k => [k, state.stats[k] + gains[k]])) }), Math.max(0, deliverySp), Math.max(0, aicLeft)); /* @negtest */"
+ },
+ {
+  "name": "two-levels-a-quarter",
+  "file": "games/taas/index.html",
+  "old": "if (nextLevel < LEVELS.length - 1 && meets(after, LEVELS[nextLevel + 1].req)) nextLevel += 1;",
+  "new": "while (nextLevel < LEVELS.length - 1 && meets(after, LEVELS[nextLevel + 1].req)) nextLevel += 1; /* @negtest */"
+ },
+ {
+  "name": "level-drops",
+  "file": "games/taas/index.html",
+  "old": "if (nextLevel < LEVELS.length - 1 && meets(after, LEVELS[nextLevel + 1].req)) nextLevel += 1;",
+  "new": "if (nextLevel < LEVELS.length - 1 && meets(after, LEVELS[nextLevel + 1].req)) nextLevel += 1; else if (nextLevel > 0 && !meets(after, LEVELS[nextLevel].req)) nextLevel -= 1; /* @negtest */"
+ },
+ {
+  "name": "unready-full-gain",
+  "file": "games/taas/index.html",
+  "old": "const f = ready ? 1 : 0.5;",
+  "new": "const f = 1; /* @negtest */"
+ },
+ {
+  "name": "unready-full-burn",
+  "file": "games/taas/index.html",
+  "old": "s.burnFactor *= (1 + opp.burnFactor) / 2;",
+  "new": "s.burnFactor *= opp.burnFactor; /* @negtest */"
+ },
+ {
+  "name": "unready-agent-bonus",
+  "file": "games/taas/index.html",
+  "old": "} else if (plan.opp && opp.burnFactor) {",
+  "new": "} else if (plan.opp && opp.agentUnits) { s.agentUnits += opp.agentUnits; s.agentAic += opp.agentAic; /* @negtest */\n    } else if (plan.opp && opp.burnFactor) {"
+ },
+ {
+  "name": "no-levelup-flag",
+  "file": "games/taas/index.html",
+  "old": "s.leveledUp = f.nextLevel > state.level;",
+  "new": "s.leveledUp = false; /* @negtest */"
+ },
+ {
+  "name": "dip-every-quarter",
+  "file": "games/taas/index.html",
+  "old": "const dip = state.leveledUp ? CFG.transitionTax : 0;",
+  "new": "const dip = state.level > 0 ? CFG.transitionTax : 0; /* @negtest */"
+ },
+ {
+  "name": "rot-ignores-upkeep",
+  "file": "games/taas/index.html",
+  "old": "if (state.level >= 3 && !upkeep.context) drift.context -= CFG.contextRot;",
+  "new": "if (state.level >= 3) drift.context -= CFG.contextRot; /* @negtest */"
+ },
+ {
+  "name": "opp-not-context-upkeep",
+  "file": "games/taas/index.html",
+  "old": "if (opp.id === 'context' || opp.id === 'lessons') upkeep.context = true;",
+  "new": "; /* @negtest */"
+ },
+ {
+  "name": "no-quality-rot",
+  "file": "games/taas/index.html",
+  "old": "if (state.level >= 4 && !upkeep.quality) drift.quality -= CFG.evalRot;",
+  "new": "; /* @negtest */"
+ },
+ {
+  "name": "opp-not-quality-upkeep",
+  "file": "games/taas/index.html",
+  "old": "if (opp.id === 'determ' || opp.id === 'lessons') upkeep.quality = true;",
+  "new": "; /* @negtest */"
+ },
+ {
+  "name": "no-trust-up",
+  "file": "games/taas/index.html",
+  "old": "if (out.gain - out.rework > 0.03) drift.trust += CFG.trustUp;",
+  "new": "if (false) drift.trust += CFG.trustUp; /* @negtest */"
+ },
+ {
+  "name": "no-trust-down",
+  "file": "games/taas/index.html",
+  "old": "else if (out.rework > out.gain) drift.trust -= CFG.trustDown;",
+  "new": "; /* @negtest */"
+ },
+ {
+  "name": "cut-at-goal",
+  "file": "games/taas/index.html",
+  "old": "if (s.q === 4 && yearUnits(s, 0) < CFG.yearGoal * CFG.budgetCutThreshold) s.budgetCut = true;",
+  "new": "if (s.q === 4 && yearUnits(s, 0) < CFG.yearGoal) s.budgetCut = true; /* @negtest */"
+ },
+ {
+  "name": "cut-reaches-y1",
+  "file": "games/taas/index.html",
+  "old": "return (state.q >= 4 && state.budgetCut) ? CFG.budgetCutAic : CFG.aic;",
+  "new": "return state.budgetCut ? CFG.budgetCutAic : CFG.aic; /* @negtest */"
+ },
+ {
+  "name": "score-weight",
+  "file": "games/taas/index.html",
+  "old": "const score = Math.round((total - base) - (short1 + short2) + 2 * (exit - CFG.sp));",
+  "new": "const score = Math.round((total - base) - (short1 + short2) + 3 * (exit - CFG.sp)); /* @negtest */"
+ },
+ {
+  "name": "exit-keeps-dip",
+  "file": "games/taas/index.html",
+  "old": "const s = Object.assign({}, state, { leveledUp: false });",
+  "new": "const s = state; /* @negtest */"
+ },
+ {
+  "name": "exit-on-cut-budget",
+  "file": "games/taas/index.html",
+  "old": "return output(s, CFG.sp, CFG.aic).units;",
+  "new": "return output(s, CFG.sp, budget(s)).units; /* @negtest */"
+ },
+ {
+  "name": "grade-stalled-band",
+  "file": "games/taas/index.html",
+  "old": "else if (score < 0) grade = 'Stalled pilot';",
+  "new": "else if (score < -100) grade = 'Stalled pilot'; /* @negtest */"
+ },
+ {
+  "name": "goals-count",
+  "file": "games/taas/index.html",
+  "old": "goals: (y1 >= CFG.yearGoal ? 1 : 0)",
+  "new": "goals: (y1 >= CFG.yearGoal * CFG.budgetCutThreshold ? 1 : 0) /* @negtest */"
+ },
+ {
+  "name": "no-half-rate",
+  "file": "games/taas/index.html",
+  "old": "CFG.fullRateSp + (sp - CFG.fullRateSp) * 0.5;",
+  "new": "CFG.fullRateSp + (sp - CFG.fullRateSp) * 1; /* @negtest */"
+ },
+ {
+  "name": "locked-invest-works",
+  "file": "games/taas/index.html",
+  "old": "const avail = unlocked(state);",
+  "new": "const avail = INVESTS; /* @negtest */"
+ },
+ {
+  "name": "agent-ignores-cover",
+  "file": "games/taas/index.html",
+  "old": "const agent = state.agentUnits * cover;",
+  "new": "const agent = state.agentUnits; /* @negtest */"
+ },
+ {
+  "name": "commit-mutates-input",
+  "file": "games/taas/index.html",
+  "old": "const s = JSON.parse(JSON.stringify(state));",
+  "new": "const s = state; /* @negtest */"
+ },
+ {
+  "name": "guard-backwards",
+  "file": "games/taas/index.html",
+  "old": "const rework = L.risk * adoption * cover * (1 - guard);",
+  "new": "const rework = L.risk * adoption * cover * (0.5 + guard); /* @negtest */"
+ },
+ {
+  "name": "flow-backwards",
+  "file": "games/taas/index.html",
+  "old": "const flowShare = CFG.flowFloor + (1 - CFG.flowFloor) * s.flow / 100;",
+  "new": "const flowShare = 1 - (1 - CFG.flowFloor) * s.flow / 100; /* @negtest */"
+ },
+ {
+  "name": "reported-includes-rework",
+  "file": "games/taas/index.html",
+  "old": "reported: (L.mult - 1) * adoption ",
+  "new": "reported: (L.mult - 1) * adoption * cover * flowShare - rework  /* @negtest */"
+ },
+ {
+  "name": "budget-cut-ignored",
+  "file": "games/taas/index.html",
+  "old": "const bud = budget(state);",
+  "new": "const bud = CFG.aic; /* @negtest */"
+ },
+ {
+  "name": "burn-factor-ignored",
+  "file": "games/taas/index.html",
+  "old": "const need = deliverySp * L.burn * adoption * state.burnFactor + state.agentAic;",
+  "new": "const need = deliverySp * L.burn * adoption + state.agentAic; /* @negtest */"
+ },
+ {
+  "name": "opp-gain-twice",
+  "file": "games/taas/index.html",
+  "old": "Object.keys(opp.gain).forEach(k => { gains[k] += opp.gain[k] * f; });",
+  "new": "Object.keys(opp.gain).forEach(k => { gains[k] += opp.gain[k] * f * (plan.opp === true && state.q > 3 ? 1.5 : 1); }); /* @negtest */"
+ },
+ {
+  "name": "upkeep-from-any-invest",
+  "file": "games/taas/index.html",
+  "old": "if (i.upkeep) upkeep[i.upkeep] = true;",
+  "new": "upkeep.context = true; /* @negtest */"
+ }
+]

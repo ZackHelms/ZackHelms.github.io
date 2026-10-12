@@ -1,0 +1,146 @@
+[
+ {
+  "name": "ui-forecast-off",
+  "file": "games/taas/index.html",
+  "old": "'<div class=\"outcome\"><span class=\"big\">' + n1(o.units) + '</span>",
+  "new": " /* @negtest */ '<div class=\"outcome\"><span class=\"big\">' + n1(o.units + (state.q === 5 ? 0.1 : 0)) + '</span>"
+ },
+ {
+  "name": "ui-no-invest-max",
+  "file": "games/taas/index.html",
+  "old": "const canAdd = sp < C.investMax && !!tryPlan(p => { p.inv[i.id] = sp + C.investStep; });",
+  "new": "const canAdd = !!tryPlan(p => { p.inv[i.id] = sp + C.investStep; }); /* @negtest */"
+ },
+ {
+  "name": "ui-click-ignores-max",
+  "file": "games/taas/index.html",
+  "old": "x.inv[id] = Math.min(C.investMax, (x.inv[id] || 0) + C.investStep);",
+  "new": "x.inv[id] = (x.inv[id] || 0) + C.investStep; /* @negtest */"
+ },
+ {
+  "name": "ui-fund-always",
+  "file": "games/taas/index.html",
+  "old": "const canFund = on || !!tryPlan(p => { p.opp = true; });",
+  "new": "const canFund = true; /* @negtest */"
+ },
+ {
+  "name": "ui-tryplan-no-check",
+  "file": "games/taas/index.html",
+  "old": "function tryPlan(mut) { const p = JSON.parse(JSON.stringify(plan)); mut(p); return E.forecast(state, p).valid ? p : null; }",
+  "new": "function tryPlan(mut) { const p = JSON.parse(JSON.stringify(plan)); mut(p); return p; } /* @negtest */"
+ },
+ {
+  "name": "ui-load-no-version",
+  "file": "games/taas/index.html",
+  "old": "if (d && d.state && d.state.version === C.version) return d;",
+  "new": "if (d && d.state) return d; /* @negtest */"
+ },
+ {
+  "name": "ui-key-unversioned",
+  "file": "games/taas/index.html",
+  "old": "const E = TAAS, C = E.CFG, KEY = 'taas.v' + C.version;",
+  "new": "const E = TAAS, C = E.CFG, KEY = 'taas.v1'; /* @negtest */"
+ },
+ {
+  "name": "ui-no-save",
+  "file": "games/taas/index.html",
+  "old": "el.focus({ preventScroll: true }); }\n    save();",
+  "new": "el.focus({ preventScroll: true }); }\n    ; /* @negtest */"
+ },
+ {
+  "name": "ui-reload-drops-plan",
+  "file": "games/taas/index.html",
+  "old": "plan = d && d.plan ? d.plan : E.emptyPlan();",
+  "new": "plan = E.emptyPlan(); /* @negtest */"
+ },
+ {
+  "name": "ui-restart-no-confirm",
+  "file": "games/taas/index.html",
+  "old": "else if (act === 'restart') { if (confirming) {",
+  "new": "else if (act === 'restart') { if (true) { /* @negtest */"
+ },
+ {
+  "name": "ui-confirm-sticks",
+  "file": "games/taas/index.html",
+  "old": "if (act !== 'restart') confirming = false;",
+  "new": "; /* @negtest */"
+ },
+ {
+  "name": "ui-no-focus-restore",
+  "file": "games/taas/index.html",
+  "old": "if (active) { const el = document.querySelector('[data-key=\"' + active + '\"]'); if (el && !el.disabled) el.focus({ preventScroll: true }); }",
+  "new": "; /* @negtest */"
+ },
+ {
+  "name": "ui-run-commits-empty",
+  "file": "games/taas/index.html",
+  "old": "state = E.commit(state, plan); plan = E.emptyPlan();",
+  "new": "state = E.commit(state, Object.assign({}, plan, { inv: {} })); plan = E.emptyPlan(); /* @negtest */"
+ },
+ {
+  "name": "ui-run-keeps-plan",
+  "file": "games/taas/index.html",
+  "old": "state = E.commit(state, plan); plan = E.emptyPlan();",
+  "new": "state = E.commit(state, plan); /* @negtest */"
+ },
+ {
+  "name": "ui-tracker-shows-sp",
+  "file": "games/taas/index.html",
+  "old": "'<span class=\"q-val\">' + n1(h.units) + '</span><span class=\"q-sub '",
+  "new": " /* @negtest */ '<span class=\"q-val\">' + n1(h.units + (h.q === 6 ? 1 : 0)) + '</span><span class=\"q-sub '"
+ },
+ {
+  "name": "ui-score-off",
+  "file": "games/taas/index.html",
+  "old": "'<dt class=\"total\">Score</dt><dd class=\"total\">' + m.score + '</dd></dl>'",
+  "new": "'<dt class=\"total\">Score</dt><dd class=\"total\">' + (m.score + 1) + '</dd></dl>' /* @negtest */"
+ },
+ {
+  "name": "ui-headstart-off",
+  "file": "games/taas/index.html",
+  "old": "sg(2 * (m.exit - C.sp))",
+  "new": "sg(3 * (m.exit - C.sp)) /* @negtest */"
+ },
+ {
+  "name": "ui-clear-keeps-opp",
+  "file": "games/taas/index.html",
+  "old": "else if (act === 'clear') { plan = E.emptyPlan(); SFX.down(); }",
+  "new": "else if (act === 'clear') { plan = { opp: plan.opp, inv: {} }; SFX.down(); } /* @negtest */"
+ },
+ {
+  "name": "ui-dec-keeps-zero",
+  "file": "games/taas/index.html",
+  "old": "if (v) plan.inv[id] = v; else delete plan.inv[id];",
+  "new": "plan.inv[id] = v; /* @negtest */"
+ },
+ {
+  "name": "ui-locked-stepper",
+  "file": "games/taas/index.html",
+  "old": "const avail = E.unlocked(state), later = E.INVESTS.filter(i => state.level < i.unlock);",
+  "new": "const avail = E.INVESTS.filter(i => state.level + 1 >= i.unlock), later = E.INVESTS.filter(i => state.level + 1 < i.unlock); /* @negtest */"
+ },
+ {
+  "name": "ui-sp-meter-off",
+  "file": "games/taas/index.html",
+  "old": "(f.spOpp + f.spInvest) + ' invested / '",
+  "new": "f.spInvest /* @negtest */ + ' invested / '"
+ },
+ {
+  "name": "ui-grade-wrong",
+  "file": "games/taas/index.html",
+  "old": "esc(m.grade) + '</div><p>'",
+  "new": "esc(m.score < 60 ? 'Stalled pilot' : m.grade) /* @negtest */ + '</div><p>'"
+ },
+ {
+  "name": "ui-wide-table",
+  "file": "games/taas/index.html",
+  "old": ".scroll { overflow-x: auto; }",
+  "new": ".scroll { overflow-x: visible; } /* @negtest */"
+ },
+ {
+  "name": "ui-chrome-fixed-top",
+  "file": "games/taas/index.html",
+  "old": "<a id=\"back-btn\" href=\"../index.html\" aria-label=\"Back to games\">",
+  "new": "<a id=\"back-btn\" href=\"../index.html\" aria-label=\"Back to games\" style=\"left:-30px\"> <!-- @negtest -->"
+ }
+]
