@@ -751,7 +751,7 @@ The long road from here is a **Kardashev ladder** to a Type III civilization,
 scoped in `games/fire-clicker/TODO.md` alongside the remaining ideas. Drive
 suite: `.claude/tests/drive-fire-clicker.cjs` (110 checks); pacing/balance eval:
 `.claude/tests/eval-fire-clicker.cjs`. **Proprietary — no permissive license
-in this directory** (one of the eight protected games). Detailed context:
+in this directory** (one of the nine protected games). Detailed context:
 `.claude/fire-clicker.md`.
 
 ### SIGNAL HUNT (`signal-hunt/index.html`, ~790 lines)
@@ -887,7 +887,7 @@ removal. Its edge lines are **opaque** on purpose — three renders only the
 opaque list into the transmission target, so transparent ones are invisible
 through the glass materials, which is exactly the bug that made the board show
 the background cleanly and none of the other pieces. **Proprietary** (one of
-the eight protected games). Detailed context: `.claude/interlock.md`; the
+the nine protected games). Detailed context: `.claude/interlock.md`; the
 measurement method behind its gates: `.claude/notes/20260920-measuring-a-rendering-change.md`.
 
 ### CYOA (`cyoa/index.html`, ~4,000 lines)
@@ -912,7 +912,7 @@ save, and opens from a $ button on the Load screen; Settings can route the openi
 player turns and the epilogue to different models. The plate turns to a new view after
 every reply with an inset of the moment (paintings, when on, change per topic); the clock
 moves with every exchange; every line of the party sheet opens a popup; selected story
-text goes to a per-tale Notes page. **Proprietary** (one of the eight protected games).
+text goes to a per-tale Notes page. **Proprietary** (one of the nine protected games).
 Suite: `.claude/tests/drive-cyoa.cjs` (165 checks, including the real clients against
 stubbed network). Detailed context: `.claude/cyoa.md`.
 
@@ -981,7 +981,7 @@ empty. **Notes** are kept by selecting words in the story or by the pen under a 
 travel in the save and are never shown to the model. And **every line of a traveller's
 sheet is a button** that opens its page of a rule book, with that traveller's own
 numbers and the rules as this table plays them.
-**Proprietary** (one of the eight protected games; confirmed by the CD on 2026-10-10).
+**Proprietary** (one of the nine protected games; confirmed by the CD on 2026-10-10).
 Suite: `.claude/tests/drive-cyoa2.cjs` (807 checks: generators over 36 worlds, sight
 judged by an independent line walker, fights played out by the script against the
 suite's own traveller, every tool called with one of each kind of bad input, the real
@@ -990,6 +990,26 @@ by the suite's own player, `.claude/tests/cyoa2-player.js`, and the narrator and
 microphone against a synthesizer and a recognizer the suite brings with it, and the paid
 voice against a stand-in for OpenAI's speech service). Detailed context:
 `.claude/cyoa2.md`.
+
+### TAAS (`taas/index.html`, ~900 lines)
+The **Team AI Adoption Simulator**, designed with the CD on 2026-10-09 and shipped on
+2026-10-12 as the hub's 3rd card (after CYOA2 and CYOA). Not a scene but a **management
+sim rendered as a DOM page**: a roadmap tracker of eight quarters across the top, the
+quarter's decisions on the left (one scripted big opportunity to fund, ongoing
+investments with steppers), a live forecast and the team's L0-L5 ladder and five stats
+on the right, then an SVG chart of units per quarter against the traditional 60, a
+quarter log that sets what the team *says* AI saved beside what was measured, and the
+model's formulas and sources behind a details panel. That makes it the **third
+rendering exception** after wayfinder and music-mixer: forms, tables and one SVG, no
+canvas and no draw loop. It is also built in its **own planning-board look** (light and
+dark themes, Bricolage Grotesque + IBM Plex), not neon, which was assumed rather than
+asked. The standard ← and 🔊 sit top-left but are positioned `absolute`, because the page
+scrolls and fixed buttons would cover the text. The whole simulation is one DOM-free
+engine block whose `forecast()` is the only place an outcome is computed, so the
+preview on screen is exactly what running the quarter does. Every number is a first
+draft the CD is still tuning. **Proprietary** (one of the nine protected games).
+Suites: `.claude/tests/drive-taas.cjs` (rules, pure node) and `eval-taas.cjs` (balance
+shape, opt-in). Detailed context: `.claude/taas.md`.
 
 ### ANIMATION RIGS (`animation-rigs/index.html`, ~2,000 lines)
 A grey-box diorama of eight 21-joint stick-figure rigs (CD commission 2026-10-04,
@@ -1049,7 +1069,7 @@ Detailed context: `.claude/animation-rigs.md`.
 5. Create `.claude/<slug>.md` with architecture notes before the session gets long
 6. Copy the standard MIT `LICENSE` from any open game directory into the new
    game's directory — unless the CD marks the game protected/proprietary
-   (root `CLAUDE.md` § Licensing lists the eight protected games)
+   (root `CLAUDE.md` § Licensing lists the nine protected games)
 7. Add the game's row to `.claude/games-index.md` **and refresh its coverage
    summary** (facet vocabulary: `templates/design/game-facets.md` in the
    zmhstudio repo) — when *choosing* what game to build, read that index's

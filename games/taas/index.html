@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TAAS</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a planning board. Roadmap strip across the top, this quarter's decision sheet on the left, live instruments on the right. */
+:root {
+  --bg: #edf0ee; --panel: #f8faf8; --raised: #ffffff;
+  --ink: #16201e; --muted: #586663; --line: #cbd4d0; --line-soft: #dde4e1;
+  --sp: #2b56c8; --sp-soft: #cdd9f8;
+  --aic: #9a5f06; --aic-soft: #f0dcb2;
+  --work: #176b5f; --work-soft: #bfe1da; --on-work: #ffffff;
+  --good: #1c7646; --bad: #b0382c; --bad-soft: #f6dad6;
+  --display: 'Bricolage Grotesque', 'Avenir Next', 'Segoe UI', sans-serif;
+  --body: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111716; --panel: #182120; --raised: #1f2a28;
+    --ink: #e5ece9; --muted: #9aaaa5; --line: #33423f; --line-soft: #263331;
+    --sp: #8aa9ff; --sp-soft: #27365f;
+    --aic: #e5ad45; --aic-soft: #4a3a17;
+    --work: #56c3b1; --work-soft: #1d4840; --on-work: #0d1716;
+    --good: #63c890; --bad: #f08477; --bad-soft: #4a2420;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111716; --panel: #182120; --raised: #1f2a28;
+  --ink: #e5ece9; --muted: #9aaaa5; --line: #33423f; --line-soft: #263331;
+  --sp: #8aa9ff; --sp-soft: #27365f;
+  --aic: #e5ad45; --aic-soft: #4a3a17;
+  --work: #56c3b1; --work-soft: #1d4840; --on-work: #0d1716;
+  --good: #63c890; --bad: #f08477; --bad-soft: #4a2420;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: max(20px, env(safe-area-inset-left), env(safe-area-inset-right)); padding-block: calc(48px + env(safe-area-inset-top)) calc(56px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 20px; }
+h1, h2, h3, p, ol, ul { margin: 0; }
+ol, ul { padding: 0; list-style: none; }
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+/* Repo chrome (games/CLAUDE.md § Hub Back Button). Absolute, not fixed: this page scrolls,
+   and fixed buttons would sit on top of the text as it passes under them. */
+#back-btn, #mute-btn { position: absolute; top: calc(8px + env(safe-area-inset-top)); z-index: 80;
+  width: 38px; height: 30px; display: flex; align-items: center; justify-content: center;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--muted); }
+#back-btn { left: calc(8px + env(safe-area-inset-left)); font-size: 17px; text-decoration: none; }
+#mute-btn { left: calc(52px + env(safe-area-inset-left)); font-size: 14px; padding: 0; }
+#back-btn:hover, #mute-btn:hover { border-color: var(--ink); color: var(--ink); }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--sp); outline-offset: 2px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.sp { color: var(--sp); } .aic { color: var(--aic); } .good { color: var(--good); } .bad { color: var(--bad); }
+
+/* masthead */
+.mast { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.mast h1 { font-family: var(--display); font-size: 40px; line-height: 0.95; letter-spacing: -0.02em; font-weight: 700; }
+.mast h1 small { display: block; font-family: var(--body); font-size: 13px; font-weight: 500; letter-spacing: 0.02em; color: var(--muted); margin-top: 6px; }
+.lede { max-width: 56ch; color: var(--muted); flex: 1 1 320px; min-width: 0; }
+.ghost { background: none; border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 500; }
+.ghost:hover { border-color: var(--ink); }
+.ghost.warn { border-color: var(--bad); color: var(--bad); }
+
+/* roadmap tracker */
+.tracker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.year { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.year-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.year-name { font-family: var(--display); font-weight: 700; font-size: 17px; }
+.year-note { font-size: 12px; color: var(--muted); }
+.goalbar { position: relative; height: 8px; background: var(--line-soft); border-radius: 4px; overflow: hidden; display: flex; }
+.goalbar i { display: block; height: 100%; background: var(--work); }
+.goalbar em { display: block; height: 100%; background: var(--work-soft); }
+.quarters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.q { border: 1px solid var(--line-soft); border-radius: 7px; padding: 7px 8px; display: flex; flex-direction: column; gap: 2px; min-width: 0; background: transparent; }
+.q-name { font-family: var(--mono); font-size: 12px; font-weight: 500; }
+.q-opp { font-size: 11px; color: var(--muted); line-height: 1.25; overflow-wrap: anywhere; }
+.q-val { font-family: var(--mono); font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.q-sub { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.q.done { background: var(--raised); border-color: var(--line); }
+.q.done.skipped .q-opp { text-decoration: line-through; }
+.q.now { background: var(--raised); border: 2px solid var(--ink); padding: 6px 7px; }
+.q.now .q-val { color: var(--muted); }
+.q.next .q-val { color: var(--line); }
+
+/* board */
+.board { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.sheet h2 { font-family: var(--display); font-size: 20px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+.sheet h3 { font-size: 15px; font-weight: 600; }
+.sheet-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
+
+.report { border-left: 3px solid var(--work); padding: 2px 0 2px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.report.down { border-left-color: var(--bad); }
+.report p { max-width: 68ch; }
+
+/* big opportunity */
+.opp { background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.opp.on { border-color: var(--work); box-shadow: inset 0 0 0 1px var(--work); }
+.opp h3 { font-family: var(--display); font-size: 19px; font-weight: 700; line-height: 1.2; text-wrap: balance; }
+.opp p { max-width: 62ch; }
+.basis { font-size: 12px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+.chip.c-sp { border-color: var(--sp); color: var(--sp); }
+.chip.c-aic { border-color: var(--aic); color: var(--aic); }
+.notice { font-size: 13px; background: var(--bad-soft); color: var(--ink); border-radius: 6px; padding: 8px 10px; }
+.opp-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.fund { border: 1px solid var(--work); background: transparent; color: var(--work); border-radius: 6px; padding: 8px 16px; font-weight: 600; }
+.fund[aria-pressed="true"] { background: var(--work); color: var(--on-work); }
+.fund:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* general investments */
+.invest { display: flex; flex-direction: column; }
+.inv { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line-soft); }
+.inv:first-child { border-top: 0; }
+.inv-name { font-weight: 600; }
+.inv-desc { font-size: 13px; color: var(--muted); }
+.inv-meta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.stepper { display: flex; align-items: center; gap: 6px; }
+.stepper button { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--line); background: var(--raised); font-family: var(--mono); font-size: 16px; line-height: 1; }
+.stepper button:hover:not(:disabled) { border-color: var(--sp); color: var(--sp); }
+.stepper button:disabled { opacity: 0.35; cursor: not-allowed; }
+.stepper output { font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 5ch; text-align: center; font-size: 14px; }
+.stepper output.set { color: var(--sp); font-weight: 500; }
+.locked { font-size: 13px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 2px; }
+
+/* forecast */
+.meter { display: flex; flex-direction: column; gap: 4px; }
+.meter-head { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.bar { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: var(--line-soft); }
+.bar span { display: block; height: 100%; min-width: 0; }
+.seg-opp { background: var(--sp); } .seg-inv { background: var(--sp-soft); } .seg-work { background: var(--work); }
+.seg-aicinv { background: var(--aic); } .seg-aicwork { background: var(--aic-soft); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.legend b { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }
+.outcome { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.outcome .big { font-family: var(--display); font-size: 44px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.math { font-size: 13px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; }
+.math dt { color: var(--muted); } .math dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.run { background: var(--work); color: var(--on-work); border: 0; border-radius: 8px; padding: 12px 16px; font-weight: 600; font-size: 16px; }
+.run:hover { filter: brightness(1.08); }
+.textbtn { background: none; border: 0; padding: 0; font-size: 13px; color: var(--muted); text-decoration: underline; }
+
+/* team */
+.ladder { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.rung { font-family: var(--mono); font-size: 12px; text-align: center; padding: 5px 0; border-radius: 5px; border: 1px solid var(--line-soft); color: var(--muted); }
+.rung.past { background: var(--work-soft); border-color: var(--work-soft); color: var(--ink); }
+.rung.here { background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 500; }
+.rung.soon { border-style: dashed; border-color: var(--work); color: var(--work); }
+.lvl-name { font-family: var(--display); font-size: 18px; font-weight: 700; }
+.lvl-tag { font-size: 13px; color: var(--muted); }
+.stat { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; align-items: baseline; }
+.stat-name { font-weight: 600; font-size: 14px; }
+.stat-val { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.stat-track { grid-column: 1 / -1; position: relative; height: 10px; background: var(--line-soft); border-radius: 3px; }
+.stat-track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); border-radius: 3px 0 0 3px; }
+.stat-track em { position: absolute; top: 0; bottom: 0; background: var(--work); opacity: 0.75; }
+.stat-track em.loss { background: var(--bad); }
+.stat-track u { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--aic); }
+.stat-note { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.stats { display: flex; flex-direction: column; gap: 12px; }
+
+/* chart + log */
+.chart { width: 100%; height: auto; display: block; }
+.chart text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+.chart .val { fill: var(--ink); font-size: 12px; }
+.chart .on-ink { fill: var(--bg); }
+.chart .on-work { fill: var(--on-work); }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+th { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+th:first-child, td:first-child { text-align: left; }
+td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.empty { color: var(--muted); font-size: 14px; }
+
+/* scorecard */
+.grade { font-family: var(--display); font-size: 40px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+.score-lines { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 0; font-size: 14px; }
+.score-lines dt { color: var(--muted); } .score-lines dd { margin: 0; padding-left: 16px; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.score-lines .total { border-top: 1px solid var(--line); padding-top: 6px; color: var(--ink); font-weight: 600; }
+
+details.sheet > summary { cursor: pointer; font-family: var(--display); font-size: 18px; font-weight: 700; }
+.notes { display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+.notes li { max-width: 80ch; padding-left: 14px; position: relative; }
+.notes li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 6px; height: 2px; background: var(--muted); }
+.notes ul { display: flex; flex-direction: column; gap: 6px; }
+.notes a { color: var(--sp); }
+
+@media (max-width: 860px) {
+  .board, .tracker { grid-template-columns: minmax(0, 1fr); }
+  .mast h1 { font-size: 34px; }
+}
+@media (max-width: 430px) {
+  .wrap { padding-inline: max(16px, env(safe-area-inset-left), env(safe-area-inset-right)); }
+  .sheet { padding: 14px 12px; }
+  .q { padding: 6px 5px; } .q.now { padding: 5px 4px; }
+  .q-val { font-size: 13px; }
+  .rung { font-size: 11px; }
+  .outcome .big { font-size: 38px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bar span, .stat-track i, .stat-track em, .goalbar i, .goalbar em { transition: width 160ms ease, left 160ms ease; }
+}
+</style>
+
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-12 19:02 UTC</div>
+<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute-btn" aria-label="Toggle sound">🔊</button>
+<div class="wrap">
+  <header class="mast">
+    <h1>TAAS<small>Team AI Adoption Simulator</small></h1>
+    <p class="lede">You run one team for two years. Each quarter you split 60 story points between shipping work and building AI skill, inside a 9,000 AI-credit budget. The traditional run ships 240 units a year and learns nothing. See if you can beat it.</p>
+    <div id="restart"></div>
+  </header>
+
+  <section class="tracker" id="tracker" aria-label="Eight-quarter progress"></section>
+
+  <div class="board">
+    <div class="col" id="left"></div>
+    <div class="col" id="right"></div>
+  </div>
+
+  <section class="sheet">
+    <div class="sheet-head"><h2>Units shipped per quarter</h2><span class="label">Dashed line: the traditional 60</span></div>
+    <div id="chart"></div>
+  </section>
+
+  <section class="sheet">
+    <div class="sheet-head"><h2>Quarter log</h2><span class="label">Team says vs measured</span></div>
+    <div class="scroll" id="log"></div>
+  </section>
+
+  <details class="sheet" id="model">
+    <summary>How the model works, and where it comes from</summary>
+    <div class="notes" id="notes"></div>
+  </details>
+</div>
+
+<script>
+/* TAAS engine - pure functions, no DOM. Every tunable number lives in CFG, LEVELS, OPPS, INVESTS. */
+const TAAS = (function () {
+  const STATS = ['knowledge', 'context', 'quality', 'trust', 'flow'];
+
+  const CFG = {
+    version: 1,
+    quarters: ['Y1Q1', 'Y1Q2', 'Y1Q3', 'Y1Q4', 'Y2Q1', 'Y2Q2', 'Y2Q3', 'Y2Q4'],
+    sp: 60,                 // story points per quarter
+    aic: 9000,              // AI credits per quarter
+    yearGoal: 240,          // units of work per year
+    investStep: 2,          // SP per click on a general investment
+    investMax: 12,          // SP cap per general investment per quarter
+    fullRateSp: 6,          // SP at full return; beyond this each SP returns half
+    adoptionFloor: 0.5,     // share of work that uses AI at Trust 0
+    flowFloor: 0.65,         // share of AI gain that survives review at Flow 0
+    transitionTax: 0.02,    // output lost in the quarter after a level-up (J-curve learning dip)
+    contextRot: 3,          // Context lost per quarter at L3a+ with no context upkeep
+    evalRot: 2,             // Quality lost per quarter at L3b+ with no script/eval upkeep
+    trustUp: 3,             // Trust gained when measured net gain is clearly positive
+    trustDown: 4,           // Trust lost when rework outweighs gain
+    budgetCutThreshold: 0.9,// Y1 below this share of goal => Y2 AIC budget is cut
+    budgetCutAic: 7500
+  };
+
+  // mult = potential speedup on AI-assisted work, burn = AIC per delivery SP, risk = raw rework rate
+  const LEVELS = [
+    { id: 'L0', name: 'Traditional', tag: 'No AI in the workflow', mult: 1.00, burn: 0, risk: 0.00, req: {} },
+    { id: 'L1', name: 'Light AI', tag: 'AI search answers, single-line completions, shell one-liners', mult: 1.10, burn: 15, risk: 0.02, req: { knowledge: 10 } },
+    { id: 'L2', name: 'Prompt engineer', tag: 'AI as a new intern', mult: 1.30, burn: 45, risk: 0.06, req: { knowledge: 25, trust: 20 } },
+    { id: 'L3a', name: 'Context engineer', tag: 'Instructions and skills train the intern', mult: 1.50, burn: 85, risk: 0.09, req: { knowledge: 40, context: 25 } },
+    { id: 'L3b', name: 'Deterministic-first', tag: 'Scripts and evals; an intern you can trust with more', mult: 1.80, burn: 120, risk: 0.11, req: { knowledge: 50, context: 40, quality: 30 } },
+    { id: 'L4', name: 'Loop engineer', tag: 'MCP tools and SDK agents with a custom harness', mult: 2.30, burn: 190, risk: 0.15, req: { knowledge: 65, context: 60, quality: 55, trust: 50, flow: 40 } },
+    { id: 'L5', name: 'Graph engineer', tag: 'Agents, tools and people designed as one system', mult: 2.80, burn: 280, risk: 0.20, req: { knowledge: 85, context: 85, quality: 80, trust: 80, flow: 75 } }
+  ];
+
+  // One scripted big opportunity per quarter. Below minLevel the team is not ready and gets half the effect.
+  const OPPS = [
+    { id: 'stance', short: 'AI stance', title: 'Set the AI stance and roll out approved tools',
+      pitch: 'Say plainly which tools are allowed, what is expected, and that experimenting is safe. Get everyone licensed and signed in.',
+      basis: 'DORA AI capability: clear and communicated AI stance',
+      sp: 4, aic: 500, minLevel: 0, gain: { trust: 20, knowledge: 12 } },
+    { id: 'workshop', short: 'Prompt workshop', title: 'Run the prompt engineering workshop',
+      pitch: 'Three hands-on sessions: free-tier chat, enterprise chat, then an agent with file and terminal access. People learn to brief AI like a new intern.',
+      basis: 'Agentic engineering levels 1-2',
+      sp: 5, aic: 1500, minLevel: 1, gain: { knowledge: 20, trust: 8 } },
+    { id: 'context', short: 'Context repo', title: 'Stand up a shared team context repo',
+      pitch: 'Instructions, skills and reference docs live in version control, so every session starts trained instead of from zero.',
+      basis: 'DORA AI capability: AI-accessible internal data',
+      sp: 8, aic: 2000, minLevel: 2, gain: { context: 30, knowledge: 8, flow: 5 } },
+    { id: 'lessons', short: 'Lessons loop', title: 'Known-issues file and a capture-lessons command',
+      pitch: 'Every session ends by writing down what worked and what broke. The same mistake stops costing you twice.',
+      basis: 'Compounding engineering: plan, delegate, assess, codify',
+      sp: 6, aic: 1000, minLevel: 3, gain: { context: 16, quality: 10, flow: 8, knowledge: 6 } },
+    { id: 'determ', short: 'Scripts + evals', title: 'Go deterministic-first: scripts and evals',
+      pitch: 'If a script can produce the answer, write the script. Add evals so changes to context files cannot quietly break what matters.',
+      basis: 'Harness engineering: backpressure from tests and evals',
+      sp: 8, aic: 2000, minLevel: 3, gain: { quality: 30, trust: 6, knowledge: 6 }, burnFactor: 0.75,
+      extra: 'Delivery burns 25% fewer AIC from now on.' },
+    { id: 'review', short: 'Review flow', title: 'Small batches and an automated review skill',
+      pitch: 'AI writes faster than people can review. Shrink the batches and let a shared review skill take the first pass.',
+      basis: 'DORA AI capabilities: small batches, strong version control',
+      sp: 6, aic: 1500, minLevel: 3, gain: { flow: 28, quality: 6 } },
+    { id: 'agent', short: 'First agent', title: 'Build the first specialized agent',
+      pitch: 'One narrow job, an SDK agent, a few MCP-served tools, and a loop that verifies its own work before it stops.',
+      basis: 'Loop engineering: plan, execute, verify, retry, stop',
+      sp: 10, aic: 3000, minLevel: 4, gain: { knowledge: 12, flow: 10, trust: 6 }, agentUnits: 6, agentAic: 600,
+      extra: 'If the team is ready, the agent ships 6 extra units every quarter for 600 AIC.' },
+    { id: 'graph', short: 'Handoff pilot', title: 'Pilot agent handoffs with human approval gates',
+      pitch: 'Two agents and one person share a workflow with explicit routes and stop points. Mostly a bet on year three.',
+      basis: 'Graph engineering: coordinated loops with control boundaries',
+      sp: 8, aic: 2500, minLevel: 5, gain: { flow: 12, knowledge: 10, trust: 6 }, agentUnits: 4, agentAic: 400,
+      extra: 'If the team is ready, handoffs free up 4 more units every quarter for 400 AIC.' }
+  ];
+
+  // General investments unlock as the team levels up. rate = stat points per SP at full return.
+  const INVESTS = [
+    { id: 'train', name: 'Training courses', desc: 'Structured learning time.', unlock: 0, aic: 20, rate: { knowledge: 4 } },
+    { id: 'demo', name: 'Demos and show-and-tell', desc: 'People show real wins and real failures.', unlock: 1, aic: 10, rate: { trust: 4 } },
+    { id: 'prompt', name: 'Prompt practice time', desc: 'Deliberate practice on real tickets.', unlock: 1, aic: 60, rate: { knowledge: 2, trust: 2 } },
+    { id: 'habits', name: 'Review and small-batch habits', desc: 'Smaller changes, faster first review.', unlock: 2, aic: 20, rate: { flow: 4 } },
+    { id: 'personal', name: 'Personal context files', desc: 'Each person tunes their own instructions.', unlock: 2, aic: 60, rate: { context: 3.5, knowledge: 0.5 }, upkeep: 'context' },
+    { id: 'shared', name: 'Shared context upkeep', desc: 'Prune, merge and refresh the team repo.', unlock: 3, aic: 60, rate: { context: 3, flow: 1 }, upkeep: 'context' },
+    { id: 'evals', name: 'Scripts and evals', desc: 'Replace re-reasoning with scripts; test the context.', unlock: 3, aic: 80, rate: { quality: 4 }, upkeep: 'quality' },
+    { id: 'agents', name: 'Agent and tool building', desc: 'MCP tools and SDK agents for narrow jobs.', unlock: 4, aic: 250, rate: { knowledge: 2, flow: 2 } },
+    { id: 'handoff', name: 'Agent handoff design', desc: 'Routes, shared state and approval gates.', unlock: 5, aic: 300, rate: { flow: 2.5, trust: 1.5 } }
+  ];
+
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const r1 = v => Math.round(v * 10) / 10;
+
+  function newGame() {
+    return {
+      version: CFG.version, q: 0, level: 0, leveledUp: false,
+      stats: { knowledge: 0, context: 0, quality: 0, trust: 0, flow: 0 },
+      burnFactor: 1, agentUnits: 0, agentAic: 0, budgetCut: false, history: []
+    };
+  }
+
+  function emptyPlan() { return { opp: false, inv: {} }; }
+
+  function budget(state) { return (state.q >= 4 && state.budgetCut) ? CFG.budgetCutAic : CFG.aic; }
+
+  function meets(stats, req) { return Object.keys(req).every(k => stats[k] >= req[k]); }
+
+  function investGain(sp) { return sp <= CFG.fullRateSp ? sp : CFG.fullRateSp + (sp - CFG.fullRateSp) * 0.5; }
+
+  function unlocked(state) { return INVESTS.filter(i => state.level >= i.unlock); }
+
+  // Output for a given delivery SP and AIC left over after investments, using start-of-quarter stats.
+  function output(state, deliverySp, aicLeft) {
+    const L = LEVELS[state.level], s = state.stats;
+    const adoption = state.level === 0 ? 0 : clamp(CFG.adoptionFloor + s.trust / 200, 0, 1);
+    const flowShare = CFG.flowFloor + (1 - CFG.flowFloor) * s.flow / 100;
+    const guard = clamp((0.7 * s.quality + 0.3 * s.context) / 100, 0, 1);
+    const need = deliverySp * L.burn * adoption * state.burnFactor + state.agentAic;
+    const cover = need > 0 ? clamp(aicLeft / need, 0, 1) : 1;
+    const gain = (L.mult - 1) * adoption * cover * flowShare;
+    const rework = L.risk * adoption * cover * (1 - guard);
+    const dip = state.leveledUp ? CFG.transitionTax : 0;
+    const agent = state.agentUnits * cover;
+    const units = deliverySp * (1 + gain - rework - dip) + agent;
+    return {
+      units: r1(units), gain, rework, dip, net: gain - rework - dip, adoption, flowShare, guard, cover,
+      aicNeed: Math.round(need), aicDelivery: Math.round(need * cover), agent: r1(agent),
+      reported: (L.mult - 1) * adoption   // what the team feels: ignores review queue and rework
+    };
+  }
+
+  function forecast(state, plan) {
+    const opp = OPPS[state.q];
+    const avail = unlocked(state);
+    let spInvest = 0, aicInvest = 0;
+    const gains = { knowledge: 0, context: 0, quality: 0, trust: 0, flow: 0 };
+    const upkeep = { context: false, quality: false };
+    avail.forEach(i => {
+      const sp = plan.inv[i.id] || 0;
+      if (!sp) return;
+      spInvest += sp; aicInvest += sp * i.aic;
+      const eff = investGain(sp);
+      Object.keys(i.rate).forEach(k => { gains[k] += i.rate[k] * eff; });
+      if (i.upkeep) upkeep[i.upkeep] = true;
+    });
+    const ready = state.level >= opp.minLevel;
+    let spOpp = 0, aicOpp = 0;
+    if (plan.opp) {
+      spOpp = opp.sp; aicOpp = opp.aic;
+      const f = ready ? 1 : 0.5;
+      Object.keys(opp.gain).forEach(k => { gains[k] += opp.gain[k] * f; });
+      if (opp.id === 'context' || opp.id === 'lessons') upkeep.context = true;
+      if (opp.id === 'determ' || opp.id === 'lessons') upkeep.quality = true;
+    }
+    const bud = budget(state);
+    const deliverySp = CFG.sp - spOpp - spInvest;
+    const aicLeft = bud - aicOpp - aicInvest;
+    const out = output(state, Math.max(0, deliverySp), Math.max(0, aicLeft));
+
+    // drift
+    const drift = { knowledge: 0, context: 0, quality: 0, trust: 0, flow: 0 };
+    if (state.level >= 3 && !upkeep.context) drift.context -= CFG.contextRot;
+    if (state.level >= 4 && !upkeep.quality) drift.quality -= CFG.evalRot;
+    if (state.level > 0) {
+      if (out.gain - out.rework > 0.03) drift.trust += CFG.trustUp;
+      else if (out.rework > out.gain) drift.trust -= CFG.trustDown;
+    }
+    const after = {};
+    STATS.forEach(k => { after[k] = r1(clamp(state.stats[k] + gains[k] + drift[k], 0, 100)); });
+    let nextLevel = state.level;
+    if (nextLevel < LEVELS.length - 1 && meets(after, LEVELS[nextLevel + 1].req)) nextLevel += 1;
+
+    return {
+      quarter: CFG.quarters[state.q], opp, ready, budget: bud,
+      spOpp, spInvest, deliverySp, aicOpp, aicInvest, aicLeft,
+      valid: deliverySp >= 0 && aicLeft >= 0,
+      out, gains, drift, after, nextLevel,
+      aicUsed: aicOpp + aicInvest + out.aicDelivery
+    };
+  }
+
+  function yearUnits(state, year) {
+    return r1(state.history.filter(h => Math.floor(h.q / 4) === year).reduce((a, h) => a + h.units, 0));
+  }
+
+  function commit(state, plan) {
+    const f = forecast(state, plan);
+    if (!f.valid) return state;
+    const s = JSON.parse(JSON.stringify(state));
+    const opp = f.opp;
+    s.history.push({
+      q: state.q, quarter: f.quarter, plan: JSON.parse(JSON.stringify(plan)),
+      took: !!plan.opp, ready: f.ready, oppId: opp.id,
+      deliverySp: f.deliverySp, spInvest: f.spOpp + f.spInvest,
+      units: f.out.units, gain: f.out.gain, rework: f.out.rework, dip: f.out.dip, net: f.out.net,
+      reported: f.out.reported, cover: f.out.cover, aicUsed: f.aicUsed, budget: f.budget,
+      levelBefore: state.level, levelAfter: f.nextLevel,
+      before: Object.assign({}, state.stats), after: Object.assign({}, f.after)
+    });
+    s.stats = f.after;
+    s.leveledUp = f.nextLevel > state.level;
+    s.level = f.nextLevel;
+    if (plan.opp && f.ready) {
+      if (opp.burnFactor) s.burnFactor *= opp.burnFactor;
+      if (opp.agentUnits) { s.agentUnits += opp.agentUnits; s.agentAic += opp.agentAic; }
+    } else if (plan.opp && opp.burnFactor) {
+      s.burnFactor *= (1 + opp.burnFactor) / 2;
+    }
+    s.q = state.q + 1;
+    if (s.q === 4 && yearUnits(s, 0) < CFG.yearGoal * CFG.budgetCutThreshold) s.budgetCut = true;
+    return s;
+  }
+
+  // Units per quarter the team would ship in year 3 with all SP on delivery and no new investment.
+  function exitRate(state) {
+    const s = Object.assign({}, state, { leveledUp: false });
+    return output(s, CFG.sp, CFG.aic).units;
+  }
+
+  function summary(state) {
+    const y1 = yearUnits(state, 0), y2 = yearUnits(state, 1);
+    const total = r1(y1 + y2), base = CFG.yearGoal * 2;
+    // score from the same rounded parts the scorecard prints, so its lines always add up
+    const short1 = r1(Math.max(0, CFG.yearGoal - y1)), short2 = state.q >= 8 ? r1(Math.max(0, CFG.yearGoal - y2)) : 0;
+    const exit = exitRate(state);
+    const score = Math.round((total - base) - (short1 + short2) + 2 * (exit - CFG.sp));
+    let grade;
+    if (state.level === 0 && total >= base) grade = 'Traditional';
+    else if (score < 0) grade = 'Stalled pilot';
+    else if (score < 60) grade = 'Paid for itself';
+    else if (score < 140) grade = 'Compounding team';
+    else grade = 'Force multiplier';
+    return { y1, y2, total, base, delta: r1(total - base), short1, short2, exit, score, grade,
+      goals: (y1 >= CFG.yearGoal ? 1 : 0) + (state.q >= 8 && y2 >= CFG.yearGoal ? 1 : 0) };
+  }
+
+  return { CFG, STATS, LEVELS, OPPS, INVESTS, newGame, emptyPlan, budget, unlocked, forecast, commit, yearUnits, exitRate, summary, meets };
+})();
+if (typeof module !== 'undefined') module.exports = TAAS;
+
+</script>
+<script>
+(function () {
+  const E = TAAS, C = E.CFG, KEY = 'taas.v' + C.version;
+  const STAT = {
+    knowledge: ['Knowledge', 'What the team knows how to do. Every level needs it.'],
+    context: ['Context', 'Instructions, skills and docs the AI starts from. Gates L3 and up, and cuts rework.'],
+    quality: ['Quality', 'Scripts, tests and evals that catch AI mistakes. Cuts rework.'],
+    trust: ['Trust', 'Share of the work people actually hand to AI.'],
+    flow: ['Flow', 'How much AI speed survives review and handoffs.']
+  };
+  const GRADE = {
+    'Traditional': 'The team shipped exactly the plan. Nothing was risked and nothing was learned.',
+    'Stalled pilot': 'Investment went in and did not come back out inside two years. Check where SP was spent before the team was ready for it.',
+    'Paid for itself': 'The early dip was repaid and the team ends ahead of the traditional run.',
+    'Compounding team': 'The dip was repaid and the team is now clearly faster than it started.',
+    'Force multiplier': 'The team finishes far ahead and enters year three shipping well above the traditional rate.'
+  };
+  let state, plan, confirming = false, lastView = null, resizeT = 0;
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const n1 = v => (Math.round(v * 10) / 10).toLocaleString('en-US', { maximumFractionDigits: 1 });
+  const n0 = v => Math.round(v).toLocaleString('en-US');
+  const sg = v => (v > 0 ? '+' : v < 0 ? '-' : '') + n1(Math.abs(v));
+  const pct = v => (v > 0.0005 ? '+' : v < -0.0005 ? '-' : '') + (Math.abs(v) * 100).toFixed(1) + '%';
+  const lv = i => E.LEVELS[i];
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ state, plan })); } catch (e) { /* storage is optional */ } }
+  function load() {
+    try {
+      const d = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (d && d.state && d.state.version === C.version) return d;
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+  function start(data) {
+    const d = (data && data.state && data.state.version === C.version) ? data : load();
+    state = d ? d.state : E.newGame();
+    plan = d && d.plan ? d.plan : E.emptyPlan();
+    render();
+  }
+
+  // ---------- tracker ----------
+  function renderTracker(f) {
+    let html = '';
+    for (let y = 0; y < 2; y++) {
+      const done = state.history.filter(h => Math.floor(h.q / 4) === y);
+      const sum = E.yearUnits(state, y), goal = C.yearGoal;
+      const inYear = state.q < 8 && Math.floor(state.q / 4) === y;
+      const fc = inYear ? f.out.units : 0;
+      let note;
+      if (done.length === 4) note = sum >= goal ? '<span class="good">Goal met</span>' : '<span class="bad">Missed by ' + n1(goal - sum) + '</span>';
+      else if (done.length === 0 && !inYear) note = 'Not started';
+      else note = 'Needs ' + n1(Math.max(0, goal - sum) / (4 - done.length)) + ' a quarter from here';
+      html += '<div class="year"><div class="year-head"><span class="year-name">Year ' + (y + 1) + '</span>' +
+        '<span class="num">' + n1(sum) + ' / ' + goal + ' units</span><span class="year-note">' + note + '</span></div>' +
+        '<div class="goalbar" role="img" aria-label="Year ' + (y + 1) + ' progress ' + n1(sum) + ' of ' + goal + '">' +
+        '<i style="width:' + Math.min(100, sum / goal * 100) + '%"></i><em style="width:' + Math.max(0, Math.min(100 - sum / goal * 100, fc / goal * 100)) + '%"></em></div>' +
+        '<ol class="quarters">';
+      for (let i = 0; i < 4; i++) {
+        const q = y * 4 + i, h = state.history[q], o = E.OPPS[q];
+        if (h) {
+          const d = h.units - C.sp;
+          html += '<li class="q done' + (h.took ? '' : ' skipped') + '"><span class="q-name">' + h.quarter + '</span>' +
+            '<span class="q-opp">' + esc(o.short) + (h.took ? '' : ' (skipped)') + '</span>' +
+            '<span class="q-val">' + n1(h.units) + '</span><span class="q-sub ' + (d >= 0 ? 'good' : 'bad') + '">' + sg(d) + ' / ' + lv(h.levelBefore).id + '</span></li>';
+        } else if (q === state.q) {
+          html += '<li class="q now" aria-current="step"><span class="q-name">' + C.quarters[q] + '</span><span class="q-opp">' + esc(o.short) + '</span>' +
+            '<span class="q-val">' + n1(f.out.units) + '</span><span class="q-sub">forecast</span></li>';
+        } else {
+          html += '<li class="q next"><span class="q-name">' + C.quarters[q] + '</span><span class="q-opp">' + esc(o.short) + '</span>' +
+            '<span class="q-val">--</span><span class="q-sub">&nbsp;</span></li>';
+        }
+      }
+      html += '</ol></div>';
+    }
+    document.getElementById('tracker').innerHTML = html;
+  }
+
+  // ---------- last quarter report ----------
+  function reportHtml() {
+    const h = state.history[state.history.length - 1];
+    if (!h) return '';
+    const d = h.units - C.sp, lines = [];
+    lines.push('<p><b>' + h.quarter + ' shipped ' + n1(h.units) + ' units</b>, ' + (Math.abs(d) < 0.05 ? 'level with' : n1(Math.abs(d)) + (d > 0 ? ' over' : ' under')) + ' the traditional 60.</p>');
+    if (h.levelBefore > 0) lines.push('<p>The team says AI made them ' + pct(h.reported) + ' faster. Measured: ' + pct(h.net) + '.</p>');
+    if (h.cover < 0.999) lines.push('<p class="bad">AI credits ran short. Only ' + Math.round(h.cover * 100) + '% of AI-assisted work was covered.</p>');
+    if (h.took && !h.ready) lines.push('<p class="bad">The team was not ready for "' + esc(E.OPPS[h.q].short) + '" and got half the benefit.</p>');
+    if (h.levelAfter > h.levelBefore) lines.push('<p class="good"><b>Level up: ' + lv(h.levelAfter).id + ' ' + esc(lv(h.levelAfter).name) + '.</b> Expect a small learning dip this quarter.</p>');
+    if (h.q === 3 || h.q === 7) {
+      const y = h.q === 3 ? 0 : 1, sum = E.yearUnits(state, y);
+      if (sum >= C.yearGoal) lines.push('<p class="good"><b>Year ' + (y + 1) + ' closed at ' + n1(sum) + ' / ' + C.yearGoal + '. Goal met.</b></p>');
+      else if (y === 0 && state.budgetCut) lines.push('<p class="bad"><b>Year 1 closed at ' + n1(sum) + ' / ' + C.yearGoal + '.</b> That is more than 10% short, so leadership cut the year 2 AI budget to ' + n0(C.budgetCutAic) + ' AIC a quarter.</p>');
+      else lines.push('<p class="bad"><b>Year ' + (y + 1) + ' closed at ' + n1(sum) + ' / ' + C.yearGoal + '.</b>' + (y === 0 ? ' Leadership noticed, but the AI budget holds.' : '') + '</p>');
+    }
+    return '<div class="report' + (d < 0 ? ' down' : '') + '"><span class="label">Last quarter</span>' + lines.join('') + '</div>';
+  }
+
+  // ---------- left: decisions ----------
+  function tryPlan(mut) { const p = JSON.parse(JSON.stringify(plan)); mut(p); return E.forecast(state, p).valid ? p : null; }
+
+  function renderLeft(f) {
+    const o = f.opp, on = !!plan.opp;
+    const canFund = on || !!tryPlan(p => { p.opp = true; });
+    const factor = f.ready ? 1 : 0.5;
+    const gainChips = Object.keys(o.gain).map(k => '<span class="chip">+' + n1(o.gain[k] * factor) + ' ' + STAT[k][0] + '</span>').join('');
+    let html = '<section class="sheet"><div class="sheet-head"><h2>Plan ' + f.quarter + '</h2><span class="label">Skills you build now pay off next quarter</span></div>' + reportHtml() +
+      '<div class="opp' + (on ? ' on' : '') + '"><span class="label">This quarter\'s big opportunity</span>' +
+      '<h3>' + esc(o.title) + '</h3><p>' + esc(o.pitch) + '</p>' +
+      '<div class="chips"><span class="chip c-sp">' + o.sp + ' SP</span><span class="chip c-aic">' + n0(o.aic) + ' AIC</span>' + gainChips + '</div>' +
+      (o.extra ? '<p class="basis">' + esc(o.extra) + '</p>' : '') +
+      (f.ready ? '' : '<p class="notice">Built for a team at ' + lv(o.minLevel).id + ' or above. Yours is at ' + lv(state.level).id + ', so you would get half the effect shown on the card' + (o.extra ? ' and miss the lasting bonus' : '') + '.</p>') +
+      '<div class="opp-foot"><span class="basis">Based on: ' + esc(o.basis) + '</span>' +
+      '<button class="fund" data-act="opp" data-key="opp" aria-pressed="' + on + '"' + (canFund ? '' : ' disabled') + '>' + (on ? 'Funded' : canFund ? 'Fund this' : 'Not enough SP or AIC') + '</button></div></div>';
+
+    const avail = E.unlocked(state), later = E.INVESTS.filter(i => state.level < i.unlock);
+    html += '<div class="sheet-head"><h3>Ongoing investments</h3><span class="label">' + C.investStep + ' SP a click, half return past ' + C.fullRateSp + '</span></div><div class="invest">';
+    avail.forEach(i => {
+      const sp = plan.inv[i.id] || 0;
+      const canAdd = sp < C.investMax && !!tryPlan(p => { p.inv[i.id] = sp + C.investStep; });
+      const rates = Object.keys(i.rate).map(k => '+' + i.rate[k] + ' ' + STAT[k][0]).join(', ');
+      html += '<div class="inv"><div><div class="inv-name">' + esc(i.name) + '</div><div class="inv-desc">' + esc(i.desc) + '</div>' +
+        '<div class="inv-meta">' + rates + ' per SP / ' + i.aic + ' AIC per SP</div></div>' +
+        '<div class="stepper"><button data-act="dec" data-id="' + i.id + '" data-key="dec-' + i.id + '" aria-label="Less ' + esc(i.name) + '"' + (sp > 0 ? '' : ' disabled') + '>-</button>' +
+        '<output class="' + (sp ? 'set' : '') + '">' + sp + ' SP</output>' +
+        '<button data-act="inc" data-id="' + i.id + '" data-key="inc-' + i.id + '" aria-label="More ' + esc(i.name) + '"' + (canAdd ? '' : ' disabled') + '>+</button></div></div>';
+    });
+    html += '</div>';
+    if (later.length) {
+      const by = {};
+      later.forEach(i => { (by[i.unlock] = by[i.unlock] || []).push(i.name); });
+      html += '<div class="locked"><span class="label">Opens up as the team levels up</span>' +
+        Object.keys(by).map(k => '<span><span class="num">' + lv(+k).id + '</span>: ' + by[k].map(esc).join(', ') + '</span>').join('') + '</div>';
+    }
+    html += '</section>';
+    document.getElementById('left').innerHTML = html;
+  }
+
+  // ---------- right: forecast + team ----------
+  function forecastHtml(f) {
+    const o = f.out, spT = C.sp, b = f.budget, d = o.units - C.sp;
+    const w = (v, t) => Math.max(0, v / t * 100) + '%';
+    const unused = Math.max(0, b - f.aicUsed);
+    const base = f.deliverySp;
+    let html = '<section class="sheet"><div class="sheet-head"><h2>' + f.quarter + ' forecast</h2></div>' +
+      '<div class="outcome"><span class="big">' + n1(o.units) + '</span><span>units<br><span class="' + (d >= 0 ? 'good' : 'bad') + ' num">' + sg(d) + '</span> vs traditional</span></div>' +
+      '<dl class="math"><dt>' + base + ' SP on delivery</dt><dd>' + n1(base) + '</dd>';
+    if (state.level > 0) {
+      html += '<dt>AI gain (' + pct(o.gain) + ')</dt><dd class="good">' + sg(base * o.gain) + '</dd>' +
+        '<dt>Rework from AI mistakes (' + pct(-o.rework) + ')</dt><dd class="bad">' + sg(-base * o.rework) + '</dd>';
+      if (o.dip) html += '<dt>Learning dip after level-up</dt><dd class="bad">' + sg(-base * o.dip) + '</dd>';
+    }
+    if (state.agentUnits) html += '<dt>Agents working on their own</dt><dd class="good">' + sg(o.agent) + '</dd>';
+    html += '</dl>';
+
+    html += '<div class="meter"><div class="meter-head"><span><b class="sp">Story points</b></span><span class="num">' + (f.spOpp + f.spInvest) + ' invested / ' + f.deliverySp + ' delivery</span></div>' +
+      '<div class="bar" role="img" aria-label="Story point split"><span class="seg-opp" style="width:' + w(f.spOpp, spT) + '"></span><span class="seg-inv" style="width:' + w(f.spInvest, spT) + '"></span><span class="seg-work" style="width:' + w(f.deliverySp, spT) + '"></span></div>' +
+      '<div class="legend"><span><b class="seg-opp"></b>Big opportunity</span><span><b class="seg-inv"></b>Ongoing</span><span><b class="seg-work"></b>Delivery</span></div></div>';
+
+    html += '<div class="meter"><div class="meter-head"><span><b class="aic">AI credits</b></span><span class="num">' + n0(f.aicUsed) + ' of ' + n0(b) + ' used</span></div>' +
+      '<div class="bar" role="img" aria-label="AI credit split"><span class="seg-aicinv" style="width:' + w(f.aicOpp + f.aicInvest, b) + '"></span><span class="seg-aicwork" style="width:' + w(o.aicDelivery, b) + '"></span></div>' +
+      '<div class="legend"><span><b class="seg-aicinv"></b>Investments ' + n0(f.aicOpp + f.aicInvest) + '</span><span><b class="seg-aicwork"></b>Delivery ' + n0(o.aicDelivery) + '</span><span>Unused ' + n0(unused) + ' (does not roll over)</span></div></div>';
+    if (o.cover < 0.999) html += '<p class="notice">Credits cover only ' + Math.round(o.cover * 100) + '% of the AI-assisted work this plan needs (' + n0(o.aicNeed) + ' AIC). The rest is done by hand.</p>';
+    if (state.budgetCut && state.q >= 4) html += '<p class="basis">Budget is ' + n0(b) + ' AIC this year because year 1 came in more than 10% short.</p>';
+    if (f.nextLevel > state.level) html += '<p class="good"><b>This plan takes the team to ' + lv(f.nextLevel).id + ' ' + esc(lv(f.nextLevel).name) + ' next quarter.</b></p>';
+    html += '<button class="run" data-act="run" data-key="run">Run ' + f.quarter + '</button>' +
+      '<button class="textbtn" data-act="clear" data-key="clear">Clear this quarter\'s plan</button></section>';
+    return html;
+  }
+
+  function teamHtml(f) {
+    const L = lv(state.level), nx = state.level < E.LEVELS.length - 1 ? lv(state.level + 1) : null;
+    let html = '<section class="sheet"><div class="sheet-head"><h2>The team</h2><span class="label">AI adoption level</span></div><div class="ladder">';
+    E.LEVELS.forEach((l, i) => {
+      const cls = i < state.level ? 'past' : i === state.level ? 'here' : (i === f.nextLevel && state.q < 8 ? 'soon' : '');
+      html += '<span class="rung ' + cls + '" title="' + esc(l.name + ': ' + l.tag) + '">' + l.id + '</span>';
+    });
+    html += '</div><div><div class="lvl-name">' + L.id + ' ' + esc(L.name) + '</div><div class="lvl-tag">' + esc(L.tag) + '</div></div>';
+    if (nx) {
+      const needs = Object.keys(nx.req).map(k => '<span class="' + (state.stats[k] >= nx.req[k] ? 'good' : '') + '">' + STAT[k][0] + ' ' + nx.req[k] + '</span>').join(', ');
+      html += '<p class="lvl-tag">Next: <b>' + nx.id + ' ' + esc(nx.name) + '</b> needs ' + needs + '. The amber tick marks each target.</p>';
+    }
+    html += '<div class="stats">';
+    E.STATS.forEach(k => {
+      const cur = state.stats[k], aft = state.q < 8 ? f.after[k] : cur, lo = Math.min(cur, aft), hi = Math.max(cur, aft);
+      const req = nx && nx.req[k];
+      html += '<div class="stat"><span class="stat-name">' + STAT[k][0] + '</span><span class="stat-val">' + n1(cur) + (aft !== cur ? ' to <b class="' + (aft > cur ? 'good' : 'bad') + '">' + n1(aft) + '</b>' : '') + '</span>' +
+        '<div class="stat-track" role="img" aria-label="' + STAT[k][0] + ' ' + n1(cur) + ' of 100"><i style="width:' + lo + '%"></i>' +
+        (hi > lo ? '<em class="' + (aft < cur ? 'loss' : '') + '" style="left:' + lo + '%;width:' + (hi - lo) + '%"></em>' : '') +
+        (req ? '<u style="left:calc(' + req + '% - 1px)"></u>' : '') + '</div>' +
+        '<span class="stat-note">' + STAT[k][1] + '</span></div>';
+    });
+    html += '</div></section>';
+    return html;
+  }
+
+  function scoreHtml() {
+    const m = E.summary(state), L = lv(state.level);
+    return '<section class="sheet"><span class="label">Two years in</span><div class="grade">' + esc(m.grade) + '</div><p>' + GRADE[m.grade] + '</p>' +
+      reportHtml() +
+      '<dl class="score-lines">' +
+      '<dt>Units shipped vs the traditional ' + m.base + '</dt><dd>' + n1(m.total) + ' (' + sg(m.delta) + ')</dd>' +
+      '<dt>Year 1 goal (' + n1(m.y1) + ' / ' + C.yearGoal + ')</dt><dd class="' + (m.short1 ? 'bad' : 'good') + '">' + (m.short1 ? '-' + n1(m.short1) : 'met') + '</dd>' +
+      '<dt>Year 2 goal (' + n1(m.y2) + ' / ' + C.yearGoal + ')</dt><dd class="' + (m.short2 ? 'bad' : 'good') + '">' + (m.short2 ? '-' + n1(m.short2) : 'met') + '</dd>' +
+      '<dt>Year 3 head start: run rate ' + n1(m.exit) + ' a quarter vs 60, counted for two quarters</dt><dd>' + sg(2 * (m.exit - C.sp)) + '</dd>' +
+      '<dt class="total">Score</dt><dd class="total">' + m.score + '</dd></dl>' +
+      '<p class="basis">The team finished at ' + L.id + ' ' + esc(L.name) + '. A traditional run scores 0.</p>' +
+      '<button class="run" data-act="reset" data-key="again">Play again</button></section>';
+  }
+
+  // ---------- chart + log ----------
+  function renderChart(f) {
+    lastView = f;
+    const box = document.getElementById('chart');
+    const W = Math.max(300, Math.min(640, box.clientWidth || 640)), H = 230, padL = 30, padR = 8, padT = 20, padB = 26;
+    const vals = state.history.map(h => h.units), fc = state.q < 8 ? f.out.units : null;
+    const max = Math.max(100, Math.ceil(Math.max.apply(null, vals.concat([fc || 0, 60])) / 20) * 20);
+    const y = v => padT + (H - padT - padB) * (1 - v / max), slot = (W - padL - padR) / 8, bw = slot * 0.6;
+    let s = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Units shipped each quarter against the traditional 60">';
+    for (let t = 0; t <= max; t += 20) s += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(t) + '" y2="' + y(t) + '" stroke="var(--line-soft)" stroke-width="1"/><text x="' + (padL - 6) + '" y="' + (y(t) + 4) + '" text-anchor="end">' + t + '</text>';
+    s += '<line x1="' + (padL + slot * 4) + '" x2="' + (padL + slot * 4) + '" y1="' + padT + '" y2="' + (H - padB) + '" stroke="var(--line)" stroke-width="1"/>';
+    for (let i = 0; i < 8; i++) {
+      const cx = padL + slot * i + slot / 2, v = i < vals.length ? vals[i] : (i === state.q ? fc : null);
+      if (v !== null && v !== undefined) {
+        const top = y(v), h = y(0) - top, isFc = i >= vals.length;
+        s += '<rect x="' + (cx - bw / 2) + '" y="' + top + '" width="' + bw + '" height="' + Math.max(0, h) + '" rx="2" ' +
+          (isFc ? 'fill="var(--work-soft)" stroke="var(--work)" stroke-dasharray="4 3" stroke-width="1.5"' : 'fill="' + (v >= 60 ? 'var(--work)' : 'var(--ink)') + '"') + '/>' +
+          '<text class="val ' + (h < 24 || isFc ? '' : v >= 60 ? 'on-work' : 'on-ink') + '" x="' + cx + '" y="' + (h < 24 ? top - 5 : top + 15) + '" text-anchor="middle">' + n1(v) + '</text>';
+      }
+      s += '<text x="' + cx + '" y="' + (H - 8) + '" text-anchor="middle">' + C.quarters[i] + '</text>';
+    }
+    s += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(60) + '" y2="' + y(60) + '" stroke="var(--aic)" stroke-width="1.5" stroke-dasharray="6 4"/></svg>';
+    box.innerHTML = s;
+  }
+
+  function renderLog() {
+    if (!state.history.length) { document.getElementById('log').innerHTML = '<p class="empty">Run a quarter and it shows up here, with what the team felt next to what was measured.</p>'; return; }
+    let t = '<table><thead><tr><th>Quarter</th><th>Level</th><th>Delivery SP</th><th>Invested SP</th><th>Units</th><th>vs 60</th><th>AI gain</th><th>Rework</th><th>Team says</th><th>Measured</th><th>AIC used</th></tr></thead><tbody>';
+    state.history.forEach(h => {
+      t += '<tr><td>' + h.quarter + '</td><td>' + lv(h.levelBefore).id + '</td><td>' + h.deliverySp + '</td><td>' + h.spInvest + '</td><td>' + n1(h.units) + '</td>' +
+        '<td class="' + (h.units >= 60 ? 'good' : 'bad') + '">' + sg(h.units - 60) + '</td><td>' + pct(h.gain) + '</td><td>' + pct(-h.rework) + '</td><td>' + pct(h.reported) + '</td><td>' + pct(h.net) + '</td><td>' + n0(h.aicUsed) + ' / ' + n0(h.budget) + '</td></tr>';
+    });
+    document.getElementById('log').innerHTML = t + '</tbody></table>';
+  }
+
+  function renderNotes() {
+    const rows = E.LEVELS.map(l => '<tr><td>' + l.id + ' ' + esc(l.name) + '</td><td>' + l.mult.toFixed(2) + 'x</td><td>' + l.burn + '</td><td>' + Math.round(l.risk * 100) + '%</td><td>' +
+      (Object.keys(l.req).map(k => STAT[k][0] + ' ' + l.req[k]).join(', ') || 'none') + '</td></tr>').join('');
+    document.getElementById('notes').innerHTML =
+      '<p>This is a first-draft model. Every number below is a tuning guess, kept in one config block so it is easy to argue with.</p><ul>' +
+      '<li><b>Units</b> = delivery SP x (1 + AI gain - rework - learning dip) + agent units. With no AI, 1 SP ships 1 unit, so 60 SP x 4 quarters is exactly the 240 goal.</li>' +
+      '<li><b>AI gain</b> = level speedup x adoption x credit coverage x flow share. Adoption is 50% plus half of Trust. Flow share is 65% plus 35% of Flow.</li>' +
+      '<li><b>Rework</b> = level risk x adoption x coverage x (1 - guard). Guard is 70% Quality plus 30% Context.</li>' +
+      '<li><b>Learning dip</b>: ' + Math.round(C.transitionTax * 100) + '% of delivery in the quarter after a level-up. The team can climb one level a quarter at most.</li>' +
+      '<li><b>AI credits</b>: investments spend first. AI-assisted delivery then burns credits per SP by level. If credits run short, only part of the work gets AI help. Nothing rolls over.</li>' +
+      '<li><b>Upkeep</b>: from L3a, Context drops ' + C.contextRot + ' a quarter with no context work. From L3b, Quality drops ' + C.evalRot + ' a quarter with no script or eval work.</li>' +
+      '<li><b>Trust</b> rises ' + C.trustUp + ' when the measured net gain is over 3%, and falls ' + C.trustDown + ' when rework outweighs the gain.</li>' +
+      '<li><b>Team says vs measured</b>: the team reports the speedup they feel while prompting. Measured also counts review queues, rework and the learning dip.</li>' +
+      '<li><b>Year goals</b>: finish year 1 under ' + n0(C.yearGoal * C.budgetCutThreshold) + ' and the year 2 budget drops to ' + n0(C.budgetCutAic) + ' AIC a quarter.</li>' +
+      '<li><b>Score</b> = units over 480, minus any goal shortfall, plus two quarters of the gap between your exit run rate and 60.</li></ul>' +
+      '<div class="scroll"><table><thead><tr><th>Level</th><th>Speedup</th><th>AIC per SP</th><th>Rework risk</th><th>Needs</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<p><b>Where the ideas come from</b></p><ul>' +
+      '<li><a href="https://cloud.google.com/blog/products/ai-machine-learning/introducing-doras-inaugural-ai-capabilities-model" target="_blank" rel="noopener">DORA AI Capabilities Model (2025)</a>: seven team capabilities that amplify AI. Four of the big opportunities are drawn from it.</li>' +
+      '<li><a href="https://infoq.com/news/2026/05/dora-roi-ai-assisted-dev-report" target="_blank" rel="noopener">DORA ROI of AI-assisted development (2026)</a>: the J-curve, the verification tax and the instability tax. These are the learning dip, flow share and rework.</li>' +
+      '<li><a href="https://www.bassimeledath.com/blog/levels-of-agentic-engineering" target="_blank" rel="noopener">The 8 Levels of Agentic Engineering</a>: the practitioner ladder that L1 to L5 are mapped against, including compounding engineering and harness backpressure.</li>' +
+      '<li><a href="https://aman.ai/primers/ai/loop-and-graph-engineering/" target="_blank" rel="noopener">Loop and graph engineering primer</a>: a loop is one verified cycle; a graph is several loops, tools and people wired together.</li>' +
+      '<li><a href="https://getdx.com/ai-measurement-framework/" target="_blank" rel="noopener">DX AI Measurement Framework</a>: utilization, impact and cost. The quarter log follows that split.</li>' +
+      '<li><a href="https://dev.to/thesythesis/the-j-curve-32hn" target="_blank" rel="noopener">METR developer study, as discussed here</a>: people felt faster with AI than they measured. That is the team-says column.</li></ul>';
+  }
+
+  // ---------- render + events ----------
+  function render() {
+    const active = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.key : null;
+    const over = state.q >= 8;
+    const f = over ? null : E.forecast(state, plan);
+    const view = f || { out: { units: 0 }, nextLevel: state.level, after: state.stats };
+    renderTracker(view);
+    if (over) {
+      document.getElementById('left').innerHTML = scoreHtml();
+      document.getElementById('right').innerHTML = teamHtml(view);
+    } else {
+      renderLeft(f);
+      document.getElementById('right').innerHTML = forecastHtml(f) + teamHtml(f);
+    }
+    renderChart(view);
+    renderLog();
+    document.getElementById('restart').innerHTML = state.history.length
+      ? '<button class="ghost' + (confirming ? ' warn' : '') + '" data-act="restart" data-key="restart">' + (confirming ? 'Click again to wipe this run' : 'Restart') + '</button>' : '';
+    if (active) { const el = document.querySelector('[data-key="' + active + '"]'); if (el && !el.disabled) el.focus({ preventScroll: true }); }
+    save();
+  }
+
+
+  // ---------- audio: WebAudio only, started by the first gesture ----------
+  let AC = null, sfxGain = null, musicGain = null, noiseBuf = null, mNext = 0, mStep = 0;
+  let muted = false;
+  try { muted = localStorage.getItem('taas-mute') === '1'; } catch (e) { /* optional */ }
+  function audioInit() {
+    if (AC) { if (AC.state === 'suspended' && !muted) AC.resume(); return; }
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    AC = new Ctx();
+    sfxGain = AC.createGain(); sfxGain.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.connect(AC.destination);
+    const len = AC.sampleRate * 0.5, nb = AC.createBuffer(1, len, AC.sampleRate), d = nb.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    noiseBuf = nb;
+    applyMute();
+    mNext = AC.currentTime + 0.1;
+    setInterval(schedMusic, 50);
+  }
+  function applyMute() {
+    document.getElementById('mute-btn').textContent = muted ? '\u{1F507}' : '\u{1F50A}';
+    if (!AC) return;
+    sfxGain.gain.value = muted ? 0 : 0.4;
+    musicGain.gain.value = muted ? 0 : 0.09;
+  }
+  function tone(freq, dur, vol, type, at) {
+    if (!AC || muted) return;
+    const t = AC.currentTime + (at || 0);
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function thump(vol) {
+    if (!AC || muted) return;
+    const t = AC.currentTime, s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+    s.buffer = noiseBuf; f.type = 'lowpass'; f.frequency.setValueAtTime(900, t);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    s.connect(f); f.connect(g); g.connect(sfxGain); s.start(t); s.stop(t + 0.14);
+  }
+  const SFX = {
+    up: () => tone(880, 0.07, 0.12, 'triangle'),
+    down: () => tone(620, 0.07, 0.10, 'triangle'),
+    fund: () => { tone(523, 0.12, 0.14, 'triangle'); tone(784, 0.18, 0.14, 'triangle', 0.07); },
+    unfund: () => { tone(659, 0.12, 0.12, 'triangle'); tone(440, 0.16, 0.12, 'triangle', 0.07); },
+    run: () => { thump(0.35); [392, 494, 587].forEach((f, i) => tone(f, 0.5, 0.08, 'sine', 0.04 + i * 0.03)); },
+    level: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.35, 0.13, 'triangle', 0.15 + i * 0.09)),
+    met: () => [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 0.55, 0.12, 'triangle', 0.2 + i * 0.1)),
+    missed: () => { tone(220, 0.5, 0.14, 'sawtooth', 0.15); tone(196, 0.7, 0.12, 'sawtooth', 0.4); }
+  };
+  // Music: a slow office-hours loop. Four seventh chords on a soft electric piano, a quiet bass.
+  const CHORDS = [[174.6, 220.0, 261.6, 329.6], [164.8, 196.0, 246.9, 293.7], [146.8, 174.6, 220.0, 261.6], [130.8, 164.8, 196.0, 246.9]];
+  const BASS = [87.3, 82.4, 73.4, 65.4];
+  const BEAT = 60 / 76;
+  function schedMusic() {
+    if (!AC || muted || document.hidden) return;
+    if (mNext < AC.currentTime) mNext = AC.currentTime + 0.05;  // after a pause, rejoin rather than replay the gap
+    while (mNext < AC.currentTime + 0.25) {
+      const bar = Math.floor(mStep / 4) % 4, beat = mStep % 4;
+      if (beat === 0) {
+        CHORDS[bar].forEach((f, i) => {
+          const o = AC.createOscillator(), g = AC.createGain();
+          o.type = 'sine'; o.frequency.value = f;
+          g.gain.setValueAtTime(0.0001, mNext + i * 0.02);
+          g.gain.linearRampToValueAtTime(0.16, mNext + i * 0.02 + 0.03);
+          g.gain.exponentialRampToValueAtTime(0.0001, mNext + BEAT * 3.6);
+          o.connect(g); g.connect(musicGain); o.start(mNext + i * 0.02); o.stop(mNext + BEAT * 3.7);
+        });
+      }
+      if (beat === 0 || beat === 2) {
+        const o = AC.createOscillator(), g = AC.createGain();
+        o.type = 'triangle'; o.frequency.value = BASS[bar];
+        g.gain.setValueAtTime(0.0001, mNext); g.gain.linearRampToValueAtTime(0.5, mNext + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, mNext + BEAT * 1.6);
+        o.connect(g); g.connect(musicGain); o.start(mNext); o.stop(mNext + BEAT * 1.7);
+      }
+      if (beat === 1 || beat === 3) {
+        const s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+        s.buffer = noiseBuf; f.type = 'highpass'; f.frequency.value = 7000;
+        g.gain.setValueAtTime(0.06, mNext); g.gain.exponentialRampToValueAtTime(0.0001, mNext + 0.05);
+        s.connect(f); f.connect(g); g.connect(musicGain); s.start(mNext); s.stop(mNext + 0.07);
+      }
+      mNext += BEAT; mStep++;
+    }
+  }
+  document.addEventListener('visibilitychange', () => { if (AC) { if (document.hidden) AC.suspend(); else if (!muted) AC.resume(); } });
+  document.getElementById('mute-btn').addEventListener('click', () => {
+    muted = !muted;
+    try { localStorage.setItem('taas-mute', muted ? '1' : '0'); } catch (e) { /* optional */ }
+    if (!muted) { audioInit(); if (AC && AC.state === 'suspended') AC.resume(); mNext = AC ? AC.currentTime + 0.1 : 0; }
+    applyMute();
+  });
+  applyMute();
+
+  document.addEventListener('click', ev => {
+    if (ev.target.closest('#mute-btn')) return;
+    audioInit();
+    const b = ev.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    const act = b.dataset.act, id = b.dataset.id;
+    if (act !== 'restart') confirming = false;
+    if (act === 'opp') { const p = tryPlan(x => { x.opp = !x.opp; }); if (p) { plan = p; (plan.opp ? SFX.fund : SFX.unfund)(); } }
+    else if (act === 'inc') { const p = tryPlan(x => { x.inv[id] = Math.min(C.investMax, (x.inv[id] || 0) + C.investStep); }); if (p) { plan = p; SFX.up(); } }
+    else if (act === 'dec') { const v = Math.max(0, (plan.inv[id] || 0) - C.investStep); if (v) plan.inv[id] = v; else delete plan.inv[id]; SFX.down(); }
+    else if (act === 'clear') { plan = E.emptyPlan(); SFX.down(); }
+    else if (act === 'run') {
+      const before = state.level;
+      state = E.commit(state, plan); plan = E.emptyPlan();
+      SFX.run();
+      if (state.q === 4 || state.q === 8) (E.yearUnits(state, state.q / 4 - 1) >= C.yearGoal ? SFX.met : SFX.missed)();
+      else if (state.level > before) SFX.level();
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+    else if (act === 'reset') { state = E.newGame(); plan = E.emptyPlan(); SFX.fund(); }
+    else if (act === 'restart') { if (confirming) { state = E.newGame(); plan = E.emptyPlan(); confirming = false; SFX.unfund(); } else { confirming = true; SFX.down(); } }
+    render();
+  });
+
+  window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (lastView) renderChart(lastView); }, 120); });
+  renderNotes();
+  start({});
+})();
+</script>
+</body>
+</html>

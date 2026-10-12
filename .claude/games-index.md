@@ -26,6 +26,7 @@ local-2p.
 |---|---|---|---|---|---|---|---|
 | CYOA2 | `cyoa2/` | tabletop-rpg | tap-to-move, pinch-zoom, drag-pan, text-entry, voice | open-sandbox, save-campaign | tile-board, asset-library, procedural-generation, seeded-determinism, line-of-sight, fog-of-war, initiative-order, grid-combat, llm-game-master, scripted-game-master, dialogue-choices, speech-narration | solo, local-coop | `.claude/cyoa2.md` |
 | CYOA | `cyoa/` | tabletop-rpg | voice, text-entry, tap | save-campaign | llm-game-master, speech-narration, procedural-generation, seeded-determinism | solo, local-coop | `.claude/cyoa.md` |
+| TAAS | `taas/` | management-sim | tap | run-based | resource-allocation, systems-simulation, scale-ladder, skill-teaching | solo | `.claude/taas.md` |
 | Animation Rigs | `animation-rigs/` | animation-sandbox | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox | procedural-animation, inverse-kinematics, simulated-agents, real-time-3d | solo | `.claude/animation-rigs.md` |
 | Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
 | Music Mixer | `music-mixer/` | music-instrument | hold, tap, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation, user-authoring | solo | `.claude/music-mixer.md` |
@@ -82,7 +83,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-56 games (54 in-repo + 2 external builds).
+57 games (55 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -151,6 +152,20 @@ local-2p.
   levels forever: 16 authored, then endless seeded drawers, each beaten by
   the in-game solver before it is served; earmarked as the first web-first
   prototype of a future iOS title).
+
+### Newly opened by the 2026-10-12 build
+- **`management-sim`** genre + **`resource-allocation`** mechanic (taas, built with the
+  CD as a design discussion, then shipped protected). The first game about **running a
+  team** rather than a body, a town or a party: eight quarters, a fixed budget of story
+  points and AI credits each quarter, and every point spent on the team's AI skill is a
+  unit of work not shipped this quarter. The decision is the whole game; there is no
+  dexterity and no hidden information beyond a scripted roadmap shown up front.
+  `scale-ladder` (fire-clicker, mitochondria) is reused for the L0-L5 adoption ladder,
+  `systems-simulation` for the stat model, `skill-teaching` because it teaches a real
+  subject (AI adoption, the J-curve, verification and instability taxes), and
+  `run-based` (ember-depths) because one sitting is one fixed-length run. A second
+  management sim should manage something else (a clinic, a newsroom, a supply chain), or
+  give the team members names and moods, which TAAS deliberately does not.
 
 ### Newly opened by the 2026-10-09 build
 - **`tile-board`** / **`asset-library`** mechanics + **`drag-pan`** input (cyoa2, a

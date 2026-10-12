@@ -15,6 +15,12 @@ backlog entry here.
 
 ## Needs Zack
 
+- [taas] **Answer the four open questions** in `.claude/taas.md` § Open questions:
+  should a well-played year 1 be able to hit 240 (today only "stance + workshop,
+  nothing else" does), one aggregate team level or a champions-to-skeptics spread,
+  random events on top of the scripted story, and keep the planning-board look or
+  restyle in Neon Arcade. Then overrule anything wrong in its "assumed, not decided"
+  table; every number in the engine is a first-draft guess.
 - [repo] Delete the remote branch **`cyoa2-step3`** (GitHub > branches). It is
   a safety copy pushed mid-session on 2026-10-10 (`8020174`, work in progress);
   everything in it shipped in `3ea55c4` on `main`. A remote session cannot

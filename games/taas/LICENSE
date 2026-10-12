@@ -1,0 +1,47 @@
+TAAS (games/taas/) — PROPRIETARY LICENSE
+
+Copyright (c) 2026 Zack Helms. All rights reserved.
+
+1. SCOPE
+   This license covers everything in the games/taas/ directory: the
+   simulation engine and its tuning tables, the level ladder and its
+   requirements, the eight scripted opportunities and their copy, the
+   ongoing investments, the scoring model, the interface code, audio
+   code, styling, and text (collectively, "the Software").
+
+2. NO PERMISSION GRANTED
+   No permission is granted to copy, modify, distribute, sublicense,
+   sell, or create derivative works of the Software, in whole or in
+   part, without prior written permission from the copyright holder.
+
+3. TRADEMARK
+   The TAAS and Team AI Adoption Simulator names as used for this game,
+   and associated branding, are reserved. No trademark rights are
+   granted by this license.
+
+4. PERMITTED USE
+   You may play TAAS where it is officially published — the copyright
+   holder's website, and any official release — for personal,
+   non-commercial use. This is not a license to the underlying Software.
+
+5. NO EARLIER LICENSING
+   This directory has been proprietary from its first publication
+   (2026-10-12). It was never covered by the repository's former root
+   Apache License 2.0, which had already been removed on 2026-08-28,
+   and no version of it has been distributed under any other license
+   by the copyright holder.
+
+6. THIRD-PARTY WORKS
+   The Software names and links to published research and frameworks
+   (such as the DORA reports, the DX AI Measurement Framework and
+   public writing on agentic engineering levels) as the basis for some
+   of its ideas. Those works and their names belong to their owners and
+   are not part of the Software or of this license. The Software makes
+   no network requests of its own beyond loading web fonts.
+
+7. PERMISSIONS AND CONTACT
+   For permission requests, contact the copyright holder via the
+   GitHub repository ZackHelms/ZackHelms.github.io.
+
+8. NO WARRANTY
+   The Software is provided "as is," without warranty of any kind.
