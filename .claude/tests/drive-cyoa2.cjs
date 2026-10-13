@@ -4151,12 +4151,12 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     ok(vFred === 'com.apple.voice.compact.en-US.Fred/en-US/1' && vSys === '//1' && vBest === 'com.apple.voice.premium.en-US.Zoe/en-US/1.5' && (await pg.evaluate(() => JSON.parse(localStorage.getItem('cyoa2.settings.v1')).rate)) === 1.5,
       'the voice chosen is the voice that speaks, "whatever this device is set to" hands the device no voice and no language to override its own, and the pace set is the pace spoken at and is remembered');
     const vq = await pg.evaluate(() => { const sel = document.getElementById('set-voiceuri'), opts = [...sel.options].map((o) => o.textContent), d = Settings.data, keep = d.voiceURI;
-      d.voiceURI = 'com.example.voice.gone'; UI.voices(); const gone = sel.value; d.voiceURI = keep; UI.voices();
+      d.voiceURI = 'com.example.voice.gone'; UI.voices(); const gone = sel.selectedIndex + ':' + sel.value; d.voiceURI = keep; UI.voices();
       const h = Speech.has, ls = Listen.supported; Speech.has = () => false; Listen.supported = () => false; UI.settings(); const dis = sel.disabled, rows = document.getElementById('listen-rows').hidden; Speech.has = h; Listen.supported = ls; UI.settings();
       const kv = Speech.voices; window.__synth.none = true; Speech.voices = []; document.getElementById('toast').textContent = ''; window.__spoken.length = 0; document.getElementById('set-voice-test').click();
       const none = { toast: document.getElementById('toast').textContent, said: window.__spoken.filter((u) => u.volume !== 0).length }; window.__synth.none = false; Speech.voices = kv; UI.settings();
       return { daniel: opts.find((t) => t.startsWith('Daniel')), fred: opts.find((t) => t.startsWith('Fred')), gone, dis, rows, back: sel.disabled || document.getElementById('listen-rows').hidden, none }; });
-    ok(vq.daniel === 'Daniel (en-GB, Enhanced)' && vq.fred === 'Fred (en-US)' && vq.gone === '' && vq.dis && vq.rows && !vq.back && /No voice is on offer/.test(vq.none.toast) && vq.none.said === 0,
+    ok(vq.daniel === 'Daniel (en-GB, Enhanced)' && vq.fred === 'Fred (en-US)' && vq.gone === '0:' && vq.dis && vq.rows && !vq.back && /No voice is on offer/.test(vq.none.toast) && vq.none.said === 0,
       'each voice says how good it is where the device says so; a voice chosen once that the device no longer has falls back to the best one here; where the browser cannot read aloud, or listen, those rows are off; and "Hear it" with no voice on offer says so');
     const samp = await pg.evaluate(async () => { const box = document.getElementById('set-voice'); box.checked = false; box.dispatchEvent(new Event('change', { bubbles: true })); window.__spoken.length = 0;
       const pressed = document.getElementById('voice-btn').getAttribute('aria-pressed'), on = Settings.data.voiceOn; document.getElementById('set-voice-test').click(); await new Promise((res) => setTimeout(res, 400));
