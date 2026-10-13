@@ -754,6 +754,17 @@ the only place that does, and it is asked by the table (UI, SESSION), never by t
   at 8,000 characters, act names are looked up as own properties only (so `__proto__` and
   `constructor` are unknown acts), every field is typed in `NET_ACTS`, a device name must
   match `/^[a-z0-9]{8,24}$/`, and names from the wire go into `textContent`.
+- **A name from outside is looked up with `own()`, never by truthiness.** `CLASSES[x]`,
+  `st.npcs[x]` and every other table or list answer to `constructor`, `toString` and the
+  rest of what every object has, so `if (!CLASSES[it.cls])` lets "constructor" through.
+  Until 2026-10-13 that let a guest make the host's engine throw by asking for a calling of
+  that name, and let a hostile save set a property on a built-in function through a board
+  token naming "toString". `own(o, k)` (a string, and an own property) now does every such
+  lookup: callings, monsters, things, kinds of place, whispers, the matter at hand, the
+  ledger's kinds, and people, places, tasks and boards looked up by a tool or a file; and a
+  token whose person is not one of the tale's own keeps no link. A new table looked up by a
+  name that a file, a guest or a tool supplies goes through `own()` too, and the hostile
+  rows in section Q name "constructor" and "toString" wherever a name can go.
 
 - **Never `innerHTML` anything from a save.** `el()` sets `textContent`; the map uses
   `fillText`. A loaded file is untrusted and the suite loads one full of markup.

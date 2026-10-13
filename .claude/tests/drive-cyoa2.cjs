@@ -3892,6 +3892,28 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       const e = st.story[st.story.length - 1]; out.told = st.story.length > k && e.src === 'script' && e.area === 'narrate'; out.calls = window.__calls.length === n; window.__CYOA2_MOCK__ = mock; UI.modeChanged(); out.back = Mode.master(); return out; });
     ok(!gone.on && gone.master === 'script' && gone.nosay && gone.strict && gone.sel === 'ai' && /no key is set: the script is running everything/.test(gone.note) && gone.told && gone.calls && gone.back === 'ai',
       'if the key goes away in the middle of a tale the script takes everything back at once, for nothing: it tells the next place, the pen is put away, Settings says why; and with a key again the model has its jobs back');
+    /* the tally, the marks and Compare at their edges (the second negative-test pass) */
+    const wx = await pg.evaluate(async () => {
+      const st = G.st, d = Settings.data, keep = { tells: st.tells.slice(), story: st.story.slice(), n: st.n.tell, mon: d.monsters, gm: d.gm }, out = {}, wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const body = () => document.getElementById('compare-body'), cell = (a, s, i) => { const tr = body().querySelector('tr[data-area="' + a + '"][data-src="' + s + '"]'); return tr ? tr.children[i].textContent : ''; }, exp = () => [...body().querySelectorAll('button')].find((b) => /Export/.test(b.textContent));
+      st.tells = []; UI.compare(); out.empty = /Nothing has been told in this tale yet\./.test(body().textContent) && !body().querySelector('table.cmp') && exp().disabled;
+      const a = UI.told('ai', 'act', 'He said "go" and went.', 1, 'The "script" said so. ' + 'x '.repeat(2000), 0.003, 'm1'); UI.told('ai', 'act', 'Then nothing.', 2, '', 0.001, 'm1');
+      st.tells[0].r = -1; st.tells[0].tr = 1; out.twin = a.twin.length <= 3000 && a.twin.startsWith('The "script"');
+      UI.compare(); out.each = [cell('act', 'ai', 5), cell('act', 'ai', 6)].join(); out.own = /rated good 1, poor 0\. Claude’s own, beside them: good 0, poor 1/.test(body().textContent); out.exp = !exp().disabled;
+      const csv = UI.compareCsv(); out.quote = csv.includes('"He said ""go"" and went."') && csv.includes('"The ""script"" said so.');
+      out.kept = (unpackState(JSON.parse(JSON.stringify(packState(st)))).story.find((e) => e.n === a.n) || {}).twin === a.twin;
+      st.tells = st.tells.concat(Array.from({ length: 3000 }, (_, k) => tellRow({ n: 20000 + k, turn: 3, area: 'narrate', src: 'script', w: 1 }))); UI.told('script', 'narrate', 'One more line.', 4); out.cap = st.tells.length === 3000 && st.tells[2999].w === 3;
+      st.tells = st.tells.slice(-1).concat([tellRow({ n: a.n, turn: 1, area: 'act', src: 'ai', w: 5 })]);
+      const f = UI.storyFoot(a), dn = f.querySelector(':scope > .rate.down'), bare = UI.storyFoot({ t: 'gm', n: 777777, text: 'x', src: 'script', area: 'narrate' }), none = UI.storyFoot({ t: 'gm', n: 5, text: 'x' });
+      dn.click(); await wait(1500); const s1 = await Store.get('auto'); dn.click(); const r2 = st.tells[1].r; await wait(1500); const s2 = await Store.get('auto'); f.querySelector(':scope > .rate.up').click(); await wait(1500); const s3 = await Store.get('auto');
+      out.marks = [r2, (s1.data.tells.find((r) => r.n === a.n) || {}).r, (s2.data.tells.find((r) => r.n === a.n) || {}).r, (s3.data.tells.find((r) => r.n === a.n) || {}).r].join() === '0,-1,0,1' && [...bare.querySelectorAll('.rate')].every((b) => b.disabled) && none === null;
+      d.gm = 'script'; d.monsters = 'hand'; UI.compare(); out.hand = /Now: the script runs the table, and you move the monsters by hand\./.test(body().textContent);
+      UI.settings(); out.off = ['narrate', 'talk', 'act', 'create'].every((k) => document.getElementById('set-a-' + k).disabled) && document.getElementById('set-twin').disabled;
+      d.gm = keep.gm; d.monsters = keep.mon; UI.settings(); out.on = !document.getElementById('set-a-talk').disabled && !document.getElementById('set-twin').disabled;
+      st.tells = keep.tells; st.story = keep.story; st.n.tell = keep.n; UI.saveNow(); return out; });
+    ok(wx.empty && wx.each === '$0.0040,$0.0020' && wx.own && wx.exp && wx.quote && wx.twin && wx.kept && wx.cap,
+      'COMPARE with nothing told says so and offers nothing to export; each telling\'s cost is the cost over the tellings; Claude\'s own marks are counted beside its twins\'; quotes in the words are doubled in the export; the script\'s version is kept to 3,000 letters, and in the save; the tally keeps its last 3,000 lines');
+    ok(wx.marks && wx.hand && wx.off && wx.on, 'a mark pressed twice is taken back, and each press is saved; a passage with no line in the tally has marks that cannot be pressed, and one nobody is named as telling has none; with the monsters moved by hand Compare says so; and while the script runs the table, its jobs and the twin cannot be given away in Settings');
     await W1.ctx.close();
   }
   }
