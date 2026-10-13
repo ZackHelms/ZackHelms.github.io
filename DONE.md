@@ -1,5 +1,15 @@
 # DONE — done log
 
+- 2026-10-13 [cyoa2] **Step 4: other phones at the table.** One phone hosts
+  the tale, the Game Master, the keys and the voice; others in the same room
+  join by QR code, phone to phone over WebRTC with no server and no STUN, see
+  the same board and story, and play their own travellers by acts the host's
+  engine judges. The CD's four answers (QR in the room, all on the host, each
+  plays their own, the host takes over). A hand-written QR encoder checked
+  against segno. Also: the Compare table fits a phone once the real font loads
+  (`eade9ba`), and the voice list of the second negative-test pass (122 breaks,
+  14 holes closed with rows, the rest caught or of no observable effect).
+
 - 2026-10-11 [cyoa2] The narrator's **paid voice**: OpenAI's speech on the
   player's own key, as CYOA has it, with the device's voice as fallback and
   its cost estimated in the ledger (`334f14e`); the Game Master dropdown in

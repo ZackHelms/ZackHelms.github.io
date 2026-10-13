@@ -382,10 +382,23 @@ legend { font-family:var(--caps); font-weight:700; font-size:14px; letter-spacin
   letter-spacing:.06em; border-radius:2px; opacity:0; transition:opacity .3s; pointer-events:none; text-align:center; }
 #toast.on { opacity:1; }
 body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the board, never over the story */
+/* ===== together: other phones at the table ===== */
+#scr-join, #scr-hand { flex-direction:column; align-items:center; justify-content:flex-start; text-align:center;
+  padding:calc(84px + var(--sat)) 16px calc(20px + var(--sab)); overflow-y:auto; z-index:2; }
+#scr-join .title, #scr-hand .title { font-size:clamp(40px, 11vw, 64px); }
+#scr-join p, #scr-hand p { max-width:min(420px, 86vw); margin:12px auto; }
+.join-name { display:flex; flex-direction:column; gap:6px; font-family:var(--caps); font-size:13px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2); margin:6px 0 10px; }
+.join-name input, #net-inv input { font:inherit; font-family:var(--serif); font-size:17px; text-transform:none; letter-spacing:0; padding:8px 10px; border:1px solid var(--ink-3); background:var(--vellum); color:var(--ink); min-width:0; }
+canvas.qr { display:block; margin:12px auto; image-rendering:pixelated; border:1px solid var(--ink-3); background:#fff; }
+#net-inv .row { flex-wrap:nowrap; gap:8px; margin:8px 0; }
+#net-inv input { flex:1 1 auto; }
+.seat { font-family:var(--caps); font-size:12px; letter-spacing:.08em; color:var(--lapis); }
+body:not(.guest) [data-guest] { display:none !important; }
+body.guest [data-host] { display:none !important; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-13 04:13 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-13 12:13 UTC</div>
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
 
@@ -404,6 +417,20 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
   <input id="file-in" type="file" accept="application/json,.json" hidden>
 </section>
 
+<!-- ===== together: a phone joining a table, and the tab a camera opened ===== -->
+<section id="scr-join" class="screen" aria-label="Joining a table">
+  <h1 class="title">CYOA2</h1>
+  <div class="subtitle">Joining a table</div>
+  <label class="join-name">Your name<input id="join-name" type="text" maxlength="24" autocomplete="nickname" spellcheck="false"></label>
+  <canvas id="join-qr" class="qr" width="10" height="10" role="img" aria-label="A code for the host's camera" hidden></canvas>
+  <p id="join-state" role="status"></p>
+  <div class="row" style="justify-content:center"><button id="join-copy" class="plaque small" type="button" hidden>Copy the code</button><button id="join-leave" class="plaque small" type="button">Not now</button></div>
+</section>
+<section id="scr-hand" class="screen" aria-label="A code for your game">
+  <h1 class="title">CYOA2</h1>
+  <p>The code is with your game. Go back to the tab where it is open.</p>
+</section>
+
 <!-- ===== play ===== -->
 <section id="scr-play" class="screen" aria-label="The map table">
   <div class="play-top">
@@ -412,7 +439,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
       <div id="chips" role="group" aria-label="The party"></div>
       <button id="btn-init" class="plaque small" type="button">Roll initiative</button>
       <button id="btn-end" class="plaque small" type="button" hidden>End turn</button>
-      <button id="btn-stand" class="iconbtn" type="button" aria-label="Stand down: stop counting rounds" title="Stand down" hidden>&#215;</button>
+      <button id="btn-stand" data-host class="iconbtn" type="button" aria-label="Stand down: stop counting rounds" title="Stand down" hidden>&#215;</button>
     </div>
   </div>
   <div id="play-main">
@@ -462,7 +489,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
   <div class="panel-head"><h2>Party</h2><button class="plaque small" type="button" data-close>Done</button></div>
   <div class="panel-body">
     <p class="note" id="party-purse"></p>
-    <div class="row" style="margin:10px auto 16px"><button id="party-add" class="plaque small" type="button">Add a traveller</button><button id="party-short" class="plaque small" type="button">Rest an hour</button><button id="party-long" class="plaque small" type="button">Sleep the night</button></div>
+    <div class="row" style="margin:10px auto 16px"><button id="party-add" class="plaque small" type="button">Add a traveller</button><button id="party-short" data-host class="plaque small" type="button">Rest an hour</button><button id="party-long" data-host class="plaque small" type="button">Sleep the night</button></div>
     <div id="party-list"></div>
     <p class="note" id="party-note"></p>
     <div id="party-fallen"></div>
@@ -473,7 +500,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
 <section id="pan-settings" class="panel" aria-label="Settings">
   <div class="panel-head"><h2>Settings</h2><button class="plaque small" type="button" data-close>Done</button></div>
   <div class="panel-body">
-    <fieldset><legend>World</legend>
+    <fieldset data-host><legend>World</legend>
       <label class="field"><span>Seed for the next new tale (blank for a random world)</span><input id="set-seed" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60"></label>
       <p class="note" id="set-seed-now"></p>
     </fieldset>
@@ -484,7 +511,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
       <p class="note">Tap a square to walk there. Drag to pan, pinch or scroll to zoom. Tap a door, a thing or a person to see it. Arrow keys and WASD also walk; Q E Z C step diagonally.</p>
       <p class="note">Roll initiative to count rounds: everyone in the fight takes a turn in order, with 30 ft of movement, one action and one bonus action. Tap an enemy in reach to strike it; tap your own piece for what else it can do. Enter ends a turn.</p>
     </fieldset>
-    <fieldset><legend>Who runs the table</legend>
+    <fieldset data-host><legend>Who runs the table</legend>
       <label class="field"><span>The Game Master is</span><select id="set-gm"><option value="script">Scripted (free)</option><option value="ai">AI (Claude api key)</option></select></label>
       <p class="note" id="gm-note"></p>
       <div id="ai-areas">
@@ -499,7 +526,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
       <div class="row" style="margin-top:10px"><button id="set-compare" class="plaque small" type="button">Compare</button></div>
       <p class="note">The beats: the opening, the first sight of a new place, a fight starting and ending, the tale's end. Walking, doors, blows, chests and locks are always the engine's, and free.</p>
     </fieldset>
-    <fieldset><legend>Claude</legend>
+    <fieldset data-host><legend>Claude</legend>
       <label class="field"><span>Your Anthropic API key</span><input id="set-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="300" placeholder="sk-ant-..."></label>
       <label class="check"><input id="set-remember" type="checkbox"><span>Remember the key on this device</span></label>
       <div class="row" style="margin-top:10px">
@@ -518,7 +545,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
       <label class="field"><span>Model for what the players say</span><select id="set-m-turn"></select></label>
       <label class="check"><input id="set-showcosts" type="checkbox"><span>Show what each reply cost</span></label>
     </fieldset>
-    <fieldset><legend>Voice</legend>
+    <fieldset data-host><legend>Voice</legend>
       <label class="check"><input id="set-voice" type="checkbox"><span>Read the tellings aloud</span></label>
       <label class="field"><span>Narrator</span><select id="set-voiceprov"><option value="device">Device voice (free)</option><option value="openai">OpenAI voice (GPT api key)</option></select></label>
       <div id="need-openai" hidden>
@@ -544,7 +571,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
     <fieldset><legend>Appearance</legend>
       <label class="field"><span>Page</span><select id="set-theme"><option value="auto">Follow this device</option><option value="light">Parchment</option><option value="dark">Night reading</option></select></label>
     </fieldset>
-    <fieldset><legend>Saved tale</legend>
+    <fieldset data-host><legend>Saved tale</legend>
       <p class="note">The tale saves itself on this device after every move. A saved file holds the whole world, including every place charted so far.</p>
       <div class="row" style="margin-top:10px">
         <button id="set-export" class="plaque small" type="button">Save to a file</button>
@@ -572,6 +599,21 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
 </section>
 
 <!-- ===== compare: the script and the model, side by side ===== -->
+<section id="pan-players" class="panel" aria-label="Players">
+  <div class="panel-head"><h2>Players</h2><button class="plaque small" type="button" data-close>Done</button></div>
+  <div class="panel-body">
+    <div class="row" style="margin:0 auto 12px"><button id="net-invite" class="plaque small" type="button">Invite a player</button></div>
+    <div id="net-inv" hidden>
+      <canvas id="net-qr" class="qr" width="10" height="10" role="img" aria-label="A code for the joining phone's camera"></canvas>
+      <p class="note">On the joining phone, point the camera at this code. That phone then shows a code of its own: point this phone's camera at it, and come back to this tab.</p>
+      <div class="row"><input id="net-link" type="text" readonly aria-label="The invitation, as a link"><button id="net-copy" class="plaque small" type="button">Copy</button></div>
+      <div class="row"><input id="net-code" type="text" placeholder="Or paste the code it shows" aria-label="The joining phone's code" autocomplete="off" autocapitalize="off" spellcheck="false"><button id="net-take" class="plaque small" type="button">Use</button></div>
+    </div>
+    <div id="net-list"></div>
+    <p class="note">Everyone at the table sees this board and the story on their own phone, and plays their own travellers. This phone holds the tale, the Game Master and the voice, and plays the travellers of anyone who drops out until they come back. Phones join over the network they share, with nothing in between: no server, and no account.</p>
+  </div>
+</section>
+
 <section id="pan-compare" class="panel" aria-label="Compare">
   <div class="panel-head"><h2>Script and AI</h2><button class="plaque small" type="button" data-close>Back</button></div>
   <div class="panel-body" id="compare-body"></div>
@@ -584,9 +626,11 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
   <button class="plaque" type="button" data-act="notes">Notes</button>
   <button class="plaque" type="button" data-act="compare">Compare</button>
   <button class="plaque" type="button" data-act="lib">Library</button>
-  <button class="plaque" type="button" data-act="export">Save to a file</button>
+  <button class="plaque" type="button" data-act="players" data-host>Players</button>
+  <button class="plaque" type="button" data-act="export" data-host>Save to a file</button>
   <button class="plaque" type="button" data-act="settings">Settings</button>
-  <button class="plaque" type="button" data-act="title">Title</button>
+  <button class="plaque" type="button" data-act="title" data-host>Title</button>
+  <button class="plaque" type="button" data-act="leave" data-guest>Leave the table</button>
 </nav>
 <div id="dialog" role="dialog" aria-modal="true"><h3 id="dlg-title"></h3><div id="dlg-body" class="dlg-body"></div><div id="dlg-btns" class="dlg-btns"></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -2135,7 +2179,7 @@ function bedside(inn) {
 function newGame(seed) {
   const bible = generateWorld(seed), pc = newPc('P1', 'Wayfarer', 'S1', 0, 0, CLASS_ORDER[0], true);
   const st = { format: 'cyoa2-save', v: ENGINE_V, seed, bible, sites: {}, npcs: {}, maps: {}, party: [pc], lead: 'P1',
-    here: 'S1', walk: null, round: null, met: {}, log: [], time: { day: 1, minute: 480 }, gold: CLASSES[pc.cls].gold, facts: [], summaries: [], quests: {}, story: [], costs: [], turn: 0, told: {}, fallen: [], over: '', flags: {}, tells: [], notes: [],
+    here: 'S1', walk: null, round: null, met: {}, log: [], time: { day: 1, minute: 480 }, gold: CLASSES[pc.cls].gold, facts: [], summaries: [], quests: {}, story: [], costs: [], turn: 0, told: {}, fallen: [], over: '', flags: {}, tells: [], notes: [], seats: {},
     n: { ev: 0, site: bible.sites.length, pc: 1, roll: 0, f: 0, Q: 1, tell: 0, note: 0 }, made: Date.now() };
   for (const s of bible.sites) st.sites[s.id] = deepClone(s);
   for (const p of bible.npcs) st.npcs[p.id] = Object.assign(deepClone(p), { bible: true });
@@ -2602,6 +2646,7 @@ function useAbility(st, a, it) {
 function intent(st, it) {
   const no = refuse;
   if (!it || typeof it !== 'object') return no('bad');
+  if (Net.guest()) return no('remote', 'The host’s table decides that.');      /* a guest's copy of the tale is only ever the host's: its taps are sent there */
   if (it.t === 'jot') return jot(st, it);                    /* the players' notes are theirs: kept even when the tale is over, in or out of a round */
   if (st.over) return no('over');
   const R = st.round;
@@ -2636,6 +2681,7 @@ function intent(st, it) {
         if (st.party.length < 2 || !st.party.some((p, j) => j !== k && p.status === 'ok')) return no('last');
         closeWalk(st);
         const gone = st.party.splice(k, 1)[0];
+        delete st.seats[gone.id];
         if (st.lead === gone.id) st.lead = st.party[0].id;
         fixLead(st);
         note(st, 'party', { op: 'drop', who: gone.id, name: gone.name });
@@ -2936,7 +2982,7 @@ function packState(st) {
   for (const k of Object.keys(st.maps)) maps[k] = packMap(st.maps[k]);
   return { format: 'cyoa2-save', v: ENGINE_V, seed: st.seed, bible: st.bible, sites: st.sites, npcs: st.npcs, maps, party: st.party, lead: st.lead, here: st.here,
     round: st.round, met: st.met, log: st.log, time: st.time, gold: st.gold, facts: st.facts, summaries: st.summaries, quests: st.quests, story: st.story, costs: st.costs,
-    turn: st.turn, told: st.told, fallen: st.fallen, over: st.over, flags: st.flags, tells: st.tells, notes: st.notes, n: st.n, made: st.made, saved: Date.now() };
+    turn: st.turn, told: st.told, fallen: st.fallen, over: st.over, flags: st.flags, tells: st.tells, notes: st.notes, seats: st.seats, n: st.n, made: st.made, saved: Date.now() };
 }
 /* plain, bounded data only: strings clipped, depth capped, no prototype keys */
 function cleanData(v, depth) {
@@ -2973,7 +3019,7 @@ function unpackState(p) {
   if ((p.v | 0) > ENGINE_V) throw new Error('That tale was saved by a newer version of the game.');
   const s = (v, n) => clip(typeof v === 'string' ? v : '', n), int = (v, lo, hi, d) => (Number.isFinite(+v) ? clamp(Math.round(+v), lo, hi) : d);
   const st = { format: 'cyoa2-save', v: ENGINE_V, seed: s(p.seed, 80) || 'unknown', bible: cleanData(p.bible, 0) || {}, sites: {}, npcs: {}, maps: {}, party: [], lead: '', here: '', walk: null, round: null, met: {},
-    log: [], time: { day: 1, minute: 480 }, gold: 0, facts: [], summaries: [], quests: {}, story: [], costs: [], turn: 0, told: {}, fallen: [], over: '', flags: {}, tells: [], notes: [], n: { ev: 0, site: 0, pc: 1, roll: 0, f: 0, Q: 1, tell: 0, note: 0 }, made: +p.made || Date.now() };
+    log: [], time: { day: 1, minute: 480 }, gold: 0, facts: [], summaries: [], quests: {}, story: [], costs: [], turn: 0, told: {}, fallen: [], over: '', flags: {}, tells: [], notes: [], seats: {}, n: { ev: 0, site: 0, pc: 1, roll: 0, f: 0, Q: 1, tell: 0, note: 0 }, made: +p.made || Date.now() };
   const B = st.bible;
   for (const k of ['town', 'region', 'inn', 'gang', 'cave', 'opening']) B[k] = s(B[k], 200);
   B.threads = (Array.isArray(B.threads) ? B.threads : []).filter((t) => t && typeof t.t === 'string');
@@ -3062,6 +3108,9 @@ function unpackState(p) {
   let qs = 1; for (const k of Object.keys(st.quests)) qs = Math.max(qs, +k.slice(1) + 1);
   let ts = 0; for (const e of st.story) if (e.n) ts = Math.max(ts, e.n); for (const e of st.tells) ts = Math.max(ts, e.n);
   let js = 0; for (const z of st.notes) js = Math.max(js, +z.id.slice(1));
+  /* which phone each traveller is played from, at a table of several (a device's random name, and what its player is called) */
+  const seats = p.seats && typeof p.seats === 'object' && !Array.isArray(p.seats) ? p.seats : {};
+  for (const k of Object.keys(seats).slice(0, 12)) { const z = seats[k]; if (pcOf(st, k) && z && typeof z.dev === 'string' && /^[a-z0-9]{8,24}$/.test(z.dev)) st.seats[k] = { dev: z.dev, name: s(z.name, 24) || 'A player' }; }
   st.n = { ev: Math.max(nn.ev | 0, st.log.length), site: Math.max(nn.site | 0, top), pc: clamp(Math.max(nn.pc | 0, pcs), 1, 9000), roll: Math.max(nn.roll | 0, 0), f: Math.max(nn.f | 0, fs), Q: Math.max(nn.Q | 0, qs), tell: clamp(Math.max(nn.tell | 0, ts), 0, 1e7), note: clamp(Math.max(nn.note | 0, js), 0, 9999999) };
   /* the monsters already met, and a round in progress, as far as they still make sense */
   const met = p.met && typeof p.met === 'object' ? p.met : {};
@@ -5486,6 +5535,7 @@ function previewTo(sx, sy) {
 }
 /* ask the engine to walk; it answers with the path it chose, or says why not */
 function go(p) {
+  if (Net.guest()) { Net.act('go', { goals: p.goals, then: p.then || null }); return; }      /* a guest's walk is the host's to take */
   const st = G.st, a = actor(), pc = a.o;
   if (G.busy) { if ($('info').hidden) UI.toast(BUSY); return; }
   const res = intent(st, { t: 'move', who: a.id, goals: p.goals, then: p.then, known: knownOnly(a) });
@@ -5511,6 +5561,7 @@ function tapAt(sx, sy) {
   if (mate) {
     if (R && !a.pc && !G.busy && aims().has(mate.id)) { UI.attack(mate.id); return; }      /* a monster moved by hand strikes whoever it can reach */
     /* one of the party: tapped while exploring, they take the lead */
+    if (Net.guest() && !R && !G.busy && mate.id !== st.lead && Net.mine(mate.id)) Net.act('lead', { who: mate.id });
     if (!R && !G.busy && mate.id !== st.lead && intent(st, { t: 'lead', id: mate.id }).ok) { View.path = null; View.walking = false; View.pending = null; UI.bar(); UI.arrived(); viewShow(); }
     View.sel = { x: tx, y: ty, w: 1, h: 1, pc: mate.id };
     UI.pcCard(mate);
@@ -5521,7 +5572,7 @@ function tapAt(sx, sy) {
     UI.card(null);
     if (G.busy) { UI.toast(BUSY); return; }
     if (d.lock) { UI.thingCard(d.id, d.kind === 'bars' ? 'Barred door' : d.kind === 'gate' ? 'Gate' : 'Door', d.kind === 'bars' ? 'Iron bars, a hand apart.' : 'Shut fast.'); return; }      /* a lock is a thing to be dealt with, not walked through */
-    if (!st.walk && doorSides(d).some((q) => q[0] === pc.x && q[1] === pc.y)) { UI.follow(intent(st, { t: 'door', who: a.id, id: d.id })); return; }
+    if (!Net.guest() && !st.walk && doorSides(d).some((q) => q[0] === pc.x && q[1] === pc.y)) { UI.follow(intent(st, { t: 'door', who: a.id, id: d.id })); return; }
     go({ goals: doorSides(d), then: { t: 'door', id: d.id } });
     return;
   }
@@ -5611,7 +5662,7 @@ function viewFrame(now) {
   const st = G.st, A = View.anim;
   if (A.t < 1) { A.t = Math.min(1, A.t + dt * WALK_SPEED); View.dirty = true; }
   if (A.t >= 1) {
-    if (st.walk) {
+    if (st.walk && !Net.guest()) {
       const a = actor(), who = st.walk.who, was = {};
       for (const p of st.party) was[p.id] = [p.x, p.y];
       if (!a.pc) was[a.id] = [a.o.x, a.o.y];
@@ -5701,7 +5752,7 @@ const Sfx = {
   },
   step() { this.foot ^= 1; this.burst(.06, this.foot ? 430 : 350, 1.4, .55); },
   door() { this.tone(190, 105, .24, 'sawtooth', .07); this.burst(.09, 170, .9, .7, .2); },
-  deny() { this.tone(130, 110, .12, 'square', .06); },
+  deny() { if (Net.remote) { Net.remote.denied = true; return; } this.tone(130, 110, .12, 'square', .06); },      /* a guest's act refused: the guest hears it, not the table */
   roll() { for (let k = 0; k < 5; k++) this.burst(.035, 2400 + k * 300, 2, .5, k * .07 + (k > 2 ? .05 : 0)); this.tone(220, 220, .3, 'triangle', .1, .46); },
   alarm() { this.tone(196, 196, .22, 'sawtooth', .05); this.tone(233.1, 233.1, .4, 'sawtooth', .05, .2); },
   travel() { this.tone(392, 392, .5, 'sine', .14); this.tone(587.3, 587.3, .8, 'sine', .1, .13); },
@@ -5789,12 +5840,12 @@ const Settings = {
 const AREA_SHORT = { narrate: 'narration', talk: 'talk', act: 'the table', monsters: 'monsters', create: 'characters' };
 const AREA_NAMES = { narrate: 'Narration at the beats', talk: 'Talking to people', act: 'Lines typed to the table', monsters: 'Monsters in a fight', create: 'Making characters' };
 const Mode = {
-  master() { return Settings.data.gm === 'ai' && Session.on() ? 'ai' : 'script'; },
-  ai(area) { return this.master() === 'ai' && (area === 'monsters' ? Settings.data.monsters === 'gm' : Settings.data.areas[area] === 'ai'); },
+  master() { if (Net.guest()) return Net.mode().master; return Settings.data.gm === 'ai' && Session.on() ? 'ai' : 'script'; },
+  ai(area) { if (Net.guest()) return Net.mode().now[area] === 'ai'; return this.master() === 'ai' && (area === 'monsters' ? Settings.data.monsters === 'gm' : Settings.data.areas[area] === 'ai'); },
   now() { const o = {}; for (const a of AREAS) o[a] = this.ai(a) ? 'ai' : 'script'; return o; },
-  typed() { return this.ai('act') || this.ai('talk'); },
+  typed() { if (Net.guest()) return Net.mode().typed; return this.ai('act') || this.ai('talk'); },
   /* nobody at this table can rule on the unusual: enemies that see the party fight, and a fight is fought out */
-  strict() { return !this.ai('narrate') && !this.ai('act') && !this.ai('monsters') && Settings.data.monsters !== 'hand'; },
+  strict() { if (Net.guest()) return Net.mode().strict; return !this.ai('narrate') && !this.ai('act') && !this.ai('monsters') && Settings.data.monsters !== 'hand'; },
 };
 /* which model a Game Master task uses: its own choice in Settings, or the main model */
 function taskSettings(task) { const d = Settings.data, m = (d.taskModels || {})[task]; return m ? Object.assign({}, d, { model: m }) : d; }
@@ -5955,9 +6006,9 @@ const CANCEL_GAP = 90;                                       /* ms left between 
 const NARR_MAX = 40;                                         /* sentences waiting: past this the oldest are dropped, not read late */
 const Narrator = {
   q: [], buf: '', node: null, running: false, gen: 0, cut: null, lit: null, spoken: 0,
-  on() { return !!Settings.data.voiceOn && (Premium.ready() || Speech.available()); },
+  on() { return !Net.guest() && !!Settings.data.voiceOn && (Premium.ready() || Speech.available()); },      /* at a table of several, the voice is the host's */
   /* is there anything here that could read aloud at all: the device's voice, or the paid one once it is set up */
-  able() { return Speech.has() || (!!Premium.provider() && Premium.can()); },
+  able() { return !Net.guest() && (Speech.has() || (!!Premium.provider() && Premium.can())); },
   busy() { return this.running || this.q.length > 0; },
   /* how long one sentence may take before it is given up on (a device voice can simply never finish) */
   patience(text, rate) { return Math.round((String(text).length / (14.5 * (rate || 1))) * 2000 + 3000); },
@@ -6038,12 +6089,10 @@ const Narrator = {
   },
   /* silence, now: whatever was waiting is not read later, and sound that was on its way for it is not waited for */
   stop() {
-    const was = this.busy();
     this.gen++; for (const it of this.q) if (it.audio) it.audio.abort();
     this.q = []; this.buf = ''; this.running = false;
     Speech.stop(); if (this.cut) this.cut();
     this.mark(null);
-    return was;
   },
 };
 /* a line spoken instead of typed: what is heard is written into the same field, to be read before it is sent */
@@ -6082,12 +6131,116 @@ const Listen = {
   drop() { const r = this.rec; this.rec = null; if (r) { try { r.abort(); } catch (e) { /* ignore */ } } if (this.live) this.show(false); },
 };
 
+/* ============================== QR CODES ==============================
+   A QR code from a string, for the codes that bring another phone to the table: byte mode,
+   error correction M (or L), the smallest version that holds it (1 to 25), and the mask that
+   scores best under the standard's four penalties. No library: the standard's own steps, in
+   order, and nothing else. QR.make(text) -> { size, ver, mask, get(x, y) }.                */
+const QR = (() => {
+  const ECC = { L: [-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26],
+    M: [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28] };
+  const BLOCKS = { L: [-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12],
+    M: [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21] };
+  const FORMAT = { L: 1, M: 0 }, MAXV = 25;
+  const rawModules = (v) => { let r = (16 * v + 128) * v + 64; if (v >= 2) { const n = Math.floor(v / 7) + 2; r -= (25 * n - 10) * n - 55; if (v >= 7) r -= 36; } return r; };
+  const dataCodewords = (v, e) => Math.floor(rawModules(v) / 8) - ECC[e][v] * BLOCKS[e][v];
+  const gmul = (x, y) => { let z = 0; for (let i = 7; i >= 0; i--) { z = ((z << 1) ^ ((z >>> 7) * 0x11d)) & 0xff; z ^= ((y >>> i) & 1) * x; } return z; };
+  function divisor(deg) {
+    const r = new Array(deg).fill(0); r[deg - 1] = 1; let root = 1;
+    for (let i = 0; i < deg; i++) { for (let j = 0; j < deg; j++) { r[j] = gmul(r[j], root); if (j + 1 < deg) r[j] ^= r[j + 1]; } root = gmul(root, 2); }
+    return r;
+  }
+  function remainder(data, div) {
+    const r = div.map(() => 0);
+    for (const b of data) { const f = b ^ r.shift(); r.push(0); div.forEach((c, i) => { r[i] ^= gmul(c, f); }); }
+    return r;
+  }
+  const alignAt = (v) => { if (v === 1) return []; const n = Math.floor(v / 7) + 2, step = Math.floor((v * 8 + n * 3 + 5) / (n * 4 - 4)) * 2, out = [6]; for (let p = v * 4 + 10; out.length < n; p -= step) out.splice(1, 0, p); return out; };
+  /* the text's bytes, framed and padded and cut into blocks with their error correction, interleaved */
+  function codewords(bytes, v, e) {
+    const bits = [], put = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+    put(4, 4); put(bytes.length, v <= 9 ? 8 : 16); for (const b of bytes) put(b, 8);
+    const cap = dataCodewords(v, e) * 8;
+    put(0, Math.min(4, cap - bits.length)); put(0, (8 - bits.length % 8) % 8);
+    for (let pad = 0xec; bits.length < cap; pad ^= 0xec ^ 0x11) put(pad, 8);
+    const data = []; for (let i = 0; i < bits.length; i += 8) { let b = 0; for (let j = 0; j < 8; j++) b = (b << 1) | bits[i + j]; data.push(b); }
+    const nb = BLOCKS[e][v], el = ECC[e][v], raw = Math.floor(rawModules(v) / 8), nShort = nb - raw % nb, shortLen = Math.floor(raw / nb), div = divisor(el), blocks = [];
+    for (let i = 0, k = 0; i < nb; i++) { const d = data.slice(k, k + shortLen - el + (i < nShort ? 0 : 1)); k += d.length; const ec = remainder(d, div); if (i < nShort) d.push(0); blocks.push(d.concat(ec)); }
+    const out = [];
+    for (let i = 0; i < blocks[0].length; i++) blocks.forEach((b, j) => { if (i !== shortLen - el || j >= nShort) out.push(b[i]); });
+    return out;
+  }
+  const MASKS = [(x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x) => x % 3 === 0, (x, y) => (x + y) % 3 === 0, (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0,
+    (x, y) => ((x * y) % 2) + ((x * y) % 3) === 0, (x, y) => (((x * y) % 2) + ((x * y) % 3)) % 2 === 0, (x, y) => (((x + y) % 2) + ((x * y) % 3)) % 2 === 0];
+  function build(v, e, cw, mask) {
+    const n = v * 4 + 17, mod = new Uint8Array(n * n), fn = new Uint8Array(n * n);
+    const set = (x, y, d) => { mod[y * n + x] = d ? 1 : 0; fn[y * n + x] = 1; };
+    for (let i = 0; i < n; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+    for (const [cx, cy] of [[3, 3], [n - 4, 3], [3, n - 4]]) for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const x = cx + dx, y = cy + dy, d = Math.max(Math.abs(dx), Math.abs(dy)); if (x >= 0 && x < n && y >= 0 && y < n) set(x, y, d !== 2 && d !== 4); }
+    const al = alignAt(v), na = al.length;
+    for (let i = 0; i < na; i++) for (let j = 0; j < na; j++) { if ((i === 0 && j === 0) || (i === 0 && j === na - 1) || (i === na - 1 && j === 0)) continue; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) set(al[i] + dx, al[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1); }
+    const fmt = (m) => { const d = (FORMAT[e] << 3) | m; let r = d; for (let i = 0; i < 10; i++) r = (r << 1) ^ ((r >>> 9) * 0x537); const b = ((d << 10) | r) ^ 0x5412, bit = (i) => ((b >>> i) & 1) === 1;
+      for (let i = 0; i <= 5; i++) set(8, i, bit(i)); set(8, 7, bit(6)); set(8, 8, bit(7)); set(7, 8, bit(8)); for (let i = 9; i < 15; i++) set(14 - i, 8, bit(i));
+      for (let i = 0; i < 8; i++) set(n - 1 - i, 8, bit(i)); for (let i = 8; i < 15; i++) set(8, n - 15 + i, bit(i)); set(8, n - 8, true); };
+    fmt(0);
+    if (v >= 7) { let r = v; for (let i = 0; i < 12; i++) r = (r << 1) ^ ((r >>> 11) * 0x1f25); const b = (v << 12) | r; for (let i = 0; i < 18; i++) { const d = ((b >>> i) & 1) === 1, a = n - 11 + (i % 3), c = Math.floor(i / 3); set(a, c, d); set(c, a, d); } }
+    let i = 0;
+    for (let right = n - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (let vert = 0; vert < n; vert++) for (let j = 0; j < 2; j++) {
+        const x = right - j, up = ((right + 1) & 2) === 0, y = up ? n - 1 - vert : vert;
+        if (!fn[y * n + x] && i < cw.length * 8) { mod[y * n + x] = (cw[i >>> 3] >>> (7 - (i & 7))) & 1; i++; }
+      }
+    }
+    const masked = (k) => { const out = mod.slice(), f = MASKS[k]; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (!fn[y * n + x] && f(x, y)) out[y * n + x] ^= 1; return out; };
+    const withFormat = (grid, k) => { const keep = mod.slice(); mod.set(grid); fmt(k); const out = mod.slice(); mod.set(keep); return out; };
+    if (mask != null) return { n, grid: withFormat(masked(mask), mask), mask };
+    let best = null;
+    /* each mask is scored before the format and version bits are written in (ISO/IEC 18004:2015, 7.8): those squares count as light */
+    const bare = (grid) => { const g = grid.slice(); for (let i = 0; i < 9; i++) { if (i !== 6) { g[8 * n + i] = 0; g[i * n + 8] = 0; } } for (let i = 0; i < 8; i++) { g[8 * n + n - 1 - i] = 0; g[(n - 1 - i) * n + 8] = 0; }
+      if (v >= 7) for (let i = 0; i < 18; i++) { const a = n - 11 + (i % 3), c = Math.floor(i / 3); g[c * n + a] = 0; g[a * n + c] = 0; } return g; };
+    for (let k = 0; k < 8; k++) { const g = masked(k), s = penalty(bare(g), n); if (!best || s < best.s) best = { s, grid: withFormat(g, k), mask: k }; }
+    return { n, grid: best.grid, mask: best.mask };
+  }
+  /* the standard's four penalties: long runs, 2x2 blocks, a finder-like 1:1:3:1:1 run with four light modules on either side
+     (the quiet margin counts as light), and an unbalanced dark count, scored as ISO/IEC 18004 table 11 has them          */
+  function penalty(g, n) {
+    let s = 0, dark = 0;
+    const line = (pass, a) => { const out = new Uint8Array(n); for (let b = 0; b < n; b++) out[b] = pass ? g[b * n + a] : g[a * n + b]; return out; };
+    for (let pass = 0; pass < 2; pass++) for (let a = 0; a < n; a++) {
+      const L = line(pass, a);
+      let run = 1;
+      for (let b = 1; b <= n; b++) { if (b < n && L[b] === L[b - 1]) run++; else { if (run >= 5) s += run - 2; run = 1; } }
+      for (let i = 0; i + 7 <= n; ) {
+        if (L[i] && !L[i + 1] && L[i + 2] && L[i + 3] && L[i + 4] && !L[i + 5] && L[i + 6]) {
+          let before = true, after = true;
+          for (let k = Math.max(0, i - 4); k < i; k++) if (L[k]) before = false;
+          for (let k = i + 7; k < Math.min(n, i + 11); k++) if (L[k]) after = false;
+          if (i === 0 || i === n - 7 || before || after) { s += 40; i += 7; } else i += 4;
+        } else i++;
+      }
+    }
+    for (let y = 0; y + 1 < n; y++) for (let x = 0; x + 1 < n; x++) { const c = g[y * n + x]; if (c === g[y * n + x + 1] && c === g[(y + 1) * n + x] && c === g[(y + 1) * n + x + 1]) s += 3; }
+    for (let i = 0; i < n * n; i++) dark += g[i];
+    s += 10 * Math.floor(Math.abs((dark * 100) / (n * n) - 50) / 5);
+    return s;
+  }
+  function make(text, opt) {
+    const o = opt || {}, e = o.ecc === 'L' ? 'L' : 'M', bytes = Array.from(new TextEncoder().encode(String(text)));
+    let v = o.ver || 1;
+    while (v <= MAXV && dataCodewords(v, e) * 8 < 4 + (v <= 9 ? 8 : 16) + bytes.length * 8) { if (o.ver) return null; v++; }
+    if (v > MAXV) return null;
+    const r = build(v, e, codewords(bytes, v, e), o.mask);
+    return { size: r.n, ver: v, ecc: e, mask: r.mask, grid: r.grid, get: (x, y) => x >= 0 && y >= 0 && x < r.n && y < r.n && r.grid[y * r.n + x] === 1 };
+  }
+  return { make };
+})();
 /* ============================== UI ============================== */
 const UI = {
   saveT: 0, toastT: 0, tab: 'tale', libDone: false, hasSave: false, dlgDefault: null,
   show(id) { for (const s of document.querySelectorAll('.screen')) s.classList.toggle('active', s.id === id); },
   veil(fn, ms) { const v = $('veil'); v.classList.add('on'); setTimeout(() => { try { fn(); } finally { requestAnimationFrame(() => v.classList.remove('on')); } }, ms || 460); },
-  toast(msg, ms) { if (!msg) return; const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(this.toastT); this.toastT = setTimeout(() => t.classList.remove('on'), ms || 2200); },
+  toast(msg, ms) { if (!msg) return; if (Net.remote) { Net.remote.toasts.push(String(msg)); return; } const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(this.toastT); this.toastT = setTimeout(() => t.classList.remove('on'), ms || 2200); },
   dialog(title, paras, btns, lead) {
     $('dlg-title').textContent = title;
     const body = $('dlg-body'), row = $('dlg-btns'); body.textContent = ''; row.textContent = '';
@@ -6159,6 +6312,7 @@ const UI = {
   mustFight() { return !!(G.st && G.st.round) && Mode.strict() && threatOf(G.st); },
   alarm() { const st = G.st; if (!st || st.round || st.over || G.busy || !Mode.strict() || !threatOf(st)) return false; this.card(null); this.rounds(true); return true; },
   rounds(on) {
+    if (Net.guest()) { if (on) Net.act('init'); else this.toast('Only the host stands the table down.'); return; }
     if (G.busy) { this.toast(BUSY); return; }
     if (!on && this.mustFight()) { this.toast('Not while they are at your throat.'); Sfx.deny(); return; }
     const st = G.st, res = intent(st, { t: 'rounds', op: on ? 'start' : 'stop' });
@@ -6172,6 +6326,7 @@ const UI = {
     this.turn();
   },
   endTurn() {
+    if (Net.guest()) { Net.act('end'); return; }
     if (G.busy) { this.toast(BUSY); return; }
     const st = G.st, res = intent(st, { t: 'end' });
     if (!res.ok) { this.toast(res.say); Sfx.deny(); return; }
@@ -6207,16 +6362,18 @@ const UI = {
 
   /* ---- blows and tricks: the table asks, the engine answers, and the answer is shown ---- */
   attack(target, weapon) {
+    if (Net.guest()) { Net.act('attack', { target, weapon: weapon || '' }); return; }
     if (G.busy) { this.toast(BUSY); return; }
     const st = G.st, a = actor(), res = intent(st, { t: 'attack', who: a.id, target, attack: weapon || '' });
     if (this.resolved(res) && st.round && !res.fell) { const t = targetOf(st, a.m, target); if (t && !t.pc) { View.sel = { x: t.o.x, y: t.o.y, w: 1, h: 1, tok: t.id }; this.tokCard(t.o); } }
   },
   ability(who, name, target) {
+    if (Net.guest()) { Net.act('ability', { who, name, target: target == null ? '' : target }); return; }
     if (G.busy) { this.toast(BUSY); return; }
     this.resolved(intent(G.st, { t: 'ability', who, name, target }));
     if (this.panelOpen()) this.party();
   },
-  act1(it) { if (G.busy) { this.toast(BUSY); return; } this.resolved(intent(G.st, it)); },
+  act1(it) { if (Net.guest()) { if (it.t === 'item' || it.t === 'dash') Net.act(it.t, { who: it.who, item: it.item || '', target: it.target || '' }); return; } if (G.busy) { this.toast(BUSY); return; } this.resolved(intent(G.st, it)); },
   /* what came back from the engine after a blow, a trick, a dash or a rest */
   resolved(res) {
     if (!res.ok) { this.toast(res.say); Sfx.deny(); return false; }
@@ -6308,6 +6465,7 @@ const UI = {
   },
   /* one thing asked of one person: the engine answers, the story keeps it, and the card shows what they said */
   ask(npcId, topic) {
+    if (Net.guest()) { Net.act('ask', { npc: npcId, topic }, (r) => { if (r.ok && !G.st.round) this.talkCard(npcId, r.text || ''); }); return; }      /* the answer comes back from the host, and this phone shows it */
     if (G.busy) { this.toast(BUSY); return; }
     const st = G.st, n = st.npcs[npcId] || { name: 'Someone' }, L = leadOf(st), was = this.where(), res = intent(st, { t: 'talk', npc: npcId, topic });
     if (!res.ok) { this.toast(res.say); Sfx.deny(); return; }
@@ -6334,6 +6492,7 @@ const UI = {
     this.card(name, text + state, V.map((v) => ({ t: v.label, sub: v.sub, off: v.off, fn: () => this.useThing(T.id, v.verb) })));
   },
   useThing(what, verb) {
+    if (Net.guest()) { this.card(null); Net.act('use', { what, verb }); return; }
     if (G.busy) { this.toast(BUSY); return; }
     const st = G.st, m = st.maps[st.here], T = thingOf(st, m, what), L = leadOf(st);
     if (!T) return;
@@ -6362,11 +6521,12 @@ const UI = {
       pp.appendChild(document.createTextNode(' · ' + clockText(st) + ' · ' + st.quests.Q0.title + (st.quests.Q0.status === 'active' ? '' : ' (' + st.quests.Q0.status + ')'))); }
     for (const p of st.party) {
       const row = el('div', 'entry pc'), chip = el('span', 'chip pc' + (p.id === st.lead ? ' on' : ''), p.name.charAt(0)), g = el('div', 'grow'), inp = document.createElement('input');
-      inp.type = 'text'; inp.className = 'pname'; inp.value = p.name; inp.maxLength = 24; inp.autocomplete = 'off'; inp.spellcheck = false; inp.setAttribute('aria-label', 'Name'); inp.disabled = busy;
-      inp.addEventListener('change', () => { const res = intent(st, { t: 'party', op: 'name', id: p.id, name: inp.value }); if (!res.ok) { this.toast(res.say); inp.value = p.name; return; } redo(); });
+      const own = !Net.guest() || Net.mine(p.id), seat = st.seats[p.id];      /* at a table of several, a guest changes only its own */
+      inp.type = 'text'; inp.className = 'pname'; inp.value = p.name; inp.maxLength = 24; inp.autocomplete = 'off'; inp.spellcheck = false; inp.setAttribute('aria-label', 'Name'); inp.disabled = busy || !own;
+      inp.addEventListener('change', () => { if (Net.guest()) { Net.act('party', { op: 'name', id: p.id, name: inp.value }, (r) => { if (!r.ok) inp.value = p.name; }); return; } const res = intent(st, { t: 'party', op: 'name', id: p.id, name: inp.value }); if (!res.ok) { this.toast(res.say); inp.value = p.name; return; } redo(); });
       const lead = el('button', 'plaque small', p.id === st.lead ? 'Leads' : 'Lead'), out = el('button', 'plaque small danger', 'Remove');
-      lead.type = out.type = 'button'; lead.disabled = p.id === st.lead || !!R || busy || p.status !== 'ok'; out.disabled = st.party.length < 2 || !!R || busy;
-      lead.addEventListener('click', () => { const res = intent(st, { t: 'lead', id: p.id }); if (!res.ok) { this.toast(res.say); return; } redo(); });
+      lead.type = out.type = 'button'; lead.disabled = p.id === st.lead || !!R || busy || p.status !== 'ok' || !own; out.disabled = st.party.length < 2 || !!R || busy; out.hidden = Net.guest();
+      lead.addEventListener('click', () => { if (Net.guest()) { Net.act('lead', { who: p.id }); return; } const res = intent(st, { t: 'lead', id: p.id }); if (!res.ok) { this.toast(res.say); return; } redo(); });
       out.addEventListener('click', () => { const res = intent(st, { t: 'party', op: 'drop', id: p.id }); if (!res.ok) { this.toast(res.say); return; } redo(); });
       /* the sheet: a calling that can be changed until it has been tested, then what it comes with */
       const sh = el('div', 'sheet'), sel = document.createElement('select');
@@ -6374,10 +6534,10 @@ const UI = {
       const term = (kind, key, label, cls) => { const b = el('button', 'term' + (cls ? ' ' + cls : ''), label); b.type = 'button'; b.addEventListener('click', () => this.rule(p, kind, key)); return b; };
       const line = (head, parts, sep, tail) => { const d = el('div', ''); if (head) d.appendChild(el('b', '', head)); parts.forEach((x, k) => { if (k) d.appendChild(document.createTextNode(sep)); d.appendChild(x); }); if (tail) d.appendChild(document.createTextNode(tail)); return d; };
       for (const c of CLASS_ORDER) { const o = el('option', '', c); o.value = c; sel.appendChild(o); }
-      sel.value = p.cls; sel.disabled = !!R || busy || p.xp > 0 || p.level > 1; sel.setAttribute('aria-label', 'Calling');
-      sel.addEventListener('change', () => { const res = intent(st, { t: 'party', op: 'class', id: p.id, cls: sel.value }); if (!res.ok) { this.toast(res.say); sel.value = p.cls; return; } redo(); });
+      sel.value = p.cls; sel.disabled = !!R || busy || p.xp > 0 || p.level > 1 || !own; sel.setAttribute('aria-label', 'Calling');
+      sel.addEventListener('change', () => { if (Net.guest()) { Net.act('party', { op: 'class', id: p.id, cls: sel.value }, (r) => { if (!r.ok) sel.value = p.cls; }); return; } const res = intent(st, { t: 'party', op: 'class', id: p.id, cls: sel.value }); if (!res.ok) { this.toast(res.say); sel.value = p.cls; return; } redo(); });
       sh.appendChild(term('class', '', 'Calling')); sh.appendChild(document.createTextNode(' ')); sh.appendChild(sel); sh.appendChild(document.createTextNode(' '));
-      if (!sel.disabled) { const sup = el('button', 'plaque small', 'Surprise me'); sup.type = 'button'; sup.addEventListener('click', () => { const res = intent(st, { t: 'party', op: 'roll', id: p.id }); if (!res.ok) { this.toast(res.say); return; } Sfx.roll(); redo(); }); sh.appendChild(sup); }
+      if (!sel.disabled) { const sup = el('button', 'plaque small', 'Surprise me'); sup.type = 'button'; sup.addEventListener('click', () => { if (Net.guest()) { Net.act('party', { op: 'roll', id: p.id }); return; } const res = intent(st, { t: 'party', op: 'roll', id: p.id }); if (!res.ok) { this.toast(res.say); return; } Sfx.roll(); redo(); }); sh.appendChild(sup); }
       { const facts = [term('level', '', 'Level ' + p.level), term('hp', '', 'HP ' + p.hp + '/' + p.hpMax), term('ac', '', 'AC ' + acOf(p)), term('level', '', 'XP ' + p.xp + (p.level < 5 ? '/' + XP_LEVELS[p.level] : ''))];
         if (p.status !== 'ok') facts.push(term('status', '', p.status.toUpperCase()));
         for (const c of p.conditions) facts.push(term('cond', c, c));
@@ -6387,17 +6547,42 @@ const UI = {
       sh.appendChild(line('Knows ', p.abilities.map((a) => term('ability', a.n, a.n + (a.max === null ? '' : ' ' + a.uses + '/' + a.max))), ', ', '.'));
       sh.appendChild(line('Carries ', p.items.length ? p.items.map((x) => term('item', x.n, x.n + (x.q > 1 ? ' x' + x.q : ''))) : [document.createTextNode('nothing')], ', ', '.'));
       if (p.background || p.personality || p.look) sh.appendChild(el('div', '', [p.ancestry, p.background, p.personality, p.look].filter(Boolean).join('; ') + '.'));
-      g.appendChild(inp); row.appendChild(chip); row.appendChild(g); row.appendChild(lead); row.appendChild(out); row.appendChild(sh); box.appendChild(row);
+      g.appendChild(inp);
+      if (seat) g.appendChild(el('div', 'seat', Net.guest() && Net.mine(p.id) ? 'Played on this phone' : 'Played on ' + seat.name + '’s phone'));
+      row.appendChild(chip); row.appendChild(g); row.appendChild(lead); row.appendChild(out); row.appendChild(sh); box.appendChild(row);
     }
-    $('party-add').disabled = st.party.length >= PARTY_MAX || !!R || busy;
+    $('party-add').disabled = st.party.length >= PARTY_MAX || !!R || busy; $('party-add').textContent = Net.guest() ? 'Add your traveller' : 'Add a traveller';
     $('party-short').disabled = $('party-long').disabled = !!R || busy;
-    $('party-note').textContent = R ? 'The party cannot change while rounds are being counted.' : 'Up to six travel together. They follow whoever leads; once initiative is rolled, each takes a turn of their own. A calling can be changed until it has earned experience.';
+    $('party-note').textContent = Net.guest() ? 'Your travellers are yours to name and make, and to play. The host’s phone plays everyone else.' : R ? 'The party cannot change while rounds are being counted.' : 'Up to six travel together. They follow whoever leads; once initiative is rolled, each takes a turn of their own. A calling can be changed until it has earned experience.';
     const fb = $('party-fallen'); fb.textContent = '';
     for (const f of st.fallen) { const e = el('div', 'entry gone'), gg = el('div', 'grow'); gg.appendChild(el('h3', '', f.name)); gg.appendChild(el('div', 'sub', f.cls + ' ' + f.level + ' · fell on day ' + f.day)); e.appendChild(gg); fb.appendChild(e); }
+  },
+  /* the Players panel: who is at the table, and an invitation for one more */
+  players() {
+    const box = $('net-list'); if (!box) return;
+    box.textContent = '';
+    const st = G.st, seats = st ? st.seats : {}, devs = new Map();
+    for (const p of Net.peers) if (p.hello) devs.set(p.dev, { name: p.name, here: p.open, away: !!p.away });
+    for (const k of Object.keys(seats)) if (!devs.has(seats[k].dev)) devs.set(seats[k].dev, { name: seats[k].name, here: false });
+    const names = (dev) => (st ? st.party.filter((p) => seats[p.id] && (dev === '' ? false : seats[p.id].dev === dev)).map((p) => p.name) : []);
+    const row = (title, sub) => { const e = el('div', 'entry'), g = el('div', 'grow'); g.appendChild(el('h3', '', title)); g.appendChild(el('div', 'sub', sub)); e.appendChild(g); box.appendChild(e); return e; };
+    const mine = st ? st.party.filter((p) => !seats[p.id]).map((p) => p.name) : [];
+    row('This phone', (mine.length ? 'Plays ' + listOf(mine) : 'Plays nobody of its own') + ', and anyone whose phone has gone.');
+    for (const [dev, d] of devs) { const n = names(dev); row(d.name, (d.here ? (d.away ? 'Away' : 'At the table') : 'Gone') + (n.length ? ' · ' + listOf(n) : ' · no traveller yet')).dataset.dev = dev; }
+    if (Net.peers.some((p) => p.pending && !p.closed)) row('An invitation', 'Waiting for a phone to answer it.');
+    $('net-invite').textContent = Net.peers.some((p) => p.pending && !p.closed) ? 'A new invitation' : 'Invite a player';
+  },
+  async invite() {
+    const b = $('net-invite'); b.disabled = true; $('net-inv').hidden = true;
+    const peer = await Net.invite(); b.disabled = false;
+    if (!peer) { this.players(); return; }
+    drawQR($('net-qr'), peer.link); $('net-link').value = peer.link; $('net-code').value = ''; $('net-inv').hidden = false;
+    this.players();
   },
   /* a line of a sheet, explained: what it is, and this traveller's own numbers in it */
   rule(p, kind, key) { const r = p && G.st ? ruleOf(G.st, p, kind, key) : null; if (!r) return; Sfx.page(); this.dialog(r.title, ruleLines(r), [{ t: 'Close', main: true }]); },
   card(name, text, acts, cls) {
+    if (Net.remote) return;                                /* a guest's act: the card is that phone's to show, not the table's */
     const on = !!name, box = $('info-acts'); $('info').hidden = !on; $('board').classList.toggle('has-info', on); $('info').classList.toggle('talk', on && cls === 'talk');
     box.textContent = '';
     if (on) {
@@ -6502,12 +6687,13 @@ const UI = {
       up.type = dn.type = 'button'; up.setAttribute('aria-label', what + ': good'); dn.setAttribute('aria-label', what + ': poor'); up.disabled = dn.disabled = !row;
       up.addEventListener('click', () => { row[key] = row[key] === 1 ? 0 : 1; show(); this.saveSoon(); });
       dn.addEventListener('click', () => { row[key] = row[key] === -1 ? 0 : -1; show(); this.saveSoon(); });
+      if (Net.guest()) up.disabled = dn.disabled = true;      /* the marks are the host's to give */
       show(); box.appendChild(up); box.appendChild(dn);
     };
     f.appendChild(el('span', 'src ' + e.src, e.src === 'ai' ? 'AI' : 'Script'));
     f.appendChild(el('span', 'area', AREA_SHORT[e.area] || ''));
     marks(f, 'r', 'This telling');
-    { const k = el('button', 'keep', '\u270E'); k.type = 'button'; k.setAttribute('aria-label', 'Keep this passage in your notes'); k.addEventListener('click', () => this.keep(e.text, 'story')); f.appendChild(k); }
+    if (!Net.guest()) { const k = el('button', 'keep', '\u270E'); k.type = 'button'; k.setAttribute('aria-label', 'Keep this passage in your notes'); k.addEventListener('click', () => this.keep(e.text, 'story')); f.appendChild(k); }
     if (e.twin) {
       const b = el('button', 'twin-btn', 'Script’s version'), box = el('div', 'st-twin'), tr = el('div', 'twin-rate');
       b.type = 'button'; b.setAttribute('aria-expanded', 'false'); box.hidden = true;
@@ -6527,12 +6713,12 @@ const UI = {
   },
   notes(focusId) {
     const st = G.st, ul = $('notes-list'); ul.textContent = '';
-    $('notes-add').disabled = !st; $('notes-none').hidden = !!(st && st.notes.length);
+    $('notes-add').disabled = !st || Net.guest(); $('notes-none').hidden = !!(st && st.notes.length);
     if (!st) return;
     for (const n of st.notes) {
       const li = el('li', n.src === 'story' ? 'story' : ''), g = el('div', 'grow'), ta = document.createElement('textarea'), del = el('button', 'iconbtn note-del', '\u00D7');
       const fit = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
-      ta.value = n.text; ta.rows = 1; ta.maxLength = NOTE_LEN; ta.dataset.id = n.id; ta.setAttribute('aria-label', n.src === 'story' ? 'A note from the story' : 'A note of your own'); ta.placeholder = 'Write here';
+      ta.value = n.text; ta.rows = 1; ta.maxLength = NOTE_LEN; ta.readOnly = Net.guest(); del.hidden = Net.guest();      /* the notes are the host's, and a guest reads them */ ta.dataset.id = n.id; ta.setAttribute('aria-label', n.src === 'story' ? 'A note from the story' : 'A note of your own'); ta.placeholder = 'Write here';
       ta.addEventListener('input', () => { fit(); const res = intent(st, { t: 'jot', op: 'edit', id: n.id, text: ta.value }); if (res.ok) this.saveSoon(); });
       del.type = 'button'; del.setAttribute('aria-label', 'Remove this note');
       del.addEventListener('click', () => { const res = intent(st, { t: 'jot', op: 'drop', id: n.id }); if (!res.ok) { this.toast(res.say); return; } li.remove(); Sfx.page(); this.saveSoon(); $('notes-none').hidden = st.notes.length > 0; });
@@ -6643,6 +6829,11 @@ const UI = {
   send() {
     const st = G.st, inp = $('say'), text = inp.value.trim();
     if (!st || !text) return;
+    if (Net.guest()) {                                     /* a line from a guest is told by the host's Game Master, on the host's key */
+      const to = Session.to;
+      if (Net.act('say', { text: clip(text, 600), to: to ? to.id : '' }, (r) => { if (!r.ok && !$('say').value.trim()) $('say').value = text; })) { inp.value = ''; inp.placeholder = 'Say or do something'; Session.to = null; Listen.drop(); this.sayBtns(); }
+      return;
+    }
     if (G.busy) { this.toast(BUSY); return; }
     if (st.over) { this.toast(REFUSE.over); return; }
     const p = pcOf(st, $('say-who').value), to = Session.to;
@@ -6667,10 +6858,10 @@ const UI = {
   },
 
   /* ---- saving ---- */
-  saveSoon() { clearTimeout(this.saveT); this.saveT = setTimeout(() => this.saveNow(), 700); },
+  saveSoon() { if (Net.guest()) return; clearTimeout(this.saveT); this.saveT = setTimeout(() => this.saveNow(), 700); },
   /* never in the middle of a telling: a Game Master turn is saved whole, or not at all */
   saveNow() {
-    clearTimeout(this.saveT); if (!G.st || G.busy) return;
+    clearTimeout(this.saveT); if (!G.st || G.busy || Net.guest()) return;      /* a guest's copy is the host's tale: the host saves it */
     /* a copy taken NOW: the store writes a moment later, and by then a telling may have begun to change the tale */
     const data = JSON.parse(JSON.stringify(packState(G.st)));
     this.hasSave = true;
@@ -6912,7 +7103,7 @@ const Session = {
   /* called between one thing and the next on the board: a beat that is waiting, or a monster's turn */
   tick(now) {
     const st = G.st;
-    if (G.busy || !st || st.over || UI.blocked()) return;
+    if (G.busy || !st || st.over || UI.blocked() || Net.guest()) return;      /* a guest's table is the host's: the beats and the monsters are told there */
     if (this.beats.length) {
       const b = this.beats.shift();
       if ((b.kind === 'enter' && (b.site !== st.here || st.told[st.here])) || (b.kind === 'fight' && !st.round)) return;
@@ -7033,6 +7224,465 @@ const Session = {
   },
 };
 
+/* ============================== TOGETHER ==============================
+   Other phones at the table (step 4; the CD's four answers, 2026-10-13). One phone HOSTS: it
+   holds the tale, the Game Master, the keys and the narrator, exactly as when it plays alone.
+   Others JOIN it in the same room, phone to phone over WebRTC and with no server between: the
+   host shows a code, the guest's camera opens it, the guest shows a code back, and the host's
+   camera hands that to the game. There is no STUN server either, so the page still calls no
+   outside service: two phones reach each other on the network they share, or not at all.
+   A guest keeps a copy of the tale the host sends it, key by key as it changes, rebuilt every
+   time through unpackState() (the door every save comes in by), and never runs the engine on
+   it. What a guest taps is sent to the host as an ACT, the same call the host's own buttons
+   make, and the host judges it: a guest acts for its own travellers only (st.seats says whose),
+   on their own turn; the host acts for anyone, and plays the travellers of a phone that has
+   gone away until it comes back.                                                            */
+const NET_CHUNK = 15000;          /* characters to a message: under every browser's limit */
+const NET_TICK = 60;              /* ms between the host's looks at what has changed */
+const NET_BEAT = 2500;            /* ms of quiet before a word is sent anyway, so silence means gone */
+const NET_AWAY = 12000;           /* ms of quiet after which the other phone is called away (the line is kept: only a line that closes is gone) */
+const NET_GUESTS = 5;             /* phones beside the host's */
+const NET_IN_MAX = 8000;          /* characters a guest may send in one message */
+const NET_WAIT = 4000;            /* ms the gathering of a connection's addresses may take */
+const NET_KEYS = /^(?!__proto__$|constructor$|prototype$)[A-Za-z_]\w{0,15}$/;
+
+/* a connection's description in brief: the few values another browser needs to reach this one (ice-ufrag, ice-pwd, the
+   certificate's sha-256, the setup role, up to four addresses on this network), packed small and written base64url; the
+   far side rebuilds a standard data-channel description from them. About 100 characters, so the code stays scannable. */
+const Brief = (() => {
+  const SETUP = ['actpass', 'active', 'passive'];
+  const b64 = (u8) => { let s = ''; for (const b of u8) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  const unb64 = (s) => { const t = atob(String(s).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(t, (c) => c.charCodeAt(0)); };
+  function pack(sdp, answer) {
+    const get = (re) => { const m = String(sdp).match(re); return m ? m[1] : ''; };
+    const ufrag = get(/^a=ice-ufrag:(\S+)/m), pwd = get(/^a=ice-pwd:(\S+)/m), fp = get(/^a=fingerprint:sha-256 ([0-9A-Fa-f:]+)/m), setup = Math.max(0, SETUP.indexOf(get(/^a=setup:(\w+)/m)));
+    if (!/^[A-Za-z0-9+/]{4,64}$/.test(ufrag) || !/^[A-Za-z0-9+/]{4,64}$/.test(pwd)) return '';
+    const fb = fp.split(':').map((h) => parseInt(h, 16));
+    if (fb.length !== 32 || fb.some((x) => !(x >= 0 && x < 256))) return '';
+    const out = [1, (answer ? 1 : 0) | (setup << 1), ufrag.length, ...Array.from(ufrag, (c) => c.charCodeAt(0)), pwd.length, ...Array.from(pwd, (c) => c.charCodeAt(0)), ...fb], cands = [];
+    for (const m of String(sdp).matchAll(/^a=candidate:\S+ \d+ udp \d+ (\S+) (\d+) typ host/gim)) {
+      const a = m[1], port = +m[2]; let c = null;
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.local$/i.test(a)) c = [0, ...a.slice(0, 36).replace(/-/g, '').match(/../g).map((h) => parseInt(h, 16))];
+      else if (/^\d{1,3}(\.\d{1,3}){3}$/.test(a)) c = [1, ...a.split('.').map((x) => +x & 255)];
+      if (c && port > 0 && port < 65536 && cands.length < 4) cands.push([...c, port >> 8, port & 255]);
+    }
+    if (!cands.length) return '';
+    out.push(cands.length); for (const c of cands) out.push(...c);
+    return b64(Uint8Array.from(out));
+  }
+  function unpack(code) {
+    let u; try { u = unb64(String(code == null ? '' : code).trim()); } catch (e) { return null; }
+    let i = 0; const take = (n) => { if (i + n > u.length) throw new Error('short'); const s = u.slice(i, i + n); i += n; return s; };
+    try {
+      if (take(1)[0] !== 1) return null;
+      const f = take(1)[0], answer = !!(f & 1), setup = SETUP[(f >> 1) & 3];
+      const txt = (n) => String.fromCharCode(...take(n)), ok = (s) => /^[A-Za-z0-9+/]{4,64}$/.test(s);
+      const ufrag = txt(take(1)[0]), pwd = txt(take(1)[0]);
+      if (!setup || !ok(ufrag) || !ok(pwd)) return null;
+      const fp = Array.from(take(32), (b) => b.toString(16).toUpperCase().padStart(2, '0')).join(':'), n = take(1)[0], lines = [];
+      if (n < 1 || n > 4) return null;
+      for (let k = 0; k < n; k++) {
+        const kind = take(1)[0]; let addr;
+        if (kind === 0) { const h = Array.from(take(16), (b) => b.toString(16).padStart(2, '0')).join(''); addr = h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20) + '.local'; }
+        else if (kind === 1) addr = Array.from(take(4)).join('.');
+        else return null;
+        const p = take(2), port = (p[0] << 8) | p[1];
+        if (!port) return null;
+        lines.push('a=candidate:' + (k + 1) + ' 1 udp ' + (2113937151 - k) + ' ' + addr + ' ' + port + ' typ host');
+      }
+      if (i !== u.length) return null;
+      const sdp = ['v=0', 'o=- ' + (1e15 + Math.floor(Math.random() * 1e15)) + ' 2 IN IP4 127.0.0.1', 's=-', 't=0 0', 'a=group:BUNDLE 0', 'a=msid-semantic: WMS', 'm=application 9 UDP/DTLS/SCTP webrtc-datachannel', 'c=IN IP4 0.0.0.0',
+        ...lines, 'a=ice-ufrag:' + ufrag, 'a=ice-pwd:' + pwd, 'a=fingerprint:sha-256 ' + fp, 'a=setup:' + setup, 'a=mid:0', 'a=sctp-port:5000', 'a=max-message-size:262144', ''].join('\r\n');
+      return { type: answer ? 'answer' : 'offer', sdp };
+    } catch (e) { return null; }
+  }
+  return { pack, unpack };
+})();
+/* every address this phone can be reached at, gathered before the description is written down: there is no second message */
+function gathered(pc) {
+  return new Promise((res) => {
+    if (pc.iceGatheringState === 'complete') { res(); return; }
+    const t = setTimeout(res, NET_WAIT);
+    pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); } });
+  });
+}
+/* a code, drawn: dark on white whatever the theme (a camera reads contrast), with the standard's quiet margin of four */
+function drawQR(cv, text) {
+  const q = QR.make(text), g = cv.getContext('2d');
+  if (!q) { cv.hidden = true; return null; }
+  const css = Math.min(300, Math.round(Math.min(window.innerWidth, 520) * .78)), dpr = Math.min(3, window.devicePixelRatio || 1), cells = q.size + 8, unit = Math.max(1, Math.floor((css * dpr) / cells));
+  cv.width = cv.height = unit * cells; cv.style.width = cv.style.height = Math.round((unit * cells) / dpr) + 'px'; cv.hidden = false;
+  g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = '#000';
+  for (let y = 0; y < q.size; y++) for (let x = 0; x < q.size; x++) if (q.get(x, y)) g.fillRect((x + 4) * unit, (y + 4) * unit, unit, unit);
+  cv.dataset.ver = String(q.ver); cv.dataset.unit = String(unit);
+  return q;
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* no clipboard here */ }
+  const t = document.createElement('textarea'); t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select();
+  let ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  t.remove(); return ok;
+}
+
+const Net = {
+  role: 'solo', dev: '', peers: [], host: null, remote: null, hm: null, packed: null, seq: 0, aid: 0, cid: 0, waits: new Map(), tickAt: 0, bc: null, state: '', timer: 0,
+  guest() { return this.role === 'guest'; },
+  /* the host's table as the guest last heard it: who runs what (the Game Master's areas are the HOST's settings) */
+  mode() { return this.hm || { master: 'script', now: {}, typed: false, strict: true, monsters: 'script' }; },
+  /* this phone's name among the others: random, kept here, so a phone that drops out is known again when it comes back */
+  device() {
+    if (this.dev) return this.dev;
+    let d = ''; try { d = localStorage.getItem('cyoa2.device') || ''; } catch (e) { /* no storage */ }
+    if (!/^[a-z0-9]{8,24}$/.test(d)) { d = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => (b % 36).toString(36)).join(''); try { localStorage.setItem('cyoa2.device', d); } catch (e) { /* this visit only */ } }
+    return (this.dev = d);
+  },
+  base() { return location.href.split('#')[0]; },
+  seated(peer, id) { const s = G.st && G.st.seats && G.st.seats[id]; return !!(s && peer && peer.dev && s.dev === peer.dev); },
+  mine(id) { const s = G.st && G.st.seats && G.st.seats[id]; return !!(s && s.dev === this.dev); },
+  /* the traveller a guest's tap is for: the one whose turn it is if that is theirs, else their first who can act */
+  me() {
+    const st = G.st; if (!st) return null;
+    const a = turnOf(st); if (a && a.pc && this.mine(a.id)) return a.o;
+    const mine = st.party.filter((p) => this.mine(p.id));
+    return mine.find((p) => p.id === st.lead) || mine.find((p) => p.status === 'ok') || mine[0] || null;
+  },
+
+  /* ---- both sides: the wire ---- */
+  wire(peer) {
+    const dc = peer.dc;
+    dc.onopen = () => { peer.open = true; peer.seen = performance.now(); this.opened(peer); };
+    dc.onclose = () => this.gone(peer);
+    dc.onmessage = (e) => this.got(peer, e.data);
+    peer.pc.onconnectionstatechange = () => { if (['failed', 'closed'].includes(peer.pc.connectionState)) this.gone(peer); };
+  },
+  send(peer, msg) {
+    const dc = peer && peer.dc;
+    if (!dc || dc.readyState !== 'open') return false;
+    const s = typeof msg === 'string' ? msg : JSON.stringify(msg);
+    try {
+      if (s.length <= NET_CHUNK) dc.send(s);
+      else { const id = ++this.cid, n = Math.ceil(s.length / NET_CHUNK); for (let i = 0; i < n; i++) dc.send(JSON.stringify({ t: 'part', id, i, n, d: s.slice(i * NET_CHUNK, (i + 1) * NET_CHUNK) })); }
+      peer.sentAt = performance.now();
+      return true;
+    } catch (e) { return false; }
+  },
+  got(peer, raw) {
+    peer.seen = performance.now();
+    if (typeof raw !== 'string' || (this.role === 'host' && raw.length > NET_IN_MAX)) return;
+    let m; try { m = JSON.parse(raw); } catch (e) { return; }
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return;
+    if (m.t === 'part') {                                  /* only the host sends in pieces: a guest has nothing that long to say */
+      if (this.role !== 'guest' || !Number.isInteger(m.i) || !Number.isInteger(m.n) || m.n < 1 || m.n > 4000 || m.i < 0 || m.i >= m.n || typeof m.d !== 'string') return;
+      const P = peer.parts && peer.parts.id === m.id ? peer.parts : (peer.parts = { id: m.id, n: m.n, got: new Array(m.n), k: 0 });
+      if (P.got[m.i] == null) { P.got[m.i] = m.d; P.k++; }
+      if (P.k === P.n) { peer.parts = null; this.got(peer, P.got.join('')); peer.seen = performance.now(); }
+      return;
+    }
+    if (this.role === 'host') this.fromGuest(peer, m); else if (this.role === 'guest') this.fromHost(m);
+  },
+  opened(peer) {
+    if (this.role === 'guest') { this.send(peer, { t: 'hello', dev: this.device(), name: this.myName() }); this.status('Joined. The host’s table is coming.'); }
+    else UI.players();
+  },
+  /* A phone that has said nothing for a while is AWAY, and the line is kept: a guest that locks its screen, or a host that
+     steps out to the camera to let the next player in, comes back on the same line. The host plays an away guest's
+     travellers as it does a gone one's. Only a line that closes, or fails, is gone. */
+  quiet(peer, q) {
+    if (!!peer.away === q) return;
+    peer.away = q;
+    if (this.role === 'host') { if (peer.hello) { UI.toast(peer.name + (q ? ' has gone quiet. Their travellers are yours to play until they are back.' : ' is back.'), 4000); UI.players(); } }
+    else if (document.body.classList.contains('in-play')) UI.toast(q ? 'The host’s phone has gone quiet. Waiting for it.' : 'The host is back.', 4000);
+  },
+  /* the other phone has gone: its line closed or failed */
+  gone(peer) {
+    if (peer.closed) return;
+    peer.closed = true; peer.open = false;
+    try { peer.pc.close(); } catch (e) { /* already */ }
+    if (this.role === 'host') {
+      if (peer.hello) UI.toast((peer.name || 'A player') + ' has gone. Their travellers are yours to play until they are back.', 4500);
+      else if (!peer.pending) UI.toast('A phone could not connect. Make a new invitation, with both phones on the same Wi-Fi.', 4500);
+      UI.players();
+    } else if (this.role === 'guest' && peer === this.host) {
+      if (document.body.classList.contains('in-play')) UI.dialog('The host is out of reach', ['The connection to the host’s phone is lost. Your travellers are the host’s to play until you come back: ask for a new code and scan it.'], [{ t: 'Stay and look' }, { t: 'Leave', main: true, fn: () => this.leave() }]);
+      else this.status('The connection was lost. Ask the host for a new code.');
+    }
+  },
+  /* The table's own clock, not the board's: a timer, so that a host whose screen is busy drawing, or a guest whose board is
+     hidden, still sends and still listens. (It ran on the board's frames at first, and a host whose frames were slow went
+     quiet long enough for its guests to hang up on it.) */
+  start() { if (!this.timer) this.timer = setInterval(() => this.tick(performance.now()), NET_TICK); },
+  /* the host sends what changed; both sides keep the line alive, and notice when the other has gone quiet */
+  tick(now) {
+    if (this.role === 'solo') return;
+    this.tickAt = now;
+    for (const p of this.peers) if (p.open) this.quiet(p, now - p.seen > NET_AWAY);
+    if (this.role === 'guest') { const h = this.host; if (h && h.open && now - (h.sentAt || 0) > NET_BEAT) this.send(h, '{"t":"beat"}'); return; }
+    this.pump(now);
+  },
+
+  /* ---- the host ---- */
+  async invite() {
+    if (this.role === 'guest') return null;
+    if (!window.RTCPeerConnection) { UI.toast('This browser cannot connect to another phone.'); return null; }
+    for (const p of this.peers.filter((q) => q.pending)) this.drop(p);       /* one invitation at a time: an older one is let go */
+    if (this.peers.filter((p) => !p.closed).length >= NET_GUESTS) { UI.toast('Five phones beside this one is as many as the table seats.'); return null; }
+    this.role = 'host'; this.listen(); this.start();
+    const pc = new RTCPeerConnection({ iceServers: [] }), peer = { pc, dc: pc.createDataChannel('cyoa2', { ordered: true }), open: false, pending: true, hello: false, dev: '', name: '', seen: 0, sentAt: 0, last: null, seq: 0, closed: false };
+    this.wire(peer); this.peers.push(peer);
+    try { await pc.setLocalDescription(await pc.createOffer()); await gathered(pc); } catch (e) { this.drop(peer); UI.toast('No connection could be offered here.'); return null; }
+    peer.code = Brief.pack(pc.localDescription.sdp, false);
+    if (!peer.code) { this.drop(peer); UI.toast('This phone found no address to offer. Is it on Wi-Fi?'); return null; }
+    peer.link = this.base() + '#j=' + peer.code;
+    return peer;
+  },
+  drop(peer) { peer.closed = true; peer.open = false; try { peer.pc.close(); } catch (e) { /* already */ } this.peers = this.peers.filter((p) => p !== peer); },
+  /* the code a joining phone showed, however it arrived: pasted, or handed over by the tab the camera opened */
+  async accept(code) {
+    const c = String(code == null ? '' : code).trim(), k = c.lastIndexOf('#a='), d = Brief.unpack(k >= 0 ? c.slice(k + 3) : c);
+    if (!d || d.type !== 'answer') return 'That is not a code from a joining phone.';
+    const peer = this.peers.filter((p) => p.pending && !p.closed && p.pc.signalingState === 'have-local-offer').pop();
+    if (!peer) return 'Make an invitation first.';
+    try { await peer.pc.setRemoteDescription(d); } catch (e) { return 'That code could not be used.'; }
+    peer.pending = false; UI.players();
+    return '';
+  },
+  /* the camera's tab hands its code over here: on a channel between tabs, and in storage for a tab that was asleep */
+  listen() {
+    if (this.bc || this.role !== 'host') return;
+    const take = (code) => { if (typeof code === 'string' && code.length < 600 && this.peers.some((p) => p.pending)) this.accept(code).then((e) => { if (e) UI.toast(e); }); };
+    try { this.bc = new BroadcastChannel('cyoa2-pair'); this.bc.onmessage = (e) => take(e.data); } catch (e) { this.bc = true; }
+    const fromStore = () => { let v = ''; try { v = localStorage.getItem('cyoa2.pair') || ''; if (v) localStorage.removeItem('cyoa2.pair'); } catch (e) { v = ''; } if (v) { try { const o = JSON.parse(v); if (Date.now() - o.at < 600000) take(o.code); } catch (e) { /* not ours */ } } };
+    window.addEventListener('storage', (e) => { if (e.key === 'cyoa2.pair' && e.newValue) fromStore(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) fromStore(); });
+  },
+  fromGuest(peer, m) {
+    if (m.t === 'hello') {
+      const dev = typeof m.dev === 'string' && /^[a-z0-9]{8,24}$/.test(m.dev) ? m.dev : '';
+      if (!dev) { this.send(peer, { t: 'toast', say: 'This phone could not be known to the table.' }); return; }
+      for (const p of this.peers) if (p !== peer && p.dev === dev && !p.closed) this.drop(p);      /* the same phone, back: the old line is let go */
+      peer.dev = dev; peer.name = this.nameOf(m.name) || 'A player'; peer.hello = true; peer.last = null; peer.pending = false;
+      this.rename(peer);
+      this.send(peer, { t: 'welcome', dev });
+      UI.toast(peer.name + ' has joined the table.'); Sfx.page(); UI.players();
+      return;
+    }
+    if (!peer.hello) return;
+    if (m.t === 'again') { peer.last = null; return; }
+    if (m.t === 'name') { peer.name = this.nameOf(m.name) || peer.name; this.rename(peer); UI.players(); return; }
+    if (m.t === 'bye') { this.gone(peer); return; }
+    if (m.t === 'act') {
+      const n = Number.isInteger(m.n) ? m.n : 0, r = this.judge(peer, m);
+      this.pump(performance.now());                         /* what the act changed goes first, so the answer finds it there */
+      this.send(peer, Object.assign({ t: 'ack', n }, r));
+    }
+  },
+  nameOf(v) { return clip(String(typeof v === 'string' ? v : '').replace(/\s+/g, ' ').trim(), 24); },
+  /* a player's name on the seats they hold */
+  rename(peer) { const st = G.st; if (!st || !st.seats) return; for (const k of Object.keys(st.seats)) if (st.seats[k].dev === peer.dev) st.seats[k].name = peer.name; },
+  /* what the guest's own table needs to know of the host's settings: who runs what */
+  modeOf() { return { master: Mode.master(), now: Mode.now(), typed: Mode.typed(), strict: Mode.strict(), monsters: Settings.data.monsters }; },
+  /* what has changed since each guest last heard: every key of the tale whose words differ, and of each board every part */
+  pump(now) {
+    const ready = this.peers.filter((p) => p.open && p.hello), st = G.st;
+    if (!ready.length) return;
+    if (!st || !document.body.classList.contains('in-play')) { for (const p of ready) if (now - p.sentAt > NET_BEAT) this.send(p, '{"t":"beat"}'); return; }
+    const P = packState(st); delete P.saved;
+    P._mode = this.modeOf(); P._busy = !!G.busy;
+    const keys = {}, maps = {};
+    for (const k of Object.keys(P)) if (k !== 'maps') keys[k] = JSON.stringify(P[k]);
+    for (const id of Object.keys(P.maps)) { maps[id] = {}; for (const k of Object.keys(P.maps[id])) maps[id][k] = JSON.stringify(P.maps[id][k]); }
+    for (const p of ready) {
+      if (p.dc.bufferedAmount > 4e6) continue;           /* that phone is behind: it is sent the difference once it has caught up */
+      const L = p.last, full = !L || L.keys.made !== keys.made || L.keys.seed !== keys.seed, set = [], mset = [];
+      for (const k of Object.keys(keys)) if (full || L.keys[k] !== keys[k]) set.push(JSON.stringify(k) + ':' + keys[k]);
+      for (const id of Object.keys(maps)) {
+        const was = !full && L.maps[id], parts = [];
+        for (const k of Object.keys(maps[id])) if (!was || was[k] !== maps[id][k]) parts.push(JSON.stringify(k) + ':' + maps[id][k]);
+        if (parts.length) mset.push(JSON.stringify(id) + ':{' + parts.join(',') + '}');
+      }
+      if (!set.length && !mset.length) { if (now - p.sentAt > NET_BEAT) this.send(p, '{"t":"beat"}'); continue; }
+      const seq = p.seq + 1;
+      if (this.send(p, '{"t":"tale","seq":' + seq + ',"full":' + full + ',"set":{' + set.join(',') + '},"maps":{' + mset.join(',') + '}}')) { p.seq = seq; p.last = { keys, maps }; }
+    }
+  },
+  /* A guest's act, judged. The act must name a traveller seated to that phone; in a round it must be that traveller's turn;
+     outside one, that traveller takes the lead first (the party follows whoever acts). Then the host's own button runs it,
+     with `remote` set: no card opens on the host, and whatever the table would have said is said to the guest instead. */
+  judge(peer, m) {
+    const st = G.st, no = (say) => ({ ok: false, say });
+    if (!st || !document.body.classList.contains('in-play')) return no('There is no tale on the table yet.');
+    const A = NET_ACTS[m.a];
+    if (!A || !Object.prototype.hasOwnProperty.call(NET_ACTS, m.a)) return no('The host’s table does not know that.');
+    if (G.busy) return no(BUSY);
+    if ($('dialog').classList.contains('open')) return no('The host has a question open. Try again once it is answered.');
+    const who = typeof m.who === 'string' ? m.who : '', p = A.who ? pcOf(st, who) : null;
+    if (A.who) {
+      if (!p) return no('Nobody by that name is at the table.');
+      if (!this.seated(peer, who)) return no(p.name + ' is not yours to play.');
+      if (st.round) { const a = turnOf(st); if (A.turn && (!a || a.id !== who)) return no('It is not ' + first(p.name) + '’s turn.'); }
+      else if (A.lead && st.lead !== who) {
+        if (st.walk || View.walking) return no('Someone is already on the move.');
+        const r = intent(st, { t: 'lead', id: who });
+        if (!r.ok) return no(r.say);
+        View.path = null; View.pending = null; UI.bar();
+      }
+    }
+    const out = { ok: true, say: '' };
+    peer.toasts = []; peer.denied = false; this.remote = peer;
+    try { A.run(m, st, peer, out, p); } catch (e) { out.ok = false; out.say = 'The host’s table could not do that.'; } finally { this.remote = null; }
+    if (peer.denied) out.ok = false;
+    if (!out.say && peer.toasts.length) out.say = clip(peer.toasts.join(' '), 300);
+    return out;
+  },
+
+  /* ---- the guest ---- */
+  myName() { const v = $('join-name') ? $('join-name').value : ''; return this.nameOf(v) || this.nameOf(this.savedName()) || 'A player'; },
+  savedName() { try { return localStorage.getItem('cyoa2.player') || ''; } catch (e) { return ''; } },
+  status(t) { const n = $('join-state'); if (n) n.textContent = t; },
+  async join(code) {
+    const d = Brief.unpack(code);
+    UI.show('scr-join'); $('join-name').value = this.savedName();
+    if (!d || d.type !== 'offer') { this.status('That code is not an invitation to a table. Ask the host for a new one.'); $('join-qr').hidden = true; $('join-copy').hidden = true; return; }
+    if (!window.RTCPeerConnection) { this.status('This browser cannot connect to another phone.'); return; }
+    this.role = 'guest'; this.device(); document.body.classList.add('guest'); this.start();
+    const pc = new RTCPeerConnection({ iceServers: [] }), peer = { pc, dc: null, open: false, seen: 0, sentAt: 0, closed: false };
+    this.host = peer; this.peers = [peer];
+    pc.ondatachannel = (e) => { if (peer.dc) return; peer.dc = e.channel; this.wire(peer); };
+    pc.onconnectionstatechange = () => { if (['failed', 'closed'].includes(pc.connectionState)) this.gone(peer); };
+    this.status('Making a code for the host…');
+    try { await pc.setRemoteDescription(d); await pc.setLocalDescription(await pc.createAnswer()); await gathered(pc); } catch (e) { this.status('That invitation could not be answered. Ask the host for a new one.'); return; }
+    const mine = Brief.pack(pc.localDescription.sdp, true);
+    if (!mine) { this.status('This phone found no address to offer. Is it on the same Wi-Fi as the host?'); return; }
+    this.answer = this.base() + '#a=' + mine;
+    drawQR($('join-qr'), this.answer); $('join-copy').hidden = false;
+    this.status('Show this to the host. Their camera reads it, and you are at the table.');
+  },
+  fromHost(m) {
+    if (m.t === 'tale') {
+      if (!m.set || typeof m.set !== 'object' || !m.maps || typeof m.maps !== 'object') return;
+      if (!m.full && (!this.packed || m.seq !== this.seq + 1)) { this.send(this.host, { t: 'again' }); this.seq = -1e9; return; }
+      this.seq = Number.isInteger(m.seq) ? m.seq : 0;
+      if (m.full) this.packed = { maps: {} };
+      for (const k of Object.keys(m.set)) if (NET_KEYS.test(k) && k !== 'maps') this.packed[k] = m.set[k];
+      for (const id of Object.keys(m.maps)) if (/^S\d{1,3}$/.test(id) && m.maps[id] && typeof m.maps[id] === 'object') {
+        const was = this.packed.maps[id] || {}, next = {};
+        for (const k of Object.keys(was)) next[k] = was[k];
+        for (const k of Object.keys(m.maps[id])) if (NET_KEYS.test(k)) next[k] = m.maps[id][k];
+        this.packed.maps[id] = next;
+      }
+      this.adopt();
+      return;
+    }
+    if (m.t === 'ack') { const f = this.waits.get(m.n); this.waits.delete(m.n); if (!m.ok && m.say) { UI.toast(clip(String(m.say), 300)); Sfx.deny(); } if (f) f(m); return; }
+    if (m.t === 'toast' && typeof m.say === 'string') { UI.toast(clip(m.say, 300)); return; }
+    if (m.t === 'welcome') { try { localStorage.setItem('cyoa2.player', this.myName()); } catch (e) { /* this visit only */ } }
+  },
+  /* the host's tale, as this phone's own: rebuilt through the sanitizer, and the board made to show what moved */
+  adopt() {
+    let st;
+    try { st = unpackState(this.packed); } catch (e) { this.send(this.host, { t: 'again' }); return; }
+    const P = this.packed, was = G.st, fresh = !document.body.classList.contains('in-play');
+    this.hm = P._mode && typeof P._mode === 'object' ? { master: P._mode.master === 'ai' ? 'ai' : 'script', now: P._mode.now && typeof P._mode.now === 'object' ? P._mode.now : {}, typed: !!P._mode.typed, strict: P._mode.strict !== false, monsters: ['script', 'gm', 'hand'].includes(P._mode.monsters) ? P._mode.monsters : 'script' } : null;
+    const busy = !!P._busy, said = was ? was.story.length + '|' + (was.story.length ? was.story[was.story.length - 1].text : '') : '';
+    G.st = st;
+    if (busy !== G.busy) { G.busy = busy; UI.busy(busy); }
+    if (fresh || !was || was.made !== st.made) { this.enter(); return; }
+    const m = st.maps[st.here], A = View.anim;
+    if (was.here !== st.here || !View.map || View.map.id !== m.id) { viewSetMap(m); UI.chrome(); }
+    else {
+      View.map = m; A.from = {}; let moved = false;
+      const at = (list) => { const o = {}; for (const q of list) o[q.id] = [q.x, q.y]; return o; }, pw = at(was.party), tw = at(was.maps[was.here] ? was.maps[was.here].tokens : []);
+      for (const p of st.party) { const q = pw[p.id]; if (q && p.site === st.here && (q[0] !== p.x || q[1] !== p.y)) { A.from[p.id] = q; moved = true; } }
+      for (const t of m.tokens) { const q = tw[t.id]; if (q && (q[0] !== t.x || q[1] !== t.y)) { A.from[t.id] = q; moved = true; } }
+      if (moved) A.t = 0;
+    }
+    if (said !== st.story.length + '|' + (st.story.length ? st.story[st.story.length - 1].text : '')) UI.renderStory();
+    UI.bar(); UI.arrived(); UI.sayBar(); View.dirty = true;
+    if ($('pan-party').classList.contains('open')) UI.party();
+  },
+  /* the first of the host's tale: this phone sits down at the table */
+  enter() {
+    UI.closePanels(); UI.closeMenu(); UI.show('scr-play'); document.body.classList.add('in-play');
+    View.opt.grid = Settings.data.grid; View.opt.foot = Settings.data.foot; View.fog = Settings.data.fog;
+    const st = G.st;
+    viewSetMap(st.maps[st.here]); UI.renderStory(); UI.bar(); UI.card(null); UI.chrome(); UI.arrived(); UI.sayBar(); UI.busy(G.busy);
+    UI.storyOpen(Settings.data.storyOpen, true);
+    if (!st.party.some((p) => this.mine(p.id))) { UI.party(); UI.openPanel('pan-party'); }
+  },
+  /* an act, sent: the host answers it, and `then` hears the answer */
+  act(a, args, then) {
+    const h = this.host;
+    if (!h || !h.open) { UI.toast('The host’s table is out of reach.'); return false; }
+    if (G.busy) { UI.toast(BUSY); return false; }
+    const me = this.me(), n = ++this.aid, msg = Object.assign({ who: me ? me.id : '' }, args || {}, { t: 'act', n, a });
+    this.waits.set(n, then || null);
+    if (this.waits.size > 50) this.waits.delete(this.waits.keys().next().value);
+    this.send(h, msg);
+    return true;
+  },
+  leave() {
+    if (this.host) { this.send(this.host, { t: 'bye' }); try { this.host.pc.close(); } catch (e) { /* already */ } }
+    location.replace(this.base());
+  },
+  /* the camera opened a joining phone's code in a tab of its own: it is handed to the game's tab, and this one says so */
+  handoff(code) {
+    try { const bc = new BroadcastChannel('cyoa2-pair'); bc.postMessage(code); setTimeout(() => bc.close(), 1000); } catch (e) { /* storage does it */ }
+    try { localStorage.setItem('cyoa2.pair', JSON.stringify({ code, at: Date.now() })); } catch (e) { /* the channel did it */ }
+    UI.show('scr-hand');
+  },
+};
+/* What a guest may ask of the host's table, and how the host does it: by the same call its own button makes.
+   who: names a traveller the guest must hold. turn: in a round, it must be that traveller's turn. lead: outside one,
+   that traveller takes the lead first. Every field from the wire is checked here, before any of it reaches the engine. */
+const netStr = (v, n) => clip(typeof v === 'string' ? v : '', n);
+const NET_ACTS = {
+  go: { who: true, turn: true, lead: true, run(m, st, peer, out) {
+    const goals = (Array.isArray(m.goals) ? m.goals.slice(0, 400) : []).filter((q) => Array.isArray(q) && Number.isInteger(q[0]) && Number.isInteger(q[1])).map((q) => [q[0], q[1]]);
+    if (!goals.length) { out.ok = false; out.say = REFUSE.noway; return; }
+    const t = m.then && typeof m.then === 'object' ? m.then : null;
+    const then = !t ? null : t.t === 'travel' && !st.round ? { t: 'travel' } : t.t === 'door' ? { t: 'door', id: netStr(t.id, 8) } : t.t === 'use' && !st.round ? { t: 'use', what: netStr(t.what, 8), verb: netStr(t.verb, 12) } : null;
+    go({ goals, then });
+  } },
+  door: { who: true, turn: true, lead: true, run(m, st) { UI.follow(intent(st, { t: 'door', who: m.who, id: netStr(m.id, 8) })); } },
+  travel: { who: true, lead: true, run(m, st) { UI.follow(intent(st, { t: 'travel', who: m.who })); } },
+  ask: { who: true, lead: true, run(m, st, peer, out) { const n = st.npcs.hasOwnProperty(m.npc) ? m.npc : '', before = st.story.length; UI.ask(n, netStr(m.topic, 40)); const e = st.story.slice(before).reverse().find((x) => x.t === 'gm'); out.text = e ? e.text : ''; } },
+  use: { who: true, lead: true, run(m) { UI.useThing(netStr(m.what, 8), netStr(m.verb, 12)); } },
+  attack: { who: true, turn: true, run(m) { UI.attack(netStr(m.target, 8), netStr(m.weapon, 40)); } },
+  ability: { who: true, turn: true, run(m) { UI.ability(m.who, netStr(m.name, 40), m.target == null || m.target === '' ? null : netStr(m.target, 8)); } },
+  item: { who: true, turn: true, run(m) { UI.act1({ t: 'item', who: m.who, item: netStr(m.item, 40), target: netStr(m.target, 8) }); } },
+  dash: { who: true, turn: true, run(m) { UI.act1({ t: 'dash', who: m.who }); } },
+  end: { who: true, turn: true, run(m, st, peer, out) { if (!st.round) { out.ok = false; out.say = REFUSE.noround; return; } UI.endTurn(); } },
+  init: { run(m, st, peer, out) { if (!st.party.some((p) => Net.seated(peer, p.id))) { out.ok = false; out.say = 'Make a traveller first.'; return; } UI.rounds(true); } },
+  lead: { who: true, lead: true, run() { UI.bar(); UI.arrived(); viewShow(); } },
+  /* a guest makes its own travellers, and only ever changes its own */
+  party: { run(m, st, peer, out) {
+    const fail = (s) => { out.ok = false; out.say = s; };
+    if (m.op === 'add') {
+      const res = intent(st, { t: 'party', op: 'add', name: netStr(m.name, 24), cls: netStr(m.cls, 12) });
+      if (!res.ok) { fail(res.say); return; }
+      st.seats[res.id] = { dev: peer.dev, name: peer.name };
+      out.id = res.id; Sfx.page(); UI.bar(); UI.arrived(); View.dirty = true; UI.saveSoon(); UI.players();
+      if ($('pan-party').classList.contains('open')) UI.party();
+      if (res.spotted && res.spotted.length) UI.spotted(res.spotted);
+      return;
+    }
+    if (!['name', 'class', 'roll'].includes(m.op)) { fail('The host’s table does not know that.'); return; }
+    const id = netStr(m.id, 8);
+    if (!pcOf(st, id) || !Net.seated(peer, id)) { fail('That traveller is not yours to change.'); return; }
+    const res = intent(st, { t: 'party', op: m.op, id, name: netStr(m.name, 24), cls: netStr(m.cls, 12) });
+    if (!res.ok) { fail(res.say); return; }
+    UI.bar(); View.dirty = true; UI.saveSoon();
+    if ($('pan-party').classList.contains('open')) UI.party();
+  } },
+  /* a line typed to the table, where Claude has been given one; the host's key pays, as for any line */
+  say: { who: true, run(m, st, peer, out, p) {
+    const text = netStr(m.text, 600).trim(), n = typeof m.to === 'string' && st.npcs.hasOwnProperty(m.to) ? st.npcs[m.to] : null;
+    if (!text) { out.ok = false; out.say = 'Nothing was said.'; return; }
+    if (!Mode.ai(n ? 'talk' : 'act')) { out.ok = false; out.say = 'The script is telling this part of the tale: it answers taps, not typed lines.'; return; }
+    if (st.over) { out.ok = false; out.say = REFUSE.over; return; }
+    Session.turn('player', { who: p.name, id: p.id, text, to: n ? n.id + ' ' + n.name : '', toId: n ? n.id : '' });
+  } },
+};
 /* ============================== BOOT ============================== */
 (function boot() {
   Settings.load(); UI.theme();
@@ -7074,15 +7724,17 @@ const Session = {
     else if (act === 'settings') { UI.settings(); UI.openPanel('pan-settings'); }
     else if (act === 'export') UI.exportFile();
     else if (act === 'title') UI.toTitle();
+    else if (act === 'players') { UI.players(); UI.openPanel('pan-players'); }
+    else if (act === 'leave') UI.dialog('Leave the table', ['Your travellers stay with the host, who plays them until you come back.'], [{ t: 'Stay', main: true }, { t: 'Leave', fn: () => Net.leave() }]);
   });
   for (const b of document.querySelectorAll('[data-close]')) b.addEventListener('click', () => { if ($('pan-costs').classList.contains('open') && !document.body.classList.contains('in-play')) { UI.settings(); UI.openPanel('pan-settings'); } else UI.closePanels(); });
   for (const t of document.querySelectorAll('#pan-chron .tab')) t.addEventListener('click', () => UI.chron(t.dataset.tab));
   on('info-x', 'click', () => UI.card(null));
-  on('act', 'click', () => { const st = G.st; if (!st || st.walk) return; if (G.busy) { UI.toast(BUSY); return; } UI.follow(intent(st, { t: 'travel' })); });
+  on('act', 'click', () => { const st = G.st; if (!st || st.walk) return; if (Net.guest()) { Net.act('travel'); return; } if (G.busy) { UI.toast(BUSY); return; } UI.follow(intent(st, { t: 'travel' })); });
   on('btn-init', 'click', () => { Sfx.wake(); if (G.st) UI.rounds(true); });
   on('btn-end', 'click', () => { Sfx.wake(); if (G.st) UI.endTurn(); });
   on('btn-stand', 'click', () => { Sfx.wake(); if (G.st) UI.rounds(false); });
-  on('party-add', 'click', () => { if (G.busy) { UI.toast(BUSY); return; } const res = intent(G.st, { t: 'party', op: 'add' }); if (!res.ok) { UI.toast(res.say); Sfx.deny(); return; } Sfx.page(); UI.party(); UI.bar(); View.dirty = true; UI.saveSoon(); if (res.spotted && res.spotted.length) { UI.closePanels(); UI.spotted(res.spotted); } });
+  on('party-add', 'click', () => { if (Net.guest()) { Net.act('party', { op: 'add' }); return; } if (G.busy) { UI.toast(BUSY); return; } const res = intent(G.st, { t: 'party', op: 'add' }); if (!res.ok) { UI.toast(res.say); Sfx.deny(); return; } Sfx.page(); UI.party(); UI.bar(); View.dirty = true; UI.saveSoon(); if (res.spotted && res.spotted.length) { UI.closePanels(); UI.spotted(res.spotted); } });
   for (const [id, kind] of [['party-short', 'short'], ['party-long', 'long']]) on(id, 'click', () => { if (G.busy) { UI.toast(BUSY); return; } if (UI.resolved(intent(G.st, { t: 'rest', kind }))) UI.toast(kind === 'long' ? 'A night passes.' : 'An hour passes.'); UI.party(); });
   on('recenter', 'click', () => { View.free = false; View.userCam = false; View.easing = true; UI.chrome(); View.dirty = true; });
   on('set-seed', 'input', (e) => { Settings.data.seed = e.target.value; Settings.save(); });
@@ -7210,7 +7862,23 @@ const Session = {
   window.addEventListener('pagehide', () => { if (G.st && document.body.classList.contains('in-play')) UI.saveNow(); });
   /* the lettering on a map waits for the faces: when they arrive, the bitmaps are painted again */
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { View.fonts++; View.moved = performance.now(); View.dirty = true; if (!document.body.classList.contains('in-play')) UI.titleState(); });
-  UI.titleState();
+  /* other phones at the table: the host's invitations, and a joining phone's own screen */
+  on('net-invite', 'click', () => { Sfx.wake(); UI.invite(); });
+  on('net-copy', 'click', async () => { const ok = await copyText($('net-link').value); UI.toast(ok ? 'Copied.' : 'Select the link and copy it by hand.'); });
+  const takeCode = async () => { const v = $('net-code').value.trim(); if (!v) return; const e = await Net.accept(v); if (e) { UI.toast(e); Sfx.deny(); } else { $('net-code').value = ''; UI.toast('Connecting…'); } };
+  on('net-take', 'click', takeCode);
+  on('net-code', 'keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); takeCode(); } });
+  on('join-copy', 'click', async () => { const ok = await copyText(Net.answer || ''); UI.toast(ok ? 'Copied: paste it on the host’s phone.' : 'Select the code and copy it by hand.'); });
+  on('join-name', 'change', () => { const n = Net.nameOf($('join-name').value); try { localStorage.setItem('cyoa2.player', n); } catch (e) { /* this visit only */ } if (Net.host && Net.host.open && n) Net.send(Net.host, { t: 'name', name: n }); });
+  on('join-leave', 'click', () => Net.leave());
+  window.addEventListener('pagehide', () => { for (const p of Net.peers) if (p.open) Net.send(p, { t: 'bye' }); });
+  /* a link with a code in it: an invitation to someone else's table, or a joining phone's answer that a camera opened here.
+     The code is taken off the address at once, so that a reload is a fresh start and not the same code again.          */
+  const hash = location.hash, code = (k) => (hash.startsWith('#' + k + '=') ? hash.slice(k.length + 2) : '');
+  if (code('a') || code('j')) try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) { /* the address keeps it */ }
+  if (code('a')) Net.handoff(code('a'));
+  else if (code('j')) Net.join(code('j'));
+  else UI.titleState();
   requestAnimationFrame(viewFrame);
 }());
 </script>

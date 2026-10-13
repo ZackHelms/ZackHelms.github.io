@@ -4,11 +4,11 @@
 **board of 5 ft squares**: a seed makes a town, its inn and trades, its houses and a
 bandit cave; each place's board is **charted the first time someone walks in** and is
 kept in the save from then on. CD commission, 2026-10-09 (in chat, not `/create-new-games`).
-Suite: `.claude/tests/drive-cyoa2.cjs` (807 checks) with its own player,
+Suite: `.claude/tests/drive-cyoa2.cjs` (865 checks) with its own player,
 `.claude/tests/cyoa2-player.js`. Style: **Grimoire** (`.claude/styles/grimoire.md`).
 **Proprietary** (`games/cyoa2/LICENSE`), confirmed by the CD on 2026-10-10.
 
-This is **step 3 of 5**. Step 1 was the map generator, the asset library, the renderer and
+This is **step 4 of 5**. Step 1 was the map generator, the asset library, the renderer and
 a token to walk. Step 2 was the grid rules: line of sight and fog of war, a party of up to
 six, rounds. Step 3 is the Game Master, and it now comes in **two kinds**:
 
@@ -38,6 +38,17 @@ calls `api.anthropic.com` only where Claude has been given part of the table, an
 typed, and each key goes to its own service and nowhere else. **With neither chosen,
 which is the default, the page calls nothing at all.** The device's voice and the
 microphone are the browser's own (`speechSynthesis`, `SpeechRecognition`).
+
+**Step 4 (2026-10-13): other phones at the table.** One phone HOSTS: it holds the tale,
+the Game Master, the keys and the narrator, exactly as when it plays alone. Others in
+the same room JOIN it phone to phone over WebRTC, with no server between: the host shows
+a QR code, the joining phone's camera opens it, that phone shows a code back, and the
+host's camera hands that to the game. Each guest keeps a copy of the host's tale, sent
+key by key as it changes, and sends what it taps to the host as an **act**, which the
+host judges and does with its own buttons. A guest plays only its own travellers (who
+plays whom is `st.seats`, in the save); the host plays anyone, including the travellers
+of a phone that has gone. **There is no STUN server**, so this adds no outside service:
+two phones reach each other on the network they share, or not at all.
 
 The shipped file is the source of truth. To work on it as parts, split it with
 `.claude/scripts/page-parts.py` (see "Working source" at the end).
@@ -300,6 +311,22 @@ use the gpt key"); these are how I filled it in, and where it departs from CYOA'
 | **Pace** is sent as the service's `speed` | CYOA does. **Not heard**, so whether gpt-4o-mini-tts honours it is not known (OpenAI's API reference, read 2026-10-11, lists it without a caveat) | `Premium.request` |
 | The area dropdowns read **"Scripted" / "AI"**; typed lines read **"Off" / "AI"**; the monsters add **"By hand"**. Nothing on the option says what the choice means any more ("topics to choose from", "say anything", "in conversation" are gone) | the CD said yes to shortening them like the Game Master's and gave no words; "(free)" and "(Claude api key)" are not repeated because the dropdown above them has just said it | the `set-a-*` and `set-monsters` options |
 
+Step 4, other phones at the table (2026-10-13). The CD's four answers are under CD
+decisions; these are how I filled in the rest.
+
+| Assumed | Why | To change it |
+|---|---|---|
+| The party follows **whoever acts** outside a fight: a guest's walk, talk or search first makes its traveller the leader | step 2's follow-the-leader, unchanged; a guest leading someone else's traveller would be odd | `NET_ACTS[..].lead`, `Net.judge` |
+| **Any guest may roll initiative; only the host stands the table down**, rests the party, saves, exports and invites | rests and the purse are the whole party's; the host is the table | `NET_ACTS`, `data-host` on the buttons |
+| A question the table asks (you are seen, the tale is told, a dialog of any kind) is shown **on the host only**, and a guest's act waits until it is answered | the host is the table, and a dialog on two screens at once is two answers | `Net.judge`'s dialog check |
+| Guests **read** the notes, the ratings and the Compare page, and **cannot change** them | one tale, one set of notes, on the host | the `Net.guest()` checks in `UI.storyFoot`, `UI.notes` |
+| A model's words reach a guest **when the telling is done**, not as they stream | a telling can still be taken back; a guest sees the host's tale as it stands | `Net.pump` sends the packed tale |
+| **Sounds and the narrator are the host's**; a guest's phone is silent | the host is the table's speaker | `Narrator.on/able`, `Sfx.deny` |
+| A guest's Settings offer only **how the board looks** (grid, footprints, fog, sound, theme) | the rest is the host's | `data-host` fieldsets |
+| A phone that says nothing for **12 s** (a word is sent every 2.5 s when there is nothing else) is called **away**, and the line is **kept**: only a line that closes or fails is gone. The host plays an away guest's travellers as it does a gone one's | a guest locks its screen; a host steps out to the camera app to let the next player in. Hanging up on either would mean two more scans | `NET_AWAY`, `NET_BEAT`, `Net.quiet` |
+| **Five guests** at most (six phones, the most travellers the table seats) | the party is six | `NET_GUESTS` |
+| **No STUN server**: two phones on different networks cannot connect, and a phone on a network that keeps its devices apart (some guest Wi-Fi) cannot either | the CD chose "same room", and the page calls no third party | `iceServers` in `Net.invite` and `Net.join` |
+
 ## The road from here (agreed in outline, 2026-10-09)
 
 1. **Done:** generators, asset library, renderer, a token to walk.
@@ -320,10 +347,11 @@ use the gpt key"); these are how I filled it in, and where it departs from CYOA'
      the Game Master dropdown in the CD's own words, and the five under it shortened.
    - Not planned yet: places the Game Master makes up beyond the charted ones, woodcut
      plates, a second adventure once the hill is taken.
-4. Multiplayer: other devices send the SAME intents; the host's engine judges them. A web
-   page on an iPhone cannot use Bluetooth or host a LAN server, so the realistic route is
-   WebRTC data channels with QR pairing or a small relay (assumed from general knowledge,
-   not re-checked on 2026-10-09).
+4. **Done (2026-10-13):** multiplayer. Other phones send the SAME acts the host's own
+   buttons make, and the host's engine judges them. They join by QR codes over WebRTC
+   data channels, phone to phone, with no server and no STUN (the CD's answer, "QR, same
+   room"; a page on an iPhone can use no Bluetooth and host no LAN server, assumed from
+   general knowledge). Not yet met: two real phones (see Tests).
 5. Table mode: a display-only map at a fixed physical scale, and a pluggable dice source
    (engine RNG, a typed-in physical roll, later a camera).
 
@@ -331,7 +359,7 @@ use the gpt key"); these are how I filled it in, and where it departs from CYOA'
 
 `UTIL / PRNG / TABLES / ASSETS / MAP / FURNISH / WORLD / SITES / RULES / ENGINE /
 GAME MASTER: TOOLS / THE SCRIPT / RULE BOOK / CONTEXT / CLIENT / COSTS / ART / VIEW /
-AUDIO / STORAGE / VOICE / UI / SESSION / BOOT`
+AUDIO / STORAGE / VOICE / QR CODES / UI / SESSION / TOGETHER / BOOT`
 
 **The two Game Masters share one door.** The script and the model both act on the tale
 through the engine (`intent()`, and the helpers the tools are built from), are told the
@@ -590,6 +618,47 @@ the only place that does, and it is asked by the table (UI, SESSION), never by t
   The narrator is told what to read in exactly three places: `UI.script()` (the script),
   the `text` hook and the end of `Session.turn()` (a model), and `UI.enterPlay()` (the
   opening on its card).
+- **QR codes** (`QR`, after VOICE; step 4). `QR.make(text, {ecc, ver, mask})` -> `{ size,
+  ver, mask, get(x, y) }`: byte mode, level M (or L), the smallest version 1 to 25 that
+  holds the text, and the mask the standard's four penalties score best, **scored before
+  the format and version bits are written** (ISO/IEC 18004:2015 7.8, as segno reads it;
+  scoring with the format bits in picks a different mask about half the time, and both are
+  readable). No library: the standard's steps in order. Checked once, matrix for matrix,
+  against segno across versions 1 to 25, both levels and all eight masks (244 symbols), and
+  one rendered code decoded by OpenCV; the suite keeps four of segno's matrices and 27 of
+  its automatic choices as fixtures. `drawQR(canvas, text)` draws black on white whatever
+  the theme, with the quiet margin of four.
+- **Together** (`Brief`, `Net`, `NET_ACTS`; after SESSION; step 4).
+  - `Brief.pack(sdp, answer)` / `Brief.unpack(code)`: a connection's description in about
+    100 characters (ice-ufrag, ice-pwd, the sha-256 fingerprint, the setup role, up to four
+    host candidates as an mDNS uuid or an IPv4 address and a port), base64url. `unpack`
+    rebuilds a standard data-channel SDP and returns null for anything that is not exactly
+    one of ours (version byte, lengths, character set, candidate count, trailing bytes).
+    The page uses `iceServers: []` and waits for gathering to finish (`gathered`), so one
+    description is the whole of each side's message.
+  - `Net.role` is `solo`, `host` or `guest`. **The host** (`invite`, `accept`, `listen`,
+    `fromGuest`, `pump`, `judge`) makes one RTCPeerConnection per guest, offers it as a
+    link `#j=<code>`, takes the answer pasted or handed over from the tab the camera
+    opened (`#a=<code>`: BroadcastChannel `cyoa2-pair`, and `localStorage['cyoa2.pair']`
+    read on a storage event or when the tab is shown again, and thrown away after ten
+    minutes), and every 60 ms sends each guest what changed: every top-level key of
+    `packState()` whose JSON differs, and per board every key that differs, numbered.
+    **The table's clock is a timer** (`Net.start`, every 60 ms), not the board's frames:
+    it first ran on `viewFrame`, and a host whose frames were slow (in the suite, a busy
+    machine; on a phone, a host out at the camera) sent nothing long enough for its
+    guests to hang up. A phone silent for 12 s is `away` (`Net.quiet`), never closed.
+    `judge()` checks an act against `NET_ACTS` and the seats, then runs the host's own UI
+    function with `Net.remote` set.
+  - **The guest** (`join`, `fromHost`, `adopt`, `enter`, `act`, `leave`) keeps the packed
+    tale, merges each delta, asks `again` on a gap in the numbers, and rebuilds `G.st`
+    with `unpackState()` every time, sliding the pieces that moved. Its own taps go through
+    the same UI functions, which send an act when `Net.guest()`.
+  - `NET_ACTS`: go, door, travel, ask, use, attack, ability, item, dash, end, init, lead,
+    party (add, name, class, roll), say. Each says whether it names a traveller (`who`),
+    whether it must be that traveller's turn in a round (`turn`), and whether outside one
+    that traveller takes the lead first (`lead`), and types every field it reads.
+  - `st.seats = { P2: { dev, name } }` says which phone plays whom. `dev` is a random name
+    the phone keeps in `localStorage['cyoa2.device']`, so a phone that comes back is known.
 - **Notes** (`jot()` in ENGINE; `UI.keep` / `notes` / `selChanged` / `grab`). `st.notes`
   is `[{ id: 'J7', text, src: 'story' | 'mine', turn, day, minute }]`, numbered by
   `st.n.note`. `intent({ t: 'jot', op: 'add' | 'edit' | 'drop' | 'tidy' })` is handled
@@ -670,6 +739,21 @@ the only place that does, and it is asked by the table (UI, SESSION), never by t
   settings for listening.
 
 ## Rules that are easy to break
+
+- **A guest never runs the engine.** `intent()` refuses everything on a guest, `Session.tick`
+  and the walk stepper do not run there, and nothing is saved there. A guest's tale is only
+  ever `unpackState()` of the host's; if a new feature changes the tale, it must change it
+  on the host.
+- **A guest's act goes through the host's own button, not around it.** `NET_ACTS[..].run`
+  calls the same `UI` function a tap on the host would, so every refusal, chip and beat is
+  the same. Anything that function would show on the host is caught while `Net.remote` is
+  set (`UI.toast` and `Sfx.deny` report to the guest; `UI.card` shows nothing). A new act
+  is a new entry in `NET_ACTS` with its fields typed, and a guard in the UI function the
+  guest's button calls.
+- **Everything from the wire is untrusted**, as a save is: a message from a guest is capped
+  at 8,000 characters, act names are looked up as own properties only (so `__proto__` and
+  `constructor` are unknown acts), every field is typed in `NET_ACTS`, a device name must
+  match `/^[a-z0-9]{8,24}$/`, and names from the wire go into `textContent`.
 
 - **Never `innerHTML` anything from a save.** `el()` sets `textContent`; the map uses
   `fillText`. A loaded file is untrusted and the suite loads one full of markup.
@@ -851,7 +935,7 @@ The second push (voice, microphone, notes, rule book):
 
 ## Tests
 
-`drive-cyoa2.cjs` (807 checks, about 250 s) runs the generators inside the real page
+`drive-cyoa2.cjs` (865 checks, about 400 s on a quiet machine) runs the generators inside the real page
 across 36 worlds (329 boards) and asserts they are whole, then the engine's refusals,
 lazy charting, saves (including a tampered file), the phone flow, tap accuracy at five
 viewports after a resize-while-hidden, gestures, keys and the panels (sections A to M,
@@ -860,13 +944,36 @@ blows and dying, R the table by touch, S the Game Master's tools, T the Game Mas
 the table** (step 3), then **U the script alone, V the script's table by touch, W the
 model's share of the table** (the two kinds of Game Master), then **X the narrator's
 voice, Y the narrator and the microphone at a model's table, Z notes and the rule book**
-(step 3's second push). `CYOA2_ONLY=NOP` runs only
+(step 3's second push), then **1 the narrator's paid voice** and **2 other phones at the
+table** (step 4). `CYOA2_ONLY=NOP` runs only
 the named sections (A stands for A to I) and `CYOA2_PAGE=<path>` points the suite at a
 copy of the page; both are for negative tests and neither prints the GREEN line a gate
 looks for. **A watchdog ends a run that is still going after 25 minutes**
 (`CYOA2_WATCHDOG_MIN`): `page.evaluate` has no timeout of its own, and a deliberate
 break once left a row awaiting a walk that could not start, so the run sat idle for
 fourteen minutes and reported nothing.
+
+**Section 2, other phones at the table** (step 4), runs a host and up to two guests as
+browser contexts of their own (each its own storage, so its own device name) joined over
+**real WebRTC** in one Chromium, the same way the phones do: an invitation link, the
+guest's answer pasted on the host, or opened in a second tab of the host's (the camera's
+hand-off), by the channel between tabs alone in one row and by storage alone in another.
+It checks the codes first (four of segno's QR matrices and 27 of its automatic choices
+as fixtures, a version boundary, the drawn canvas module for module; the brief codec
+both ways and every malformed code), then the table: the guest holds the host's tale
+**byte for byte** after every step, makes and names only its own traveller, walks it a
+step at a time, talks, acts on its own turn only, and never runs the engine; every
+forged act is refused (another's traveller, an unknown act, `__proto__`, goals that are
+not squares, a message over the cap) with the tale untouched; a lost message is asked
+for again; a guest that goes quiet is away and comes back, a host that goes quiet is
+waited for, a line that closes is gone, a phone that comes back is known again, seats
+survive the save and a doctored one loses what does not fit. That section uses a second
+Chromium that announces plain addresses instead of mDNS names (`--disable-features=
+WebRtcHideLocalIpsWithMdns`): with mDNS this container failed one pairing in twenty, and
+the brief codec's own row covers the mDNS form. **A pairing the network fails is tried
+once more**, and the run says so; a page that cannot pair fails both. **Nothing here has
+met two real phones**: Safari's acceptance of the rebuilt description, mDNS between two
+iPhones on one Wi-Fi, and the camera app's second tab in iOS Safari are the CD's to try.
 
 **The suite measures the font that loaded.** Until 2026-10-13 every run had met a
 container that could not reach Google Fonts, so the Compare table was measured in
@@ -970,6 +1077,49 @@ uses, and section 1's stand-in answers with WAV where the service sends MP3. Wha
 clip sounds like, how long a sentence takes to come back, whether `speed` is honoured,
 whether a request called off in flight is billed, and what an iPhone's silent switch
 does to it are for a real key on a real phone.
+
+### Negative tests, the second pass (2026-10-13, `negtest-copies.py`)
+
+The pass the hand-off asked for before step 4 moved the same code: the breaks of the last
+three pushes written again (the lists were scratch), **595 in four lists**, plus step 4's
+own list. The rows they test had been fixed and added to since the first pass, so this is
+the "re-run the old breaks" rule applied at scale.
+
+**Voice (the narrator, the paid voice, the microphone): 122 breaks, 102 caught on the
+first run, 1 caught only by a timeout** (a sentence the device never finishes, with its
+time limit removed: the row's own wait ran out first, which is the failure). **Fourteen
+holes, all closed** with rows, and each row re-run against its break:
+
+- *Ranking voices within one language.* Every voice the fake device offers is in a
+  different tier or language, so Premium against Enhanced in one language, the device's
+  default between equals, and the device's order between equal scores were never
+  compared. Synthetic voices now are (three breaks).
+- *An ellipsis ends a sentence.* The only ellipsis in the rows stood alone at the end.
+- *The other refusals.* Only 401 was tried; 400, 403 and 404 end the paid voice too.
+- *Sound that cannot be read* had a row for its fallback and none for its words.
+- *The narrator's queue at its edges* (five breaks): the gap left after a cancel, a
+  sentence the device fails, an engine left paused (the fake had no pause), a cut
+  followed at once by something new (the cut-off reading woke up and read beside it),
+  a half sentence held when silenced, and one held when the voice goes off.
+- *The microphone* opens a folded story, and a line heard just as the Game Master begins
+  waits in the field without a toast.
+
+**Five have no observable effect**, said here rather than forced into a row: the
+fallbacks in `Premium.model()` and the OpenAI voice (`Settings.load()` always sets both);
+"no sound output" (only the message differs, and only where an AudioContext cannot be
+made, which `Premium.can()` already refuses); the first line of `Premium.fail()` (a
+telling's later sentences check `Premium.failed` before they could fail again); and the
+`show(false)` after a recognizer that throws on start (`show(true)` was never reached).
+**One line was retired:** `Narrator.stop()` returned whether it had been busy, and
+nothing read it.
+
+One thing noticed and **not changed**: a device's own default voice of an Enhanced tier
+outscores a Premium one in the same language (8 + 3 against 10), though the code's
+comment says the default only breaks ties within a tier. Whether a downloaded Premium
+voice should beat the device's choice is a question for whoever hears both.
+
+**Script, table and book (473 breaks), and step 4's own list (93)** are written up below
+as they are run and their holes closed.
 
 ### Negative tests, the paid voice (2026-10-11, `negtest-copies.py`)
 
@@ -1263,6 +1413,13 @@ whether a tap on a ringed enemy is easy to hit at the default zoom with a thumb;
 how a telling of several tool calls reads while the pieces move.
 
 ## Follow-ups (not built)
+
+From step 4: a relay or a STUN server for players who are not in one room (the CD chose
+the room); a model's words streamed to guests as they arrive; notes, ratings and the
+narrator on a guest's phone; a guest's own Settings for the Game Master's areas, if the
+host wants to share that; scanning a guest's code inside the page with `BarcodeDetector`
+where a browser has it (Safari does not, so the camera app and the second tab do it
+everywhere); a table-wide "who is here" on the board itself; step 5's table mode.
 
 Save slots beyond the autosave; a second floor behind the inn's stairs and a cellar; a
 way into the locked cell (a key in the chief's chest is the obvious one); locked doors in

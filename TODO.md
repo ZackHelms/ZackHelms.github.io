@@ -15,6 +15,20 @@ backlog entry here.
 
 ## Needs Zack
 
+- [cyoa2] **Try step 4 on two phones.** Host: Menu > Players > Invite a player.
+  Guest: point the camera at the code, open the link, type a name, and show the
+  code that appears to the host's camera; on the host, go back to the game's tab.
+  It has only ever met two browsers on one machine. What only phones can answer:
+  does Safari take the connection at all (inferred: yes, it is standard WebRTC);
+  do two iPhones on one Wi-Fi find each other with no server (inferred: yes, by
+  their .local names, not checked); does the camera's link open as a second tab
+  that hands the code to the game's tab; and does a guest that locks its screen
+  come back on the same line. Also overrule what is wrong in the new "assumed"
+  table for step 4 in `.claude/cyoa2.md` (most worth a look: any guest may roll
+  initiative, only the host rests or stands down; guests read the notes and
+  ratings but cannot change them; a model's words reach a guest when the telling
+  is done, not as they stream).
+
 - [taas] **Answer the four open questions** in `.claude/taas.md` § Open questions:
   should a well-played year 1 be able to hit 240 (today only "stance + workshop,
   nothing else" does), one aggregate team level or a champions-to-skeptics spread,
@@ -146,12 +160,6 @@ backlog entry here.
 
 ## Next
 
-- [cyoa2] **Step 4, multiplayer** (roadmap: `.claude/cyoa2.md` § The road
-  from here). **Answered 2026-10-13** (`.claude/cyoa2.md` § CD decisions, step
-  4): QR pairing in the same room over WebRTC, everything on the host (the Game
-  Master, the keys, the narrator), each device owns its own travellers, and the
-  host takes over a player who drops out. Other devices send the SAME intents
-  and the host's engine judges them.
 - [phasic] Endless launch-board weighting: endless (73+) never draws the
   launch template (block-8 curriculum only, by construction). Decide a
   weighting and wire it in — unblocked 2026-08-29 by the block-8 audition
@@ -160,12 +168,10 @@ backlog entry here.
 
 ## Later
 
-- [cyoa2] A **second negative-test pass** over the breaks each of the last
-  three pushes caught the first time (the two kinds of Game Master, the
-  second push, the paid voice: about 550 breaks in all). Never run, and the
-  break lists were scratch, so it means writing them again; the traces in
-  `.claude/cyoa2.md` § Tests say what each pass covered and found. Worth it
-  before step 4 starts moving the same code.
+- [cyoa2] Finish the **second negative-test pass** (started 2026-10-13): the
+  voice list is done (122 breaks, every hole closed); the script, table and book
+  lists and step 4's own list have run or are running, and their holes are
+  listed in `.claude/cyoa2.md` § Tests as they are closed.
 
 ## Icebox
 

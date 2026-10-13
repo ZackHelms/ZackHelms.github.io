@@ -147,6 +147,15 @@
  *      "Hear it"; and at a model's table, a line of the ledger a turn and a bill that
  *      survives a telling taken back. Its waits give up quietly: a row that cannot get
  *      what it waits for fails by name, and the rows after it still run.
+ *   2. other phones at the table (step 4): a host and up to two guests as browser
+ *      contexts of their own, joined over real WebRTC in a second Chromium that
+ *      announces plain addresses. The QR encoder against segno's matrices and its
+ *      automatic mask choices; the connection codec both ways and every malformed
+ *      code; then the guest's tale byte for byte the host's after every act, its own
+ *      traveller made, named and walked, talking, turns, forged acts refused, a lost
+ *      message asked for again, the hand-off from the camera's tab by each of its two
+ *      routes, quiet lines (away, kept) and closed ones (gone), a phone known again,
+ *      seats in the save. A pairing the network fails is tried once more, and said.
  *
  * A to P run with the story folded and (P) the monsters moved by hand, through
  * open()'s settings argument: step 3 changed both defaults, and the older rows are
@@ -3687,7 +3696,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
      asked to say and takes a set time over each utterance, and a recognizer the suite does the talking for. Installed
      before the page's own script, so the page meets them exactly where it would meet the real ones.                      */
   const FAKES = () => {
-    window.__spoken = []; window.__cancels = 0; window.__primes = 0; window.__cancelAt = 0; window.__synth = { delay: 25, hang: false, none: false, rude: false };
+    window.__spoken = []; window.__started = []; window.__cancels = 0; window.__primes = 0; window.__cancelAt = 0; window.__synth = { delay: 25, hang: false, none: false, rude: false, fail: '' };
     const V = (name, uri, lang, def) => ({ name, voiceURI: uri, lang, localService: true, default: !!def });
     const voices = [V('Fred', 'com.apple.voice.compact.en-US.Fred', 'en-US'), V('Daniel', 'com.apple.voice.enhanced.en-GB.Daniel', 'en-GB', true), V('Samantha', 'com.apple.voice.Samantha', 'en-US'), V('Zoe', 'com.apple.voice.premium.en-US.Zoe', 'en-US'),
       V('Amelie', 'com.apple.voice.enhanced.fr-CA.Amelie', 'fr-CA'), V('Bells', 'com.apple.speech.synthesis.voice.Bells', 'en-US'), V('<img src=x onerror="window.__pwn=1">', 'urn:markup', 'de-DE')];
@@ -3699,10 +3708,13 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         window.__spoken.push({ text: u.text, voice: u.voice ? u.voice.voiceURI : '', lang: u.lang || '', rate: u.rate, volume: u.volume, at: performance.now(), lit: lit ? lit.textContent : '', mark: !!bar && bar.content !== 'none' && parseFloat(bar.width) >= 2 && bar.backgroundColor !== 'rgba(0, 0, 0, 0)', ducked: typeof Sfx === 'object' && Sfx.ducked, live: document.getElementById('voice-btn').classList.contains('live') });
         this.q.push(u); this.next();
       },
-      next() { if (this.cur || !this.q.length) return; const u = this.cur = this.q.shift(); this.speaking = true; if (window.__synth.hang && u.volume !== 0) return; u.t = setTimeout(() => { this.cur = null; this.speaking = false; if (u.onend) u.onend({}); this.next(); }, u.volume === 0 ? 0 : window.__synth.delay); },
+      next() { if (this.paused || this.cur || !this.q.length) return; const u = this.cur = this.q.shift(); this.speaking = true; window.__started.push(u.text); if (window.__synth.hang && u.volume !== 0) return;
+        if (window.__synth.fail && u.text === window.__synth.fail) { u.t = setTimeout(() => { this.cur = null; this.speaking = false; if (u.onerror) u.onerror({ error: 'synthesis-failed' }); this.next(); }, 10); return; }      /* a sentence the engine cannot say */
+        u.t = setTimeout(() => { this.cur = null; this.speaking = false; if (u.onend) u.onend({}); this.next(); }, u.volume === 0 ? 0 : window.__synth.delay); },
       /* a rude synthesizer drops what it was saying and tells nobody: no end, no error (some do) */
       cancel() { window.__cancels++; window.__cancelAt = performance.now(); const u = this.cur; this.q = []; this.cur = null; this.speaking = false; if (u) { clearTimeout(u.t); if (u.onerror && !window.__synth.rude) u.onerror({ error: 'interrupted' }); } },
-      resume() {}, pause() {}, addEventListener() {}, removeEventListener() {} };
+      /* an engine left paused (Chrome's can be) says nothing until it is resumed */
+      paused: false, resume() { this.paused = false; this.next(); }, pause() { this.paused = true; }, addEventListener() {}, removeEventListener() {} };
     Object.defineProperty(window, 'speechSynthesis', { value: synth, configurable: true, writable: true });
     window.SpeechSynthesisUtterance = function (text) { this.text = text; this.volume = 1; this.rate = 1; this.voice = null; this.lang = ''; };
     window.__said = () => window.__spoken.filter((u) => u.volume !== 0 && u.text.trim());
@@ -3744,6 +3756,8 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       const a = sentencesOf('One. Two! Three? Four', false), b = sentencesOf('One. Two! Three? Four', true);
       row(a.out.join('|') === 'One.|Two!|Three?' && a.rest === 'Four' && b.out.join('|') === 'One.|Two!|Three?|Four' && b.rest === '', 'a telling is cut into sentences at a full stop, a question or a shout; what has not ended yet is held back until more arrives, or until the telling is over');
       const q = sentencesOf('She said “Go.” Then (quietly) “Now!” And went.\n\nA heading\n\nIt cost 3.5 gold... or so. …', true).out;
+      const ell = sentencesOf('He waited… Then he went. Then…', true).out;
+      row(ell.join('|') === 'He waited…|Then he went.|Then…', 'an ellipsis ends a sentence as a full stop does (' + ell.length + ' sentences)');
       row(q.join('|') === 'She said “Go.”|Then (quietly) “Now!”|And went.|A heading|It cost 3.5 gold...|or so.', 'a closing quote stays with its sentence, a blank line ends one, a decimal point does not, and a line that is nothing but dots is not said (' + q.length + ' sentences)');
       const st = newGame('split-1'), T = [beatText(st, 'opening'), beatText(st, 'enter'), talkOf(st, 'N0', 'gang', true).text || 'x'].join('\n\n'), whole = sentencesOf(T, true).out;
       let buf = '', got = []; for (const ch of T) { buf += ch; const r = sentencesOf(buf, false); got = got.concat(r.out); buf = r.rest; } got = got.concat(sentencesOf(buf, true).out);
@@ -3759,6 +3773,13 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       d.srLang = 'en-US'; d.voiceURI = ''; const p0 = Speech.pick().name; d.voiceURI = 'system'; const p1 = Speech.pick(); d.voiceURI = 'com.apple.voice.compact.en-US.Fred'; const p2 = Speech.pick().name; d.voiceURI = 'gone-with-the-last-update'; const p3 = Speech.pick().name;
       row(p0 === 'Zoe' && p1 === null && p2 === 'Fred' && p3 === 'Zoe', 'the voice is the best one unless one is chosen; "whatever this device is set to" names none at all; a chosen voice that is no longer there falls back to the best');
       d.srLang = keep[0]; d.voiceURI = keep[1];
+      /* within one language: a better-made voice before a plainer one, the device's own choice between equals, and the device's order between voices that score alike */
+      const V2 = (name, voiceURI, def) => ({ name, voiceURI, lang: 'en-US', localService: true, default: !!def }), heard = Speech.voices, was = d.srLang; d.srLang = 'en-US';
+      Speech.voices = [V2('Plain', 'x.enhanced.en-US.Plain'), V2('Fine', 'x.premium.en-US.Fine')]; const tier = Speech.best().name;
+      Speech.voices = [V2('Ann', 'x.Ann'), V2('Bea', 'x.Bea', true)]; const own = Speech.best().name;
+      Speech.voices = [V2('Ann', 'x.Ann'), V2('Bea', 'x.Bea'), V2('Cy', 'x.Cy')]; const order = Speech.ranked().map((v) => v.name).join();
+      Speech.voices = heard; d.srLang = was;
+      row(tier === 'Fine' && own === 'Bea' && order === 'Ann,Bea,Cy', 'in one language a premium voice comes before an enhanced one listed ahead of it (' + tier + '), the device\'s own default before an equal listed ahead of it (' + own + '), and voices that score alike keep the device\'s order (' + order + ')');
       /* what the narrator's settings are when nothing is saved, and when what is saved is nonsense */
       const blob = localStorage.getItem('cyoa2.settings.v1'), live = Settings.data;
       localStorage.removeItem('cyoa2.settings.v1'); Settings.load(); const fresh = [Settings.data.voiceOn, Settings.data.voiceURI, Settings.data.rate, Settings.data.autoSend, Settings.data.srLang].join('/');
@@ -3907,6 +3928,28 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       box.checked = true; box.dispatchEvent(new Event('change', { bubbles: true })); const r = document.getElementById('set-rate'); r.value = '1'; r.dispatchEvent(new Event('input', { bubbles: true })); return { pressed, on, said, after, back: Settings.data.voiceOn }; });
     ok(samp.pressed === 'false' && samp.on === false && samp.said.length === 1 && samp.said[0].length > 20 && samp.after === 1 && samp.back === true, 'HEAR IT says one line in the chosen voice whether or not the narrator is on, and the switch in Settings is the same switch as the speaker by the story');
     await pg.evaluate(() => UI.closePanels());
+    /* the queue at its edges: a voice switched on mid-telling, a cut and what follows it, a sentence the device fails, an engine left paused, a half sentence held when silenced */
+    const edge = await pg.evaluate(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms)), said = () => window.__said().map((u) => u.text), out = {};
+      const fresh = async (delay) => { Narrator.stop(); await wait(150); window.__spoken.length = 0; window.__started.length = 0; window.__synth.delay = delay; };
+      await fresh(25); Narrator.begin(null); Narrator.push('Said before. Held'); Settings.data.voiceOn = false; Narrator.push(' while off.'); Settings.data.voiceOn = true; Narrator.push(' Said after.'); Narrator.end(); await wait(500); out.offOn = said().join('|');
+      await fresh(400); Narrator.say('A long first sentence that is cut off.', null); await wait(150); Narrator.stop(); const cut = window.__cancelAt; Narrator.say('The next one.', null); await wait(400);
+      const nx = window.__said().find((u) => u.text === 'The next one.'); out.gap = nx ? Math.round(nx.at - cut) : -1;
+      await fresh(60); window.__synth.fail = 'This one fails.'; const t0 = performance.now(); Narrator.say('First of three. This one fails. Third of three.', null); await wait(1500); window.__synth.fail = '';
+      const third = window.__said().find((u) => u.text === 'Third of three.'); out.fails = { n: said().length, ms: third ? Math.round(third.at - t0) : -1 };
+      await fresh(30); speechSynthesis.pause(); Narrator.say('Heard after a pause.', null); await wait(400); out.paused = { started: window.__started.join('|'), busy: Narrator.busy(), paused: speechSynthesis.paused };
+      await fresh(300); Narrator.say('Being read when it is cut.', null); await wait(150); Narrator.stop(); Narrator.say('One after. Two after.', null); await wait(1200);
+      const S = window.__said(), a = S.find((u) => u.text === 'One after.'), b = S.find((u) => u.text === 'Two after.'); out.pair = a && b ? Math.round(b.at - a.at) : -1;
+      await fresh(30); Narrator.begin(null); Narrator.push('Read in full. And this is half'); await wait(200); Narrator.stop(); Narrator.end(); await wait(300); out.half = said().join('|');
+      await fresh(25);
+      return out;
+    });
+    ok(edge.offOn === 'Said before.|Said after.', 'a half sentence the narrator was holding when it went off is forgotten, and words that arrived while it was off are never read: switched on again in the middle of the telling, it reads on from there (' + edge.offOn + ')');
+    ok(edge.gap >= 80, 'after the voice is cut off, the next sentence is handed over a moment later (' + edge.gap + ' ms), not in the same breath as the cancel, which some engines swallow');
+    ok(edge.fails.n === 3 && edge.fails.ms >= 0 && edge.fails.ms < 1000, 'a sentence the device fails to say is let go at once: the next follows it straight away (' + edge.fails.ms + ' ms in), not after the time a sentence is allowed');
+    ok(edge.paused.started === 'Heard after a pause.' && !edge.paused.busy && !edge.paused.paused, 'an engine left paused is woken before each sentence, so the narrator is never stuck behind it');
+    ok(edge.pair >= 250, 'cut off and given something new at once, the narrator reads the new sentences one after the other (' + edge.pair + ' ms apart): the cut-off reading does not wake up and hand over a second sentence beside the first');
+    ok(edge.half === 'Read in full.', 'silenced while a telling is still arriving, the narrator forgets the half sentence it was holding: the end of that telling reads nothing more');
     await X1.ctx.close();
   }
   }
@@ -3997,6 +4040,8 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     const more = await pg.evaluate(() => { const say = document.getElementById('say'); say.value = 'First this'; UI.sayBtns(); const shown = document.getElementById('mic').hidden; Listen.start(); const r = window.__recs[window.__recs.length - 1];
       r.hear([[' then that', true]], 0); const v = say.value; r.hear([[' then that', true], [' x'.repeat(400), true]], 1); const len = say.value.length; r.stop(); say.value = ''; UI.sayBtns(); return { shown, v, len }; });
     ok(more.shown === true && more.v === 'First this then that' && more.len >= 598 && more.len <= 600, 'speech is added after what was already typed, and the field holds 600 letters however long someone talks');
+    const folded = await pg.evaluate(() => { UI.storyOpen(false, true); const was = document.getElementById('story').classList.contains('open'); Listen.start(); const r = window.__recs[window.__recs.length - 1], now = document.getElementById('story').classList.contains('open'); r.abort(); UI.storyOpen(true, true); return { was, now }; });
+    ok(!folded.was && folded.now, 'the story opens when the microphone starts, if it was folded away, so that what is heard can be seen being written');
     await pg.evaluate(() => { Settings.data.autoSend = true; Settings.data.srLang = 'en-GB'; });
     await pg.tap('#mic');
     const auto = await pg.evaluate(() => { const r = window.__recs[window.__recs.length - 1], calls = window.__calls.length; r.hear([['Is anyone there?', true]], 0); r.stop(); return { lang: r.lang, calls, busy: G.busy, field: document.getElementById('say').value }; });
@@ -4005,6 +4050,9 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     ok(auto.lang === 'en-GB' && auto.busy && auto.field === '' && auto2.calls === 1 && auto2.ctx && auto2.pl === 'Is anyone there?', 'with "send as soon as I stop speaking" on, the end of the listening sends the line (and the language to listen in is the one set)');
     const autoEmpty = await pg.evaluate(() => { Listen.start(); const r = window.__recs[window.__recs.length - 1], calls = window.__calls.length; r.hear([['um', false]], 0); r.stop(); const out = { calls: window.__calls.length - calls, busy: G.busy }; document.getElementById('say').value = ''; UI.sayBtns(); Settings.data.autoSend = false; Settings.data.srLang = ''; return out; });
     ok(autoEmpty.calls === 0 && !autoEmpty.busy, 'but a guess that was never settled on is not a line: it is not sent');
+    const busyEnd = await pg.evaluate(() => { const say = document.getElementById('say'); say.value = ''; Settings.data.autoSend = true; Listen.start(); const r = window.__recs[window.__recs.length - 1], calls = window.__calls.length; document.getElementById('toast').textContent = '';
+      r.hear([['Wait for me.', true]], 0); G.busy = true; r.stop(); const out = { calls: window.__calls.length - calls, field: say.value, toast: document.getElementById('toast').textContent }; G.busy = false; say.value = ''; UI.sayBtns(); Settings.data.autoSend = false; return out; });
+    ok(busyEnd.calls === 0 && busyEnd.field === 'Wait for me.' && busyEnd.toast === '', 'and a line heard just as the Game Master begins speaking is not sent: it waits in the field to be sent by hand, without a word about it');
     const errs = await pg.evaluate(async () => { const out = [], toast = () => document.getElementById('toast').textContent, live = () => document.getElementById('mic').classList.contains('live');
       for (const e of ['not-allowed', 'no-speech', 'network']) { Listen.start(); window.__recs[window.__recs.length - 1].fail(e); out.push(toast() + (live() ? ' LIVE' : '')); }
       window.__srThrow = true; Listen.start(); out.push(toast() + (live() ? ' LIVE' : '')); window.__srThrow = false;
@@ -4432,6 +4480,12 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     await tell('narrate', 'The key is refused. So the device reads this. And this.'); await quiet();
     const D8d = await said(), E8d = await state(), L8d = await played(), about8 = await pg.evaluate(() => { UI.settings(); return document.getElementById('voice-about').textContent; });
     ok(L8d.length === 0 && D8d.length === 3 && E8d.failed && E8d.strikes === 0 && /401 Incorrect API key provided\./.test(E8d.toast) && /It has failed, and this device is reading: Hear it tries it again\.$/.test(about8), 'a refusal is not waited on three times: a key the service will not take ends the paid voice at the first sentence, the toast says what the service said, and Settings says how to try again');
+    const hard = [];
+    for (const code of [400, 403, 404]) { await clear({ mode: code }); await tell('narrate', 'Refused first. Then the device. And again.'); await quiet(); const E = await state(); hard.push(code + (E.failed && E.strikes === 0 ? ' ends it' : ' strikes ' + E.strikes)); }
+    ok(hard.join() === '400 ends it,403 ends it,404 ends it', 'and so does a request the service calls bad, one it forbids, and a voice or a model it does not have: each ends the paid voice at the first sentence (' + hard.join(', ') + ')');
+    await clear({ mode: 'junk' }); await tell('narrate', 'Rubbish one. Rubbish two. Rubbish three.'); await quiet();
+    const EJ = await state();
+    ok(EJ.failed && /\(the sound could not be read\)/.test(EJ.toast), 'and when it is sound that cannot be read, three times running, the notice says that: "' + EJ.toast + '"');
     await clear({ mode: (rec) => (/rubbish/.test(rec.body.input) ? 'junk' : /dropped/.test(rec.body.input) ? 'drop' : 'ok') });
     await tell('narrate', 'An answer of rubbish. A line that dropped. And one that is sound.'); await quiet();
     const L8e = await played(), D8e = await said(), E8e = await state();
@@ -4616,6 +4670,366 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     ok(back.turn && back.gm === 0 && back.V.length === 3 && back.V[2].calls === 2 && back.V[2].chars === 41 && S.reqs.reduce((a, r) => a + r.body.input.length, 0) === 41 && back.kinds.split(',').sort().join() === 'gm,gm,gm!,voice,voice,voice' && /gm!$/.test(back.kinds) && back.order && !back.busy && back.played >= 1,
       'a telling that fails is taken back, and what was read aloud of it is still on the bill: the tale is as it was, the voice\'s line keeps its two sentences beside the failed reply\'s own line, the ledger is still in the order things happened (' + back.kinds + '), and the reading stops');
     await P2.ctx.close();
+  }
+  }
+
+  if (want('2')) {
+  /* ------------------------------------------------------------------ 2 */
+  console.log('2. other phones at the table');
+  {
+    const QRFIX = [{"t":"CYOA2","v":1,"e":"M","m":2,"rows":["fe0bf8","822208","bacae8","bac2e8","ba8ae8","82d208","feabf8","008000","be13e0","415e10","eeab70","795e78","f6a920","00c940","fe14d0","82c1f0","bab4b0","badf20","ba8b60","823fa0","fec950"]},{"t":"https://tythos.com/games/cyoa2/#j=AbC-_9","v":3,"e":"L","m":5,"rows":["fe1f63f8","82640a08","ba0a0ae8","ba8edae8","bac49ae8","821aea08","feaaabf8","00320000","c75360c0","28cc71b0","3aa7ca80","f8ca9e40","ceda1b08","e5473f98","3f796ce0","7d7195a8","d3f05560","b9add3b8","e6b170c8","8c8d0a00","8b0b5fb8","00a3e8c0","fe99dae0","82b39880","ba469fd0","ba2f3d68","ba673ff0","82cf82e8","fecbf3e0"]},{"t":"https://tythos.com/games/cyoa2/#a=Q29udmVyc2F0aW9uIGF0IHRoZSB0YWJsZSwgc2V2ZW4gc3RlcHMgdXAgdGhlIGhpbGw","v":7,"e":"M","m":0,"rows":["fe21f8634bf8","82b619771208","ba4bc74e92e8","ba179d66dae8","bada9fda3ae8","825558c2c208","feaaaaaaabf8","006988980000","aa6d3fdda090","d9bf890d84c8","f2fb2d1454d8","391009e52490","4f4d216fe180","5c14ad858578","0e5827aeec78","7d422422c610","b3097f39d1e0","c1715308c0a0","a63f7d8956b8","e01bc14c2c90","4f83fffa9fa8","c885c8c02898","5af1dae0baa8","78bd68d87888","afb44febffd0","b5944f018d58","db500110cff8","00c834128f40","de4e77d08158","a9ec301a8e18","6ea207b2cad8","bccbb54dcf08","3b08afcd8038","31e8f9091868","0be10ca86f68","7931962d4218","9b7e3f8f6fa8","009e18a9c898","fe42babf7aa8","823508b88898","ba95cffcbfc8","ba6a1b0994b8","babc0a119df8","8246ac85f990","fe9bfc8fec78"]},{"t":"https://tythos.com/games/cyoa2/#j=AaHlOwVhCsJdQoXzEkLvSgZrGcNnUyBjIuPfWqDbKmRxYiFtMeTpAaHlOwVhCsJdQoXzEkLvSgZrGcNnUyBjIuPfWqDbKmRxYiFtMeTpAaHlOwVhCsJdQoXzEkLvSgZrGcNnUyBjIuPfWqDbKmRxYiFtMeTpAaHl","v":10,"e":"M","m":6,"rows":["fe8b7ebe22b73f8","82a8e0283c55208","bad57cd259df2e8","ba36e6389dcd2e8","bab296bf8eb52e8","823cbae22aa6208","feaaaaaaaaaabf8","000a5d2363c5000","9f8707fe58c74b8","cc550fbf56e7e30","578d1256c49bc78","60ec10de2da08b8","a67791fc9ce9af8","d9a31916dafda30","a7bd8e79882ec00","606ca5463042260","435ceba1c85b408","0d910e927d369b8","eb3124aad4589a8","402236350e299e8","fe45a64918872f8","dd98759c66f7e98","665827e6db7c778","35b110d6615a730","b3ddb9c82aed080","e0e95faf5be5ba0","af98e2bec7c9fc0","a8e241a3a0e98e8","facb602b9e19af8","3881c8e2a5368e0","1fa7ee7ebf30fa8","f526af002ed6178","57fa51b832e6198","c4daaebde66e388","5b6086c3e0c3e70","08b69b946c72020","5f390e7ccf89b38","09c00dd8d37d738","9f382dd730069a0","103069d35162060","06d6c5b4ea19840","d9de3e9d74beba8","4ec1a293d4dcfe8","e8947aa4a813d60","06c067431886658","2513399fe6ef398","a7624906d1e0f58","f8cc3083c02f7b0","030ed9becccffc8","00ade9a3fb6c8b0","fee9eeaafe9dae0","82baef23ceee8e0","baffc5ffbc3fff8","bae0067cfd375c0","ba7fe10c43ba8b8","8202475246d3af8","fef13f8418c5080"]}];
+    const QRAUTO = [["Qv8IB8hdY88yTdTxBIUF",4,3],["Di8x2y4RuMER_bh3m1xs0drDjUpNbikPI99LsI0T",5,2],["l21PF",3,7],["FwqjeEnAJNEZ0lhTFrouRww6xNi3em3hmrB1oCwRHq7ttj-CHCvg6moWuXovhmwNDQnciepX3MNpqc4VKrb5icPEYoXjrKsQ1li7s1l10E0TZA93",8,2],["NA8SexFLMwWDrPDO9kmLEeNMHpXJeXf6ygvys1Kwe0U19TzTUM_94XRiZSodl0ibnCi9wZWuep9S19a7D9JzF7deIbgeYhRXEgVFoX2LKPLhlEt5",8,7],["rADqq3w-Ja-yQoPjJ3O4gMvv5lhNrO_tHlXTWv6PNSq1mX69nWINXytMiixGRF9iftqz5It_OTiMOOXY1yQSyYVWZgvlD40xon_m9DYANd-W6ZYb",8,6],["LGDudJ_CrpqsRKEKraIZ3c-oNF0JZUy_8I2a-mC76z4X6Eguv5uzcAahvS6YUaCVzVDROV4-XHCz5o0EGezFy_DceM",7,6],["BOdkac1oY7WKFODMZgKN7zcN-sz5Ol4waOA7mJrsY-Ju2IbfsHqe34KgbpVab71vY0908ElCXMDTlH8FYaj-3Es7ZkSN4m04JaT-kwvU3n78cukk",8,4],["BBQTCVGAa7tuE-XeBj3rGM5nhf_1hrFD2EVfR0rRjCVFC-H671vVlXJRN0t46jg5kToRE0-d6iDoO-QjiN3JvE-5YnsXxyoGibEooykEQ1g0K_dZKOPAkI3i97ilGWe-VSTW7yBSyGXWnYQSGTbwN3xXDjNQOSlQxtJYAvS9fIt-No8Cs407n4T6xZlWmVoiZQGH0WOBUPzvjL74pSbp6votsrkmiXPcrfk3i5",12,2],["9qW4GI12lHewxbJubH_P",4,4],["xuBmvvz4vN_SpcAvIARKap3kZDDo4ub4rPwc8RnkYPWK3DswA-X8jRxa3m3kMKI4pIBp92Mq1cpZyLGDeKXd8yks6d",7,1],["mrRutoa5H3nY_bXN6Pyb",4,2],["8-mnQnLzFOYeKUyRVKmA_Iu_K1qy37rDpn9h8gat",5,4],["h919Z",3,0],["rHeGzexXoMW5g31rw3FuyuyicRdZD0Nz99w3Z8yHUCYMRyOPNblQ23SUb2_o4DgCroxbPkZKaxfcqdLqmbayAmeSjJgsalTsbZO62gHyhkZ5ansLN1zsegPPDWosVcpGOoI0qlC-44V9APVv9jwZ6w",10,4],["uuBq9_5B8JnXdOWWhoKuAcqBGwVN5s-B63KNLKZNjKqDaG4EPbp4mpBYBb3Qs408RmkJdVq4xeolrsVlvJXxm6z3bM",7,2],["sAu4H6g_-YmLJ-4yVZhRhAWZe6PlvYMAp4m-FolW6_n8reIZEuJsAWE8UpMVue8HBdoSkfsswT62zH7zCKi1nuPBXM0Fy2fJ3FhvX2s0CdtdxvtkUduAfU-hYR84VzgwyLawNauthmw3TsJkpjYYyb",10,7],["bdvh5fPOC0EnntQQgW8xheU9KYtB-H13Oyo0mtzJ7YJg4OhIesjfp0GJASZcNZtVLVy6CNpaw1cNFLImZX4XLsJ-TSec-jzHdmtIWUD5OeNWRob2DlL4f6ePzUciMQ70DxOe1VLJ8DWepq86lJNtHC",10,2],["AeW6v1y4mzwmKoNKx2h7",4,5],["Md69UNw_b4mCklJRYFF90xw3BTAw05NfWWvOtsDn",5,6],["ujf6OTtfvKtamYTCKyOHa_1suezJ0wZbx8ZAvvFH",5,3],["oNa7Yipus23zXwhy_lCJ4MMOv-gibM99k_CBYe2u",5,1],["CcRf_3HTt6L3M6fdibMBVtJAo4MWTfnSwkZRZHN0eI_Td5QMm3FDDFfvDhAP_4OfzGWzL8GXgiek8vo5D28y5_mJvQ0YV8ih4u_2ADIYvwTCfUYPdkXC-fOGfeUWogBLPne1lRh7py4Oc2DWJQ9aPN",10,5],["L1ste",3,3],["FbU3e3oJAOcjfIQH2Zdt1HAIeEJ_TjP1_DtK8LNoApOsQalma1qrp8fPT0KbvEXaFeiPQWt1Pw5xplJ7gtBT3INPgxq_bJGCWDlTK2In04_oF5mV",8,3],["e0OwJnhcqrCSMsK74Wp9lRPWBOpqXo01fHq8TEyTA4tzDf46fKJBYVqndjuv2WhcC2DJCalcctL_CHBoRrTdvQTRjgkBYiXqlAbNQ263E2atCTm0mmgr_mKIRpbuG0cVRMmdolqdZBCswL3bMHgW3A",10,6],["Hc1MMqhOzdToHvtOqfC3eYgYHYFSnSNunhV3tHw1tBUE6Qy4ahKNAk9zvdVnm-TAQ6EeIGbCW-sx9M9tzt2mMs6HI8zbuymKoKxcU39Vo-drVmYrPiKXz4aQpkcGFbhhquqLgBZ7jzSDMPy-3O6IdLrCh_uoOQ8-tgrTakkQcSbwL21-dgqcU4iRLlebdcBfCIZyguhUf0yt-uovoYcOOV4L9uUkElUirFpaqJ",12,7]];
+    const BUSY_TEXT = 'The Game Master is speaking.';
+    /* phones that join are reached by the addresses they announce. In this container a browser's own mDNS names are found
+       only most of the time (a pairing failed 1 time in 20 that way, and 0 in 30 with plain addresses), so this section's
+       browser announces plain ones: the rows are about the table, not about this machine's multicast. The mDNS form of an
+       address is covered by the brief's own row below.                                                                     */
+    const NB = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--disable-features=WebRtcHideLocalIpsWithMdns'] });
+    const listen = (page, who) => { page.on('console', (m) => { if (m.type() === 'error' && !/fonts\.g|net::ERR|Failed to load resource/i.test(m.text())) errors.push(who + ': ' + m.text()); }); page.on('pageerror', (e) => errors.push(who + ' pageerror: ' + e.message)); };
+    /* every connection's states as they change, kept in the page, to be printed if a pairing fails */
+    const ICELOG = () => { const R = window.RTCPeerConnection; if (!R) return; window.__ice = []; const W = function (cfg) { const pc = new R(cfg), t0 = performance.now(), k = window.__ice.length, log = (what) => window.__ice.push(k + ' ' + what + '=' + pc[what] + ' @' + Math.round(performance.now() - t0));
+      for (const e of ['iceconnectionstatechange', 'connectionstatechange', 'icegatheringstatechange', 'signalingstatechange']) pc.addEventListener(e, () => log({ iceconnectionstatechange: 'iceConnectionState', connectionstatechange: 'connectionState', icegatheringstatechange: 'iceGatheringState', signalingstatechange: 'signalingState' }[e])); return pc; };
+      W.prototype = R.prototype; window.RTCPeerConnection = W; };
+    const H = { ctx: await NB.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true }) };
+    await H.ctx.addInitScript(ICELOG);
+    await H.ctx.addInitScript(() => { try { localStorage.setItem('cyoa2.settings.v1', JSON.stringify({ seed: 'net-host-1', musicVol: 0, sfxVol: 0, theme: 'light', storyOpen: true, voiceOn: false })); } catch (e) { /* none */ } });
+    H.page = await H.ctx.newPage(); listen(H.page, 'host');
+    const hp = H.page;
+    await hp.goto(PAGE); await hp.waitForFunction(() => typeof newGame === 'function' && typeof Net === 'object');
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    /* a joining phone: a context of its own (its own storage, so its own device name), opened at the link the host made */
+    const guest = async (link, name, dev) => {
+      const ctx = await NB.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+      await ctx.addInitScript(ICELOG);
+      await ctx.addInitScript((dev) => { try { localStorage.setItem('cyoa2.settings.v1', JSON.stringify({ seed: 'guest', musicVol: 0, sfxVol: 0, theme: 'light', storyOpen: true, voiceOn: true })); if (dev && !localStorage.getItem('cyoa2.device')) localStorage.setItem('cyoa2.device', dev); } catch (e) { /* none */ } }, dev || '');
+      const page = await ctx.newPage(); listen(page, name);
+      await page.goto(PAGE + link.slice(link.indexOf('#')));
+      await page.waitForFunction(() => typeof Net === 'object' && !!Net.answer, null, { timeout: 15000 }).catch(() => {});
+      await page.evaluate((n) => { const f = document.getElementById('join-name'); f.value = n; f.dispatchEvent(new Event('change', { bubbles: true })); }, name);
+      return { ctx, page, name, dev };
+    };
+    const invite = async () => {
+      await hp.evaluate(() => { UI.players(); UI.openPanel('pan-players'); document.getElementById('net-link').value = ''; document.getElementById('net-invite').click(); });
+      await hp.waitForFunction(() => !document.getElementById('net-inv').hidden && !!document.getElementById('net-link').value, null, { timeout: 10000 }).catch(() => {});
+      return hp.evaluate(() => document.getElementById('net-link').value);
+    };
+    const paste = (code) => hp.evaluate((c) => { document.getElementById('net-code').value = c; document.getElementById('net-take').click(); }, code);
+    const seated = (g) => g.page.waitForFunction(() => document.body.classList.contains('in-play') && !!G.st && !!Net.host && Net.host.open, null, { timeout: 15000 }).then(() => true, () => false);
+    const hostHas = (name) => hp.waitForFunction((n) => Net.peers.some((p) => p.hello && p.open && p.name === n), name, { timeout: 10000 }).then(() => true, () => false);
+    const pair = async (name, dev) => { const link = await invite(), g = await guest(link, name, dev); g.link = link; g.ans = await g.page.evaluate(() => Net.answer || ''); await paste(g.ans); g.in = await seated(g); g.known = await hostHas(name); return g; };
+    /* A pairing whose connection the network itself gives up on is tried once more with a fresh invitation, and the run
+       says so. Under the load of three negative-test copies at once, two Chromium contexts on this machine sometimes fail
+       to connect at all (ICE fails); with the machine to itself it was 0 in 30. That is this machine, not the page: a page
+       that cannot pair fails both attempts and stays red, and one whose channel connects but says nothing is never retried. */
+    const iceFailed = (g) => g.page.evaluate(() => !!Net.host && !Net.host.open && ['failed', 'closed'].includes(Net.host.pc.connectionState)).catch(() => false);
+    const again = async (attempt) => { let g = await attempt(true); if (!g.in && await iceFailed(g)) { console.log('    (a pairing failed at the network and was tried once more; guest ' + JSON.stringify(await g.page.evaluate(() => (window.__ice || []).join(' | '))) + '; host ' + JSON.stringify(await hp.evaluate(() => (window.__ice || []).slice(-14).join(' | '))) + ')'); await g.ctx.close(); g = await attempt(false); } return g; };
+    const tale = (pg) => pg.evaluate(() => { if (!G.st) return 'no tale'; const P = packState(G.st); delete P.saved; return JSON.stringify(P); });
+    /* the host and a guest hold the same tale, byte for byte, once the host has had a moment to send what changed */
+    const same = async (g) => { for (let k = 0; k < 30; k++) { const [a, b] = await Promise.all([tale(hp), tale(g.page)]); if (a === b) return true; await sleep(100); } return false; };
+    const hostIdle = () => hp.waitForFunction(() => G.st && !G.busy && !G.st.walk && !View.walking && View.anim.t >= 1 && !Session.beats.length && !document.getElementById('veil').classList.contains('on'), null, { timeout: 15000 }).catch(() => {});
+    /* an act sent straight down the wire, past the guest's own buttons: what a doctored page could send */
+    const raw = (g, m) => g.page.evaluate((m) => new Promise((res) => { const n = 900000 + Math.floor(Math.random() * 90000); Net.waits.set(n, res); Net.send(Net.host, Object.assign({}, m, { t: 'act', n })); setTimeout(() => res({ timeout: true }), 3000); }), m);
+
+    /* the codes: made by the standard's own steps, and drawn as made */
+    const qr = await hp.evaluate((F) => F.map((c) => {
+      const q = QR.make(c.t, { ver: c.v, ecc: c.e, mask: c.m }); if (!q) return 'none';
+      const rows = [];
+      for (let y = 0; y < q.size; y++) { let b = ''; for (let x = 0; x < q.size; x++) b += q.get(x, y) ? '1' : '0'; b += '0'.repeat((4 - (b.length % 4)) % 4); let h = ''; for (let i = 0; i < b.length; i += 4) h += parseInt(b.slice(i, i + 4), 2).toString(16); rows.push(h); }
+      const k = rows.findIndex((r, j) => r !== c.rows[j]);
+      return k < 0 && rows.length === c.rows.length ? 'same' : 'v' + c.v + ' differs at row ' + k;
+    }), QRFIX);
+    ok(qr.every((r) => r === 'same'), 'a QR code is made by the standard\'s own steps: four codes (versions 1, 3, 7 and 10, levels M and L, masks 0, 2, 5 and 6) match an independent encoder module for module (' + qr.join(', ') + ')');
+    const auto = await hp.evaluate((A) => A.filter(([t, v, m]) => { const q = QR.make('https://tythos.com/games/cyoa2/#' + t); return !q || q.ver !== v || q.mask !== m; }).length, QRAUTO);
+    ok(auto === 0, 'and left to choose, it picks the version and the mask an independent encoder picks, scoring each mask before the format bits go in (' + (QRAUTO.length - auto) + ' of ' + QRAUTO.length + ' links, every mask among them)');
+    const fit = await hp.evaluate(() => ({ small: QR.make('CYOA2').ver, mid: QR.make('x'.repeat(122)).ver, mid2: QR.make('x'.repeat(123)).ver, top: QR.make('x'.repeat(997)) && QR.make('x'.repeat(997)).ver, over: QR.make('x'.repeat(998)), m: QR.make('https://tythos.com/games/cyoa2/').ecc }));
+    ok(fit.small === 1 && fit.mid === 7 && fit.mid2 === 8 && fit.top === 25 && fit.over === null && fit.m === 'M', 'a code is the smallest version that holds its text at level M (122 bytes is version 7, 123 is 8, as the independent encoder has it), and text too long for version 25 makes none');
+
+    /* a connection in brief: what the codes carry */
+    const br = await hp.evaluate(async () => {
+      const pc = new RTCPeerConnection({ iceServers: [] }); pc.createDataChannel('x');
+      await pc.setLocalDescription(await pc.createOffer()); await gathered(pc);
+      const sdp = pc.localDescription.sdp, code = Brief.pack(sdp, false), d = Brief.unpack(code), ans = Brief.unpack(Brief.pack(sdp, true)), get = (s, k) => ((s.match(new RegExp('^a=' + k + '[: ](\\S+)', 'm')) || [])[1]);
+      const cands = (s) => [...s.matchAll(/^a=candidate:\S+ \d+ udp \d+ (\S+) (\d+) typ host/gm)].map((m) => m[1] + ':' + m[2]).sort().join();
+      const u = Uint8Array.from(atob(code.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)), enc = (a) => btoa(String.fromCharCode(...a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const nAt = 3 + u[2] + 1 + u[3 + u[2]] + 32, five = Uint8Array.from([...u.slice(0, nAt), 5, ...u.slice(nAt + 1), 1, 10, 0, 0, 1, 0, 9]), badU = u.slice(); badU[3] = 33;
+      const bad = { empty: Brief.unpack(''), words: Brief.unpack('not a code at all'), v2: Brief.unpack(enc(Uint8Array.from([2, ...u.slice(1)]))), short: Brief.unpack(enc(u.slice(0, -1))), long: Brief.unpack(enc(Uint8Array.from([...u, 0]))), five: Brief.unpack(enc(five)), ufrag: Brief.unpack(enc(badU)) };
+      const none = Brief.pack(sdp.replace(/^a=candidate:.*\r?\n/gm, ''), false);
+      const md = Brief.unpack(Brief.pack(sdp.replace(/^(a=candidate:\S+ \d+ udp \d+ )(\S+)/m, '$148daa5fc-8a3f-43e9-ae7b-c72ba1ed77f2.local'), false)), mdns = !!md && /^a=candidate:\S+ \d+ udp \d+ 48daa5fc-8a3f-43e9-ae7b-c72ba1ed77f2\.local \d+ typ host/m.test(md.sdp);
+      pc.close();
+      return { mdns, len: code.length, offer: d && d.type, answer: ans && ans.type, keep: ['ice-ufrag', 'ice-pwd', 'fingerprint:sha-256', 'setup'].every((k) => get(sdp, k) && get(sdp, k) === get(d.sdp, k)), cands: cands(sdp), back: cands(d.sdp), bad: Object.keys(bad).filter((k) => bad[k] !== null), none };
+    });
+    ok(br.offer === 'offer' && br.answer === 'answer' && br.keep && br.cands && br.cands === br.back && br.len <= 150 && br.mdns, 'a connection\'s description goes into ' + br.len + ' characters and comes back whole: its ice-ufrag, ice-pwd, fingerprint and role, every address on this network (a phone\'s mDNS name as well as a plain address), and whether it is an offer or an answer');
+    ok(br.bad.length === 0 && br.none === '', 'and a code that is not one of ours comes back as nothing: empty, words, another version, a byte short or a byte over, five addresses, a bad character; a description with no address of its own is not written down at all' + (br.bad.length ? ' (accepted: ' + br.bad.join(', ') + ')' : ''));
+
+    /* the host's tale, and the first phone to join it, by pasting its code */
+    await hp.evaluate(() => { G.st = newGame('net-host-1'); exec(G.st, 'travel_party', { to: 'S0' }); UI.enterPlay(false); });      /* out in the town: room to walk, and people to ask */
+    await hp.waitForFunction(() => document.body.classList.contains('in-play') && !document.getElementById('veil').classList.contains('on'), null, { timeout: 8000 });
+    await hostIdle();
+    const link1 = await invite();
+    const drawn = await hp.evaluate(() => {
+      const cv = document.getElementById('net-qr'), q = QR.make(document.getElementById('net-link').value), u = +cv.dataset.unit, d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data, n = q.size + 8;
+      let wrong = 0, margin = 0;
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = d[((y * u + (u >> 1)) * cv.width + x * u + (u >> 1)) * 4], inside = x >= 4 && y >= 4 && x < q.size + 4 && y < q.size + 4, dark = inside && q.get(x - 4, y - 4); if (dark ? v !== 0 : v !== 255) { if (inside) wrong++; else margin++; } }
+      return { wrong, margin, n, u, w: cv.width, css: cv.getBoundingClientRect().width, hidden: cv.hidden };
+    });
+    ok(link1.startsWith(PAGE + '#j=') && /^[A-Za-z0-9_-]{60,150}$/.test(link1.slice(PAGE.length + 3)), 'an invitation is this page\'s own address with the code after #j= (' + (link1.length - PAGE.length - 3) + ' characters)');
+    ok(!drawn.hidden && drawn.wrong === 0 && drawn.margin === 0 && drawn.w === drawn.n * drawn.u && drawn.css >= 150, 'and the code on the screen is that link, module for module: black on white, with the standard\'s quiet margin of four, ' + Math.round(drawn.css) + ' px across');
+    let front = null;
+    const A = await again(async (first) => {
+      const g = await guest(first ? link1 : await invite(), 'Sam', 'samsphone01');
+      g.ans = await g.page.evaluate(() => Net.answer || '');
+      front = await g.page.evaluate(() => ({ hash: location.hash, join: document.getElementById('scr-join').classList.contains('active'), qr: !document.getElementById('join-qr').hidden, role: Net.role, play: document.body.classList.contains('in-play') }));
+      await paste(g.ans); g.in = await seated(g); g.known = await hostHas('Sam');
+      return g;
+    });
+    ok(front.hash === '' && front.join && front.qr && front.role === 'guest' && !front.play && A.ans.startsWith(PAGE + '#a='), 'the joining phone opens on a screen of its own with a code for the host (this page\'s address with the code after #a=), and its own address keeps no code, so a reload is a fresh start');
+    if (!A.in) console.log('    (the first pairing: ' + JSON.stringify({ host: await hp.evaluate(() => Net.peers.map((p) => ({ open: p.open, hello: p.hello, pend: p.pending, closed: p.closed, sig: p.pc.signalingState, ice: p.pc.iceConnectionState, conn: p.pc.connectionState, dc: p.dc && p.dc.readyState }))),
+      guest: await A.page.evaluate(() => ({ role: Net.role, sig: Net.host && Net.host.pc.signalingState, ice: Net.host && Net.host.pc.iceConnectionState, conn: Net.host && Net.host.pc.connectionState, dc: Net.host && Net.host.dc && Net.host.dc.readyState, open: Net.host && Net.host.open, state: document.getElementById('join-state').textContent })) }) + ')');
+    const at1 = await A.page.evaluate(() => ({ guest: document.body.classList.contains('guest'), party: document.getElementById('pan-party').classList.contains('open'), add: document.getElementById('party-add').textContent }));
+    ok(A.in && A.known && await same(A), 'pasted on the host\'s phone, the code connects them: the guest sits down at the host\'s table, and holds the same tale as the host, byte for byte');
+    ok(at1.guest && at1.party && at1.add === 'Add your traveller', 'a guest with no traveller of its own is shown the party sheet first, with a button to add one');
+
+    /* a guest makes its own traveller, and changes only its own */
+    await A.page.evaluate(() => document.getElementById('party-add').click());
+    await hp.waitForFunction(() => G.st.party.length === 2, null, { timeout: 5000 }).catch(() => {});
+    await same(A);
+    const mk = await Promise.all([hp.evaluate(() => { const p = G.st.party[1]; UI.party(); return { id: p && p.id, seat: p && G.st.seats[p.id], tags: [...document.querySelectorAll('#party-list .seat')].map((n) => n.textContent) }; }),
+      A.page.evaluate(() => { const p = G.st.party[1]; return { mine: !!p && Net.mine(p.id), host: Net.mine(G.st.party[0].id), tags: [...document.querySelectorAll('#party-list .seat')].map((n) => n.textContent), dis: [...document.querySelectorAll('#party-list input.pname')].map((i) => i.disabled) }; })]);
+    const samId = mk[0].id;
+    ok(mk[0].seat && mk[0].seat.dev === 'samsphone01' && mk[0].seat.name === 'Sam' && mk[1].mine && !mk[1].host, 'a guest makes its own traveller on its own phone: the host\'s engine adds it and seats it to that phone, under its player\'s name');
+    ok(mk[0].tags.join() === 'Played on Sam’s phone' && mk[1].tags.join() === 'Played on this phone' && mk[1].dis.join() === 'true,false', 'and both sheets say whose it is; on the guest\'s, only its own traveller can be changed');
+    await A.page.evaluate(() => { const i = document.querySelectorAll('#party-list input.pname')[1]; i.value = 'Samwise'; i.dispatchEvent(new Event('change', { bubbles: true })); });
+    await hp.waitForFunction((id) => pcOf(G.st, id).name === 'Samwise', samId, { timeout: 4000 }).catch(() => {});
+    const before = await tale(hp), hostName = await hp.evaluate(() => G.st.party[0].name);
+    const ren = await raw(A, { a: 'party', op: 'name', id: 'P1', name: 'Hacked' }), cls = await raw(A, { a: 'party', op: 'class', id: 'P1', cls: 'Wizard' });
+    ok(await hp.evaluate((id) => pcOf(G.st, id).name, samId) === 'Samwise' && ren.ok === false && /not yours to change/.test(ren.say) && cls.ok === false && await hp.evaluate(() => G.st.party[0].name) === hostName && before === await tale(hp),
+      'a guest renames its own traveller through the host; asked to rename or re-call the host\'s, the host refuses, says why, and changes nothing');
+
+    /* a guest's walk, judged and walked by the host, and seen a step at a time */
+    await same(A);
+    const tgt = await A.page.evaluate(() => { const st = G.st, me = Net.me(), m = st.maps[st.here]; for (let r = 4; r < 9; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x = me.x + dx, y = me.y + dy; if (inb(m, x, y) && tileFree(m, x, y) && !tokenAt(m, x, y) && !pcAt(st, m, x, y, '') && m.seen[y * m.w + x] && route(st, { id: me.id, pc: true, o: me, m }, [[x, y]], true).ok) return [x, y]; } return null; });
+    await A.page.evaluate(() => {
+      window.__trail = []; window.__slid = 0; window.__tales = [];
+      const got = Net.got.bind(Net); Net.got = (peer, raw) => { if (typeof raw === 'string' && raw.startsWith('{"t":"tale"')) { const m = JSON.parse(raw); window.__tales.push({ full: m.full, len: raw.length, keys: Object.keys(m.set).concat(Object.keys(m.maps).map((k) => k + ':' + Object.keys(m.maps[k]).join('+'))).join() }); } return got(peer, raw); };
+      const id = setInterval(() => { const p = Net.me(), k = p.x + ',' + p.y; if (window.__trail[window.__trail.length - 1] !== k) window.__trail.push(k); if (View.anim.t < 1 && View.anim.from[p.id]) window.__slid++; }, 20);
+      window.__stopTrail = () => clearInterval(id);
+    });
+    await A.page.evaluate((t) => go({ goals: [t] }), tgt);
+    await sleep(300); await hostIdle(); await sleep(250);
+    const walk = await Promise.all([hp.evaluate((id) => { const p = pcOf(G.st, id); return { at: [p.x, p.y], lead: G.st.lead === id }; }, samId), A.page.evaluate(() => { window.__stopTrail(); return window.__trail.length; })]);
+    const flow = await A.page.evaluate(() => ({ n: window.__tales.length, full: window.__tales.filter((t) => t.full).length, max: Math.max(0, ...window.__tales.map((t) => t.len)), keys: [...new Set(window.__tales.map((t) => t.keys))].slice(0, 4), slid: window.__slid }));
+    ok(!!tgt && walk[0].lead && walk[0].at.join() === tgt.join() && walk[1] >= 4 && await same(A), 'a guest\'s tap walks its own traveller on the host\'s board: it takes the lead, the host\'s engine walks it, and the guest sees the walk a step at a time (' + walk[1] + ' squares), ending where the host\'s does');
+    ok(flow.n >= walk[1] - 1 && flow.full === 0 && flow.max < 6000, 'and what the host sends while it walks is only what changed, a step at a time: ' + flow.n + ' messages, none of them the whole tale, the largest ' + flow.max + ' characters (' + flow.keys.join(' / ') + ')');
+    ok(flow.slid > 0, 'and on the guest\'s board the traveller slides from square to square as the host\'s does, rather than jumping');
+
+    /* a message lost on the way: the guest notices the gap and asks for the whole tale again */
+    await A.page.evaluate(() => { const got = Net.got.bind(Net); window.__lost = 0; Net.got = (peer, raw) => { if (window.__lose && typeof raw === 'string' && raw.startsWith('{"t":"tale"')) { window.__lose = false; window.__lost++; return; } return got(peer, raw); }; window.__lose = true; });
+    await hp.evaluate(() => { G.st.gold += 7; });
+    await A.page.waitForFunction(() => window.__lost === 1, null, { timeout: 4000 }).catch(() => {});
+    await hp.evaluate(() => { G.st.time.minute += 1; });
+    const healed = await same(A), goldSeen = await A.page.evaluate(() => G.st.gold) === await hp.evaluate(() => G.st.gold);
+    ok(healed && goldSeen && await A.page.evaluate(() => window.__lost) === 1, 'a message from the host that never arrives is noticed by the next one\'s number: the guest asks for the whole tale again and holds the host\'s, gold and all');
+
+    /* what a doctored page could send */
+    const b4 = await tale(hp);
+    const forged = { host: await raw(A, { a: 'go', who: 'P1', goals: [[1, 1]] }), nobody: await raw(A, { a: 'go', who: 'P9', goals: [[1, 1]] }), fly: await raw(A, { a: 'fly', who: samId }), proto: await raw(A, { a: '__proto__', who: samId }), ctor: await raw(A, { a: 'constructor' }),
+      goals: await raw(A, { a: 'go', who: samId, goals: 'everywhere' }), big: await raw(A, { a: 'go', who: samId, goals: [[1, 1]], pad: 'x'.repeat(9000) }) };
+    await sleep(200);
+    const wall = await A.page.evaluate(() => { const st = G.st, m = st.maps[st.here]; for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) if (!tileFree(m, x, y) && m.seen[y * m.w + x]) return [x, y]; return null; });
+    await hp.evaluate(() => { const t = document.getElementById('toast'); t.textContent = ''; t.classList.remove('on'); });
+    forged.wall = await raw(A, { a: 'go', who: samId, goals: [wall] });
+    const hostToast = await hp.evaluate(() => document.getElementById('toast').textContent);
+    const wallSays = await hp.evaluate(([id, w]) => { const p = pcOf(G.st, id), r = route(G.st, { id, pc: true, o: p, m: G.st.maps[p.site] }, [w], View.fog); return r.ok ? '' : refuse(r.why).say; }, [samId, wall]);
+    ok(!!wall && !!wallSays && forged.wall.ok === false && forged.wall.say === wallSays && hostToast === '', 'what the host\'s table would have said to a refused walk (into a wall) is said to the guest that asked, and not on the host\'s screen');
+    ok(forged.host.ok === false && /not yours to play/.test(forged.host.say) && forged.nobody.ok === false && /Nobody by that name/.test(forged.nobody.say) && b4 === await tale(hp), 'an act for a traveller that is not that phone\'s, or for nobody, is refused with a reason and changes nothing on the host');
+    ok(['fly', 'proto', 'ctor'].every((k) => forged[k].ok === false && /does not know that/.test(forged[k].say)) && forged.goals.ok === false && forged.goals.say === 'There is no way there.' && forged.big.timeout === true && b4 === await tale(hp),
+      'an act the table does not know (including __proto__ and constructor), goals that are not squares, and a message over the size limit are all refused or ignored, and the tale is untouched');
+
+    /* talking, by topic, from a guest's phone */
+    const talk = await A.page.evaluate(() => { const st = G.st, m = st.maps[st.here], V = visOf(st).g; for (const t of m.tokens) if (t.k === 'npc' && V[t.y * m.w + t.x]) { const T = topicsFor(st, t.npc).find((x) => !x.off && ['gang', 'news'].includes(x.id)); if (T) return { npc: t.npc, topic: T.id, label: T.label }; } return null; });
+    const told0 = await hp.evaluate(() => G.st.story.length);
+    if (talk) await A.page.evaluate((t) => UI.ask(t.npc, t.topic), talk);
+    await sleep(400); await same(A);
+    const said = await Promise.all([hp.evaluate((n) => { const s = G.st.story.slice(n); return { pl: s.filter((e) => e.t === 'pl').map((e) => e.who + '|' + e.text), gm: (s.filter((e) => e.t === 'gm').pop() || {}).text || '', card: !document.getElementById('info').hidden, lead: G.st.lead }; }, told0),
+      A.page.evaluate(() => ({ card: !document.getElementById('info').hidden, name: document.getElementById('info-name').textContent, text: document.getElementById('info-text').textContent }))]);
+    ok(!!talk && said[0].pl.length === 1 && said[0].pl[0].startsWith('Samwise|to ') && said[0].pl[0].endsWith(talk.label) && said[0].gm && said[0].lead === samId, 'a guest asks someone a topic: the host\'s script answers, in the host\'s story, in the guest\'s traveller\'s name (who takes the lead to do it)');
+    const gStory = await A.page.evaluate(() => { const n = [...document.querySelectorAll('#story-log .st-gm')].pop(); return n ? n.textContent : ''; });
+    ok(said[1].card && said[1].text.startsWith(said[0].gm.slice(0, 40)) && !said[0].card && gStory === said[0].gm, 'and the answer is shown on the guest\'s card and in its story, while the host\'s board opens no card for it');
+
+    /* rounds: a guest acts on its own turn only */
+    await A.page.evaluate(() => UI.rounds(true));
+    await hp.waitForFunction(() => !!G.st.round, null, { timeout: 4000 }).catch(() => {});
+    await hp.evaluate(() => { const R = G.st.round; R.i = R.order.findIndex((c) => c.id === 'P1'); }); await same(A);
+    const r0 = await tale(hp), notYours = await raw(A, { a: 'end', who: samId });
+    const r1 = await tale(hp);
+    await hp.evaluate((id) => { const R = G.st.round; R.i = R.order.findIndex((c) => c.id === id); }, samId); await same(A);
+    await A.page.evaluate(() => UI.endTurn()); await sleep(400);
+    const moved = await hp.evaluate((id) => G.st.round && G.st.round.order[G.st.round.i].id !== id, samId);
+    await A.page.evaluate(() => UI.rounds(false)); await sleep(300);
+    const stillOn = await hp.evaluate(() => !!G.st.round), standNote = await A.page.evaluate(() => document.getElementById('toast').textContent);
+    ok(notYours.ok === false && notYours.say === 'It is not Samwise’s turn.' && r0 === r1 && moved, 'in a round a guest acts on its own traveller\'s turn and no other: out of turn it is refused and nothing changes; on its turn, ending it moves the round on');
+    ok(stillOn && /Only the host stands the table down/.test(standNote), 'a guest may roll initiative, but only the host stands the table down');
+    await hp.evaluate(() => UI.rounds(false)); await hostIdle(); await same(A);
+
+    /* the guest's copy is only ever the host's */
+    const eng = await A.page.evaluate(async () => {
+      const pk = () => { const P = packState(G.st); delete P.saved; return JSON.stringify(P); }, b = pk(), r = intent(G.st, { t: 'lead', id: G.st.party[0].id }), w = intent(G.st, { t: 'move', who: G.st.lead, to: [0, 0] });
+      Session.beats.push({ kind: 'enter', site: G.st.here }); Session.tick(performance.now() + 1e6); const left = Session.beats.length; Session.beats.length = 0;
+      const same = b === pk();       /* asked in the same breath: nothing from the host can arrive in between */
+      UI.saveNow(); UI.saveSoon(); await new Promise((res) => setTimeout(res, 900));
+      return { ok: r.ok || w.ok, why: r.why, left, rec: !!(await Store.get('auto')), same };
+    });
+    ok(!eng.ok && eng.why === 'remote' && eng.left === 1 && !eng.rec && eng.same, 'a guest never runs the engine on its copy: an intent is refused there, a beat waits for the host, and nothing is ever saved on the guest\'s phone');
+    const gui = await A.page.evaluate(() => {
+      UI.notes(); UI.settings();
+      const rates = [...document.querySelectorAll('#story-log .rate')], vis = (n) => getComputedStyle(n).display !== 'none';
+      return { on: Narrator.on(), voice: document.getElementById('voice-btn').hidden, setOn: Settings.data.voiceOn, rates: rates.length, enabled: rates.filter((b) => !b.disabled).length, keep: document.querySelectorAll('#story-log .keep').length, add: document.getElementById('notes-add').disabled,
+        host: [...document.querySelectorAll('#pan-settings fieldset[data-host]')].filter(vis).length, map: vis(document.getElementById('set-grid').closest('fieldset')),
+        menu: [...document.querySelectorAll('#menu .plaque')].filter(vis).map((b) => b.dataset.act).join(), rest: vis(document.getElementById('party-long')) };
+    });
+    ok(!gui.on && gui.voice && gui.setOn, 'the voice is the host\'s: a guest\'s narrator stays silent with its own voice switched on, and it shows no speaker button');
+    ok(gui.rates > 0 && gui.enabled === 0 && gui.keep === 0 && gui.add, 'the ratings and the notes are the host\'s: a guest sees the marks and the notes and cannot change them');
+    ok(gui.host === 0 && gui.map && gui.menu === 'party,chron,notes,compare,lib,settings,leave' && !gui.rest, 'a guest\'s settings offer only how the board looks; its menu has Leave in place of the title, the save and the players, and the party sheet has no rests');
+
+    /* who runs the host's table is the guest's too, and a typed line from a guest is told on the host's key */
+    await hp.evaluate(() => { window.__CYOA2_MOCK__ = async (api) => { api.usage({ input_tokens: 100, output_tokens: 50 }); await api.text('The table hears you.'); }; Settings.data.gm = 'ai'; Settings.data.areas.act = 'ai'; Settings.data.areas.narrate = 'script'; UI.modeChanged(); });
+    await A.page.waitForFunction(() => Mode.typed() && !document.body.classList.contains('no-say'), null, { timeout: 4000 }).catch(() => {});
+    const typed = await A.page.evaluate(() => Mode.typed() && !document.body.classList.contains('no-say'));
+    const k0 = await hp.evaluate(() => G.st.story.length);
+    await A.page.evaluate(() => { document.getElementById('say').value = 'We listen at the door.'; document.getElementById('say-send').click(); });
+    await sleep(500); await hostIdle(); await same(A);
+    const line = await Promise.all([hp.evaluate((k) => G.st.story.slice(k).map((e) => e.t + ':' + (e.who || e.src || '') + ':' + e.text), k0), A.page.evaluate(() => document.getElementById('say').value)]);
+    ok(typed && line[0].includes('pl:Samwise:We listen at the door.') && line[0].includes('gm:ai:The table hears you.') && line[1] === '', 'when the host gives Claude the typed lines, the guest\'s phone offers the line field too, and a line sent from it is told by the host\'s Game Master, in the guest\'s traveller\'s name');
+    await hp.evaluate(() => { G.busy = true; }); await A.page.waitForFunction(() => G.busy, null, { timeout: 3000 }).catch(() => {});
+    const busy = { local: await A.page.evaluate(() => { const ok = Net.act('lead', {}); return { ok, busy: G.busy, toast: document.getElementById('toast').textContent }; }), wire: await raw(A, { a: 'lead', who: samId }) };
+    await hp.evaluate(() => { G.busy = false; }); await A.page.waitForFunction(() => !G.busy, null, { timeout: 3000 }).catch(() => {});
+    ok(busy.local.busy && busy.local.ok === false && busy.local.toast === BUSY_TEXT && busy.wire.ok === false && busy.wire.say === BUSY_TEXT, 'while the host\'s Game Master is speaking, the guest knows it, and an act from it waits: refused on the guest\'s own phone, and by the host if it is sent anyway');
+    await hp.evaluate(() => { window.__CYOA2_MOCK__ = null; Settings.data.gm = 'script'; UI.modeChanged(); });
+    const k1 = await hp.evaluate(() => G.st.story.length), scripted = await raw(A, { a: 'say', who: samId, text: 'Anyone home?' });
+    ok(scripted.ok === false && /script is telling/.test(scripted.say) && await hp.evaluate((k) => G.st.story.length === k, k1), 'and with the script back at the table a typed line from a guest is refused, as it would be on the host, and nothing is told');
+    await hp.evaluate(() => { UI.dialog('A question', ['For the host.'], [{ t: 'Fine', main: true }]); });
+    const asked = await raw(A, { a: 'lead', who: samId });
+    await hp.evaluate(() => document.querySelector('#dlg-btns button').click());
+    ok(asked.ok === false && /question open/.test(asked.say), 'while the host has a question open on its screen, a guest\'s act is refused until it is answered');
+
+    /* a second guest, through the camera's tab: the code handed to the game's tab by a channel between tabs */
+    let hand = null;
+    const B = await again(async () => {
+      const g = await guest(await invite(), 'Kit', 'kitsphone001');
+      g.ans = await g.page.evaluate(() => Net.answer || '');
+      const tab = await H.ctx.newPage(); tab.on('pageerror', (e) => errors.push('hand-off tab: ' + e.message));
+      await tab.addInitScript(() => { Storage.prototype.setItem = function () { throw new Error('no storage in this tab'); }; });      /* the channel between tabs, and nothing else */
+      await tab.goto(g.ans);
+      g.in = await seated(g); g.known = await hostHas('Kit');
+      hand = await tab.evaluate(() => ({ hand: document.getElementById('scr-hand').classList.contains('active'), play: document.body.classList.contains('in-play'), st: !!G.st, hash: location.hash, role: Net.role }));
+      await tab.close();
+      return g;
+    });
+    ok(B.in && B.known && hand.hand && !hand.play && !hand.st && hand.hash === '' && hand.role === 'solo', 'a joining phone\'s code opened by the host\'s camera in a second tab is handed to the game\'s tab, which connects; that tab starts no game of its own and says to go back (by the channel between tabs alone: that tab could store nothing)');
+    await B.page.evaluate(() => document.getElementById('party-add').click());
+    await hp.waitForFunction(() => G.st.party.length === 3, null, { timeout: 5000 }).catch(() => {});
+    const kitId = await hp.evaluate(() => G.st.party[2] && G.st.party[2].id);
+    await same(B); await same(A);
+    const cross = await raw(A, { a: 'lead', who: kitId });
+    const tgtA = await A.page.evaluate(() => { const st = G.st, me = Net.me(), m = st.maps[st.here]; for (let r = 2; r < 7; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const x = me.x + dx, y = me.y + dy; if (inb(m, x, y) && tileFree(m, x, y) && !tokenAt(m, x, y) && !pcAt(st, m, x, y, '') && m.seen[y * m.w + x] && route(st, { id: me.id, pc: true, o: me, m }, [[x, y]], true).ok) return [x, y]; } return null; });
+    await A.page.evaluate((t) => go({ goals: [t] }), tgtA); await sleep(300); await hostIdle();
+    ok(cross.ok === false && /not yours to play/.test(cross.say) && await same(B) && await B.page.evaluate((id) => { const p = pcOf(G.st, id); return p.x + ',' + p.y; }, samId) === tgtA.join(), 'with two guests at the table, each sees the other\'s walk as the host walks it, and neither can act for the other\'s traveller');
+
+    /* a phone that goes: closed, or silent */
+    const goneAt = Date.now();
+    await B.ctx.close();
+    await hp.waitForFunction(() => Net.peers.some((p) => p.name === 'Kit' && !p.open), null, { timeout: 15000 }).catch(() => {});
+    const gone = await hp.evaluate(() => { UI.players(); const row = [...document.querySelectorAll('#net-list .entry')].find((e) => /Kit/.test(e.textContent)); return { toast: document.getElementById('toast').textContent, row: row ? row.textContent : '' }; });
+    ok(Date.now() - goneAt < 14000 && /Kit has gone/.test(gone.toast) && /Gone/.test(gone.row) && /Kit/.test(gone.row), 'a guest that closes its page is seen to have gone: the host is told its travellers are the host\'s to play, and the players list says so');
+    const tgtK = await hp.evaluate((id) => { const st = G.st, me = pcOf(st, id), m = st.maps[st.here]; for (let r = 2; r < 7; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const x = me.x + dx, y = me.y + dy; if (inb(m, x, y) && tileFree(m, x, y) && !tokenAt(m, x, y) && !pcAt(st, m, x, y, '') && m.seen[y * m.w + x] && route(st, { id: me.id, pc: true, o: me, m }, [[x, y]], true).ok) return [x, y]; } return null; }, kitId);
+    await hp.evaluate(([id, t]) => { intent(G.st, { t: 'lead', id }); go({ goals: [t] }); }, [kitId, tgtK]); await sleep(300); await hostIdle();
+    ok(await hp.evaluate((id) => { const p = pcOf(G.st, id); return p.x + ',' + p.y; }, kitId) === tgtK.join(), 'and the host plays the gone guest\'s traveller as its own: it leads it, and walks it');
+    /* a phone that goes quiet: away, with the line kept, and back when it speaks again; only a line that closes is gone */
+    await A.page.evaluate(() => { window.__tick = Net.tick; Net.tick = () => {}; });
+    const quietAt = Date.now();
+    await hp.waitForFunction(() => Net.peers.some((p) => p.name === 'Sam' && p.away), null, { timeout: 20000 }).catch(() => {});
+    const silent = Date.now() - quietAt;
+    const away = await hp.evaluate(() => { UI.players(); const row = [...document.querySelectorAll('#net-list .entry')].find((e) => /Sam/.test(e.textContent)), p = Net.peers.find((q) => q.name === 'Sam'); return { toast: document.getElementById('toast').textContent, row: row ? row.textContent : '', open: !!p && p.open }; });
+    ok(silent > 9000 && silent < 16000 && /Sam has gone quiet/.test(away.toast) && /Away/.test(away.row) && away.open, 'a guest that falls silent is called away after about twelve seconds (' + Math.round(silent / 100) / 10 + ' s): the host is told its travellers are the host\'s to play, the players list says Away, and the line is kept open');
+    await A.page.evaluate(() => { Net.tick = window.__tick; });
+    await hp.waitForFunction(() => Net.peers.some((p) => p.name === 'Sam' && p.open && !p.away), null, { timeout: 8000 }).catch(() => {});
+    const backA = await hp.evaluate(() => ({ back: Net.peers.some((p) => p.name === 'Sam' && p.open && !p.away), toast: document.getElementById('toast').textContent }));
+    ok(backA.back && /Sam is back/.test(backA.toast) && await same(A), 'and when it speaks again it is back at the table on the same line, holding the host\'s tale');
+    await hp.evaluate(() => { window.__tick = Net.tick; Net.tick = () => {}; });
+    const hushAt = Date.now();
+    await A.page.waitForFunction(() => /host’s phone has gone quiet/.test(document.getElementById('toast').textContent), null, { timeout: 20000 }).catch(() => {});
+    const hush = { ms: Date.now() - hushAt, line: await A.page.evaluate(() => !!Net.host && Net.host.open && Net.host.pc.connectionState === 'connected'), play: await A.page.evaluate(() => document.body.classList.contains('in-play') && !document.getElementById('dialog').classList.contains('open')) };
+    await hp.evaluate(() => { Net.tick = window.__tick; G.st.gold += 3; });
+    await A.page.waitForFunction(() => /The host is back/.test(document.getElementById('toast').textContent), null, { timeout: 8000 }).catch(() => {});
+    const hostBack = await A.page.evaluate(() => /The host is back/.test(document.getElementById('toast').textContent));
+    ok(hush.ms > 9000 && hush.ms < 16000 && hush.line && hush.play && hostBack && await same(A), 'a host that goes quiet (out to the camera to let the next player in) is waited for: its guests say so after about twelve seconds (' + Math.round(hush.ms / 100) / 10 + ' s), keep the line and the board, and say when it is back');
+    await hp.evaluate(() => { const p = Net.peers.find((q) => q.name === 'Sam' && q.open); if (p) Net.gone(p); });
+    await A.page.waitForFunction(() => document.getElementById('dialog').classList.contains('open'), null, { timeout: 8000 }).catch(() => {});
+    const told = await A.page.evaluate(() => document.getElementById('dlg-title').textContent);
+    ok(told === 'The host is out of reach', 'and a line that closes is gone: that phone is told the host is out of reach');
+    await A.ctx.close();
+
+    /* coming back: the same phone, known again, through the storage a tab that was asleep reads */
+    await hp.evaluate(() => { if (Net.bc && Net.bc.close) Net.bc.close(); Net.bc = true; });
+    const B2 = await again(async () => {
+      const g = await guest(await invite(), 'Kit again', 'kitsphone001');
+      g.ans = await g.page.evaluate(() => Net.answer || '');
+      const tab2 = await H.ctx.newPage(); await tab2.goto(g.ans); await tab2.close();
+      g.in = await seated(g); g.known = await hostHas('Kit again');
+      return g;
+    });
+    if (!B2.in || !B2.known) console.log('    (the rejoin: ' + JSON.stringify({ in: B2.in, known: B2.known, pair: await hp.evaluate(() => localStorage.getItem('cyoa2.pair')), host: await hp.evaluate(() => Net.peers.map((p) => ({ n: p.name, dev: p.dev, open: p.open, hello: p.hello, pend: p.pending, closed: p.closed, sig: p.pc.signalingState, ice: p.pc.iceConnectionState }))),
+      guest: await B2.page.evaluate(() => ({ role: Net.role, sig: Net.host && Net.host.pc.signalingState, ice: Net.host && Net.host.pc.iceConnectionState, open: Net.host && Net.host.open, state: document.getElementById('join-state').textContent, play: document.body.classList.contains('in-play') })) }) + ')');
+    await same(B2);
+    const back = await Promise.all([B2.page.evaluate((id) => ({ mine: Net.mine(id), dev: Net.dev }), kitId), hp.evaluate((id) => G.st.seats[id], kitId)]);
+    ok(B2.in && B2.known && back[0].mine && back[0].dev === 'kitsphone001' && back[1].name === 'Kit again', 'a phone that comes back is known again by its own name for itself: its traveller is its own once more, under the name it gives now (the code reached the game\'s tab through storage, as for a tab that was asleep)');
+
+    /* a tab that was asleep when the code came: it reads storage when it is shown again, and a stale code is not used */
+    const vis = await hp.evaluate(async (base) => {
+      const peer = await Net.invite(); if (!peer) return null;
+      const g = new RTCPeerConnection({ iceServers: [] }); await g.setRemoteDescription(Brief.unpack(peer.code)); await g.setLocalDescription(await g.createAnswer()); await gathered(g);
+      const code = base + '#a=' + Brief.pack(g.localDescription.sdp, true), wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      localStorage.setItem('cyoa2.pair', JSON.stringify({ code, at: Date.now() - 11 * 60000 })); document.dispatchEvent(new Event('visibilitychange')); await wait(300);
+      const afterStale = peer.pc.signalingState === 'have-local-offer', staleGone = localStorage.getItem('cyoa2.pair') === null;
+      localStorage.setItem('cyoa2.pair', JSON.stringify({ code, at: Date.now() })); document.dispatchEvent(new Event('visibilitychange')); await wait(500);
+      const r = { afterStale, staleGone, took: peer.pc.signalingState === 'stable', gone: localStorage.getItem('cyoa2.pair') === null };
+      g.close(); Net.drop(peer); return r;
+    }, PAGE);
+    ok(!!vis && vis.afterStale && vis.staleGone && vis.took && vis.gone, 'a code left in storage while the game\'s tab was asleep is taken when the tab is shown again, once; one more than ten minutes old is thrown away unused');
+
+    /* seats travel in the save, and a doctored save loses what does not fit */
+    const sv = await hp.evaluate((id) => {
+      const P = JSON.parse(JSON.stringify(packState(G.st))), again = unpackState(JSON.parse(JSON.stringify(P)));
+      P.seats = Object.assign(JSON.parse('{"__proto__":{"dev":"abcdefgh12"}}'), { P1: { dev: 'NOT A DEVICE!' }, P9: { dev: 'abcdefgh12', name: 'Ghost' } }, { [id]: { dev: 'kitsphone001', name: 'x'.repeat(60) } });
+      const bad = unpackState(P);
+      return { kept: JSON.stringify(again.seats) === JSON.stringify(G.st.seats), keys: Object.keys(bad.seats).join(), proto: Object.getPrototypeOf(bad.seats) === Object.prototype, name: bad.seats[id].name.length };
+    }, kitId);
+    ok(sv.kept && sv.keys === kitId && sv.proto && sv.name === 24, 'who plays whom is kept in the save; a doctored save loses a seat for a traveller who is not there, a device name that is not one, and __proto__, and a player\'s name is cut to 24');
+    const dropped = await hp.evaluate((id) => { const r = intent(G.st, { t: 'party', op: 'drop', id }); return r.ok && !(id in G.st.seats); }, kitId);
+    ok(dropped, 'and a traveller who leaves the party takes the seat with it');
+
+    /* a phone that answers but cannot be reached: the host is told, and the invitation is let go */
+    const dead = await hp.evaluate(async () => {
+      const peer = await Net.invite(); if (!peer) return null;
+      const g = new RTCPeerConnection({ iceServers: [] }); await g.setRemoteDescription(Brief.unpack(peer.code)); await g.setLocalDescription(await g.createAnswer()); await gathered(g);
+      const code = Brief.pack(g.localDescription.sdp.replace(/(a=candidate:\S+ \d+ udp \d+ )(\S+) (\d+)/g, '$1192.0.2.99 9'), true); g.close();
+      const t0 = performance.now(), e = await Net.accept(code);
+      await new Promise((res) => { const iv = setInterval(() => { if (peer.closed || performance.now() - t0 > 40000) { clearInterval(iv); res(); } }, 100); });
+      return { e, closed: peer.closed, ms: performance.now() - t0, toast: document.getElementById('toast').textContent, left: Net.peers.includes(peer) };
+    });
+    ok(!!dead && dead.e === '' && dead.closed && /could not connect/.test(dead.toast), 'a phone that answers but cannot be reached (an address nobody is at): the connection gives up, and the host is told to make a new invitation' + (dead ? ' (' + Math.round(dead.ms / 1000) + ' s)' : ''));
+
+    /* leaving */
+    await B2.page.evaluate(() => { document.querySelector('#menu [data-act="leave"]').click(); });
+    await B2.page.waitForFunction(() => document.getElementById('dialog').classList.contains('open'), null, { timeout: 3000 }).catch(() => {});
+    await Promise.all([B2.page.waitForNavigation({ timeout: 8000 }).catch(() => {}), B2.page.evaluate(() => [...document.querySelectorAll('#dlg-btns button')].find((b) => b.textContent === 'Leave').click()).catch(() => {})]);
+    await B2.page.waitForFunction(() => typeof Net === 'object', null, { timeout: 8000 }).catch(() => {});
+    const left = await B2.page.evaluate(() => ({ url: location.href, title: document.getElementById('scr-title').classList.contains('active'), role: Net.role, guest: document.body.classList.contains('guest') }));
+    await hp.waitForFunction(() => Net.peers.some((p) => p.name === 'Kit again' && !p.open), null, { timeout: 8000 }).catch(() => {});
+    ok(left.url === PAGE && left.title && left.role === 'solo' && !left.guest && await hp.evaluate(() => Net.peers.some((p) => p.name === 'Kit again' && !p.open)), 'a guest that leaves goes back to its own title screen with nothing of the host\'s left, and the host sees it go');
+    await B2.ctx.close();
+    await H.ctx.close();
+    await NB.close();
   }
   }
 
