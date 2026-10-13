@@ -2977,6 +2977,9 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
           row(flag(c1, 'hush') && guards.length >= 1 && guards.every((t) => sheetOf(c1, t, false).asleep > 0) && rest.every((t) => !sheetOf(c1, t, true).asleep) && awakeThere, 'informer: with no lamp in the window the lookouts at the mouth of the hideout are found asleep (' + guards.length + '), and nobody deeper in is; in a tale where the lamp still burns they are all awake');
           const late = copy(st); chart(late, 'S2'); late.met.S2 = [late.maps.S2.tokens.find((t) => t.k === 'foe').id]; intent(late, { t: 'jump', site: 'S2' });
           row(flag(late, 'hush') === 1 && late.maps.S2.tokens.filter((t) => t.k === 'foe').every((t) => !sheetOf(late, t, true).asleep), 'informer: but a lamp put out after the gang has already seen the party on their hill comes too late: nobody is found dozing');
+          /* woken as the end of any fight on the hill wakes them, by a party that has seen nobody there (initiative rolled and stood down) */
+          const woke = copy(c1); woke.met.S2 = []; for (const t of guards) sheetOf(woke, t, true).asleep = 0; intent(woke, { t: 'jump', site: 'S1' }); intent(woke, { t: 'jump', site: 'S2' });
+          row(woke.here === 'S2' && guards.every((t) => !sheetOf(woke, t, true).asleep), 'informer: and they are caught dozing once: woken, going away and coming back does not put them to sleep again');
           const seenSleepers = guards.filter((t) => visOf(c1).g[t.y * m.w + t.x]).length, others = rest.filter((t) => visOf(c1).g[t.y * m.w + t.x]).length;
           row(seenSleepers === 0 || others > 0 || !threatOf(c1), 'informer: and a sleeper in plain sight is no threat: nothing forces a fight on a party that can see only them'); }
       }
@@ -2986,6 +2989,9 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         row(b && top && /letter/.test(top.label) && !top.sub && r.ok && st.n.roll === roll && flag(st, 'done:debt') && r.text.includes('handwriting') && !r.lines.some((z) => z.k === 'check'), 'debt: with the letter from the chief\'s desk in hand there is nothing to roll: the keeper is shown it, and that settles it');
         const s2 = withW('informer'); at(s2, 'S4', 'N2'); giveItem(leadOf(s2), 'the gang’s ledger'); const t2 = topicsFor(s2, 'N2').find((x) => x.id === 'w:informer'), roll2 = s2.n.roll, r2 = ask(s2, 'N2', 'w:informer');
         row(t2 && /ledger/.test(t2.label) && r2.ok && s2.n.roll === roll2 && flag(s2, 'done:informer'), 'informer: and a name in the gang\'s ledger does the same for whoever it names');
+        const sx = withW('informer'), wx = WHISPERS.informer.who; chart(sx, 'S2'); const setx = at(sx, sx.npcs[wx].home, wx); force(sx, 20, 20); const rx = setx ? ask(sx, wx, 'w:informer') : {};
+        const mx = sx.maps.S2, gx = mx.rooms.findIndex((q) => q.kind === 'cave_guard'), lx = mx.tokens.filter((t) => t.k === 'foe' && mx.rg[t.y * mx.w + t.x] === gx + 1);
+        row(rx.ok && flag(sx, 'hush') && sx.here !== 'S2' && lx.length >= 1 && lx.every((t) => sheetOf(sx, t, true).asleep > 0) && rx.lines.some((z) => z.t === 'No warning goes up the hill tonight.'), 'informer: settled once the hideout is on the map, its lookouts are asleep from that moment, and the table is told no warning goes up tonight');
       }
       {
         const st = withW('tunnel'); at(st, 'S1', 'N0'); const had = !!st.maps.S2, r = ask(st, 'N0', 'w:tunnel'), m = st.maps.S2; let floor = 0, seen = 0; if (m) for (let i = 0; i < m.w * m.h; i++) if (TWALK[m.t[i]]) { floor++; if (m.seen[i]) seen++; }
@@ -3047,6 +3053,15 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
           row(dcOf(pd) === 13 && dcOf(pt) === 13 && dcOf(pf) === 16 && dcOf(pn) === 16, 'and the shoulder really is three harder than the pick: the check is rolled against the number on the button (13 and 16)');
           const k = mk(); giveItem(leadOf(k), 'the gang’s keys'); const vk = verbsFor(k, locked.id), nk = k.n.roll, uk = intent(k, { t: 'use', what: locked.id, verb: 'unlock' }), after = verbsFor(k, locked.id).map((v) => v.verb).join();
           row(vk.length === 1 && vk[0].verb === 'unlock' && uk.ok && uk.opened && k.n.roll === nk && flag(k, 'o:S2:' + locked.id) && after === 'search' && /\[can be searched\]/.test(boardDigest(k).split('\n').find((l) => l.includes(locked.id + ' '))), 'with the gang\'s keys a lock is simply opened: no dice, and then the thing can be searched');
+          const r = mk(); giveItem(leadOf(r), 'thieves’ tools'); const vr0 = verbsFor(r, locked.id).length; intent(r, { t: 'rounds', op: 'start' });
+          row(vr0 === 2 && r.round && verbsFor(r, locked.id).length === 0, 'and in the middle of a round a thing offers nothing at all');
+        }
+        /* the gang's keys are for the gang's locks: a door in town locked by the Game Master (no generator locks one there) */
+        { const z = party4('keys-town'), m = z.maps[z.here], L = leadOf(z);
+          let door = null, side = null; for (const d of m.doors) { const q = doorSides(d).find((s) => tileFree(m, s[0], s[1]) && !tokenAt(m, s[0], s[1])); if (q) { door = d; side = q; break; } }
+          if (door) exec(z, 'set_door', { door_id: door.id, locked: true }); if (side) { L.x = side[0]; L.y = side[1]; look(z); giveItem(L, 'the gang’s keys'); }
+          const v = side ? verbsFor(z, door.id).map((x) => x.verb) : [];
+          row(side && door.lock && v.join() === 'pick,force' && intent(z, { t: 'use', what: door.id, verb: 'unlock' }).why === 'noverb', 'the gang\'s keys open the gang\'s locks only: a door in ' + z.sites[z.here].name + ' that the Game Master has locked offers the pick and the shoulder, not the keys');
         }
         /* the cell */
         { const k = seedWith((s) => { intent(s, { t: 'jump', site: 'S2' }); return s.maps.S2.doors.some((d) => d.kind === 'bars' && d.lock); }, 'cell'), mk = k.maps.S2, door = mk.doors.find((d) => d.kind === 'bars'), Lk = leadOf(k);
@@ -3125,6 +3140,22 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         const a = turnOf(f).o, o = f.party.find((p) => p !== a); giveItem(a, 'healing draught', 3); a.hp = 1; const d1 = intent(f, { t: 'item', item: 'healing draught' }), act = f.round.act, d2 = intent(f, { t: 'item', item: 'healing draught' });
         f.round.act = 1; o.hp = 1; const adj = meleeClear(a.m || f.maps.S2, a.x, a.y, o.x, o.y), d3 = intent(f, { t: 'item', item: 'healing draught', target: o.id }), notMine = intent(f, { t: 'item', who: o.id, item: 'healing draught' });
         row(d1.ok && act === 0 && d2.why === 'noact' && (adj ? d3.ok : d3.why === 'reach') && notMine.why === 'notturn', 'in a fight it takes the action, on the drinker\'s own turn, and can only be handed to someone within arm\'s reach');
+        const z = party4('item-3'), [P, Q, D, W] = z.party; for (const p of z.party) giveItem(p, 'healing draught');
+        Q.status = 'down'; Q.hp = 0; D.status = 'dead'; D.hp = 0; W.site = W.site === 'S2' ? 'S1' : 'S2';
+        const bz = snap(z), down = intent(z, { t: 'item', who: Q.id, item: 'healing draught' }), dead = intent(z, { t: 'item', who: P.id, item: 'healing draught', target: D.id }), away = intent(z, { t: 'item', who: P.id, item: 'healing draught', target: W.id });
+        row(down.why === 'downed' && dead.why === 'gone' && away.why === 'notarget' && snap(z) === bz, 'nor does the fallen drink one, or anyone hand one to the dead or to someone in another place');
+      }
+
+      /* 9b. what the plot hands out, it hands out once, and never after the tale is over */
+      {
+        const K = 'the gang’s keys', sets = (s) => s.party.reduce((a, p) => a + p.items.filter((x) => itemKey(x.n) === itemKey(K)).reduce((b, x) => b + x.q, 0), 0);
+        const z = party4('keys-1'); z.npcs.N5.status = 'defeated'; const l1 = plotCheck(z), h = carries(z, K), gone = h ? intent(z, { t: 'party', op: 'drop', id: h.id }) : {}, l2 = plotCheck(z);
+        const y = party4('keys-2'); giveItem(y.party[1], K); y.npcs.N5.status = 'dead'; const l3 = plotCheck(y);
+        row(h && l1.some((x) => x.t.includes(K)) && gone.ok && !carries(z, K) && !l2.length && flag(y, 'spoils') && sets(y) === 1 && !l3.some((x) => x.t.includes(K)), 'the chief\'s keys come to the party once: sent away with whoever held them they do not come back, and a party already given a set (as the Game Master can) is not given another');
+        const q = party4('goal-1'); q.quests.Q0.status = 'failed'; q.npcs.N5.status = 'defeated'; if (q.npcs.N6) q.npcs.N6.kind = 'npc'; giveItem(q.party[0], 'silver reliquary'); const n0 = q.quests.Q0.notes.length, l4 = plotCheck(q);
+        row(goalMet(q) && !flag(q, 'goal') && q.quests.Q0.notes.length === n0 && !l4.some((x) => x.k === 'quest'), 'a matter at hand the Game Master has already closed is not opened again by its goal coming true');
+        const o = party4('over-1'); o.npcs.N5.status = 'defeated'; for (const p of o.party) { p.hp = 0; p.status = 'dead'; } afterHarm(o); const l5 = plotCheck(o);
+        row(o.over === 'dead' && !l5.length && !flag(o, 'spoils') && !flag(o, 'goal'), 'and a tale that is over settles nothing more: a party that dies in the fight its chief fell in takes no keys from him');
       }
 
       /* 10. threat: awake, in sight of someone standing */
@@ -3257,6 +3288,13 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
           const t0 = m2.time.day * 1440 + m2.time.minute, mr = talkOf(m2, 'N3', 'mend', false);
           row(paid === '3 gold' && fr === 'free' && /will not hear of payment/.test(said) && mr.ok && m2.party[1].hp === m2.party[1].hpMax && m2.party[1].status === 'ok' && m2.party[1].saves.s === 0 && m2.party[1].saves.f === 0 && m2.party[2].status === 'dead' && m2.party[2].hp === 0 && m2.gold === 15 && m2.time.day * 1440 + m2.time.minute === t0 + 50,
             'a bed costs a coin for each traveller still alive, and with the keeper\'s debt settled it is free and the keeper says so; the priest\'s care takes most of an hour, brings back the fallen who still breathe with their death saves cleared, and leaves the dead dead'); }
+        /* no bed is had with an enemy in the room (a patron the Game Master has turned), and none is offered mid-round */
+        { const z = party4('bed-2'); at(z, 'S1', 'N0'); const t = z.maps.S1.tokens.find((q) => q.npc && q.npc !== 'N0' && q.k === 'npc');
+          if (t) exec(z, 'update_npc', { npc_id: t.npc, attitude: 'hostile' });
+          z.gold = 50; z.party[0].hp = 1; const t0 = z.time.day * 1440 + z.time.minute, r = t ? talkOf(z, 'N0', 'bed', false) : {};
+          const rested = z.party[0].hp !== 1 || z.gold !== 50 || z.time.day * 1440 + z.time.minute !== t0;
+          intent(z, { t: 'rounds', op: 'start' }); const inr = z.round && topicsFor(z, 'N0').find((x) => x.id === 'bed');
+          row(t && !r.ok && ['unsafe', 'hostiles'].includes(r.why) && !rested && inr && inr.off === 'not now', 'no bed is had with an enemy in the room: the keeper is asked, and nothing is paid or slept; and in the middle of a round the bed is offered as "not now"'); }
         /* the childhood name */
         { const mk = () => { const z = seedWith((y) => sideKs(y).includes('kin'), 'name'); setFlag(z, 'done:kin'); intent(z, { t: 'jump', site: 'S2' }); return z; };
           const a = mk(), b = bestCheck(leadOf(a), ['persuasion']); force(a, 20, Math.max(1, 11 - b.mod)); const ra = talkOf(a, 'N5', 'name', false);
