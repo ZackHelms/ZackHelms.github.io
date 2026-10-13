@@ -298,6 +298,8 @@ table.cmp th { font-family:var(--caps); font-size:11px; letter-spacing:.1em; tex
 table.cmp td { text-align:right; padding:5px 6px; border-top:1px solid var(--vellum-3); font-family:var(--caps); }
 table.cmp td:first-child, table.cmp th:first-child { text-align:left; }
 table.cmp tr.area td { font-weight:700; font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--rubric); border-top:0; padding-top:12px; }
+@media (max-width:480px) { table.cmp { font-size:13px; } table.cmp th, table.cmp td { padding-left:3px; padding-right:3px; } table.cmp th { letter-spacing:.04em; } }
+@media (max-width:350px) { table.cmp { font-size:12px; } table.cmp th { font-size:10px; letter-spacing:0; } table.cmp th, table.cmp td { padding-left:2px; padding-right:2px; } }
 table.cmp tr.ai td:first-child { color:var(--lapis); }
 .cost-row .how { grid-column:2; font-family:var(--caps); font-size:11px; letter-spacing:.06em; color:var(--ink-3); }
 .field input[type=password] { min-height:44px; padding:8px 10px; background:var(--vellum-2); border:1.5px solid var(--ink-2); border-radius:2px;
@@ -383,7 +385,7 @@ body.in-play #toast { bottom:auto; top:calc(162px + var(--sat)); }   /* over the
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-11 16:36 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-13 04:13 UTC</div>
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
 

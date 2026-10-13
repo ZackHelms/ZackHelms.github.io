@@ -224,6 +224,18 @@ The long form is `.claude/notes/20261010-negative-tests-at-scale-and-a-gm-on-a-b
   on two cores the write had not landed. Await the thing itself (the page's save
   now returns its write), never a duration.
 
+One from 2026-10-13, when a CYOA2 width row that had been green since it was
+written went red with no change to the page:
+
+- **A width row measures whatever font arrived.** Earlier containers could not
+  reach `fonts.googleapis.com` (`.claude/notes/20260724-headless-mobile-game-testing.md`),
+  so the page fell back to a narrower serif and the Compare table fitted a 390 px
+  screen. This container loads Cinzel, the table came out 392 px wide, and the
+  row went red. A phone loads the real font, so the red was the true answer
+  and the green had been measuring the fallback font. Before believing a
+  layout row, check `document.fonts.check('15px <family>')`. To try one both
+  ways, load a copy of the page with the fonts `<link>` removed.
+
 And one older rule that keeps earning its place: **break it to believe it.**
 Every check above was verified by deliberately breaking the thing it guards and
 confirming that check — and only that check — went red. `.claude/scripts/negtest.sh`

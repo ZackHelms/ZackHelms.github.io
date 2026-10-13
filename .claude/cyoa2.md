@@ -849,6 +849,14 @@ looks for. **A watchdog ends a run that is still going after 25 minutes**
 break once left a row awaiting a walk that could not start, so the run sat idle for
 fourteen minutes and reported nothing.
 
+**The suite measures the font that loaded.** Until 2026-10-13 every run had met a
+container that could not reach Google Fonts, so the Compare table was measured in
+a fallback serif and fitted a 390 px phone. With Cinzel loaded it was 392 px wide
+and ran off the screen, which is what a phone would have shown. Narrow screens now
+get tighter cells (13 px under 480 px wide, 12 px under 350), and W's Compare row
+measures at 390 and at 320. A width row that fails only where the fonts load is
+reporting the real layout, not flaking.
+
 Section N judges the engine's sight with **an independent judge**: a line walked in
 fiftieths of a square that shares no code with the ray march. *Sound:* every square shown
 has some clear line to it. *Complete:* every square plainly in view is shown. That judge
