@@ -172,10 +172,11 @@ backlog entry here.
 
 ## Later
 
-- [cyoa2] Finish the **second negative-test pass** (started 2026-10-13): the
-  voice list is done (122 breaks, every hole closed); the script, table and book
-  lists and step 4's own list have run or are running, and their holes are
-  listed in `.claude/cyoa2.md` § Tests as they are closed.
+- [cyoa2] Trace why section T's **Continue row loses its key** across the
+  reload when three whole suites run at once (16 times in the 2026-10-13
+  negative-test pass; it passes on a quiet machine). Until then a break
+  "caught" only by that row, or by section 2's pairing under the same load, is
+  noise, not a catch (`.claude/cyoa2.md` § Tests, the second pass).
 
 ## Icebox
 

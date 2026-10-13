@@ -4,7 +4,7 @@
 **board of 5 ft squares**: a seed makes a town, its inn and trades, its houses and a
 bandit cave; each place's board is **charted the first time someone walks in** and is
 kept in the save from then on. CD commission, 2026-10-09 (in chat, not `/create-new-games`).
-Suite: `.claude/tests/drive-cyoa2.cjs` (865 checks) with its own player,
+Suite: `.claude/tests/drive-cyoa2.cjs` (925 checks) with its own player,
 `.claude/tests/cyoa2-player.js`. Style: **Grimoire** (`.claude/styles/grimoire.md`).
 **Proprietary** (`games/cyoa2/LICENSE`), confirmed by the CD on 2026-10-10.
 
@@ -946,7 +946,7 @@ The second push (voice, microphone, notes, rule book):
 
 ## Tests
 
-`drive-cyoa2.cjs` (865 checks, about 400 s on a quiet machine) runs the generators inside the real page
+`drive-cyoa2.cjs` (925 checks, about 400 s on a quiet machine) runs the generators inside the real page
 across 36 worlds (329 boards) and asserts they are whole, then the engine's refusals,
 lazy charting, saves (including a tampered file), the phone flow, tap accuracy at five
 viewports after a resize-while-hidden, gestures, keys and the panels (sections A to M,
@@ -1129,8 +1129,93 @@ outscores a Premium one in the same language (8 + 3 against 10), though the code
 comment says the default only breaks ties within a tier. Whether a downloaded Premium
 voice should beat the device's choice is a question for whoever hears both.
 
-**Script, table and book (473 breaks), and step 4's own list (93)** are written up below
-as they are run and their holes closed.
+**The script (190 breaks): 107 caught on the first run** against sections U to W. Of the
+83 let through, **72 are closed by 35 rows**, each re-run against its break: lines chosen by
+what they are about and never by when; a whisper settled once and paying the living; the
+matter at hand only while open; the cell, the keeper's letter and a captive still caged
+when the chief falls; the bed, the priest, the childhood name; a chief the Game Master
+makes friendly; a thing on a container; nothing searched through a wall; a draught refused
+to the fallen, the dead and the absent; the lookouts caught dozing once, and asleep from
+the moment the informer is settled; the chief's keys handed out once and never after the
+tale is over; a matter the Game Master has closed not opened again; no bed with an enemy
+in the room or mid-round; no deeds mid-round; the gang's keys only for the gang's locks; a
+door picked open shows who stands behind it. **Five more had been caught only by a crash**:
+the engine threw inside section U's one long page block, which ended the section there. U's
+own calls to the engine now turn a throw into an answer a row can name, and three rows read
+a missing task or line without crashing, so all five fail by name.
+
+**The book (154 breaks): 110 caught on the first run** against sections X to Z and 1. Of
+the 44 let through, **38 are closed by rows**: every number the rule book prints checked
+against the traveller at levels 1, 3 and 5 (each modifier, which skills are trained, the
+training bonus, the next level and none past the fifth, Sneak Attack's dice, an ability's
+dice with the scores put in, its cost, reach, uses and when they come back, a calling
+fixed by experience); Shield on the armour page; two of a thing; DOWN on the sheet and the
+scores named for a screen reader; notes (300 of them, line breaks, the field's limit, the
+cross and the closing saved, a full page); a key held when storage reads but will not
+write; the voice settings (quality in a voice's name, a voice the device no longer has,
+the rows off where the browser cannot speak or listen, "Hear it" with no voice); leave to
+speak asked when the voice is turned on, or by "Hear it", on a page that started silent;
+the microphone kept while listening; another OpenAI voice as a fresh start; a ledger
+line's kind; dated speech models. One row, STOP, waited on a button and timed out when the
+button was gone: it now fails by name.
+
+**Step 4 (93 breaks): 84 caught.** Rows for the rest: a guest's phone follows the host's
+Game Master, not its own settings; nothing waiting on a guest's phone is told there; a line
+the host will not take comes back into the guest's field; each guest's sheet says whose
+traveller is whose; a hello whose device id is not one is refused; the host's own
+invitation pasted as an answer is refused and still stands; "Leave the table" is a guest's
+only. The QR size row ran into a crash past version 25 and now fails by name.
+
+**No observable effect**, each checked against the whole suite: the script's `flag()`
+default (every caller reads a flag as true or false, or through `| 0`); `fillT`'s fallback
+for a name it does not know (every table's names are known); `hush()` refusing in a round
+(talk, travel and jump are all refused in one first); `freeCaptive()`'s own check (both
+callers check first); `reward()` skipping the dead (`grantXp()` refuses them too); the rule
+book's check for a strike the calling does not have (`weaponsOf()` is built from the
+calling's strikes); Sneak Attack kept off a Rogue's spells (a Rogue has none); the sheet's
+guard for a term with no page (every term has one, and the sheet is drawn again whenever
+the tale changes); a blank grab (the button is not there without words selected); Settings
+drawn again when the voice is switched (the bar's switch is under the panel); STOP's own
+`Narrator.stop()` (the telling's end stops the voice in the same task); the QR penalty for
+an unbalanced count rounded up rather than down (it moves every mask by the same 10 unless
+a code's dark share is exactly 40 or 60 % on a side divisible by five); `lootOf()` refusing
+a container that sits on something (no container is a small thing, and only small things
+sit on others: the generator, the Game Master's tool and the loader all hold to that). One
+break, Sneak Attack's, looked caught: its marker had landed inside the string the row reads.
+**Catches that rested only on noise were not counted**: with three whole suites at once,
+section 2's pairings sometimes fail, and section T's Continue row sometimes finds no key
+after its reload (16 times in this pass; it passes on a quiet machine, and why it loses the
+key under load is not yet traced).
+
+**The pass found a defect, not only holes.** A row for a ledger line's kind tried the
+name "constructor" and failed on the real page: `COST_KINDS['constructor']` is
+`Object`, which is true. The same test, a plain lookup taken as true or false, guarded the
+callings, the monsters, the things on a board, the kinds of place, the whispers, the
+matter at hand, and the people, places and tasks a Game Master's tool names. A guest's
+phone could make the host's engine throw by asking for a calling named "constructor"; a
+hostile save could do the same on loading, and through a board token naming "toString"
+set a property on the browser's own `Object.prototype.toString`. Fixed with `own()` (see
+the rule above), with rows in section Q that name "constructor" and "toString" in every
+place a file, a guest or a tool can put a name, and 18 breaks at the new sites, all caught.
+
+**The table (129 breaks): 65 caught by name on the first run** against sections U to W,
+14 more only by a crash. Of the 64 not caught by name, the older sections (Q to T, X to Z
+and 1) catch 25. **37 are closed by five rows in W**: Compare and the marks at their edges
+(nothing told, the cost of each telling, Claude's own marks beside its twins', quotes in
+the export, the twin's length and the tally's, a mark taken back and each press saved,
+marks with no tally line, the hand-moved monsters' line, the jobs and the twin locked while
+the script runs the table); the beats one at a time (a place already told queues nothing,
+a stale beat is dropped, a beat for making characters goes by whoever makes them, the
+ending said once however it comes, one model telling per monster's turn); a beat told in
+deeds and no words; and the talk and use buttons one at a time, with the table's outputs
+listened to. Those rows run first in W: nine breaks that stop a later telling had been
+caught there only by a timeout. **Two have no effect**: the saves after a word and after a
+deed (`UI.arrived()` saves after both). A check of the second had passed only on a board
+the table was not showing, and was dropped.
+
+**In all: 688 breaks** (595 in the four lists, step 4's 93) **and 18 at the `own()` fix.
+Every one is caught by a named row or written up above as having no effect.**
+
 
 ### Negative tests, the paid voice (2026-10-11, `negtest-copies.py`)
 

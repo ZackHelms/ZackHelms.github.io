@@ -989,7 +989,7 @@ makes and plays its own travellers, and sends what it taps to the host, whose en
 judges it; the host keeps the tale, the Game Master, the keys and the voice, and plays
 the travellers of anyone who goes quiet or leaves.
 **Proprietary** (one of the nine protected games; confirmed by the CD on 2026-10-10).
-Suite: `.claude/tests/drive-cyoa2.cjs` (865 checks: generators over 36 worlds, sight
+Suite: `.claude/tests/drive-cyoa2.cjs` (925 checks: generators over 36 worlds, sight
 judged by an independent line walker, fights played out by the script against the
 suite's own traveller, every tool called with one of each kind of bad input, the real
 client against a stand-in for the API, whole scripted tales played start to ending
