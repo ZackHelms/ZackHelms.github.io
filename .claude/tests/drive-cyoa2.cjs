@@ -3199,6 +3199,133 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         { let hit = null; for (let k = 0; k < 60 && !hit; k++) { const z = newGame('roll-g' + k), g = z.gold; intent(z, { t: 'party', op: 'roll', id: 'P1' }); if (CLASSES[z.party[0].cls].gold !== CLASSES.Fighter.gold) hit = { g, z }; }
           row(hit && hit.g === CLASSES.Fighter.gold && hit.z.gold === CLASSES[hit.z.party[0].cls].gold && hit.z.gold !== hit.g, 'and the purse really does follow: rolled into a calling that starts richer or poorer than a fighter, the party holds that calling\'s gold' + (hit ? ' (' + hit.z.party[0].cls + ', ' + hit.z.gold + ')' : '')); }
       }
+      /* 15. the second pass (2026-10-13): the rules a re-run of the old breaks found no row for */
+      {
+        /* a line is chosen by what it is about, and never by when it is asked */
+        { const st = party4('vary-1'), L = Array.from({ length: 50 }, (_, i) => 'line ' + i), keys = ['greet:N0', 'greet:N1', 'greet:N2', 'greet:N3', 'greet:N4', 'gang:N0', 'about:N1', 'enter:S1', 'enter:S3', 'fight:S2'];
+          const before = keys.map((k) => varyOf(st, k, L)), turn = st.turn; st.turn += 7; addMinutes(st, 300); const after = keys.map((k) => varyOf(st, k, L)); st.turn = turn;
+          row(new Set(before).size >= 6 && before.join() === after.join(), 'a line is chosen by what it is about, so different people and places get different lines (' + new Set(before).size + ' of 10 differ), and never by when it is asked: seven turns and five hours later the same ones'); }
+        /* a hand-edited tale whose threads the script has no lines for */
+        { const P = JSON.parse(JSON.stringify(packState(newGame('odd-threads')))); P.bible.threads = [{ k: 'nonsense', t: 'A matter nobody wrote.', main: true }, { k: 'gossip', t: 'An odd rumour.' }].concat(P.bible.threads.filter((t) => !t.main));
+          let ok2 = false, err = ''; try { const st = unpackState(P); ['N0', 'N1', 'N2', 'N3', 'N4'].forEach((id) => topicsFor(st, id)); ok2 = mainK(st) === 'kidnap' && !sideKs(st).includes('gossip') && sideKs(st).length >= 1 && !!beatText(st, 'opening') && !!beatText(st, 'ending'); } catch (e) { err = e.message; }
+          row(ok2, 'a tale whose threads name a matter or a whisper the script has no lines for (a hand-edited file) still plays: the matter falls back to the one every seed can deal, and the unknown whisper is left out' + (err ? ' (' + err + ')' : '')); }
+        /* a whisper settled: 75 to the living, once */
+        { const st = party4('settle-1'), k = sideKs(st)[0], x0 = st.party.map((p) => p.xp); st.party[3].status = 'dead'; hearWhisper(st, k);
+          const o1 = { lines: [] }; settleWhisper(st, k, o1); const x1 = st.party.map((p) => p.xp), g1 = st.gold, f1 = st.facts.length, q1 = Object.values(st.quests).filter((q) => q.status === 'done').length;
+          const o2 = { lines: [] }; settleWhisper(st, k, o2);
+          row(x1.slice(0, 3).every((x, i) => x - x0[i] === 75) && x1[3] === x0[3] && o1.lines.length >= 2 && o2.lines.length === 0 && st.party.map((p) => p.xp).join() === x1.join() && st.gold === g1 && st.facts.length === f1 && Object.values(st.quests).filter((q) => q.status === 'done').length === q1 && st.quests[flag(st, 'heard:' + k)].status === 'done',
+            'a whisper settled closes its task and pays 75 experience to each traveller still alive and none to the dead, once: settled again it pays nothing, says nothing and records nothing (' + k + ')'); }
+        /* a whisper heard: one task, and a fact */
+        { const st = party4('hear-1'), k = sideKs(st)[0], q1 = hearWhisper(st, k), n1 = Object.keys(st.quests).length, q2 = hearWhisper(st, k);
+          const st2 = party4('fact-1'), id = ['N0', 'N1', 'N2', 'N3', 'N4'].find((x) => whisperOf(st2, st2.npcs[x])), w = id && whisperOf(st2, st2.npcs[id]), r = id && talkOf(st2, id, 'news', false), q = w && st2.quests[flag(st2, 'heard:' + w)];
+          row(q1 && q2 === null && Object.keys(st.quests).length === n1 && flag(st, 'heard:' + k) === q1.id && r && r.ok && q && st2.facts.some((f) => f.text === q.goal),
+            'a whisper heard twice is one task, its flag remembers which; and hearing one writes it into the facts of the world, where the Game Master reads it, as well as into the tasks'); }
+        /* who knows a whisper, and whom it is put to */
+        { let n = 0, knows = 0; for (let s = 0; s < 12; s++) { const st = party4('third-' + s); for (const id of Object.keys(st.npcs)) { const nn = st.npcs[id]; if (nn.bible || nn.kind !== 'npc') continue; n++; if (whisperOf(st, nn)) knows++; } }
+          const st = seedWith((z) => sideKs(z).some((k) => WHISPERS[k].check), 'who'), k = sideKs(st).find((x) => WHISPERS[x].check); hearWhisper(st, k);
+          const holders = ['N0', 'N1', 'N2', 'N3', 'N4'].filter((id) => topicsFor(st, id).some((x) => x.id === 'w:' + k));
+          row(n >= 30 && knows / n > .15 && knows / n < .55 && holders.join() === WHISPERS[k].who, 'of the people nobody named, about one in three has heard a whisper (' + knows + ' of ' + n + '); and a whisper\'s question is put only to the one it is about (' + k + ': ' + holders.join() + ')'); }
+        /* the matter at hand, while it is open */
+        { const st = party4('matter-1'), who = () => ['N0', 'N1', 'N2', 'N3', 'N4'].filter((id) => topicsFor(st, id).some((x) => x.id === 'matter')).length, before = who(); st.quests.Q0.status = 'done';
+          const late = questNote(st, 'Q0', 'A note too late.'), notes = st.quests.Q0.notes.length;
+          row(before === 5 && who() === 0 && late === false && !st.quests.Q0.notes.some((x) => x.text === 'A note too late.') && notes === st.quests.Q0.notes.length, 'everybody can be asked about the matter at hand while it is open, nobody once it is done, and a finished task takes no more notes'); }
+        /* the script's records are bounded */
+        { const st = party4('caps-1'); for (let i = 0; i < 50; i++) addQuest(st, 'Task ' + i, 'goal'); const nq = Object.keys(st.quests).length;
+          for (let i = 0; i < 50; i++) questNote(st, 'Q0', 'note ' + i); const ns = st.quests.Q0.notes, last = ns[ns.length - 1].text;
+          for (let i = 0; i < 70; i++) sceneNote(st, 'scene ' + i);
+          row(nq === 40 && ns.length === 40 && last === 'note 49' && st.summaries.length === 60 && st.summaries[59].text === 'scene 69', 'the script\'s records are bounded: at most 40 tasks, 40 notes on a task and 60 scenes remembered, the oldest let go first'); }
+        /* who someone is to the script */
+        { const st = party4('freed-1'), nm = first(st.npcs.N6.name), g0 = greetOf(st, st.npcs.N6); freeCaptive(st, { lines: [] }); const g1 = greetOf(st, st.npcs.N6);
+          let res = null, pat = null;
+          for (let s = 0; s < 20 && !(res && pat); s++) { const z = party4('home-' + s); for (const id of Object.keys(z.sites)) chart(z, id);
+            for (const id of Object.keys(z.npcs)) { const n = z.npcs[id], h = z.sites[n.home]; if (n.bible || n.kind !== 'npc' || !h || PATRONS.includes(n.role) || /cook|scullion|pot-boy/.test(n.role || '')) continue; if (h.kind === 'house' && !res) res = [z, n]; if (h.kind === 'inn' && !pat) pat = [z, n]; } }
+          const inn = Object.keys(st.sites).find((id) => st.sites[id].kind === 'inn'), weaver = { id: 'X1', kind: 'npc', role: 'weaver', home: inn };
+          row(GREET.captive.some((l) => fillT(st, l, { n: nm }) === g0) && GREET.freed.some((l) => fillT(st, l, { n: nm }) === g1) && res && groupOf(res[0], res[1]) === 'resident' && groupOf(st, weaver) === 'patron',
+            'the captive greets from behind the bars and, once free, with a line of their own; someone met at home is a resident to the script and someone met at the inn a patron, whatever their trade'); }
+        /* the hideout's locks and what the chief's desk holds */
+        { const st = seedWith((z) => { chart(z, 'S2'); return z.maps.S2.doors.some((q) => q.kind === 'bars' && q.lock) && sideKs(z).includes('debt'); }, 'bars'); intent(st, { t: 'jump', site: 'S2' });
+          const m = st.maps.S2, d = m.doors.find((q) => q.kind === 'bars' && q.lock), vb = verbsFor(st, d.id), pk = vb.find((v) => v.verb === 'pick'), fc = vb.find((v) => v.verb === 'force'), S = plotSpots(st), desk = lootOf(st, m, thingOf(st, m, S.desk).obj);
+          const st2 = seedWith((z) => !sideKs(z).includes('debt'), 'noletter'); chart(st2, 'S2'); const S2s = plotSpots(st2), desk2 = lootOf(st2, st2.maps.S2, thingOf(st2, st2.maps.S2, S2s.desk).obj);
+          row(pk && fc && /DC 15\b/.test(pk.sub) && /DC 18\b/.test(fc.sub) && desk.items.includes('a letter in the keeper’s hand') && !desk2.items.includes('a letter in the keeper’s hand'),
+            'the bars of the cell are harder than a door (Sleight of Hand DC 15, Athletics DC 18), and the keeper\'s letter lies in the chief\'s desk on a world whose whispers include the debt, and on no other'); }
+        /* a captive still behind bars when the chief falls */
+        { const st = seedWith((z) => { chart(z, 'S2'); return z.maps.S2.tokens.some((t) => t.npc === 'N6'); }, 'found'); st.npcs.N5.status = 'dead'; const lines = plotCheck(st);
+          row(st.npcs.N6.kind === 'captive' && !lines.some((z) => /cut loose/.test(z.t)) && lines.some((z) => /gang’s keys/.test(z.t)), 'when the chief falls, a captive still behind bars stays there until someone opens the cell (the party takes the keys; only a captive with no cell to be held in is found and cut loose)'); }
+        /* the inn and the chapel */
+        { const st = party4('bed-1'); st.party[3].status = 'dead'; st.party[3].hp = 0; st.gold = 50; const paid = topicsFor(st, 'N0').find((x) => x.id === 'bed').sub; setFlag(st, 'freebed'); const fr = topicsFor(st, 'N0').find((x) => x.id === 'bed').sub, said = talkOf(st, 'N0', 'bed', true).text;
+          const m2 = party4('mend-1'); m2.party[1].hp = 0; m2.party[1].status = 'down'; m2.party[1].saves = { s: 1, f: 2 }; m2.party[2].status = 'dead'; m2.party[2].hp = 0; m2.gold = 20; m2.party[0].hp = Math.max(1, m2.party[0].hp - 1);
+          const t0 = m2.time.day * 1440 + m2.time.minute, mr = talkOf(m2, 'N3', 'mend', false);
+          row(paid === '3 gold' && fr === 'free' && /will not hear of payment/.test(said) && mr.ok && m2.party[1].hp === m2.party[1].hpMax && m2.party[1].status === 'ok' && m2.party[1].saves.s === 0 && m2.party[1].saves.f === 0 && m2.party[2].status === 'dead' && m2.party[2].hp === 0 && m2.gold === 15 && m2.time.day * 1440 + m2.time.minute === t0 + 50,
+            'a bed costs a coin for each traveller still alive, and with the keeper\'s debt settled it is free and the keeper says so; the priest\'s care takes most of an hour, brings back the fallen who still breathe with their death saves cleared, and leaves the dead dead'); }
+        /* the childhood name */
+        { const mk = () => { const z = seedWith((y) => sideKs(y).includes('kin'), 'name'); setFlag(z, 'done:kin'); intent(z, { t: 'jump', site: 'S2' }); return z; };
+          const a = mk(), b = bestCheck(leadOf(a), ['persuasion']); force(a, 20, Math.max(1, 11 - b.mod)); const ra = talkOf(a, 'N5', 'name', false);
+          const c = mk(); force(c, 20, 20); const rc = talkOf(c, 'N5', 'name', false);
+          row(11 - b.mod >= 1 && ra.ok && ra.next === 'fight' && a.npcs.N5.kind === 'foe' && rc.ok && c.npcs.N5.kind === 'npc' && c.npcs.N5.status === 'gone' && !c.maps.S2.tokens.some((t) => t.k === 'foe'),
+            'the childhood name is Persuasion against 12: one short and steel comes out; made, the chief is no longer an enemy and the gang leaves'); }
+        /* every topic of everyone, asked dry, in a tale where every kind of topic is on offer */
+        { const st = seedWith((z) => sideKs(z).includes('kin'), 'dry-all'), L = leadOf(st); st.gold = 200; st.party[1].hp = 1; for (const k of sideKs(st)) hearWhisper(st, k); setFlag(st, 'done:kin');
+          const g = MAIN[mainK(st)].goal; if (g === 'free') st.npcs.N6.kind = 'npc'; else if (g === 'relic') giveItem(L, 'silver reliquary'); else st.npcs.N5.status = 'defeated';
+          giveItem(L, 'the gang’s ledger'); giveItem(L, 'a letter in the keeper’s hand'); for (const id of Object.keys(st.sites)) chart(st, id);
+          const b2 = snap(st), roll = st.n.roll, asked = new Set();
+          for (const id of Object.keys(st.npcs)) for (const x of topicsFor(st, id)) { if (x.off) continue; const r = talkOf(st, id, x.id, true); if (r.ok) asked.add(x.id.split(':')[0]); }
+          row(['report', 'buy', 'name', 'w', 'news', 'bed', 'mend', 'gang'].every((k) => asked.has(k)) && snap(st) === b2 && st.n.roll === roll, 'every topic of everyone, asked dry in a tale where every kind is on offer (' + [...asked].sort().join(', ') + '), leaves the tale byte for byte the same and rolls no dice'); }
+        /* a lock, forced and held (the cell's bars: the only lock a hideout has) */
+        { const st = seedWith((z) => { chart(z, 'S2'); return z.maps.S2.doors.some((q) => q.lock); }, 'force'); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2; for (const t of m.tokens.slice()) if (t.k === 'foe') dropToken(st, m, t); look(st);
+          const d = m.doors.find((q) => q.lock), L = leadOf(st), q = doorSides(d).find((s) => tileFree(m, s[0], s[1]) && !taken(st, m, s[0], s[1], L.id)); L.x = q[0]; L.y = q[1]; look(st);
+          const t0 = st.time.minute, n0 = st.log.length; force(st, 20, 1); const r1 = useOf(st, { what: d.id, verb: 'force' }), t1 = st.time.minute, v = verbsFor(st, d.id).find((x) => x.verb === 'force');
+          giveItem(L, 'the gang’s keys'); const r2 = useOf(st, { what: d.id, verb: 'unlock' });
+          row(r1.ok && t1 === t0 + 1 && v && /has tried/.test(v.off) && r2.ok && !d.lock && d.open && st.log.slice(n0).some((e) => e.t === 'door' && e.id === d.id && e.open),
+            'a lock forced and held takes a minute and cannot be forced again by the same traveller; unlocked with the gang\'s keys, the door stands open and the journal says so'); }
+        /* searching the chief\'s desk */
+        { const st = seedWith((z) => sideKs(z).includes('ledger'), 'desk'); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2; for (const t of m.tokens.slice()) if (t.k === 'foe') dropToken(st, m, t); look(st);
+          const S = plotSpots(st), T = thingOf(st, m, S.desk), L = leadOf(st), q = T.stand.find((s) => !taken(st, m, s[0], s[1], L.id)); L.x = q[0]; L.y = q[1]; look(st);
+          const r = useOf(st, { what: T.id, verb: T.obj.a === 'chest' ? 'unlock' : 'search' }); if (r.ok && T.obj.a === 'chest') useOf(st, { what: T.id, verb: 'search' });
+          row(r.ok && carries(st, 'the gang’s ledger') && !!flag(st, 'heard:ledger') && st.facts.some((f) => /has been emptied/.test(f.text) && f.text.includes(T.id)), 'the ledger found in the chief\'s desk is at once a task of its own (who would want it in town), and the emptied desk is a fact the Game Master is told'); }
+        /* the beats in the script's words */
+        { const st = party4('beats-1'); intent(st, { t: 'jump', site: 'S0' }); let hidden = 0, listed = 0, ok3 = true;
+          for (const id of ['S0', 'S1', 'S3', 'S4', 'S5']) { intent(st, { t: 'jump', site: id }); const m = st.maps[id], V = visOf(st).g, S = sceneOf(st), L = leadOf(st), r = roomAt(m, L.x, L.y), ri = r ? m.rooms.indexOf(r) + 1 : 0;
+            for (const t of m.tokens) { if (!st.npcs[t.npc]) continue; const seen = !!V[t.y * m.w + t.x], inS = S.folk.concat(S.foes).some((x) => x.t === t); if (inS !== seen) ok3 = false; if (!seen) hidden++; else listed++; }
+            const names = new Set(); for (const o of m.objs) { if (o.on || SCATTER[o.a] || ASSETS[o.a].lay === 'd') continue; const f = footprint(o); if (V[f.y * m.w + f.x] && (!ri || m.rg[f.y * m.w + f.x] === ri)) names.add(ASSETS[o.a].n.toLowerCase()); }
+            if (S.things.length > 3 || S.things.some((x) => !names.has(x))) ok3 = false; }
+          const fake = (k) => Array.from({ length: k }, (_, i) => ({ n: { bible: false, role: 'carter', trait: '' }, t: {} })), many = folkLine(st, { folk: fake(7) }), few = folkLine(st, { folk: fake(3) });
+          const sleepy = foeLine(st, { foes: [{ n: { id: 'X', role: 'bandit', sheet: { asleep: 5 } } }, { n: { id: 'Y', role: 'bandit', sheet: { asleep: 5 } } }] }), awake = foeLine(st, { foes: [{ n: { id: 'X', role: 'bandit', sheet: { asleep: 5 } } }, { n: { id: 'Y', role: 'bandit', sheet: {} } }] });
+          row(ok3 && hidden > 0 && listed > 0 && /and four more besides\.$/.test(many) && /are here\.$/.test(few) && /slumped and snoring/.test(sleepy) && /no friend of yours/.test(awake),
+            'a place first entered is told as it is seen: the people in sight and nobody else (' + listed + ' in sight, ' + hidden + ' not), at most three things and only those in the room the party stands in, a crowd summed up past four, and bandits snoring only when every one of them is asleep'); }
+        /* a room told is that room: a spot where the eye reaches into the next room, with fewer than three things in its own */
+        { let hit = null;
+          for (let k = 0; k < 40 && !hit; k++) { const st = party4('room-' + k); for (const id of Object.keys(st.sites)) chart(st, id);
+            for (const id of Object.keys(st.sites)) { if (hit || id === 'S0' || id === 'S2') continue; intent(st, { t: 'jump', site: id }); const m = st.maps[id], L = leadOf(st);
+              for (let y = 0; y < m.h && !hit; y++) for (let x = 0; x < m.w && !hit; x++) { const ri = m.rg[y * m.w + x]; if (!ri || !tileFree(m, x, y) || taken(st, m, x, y, L.id)) continue; L.x = x; L.y = y; look(st); const V = visOf(st).g, inN = new Set(), outN = new Set();
+                for (const o of m.objs) { if (o.on || SCATTER[o.a] || ASSETS[o.a].lay === 'd') continue; const f = footprint(o); if (!V[f.y * m.w + f.x]) continue; (m.rg[f.y * m.w + f.x] === ri ? inN : outN).add(ASSETS[o.a].n.toLowerCase()); }
+                const only = [...outN].filter((n) => !inN.has(n)); if (inN.size < 3 && only.length) hit = { st, only, things: sceneOf(st).things }; } } }
+          row(hit && hit.only.every((n) => !hit.things.includes(n)), 'a room first entered is told as that room: things the eye can see in the room beyond (' + (hit ? hit.only.join(', ') : 'none found') + ') are not counted among its own'); }
+        { const st = party4('beats-2'); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2, P = st.party[0], tok = m.tokens.find((t) => t.k === 'foe'), f = freeNear(st, m, tok.x, tok.y, P.id); P.x = f[0]; P.y = f[1]; look(st);
+          intent(st, { t: 'rounds', op: 'start' }); const fight = beatText(st, 'fight'), who = nameOf(st, turnOf(st));
+          const left = beatText(st, 'fightend', 'The fight is won.'), none = (() => { for (const t of m.tokens.slice()) if (t.k === 'foe') dropToken(st, m, t); return beatText(st, 'fightend', 'The fight is won.'); })();
+          const inn = beatText(st, 'fightend', 'The party is beaten. They wake at the inn.'), lost = beatText(st, 'fightend', 'The party is beaten.');
+          const e1 = party4('end-1'); e1.fallen.push({ name: 'Ada Vell', cls: 'Fighter', level: 1, day: 1 }); const end = beatText(e1, 'ending');
+          row(fight.includes(who + ' is quickest, and moves first.') && /not empty yet/.test(left) && !/not empty yet/.test(none) && /a bed at /.test(inn) && /nobody is left/.test(lost) && /Ada Vell lies in the chapel yard/.test(end),
+            'the fight\'s beats say who is quickest, whether anything is still out there when it is won, where a beaten party wakes if it wakes at all; and the ending names the fallen'); }
+        /* the script's twin for a typed line, and for a line typed to the table */
+        { const st = seedWith((z) => sideKs(z).includes('kin'), 'twin-k'); setFlag(st, 'done:kin'); intent(st, { t: 'jump', site: 'S2' });
+          const tn = talkTwin(st, 'N5', 'I call out the childhood name'); const s2 = party4('twin-off'); s2.gold = 0; const to = talkTwin(s2, 'N2', 'I want to buy a crowbar');
+          row(!/^\[Call out/.test(tn) && /answers topics, not typed lines/.test(to) && !/Buy /.test(to), 'the script\'s version of a typed line never calls out the childhood name (that is the dice\'s to settle), and never offers what the purse cannot pay for'); }
+        { const st = party4('acttwin'); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2; for (const t of m.tokens.slice()) if (t.k === 'foe') dropToken(st, m, t); look(st);
+          const L = leadOf(st), near = (x, y) => m.objs.some((o) => !o.on && verbsFor(st, o.id).length && cheb(o, { x, y }) <= 3) || m.doors.some((d) => d.lock && doorSides(d).some((q) => Math.max(Math.abs(q[0] - x), Math.abs(q[1] - y)) <= 3));
+          let far = null; for (let y = 0; y < m.h && !far; y++) for (let x = 0; x < m.w && !far; x++) if (tileFree(m, x, y) && !taken(st, m, x, y, L.id) && !near(x, y)) far = [x, y];
+          L.x = far[0]; L.y = far[1]; const a1 = actTwin(st);
+          const ch = m.objs.find((o) => !o.on && verbsFor(st, o.id).some((v) => v.verb === 'pick')), T = thingOf(st, m, ch.id), q = T.stand.find((s) => !taken(st, m, s[0], s[1], L.id)); L.x = q[0]; L.y = q[1]; setFlag(st, 'tried:' + thingKey(m, ch.id) + ':pick:' + L.id); const a2 = actTwin(st);
+          row(/walking, doors, and whoever is in sight/.test(a1) && !/Pick the lock/.test(a2) && /Force it/.test(a2), 'the script\'s answer to a line typed to the table offers only what is within three squares (nothing, from the middle of a cave floor) and never a deed this traveller has already tried'); }
+        /* the monsters' twin plays every monster before the first traveller, and says how a fight it ends ended */
+        { const st = party4('twin-2'); for (let k = 0; k < 3; k++) intent(st, { t: 'party', op: 'drop', id: st.party[st.party.length - 1].id }); intent(st, { t: 'jump', site: 'S2' });
+          const m = st.maps.S2, P = st.party[0], foes = m.tokens.filter((t) => t.k === 'foe'), two = foes.find((t) => foes.some((u) => u !== t && cheb(u, t) <= 2)) || foes[0], f = freeNear(st, m, two.x, two.y, P.id); P.x = f[0]; P.y = f[1]; look(st);
+          intent(st, { t: 'rounds', op: 'start' }); const R = st.round, fo = R.order.filter((c) => c.k === 'foe');
+          R.order = fo.concat(R.order.filter((c) => c.k !== 'foe')); R.i = 0;
+          const names = fo.slice(0, 2).map((c) => nameOf(st, { pc: false, o: m.tokens.find((t) => t.id === c.id) }).split(' ')[0]), text = monstersTwin(JSON.stringify(packState(st)));
+          P.hp = 1; force(st, 20, 20); const ended = monstersTwin(JSON.stringify(packState(st)));
+          row(fo.length >= 2 && names.every((n) => text.includes(n)) && /The party is beaten|nobody is left|fight is won|over/i.test(ended), 'what the script would have done with the monsters\' turns is every monster\'s turn until a traveller\'s (' + names.join(' and ') + '), and when a blow of theirs ends the fight it says so'); }
+      }
       return rows;
     }, 24);
     for (const [c, m] of rows) ok(c, m);
