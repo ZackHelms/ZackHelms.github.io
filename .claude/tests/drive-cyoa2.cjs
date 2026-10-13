@@ -3300,6 +3300,34 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
                 for (const o of m.objs) { if (o.on || SCATTER[o.a] || ASSETS[o.a].lay === 'd') continue; const f = footprint(o); if (!V[f.y * m.w + f.x]) continue; (m.rg[f.y * m.w + f.x] === ri ? inN : outN).add(ASSETS[o.a].n.toLowerCase()); }
                 const only = [...outN].filter((n) => !inN.has(n)); if (inN.size < 3 && only.length) hit = { st, only, things: sceneOf(st).things }; } } }
           row(hit && hit.only.every((n) => !hit.things.includes(n)), 'a room first entered is told as that room: things the eye can see in the room beyond (' + (hit ? hit.only.join(', ') : 'none found') + ') are not counted among its own'); }
+        /* the plot as a model can leave it: a chief made friendly, a chief gone, a freed captive killed */
+        { const mk = (main) => seedWith((z) => mainK(z) === main, 'plot-' + main);
+          const a1 = mk('toll'), e1 = exec(a1, 'update_npc', { npc_id: 'N5', attitude: 'friendly' }), a2 = mk('toll'), e2 = exec(a2, 'update_npc', { npc_id: 'N5', status: 'gone' });
+          const c1 = mk('kidnap'); freeCaptive(c1, { lines: [] }); const freed = goalMet(c1), e3 = exec(c1, 'update_npc', { npc_id: 'N6', status: 'dead' });
+          row(e1.ok && a1.npcs.N5.kind === 'npc' && goalMet(a1) && e2.ok && a2.npcs.N5.kind === 'foe' && goalMet(a2) && freed && e3.ok && !goalMet(c1),
+            'the plot is the engine\'s whoever moved it: a chief the Game Master makes friendly, or sends away, no longer holds the hill; a captive freed and then killed was not brought home'); }
+        /* a key lying on the chief's desk is the desk, to a tap */
+        { const st = party4('on-desk'); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2, kid = m.objs.find((o) => o.on && CONTAINERS[(m._.byId.get(o.on) || {}).a]), T = kid && thingOf(st, m, kid.id);
+          row(kid && T && T.id === kid.on && verbsFor(st, kid.id).length > 0 && verbsFor(st, kid.id).map((v) => v.verb).join() === verbsFor(st, kid.on).map((v) => v.verb).join(), 'a small thing lying on a chest, a crate or the desk is that container to a tap: it offers what the container offers (' + (kid ? kid.a + ' on a ' + m._.byId.get(kid.on).a : 'none') + ')'); }
+        /* nobody searches a chest through a wall */
+        { let bad = 0, n = 0;
+          for (let k = 0; k < 8; k++) { const st = party4('reach-' + k); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2;
+            for (const o of m.objs) { if (o.on || !CONTAINERS[o.a]) continue; const T = thingOf(st, m, o.id), f = footprint(o);
+              for (const [x, y] of T.stand) { if (x >= f.x && x < f.x + f.w && y >= f.y && y < f.y + f.h) continue; n++; const nx = clamp(x, f.x, f.x + f.w - 1), ny = clamp(y, f.y, f.y + f.h - 1); if (!meleeClear(m, x, y, nx, ny)) bad++; } } }
+          row(n > 50 && bad === 0, 'a thing is searched only from a square that reaches it, as a blow would: never through a wall or round a corner (' + n + ' squares beside things in eight hideouts)'); }
+        /* the freed captive stays where they were seen home */
+        { const st = seedWith((z) => mainK(z) === 'kidnap', 'home-c'); intent(st, { t: 'jump', site: 'S2' }); freeCaptive(st, { lines: [] }); intent(st, { t: 'jump', site: 'S0' });
+          const at = () => { const t = st.maps.S0.tokens.find((q) => q.npc === 'N6'); return t ? t.x + ',' + t.y : ''; }, home = at();
+          const t = st.maps.S0.tokens.find((q) => q.npc === 'N6'), sp = t && freeNear(st, st.maps.S0, t.x + 3, t.y, ''); if (sp) moveToken(st.maps.S0, t, sp[0], sp[1]); const moved = at();
+          intent(st, { t: 'jump', site: 'S1' }); intent(st, { t: 'jump', site: 'S0' });
+          row(home && moved !== home && at() === moved, 'a freed captive is seen home once, when the party comes down from the hideout: leaving the town afterwards does not fetch them back to the elder\'s side'); }
+        /* the monsters' twin stops at the first traveller */
+        { const st = party4('twin-3'); for (let k = 0; k < 3; k++) intent(st, { t: 'party', op: 'drop', id: st.party[st.party.length - 1].id }); intent(st, { t: 'jump', site: 'S2' });
+          const m = st.maps.S2, P = st.party[0], foes = m.tokens.filter((t) => t.k === 'foe'), two = foes.find((t) => foes.some((u) => u !== t && cheb(u, t) <= 2)) || foes[0], f = freeNear(st, m, two.x, two.y, P.id); P.x = f[0]; P.y = f[1]; look(st);
+          intent(st, { t: 'rounds', op: 'start' }); const R = st.round, fo = R.order.filter((c) => c.k === 'foe'), pc = R.order.find((c) => c.k === 'pc');
+          R.order = [fo[0], pc, fo[1]].filter(Boolean); R.i = 0;
+          const nm = (c) => nameOf(st, { pc: false, o: m.tokens.find((t) => t.id === c.id) }), text = monstersTwin(JSON.stringify(packState(st)));
+          row(fo.length >= 2 && text.includes(nm(fo[0]).split(' ')[0]) && !text.includes(nm(fo[1])), 'and it stops at the first traveller\'s turn: a monster that comes after them in the order is not played (' + (fo[1] ? nm(fo[1]) : '?') + ')'); }
         { const st = party4('beats-2'); intent(st, { t: 'jump', site: 'S2' }); const m = st.maps.S2, P = st.party[0], tok = m.tokens.find((t) => t.k === 'foe'), f = freeNear(st, m, tok.x, tok.y, P.id); P.x = f[0]; P.y = f[1]; look(st);
           intent(st, { t: 'rounds', op: 'start' }); const fight = beatText(st, 'fight'), who = nameOf(st, turnOf(st));
           const left = beatText(st, 'fightend', 'The fight is won.'), none = (() => { for (const t of m.tokens.slice()) if (t.k === 'foe') dropToken(st, m, t); return beatText(st, 'fightend', 'The fight is won.'); })();
