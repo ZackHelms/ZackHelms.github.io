@@ -1664,6 +1664,19 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         row(e && e.gold === 0 && e.time.day === 1 && e.time.minute === 1439 && e.turn === 0 && e.over === '' && e.story.length === 2 && e.story[0].text.length === 6000 && e.story[1].k === '<b>' && e.costs.length === 1 && e.costs[0].kind === 'gm' && e.costs[0].calls === 0 && e.facts.length === 1 && e.facts[0].text.length === 280 && e.facts[0].subject.length <= 12 &&
           Object.keys(e.quests).join() === 'Q0' && e.quests.Q0.status === 'active' && e.quests.Q0.title === 'A task' && Object.keys(e.told).join() === 'open' && e.fallen[0].cls === 'Fighter' && e.fallen[0].level === 5,
           'the purse, the clock, the story, the ledger, the facts and the quests out of a hostile file are all bounded and plain');
+        /* names every object answers to ("constructor", "toString"), wherever a file, a guest or a tool can put a name */
+        { const pr = newGame('proto-1'); intent(pr, { t: 'party', op: 'add' }); intent(pr, { t: 'jump', site: 'S2' }); const h = JSON.parse(JSON.stringify(packState(pr))); h.party[1].site = 'toString'; h.npcs.N5.sheet = { tpl: 'constructor', hp: 5 };
+          h.party[0].cls = 'constructor'; h.fallen = [{ name: 'A', cls: '__proto__', level: 1 }]; h.bible.threads.push({ k: 'toString', t: 'x', main: false }); h.bible.threads.find((x) => x.main).k = 'constructor';
+          h.sites.S0.kind = 'constructor'; h.maps.S0.kind = 'valueOf'; h.maps.S0.objs.push({ id: 'Ox', a: 'constructor', x: 1, y: 1 }); h.maps.S2.tokens.find((t) => t.k === 'foe').npc = 'toString'; h.costs = [{ kind: 'hasOwnProperty', usd: 1 }];
+          let q = null; try { q = unpackState(JSON.parse(JSON.stringify(h).replace('"maps":{', '"maps":{"__proto__":' + JSON.stringify(h.maps.S0) + ','))); } catch (x) { q = null; }
+          if (q) try { look(q); for (const t of q.maps.S2.tokens) if (t.k === 'foe') sheetOf(q, t, true); } catch (x) { q = null; }
+          row(q && q.party.length === 1 && q.party[0].cls === 'Fighter' && q.npcs.N5.sheet && q.npcs.N5.sheet.tpl !== 'constructor' && q.fallen[0].cls === 'Fighter' && !sideKs(q).includes('toString') && mainK(q) === 'kidnap' && sightOf(q.maps.S0) === 16 && !q.maps.S0.objs.some((o) => o.id === 'Ox') && Object.getPrototypeOf(q.maps) === Object.prototype &&
+            q.costs[0].kind === 'gm' && q.maps.S2.tokens.every((t) => !t.npc || Object.prototype.hasOwnProperty.call(q.npcs, t.npc)) && !('sheet' in Object.prototype.toString) && !/function|native code/.test(boardDigest(q) + bibleText(q) + turnContext(q, { text: '' })),
+            'a file that names a calling, a whisper, a kind of place, a board, a thing, a monster, a person or a ledger line "constructor" or "toString" (names every object answers to) has them read as unknown, like any other wrong name, and nothing outside the tale is touched');
+          const tr = (f) => { try { return f(); } catch (x) { return { why: 'threw' }; } }, w = newGame('proto-2'), g0 = w.gold, add = tr(() => intent(w, { t: 'party', op: 'add', cls: 'constructor' })), chg = tr(() => intent(w, { t: 'party', op: 'class', id: 'P1', cls: 'toString' })), jmp = tr(() => intent(w, { t: 'jump', site: 'constructor' }));
+          const t1 = tr(() => exec(w, 'update_npc', { npc_id: 'constructor', attitude: 'hostile' })), t2 = tr(() => exec(w, 'update_quest', { quest_id: 'toString', op: 'note', note: 'x' })), t3 = tr(() => exec(w, 'create_npc', { role: 'bandit', hostile: true, template: 'constructor', near: 'P1' }));
+          row(add.ok && CLASS_ORDER.includes(w.party[1].cls) && chg.why === 'noclass' && w.party[0].cls === 'Fighter' && w.gold === g0 + CLASSES[w.party[1].cls].gold && jmp.why === 'uncharted' && !t1.ok && !t2.ok && !t3.ok && !('attitude' in Object),
+            'and so does an act or a Game Master\'s tool that names one: a new traveller gets a real calling, a calling, a place, a person, a task or a monster by such a name is refused'); }
         { const ev2 = JSON.parse(JSON.stringify(packState(st))); Object.assign(ev2.party[1], { hp: 5, status: 'down', saves: { s: 2, f: 2 } }); Object.assign(ev2.party[2], { hp: 3, status: 'dead' }); ev2.over = 'dead'; ev2.v = 99;
           let newer = ''; try { unpackState(ev2); } catch (x) { newer = String(x.message); }
           ev2.v = 3; let e2 = null; try { e2 = unpackState(ev2); } catch (x) { e2 = null; }
@@ -4115,6 +4128,14 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     const vBest = await pickV('');
     ok(vFred === 'com.apple.voice.compact.en-US.Fred/en-US/1' && vSys === '//1' && vBest === 'com.apple.voice.premium.en-US.Zoe/en-US/1.5' && (await pg.evaluate(() => JSON.parse(localStorage.getItem('cyoa2.settings.v1')).rate)) === 1.5,
       'the voice chosen is the voice that speaks, "whatever this device is set to" hands the device no voice and no language to override its own, and the pace set is the pace spoken at and is remembered');
+    const vq = await pg.evaluate(() => { const sel = document.getElementById('set-voiceuri'), opts = [...sel.options].map((o) => o.textContent), d = Settings.data, keep = d.voiceURI;
+      d.voiceURI = 'com.example.voice.gone'; UI.voices(); const gone = sel.value; d.voiceURI = keep; UI.voices();
+      const h = Speech.has, ls = Listen.supported; Speech.has = () => false; Listen.supported = () => false; UI.settings(); const dis = sel.disabled, rows = document.getElementById('listen-rows').hidden; Speech.has = h; Listen.supported = ls; UI.settings();
+      const kv = Speech.voices; window.__synth.none = true; Speech.voices = []; document.getElementById('toast').textContent = ''; window.__spoken.length = 0; document.getElementById('set-voice-test').click();
+      const none = { toast: document.getElementById('toast').textContent, said: window.__spoken.filter((u) => u.volume !== 0).length }; window.__synth.none = false; Speech.voices = kv; UI.settings();
+      return { daniel: opts.find((t) => t.startsWith('Daniel')), fred: opts.find((t) => t.startsWith('Fred')), gone, dis, rows, back: sel.disabled || document.getElementById('listen-rows').hidden, none }; });
+    ok(vq.daniel === 'Daniel (en-GB, Enhanced)' && vq.fred === 'Fred (en-US)' && vq.gone === '' && vq.dis && vq.rows && !vq.back && /No voice is on offer/.test(vq.none.toast) && vq.none.said === 0,
+      'each voice says how good it is where the device says so; a voice chosen once that the device no longer has falls back to the best one here; where the browser cannot read aloud, or listen, those rows are off; and "Hear it" with no voice on offer says so');
     const samp = await pg.evaluate(async () => { const box = document.getElementById('set-voice'); box.checked = false; box.dispatchEvent(new Event('change', { bubbles: true })); window.__spoken.length = 0;
       const pressed = document.getElementById('voice-btn').getAttribute('aria-pressed'), on = Settings.data.voiceOn; document.getElementById('set-voice-test').click(); await new Promise((res) => setTimeout(res, 400));
       const said = window.__said().map((u) => u.text); UI.script('narrate', 'Not this, though.'); await new Promise((res) => setTimeout(res, 200)); const after = window.__said().length;
@@ -4144,6 +4165,19 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     ok(edge.pair >= 250, 'cut off and given something new at once, the narrator reads the new sentences one after the other (' + edge.pair + ' ms apart): the cut-off reading does not wake up and hand over a second sentence beside the first');
     ok(edge.half === 'Read in full.', 'silenced while a telling is still arriving, the narrator forgets the half sentence it was holding: the end of that telling reads nothing more');
     await X1.ctx.close();
+  }
+  /* a page that starts silent: the first touch asks the device for nothing, so turning the voice on, or "Hear it", must */
+  {
+    const X9 = await open({ width: 390, height: 844 }, null, { storyOpen: true, voiceOn: false, seed: 'voice-9' }), pg = X9.page;
+    await X9.ctx.addInitScript(FAKES); await pg.reload(); await pg.waitForFunction(() => typeof newGame === 'function' && typeof View === 'object');
+    await pg.evaluate(() => { Session.reset(); G.st = newGame('voice-9'); UI.enterPlay(true); }); await pg.waitForFunction(() => document.body.classList.contains('in-play') && !document.getElementById('veil').classList.contains('on'), null, { timeout: 8000 });
+    await pg.evaluate(() => { UI.closeDialog(); UI.closePanels(); }); await pg.waitForTimeout(150);
+    await pg.tap('#story-log'); const p0 = await pg.evaluate(() => window.__primes);
+    await pg.tap('#voice-btn'); const p1 = await pg.evaluate(() => ({ n: window.__primes, on: Settings.data.voiceOn }));
+    await pg.evaluate(() => { UI.voice(false); Speech.primed = false; window.__primes = 0; UI.settings(); UI.openPanel('pan-settings'); }); await pg.waitForTimeout(150);
+    await pg.tap('#set-voice-test'); await pg.waitForTimeout(300); const p2 = await pg.evaluate(() => window.__primes);
+    ok(p0 === 0 && p1.n === 1 && p1.on && p2 === 1, 'with the narrator off a touch asks the device for nothing; turning it on asks for leave to speak in that same touch, and so does "Hear it" with the narrator off');
+    await X9.ctx.close();
   }
   }
 
@@ -4195,7 +4229,8 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     await pg.evaluate(() => { document.getElementById('say').value = 'Tell me everything.'; document.getElementById('say-send').click(); });
     await speaking(pg, 1);
     const stopR0 = await pg.evaluate(() => ({ stop: document.getElementById('say-stop').hidden, send: document.getElementById('say-send').hidden, mic: document.getElementById('mic').hidden, c: window.__cancels }));
-    await pg.tap('#say-stop'); await calm(); await pg.waitForTimeout(600);
+    if (!stopR0.stop) await pg.tap('#say-stop'); else await pg.evaluate(() => { if (G.abort) G.abort.abort(); Narrator.stop(); });      /* a STOP that is not there fails the row by name */
+    await calm(); await pg.waitForTimeout(600);
     const stopR = await pg.evaluate(() => ({ n: window.__said().length, c: window.__cancels, busy: Narrator.busy(), gbusy: G.busy }));
     ok(!stopR0.stop && stopR0.send && stopR0.mic && stopR.n === 1 && stopR.c > stopR0.c && !stopR.busy && !stopR.gbusy, 'STOP stops the voice as well as the telling; while a model is telling, STOP is the only button at the end of the line');
     await pg.evaluate(() => { document.getElementById('say').value = ''; UI.sayBtns(); window.__gm = null; });
@@ -4233,6 +4268,9 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     const more = await pg.evaluate(() => { const say = document.getElementById('say'); say.value = 'First this'; UI.sayBtns(); const shown = document.getElementById('mic').hidden; Listen.start(); const r = window.__recs[window.__recs.length - 1];
       r.hear([[' then that', true]], 0); const v = say.value; r.hear([[' then that', true], [' x'.repeat(400), true]], 1); const len = say.value.length; r.stop(); say.value = ''; UI.sayBtns(); return { shown, v, len }; });
     ok(more.shown === true && more.v === 'First this then that' && more.len >= 598 && more.len <= 600, 'speech is added after what was already typed, and the field holds 600 letters however long someone talks');
+    const liveTyped = await pg.evaluate(() => { const say = document.getElementById('say'); say.value = ''; Listen.start(); const r = window.__recs[window.__recs.length - 1]; r.hear([['over there', false]], 0); say.dispatchEvent(new Event('input', { bubbles: true }));
+      const out = [document.getElementById('mic').hidden, document.getElementById('say-send').hidden].join(); r.abort(); say.value = ''; UI.sayBtns(); return out; });
+    ok(liveTyped === 'false,true', 'while it listens the microphone stays at the end of the line, to be tapped to stop, even once words are in the field and a key is pressed');
     const folded = await pg.evaluate(() => { UI.storyOpen(false, true); const was = document.getElementById('story').classList.contains('open'); Listen.start(); const r = window.__recs[window.__recs.length - 1], now = document.getElementById('story').classList.contains('open'); r.abort(); UI.storyOpen(true, true); return { was, now }; });
     ok(!folded.was && folded.now, 'the story opens when the microphone starts, if it was folded away, so that what is heard can be seen being written');
     await pg.evaluate(() => { Settings.data.autoSend = true; Settings.data.srLang = 'en-GB'; });
@@ -4299,8 +4337,10 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       row(e.ok && len === NOTE_LEN && d.ok && !st.notes.some((n) => n.id === 'J2') && f.id === 'J4' && t.ok && t.dropped === 1 && st.notes.map((n) => n.id).join() === 'J1,J4', 'a note can be rewritten (to ' + NOTE_LEN + ' letters and no more) or removed; a removed note\'s number is not used again; and leaving the page drops the ones left blank');
       { const os = newGame('notes-e6'); const k1 = intent(os, { t: 'jot', op: 'add', text: 'one', src: 'theirs' }), k2 = intent(os, { t: 'jot', op: 'add', text: 'two', src: { toString: () => 'story' } }), k3 = intent(os, { t: 'jot', op: 'add', text: 'three', src: 'story' });
         row(k1.ok && k2.ok && k3.ok && os.notes.map((n) => n.src).join() === 'mine,mine,story', 'a note is from the story or it is the players\' own: any other word for where it came from is read as their own'); }
-      const full = newGame('notes-e2'); let last = null; for (let k = 0; k < NOTES_MAX + 1; k++) last = intent(full, { t: 'jot', op: 'add', text: 'n' + k });
-      row(full.notes.length === NOTES_MAX && last.why === 'fullnotes' && /full/.test(last.say), 'the page holds ' + NOTES_MAX + ' notes, and says so when it is full');
+      const full = newGame('notes-e2'); let last = null; for (let k = 0; k < 301; k++) last = intent(full, { t: 'jot', op: 'add', text: 'n' + k });
+      row(full.notes.length === 300 && last.why === 'fullnotes' && /full/.test(last.say), 'the page holds 300 notes, and says so when it is full');
+      { const cr = newGame('notes-e7'); intent(cr, { t: 'jot', op: 'add', text: 'one\r\ntwo\rthree' }); const t1 = cr.notes[0].text; intent(cr, { t: 'jot', op: 'edit', id: cr.notes[0].id, text: 'four\r\nfive' });
+        row(t1 === 'one\ntwothree' && cr.notes[0].text === 'four\nfive', 'a note keeps its line breaks as plain ones, whichever kind the keyboard sent'); }
       /* at any time: in a round, and after the tale is over */
       const r = newGame('notes-e3'); intent(r, { t: 'jump', site: 'S2' }); intent(r, { t: 'rounds', op: 'start' }); const inR = intent(r, { t: 'jot', op: 'add', text: 'in a fight' }); r.over = 'dead'; const after = intent(r, { t: 'jot', op: 'add', text: 'afterwards' }), moved = intent(r, { t: 'rest', kind: 'short' });
       row(!!r.round && inR.ok && after.ok && moved.why === 'over' && r.notes.length === 2, 'a note can be written in the middle of a round, and after the tale is over, when nothing else can be done');
@@ -4368,6 +4408,16 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       const n1 = G.st.notes.map((n) => n.id).join(), rows = document.querySelectorAll('#notes-list li').length; intent(G.st, { t: 'jot', op: 'add', text: '' }); intent(G.st, { t: 'jot', op: 'add', text: '   ' }); const n2 = G.st.notes.length; document.querySelector('#pan-notes [data-close]').click();
       return { b, n1, rows, n2, n3: G.st.notes.length, open: document.getElementById('pan-notes').classList.contains('open') }; });
     ok(page2.b === 0 && page2.n1 === 'J1,J3,J4' && page2.rows === 3 && page2.n2 === 5 && page2.n3 === 3 && !page2.open, 'markup typed into a note is shown as the letters it is; the cross removes a note; and notes left blank are gone when the page is closed');
+    /* what the cross and the closing change is saved; the last note gone, the page says how to make one; a full page refuses a note out loud */
+    const saved = async () => pg.evaluate(async () => { const rec = await Store.get('auto'); return rec && rec.data ? rec.data.notes.map((n) => n.id + ':' + n.text).join('|') : '?'; });
+    const crossA = await pg.evaluate(() => { const st = G.st; for (const n of st.notes.slice()) intent(st, { t: 'jot', op: 'drop', id: n.id }); intent(st, { t: 'jot', op: 'add', text: 'only one' }); UI.notes(); UI.openPanel('pan-notes'); UI.saveNow();
+      const max = [...document.querySelectorAll('#notes-list textarea')].every((t) => t.maxLength === NOTE_LEN); document.querySelector('#notes-list .note-del').click(); return { max, none: document.getElementById('notes-none').hidden }; });
+    await pg.waitForTimeout(1500); const crossB = await saved();
+    await pg.evaluate(() => { intent(G.st, { t: 'jot', op: 'add', text: '' }); UI.saveNow(); });
+    await pg.waitForTimeout(300); const blankA = await saved(); await pg.evaluate(() => document.querySelector('#pan-notes [data-close]').click()); await pg.waitForTimeout(1500); const blankB = await saved();
+    const fullUI = await pg.evaluate(() => { const st = G.st; while (st.notes.length < 300) intent(st, { t: 'jot', op: 'add', text: 'x' }); document.getElementById('toast').textContent = ''; const r = UI.keep('one too many', 'story'), t = document.getElementById('toast').textContent, n = st.notes.length; st.notes.length = 0; return { r, t, n }; });
+    ok(crossA.max && crossA.none === false && crossB === '' && /:$/.test(blankA) && blankB === '' && fullUI.r === null && /full/.test(fullUI.t) && !/Kept/.test(fullUI.t) && fullUI.n === 300,
+      'a note\'s field takes 2000 letters at most; the cross is saved at once, and taking the last note away brings back how to make one; a blank note dropped on closing is dropped from the save too; and a full page says so when asked to keep one more');
     const empty = await pg.evaluate(() => { const st = G.st; for (const n of st.notes.slice()) intent(st, { t: 'jot', op: 'drop', id: n.id }); UI.notes(); UI.openPanel('pan-notes'); const r = { none: document.getElementById('notes-none').hidden, text: document.getElementById('notes-none').textContent, rows: document.querySelectorAll('#notes-list li').length }; UI.closePanels(); return r; });
     ok(empty.none === false && /Select words in the story/.test(empty.text) && empty.rows === 0, 'an empty page says how a note is made, and only an empty page does');
     await X3.ctx.close();
@@ -4419,6 +4469,25 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       giveItem(W, 'healing draught'); giveItem(W, 'the gang’s keys'); const dr = ruleLines(ruleOf(w, W, 'item', 'healing draught')).join(' '), ky = ruleLines(ruleOf(w, W, 'item', 'the gang’s keys')).join(' '), cm = ruleLines(ruleOf(w, W, 'item', 'chain mail')).join(' ');
       row(dr.includes(ITEMS['healing draught'].t) && dr.includes('for ' + ITEMS['healing draught'].price + ' gold') && /action of whoever is acting/.test(dr) && !/matters to the tale/.test(dr) && !/action of whoever/.test(ky) && ky.includes(ITEMS['the gang’s keys'].t) && /matters to the tale/.test(ky) && !/gold/.test(ky) && /counted in Armour/.test(cm) && !/sells|tale/.test(cm),
         'a thing with a rule of its own says the rule, what the shop asks for it, and whether the tale turns on it; a thing with none says only what it is');
+      /* every number a page prints is this traveller's own, at every level (the second negative-test pass) */
+      const capS = (s) => s.replace(/^./, (c) => c.toUpperCase()), nb = [];
+      for (const lvl of [1, 3, 5]) {
+        const b = newGame('book-6'); for (let k = 0; k < 5; k++) intent(b, { t: 'party', op: 'add' });
+        for (const p of b.party) { while (p.level < lvl) grantXp(p, XP_LEVELS[p.level] - p.xp, []);
+          const C = CLASSES[p.cls], pb = profBonus(p.level), R = (k, key) => ruleLines(ruleOf(b, p, k, key)).join(' '), tag = p.cls + ' ' + lvl + ' ';
+          for (const a of ABILS) { const L = R('abil', a), m = L.match(/Modifier ([+-]\d+):/), t = L.match(/training bonus \(\+(\d+)\)/);
+            if (!m || +m[1] !== abMod(p.scores[a]) || !t || +t[1] !== pb) nb.push(tag + a);
+            for (const sk of Object.keys(SKILLS).filter((k) => SKILLS[k] === a)) { const s = L.match(new RegExp(capS(sk) + ' [+-]\\d+( \\(trained\\))?')); if (!s || !!s[1] !== C.skills.includes(sk)) nb.push(tag + sk); } }
+          const lv = R('level', ''); if (!lv.includes('Training bonus +' + pb + ':') || (lvl < 5 ? !lv.includes('level ' + (lvl + 1) + ' at ' + XP_LEVELS[lvl]) : /level 6/.test(lv) || !/the highest level/.test(lv))) nb.push(tag + 'level');
+          for (const w of weaponsOf(p)) { const L = R('attack', w.n), sn = L.match(/Sneak Attack adds (\d+)d6/); if (p.cls === 'Rogue' ? !sn || +sn[1] !== Math.ceil(lvl / 2) : sn) nb.push(tag + w.n); }
+          for (const a of p.abilities) { const d = abilityDef(p.cls, a.n), roll = d.heal || d.dmg; if (a.max !== null && a.max > 1) a.uses = a.max - 1; const L = R('ability', a.n), sn = L.match(/Adds (\d+)d6/);
+            if ((roll && !L.includes((d.heal ? 'Heals ' : 'Deals ') + expandStatExpr(roll, p) + ' ')) || /\b(STR|DEX|CON|INT|WIS|CHA|LVL)\b/.test(L) || !L.includes(COST_WORDS[d.cost]) || (d.rg > 1 && !L.includes('Reaches ' + d.rg * FT + ' ft')) ||
+              (a.max !== null && (!L.includes(a.uses + ' of ' + a.max + ' left') || /short rest or/.test(L) !== (d.per === 'short'))) || (d.n === 'Sneak Attack' && (!sn || +sn[1] !== Math.ceil(lvl / 2)))) nb.push(tag + a.n); }
+          if (lvl === 1) { p.xp = 10; if (!/cannot be changed/.test(R('class', '')) || intent(b, { t: 'party', op: 'class', id: p.id, cls: p.cls === 'Fighter' ? 'Wizard' : 'Fighter' }).why !== 'seasoned') nb.push(tag + 'calling'); } } }
+      row(!nb.length, 'every number a page prints is the traveller\'s own at levels 1, 3 and 5: each score\'s modifier, which skills are trained, the training bonus, the next level (and none past the fifth), Sneak Attack\'s dice, an ability\'s dice with the scores put in, its cost, reach, uses left and when they come back; and a calling with any experience is fixed, as the engine says' + (nb.length ? ' - not ' + nb.slice(0, 6).join('; ') : ''));
+      const sh = newGame('book-7'), S = sh.party[0]; S.conditions = ['shielded']; giveItem(S, 'healing draught', 2); const hq = S.items.find((x) => x.n === 'healing draught').q;
+      row(ruleOf(sh, S, 'ac', '').title === 'Armour ' + (S.ac + 5) && acOf(S) === S.ac + 5 && ruleLines(ruleOf(sh, S, 'ac', '')).join(' ').includes('+5 from Shield') && hq >= 2 && ruleOf(sh, S, 'item', 'healing draught').title === 'Healing draught x' + hq,
+        'Shield is counted on the armour page and says how long it lasts, and two of a thing are shown as two');
       return rows;
     });
     for (const [c, m] of book) ok(c, m);
@@ -4441,6 +4510,12 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     const all = await pg.evaluate(() => { const bad = []; let n = 0; for (const box of document.querySelectorAll('#party-list .entry.pc')) for (const t of [...box.querySelectorAll('.term')].concat([document.querySelector('#party-purse .term')])) { n++; t.click(); const d = document.getElementById('dialog'), title = document.getElementById('dlg-title').textContent, paras = document.querySelectorAll('#dlg-body p').length; if (!d.classList.contains('open') || !title || !paras) bad.push(t.textContent); UI.closeDialog(); }
       return { n, bad, second: document.querySelectorAll('#party-list .entry.pc').length }; });
     ok(all.second === 2 && all.n > 40 && !all.bad.length, 'every term on both sheets, and the purse, opens a page (' + all.n + ' taps)' + (all.bad.length ? ' - not ' + all.bad.slice(0, 5).join(', ') : ''));
+    const more = await pg.evaluate(() => { const p = G.st.party[0], keep = [p.hp, p.status, p.saves]; p.hp = 0; p.status = 'down'; p.saves = { s: 1, f: 0 }; UI.party();
+      const box = document.querySelector('#party-list .entry.pc'), t = [...box.querySelectorAll('.term')].find((b) => b.textContent === 'DOWN'); let title = ''; if (t) { t.click(); title = document.getElementById('dlg-title').textContent; UI.closeDialog(); }
+      const labels = [...box.querySelectorAll('.stat')].map((s) => s.getAttribute('aria-label'));
+      p.hp = keep[0]; p.status = keep[1]; p.saves = keep[2]; UI.party();
+      return { title, labels, want: ABILS.map((a) => ABIL_NAMES[a] + ' ' + p.scores[a]) }; });
+    ok(more.title === 'Down' && more.labels.join() === more.want.join(), 'someone down has DOWN on their sheet, which opens the page on their fight for life; and each of the six scores is named for a screen reader (' + more.labels.join(', ') + ')');
     await pg.setViewportSize({ width: 320, height: 568 }); await pg.waitForTimeout(150);
     const narrow = await pg.evaluate(() => { UI.party(); const body = document.querySelector('#pan-party .panel-body'), S = [...document.querySelectorAll('#party-list .stat')]; return { wide: body.scrollWidth <= innerWidth, stats: S.every((s) => { const r = s.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.width >= 36; }), row: new Set(S.slice(0, 6).map((s) => Math.round(s.getBoundingClientRect().top))).size }; });
     ok(narrow.wide && narrow.stats && narrow.row === 1, 'on the narrowest phone the six scores still sit in one row inside the screen');
@@ -4537,6 +4612,8 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       Storage.prototype.getItem = Storage.prototype.setItem = Storage.prototype.removeItem = shut; Settings.setKeyOf('openai', 'sk-mem', true); const m1 = Settings.keyOf('openai'); Settings.setKeyOf('openai', '', true); const m2 = Settings.keyOf('openai');
       Storage.prototype.getItem = gI; Storage.prototype.setItem = sI; Storage.prototype.removeItem = rI;
       row(m1 === 'sk-mem' && m2 === '' && localStorage.getItem(K) === null, 'where a browser will not let the page keep anything, the key is held for as long as the page is open, and no longer');
+      Storage.prototype.setItem = shut; Settings.setKeyOf('openai', 'sk-full', true); const f1 = Settings.keyOf('openai'); Storage.prototype.setItem = sI; Settings.setKeyOf('openai', '', true);
+      row(f1 === 'sk-full' && localStorage.getItem(K) === null, 'and where it can read but not write (a full store, or an older Safari\'s private window), the key is still held for the visit');
       Settings.setKeyOf('openai', '', true); sessionStorage.setItem(K, 'sk-this-visit'); const v1 = Settings.keyOf('openai'); sessionStorage.removeItem(K);
       row(v1 === 'sk-this-visit', 'a key kept for this visit only is found again when the page is loaded afresh in the same tab, with nothing in memory to go by');
       localStorage.setItem('cyoa.key.openai', 'sk-from-cyoa'); const c1 = Settings.cyoaKeyOf('openai'); localStorage.removeItem('cyoa.key.openai'); sessionStorage.setItem('cyoa.key.openai', 'sk-cyoa-visit'); const c2 = Settings.cyoaKeyOf('openai'); sessionStorage.removeItem('cyoa.key.openai');
@@ -4551,8 +4628,10 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       window.__synth.none = false; Speech.voices = keep;
       row(n0 === 'true,true' && n1 === 'false,true' && n2 === false && n3 === true && n4 === false, 'on a device that offers no voice of its own the paid voice can still read, and on a browser that cannot speak at all it is the only narrator there is; switched off, it is off');
       const near = (x, y) => Math.abs(x - y) < 1e-12;
-      row(NARRATOR_STYLE.length === 243 && near(Costs.speech('gpt-4o-mini-tts', 'x'.repeat(157), 60), .01506) && near(Costs.speech('gpt-4o-mini-tts', '', 0), 243 / 4 * .6 / 1e6) && near(Costs.speech('tts-1', 'x'.repeat(1000), 60), .015) && near(Costs.speech('tts-1-hd', 'x'.repeat(1000), 5), .03),
-        'a sentence is priced from what was sent and how long the sound ran: 100 tokens of text and a minute of sound on gpt-4o-mini-tts is $0.01506, and the older models go by the letter');
+      row(NARRATOR_STYLE.length === 243 && near(Costs.speech('gpt-4o-mini-tts', 'x'.repeat(157), 60), .01506) && near(Costs.speech('gpt-4o-mini-tts', '', 0), 243 / 4 * .6 / 1e6) && near(Costs.speech('tts-1', 'x'.repeat(1000), 60), .015) && near(Costs.speech('tts-1-1106', 'x'.repeat(1000), 60), .015) && near(Costs.speech('tts-1-hd', 'x'.repeat(1000), 5), .03) && near(Costs.speech('tts-1-hd-1106', 'x'.repeat(1000), 5), .03),
+        'a sentence is priced from what was sent and how long the sound ran: 100 tokens of text and a minute of sound on gpt-4o-mini-tts is $0.01506, and the older models go by the letter, dated names too');
+      const nk = ['voice', 'test', 'gm', 'tests', 'constructor', '__proto__', 7].map((k) => Costs.norm({ kind: k }).kind).join();
+      row(nk === 'voice,test,gm,gm,gm,gm,gm', 'a ledger line from a file says what it was for in one of three words, and any other word (one that is the name of something built in included) is read as the Game Master\'s');
       Settings.setKeyOf('openai', 'sk-paid-test-1', true);
       return rows;
     });
@@ -4754,7 +4833,10 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
       sel.value = 'openai'; sel.dispatchEvent(new Event('change', { bubbles: true })); out.back = [Settings.data.voiceProvider, vis('need-openai'), vis('device-voice-row'), Premium.ready()].join(); return out; });
     ok(set1.saved === 'device' && !set1.need && set1.dev && set1.note && /this device.s own and costs nothing/.test(set1.about) && !set1.ready && !set1.failed && set1.q === 0 && set1.status === '' && set1.key === 'sk-paid-test-1' && set1.back === 'openai,true,false,true',
       'changing the narrator to the device\'s voice is saved, is silence, puts the OpenAI fields away and brings the device\'s list back; the key is kept for next time, and choosing OpenAI again tries it afresh');
-    await pg.evaluate(() => { const v = document.getElementById('set-openai-voice'); v.value = 'nova'; v.dispatchEvent(new Event('change', { bubbles: true })); const r = document.getElementById('set-rate'); r.value = '1.4'; r.dispatchEvent(new Event('input', { bubbles: true })); });
+    const fresh1 = await pg.evaluate(() => { document.getElementById('voice-status').textContent = 'The narrator answers: about $0.0001 for that sentence.'; Premium.failed = true; Premium.strikes = 2;
+      const v = document.getElementById('set-openai-voice'); v.value = 'nova'; v.dispatchEvent(new Event('change', { bubbles: true })); const r = document.getElementById('set-rate'); r.value = '1.4'; r.dispatchEvent(new Event('input', { bubbles: true }));
+      return { status: document.getElementById('voice-status').textContent, failed: Premium.failed, strikes: Premium.strikes }; });
+    ok(fresh1.status === '' && !fresh1.failed && fresh1.strikes === 0, 'another OpenAI voice chosen is a fresh start: what the last "Hear it" said is cleared, and a voice given up on is tried again');
     const nova = await pg.evaluate(() => JSON.parse(localStorage.getItem('cyoa2.settings.v1')).openaiVoice);
     await tell('narrate', 'In another voice, and quicker.'); await quiet();
     const R10 = S.reqs[0] || { body: {} };
@@ -4994,9 +5076,22 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     await A.page.evaluate(() => { const i = document.querySelectorAll('#party-list input.pname')[1]; i.value = 'Samwise'; i.dispatchEvent(new Event('change', { bubbles: true })); });
     await hp.waitForFunction((id) => pcOf(G.st, id).name === 'Samwise', samId, { timeout: 4000 }).catch(() => {});
     const before = await tale(hp), hostName = await hp.evaluate(() => G.st.party[0].name);
-    const ren = await raw(A, { a: 'party', op: 'name', id: 'P1', name: 'Hacked' }), cls = await raw(A, { a: 'party', op: 'class', id: 'P1', cls: 'Wizard' });
-    ok(await hp.evaluate((id) => pcOf(G.st, id).name, samId) === 'Samwise' && ren.ok === false && /not yours to change/.test(ren.say) && cls.ok === false && await hp.evaluate(() => G.st.party[0].name) === hostName && before === await tale(hp),
-      'a guest renames its own traveller through the host; asked to rename or re-call the host\'s, the host refuses, says why, and changes nothing');
+    const ren = await raw(A, { a: 'party', op: 'name', id: 'P1', name: 'Hacked' }), cls = await raw(A, { a: 'party', op: 'class', id: 'P1', cls: 'Wizard' }), odd = await raw(A, { a: 'party', op: 'class', id: samId, cls: 'constructor' });
+    ok(await hp.evaluate((id) => pcOf(G.st, id).name, samId) === 'Samwise' && ren.ok === false && /not yours to change/.test(ren.say) && cls.ok === false && odd.ok === false && await hp.evaluate(() => G.st.party[0].name) === hostName && before === await tale(hp),
+      'a guest renames its own traveller through the host; asked to rename or re-call the host\'s, or to give its own a calling by a name every object answers to ("constructor"), the host refuses, says why, and changes nothing');
+    /* a guest's phone follows the host's table, not its own settings, and tells nothing of its own */
+    const hk = await hp.evaluate(() => { const d = Settings.data, k = { gm: d.gm, areas: JSON.stringify(d.areas), mock: typeof window.__CYOA2_MOCK__ }; if (k.mock !== 'function') window.__CYOA2_MOCK__ = async () => 'default'; d.gm = 'ai'; for (const a of AREAS) d.areas[a] = 'script'; return k; });
+    await A.page.waitForFunction(() => Net.mode().master === 'ai', null, { timeout: 4000 }).catch(() => {});
+    const gmode = await A.page.evaluate(() => { const d = Settings.data, k = JSON.stringify([d.gm, d.areas]); d.gm = 'ai'; for (const a of AREAS) d.areas[a] = 'ai';
+      const out = { master: Mode.master(), any: AREAS.some((a) => Mode.ai(a)) }; const b = JSON.parse(k); d.gm = b[0]; d.areas = b[1]; return out; });
+    await hp.evaluate((k) => { const d = Settings.data; d.gm = k.gm; d.areas = JSON.parse(k.areas); if (k.mock !== 'function') delete window.__CYOA2_MOCK__; }, hk);
+    const gtick = await A.page.evaluate(() => { const st = G.st, n0 = Session.beats.length, said = [], us = UI.script; UI.script = (a, t) => said.push(t);
+      Session.beats.push({ kind: 'enter', site: st.here }, { kind: 'fight' }); Session.tick(performance.now() + 1e6); Session.tick(performance.now() + 2e6);
+      const out = { left: Session.beats.length - n0, busy: G.busy, said: said.length }; Session.beats.length = n0; UI.script = us; return out; });
+    ok(gmode.master === 'ai' && !gmode.any && gtick.left === 2 && !gtick.busy && !gtick.said, 'a guest\'s phone goes by the host\'s table, not its own settings: with the Game Master at the host keeping every area for the script, a guest set to give it all of them still has none; and nothing waiting on a guest\'s phone is told there');
+    const sayBack = await A.page.evaluate(async () => { const say = document.getElementById('say'); say.value = 'I knock on the door.'; UI.send(); const mid = say.value; for (let i = 0; i < 40 && !say.value; i++) await new Promise((r) => setTimeout(r, 100));
+      const out = { mid, after: say.value }; say.value = ''; UI.sayBtns(); return out; });
+    ok(sayBack.mid === '' && sayBack.after === 'I knock on the door.', 'a line a guest types that the host\'s table will not take (its script answers taps, not typed lines) comes back into the guest\'s field: nothing typed is lost');
 
     /* a guest's walk, judged and walked by the host, and seen a step at a time */
     await same(A);
