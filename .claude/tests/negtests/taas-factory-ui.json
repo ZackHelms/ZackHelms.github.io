@@ -1,0 +1,152 @@
+[
+ {
+  "name": "mode-default-factory",
+  "file": "games/taas/index.html",
+  "old": "    return m || 'formal';",
+  "new": "    return m || 'robot-factory'; /* @negtest */"
+ },
+ {
+  "name": "mode-not-remembered",
+  "file": "games/taas/index.html",
+  "old": "    try { localStorage.setItem('taas-mode', m); } catch (e) { /* optional */ }",
+  "new": "     /* @negtest */"
+ },
+ {
+  "name": "mode-url-ignored",
+  "file": "games/taas/index.html",
+  "old": "    try { m = norm(new URLSearchParams(location.search).get('mode')); } catch (e) { /* no URL API */ }",
+  "new": "     /* @negtest */"
+ },
+ {
+  "name": "mode-url-not-written",
+  "file": "games/taas/index.html",
+  "old": "      if (u.searchParams.get('mode') !== m) { u.searchParams.set('mode', m); history.replaceState(null, '', u.toString()); }",
+  "new": "       /* @negtest */"
+ },
+ {
+  "name": "leave-keeps-running",
+  "file": "games/taas/index.html",
+  "old": "  function leave() {\n    if (!on) return;\n    on = false; cancelAnimationFrame(raf);",
+  "new": "  function leave() {\n    if (!on) return; /* @negtest */"
+ },
+ {
+  "name": "button-never-glows",
+  "file": "games/taas/index.html",
+  "old": "    const m = s.machine, lit = F.ready(s) && m.phase === 'ready';",
+  "new": "    const m = s.machine, lit = false; /* @negtest */"
+ },
+ {
+  "name": "button-always-glows",
+  "file": "games/taas/index.html",
+  "old": "    const col = lit ? '!#ff3b30' : m.phase === 'jam' ? '#5b2420' : '#7a2620';",
+  "new": "    const col = '!#ff3b30'; /* @negtest */"
+ },
+ {
+  "name": "hit-offset",
+  "file": "games/taas/index.html",
+  "old": "  function toWorldFloor(x, y) { return { x: (x - VW.ox) / VW.S, y: (y + VW.camY) / (VW.S * SE) }; }",
+  "new": "  function toWorldFloor(x, y) { return { x: (x - VW.ox) / VW.S, y: (y + 20 + VW.camY) / (VW.S * SE) }; } /* @negtest */"
+ },
+ {
+  "name": "console-not-machine",
+  "file": "games/taas/index.html",
+  "old": "    inR(spriteRect('console'), { t: { kind: 'machine' }, key: 3.88 });",
+  "new": "     /* @negtest */"
+ },
+ {
+  "name": "drag-also-taps",
+  "file": "games/taas/index.html",
+  "old": "  function up(x, y) { if (!drag) return; const d = drag; drag = null; if (!d.moved) tapAt(x, y); }",
+  "new": "  function up(x, y) { if (!drag) return; drag = null; tapAt(x, y); } /* @negtest */"
+ },
+ {
+  "name": "no-scroll-clamp",
+  "file": "games/taas/index.html",
+  "old": "      VW.camY = clamp(drag.cam - (y - drag.y0), VW.minY, VW.maxY);",
+  "new": "      VW.camY = drag.cam - (y - drag.y0); /* @negtest */"
+ },
+ {
+  "name": "floor-too-short",
+  "file": "games/taas/index.html",
+  "old": "    VW.maxY = Math.max(VW.minY, (L.H * SE + 0.3 * CE) * S + 24 - h);",
+  "new": "    VW.maxY = Math.max(VW.minY, 12 * SE * S - h); /* @negtest */"
+ },
+ {
+  "name": "bill-is-robot",
+  "file": "games/taas/index.html",
+  "old": "        bubbleEl.innerHTML = opts.map(o => {\n          let inner = ICON[o.icon] || '';",
+  "new": "        bubbleEl.innerHTML = opts.map(o => {\n          let inner = ICON.robot; /* @negtest */"
+ },
+ {
+  "name": "hud-money-stale",
+  "file": "games/taas/index.html",
+  "old": "      moneyEl.textContent = '$' + s.money.toLocaleString('en-US');",
+  "new": "       /* @negtest */"
+ },
+ {
+  "name": "restart-no-confirm",
+  "file": "games/taas/index.html",
+  "old": "      if (!confirmReset) { confirmReset = true; renderPanel(); return; }",
+  "new": "       /* @negtest */"
+ },
+ {
+  "name": "factory-key-clobbers-formal",
+  "file": "games/taas/index.html",
+  "old": "  const KEY = 'taas.factory.v' + C.version;",
+  "new": "  const KEY = 'taas.v1'; /* @negtest */"
+ },
+ {
+  "name": "factory-load-any-version",
+  "file": "games/taas/index.html",
+  "old": "      if (!d || d.version !== CFG.version || !d.machine || !Array.isArray(d.robots)) return null;",
+  "new": "      if (!d || !d.machine || !Array.isArray(d.robots)) return null; /* @negtest */"
+ },
+ {
+  "name": "no-autosave",
+  "file": "games/taas/index.html",
+  "old": "    if (saveT > 2) save();",
+  "new": "     /* @negtest */"
+ },
+ {
+  "name": "no-remeasure",
+  "file": "games/taas/index.html",
+  "old": "    if (w === VW.w && h === VW.h && dpr === VW.dpr) return false;",
+  "new": "    if (VW.w > 1) return false; /* @negtest */"
+ },
+ {
+  "name": "hud-on-chrome",
+  "file": "games/taas/index.html",
+  "old": "#fx-hud { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right));",
+  "new": "#fx-hud { position: absolute; top: calc(8px + env(safe-area-inset-top)); left: 60px; /* @negtest */"
+ },
+ {
+  "name": "bubble-unclamped",
+  "file": "games/taas/index.html",
+  "old": "    const left = clamp(x - w / 2, 6, VW.w - w - 6), top = clamp(y - h - 14, 50, VW.h - h - 6);",
+  "new": "    const left = x - w / 2, top = y - h - 14; /* @negtest */"
+ },
+ {
+  "name": "canvas-wrong-space",
+  "file": "games/taas/index.html",
+  "old": "    const r = cv.getBoundingClientRect();     // measure the element: the space taps resolve in\n    const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));",
+  "new": "    const w = Math.max(1, Math.round(innerWidth * 0.9)), h = Math.max(1, Math.round(innerHeight)); /* @negtest */"
+ },
+ {
+  "name": "robot-not-tappable",
+  "file": "games/taas/index.html",
+  "old": "      if (Math.abs(x - c) <= Math.max(22, 0.34 * VW.S) && y >= top - 6 && y <= bot + 6) hits.push({ t: { kind: 'robot', id: r.id }, key: r.y + 10 });",
+  "new": "       /* @negtest */"
+ },
+ {
+  "name": "panel-no-odds",
+  "file": "games/taas/index.html",
+  "old": "      '<h3>The odds, by prompt level</h3><div class=\"fx-scroll\"><table><thead><tr><th></th><th>Good</th><th>So-so</th><th>Bad</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +",
+  "new": "       /* @negtest */"
+ },
+ {
+  "name": "no-pagehide-save",
+  "file": "games/taas/index.html",
+  "old": "  window.addEventListener('pagehide', () => { if (s) save(); });",
+  "new": "  /* @negtest */"
+ }
+]

@@ -15,6 +15,10 @@ backlog entry here.
 
 ## Needs Zack
 
+- [taas] **Play the robot factory** (TAAS's mode dropdown, or `games/taas/?mode=robot-factory`)
+  and overrule anything in its "assumed, not decided" table (`.claude/taas.md` § Robot factory
+  mode); then say what comes after prompt engineering (its four open questions suggest the
+  next rungs: context binders, an in-feed filter, a maintenance robot) and what the bays hold.
 - [taas] **Answer the four open questions** in `.claude/taas.md` § Open questions:
   should a well-played year 1 be able to hit 240 (today only "stance + workshop,
   nothing else" does), one aggregate team level or a champions-to-skeptics spread,

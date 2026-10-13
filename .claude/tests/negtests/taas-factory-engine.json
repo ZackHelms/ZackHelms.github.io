@@ -1,0 +1,248 @@
+[
+ {
+  "name": "press-anytime",
+  "file": "games/taas/index.html",
+  "old": "    if (!ready(s)) return false;\n    m.phase = 'run';",
+  "new": "     /* @negtest */\n    m.phase = 'run';"
+ },
+ {
+  "name": "process-short",
+  "file": "games/taas/index.html",
+  "old": "} else if (m.result !== 'sap' && m.t >= CFG.processSec) {",
+  "new": "} else if (m.result !== 'sap' && m.t >= CFG.processSec * 0.75) { /* @negtest */"
+ },
+ {
+  "name": "no-stage-wait",
+  "file": "games/taas/index.html",
+  "old": "if (m.phase === 'ready') { if (m.staged < 1) m.staged = Math.min(1, m.staged + dt / CFG.stageSec); return; }",
+  "new": "if (m.phase === 'ready') { m.staged = 1; return; } /* @negtest */"
+ },
+ {
+  "name": "belt-instant",
+  "file": "games/taas/index.html",
+  "old": "if (it.t >= CFG.outSec + CFG.dropSec) {",
+  "new": "if (it.t >= 0) { /* @negtest */"
+ },
+ {
+  "name": "near-always-walks",
+  "file": "games/taas/index.html",
+  "old": "a.path = dist(a, spot) <= (task.kind === 'floor' ? 0.05 : CFG.near) ? [] : path(s, a, spot);",
+  "new": "a.path = path(s, a, spot); /* @negtest */"
+ },
+ {
+  "name": "bubble-before-arrival",
+  "file": "games/taas/index.html",
+  "old": "if (!b || !a.task || !a.task.arrived || a.path.length) return null;",
+  "new": "if (!b) return null; /* @negtest */"
+ },
+ {
+  "name": "bubble-stays-open",
+  "file": "games/taas/index.html",
+  "old": "    a.act = null; s.bubble = null;\n    a.task = Object.assign",
+  "new": "    a.act = null; /* @negtest */\n    a.task = Object.assign"
+ },
+ {
+  "name": "sell-keeps-item",
+  "file": "games/taas/index.html",
+  "old": "      s.bin.splice(k, 1);\n      settle(s, item, 'good', 'player');",
+  "new": "       /* @negtest */\n      settle(s, item, 'good', 'player');"
+ },
+ {
+  "name": "choose-ignores-enabled",
+  "file": "games/taas/index.html",
+  "old": "    if (!o || !o.enabled) return false;\n    const b = s.bubble, a = s.avatar;",
+  "new": "    if (!o) return false; /* @negtest */\n    const b = s.bubble, a = s.avatar;"
+ },
+ {
+  "name": "hire-always-20",
+  "file": "games/taas/index.html",
+  "old": "function hirePrice(s) { return s.hired < CFG.hire.length ? CFG.hire[s.hired] : null; }",
+  "new": "function hirePrice(s) { return s.hired < CFG.hire.length ? CFG.hire[0] : null; } /* @negtest */"
+ },
+ {
+  "name": "third-robot",
+  "file": "games/taas/index.html",
+  "old": "function hirePrice(s) { return s.hired < CFG.hire.length ? CFG.hire[s.hired] : null; }",
+  "new": "function hirePrice(s) { return s.hired < 3 ? (CFG.hire[s.hired] || 60) : null; } /* @negtest */"
+ },
+ {
+  "name": "crate-blocks-forever",
+  "file": "games/taas/index.html",
+  "old": "    CRATES.forEach((c, i) => { if (s.hired <= i) r.push(c); });",
+  "new": "    CRATES.forEach((c, i) => { r.push(c); }); /* @negtest */"
+ },
+ {
+  "name": "no-swap",
+  "file": "games/taas/index.html",
+  "old": "      if (other) { release(s, other); other.job = r.job; }",
+  "new": "       /* @negtest */"
+ },
+ {
+  "name": "release-drops-item",
+  "file": "games/taas/index.html",
+  "old": "    if (r.carry && r.carry !== 'sap') s.bin.unshift(r.carry);",
+  "new": "     /* @negtest */"
+ },
+ {
+  "name": "slow-no-dawdle",
+  "file": "games/taas/index.html",
+  "old": "          if (p.plan === 'slow') r.state = 'dawdle';",
+  "new": "          if (p.plan === 'slow') r.state = 'press'; /* @negtest */"
+ },
+ {
+  "name": "rough-is-plank",
+  "file": "games/taas/index.html",
+  "old": "const result = r.plan === 'rough' ? 'rough' : r.plan === 'dowels' ? 'dowels' : 'plank';",
+  "new": "const result = r.plan === 'dowels' ? 'dowels' : 'plank'; /* @negtest */"
+ },
+ {
+  "name": "dowels-are-planks",
+  "file": "games/taas/index.html",
+  "old": "const result = r.plan === 'rough' ? 'rough' : r.plan === 'dowels' ? 'dowels' : 'plank';",
+  "new": "const result = r.plan === 'rough' ? 'rough' : 'plank'; /* @negtest */"
+ },
+ {
+  "name": "sap-never-jams",
+  "file": "games/taas/index.html",
+  "old": "if (m.result === 'sap' && m.t >= CFG.jamAt) {",
+  "new": "if (false) { /* @negtest */"
+ },
+ {
+  "name": "robots-clean",
+  "file": "games/taas/index.html",
+  "old": "        if (m.phase === 'jam') { r.mood = 'stuck'; r.moodT = 0.5; return; }",
+  "new": "        if (m.phase === 'jam') { m.phase = 'ready'; m.staged = 0; m.load = 'log'; m.result = null; return; } /* @negtest */"
+ },
+ {
+  "name": "clean-fast",
+  "file": "games/taas/index.html",
+  "old": "m.dirt = Math.max(0, m.dirt - dt / CFG.cleanSec);",
+  "new": "m.dirt = Math.max(0, m.dirt - 2 * dt / CFG.cleanSec); /* @negtest */"
+ },
+ {
+  "name": "scrub-resets",
+  "file": "games/taas/index.html",
+  "old": "    a.act = null; s.bubble = null;\n    a.task = Object.assign",
+  "new": "    a.act = null; s.bubble = null; if (s.machine.phase === 'jam') s.machine.dirt = 1; /* @negtest */\n    a.task = Object.assign"
+ },
+ {
+  "name": "soso-full-price",
+  "file": "games/taas/index.html",
+  "old": "else if (g === 'soso') { ask = CFG.soso[item]; kind = 'cheap'; }",
+  "new": "else if (g === 'soso') { ask = CFG.price[item]; kind = 'cheap'; } /* @negtest */"
+ },
+ {
+  "name": "bad-sells-fair",
+  "file": "games/taas/index.html",
+  "old": "    else { ask = 0; kind = 'free'; }",
+  "new": "    else { ask = CFG.price[item]; kind = 'free'; } /* @negtest */"
+ },
+ {
+  "name": "mislabel-no-hit",
+  "file": "games/taas/index.html",
+  "old": "if (kind === 'mislabel') s.trust = Math.max(CFG.trustMin, s.trust - CFG.trustHit);",
+  "new": "; /* @negtest */"
+ },
+ {
+  "name": "mislabel-cheap",
+  "file": "games/taas/index.html",
+  "old": "else if (item === 'dowels') { ask = CFG.mislabel; kind = 'mislabel'; }",
+  "new": "else if (item === 'dowels') { ask = CFG.price.dowels; kind = 'mislabel'; } /* @negtest */"
+ },
+ {
+  "name": "price-ignores-trust",
+  "file": "games/taas/index.html",
+  "old": "function paid(s, ask) { return Math.round(ask * s.trust / 100); }",
+  "new": "function paid(s, ask) { return ask; } /* @negtest */"
+ },
+ {
+  "name": "no-trust-floor",
+  "file": "games/taas/index.html",
+  "old": "if (kind === 'mislabel') s.trust = Math.max(CFG.trustMin, s.trust - CFG.trustHit);",
+  "new": "if (kind === 'mislabel') s.trust = s.trust - CFG.trustHit; /* @negtest */"
+ },
+ {
+  "name": "no-trust-up",
+  "file": "games/taas/index.html",
+  "old": "if (kind === 'fair') s.trust = Math.min(100, s.trust + CFG.trustUp);",
+  "new": "; /* @negtest */"
+ },
+ {
+  "name": "no-trust-heal",
+  "file": "games/taas/index.html",
+  "old": "      s.trust = Math.min(100, s.trust + (100 - s.trust) * CFG.trustHeal * h);",
+  "new": "       /* @negtest */"
+ },
+ {
+  "name": "player-rolls-odds",
+  "file": "games/taas/index.html",
+  "old": "      settle(s, item, 'good', 'player');",
+  "new": "      settle(s, item, grade(s, 'sell'), 'player'); /* @negtest */"
+ },
+ {
+  "name": "odds-ignore-prompt",
+  "file": "games/taas/index.html",
+  "old": "function odds(s) { return s.prompt ? CFG.prompt[s.prompt - 1].odds : CFG.baseOdds; }",
+  "new": "function odds(s) { return CFG.baseOdds; } /* @negtest */"
+ },
+ {
+  "name": "odds-columns-swapped",
+  "file": "games/taas/index.html",
+  "old": "return u < o[0] ? 'good' : u < o[0] + o[1] ? 'soso' : 'bad';",
+  "new": "return u < o[2] ? 'good' : u < o[2] + o[1] ? 'soso' : 'bad'; /* @negtest */"
+ },
+ {
+  "name": "seller-copies-operator",
+  "file": "games/taas/index.html",
+  "old": "r.carry = s.bin.shift(); r.grade = grade(s, 'sell');",
+  "new": "r.carry = s.bin.shift(); r.grade = (s.robots.find(x => x.job === 'operate' && x.grade) || {}).grade || grade(s, 'sell'); /* @negtest */"
+ },
+ {
+  "name": "prompt-unlocked",
+  "file": "games/taas/index.html",
+  "old": "      if (s.hired < CFG.hire.length) return [{ id: 'prompt', icon: 'prompt', enabled: false, locked: true, need: CFG.hire.length }];",
+  "new": "       /* @negtest */"
+ },
+ {
+  "name": "prompt-price-index",
+  "file": "games/taas/index.html",
+  "old": "function promptPrice(s) { return s.prompt < CFG.prompt.length ? CFG.prompt[s.prompt].price : null; }",
+  "new": "function promptPrice(s) { return s.prompt < CFG.prompt.length ? CFG.prompt[0].price : null; } /* @negtest */"
+ },
+ {
+  "name": "save-drops-seed",
+  "file": "games/taas/index.html",
+  "old": "    const o = Object.assign({}, s, { events: [], force: { operate: [], sell: [] } });",
+  "new": "    const o = Object.assign({}, s, { seed: 1, events: [], force: { operate: [], sell: [] } }); /* @negtest */"
+ },
+ {
+  "name": "load-any-version",
+  "file": "games/taas/index.html",
+  "old": "      if (!d || d.version !== CFG.version || !d.machine || !Array.isArray(d.robots)) return null;",
+  "new": "      if (!d || !d.machine || !Array.isArray(d.robots)) return null; /* @negtest */"
+ },
+ {
+  "name": "load-no-clamp",
+  "file": "games/taas/index.html",
+  "old": "      s.money = Math.max(0, +s.money || 0);",
+  "new": "       /* @negtest */"
+ },
+ {
+  "name": "los-always",
+  "file": "games/taas/index.html",
+  "old": "    if (los(s, start, goal)) return (start.x !== from.x || start.y !== from.y) ? [start, goal] : [goal];",
+  "new": "    if (true) return [goal]; /* @negtest */"
+ },
+ {
+  "name": "unreachable-goal",
+  "file": "games/taas/index.html",
+  "old": "    const sc0 = cellOf(start.x, start.y), goal = nearestFree(s, to.x, to.y, grid(s).lab[sc0[1] * GW + sc0[0]]);",
+  "new": "    const goal = nearestFree(s, to.x, to.y); /* @negtest */"
+ },
+ {
+  "name": "no-credit",
+  "file": "games/taas/index.html",
+  "old": "    r.tally[g]++; r.mood = g; r.moodT = 2.4;",
+  "new": "    r.mood = g; r.moodT = 2.4; /* @negtest */"
+ }
+]

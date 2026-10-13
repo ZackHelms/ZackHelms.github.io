@@ -1,6 +1,9 @@
 # TAAS (Team AI Adoption Simulator) - context
 
-`games/taas/index.html` (single file, ~900 lines). A management sim: you run one team
+`games/taas/index.html` (single file, ~3,000 lines) holds **two modes**, picked from a
+dropdown beside the mute button (2026-10-13): **Formal** (everything in this file down to §
+Robot factory mode; the default) and **Robot factory** (§ Robot factory mode, a playful
+cel-shaded take on the same story). The formal mode is a management sim: you run one team
 for **eight quarters** (Y1Q1 to Y2Q4), and each quarter you split **60 story points (SP)**
 between shipping work and building the team's AI skill, inside a **9,000 AI-credit (AIC)**
 budget. The team starts with no AI skill and owes **240 units of work a year**. The
@@ -14,8 +17,10 @@ CYOA, with the restrictive licence. **Proprietary** (`games/taas/LICENSE`; one o
 nine protected games). Suites: `.claude/tests/drive-taas.cjs` (the engine's rules, 43
 checks, pure node), `.claude/tests/drive-taas-ui.cjs` (the page, 26 checks, Chromium at
 phone width) and `.claude/tests/eval-taas.cjs` (balance shape, opt-in); both drive suites
-are negative-tested (§ Negative tests). It is a **first draft
-the CD is still designing**; most numbers below are guesses waiting for the CD's tuning.
+are negative-tested (§ Negative tests). The robot factory has its own three
+(`drive-taas-factory.cjs`, `drive-taas-factory-ui.cjs`, `eval-taas-factory.cjs`). It is a
+**first draft the CD is still designing**; most numbers below are guesses waiting for the
+CD's tuning.
 
 ## The CD's brief (2026-10-09) - stated, do not relitigate
 
@@ -299,7 +304,235 @@ the new code rather than dropping it.
   to overflow widens the phone's layout viewport to ~850 px, and the tracker then lies
   over the plan's buttons. The layout row asks for `innerWidth` to stay the screen's.
 
-## How to change it
+## Robot factory mode (2026-10-13)
+
+### The CD's brief - stated, do not relitigate
+
+Asked for on 2026-10-12, built overnight. In the CD's words, lightly trimmed:
+
+- **A mode button** at the top, right of the mute button, that opens a dropdown and shows
+  the selected mode's name. The existing game becomes **"mode=formal"**.
+- **"Robot factory"**: the same concepts, as a more playful game. A **top-down view at a
+  slight angle where up/down and left/right movement is parallel to the screen edges**
+  (like the original Legend of Zelda). **Cel-shaded (toon) 3D models.** The player is a
+  **chibi human who walks where you tap**. **Scroll up and down** to see the whole floor.
+- **machine01 with a glowing red button.** Tap it: if the avatar is not near, it **walks
+  over (animated)** and presses it; the button **depresses and goes dark** while one wood
+  plank is made (**4 seconds**). Raw lumber goes in on an **in-feed conveyor**; a smooth
+  plank comes out **at the same rate** on the out-feed and **drops into a storage bin**.
+- **Tap the bin** (the avatar walks to it): one option, **sell planks one at a time**, as a
+  **green USD bill in a white chat bubble**. A sale takes the plank away and money goes
+  **$0 to $5**.
+- At **$20, hire a robot "agent"** and assign it to the **button** or to **selling from the
+  bin**. Robots are AI agents, drawn as **cute cel-shaded robots**. The **second costs $40**:
+  a fully automated make-and-sell loop.
+- Then **prompt engineering** is the next upgrade. Robots do a good job **sometimes**, a bad
+  one sometimes, and in between; **each robot's chances are independent**. The CD's
+  examples: an operator puts **sap** in (it gums up the machine and **you clean it
+  manually**) or turns a log into **dowel rods** (worth **$1 at most**); a seller sells a
+  good plank for **$0**, or sells **dowels for $5**, which costs **customer trust**. "These
+  are just examples to get us started"; the factory will grow.
+
+### The Q&A (2026-10-12, before the build) - stated
+
+| Question | CD's answer |
+|---|---|
+| How to render cel-shaded 3D | **Canvas 2D meshes**: hand-written low-poly meshes, toon bands, ink outlines (as Star Surge's 3D style and Animation Rigs); no library, one file |
+| Prompt engineering in the first build | **Yes**: bought with $, steps that raise the good odds; prices and steps are Claude's, to tune |
+| What customer trust does | **Lowers prices**: a good plank sells for $5 x trust; fair sales win it back |
+| Outcome split at the start | **25 good / 35 so-so / 40 bad** (so-so: a slow cycle or a plank let go for $3) |
+
+### What was built
+
+**The floor** is 6 m wide and 26 m deep (`FACTORY.LAYOUT`), drawn orthographically at a 50
+degree elevation, so x is screen x and depth is screen y, with heights foreshortened by
+cos 50. Back wall with the sign; the production line along it (log rack, in-feed belt,
+machine01 with its console and red button, out-feed belt, blue bin); a sap barrel by the
+in-feed; the hatch in the east wall where sold goods leave; the robot dock (charging panel,
+two crates on two pads); the prompt-lab desk and monitor; then two empty bays (pallets, a
+machine under a tarp, cones) as room to grow. A portrait phone sees the whole working area;
+the bays are a scroll away.
+
+**The loop.** Tap anything and the avatar walks there (an A* over 0.2 m cells, string-pulled,
+aimed only at floor it can actually reach) and does the thing on arrival: presses the button,
+scrubs a jam, or opens that thing's chat bubble. Within 0.6 m it acts without walking. The
+press starts a 4 s cut: the log feeds in and the plank feeds out at the same speed, then
+rides the out-feed (1 s) and drops into the bin (0.35 s); the next log rolls off the rack in
+0.9 s, and only then does the button light again.
+
+**Robots.** The dock's bubble hires one ($20, then $40; two at most for now); it climbs out
+of its crate and the bubble turns to its three jobs: **the button**, **selling**, **rest**.
+Giving a job someone already has swaps them. Every job a robot does rolls good / so-so / bad
+from the current odds, independently:
+
+| Robot | Good | So-so | Bad |
+|---|---|---|---|
+| Operator | a plank | half the time it stands and thinks 3 s first (still a plank), half the time a rough plank ($3) | half the time it fetches sap from the barrel and pours it in (the machine jams until **you** scrub it, 2.5 s; robots never clean), half the time dowel rods ($1) |
+| Seller | the right price | lets it go cheap (plank $3, rough $2, dowels $0) | a plank given away for $0, or dowels sold **as a plank for $5** (the sale goes through, trust -15) |
+
+Each outcome shows: a check, a squiggle or a cross pops over the robot, its screen face
+changes, and it beeps; a jammed machine shakes, smokes and flashes amber while its operator
+shows a "?".
+
+**Trust** multiplies every price (`round(base x trust)`), starts at 100%, takes 15 points per
+dowel sold as a plank, gives one back per fair sale, never drops below 10%, and **heals by
+itself**: each second closes 0.5% of the gap to 100 (customers forget). Your own sales are
+always fair; your own presses always make planks.
+
+**Prompt engineering** is the prompt lab's terminal. It stays dark (a padlock) until both
+robots are on staff, then offers three levels, each replacing both robots' odds:
+
+| Level | Price | Good / so-so / bad |
+|---|---|---|
+| none | - | 25 / 35 / 40 (the CD's answer) |
+| 1 | $50 | 45 / 30 / 25 |
+| 2 | $120 | 65 / 22 / 13 |
+| 3 | $250 | 85 / 10 / 5 |
+
+The robots' antenna bulbs change colour with the level and the monitor shows the stars.
+
+**The i button** (top right, beside the money and trust) opens the reference: what maps to
+what (machine01 is a task, robots are agents, sap is rework you clean up yourself, dowels
+sold as planks are confident wrong output that costs trust, prompt engineering is the L2
+rung), the odds table with the current level marked, each robot's measured tally and good
+percentage, and **Start over** (two taps).
+
+### Assumed, not decided (Claude's choices; the CD has not ruled on these)
+
+| Assumption | Where it lives | Why |
+|---|---|---|
+| **Formal stays the default** on a first visit; the choice is remembered (`taas-mode`) and `?mode=formal` or `?mode=robot-factory` wins over it | `MODE` | The CD said the current game *becomes* a mode, not that it stops being the front door |
+| **The look**: a chibi in a yellow hard hat and blue shirt; white robots on a hover base with a screen face, teal and orange accents; a light grey concrete floor, steel-blue machine, blue bin | `COL`, `AV`, `RB` | "Cute cel-shaded robots" and a chibi; the rest is taste |
+| **Camera**: orthographic, 50 degrees above the floor, no yaw | `ELEV` | Zelda-like: moving up/down and left/right stays parallel to the screen edges |
+| **The floor's size and layout**, and the two empty bays | `FACTORY.LAYOUT` | Enough to scroll ("view the entirety"), and room for the expansion the CD promised |
+| **Timings**: 0.9 s for the next log, 1 s out-feed, 0.35 s drop; "near" is 0.6 m; walk 1.7 m/s, robots 1.3 m/s | `FACTORY.CFG` | The CD fixed only the 4 s |
+| **Outcome details** beyond the CD's examples: the so-so and bad splits in the table above, the rough plank ($3), the seller's cheap prices, the sale of dowels-as-a-plank going through for $5 | `operatorPlan()`, `settle()`, `CFG.soso` | The CD's examples, filled out so every grade does something visible |
+| **Prompt levels**: three, at $50 / $120 / $250 with the odds above, unlocked by hiring the second robot, applying to both robots | `CFG.prompt` | Tuned against the eval so each level arrives a few minutes apart |
+| **Trust**: -15 per mislabelled sale, +1 per fair one, floor 10%, heals 0.5% of the gap a second | `CFG.trust*` | Without the healing an unprompted seller drives trust to the floor, every price (yours too) falls to about $1, and the first prompt level takes 25 minutes; with it, unprompted robots sit near 60% and prompted ones near 100% (measured, below) |
+| **Rest** as a third job, and **swap** when a job is taken | `choose()` | A way to stop a robot that is costing you trust, and no two operators on one button |
+| **Robots never clean a jam** | `operate()` | The CD: "you have to manually do maintenance" |
+| **Two robots at most** until the factory grows | `CFG.hire` | Two jobs exist |
+| **Whole dollars**; trust shown as a bar | `paid()`, the HUD | Readable at a glance |
+| **Music**: a bouncy 112 bpm marimba loop in this mode, the office loop in formal | `SND` | The repo's every-game audio rule; a playful mode wanted a playful loop |
+| **The canvas draws at 2x device pixels at most** | `layout()` | Crisp for toon art, and a 3x phone pays 2.25x less (it took the busy scene from over budget to inside it) |
+
+### Open questions for the CD (factory)
+
+1. **What comes after prompt engineering?** The formal ladder suggests the next rungs:
+   **L3a context engineering** (a work-instructions binder at each station that robots read:
+   fewer so-so outcomes), **L3b deterministic-first** (a filter on the in-feed so sap cannot
+   go in at all; a price list at the bin so dowels cannot be sold as planks), **L4 loop
+   engineering** (a maintenance robot that cleans jams, robots that check their own work).
+2. **What do the bays hold next?** A second machine (logs to dowels on purpose, or planks to
+   furniture) would give the dowels a real market and the operators a second line.
+3. **Should a jam cost more than time** (a repair bill, a lost log)? Today it only stops
+   the line until you scrub it.
+4. **Should the factory and the formal mode share anything** (a score, the same L0-L5
+   ladder on screen)? Today they are independent, with independent saves.
+
+### Architecture (factory)
+
+Three script blocks join the page, in this order after the formal engine:
+
+1. **`const FACTORY = (function () { ... })()`**, the factory engine: pure functions over one
+   plain state object, no DOM, ending `if (typeof module !== 'undefined') module.exports =
+   FACTORY;` (the suites lift exactly that span, so keep both lines). It owns the layout,
+   pathing, the avatar's tasks and acts, the machine, belt and bin, the robots' state
+   machines, outcomes (`grade()`, `operatorPlan()`), prices and trust (`settle()`), the
+   chat bubble's options (`options()` / `choose()`) and saving. Its dice are a mulberry32 on
+   `s.seed`, so **a save resumes the same luck**; `s.force.operate|sell` is a test queue that
+   forces the next outcome. The engine emits `s.events` (press, made, binned, jam, cleaned,
+   sold, hired, assigned, prompt, outcome, arrive) that the page drains for sound and effects.
+2. **`SND` and `MODE`**, shared by both modes: one AudioContext (formal's sounds moved here
+   unchanged, plus the factory's), two music tracks switched by the mode, the mute button;
+   and the mode switch, a native `<select id="mode-btn">` dressed as the third chrome
+   button (it listens to `change`, per the native-form-controls rule), which sets
+   `html[data-mode]` (CSS shows one mode and hides the other), remembers the choice, writes
+   `?mode=` with `replaceState`, and calls each mode's `enter`/`leave` hooks.
+3. **The factory UI** (an IIFE): the 3D kit and everything on screen.
+   - **Primitives** (`box`, `cyl`, `ell` superellipsoids) are convex, wound outward by the
+     centroid rule, and carry their **edge list** with the face on each side. `drawPrim()`
+     transforms, culls back faces, shades each face into **three flat bands** (shadows pushed
+     cool, a high floor, a colour starting `!` is emissive), strokes the ink only on
+     **silhouette edges** (a shown face against a hidden one), then fills **one path per
+     colour band** (a convex primitive's shown faces never overlap). Parts of a character are
+     drawn back to front by their centres, each with its own ink, so an arm over a body gets
+     its line.
+   - **Static scenery is baked once per scale** into one canvas per object (the key carries
+     scale, dpr and offset), and blitted on **whole device pixels**; the floor is one baked
+     canvas keyed on the robots hired (the pads light). Everything else is drawn live in
+     **depth order** (sorted by each thing's front edge): belt tops, the machine's window
+     (a spinning blade, sap drips), the button and beacon, items, the avatar, robots.
+   - **The avatar** is a joint chain of matrices (hips, torso, head with hair and hard hat,
+     arms, two-segment legs and boots) with a walk cycle **driven by distance walked** (a
+     0.62 m stride, so feet do not slide), arms counter-swinging, a bob, and acts: press,
+     scrub (with a sponge), hold a sale overhead. Facing turns through an exponential spring.
+     Its painter-side state lives in a WeakMap, off the sim objects.
+   - **Robots** hover and bob, lean into motion, and pose per state (press, think, scoop,
+     pour, reach, pitch the item); their face screen draws eyes by mood.
+   - **Input**: touch and mouse on the canvas; past 10 px of travel it is a scroll (with a
+     little fling), otherwise a tap, resolved by `hitTest()` against the drawn sprites'
+     boxes (front-most wins), robots' projected boxes, then the floor. **One coordinate
+     space**: the canvas is sized from its own `getBoundingClientRect()`, re-measured every
+     frame, on resize, and on the way back into the mode.
+   - **The bubble, HUD and panel are DOM** over the canvas, so they stay crisp and are
+     testable; the bubble follows its anchor every frame and is clamped on screen.
+   - **Saving**: `localStorage['taas.factory.v' + CFG.version]`, every 2 s while running, on
+     `pagehide`, on hiding and on leaving the mode. A save from another version is ignored;
+     a hand-edited one is clamped.
+   - **Test hook**: `window.TAAS_FACTORY` (`s`, `view`, `tick`, `paused`, `hitTest`,
+     `spriteRect`, `screen`, `save`, `layout`): the suites step exact frames and find where
+     things are drawn.
+
+### Measured (2026-10-13)
+
+`node .claude/tests/eval-taas-factory.cjs` (30 simulated minutes, every action walked):
+
+| Persona | $20 | robot 1 | robot 2 | prompt 1 | prompt 2 | prompt 3 | earned | $/min, last 5 | trust end/min |
+|---|---|---|---|---|---|---|---|---|---|
+| hands-on | 0.5m | 0.5m | 1.7m | 4.3m | 11.5m | 19.7m | 953 | 44.6 | 100/51 |
+| supervisor (cleans jams 10 s late) | 0.5m | 0.5m | 1.7m | 4.8m | 13.8m | 22.5m | 826 | 44.4 | 100/52 |
+| walks away after hiring | 0.5m | 0.5m | 1.7m | - | - | - | 86 | 0.0 | 100/85 |
+| supervisor, never prompts | 0.5m | 0.5m | 1.7m | - | - | - | 308 | 6.4 | 61/26 |
+
+The shape it asserts: the first robot inside a minute and a half, both inside five minutes,
+the top prompt level inside 25; robots left alone stall on their first jam; prompt
+engineering pays (over 3x the unprompted line); an unprompted seller wears trust down and a
+prompted one wins it back; unprompted robots barely beat a person working alone.
+
+Frame cost (`.claude/scripts/frame-budget.cjs` at 390x844, dpr 3, the busy pose in
+`.claude/scripts/poses/taas-factory-busy.js`): **16.7 ms median, 0 of 149 frames over** after
+three fixes, in order of effect: blitting baked sprites on whole device pixels (fractional
+offsets during a scroll forced resampling), capping the canvas at 2x, and baking the floor.
+Before them: 26-57 of 149 over, run to run.
+
+### Negative tests (factory)
+
+`.claude/tests/negtests/taas-factory-engine.json` (41 breaks) and `taas-factory-ui.json` (25):
+40 and 23 caught. The misses are **equivalent changes**, recorded rather than tested:
+`bubbleOpen()`'s arrival check (every `tap()` clears the bubble first, so nothing can show it
+early), the console's own tap box (the machine's box covers it), and the `pagehide` save (in
+Chromium the `visibilitychange` save fires on the same navigation; on iOS Safari `pagehide`
+is the reliable one, so both stay). The first passes found rows that could not fail: the
+"near the button" row started the avatar on the spot itself, the "walking away" row looked
+while it was still walking, the slow-operator row could time out and pass, the scroll-clamp
+row was rescued by the fling's own clamp, and the save row was rescued by `pagehide`.
+
+### How to change it (factory)
+
+- **Retune**: `FACTORY.CFG` only. Then `.claude/scripts/gates.sh games/taas/index.html` and
+  `node .claude/tests/eval-taas-factory.cjs`, and bump `CFG.version` if a save would now
+  mean something else.
+- **Move or add a thing on the floor**: its footprint in `LAYOUT.SOLID` (pathing reads it),
+  its model in `sceneObjects()` (key = its front edge's y), a tap target in `hitTest()` if
+  it does something, and a spot in `LAYOUT.SPOT`. The suite walks every spot to every other.
+- **A new outcome**: a row in `operatorPlan()` or `settle()`, an item model in `ITEM_MODEL`
+  if it makes a new thing (and `ITEMS` if it can be sold), and a row in the suite's § 6.
+- **A new job or machine**: a state machine beside `operate()`/`vend()`, a branch in
+  `homeOf()`, a bubble option in `options()`, and an icon in `ICON`.
+
+
+## How to change it (formal)
 
 - **Retune:** edit the tables only. Run `.claude/scripts/gates.sh games/taas/index.html`
   (smoke + both drive suites; rules must stay green whatever the numbers) and
@@ -324,6 +557,10 @@ the new code rather than dropping it.
 - 2026-10-12: shipped to `games/taas/` (3rd on the hub, proprietary), with the repo's
   chrome, badge and audio added and the score made to add up from its printed parts
   (`summary()` now rounds the shortfalls before scoring). Suites added.
+- 2026-10-13: **robot factory mode** (overnight, at the CD's request; four answers before the
+  build): the mode dropdown, the factory engine, the Canvas 2D toon renderer, shared audio,
+  three suites and two break lists. Formal mode unchanged apart from its sounds moving into
+  `SND`.
 - 2026-10-12 (later): negative tests over both drive suites. `drive-taas` grew from 29 to
   43 checks (section 9, hand-built states) and lost two rows that could not fail;
   `drive-taas-ui` added (the page in Chromium); found that trust can never fall in

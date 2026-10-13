@@ -40,7 +40,8 @@ function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let
 
 // serve the page; `bump` serves it with CFG.version + 1
 let bump = false;
-const VERSION_RE = /(\n\s*version: )(\d+)(,)/;
+// the formal engine's CFG.version (the robot factory's engine has its own, later in the page)
+const VERSION_RE = /(const TAAS = \(function \(\) \{[\s\S]*?\n\s*version: )(\d+)(,)/;
 const server = http.createServer((req, res) => {
   if (!req.url.startsWith('/taas.html')) { res.writeHead(404); res.end(); return; }
   const body = bump ? SRC.replace(VERSION_RE, (m, a, n, c) => a + (+n + 1) + c) : SRC;
@@ -115,7 +116,7 @@ const click = (p, sel) => p.locator(sel).first().click();
   async function section(name, fn) { try { await fn(); } catch (e) { ok(false, name + ' played through', e.message.split('\n')[0]); } }
 
   {
-    ok((SRC.match(new RegExp(VERSION_RE.source, 'g')) || []).length === 1, 'the page has exactly one CFG.version line for the bump to move');
+    ok((SRC.match(new RegExp(VERSION_RE.source, 'g')) || []).length === 1, 'the formal engine has exactly one CFG.version line for the bump to move');
 
     /* ---------- 1. a fresh page ---------- */
     await section('1. a fresh page', async () => {
