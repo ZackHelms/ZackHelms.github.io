@@ -124,6 +124,25 @@ when a key is saved**; the model is switched **per area**, not all-or-nothing; t
 switches can be flipped **in the middle of a tale**; every passage **records who told
 it**; scripted text is **seeded** (the same seed and the same moves give the same words).
 
+Step 4, multiplayer, asked and answered before a line of it was written (2026-10-13, four
+questions; the CD took the recommended answer to each):
+
+- **How other phones join: "QR, same room."** Phone to phone over WebRTC, no server and
+  no accounts. The guest scans the host's code, then the host scans the guest's code
+  back: two scans per guest. Same Wi-Fi works best. (Told with the question: a page on
+  GitHub Pages can run no server, and an iPhone page can use no Bluetooth and host no
+  local server; inferred from general knowledge, not re-checked.)
+- **Where the Game Master, the keys and the narrator live: "All on the host."** One
+  engine, one Game Master, keys never leave the host's device, and the narrator speaks
+  only from the host (the table's speaker). Guests see the story on their own screens,
+  silently.
+- **Who moves whom: "Each owns theirs."** Each traveller belongs to one device; a guest
+  acts only for their own; the host can act for anyone (a player who stepped away).
+  Guests make their own characters on their own phones.
+- **A phone that drops out: "Host takes over."** Its travellers stay on the board and
+  the host can move them (in a fight their turn waits for the host) until the player
+  rejoins and picks them back up. The save lives on the host either way.
+
 ## Assumed, not decided (flag these when the CD next looks)
 
 None of these was asked for; each was the conservative reading. All are cheap to change.
