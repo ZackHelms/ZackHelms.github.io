@@ -224,17 +224,26 @@ html[data-mode="robot-factory"] #factory { display: block; }
 html[data-mode="robot-factory"] .wrap { display: none; }
 html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow: hidden; overscroll-behavior: none; }
 #fx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-#fx-hud { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); z-index: 30; display: flex; gap: 6px; align-items: flex-start; }
+#fx-hud { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); z-index: 30;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
+#fx-hud > * { pointer-events: auto; }
 @media (max-width: 380px) { #fx-hud { top: calc(46px + env(safe-area-inset-top)); } }
-.fx-pill { background: #fff; color: #1d2430; border: 2px solid #1d2430; border-radius: 14px; box-shadow: 0 2px 0 #1d2430; padding: 4px 10px 5px;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 80px; }
-#fx-money { font: 800 17px/1 var(--display); font-variant-numeric: tabular-nums; display: inline-block; transform-origin: 100% 50%; }
+.fx-hudrow { display: flex; gap: 6px; align-items: center; }
+.fx-pill { background: #fff; color: #1d2430; border: 2px solid #1d2430; border-radius: 14px; box-shadow: 0 2px 0 #1d2430; }
+#fx-cash { min-width: 80px; padding: 6px 12px; text-align: right; }
+#fx-money { font: 800 18px/1 var(--display); font-variant-numeric: tabular-nums; display: inline-block; transform-origin: 100% 50%; }
 #fx-money.bump { animation: fxbump .35s ease-out; }
 @keyframes fxbump { 0% { transform: scale(1.3); color: #1c8f4c; } 100% { transform: scale(1); } }
-#fx-trust { display: flex; align-items: center; gap: 5px; font: 600 10px/1 var(--mono); color: #586663; }
-#fx-trust i { display: block; width: 46px; height: 6px; border-radius: 3px; background: #dfe5e9; overflow: hidden; position: relative; }
-#fx-trust i::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: var(--trust, 100%); background: #2fbf71; border-radius: 3px; transition: width .3s; }
-#fx-trust.low i::after { background: #e5484d; }
+/* customer satisfaction: how much our customers trust us and our products */
+#fx-sat { padding: 5px 10px 7px; display: flex; flex-direction: column; gap: 5px; min-width: 150px; }
+.fx-sat-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; white-space: nowrap; font: 600 9.5px/1 var(--mono); color: #586663; }
+.fx-sat-top b { font: 800 14px/1 var(--display); color: #1c8f4c; font-variant-numeric: tabular-nums; }
+#fx-sat i { display: block; height: 7px; border-radius: 4px; background: #dfe5e9; overflow: hidden; position: relative; }
+#fx-sat i::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: var(--sat, 100%); background: #2fbf71; border-radius: 4px; transition: width .3s, background-color .3s; }
+#fx-sat.mid i::after { background: #f2b632; }
+#fx-sat.mid b { color: #b7791f; }
+#fx-sat.low i::after { background: #e5484d; }
+#fx-sat.low b { color: #c0392b; }
 #fx-info { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #1d2430; background: #fff; color: #1d2430; padding: 0;
   font: italic 800 17px/1 Georgia, 'Times New Roman', serif; box-shadow: 0 2px 0 #1d2430; }
 .fx-bubble { position: absolute; left: 0; top: 0; z-index: 25; display: flex; gap: 6px; padding: 6px; background: #fff;
@@ -277,7 +286,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-13 06:19 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-13 18:39 UTC</div>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute-btn" aria-label="Toggle sound">🔊</button>
 <select id="mode-btn" aria-label="Mode"><option value="formal">Formal</option><option value="robot-factory">Robot factory</option></select>
@@ -313,7 +322,10 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 
 <div id="factory">
   <canvas id="fx-canvas" aria-label="The robot factory floor"></canvas>
-  <div id="fx-hud"><div class="fx-pill"><span id="fx-money">$0</span><span id="fx-trust" aria-label="Customer trust 100%">trust<i></i></span></div><button id="fx-info" aria-label="How the factory works">i</button></div>
+  <div id="fx-hud">
+    <div class="fx-hudrow"><div class="fx-pill" id="fx-cash"><span id="fx-money">$0</span></div><button id="fx-info" aria-label="How the factory works">i</button></div>
+    <div class="fx-pill" id="fx-sat" role="img" aria-label="Customer satisfaction 100%"><span class="fx-sat-top"><span>customer satisfaction</span><b id="fx-sat-num">100%</b></span><i></i></div>
+  </div>
   <div id="fx-bubble" class="fx-bubble" hidden></div>
   <div id="fx-panel" hidden><div id="fx-panel-body"></div></div>
 </div>
@@ -587,8 +599,10 @@ const FACTORY = (function () {
     price: { plank: 5, rough: 3, dowels: 1 },   // the right price for each thing
     soso: { plank: 3, rough: 2, dowels: 0 },    // what a so-so seller lets it go for
     mislabel: 5,            // a bad seller passes dowels off as a plank at this price
-    trustStart: 100, trustMin: 10, trustUp: 1, trustHit: 15,
-    trustHeal: 0.005        // customers forget: each second closes this share of the gap to 100
+    // customer satisfaction: how much our customers trust us and our products (not the formal
+    // mode's Trust, which is how much the team trusts the AI tool). It starts at 100%.
+    satStart: 100, satMin: 10, satUp: 1, satHit: 15,
+    satHeal: 0.005          // customers forget: each second closes this share of the gap to 100
   };
 
   /* ---------- the floor (metres; x right, y toward the camera, z up) ---------- */
@@ -629,7 +643,7 @@ const FACTORY = (function () {
   function newGame(seed) {
     return {
       version: CFG.version, t: 0, seed: (seed === undefined ? 20261013 : seed) >>> 0,
-      money: 0, earned: 0, trust: CFG.trustStart, hired: 0, prompt: 0,
+      money: 0, earned: 0, satisfaction: CFG.satStart, hired: 0, prompt: 0,
       machine: { phase: 'ready', t: 0, staged: 1, load: 'log', result: null, by: null, grade: null, dirt: 0 },
       belt: [], bin: [],
       avatar: { x: SPOT.start.x, y: SPOT.start.y, yawT: SPOT.start.face, path: [], task: null, act: null, dist: 0 },
@@ -670,7 +684,7 @@ const FACTORY = (function () {
     if (g === 'soso') return { plan: rng(s) < 0.5 ? 'slow' : 'rough', grade: g };
     return { plan: rng(s) < 0.5 ? 'sap' : 'dowels', grade: g };
   }
-  function paid(s, ask) { return Math.round(ask * s.trust / 100); }
+  function paid(s, ask) { return Math.round(ask * s.satisfaction / 100); }
   function priceNow(s, item) { return paid(s, CFG.price[item]); }
   function hirePrice(s) { return s.hired < CFG.hire.length ? CFG.hire[s.hired] : null; }
   function promptPrice(s) { return s.prompt < CFG.prompt.length ? CFG.prompt[s.prompt].price : null; }
@@ -684,8 +698,8 @@ const FACTORY = (function () {
     else { ask = 0; kind = 'free'; }
     const p = paid(s, ask);
     s.money += p; s.earned += p;
-    if (kind === 'fair') s.trust = Math.min(100, s.trust + CFG.trustUp);
-    if (kind === 'mislabel') s.trust = Math.max(CFG.trustMin, s.trust - CFG.trustHit);
+    if (kind === 'fair') s.satisfaction = Math.min(100, s.satisfaction + CFG.satUp);
+    if (kind === 'mislabel') s.satisfaction = Math.max(CFG.satMin, s.satisfaction - CFG.satHit);
     ev(s, 'sold', { by, item, paid: p, sale: kind, grade: g });
     return p;
   }
@@ -1083,7 +1097,7 @@ const FACTORY = (function () {
     while (dt > 1e-9) {
       const h = Math.min(0.05, dt);
       s.t += h;
-      s.trust = Math.min(100, s.trust + (100 - s.trust) * CFG.trustHeal * h);
+      s.satisfaction = Math.min(100, s.satisfaction + (100 - s.satisfaction) * CFG.satHeal * h);
       stepAvatar(s, h);
       s.robots.forEach(r => stepRobot(s, r, h));
       stepMachine(s, h);
@@ -1103,9 +1117,11 @@ const FACTORY = (function () {
       const d = JSON.parse(text);
       if (!d || d.version !== CFG.version || !d.machine || !Array.isArray(d.robots)) return null;
       const s = Object.assign(newGame(), d, { events: [], force: { operate: [], sell: [] } });
+      if (d.satisfaction === undefined && d.trust !== undefined) s.satisfaction = d.trust;   // saved before the rename (2026-10-13)
+      delete s.trust;
       s.hired = Math.max(0, Math.min(CFG.hire.length, s.robots.length));
       s.prompt = Math.max(0, Math.min(CFG.prompt.length, s.prompt | 0));
-      s.trust = Math.max(CFG.trustMin, Math.min(100, +s.trust || CFG.trustStart));
+      s.satisfaction = Math.max(CFG.satMin, Math.min(100, +s.satisfaction || CFG.satStart));
       s.money = Math.max(0, +s.money || 0);
       return s;
     } catch (e) { return null; }
@@ -1628,7 +1644,7 @@ const MODE = (function () {
   const cv = document.getElementById('fx-canvas');
   let ctx = cv.getContext('2d');   // let: the floor bake borrows it for a moment
   const bubbleEl = document.getElementById('fx-bubble');
-  const moneyEl = document.getElementById('fx-money'), trustEl = document.getElementById('fx-trust');
+  const moneyEl = document.getElementById('fx-money'), satEl = document.getElementById('fx-sat'), satNum = document.getElementById('fx-sat-num');
   const hudEl = document.getElementById('fx-hud'), panelEl = document.getElementById('fx-panel');
   const panelBody = document.getElementById('fx-panel-body');
 
@@ -1636,7 +1652,7 @@ const MODE = (function () {
 
   /* ---------- view ---------- */
   const ELEV = 50 * Math.PI / 180, SE = Math.sin(ELEV), CE = Math.cos(ELEV);
-  const VW = { S: 60, ox: 0, camY: 0, dpr: 1, w: 0, h: 0, minY: 0, maxY: 0, gen: 0 };
+  const VW = { S: 60, ox: 0, camY: 0, dpr: 1, w: 0, h: 0, minY: 0, maxY: 0, gen: 0, hudBottom: 50 };
   const LT = (function () { const x = -0.45, y = 0.5, z = 0.75, n = Math.hypot(x, y, z); return [x / n, y / n, z / n]; })();
   const INK = '#1d2430';
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1649,6 +1665,7 @@ const MODE = (function () {
     const first = !VW.w;
     VW.w = w; VW.h = h; VW.dpr = dpr;
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    VW.hudBottom = Math.max(50, hudEl.getBoundingClientRect().bottom - r.top);
     // enough depth to see the line, the dock and the desk at once; a short landscape screen settles for the line
     const S = clamp(Math.min((w - 32) / L.W, h / ((h < 500 ? 9.5 : 13) * SE)), 34, 110);
     VW.S = S;
@@ -2529,7 +2546,7 @@ const MODE = (function () {
           const src = typeof e.by === 'number' && s.robots[e.by] ? s.robots[e.by] : s.avatar;
           FLY.push({ item: e.item, x0: src.x, y0: src.y, z0: 0.9, age: 0, dur: 0.6 });
           const col = { fair: '#7dff9a', cheap: '#ffe066', free: '#c9d2db', mislabel: '#ff8a8a' }[e.sale];
-          FLOAT.push({ x: src.x, y: src.y, z: 1.45, text: '+$' + e.paid, color: col, sub: e.sale === 'mislabel' ? 'trust -' + C.trustHit : '', age: 0 });
+          FLOAT.push({ x: src.x, y: src.y, z: 1.45, text: '+$' + e.paid, color: col, sub: e.sale === 'mislabel' ? 'satisfaction -' + C.satHit + '%' : '', age: 0 });
           SND.sfx(e.paid > 0 ? 'cash' : 'flop');
           if (e.sale === 'mislabel') SND.sfx('boo');
           break;
@@ -2590,7 +2607,7 @@ const MODE = (function () {
     const an = anchorOf(b);
     const x = PX(an[0]), y = PY(an[1], an[2]);
     const w = bubbleEl.offsetWidth, h = bubbleEl.offsetHeight;
-    const left = clamp(x - w / 2, 6, VW.w - w - 6), top = clamp(y - h - 14, 50, VW.h - h - 6);
+    const left = clamp(x - w / 2, 6, VW.w - w - 6), top = clamp(y - h - 14, VW.hudBottom + 6, VW.h - h - 6);
     bubbleEl.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
     bubbleEl.style.setProperty('--tail', clamp(x - left, 18, w - 18) + 'px');
     bubbleEl.classList.toggle('below', top > y - h);
@@ -2605,18 +2622,20 @@ const MODE = (function () {
   });
 
   /* ---------- HUD and the opt-in panel ---------- */
-  let shownMoney = -1, shownTrust = -1;
+  let shownMoney = -1, shownSat = -1;
   function renderHud() {
     if (s.money !== shownMoney) {
       if (shownMoney >= 0 && s.money > shownMoney) { moneyEl.classList.remove('bump'); void moneyEl.offsetWidth; moneyEl.classList.add('bump'); }
       shownMoney = s.money;
       moneyEl.textContent = '$' + s.money.toLocaleString('en-US');
     }
-    if (Math.round(s.trust) !== shownTrust) {
-      shownTrust = Math.round(s.trust);
-      trustEl.style.setProperty('--trust', shownTrust + '%');
-      trustEl.classList.toggle('low', s.trust < 60);
-      trustEl.setAttribute('aria-label', 'Customer trust ' + Math.round(s.trust) + '%');
+    if (Math.round(s.satisfaction) !== shownSat) {
+      shownSat = Math.round(s.satisfaction);
+      satEl.style.setProperty('--sat', shownSat + '%');
+      satEl.classList.toggle('mid', shownSat < 85 && shownSat >= 60);
+      satEl.classList.toggle('low', shownSat < 60);
+      satNum.textContent = shownSat + '%';
+      satEl.setAttribute('aria-label', 'Customer satisfaction ' + shownSat + '%');
     }
   }
   function renderPanel() {
@@ -2628,13 +2647,14 @@ const MODE = (function () {
     }).join('') : '<tr><td colspan="5">No robots yet. The first one costs $' + C.hire[0] + '.</td></tr>';
     panelBody.innerHTML =
       '<h2>Robot factory</h2>' +
-      '<p>The same story as the formal mode, played with your hands. Machine 01 is a task. You can always do it yourself, and you never get it wrong, but you can only be in one place. The robots are AI agents: they take the work off you, and they do not always do it well.</p>' +
+      '<p>Machine 01 is a task. You can always do it yourself, and you never get it wrong, but you can only be in one place. The robots are AI agents: they take the work off you, and they do not always do it well.</p>' +
+      '<p><b>Customer satisfaction</b> (' + Math.round(s.satisfaction) + '% now) is how much our customers trust us and our products. It starts at 100%. As the robots take over the work, do not let it erode.</p>' +
       '<ul>' +
       '<li><b>Good</b>: the right input, a smooth plank; a plank sold for its full price.</li>' +
       '<li><b>So-so</b>: the operator stands and thinks first, or cuts a rough plank ($' + C.price.rough + '); the seller lets a plank go for $' + C.soso.plank + '.</li>' +
-      '<li><b>Bad</b>: sap poured in, which jams the machine until you scrub it clean yourself; dowels instead of a plank ($' + C.price.dowels + '); a plank given away for $0; dowels sold as a plank for $' + C.mislabel + ', which costs ' + C.trustHit + ' points of customer trust.</li>' +
-      '<li><b>Trust</b> sets what customers pay: every price is multiplied by it (now ' + Math.round(s.trust) + '%). Each fair sale wins back a point, and customers slowly forget a bad one.</li>' +
-      '<li><b>Prompt engineering</b> (the terminal, once both robots are on staff) is the L2 rung of the formal ladder: better instructions, better odds. Each robot rolls its own odds every job.</li>' +
+      '<li><b>Bad</b>: sap poured in, which jams the machine until you scrub it clean yourself; dowels instead of a plank ($' + C.price.dowels + '); a plank given away for $0; dowels sold to a customer as a plank for $' + C.mislabel + ', which costs ' + C.satHit + ' points of customer satisfaction.</li>' +
+      '<li><b>Satisfaction sets what customers pay</b>: every price is multiplied by it. Each fair sale wins back a point, and customers slowly forget a bad one.</li>' +
+      '<li><b>Prompt engineering</b> (the terminal, once both robots are on staff): better instructions, better odds. Each robot rolls its own odds every job.</li>' +
       '</ul>' +
       '<h3>The odds, by prompt level</h3><div class="fx-scroll"><table><thead><tr><th></th><th>Good</th><th>So-so</th><th>Bad</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<h3>Measured so far</h3><div class="fx-scroll"><table><thead><tr><th></th><th>Good</th><th>So-so</th><th>Bad</th><th>Good %</th></tr></thead><tbody>' + bots + '</tbody></table></div>' +
@@ -2650,7 +2670,7 @@ const MODE = (function () {
     if (b.dataset.panel === 'restart') {
       if (!confirmReset) { confirmReset = true; renderPanel(); return; }
       confirmReset = false; s = F.newGame((Date.now() >>> 0) || 1); bubbleSig = ''; FX.length = FLOAT.length = FLY.length = 0;
-      shownMoney = -1; shownTrust = -1; save(); panelEl.hidden = true; VW.camY = VW.minY;
+      shownMoney = -1; shownSat = -1; save(); panelEl.hidden = true; VW.camY = VW.minY;
     }
   });
 
@@ -2762,7 +2782,7 @@ const MODE = (function () {
 
   // test hook: lets the suites find where things are drawn and run frames without a display
   window.TAAS_FACTORY = {
-    get s() { return s; }, set s(v) { s = v; bubbleSig = ''; shownMoney = -1; shownTrust = -1; },
+    get s() { return s; }, set s(v) { s = v; bubbleSig = ''; shownMoney = -1; shownSat = -1; },
     view: VW, layout, tick, save, hitTest, spriteRect,
     screen: (x, y, z) => [PX(x), PY(y, z || 0)],
     get on() { return on; },

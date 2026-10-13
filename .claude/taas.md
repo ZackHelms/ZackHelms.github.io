@@ -333,13 +333,33 @@ Asked for on 2026-10-12, built overnight. In the CD's words, lightly trimmed:
   good plank for **$0**, or sells **dowels for $5**, which costs **customer trust**. "These
   are just examples to get us started"; the factory will grow.
 
+### Customer satisfaction, and the factory on its own (CD, 2026-10-13) - stated
+
+The day after the build, in the CD's words: "For robot factory change 'trust' to 'customer
+satisfaction' which should start at 100% as an indicator that our customers trust us and our
+products. As we start using AI, it is important to not let that erode."
+
+And: "For now, I want to work on robot factory separately from formal mode to help me get a
+different perspective." The two words were never one metric:
+
+- **Formal's Trust** is how much the **employees trust the AI tool**, from their experience
+  with it (a `STATS` row; unchanged).
+- **The factory's customer satisfaction** is how much the **customers trust the company** and
+  its products: it starts at 100%, sets what they pay, and is what the robots must not erode.
+
+"Both are useful metrics." So the factory is developed **as its own game for now**: its HUD,
+reference panel and copy use none of the formal mode's terms (no L0-L5 ladder, no "L2
+rung"), and nothing in one mode reads the other. The engine's field is `s.satisfaction` and
+its tuning `CFG.sat*`; a save from before the rename keeps its number (`load()` reads the old
+`trust` field once).
+
 ### The Q&A (2026-10-12, before the build) - stated
 
 | Question | CD's answer |
 |---|---|
 | How to render cel-shaded 3D | **Canvas 2D meshes**: hand-written low-poly meshes, toon bands, ink outlines (as Star Surge's 3D style and Animation Rigs); no library, one file |
 | Prompt engineering in the first build | **Yes**: bought with $, steps that raise the good odds; prices and steps are Claude's, to tune |
-| What customer trust does | **Lowers prices**: a good plank sells for $5 x trust; fair sales win it back |
+| What customer trust does (now **customer satisfaction**) | **Lowers prices**: a good plank sells for $5 x satisfaction; fair sales win it back |
 | Outcome split at the start | **25 good / 35 so-so / 40 bad** (so-so: a slow cycle or a plank let go for $3) |
 
 ### What was built
@@ -368,13 +388,13 @@ from the current odds, independently:
 | Robot | Good | So-so | Bad |
 |---|---|---|---|
 | Operator | a plank | half the time it stands and thinks 3 s first (still a plank), half the time a rough plank ($3) | half the time it fetches sap from the barrel and pours it in (the machine jams until **you** scrub it, 2.5 s; robots never clean), half the time dowel rods ($1) |
-| Seller | the right price | lets it go cheap (plank $3, rough $2, dowels $0) | a plank given away for $0, or dowels sold **as a plank for $5** (the sale goes through, trust -15) |
+| Seller | the right price | lets it go cheap (plank $3, rough $2, dowels $0) | a plank given away for $0, or dowels sold **as a plank for $5** (the sale goes through, customer satisfaction -15) |
 
 Each outcome shows: a check, a squiggle or a cross pops over the robot, its screen face
 changes, and it beeps; a jammed machine shakes, smokes and flashes amber while its operator
 shows a "?".
 
-**Trust** multiplies every price (`round(base x trust)`), starts at 100%, takes 15 points per
+**Customer satisfaction** multiplies every price (`round(base x satisfaction)`), starts at 100%, takes 15 points per
 dowel sold as a plank, gives one back per fair sale, never drops below 10%, and **heals by
 itself**: each second closes 0.5% of the gap to 100 (customers forget). Your own sales are
 always fair; your own presses always make planks.
@@ -391,11 +411,14 @@ robots are on staff, then offers three levels, each replacing both robots' odds:
 
 The robots' antenna bulbs change colour with the level and the monitor shows the stars.
 
-**The i button** (top right, beside the money and trust) opens the reference: what maps to
-what (machine01 is a task, robots are agents, sap is rework you clean up yourself, dowels
-sold as planks are confident wrong output that costs trust, prompt engineering is the L2
-rung), the odds table with the current level marked, each robot's measured tally and good
-percentage, and **Start over** (two taps).
+**The HUD** (top right) is the money with the i button beside it, and under them a white
+pill reading **customer satisfaction** with its percentage and a bar (green, amber under
+85%, red under 60%). **The i button** opens the reference: what maps to what (machine01 is a
+task you can always do yourself, robots are AI agents that take the work off you and do not
+always do it well), what customer satisfaction is, what each grade does, prompt engineering
+as better instructions for better odds, the odds table with the current level marked, each
+robot's measured tally and good percentage, and **Start over** (two taps). It names nothing
+from the formal mode.
 
 ### Assumed, not decided (Claude's choices; the CD has not ruled on these)
 
@@ -408,27 +431,28 @@ percentage, and **Start over** (two taps).
 | **Timings**: 0.9 s for the next log, 1 s out-feed, 0.35 s drop; "near" is 0.6 m; walk 1.7 m/s, robots 1.3 m/s | `FACTORY.CFG` | The CD fixed only the 4 s |
 | **Outcome details** beyond the CD's examples: the so-so and bad splits in the table above, the rough plank ($3), the seller's cheap prices, the sale of dowels-as-a-plank going through for $5 | `operatorPlan()`, `settle()`, `CFG.soso` | The CD's examples, filled out so every grade does something visible |
 | **Prompt levels**: three, at $50 / $120 / $250 with the odds above, unlocked by hiring the second robot, applying to both robots | `CFG.prompt` | Tuned against the eval so each level arrives a few minutes apart |
-| **Trust**: -15 per mislabelled sale, +1 per fair one, floor 10%, heals 0.5% of the gap a second | `CFG.trust*` | Without the healing an unprompted seller drives trust to the floor, every price (yours too) falls to about $1, and the first prompt level takes 25 minutes; with it, unprompted robots sit near 60% and prompted ones near 100% (measured, below) |
-| **Rest** as a third job, and **swap** when a job is taken | `choose()` | A way to stop a robot that is costing you trust, and no two operators on one button |
+| **Customer satisfaction**: -15 per mislabelled sale, +1 per fair one, floor 10%, heals 0.5% of the gap a second | `CFG.sat*` | Without the healing an unprompted seller drives satisfaction to the floor, every price (yours too) falls to about $1, and the first prompt level takes 25 minutes; with it, unprompted robots sit near 60% and prompted ones near 100% (measured, below) |
+| **Rest** as a third job, and **swap** when a job is taken | `choose()` | A way to stop a robot that is costing you customer satisfaction, and no two operators on one button |
 | **Robots never clean a jam** | `operate()` | The CD: "you have to manually do maintenance" |
 | **Two robots at most** until the factory grows | `CFG.hire` | Two jobs exist |
-| **Whole dollars**; trust shown as a bar | `paid()`, the HUD | Readable at a glance |
+| **Whole dollars**; satisfaction as a labelled percentage over a bar, amber under 85%, red under 60% | `paid()`, the HUD | Readable at a glance |
 | **Music**: a bouncy 112 bpm marimba loop in this mode, the office loop in formal | `SND` | The repo's every-game audio rule; a playful mode wanted a playful loop |
 | **The canvas draws at 2x device pixels at most** | `layout()` | Crisp for toon art, and a 3x phone pays 2.25x less (it took the busy scene from over budget to inside it) |
 
 ### Open questions for the CD (factory)
 
-1. **What comes after prompt engineering?** The formal ladder suggests the next rungs:
-   **L3a context engineering** (a work-instructions binder at each station that robots read:
-   fewer so-so outcomes), **L3b deterministic-first** (a filter on the in-feed so sap cannot
-   go in at all; a price list at the bin so dowels cannot be sold as planks), **L4 loop
-   engineering** (a maintenance robot that cleans jams, robots that check their own work).
+1. **What comes after prompt engineering?** Ideas in the factory's own terms (assumed, not
+   asked for): a **work-instructions binder** at each station that robots read (fewer so-so
+   outcomes); a **filter on the in-feed** so sap cannot go in at all and a **price list at
+   the bin** so dowels cannot be sold as planks; a **maintenance robot** that cleans jams, or
+   robots that check their own work before it reaches a customer.
 2. **What do the bays hold next?** A second machine (logs to dowels on purpose, or planks to
    furniture) would give the dowels a real market and the operators a second line.
 3. **Should a jam cost more than time** (a repair bill, a lost log)? Today it only stops
    the line until you scrub it.
-4. **Should the factory and the formal mode share anything** (a score, the same L0-L5
-   ladder on screen)? Today they are independent, with independent saves.
+4. ~~Should the factory and the formal mode share anything?~~ **Answered 2026-10-13: not
+   for now.** The CD is working on the factory separately for a different perspective (see
+   Customer satisfaction, above); independent rules, copy and saves.
 
 ### Architecture (factory)
 
@@ -438,7 +462,7 @@ Three script blocks join the page, in this order after the formal engine:
    plain state object, no DOM, ending `if (typeof module !== 'undefined') module.exports =
    FACTORY;` (the suites lift exactly that span, so keep both lines). It owns the layout,
    pathing, the avatar's tasks and acts, the machine, belt and bin, the robots' state
-   machines, outcomes (`grade()`, `operatorPlan()`), prices and trust (`settle()`), the
+   machines, outcomes (`grade()`, `operatorPlan()`), prices and customer satisfaction (`settle()`), the
    chat bubble's options (`options()` / `choose()`) and saving. Its dice are a mulberry32 on
    `s.seed`, so **a save resumes the same luck**; `s.force.operate|sell` is a test queue that
    forces the next outcome. The engine emits `s.events` (press, made, binned, jam, cleaned,
@@ -488,7 +512,7 @@ Three script blocks join the page, in this order after the formal engine:
 
 `node .claude/tests/eval-taas-factory.cjs` (30 simulated minutes, every action walked):
 
-| Persona | $20 | robot 1 | robot 2 | prompt 1 | prompt 2 | prompt 3 | earned | $/min, last 5 | trust end/min |
+| Persona | $20 | robot 1 | robot 2 | prompt 1 | prompt 2 | prompt 3 | earned | $/min, last 5 | satisfaction end/min |
 |---|---|---|---|---|---|---|---|---|---|
 | hands-on | 0.5m | 0.5m | 1.7m | 4.3m | 11.5m | 19.7m | 953 | 44.6 | 100/51 |
 | supervisor (cleans jams 10 s late) | 0.5m | 0.5m | 1.7m | 4.8m | 13.8m | 22.5m | 826 | 44.4 | 100/52 |
@@ -497,7 +521,7 @@ Three script blocks join the page, in this order after the formal engine:
 
 The shape it asserts: the first robot inside a minute and a half, both inside five minutes,
 the top prompt level inside 25; robots left alone stall on their first jam; prompt
-engineering pays (over 3x the unprompted line); an unprompted seller wears trust down and a
+engineering pays (over 3x the unprompted line); an unprompted seller wears customer satisfaction down and a
 prompted one wins it back; unprompted robots barely beat a person working alone.
 
 Frame cost (`.claude/scripts/frame-budget.cjs` at 390x844, dpr 3, the busy pose in
@@ -508,8 +532,11 @@ Before them: 26-57 of 149 over, run to run.
 
 ### Negative tests (factory)
 
-`.claude/tests/negtests/taas-factory-engine.json` (41 breaks) and `taas-factory-ui.json` (25):
-40 and 23 caught. The misses are **equivalent changes**, recorded rather than tested:
+`.claude/tests/negtests/taas-factory-engine.json` (43 breaks) and `taas-factory-ui.json` (28):
+42 and 26 caught (after the customer-satisfaction rename, which re-anchored the lists and
+added breaks for a game that starts below 100%, an old save that loses its number, a HUD
+still labelled trust, a bar that never turns red, and a panel that leans on formal terms).
+The misses are **equivalent changes**, recorded rather than tested:
 `bubbleOpen()`'s arrival check (every `tap()` clears the bubble first, so nothing can show it
 early), the console's own tap box (the machine's box covers it), and the `pagehide` save (in
 Chromium the `visibilitychange` save fires on the same navigation; on iOS Safari `pagehide`
@@ -561,6 +588,11 @@ row was rescued by the fling's own clamp, and the save row was rescued by `pageh
   build): the mode dropdown, the factory engine, the Canvas 2D toon renderer, shared audio,
   three suites and two break lists. Formal mode unchanged apart from its sounds moving into
   `SND`.
+- 2026-10-13 (later): the factory's **trust** became **customer satisfaction** (CD: how much
+  the customers trust the company, not formal's Trust in the AI tool), shown as a labelled
+  percentage on the HUD, and the factory is developed **separately from formal** for now:
+  its panel no longer names the formal ladder. Rules and tuning unchanged; old saves keep
+  their number.
 - 2026-10-12 (later): negative tests over both drive suites. `drive-taas` grew from 29 to
   43 checks (section 9, hand-built states) and lost two rows that could not fail;
   `drive-taas-ui` added (the page in Chromium); found that trust can never fall in

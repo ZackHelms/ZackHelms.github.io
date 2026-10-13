@@ -140,7 +140,7 @@
  {
   "name": "mislabel-no-hit",
   "file": "games/taas/index.html",
-  "old": "if (kind === 'mislabel') s.trust = Math.max(CFG.trustMin, s.trust - CFG.trustHit);",
+  "old": "if (kind === 'mislabel') s.satisfaction = Math.max(CFG.satMin, s.satisfaction - CFG.satHit);",
   "new": "; /* @negtest */"
  },
  {
@@ -150,27 +150,27 @@
   "new": "else if (item === 'dowels') { ask = CFG.price.dowels; kind = 'mislabel'; } /* @negtest */"
  },
  {
-  "name": "price-ignores-trust",
+  "name": "price-ignores-sat",
   "file": "games/taas/index.html",
-  "old": "function paid(s, ask) { return Math.round(ask * s.trust / 100); }",
+  "old": "function paid(s, ask) { return Math.round(ask * s.satisfaction / 100); }",
   "new": "function paid(s, ask) { return ask; } /* @negtest */"
  },
  {
-  "name": "no-trust-floor",
+  "name": "no-sat-floor",
   "file": "games/taas/index.html",
-  "old": "if (kind === 'mislabel') s.trust = Math.max(CFG.trustMin, s.trust - CFG.trustHit);",
-  "new": "if (kind === 'mislabel') s.trust = s.trust - CFG.trustHit; /* @negtest */"
+  "old": "if (kind === 'mislabel') s.satisfaction = Math.max(CFG.satMin, s.satisfaction - CFG.satHit);",
+  "new": "if (kind === 'mislabel') s.satisfaction = s.satisfaction - CFG.satHit; /* @negtest */"
  },
  {
-  "name": "no-trust-up",
+  "name": "no-sat-up",
   "file": "games/taas/index.html",
-  "old": "if (kind === 'fair') s.trust = Math.min(100, s.trust + CFG.trustUp);",
+  "old": "if (kind === 'fair') s.satisfaction = Math.min(100, s.satisfaction + CFG.satUp);",
   "new": "; /* @negtest */"
  },
  {
-  "name": "no-trust-heal",
+  "name": "no-sat-heal",
   "file": "games/taas/index.html",
-  "old": "      s.trust = Math.min(100, s.trust + (100 - s.trust) * CFG.trustHeal * h);",
+  "old": "      s.satisfaction = Math.min(100, s.satisfaction + (100 - s.satisfaction) * CFG.satHeal * h);",
   "new": "       /* @negtest */"
  },
  {
@@ -244,5 +244,17 @@
   "file": "games/taas/index.html",
   "old": "    r.tally[g]++; r.mood = g; r.moodT = 2.4;",
   "new": "    r.mood = g; r.moodT = 2.4; /* @negtest */"
+ },
+ {
+  "name": "sat-starts-low",
+  "file": "games/taas/index.html",
+  "old": "    satStart: 100, satMin: 10,",
+  "new": "    satStart: 90, satMin: 10, /* @negtest */"
+ },
+ {
+  "name": "old-save-loses-sat",
+  "file": "games/taas/index.html",
+  "old": "      if (d.satisfaction === undefined && d.trust !== undefined) s.satisfaction = d.trust;",
+  "new": "      /* @negtest */"
  }
 ]

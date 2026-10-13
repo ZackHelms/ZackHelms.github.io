@@ -121,6 +121,13 @@ const server = http.createServer((req, res) => {
     const t3 = await S();
     const hud = await H(() => document.getElementById('fx-money').textContent);
     ok(t3.money === 5 && !t3.bin.length && hud === '$5', 'tapping the bill sells the plank: the HUD goes from $0 to $5', hud);
+    // customer satisfaction: how much customers trust us and our products, from 100%
+    const read = () => H(() => { const e = document.getElementById('fx-sat'); return { text: e.querySelector('.fx-sat-top span').textContent + ' ' + document.getElementById('fx-sat-num').textContent, aria: e.getAttribute('aria-label'), cls: e.className, low: e.classList.contains('low') }; });
+    const sat0 = await read();
+    await H(() => { window.TAAS_FACTORY.s.satisfaction = 55; window.TAAS_FACTORY.tick(1 / 60); });
+    const sat1 = await read();
+    ok(sat0.text === 'customer satisfaction 100%' && sat0.aria === 'Customer satisfaction 100%' && !/low|mid/.test(sat0.cls) && /55%$/.test(sat1.text) && sat1.low,
+      'the HUD shows customer satisfaction, starting at 100%, and turns red when it falls', JSON.stringify([sat0, sat1]));
   });
 
   /* ---------- 3. a drag scrolls and never walks ---------- */
@@ -220,16 +227,18 @@ const server = http.createServer((req, res) => {
       await step(4);
       const r = await H(() => {
         const box = id => { const e = document.getElementById(id); const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom, hidden: e.hidden }; };
-        const ids = ['back-btn', 'mute-btn', 'mode-btn', 'fx-hud', 'fx-bubble'];
+        const ids = ['back-btn', 'mute-btn', 'mode-btn', 'fx-cash', 'fx-info', 'fx-sat', 'fx-bubble'];
         const o = {}; ids.forEach(i => { o[i] = box(i); });
         o.vw = innerWidth; o.vh = innerHeight; o.sw = document.scrollingElement.scrollWidth;
         return o;
       });
       const inside = k => r[k].l >= 0 && r[k].r <= r.vw + 0.5 && r[k].t >= 0 && r[k].b <= r.vh + 0.5;
       const overlap = (a, b) => !(r[a].r <= r[b].l || r[b].r <= r[a].l || r[a].b <= r[b].t || r[b].b <= r[a].t);
-      ['back-btn', 'mute-btn', 'mode-btn', 'fx-hud', 'fx-bubble'].forEach(k => { if (!inside(k)) bad.push(w + 'x' + h + ' ' + k + ' off screen'); });
+      ['back-btn', 'mute-btn', 'mode-btn', 'fx-cash', 'fx-info', 'fx-sat', 'fx-bubble'].forEach(k => { if (!inside(k)) bad.push(w + 'x' + h + ' ' + k + ' off screen'); });
       if (r['fx-bubble'].hidden) bad.push(w + 'x' + h + ' bubble did not open');
-      [['back-btn', 'mute-btn'], ['mute-btn', 'mode-btn'], ['mode-btn', 'fx-hud'], ['mute-btn', 'fx-hud'], ['fx-bubble', 'fx-hud'], ['fx-bubble', 'mode-btn']].forEach(([a, b]) => { if (overlap(a, b)) bad.push(w + 'x' + h + ' ' + a + ' over ' + b); });
+      const pairs = [['back-btn', 'mute-btn'], ['mute-btn', 'mode-btn'], ['fx-bubble', 'mode-btn'], ['fx-cash', 'fx-info'], ['fx-cash', 'fx-sat'], ['fx-info', 'fx-sat']];
+      ['fx-cash', 'fx-info', 'fx-sat'].forEach(k => pairs.push(['mode-btn', k], ['mute-btn', k], ['fx-bubble', k]));
+      pairs.forEach(([a, b]) => { if (overlap(a, b)) bad.push(w + 'x' + h + ' ' + a + ' over ' + b); });
       if (!(r['back-btn'].r <= r['mute-btn'].l && r['mute-btn'].r <= r['mode-btn'].l)) bad.push(w + 'x' + h + ' chrome order');
       if (r.sw > r.vw) bad.push(w + 'x' + h + ' sideways scroll');
     }
@@ -243,6 +252,8 @@ const server = http.createServer((req, res) => {
     await page.tap('#fx-info');
     const p = await H(() => ({ open: !document.getElementById('fx-panel').hidden, rows: document.querySelectorAll('#fx-panel-body tbody tr').length, cur: document.querySelector('#fx-panel-body tr.cur td') && document.querySelector('#fx-panel-body tr.cur td').textContent }));
     ok(p.open && p.rows >= 5 && /No prompt/.test(p.cur), 'the i button opens the explanation, with the odds table and the current level marked', JSON.stringify(p));
+    const words = await H(() => document.getElementById('fx-panel-body').textContent);
+    ok(/Customer satisfaction/.test(words) && /starts at 100%/.test(words) && !/formal/i.test(words), 'it explains customer satisfaction on its own terms, without leaning on the formal mode', (words.match(/formal.{0,30}/i) || [''])[0]);
     await H(() => { window.TAAS_FACTORY.s.money = 33; });
     await page.tap('[data-panel="restart"]');
     const once = await S();

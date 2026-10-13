@@ -1022,7 +1022,7 @@ Zelda-style from 50 degrees up. A chibi in a hard hat walks where you tap (an A*
 floor, a walk cycle driven by distance), presses machine01's glowing red button, and sells
 planks from a bin through a chat bubble; then robots hired as **AI agents** run the button
 and the selling, each job rolling good / so-so / bad (sap that jams the machine until you
-scrub it, dowels, planks given away, dowels sold as planks at the cost of customer trust),
+scrub it, dowels, planks given away, dowels sold as planks at the cost of **customer satisfaction**, which starts at 100% and sets what customers pay),
 until prompt engineering buys better odds. Static scenery is baked per scale and blitted on
 whole device pixels, the canvas is capped at 2x, and the busy scene holds 60 fps.
 **Proprietary** (one of the nine protected games). Suites: `.claude/tests/drive-taas.cjs`

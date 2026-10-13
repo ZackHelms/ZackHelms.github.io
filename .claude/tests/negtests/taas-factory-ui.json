@@ -122,7 +122,7 @@
  {
   "name": "bubble-unclamped",
   "file": "games/taas/index.html",
-  "old": "    const left = clamp(x - w / 2, 6, VW.w - w - 6), top = clamp(y - h - 14, 50, VW.h - h - 6);",
+  "old": "    const left = clamp(x - w / 2, 6, VW.w - w - 6), top = clamp(y - h - 14, VW.hudBottom + 6, VW.h - h - 6);",
   "new": "    const left = x - w / 2, top = y - h - 14; /* @negtest */"
  },
  {
@@ -148,5 +148,23 @@
   "file": "games/taas/index.html",
   "old": "  window.addEventListener('pagehide', () => { if (s) save(); });",
   "new": "  /* @negtest */"
+ },
+ {
+  "name": "hud-says-trust",
+  "file": "games/taas/index.html",
+  "old": "<span class=\"fx-sat-top\"><span>customer satisfaction</span>",
+  "new": "<span class=\"fx-sat-top\"><span>trust</span><!-- @negtest -->"
+ },
+ {
+  "name": "sat-never-red",
+  "file": "games/taas/index.html",
+  "old": "      satEl.classList.toggle('low', shownSat < 60);",
+  "new": "      ; /* @negtest */"
+ },
+ {
+  "name": "panel-leans-on-formal",
+  "file": "games/taas/index.html",
+  "old": "      '<p>Machine 01 is a task.",
+  "new": "      /* @negtest */ '<p>The same story as the formal mode. Machine 01 is a task."
  }
 ]

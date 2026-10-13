@@ -7,7 +7,7 @@
  * block, lifted out of the page, with no browser: the floor and its paths, the manual loop
  * the CD described (tap the button, the avatar walks over and presses, four seconds, a plank
  * in the bin, sell it for $5), hiring at $20 and $40, the two jobs, every outcome a robot can
- * have and what it does, the odds at every prompt level as MEASURED over real play, trust and
+ * have and what it does, the odds at every prompt level as MEASURED over real play, customer satisfaction and
  * prices, and saving. Numbers come from FACTORY.CFG, so a retune never turns this red.
  * The page around the engine is drive-taas-factory-ui.cjs.
  *
@@ -110,7 +110,7 @@ function staffed(seed, jobs, force) {
 /* ---------- 3. the manual loop the CD described ---------- */
 {
   const s = F.newGame();
-  ok(s.money === 0 && s.trust === 100 && F.ready(s) && !s.robots.length && !s.bin.length, 'a new factory: $0, full trust, machine 01 ready, no robots');
+  ok(s.money === 0 && s.satisfaction === 100 && F.ready(s) && !s.robots.length && !s.bin.length, 'a new factory: $0, customer satisfaction at 100%, machine 01 ready, no robots');
   F.tap(s, { kind: 'machine' });
   const walked = s.avatar.path.length > 0;
   until(s, x => x.machine.phase === 'run', 10);
@@ -149,8 +149,8 @@ function staffed(seed, jobs, force) {
   ok(s.money === 5 && s.bin.length === 1, 'one tap sells exactly one plank: $0 to $5', s.money + ' / ' + s.bin.length);
   F.choose(s, 'sell:plank');
   const empty = F.options(s)[0];
-  const before = JSON.stringify([s.money, s.bin, s.trust]);
-  ok(empty && !empty.enabled && !F.choose(s, 'sell:plank') && before === JSON.stringify([s.money, s.bin, s.trust]), 'with the bin empty the bill is greyed and a tap on it changes nothing');
+  const before = JSON.stringify([s.money, s.bin, s.satisfaction]);
+  ok(empty && !empty.enabled && !F.choose(s, 'sell:plank') && before === JSON.stringify([s.money, s.bin, s.satisfaction]), 'with the bin empty the bill is greyed and a tap on it changes nothing');
   F.tap(s, { kind: 'floor', x: 3, y: 9 }); F.step(s, 0.05);
   const walking = !F.bubbleOpen(s) && !F.options(s).length;
   until(s, x => !x.avatar.path.length, 10);
@@ -277,18 +277,18 @@ function opCycle(plan) {
   until(s, x => x.machine.load === 'sap' || x.machine.phase === 'run', 20);
   ok(s.machine.load === 'sap', 'poured sap waits on the belt for whoever presses next');
 }
-function sale(item, grade, trust) {
-  // trust heals a little every second, so a row that sets it holds it there until the sale
+function sale(item, grade, sat) {
+  // satisfaction heals a little every second, so a row that sets it holds it there until the sale
   const s = staffed(13, [null, 'sell']);
-  if (trust !== undefined) s.trust = trust;
+  if (sat !== undefined) s.satisfaction = sat;
   until(s, x => x.robots[1].state === 'idle' && dist(x.robots[1], SP.sell) < 0.07, 20);
   s.events = []; s.bin.push(item); s.force.sell.push(grade);
-  const m0 = s.money, t0 = trust !== undefined ? trust : s.trust;
-  let trustAt = s.trust;
-  until(s, x => { if (trust !== undefined && !take(x, 'sold').length) { x.trust = trust; } trustAt = x.trust; return take(x, 'sold').length > 0; }, 10);
+  const m0 = s.money, t0 = sat !== undefined ? sat : s.satisfaction;
+  let satAt = s.satisfaction;
+  until(s, x => { if (sat !== undefined && !take(x, 'sold').length) { x.satisfaction = sat; } satAt = x.satisfaction; return take(x, 'sold').length > 0; }, 10);
   const e = take(s, 'sold')[0];
-  e.trustAt = trust !== undefined ? trust : trustAt;
-  return { paid: s.money - m0, dt: s.trust - t0, e, s };
+  e.satAt = sat !== undefined ? sat : satAt;
+  return { paid: s.money - m0, dt: s.satisfaction - t0, e, s };
 }
 {
   let r = sale('plank', 'good');
@@ -298,27 +298,27 @@ function sale(item, grade, trust) {
   r = sale('plank', 'bad');
   ok(r.paid === 0 && r.e.sale === 'free' && r.dt === 0, 'bad seller: gives a good plank away for $0', r.paid);
   r = sale('dowels', 'bad');
-  ok(r.paid === 5 && r.dt <= -C.trustHit + 0.5 && r.dt > -C.trustHit - 0.01 && r.e.sale === 'mislabel', 'bad seller: sells dowel rods as a plank for $5, and customer trust drops ' + C.trustHit, r.paid + ' / ' + r.dt.toFixed(2));
+  ok(r.paid === 5 && r.dt <= -C.satHit + 0.5 && r.dt > -C.satHit - 0.01 && r.e.sale === 'mislabel', 'bad seller: sells dowel rods as a plank for $5, and customer satisfaction drops ' + C.satHit, r.paid + ' / ' + r.dt.toFixed(2));
   r = sale('dowels', 'good');
   ok(r.paid === C.price.dowels, 'good seller: dowels at their own price, $' + C.price.dowels, r.paid);
   r = sale('rough', 'good');
   ok(r.paid === C.price.rough, 'good seller: a rough plank at its own price, $' + C.price.rough, r.paid);
   r = sale('plank', 'good', 70);
-  ok(r.paid === Math.round(5 * r.e.trustAt / 100) && r.paid === 4 && r.dt >= C.trustUp && r.dt < C.trustUp + 1, 'trust sets the price: at 70% trust a plank fetches $4, and a fair sale wins a point back', r.paid + ' / ' + r.dt.toFixed(2));
-  r = sale('dowels', 'bad', C.trustMin + 3);
-  ok(r.s.trust >= C.trustMin && r.s.trust < C.trustMin + 0.5, 'trust never drops below ' + C.trustMin + '%', r.s.trust.toFixed(2));
+  ok(r.paid === Math.round(5 * r.e.satAt / 100) && r.paid === 4 && r.dt >= C.satUp && r.dt < C.satUp + 1, 'customer satisfaction sets the price: at 70% a plank fetches $4, and a fair sale wins a point back', r.paid + ' / ' + r.dt.toFixed(2));
+  r = sale('dowels', 'bad', C.satMin + 3);
+  ok(r.s.satisfaction >= C.satMin && r.s.satisfaction < C.satMin + 0.5, 'customer satisfaction never drops below ' + C.satMin + '%', r.s.satisfaction.toFixed(2));
   r = sale('plank', 'good', 100);
-  ok(r.s.trust === 100, 'and never rises above 100%');
-  const q = F.newGame(); q.trust = 40; run(q, 60);
-  const want = 100 - 60 * Math.exp(-C.trustHeal * 60);
-  ok(q.trust > 40 && Math.abs(q.trust - want) < 0.5, 'customers forget: a minute with no sales heals trust from 40% toward 100%', q.trust.toFixed(1) + ' vs ' + want.toFixed(1));
-  // the player always sells fairly, whatever the odds, and at trust's price
-  const s = F.newGame(); s.bin.push('dowels', 'rough', 'plank'); s.trust = 50;
+  ok(r.s.satisfaction === 100, 'and never rises above 100%');
+  const q = F.newGame(); q.satisfaction = 40; run(q, 60);
+  const want = 100 - 60 * Math.exp(-C.satHeal * 60);
+  ok(q.satisfaction > 40 && Math.abs(q.satisfaction - want) < 0.5, 'customers forget: a minute with no sales heals satisfaction from 40% toward 100%', q.satisfaction.toFixed(1) + ' vs ' + want.toFixed(1));
+  // the player always sells fairly, whatever the odds, and at satisfaction's price
+  const s = F.newGame(); s.bin.push('dowels', 'rough', 'plank'); s.satisfaction = 50;
   F.tap(s, { kind: 'bin' }); until(s, x => !!F.bubbleOpen(x), 10);
   const opts = F.options(s);
   const got = ['sell:dowels', 'sell:rough', 'sell:plank'].map(id => { const m = s.money; F.choose(s, id); return s.money - m; });
   ok(opts.map(o => o.id).join() === 'sell:plank,sell:rough,sell:dowels' && got.join() === [1, 3, 5].map(p => Math.round(p * 0.5)).join(),
-    'selling by hand: one button per kind of thing in the bin, each at its fair price times trust', opts.map(o => o.id + '=' + o.price).join() + ' got ' + got.join());
+    'selling by hand: one button per kind of thing in the bin, each at its fair price times customer satisfaction', opts.map(o => o.id + '=' + o.price).join() + ' got ' + got.join());
 }
 
 /* ---------- 7. the odds, measured over real play at every prompt level ---------- */
@@ -403,13 +403,13 @@ function sale(item, grade, trust) {
   play(s, 300, x => {
     if (worst) return;
     if (x.money < 0) worst = 'money ' + x.money;
-    else if (x.trust < C.trustMin || x.trust > 100) worst = 'trust ' + x.trust;
+    else if (x.satisfaction < C.satMin || x.satisfaction > 100) worst = 'satisfaction ' + x.satisfaction;
     else if (!F.free(x, x.avatar.x, x.avatar.y)) worst = 'avatar inside something at ' + x.avatar.x.toFixed(2) + ',' + x.avatar.y.toFixed(2);
     else if (x.robots.some(r => !F.free(x, r.x, r.y))) worst = 'a robot inside something';
     else if (x.bin.some(k => F.ITEMS.indexOf(k) < 0)) worst = 'bin holds ' + x.bin.join();
     else if (['ready', 'run', 'jam'].indexOf(x.machine.phase) < 0) worst = 'machine ' + x.machine.phase;
   });
-  ok(!worst && s.robots.length >= 1, 'over 300 random taps: money never negative, trust in bounds, nobody walks into anything, the bin holds only things', worst || (s.robots.length + ' robots, $' + s.money));
+  ok(!worst && s.robots.length >= 1, 'over 300 random taps: money never negative, satisfaction in bounds, nobody walks into anything, the bin holds only things', worst || (s.robots.length + ' robots, $' + s.money));
 
   const a = play(F.newGame(8), 40), text = F.save(a), b = F.load(text);
   const strip = x => JSON.stringify(Object.assign({}, x, { events: [] }));
@@ -417,8 +417,12 @@ function sale(item, grade, trust) {
   run(a, 30); run(b, 30);
   ok(strip(a) === strip(b), 'and both carry on identically, robot luck included (the dice live in the save)');
   ok(F.load('{}') === null && F.load('nonsense') === null && F.load(JSON.stringify(Object.assign(F.newGame(), { version: C.version + 1 }))) === null, 'a save from another version, or garbage, is not loaded');
-  const hacked = F.load(JSON.stringify(Object.assign(F.newGame(), { money: -50, prompt: 9, trust: 400 })));
-  ok(hacked && hacked.money === 0 && hacked.prompt === C.prompt.length && hacked.trust === 100, 'a hand-edited save is clamped into range', hacked && [hacked.money, hacked.prompt, hacked.trust].join());
+  const hacked = F.load(JSON.stringify(Object.assign(F.newGame(), { money: -50, prompt: 9, satisfaction: 400 })));
+  ok(hacked && hacked.money === 0 && hacked.prompt === C.prompt.length && hacked.satisfaction === 100, 'a hand-edited save is clamped into range', hacked && [hacked.money, hacked.prompt, hacked.satisfaction].join());
+  // saved before "trust" was renamed customer satisfaction (2026-10-13): the number carries over
+  const old = JSON.parse(F.save(F.newGame())); delete old.satisfaction; old.trust = 63;
+  const moved = F.load(JSON.stringify(old));
+  ok(moved && moved.satisfaction === 63 && moved.trust === undefined, 'a save from before the rename keeps its number as customer satisfaction', moved && moved.satisfaction);
 }
 
 console.log('CHECKS=' + checks + ' PASSED=' + (checks - failed) + ' FAILED=' + failed);
