@@ -104,8 +104,8 @@
  {
   "name": "ui-clear-keeps-opp",
   "file": "games/taas/index.html",
-  "old": "else if (act === 'clear') { plan = E.emptyPlan(); SFX.down(); }",
-  "new": "else if (act === 'clear') { plan = { opp: plan.opp, inv: {} }; SFX.down(); } /* @negtest */"
+  "old": "else if (act === 'clear') { plan = E.emptyPlan(); SND.sfx('down'); }",
+  "new": "else if (act === 'clear') { plan = { opp: plan.opp, inv: {} }; SND.sfx('down'); } /* @negtest */"
  },
  {
   "name": "ui-dec-keeps-zero",
