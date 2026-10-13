@@ -1667,7 +1667,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         /* names every object answers to ("constructor", "toString"), wherever a file, a guest or a tool can put a name */
         { const pr = newGame('proto-1'); intent(pr, { t: 'party', op: 'add' }); intent(pr, { t: 'jump', site: 'S2' }); const h = JSON.parse(JSON.stringify(packState(pr))); h.party[1].site = 'toString'; h.npcs.N5.sheet = { tpl: 'constructor', hp: 5 };
           h.party[0].cls = 'constructor'; h.fallen = [{ name: 'A', cls: '__proto__', level: 1 }]; h.bible.threads.push({ k: 'toString', t: 'x', main: false }); h.bible.threads.find((x) => x.main).k = 'constructor';
-          h.sites.S0.kind = 'constructor'; h.maps.S0.kind = 'valueOf'; h.maps.S0.objs.push({ id: 'Ox', a: 'constructor', x: 1, y: 1 }); h.maps.S2.tokens.find((t) => t.k === 'foe').npc = 'toString'; h.costs = [{ kind: 'hasOwnProperty', usd: 1 }];
+          h.sites.S0.kind = 'constructor'; h.maps.S0.kind = 'valueOf'; h.maps.S0.objs.push(Object.assign({}, h.maps.S0.objs.find((o) => !o.on), { id: 'Ox', a: 'constructor' })); h.maps.S2.tokens.find((t) => t.k === 'foe').npc = 'toString'; h.costs = [{ kind: 'hasOwnProperty', usd: 1 }];
           let q = null; try { q = unpackState(JSON.parse(JSON.stringify(h).replace('"maps":{', '"maps":{"__proto__":' + JSON.stringify(h.maps.S0) + ','))); } catch (x) { q = null; }
           if (q) try { look(q); for (const t of q.maps.S2.tokens) if (t.k === 'foe') sheetOf(q, t, true); } catch (x) { q = null; }
           row(q && q.party.length === 1 && q.party[0].cls === 'Fighter' && q.npcs.N5.sheet && q.npcs.N5.sheet.tpl !== 'constructor' && q.fallen[0].cls === 'Fighter' && !sideKs(q).includes('toString') && mainK(q) === 'kidnap' && sightOf(q.maps.S0) === 16 && !q.maps.S0.objs.some((o) => o.id === 'Ox') && Object.getPrototypeOf(q.maps) === Object.prototype &&
@@ -1675,7 +1675,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
             'a file that names a calling, a whisper, a kind of place, a board, a thing, a monster, a person or a ledger line "constructor" or "toString" (names every object answers to) has them read as unknown, like any other wrong name, and nothing outside the tale is touched');
           const tr = (f) => { try { return f(); } catch (x) { return { why: 'threw' }; } }, w = newGame('proto-2'), g0 = w.gold, add = tr(() => intent(w, { t: 'party', op: 'add', cls: 'constructor' })), chg = tr(() => intent(w, { t: 'party', op: 'class', id: 'P1', cls: 'toString' })), jmp = tr(() => intent(w, { t: 'jump', site: 'constructor' }));
           const t1 = tr(() => exec(w, 'update_npc', { npc_id: 'constructor', attitude: 'hostile' })), t2 = tr(() => exec(w, 'update_quest', { quest_id: 'toString', op: 'note', note: 'x' })), t3 = tr(() => exec(w, 'create_npc', { role: 'bandit', hostile: true, template: 'constructor', near: 'P1' }));
-          row(add.ok && CLASS_ORDER.includes(w.party[1].cls) && chg.why === 'noclass' && w.party[0].cls === 'Fighter' && w.gold === g0 + CLASSES[w.party[1].cls].gold && jmp.why === 'uncharted' && !t1.ok && !t2.ok && !t3.ok && !('attitude' in Object),
+          row(add.ok && CLASS_ORDER.includes(w.party[1].cls) && chg.why === 'noclass' && w.party[0].cls === 'Fighter' && w.gold === g0 + CLASSES[w.party[1].cls].gold && jmp.why === 'uncharted' && /Unknown person/.test(t1.error) && /Unknown quest/.test(t2.error) && /Unknown template/.test(t3.error) && !('attitude' in Object),
             'and so does an act or a Game Master\'s tool that names one: a new traveller gets a real calling, a calling, a place, a person, a task or a monster by such a name is refused'); }
         { const ev2 = JSON.parse(JSON.stringify(packState(st))); Object.assign(ev2.party[1], { hp: 5, status: 'down', saves: { s: 2, f: 2 } }); Object.assign(ev2.party[2], { hp: 3, status: 'dead' }); ev2.over = 'dead'; ev2.v = 99;
           let newer = ''; try { unpackState(ev2); } catch (x) { newer = String(x.message); }
@@ -5038,7 +5038,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     ok(qr.every((r) => r === 'same'), 'a QR code is made by the standard\'s own steps: four codes (versions 1, 3, 7 and 10, levels M and L, masks 0, 2, 5 and 6) match an independent encoder module for module (' + qr.join(', ') + ')');
     const auto = await hp.evaluate((A) => A.filter(([t, v, m]) => { const q = QR.make('https://tythos.com/games/cyoa2/#' + t); return !q || q.ver !== v || q.mask !== m; }).length, QRAUTO);
     ok(auto === 0, 'and left to choose, it picks the version and the mask an independent encoder picks, scoring each mask before the format bits go in (' + (QRAUTO.length - auto) + ' of ' + QRAUTO.length + ' links, every mask among them)');
-    const fit = await hp.evaluate(() => ({ small: QR.make('CYOA2').ver, mid: QR.make('x'.repeat(122)).ver, mid2: QR.make('x'.repeat(123)).ver, top: QR.make('x'.repeat(997)) && QR.make('x'.repeat(997)).ver, over: QR.make('x'.repeat(998)), m: QR.make('https://tythos.com/games/cyoa2/').ecc }));
+    const fit = await hp.evaluate(() => ({ small: QR.make('CYOA2').ver, mid: QR.make('x'.repeat(122)).ver, mid2: QR.make('x'.repeat(123)).ver, top: QR.make('x'.repeat(997)) && QR.make('x'.repeat(997)).ver, over: (() => { try { return QR.make('x'.repeat(998)); } catch (e) { return 'threw'; } })(), m: QR.make('https://tythos.com/games/cyoa2/').ecc }));
     ok(fit.small === 1 && fit.mid === 7 && fit.mid2 === 8 && fit.top === 25 && fit.over === null && fit.m === 'M', 'a code is the smallest version that holds its text at level M (122 bytes is version 7, 123 is 8, as the independent encoder has it), and text too long for version 25 makes none');
 
     /* a connection in brief: what the codes carry */
@@ -5071,15 +5071,18 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     });
     ok(link1.startsWith(PAGE + '#j=') && /^[A-Za-z0-9_-]{60,150}$/.test(link1.slice(PAGE.length + 3)), 'an invitation is this page\'s own address with the code after #j= (' + (link1.length - PAGE.length - 3) + ' characters)');
     ok(!drawn.hidden && drawn.wrong === 0 && drawn.margin === 0 && drawn.w === drawn.n * drawn.u && drawn.css >= 150, 'and the code on the screen is that link, module for module: black on white, with the standard\'s quiet margin of four, ' + Math.round(drawn.css) + ' px across');
-    let front = null;
+    let front = null, wrongCode = null;
     const A = await again(async (first) => {
       const g = await guest(first ? link1 : await invite(), 'Sam', 'samsphone01');
       g.ans = await g.page.evaluate(() => Net.answer || '');
+      if (first) { await hp.evaluate(() => { document.getElementById('toast').textContent = ''; }); await paste(link1.split('#j=')[1] || link1); await sleep(400);
+        wrongCode = await hp.evaluate(() => ({ toast: document.getElementById('toast').textContent, sig: Net.peers.filter((p) => p.pending && !p.closed).map((p) => p.pc.signalingState).join() })); }
       front = await g.page.evaluate(() => ({ hash: location.hash, join: document.getElementById('scr-join').classList.contains('active'), qr: !document.getElementById('join-qr').hidden, role: Net.role, play: document.body.classList.contains('in-play') }));
       await paste(g.ans); g.in = await seated(g); g.known = await hostHas('Sam');
       return g;
     });
     ok(front.hash === '' && front.join && front.qr && front.role === 'guest' && !front.play && A.ans.startsWith(PAGE + '#a='), 'the joining phone opens on a screen of its own with a code for the host (this page\'s address with the code after #a=), and its own address keeps no code, so a reload is a fresh start');
+    ok(wrongCode && /not a code from a joining phone/.test(wrongCode.toast) && wrongCode.sig === 'have-local-offer', 'the host\'s own invitation code pasted where a joining phone\'s goes is refused for what it is, and the invitation still stands');
     if (!A.in) console.log('    (the first pairing: ' + JSON.stringify({ host: await hp.evaluate(() => Net.peers.map((p) => ({ open: p.open, hello: p.hello, pend: p.pending, closed: p.closed, sig: p.pc.signalingState, ice: p.pc.iceConnectionState, conn: p.pc.connectionState, dc: p.dc && p.dc.readyState }))),
       guest: await A.page.evaluate(() => ({ role: Net.role, sig: Net.host && Net.host.pc.signalingState, ice: Net.host && Net.host.pc.iceConnectionState, conn: Net.host && Net.host.pc.connectionState, dc: Net.host && Net.host.dc && Net.host.dc.readyState, open: Net.host && Net.host.open, state: document.getElementById('join-state').textContent })) }) + ')');
     const at1 = await A.page.evaluate(() => ({ guest: document.body.classList.contains('guest'), party: document.getElementById('pan-party').classList.contains('open'), add: document.getElementById('party-add').textContent }));
@@ -5154,6 +5157,12 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     ok(forged.host.ok === false && /not yours to play/.test(forged.host.say) && forged.nobody.ok === false && /Nobody by that name/.test(forged.nobody.say) && b4 === await tale(hp), 'an act for a traveller that is not that phone\'s, or for nobody, is refused with a reason and changes nothing on the host');
     ok(['fly', 'proto', 'ctor'].every((k) => forged[k].ok === false && /does not know that/.test(forged[k].say)) && forged.goals.ok === false && forged.goals.say === 'There is no way there.' && forged.big.timeout === true && b4 === await tale(hp),
       'an act the table does not know (including __proto__ and constructor), goals that are not squares, and a message over the size limit are all refused or ignored, and the tale is untouched');
+    const devB4 = await hp.evaluate(() => Net.peers.map((p) => p.dev + ':' + p.name).join());
+    await A.page.evaluate(() => { document.getElementById('toast').textContent = ''; Net.send(Net.host, { t: 'hello', dev: '<b>x</b> not an id', name: 'Mallory' }); }); await sleep(600);
+    const devAfter = await hp.evaluate(() => Net.peers.map((p) => p.dev + ':' + p.name).join()), helloToast = await A.page.evaluate(() => document.getElementById('toast').textContent), stillMine = await A.page.evaluate((id) => Net.mine(id), samId);
+    ok(devAfter === devB4 && /could not be known/.test(helloToast) && stillMine, 'a phone that calls itself by something that is not a device id is told it cannot be known to the table, and keeps the name and the seat it had');
+    const leaveShown = (pg) => pg.evaluate(() => getComputedStyle(document.querySelector('#menu [data-act="leave"]')).display !== 'none');
+    ok(!(await leaveShown(hp)) && await leaveShown(A.page), '"Leave the table" is on a guest\'s menu and not on the host\'s');
 
     /* talking, by topic, from a guest's phone */
     const talk = await A.page.evaluate(() => { const st = G.st, m = st.maps[st.here], V = visOf(st).g; for (const t of m.tokens) if (t.k === 'npc' && V[t.y * m.w + t.x]) { const T = topicsFor(st, t.npc).find((x) => !x.off && ['gang', 'news'].includes(x.id)); if (T) return { npc: t.npc, topic: T.id, label: T.label }; } return null; });
@@ -5243,6 +5252,9 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     const cross = await raw(A, { a: 'lead', who: kitId });
     const tgtA = await A.page.evaluate(() => { const st = G.st, me = Net.me(), m = st.maps[st.here]; for (let r = 2; r < 7; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const x = me.x + dx, y = me.y + dy; if (inb(m, x, y) && tileFree(m, x, y) && !tokenAt(m, x, y) && !pcAt(st, m, x, y, '') && m.seen[y * m.w + x] && route(st, { id: me.id, pc: true, o: me, m }, [[x, y]], true).ok) return [x, y]; } return null; });
     await A.page.evaluate((t) => go({ goals: [t] }), tgtA); await sleep(300); await hostIdle();
+    const seatsOf = (g) => g.page.evaluate(() => { UI.party(); return [...document.querySelectorAll('#party-list .entry.pc')].map((e) => (e.querySelector('.seat') || { textContent: '-' }).textContent).join('|'); });
+    const seatsA = await seatsOf(A), seatsB = await seatsOf(B);
+    ok(seatsA === '-|Played on this phone|Played on Kit’s phone' && seatsB === '-|Played on Sam’s phone|Played on this phone', 'on each guest\'s sheet its own traveller is "played on this phone" and the other guest\'s is named as the other\'s (' + seatsA + ' / ' + seatsB + ')');
     ok(cross.ok === false && /not yours to play/.test(cross.say) && await same(B) && await B.page.evaluate((id) => { const p = pcOf(G.st, id); return p.x + ',' + p.y; }, samId) === tgtA.join(), 'with two guests at the table, each sees the other\'s walk as the host walks it, and neither can act for the other\'s traveller');
 
     /* a phone that goes: closed, or silent */
