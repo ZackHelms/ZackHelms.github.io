@@ -151,15 +151,11 @@ backlog entry here.
 ## Next
 
 - [cyoa2] **Step 4, multiplayer** (roadmap: `.claude/cyoa2.md` § The road
-  from here), when the CD says go. Not specced: per the standing rule, the
-  session that starts it **asks first**. The questions it needs answered:
-  how other devices join (QR pairing over WebRTC data channels, or a small
-  relay: a page on an iPhone can host no LAN server and use no Bluetooth;
-  assumed from general knowledge, not re-checked); one Game Master and one
-  key on the host, or not; who may move whom, and who holds the narrator;
-  what a player who drops out leaves behind. What does not change: other
-  devices send the SAME intents and the host's engine judges them.
-  Plan-shaped: draft via `/zmh-producer:backlog-plan-gen` once answered.
+  from here). **Answered 2026-10-13** (`.claude/cyoa2.md` § CD decisions, step
+  4): QR pairing in the same room over WebRTC, everything on the host (the Game
+  Master, the keys, the narrator), each device owns its own travellers, and the
+  host takes over a player who drops out. Other devices send the SAME intents
+  and the host's engine judges them.
 - [phasic] Endless launch-board weighting: endless (73+) never draws the
   launch template (block-8 curriculum only, by construction). Decide a
   weighting and wire it in — unblocked 2026-08-29 by the block-8 audition
