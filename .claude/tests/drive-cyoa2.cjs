@@ -2819,6 +2819,8 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
     await page.evaluate(PLAYER);
     const rows = await page.evaluate((N) => {
       const rows = [], row = (c, m) => rows.push([!!c, m]);
+      /* the engine as a tap meets it, except that a throw is an answer a row can name rather than the end of the section */
+      const intent = (st, it) => { try { return window.intent(st, it); } catch (e) { return { ok: false, why: 'threw', say: String(e && e.message) }; } };
       const snap = (st) => JSON.stringify(packState(st)).replace(/"saved":\d+/, '');
       const copy = (st) => unpackState(JSON.parse(JSON.stringify(packState(st))));
       const force = (st, die, v) => { for (let n = st.n.roll; n < st.n.roll + 4000; n++) if (1 + Math.floor(rngFor(st.seed, 'dice', n)() * die) === v) { st.n.roll = n; return true; } return false; };
@@ -3028,7 +3030,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         const g = st.gold, r = ask(st, 'N4', 'w:ledger');
         row(!none && r.ok && st.gold === g + 30 && st.party.every((p) => p.xp === SIDE_XP) && !carries(st, 'the gang’s ledger') && flag(st, 'done:ledger'), 'ledger: the elder cannot be handed a book the party does not have; with it in hand it is worth 30 gold, and it leaves the pack');
         const s2 = seedWith((s) => sideKs(s).includes('ledger'), 'w-ledger-b'), had = flag(s2, 'heard:ledger'); giveItem(leadOf(s2), 'the gang’s ledger'); plotCheck(s2);
-        row(!had && typeof flag(s2, 'heard:ledger') === 'string' && s2.quests[flag(s2, 'heard:ledger')].title === WHISPERS.ledger.title, 'ledger: a party that finds the book before hearing of it learns what it has: the task appears by itself');
+        row(!had && typeof flag(s2, 'heard:ledger') === 'string' && (s2.quests[flag(s2, 'heard:ledger')] || {}).title === WHISPERS.ledger.title, 'ledger: a party that finds the book before hearing of it learns what it has: the task appears by itself');
       }
 
       /* 7. things: what a chest, a desk or a lock offers, and what comes of it */
@@ -3045,8 +3047,8 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         row((far.why === 'far' || thingOf(st, m, open1.id).stand.some((q) => q[0] === L.x && q[1] === L.y)) && bogus.why === 'nothing' && wrong.why === 'noverb' && (far.ok || snap(st) === b0), 'a thing is used from beside it; a thing that is not there, or a deed it does not offer, is refused and changes nothing');
         const c = copy(st); { const Lc = leadOf(c), mc = c.maps.S2, T = thingOf(c, mc, open1.id), q = T.stand.find((z) => !taken(c, mc, z[0], z[1], Lc.id)); Lc.x = q[0]; Lc.y = q[1]; look(c);
           const want = lootOf(c, mc, mc._.byId.get(open1.id)), g = c.gold, t0 = c.time.day * 1440 + c.time.minute, roll = c.n.roll, r = intent(c, { t: 'use', what: open1.id, verb: 'search' }), b = snap(c), again = intent(c, { t: 'use', what: open1.id, verb: 'search' });
-          row(r.ok && r.verb === 'search' && c.gold === g + want.gold && want.items.every((n) => Lc.items.some((x) => itemKey(x.n) === itemKey(n))) && flag(c, 'u:S2:' + open1.id) && c.time.day * 1440 + c.time.minute === t0 + 5 && c.n.roll === roll && r.lines[0].t.includes(want.gold ? want.gold + ' gold' : want.items[0]) && again.why === 'noverb' && snap(c) === b && /\[searched: empty\]/.test(boardDigest(c)),
-            'searching hands over exactly what the seed put there (' + r.lines[0].t + '), takes five minutes and no dice, and can be done once'); }
+          row(r.ok && r.verb === 'search' && c.gold === g + want.gold && want.items.every((n) => Lc.items.some((x) => itemKey(x.n) === itemKey(n))) && flag(c, 'u:S2:' + open1.id) && c.time.day * 1440 + c.time.minute === t0 + 5 && c.n.roll === roll && (r.lines && r.lines[0] ? r.lines[0].t : '').includes(want.gold ? want.gold + ' gold' : want.items[0]) && again.why === 'noverb' && snap(c) === b && /\[searched: empty\]/.test(boardDigest(c)),
+            'searching hands over exactly what the seed put there (' + (r.lines && r.lines[0] ? r.lines[0].t : '-') + '), takes five minutes and no dice, and can be done once'); }
         /* a lock, three ways */
         if (!locked) row(false, 'no locked chest but the strongbox on this seed'); else {
           const mk = () => { const z = copy(st), Lz = leadOf(z), mz = z.maps.S2, T = thingOf(z, mz, locked.id), q = T.stand.find((s) => !taken(z, mz, s[0], s[1], Lz.id)); Lz.x = q[0]; Lz.y = q[1]; look(z); for (const p of z.party) p.items = p.items.filter((x) => !/thieves|crowbar/.test(x.n)); return z; };
@@ -3068,6 +3070,22 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
           row(vk.length === 1 && vk[0].verb === 'unlock' && uk.ok && uk.opened && k.n.roll === nk && flag(k, 'o:S2:' + locked.id) && after === 'search' && /\[can be searched\]/.test(boardDigest(k).split('\n').find((l) => l.includes(locked.id + ' '))), 'with the gang\'s keys a lock is simply opened: no dice, and then the thing can be searched');
           const r = mk(); giveItem(leadOf(r), 'thieves’ tools'); const vr0 = verbsFor(r, locked.id).length; intent(r, { t: 'rounds', op: 'start' });
           row(vr0 === 2 && r.round && verbsFor(r, locked.id).length === 0, 'and in the middle of a round a thing offers nothing at all');
+        }
+        /* a door opened by a deed shows who stands behind it: an inn door, someone the Game Master has turned standing past it */
+        { let hit = null;
+          for (let k = 0; k < 30 && !hit; k++) { const z = party4('doorlook-' + k); intent(z, { t: 'jump', site: 'S1' }); const m0 = z.maps.S1;
+            for (const d of m0.doors) { if (hit || d.ext) continue; const sd = doorSides(d); if (sd.length !== 2) continue;
+              for (const [a, b] of [[sd[0], sd[1]], [sd[1], sd[0]]]) { if (hit) break; const far = [b[0] + (b[0] - a[0]), b[1] + (b[1] - a[1])];
+                if (![a, b, far].every((q) => tileFree(m0, q[0], q[1]) && !tokenAt(m0, q[0], q[1]))) continue;
+                const y = copy(z), my = y.maps.S1, dy = my.doors.find((q) => q.id === d.id), L = leadOf(y); dy.open = false; dy.lock = false; y.met.S1 = []; L.x = a[0]; L.y = a[1];
+                for (const p of y.party) if (p !== L) { const f = freeNear(y, my, L.x, L.y, p.id); p.x = f[0]; p.y = f[1]; }
+                const c = exec(y, 'create_npc', { role: 'bandit', hostile: true, near: far[0] + ',' + far[1] }); if (!c.ok) continue; look(y);
+                const tok = my.tokens.find((t) => t.npc === c.result.id); if (!tok || (y.met.S1 || []).includes(tok.id)) continue;
+                const peek = copy(y); peek.maps.S1.doors.find((q) => q.id === d.id).open = true; if (!look(peek).fresh.includes(tok.id)) continue;
+                hit = { y, id: d.id, tok: tok.id }; } } }
+          const y = hit && hit.y; if (y) { exec(y, 'set_door', { door_id: hit.id, locked: true }); force(y, 20, 20); }
+          const r = y ? intent(y, { t: 'use', what: hit.id, verb: 'pick' }) : {};
+          row(hit && r.ok && r.opened && (r.spotted || []).includes(hit.tok), 'a door picked open shows at once who stands behind it, so the table can answer them as it would anyone seen' + (hit && r.ok && r.opened && (r.spotted || []).includes(hit.tok) ? '' : ' [' + JSON.stringify({ hit: !!hit, ok: r.ok, why: r.why, say: r.say, opened: r.opened, sp: r.spotted, tok: hit && hit.tok }) + ']'));
         }
         /* the gang's keys are for the gang's locks: a door in town locked by the Game Master (no generator locks one there) */
         { const z = party4('keys-town'), m = z.maps[z.here], L = leadOf(z);
@@ -3257,7 +3275,7 @@ const ok = (c, m) => { if (c) { good++; console.log('  ok   ' + m); } else fail(
         { const st = party4('settle-1'), k = sideKs(st)[0], x0 = st.party.map((p) => p.xp); st.party[3].status = 'dead'; hearWhisper(st, k);
           const o1 = { lines: [] }; settleWhisper(st, k, o1); const x1 = st.party.map((p) => p.xp), g1 = st.gold, f1 = st.facts.length, q1 = Object.values(st.quests).filter((q) => q.status === 'done').length;
           const o2 = { lines: [] }; settleWhisper(st, k, o2);
-          row(x1.slice(0, 3).every((x, i) => x - x0[i] === 75) && x1[3] === x0[3] && o1.lines.length >= 2 && o2.lines.length === 0 && st.party.map((p) => p.xp).join() === x1.join() && st.gold === g1 && st.facts.length === f1 && Object.values(st.quests).filter((q) => q.status === 'done').length === q1 && st.quests[flag(st, 'heard:' + k)].status === 'done',
+          row(x1.slice(0, 3).every((x, i) => x - x0[i] === 75) && x1[3] === x0[3] && o1.lines.length >= 2 && o2.lines.length === 0 && st.party.map((p) => p.xp).join() === x1.join() && st.gold === g1 && st.facts.length === f1 && Object.values(st.quests).filter((q) => q.status === 'done').length === q1 && (st.quests[flag(st, 'heard:' + k)] || {}).status === 'done',
             'a whisper settled closes its task and pays 75 experience to each traveller still alive and none to the dead, once: settled again it pays nothing, says nothing and records nothing (' + k + ')'); }
         /* a whisper heard: one task, and a fact */
         { const st = party4('hear-1'), k = sideKs(st)[0], q1 = hearWhisper(st, k), n1 = Object.keys(st.quests).length, q2 = hearWhisper(st, k);
